@@ -25,6 +25,7 @@ import requests
 from getpass import getuser
 from tests.common.custom_cluster_test_suite import CustomClusterTestSuite
 from tests.util.hdfs_util import NAMENODE
+from tests.util.calculation_util import get_random_id
 
 ADMIN = "admin"
 RANGER_AUTH = ("admin", "admin")
@@ -34,6 +35,10 @@ IMPALAD_ARGS = "--server-name=server1 --ranger_service_type=hive " \
 CATALOGD_ARGS = "--server-name=server1 --ranger_service_type=hive " \
                 "--ranger_app_id=impala --authorization_provider=ranger"
 
+LOCAL_CATALOG_IMPALAD_ARGS = "--server-name=server1 --ranger_service_type=hive " \
+    "--ranger_app_id=impala --authorization_provider=ranger --use_local_catalog=true"
+LOCAL_CATALOG_CATALOGD_ARGS = "--server-name=server1 --ranger_service_type=hive " \
+    "--ranger_app_id=impala --authorization_provider=ranger --catalog_topic_mode=minimal"
 
 class TestRanger(CustomClusterTestSuite):
   """
@@ -545,6 +550,14 @@ class TestRanger(CustomClusterTestSuite):
     if statement is not None:
       self.execute_query_expect_success(client, statement)
 
+  def _run_query_as_user(self, query, username, expect_success):
+    """Helper to run an input query as a given user."""
+    impala_client = self.create_impala_client()
+    if expect_success:
+      return self.execute_query_expect_success(
+          impala_client, query, user=username, query_options={'sync_ddl': 1})
+    return self.execute_query_expect_failure(impala_client, query, user=username)
+
   @CustomClusterTestSuite.with_args(
     impalad_args=IMPALAD_ARGS, catalogd_args=CATALOGD_ARGS)
   def test_unsupported_sql(self):
@@ -619,3 +632,87 @@ class TestRanger(CustomClusterTestSuite):
       else:
         assert "Error revoking a privilege in Ranger. Ranger error message: " \
                "HTTP 403 Error: Grantee group invalid_group doesn't exist" in str(result)
+
+  @CustomClusterTestSuite.with_args(
+    impalad_args=IMPALAD_ARGS, catalogd_args=CATALOGD_ARGS)
+  def test_legacy_catalog_ownership(self):
+      self._test_ownership()
+
+  @CustomClusterTestSuite.with_args(impalad_args=LOCAL_CATALOG_IMPALAD_ARGS,
+    catalogd_args=LOCAL_CATALOG_CATALOGD_ARGS)
+  def test_local_catalog_ownership(self):
+      # getTableIfCached() in LocalCatalog loads a minimal incomplete table
+      # that does not include the ownership information. Hence show tables
+      # *never* show owned tables. TODO(bharathv): Fix in a follow up commit
+      pytest.xfail("getTableIfCached() faulty behavior, known issue")
+      self._test_ownership()
+
+  def _test_ownership(self):
+    """Tests ownership privileges for databases and tables with ranger along with
+    some known quirks in the implementation."""
+    test_user = getuser()
+    test_db = "test_ranger_ownership_" + get_random_id(5).lower()
+    # Create a test database as "admin" user. Owner is set accordingly.
+    self._run_query_as_user("create database {}".format(test_db), ADMIN, True)
+    try:
+      # Try to create a table under test_db as current user. It should fail.
+      self._run_query_as_user(
+          "create table {}.foo(a int)".format(test_db), test_user, False)
+      # Change the owner of the database to the current user.
+      self._run_query_as_user(
+          "alter database {} set owner user {}".format(test_db, test_user), ADMIN, True)
+      # Try creating a table under it again. It should still fail due to lack of ownership
+      # privileges
+      self._run_query_as_user(
+          "create table {}.foo(a int)".format(test_db), test_user, False)
+      # Create ranger ownership poicy for the current user on test_db.
+      resource = {
+        "database": test_db,
+        "column": "*",
+        "table": "*"
+      }
+      access = ["create", "select"]
+      TestRanger._grant_ranger_privilege("{OWNER}", resource, access)
+      self._run_query_as_user("refresh authorization", ADMIN, True)
+      try:
+        # Create should succeed now.
+        self._run_query_as_user(
+            "create table {}.foo(a int)".format(test_db), test_user, True)
+        # Run show tables on the db. The resulting list should be empty. This happens
+        # because the created table's ownership information is not aggresively cached
+        # by the current Catalog implementations. Hence the analysis pass does not
+        # have access to the ownership information to verify if the current session
+        # user is actually the owner. We need to fix this by caching the HMS metadata
+        # more aggressively when the table loads. TODO(IMPALA-8937).
+        result =\
+            self._run_query_as_user("show tables in {}".format(test_db), test_user, True)
+        assert len(result.data) == 0
+        # Run a simple query that warms up the table metadata and repeat SHOW TABLES.
+        self._run_query_as_user("select * from {}.foo".format(test_db), test_user, True)
+        result =\
+            self._run_query_as_user("show tables in {}".format(test_db), test_user, True)
+        assert len(result.data) == 1
+        assert "foo" in result.data
+        # Change the owner of the db back to the admin user
+        self._run_query_as_user(
+            "alter database {} set owner user {}".format(test_db, ADMIN), ADMIN, True)
+        result =\
+            self._run_query_as_user("show tables in {}".format(test_db), test_user, False)
+        err = "User '{}' does not have privileges to access: {}.*.*".\
+            format(test_user, test_db)
+        assert err in str(result)
+        # test_user is still the owner of the table, so select should work fine.
+        self._run_query_as_user("select * from {}.foo".format(test_db), test_user, True)
+        # Change the table owner back to admin.
+        self._run_query_as_user(
+            "alter table {}.foo set owner user {}".format(test_db, ADMIN), ADMIN, True)
+        # test_user should not be authorized to run the queries anymore.
+        result = self._run_query_as_user(
+            "select * from {}.foo".format(test_db), test_user, False)
+        err = ("AuthorizationException: User '{}' does not have privileges to execute" +
+            " 'SELECT' on: {}.foo").format(test_user, test_db)
+        assert err in str(result)
+      finally:
+        TestRanger._revoke_ranger_privilege("{OWNER}", resource, access)
+    finally:
+      self._run_query_as_user("drop database {} cascade".format(test_db), ADMIN, True)

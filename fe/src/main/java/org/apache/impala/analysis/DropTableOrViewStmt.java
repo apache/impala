@@ -107,16 +107,20 @@ public class DropTableOrViewStmt extends StatementBase {
     // available in the toThrift() method.
     serverName_ = analyzer.getServerName();
     try {
+      // Fetch the table owner information, without registering any privileges.
+      FeTable table = analyzer.getTableNoThrow(dbName_, tableName_.getTbl());
+      String tblOwnerUser = table == null ? null : table.getOwnerUser();
       if (ifExists_) {
         // Start with ANY privilege in case of IF EXISTS, and register DROP privilege
         // later only if the table exists. See IMPALA-8851 for more explanation.
         analyzer.registerPrivReq(builder ->
             builder.allOf(Privilege.ANY)
-                .onTable(dbName_, getTbl())
-                .build());
-        if (!analyzer.tableExists(tableName_)) return;
+            .onTable(dbName_, getTbl(), tblOwnerUser)
+            .build());
+        if (table == null) return;
       }
-      FeTable table = analyzer.getTable(tableName_, /* add access event */ true,
+      // Register the DROP privilege on the table.
+      table = analyzer.getTable(tableName_, /* add access event */ true,
           /* add column-level privilege */ false, Privilege.DROP);
       Preconditions.checkNotNull(table);
       if (table instanceof FeView && dropTable_) {

@@ -580,7 +580,7 @@ public class SelectStmt extends QueryStmt {
             analyzer_.registerPrivReq(builder -> builder
                 .allOf(Privilege.SELECT)
                 .onColumn(view.getDb().getName(), view.getName(),
-                    slotRef.getDesc().getLabel())
+                    slotRef.getDesc().getLabel(), view.getOwnerUser())
                 .build());
           }
         }

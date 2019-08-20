@@ -17,6 +17,8 @@
 
 package org.apache.impala.authorization;
 
+import javax.annotation.Nullable;
+
 import com.google.common.base.Preconditions;
 import com.google.common.base.Strings;
 
@@ -26,12 +28,15 @@ import com.google.common.base.Strings;
 public class AuthorizableTable extends Authorizable {
   private final String dbName_;
   private final String tableName_;
+  @Nullable // Is null if the owner is not set.
+  private final String ownerUser_;
 
-  public AuthorizableTable(String dbName, String tableName) {
+  public AuthorizableTable(String dbName, String tableName, @Nullable String ownerUser) {
     Preconditions.checkArgument(!Strings.isNullOrEmpty(dbName));
     Preconditions.checkArgument(!Strings.isNullOrEmpty(tableName));
     dbName_ = dbName;
     tableName_ = tableName;
+    ownerUser_ = ownerUser;
   }
 
   @Override
@@ -48,4 +53,7 @@ public class AuthorizableTable extends Authorizable {
 
   @Override
   public String getFullTableName() { return getName(); }
+
+  @Override
+  public String getOwnerUser() { return ownerUser_; }
 }

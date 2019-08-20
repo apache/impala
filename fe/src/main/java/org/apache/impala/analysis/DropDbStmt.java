@@ -71,16 +71,20 @@ public class DropDbStmt extends StatementBase {
     // Set the servername here if authorization is enabled because analyzer_ is not
     // available in the toThrift() method.
     serverName_ = analyzer.getServerName();
+    // Fetch the owner information if the db exists.
+    FeDb db = analyzer.getDb(dbName_, /*ThrowIfNotExists*/ false);
+    String ownerUser = db == null ? null : db.getOwnerUser();
     if (ifExists_) {
       // Start with ANY privilege in case of IF EXISTS, and register DROP privilege
       // later only if the database exists. See IMPALA-8851 for more explanation.
       analyzer.registerPrivReq(builder ->
           builder.allOf(Privilege.ANY)
-              .onDb(dbName_)
+              .onDb(dbName_, ownerUser)
               .build());
       if (!analyzer.dbExists(dbName_)) return;
     }
-    FeDb db = analyzer.getDb(dbName_, Privilege.DROP, false, false);
+    // Register the DROP privilege request.
+    db = analyzer.getDb(dbName_, Privilege.DROP, false, false);
     if (db == null && !ifExists_) {
       throw new AnalysisException(Analyzer.DB_DOES_NOT_EXIST_ERROR_MSG + dbName_);
     }

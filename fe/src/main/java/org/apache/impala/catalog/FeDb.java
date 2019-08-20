@@ -128,4 +128,9 @@ public interface FeDb extends HasName {
    * Create a target FS table object for CTAS.
    */
   FeFsTable createFsCtasTarget(Table msTbl) throws CatalogException;
+
+  /**
+   * @return the owner user for this database. Returns null if one does not exist.
+   */
+  String getOwnerUser();
 }

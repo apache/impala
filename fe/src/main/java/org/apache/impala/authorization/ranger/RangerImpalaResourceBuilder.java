@@ -58,5 +58,10 @@ public class RangerImpalaResourceBuilder {
     return this;
   }
 
+  public RangerImpalaResourceBuilder owner(String ownerUser) {
+    rangerAccessResource.setOwnerUser(ownerUser);
+    return this;
+  }
+
   public RangerAccessResourceImpl build() { return rangerAccessResource; }
 }

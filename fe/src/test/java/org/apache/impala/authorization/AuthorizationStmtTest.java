@@ -17,6 +17,7 @@
 
 package org.apache.impala.authorization;
 
+import com.google.common.collect.ImmutableMap;
 import com.google.common.collect.Sets;
 import org.apache.commons.lang.ArrayUtils;
 import org.apache.impala.analysis.AnalysisContext;
@@ -26,6 +27,7 @@ import org.apache.impala.catalog.Type;
 import org.apache.impala.common.AnalysisException;
 import org.apache.impala.common.ImpalaException;
 import org.apache.impala.common.RuntimeEnv;
+import org.apache.impala.testutil.TestUtils;
 import org.apache.impala.thrift.TDescribeOutputStyle;
 import org.apache.impala.thrift.TPrivilegeLevel;
 import org.apache.impala.thrift.TQueryOptions;
@@ -38,12 +40,16 @@ import org.junit.Test;
 import org.junit.runner.RunWith;
 import org.junit.runners.Parameterized;
 import org.junit.runners.Parameterized.Parameters;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collection;
 import java.util.HashSet;
 import java.util.List;
+import java.util.regex.Matcher;
+import java.util.regex.Pattern;
 import java.util.Set;
 
 import static org.junit.Assert.assertEquals;
@@ -54,6 +60,7 @@ import static org.junit.Assert.assertTrue;
  */
 @RunWith(Parameterized.class)
 public class AuthorizationStmtTest extends AuthorizationTestBase {
+  public static final Logger LOG = LoggerFactory.getLogger(AuthorizationStmtTest.class);
   public AuthorizationStmtTest(AuthorizationProvider authzProvider)
       throws ImpalaException {
     super(authzProvider);
@@ -3045,6 +3052,170 @@ public class AuthorizationStmtTest extends AuthorizationTestBase {
       } finally {
         deleteRangerPolicy(policyName);
       }
+    }
+  }
+
+  /**
+   * Validates Ranger's object ownership privileges.
+   */
+  @Test
+  public void testRangerObjectOwnership() throws Exception {
+    if (authzProvider_ == AuthorizationProvider.SENTRY) return;
+    // Out of the box there are no privileges for the owner on functional db.
+    // So the following set of queries should fail with authz failures.
+    // Maps from a query to the corresponding authz error.
+    ImmutableMap<AuthzTest, String> testQueries = ImmutableMap
+        .<AuthzTest, String>builder()
+        .put(authorize("select count(*) from functional.alltypes"),
+            selectError("functional.alltypes"))
+        .put(authorize("select id from functional.alltypes"),
+            selectError("functional.alltypes"))
+        .put(authorize("select id from functional.alltypes_view"),
+            selectError("functional.alltypes_view"))
+        .put(authorize("show create table functional.alltypes"),
+            accessError("functional.alltypes"))
+        .put(authorize("describe functional.alltypes"),
+            accessError("functional.alltypes"))
+        .put(authorize("show create table functional.alltypes_view"),
+            accessError("functional.alltypes_view"))
+        .put(authorize("describe functional.alltypes_view"),
+            accessError("functional.alltypes_view"))
+        .put(authorize("describe functional.allcomplextypes.int_struct_col"),
+            accessError("functional.allcomplextypes"))
+        .put(authorize("refresh functional.alltypes"),
+            refreshError("functional.alltypes"))
+        .put(authorize("invalidate metadata functional.alltypes"),
+            refreshError("functional.alltypes"))
+        .put(authorize("compute stats functional.alltypes"),
+            alterError("functional.alltypes"))
+        .put(authorize("drop stats functional.alltypes"),
+            alterError("functional.alltypes"))
+        .put(authorize("create table functional.test_tbl(a int)"),
+            createError("functional"))
+        .put(authorize("create table functional.test_tbl like functional.alltypes"),
+            accessError("functional.alltypes"))
+        .put(authorize("create table functional.test_tbl as select 1"),
+            createError("functional"))
+        .put(authorize("create view functional.test_view as select 1"),
+            createError("functional"))
+        .put(authorize("alter table functional.alltypes add column c1 int"),
+            alterError("functional"))
+        .put(authorize("drop table functional.alltypes"),
+            dropError("functional"))
+        .put(authorize("drop view functional.alltypes_view"),
+            dropError("functional"))
+        .put(authorize("alter view functional.alltypes_view as select 1"),
+            alterError("functional.alltypes_view"))
+        .put(authorize("alter database functional set owner user foo"),
+            accessError(true, "functional"))
+        .build();
+    // Run the queries.
+    for (AuthzTest authz: testQueries.keySet()) authz.error(testQueries.get(authz));
+    // Grant ALL privileges on functional db to it's owner. All the above queries
+    // should be authorized now, since we are running as the owner of the db and
+    // ownership should be translated to the tables underneath.
+    String policyName = "functional_owner_" + TestUtils.getRandomString(5);
+    createOwnerPolicy(policyName, "ALL", "functional", "*", "*");
+    try {
+      rangerImpalaPlugin_.refreshPoliciesAndTags();
+      for (AuthzTest authz: testQueries.keySet()) authz.ok();
+    } finally {
+      deleteRangerPolicy(policyName);
+    }
+    rangerImpalaPlugin_.refreshPoliciesAndTags();
+    // Tests for more fine grained {OWNER} privileges.
+    //
+    // SELECT privilege.
+    // With default privileges, select on both alltypes/alltypes_view should fail.
+    authorize("select count(*) from functional.alltypes")
+        .error(selectError("functional.alltypes"));
+    authorize("select count(*) from functional.alltypes")
+        .error(selectError("functional.alltypes"));
+    policyName = "functional_owner_alltypes" + TestUtils.getRandomString(5);
+    createOwnerPolicy(policyName, "SELECT", "functional", "alltypes", "*");
+    rangerImpalaPlugin_.refreshPoliciesAndTags();
+    // With the new privileges, only the first query should pass. Also,
+    // any other non-SELECT on functional.alltypes should fail.
+    try {
+      authorize("select count(*) from functional.alltypes").ok();
+      authorize("alter table functional.alltypes add column c1 int")
+          .error(alterError("functional"));
+      authorize("drop table functional.alltypes")
+          .error(dropError("functional"));
+      authorize("select count(*) from functional.alltypes_view")
+          .error(selectError("functional.alltypes_view"));
+    } finally {
+      deleteRangerPolicy(policyName);
+    }
+  }
+
+  private void createOwnerPolicy(String policyName, String privilege,
+      String db, String tbl, String col) throws Exception {
+    // Template policy that grants privileges on a given db/tbl/column to it's
+    // owner.
+    final String createOwnerPolicyTemplate = "{\n" +
+        "    \"isAuditEnabled\": true,\n" +
+        "    \"isDenyAllElse\": false,\n" +
+        "    \"isEnabled\": true,\n" +
+        "    \"name\": \"%s\",\n" + // policy name
+        "    \"policyItems\": [\n" +
+        "        {\n" +
+        "            \"accesses\": [\n" +
+        "                {\n" +
+        "                    \"isAllowed\": true,\n" +
+        "                    \"type\": \"%s\"\n" + // privilege to grant
+        "                }\n" +
+        "            ],\n" +
+        "            \"delegateAdmin\": false,\n" +
+        "            \"users\": [\n" +
+        "                \"{OWNER}\"\n" + // {OWNER} access
+        "            ]\n" +
+        "        }\n" +
+        "    ],\n" +
+        "    \"policyPriority\": 0,\n" +
+        "    \"policyType\": 0,\n" +
+        "    \"resources\": {\n" +
+        "        \"column\": {\n" +
+        "            \"isExcludes\": false,\n" +
+        "            \"isRecursive\": false,\n" +
+        "           \"values\": [\n" +
+        "               \"%s\"\n" +  // column name
+        "           ]\n" +
+        "        },\n" +
+        "        \"database\": {\n" +
+        "            \"isExcludes\": false,\n" +
+        "            \"isRecursive\": false,\n" +
+        "            \"values\": [\n" +
+        "                \"%s\"\n" + // database name
+        "            ]\n" +
+        "        },\n" +
+        "        \"table\": {\n" +
+        "            \"isExcludes\": false,\n" +
+        "            \"isRecursive\": false,\n" +
+        "            \"values\": [\n" +
+        "                \"%s\"\n" +  // table name
+        "            ]\n" +
+        "        }\n" +
+        "    },\n" +
+        "    \"service\": \"%s\",\n" + // service name
+        "    \"serviceType\": \"%s\"\n" + // service type
+        "}";
+    String policyRequest = String.format(createOwnerPolicyTemplate,
+        policyName, privilege, col, db, tbl, RANGER_SERVICE_NAME, RANGER_SERVICE_TYPE);
+    // Some old policies may exist on the same db/tbl/col combination due to other test
+    // runs. We clean them up and retry in that case.
+    try {
+      createRangerPolicy(policyName, policyRequest);
+    } catch (RuntimeException e) {
+      if (!e.getMessage().contains("Another policy already exists")) throw e;
+      LOG.info("Another policy exists for the given resource, deleting it", e);
+      // Look for policy-name=[*]
+      Pattern pattern = Pattern.compile("policy-name=\\[(.*?)\\]");
+      Matcher m = pattern.matcher(e.getMessage());
+      assertTrue(m.find());
+      LOG.info("Deleting policy: " + m.group(1));
+      deleteRangerPolicy(m.group(1));
+      createRangerPolicy(policyName, policyRequest);
     }
   }
 

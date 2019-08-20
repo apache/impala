@@ -587,6 +587,12 @@ public abstract class Table extends CatalogObjectImpl implements FeTable {
     return msTable_;
   }
 
+  @Override // FeTable
+  public String getOwnerUser() {
+    if (msTable_ == null) return null;
+    return msTable_.getOwner();
+  }
+
   public void setMetaStoreTable(org.apache.hadoop.hive.metastore.api.Table msTbl) {
     msTable_ = msTbl;
     CatalogInterners.internFieldsInPlace(msTable_);

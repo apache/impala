@@ -17,6 +17,8 @@
 
 package org.apache.impala.authorization;
 
+import javax.annotation.Nullable;
+
 /**
  * An interface to create a factory class for creating instances of
  * {@link Authorizable}s.
@@ -29,33 +31,36 @@ public interface AuthorizableFactory {
   Authorizable newServer(String serverName);
 
   /**
-   * Creates a new instance of database {@link Authorizable} for a given database name.
+   * Creates a new instance of database {@link Authorizable} for a given database name
+   * owned by a given user.
    */
-  Authorizable newDatabase(String dbName);
+  Authorizable newDatabase(String dbName, @Nullable String ownerUser);
 
   /**
    * Creates a new instance of table {@link Authorizable} for given database and table
-   * names.
+   * names owned by a given user.
    */
-  Authorizable newTable(String dbName, String tableName);
+  Authorizable newTable(String dbName, String tableName, @Nullable String ownerUser);
 
   /**
    * Creates a new instance of column {@link Authorizable} for a given database name and
-   * gives access to all tables and columns.
+   * it's owner and gives access to all tables and columns.
    */
-  Authorizable newColumn(String dbName);
+  Authorizable newColumnAllTbls(String dbName, @Nullable String dbOwnerUser);
 
   /**
    * Creates a new instance of column {@link Authorizable} for given database and table
-   * names and gives access to all columns.
+   * name and it's owner and gives access to all columns.
    */
-  Authorizable newColumn(String dbName, String tableName);
+  Authorizable newColumnInTable(
+      String dbName, String tableName, @Nullable String tblOwnerUser);
 
   /**
    * Creates a new instance of column {@link Authorizable} for given database, table, and
-   * column names.
+   * column names. 'tblOwnerUser' is the owner of the table that has this column.
    */
-  Authorizable newColumn(String dbName, String tableName, String columnName);
+  Authorizable newColumnInTable(
+      String dbName, String tableName, String columnName, @Nullable String tblOwnerUser);
 
   /**
    * Creates a new instance of URI {@link Authorizable} for a given URI.

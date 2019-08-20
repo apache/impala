@@ -100,18 +100,20 @@ public class RangerAuthorizationChecker extends BaseAuthorizationChecker {
       case DB:
         resources.add(new RangerImpalaResourceBuilder()
             .database(authorizable.getDbName())
+            .owner(authorizable.getOwnerUser())
             .build());
         break;
       case TABLE:
         resources.add(new RangerImpalaResourceBuilder()
             .database(authorizable.getDbName())
             .table(authorizable.getTableName())
+            .owner(authorizable.getOwnerUser())
             .build());
         break;
       case COLUMN:
         RangerImpalaResourceBuilder builder = new RangerImpalaResourceBuilder();
         builder.database(authorizable.getDbName());
-        // * in Ranger means "all". For example to check access for all columns, we need
+        // * in Ranger means "all". For example, to check access for all columns, we need
         // to create a request, such as:
         // [server=server1, database=foo, table=bar, column=*]
         //
@@ -131,6 +133,7 @@ public class RangerAuthorizationChecker extends BaseAuthorizationChecker {
           !DefaultAuthorizableFactory.ALL.equals(authorizable.getColumnName())) {
           builder.column(authorizable.getColumnName());
         }
+        builder.owner(authorizable.getOwnerUser());
         resources.add(builder.build());
         break;
       case FUNCTION:

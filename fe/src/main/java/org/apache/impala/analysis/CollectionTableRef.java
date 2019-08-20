@@ -107,8 +107,8 @@ public class CollectionTableRef extends TableRef {
       analyzer.registerPrivReq(builder ->
           builder.allOf(Privilege.SELECT)
               .onColumn(desc_.getTableName().getDb(), desc_.getTableName().getTbl(),
-                  desc_.getPath().getRawPath().get(0))
-              .build());
+                  desc_.getPath().getRawPath().get(0),
+                  resolvedPath_.getRootTable().getOwnerUser()).build());
     }
     isAnalyzed_ = true;
     analyzeTableSample(analyzer);

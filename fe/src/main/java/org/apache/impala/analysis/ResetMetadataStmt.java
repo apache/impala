@@ -22,6 +22,7 @@ import java.util.List;
 import com.google.common.annotations.VisibleForTesting;
 import org.apache.impala.authorization.Privilege;
 import org.apache.impala.authorization.User;
+import org.apache.impala.catalog.FeDb;
 import org.apache.impala.catalog.FeTable;
 import org.apache.impala.catalog.TableLoadingException;
 import org.apache.impala.common.AnalysisException;
@@ -44,6 +45,7 @@ import com.google.common.base.Preconditions;
  * REFRESH AUTHORIZATION
  */
 public class ResetMetadataStmt extends StatementBase {
+
   public enum Action {
     INVALIDATE_METADATA_ALL(false),
     INVALIDATE_METADATA_TABLE(false),
@@ -125,7 +127,6 @@ public class ResetMetadataStmt extends StatementBase {
 
   @Override
   public void collectTableRefs(List<TableRef> tblRefs) {
-    // Only need table metadata for REFRESH <tbl> PARTITION (<partition>)
     if (tableName_ != null && partitionSpec_ != null) {
       tblRefs.add(new TableRef(tableName_.toPath(), null));
     }
@@ -168,11 +169,17 @@ public class ResetMetadataStmt extends StatementBase {
             partitionSpec_.analyze(analyzer);
           }
         } else {
+          FeTable tbl = analyzer.getTableNoThrow(dbName, tableName_.getTbl());
           // Verify the user has privileges to access this table.
-          analyzer.registerPrivReq(builder ->
-              builder.onTable(dbName, tableName_.getTbl())
-                  .allOf(Privilege.REFRESH)
-                  .build());
+          if (tbl == null) {
+            analyzer.registerPrivReq(builder ->
+                builder.onTableUnknownOwner(
+                  dbName, tableName_.getTbl()).allOf(Privilege.REFRESH).build());
+          } else {
+            analyzer.registerPrivReq(
+                builder -> builder.onTable(dbName, tableName_.getTbl(),
+                  tbl.getOwnerUser()).allOf(Privilege.REFRESH).build());
+          }
         }
         break;
       case REFRESH_AUTHORIZATION:
@@ -186,8 +193,10 @@ public class ResetMetadataStmt extends StatementBase {
                 .build());
         break;
       case REFRESH_FUNCTIONS:
+        FeDb db = analyzer.getDb(database_, /*throwIfDoesNotExist*/ false);
+        String dbOwner = db == null ? null : db.getOwnerUser();
         analyzer.registerPrivReq(builder ->
-            builder.onDb(database_)
+            builder.onDb(database_, dbOwner)
                 .allOf(Privilege.REFRESH)
                 .build());
         break;

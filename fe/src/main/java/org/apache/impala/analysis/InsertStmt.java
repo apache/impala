@@ -425,9 +425,7 @@ public class InsertStmt extends StatementBase {
     } else {
       targetTableName_ = new TableName(table_.getDb().getName(), table_.getName());
       analyzer.registerPrivReq(builder ->
-          builder.onTable(table_.getDb().getName(), table_.getName())
-              .allOf(privilegeRequired)
-              .build());
+          builder.onTable(table_).allOf(privilegeRequired).build());
     }
 
     // We do not support (in|up)serting into views.

@@ -99,6 +99,9 @@ public class BuiltinsDb extends Db {
         BUILTINS_DB_COMMENT, "", Collections.<String,String>emptyMap());
   }
 
+  @Override // FeDb
+  public String getOwnerUser() { return null; }
+
   private static final Map<Type, String> SAMPLE_INIT_SYMBOL =
       ImmutableMap.<Type, String>builder()
         .put(Type.BOOLEAN,

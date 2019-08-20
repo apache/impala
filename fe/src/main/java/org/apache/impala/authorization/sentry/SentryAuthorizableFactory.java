@@ -31,33 +31,40 @@ public class SentryAuthorizableFactory implements AuthorizableFactory {
   }
 
   @Override
-  public Authorizable newDatabase(String dbName) {
+  public Authorizable newDatabase(String dbName, String ownerUser) {
+    // Sentry works with OWNER privilege. Hence ownerUser is ignored.
     Preconditions.checkNotNull(dbName);
     return new SentryAuthorizableDb(dbName);
   }
 
   @Override
-  public Authorizable newTable(String dbName, String tableName) {
+  public Authorizable newTable(String dbName, String tableName, String ownerUser) {
+    // Sentry works with OWNER privilege. Hence ownerUser is ignored.
     Preconditions.checkNotNull(dbName);
     Preconditions.checkNotNull(tableName);
     return new SentryAuthorizableTable(dbName, tableName);
   }
 
   @Override
-  public Authorizable newColumn(String dbName) {
+  public Authorizable newColumnAllTbls(String dbName, String dbOwnerUser) {
+    // Sentry works with OWNER privilege. Hence ownerUser is ignored.
     Preconditions.checkNotNull(dbName);
     return new SentryAuthorizableColumn(dbName);
   }
 
   @Override
-  public Authorizable newColumn(String dbName, String tableName) {
+  public Authorizable newColumnInTable(
+      String dbName, String tableName, String dbOwnerUser) {
+    // Sentry works with OWNER privilege. Hence ownerUser is ignored.
     Preconditions.checkNotNull(dbName);
     Preconditions.checkNotNull(tableName);
     return new SentryAuthorizableColumn(dbName, tableName);
   }
 
   @Override
-  public Authorizable newColumn(String dbName, String tableName, String columnName) {
+  public Authorizable newColumnInTable(
+      String dbName, String tableName, String columnName, String tblOwnerUser) {
+    // Sentry works with OWNER privilege. Hence ownerUser is ignored.
     Preconditions.checkNotNull(dbName);
     Preconditions.checkNotNull(tableName);
     Preconditions.checkNotNull(columnName);

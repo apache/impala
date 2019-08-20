@@ -31,37 +31,39 @@ public class DefaultAuthorizableFactory implements AuthorizableFactory {
   }
 
   @Override
-  public Authorizable newDatabase(String dbName) {
+  public Authorizable newDatabase(String dbName, String ownerUser) {
     Preconditions.checkNotNull(dbName);
-    return new AuthorizableDb(dbName);
+    return new AuthorizableDb(dbName, ownerUser);
   }
 
   @Override
-  public Authorizable newTable(String dbName, String tableName) {
-    Preconditions.checkNotNull(dbName);
-    Preconditions.checkNotNull(tableName);
-    return new AuthorizableTable(dbName, tableName);
-  }
-
-  @Override
-  public Authorizable newColumn(String dbName) {
-    Preconditions.checkNotNull(dbName);
-    return new AuthorizableColumn(dbName, ALL, ALL);
-  }
-
-  @Override
-  public Authorizable newColumn(String dbName, String tableName) {
+  public Authorizable newTable(String dbName, String tableName, String ownerUser) {
     Preconditions.checkNotNull(dbName);
     Preconditions.checkNotNull(tableName);
-    return new AuthorizableColumn(dbName, tableName, ALL);
+    return new AuthorizableTable(dbName, tableName, ownerUser);
   }
 
   @Override
-  public Authorizable newColumn(String dbName, String tableName, String columnName) {
+  public Authorizable newColumnAllTbls(String dbName, String dbOwnerUser) {
+    Preconditions.checkNotNull(dbName);
+    return new AuthorizableColumn(dbName, ALL, ALL, dbOwnerUser);
+  }
+
+  @Override
+  public Authorizable newColumnInTable(
+      String dbName, String tableName, String tblOwnerUser) {
+    Preconditions.checkNotNull(dbName);
+    Preconditions.checkNotNull(tableName);
+    return new AuthorizableColumn(dbName, tableName, ALL, tblOwnerUser);
+  }
+
+  @Override
+  public Authorizable newColumnInTable(
+      String dbName, String tableName, String columnName, String tblOwnerUser) {
     Preconditions.checkNotNull(dbName);
     Preconditions.checkNotNull(tableName);
     Preconditions.checkNotNull(columnName);
-    return new AuthorizableColumn(dbName, tableName, columnName);
+    return new AuthorizableColumn(dbName, tableName, columnName, tblOwnerUser);
   }
 
   @Override

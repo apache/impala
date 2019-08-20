@@ -17,8 +17,10 @@
 
 package org.apache.impala.authorization;
 
+import java.util.Objects;
 import java.util.List;
 
+import com.google.common.base.Strings;
 /*
  * Abstract class representing an authorizable object (Table, Db, Column, etc).
  */
@@ -53,13 +55,25 @@ public abstract class Authorizable {
   // Returns the function name if applicable, null otherwise.
   public String getFnName() { return null; }
 
+  // Returns the owner for this authorizable if applicable, null otherwise.
+  // Currently, ownership is applicable only for database and table objects.
+  // Only used by RangerAuthorizationChecker.
+  public String getOwnerUser() { return null; }
+
   @Override
-  public int hashCode() { return getName().hashCode(); }
+  public int hashCode() {
+    int ownerHash = getOwnerUser() == null ? 0 : getOwnerUser().hashCode();
+    int nameHash = getName().hashCode();
+    return nameHash * 31 + ownerHash;
+  }
 
   @Override
   public boolean equals(Object o) {
     if (o == null) return false;
     if (o.getClass() != this.getClass()) return false;
-    return ((Authorizable) o).getName().equals(this.getName());
+    Authorizable temp = (Authorizable) o;
+    return temp.getName().equals(this.getName())
+        && Strings.nullToEmpty(temp.getOwnerUser()).equals(
+            Strings.nullToEmpty(this.getOwnerUser()));
   }
 }

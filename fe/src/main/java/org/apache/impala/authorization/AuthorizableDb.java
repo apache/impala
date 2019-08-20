@@ -17,6 +17,8 @@
 
 package org.apache.impala.authorization;
 
+import javax.annotation.Nullable;
+
 import com.google.common.base.Preconditions;
 import com.google.common.base.Strings;
 
@@ -25,10 +27,13 @@ import com.google.common.base.Strings;
  */
 public class AuthorizableDb extends Authorizable {
   private final String dbName_;
+  @Nullable // Owner can be null if not set.
+  private final String ownerUser_;
 
-  public AuthorizableDb(String dbName) {
+  public AuthorizableDb(String dbName, String ownerUser) {
     Preconditions.checkArgument(!Strings.isNullOrEmpty(dbName));
     dbName_ = dbName;
+    ownerUser_ = ownerUser;
   }
 
   @Override
@@ -39,4 +44,7 @@ public class AuthorizableDb extends Authorizable {
 
   @Override
   public Type getType() { return Authorizable.Type.DB; }
+
+  @Override
+  public String getOwnerUser() { return ownerUser_; }
 }

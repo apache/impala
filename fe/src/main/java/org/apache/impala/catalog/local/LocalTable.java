@@ -170,6 +170,12 @@ abstract class LocalTable implements FeTable {
   }
 
   @Override
+  public String getOwnerUser() {
+    if (msTable_ == null) return null;
+    return msTable_.getOwner();
+  }
+
+  @Override
   public String getStorageHandlerClassName() {
     // Subclasses should override as appropriate.
     return null;

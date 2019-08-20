@@ -99,12 +99,12 @@ public class DescribeTableStmt extends StatementBase {
       // table/database if the user is not authorized.
       if (rawPath_.size() > 1) {
         analyzer.registerPrivReq(builder ->
-            builder.onTable(rawPath_.get(0), rawPath_.get(1))
+            builder.onTableUnknownOwner(rawPath_.get(0), rawPath_.get(1))
                 .any()
                 .build());
       }
       analyzer.registerPrivReq(builder ->
-          builder.onTable(analyzer.getDefaultDb(), rawPath_.get(0))
+          builder.onTableUnknownOwner(analyzer.getDefaultDb(), rawPath_.get(0))
               .any()
               .build());
       throw ae;
@@ -131,7 +131,7 @@ public class DescribeTableStmt extends StatementBase {
     analyzer.registerPrivReq(builder ->
         builder.onColumn(path_.getRootTable().getDb().getName(),
             path_.getRootTable().getName(),
-            path_.getRawPath().get(0))
+            path_.getRawPath().get(0), path_.getRootTable().getOwnerUser())
             .any()
             .build());
 

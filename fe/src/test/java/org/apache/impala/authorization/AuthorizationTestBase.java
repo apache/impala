@@ -593,8 +593,9 @@ public abstract class AuthorizationTestBase extends FrontendTestBase {
         .type(RangerRESTUtils.REST_MIME_TYPE_JSON)
         .post(ClientResponse.class, json);
     if (response.getStatusInfo().getFamily() != Family.SUCCESSFUL) {
-      throw new RuntimeException(
-          String.format("Unable to create a Ranger policy: %s.", policyName));
+      throw new RuntimeException(String.format(
+          "Unable to create a Ranger policy: %s Response: %s",
+          policyName, response.getEntity(String.class)));
     }
   }
 

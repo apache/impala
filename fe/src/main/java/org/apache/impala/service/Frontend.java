@@ -770,14 +770,28 @@ public class Frontend {
 
   private List<String> doGetTableNames(String dbName, PatternMatcher matcher,
       User user) throws ImpalaException {
-    List<String> tblNames = getCatalog().getTableNames(dbName, matcher);
+    FeCatalog catalog = getCatalog();
+    List<String> tblNames = catalog.getTableNames(dbName, matcher);
     if (authzFactory_.getAuthorizationConfig().isEnabled()) {
       Iterator<String> iter = tblNames.iterator();
       while (iter.hasNext()) {
         String tblName = iter.next();
+        // Get the owner information. Do not force load the table, only get it
+        // from cache, if it is already loaded. This means that we cannot access
+        // ownership information for unloaded tables and they will not be listed
+        // here. This might result in situations like 'show tables' not listing
+        // 'owned' tables for a given user just because the metadata is not loaded.
+        // TODO(IMPALA-8937): Figure out a way to load Table/Database ownership
+        // information when fetching the table lists from HMS.
+        FeTable table = catalog.getTableIfCached(dbName, tblName);
+        String tableOwner = table.getOwnerUser();
+        if (tableOwner == null) {
+          LOG.info("Table {} not yet loaded, ignoring it in table listing.",
+              dbName + "." + tblName);
+        }
         PrivilegeRequest privilegeRequest = new PrivilegeRequestBuilder(
             authzFactory_.getAuthorizableFactory())
-            .any().onAnyColumn(dbName, tblName).build();
+            .any().onAnyColumn(dbName, tblName, tableOwner).build();
         if (!authzChecker_.get().hasAccess(user, privilegeRequest)) {
           iter.remove();
         }
@@ -802,7 +816,7 @@ public class Frontend {
         PrivilegeRequest privilegeRequest = new PrivilegeRequestBuilder(
             authzFactory_.getAuthorizableFactory())
             .any().onColumn(table.getTableName().getDb(), table.getTableName().getTbl(),
-                colName).build();
+                colName, table.getOwnerUser()).build();
         if (!authzChecker_.get().hasAccess(user, privilegeRequest)) continue;
       }
       columns.add(column);
@@ -839,7 +853,8 @@ public class Frontend {
       return true;
     }
     PrivilegeRequest request = new PrivilegeRequestBuilder(
-        authzFactory_.getAuthorizableFactory()).any().onAnyColumn(db.getName()).build();
+        authzFactory_.getAuthorizableFactory()).any().onAnyColumn(
+            db.getName(), db.getOwnerUser()).build();
     return authzChecker_.get().hasAccess(user, request);
   }
 
@@ -1011,9 +1026,7 @@ public class Frontend {
       // First run a table check
       PrivilegeRequest privilegeRequest = new PrivilegeRequestBuilder(
           authzFactory_.getAuthorizableFactory())
-          .allOf(Privilege.VIEW_METADATA).onTable(table.getDb().getName(),
-              table.getName())
-          .build();
+          .allOf(Privilege.VIEW_METADATA).onTable(table).build();
       if (!authzChecker_.get().hasAccess(user, privilegeRequest)) {
         // Filter out columns that the user is not authorized to see.
         filteredColumns = new ArrayList<Column>();
@@ -1022,8 +1035,8 @@ public class Frontend {
           privilegeRequest = new PrivilegeRequestBuilder(
               authzFactory_.getAuthorizableFactory())
               .allOf(Privilege.VIEW_METADATA)
-              .onColumn(table.getDb().getName(), table.getName(), colName)
-              .build();
+              .onColumn(table.getDb().getName(),
+                  table.getName(), colName, table.getOwnerUser()).build();
           if (authzChecker_.get().hasAccess(user, privilegeRequest)) {
             filteredColumns.add(col);
           }
@@ -1051,9 +1064,7 @@ public class Frontend {
       if (authzFactory_.getAuthorizationConfig().isEnabled()) {
         PrivilegeRequest privilegeRequest = new PrivilegeRequestBuilder(
             authzFactory_.getAuthorizableFactory())
-            .allOf(Privilege.VIEW_METADATA)
-            .onTable(table.getDb().getName(),table.getName())
-            .build();
+            .allOf(Privilege.VIEW_METADATA).onTable(table).build();
         // Only filter if the user doesn't have table access.
         if (!authzChecker_.get().hasAccess(user, privilegeRequest)) {
           List<TResultRow> results = new ArrayList<>();

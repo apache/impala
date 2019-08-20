@@ -18,6 +18,8 @@
 package org.apache.impala.authorization;
 
 import com.google.common.base.Preconditions;
+import org.apache.impala.catalog.FeDb;
+import org.apache.impala.catalog.FeTable;
 
 /**
  * Class that helps build PrivilegeRequest objects.
@@ -57,22 +59,31 @@ public class PrivilegeRequestBuilder {
   }
 
   /**
-   * Sets the authorizable object to be a column.
+   * Sets the authorizable object to be a table.
    */
-  public PrivilegeRequestBuilder onColumn(String dbName, String tableName,
-      String columnName) {
-    Preconditions.checkState(authorizable_ == null);
-    authorizable_ = authzFactory_.newColumn(dbName, tableName, columnName);
-    return this;
+  public PrivilegeRequestBuilder onTable(FeTable table) {
+    Preconditions.checkNotNull(table);
+    String dbName = Preconditions.checkNotNull(table.getTableName().getDb());
+    String tblName = Preconditions.checkNotNull(table.getTableName().getTbl());
+    return onTable(dbName, tblName, table.getOwnerUser());
   }
 
   /**
    * Sets the authorizable object to be a table.
    */
-  public PrivilegeRequestBuilder onTable(String dbName, String tableName) {
+  public PrivilegeRequestBuilder onTable(
+      String dbName, String tableName, String ownerUser) {
     Preconditions.checkState(authorizable_ == null);
-    authorizable_ = authzFactory_.newTable(dbName, tableName);
+    authorizable_ = authzFactory_.newTable(dbName, tableName, ownerUser);
     return this;
+  }
+
+  public PrivilegeRequestBuilder onTableUnknownOwner(String dbName, String tableName) {
+    // Useful when owner cannot be determined because the table does not exist.
+    // This call path is specifically meant for cases that try to mask the
+    // TableNotFound AnalysisExceptions and instead propagate that as an
+    // AuthorizationException.
+    return onTable(dbName, tableName, null);
   }
 
   /**
@@ -87,27 +98,48 @@ public class PrivilegeRequestBuilder {
   /**
    * Sets the authorizable object to be a database.
    */
-  public PrivilegeRequestBuilder onDb(String dbName) {
+  public PrivilegeRequestBuilder onDb(FeDb db) {
     Preconditions.checkState(authorizable_ == null);
-    authorizable_ = authzFactory_.newDatabase(dbName);
+    Preconditions.checkNotNull(db);
+    return onDb(db.getName(), db.getMetaStoreDb().getOwnerName());
+  }
+
+  /**
+   * Sets the authorizable object to be a database.
+   */
+  public PrivilegeRequestBuilder onDb(String dbName, String ownerUser) {
+    Preconditions.checkState(authorizable_ == null);
+    authorizable_ = authzFactory_.newDatabase(dbName, ownerUser);
+    return this;
+  }
+
+  /**
+   * Sets the authorizable object to be a column.
+   */
+  public PrivilegeRequestBuilder onColumn(String dbName, String tableName,
+      String columnName, String tblOwnerUser) {
+    Preconditions.checkState(authorizable_ == null);
+    authorizable_ =
+        authzFactory_.newColumnInTable(dbName, tableName, columnName, tblOwnerUser);
     return this;
   }
 
   /**
    * Specifies that permissions on any column in the given table.
    */
-  public PrivilegeRequestBuilder onAnyColumn(String dbName, String tableName) {
+  public PrivilegeRequestBuilder onAnyColumn(
+      String dbName, String tableName, String tblOwnerUser) {
     Preconditions.checkState(authorizable_ == null);
-    authorizable_ = authzFactory_.newColumn(dbName, tableName);
+    authorizable_ = authzFactory_.newColumnInTable(dbName, tableName, tblOwnerUser);
     return this;
   }
 
   /**
    * Specifies that permissions on any column in any table.
    */
-  public PrivilegeRequestBuilder onAnyColumn(String dbName) {
+  public PrivilegeRequestBuilder onAnyColumn(String dbName, String dbOwnerUser) {
     Preconditions.checkState(authorizable_ == null);
-    authorizable_ = authzFactory_.newColumn(dbName);
+    authorizable_ = authzFactory_.newColumnAllTbls(dbName, dbOwnerUser);
     return this;
   }
 

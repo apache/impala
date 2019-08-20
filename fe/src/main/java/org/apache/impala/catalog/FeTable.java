@@ -146,4 +146,10 @@ public interface FeTable {
    */
   String getValidWriteIds();
 
+  /**
+   * @return the owner user for this table. If the table is not loaded or the owner is
+   * missing returns null.
+   */
+  String getOwnerUser();
+
 }

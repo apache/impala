@@ -537,4 +537,10 @@ public class Db extends CatalogObjectImpl implements FeDb {
     versionsForInflightEvents_.add(versionNumber);
     return true;
   }
+
+  @Override // FeDb
+  public String getOwnerUser() {
+    org.apache.hadoop.hive.metastore.api.Database db = getMetaStoreDb();
+    return db == null ? null : db.getOwnerName();
+  }
 }

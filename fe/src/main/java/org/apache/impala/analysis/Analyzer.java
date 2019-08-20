@@ -719,7 +719,8 @@ public class Analyzer {
       // table/database if the user is not authorized.
       if (rawPath.size() > 1) {
         registerPrivReq(builder -> {
-          builder.onTable(rawPath.get(0), rawPath.get(1)).allOf(tableRef.getPrivilege());
+          builder.onTableUnknownOwner(
+              rawPath.get(0), rawPath.get(1)).allOf(tableRef.getPrivilege());
           if (tableRef.requireGrantOption()) {
             builder.grantOption();
           }
@@ -728,7 +729,8 @@ public class Analyzer {
       }
 
       registerPrivReq(builder -> {
-        builder.onTable(getDefaultDb(), rawPath.get(0)).allOf(tableRef.getPrivilege());
+        builder.onTableUnknownOwner(
+            getDefaultDb(), rawPath.get(0)).allOf(tableRef.getPrivilege());
         if (tableRef.requireGrantOption()) {
           builder.grantOption();
         }
@@ -1124,7 +1126,7 @@ public class Analyzer {
         registerPrivReq(builder -> builder
             .allOf(Privilege.SELECT)
             .onColumn(tupleDesc.getTableName().getDb(), tupleDesc.getTableName().getTbl(),
-                column.getName()).build());
+                column.getName(), tupleDesc.getTable().getOwnerUser()).build());
       }
     }
   }
@@ -2651,6 +2653,16 @@ public class Analyzer {
   }
 
   /**
+   * Returns the table by looking it up in the local Catalog. Returns null if the db/table
+   * does not exist. Does *not* force-load the table.
+   */
+  public FeTable getTableNoThrow(String dbName, String tableName) {
+    FeDb db = getCatalog().getDb(dbName);
+    if (db == null) return null;
+    return db.getTableIfCached(tableName);
+  }
+
+  /**
    * Checks if a table exists without registering privileges.
    */
   public boolean tableExists(TableName tblName) {
@@ -2686,20 +2698,25 @@ public class Analyzer {
     Preconditions.checkNotNull(tableName);
     Preconditions.checkNotNull(privilege);
     TableName fqTableName = getFqTableName(tableName);
+    // Get the ownership information if the table exists. We do not want it to throw
+    // without registering privileges.
+    FeTable table = getTableNoThrow(fqTableName.getDb(), fqTableName.getTbl());
+    final String tableOwner = table == null ? null : table.getOwnerUser();
     for (Privilege priv : privilege) {
       if (priv == Privilege.ANY || addColumnPrivilege) {
         registerPrivReq(builder ->
             builder.allOf(priv)
-                .onAnyColumn(fqTableName.getDb(), fqTableName.getTbl())
+                .onAnyColumn(fqTableName.getDb(), fqTableName.getTbl(), tableOwner)
                 .build());
       } else {
         registerPrivReq(builder ->
             builder.allOf(priv)
-                .onTable(fqTableName.getDb(), fqTableName.getTbl())
+                .onTable(fqTableName.getDb(), fqTableName.getTbl(), tableOwner)
                 .build());
       }
     }
-    FeTable table = getTable(fqTableName.getDb(), fqTableName.getTbl());
+    // Propagate the AnalysisException if the table/db does not exist.
+    table = getTable(fqTableName.getDb(), fqTableName.getTbl());
     Preconditions.checkNotNull(table);
     if (addAccessEvent) {
       // Add an audit event for this access
@@ -2773,19 +2790,26 @@ public class Analyzer {
    */
   public FeDb getDb(String dbName, Privilege privilege, boolean throwIfDoesNotExist,
       boolean requireGrantOption) throws AnalysisException {
+    // Do not throw until the privileges are registered.
+    FeDb db = getDb(dbName, /*throwIfDoesNotExist*/ false);
     registerPrivReq(builder -> {
       if (requireGrantOption) {
         builder.grantOption();
       }
-      return privilege == Privilege.ANY ?
-          builder.any().onAnyColumn(dbName).build() :
-          builder.allOf(privilege).onDb(dbName).build();
+      if (privilege == Privilege.ANY) {
+        String dbOwner = db == null ? null : db.getOwnerUser();
+        return builder.any().onAnyColumn(dbName, dbOwner).build();
+      } else if (db == null) {
+        // Db does not exist, register a privilege request based on the DB name.
+        return builder.allOf(privilege).onDb(dbName, null).build();
+      }
+      return builder.allOf(privilege).onDb(db).build();
     });
-
-    FeDb db = getDb(dbName, throwIfDoesNotExist);
+    // Propagate the exception if needed.
+    FeDb retDb = getDb(dbName, throwIfDoesNotExist);
     globalState_.accessEvents.add(new TAccessEvent(
         dbName, TCatalogObjectType.DATABASE, privilege.toString()));
-    return db;
+    return retDb;
   }
 
   /**
@@ -2810,16 +2834,35 @@ public class Analyzer {
    */
   public boolean dbContainsTable(String dbName, String tableName, Privilege privilege)
       throws AnalysisException {
-    registerPrivReq(builder ->
-        builder.allOf(privilege)
-            .onTable(dbName, tableName)
-            .build());
     try {
       FeDb db = getCatalog().getDb(dbName);
+      FeTable table = db == null ? null: db.getTable(tableName);
+      if (table != null) {
+        // Table exists, register the privilege and pass the right ownership information.
+        // Table owners are expected to have ALL privileges on the table object.
+        registerPrivReq(builder ->
+            builder.allOf(privilege)
+                .onTable(table)
+                .build());
+      } else if (privilege == Privilege.CREATE) {
+        // Table does not exist and hence the owner information cannot be deduced.
+        // For creating something under this db, we translate the db ownership into having
+        // CREATE privilege on tables under it.
+        String dbOwnerUser = db == null? null : db.getOwnerUser();
+        registerPrivReq(builder ->
+          builder.allOf(privilege)
+              .onTable(dbName, tableName, dbOwnerUser)
+              .build());
+      } else {
+        // All non-CREATE privileges are checked directly on the table object.
+        Preconditions.checkState(table == null && privilege != Privilege.CREATE);
+        registerPrivReq(builder ->
+          builder.allOf(privilege).onTableUnknownOwner(dbName, tableName).build());
+      }
       if (db == null) {
         throw new DatabaseNotFoundException("Database not found: " + dbName);
       }
-      return db.containsTable(tableName);
+      return table != null;
     } catch (DatabaseNotFoundException e) {
       throw new AnalysisException(DB_DOES_NOT_EXIST_ERROR_MSG + dbName);
     }
@@ -2954,9 +2997,8 @@ public class Analyzer {
           priv.toString()));
     }
     // Add privilege request.
-    TableName tableName = table.getTableName();
     registerPrivReq(builder -> {
-      builder.onTable(tableName.getDb(), tableName.getTbl()).allOf(priv);
+      builder.onTable(table).allOf(priv);
       if (requireGrantOption) {
         builder.grantOption();
       }

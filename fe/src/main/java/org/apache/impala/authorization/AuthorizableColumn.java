@@ -17,6 +17,8 @@
 
 package org.apache.impala.authorization;
 
+import javax.annotation.Nullable;
+
 import com.google.common.base.Preconditions;
 import com.google.common.base.Strings;
 
@@ -27,14 +29,19 @@ public class AuthorizableColumn extends Authorizable {
   private final String dbName_;
   private final String tableName_;
   private final String columnName_;
+  // Owner for the parent db or table that this Authorizable corresponds to.
+  @Nullable
+  private final String ownerUser_;
 
-  public AuthorizableColumn(String dbName, String tableName, String columnName) {
+  public AuthorizableColumn(
+      String dbName, String tableName, String columnName, @Nullable String ownerUser) {
     Preconditions.checkArgument(!Strings.isNullOrEmpty(dbName));
     Preconditions.checkArgument(!Strings.isNullOrEmpty(tableName));
     Preconditions.checkArgument(!Strings.isNullOrEmpty(columnName));
     dbName_ = dbName;
     tableName_ = tableName;
     columnName_ = columnName;
+    ownerUser_ = ownerUser;
   }
 
   @Override
@@ -54,4 +61,7 @@ public class AuthorizableColumn extends Authorizable {
 
   @Override
   public String getColumnName() { return columnName_; }
+
+  @Override
+  public String getOwnerUser() { return ownerUser_; }
 }

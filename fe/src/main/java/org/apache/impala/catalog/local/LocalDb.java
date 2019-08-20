@@ -287,4 +287,10 @@ class LocalDb implements FeDb {
   LocalCatalog getCatalog() {
     return catalog_;
   }
+
+  @Override // FeDb
+  public String getOwnerUser() {
+    Database db = getMetaStoreDb();
+    return db == null? null : db.getOwnerName();
+  }
 }
