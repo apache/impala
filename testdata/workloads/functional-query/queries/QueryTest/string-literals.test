@@ -1,0 +1,41 @@
+====
+---- QUERY
+SELECT DISTINCT CAST('' as VARCHAR(101)) as CL_COMMENTS,CAST('' as VARCHAR(100))  as
+    CL_USER_ID FROM chars_formats limit 1;
+---- TYPES
+string, string
+---- HS2_TYPES
+varchar, varchar
+---- RESULTS
+'',''
+====
+---- QUERY
+SELECT DISTINCT CAST('' as CHAR(3)) as CL_COMMENTS,CAST('' as CHAR(2))  as CL_USER_ID FROM
+    chars_formats limit 1;
+---- TYPES
+char, char
+---- RESULTS
+'   ','  '
+====
+---- QUERY
+SELECT vc from chars_formats where vc = cast ("abc" as varchar(210)) limit 1;
+---- RESULTS
+'abc'
+====
+---- QUERY
+SELECT vc from chars_formats where cast ("abc" as varchar(210)) = vc limit 1;
+---- RESULTS
+'abc'
+====
+---- QUERY
+SELECT 1 from chars_formats WHERE CAST('' as VARCHAR(101)) = CAST('' as VARCHAR(100))
+    limit 1;
+---- RESULTS
+1
+====
+---- QUERY
+SELECT 1 from chars_formats WHERE CAST('' as VARCHAR(100)) = CAST('' as VARCHAR(101))
+    limit 1;
+---- RESULTS
+1
+====

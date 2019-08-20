@@ -73,3 +73,6 @@ class TestCharFormats(ImpalaTestSuite):
 
   def test_char_format(self, vector):
     self.run_test_case('QueryTest/chars-formats', vector)
+
+  def test_string_literal(self, vector):
+    self.run_test_case('QueryTest/string-literals', vector)
