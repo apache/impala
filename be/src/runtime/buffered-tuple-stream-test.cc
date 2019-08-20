@@ -1272,6 +1272,92 @@ TEST_F(SimpleTupleStreamTest, UnpinReadPage) {
     ASSERT_OK(stream.UnpinStream(BufferedTupleStream::UNPIN_ALL_EXCEPT_CURRENT));
     stream.Close(nullptr, RowBatch::FlushMode::NO_FLUSH_RESOURCES);
   }
+  write_batch->Reset();
+}
+
+// Test writing to a stream (AddRow and UnpinStream), even though attached pages have not
+// been released yet.
+TEST_F(SimpleTupleStreamTest, WriteAfterReadAttached) {
+  int buffer_size = 4 * 1024;
+  Init(100 * buffer_size);
+
+  bool eos;
+  bool got_reservation;
+  Status status;
+
+  vector<int> results;
+  RowBatch read_batch(int_desc_, 1, &tracker_);
+  RowBatch* write_batch = CreateIntBatch(0, 1, false);
+  ASSERT_EQ(write_batch->num_rows(), 1);
+
+  // Test adding a row to the stream before releasing an output batch returned by
+  // GetNext.
+  BufferedTupleStream stream(
+      runtime_state_, int_desc_, &client_, buffer_size, buffer_size);
+  ASSERT_OK(stream.Init("SimpleTupleStreamTest::InterleaveReadAndWrite", true));
+  ASSERT_OK(stream.PrepareForReadWrite(true, &got_reservation));
+  ASSERT_TRUE(got_reservation);
+
+  // Add a row to the stream.
+  EXPECT_TRUE(stream.AddRow(write_batch->GetRow(0), &status));
+  ASSERT_OK(status);
+
+  // Read a row from the stream, but do not reset the read_batch.
+  ASSERT_OK(stream.GetNext(&read_batch, &eos));
+
+  // Add a row to the stream.
+  EXPECT_TRUE(stream.AddRow(write_batch->GetRow(0), &status));
+  ASSERT_OK(status);
+
+  // Validate the contents of read_batch.
+  AppendRowTuples(read_batch.GetRow(0), int_desc_, &results);
+  VerifyResults<int>(*int_desc_, results, 1, false);
+  results.clear();
+
+  // Validate the data just added to the stream.
+  ReadValues(&stream, int_desc_, &results);
+  VerifyResults<int>(*int_desc_, results, 1, false);
+  results.clear();
+
+  // Reset the read_batch and close the stream.
+  read_batch.Reset();
+  stream.Close(nullptr, RowBatch::FlushMode::NO_FLUSH_RESOURCES);
+
+  // Read a batch from the stream, unpin the stream, add a row, and then validate the
+  // contents of read batch.
+  BufferedTupleStream unpin_stream(
+      runtime_state_, int_desc_, &client_, buffer_size, buffer_size);
+  ASSERT_OK(unpin_stream.Init("SimpleTupleStreamTest::InterleaveReadAndWrite", true));
+  ASSERT_OK(unpin_stream.PrepareForReadWrite(true, &got_reservation));
+  ASSERT_TRUE(got_reservation);
+
+  // Add a row to the stream.
+  EXPECT_TRUE(unpin_stream.AddRow(write_batch->GetRow(0), &status));
+  ASSERT_OK(status);
+
+  // Read a row from the stream, but do not reset the read_batch.
+  ASSERT_OK(unpin_stream.GetNext(&read_batch, &eos));
+
+  // Unpin the stream.
+  ASSERT_OK(unpin_stream.UnpinStream(BufferedTupleStream::UNPIN_ALL_EXCEPT_CURRENT));
+
+  // Add a row to the stream.
+  EXPECT_TRUE(unpin_stream.AddRow(write_batch->GetRow(0), &status));
+  ASSERT_OK(status);
+
+  // Validate the contents of read_batch.
+  AppendRowTuples(read_batch.GetRow(0), int_desc_, &results);
+  VerifyResults<int>(*int_desc_, results, 1, false);
+  results.clear();
+
+  // Validate the data just added to the stream.
+  ReadValues(&unpin_stream, int_desc_, &results);
+  VerifyResults<int>(*int_desc_, results, 1, false);
+  results.clear();
+
+  // Reset the read_batch and close the stream.
+  read_batch.Reset();
+  unpin_stream.Close(nullptr, RowBatch::FlushMode::NO_FLUSH_RESOURCES);
 
   write_batch->Reset();
 }

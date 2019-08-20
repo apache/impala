@@ -22,17 +22,9 @@ import threading
 from time import sleep
 from tests.common.errors import Timeout
 from tests.common.impala_test_suite import ImpalaTestSuite
+from tests.common.test_dimensions import create_exec_option_dimension
 from tests.common.test_vector import ImpalaTestDimension
 from tests.util.cancel_util import cancel_query_and_validate_state
-
-# Queries to execute, use the TPC-H dataset because tables are large so queries take some
-# time to execute.
-CANCELLATION_QUERIES = ["select l_returnflag from tpch_parquet.lineitem",
-                        "select * from tpch_parquet.lineitem limit 50",
-                        "select * from tpch_parquet.lineitem order by l_orderkey"]
-
-# Time to sleep between issuing query and canceling.
-CANCEL_DELAY_IN_SECONDS = [0, 0.01, 0.1, 1, 4]
 
 
 class TestResultSpooling(ImpalaTestSuite):
@@ -111,11 +103,23 @@ class TestResultSpooling(ImpalaTestSuite):
       self.client.close_query(handle)
 
   def test_full_queue(self, vector):
+    """Delegates to _test_full_queue."""
+    query = "select * from functional.alltypes order by id limit 1500"
+    self._test_full_queue(vector, query)
+
+  def test_full_queue_large_fetch(self, vector):
+    """Delegates to _test_full_queue, but specifies a fetch size equal to the number of
+    rows returned by the query. This tests that clients can fetch all rows from a full
+    queue."""
+    num_rows = 1500
+    query = "select * from functional.alltypes order by id limit {0}".format(num_rows)
+    self._test_full_queue(vector, query, fetch_size=num_rows)
+
+  def _test_full_queue(self, vector, query, fetch_size=-1):
     """Tests result spooling when there is no more space to buffer query results (the
     queue is full), and the client hasn't fetched any results. Validates that
     RowBatchSendWaitTime (amount of time Impala blocks waiting for the client to read
     buffered results and clear up space in the queue) is updated properly."""
-    query = "select * from functional.alltypes order by id limit 1500"
     exec_options = vector.get_value('exec_option')
 
     # Set lower values for spill-to-disk and result spooling configs so that the queue
@@ -140,7 +144,7 @@ class TestResultSpooling(ImpalaTestSuite):
       self.wait_for_any_state(handle, [self.client.QUERY_STATES['RUNNING'],
           self.client.QUERY_STATES['FINISHED']], timeout)
       time.sleep(5)
-      self.client.fetch(query, handle)
+      self.client.fetch(query, handle, max_rows=fetch_size)
       assert re.search(send_wait_time_regex, self.client.get_runtime_profile(handle)) \
           is not None
     finally:
@@ -193,6 +197,96 @@ class TestResultSpooling(ImpalaTestSuite):
                                      "spooling was enabled".format(query)
 
 
+class TestResultSpoolingFetchSize(ImpalaTestSuite):
+  """Tests fetching logic when result spooling is enabled. When result spooling is
+  disabled, Impala only supports fetching up to BATCH_SIZE rows at a time (since only
+  one RowBatch is ever buffered). When result spooling is enabled, clients can specify
+  any fetch size (up to a limit) and Impala will return exactly that number of rows
+  (assuming there are that many rows left to fetch). This class validates the
+  aformentioned result spooling fetch logic using different fetch and batch sizes."""
+
+  # The different values of BATCH_SIZE 'test_fetch' will be parameterized by.
+  _batch_sizes = [100, 1024, 2048]
+
+  # The number of rows to fetch from the query handle.
+  _fetch_sizes = [7, 23, 321, 512, 2048, 4321, 5000, 10000]
+
+  # The number of rows in functional_parquet.alltypes.
+  _num_rows = 7300
+
+  # The query that 'test_fetch' will run.
+  _query = "select id from functional_parquet.alltypes order by id"
+
+  @classmethod
+  def get_workload(cls):
+    return 'functional-query'
+
+  @classmethod
+  def add_test_dimensions(cls):
+    super(TestResultSpoolingFetchSize, cls).add_test_dimensions()
+    # Create a test matrix with three different dimensions: BATCH_SIZE, the number of
+    # rows to fetch at a time, and whether the tests should wait for all results to be
+    # spooled before fetching any rows.
+    cls.ImpalaTestMatrix.add_dimension(create_exec_option_dimension(
+        batch_sizes=cls._batch_sizes))
+    cls.ImpalaTestMatrix.add_dimension(ImpalaTestDimension('fetch_size',
+        *cls._fetch_sizes))
+    cls.ImpalaTestMatrix.add_dimension(ImpalaTestDimension('wait_for_finished',
+        *[True, False]))
+
+    # Result spooling should be independent of file format, so only testing for
+    # table_format=parquet/none in order to avoid a test dimension explosion.
+    cls.ImpalaTestMatrix.add_constraint(lambda v:
+        v.get_value('table_format').file_format == 'parquet' and
+        v.get_value('table_format').compression_codec == 'none')
+
+  @classmethod
+  def setup_class(cls):
+    super(TestResultSpoolingFetchSize, cls).setup_class()
+    # All tests only ever run a single query, so rather than re-run this query for every
+    # test, run it once and store the results.
+    base_result = cls.client.execute(cls._query)
+    assert base_result.success, "Failed to run {0} when result spooling is " \
+                                "enabled".format(cls._query)
+    cls._base_data = base_result.data
+
+  def test_fetch(self, vector):
+    """Run '_query' with result spooling enabled and with the specified BATCH_SIZE. Use
+    the 'fetch_size' parameter to determine how many rows to fetch from the query handle
+    at a time. Fetch all results and then validate they match '_base_data'."""
+    exec_options = vector.get_value('exec_option')
+    exec_options['spool_query_results'] = 'true'
+    fetch_size = vector.get_value('fetch_size')
+
+    # Amount of time to wait for the query to reach a running state before through a
+    # Timeout exception.
+    timeout = 10
+
+    results = []
+    handle = self.execute_query_async(self._query, exec_options)
+    try:
+      # If 'wait_for_finished' is True, wait for the query to reach the FINISHED state.
+      # When it reaches this state all results should be successfully spooled.
+      if vector.get_value('wait_for_finished'):
+          self.wait_for_state(handle, self.client.QUERY_STATES['FINISHED'], timeout)
+      rows_fetched = 0
+
+      # Call 'fetch' on the query handle enough times to read all rows.
+      while rows_fetched < self._num_rows:
+        result_data = self.client.fetch(self._query, handle, fetch_size).data
+        # Assert that each fetch request returns exactly the number of rows requested,
+        # unless less than that many rows were left in the result set.
+        assert len(result_data) == min(fetch_size, self._num_rows - rows_fetched)
+        rows_fetched += len(result_data)
+        results.extend(result_data)
+    finally:
+       self.client.close_query(handle)
+
+    # Assert that the fetched results match the '_base_data'.
+    assert self._num_rows == rows_fetched
+    assert self._base_data == results
+
+
 class TestResultSpoolingCancellation(ImpalaTestSuite):
   """Test cancellation of queries when result spooling is enabled. This class heavily
   borrows from the cancellation tests in test_cancellation.py. It uses the following test
@@ -200,6 +294,15 @@ class TestResultSpoolingCancellation(ImpalaTestSuite):
   asynchronously and then cancel. 'cancel_delay' controls how long a query should run
   before being cancelled.
   """
+
+  # Queries to execute, use the TPC-H dataset because tables are large so queries take
+  # some time to execute.
+  _cancellation_queries = ["select l_returnflag from tpch_parquet.lineitem",
+                          "select * from tpch_parquet.lineitem limit 50",
+                          "select * from tpch_parquet.lineitem order by l_orderkey"]
+
+  # Time to sleep between issuing query and canceling.
+  _cancel_delay_in_seconds = [0, 0.01, 0.1, 1, 4]
 
   @classmethod
   def get_workload(cls):
@@ -209,9 +312,9 @@ class TestResultSpoolingCancellation(ImpalaTestSuite):
   def add_test_dimensions(cls):
     super(TestResultSpoolingCancellation, cls).add_test_dimensions()
     cls.ImpalaTestMatrix.add_dimension(ImpalaTestDimension('query',
-        *CANCELLATION_QUERIES))
+        *cls._cancellation_queries))
     cls.ImpalaTestMatrix.add_dimension(ImpalaTestDimension('cancel_delay',
-        *CANCEL_DELAY_IN_SECONDS))
+        *cls._cancel_delay_in_seconds))
 
     # Result spooling should be independent of file format, so only testing for
     # table_format=parquet/none in order to avoid a test dimension explosion.

@@ -22,6 +22,12 @@
 
 namespace impala {
 
+const int BufferedPlanRootSink::MAX_FETCH_SIZE;
+
+/// If the fetch size is <= 0, the default number of RowBatches to return in one call to
+/// 'GetNext'.
+const int FETCH_NUM_BATCHES = 10;
+
 BufferedPlanRootSink::BufferedPlanRootSink(TDataSinkId sink_id,
     const RowDescriptor* row_desc, RuntimeState* state,
     const TBackendResourceProfile& resource_profile, const TDebugOptions& debug_options)
@@ -39,6 +45,8 @@ Status BufferedPlanRootSink::Prepare(
 
 Status BufferedPlanRootSink::Open(RuntimeState* state) {
   RETURN_IF_ERROR(DataSink::Open(state));
+  current_batch_ =
+      make_unique<RowBatch>(row_desc_, state->batch_size(), mem_tracker());
   batch_queue_.reset(new SpillableRowBatchQueue(name_,
       state->query_options().max_spilled_result_spooling_mem, state, mem_tracker(),
       profile(), row_desc_, resource_profile_, debug_options_));
@@ -105,6 +113,10 @@ void BufferedPlanRootSink::Close(RuntimeState* state) {
   if (sender_state_ == SenderState::ROWS_PENDING) {
     sender_state_ = SenderState::CLOSED_NOT_EOS;
   }
+  if (current_batch_row_ != 0) {
+    current_batch_->Reset();
+  }
+  current_batch_.reset();
   if (batch_queue_ != nullptr) batch_queue_->Close();
   // While it should be safe to call NotifyOne() here, prefer to use NotifyAll() to
   // ensure that all sleeping threads are awoken. The call to NotifyAll() is not on the
@@ -128,50 +140,71 @@ Status BufferedPlanRootSink::GetNext(
     RuntimeState* state, QueryResultSet* results, int num_results, bool* eos) {
   {
     unique_lock<mutex> l(lock_);
-    while (batch_queue_->IsEmpty() && sender_state_ == SenderState::ROWS_PENDING
-        && !state->is_cancelled()) {
-      SCOPED_TIMER(row_batches_get_wait_timer_);
-      rows_available_.Wait(l);
-    }
+    *eos = false;
 
-    // If the query was cancelled while the sink was waiting for rows to become available,
-    // or if the query was cancelled before the current call to GetNext, set eos and then
-    // return. The queue could be empty if the sink was closed while waiting for rows to
-    // become available, or if the sink was closed before the current call to GetNext.
-    if (!state->is_cancelled() && !batch_queue_->IsEmpty()) {
-      unique_ptr<RowBatch> batch =
-          make_unique<RowBatch>(row_desc_, state->batch_size(), mem_tracker());
-      RETURN_IF_ERROR(batch_queue_->GetBatch(batch.get()));
-      // TODO for now, if num_results < batch->num_rows(), we terminate returning results
-      // early until we can properly handle fetch requests where
-      // num_results < batch->num_rows().
-      if (num_results > 0 && num_results < batch->num_rows()) {
-        *eos = true;
-        batch_queue_has_capacity_.NotifyOne();
-        consumer_eos_.NotifyOne();
-        batch->Reset();
-        return Status::Expected(TErrorCode::NOT_IMPLEMENTED_ERROR,
-            "BufferedPlanRootSink does not support setting num_results < BATCH_SIZE");
+    // Cap the maximum number of results fetched by this call to GetNext so that the
+    // resulting QueryResultSet does not consume excessive amounts of memory.
+    num_results = min(num_results, MAX_FETCH_SIZE);
+
+    // Track the number of rows read from the queue and the number of rows to read.
+    int num_rows_read = 0;
+    // If 'num_results' <= 0 then by default fetch FETCH_NUM_BATCHES batches.
+    int num_rows_to_read =
+        num_results <= 0 ? FETCH_NUM_BATCHES * state->batch_size() : num_results;
+
+    // Read from the queue until all requested rows have been read, or eos is hit.
+    while (!*eos && num_rows_read < num_rows_to_read) {
+      // Wait for the queue to have rows in it.
+      while (IsQueueEmpty() && sender_state_ == SenderState::ROWS_PENDING
+          && !state->is_cancelled()) {
+        SCOPED_TIMER(row_batches_get_wait_timer_);
+        rows_available_.Wait(l);
       }
-      RETURN_IF_ERROR(
-          results->AddRows(output_expr_evals_, batch.get(), 0, batch->num_rows()));
-      // Prevent expr result allocations from accumulating.
-      expr_results_pool_->Clear();
-      batch->Reset();
+
+      // If the query was cancelled while the sink was waiting for rows to become
+      // available, or if the query was cancelled before the current call to GetNext, set
+      // eos and then return. The queue could be empty if the sink was closed while
+      // waiting for rows to become available, or if the sink was closed before the
+      // current call to GetNext.
+      if (!state->is_cancelled() && !IsQueueEmpty()) {
+        // If current_batch_ is empty, then read directly from the queue.
+        if (current_batch_row_ == 0) {
+          RETURN_IF_ERROR(batch_queue_->GetBatch(current_batch_.get()));
+
+          // After reading a RowBatch from the queue, it now has additional capacity,
+          // notify the producer so it can add more RowBatches. Even though the lock is
+          // still held when batch_queue_has_capacity_ is notified, the lock may be
+          // released if the current thread waits on rows_available_.
+          batch_queue_has_capacity_.NotifyOne();
+        }
+
+        // Set the number of rows to be fetched from 'current_batch_'. Either read all
+        // remaining rows in the batch, or read up to the 'num_rows_to_read' limit.
+        int num_rows_to_fetch = min(current_batch_->num_rows() - current_batch_row_,
+            num_rows_to_read - num_rows_read);
+        DCHECK_GE(num_rows_to_fetch, 0);
+
+        // Read rows from 'current_batch_' and add them to 'results'.
+        RETURN_IF_ERROR(results->AddRows(output_expr_evals_, current_batch_.get(),
+            current_batch_row_, num_rows_to_fetch));
+        num_rows_read += num_rows_to_fetch;
+        current_batch_row_ += num_rows_to_fetch;
+
+        // If all rows have been read from 'current_batch_' then reset the batch and its
+        // index.
+        DCHECK_LE(current_batch_row_, current_batch_->num_rows());
+        if (current_batch_row_ == current_batch_->num_rows()) {
+          current_batch_row_ = 0;
+          current_batch_->Reset();
+        }
+
+        // Prevent expr result allocations from accumulating.
+        expr_results_pool_->Clear();
+      }
+      *eos = IsQueueEmpty() && sender_state_ == SenderState::EOS;
     }
-    *eos = batch_queue_->IsEmpty() && sender_state_ == SenderState::EOS;
     if (*eos) consumer_eos_.NotifyOne();
   }
-  // Release the lock before calling notify so the consumer thread can immediately
-  // acquire the lock. It is safe to call notify batch_queue_has_capacity_ regardless of
-  // whether a RowBatch is read. Either (1) a RowBatch is read and the queue is no longer
-  // full, so notify the consumer thread or (2) a Rowbatch was not read, which means
-  // either FlushFinal was called or the query was cancelled. If FlushFinal was called
-  // then the consumer thread has completed. If the query is cancelled, then we wake up
-  // the consumer thread so it can check the cancellation status and return. Releasing
-  // the lock is safe because the consumer always loops until the queue actually has
-  // space.
-  batch_queue_has_capacity_.NotifyOne();
   return state->GetQueryStatus();
 }
-}
+} // namespace impala

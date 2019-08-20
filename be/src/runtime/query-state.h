@@ -239,14 +239,15 @@ class QueryState {
   /// already. Also notifies anyone waiting on WaitForFinishOrTimeout().
   void ErrorDuringExecute(const Status& status, const TUniqueId& finst_id);
 
+  /// The default BATCH_SIZE.
+  static const int DEFAULT_BATCH_SIZE = 1024;
+
  private:
   friend class QueryExecMgr;
 
   /// test execution
   friend class RuntimeState;
   friend class TestEnv;
-
-  static const int DEFAULT_BATCH_SIZE = 1024;
 
   /// Blocks until all fragment instances have finished executing or until one of them
   /// hits an error, or until 'timeout_ms' milliseconds has elapsed. Returns 'true' if
