@@ -51,7 +51,7 @@ under the License.
       <p> The following sections describe the noteworthy improvements made in
           <keyword keyref="impala33"/>. </p>
       <p> For the full list of issues closed in this release, see the <xref
-          keyref="changelog_33">changelog for <keyword keyref="impala32"
+          keyref="changelog_33">changelog for <keyword keyref="impala33"
           /></xref>. </p>
       <section id="section_ezf_tnq_s3b">
         <title>Increased Compatibility with Apache Projects</title>
