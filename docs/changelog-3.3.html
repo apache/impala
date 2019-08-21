@@ -1,0 +1,753 @@
+<!DOCTYPE html>
+<html>
+<head>
+<title>Impala 3.3 Change Log</title>
+</head>
+<body>
+<h1>Impala 3.3 Change Log</h1>
+        Release Notes - IMPALA - Version Impala 3.3.0
+    
+<h2>        New Feature
+</h2>
+<ul>
+<li>[<a href='https://issues.apache.org/jira/browse/IMPALA-1653'>IMPALA-1653</a>] -         Impala should not close a session when a HiveServer2 connection is closed
+</li>
+<li>[<a href='https://issues.apache.org/jira/browse/IMPALA-5051'>IMPALA-5051</a>] -         Add support to write INT64 timestamps to the parquet writer
+</li>
+<li>[<a href='https://issues.apache.org/jira/browse/IMPALA-5843'>IMPALA-5843</a>] -         Use page index in Parquet files to skip pages
+</li>
+<li>[<a href='https://issues.apache.org/jira/browse/IMPALA-7947'>IMPALA-7947</a>] -         Run impalad minicluster processes inside docker containers
+</li>
+<li>[<a href='https://issues.apache.org/jira/browse/IMPALA-7981'>IMPALA-7981</a>] -         Add system disk I/O throughput to query profiles
+</li>
+<li>[<a href='https://issues.apache.org/jira/browse/IMPALA-7982'>IMPALA-7982</a>] -         Add network I/O throughput to query profiles
+</li>
+<li>[<a href='https://issues.apache.org/jira/browse/IMPALA-8158'>IMPALA-8158</a>] -         Bump Impyla version, use HS2 service to retrieve thrift profiles
+</li>
+<li>[<a href='https://issues.apache.org/jira/browse/IMPALA-8420'>IMPALA-8420</a>] -         Support HTTP based HS2/beeswax endpoints on coordinators
+</li>
+<li>[<a href='https://issues.apache.org/jira/browse/IMPALA-8435'>IMPALA-8435</a>] -         Prohibit unsupported operations on transactional tables
+</li>
+<li>[<a href='https://issues.apache.org/jira/browse/IMPALA-8437'>IMPALA-8437</a>] -         Add writeId to table and partition for ACID table
+</li>
+<li>[<a href='https://issues.apache.org/jira/browse/IMPALA-8438'>IMPALA-8438</a>] -         List valid writeIds for a ACID table
+</li>
+<li>[<a href='https://issues.apache.org/jira/browse/IMPALA-8484'>IMPALA-8484</a>] -         Add support to run queries on disjoint executor groups
+</li>
+<li>[<a href='https://issues.apache.org/jira/browse/IMPALA-8502'>IMPALA-8502</a>] -         Improve Kudu/Impala integration based on Kudu/HMS/Sentry integration
+</li>
+<li>[<a href='https://issues.apache.org/jira/browse/IMPALA-8593'>IMPALA-8593</a>] -         Prohibit write to bucketed table
+</li>
+<li>[<a href='https://issues.apache.org/jira/browse/IMPALA-8636'>IMPALA-8636</a>] -         Implement INSERT for insert-only ACID tables
+</li>
+<li>[<a href='https://issues.apache.org/jira/browse/IMPALA-8752'>IMPALA-8752</a>] -         Add Jaro-winkler edit distance and similarity built-in function
+</li>
+<li>[<a href='https://issues.apache.org/jira/browse/IMPALA-8808'>IMPALA-8808</a>] -         Add query option to change default ACID type of new tables
+</li>
+<li>[<a href='https://issues.apache.org/jira/browse/IMPALA-8836'>IMPALA-8836</a>] -         Support COMPUTE STATS on insert only ACID tables
+</li>
+</ul>
+    
+<h2>        Epic
+</h2>
+<ul>
+<li>[<a href='https://issues.apache.org/jira/browse/IMPALA-7916'>IMPALA-7916</a>] -         Support for Apache Ranger authorization provider
+</li>
+</ul>
+    
+<h2>        Story
+</h2>
+<ul>
+<li>[<a href='https://issues.apache.org/jira/browse/IMPALA-8439'>IMPALA-8439</a>] -         Add Hive ACID tables during dataload if Hive 3.1 is enabled
+</li>
+<li>[<a href='https://issues.apache.org/jira/browse/IMPALA-8440'>IMPALA-8440</a>] -         Add &quot;post upgrade&quot; ACID tables to test data
+</li>
+</ul>
+    
+<h2>        Improvement
+</h2>
+<ul>
+<li>[<a href='https://issues.apache.org/jira/browse/IMPALA-4356'>IMPALA-4356</a>] -         Automatically codegen expressions with any root Expr node
+</li>
+<li>[<a href='https://issues.apache.org/jira/browse/IMPALA-5278'>IMPALA-5278</a>] -         Add Kerberos HTTP SPNEGO authentication support to Impala web consoles
+</li>
+<li>[<a href='https://issues.apache.org/jira/browse/IMPALA-5351'>IMPALA-5351</a>] -         Handle column comments for Kudu tables
+</li>
+<li>[<a href='https://issues.apache.org/jira/browse/IMPALA-5393'>IMPALA-5393</a>] -         Regexp should use THREAD_LOCAL context rather than FRAGMENT_LOCAL
+</li>
+<li>[<a href='https://issues.apache.org/jira/browse/IMPALA-6050'>IMPALA-6050</a>] -         Query profiles should clearly indicate storage layer(s) used
+</li>
+<li>[<a href='https://issues.apache.org/jira/browse/IMPALA-6852'>IMPALA-6852</a>] -         Add a section to the query profile covering number of fragments instances and total bytes scanned per host
+</li>
+<li>[<a href='https://issues.apache.org/jira/browse/IMPALA-6903'>IMPALA-6903</a>] -         Allow download of text profile via Impala WebUI
+</li>
+<li>[<a href='https://issues.apache.org/jira/browse/IMPALA-7290'>IMPALA-7290</a>] -         Move impala-shell to use HS2
+</li>
+<li>[<a href='https://issues.apache.org/jira/browse/IMPALA-7486'>IMPALA-7486</a>] -         Admit less memory on dedicated coordinator for admission control purposes
+</li>
+<li>[<a href='https://issues.apache.org/jira/browse/IMPALA-7640'>IMPALA-7640</a>] -         ALTER TABLE RENAME on managed Kudu table should rename underlying Kudu table
+</li>
+<li>[<a href='https://issues.apache.org/jira/browse/IMPALA-7770'>IMPALA-7770</a>] -         SPLIT_PART to support negative indexes
+</li>
+<li>[<a href='https://issues.apache.org/jira/browse/IMPALA-7800'>IMPALA-7800</a>] -         Reject or timeout new incoming connections once --fe_service_threads limit is reached
+</li>
+<li>[<a href='https://issues.apache.org/jira/browse/IMPALA-7802'>IMPALA-7802</a>] -         Implement support for closing idle sessions
+</li>
+<li>[<a href='https://issues.apache.org/jira/browse/IMPALA-7936'>IMPALA-7936</a>] -         Enable better control over Parquet writing
+</li>
+<li>[<a href='https://issues.apache.org/jira/browse/IMPALA-8116'>IMPALA-8116</a>] -         Impala Doc: Create Impala Usage Limits doc
+</li>
+<li>[<a href='https://issues.apache.org/jira/browse/IMPALA-8269'>IMPALA-8269</a>] -         Clean up authorization test package structure
+</li>
+<li>[<a href='https://issues.apache.org/jira/browse/IMPALA-8271'>IMPALA-8271</a>] -         Refactor the use of Thrift enums in query-options.cc
+</li>
+<li>[<a href='https://issues.apache.org/jira/browse/IMPALA-8284'>IMPALA-8284</a>] -         KuduTableSink spends a lot of CPU copying KuduColumnSchemas
+</li>
+<li>[<a href='https://issues.apache.org/jira/browse/IMPALA-8303'>IMPALA-8303</a>] -         Generate JUnitXML symptom for ASAN failures
+</li>
+<li>[<a href='https://issues.apache.org/jira/browse/IMPALA-8305'>IMPALA-8305</a>] -         Generate JUnitXML symptom to detect crashes due to a DCHECK
+</li>
+<li>[<a href='https://issues.apache.org/jira/browse/IMPALA-8316'>IMPALA-8316</a>] -         Update re2 to avoid lock contention
+</li>
+<li>[<a href='https://issues.apache.org/jira/browse/IMPALA-8328'>IMPALA-8328</a>] -         Add missing ToSql test cases for authorization statements
+</li>
+<li>[<a href='https://issues.apache.org/jira/browse/IMPALA-8339'>IMPALA-8339</a>] -         Coordinator should be more resilient to fragment instances startup failure
+</li>
+<li>[<a href='https://issues.apache.org/jira/browse/IMPALA-8341'>IMPALA-8341</a>] -         Data cache for remote reads
+</li>
+<li>[<a href='https://issues.apache.org/jira/browse/IMPALA-8344'>IMPALA-8344</a>] -         Add support for running S3 tests with S3Guard
+</li>
+<li>[<a href='https://issues.apache.org/jira/browse/IMPALA-8345'>IMPALA-8345</a>] -         Add option to set up minicluster to use Hive 3
+</li>
+<li>[<a href='https://issues.apache.org/jira/browse/IMPALA-8362'>IMPALA-8362</a>] -         Add authorization tests running with local catalog
+</li>
+<li>[<a href='https://issues.apache.org/jira/browse/IMPALA-8381'>IMPALA-8381</a>] -         Remove branch from ParquetPlainEncoder::Decode()
+</li>
+<li>[<a href='https://issues.apache.org/jira/browse/IMPALA-8410'>IMPALA-8410</a>] -         TestTpcdsInsert doesn&#39;t run in core or exhaustive builds, and test_tpcds_partitioned_insert is broken
+</li>
+<li>[<a href='https://issues.apache.org/jira/browse/IMPALA-8428'>IMPALA-8428</a>] -         Add support for caching file handles on s3
+</li>
+<li>[<a href='https://issues.apache.org/jira/browse/IMPALA-8443'>IMPALA-8443</a>] -         Record time spent in authorization in the runtime profile
+</li>
+<li>[<a href='https://issues.apache.org/jira/browse/IMPALA-8450'>IMPALA-8450</a>] -         Add support for zstd in parquet
+</li>
+<li>[<a href='https://issues.apache.org/jira/browse/IMPALA-8454'>IMPALA-8454</a>] -         Recursively list files within transactional tables
+</li>
+<li>[<a href='https://issues.apache.org/jira/browse/IMPALA-8460'>IMPALA-8460</a>] -         Unify cluster membership management in the backend
+</li>
+<li>[<a href='https://issues.apache.org/jira/browse/IMPALA-8461'>IMPALA-8461</a>] -         Re-schedule queries if the executor configuration has changed while queued in AC
+</li>
+<li>[<a href='https://issues.apache.org/jira/browse/IMPALA-8476'>IMPALA-8476</a>] -         Replace Sentry admin check workaround with proper Sentry API
+</li>
+<li>[<a href='https://issues.apache.org/jira/browse/IMPALA-8486'>IMPALA-8486</a>] -         test_udf_update_via_drop and test_udf_update_via_create fail on local catalog
+</li>
+<li>[<a href='https://issues.apache.org/jira/browse/IMPALA-8512'>IMPALA-8512</a>] -         Data cache tests failing on older CentOS 6 versions
+</li>
+<li>[<a href='https://issues.apache.org/jira/browse/IMPALA-8542'>IMPALA-8542</a>] -         Access trace collection for data cache
+</li>
+<li>[<a href='https://issues.apache.org/jira/browse/IMPALA-8543'>IMPALA-8543</a>] -         Log more diagnostics information in TAcceptQueueServer
+</li>
+<li>[<a href='https://issues.apache.org/jira/browse/IMPALA-8545'>IMPALA-8545</a>] -         Test ldap authentication
+</li>
+<li>[<a href='https://issues.apache.org/jira/browse/IMPALA-8549'>IMPALA-8549</a>] -         Add support for scanning DEFLATE text files
+</li>
+<li>[<a href='https://issues.apache.org/jira/browse/IMPALA-8578'>IMPALA-8578</a>] -         Reduce code in metric headers
+</li>
+<li>[<a href='https://issues.apache.org/jira/browse/IMPALA-8604'>IMPALA-8604</a>] -         Improve authorization test coverage for update/upsert/delete statements
+</li>
+<li>[<a href='https://issues.apache.org/jira/browse/IMPALA-8605'>IMPALA-8605</a>] -         Clean up connection/session management
+</li>
+<li>[<a href='https://issues.apache.org/jira/browse/IMPALA-8617'>IMPALA-8617</a>] -         Add support for lz4 in parquet
+</li>
+<li>[<a href='https://issues.apache.org/jira/browse/IMPALA-8637'>IMPALA-8637</a>] -         Implement transaction handling and locking for ACID queries
+</li>
+<li>[<a href='https://issues.apache.org/jira/browse/IMPALA-8659'>IMPALA-8659</a>] -         Allow self-RPCs for KRPC to go via loopback
+</li>
+<li>[<a href='https://issues.apache.org/jira/browse/IMPALA-8665'>IMPALA-8665</a>] -         Include extra info in error message when date cast fails
+</li>
+<li>[<a href='https://issues.apache.org/jira/browse/IMPALA-8667'>IMPALA-8667</a>] -         Remove --pull_incremental_statistics flag (on by default)
+</li>
+<li>[<a href='https://issues.apache.org/jira/browse/IMPALA-8673'>IMPALA-8673</a>] -         Add query option to force plan hints for insert queries
+</li>
+<li>[<a href='https://issues.apache.org/jira/browse/IMPALA-8682'>IMPALA-8682</a>] -         Add test coverage for testing authorized proxy user/group with Ranger
+</li>
+<li>[<a href='https://issues.apache.org/jira/browse/IMPALA-8734'>IMPALA-8734</a>] -         ALTER TABLE ... SET TBLPROPERTIES doesn&#39;t propagate until Invalidate Metadata
+</li>
+<li>[<a href='https://issues.apache.org/jira/browse/IMPALA-8766'>IMPALA-8766</a>] -         Change hadoop cloud dependencies to use hadoop-cloud-storage
+</li>
+<li>[<a href='https://issues.apache.org/jira/browse/IMPALA-8771'>IMPALA-8771</a>] -         Missing stats warning for complex type columns
+</li>
+<li>[<a href='https://issues.apache.org/jira/browse/IMPALA-8776'>IMPALA-8776</a>] -         test_event_processing.TestEventProcessing.test_insert_events is flaky
+</li>
+<li>[<a href='https://issues.apache.org/jira/browse/IMPALA-8785'>IMPALA-8785</a>] -         DEBUG build images should be tagged differently from release build
+</li>
+<li>[<a href='https://issues.apache.org/jira/browse/IMPALA-8799'>IMPALA-8799</a>] -         Prometheus metrics should be prefixed with &quot;impala_&quot;
+</li>
+<li>[<a href='https://issues.apache.org/jira/browse/IMPALA-8806'>IMPALA-8806</a>] -         Add metrics to improve observability of executor groups
+</li>
+<li>[<a href='https://issues.apache.org/jira/browse/IMPALA-8823'>IMPALA-8823</a>] -         Implement DROP TABLE for insert-only ACID tables
+</li>
+<li>[<a href='https://issues.apache.org/jira/browse/IMPALA-8828'>IMPALA-8828</a>] -         Support impersonation via http paths
+</li>
+<li>[<a href='https://issues.apache.org/jira/browse/IMPALA-8856'>IMPALA-8856</a>] -         TestKuduHMSIntegration.test_drop_managed_kudu_table failed with &quot;the table does not exist&quot;
+</li>
+</ul>
+    
+<h2>        Sub-task
+</h2>
+<ul>
+<li>[<a href='https://issues.apache.org/jira/browse/IMPALA-6718'>IMPALA-6718</a>] -         Add support column-level permissions on views
+</li>
+<li>[<a href='https://issues.apache.org/jira/browse/IMPALA-7331'>IMPALA-7331</a>] -         Add Char codegen support to helpers
+</li>
+<li>[<a href='https://issues.apache.org/jira/browse/IMPALA-7368'>IMPALA-7368</a>] -         Add initial support for DATE type
+</li>
+<li>[<a href='https://issues.apache.org/jira/browse/IMPALA-7369'>IMPALA-7369</a>] -         Implement DATE builtin functions
+</li>
+<li>[<a href='https://issues.apache.org/jira/browse/IMPALA-7370'>IMPALA-7370</a>] -         Add DATE type support to Parquet scanner/writer
+</li>
+<li>[<a href='https://issues.apache.org/jira/browse/IMPALA-7374'>IMPALA-7374</a>] -         Impala Doc: Doc DATE type
+</li>
+<li>[<a href='https://issues.apache.org/jira/browse/IMPALA-7375'>IMPALA-7375</a>] -         Impala Doc: Doc DATE functions
+</li>
+<li>[<a href='https://issues.apache.org/jira/browse/IMPALA-7467'>IMPALA-7467</a>] -         Port ExecQueryFInstances() to KPRC
+</li>
+<li>[<a href='https://issues.apache.org/jira/browse/IMPALA-7492'>IMPALA-7492</a>] -         Add support for DATE text parser/formatter
+</li>
+<li>[<a href='https://issues.apache.org/jira/browse/IMPALA-7917'>IMPALA-7917</a>] -         Decouple Sentry from Impala
+</li>
+<li>[<a href='https://issues.apache.org/jira/browse/IMPALA-7918'>IMPALA-7918</a>] -         Remove support for authorization policy file
+</li>
+<li>[<a href='https://issues.apache.org/jira/browse/IMPALA-7971'>IMPALA-7971</a>] -         Add support to detect insert events from Impala
+</li>
+<li>[<a href='https://issues.apache.org/jira/browse/IMPALA-7973'>IMPALA-7973</a>] -         Add support for fine-grained updates at partition level
+</li>
+<li>[<a href='https://issues.apache.org/jira/browse/IMPALA-7977'>IMPALA-7977</a>] -         Impala Doc: Doc the support for fine-grained updates at partition level
+</li>
+<li>[<a href='https://issues.apache.org/jira/browse/IMPALA-7991'>IMPALA-7991</a>] -         Impala 3.3 Doc: Doc Parquet page index
+</li>
+<li>[<a href='https://issues.apache.org/jira/browse/IMPALA-7995'>IMPALA-7995</a>] -         Run end-to-end tests against docker in minicluster
+</li>
+<li>[<a href='https://issues.apache.org/jira/browse/IMPALA-8049'>IMPALA-8049</a>] -         Impala Doc: Document Apache Ranger authorization provider
+</li>
+<li>[<a href='https://issues.apache.org/jira/browse/IMPALA-8072'>IMPALA-8072</a>] -         Clean up config files in docker containers
+</li>
+<li>[<a href='https://issues.apache.org/jira/browse/IMPALA-8097'>IMPALA-8097</a>] -         Experimental flag for running all queries with mt_dop
+</li>
+<li>[<a href='https://issues.apache.org/jira/browse/IMPALA-8099'>IMPALA-8099</a>] -         Update Impala build infrastructure to support Apache Ranger
+</li>
+<li>[<a href='https://issues.apache.org/jira/browse/IMPALA-8100'>IMPALA-8100</a>] -         Add support for Apache Ranger as an alternative authorization provider
+</li>
+<li>[<a href='https://issues.apache.org/jira/browse/IMPALA-8119'>IMPALA-8119</a>] -         Improve experience for configuring JVM heap size in docker container.
+</li>
+<li>[<a href='https://issues.apache.org/jira/browse/IMPALA-8121'>IMPALA-8121</a>] -         Pick better default flags in containers
+</li>
+<li>[<a href='https://issues.apache.org/jira/browse/IMPALA-8149'>IMPALA-8149</a>] -         Add support for alter_database events
+</li>
+<li>[<a href='https://issues.apache.org/jira/browse/IMPALA-8160'>IMPALA-8160</a>] -         Impala Doc: Doc CAST(... AS ... FORMAT &lt;template&gt;)
+</li>
+<li>[<a href='https://issues.apache.org/jira/browse/IMPALA-8176'>IMPALA-8176</a>] -         Convert tests with trivial main() functions to use a unified executable
+</li>
+<li>[<a href='https://issues.apache.org/jira/browse/IMPALA-8215'>IMPALA-8215</a>] -         Don&#39;t set numTrue = 1
+</li>
+<li>[<a href='https://issues.apache.org/jira/browse/IMPALA-8225'>IMPALA-8225</a>] -         Implement GRANT/REVOKE privilege to USER
+</li>
+<li>[<a href='https://issues.apache.org/jira/browse/IMPALA-8226'>IMPALA-8226</a>] -         Implement GRANT/REVOKE privilege to GROUP
+</li>
+<li>[<a href='https://issues.apache.org/jira/browse/IMPALA-8227'>IMPALA-8227</a>] -         Support WITH GRANT OPTION with Ranger authorization provider
+</li>
+<li>[<a href='https://issues.apache.org/jira/browse/IMPALA-8233'>IMPALA-8233</a>] -         Do not re-download Ranger if it is already downloaded
+</li>
+<li>[<a href='https://issues.apache.org/jira/browse/IMPALA-8248'>IMPALA-8248</a>] -         Improve Ranger test coverage
+</li>
+<li>[<a href='https://issues.apache.org/jira/browse/IMPALA-8280'>IMPALA-8280</a>] -         Implement SHOW GRANT USER &lt;user&gt;
+</li>
+<li>[<a href='https://issues.apache.org/jira/browse/IMPALA-8281'>IMPALA-8281</a>] -         Implement SHOW GRANT GROUP &lt;group&gt;
+</li>
+<li>[<a href='https://issues.apache.org/jira/browse/IMPALA-8292'>IMPALA-8292</a>] -         Misc clean-up after Sentry decoupling
+</li>
+<li>[<a href='https://issues.apache.org/jira/browse/IMPALA-8293'>IMPALA-8293</a>] -         Support for Ranger cache invalidation with INVALIDATE METADATA or REFRESH AUTHORIZATION
+</li>
+<li>[<a href='https://issues.apache.org/jira/browse/IMPALA-8309'>IMPALA-8309</a>] -         Use a more human-readable flag to switch to a different authorization provider
+</li>
+<li>[<a href='https://issues.apache.org/jira/browse/IMPALA-8329'>IMPALA-8329</a>] -         Update the Ranger minicluster with various fixes
+</li>
+<li>[<a href='https://issues.apache.org/jira/browse/IMPALA-8334'>IMPALA-8334</a>] -         Impala Doc: Document impala-shell config_file format
+</li>
+<li>[<a href='https://issues.apache.org/jira/browse/IMPALA-8338'>IMPALA-8338</a>] -         Check CREATION_TIME of databases in event processor to avoid incorrect/redundant invalidates
+</li>
+<li>[<a href='https://issues.apache.org/jira/browse/IMPALA-8363'>IMPALA-8363</a>] -         Disable column masking and row filtering
+</li>
+<li>[<a href='https://issues.apache.org/jira/browse/IMPALA-8364'>IMPALA-8364</a>] -         Impala Doc: Remove support for authorization policy file
+</li>
+<li>[<a href='https://issues.apache.org/jira/browse/IMPALA-8365'>IMPALA-8365</a>] -         Add test coverage for Ranger with catalog v2 (local catalog) mode
+</li>
+<li>[<a href='https://issues.apache.org/jira/browse/IMPALA-8368'>IMPALA-8368</a>] -         Create database/table with Ranger throws UnsupportedOperationException
+</li>
+<li>[<a href='https://issues.apache.org/jira/browse/IMPALA-8375'>IMPALA-8375</a>] -         Add metrics for spill disk usage
+</li>
+<li>[<a href='https://issues.apache.org/jira/browse/IMPALA-8376'>IMPALA-8376</a>] -         Add per-directory limits for scratch disk usage
+</li>
+<li>[<a href='https://issues.apache.org/jira/browse/IMPALA-8385'>IMPALA-8385</a>] -         Refactor Sentry admin user check
+</li>
+<li>[<a href='https://issues.apache.org/jira/browse/IMPALA-8387'>IMPALA-8387</a>] -         Impala Doc: Network I/O throughput to Query Profile output
+</li>
+<li>[<a href='https://issues.apache.org/jira/browse/IMPALA-8391'>IMPALA-8391</a>] -         Impala Doc: ALTER TABLE RENAME on managed Kudu table renames underlying Kudu table
+</li>
+<li>[<a href='https://issues.apache.org/jira/browse/IMPALA-8392'>IMPALA-8392</a>] -         make -j $IMPALA_BUILD_THREADS docker_images fails with OSError: [Errno 17] File exists: &#39;/home/ubuntu/Impala/docker/build_context&#39;
+</li>
+<li>[<a href='https://issues.apache.org/jira/browse/IMPALA-8400'>IMPALA-8400</a>] -         Implement Ranger audit event handler
+</li>
+<li>[<a href='https://issues.apache.org/jira/browse/IMPALA-8416'>IMPALA-8416</a>] -         Impala Doc: Document the system disk I/O throughput added to query profiles
+</li>
+<li>[<a href='https://issues.apache.org/jira/browse/IMPALA-8419'>IMPALA-8419</a>] -         Fetch metastore configuration values to detect misconfigured setups
+</li>
+<li>[<a href='https://issues.apache.org/jira/browse/IMPALA-8424'>IMPALA-8424</a>] -         Impala Doc: Doc the column level permission on views
+</li>
+<li>[<a href='https://issues.apache.org/jira/browse/IMPALA-8447'>IMPALA-8447</a>] -         Impala Doc: Document the feature to detect insert events from Impala
+</li>
+<li>[<a href='https://issues.apache.org/jira/browse/IMPALA-8448'>IMPALA-8448</a>] -         Impala Doc: Doc the feature for alter_database events
+</li>
+<li>[<a href='https://issues.apache.org/jira/browse/IMPALA-8456'>IMPALA-8456</a>] -         Impala Doc: Document HTTP based HS2/beeswax endpoints on coordinators
+</li>
+<li>[<a href='https://issues.apache.org/jira/browse/IMPALA-8472'>IMPALA-8472</a>] -         Update Ranger minicluster with the one that supports &quot;refresh&quot; access type
+</li>
+<li>[<a href='https://issues.apache.org/jira/browse/IMPALA-8473'>IMPALA-8473</a>] -         Refactor lineage publication mechanism to allow for different consumers
+</li>
+<li>[<a href='https://issues.apache.org/jira/browse/IMPALA-8477'>IMPALA-8477</a>] -         Impala Doc: Doc SHOW GRANT GROUP
+</li>
+<li>[<a href='https://issues.apache.org/jira/browse/IMPALA-8482'>IMPALA-8482</a>] -         Include all ranger-audit-plugins runtime dependencies
+</li>
+<li>[<a href='https://issues.apache.org/jira/browse/IMPALA-8490'>IMPALA-8490</a>] -         Impala Doc: the file handle cache now supports S3
+</li>
+<li>[<a href='https://issues.apache.org/jira/browse/IMPALA-8491'>IMPALA-8491</a>] -         Run container as non-root user
+</li>
+<li>[<a href='https://issues.apache.org/jira/browse/IMPALA-8492'>IMPALA-8492</a>] -         Re-enable large_string tests disabled for JVM OOM
+</li>
+<li>[<a href='https://issues.apache.org/jira/browse/IMPALA-8493'>IMPALA-8493</a>] -         Impala Doc: Document GRANT/REVOKE privilege to USER
+</li>
+<li>[<a href='https://issues.apache.org/jira/browse/IMPALA-8494'>IMPALA-8494</a>] -         Impala Doc: Document GRANT/REVOKE privilege to GROUP
+</li>
+<li>[<a href='https://issues.apache.org/jira/browse/IMPALA-8503'>IMPALA-8503</a>] -         Add option to allow Kudu cluster to start with HMS integration
+</li>
+<li>[<a href='https://issues.apache.org/jira/browse/IMPALA-8504'>IMPALA-8504</a>] -         Support CreateTable DDL with Kudu/HMS integration in Catalogd mode
+</li>
+<li>[<a href='https://issues.apache.org/jira/browse/IMPALA-8505'>IMPALA-8505</a>] -         Support AlterTable DDL with Kudu/HMS integration in Catalogd mode
+</li>
+<li>[<a href='https://issues.apache.org/jira/browse/IMPALA-8506'>IMPALA-8506</a>] -         Support RenameTable DDL with Kudu/HMS integration in Catalogd mode
+</li>
+<li>[<a href='https://issues.apache.org/jira/browse/IMPALA-8507'>IMPALA-8507</a>] -         Support DropTable DDL with Kudu/HMS integration in Catalogd mode
+</li>
+<li>[<a href='https://issues.apache.org/jira/browse/IMPALA-8515'>IMPALA-8515</a>] -         Test impala-shell distribution instead of special dev environment version
+</li>
+<li>[<a href='https://issues.apache.org/jira/browse/IMPALA-8519'>IMPALA-8519</a>] -         Impala Doc: Doc the limitation in insert events from SparkSQL
+</li>
+<li>[<a href='https://issues.apache.org/jira/browse/IMPALA-8528'>IMPALA-8528</a>] -         Refactor authorization code from AnalysisContext to AuthorizationChecker
+</li>
+<li>[<a href='https://issues.apache.org/jira/browse/IMPALA-8530'>IMPALA-8530</a>] -         Make some unsupported SQL error messages to be more user friendly
+</li>
+<li>[<a href='https://issues.apache.org/jira/browse/IMPALA-8534'>IMPALA-8534</a>] -         Enable data cache by default for end-to-end containerised tests
+</li>
+<li>[<a href='https://issues.apache.org/jira/browse/IMPALA-8546'>IMPALA-8546</a>] -         Collect logs from docker containers in tests
+</li>
+<li>[<a href='https://issues.apache.org/jira/browse/IMPALA-8551'>IMPALA-8551</a>] -         GRANT gives confusing error message
+</li>
+<li>[<a href='https://issues.apache.org/jira/browse/IMPALA-8559'>IMPALA-8559</a>] -         Support config validation for event processor on HMS-3
+</li>
+<li>[<a href='https://issues.apache.org/jira/browse/IMPALA-8564'>IMPALA-8564</a>] -         Add table&#39;s createTime information in the column lineage information
+</li>
+<li>[<a href='https://issues.apache.org/jira/browse/IMPALA-8575'>IMPALA-8575</a>] -         Impala Doc: New query options for Parquet writing
+</li>
+<li>[<a href='https://issues.apache.org/jira/browse/IMPALA-8588'>IMPALA-8588</a>] -         FIx revoke grant option behavior
+</li>
+<li>[<a href='https://issues.apache.org/jira/browse/IMPALA-8589'>IMPALA-8589</a>] -         Fix flaky query event hook tests
+</li>
+<li>[<a href='https://issues.apache.org/jira/browse/IMPALA-8599'>IMPALA-8599</a>] -         Create a separate Maven module for query event hook API
+</li>
+<li>[<a href='https://issues.apache.org/jira/browse/IMPALA-8615'>IMPALA-8615</a>] -         Impala Doc: Doc admission control support for scalable config params
+</li>
+<li>[<a href='https://issues.apache.org/jira/browse/IMPALA-8616'>IMPALA-8616</a>] -         Document --disconnected_session_timeout
+</li>
+<li>[<a href='https://issues.apache.org/jira/browse/IMPALA-8622'>IMPALA-8622</a>] -         Generate list of docker images generated by the build
+</li>
+<li>[<a href='https://issues.apache.org/jira/browse/IMPALA-8623'>IMPALA-8623</a>] -         Expose HS2 HTTP port in containers
+</li>
+<li>[<a href='https://issues.apache.org/jira/browse/IMPALA-8627'>IMPALA-8627</a>] -         Re-enable catalog v2 in containers
+</li>
+<li>[<a href='https://issues.apache.org/jira/browse/IMPALA-8629'>IMPALA-8629</a>] -         Adjust new KuduStorageHandler package
+</li>
+<li>[<a href='https://issues.apache.org/jira/browse/IMPALA-8633'>IMPALA-8633</a>] -         Insert event should not error when table does not exists
+</li>
+<li>[<a href='https://issues.apache.org/jira/browse/IMPALA-8649'>IMPALA-8649</a>] -         Confusing error messages in SHOW GRANT statements
+</li>
+<li>[<a href='https://issues.apache.org/jira/browse/IMPALA-8650'>IMPALA-8650</a>] -         Docker build should not depend on test config
+</li>
+<li>[<a href='https://issues.apache.org/jira/browse/IMPALA-8654'>IMPALA-8654</a>] -         Log the SQL statement in Ranger audit log
+</li>
+<li>[<a href='https://issues.apache.org/jira/browse/IMPALA-8658'>IMPALA-8658</a>] -         Populate required Ranger audit fields to be consistent with Hive
+</li>
+<li>[<a href='https://issues.apache.org/jira/browse/IMPALA-8668'>IMPALA-8668</a>] -         Document impala-shell HS2 support
+</li>
+<li>[<a href='https://issues.apache.org/jira/browse/IMPALA-8671'>IMPALA-8671</a>] -         Do not re-create a new instance of AuthorizationChecker with Ranger authorization
+</li>
+<li>[<a href='https://issues.apache.org/jira/browse/IMPALA-8686'>IMPALA-8686</a>] -         container entrypoint should exec binary
+</li>
+<li>[<a href='https://issues.apache.org/jira/browse/IMPALA-8688'>IMPALA-8688</a>] -         Script to automate pushing images to docker repo, e.g. dockerhub
+</li>
+<li>[<a href='https://issues.apache.org/jira/browse/IMPALA-8696'>IMPALA-8696</a>] -         Cmake dependencies for container build do not work correctly
+</li>
+<li>[<a href='https://issues.apache.org/jira/browse/IMPALA-8716'>IMPALA-8716</a>] -         Log a a group of privileges into a single audit event
+</li>
+<li>[<a href='https://issues.apache.org/jira/browse/IMPALA-8717'>IMPALA-8717</a>] -         impala-shell support for HiveServer2 HTTP endpoint
+</li>
+<li>[<a href='https://issues.apache.org/jira/browse/IMPALA-8727'>IMPALA-8727</a>] -         Impala Doc: DDL Docs Update for Kudu / HMS Integration 
+</li>
+<li>[<a href='https://issues.apache.org/jira/browse/IMPALA-8765'>IMPALA-8765</a>] -         Document JSON Udfs
+</li>
+<li>[<a href='https://issues.apache.org/jira/browse/IMPALA-8780'>IMPALA-8780</a>] -         Implementation of BufferedPlanRootSink where FlushFinal blocks until all rows are fetched
+</li>
+<li>[<a href='https://issues.apache.org/jira/browse/IMPALA-8781'>IMPALA-8781</a>] -         Add additional tests in test_result_spooling.py and validate cancellation logic
+</li>
+<li>[<a href='https://issues.apache.org/jira/browse/IMPALA-8811'>IMPALA-8811</a>] -         Impala Doc: query option to change default ACID type of new tables
+</li>
+<li>[<a href='https://issues.apache.org/jira/browse/IMPALA-8812'>IMPALA-8812</a>] -         Impala Doc: SPLIT_PART to support negative indexes
+</li>
+<li>[<a href='https://issues.apache.org/jira/browse/IMPALA-8813'>IMPALA-8813</a>] -         Impala Doc: Support Hive ACID Insert-only Tables
+</li>
+<li>[<a href='https://issues.apache.org/jira/browse/IMPALA-8837'>IMPALA-8837</a>] -         Impala Doc: Document impersonalization via HTTP and Knox authentication
+</li>
+</ul>
+        
+<h2>        Bug
+</h2>
+<ul>
+<li>[<a href='https://issues.apache.org/jira/browse/IMPALA-966'>IMPALA-966</a>] -         Type errors are attributed to wrong expression with insert
+</li>
+<li>[<a href='https://issues.apache.org/jira/browse/IMPALA-1789'>IMPALA-1789</a>] -         Return row count in HS2, possibly by having INSERT return a result set
+</li>
+<li>[<a href='https://issues.apache.org/jira/browse/IMPALA-1856'>IMPALA-1856</a>] -         MetadataOp.getTypeInfo() does not return all supported types
+</li>
+<li>[<a href='https://issues.apache.org/jira/browse/IMPALA-2029'>IMPALA-2029</a>] -         Impala in CDH 5.2.0 fails to compile with hadoop 2.7
+</li>
+<li>[<a href='https://issues.apache.org/jira/browse/IMPALA-2990'>IMPALA-2990</a>] -         Coordinator should timeout and cancel queries with unresponsive / stuck executors
+</li>
+<li>[<a href='https://issues.apache.org/jira/browse/IMPALA-4304'>IMPALA-4304</a>] -         Refactor cmake_modules to not use thirdparty/
+</li>
+<li>[<a href='https://issues.apache.org/jira/browse/IMPALA-4551'>IMPALA-4551</a>] -         Set limits on size of expression trees
+</li>
+<li>[<a href='https://issues.apache.org/jira/browse/IMPALA-4658'>IMPALA-4658</a>] -         Potential race if compiler reorders ReachedLimit() usage
+</li>
+<li>[<a href='https://issues.apache.org/jira/browse/IMPALA-4865'>IMPALA-4865</a>] -         Limit size of literal values from constant folding
+</li>
+<li>[<a href='https://issues.apache.org/jira/browse/IMPALA-6216'>IMPALA-6216</a>] -         PYTHON_EGG_CACHE used in impala-shell code should be made configurable
+</li>
+<li>[<a href='https://issues.apache.org/jira/browse/IMPALA-6326'>IMPALA-6326</a>] -         segfault during impyla HiveServer2Cursor.cancel_operation() over SSL
+</li>
+<li>[<a href='https://issues.apache.org/jira/browse/IMPALA-7070'>IMPALA-7070</a>] -         Failed test: query_test.test_nested_types.TestParquetArrayEncodings.test_thrift_array_of_arrays on S3
+</li>
+<li>[<a href='https://issues.apache.org/jira/browse/IMPALA-7154'>IMPALA-7154</a>] -         Error making &#39;dropDatabase&#39; RPC to Hive Metastore. NoSuchObjectException thrown
+</li>
+<li>[<a href='https://issues.apache.org/jira/browse/IMPALA-7176'>IMPALA-7176</a>] -         Impala fails to cancel a fragment in test_insert_mem_limit
+</li>
+<li>[<a href='https://issues.apache.org/jira/browse/IMPALA-7665'>IMPALA-7665</a>] -         Bringing up stopped statestore causes queries to fail
+</li>
+<li>[<a href='https://issues.apache.org/jira/browse/IMPALA-7734'>IMPALA-7734</a>] -         Catalog and Statestore memz page shows useless memory breakdown
+</li>
+<li>[<a href='https://issues.apache.org/jira/browse/IMPALA-7957'>IMPALA-7957</a>] -         UNION ALL query returns incorrect results
+</li>
+<li>[<a href='https://issues.apache.org/jira/browse/IMPALA-8124'>IMPALA-8124</a>] -         Build failure: webserver/test_web_pages.py
+</li>
+<li>[<a href='https://issues.apache.org/jira/browse/IMPALA-8224'>IMPALA-8224</a>] -         Impala Doc: Update the Web UI doc with missing contents
+</li>
+<li>[<a href='https://issues.apache.org/jira/browse/IMPALA-8270'>IMPALA-8270</a>] -         ASAN issue with MemTracker::LogUsage() called via webserver&#39;s /memz page
+</li>
+<li>[<a href='https://issues.apache.org/jira/browse/IMPALA-8277'>IMPALA-8277</a>] -         CHECK can be hit when there are gaps in present CPU numbers (KUDU-2721)
+</li>
+<li>[<a href='https://issues.apache.org/jira/browse/IMPALA-8279'>IMPALA-8279</a>] -         Revert IMPALA-6658 to avoid ETL performance regression
+</li>
+<li>[<a href='https://issues.apache.org/jira/browse/IMPALA-8283'>IMPALA-8283</a>] -         Creating a Kudu table doesn&#39;t take the primary key order specified
+</li>
+<li>[<a href='https://issues.apache.org/jira/browse/IMPALA-8286'>IMPALA-8286</a>] -         Accounting error in stress test on client failure
+</li>
+<li>[<a href='https://issues.apache.org/jira/browse/IMPALA-8288'>IMPALA-8288</a>] -         Setting EXEC_TIME_LIMIT_S to very high value triggers DCHECK in pretty printer
+</li>
+<li>[<a href='https://issues.apache.org/jira/browse/IMPALA-8295'>IMPALA-8295</a>] -         test_mem_limit in test_admission_controller timed out waiting for query to end
+</li>
+<li>[<a href='https://issues.apache.org/jira/browse/IMPALA-8307'>IMPALA-8307</a>] -         ntp-wait --help does not always return 0
+</li>
+<li>[<a href='https://issues.apache.org/jira/browse/IMPALA-8312'>IMPALA-8312</a>] -         Alter database operations have race condition
+</li>
+<li>[<a href='https://issues.apache.org/jira/browse/IMPALA-8314'>IMPALA-8314</a>] -         bootstrap_system.sh does not set correct permissions for files in ~/.ssh
+</li>
+<li>[<a href='https://issues.apache.org/jira/browse/IMPALA-8315'>IMPALA-8315</a>] -         Error from shutil.rmtree in ImpalaTestSuite::run_stmt_in_hive()
+</li>
+<li>[<a href='https://issues.apache.org/jira/browse/IMPALA-8317'>IMPALA-8317</a>] -         impala-shell&#39;s config_file should be parsed correctly for &#39;keyval&#39;
+</li>
+<li>[<a href='https://issues.apache.org/jira/browse/IMPALA-8322'>IMPALA-8322</a>] -         S3 tests encounter &quot;timed out waiting for receiver fragment instance&quot;
+</li>
+<li>[<a href='https://issues.apache.org/jira/browse/IMPALA-8323'>IMPALA-8323</a>] -         Bump impyla to 0.15 once it gets released
+</li>
+<li>[<a href='https://issues.apache.org/jira/browse/IMPALA-8325'>IMPALA-8325</a>] -         Leading Unicode comments cause Impala Shell failure.
+</li>
+<li>[<a href='https://issues.apache.org/jira/browse/IMPALA-8326'>IMPALA-8326</a>] -         Incorrect toSql for CreateDropRoleStmt
+</li>
+<li>[<a href='https://issues.apache.org/jira/browse/IMPALA-8327'>IMPALA-8327</a>] -         TestRPCTimeout::test_reportexecstatus_retry() times out on exhaustive build
+</li>
+<li>[<a href='https://issues.apache.org/jira/browse/IMPALA-8330'>IMPALA-8330</a>] -         Impala shell --config_file should use flag names and not dest variable names
+</li>
+<li>[<a href='https://issues.apache.org/jira/browse/IMPALA-8332'>IMPALA-8332</a>] -         Remove Impala Shell warnings part 1
+</li>
+<li>[<a href='https://issues.apache.org/jira/browse/IMPALA-8333'>IMPALA-8333</a>] -         Remove Impala Shell warnings part 2
+</li>
+<li>[<a href='https://issues.apache.org/jira/browse/IMPALA-8336'>IMPALA-8336</a>] -         TestNestedTypes.test_tpch_mem_limit_single_node failed on centos6
+</li>
+<li>[<a href='https://issues.apache.org/jira/browse/IMPALA-8337'>IMPALA-8337</a>] -         Dataload fails due to ImportError: cannot import name OrderedDict from impala-shell
+</li>
+<li>[<a href='https://issues.apache.org/jira/browse/IMPALA-8340'>IMPALA-8340</a>] -         IMPALA-8337 adds configparser dependency which isn&#39;t always available where impala-shell is installed
+</li>
+<li>[<a href='https://issues.apache.org/jira/browse/IMPALA-8359'>IMPALA-8359</a>] -         Coverage measurement is not working for Impala daemons
+</li>
+<li>[<a href='https://issues.apache.org/jira/browse/IMPALA-8360'>IMPALA-8360</a>] -         SynchronousThreadPoolTest ASSERT_TRUE(*no_sleep_destroyed) failed
+</li>
+<li>[<a href='https://issues.apache.org/jira/browse/IMPALA-8371'>IMPALA-8371</a>] -         Unified backend tests need to return appropriate return code
+</li>
+<li>[<a href='https://issues.apache.org/jira/browse/IMPALA-8372'>IMPALA-8372</a>] -         Impala Doc: Consistent uses of hyphens with global flags
+</li>
+<li>[<a href='https://issues.apache.org/jira/browse/IMPALA-8377'>IMPALA-8377</a>] -         Recent toolchain bump breaks Ubuntu 14.04 builds
+</li>
+<li>[<a href='https://issues.apache.org/jira/browse/IMPALA-8380'>IMPALA-8380</a>] -         The minicluster metastore doesn&#39;t start on systems with postgres 10
+</li>
+<li>[<a href='https://issues.apache.org/jira/browse/IMPALA-8382'>IMPALA-8382</a>] -         Add support for SLES 12 SP3
+</li>
+<li>[<a href='https://issues.apache.org/jira/browse/IMPALA-8386'>IMPALA-8386</a>] -         Incorrect predicate in a left outer join query
+</li>
+<li>[<a href='https://issues.apache.org/jira/browse/IMPALA-8390'>IMPALA-8390</a>] -         test_cancel_insert and test_cancel_sort broken
+</li>
+<li>[<a href='https://issues.apache.org/jira/browse/IMPALA-8393'>IMPALA-8393</a>] -         setup-ranger step in create-load-data.sh breaks data load to real clusters
+</li>
+<li>[<a href='https://issues.apache.org/jira/browse/IMPALA-8395'>IMPALA-8395</a>] -         SystemStateInfoTest.ReadProcNetDev failing on Centos 6
+</li>
+<li>[<a href='https://issues.apache.org/jira/browse/IMPALA-8401'>IMPALA-8401</a>] -         Initiate graceful shutdown of impala daemon by sending a signal to the process
+</li>
+<li>[<a href='https://issues.apache.org/jira/browse/IMPALA-8412'>IMPALA-8412</a>] -         Bump ORC library version
+</li>
+<li>[<a href='https://issues.apache.org/jira/browse/IMPALA-8413'>IMPALA-8413</a>] -         SystemStateInfoTest.ReadProcNetDev fails inside a Docker container
+</li>
+<li>[<a href='https://issues.apache.org/jira/browse/IMPALA-8414'>IMPALA-8414</a>] -         Warning caused by not skipping header of /proc/net/dev
+</li>
+<li>[<a href='https://issues.apache.org/jira/browse/IMPALA-8426'>IMPALA-8426</a>] -         Logging error in DROP_TABLE event processing.
+</li>
+<li>[<a href='https://issues.apache.org/jira/browse/IMPALA-8430'>IMPALA-8430</a>] -         testCreateDropCreateDatabaseFromImpala failed
+</li>
+<li>[<a href='https://issues.apache.org/jira/browse/IMPALA-8434'>IMPALA-8434</a>] -         Alter Db leads to functions missing unless run &quot;refresh functions&quot; 
+</li>
+<li>[<a href='https://issues.apache.org/jira/browse/IMPALA-8444'>IMPALA-8444</a>] -         Analysis perf regression after IMPALA-7616
+</li>
+<li>[<a href='https://issues.apache.org/jira/browse/IMPALA-8455'>IMPALA-8455</a>] -         GET_TABLE failed with InvalidStorageDescriptorException
+</li>
+<li>[<a href='https://issues.apache.org/jira/browse/IMPALA-8458'>IMPALA-8458</a>] -         Can&#39;t set numNull/maxSize/avgSize column stats with local catalog without also setting NDV
+</li>
+<li>[<a href='https://issues.apache.org/jira/browse/IMPALA-8459'>IMPALA-8459</a>] -         Cannot delete impala/kudu table if backing kudu table dropped with local catalog
+</li>
+<li>[<a href='https://issues.apache.org/jira/browse/IMPALA-8463'>IMPALA-8463</a>] -         skip.header.line.count ignored on local catalog
+</li>
+<li>[<a href='https://issues.apache.org/jira/browse/IMPALA-8464'>IMPALA-8464</a>] -         JdbcTest.testMetaDataGetColumnComments() fails with local catalog
+</li>
+<li>[<a href='https://issues.apache.org/jira/browse/IMPALA-8465'>IMPALA-8465</a>] -         hs2.test_json_endpoints.TestJsonEndpoints fails on deployed clusters
+</li>
+<li>[<a href='https://issues.apache.org/jira/browse/IMPALA-8466'>IMPALA-8466</a>] -         TestHdfsCachingDdl.test_caching_ddl fails under docker
+</li>
+<li>[<a href='https://issues.apache.org/jira/browse/IMPALA-8467'>IMPALA-8467</a>] -         ParquetPlainEncoder::Decode leads to multiple test failures in ASAN builds
+</li>
+<li>[<a href='https://issues.apache.org/jira/browse/IMPALA-8468'>IMPALA-8468</a>] -         buildall.sh should warn that asan/ubsan/... are exclusive
+</li>
+<li>[<a href='https://issues.apache.org/jira/browse/IMPALA-8469'>IMPALA-8469</a>] -         Admit memory not set in backend descriptor for coordinator-only nodes
+</li>
+<li>[<a href='https://issues.apache.org/jira/browse/IMPALA-8475'>IMPALA-8475</a>] -         buildall.sh fails with undefined CMAKE_BUILD_TYPE_LIST on Centos
+</li>
+<li>[<a href='https://issues.apache.org/jira/browse/IMPALA-8478'>IMPALA-8478</a>] -         tests/authorization/test_provider.py breaks on CentOS 6 with Python 2.7-ism
+</li>
+<li>[<a href='https://issues.apache.org/jira/browse/IMPALA-8481'>IMPALA-8481</a>] -         test_hbase_col_filter failing on deployed clusters due to permissions error
+</li>
+<li>[<a href='https://issues.apache.org/jira/browse/IMPALA-8485'>IMPALA-8485</a>] -         References to deprecated feature authorization policy file need to be removed
+</li>
+<li>[<a href='https://issues.apache.org/jira/browse/IMPALA-8488'>IMPALA-8488</a>] -         Authorization tests for Ranger breaks on S3 in test_show_grant
+</li>
+<li>[<a href='https://issues.apache.org/jira/browse/IMPALA-8496'>IMPALA-8496</a>] -         test_data_cache.py is flaky
+</li>
+<li>[<a href='https://issues.apache.org/jira/browse/IMPALA-8497'>IMPALA-8497</a>] -         SQL return ArrayIndexOutOfBoundsException when ends with &#39;\n&#39;
+</li>
+<li>[<a href='https://issues.apache.org/jira/browse/IMPALA-8499'>IMPALA-8499</a>] -         test_insert_events datetime.total_seconds(), which is not supported in Python 2.6
+</li>
+<li>[<a href='https://issues.apache.org/jira/browse/IMPALA-8524'>IMPALA-8524</a>] -         Avoid calling &quot;hive&quot; via command line in EE tests
+</li>
+<li>[<a href='https://issues.apache.org/jira/browse/IMPALA-8527'>IMPALA-8527</a>] -         Maven hangs on jenkins.impala.io talking to repository.apache.org
+</li>
+<li>[<a href='https://issues.apache.org/jira/browse/IMPALA-8537'>IMPALA-8537</a>] -         Negative values reported for tmp-file-mgr.scratch-space-bytes-used under heavy spilling load
+</li>
+<li>[<a href='https://issues.apache.org/jira/browse/IMPALA-8540'>IMPALA-8540</a>] -         Statestore address already in use error causing occasional test failures
+</li>
+<li>[<a href='https://issues.apache.org/jira/browse/IMPALA-8552'>IMPALA-8552</a>] -         impala-shell tests break on deployed clusters if IMPALA_LOCAL_BUILD_VERSION is None
+</li>
+<li>[<a href='https://issues.apache.org/jira/browse/IMPALA-8553'>IMPALA-8553</a>] -         Several tests failing with connection errors on deployed clusters
+</li>
+<li>[<a href='https://issues.apache.org/jira/browse/IMPALA-8560'>IMPALA-8560</a>] -         Prometheus metrics support in Impala
+</li>
+<li>[<a href='https://issues.apache.org/jira/browse/IMPALA-8561'>IMPALA-8561</a>] -         ScanRanges with mtime=-1 can lead to inconsistent reads when using the file handle cache
+</li>
+<li>[<a href='https://issues.apache.org/jira/browse/IMPALA-8562'>IMPALA-8562</a>] -         Data cache should skip scan range with mtime == -1
+</li>
+<li>[<a href='https://issues.apache.org/jira/browse/IMPALA-8563'>IMPALA-8563</a>] -         BE tests specifying their own SSL cipher sets fail on Ubuntu 18
+</li>
+<li>[<a href='https://issues.apache.org/jira/browse/IMPALA-8565'>IMPALA-8565</a>] -         Test failure in TestAdmissionControllerStress.test_mem_limit
+</li>
+<li>[<a href='https://issues.apache.org/jira/browse/IMPALA-8566'>IMPALA-8566</a>] -         COMPUTE INCREMENTAL STATS sets num_nulls off-by-one
+</li>
+<li>[<a href='https://issues.apache.org/jira/browse/IMPALA-8567'>IMPALA-8567</a>] -         Many random catalog consistency issues with catalog v2/event processor
+</li>
+<li>[<a href='https://issues.apache.org/jira/browse/IMPALA-8570'>IMPALA-8570</a>] -         test_restart_statestore_query_resilience AssertionError: Query expected to fail
+</li>
+<li>[<a href='https://issues.apache.org/jira/browse/IMPALA-8595'>IMPALA-8595</a>] -         THRIFT-3505 breaks IMPALA-5775
+</li>
+<li>[<a href='https://issues.apache.org/jira/browse/IMPALA-8600'>IMPALA-8600</a>] -         Reload partition does not work for transactional tables
+</li>
+<li>[<a href='https://issues.apache.org/jira/browse/IMPALA-8603'>IMPALA-8603</a>] -         Some custom cluster tests print error messages after IMPALA-1653 was fixed
+</li>
+<li>[<a href='https://issues.apache.org/jira/browse/IMPALA-8606'>IMPALA-8606</a>] -         GET_TABLES performance in local catalog mode
+</li>
+<li>[<a href='https://issues.apache.org/jira/browse/IMPALA-8613'>IMPALA-8613</a>] -         AnalyzeKuduDDLTest broken in S3 environment
+</li>
+<li>[<a href='https://issues.apache.org/jira/browse/IMPALA-8630'>IMPALA-8630</a>] -         Consistent remote placement should include partition information when calculating placement
+</li>
+<li>[<a href='https://issues.apache.org/jira/browse/IMPALA-8635'>IMPALA-8635</a>] -         Kudu HMS integration check should not fetch metastore URIs configuration from metastore
+</li>
+<li>[<a href='https://issues.apache.org/jira/browse/IMPALA-8638'>IMPALA-8638</a>] -         Test failure: test_create_table_timestamp
+</li>
+<li>[<a href='https://issues.apache.org/jira/browse/IMPALA-8640'>IMPALA-8640</a>] -         ImpalaTestSuite::create_impala_client() user session is sticky
+</li>
+<li>[<a href='https://issues.apache.org/jira/browse/IMPALA-8663'>IMPALA-8663</a>] -         FileMetadataLoader should skip listing files in hidden and tmp directories
+</li>
+<li>[<a href='https://issues.apache.org/jira/browse/IMPALA-8677'>IMPALA-8677</a>] -         Removing an unused node does not leave consistent remote scheduling unchanged
+</li>
+<li>[<a href='https://issues.apache.org/jira/browse/IMPALA-8681'>IMPALA-8681</a>] -         null ValidWriteIdLists written into profile
+</li>
+<li>[<a href='https://issues.apache.org/jira/browse/IMPALA-8689'>IMPALA-8689</a>] -         test_hive_impala_interop failing with &quot;Timeout &gt;7200s&quot;
+</li>
+<li>[<a href='https://issues.apache.org/jira/browse/IMPALA-8697'>IMPALA-8697</a>] -         test_query_options fails on EC(Erasure coding turned on) builds
+</li>
+<li>[<a href='https://issues.apache.org/jira/browse/IMPALA-8700'>IMPALA-8700</a>] -         test_hdfs_scan_node_errors DCHECK-failing on invalid mtime
+</li>
+<li>[<a href='https://issues.apache.org/jira/browse/IMPALA-8702'>IMPALA-8702</a>] -         PlannerTest.testJoins flakiness due to reliance on an exact cardinality estimate
+</li>
+<li>[<a href='https://issues.apache.org/jira/browse/IMPALA-8713'>IMPALA-8713</a>] -         MathFunctions::Unhex() can overflow stack
+</li>
+<li>[<a href='https://issues.apache.org/jira/browse/IMPALA-8730'>IMPALA-8730</a>] -         Multiple test failures in S3 due to incorrect loading of functional.alltypes
+</li>
+<li>[<a href='https://issues.apache.org/jira/browse/IMPALA-8732'>IMPALA-8732</a>] -         tcmalloc contention in Coordinator::BackendState::Exec()
+</li>
+<li>[<a href='https://issues.apache.org/jira/browse/IMPALA-8743'>IMPALA-8743</a>] -         ASAN failure with BatchedBitReader::UnpackBatch
+</li>
+<li>[<a href='https://issues.apache.org/jira/browse/IMPALA-8744'>IMPALA-8744</a>] -         TestSessionExpiration.test_closing_idle_connection fails on Centos 6 due to Python 2.6 incompatibility
+</li>
+<li>[<a href='https://issues.apache.org/jira/browse/IMPALA-8745'>IMPALA-8745</a>] -         Impala Doc: Fix description of Impala function initcap() in docs
+</li>
+<li>[<a href='https://issues.apache.org/jira/browse/IMPALA-8747'>IMPALA-8747</a>] -         ImpalaTestSuite::setup_class() can hit TypeError on HS2 connection setup failure
+</li>
+<li>[<a href='https://issues.apache.org/jira/browse/IMPALA-8748'>IMPALA-8748</a>] -         Must pass hostname to RpcMgr::GetProxy()
+</li>
+<li>[<a href='https://issues.apache.org/jira/browse/IMPALA-8750'>IMPALA-8750</a>] -         TestObservability.test_query_profile_contains_query_compilation_events failing when compilation events appear dynamically
+</li>
+<li>[<a href='https://issues.apache.org/jira/browse/IMPALA-8758'>IMPALA-8758</a>] -         Misleading error message &quot;Unknown executor group&quot; during cluster startup with dedicated coordinator
+</li>
+<li>[<a href='https://issues.apache.org/jira/browse/IMPALA-8783'>IMPALA-8783</a>] -         Add Kerberos SPNEGO support to the http hs2 server
+</li>
+<li>[<a href='https://issues.apache.org/jira/browse/IMPALA-8790'>IMPALA-8790</a>] -         IllegalStateException: Illegal reference to non-materialized slot
+</li>
+<li>[<a href='https://issues.apache.org/jira/browse/IMPALA-8798'>IMPALA-8798</a>] -         TestAutoScaling does not work on erasure-coded files
+</li>
+<li>[<a href='https://issues.apache.org/jira/browse/IMPALA-8807'>IMPALA-8807</a>] -         OPTIMIZE_PARTITION_KEY_SCANS works in more cases than documented
+</li>
+<li>[<a href='https://issues.apache.org/jira/browse/IMPALA-8816'>IMPALA-8816</a>] -         custom cluster tests in precommit are taking close to 2 hours
+</li>
+<li>[<a href='https://issues.apache.org/jira/browse/IMPALA-8817'>IMPALA-8817</a>] -         TestTestcaseBuilder broken on S3
+</li>
+<li>[<a href='https://issues.apache.org/jira/browse/IMPALA-8820'>IMPALA-8820</a>] -         start-impala-cluster can&#39;t find catalogd on recent Ubuntu 16.04
+</li>
+<li>[<a href='https://issues.apache.org/jira/browse/IMPALA-8832'>IMPALA-8832</a>] -         Queries fail to run when connecting to Impala over Knox
+</li>
+<li>[<a href='https://issues.apache.org/jira/browse/IMPALA-8833'>IMPALA-8833</a>] -         Check failed: bit_width &lt;= sizeof(T) * 8 (40 vs. 32)  in BatchedBitReader::UnpackBatch()
+</li>
+<li>[<a href='https://issues.apache.org/jira/browse/IMPALA-8841'>IMPALA-8841</a>] -         Dataload flakiness: hive-exec-*.jar changed on src filesystem
+</li>
+<li>[<a href='https://issues.apache.org/jira/browse/IMPALA-8847'>IMPALA-8847</a>] -         Add partition events may contain empty partition object list
+</li>
+<li>[<a href='https://issues.apache.org/jira/browse/IMPALA-8848'>IMPALA-8848</a>] -         Cardinality of UnionNode does not handle missing input cardinality correctly
+</li>
+<li>[<a href='https://issues.apache.org/jira/browse/IMPALA-8849'>IMPALA-8849</a>] -         IllegalStateException in HashJoinNode because of missing memory estimate
+</li>
+<li>[<a href='https://issues.apache.org/jira/browse/IMPALA-8850'>IMPALA-8850</a>] -         TmpFileMgrTest.TestDirectoryLimitParsing failed in asf-master build with error &quot;Value of: dirs3.size()   Actual: 3 Expected: 4&quot;
+</li>
+<li>[<a href='https://issues.apache.org/jira/browse/IMPALA-8854'>IMPALA-8854</a>] -         test_acid_insert is failing with &quot;Processor has no capabilities&quot;
+</li>
+<li>[<a href='https://issues.apache.org/jira/browse/IMPALA-8859'>IMPALA-8859</a>] -         test_shell_commandline.test_global_config_file fails in remote cluster test
+</li>
+<li>[<a href='https://issues.apache.org/jira/browse/IMPALA-8862'>IMPALA-8862</a>] -         Don&#39;t ship jetty and ant in Impala containers
+</li>
+<li>[<a href='https://issues.apache.org/jira/browse/IMPALA-8864'>IMPALA-8864</a>] -         Shell tests in http mode fail on CentOS 6
+</li>
+<li>[<a href='https://issues.apache.org/jira/browse/IMPALA-8872'>IMPALA-8872</a>] -         SPNEGO auth failures using httpcore v4.4.1
+</li>
+<li>[<a href='https://issues.apache.org/jira/browse/IMPALA-8874'>IMPALA-8874</a>] -         TestEventProcessing.test_empty_partition_events_transactional seems flaky
+</li>
+</ul>
+    
+<h2>        Test
+</h2>
+<ul>
+<li>[<a href='https://issues.apache.org/jira/browse/IMPALA-8415'>IMPALA-8415</a>] -         test_corrupt_stats exhaustive test failed
+</li>
+<li>[<a href='https://issues.apache.org/jira/browse/IMPALA-8619'>IMPALA-8619</a>] -         Add interoperability tests for parquet/zstd
+</li>
+</ul>
+        
+<h2>        Task
+</h2>
+<ul>
+<li>[<a href='https://issues.apache.org/jira/browse/IMPALA-337'>IMPALA-337</a>] -         Update Impala debug webserver to accept HTTP POST requests
+</li>
+<li>[<a href='https://issues.apache.org/jira/browse/IMPALA-6826'>IMPALA-6826</a>] -         Add support for Ubuntu 18.04
+</li>
+<li>[<a href='https://issues.apache.org/jira/browse/IMPALA-8101'>IMPALA-8101</a>] -         Thrift 11 compilation and Thrift ext-data-source compilation are always run
+</li>
+<li>[<a href='https://issues.apache.org/jira/browse/IMPALA-8143'>IMPALA-8143</a>] -         Add features to DoRpcWithRetry()
+</li>
+<li>[<a href='https://issues.apache.org/jira/browse/IMPALA-8161'>IMPALA-8161</a>] -         Impala Doc: Document the supported Date and Time patterns
+</li>
+<li>[<a href='https://issues.apache.org/jira/browse/IMPALA-8427'>IMPALA-8427</a>] -         Document the behavior change in IMPALA-7800
+</li>
+<li>[<a href='https://issues.apache.org/jira/browse/IMPALA-8470'>IMPALA-8470</a>] -         Impala Doc: Use a more human-readable flag to switch to a different authorization provider
+</li>
+<li>[<a href='https://issues.apache.org/jira/browse/IMPALA-8495'>IMPALA-8495</a>] -         Impala Doc: Document Data Read Cache
+</li>
+<li>[<a href='https://issues.apache.org/jira/browse/IMPALA-8516'>IMPALA-8516</a>] -         Update maven on Jenkins Ubuntu build slaves
+</li>
+<li>[<a href='https://issues.apache.org/jira/browse/IMPALA-8529'>IMPALA-8529</a>] -         ccache is ignored when using ninja generator
+</li>
+<li>[<a href='https://issues.apache.org/jira/browse/IMPALA-8641'>IMPALA-8641</a>] -         Document compression codec zstd in Parquet
+</li>
+<li>[<a href='https://issues.apache.org/jira/browse/IMPALA-8701'>IMPALA-8701</a>] -         Document idle session management after IMPALA-7802
+</li>
+<li>[<a href='https://issues.apache.org/jira/browse/IMPALA-8723'>IMPALA-8723</a>] -         Impala Doc: Upgrading to 3.3
+</li>
+<li>[<a href='https://issues.apache.org/jira/browse/IMPALA-8729'>IMPALA-8729</a>] -         Impala Doc: Describe how to enable Catalog V2
+</li>
+<li>[<a href='https://issues.apache.org/jira/browse/IMPALA-8746'>IMPALA-8746</a>] -         Document the new query option DEFAULT_HINTS_INSERT_STATEMENT
+</li>
+<li>[<a href='https://issues.apache.org/jira/browse/IMPALA-8814'>IMPALA-8814</a>] -         Impala Doc: Webui and SPNEGO
+</li>
+<li>[<a href='https://issues.apache.org/jira/browse/IMPALA-8829'>IMPALA-8829</a>] -         Document limitation of parsing memory string
+</li>
+</ul>
+                                                                                                                                        
+</body>
+</html>
