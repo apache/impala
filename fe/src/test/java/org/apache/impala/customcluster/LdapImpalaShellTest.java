@@ -22,6 +22,8 @@ import static org.junit.Assert.assertTrue;
 
 import java.io.BufferedReader;
 import java.io.InputStreamReader;
+import java.util.Arrays;
+import java.util.List;
 
 import org.apache.directory.server.core.annotations.CreateDS;
 import org.apache.directory.server.core.annotations.CreatePartition;
@@ -31,6 +33,7 @@ import org.apache.directory.server.core.annotations.ApplyLdifFiles;
 import org.apache.directory.server.core.integ.CreateLdapServerRule;
 import org.apache.impala.testutil.ImpalaJdbcClient;
 import org.junit.After;
+import org.junit.Assume;
 import org.junit.Before;
 import org.junit.ClassRule;
 import org.junit.Test;
@@ -80,9 +83,9 @@ public class LdapImpalaShellTest {
 
   /**
    * Helper to run a shell command 'cmd'. If 'shouldSucceed' is true, the command
-   * is expected to succeed, failure otherwise.
+   * is expected to succeed, failure otherwise. Returns the stdout from the command.
    */
-  private void runShellCommand(String[] cmd, boolean shouldSucceed, String expectedOut,
+  private String runShellCommand(String[] cmd, boolean shouldSucceed, String expectedOut,
       String expectedErr) throws Exception {
     Runtime rt = Runtime.getRuntime();
     Process process = rt.exec(cmd);
@@ -107,10 +110,24 @@ public class LdapImpalaShellTest {
     int expectedReturn = shouldSucceed ? 0 : 1;
     assertEquals(stderr.toString(), expectedReturn, process.waitFor());
     // If the query succeeds, assert that the output is correct.
+    String stdout = stdoutBuf.toString();
     if (shouldSucceed) {
-      String stdout = stdoutBuf.toString();
       assertTrue(stdout, stdout.contains(expectedOut));
     }
+    return stdout;
+  }
+
+  /**
+   * Checks if the local python supports SSLContext needed by shell http
+   * transport tests. Python version shipped with CentOS6 is known to
+   * have an older version of python resulting in test failures.
+   */
+  private boolean pythonSupportsSSLContext() throws Exception {
+    // Runs the following command:
+    // python -c "import ssl; print hasattr(ssl, 'create_default_context')"
+    String[] cmd =
+        {"python", "-c", "import ssl; print hasattr(ssl, 'create_default_context')"};
+    return Boolean.parseBoolean(runShellCommand(cmd, true, "", "").replace("\n", ""));
   }
 
   /**
@@ -133,7 +150,12 @@ public class LdapImpalaShellTest {
     String[] commandWithoutAuth =
         {"impala-shell.sh", "", String.format("--query=%s", query)};
     String protocolTemplate = "--protocol=%s";
-    String[] protocolsToTest = {"beeswax", "hs2", "hs2-http"};
+    List<String> protocolsToTest = Arrays.asList("beeswax", "hs2");
+    if (pythonSupportsSSLContext()) {
+      // http transport tests will fail with older python versions (IMPALA-8873)
+      protocolsToTest = Arrays.asList("beeswax", "hs2", "hs2-http");
+    }
+
     for (String protocol: protocolsToTest) {
       protocol = String.format(protocolTemplate, protocol);
       validCommand[1] = protocol;
@@ -163,6 +185,8 @@ public class LdapImpalaShellTest {
    */
   @Test
   public void testHttpImpersonation() throws Exception {
+    // Ignore the test if python SSLContext support is not available.
+    Assume.assumeTrue(pythonSupportsSSLContext());
     String invalidDelegateUser = "invalid-delegate-user";
     String query = "select logged_in_user()";
     String errTemplate = "User '%s' is not authorized to delegate to '%s'";
