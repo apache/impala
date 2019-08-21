@@ -10,8 +10,8 @@
 <meta name="DC.Title" content="Upgrading Impala" />
 <meta name="prodname" content="Impala" />
 <meta name="prodname" content="Impala" />
-<meta name="version" content="Impala 3.2.x" />
-<meta name="version" content="Impala 3.2.x" />
+<meta name="version" content="Impala 3.3.x" />
+<meta name="version" content="Impala 3.3.x" />
 <meta name="DC.Format" content="XHTML" />
 <meta name="DC.Identifier" content="upgrading" />
 <link rel="stylesheet" type="text/css" href="../commonltr.css" />
@@ -149,7 +149,7 @@ $ ps ax | grep [i]mpalad
       </ul>
 
 
-      <div class="note note"><span class="notetitle">Note:</span>
+      <div class="note note"><span class="notetitle">Note:</span> 
         <p class="p">
           If the services did not start successfully (even though the <code class="ph codeph">sudo
           service</code> command might display <code class="ph codeph">[OK]</code>), check for errors in the
@@ -169,17 +169,25 @@ $ ps ax | grep [i]mpalad
 
     <h2 class="title topictitle2" id="ariaid-title3">Impala Upgrade Considerations</h2>
 
+
     <div class="topic concept nested2" aria-labelledby="ariaid-title4" id="impala_privileges_30">
-      <h3 class="title topictitle3" id="ariaid-title4">Grant REFRESH Privilege to Impala Roles with SELECT or INSERT
-        Privilege when Upgrading to <span class="keyword">Impala 3.0</span></h3>
+
+      <h3 class="title topictitle3" id="ariaid-title4">Grant REFRESH Privilege to Impala Roles with SELECT or INSERT Privilege when Upgrading to <span class="keyword">Impala 3.0</span></h3>
+
 
       <div class="body conbody">
-        <p class="p"> To use the fine grained privileges feature in <span class="keyword">Impala 3.0</span>, if a role has the <code class="ph codeph">SELECT</code> or
-            <code class="ph codeph">INSERT</code> privilege on an object in Impala before
-          upgrading to <span class="keyword">Impala 3.0</span>, grant that role the
-            <code class="ph codeph">REFRESH</code> privilege after the upgrade. </p>
+
+        <p class="p">
+          To use the fine grained privileges feature in
+          <span class="keyword">Impala 3.0</span>, if a role has the <code class="ph codeph">SELECT</code> or
+          <code class="ph codeph">INSERT</code> privilege on an object in Impala before upgrading to
+          <span class="keyword">Impala 3.0</span>, grant that role the <code class="ph codeph">REFRESH</code> privilege
+          after the upgrade.
+        </p>
+
 
       </div>
+
 
     </div>
 
@@ -200,9 +208,9 @@ $ ps ax | grep [i]mpalad
 
         <div class="p">
           If you need to use the reserved words from previous versions of Impala, set the
-          <code class="ph codeph">impalad</code> and <code class="ph codeph">catalogd</code> startup flag. Note that this
-          startup option will be deprecated in a future release.
-<pre class="pre codeblock"><code>--reserved_words_version=2.11.0</code></pre>
+          <code class="ph codeph">impalad</code> and <code class="ph codeph">catalogd</code> startup flag.
+<pre class="pre codeblock"><code>‑‑reserved_words_version=2.11.0</code></pre>
+          Note that this startup option will be deprecated in a future release.
         </div>
 
 
@@ -277,8 +285,8 @@ $ ps ax | grep [i]mpalad
 
 
         <p class="p">
-          See <a href="impala_parquet_array_resolution.html"><span class="keyword">PARQUET_ARRAY_RESOLUTION Query Option (Impala 2.9 or higher only)</span></a> for the information about the query
-          option.
+          See <code class="ph codeph"><a href="impala_parquet_array_resolution.html"><span class="keyword">PARQUET_ARRAY_RESOLUTION Query Option (Impala 2.9 or higher only)</span></a></code> for the information
+          about the query option.
         </p>
 
 
@@ -425,8 +433,8 @@ $ ps ax | grep [i]mpalad
       <div class="body conbody">
 
         <p class="p">
-          The deprecated <code class="ph codeph">refresh_after_connect</code> option was removed from Impala
-          Shell in <span class="keyword">Impala 3.0</span>
+          The deprecated <code class="ph codeph">‑‑refresh_after_connect</code> option was removed
+          from Impala Shell in <span class="keyword">Impala 3.0</span>
         </p>
 
 
@@ -473,65 +481,85 @@ $ ps ax | grep [i]mpalad
 
     </div>
 
+
     <div class="topic concept nested2" aria-labelledby="ariaid-title14" id="impala-7985">
+
       <h3 class="title topictitle3" id="ariaid-title14">Port Change for SHUTDOWN Command</h3>
 
+
       <div class="body conbody">
-        <p class="p"> If you used the <code class="ph codeph">SHUTDOWN</code> command in Impala 3.1, and
-          specified a port explicitly, change the port number parameter, in
-          Impala 3.2, to use the KRPC port. </p>
+
+        <p class="p">
+          If you used the <code class="ph codeph">SHUTDOWN</code> command in Impala 3.1, and specified a port
+          explicitly, change the port number parameter, in Impala 3.2, to use the KRPC port.
+        </p>
+
+
+      </div>
+
+
+    </div>
+
+    <div class="topic concept nested2" aria-labelledby="ariaid-title15" id="impala-7800">
+      <h3 class="title topictitle3" id="ariaid-title15">Change in Client Connection Timeout</h3>
+
+      <div class="body conbody">
+        <p class="p">The default behavior of client connection timeout changed.</p>
+
+        <p class="p">In Impala 3.2 and lower, client waited indefinitely to open the new
+          session if the maximum number of threads specified by
+            <code class="ph codeph">--fe_service_threads</code> has been allocated.</p>
+
+        <p class="p">In Impala 3.3 and higher, a new startup flag,
+            <code class="ph codeph">--accepted_client_cnxn_timeout</code>, was added to
+          control how the server should treat new connection requests if we have
+          run out of the configured number of server threads.</p>
+
+        <p class="p">If <code class="ph codeph">--accepted_client_cnxn_timeout &gt; 0</code>, new
+          connection requests are rejected after the specified timeout.</p>
+
+        <p class="p">If <code class="ph codeph">--accepted_client_cnxn_timeout=0</code>, clients waits
+          indefinitely to connect to Impala. You can use this setting to restore
+          the pre-Impala 3.3 behavior.</p>
+
+        <p class="p">The default timeout is 5 minutes. </p>
 
       </div>
 
     </div>
 
 
-    <div class="topic concept nested2" aria-labelledby="ariaid-title15" id="concept_mkn_ygr_jdb">
+    <div class="topic concept nested2" aria-labelledby="ariaid-title16" id="concept_mkn_ygr_jdb">
 
-      <h3 class="title topictitle3" id="ariaid-title15">Default Setting Changes</h3>
+      <h3 class="title topictitle3" id="ariaid-title16">Default Setting Changes</h3>
 
 
       <div class="body conbody">
 
         <table cellpadding="4" cellspacing="0" summary="" id="concept_mkn_ygr_jdb__simpletable_x55_ghr_jdb" border="1" class="simpletable"><col style="width:33.33333333333333%" /><col style="width:33.33333333333333%" /><col style="width:33.33333333333333%" /><thead><tr class="sthead">
 
-            <th style="vertical-align:bottom;text-align:left;" id="d211878e618" class="stentry">Release Changed</th>
+            <th style="vertical-align:bottom;text-align:left;" id="d218838e659" class="stentry">Release Changed</th>
 
 
-            <th style="vertical-align:bottom;text-align:left;" id="d211878e621" class="stentry">Setting</th>
+            <th style="vertical-align:bottom;text-align:left;" id="d218838e662" class="stentry">Setting</th>
 
 
-            <th style="vertical-align:bottom;text-align:left;" id="d211878e624" class="stentry">Default Value</th>
+            <th style="vertical-align:bottom;text-align:left;" id="d218838e665" class="stentry">Default Value</th>
 
 
           </tr>
 </thead><tbody><tr class="strow">
 
-            <td style="vertical-align:top;" headers="d211878e618" class="stentry"><span class="keyword">Impala 2.12</span>
+            <td style="vertical-align:top;" headers="d218838e659" class="stentry"><span class="keyword">Impala 2.12</span>
 
             </td>
 
 
-            <td style="vertical-align:top;" headers="d211878e621" class="stentry"><code class="ph codeph">compact_catalog_topic</code><code class="ph codeph">impalad</code> flag</td>
+            <td style="vertical-align:top;" headers="d218838e662" class="stentry"><code class="ph codeph">‑‑compact_catalog_topic</code><code class="ph codeph">impalad</code>
+              flag</td>
 
 
-            <td style="vertical-align:top;" headers="d211878e624" class="stentry"><code class="ph codeph">true</code>
-
-            </td>
-
-
-          </tr>
-<tr class="strow">
-
-            <td style="vertical-align:top;" headers="d211878e618" class="stentry"><span class="keyword">Impala 2.12</span>
-
-            </td>
-
-
-            <td style="vertical-align:top;" headers="d211878e621" class="stentry"><code class="ph codeph">max_cached_file_handles</code><code class="ph codeph">impalad</code> flag</td>
-
-
-            <td style="vertical-align:top;" headers="d211878e624" class="stentry"><code class="ph codeph">20000</code>
+            <td style="vertical-align:top;" headers="d218838e665" class="stentry"><code class="ph codeph">true</code>
 
             </td>
 
@@ -539,16 +567,51 @@ $ ps ax | grep [i]mpalad
           </tr>
 <tr class="strow">
 
-            <td style="vertical-align:top;" headers="d211878e618" class="stentry"><span class="keyword">Impala 3.0</span>
+            <td style="vertical-align:top;" headers="d218838e659" class="stentry"><span class="keyword">Impala 2.12</span>
 
             </td>
 
 
-            <td style="vertical-align:top;" headers="d211878e621" class="stentry"><code class="ph codeph">PARQUET_ARRAY_RESOLUTION</code> query
+            <td style="vertical-align:top;" headers="d218838e662" class="stentry"><code class="ph codeph">‑‑max_cached_file_handles</code><code class="ph codeph">impalad</code>
+              flag</td>
+
+
+            <td style="vertical-align:top;" headers="d218838e665" class="stentry"><code class="ph codeph">20000</code>
+
+            </td>
+
+
+          </tr>
+<tr class="strow">
+
+            <td style="vertical-align:top;" headers="d218838e659" class="stentry"><span class="keyword">Impala 3.0</span>
+
+            </td>
+
+
+            <td style="vertical-align:top;" headers="d218838e662" class="stentry"><code class="ph codeph">PARQUET_ARRAY_RESOLUTION</code> query
               option</td>
 
 
-            <td style="vertical-align:top;" headers="d211878e624" class="stentry"><code class="ph codeph">THREE_LEVEL</code>
+            <td style="vertical-align:top;" headers="d218838e665" class="stentry"><code class="ph codeph">THREE_LEVEL</code>
+
+            </td>
+
+
+          </tr>
+<tr class="strow">
+
+            <td style="vertical-align:top;" headers="d218838e659" class="stentry"><span class="keyword">Impala 3.0</span>
+
+            </td>
+
+
+            <td style="vertical-align:top;" headers="d218838e662" class="stentry"><code class="ph codeph">DECIMAL_V2</code>
+
+            </td>
+
+
+            <td style="vertical-align:top;" headers="d218838e665" class="stentry"><code class="ph codeph">TRUE</code>
 
             </td>
 

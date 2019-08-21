@@ -340,7 +340,7 @@ div.imagejustify {
    {border-right:solid}
    This value creates a very thick border in Firefox (does not match other tables)
 
-   Firefox works with
+   Firefox works with 
    {border-right:solid 1pt}
    but this causes a barely visible line in IE */
 .cellrowborder {

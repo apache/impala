@@ -11,8 +11,8 @@
 <meta name="DC.Relation" scheme="URI" content="../topics/impala_admin.html" />
 <meta name="prodname" content="Impala" />
 <meta name="prodname" content="Impala" />
-<meta name="version" content="Impala 3.2.x" />
-<meta name="version" content="Impala 3.2.x" />
+<meta name="version" content="Impala 3.3.x" />
+<meta name="version" content="Impala 3.3.x" />
 <meta name="DC.Format" content="XHTML" />
 <meta name="DC.Identifier" content="proxy" />
 <link rel="stylesheet" type="text/css" href="../commonltr.css" />
@@ -43,15 +43,16 @@
     </p>
 
 
-    <div class="note note"><span class="notetitle">Note:</span>
+    <div class="note note"><span class="notetitle">Note:</span> 
       <p class="p">
-        Most considerations for load balancing and high availability apply to the <span class="keyword cmdname">impalad</span> daemon.
-        The <span class="keyword cmdname">statestored</span> and <span class="keyword cmdname">catalogd</span> daemons do not have special
-        requirements for high availability, because problems with those daemons do not result in data loss.
-        If those daemons become unavailable due to an outage on a particular
-        host, you can stop the Impala service, delete the <span class="ph uicontrol">Impala StateStore</span> and
-        <span class="ph uicontrol">Impala Catalog Server</span> roles, add the roles on a different host, and restart the
-        Impala service.
+        Most considerations for load balancing and high availability apply to the
+        <span class="keyword cmdname">impalad</span> daemon. The <span class="keyword cmdname">statestored</span> and
+        <span class="keyword cmdname">catalogd</span> daemons do not have special requirements for high
+        availability, because problems with those daemons do not result in data loss. If those
+        daemons become unavailable due to an outage on a particular host, you can stop the
+        Impala service, delete the <span class="ph uicontrol">Impala StateStore</span> and
+        <span class="ph uicontrol">Impala Catalog Server</span> roles, add the roles on a different host,
+        and restart the Impala service.
       </p>
 
     </div>
@@ -72,7 +73,7 @@
     <h2 class="title topictitle2" id="ariaid-title2">Overview of Proxy Usage and Load Balancing for Impala</h2>
 
 
-
+    
 
     <div class="body conbody">
 
@@ -173,7 +174,7 @@
       </ol>
 
 
-      <div class="note note"><span class="notetitle">Note:</span>
+      <div class="note note"><span class="notetitle">Note:</span> 
         The following sections use the HAProxy software as a representative example of a load
         balancer that you can use with Impala.
       </div>
@@ -200,7 +201,7 @@
 
 
       <dl class="dl">
-
+        
 
           <dt class="dt dlterm">
             Leastconn
@@ -220,9 +221,9 @@
           </dd>
 
 
+        
 
-
-
+        
 
           <dt class="dt dlterm">
             Source IP Persistence
@@ -253,9 +254,9 @@
           </dd>
 
 
+        
 
-
-
+        
 
           <dt class="dt dlterm">
             Round-robin
@@ -271,7 +272,7 @@
           </dd>
 
 
-
+        
       </dl>
 
 
@@ -293,7 +294,7 @@
     <h2 class="title topictitle2" id="ariaid-title4">Special Proxy Considerations for Clusters Using Kerberos</h2>
 
 
-
+    
 
     <div class="body conbody">
 
@@ -419,7 +420,7 @@ klist -k <var class="keyword varname">keytabfile</var>
   --be_principal=impala/<em class="ph i">actual_host@realm</em>
   --keytab_file=<em class="ph i">path_to_merged_keytab</em>
 </code></pre>
-              <div class="note note"><span class="notetitle">Note:</span>
+              <div class="note note"><span class="notetitle">Note:</span> 
                 Every host has different <code class="ph codeph">--be_principal</code> because the actual
                 hostname is different on each host. Specify the fully qualified domain name
                 (FQDN) for the proxy host, not the IP address. Use the exact FQDN as returned by
@@ -460,7 +461,7 @@ klist -k <var class="keyword varname">keytabfile</var>
     <h2 class="title topictitle2" id="ariaid-title5">Special Proxy Considerations for TLS/SSL Enabled Clusters</h2>
 
 
-
+    
 
     <div class="body conbody">
 
@@ -482,7 +483,7 @@ klist -k <var class="keyword varname">keytabfile</var>
 
 
       <dl class="dl">
-
+        
 
           <dt class="dt dlterm">
             Client/Server SSL
@@ -497,9 +498,9 @@ klist -k <var class="keyword varname">keytabfile</var>
           </dd>
 
 
+        
 
-
-
+        
 
           <dt class="dt dlterm">
             TLS/SSL Passthrough
@@ -519,9 +520,9 @@ klist -k <var class="keyword varname">keytabfile</var>
           </dd>
 
 
+        
 
-
-
+        
 
           <dt class="dt dlterm">
             TLS/SSL Offload
@@ -536,7 +537,7 @@ klist -k <var class="keyword varname">keytabfile</var>
           </dd>
 
 
-
+        
       </dl>
 
 
@@ -557,7 +558,7 @@ klist -k <var class="keyword varname">keytabfile</var>
     <h2 class="title topictitle2" id="ariaid-title6">Example of Configuring HAProxy Load Balancer for Impala</h2>
 
 
-
+    
 
     <div class="body conbody">
 
@@ -703,7 +704,7 @@ listen impalajdbc :21051
     server <var class="keyword varname">symbolic_name_8</var> impala-host-4.example.com:21050 check
 </code></pre>
 
-      <div class="note important"><span class="importanttitle">Important:</span>
+      <div class="note important"><span class="importanttitle">Important:</span> 
         Hue requires the <code class="ph codeph">check</code> option at end of each line in the above file to
         ensure HAProxy can detect any unreachable Impalad server, and failover can be
         successful. Without the TCP check, you may hit an error when the
@@ -711,12 +712,13 @@ listen impalajdbc :21051
       </div>
 
 
-      <div class="note note"><span class="notetitle">Note:</span>
+      <div class="note note"><span class="notetitle">Note:</span> 
         If your JDBC or ODBC application connects to Impala through a load balancer such as
-        <code class="ph codeph">haproxy</code>, be cautious about reusing the connections. If the load balancer has set up
-        connection timeout values, either check the connection frequently so that it never sits idle longer than
-        the load balancer timeout value, or check the connection validity before using it and create a new one if
-        the connection has been closed.
+        <code class="ph codeph">haproxy</code>, be cautious about reusing the connections. If the load
+        balancer has set up connection timeout values, either check the connection frequently so
+        that it never sits idle longer than the load balancer timeout value, or check the
+        connection validity before using it and create a new one if the connection has been
+        closed.
       </div>
 
 

@@ -7,21 +7,21 @@
 <meta name="copyright" content="(C) Copyright 2019" />
 <meta name="DC.rights.owner" content="(C) Copyright 2019" />
 <meta name="DC.Type" content="concept" />
-<meta name="DC.Title" content="Configuring Impala Delegation for Hue and BI Tools" />
+<meta name="DC.Title" content="Configuring Impala Delegation for Clients" />
 <meta name="DC.Relation" scheme="URI" content="../topics/impala_authentication.html" />
 <meta name="prodname" content="Impala" />
 <meta name="prodname" content="Impala" />
-<meta name="version" content="Impala 3.2.x" />
-<meta name="version" content="Impala 3.2.x" />
+<meta name="version" content="Impala 3.3.x" />
+<meta name="version" content="Impala 3.3.x" />
 <meta name="DC.Format" content="XHTML" />
 <meta name="DC.Identifier" content="delegation" />
 <link rel="stylesheet" type="text/css" href="../commonltr.css" />
-<title>Configuring Impala Delegation for Hue and BI Tools</title>
+<title>Configuring Impala Delegation for Clients</title>
 </head>
 <body id="delegation">
 
 
-  <h1 class="title topictitle1" id="ariaid-title1">Configuring Impala Delegation for Hue and BI Tools</h1>
+  <h1 class="title topictitle1" id="ariaid-title1">Configuring Impala Delegation for Clients</h1>
 
 
   
@@ -29,10 +29,10 @@
   <div class="body conbody">
 
     <p class="p">
-      When users submit Impala queries through a separate application, such as Hue or a business
-      intelligence tool, typically all requests are treated as coming from the same user. In
-      Impala 1.2 and higher, Impala supports <span class="q">"delegation"</span> where users whose names you
-      specify can delegate the execution of a query to another user. The query runs with the
+      When users submit Impala queries through a separate client application, such as Hue or a
+      business intelligence tool, typically all requests are treated as coming from the same
+      user. In Impala 1.2 and higher, Impala supports <span class="q">"delegation"</span> where users whose names
+      you specify can delegate the execution of a query to another user. The query runs with the
       privileges of the delegated user, not the original authenticated user.
     </p>
 
@@ -40,9 +40,10 @@
     <p class="p">
       Starting in <span class="keyword">Impala 3.1</span> and higher, you can
       delegate using groups. Instead of listing a large number of delegated users, you can
-      create a group of those users and specify the delegated group name in the Impalad startup
-      option. The client sends the delegated user name, and Impala performs an authorization to
-      see if the delegated user belongs to a delegated group.
+      create a group of those users and specify the delegated group name in the
+      <code class="ph codeph">impalad</code> startup option. The client sends the delegated user name, and
+      Impala performs an authorization to see if the delegated user belongs to a delegated
+      group.
     </p>
 
 
@@ -59,7 +60,7 @@
     </p>
 
 
-    <div class="note attention"><span class="attentiontitle">Attention:</span>
+    <div class="note attention"><span class="attentiontitle">Attention:</span> 
       <ul class="ul">
         <li class="li">
           When the delegation is enabled in Impala, the Impala clients should take an extra
@@ -81,8 +82,8 @@
 
     <p class="p">
       The delegation feature is enabled by the startup options for <span class="keyword cmdname">impalad</span>:
-      <code class="ph codeph">--authorized_proxy_user_config</code> and
-      <code class="ph codeph">--authorized_proxy_group_config</code>.
+      <code class="ph codeph">‑‑authorized_proxy_user_config</code> and
+      <code class="ph codeph">‑‑authorized_proxy_group_config</code>.
     </p>
 
 
@@ -91,9 +92,9 @@
     </p>
 
 
-<pre class="pre codeblock"><code>--authorized_proxy_user_config=<var class="keyword varname">authenticated_user1</var>=<var class="keyword varname">delegated_user1</var>,<var class="keyword varname">delegated_user2</var>,...;<var class="keyword varname">authenticated_user2</var>=...</code></pre>
+<pre class="pre codeblock"><code>‑‑authorized_proxy_user_config=<var class="keyword varname">authenticated_user1</var>=<var class="keyword varname">delegated_user1</var>,<var class="keyword varname">delegated_user2</var>,...;<var class="keyword varname">authenticated_user2</var>=...</code></pre>
 
-<pre class="pre codeblock"><code>--authorized_proxy_group_config=<var class="keyword varname">authenticated_user1</var>=<var class="keyword varname">delegated_group1</var>,<var class="keyword varname">delegated_group2</var>,...;<var class="keyword varname">authenticated_user2</var>=...</code></pre>
+<pre class="pre codeblock"><code>‑‑authorized_proxy_group_config=<var class="keyword varname">authenticated_user1</var>=<var class="keyword varname">delegated_group1</var>,<var class="keyword varname">delegated_group2</var>,...;<var class="keyword varname">authenticated_user2</var>=...</code></pre>
 
     <ul class="ul">
       <li class="li">
@@ -107,22 +108,24 @@
 
 
       <li class="li">
-        Use the <code class="ph codeph">--authorized_proxy_user_config_delimiter</code> startup option to
-        override the default user delimiter (the comma character) to another character.
+        Use the <code class="ph codeph">‑‑authorized_proxy_user_config_delimiter</code> startup
+        option to override the default user delimiter (the comma character) to another
+        character.
       </li>
 
 
       <li class="li">
-        Use the <code class="ph codeph">--authorized_proxy_group_config_delimiter</code> startup option to
-        override the default group delimiter ( (the comma character) to another character.
+        Use the <code class="ph codeph">‑‑authorized_proxy_group_config_delimiter</code> startup
+        option to override the default group delimiter ( (the comma character) to another
+        character.
       </li>
 
 
       <li class="li">
         Wildcard (<code class="ph codeph">*</code>) is supported to delegated to any users or any groups, e.g.
-        <code class="ph codeph">--authorized_proxy_group_config=hue=*</code>. Make sure to use single quotes
-        or escape characters to ensure that any <code class="ph codeph">*</code> characters do not undergo
-        wildcard expansion when specified in command-line arguments.
+        <code class="ph codeph">‑‑authorized_proxy_group_config=hue=*</code>. Make sure to use
+        single quotes or escape characters to ensure that any <code class="ph codeph">*</code> characters do
+        not undergo wildcard expansion when specified in command-line arguments.
       </li>
 
     </ul>
@@ -130,9 +133,9 @@
 
     <p class="p">
       When you start Impala with the
-      <code class="ph codeph">--authorized_proxy_user_config=<var class="keyword varname">authenticated_user</var>=<var class="keyword varname">delegated_user</var></code>
+      <code class="ph codeph">‑‑authorized_proxy_user_config=<var class="keyword varname">authenticated_user</var>=<var class="keyword varname">delegated_user</var></code>
       or
-      <code class="ph codeph">--authorized_proxy_group_config=<var class="keyword varname">authenticated_user</var>=<var class="keyword varname">delegated_group</var></code>
+      <code class="ph codeph">‑‑authorized_proxy_group_config=<var class="keyword varname">authenticated_user</var>=<var class="keyword varname">delegated_group</var></code>
       option:
     </p>
 
@@ -154,6 +157,12 @@
         When opening a client connection, the client must provide a delegated username via the
         HiveServer2 protocol property,<code class="ph codeph">impala.doas.user</code> or
         <code class="ph codeph">DelegationUID</code>.
+        <p class="p">
+          When the client connects over HTTP, the <code class="ph codeph">doAs</code> parameter can be
+          specified in the HTTP path, e.g.
+          <code class="ph codeph">/?doAs=</code><var class="keyword varname">delegated_user</var>.
+        </p>
+
       </li>
 
 
@@ -198,15 +207,15 @@
       The user or group delegation process works as follows:
       <ol class="ol">
         <li class="li">
-          The Impalad daemon starts with one of the following options:
+          The <code class="ph codeph">impalad</code> daemon starts with one of the following options:
           <ul class="ul">
             <li class="li">
-              <code class="ph codeph">--authorized_proxy_user_config=<var class="keyword varname">authenticated_user</var>=<var class="keyword varname">delegated_user</var></code>
+              <code class="ph codeph">‑‑authorized_proxy_user_config=<var class="keyword varname">authenticated_user</var>=<var class="keyword varname">delegated_user</var></code>
             </li>
 
 
             <li class="li">
-              <code class="ph codeph">--authorized_proxy_group_config=<var class="keyword varname">authenticated_user</var>=<var class="keyword varname">delegated_group</var></code>
+              <code class="ph codeph">‑‑authorized_proxy_group_config=<var class="keyword varname">authenticated_user</var>=<var class="keyword varname">delegated_group</var></code>
             </li>
 
           </ul>

@@ -10,7 +10,7 @@
 <meta name="DC.Title" content="Configuring Admission Control" />
 <meta name="DC.Relation" scheme="URI" content="../topics/impala_resource_management.html" />
 <meta name="prodname" content="Impala" />
-<meta name="version" content="Impala 3.2.x" />
+<meta name="version" content="Impala 3.3.x" />
 <meta name="DC.Format" content="XHTML" />
 <meta name="DC.Identifier" content="admission_control" />
 <link rel="stylesheet" type="text/css" href="../commonltr.css" />
@@ -22,118 +22,165 @@
   <h1 class="title topictitle1" id="ariaid-title1">Configuring Admission Control</h1>
 
 
-  <div class="body conbody">
-    <p class="p">Impala includes features that balance and maximize resources in your
-        <span class="keyword">Apache Hadoop</span> cluster. This topic describes how you
-      can improve efficiency of your a <span class="keyword">Apache Hadoop</span> cluster
-      using those features.</p>
+  
 
-    <p class="p"> The configuration options for admission control range from the simple (a
-      single resource pool with a single set of options) to the complex
-      (multiple resource pools with different options, each pool handling
-      queries for a different set of users and groups). </p>
+  <div class="body conbody">
+
+    <p class="p">
+      Impala includes features that balance and maximize resources in your
+      <span class="keyword">Apache Hadoop</span> cluster. This topic describes how you can improve
+      efficiency of your a <span class="keyword">Apache Hadoop</span> cluster using those features.
+    </p>
+
+
+    <p class="p">
+      The configuration options for admission control range from the simple (a single resource
+      pool with a single set of options) to the complex (multiple resource pools with different
+      options, each pool handling queries for a different set of users and groups).
+    </p>
+
 
   </div>
+
 
   <div class="related-links">
 <div class="familylinks">
 <div class="parentlink"><strong>Parent topic:</strong> <a class="link" href="../topics/impala_resource_management.html">Resource Management</a></div>
 </div>
 </div><div class="topic concept nested1" aria-labelledby="ariaid-title2" id="concept_bz4_vxz_jgb">
+
     <h2 class="title topictitle2" id="ariaid-title2">Configuring Admission Control in Command Line Interface</h2>
 
+
     <div class="body conbody">
-      <p class="p"> To configure admission control, use a combination of startup options
-        for the Impala daemon and edit or create the configuration files
-          <span class="ph filepath">fair-scheduler.xml</span> and
-          <span class="ph filepath">llama-site.xml</span>. </p>
 
-      <p class="p"> For a straightforward configuration using a single resource pool named
-          <code class="ph codeph">default</code>, you can specify configuration options on the
-        command line and skip the <span class="ph filepath">fair-scheduler.xml</span> and
-          <span class="ph filepath">llama-site.xml</span> configuration files. </p>
+      <p class="p">
+        To configure admission control, use a combination of startup options for the Impala
+        daemon and edit or create the configuration files
+        <span class="ph filepath">fair-scheduler.xml</span> and <span class="ph filepath">llama-site.xml</span>.
+      </p>
 
-      <div class="p"> For an advanced configuration with multiple resource pools using
-        different settings:<ol class="ol">
-          <li class="li">Set up the <span class="ph filepath">fair-scheduler.xml</span> and
-              <span class="ph filepath">llama-site.xml</span> configuration files
-            manually.</li>
 
-          <li class="li">Provide the paths to each one using the <span class="keyword cmdname">impalad</span>
-            command-line options,
-              <code class="ph codeph">--fair_scheduler_allocation_path</code> and
-              <code class="ph codeph">--llama_site_path</code> respectively. </li>
+      <p class="p">
+        For a straightforward configuration using a single resource pool named
+        <code class="ph codeph">default</code>, you can specify configuration options on the command line and
+        skip the <span class="ph filepath">fair-scheduler.xml</span> and <span class="ph filepath">llama-site.xml</span>
+        configuration files.
+      </p>
+
+
+      <div class="p">
+        For an advanced configuration with multiple resource pools using different settings:
+        <ol class="ol">
+          <li class="li">
+            Set up the <span class="ph filepath">fair-scheduler.xml</span> and
+            <span class="ph filepath">llama-site.xml</span> configuration files manually.
+          </li>
+
+
+          <li class="li">
+            Provide the paths to each one using the <span class="keyword cmdname">impalad</span> command-line
+            options, <code class="ph codeph">‑‑fair_scheduler_allocation_path</code> and
+            <code class="ph codeph">‑‑llama_site_path</code> respectively.
+          </li>
 
         </ol>
-</div>
 
-      <p class="p"> The Impala admission control feature uses the Fair Scheduler
-        configuration settings to determine how to map users and groups to
-        different resource pools. For example, you might set up different
-        resource pools with separate memory limits, and maximum number of
-        concurrent and queued queries, for different categories of users within
-        your organization. For details about all the Fair Scheduler
-        configuration settings, see the <a class="xref" href="http://hadoop.apache.org/docs/current/hadoop-yarn/hadoop-yarn-site/FairScheduler.html#Configuration" target="_blank">Apache wiki</a>. </p>
+      </div>
 
-      <p class="p"> The Impala admission control feature uses a small subset of possible
-        settings from the <span class="ph filepath">llama-site.xml</span> configuration
-        file: </p>
 
-      <pre class="pre codeblock"><code>llama.am.throttling.maximum.placed.reservations.<var class="keyword varname">queue_name</var>
+      <p class="p">
+        The Impala admission control feature uses the Fair Scheduler configuration settings to
+        determine how to map users and groups to different resource pools. For example, you
+        might set up different resource pools with separate memory limits, and maximum number of
+        concurrent and queued queries, for different categories of users within your
+        organization. For details about all the Fair Scheduler configuration settings, see the
+        <a class="xref" href="http://hadoop.apache.org/docs/current/hadoop-yarn/hadoop-yarn-site/FairScheduler.html#Configuration" target="_blank">Apache
+        wiki</a>.
+      </p>
+
+
+      <p class="p">
+        The Impala admission control feature uses a small subset of possible settings from the
+        <span class="ph filepath">llama-site.xml</span> configuration file:
+      </p>
+
+
+<pre class="pre codeblock"><code>llama.am.throttling.maximum.placed.reservations.<var class="keyword varname">queue_name</var>
 llama.am.throttling.maximum.queued.reservations.<var class="keyword varname">queue_name</var>
 <span class="ph">impala.admission-control.pool-default-query-options.<var class="keyword varname">queue_name</var>
 impala.admission-control.pool-queue-timeout-ms.<var class="keyword varname">queue_name</var></span>
 </code></pre>
-      <p class="p"> The
-          <code class="ph codeph">impala.admission-control.pool-queue-timeout-ms</code>
-        setting specifies the timeout value for this pool in milliseconds. </p>
 
-      <p class="p">The<code class="ph codeph">impala.admission-control.pool-default-query-options</code>
-        settings designates the default query options for all queries that run
-        in this pool. Its argument value is a comma-delimited string of
-        'key=value' pairs, <code class="ph codeph">'key1=val1,key2=val2, ...'</code>. For
-        example, this is where you might set a default memory limit for all
-        queries in the pool, using an argument such as
-          <code class="ph codeph">MEM_LIMIT=5G</code>. </p>
+      <p class="p">
+        The <code class="ph codeph">impala.admission-control.pool-queue-timeout-ms</code> setting specifies
+        the timeout value for this pool in milliseconds.
+      </p>
 
-      <p class="p"> The
-          <code class="ph codeph">impala.admission-control.*</code> configuration settings are
-        available in <span class="keyword">Impala 2.5</span> and higher. </p>
+
+      <p class="p">
+        The<code class="ph codeph">impala.admission-control.pool-default-query-options</code> settings
+        designates the default query options for all queries that run in this pool. Its argument
+        value is a comma-delimited string of 'key=value' pairs, <code class="ph codeph">'key1=val1,key2=val2,
+        ...'</code>. For example, this is where you might set a default memory limit for all
+        queries in the pool, using an argument such as <code class="ph codeph">MEM_LIMIT=5G</code>.
+      </p>
+
+
+      <p class="p">
+        The <code class="ph codeph">impala.admission-control.*</code> configuration settings are available in
+        <span class="keyword">Impala 2.5</span> and higher.
+      </p>
+
 
     </div>
 
+
     <div class="topic concept nested2" aria-labelledby="ariaid-title3" id="concept_cz4_vxz_jgb">
+
       <h3 class="title topictitle3" id="ariaid-title3">Example of Admission Control Configuration</h3>
 
+
       <div class="body conbody">
-        <p class="p"> Here are sample <span class="ph filepath">fair-scheduler.xml</span> and
-            <span class="ph filepath">llama-site.xml</span> files that define resource pools
-            <code class="ph codeph">root.default</code>, <code class="ph codeph">root.development</code>,
-          and <code class="ph codeph">root.production</code>. These files define resource
-          pools for Impala admission control and are separate from the similar
-            <code class="ph codeph">fair-scheduler.xml</code>that defines resource pools for
-          YARN.</p>
+
+        <p class="p">
+          Here are sample <span class="ph filepath">fair-scheduler.xml</span> and
+          <span class="ph filepath">llama-site.xml</span> files that define resource pools
+          <code class="ph codeph">root.default</code>, <code class="ph codeph">root.development</code>, and
+          <code class="ph codeph">root.production</code>. These files define resource pools for Impala
+          admission control and are separate from the similar
+          <code class="ph codeph">fair-scheduler.xml</code>that defines resource pools for YARN.
+        </p>
+
 
         <p class="p">
           <strong class="ph b">fair-scheduler.xml:</strong>
         </p>
 
-        <p class="p"> Although Impala does not use the <code class="ph codeph">vcores</code> value, you
-          must still specify it to satisfy YARN requirements for the file
-          contents. </p>
 
-        <p class="p"> Each <code class="ph codeph">&lt;aclSubmitApps&gt;</code> tag (other than the one
-          for <code class="ph codeph">root</code>) contains a comma-separated list of users,
-          then a space, then a comma-separated list of groups; these are the
-          users and groups allowed to submit Impala statements to the
-          corresponding resource pool. </p>
+        <p class="p">
+          Although Impala does not use the <code class="ph codeph">vcores</code> value, you must still specify
+          it to satisfy YARN requirements for the file contents.
+        </p>
 
-        <p class="p"> If you leave the <code class="ph codeph">&lt;aclSubmitApps&gt;</code> element
-          empty for a pool, nobody can submit directly to that pool; child pools
-          can specify their own <code class="ph codeph">&lt;aclSubmitApps&gt;</code> values to
-          authorize users and groups to submit to those pools. </p>
 
-        <pre class="pre codeblock"><code>&lt;allocations&gt;
+        <p class="p">
+          Each <code class="ph codeph">&lt;aclSubmitApps&gt;</code> tag (other than the one for
+          <code class="ph codeph">root</code>) contains a comma-separated list of users, then a space, then a
+          comma-separated list of groups; these are the users and groups allowed to submit
+          Impala statements to the corresponding resource pool.
+        </p>
+
+
+        <p class="p">
+          If you leave the <code class="ph codeph">&lt;aclSubmitApps&gt;</code> element empty for a pool,
+          nobody can submit directly to that pool; child pools can specify their own
+          <code class="ph codeph">&lt;aclSubmitApps&gt;</code> values to authorize users and groups to submit
+          to those pools.
+        </p>
+
+
+<pre class="pre codeblock"><code>&lt;allocations&gt;
 
     &lt;queue name="root"&gt;
         &lt;aclSubmitApps&gt; &lt;/aclSubmitApps&gt;
@@ -157,11 +204,13 @@ impala.admission-control.pool-queue-timeout-ms.<var class="keyword varname">queu
 &lt;/allocations&gt;
 
 </code></pre>
+
         <p class="p">
           <strong class="ph b">llama-site.xml:</strong>
         </p>
 
-        <pre class="pre codeblock"><code>
+
+<pre class="pre codeblock"><code>
 &lt;?xml version="1.0" encoding="UTF-8"?&gt;
 &lt;configuration&gt;
   &lt;property&gt;
@@ -193,227 +242,286 @@ impala.admission-control.pool-queue-timeout-ms.<var class="keyword varname">queu
     &lt;value&gt;true&lt;/value&gt;
   &lt;/property&gt;
 </code></pre>
+
       </div>
+
 
     </div>
 
+
   </div>
 
+
   <div class="topic concept nested1" aria-labelledby="ariaid-title4" id="concept_zy4_vxz_jgb">
+
     <h2 class="title topictitle2" id="ariaid-title4">Configuring Cluster-wide Admission Control</h2>
 
 
-    <div class="body conbody">
-      <div class="note important"><span class="importanttitle">Important:</span>  These settings only apply if you enable admission
-        control but leave dynamic resource pools disabled. In <span class="keyword">Impala 2.5</span> and higher, we recommend that you set up
-        dynamic resource pools and customize the settings for each pool as
-        described in <a class="xref" href="#concept_bz4_vxz_jgb">Configuring Admission Control in Command Line Interface</a>.</div>
+    
 
-      <p class="p"> The following Impala configuration options let you adjust the settings
-        of the admission control feature. When supplying the options on the
-          <span class="keyword cmdname">impalad</span> command line, prepend the option name with
-          <code class="ph codeph">--</code>. </p>
+    <div class="body conbody">
+
+      <div class="note important"><span class="importanttitle">Important:</span> 
+        These settings only apply if you enable admission control but leave dynamic resource
+        pools disabled. In <span class="keyword">Impala 2.5</span> and higher, we recommend
+        that you set up dynamic resource pools and customize the settings for each pool as
+        described in <a class="xref" href="#concept_bz4_vxz_jgb">Configuring Admission Control in Command Line Interface</a>.
+      </div>
+
+
+      <p class="p">
+        The following Impala configuration options let you adjust the settings of the admission
+        control feature. When supplying the options on the <span class="keyword cmdname">impalad</span> command
+        line, prepend the option name with <code class="ph codeph">--</code>.
+      </p>
+
 
       <dl class="dl">
+        
 
           <dt class="dt dlterm">
             <code class="ph codeph">queue_wait_timeout_ms</code>
           </dt>
 
+
           <dd class="dd">
-            <strong class="ph b">Purpose:</strong> Maximum amount of time (in milliseconds) that a
-            request waits to be admitted before timing out. <p class="p">
-              <strong class="ph b">Type:</strong>
-              <code class="ph codeph">int64</code>
+            <strong class="ph b">Purpose:</strong> Maximum amount of time (in milliseconds) that a request waits to be
+            admitted before timing out.
+            <p class="p">
+              <strong class="ph b">Type:</strong> <code class="ph codeph">int64</code>
             </p>
 
+
             <p class="p">
-              <strong class="ph b">Default:</strong>
-              <code class="ph codeph">60000</code>
+              <strong class="ph b">Default:</strong> <code class="ph codeph">60000</code>
             </p>
 
           </dd>
 
 
+        
+
+        
 
           <dt class="dt dlterm">
             <code class="ph codeph">default_pool_max_requests</code>
           </dt>
 
+
           <dd class="dd">
-            <strong class="ph b">Purpose:</strong> Maximum number of concurrent outstanding requests
-            allowed to run before incoming requests are queued. Because this
-            limit applies cluster-wide, but each Impala node makes independent
-            decisions to run queries immediately or queue them, it is a soft
-            limit; the overall number of concurrent queries might be slightly
-            higher during times of heavy load. A negative value indicates no
-            limit. Ignored if <code class="ph codeph">fair_scheduler_config_path</code> and
-              <code class="ph codeph">llama_site_path</code> are set. <p class="p">
-              <strong class="ph b">Type:</strong>
-              <code class="ph codeph">int64</code>
+            <strong class="ph b">Purpose:</strong> Maximum number of concurrent outstanding requests allowed to run
+            before incoming requests are queued. Because this limit applies cluster-wide, but
+            each Impala node makes independent decisions to run queries immediately or queue
+            them, it is a soft limit; the overall number of concurrent queries might be slightly
+            higher during times of heavy load. A negative value indicates no limit. Ignored if
+            <code class="ph codeph">fair_scheduler_config_path</code> and <code class="ph codeph">llama_site_path</code> are
+            set.
+            <p class="p">
+              <strong class="ph b">Type:</strong> <code class="ph codeph">int64</code>
             </p>
 
+
             <p class="p">
-              <strong class="ph b">Default:</strong>
-              <span class="ph">-1, meaning unlimited (prior to <span class="keyword">Impala 2.5</span> the default was 200)</span>
+              <strong class="ph b">Default:</strong> <span class="ph">-1, meaning unlimited (prior to
+              <span class="keyword">Impala 2.5</span> the default was 200)</span>
             </p>
 
           </dd>
 
 
+        
+
+        
 
           <dt class="dt dlterm">
             <code class="ph codeph">default_pool_max_queued</code>
           </dt>
 
+
           <dd class="dd">
-            <strong class="ph b">Purpose:</strong> Maximum number of requests allowed to be queued
-            before rejecting requests. Because this limit applies cluster-wide,
-            but each Impala node makes independent decisions to run queries
-            immediately or queue them, it is a soft limit; the overall number of
-            queued queries might be slightly higher during times of heavy load.
-            A negative value or 0 indicates requests are always rejected once
-            the maximum concurrent requests are executing. Ignored if
-              <code class="ph codeph">fair_scheduler_config_path</code> and
-              <code class="ph codeph">llama_site_path</code> are set. <p class="p">
-              <strong class="ph b">Type:</strong>
-              <code class="ph codeph">int64</code>
+            <strong class="ph b">Purpose:</strong> Maximum number of requests allowed to be queued before rejecting
+            requests. Because this limit applies cluster-wide, but each Impala node makes
+            independent decisions to run queries immediately or queue them, it is a soft limit;
+            the overall number of queued queries might be slightly higher during times of heavy
+            load. A negative value or 0 indicates requests are always rejected once the maximum
+            concurrent requests are executing. Ignored if
+            <code class="ph codeph">fair_scheduler_config_path</code> and <code class="ph codeph">llama_site_path</code> are
+            set.
+            <p class="p">
+              <strong class="ph b">Type:</strong> <code class="ph codeph">int64</code>
             </p>
 
+
             <p class="p">
-              <strong class="ph b">Default:</strong>
-              <span class="ph">unlimited</span>
+              <strong class="ph b">Default:</strong> <span class="ph">unlimited</span>
             </p>
 
           </dd>
 
 
+        
+
+        
 
           <dt class="dt dlterm">
             <code class="ph codeph">default_pool_mem_limit</code>
           </dt>
 
+
           <dd class="dd">
-            <strong class="ph b">Purpose:</strong> Maximum amount of memory (across the entire cluster)
-            that all outstanding requests in this pool can use before new
-            requests to this pool are queued. Specified in bytes, megabytes, or
-            gigabytes by a number followed by the suffix <code class="ph codeph">b</code>
-            (optional), <code class="ph codeph">m</code>, or <code class="ph codeph">g</code>, either
-            uppercase or lowercase. You can specify floating-point values for
-            megabytes and gigabytes, to represent fractional numbers such as
-              <code class="ph codeph">1.5</code>. You can also specify it as a percentage of
-            the physical memory by specifying the suffix <code class="ph codeph">%</code>. 0
-            or no setting indicates no limit. Defaults to bytes if no unit is
-            given. Because this limit applies cluster-wide, but each Impala node
-            makes independent decisions to run queries immediately or queue
-            them, it is a soft limit; the overall memory used by concurrent
-            queries might be slightly higher during times of heavy load. Ignored
-            if <code class="ph codeph">fair_scheduler_config_path</code> and
-              <code class="ph codeph">llama_site_path</code> are set. <div class="note note"><span class="notetitle">Note:</span>
-        Impala relies on the statistics produced by the <code class="ph codeph">COMPUTE STATS</code> statement to estimate memory
-        usage for each query. See <a class="xref" href="../shared/../topics/impala_compute_stats.html#compute_stats">COMPUTE STATS Statement</a> for guidelines
-        about how and when to use this statement.
+            <strong class="ph b">Purpose:</strong> Maximum amount of memory (across the entire cluster) that all
+            outstanding requests in this pool can use before new requests to this pool are
+            queued. Specified in bytes, megabytes, or gigabytes by a number followed by the
+            suffix <code class="ph codeph">b</code> (optional), <code class="ph codeph">m</code>, or <code class="ph codeph">g</code>,
+            either uppercase or lowercase. You can specify floating-point values for megabytes
+            and gigabytes, to represent fractional numbers such as <code class="ph codeph">1.5</code>. You can
+            also specify it as a percentage of the physical memory by specifying the suffix
+            <code class="ph codeph">%</code>. 0 or no setting indicates no limit. Defaults to bytes if no unit
+            is given. Because this limit applies cluster-wide, but each Impala node makes
+            independent decisions to run queries immediately or queue them, it is a soft limit;
+            the overall memory used by concurrent queries might be slightly higher during times
+            of heavy load. Ignored if <code class="ph codeph">fair_scheduler_config_path</code> and
+            <code class="ph codeph">llama_site_path</code> are set.
+            <div class="note note"><span class="notetitle">Note:</span> 
+        Impala relies on the statistics produced by the <code class="ph codeph">COMPUTE STATS</code> statement
+        to estimate memory usage for each query. See
+        <a class="xref" href="../shared/../topics/impala_compute_stats.html#compute_stats">COMPUTE STATS Statement</a> for guidelines about how
+        and when to use this statement.
       </div>
+
 
             <p class="p">
         <strong class="ph b">Type:</strong> string
       </p>
 
+
             <p class="p">
-              <strong class="ph b">Default:</strong>
-              <code class="ph codeph">""</code> (empty string, meaning unlimited) </p>
+              <strong class="ph b">Default:</strong> <code class="ph codeph">""</code> (empty string, meaning unlimited)
+            </p>
 
           </dd>
 
 
+        
+
+        
 
           <dt class="dt dlterm">
             <code class="ph codeph">disable_pool_max_requests</code>
           </dt>
 
+
           <dd class="dd">
-            <strong class="ph b">Purpose:</strong> Disables all per-pool limits on the maximum number
-            of running requests. <p class="p">
-              <strong class="ph b">Type:</strong> Boolean </p>
+            <strong class="ph b">Purpose:</strong> Disables all per-pool limits on the maximum number of running
+            requests.
+            <p class="p">
+              <strong class="ph b">Type:</strong> Boolean
+            </p>
+
 
             <p class="p">
-              <strong class="ph b">Default:</strong>
-              <code class="ph codeph">false</code>
+              <strong class="ph b">Default:</strong> <code class="ph codeph">false</code>
             </p>
 
           </dd>
 
 
+        
+
+        
 
           <dt class="dt dlterm">
             <code class="ph codeph">disable_pool_mem_limits</code>
           </dt>
 
+
           <dd class="dd">
-            <strong class="ph b">Purpose:</strong> Disables all per-pool mem limits. <p class="p">
-              <strong class="ph b">Type:</strong> Boolean </p>
+            <strong class="ph b">Purpose:</strong> Disables all per-pool mem limits.
+            <p class="p">
+              <strong class="ph b">Type:</strong> Boolean
+            </p>
+
 
             <p class="p">
-              <strong class="ph b">Default:</strong>
-              <code class="ph codeph">false</code>
+              <strong class="ph b">Default:</strong> <code class="ph codeph">false</code>
             </p>
 
           </dd>
 
 
+        
+
+        
 
           <dt class="dt dlterm">
             <code class="ph codeph">fair_scheduler_allocation_path</code>
           </dt>
 
+
           <dd class="dd">
             <strong class="ph b">Purpose:</strong> Path to the fair scheduler allocation file
-              (<code class="ph codeph">fair-scheduler.xml</code>). <p class="p">
+            (<code class="ph codeph">fair-scheduler.xml</code>).
+            <p class="p">
         <strong class="ph b">Type:</strong> string
       </p>
 
-            <p class="p">
-              <strong class="ph b">Default:</strong>
-              <code class="ph codeph">""</code> (empty string) </p>
 
             <p class="p">
-              <strong class="ph b">Usage notes:</strong> Admission control only uses a small subset of
-              the settings that can go in this file, as described below. For
-              details about all the Fair Scheduler configuration settings, see
-              the <a class="xref" href="http://hadoop.apache.org/docs/current/hadoop-yarn/hadoop-yarn-site/FairScheduler.html#Configuration" target="_blank">Apache wiki</a>. </p>
+              <strong class="ph b">Default:</strong> <code class="ph codeph">""</code> (empty string)
+            </p>
+
+
+            <p class="p">
+              <strong class="ph b">Usage notes:</strong> Admission control only uses a small subset of the settings
+              that can go in this file, as described below. For details about all the Fair
+              Scheduler configuration settings, see the
+              <a class="xref" href="http://hadoop.apache.org/docs/current/hadoop-yarn/hadoop-yarn-site/FairScheduler.html#Configuration" target="_blank">Apache
+              wiki</a>.
+            </p>
 
           </dd>
 
 
+        
+
+        
 
           <dt class="dt dlterm">
             <code class="ph codeph">llama_site_path</code>
           </dt>
 
+
           <dd class="dd">
-            <strong class="ph b">Purpose:</strong> Path to the configuration file used by admission
-            control (<code class="ph codeph">llama-site.xml</code>). If set,
-              <code class="ph codeph">fair_scheduler_allocation_path</code> must also be set.
-              <p class="p">
+            <strong class="ph b">Purpose:</strong> Path to the configuration file used by admission control
+            (<code class="ph codeph">llama-site.xml</code>). If set,
+            <code class="ph codeph">fair_scheduler_allocation_path</code> must also be set.
+            <p class="p">
         <strong class="ph b">Type:</strong> string
       </p>
 
-            <p class="p">
-              <strong class="ph b">Default:</strong>
-              <code class="ph codeph">""</code> (empty string) </p>
 
             <p class="p">
-              <strong class="ph b">Usage notes:</strong> Admission control only uses a few of the
-              settings that can go in this file, as described below. </p>
+              <strong class="ph b">Default:</strong> <code class="ph codeph">""</code> (empty string)
+            </p>
+
+
+            <p class="p">
+              <strong class="ph b">Usage notes:</strong> Admission control only uses a few of the settings that can go
+              in this file, as described below.
+            </p>
 
           </dd>
 
 
+        
       </dl>
+
 
     </div>
 
+
   </div>
+
 
 </body>
 </html>

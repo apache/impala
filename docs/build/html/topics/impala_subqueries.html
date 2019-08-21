@@ -11,8 +11,8 @@
 <meta name="DC.Relation" scheme="URI" content="../topics/impala_select.html" />
 <meta name="prodname" content="Impala" />
 <meta name="prodname" content="Impala" />
-<meta name="version" content="Impala 3.2.x" />
-<meta name="version" content="Impala 3.2.x" />
+<meta name="version" content="Impala 3.3.x" />
+<meta name="version" content="Impala 3.3.x" />
 <meta name="DC.Format" content="XHTML" />
 <meta name="DC.Identifier" content="subqueries" />
 <link rel="stylesheet" type="text/css" href="../commonltr.css" />
@@ -139,9 +139,9 @@ WHERE NOT EXISTS (<var class="keyword varname">correlated_select_statement</var>
 
 
     <p class="p">
-      <strong class="ph b">Standards compliance:</strong> Introduced in
-      <a class="xref" href="http://en.wikipedia.org/wiki/SQL:1999" target="_blank">SQL:1999</a>.
-    </p>
+        <strong class="ph b">Standards compliance:</strong> Introduced in
+        <a class="xref" href="http://en.wikipedia.org/wiki/SQL:1999" target="_blank">SQL:1999</a>.
+      </p>
 
 
     <p class="p">
@@ -212,10 +212,11 @@ SELECT x FROM t1 WHERE y &gt; (SELECT count(z) FROM t2);
 </code></pre>
 
     <p class="p">
-        The <code class="ph codeph">STRAIGHT_JOIN</code> hint affects the join order of table references in the query
-        block containing the hint. It does not affect the join order of nested queries, such as views,
-        inline views, or <code class="ph codeph">WHERE</code>-clause subqueries. To use this hint for performance
-        tuning of complex queries, apply the hint to all query blocks that need a fixed join order.
+        The <code class="ph codeph">STRAIGHT_JOIN</code> hint affects the join order of table references in
+        the query block containing the hint. It does not affect the join order of nested
+        queries, such as views, inline views, or <code class="ph codeph">WHERE</code>-clause subqueries. To
+        use this hint for performance tuning of complex queries, apply the hint to all query
+        blocks that need a fixed join order.
       </p>
 
 
@@ -364,11 +365,10 @@ SELECT x FROM t1 WHERE y &gt; (SELECT count(z) FROM t2);
 
       <li class="li">
         <p class="p">
-        The <code class="ph codeph">TABLESAMPLE</code> clause of the <code class="ph codeph">SELECT</code>
-        statement does not apply to a table reference derived from a view, a subquery,
-        or anything other than a real base table. This clause only works for tables
-        backed by HDFS or HDFS-like data files, therefore it does not apply to Kudu or
-        HBase tables.
+        The <code class="ph codeph">TABLESAMPLE</code> clause of the <code class="ph codeph">SELECT</code> statement does
+        not apply to a table reference derived from a view, a subquery, or anything other than a
+        real base table. This clause only works for tables backed by HDFS or HDFS-like data
+        files, therefore it does not apply to Kudu or HBase tables.
       </p>
 
       </li>

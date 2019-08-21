@@ -11,8 +11,8 @@
 <meta name="DC.Relation" scheme="URI" content="../topics/impala_datatypes.html" />
 <meta name="prodname" content="Impala" />
 <meta name="prodname" content="Impala" />
-<meta name="version" content="Impala 3.2.x" />
-<meta name="version" content="Impala 3.2.x" />
+<meta name="version" content="Impala 3.3.x" />
+<meta name="version" content="Impala 3.3.x" />
 <meta name="DC.Format" content="XHTML" />
 <meta name="DC.Identifier" content="int" />
 <link rel="stylesheet" type="text/css" href="../commonltr.css" />
@@ -55,13 +55,13 @@
       floating-point type (<code class="ph codeph">FLOAT</code> or <code class="ph codeph">DOUBLE</code>) automatically. Use
       <code class="ph codeph">CAST()</code> to convert to <code class="ph codeph">TINYINT</code>, <code class="ph codeph">SMALLINT</code>,
       <code class="ph codeph">STRING</code>, or <code class="ph codeph">TIMESTAMP</code>.
-      <span class="ph">
-          Casting an integer or floating-point value <code class="ph codeph">N</code> to
-        <code class="ph codeph">TIMESTAMP</code> produces a value that is <code class="ph codeph">N</code> seconds past the start of the epoch
-        date (January 1, 1970). By default, the result value represents a date and time in the UTC time zone.
-        If the setting <code class="ph codeph">--use_local_tz_for_unix_timestamp_conversions=true</code> is in effect,
-        the resulting <code class="ph codeph">TIMESTAMP</code> represents a date and time in the local time zone.
-        </span>
+      <span class="ph"> Casting an integer or floating-point value
+        <code class="ph codeph">N</code> to <code class="ph codeph">TIMESTAMP</code> produces a value that is
+        <code class="ph codeph">N</code> seconds past the start of the epoch date (January 1, 1970). By
+        default, the result value represents a date and time in the UTC time zone. If the
+        setting <code class="ph codeph">‑‑use_local_tz_for_unix_timestamp_conversions=true</code>
+        is in effect, the resulting <code class="ph codeph">TIMESTAMP</code> represents a date and time in the
+        local time zone. </span>
     </p>
 
 
@@ -88,8 +88,8 @@
 
 
     <p class="p">
-        <strong class="ph b">NULL considerations:</strong> Casting any non-numeric value to this type produces a <code class="ph codeph">NULL</code>
-        value.
+        <strong class="ph b">NULL considerations:</strong> Casting any non-numeric value to this type produces a
+        <code class="ph codeph">NULL</code> value.
       </p>
 
 
@@ -103,8 +103,9 @@ SELECT CAST(1000 AS INT);
 </code></pre>
 
     <p class="p">
-        <strong class="ph b">Partitioning:</strong> Prefer to use this type for a partition key column. Impala can process the numeric
-        type more efficiently than a <code class="ph codeph">STRING</code> representation of the value.
+        <strong class="ph b">Partitioning:</strong> Prefer to use this type for a partition key column. Impala can
+        process the numeric type more efficiently than a <code class="ph codeph">STRING</code> representation
+        of the value.
       </p>
 
 
@@ -119,8 +120,8 @@ SELECT CAST(1000 AS INT);
 
 
     <p class="p">
-        <strong class="ph b">Text table considerations:</strong> Values of this type are potentially larger in text tables than in tables
-        using Parquet or other binary formats.
+        <strong class="ph b">Text table considerations:</strong> Values of this type are potentially larger in text
+        tables than in tables using Parquet or other binary formats.
       </p>
 
 
@@ -137,9 +138,9 @@ SELECT CAST(1000 AS INT);
 
 
     <p class="p">
-        <strong class="ph b">Column statistics considerations:</strong> Because this type has a fixed size, the maximum and average size
-        fields are always filled in for column statistics, even before you run the <code class="ph codeph">COMPUTE STATS</code>
-        statement.
+        <strong class="ph b">Column statistics considerations:</strong> Because this type has a fixed size, the maximum
+        and average size fields are always filled in for column statistics, even before you run
+        the <code class="ph codeph">COMPUTE STATS</code> statement.
       </p>
 
 

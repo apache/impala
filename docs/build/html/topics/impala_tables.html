@@ -12,9 +12,9 @@
 <meta name="prodname" content="Impala" />
 <meta name="prodname" content="Impala" />
 <meta name="prodname" content="Impala" />
-<meta name="version" content="Impala 3.2.x" />
-<meta name="version" content="Impala 3.2.x" />
-<meta name="version" content="Impala 3.2.x" />
+<meta name="version" content="Impala 3.3.x" />
+<meta name="version" content="Impala 3.3.x" />
+<meta name="version" content="Impala 3.3.x" />
 <meta name="DC.Format" content="XHTML" />
 <meta name="DC.Identifier" content="tables" />
 <link rel="stylesheet" type="text/css" href="../commonltr.css" />
@@ -82,9 +82,10 @@
 
 
     <p class="p">
-        Impala queries ignore files with extensions commonly used for temporary work files by Hadoop tools. Any
-        files with extensions <code class="ph codeph">.tmp</code> or <code class="ph codeph">.copying</code> are not considered part of the
-        Impala table. The suffix matching is case-insensitive, so for example Impala ignores both
+        Impala queries ignore files with extensions commonly used for temporary work files by
+        Hadoop tools. Any files with extensions <code class="ph codeph">.tmp</code> or
+        <code class="ph codeph">.copying</code> are not considered part of the Impala table. The suffix
+        matching is case-insensitive, so for example Impala ignores both
         <code class="ph codeph">.copying</code> and <code class="ph codeph">.COPYING</code> suffixes.
       </p>
 
@@ -160,11 +161,11 @@
 
         <li class="li">
           <p class="p">
-        To see whether a table is internal or external, and its associated HDFS location, issue the statement
-        <code class="ph codeph">DESCRIBE FORMATTED <var class="keyword varname">table_name</var></code>. The <code class="ph codeph">Table Type</code> field
-        displays <code class="ph codeph">MANAGED_TABLE</code> for internal tables and <code class="ph codeph">EXTERNAL_TABLE</code> for
-        external tables. The <code class="ph codeph">Location</code> field displays the path of the table directory as an HDFS
-        URI.
+        To see whether a table is internal or external, and its associated HDFS location, issue
+        the statement <code class="ph codeph">DESCRIBE FORMATTED <var class="keyword varname">table_name</var></code>. The
+        <code class="ph codeph">Table Type</code> field displays <code class="ph codeph">MANAGED_TABLE</code> for internal
+        tables and <code class="ph codeph">EXTERNAL_TABLE</code> for external tables. The
+        <code class="ph codeph">Location</code> field displays the path of the table directory as an HDFS URI.
       </p>
 
         </li>
@@ -188,17 +189,18 @@
       </p>
 
 
-      <div class="p">
-        You can switch a table from internal to external, or from external to internal, by using the <code class="ph codeph">ALTER
-        TABLE</code> statement:
-<pre class="pre codeblock"><code>
+      <div class="p"> You can switch a table from
+        internal to external, or from external to internal, by using the
+          <code class="ph codeph">ALTER TABLE</code> statement:
+        <pre class="pre codeblock"><code>
 -- Switch a table from internal to external.
 ALTER TABLE <var class="keyword varname">table_name</var> SET TBLPROPERTIES('EXTERNAL'='TRUE');
 
 -- Switch a table from external to internal.
 ALTER TABLE <var class="keyword varname">table_name</var> SET TBLPROPERTIES('EXTERNAL'='FALSE');
-</code></pre>
-      </div>
+</code></pre>If
+        the Kudu service is integrated with the Hive Metastore, the above
+        operations are not supported.</div>
 
 
       <p class="p">
@@ -273,11 +275,11 @@ ALTER TABLE <var class="keyword varname">table_name</var> SET TBLPROPERTIES('EXT
 
         <li class="li">
           <p class="p">
-        To see whether a table is internal or external, and its associated HDFS location, issue the statement
-        <code class="ph codeph">DESCRIBE FORMATTED <var class="keyword varname">table_name</var></code>. The <code class="ph codeph">Table Type</code> field
-        displays <code class="ph codeph">MANAGED_TABLE</code> for internal tables and <code class="ph codeph">EXTERNAL_TABLE</code> for
-        external tables. The <code class="ph codeph">Location</code> field displays the path of the table directory as an HDFS
-        URI.
+        To see whether a table is internal or external, and its associated HDFS location, issue
+        the statement <code class="ph codeph">DESCRIBE FORMATTED <var class="keyword varname">table_name</var></code>. The
+        <code class="ph codeph">Table Type</code> field displays <code class="ph codeph">MANAGED_TABLE</code> for internal
+        tables and <code class="ph codeph">EXTERNAL_TABLE</code> for external tables. The
+        <code class="ph codeph">Location</code> field displays the path of the table directory as an HDFS URI.
       </p>
 
         </li>
@@ -311,17 +313,18 @@ ALTER TABLE <var class="keyword varname">table_name</var> SET TBLPROPERTIES('EXT
       </p>
 
 
-      <div class="p">
-        You can switch a table from internal to external, or from external to internal, by using the <code class="ph codeph">ALTER
-        TABLE</code> statement:
-<pre class="pre codeblock"><code>
+      <div class="p"> You can switch a table from
+        internal to external, or from external to internal, by using the
+          <code class="ph codeph">ALTER TABLE</code> statement:
+        <pre class="pre codeblock"><code>
 -- Switch a table from internal to external.
 ALTER TABLE <var class="keyword varname">table_name</var> SET TBLPROPERTIES('EXTERNAL'='TRUE');
 
 -- Switch a table from external to internal.
 ALTER TABLE <var class="keyword varname">table_name</var> SET TBLPROPERTIES('EXTERNAL'='FALSE');
-</code></pre>
-      </div>
+</code></pre>If
+        the Kudu service is integrated with the Hive Metastore, the above
+        operations are not supported.</div>
 
 
       <p class="p">
@@ -386,65 +389,71 @@ ALTER TABLE <var class="keyword varname">table_name</var> SET TBLPROPERTIES('EXT
     <h2 class="title topictitle2" id="ariaid-title5">Kudu Tables</h2>
 
     
-
     <div class="body conbody">
-      <p class="p">
-        Tables stored in Apache Kudu are treated specially, because Kudu manages its data independently of HDFS files.
-        Some information about the table is stored in the metastore database for use by Impala. Other table metadata is
-        managed internally by Kudu.
-      </p>
+      <p class="p"> By default, tables stored in Apache Kudu are treated specially,
+        because Kudu manages its data independently of HDFS files. </p>
 
+      <p class="p">All metadata that Impala needs is stored in the HMS.</p>
 
-      <p class="p"> When you create a Kudu table through Impala, it is assigned an
-        internal Kudu table name of the form
+      <p class="p"> When Kudu is not integrated with the HMS, when you create a Kudu table
+        through Impala, the table is assigned an internal Kudu table name of the
+        form
             <code class="ph codeph">impala::<var class="keyword varname">db_name</var>.<var class="keyword varname">table_name</var></code>.
         You can see the Kudu-assigned name in the output of <code class="ph codeph">DESCRIBE
           FORMATTED</code>, in the <code class="ph codeph">kudu.table_name</code> field of
-        the table properties. The Kudu-assigned name remains the same even if
-        you use <code class="ph codeph">ALTER TABLE</code> to rename the Impala table or move
-        it to a different Impala database. You can issue the statement
-          <code class="ph codeph">ALTER TABLE <var class="keyword varname">impala_name</var> SET
-          TBLPROPERTIES('kudu.table_name' =
-            '<var class="keyword varname">different_kudu_table_name</var>')</code> for the
-        external tables created with the <code class="ph codeph">CREATE EXTERNAL TABLE</code>
-        statement. Changing the <code class="ph codeph">kudu.table_name</code> property of an
-        external table switches which underlying Kudu table the Impala table
-        refers to. The underlying Kudu table must already exist. </p>
+        the table properties. </p>
 
+      <p class="p"> 
+        For Impala-Kudu managed tables, <code class="ph codeph">ALTER TABLE ...
+          RENAME</code> renames both the Impala and the Kudu table. 
+      </p>
 
-      <p class="p">In practice, external tables are typically used to access underlying
-        Kudu tables that were created outside of Impala, that is, through the
-        Kudu API. </p>
-
+      <p class="p"> 
+        For Impala-Kudu external tables, <code class="ph codeph">ALTER TABLE ...
+          RENAME</code> renames just the Impala table. To change the Kudu
+        table that an Impala external table points to, use <code class="ph codeph">ALTER TABLE
+            <var class="keyword varname">impala_name</var> SET TBLPROPERTIES('kudu.table_name' =
+            '<var class="keyword varname">different_kudu_table_name</var>')</code>. The
+        underlying Kudu table must already exist. 
+      </p>
 
       <p class="p">
-        The <code class="ph codeph">SHOW TABLE STATS</code> output for a Kudu table shows Kudu-specific details about the layout of the table.
-        Instead of information about the number and sizes of files, the information is divided by the Kudu tablets.
-        For each tablet, the output includes the fields
-        <code class="ph codeph"># Rows</code> (although this number is not currently computed), <code class="ph codeph">Start Key</code>, <code class="ph codeph">Stop Key</code>, <code class="ph codeph">Leader Replica</code>, and <code class="ph codeph"># Replicas</code>.
-        The output of <code class="ph codeph">SHOW COLUMN STATS</code>, illustrating the distribution of values within each column, is the same for Kudu tables
+        In practice, external tables are typically used to access underlying
+        Kudu tables that were created outside of Impala, that is, through the
+        Kudu API.
+      </p>
+
+      <p class="p">
+        The <code class="ph codeph">SHOW TABLE STATS</code> output for a Kudu table shows
+        Kudu-specific details about the layout of the table. Instead of
+        information about the number and sizes of files, the information is
+        divided by the Kudu tablets. For each tablet, the output includes the
+        fields <code class="ph codeph"># Rows</code> (although this number is not currently
+        computed), <code class="ph codeph">Start Key</code>, <code class="ph codeph">Stop Key</code>,
+          <code class="ph codeph">Leader Replica</code>, and <code class="ph codeph"># Replicas</code>. The
+        output of <code class="ph codeph">SHOW COLUMN STATS</code>, illustrating the
+        distribution of values within each column, is the same for Kudu tables
         as for HDFS-backed tables.
       </p>
 
-
-      <div class="p">
-        The distinction between internal and external tables has some special
-        details for Kudu tables. Tables created entirely through Impala are
-        internal tables. The table name as represented within Kudu includes
-        notation such as an <code class="ph codeph">impala::</code> prefix and the Impala
-        database name. External Kudu tables are those created by a non-Impala
-        mechanism, such as a user application calling the Kudu APIs. For
-        these tables, the <code class="ph codeph">CREATE EXTERNAL TABLE</code> syntax lets
-        you establish a mapping from Impala to the existing Kudu table:
-<pre class="pre codeblock"><code>
+      <div class="p"> If the Kudu service is not
+        integrated with the Hive Metastore, the distinction between internal and
+        external tables has some special details for Kudu tables. Tables created
+        entirely through Impala are internal tables. The table name as
+        represented within Kudu includes notation such as an
+          <code class="ph codeph">impala::</code> prefix and the Impala database name.
+        External Kudu tables are those created by a non-Impala mechanism, such
+        as a user application calling the Kudu APIs. For these tables, the
+          <code class="ph codeph">CREATE EXTERNAL TABLE</code> syntax lets you establish a
+        mapping from Impala to the existing Kudu table:
+        <pre class="pre codeblock"><code>
 CREATE EXTERNAL TABLE impala_name STORED AS KUDU
   TBLPROPERTIES('kudu.table_name' = 'original_kudu_name');
 </code></pre>
         External Kudu tables differ in one important way from other external
-        tables: adding or dropping a column or range partition changes the
-        data in the underlying Kudu table, in contrast to an HDFS-backed
-        external table where existing data files are left untouched.
-      </div>
+        tables: adding or dropping a column or range partition changes the data
+        in the underlying Kudu table, in contrast to an HDFS-backed external
+        table where existing data files are left untouched.</div>
 
     </div>
 

@@ -14,11 +14,11 @@
 <meta name="prodname" content="Impala" />
 <meta name="prodname" content="Impala" />
 <meta name="prodname" content="Impala" />
-<meta name="version" content="Impala 3.2.x" />
-<meta name="version" content="Impala 3.2.x" />
-<meta name="version" content="Impala 3.2.x" />
-<meta name="version" content="Impala 3.2.x" />
-<meta name="version" content="Impala 3.2.x" />
+<meta name="version" content="Impala 3.3.x" />
+<meta name="version" content="Impala 3.3.x" />
+<meta name="version" content="Impala 3.3.x" />
+<meta name="version" content="Impala 3.3.x" />
+<meta name="version" content="Impala 3.3.x" />
 <meta name="DC.Format" content="XHTML" />
 <meta name="DC.Identifier" content="perf_joins" />
 <link rel="stylesheet" type="text/css" href="../commonltr.css" />
@@ -174,12 +174,13 @@
       </p>
 
 
-      <div class="note note"><span class="notetitle">Note:</span>
+      <div class="note note"><span class="notetitle">Note:</span> 
         <p class="p">
-        The <code class="ph codeph">STRAIGHT_JOIN</code> hint affects the join order of table references in the query
-        block containing the hint. It does not affect the join order of nested queries, such as views,
-        inline views, or <code class="ph codeph">WHERE</code>-clause subqueries. To use this hint for performance
-        tuning of complex queries, apply the hint to all query blocks that need a fixed join order.
+        The <code class="ph codeph">STRAIGHT_JOIN</code> hint affects the join order of table references in
+        the query block containing the hint. It does not affect the join order of nested
+        queries, such as views, inline views, or <code class="ph codeph">WHERE</code>-clause subqueries. To
+        use this hint for performance tuning of complex queries, apply the hint to all query
+        blocks that need a fixed join order.
       </p>
 
       </div>
@@ -556,7 +557,7 @@ Returned 1 row(s) in 108.85s
 +------------+
 Returned 1 row(s) in 100.76s</code></pre>
 
-      <div class="note note"><span class="notetitle">Note:</span>
+      <div class="note note"><span class="notetitle">Note:</span> 
         When examining the performance of join queries and the effectiveness of the join order optimization, make
         sure the query involves enough data and cluster resources to see a difference depending on the query plan.
         For example, a single data file of just a few megabytes will reside in a single HDFS block and be processed

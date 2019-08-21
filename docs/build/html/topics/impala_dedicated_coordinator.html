@@ -11,8 +11,8 @@
 <meta name="DC.Relation" scheme="URI" content="../topics/impala_scalability.html" />
 <meta name="prodname" content="Impala" />
 <meta name="prodname" content="Impala" />
-<meta name="version" content="Impala 3.2.x" />
-<meta name="version" content="Impala 3.2.x" />
+<meta name="version" content="Impala 3.3.x" />
+<meta name="version" content="Impala 3.3.x" />
 <meta name="DC.Format" content="XHTML" />
 <meta name="DC.Identifier" content="scalability" />
 <link rel="stylesheet" type="text/css" href="../commonltr.css" />
@@ -24,9 +24,9 @@
   <h1 class="title topictitle1" id="ariaid-title1">How to Configure Impala with Dedicated Coordinators</h1>
 
 
+  
 
-
-
+  
 
   <div class="body conbody">
 
@@ -128,9 +128,11 @@
     </ul>
 
 
-    <p class="p"> If such scalability bottlenecks occur, in Impala 2.9 and higher, you can
-      assign one dedicated role to each Impala daemon host, either as a
-      coordinator or as an executor, to address the issues. </p>
+    <p class="p">
+      If such scalability bottlenecks occur, in Impala 2.9 and higher, you can assign one
+      dedicated role to each Impala daemon host, either as a coordinator or as an executor, to
+      address the issues.
+    </p>
 
 
     <ul class="ul">
@@ -443,7 +445,7 @@
       <div class="body conbody">
 
         <div class="p">
-
+          
 <div class="tablenoborder"><table cellpadding="4" cellspacing="0" summary="" id="concept_w51_cd1_n2b__table_kh3_d31_n2b" class="table" frame="border" border="1" rules="all"><colgroup><col /><col /><col /></colgroup><tbody class="tbody">
                 <tr class="row">
                   <td class="entry cellrowborder" style="vertical-align:top;">
@@ -722,10 +724,11 @@
         <ul class="ul">
           <li class="li">
             <p class="p">
-              <code class="ph codeph">is_executor=false</code> for each host that does not act as an executor
-              for Impala queries. These hosts act exclusively as query coordinators. This
-              setting typically applies to a relatively small number of hosts, because the most
-              common topology is to have nearly all DataNodes doing work for query execution.
+              <code class="ph codeph">‑‑is_executor=false</code> for each host that does not act
+              as an executor for Impala queries. These hosts act exclusively as query
+              coordinators. This setting typically applies to a relatively small number of
+              hosts, because the most common topology is to have nearly all DataNodes doing work
+              for query execution.
             </p>
 
           </li>
@@ -733,12 +736,12 @@
 
           <li class="li">
             <p class="p">
-              <code class="ph codeph">is_coordinator=false</code> for each host that does not act as a
-              coordinator for Impala queries. These hosts act exclusively as executors. The
-              number of hosts with this setting typically increases as the cluster grows larger
-              and handles more table partitions, data files, and concurrent queries. As the
-              overhead for query coordination increases, it becomes more important to centralize
-              that work on dedicated hosts.
+              <code class="ph codeph">‑‑is_coordinator=false</code> for each host that does not
+              act as a coordinator for Impala queries. These hosts act exclusively as executors.
+              The number of hosts with this setting typically increases as the cluster grows
+              larger and handles more table partitions, data files, and concurrent queries. As
+              the overhead for query coordination increases, it becomes more important to
+              centralize that work on dedicated hosts.
             </p>
 
           </li>

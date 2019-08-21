@@ -11,8 +11,8 @@
 <meta name="DC.Relation" scheme="URI" content="../topics/impala_authentication.html" />
 <meta name="prodname" content="Impala" />
 <meta name="prodname" content="Impala" />
-<meta name="version" content="Impala 3.2.x" />
-<meta name="version" content="Impala 3.2.x" />
+<meta name="version" content="Impala 3.3.x" />
+<meta name="version" content="Impala 3.3.x" />
 <meta name="DC.Format" content="XHTML" />
 <meta name="DC.Identifier" content="ldap" />
 <link rel="stylesheet" type="text/css" href="../commonltr.css" />
@@ -38,12 +38,13 @@
     </p>
 
 
-    <div class="note note"><span class="notetitle">Note:</span>
-      Regardless of the authentication mechanism used, Impala always creates HDFS directories and data files
-      owned by the same user (typically <code class="ph codeph">impala</code>). To implement user-level access to different
-      databases, tables, columns, partitions, and so on, use the Sentry authorization feature, as explained in
-      <a class="xref" href="../shared/../topics/impala_authorization.html#authorization">Enabling Sentry Authorization for Impala</a>.
-    </div>
+    <div class="note note"><span class="notetitle">Note:</span> 
+        Regardless of the authentication mechanism used, Impala always creates HDFS directories
+        and data files owned by the same user (typically <code class="ph codeph">impala</code>). To implement
+        user-level access to different databases, tables, columns, partitions, and so on, use
+        the Sentry authorization feature, as explained in
+        <a class="xref" href="../shared/../topics/impala_authorization.html#authorization">Impala Authorization</a>.
+      </div>
 
 
     <p class="p toc inpage"></p>
@@ -67,7 +68,7 @@
     <h2 class="title topictitle2" id="ariaid-title2">Requirements for Using Impala with LDAP</h2>
 
 
-
+    
 
     <div class="body conbody">
 
@@ -130,10 +131,10 @@
 
 
       <dl class="dl">
-
+        
 
           <dt class="dt dlterm">
-            <code class="ph codeph">--enable_ldap_auth</code>
+            <code class="ph codeph">‑‑enable_ldap_auth</code>
           </dt>
 
 
@@ -145,12 +146,12 @@
           </dd>
 
 
+        
 
-
-
+        
 
           <dt class="dt dlterm">
-            <code class="ph codeph">--ldap_uri</code>
+            <code class="ph codeph">‑‑ldap_uri</code>
           </dt>
 
 
@@ -167,7 +168,7 @@
           </dd>
 
 
-
+        
       </dl>
 
 
@@ -201,7 +202,7 @@
 
 
       <dl class="dl">
-
+        
 
           <dt class="dt dlterm">
             <code class="ph codeph">--ldap_domain</code>
@@ -217,9 +218,9 @@
           </dd>
 
 
+        
 
-
-
+        
 
           <dt class="dt dlterm">
             <code class="ph codeph">--ldap_baseDN</code>
@@ -236,9 +237,9 @@
           </dd>
 
 
+        
 
-
-
+        
 
           <dt class="dt dlterm">
             <code class="ph codeph">--ldap_bind_pattern</code>
@@ -258,7 +259,7 @@
           </dd>
 
 
-
+        
       </dl>
 
 
@@ -315,10 +316,10 @@
 
 
       <dl class="dl">
-
+        
 
           <dt class="dt dlterm">
-            <code class="ph codeph">--ldap_tls</code>
+            <code class="ph codeph">‑‑ldap_tls</code>
           </dt>
 
 
@@ -331,12 +332,12 @@
           </dd>
 
 
+        
 
-
-
+        
 
           <dt class="dt dlterm">
-            <code class="ph codeph">--ldap_ca_certificate</code>
+            <code class="ph codeph">‑‑ldap_ca_certificate</code>
           </dt>
 
 
@@ -350,7 +351,7 @@
           </dd>
 
 
-
+        
       </dl>
 
 
@@ -375,7 +376,7 @@
 
 
       <dl class="dl">
-
+        
 
           <dt class="dt dlterm">
             <code class="ph codeph">-l</code>
@@ -390,9 +391,9 @@
           </dd>
 
 
+        
 
-
-
+        
 
           <dt class="dt dlterm">
             <code class="ph codeph">-u</code>
@@ -411,7 +412,7 @@
           </dd>
 
 
-
+        
       </dl>
 
 
@@ -449,7 +450,7 @@
           LDAP authentication for the Impala app in Hue can be enabled by setting the following
           properties under the <code class="ph codeph">[impala]</code> section in <code class="ph codeph">hue.ini</code>.
           <dl class="dl">
-
+            
 
               <dt class="dt dlterm">
                 <code class="ph codeph">auth_username</code>
@@ -464,9 +465,9 @@
               </dd>
 
 
+            
 
-
-
+            
 
               <dt class="dt dlterm">
                 <code class="ph codeph">auth_password</code>
@@ -481,7 +482,7 @@
               </dd>
 
 
-
+            
           </dl>
 
           These login details are only used by Impala to authenticate to LDAP. The Impala
@@ -507,7 +508,7 @@
     <div class="body conbody">
 
       <p class="p">
-        See <a class="xref" href="impala_delegation.html#delegation">Configuring Impala Delegation for Hue and BI Tools</a> for details about the delegation
+        See <a class="xref" href="impala_delegation.html#delegation">Configuring Impala Delegation for Clients</a> for details about the delegation
         feature that lets certain users submit queries using the credentials of other users.
       </p>
 

@@ -11,8 +11,8 @@
 <meta name="DC.Relation" scheme="URI" content="../topics/impala_performance.html" />
 <meta name="prodname" content="Impala" />
 <meta name="prodname" content="Impala" />
-<meta name="version" content="Impala 3.2.x" />
-<meta name="version" content="Impala 3.2.x" />
+<meta name="version" content="Impala 3.3.x" />
+<meta name="version" content="Impala 3.3.x" />
 <meta name="DC.Format" content="XHTML" />
 <meta name="DC.Identifier" content="perf_stats" />
 <link rel="stylesheet" type="text/css" href="../commonltr.css" />
@@ -54,7 +54,7 @@
     <h2 class="title topictitle2" id="perf_table_stats__table_stats">Overview of Table Statistics</h2>
 
 
-
+    
 
     <div class="body conbody">
 
@@ -127,9 +127,10 @@ show table stats parquet_snappy;
 
 
       <p class="p">
-        If you run the Hive statement <code class="ph codeph">ANALYZE TABLE COMPUTE STATISTICS FOR COLUMNS</code>,
-        Impala can only use the resulting column statistics if the table is unpartitioned.
-        Impala cannot use Hive-generated column statistics for a partitioned table.
+        If you run the Hive statement <code class="ph codeph">ANALYZE TABLE COMPUTE STATISTICS FOR
+        COLUMNS</code>, Impala can only use the resulting column statistics if the table is
+        unpartitioned. Impala cannot use Hive-generated column statistics for a partitioned
+        table.
       </p>
 
 
@@ -203,7 +204,7 @@ show column stats parquet_snappy;
 +-------------+----------+------------------+--------+----------+-------------------+
 </code></pre>
 
-      <div class="note note"><span class="notetitle">Note:</span>
+      <div class="note note"><span class="notetitle">Note:</span> 
         <p class="p">
           For column statistics to be effective in Impala, you also need to have table
           statistics for the applicable tables, as described in
@@ -215,13 +216,13 @@ show column stats parquet_snappy;
       </div>
 
 
-      <div class="note note"><span class="notetitle">Note:</span>  Prior to Impala 1.4.0,
-          <code class="ph codeph">COMPUTE STATS</code> counted the number of
-          <code class="ph codeph">NULL</code> values in each column and recorded that figure
-        in the metastore database. Because Impala does not currently use the
-          <code class="ph codeph">NULL</code> count during query planning, Impala 1.4.0 and
-        higher speeds up the <code class="ph codeph">COMPUTE STATS</code> statement by
-        skipping this <code class="ph codeph">NULL</code> counting. </div>
+      <div class="note note"><span class="notetitle">Note:</span> 
+        Prior to Impala 1.4.0, <code class="ph codeph">COMPUTE STATS</code> counted the number of
+        <code class="ph codeph">NULL</code> values in each column and recorded that figure in the metastore
+        database. Because Impala does not currently use the <code class="ph codeph">NULL</code> count during
+        query planning, Impala 1.4.0 and higher speeds up the <code class="ph codeph">COMPUTE STATS</code>
+        statement by skipping this <code class="ph codeph">NULL</code> counting.
+      </div>
 
 
       <p class="p">
@@ -234,9 +235,10 @@ show column stats parquet_snappy;
 
 
       <p class="p">
-        If you run the Hive statement <code class="ph codeph">ANALYZE TABLE COMPUTE STATISTICS FOR COLUMNS</code>,
-        Impala can only use the resulting column statistics if the table is unpartitioned.
-        Impala cannot use Hive-generated column statistics for a partitioned table.
+        If you run the Hive statement <code class="ph codeph">ANALYZE TABLE COMPUTE STATISTICS FOR
+        COLUMNS</code>, Impala can only use the resulting column statistics if the table is
+        unpartitioned. Impala cannot use Hive-generated column statistics for a partitioned
+        table.
       </p>
 
 
@@ -351,9 +353,10 @@ show column stats year_month_day;
 </code></pre>
 
       <p class="p">
-        If you run the Hive statement <code class="ph codeph">ANALYZE TABLE COMPUTE STATISTICS FOR COLUMNS</code>,
-        Impala can only use the resulting column statistics if the table is unpartitioned.
-        Impala cannot use Hive-generated column statistics for a partitioned table.
+        If you run the Hive statement <code class="ph codeph">ANALYZE TABLE COMPUTE STATISTICS FOR
+        COLUMNS</code>, Impala can only use the resulting column statistics if the table is
+        unpartitioned. Impala cannot use Hive-generated column statistics for a partitioned
+        table.
       </p>
 
 
@@ -378,20 +381,19 @@ show column stats year_month_day;
       </p>
 
 
-      <div class="note important"><span class="importanttitle">Important:</span>
+      <div class="note important"><span class="importanttitle">Important:</span> 
         <p class="p">
-        For a particular table, use either <code class="ph codeph">COMPUTE STATS</code> or
-        <code class="ph codeph">COMPUTE INCREMENTAL STATS</code>, but never combine the two or
-        alternate between them. If you switch from <code class="ph codeph">COMPUTE STATS</code> to
-        <code class="ph codeph">COMPUTE INCREMENTAL STATS</code> during the lifetime of a table, or
-        vice versa, drop all statistics by running <code class="ph codeph">DROP STATS</code> before
-        making the switch.
+        For a particular table, use either <code class="ph codeph">COMPUTE STATS</code> or <code class="ph codeph">COMPUTE
+        INCREMENTAL STATS</code>, but never combine the two or alternate between them. If you
+        switch from <code class="ph codeph">COMPUTE STATS</code> to <code class="ph codeph">COMPUTE INCREMENTAL STATS</code>
+        during the lifetime of a table, or vice versa, drop all statistics by running
+        <code class="ph codeph">DROP STATS</code> before making the switch.
       </p>
 
       </div>
 
 
-
+      
 
     </div>
 
@@ -547,7 +549,7 @@ show column stats year_month_day;
             ALTER TABLE mytable test_table SET TBLPROPERTIES("impala.enable.stats.extrapolation"="true")
           </p>
 
-          <div class="note note"><span class="notetitle">Note:</span>
+          <div class="note note"><span class="notetitle">Note:</span> 
             Why are these features experimental? Due to their probabilistic nature
             it is possible that these features perform pathologically poorly on tables
             with extreme data/file/size distributions. Since it is not feasible for us
@@ -614,7 +616,7 @@ show column stats year_month_day;
             well below 10 percent has shown poor results and is not recommended.
             </p>
 
-            <div class="note important"><span class="importanttitle">Important:</span>
+            <div class="note important"><span class="importanttitle">Important:</span> 
               Sampling-based techniques sacrifice result accuracy for execution
               efficiency, so your mileage may vary for different tables and columns
               depending on their data distribution. The extrapolation procedure Impala
@@ -664,23 +666,23 @@ show column stats year_month_day;
         </p>
 
 
-        <div class="note important"><span class="importanttitle">Important:</span>
-          <p class="p"> In Impala 3.0 and lower, approximately
-        400 bytes of metadata per column per partition are needed for caching.
-        Tables with a big number of partitions and many columns can add up to a
-        significant memory overhead as the metadata must be cached on the
-          <span class="keyword cmdname">catalogd</span> host and on every
-          <span class="keyword cmdname">impalad</span> host that is eligible to be a coordinator.
-        If this metadata for all tables exceeds 2 GB, you might experience
-        service downtime. In Impala 3.1 and higher, the issue was alleviated
-        with an improved handling of incremental stats.</p>
+        <div class="note important"><span class="importanttitle">Important:</span> 
+          <p class="p">
+        In Impala 3.0 and lower, approximately 400 bytes of metadata per column per partition
+        are needed for caching. Tables with a big number of partitions and many columns can add
+        up to a significant memory overhead as the metadata must be cached on the
+        <span class="keyword cmdname">catalogd</span> host and on every <span class="keyword cmdname">impalad</span> host that is
+        eligible to be a coordinator. If this metadata for all tables exceeds 2 GB, you might
+        experience service downtime. In Impala 3.1 and higher, the issue was alleviated with an
+        improved handling of incremental stats.
+      </p>
 
           <p class="p">
         When you run <code class="ph codeph">COMPUTE INCREMENTAL STATS</code> on a table for the first time,
         the statistics are computed again from scratch regardless of whether the table already
-        has statistics. Therefore, expect a one-time resource-intensive operation
-        for scanning the entire table when running <code class="ph codeph">COMPUTE INCREMENTAL STATS</code>
-        for the first time on a given table.
+        has statistics. Therefore, expect a one-time resource-intensive operation for scanning
+        the entire table when running <code class="ph codeph">COMPUTE INCREMENTAL STATS</code> for the first
+        time on a given table.
       </p>
 
         </div>
@@ -968,7 +970,7 @@ show column stats year_month_day;
 +-------+-------+--------+------+--------------+--------+-------------------+
 </code></pre>
 
-      <div class="note note"><span class="notetitle">Note:</span>
+      <div class="note note"><span class="notetitle">Note:</span> 
         Because the default <code class="ph codeph">COMPUTE STATS</code> statement creates and updates
         statistics for all partitions in a table, if you expect to frequently add new
         partitions, use the <code class="ph codeph">COMPUTE INCREMENTAL STATS</code> syntax instead, which
@@ -1141,9 +1143,9 @@ alter table partitioned_data set tblproperties ('numRows'='1030000', 'STATS_GENE
 
         <div class="p">
         You specify a case-insensitive symbolic name for the kind of statistics:
-        <code class="ph codeph">numDVs</code>, <code class="ph codeph">numNulls</code>, <code class="ph codeph">avgSize</code>, <code class="ph codeph">maxSize</code>.
-        The key names and values are both quoted. This operation applies to an entire table,
-        not a specific partition. For example:
+        <code class="ph codeph">numDVs</code>, <code class="ph codeph">numNulls</code>, <code class="ph codeph">avgSize</code>,
+        <code class="ph codeph">maxSize</code>. The key names and values are both quoted. This operation
+        applies to an entire table, not a specific partition. For example:
 <pre class="pre codeblock"><code>
 create table t1 (x int, s string);
 insert into t1 values (1, 'one'), (2, 'two'), (2, 'deux');

@@ -11,8 +11,8 @@
 <meta name="DC.Relation" scheme="URI" content="../topics/impala_langref_sql.html" />
 <meta name="prodname" content="Impala" />
 <meta name="prodname" content="Impala" />
-<meta name="version" content="Impala 3.2.x" />
-<meta name="version" content="Impala 3.2.x" />
+<meta name="version" content="Impala 3.3.x" />
+<meta name="version" content="Impala 3.3.x" />
 <meta name="DC.Format" content="XHTML" />
 <meta name="DC.Identifier" content="grant" />
 <link rel="stylesheet" type="text/css" href="../commonltr.css" />
@@ -31,8 +31,8 @@
   <div class="body conbody">
 
     <p class="p">
-      The <code class="ph codeph">GRANT</code> statement grants a privilege on a specified object to a role or
-      grants a role to a group.
+      The <code class="ph codeph">GRANT</code> statement grants a privilege on a specified object to a role,
+      to a user, or to a group. The statement is also used to grant a role to a group.
     </p>
 
 
@@ -41,21 +41,38 @@
       </p>
 
 
-<pre class="pre codeblock"><code>GRANT ROLE <var class="keyword varname">role_name</var> TO GROUP <var class="keyword varname">group_name</var>
-
-GRANT <var class="keyword varname">privilege</var> ON <var class="keyword varname">object_type</var> <var class="keyword varname">object_name</var>
-   TO [ROLE] <var class="keyword varname">roleName</var>
-   [WITH GRANT OPTION]
-
-<span class="ph" id="grant__privileges">privilege ::= ALL | ALTER | CREATE | DROP | INSERT | REFRESH | SELECT | SELECT(<var class="keyword varname">column_name</var>)</span>
-<span class="ph" id="grant__priv_objs">object_type ::= SERVER | URI | DATABASE | TABLE</span>
-</code></pre>
-
     <p class="p">
-      Typically, the object name is an identifier. For URIs, it is a string literal.
+      The following syntax is supported when Impala is using Sentry to manage authorization.
     </p>
 
 
+<pre class="pre codeblock"><code>GRANT ROLE <var class="keyword varname">role_name</var> TO GROUP <var class="keyword varname">group_name</var>
+
+GRANT <var class="keyword varname">privilege</var> ON <var class="keyword varname">object_type</var> <var class="keyword varname">object_name</var>
+   TO [ROLE] <var class="keyword varname">role_name</var>
+   [WITH GRANT OPTION]
+
+<span class="ph" id="grant__privileges"><var class="keyword varname">privilege</var> ::= ALL | ALTER | CREATE | DROP | INSERT | REFRESH | SELECT | SELECT(<var class="keyword varname">column_name</var>)</span>
+<span class="ph" id="grant__priv_objs"><var class="keyword varname">object_type</var> ::= SERVER | URI | DATABASE | TABLE</span>
+</code></pre>
+
+    <p class="p">
+      The following syntax is supported when Impala is using Ranger to manage authorization.
+    </p>
+
+
+<pre class="pre codeblock"><code>GRANT <var class="keyword varname">privilege</var> ON <var class="keyword varname">object_type</var> <var class="keyword varname">object_name</var>
+   TO USER <var class="keyword varname">user_name</var>
+GRANT <var class="keyword varname">privilege</var> ON <var class="keyword varname">object_type</var> <var class="keyword varname">object_name</var>
+   TO GROUP <var class="keyword varname">group_name</var>
+
+<span class="ph">privilege ::= ALL | ALTER | CREATE | DROP | INSERT | REFRESH | SELECT | SELECT(<var class="keyword varname">column_name</var>)</span>
+<span class="ph">object_type ::= SERVER | URI | DATABASE | TABLE</span></code></pre>
+
+    <p class="p">
+      Typically, the <code class="ph codeph"><var class="keyword varname">object_name</var></code> is an identifier. For URIs,
+      it is a string literal.
+    </p>
 
 
     <p class="p">
@@ -103,722 +120,1158 @@ GRANT <var class="keyword varname">privilege</var> ON <var class="keyword varnam
     </p>
 
 
-    <div class="p">The table below lists the minimum level
-        of privileges and the scope required to execute SQL statements in
-          <span class="keyword">Impala 3.0</span> and higher. The following notations
-        are used:<ul class="ul">
-          <li class="li"><strong class="ph b">ANY</strong> denotes the <code class="ph codeph">SELECT</code>,
-              <code class="ph codeph">INSERT</code>, <code class="ph codeph">CREATE</code>,
-              <code class="ph codeph">ALTER</code>, <code class="ph codeph">DROP</code>, <strong class="ph b"><em class="ph i">or</em></strong>
-            <code class="ph codeph">REFRESH</code> privilege.</li>
+    <div class="p">
+        The table below lists the minimum level of privileges and the scope required to execute
+        SQL statements in <span class="keyword">Impala 3.0</span> and higher. The following notations
+        are used:
+        <ul class="ul">
+          <li class="li">
+            <strong class="ph b">ANY</strong> denotes the <code class="ph codeph">SELECT</code>, <code class="ph codeph">INSERT</code>,
+            <code class="ph codeph">CREATE</code>, <code class="ph codeph">ALTER</code>, <code class="ph codeph">DROP</code>,
+            <strong class="ph b"><em class="ph i">or</em></strong> <code class="ph codeph">REFRESH</code> privilege.
+          </li>
 
-          <li class="li"><strong class="ph b">ALL</strong> privilege denotes the <code class="ph codeph">SELECT</code>,
-              <code class="ph codeph">INSERT</code>, <code class="ph codeph">CREATE</code>,
-              <code class="ph codeph">ALTER</code>, <code class="ph codeph">DROP</code>, <strong class="ph b"><em class="ph i">and</em></strong>
-            <code class="ph codeph">REFRESH</code> privileges.</li>
 
-          <li class="li">The owner of an object effectively has the ALL privilege on the
-            object.</li>
+          <li class="li">
+            <strong class="ph b">ALL</strong> privilege denotes the <code class="ph codeph">SELECT</code>, <code class="ph codeph">INSERT</code>,
+            <code class="ph codeph">CREATE</code>, <code class="ph codeph">ALTER</code>, <code class="ph codeph">DROP</code>,
+            <strong class="ph b"><em class="ph i">and</em></strong> <code class="ph codeph">REFRESH</code> privileges.
+          </li>
 
-          <li class="li">The parent levels of the specified scope are implicitly supported
-            where a scope refers to the specific level in the object hierarchy
-            that the privilege is granted. For example, if a privilege is listed
-            with the <code class="ph codeph">TABLE</code> scope, the same privilege granted on
-              <code class="ph codeph">DATABASE</code> and <code class="ph codeph">SERVER</code> will allow
-            the user to execute the specified SQL statement.</li>
+
+          <li class="li">
+            The owner of an object effectively has the ALL privilege on the object.
+          </li>
+
+
+          <li class="li">
+            The parent levels of the specified scope are implicitly supported where a scope
+            refers to the specific level in the object hierarchy that the privilege is granted.
+            For example, if a privilege is listed with the <code class="ph codeph">TABLE</code> scope, the
+            same privilege granted on <code class="ph codeph">DATABASE</code> and <code class="ph codeph">SERVER</code> will
+            allow the user to execute the specified SQL statement.
+          </li>
 
         </ul>
 
-<div class="tablenoborder"><table cellpadding="4" cellspacing="0" summary="" id="grant__d6e169" class="table" frame="border" border="1" rules="all"><colgroup><col /><col /><col /></colgroup><tbody class="tbody">
+        
+<div class="tablenoborder"><table cellpadding="4" cellspacing="0" summary="" id="grant__d6e172" class="table" frame="border" border="1" rules="all"><colgroup><col /><col /><col /></colgroup><tbody class="tbody">
               <tr class="row">
-                <td class="entry cellrowborder" style="vertical-align:top;"><strong class="ph b">SQL Statement</strong></td>
+                <td class="entry cellrowborder" style="vertical-align:top;">
+                  <strong class="ph b">SQL Statement</strong>
+                </td>
 
-                <td class="entry cellrowborder" style="vertical-align:top;"><strong class="ph b">Privileges</strong></td>
+                <td class="entry cellrowborder" style="vertical-align:top;">
+                  <strong class="ph b">Privileges</strong>
+                </td>
 
-                <td class="entry cellrowborder" style="vertical-align:top;"><strong class="ph b">Scope</strong></td>
+                <td class="entry cellrowborder" style="vertical-align:top;">
+                  <strong class="ph b">Object Type / </strong><p class="p"><strong class="ph b">Resource Type</strong></p>
+</td>
 
               </tr>
 
               <tr class="row">
-                <td class="entry cellrowborder" style="vertical-align:top;">SELECT</td>
+                <td class="entry cellrowborder" style="vertical-align:top;">
+                  SELECT
+                </td>
 
-                <td class="entry cellrowborder" style="vertical-align:top;">SELECT</td>
+                <td class="entry cellrowborder" style="vertical-align:top;">
+                  SELECT
+                </td>
 
-                <td class="entry cellrowborder" style="vertical-align:top;">TABLE</td>
-
-              </tr>
-
-              <tr class="row">
-                <td class="entry cellrowborder" style="vertical-align:top;">WITH SELECT</td>
-
-                <td class="entry cellrowborder" style="vertical-align:top;">SELECT</td>
-
-                <td class="entry cellrowborder" style="vertical-align:top;">TABLE</td>
+                <td class="entry cellrowborder" style="vertical-align:top;"> TABLE</td>
 
               </tr>
 
               <tr class="row">
-                <td class="entry cellrowborder" style="vertical-align:top;">EXPLAIN SELECT</td>
+                <td class="entry cellrowborder" style="vertical-align:top;">
+                  WITH SELECT
+                </td>
 
-                <td class="entry cellrowborder" style="vertical-align:top;">SELECT</td>
+                <td class="entry cellrowborder" style="vertical-align:top;">
+                  SELECT
+                </td>
 
-                <td class="entry cellrowborder" style="vertical-align:top;">TABLE</td>
-
-              </tr>
-
-              <tr class="row">
-                <td class="entry cellrowborder" style="vertical-align:top;">INSERT</td>
-
-                <td class="entry cellrowborder" style="vertical-align:top;">INSERT</td>
-
-                <td class="entry cellrowborder" style="vertical-align:top;">TABLE</td>
+                <td class="entry cellrowborder" style="vertical-align:top;">
+                  TABLE
+                </td>
 
               </tr>
 
               <tr class="row">
-                <td class="entry cellrowborder" style="vertical-align:top;">EXPLAIN INSERT</td>
+                <td class="entry cellrowborder" style="vertical-align:top;">
+                  EXPLAIN SELECT
+                </td>
 
-                <td class="entry cellrowborder" style="vertical-align:top;">INSERT</td>
+                <td class="entry cellrowborder" style="vertical-align:top;">
+                  SELECT
+                </td>
 
-                <td class="entry cellrowborder" style="vertical-align:top;">TABLE</td>
-
-              </tr>
-
-              <tr class="row">
-                <td class="entry cellrowborder" style="vertical-align:top;">TRUNCATE</td>
-
-                <td class="entry cellrowborder" style="vertical-align:top;">INSERT</td>
-
-                <td class="entry cellrowborder" style="vertical-align:top;">TABLE</td>
+                <td class="entry cellrowborder" style="vertical-align:top;">
+                  TABLE
+                </td>
 
               </tr>
 
               <tr class="row">
-                <td class="entry cellrowborder" style="vertical-align:top;">LOAD</td>
+                <td class="entry cellrowborder" style="vertical-align:top;">
+                  INSERT
+                </td>
 
-                <td class="entry cellrowborder" style="vertical-align:top;">INSERT</td>
+                <td class="entry cellrowborder" style="vertical-align:top;">
+                  INSERT
+                </td>
 
-                <td class="entry cellrowborder" style="vertical-align:top;">TABLE</td>
-
-              </tr>
-
-              <tr class="row">
-                <td class="entry cellrowborder" style="vertical-align:top;"> </td>
-
-                <td class="entry cellrowborder" style="vertical-align:top;">ALL</td>
-
-                <td class="entry cellrowborder" style="vertical-align:top;">URI</td>
+                <td class="entry cellrowborder" style="vertical-align:top;">
+                  TABLE
+                </td>
 
               </tr>
 
               <tr class="row">
-                <td class="entry cellrowborder" style="vertical-align:top;">CREATE DATABASE</td>
+                <td class="entry cellrowborder" style="vertical-align:top;">
+                  EXPLAIN INSERT
+                </td>
 
-                <td class="entry cellrowborder" style="vertical-align:top;">CREATE</td>
+                <td class="entry cellrowborder" style="vertical-align:top;">
+                  INSERT
+                </td>
 
-                <td class="entry cellrowborder" style="vertical-align:top;">SERVER</td>
-
-              </tr>
-
-              <tr class="row">
-                <td class="entry cellrowborder" style="vertical-align:top;">CREATE DATABASE LOCATION</td>
-
-                <td class="entry cellrowborder" style="vertical-align:top;">CREATE</td>
-
-                <td class="entry cellrowborder" style="vertical-align:top;">SERVER</td>
+                <td class="entry cellrowborder" style="vertical-align:top;">
+                  TABLE
+                </td>
 
               </tr>
 
               <tr class="row">
-                <td class="entry cellrowborder" style="vertical-align:top;"> </td>
+                <td class="entry cellrowborder" style="vertical-align:top;">
+                  TRUNCATE
+                </td>
 
-                <td class="entry cellrowborder" style="vertical-align:top;">ALL</td>
+                <td class="entry cellrowborder" style="vertical-align:top;">
+                  INSERT
+                </td>
 
-                <td class="entry cellrowborder" style="vertical-align:top;">URI</td>
-
-              </tr>
-
-              <tr class="row">
-                <td class="entry cellrowborder" style="vertical-align:top;">CREATE TABLE</td>
-
-                <td class="entry cellrowborder" style="vertical-align:top;">CREATE</td>
-
-                <td class="entry cellrowborder" style="vertical-align:top;">DATABASE</td>
+                <td class="entry cellrowborder" style="vertical-align:top;">
+                  TABLE
+                </td>
 
               </tr>
 
               <tr class="row">
-                <td class="entry cellrowborder" style="vertical-align:top;">CREATE TABLE LIKE</td>
+                <td class="entry cellrowborder" style="vertical-align:top;">
+                  LOAD
+                </td>
 
-                <td class="entry cellrowborder" style="vertical-align:top;">CREATE</td>
+                <td class="entry cellrowborder" style="vertical-align:top;">
+                  INSERT
+                </td>
 
-                <td class="entry cellrowborder" style="vertical-align:top;">DATABASE</td>
+                <td class="entry cellrowborder" style="vertical-align:top;">
+                  TABLE
+                </td>
 
               </tr>
 
               <tr class="row">
                 <td class="entry cellrowborder" style="vertical-align:top;"> </td>
 
-                <td class="entry cellrowborder" style="vertical-align:top;">SELECT, INSERT, <strong class="ph b"><em class="ph i">or</em></strong> REFRESH</td>
+                <td class="entry cellrowborder" style="vertical-align:top;">
+                  ALL
+                </td>
 
-                <td class="entry cellrowborder" style="vertical-align:top;">TABLE</td>
-
-              </tr>
-
-              <tr class="row">
-                <td class="entry cellrowborder" style="vertical-align:top;">CREATE TABLE AS SELECT</td>
-
-                <td class="entry cellrowborder" style="vertical-align:top;">CREATE</td>
-
-                <td class="entry cellrowborder" style="vertical-align:top;">DATABASE</td>
+                <td class="entry cellrowborder" style="vertical-align:top;">
+                  URI
+                </td>
 
               </tr>
 
               <tr class="row">
-                <td class="entry cellrowborder" style="vertical-align:top;"> </td>
+                <td class="entry cellrowborder" style="vertical-align:top;">
+                  CREATE DATABASE
+                </td>
 
-                <td class="entry cellrowborder" style="vertical-align:top;">INSERT</td>
+                <td class="entry cellrowborder" style="vertical-align:top;">
+                  CREATE
+                </td>
 
-                <td class="entry cellrowborder" style="vertical-align:top;">DATABASE</td>
-
-              </tr>
-
-              <tr class="row">
-                <td class="entry cellrowborder" style="vertical-align:top;"> </td>
-
-                <td class="entry cellrowborder" style="vertical-align:top;">SELECT</td>
-
-                <td class="entry cellrowborder" style="vertical-align:top;">TABLE</td>
+                <td class="entry cellrowborder" style="vertical-align:top;">
+                  SERVER
+                </td>
 
               </tr>
 
               <tr class="row">
-                <td class="entry cellrowborder" style="vertical-align:top;">EXPLAIN CREATE TABLE AS SELECT</td>
+                <td class="entry cellrowborder" style="vertical-align:top;">
+                  CREATE DATABASE LOCATION
+                </td>
 
-                <td class="entry cellrowborder" style="vertical-align:top;">CREATE</td>
+                <td class="entry cellrowborder" style="vertical-align:top;">
+                  CREATE
+                </td>
 
-                <td class="entry cellrowborder" style="vertical-align:top;">DATABASE</td>
-
-              </tr>
-
-              <tr class="row">
-                <td class="entry cellrowborder" style="vertical-align:top;"> </td>
-
-                <td class="entry cellrowborder" style="vertical-align:top;">INSERT</td>
-
-                <td class="entry cellrowborder" style="vertical-align:top;">DATABASE</td>
+                <td class="entry cellrowborder" style="vertical-align:top;">
+                  SERVER
+                </td>
 
               </tr>
 
               <tr class="row">
                 <td class="entry cellrowborder" style="vertical-align:top;"> </td>
 
-                <td class="entry cellrowborder" style="vertical-align:top;">SELECT</td>
+                <td class="entry cellrowborder" style="vertical-align:top;">
+                  ALL
+                </td>
 
-                <td class="entry cellrowborder" style="vertical-align:top;">TABLE</td>
-
-              </tr>
-
-              <tr class="row">
-                <td class="entry cellrowborder" style="vertical-align:top;">CREATE TABLE LOCATION</td>
-
-                <td class="entry cellrowborder" style="vertical-align:top;">CREATE</td>
-
-                <td class="entry cellrowborder" style="vertical-align:top;">TABLE</td>
+                <td class="entry cellrowborder" style="vertical-align:top;">
+                  URI
+                </td>
 
               </tr>
 
               <tr class="row">
-                <td class="entry cellrowborder" style="vertical-align:top;"> </td>
+                <td class="entry cellrowborder" style="vertical-align:top;">
+                  CREATE TABLE
+                </td>
 
-                <td class="entry cellrowborder" style="vertical-align:top;">ALL</td>
+                <td class="entry cellrowborder" style="vertical-align:top;">
+                  CREATE
+                </td>
 
-                <td class="entry cellrowborder" style="vertical-align:top;">URI</td>
-
-              </tr>
-
-              <tr class="row">
-                <td class="entry cellrowborder" style="vertical-align:top;">CREATE VIEW</td>
-
-                <td class="entry cellrowborder" style="vertical-align:top;">CREATE</td>
-
-                <td class="entry cellrowborder" style="vertical-align:top;">DATABASE</td>
+                <td class="entry cellrowborder" style="vertical-align:top;">
+                  DATABASE
+                </td>
 
               </tr>
 
               <tr class="row">
-                <td class="entry cellrowborder" style="vertical-align:top;"> </td>
+                <td class="entry cellrowborder" style="vertical-align:top;">
+                  CREATE TABLE LIKE
+                </td>
 
-                <td class="entry cellrowborder" style="vertical-align:top;">SELECT</td>
+                <td class="entry cellrowborder" style="vertical-align:top;">
+                  CREATE
+                </td>
 
-                <td class="entry cellrowborder" style="vertical-align:top;">TABLE</td>
-
-              </tr>
-
-              <tr class="row">
-                <td class="entry cellrowborder" style="vertical-align:top;">ALTER DATABASE SET OWNER</td>
-
-                <td class="entry cellrowborder" style="vertical-align:top;">ALL WITH GRANT</td>
-
-                <td class="entry cellrowborder" style="vertical-align:top;">DATABASE</td>
-
-              </tr>
-
-              <tr class="row">
-                <td class="entry cellrowborder" style="vertical-align:top;">ALTER TABLE</td>
-
-                <td class="entry cellrowborder" style="vertical-align:top;">ALTER</td>
-
-                <td class="entry cellrowborder" style="vertical-align:top;">TABLE</td>
-
-              </tr>
-
-              <tr class="row">
-                <td class="entry cellrowborder" style="vertical-align:top;">ALTER TABLE SET LOCATION</td>
-
-                <td class="entry cellrowborder" style="vertical-align:top;">ALTER</td>
-
-                <td class="entry cellrowborder" style="vertical-align:top;">TABLE</td>
+                <td class="entry cellrowborder" style="vertical-align:top;">
+                  DATABASE
+                </td>
 
               </tr>
 
               <tr class="row">
                 <td class="entry cellrowborder" style="vertical-align:top;"> </td>
 
-                <td class="entry cellrowborder" style="vertical-align:top;">ALL</td>
+                <td class="entry cellrowborder" style="vertical-align:top;">
+                  SELECT, INSERT, <strong class="ph b"><em class="ph i">or</em></strong> REFRESH
+                </td>
 
-                <td class="entry cellrowborder" style="vertical-align:top;">URI</td>
-
-              </tr>
-
-              <tr class="row">
-                <td class="entry cellrowborder" style="vertical-align:top;">ALTER TABLE RENAME</td>
-
-                <td class="entry cellrowborder" style="vertical-align:top;">CREATE</td>
-
-                <td class="entry cellrowborder" style="vertical-align:top;">DATABASE</td>
+                <td class="entry cellrowborder" style="vertical-align:top;">
+                  TABLE
+                </td>
 
               </tr>
 
               <tr class="row">
-                <td class="entry cellrowborder" style="vertical-align:top;"> </td>
+                <td class="entry cellrowborder" style="vertical-align:top;">
+                  CREATE TABLE AS SELECT
+                </td>
 
-                <td class="entry cellrowborder" style="vertical-align:top;">ALL</td>
+                <td class="entry cellrowborder" style="vertical-align:top;">
+                  CREATE
+                </td>
 
-                <td class="entry cellrowborder" style="vertical-align:top;">TABLE</td>
-
-              </tr>
-
-              <tr class="row">
-                <td class="entry cellrowborder" style="vertical-align:top;">ALTER TABLE SET OWNER</td>
-
-                <td class="entry cellrowborder" style="vertical-align:top;">ALL WITH GRANT</td>
-
-                <td class="entry cellrowborder" style="vertical-align:top;">TABLE</td>
-
-              </tr>
-
-              <tr class="row">
-                <td class="entry cellrowborder" style="vertical-align:top;">ALTER VIEW</td>
-
-                <td class="entry cellrowborder" style="vertical-align:top;">ALTER</td>
-
-                <td class="entry cellrowborder" style="vertical-align:top;">TABLE</td>
+                <td class="entry cellrowborder" style="vertical-align:top;">
+                  DATABASE
+                </td>
 
               </tr>
 
               <tr class="row">
                 <td class="entry cellrowborder" style="vertical-align:top;"> </td>
 
-                <td class="entry cellrowborder" style="vertical-align:top;">SELECT</td>
+                <td class="entry cellrowborder" style="vertical-align:top;">
+                  INSERT
+                </td>
 
-                <td class="entry cellrowborder" style="vertical-align:top;">TABLE</td>
-
-              </tr>
-
-              <tr class="row">
-                <td class="entry cellrowborder" style="vertical-align:top;">ALTER VIEW RENAME</td>
-
-                <td class="entry cellrowborder" style="vertical-align:top;">CREATE</td>
-
-                <td class="entry cellrowborder" style="vertical-align:top;">DATABASE</td>
+                <td class="entry cellrowborder" style="vertical-align:top;">
+                  DATABASE
+                </td>
 
               </tr>
 
               <tr class="row">
                 <td class="entry cellrowborder" style="vertical-align:top;"> </td>
 
-                <td class="entry cellrowborder" style="vertical-align:top;">ALL</td>
+                <td class="entry cellrowborder" style="vertical-align:top;">
+                  SELECT
+                </td>
 
-                <td class="entry cellrowborder" style="vertical-align:top;">TABLE</td>
-
-              </tr>
-
-              <tr class="row">
-                <td class="entry cellrowborder" style="vertical-align:top;">ALTER VIEW SET OWNER</td>
-
-                <td class="entry cellrowborder" style="vertical-align:top;">ALL WITH GRANT</td>
-
-                <td class="entry cellrowborder" style="vertical-align:top;">VIEW</td>
+                <td class="entry cellrowborder" style="vertical-align:top;">
+                  TABLE
+                </td>
 
               </tr>
 
               <tr class="row">
-                <td class="entry cellrowborder" style="vertical-align:top;">DROP DATABASE</td>
+                <td class="entry cellrowborder" style="vertical-align:top;">
+                  EXPLAIN CREATE TABLE AS SELECT
+                </td>
 
-                <td class="entry cellrowborder" style="vertical-align:top;">DROP</td>
+                <td class="entry cellrowborder" style="vertical-align:top;">
+                  CREATE
+                </td>
 
-                <td class="entry cellrowborder" style="vertical-align:top;">DATABASE</td>
-
-              </tr>
-
-              <tr class="row">
-                <td class="entry cellrowborder" style="vertical-align:top;">DROP TABLE</td>
-
-                <td class="entry cellrowborder" style="vertical-align:top;">DROP</td>
-
-                <td class="entry cellrowborder" style="vertical-align:top;">TABLE</td>
-
-              </tr>
-
-              <tr class="row">
-                <td class="entry cellrowborder" style="vertical-align:top;">DROP VIEW</td>
-
-                <td class="entry cellrowborder" style="vertical-align:top;">DROP</td>
-
-                <td class="entry cellrowborder" style="vertical-align:top;">TABLE</td>
-
-              </tr>
-
-              <tr class="row">
-                <td class="entry cellrowborder" style="vertical-align:top;">CREATE FUNCTION</td>
-
-                <td class="entry cellrowborder" style="vertical-align:top;">CREATE</td>
-
-                <td class="entry cellrowborder" style="vertical-align:top;">DATABASE</td>
+                <td class="entry cellrowborder" style="vertical-align:top;">
+                  DATABASE
+                </td>
 
               </tr>
 
               <tr class="row">
                 <td class="entry cellrowborder" style="vertical-align:top;"> </td>
 
-                <td class="entry cellrowborder" style="vertical-align:top;">ALL</td>
+                <td class="entry cellrowborder" style="vertical-align:top;">
+                  INSERT
+                </td>
 
-                <td class="entry cellrowborder" style="vertical-align:top;">URI</td>
-
-              </tr>
-
-              <tr class="row">
-                <td class="entry cellrowborder" style="vertical-align:top;">DROP FUNCTION</td>
-
-                <td class="entry cellrowborder" style="vertical-align:top;">DROP</td>
-
-                <td class="entry cellrowborder" style="vertical-align:top;">DATABASE</td>
+                <td class="entry cellrowborder" style="vertical-align:top;">
+                  DATABASE
+                </td>
 
               </tr>
 
               <tr class="row">
-                <td class="entry cellrowborder" style="vertical-align:top;">COMPUTE STATS</td>
+                <td class="entry cellrowborder" style="vertical-align:top;"> </td>
 
-                <td class="entry cellrowborder" style="vertical-align:top;">ALTER and SELECT</td>
+                <td class="entry cellrowborder" style="vertical-align:top;">
+                  SELECT
+                </td>
 
-                <td class="entry cellrowborder" style="vertical-align:top;">TABLE</td>
-
-              </tr>
-
-              <tr class="row">
-                <td class="entry cellrowborder" style="vertical-align:top;">DROP STATS</td>
-
-                <td class="entry cellrowborder" style="vertical-align:top;">ALTER</td>
-
-                <td class="entry cellrowborder" style="vertical-align:top;">TABLE</td>
+                <td class="entry cellrowborder" style="vertical-align:top;">
+                  TABLE
+                </td>
 
               </tr>
 
               <tr class="row">
-                <td class="entry cellrowborder" style="vertical-align:top;">INVALIDATE METADATA</td>
+                <td class="entry cellrowborder" style="vertical-align:top;">
+                  CREATE TABLE LOCATION
+                </td>
 
-                <td class="entry cellrowborder" style="vertical-align:top;">REFRESH</td>
+                <td class="entry cellrowborder" style="vertical-align:top;">
+                  CREATE
+                </td>
 
-                <td class="entry cellrowborder" style="vertical-align:top;">SERVER</td>
-
-              </tr>
-
-              <tr class="row">
-                <td class="entry cellrowborder" style="vertical-align:top;">INVALIDATE METADATA &lt;table&gt;</td>
-
-                <td class="entry cellrowborder" style="vertical-align:top;">REFRESH</td>
-
-                <td class="entry cellrowborder" style="vertical-align:top;">TABLE</td>
+                <td class="entry cellrowborder" style="vertical-align:top;">
+                  TABLE
+                </td>
 
               </tr>
 
               <tr class="row">
-                <td class="entry cellrowborder" style="vertical-align:top;">REFRESH &lt;table&gt;</td>
+                <td class="entry cellrowborder" style="vertical-align:top;"> </td>
 
-                <td class="entry cellrowborder" style="vertical-align:top;">REFRESH</td>
+                <td class="entry cellrowborder" style="vertical-align:top;">
+                  ALL
+                </td>
 
-                <td class="entry cellrowborder" style="vertical-align:top;">TABLE</td>
-
-              </tr>
-
-              <tr class="row">
-                <td class="entry cellrowborder" style="vertical-align:top;">REFRESH AUTHORIZATION</td>
-
-                <td class="entry cellrowborder" style="vertical-align:top;">REFRESH</td>
-
-                <td class="entry cellrowborder" style="vertical-align:top;">SERVER</td>
+                <td class="entry cellrowborder" style="vertical-align:top;">
+                  URI
+                </td>
 
               </tr>
 
               <tr class="row">
-                <td class="entry cellrowborder" style="vertical-align:top;">REFRESH FUNCTIONS</td>
+                <td class="entry cellrowborder" style="vertical-align:top;">
+                  CREATE VIEW
+                </td>
 
-                <td class="entry cellrowborder" style="vertical-align:top;">REFRESH</td>
+                <td class="entry cellrowborder" style="vertical-align:top;">
+                  CREATE
+                </td>
 
-                <td class="entry cellrowborder" style="vertical-align:top;">DATABASE</td>
-
-              </tr>
-
-              <tr class="row">
-                <td class="entry cellrowborder" style="vertical-align:top;">COMMENT ON DATABASE</td>
-
-                <td class="entry cellrowborder" style="vertical-align:top;">ALTER</td>
-
-                <td class="entry cellrowborder" style="vertical-align:top;">DATABASE</td>
+                <td class="entry cellrowborder" style="vertical-align:top;">
+                  DATABASE
+                </td>
 
               </tr>
 
               <tr class="row">
-                <td class="entry cellrowborder" style="vertical-align:top;">COMMENT ON TABLE</td>
+                <td class="entry cellrowborder" style="vertical-align:top;"> </td>
 
-                <td class="entry cellrowborder" style="vertical-align:top;">ALTER</td>
+                <td class="entry cellrowborder" style="vertical-align:top;">
+                  SELECT
+                </td>
 
-                <td class="entry cellrowborder" style="vertical-align:top;">TABLE</td>
-
-              </tr>
-
-              <tr class="row">
-                <td class="entry cellrowborder" style="vertical-align:top;">COMMENT ON VIEW</td>
-
-                <td class="entry cellrowborder" style="vertical-align:top;">ALTER</td>
-
-                <td class="entry cellrowborder" style="vertical-align:top;">TABLE</td>
+                <td class="entry cellrowborder" style="vertical-align:top;">
+                  TABLE
+                </td>
 
               </tr>
 
               <tr class="row">
-                <td class="entry cellrowborder" style="vertical-align:top;">COMMENT ON COLUMN</td>
+                <td class="entry cellrowborder" style="vertical-align:top;">
+                  ALTER DATABASE SET OWNER
+                </td>
 
-                <td class="entry cellrowborder" style="vertical-align:top;">ALTER</td>
+                <td class="entry cellrowborder" style="vertical-align:top;">
+                  ALL WITH GRANT
+                </td>
 
-                <td class="entry cellrowborder" style="vertical-align:top;">TABLE</td>
-
-              </tr>
-
-              <tr class="row">
-                <td class="entry cellrowborder" style="vertical-align:top;">DESCRIBE DATABASE</td>
-
-                <td class="entry cellrowborder" style="vertical-align:top;">SELECT, INSERT, <strong class="ph b"><em class="ph i">or</em></strong> REFRESH</td>
-
-                <td class="entry cellrowborder" style="vertical-align:top;">DATABASE</td>
+                <td class="entry cellrowborder" style="vertical-align:top;">
+                  DATABASE
+                </td>
 
               </tr>
 
               <tr class="row">
-                <td class="entry cellrowborder" style="vertical-align:top;">DESCRIBE &lt;table/view&gt;</td>
+                <td class="entry cellrowborder" style="vertical-align:top;">
+                  ALTER TABLE
+                </td>
 
-                <td class="entry cellrowborder" style="vertical-align:top;">SELECT, INSERT, <strong class="ph b"><em class="ph i">or</em></strong> REFRESH</td>
+                <td class="entry cellrowborder" style="vertical-align:top;">
+                  ALTER
+                </td>
 
-                <td class="entry cellrowborder" style="vertical-align:top;">TABLE</td>
-
-              </tr>
-
-              <tr class="row">
-                <td class="entry cellrowborder" style="vertical-align:top;">If the user has the SELECT privilege at the COLUMN level,
-                  only the columns the user has access will show.</td>
-
-                <td class="entry cellrowborder" style="vertical-align:top;">SELECT</td>
-
-                <td class="entry cellrowborder" style="vertical-align:top;">COLUMN</td>
+                <td class="entry cellrowborder" style="vertical-align:top;">
+                  TABLE
+                </td>
 
               </tr>
 
               <tr class="row">
-                <td class="entry cellrowborder" style="vertical-align:top;">USE</td>
+                <td class="entry cellrowborder" style="vertical-align:top;">
+                  ALTER TABLE SET LOCATION
+                </td>
 
-                <td class="entry cellrowborder" style="vertical-align:top;">ANY</td>
+                <td class="entry cellrowborder" style="vertical-align:top;">
+                  ALTER
+                </td>
 
-                <td class="entry cellrowborder" style="vertical-align:top;">TABLE</td>
-
-              </tr>
-
-              <tr class="row">
-                <td class="entry cellrowborder" style="vertical-align:top;">SHOW DATABASES</td>
-
-                <td class="entry cellrowborder" style="vertical-align:top;">ANY</td>
-
-                <td class="entry cellrowborder" style="vertical-align:top;">TABLE</td>
+                <td class="entry cellrowborder" style="vertical-align:top;">
+                  TABLE
+                </td>
 
               </tr>
 
               <tr class="row">
-                <td class="entry cellrowborder" style="vertical-align:top;">SHOW TABLES</td>
+                <td class="entry cellrowborder" style="vertical-align:top;"> </td>
 
-                <td class="entry cellrowborder" style="vertical-align:top;">ANY</td>
+                <td class="entry cellrowborder" style="vertical-align:top;">
+                  ALL
+                </td>
 
-                <td class="entry cellrowborder" style="vertical-align:top;">TABLE</td>
-
-              </tr>
-
-              <tr class="row">
-                <td class="entry cellrowborder" style="vertical-align:top;">SHOW FUNCTIONS</td>
-
-                <td class="entry cellrowborder" style="vertical-align:top;">SELECT, INSERT, <strong class="ph b"><em class="ph i">or</em></strong> REFRESH</td>
-
-                <td class="entry cellrowborder" style="vertical-align:top;">DATABASE</td>
+                <td class="entry cellrowborder" style="vertical-align:top;">
+                  URI
+                </td>
 
               </tr>
 
               <tr class="row">
-                <td class="entry cellrowborder" style="vertical-align:top;">SHOW PARTITIONS</td>
+                <td class="entry cellrowborder" style="vertical-align:top;">
+                  ALTER TABLE RENAME
+                </td>
 
-                <td class="entry cellrowborder" style="vertical-align:top;">SELECT, INSERT, <strong class="ph b"><em class="ph i">or</em></strong> REFRESH</td>
+                <td class="entry cellrowborder" style="vertical-align:top;">
+                  CREATE
+                </td>
 
-                <td class="entry cellrowborder" style="vertical-align:top;">TABLE</td>
-
-              </tr>
-
-              <tr class="row">
-                <td class="entry cellrowborder" style="vertical-align:top;">SHOW TABLE STATS</td>
-
-                <td class="entry cellrowborder" style="vertical-align:top;">SELECT, INSERT, <strong class="ph b"><em class="ph i">or</em></strong> REFRESH</td>
-
-                <td class="entry cellrowborder" style="vertical-align:top;">TABLE</td>
+                <td class="entry cellrowborder" style="vertical-align:top;">
+                  DATABASE
+                </td>
 
               </tr>
 
               <tr class="row">
-                <td class="entry cellrowborder" style="vertical-align:top;">SHOW COLUMN STATS</td>
+                <td class="entry cellrowborder" style="vertical-align:top;"> </td>
 
-                <td class="entry cellrowborder" style="vertical-align:top;">SELECT, INSERT, <strong class="ph b"><em class="ph i">or</em></strong> REFRESH</td>
+                <td class="entry cellrowborder" style="vertical-align:top;">
+                  ALL
+                </td>
 
-                <td class="entry cellrowborder" style="vertical-align:top;">TABLE</td>
-
-              </tr>
-
-              <tr class="row">
-                <td class="entry cellrowborder" style="vertical-align:top;">SHOW FILES</td>
-
-                <td class="entry cellrowborder" style="vertical-align:top;">SELECT, INSERT, <strong class="ph b"><em class="ph i">or</em></strong> REFRESH</td>
-
-                <td class="entry cellrowborder" style="vertical-align:top;">TABLE</td>
+                <td class="entry cellrowborder" style="vertical-align:top;">
+                  TABLE
+                </td>
 
               </tr>
 
               <tr class="row">
-                <td class="entry cellrowborder" style="vertical-align:top;">SHOW CREATE TABLE</td>
+                <td class="entry cellrowborder" style="vertical-align:top;">
+                  ALTER TABLE SET OWNER
+                </td>
 
-                <td class="entry cellrowborder" style="vertical-align:top;">SELECT, INSERT, <strong class="ph b"><em class="ph i">or</em></strong> REFRESH</td>
+                <td class="entry cellrowborder" style="vertical-align:top;">
+                  ALL WITH GRANT
+                </td>
 
-                <td class="entry cellrowborder" style="vertical-align:top;">TABLE</td>
-
-              </tr>
-
-              <tr class="row">
-                <td class="entry cellrowborder" style="vertical-align:top;">SHOW CREATE VIEW</td>
-
-                <td class="entry cellrowborder" style="vertical-align:top;">SELECT, INSERT, <strong class="ph b"><em class="ph i">or</em></strong> REFRESH</td>
-
-                <td class="entry cellrowborder" style="vertical-align:top;">TABLE</td>
+                <td class="entry cellrowborder" style="vertical-align:top;">
+                  TABLE
+                </td>
 
               </tr>
 
               <tr class="row">
-                <td class="entry cellrowborder" style="vertical-align:top;">SHOW CREATE FUNCTION</td>
+                <td class="entry cellrowborder" style="vertical-align:top;">
+                  ALTER VIEW
+                </td>
 
-                <td class="entry cellrowborder" style="vertical-align:top;">SELECT, INSERT, <strong class="ph b"><em class="ph i">or</em></strong> REFRESH</td>
+                <td class="entry cellrowborder" style="vertical-align:top;">
+                  ALTER
+                </td>
 
-                <td class="entry cellrowborder" style="vertical-align:top;">DATABASE</td>
-
-              </tr>
-
-              <tr class="row">
-                <td class="entry cellrowborder" style="vertical-align:top;">SHOW RANGE PARTITIONS (Kudu only)</td>
-
-                <td class="entry cellrowborder" style="vertical-align:top;">SELECT, INSERT, <strong class="ph b"><em class="ph i">or</em></strong> REFRESH</td>
-
-                <td class="entry cellrowborder" style="vertical-align:top;">TABLE</td>
+                <td class="entry cellrowborder" style="vertical-align:top;">
+                  TABLE
+                </td>
 
               </tr>
 
               <tr class="row">
-                <td class="entry cellrowborder" style="vertical-align:top;">UPDATE (Kudu only)</td>
+                <td class="entry cellrowborder" style="vertical-align:top;"> </td>
 
-                <td class="entry cellrowborder" style="vertical-align:top;">ALL</td>
+                <td class="entry cellrowborder" style="vertical-align:top;">
+                  SELECT
+                </td>
 
-                <td class="entry cellrowborder" style="vertical-align:top;">TABLE</td>
-
-              </tr>
-
-              <tr class="row">
-                <td class="entry cellrowborder" style="vertical-align:top;">EXPLAIN UPDATE (Kudu only)</td>
-
-                <td class="entry cellrowborder" style="vertical-align:top;">ALL</td>
-
-                <td class="entry cellrowborder" style="vertical-align:top;">TABLE</td>
+                <td class="entry cellrowborder" style="vertical-align:top;">
+                  TABLE
+                </td>
 
               </tr>
 
               <tr class="row">
-                <td class="entry cellrowborder" style="vertical-align:top;">UPSERT (Kudu only)</td>
+                <td class="entry cellrowborder" style="vertical-align:top;">
+                  ALTER VIEW RENAME
+                </td>
 
-                <td class="entry cellrowborder" style="vertical-align:top;">ALL</td>
+                <td class="entry cellrowborder" style="vertical-align:top;">
+                  CREATE
+                </td>
 
-                <td class="entry cellrowborder" style="vertical-align:top;">TABLE</td>
-
-              </tr>
-
-              <tr class="row">
-                <td class="entry cellrowborder" style="vertical-align:top;">WITH UPSERT (Kudu only)</td>
-
-                <td class="entry cellrowborder" style="vertical-align:top;">ALL</td>
-
-                <td class="entry cellrowborder" style="vertical-align:top;">TABLE</td>
+                <td class="entry cellrowborder" style="vertical-align:top;">
+                  DATABASE
+                </td>
 
               </tr>
 
               <tr class="row">
-                <td class="entry cellrowborder" style="vertical-align:top;">EXPLAIN UPSERT (Kudu only)</td>
+                <td class="entry cellrowborder" style="vertical-align:top;"> </td>
 
-                <td class="entry cellrowborder" style="vertical-align:top;">ALL</td>
+                <td class="entry cellrowborder" style="vertical-align:top;">
+                  ALL
+                </td>
 
-                <td class="entry cellrowborder" style="vertical-align:top;">TABLE</td>
-
-              </tr>
-
-              <tr class="row">
-                <td class="entry cellrowborder" style="vertical-align:top;">DELETE (Kudu only)</td>
-
-                <td class="entry cellrowborder" style="vertical-align:top;">ALL</td>
-
-                <td class="entry cellrowborder" style="vertical-align:top;">TABLE</td>
+                <td class="entry cellrowborder" style="vertical-align:top;">
+                  TABLE
+                </td>
 
               </tr>
 
               <tr class="row">
-                <td class="entry cellrowborder" style="vertical-align:top;">EXPLAIN DELETE (Kudu only)</td>
+                <td class="entry cellrowborder" style="vertical-align:top;">
+                  ALTER VIEW SET OWNER
+                </td>
 
-                <td class="entry cellrowborder" style="vertical-align:top;">ALL</td>
+                <td class="entry cellrowborder" style="vertical-align:top;">
+                  ALL WITH GRANT
+                </td>
 
-                <td class="entry cellrowborder" style="vertical-align:top;">TABLE</td>
+                <td class="entry cellrowborder" style="vertical-align:top;">
+                  VIEW
+                </td>
+
+              </tr>
+
+              <tr class="row">
+                <td class="entry cellrowborder" style="vertical-align:top;">
+                  DROP DATABASE
+                </td>
+
+                <td class="entry cellrowborder" style="vertical-align:top;">
+                  DROP
+                </td>
+
+                <td class="entry cellrowborder" style="vertical-align:top;">
+                  DATABASE
+                </td>
+
+              </tr>
+
+              <tr class="row">
+                <td class="entry cellrowborder" style="vertical-align:top;">
+                  DROP TABLE
+                </td>
+
+                <td class="entry cellrowborder" style="vertical-align:top;">
+                  DROP
+                </td>
+
+                <td class="entry cellrowborder" style="vertical-align:top;">
+                  TABLE
+                </td>
+
+              </tr>
+
+              <tr class="row">
+                <td class="entry cellrowborder" style="vertical-align:top;">
+                  DROP VIEW
+                </td>
+
+                <td class="entry cellrowborder" style="vertical-align:top;">
+                  DROP
+                </td>
+
+                <td class="entry cellrowborder" style="vertical-align:top;">
+                  TABLE
+                </td>
+
+              </tr>
+
+              <tr class="row">
+                <td class="entry cellrowborder" style="vertical-align:top;">
+                  CREATE FUNCTION
+                </td>
+
+                <td class="entry cellrowborder" style="vertical-align:top;">
+                  CREATE
+                </td>
+
+                <td class="entry cellrowborder" style="vertical-align:top;">
+                  DATABASE
+                </td>
+
+              </tr>
+
+              <tr class="row">
+                <td class="entry cellrowborder" style="vertical-align:top;"> </td>
+
+                <td class="entry cellrowborder" style="vertical-align:top;">
+                  ALL
+                </td>
+
+                <td class="entry cellrowborder" style="vertical-align:top;">
+                  URI
+                </td>
+
+              </tr>
+
+              <tr class="row">
+                <td class="entry cellrowborder" style="vertical-align:top;">
+                  DROP FUNCTION
+                </td>
+
+                <td class="entry cellrowborder" style="vertical-align:top;">
+                  DROP
+                </td>
+
+                <td class="entry cellrowborder" style="vertical-align:top;">
+                  DATABASE
+                </td>
+
+              </tr>
+
+              <tr class="row">
+                <td class="entry cellrowborder" style="vertical-align:top;">
+                  COMPUTE STATS
+                </td>
+
+                <td class="entry cellrowborder" style="vertical-align:top;">
+                  ALTER and SELECT
+                </td>
+
+                <td class="entry cellrowborder" style="vertical-align:top;">
+                  TABLE
+                </td>
+
+              </tr>
+
+              <tr class="row">
+                <td class="entry cellrowborder" style="vertical-align:top;">
+                  DROP STATS
+                </td>
+
+                <td class="entry cellrowborder" style="vertical-align:top;">
+                  ALTER
+                </td>
+
+                <td class="entry cellrowborder" style="vertical-align:top;">
+                  TABLE
+                </td>
+
+              </tr>
+
+              <tr class="row">
+                <td class="entry cellrowborder" style="vertical-align:top;">
+                  INVALIDATE METADATA
+                </td>
+
+                <td class="entry cellrowborder" style="vertical-align:top;">
+                  REFRESH
+                </td>
+
+                <td class="entry cellrowborder" style="vertical-align:top;">
+                  SERVER
+                </td>
+
+              </tr>
+
+              <tr class="row">
+                <td class="entry cellrowborder" style="vertical-align:top;">
+                  INVALIDATE METADATA &lt;table&gt;
+                </td>
+
+                <td class="entry cellrowborder" style="vertical-align:top;">
+                  REFRESH
+                </td>
+
+                <td class="entry cellrowborder" style="vertical-align:top;">
+                  TABLE
+                </td>
+
+              </tr>
+
+              <tr class="row">
+                <td class="entry cellrowborder" style="vertical-align:top;">
+                  REFRESH &lt;table&gt;
+                </td>
+
+                <td class="entry cellrowborder" style="vertical-align:top;">
+                  REFRESH
+                </td>
+
+                <td class="entry cellrowborder" style="vertical-align:top;">
+                  TABLE
+                </td>
+
+              </tr>
+
+              <tr class="row">
+                <td class="entry cellrowborder" style="vertical-align:top;">
+                  REFRESH AUTHORIZATION
+                </td>
+
+                <td class="entry cellrowborder" style="vertical-align:top;">
+                  REFRESH
+                </td>
+
+                <td class="entry cellrowborder" style="vertical-align:top;">
+                  SERVER
+                </td>
+
+              </tr>
+
+              <tr class="row">
+                <td class="entry cellrowborder" style="vertical-align:top;">
+                  REFRESH FUNCTIONS
+                </td>
+
+                <td class="entry cellrowborder" style="vertical-align:top;">
+                  REFRESH
+                </td>
+
+                <td class="entry cellrowborder" style="vertical-align:top;">
+                  DATABASE
+                </td>
+
+              </tr>
+
+              <tr class="row">
+                <td class="entry cellrowborder" style="vertical-align:top;">
+                  COMMENT ON DATABASE
+                </td>
+
+                <td class="entry cellrowborder" style="vertical-align:top;">
+                  ALTER
+                </td>
+
+                <td class="entry cellrowborder" style="vertical-align:top;">
+                  DATABASE
+                </td>
+
+              </tr>
+
+              <tr class="row">
+                <td class="entry cellrowborder" style="vertical-align:top;">
+                  COMMENT ON TABLE
+                </td>
+
+                <td class="entry cellrowborder" style="vertical-align:top;">
+                  ALTER
+                </td>
+
+                <td class="entry cellrowborder" style="vertical-align:top;">
+                  TABLE
+                </td>
+
+              </tr>
+
+              <tr class="row">
+                <td class="entry cellrowborder" style="vertical-align:top;">
+                  COMMENT ON VIEW
+                </td>
+
+                <td class="entry cellrowborder" style="vertical-align:top;">
+                  ALTER
+                </td>
+
+                <td class="entry cellrowborder" style="vertical-align:top;">
+                  TABLE
+                </td>
+
+              </tr>
+
+              <tr class="row">
+                <td class="entry cellrowborder" style="vertical-align:top;">
+                  COMMENT ON COLUMN
+                </td>
+
+                <td class="entry cellrowborder" style="vertical-align:top;">
+                  ALTER
+                </td>
+
+                <td class="entry cellrowborder" style="vertical-align:top;">
+                  TABLE
+                </td>
+
+              </tr>
+
+              <tr class="row">
+                <td class="entry cellrowborder" style="vertical-align:top;">
+                  DESCRIBE DATABASE
+                </td>
+
+                <td class="entry cellrowborder" style="vertical-align:top;">
+                  SELECT, INSERT, <strong class="ph b"><em class="ph i">or</em></strong> REFRESH
+                </td>
+
+                <td class="entry cellrowborder" style="vertical-align:top;">
+                  DATABASE
+                </td>
+
+              </tr>
+
+              <tr class="row">
+                <td class="entry cellrowborder" style="vertical-align:top;">
+                  DESCRIBE &lt;table/view&gt;
+                </td>
+
+                <td class="entry cellrowborder" style="vertical-align:top;">
+                  SELECT, INSERT, <strong class="ph b"><em class="ph i">or</em></strong> REFRESH
+                </td>
+
+                <td class="entry cellrowborder" style="vertical-align:top;">
+                  TABLE
+                </td>
+
+              </tr>
+
+              <tr class="row">
+                <td class="entry cellrowborder" style="vertical-align:top;">
+                  If the user has the SELECT privilege at the COLUMN level, only the columns the
+                  user has access will show.
+                </td>
+
+                <td class="entry cellrowborder" style="vertical-align:top;">
+                  SELECT
+                </td>
+
+                <td class="entry cellrowborder" style="vertical-align:top;">
+                  COLUMN
+                </td>
+
+              </tr>
+
+              <tr class="row">
+                <td class="entry cellrowborder" style="vertical-align:top;">
+                  USE
+                </td>
+
+                <td class="entry cellrowborder" style="vertical-align:top;">
+                  ANY
+                </td>
+
+                <td class="entry cellrowborder" style="vertical-align:top;">
+                  TABLE
+                </td>
+
+              </tr>
+
+              <tr class="row">
+                <td class="entry cellrowborder" style="vertical-align:top;">
+                  SHOW DATABASES
+                </td>
+
+                <td class="entry cellrowborder" style="vertical-align:top;">
+                  ANY
+                </td>
+
+                <td class="entry cellrowborder" style="vertical-align:top;">
+                  TABLE
+                </td>
+
+              </tr>
+
+              <tr class="row">
+                <td class="entry cellrowborder" style="vertical-align:top;">
+                  SHOW TABLES
+                </td>
+
+                <td class="entry cellrowborder" style="vertical-align:top;">
+                  ANY
+                </td>
+
+                <td class="entry cellrowborder" style="vertical-align:top;">
+                  TABLE
+                </td>
+
+              </tr>
+
+              <tr class="row">
+                <td class="entry cellrowborder" style="vertical-align:top;">
+                  SHOW FUNCTIONS
+                </td>
+
+                <td class="entry cellrowborder" style="vertical-align:top;">
+                  SELECT, INSERT, <strong class="ph b"><em class="ph i">or</em></strong> REFRESH
+                </td>
+
+                <td class="entry cellrowborder" style="vertical-align:top;">
+                  DATABASE
+                </td>
+
+              </tr>
+
+              <tr class="row">
+                <td class="entry cellrowborder" style="vertical-align:top;">
+                  SHOW PARTITIONS
+                </td>
+
+                <td class="entry cellrowborder" style="vertical-align:top;">
+                  SELECT, INSERT, <strong class="ph b"><em class="ph i">or</em></strong> REFRESH
+                </td>
+
+                <td class="entry cellrowborder" style="vertical-align:top;">
+                  TABLE
+                </td>
+
+              </tr>
+
+              <tr class="row">
+                <td class="entry cellrowborder" style="vertical-align:top;">
+                  SHOW TABLE STATS
+                </td>
+
+                <td class="entry cellrowborder" style="vertical-align:top;">
+                  SELECT, INSERT, <strong class="ph b"><em class="ph i">or</em></strong> REFRESH
+                </td>
+
+                <td class="entry cellrowborder" style="vertical-align:top;">
+                  TABLE
+                </td>
+
+              </tr>
+
+              <tr class="row">
+                <td class="entry cellrowborder" style="vertical-align:top;">
+                  SHOW COLUMN STATS
+                </td>
+
+                <td class="entry cellrowborder" style="vertical-align:top;">
+                  SELECT, INSERT, <strong class="ph b"><em class="ph i">or</em></strong> REFRESH
+                </td>
+
+                <td class="entry cellrowborder" style="vertical-align:top;">
+                  TABLE
+                </td>
+
+              </tr>
+
+              <tr class="row">
+                <td class="entry cellrowborder" style="vertical-align:top;">
+                  SHOW FILES
+                </td>
+
+                <td class="entry cellrowborder" style="vertical-align:top;">
+                  SELECT, INSERT, <strong class="ph b"><em class="ph i">or</em></strong> REFRESH
+                </td>
+
+                <td class="entry cellrowborder" style="vertical-align:top;">
+                  TABLE
+                </td>
+
+              </tr>
+
+              <tr class="row">
+                <td class="entry cellrowborder" style="vertical-align:top;">
+                  SHOW CREATE TABLE
+                </td>
+
+                <td class="entry cellrowborder" style="vertical-align:top;">
+                  SELECT, INSERT, <strong class="ph b"><em class="ph i">or</em></strong> REFRESH
+                </td>
+
+                <td class="entry cellrowborder" style="vertical-align:top;">
+                  TABLE
+                </td>
+
+              </tr>
+
+              <tr class="row">
+                <td class="entry cellrowborder" style="vertical-align:top;">
+                  SHOW CREATE VIEW
+                </td>
+
+                <td class="entry cellrowborder" style="vertical-align:top;">
+                  SELECT, INSERT, <strong class="ph b"><em class="ph i">or</em></strong> REFRESH
+                </td>
+
+                <td class="entry cellrowborder" style="vertical-align:top;">
+                  TABLE
+                </td>
+
+              </tr>
+
+              <tr class="row">
+                <td class="entry cellrowborder" style="vertical-align:top;">
+                  SHOW CREATE FUNCTION
+                </td>
+
+                <td class="entry cellrowborder" style="vertical-align:top;">
+                  SELECT, INSERT, <strong class="ph b"><em class="ph i">or</em></strong> REFRESH
+                </td>
+
+                <td class="entry cellrowborder" style="vertical-align:top;">
+                  DATABASE
+                </td>
+
+              </tr>
+
+              <tr class="row">
+                <td class="entry cellrowborder" style="vertical-align:top;">
+                  SHOW RANGE PARTITIONS (Kudu only)
+                </td>
+
+                <td class="entry cellrowborder" style="vertical-align:top;">
+                  SELECT, INSERT, <strong class="ph b"><em class="ph i">or</em></strong> REFRESH
+                </td>
+
+                <td class="entry cellrowborder" style="vertical-align:top;">
+                  TABLE
+                </td>
+
+              </tr>
+
+              <tr class="row">
+                <td class="entry cellrowborder" style="vertical-align:top;">
+                  UPDATE (Kudu only)
+                </td>
+
+                <td class="entry cellrowborder" style="vertical-align:top;">
+                  ALL
+                </td>
+
+                <td class="entry cellrowborder" style="vertical-align:top;">
+                  TABLE
+                </td>
+
+              </tr>
+
+              <tr class="row">
+                <td class="entry cellrowborder" style="vertical-align:top;">
+                  EXPLAIN UPDATE (Kudu only)
+                </td>
+
+                <td class="entry cellrowborder" style="vertical-align:top;">
+                  ALL
+                </td>
+
+                <td class="entry cellrowborder" style="vertical-align:top;">
+                  TABLE
+                </td>
+
+              </tr>
+
+              <tr class="row">
+                <td class="entry cellrowborder" style="vertical-align:top;">
+                  UPSERT (Kudu only)
+                </td>
+
+                <td class="entry cellrowborder" style="vertical-align:top;">
+                  ALL
+                </td>
+
+                <td class="entry cellrowborder" style="vertical-align:top;">
+                  TABLE
+                </td>
+
+              </tr>
+
+              <tr class="row">
+                <td class="entry cellrowborder" style="vertical-align:top;">
+                  WITH UPSERT (Kudu only)
+                </td>
+
+                <td class="entry cellrowborder" style="vertical-align:top;">
+                  ALL
+                </td>
+
+                <td class="entry cellrowborder" style="vertical-align:top;">
+                  TABLE
+                </td>
+
+              </tr>
+
+              <tr class="row">
+                <td class="entry cellrowborder" style="vertical-align:top;">
+                  EXPLAIN UPSERT (Kudu only)
+                </td>
+
+                <td class="entry cellrowborder" style="vertical-align:top;">
+                  ALL
+                </td>
+
+                <td class="entry cellrowborder" style="vertical-align:top;">
+                  TABLE
+                </td>
+
+              </tr>
+
+              <tr class="row">
+                <td class="entry cellrowborder" style="vertical-align:top;">
+                  DELETE (Kudu only)
+                </td>
+
+                <td class="entry cellrowborder" style="vertical-align:top;">
+                  ALL
+                </td>
+
+                <td class="entry cellrowborder" style="vertical-align:top;">
+                  TABLE
+                </td>
+
+              </tr>
+
+              <tr class="row">
+                <td class="entry cellrowborder" style="vertical-align:top;">
+                  EXPLAIN DELETE (Kudu only)
+                </td>
+
+                <td class="entry cellrowborder" style="vertical-align:top;">
+                  ALL
+                </td>
+
+                <td class="entry cellrowborder" style="vertical-align:top;">
+                  TABLE
+                </td>
 
               </tr>
 
             </tbody>
 </table>
 </div>
-</div>
+
+      </div>
 
 
     <p class="p">
@@ -850,8 +1303,8 @@ GRANT <var class="keyword varname">privilege</var> ON <var class="keyword varnam
 
 
         <li class="li">
-          Currently, each Impala <code class="ph codeph">GRANT</code> or <code class="ph codeph">REVOKE</code> statement can only grant or
-          revoke a single privilege to or from a single role.
+          Currently, each Impala <code class="ph codeph">GRANT</code> or <code class="ph codeph">REVOKE</code> statement can
+          only grant or revoke a single privilege to or from a single role.
         </li>
 
       </ul>
@@ -876,42 +1329,42 @@ GRANT <var class="keyword varname">privilege</var> ON <var class="keyword varnam
 
 
     <div class="p">
-        Access to Kudu tables must be granted to and revoked from roles with the
-        following considerations:
+        Access to Kudu tables must be granted to and revoked from roles with the following
+        considerations:
         <ul class="ul">
           <li class="li">
-            Only users with the <code class="ph codeph">ALL</code> privilege on
-              <code class="ph codeph">SERVER</code> can create external Kudu tables.
+            Only users with the <code class="ph codeph">ALL</code> privilege on <code class="ph codeph">SERVER</code> can
+            create external Kudu tables.
           </li>
 
-          <li class="li">
-            The <code class="ph codeph">ALL</code> privileges on <code class="ph codeph">SERVER</code> is
-            required to specify the <code class="ph codeph">kudu.master_addresses</code>
-            property in the <code class="ph codeph">CREATE TABLE</code> statements for managed
-            tables as well as external tables.
-          </li>
 
           <li class="li">
-            Access to Kudu tables is enforced at the table level and at the
-            column level.
+            The <code class="ph codeph">ALL</code> privileges on <code class="ph codeph">SERVER</code> is required to
+            specify the <code class="ph codeph">kudu.master_addresses</code> property in the <code class="ph codeph">CREATE
+            TABLE</code> statements for managed tables as well as external tables.
           </li>
 
-          <li class="li">
-            The <code class="ph codeph">SELECT</code>- and <code class="ph codeph">INSERT</code>-specific
-            permissions are supported.
-          </li>
 
           <li class="li">
-            The <code class="ph codeph">DELETE</code>, <code class="ph codeph">UPDATE</code>, and
-            <code class="ph codeph">UPSERT</code> operations require the <code class="ph codeph">ALL</code>
-            privilege.
+            Access to Kudu tables is enforced at the table level and at the column level.
+          </li>
+
+
+          <li class="li">
+            The <code class="ph codeph">SELECT</code>- and <code class="ph codeph">INSERT</code>-specific permissions are
+            supported.
+          </li>
+
+
+          <li class="li">
+            The <code class="ph codeph">DELETE</code>, <code class="ph codeph">UPDATE</code>, and <code class="ph codeph">UPSERT</code>
+            operations require the <code class="ph codeph">ALL</code> privilege.
           </li>
 
         </ul>
 
-        Because non-SQL APIs can access Kudu data without going through Sentry
-        authorization, currently the Sentry support is considered preliminary
-        and subject to change.
+        Because non-SQL APIs can access Kudu data without going through Sentry authorization,
+        currently the Sentry support is considered preliminary and subject to change.
       </div>
 
 
@@ -921,7 +1374,7 @@ GRANT <var class="keyword varname">privilege</var> ON <var class="keyword varnam
 
 
     <p class="p">
-      <a class="xref" href="impala_authorization.html#authorization">Enabling Sentry Authorization for Impala</a>,
+      <a class="xref" href="impala_authorization.html#authorization">Impala Authorization</a>,
       <a class="xref" href="impala_revoke.html#revoke">REVOKE Statement (Impala 2.0 or higher only)</a>,
       <a class="xref" href="impala_create_role.html#create_role">CREATE ROLE Statement (Impala 2.0 or higher only)</a>,
       <a class="xref" href="impala_drop_role.html#drop_role">DROP ROLE Statement (Impala 2.0 or higher only)</a>, <a class="xref" href="impala_show.html#show">SHOW Statement</a>

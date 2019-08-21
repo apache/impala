@@ -11,8 +11,8 @@
 <meta name="DC.Relation" scheme="URI" content="../topics/impala_datatypes.html" />
 <meta name="prodname" content="Impala" />
 <meta name="prodname" content="Impala" />
-<meta name="version" content="Impala 3.2.x" />
-<meta name="version" content="Impala 3.2.x" />
+<meta name="version" content="Impala 3.3.x" />
+<meta name="version" content="Impala 3.3.x" />
 <meta name="DC.Format" content="XHTML" />
 <meta name="DC.Identifier" content="decimal" />
 <link rel="stylesheet" type="text/css" href="../commonltr.css" />
@@ -133,37 +133,37 @@
     <div class="p">
       <table cellpadding="4" cellspacing="0" summary="" id="decimal__simpletable_tty_3y2_mdb" border="1" class="simpletable"><col style="width:50%" /><col style="width:50%" /><thead><tr class="sthead">
 
-          <th style="vertical-align:bottom;text-align:left;" id="d52648e176" class="stentry">Precision</th>
+          <th style="vertical-align:bottom;text-align:left;" id="d56459e176" class="stentry">Precision</th>
 
 
-          <th style="vertical-align:bottom;text-align:left;" id="d52648e179" class="stentry">In-memory Storage</th>
+          <th style="vertical-align:bottom;text-align:left;" id="d56459e179" class="stentry">In-memory Storage</th>
 
 
         </tr>
 </thead><tbody><tr class="strow">
 
-          <td style="vertical-align:top;" headers="d52648e176" class="stentry">1 - 9</td>
+          <td style="vertical-align:top;" headers="d56459e176" class="stentry">1 - 9</td>
 
 
-          <td style="vertical-align:top;" headers="d52648e179" class="stentry">4 bytes</td>
-
-
-        </tr>
-<tr class="strow">
-
-          <td style="vertical-align:top;" headers="d52648e176" class="stentry">10 - 18</td>
-
-
-          <td style="vertical-align:top;" headers="d52648e179" class="stentry">8 bytes</td>
+          <td style="vertical-align:top;" headers="d56459e179" class="stentry">4 bytes</td>
 
 
         </tr>
 <tr class="strow">
 
-          <td style="vertical-align:top;" headers="d52648e176" class="stentry">19 - 38</td>
+          <td style="vertical-align:top;" headers="d56459e176" class="stentry">10 - 18</td>
 
 
-          <td style="vertical-align:top;" headers="d52648e179" class="stentry">16 bytes</td>
+          <td style="vertical-align:top;" headers="d56459e179" class="stentry">8 bytes</td>
+
+
+        </tr>
+<tr class="strow">
+
+          <td style="vertical-align:top;" headers="d56459e176" class="stentry">19 - 38</td>
+
+
+          <td style="vertical-align:top;" headers="d56459e179" class="stentry">16 bytes</td>
 
 
         </tr>
@@ -288,7 +288,7 @@
 
 
     <div class="p">
-
+      
 <div class="tablenoborder"><table cellpadding="4" cellspacing="0" summary="" id="decimal__table_inl_sz2_mdb" class="table" frame="border" border="1" rules="all"><colgroup><col /><col /><col /></colgroup><tbody class="tbody">
             <tr class="row">
               <td class="entry cellrowborder" style="text-align:left;vertical-align:top;">
@@ -1080,64 +1080,64 @@ INSERT INTO decimals_11_8 VALUES (CAST(1 AS TINYINT));</code></pre>
     <div class="p">
       <table cellpadding="4" cellspacing="0" summary="" id="decimal__simpletable_bwl_khm_rdb" border="1" class="simpletable"><col style="width:33.33333333333333%" /><col style="width:33.33333333333333%" /><col style="width:33.33333333333333%" /><thead><tr class="sthead">
 
-          <th style="vertical-align:bottom;text-align:left;" id="d52648e1325" class="stentry"> </th>
+          <th style="vertical-align:bottom;text-align:left;" id="d56459e1325" class="stentry"> </th>
 
 
-          <th style="vertical-align:bottom;text-align:left;" id="d52648e1327" class="stentry">DECIMAL in <span class="keyword">Impala 3.0</span> or
+          <th style="vertical-align:bottom;text-align:left;" id="d56459e1327" class="stentry">DECIMAL in <span class="keyword">Impala 3.0</span> or
             higher</th>
 
 
-          <th style="vertical-align:bottom;text-align:left;" id="d52648e1333" class="stentry">DECIMAL in <span class="keyword">Impala 2.12</span> or lower
+          <th style="vertical-align:bottom;text-align:left;" id="d56459e1333" class="stentry">DECIMAL in <span class="keyword">Impala 2.12</span> or lower
           </th>
 
 
         </tr>
 </thead><tbody><tr class="strow">
 
-          <td style="vertical-align:top;" headers="d52648e1325" class="stentry">Overall behavior</td>
+          <td style="vertical-align:top;" headers="d56459e1325" class="stentry">Overall behavior</td>
 
 
-          <td style="vertical-align:top;" headers="d52648e1327" class="stentry">Returns either the result or an error.</td>
+          <td style="vertical-align:top;" headers="d56459e1327" class="stentry">Returns either the result or an error.</td>
 
 
-          <td style="vertical-align:top;" headers="d52648e1333" class="stentry">Returns either the result or <code class="ph codeph">NULL</code> with a
+          <td style="vertical-align:top;" headers="d56459e1333" class="stentry">Returns either the result or <code class="ph codeph">NULL</code> with a
             warning.</td>
 
 
         </tr>
 <tr class="strow">
 
-          <td style="vertical-align:top;" headers="d52648e1325" class="stentry">Overflow behavior</td>
+          <td style="vertical-align:top;" headers="d56459e1325" class="stentry">Overflow behavior</td>
 
 
-          <td style="vertical-align:top;" headers="d52648e1327" class="stentry">Aborts with an error.</td>
+          <td style="vertical-align:top;" headers="d56459e1327" class="stentry">Aborts with an error.</td>
 
 
-          <td style="vertical-align:top;" headers="d52648e1333" class="stentry">Issues a warning and returns <code class="ph codeph">NULL</code>.</td>
-
-
-        </tr>
-<tr class="strow">
-
-          <td style="vertical-align:top;" headers="d52648e1325" class="stentry">Truncation / rounding behavior in arithmetic</td>
-
-
-          <td style="vertical-align:top;" headers="d52648e1327" class="stentry">Truncates and rounds digits from the back.</td>
-
-
-          <td style="vertical-align:top;" headers="d52648e1333" class="stentry">Truncates digits from the front.</td>
+          <td style="vertical-align:top;" headers="d56459e1333" class="stentry">Issues a warning and returns <code class="ph codeph">NULL</code>.</td>
 
 
         </tr>
 <tr class="strow">
 
-          <td style="vertical-align:top;" headers="d52648e1325" class="stentry">String cast</td>
+          <td style="vertical-align:top;" headers="d56459e1325" class="stentry">Truncation / rounding behavior in arithmetic</td>
 
 
-          <td style="vertical-align:top;" headers="d52648e1327" class="stentry">Truncates from the back and rounds.</td>
+          <td style="vertical-align:top;" headers="d56459e1327" class="stentry">Truncates and rounds digits from the back.</td>
 
 
-          <td style="vertical-align:top;" headers="d52648e1333" class="stentry">Truncates from the back.</td>
+          <td style="vertical-align:top;" headers="d56459e1333" class="stentry">Truncates digits from the front.</td>
+
+
+        </tr>
+<tr class="strow">
+
+          <td style="vertical-align:top;" headers="d56459e1325" class="stentry">String cast</td>
+
+
+          <td style="vertical-align:top;" headers="d56459e1327" class="stentry">Truncates from the back and rounds.</td>
+
+
+          <td style="vertical-align:top;" headers="d56459e1333" class="stentry">Truncates from the back.</td>
 
 
         </tr>

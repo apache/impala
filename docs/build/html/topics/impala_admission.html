@@ -11,8 +11,8 @@
 <meta name="DC.Relation" scheme="URI" content="../topics/impala_resource_management.html" />
 <meta name="prodname" content="Impala" />
 <meta name="prodname" content="Impala" />
-<meta name="version" content="Impala 3.2.x" />
-<meta name="version" content="Impala 3.2.x" />
+<meta name="version" content="Impala 3.3.x" />
+<meta name="version" content="Impala 3.3.x" />
 <meta name="DC.Format" content="XHTML" />
 <meta name="DC.Identifier" content="admission_control" />
 <link rel="stylesheet" type="text/css" href="../commonltr.css" />
@@ -88,7 +88,7 @@
         for each dynamic resource pool. </p>
 
       <dl class="dl">
-
+        
           <dt class="dt dlterm"> Max Running Queries </dt>
 
           <dd class="dd"><p class="p">Maximum number of concurrently running queries in this pool.
@@ -115,25 +115,53 @@
               safeguard. If queries exceed either the total estimated memory or
               the maximum number of concurrent queries, they are added to the
               queue. </p>
+<p class="p">If <span class="ph uicontrol">Max Running Queries
+                Multiple</span> is set, the <span class="ph uicontrol">Max Running
+                Queries</span> setting is ignored.</p>
 
           </dd>
 
+        
+        
+          <dt class="dt dlterm">Max Running Queries Multiple</dt>
 
-      </dl>
+          <dd class="dd">This floating point number is multiplied by the current total
+            number of executors at runtime to give the maximum number of
+            concurrently running queries allowed in the pool. The effect of this
+            setting scales with the number of executors in the resource
+              pool.<p class="p">This calculation is rounded up to the nearest integer, so
+              the result will always be at least one. </p>
+<p class="p">If set to zero or a
+              negative number, the setting is ignored.</p>
+</dd>
 
-      <dl class="dl">
-
+        
+        
           <dt class="dt dlterm"> Max Queued Queries </dt>
 
           <dd class="dd"> Maximum number of queries that can be queued in this pool. The
             default value is 200 for Impala 2.1 or higher and 50 for previous
-            versions of Impala. (optional)</dd>
+            versions of Impala. (optional)<p class="p">If <span class="ph uicontrol">Max Queued Queries
+                Multiple</span> is set, the <span class="ph uicontrol">Max Queued
+                Queries</span> setting is ignored.</p>
+</dd>
 
+        
+        
+          <dt class="dt dlterm">Max Queued Queries Multiple</dt>
 
-      </dl>
+          <dd class="dd">This floating point number is multiplied by the current total
+            number of executors at runtime to give the maximum number of queries
+            that can be queued in the pool. The effect of this setting scales
+            with the number of executors in the resource pool.<p class="p">This
+              calculation is rounded up to the nearest integer, so the result
+              will always be at least one. </p>
+<p class="p">If set to zero or a negative
+              number, the setting is ignored.</p>
+</dd>
 
-      <dl class="dl">
-
+        
+        
           <dt class="dt dlterm"> Queue Timeout </dt>
 
           <dd class="dd"> The amount of time, in milliseconds, that a query waits in the
@@ -171,7 +199,7 @@ You might also need to increase the value to use Impala with
 
           </dd>
 
-
+        
       </dl>
 
       <p class="p"> You can combine these settings with the memory-based approach
@@ -198,7 +226,7 @@ You might also need to increase the value to use Impala with
         control.</p>
 
       <dl class="dl">
-
+        
           <dt class="dt dlterm">Max Memory</dt>
 
           <dd class="dd">
@@ -261,10 +289,24 @@ You might also need to increase the value to use Impala with
 
             </div>
 
+            <p class="p">If <span class="ph uicontrol">Max Memory Multiple</span> is set, the
+                <span class="ph uicontrol">Max Memory</span> setting is ignored.</p>
+
           </dd>
 
+        
+        
+          <dt class="dt dlterm">Max Memory Multiple</dt>
 
+          <dd class="dd"> This number of bytes is multiplied by the current total number of
+            executors at runtime to give the maximum memory available across the
+            cluster for the pool. The effect of this setting scales with the
+            number of executors in the resource pool.<p class="p">If set to zero or a
+              negative number, the setting is ignored.</p>
+</dd>
 
+        
+        
           <dt class="dt dlterm">Minimum Query Memory Limit and Maximum Query Memory Limit</dt>
 
           <dd class="dd">
@@ -315,8 +357,8 @@ If a user tries to submit a query with the
 
           </dd>
 
-
-
+        
+        
           <dt class="dt dlterm">Default Query Memory Limit</dt>
 
           <dd class="dd">The default memory limit applied to queries executing in this pool
@@ -329,11 +371,11 @@ If a user tries to submit a query with the
             Minimum Query Memory Limit. Do not set this if either Maximum Query
             Memory Limit or Minimum Query Memory Limit is set.</dd>
 
-
+        
       </dl>
 
       <dl class="dl">
-
+        
           <dt class="dt dlterm"> Clamp MEM_LIMIT Query Option</dt>
 
           <dd class="dd">If this field is not selected, the <code class="ph codeph">MEM_LIMIT</code>
@@ -344,33 +386,44 @@ If a user tries to submit a query with the
               Query Memory Limit</strong> and <strong class="ph b">Maximum Query Memory Limit</strong> are
             not set.</dd>
 
-
+        
       </dl>
 
-      <div class="p"> For example, consider the
-        following scenario: <ul class="ul">
-          <li class="li">The cluster is running <code class="ph codeph">impalad</code> daemons on five
-            hosts.</li>
+      <div class="p">
+        For example, consider the following scenario:
+        <ul class="ul">
+          <li class="li">
+            The cluster is running <code class="ph codeph">impalad</code> daemons on five hosts.
+          </li>
 
-          <li class="li">A dynamic resource pool has Max Memory set to 100 GB.</li>
 
-          <li class="li">The Maximum Query Memory Limit for the pool is 10 GB and Minimum
-            Query Memory Limit is 2 GB. Therefore, any query running in this
-            pool could use up to 50 GB of memory (Maximum Query Memory Limit *
-            number of Impala nodes).</li>
+          <li class="li">
+            A dynamic resource pool has Max Memory set to 100 GB.
+          </li>
 
-          <li class="li">Impala will execute varying numbers of queries concurrently
-            because queries may be given memory limits anywhere between 2 GB and
-            10 GB, depending on the estimated memory requirements. For example,
-            Impala may execute up to 10 small queries with 2 GB memory limits or
-            two large queries with 10 GB memory limits because that is what will
-            fit in the 100 GB cluster-wide limit when executing on five
-            hosts.</li>
 
-          <li class="li">The executing queries may use less memory than the per-host memory
-            limit or the Max Memory cluster-wide limit if they do not need that
-            much memory. In general this is not a problem so long as you are
-            able to execute enough queries concurrently to meet your needs.</li>
+          <li class="li">
+            The Maximum Query Memory Limit for the pool is 10 GB and Minimum Query Memory Limit
+            is 2 GB. Therefore, any query running in this pool could use up to 50 GB of memory
+            (Maximum Query Memory Limit * number of Impala nodes).
+          </li>
+
+
+          <li class="li">
+            Impala will execute varying numbers of queries concurrently because queries may be
+            given memory limits anywhere between 2 GB and 10 GB, depending on the estimated
+            memory requirements. For example, Impala may execute up to 10 small queries with 2
+            GB memory limits or two large queries with 10 GB memory limits because that is what
+            will fit in the 100 GB cluster-wide limit when executing on five hosts.
+          </li>
+
+
+          <li class="li">
+            The executing queries may use less memory than the per-host memory limit or the Max
+            Memory cluster-wide limit if they do not need that much memory. In general this is
+            not a problem so long as you are able to execute enough queries concurrently to meet
+            your needs.
+          </li>
 
         </ul>
 
@@ -619,7 +672,7 @@ If a user tries to submit a query with the
   <div class="topic concept nested1" aria-labelledby="ariaid-title9" id="admission_guidelines">
     <h2 class="title topictitle2" id="ariaid-title9">Guidelines for Using Admission Control</h2>
 
-
+    
     <div class="body conbody">
       <p class="p"> The limits imposed by admission control are de-centrally managed
           <span class="q">"soft"</span> limits. Each Impala coordinator node makes its own

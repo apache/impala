@@ -11,8 +11,8 @@
 <meta name="DC.Relation" scheme="URI" content="../topics/impala_query_options.html" />
 <meta name="prodname" content="Impala" />
 <meta name="prodname" content="Impala" />
-<meta name="version" content="Impala 3.2.x" />
-<meta name="version" content="Impala 3.2.x" />
+<meta name="version" content="Impala 3.3.x" />
+<meta name="version" content="Impala 3.3.x" />
 <meta name="DC.Format" content="XHTML" />
 <meta name="DC.Identifier" content="optimize_partition_key_scans" />
 <link rel="stylesheet" type="text/css" href="../commonltr.css" />
@@ -37,21 +37,21 @@
 
 
     <p class="p">
-        <strong class="ph b">Type:</strong> Boolean; recognized values are 1 and 0, or <code class="ph codeph">true</code> and <code class="ph codeph">false</code>;
-        any other value interpreted as <code class="ph codeph">false</code>
+        <strong class="ph b">Type:</strong> Boolean; recognized values are 1 and 0, or <code class="ph codeph">true</code> and
+        <code class="ph codeph">false</code>; any other value interpreted as <code class="ph codeph">false</code>
       </p>
 
     <p class="p">
-        <strong class="ph b">Default:</strong> <code class="ph codeph">false</code> (shown as 0 in output of <code class="ph codeph">SET</code> statement)
+        <strong class="ph b">Default:</strong> <code class="ph codeph">false</code> (shown as 0 in output of <code class="ph codeph">SET</code>
+        statement)
       </p>
 
 
-    <div class="note note"><span class="notetitle">Note:</span>
+    <div class="note note"><span class="notetitle">Note:</span> 
         In <span class="keyword">Impala 2.5.0</span>, only the value 1 enables the option, and the value
-        <code class="ph codeph">true</code> is not recognized. This limitation is
-        tracked by the issue
-        <a class="xref" href="https://issues.apache.org/jira/browse/IMPALA-3334" target="_blank">IMPALA-3334</a>,
-        which shows the releases where the problem is fixed.
+        <code class="ph codeph">true</code> is not recognized. This limitation is tracked by the issue
+        <a class="xref" href="https://issues.apache.org/jira/browse/IMPALA-3334" target="_blank">IMPALA-3334</a>, which shows the releases where the
+        problem is fixed.
       </div>
 
 
@@ -66,17 +66,38 @@
 
 
     <p class="p">
-      This optimization speeds up common <span class="q">"introspection"</span> operations when using queries
-      to calculate the cardinality and range for partition key columns.
+      This optimization speeds up common <span class="q">"introspection"</span> operations
+      over partition key columns, for example determining the distinct values
+      of partition keys.
     </p>
 
 
-    <p class="p">
-      This optimization does not apply if the queries contain any <code class="ph codeph">WHERE</code>,
-      <code class="ph codeph">GROUP BY</code>, or <code class="ph codeph">HAVING</code> clause. The relevant queries
-      should only compute the minimum, maximum, or number of distinct values for the
-      partition key columns across the whole table.
-    </p>
+    <div class="p">
+      This optimization does not apply to <code class="ph codeph">SELECT</code> statements
+      that reference columns that are not partition keys. It also only applies
+      when all the partition key columns in the <code class="ph codeph">SELECT</code> statement
+      are referenced in one of the following contexts:
+      <ul class="ul">
+        <li class="li">
+          <p class="p">
+            Within a <code class="ph codeph">MAX()</code> or <code class="ph codeph">MAX()</code>
+            aggregate function or as the argument of any aggregate function with
+            the <code class="ph codeph">DISTINCT</code> keyword applied.
+          </p>
+
+        </li>
+
+        <li class="li">
+          <p class="p">
+            Within a <code class="ph codeph">WHERE</code>, <code class="ph codeph">GROUP BY</code>
+            or <code class="ph codeph">HAVING</code> clause.
+          </p>
+
+        </li>
+
+      </ul>
+
+    </div>
 
 
     <p class="p">

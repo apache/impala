@@ -1,0 +1,83 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE html
+  PUBLIC "-//W3C//DTD XHTML 1.0 Transitional//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-transitional.dtd">
+<html xmlns="http://www.w3.org/1999/xhtml" xml:lang="en" lang="en">
+<head><meta http-equiv="Content-Type" content="text/html; charset=UTF-8" />
+
+<meta name="copyright" content="(C) Copyright 2019" />
+<meta name="DC.rights.owner" content="(C) Copyright 2019" />
+<meta name="DC.Type" content="concept" />
+<meta name="DC.Title" content="Impala Transactions" />
+<meta name="DC.Relation" scheme="URI" content="../topics/impala_langref.html" />
+<meta name="prodname" content="Impala" />
+<meta name="version" content="Impala 3.3.x" />
+<meta name="DC.Format" content="XHTML" />
+<meta name="DC.Identifier" content="transactions" />
+<link rel="stylesheet" type="text/css" href="../commonltr.css" />
+<title>Impala Transactions</title>
+</head>
+<body id="transactions">
+
+
+  <h1 class="title topictitle1" id="ariaid-title1">Impala Transactions</h1>
+
+
+  
+
+  <div class="body conbody">
+
+    <p class="p">
+      A transaction is a single logical operation on the data. Impala supports transactions that
+      satisfy a level of consistency that improves the integrity and reliability of the data
+      before and after a transaction.
+    </p>
+
+
+    <p class="p">
+      Specifically, Impala provides atomicity and isolation of insert operations on
+      transactional tables. A single table insert is either committed in full or not committed,
+      and the results of the insert operation are not visible to other query operations until
+      the operation is committed.
+    </p>
+
+
+    <p class="p">
+      For single table, the inserts are ordered, so if Impala doesn't see a committed insert, it
+      won't see any insert committed after it.
+    </p>
+
+
+    <p class="p">
+      For insert-only transactional tables, you can perform the following statements:
+      <code class="ph codeph">CREATE TABLE</code>, <code class="ph codeph">DROP TABLE</code>, <code class="ph codeph">INSERT</code>,
+      <code class="ph codeph">SELECT</code>
+    </p>
+
+
+    <p class="p">
+      All transactions in Impala automatically commit at the end of the statement. Currently,
+      Impala does not support multi-statement transactions.
+    </p>
+
+
+    <p class="p">
+      Insert-only tables must be the managed and file-format based tables, such as Parquet,
+      Avro, and text.
+    </p>
+
+
+    <div class="note note"><span class="notetitle">Note:</span> 
+      Impala does not support changing transactional properties of tables. For example, you
+      cannot alter a transactional table to a non-transactional table.
+    </div>
+
+
+  </div>
+
+
+<div class="related-links">
+<div class="familylinks">
+<div class="parentlink"><strong>Parent topic:</strong> <a class="link" href="../topics/impala_langref.html">Impala SQL Language Reference</a></div>
+</div>
+</div></body>
+</html>

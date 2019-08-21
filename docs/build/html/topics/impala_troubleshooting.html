@@ -12,8 +12,8 @@
 <meta name="DC.Relation" scheme="URI" content="../topics/impala_breakpad.html" />
 <meta name="prodname" content="Impala" />
 <meta name="prodname" content="Impala" />
-<meta name="version" content="Impala 3.2.x" />
-<meta name="version" content="Impala 3.2.x" />
+<meta name="version" content="Impala 3.3.x" />
+<meta name="version" content="Impala 3.3.x" />
 <meta name="DC.Format" content="XHTML" />
 <meta name="DC.Identifier" content="troubleshooting" />
 <link rel="stylesheet" type="text/css" href="../commonltr.css" />
@@ -209,18 +209,18 @@ $ sudo dd if=/dev/sdd bs=1M of=/dev/null count=1k
       </p>
 
 
-
+      
 <div class="tablenoborder"><table cellpadding="4" cellspacing="0" summary="" class="table" frame="border" border="1" rules="all"><colgroup><col style="width:14.285714285714285%" /><col style="width:42.857142857142854%" /><col style="width:42.857142857142854%" /></colgroup><thead class="thead" style="text-align:left;">
             <tr class="row">
-              <th class="entry nocellnorowborder" style="vertical-align:top;" id="d204032e238">
+              <th class="entry nocellnorowborder" style="vertical-align:top;" id="d210947e238">
                 Symptom
               </th>
 
-              <th class="entry nocellnorowborder" style="vertical-align:top;" id="d204032e241">
+              <th class="entry nocellnorowborder" style="vertical-align:top;" id="d210947e241">
                 Explanation
               </th>
 
-              <th class="entry cell-norowborder" style="vertical-align:top;" id="d204032e244">
+              <th class="entry cell-norowborder" style="vertical-align:top;" id="d210947e244">
                 Recommendation
               </th>
 
@@ -229,31 +229,31 @@ $ sudo dd if=/dev/sdd bs=1M of=/dev/null count=1k
           </thead>
 <tbody class="tbody">
             <tr class="row">
-              <td class="entry nocellnorowborder" style="vertical-align:top;" headers="d204032e238 ">
+              <td class="entry nocellnorowborder" style="vertical-align:top;" headers="d210947e238 ">
                 Impala takes a long time to start.
               </td>
 
-              <td class="entry nocellnorowborder" style="vertical-align:top;" headers="d204032e241 ">
+              <td class="entry nocellnorowborder" style="vertical-align:top;" headers="d210947e241 ">
                 Impala instances with large numbers of tables, partitions, or data files take longer to start
                 because the metadata for these objects is broadcast to all <span class="keyword cmdname">impalad</span> nodes and
                 cached.
               </td>
 
-              <td class="entry cell-norowborder" style="vertical-align:top;" headers="d204032e244 ">
+              <td class="entry cell-norowborder" style="vertical-align:top;" headers="d210947e244 ">
                 Adjust timeout and synchronicity settings.
               </td>
 
             </tr>
 
             <tr class="row">
-              <td class="entry nocellnorowborder" style="vertical-align:top;" headers="d204032e238 ">
+              <td class="entry nocellnorowborder" style="vertical-align:top;" headers="d210947e238 ">
                 <p class="p">
                   Joins fail to complete.
                 </p>
 
               </td>
 
-              <td class="entry nocellnorowborder" style="vertical-align:top;" headers="d204032e241 ">
+              <td class="entry nocellnorowborder" style="vertical-align:top;" headers="d210947e241 ">
                 <p class="p">
                   There may be insufficient memory. During a join, data from the second, third, and so on sets to
                   be joined is loaded into memory. If Impala chooses an inefficient join order or join mechanism,
@@ -262,7 +262,7 @@ $ sudo dd if=/dev/sdd bs=1M of=/dev/null count=1k
 
               </td>
 
-              <td class="entry cell-norowborder" style="vertical-align:top;" headers="d204032e244 ">
+              <td class="entry cell-norowborder" style="vertical-align:top;" headers="d210947e244 ">
                 <p class="p">
                   Start by gathering statistics with the <code class="ph codeph">COMPUTE STATS</code> statement for each table
                   involved in the join. Consider specifying the <code class="ph codeph">[SHUFFLE]</code> hint so that data from
@@ -275,21 +275,21 @@ $ sudo dd if=/dev/sdd bs=1M of=/dev/null count=1k
             </tr>
 
             <tr class="row">
-              <td class="entry nocellnorowborder" style="vertical-align:top;" headers="d204032e238 ">
+              <td class="entry nocellnorowborder" style="vertical-align:top;" headers="d210947e238 ">
                 <p class="p">
                   Queries return incorrect results.
                 </p>
 
               </td>
 
-              <td class="entry nocellnorowborder" style="vertical-align:top;" headers="d204032e241 ">
+              <td class="entry nocellnorowborder" style="vertical-align:top;" headers="d210947e241 ">
                 <p class="p">
                   Impala metadata may be outdated after changes are performed in Hive.
                 </p>
 
               </td>
 
-              <td class="entry cell-norowborder" style="vertical-align:top;" headers="d204032e244 ">
+              <td class="entry cell-norowborder" style="vertical-align:top;" headers="d210947e244 ">
                 <p class="p">
                   Where possible, use the appropriate Impala statement (<code class="ph codeph">INSERT</code>, <code class="ph codeph">LOAD
                   DATA</code>, <code class="ph codeph">CREATE TABLE</code>, <code class="ph codeph">ALTER TABLE</code>, <code class="ph codeph">COMPUTE
@@ -305,14 +305,14 @@ $ sudo dd if=/dev/sdd bs=1M of=/dev/null count=1k
             </tr>
 
             <tr class="row">
-              <td class="entry nocellnorowborder" style="vertical-align:top;" headers="d204032e238 ">
+              <td class="entry nocellnorowborder" style="vertical-align:top;" headers="d210947e238 ">
                 <p class="p">
                   Queries are slow to return results.
                 </p>
 
               </td>
 
-              <td class="entry nocellnorowborder" style="vertical-align:top;" headers="d204032e241 ">
+              <td class="entry nocellnorowborder" style="vertical-align:top;" headers="d210947e241 ">
                 <p class="p">
                   Some <code class="ph codeph">impalad</code> instances may not have started. Using a browser, connect to the
                   host running the Impala state store. Connect using an address of the form
@@ -334,7 +334,7 @@ $ sudo dd if=/dev/sdd bs=1M of=/dev/null count=1k
 
               </td>
 
-              <td class="entry cell-norowborder" style="vertical-align:top;" headers="d204032e244 ">
+              <td class="entry cell-norowborder" style="vertical-align:top;" headers="d210947e244 ">
                 <p class="p">
                   Ensure Impala is installed on all DataNodes. Start any <code class="ph codeph">impalad</code> instances that
                   are not running.
@@ -345,14 +345,14 @@ $ sudo dd if=/dev/sdd bs=1M of=/dev/null count=1k
             </tr>
 
             <tr class="row">
-              <td class="entry nocellnorowborder" style="vertical-align:top;" headers="d204032e238 ">
+              <td class="entry nocellnorowborder" style="vertical-align:top;" headers="d210947e238 ">
                 <p class="p">
                   Queries are slow to return results.
                 </p>
 
               </td>
 
-              <td class="entry nocellnorowborder" style="vertical-align:top;" headers="d204032e241 ">
+              <td class="entry nocellnorowborder" style="vertical-align:top;" headers="d210947e241 ">
                 <p class="p">
                   Impala may not be configured to use native checksumming. Native checksumming uses
                   machine-specific instructions to compute checksums over HDFS data very quickly. Review Impala
@@ -362,7 +362,7 @@ $ sudo dd if=/dev/sdd bs=1M of=/dev/null count=1k
 
               </td>
 
-              <td class="entry cell-norowborder" style="vertical-align:top;" headers="d204032e244 ">
+              <td class="entry cell-norowborder" style="vertical-align:top;" headers="d210947e244 ">
                 <p class="p">
                   Ensure Impala is configured to use native checksumming as described in
                   <a class="xref" href="impala_config_performance.html#config_performance">Post-Installation Configuration for Impala</a>.
@@ -373,21 +373,21 @@ $ sudo dd if=/dev/sdd bs=1M of=/dev/null count=1k
             </tr>
 
             <tr class="row">
-              <td class="entry nocellnorowborder" style="vertical-align:top;" headers="d204032e238 ">
+              <td class="entry nocellnorowborder" style="vertical-align:top;" headers="d210947e238 ">
                 <p class="p">
                   Queries are slow to return results.
                 </p>
 
               </td>
 
-              <td class="entry nocellnorowborder" style="vertical-align:top;" headers="d204032e241 ">
+              <td class="entry nocellnorowborder" style="vertical-align:top;" headers="d210947e241 ">
                 <p class="p">
                   Impala may not be configured to use data locality tracking.
                 </p>
 
               </td>
 
-              <td class="entry cell-norowborder" style="vertical-align:top;" headers="d204032e244 ">
+              <td class="entry cell-norowborder" style="vertical-align:top;" headers="d210947e244 ">
                 <p class="p">
                   Test Impala for data locality tracking and make configuration changes as necessary. Information
                   on this process can be found in <a class="xref" href="impala_config_performance.html#config_performance">Post-Installation Configuration for Impala</a>.
@@ -398,7 +398,7 @@ $ sudo dd if=/dev/sdd bs=1M of=/dev/null count=1k
             </tr>
 
             <tr class="row">
-              <td class="entry nocellnorowborder" style="vertical-align:top;" headers="d204032e238 ">
+              <td class="entry nocellnorowborder" style="vertical-align:top;" headers="d210947e238 ">
                 <p class="p">
                   Attempts to complete Impala tasks such as executing INSERT-SELECT actions fail. The Impala logs
                   include notes that files could not be opened due to permission denied.
@@ -406,7 +406,7 @@ $ sudo dd if=/dev/sdd bs=1M of=/dev/null count=1k
 
               </td>
 
-              <td class="entry nocellnorowborder" style="vertical-align:top;" headers="d204032e241 ">
+              <td class="entry nocellnorowborder" style="vertical-align:top;" headers="d210947e241 ">
                 <p class="p">
                   This can be the result of permissions issues. For example, you could use the Hive shell as the
                   hive user to create a table. After creating this table, you could attempt to complete some
@@ -416,7 +416,7 @@ $ sudo dd if=/dev/sdd bs=1M of=/dev/null count=1k
 
               </td>
 
-              <td class="entry cell-norowborder" style="vertical-align:top;" headers="d204032e244 ">
+              <td class="entry cell-norowborder" style="vertical-align:top;" headers="d210947e244 ">
                 <p class="p">
                   In general, ensure the Impala user has sufficient permissions. In the preceding example, ensure
                   the Impala user has sufficient permissions to the table that the Hive user created.
@@ -427,7 +427,7 @@ $ sudo dd if=/dev/sdd bs=1M of=/dev/null count=1k
             </tr>
 
             <tr class="row">
-              <td class="entry row-nocellborder" style="vertical-align:top;" headers="d204032e238 ">
+              <td class="entry row-nocellborder" style="vertical-align:top;" headers="d210947e238 ">
                 <p class="p">
                   Impala fails to start up, with the <span class="keyword cmdname">impalad</span> logs referring to errors connecting
                   to the statestore service and attempts to re-register.
@@ -435,7 +435,7 @@ $ sudo dd if=/dev/sdd bs=1M of=/dev/null count=1k
 
               </td>
 
-              <td class="entry row-nocellborder" style="vertical-align:top;" headers="d204032e241 ">
+              <td class="entry row-nocellborder" style="vertical-align:top;" headers="d210947e241 ">
                 <p class="p">
                   A large number of databases, tables, partitions, and so on can require metadata synchronization,
                   particularly on startup, that takes longer than the default timeout for the statestore service.
@@ -443,7 +443,7 @@ $ sudo dd if=/dev/sdd bs=1M of=/dev/null count=1k
 
               </td>
 
-              <td class="entry cellrowborder" style="vertical-align:top;" headers="d204032e244 ">
+              <td class="entry cellrowborder" style="vertical-align:top;" headers="d210947e244 ">
                 <p class="p">
                   Configure the statestore timeout value and possibly other settings related to the frequency of
                   statestore updates and metadata loading. See
@@ -468,7 +468,7 @@ $ sudo dd if=/dev/sdd bs=1M of=/dev/null count=1k
 
   
 
-
+  
 
 </body>
 </html>

@@ -11,8 +11,8 @@
 <meta name="DC.Relation" scheme="URI" content="../topics/impala_select.html" />
 <meta name="prodname" content="Impala" />
 <meta name="prodname" content="Impala" />
-<meta name="version" content="Impala 3.2.x" />
-<meta name="version" content="Impala 3.2.x" />
+<meta name="version" content="Impala 3.3.x" />
+<meta name="version" content="Impala 3.3.x" />
 <meta name="DC.Format" content="XHTML" />
 <meta name="DC.Identifier" content="joins" />
 <link rel="stylesheet" type="text/css" href="../commonltr.css" />
@@ -41,11 +41,13 @@
 
 
     <p class="p">
-        Impala supports a wide variety of <code class="ph codeph">JOIN</code> clauses. Left, right, semi, full, and outer joins
-        are supported in all Impala versions. The <code class="ph codeph">CROSS JOIN</code> operator is available in Impala 1.2.2
-        and higher. During performance tuning, you can override the reordering of join clauses that Impala does
-        internally by including the keyword <code class="ph codeph">STRAIGHT_JOIN</code> immediately after the
-        <code class="ph codeph">SELECT</code> and any <code class="ph codeph">DISTINCT</code> or <code class="ph codeph">ALL</code> keywords.
+        Impala supports a wide variety of <code class="ph codeph">JOIN</code> clauses. Left, right, semi,
+        full, and outer joins are supported in all Impala versions. The <code class="ph codeph">CROSS
+        JOIN</code> operator is available in Impala 1.2.2 and higher. During performance
+        tuning, you can override the reordering of join clauses that Impala does internally by
+        including the keyword <code class="ph codeph">STRAIGHT_JOIN</code> immediately after the
+        <code class="ph codeph">SELECT</code> and any <code class="ph codeph">DISTINCT</code> or <code class="ph codeph">ALL</code>
+        keywords.
       </p>
 
 
@@ -304,7 +306,7 @@ SELECT t1.c1, t2.c2 FROM t1 JOIN t2 USING (id, type_flag, name, address);</code>
         When related data arrives from different sources, with each data set physically residing in a separate
         table. For example, you might have address data from business records that you cross-check against phone
         listings or census data.
-        <div class="note note"><span class="notetitle">Note:</span>
+        <div class="note note"><span class="notetitle">Note:</span> 
           Impala can join tables of different file formats, including Impala-managed tables and HBase tables. For
           example, you might keep small dimension tables in HBase, for convenience of single-row lookups and
           updates, and for the larger fact tables use Parquet or other binary file format optimized for scan
@@ -355,7 +357,7 @@ select fact.custno, dimension.custno from
   customer_data as fact join customer_address as dimension
   using (custno)</code></pre>
 
-    <div class="note note"><span class="notetitle">Note:</span>
+    <div class="note note"><span class="notetitle">Note:</span> 
       <p class="p">
         Performance for join queries is a crucial aspect for Impala, because complex join queries are
         resource-intensive operations. An efficient join query produces much less network traffic and CPU overhead

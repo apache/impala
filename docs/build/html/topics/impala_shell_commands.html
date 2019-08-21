@@ -11,8 +11,8 @@
 <meta name="DC.Relation" scheme="URI" content="../topics/impala_impala_shell.html" />
 <meta name="prodname" content="Impala" />
 <meta name="prodname" content="Impala" />
-<meta name="version" content="Impala 3.2.x" />
-<meta name="version" content="Impala 3.2.x" />
+<meta name="version" content="Impala 3.3.x" />
+<meta name="version" content="Impala 3.3.x" />
 <meta name="DC.Format" content="XHTML" />
 <meta name="DC.Identifier" content="shell_commands" />
 <link rel="stylesheet" type="text/css" href="../commonltr.css" />
@@ -39,14 +39,14 @@
     </p>
 
 
-
+    
 <div class="tablenoborder"><table cellpadding="4" cellspacing="0" summary="" class="table" frame="border" border="1" rules="all"><colgroup><col style="width:20%" /><col style="width:80%" /></colgroup><thead class="thead" style="text-align:left;">
           <tr class="row">
-            <th class="entry nocellnorowborder" style="vertical-align:top;" id="d184570e86">
+            <th class="entry nocellnorowborder" style="vertical-align:top;" id="d191030e86">
               Command
             </th>
 
-            <th class="entry cell-norowborder" style="vertical-align:top;" id="d184570e89">
+            <th class="entry cell-norowborder" style="vertical-align:top;" id="d191030e89">
               Explanation
             </th>
 
@@ -55,14 +55,14 @@
         </thead>
 <tbody class="tbody">
           <tr id="shell_commands__alter_cmd" class="row">
-            <td class="entry nocellnorowborder" style="vertical-align:top;" headers="d184570e86 ">
+            <td class="entry nocellnorowborder" style="vertical-align:top;" headers="d191030e86 ">
               <p class="p">
                 <code class="ph codeph">alter</code>
               </p>
 
             </td>
 
-            <td class="entry cell-norowborder" style="vertical-align:top;" headers="d184570e89 ">
+            <td class="entry cell-norowborder" style="vertical-align:top;" headers="d191030e89 ">
               <p class="p">
                 Changes the underlying structure or settings of an Impala table, or a table shared between Impala
                 and Hive. See <a class="xref" href="impala_alter_table.html#alter_table">ALTER TABLE Statement</a> and
@@ -74,14 +74,14 @@
           </tr>
 
           <tr id="shell_commands__compute_cmd" class="row">
-            <td class="entry nocellnorowborder" style="vertical-align:top;" headers="d184570e86 ">
+            <td class="entry nocellnorowborder" style="vertical-align:top;" headers="d191030e86 ">
               <p class="p">
                 <code class="ph codeph">compute stats</code>
               </p>
 
             </td>
 
-            <td class="entry cell-norowborder" style="vertical-align:top;" headers="d184570e89 ">
+            <td class="entry cell-norowborder" style="vertical-align:top;" headers="d191030e89 ">
               <p class="p">
                 Gathers important performance-related information for a table, used by Impala to optimize queries.
                 See <a class="xref" href="impala_compute_stats.html#compute_stats">COMPUTE STATS Statement</a> for details.
@@ -92,27 +92,28 @@
           </tr>
 
           <tr id="shell_commands__connect_cmd" class="row">
-            <td class="entry nocellnorowborder" style="vertical-align:top;" headers="d184570e86 ">
+            <td class="entry nocellnorowborder" style="vertical-align:top;" headers="d191030e86 ">
               <p class="p">
                 <code class="ph codeph">connect</code>
               </p>
 
             </td>
 
-            <td class="entry cell-norowborder" style="vertical-align:top;" headers="d184570e89 ">
+            <td class="entry cell-norowborder" style="vertical-align:top;" headers="d191030e89 ">
               <p class="p">
                 Connects to the specified instance of <code class="ph codeph">impalad</code>. The default port of 21000 is
                 assumed unless you provide another value. You can connect to any host in your cluster that is
                 running <code class="ph codeph">impalad</code>. If you connect to an instance of <code class="ph codeph">impalad</code> that
                 was started with an alternate port specified by the <code class="ph codeph">--fe_port</code> flag, you must
-                provide that alternate port. See <a class="xref" href="impala_connecting.html#connecting">Connecting to impalad through impala-shell</a> for examples.
+                provide that alternate port. See <a class="xref" href="impala_connecting.html#connecting">Connecting to Impala Daemon from impala-shell</a> for examples.
               </p>
 
 
               <p class="p">
-        The <code class="ph codeph">SET</code> statement has no effect until the <span class="keyword cmdname">impala-shell</span> interpreter is
-        connected to an Impala server. Once you are connected, any query options you set remain in effect as you
-        issue a subsequent <code class="ph codeph">CONNECT</code> command to connect to a different Impala host.
+        The <code class="ph codeph">SET</code> statement has no effect until the
+        <span class="keyword cmdname">impala-shell</span> interpreter is connected to an Impala server. Once you
+        are connected, any query options you set remain in effect as you issue a subsequent
+        <code class="ph codeph">CONNECT</code> command to connect to a different Impala host.
       </p>
 
             </td>
@@ -120,14 +121,14 @@
           </tr>
 
           <tr id="shell_commands__describe_cmd" class="row">
-            <td class="entry nocellnorowborder" style="vertical-align:top;" headers="d184570e86 ">
+            <td class="entry nocellnorowborder" style="vertical-align:top;" headers="d191030e86 ">
               <p class="p">
                 <code class="ph codeph">describe</code>
               </p>
 
             </td>
 
-            <td class="entry cell-norowborder" style="vertical-align:top;" headers="d184570e89 ">
+            <td class="entry cell-norowborder" style="vertical-align:top;" headers="d191030e89 ">
               <p class="p">
                 Shows the columns, column data types, and any column comments for a specified table.
                 <code class="ph codeph">DESCRIBE FORMATTED</code> shows additional information such as the HDFS data directory,
@@ -142,14 +143,14 @@
           </tr>
 
           <tr id="shell_commands__drop_cmd" class="row">
-            <td class="entry nocellnorowborder" style="vertical-align:top;" headers="d184570e86 ">
+            <td class="entry nocellnorowborder" style="vertical-align:top;" headers="d191030e86 ">
               <p class="p">
                 <code class="ph codeph">drop</code>
               </p>
 
             </td>
 
-            <td class="entry cell-norowborder" style="vertical-align:top;" headers="d184570e89 ">
+            <td class="entry cell-norowborder" style="vertical-align:top;" headers="d191030e89 ">
               <p class="p">
                 Removes a schema object, and in some cases its associated data files. See
                 <a class="xref" href="impala_drop_table.html#drop_table">DROP TABLE Statement</a>, <a class="xref" href="impala_drop_view.html#drop_view">DROP VIEW Statement</a>,
@@ -162,14 +163,14 @@
           </tr>
 
           <tr id="shell_commands__explain_cmd" class="row">
-            <td class="entry nocellnorowborder" style="vertical-align:top;" headers="d184570e86 ">
+            <td class="entry nocellnorowborder" style="vertical-align:top;" headers="d191030e86 ">
               <p class="p">
                 <code class="ph codeph">explain</code>
               </p>
 
             </td>
 
-            <td class="entry cell-norowborder" style="vertical-align:top;" headers="d184570e89 ">
+            <td class="entry cell-norowborder" style="vertical-align:top;" headers="d191030e89 ">
               <p class="p">
                 Provides the execution plan for a query. <code class="ph codeph">EXPLAIN</code> represents a query as a series of
                 steps. For example, these steps might be map/reduce stages, metastore operations, or file system
@@ -182,14 +183,14 @@
           </tr>
 
           <tr id="shell_commands__help_cmd" class="row">
-            <td class="entry nocellnorowborder" style="vertical-align:top;" headers="d184570e86 ">
+            <td class="entry nocellnorowborder" style="vertical-align:top;" headers="d191030e86 ">
               <p class="p">
                 <code class="ph codeph">help</code>
               </p>
 
             </td>
 
-            <td class="entry cell-norowborder" style="vertical-align:top;" headers="d184570e89 ">
+            <td class="entry cell-norowborder" style="vertical-align:top;" headers="d191030e89 ">
               <p class="p">
                 Help provides a list of all available commands and options.
               </p>
@@ -199,14 +200,14 @@
           </tr>
 
           <tr id="shell_commands__history_cmd" class="row">
-            <td class="entry nocellnorowborder" style="vertical-align:top;" headers="d184570e86 ">
+            <td class="entry nocellnorowborder" style="vertical-align:top;" headers="d191030e86 ">
               <p class="p">
                 <code class="ph codeph">history</code>
               </p>
 
             </td>
 
-            <td class="entry cell-norowborder" style="vertical-align:top;" headers="d184570e89 ">
+            <td class="entry cell-norowborder" style="vertical-align:top;" headers="d191030e89 ">
               <p class="p">
                 Maintains an enumerated cross-session command history. This history is stored in the
                 <span class="ph filepath">~/.impalahistory</span> file.
@@ -217,14 +218,14 @@
           </tr>
 
           <tr id="shell_commands__insert_cmd" class="row">
-            <td class="entry nocellnorowborder" style="vertical-align:top;" headers="d184570e86 ">
+            <td class="entry nocellnorowborder" style="vertical-align:top;" headers="d191030e86 ">
               <p class="p">
                 <code class="ph codeph">insert</code>
               </p>
 
             </td>
 
-            <td class="entry cell-norowborder" style="vertical-align:top;" headers="d184570e89 ">
+            <td class="entry cell-norowborder" style="vertical-align:top;" headers="d191030e89 ">
               <p class="p">
                 Writes the results of a query to a specified table. This either overwrites table data or appends
                 data to the existing table content. See <a class="xref" href="impala_insert.html#insert">INSERT Statement</a> for details.
@@ -235,14 +236,14 @@
           </tr>
 
           <tr id="shell_commands__invalidate_metadata_cmd" class="row">
-            <td class="entry nocellnorowborder" style="vertical-align:top;" headers="d184570e86 ">
+            <td class="entry nocellnorowborder" style="vertical-align:top;" headers="d191030e86 ">
               <p class="p">
                 <code class="ph codeph">invalidate metadata</code>
               </p>
 
             </td>
 
-            <td class="entry cell-norowborder" style="vertical-align:top;" headers="d184570e89 ">
+            <td class="entry cell-norowborder" style="vertical-align:top;" headers="d191030e89 ">
               <p class="p">
                 Updates <span class="keyword cmdname">impalad</span> metadata for table existence and structure. Use this command
                 after creating, dropping, or altering databases, tables, or partitions in Hive. See
@@ -254,14 +255,14 @@
           </tr>
 
           <tr id="shell_commands__profile_cmd" class="row">
-            <td class="entry nocellnorowborder" style="vertical-align:top;" headers="d184570e86 ">
+            <td class="entry nocellnorowborder" style="vertical-align:top;" headers="d191030e86 ">
               <p class="p">
                 <code class="ph codeph">profile</code>
               </p>
 
             </td>
 
-            <td class="entry cell-norowborder" style="vertical-align:top;" headers="d184570e89 ">
+            <td class="entry cell-norowborder" style="vertical-align:top;" headers="d191030e89 ">
               <p class="p">
                 Displays low-level information about the most recent query. Used for performance diagnosis and
                 tuning. <span class="ph"> The report starts with the same information as produced by the
@@ -274,14 +275,14 @@
           </tr>
 
           <tr id="shell_commands__quit_cmd" class="row">
-            <td class="entry nocellnorowborder" style="vertical-align:top;" headers="d184570e86 ">
+            <td class="entry nocellnorowborder" style="vertical-align:top;" headers="d191030e86 ">
               <p class="p">
                 <code class="ph codeph">quit</code>
               </p>
 
             </td>
 
-            <td class="entry cell-norowborder" style="vertical-align:top;" headers="d184570e89 ">
+            <td class="entry cell-norowborder" style="vertical-align:top;" headers="d191030e89 ">
               <p class="p">
                 Exits the shell. Remember to include the final semicolon so that the shell recognizes the end of
                 the command.
@@ -292,14 +293,14 @@
           </tr>
 
           <tr id="shell_commands__refresh_cmd" class="row">
-            <td class="entry nocellnorowborder" style="vertical-align:top;" headers="d184570e86 ">
+            <td class="entry nocellnorowborder" style="vertical-align:top;" headers="d191030e86 ">
               <p class="p">
                 <code class="ph codeph">refresh</code>
               </p>
 
             </td>
 
-            <td class="entry cell-norowborder" style="vertical-align:top;" headers="d184570e89 ">
+            <td class="entry cell-norowborder" style="vertical-align:top;" headers="d191030e89 ">
               <p class="p">
                 Refreshes <span class="keyword cmdname">impalad</span> metadata for the locations of HDFS blocks corresponding to
                 Impala data files. Use this command after loading new data files into an Impala table through Hive
@@ -311,14 +312,14 @@
           </tr>
 
           <tr id="shell_commands__rerun_cmd" class="row">
-            <td class="entry nocellnorowborder" style="vertical-align:top;" headers="d184570e86 ">
+            <td class="entry nocellnorowborder" style="vertical-align:top;" headers="d191030e86 ">
               <p class="p">
                 <code class="ph codeph">rerun</code> or <code class="ph codeph">@</code>
               </p>
 
             </td>
 
-            <td class="entry cell-norowborder" style="vertical-align:top;" headers="d184570e89 ">
+            <td class="entry cell-norowborder" style="vertical-align:top;" headers="d191030e89 ">
               <p class="p">
                 Executes a previous <span class="keyword cmdname">impala-shell</span> command again,
                 from the list of commands displayed by the <code class="ph codeph">history</code>
@@ -343,14 +344,14 @@
           </tr>
 
           <tr id="shell_commands__select_cmd" class="row">
-            <td class="entry nocellnorowborder" style="vertical-align:top;" headers="d184570e86 ">
+            <td class="entry nocellnorowborder" style="vertical-align:top;" headers="d191030e86 ">
               <p class="p">
                 <code class="ph codeph">select</code>
               </p>
 
             </td>
 
-            <td class="entry cell-norowborder" style="vertical-align:top;" headers="d184570e89 ">
+            <td class="entry cell-norowborder" style="vertical-align:top;" headers="d191030e89 ">
               <p class="p">
                 Specifies the data set on which to complete some action. All information returned from
                 <code class="ph codeph">select</code> can be sent to some output such as the console or a file or can be used to
@@ -362,14 +363,14 @@
           </tr>
 
           <tr id="shell_commands__set_cmd" class="row">
-            <td class="entry nocellnorowborder" style="vertical-align:top;" headers="d184570e86 ">
+            <td class="entry nocellnorowborder" style="vertical-align:top;" headers="d191030e86 ">
               <p class="p">
                 <code class="ph codeph">set</code>
               </p>
 
             </td>
 
-            <td class="entry cell-norowborder" style="vertical-align:top;" headers="d184570e89 ">
+            <td class="entry cell-norowborder" style="vertical-align:top;" headers="d191030e89 ">
               <p class="p">
                 Manages query options for an <span class="keyword cmdname">impala-shell</span>
                 session. The available options are the ones listed in <a class="xref" href="impala_query_options.html#query_options">Query Options for the SET Statement</a>. These options
@@ -387,9 +388,10 @@
 
 
               <p class="p">
-        The <code class="ph codeph">SET</code> statement has no effect until the <span class="keyword cmdname">impala-shell</span> interpreter is
-        connected to an Impala server. Once you are connected, any query options you set remain in effect as you
-        issue a subsequent <code class="ph codeph">CONNECT</code> command to connect to a different Impala host.
+        The <code class="ph codeph">SET</code> statement has no effect until the
+        <span class="keyword cmdname">impala-shell</span> interpreter is connected to an Impala server. Once you
+        are connected, any query options you set remain in effect as you issue a subsequent
+        <code class="ph codeph">CONNECT</code> command to connect to a different Impala host.
       </p>
 
 
@@ -404,14 +406,14 @@
           </tr>
 
           <tr id="shell_commands__shell_cmd" class="row">
-            <td class="entry nocellnorowborder" style="vertical-align:top;" headers="d184570e86 ">
+            <td class="entry nocellnorowborder" style="vertical-align:top;" headers="d191030e86 ">
               <p class="p">
                 <code class="ph codeph">shell</code>
               </p>
 
             </td>
 
-            <td class="entry cell-norowborder" style="vertical-align:top;" headers="d184570e89 ">
+            <td class="entry cell-norowborder" style="vertical-align:top;" headers="d191030e89 ">
               <p class="p">
                 Executes the specified command in the operating system shell without exiting
                 <code class="ph codeph">impala-shell</code>. You can use the <code class="ph codeph">!</code> character as shorthand for the
@@ -419,7 +421,7 @@
               </p>
 
 
-              <div class="note note"><span class="notetitle">Note:</span>
+              <div class="note note"><span class="notetitle">Note:</span> 
                 Quote any instances of the <code class="ph codeph">--</code> or <code class="ph codeph">/*</code> tokens to avoid them being
                 interpreted as the start of a comment. To embed comments within <code class="ph codeph">source</code> or
                 <code class="ph codeph">!</code> commands, use the shell comment character <code class="ph codeph">#</code> before the comment
@@ -431,14 +433,14 @@
           </tr>
 
           <tr id="shell_commands__show_cmd" class="row">
-            <td class="entry nocellnorowborder" style="vertical-align:top;" headers="d184570e86 ">
+            <td class="entry nocellnorowborder" style="vertical-align:top;" headers="d191030e86 ">
               <p class="p">
                 <code class="ph codeph">show</code>
               </p>
 
             </td>
 
-            <td class="entry cell-norowborder" style="vertical-align:top;" headers="d184570e89 ">
+            <td class="entry cell-norowborder" style="vertical-align:top;" headers="d191030e89 ">
               <p class="p">
                 Displays metastore data for schema objects created and accessed through Impala, Hive, or both.
                 <code class="ph codeph">show</code> can be used to gather information about objects such as databases, tables, and functions.
@@ -450,14 +452,14 @@
           </tr>
 
           <tr id="shell_commands__source_cmd" class="row">
-            <td class="entry nocellnorowborder" style="vertical-align:top;" headers="d184570e86 ">
+            <td class="entry nocellnorowborder" style="vertical-align:top;" headers="d191030e86 ">
               <p class="p">
                 <code class="ph codeph">source</code> or <code class="ph codeph">src</code>
               </p>
 
             </td>
 
-            <td class="entry cell-norowborder" style="vertical-align:top;" headers="d184570e89 ">
+            <td class="entry cell-norowborder" style="vertical-align:top;" headers="d191030e89 ">
               <p class="p">
                 Executes one or more statements residing in a specified file from the local filesystem.
                 Allows you to perform the same kinds of batch operations as with the <code class="ph codeph">-f</code> option,
@@ -473,14 +475,14 @@
           </tr>
 
           <tr id="shell_commands__summary_cmd" class="row">
-            <td class="entry nocellnorowborder" style="vertical-align:top;" headers="d184570e86 ">
+            <td class="entry nocellnorowborder" style="vertical-align:top;" headers="d191030e86 ">
               <p class="p">
                 <code class="ph codeph">summary</code>
               </p>
 
             </td>
 
-            <td class="entry cell-norowborder" style="vertical-align:top;" headers="d184570e89 ">
+            <td class="entry cell-norowborder" style="vertical-align:top;" headers="d191030e89 ">
               <p class="p">
                 Summarizes the work performed in various stages of a query. It provides a higher-level view of the
                 information displayed by the <code class="ph codeph">EXPLAIN</code> command. Added in Impala 1.4.0. See
@@ -499,14 +501,14 @@
           </tr>
 
           <tr id="shell_commands__unset_cmd" class="row">
-            <td class="entry nocellnorowborder" style="vertical-align:top;" headers="d184570e86 ">
+            <td class="entry nocellnorowborder" style="vertical-align:top;" headers="d191030e86 ">
               <p class="p">
                 <code class="ph codeph">unset</code>
               </p>
 
             </td>
 
-            <td class="entry cell-norowborder" style="vertical-align:top;" headers="d184570e89 ">
+            <td class="entry cell-norowborder" style="vertical-align:top;" headers="d191030e89 ">
               <p class="p">
                 Removes any user-specified value for a query option and returns the option to its default value.
                 See <a class="xref" href="impala_query_options.html#query_options">Query Options for the SET Statement</a> for the available query options.
@@ -522,14 +524,14 @@
           </tr>
 
           <tr id="shell_commands__use_cmd" class="row">
-            <td class="entry nocellnorowborder" style="vertical-align:top;" headers="d184570e86 ">
+            <td class="entry nocellnorowborder" style="vertical-align:top;" headers="d191030e86 ">
               <p class="p">
                 <code class="ph codeph">use</code>
               </p>
 
             </td>
 
-            <td class="entry cell-norowborder" style="vertical-align:top;" headers="d184570e89 ">
+            <td class="entry cell-norowborder" style="vertical-align:top;" headers="d191030e89 ">
               <p class="p">
                 Indicates the database against which to execute subsequent commands. Lets you avoid using fully
                 qualified names when referring to tables in databases other than <code class="ph codeph">default</code>. See
@@ -542,14 +544,14 @@
           </tr>
 
           <tr id="shell_commands__version_cmd" class="row">
-            <td class="entry row-nocellborder" style="vertical-align:top;" headers="d184570e86 ">
+            <td class="entry row-nocellborder" style="vertical-align:top;" headers="d191030e86 ">
               <p class="p">
                 <code class="ph codeph">version</code>
               </p>
 
             </td>
 
-            <td class="entry cellrowborder" style="vertical-align:top;" headers="d184570e89 ">
+            <td class="entry cellrowborder" style="vertical-align:top;" headers="d191030e89 ">
               <p class="p">
                 Returns Impala version information.
               </p>

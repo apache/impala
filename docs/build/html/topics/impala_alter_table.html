@@ -11,8 +11,8 @@
 <meta name="DC.Relation" scheme="URI" content="../topics/impala_langref_sql.html" />
 <meta name="prodname" content="Impala" />
 <meta name="prodname" content="Impala" />
-<meta name="version" content="Impala 3.2.x" />
-<meta name="version" content="Impala 3.2.x" />
+<meta name="version" content="Impala 3.3.x" />
+<meta name="version" content="Impala 3.3.x" />
 <meta name="DC.Format" content="XHTML" />
 <meta name="DC.Identifier" content="alter_table" />
 <link rel="stylesheet" type="text/css" href="../commonltr.css" />
@@ -226,7 +226,7 @@ alter table fast_growing_data partition (year = 2016, month in (10,11,12)) set f
 
 </code></pre>
 
-    <div class="note note"><span class="notetitle">Note:</span>
+    <div class="note note"><span class="notetitle">Note:</span> 
       <p class="p">
         The extended syntax involving comparison operators and multiple partitions applies to
         the <code class="ph codeph">SET FILEFORMAT</code>, <code class="ph codeph">SET TBLPROPERTIES</code>, <code class="ph codeph">SET
@@ -276,11 +276,13 @@ alter table fast_growing_data partition (year = 2016, month in (10,11,12)) set f
 
     <p class="p">
         In <span class="keyword">Impala 2.6</span> and higher, Impala DDL statements such as
-        <code class="ph codeph">CREATE DATABASE</code>, <code class="ph codeph">CREATE TABLE</code>, <code class="ph codeph">DROP DATABASE CASCADE</code>,
-        <code class="ph codeph">DROP TABLE</code>, and <code class="ph codeph">ALTER TABLE [ADD|DROP] PARTITION</code> can create or remove folders
-        as needed in the Amazon S3 system. Prior to <span class="keyword">Impala 2.6</span>, you had to create folders yourself and point
-        Impala database, tables, or partitions at them, and manually remove folders when no longer needed.
-        See <a class="xref" href="../shared/../topics/impala_s3.html#s3">Using Impala with the Amazon S3 Filesystem</a> for details about reading and writing S3 data with Impala.
+        <code class="ph codeph">CREATE DATABASE</code>, <code class="ph codeph">CREATE TABLE</code>, <code class="ph codeph">DROP DATABASE
+        CASCADE</code>, <code class="ph codeph">DROP TABLE</code>, and <code class="ph codeph">ALTER TABLE [ADD|DROP]
+        PARTITION</code> can create or remove folders as needed in the Amazon S3 system. Prior
+        to <span class="keyword">Impala 2.6</span>, you had to create folders yourself and point
+        Impala database, tables, or partitions at them, and manually remove folders when no
+        longer needed. See <a class="xref" href="../shared/../topics/impala_s3.html#s3">Using Impala with the Amazon S3 Filesystem</a> for details about reading
+        and writing S3 data with Impala.
       </p>
 
 
@@ -299,21 +301,23 @@ alter table fast_growing_data partition (year = 2016, month in (10,11,12)) set f
 
 
     <p class="p">
-        In <span class="keyword">Impala 2.2</span> and higher, the optional <code class="ph codeph">WITH REPLICATION</code> clause
-        for <code class="ph codeph">CREATE TABLE</code> and <code class="ph codeph">ALTER TABLE</code> lets you specify
-        a <dfn class="term">replication factor</dfn>, the number of hosts on which to cache the same data blocks.
-        When Impala processes a cached data block, where the cache replication factor is greater than 1, Impala randomly
-        selects a host that has a cached copy of that data block. This optimization avoids excessive CPU
-        usage on a single host when the same cached data block is processed multiple times.
-        Where practical, specify a value greater than or equal to the HDFS block replication factor.
+        In <span class="keyword">Impala 2.2</span> and higher, the optional <code class="ph codeph">WITH
+        REPLICATION</code> clause for <code class="ph codeph">CREATE TABLE</code> and <code class="ph codeph">ALTER
+        TABLE</code> lets you specify a <dfn class="term">replication factor</dfn>, the number of hosts
+        on which to cache the same data blocks. When Impala processes a cached data block, where
+        the cache replication factor is greater than 1, Impala randomly selects a host that has
+        a cached copy of that data block. This optimization avoids excessive CPU usage on a
+        single host when the same cached data block is processed multiple times. Where
+        practical, specify a value greater than or equal to the HDFS block replication factor.
       </p>
 
 
     <p class="p">
-        If you connect to different Impala nodes within an <span class="keyword cmdname">impala-shell</span> session for
-        load-balancing purposes, you can enable the <code class="ph codeph">SYNC_DDL</code> query option to make each DDL
-        statement wait before returning, until the new or changed metadata has been received by all the Impala
-        nodes. See <a class="xref" href="../shared/../topics/impala_sync_ddl.html#sync_ddl">SYNC_DDL Query Option</a> for details.
+        If you connect to different Impala nodes within an <span class="keyword cmdname">impala-shell</span>
+        session for load-balancing purposes, you can enable the <code class="ph codeph">SYNC_DDL</code> query
+        option to make each DDL statement wait before returning, until the new or changed
+        metadata has been received by all the Impala nodes. See
+        <a class="xref" href="../shared/../topics/impala_sync_ddl.html#sync_ddl">SYNC_DDL Query Option</a> for details.
       </p>
 
 
@@ -409,11 +413,12 @@ alter table p1 add partition (month=2, day=2);
 alter table p1 partition (month=1, day=1) set location '/usr/external_data/new_years_day';
 </code></pre>
 
-    <div class="note note"><span class="notetitle">Note:</span>
-        If you are creating a partition for the first time and specifying its location, for maximum efficiency, use
-        a single <code class="ph codeph">ALTER TABLE</code> statement including both the <code class="ph codeph">ADD PARTITION</code> and
-        <code class="ph codeph">LOCATION</code> clauses, rather than separate statements with <code class="ph codeph">ADD PARTITION</code> and
-        <code class="ph codeph">SET LOCATION</code> clauses.
+    <div class="note note"><span class="notetitle">Note:</span> 
+        If you are creating a partition for the first time and specifying its location, for
+        maximum efficiency, use a single <code class="ph codeph">ALTER TABLE</code> statement including both
+        the <code class="ph codeph">ADD PARTITION</code> and <code class="ph codeph">LOCATION</code> clauses, rather than
+        separate statements with <code class="ph codeph">ADD PARTITION</code> and <code class="ph codeph">SET
+        LOCATION</code> clauses.
       </div>
 
 
@@ -612,9 +617,9 @@ alter table partitioned_data set tblproperties ('numRows'='1030000', 'STATS_GENE
 
     <div class="p">
         You specify a case-insensitive symbolic name for the kind of statistics:
-        <code class="ph codeph">numDVs</code>, <code class="ph codeph">numNulls</code>, <code class="ph codeph">avgSize</code>, <code class="ph codeph">maxSize</code>.
-        The key names and values are both quoted. This operation applies to an entire table,
-        not a specific partition. For example:
+        <code class="ph codeph">numDVs</code>, <code class="ph codeph">numNulls</code>, <code class="ph codeph">avgSize</code>,
+        <code class="ph codeph">maxSize</code>. The key names and values are both quoted. This operation
+        applies to an entire table, not a specific partition. For example:
 <pre class="pre codeblock"><code>
 create table t1 (x int, s string);
 insert into t1 values (1, 'one'), (2, 'two'), (2, 'deux');
@@ -1111,7 +1116,7 @@ alter table part_t add partition (month=3) set fileformat=parquet;
 <pre class="pre codeblock"><code>alter table time_data add partition (month=concat('Decem','ber'));
 alter table sales_data add partition (zipcode = cast(9021 * 10 as string));</code></pre>
 
-    <div class="note note"><span class="notetitle">Note:</span>
+    <div class="note note"><span class="notetitle">Note:</span> 
       <p class="p">
         An alternative way to reorganize a table and its associated data files is to use
         <code class="ph codeph">CREATE TABLE</code> to create a variation of the original table, then use
@@ -1129,17 +1134,18 @@ alter table sales_data add partition (zipcode = cast(9021 * 10 as string));</cod
     </p>
 
 
-    <div class="p">
-        You can switch a table from internal to external, or from external to internal, by using the <code class="ph codeph">ALTER
-        TABLE</code> statement:
-<pre class="pre codeblock"><code>
+    <div class="p"> You can switch a table from
+        internal to external, or from external to internal, by using the
+          <code class="ph codeph">ALTER TABLE</code> statement:
+        <pre class="pre codeblock"><code>
 -- Switch a table from internal to external.
 ALTER TABLE <var class="keyword varname">table_name</var> SET TBLPROPERTIES('EXTERNAL'='TRUE');
 
 -- Switch a table from external to internal.
 ALTER TABLE <var class="keyword varname">table_name</var> SET TBLPROPERTIES('EXTERNAL'='FALSE');
-</code></pre>
-      </div>
+</code></pre>If
+        the Kudu service is integrated with the Hive Metastore, the above
+        operations are not supported.</div>
 
 
     <p class="p">

@@ -11,8 +11,8 @@
 <meta name="DC.Relation" scheme="URI" content="../topics/impala_datatypes.html" />
 <meta name="prodname" content="Impala" />
 <meta name="prodname" content="Impala" />
-<meta name="version" content="Impala 3.2.x" />
-<meta name="version" content="Impala 3.2.x" />
+<meta name="version" content="Impala 3.3.x" />
+<meta name="version" content="Impala 3.3.x" />
 <meta name="DC.Format" content="XHTML" />
 <meta name="DC.Identifier" content="float" />
 <link rel="stylesheet" type="text/css" href="../commonltr.css" />
@@ -70,13 +70,13 @@
       <code class="ph codeph">BIGINT</code>, <code class="ph codeph">STRING</code>, <code class="ph codeph">TIMESTAMP</code>, or <code class="ph codeph">BOOLEAN</code>.
       You can use exponential notation in <code class="ph codeph">FLOAT</code> literals or when casting from
       <code class="ph codeph">STRING</code>, for example <code class="ph codeph">1.0e6</code> to represent one million.
-      <span class="ph">
-          Casting an integer or floating-point value <code class="ph codeph">N</code> to
-        <code class="ph codeph">TIMESTAMP</code> produces a value that is <code class="ph codeph">N</code> seconds past the start of the epoch
-        date (January 1, 1970). By default, the result value represents a date and time in the UTC time zone.
-        If the setting <code class="ph codeph">--use_local_tz_for_unix_timestamp_conversions=true</code> is in effect,
-        the resulting <code class="ph codeph">TIMESTAMP</code> represents a date and time in the local time zone.
-        </span>
+      <span class="ph"> Casting an integer or floating-point value
+        <code class="ph codeph">N</code> to <code class="ph codeph">TIMESTAMP</code> produces a value that is
+        <code class="ph codeph">N</code> seconds past the start of the epoch date (January 1, 1970). By
+        default, the result value represents a date and time in the UTC time zone. If the
+        setting <code class="ph codeph">‑‑use_local_tz_for_unix_timestamp_conversions=true</code>
+        is in effect, the resulting <code class="ph codeph">TIMESTAMP</code> represents a date and time in the
+        local time zone. </span>
     </p>
 
 
@@ -88,8 +88,8 @@
     
     <p class="p">
         Impala does not evaluate NaN (not a number) as equal to any other numeric values,
-        including other NaN values. For example, the following statement, which evaluates equality
-        between two NaN values, returns <code class="ph codeph">false</code>:
+        including other NaN values. For example, the following statement, which evaluates
+        equality between two NaN values, returns <code class="ph codeph">false</code>:
       </p>
 
 
@@ -107,9 +107,10 @@ SELECT CAST(1000.5 AS FLOAT);
 </code></pre>
 
     <p class="p">
-        <strong class="ph b">Partitioning:</strong> Because fractional values of this type are not always represented precisely, when this
-        type is used for a partition key column, the underlying HDFS directories might not be named exactly as you
-        expect. Prefer to partition on a <code class="ph codeph">DECIMAL</code> column instead.
+        <strong class="ph b">Partitioning:</strong> Because fractional values of this type are not always represented
+        precisely, when this type is used for a partition key column, the underlying HDFS
+        directories might not be named exactly as you expect. Prefer to partition on a
+        <code class="ph codeph">DECIMAL</code> column instead.
       </p>
 
 
@@ -124,8 +125,8 @@ SELECT CAST(1000.5 AS FLOAT);
 
 
     <p class="p">
-        <strong class="ph b">Text table considerations:</strong> Values of this type are potentially larger in text tables than in tables
-        using Parquet or other binary formats.
+        <strong class="ph b">Text table considerations:</strong> Values of this type are potentially larger in text
+        tables than in tables using Parquet or other binary formats.
       </p>
 
 
@@ -139,9 +140,9 @@ SELECT CAST(1000.5 AS FLOAT);
 
 
     <p class="p">
-        <strong class="ph b">Column statistics considerations:</strong> Because this type has a fixed size, the maximum and average size
-        fields are always filled in for column statistics, even before you run the <code class="ph codeph">COMPUTE STATS</code>
-        statement.
+        <strong class="ph b">Column statistics considerations:</strong> Because this type has a fixed size, the maximum
+        and average size fields are always filled in for column statistics, even before you run
+        the <code class="ph codeph">COMPUTE STATS</code> statement.
       </p>
 
 
@@ -153,22 +154,22 @@ SELECT CAST(1000.5 AS FLOAT);
 
 
     <p class="p">
-        Due to the way arithmetic on <code class="ph codeph">FLOAT</code> and <code class="ph codeph">DOUBLE</code> columns uses
-        high-performance hardware instructions, and distributed queries can perform these operations in different
-        order for each query, results can vary slightly for aggregate function calls such as <code class="ph codeph">SUM()</code>
-        and <code class="ph codeph">AVG()</code> for <code class="ph codeph">FLOAT</code> and <code class="ph codeph">DOUBLE</code> columns, particularly on
-        large data sets where millions or billions of values are summed or averaged. For perfect consistency and
-        repeatability, use the <code class="ph codeph">DECIMAL</code> data type for such operations instead of
-        <code class="ph codeph">FLOAT</code> or <code class="ph codeph">DOUBLE</code>.
+        Due to the way arithmetic on <code class="ph codeph">FLOAT</code> and <code class="ph codeph">DOUBLE</code> columns
+        uses high-performance hardware instructions, and distributed queries can perform these
+        operations in different order for each query, results can vary slightly for aggregate
+        function calls such as <code class="ph codeph">SUM()</code> and <code class="ph codeph">AVG()</code> for
+        <code class="ph codeph">FLOAT</code> and <code class="ph codeph">DOUBLE</code> columns, particularly on large data
+        sets where millions or billions of values are summed or averaged. For perfect
+        consistency and repeatability, use the <code class="ph codeph">DECIMAL</code> data type for such
+        operations instead of <code class="ph codeph">FLOAT</code> or <code class="ph codeph">DOUBLE</code>.
       </p>
 
 
     <p class="p">
         The inability to exactly represent certain floating-point values means that
-        <code class="ph codeph">DECIMAL</code> is sometimes a better choice than <code class="ph codeph">DOUBLE</code>
-        or <code class="ph codeph">FLOAT</code> when precision is critical, particularly when
-        transferring data from other database systems that use different representations
-        or file formats.
+        <code class="ph codeph">DECIMAL</code> is sometimes a better choice than <code class="ph codeph">DOUBLE</code> or
+        <code class="ph codeph">FLOAT</code> when precision is critical, particularly when transferring data
+        from other database systems that use different representations or file formats.
       </p>
 
 
@@ -177,8 +178,8 @@ SELECT CAST(1000.5 AS FLOAT);
       </p>
 
     <p class="p">
-        Currently, the data types <code class="ph codeph">BOOLEAN</code>, <code class="ph codeph">FLOAT</code>,
-        and <code class="ph codeph">DOUBLE</code> cannot be used for primary key columns in Kudu tables.
+        Currently, the data types <code class="ph codeph">BOOLEAN</code>, <code class="ph codeph">FLOAT</code>, and
+        <code class="ph codeph">DOUBLE</code> cannot be used for primary key columns in Kudu tables.
       </p>
 
 

@@ -1,0 +1,108 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE html
+  PUBLIC "-//W3C//DTD XHTML 1.0 Transitional//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-transitional.dtd">
+<html xmlns="http://www.w3.org/1999/xhtml" xml:lang="en" lang="en">
+<head><meta http-equiv="Content-Type" content="text/html; charset=UTF-8" />
+
+<meta name="copyright" content="(C) Copyright 2019" />
+<meta name="DC.rights.owner" content="(C) Copyright 2019" />
+<meta name="DC.Type" content="concept" />
+<meta name="DC.Title" content="Data Cache for Remote Reads" />
+<meta name="DC.Relation" scheme="URI" content="../topics/impala_performance.html" />
+<meta name="prodname" content="Impala" />
+<meta name="version" content="Impala 3.3.x" />
+<meta name="DC.Format" content="XHTML" />
+<meta name="DC.Identifier" content="data_cache" />
+<link rel="stylesheet" type="text/css" href="../commonltr.css" />
+<title>Data Cache for Remote Reads</title>
+</head>
+<body id="data_cache">
+
+
+  <h1 class="title topictitle1" id="ariaid-title1">Data Cache for Remote Reads</h1>
+
+
+  <div class="body conbody">
+
+    <p class="p">
+      When Impala compute nodes and its storage are not co-located, the network bandwidth
+      requirement goes up as the network traffic includes the data fetch as well as the
+      shuffling exchange traffic of intermediate results.
+    </p>
+
+
+    <div class="note note"><span class="notetitle">Note:</span> 
+      This is an experimental feature in Impala 3.3 and is not generally supported.
+    </div>
+
+
+    <p class="p">
+      To mitigate the pressure on the network, you can enable the compute nodes to cache the
+      working set read from remote filesystems, such as, remote HDFS data node, S3, ABFS, ADLS.
+    </p>
+
+
+    <p class="p">
+      To enable remote data cache, set the <code class="ph codeph">--data_cache</code> Impala Daemon start-up
+      flag as below:
+    </p>
+
+
+<pre class="pre codeblock"><code>--data_cache=<var class="keyword varname">dir1</var>,<var class="keyword varname">dir2</var>,<var class="keyword varname">dir3</var>,...:<var class="keyword varname">quota</var></code></pre>
+
+    <p class="p">
+      The flag is set to a list of directories, separated by <code class="ph codeph">,</code>, followed by a
+      <code class="ph codeph">:</code>, and a capacity <code class="ph codeph"><var class="keyword varname">quota</var></code> per
+      directory.
+    </p>
+
+
+    <p class="p">
+      If set to an empty string, data caching is disabled.
+    </p>
+
+
+    <p class="p">
+      Cached data is stored in the specified directories.
+    </p>
+
+
+    <p class="p">
+      The specified directories must exist in the local filesystem of each Impala Daemon, or
+      Impala will fail to start.
+    </p>
+
+
+    <p class="p">
+      In addition, the filesystem which the directory resides in must support hole punching.
+    </p>
+
+
+    <p class="p">
+      The cache can consume up to the <code class="ph codeph">quota</code> bytes for each of the directories
+      specified.
+    </p>
+
+
+    <p class="p">
+      The default setting for <code class="ph codeph">--data_cache</code> is an empty string.
+    </p>
+
+
+    <p class="p">
+      For example, with the following setting, the data cache may use up to 1 TB, with 500 GB
+      max in <code class="ph codeph">/data/0</code> and <code class="ph codeph">/data/1</code> respectively.
+    </p>
+
+
+<pre class="pre codeblock"><code>--data_cache=/data/0,/data/1:500GB</code></pre>
+
+  </div>
+
+
+<div class="related-links">
+<div class="familylinks">
+<div class="parentlink"><strong>Parent topic:</strong> <a class="link" href="../topics/impala_performance.html">Tuning Impala for Performance</a></div>
+</div>
+</div></body>
+</html>

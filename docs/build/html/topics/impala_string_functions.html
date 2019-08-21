@@ -11,8 +11,8 @@
 <meta name="DC.Relation" scheme="URI" content="../topics/impala_functions.html" />
 <meta name="prodname" content="Impala" />
 <meta name="prodname" content="Impala" />
-<meta name="version" content="Impala 3.2.x" />
-<meta name="version" content="Impala 3.2.x" />
+<meta name="version" content="Impala 3.3.x" />
+<meta name="version" content="Impala 3.3.x" />
 <meta name="DC.Format" content="XHTML" />
 <meta name="DC.Identifier" content="string_functions" />
 <link rel="stylesheet" type="text/css" href="../commonltr.css" />
@@ -313,40 +313,41 @@
           </p>
 
 
-          <p class="p"> The functions <code class="ph codeph">BASE64ENCODE()</code>
-        and <code class="ph codeph">BASE64DECODE()</code> are typically used in combination,
-        to store in an Impala table string data that is problematic to store or
-        transmit. For example, you could use these functions to store string
-        data that uses an encoding other than UTF-8, or to transform the values
-        in contexts that require ASCII values, such as for partition key
-        columns. Keep in mind that base64-encoded values produce different
-        results for string functions such as <code class="ph codeph">LENGTH()</code>,
-          <code class="ph codeph">MAX()</code>, and <code class="ph codeph">MIN()</code> than when those
-        functions are called with the unencoded string values. </p>
+          <p class="p">
+        The functions <code class="ph codeph">BASE64ENCODE()</code> and <code class="ph codeph">BASE64DECODE()</code> are
+        typically used in combination, to store in an Impala table string data that is
+        problematic to store or transmit. For example, you could use these functions to store
+        string data that uses an encoding other than UTF-8, or to transform the values in
+        contexts that require ASCII values, such as for partition key columns. Keep in mind that
+        base64-encoded values produce different results for string functions such as
+        <code class="ph codeph">LENGTH()</code>, <code class="ph codeph">MAX()</code>, and <code class="ph codeph">MIN()</code> than when
+        those functions are called with the unencoded string values.
+      </p>
 
 
-          <p class="p"> The set of characters that can be generated as
-        output from <code class="ph codeph">BASE64ENCODE()</code>, or specified in the
-        argument string to <code class="ph codeph">BASE64DECODE()</code>, are the ASCII
-        uppercase and lowercase letters (A-Z, a-z), digits (0-9), and the
-        punctuation characters <code class="ph codeph">+</code>, <code class="ph codeph">/</code>, and
-          <code class="ph codeph">=</code>. </p>
+          <p class="p">
+        The set of characters that can be generated as output from
+        <code class="ph codeph">BASE64ENCODE()</code>, or specified in the argument string to
+        <code class="ph codeph">BASE64DECODE()</code>, are the ASCII uppercase and lowercase letters (A-Z,
+        a-z), digits (0-9), and the punctuation characters <code class="ph codeph">+</code>,
+        <code class="ph codeph">/</code>, and <code class="ph codeph">=</code>.
+      </p>
 
 
-          <p class="p"> All return values produced by
-          <code class="ph codeph">BASE64ENCODE()</code> are a multiple of 4 bytes in length.
-        All argument values supplied to <code class="ph codeph">BASE64DECODE()</code> must
-        also be a multiple of 4 bytes in length. If a base64-encoded value would
-        otherwise have a different length, it can be padded with trailing
-          <code class="ph codeph">=</code> characters to reach a length that is a multiple of
-        4 bytes. </p>
+          <p class="p">
+        All return values produced by <code class="ph codeph">BASE64ENCODE()</code> are a multiple of 4 bytes
+        in length. All argument values supplied to <code class="ph codeph">BASE64DECODE()</code> must also be
+        a multiple of 4 bytes in length. If a base64-encoded value would otherwise have a
+        different length, it can be padded with trailing <code class="ph codeph">=</code> characters to reach
+        a length that is a multiple of 4 bytes.
+      </p>
 
 
-          <p class="p"> If the argument string to
-          <code class="ph codeph">BASE64DECODE()</code> does not represent a valid
-        base64-encoded value, subject to the constraints of the Impala
-        implementation such as the allowed character set, the function returns
-          <code class="ph codeph">NULL</code>. </p>
+          <p class="p">
+        If the argument string to <code class="ph codeph">BASE64DECODE()</code> does not represent a valid
+        base64-encoded value, subject to the constraints of the Impala implementation such as
+        the allowed character set, the function returns <code class="ph codeph">NULL</code>.
+      </p>
 
 
           <p class="p">
@@ -354,10 +355,10 @@
       </p>
 
 
-          <div class="p"> The following examples show how to use
-          <code class="ph codeph">BASE64ENCODE()</code> and <code class="ph codeph">BASE64DECODE()</code>
-        together to store and retrieve string values:
-        <pre class="pre codeblock"><code>
+          <div class="p">
+        The following examples show how to use <code class="ph codeph">BASE64ENCODE()</code> and
+        <code class="ph codeph">BASE64DECODE()</code> together to store and retrieve string values:
+<pre class="pre codeblock"><code>
 -- An arbitrary string can be encoded in base 64.
 -- The length of the output is a multiple of 4 bytes,
 -- padded with trailing = characters if necessary.
@@ -378,9 +379,9 @@ select base64decode('aGVsbG8gd29ybGQ=') as decoded;
 | hello world |
 +-------------+
 </code></pre>
-        These examples demonstrate incorrect encoded values that produce
-          <code class="ph codeph">NULL</code> return values when decoded:
-        <pre class="pre codeblock"><code>
+        These examples demonstrate incorrect encoded values that produce <code class="ph codeph">NULL</code>
+        return values when decoded:
+<pre class="pre codeblock"><code>
 -- The input value to base64decode() must be a multiple of 4 bytes.
 -- In this case, leaving off the trailing = padding character
 -- produces a NULL return value.
@@ -403,11 +404,11 @@ select base64decode('abc$');
 +----------------------+
 WARNINGS: UDF WARNING: Could not base64 decode input in space 4; actual output length 0
 </code></pre>
-        These examples demonstrate <span class="q">"round-tripping"</span> of an original string
-        to an encoded string, and back again. This technique is applicable if
-        the original source is in an unknown encoding, or if some intermediate
-        processing stage might cause national characters to be misrepresented:
-        <pre class="pre codeblock"><code>
+        These examples demonstrate <span class="q">"round-tripping"</span> of an original string to an encoded
+        string, and back again. This technique is applicable if the original source is in an
+        unknown encoding, or if some intermediate processing stage might cause national
+        characters to be misrepresented:
+<pre class="pre codeblock"><code>
 select 'circumflex accents: â, ê, î, ô, û' as original,
   base64encode('circumflex accents: â, ê, î, ô, û') as encoded;
 +-----------------------------------+------------------------------------------------------+
@@ -456,33 +457,34 @@ select base64encode('circumflex accents: â, ê, î, ô, û') as encoded,
           </p>
 
 
-          <p class="p"> The functions <code class="ph codeph">BASE64ENCODE()</code>
-        and <code class="ph codeph">BASE64DECODE()</code> are typically used in combination,
-        to store in an Impala table string data that is problematic to store or
-        transmit. For example, you could use these functions to store string
-        data that uses an encoding other than UTF-8, or to transform the values
-        in contexts that require ASCII values, such as for partition key
-        columns. Keep in mind that base64-encoded values produce different
-        results for string functions such as <code class="ph codeph">LENGTH()</code>,
-          <code class="ph codeph">MAX()</code>, and <code class="ph codeph">MIN()</code> than when those
-        functions are called with the unencoded string values. </p>
+          <p class="p">
+        The functions <code class="ph codeph">BASE64ENCODE()</code> and <code class="ph codeph">BASE64DECODE()</code> are
+        typically used in combination, to store in an Impala table string data that is
+        problematic to store or transmit. For example, you could use these functions to store
+        string data that uses an encoding other than UTF-8, or to transform the values in
+        contexts that require ASCII values, such as for partition key columns. Keep in mind that
+        base64-encoded values produce different results for string functions such as
+        <code class="ph codeph">LENGTH()</code>, <code class="ph codeph">MAX()</code>, and <code class="ph codeph">MIN()</code> than when
+        those functions are called with the unencoded string values.
+      </p>
 
 
-          <p class="p"> The set of characters that can be generated as
-        output from <code class="ph codeph">BASE64ENCODE()</code>, or specified in the
-        argument string to <code class="ph codeph">BASE64DECODE()</code>, are the ASCII
-        uppercase and lowercase letters (A-Z, a-z), digits (0-9), and the
-        punctuation characters <code class="ph codeph">+</code>, <code class="ph codeph">/</code>, and
-          <code class="ph codeph">=</code>. </p>
+          <p class="p">
+        The set of characters that can be generated as output from
+        <code class="ph codeph">BASE64ENCODE()</code>, or specified in the argument string to
+        <code class="ph codeph">BASE64DECODE()</code>, are the ASCII uppercase and lowercase letters (A-Z,
+        a-z), digits (0-9), and the punctuation characters <code class="ph codeph">+</code>,
+        <code class="ph codeph">/</code>, and <code class="ph codeph">=</code>.
+      </p>
 
 
-          <p class="p"> All return values produced by
-          <code class="ph codeph">BASE64ENCODE()</code> are a multiple of 4 bytes in length.
-        All argument values supplied to <code class="ph codeph">BASE64DECODE()</code> must
-        also be a multiple of 4 bytes in length. If a base64-encoded value would
-        otherwise have a different length, it can be padded with trailing
-          <code class="ph codeph">=</code> characters to reach a length that is a multiple of
-        4 bytes. </p>
+          <p class="p">
+        All return values produced by <code class="ph codeph">BASE64ENCODE()</code> are a multiple of 4 bytes
+        in length. All argument values supplied to <code class="ph codeph">BASE64DECODE()</code> must also be
+        a multiple of 4 bytes in length. If a base64-encoded value would otherwise have a
+        different length, it can be padded with trailing <code class="ph codeph">=</code> characters to reach
+        a length that is a multiple of 4 bytes.
+      </p>
 
 
           <p class="p">
@@ -490,10 +492,10 @@ select base64encode('circumflex accents: â, ê, î, ô, û') as encoded,
       </p>
 
 
-          <div class="p"> The following examples show how to use
-          <code class="ph codeph">BASE64ENCODE()</code> and <code class="ph codeph">BASE64DECODE()</code>
-        together to store and retrieve string values:
-        <pre class="pre codeblock"><code>
+          <div class="p">
+        The following examples show how to use <code class="ph codeph">BASE64ENCODE()</code> and
+        <code class="ph codeph">BASE64DECODE()</code> together to store and retrieve string values:
+<pre class="pre codeblock"><code>
 -- An arbitrary string can be encoded in base 64.
 -- The length of the output is a multiple of 4 bytes,
 -- padded with trailing = characters if necessary.
@@ -514,9 +516,9 @@ select base64decode('aGVsbG8gd29ybGQ=') as decoded;
 | hello world |
 +-------------+
 </code></pre>
-        These examples demonstrate incorrect encoded values that produce
-          <code class="ph codeph">NULL</code> return values when decoded:
-        <pre class="pre codeblock"><code>
+        These examples demonstrate incorrect encoded values that produce <code class="ph codeph">NULL</code>
+        return values when decoded:
+<pre class="pre codeblock"><code>
 -- The input value to base64decode() must be a multiple of 4 bytes.
 -- In this case, leaving off the trailing = padding character
 -- produces a NULL return value.
@@ -539,11 +541,11 @@ select base64decode('abc$');
 +----------------------+
 WARNINGS: UDF WARNING: Could not base64 decode input in space 4; actual output length 0
 </code></pre>
-        These examples demonstrate <span class="q">"round-tripping"</span> of an original string
-        to an encoded string, and back again. This technique is applicable if
-        the original source is in an unknown encoding, or if some intermediate
-        processing stage might cause national characters to be misrepresented:
-        <pre class="pre codeblock"><code>
+        These examples demonstrate <span class="q">"round-tripping"</span> of an original string to an encoded
+        string, and back again. This technique is applicable if the original source is in an
+        unknown encoding, or if some intermediate processing stage might cause national
+        characters to be misrepresented:
+<pre class="pre codeblock"><code>
 select 'circumflex accents: â, ê, î, ô, û' as original,
   base64encode('circumflex accents: â, ê, î, ô, û') as encoded;
 +-----------------------------------+------------------------------------------------------+
@@ -671,13 +673,12 @@ select concat('[',btrim('xyhelxyzlozyzzxx','xyz'),']');
 
 
           <div class="p">
-        The following example demonstrates how <code class="ph codeph">length()</code>
-        and <code class="ph codeph">char_length()</code> sometimes produce the same result,
-        and sometimes produce different results depending on the type of the
-        argument and the presence of trailing spaces for <code class="ph codeph">CHAR</code>
-        values. The <code class="ph codeph">S</code> and <code class="ph codeph">C</code> values are
-        displayed with enclosing quotation marks to show any trailing spaces.
-<pre class="pre codeblock" id="string_functions__d6e2675"><code>create table length_demo (s string, c char(5));
+        The following example demonstrates how <code class="ph codeph">length()</code> and
+        <code class="ph codeph">char_length()</code> sometimes produce the same result, and sometimes produce
+        different results depending on the type of the argument and the presence of trailing
+        spaces for <code class="ph codeph">CHAR</code> values. The <code class="ph codeph">S</code> and <code class="ph codeph">C</code>
+        values are displayed with enclosing quotation marks to show any trailing spaces.
+<pre class="pre codeblock" id="string_functions__d6e2688"><code>create table length_demo (s string, c char(5));
 insert into length_demo values
   ('a',cast('a' as char(5))),
   ('abc',cast('abc' as char(5))),
@@ -770,9 +771,9 @@ SELECT chr(97);
 
 
           <p class="p">
-        <strong class="ph b">Usage notes:</strong> <code class="ph codeph">concat()</code> and <code class="ph codeph">concat_ws()</code> are appropriate for
-        concatenating the values of multiple columns within the same row, while <code class="ph codeph">group_concat()</code>
-        joins together values from different rows.
+        <strong class="ph b">Usage notes:</strong> <code class="ph codeph">concat()</code> and <code class="ph codeph">concat_ws()</code> are
+        appropriate for concatenating the values of multiple columns within the same row, while
+        <code class="ph codeph">group_concat()</code> joins together values from different rows.
       </p>
 
         </dd>
@@ -796,9 +797,9 @@ SELECT chr(97);
 
 
           <p class="p">
-        <strong class="ph b">Usage notes:</strong> <code class="ph codeph">concat()</code> and <code class="ph codeph">concat_ws()</code> are appropriate for
-        concatenating the values of multiple columns within the same row, while <code class="ph codeph">group_concat()</code>
-        joins together values from different rows.
+        <strong class="ph b">Usage notes:</strong> <code class="ph codeph">concat()</code> and <code class="ph codeph">concat_ws()</code> are
+        appropriate for concatenating the values of multiple columns within the same row, while
+        <code class="ph codeph">group_concat()</code> joins together values from different rows.
       </p>
 
         </dd>
@@ -844,9 +845,9 @@ SELECT chr(97);
 
 
           <p class="p">
-        <strong class="ph b">Usage notes:</strong> <code class="ph codeph">concat()</code> and <code class="ph codeph">concat_ws()</code> are appropriate for
-        concatenating the values of multiple columns within the same row, while <code class="ph codeph">group_concat()</code>
-        joins together values from different rows.
+        <strong class="ph b">Usage notes:</strong> <code class="ph codeph">concat()</code> and <code class="ph codeph">concat_ws()</code> are
+        appropriate for concatenating the values of multiple columns within the same row, while
+        <code class="ph codeph">group_concat()</code> joins together values from different rows.
       </p>
 
 
@@ -876,9 +877,21 @@ SELECT chr(97);
 
 
         <dd class="dd">
-          <strong class="ph b">Purpose:</strong> Returns the input string with the first letter capitalized.
+          <strong class="ph b">Purpose:</strong> Returns the input string with the first letter of each word
+          capitalized and all other letters in lowercase.
           <p class="p">
             <strong class="ph b">Return type:</strong> <code class="ph codeph">STRING</code>
+          </p>
+
+
+          <p class="p">
+            <strong class="ph b">Example: </strong>
+          </p>
+
+
+          <p class="p">
+            <code class="ph codeph">INITCAP("i gOt mY ChiCkeNs in tHe yard.")</code> returns <code class="ph codeph">" I Got
+            My Chickens In The Yard."</code>.
           </p>
 
         </dd>
@@ -1077,7 +1090,7 @@ select instr('foo bar bletch', 'b', 1, null);
         </dd>
 
 
-
+      
 
       
 
@@ -1093,7 +1106,7 @@ select instr('foo bar bletch', 'b', 1, null);
 
       
 
-
+      
 
         <dt class="dt dlterm" id="string_functions__length">
           LENGTH(STRING a)
@@ -1122,7 +1135,7 @@ select instr('foo bar bletch', 'b', 1, null);
           </p>
 
 
-          <div class="note note"><span class="notetitle">Note:</span>
+          <div class="note note"><span class="notetitle">Note:</span> 
             Because the behavior of <code class="ph codeph">LENGTH()</code> with <code class="ph codeph">CHAR</code> values
             containing trailing spaces is not standardized across the industry, when porting
             code from other database systems, evaluate the behavior of <code class="ph codeph">LENGTH()</code>
@@ -1137,13 +1150,12 @@ select instr('foo bar bletch', 'b', 1, null);
 
 
           <div class="p">
-        The following example demonstrates how <code class="ph codeph">length()</code>
-        and <code class="ph codeph">char_length()</code> sometimes produce the same result,
-        and sometimes produce different results depending on the type of the
-        argument and the presence of trailing spaces for <code class="ph codeph">CHAR</code>
-        values. The <code class="ph codeph">S</code> and <code class="ph codeph">C</code> values are
-        displayed with enclosing quotation marks to show any trailing spaces.
-<pre class="pre codeblock" id="string_functions__d6e2675"><code>create table length_demo (s string, c char(5));
+        The following example demonstrates how <code class="ph codeph">length()</code> and
+        <code class="ph codeph">char_length()</code> sometimes produce the same result, and sometimes produce
+        different results depending on the type of the argument and the presence of trailing
+        spaces for <code class="ph codeph">CHAR</code> values. The <code class="ph codeph">S</code> and <code class="ph codeph">C</code>
+        values are displayed with enclosing quotation marks to show any trailing spaces.
+<pre class="pre codeblock" id="string_functions__d6e2688"><code>create table length_demo (s string, c char(5));
 insert into length_demo values
   ('a',cast('a' as char(5))),
   ('abc',cast('abc' as char(5))),
@@ -1171,7 +1183,7 @@ from length_demo;
 
 
     <dl class="dl">
-
+      
 
         <dt class="dt dlterm" id="string_functions__levenshtein">
           LEVENSHTEIN(STRING str1, STRING str2), <span class="ph" id="string_functions__le_dst">LE_DST(STRING
@@ -1215,6 +1227,7 @@ from length_demo;
             <strong class="ph b">Example:</strong>
           </p>
 
+
           <p class="p">
             <code class="ph codeph">LEVENSHTEIN ('welcome', 'We come')</code> returns 2, first change to
             replace '<code class="ph codeph">w</code>' to '<code class="ph codeph">W</code>', and then to replace
@@ -1224,7 +1237,7 @@ from length_demo;
         </dd>
 
 
-
+      
     </dl>
 
 
@@ -1268,11 +1281,10 @@ from length_demo;
 
 
           <p class="p">
-        In <span class="keyword">Impala 2.5</span> and higher, you can simplify queries that
-        use many <code class="ph codeph">UPPER()</code> and <code class="ph codeph">LOWER()</code> calls
-        to do case-insensitive comparisons, by using the <code class="ph codeph">ILIKE</code>
-        or <code class="ph codeph">IREGEXP</code> operators instead. See
-        <a class="xref" href="../shared/../topics/impala_operators.html#ilike">ILIKE Operator</a> and
+        In <span class="keyword">Impala 2.5</span> and higher, you can simplify queries that use many
+        <code class="ph codeph">UPPER()</code> and <code class="ph codeph">LOWER()</code> calls to do case-insensitive
+        comparisons, by using the <code class="ph codeph">ILIKE</code> or <code class="ph codeph">IREGEXP</code> operators
+        instead. See <a class="xref" href="../shared/../topics/impala_operators.html#ilike">ILIKE Operator</a> and
         <a class="xref" href="../shared/../topics/impala_operators.html#iregexp">IREGEXP Operator</a> for details.
       </p>
 
@@ -1376,28 +1388,30 @@ from length_demo;
 
 
           <p class="p">
-        In Impala 2.0 and later, the Impala regular expression syntax conforms to the POSIX Extended Regular
-        Expression syntax used by the Google RE2 library. For details, see
-        <a class="xref" href="https://code.google.com/p/re2/" target="_blank">the RE2 documentation</a>. It
-        has most idioms familiar from regular expressions in Perl, Python, and so on, including
-        <code class="ph codeph">.*?</code> for non-greedy matches.
+        In Impala 2.0 and later, the Impala regular expression syntax conforms to the POSIX
+        Extended Regular Expression syntax used by the Google RE2 library. For details, see
+        <a class="xref" href="https://code.google.com/p/re2/" target="_blank">the RE2
+        documentation</a>. It has most idioms familiar from regular expressions in Perl,
+        Python, and so on, including <code class="ph codeph">.*?</code> for non-greedy matches.
       </p>
 
 
           <p class="p">
-        In Impala 2.0 and later, a change in the underlying regular expression library could cause changes in the
-        way regular expressions are interpreted by this function. Test any queries that use regular expressions and
-        adjust the expression patterns if necessary. See
-        <a class="xref" href="../shared/../topics/impala_incompatible_changes.html#incompatible_changes_200">Incompatible Changes Introduced in Impala 2.0.0</a> for details.
+        In Impala 2.0 and later, a change in the underlying regular expression library could
+        cause changes in the way regular expressions are interpreted by this function. Test any
+        queries that use regular expressions and adjust the expression patterns if necessary.
+        See <a class="xref" href="../shared/../topics/impala_incompatible_changes.html#incompatible_changes_200">Incompatible Changes Introduced in Impala 2.0.0</a>
+        for details.
       </p>
 
 
           <p class="p">
-        Because the <span class="keyword cmdname">impala-shell</span> interpreter uses the <code class="ph codeph">\</code> character for escaping,
-        use <code class="ph codeph">\\</code> to represent the regular expression escape character in any regular expressions
-        that you submit through <span class="keyword cmdname">impala-shell</span> . You might prefer to use the equivalent character
-        class names, such as <code class="ph codeph">[[:digit:]]</code> instead of <code class="ph codeph">\d</code> which you would have to
-        escape as <code class="ph codeph">\\d</code>.
+        Because the <span class="keyword cmdname">impala-shell</span> interpreter uses the <code class="ph codeph">\</code>
+        character for escaping, use <code class="ph codeph">\\</code> to represent the regular expression
+        escape character in any regular expressions that you submit through
+        <span class="keyword cmdname">impala-shell</span> . You might prefer to use the equivalent character class
+        names, such as <code class="ph codeph">[[:digit:]]</code> instead of <code class="ph codeph">\d</code> which you
+        would have to escape as <code class="ph codeph">\\d</code>.
       </p>
 
 
@@ -1432,9 +1446,9 @@ from length_demo;
         </dd>
 
 
+      
 
-
-
+      
 
         <dt class="dt dlterm" id="string_functions__regexp_extract">
           REGEXP_EXTRACT(STRING subject, STRING pattern, INT index)
@@ -1451,28 +1465,30 @@ from length_demo;
 
 
           <p class="p">
-        In Impala 2.0 and later, the Impala regular expression syntax conforms to the POSIX Extended Regular
-        Expression syntax used by the Google RE2 library. For details, see
-        <a class="xref" href="https://code.google.com/p/re2/" target="_blank">the RE2 documentation</a>. It
-        has most idioms familiar from regular expressions in Perl, Python, and so on, including
-        <code class="ph codeph">.*?</code> for non-greedy matches.
+        In Impala 2.0 and later, the Impala regular expression syntax conforms to the POSIX
+        Extended Regular Expression syntax used by the Google RE2 library. For details, see
+        <a class="xref" href="https://code.google.com/p/re2/" target="_blank">the RE2
+        documentation</a>. It has most idioms familiar from regular expressions in Perl,
+        Python, and so on, including <code class="ph codeph">.*?</code> for non-greedy matches.
       </p>
 
 
           <p class="p">
-        In Impala 2.0 and later, a change in the underlying regular expression library could cause changes in the
-        way regular expressions are interpreted by this function. Test any queries that use regular expressions and
-        adjust the expression patterns if necessary. See
-        <a class="xref" href="../shared/../topics/impala_incompatible_changes.html#incompatible_changes_200">Incompatible Changes Introduced in Impala 2.0.0</a> for details.
+        In Impala 2.0 and later, a change in the underlying regular expression library could
+        cause changes in the way regular expressions are interpreted by this function. Test any
+        queries that use regular expressions and adjust the expression patterns if necessary.
+        See <a class="xref" href="../shared/../topics/impala_incompatible_changes.html#incompatible_changes_200">Incompatible Changes Introduced in Impala 2.0.0</a>
+        for details.
       </p>
 
 
           <p class="p">
-        Because the <span class="keyword cmdname">impala-shell</span> interpreter uses the <code class="ph codeph">\</code> character for escaping,
-        use <code class="ph codeph">\\</code> to represent the regular expression escape character in any regular expressions
-        that you submit through <span class="keyword cmdname">impala-shell</span> . You might prefer to use the equivalent character
-        class names, such as <code class="ph codeph">[[:digit:]]</code> instead of <code class="ph codeph">\d</code> which you would have to
-        escape as <code class="ph codeph">\\d</code>.
+        Because the <span class="keyword cmdname">impala-shell</span> interpreter uses the <code class="ph codeph">\</code>
+        character for escaping, use <code class="ph codeph">\\</code> to represent the regular expression
+        escape character in any regular expressions that you submit through
+        <span class="keyword cmdname">impala-shell</span> . You might prefer to use the equivalent character class
+        names, such as <code class="ph codeph">[[:digit:]]</code> instead of <code class="ph codeph">\d</code> which you
+        would have to escape as <code class="ph codeph">\\d</code>.
       </p>
 
 
@@ -1588,28 +1604,30 @@ Returned 1 row(s) in 0.11s</code></pre>
 
 
           <p class="p">
-        In Impala 2.0 and later, the Impala regular expression syntax conforms to the POSIX Extended Regular
-        Expression syntax used by the Google RE2 library. For details, see
-        <a class="xref" href="https://code.google.com/p/re2/" target="_blank">the RE2 documentation</a>. It
-        has most idioms familiar from regular expressions in Perl, Python, and so on, including
-        <code class="ph codeph">.*?</code> for non-greedy matches.
+        In Impala 2.0 and later, the Impala regular expression syntax conforms to the POSIX
+        Extended Regular Expression syntax used by the Google RE2 library. For details, see
+        <a class="xref" href="https://code.google.com/p/re2/" target="_blank">the RE2
+        documentation</a>. It has most idioms familiar from regular expressions in Perl,
+        Python, and so on, including <code class="ph codeph">.*?</code> for non-greedy matches.
       </p>
 
 
           <p class="p">
-        In Impala 2.0 and later, a change in the underlying regular expression library could cause changes in the
-        way regular expressions are interpreted by this function. Test any queries that use regular expressions and
-        adjust the expression patterns if necessary. See
-        <a class="xref" href="../shared/../topics/impala_incompatible_changes.html#incompatible_changes_200">Incompatible Changes Introduced in Impala 2.0.0</a> for details.
+        In Impala 2.0 and later, a change in the underlying regular expression library could
+        cause changes in the way regular expressions are interpreted by this function. Test any
+        queries that use regular expressions and adjust the expression patterns if necessary.
+        See <a class="xref" href="../shared/../topics/impala_incompatible_changes.html#incompatible_changes_200">Incompatible Changes Introduced in Impala 2.0.0</a>
+        for details.
       </p>
 
 
           <p class="p">
-        Because the <span class="keyword cmdname">impala-shell</span> interpreter uses the <code class="ph codeph">\</code> character for escaping,
-        use <code class="ph codeph">\\</code> to represent the regular expression escape character in any regular expressions
-        that you submit through <span class="keyword cmdname">impala-shell</span> . You might prefer to use the equivalent character
-        class names, such as <code class="ph codeph">[[:digit:]]</code> instead of <code class="ph codeph">\d</code> which you would have to
-        escape as <code class="ph codeph">\\d</code>.
+        Because the <span class="keyword cmdname">impala-shell</span> interpreter uses the <code class="ph codeph">\</code>
+        character for escaping, use <code class="ph codeph">\\</code> to represent the regular expression
+        escape character in any regular expressions that you submit through
+        <span class="keyword cmdname">impala-shell</span> . You might prefer to use the equivalent character class
+        names, such as <code class="ph codeph">[[:digit:]]</code> instead of <code class="ph codeph">\d</code> which you
+        would have to escape as <code class="ph codeph">\\d</code>.
       </p>
 
 
@@ -1700,28 +1718,30 @@ select regexp_like('foooooobar','fx*y*o*b');
 
 
           <p class="p">
-        In Impala 2.0 and later, the Impala regular expression syntax conforms to the POSIX Extended Regular
-        Expression syntax used by the Google RE2 library. For details, see
-        <a class="xref" href="https://code.google.com/p/re2/" target="_blank">the RE2 documentation</a>. It
-        has most idioms familiar from regular expressions in Perl, Python, and so on, including
-        <code class="ph codeph">.*?</code> for non-greedy matches.
+        In Impala 2.0 and later, the Impala regular expression syntax conforms to the POSIX
+        Extended Regular Expression syntax used by the Google RE2 library. For details, see
+        <a class="xref" href="https://code.google.com/p/re2/" target="_blank">the RE2
+        documentation</a>. It has most idioms familiar from regular expressions in Perl,
+        Python, and so on, including <code class="ph codeph">.*?</code> for non-greedy matches.
       </p>
 
 
           <p class="p">
-        In Impala 2.0 and later, a change in the underlying regular expression library could cause changes in the
-        way regular expressions are interpreted by this function. Test any queries that use regular expressions and
-        adjust the expression patterns if necessary. See
-        <a class="xref" href="../shared/../topics/impala_incompatible_changes.html#incompatible_changes_200">Incompatible Changes Introduced in Impala 2.0.0</a> for details.
+        In Impala 2.0 and later, a change in the underlying regular expression library could
+        cause changes in the way regular expressions are interpreted by this function. Test any
+        queries that use regular expressions and adjust the expression patterns if necessary.
+        See <a class="xref" href="../shared/../topics/impala_incompatible_changes.html#incompatible_changes_200">Incompatible Changes Introduced in Impala 2.0.0</a>
+        for details.
       </p>
 
 
           <p class="p">
-        Because the <span class="keyword cmdname">impala-shell</span> interpreter uses the <code class="ph codeph">\</code> character for escaping,
-        use <code class="ph codeph">\\</code> to represent the regular expression escape character in any regular expressions
-        that you submit through <span class="keyword cmdname">impala-shell</span> . You might prefer to use the equivalent character
-        class names, such as <code class="ph codeph">[[:digit:]]</code> instead of <code class="ph codeph">\d</code> which you would have to
-        escape as <code class="ph codeph">\\d</code>.
+        Because the <span class="keyword cmdname">impala-shell</span> interpreter uses the <code class="ph codeph">\</code>
+        character for escaping, use <code class="ph codeph">\\</code> to represent the regular expression
+        escape character in any regular expressions that you submit through
+        <span class="keyword cmdname">impala-shell</span> . You might prefer to use the equivalent character class
+        names, such as <code class="ph codeph">[[:digit:]]</code> instead of <code class="ph codeph">\d</code> which you
+        would have to escape as <code class="ph codeph">\\d</code>.
       </p>
 
 
@@ -1892,7 +1912,7 @@ select replace('hello world','xyz','abc');
         </dd>
 
 
-
+      
 
       
 
@@ -1908,7 +1928,7 @@ select replace('hello world','xyz','abc');
 
       
 
-
+      
 
         <dt class="dt dlterm" id="string_functions__rpad">
           RPAD(STRING str, INT len, STRING pad)
@@ -1971,122 +1991,71 @@ select replace('hello world','xyz','abc');
       
 
         <dt class="dt dlterm" id="string_functions__split_part">
-          SPLIT_PART(STRING source, STRING delimiter, BIGINT n)
+          SPLIT_PART(STRING source, STRING delimiter, BIGINT index)
         </dt>
 
 
         <dd class="dd">
-          <strong class="ph b">Purpose:</strong> Returns the nth field within a delimited string. The fields are
-          numbered starting from 1. The delimiter can consist of multiple characters, not just a
-          single character. All matching of the delimiter is done exactly, not using any regular
-          expression patterns.
+          <strong class="ph b">Purpose:</strong> Returns the requested <code class="ph codeph">index</code>th part of the input
+          <var class="keyword varname">source</var> string split by the <var class="keyword varname">delimiter</var>.
+          <ul class="ul">
+            <li class="li">
+              If <var class="keyword varname">index</var> is a positive number, returns the
+              <var class="keyword varname">index</var>th part from the left within the <var class="keyword varname">source</var>
+              string.
+            </li>
+
+
+            <li class="li">
+              If <var class="keyword varname">index</var> is a negative number, returns the
+              <var class="keyword varname">index</var>th part from the right within the
+              <var class="keyword varname">source</var> string.
+            </li>
+
+
+            <li class="li">
+              If <var class="keyword varname">index</var> is 0, returns an error.
+            </li>
+
+          </ul>
+
+          <p class="p">
+            The <var class="keyword varname">delimiter</var> can consist of multiple characters, not just a
+            single character.
+          </p>
+
+          <p class="p">
+            All matching of the delimiter is done exactly, not using any regular expression
+            patterns.
+          </p>
+
           <p class="p">
             <strong class="ph b">Return type:</strong> <code class="ph codeph">STRING</code>
           </p>
-
-
-          <p class="p">
-        In Impala 2.0 and later, the Impala regular expression syntax conforms to the POSIX Extended Regular
-        Expression syntax used by the Google RE2 library. For details, see
-        <a class="xref" href="https://code.google.com/p/re2/" target="_blank">the RE2 documentation</a>. It
-        has most idioms familiar from regular expressions in Perl, Python, and so on, including
-        <code class="ph codeph">.*?</code> for non-greedy matches.
-      </p>
-
-
-          <p class="p">
-        In Impala 2.0 and later, a change in the underlying regular expression library could cause changes in the
-        way regular expressions are interpreted by this function. Test any queries that use regular expressions and
-        adjust the expression patterns if necessary. See
-        <a class="xref" href="../shared/../topics/impala_incompatible_changes.html#incompatible_changes_200">Incompatible Changes Introduced in Impala 2.0.0</a> for details.
-      </p>
-
-
-          <p class="p">
-        Because the <span class="keyword cmdname">impala-shell</span> interpreter uses the <code class="ph codeph">\</code> character for escaping,
-        use <code class="ph codeph">\\</code> to represent the regular expression escape character in any regular expressions
-        that you submit through <span class="keyword cmdname">impala-shell</span> . You might prefer to use the equivalent character
-        class names, such as <code class="ph codeph">[[:digit:]]</code> instead of <code class="ph codeph">\d</code> which you would have to
-        escape as <code class="ph codeph">\\d</code>.
-      </p>
-
 
           <p class="p">
         <strong class="ph b">Examples:</strong>
       </p>
 
-
           <p class="p">
-            These examples show how to retrieve the nth field from a delimited string:
+            <code class="ph codeph">SPLIT_PART('x,y,z',',',2)</code> returns <code class="ph codeph">'y'</code>.
           </p>
 
-<pre class="pre codeblock"><code>
-select split_part('x,y,z',',',1);
-+-----------------------------+
-| split_part('x,y,z', ',', 1) |
-+-----------------------------+
-| x                           |
-+-----------------------------+
-
-select split_part('x,y,z',',',2);
-+-----------------------------+
-| split_part('x,y,z', ',', 2) |
-+-----------------------------+
-| y                           |
-+-----------------------------+
-
-select split_part('x,y,z',',',3);
-+-----------------------------+
-| split_part('x,y,z', ',', 3) |
-+-----------------------------+
-| z                           |
-+-----------------------------+
-
-</code></pre>
           <p class="p">
-            These examples show what happens for out-of-range field positions. Specifying a
-            value less than 1 produces an error. Specifying a value greater than the number of
-            fields returns a zero-length string (which is not the same as
-            <code class="ph codeph">NULL</code>).
+            <code class="ph codeph">SPLIT_PART('one***two***three','***',2)</code> returns
+            <code class="ph codeph">'two'</code>.
           </p>
 
-<pre class="pre codeblock"><code>
-select split_part('x,y,z',',',0);
-ERROR: Invalid field position: 0
-
-with t1 as (select split_part('x,y,z',',',4) nonexistent_field)
-  select
-      nonexistent_field
-    , concat('[',nonexistent_field,']')
-    , length(nonexistent_field);
-from t1
-+-------------------+-------------------------------------+---------------------------+
-| nonexistent_field | concat('[', nonexistent_field, ']') | length(nonexistent_field) |
-+-------------------+-------------------------------------+---------------------------+
-|                   | []                                  | 0                         |
-+-------------------+-------------------------------------+---------------------------+
-
-</code></pre>
           <p class="p">
-            These examples show how the delimiter can be a multi-character value:
+            <code class="ph codeph">SPLIT_PART('abc@@def@@ghi', '@@', 3)</code> returns
+            <code class="ph codeph">'ghi'</code>.
           </p>
 
-<pre class="pre codeblock"><code>
-select split_part('one***two***three','***',2);
-+-------------------------------------------+
-| split_part('one***two***three', '***', 2) |
-+-------------------------------------------+
-| two                                       |
-+-------------------------------------------+
+          <p class="p">
+            <code class="ph codeph">SPLIT_PART('abc@@def@@ghi', '@@', -3)</code> returns
+            <code class="ph codeph">'abc'</code>.
+          </p>
 
-select split_part('one\|/two\|/three','\|/',3);
-+-------------------------------------------+
-| split_part('one\|/two\|/three', '\|/', 3) |
-+-------------------------------------------+
-| three                                     |
-+-------------------------------------------+
-
-</code></pre>
         </dd>
 
 
@@ -2278,11 +2247,10 @@ select split_part('one\|/two\|/three','\|/',3);
 
 
           <p class="p">
-        In <span class="keyword">Impala 2.5</span> and higher, you can simplify queries that
-        use many <code class="ph codeph">UPPER()</code> and <code class="ph codeph">LOWER()</code> calls
-        to do case-insensitive comparisons, by using the <code class="ph codeph">ILIKE</code>
-        or <code class="ph codeph">IREGEXP</code> operators instead. See
-        <a class="xref" href="../shared/../topics/impala_operators.html#ilike">ILIKE Operator</a> and
+        In <span class="keyword">Impala 2.5</span> and higher, you can simplify queries that use many
+        <code class="ph codeph">UPPER()</code> and <code class="ph codeph">LOWER()</code> calls to do case-insensitive
+        comparisons, by using the <code class="ph codeph">ILIKE</code> or <code class="ph codeph">IREGEXP</code> operators
+        instead. See <a class="xref" href="../shared/../topics/impala_operators.html#ilike">ILIKE Operator</a> and
         <a class="xref" href="../shared/../topics/impala_operators.html#iregexp">IREGEXP Operator</a> for details.
       </p>
 

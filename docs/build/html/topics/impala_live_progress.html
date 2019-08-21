@@ -11,8 +11,8 @@
 <meta name="DC.Relation" scheme="URI" content="../topics/impala_query_options.html" />
 <meta name="prodname" content="Impala" />
 <meta name="prodname" content="Impala" />
-<meta name="version" content="Impala 3.2.x" />
-<meta name="version" content="Impala 3.2.x" />
+<meta name="version" content="Impala 3.3.x" />
+<meta name="version" content="Impala 3.3.x" />
 <meta name="DC.Format" content="XHTML" />
 <meta name="DC.Identifier" content="live_progress" />
 <link rel="stylesheet" type="text/css" href="../commonltr.css" />
@@ -64,8 +64,9 @@
       </p>
 
     <p class="p">
-        The output from this query option is printed to standard error. The output is only displayed in interactive mode,
-        that is, not when the <code class="ph codeph">-q</code> or <code class="ph codeph">-f</code> options are used.
+        The output from this query option is printed to standard error. The output is only
+        displayed in interactive mode, that is, not when the <code class="ph codeph">-q</code> or
+        <code class="ph codeph">-f</code> options are used.
       </p>
 
     <p class="p">
@@ -94,38 +95,40 @@
       </p>
 
     <div class="p">
-        Because the <code class="ph codeph">LIVE_PROGRESS</code> and <code class="ph codeph">LIVE_SUMMARY</code> query options
-        are available only within the <span class="keyword cmdname">impala-shell</span> interpreter:
+        Because the <code class="ph codeph">LIVE_PROGRESS</code> and <code class="ph codeph">LIVE_SUMMARY</code> query
+        options are available only within the <span class="keyword cmdname">impala-shell</span> interpreter:
         <ul class="ul">
           <li class="li">
             <p class="p">
               You cannot change these query options through the SQL <code class="ph codeph">SET</code>
-              statement using the JDBC or ODBC interfaces. The <code class="ph codeph">SET</code>
-              command in <span class="keyword cmdname">impala-shell</span> recognizes these names as
-              shell-only options.
+              statement using the JDBC or ODBC interfaces. The <code class="ph codeph">SET</code> command in
+              <span class="keyword cmdname">impala-shell</span> recognizes these names as shell-only options.
             </p>
 
           </li>
 
+
           <li class="li">
             <p class="p">
-              Be careful when using <span class="keyword cmdname">impala-shell</span> on a pre-<span class="keyword">Impala 2.3</span>
-              system to connect to a system running <span class="keyword">Impala 2.3</span> or higher.
-              The older <span class="keyword cmdname">impala-shell</span> does not recognize these
-              query option names. Upgrade <span class="keyword cmdname">impala-shell</span> on the
-              systems where you intend to use these query options.
+              Be careful when using <span class="keyword cmdname">impala-shell</span> on a
+              pre-<span class="keyword">Impala 2.3</span> system to connect to a system running
+              <span class="keyword">Impala 2.3</span> or higher. The older <span class="keyword cmdname">impala-shell</span>
+              does not recognize these query option names. Upgrade
+              <span class="keyword cmdname">impala-shell</span> on the systems where you intend to use these query
+              options.
             </p>
 
           </li>
 
+
           <li class="li">
             <p class="p">
-              Likewise, the <span class="keyword cmdname">impala-shell</span> command relies on
-              some information only available in <span class="keyword">Impala 2.3</span> and higher
-              to prepare live progress reports and query summaries. The
-              <code class="ph codeph">LIVE_PROGRESS</code> and <code class="ph codeph">LIVE_SUMMARY</code>
-              query options have no effect when <span class="keyword cmdname">impala-shell</span> connects
-              to a cluster running an older version of Impala.
+              Likewise, the <span class="keyword cmdname">impala-shell</span> command relies on some information
+              only available in <span class="keyword">Impala 2.3</span> and higher to prepare live
+              progress reports and query summaries. The <code class="ph codeph">LIVE_PROGRESS</code> and
+              <code class="ph codeph">LIVE_SUMMARY</code> query options have no effect when
+              <span class="keyword cmdname">impala-shell</span> connects to a cluster running an older version of
+              Impala.
             </p>
 
           </li>
@@ -160,8 +163,10 @@ LIVE_PROGRESS set to true
 </code></pre>
 
     <p class="p">
-        To see how the <code class="ph codeph">LIVE_PROGRESS</code> and <code class="ph codeph">LIVE_SUMMARY</code> query options
-        work in real time, see <a class="xref" href="https://asciinema.org/a/1rv7qippo0fe7h5k1b6k4nexk" target="_blank">this animated demo</a>.
+        To see how the <code class="ph codeph">LIVE_PROGRESS</code> and <code class="ph codeph">LIVE_SUMMARY</code> query
+        options work in real time, see
+        <a class="xref" href="https://asciinema.org/a/1rv7qippo0fe7h5k1b6k4nexk" target="_blank">this
+        animated demo</a>.
       </p>
 
 

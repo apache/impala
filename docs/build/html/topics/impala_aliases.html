@@ -11,8 +11,8 @@
 <meta name="DC.Relation" scheme="URI" content="../topics/impala_schema_objects.html" />
 <meta name="prodname" content="Impala" />
 <meta name="prodname" content="Impala" />
-<meta name="version" content="Impala 3.2.x" />
-<meta name="version" content="Impala 3.2.x" />
+<meta name="version" content="Impala 3.3.x" />
+<meta name="version" content="Impala 3.3.x" />
 <meta name="DC.Format" content="XHTML" />
 <meta name="DC.Identifier" content="aliases" />
 <link rel="stylesheet" type="text/css" href="../commonltr.css" />
@@ -71,10 +71,11 @@ SELECT t1.column_n c1, t2.column_n c2 FROM table1 t1, table2 t2
     </p>
 
     <div class="p">
-      You can specify column aliases with or without the <code class="ph codeph">AS</code> keyword, and with no quotation
-      marks, single quotation marks, or double quotation marks. Some kind of quotation marks are required if the
-      column alias contains any spaces or other problematic characters. The alias text is displayed in the
-      <span class="keyword cmdname">impala-shell</span> output as all-lowercase. For example:
+        You can specify column aliases with or without the <code class="ph codeph">AS</code> keyword, and with
+        no quotation marks, single quotation marks, or double quotation marks. Some kind of
+        quotation marks are required if the column alias contains any spaces or other
+        problematic characters. The alias text is displayed in the
+        <span class="keyword cmdname">impala-shell</span> output as all-lowercase. For example:
 <pre class="pre codeblock"><code>[localhost:21000] &gt; select c1 First_Column from t;
 [localhost:21000] &gt; select c1 as First_Column from t;
 +--------------+
@@ -95,10 +96,10 @@ SELECT t1.column_n c1, t2.column_n c2 FROM table1 t1, table2 t2
 | first column |
 +--------------+
 ...</code></pre>
-      From Impala 3.0, the alias substitution logic in the <code class="ph codeph">GROUP BY</code>, <code class="ph codeph">HAVING</code>,
-      and <code class="ph codeph">ORDER BY</code> clauses has become more consistent with standard SQL behavior, as follows.
-      Aliases are now only legal at the top level, and not in subexpressions. The following statements are
-      allowed:
+        From Impala 3.0, the alias substitution logic in the <code class="ph codeph">GROUP BY</code>,
+        <code class="ph codeph">HAVING</code>, and <code class="ph codeph">ORDER BY</code> clauses has become more
+        consistent with standard SQL behavior, as follows. Aliases are now only legal at the top
+        level, and not in subexpressions. The following statements are allowed:
 <pre class="pre codeblock"><code>
   SELECT int_col / 2 AS x
   FROM t
@@ -113,7 +114,7 @@ SELECT t1.column_n c1, t2.column_n c2 FROM table1 t1, table2 t2
   GROUP BY nb
   HAVING nb;
 </code></pre>
-      And the following statements are NOT allowed:
+        And the following statements are NOT allowed:
 <pre class="pre codeblock"><code>
   SELECT int_col / 2 AS x
   FROM t
@@ -128,7 +129,7 @@ SELECT t1.column_n c1, t2.column_n c2 FROM table1 t1, table2 t2
   GROUP BY x
   HAVING x &gt; 3;
 </code></pre>
-    </div>
+      </div>
 
 
     <p class="p">
@@ -139,10 +140,10 @@ SELECT t1.column_n c1, t2.column_n c2 FROM table1 t1, table2 t2
 
 
     <p class="p">
-      <span class="ph"> Aliases follow the same rules as identifiers when it comes to case
-        insensitivity. Aliases can be longer than identifiers (up to the maximum length of a Java string) and can
-        include additional characters such as spaces and dashes when they are quoted using backtick characters.
-        </span>
+      <span class="ph"> Aliases follow the same rules as identifiers when it
+        comes to case insensitivity. Aliases can be longer than identifiers (up to the maximum
+        length of a Java string) and can include additional characters such as spaces and dashes
+        when they are quoted using backtick characters. </span>
     </p>
 
 
@@ -170,8 +171,8 @@ SELECT t1.column_n c1, t2.column_n c2 FROM table1 t1, table2 t2
 
 
     <p class="p">
-        Another way to define different names for the same tables or columns is to create views. See
-        <a class="xref" href="../shared/../topics/impala_views.html#views">Overview of Impala Views</a> for details.
+        Another way to define different names for the same tables or columns is to create views.
+        See <a class="xref" href="../shared/../topics/impala_views.html#views">Overview of Impala Views</a> for details.
       </p>
 
   </div>

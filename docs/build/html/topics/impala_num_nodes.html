@@ -11,8 +11,8 @@
 <meta name="DC.Relation" scheme="URI" content="../topics/impala_query_options.html" />
 <meta name="prodname" content="Impala" />
 <meta name="prodname" content="Impala" />
-<meta name="version" content="Impala 3.2.x" />
-<meta name="version" content="Impala 3.2.x" />
+<meta name="version" content="Impala 3.3.x" />
+<meta name="version" content="Impala 3.3.x" />
 <meta name="DC.Format" content="XHTML" />
 <meta name="DC.Identifier" content="num_nodes" />
 <link rel="stylesheet" type="text/css" href="../commonltr.css" />
@@ -63,16 +63,17 @@
 
 
     <p class="p">
-        You might set the <code class="ph codeph">NUM_NODES</code> option to 1 briefly, during <code class="ph codeph">INSERT</code> or
-        <code class="ph codeph">CREATE TABLE AS SELECT</code> statements. Normally, those statements produce one or more data
-        files per data node. If the write operation involves small amounts of data, a Parquet table, and/or a
-        partitioned table, the default behavior could produce many small files when intuitively you might expect
-        only a single output file. <code class="ph codeph">SET NUM_NODES=1</code> turns off the <span class="q">"distributed"</span> aspect of the
-        write operation, making it more likely to produce only one or a few data files.
+        You might set the <code class="ph codeph">NUM_NODES</code> option to 1 briefly, during
+        <code class="ph codeph">INSERT</code> or <code class="ph codeph">CREATE TABLE AS SELECT</code> statements. Normally,
+        those statements produce one or more data files per data node. If the write operation
+        involves small amounts of data, a Parquet table, and/or a partitioned table, the default
+        behavior could produce many small files when intuitively you might expect only a single
+        output file. <code class="ph codeph">SET NUM_NODES=1</code> turns off the <span class="q">"distributed"</span> aspect of
+        the write operation, making it more likely to produce only one or a few data files.
       </p>
 
 
-    <div class="note warning"><span class="warningtitle">Warning:</span>
+    <div class="note warning"><span class="warningtitle">Warning:</span> 
     <p class="p">
       Because this option results in increased resource utilization on a single host,
       it could cause problems due to contention with other Impala statements or

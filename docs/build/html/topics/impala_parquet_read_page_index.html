@@ -1,0 +1,107 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE html
+  PUBLIC "-//W3C//DTD XHTML 1.0 Transitional//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-transitional.dtd">
+<html xmlns="http://www.w3.org/1999/xhtml" xml:lang="en" lang="en">
+<head><meta http-equiv="Content-Type" content="text/html; charset=UTF-8" />
+
+<meta name="copyright" content="(C) Copyright 2019" />
+<meta name="DC.rights.owner" content="(C) Copyright 2019" />
+<meta name="DC.Type" content="concept" />
+<meta name="DC.Title" content="PARQUET_READ_PAGE_INDEX Query Option" />
+<meta name="DC.Relation" scheme="URI" content="../topics/impala_query_options.html" />
+<meta name="prodname" content="Impala" />
+<meta name="version" content="Impala 3.3.x" />
+<meta name="DC.Format" content="XHTML" />
+<meta name="DC.Identifier" content="parquet_read_page_index" />
+<link rel="stylesheet" type="text/css" href="../commonltr.css" />
+<title>PARQUET_READ_PAGE_INDEX Query Option</title>
+</head>
+<body id="parquet_read_page_index">
+
+
+  <h1 class="title topictitle1" id="ariaid-title1">PARQUET_READ_PAGE_INDEX Query Option</h1>
+
+
+  
+
+  
+
+  <div class="body conbody">
+
+    <p class="p">
+      Use the <code class="ph codeph">PARQUET_READ_PAGE_INDEX</code> query option to disable or enable using
+      the Parquet page index during scans. The page index contains min/max statistics at the
+      page-level granularity. It can be used to skip pages and rows that do not match the
+      conditions in the <code class="ph codeph">WHERE</code> clause.
+    </p>
+
+
+    <p class="p">
+      This option enables the same optimization as the <code class="ph codeph">PARQUET_READ_STATISTICS</code>
+      at the finer grained page level.
+    </p>
+
+
+    <p class="p">
+      Impala supports filtering based on Parquet statistics:
+    </p>
+
+
+    <ul class="ul">
+      <li class="li">
+        Of the types: Boolean, Integer, Decimal, String, Timestamp
+      </li>
+
+
+      <li class="li">
+        For simple predicates of the forms: <code class="ph codeph">&lt;slot&gt; &lt;op&gt; &lt;constant&gt;</code> or
+        <code class="ph codeph">&lt;constant&gt; &lt;op&gt; &lt;slot&gt;</code>, where <code class="ph codeph">&lt;op&gt;</code> is LT,
+        LE, GE, GT, and EQ
+      </li>
+
+    </ul>
+
+
+    <div class="p">
+      The supported values for the query option are:
+      <ul class="ul">
+        <li class="li">
+          <code class="ph codeph">true</code> (<code class="ph codeph">1</code>): Read the page-level statistics from the
+          Parquet page index during query processing and filter out pages based on the
+          statistics.
+        </li>
+
+
+        <li class="li">
+          <code class="ph codeph">false</code> (<code class="ph codeph">0</code>): Do not use the Parquet page index.
+        </li>
+
+
+        <li class="li">
+          Any other values are treated as <code class="ph codeph">false</code>.
+        </li>
+
+      </ul>
+
+    </div>
+
+
+    <p class="p">
+      <strong class="ph b">Type:</strong> Boolean
+    </p>
+
+
+    <p class="p">
+      <strong class="ph b">Default:</strong> <code class="ph codeph">TRUE</code>
+    </p>
+
+
+  </div>
+
+
+<div class="related-links">
+<div class="familylinks">
+<div class="parentlink"><strong>Parent topic:</strong> <a class="link" href="../topics/impala_query_options.html">Query Options for the SET Statement</a></div>
+</div>
+</div></body>
+</html>

@@ -11,8 +11,8 @@
 <meta name="DC.Relation" scheme="URI" content="../topics/impala_admin.html" />
 <meta name="prodname" content="Impala" />
 <meta name="prodname" content="Impala" />
-<meta name="version" content="Impala 3.2.x" />
-<meta name="version" content="Impala 3.2.x" />
+<meta name="version" content="Impala 3.3.x" />
+<meta name="version" content="Impala 3.3.x" />
 <meta name="DC.Format" content="XHTML" />
 <meta name="DC.Identifier" content="timeouts" />
 <link rel="stylesheet" type="text/css" href="../commonltr.css" />
@@ -98,21 +98,20 @@ Trying to re-register with state-store</code></pre>
       </p>
 
 
-      <div class="note note"><span class="notetitle">Note:</span>
+      <div class="note note"><span class="notetitle">Note:</span> 
         <p class="p">
-          The timeout clock for queries and sessions only starts ticking when
-          the query or session is idle.
+          The timeout clock for queries and sessions only starts ticking when the query or
+          session is idle.
         </p>
 
 
         <p class="p">
-          For queries, this means the query has results ready but is waiting
-          for a client to fetch the data. A query can run for an arbitrary time
-          without triggering a timeout, because the query is computing results
-          rather than sitting idle waiting for the results to be fetched. The
-          timeout period is intended to prevent unclosed queries from consuming
-          resources and taking up slots in the admission count of running
-          queries, potentially preventing other queries from starting.
+          For queries, this means the query has results ready but is waiting for a client to
+          fetch the data. A query can run for an arbitrary time without triggering a timeout,
+          because the query is computing results rather than sitting idle waiting for the
+          results to be fetched. The timeout period is intended to prevent unclosed queries from
+          consuming resources and taking up slots in the admission count of running queries,
+          potentially preventing other queries from starting.
         </p>
 
 
@@ -197,7 +196,7 @@ Trying to re-register with state-store</code></pre>
       </p>
 
 
-      <div class="note note"><span class="notetitle">Note:</span>
+      <div class="note note"><span class="notetitle">Note:</span> 
         <p class="p">
           Impala checks periodically for idle sessions and queries
           to cancel. The actual idle time before cancellation might be up to 50% greater than

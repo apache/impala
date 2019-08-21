@@ -11,8 +11,8 @@
 <meta name="DC.Relation" scheme="URI" content="../topics/impala_performance.html" />
 <meta name="prodname" content="Impala" />
 <meta name="prodname" content="Impala" />
-<meta name="version" content="Impala 3.2.x" />
-<meta name="version" content="Impala 3.2.x" />
+<meta name="version" content="Impala 3.3.x" />
+<meta name="version" content="Impala 3.3.x" />
 <meta name="DC.Format" content="XHTML" />
 <meta name="DC.Identifier" content="hdfs_caching" />
 <link rel="stylesheet" type="text/css" href="../commonltr.css" />
@@ -37,7 +37,7 @@
     </p>
 
 
-    <div class="note note"><span class="notetitle">Note:</span>
+    <div class="note note"><span class="notetitle">Note:</span> 
       <p class="p">
         On a small or lightly loaded cluster, HDFS caching might not produce any speedup. It might even lead to
         slower queries, if I/O read operations that were performed in parallel across the entire cluster are replaced by in-memory
@@ -198,13 +198,14 @@
 
 
       <p class="p">
-        In <span class="keyword">Impala 2.2</span> and higher, the optional <code class="ph codeph">WITH REPLICATION</code> clause
-        for <code class="ph codeph">CREATE TABLE</code> and <code class="ph codeph">ALTER TABLE</code> lets you specify
-        a <dfn class="term">replication factor</dfn>, the number of hosts on which to cache the same data blocks.
-        When Impala processes a cached data block, where the cache replication factor is greater than 1, Impala randomly
-        selects a host that has a cached copy of that data block. This optimization avoids excessive CPU
-        usage on a single host when the same cached data block is processed multiple times.
-        Where practical, specify a value greater than or equal to the HDFS block replication factor.
+        In <span class="keyword">Impala 2.2</span> and higher, the optional <code class="ph codeph">WITH
+        REPLICATION</code> clause for <code class="ph codeph">CREATE TABLE</code> and <code class="ph codeph">ALTER
+        TABLE</code> lets you specify a <dfn class="term">replication factor</dfn>, the number of hosts
+        on which to cache the same data blocks. When Impala processes a cached data block, where
+        the cache replication factor is greater than 1, Impala randomly selects a host that has
+        a cached copy of that data block. This optimization avoids excessive CPU usage on a
+        single host when the same cached data block is processed multiple times. Where
+        practical, specify a value greater than or equal to the HDFS block replication factor.
       </p>
 
 
@@ -319,7 +320,7 @@ show table stats census;
       </p>
 
 
-      <div class="note note"><span class="notetitle">Note:</span>
+      <div class="note note"><span class="notetitle">Note:</span> 
         Because the HDFS cache consists of combined memory from all the DataNodes in the cluster, cached tables or
         partitions can be bigger than the amount of HDFS cache memory on any single host.
       </div>
@@ -613,10 +614,10 @@ Found 122 entries
 
 
       <p class="p">
-        Due to a limitation of HDFS, zero-copy reads are not supported with
-        encryption. Where practical, avoid HDFS caching for Impala data
-        files in encryption zones. The queries fall back to the normal read
-        path during query execution, which might cause some performance overhead.
+        Due to a limitation of HDFS, zero-copy reads are not supported with encryption. Where
+        practical, avoid HDFS caching for Impala data files in encryption zones. The queries
+        fall back to the normal read path during query execution, which might cause some
+        performance overhead.
       </p>
 
 

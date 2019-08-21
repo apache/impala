@@ -11,8 +11,8 @@
 <meta name="DC.Relation" scheme="URI" content="../topics/impala_datatypes.html" />
 <meta name="prodname" content="Impala" />
 <meta name="prodname" content="Impala" />
-<meta name="version" content="Impala 3.2.x" />
-<meta name="version" content="Impala 3.2.x" />
+<meta name="version" content="Impala 3.3.x" />
+<meta name="version" content="Impala 3.3.x" />
 <meta name="DC.Format" content="XHTML" />
 <meta name="DC.Identifier" content="array" />
 <link rel="stylesheet" type="text/css" href="../commonltr.css" />
@@ -53,11 +53,11 @@ type ::= <var class="keyword varname">primitive_type</var> | <var class="keyword
 
 
       <p class="p">
-        Because complex types are often used in combination,
-        for example an <code class="ph codeph">ARRAY</code> of <code class="ph codeph">STRUCT</code>
-        elements, if you are unfamiliar with the Impala complex types,
-        start with <a class="xref" href="../shared/../topics/impala_complex_types.html#complex_types">Complex Types (Impala 2.3 or higher only)</a> for
-        background information and usage examples.
+        Because complex types are often used in combination, for example an
+        <code class="ph codeph">ARRAY</code> of <code class="ph codeph">STRUCT</code> elements, if you are unfamiliar with
+        the Impala complex types, start with
+        <a class="xref" href="../shared/../topics/impala_complex_types.html#complex_types">Complex Types (Impala 2.3 or higher only)</a> for background
+        information and usage examples.
       </p>
 
 
@@ -106,20 +106,18 @@ type ::= <var class="keyword varname">primitive_type</var> | <var class="keyword
 
 
       <p class="p">
-        You can pass a multi-part qualified name to <code class="ph codeph">DESCRIBE</code>
-        to specify an <code class="ph codeph">ARRAY</code>, <code class="ph codeph">STRUCT</code>, or <code class="ph codeph">MAP</code>
-        column and visualize its structure as if it were a table.
-        For example, if table <code class="ph codeph">T1</code> contains an <code class="ph codeph">ARRAY</code> column
-        <code class="ph codeph">A1</code>, you could issue the statement <code class="ph codeph">DESCRIBE t1.a1</code>.
-        If table <code class="ph codeph">T1</code> contained a <code class="ph codeph">STRUCT</code> column <code class="ph codeph">S1</code>,
-        and a field <code class="ph codeph">F1</code> within the <code class="ph codeph">STRUCT</code> was a <code class="ph codeph">MAP</code>,
-        you could issue the statement <code class="ph codeph">DESCRIBE t1.s1.f1</code>.
-        An <code class="ph codeph">ARRAY</code> is shown as a two-column table, with
-        <code class="ph codeph">ITEM</code> and <code class="ph codeph">POS</code> columns.
-        A <code class="ph codeph">STRUCT</code> is shown as a table with each field
-        representing a column in the table.
-        A <code class="ph codeph">MAP</code> is shown as a two-column table, with
-        <code class="ph codeph">KEY</code> and <code class="ph codeph">VALUE</code> columns.
+        You can pass a multi-part qualified name to <code class="ph codeph">DESCRIBE</code> to specify an
+        <code class="ph codeph">ARRAY</code>, <code class="ph codeph">STRUCT</code>, or <code class="ph codeph">MAP</code> column and
+        visualize its structure as if it were a table. For example, if table <code class="ph codeph">T1</code>
+        contains an <code class="ph codeph">ARRAY</code> column <code class="ph codeph">A1</code>, you could issue the
+        statement <code class="ph codeph">DESCRIBE t1.a1</code>. If table <code class="ph codeph">T1</code> contained a
+        <code class="ph codeph">STRUCT</code> column <code class="ph codeph">S1</code>, and a field <code class="ph codeph">F1</code>
+        within the <code class="ph codeph">STRUCT</code> was a <code class="ph codeph">MAP</code>, you could issue the
+        statement <code class="ph codeph">DESCRIBE t1.s1.f1</code>. An <code class="ph codeph">ARRAY</code> is shown as a
+        two-column table, with <code class="ph codeph">ITEM</code> and <code class="ph codeph">POS</code> columns. A
+        <code class="ph codeph">STRUCT</code> is shown as a table with each field representing a column in the
+        table. A <code class="ph codeph">MAP</code> is shown as a two-column table, with <code class="ph codeph">KEY</code>
+        and <code class="ph codeph">VALUE</code> columns.
       </p>
 
 
@@ -136,37 +134,44 @@ type ::= <var class="keyword varname">primitive_type</var> | <var class="keyword
       <ul class="ul">
         <li class="li">
           <p class="p">
-            Columns with this data type can only be used in tables or partitions with the Parquet or ORC file format.
+            Columns with this data type can only be used in tables or partitions with the
+            Parquet or ORC file format.
           </p>
 
         </li>
+
 
         <li class="li">
           <p class="p">
-            Columns with this data type cannot be used as partition key columns in a partitioned table.
+            Columns with this data type cannot be used as partition key columns in a partitioned
+            table.
           </p>
 
         </li>
+
 
         <li class="li">
           <p class="p">
-            The <code class="ph codeph">COMPUTE STATS</code> statement does not produce any statistics for columns of this data type.
+            The <code class="ph codeph">COMPUTE STATS</code> statement does not produce any statistics for
+            columns of this data type.
           </p>
 
         </li>
+
 
         <li class="li">
-          <p class="p" id="array__d6e3269">
-            The maximum length of the column definition for any complex type, including declarations for any nested types,
-            is 4000 characters.
+          <p class="p" id="array__d6e3282">
+            The maximum length of the column definition for any complex type, including
+            declarations for any nested types, is 4000 characters.
           </p>
 
         </li>
+
 
         <li class="li">
           <p class="p">
-            See <a class="xref" href="../shared/../topics/impala_complex_types.html#complex_types_limits">Limitations and Restrictions for Complex Types</a> for a full list of limitations
-            and associated guidelines about complex type columns.
+            See <a class="xref" href="../shared/../topics/impala_complex_types.html#complex_types_limits">Limitations and Restrictions for Complex Types</a> for a
+            full list of limitations and associated guidelines about complex type columns.
           </p>
 
         </li>
@@ -180,7 +185,8 @@ type ::= <var class="keyword varname">primitive_type</var> | <var class="keyword
 
       <p class="p">
         Currently, the data types <code class="ph codeph">CHAR</code>, <code class="ph codeph">VARCHAR</code>,
-        <code class="ph codeph">ARRAY</code>, <code class="ph codeph">MAP</code>, and <code class="ph codeph">STRUCT</code> cannot be used with Kudu tables.
+        <code class="ph codeph">ARRAY</code>, <code class="ph codeph">MAP</code>, and <code class="ph codeph">STRUCT</code> cannot be used
+        with Kudu tables.
       </p>
 
 
@@ -189,12 +195,11 @@ type ::= <var class="keyword varname">primitive_type</var> | <var class="keyword
       </p>
 
 
-      <div class="note note"><span class="notetitle">Note:</span>
-      Many of the complex type examples refer to tables
-      such as <code class="ph codeph">CUSTOMER</code> and <code class="ph codeph">REGION</code>
-      adapted from the tables used in the TPC-H benchmark.
-      See <a class="xref" href="../shared/../topics/impala_complex_types.html#complex_sample_schema">Sample Schema and Data for Experimenting with Impala Complex Types</a>
-      for the table definitions.
+      <div class="note note"><span class="notetitle">Note:</span> 
+        Many of the complex type examples refer to tables such as <code class="ph codeph">CUSTOMER</code> and
+        <code class="ph codeph">REGION</code> adapted from the tables used in the TPC-H benchmark. See
+        <a class="xref" href="../shared/../topics/impala_complex_types.html#complex_sample_schema">Sample Schema and Data for Experimenting with Impala Complex Types</a> for the table
+        definitions.
       </div>
 
 
@@ -209,7 +214,7 @@ type ::= <var class="keyword varname">primitive_type</var> | <var class="keyword
       </p>
 
 
-      <div class="note note"><span class="notetitle">Note:</span>
+      <div class="note note"><span class="notetitle">Note:</span> 
         Practice the <code class="ph codeph">CREATE TABLE</code> and query notation for complex type columns
         using empty tables, until you can visualize a complex data structure and construct corresponding SQL statements reliably.
       </div>

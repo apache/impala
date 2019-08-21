@@ -33,30 +33,30 @@
 <meta name="prodname" content="Impala" />
 <meta name="prodname" content="Impala" />
 <meta name="prodname" content="Impala" />
-<meta name="version" content="Impala 3.2.x" />
-<meta name="version" content="Impala 3.2.x" />
-<meta name="version" content="Impala 3.2.x" />
-<meta name="version" content="Impala 3.2.x" />
-<meta name="version" content="Impala 3.2.x" />
-<meta name="version" content="Impala 3.2.x" />
-<meta name="version" content="Impala 3.2.x" />
-<meta name="version" content="Impala 3.2.x" />
-<meta name="version" content="Impala 3.2.x" />
-<meta name="version" content="Impala 3.2.x" />
-<meta name="version" content="Impala 3.2.x" />
-<meta name="version" content="Impala 3.2.x" />
-<meta name="version" content="Impala 3.2.x" />
-<meta name="version" content="Impala 3.2.x" />
-<meta name="version" content="Impala 3.2.x" />
-<meta name="version" content="Impala 3.2.x" />
-<meta name="version" content="Impala 3.2.x" />
-<meta name="version" content="Impala 3.2.x" />
-<meta name="version" content="Impala 3.2.x" />
-<meta name="version" content="Impala 3.2.x" />
-<meta name="version" content="Impala 3.2.x" />
-<meta name="version" content="Impala 3.2.x" />
-<meta name="version" content="Impala 3.2.x" />
-<meta name="version" content="Impala 3.2.x" />
+<meta name="version" content="Impala 3.3.x" />
+<meta name="version" content="Impala 3.3.x" />
+<meta name="version" content="Impala 3.3.x" />
+<meta name="version" content="Impala 3.3.x" />
+<meta name="version" content="Impala 3.3.x" />
+<meta name="version" content="Impala 3.3.x" />
+<meta name="version" content="Impala 3.3.x" />
+<meta name="version" content="Impala 3.3.x" />
+<meta name="version" content="Impala 3.3.x" />
+<meta name="version" content="Impala 3.3.x" />
+<meta name="version" content="Impala 3.3.x" />
+<meta name="version" content="Impala 3.3.x" />
+<meta name="version" content="Impala 3.3.x" />
+<meta name="version" content="Impala 3.3.x" />
+<meta name="version" content="Impala 3.3.x" />
+<meta name="version" content="Impala 3.3.x" />
+<meta name="version" content="Impala 3.3.x" />
+<meta name="version" content="Impala 3.3.x" />
+<meta name="version" content="Impala 3.3.x" />
+<meta name="version" content="Impala 3.3.x" />
+<meta name="version" content="Impala 3.3.x" />
+<meta name="version" content="Impala 3.3.x" />
+<meta name="version" content="Impala 3.3.x" />
+<meta name="version" content="Impala 3.3.x" />
 <meta name="DC.Format" content="XHTML" />
 <meta name="DC.Identifier" content="udfs" />
 <link rel="stylesheet" type="text/css" href="../commonltr.css" />
@@ -85,11 +85,8 @@
     </p>
 
 
-    <p class="p">
-      You might be familiar with this feature from other database products, under names such as stored functions or
-      stored routines.
-
-    </p>
+    <p class="p"> You might be familiar with this feature from other database products,
+      under names such as stored functions or stored routines.  </p>
 
 
     <p class="p">
@@ -191,8 +188,6 @@ select most_profitable_location(store_id, sales, expenses, tax_rate, depreciatio
             Currently, Impala does not support other categories of user-defined functions, such as user-defined
             table functions (UDTFs) or window functions.
           </li>
-
-
 
         </ul>
 
@@ -346,14 +341,14 @@ select most_profitable_location(store_id, sales, expenses, tax_rate, depreciatio
         </ol>
 
 
-        <div class="note note"><span class="notetitle">Note:</span>
+        <div class="note note"><span class="notetitle">Note:</span> 
           <div class="p">
-        In <span class="keyword">Impala 2.9</span> and higher, you can refresh the user-defined functions (UDFs)
-        that Impala recognizes, at the database level, by running the <code class="ph codeph">REFRESH FUNCTIONS</code>
-        statement with the database name as an argument. Java-based UDFs can be added to the metastore
-        database through Hive <code class="ph codeph">CREATE FUNCTION</code> statements, and made visible to Impala
-        by subsequently running <code class="ph codeph">REFRESH FUNCTIONS</code>. For example:
-
+        In <span class="keyword">Impala 2.9</span> and higher, you can refresh the user-defined
+        functions (UDFs) that Impala recognizes, at the database level, by running the
+        <code class="ph codeph">REFRESH FUNCTIONS</code> statement with the database name as an argument.
+        Java-based UDFs can be added to the metastore database through Hive <code class="ph codeph">CREATE
+        FUNCTION</code> statements, and made visible to Impala by subsequently running
+        <code class="ph codeph">REFRESH FUNCTIONS</code>. For example:
 <pre class="pre codeblock"><code>CREATE DATABASE shared_udfs;
 USE shared_udfs;
 ...use CREATE FUNCTION statements in Hive to create some Java-based UDFs
@@ -538,7 +533,7 @@ Returned 1 row(s) in 0.11s</code></pre>
 
 
 
-      <div class="note note"><span class="notetitle">Note:</span>
+      <div class="note note"><span class="notetitle">Note:</span> 
         The UDF development code does not rely on Impala being installed on the same machine. You can write and
         compile UDFs on a minimal development system, then deploy them on a different one for use with Impala.
       </div>
@@ -667,8 +662,8 @@ IntVal AddUdf(FunctionContext* context, const IntVal&amp; arg1, const IntVal&amp
 
 
         <p class="p">
-        Currently, Impala UDFs cannot accept arguments or return values of the Impala complex types
-        (<code class="ph codeph">STRUCT</code>, <code class="ph codeph">ARRAY</code>, or <code class="ph codeph">MAP</code>).
+        Currently, Impala UDFs cannot accept arguments or return values of the Impala complex
+        types (<code class="ph codeph">STRUCT</code>, <code class="ph codeph">ARRAY</code>, or <code class="ph codeph">MAP</code>).
       </p>
 
 
@@ -1237,17 +1232,19 @@ IntVal AddUdf(FunctionContext* context, const IntVal&amp; arg1, const IntVal&amp
       </p>
 
 
-      <div class="note note"><span class="notetitle">Note:</span>
+      <div class="note note"><span class="notetitle">Note:</span> 
         <p class="p">
-        In <span class="keyword">Impala 2.5</span> and higher, Impala UDFs and UDAs written in C++ are persisted in the metastore database.
-        Java UDFs are also persisted, if they were created with the new <code class="ph codeph">CREATE FUNCTION</code> syntax for Java UDFs,
-        where the Java function argument and return types are omitted.
-        Java-based UDFs created with the old <code class="ph codeph">CREATE FUNCTION</code> syntax do not persist across restarts
-        because they are held in the memory of the <span class="keyword cmdname">catalogd</span> daemon.
-        Until you re-create such Java UDFs using the new <code class="ph codeph">CREATE FUNCTION</code> syntax,
-        you must reload those Java-based UDFs by running the original <code class="ph codeph">CREATE FUNCTION</code> statements again each time
-        you restart the <span class="keyword cmdname">catalogd</span> daemon.
-        Prior to <span class="keyword">Impala 2.5</span> the requirement to reload functions after a restart applied to both C++ and Java functions.
+        In <span class="keyword">Impala 2.5</span> and higher, Impala UDFs and UDAs written in C++ are
+        persisted in the metastore database. Java UDFs are also persisted, if they were created
+        with the new <code class="ph codeph">CREATE FUNCTION</code> syntax for Java UDFs, where the Java
+        function argument and return types are omitted. Java-based UDFs created with the old
+        <code class="ph codeph">CREATE FUNCTION</code> syntax do not persist across restarts because they are
+        held in the memory of the <span class="keyword cmdname">catalogd</span> daemon. Until you re-create such
+        Java UDFs using the new <code class="ph codeph">CREATE FUNCTION</code> syntax, you must reload those
+        Java-based UDFs by running the original <code class="ph codeph">CREATE FUNCTION</code> statements
+        again each time you restart the <span class="keyword cmdname">catalogd</span> daemon. Prior to
+        <span class="keyword">Impala 2.5</span> the requirement to reload functions after a restart
+        applied to both C++ and Java functions.
       </p>
 
         <p class="p">
@@ -1829,19 +1826,22 @@ Returned 2 row(s) in 0.43s</code></pre>
           the query.
         </li>
 
+        <li class="li"> The <code class="ph codeph">CREATE FUNCTION</code> statement requires:<ul class="ul">
+            <li class="li">The <code class="ph codeph">CREATE</code> privilege on the database.</li>
 
-        <li class="li">
-          Because incorrectly coded UDFs could cause performance or capacity problems, for example by going into
-          infinite loops or allocating excessive amounts of memory, only an administrative user can create UDFs.
-          That is, to execute the <code class="ph codeph">CREATE FUNCTION</code> statement requires the <code class="ph codeph">ALL</code>
-          privilege on the server.
+            <li class="li">The <code class="ph codeph">ALL</code> privilege on URI where URI is the value
+              you specified for the <code class="ph codeph">LOCATION</code> in the
+                <code class="ph codeph">CREATE FUNCTION</code> statement. </li>
+
+          </ul>
+
         </li>
 
       </ul>
 
 
       <p class="p">
-        See <a class="xref" href="impala_authorization.html#authorization">Enabling Sentry Authorization for Impala</a> for details about authorization in Impala.
+        See <a class="xref" href="impala_authorization.html#authorization">Impala Authorization</a> for details about authorization in Impala.
       </p>
 
     </div>
@@ -1870,8 +1870,8 @@ Returned 2 row(s) in 0.43s</code></pre>
 
         <li class="li">
           <p class="p">
-        The Hive <code class="ph codeph">current_user()</code> function cannot be
-        called from a Java UDF through Impala.
+        The Hive <code class="ph codeph">current_user()</code> function cannot be called from a Java UDF
+        through Impala.
       </p>
 
         </li>

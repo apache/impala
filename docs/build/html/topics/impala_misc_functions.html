@@ -11,8 +11,8 @@
 <meta name="DC.Relation" scheme="URI" content="../topics/impala_functions.html" />
 <meta name="prodname" content="Impala" />
 <meta name="prodname" content="Impala" />
-<meta name="version" content="Impala 3.2.x" />
-<meta name="version" content="Impala 3.2.x" />
+<meta name="version" content="Impala 3.3.x" />
+<meta name="version" content="Impala 3.3.x" />
 <meta name="DC.Format" content="XHTML" />
 <meta name="DC.Identifier" content="misc_functions" />
 <link rel="stylesheet" type="text/css" href="../commonltr.css" />
@@ -44,6 +44,11 @@
 
       <li class="li">
         <a class="xref" href="#misc_functions__effective_user">EFFECTIVE_USER</a>
+      </li>
+
+
+      <li class="li">
+        <a class="xref" href="#misc_functions__get_json_object">GET_JSON_OBJECT</a>
       </li>
 
 
@@ -128,9 +133,111 @@
         </dd>
 
 
+      
+
+      
+
+        <dt class="dt dlterm" id="misc_functions__get_json_object">
+          GET_JSON_OBJECT(STRING json_str, STRING selector)
+        </dt>
 
 
+        <dd class="dd">
+          <strong class="ph b">Purpose:</strong> Extracts JSON object from the <var class="keyword varname">json_str</var> based on the
+          <var class="keyword varname">selector</var> JSON path and returns the string of the extracted JSON
+          object.
+          <p class="p">
+            The function returns <code class="ph codeph">NULL</code> if the input <var class="keyword varname">json_str</var>
+            is invalid or if nothing is selected based on the <var class="keyword varname">selector</var> JSON
+            path.
+          </p>
 
+
+          <div class="p">
+            The following characters are supported in the <var class="keyword varname">selector</var> JSON path:
+            <ul class="ul">
+              <li class="li">
+                $ : Denotes the root object
+              </li>
+
+
+              <li class="li">
+                . : Denotes the child operator
+              </li>
+
+
+              <li class="li">
+                [] : Denotes the subscript operator for array
+              </li>
+
+
+              <li class="li">
+                * : Denotes the wildcard for [] or .
+              </li>
+
+            </ul>
+
+          </div>
+
+
+          <p class="p">
+            <strong class="ph b">Return type:</strong> <code class="ph codeph">STRING</code>
+          </p>
+
+
+          <p class="p">
+            <strong class="ph b">Examples:</strong>
+          </p>
+
+<pre class="pre codeblock"><code>---- QUERY
+SELECT GET_JSON_OBJECT ('{"a":true, "b":false, "c":true}', '$.*');
+---- RESULTS
+[true,false,true]</code></pre>
+<pre class="pre codeblock"><code>---- QUERY
+SELECT GET_JSON_OBJECT(t.json, '$.a.b.c') FROM (VALUES (
+ ('{"a": {"b": {"c": 1}}}' AS json),
+ ('{"a": {"b": {"c": 2}}}'),
+ ('{"a": {"b": {"c": 3}}}')
+)) t
+---- RESULTS
+'1'
+'2'
+'3'</code></pre>
+<pre class="pre codeblock"><code>---- QUERY
+SELECT GET_JSON_OBJECT(t.json, '$.a'),
+ GET_JSON_OBJECT(t.json, '$.b'),
+ GET_JSON_OBJECT(t.json, '$.c')
+FROM (VALUES (
+ ('{"a":1, "b":2, "c":3}' AS json),
+ ('{"b":2, "c":3}'),
+ ('{"c":3}')
+)) t
+---- RESULTS
+'1','2','3'
+'NULL','2','3'
+'NULL','NULL','3'</code></pre>
+<pre class="pre codeblock"><code>---- QUERY
+SELECT GET_JSON_OBJECT(t.json, '$[1]'),
+ GET_JSON_OBJECT(t.json, '$[*]')
+FROM (VALUES (
+ ('["a", "b", "c"]' AS json),
+ ('["a", "b"]'),
+ ('["a"]')
+)) t
+---- RESULTS
+'b','["a","b","c"]'
+'b','["a","b"]'
+'NULL','a'</code></pre>
+          <p class="p">
+            <strong class="ph b">Added in:</strong> <span class="keyword">Impala 3.1</span>
+          </p>
+
+        </dd>
+
+
+      
+
+      
 
         <dt class="dt dlterm" id="misc_functions__logged_in_user">
           LOGGED_IN_USER()
@@ -178,7 +285,7 @@
         </dd>
 
 
-
+      
 
       
 
@@ -222,8 +329,8 @@
           that user belongs to, and from the list of groups you can check which roles are
           available to those groups through the authorization policy file.
           <p class="p">
-        In Impala 2.0 and later, <code class="ph codeph">user()</code> returns the full Kerberos principal string, such as
-        <code class="ph codeph">user@example.com</code>, in a Kerberized environment.
+        In Impala 2.0 and later, <code class="ph codeph">user()</code> returns the full Kerberos principal
+        string, such as <code class="ph codeph">user@example.com</code>, in a Kerberized environment.
       </p>
 
 
@@ -255,6 +362,17 @@
           unique identifier</a>, a 128-bit value encoded as a string with groups of
           hexadecimal digits separated by dashes.
           <p class="p">
+            Each call to <code class="ph codeph">UUID()</code> produces a new arbitrary value.
+          </p>
+
+
+          <p class="p">
+            If you get a UUID for each row of a result set, you can use it as a unique
+            identifier within a table, or even a unique ID across tables.
+          </p>
+
+
+          <p class="p">
             <strong class="ph b">Return type:</strong> <code class="ph codeph">STRING</code>
           </p>
 
@@ -278,32 +396,6 @@
             data from different tables without the likelihood of ID collisions.
           </p>
 
-
-          <p class="p">
-        <strong class="ph b">Examples:</strong>
-      </p>
-
-<pre class="pre codeblock"><code>
--- Each call to uuid() produces a new arbitrary value.
-select uuid();
-+--------------------------------------+
-| uuid()                               |
-+--------------------------------------+
-| c7013e25-1455-457f-bf74-a2046e58caea |
-+--------------------------------------+
-
--- If you get a UUID for each row of a result set, you can use it as a
--- unique identifier within a table, or even a unique ID across tables.
-select uuid() from four_row_table;
-+--------------------------------------+
-| uuid()                               |
-+--------------------------------------+
-| 51d3c540-85e5-4cb9-9110-604e53999e2e |
-| 0bb40071-92f6-4a59-a6a4-60d46e9703e2 |
-| 5e9d7c36-9842-4a96-862d-c13cd0457c02 |
-| cae29095-0cc0-4053-a5ea-7fcd3c780861 |
-+--------------------------------------+
-</code></pre>
         </dd>
 
 
@@ -329,9 +421,9 @@ select uuid() from four_row_table;
         </dd>
 
 
+      
 
-
-
+      
 
         <dt class="dt dlterm" id="misc_functions__coordinator">
           COORDINATOR()

@@ -11,8 +11,8 @@
 <meta name="DC.Relation" scheme="URI" content="../topics/impala_config_options.html" />
 <meta name="prodname" content="Impala" />
 <meta name="prodname" content="Impala" />
-<meta name="version" content="Impala 3.2.x" />
-<meta name="version" content="Impala 3.2.x" />
+<meta name="version" content="Impala 3.3.x" />
+<meta name="version" content="Impala 3.3.x" />
 <meta name="DC.Format" content="XHTML" />
 <meta name="DC.Identifier" content="processes" />
 <link rel="stylesheet" type="text/css" href="../commonltr.css" />
@@ -122,17 +122,19 @@
       </div>
 
 
-      <div class="note note"><span class="notetitle">Note:</span>
+      <div class="note note"><span class="notetitle">Note:</span> 
         <p class="p">
-        In <span class="keyword">Impala 2.5</span> and higher, Impala UDFs and UDAs written in C++ are persisted in the metastore database.
-        Java UDFs are also persisted, if they were created with the new <code class="ph codeph">CREATE FUNCTION</code> syntax for Java UDFs,
-        where the Java function argument and return types are omitted.
-        Java-based UDFs created with the old <code class="ph codeph">CREATE FUNCTION</code> syntax do not persist across restarts
-        because they are held in the memory of the <span class="keyword cmdname">catalogd</span> daemon.
-        Until you re-create such Java UDFs using the new <code class="ph codeph">CREATE FUNCTION</code> syntax,
-        you must reload those Java-based UDFs by running the original <code class="ph codeph">CREATE FUNCTION</code> statements again each time
-        you restart the <span class="keyword cmdname">catalogd</span> daemon.
-        Prior to <span class="keyword">Impala 2.5</span> the requirement to reload functions after a restart applied to both C++ and Java functions.
+        In <span class="keyword">Impala 2.5</span> and higher, Impala UDFs and UDAs written in C++ are
+        persisted in the metastore database. Java UDFs are also persisted, if they were created
+        with the new <code class="ph codeph">CREATE FUNCTION</code> syntax for Java UDFs, where the Java
+        function argument and return types are omitted. Java-based UDFs created with the old
+        <code class="ph codeph">CREATE FUNCTION</code> syntax do not persist across restarts because they are
+        held in the memory of the <span class="keyword cmdname">catalogd</span> daemon. Until you re-create such
+        Java UDFs using the new <code class="ph codeph">CREATE FUNCTION</code> syntax, you must reload those
+        Java-based UDFs by running the original <code class="ph codeph">CREATE FUNCTION</code> statements
+        again each time you restart the <span class="keyword cmdname">catalogd</span> daemon. Prior to
+        <span class="keyword">Impala 2.5</span> the requirement to reload functions after a restart
+        applied to both C++ and Java functions.
       </p>
 
       </div>

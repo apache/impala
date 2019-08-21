@@ -11,8 +11,8 @@
 <meta name="DC.Relation" scheme="URI" content="../topics/impala_admin.html" />
 <meta name="prodname" content="Impala" />
 <meta name="prodname" content="Impala" />
-<meta name="version" content="Impala 3.2.x" />
-<meta name="version" content="Impala 3.2.x" />
+<meta name="version" content="Impala 3.3.x" />
+<meta name="version" content="Impala 3.3.x" />
 <meta name="DC.Format" content="XHTML" />
 <meta name="DC.Identifier" content="disk_space" />
 <link rel="stylesheet" type="text/css" href="../commonltr.css" />
@@ -140,20 +140,23 @@
 
       <li class="li">
         <p class="p">
-        By default, intermediate files used during large sort, join, aggregation, or analytic function operations
-        are stored in the directory <span class="ph filepath">/tmp/impala-scratch</span> . These files are removed when the
-        operation finishes. (Multiple concurrent queries can perform operations that use the <span class="q">"spill to disk"</span>
-        technique, without any name conflicts for these temporary files.) You can specify a different location by
-        starting the <span class="keyword cmdname">impalad</span> daemon with the
-        <code class="ph codeph">--scratch_dirs="<var class="keyword varname">path_to_directory</var>"</code> configuration option.
-        You can specify a single directory, or a comma-separated list of directories. The scratch directories must
-        be on the local filesystem, not in HDFS. You might specify different directory paths for different hosts,
-        depending on the capacity and speed
-        of the available storage devices. In <span class="keyword">Impala 2.3</span> or higher, Impala successfully starts (with a warning
-        Impala successfully starts (with a warning written to the log) if it cannot create or read and write files
-        in one of the scratch directories. If there is less than 1 GB free on the filesystem where that directory resides,
-        Impala still runs, but writes a warning message to its log.  If Impala encounters an error reading or writing
-        files in a scratch directory during a query, Impala logs the error and the query fails.
+        By default, intermediate files used during large sort, join, aggregation, or analytic
+        function operations are stored in the directory <span class="ph filepath">/tmp/impala-scratch</span>
+        . These files are removed when the operation finishes. (Multiple concurrent queries can
+        perform operations that use the <span class="q">"spill to disk"</span> technique, without any name
+        conflicts for these temporary files.) You can specify a different location by starting
+        the <span class="keyword cmdname">impalad</span> daemon with the
+        <code class="ph codeph">‑‑scratch_dirs="<var class="keyword varname">path_to_directory</var>"</code>
+        configuration option. You can specify a single directory, or a comma-separated list of
+        directories. The scratch directories must be on the local filesystem, not in HDFS. You
+        might specify different directory paths for different hosts, depending on the capacity
+        and speed of the available storage devices. In <span class="keyword">Impala 2.3</span> or
+        higher, Impala successfully starts (with a warning Impala successfully starts (with a
+        warning written to the log) if it cannot create or read and write files in one of the
+        scratch directories. If there is less than 1 GB free on the filesystem where that
+        directory resides, Impala still runs, but writes a warning message to its log. If Impala
+        encounters an error reading or writing files in a scratch directory during a query,
+        Impala logs the error and the query fails.
       </p>
 
       </li>

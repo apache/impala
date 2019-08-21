@@ -11,8 +11,8 @@
 <meta name="DC.Relation" scheme="URI" content="../topics/impala_query_options.html" />
 <meta name="prodname" content="Impala" />
 <meta name="prodname" content="Impala" />
-<meta name="version" content="Impala 3.2.x" />
-<meta name="version" content="Impala 3.2.x" />
+<meta name="version" content="Impala 3.3.x" />
+<meta name="version" content="Impala 3.3.x" />
 <meta name="DC.Format" content="XHTML" />
 <meta name="DC.Identifier" content="sync_ddl" />
 <link rel="stylesheet" type="text/css" href="../commonltr.css" />
@@ -49,7 +49,7 @@
     </p>
 
 
-    <div class="note note"><span class="notetitle">Note:</span>
+    <div class="note note"><span class="notetitle">Note:</span> 
       Because this option can introduce a delay after each write operation, if you are running a sequence of
       <code class="ph codeph">CREATE DATABASE</code>, <code class="ph codeph">CREATE TABLE</code>, <code class="ph codeph">ALTER TABLE</code>,
       <code class="ph codeph">INSERT</code>, and similar statements within a setup script, to minimize the overall delay you can
@@ -58,12 +58,13 @@
 
 
     <p class="p">
-        <strong class="ph b">Type:</strong> Boolean; recognized values are 1 and 0, or <code class="ph codeph">true</code> and <code class="ph codeph">false</code>;
-        any other value interpreted as <code class="ph codeph">false</code>
+        <strong class="ph b">Type:</strong> Boolean; recognized values are 1 and 0, or <code class="ph codeph">true</code> and
+        <code class="ph codeph">false</code>; any other value interpreted as <code class="ph codeph">false</code>
       </p>
 
     <p class="p">
-        <strong class="ph b">Default:</strong> <code class="ph codeph">false</code> (shown as 0 in output of <code class="ph codeph">SET</code> statement)
+        <strong class="ph b">Default:</strong> <code class="ph codeph">false</code> (shown as 0 in output of <code class="ph codeph">SET</code>
+        statement)
       </p>
 
 

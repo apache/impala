@@ -11,8 +11,8 @@
 <meta name="DC.Relation" scheme="URI" content="../topics/impala_security.html" />
 <meta name="prodname" content="Impala" />
 <meta name="prodname" content="Impala" />
-<meta name="version" content="Impala 3.2.x" />
-<meta name="version" content="Impala 3.2.x" />
+<meta name="version" content="Impala 3.3.x" />
+<meta name="version" content="Impala 3.3.x" />
 <meta name="DC.Format" content="XHTML" />
 <meta name="DC.Identifier" content="ssl" />
 <link rel="stylesheet" type="text/css" href="../commonltr.css" />
@@ -79,13 +79,12 @@
       </p>
 
 
-      <div class="note warning"><span class="warningtitle">Warning:</span>
-        In <span class="keyword"> Impala 2.3.1</span> and lower versions, you could enable
-        Kerberos authentication between Impala internal components, or SSL
-        encryption between Impala internal components, but not both at the same
-        time. This restriction has now been lifted. See <a class="xref" href="https://issues.apache.org/jira/browse/IMPALA-2598" target="_blank">IMPALA-2598</a> to see the maintenance
-        releases for different levels of Impala where the fix has been
-        published.
+      <div class="note warning"><span class="warningtitle">Warning:</span> 
+        In <span class="keyword"> Impala 2.3.1</span> and lower versions, you could
+        enable Kerberos authentication between Impala internal components, or SSL encryption
+        between Impala internal components, but not both at the same time. This restriction has
+        now been lifted. See <a class="xref" href="https://issues.apache.org/jira/browse/IMPALA-2598" target="_blank">IMPALA-2598</a> to see the
+        maintenance releases for different levels of Impala where the fix has been published.
       </div>
 
 
@@ -154,10 +153,10 @@
 
 
       <p class="p">
-        Prior to <span class="keyword">Impala 2.5</span>, the Hive JDBC driver did not support connections that use both Kerberos authentication
-        and SSL encryption. If your cluster is running an older release that has this restriction,
-        use an alternative JDBC driver that supports
-        both of these security features.
+        Prior to <span class="keyword">Impala 2.5</span>, the Hive JDBC driver did not support
+        connections that use both Kerberos authentication and SSL encryption. If your cluster is
+        running an older release that has this restriction, use an alternative JDBC driver that
+        supports both of these security features.
       </p>
 
     </div>

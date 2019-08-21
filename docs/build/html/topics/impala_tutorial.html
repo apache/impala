@@ -24,22 +24,22 @@
 <meta name="prodname" content="Impala" />
 <meta name="prodname" content="Impala" />
 <meta name="prodname" content="Impala" />
-<meta name="version" content="Impala 3.2.x" />
-<meta name="version" content="Impala 3.2.x" />
-<meta name="version" content="Impala 3.2.x" />
-<meta name="version" content="Impala 3.2.x" />
-<meta name="version" content="Impala 3.2.x" />
-<meta name="version" content="Impala 3.2.x" />
-<meta name="version" content="Impala 3.2.x" />
-<meta name="version" content="Impala 3.2.x" />
-<meta name="version" content="Impala 3.2.x" />
-<meta name="version" content="Impala 3.2.x" />
-<meta name="version" content="Impala 3.2.x" />
-<meta name="version" content="Impala 3.2.x" />
-<meta name="version" content="Impala 3.2.x" />
-<meta name="version" content="Impala 3.2.x" />
-<meta name="version" content="Impala 3.2.x" />
-<meta name="version" content="Impala 3.2.x" />
+<meta name="version" content="Impala 3.3.x" />
+<meta name="version" content="Impala 3.3.x" />
+<meta name="version" content="Impala 3.3.x" />
+<meta name="version" content="Impala 3.3.x" />
+<meta name="version" content="Impala 3.3.x" />
+<meta name="version" content="Impala 3.3.x" />
+<meta name="version" content="Impala 3.3.x" />
+<meta name="version" content="Impala 3.3.x" />
+<meta name="version" content="Impala 3.3.x" />
+<meta name="version" content="Impala 3.3.x" />
+<meta name="version" content="Impala 3.3.x" />
+<meta name="version" content="Impala 3.3.x" />
+<meta name="version" content="Impala 3.3.x" />
+<meta name="version" content="Impala 3.3.x" />
+<meta name="version" content="Impala 3.3.x" />
+<meta name="version" content="Impala 3.3.x" />
 <meta name="DC.Format" content="XHTML" />
 <meta name="DC.Identifier" content="tutorial" />
 <link rel="stylesheet" type="text/css" href="../commonltr.css" />
@@ -62,7 +62,7 @@
     </p>
 
 
-    <div class="note note"><span class="notetitle">Note:</span>
+    <div class="note note"><span class="notetitle">Note:</span> 
       <p class="p">
         Where practical, the tutorials take you from <span class="q">"ground zero"</span> to having the desired Impala tables and
         data. In some cases, you might need to download additional files from outside sources, set up additional
@@ -163,7 +163,7 @@ Starting Impala Shell without Kerberos authentication
 Welcome to the Impala shell. Press TAB twice to see a list of available commands.
 ...
 <span class="ph">(Shell
-      build version: Impala Shell v3.2.x (<var class="keyword varname">hash</var>) built on
+      build version: Impala Shell v3.3.x (<var class="keyword varname">hash</var>) built on
       <var class="keyword varname">date</var>)</span>
 [localhost:21000] &gt; select version();
 +-------------------------------------------
@@ -425,7 +425,7 @@ Welcome to the Impala shell. Press TAB twice to see a list of available commands
         </p>
 
 
-        <div class="note note"><span class="notetitle">Note:</span>
+        <div class="note note"><span class="notetitle">Note:</span> 
           As you graduate to more realistic scenarios, you will use more elaborate tables with many columns,
           features such as partitioning, and file formats such as Parquet. When dealing with realistic data
           volumes, you will bring in data using <code class="ph codeph">LOAD DATA</code> or <code class="ph codeph">INSERT ... SELECT</code>
@@ -676,7 +676,7 @@ CREATE TABLE tab3
 ROW FORMAT DELIMITED FIELDS TERMINATED BY ',';
 </code></pre>
 
-        <div class="note note"><span class="notetitle">Note:</span>
+        <div class="note note"><span class="notetitle">Note:</span> 
           Getting through these <code class="ph codeph">CREATE TABLE</code> statements successfully is an important validation
           step to confirm everything is configured correctly with the Hive metastore and HDFS permissions. If you
           receive any errors during the <code class="ph codeph">CREATE TABLE</code> statements:
@@ -1382,7 +1382,7 @@ select * from log_type limit 100;
         </p>
 
 
-        <div class="note note"><span class="notetitle">Note:</span>
+        <div class="note note"><span class="notetitle">Note:</span> 
           <p class="p">
             Originally, Impala did not support UDFs, but this feature is available in Impala starting in Impala
             1.2. Some <code class="ph codeph">INSERT ... SELECT</code> transformations that you originally did through Hive can
@@ -2310,7 +2310,7 @@ flat table and the new partitioned table, and compare times.
           other. </p>
 
 
-<div class="note note"><span class="notetitle">Note:</span>
+<div class="note note"><span class="notetitle">Note:</span> 
 If you find the volume of each partition is only in the low tens of megabytes, consider lowering the granularity
 of partitioning. For example, instead of partitioning by year, month, and day, partition by year and month
 or even just by year. The ideal layout to distribute work efficiently in a parallel query is many tens or

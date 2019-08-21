@@ -9,7 +9,7 @@
 <meta name="DC.Type" content="concept" />
 <meta name="DC.Title" content="Introducing Apache Impala" />
 <meta name="prodname" content="Impala" />
-<meta name="version" content="Impala 3.2.x" />
+<meta name="version" content="Impala 3.3.x" />
 <meta name="DC.Format" content="XHTML" />
 <meta name="DC.Identifier" content="intro" />
 <link rel="stylesheet" type="text/css" href="../commonltr.css" />
@@ -42,7 +42,7 @@
       </p>
 
 
-      <div class="note note"><span class="notetitle">Note:</span>
+      <div class="note note"><span class="notetitle">Note:</span> 
          Impala graduated from the Apache Incubator on November 15, 2017.
          In places where the documentation formerly referred to <span class="q">"Cloudera Impala"</span>,
          now the official name is <span class="q">"Apache Impala"</span>.
@@ -61,7 +61,6 @@
 
       <div class="p">
         Impala provides:
-
         <ul class="ul">
           <li class="li">
             Familiar SQL interface that data scientists and analysts already know.
@@ -74,21 +73,22 @@
 
 
           <li class="li">
-            Distributed queries in a cluster environment, for convenient scaling and to make use of cost-effective
-            commodity hardware.
+            Distributed queries in a cluster environment, for convenient scaling and to make use
+            of cost-effective commodity hardware.
           </li>
 
 
           <li class="li">
-            Ability to share data files between different components with no copy or export/import step; for example,
-            to write with Pig, transform with Hive and query with Impala. Impala can read from and write to Hive
-            tables, enabling simple data interchange using Impala for analytics on Hive-produced data.
+            Ability to share data files between different components with no copy or
+            export/import step; for example, to write with Pig, transform with Hive and query
+            with Impala. Impala can read from and write to Hive tables, enabling simple data
+            interchange using Impala for analytics on Hive-produced data.
           </li>
 
 
           <li class="li">
-            Single system for big data processing and analytics, so customers can avoid costly modeling and ETL just
-            for analytics.
+            Single system for big data processing and analytics, so customers can avoid costly
+            modeling and ETL just for analytics.
           </li>
 
         </ul>
@@ -115,26 +115,27 @@
         The Impala solution is composed of the following components:
         <ul class="ul">
           <li class="li">
-            Clients - Entities including Hue, ODBC clients, JDBC clients, and the Impala Shell can all interact
-            with Impala. These interfaces are typically used to issue queries or complete administrative tasks such
-            as connecting to Impala.
+            Clients - Entities including Hue, ODBC clients, JDBC clients, and the Impala Shell
+            can all interact with Impala. These interfaces are typically used to issue queries
+            or complete administrative tasks such as connecting to Impala.
           </li>
 
 
           <li class="li">
-            Hive Metastore - Stores information about the data available to Impala. For example, the metastore lets
-            Impala know what databases are available and what the structure of those databases is. As you create,
-            drop, and alter schema objects, load data into tables, and so on through Impala SQL statements, the
-            relevant metadata changes are automatically broadcast to all Impala nodes by the dedicated catalog
-            service introduced in Impala 1.2.
+            Hive Metastore - Stores information about the data available to Impala. For example,
+            the metastore lets Impala know what databases are available and what the structure
+            of those databases is. As you create, drop, and alter schema objects, load data into
+            tables, and so on through Impala SQL statements, the relevant metadata changes are
+            automatically broadcast to all Impala nodes by the dedicated catalog service
+            introduced in Impala 1.2.
           </li>
 
 
           <li class="li">
-            Impala - This process, which runs on DataNodes, coordinates and executes queries. Each
-            instance of Impala can receive, plan, and coordinate queries from Impala clients. Queries are
-            distributed among Impala nodes, and these nodes then act as workers, executing parallel query
-            fragments.
+            Impala - This process, which runs on DataNodes, coordinates and executes queries.
+            Each instance of Impala can receive, plan, and coordinate queries from Impala
+            clients. Queries are distributed among Impala nodes, and these nodes then act as
+            workers, executing parallel query fragments.
           </li>
 
 
@@ -151,27 +152,29 @@
         Queries executed using Impala are handled as follows:
         <ol class="ol">
           <li class="li">
-            User applications send SQL queries to Impala through ODBC or JDBC, which provide standardized querying
-            interfaces. The user application may connect to any <code class="ph codeph">impalad</code> in the cluster. This
-            <code class="ph codeph">impalad</code> becomes the coordinator for the query.
+            User applications send SQL queries to Impala through ODBC or JDBC, which provide
+            standardized querying interfaces. The user application may connect to any
+            <code class="ph codeph">impalad</code> in the cluster. This <code class="ph codeph">impalad</code> becomes the
+            coordinator for the query.
           </li>
 
 
           <li class="li">
-            Impala parses the query and analyzes it to determine what tasks need to be performed by
-            <code class="ph codeph">impalad</code> instances across the cluster. Execution is planned for optimal efficiency.
+            Impala parses the query and analyzes it to determine what tasks need to be performed
+            by <code class="ph codeph">impalad</code> instances across the cluster. Execution is planned for
+            optimal efficiency.
           </li>
 
 
           <li class="li">
-            Services such as HDFS and HBase are accessed by local <code class="ph codeph">impalad</code> instances to provide
-            data.
+            Services such as HDFS and HBase are accessed by local <code class="ph codeph">impalad</code>
+            instances to provide data.
           </li>
 
 
           <li class="li">
-            Each <code class="ph codeph">impalad</code> returns data to the coordinating <code class="ph codeph">impalad</code>, which sends
-            these results to the client.
+            Each <code class="ph codeph">impalad</code> returns data to the coordinating
+            <code class="ph codeph">impalad</code>, which sends these results to the client.
           </li>
 
         </ol>
@@ -197,16 +200,18 @@
             Most common SQL-92 features of Hive Query Language (HiveQL) including
             <a class="xref" href="../shared/../topics/impala_select.html#select">SELECT</a>,
             <a class="xref" href="../shared/../topics/impala_joins.html#joins">joins</a>, and
-            <a class="xref" href="../shared/../topics/impala_aggregate_functions.html#aggregate_functions">aggregate functions</a>.
+            <a class="xref" href="../shared/../topics/impala_aggregate_functions.html#aggregate_functions">aggregate
+            functions</a>.
           </li>
 
 
           <li class="li">
-            HDFS, HBase, <span class="ph">and Amazon Simple Storage System (S3)</span> storage, including:
+            HDFS, HBase, <span class="ph">and Amazon Simple Storage System (S3)</span> storage,
+            including:
             <ul class="ul">
               <li class="li">
-                <a class="xref" href="../shared/../topics/impala_file_formats.html#file_formats">HDFS file formats</a>: delimited text files, Parquet,
-                Avro, SequenceFile, and RCFile.
+                <a class="xref" href="../shared/../topics/impala_file_formats.html#file_formats">HDFS file
+                formats</a>: delimited text files, Parquet, Avro, SequenceFile, and RCFile.
               </li>
 
 
@@ -242,7 +247,8 @@
 
 
           <li class="li">
-            <a class="xref" href="../shared/../topics/impala_impala_shell.html#impala_shell">impala-shell command-line interface</a>.
+            <a class="xref" href="../shared/../topics/impala_impala_shell.html#impala_shell">impala-shell
+            command-line interface</a>.
           </li>
 
 

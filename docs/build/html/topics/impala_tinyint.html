@@ -11,8 +11,8 @@
 <meta name="DC.Relation" scheme="URI" content="../topics/impala_datatypes.html" />
 <meta name="prodname" content="Impala" />
 <meta name="prodname" content="Impala" />
-<meta name="version" content="Impala 3.2.x" />
-<meta name="version" content="Impala 3.2.x" />
+<meta name="version" content="Impala 3.3.x" />
+<meta name="version" content="Impala 3.3.x" />
 <meta name="DC.Format" content="XHTML" />
 <meta name="DC.Identifier" content="tinyint" />
 <link rel="stylesheet" type="text/css" href="../commonltr.css" />
@@ -55,23 +55,24 @@
       <code class="ph codeph">INT</code>, or <code class="ph codeph">BIGINT</code>) or a floating-point type (<code class="ph codeph">FLOAT</code> or
       <code class="ph codeph">DOUBLE</code>) automatically. Use <code class="ph codeph">CAST()</code> to convert to <code class="ph codeph">STRING</code> or
       <code class="ph codeph">TIMESTAMP</code>.
-      <span class="ph">
-          Casting an integer or floating-point value <code class="ph codeph">N</code> to
-        <code class="ph codeph">TIMESTAMP</code> produces a value that is <code class="ph codeph">N</code> seconds past the start of the epoch
-        date (January 1, 1970). By default, the result value represents a date and time in the UTC time zone.
-        If the setting <code class="ph codeph">--use_local_tz_for_unix_timestamp_conversions=true</code> is in effect,
-        the resulting <code class="ph codeph">TIMESTAMP</code> represents a date and time in the local time zone.
-        </span>
+      <span class="ph"> Casting an integer or floating-point value
+        <code class="ph codeph">N</code> to <code class="ph codeph">TIMESTAMP</code> produces a value that is
+        <code class="ph codeph">N</code> seconds past the start of the epoch date (January 1, 1970). By
+        default, the result value represents a date and time in the UTC time zone. If the
+        setting <code class="ph codeph">‑‑use_local_tz_for_unix_timestamp_conversions=true</code>
+        is in effect, the resulting <code class="ph codeph">TIMESTAMP</code> represents a date and time in the
+        local time zone. </span>
     </p>
 
 
     <p class="p">
-        Impala does not return column overflows as <code class="ph codeph">NULL</code>, so that customers can distinguish
-        between <code class="ph codeph">NULL</code> data and overflow conditions similar to how they do so with traditional
-        database systems. Impala returns the largest or smallest value in the range for the type. For example,
-        valid values for a <code class="ph codeph">tinyint</code> range from -128 to 127. In Impala, a <code class="ph codeph">tinyint</code>
-        with a value of -200 returns -128 rather than <code class="ph codeph">NULL</code>. A <code class="ph codeph">tinyint</code> with a
-        value of 200 returns 127.
+        Impala does not return column overflows as <code class="ph codeph">NULL</code>, so that customers can
+        distinguish between <code class="ph codeph">NULL</code> data and overflow conditions similar to how
+        they do so with traditional database systems. Impala returns the largest or smallest
+        value in the range for the type. For example, valid values for a
+        <code class="ph codeph">tinyint</code> range from -128 to 127. In Impala, a <code class="ph codeph">tinyint</code>
+        with a value of -200 returns -128 rather than <code class="ph codeph">NULL</code>. A
+        <code class="ph codeph">tinyint</code> with a value of 200 returns 127.
       </p>
 
 
@@ -93,8 +94,8 @@
 
 
     <p class="p">
-        <strong class="ph b">NULL considerations:</strong> Casting any non-numeric value to this type produces a <code class="ph codeph">NULL</code>
-        value.
+        <strong class="ph b">NULL considerations:</strong> Casting any non-numeric value to this type produces a
+        <code class="ph codeph">NULL</code> value.
       </p>
 
 
@@ -131,8 +132,8 @@ SELECT CAST(100 AS TINYINT);
 
 
     <p class="p">
-        <strong class="ph b">Text table considerations:</strong> Values of this type are potentially larger in text tables than in tables
-        using Parquet or other binary formats.
+        <strong class="ph b">Text table considerations:</strong> Values of this type are potentially larger in text
+        tables than in tables using Parquet or other binary formats.
       </p>
 
 
@@ -149,9 +150,9 @@ SELECT CAST(100 AS TINYINT);
 
 
     <p class="p">
-        <strong class="ph b">Column statistics considerations:</strong> Because this type has a fixed size, the maximum and average size
-        fields are always filled in for column statistics, even before you run the <code class="ph codeph">COMPUTE STATS</code>
-        statement.
+        <strong class="ph b">Column statistics considerations:</strong> Because this type has a fixed size, the maximum
+        and average size fields are always filled in for column statistics, even before you run
+        the <code class="ph codeph">COMPUTE STATS</code> statement.
       </p>
 
 

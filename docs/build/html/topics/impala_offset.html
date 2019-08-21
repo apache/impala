@@ -11,8 +11,8 @@
 <meta name="DC.Relation" scheme="URI" content="../topics/impala_select.html" />
 <meta name="prodname" content="Impala" />
 <meta name="prodname" content="Impala" />
-<meta name="version" content="Impala 3.2.x" />
-<meta name="version" content="Impala 3.2.x" />
+<meta name="version" content="Impala 3.3.x" />
+<meta name="version" content="Impala 3.3.x" />
 <meta name="DC.Format" content="XHTML" />
 <meta name="DC.Identifier" content="offset" />
 <link rel="stylesheet" type="text/css" href="../commonltr.css" />
@@ -38,13 +38,14 @@
 
 
     <p class="p">
-        In Impala 1.2.1 and higher, you can combine a <code class="ph codeph">LIMIT</code> clause with an <code class="ph codeph">OFFSET</code>
-        clause to produce a small result set that is different from a top-N query, for example, to return items 11
-        through 20. This technique can be used to simulate <span class="q">"paged"</span> results. Because Impala queries typically
-        involve substantial amounts of I/O, use this technique only for compatibility in cases where you cannot
-        rewrite the application logic. For best performance and scalability, wherever practical, query as many
-        items as you expect to need, cache them on the application side, and display small groups of results to
-        users using application logic.
+        In Impala 1.2.1 and higher, you can combine a <code class="ph codeph">LIMIT</code> clause with an
+        <code class="ph codeph">OFFSET</code> clause to produce a small result set that is different from a
+        top-N query, for example, to return items 11 through 20. This technique can be used to
+        simulate <span class="q">"paged"</span> results. Because Impala queries typically involve substantial
+        amounts of I/O, use this technique only for compatibility in cases where you cannot
+        rewrite the application logic. For best performance and scalability, wherever practical,
+        query as many items as you expect to need, cache them on the application side, and
+        display small groups of results to users using application logic.
       </p>
 
 

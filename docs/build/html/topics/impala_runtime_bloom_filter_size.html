@@ -11,8 +11,8 @@
 <meta name="DC.Relation" scheme="URI" content="../topics/impala_query_options.html" />
 <meta name="prodname" content="Impala" />
 <meta name="prodname" content="Impala" />
-<meta name="version" content="Impala 3.2.x" />
-<meta name="version" content="Impala 3.2.x" />
+<meta name="version" content="Impala 3.3.x" />
+<meta name="version" content="Impala 3.3.x" />
 <meta name="DC.Format" content="XHTML" />
 <meta name="DC.Identifier" content="runtime_bloom_filter_size" />
 <link rel="stylesheet" type="text/css" href="../commonltr.css" />
@@ -35,7 +35,7 @@
     </p>
 
 
-    <div class="note important"><span class="importanttitle">Important:</span>
+    <div class="note important"><span class="importanttitle">Important:</span> 
       <p class="p">
         In <span class="keyword">Impala 2.6</span> and higher, this query option only applies as a fallback, when statistics
         are not available. By default, Impala estimates the optimal size of the Bloom filter structure
@@ -98,8 +98,8 @@
 
 
     <p class="p">
-        Because the runtime filtering feature applies mainly to resource-intensive
-        and long-running queries, only adjust this query option when tuning long-running queries
+        Because the runtime filtering feature applies mainly to resource-intensive and
+        long-running queries, only adjust this query option when tuning long-running queries
         involving some combination of large partitioned tables and joins involving large tables.
       </p>
 
@@ -118,9 +118,9 @@
 
 
     <p class="p">
-        This query option affects only Bloom filters, not the min/max filters
-        that are applied to Kudu tables. Therefore, it does not affect the
-        performance of queries against Kudu tables.
+        This query option affects only Bloom filters, not the min/max filters that are applied
+        to Kudu tables. Therefore, it does not affect the performance of queries against Kudu
+        tables.
       </p>
 
 

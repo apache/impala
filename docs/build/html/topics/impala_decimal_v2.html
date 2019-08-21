@@ -10,7 +10,7 @@
 <meta name="DC.Title" content="DECIMAL_V2 Query Option" />
 <meta name="DC.Relation" scheme="URI" content="../topics/impala_query_options.html" />
 <meta name="prodname" content="Impala" />
-<meta name="version" content="Impala 3.2.x" />
+<meta name="version" content="Impala 3.3.x" />
 <meta name="DC.Format" content="XHTML" />
 <meta name="DC.Identifier" content="decimal_v2" />
 <link rel="stylesheet" type="text/css" href="../commonltr.css" />
@@ -27,29 +27,15 @@
   <div class="body conbody">
 
     <p class="p">
-      A query option that changes behavior related to the <code class="ph codeph">DECIMAL</code>
-      data type.
+      A query option that changes behavior related to the
+        <code class="ph codeph">DECIMAL</code> data type. Set this option to
+        <code class="ph codeph">FALSE</code> for backward compatibility to Impala 2.x.
     </p>
 
+    <p class="p"><strong class="ph b">Type:</strong> Boolean</p>
 
-    <div class="note important"><span class="importanttitle">Important:</span>
-      <p class="p">
-        This query option is currently unsupported.
-        Its precise behavior is currently undefined and might change
-        in the future.
-      </p>
-
-    </div>
-
-
-    <p class="p">
-        <strong class="ph b">Type:</strong> Boolean; recognized values are 1 and 0, or <code class="ph codeph">true</code> and <code class="ph codeph">false</code>;
-        any other value interpreted as <code class="ph codeph">false</code>
-      </p>
-
-    <p class="p">
-        <strong class="ph b">Default:</strong> <code class="ph codeph">false</code> (shown as 0 in output of <code class="ph codeph">SET</code> statement)
-      </p>
+    <p class="p"><strong class="ph b">Default:</strong>
+      <code class="ph codeph">TRUE</code></p>
 
   </div>
 

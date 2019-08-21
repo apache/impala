@@ -11,8 +11,8 @@
 <meta name="DC.Relation" scheme="URI" content="../topics/impala_query_options.html" />
 <meta name="prodname" content="Impala" />
 <meta name="prodname" content="Impala" />
-<meta name="version" content="Impala 3.2.x" />
-<meta name="version" content="Impala 3.2.x" />
+<meta name="version" content="Impala 3.3.x" />
+<meta name="version" content="Impala 3.3.x" />
 <meta name="DC.Format" content="XHTML" />
 <meta name="DC.Identifier" content="parquet_file_size" />
 <link rel="stylesheet" type="text/css" href="../commonltr.css" />
@@ -78,7 +78,7 @@ INSERT OVERWRITE parquet_table SELECT * FROM text_table;
     </p>
 
 
-    <div class="note important"><span class="importanttitle">Important:</span>
+    <div class="note important"><span class="importanttitle">Important:</span> 
     <p class="p">
       Currently, the maximum value for this setting is 1 gigabyte (<code class="ph codeph">1g</code>).
       Setting a value higher than 1 gigabyte could result in errors during
@@ -94,11 +94,11 @@ INSERT OVERWRITE parquet_table SELECT * FROM text_table;
 
 
     <p class="p">
-        Because ADLS does not expose the block sizes of data files the way HDFS does,
-        any Impala <code class="ph codeph">INSERT</code> or <code class="ph codeph">CREATE TABLE AS SELECT</code> statements
-        use the <code class="ph codeph">PARQUET_FILE_SIZE</code> query option setting to define the size of
-        Parquet data files. (Using a large block size is more important for Parquet tables than
-        for tables that use other file formats.)
+        Because ADLS does not expose the block sizes of data files the way HDFS does, any Impala
+        <code class="ph codeph">INSERT</code> or <code class="ph codeph">CREATE TABLE AS SELECT</code> statements use the
+        <code class="ph codeph">PARQUET_FILE_SIZE</code> query option setting to define the size of Parquet
+        data files. (Using a large block size is more important for Parquet tables than for
+        tables that use other file formats.)
       </p>
 
 
@@ -107,13 +107,12 @@ INSERT OVERWRITE parquet_table SELECT * FROM text_table;
       </p>
 
     <div class="p">
-        Because the EMC Isilon storage devices use a global value for the block size
-        rather than a configurable value for each file, the <code class="ph codeph">PARQUET_FILE_SIZE</code>
-        query option has no effect when Impala inserts data into a table or partition
-        residing on Isilon storage. Use the <code class="ph codeph">isi</code> command to set the
-        default block size globally on the Isilon device. For example, to set the
-        Isilon default block size to 256 MB, the recommended size for Parquet
-        data files for Impala, issue the following command:
+        Because the EMC Isilon storage devices use a global value for the block size rather than
+        a configurable value for each file, the <code class="ph codeph">PARQUET_FILE_SIZE</code> query option
+        has no effect when Impala inserts data into a table or partition residing on Isilon
+        storage. Use the <code class="ph codeph">isi</code> command to set the default block size globally on
+        the Isilon device. For example, to set the Isilon default block size to 256 MB, the
+        recommended size for Parquet data files for Impala, issue the following command:
 <pre class="pre codeblock"><code>isi hdfs settings modify --default-block-size=256MB</code></pre>
       </div>
 

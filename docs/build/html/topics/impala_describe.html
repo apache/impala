@@ -11,8 +11,8 @@
 <meta name="DC.Relation" scheme="URI" content="../topics/impala_langref_sql.html" />
 <meta name="prodname" content="Impala" />
 <meta name="prodname" content="Impala" />
-<meta name="version" content="Impala 3.2.x" />
-<meta name="version" content="Impala 3.2.x" />
+<meta name="version" content="Impala 3.3.x" />
+<meta name="version" content="Impala 3.3.x" />
 <meta name="DC.Format" content="XHTML" />
 <meta name="DC.Identifier" content="describe" />
 <link rel="stylesheet" type="text/css" href="../commonltr.css" />
@@ -64,7 +64,7 @@ object_name ::=
     </p>
 
 
-    <div class="note note"><span class="notetitle">Note:</span>
+    <div class="note note"><span class="notetitle">Note:</span> 
       The <code class="ph codeph">Compressed</code> field is not a reliable indicator of whether the table contains compressed
       data. It typically always shows <code class="ph codeph">No</code>, because the compression settings only apply during the
       session that loads data and are not stored persistently with the table metadata.
@@ -228,20 +228,18 @@ describe formatted my_table;
 
 
     <p class="p">
-        You can pass a multi-part qualified name to <code class="ph codeph">DESCRIBE</code>
-        to specify an <code class="ph codeph">ARRAY</code>, <code class="ph codeph">STRUCT</code>, or <code class="ph codeph">MAP</code>
-        column and visualize its structure as if it were a table.
-        For example, if table <code class="ph codeph">T1</code> contains an <code class="ph codeph">ARRAY</code> column
-        <code class="ph codeph">A1</code>, you could issue the statement <code class="ph codeph">DESCRIBE t1.a1</code>.
-        If table <code class="ph codeph">T1</code> contained a <code class="ph codeph">STRUCT</code> column <code class="ph codeph">S1</code>,
-        and a field <code class="ph codeph">F1</code> within the <code class="ph codeph">STRUCT</code> was a <code class="ph codeph">MAP</code>,
-        you could issue the statement <code class="ph codeph">DESCRIBE t1.s1.f1</code>.
-        An <code class="ph codeph">ARRAY</code> is shown as a two-column table, with
-        <code class="ph codeph">ITEM</code> and <code class="ph codeph">POS</code> columns.
-        A <code class="ph codeph">STRUCT</code> is shown as a table with each field
-        representing a column in the table.
-        A <code class="ph codeph">MAP</code> is shown as a two-column table, with
-        <code class="ph codeph">KEY</code> and <code class="ph codeph">VALUE</code> columns.
+        You can pass a multi-part qualified name to <code class="ph codeph">DESCRIBE</code> to specify an
+        <code class="ph codeph">ARRAY</code>, <code class="ph codeph">STRUCT</code>, or <code class="ph codeph">MAP</code> column and
+        visualize its structure as if it were a table. For example, if table <code class="ph codeph">T1</code>
+        contains an <code class="ph codeph">ARRAY</code> column <code class="ph codeph">A1</code>, you could issue the
+        statement <code class="ph codeph">DESCRIBE t1.a1</code>. If table <code class="ph codeph">T1</code> contained a
+        <code class="ph codeph">STRUCT</code> column <code class="ph codeph">S1</code>, and a field <code class="ph codeph">F1</code>
+        within the <code class="ph codeph">STRUCT</code> was a <code class="ph codeph">MAP</code>, you could issue the
+        statement <code class="ph codeph">DESCRIBE t1.s1.f1</code>. An <code class="ph codeph">ARRAY</code> is shown as a
+        two-column table, with <code class="ph codeph">ITEM</code> and <code class="ph codeph">POS</code> columns. A
+        <code class="ph codeph">STRUCT</code> is shown as a table with each field representing a column in the
+        table. A <code class="ph codeph">MAP</code> is shown as a two-column table, with <code class="ph codeph">KEY</code>
+        and <code class="ph codeph">VALUE</code> columns.
       </p>
 
 
@@ -568,10 +566,11 @@ describe customer.c_orders.o_lineitems.item;
 
 
 <p class="p">
-        If you connect to different Impala nodes within an <span class="keyword cmdname">impala-shell</span> session for
-        load-balancing purposes, you can enable the <code class="ph codeph">SYNC_DDL</code> query option to make each DDL
-        statement wait before returning, until the new or changed metadata has been received by all the Impala
-        nodes. See <a class="xref" href="../shared/../topics/impala_sync_ddl.html#sync_ddl">SYNC_DDL Query Option</a> for details.
+        If you connect to different Impala nodes within an <span class="keyword cmdname">impala-shell</span>
+        session for load-balancing purposes, you can enable the <code class="ph codeph">SYNC_DDL</code> query
+        option to make each DDL statement wait before returning, until the new or changed
+        metadata has been received by all the Impala nodes. See
+        <a class="xref" href="../shared/../topics/impala_sync_ddl.html#sync_ddl">SYNC_DDL Query Option</a> for details.
       </p>
 
 
@@ -584,13 +583,14 @@ describe customer.c_orders.o_lineitems.item;
 </p>
 
 
-<div class="note important"><span class="importanttitle">Important:</span>
-        After adding or replacing data in a table used in performance-critical queries, issue a <code class="ph codeph">COMPUTE
-        STATS</code> statement to make sure all statistics are up-to-date. Consider updating statistics for a
-        table after any <code class="ph codeph">INSERT</code>, <code class="ph codeph">LOAD DATA</code>, or <code class="ph codeph">CREATE TABLE AS
-        SELECT</code> statement in Impala, or after loading data through Hive and doing a <code class="ph codeph">REFRESH
-        <var class="keyword varname">table_name</var></code> in Impala. This technique is especially important for tables that
-        are very large, used in join queries, or both.
+<div class="note important"><span class="importanttitle">Important:</span> 
+        After adding or replacing data in a table used in performance-critical queries, issue a
+        <code class="ph codeph">COMPUTE STATS</code> statement to make sure all statistics are up-to-date.
+        Consider updating statistics for a table after any <code class="ph codeph">INSERT</code>, <code class="ph codeph">LOAD
+        DATA</code>, or <code class="ph codeph">CREATE TABLE AS SELECT</code> statement in Impala, or after
+        loading data through Hive and doing a <code class="ph codeph">REFRESH
+        <var class="keyword varname">table_name</var></code> in Impala. This technique is especially important
+        for tables that are very large, used in join queries, or both.
       </div>
 
 

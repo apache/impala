@@ -21,8 +21,8 @@
 <meta name="DC.Relation" scheme="URI" content="../topics/impala_variance.html" />
 <meta name="prodname" content="Impala" />
 <meta name="prodname" content="Impala" />
-<meta name="version" content="Impala 3.2.x" />
-<meta name="version" content="Impala 3.2.x" />
+<meta name="version" content="Impala 3.3.x" />
+<meta name="version" content="Impala 3.3.x" />
 <meta name="DC.Format" content="XHTML" />
 <meta name="DC.Identifier" content="aggregate_functions" />
 <link rel="stylesheet" type="text/css" href="../commonltr.css" />
@@ -39,8 +39,9 @@
   <div class="body conbody">
 
     <p class="p">
-        Aggregate functions are a special category with different rules. These functions calculate a return value
-        across all the items in a result set, so they require a <code class="ph codeph">FROM</code> clause in the query:
+        Aggregate functions are a special category with different rules. These functions
+        calculate a return value across all the items in a result set, so they require a
+        <code class="ph codeph">FROM</code> clause in the query:
       </p>
 
 
@@ -49,11 +50,12 @@ select max(height), avg(height) from census_data where age &gt; 20;
 </code></pre>
 
     <p class="p">
-        Aggregate functions also ignore <code class="ph codeph">NULL</code> values rather than returning a <code class="ph codeph">NULL</code>
-        result. For example, if some rows have <code class="ph codeph">NULL</code> for a particular column, those rows are
-        ignored when computing the <code class="ph codeph">AVG()</code> for that column. Likewise, specifying
-        <code class="ph codeph">COUNT(<var class="keyword varname">col_name</var>)</code> in a query counts only those rows where
-        <var class="keyword varname">col_name</var> contains a non-<code class="ph codeph">NULL</code> value.
+        Aggregate functions also ignore <code class="ph codeph">NULL</code> values rather than returning a
+        <code class="ph codeph">NULL</code> result. For example, if some rows have <code class="ph codeph">NULL</code> for a
+        particular column, those rows are ignored when computing the <code class="ph codeph">AVG()</code> for
+        that column. Likewise, specifying <code class="ph codeph">COUNT(<var class="keyword varname">col_name</var>)</code> in
+        a query counts only those rows where <var class="keyword varname">col_name</var> contains a
+        non-<code class="ph codeph">NULL</code> value.
       </p>
 
 

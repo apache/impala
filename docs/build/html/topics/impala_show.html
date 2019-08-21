@@ -23,20 +23,20 @@
 <meta name="prodname" content="Impala" />
 <meta name="prodname" content="Impala" />
 <meta name="prodname" content="Impala" />
-<meta name="version" content="Impala 3.2.x" />
-<meta name="version" content="Impala 3.2.x" />
-<meta name="version" content="Impala 3.2.x" />
-<meta name="version" content="Impala 3.2.x" />
-<meta name="version" content="Impala 3.2.x" />
-<meta name="version" content="Impala 3.2.x" />
-<meta name="version" content="Impala 3.2.x" />
-<meta name="version" content="Impala 3.2.x" />
-<meta name="version" content="Impala 3.2.x" />
-<meta name="version" content="Impala 3.2.x" />
-<meta name="version" content="Impala 3.2.x" />
-<meta name="version" content="Impala 3.2.x" />
-<meta name="version" content="Impala 3.2.x" />
-<meta name="version" content="Impala 3.2.x" />
+<meta name="version" content="Impala 3.3.x" />
+<meta name="version" content="Impala 3.3.x" />
+<meta name="version" content="Impala 3.3.x" />
+<meta name="version" content="Impala 3.3.x" />
+<meta name="version" content="Impala 3.3.x" />
+<meta name="version" content="Impala 3.3.x" />
+<meta name="version" content="Impala 3.3.x" />
+<meta name="version" content="Impala 3.3.x" />
+<meta name="version" content="Impala 3.3.x" />
+<meta name="version" content="Impala 3.3.x" />
+<meta name="version" content="Impala 3.3.x" />
+<meta name="version" content="Impala 3.3.x" />
+<meta name="version" content="Impala 3.3.x" />
+<meta name="version" content="Impala 3.3.x" />
 <meta name="DC.Format" content="XHTML" />
 <meta name="DC.Identifier" content="show" />
 <link rel="stylesheet" type="text/css" href="../commonltr.css" />
@@ -51,20 +51,14 @@
   
 
   <div class="body conbody">
-
-    <p class="p">
-      
-      The <code class="ph codeph">SHOW</code> statement is a flexible way to get information about different types of Impala
-      objects.
-    </p>
-
+    <p class="p"> The <code class="ph codeph">SHOW</code> statement is a flexible way to get information
+      about different types of Impala objects. </p>
 
     <p class="p">
         <strong class="ph b">Syntax:</strong>
       </p>
 
-
-<pre class="pre codeblock"><code>SHOW DATABASES [[LIKE] '<var class="keyword varname">pattern</var>']
+    <pre class="pre codeblock"><code>SHOW DATABASES [[LIKE] '<var class="keyword varname">pattern</var>']
 SHOW SCHEMAS [[LIKE] '<var class="keyword varname">pattern</var>'] - an alias for SHOW DATABASES
 SHOW TABLES [IN <var class="keyword varname">database_name</var>] [[LIKE] '<var class="keyword varname">pattern</var>']
 <span class="ph">SHOW [AGGREGATE | ANALYTIC] FUNCTIONS [IN <var class="keyword varname">database_name</var>] [[LIKE] '<var class="keyword varname">pattern</var>']</span>
@@ -78,44 +72,54 @@ SHOW FILES IN [<var class="keyword varname">database_name</var>.]<var class="key
 
 <span class="ph">SHOW ROLES
 SHOW CURRENT ROLES
-SHOW ROLE GRANT GROUP <var class="keyword varname">group_name</var>
-SHOW GRANT ROLE <var class="keyword varname">role_name</var></span>
+SHOW ROLE GRANT GROUP <var class="keyword varname">group_name</var></span>
 
-<span class="ph">SHOW GRANT USER <var class="keyword varname">user_name</var>
-SHOW GRANT USER <var class="keyword varname">user_name</var> ON SERVER
+<span class="ph">SHOW GRANT USER <var class="keyword varname">user_name</var> ON SERVER
 SHOW GRANT USER <var class="keyword varname">user_name</var> ON DATABASE <var class="keyword varname">database_name</var>
-SHOW GRANT USER <var class="keyword varname">user_name</var> ON TABLE <var class="keyword varname">table_name</var>
+SHOW GRANT USER <var class="keyword varname">user_name</var> ON TABLE <var class="keyword varname">database_name.table_name</var>
 SHOW GRANT USER <var class="keyword varname">user_name</var> ON URI <var class="keyword varname">uri</var></span>
-</code></pre>
+SHOW GRANT USER <var class="keyword varname">user_name</var> ON COLUMN <var class="keyword varname">database_name.table_name.column_name</var></code></pre>
+    <p class="p">The following statements are supported only when Impala uses Sentry to
+      manage authorization.</p>
 
-    <p class="p">
-      Issue a <code class="ph codeph">SHOW <var class="keyword varname">object_type</var></code> statement to see the appropriate objects in the
-      current database, or <code class="ph codeph">SHOW <var class="keyword varname">object_type</var> IN <var class="keyword varname">database_name</var></code>
-      to see objects in a specific database.
-    </p>
+    <pre class="pre codeblock"><code>SHOW GRANT USER <var class="keyword varname">user_name</var>
 
+SHOW GRANT ROLE <var class="keyword varname">role_name</var>
+SHOW GRANT ROLE <var class="keyword varname">role_name</var> ON SERVER
+SHOW GRANT ROLE <var class="keyword varname">role_name</var> ON DATABASE <var class="keyword varname">database_name</var>
+SHOW GRANT ROLE <var class="keyword varname">role_name</var> ON TABLE <var class="keyword varname">database_name.table_name</var>
+SHOW GRANT ROLE <var class="keyword varname">role_name</var> ON URI <var class="keyword varname">uri</var>
+SHOW GRANT ROLE <var class="keyword varname">role_name</var> ON COLUMN <var class="keyword varname">database_name.table_name.column_name</var></code></pre>
+    <p class="p">The following statements are supported only when Impala uses
+      Ranger to manage authorization.</p>
 
-    <p class="p">
-      The optional <var class="keyword varname">pattern</var> argument is a quoted string literal, using Unix-style
-      <code class="ph codeph">*</code> wildcards and allowing <code class="ph codeph">|</code> for alternation. The preceding
-      <code class="ph codeph">LIKE</code> keyword is also optional. All object names are stored in lowercase, so use all
-      lowercase letters in the pattern string. For example:
-    </p>
+    <pre class="pre codeblock"><code>SHOW GRANT GROUP <var class="keyword varname">group_name</var> ON SERVER
+SHOW GRANT GROUP <var class="keyword varname">group_name</var> ON DATABASE <var class="keyword varname">database_name</var>
+SHOW GRANT GROUP <var class="keyword varname">group_name</var> ON TABLE <var class="keyword varname">database_name.table_name</var>
+SHOW GRANT GROUP <var class="keyword varname">group_name</var> ON URI <var class="keyword varname">uri</var>
+SHOW GRANT GROUP <var class="keyword varname">group_name</var> ON COLUMN <var class="keyword varname">database_name.table_name.column_name</var></code></pre>
+    <p class="p"> Issue a <code class="ph codeph">SHOW <var class="keyword varname">object_type</var></code> statement
+      to see the appropriate objects in the current database, or <code class="ph codeph">SHOW
+          <var class="keyword varname">object_type</var> IN
+        <var class="keyword varname">database_name</var></code> to see objects in a specific
+      database. </p>
 
+    <p class="p"> The optional <var class="keyword varname">pattern</var> argument is a quoted string
+      literal, using Unix-style <code class="ph codeph">*</code> wildcards and allowing
+        <code class="ph codeph">|</code> for alternation. The preceding <code class="ph codeph">LIKE</code>
+      keyword is also optional. All object names are stored in lowercase, so use
+      all lowercase letters in the pattern string. For example: </p>
 
-<pre class="pre codeblock"><code>show databases 'a*';
-show databases like 'a*';
-show tables in some_db like '*fact*';
-use some_db;
-show tables '*dim*|*fact*';</code></pre>
-
+    <pre class="pre codeblock"><code>SHOW DATABASES 'a*';
+SHOW DATABASES LIKE 'a*';
+SHOW TABLES IN some_db LIKE '*fact*';
+USE some_db;
+SHOW TABLES '*dim*|*fact*';</code></pre>
     <p class="p">
         <strong class="ph b">Cancellation:</strong> Cannot be cancelled.
       </p>
 
-
     <p class="p toc inpage"></p>
-
 
   </div>
 
@@ -155,7 +159,7 @@ show files in sample_table partition (month like 'J%');
       </div>
 
 
-      <div class="note note"><span class="notetitle">Note:</span>
+      <div class="note note"><span class="notetitle">Note:</span> 
         This statement applies to tables and partitions stored on HDFS, or in the Amazon Simple Storage System (S3).
         It does not apply to views.
         It does not apply to tables mapped onto HBase <span class="ph">or Kudu</span>,
@@ -374,10 +378,10 @@ where id between 1 and 1000000;
     <div class="body conbody">
 
       <p class="p">
-        The <code class="ph codeph">SHOW ROLES</code> statement displays roles. This syntax is available in <span class="keyword">Impala 2.0</span> and later
-        only, when you are using the Sentry authorization framework along with the Sentry service, as described in
-        <a class="xref" href="impala_authorization.html#sentry_service">Using Impala with the Sentry Service</a>. It does not apply when you use the Sentry framework
-        with privileges defined in a policy file.
+        The <code class="ph codeph">SHOW ROLES</code> statement displays roles. This syntax
+        is available in <span class="keyword">Impala 2.0</span> and later only, when
+        you are using the Sentry authorization framework along with the Sentry
+        service, as described in <a class="xref" href="impala_authorization.html#sentry_service">Managing Privileges</a>.
       </p>
 
 
@@ -387,13 +391,12 @@ where id between 1 and 1000000;
 
 
       <p class="p">
-        When authorization is enabled, the output of the
-          <code class="ph codeph">SHOW</code> statement only shows those objects for which you
-        have the privilege to view. If you believe an object exists but you
-        cannot see it in the <code class="ph codeph">SHOW</code> output, check with the system
-        administrator if you need to be granted a new privilege for that object.
-        See <a class="xref" href="../shared/../topics/impala_authorization.html#authorization">Enabling Sentry Authorization for Impala</a> for
-        how to set up authorization and add privileges for specific objects.
+        When authorization is enabled, the output of the <code class="ph codeph">SHOW</code> statement only
+        shows those objects for which you have the privilege to view. If you believe an object
+        exists but you cannot see it in the <code class="ph codeph">SHOW</code> output, check with the system
+        administrator if you need to be granted a new privilege for that object. See
+        <a class="xref" href="../shared/../topics/impala_authorization.html#authorization">Impala Authorization</a> for how to set up
+        authorization and add privileges for specific objects.
       </p>
 
 
@@ -432,7 +435,7 @@ where id between 1 and 1000000;
 
 
       <p class="p">
-        <a class="xref" href="impala_authorization.html#authorization">Enabling Sentry Authorization for Impala</a>
+        <a class="xref" href="impala_authorization.html#authorization">Impala Authorization</a>
       </p>
 
     </div>
@@ -442,17 +445,17 @@ where id between 1 and 1000000;
 
   <div class="topic concept nested1" aria-labelledby="ariaid-title4" id="show_current_role">
 
-    <h2 class="title topictitle2" id="ariaid-title4">SHOW CURRENT ROLE</h2>
+    <h2 class="title topictitle2" id="ariaid-title4">SHOW CURRENT ROLES</h2>
 
   
 
     <div class="body conbody">
 
       <p class="p">
-        The <code class="ph codeph">SHOW CURRENT ROLE</code> statement displays roles assigned to the current user. This syntax
-        is available in <span class="keyword">Impala 2.0</span> and later only, when you are using the Sentry authorization framework along with
-        the Sentry service, as described in <a class="xref" href="impala_authorization.html#sentry_service">Using Impala with the Sentry Service</a>. It does not
-        apply when you use the Sentry framework with privileges defined in a policy file.
+        The <code class="ph codeph">SHOW CURRENT ROLES</code> statement displays
+        roles assigned to the current user. This syntax is available in <span class="keyword">Impala 2.0</span> and later only, when you are using the Sentry
+        authorization framework along with the Sentry service, as described in
+          <a class="xref" href="impala_authorization.html#sentry_service">Managing Privileges</a>.
       </p>
 
 
@@ -462,13 +465,12 @@ where id between 1 and 1000000;
 
 
       <p class="p">
-        When authorization is enabled, the output of the
-          <code class="ph codeph">SHOW</code> statement only shows those objects for which you
-        have the privilege to view. If you believe an object exists but you
-        cannot see it in the <code class="ph codeph">SHOW</code> output, check with the system
-        administrator if you need to be granted a new privilege for that object.
-        See <a class="xref" href="../shared/../topics/impala_authorization.html#authorization">Enabling Sentry Authorization for Impala</a> for
-        how to set up authorization and add privileges for specific objects.
+        When authorization is enabled, the output of the <code class="ph codeph">SHOW</code> statement only
+        shows those objects for which you have the privilege to view. If you believe an object
+        exists but you cannot see it in the <code class="ph codeph">SHOW</code> output, check with the system
+        administrator if you need to be granted a new privilege for that object. See
+        <a class="xref" href="../shared/../topics/impala_authorization.html#authorization">Impala Authorization</a> for how to set up
+        authorization and add privileges for specific objects.
       </p>
 
 
@@ -504,7 +506,7 @@ where id between 1 and 1000000;
 
 
       <p class="p">
-        <a class="xref" href="impala_authorization.html#authorization">Enabling Sentry Authorization for Impala</a>
+        <a class="xref" href="impala_authorization.html#authorization">Impala Authorization</a>
       </p>
 
     </div>
@@ -514,7 +516,7 @@ where id between 1 and 1000000;
 
   <div class="topic concept nested1" aria-labelledby="ariaid-title5" id="show_role_grant">
 
-    <h2 class="title topictitle2" id="ariaid-title5">SHOW ROLE GRANT Statement</h2>
+    <h2 class="title topictitle2" id="ariaid-title5">SHOW ROLE GRANT GROUP Statement</h2>
 
   
 
@@ -522,13 +524,12 @@ where id between 1 and 1000000;
     <div class="body conbody">
 
       <p class="p">
-
-        The <code class="ph codeph">SHOW ROLE GRANT</code> statement lists all the roles assigned to the specified group. This
-        statement is only allowed for Sentry administrative users and others users that are part of the specified
-        group. This syntax is available in <span class="keyword">Impala 2.0</span> and later only, when you are using the Sentry authorization
-        framework along with the Sentry service, as described in
-        <a class="xref" href="impala_authorization.html#sentry_service">Using Impala with the Sentry Service</a>. It does not apply when you use the Sentry framework
-        with privileges defined in a policy file.
+        The <code class="ph codeph">SHOW ROLE GRANT GROUP</code> statement lists
+        all the roles assigned to the specified group. This statement is only
+        allowed for Sentry administrative users and others users that are part
+        of the specified group. This syntax is available in <span class="keyword">Impala 2.0</span> and later only, when you are using the Sentry
+        authorization framework along with the Sentry service, as described in
+          <a class="xref" href="impala_authorization.html#sentry_service">Managing Privileges</a>.
       </p>
 
 
@@ -538,16 +539,13 @@ where id between 1 and 1000000;
 
 
       <p class="p">
-        When authorization is enabled, the output of the
-          <code class="ph codeph">SHOW</code> statement only shows those objects for which you
-        have the privilege to view. If you believe an object exists but you
-        cannot see it in the <code class="ph codeph">SHOW</code> output, check with the system
-        administrator if you need to be granted a new privilege for that object.
-        See <a class="xref" href="../shared/../topics/impala_authorization.html#authorization">Enabling Sentry Authorization for Impala</a> for
-        how to set up authorization and add privileges for specific objects.
+        When authorization is enabled, the output of the <code class="ph codeph">SHOW</code> statement only
+        shows those objects for which you have the privilege to view. If you believe an object
+        exists but you cannot see it in the <code class="ph codeph">SHOW</code> output, check with the system
+        administrator if you need to be granted a new privilege for that object. See
+        <a class="xref" href="../shared/../topics/impala_authorization.html#authorization">Impala Authorization</a> for how to set up
+        authorization and add privileges for specific objects.
       </p>
-
-
 
 
       <p class="p">
@@ -562,7 +560,7 @@ where id between 1 and 1000000;
 
 
       <p class="p">
-        <a class="xref" href="impala_authorization.html#authorization">Enabling Sentry Authorization for Impala</a>
+        <a class="xref" href="impala_authorization.html#authorization">Impala Authorization</a>
       </p>
 
     </div>
@@ -580,12 +578,13 @@ where id between 1 and 1000000;
     <div class="body conbody">
 
       <p class="p">
-
-        The <code class="ph codeph">SHOW GRANT ROLE</code> statement list all the grants for the given role name. This statement
-        is only allowed for Sentry administrative users and other users that have been granted the specified role.
-        This syntax is available in <span class="keyword">Impala 2.0</span> and later only, when you are using the Sentry authorization framework
-        along with the Sentry service, as described in <a class="xref" href="impala_authorization.html#sentry_service">Using Impala with the Sentry Service</a>. It
-        does not apply when you use the Sentry framework with privileges defined in a policy file.
+        
+        The <code class="ph codeph">SHOW GRANT ROLE</code> statement list all the grants for
+        the given role name. This statement is only allowed for Sentry
+        administrative users and other users that have been granted the
+        specified role. This syntax is available in <span class="keyword">Impala 2.0</span> and later only, when you are using the Sentry
+        authorization framework along with the Sentry service, as described in
+          <a class="xref" href="impala_authorization.html#sentry_service">Managing Privileges</a>.
       </p>
 
 
@@ -595,13 +594,12 @@ where id between 1 and 1000000;
 
 
       <p class="p">
-        When authorization is enabled, the output of the
-          <code class="ph codeph">SHOW</code> statement only shows those objects for which you
-        have the privilege to view. If you believe an object exists but you
-        cannot see it in the <code class="ph codeph">SHOW</code> output, check with the system
-        administrator if you need to be granted a new privilege for that object.
-        See <a class="xref" href="../shared/../topics/impala_authorization.html#authorization">Enabling Sentry Authorization for Impala</a> for
-        how to set up authorization and add privileges for specific objects.
+        When authorization is enabled, the output of the <code class="ph codeph">SHOW</code> statement only
+        shows those objects for which you have the privilege to view. If you believe an object
+        exists but you cannot see it in the <code class="ph codeph">SHOW</code> output, check with the system
+        administrator if you need to be granted a new privilege for that object. See
+        <a class="xref" href="../shared/../topics/impala_authorization.html#authorization">Impala Authorization</a> for how to set up
+        authorization and add privileges for specific objects.
       </p>
 
 
@@ -619,7 +617,7 @@ where id between 1 and 1000000;
 
 
       <p class="p">
-        <a class="xref" href="impala_authorization.html#authorization">Enabling Sentry Authorization for Impala</a>
+        <a class="xref" href="impala_authorization.html#authorization">Impala Authorization</a>
       </p>
 
     </div>
@@ -629,31 +627,32 @@ where id between 1 and 1000000;
   <div class="topic concept nested1" aria-labelledby="ariaid-title7" id="show_grant_user">
     <h2 class="title topictitle2" id="ariaid-title7">SHOW GRANT USER Statement</h2>
 
-
+    
     <div class="body conbody">
-      <p class="p"> The <code class="ph codeph">SHOW GRANT USER</code> statement shows the list of
+      <p class="p">
+        The <code class="ph codeph">SHOW GRANT USER</code> statement shows the list of
         privileges for a given user. This statement is only allowed for Sentry
         administrative users. However, the current user can run <code class="ph codeph">SHOW
-          GRANT USER</code> for themselves. </p>
+          GRANT USER</code> for themselves.
+      </p>
 
-      <p class="p">This syntax is available in <span class="keyword">Impala 3.1</span> and later
+      <p class="p">
+        This syntax is available in <span class="keyword">Impala 3.1</span> and later
         only, when you are using the Sentry authorization framework along with
-        the Sentry service, as described in <a class="xref" href="impala_authorization.html#sentry_service">Using Impala with the Sentry Service</a>. It does not apply
-        when you use the Sentry framework with privileges defined in a policy
-        file. </p>
+        the Sentry service, as described in <a class="xref" href="impala_authorization.html#sentry_service">Managing Privileges</a>.
+      </p>
 
       <p class="p">
         <strong class="ph b">Security considerations:</strong>
       </p>
 
       <p class="p">
-        When authorization is enabled, the output of the
-          <code class="ph codeph">SHOW</code> statement only shows those objects for which you
-        have the privilege to view. If you believe an object exists but you
-        cannot see it in the <code class="ph codeph">SHOW</code> output, check with the system
-        administrator if you need to be granted a new privilege for that object.
-        See <a class="xref" href="../shared/../topics/impala_authorization.html#authorization">Enabling Sentry Authorization for Impala</a> for
-        how to set up authorization and add privileges for specific objects.
+        When authorization is enabled, the output of the <code class="ph codeph">SHOW</code> statement only
+        shows those objects for which you have the privilege to view. If you believe an object
+        exists but you cannot see it in the <code class="ph codeph">SHOW</code> output, check with the system
+        administrator if you need to be granted a new privilege for that object. See
+        <a class="xref" href="../shared/../topics/impala_authorization.html#authorization">Impala Authorization</a> for how to set up
+        authorization and add privileges for specific objects.
       </p>
 
       <p class="p">
@@ -666,7 +665,7 @@ where id between 1 and 1000000;
       </p>
 
       <p class="p">
-        <a class="xref" href="impala_authorization.html#authorization">Enabling Sentry Authorization for Impala</a>
+        <a class="xref" href="impala_authorization.html#authorization">Impala Authorization</a>
       </p>
 
     </div>
@@ -710,13 +709,12 @@ where id between 1 and 1000000;
 
 
       <p class="p">
-        When authorization is enabled, the output of the
-          <code class="ph codeph">SHOW</code> statement only shows those objects for which you
-        have the privilege to view. If you believe an object exists but you
-        cannot see it in the <code class="ph codeph">SHOW</code> output, check with the system
-        administrator if you need to be granted a new privilege for that object.
-        See <a class="xref" href="../shared/../topics/impala_authorization.html#authorization">Enabling Sentry Authorization for Impala</a> for
-        how to set up authorization and add privileges for specific objects.
+        When authorization is enabled, the output of the <code class="ph codeph">SHOW</code> statement only
+        shows those objects for which you have the privilege to view. If you believe an object
+        exists but you cannot see it in the <code class="ph codeph">SHOW</code> output, check with the system
+        administrator if you need to be granted a new privilege for that object. See
+        <a class="xref" href="../shared/../topics/impala_authorization.html#authorization">Impala Authorization</a> for how to set up
+        authorization and add privileges for specific objects.
       </p>
 
 
@@ -805,13 +803,12 @@ Returned 1 row(s) in 0.01s</code></pre>
 
 
       <p class="p">
-        When authorization is enabled, the output of the
-          <code class="ph codeph">SHOW</code> statement only shows those objects for which you
-        have the privilege to view. If you believe an object exists but you
-        cannot see it in the <code class="ph codeph">SHOW</code> output, check with the system
-        administrator if you need to be granted a new privilege for that object.
-        See <a class="xref" href="../shared/../topics/impala_authorization.html#authorization">Enabling Sentry Authorization for Impala</a> for
-        how to set up authorization and add privileges for specific objects.
+        When authorization is enabled, the output of the <code class="ph codeph">SHOW</code> statement only
+        shows those objects for which you have the privilege to view. If you believe an object
+        exists but you cannot see it in the <code class="ph codeph">SHOW</code> output, check with the system
+        administrator if you need to be granted a new privilege for that object. See
+        <a class="xref" href="../shared/../topics/impala_authorization.html#authorization">Impala Authorization</a> for how to set up
+        authorization and add privileges for specific objects.
       </p>
 
 
@@ -970,13 +967,12 @@ show tables like '*dim*|t*';
 
 
       <p class="p">
-        When authorization is enabled, the output of the
-          <code class="ph codeph">SHOW</code> statement only shows those objects for which you
-        have the privilege to view. If you believe an object exists but you
-        cannot see it in the <code class="ph codeph">SHOW</code> output, check with the system
-        administrator if you need to be granted a new privilege for that object.
-        See <a class="xref" href="../shared/../topics/impala_authorization.html#authorization">Enabling Sentry Authorization for Impala</a> for
-        how to set up authorization and add privileges for specific objects.
+        When authorization is enabled, the output of the <code class="ph codeph">SHOW</code> statement only
+        shows those objects for which you have the privilege to view. If you believe an object
+        exists but you cannot see it in the <code class="ph codeph">SHOW</code> output, check with the system
+        administrator if you need to be granted a new privilege for that object. See
+        <a class="xref" href="../shared/../topics/impala_authorization.html#authorization">Impala Authorization</a> for how to set up
+        authorization and add privileges for specific objects.
       </p>
 
 
@@ -1197,13 +1193,12 @@ show create table show_create_table_demo;
 
 
       <p class="p">
-        When authorization is enabled, the output of the
-          <code class="ph codeph">SHOW</code> statement only shows those objects for which you
-        have the privilege to view. If you believe an object exists but you
-        cannot see it in the <code class="ph codeph">SHOW</code> output, check with the system
-        administrator if you need to be granted a new privilege for that object.
-        See <a class="xref" href="../shared/../topics/impala_authorization.html#authorization">Enabling Sentry Authorization for Impala</a> for
-        how to set up authorization and add privileges for specific objects.
+        When authorization is enabled, the output of the <code class="ph codeph">SHOW</code> statement only
+        shows those objects for which you have the privilege to view. If you believe an object
+        exists but you cannot see it in the <code class="ph codeph">SHOW</code> output, check with the system
+        administrator if you need to be granted a new privilege for that object. See
+        <a class="xref" href="../shared/../topics/impala_authorization.html#authorization">Impala Authorization</a> for how to set up
+        authorization and add privileges for specific objects.
       </p>
 
 
@@ -1365,13 +1360,12 @@ show table stats store_sales;
 
 
       <p class="p">
-        When authorization is enabled, the output of the
-          <code class="ph codeph">SHOW</code> statement only shows those objects for which you
-        have the privilege to view. If you believe an object exists but you
-        cannot see it in the <code class="ph codeph">SHOW</code> output, check with the system
-        administrator if you need to be granted a new privilege for that object.
-        See <a class="xref" href="../shared/../topics/impala_authorization.html#authorization">Enabling Sentry Authorization for Impala</a> for
-        how to set up authorization and add privileges for specific objects.
+        When authorization is enabled, the output of the <code class="ph codeph">SHOW</code> statement only
+        shows those objects for which you have the privilege to view. If you believe an object
+        exists but you cannot see it in the <code class="ph codeph">SHOW</code> output, check with the system
+        administrator if you need to be granted a new privilege for that object. See
+        <a class="xref" href="../shared/../topics/impala_authorization.html#authorization">Impala Authorization</a> for how to set up
+        authorization and add privileges for specific objects.
       </p>
 
 
@@ -1585,13 +1579,12 @@ show column stats store_sales;
 
 
       <p class="p">
-        When authorization is enabled, the output of the
-          <code class="ph codeph">SHOW</code> statement only shows those objects for which you
-        have the privilege to view. If you believe an object exists but you
-        cannot see it in the <code class="ph codeph">SHOW</code> output, check with the system
-        administrator if you need to be granted a new privilege for that object.
-        See <a class="xref" href="../shared/../topics/impala_authorization.html#authorization">Enabling Sentry Authorization for Impala</a> for
-        how to set up authorization and add privileges for specific objects.
+        When authorization is enabled, the output of the <code class="ph codeph">SHOW</code> statement only
+        shows those objects for which you have the privilege to view. If you believe an object
+        exists but you cannot see it in the <code class="ph codeph">SHOW</code> output, check with the system
+        administrator if you need to be granted a new privilege for that object. See
+        <a class="xref" href="../shared/../topics/impala_authorization.html#authorization">Impala Authorization</a> for how to set up
+        authorization and add privileges for specific objects.
       </p>
 
 
@@ -1770,13 +1763,12 @@ show range partitions million_rows_range;
 
 
       <p class="p">
-        When authorization is enabled, the output of the
-          <code class="ph codeph">SHOW</code> statement only shows those objects for which you
-        have the privilege to view. If you believe an object exists but you
-        cannot see it in the <code class="ph codeph">SHOW</code> output, check with the system
-        administrator if you need to be granted a new privilege for that object.
-        See <a class="xref" href="../shared/../topics/impala_authorization.html#authorization">Enabling Sentry Authorization for Impala</a> for
-        how to set up authorization and add privileges for specific objects.
+        When authorization is enabled, the output of the <code class="ph codeph">SHOW</code> statement only
+        shows those objects for which you have the privilege to view. If you believe an object
+        exists but you cannot see it in the <code class="ph codeph">SHOW</code> output, check with the system
+        administrator if you need to be granted a new privilege for that object. See
+        <a class="xref" href="../shared/../topics/impala_authorization.html#authorization">Impala Authorization</a> for how to set up
+        authorization and add privileges for specific objects.
       </p>
 
 

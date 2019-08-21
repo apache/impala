@@ -20,8 +20,10 @@
 <meta name="DC.Relation" scheme="URI" content="../topics/impala_debug_action.html" />
 <meta name="DC.Relation" scheme="URI" content="../topics/impala_decimal_v2.html" />
 <meta name="DC.Relation" scheme="URI" content="../topics/impala_default_file_format.html" />
+<meta name="DC.Relation" scheme="URI" content="../topics/impala_default_hints_insert_statement.html" />
 <meta name="DC.Relation" scheme="URI" content="../topics/impala_default_join_distribution_mode.html" />
 <meta name="DC.Relation" scheme="URI" content="../topics/impala_default_spillable_buffer_size.html" />
+<meta name="DC.Relation" scheme="URI" content="../topics/impala_default_transactional_type.html" />
 <meta name="DC.Relation" scheme="URI" content="../topics/impala_disable_codegen.html" />
 <meta name="DC.Relation" scheme="URI" content="../topics/impala_disable_codegen_rows_threshold.html" />
 <meta name="DC.Relation" scheme="URI" content="../topics/impala_disable_row_runtime_filtering.html" />
@@ -55,7 +57,10 @@
 <meta name="DC.Relation" scheme="URI" content="../topics/impala_parquet_dictionary_filtering.html" />
 <meta name="DC.Relation" scheme="URI" content="../topics/impala_parquet_fallback_schema_resolution.html" />
 <meta name="DC.Relation" scheme="URI" content="../topics/impala_parquet_file_size.html" />
+<meta name="DC.Relation" scheme="URI" content="../topics/impala_parquet_page_row_count_limit.html" />
 <meta name="DC.Relation" scheme="URI" content="../topics/impala_parquet_read_statistics.html" />
+<meta name="DC.Relation" scheme="URI" content="../topics/impala_parquet_read_page_index.html" />
+<meta name="DC.Relation" scheme="URI" content="../topics/impala_parquet_write_page_index.html" />
 <meta name="DC.Relation" scheme="URI" content="../topics/impala_prefetch_mode.html" />
 <meta name="DC.Relation" scheme="URI" content="../topics/impala_query_timeout_s.html" />
 <meta name="DC.Relation" scheme="URI" content="../topics/impala_replica_preference.html" />
@@ -79,8 +84,8 @@
 <meta name="DC.Relation" scheme="URI" content="../topics/impala_topn_bytes_limit.html" />
 <meta name="prodname" content="Impala" />
 <meta name="prodname" content="Impala" />
-<meta name="version" content="Impala 3.2.x" />
-<meta name="version" content="Impala 3.2.x" />
+<meta name="version" content="Impala 3.3.x" />
+<meta name="version" content="Impala 3.3.x" />
 <meta name="DC.Format" content="XHTML" />
 <meta name="DC.Identifier" content="query_options" />
 <link rel="stylesheet" type="text/css" href="../commonltr.css" />
@@ -118,7 +123,7 @@
     </p>
 
 
-    <div class="note note"><span class="notetitle">Note:</span>
+    <div class="note note"><span class="notetitle">Note:</span> 
       <p class="p">
         In Impala 2.0 and later, you can set query options directly through the JDBC and ODBC interfaces by using the
         <code class="ph codeph">SET</code> statement. Formerly, <code class="ph codeph">SET</code> was only available as a command within the
@@ -175,9 +180,13 @@
 </li>
 <li class="link ulchildlink"><strong><a href="../topics/impala_default_file_format.html">DEFAULT_FILE_FORMAT Query Option</a></strong><br />
 </li>
+<li class="link ulchildlink"><strong><a href="../topics/impala_default_hints_insert_statement.html">DEFAULT_HINTS_INSERT_STATEMENT Query Option</a></strong><br />
+</li>
 <li class="link ulchildlink"><strong><a href="../topics/impala_default_join_distribution_mode.html">DEFAULT_JOIN_DISTRIBUTION_MODE Query Option</a></strong><br />
 </li>
 <li class="link ulchildlink"><strong><a href="../topics/impala_default_spillable_buffer_size.html">DEFAULT_SPILLABLE_BUFFER_SIZE Query Option</a></strong><br />
+</li>
+<li class="link ulchildlink"><strong><a href="../topics/impala_default_transactional_type.html">DEFAULT_TRANSACTIONAL_TYPE Query Option</a></strong><br />
 </li>
 <li class="link ulchildlink"><strong><a href="../topics/impala_disable_codegen.html">DISABLE_CODEGEN Query Option</a></strong><br />
 </li>
@@ -245,7 +254,13 @@
 </li>
 <li class="link ulchildlink"><strong><a href="../topics/impala_parquet_file_size.html">PARQUET_FILE_SIZE Query Option</a></strong><br />
 </li>
+<li class="link ulchildlink"><strong><a href="../topics/impala_parquet_page_row_count_limit.html">PARQUET_PAGE_ROW_COUNT_LIMIT Query Option</a></strong><br />
+</li>
 <li class="link ulchildlink"><strong><a href="../topics/impala_parquet_read_statistics.html">PARQUET_READ_STATISTICS Query Option (Impala 2.9 or higher only)</a></strong><br />
+</li>
+<li class="link ulchildlink"><strong><a href="../topics/impala_parquet_read_page_index.html">PARQUET_READ_PAGE_INDEX Query Option</a></strong><br />
+</li>
+<li class="link ulchildlink"><strong><a href="../topics/impala_parquet_write_page_index.html">PARQUET_WRITE_PAGE_INDEX Query Option</a></strong><br />
 </li>
 <li class="link ulchildlink"><strong><a href="../topics/impala_prefetch_mode.html">PREFETCH_MODE Query Option (Impala 2.6 or higher only)</a></strong><br />
 </li>

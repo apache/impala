@@ -11,8 +11,8 @@
 <meta name="DC.Relation" scheme="URI" content="../topics/impala_datatypes.html" />
 <meta name="prodname" content="Impala" />
 <meta name="prodname" content="Impala" />
-<meta name="version" content="Impala 3.2.x" />
-<meta name="version" content="Impala 3.2.x" />
+<meta name="version" content="Impala 3.3.x" />
+<meta name="version" content="Impala 3.3.x" />
 <meta name="DC.Format" content="XHTML" />
 <meta name="DC.Identifier" content="boolean" />
 <link rel="stylesheet" type="text/css" href="../commonltr.css" />
@@ -120,8 +120,8 @@
 
 
     <p class="p">
-        <strong class="ph b">NULL considerations:</strong> An expression of this type produces a <code class="ph codeph">NULL</code> value if any
-        argument of the expression is <code class="ph codeph">NULL</code>.
+        <strong class="ph b">NULL considerations:</strong> An expression of this type produces a <code class="ph codeph">NULL</code>
+        value if any argument of the expression is <code class="ph codeph">NULL</code>.
       </p>
 
 
@@ -169,8 +169,8 @@ SELECT claim FROM assertions WHERE really = TRUE;
 
 
     <p class="p">
-        <strong class="ph b">Text table considerations:</strong> Values of this type are potentially larger in text tables than in tables
-        using Parquet or other binary formats.
+        <strong class="ph b">Text table considerations:</strong> Values of this type are potentially larger in text
+        tables than in tables using Parquet or other binary formats.
       </p>
 
 
@@ -181,9 +181,9 @@ SELECT claim FROM assertions WHERE really = TRUE;
 
 
     <p class="p">
-        <strong class="ph b">Column statistics considerations:</strong> Because this type has a fixed size, the maximum and average size
-        fields are always filled in for column statistics, even before you run the <code class="ph codeph">COMPUTE STATS</code>
-        statement.
+        <strong class="ph b">Column statistics considerations:</strong> Because this type has a fixed size, the maximum
+        and average size fields are always filled in for column statistics, even before you run
+        the <code class="ph codeph">COMPUTE STATS</code> statement.
       </p>
 
 
@@ -194,8 +194,8 @@ SELECT claim FROM assertions WHERE really = TRUE;
       </p>
 
     <p class="p">
-        Currently, the data types <code class="ph codeph">BOOLEAN</code>, <code class="ph codeph">FLOAT</code>,
-        and <code class="ph codeph">DOUBLE</code> cannot be used for primary key columns in Kudu tables.
+        Currently, the data types <code class="ph codeph">BOOLEAN</code>, <code class="ph codeph">FLOAT</code>, and
+        <code class="ph codeph">DOUBLE</code> cannot be used for primary key columns in Kudu tables.
       </p>
 
 

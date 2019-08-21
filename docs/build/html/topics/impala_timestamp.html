@@ -12,8 +12,8 @@
 <meta name="DC.Relation" scheme="URI" content="../topics/impala_custom_timezones.html" />
 <meta name="prodname" content="Impala" />
 <meta name="prodname" content="Impala" />
-<meta name="version" content="Impala 3.2.x" />
-<meta name="version" content="Impala 3.2.x" />
+<meta name="version" content="Impala 3.3.x" />
+<meta name="version" content="Impala 3.3.x" />
 <meta name="DC.Format" content="XHTML" />
 <meta name="DC.Identifier" content="timestamp" />
 <link rel="stylesheet" type="text/css" href="../commonltr.css" />
@@ -174,10 +174,11 @@ DATE_ADD (<var class="keyword varname">timestamp</var>, INTERVAL <var class="key
 
 
     <div class="p">
-      When you set the <code class="ph codeph">--use_local_tz_for_unix_timestamp_conversions</code> startup
-      flag to <code class="ph codeph">TRUE</code>, Impala treats the <code class="ph codeph">TIMESTAMP</code> values
-      specified in the local time zone. The local time zone is determined in the following order
-      with the <code class="ph codeph">TIMESTAMP</code> query option takes the highest precedence:
+      When you set the
+      <code class="ph codeph">‑‑use_local_tz_for_unix_timestamp_conversions</code> startup flag to
+      <code class="ph codeph">TRUE</code>, Impala treats the <code class="ph codeph">TIMESTAMP</code> values specified in
+      the local time zone. The local time zone is determined in the following order with the
+      <code class="ph codeph">TIMESTAMP</code> query option takes the highest precedence:
       <ol class="ol">
         <li class="li">
           The <code class="ph codeph">TIMESTAMP</code> query option
@@ -199,11 +200,11 @@ DATE_ADD (<var class="keyword varname">timestamp</var>, INTERVAL <var class="key
 
 
     <p class="p">
-      The <code class="ph codeph">--use_local_tz_for_unix_timestamp_conversions</code> setting can be used to
-      fix discrepancy in <code class="ph codeph">INTERVAL</code> operations. For example, a <code class="ph codeph">TIMESTAMP
-      + INTERVAL <var class="keyword varname">n-hours</var></code> can be affected by Daylight Saving Time,
-      which Impala does not consider by default as these operations are applied as if the
-      timestamp was in UTC. You can use the
+      The <code class="ph codeph">‑‑use_local_tz_for_unix_timestamp_conversions</code> setting can
+      be used to fix discrepancy in <code class="ph codeph">INTERVAL</code> operations. For example, a
+      <code class="ph codeph">TIMESTAMP + INTERVAL <var class="keyword varname">n-hours</var></code> can be affected by
+      Daylight Saving Time, which Impala does not consider by default as these operations are
+      applied as if the timestamp was in UTC. You can use the
       <code class="ph codeph">--use_local_tz_for_unix_timestamp_conversions</code> setting to fix the issue.
     </p>
 
@@ -245,62 +246,75 @@ DATE_ADD (<var class="keyword varname">timestamp</var>, INTERVAL <var class="key
 
       <li class="li">
         <em class="ph i">Parquet</em>
-        <div class="note note"><span class="notetitle">Note:</span>  This section only applies to <code class="ph codeph">INT96 TIMESTAMP</code>.
-          See <a class="xref" href="impala_parquet.html#parquet_data_types">Data Type Considerations for Parquet Tables</a> for
-          information about Parquet data types. </div>
-<p class="p"> When Hive writes to
-          Parquet data files, the <code class="ph codeph">TIMESTAMP</code> values are
-          normalized to UTC from the local time zone of the host where the data
-          was written. On the other hand, Impala does not make any time zone
-          adjustment when it writes or reads <code class="ph codeph">INT96 TIMESTAMP</code>
-          values to Parquet files. This difference in time zone handling can
-          cause potentially inconsistent results when Impala processes
-            <code class="ph codeph">TIMESTAMP</code> values in the Parquet files written by
-          Hive. </p>
+        <div class="note note"><span class="notetitle">Note:</span> 
+          This section only applies to <code class="ph codeph">INT96 TIMESTAMP</code>. See
+          <a class="xref" href="impala_parquet.html#parquet_data_types">Data Type Considerations for Parquet Tables</a> for information about Parquet
+          data types.
+        </div>
 
-        <div class="p"> To avoid incompatibility problems or having to code workarounds, you
-          can specify one or both of these impalad startup flags: <ul class="ul">
+        <p class="p">
+          When Hive writes to Parquet data files, the <code class="ph codeph">TIMESTAMP</code> values are
+          normalized to UTC from the local time zone of the host where the data was written. On
+          the other hand, Impala does not make any time zone adjustment when it writes or reads
+          <code class="ph codeph">INT96 TIMESTAMP</code> values to Parquet files. This difference in time zone
+          handling can cause potentially inconsistent results when Impala processes
+          <code class="ph codeph">TIMESTAMP</code> values in the Parquet files written by Hive.
+        </p>
+
+
+        <div class="p">
+          To avoid incompatibility problems or having to code workarounds, you can specify one
+          or both of these impalad startup flags:
+          <ul class="ul">
             <li class="li">
-              <code class="ph codeph">--use_local_tz_for_unix_timestamp_conversions=true</code>
+              <code class="ph codeph">‑use_local_tz_for_unix_timestamp_conversions=true</code>
             </li>
 
+
             <li class="li">
-              <code class="ph codeph">--convert_legacy_hive_parquet_utc_timestamps=true</code>
+              <code class="ph codeph">‑convert_legacy_hive_parquet_utc_timestamps=true</code>
             </li>
 
           </ul>
 
         </div>
 
-        <p class="p"> When the
-            <code class="ph codeph">‑‑convert_legacy_hive_parquet_utc_timestamps</code>
-          setting is enabled, Impala recognizes the Parquet data files written
-          by Hive, and applies the same UTC-to-local-timezone conversion logic
-          during the query as Hive does. </p>
 
-        <p class="p"> In <span class="keyword">Impala 3.0</span> and lower, the
-            <code class="ph codeph">‑‑convert_legacy_hive_parquet_utc_timestamps</code>
-          setting had a severe impact on multi-threaded performance. The new
-          time zone implementation in <span class="keyword">Impala 3.1</span> eliminated
-          most of the performance overhead and made Impala scale well to
-          multiple threads. The
-            <code class="ph codeph">‑‑convert_legacy_hive_parquet_utc_timestamps</code>
-          setting is turned off by default for a performance reason. To avoid
-          unexpected incompatibility problems, you should turn on the option
-          when processing <code class="ph codeph">TIMESTAMP</code> columns in Parquet files
-          written by Hive. </p>
+        <p class="p">
+          When the <code class="ph codeph">‑‑convert_legacy_hive_parquet_utc_timestamps</code>
+          setting is enabled, Impala recognizes the Parquet data files written by Hive, and
+          applies the same UTC-to-local-timezone conversion logic during the query as Hive does.
+        </p>
 
-        <p class="p"> Hive currently cannot write <code class="ph codeph">INT64</code>
-          <code class="ph codeph">TIMESTAMP</code> values. </p>
-<p class="p">In <span class="keyword">Impala 3.2</span> and higher, <code class="ph codeph">INT64 TIMESTAMP</code>
-          values annotated with the <code class="ph codeph">TIMESTAMP_MILLIS</code> or
-            <code class="ph codeph">TIMESTAMP_MICROS</code>
-          <code class="ph codeph">OriginalType</code> are assumed to be always UTC normalized,
-          so the UTC to local conversion will be always done. <code class="ph codeph">INT64
-            TIMESTAMP</code> annotated with the <code class="ph codeph">TIMESTAMP</code>
-          <code class="ph codeph">LogicalType</code> specifies whether UTC to local conversion
-          is necessary depending on the Parquet metadata. </p>
-</li>
+
+        <p class="p">
+          In <span class="keyword">Impala 3.0</span> and lower, the
+          <code class="ph codeph">‑‑convert_legacy_hive_parquet_utc_timestamps</code> setting had a severe
+          impact on multi-threaded performance. The new time zone implementation in
+          <span class="keyword">Impala 3.1</span> eliminated most of the performance overhead and made
+          Impala scale well to multiple threads. The
+          <code class="ph codeph">‑‑convert_legacy_hive_parquet_utc_timestamps</code> setting is turned
+          off by default for a performance reason. To avoid unexpected incompatibility problems,
+          you should turn on the option when processing <code class="ph codeph">TIMESTAMP</code> columns in
+          Parquet files written by Hive.
+        </p>
+
+
+        <p class="p">
+          Hive currently cannot write <code class="ph codeph">INT64</code> <code class="ph codeph">TIMESTAMP</code> values.
+        </p>
+
+        <p class="p">
+          In <span class="keyword">Impala 3.2</span> and higher, <code class="ph codeph">INT64
+          TIMESTAMP</code> values annotated with the <code class="ph codeph">TIMESTAMP_MILLIS</code> or
+          <code class="ph codeph">TIMESTAMP_MICROS</code> <code class="ph codeph">OriginalType</code> are assumed to be
+          always UTC normalized, so the UTC to local conversion will be always done.
+          <code class="ph codeph">INT64 TIMESTAMP</code> annotated with the <code class="ph codeph">TIMESTAMP</code>
+          <code class="ph codeph">LogicalType</code> specifies whether UTC to local conversion is necessary
+          depending on the Parquet metadata.
+        </p>
+
+      </li>
 
     </ul>
 
@@ -310,44 +324,53 @@ DATE_ADD (<var class="keyword varname">timestamp</var>, INTERVAL <var class="key
     </p>
 
 
-    <p class="p"> Impala automatically converts
-          <code class="ph codeph">STRING</code> literals of the correct format into
-          <code class="ph codeph">TIMESTAMP</code> values. Timestamp values are accepted in
-        the format <code class="ph codeph">'yyyy‑MM‑dd HH:mm:ss.SSSSSS'</code>, and can
-        consist of just the date, or just the time, with or without the
-        fractional second portion. For example, you can specify
-          <code class="ph codeph">TIMESTAMP</code> values such as
-          <code class="ph codeph">'1966‑07‑30'</code>, <code class="ph codeph">'08:30:00'</code>, or
-          <code class="ph codeph">'1985‑09‑25 17:45:30.005'</code>. </p>
-<p class="p"> Leading zeroes are not required in the numbers representing the date
-        component, such as month and date, or the time component, such as hour,
-        minute, and second. For example, Impala accepts both
-          <code class="ph codeph">'2018‑1‑1 01:02:03'</code> and
-          <code class="ph codeph">'2018‑01‑01 1:2:3'</code> as valid. </p>
-<p class="p"> In <code class="ph codeph">STRING</code> to <code class="ph codeph">TIMESTAMP</code> conversions,
-        leading and trailing white spaces, such as a space, a tab, a newline, or
-        a carriage return, are ignored. For example, Impala treats the following
-        as equivalent: '1999‑12‑01 01:02:03 ', ' 1999‑12‑01 01:02:03',
-        '1999‑12‑01 01:02:03\r\n\t'. </p>
+    <p class="p">
+        Impala automatically converts <code class="ph codeph">STRING</code> literals of the correct format
+        into <code class="ph codeph">TIMESTAMP</code> values. Timestamp values are accepted in the format
+        <code class="ph codeph">'yyyy‑MM‑dd HH:mm:ss.SSSSSS'</code>, and can consist of just the date, or
+        just the time, with or without the fractional second portion. For example, you can
+        specify <code class="ph codeph">TIMESTAMP</code> values such as <code class="ph codeph">'1966‑07‑30'</code>,
+        <code class="ph codeph">'08:30:00'</code>, or <code class="ph codeph">'1985‑09‑25 17:45:30.005'</code>.
+      </p>
+<p class="p">
+        Leading zeroes are not required in the numbers representing the date component, such as
+        month and date, or the time component, such as hour, minute, and second. For example,
+        Impala accepts both <code class="ph codeph">'2018‑1‑1 01:02:03'</code> and
+        <code class="ph codeph">'2018‑01‑01 1:2:3'</code> as valid.
+      </p>
+<p class="p">
+        In <code class="ph codeph">STRING</code> to <code class="ph codeph">TIMESTAMP</code> conversions, leading and
+        trailing white spaces, such as a space, a tab, a newline, or a carriage return, are
+        ignored. For example, Impala treats the following as equivalent:
+        '1999‑12‑01 01:02:03 ', ' 1999‑12‑01 01:02:03',
+        '1999‑12‑01 01:02:03\r\n\t'.
+      </p>
 <div class="p">
-        When you convert or cast a
-          <code class="ph codeph">STRING</code> literal to <code class="ph codeph">TIMESTAMP</code>, you can
-        use the following separators between the date part and the time part:
+        When you convert or cast a <code class="ph codeph">STRING</code> literal to
+        <code class="ph codeph">TIMESTAMP</code>, you can use the following separators between the date part
+        and the time part:
         <ul class="ul">
           <li class="li">
-            <p class="p"> One or more space characters </p>
+            <p class="p">
+              One or more space characters
+            </p>
 
-            <p class="p"> Example: <code class="ph codeph">CAST('2001-01-09 01:05:01' AS
-                TIMESTAMP)</code>
+
+            <p class="p">
+              Example: <code class="ph codeph">CAST('2001-01-09 01:05:01' AS TIMESTAMP)</code>
             </p>
 
           </li>
 
-          <li class="li">
-            <p class="p"> The character “T” </p>
 
-            <p class="p"> Example: <code class="ph codeph">CAST('2001-01-09T01:05:01' AS
-                TIMESTAMP)</code>
+          <li class="li">
+            <p class="p">
+              The character “T”
+            </p>
+
+
+            <p class="p">
+              Example: <code class="ph codeph">CAST('2001-01-09T01:05:01' AS TIMESTAMP)</code>
             </p>
 
           </li>
@@ -358,13 +381,13 @@ DATE_ADD (<var class="keyword varname">timestamp</var>, INTERVAL <var class="key
 
 
     <p class="p">
-      <span class="ph">
-          Casting an integer or floating-point value <code class="ph codeph">N</code> to
-        <code class="ph codeph">TIMESTAMP</code> produces a value that is <code class="ph codeph">N</code> seconds past the start of the epoch
-        date (January 1, 1970). By default, the result value represents a date and time in the UTC time zone.
-        If the setting <code class="ph codeph">--use_local_tz_for_unix_timestamp_conversions=true</code> is in effect,
-        the resulting <code class="ph codeph">TIMESTAMP</code> represents a date and time in the local time zone.
-        </span>
+      <span class="ph"> Casting an integer or floating-point value
+        <code class="ph codeph">N</code> to <code class="ph codeph">TIMESTAMP</code> produces a value that is
+        <code class="ph codeph">N</code> seconds past the start of the epoch date (January 1, 1970). By
+        default, the result value represents a date and time in the UTC time zone. If the
+        setting <code class="ph codeph">‑‑use_local_tz_for_unix_timestamp_conversions=true</code>
+        is in effect, the resulting <code class="ph codeph">TIMESTAMP</code> represents a date and time in the
+        local time zone. </span>
     </p>
 
 
@@ -379,18 +402,19 @@ DATE_ADD (<var class="keyword varname">timestamp</var>, INTERVAL <var class="key
     </p>
 
 
-    <p class="p"> In Impala 2.2.0 and higher, built-in functions
-        that accept or return integers representing <code class="ph codeph">TIMESTAMP</code>
-        values use the <code class="ph codeph">BIGINT</code> type for parameters and return
-        values, rather than <code class="ph codeph">INT</code>. This change lets the date and
-        time functions avoid an overflow error that would otherwise occur on
-        January 19th, 2038 (known as the <a class="xref" href="http://en.wikipedia.org/wiki/Year_2038_problem" target="_blank"><span class="q">"Year 2038 problem"</span> or <span class="q">"Y2K38
-        problem"</span></a>). This change affects the
-          <code class="ph codeph">FROM_UNIXTIME()</code> and <code class="ph codeph">UNIX_TIMESTAMP()</code>
-        functions. You might need to change application code that interacts with
-        these functions, change the types of columns that store the return
-        values, or add <code class="ph codeph">CAST()</code> calls to SQL statements that call
-        these functions. </p>
+    <p class="p">
+        In Impala 2.2.0 and higher, built-in functions that accept or return integers
+        representing <code class="ph codeph">TIMESTAMP</code> values use the <code class="ph codeph">BIGINT</code> type for
+        parameters and return values, rather than <code class="ph codeph">INT</code>. This change lets the
+        date and time functions avoid an overflow error that would otherwise occur on January
+        19th, 2038 (known as the
+        <a class="xref" href="http://en.wikipedia.org/wiki/Year_2038_problem" target="_blank"><span class="q">"Year
+        2038 problem"</span> or <span class="q">"Y2K38 problem"</span></a>). This change affects the
+        <code class="ph codeph">FROM_UNIXTIME()</code> and <code class="ph codeph">UNIX_TIMESTAMP()</code> functions. You
+        might need to change application code that interacts with these functions, change the
+        types of columns that store the return values, or add <code class="ph codeph">CAST()</code> calls to
+        SQL statements that call these functions.
+      </p>
 
 
     <p class="p">
@@ -414,8 +438,8 @@ ERROR: AnalysisException: Type 'TIMESTAMP' is not supported as partition-column 
 </code></pre>
 
     <p class="p">
-        <strong class="ph b">NULL considerations:</strong> Casting any unrecognized <code class="ph codeph">STRING</code> value to this type produces a
-        <code class="ph codeph">NULL</code> value.
+        <strong class="ph b">NULL considerations:</strong> Casting any unrecognized <code class="ph codeph">STRING</code> value to
+        this type produces a <code class="ph codeph">NULL</code> value.
       </p>
 
 
@@ -440,21 +464,21 @@ ERROR: AnalysisException: Type 'TIMESTAMP' is not supported as partition-column 
 
 
     <p class="p">
-        <strong class="ph b">Text table considerations:</strong> Values of this type are potentially larger in text tables than in tables
-        using Parquet or other binary formats.
+        <strong class="ph b">Text table considerations:</strong> Values of this type are potentially larger in text
+        tables than in tables using Parquet or other binary formats.
       </p>
 
 
     <p class="p">
-        <strong class="ph b">Column statistics considerations:</strong> Because this type has a fixed size, the maximum and average size
-        fields are always filled in for column statistics, even before you run the <code class="ph codeph">COMPUTE STATS</code>
-        statement.
+        <strong class="ph b">Column statistics considerations:</strong> Because this type has a fixed size, the maximum
+        and average size fields are always filled in for column statistics, even before you run
+        the <code class="ph codeph">COMPUTE STATS</code> statement.
       </p>
 
 
+    
 
-
-
+    
 
     <p class="p">
         <strong class="ph b">Kudu considerations:</strong>
@@ -462,41 +486,45 @@ ERROR: AnalysisException: Type 'TIMESTAMP' is not supported as partition-column 
 
 
     <div class="p">
-        In <span class="keyword">Impala 2.9</span> and higher, you can include <code class="ph codeph">TIMESTAMP</code>
-        columns in Kudu tables, instead of representing the date and time as a <code class="ph codeph">BIGINT</code>
-        value. The behavior of <code class="ph codeph">TIMESTAMP</code> for Kudu tables has some special considerations:
-
+        In <span class="keyword">Impala 2.9</span> and higher, you can include
+        <code class="ph codeph">TIMESTAMP</code> columns in Kudu tables, instead of representing the date and
+        time as a <code class="ph codeph">BIGINT</code> value. The behavior of <code class="ph codeph">TIMESTAMP</code> for
+        Kudu tables has some special considerations:
         <ul class="ul">
           <li class="li">
             <p class="p">
-              Any nanoseconds in the original 96-bit value produced by Impala are not stored, because
-              Kudu represents date/time columns using 64-bit values. The nanosecond portion of the value
-              is rounded, not truncated. Therefore, a <code class="ph codeph">TIMESTAMP</code> value
-              that you store in a Kudu table might not be bit-for-bit identical to the value returned by a query.
+              Any nanoseconds in the original 96-bit value produced by Impala are not stored,
+              because Kudu represents date/time columns using 64-bit values. The nanosecond
+              portion of the value is rounded, not truncated. Therefore, a
+              <code class="ph codeph">TIMESTAMP</code> value that you store in a Kudu table might not be
+              bit-for-bit identical to the value returned by a query.
             </p>
 
           </li>
 
+
           <li class="li">
             <p class="p">
-              The conversion between the Impala 96-bit representation and the Kudu 64-bit representation
-              introduces some performance overhead when reading or writing <code class="ph codeph">TIMESTAMP</code>
-              columns. You can minimize the overhead during writes by performing inserts through the
-              Kudu API. Because the overhead during reads applies to each query, you might continue to
-              use a <code class="ph codeph">BIGINT</code> column to represent date/time values  in performance-critical
-              applications.
+              The conversion between the Impala 96-bit representation and the Kudu 64-bit
+              representation introduces some performance overhead when reading or writing
+              <code class="ph codeph">TIMESTAMP</code> columns. You can minimize the overhead during writes by
+              performing inserts through the Kudu API. Because the overhead during reads applies
+              to each query, you might continue to use a <code class="ph codeph">BIGINT</code> column to
+              represent date/time values in performance-critical applications.
             </p>
 
           </li>
 
+
           <li class="li">
             <p class="p">
-              The Impala <code class="ph codeph">TIMESTAMP</code> type has a narrower range for years than the underlying
-              Kudu data type. Impala can represent years 1400-9999. If year values outside this range
-              are written to a Kudu table by a non-Impala client, Impala returns <code class="ph codeph">NULL</code>
-              by default when reading those <code class="ph codeph">TIMESTAMP</code> values during a query. Or, if the
-              <code class="ph codeph">ABORT_ON_ERROR</code> query option is enabled, the query fails when it encounters
-              a value with an out-of-range year.
+              The Impala <code class="ph codeph">TIMESTAMP</code> type has a narrower range for years than the
+              underlying Kudu data type. Impala can represent years 1400-9999. If year values
+              outside this range are written to a Kudu table by a non-Impala client, Impala
+              returns <code class="ph codeph">NULL</code> by default when reading those
+              <code class="ph codeph">TIMESTAMP</code> values during a query. Or, if the
+              <code class="ph codeph">ABORT_ON_ERROR</code> query option is enabled, the query fails when it
+              encounters a value with an out-of-range year.
             </p>
 
           </li>
@@ -520,11 +548,12 @@ ERROR: AnalysisException: Type 'TIMESTAMP' is not supported as partition-column 
 
 
     <p class="p">
-        Currently, Avro tables cannot contain <code class="ph codeph">TIMESTAMP</code> columns. If you need to store date and
-        time values in Avro tables, as a workaround you can use a <code class="ph codeph">STRING</code> representation of the
-        values, convert the values to <code class="ph codeph">BIGINT</code> with the <code class="ph codeph">UNIX_TIMESTAMP()</code> function,
-        or create separate numeric columns for individual date and time fields using the <code class="ph codeph">EXTRACT()</code>
-        function.
+        Currently, Avro tables cannot contain <code class="ph codeph">TIMESTAMP</code> columns. If you need to
+        store date and time values in Avro tables, as a workaround you can use a
+        <code class="ph codeph">STRING</code> representation of the values, convert the values to
+        <code class="ph codeph">BIGINT</code> with the <code class="ph codeph">UNIX_TIMESTAMP()</code> function, or create
+        separate numeric columns for individual date and time fields using the
+        <code class="ph codeph">EXTRACT()</code> function.
       </p>
 
 

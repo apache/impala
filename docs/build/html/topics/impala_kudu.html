@@ -10,8 +10,8 @@
 <meta name="DC.Title" content="Using Impala to Query Kudu Tables" />
 <meta name="prodname" content="Impala" />
 <meta name="prodname" content="Impala" />
-<meta name="version" content="Impala 3.2.x" />
-<meta name="version" content="Impala 3.2.x" />
+<meta name="version" content="Impala 3.3.x" />
+<meta name="version" content="Impala 3.3.x" />
 <meta name="DC.Format" content="XHTML" />
 <meta name="DC.Identifier" content="impala_kudu" />
 <link rel="stylesheet" type="text/css" href="../commonltr.css" />
@@ -275,7 +275,7 @@
         </ul>
 
 
-        <div class="note note"><span class="notetitle">Note:</span>
+        <div class="note note"><span class="notetitle">Note:</span> 
           <p class="p">
             Impala only allows <code class="ph codeph">PRIMARY KEY</code> clauses and <code class="ph codeph">NOT NULL</code>
             constraints on columns for Kudu tables. These constraints are enforced on the Kudu side.
@@ -344,9 +344,9 @@
 
 
           <p class="p">
-        Because all of the primary key columns must have non-null values, specifying a column
-        in the <code class="ph codeph">PRIMARY KEY</code> clause implicitly adds the <code class="ph codeph">NOT
-        NULL</code> attribute to that column.
+        Because all of the primary key columns must have non-null values, specifying a column in
+        the <code class="ph codeph">PRIMARY KEY</code> clause implicitly adds the <code class="ph codeph">NOT NULL</code>
+        attribute to that column.
       </p>
 
 
@@ -478,9 +478,9 @@ SHOW CREATE TABLE inline_pk_rewritten;
 
 
           <p class="p">
-        Because all of the primary key columns must have non-null values, specifying a column
-        in the <code class="ph codeph">PRIMARY KEY</code> clause implicitly adds the <code class="ph codeph">NOT
-        NULL</code> attribute to that column.
+        Because all of the primary key columns must have non-null values, specifying a column in
+        the <code class="ph codeph">PRIMARY KEY</code> clause implicitly adds the <code class="ph codeph">NOT NULL</code>
+        attribute to that column.
       </p>
 
 
@@ -570,7 +570,7 @@ CREATE TABLE default_vals
 ) PARTITION BY HASH(id) PARTITIONS 2 STORED AS KUDU;
 </code></pre>
 
-          <div class="note note"><span class="notetitle">Note:</span>
+          <div class="note note"><span class="notetitle">Note:</span> 
             <p class="p">
               When designing an entirely new schema, prefer to use <code class="ph codeph">NULL</code> as the
               placeholder for any unknown or missing values, because that is the universal convention
@@ -733,7 +733,7 @@ describe various_encodings;
           </p>
 
 
-          <div class="note note"><span class="notetitle">Note:</span>
+          <div class="note note"><span class="notetitle">Note:</span> 
             <p class="p">
               Columns that use the <code class="ph codeph">BITSHUFFLE</code> encoding are already compressed
               using <code class="ph codeph">LZ4</code>, and so typically do not need any additional
@@ -840,7 +840,7 @@ CREATE TABLE blog_posts
 
 
 
-        <div class="note note"><span class="notetitle">Note:</span>
+        <div class="note note"><span class="notetitle">Note:</span> 
           <p class="p">
             The Impala DDL syntax for Kudu tables is different than in early Kudu versions,
             which used an experimental fork of the Impala code. For example, the
@@ -892,7 +892,7 @@ CREATE TABLE million_rows (id string primary key, s string)
 INSERT INTO million_rows SELECT * FROM billion_rows ORDER BY id LIMIT 1e6;
 </code></pre>
 
-          <div class="note note"><span class="notetitle">Note:</span>
+          <div class="note note"><span class="notetitle">Note:</span> 
             <p class="p">
               The largest number of buckets that you can create with a <code class="ph codeph">PARTITIONS</code>
               clause varies depending on the number of tablet servers in the cluster, while the smallest is 2.
@@ -969,7 +969,7 @@ show range partitions million_rows_three_ranges;
 
 </code></pre>
 
-          <div class="note note"><span class="notetitle">Note:</span>
+          <div class="note note"><span class="notetitle">Note:</span> 
             <p class="p">
               When defining ranges, be careful to avoid <span class="q">"fencepost errors"</span> where values at the
               extreme ends might be included or omitted by accident. For example, in the tables defined
@@ -1097,41 +1097,45 @@ partition by hash (school) partitions 10,
       <div class="body conbody">
 
         <div class="p">
-        In <span class="keyword">Impala 2.9</span> and higher, you can include <code class="ph codeph">TIMESTAMP</code>
-        columns in Kudu tables, instead of representing the date and time as a <code class="ph codeph">BIGINT</code>
-        value. The behavior of <code class="ph codeph">TIMESTAMP</code> for Kudu tables has some special considerations:
-
+        In <span class="keyword">Impala 2.9</span> and higher, you can include
+        <code class="ph codeph">TIMESTAMP</code> columns in Kudu tables, instead of representing the date and
+        time as a <code class="ph codeph">BIGINT</code> value. The behavior of <code class="ph codeph">TIMESTAMP</code> for
+        Kudu tables has some special considerations:
         <ul class="ul">
           <li class="li">
             <p class="p">
-              Any nanoseconds in the original 96-bit value produced by Impala are not stored, because
-              Kudu represents date/time columns using 64-bit values. The nanosecond portion of the value
-              is rounded, not truncated. Therefore, a <code class="ph codeph">TIMESTAMP</code> value
-              that you store in a Kudu table might not be bit-for-bit identical to the value returned by a query.
+              Any nanoseconds in the original 96-bit value produced by Impala are not stored,
+              because Kudu represents date/time columns using 64-bit values. The nanosecond
+              portion of the value is rounded, not truncated. Therefore, a
+              <code class="ph codeph">TIMESTAMP</code> value that you store in a Kudu table might not be
+              bit-for-bit identical to the value returned by a query.
             </p>
 
           </li>
 
+
           <li class="li">
             <p class="p">
-              The conversion between the Impala 96-bit representation and the Kudu 64-bit representation
-              introduces some performance overhead when reading or writing <code class="ph codeph">TIMESTAMP</code>
-              columns. You can minimize the overhead during writes by performing inserts through the
-              Kudu API. Because the overhead during reads applies to each query, you might continue to
-              use a <code class="ph codeph">BIGINT</code> column to represent date/time values  in performance-critical
-              applications.
+              The conversion between the Impala 96-bit representation and the Kudu 64-bit
+              representation introduces some performance overhead when reading or writing
+              <code class="ph codeph">TIMESTAMP</code> columns. You can minimize the overhead during writes by
+              performing inserts through the Kudu API. Because the overhead during reads applies
+              to each query, you might continue to use a <code class="ph codeph">BIGINT</code> column to
+              represent date/time values in performance-critical applications.
             </p>
 
           </li>
 
+
           <li class="li">
             <p class="p">
-              The Impala <code class="ph codeph">TIMESTAMP</code> type has a narrower range for years than the underlying
-              Kudu data type. Impala can represent years 1400-9999. If year values outside this range
-              are written to a Kudu table by a non-Impala client, Impala returns <code class="ph codeph">NULL</code>
-              by default when reading those <code class="ph codeph">TIMESTAMP</code> values during a query. Or, if the
-              <code class="ph codeph">ABORT_ON_ERROR</code> query option is enabled, the query fails when it encounters
-              a value with an out-of-range year.
+              The Impala <code class="ph codeph">TIMESTAMP</code> type has a narrower range for years than the
+              underlying Kudu data type. Impala can represent years 1400-9999. If year values
+              outside this range are written to a Kudu table by a non-Impala client, Impala
+              returns <code class="ph codeph">NULL</code> by default when reading those
+              <code class="ph codeph">TIMESTAMP</code> values during a query. Or, if the
+              <code class="ph codeph">ABORT_ON_ERROR</code> query option is enabled, the query fails when it
+              encounters a value with an out-of-range year.
             </p>
 
           </li>
@@ -1241,7 +1245,7 @@ select id, when_exactly, from_unixtime(when_exactly) as 'human-readable date/tim
 
 </code></pre>
 
-        <div class="note note"><span class="notetitle">Note:</span>
+        <div class="note note"><span class="notetitle">Note:</span> 
           <p class="p">
             If you do high-precision arithmetic involving numeric date/time values,
             when dividing millisecond values by 1000, or microsecond values by 1 million, always
@@ -1277,45 +1281,39 @@ select microseconds,
 
 
       <div class="body conbody">
+        <div class="note note"><span class="notetitle">Note:</span> This section only applies the Kudu services that are not
+          integrated with the Hive Metastore (HMS).</div>
+
+        <p class="p">By default, much of the metadata
+        for Kudu tables is handled by the underlying storage layer. Kudu tables
+        have less reliance on the Metastore database, and require less metadata
+        caching on the Impala side. For example, information about partitions in
+        Kudu tables is managed by Kudu, and Impala does not cache any block
+        locality metadata for Kudu tables. If the Kudu service is not integrated
+        with the Hive Metastore, Impala will manage Kudu table metadata in the
+        Hive Metastore.</p>
 
         <p class="p">
-        Much of the metadata for Kudu tables is handled by the underlying
-        storage layer. Kudu tables have less reliance on the metastore
-        database, and require less metadata caching on the Impala side.
-        For example, information about partitions in Kudu tables is managed
-        by Kudu, and Impala does not cache any block locality metadata
-        for Kudu tables.
+        The <code class="ph codeph">REFRESH</code> and <code class="ph codeph">INVALIDATE METADATA</code> statements are
+        needed less frequently for Kudu tables than for HDFS-backed tables. Neither statement is
+        needed when data is added to, removed, or updated in a Kudu table, even if the changes
+        are made directly to Kudu through a client program using the Kudu API. Run
+        <code class="ph codeph">REFRESH <var class="keyword varname">table_name</var></code> or <code class="ph codeph">INVALIDATE METADATA
+        <var class="keyword varname">table_name</var></code> for a Kudu table only after making a change to
+        the Kudu table schema, such as adding or dropping a column.
       </p>
 
-        <p class="p">
-        The <code class="ph codeph">REFRESH</code> and <code class="ph codeph">INVALIDATE METADATA</code>
-        statements are needed less frequently for Kudu tables than for
-        HDFS-backed tables. Neither statement is needed when data is
-        added to, removed, or updated in a Kudu table, even if the changes
-        are made directly to Kudu through a client program using the Kudu API.
-        Run <code class="ph codeph">REFRESH <var class="keyword varname">table_name</var></code> or
-        <code class="ph codeph">INVALIDATE METADATA <var class="keyword varname">table_name</var></code>
-        for a Kudu table only after making a change to the Kudu table schema,
-        such as adding or dropping a column.
-      </p>
+        <p class="p"> Because Kudu manages the metadata for its own tables separately from
+          the metastore database, there is a table name stored in the metastore
+          database for Impala to use, and a table name on the Kudu side, and
+          these names can be modified independently through <code class="ph codeph">ALTER
+            TABLE</code> statements. </p>
 
+        <p class="p"> To avoid potential name conflicts, the prefix
+            <code class="ph codeph">impala::</code> and the Impala database name are encoded
+          into the underlying Kudu table name: </p>
 
-        <p class="p">
-          Because Kudu manages the metadata for its own tables separately from the metastore
-          database, there is a table name stored in the metastore database for Impala to use,
-          and a table name on the Kudu side, and these names can be modified independently
-          through <code class="ph codeph">ALTER TABLE</code> statements.
-        </p>
-
-
-        <p class="p">
-          To avoid potential name conflicts, the prefix <code class="ph codeph">impala::</code>
-          and the Impala database name are encoded into the underlying Kudu
-          table name:
-        </p>
-
-
-<pre class="pre codeblock"><code>
+        <pre class="pre codeblock"><code>
 create database some_database;
 use some_database;
 
@@ -1327,13 +1325,9 @@ describe formatted table_name_demo;
 kudu.table_name  | impala::some_database.table_name_demo
 
 </code></pre>
-
-        <p class="p">
-          See <a class="xref" href="impala_tables.html">Overview of Impala Tables</a> for examples of how to change the name of
-          the Impala table in the metastore database, the name of the underlying Kudu
-          table, or both.
-        </p>
-
+        <p class="p"> See <a class="xref" href="impala_tables.html">Overview of Impala Tables</a> for examples of how to change the
+          name of the Impala table in the metastore database, the name of the
+          underlying Kudu table, or both. </p>
 
       </div>
 
@@ -1343,10 +1337,44 @@ kudu.table_name  | impala::some_database.table_name_demo
 
   </div>
 
+  <div class="topic concept nested1" aria-labelledby="ariaid-title21" id="kudu_hms">
+    <h2 class="title topictitle2" id="ariaid-title21">Working with Kudu Integrated with Hive Metastore</h2>
 
-  <div class="topic concept nested1" aria-labelledby="ariaid-title21" id="kudu_etl">
+    <div class="body conbody">
+      <p class="p">Starting from Kudu 1.10 and Impala 3.3, Impala supports Kudu services
+        integrated with the Hive Metastore (HMS). See <a class="xref" href="https://kudu.apache.org/docs/hive_metastore.html#hive_metastore" target="_blank">the HMS integration
+          documentation</a> for more details on Kudu’s Hive Metastore
+        integration.</p>
 
-    <h2 class="title topictitle2" id="ariaid-title21">Loading Data into Kudu Tables</h2>
+      <div class="p">The following are some of the changes you need to consider when working
+        with Kudu services integrated with the HMS.<ul class="ul">
+          <li class="li"> When Kudu is integrated with the Hive Metastore, Impala must be
+            configured to use the same HMS as Kudu.</li>
+
+          <li class="li"> Since there may be no one-to-one mapping between Kudu tables and
+            external tables, only internal tables are automatically
+            synchronized. </li>
+
+          <li class="li">When you create a table in Kudu, Kudu will create an HMS entry for
+            that table with the internal table type.</li>
+
+          <li class="li">When the Kudu service is integrated with the HMS, internal table
+            entries will be created automatically in the HMS when tables are
+            created in Kudu without Impala. To access these tables through
+            Impala, run <code class="ph codeph">INVALIDATE METADATA</code> statement so Impala
+            picks up the latest metadata.</li>
+
+        </ul>
+</div>
+
+    </div>
+
+  </div>
+
+
+  <div class="topic concept nested1" aria-labelledby="ariaid-title22" id="kudu_etl">
+
+    <h2 class="title topictitle2" id="ariaid-title22">Loading Data into Kudu Tables</h2>
 
 
     <div class="body conbody">
@@ -1411,9 +1439,9 @@ kudu.table_name  | impala::some_database.table_name_demo
   </div>
 
 
-  <div class="topic concept nested1" aria-labelledby="ariaid-title22" id="kudu_dml">
+  <div class="topic concept nested1" aria-labelledby="ariaid-title23" id="kudu_dml">
 
-    <h2 class="title topictitle2" id="ariaid-title22">Impala DML Support for Kudu Tables (INSERT, UPDATE, DELETE, UPSERT)</h2>
+    <h2 class="title topictitle2" id="ariaid-title23">Impala DML Support for Kudu Tables (INSERT, UPDATE, DELETE, UPSERT)</h2>
 
 
     
@@ -1455,7 +1483,7 @@ kudu.table_name  | impala::some_database.table_name_demo
       </p>
 
 
-      <div class="note note"><span class="notetitle">Note:</span>
+      <div class="note note"><span class="notetitle">Note:</span> 
         <p class="p">
           The <code class="ph codeph">LOAD DATA</code> statement, which involves manipulation of HDFS data files,
           does not apply to Kudu tables.
@@ -1465,22 +1493,20 @@ kudu.table_name  | impala::some_database.table_name_demo
 
 
       <p class="p">
-        Starting from <span class="keyword">Impala 2.9</span>, the
-          <code class="ph codeph">INSERT</code> or <code class="ph codeph">UPSERT</code> operations into
-        Kudu tables automatically add an exchange and a sort node to the plan
-        that partitions and sorts the rows according to the partitioning/primary
-        key scheme of the target table (unless the number of rows to be inserted
-        is small enough to trigger single node execution). Since Kudu partitions
-        and sorts rows on write, pre-partitioning and sorting takes some of the
-        load off of Kudu and helps large <code class="ph codeph">INSERT</code> operations to
-        complete without timing out. However, this default behavior may slow
-        down the end-to-end performance of the <code class="ph codeph">INSERT</code> or
-          <code class="ph codeph">UPSERT</code> operations. Starting from<span class="keyword">Impala 2.10</span>, you can use the<code class="ph codeph"> /* +NOCLUSTERED
-          */</code> and <code class="ph codeph">/* +NOSHUFFLE */</code> hints together to
-        disable partitioning and sorting before the rows are sent to Kudu.
-        Additionally, since sorting may consume a large amount of memory,
-        consider setting the <code class="ph codeph">MEM_LIMIT</code> query option for those
-        queries.
+        Starting from <span class="keyword">Impala 2.9</span>, the <code class="ph codeph">INSERT</code> or
+        <code class="ph codeph">UPSERT</code> operations into Kudu tables automatically add an exchange and a
+        sort node to the plan that partitions and sorts the rows according to the
+        partitioning/primary key scheme of the target table (unless the number of rows to be
+        inserted is small enough to trigger single node execution). Since Kudu partitions and
+        sorts rows on write, pre-partitioning and sorting takes some of the load off of Kudu and
+        helps large <code class="ph codeph">INSERT</code> operations to complete without timing out. However,
+        this default behavior may slow down the end-to-end performance of the
+        <code class="ph codeph">INSERT</code> or <code class="ph codeph">UPSERT</code> operations. Starting
+        from<span class="keyword">Impala 2.10</span>, you can use the<code class="ph codeph"> /*
+        +NOCLUSTERED */</code> and <code class="ph codeph">/* +NOSHUFFLE */</code> hints together to disable
+        partitioning and sorting before the rows are sent to Kudu. Additionally, since sorting
+        may consume a large amount of memory, consider setting the <code class="ph codeph">MEM_LIMIT</code>
+        query option for those queries.
       </p>
 
 
@@ -1490,9 +1516,9 @@ kudu.table_name  | impala::some_database.table_name_demo
   </div>
 
 
-  <div class="topic concept nested1" aria-labelledby="ariaid-title23" id="kudu_consistency">
+  <div class="topic concept nested1" aria-labelledby="ariaid-title24" id="kudu_consistency">
 
-    <h2 class="title topictitle2" id="ariaid-title23">Consistency Considerations for Kudu Tables</h2>
+    <h2 class="title topictitle2" id="ariaid-title24">Consistency Considerations for Kudu Tables</h2>
 
 
     <div class="body conbody">
@@ -1553,9 +1579,9 @@ kudu.table_name  | impala::some_database.table_name_demo
   </div>
 
 
-  <div class="topic concept nested1" aria-labelledby="ariaid-title24" id="kudu_security">
+  <div class="topic concept nested1" aria-labelledby="ariaid-title25" id="kudu_security">
 
-    <h2 class="title topictitle2" id="ariaid-title24">Security Considerations for Kudu Tables</h2>
+    <h2 class="title topictitle2" id="ariaid-title25">Security Considerations for Kudu Tables</h2>
 
 
     <div class="body conbody">
@@ -1572,42 +1598,42 @@ kudu.table_name  | impala::some_database.table_name_demo
           </p>
 
           <div class="p">
-        Access to Kudu tables must be granted to and revoked from roles with the
-        following considerations:
+        Access to Kudu tables must be granted to and revoked from roles with the following
+        considerations:
         <ul class="ul">
           <li class="li">
-            Only users with the <code class="ph codeph">ALL</code> privilege on
-              <code class="ph codeph">SERVER</code> can create external Kudu tables.
+            Only users with the <code class="ph codeph">ALL</code> privilege on <code class="ph codeph">SERVER</code> can
+            create external Kudu tables.
           </li>
 
-          <li class="li">
-            The <code class="ph codeph">ALL</code> privileges on <code class="ph codeph">SERVER</code> is
-            required to specify the <code class="ph codeph">kudu.master_addresses</code>
-            property in the <code class="ph codeph">CREATE TABLE</code> statements for managed
-            tables as well as external tables.
-          </li>
 
           <li class="li">
-            Access to Kudu tables is enforced at the table level and at the
-            column level.
+            The <code class="ph codeph">ALL</code> privileges on <code class="ph codeph">SERVER</code> is required to
+            specify the <code class="ph codeph">kudu.master_addresses</code> property in the <code class="ph codeph">CREATE
+            TABLE</code> statements for managed tables as well as external tables.
           </li>
 
-          <li class="li">
-            The <code class="ph codeph">SELECT</code>- and <code class="ph codeph">INSERT</code>-specific
-            permissions are supported.
-          </li>
 
           <li class="li">
-            The <code class="ph codeph">DELETE</code>, <code class="ph codeph">UPDATE</code>, and
-            <code class="ph codeph">UPSERT</code> operations require the <code class="ph codeph">ALL</code>
-            privilege.
+            Access to Kudu tables is enforced at the table level and at the column level.
+          </li>
+
+
+          <li class="li">
+            The <code class="ph codeph">SELECT</code>- and <code class="ph codeph">INSERT</code>-specific permissions are
+            supported.
+          </li>
+
+
+          <li class="li">
+            The <code class="ph codeph">DELETE</code>, <code class="ph codeph">UPDATE</code>, and <code class="ph codeph">UPSERT</code>
+            operations require the <code class="ph codeph">ALL</code> privilege.
           </li>
 
         </ul>
 
-        Because non-SQL APIs can access Kudu data without going through Sentry
-        authorization, currently the Sentry support is considered preliminary
-        and subject to change.
+        Because non-SQL APIs can access Kudu data without going through Sentry authorization,
+        currently the Sentry support is considered preliminary and subject to change.
       </div>
 
         </li>
@@ -1661,9 +1687,9 @@ kudu.table_name  | impala::some_database.table_name_demo
   </div>
 
 
-  <div class="topic concept nested1" aria-labelledby="ariaid-title25" id="kudu_performance">
+  <div class="topic concept nested1" aria-labelledby="ariaid-title26" id="kudu_performance">
 
-    <h2 class="title topictitle2" id="ariaid-title25">Impala Query Performance for Kudu Tables</h2>
+    <h2 class="title topictitle2" id="ariaid-title26">Impala Query Performance for Kudu Tables</h2>
 
 
     <div class="body conbody">
@@ -1707,11 +1733,10 @@ kudu.table_name  | impala::some_database.table_name_demo
 
 
       <p class="p">
-        The <code class="ph codeph">TABLESAMPLE</code> clause of the <code class="ph codeph">SELECT</code>
-        statement does not apply to a table reference derived from a view, a subquery,
-        or anything other than a real base table. This clause only works for tables
-        backed by HDFS or HDFS-like data files, therefore it does not apply to Kudu or
-        HBase tables.
+        The <code class="ph codeph">TABLESAMPLE</code> clause of the <code class="ph codeph">SELECT</code> statement does
+        not apply to a table reference derived from a view, a subquery, or anything other than a
+        real base table. This clause only works for tables backed by HDFS or HDFS-like data
+        files, therefore it does not apply to Kudu or HBase tables.
       </p>
 
 

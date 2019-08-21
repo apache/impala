@@ -11,8 +11,8 @@
 <meta name="DC.Relation" scheme="URI" content="../topics/impala_file_formats.html" />
 <meta name="prodname" content="Impala" />
 <meta name="prodname" content="Impala" />
-<meta name="version" content="Impala 3.2.x" />
-<meta name="version" content="Impala 3.2.x" />
+<meta name="version" content="Impala 3.3.x" />
+<meta name="version" content="Impala 3.3.x" />
 <meta name="DC.Format" content="XHTML" />
 <meta name="DC.Identifier" content="rcfile" />
 <link rel="stylesheet" type="text/css" href="../commonltr.css" />
@@ -34,26 +34,26 @@
     </p>
 
 
-
+    
 <div class="tablenoborder"><table cellpadding="4" cellspacing="0" summary="" class="table" frame="border" border="1" rules="all"><caption><span class="tablecap"><span class="table--title-label">Table 1. </span>RCFile Format Support in Impala</span></caption><colgroup><col style="width:10%" /><col style="width:10%" /><col style="width:20%" /><col style="width:30%" /><col style="width:30%" /></colgroup><thead class="thead" style="text-align:left;">
           <tr class="row">
-            <th class="entry nocellnorowborder" style="vertical-align:top;" id="d150154e80">
+            <th class="entry nocellnorowborder" style="vertical-align:top;" id="d156146e80">
               File Type
             </th>
 
-            <th class="entry nocellnorowborder" style="vertical-align:top;" id="d150154e83">
+            <th class="entry nocellnorowborder" style="vertical-align:top;" id="d156146e83">
               Format
             </th>
 
-            <th class="entry nocellnorowborder" style="vertical-align:top;" id="d150154e86">
+            <th class="entry nocellnorowborder" style="vertical-align:top;" id="d156146e86">
               Compression Codecs
             </th>
 
-            <th class="entry nocellnorowborder" style="vertical-align:top;" id="d150154e89">
+            <th class="entry nocellnorowborder" style="vertical-align:top;" id="d156146e89">
               Impala Can CREATE?
             </th>
 
-            <th class="entry cell-norowborder" style="vertical-align:top;" id="d150154e92">
+            <th class="entry cell-norowborder" style="vertical-align:top;" id="d156146e92">
               Impala Can INSERT?
             </th>
 
@@ -62,23 +62,23 @@
         </thead>
 <tbody class="tbody">
           <tr class="row">
-            <td class="entry row-nocellborder" style="vertical-align:top;" headers="d150154e80 ">
+            <td class="entry row-nocellborder" style="vertical-align:top;" headers="d156146e80 ">
               <a class="xref" href="impala_rcfile.html#rcfile">RCFile</a>
             </td>
 
-            <td class="entry row-nocellborder" style="vertical-align:top;" headers="d150154e83 ">
+            <td class="entry row-nocellborder" style="vertical-align:top;" headers="d156146e83 ">
               Structured
             </td>
 
-            <td class="entry row-nocellborder" style="vertical-align:top;" headers="d150154e86 ">
+            <td class="entry row-nocellborder" style="vertical-align:top;" headers="d156146e86 ">
               Snappy, gzip, deflate, bzip2
             </td>
 
-            <td class="entry row-nocellborder" style="vertical-align:top;" headers="d150154e89 ">
+            <td class="entry row-nocellborder" style="vertical-align:top;" headers="d156146e89 ">
               Yes.
             </td>
 
-            <td class="entry cellrowborder" style="vertical-align:top;" headers="d150154e92 ">
+            <td class="entry cellrowborder" style="vertical-align:top;" headers="d156146e92 ">
               No. Import data by using <code class="ph codeph">LOAD DATA</code> on data files already in the
               right format, or use <code class="ph codeph">INSERT</code> in Hive followed by <code class="ph codeph">REFRESH
               <var class="keyword varname">table_name</var></code> in Impala.
@@ -136,7 +136,7 @@
       </p>
 
 
-      <div class="note important"><span class="importanttitle">Important:</span>
+      <div class="note important"><span class="importanttitle">Important:</span> 
         See <a class="xref" href="impala_known_issues.html#known_issues">Known Issues and Workarounds in Impala</a> for potential compatibility issues with
         RCFile tables created in Hive 0.12, due to a change in the default RCFile SerDe for Hive.
       </div>
@@ -176,15 +176,13 @@ Returned 0 row(s) in 0.23s
 Returned 3 row(s) in 0.23s</code></pre>
 
       <p class="p">
-        <strong class="ph b">Complex type considerations:</strong>
-        Although you can create tables in this file format using
-        the complex types (<code class="ph codeph">ARRAY</code>, <code class="ph codeph">STRUCT</code>,
-        and <code class="ph codeph">MAP</code>) available in <span class="keyword">Impala 2.3</span> and higher,
-        currently, Impala can query these types only in Parquet tables.
-        <span class="ph">
-        The one exception to the preceding rule is <code class="ph codeph">COUNT(*)</code> queries on RCFile tables that include complex types.
-        Such queries are allowed in <span class="keyword">Impala 2.6</span> and higher.
-        </span>
+        <strong class="ph b">Complex type considerations:</strong> Although you can create tables in this file format
+        using the complex types (<code class="ph codeph">ARRAY</code>, <code class="ph codeph">STRUCT</code>, and
+        <code class="ph codeph">MAP</code>) available in <span class="keyword">Impala 2.3</span> and higher,
+        currently, Impala can query these types only in Parquet tables. <span class="ph">
+        The one exception to the preceding rule is <code class="ph codeph">COUNT(*)</code> queries on RCFile
+        tables that include complex types. Such queries are allowed in
+        <span class="keyword">Impala 2.6</span> and higher. </span>
       </p>
 
 
@@ -258,7 +256,7 @@ hive&gt; SET hive.exec.dynamic.partition.mode=nonstrict;
 hive&gt; SET hive.exec.dynamic.partition=true;
 hive&gt; INSERT OVERWRITE TABLE tbl_rc PARTITION(year) SELECT * FROM tbl;</code></pre>
 
-      <div class="note note"><span class="notetitle">Note:</span>
+      <div class="note note"><span class="notetitle">Note:</span> 
         <p class="p">
           The compression type is specified in the following command:
         </p>
@@ -292,18 +290,18 @@ hive&gt; INSERT OVERWRITE TABLE tbl_rc PARTITION(year) SELECT * FROM tbl;</code>
 
 
       <p class="p">
-        In <span class="keyword">Impala 2.6</span> and higher, Impala queries are optimized for files stored in Amazon S3.
-        For Impala tables that use the file formats Parquet, ORC, RCFile, SequenceFile,
-        Avro, and uncompressed text, the setting <code class="ph codeph">fs.s3a.block.size</code>
-        in the <span class="ph filepath">core-site.xml</span> configuration file determines
-        how Impala divides the I/O work of reading the data files. This configuration
-        setting is specified in bytes. By default, this
-        value is 33554432 (32 MB), meaning that Impala parallelizes S3 read operations on the files
-        as if they were made up of 32 MB blocks. For example, if your S3 queries primarily access
-        Parquet files written by MapReduce or Hive, increase <code class="ph codeph">fs.s3a.block.size</code>
-        to 134217728 (128 MB) to match the row group size of those files. If most S3 queries involve
-        Parquet files written by Impala, increase <code class="ph codeph">fs.s3a.block.size</code>
-        to 268435456 (256 MB) to match the row group size produced by Impala.
+        In <span class="keyword">Impala 2.6</span> and higher, Impala queries are optimized for files
+        stored in Amazon S3. For Impala tables that use the file formats Parquet, ORC, RCFile,
+        SequenceFile, Avro, and uncompressed text, the setting
+        <code class="ph codeph">fs.s3a.block.size</code> in the <span class="ph filepath">core-site.xml</span>
+        configuration file determines how Impala divides the I/O work of reading the data files.
+        This configuration setting is specified in bytes. By default, this value is 33554432 (32
+        MB), meaning that Impala parallelizes S3 read operations on the files as if they were
+        made up of 32 MB blocks. For example, if your S3 queries primarily access Parquet files
+        written by MapReduce or Hive, increase <code class="ph codeph">fs.s3a.block.size</code> to 134217728
+        (128 MB) to match the row group size of those files. If most S3 queries involve Parquet
+        files written by Impala, increase <code class="ph codeph">fs.s3a.block.size</code> to 268435456 (256
+        MB) to match the row group size produced by Impala.
       </p>
 
 

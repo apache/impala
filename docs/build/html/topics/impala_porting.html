@@ -11,8 +11,8 @@
 <meta name="DC.Relation" scheme="URI" content="../topics/impala_langref.html" />
 <meta name="prodname" content="Impala" />
 <meta name="prodname" content="Impala" />
-<meta name="version" content="Impala 3.2.x" />
-<meta name="version" content="Impala 3.2.x" />
+<meta name="version" content="Impala 3.3.x" />
+<meta name="version" content="Impala 3.3.x" />
 <meta name="DC.Format" content="XHTML" />
 <meta name="DC.Identifier" content="porting" />
 <link rel="stylesheet" type="text/css" href="../commonltr.css" />
@@ -472,9 +472,10 @@ select count(*) from (select * from t1);
           <p class="p"> Impala supports <code class="ph codeph">UNION</code> and <code class="ph codeph">UNION
               ALL</code> set operators, but not <code class="ph codeph">INTERSECT</code>. </p>
 
-          <p class="p"><span class="ph">Prefer <code class="ph codeph">UNION ALL</code> over <code class="ph codeph">UNION</code> when you know the
-        data sets are disjoint or duplicate values are not a problem; <code class="ph codeph">UNION ALL</code> is more efficient
-        because it avoids materializing and sorting the entire result set to eliminate duplicate values.</span>
+          <p class="p"><span class="ph">Prefer <code class="ph codeph">UNION ALL</code> over
+        <code class="ph codeph">UNION</code> when you know the data sets are disjoint or duplicate values are
+        not a problem; <code class="ph codeph">UNION ALL</code> is more efficient because it avoids
+        materializing and sorting the entire result set to eliminate duplicate values.</span>
           </p>
 
         </li>
@@ -656,9 +657,10 @@ Aliases
         <li class="li">
           <p class="p">
             If practical, rewrite <code class="ph codeph">UNION</code> queries to use the <code class="ph codeph">UNION ALL</code> operator
-            instead. <span class="ph">Prefer <code class="ph codeph">UNION ALL</code> over <code class="ph codeph">UNION</code> when you know the
-        data sets are disjoint or duplicate values are not a problem; <code class="ph codeph">UNION ALL</code> is more efficient
-        because it avoids materializing and sorting the entire result set to eliminate duplicate values.</span>
+            instead. <span class="ph">Prefer <code class="ph codeph">UNION ALL</code> over
+        <code class="ph codeph">UNION</code> when you know the data sets are disjoint or duplicate values are
+        not a problem; <code class="ph codeph">UNION ALL</code> is more efficient because it avoids
+        materializing and sorting the entire result set to eliminate duplicate values.</span>
           </p>
 
         </li>

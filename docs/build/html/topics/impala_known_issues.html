@@ -11,8 +11,8 @@
 <meta name="DC.Relation" scheme="URI" content="../topics/impala_release_notes.html" />
 <meta name="prodname" content="Impala" />
 <meta name="prodname" content="Impala" />
-<meta name="version" content="Impala 3.2.x" />
-<meta name="version" content="Impala 3.2.x" />
+<meta name="version" content="Impala 3.3.x" />
+<meta name="version" content="Impala 3.3.x" />
 <meta name="DC.Format" content="XHTML" />
 <meta name="DC.Identifier" content="known_issues" />
 <link rel="stylesheet" type="text/css" href="../commonltr.css" />
@@ -37,7 +37,7 @@
     </p>
 
 
-    <div class="note note"><span class="notetitle">Note:</span>
+    <div class="note note"><span class="notetitle">Note:</span> 
       The online issue tracking system for Impala contains comprehensive information and is
       updated in real time. To verify whether an issue you are experiencing has already been
       reported, or which release an issue is fixed in, search on the
@@ -81,25 +81,26 @@
 
     <div class="topic concept nested2" aria-labelledby="ariaid-title3" id="IMPALA-4978">
 
-      <h3 class="title topictitle3" id="ariaid-title3">Impala requires FQDN from hostname command on Kerberized
-        clusters</h3>
+      <h3 class="title topictitle3" id="ariaid-title3">Impala requires FQDN from hostname command on Kerberized clusters</h3>
 
 
       <div class="body conbody">
 
-        <p class="p"> The method Impala uses to retrieve the host name while constructing
-          the Kerberos principal is the <code class="ph codeph">gethostname()</code> system
-          call. This function might not always return the fully qualified domain
-          name, depending on the network configuration. If the daemons cannot
-          determine the FQDN, Impala does not start on a Kerberized cluster. </p>
+        <p class="p">
+          The method Impala uses to retrieve the host name while constructing the Kerberos
+          principal is the <code class="ph codeph">gethostname()</code> system call. This function might not
+          always return the fully qualified domain name, depending on the network configuration.
+          If the daemons cannot determine the FQDN, Impala does not start on a Kerberized
+          cluster.
+        </p>
 
 
         <p class="p">
           <strong class="ph b">Workaround:</strong> Test if a host is affected by checking whether the output of the
           <span class="keyword cmdname">hostname</span> command includes the FQDN. On hosts where
           <span class="keyword cmdname">hostname</span>, only returns the short name, pass the command-line flag
-          <code class="ph codeph">--hostname=<var class="keyword varname">fully_qualified_domain_name</var></code> in the
-          startup options of all Impala-related daemons.
+          <code class="ph codeph">‑‑hostname=<var class="keyword varname">fully_qualified_domain_name</var></code>
+          in the startup options of all Impala-related daemons.
         </p>
 
 
@@ -148,8 +149,7 @@
 
 
         <p class="p">
-          <strong class="ph b">Apache Issue:</strong>
-          <a class="xref" href="https://issues.apache.org/jira/browse/IMPALA-6671" target="_blank">IMPALA-6671</a>
+          <strong class="ph b">Apache Issue:</strong> <a class="xref" href="https://issues.apache.org/jira/browse/IMPALA-6671" target="_blank">IMPALA-6671</a>
         </p>
 
 
@@ -196,8 +196,7 @@
 
 
         <p class="p">
-          <strong class="ph b">Apache Issue:</strong>
-          <a class="xref" href="https://issues.apache.org/jira/browse/IMPALA-1792" target="_blank">IMPALA-1792</a>
+          <strong class="ph b">Apache Issue:</strong> <a class="xref" href="https://issues.apache.org/jira/browse/IMPALA-1792" target="_blank">IMPALA-1792</a>
         </p>
 
 
@@ -215,69 +214,92 @@
   </div>
 
 
-<div class="topic concept nested1" aria-labelledby="known_issues_security__ki_security" id="known_issues_security">
-  <h2 class="title topictitle2" id="known_issues_security__ki_security">Impala Known Issues: Security</h2>
+  <div class="topic concept nested1" aria-labelledby="known_issues_security__ki_security" id="known_issues_security">
 
-  <div class="body conbody">
-    <p class="p">
-      These issues are related to security features, such as Kerberos
-        authentication, Sentry authorization, encryption, auditing, and
-        redaction.
-    </p>
-
-  </div>
-
-    <div class="topic concept nested2" aria-labelledby="ariaid-title9" id="impala-7072">
-      <h3 class="title topictitle3" id="ariaid-title9">Impala does not support Heimdal Kerberos </h3>
-
-      <div class="body conbody">
-        <p class="p">Heimdal Kerberos is not supported in Impala.</p>
-
-        <p class="p"><strong class="ph b">Apache Issue:</strong>
-          <a class="xref" href="https://issues.apache.org/jira/browse/IMPALA-7072" target="_blank">IMPALA-7072</a></p>
-
-        <p class="p"><strong class="ph b">Affected Versions:</strong> All versions of Impala</p>
-
-      </div>
-
-    </div>
-
-
-  <div class="topic concept nested2" aria-labelledby="ariaid-title10" id="id_p1n_tbx_22b">
-    <h3 class="title topictitle3" id="ariaid-title10">Impala does not allow the use of insecure clusters with public IPs</h3>
+    <h2 class="title topictitle2" id="known_issues_security__ki_security">Impala Known Issues: Security</h2>
 
 
     <div class="body conbody">
+
       <p class="p">
-          Starting in <span class="keyword">Impala 2.12</span>, Impala, by default,
-          will only allow unencrypted or unauthenticated connections from
-          trusted subnets: <code class="ph codeph">127.0.0.0/8</code>,
-            <code class="ph codeph">10.0.0.0/8</code>, <code class="ph codeph">172.16.0.0/12</code>,
-            <code class="ph codeph">192.168.0.0/16</code>, <code class="ph codeph">169.254.0.0/16</code>.
-          Unencrypted or unauthenticated connections from publicly routable IPs
-          will be rejected.
+        These issues are related to security features, such as Kerberos authentication, Sentry
+        authorization, encryption, auditing, and redaction.
       </p>
 
 
-      <p class="p">
-          The trusted subnets can be configured using the
-            <code class="ph codeph">--trusted_subnets</code> flag. Set it to
-            '<code class="ph codeph">0.0.0.0/0</code>' to allow unauthenticated connections
-          from all remote IP addresses. However, if network access is not
-          otherwise restricted by a firewall, malicious users may be able to
-          gain unauthorized access.
-      </p>
+    </div>
+
+
+    <div class="topic concept nested2" aria-labelledby="ariaid-title9" id="impala-7072">
+
+      <h3 class="title topictitle3" id="ariaid-title9">Impala does not support Heimdal Kerberos</h3>
+
+
+      <div class="body conbody">
+
+        <p class="p">
+          Heimdal Kerberos is not supported in Impala.
+        </p>
+
+
+        <p class="p">
+          <strong class="ph b">Apache Issue:</strong> <a class="xref" href="https://issues.apache.org/jira/browse/IMPALA-7072" target="_blank">IMPALA-7072</a>
+        </p>
+
+
+        <p class="p">
+          <strong class="ph b">Affected Versions:</strong> All versions of Impala
+        </p>
+
 
       </div>
+
+
+    </div>
+
+
+    <div class="topic concept nested2" aria-labelledby="ariaid-title10" id="id_p1n_tbx_22b">
+
+      <h3 class="title topictitle3" id="ariaid-title10">Impala does not allow the use of insecure clusters with public IPs</h3>
+
+
+      <div class="body conbody">
+
+        <p class="p">
+          Starting in <span class="keyword">Impala 2.12</span>, Impala, by default, will only allow
+          unencrypted or unauthenticated connections from trusted subnets:
+          <code class="ph codeph">127.0.0.0/8</code>, <code class="ph codeph">10.0.0.0/8</code>,
+          <code class="ph codeph">172.16.0.0/12</code>, <code class="ph codeph">192.168.0.0/16</code>,
+          <code class="ph codeph">169.254.0.0/16</code>. Unencrypted or unauthenticated connections from
+          publicly routable IPs will be rejected.
+        </p>
+
+
+        <p class="p">
+          The trusted subnets can be configured using the <code class="ph codeph">--trusted_subnets</code>
+          flag. Set it to '<code class="ph codeph">0.0.0.0/0</code>' to allow unauthenticated connections from
+          all remote IP addresses. However, if network access is not otherwise restricted by a
+          firewall, malicious users may be able to gain unauthorized access.
+        </p>
+
+
+      </div>
+
 
     </div>
 
 
 
 
+    
+
+    
 
 
-</div>
+
+    
+
+  </div>
 
 
   <div class="topic concept nested1" aria-labelledby="known_issues_resources__ki_resources" id="known_issues_resources">
@@ -316,8 +338,7 @@ terminate called after throwing an instance of 'boost::exception_detail::clone_i
 </code></pre>
 
         <p class="p">
-          <strong class="ph b">Apache Issue:</strong>
-          <a class="xref" href="https://issues.apache.org/jira/browse/IMPALA-5605" target="_blank">IMPALA-5605</a>
+          <strong class="ph b">Apache Issue:</strong> <a class="xref" href="https://issues.apache.org/jira/browse/IMPALA-5605" target="_blank">IMPALA-5605</a>
         </p>
 
 
@@ -471,8 +492,7 @@ explain SELECT 1 FROM alltypestiny a1
 </code></pre>
 
         <p class="p">
-          <strong class="ph b">Apache Issue:</strong>
-          <a class="xref" href="https://issues.apache.org/jira/browse/IMPALA-3094" target="_blank">IMPALA-3094</a>
+          <strong class="ph b">Apache Issue:</strong> <a class="xref" href="https://issues.apache.org/jira/browse/IMPALA-3094" target="_blank">IMPALA-3094</a>
         </p>
 
 
@@ -502,8 +522,7 @@ explain SELECT 1 FROM alltypestiny a1
 
 
         <p class="p">
-          <strong class="ph b">Apache Issue:</strong>
-          <a class="xref" href="https://issues.apache.org/jira/browse/IMPALA-2422" target="_blank">IMPALA-2422</a>
+          <strong class="ph b">Apache Issue:</strong> <a class="xref" href="https://issues.apache.org/jira/browse/IMPALA-2422" target="_blank">IMPALA-2422</a>
         </p>
 
 
@@ -527,8 +546,7 @@ explain SELECT 1 FROM alltypestiny a1
 
 
         <p class="p">
-          <strong class="ph b">Apache Issue:</strong>
-          <a class="xref" href="https://issues.apache.org/jira/browse/IMPALA-2603" target="_blank">IMPALA-2603</a>
+          <strong class="ph b">Apache Issue:</strong> <a class="xref" href="https://issues.apache.org/jira/browse/IMPALA-2603" target="_blank">IMPALA-2603</a>
         </p>
 
 
@@ -558,28 +576,42 @@ explain SELECT 1 FROM alltypestiny a1
 
     </div>
 
+
     <div class="topic concept nested2" aria-labelledby="ariaid-title20" id="hadoop-15720">
+
       <h3 class="title topictitle3" id="ariaid-title20">Queries Stuck on Failed HDFS Calls and not Timing out</h3>
 
-      <div class="body conbody">
-        <p class="p">If the following error appears multiple times in a short duration
-          while running a query, it would mean that the connection between the
-            <code class="ph codeph">impalad</code> and the HDFS NameNode is in a bad state and
-          hence the <code class="ph codeph">impalad</code> would have to be restarted:</p>
 
-        <pre class="pre codeblock"><code>"hdfsOpenFile() for &lt;filename&gt; at backend &lt;hostname:port&gt; failed to finish before the &lt;hdfs_operation_timeout_sec&gt; second timeout " </code></pre>
+      <div class="body conbody">
+
+        <p class="p">
+          If the following error appears multiple times in a short duration while running a
+          query, it would mean that the connection between the <code class="ph codeph">impalad</code> and the
+          HDFS NameNode is in a bad state and hence the <code class="ph codeph">impalad</code> would have to
+          be restarted:
+        </p>
+
+
+<pre class="pre codeblock"><code>"hdfsOpenFile() for &lt;filename&gt; at backend &lt;hostname:port&gt; failed to finish before the &lt;hdfs_operation_timeout_sec&gt; second timeout " </code></pre>
+
         <p class="p">
           <strong class="ph b">Apache Issue:</strong>
           <a class="xref" href="https://issues.apache.org/jira/browse/HADOOP-15720" target="_blank">HADOOP-15720</a>
         </p>
 
-        <p class="p"><strong class="ph b">Affected Versions:</strong> All versions of Impala</p>
 
         <p class="p">
-          <strong class="ph b">Workaround:</strong> Restart the <code class="ph codeph">impalad</code> in the bad
-          state.</p>
+          <strong class="ph b">Affected Versions:</strong> All versions of Impala
+        </p>
+
+
+        <p class="p">
+          <strong class="ph b">Workaround:</strong> Restart the <code class="ph codeph">impalad</code> in the bad state.
+        </p>
+
 
       </div>
+
 
     </div>
 
@@ -607,7 +639,7 @@ explain SELECT 1 FROM alltypestiny a1
         </p>
 
 
-        <div class="note warning"><span class="warningtitle">Warning:</span>
+        <div class="note warning"><span class="warningtitle">Warning:</span> 
           <div class="p">
             Only use this for external tables, or Impala will remove the data files. In case of
             an internal table, set it to external first:
@@ -634,7 +666,7 @@ ALTER TABLE table_name SET TBLPROPERTIES('EXTERNAL'='TRUE');
     </div>
 
 
-
+    
 
     <div class="topic concept nested2" aria-labelledby="ariaid-title22" id="flume_writeformat_text">
 
@@ -672,25 +704,22 @@ ALTER TABLE table_name SET TBLPROPERTIES('EXTERNAL'='TRUE');
       <div class="body conbody">
 
         <p class="p">
-          The default value in Avro schema must match type of first union
-          type, e.g. if the default value is <code class="ph codeph">null</code>, then the
-          first type in the <code class="ph codeph">UNION</code> must be
-            <code class="ph codeph">"null"</code>.
+          The default value in Avro schema must match type of first union type, e.g. if the
+          default value is <code class="ph codeph">null</code>, then the first type in the
+          <code class="ph codeph">UNION</code> must be <code class="ph codeph">"null"</code>.
         </p>
 
 
         <p class="p">
-          <strong class="ph b">Apache Issue:</strong>
-          <a class="xref" href="https://issues.apache.org/jira/browse/IMPALA-635" target="_blank">IMPALA-635</a>
+          <strong class="ph b">Apache Issue:</strong> <a class="xref" href="https://issues.apache.org/jira/browse/IMPALA-635" target="_blank">IMPALA-635</a>
         </p>
 
 
         <p class="p">
-          <strong class="ph b">Workaround:</strong>Swap the order of the fields in the schema
-          specification. For example, use <code class="ph codeph">["null", "string"]</code>
-          instead of <code class="ph codeph">["string", "null"]</code>. Note that the files
-          written with the problematic schema must be rewritten with the new
-          schema because Avro files have embedded schemas.
+          <strong class="ph b">Workaround:</strong>Swap the order of the fields in the schema specification. For
+          example, use <code class="ph codeph">["null", "string"]</code> instead of <code class="ph codeph">["string",
+          "null"]</code>. Note that the files written with the problematic schema must be
+          rewritten with the new schema because Avro files have embedded schemas.
         </p>
 
 
@@ -714,8 +743,7 @@ ALTER TABLE table_name SET TBLPROPERTIES('EXTERNAL'='TRUE');
 
 
         <p class="p">
-          <strong class="ph b">Apache Issue:</strong>
-          <a class="xref" href="https://issues.apache.org/jira/browse/IMPALA-1024" target="_blank">IMPALA-1024</a>
+          <strong class="ph b">Apache Issue:</strong> <a class="xref" href="https://issues.apache.org/jira/browse/IMPALA-1024" target="_blank">IMPALA-1024</a>
         </p>
 
 
@@ -744,8 +772,7 @@ ALTER TABLE table_name SET TBLPROPERTIES('EXTERNAL'='TRUE');
 
 
         <p class="p">
-          <strong class="ph b">Apache Issue:</strong>
-          <a class="xref" href="https://issues.apache.org/jira/browse/IMPALA-1652" target="_blank">IMPALA-1652</a>
+          <strong class="ph b">Apache Issue:</strong> <a class="xref" href="https://issues.apache.org/jira/browse/IMPALA-1652" target="_blank">IMPALA-1652</a>
         </p>
 
 
@@ -779,10 +806,32 @@ ALTER TABLE table_name SET TBLPROPERTIES('EXTERNAL'='TRUE');
 
     </div>
 
+    <div class="topic concept nested2" aria-labelledby="ariaid-title27" id="IMPALA-8829">
+      <h3 class="title topictitle3" id="ariaid-title27">Unable to Correctly Parse the Terabyte Unit</h3>
 
-    <div class="topic concept nested2" aria-labelledby="ariaid-title27" id="IMPALA-4551">
+      <div class="body conbody">
+        <p class="p">Impala does not support parsing strings that contain "TB" when used
+          as a unit for terabytes. The flags related to memory limits may be
+          affected, such as the flags for scratch space and data cache.</p>
 
-      <h3 class="title topictitle3" id="ariaid-title27">Set limits on size of expression trees</h3>
+        <p class="p"><strong class="ph b">Workaround:</strong> Use other supported units to specify values, e.g.
+          GB or MB.</p>
+
+        <p class="p"><strong class="ph b">Affected Versions:</strong> All versions</p>
+
+        <p class="p">
+          <strong class="ph b">Apache Issue:</strong>
+          <a class="xref" href="https://issues.apache.org/jira/browse/IMPALA-8829" target="_blank">IMPALA-8829</a>
+        </p>
+
+      </div>
+
+    </div>
+
+
+    <div class="topic concept nested2" aria-labelledby="ariaid-title28" id="IMPALA-4551">
+
+      <h3 class="title topictitle3" id="ariaid-title28">Set limits on size of expression trees</h3>
 
 
       <div class="body conbody">
@@ -794,8 +843,7 @@ ALTER TABLE table_name SET TBLPROPERTIES('EXTERNAL'='TRUE');
 
 
         <p class="p">
-          <strong class="ph b">Apache Issue:</strong>
-          <a class="xref" href="https://issues.apache.org/jira/browse/IMPALA-4551" target="_blank">IMPALA-4551</a>
+          <strong class="ph b">Apache Issue:</strong> <a class="xref" href="https://issues.apache.org/jira/browse/IMPALA-4551" target="_blank">IMPALA-4551</a>
         </p>
 
 
@@ -817,9 +865,9 @@ ALTER TABLE table_name SET TBLPROPERTIES('EXTERNAL'='TRUE');
     </div>
 
 
-    <div class="topic concept nested2" aria-labelledby="ariaid-title28" id="IMPALA-77">
+    <div class="topic concept nested2" aria-labelledby="ariaid-title29" id="IMPALA-77">
 
-      <h3 class="title topictitle3" id="ariaid-title28">Impala does not support running on clusters with federated namespaces</h3>
+      <h3 class="title topictitle3" id="ariaid-title29">Impala does not support running on clusters with federated namespaces</h3>
 
 
       <div class="body conbody">
@@ -832,8 +880,7 @@ ALTER TABLE table_name SET TBLPROPERTIES('EXTERNAL'='TRUE');
 
 
         <p class="p">
-          <strong class="ph b">Apache Issue:</strong>
-          <a class="xref" href="https://issues.apache.org/jira/browse/IMPALA-77" target="_blank">IMPALA-77</a>
+          <strong class="ph b">Apache Issue:</strong> <a class="xref" href="https://issues.apache.org/jira/browse/IMPALA-77" target="_blank">IMPALA-77</a>
         </p>
 
 
@@ -856,9 +903,9 @@ ALTER TABLE table_name SET TBLPROPERTIES('EXTERNAL'='TRUE');
   </div>
 
 
-  <div class="topic concept nested1" aria-labelledby="ariaid-title29" id="known_issues_misc">
+  <div class="topic concept nested1" aria-labelledby="ariaid-title30" id="known_issues_misc">
 
-    <h2 class="title topictitle2" id="ariaid-title29">Impala Known Issues: Miscellaneous</h2>
+    <h2 class="title topictitle2" id="ariaid-title30">Impala Known Issues: Miscellaneous</h2>
 
 
     <div class="body conbody">
@@ -872,9 +919,9 @@ ALTER TABLE table_name SET TBLPROPERTIES('EXTERNAL'='TRUE');
     </div>
 
 
-    <div class="topic concept nested2" aria-labelledby="ariaid-title30" id="IMPALA-2005">
+    <div class="topic concept nested2" aria-labelledby="ariaid-title31" id="IMPALA-2005">
 
-      <h3 class="title topictitle3" id="ariaid-title30">A failed CTAS does not drop the table if the insert fails</h3>
+      <h3 class="title topictitle3" id="ariaid-title31">A failed CTAS does not drop the table if the insert fails</h3>
 
 
       <div class="body conbody">
@@ -887,8 +934,7 @@ ALTER TABLE table_name SET TBLPROPERTIES('EXTERNAL'='TRUE');
 
 
         <p class="p">
-          <strong class="ph b">Apache Issue:</strong>
-          <a class="xref" href="https://issues.apache.org/jira/browse/IMPALA-2005" target="_blank">IMPALA-2005</a>
+          <strong class="ph b">Apache Issue:</strong> <a class="xref" href="https://issues.apache.org/jira/browse/IMPALA-2005" target="_blank">IMPALA-2005</a>
         </p>
 
 
@@ -904,9 +950,9 @@ ALTER TABLE table_name SET TBLPROPERTIES('EXTERNAL'='TRUE');
     </div>
 
 
-    <div class="topic concept nested2" aria-labelledby="ariaid-title31" id="IMPALA-1821">
+    <div class="topic concept nested2" aria-labelledby="ariaid-title32" id="IMPALA-1821">
 
-      <h3 class="title topictitle3" id="ariaid-title31">Casting scenarios with invalid/inconsistent results</h3>
+      <h3 class="title topictitle3" id="ariaid-title32">Casting scenarios with invalid/inconsistent results</h3>
 
 
       <div class="body conbody">
@@ -920,8 +966,7 @@ ALTER TABLE table_name SET TBLPROPERTIES('EXTERNAL'='TRUE');
 
 
         <p class="p">
-          <strong class="ph b">Apache Issue:</strong>
-          <a class="xref" href="https://issues.apache.org/jira/browse/IMPALA-1821" target="_blank">IMPALA-1821</a>
+          <strong class="ph b">Apache Issue:</strong> <a class="xref" href="https://issues.apache.org/jira/browse/IMPALA-1821" target="_blank">IMPALA-1821</a>
         </p>
 
 
@@ -935,10 +980,11 @@ ALTER TABLE table_name SET TBLPROPERTIES('EXTERNAL'='TRUE');
 
 
 
+    
 
-    <div class="topic concept nested2" aria-labelledby="ariaid-title32" id="IMPALA-532">
+    <div class="topic concept nested2" aria-labelledby="ariaid-title33" id="IMPALA-532">
 
-      <h3 class="title topictitle3" id="ariaid-title32">Impala should tolerate bad locale settings</h3>
+      <h3 class="title topictitle3" id="ariaid-title33">Impala should tolerate bad locale settings</h3>
 
 
       <div class="body conbody">
@@ -950,8 +996,7 @@ ALTER TABLE table_name SET TBLPROPERTIES('EXTERNAL'='TRUE');
 
 
         <p class="p">
-          <strong class="ph b">Apache Issue:</strong>
-          <a class="xref" href="https://issues.apache.org/jira/browse/IMPALA-532" target="_blank">IMPALA-532</a>
+          <strong class="ph b">Apache Issue:</strong> <a class="xref" href="https://issues.apache.org/jira/browse/IMPALA-532" target="_blank">IMPALA-532</a>
         </p>
 
 
@@ -975,9 +1020,9 @@ ALTER TABLE table_name SET TBLPROPERTIES('EXTERNAL'='TRUE');
     </div>
 
 
-    <div class="topic concept nested2" aria-labelledby="ariaid-title33" id="IMP-1203">
+    <div class="topic concept nested2" aria-labelledby="ariaid-title34" id="IMP-1203">
 
-      <h3 class="title topictitle3" id="ariaid-title33">Log Level 3 Not Recommended for Impala</h3>
+      <h3 class="title topictitle3" id="ariaid-title34">Log Level 3 Not Recommended for Impala</h3>
 
 
       <div class="body conbody">
@@ -1004,9 +1049,9 @@ ALTER TABLE table_name SET TBLPROPERTIES('EXTERNAL'='TRUE');
   </div>
 
 
-  <div class="topic concept nested1" aria-labelledby="ariaid-title34" id="known_issues_crash">
+  <div class="topic concept nested1" aria-labelledby="ariaid-title35" id="known_issues_crash">
 
-    <h2 class="title topictitle2" id="ariaid-title34">Impala Known Issues: Crashes and Hangs</h2>
+    <h2 class="title topictitle2" id="ariaid-title35">Impala Known Issues: Crashes and Hangs</h2>
 
 
     <div class="body conbody">
@@ -1019,9 +1064,9 @@ ALTER TABLE table_name SET TBLPROPERTIES('EXTERNAL'='TRUE');
     </div>
 
 
-    <div class="topic concept nested2" aria-labelledby="ariaid-title35" id="impala-6841">
+    <div class="topic concept nested2" aria-labelledby="ariaid-title36" id="impala-6841">
 
-      <h3 class="title topictitle3" id="ariaid-title35">Unable to view large catalog objects in catalogd Web UI</h3>
+      <h3 class="title topictitle3" id="ariaid-title36">Unable to view large catalog objects in catalogd Web UI</h3>
 
 
       <div class="body conbody">
@@ -1035,8 +1080,7 @@ ALTER TABLE table_name SET TBLPROPERTIES('EXTERNAL'='TRUE');
 
 
         <p class="p">
-          <strong class="ph b">Apache Issue:</strong>
-          <a class="xref" href="https://issues.apache.org/jira/browse/IMPALA-6841" target="_blank">IMPALA-6841</a>
+          <strong class="ph b">Apache Issue:</strong> <a class="xref" href="https://issues.apache.org/jira/browse/IMPALA-6841" target="_blank">IMPALA-6841</a>
         </p>
 
 

@@ -18,16 +18,16 @@
 <meta name="prodname" content="Impala" />
 <meta name="prodname" content="Impala" />
 <meta name="prodname" content="Impala" />
-<meta name="version" content="Impala 3.2.x" />
-<meta name="version" content="Impala 3.2.x" />
-<meta name="version" content="Impala 3.2.x" />
-<meta name="version" content="Impala 3.2.x" />
-<meta name="version" content="Impala 3.2.x" />
-<meta name="version" content="Impala 3.2.x" />
-<meta name="version" content="Impala 3.2.x" />
-<meta name="version" content="Impala 3.2.x" />
-<meta name="version" content="Impala 3.2.x" />
-<meta name="version" content="Impala 3.2.x" />
+<meta name="version" content="Impala 3.3.x" />
+<meta name="version" content="Impala 3.3.x" />
+<meta name="version" content="Impala 3.3.x" />
+<meta name="version" content="Impala 3.3.x" />
+<meta name="version" content="Impala 3.3.x" />
+<meta name="version" content="Impala 3.3.x" />
+<meta name="version" content="Impala 3.3.x" />
+<meta name="version" content="Impala 3.3.x" />
+<meta name="version" content="Impala 3.3.x" />
+<meta name="version" content="Impala 3.3.x" />
 <meta name="DC.Format" content="XHTML" />
 <meta name="DC.Identifier" content="impala_hbase" />
 <link rel="stylesheet" type="text/css" href="../commonltr.css" />
@@ -547,7 +547,7 @@ set hbase_caching=1000;
         </p>
 
 
-        <div class="note note"><span class="notetitle">Note:</span>
+        <div class="note note"><span class="notetitle">Note:</span> 
           In Impala 2.0 and later, these options are settable through the JDBC or ODBC interfaces using the
           <code class="ph codeph">SET</code> statement.
         </div>
@@ -723,11 +723,10 @@ set hbase_caching=1000;
 
         <li class="li">
           <p class="p">
-        The <code class="ph codeph">TABLESAMPLE</code> clause of the <code class="ph codeph">SELECT</code>
-        statement does not apply to a table reference derived from a view, a subquery,
-        or anything other than a real base table. This clause only works for tables
-        backed by HDFS or HDFS-like data files, therefore it does not apply to Kudu or
-        HBase tables.
+        The <code class="ph codeph">TABLESAMPLE</code> clause of the <code class="ph codeph">SELECT</code> statement does
+        not apply to a table reference derived from a view, a subquery, or anything other than a
+        real base table. This clause only works for tables backed by HDFS or HDFS-like data
+        files, therefore it does not apply to Kudu or HBase tables.
       </p>
 
         </li>
@@ -797,7 +796,7 @@ hbase(main):006:0&gt; quit
         </p>
 
 
-        <div class="note note"><span class="notetitle">Note:</span>
+        <div class="note note"><span class="notetitle">Note:</span> 
           For Impala with HBase tables, the most important aspect to ensure good performance is to use a
           <code class="ph codeph">STRING</code> column as the row key, as shown in this example.
         </div>
@@ -882,12 +881,13 @@ Inserted 1 row(s) in 0.12s
 Fetched 1 row(s) in 0.54s
 </code></pre>
 
-        <div class="note note"><span class="notetitle">Note:</span>
-        After you create a table in Hive, such as the HBase mapping table in this example, issue an
-        <code class="ph codeph">INVALIDATE METADATA <var class="keyword varname">table_name</var></code> statement the next time you connect to
-        Impala, make Impala aware of the new table. (Prior to Impala 1.2.4, you could not specify the table name if
-        Impala was not aware of the table yet; in Impala 1.2.4 and higher, specifying the table name avoids
-        reloading the metadata for other tables that are not changed.)
+        <div class="note note"><span class="notetitle">Note:</span> 
+        After you create a table in Hive, such as the HBase mapping table in this example, issue
+        an <code class="ph codeph">INVALIDATE METADATA <var class="keyword varname">table_name</var></code> statement the next
+        time you connect to Impala, make Impala aware of the new table. (Prior to Impala 1.2.4,
+        you could not specify the table name if Impala was not aware of the table yet; in Impala
+        1.2.4 and higher, specifying the table name avoids reloading the metadata for other
+        tables that are not changed.)
       </div>
 
     </div>

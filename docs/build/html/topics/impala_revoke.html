@@ -11,8 +11,8 @@
 <meta name="DC.Relation" scheme="URI" content="../topics/impala_langref_sql.html" />
 <meta name="prodname" content="Impala" />
 <meta name="prodname" content="Impala" />
-<meta name="version" content="Impala 3.2.x" />
-<meta name="version" content="Impala 3.2.x" />
+<meta name="version" content="Impala 3.3.x" />
+<meta name="version" content="Impala 3.3.x" />
 <meta name="DC.Format" content="XHTML" />
 <meta name="DC.Identifier" content="revoke" />
 <link rel="stylesheet" type="text/css" href="../commonltr.css" />
@@ -32,7 +32,7 @@
 
     <p class="p">
       The <code class="ph codeph">REVOKE</code> statement revokes roles or privileges on a specified object
-      from groups.
+      from groups, roles, or users.
     </p>
 
 
@@ -41,15 +41,36 @@
       </p>
 
 
+    <p class="p">
+      The following syntax is supported when Impala is using Senty to manage authorization.
+    </p>
+
+
 <pre class="pre codeblock"><code>REVOKE ROLE <var class="keyword varname">role_name</var> FROM GROUP <var class="keyword varname">group_name</var>
 
 REVOKE [GRANT OPTION FOR] <var class="keyword varname">privilege</var> ON <var class="keyword varname">object_type</var> <var class="keyword varname">object_name</var>
   FROM [ROLE] <var class="keyword varname">role_name</var>
 
 <span class="ph">
+  <var class="keyword varname">privilege</var> ::= ALL | ALTER | CREATE | DROP | INSERT | REFRESH | SELECT | SELECT(<var class="keyword varname">column_name</var>)
+</span>
+<span class="ph" id="revoke__priv_objs"><var class="keyword varname">object_type</var> ::= SERVER | URI | DATABASE | TABLE</span></code></pre>
+
+    <p class="p">
+      The following syntax is supported when Impala is using Ranger to manage authorization.
+    </p>
+
+
+<pre class="pre codeblock"><code>REVOKE <var class="keyword varname">privilege</var> ON <var class="keyword varname">object_type</var> <var class="keyword varname">object_name</var>
+  FROM USER <var class="keyword varname">user_name</var>
+
+REVOKE <var class="keyword varname">privilege</var> ON <var class="keyword varname">object_type</var> <var class="keyword varname">object_name</var>
+  FROM GROUP <var class="keyword varname">group_name</var>
+<span class="ph">
+
   privilege ::= ALL | ALTER | CREATE | DROP | INSERT | REFRESH | SELECT | SELECT(<var class="keyword varname">column_name</var>)
 </span>
-<span class="ph" id="revoke__priv_objs">object_type ::= SERVER | URI | DATABASE | TABLE</span></code></pre>
+<span class="ph">object_type ::= SERVER | URI | DATABASE | TABLE</span></code></pre>
 
     <p class="p">
       <strong class="ph b">Usage notes:</strong>
@@ -143,8 +164,8 @@ REVOKE ALL ON SERVER FROM ROLE foo_role;</code></pre>
 
 
         <li class="li">
-          Currently, each Impala <code class="ph codeph">GRANT</code> or <code class="ph codeph">REVOKE</code> statement can only grant or
-          revoke a single privilege to or from a single role.
+          Currently, each Impala <code class="ph codeph">GRANT</code> or <code class="ph codeph">REVOKE</code> statement can
+          only grant or revoke a single privilege to or from a single role.
         </li>
 
       </ul>
@@ -169,42 +190,42 @@ REVOKE ALL ON SERVER FROM ROLE foo_role;</code></pre>
 
 
     <div class="p">
-        Access to Kudu tables must be granted to and revoked from roles with the
-        following considerations:
+        Access to Kudu tables must be granted to and revoked from roles with the following
+        considerations:
         <ul class="ul">
           <li class="li">
-            Only users with the <code class="ph codeph">ALL</code> privilege on
-              <code class="ph codeph">SERVER</code> can create external Kudu tables.
+            Only users with the <code class="ph codeph">ALL</code> privilege on <code class="ph codeph">SERVER</code> can
+            create external Kudu tables.
           </li>
 
-          <li class="li">
-            The <code class="ph codeph">ALL</code> privileges on <code class="ph codeph">SERVER</code> is
-            required to specify the <code class="ph codeph">kudu.master_addresses</code>
-            property in the <code class="ph codeph">CREATE TABLE</code> statements for managed
-            tables as well as external tables.
-          </li>
 
           <li class="li">
-            Access to Kudu tables is enforced at the table level and at the
-            column level.
+            The <code class="ph codeph">ALL</code> privileges on <code class="ph codeph">SERVER</code> is required to
+            specify the <code class="ph codeph">kudu.master_addresses</code> property in the <code class="ph codeph">CREATE
+            TABLE</code> statements for managed tables as well as external tables.
           </li>
 
-          <li class="li">
-            The <code class="ph codeph">SELECT</code>- and <code class="ph codeph">INSERT</code>-specific
-            permissions are supported.
-          </li>
 
           <li class="li">
-            The <code class="ph codeph">DELETE</code>, <code class="ph codeph">UPDATE</code>, and
-            <code class="ph codeph">UPSERT</code> operations require the <code class="ph codeph">ALL</code>
-            privilege.
+            Access to Kudu tables is enforced at the table level and at the column level.
+          </li>
+
+
+          <li class="li">
+            The <code class="ph codeph">SELECT</code>- and <code class="ph codeph">INSERT</code>-specific permissions are
+            supported.
+          </li>
+
+
+          <li class="li">
+            The <code class="ph codeph">DELETE</code>, <code class="ph codeph">UPDATE</code>, and <code class="ph codeph">UPSERT</code>
+            operations require the <code class="ph codeph">ALL</code> privilege.
           </li>
 
         </ul>
 
-        Because non-SQL APIs can access Kudu data without going through Sentry
-        authorization, currently the Sentry support is considered preliminary
-        and subject to change.
+        Because non-SQL APIs can access Kudu data without going through Sentry authorization,
+        currently the Sentry support is considered preliminary and subject to change.
       </div>
 
 
@@ -214,7 +235,7 @@ REVOKE ALL ON SERVER FROM ROLE foo_role;</code></pre>
 
 
     <p class="p">
-      <a class="xref" href="impala_authorization.html#authorization">Enabling Sentry Authorization for Impala</a>,
+      <a class="xref" href="impala_authorization.html#authorization">Impala Authorization</a>,
       <a class="xref" href="impala_grant.html#grant">GRANT Statement (Impala 2.0 or higher only)</a> <a class="xref" href="impala_create_role.html#create_role">CREATE ROLE Statement (Impala 2.0 or higher only)</a>,
       <a class="xref" href="impala_drop_role.html#drop_role">DROP ROLE Statement (Impala 2.0 or higher only)</a>, <a class="xref" href="impala_show.html#show">SHOW Statement</a>
     </p>

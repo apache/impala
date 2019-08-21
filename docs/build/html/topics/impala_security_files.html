@@ -11,8 +11,8 @@
 <meta name="DC.Relation" scheme="URI" content="../topics/impala_security.html" />
 <meta name="prodname" content="Impala" />
 <meta name="prodname" content="Impala" />
-<meta name="version" content="Impala 3.2.x" />
-<meta name="version" content="Impala 3.2.x" />
+<meta name="version" content="Impala 3.3.x" />
+<meta name="version" content="Impala 3.3.x" />
 <meta name="DC.Format" content="XHTML" />
 <meta name="DC.Identifier" content="secure_files" />
 <link rel="stylesheet" type="text/css" href="../commonltr.css" />
@@ -62,7 +62,7 @@
       <p class="p">
         The way to ensure that only authorized users can submit requests for databases and tables they are allowed
         to access is to set up Sentry authorization, as explained in
-        <a class="xref" href="impala_authorization.html#authorization">Enabling Sentry Authorization for Impala</a>. With authorization enabled, the checking of the user
+        <a class="xref" href="impala_authorization.html#authorization">Impala Authorization</a>. With authorization enabled, the checking of the user
         ID and group is done by Impala, and unauthorized access is blocked by Impala itself. The actual low-level
         read and write requests are still done by the <code class="ph codeph">impala</code> user, so you must have appropriate
         file and directory permissions for that user ID.

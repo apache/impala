@@ -11,8 +11,8 @@
 <meta name="DC.Relation" scheme="URI" content="../topics/impala_datatypes.html" />
 <meta name="prodname" content="Impala" />
 <meta name="prodname" content="Impala" />
-<meta name="version" content="Impala 3.2.x" />
-<meta name="version" content="Impala 3.2.x" />
+<meta name="version" content="Impala 3.3.x" />
+<meta name="version" content="Impala 3.3.x" />
 <meta name="DC.Format" content="XHTML" />
 <meta name="DC.Identifier" content="string" />
 <link rel="stylesheet" type="text/css" href="../commonltr.css" />
@@ -261,36 +261,37 @@
     </p>
 
     <p class="p">
-        <strong class="ph b">Zero-length strings:</strong> For purposes of clauses such as <code class="ph codeph">DISTINCT</code> and <code class="ph codeph">GROUP
-        BY</code>, Impala considers zero-length strings (<code class="ph codeph">""</code>), <code class="ph codeph">NULL</code>, and space
-        to all be different values.
+        <strong class="ph b">Zero-length strings:</strong> For purposes of clauses such as <code class="ph codeph">DISTINCT</code>
+        and <code class="ph codeph">GROUP BY</code>, Impala considers zero-length strings
+        (<code class="ph codeph">""</code>), <code class="ph codeph">NULL</code>, and space to all be different values.
       </p>
 
-
-
+    
+    
     <p class="p">
-        <strong class="ph b">Text table considerations:</strong> Values of this type are potentially larger in text tables than in tables
-        using Parquet or other binary formats.
+        <strong class="ph b">Text table considerations:</strong> Values of this type are potentially larger in text
+        tables than in tables using Parquet or other binary formats.
       </p>
 
     <p class="p"><strong class="ph b">Avro considerations:</strong></p>
 
     <p class="p">
-        The Avro specification allows string values up to 2**64 bytes in length.
-        Impala queries for Avro tables use 32-bit integers to hold string lengths.
-        In <span class="keyword">Impala 2.5</span> and higher, Impala truncates <code class="ph codeph">CHAR</code>
-        and <code class="ph codeph">VARCHAR</code> values in Avro tables to (2**31)-1 bytes.
-        If a query encounters a <code class="ph codeph">STRING</code> value longer than (2**31)-1
-        bytes in an Avro table, the query fails. In earlier releases,
-        encountering such long values in an Avro table could cause a crash.
+        The Avro specification allows string values up to 2**64 bytes in length. Impala queries
+        for Avro tables use 32-bit integers to hold string lengths. In
+        <span class="keyword">Impala 2.5</span> and higher, Impala truncates <code class="ph codeph">CHAR</code> and
+        <code class="ph codeph">VARCHAR</code> values in Avro tables to (2**31)-1 bytes. If a query encounters
+        a <code class="ph codeph">STRING</code> value longer than (2**31)-1 bytes in an Avro table, the query
+        fails. In earlier releases, encountering such long values in an Avro table could cause a
+        crash.
       </p>
 
-
-
-
+    
+    
+    
     <p class="p">
-        <strong class="ph b">Column statistics considerations:</strong> Because the values of this type have variable size, none of the
-        column statistics fields are filled in until you run the <code class="ph codeph">COMPUTE STATS</code> statement.
+        <strong class="ph b">Column statistics considerations:</strong> Because the values of this type have variable
+        size, none of the column statistics fields are filled in until you run the
+        <code class="ph codeph">COMPUTE STATS</code> statement.
       </p>
 
     <p class="p">

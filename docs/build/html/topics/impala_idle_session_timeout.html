@@ -10,7 +10,7 @@
 <meta name="DC.Title" content="IDLE_SESSION_TIMEOUT Query Option (Impala 2.12 or higher only)" />
 <meta name="DC.Relation" scheme="URI" content="../topics/impala_query_options.html" />
 <meta name="prodname" content="Impala" />
-<meta name="version" content="Impala 3.2.x" />
+<meta name="version" content="Impala 3.3.x" />
 <meta name="DC.Format" content="XHTML" />
 <meta name="DC.Identifier" content="idle_session_timeout" />
 <link rel="stylesheet" type="text/css" href="../commonltr.css" />
@@ -22,9 +22,9 @@
   <h1 class="title topictitle1" id="ariaid-title1">IDLE_SESSION_TIMEOUT Query Option (<span class="keyword">Impala 2.12</span> or higher only)</h1>
 
 
+  
 
-
-
+  
 
   <div class="body conbody">
 
@@ -39,9 +39,9 @@
 
     <p class="p">
       The <code class="ph codeph">IDLE_SESSION_TIMEOUT</code> query option overrides the
-      <code class="ph codeph">--idle_session_timeout</code> startup option. See
+      <code class="ph codeph">‑‑idle_session_timeout</code> startup option. See
       <a class="xref" href="impala_timeouts.html#timeouts">Setting Timeout Periods for Daemons, Queries, and Sessions</a> for the
-      <code class="ph codeph">--idle_session_timeout</code> startup option.
+      <code class="ph codeph">‑‑idle_session_timeout</code> startup option.
     </p>
 
 
@@ -67,12 +67,13 @@
       <strong class="ph b">Default:</strong> 0
       <ul class="ul">
         <li class="li">
-          If <code class="ph codeph">--idle_session_timeout</code> is not set, the session never expires.
+          If <code class="ph codeph">‑‑idle_session_timeout</code> is not set, the session never
+          expires.
         </li>
 
 
         <li class="li">
-          If <code class="ph codeph">--idle_session_timeout</code> is set, use that timeout value.
+          If <code class="ph codeph">‑‑idle_session_timeout</code> is set, use that timeout value.
         </li>
 
       </ul>

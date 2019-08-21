@@ -11,8 +11,8 @@
 <meta name="DC.Relation" scheme="URI" content="../topics/impala_langref_sql.html" />
 <meta name="prodname" content="Impala" />
 <meta name="prodname" content="Impala" />
-<meta name="version" content="Impala 3.2.x" />
-<meta name="version" content="Impala 3.2.x" />
+<meta name="version" content="Impala 3.3.x" />
+<meta name="version" content="Impala 3.3.x" />
 <meta name="DC.Format" content="XHTML" />
 <meta name="DC.Identifier" content="create_table" />
 <link rel="stylesheet" type="text/css" href="../commonltr.css" />
@@ -31,7 +31,6 @@
   <div class="body conbody">
 
     <p class="p">
-      
       Creates a new table and specifies its characteristics. While creating a table, you
       optionally specify aspects such as:
     </p>
@@ -211,7 +210,7 @@ data_type:
 
     <div class="p">
       <strong class="ph b">kudu_partition_clause:</strong>
-      <pre class="pre codeblock"><code>
+<pre class="pre codeblock"><code>
 kudu_partition_clause ::= [ <var class="keyword varname">hash_clause</var> [, ...]] [, <var class="keyword varname">range_clause</var> ]
 
 hash_clause ::=
@@ -322,8 +321,8 @@ AS
 
 
     <p class="p">
-        Partitioned tables can contain complex type columns.
-        All the partition key columns must be scalar types.
+        Partitioned tables can contain complex type columns. All the partition key columns must
+        be scalar types.
       </p>
 
 
@@ -380,20 +379,21 @@ AS
     </p>
 
 
-    <div class="note note"><span class="notetitle">Note:</span>
+    <div class="note note"><span class="notetitle">Note:</span> 
       <p class="p">
         All Kudu tables require partitioning, which involves different syntax than non-Kudu
         tables. See the <code class="ph codeph">PARTITION BY</code> clause, rather than <code class="ph codeph">PARTITIONED
         BY</code>, for Kudu tables.
       </p>
 
+
       <p class="p">
         In <span class="keyword">Impala 2.10</span> and higher, the <code class="ph codeph">PARTITION BY</code>
         clause is optional for Kudu tables. If the clause is omitted, Impala automatically
-        constructs a single partition that is not connected to any column. Because such a
-        table cannot take advantage of Kudu features for parallelized queries and
-        query optimizations, omitting the <code class="ph codeph">PARTITION BY</code> clause is only
-        appropriate for small lookup tables.
+        constructs a single partition that is not connected to any column. Because such a table
+        cannot take advantage of Kudu features for parallelized queries and query optimizations,
+        omitting the <code class="ph codeph">PARTITION BY</code> clause is only appropriate for small lookup
+        tables.
       </p>
 
     </div>
@@ -415,54 +415,54 @@ AS
 
 
     <p class="p">
-      The optional <code class="ph codeph">SORT BY</code> clause lets you specify zero or more columns
-      that are sorted in the data files created by each Impala <code class="ph codeph">INSERT</code> or
-      <code class="ph codeph">CREATE TABLE AS SELECT</code> operation. Creating data files that are
-      sorted is most useful for Parquet tables, where the metadata stored inside each file includes
-      the minimum and maximum values for each column in the file. (The statistics apply to each row group
-      within the file; for simplicity, Impala writes a single row group in each file.) Grouping
-      data values together in relatively narrow ranges within each data file makes it possible
-      for Impala to quickly skip over data files that do not contain value ranges indicated in
-      the <code class="ph codeph">WHERE</code> clause of a query, and can improve the effectiveness
-      of Parquet encoding and compression.
+      The optional <code class="ph codeph">SORT BY</code> clause lets you specify zero or more columns that
+      are sorted in the data files created by each Impala <code class="ph codeph">INSERT</code> or
+      <code class="ph codeph">CREATE TABLE AS SELECT</code> operation. Creating data files that are sorted is
+      most useful for Parquet tables, where the metadata stored inside each file includes the
+      minimum and maximum values for each column in the file. (The statistics apply to each row
+      group within the file; for simplicity, Impala writes a single row group in each file.)
+      Grouping data values together in relatively narrow ranges within each data file makes it
+      possible for Impala to quickly skip over data files that do not contain value ranges
+      indicated in the <code class="ph codeph">WHERE</code> clause of a query, and can improve the
+      effectiveness of Parquet encoding and compression.
     </p>
 
 
     <p class="p">
-      This clause is not applicable for Kudu tables or HBase tables. Although it works
-      for other HDFS file formats besides Parquet, the more efficient layout is most
-      evident with Parquet tables, because each Parquet data file includes statistics
-      about the data values in that file.
+      This clause is not applicable for Kudu tables or HBase tables. Although it works for other
+      HDFS file formats besides Parquet, the more efficient layout is most evident with Parquet
+      tables, because each Parquet data file includes statistics about the data values in that
+      file.
     </p>
 
 
     <p class="p">
-      The <code class="ph codeph">SORT BY</code> columns cannot include any partition key columns
-      for a partitioned table, because those column values are not represented in
-      the underlying data files.
+      The <code class="ph codeph">SORT BY</code> columns cannot include any partition key columns for a
+      partitioned table, because those column values are not represented in the underlying data
+      files.
     </p>
 
 
     <p class="p">
-      Because data files can arrive in Impala tables by mechanisms that do not respect
-      the <code class="ph codeph">SORT BY</code> clause, such as <code class="ph codeph">LOAD DATA</code> or ETL
-      tools that create HDFS files, Impala does not guarantee or rely on the data being
-      sorted. The sorting aspect is only used to create a more efficient layout for
-      Parquet files generated by Impala, which helps to optimize the processing of
-      those Parquet files during Impala queries. During an <code class="ph codeph">INSERT</code>
-      or <code class="ph codeph">CREATE TABLE AS SELECT</code> operation, the sorting occurs
-      when the <code class="ph codeph">SORT BY</code> clause applies to the destination table
-      for the data, regardless of whether the source table has a <code class="ph codeph">SORT BY</code>
-      clause.
+      Because data files can arrive in Impala tables by mechanisms that do not respect the
+      <code class="ph codeph">SORT BY</code> clause, such as <code class="ph codeph">LOAD DATA</code> or ETL tools that
+      create HDFS files, Impala does not guarantee or rely on the data being sorted. The sorting
+      aspect is only used to create a more efficient layout for Parquet files generated by
+      Impala, which helps to optimize the processing of those Parquet files during Impala
+      queries. During an <code class="ph codeph">INSERT</code> or <code class="ph codeph">CREATE TABLE AS SELECT</code>
+      operation, the sorting occurs when the <code class="ph codeph">SORT BY</code> clause applies to the
+      destination table for the data, regardless of whether the source table has a <code class="ph codeph">SORT
+      BY</code> clause.
     </p>
 
 
     <p class="p">
-      For example, when creating a table intended to contain census data, you might define
-      sort columns such as last name and state. If a data file in this table contains a
-      narrow range of last names, for example from <code class="ph codeph">Smith</code> to <code class="ph codeph">Smythe</code>,
-      Impala can quickly detect that this data file contains no matches for a <code class="ph codeph">WHERE</code>
-      clause such as <code class="ph codeph">WHERE last_name = 'Jones'</code> and avoid reading the entire file.
+      For example, when creating a table intended to contain census data, you might define sort
+      columns such as last name and state. If a data file in this table contains a narrow range
+      of last names, for example from <code class="ph codeph">Smith</code> to <code class="ph codeph">Smythe</code>, Impala
+      can quickly detect that this data file contains no matches for a <code class="ph codeph">WHERE</code>
+      clause such as <code class="ph codeph">WHERE last_name = 'Jones'</code> and avoid reading the entire
+      file.
     </p>
 
 
@@ -473,9 +473,9 @@ AS
 
     <p class="p">
       Likewise, if an existing table contains data without any sort order, you can reorganize
-      the data in a more efficient way by using <code class="ph codeph">INSERT</code> or
-      <code class="ph codeph">CREATE TABLE AS SELECT</code> to copy that data into a new table with a
-      <code class="ph codeph">SORT BY</code> clause:
+      the data in a more efficient way by using <code class="ph codeph">INSERT</code> or <code class="ph codeph">CREATE TABLE
+      AS SELECT</code> to copy that data into a new table with a <code class="ph codeph">SORT BY</code>
+      clause:
     </p>
 
 
@@ -487,10 +487,42 @@ AS
 </code></pre>
 
     <p class="p">
-      The metadata for the <code class="ph codeph">SORT BY</code> clause is stored in the <code class="ph codeph">TBLPROPERTIES</code>
-      fields for the table. Other SQL engines that can interoperate with Impala tables, such as Hive
-      and Spark SQL, do not recognize this property when inserting into a table that has a <code class="ph codeph">SORT BY</code>
-      clause.
+      The metadata for the <code class="ph codeph">SORT BY</code> clause is stored in the
+      <code class="ph codeph">TBLPROPERTIES</code> fields for the table. Other SQL engines that can
+      interoperate with Impala tables, such as Hive and Spark SQL, do not recognize this
+      property when inserting into a table that has a <code class="ph codeph">SORT BY</code> clause.
+    </p>
+
+
+    <p class="p">
+      <strong class="ph b">Transactional tables:</strong>
+    </p>
+
+
+    <p class="p">
+      In the version 3.3 and higher, when integrated with Hive 3, Impala can create, read, and
+      insert into transactional tables.
+    </p>
+
+
+    <div class="p">
+      To create a table that supports transactions, use the <code class="ph codeph">TBLPROPERTIES</code>
+      clause and set the <code class="ph codeph">'transactional'</code> and
+      <code class="ph codeph">'transactional_properties'</code> as below. Currently, Impala only supports
+      insert-only transactional tables.
+<pre class="pre codeblock"><code>TBLPROPERTIES('transactional'='true', 'transactional_properties'='insert_only')</code></pre>
+    </div>
+
+
+    <p class="p">
+      When integrated with Hive3 and the <code class="ph codeph">DEFAULT_TRANSACTIONAL_TYPE</code> query
+      option is set to <code class="ph codeph">INSERT_ONLY</code>, tables are created as insert-only
+      transactional table by default.
+    </p>
+
+
+    <p class="p">
+      Transactional tables are not supported for Kudu and HBase.
     </p>
 
 
@@ -504,9 +536,10 @@ AS
       partitioning mechanisms, the syntax associated with the <code class="ph codeph">STORED AS KUDU</code>
       clause is shown separately in the above syntax descriptions. Kudu tables have their own
       syntax for <code class="ph codeph">CREATE TABLE</code>, <code class="ph codeph">CREATE EXTERNAL TABLE</code>, and
-      <code class="ph codeph">CREATE TABLE AS SELECT</code>. <span class="ph">Prior to <span class="keyword">Impala 2.10</span>,
-      all internal Kudu tables require a <code class="ph codeph">PARTITION BY</code> clause, different than
-      the <code class="ph codeph">PARTITIONED BY</code> clause for HDFS-backed tables.</span>
+      <code class="ph codeph">CREATE TABLE AS SELECT</code>. <span class="ph">Prior to
+      <span class="keyword">Impala 2.10</span>, all internal Kudu tables require a <code class="ph codeph">PARTITION
+      BY</code> clause, different than the <code class="ph codeph">PARTITIONED BY</code> clause for
+      HDFS-backed tables.</span>
     </p>
 
 
@@ -616,7 +649,7 @@ CREATE TABLE ctas_t1
 
     <p class="p">
       For more on creating a Kudu table with a specific replication factor, see
-        <a class="xref" href="impala_kudu.html#kudu_replication_factor">Kudu Replication Factor</a>.
+      <a class="xref" href="impala_kudu.html#kudu_replication_factor">Kudu Replication Factor</a>.
     </p>
 
 
@@ -798,7 +831,7 @@ create table combined_t2 (x bigint, s string, s2 string, primary key (x, s))
     </p>
 
 
-    <div class="note note"><span class="notetitle">Note:</span>
+    <div class="note note"><span class="notetitle">Note:</span> 
       In Impala 1.4.0 and higher, Impala can create Avro tables, which formerly required doing
       the <code class="ph codeph">CREATE TABLE</code> statement in Hive. See
       <a class="xref" href="impala_avro.html#avro">Using the Avro File Format with Impala Tables</a> for details and examples.
@@ -837,15 +870,17 @@ create table combined_t2 (x bigint, s string, s2 string, primary key (x, s))
     </p>
 
 
-    <div class="note note"><span class="notetitle">Note:</span>
-        The <code class="ph codeph">CREATE TABLE</code> clauses <code class="ph codeph">FIELDS TERMINATED BY</code>, <code class="ph codeph">ESCAPED
-        BY</code>, and <code class="ph codeph">LINES TERMINATED BY</code> have special rules for the string literal used for
-        their argument, because they all require a single character. You can use a regular character surrounded by
-        single or double quotation marks, an octal sequence such as <code class="ph codeph">'\054'</code> (representing a comma),
-        or an integer in the range '-127'..'128' (with quotation marks but no backslash), which is interpreted as a
-        single-byte ASCII character. Negative values are subtracted from 256; for example, <code class="ph codeph">FIELDS
-        TERMINATED BY '-2'</code> sets the field delimiter to ASCII code 254, the <span class="q">"Icelandic Thorn"</span>
-        character used as a delimiter by some data formats.
+    <div class="note note"><span class="notetitle">Note:</span> 
+        The <code class="ph codeph">CREATE TABLE</code> clauses <code class="ph codeph">FIELDS TERMINATED BY</code>,
+        <code class="ph codeph">ESCAPED BY</code>, and <code class="ph codeph">LINES TERMINATED BY</code> have special rules
+        for the string literal used for their argument, because they all require a single
+        character. You can use a regular character surrounded by single or double quotation
+        marks, an octal sequence such as <code class="ph codeph">'\054'</code> (representing a comma), or an
+        integer in the range '-127'..'128' (with quotation marks but no backslash), which is
+        interpreted as a single-byte ASCII character. Negative values are subtracted from 256;
+        for example, <code class="ph codeph">FIELDS TERMINATED BY '-2'</code> sets the field delimiter to
+        ASCII code 254, the <span class="q">"Icelandic Thorn"</span> character used as a delimiter by some data
+        formats.
       </div>
 
 
@@ -868,7 +903,7 @@ create table combined_t2 (x bigint, s string, s2 string, primary key (x, s))
   [STORED AS <var class="keyword varname">file_format</var>]
   [LOCATION '<var class="keyword varname">hdfs_path</var>']</code></pre>
 
-    <div class="note note"><span class="notetitle">Note:</span>
+    <div class="note note"><span class="notetitle">Note:</span> 
       <p class="p">
         To clone the structure of a table and transfer data into it in a single operation, use
         the <code class="ph codeph">CREATE TABLE AS SELECT</code> syntax described in the next subsection.
@@ -912,13 +947,14 @@ create table combined_t2 (x bigint, s string, s2 string, primary key (x, s))
 
     <p class="p">
         Prior to Impala 1.4.0, it was not possible to use the <code class="ph codeph">CREATE TABLE LIKE
-        <var class="keyword varname">view_name</var></code> syntax. In Impala 1.4.0 and higher, you can create a table with the
-        same column definitions as a view using the <code class="ph codeph">CREATE TABLE LIKE</code> technique. Although
-        <code class="ph codeph">CREATE TABLE LIKE</code> normally inherits the file format of the original table, a view has no
-        underlying file format, so <code class="ph codeph">CREATE TABLE LIKE <var class="keyword varname">view_name</var></code> produces a text
-        table by default. To specify a different file format, include a <code class="ph codeph">STORED AS
-        <var class="keyword varname">file_format</var></code> clause at the end of the <code class="ph codeph">CREATE TABLE LIKE</code>
-        statement.
+        <var class="keyword varname">view_name</var></code> syntax. In Impala 1.4.0 and higher, you can create
+        a table with the same column definitions as a view using the <code class="ph codeph">CREATE TABLE
+        LIKE</code> technique. Although <code class="ph codeph">CREATE TABLE LIKE</code> normally inherits
+        the file format of the original table, a view has no underlying file format, so
+        <code class="ph codeph">CREATE TABLE LIKE <var class="keyword varname">view_name</var></code> produces a text table by
+        default. To specify a different file format, include a <code class="ph codeph">STORED AS
+        <var class="keyword varname">file_format</var></code> clause at the end of the <code class="ph codeph">CREATE TABLE
+        LIKE</code> statement.
       </p>
 
 
@@ -1024,7 +1060,7 @@ SELECT * FROM t5;
     </p>
 
 
-    <div class="note note"><span class="notetitle">Note:</span>
+    <div class="note note"><span class="notetitle">Note:</span> 
       When using the <code class="ph codeph">STORED AS</code> clause with a <code class="ph codeph">CREATE TABLE AS
       SELECT</code> statement, the destination table must be a file format that Impala can
       write to: currently, text or Parquet. You cannot specify an Avro, SequenceFile, or RCFile
@@ -1035,16 +1071,16 @@ SELECT * FROM t5;
     <p class="p">
       Prior to <span class="keyword">Impala 2.5</span> you could use a partitioned table as the source
       and copy data from it, but could not specify any partitioning clauses for the new table.
-      In <span class="keyword">Impala 2.5</span> and higher, you can now use the <code class="ph codeph">PARTITIONED
-      BY</code> clause with a <code class="ph codeph">CREATE TABLE AS SELECT</code> statement. The following
-      example demonstrates how you can copy data from an unpartitioned table in a <code class="ph codeph">CREATE
-      TABLE AS SELECT</code> operation, creating a new partitioned table in the process. The
-      main syntax consideration is the column order in the <code class="ph codeph">PARTITIONED BY</code>
-      clause and the select list: the partition key columns must be listed last in the select
-      list, in the same order as in the <code class="ph codeph">PARTITIONED BY</code> clause. Therefore, in
-      this case, the column order in the destination table is different from the source table.
-      You also only specify the column names in the <code class="ph codeph">PARTITIONED BY</code> clause, not
-      the data types or column comments.
+      In <span class="keyword">Impala 2.5</span> and higher, you can now use the
+      <code class="ph codeph">PARTITIONED BY</code> clause with a <code class="ph codeph">CREATE TABLE AS SELECT</code>
+      statement. The following example demonstrates how you can copy data from an unpartitioned
+      table in a <code class="ph codeph">CREATE TABLE AS SELECT</code> operation, creating a new partitioned
+      table in the process. The main syntax consideration is the column order in the
+      <code class="ph codeph">PARTITIONED BY</code> clause and the select list: the partition key columns must
+      be listed last in the select list, in the same order as in the <code class="ph codeph">PARTITIONED
+      BY</code> clause. Therefore, in this case, the column order in the destination table is
+      different from the source table. You also only specify the column names in the
+      <code class="ph codeph">PARTITIONED BY</code> clause, not the data types or column comments.
     </p>
 
 
@@ -1137,11 +1173,12 @@ ERROR: AnalysisException: Partition column name mismatch: year != month
 
 
     <p class="p">
-        <strong class="ph b">Sorting considerations:</strong> Although you can specify an <code class="ph codeph">ORDER BY</code> clause in an
-        <code class="ph codeph">INSERT ... SELECT</code> statement, any <code class="ph codeph">ORDER BY</code> clause is ignored and the
-        results are not necessarily sorted. An <code class="ph codeph">INSERT ... SELECT</code> operation potentially creates
-        many different data files, prepared by different executor Impala daemons, and therefore the notion of the data being
-        stored in sorted order is impractical.
+        <strong class="ph b">Sorting considerations:</strong> Although you can specify an <code class="ph codeph">ORDER BY</code>
+        clause in an <code class="ph codeph">INSERT ... SELECT</code> statement, any <code class="ph codeph">ORDER BY</code>
+        clause is ignored and the results are not necessarily sorted. An <code class="ph codeph">INSERT ...
+        SELECT</code> operation potentially creates many different data files, prepared by
+        different executor Impala daemons, and therefore the notion of the data being stored in
+        sorted order is impractical.
       </p>
 
 
@@ -1287,19 +1324,20 @@ ERROR: AnalysisException: Partition column name mismatch: year != month
       If you specify the <code class="ph codeph">CACHED IN</code> clause, any existing or future data files in
       the table directory or the partition subdirectories are designated to be loaded into
       memory with the HDFS caching mechanism. See
-      <a class="xref" href="impala_perf_hdfs_caching.html#hdfs_caching">Using HDFS Caching with Impala (Impala 2.1 or higher only)</a> for details about using the HDFS
-      caching feature.
+      <a class="xref" href="impala_perf_hdfs_caching.html#hdfs_caching">Using HDFS Caching with Impala (Impala 2.1 or higher only)</a> for details about using
+      the HDFS caching feature.
     </p>
 
 
     <p class="p">
-        In <span class="keyword">Impala 2.2</span> and higher, the optional <code class="ph codeph">WITH REPLICATION</code> clause
-        for <code class="ph codeph">CREATE TABLE</code> and <code class="ph codeph">ALTER TABLE</code> lets you specify
-        a <dfn class="term">replication factor</dfn>, the number of hosts on which to cache the same data blocks.
-        When Impala processes a cached data block, where the cache replication factor is greater than 1, Impala randomly
-        selects a host that has a cached copy of that data block. This optimization avoids excessive CPU
-        usage on a single host when the same cached data block is processed multiple times.
-        Where practical, specify a value greater than or equal to the HDFS block replication factor.
+        In <span class="keyword">Impala 2.2</span> and higher, the optional <code class="ph codeph">WITH
+        REPLICATION</code> clause for <code class="ph codeph">CREATE TABLE</code> and <code class="ph codeph">ALTER
+        TABLE</code> lets you specify a <dfn class="term">replication factor</dfn>, the number of hosts
+        on which to cache the same data blocks. When Impala processes a cached data block, where
+        the cache replication factor is greater than 1, Impala randomly selects a host that has
+        a cached copy of that data block. This optimization avoids excessive CPU usage on a
+        single host when the same cached data block is processed multiple times. Where
+        practical, specify a value greater than or equal to the HDFS block replication factor.
       </p>
 
 
@@ -1382,7 +1420,7 @@ ERROR: AnalysisException: Partition column name mismatch: year != month
       </p>
 
 
-    <div class="note note"><span class="notetitle">Note:</span>
+    <div class="note note"><span class="notetitle">Note:</span> 
       <p class="p">
         The Impala <code class="ph codeph">CREATE TABLE</code> statement cannot create an HBase table, because
         it currently does not support the <code class="ph codeph">STORED BY</code> clause needed for HBase
@@ -1414,20 +1452,23 @@ ERROR: AnalysisException: Partition column name mismatch: year != month
 
     <p class="p">
         In <span class="keyword">Impala 2.6</span> and higher, Impala DDL statements such as
-        <code class="ph codeph">CREATE DATABASE</code>, <code class="ph codeph">CREATE TABLE</code>, <code class="ph codeph">DROP DATABASE CASCADE</code>,
-        <code class="ph codeph">DROP TABLE</code>, and <code class="ph codeph">ALTER TABLE [ADD|DROP] PARTITION</code> can create or remove folders
-        as needed in the Amazon S3 system. Prior to <span class="keyword">Impala 2.6</span>, you had to create folders yourself and point
-        Impala database, tables, or partitions at them, and manually remove folders when no longer needed.
-        See <a class="xref" href="../shared/../topics/impala_s3.html#s3">Using Impala with the Amazon S3 Filesystem</a> for details about reading and writing S3 data with Impala.
+        <code class="ph codeph">CREATE DATABASE</code>, <code class="ph codeph">CREATE TABLE</code>, <code class="ph codeph">DROP DATABASE
+        CASCADE</code>, <code class="ph codeph">DROP TABLE</code>, and <code class="ph codeph">ALTER TABLE [ADD|DROP]
+        PARTITION</code> can create or remove folders as needed in the Amazon S3 system. Prior
+        to <span class="keyword">Impala 2.6</span>, you had to create folders yourself and point
+        Impala database, tables, or partitions at them, and manually remove folders when no
+        longer needed. See <a class="xref" href="../shared/../topics/impala_s3.html#s3">Using Impala with the Amazon S3 Filesystem</a> for details about reading
+        and writing S3 data with Impala.
       </p>
 
 
     <p class="p">
-        <strong class="ph b">Sorting considerations:</strong> Although you can specify an <code class="ph codeph">ORDER BY</code> clause in an
-        <code class="ph codeph">INSERT ... SELECT</code> statement, any <code class="ph codeph">ORDER BY</code> clause is ignored and the
-        results are not necessarily sorted. An <code class="ph codeph">INSERT ... SELECT</code> operation potentially creates
-        many different data files, prepared by different executor Impala daemons, and therefore the notion of the data being
-        stored in sorted order is impractical.
+        <strong class="ph b">Sorting considerations:</strong> Although you can specify an <code class="ph codeph">ORDER BY</code>
+        clause in an <code class="ph codeph">INSERT ... SELECT</code> statement, any <code class="ph codeph">ORDER BY</code>
+        clause is ignored and the results are not necessarily sorted. An <code class="ph codeph">INSERT ...
+        SELECT</code> operation potentially creates many different data files, prepared by
+        different executor Impala daemons, and therefore the notion of the data being stored in
+        sorted order is impractical.
       </p>
 
 
@@ -1473,20 +1514,22 @@ ERROR: AnalysisException: Partition column name mismatch: year != month
 
 
     <p class="p">
-        If these statements in your environment contain sensitive literal values such as credit card numbers or tax
-        identifiers, Impala can redact this sensitive information when displaying the statements in log files and
-        other administrative contexts. See <span class="xref">the documentation for your Apache Hadoop distribution</span> for details.
+        If these statements in your environment contain sensitive literal values such as credit
+        card numbers or tax identifiers, Impala can redact this sensitive information when
+        displaying the statements in log files and other administrative contexts. See
+        <span class="xref">the documentation for your Apache Hadoop distribution</span> for details.
       </p>
 
 
     <p class="p">
-        <strong class="ph b">Cancellation:</strong> Certain multi-stage statements (<code class="ph codeph">CREATE TABLE AS SELECT</code> and
-        <code class="ph codeph">COMPUTE STATS</code>) can be cancelled during some stages, when running <code class="ph codeph">INSERT</code>
-        or <code class="ph codeph">SELECT</code> operations internally. To cancel this statement, use Ctrl-C from the
-        <span class="keyword cmdname">impala-shell</span> interpreter, the <span class="ph uicontrol">Cancel</span> button from the
-        <span class="ph uicontrol">Watch</span> page in Hue, or <span class="ph uicontrol">Cancel</span> from the list of
-        in-flight queries (for a particular node) on the <span class="ph uicontrol">Queries</span> tab in the Impala web UI
-        (port 25000).
+        <strong class="ph b">Cancellation:</strong> Certain multi-stage statements (<code class="ph codeph">CREATE TABLE AS
+        SELECT</code> and <code class="ph codeph">COMPUTE STATS</code>) can be cancelled during some stages,
+        when running <code class="ph codeph">INSERT</code> or <code class="ph codeph">SELECT</code> operations internally.
+        To cancel this statement, use Ctrl-C from the <span class="keyword cmdname">impala-shell</span>
+        interpreter, the <span class="ph uicontrol">Cancel</span> button from the
+        <span class="ph uicontrol">Watch</span> page in Hue, or <span class="ph uicontrol">Cancel</span> from the list
+        of in-flight queries (for a particular node) on the <span class="ph uicontrol">Queries</span> tab
+        in the Impala web UI (port 25000).
       </p>
 
 
@@ -1503,7 +1546,8 @@ ERROR: AnalysisException: Partition column name mismatch: year != month
       <a class="xref" href="impala_tables.html#internal_tables">Internal Tables</a>,
       <a class="xref" href="impala_tables.html#external_tables">External Tables</a>,
       <a class="xref" href="impala_compute_stats.html#compute_stats">COMPUTE STATS Statement</a>,
-      <a class="xref" href="impala_sync_ddl.html#sync_ddl">SYNC_DDL Query Option</a>, <a class="xref" href="impala_show.html#show_tables">SHOW TABLES Statement</a>,
+      <a class="xref" href="impala_sync_ddl.html#sync_ddl">SYNC_DDL Query Option</a>,
+      <a class="xref" href="impala_show.html#show_tables">SHOW TABLES Statement</a>,
       <a class="xref" href="impala_show.html#show_create_table">SHOW CREATE TABLE Statement</a>,
       <a class="xref" href="impala_describe.html#describe">DESCRIBE Statement</a>
     </p>

@@ -1,0 +1,90 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE html
+  PUBLIC "-//W3C//DTD XHTML 1.0 Transitional//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-transitional.dtd">
+<html xmlns="http://www.w3.org/1999/xhtml" xml:lang="en" lang="en">
+<head><meta http-equiv="Content-Type" content="text/html; charset=UTF-8" />
+
+<meta name="copyright" content="(C) Copyright 2019" />
+<meta name="DC.rights.owner" content="(C) Copyright 2019" />
+<meta name="DC.Type" content="concept" />
+<meta name="DC.Title" content="PARQUET_WRITE_PAGE_INDEX Query Option" />
+<meta name="DC.Relation" scheme="URI" content="../topics/impala_query_options.html" />
+<meta name="prodname" content="Impala" />
+<meta name="version" content="Impala 3.3.x" />
+<meta name="DC.Format" content="XHTML" />
+<meta name="DC.Identifier" content="parquet_write_page_index" />
+<link rel="stylesheet" type="text/css" href="../commonltr.css" />
+<title>PARQUET_WRITE_PAGE_INDEX Query Option</title>
+</head>
+<body id="parquet_write_page_index">
+
+
+  <h1 class="title topictitle1" id="ariaid-title1">PARQUET_WRITE_PAGE_INDEX Query Option</h1>
+
+
+  
+
+  
+
+  <div class="body conbody">
+
+    <p class="p">
+      The <code class="ph codeph">PARQUET_WRITE_PAGE_INDEX</code> query option to disable or enable the
+      Parquet page index writing.
+    </p>
+
+
+    <p class="p">
+      Impala writes page-level statistics into the Parquet page index of the types: Boolean,
+      Integer, Decimal, String, Timestamp
+    </p>
+
+
+    <div class="p">
+      The supported values for the query option are:
+      <ul class="ul">
+        <li class="li">
+          <code class="ph codeph">true</code> (<code class="ph codeph">1</code>): Write the Parquet page index when creating
+          Parquet files.
+        </li>
+
+
+        <li class="li">
+          <code class="ph codeph">false</code> (<code class="ph codeph">0</code>): Do not write the Parquet page index when
+          creating Parquet files.
+        </li>
+
+
+        <li class="li">
+          Any other values are treated as <code class="ph codeph">false</code>.
+        </li>
+
+      </ul>
+
+    </div>
+
+
+    <p class="p">
+      <strong class="ph b">Type:</strong> Boolean
+    </p>
+
+
+    <p class="p">
+      <strong class="ph b">Default:</strong> <code class="ph codeph">TRUE</code>
+    </p>
+
+
+    <p class="p">
+      <strong class="ph b">Added in:</strong> <span class="keyword">Impala 3.3</span>
+    </p>
+
+
+  </div>
+
+
+<div class="related-links">
+<div class="familylinks">
+<div class="parentlink"><strong>Parent topic:</strong> <a class="link" href="../topics/impala_query_options.html">Query Options for the SET Statement</a></div>
+</div>
+</div></body>
+</html>

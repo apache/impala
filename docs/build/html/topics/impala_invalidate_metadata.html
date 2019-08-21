@@ -11,8 +11,8 @@
 <meta name="DC.Relation" scheme="URI" content="../topics/impala_langref_sql.html" />
 <meta name="prodname" content="Impala" />
 <meta name="prodname" content="Impala" />
-<meta name="version" content="Impala 3.2.x" />
-<meta name="version" content="Impala 3.2.x" />
+<meta name="version" content="Impala 3.3.x" />
+<meta name="version" content="Impala 3.3.x" />
 <meta name="DC.Format" content="XHTML" />
 <meta name="DC.Identifier" content="invalidate_metadata" />
 <link rel="stylesheet" type="text/css" href="../commonltr.css" />
@@ -131,31 +131,28 @@
 
 
     <div class="p">
-        <code class="ph codeph">INVALIDATE METADATA</code> and <code class="ph codeph">REFRESH</code> are
-        counterparts:
-      <ul class="ul">
+        <code class="ph codeph">INVALIDATE METADATA</code> and <code class="ph codeph">REFRESH</code> are counterparts:
+        <ul class="ul">
           <li class="li">
-            <code class="ph codeph">INVALIDATE METADATA</code> is an asynchronous operations
-            that simply discards the loaded metadata from the catalog and
-            coordinator caches. After that operation, the catalog and all the
-            Impala coordinators only know about the existence of databases and
-            tables and nothing more. Metadata loading for tables is triggered by
-            any subsequent queries.
+            <code class="ph codeph">INVALIDATE METADATA</code> is an asynchronous operations that simply
+            discards the loaded metadata from the catalog and coordinator caches. After that
+            operation, the catalog and all the Impala coordinators only know about the existence
+            of databases and tables and nothing more. Metadata loading for tables is triggered
+            by any subsequent queries.
           </li>
 
 
           <li class="li">
             <code class="ph codeph">REFRESH</code> reloads the metadata synchronously.
-              <code class="ph codeph">REFRESH</code> is more lightweight than doing a full
-            metadata load after a table has been invalidated.
-              <code class="ph codeph">REFRESH</code> cannot detect changes in block locations
-            triggered by operations like HDFS balancer, hence causing remote
-            reads during query execution with negative performance implications.
+            <code class="ph codeph">REFRESH</code> is more lightweight than doing a full metadata load after a
+            table has been invalidated. <code class="ph codeph">REFRESH</code> cannot detect changes in block
+            locations triggered by operations like HDFS balancer, hence causing remote reads
+            during query execution with negative performance implications.
           </li>
 
         </ul>
 
-    </div>
+      </div>
 
 
     <p class="p">
@@ -247,26 +244,24 @@ ERROR: AnalysisException: Database does not exist: new_db_from_hive
       </p>
 
 
-    <p class="p">
-        Much of the metadata for Kudu tables is handled by the underlying
-        storage layer. Kudu tables have less reliance on the metastore
-        database, and require less metadata caching on the Impala side.
-        For example, information about partitions in Kudu tables is managed
-        by Kudu, and Impala does not cache any block locality metadata
-        for Kudu tables.
-      </p>
+    <p class="p">By default, much of the metadata
+        for Kudu tables is handled by the underlying storage layer. Kudu tables
+        have less reliance on the Metastore database, and require less metadata
+        caching on the Impala side. For example, information about partitions in
+        Kudu tables is managed by Kudu, and Impala does not cache any block
+        locality metadata for Kudu tables. If the Kudu service is not integrated
+        with the Hive Metastore, Impala will manage Kudu table metadata in the
+        Hive Metastore.</p>
 
 
     <p class="p">
-        The <code class="ph codeph">REFRESH</code> and <code class="ph codeph">INVALIDATE METADATA</code>
-        statements are needed less frequently for Kudu tables than for
-        HDFS-backed tables. Neither statement is needed when data is
-        added to, removed, or updated in a Kudu table, even if the changes
-        are made directly to Kudu through a client program using the Kudu API.
-        Run <code class="ph codeph">REFRESH <var class="keyword varname">table_name</var></code> or
-        <code class="ph codeph">INVALIDATE METADATA <var class="keyword varname">table_name</var></code>
-        for a Kudu table only after making a change to the Kudu table schema,
-        such as adding or dropping a column.
+        The <code class="ph codeph">REFRESH</code> and <code class="ph codeph">INVALIDATE METADATA</code> statements are
+        needed less frequently for Kudu tables than for HDFS-backed tables. Neither statement is
+        needed when data is added to, removed, or updated in a Kudu table, even if the changes
+        are made directly to Kudu through a client program using the Kudu API. Run
+        <code class="ph codeph">REFRESH <var class="keyword varname">table_name</var></code> or <code class="ph codeph">INVALIDATE METADATA
+        <var class="keyword varname">table_name</var></code> for a Kudu table only after making a change to
+        the Kudu table schema, such as adding or dropping a column.
       </p>
 
 

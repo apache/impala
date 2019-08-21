@@ -11,8 +11,8 @@
 <meta name="DC.Relation" scheme="URI" content="../topics/impala_langref_sql.html" />
 <meta name="prodname" content="Impala" />
 <meta name="prodname" content="Impala" />
-<meta name="version" content="Impala 3.2.x" />
-<meta name="version" content="Impala 3.2.x" />
+<meta name="version" content="Impala 3.3.x" />
+<meta name="version" content="Impala 3.3.x" />
 <meta name="DC.Format" content="XHTML" />
 <meta name="DC.Identifier" content="load_data" />
 <link rel="stylesheet" type="text/css" href="../commonltr.css" />
@@ -152,20 +152,22 @@
 
 
     <p class="p">
-        If you connect to different Impala nodes within an <span class="keyword cmdname">impala-shell</span> session for
-        load-balancing purposes, you can enable the <code class="ph codeph">SYNC_DDL</code> query option to make each DDL
-        statement wait before returning, until the new or changed metadata has been received by all the Impala
-        nodes. See <a class="xref" href="../shared/../topics/impala_sync_ddl.html#sync_ddl">SYNC_DDL Query Option</a> for details.
+        If you connect to different Impala nodes within an <span class="keyword cmdname">impala-shell</span>
+        session for load-balancing purposes, you can enable the <code class="ph codeph">SYNC_DDL</code> query
+        option to make each DDL statement wait before returning, until the new or changed
+        metadata has been received by all the Impala nodes. See
+        <a class="xref" href="../shared/../topics/impala_sync_ddl.html#sync_ddl">SYNC_DDL Query Option</a> for details.
       </p>
 
 
-    <div class="note important"><span class="importanttitle">Important:</span>
-        After adding or replacing data in a table used in performance-critical queries, issue a <code class="ph codeph">COMPUTE
-        STATS</code> statement to make sure all statistics are up-to-date. Consider updating statistics for a
-        table after any <code class="ph codeph">INSERT</code>, <code class="ph codeph">LOAD DATA</code>, or <code class="ph codeph">CREATE TABLE AS
-        SELECT</code> statement in Impala, or after loading data through Hive and doing a <code class="ph codeph">REFRESH
-        <var class="keyword varname">table_name</var></code> in Impala. This technique is especially important for tables that
-        are very large, used in join queries, or both.
+    <div class="note important"><span class="importanttitle">Important:</span> 
+        After adding or replacing data in a table used in performance-critical queries, issue a
+        <code class="ph codeph">COMPUTE STATS</code> statement to make sure all statistics are up-to-date.
+        Consider updating statistics for a table after any <code class="ph codeph">INSERT</code>, <code class="ph codeph">LOAD
+        DATA</code>, or <code class="ph codeph">CREATE TABLE AS SELECT</code> statement in Impala, or after
+        loading data through Hive and doing a <code class="ph codeph">REFRESH
+        <var class="keyword varname">table_name</var></code> in Impala. This technique is especially important
+        for tables that are very large, used in join queries, or both.
       </div>
 
 
@@ -273,31 +275,34 @@ Returned 1 row(s) in 0.62s</code></pre>
       </p>
 
     <p class="p">
-        In <span class="keyword">Impala 2.6</span> and higher, the Impala DML statements (<code class="ph codeph">INSERT</code>, <code class="ph codeph">LOAD DATA</code>,
-        and <code class="ph codeph">CREATE TABLE AS SELECT</code>) can write data into a table or partition that resides in the
-        Amazon Simple Storage Service (S3).
-        The syntax of the DML statements is the same as for any other tables, because the S3 location for tables and
-        partitions is specified by an <code class="ph codeph">s3a://</code> prefix in the
-        <code class="ph codeph">LOCATION</code> attribute of
-        <code class="ph codeph">CREATE TABLE</code> or <code class="ph codeph">ALTER TABLE</code> statements.
-        If you bring data into S3 using the normal S3 transfer mechanisms instead of Impala DML statements,
-        issue a <code class="ph codeph">REFRESH</code> statement for the table before using Impala to query the S3 data.
+        In <span class="keyword">Impala 2.6</span> and higher, the Impala DML statements
+        (<code class="ph codeph">INSERT</code>, <code class="ph codeph">LOAD DATA</code>, and <code class="ph codeph">CREATE TABLE AS
+        SELECT</code>) can write data into a table or partition that resides in the Amazon
+        Simple Storage Service (S3). The syntax of the DML statements is the same as for any
+        other tables, because the S3 location for tables and partitions is specified by an
+        <code class="ph codeph">s3a://</code> prefix in the <code class="ph codeph">LOCATION</code> attribute of
+        <code class="ph codeph">CREATE TABLE</code> or <code class="ph codeph">ALTER TABLE</code> statements. If you bring
+        data into S3 using the normal S3 transfer mechanisms instead of Impala DML statements,
+        issue a <code class="ph codeph">REFRESH</code> statement for the table before using Impala to query
+        the S3 data.
       </p>
 
     <p class="p">
-        Because of differences between S3 and traditional filesystems, DML operations
-        for S3 tables can take longer than for tables on HDFS. For example, both the
-        <code class="ph codeph">LOAD DATA</code> statement and the final stage of the <code class="ph codeph">INSERT</code>
-        and <code class="ph codeph">CREATE TABLE AS SELECT</code> statements involve moving files from one directory
-        to another. (In the case of <code class="ph codeph">INSERT</code> and <code class="ph codeph">CREATE TABLE AS SELECT</code>,
-        the files are moved from a temporary staging directory to the final destination directory.)
-        Because S3 does not support a <span class="q">"rename"</span> operation for existing objects, in these cases Impala
-        actually copies the data files from one location to another and then removes the original files.
-        In <span class="keyword">Impala 2.6</span>, the <code class="ph codeph">S3_SKIP_INSERT_STAGING</code> query option provides a way
-        to speed up <code class="ph codeph">INSERT</code> statements for S3 tables and partitions, with the tradeoff
-        that a problem during statement execution could leave data in an inconsistent state.
-        It does not apply to <code class="ph codeph">INSERT OVERWRITE</code> or <code class="ph codeph">LOAD DATA</code> statements.
-        See <a class="xref" href="../shared/../topics/impala_s3_skip_insert_staging.html#s3_skip_insert_staging">S3_SKIP_INSERT_STAGING Query Option (Impala 2.6 or higher only)</a> for details.
+        Because of differences between S3 and traditional filesystems, DML operations for S3
+        tables can take longer than for tables on HDFS. For example, both the <code class="ph codeph">LOAD
+        DATA</code> statement and the final stage of the <code class="ph codeph">INSERT</code> and
+        <code class="ph codeph">CREATE TABLE AS SELECT</code> statements involve moving files from one
+        directory to another. (In the case of <code class="ph codeph">INSERT</code> and <code class="ph codeph">CREATE TABLE
+        AS SELECT</code>, the files are moved from a temporary staging directory to the final
+        destination directory.) Because S3 does not support a <span class="q">"rename"</span> operation for
+        existing objects, in these cases Impala actually copies the data files from one location
+        to another and then removes the original files. In <span class="keyword">Impala 2.6</span>,
+        the <code class="ph codeph">S3_SKIP_INSERT_STAGING</code> query option provides a way to speed up
+        <code class="ph codeph">INSERT</code> statements for S3 tables and partitions, with the tradeoff that
+        a problem during statement execution could leave data in an inconsistent state. It does
+        not apply to <code class="ph codeph">INSERT OVERWRITE</code> or <code class="ph codeph">LOAD DATA</code> statements.
+        See <a class="xref" href="../shared/../topics/impala_s3_skip_insert_staging.html#s3_skip_insert_staging">S3_SKIP_INSERT_STAGING Query Option (Impala 2.6 or higher only)</a>
+        for details.
       </p>
 
     <p class="p">See <a class="xref" href="impala_s3.html#s3">Using Impala with the Amazon S3 Filesystem</a> for details about reading and writing S3 data with Impala.</p>
@@ -307,20 +312,23 @@ Returned 1 row(s) in 0.62s</code></pre>
         <strong class="ph b">ADLS considerations:</strong>
       </p>
 
-    <p class="p"> In <span class="keyword">Impala 2.9</span> and higher, the Impala DML statements
-          (<code class="ph codeph">INSERT</code>, <code class="ph codeph">LOAD DATA</code>, and
-          <code class="ph codeph">CREATE TABLE AS SELECT</code>) can write data into a table
-        or partition that resides in the Azure Data Lake Store (ADLS). ADLS Gen2
-        is supported in <span class="keyword">Impala 3.1</span> and higher.</p>
-<p class="p">In the<code class="ph codeph">CREATE TABLE</code> or
-          <code class="ph codeph">ALTER TABLE</code> statements, specify the ADLS location for
-        tables and partitions with the <code class="ph codeph">adl://</code> prefix for ADLS
-        Gen1 and <code class="ph codeph">abfs://</code> or <code class="ph codeph">abfss://</code> for ADLS
-        Gen2 in the <code class="ph codeph">LOCATION</code> attribute.</p>
-<p class="p">If you bring data into ADLS
-        using the normal ADLS transfer mechanisms instead of Impala DML
-        statements, issue a <code class="ph codeph">REFRESH</code> statement for the table
-        before using Impala to query the ADLS data. </p>
+    <p class="p">
+        In <span class="keyword">Impala 2.9</span> and higher, the Impala DML statements
+        (<code class="ph codeph">INSERT</code>, <code class="ph codeph">LOAD DATA</code>, and <code class="ph codeph">CREATE TABLE AS
+        SELECT</code>) can write data into a table or partition that resides in the Azure Data
+        Lake Store (ADLS). ADLS Gen2 is supported in <span class="keyword">Impala 3.1</span> and higher.
+      </p>
+<p class="p">
+        In the<code class="ph codeph">CREATE TABLE</code> or <code class="ph codeph">ALTER TABLE</code> statements, specify
+        the ADLS location for tables and partitions with the <code class="ph codeph">adl://</code> prefix for
+        ADLS Gen1 and <code class="ph codeph">abfs://</code> or <code class="ph codeph">abfss://</code> for ADLS Gen2 in the
+        <code class="ph codeph">LOCATION</code> attribute.
+      </p>
+<p class="p">
+        If you bring data into ADLS using the normal ADLS transfer mechanisms instead of Impala
+        DML statements, issue a <code class="ph codeph">REFRESH</code> statement for the table before using
+        Impala to query the ADLS data.
+      </p>
 
     <p class="p">See <a class="xref" href="impala_adls.html#adls">Using Impala with the Azure Data Lake Store (ADLS)</a> for details about reading and writing ADLS data with Impala.</p>
 

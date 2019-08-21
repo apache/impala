@@ -17,14 +17,14 @@
 <meta name="prodname" content="Impala" />
 <meta name="prodname" content="Impala" />
 <meta name="prodname" content="Impala" />
-<meta name="version" content="Impala 3.2.x" />
-<meta name="version" content="Impala 3.2.x" />
-<meta name="version" content="Impala 3.2.x" />
-<meta name="version" content="Impala 3.2.x" />
-<meta name="version" content="Impala 3.2.x" />
-<meta name="version" content="Impala 3.2.x" />
-<meta name="version" content="Impala 3.2.x" />
-<meta name="version" content="Impala 3.2.x" />
+<meta name="version" content="Impala 3.3.x" />
+<meta name="version" content="Impala 3.3.x" />
+<meta name="version" content="Impala 3.3.x" />
+<meta name="version" content="Impala 3.3.x" />
+<meta name="version" content="Impala 3.3.x" />
+<meta name="version" content="Impala 3.3.x" />
+<meta name="version" content="Impala 3.3.x" />
+<meta name="version" content="Impala 3.3.x" />
 <meta name="DC.Format" content="XHTML" />
 <meta name="DC.Identifier" content="txtfile" />
 <link rel="stylesheet" type="text/css" href="../commonltr.css" />
@@ -55,26 +55,26 @@
     </p>
 
 
-
+    
 <div class="tablenoborder"><table cellpadding="4" cellspacing="0" summary="" class="table" frame="border" border="1" rules="all"><caption><span class="tablecap"><span class="table--title-label">Table 1. </span>Text Format Support in Impala</span></caption><colgroup><col style="width:10%" /><col style="width:10%" /><col style="width:20%" /><col style="width:30%" /><col style="width:30%" /></colgroup><thead class="thead" style="text-align:left;">
           <tr class="row">
-            <th class="entry nocellnorowborder" style="vertical-align:top;" id="d207369e149">
+            <th class="entry nocellnorowborder" style="vertical-align:top;" id="d214284e149">
               File Type
             </th>
 
-            <th class="entry nocellnorowborder" style="vertical-align:top;" id="d207369e152">
+            <th class="entry nocellnorowborder" style="vertical-align:top;" id="d214284e152">
               Format
             </th>
 
-            <th class="entry nocellnorowborder" style="vertical-align:top;" id="d207369e155">
+            <th class="entry nocellnorowborder" style="vertical-align:top;" id="d214284e155">
               Compression Codecs
             </th>
 
-            <th class="entry nocellnorowborder" style="vertical-align:top;" id="d207369e158">
+            <th class="entry nocellnorowborder" style="vertical-align:top;" id="d214284e158">
               Impala Can CREATE?
             </th>
 
-            <th class="entry cell-norowborder" style="vertical-align:top;" id="d207369e161">
+            <th class="entry cell-norowborder" style="vertical-align:top;" id="d214284e161">
               Impala Can INSERT?
             </th>
 
@@ -83,25 +83,25 @@
         </thead>
 <tbody class="tbody">
           <tr class="row">
-            <td class="entry row-nocellborder" style="vertical-align:top;" headers="d207369e149 ">
+            <td class="entry row-nocellborder" style="vertical-align:top;" headers="d214284e149 ">
               <a class="xref" href="impala_txtfile.html#txtfile">Text</a>
             </td>
 
-            <td class="entry row-nocellborder" style="vertical-align:top;" headers="d207369e152 ">
+            <td class="entry row-nocellborder" style="vertical-align:top;" headers="d214284e152 ">
               Unstructured
             </td>
 
-            <td class="entry row-nocellborder" style="vertical-align:top;" headers="d207369e155 ">
+            <td class="entry row-nocellborder" style="vertical-align:top;" headers="d214284e155 ">
               LZO, gzip, bzip2, Snappy
             </td>
 
-            <td class="entry row-nocellborder" style="vertical-align:top;" headers="d207369e158 ">
+            <td class="entry row-nocellborder" style="vertical-align:top;" headers="d214284e158 ">
               Yes. For <code class="ph codeph">CREATE TABLE</code> with no <code class="ph codeph">STORED AS</code> clause,
               the default file format is uncompressed text, with values separated by ASCII
               <code class="ph codeph">0x01</code> characters (typically represented as Ctrl-A).
             </td>
 
-            <td class="entry cellrowborder" style="vertical-align:top;" headers="d207369e161 ">
+            <td class="entry cellrowborder" style="vertical-align:top;" headers="d214284e161 ">
               Yes: <code class="ph codeph">CREATE TABLE</code>, <code class="ph codeph">INSERT</code>, <code class="ph codeph">LOAD
               DATA</code>, and query. If LZO compression is used, you must create the table
               and load data in Hive. If other kinds of compression are used, you must load data
@@ -169,7 +169,7 @@
       </p>
 
 
-      <div class="note note"><span class="notetitle">Note:</span>
+      <div class="note note"><span class="notetitle">Note:</span> 
         <p class="p">
           Impala supports bzip files created by the <code class="ph codeph">bzip2</code> command, but not bzip files with
           multiple streams created by the <code class="ph codeph">pbzip2</code> command. Impala decodes only the data from the
@@ -185,18 +185,18 @@
 
 
       <p class="p">
-        In <span class="keyword">Impala 2.6</span> and higher, Impala queries are optimized for files stored in Amazon S3.
-        For Impala tables that use the file formats Parquet, ORC, RCFile, SequenceFile,
-        Avro, and uncompressed text, the setting <code class="ph codeph">fs.s3a.block.size</code>
-        in the <span class="ph filepath">core-site.xml</span> configuration file determines
-        how Impala divides the I/O work of reading the data files. This configuration
-        setting is specified in bytes. By default, this
-        value is 33554432 (32 MB), meaning that Impala parallelizes S3 read operations on the files
-        as if they were made up of 32 MB blocks. For example, if your S3 queries primarily access
-        Parquet files written by MapReduce or Hive, increase <code class="ph codeph">fs.s3a.block.size</code>
-        to 134217728 (128 MB) to match the row group size of those files. If most S3 queries involve
-        Parquet files written by Impala, increase <code class="ph codeph">fs.s3a.block.size</code>
-        to 268435456 (256 MB) to match the row group size produced by Impala.
+        In <span class="keyword">Impala 2.6</span> and higher, Impala queries are optimized for files
+        stored in Amazon S3. For Impala tables that use the file formats Parquet, ORC, RCFile,
+        SequenceFile, Avro, and uncompressed text, the setting
+        <code class="ph codeph">fs.s3a.block.size</code> in the <span class="ph filepath">core-site.xml</span>
+        configuration file determines how Impala divides the I/O work of reading the data files.
+        This configuration setting is specified in bytes. By default, this value is 33554432 (32
+        MB), meaning that Impala parallelizes S3 read operations on the files as if they were
+        made up of 32 MB blocks. For example, if your S3 queries primarily access Parquet files
+        written by MapReduce or Hive, increase <code class="ph codeph">fs.s3a.block.size</code> to 134217728
+        (128 MB) to match the row group size of those files. If most S3 queries involve Parquet
+        files written by Impala, increase <code class="ph codeph">fs.s3a.block.size</code> to 268435456 (256
+        MB) to match the row group size produced by Impala.
       </p>
 
 
@@ -277,7 +277,7 @@ create table pipe_separated(id int, s string, n int, t timestamp, b boolean)
   stored as textfile;
 </code></pre>
 
-      <div class="note note"><span class="notetitle">Note:</span>
+      <div class="note note"><span class="notetitle">Note:</span> 
         <p class="p">
           Do not surround string values with quotation marks in text data files that you construct. If you need to
           include the separator character inside a field value, for example to put a string value with a comma
@@ -296,15 +296,13 @@ create table pipe_separated(id int, s string, n int, t timestamp, b boolean)
 
 
       <p class="p">
-        <strong class="ph b">Complex type considerations:</strong>
-        Although you can create tables in this file format using
-        the complex types (<code class="ph codeph">ARRAY</code>, <code class="ph codeph">STRUCT</code>,
-        and <code class="ph codeph">MAP</code>) available in <span class="keyword">Impala 2.3</span> and higher,
-        currently, Impala can query these types only in Parquet tables.
-        <span class="ph">
-        The one exception to the preceding rule is <code class="ph codeph">COUNT(*)</code> queries on RCFile tables that include complex types.
-        Such queries are allowed in <span class="keyword">Impala 2.6</span> and higher.
-        </span>
+        <strong class="ph b">Complex type considerations:</strong> Although you can create tables in this file format
+        using the complex types (<code class="ph codeph">ARRAY</code>, <code class="ph codeph">STRUCT</code>, and
+        <code class="ph codeph">MAP</code>) available in <span class="keyword">Impala 2.3</span> and higher,
+        currently, Impala can query these types only in Parquet tables. <span class="ph">
+        The one exception to the preceding rule is <code class="ph codeph">COUNT(*)</code> queries on RCFile
+        tables that include complex types. Such queries are allowed in
+        <span class="keyword">Impala 2.6</span> and higher. </span>
       </p>
 
 
@@ -338,9 +336,10 @@ create table pipe_separated(id int, s string, n int, t timestamp, b boolean)
 
         <li class="li">
           <p class="p">
-        Impala queries ignore files with extensions commonly used for temporary work files by Hadoop tools. Any
-        files with extensions <code class="ph codeph">.tmp</code> or <code class="ph codeph">.copying</code> are not considered part of the
-        Impala table. The suffix matching is case-insensitive, so for example Impala ignores both
+        Impala queries ignore files with extensions commonly used for temporary work files by
+        Hadoop tools. Any files with extensions <code class="ph codeph">.tmp</code> or
+        <code class="ph codeph">.copying</code> are not considered part of the Impala table. The suffix
+        matching is case-insensitive, so for example Impala ignores both
         <code class="ph codeph">.copying</code> and <code class="ph codeph">.COPYING</code> suffixes.
       </p>
 
@@ -358,20 +357,18 @@ create table pipe_separated(id int, s string, n int, t timestamp, b boolean)
         </li>
 
 
-        <li class="li">
-          Otherwise, the file names are not significant. When you put files into an HDFS directory through ETL
-          jobs, or point Impala to an existing HDFS directory with the <code class="ph codeph">CREATE EXTERNAL TABLE</code>
-          statement, or move data files under external control with the <code class="ph codeph">LOAD DATA</code> statement,
-          Impala preserves the original filenames.
-        </li>
+        <li class="li"> Otherwise, the file names are not significant. When you put files
+          into an HDFS directory through ETL jobs, or point Impala to an
+          existing HDFS directory with the <code class="ph codeph">CREATE EXTERNAL
+            TABLE</code> statement, or move data files under external control
+          with the <code class="ph codeph">LOAD DATA</code> statement, Impala preserves the
+          original file names. </li>
 
       </ul>
 
 
-      <p class="p">
-        Filenames for data produced through Impala <code class="ph codeph">INSERT</code> statements are given unique names to
-        avoid filename conflicts.
-      </p>
+      <p class="p"> File names for data produced through Impala <code class="ph codeph">INSERT</code>
+        statements are given unique names to avoid file name conflicts. </p>
 
 
       <p class="p">
@@ -401,25 +398,34 @@ create table pipe_separated(id int, s string, n int, t timestamp, b boolean)
 
 
         <li class="li">
-          <p class="p">
-            Impala recognizes the literal string <code class="ph codeph">\N</code> to represent <code class="ph codeph">NULL</code>. When using
-            Sqoop, specify the options <code class="ph codeph">--null-non-string</code> and <code class="ph codeph">--null-string</code> to
-            ensure all <code class="ph codeph">NULL</code> values are represented correctly in the Sqoop output files. By default,
-            Sqoop writes <code class="ph codeph">NULL</code> values using the string <code class="ph codeph">null</code>, which causes a
-            conversion error when such rows are evaluated by Impala. (A workaround for existing tables and data files
-            is to change the table properties through <code class="ph codeph">ALTER TABLE <var class="keyword varname">name</var> SET
-            TBLPROPERTIES("serialization.null.format"="null")</code>.)
-          </p>
+          <div class="p"> Impala recognizes the literal string <code class="ph codeph">\N</code> to
+            represent <code class="ph codeph">NULL</code>. When using Sqoop, specify the
+            options <code class="ph codeph">--null-non-string</code> and
+              <code class="ph codeph">--null-string</code> to ensure all <code class="ph codeph">NULL</code>
+            values are represented correctly in the Sqoop output files.
+              <code class="ph codeph">\N</code> needs to be escaped as in the below example:
+            <pre class="pre codeblock"><code>--null-string '\\N' --null-non-string '\\N'</code></pre>
+          </div>
+
+        </li>
+
+        <li class="li">
+          <p class="p">By default, Sqoop writes <code class="ph codeph">NULL</code> values using the
+            string <code class="ph codeph">null</code>, which causes a conversion error when
+            such rows are evaluated by Impala. A workaround for existing tables
+            and data files is to change the table properties through
+              <code class="ph codeph">ALTER TABLE <var class="keyword varname">name</var> SET
+              TBLPROPERTIES("serialization.null.format"="null")</code>.</p>
 
         </li>
 
 
         <li class="li">
           <div class="p">
-        In <span class="keyword">Impala 2.6</span> and higher, Impala can optionally
-        skip an arbitrary number of header lines from text input files on HDFS
-        based on the <code class="ph codeph">skip.header.line.count</code> value in the
-        <code class="ph codeph">TBLPROPERTIES</code> field of the table metadata. For example:
+        In <span class="keyword">Impala 2.6</span> and higher, Impala can optionally skip an arbitrary
+        number of header lines from text input files on HDFS based on the
+        <code class="ph codeph">skip.header.line.count</code> value in the <code class="ph codeph">TBLPROPERTIES</code>
+        field of the table metadata. For example:
 <pre class="pre codeblock"><code>create table header_line(first_name string, age int)
   row format delimited fields terminated by ',';
 
@@ -521,7 +527,7 @@ INSERT INTO csv SELECT * FROM other_file_format_table;</code></pre>
 
 <pre class="pre codeblock"><code>INSERT INTO <var class="keyword varname">text_table</var> VALUES ('string_literal',100,hex('hello world'));</code></pre>
 
-      <div class="note note"><span class="notetitle">Note:</span>
+      <div class="note note"><span class="notetitle">Note:</span> 
         Because Impala and the HDFS infrastructure are optimized for multi-megabyte files, avoid the <code class="ph codeph">INSERT
         ... VALUES</code> notation when you are inserting many rows. Each <code class="ph codeph">INSERT ... VALUES</code>
         statement produces a new tiny file, leading to fragmentation and reduced performance. When creating any
@@ -532,11 +538,10 @@ INSERT INTO csv SELECT * FROM other_file_format_table;</code></pre>
       </div>
 
 
-      <p class="p">
-        When you create a text file for use with an Impala text table, specify <code class="ph codeph">\N</code> to represent a
-        <code class="ph codeph">NULL</code> value. For the differences between <code class="ph codeph">NULL</code> and empty strings, see
-        <a class="xref" href="impala_literals.html#null">NULL</a>.
-      </p>
+      <p class="p"> When you create a text file for use with an Impala text table, specify
+          <code class="ph codeph">\N</code> to represent a <code class="ph codeph">NULL</code> value. For
+        the differences between <code class="ph codeph">NULL</code> and empty strings, see
+          <a class="xref" href="impala_literals.html#null">NULL</a>. </p>
 
 
       <p class="p">
@@ -638,7 +643,7 @@ INSERT INTO csv SELECT * FROM other_file_format_table;</code></pre>
             </p>
 
 
-            <div class="note note"><span class="notetitle">Note:</span>
+            <div class="note note"><span class="notetitle">Note:</span> 
               <p class="p">
                 The name of the Hadoop LZO package changed in the distant past.
                 Currently, the package name is <code class="ph codeph">hadoop-lzo</code>.
@@ -668,7 +673,7 @@ $ sudo zypper install impala-lzo</code></pre>
 <pre class="pre codeblock"><code>$ sudo zypper update
 $ sudo apt-get install hadoop-lzo
 $ sudo apt-get install impala-lzo</code></pre>
-            <div class="note note"><span class="notetitle">Note:</span>
+            <div class="note note"><span class="notetitle">Note:</span> 
               <p class="p">
                 The level of the <code class="ph codeph">impala-lzo</code> package is closely tied to the version of Impala
                 you use. Any time you upgrade Impala, re-do the installation command for
@@ -691,7 +696,7 @@ $ sudo apt-get install impala-lzo</code></pre>
         org.apache.hadoop.io.compress.BZip2Codec,org.apache.hadoop.io.compress.DeflateCodec,
         org.apache.hadoop.io.compress.SnappyCodec,com.hadoop.compression.lzo.LzopCodec&lt;/value&gt;
 &lt;/property&gt;</code></pre>
-            <div class="note note"><span class="notetitle">Note:</span>
+            <div class="note note"><span class="notetitle">Note:</span> 
               <p class="p">
                 If this is the first time you have edited the Hadoop <span class="ph filepath">core-site.xml</span> file, note
                 that the <span class="ph filepath">/etc/hadoop/conf</span> directory is typically a symbolic link, so the
@@ -781,7 +786,7 @@ hive&gt; INSERT INTO TABLE lzo_t SELECT col1, col2 FROM uncompressed_text_table;
 <pre class="pre codeblock"><code>$ hadoop jar /usr/lib/hadoop/lib/hadoop-lzo-<var class="keyword varname">version</var>-gplextras.jar
   com.hadoop.compression.lzo.DistributedLzoIndexer /<var class="keyword varname">hdfs_location_of_table</var>/</code></pre>
 
-        <div class="note note"><span class="notetitle">Note:</span>
+        <div class="note note"><span class="notetitle">Note:</span> 
           If the path of the JAR file in the preceding example is not recognized, do a <span class="keyword cmdname">find</span>
           command to locate <span class="ph filepath">hadoop-lzo-*-gplextras.jar</span> and use that path.
         </div>

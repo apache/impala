@@ -11,8 +11,8 @@
 <meta name="DC.Relation" scheme="URI" content="../topics/impala_langref_sql.html" />
 <meta name="prodname" content="Impala" />
 <meta name="prodname" content="Impala" />
-<meta name="version" content="Impala 3.2.x" />
-<meta name="version" content="Impala 3.2.x" />
+<meta name="version" content="Impala 3.3.x" />
+<meta name="version" content="Impala 3.3.x" />
 <meta name="DC.Format" content="XHTML" />
 <meta name="DC.Identifier" content="drop_table" />
 <link rel="stylesheet" type="text/css" href="../commonltr.css" />
@@ -163,31 +163,39 @@ drop table temporary.trivial;</code></pre>
         For best compatibility with the S3 write support in <span class="keyword">Impala 2.6</span>
         and higher:
         <ul class="ul">
-        <li class="li">Use native Hadoop techniques to create data files in S3 for querying through Impala.</li>
+          <li class="li">
+            Use native Hadoop techniques to create data files in S3 for querying through Impala.
+          </li>
 
-        <li class="li">Use the <code class="ph codeph">PURGE</code> clause of <code class="ph codeph">DROP TABLE</code> when dropping internal (managed) tables.</li>
+
+          <li class="li">
+            Use the <code class="ph codeph">PURGE</code> clause of <code class="ph codeph">DROP TABLE</code> when dropping
+            internal (managed) tables.
+          </li>
 
         </ul>
 
-        By default, when you drop an internal (managed) table, the data files are
-        moved to the HDFS trashcan. This operation is expensive for tables that
-        reside on the Amazon S3 filesystem. Therefore, for S3 tables, prefer to use
-        <code class="ph codeph">DROP TABLE <var class="keyword varname">table_name</var> PURGE</code> rather than the default <code class="ph codeph">DROP TABLE</code> statement.
-        The <code class="ph codeph">PURGE</code> clause makes Impala delete the data files immediately,
-        skipping the HDFS trashcan.
-        For the <code class="ph codeph">PURGE</code> clause to work effectively, you must originally create the
-        data files on S3 using one of the tools from the Hadoop ecosystem, such as
-        <code class="ph codeph">hadoop fs -cp</code>, or <code class="ph codeph">INSERT</code> in Impala or Hive.
+        By default, when you drop an internal (managed) table, the data files are moved to the
+        HDFS trashcan. This operation is expensive for tables that reside on the Amazon S3
+        filesystem. Therefore, for S3 tables, prefer to use <code class="ph codeph">DROP TABLE
+        <var class="keyword varname">table_name</var> PURGE</code> rather than the default <code class="ph codeph">DROP
+        TABLE</code> statement. The <code class="ph codeph">PURGE</code> clause makes Impala delete the data
+        files immediately, skipping the HDFS trashcan. For the <code class="ph codeph">PURGE</code> clause to
+        work effectively, you must originally create the data files on S3 using one of the tools
+        from the Hadoop ecosystem, such as <code class="ph codeph">hadoop fs -cp</code>, or
+        <code class="ph codeph">INSERT</code> in Impala or Hive.
       </div>
 
 
     <p class="p">
         In <span class="keyword">Impala 2.6</span> and higher, Impala DDL statements such as
-        <code class="ph codeph">CREATE DATABASE</code>, <code class="ph codeph">CREATE TABLE</code>, <code class="ph codeph">DROP DATABASE CASCADE</code>,
-        <code class="ph codeph">DROP TABLE</code>, and <code class="ph codeph">ALTER TABLE [ADD|DROP] PARTITION</code> can create or remove folders
-        as needed in the Amazon S3 system. Prior to <span class="keyword">Impala 2.6</span>, you had to create folders yourself and point
-        Impala database, tables, or partitions at them, and manually remove folders when no longer needed.
-        See <a class="xref" href="../shared/../topics/impala_s3.html#s3">Using Impala with the Amazon S3 Filesystem</a> for details about reading and writing S3 data with Impala.
+        <code class="ph codeph">CREATE DATABASE</code>, <code class="ph codeph">CREATE TABLE</code>, <code class="ph codeph">DROP DATABASE
+        CASCADE</code>, <code class="ph codeph">DROP TABLE</code>, and <code class="ph codeph">ALTER TABLE [ADD|DROP]
+        PARTITION</code> can create or remove folders as needed in the Amazon S3 system. Prior
+        to <span class="keyword">Impala 2.6</span>, you had to create folders yourself and point
+        Impala database, tables, or partitions at them, and manually remove folders when no
+        longer needed. See <a class="xref" href="../shared/../topics/impala_s3.html#s3">Using Impala with the Amazon S3 Filesystem</a> for details about reading
+        and writing S3 data with Impala.
       </p>
 
 

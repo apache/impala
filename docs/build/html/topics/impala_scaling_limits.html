@@ -1,0 +1,351 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE html
+  PUBLIC "-//W3C//DTD XHTML 1.0 Transitional//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-transitional.dtd">
+<html xmlns="http://www.w3.org/1999/xhtml" xml:lang="en" lang="en">
+<head><meta http-equiv="Content-Type" content="text/html; charset=UTF-8" />
+
+<meta name="copyright" content="(C) Copyright 2019" />
+<meta name="DC.rights.owner" content="(C) Copyright 2019" />
+<meta name="DC.Type" content="concept" />
+<meta name="DC.Title" content="Scaling Limits and Guidelines" />
+<meta name="DC.Relation" scheme="URI" content="../topics/impala_scalability.html" />
+<meta name="prodname" content="Impala" />
+<meta name="version" content="Impala 3.3.x" />
+<meta name="DC.Format" content="XHTML" />
+<meta name="DC.Identifier" content="impala_scaling_limits" />
+<link rel="stylesheet" type="text/css" href="../commonltr.css" />
+<title>Scaling Limits and Guidelines</title>
+</head>
+<body id="impala_scaling_limits">
+
+
+  <h1 class="title topictitle1" id="ariaid-title1">Scaling Limits and Guidelines</h1>
+
+
+  
+
+  <div class="body conbody">
+
+    <p class="p">
+      This topic lists the <em class="ph i">scalability</em> limitation in Impala. For a given functional
+      feature, it is recommended that you respect these limitations to achieve optimal
+      scalability and performance. For example, you might be able to create a table with 2000
+      columns, you will experience performance problems while querying the table. This topic
+      does not cover functional limitations in Impala.
+    </p>
+
+
+    <p class="p">
+      Unless noted otherwise, the limits were tested and certified.
+    </p>
+
+
+    <p class="p">
+      The limits noted as "<em class="ph i">generally safe</em>" are not certified, but recommended as
+      generally safe. A safe range is not a hard limit as unforeseen errors or troubles in your
+      particular environment can affect the range.
+    </p>
+
+
+    <p class="p toc inpage"></p>
+
+
+  </div>
+
+
+  <div class="related-links">
+<div class="familylinks">
+<div class="parentlink"><strong>Parent topic:</strong> <a class="link" href="../topics/impala_scalability.html">Scalability Considerations for Impala</a></div>
+</div>
+</div><div class="topic concept nested1" aria-labelledby="ariaid-title2" id="deployment_limits">
+
+    <h2 class="title topictitle2" id="ariaid-title2">Deployment Limits</h2>
+
+
+    <div class="body conbody">
+
+      <ul class="ul">
+        <li class="li">
+          Number of Impalad Executors
+          <ul class="ul">
+            <li class="li">
+              80 nodes in <span class="keyword">Impala 2.11</span> and lower
+            </li>
+
+
+            <li class="li">
+              150 nodes in <span class="keyword">Impala 2.12</span> and higher
+            </li>
+
+          </ul>
+
+        </li>
+
+
+        <li class="li">
+          Number of Impalad Coordinators: 1 coordinator for at most every 50 executors
+        </li>
+
+
+        
+
+        
+
+        
+      </ul>
+
+
+      <ul class="ul">
+        <li class="li">
+          The number of Impala clusters per deployment
+          <ul class="ul">
+            <li class="li">
+              1 Impala cluster in Impala 3.1 and lower
+            </li>
+
+
+            <li class="li">
+              Multiple clusters in Impala 3.2 and higher is <em class="ph i">generally safe</em>.
+            </li>
+
+          </ul>
+
+        </li>
+
+      </ul>
+
+
+    </div>
+
+
+  </div>
+
+
+  <div class="topic concept nested1" aria-labelledby="ariaid-title3" id="data_storage_limits">
+
+    <h2 class="title topictitle2" id="ariaid-title3">Data Storage Limits</h2>
+
+
+    <div class="body conbody">
+
+      <p class="p">
+        There are no hard limits for the following, but you will experience gradual performance
+        degradation as you increase these numbers.
+      </p>
+
+
+      <ul class="ul">
+        <li class="li">
+          Number of databases
+        </li>
+
+
+        <li class="li">
+          Number of tables - total, per database
+        </li>
+
+
+        <li class="li">
+          Number of partitions - total, per table
+        </li>
+
+
+        <li class="li">
+          Number of files - total, per table, per table per partition
+        </li>
+
+
+        <li class="li">
+          Number of views - total, per database
+        </li>
+
+
+        <li class="li">
+          Number of user-defined functions - total, per database
+        </li>
+
+
+        <li class="li">
+          Parquet
+          <ul class="ul">
+            <li class="li">
+              Number of columns per row group
+            </li>
+
+
+            <li class="li">
+              Number of row groups per block
+            </li>
+
+
+            <li class="li">
+              Number of HDFS blocks per file
+            </li>
+
+          </ul>
+
+        </li>
+
+      </ul>
+
+
+    </div>
+
+
+  </div>
+
+
+  <div class="topic concept nested1" aria-labelledby="ariaid-title4" id="schema_design_limits">
+
+    <h2 class="title topictitle2" id="ariaid-title4">Schema Design Limits</h2>
+
+
+    <div class="body conbody">
+
+      <ul class="ul">
+        <li class="li">
+          Number of columns
+          <ul class="ul">
+            <li class="li">
+              300 for Kudu tables
+              <p class="p">
+                See
+                <a class="xref" href="https://kudu.apache.org/docs/known_issues.html" target="_blank">Kudu
+                Usage Limitations</a> for more information.
+              </p>
+
+            </li>
+
+
+            <li class="li">
+              1000 for other types of tables
+            </li>
+
+          </ul>
+
+        </li>
+
+
+        
+
+        
+      </ul>
+
+
+    </div>
+
+
+  </div>
+
+
+  <div class="topic concept nested1" aria-labelledby="ariaid-title5" id="security_limits">
+
+    <h2 class="title topictitle2" id="ariaid-title5">Security Limits</h2>
+
+
+    <div class="body conbody">
+
+      <ul class="ul">
+        <li class="li">
+          Number of roles: 10,000 for Sentry
+        </li>
+
+
+        
+      </ul>
+
+
+    </div>
+
+
+  </div>
+
+
+  
+
+  <div class="topic concept nested1" aria-labelledby="ariaid-title6" id="query_compile_limits">
+
+    <h2 class="title topictitle2" id="ariaid-title6">Query Limits - Compile Time</h2>
+
+
+    <div class="body conbody">
+
+      <ul class="ul">
+        <li class="li">
+          Maximum number of columns in a query, included in a <code class="ph codeph">SELECT</code> list,
+          <code class="ph codeph">INSERT</code>, and in an expression: no limit
+        </li>
+
+
+        <li class="li">
+          Number of tables referenced: no limit
+        </li>
+
+
+        <li class="li">
+          Number of plan nodes: no limit
+        </li>
+
+
+        <li class="li">
+          Number of plan fragments: no limit
+        </li>
+
+
+        <li class="li">
+          Depth of expression tree: 1000 hard limit
+        </li>
+
+
+        <li class="li">
+          Width of expression tree: 10,000 hard limit
+        </li>
+
+      </ul>
+
+
+    </div>
+
+
+  </div>
+
+
+  <div class="topic concept nested1" aria-labelledby="ariaid-title7" id="query_runtime_limits">
+
+    <h2 class="title topictitle2" id="ariaid-title7">Query Limits - Runtime Time</h2>
+
+
+    <div class="body conbody">
+
+      <ul class="ul">
+        
+
+        <li class="li">
+          Codegen
+          <ul class="ul">
+            <li class="li">
+              Very deeply nested expressions within queries can exceed internal Impala limits,
+              leading to excessive memory usage. Setting the query option
+              <code class="ph codeph">disable_codegen=true</code> may reduce the impact, at a cost of longer
+              query runtime.
+            </li>
+
+          </ul>
+
+        </li>
+
+
+        
+
+        
+      </ul>
+
+
+    </div>
+
+
+  </div>
+
+
+</body>
+</html>

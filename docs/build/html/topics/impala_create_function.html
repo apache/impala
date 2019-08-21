@@ -11,8 +11,8 @@
 <meta name="DC.Relation" scheme="URI" content="../topics/impala_langref_sql.html" />
 <meta name="prodname" content="Impala" />
 <meta name="prodname" content="Impala" />
-<meta name="version" content="Impala 3.2.x" />
-<meta name="version" content="Impala 3.2.x" />
+<meta name="version" content="Impala 3.3.x" />
+<meta name="version" content="Impala 3.3.x" />
 <meta name="DC.Format" content="XHTML" />
 <meta name="DC.Identifier" content="create_function" />
 <link rel="stylesheet" type="text/css" href="../commonltr.css" />
@@ -28,11 +28,9 @@
 
   <div class="body conbody">
 
-    <p class="p">
-      
-      Creates a user-defined function (UDF), which you can use to implement custom logic during
-      <code class="ph codeph">SELECT</code> or <code class="ph codeph">INSERT</code> operations.
-    </p>
+    <p class="p">  Creates a user-defined function (UDF), which you can use to implement
+      custom logic during <code class="ph codeph">SELECT</code> or <code class="ph codeph">INSERT</code>
+      operations. </p>
 
 
     <p class="p">
@@ -73,8 +71,6 @@
     </div>
 
 
-
-
     <p class="p">
       To create a persistent UDA, which must be written in C++, issue a <code class="ph codeph">CREATE AGGREGATE FUNCTION</code> statement:
     </p>
@@ -82,6 +78,7 @@
 
 <pre class="pre codeblock"><code>CREATE [AGGREGATE] FUNCTION [IF NOT EXISTS] [<var class="keyword varname">db_name</var>.]<var class="keyword varname">function_name</var>([<var class="keyword varname">arg_type</var>[, <var class="keyword varname">arg_type</var>...])
   RETURNS <var class="keyword varname">return_type</var>
+  <span class="ph">[INTERMEDIATE <var class="keyword varname">type_spec</var>]</span>
   LOCATION '<var class="keyword varname">hdfs_path</var>'
   [INIT_FN='<var class="keyword varname">function</var>]
   UPDATE_FN='<var class="keyword varname">function</var>
@@ -89,8 +86,7 @@
   [PREPARE_FN='<var class="keyword varname">function</var>]
   [CLOSEFN='<var class="keyword varname">function</var>]
   <span class="ph">[SERIALIZE_FN='<var class="keyword varname">function</var>]</span>
-  [FINALIZE_FN='<var class="keyword varname">function</var>]
-  <span class="ph">[INTERMEDIATE <var class="keyword varname">type_spec</var>]</span></code></pre>
+  [FINALIZE_FN='<var class="keyword varname">function</var>]</code></pre>
 
     <p class="p">
         <strong class="ph b">Statement type:</strong> DDL
@@ -102,7 +98,7 @@
     </p>
 
 
-    <div class="note note"><span class="notetitle">Note:</span>
+    <div class="note note"><span class="notetitle">Note:</span> 
       <p class="p">
         Variable-length argument lists are supported for C++ UDFs, but currently not for Java UDFs.
       </p>
@@ -230,8 +226,6 @@
     </p>
 
 
-    
-
     <p class="p">
       For end-to-end examples of UDAs, see <a class="xref" href="impala_udf.html#udfs">User-Defined Functions (UDFs)</a>.
     </p>
@@ -243,8 +237,8 @@
 
 
     <p class="p">
-        Currently, Impala UDFs cannot accept arguments or return values of the Impala complex types
-        (<code class="ph codeph">STRUCT</code>, <code class="ph codeph">ARRAY</code>, or <code class="ph codeph">MAP</code>).
+        Currently, Impala UDFs cannot accept arguments or return values of the Impala complex
+        types (<code class="ph codeph">STRUCT</code>, <code class="ph codeph">ARRAY</code>, or <code class="ph codeph">MAP</code>).
       </p>
 
 
@@ -254,6 +248,17 @@
 
 
     <ul class="ul">
+      <li class="li"> When authorization is enabled, the <code class="ph codeph">CREATE FUNCTION</code>
+        statement requires:<ul class="ul">
+          <li class="li">The <code class="ph codeph">CREATE</code> privilege on the database.</li>
+
+          <li class="li">The <code class="ph codeph">ALL</code> privilege on URI where URI is the value
+            you specified for the <code class="ph codeph">LOCATION</code> in the
+              <code class="ph codeph">CREATE FUNCTION</code> statement. </li>
+
+        </ul>
+</li>
+
       <li class="li">
         You can write Impala UDFs in either C++ or Java. C++ UDFs are new to Impala, and are the recommended format
         for high performance utilizing native code. Java-based UDFs are compatible between Impala and Hive, and are
@@ -347,10 +352,11 @@
 
 
     <p class="p">
-        If you connect to different Impala nodes within an <span class="keyword cmdname">impala-shell</span> session for
-        load-balancing purposes, you can enable the <code class="ph codeph">SYNC_DDL</code> query option to make each DDL
-        statement wait before returning, until the new or changed metadata has been received by all the Impala
-        nodes. See <a class="xref" href="../shared/../topics/impala_sync_ddl.html#sync_ddl">SYNC_DDL Query Option</a> for details.
+        If you connect to different Impala nodes within an <span class="keyword cmdname">impala-shell</span>
+        session for load-balancing purposes, you can enable the <code class="ph codeph">SYNC_DDL</code> query
+        option to make each DDL statement wait before returning, until the new or changed
+        metadata has been received by all the Impala nodes. See
+        <a class="xref" href="../shared/../topics/impala_sync_ddl.html#sync_ddl">SYNC_DDL Query Option</a> for details.
       </p>
 
 
@@ -367,8 +373,8 @@
 
 
     <p class="p">
-        The Hive <code class="ph codeph">current_user()</code> function cannot be
-        called from a Java UDF through Impala.
+        The Hive <code class="ph codeph">current_user()</code> function cannot be called from a Java UDF
+        through Impala.
       </p>
 
 
@@ -376,15 +382,17 @@
 
 
     <p class="p">
-        In <span class="keyword">Impala 2.5</span> and higher, Impala UDFs and UDAs written in C++ are persisted in the metastore database.
-        Java UDFs are also persisted, if they were created with the new <code class="ph codeph">CREATE FUNCTION</code> syntax for Java UDFs,
-        where the Java function argument and return types are omitted.
-        Java-based UDFs created with the old <code class="ph codeph">CREATE FUNCTION</code> syntax do not persist across restarts
-        because they are held in the memory of the <span class="keyword cmdname">catalogd</span> daemon.
-        Until you re-create such Java UDFs using the new <code class="ph codeph">CREATE FUNCTION</code> syntax,
-        you must reload those Java-based UDFs by running the original <code class="ph codeph">CREATE FUNCTION</code> statements again each time
-        you restart the <span class="keyword cmdname">catalogd</span> daemon.
-        Prior to <span class="keyword">Impala 2.5</span> the requirement to reload functions after a restart applied to both C++ and Java functions.
+        In <span class="keyword">Impala 2.5</span> and higher, Impala UDFs and UDAs written in C++ are
+        persisted in the metastore database. Java UDFs are also persisted, if they were created
+        with the new <code class="ph codeph">CREATE FUNCTION</code> syntax for Java UDFs, where the Java
+        function argument and return types are omitted. Java-based UDFs created with the old
+        <code class="ph codeph">CREATE FUNCTION</code> syntax do not persist across restarts because they are
+        held in the memory of the <span class="keyword cmdname">catalogd</span> daemon. Until you re-create such
+        Java UDFs using the new <code class="ph codeph">CREATE FUNCTION</code> syntax, you must reload those
+        Java-based UDFs by running the original <code class="ph codeph">CREATE FUNCTION</code> statements
+        again each time you restart the <span class="keyword cmdname">catalogd</span> daemon. Prior to
+        <span class="keyword">Impala 2.5</span> the requirement to reload functions after a restart
+        applied to both C++ and Java functions.
       </p>
 
 

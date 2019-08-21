@@ -11,8 +11,8 @@
 <meta name="DC.Relation" scheme="URI" content="../topics/impala_select.html" />
 <meta name="prodname" content="Impala" />
 <meta name="prodname" content="Impala" />
-<meta name="version" content="Impala 3.2.x" />
-<meta name="version" content="Impala 3.2.x" />
+<meta name="version" content="Impala 3.3.x" />
+<meta name="version" content="Impala 3.3.x" />
 <meta name="DC.Format" content="XHTML" />
 <meta name="DC.Identifier" content="distinct" />
 <link rel="stylesheet" type="text/css" href="../commonltr.css" />
@@ -55,13 +55,13 @@ SELECT COUNT(DISTINCT c_birth_country) FROM customer;
 SELECT COUNT(DISTINCT c_salutation, c_last_name) FROM customer;</code></pre>
 
     <p class="p">
-        <strong class="ph b">Zero-length strings:</strong> For purposes of clauses such as <code class="ph codeph">DISTINCT</code> and <code class="ph codeph">GROUP
-        BY</code>, Impala considers zero-length strings (<code class="ph codeph">""</code>), <code class="ph codeph">NULL</code>, and space
-        to all be different values.
+        <strong class="ph b">Zero-length strings:</strong> For purposes of clauses such as <code class="ph codeph">DISTINCT</code>
+        and <code class="ph codeph">GROUP BY</code>, Impala considers zero-length strings
+        (<code class="ph codeph">""</code>), <code class="ph codeph">NULL</code>, and space to all be different values.
       </p>
 
 
-    <div class="note note"><span class="notetitle">Note:</span>
+    <div class="note note"><span class="notetitle">Note:</span> 
       <p class="p">
         In contrast with some database systems that always return <code class="ph codeph">DISTINCT</code>
         values in sorted order, Impala does not do any ordering of <code class="ph codeph">DISTINCT</code>

@@ -11,8 +11,8 @@
 <meta name="DC.Relation" scheme="URI" content="../topics/impala_schema_objects.html" />
 <meta name="prodname" content="Impala" />
 <meta name="prodname" content="Impala" />
-<meta name="version" content="Impala 3.2.x" />
-<meta name="version" content="Impala 3.2.x" />
+<meta name="version" content="Impala 3.3.x" />
+<meta name="version" content="Impala 3.3.x" />
 <meta name="DC.Format" content="XHTML" />
 <meta name="DC.Identifier" content="views" />
 <link rel="stylesheet" type="text/css" href="../commonltr.css" />
@@ -168,8 +168,8 @@ select * from top_10_days;</code></pre>
 
 
     <div class="p">
-        To see the definition of a view, issue a <code class="ph codeph">DESCRIBE FORMATTED</code> statement, which shows the
-        query from the original <code class="ph codeph">CREATE VIEW</code> statement:
+        To see the definition of a view, issue a <code class="ph codeph">DESCRIBE FORMATTED</code> statement,
+        which shows the query from the original <code class="ph codeph">CREATE VIEW</code> statement:
 <pre class="pre codeblock"><code>[localhost:21000] &gt; create view v1 as select * from t1;
 [localhost:21000] &gt; describe formatted v1;
 Query finished, fetching results ...
@@ -212,13 +212,14 @@ Query finished, fetching results ...
 
     <p class="p">
         Prior to Impala 1.4.0, it was not possible to use the <code class="ph codeph">CREATE TABLE LIKE
-        <var class="keyword varname">view_name</var></code> syntax. In Impala 1.4.0 and higher, you can create a table with the
-        same column definitions as a view using the <code class="ph codeph">CREATE TABLE LIKE</code> technique. Although
-        <code class="ph codeph">CREATE TABLE LIKE</code> normally inherits the file format of the original table, a view has no
-        underlying file format, so <code class="ph codeph">CREATE TABLE LIKE <var class="keyword varname">view_name</var></code> produces a text
-        table by default. To specify a different file format, include a <code class="ph codeph">STORED AS
-        <var class="keyword varname">file_format</var></code> clause at the end of the <code class="ph codeph">CREATE TABLE LIKE</code>
-        statement.
+        <var class="keyword varname">view_name</var></code> syntax. In Impala 1.4.0 and higher, you can create
+        a table with the same column definitions as a view using the <code class="ph codeph">CREATE TABLE
+        LIKE</code> technique. Although <code class="ph codeph">CREATE TABLE LIKE</code> normally inherits
+        the file format of the original table, a view has no underlying file format, so
+        <code class="ph codeph">CREATE TABLE LIKE <var class="keyword varname">view_name</var></code> produces a text table by
+        default. To specify a different file format, include a <code class="ph codeph">STORED AS
+        <var class="keyword varname">file_format</var></code> clause at the end of the <code class="ph codeph">CREATE TABLE
+        LIKE</code> statement.
       </p>
 
 
@@ -229,20 +230,20 @@ Query finished, fetching results ...
 
     <p class="p">
         For tables containing complex type columns (<code class="ph codeph">ARRAY</code>,
-        <code class="ph codeph">STRUCT</code>, or <code class="ph codeph">MAP</code>), you typically use
-        join queries to refer to the complex values. You can use views to
-        hide the join notation, making such tables seem like traditional denormalized
-        tables, and making those tables queryable by business intelligence tools
-        that do not have built-in support for those complex types.
+        <code class="ph codeph">STRUCT</code>, or <code class="ph codeph">MAP</code>), you typically use join queries to
+        refer to the complex values. You can use views to hide the join notation, making such
+        tables seem like traditional denormalized tables, and making those tables queryable by
+        business intelligence tools that do not have built-in support for those complex types.
         See <a class="xref" href="../shared/../topics/impala_complex_types.html#complex_types_views">Accessing Complex Type Data in Flattened Form Using Views</a> for details.
       </p>
 
 
     <p class="p">
-        The <code class="ph codeph">STRAIGHT_JOIN</code> hint affects the join order of table references in the query
-        block containing the hint. It does not affect the join order of nested queries, such as views,
-        inline views, or <code class="ph codeph">WHERE</code>-clause subqueries. To use this hint for performance
-        tuning of complex queries, apply the hint to all query blocks that need a fixed join order.
+        The <code class="ph codeph">STRAIGHT_JOIN</code> hint affects the join order of table references in
+        the query block containing the hint. It does not affect the join order of nested
+        queries, such as views, inline views, or <code class="ph codeph">WHERE</code>-clause subqueries. To
+        use this hint for performance tuning of complex queries, apply the hint to all query
+        blocks that need a fixed join order.
       </p>
 
 
@@ -265,10 +266,11 @@ Query finished, fetching results ...
       <li class="li">
 
         <p class="p">
-        If a view applies to a partitioned table, any partition pruning considers the clauses on both
-        the original query and any additional <code class="ph codeph">WHERE</code> predicates in the query that refers to the view.
-        Prior to Impala 1.4, only the <code class="ph codeph">WHERE</code> clauses on the original query from the
-        <code class="ph codeph">CREATE VIEW</code> statement were used for partition pruning.
+        If a view applies to a partitioned table, any partition pruning considers the clauses on
+        both the original query and any additional <code class="ph codeph">WHERE</code> predicates in the
+        query that refers to the view. Prior to Impala 1.4, only the <code class="ph codeph">WHERE</code>
+        clauses on the original query from the <code class="ph codeph">CREATE VIEW</code> statement were used
+        for partition pruning.
       </p>
 
       </li>
@@ -276,11 +278,12 @@ Query finished, fetching results ...
 
       <li class="li">
         <div class="p">
-        An <code class="ph codeph">ORDER BY</code> clause without an additional <code class="ph codeph">LIMIT</code> clause is ignored in any
-        view definition. If you need to sort the entire result set from a view, use an <code class="ph codeph">ORDER BY</code>
-        clause in the <code class="ph codeph">SELECT</code> statement that queries the view. You can still make a simple <span class="q">"top
-        10"</span> report by combining the <code class="ph codeph">ORDER BY</code> and <code class="ph codeph">LIMIT</code> clauses in the same
-        view definition:
+        An <code class="ph codeph">ORDER BY</code> clause without an additional <code class="ph codeph">LIMIT</code> clause
+        is ignored in any view definition. If you need to sort the entire result set from a
+        view, use an <code class="ph codeph">ORDER BY</code> clause in the <code class="ph codeph">SELECT</code> statement
+        that queries the view. You can still make a simple <span class="q">"top 10"</span> report by combining the
+        <code class="ph codeph">ORDER BY</code> and <code class="ph codeph">LIMIT</code> clauses in the same view
+        definition:
 <pre class="pre codeblock"><code>[localhost:21000] &gt; create table unsorted (x bigint);
 [localhost:21000] &gt; insert into unsorted values (1), (9), (3), (7), (5), (8), (4), (6), (2);
 [localhost:21000] &gt; create view sorted_view as select x from unsorted order by x;
@@ -328,11 +331,10 @@ Query finished, fetching results ...
 
       <li class="li">
         <p class="p">
-        The <code class="ph codeph">TABLESAMPLE</code> clause of the <code class="ph codeph">SELECT</code>
-        statement does not apply to a table reference derived from a view, a subquery,
-        or anything other than a real base table. This clause only works for tables
-        backed by HDFS or HDFS-like data files, therefore it does not apply to Kudu or
-        HBase tables.
+        The <code class="ph codeph">TABLESAMPLE</code> clause of the <code class="ph codeph">SELECT</code> statement does
+        not apply to a table reference derived from a view, a subquery, or anything other than a
+        real base table. This clause only works for tables backed by HDFS or HDFS-like data
+        files, therefore it does not apply to Kudu or HBase tables.
       </p>
 
       </li>

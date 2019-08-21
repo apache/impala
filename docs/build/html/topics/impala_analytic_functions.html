@@ -28,25 +28,25 @@
 <meta name="prodname" content="Impala" />
 <meta name="prodname" content="Impala" />
 <meta name="prodname" content="Impala" />
-<meta name="version" content="Impala 3.2.x" />
-<meta name="version" content="Impala 3.2.x" />
-<meta name="version" content="Impala 3.2.x" />
-<meta name="version" content="Impala 3.2.x" />
-<meta name="version" content="Impala 3.2.x" />
-<meta name="version" content="Impala 3.2.x" />
-<meta name="version" content="Impala 3.2.x" />
-<meta name="version" content="Impala 3.2.x" />
-<meta name="version" content="Impala 3.2.x" />
-<meta name="version" content="Impala 3.2.x" />
-<meta name="version" content="Impala 3.2.x" />
-<meta name="version" content="Impala 3.2.x" />
-<meta name="version" content="Impala 3.2.x" />
-<meta name="version" content="Impala 3.2.x" />
-<meta name="version" content="Impala 3.2.x" />
-<meta name="version" content="Impala 3.2.x" />
-<meta name="version" content="Impala 3.2.x" />
-<meta name="version" content="Impala 3.2.x" />
-<meta name="version" content="Impala 3.2.x" />
+<meta name="version" content="Impala 3.3.x" />
+<meta name="version" content="Impala 3.3.x" />
+<meta name="version" content="Impala 3.3.x" />
+<meta name="version" content="Impala 3.3.x" />
+<meta name="version" content="Impala 3.3.x" />
+<meta name="version" content="Impala 3.3.x" />
+<meta name="version" content="Impala 3.3.x" />
+<meta name="version" content="Impala 3.3.x" />
+<meta name="version" content="Impala 3.3.x" />
+<meta name="version" content="Impala 3.3.x" />
+<meta name="version" content="Impala 3.3.x" />
+<meta name="version" content="Impala 3.3.x" />
+<meta name="version" content="Impala 3.3.x" />
+<meta name="version" content="Impala 3.3.x" />
+<meta name="version" content="Impala 3.3.x" />
+<meta name="version" content="Impala 3.3.x" />
+<meta name="version" content="Impala 3.3.x" />
+<meta name="version" content="Impala 3.3.x" />
+<meta name="version" content="Impala 3.3.x" />
 <meta name="DC.Format" content="XHTML" />
 <meta name="DC.Identifier" content="analytic_functions" />
 <link rel="stylesheet" type="text/css" href="../commonltr.css" />
@@ -194,10 +194,14 @@ window_clause: See <a class="xref" href="#window_clause">Window Clause</a>
 
 
       <p class="p">
-        In queries involving both analytic functions and partitioned tables, partition pruning only occurs for columns named in the <code class="ph codeph">PARTITION BY</code>
-        clause of the analytic function call. For example, if an analytic function query has a clause such as <code class="ph codeph">WHERE year=2016</code>,
-        the way to make the query prune all other <code class="ph codeph">YEAR</code> partitions is to include <code class="ph codeph">PARTITION BY year</code> in the analytic function call;
-        for example, <code class="ph codeph">OVER (PARTITION BY year,<var class="keyword varname">other_columns</var> <var class="keyword varname">other_analytic_clauses</var>)</code>.
+        In queries involving both analytic functions and partitioned tables, partition pruning
+        only occurs for columns named in the <code class="ph codeph">PARTITION BY</code> clause of the
+        analytic function call. For example, if an analytic function query has a clause such as
+        <code class="ph codeph">WHERE year=2016</code>, the way to make the query prune all other
+        <code class="ph codeph">YEAR</code> partitions is to include <code class="ph codeph">PARTITION BY year</code> in the
+        analytic function call; for example, <code class="ph codeph">OVER (PARTITION BY
+        year,<var class="keyword varname">other_columns</var>
+        <var class="keyword varname">other_analytic_clauses</var>)</code>.
 
       </p>
 

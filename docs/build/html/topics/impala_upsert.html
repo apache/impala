@@ -11,8 +11,8 @@
 <meta name="DC.Relation" scheme="URI" content="../topics/impala_langref_sql.html" />
 <meta name="prodname" content="Impala" />
 <meta name="prodname" content="Impala" />
-<meta name="version" content="Impala 3.2.x" />
-<meta name="version" content="Impala 3.2.x" />
+<meta name="version" content="Impala 3.3.x" />
+<meta name="version" content="Impala 3.3.x" />
 <meta name="DC.Format" content="XHTML" />
 <meta name="DC.Identifier" content="upsert" />
 <link rel="stylesheet" type="text/css" href="../commonltr.css" />
@@ -112,13 +112,14 @@ hint_clause ::= [SHUFFLE] | [NOSHUFFLE]
     </p>
 
 
-    <div class="note important"><span class="importanttitle">Important:</span>
-        After adding or replacing data in a table used in performance-critical queries, issue a <code class="ph codeph">COMPUTE
-        STATS</code> statement to make sure all statistics are up-to-date. Consider updating statistics for a
-        table after any <code class="ph codeph">INSERT</code>, <code class="ph codeph">LOAD DATA</code>, or <code class="ph codeph">CREATE TABLE AS
-        SELECT</code> statement in Impala, or after loading data through Hive and doing a <code class="ph codeph">REFRESH
-        <var class="keyword varname">table_name</var></code> in Impala. This technique is especially important for tables that
-        are very large, used in join queries, or both.
+    <div class="note important"><span class="importanttitle">Important:</span> 
+        After adding or replacing data in a table used in performance-critical queries, issue a
+        <code class="ph codeph">COMPUTE STATS</code> statement to make sure all statistics are up-to-date.
+        Consider updating statistics for a table after any <code class="ph codeph">INSERT</code>, <code class="ph codeph">LOAD
+        DATA</code>, or <code class="ph codeph">CREATE TABLE AS SELECT</code> statement in Impala, or after
+        loading data through Hive and doing a <code class="ph codeph">REFRESH
+        <var class="keyword varname">table_name</var></code> in Impala. This technique is especially important
+        for tables that are very large, used in join queries, or both.
       </div>
 
 

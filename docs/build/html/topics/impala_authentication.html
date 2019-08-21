@@ -15,8 +15,8 @@
 <meta name="DC.Relation" scheme="URI" content="../topics/impala_delegation.html" />
 <meta name="prodname" content="Impala" />
 <meta name="prodname" content="Impala" />
-<meta name="version" content="Impala 3.2.x" />
-<meta name="version" content="Impala 3.2.x" />
+<meta name="version" content="Impala 3.3.x" />
+<meta name="version" content="Impala 3.3.x" />
 <meta name="DC.Format" content="XHTML" />
 <meta name="DC.Identifier" content="authentication" />
 <link rel="stylesheet" type="text/css" href="../commonltr.css" />
@@ -44,13 +44,18 @@
       Impala supports authentication using either Kerberos or LDAP.
     </p>
 
+    <p class="p">
+      You can also make proxy connections to Impala through Apache Knox.
+    </p>
 
-    <div class="note note"><span class="notetitle">Note:</span>
-      Regardless of the authentication mechanism used, Impala always creates HDFS directories and data files
-      owned by the same user (typically <code class="ph codeph">impala</code>). To implement user-level access to different
-      databases, tables, columns, partitions, and so on, use the Sentry authorization feature, as explained in
-      <a class="xref" href="../shared/../topics/impala_authorization.html#authorization">Enabling Sentry Authorization for Impala</a>.
-    </div>
+
+    <div class="note note"><span class="notetitle">Note:</span> 
+        Regardless of the authentication mechanism used, Impala always creates HDFS directories
+        and data files owned by the same user (typically <code class="ph codeph">impala</code>). To implement
+        user-level access to different databases, tables, columns, partitions, and so on, use
+        the Sentry authorization feature, as explained in
+        <a class="xref" href="../shared/../topics/impala_authorization.html#authorization">Impala Authorization</a>.
+      </div>
 
 
     <p class="p toc"></p>
@@ -59,7 +64,7 @@
     <p class="p">
       Once you are finished setting up authentication, move on to authorization, which involves specifying what
       databases, tables, HDFS directories, and so on can be accessed by particular users when they connect through
-      Impala. See <a class="xref" href="impala_authorization.html#authorization">Enabling Sentry Authorization for Impala</a> for details.
+      Impala. See <a class="xref" href="impala_authorization.html#authorization">Impala Authorization</a> for details.
     </p>
 
   </div>
@@ -72,7 +77,7 @@
 </li>
 <li class="link ulchildlink"><strong><a href="../topics/impala_mixed_security.html">Using Multiple Authentication Methods with Impala</a></strong><br />
 </li>
-<li class="link ulchildlink"><strong><a href="../topics/impala_delegation.html">Configuring Impala Delegation for Hue and BI Tools</a></strong><br />
+<li class="link ulchildlink"><strong><a href="../topics/impala_delegation.html">Configuring Impala Delegation for Clients</a></strong><br />
 </li>
 </ul>
 

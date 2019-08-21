@@ -11,8 +11,8 @@
 <meta name="DC.Relation" scheme="URI" content="../topics/impala_functions.html" />
 <meta name="prodname" content="Impala" />
 <meta name="prodname" content="Impala" />
-<meta name="version" content="Impala 3.2.x" />
-<meta name="version" content="Impala 3.2.x" />
+<meta name="version" content="Impala 3.3.x" />
+<meta name="version" content="Impala 3.3.x" />
 <meta name="DC.Format" content="XHTML" />
 <meta name="DC.Identifier" content="conversion_functions" />
 <link rel="stylesheet" type="text/css" href="../commonltr.css" />
@@ -31,22 +31,14 @@
   <div class="body conbody">
 
     <p class="p">
-      Conversion functions are usually used in combination with other functions, to explicitly
+      Conversion functions are typically used in combination with other functions to explicitly
       pass the expected data types. Impala has strict rules regarding data types for function
       parameters. For example, Impala does not automatically convert a <code class="ph codeph">DOUBLE</code>
       value to <code class="ph codeph">FLOAT</code>, a <code class="ph codeph">BIGINT</code> value to <code class="ph codeph">INT</code>,
       or other conversion where precision could be lost or overflow could occur. Also, for
-      reporting or dealing with loosely defined schemas in big data contexts, you might
-      frequently need to convert values to or from the <code class="ph codeph">STRING</code> type.
+      reporting or dealing with loosely defined schemas in big data contexts, you might need to
+      convert values to or from the <code class="ph codeph">STRING</code> type.
     </p>
-
-
-    <div class="note note"><span class="notetitle">Note:</span>
-      Although in <span class="keyword">Impala 2.3</span>, the <code class="ph codeph">SHOW FUNCTIONS</code> output
-      for database <code class="ph codeph">_IMPALA_BUILTINS</code> contains some function signatures matching
-      the pattern <code class="ph codeph">castto*</code>, these functions are not intended for public use and
-      are expected to be hidden in future.
-    </div>
 
 
     <p class="p">
@@ -73,65 +65,68 @@
 
 
     <dl class="dl">
-
+      
 
         <dt class="dt dlterm" id="conversion_functions__cast">
-          CAST(expr AS type)
+          CAST(expression AS type)
         </dt>
 
 
         <dd class="dd">
-          <strong class="ph b">Purpose:</strong> Converts the value of an expression to any other type. If the
-          expression value is of a type that cannot be converted to the target type, the result
-          is <code class="ph codeph">NULL</code>.
+          <strong class="ph b">Purpose:</strong> Returns <var class="keyword varname">expression</var> converted to the
+          <var class="keyword varname">type</var> data type.
+          <div class="p">
+            If the <var class="keyword varname">expression</var> value is of a type that cannot be converted to
+            the target <var class="keyword varname">type</var>:
+            <ul class="ul">
+              <li class="li">
+                Of <code class="ph codeph">DECIMAL</code>, <code class="ph codeph">DATE</code>, and
+                <code class="ph codeph">BOOLEAN</code>, the function returns an error.
+              </li>
+
+
+              <li class="li">
+                Of all other types, the function returns <code class="ph codeph">NULL</code>.
+              </li>
+
+            </ul>
+
+          </div>
+
+
           <p class="p">
-            <strong class="ph b">Usage notes:</strong> Use <code class="ph codeph">CAST</code> when passing a column value or literal
-            to a function that expects a parameter with a different type. Frequently used in SQL
-            operations such as <code class="ph codeph">CREATE TABLE AS SELECT</code> and <code class="ph codeph">INSERT ...
-            VALUES</code> to ensure that values from various sources are of the appropriate
-            type for the destination columns. Where practical, do a one-time
-            <code class="ph codeph">CAST()</code> operation during the ingestion process to make each column
-            into the appropriate type, rather than using many <code class="ph codeph">CAST()</code> operations
-            in each query; doing type conversions for each row during each query can be
-            expensive for tables with millions or billions of rows.
+            <strong class="ph b">Usage notes:</strong>
           </p>
 
 
           <p class="p">
-        The way this function deals with time zones when converting to or from <code class="ph codeph">TIMESTAMP</code>
-        values is affected by the <code class="ph codeph">--use_local_tz_for_unix_timestamp_conversions</code> startup flag for the
-        <span class="keyword cmdname">impalad</span> daemon. See <a class="xref" href="../shared/../topics/impala_timestamp.html#timestamp">TIMESTAMP Data Type</a> for details about
-        how Impala handles time zone considerations for the <code class="ph codeph">TIMESTAMP</code> data type.
-      </p>
-
-
-          <p class="p">
-        <strong class="ph b">Examples:</strong>
-      </p>
-
-<pre class="pre codeblock"><code>SELECT CONCAT('Here are the first ',10,' results.'); -- Fails
-SELECT CONCAT('Here are the first ',CAST(10 AS STRING),' results.'); -- Succeeds
-</code></pre>
-          <p class="p">
-            The following example starts with a text table where every column has a type of
-            <code class="ph codeph">STRING</code>, which might be how you ingest data of unknown schema until
-            you can verify the cleanliness of the underlying values. Then it uses
-            <code class="ph codeph">CAST()</code> to create a new Parquet table with the same data, but using
-            specific numeric data types for the columns with numeric data. Using numeric types
-            of appropriate sizes can result in substantial space savings on disk and in memory,
-            and performance improvements in queries, over using strings or larger-than-necessary
-            numeric types.
+            Use <code class="ph codeph">CAST</code> when passing a column value or literal to a function that
+            expects a parameter with a different type. Frequently used in SQL operations such as
+            <code class="ph codeph">CREATE TABLE AS SELECT</code> and <code class="ph codeph">INSERT ... VALUES</code> to
+            ensure that values from various sources are of the appropriate type for the
+            destination columns.
           </p>
 
-<pre class="pre codeblock"><code>CREATE TABLE t1 (name STRING, x STRING, y STRING, z STRING);
 
-CREATE TABLE t2 STORED AS PARQUET
-AS SELECT
-  name,
-  CAST(x AS BIGINT) x,
-  CAST(y AS TIMESTAMP) y,
-  CAST(z AS SMALLINT) z
-FROM t1;</code></pre>
+          <p class="p">
+            Where practical, do a one-time <code class="ph codeph">CAST()</code> operation during the
+            ingestion process to make each column into the appropriate type, rather than using
+            many <code class="ph codeph">CAST()</code> operations in each query; doing type conversions for
+            each row during each query can be expensive for tables with millions or billions of
+            rows.
+          </p>
+
+
+          <p class="p">
+        The way this function deals with time zones when converting to or from
+        <code class="ph codeph">TIMESTAMP</code> values is affected by the
+        <code class="ph codeph">‑‑use_local_tz_for_unix_timestamp_conversions</code> startup flag
+        for the <span class="keyword cmdname">impalad</span> daemon. See
+        <a class="xref" href="../shared/../topics/impala_timestamp.html#timestamp">TIMESTAMP Data Type</a> for details about how
+        Impala handles time zone considerations for the <code class="ph codeph">TIMESTAMP</code> data type.
+      </p>
+
+
           <p class="p">
         <strong class="ph b">Related information:</strong>
       </p>
@@ -145,10 +140,10 @@ FROM t1;</code></pre>
             <a class="xref" href="impala_bigint.html#bigint">BIGINT Data Type</a>,
             <a class="xref" href="impala_float.html#float">FLOAT Data Type</a>,
             <a class="xref" href="impala_double.html#double">DOUBLE Data Type</a>,
-            <a class="xref" href="impala_decimal.html#decimal">DECIMAL Data Type (Impala 3.0 or higher only)</a>,
+            <a class="xref" href="impala_decimal.html#decimal">DECIMAL Data Type</a>,
             <a class="xref" href="impala_string.html#string">STRING Data Type</a>,
-            <a class="xref" href="impala_char.html#char">CHAR Data Type (Impala 2.0 or higher only)</a>,
-            <a class="xref" href="impala_varchar.html#varchar">VARCHAR Data Type (Impala 2.0 or higher only)</a>,
+            <a class="xref" href="impala_char.html#char">CHAR Data Type</a>,
+            <a class="xref" href="impala_varchar.html#varchar">VARCHAR Data Type</a>,
             <a class="xref" href="impala_timestamp.html#timestamp">TIMESTAMP Data Type</a>,
             <a class="xref" href="impala_boolean.html#boolean">BOOLEAN Data Type</a>
           </p>
@@ -156,21 +151,860 @@ FROM t1;</code></pre>
         </dd>
 
 
+      
 
+      
 
-
-
-        <dt class="dt dlterm" id="conversion_functions__typeof">
-          TYPEOF(type value)
+        <dt class="dt dlterm" id="conversion_functions__cast_format">
+          CAST(expression AS type FORMAT pattern)
         </dt>
 
 
         <dd class="dd">
-          <strong class="ph b">Purpose:</strong> Returns the name of the data type corresponding to an expression. For
-          types with extra attributes, such as length for <code class="ph codeph">CHAR</code> and
-          <code class="ph codeph">VARCHAR</code>, or precision and scale for <code class="ph codeph">DECIMAL</code>,
-          includes the full specification of the type.
+          <strong class="ph b">Purpose:</strong> Returns <var class="keyword varname">expression</var> converted to the
+          <var class="keyword varname">type</var> data type based on the <var class="keyword varname">pattern</var> format
+          string. This signature of <code class="ph codeph">CAST()</code> with the <code class="ph codeph">FORMAT</code>
+          clause is supported only for casts between <code class="ph codeph">STRING</code> /
+          <code class="ph codeph">CHAR</code> / <code class="ph codeph">VARCHAR</code> types and <code class="ph codeph">TIMESTAMP</code>
+          / <code class="ph codeph">DATE</code> types.
+          <div class="note note"><span class="notetitle">Note:</span> 
+            The patterns allowed in the <code class="ph codeph">FORMAT</code> clause support ISO SQL:2016
+            standard patterns. Those patterns are not the same format patterns used with the
+            other Impala conversion functions, e.g. <code class="ph codeph">TO_TIMESTAMP()</code> and
+            <code class="ph codeph">FROM_TIMESTAMP()</code>.
+          </div>
 
+
+          <div class="p">
+            The following rules apply to <var class="keyword varname">pattern</var>. Any exceptions to these
+            rules are noted in the Details column of the table below.
+            <ul class="ul">
+              <li class="li">
+                <var class="keyword varname">pattern</var> is a case-insensitive <code class="ph codeph">STRING</code>.
+              </li>
+
+
+              <li class="li">
+                If <var class="keyword varname">pattern</var> is <code class="ph codeph">NULL</code>, an empty string, or a
+                number, an error returns.
+              </li>
+
+
+              <li class="li">
+                A fewer digits in <var class="keyword varname">expression</var> than specified in the
+                <var class="keyword varname">pattern</var> is accepted if a separator is correctly specified in
+                the <var class="keyword varname">pattern</var>. For example, <code class="ph codeph">CAST('5-01-2017' AS DATE
+                FORMAT 'MM-dd-yyyy')</code> returns <code class="ph codeph">DATE'2017-05-01'</code>.
+              </li>
+
+
+              <li class="li">
+                If fewer number of digits are in <var class="keyword varname">expression</var> than specified in
+                the <var class="keyword varname">pattern</var>, the current date is used to complete the year
+                pattern. For example, <code class="ph codeph">CAST('19/05' AS DATE FORMAT 'YYYY/MM')</code>
+                will return <code class="ph codeph">DATE'2019-05-01'</code> when executed on August 8, 2019.
+              </li>
+
+            </ul>
+
+          </div>
+
+
+          <div class="p">
+            The following format patterns are supported in the <code class="ph codeph">FORMAT</code> clause.
+            
+<div class="tablenoborder"><table cellpadding="4" cellspacing="0" summary="" id="conversion_functions__table_gbt_5ym_r3b" class="table" frame="border" border="1" rules="all"><colgroup><col style="width:10.695187165775401%" /><col style="width:18.71657754010695%" /><col style="width:70.58823529411764%" /></colgroup><thead class="thead" style="text-align:left;">
+                  <tr class="row">
+                    <th class="entry cellrowborder" style="text-align:left;vertical-align:top;" id="d39549e394">
+                      Pattern
+                    </th>
+
+                    <th class="entry cellrowborder" style="text-align:left;vertical-align:top;" id="d39549e397">
+                      Description
+                    </th>
+
+                    <th class="entry cellrowborder" style="text-align:left;vertical-align:top;" id="d39549e400">
+                      Details
+                    </th>
+
+                  </tr>
+
+                </thead>
+<tbody class="tbody">
+                  <tr class="row">
+                    <td class="entry cellrowborder" style="text-align:left;vertical-align:top;" headers="d39549e394 ">
+                      <code class="ph codeph">YYYY</code>
+                    </td>
+
+                    <td class="entry cellrowborder" style="text-align:left;vertical-align:top;" headers="d39549e397 ">
+                      4-digit year.
+                    </td>
+
+                    <td class="entry cellrowborder" style="text-align:left;vertical-align:top;" headers="d39549e400 "> </td>
+
+                  </tr>
+
+                  <tr class="row">
+                    <td class="entry cellrowborder" style="text-align:left;vertical-align:top;" headers="d39549e394 ">
+                      <code class="ph codeph">YYY</code>
+                    </td>
+
+                    <td class="entry cellrowborder" style="text-align:left;vertical-align:top;" headers="d39549e397 ">
+                      Last 3 digits of a year.
+                    </td>
+
+                    <td class="entry cellrowborder" style="text-align:left;vertical-align:top;" headers="d39549e400 "> </td>
+
+                  </tr>
+
+                  <tr class="row">
+                    <td class="entry cellrowborder" style="text-align:left;vertical-align:top;" headers="d39549e394 ">
+                      <code class="ph codeph">YY</code>
+                    </td>
+
+                    <td class="entry cellrowborder" style="text-align:left;vertical-align:top;" headers="d39549e397 ">
+                      Last 2 digits of a year.
+                    </td>
+
+                    <td class="entry cellrowborder" style="text-align:left;vertical-align:top;" headers="d39549e400 "> </td>
+
+                  </tr>
+
+                  <tr class="row">
+                    <td class="entry cellrowborder" style="text-align:left;vertical-align:top;" headers="d39549e394 ">
+                      <code class="ph codeph">Y</code>
+                    </td>
+
+                    <td class="entry cellrowborder" style="text-align:left;vertical-align:top;" headers="d39549e397 ">
+                      Last digit of a year
+                    </td>
+
+                    <td class="entry cellrowborder" style="text-align:left;vertical-align:top;" headers="d39549e400 "> </td>
+
+                  </tr>
+
+                  <tr class="row">
+                    <td class="entry cellrowborder" style="text-align:left;vertical-align:top;" headers="d39549e394 ">
+                      <code class="ph codeph">RRRR</code>
+                    </td>
+
+                    <td class="entry cellrowborder" style="text-align:left;vertical-align:top;" headers="d39549e397 ">
+                      4-digit round year
+                    </td>
+
+                    <td class="entry cellrowborder" style="text-align:left;vertical-align:top;" headers="d39549e400 ">
+                      <p class="p">
+                        If 1,3 or 4-digit year values are provided in
+                        <var class="keyword varname">expression</var>, treated as <code class="ph codeph">YYYY</code>.
+                      </p>
+
+
+
+
+                      <p class="p">
+                        If 2-digit years are provided in <var class="keyword varname">expression</var>, treated
+                        as <code class="ph codeph">RR</code>.
+                      </p>
+
+
+
+
+                      <p class="p">
+                        For datetime to string conversions, treated as <code class="ph codeph">YYYY</code>.
+                      </p>
+
+
+
+
+                      <p class="p">
+                        If <code class="ph codeph">YYYY</code>, <code class="ph codeph">YYY</code>, <code class="ph codeph">YY</code>,
+                        <code class="ph codeph">Y</code>, or <code class="ph codeph">RR</code> is given in the same
+                        <var class="keyword varname">pattern</var> for a string to datetime conversion, an error
+                        returns.
+                      </p>
+
+                    </td>
+
+                  </tr>
+
+                  <tr class="row">
+                    <td class="entry cellrowborder" style="text-align:left;vertical-align:top;" headers="d39549e394 ">
+                      <code class="ph codeph">RR</code>
+                    </td>
+
+                    <td class="entry cellrowborder" style="text-align:left;vertical-align:top;" headers="d39549e397 ">
+                      2-digit round year.
+                    </td>
+
+                    <td class="entry cellrowborder" style="text-align:left;vertical-align:top;" headers="d39549e400 ">
+                      <div class="p">
+                        <ul class="ul">
+                          <li class="li">
+                            For datetime to string conversion, same as <code class="ph codeph">YY</code>.
+                          </li>
+
+
+                          <li class="li">
+                            For string to datetime conversions, the first 2 digits of the year
+                            in the return value depends on the specified two-digit year and the
+                            last two digits of the current year as follows:
+                            <ul class="ul">
+                              <li class="li">
+                                <p class="p">
+                                  If the specified 2-digit year is 00 to 49:
+                                </p>
+
+                                <ul class="ul">
+                                  <li class="li">
+                                    <p class="p">
+                                      If the last 2 digits of the current year are 00 to 49, the
+                                      returned year has the same first 2 digits as the current
+                                      year.
+                                    </p>
+
+                                  </li>
+
+
+                                  <li class="li">
+                                    <p class="p">
+                                      If the last 2 digits of the current year are 50 to 99, the
+                                      first 2 digits of the returned year are 1 greater than the
+                                      first 2 digits of the current year.
+                                    </p>
+
+                                  </li>
+
+                                </ul>
+
+                              </li>
+
+
+                              <li class="li">
+                                <p class="p">
+                                  If the specified 2-digit year is 50 to 99:
+                                </p>
+
+                                <ul class="ul">
+                                  <li class="li">
+                                    <p class="p">
+                                      If the last 2 digits of the current year are 00 to 49, the
+                                      first 2 digits of the returned year are 1 less than the
+                                      first 2 digits of the current year.
+                                    </p>
+
+                                  </li>
+
+
+                                  <li class="li">
+                                    <p class="p">
+                                      If the last 2 digits of the current year are 50 to 99, the
+                                      returned year has the same first 2 digits as the current
+                                      year.
+                                    </p>
+
+                                  </li>
+
+                                </ul>
+
+                              </li>
+
+                            </ul>
+
+                          </li>
+
+                        </ul>
+
+                      </div>
+
+
+
+
+                      <p class="p">
+                        If <code class="ph codeph">YYYY</code>, <code class="ph codeph">YYY</code>, <code class="ph codeph">YY</code>,
+                        <code class="ph codeph">Y</code>, or <code class="ph codeph">RR</code> is given in the same
+                        <var class="keyword varname">pattern</var> for a string to datetime conversion, an error
+                        returns.
+                      </p>
+
+
+
+
+                      <p class="p">
+                        If 1-digit year values are provided in <var class="keyword varname">expression</var>, it
+                        is treated as <code class="ph codeph">YYYY</code>.
+                      </p>
+
+                    </td>
+
+                  </tr>
+
+                  <tr class="row">
+                    <td class="entry cellrowborder" style="text-align:left;vertical-align:top;" headers="d39549e394 ">
+                      <code class="ph codeph">MM</code>
+                    </td>
+
+                    <td class="entry cellrowborder" style="text-align:left;vertical-align:top;" headers="d39549e397 ">
+                      Month
+                    </td>
+
+                    <td class="entry cellrowborder" style="text-align:left;vertical-align:top;" headers="d39549e400 ">
+                      <p class="p">
+                        In datetime to string conversions, 1-digit month is prefixed with a
+                        zero.
+                      </p>
+
+                    </td>
+
+                  </tr>
+
+                  <tr class="row">
+                    <td class="entry cellrowborder" style="text-align:left;vertical-align:top;" headers="d39549e394 ">
+                      <code class="ph codeph">DD</code>
+                    </td>
+
+                    <td class="entry cellrowborder" style="text-align:left;vertical-align:top;" headers="d39549e397 ">
+                      Day of month (1-31)
+                    </td>
+
+                    <td class="entry cellrowborder" style="text-align:left;vertical-align:top;" headers="d39549e400 ">
+                      <p class="p">
+                        In datetime to string conversions, one digit day is prefixed with a
+                        zero.
+                      </p>
+
+                    </td>
+
+                  </tr>
+
+                  <tr class="row">
+                    <td class="entry cellrowborder" style="text-align:left;vertical-align:top;" headers="d39549e394 ">
+                      <code class="ph codeph">DDD</code>
+                    </td>
+
+                    <td class="entry cellrowborder" style="text-align:left;vertical-align:top;" headers="d39549e397 ">
+                      Day of year (1-366)
+                    </td>
+
+                    <td class="entry cellrowborder" style="text-align:left;vertical-align:top;" headers="d39549e400 ">
+                      <p class="p">
+                        In string to datetime conversions, providing <code class="ph codeph">MM</code> and
+                        <code class="ph codeph">DD</code> along with <code class="ph codeph">DDD</code> results an error,
+                        e.g. <code class="ph codeph">YYYY-MM-DDD</code>.
+                      </p>
+
+                    </td>
+
+                  </tr>
+
+                  <tr class="row">
+                    <td class="entry cellrowborder" style="text-align:left;vertical-align:top;" headers="d39549e394 ">
+                      <code class="ph codeph">HH</code>
+
+                      <p class="p">
+                        <code class="ph codeph">HH12</code>
+                      </p>
+
+                    </td>
+
+                    <td class="entry cellrowborder" style="text-align:left;vertical-align:top;" headers="d39549e397 ">
+                      Hour of day (1-12)
+                    </td>
+
+                    <td class="entry cellrowborder" style="text-align:left;vertical-align:top;" headers="d39549e400 ">
+                      <p class="p">
+                        In datetime to string conversions, 1-digit hours are prefixed with a
+                        zero.
+                      </p>
+
+
+
+
+                      <p class="p">
+                        If provided hour in <var class="keyword varname">expression</var> is not between 1 and
+                        12, returns an error.
+                      </p>
+
+
+
+
+                      <p class="p">
+                        If no AM/PM is provided in <var class="keyword varname">expression</var>, the default is
+                        <code class="ph codeph">AM</code>.
+                      </p>
+
+                    </td>
+
+                  </tr>
+
+                  <tr class="row">
+                    <td class="entry cellrowborder" style="text-align:left;vertical-align:top;" headers="d39549e394 ">
+                      <code class="ph codeph">HH24</code>
+                    </td>
+
+                    <td class="entry cellrowborder" style="text-align:left;vertical-align:top;" headers="d39549e397 ">
+                      Hour of day (0-23)
+                    </td>
+
+                    <td class="entry cellrowborder" style="text-align:left;vertical-align:top;" headers="d39549e400 ">
+                      <p class="p">
+                        In string to datetime conversions, if <code class="ph codeph">HH12</code>,
+                        <code class="ph codeph">AM</code>, <code class="ph codeph">PM</code> are given in the same
+                        <var class="keyword varname">pattern</var>, an error returns.
+                      </p>
+
+                    </td>
+
+                  </tr>
+
+                  <tr class="row">
+                    <td class="entry cellrowborder" style="text-align:left;vertical-align:top;" headers="d39549e394 ">
+                      <code class="ph codeph">MI</code>
+                    </td>
+
+                    <td class="entry cellrowborder" style="text-align:left;vertical-align:top;" headers="d39549e397 ">
+                      Minute of hour (0-59)
+                    </td>
+
+                    <td class="entry cellrowborder" style="text-align:left;vertical-align:top;" headers="d39549e400 ">
+                      <p class="p">
+                        In datetime to string conversions, 1-digit minutes are prefixed with a
+                        zero.
+                      </p>
+
+                    </td>
+
+                  </tr>
+
+                  <tr class="row">
+                    <td class="entry cellrowborder" style="text-align:left;vertical-align:top;" headers="d39549e394 ">
+                      <code class="ph codeph">SS</code>
+                    </td>
+
+                    <td class="entry cellrowborder" style="text-align:left;vertical-align:top;" headers="d39549e397 ">
+                      Second of minute (0-59)
+                    </td>
+
+                    <td class="entry cellrowborder" style="text-align:left;vertical-align:top;" headers="d39549e400 ">
+                      <p class="p">
+                        In datetime to string conversions, 1-digit seconds are prefixed with a
+                        zero.
+                      </p>
+
+                    </td>
+
+                  </tr>
+
+                  <tr class="row">
+                    <td class="entry cellrowborder" style="text-align:left;vertical-align:top;" headers="d39549e394 ">
+                      <code class="ph codeph">SSSSS</code>
+                    </td>
+
+                    <td class="entry cellrowborder" style="text-align:left;vertical-align:top;" headers="d39549e397 ">
+                      Second of Day (0-86399)
+                    </td>
+
+                    <td class="entry cellrowborder" style="text-align:left;vertical-align:top;" headers="d39549e400 ">
+                      In string to timestamp conversions, if <code class="ph codeph">SS</code>,
+                      <code class="ph codeph">HH</code>, <code class="ph codeph">HH12</code>, <code class="ph codeph">HH24</code>,
+                      <code class="ph codeph">MI</code>, <code class="ph codeph">AM</code>/<code class="ph codeph">PM</code> are given in
+                      the same <var class="keyword varname">pattern</var>, an error returns.
+                    </td>
+
+                  </tr>
+
+                  <tr class="row">
+                    <td class="entry cellrowborder" style="text-align:left;vertical-align:top;" headers="d39549e394 ">
+                      <code class="ph codeph">FF</code>
+
+                      <p class="p">
+                        <code class="ph codeph">FF1</code>, ..., <code class="ph codeph">FF9</code>
+                      </p>
+
+                    </td>
+
+                    <td class="entry cellrowborder" style="text-align:left;vertical-align:top;" headers="d39549e397 ">
+                      Fractional second
+                    </td>
+
+                    <td class="entry cellrowborder" style="text-align:left;vertical-align:top;" headers="d39549e400 ">
+                      <p class="p">
+                        A number, 1 to 9, can be used to indicate the number of digits.
+                      </p>
+
+
+
+
+                      <p class="p">
+                        <code class="ph codeph">FF</code> specifies a 9 digits fractional second.
+                      </p>
+
+                    </td>
+
+                  </tr>
+
+                  <tr class="row">
+                    <td class="entry cellrowborder" style="text-align:left;vertical-align:top;" headers="d39549e394 ">
+                      <code class="ph codeph">AM</code>
+
+                      <p class="p">
+                        <code class="ph codeph">PM</code>
+                      </p>
+
+
+
+
+                      <p class="p">
+                        <code class="ph codeph">A.M.</code>
+                      </p>
+
+
+
+
+                      <p class="p">
+                        <code class="ph codeph">P.M.</code>
+                      </p>
+
+                    </td>
+
+                    <td class="entry cellrowborder" style="text-align:left;vertical-align:top;" headers="d39549e397 ">
+                      Meridiem indicator
+                    </td>
+
+                    <td class="entry cellrowborder" style="text-align:left;vertical-align:top;" headers="d39549e400 ">
+                      <p class="p">
+                        For datetime to string conversions, <code class="ph codeph">AM</code> and
+                        <code class="ph codeph">PM</code> are treated as synonyms. For example, casting
+                        <code class="ph codeph">'2019-01-01 11:00 am'</code> to <code class="ph codeph">TIMESTAMP</code>
+                        with the <code class="ph codeph">'YYYY-MM-DD HH12:MI PM'</code> pattern returns
+                        <code class="ph codeph">01-JAN-19 11.00.00.000000 AM</code>.
+                      </p>
+
+
+
+
+                      <p class="p">
+                        For string to datetime conversion, <code class="ph codeph">HH24</code> in the same
+                        <var class="keyword varname">pattern</var> returns an error.
+                      </p>
+
+                    </td>
+
+                  </tr>
+
+                  <tr class="row">
+                    <td class="entry cellrowborder" style="text-align:left;vertical-align:top;" headers="d39549e394 ">
+                      <code class="ph codeph">TZH</code>
+                    </td>
+
+                    <td class="entry cellrowborder" style="text-align:left;vertical-align:top;" headers="d39549e397 ">
+                      Timezone offset hour
+                    </td>
+
+                    <td class="entry cellrowborder" style="text-align:left;vertical-align:top;" headers="d39549e400 ">
+                      <p class="p">
+                        An optional sign, + or -, and 2 digits for the value of signed numbers
+                        are allowed for the source <var class="keyword varname">expression</var>, e.g.
+                        <code class="ph codeph">“+10”</code>, <code class="ph codeph">“-05”</code>,
+                        <code class="ph codeph">"04"</code>.
+                      </p>
+
+                    </td>
+
+                  </tr>
+
+                  <tr class="row">
+                    <td class="entry cellrowborder" style="text-align:left;vertical-align:top;" headers="d39549e394 ">
+                      <code class="ph codeph">TZM</code>
+                    </td>
+
+                    <td class="entry cellrowborder" style="text-align:left;vertical-align:top;" headers="d39549e397 ">
+                      Timezone offset minute
+                    </td>
+
+                    <td class="entry cellrowborder" style="text-align:left;vertical-align:top;" headers="d39549e400 ">
+                      <p class="p">
+                        Unsigned numbers are allowed for the source
+                        <var class="keyword varname">expression</var>.
+                      </p>
+
+                    </td>
+
+                  </tr>
+
+                  <tr class="row">
+                    <td class="entry cellrowborder" style="text-align:left;vertical-align:top;" headers="d39549e394 ">
+                      <code class="ph codeph">-</code>
+
+                      <p class="p">
+                        <code class="ph codeph">.</code>
+                      </p>
+
+
+
+
+                      <p class="p">
+                        <code class="ph codeph">/</code>
+                      </p>
+
+
+
+
+                      <p class="p">
+                        <code class="ph codeph">,</code>
+                      </p>
+
+
+
+
+                      <p class="p">
+                        <code class="ph codeph">'</code>
+                      </p>
+
+
+
+
+                      <p class="p">
+                        <code class="ph codeph">;</code>
+                      </p>
+
+
+
+
+                      <p class="p">
+                        <code class="ph codeph">:</code>
+                      </p>
+
+
+
+
+                      <p class="p">
+                        &lt;space&gt;
+                      </p>
+
+                    </td>
+
+                    <td class="entry cellrowborder" style="text-align:left;vertical-align:top;" headers="d39549e397 ">
+                      Separator
+                    </td>
+
+                    <td class="entry cellrowborder" style="text-align:left;vertical-align:top;" headers="d39549e400 ">
+                      <p class="p">
+                        For string to datetime conversions, any separator character in the
+                        <var class="keyword varname">pattern</var> string would match any separator character in
+                        the input <var class="keyword varname">expression</var>.
+                      </p>
+
+
+
+
+                      <p class="p">
+                        For example, <code class="ph codeph">CAST(“20191010” AS DATE FORMAT
+                        “YYYY-MM-DD”)</code> returns an error, but <code class="ph codeph">CAST("2019-.;10
+                        10" AS DATE FORMAT "YYYY-MM-DD")</code> succeeds.
+                      </p>
+
+                    </td>
+
+                  </tr>
+
+                  <tr class="row">
+                    <td class="entry cellrowborder" style="text-align:left;vertical-align:top;" headers="d39549e394 ">
+                      <code class="ph codeph">T</code>
+                    </td>
+
+                    <td class="entry cellrowborder" style="text-align:left;vertical-align:top;" headers="d39549e397 ">
+                      Separates the date from the time.
+                    </td>
+
+                    <td class="entry cellrowborder" style="text-align:left;vertical-align:top;" headers="d39549e400 ">
+                      This pattern is used for accepting ISO 8601 datetime formats.
+
+                      <p class="p">
+                        Example: <code class="ph codeph">YYYY-MM-DD<strong class="ph b">T</strong>HH24:MI:SS.FF9Z</code>
+                      </p>
+
+                    </td>
+
+                  </tr>
+
+                  <tr class="row">
+                    <td class="entry cellrowborder" style="text-align:left;vertical-align:top;" headers="d39549e394 ">
+                      <code class="ph codeph">Z</code>
+                    </td>
+
+                    <td class="entry cellrowborder" style="text-align:left;vertical-align:top;" headers="d39549e397 ">
+                      Indicates the zero hour offset from UTC.
+                    </td>
+
+                    <td class="entry cellrowborder" style="text-align:left;vertical-align:top;" headers="d39549e400 ">
+                      This pattern is used for accepting ISO 8601 datetime formats.
+                    </td>
+
+                  </tr>
+
+                </tbody>
+</table>
+</div>
+
+          </div>
+
+
+          <p class="p">
+            <strong class="ph b">Examples:</strong>
+          </p>
+
+          
+<div class="tablenoborder"><table cellpadding="4" cellspacing="0" summary="" id="conversion_functions__table_qqg_txn_r3b" class="table" frame="border" border="1" rules="all"><colgroup><col style="width:50%" /><col style="width:50%" /></colgroup><thead class="thead" style="text-align:left;">
+                <tr class="row">
+                  <th class="entry cellrowborder" style="text-align:left;vertical-align:top;" id="d39549e1126">
+                    Input
+                  </th>
+
+                  <th class="entry cellrowborder" style="text-align:left;vertical-align:top;" id="d39549e1129">
+                    Output
+                  </th>
+
+                </tr>
+
+              </thead>
+<tbody class="tbody">
+                <tr class="row">
+                  <td class="entry cellrowborder" style="text-align:left;vertical-align:top;" headers="d39549e1126 ">
+                    <code class="ph codeph">CAST("02-11-2014" AS DATE FORMAT 'dd-mm-yyyy')</code>
+                  </td>
+
+                  <td class="entry cellrowborder" style="text-align:left;vertical-align:top;" headers="d39549e1129 ">
+                    2014-11-02
+                  </td>
+
+                </tr>
+
+                <tr class="row">
+                  <td class="entry cellrowborder" style="text-align:left;vertical-align:top;" headers="d39549e1126 ">
+                    <code class="ph codeph">CAST("365 2014" AS DATE FORMAT 'DDD-YYYY')</code>
+                  </td>
+
+                  <td class="entry cellrowborder" style="text-align:left;vertical-align:top;" headers="d39549e1129 ">
+                    2014-12-31
+                  </td>
+
+                </tr>
+
+                <tr class="row">
+                  <td class="entry cellrowborder" style="text-align:left;vertical-align:top;" headers="d39549e1126 ">
+                    <code class="ph codeph">CAST("5-01-26" AS DATE FORMAT 'YY-MM-DD')</code>
+                  </td>
+
+                  <td class="entry cellrowborder" style="text-align:left;vertical-align:top;" headers="d39549e1129 ">
+                    Executed at 2019-01-01 11:11:11:
+
+                    <p class="p">
+                      2015-01-26
+                    </p>
+
+                  </td>
+
+                </tr>
+
+                <tr class="row">
+                  <td class="entry cellrowborder" style="text-align:left;vertical-align:top;" headers="d39549e1126 ">
+                    <code class="ph codeph">CAST('2018-11-10T15:11:04Z' AS TIMESTAMP</code>
+
+                    <p class="p">
+                      <code class="ph codeph">FORMAT 'YYYY-MM-DDTHH24:MI:SSZ')</code>
+                    </p>
+
+                  </td>
+
+                  <td class="entry cellrowborder" style="text-align:left;vertical-align:top;" headers="d39549e1129 ">
+                    2018-11-10 15:11:04
+                  </td>
+
+                </tr>
+
+                <tr class="row">
+                  <td class="entry cellrowborder" style="text-align:left;vertical-align:top;" headers="d39549e1126 ">
+                    <code class="ph codeph">CAST("95-01-28" AS DATE FORMAT 'YYY-MM-DD')</code>
+                  </td>
+
+                  <td class="entry cellrowborder" style="text-align:left;vertical-align:top;" headers="d39549e1129 ">
+                    Executed at 2019-01-01 11:11:11:
+
+                    <p class="p">
+                      2095-01-28
+                    </p>
+
+                  </td>
+
+                </tr>
+
+                <tr class="row">
+                  <td class="entry cellrowborder" style="text-align:left;vertical-align:top;" headers="d39549e1126 ">
+                    <code class="ph codeph">CAST("49-01-15" AS DATE FORMAT 'RR-MM-DD')</code>
+                  </td>
+
+                  <td class="entry cellrowborder" style="text-align:left;vertical-align:top;" headers="d39549e1129 ">
+                    Round year when last 2 digits of current year is greater than 49.
+
+                    <p class="p">
+                      Executed at 2099-01-01 11:11:11:
+                    </p>
+
+
+
+
+                    <p class="p">
+                      2149-01-15
+                    </p>
+
+                  </td>
+
+                </tr>
+
+                <tr class="row">
+                  <td class="entry cellrowborder" style="text-align:left;vertical-align:top;" headers="d39549e1126 ">
+                    <code class="ph codeph">CAST('2019.10.10 13:30:40.123456 +01:30' </code>
+
+                    <p class="p">
+                      <code class="ph codeph">AS TIMESTAMP</code>
+                    </p>
+
+
+
+
+                    <p class="p">
+                      <code class="ph codeph">FORMAT 'YYYY-MM-DD HH24:MI:SS.FF9 TZH:TZM')</code>
+                    </p>
+
+                  </td>
+
+                  <td class="entry cellrowborder" style="text-align:left;vertical-align:top;" headers="d39549e1129 ">
+                    2019-10-10 13:30:40.123456000
+                  </td>
+
+                </tr>
+
+              </tbody>
+</table>
+</div>
+
+        </dd>
+
+
+      
+
+      
+
+        <dt class="dt dlterm" id="conversion_functions__typeof">
+          TYPEOF(expression)
+        </dt>
+
+
+        <dd class="dd">
+          <strong class="ph b">Purpose:</strong> Returns the name of the data type corresponding to
+          <var class="keyword varname">expression</var>. For types with extra attributes, such as length for
+          <code class="ph codeph">CHAR</code> and <code class="ph codeph">VARCHAR</code>, or precision and scale for
+          <code class="ph codeph">DECIMAL</code>, includes the full specification of the type.
           <p class="p">
             <strong class="ph b">Return type:</strong> <code class="ph codeph">STRING</code>
           </p>
@@ -188,25 +1022,23 @@ FROM t1;</code></pre>
 
 
           <p class="p">
-        <strong class="ph b">Added in:</strong> <span class="keyword">Impala 2.3.0</span>
+        <strong class="ph b">Examples:</strong>
       </p>
 
 
           <p class="p">
-        <strong class="ph b">Examples:</strong>
-      </p>
+            <code class="ph codeph">TYPEOF(2)</code> returns <code class="ph codeph">TINYINT</code>.
+          </p>
 
-<pre class="pre codeblock"><code>SELECT TYPEOF(2), TYPEOF(2+2);
-+-----------+---------------+
-| typeof(2) | typeof(2 + 2) |
-+-----------+---------------+
-| TINYINT   | SMALLINT      |
-+-----------+---------------+
-</code></pre>
+
+          <p class="p">
+            <code class="ph codeph">TYPEOF(NOW())</code> returns <code class="ph codeph">TIMESTAMP</code>.
+          </p>
+
         </dd>
 
 
-
+      
     </dl>
 
 

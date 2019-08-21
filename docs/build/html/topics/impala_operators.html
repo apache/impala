@@ -24,21 +24,21 @@
 <meta name="prodname" content="Impala" />
 <meta name="prodname" content="Impala" />
 <meta name="prodname" content="Impala" />
-<meta name="version" content="Impala 3.2.x" />
-<meta name="version" content="Impala 3.2.x" />
-<meta name="version" content="Impala 3.2.x" />
-<meta name="version" content="Impala 3.2.x" />
-<meta name="version" content="Impala 3.2.x" />
-<meta name="version" content="Impala 3.2.x" />
-<meta name="version" content="Impala 3.2.x" />
-<meta name="version" content="Impala 3.2.x" />
-<meta name="version" content="Impala 3.2.x" />
-<meta name="version" content="Impala 3.2.x" />
-<meta name="version" content="Impala 3.2.x" />
-<meta name="version" content="Impala 3.2.x" />
-<meta name="version" content="Impala 3.2.x" />
-<meta name="version" content="Impala 3.2.x" />
-<meta name="version" content="Impala 3.2.x" />
+<meta name="version" content="Impala 3.3.x" />
+<meta name="version" content="Impala 3.3.x" />
+<meta name="version" content="Impala 3.3.x" />
+<meta name="version" content="Impala 3.3.x" />
+<meta name="version" content="Impala 3.3.x" />
+<meta name="version" content="Impala 3.3.x" />
+<meta name="version" content="Impala 3.3.x" />
+<meta name="version" content="Impala 3.3.x" />
+<meta name="version" content="Impala 3.3.x" />
+<meta name="version" content="Impala 3.3.x" />
+<meta name="version" content="Impala 3.3.x" />
+<meta name="version" content="Impala 3.3.x" />
+<meta name="version" content="Impala 3.3.x" />
+<meta name="version" content="Impala 3.3.x" />
+<meta name="version" content="Impala 3.3.x" />
 <meta name="DC.Format" content="XHTML" />
 <meta name="DC.Identifier" content="operators" />
 <link rel="stylesheet" type="text/css" href="../commonltr.css" />
@@ -203,25 +203,25 @@
 
 
       <p class="p">
-        To access a column with a complex type (<code class="ph codeph">ARRAY</code>, <code class="ph codeph">STRUCT</code>, or <code class="ph codeph">MAP</code>)
-        in an aggregation function, you unpack the individual elements using join notation in the query,
-        and then apply the function to the final scalar item, field, key, or value at the bottom of any nested type hierarchy in the column.
-        See <a class="xref" href="../shared/../topics/impala_complex_types.html#complex_types">Complex Types (Impala 2.3 or higher only)</a> for details about using complex types in Impala.
+        To access a column with a complex type (<code class="ph codeph">ARRAY</code>, <code class="ph codeph">STRUCT</code>,
+        or <code class="ph codeph">MAP</code>) in an aggregation function, you unpack the individual elements
+        using join notation in the query, and then apply the function to the final scalar item,
+        field, key, or value at the bottom of any nested type hierarchy in the column. See
+        <a class="xref" href="../shared/../topics/impala_complex_types.html#complex_types">Complex Types (Impala 2.3 or higher only)</a> for details about using
+        complex types in Impala.
       </p>
 
 
       <div class="p">
-The following example demonstrates calls to several aggregation functions
-using values from a column containing nested complex types
-(an <code class="ph codeph">ARRAY</code> of <code class="ph codeph">STRUCT</code> items).
-The array is unpacked inside the query using join notation.
-The array elements are referenced using the <code class="ph codeph">ITEM</code>
-pseudocolumn, and the structure fields inside the array elements
-are referenced using dot notation.
-Numeric values such as <code class="ph codeph">SUM()</code> and <code class="ph codeph">AVG()</code>
-are computed using the numeric <code class="ph codeph">R_NATIONKEY</code> field, and
-the general-purpose <code class="ph codeph">MAX()</code> and <code class="ph codeph">MIN()</code>
-values are computed from the string <code class="ph codeph">N_NAME</code> field.
+        The following example demonstrates calls to several aggregation functions using values
+        from a column containing nested complex types (an <code class="ph codeph">ARRAY</code> of
+        <code class="ph codeph">STRUCT</code> items). The array is unpacked inside the query using join
+        notation. The array elements are referenced using the <code class="ph codeph">ITEM</code>
+        pseudocolumn, and the structure fields inside the array elements are referenced using
+        dot notation. Numeric values such as <code class="ph codeph">SUM()</code> and <code class="ph codeph">AVG()</code>
+        are computed using the numeric <code class="ph codeph">R_NATIONKEY</code> field, and the
+        general-purpose <code class="ph codeph">MAX()</code> and <code class="ph codeph">MIN()</code> values are computed
+        from the string <code class="ph codeph">N_NAME</code> field.
 <pre class="pre codeblock"><code>describe region;
 +-------------+-------------------------+---------+
 | name        | type                    | comment |
@@ -291,16 +291,17 @@ order by r_name;
 | MIDDLE EAST | 5     | 58  | 11.6 | EGYPT     | SAUDI ARABIA   | 5             |
 +-------------+-------+-----+------+-----------+----------------+---------------+
 </code></pre>
-</div>
+      </div>
 
 
       <p class="p">
-        You cannot refer to a column with a complex data type (<code class="ph codeph">ARRAY</code>, <code class="ph codeph">STRUCT</code>, or <code class="ph codeph">MAP</code>
-        directly in an operator. You can apply operators only to scalar values that make up a complex type
-        (the fields of a <code class="ph codeph">STRUCT</code>, the items of an <code class="ph codeph">ARRAY</code>,
-        or the key or value portion of a <code class="ph codeph">MAP</code>) as part of a join query that refers to
-        the scalar value using the appropriate dot notation or <code class="ph codeph">ITEM</code>, <code class="ph codeph">KEY</code>, or <code class="ph codeph">VALUE</code>
-        pseudocolumn names.
+        You cannot refer to a column with a complex data type (<code class="ph codeph">ARRAY</code>,
+        <code class="ph codeph">STRUCT</code>, or <code class="ph codeph">MAP</code> directly in an operator. You can apply
+        operators only to scalar values that make up a complex type (the fields of a
+        <code class="ph codeph">STRUCT</code>, the items of an <code class="ph codeph">ARRAY</code>, or the key or value
+        portion of a <code class="ph codeph">MAP</code>) as part of a join query that refers to the scalar
+        value using the appropriate dot notation or <code class="ph codeph">ITEM</code>, <code class="ph codeph">KEY</code>,
+        or <code class="ph codeph">VALUE</code> pseudocolumn names.
       </p>
 
 
@@ -400,12 +401,13 @@ where nation.item.n_nationkey &lt; 5;
 
 
       <p class="p">
-        You cannot refer to a column with a complex data type (<code class="ph codeph">ARRAY</code>, <code class="ph codeph">STRUCT</code>, or <code class="ph codeph">MAP</code>
-        directly in an operator. You can apply operators only to scalar values that make up a complex type
-        (the fields of a <code class="ph codeph">STRUCT</code>, the items of an <code class="ph codeph">ARRAY</code>,
-        or the key or value portion of a <code class="ph codeph">MAP</code>) as part of a join query that refers to
-        the scalar value using the appropriate dot notation or <code class="ph codeph">ITEM</code>, <code class="ph codeph">KEY</code>, or <code class="ph codeph">VALUE</code>
-        pseudocolumn names.
+        You cannot refer to a column with a complex data type (<code class="ph codeph">ARRAY</code>,
+        <code class="ph codeph">STRUCT</code>, or <code class="ph codeph">MAP</code> directly in an operator. You can apply
+        operators only to scalar values that make up a complex type (the fields of a
+        <code class="ph codeph">STRUCT</code>, the items of an <code class="ph codeph">ARRAY</code>, or the key or value
+        portion of a <code class="ph codeph">MAP</code>) as part of a join query that refers to the scalar
+        value using the appropriate dot notation or <code class="ph codeph">ITEM</code>, <code class="ph codeph">KEY</code>,
+        or <code class="ph codeph">VALUE</code> pseudocolumn names.
       </p>
 
 
@@ -527,12 +529,13 @@ where nation.item.n_nationkey between 3 and 5
 
 
       <p class="p">
-        You cannot refer to a column with a complex data type (<code class="ph codeph">ARRAY</code>, <code class="ph codeph">STRUCT</code>, or <code class="ph codeph">MAP</code>
-        directly in an operator. You can apply operators only to scalar values that make up a complex type
-        (the fields of a <code class="ph codeph">STRUCT</code>, the items of an <code class="ph codeph">ARRAY</code>,
-        or the key or value portion of a <code class="ph codeph">MAP</code>) as part of a join query that refers to
-        the scalar value using the appropriate dot notation or <code class="ph codeph">ITEM</code>, <code class="ph codeph">KEY</code>, or <code class="ph codeph">VALUE</code>
-        pseudocolumn names.
+        You cannot refer to a column with a complex data type (<code class="ph codeph">ARRAY</code>,
+        <code class="ph codeph">STRUCT</code>, or <code class="ph codeph">MAP</code> directly in an operator. You can apply
+        operators only to scalar values that make up a complex type (the fields of a
+        <code class="ph codeph">STRUCT</code>, the items of an <code class="ph codeph">ARRAY</code>, or the key or value
+        portion of a <code class="ph codeph">MAP</code>) as part of a join query that refers to the scalar
+        value using the appropriate dot notation or <code class="ph codeph">ITEM</code>, <code class="ph codeph">KEY</code>,
+        or <code class="ph codeph">VALUE</code> pseudocolumn names.
       </p>
 
 
@@ -686,8 +689,8 @@ NOT EXISTS (<var class="keyword varname">subquery</var>)
 
 
       <p class="p">
-        Correlated subqueries used in <code class="ph codeph">EXISTS</code> and <code class="ph codeph">IN</code> operators cannot include a
-        <code class="ph codeph">LIMIT</code> clause.
+        Correlated subqueries used in <code class="ph codeph">EXISTS</code> and <code class="ph codeph">IN</code> operators
+        cannot include a <code class="ph codeph">LIMIT</code> clause.
       </p>
 
 
@@ -705,12 +708,13 @@ NOT EXISTS (<var class="keyword varname">subquery</var>)
 
 
       <p class="p">
-        You cannot refer to a column with a complex data type (<code class="ph codeph">ARRAY</code>, <code class="ph codeph">STRUCT</code>, or <code class="ph codeph">MAP</code>
-        directly in an operator. You can apply operators only to scalar values that make up a complex type
-        (the fields of a <code class="ph codeph">STRUCT</code>, the items of an <code class="ph codeph">ARRAY</code>,
-        or the key or value portion of a <code class="ph codeph">MAP</code>) as part of a join query that refers to
-        the scalar value using the appropriate dot notation or <code class="ph codeph">ITEM</code>, <code class="ph codeph">KEY</code>, or <code class="ph codeph">VALUE</code>
-        pseudocolumn names.
+        You cannot refer to a column with a complex data type (<code class="ph codeph">ARRAY</code>,
+        <code class="ph codeph">STRUCT</code>, or <code class="ph codeph">MAP</code> directly in an operator. You can apply
+        operators only to scalar values that make up a complex type (the fields of a
+        <code class="ph codeph">STRUCT</code>, the items of an <code class="ph codeph">ARRAY</code>, or the key or value
+        portion of a <code class="ph codeph">MAP</code>) as part of a join query that refers to the scalar
+        value using the appropriate dot notation or <code class="ph codeph">ITEM</code>, <code class="ph codeph">KEY</code>,
+        or <code class="ph codeph">VALUE</code> pseudocolumn names.
       </p>
 
 
@@ -937,12 +941,13 @@ ERROR: AnalysisException: couldn't resolve column reference: 'x'
 
 
       <p class="p">
-        You cannot refer to a column with a complex data type (<code class="ph codeph">ARRAY</code>, <code class="ph codeph">STRUCT</code>, or <code class="ph codeph">MAP</code>
-        directly in an operator. You can apply operators only to scalar values that make up a complex type
-        (the fields of a <code class="ph codeph">STRUCT</code>, the items of an <code class="ph codeph">ARRAY</code>,
-        or the key or value portion of a <code class="ph codeph">MAP</code>) as part of a join query that refers to
-        the scalar value using the appropriate dot notation or <code class="ph codeph">ITEM</code>, <code class="ph codeph">KEY</code>, or <code class="ph codeph">VALUE</code>
-        pseudocolumn names.
+        You cannot refer to a column with a complex data type (<code class="ph codeph">ARRAY</code>,
+        <code class="ph codeph">STRUCT</code>, or <code class="ph codeph">MAP</code> directly in an operator. You can apply
+        operators only to scalar values that make up a complex type (the fields of a
+        <code class="ph codeph">STRUCT</code>, the items of an <code class="ph codeph">ARRAY</code>, or the key or value
+        portion of a <code class="ph codeph">MAP</code>) as part of a join query that refers to the scalar
+        value using the appropriate dot notation or <code class="ph codeph">ITEM</code>, <code class="ph codeph">KEY</code>,
+        or <code class="ph codeph">VALUE</code> pseudocolumn names.
       </p>
 
 
@@ -1176,8 +1181,8 @@ select 'ABCXYZ' not like 'ab_xyz';
 </code></pre>
 
       <p class="p">
-        <strong class="ph b">Added in:</strong> Available in earlier Impala releases, but new capabilities were added in
-        <span class="keyword">Impala 2.0.0</span>
+        <strong class="ph b">Added in:</strong> Available in earlier Impala releases, but new capabilities were added
+        in <span class="keyword">Impala 2.0.0</span>
       </p>
 
 
@@ -1187,12 +1192,13 @@ select 'ABCXYZ' not like 'ab_xyz';
 
 
       <p class="p">
-        You cannot refer to a column with a complex data type (<code class="ph codeph">ARRAY</code>, <code class="ph codeph">STRUCT</code>, or <code class="ph codeph">MAP</code>
-        directly in an operator. You can apply operators only to scalar values that make up a complex type
-        (the fields of a <code class="ph codeph">STRUCT</code>, the items of an <code class="ph codeph">ARRAY</code>,
-        or the key or value portion of a <code class="ph codeph">MAP</code>) as part of a join query that refers to
-        the scalar value using the appropriate dot notation or <code class="ph codeph">ITEM</code>, <code class="ph codeph">KEY</code>, or <code class="ph codeph">VALUE</code>
-        pseudocolumn names.
+        You cannot refer to a column with a complex data type (<code class="ph codeph">ARRAY</code>,
+        <code class="ph codeph">STRUCT</code>, or <code class="ph codeph">MAP</code> directly in an operator. You can apply
+        operators only to scalar values that make up a complex type (the fields of a
+        <code class="ph codeph">STRUCT</code>, the items of an <code class="ph codeph">ARRAY</code>, or the key or value
+        portion of a <code class="ph codeph">MAP</code>) as part of a join query that refers to the scalar
+        value using the appropriate dot notation or <code class="ph codeph">ITEM</code>, <code class="ph codeph">KEY</code>,
+        or <code class="ph codeph">VALUE</code> pseudocolumn names.
       </p>
 
 
@@ -1240,8 +1246,8 @@ where nation.item.n_nationkey in (1,3,5)
 
 
       <p class="p">
-        Correlated subqueries used in <code class="ph codeph">EXISTS</code> and <code class="ph codeph">IN</code> operators cannot include a
-        <code class="ph codeph">LIMIT</code> clause.
+        Correlated subqueries used in <code class="ph codeph">EXISTS</code> and <code class="ph codeph">IN</code> operators
+        cannot include a <code class="ph codeph">LIMIT</code> clause.
       </p>
 
 
@@ -1324,30 +1330,33 @@ SELECT COUNT(DISTINCT(visitor_id)) FROM web_traffic WHERE month IN ('January','J
 
 
       <p class="p">
-        In Impala 1.3.1 and higher, the <code class="ph codeph">REGEXP</code> and <code class="ph codeph">RLIKE</code> operators now match a
-        regular expression string that occurs anywhere inside the target string, the same as if the regular
-        expression was enclosed on each side by <code class="ph codeph">.*</code>. See
-        <a class="xref" href="../shared/../topics/impala_operators.html#regexp">REGEXP Operator</a> for examples. Previously, these operators only
-        succeeded when the regular expression matched the entire target string. This change improves compatibility
-        with the regular expression support for popular database systems. There is no change to the behavior of the
-        <code class="ph codeph">regexp_extract()</code> and <code class="ph codeph">regexp_replace()</code> built-in functions.
+        In Impala 1.3.1 and higher, the <code class="ph codeph">REGEXP</code> and <code class="ph codeph">RLIKE</code>
+        operators now match a regular expression string that occurs anywhere inside the target
+        string, the same as if the regular expression was enclosed on each side by
+        <code class="ph codeph">.*</code>. See <a class="xref" href="../shared/../topics/impala_operators.html#regexp">REGEXP Operator</a> for
+        examples. Previously, these operators only succeeded when the regular expression matched
+        the entire target string. This change improves compatibility with the regular expression
+        support for popular database systems. There is no change to the behavior of the
+        <code class="ph codeph">regexp_extract()</code> and <code class="ph codeph">regexp_replace()</code> built-in
+        functions.
       </p>
 
 
       <p class="p">
-        In Impala 2.0 and later, the Impala regular expression syntax conforms to the POSIX Extended Regular
-        Expression syntax used by the Google RE2 library. For details, see
-        <a class="xref" href="https://code.google.com/p/re2/" target="_blank">the RE2 documentation</a>. It
-        has most idioms familiar from regular expressions in Perl, Python, and so on, including
-        <code class="ph codeph">.*?</code> for non-greedy matches.
+        In Impala 2.0 and later, the Impala regular expression syntax conforms to the POSIX
+        Extended Regular Expression syntax used by the Google RE2 library. For details, see
+        <a class="xref" href="https://code.google.com/p/re2/" target="_blank">the RE2
+        documentation</a>. It has most idioms familiar from regular expressions in Perl,
+        Python, and so on, including <code class="ph codeph">.*?</code> for non-greedy matches.
       </p>
 
 
       <p class="p">
-        In Impala 2.0 and later, a change in the underlying regular expression library could cause changes in the
-        way regular expressions are interpreted by this function. Test any queries that use regular expressions and
-        adjust the expression patterns if necessary. See
-        <a class="xref" href="../shared/../topics/impala_incompatible_changes.html#incompatible_changes_200">Incompatible Changes Introduced in Impala 2.0.0</a> for details.
+        In Impala 2.0 and later, a change in the underlying regular expression library could
+        cause changes in the way regular expressions are interpreted by this function. Test any
+        queries that use regular expressions and adjust the expression patterns if necessary.
+        See <a class="xref" href="../shared/../topics/impala_incompatible_changes.html#incompatible_changes_200">Incompatible Changes Introduced in Impala 2.0.0</a>
+        for details.
       </p>
 
 
@@ -1357,12 +1366,13 @@ SELECT COUNT(DISTINCT(visitor_id)) FROM web_traffic WHERE month IN ('January','J
 
 
       <p class="p">
-        You cannot refer to a column with a complex data type (<code class="ph codeph">ARRAY</code>, <code class="ph codeph">STRUCT</code>, or <code class="ph codeph">MAP</code>
-        directly in an operator. You can apply operators only to scalar values that make up a complex type
-        (the fields of a <code class="ph codeph">STRUCT</code>, the items of an <code class="ph codeph">ARRAY</code>,
-        or the key or value portion of a <code class="ph codeph">MAP</code>) as part of a join query that refers to
-        the scalar value using the appropriate dot notation or <code class="ph codeph">ITEM</code>, <code class="ph codeph">KEY</code>, or <code class="ph codeph">VALUE</code>
-        pseudocolumn names.
+        You cannot refer to a column with a complex data type (<code class="ph codeph">ARRAY</code>,
+        <code class="ph codeph">STRUCT</code>, or <code class="ph codeph">MAP</code> directly in an operator. You can apply
+        operators only to scalar values that make up a complex type (the fields of a
+        <code class="ph codeph">STRUCT</code>, the items of an <code class="ph codeph">ARRAY</code>, or the key or value
+        portion of a <code class="ph codeph">MAP</code>) as part of a join query that refers to the scalar
+        value using the appropriate dot notation or <code class="ph codeph">ITEM</code>, <code class="ph codeph">KEY</code>,
+        or <code class="ph codeph">VALUE</code> pseudocolumn names.
       </p>
 
 
@@ -1719,12 +1729,12 @@ select count(*) from web_traffic where weird_http_code is not null;</code></pre>
       </p>
 
 
-      <p class="p"> In
-          <span class="keyword">Impala 2.11</span> and higher, you can use the
-        operators <code class="ph codeph">IS [NOT] TRUE</code> and <code class="ph codeph">IS [NOT]
-          FALSE</code> as equivalents for the built-in functions
-          <code class="ph codeph">ISTRUE()</code>, <code class="ph codeph">ISNOTTRUE()</code>,
-          <code class="ph codeph">ISFALSE()</code>, and <code class="ph codeph">ISNOTFALSE()</code>. </p>
+      <p class="p">
+        In <span class="keyword">Impala 2.11</span> and higher, you can use the operators <code class="ph codeph">IS
+        [NOT] TRUE</code> and <code class="ph codeph">IS [NOT] FALSE</code> as equivalents for the built-in
+        functions <code class="ph codeph">ISTRUE()</code>, <code class="ph codeph">ISNOTTRUE()</code>,
+        <code class="ph codeph">ISFALSE()</code>, and <code class="ph codeph">ISNOTFALSE()</code>.
+      </p>
 
 
       <p class="p">
@@ -1799,12 +1809,13 @@ select assertion, b, b is true, b is false, b is unknown
 
 
       <p class="p">
-        You cannot refer to a column with a complex data type (<code class="ph codeph">ARRAY</code>, <code class="ph codeph">STRUCT</code>, or <code class="ph codeph">MAP</code>
-        directly in an operator. You can apply operators only to scalar values that make up a complex type
-        (the fields of a <code class="ph codeph">STRUCT</code>, the items of an <code class="ph codeph">ARRAY</code>,
-        or the key or value portion of a <code class="ph codeph">MAP</code>) as part of a join query that refers to
-        the scalar value using the appropriate dot notation or <code class="ph codeph">ITEM</code>, <code class="ph codeph">KEY</code>, or <code class="ph codeph">VALUE</code>
-        pseudocolumn names.
+        You cannot refer to a column with a complex data type (<code class="ph codeph">ARRAY</code>,
+        <code class="ph codeph">STRUCT</code>, or <code class="ph codeph">MAP</code> directly in an operator. You can apply
+        operators only to scalar values that make up a complex type (the fields of a
+        <code class="ph codeph">STRUCT</code>, the items of an <code class="ph codeph">ARRAY</code>, or the key or value
+        portion of a <code class="ph codeph">MAP</code>) as part of a join query that refers to the scalar
+        value using the appropriate dot notation or <code class="ph codeph">ITEM</code>, <code class="ph codeph">KEY</code>,
+        or <code class="ph codeph">VALUE</code> pseudocolumn names.
       </p>
 
 
@@ -1897,12 +1908,13 @@ select distinct c_last_name from customer where c_last_name like 'M___';</code><
 
 
       <p class="p">
-        You cannot refer to a column with a complex data type (<code class="ph codeph">ARRAY</code>, <code class="ph codeph">STRUCT</code>, or <code class="ph codeph">MAP</code>
-        directly in an operator. You can apply operators only to scalar values that make up a complex type
-        (the fields of a <code class="ph codeph">STRUCT</code>, the items of an <code class="ph codeph">ARRAY</code>,
-        or the key or value portion of a <code class="ph codeph">MAP</code>) as part of a join query that refers to
-        the scalar value using the appropriate dot notation or <code class="ph codeph">ITEM</code>, <code class="ph codeph">KEY</code>, or <code class="ph codeph">VALUE</code>
-        pseudocolumn names.
+        You cannot refer to a column with a complex data type (<code class="ph codeph">ARRAY</code>,
+        <code class="ph codeph">STRUCT</code>, or <code class="ph codeph">MAP</code> directly in an operator. You can apply
+        operators only to scalar values that make up a complex type (the fields of a
+        <code class="ph codeph">STRUCT</code>, the items of an <code class="ph codeph">ARRAY</code>, or the key or value
+        portion of a <code class="ph codeph">MAP</code>) as part of a join query that refers to the scalar
+        value using the appropriate dot notation or <code class="ph codeph">ITEM</code>, <code class="ph codeph">KEY</code>,
+        or <code class="ph codeph">VALUE</code> pseudocolumn names.
       </p>
 
 
@@ -2132,30 +2144,33 @@ where
 
 
       <p class="p">
-        In Impala 1.3.1 and higher, the <code class="ph codeph">REGEXP</code> and <code class="ph codeph">RLIKE</code> operators now match a
-        regular expression string that occurs anywhere inside the target string, the same as if the regular
-        expression was enclosed on each side by <code class="ph codeph">.*</code>. See
-        <a class="xref" href="../shared/../topics/impala_operators.html#regexp">REGEXP Operator</a> for examples. Previously, these operators only
-        succeeded when the regular expression matched the entire target string. This change improves compatibility
-        with the regular expression support for popular database systems. There is no change to the behavior of the
-        <code class="ph codeph">regexp_extract()</code> and <code class="ph codeph">regexp_replace()</code> built-in functions.
+        In Impala 1.3.1 and higher, the <code class="ph codeph">REGEXP</code> and <code class="ph codeph">RLIKE</code>
+        operators now match a regular expression string that occurs anywhere inside the target
+        string, the same as if the regular expression was enclosed on each side by
+        <code class="ph codeph">.*</code>. See <a class="xref" href="../shared/../topics/impala_operators.html#regexp">REGEXP Operator</a> for
+        examples. Previously, these operators only succeeded when the regular expression matched
+        the entire target string. This change improves compatibility with the regular expression
+        support for popular database systems. There is no change to the behavior of the
+        <code class="ph codeph">regexp_extract()</code> and <code class="ph codeph">regexp_replace()</code> built-in
+        functions.
       </p>
 
 
       <p class="p">
-        In Impala 2.0 and later, the Impala regular expression syntax conforms to the POSIX Extended Regular
-        Expression syntax used by the Google RE2 library. For details, see
-        <a class="xref" href="https://code.google.com/p/re2/" target="_blank">the RE2 documentation</a>. It
-        has most idioms familiar from regular expressions in Perl, Python, and so on, including
-        <code class="ph codeph">.*?</code> for non-greedy matches.
+        In Impala 2.0 and later, the Impala regular expression syntax conforms to the POSIX
+        Extended Regular Expression syntax used by the Google RE2 library. For details, see
+        <a class="xref" href="https://code.google.com/p/re2/" target="_blank">the RE2
+        documentation</a>. It has most idioms familiar from regular expressions in Perl,
+        Python, and so on, including <code class="ph codeph">.*?</code> for non-greedy matches.
       </p>
 
 
       <p class="p">
-        In Impala 2.0 and later, a change in the underlying regular expression library could cause changes in the
-        way regular expressions are interpreted by this function. Test any queries that use regular expressions and
-        adjust the expression patterns if necessary. See
-        <a class="xref" href="../shared/../topics/impala_incompatible_changes.html#incompatible_changes_200">Incompatible Changes Introduced in Impala 2.0.0</a> for details.
+        In Impala 2.0 and later, a change in the underlying regular expression library could
+        cause changes in the way regular expressions are interpreted by this function. Test any
+        queries that use regular expressions and adjust the expression patterns if necessary.
+        See <a class="xref" href="../shared/../topics/impala_incompatible_changes.html#incompatible_changes_200">Incompatible Changes Introduced in Impala 2.0.0</a>
+        for details.
       </p>
 
 
@@ -2165,12 +2180,13 @@ where
 
 
       <p class="p">
-        You cannot refer to a column with a complex data type (<code class="ph codeph">ARRAY</code>, <code class="ph codeph">STRUCT</code>, or <code class="ph codeph">MAP</code>
-        directly in an operator. You can apply operators only to scalar values that make up a complex type
-        (the fields of a <code class="ph codeph">STRUCT</code>, the items of an <code class="ph codeph">ARRAY</code>,
-        or the key or value portion of a <code class="ph codeph">MAP</code>) as part of a join query that refers to
-        the scalar value using the appropriate dot notation or <code class="ph codeph">ITEM</code>, <code class="ph codeph">KEY</code>, or <code class="ph codeph">VALUE</code>
-        pseudocolumn names.
+        You cannot refer to a column with a complex data type (<code class="ph codeph">ARRAY</code>,
+        <code class="ph codeph">STRUCT</code>, or <code class="ph codeph">MAP</code> directly in an operator. You can apply
+        operators only to scalar values that make up a complex type (the fields of a
+        <code class="ph codeph">STRUCT</code>, the items of an <code class="ph codeph">ARRAY</code>, or the key or value
+        portion of a <code class="ph codeph">MAP</code>) as part of a join query that refers to the scalar
+        value using the appropriate dot notation or <code class="ph codeph">ITEM</code>, <code class="ph codeph">KEY</code>,
+        or <code class="ph codeph">VALUE</code> pseudocolumn names.
       </p>
 
 

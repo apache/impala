@@ -23,21 +23,21 @@
 <meta name="prodname" content="Impala" />
 <meta name="prodname" content="Impala" />
 <meta name="prodname" content="Impala" />
-<meta name="version" content="Impala 3.2.x" />
-<meta name="version" content="Impala 3.2.x" />
-<meta name="version" content="Impala 3.2.x" />
-<meta name="version" content="Impala 3.2.x" />
-<meta name="version" content="Impala 3.2.x" />
-<meta name="version" content="Impala 3.2.x" />
-<meta name="version" content="Impala 3.2.x" />
-<meta name="version" content="Impala 3.2.x" />
-<meta name="version" content="Impala 3.2.x" />
-<meta name="version" content="Impala 3.2.x" />
-<meta name="version" content="Impala 3.2.x" />
-<meta name="version" content="Impala 3.2.x" />
-<meta name="version" content="Impala 3.2.x" />
-<meta name="version" content="Impala 3.2.x" />
-<meta name="version" content="Impala 3.2.x" />
+<meta name="version" content="Impala 3.3.x" />
+<meta name="version" content="Impala 3.3.x" />
+<meta name="version" content="Impala 3.3.x" />
+<meta name="version" content="Impala 3.3.x" />
+<meta name="version" content="Impala 3.3.x" />
+<meta name="version" content="Impala 3.3.x" />
+<meta name="version" content="Impala 3.3.x" />
+<meta name="version" content="Impala 3.3.x" />
+<meta name="version" content="Impala 3.3.x" />
+<meta name="version" content="Impala 3.3.x" />
+<meta name="version" content="Impala 3.3.x" />
+<meta name="version" content="Impala 3.3.x" />
+<meta name="version" content="Impala 3.3.x" />
+<meta name="version" content="Impala 3.3.x" />
+<meta name="version" content="Impala 3.3.x" />
 <meta name="DC.Format" content="XHTML" />
 <meta name="DC.Identifier" content="partitioning" />
 <link rel="stylesheet" type="text/css" href="../commonltr.css" />
@@ -183,11 +183,12 @@
           with different portions of a huge data set. You can designate the HDFS
           directory that holds the data files for a specific partition. With
           data partitioned by date values, you might <span class="q">"age out"</span> data that is
-          no longer relevant. <div class="note note"><span class="notetitle">Note:</span>
-        If you are creating a partition for the first time and specifying its location, for maximum efficiency, use
-        a single <code class="ph codeph">ALTER TABLE</code> statement including both the <code class="ph codeph">ADD PARTITION</code> and
-        <code class="ph codeph">LOCATION</code> clauses, rather than separate statements with <code class="ph codeph">ADD PARTITION</code> and
-        <code class="ph codeph">SET LOCATION</code> clauses.
+          no longer relevant. <div class="note note"><span class="notetitle">Note:</span> 
+        If you are creating a partition for the first time and specifying its location, for
+        maximum efficiency, use a single <code class="ph codeph">ALTER TABLE</code> statement including both
+        the <code class="ph codeph">ADD PARTITION</code> and <code class="ph codeph">LOCATION</code> clauses, rather than
+        separate statements with <code class="ph codeph">ADD PARTITION</code> and <code class="ph codeph">SET
+        LOCATION</code> clauses.
       </div>
 
         </li>
@@ -202,10 +203,12 @@
           a set of data into, with <code class="ph codeph">INSERT OVERWRITE</code> statements;
           you can replace the contents of a specific partition but you cannot
           append data to a specific partition. <p class="p">
-        By default, if an <code class="ph codeph">INSERT</code> statement creates any new subdirectories underneath a partitioned
-        table, those subdirectories are assigned default HDFS permissions for the <code class="ph codeph">impala</code> user. To
-        make each subdirectory have the same permissions as its parent directory in HDFS, specify the
-        <code class="ph codeph">--insert_inherit_permissions</code> startup option for the <span class="keyword cmdname">impalad</span> daemon.
+        By default, if an <code class="ph codeph">INSERT</code> statement creates any new subdirectories
+        underneath a partitioned table, those subdirectories are assigned default HDFS
+        permissions for the <code class="ph codeph">impala</code> user. To make each subdirectory have the
+        same permissions as its parent directory in HDFS, specify the
+        <code class="ph codeph">‑‑insert_inherit_permissions</code> startup option for the
+        <span class="keyword cmdname">impalad</span> daemon.
       </p>
 
         </li>
@@ -313,10 +316,12 @@ insert into weather <strong class="ph b">partition (year=2014, month=04, day)</s
     <div class="body conbody">
 
       <p class="p">
-        By default, if an <code class="ph codeph">INSERT</code> statement creates any new subdirectories underneath a partitioned
-        table, those subdirectories are assigned default HDFS permissions for the <code class="ph codeph">impala</code> user. To
-        make each subdirectory have the same permissions as its parent directory in HDFS, specify the
-        <code class="ph codeph">--insert_inherit_permissions</code> startup option for the <span class="keyword cmdname">impalad</span> daemon.
+        By default, if an <code class="ph codeph">INSERT</code> statement creates any new subdirectories
+        underneath a partitioned table, those subdirectories are assigned default HDFS
+        permissions for the <code class="ph codeph">impala</code> user. To make each subdirectory have the
+        same permissions as its parent directory in HDFS, specify the
+        <code class="ph codeph">‑‑insert_inherit_permissions</code> startup option for the
+        <span class="keyword cmdname">impalad</span> daemon.
       </p>
 
 
@@ -466,18 +471,23 @@ insert into weather <strong class="ph b">partition (year=2014, month=04, day)</s
 </code></pre>
 
         <p class="p">
-        If a view applies to a partitioned table, any partition pruning considers the clauses on both
-        the original query and any additional <code class="ph codeph">WHERE</code> predicates in the query that refers to the view.
-        Prior to Impala 1.4, only the <code class="ph codeph">WHERE</code> clauses on the original query from the
-        <code class="ph codeph">CREATE VIEW</code> statement were used for partition pruning.
+        If a view applies to a partitioned table, any partition pruning considers the clauses on
+        both the original query and any additional <code class="ph codeph">WHERE</code> predicates in the
+        query that refers to the view. Prior to Impala 1.4, only the <code class="ph codeph">WHERE</code>
+        clauses on the original query from the <code class="ph codeph">CREATE VIEW</code> statement were used
+        for partition pruning.
       </p>
 
 
         <p class="p">
-        In queries involving both analytic functions and partitioned tables, partition pruning only occurs for columns named in the <code class="ph codeph">PARTITION BY</code>
-        clause of the analytic function call. For example, if an analytic function query has a clause such as <code class="ph codeph">WHERE year=2016</code>,
-        the way to make the query prune all other <code class="ph codeph">YEAR</code> partitions is to include <code class="ph codeph">PARTITION BY year</code> in the analytic function call;
-        for example, <code class="ph codeph">OVER (PARTITION BY year,<var class="keyword varname">other_columns</var> <var class="keyword varname">other_analytic_clauses</var>)</code>.
+        In queries involving both analytic functions and partitioned tables, partition pruning
+        only occurs for columns named in the <code class="ph codeph">PARTITION BY</code> clause of the
+        analytic function call. For example, if an analytic function query has a clause such as
+        <code class="ph codeph">WHERE year=2016</code>, the way to make the query prune all other
+        <code class="ph codeph">YEAR</code> partitions is to include <code class="ph codeph">PARTITION BY year</code> in the
+        analytic function call; for example, <code class="ph codeph">OVER (PARTITION BY
+        year,<var class="keyword varname">other_columns</var>
+        <var class="keyword varname">other_analytic_clauses</var>)</code>.
 
       </p>
 
@@ -600,9 +610,9 @@ PROFILE;
 
 
         <p class="p">
-        When the spill-to-disk feature is activated for a join node within a query, Impala does not
-        produce any runtime filters for that join operation on that host. Other join nodes within
-        the query are not affected.
+        When the spill-to-disk feature is activated for a join node within a query, Impala does
+        not produce any runtime filters for that join operation on that host. Other join nodes
+        within the query are not affected.
       </p>
 
 
@@ -667,8 +677,8 @@ PROFILE;
 
         <li class="li">
           <p class="p">
-        Partitioned tables can contain complex type columns.
-        All the partition key columns must be scalar types.
+        Partitioned tables can contain complex type columns. All the partition key columns must
+        be scalar types.
       </p>
 
         </li>
@@ -691,12 +701,13 @@ PROFILE;
 
 
       <p class="p">
-        If you frequently run aggregate functions such as <code class="ph codeph">MIN()</code>, <code class="ph codeph">MAX()</code>, and
-        <code class="ph codeph">COUNT(DISTINCT)</code> on partition key columns, consider enabling the <code class="ph codeph">OPTIMIZE_PARTITION_KEY_SCANS</code>
-        query option, which optimizes such queries. This feature is available in <span class="keyword">Impala 2.5</span> and higher.
-        See <a class="xref" href="../shared/../topics/impala_optimize_partition_key_scans.html">OPTIMIZE_PARTITION_KEY_SCANS Query Option (Impala 2.5 or higher only)</a>
-        for the kinds of queries that this option applies to, and slight differences in how partitions are
-        evaluated when this query option is enabled.
+        If you frequently run aggregate functions such as <code class="ph codeph">MIN()</code>,
+        <code class="ph codeph">MAX()</code>, and <code class="ph codeph">COUNT(DISTINCT)</code> on partition key columns,
+        consider enabling the <code class="ph codeph">OPTIMIZE_PARTITION_KEY_SCANS</code> query option, which
+        optimizes such queries. This feature is available in <span class="keyword">Impala 2.5</span>
+        and higher. See <a class="xref" href="../shared/../topics/impala_optimize_partition_key_scans.html">OPTIMIZE_PARTITION_KEY_SCANS Query Option (Impala 2.5 or higher only)</a> for the
+        kinds of queries that this option applies to, and slight differences in how partitions
+        are evaluated when this query option is enabled.
       </p>
 
 
@@ -773,11 +784,12 @@ PROFILE;
       </p>
 
 
-      <div class="note note"><span class="notetitle">Note:</span>
-        If you are creating a partition for the first time and specifying its location, for maximum efficiency, use
-        a single <code class="ph codeph">ALTER TABLE</code> statement including both the <code class="ph codeph">ADD PARTITION</code> and
-        <code class="ph codeph">LOCATION</code> clauses, rather than separate statements with <code class="ph codeph">ADD PARTITION</code> and
-        <code class="ph codeph">SET LOCATION</code> clauses.
+      <div class="note note"><span class="notetitle">Note:</span> 
+        If you are creating a partition for the first time and specifying its location, for
+        maximum efficiency, use a single <code class="ph codeph">ALTER TABLE</code> statement including both
+        the <code class="ph codeph">ADD PARTITION</code> and <code class="ph codeph">LOCATION</code> clauses, rather than
+        separate statements with <code class="ph codeph">ADD PARTITION</code> and <code class="ph codeph">SET
+        LOCATION</code> clauses.
       </div>
 
 
@@ -839,33 +851,32 @@ PROFILE;
       </p>
 
 
-      <div class="note important"><span class="importanttitle">Important:</span>
+      <div class="note important"><span class="importanttitle">Important:</span> 
         <p class="p">
-        For a particular table, use either <code class="ph codeph">COMPUTE STATS</code> or
-        <code class="ph codeph">COMPUTE INCREMENTAL STATS</code>, but never combine the two or
-        alternate between them. If you switch from <code class="ph codeph">COMPUTE STATS</code> to
-        <code class="ph codeph">COMPUTE INCREMENTAL STATS</code> during the lifetime of a table, or
-        vice versa, drop all statistics by running <code class="ph codeph">DROP STATS</code> before
-        making the switch.
+        For a particular table, use either <code class="ph codeph">COMPUTE STATS</code> or <code class="ph codeph">COMPUTE
+        INCREMENTAL STATS</code>, but never combine the two or alternate between them. If you
+        switch from <code class="ph codeph">COMPUTE STATS</code> to <code class="ph codeph">COMPUTE INCREMENTAL STATS</code>
+        during the lifetime of a table, or vice versa, drop all statistics by running
+        <code class="ph codeph">DROP STATS</code> before making the switch.
       </p>
 
         <p class="p">
         When you run <code class="ph codeph">COMPUTE INCREMENTAL STATS</code> on a table for the first time,
         the statistics are computed again from scratch regardless of whether the table already
-        has statistics. Therefore, expect a one-time resource-intensive operation
-        for scanning the entire table when running <code class="ph codeph">COMPUTE INCREMENTAL STATS</code>
-        for the first time on a given table.
+        has statistics. Therefore, expect a one-time resource-intensive operation for scanning
+        the entire table when running <code class="ph codeph">COMPUTE INCREMENTAL STATS</code> for the first
+        time on a given table.
       </p>
 
-        <p class="p"> In Impala 3.0 and lower, approximately
-        400 bytes of metadata per column per partition are needed for caching.
-        Tables with a big number of partitions and many columns can add up to a
-        significant memory overhead as the metadata must be cached on the
-          <span class="keyword cmdname">catalogd</span> host and on every
-          <span class="keyword cmdname">impalad</span> host that is eligible to be a coordinator.
-        If this metadata for all tables exceeds 2 GB, you might experience
-        service downtime. In Impala 3.1 and higher, the issue was alleviated
-        with an improved handling of incremental stats.</p>
+        <p class="p">
+        In Impala 3.0 and lower, approximately 400 bytes of metadata per column per partition
+        are needed for caching. Tables with a big number of partitions and many columns can add
+        up to a significant memory overhead as the metadata must be cached on the
+        <span class="keyword cmdname">catalogd</span> host and on every <span class="keyword cmdname">impalad</span> host that is
+        eligible to be a coordinator. If this metadata for all tables exceeds 2 GB, you might
+        experience service downtime. In Impala 3.1 and higher, the issue was alleviated with an
+        improved handling of incremental stats.
+      </p>
 
       </div>
 

@@ -1,0 +1,332 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE html
+  PUBLIC "-//W3C//DTD XHTML 1.0 Transitional//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-transitional.dtd">
+<html xmlns="http://www.w3.org/1999/xhtml" xml:lang="en" lang="en">
+<head><meta http-equiv="Content-Type" content="text/html; charset=UTF-8" />
+
+<meta name="copyright" content="(C) Copyright 2019" />
+<meta name="DC.rights.owner" content="(C) Copyright 2019" />
+<meta name="DC.Type" content="concept" />
+<meta name="DC.Title" content="Impala Client Access" />
+<meta name="DC.Relation" scheme="URI" content="../topics/impala_impala_shell.html" />
+<meta name="DC.Relation" scheme="URI" content="../topics/impala_odbc.html" />
+<meta name="DC.Relation" scheme="URI" content="../topics/impala_jdbc.html" />
+<meta name="prodname" content="Impala" />
+<meta name="version" content="Impala 3.3.x" />
+<meta name="DC.Format" content="XHTML" />
+<meta name="DC.Identifier" content="intro_client" />
+<link rel="stylesheet" type="text/css" href="../commonltr.css" />
+<title>Impala Client Access</title>
+</head>
+<body id="intro_client">
+
+
+  <h1 class="title topictitle1" id="ariaid-title1">Impala Client Access</h1>
+
+
+  <div class="body conbody">
+
+    <p class="p">
+      Application developers have a number of options to interface with Impala. The core
+      development language with Impala is SQL. You can also use Java or other languages to
+      interact with Impala through the standard JDBC and ODBC interfaces used by many business
+      intelligence tools. For specialized kinds of analysis, you can supplement the Impala
+      built-in functions by writing user-defined functions in C++ or Java.
+    </p>
+
+
+    <p class="p">
+      You can connect and submit requests to the Impala through:
+    </p>
+
+
+    <ul class="ul">
+      <li class="li">
+        The impala-shell interactive command interpreter
+      </li>
+
+
+      <li class="li">
+        The Hue web-based user interface
+      </li>
+
+
+      <li class="li">
+        JDBC
+      </li>
+
+
+      <li class="li">
+        ODBC
+      </li>
+
+    </ul>
+
+
+    <p class="p">
+      Impala clients can connect to the Coordinator Impala Daemon (<code class="ph codeph">impalad</code>) via
+      HiveServer2 over HTTP or over the TCP binary. Both HTTP and binary support the Kerberos
+      SPNEGO and LDAP for authentication to Impala. See below for the default ports and the
+      Impala flags to change the ports.
+    </p>
+
+
+    <div class="p">
+      <table cellpadding="4" cellspacing="0" summary="" id="intro_client__simpletable_tr2_gnt_43b" border="1" class="simpletable"><col style="width:22.675736961451246%" /><col style="width:23.356009070294785%" /><col style="width:53.96825396825397%" /><thead></thead><tbody><tr class="strow">
+
+          <td style="vertical-align:top;" class="stentry"><strong class="ph b">Protocol</strong>
+
+          </td>
+
+
+          <td style="vertical-align:top;" class="stentry"><strong class="ph b">Default Port</strong>
+
+          </td>
+
+
+          <td style="vertical-align:top;" class="stentry"><strong class="ph b">Flag to Specify an Alternate Port</strong>
+
+          </td>
+
+
+        </tr>
+<tr class="strow">
+
+          <td style="vertical-align:top;" class="stentry">HTTP</td>
+
+
+          <td style="vertical-align:top;" class="stentry">28000</td>
+
+
+          <td style="vertical-align:top;" class="stentry"><code class="ph codeph">‑‑hs2_http_port</code>
+
+          </td>
+
+
+        </tr>
+<tr class="strow">
+
+          <td style="vertical-align:top;" class="stentry">Binary TCP</td>
+
+
+          <td style="vertical-align:top;" class="stentry">21050</td>
+
+
+          <td style="vertical-align:top;" class="stentry"><code class="ph codeph">‑‑hs2_port</code>
+
+          </td>
+
+
+        </tr>
+</tbody></table>
+
+    </div>
+
+
+    <p class="p">
+      Each <code class="ph codeph">impalad</code> daemon process, running on separate nodes in a cluster,
+      listens to <a class="xref" href="impala_ports.html#ports">several ports</a> for incoming requests:
+    </p>
+
+
+    <ul class="ul">
+      <li class="li">
+        Requests from <code class="ph codeph">impala-shell</code> and Hue are routed to the
+        <code class="ph codeph">impalad</code> daemons through the same port.
+      </li>
+
+
+      <li class="li">
+        The <code class="ph codeph">impalad</code> daemons listen on separate ports for JDBC and ODBC
+        requests.
+      </li>
+
+    </ul>
+
+
+    <div class="section" id="intro_client__section_egg_wjt_f3b"><h2 class="title sectiontitle">Impala Startup Options for Client Connections</h2>
+
+      
+
+      <p class="p">
+        Use the following flags when starting Impala Daemon coordinator to control client
+        connections to Impala.
+      </p>
+
+
+      <dl class="dl">
+        
+
+          <dt class="dt dlterm">
+            --accepted_client_cnxn_timeout
+          </dt>
+
+
+          <dd class="dd">
+            Controls how Impala treats new connection requests if it has run out of the number
+            of threads configured by <code class="ph codeph">--fe_service_threads</code>.
+            <p class="p">
+              If <code class="ph codeph">--accepted_client_cnxn_timeout &gt; 0</code>, new connection requests
+              are rejected if Impala can't get a server thread within the specified (in seconds)
+              timeout.
+            </p>
+
+
+            <p class="p">
+              If <code class="ph codeph">--accepted_client_cnxn_timeout=0</code>, i.e. no timeout, clients
+              wait indefinitely to open the new session until more threads are available.
+            </p>
+
+
+            <p class="p">
+              The default timeout is 5 minutes.
+            </p>
+
+
+            <p class="p">
+              The timeout applies only to client facing thrift servers, i.e., HS2 and Beeswax
+              servers.
+            </p>
+
+          </dd>
+
+
+        
+
+        
+
+          <dt class="dt dlterm">
+            --disconnected_session_timeout
+          </dt>
+
+
+          <dd class="dd">
+            When a HiveServer2 session has had no open connections for longer than this value,
+            the session will be closed, and any associated queries will be unregistered.
+            <p class="p">
+              Specify the value in hours.
+            </p>
+
+
+            <p class="p">
+              The default value is 1 hour.
+            </p>
+
+
+            <p class="p">
+              This flag does not apply to Beeswax clients. When a Beeswax client connection is
+              closed, Impala closes the session associated with that connection.
+            </p>
+
+          </dd>
+
+
+        
+
+        
+
+          <dt class="dt dlterm">
+            --fe_service_threads
+          </dt>
+
+
+          <dd class="dd">
+            Specifies the maximum number of concurrent client connections allowed. The default
+            value is 64 with which 64 queries can run simultaneously.
+            <p class="p">
+              If you have more clients trying to connect to Impala than the value of this
+              setting, the later arriving clients have to wait for the duration specified by
+              <code class="ph codeph">--accepted_client_cnxn_timeout</code>. You can increase this value to
+              allow more client connections. However, a large value means more threads to be
+              maintained even if most of the connections are idle, and it could negatively
+              impact query latency. Client applications should use the connection pool to avoid
+              need for large number of sessions.
+            </p>
+
+          </dd>
+
+
+        
+
+        
+
+          <dt class="dt dlterm">
+            --idle_client_poll_time_s
+          </dt>
+
+
+          <dd class="dd">
+            The value of this setting specifies how frequently Impala polls to check if a client
+            connection is idle and closes it if the connection is idle. A client connection is
+            idle if all sessions associated with the client connection are idle.
+            <p class="p">
+              By default, <code class="ph codeph">--idle_client_poll_time_s</code> is set to 30 seconds.
+            </p>
+
+
+            <p class="p">
+              If <code class="ph codeph">--idle_client_poll_time_s</code> is set to 0, idle client connections
+              stay open until explicitly closed by the clients.
+            </p>
+
+
+            <p class="p">
+              The connection will only be closed if all the associated sessions are idle or
+              closed. Sessions cannot be idle unless either the flag
+              <code class="ph codeph">--idle_session_timeout</code> or the
+              <code class="ph codeph">IDLE_SESSION_TIMEOUT</code> query option is set to greater than 0. If
+              idle session timeout is not configured, a session cannot become idle by
+              definition, and therefore its connection stays open until the client explicitly
+              closes it.
+            </p>
+
+          </dd>
+
+
+        
+
+        
+
+          <dt class="dt dlterm">
+            --hs2_http_port
+          </dt>
+
+
+          <dd class="dd">
+            Specifies the port for clients to connect to Impala server over HTTP.
+            <p class="p">
+              You can disable the HTTP end point for clients by setting the flag to
+              <code class="ph codeph">0</code>.
+            </p>
+
+
+            <p class="p">
+              To enable TLS/SSL for HiveServer2 HTTP endpoint use
+              <code class="ph codeph">--ssl_server_certificate</code> and <code class="ph codeph">--ssl_private_key</code>.
+              See <a class="xref" href="impala_ssl.html#ssl">Configuring TLS/SSL for Impala</a> for detail.
+            </p>
+
+          </dd>
+
+
+        
+      </dl>
+
+
+    </div>
+
+
+  </div>
+
+
+<div class="related-links">
+<ul class="ullinks">
+<li class="link ulchildlink"><strong><a href="../topics/impala_impala_shell.html">Using the Impala Shell (impala-shell Command)</a></strong><br />
+</li>
+<li class="link ulchildlink"><strong><a href="../topics/impala_odbc.html">Configuring Impala to Work with ODBC</a></strong><br />
+</li>
+<li class="link ulchildlink"><strong><a href="../topics/impala_jdbc.html">Configuring Impala to Work with JDBC</a></strong><br />
+</li>
+</ul>
+</div></body>
+</html>

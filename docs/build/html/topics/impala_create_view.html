@@ -11,8 +11,8 @@
 <meta name="DC.Relation" scheme="URI" content="../topics/impala_langref_sql.html" />
 <meta name="prodname" content="Impala" />
 <meta name="prodname" content="Impala" />
-<meta name="version" content="Impala 3.2.x" />
-<meta name="version" content="Impala 3.2.x" />
+<meta name="version" content="Impala 3.3.x" />
+<meta name="version" content="Impala 3.3.x" />
 <meta name="DC.Format" content="XHTML" />
 <meta name="DC.Identifier" content="create_view" />
 <link rel="stylesheet" type="text/css" href="../commonltr.css" />
@@ -135,11 +135,10 @@ select * from <var class="keyword varname">view_name</var> order by c1 desc limi
 
     <p class="p">
         For tables containing complex type columns (<code class="ph codeph">ARRAY</code>,
-        <code class="ph codeph">STRUCT</code>, or <code class="ph codeph">MAP</code>), you typically use
-        join queries to refer to the complex values. You can use views to
-        hide the join notation, making such tables seem like traditional denormalized
-        tables, and making those tables queryable by business intelligence tools
-        that do not have built-in support for those complex types.
+        <code class="ph codeph">STRUCT</code>, or <code class="ph codeph">MAP</code>), you typically use join queries to
+        refer to the complex values. You can use views to hide the join notation, making such
+        tables seem like traditional denormalized tables, and making those tables queryable by
+        business intelligence tools that do not have built-in support for those complex types.
         See <a class="xref" href="../shared/../topics/impala_complex_types.html#complex_types_views">Accessing Complex Type Data in Flattened Form Using Views</a> for details.
       </p>
 
@@ -152,10 +151,11 @@ select * from <var class="keyword varname">view_name</var> order by c1 desc limi
 
 
     <p class="p">
-        If you connect to different Impala nodes within an <span class="keyword cmdname">impala-shell</span> session for
-        load-balancing purposes, you can enable the <code class="ph codeph">SYNC_DDL</code> query option to make each DDL
-        statement wait before returning, until the new or changed metadata has been received by all the Impala
-        nodes. See <a class="xref" href="../shared/../topics/impala_sync_ddl.html#sync_ddl">SYNC_DDL Query Option</a> for details.
+        If you connect to different Impala nodes within an <span class="keyword cmdname">impala-shell</span>
+        session for load-balancing purposes, you can enable the <code class="ph codeph">SYNC_DDL</code> query
+        option to make each DDL statement wait before returning, until the new or changed
+        metadata has been received by all the Impala nodes. See
+        <a class="xref" href="../shared/../topics/impala_sync_ddl.html#sync_ddl">SYNC_DDL Query Option</a> for details.
       </p>
 
 
@@ -165,9 +165,10 @@ select * from <var class="keyword varname">view_name</var> order by c1 desc limi
 
 
     <p class="p">
-        If these statements in your environment contain sensitive literal values such as credit card numbers or tax
-        identifiers, Impala can redact this sensitive information when displaying the statements in log files and
-        other administrative contexts. See <span class="xref">the documentation for your Apache Hadoop distribution</span> for details.
+        If these statements in your environment contain sensitive literal values such as credit
+        card numbers or tax identifiers, Impala can redact this sensitive information when
+        displaying the statements in log files and other administrative contexts. See
+        <span class="xref">the documentation for your Apache Hadoop distribution</span> for details.
       </p>
 
 

@@ -28,25 +28,25 @@
 <meta name="prodname" content="Impala" />
 <meta name="prodname" content="Impala" />
 <meta name="prodname" content="Impala" />
-<meta name="version" content="Impala 3.2.x" />
-<meta name="version" content="Impala 3.2.x" />
-<meta name="version" content="Impala 3.2.x" />
-<meta name="version" content="Impala 3.2.x" />
-<meta name="version" content="Impala 3.2.x" />
-<meta name="version" content="Impala 3.2.x" />
-<meta name="version" content="Impala 3.2.x" />
-<meta name="version" content="Impala 3.2.x" />
-<meta name="version" content="Impala 3.2.x" />
-<meta name="version" content="Impala 3.2.x" />
-<meta name="version" content="Impala 3.2.x" />
-<meta name="version" content="Impala 3.2.x" />
-<meta name="version" content="Impala 3.2.x" />
-<meta name="version" content="Impala 3.2.x" />
-<meta name="version" content="Impala 3.2.x" />
-<meta name="version" content="Impala 3.2.x" />
-<meta name="version" content="Impala 3.2.x" />
-<meta name="version" content="Impala 3.2.x" />
-<meta name="version" content="Impala 3.2.x" />
+<meta name="version" content="Impala 3.3.x" />
+<meta name="version" content="Impala 3.3.x" />
+<meta name="version" content="Impala 3.3.x" />
+<meta name="version" content="Impala 3.3.x" />
+<meta name="version" content="Impala 3.3.x" />
+<meta name="version" content="Impala 3.3.x" />
+<meta name="version" content="Impala 3.3.x" />
+<meta name="version" content="Impala 3.3.x" />
+<meta name="version" content="Impala 3.3.x" />
+<meta name="version" content="Impala 3.3.x" />
+<meta name="version" content="Impala 3.3.x" />
+<meta name="version" content="Impala 3.3.x" />
+<meta name="version" content="Impala 3.3.x" />
+<meta name="version" content="Impala 3.3.x" />
+<meta name="version" content="Impala 3.3.x" />
+<meta name="version" content="Impala 3.3.x" />
+<meta name="version" content="Impala 3.3.x" />
+<meta name="version" content="Impala 3.3.x" />
+<meta name="version" content="Impala 3.3.x" />
 <meta name="DC.Format" content="XHTML" />
 <meta name="DC.Identifier" content="parquet" />
 <link rel="stylesheet" type="text/css" href="../commonltr.css" />
@@ -194,7 +194,7 @@
     <h2 class="title topictitle2" id="ariaid-title3">Loading Data into Parquet Tables</h2>
 
 
-
+    
 
     <div class="body conbody">
 
@@ -210,7 +210,7 @@
         or partitioning scheme, you can transfer the data to a Parquet table using the Impala
         <code class="ph codeph">INSERT...SELECT</code> syntax. You can convert, filter, repartition, and do
         other things to the data as part of this same <code class="ph codeph">INSERT</code> statement. See
-        <a class="xref" href="#parquet_compression">Snappy and GZip Compression for Parquet Data Files</a> for some examples showing how to insert
+        <a class="xref" href="#parquet_compression">Compressions for Parquet Data Files</a> for some examples showing how to insert
         data into Parquet tables.
       </p>
 
@@ -224,10 +224,10 @@
 
 
       <p class="p">
-        Any <code class="ph codeph">INSERT</code> statement for a Parquet table requires enough free space in the HDFS filesystem
-        to write one block. Because Parquet data files use a block size of 1 GB by default, an
-        <code class="ph codeph">INSERT</code> might fail (even for a very small amount of data) if your HDFS is running low on
-        space.
+        Any <code class="ph codeph">INSERT</code> statement for a Parquet table requires enough free space in
+        the HDFS filesystem to write one block. Because Parquet data files use a block size of 1
+        GB by default, an <code class="ph codeph">INSERT</code> might fail (even for a very small amount of
+        data) if your HDFS is running low on space.
       </p>
 
 
@@ -277,22 +277,24 @@
       </ul>
 
 
-      <div class="note note"><span class="notetitle">Note:</span>
+      <div class="note note"><span class="notetitle">Note:</span> 
         <p class="p">
-          Currently, Impala always decodes the column data in Parquet files based on the ordinal position of the
-          columns, not by looking up the position of each column based on its name. Parquet files produced outside
-          of Impala must write column data in the same order as the columns are declared in the Impala table. Any
-          optional columns that are omitted from the data files must be the rightmost columns in the Impala table
+          Currently, Impala always decodes the column data in Parquet files based on the ordinal
+          position of the columns, not by looking up the position of each column based on its
+          name. Parquet files produced outside of Impala must write column data in the same
+          order as the columns are declared in the Impala table. Any optional columns that are
+          omitted from the data files must be the rightmost columns in the Impala table
           definition.
         </p>
 
 
         <p class="p">
-          If you created compressed Parquet files through some tool other than Impala, make sure that any
-          compression codecs are supported in Parquet by Impala. For example, Impala does not currently support LZO
-          compression in Parquet files. Also doublecheck that you used any recommended compatibility settings in
-          the other tool, such as <code class="ph codeph">spark.sql.parquet.binaryAsString</code> when writing Parquet files
-          through Spark.
+          If you created compressed Parquet files through some tool other than Impala, make sure
+          that any compression codecs are supported in Parquet by Impala. For example, Impala
+          does not currently support LZO compression in Parquet files. Also doublecheck that you
+          used any recommended compatibility settings in the other tool, such as
+          <code class="ph codeph">spark.sql.parquet.binaryAsString</code> when writing Parquet files through
+          Spark.
         </p>
 
       </div>
@@ -334,7 +336,7 @@
       </p>
 
 
-      <div class="note note"><span class="notetitle">Note:</span>
+      <div class="note note"><span class="notetitle">Note:</span> 
         All the preceding techniques assume that the data you are loading matches the structure
         of the destination table, including column order, column names, and partition layout. To
         transform or reorganize the data, start by loading the data into a Parquet table that
@@ -359,7 +361,7 @@
     <h2 class="title topictitle2" id="ariaid-title4">Query Performance for Impala Parquet Tables</h2>
 
 
-
+    
 
     <div class="body conbody">
 
@@ -413,18 +415,18 @@
 
 
       <p class="p">
-        In <span class="keyword">Impala 2.6</span> and higher, Impala queries are optimized for files stored in Amazon S3.
-        For Impala tables that use the file formats Parquet, ORC, RCFile, SequenceFile,
-        Avro, and uncompressed text, the setting <code class="ph codeph">fs.s3a.block.size</code>
-        in the <span class="ph filepath">core-site.xml</span> configuration file determines
-        how Impala divides the I/O work of reading the data files. This configuration
-        setting is specified in bytes. By default, this
-        value is 33554432 (32 MB), meaning that Impala parallelizes S3 read operations on the files
-        as if they were made up of 32 MB blocks. For example, if your S3 queries primarily access
-        Parquet files written by MapReduce or Hive, increase <code class="ph codeph">fs.s3a.block.size</code>
-        to 134217728 (128 MB) to match the row group size of those files. If most S3 queries involve
-        Parquet files written by Impala, increase <code class="ph codeph">fs.s3a.block.size</code>
-        to 268435456 (256 MB) to match the row group size produced by Impala.
+        In <span class="keyword">Impala 2.6</span> and higher, Impala queries are optimized for files
+        stored in Amazon S3. For Impala tables that use the file formats Parquet, ORC, RCFile,
+        SequenceFile, Avro, and uncompressed text, the setting
+        <code class="ph codeph">fs.s3a.block.size</code> in the <span class="ph filepath">core-site.xml</span>
+        configuration file determines how Impala divides the I/O work of reading the data files.
+        This configuration setting is specified in bytes. By default, this value is 33554432 (32
+        MB), meaning that Impala parallelizes S3 read operations on the files as if they were
+        made up of 32 MB blocks. For example, if your S3 queries primarily access Parquet files
+        written by MapReduce or Hive, increase <code class="ph codeph">fs.s3a.block.size</code> to 134217728
+        (128 MB) to match the row group size of those files. If most S3 queries involve Parquet
+        files written by Impala, increase <code class="ph codeph">fs.s3a.block.size</code> to 268435456 (256
+        MB) to match the row group size produced by Impala.
       </p>
 
 
@@ -446,6 +448,10 @@
         tables produces Parquet data files with relatively narrow ranges of column values within
         each file.
       </p>
+
+      <p class="p">To disable Impala from writing the Parquet page index when creating
+        Parquet files, set the <code class="ph codeph">PARQUET_WRITE_PAGE_INDEX</code> query
+        option to <code class="ph codeph">FALSE</code>.</p>
 
 
     </div>
@@ -535,10 +541,10 @@
 
   <div class="topic concept nested1" aria-labelledby="ariaid-title6" id="parquet_compression">
 
-    <h2 class="title topictitle2" id="ariaid-title6">Snappy and GZip Compression for Parquet Data Files</h2>
+    <h2 class="title topictitle2" id="ariaid-title6">Compressions for Parquet Data Files</h2>
 
 
-
+    
 
     <div class="body conbody">
 
@@ -547,10 +553,10 @@
         underlying compression is controlled by the <code class="ph codeph">COMPRESSION_CODEC</code> query
         option. (Prior to Impala 2.0, the query option name was
         <code class="ph codeph">PARQUET_COMPRESSION_CODEC</code>.) The allowed values for this query option
-        are <code class="ph codeph">snappy</code> (the default), <code class="ph codeph">gzip</code>, and
-        <code class="ph codeph">none</code>. The option value is not case-sensitive. If the option is set to
-        an unrecognized value, all kinds of queries will fail due to the invalid option setting,
-        not just queries involving Parquet tables.
+        are <code class="ph codeph">snappy</code> (the default), <code class="ph codeph">gzip</code>, <code class="ph codeph">zstd</code>,
+        <code class="ph codeph">lz4</code>, and <code class="ph codeph">none</code>. The option value is not case-sensitive.
+        If the option is set to an unrecognized value, all kinds of queries will fail due to
+        the invalid option setting, not just queries involving Parquet tables.
       </p>
 
 
@@ -828,14 +834,16 @@ Returned 1 row(s) in 13.35s
 
     <div class="body conbody">
 
-      <p class="p"> In <span class="keyword">Impala 2.3</span>
-        and higher, Impala supports the complex types <code class="ph codeph">ARRAY</code>,
-          <code class="ph codeph">STRUCT</code>, and <code class="ph codeph">MAP</code>. In <span class="keyword">Impala 3.2</span> and higher, Impala also supports these
-        complex types in ORC. See <a class="xref" href="../shared/../topics/impala_complex_types.html#complex_types">Complex Types (Impala 2.3 or higher only)</a> for details.
-        These Complex types are currently supported only for the Parquet or ORC
-        file formats. Because Impala has better performance on Parquet than ORC,
-        if you plan to use complex types, become familiar with the performance
-        and storage aspects of Parquet first. </p>
+      <p class="p">
+        In <span class="keyword">Impala 2.3</span> and higher, Impala supports the complex types
+        <code class="ph codeph">ARRAY</code>, <code class="ph codeph">STRUCT</code>, and <code class="ph codeph">MAP</code>. In
+        <span class="keyword">Impala 3.2</span> and higher, Impala also supports these
+        complex types in ORC. See
+        <a class="xref" href="../shared/../topics/impala_complex_types.html#complex_types">Complex Types (Impala 2.3 or higher only)</a> for details.
+        These Complex types are currently supported only for the Parquet or ORC file formats.
+        Because Impala has better performance on Parquet than ORC, if you plan to use complex
+        types, become familiar with the performance and storage aspects of Parquet first.
+      </p>
 
 
     </div>
@@ -849,7 +857,7 @@ Returned 1 row(s) in 13.35s
     <h2 class="title topictitle2" id="ariaid-title13">Exchanging Parquet Data Files with Other Hadoop Components</h2>
 
 
-
+    
 
     <div class="body conbody">
 
@@ -929,42 +937,50 @@ ALTER TABLE <var class="keyword varname">table_name</var> SET FILEFORMAT
 
 
       <p class="p">
-        Impala can query Parquet files that use the <code class="ph codeph">PLAIN</code>, <code class="ph codeph">PLAIN_DICTIONARY</code>,
-        <code class="ph codeph">BIT_PACKED</code>, and <code class="ph codeph">RLE</code> encodings.
-        Currently, Impala does not support <code class="ph codeph">RLE_DICTIONARY</code> encoding.
-        When creating files outside of Impala for use by Impala, make sure to use one of the supported encodings.
-        In particular, for MapReduce jobs, <code class="ph codeph">parquet.writer.version</code> must not be defined
-        (especially as <code class="ph codeph">PARQUET_2_0</code>) for writing the configurations of Parquet MR jobs.
-        Use the default version (or format). The default format, 1.0, includes some enhancements that are compatible with older versions.
-        Data using the 2.0 format might not be consumable by Impala, due to use of the <code class="ph codeph">RLE_DICTIONARY</code> encoding.
+        Impala can query Parquet files that use the <code class="ph codeph">PLAIN</code>,
+        <code class="ph codeph">PLAIN_DICTIONARY</code>, <code class="ph codeph">BIT_PACKED</code>, and <code class="ph codeph">RLE</code>
+        encodings. Currently, Impala does not support <code class="ph codeph">RLE_DICTIONARY</code> encoding.
+        When creating files outside of Impala for use by Impala, make sure to use one of the
+        supported encodings. In particular, for MapReduce jobs,
+        <code class="ph codeph">parquet.writer.version</code> must not be defined (especially as
+        <code class="ph codeph">PARQUET_2_0</code>) for writing the configurations of Parquet MR jobs. Use the
+        default version (or format). The default format, 1.0, includes some enhancements that
+        are compatible with older versions. Data using the 2.0 format might not be consumable by
+        Impala, due to use of the <code class="ph codeph">RLE_DICTIONARY</code> encoding.
       </p>
 
 
       <div class="p">
         To examine the internal structure and data of Parquet files, you can use the
-        <span class="keyword cmdname">parquet-tools</span> command. Make sure this
-        command is in your <code class="ph codeph">$PATH</code>. (Typically, it is symlinked from
-        <span class="ph filepath">/usr/bin</span>; sometimes, depending on your installation setup, you
-        might need to locate it under an alternative  <code class="ph codeph">bin</code> directory.)
-        The arguments to this command let you perform operations such as:
+        <span class="keyword cmdname">parquet-tools</span> command. Make sure this command is in your
+        <code class="ph codeph">$PATH</code>. (Typically, it is symlinked from <span class="ph filepath">/usr/bin</span>;
+        sometimes, depending on your installation setup, you might need to locate it under an
+        alternative <code class="ph codeph">bin</code> directory.) The arguments to this command let you
+        perform operations such as:
         <ul class="ul">
           <li class="li">
-            <code class="ph codeph">cat</code>: Print a file's contents to standard out. In <span class="keyword">Impala 2.3</span> and higher, you can use
-            the <code class="ph codeph">-j</code> option to output JSON.
+            <code class="ph codeph">cat</code>: Print a file's contents to standard out. In
+            <span class="keyword">Impala 2.3</span> and higher, you can use the <code class="ph codeph">-j</code>
+            option to output JSON.
           </li>
+
 
           <li class="li">
             <code class="ph codeph">head</code>: Print the first few records of a file to standard output.
           </li>
 
+
           <li class="li">
             <code class="ph codeph">schema</code>: Print the Parquet schema for the file.
           </li>
 
+
           <li class="li">
-            <code class="ph codeph">meta</code>: Print the file footer metadata, including key-value properties (like Avro schema), compression ratios,
-            encodings, compression used, and row group information.
+            <code class="ph codeph">meta</code>: Print the file footer metadata, including key-value
+            properties (like Avro schema), compression ratios, encodings, compression used, and
+            row group information.
           </li>
+
 
           <li class="li">
             <code class="ph codeph">dump</code>: Print all data and metadata.
@@ -974,7 +990,6 @@ ALTER TABLE <var class="keyword varname">table_name</var> SET FILEFORMAT
 
         Use <code class="ph codeph">parquet-tools -h</code> to see usage information for all the arguments.
         Here are some examples showing <span class="keyword cmdname">parquet-tools</span> usage:
-
 <pre class="pre codeblock"><code>
 $ # Be careful doing this for a big file! Use parquet-tools head to be safe.
 $ parquet-tools cat sample.parq
@@ -1004,7 +1019,6 @@ day = 3
 ...
 
 </code></pre>
-
 <pre class="pre codeblock"><code>
 $ parquet-tools head -n 2 sample.parq
 year = 1992
@@ -1033,7 +1047,6 @@ day = 3
 ...
 
 </code></pre>
-
 <pre class="pre codeblock"><code>
 $ parquet-tools schema sample.parq
 message schema {
@@ -1050,7 +1063,6 @@ message schema {
 ...
 
 </code></pre>
-
 <pre class="pre codeblock"><code>
 $ parquet-tools meta sample.parq
 creator:             impala version 2.2.0-...
@@ -1098,7 +1110,7 @@ flight_num:           INT32 SNAPPY DO:83456393 FPO:83488603 SZ:10216514/11474301
     <h2 class="title topictitle2" id="ariaid-title14">How Parquet Data Files Are Organized</h2>
 
 
-
+    
 
     <div class="body conbody">
 
@@ -1119,7 +1131,7 @@ flight_num:           INT32 SNAPPY DO:83456393 FPO:83488603 SZ:10216514/11474301
       </p>
 
 
-      <div class="note note"><span class="notetitle">Note:</span>
+      <div class="note note"><span class="notetitle">Note:</span> 
         <p class="p">
           Impala <code class="ph codeph">INSERT</code> statements write Parquet data files using an HDFS block
           size <span class="ph">that matches the data file size</span>, to ensure that
@@ -1282,12 +1294,13 @@ insert into partitioned_parquet_table partition (year, month, day)
 
         <li class="li">
           <p class="p">
-        You might set the <code class="ph codeph">NUM_NODES</code> option to 1 briefly, during <code class="ph codeph">INSERT</code> or
-        <code class="ph codeph">CREATE TABLE AS SELECT</code> statements. Normally, those statements produce one or more data
-        files per data node. If the write operation involves small amounts of data, a Parquet table, and/or a
-        partitioned table, the default behavior could produce many small files when intuitively you might expect
-        only a single output file. <code class="ph codeph">SET NUM_NODES=1</code> turns off the <span class="q">"distributed"</span> aspect of the
-        write operation, making it more likely to produce only one or a few data files.
+        You might set the <code class="ph codeph">NUM_NODES</code> option to 1 briefly, during
+        <code class="ph codeph">INSERT</code> or <code class="ph codeph">CREATE TABLE AS SELECT</code> statements. Normally,
+        those statements produce one or more data files per data node. If the write operation
+        involves small amounts of data, a Parquet table, and/or a partitioned table, the default
+        behavior could produce many small files when intuitively you might expect only a single
+        output file. <code class="ph codeph">SET NUM_NODES=1</code> turns off the <span class="q">"distributed"</span> aspect of
+        the write operation, making it more likely to produce only one or a few data files.
       </p>
 
         </li>
@@ -1570,73 +1583,73 @@ select * from t2;
 
       <table cellpadding="4" cellspacing="0" summary="" id="parquet_data_types__simpletable_am3_rxn_wgb" border="1" class="simpletable"><col style="width:50%" /><col style="width:50%" /><thead><tr class="sthead">
 
-          <th style="vertical-align:bottom;text-align:left;" id="d135616e1590" class="stentry">Parquet type</th>
+          <th style="vertical-align:bottom;text-align:left;" id="d141207e1605" class="stentry">Parquet type</th>
 
 
-          <th style="vertical-align:bottom;text-align:left;" id="d135616e1593" class="stentry">Impala type</th>
+          <th style="vertical-align:bottom;text-align:left;" id="d141207e1608" class="stentry">Impala type</th>
 
 
         </tr>
 </thead><tbody><tr class="strow">
 
-          <td style="vertical-align:top;" headers="d135616e1590" class="stentry">BINARY</td>
+          <td style="vertical-align:top;" headers="d141207e1605" class="stentry">BINARY</td>
 
 
-          <td style="vertical-align:top;" headers="d135616e1593" class="stentry">STRING</td>
-
-
-        </tr>
-<tr class="strow">
-
-          <td style="vertical-align:top;" headers="d135616e1590" class="stentry">BOOLEAN</td>
-
-
-          <td style="vertical-align:top;" headers="d135616e1593" class="stentry">BOOLEAN</td>
+          <td style="vertical-align:top;" headers="d141207e1608" class="stentry">STRING</td>
 
 
         </tr>
 <tr class="strow">
 
-          <td style="vertical-align:top;" headers="d135616e1590" class="stentry">DOUBLE</td>
+          <td style="vertical-align:top;" headers="d141207e1605" class="stentry">BOOLEAN</td>
 
 
-          <td style="vertical-align:top;" headers="d135616e1593" class="stentry">DOUBLE</td>
-
-
-        </tr>
-<tr class="strow">
-
-          <td style="vertical-align:top;" headers="d135616e1590" class="stentry">FLOAT</td>
-
-
-          <td style="vertical-align:top;" headers="d135616e1593" class="stentry">FLOAT</td>
+          <td style="vertical-align:top;" headers="d141207e1608" class="stentry">BOOLEAN</td>
 
 
         </tr>
 <tr class="strow">
 
-          <td style="vertical-align:top;" headers="d135616e1590" class="stentry">INT32</td>
+          <td style="vertical-align:top;" headers="d141207e1605" class="stentry">DOUBLE</td>
 
 
-          <td style="vertical-align:top;" headers="d135616e1593" class="stentry">INT</td>
-
-
-        </tr>
-<tr class="strow">
-
-          <td style="vertical-align:top;" headers="d135616e1590" class="stentry">INT64</td>
-
-
-          <td style="vertical-align:top;" headers="d135616e1593" class="stentry">BIGINT</td>
+          <td style="vertical-align:top;" headers="d141207e1608" class="stentry">DOUBLE</td>
 
 
         </tr>
 <tr class="strow">
 
-          <td style="vertical-align:top;" headers="d135616e1590" class="stentry">INT96</td>
+          <td style="vertical-align:top;" headers="d141207e1605" class="stentry">FLOAT</td>
 
 
-          <td style="vertical-align:top;" headers="d135616e1593" class="stentry">TIMESTAMP</td>
+          <td style="vertical-align:top;" headers="d141207e1608" class="stentry">FLOAT</td>
+
+
+        </tr>
+<tr class="strow">
+
+          <td style="vertical-align:top;" headers="d141207e1605" class="stentry">INT32</td>
+
+
+          <td style="vertical-align:top;" headers="d141207e1608" class="stentry">INT</td>
+
+
+        </tr>
+<tr class="strow">
+
+          <td style="vertical-align:top;" headers="d141207e1605" class="stentry">INT64</td>
+
+
+          <td style="vertical-align:top;" headers="d141207e1608" class="stentry">BIGINT</td>
+
+
+        </tr>
+<tr class="strow">
+
+          <td style="vertical-align:top;" headers="d141207e1605" class="stentry">INT96</td>
+
+
+          <td style="vertical-align:top;" headers="d141207e1608" class="stentry">TIMESTAMP</td>
 
 
         </tr>
@@ -1656,56 +1669,56 @@ select * from t2;
 
       <table cellpadding="4" cellspacing="0" summary="" id="parquet_data_types__simpletable_az3_byn_wgb" border="1" class="simpletable"><col style="width:50%" /><col style="width:50%" /><thead><tr class="sthead">
 
-          <th style="vertical-align:bottom;text-align:left;" id="d135616e1676" class="stentry">Parquet primitive type and annotation</th>
+          <th style="vertical-align:bottom;text-align:left;" id="d141207e1691" class="stentry">Parquet primitive type and annotation</th>
 
 
-          <th style="vertical-align:bottom;text-align:left;" id="d135616e1679" class="stentry">Impala type</th>
+          <th style="vertical-align:bottom;text-align:left;" id="d141207e1694" class="stentry">Impala type</th>
 
 
         </tr>
 </thead><tbody><tr class="strow">
 
-          <td style="vertical-align:top;" headers="d135616e1676" class="stentry">BINARY annotated with the UTF8 OriginalType</td>
+          <td style="vertical-align:top;" headers="d141207e1691" class="stentry">BINARY annotated with the UTF8 OriginalType</td>
 
 
-          <td style="vertical-align:top;" headers="d135616e1679" class="stentry">STRING</td>
-
-
-        </tr>
-<tr class="strow">
-
-          <td style="vertical-align:top;" headers="d135616e1676" class="stentry">BINARY annotated with the STRING LogicalType</td>
-
-
-          <td style="vertical-align:top;" headers="d135616e1679" class="stentry">STRING</td>
+          <td style="vertical-align:top;" headers="d141207e1694" class="stentry">STRING</td>
 
 
         </tr>
 <tr class="strow">
 
-          <td style="vertical-align:top;" headers="d135616e1676" class="stentry">BINARY annotated with the  ENUM OriginalType</td>
+          <td style="vertical-align:top;" headers="d141207e1691" class="stentry">BINARY annotated with the STRING LogicalType</td>
 
 
-          <td style="vertical-align:top;" headers="d135616e1679" class="stentry">STRING</td>
-
-
-        </tr>
-<tr class="strow">
-
-          <td style="vertical-align:top;" headers="d135616e1676" class="stentry">BINARY annotated with the DECIMAL OriginalType</td>
-
-
-          <td style="vertical-align:top;" headers="d135616e1679" class="stentry">DECIMAL</td>
+          <td style="vertical-align:top;" headers="d141207e1694" class="stentry">STRING</td>
 
 
         </tr>
 <tr class="strow">
 
-          <td style="vertical-align:top;" headers="d135616e1676" class="stentry">INT64 annotated with the TIMESTAMP_MILLIS
+          <td style="vertical-align:top;" headers="d141207e1691" class="stentry">BINARY annotated with the  ENUM OriginalType</td>
+
+
+          <td style="vertical-align:top;" headers="d141207e1694" class="stentry">STRING</td>
+
+
+        </tr>
+<tr class="strow">
+
+          <td style="vertical-align:top;" headers="d141207e1691" class="stentry">BINARY annotated with the DECIMAL OriginalType</td>
+
+
+          <td style="vertical-align:top;" headers="d141207e1694" class="stentry">DECIMAL</td>
+
+
+        </tr>
+<tr class="strow">
+
+          <td style="vertical-align:top;" headers="d141207e1691" class="stentry">INT64 annotated with the TIMESTAMP_MILLIS
             OriginalType</td>
 
 
-          <td style="vertical-align:top;" headers="d135616e1679" class="stentry">TIMESTAMP (in <span class="keyword">Impala 3.2</span> or
+          <td style="vertical-align:top;" headers="d141207e1694" class="stentry">TIMESTAMP (in <span class="keyword">Impala 3.2</span> or
               higher)<p class="p">
               or
             </p>
@@ -1715,11 +1728,11 @@ BIGINT (for backward compatibility)</td>
         </tr>
 <tr class="strow">
 
-          <td style="vertical-align:top;" headers="d135616e1676" class="stentry">INT64 annotated with the TIMESTAMP_MICROS
+          <td style="vertical-align:top;" headers="d141207e1691" class="stentry">INT64 annotated with the TIMESTAMP_MICROS
             OriginalType</td>
 
 
-          <td style="vertical-align:top;" headers="d135616e1679" class="stentry">TIMESTAMP (in <span class="keyword">Impala 3.2</span> or
+          <td style="vertical-align:top;" headers="d141207e1694" class="stentry">TIMESTAMP (in <span class="keyword">Impala 3.2</span> or
               higher)<p class="p">
               or
             </p>
@@ -1729,10 +1742,10 @@ BIGINT (for backward compatibility)</td>
         </tr>
 <tr class="strow">
 
-          <td style="vertical-align:top;" headers="d135616e1676" class="stentry">INT64 annotated with the  TIMESTAMP LogicalType</td>
+          <td style="vertical-align:top;" headers="d141207e1691" class="stentry">INT64 annotated with the  TIMESTAMP LogicalType</td>
 
 
-          <td style="vertical-align:top;" headers="d135616e1679" class="stentry">TIMESTAMP (in <span class="keyword">Impala 3.2</span> or
+          <td style="vertical-align:top;" headers="d141207e1694" class="stentry">TIMESTAMP (in <span class="keyword">Impala 3.2</span> or
               higher)<p class="p">
               or
             </p>

@@ -11,8 +11,8 @@
 <meta name="DC.Relation" scheme="URI" content="../topics/impala_langref_sql.html" />
 <meta name="prodname" content="Impala" />
 <meta name="prodname" content="Impala" />
-<meta name="version" content="Impala 3.2.x" />
-<meta name="version" content="Impala 3.2.x" />
+<meta name="version" content="Impala 3.3.x" />
+<meta name="version" content="Impala 3.3.x" />
 <meta name="DC.Format" content="XHTML" />
 <meta name="DC.Identifier" content="alter_view" />
 <link rel="stylesheet" type="text/css" href="../commonltr.css" />
@@ -122,10 +122,11 @@ ALTER VIEW db1.v1 RENAME TO db2.v1; -- Move the view to a difference database wi
 
 
     <p class="p">
-        If you connect to different Impala nodes within an <span class="keyword cmdname">impala-shell</span> session for
-        load-balancing purposes, you can enable the <code class="ph codeph">SYNC_DDL</code> query option to make each DDL
-        statement wait before returning, until the new or changed metadata has been received by all the Impala
-        nodes. See <a class="xref" href="../shared/../topics/impala_sync_ddl.html#sync_ddl">SYNC_DDL Query Option</a> for details.
+        If you connect to different Impala nodes within an <span class="keyword cmdname">impala-shell</span>
+        session for load-balancing purposes, you can enable the <code class="ph codeph">SYNC_DDL</code> query
+        option to make each DDL statement wait before returning, until the new or changed
+        metadata has been received by all the Impala nodes. See
+        <a class="xref" href="../shared/../topics/impala_sync_ddl.html#sync_ddl">SYNC_DDL Query Option</a> for details.
       </p>
 
 
@@ -135,9 +136,10 @@ ALTER VIEW db1.v1 RENAME TO db2.v1; -- Move the view to a difference database wi
 
 
     <p class="p">
-        If these statements in your environment contain sensitive literal values such as credit card numbers or tax
-        identifiers, Impala can redact this sensitive information when displaying the statements in log files and
-        other administrative contexts. See <span class="xref">the documentation for your Apache Hadoop distribution</span> for details.
+        If these statements in your environment contain sensitive literal values such as credit
+        card numbers or tax identifiers, Impala can redact this sensitive information when
+        displaying the statements in log files and other administrative contexts. See
+        <span class="xref">the documentation for your Apache Hadoop distribution</span> for details.
       </p>
 
 

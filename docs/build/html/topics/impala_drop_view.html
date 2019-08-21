@@ -11,8 +11,8 @@
 <meta name="DC.Relation" scheme="URI" content="../topics/impala_langref_sql.html" />
 <meta name="prodname" content="Impala" />
 <meta name="prodname" content="Impala" />
-<meta name="version" content="Impala 3.2.x" />
-<meta name="version" content="Impala 3.2.x" />
+<meta name="version" content="Impala 3.3.x" />
+<meta name="version" content="Impala 3.3.x" />
 <meta name="DC.Format" content="XHTML" />
 <meta name="DC.Identifier" content="drop_view" />
 <link rel="stylesheet" type="text/css" href="../commonltr.css" />
@@ -66,10 +66,11 @@
 
 
     <div class="p">
-        The following example creates a series of views and then drops them. These examples illustrate how views
-        are associated with a particular database, and both the view definitions and the view names for
-        <code class="ph codeph">CREATE VIEW</code> and <code class="ph codeph">DROP VIEW</code> can refer to a view in the current database or
-        a fully qualified view name.
+        The following example creates a series of views and then drops them. These examples
+        illustrate how views are associated with a particular database, and both the view
+        definitions and the view names for <code class="ph codeph">CREATE VIEW</code> and <code class="ph codeph">DROP
+        VIEW</code> can refer to a view in the current database or a fully qualified view
+        name.
 <pre class="pre codeblock"><code>
 -- Create and drop a view in the current database.
 CREATE VIEW few_rows_from_t1 AS SELECT * FROM t1 LIMIT 10;

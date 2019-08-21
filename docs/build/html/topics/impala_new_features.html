@@ -11,8 +11,8 @@
 <meta name="DC.Relation" scheme="URI" content="../topics/impala_release_notes.html" />
 <meta name="prodname" content="Impala" />
 <meta name="prodname" content="Impala" />
-<meta name="version" content="Impala 3.2.x" />
-<meta name="version" content="Impala 3.2.x" />
+<meta name="version" content="Impala 3.3.x" />
+<meta name="version" content="Impala 3.3.x" />
 <meta name="DC.Format" content="XHTML" />
 <meta name="DC.Identifier" content="new_features" />
 <link rel="stylesheet" type="text/css" href="../commonltr.css" />
@@ -24,7 +24,7 @@
   <h1 class="title topictitle1" id="ariaid-title1"><span class="ph">New Features in Apache Impala</span></h1>
 
 
-  
+
 
   <div class="body conbody">
 
@@ -38,13 +38,281 @@
 
   </div>
 
-
   <div class="related-links">
 <div class="familylinks">
 <div class="parentlink"><strong>Parent topic:</strong> <a class="link" href="../topics/impala_release_notes.html">Impala Release Notes</a></div>
 </div>
-</div><div class="topic concept nested1" aria-labelledby="ariaid-title2" id="new_features_32">
-    <h2 class="title topictitle2" id="ariaid-title2">New Features in <span class="keyword">Impala 3.2</span></h2>
+</div><div class="topic concept nested1" aria-labelledby="ariaid-title2" id="new_features_33">
+    <h2 class="title topictitle2" id="ariaid-title2">New Features in <span class="keyword">Impala 3.3</span></h2>
+
+    <div class="body conbody">
+      <p class="p"> The following sections describe the noteworthy improvements made in
+          <span class="keyword">Impala 3.3</span>. </p>
+
+      <p class="p"> For the full list of issues closed in this release, see the <a class="xref" href="https://impala.apache.org/docs/changelog-3.3.html" target="_blank">changelog for <span class="keyword">Impala 3.3</span></a>. </p>
+
+      <div class="section" id="new_features_33__section_ezf_tnq_s3b"><h3 class="title sectiontitle">Increased Compatibility with Apache Projects</h3>
+
+        <div class="p">Impala is integrate with the following components:<ul class="ul">
+            <li dir="ltr" class="li">
+              <p dir="ltr" class="p">Apache Ranger: Use Apache Ranger to manage
+                authorization in Impala. See <a class="xref" href="https://impala.apache.org/docs/build/html/topics/impala_authorization.html" target="_blank"><u class="ph u">Impala
+                  Authorization</u></a> for details.</p>
+
+            </li>
+
+            <li dir="ltr" class="li">
+              <p dir="ltr" class="p">Apache Atlas: Use Apache Atlas to manage data
+                governance in Impala.</p>
+
+            </li>
+
+            <li dir="ltr" class="li">
+              <p dir="ltr" class="p">Hive 3</p>
+
+            </li>
+
+          </ul>
+</div>
+
+      </div>
+
+      <div class="section" id="new_features_33__section_ys5_k4n_t3b"><h3 class="title sectiontitle">Parquet Page Index </h3>
+
+        <p class="p">To improve performance when using Parquet files, Impala can now write
+          page indexes in Parquet files and use those indexes to skip pages for
+          the faster scan.</p>
+
+        <p class="p">See <a class="xref" href="impala_parquet.html#parquet_performance">Query Performance for Impala Parquet Tables</a> for
+          details.</p>
+
+      </div>
+
+      <div class="section" id="new_features_33__section_zs5_k4n_t3b"><h3 class="title sectiontitle">The Remote File Handle Cache Supports S3</h3>
+
+        <p class="p">Impala can now cache remote HDFS file handles when the tables that
+          store their data in Amazon S3 cloud storage.</p>
+
+        <p class="p">See <a class="xref" href="impala_scalability.html#scalability_file_handle_cache">Scalability Considerations for File Handle Caching</a> for the information on remote file handle cache.</p>
+
+      </div>
+
+      <div class="section" id="new_features_33__section_jls_hxj_s3b"><h3 class="title sectiontitle">Support for Kudu Integrated with Hive Metastore</h3>
+
+        <p class="p">In Impala 3.3 and Kudu 1.10, Kudu is integrated with Hive Metastore
+          (HMS), and from Impala, you can create, update, delete, and query the
+          tables in the Kudu services integrated with HMS.</p>
+
+        <p class="p">See <a class="xref" href="https://impala.apache.org/docs/build/html/topics/impala_kudu.html" target="_blank">Using Kudu with Impala</a> for
+          information on using Kudu tables in Impala.</p>
+
+      </div>
+
+      <div class="section" id="new_features_33__section_dp4_mxj_s3b"><h3 class="title sectiontitle">Zstd Compression for Parquet files</h3>
+
+        <p class="p">Zstandard (Zstd) is a real-time compression algorithm offering a
+          tradeoff between speed and ratio of compression. Compression levels
+          from 1 up to 22 are supported. The lower the level, the faster the
+          speed at the cost of compression ratio.</p>
+
+      </div>
+
+      <div class="section" id="new_features_33__section_parquet_lz4_notes"><h3 class="title sectiontitle">Lz4 Compression for Parquet files</h3>
+
+        <p class="p">Lz4 is a lossless compression algorithm providing extremely fast
+            and scalable compression and decompression.</p>
+
+      </div>
+
+      <div class="section" id="new_features_33__section_drv_nxj_s3b"><h3 class="title sectiontitle">Data Cache for Remote Reads</h3>
+
+        <p class="p">To improve performance on multi-cluster HDFS environments as well as
+          on object store environments, Impala now caches data for non-local
+          reads (e.g. S3, ABFS, ADLS) on local storage.</p>
+
+        <p class="p">The data cache is enabled with the <code class="ph codeph">--data_cache
+            startup</code> flag.</p>
+
+        <p class="p">See <a class="xref" href="https://impala.apache.org/docs/build/html/topics/impala_data_cache.html" target="_blank">Impala Remote Data Cache</a> for
+          the information and steps to enable remote data cache.</p>
+
+      </div>
+
+      <div class="section" id="new_features_33__section_xp4_b1f_t3b"><h3 class="title sectiontitle">Metadata Performance Improvements </h3>
+
+        <p class="p">The following features to improve metadata performance are enabled by
+          default in this release:</p>
+
+        <ul class="ul">
+          <li class="li">
+            <p class="p">Incremental stats are now compressed in memory in
+                <code class="ph codeph">catalogd</code>, reducing memory footprint in
+                <code class="ph codeph">catalogd</code>.</p>
+
+          </li>
+
+          <li class="li">
+            <p class="p"><code class="ph codeph">impalad</code>coordinators fetch incremental stats from
+                <code class="ph codeph">catalogd</code> on-demand, reducing the memory
+              footprint and the network requirements for broadcasting
+              metadata.</p>
+
+          </li>
+
+          <li class="li">
+            <p class="p">Time-based and memory-based automatic invalidation of metadata to
+              keep the size of metadata bounded and to reduce the chances of
+                <code class="ph codeph">catalogd</code>cache running out of memory.</p>
+
+          </li>
+
+          <li class="li">
+            <p class="p">Automatic invalidation of metadata</p>
+
+            <p class="p">With automatic metadata management enabled, you no longer have to
+              issue <code class="ph codeph">INVALIDATE</code> / <code class="ph codeph">REFRESH</code> in a
+              number of conditions.</p>
+
+            <p class="p">In Impala 3.3, the following additional event in Hive Metastore
+              can trigger automatic INVALIDATE / REFRESH of Metadata:</p>
+
+            <ul class="ul">
+              <li class="li">
+                <p class="p">INSERT into tables and partitions from Impala or from Spark
+                  on the same or multiple cluster configuration</p>
+
+              </li>
+
+            </ul>
+
+          </li>
+
+        </ul>
+
+        <p class="p">See <a class="xref" href="impala_metadata.html#impala_metadata">Metadata Management</a> for the
+          information on the above features.</p>
+
+      </div>
+
+      <div class="section" id="new_features_33__section_ztf_c4q_s3b"><h3 class="title sectiontitle">Scalable Pool Configuration in Admission Controller</h3>
+
+        <p class="p">To offer more dynamic and flexible resource management, Impala
+          supports the new configuration parameters that scale with the number
+          of hosts in the resource pool. You can use the parameters to control
+          the number of running queries, queued queries, and maximum amount of
+          memory allocated for Impala resource pools. See <a class="xref" href="impala_admission.html#admission_control">Admission Control and Query Queuing</a> for the information
+          about the new parameters and using them for admission control.</p>
+
+      </div>
+
+      <div class="section" id="new_features_33__section_b55_gxj_s3b"><h3 class="title sectiontitle">Query Profile</h3>
+
+        <p class="p">The following information was added to the Query Profile output for
+          better monitoring and troubleshooting of query performance.</p>
+
+        <ul class="ul">
+          <li class="li">
+            <p class="p">Network I/O throughput</p>
+
+          </li>
+
+          <li class="li">
+            <p class="p">System disk I/O throughput</p>
+
+          </li>
+
+        </ul>
+
+        <p class="p">See <a class="xref" href="https://impala.apache.org/docs/build/html/topics/impala_explain_plan.html" target="_blank">Impala Query Profile</a> for
+          generating and reading query profile.</p>
+
+      </div>
+
+      <div class="section" id="new_features_33__section_lbh_kzj_s3b"><h3 class="title sectiontitle">DATE Data Type and Functions</h3>
+
+        <p class="p">You can use the new the DATE type to describe a particular
+          year/month/day, in the form YYYY-­MM-­DD.</p>
+
+        <p class="p">This initial DATE type support the TEXT, Parquet, and HBASE file
+          formats.</p>
+
+        <p class="p">The support of DATE data type includes the following features:</p>
+
+        <ul class="ul">
+          <li class="li"><code class="ph codeph">DATE</code> type column as a partitioning key
+            column</li>
+
+          <li class="li"><code class="ph codeph">DATE</code> literal</li>
+
+          <li class="li">Implicit casting between <code class="ph codeph">DATE</code> and other types:
+              <code class="ph codeph">STRING</code> and <code class="ph codeph">TIMESTAMP</code></li>
+
+          <li class="li">Most of the built-in functions for <code class="ph codeph">TIMESTAMP</code> now
+            allow the <code class="ph codeph">DATE</code> type arguments, as well.</li>
+
+        </ul>
+
+        <p class="p">See <a class="xref" href="impala_date.html#date">DATE Data Type</a> and <a class="xref" href="impala_datetime_functions.html#datetime_functions">Impala Date and Time Functions</a> for using
+          the DATE type.</p>
+
+      </div>
+
+      <div class="section" id="new_features_33__section_wpm_zzj_s3b"><h3 class="title sectiontitle">Support Hive Insert-Only Transactional Tables</h3>
+
+        <p class="p">Impala added the support to create, drop, query, and insert into the
+          insert-only type of transactional tables. </p>
+
+      </div>
+
+      <div class="section">
+        <p class="p">See <a class="xref" href="https://impala.apache.org/docs/build/html/topics/impala_transactions.html" target="_blank">Impala Transactions</a> for
+          details.</p>
+
+      </div>
+
+      <div class="section" id="new_features_33__section_ab2_41k_s3b"><h3 class="title sectiontitle">HiveServer2 HTTP Connection for Clients</h3>
+
+        <p class="p">Now client applications can connect to Impala over HTTP via
+          HiveServer2 with the option to use the Kerberos SPNEGO and LDAP for
+          authentication. See <a class="xref" href="https://impala.apache.org/docs/build/html/topics/impala_client.html" target="_blank">Impala Clients</a> for
+          details.</p>
+
+      </div>
+
+      <div class="section" id="new_features_33__section_xxt_44q_s3b"><h3 class="title sectiontitle">Default File Format Changed to Parquet</h3>
+
+        <p class="p">When you create a table, the default format for that table data is
+          now Parquet.</p>
+
+        <p class="p">For backward compatibility, you can use the DEFAULT_FILE_FORMAT query
+          option to set the default file format to the previous default, text,
+          or other formats.</p>
+
+      </div>
+
+      <div class="section" id="new_features_33__section_m1h_mnf_t3b"><h3 class="title sectiontitle">Built-in Function to Process JSON Objects</h3>
+
+        <p class="p">The <code class="ph codeph">GET_JSON_OBJECT()</code> function extracts JSON object
+          from a string based on the path specified and returns the extracted
+          JSON object.</p>
+
+        <p class="p">See <a class="xref" href="impala_misc_functions.html#misc_functions">Impala
+            Miscellaneous Functions</a>. for details.</p>
+
+      </div>
+
+      <div class="section" id="new_features_33__section_acs_wck_s3b"><h3 class="title sectiontitle">Ubuntu 18.04</h3>
+
+        <p class="p">This version of Impala is certified to run on Ubuntu 18.04.</p>
+
+      </div>
+
+    </div>
+
+  </div>
+
+  <div class="topic concept nested1" aria-labelledby="ariaid-title3" id="new_features_32">
+    <h2 class="title topictitle2" id="ariaid-title3">New Features in <span class="keyword">Impala 3.2</span></h2>
 
     <div class="body conbody">
       <p class="p"> The following sections describe the noteworthy improvements made in
@@ -54,8 +322,8 @@
 
     </div>
 
-    <div class="topic concept nested2" aria-labelledby="ariaid-title3" id="rn_32_multi_cluster">
-      <h3 class="title topictitle3" id="ariaid-title3">Multi-cluster Support</h3>
+    <div class="topic concept nested2" aria-labelledby="ariaid-title4" id="rn_32_multi_cluster">
+      <h3 class="title topictitle3" id="ariaid-title4">Multi-cluster Support</h3>
 
       <div class="body conbody">
         <ul class="ul">
@@ -75,8 +343,8 @@
 
     </div>
 
-    <div class="topic concept nested2" aria-labelledby="ariaid-title4" id="rn_32_ac">
-      <h3 class="title topictitle3" id="ariaid-title4">Enhancements in Resource Management and Admission Control</h3>
+    <div class="topic concept nested2" aria-labelledby="ariaid-title5" id="rn_32_ac">
+      <h3 class="title topictitle3" id="ariaid-title5">Enhancements in Resource Management and Admission Control</h3>
 
       <div class="body conbody">
         <ul class="ul">
@@ -118,8 +386,8 @@
 
     </div>
 
-    <div class="topic concept nested2" aria-labelledby="ariaid-title5" id="rn_32_metadata">
-      <h3 class="title topictitle3" id="ariaid-title5">Metadata Performance Improvements</h3>
+    <div class="topic concept nested2" aria-labelledby="ariaid-title6" id="rn_32_metadata">
+      <h3 class="title topictitle3" id="ariaid-title6">Metadata Performance Improvements</h3>
 
       <div class="body conbody">
         <ul class="ul">
@@ -141,8 +409,8 @@
 
     </div>
 
-    <div class="topic concept nested2" aria-labelledby="ariaid-title6" id="rn_32_usability">
-      <h3 class="title topictitle3" id="ariaid-title6">Compatibility and Usability Enhancements</h3>
+    <div class="topic concept nested2" aria-labelledby="ariaid-title7" id="rn_32_usability">
+      <h3 class="title topictitle3" id="ariaid-title7">Compatibility and Usability Enhancements</h3>
 
       <div class="body conbody">
         <ul class="ul">
@@ -206,8 +474,8 @@
 
     </div>
 
-    <div class="topic concept nested2" aria-labelledby="ariaid-title7" id="rn_32_security">
-      <h3 class="title topictitle3" id="ariaid-title7"><strong class="ph b" id="docs-internal-guid-e1c558d3-7fff-4d4e-0ec1-e40f60c9b64a"><strong class="ph b">Security Enhancement</strong></strong></h3>
+    <div class="topic concept nested2" aria-labelledby="ariaid-title8" id="rn_32_security">
+      <h3 class="title topictitle3" id="ariaid-title8"><strong class="ph b" id="docs-internal-guid-e1c558d3-7fff-4d4e-0ec1-e40f60c9b64a"><strong class="ph b">Security Enhancement</strong></strong></h3>
 
       <div class="body conbody">
         <ul class="ul">
@@ -223,8 +491,8 @@
   </div>
 
 
-  <div class="topic concept nested1" aria-labelledby="ariaid-title8" id="new_features_31">
-    <h2 class="title topictitle2" id="ariaid-title8">New Features in <span class="keyword">Impala 3.1</span></h2>
+  <div class="topic concept nested1" aria-labelledby="ariaid-title9" id="new_features_31">
+    <h2 class="title topictitle2" id="ariaid-title9">New Features in <span class="keyword">Impala 3.1</span></h2>
 
     <div class="body conbody">
       <p class="p"> For the full list of issues closed in this release, including the
@@ -237,8 +505,8 @@
 
 
 
-  <div class="topic concept nested1" aria-labelledby="ariaid-title9" id="new_features_300">
-    <h2 class="title topictitle2" id="ariaid-title9">New Features in <span class="keyword">Impala 3.0</span></h2>
+  <div class="topic concept nested1" aria-labelledby="ariaid-title10" id="new_features_300">
+    <h2 class="title topictitle2" id="ariaid-title10">New Features in <span class="keyword">Impala 3.0</span></h2>
 
     <div class="body conbody">
       <p class="p">
@@ -254,9 +522,9 @@
 
 
 
-  <div class="topic concept nested1" aria-labelledby="ariaid-title10" id="new_features_2120">
+  <div class="topic concept nested1" aria-labelledby="ariaid-title11" id="new_features_2120">
 
-    <h2 class="title topictitle2" id="ariaid-title10">New Features in <span class="keyword">Impala 2.12</span></h2>
+    <h2 class="title topictitle2" id="ariaid-title11">New Features in <span class="keyword">Impala 2.12</span></h2>
 
 
     <div class="body conbody">
@@ -275,9 +543,9 @@
 
 
 
-  <div class="topic concept nested1" aria-labelledby="ariaid-title11" id="new_features_2110">
+  <div class="topic concept nested1" aria-labelledby="ariaid-title12" id="new_features_2110">
 
-    <h2 class="title topictitle2" id="ariaid-title11">New Features in <span class="keyword">Impala 2.11</span></h2>
+    <h2 class="title topictitle2" id="ariaid-title12">New Features in <span class="keyword">Impala 2.11</span></h2>
 
 
     <div class="body conbody">
@@ -296,9 +564,9 @@
 
 
 
-  <div class="topic concept nested1" aria-labelledby="ariaid-title12" id="new_features_2100">
+  <div class="topic concept nested1" aria-labelledby="ariaid-title13" id="new_features_2100">
 
-    <h2 class="title topictitle2" id="ariaid-title12">New Features in <span class="keyword">Impala 2.10</span></h2>
+    <h2 class="title topictitle2" id="ariaid-title13">New Features in <span class="keyword">Impala 2.10</span></h2>
 
 
     <div class="body conbody">
@@ -317,9 +585,9 @@
 
 
 
-  <div class="topic concept nested1" aria-labelledby="ariaid-title13" id="new_features_290">
+  <div class="topic concept nested1" aria-labelledby="ariaid-title14" id="new_features_290">
 
-    <h2 class="title topictitle2" id="ariaid-title13">New Features in <span class="keyword">Impala 2.9</span></h2>
+    <h2 class="title topictitle2" id="ariaid-title14">New Features in <span class="keyword">Impala 2.9</span></h2>
 
 
     <div class="body conbody">
@@ -368,9 +636,9 @@
 
 
 
-  <div class="topic concept nested1" aria-labelledby="ariaid-title14" id="new_features_280">
+  <div class="topic concept nested1" aria-labelledby="ariaid-title15" id="new_features_280">
 
-    <h2 class="title topictitle2" id="ariaid-title14">New Features in <span class="keyword">Impala 2.8</span></h2>
+    <h2 class="title topictitle2" id="ariaid-title15">New Features in <span class="keyword">Impala 2.8</span></h2>
 
 
     <div class="body conbody">
@@ -834,9 +1102,9 @@
 
 
 
-  <div class="topic concept nested1" aria-labelledby="ariaid-title15" id="new_features_270">
+  <div class="topic concept nested1" aria-labelledby="ariaid-title16" id="new_features_270">
 
-    <h2 class="title topictitle2" id="ariaid-title15">New Features in <span class="keyword">Impala 2.7</span></h2>
+    <h2 class="title topictitle2" id="ariaid-title16">New Features in <span class="keyword">Impala 2.7</span></h2>
 
 
     <div class="body conbody">
@@ -867,7 +1135,7 @@
 
             </li>
 
-            
+
             <li class="li">
               <p class="p">
                 [<a class="xref" href="https://issues.apache.org/jira/browse/IMPALA-2979" target="_blank">IMPALA-2979</a>]
@@ -882,7 +1150,7 @@
 
         </li>
 
-        
+
         <li class="li">
           <p class="p">
             [<a class="xref" href="https://issues.apache.org/jira/browse/IMPALA-1683" target="_blank">IMPALA-1683</a>]
@@ -987,9 +1255,9 @@
 
 
 
-  <div class="topic concept nested1" aria-labelledby="ariaid-title16" id="new_features_260">
+  <div class="topic concept nested1" aria-labelledby="ariaid-title17" id="new_features_260">
 
-    <h2 class="title topictitle2" id="ariaid-title16">New Features in <span class="keyword">Impala 2.6</span></h2>
+    <h2 class="title topictitle2" id="ariaid-title17">New Features in <span class="keyword">Impala 2.6</span></h2>
 
 
     <div class="body conbody">
@@ -1093,7 +1361,7 @@
             general information about the runtime filtering feature.
         </li>
 
-        
+
         <li class="li">
           <p class="p">
             Admission control and dynamic resource pools are enabled by default.
@@ -1103,7 +1371,7 @@
 
         </li>
 
-        
+
         <li class="li">
           <p class="p">
             Impala can now manually set column statistics,
@@ -1343,7 +1611,7 @@
 
         </li>
 
-        
+
         <li class="li">
           <p class="p">
             Impala optionally skips an arbitrary number of header lines from text input
@@ -1386,9 +1654,9 @@
 
 
 
-  <div class="topic concept nested1" aria-labelledby="ariaid-title17" id="new_features_250">
+  <div class="topic concept nested1" aria-labelledby="ariaid-title18" id="new_features_250">
 
-    <h2 class="title topictitle2" id="ariaid-title17">New Features in <span class="keyword">Impala 2.5</span></h2>
+    <h2 class="title topictitle2" id="ariaid-title18">New Features in <span class="keyword">Impala 2.5</span></h2>
 
 
     <div class="body conbody">
@@ -1473,7 +1741,7 @@
             when enabling HDFS caching for a table or partition, to cache the same
             data blocks across multiple hosts.)
             The new query option <code class="ph codeph">SCHEDULE_RANDOM_REPLICA</code>
-            
+
             lets you fine-tune the interaction with HDFS caching even more.
             <span class="ph">See <a class="xref" href="impala_perf_hdfs_caching.html#hdfs_caching">Using HDFS Caching with Impala (Impala 2.1 or higher only)</a> for details.</span>
           </p>
@@ -1551,7 +1819,7 @@
         </li>
 
 
-        
+
         <li class="li">
           <p class="p">
             Performance improvements for queries involving nested complex types.
@@ -1810,7 +2078,7 @@
         </li>
 
         <li class="li">
-          
+
           <p class="p">
             Reliability enhancements for memory management. Some aggregation and join queries
             that formerly might have failed with an out-of-memory error due to memory contention,
@@ -1820,7 +2088,7 @@
         </li>
 
         <li class="li">
-          
+
           <p class="p">
             The <code class="ph codeph">SHOW DATABASES</code> statement now returns two columns rather than one.
             The second column includes the associated comment string, if any, for each database.
@@ -1844,7 +2112,7 @@
 
         </li>
 
-        
+
         <li class="li">
           <p class="p">
             The <code class="ph codeph">DESCRIBE</code> statement can now display metadata about a database, using the
@@ -1875,9 +2143,9 @@
 
 
 
-  <div class="topic concept nested1" aria-labelledby="ariaid-title18" id="new_features_240">
+  <div class="topic concept nested1" aria-labelledby="ariaid-title19" id="new_features_240">
 
-    <h2 class="title topictitle2" id="ariaid-title18">New Features in <span class="keyword">Impala 2.4</span></h2>
+    <h2 class="title topictitle2" id="ariaid-title19">New Features in <span class="keyword">Impala 2.4</span></h2>
 
 
     <div class="body conbody">
@@ -1903,9 +2171,9 @@
 
 
 
-  <div class="topic concept nested1" aria-labelledby="ariaid-title19" id="new_features_230">
+  <div class="topic concept nested1" aria-labelledby="ariaid-title20" id="new_features_230">
 
-    <h2 class="title topictitle2" id="ariaid-title19">New Features in <span class="keyword">Impala 2.3</span></h2>
+    <h2 class="title topictitle2" id="ariaid-title20">New Features in <span class="keyword">Impala 2.3</span></h2>
 
 
     <div class="body conbody">
@@ -2369,9 +2637,9 @@
 
 
 
-  <div class="topic concept nested1" aria-labelledby="ariaid-title20" id="new_features_220">
+  <div class="topic concept nested1" aria-labelledby="ariaid-title21" id="new_features_220">
 
-    <h2 class="title topictitle2" id="ariaid-title20">New Features in <span class="keyword">Impala 2.8</span></h2>
+    <h2 class="title topictitle2" id="ariaid-title21">New Features in <span class="keyword">Impala 2.8</span></h2>
 
 
     <div class="body conbody">
@@ -2445,18 +2713,19 @@
 
 
             <li class="li">
-              <p class="p"> In Impala 2.2.0 and higher, built-in functions
-        that accept or return integers representing <code class="ph codeph">TIMESTAMP</code>
-        values use the <code class="ph codeph">BIGINT</code> type for parameters and return
-        values, rather than <code class="ph codeph">INT</code>. This change lets the date and
-        time functions avoid an overflow error that would otherwise occur on
-        January 19th, 2038 (known as the <a class="xref" href="http://en.wikipedia.org/wiki/Year_2038_problem" target="_blank"><span class="q">"Year 2038 problem"</span> or <span class="q">"Y2K38
-        problem"</span></a>). This change affects the
-          <code class="ph codeph">FROM_UNIXTIME()</code> and <code class="ph codeph">UNIX_TIMESTAMP()</code>
-        functions. You might need to change application code that interacts with
-        these functions, change the types of columns that store the return
-        values, or add <code class="ph codeph">CAST()</code> calls to SQL statements that call
-        these functions. </p>
+              <p class="p">
+        In Impala 2.2.0 and higher, built-in functions that accept or return integers
+        representing <code class="ph codeph">TIMESTAMP</code> values use the <code class="ph codeph">BIGINT</code> type for
+        parameters and return values, rather than <code class="ph codeph">INT</code>. This change lets the
+        date and time functions avoid an overflow error that would otherwise occur on January
+        19th, 2038 (known as the
+        <a class="xref" href="http://en.wikipedia.org/wiki/Year_2038_problem" target="_blank"><span class="q">"Year
+        2038 problem"</span> or <span class="q">"Y2K38 problem"</span></a>). This change affects the
+        <code class="ph codeph">FROM_UNIXTIME()</code> and <code class="ph codeph">UNIX_TIMESTAMP()</code> functions. You
+        might need to change application code that interacts with these functions, change the
+        types of columns that store the return values, or add <code class="ph codeph">CAST()</code> calls to
+        SQL statements that call these functions.
+      </p>
 
 
               <p class="p">
@@ -2549,8 +2818,8 @@
 
           <div class="note important"><span class="importanttitle">Important:</span>
         <p class="p">
-          Impala query support for Amazon S3 is included in <span class="keyword">Impala 2.2</span>, but is
-          not supported or recommended for production use in this version.
+          Impala query support for Amazon S3 is included in <span class="keyword">Impala 2.2</span>,
+          but is not supported or recommended for production use in this version.
         </p>
 
       </div>
@@ -2559,7 +2828,7 @@
 
 
         <li class="li">
-        
+
           <p class="p">
             Improved support for HDFS encryption. The <code class="ph codeph">LOAD DATA</code> statement now works when the
             source directory and destination table are in different encryption zones. See
@@ -2606,10 +2875,10 @@
 
 
           <p class="p">
-        The prerequisite for CPU architecture has been relaxed in Impala 2.2.0 and higher. From this release
-        onward, Impala works on CPUs that have the SSSE3 instruction set. The SSE4 instruction set is no longer
-        required. This relaxed requirement simplifies the upgrade planning from Impala 1.x releases, which also
-        worked on SSSE3-enabled processors.
+        The prerequisite for CPU architecture has been relaxed in Impala 2.2.0 and higher. From
+        this release onward, Impala works on CPUs that have the SSSE3 instruction set. The SSE4
+        instruction set is no longer required. This relaxed requirement simplifies the upgrade
+        planning from Impala 1.x releases, which also worked on SSSE3-enabled processors.
       </p>
 
         </li>
@@ -2669,9 +2938,9 @@
 
 
 
-  <div class="topic concept nested1" aria-labelledby="ariaid-title21" id="new_features_210">
+  <div class="topic concept nested1" aria-labelledby="ariaid-title22" id="new_features_210">
 
-    <h2 class="title topictitle2" id="ariaid-title21">New Features in <span class="keyword">Impala 2.1</span></h2>
+    <h2 class="title topictitle2" id="ariaid-title22">New Features in <span class="keyword">Impala 2.1</span></h2>
 
 
     <div class="body conbody">
@@ -2738,9 +3007,9 @@
 
 
 
-  <div class="topic concept nested1" aria-labelledby="ariaid-title22" id="new_features_200">
+  <div class="topic concept nested1" aria-labelledby="ariaid-title23" id="new_features_200">
 
-    <h2 class="title topictitle2" id="ariaid-title22">New Features in <span class="keyword">Impala 2.0</span></h2>
+    <h2 class="title topictitle2" id="ariaid-title23">New Features in <span class="keyword">Impala 2.0</span></h2>
 
 
     <div class="body conbody">
@@ -2855,7 +3124,7 @@
             </li>
 
 
-            
+
           </ul>
 
         </li>
@@ -3067,7 +3336,7 @@
         </li>
 
 
-        
+
 
         <li class="li">
           <p class="p">
@@ -3091,7 +3360,7 @@
         </li>
 
 
-        
+
 
         <li class="li">
           <p class="p">
@@ -3115,9 +3384,9 @@
   </div>
 
 
-  <div class="topic concept nested1" aria-labelledby="ariaid-title23" id="new_features_140">
+  <div class="topic concept nested1" aria-labelledby="ariaid-title24" id="new_features_140">
 
-    <h2 class="title topictitle2" id="ariaid-title23">New Features in <span class="keyword">Impala 1.4</span></h2>
+    <h2 class="title topictitle2" id="ariaid-title24">New Features in <span class="keyword">Impala 1.4</span></h2>
 
 
     <div class="body conbody">
@@ -3298,7 +3567,7 @@
         </li>
 
 
-        
+
 
         <li class="li">
           <p class="p">
@@ -3351,7 +3620,7 @@
           <ul class="ul">
 
 
-            
+
 
             <li class="li">
               The <code class="ph codeph">NDV</code> function is speeded up through native code generation.
@@ -3415,9 +3684,9 @@
   </div>
 
 
-  <div class="topic concept nested1" aria-labelledby="ariaid-title24" id="new_features_132">
+  <div class="topic concept nested1" aria-labelledby="ariaid-title25" id="new_features_132">
 
-    <h2 class="title topictitle2" id="ariaid-title24">New Features in <span class="keyword">Impala 1.3.2</span></h2>
+    <h2 class="title topictitle2" id="ariaid-title25">New Features in <span class="keyword">Impala 1.3.2</span></h2>
 
 
     <div class="body conbody">
@@ -3434,9 +3703,9 @@
   </div>
 
 
-  <div class="topic concept nested1" aria-labelledby="ariaid-title25" id="new_features_131">
+  <div class="topic concept nested1" aria-labelledby="ariaid-title26" id="new_features_131">
 
-    <h2 class="title topictitle2" id="ariaid-title25">New Features in Impala 1.3.1</h2>
+    <h2 class="title topictitle2" id="ariaid-title26">New Features in Impala 1.3.1</h2>
 
 
     <div class="body conbody">
@@ -3481,13 +3750,15 @@
 
         <li class="li">
           <p class="p">
-        In Impala 1.3.1 and higher, the <code class="ph codeph">REGEXP</code> and <code class="ph codeph">RLIKE</code> operators now match a
-        regular expression string that occurs anywhere inside the target string, the same as if the regular
-        expression was enclosed on each side by <code class="ph codeph">.*</code>. See
-        <a class="xref" href="../shared/../topics/impala_operators.html#regexp">REGEXP Operator</a> for examples. Previously, these operators only
-        succeeded when the regular expression matched the entire target string. This change improves compatibility
-        with the regular expression support for popular database systems. There is no change to the behavior of the
-        <code class="ph codeph">regexp_extract()</code> and <code class="ph codeph">regexp_replace()</code> built-in functions.
+        In Impala 1.3.1 and higher, the <code class="ph codeph">REGEXP</code> and <code class="ph codeph">RLIKE</code>
+        operators now match a regular expression string that occurs anywhere inside the target
+        string, the same as if the regular expression was enclosed on each side by
+        <code class="ph codeph">.*</code>. See <a class="xref" href="../shared/../topics/impala_operators.html#regexp">REGEXP Operator</a> for
+        examples. Previously, these operators only succeeded when the regular expression matched
+        the entire target string. This change improves compatibility with the regular expression
+        support for popular database systems. There is no change to the behavior of the
+        <code class="ph codeph">regexp_extract()</code> and <code class="ph codeph">regexp_replace()</code> built-in
+        functions.
       </p>
 
         </li>
@@ -3501,9 +3772,9 @@
   </div>
 
 
-  <div class="topic concept nested1" aria-labelledby="ariaid-title26" id="new_features_130">
+  <div class="topic concept nested1" aria-labelledby="ariaid-title27" id="new_features_130">
 
-    <h2 class="title topictitle2" id="ariaid-title26">New Features in <span class="keyword">Impala 1.3</span></h2>
+    <h2 class="title topictitle2" id="ariaid-title27">New Features in <span class="keyword">Impala 1.3</span></h2>
 
 
     <div class="body conbody">
@@ -3656,9 +3927,9 @@
   </div>
 
 
-  <div class="topic concept nested1" aria-labelledby="ariaid-title27" id="new_features_124">
+  <div class="topic concept nested1" aria-labelledby="ariaid-title28" id="new_features_124">
 
-    <h2 class="title topictitle2" id="ariaid-title27">New Features in Impala 1.2.4</h2>
+    <h2 class="title topictitle2" id="ariaid-title28">New Features in Impala 1.2.4</h2>
 
 
     <div class="body conbody">
@@ -3748,9 +4019,9 @@
   </div>
 
 
-  <div class="topic concept nested1" aria-labelledby="ariaid-title28" id="new_features_123">
+  <div class="topic concept nested1" aria-labelledby="ariaid-title29" id="new_features_123">
 
-    <h2 class="title topictitle2" id="ariaid-title28">New Features in Impala 1.2.3</h2>
+    <h2 class="title topictitle2" id="ariaid-title29">New Features in Impala 1.2.3</h2>
 
 
     <div class="body conbody">
@@ -3769,9 +4040,9 @@
   </div>
 
 
-  <div class="topic concept nested1" aria-labelledby="ariaid-title29" id="new_features_122">
+  <div class="topic concept nested1" aria-labelledby="ariaid-title30" id="new_features_122">
 
-    <h2 class="title topictitle2" id="ariaid-title29">New Features in Impala 1.2.2</h2>
+    <h2 class="title topictitle2" id="ariaid-title30">New Features in Impala 1.2.2</h2>
 
 
     <div class="body conbody">
@@ -3929,9 +4200,9 @@
   </div>
 
 
-  <div class="topic concept nested1" aria-labelledby="ariaid-title30" id="new_features_121">
+  <div class="topic concept nested1" aria-labelledby="ariaid-title31" id="new_features_121">
 
-    <h2 class="title topictitle2" id="ariaid-title30">New Features in Impala 1.2.1</h2>
+    <h2 class="title topictitle2" id="ariaid-title31">New Features in Impala 1.2.1</h2>
 
 
     <div class="body conbody">
@@ -4118,7 +4389,7 @@
           <p class="p">
             Delegation support lets you authorize certain OS users associated with applications (for example,
             <code class="ph codeph">hue</code>), to submit requests using the credentials of other users.
-            See <a class="xref" href="impala_delegation.html#delegation">Configuring Impala Delegation for Hue and BI Tools</a> for details.
+            See <a class="xref" href="impala_delegation.html#delegation">Configuring Impala Delegation for Clients</a> for details.
           </p>
 
         </li>
@@ -4164,9 +4435,9 @@
   </div>
 
 
-  <div class="topic concept nested1" aria-labelledby="ariaid-title31" id="new_features_120">
+  <div class="topic concept nested1" aria-labelledby="ariaid-title32" id="new_features_120">
 
-    <h2 class="title topictitle2" id="ariaid-title31">New Features in Impala 1.2.0 (Beta)</h2>
+    <h2 class="title topictitle2" id="ariaid-title32">New Features in Impala 1.2.0 (Beta)</h2>
 
 
     <div class="body conbody">
@@ -4341,7 +4612,7 @@
           <p class="p">
             Delegation support lets you authorize certain OS users associated with applications (for example,
             <code class="ph codeph">hue</code>), to submit requests using the credentials of other users.
-            See <a class="xref" href="impala_delegation.html#delegation">Configuring Impala Delegation for Hue and BI Tools</a> for details.
+            See <a class="xref" href="impala_delegation.html#delegation">Configuring Impala Delegation for Clients</a> for details.
           </p>
 
         </li>
@@ -4368,9 +4639,9 @@
   </div>
 
 
-  <div class="topic concept nested1" aria-labelledby="ariaid-title32" id="new_features_111">
+  <div class="topic concept nested1" aria-labelledby="ariaid-title33" id="new_features_111">
 
-    <h2 class="title topictitle2" id="ariaid-title32">New Features in Impala 1.1.1</h2>
+    <h2 class="title topictitle2" id="ariaid-title33">New Features in Impala 1.1.1</h2>
 
 
     <div class="body conbody">
@@ -4418,9 +4689,9 @@
   </div>
 
 
-  <div class="topic concept nested1" aria-labelledby="ariaid-title33" id="new_features_11">
+  <div class="topic concept nested1" aria-labelledby="ariaid-title34" id="new_features_11">
 
-    <h2 class="title topictitle2" id="ariaid-title33">New Features in Impala 1.1</h2>
+    <h2 class="title topictitle2" id="ariaid-title34">New Features in Impala 1.1</h2>
 
 
     <div class="body conbody">
@@ -4576,9 +4847,9 @@
   </div>
 
 
-  <div class="topic concept nested1" aria-labelledby="ariaid-title34" id="new_features_101">
+  <div class="topic concept nested1" aria-labelledby="ariaid-title35" id="new_features_101">
 
-    <h2 class="title topictitle2" id="ariaid-title34">New Features in Impala 1.0.1</h2>
+    <h2 class="title topictitle2" id="ariaid-title35">New Features in Impala 1.0.1</h2>
 
 
     <div class="body conbody">
@@ -4621,9 +4892,9 @@
   </div>
 
 
-  <div class="topic concept nested1" aria-labelledby="ariaid-title35" id="new_features_10">
+  <div class="topic concept nested1" aria-labelledby="ariaid-title36" id="new_features_10">
 
-    <h2 class="title topictitle2" id="ariaid-title35">New Features in Impala 1.0</h2>
+    <h2 class="title topictitle2" id="ariaid-title36">New Features in Impala 1.0</h2>
 
 
     <div class="body conbody">
@@ -4667,9 +4938,9 @@
   </div>
 
 
-  <div class="topic concept nested1" aria-labelledby="ariaid-title36" id="new_features_07">
+  <div class="topic concept nested1" aria-labelledby="ariaid-title37" id="new_features_07">
 
-    <h2 class="title topictitle2" id="ariaid-title36">New Features in Version 0.7 of the Impala Beta Release</h2>
+    <h2 class="title topictitle2" id="ariaid-title37">New Features in Version 0.7 of the Impala Beta Release</h2>
 
 
     <div class="body conbody">
@@ -4736,9 +5007,9 @@
   </div>
 
 
-  <div class="topic concept nested1" aria-labelledby="ariaid-title37" id="new_features_06">
+  <div class="topic concept nested1" aria-labelledby="ariaid-title38" id="new_features_06">
 
-    <h2 class="title topictitle2" id="ariaid-title37">New Features in Version 0.6 of the Impala Beta Release</h2>
+    <h2 class="title topictitle2" id="ariaid-title38">New Features in Version 0.6 of the Impala Beta Release</h2>
 
 
     <div class="body conbody">
@@ -4785,9 +5056,9 @@
   </div>
 
 
-  <div class="topic concept nested1" aria-labelledby="ariaid-title38" id="new_features_05">
+  <div class="topic concept nested1" aria-labelledby="ariaid-title39" id="new_features_05">
 
-    <h2 class="title topictitle2" id="ariaid-title38">New Features in Version 0.5 of the Impala Beta Release</h2>
+    <h2 class="title topictitle2" id="ariaid-title39">New Features in Version 0.5 of the Impala Beta Release</h2>
 
 
     <div class="body conbody">
@@ -4814,9 +5085,9 @@
   </div>
 
 
-  <div class="topic concept nested1" aria-labelledby="ariaid-title39" id="new_features_04">
+  <div class="topic concept nested1" aria-labelledby="ariaid-title40" id="new_features_04">
 
-    <h2 class="title topictitle2" id="ariaid-title39">New Features in Version 0.4 of the Impala Beta Release</h2>
+    <h2 class="title topictitle2" id="ariaid-title40">New Features in Version 0.4 of the Impala Beta Release</h2>
 
 
     <div class="body conbody">
@@ -4854,9 +5125,9 @@
   </div>
 
 
-  <div class="topic concept nested1" aria-labelledby="ariaid-title40" id="new_features_03">
+  <div class="topic concept nested1" aria-labelledby="ariaid-title41" id="new_features_03">
 
-    <h2 class="title topictitle2" id="ariaid-title40">New Features in Version 0.3 of the Impala Beta Release</h2>
+    <h2 class="title topictitle2" id="ariaid-title41">New Features in Version 0.3 of the Impala Beta Release</h2>
 
 
     <div class="body conbody">
@@ -4886,9 +5157,9 @@
   </div>
 
 
-  <div class="topic concept nested1" aria-labelledby="ariaid-title41" id="new_features_02">
+  <div class="topic concept nested1" aria-labelledby="ariaid-title42" id="new_features_02">
 
-    <h2 class="title topictitle2" id="ariaid-title41">New Features in Version 0.2 of the Impala Beta Release</h2>
+    <h2 class="title topictitle2" id="ariaid-title42">New Features in Version 0.2 of the Impala Beta Release</h2>
 
 
     <div class="body conbody">

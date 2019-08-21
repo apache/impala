@@ -10,7 +10,7 @@
 <meta name="DC.Title" content="Metadata Management" />
 <meta name="DC.Relation" scheme="URI" content="../topics/impala_scalability.html" />
 <meta name="prodname" content="Impala" />
-<meta name="version" content="Impala 3.2.x" />
+<meta name="version" content="Impala 3.3.x" />
 <meta name="DC.Format" content="XHTML" />
 <meta name="DC.Identifier" content="impala_metadata" />
 <link rel="stylesheet" type="text/css" href="../commonltr.css" />
@@ -22,7 +22,7 @@
   <h1 class="title topictitle1" id="ariaid-title1">Metadata Management</h1>
 
 
-
+  
 
   <div class="body conbody">
 
@@ -42,51 +42,116 @@
 <div class="familylinks">
 <div class="parentlink"><strong>Parent topic:</strong> <a class="link" href="../topics/impala_scalability.html">Scalability Considerations for Impala</a></div>
 </div>
-</div><div class="topic concept nested1" aria-labelledby="ariaid-title2" id="auto_invalidate_metadata">
+</div><div class="topic concept nested1" aria-labelledby="ariaid-title2" id="on_demand_metadata">
 
-    <h2 class="title topictitle2" id="ariaid-title2">Startup Options for Automatic Invalidation of Metadata</h2>
+    <h2 class="title topictitle2" id="ariaid-title2">On-demand Metadata</h2>
 
 
     <div class="body conbody">
 
       <p class="p">
-        To keep the size of metadata bounded, <code class="ph codeph">catalogd</code> periodically scans all
-        the tables and invalidates those not recently used. There are two types of
-        configurations in <code class="ph codeph">catalogd</code>.
+        In previous versions of Impala, every coordinator kept a replica of all the cache in
+        <code class="ph codeph">catalogd</code>, consuming large memory on each coordinator with no option to
+        evict. Metadata always propagated through the <code class="ph codeph">statestored</code> and suffers
+        from head-of-line blocking, for example, one user loading a big table blocking another
+        user loading a small table.
       </p>
-
-
-      <ul class="ul">
-        <li class="li">
-          Time-based invalidation with the <code class="ph codeph">‑‑invalidate_tables_timeout_s</code>
-          flag: <code class="ph codeph">Catalogd</code> invalidates tables that are not recently used in the
-          specified time period (in seconds). This flag needs to be applied to both
-          <code class="ph codeph">impalad</code> and <code class="ph codeph">catalogd</code>.
-        </li>
-
-
-        <li class="li">
-          Memory-based invalidation with the
-          <code class="ph codeph">‑‑invalidate_tables_on_memory_pressure</code> flag: When the memory
-          pressure reaches 60% of JVM heap size after a Java garbage collection in
-          <code class="ph codeph">catalogd</code>, Impala invalidates 10% of the least recently used tables.
-          This flag needs to be applied to both <code class="ph codeph">impalad</code> and
-          <code class="ph codeph">catalogd</code>.
-        </li>
-
-      </ul>
 
 
       <p class="p">
-        Automatic invalidation of metadata provides more stability with lower chances of running
-        out of memory, but the feature could potentially cause performance issues and may
-        require tuning.
+        With this new feature, the coordinators pull metadata as needed from
+        <code class="ph codeph">catalogd</code> and cache it locally. The cached metadata gets evicted
+        automatically under memory pressure.
       </p>
 
 
-      <div class="note note"><span class="notetitle">Note:</span>
-        This is a preview feature in Impala 3.1 and not generally available.
+      <p class="p">
+        The granularity of on-demand metadata fetches is now at the partition level between the
+        coordinator and <code class="ph codeph">catalogd</code>. Common use cases like add/drop partitions do
+        not trigger unnecessary serialization/deserialization of large metadata.
+      </p>
+
+
+      <p class="p">
+        This feature is disabled by default.
+      </p>
+
+
+      <div class="p">
+        The feature can be used in either of the following modes.
+        <dl class="dl">
+          
+
+            <dt class="dt dlterm">
+              Metadata on-demand mode
+            </dt>
+
+
+            <dd class="dd">
+              In this mode, all coordinators use the metadata on-demand.
+            </dd>
+
+
+            <dd class="dd ddexpand">
+              Set the following on <code class="ph codeph">catalogd</code>:
+<pre class="pre codeblock"><code>--catalog_topic_mode=minimal</code></pre>
+            </dd>
+
+
+            <dd class="dd ddexpand">
+              Set the following on all <code class="ph codeph">impalad</code> coordinators:
+<pre class="pre codeblock"><code>--use_local_catalog=true</code></pre>
+            </dd>
+
+
+          
+
+          
+
+            <dt class="dt dlterm">
+              Mixed mode
+            </dt>
+
+
+            <dd class="dd">
+              In this mode, only some coordinators are enabled to use the metadata on-demand.
+            </dd>
+
+
+            <dd class="dd ddexpand">
+              We recommend that you use the mixed mode only for testing local catalog’s impact
+              on heap usage.
+            </dd>
+
+
+            <dd class="dd ddexpand">
+              Set the following on <code class="ph codeph">catalogd</code>:
+<pre class="pre codeblock"><code>--catalog_topic_mode=mixed</code></pre>
+            </dd>
+
+
+            <dd class="dd ddexpand">
+              Set the following on <code class="ph codeph">impalad</code> coordinators with metdadata
+              on-demand:
+<pre class="pre codeblock"><code>--use_local_catalog=true </code></pre>
+            </dd>
+
+
+          
+        </dl>
+
       </div>
+
+
+      <p class="p">
+        <strong class="ph b">Limitation:</strong>
+      </p>
+
+
+      <p class="p">
+        Global <code class="ph codeph">INVALIDATES</code> are not supported when this feature is enabled. If
+        your workload requires global <code class="ph codeph">INVALIDATES</code>, do not use this feature.
+      </p>
 
 
     </div>
@@ -95,42 +160,70 @@
   </div>
 
 
-  <div class="topic concept nested1" aria-labelledby="ariaid-title3" id="pull_incremental_statistics">
+  <div class="topic concept nested1" aria-labelledby="ariaid-title3" id="auto_invalidate_metadata">
 
-    <h2 class="title topictitle2" id="ariaid-title3">Loading Incremental Statistics from Catalog Server</h2>
+    <h2 class="title topictitle2" id="ariaid-title3">Automatic Invalidation of Metadata Cache</h2>
 
 
     <div class="body conbody">
 
       <p class="p">
-        Starting in Impala 3.1, a new configuration setting,
-        <code class="ph codeph">‑‑pull_incremental_statistics</code>, was added and set to
-        <code class="ph codeph">true</code> by default. When you start Impala <code class="ph codeph">catalogd</code> and
-        <code class="ph codeph">impalad</code> coordinators with this setting enabled:
+        To keep the size of metadata bounded, <code class="ph codeph">catalogd</code> periodically scans all
+        the tables and invalidates those not recently used. There are two types of
+        configurations for <code class="ph codeph">catalogd</code> and <code class="ph codeph">impalad</code>.
       </p>
 
 
-      <ul class="ul">
-        <li class="li">
-          Newly created incremental stats will be smaller in size thus reducing memory pressure
-          on the <code class="ph codeph">catalogd</code> daemon. Your users can keep more tables and
-          partitions in the same catalog and have lower chances of crashing
-          <code class="ph codeph">catalogd</code> due to out-of-memory issues.
-        </li>
+      <dl class="dl">
+        
+
+          <dt class="dt dlterm">
+            Time-based cache invalidation
+          </dt>
 
 
-        <li class="li">
-          Incremental stats will not be replicated to <code class="ph codeph">impalad</code> and will be
-          accessed on demand from <code class="ph codeph">catalogd</code>, resulting in a reduced memory
-          footprint of <code class="ph codeph">impalad</code>.
-        </li>
+          <dd class="dd">
+            <code class="ph codeph">Catalogd</code> invalidates tables that are not recently used in the
+            specified time period (in seconds).
+          </dd>
 
-      </ul>
+
+          <dd class="dd ddexpand">
+            The <code class="ph codeph">‑‑invalidate_tables_timeout_s</code> flag needs to be
+            applied to both <code class="ph codeph">impalad</code> and <code class="ph codeph">catalogd</code>.
+          </dd>
+
+
+        
+
+        
+
+          <dt class="dt dlterm">
+            Memory-based cache invalidation
+          </dt>
+
+
+          <dd class="dd">
+            When the memory pressure reaches 60% of JVM heap size after a Java garbage
+            collection in <code class="ph codeph">catalogd</code>, Impala invalidates 10% of the least
+            recently used tables.
+          </dd>
+
+
+          <dd class="dd ddexpand">
+            The <code class="ph codeph">‑‑invalidate_tables_on_memory_pressure</code> flag needs
+            to be applied to both <code class="ph codeph">impalad</code> and <code class="ph codeph">catalogd</code>.
+          </dd>
+
+
+        
+      </dl>
 
 
       <p class="p">
-        We do not recommend you change the default setting of
-        <code class="ph codeph">‑‑pull_incremental_statistics</code>.
+        Automatic invalidation of metadata provides more stability with lower chances of running
+        out of memory, but the feature could potentially cause performance issues and may
+        require tuning.
       </p>
 
 
@@ -142,28 +235,42 @@
 
   <div class="topic concept nested1" aria-labelledby="ariaid-title4" id="auto_poll_hms_notification">
 
-    <h2 class="title topictitle2" id="ariaid-title4">Automatic Metadata Sync using Hive Metastore Notification Events</h2>
+    <h2 class="title topictitle2" id="ariaid-title4">Automatic Invalidation/Refresh of Metadata</h2>
 
 
     <div class="body conbody">
 
       <p class="p">
-        When this feature is enabled, <code class="ph codeph">catalogd</code> polls Hive Metastore (HMS)
-        notifications events at a configurable interval and processes the following changes:
+        When tools such as Hive and Spark are used to process the raw data ingested into Hive
+        tables, new HMS metadata (database, tables, partitions) and filesystem metadata (new
+        files in existing partitions/tables) is generated. In previous versions of Impala, in
+        order to pick up this new information, Impala users needed to manually issue an
+        <code class="ph codeph">INVALIDATE</code> or <code class="ph codeph">REFRESH</code> commands.
       </p>
 
 
-      <div class="note note"><span class="notetitle">Note:</span>
-        This is a preview feature in <span class="keyword">Impala 3.2</span> and not generally
+      <p class="p">
+        When automatic invalidate/refresh of metadata is enabled, <code class="ph codeph">catalogd</code>
+        polls Hive Metastore (HMS) notification events at a configurable interval and processes
+        the following changes:
+      </p>
+
+
+      <div class="note note"><span class="notetitle">Note:</span> 
+        This is a preview feature in <span class="keyword">Impala 3.3</span> and not generally
         available.
       </div>
 
 
       <ul class="ul">
         <li class="li">
-          Invalidates the tables when it receives the <code class="ph codeph">ALTER TABLE</code> events or the
-          <code class="ph codeph">ALTER</code>, <code class="ph codeph">ADD</code>, or <code class="ph codeph">DROP</code> their
-          partitions.
+          Invalidates the tables when it receives the <code class="ph codeph">ALTER TABLE</code> event.
+        </li>
+
+
+        <li class="li">
+          Refreshes the partition when it receives the <code class="ph codeph">ALTER</code>,
+          <code class="ph codeph">ADD</code>, or <code class="ph codeph">DROP</code> partitions.
         </li>
 
 
@@ -178,15 +285,62 @@
           TABLE</code> or <code class="ph codeph">DROP DATABASE</code> events.
         </li>
 
+
+        <li class="li">
+          Refreshes the table and partitions when it receives the <code class="ph codeph">INSERT</code>
+          events.
+          <p class="p">
+            If the table is not loaded at the time of processing the <code class="ph codeph">INSERT</code>
+            event, the event processor does not need to refresh the table and skips it.
+          </p>
+
+        </li>
+
+
+        <li class="li">
+          Changes the database and updates <code class="ph codeph">catalogd</code> when it receives the
+          <code class="ph codeph">ALTER DATABASE</code> events. The following changes are supported. This
+          event does not invalidate the tables in the database.
+          <ul class="ul">
+            <li class="li">
+              Change the database properties
+            </li>
+
+
+            <li class="li">
+              Change the comment on the database
+            </li>
+
+
+            <li class="li">
+              Change the owner of the database
+            </li>
+
+
+            <li class="li">
+              Change the default location of the database
+              <p class="p">
+                Changing the default location of the database does not move the tables of that
+                database to the new location. Only the new tables which are created subsequently
+                use the default location of the database in case it is not provided in the
+                create table statement.
+              </p>
+
+            </li>
+
+          </ul>
+
+        </li>
+
       </ul>
 
 
       <p class="p">
-        This feature is controlled by the <code class="ph codeph">‑‑hms_event_polling_interval_s</code>
-        flag. Start the <code class="ph codeph">catalogd</code> with the
-        <code class="ph codeph">‑‑hms_event_polling_interval_s</code> flag set to a non-zero value to
-        enable the feature and set the polling frequency in seconds. We recommend the value to
-        be less than 5 seconds.
+        This feature is controlled by the
+        <code class="ph codeph">‑‑hms_event_polling_interval_s</code> flag. Start the
+        <code class="ph codeph">catalogd</code> with the <code class="ph codeph">‑‑hms_event_polling_interval_s</code>
+        flag set to a positive integer to enable the feature and set the polling frequency in
+        seconds. We recommend the value to be less than 5 seconds.
       </p>
 
 
@@ -197,23 +351,23 @@
 
       <ul class="ul">
         <li class="li">
-          The operations that do not generate events in HMS, such as adding new data to existing
-          tables/partitions from Spark, are not supported.
-        </li>
-
-
-        <li class="li">
-          Adding data from one Impala cluster to existing tables/partitions will not synced to
-          another Impala cluster.
+          When you bypass HMS and add or remove data into table by adding files directly on the
+          filesystem, HMS does not generate the <code class="ph codeph">INSERT</code> event, and the event
+          processor will not invalidate the corresponding table or refresh the corresponding
+          partition.
           <p class="p">
-            Only new tables and partitions are synced.
+            It is recommended that you use the <code class="ph codeph">LOAD DATA</code> command to do the data
+            load in such cases, so that event processor can act on the events generated by the
+            <code class="ph codeph">LOAD</code> command.
           </p>
 
         </li>
 
 
         <li class="li">
-          The <code class="ph codeph">ALTER DATABASE</code> events are not supported and currently ignored.
+          The Spark API that saves data to a specified location does not generate events in HMS,
+          thus is not supported. For example:
+<pre class="pre codeblock"><code>Seq((1, 2)).toDF("i", "j").write.save("/user/hive/warehouse/spark_etl.db/customers/date=01012019")</code></pre>
         </li>
 
       </ul>
@@ -221,7 +375,8 @@
 
       <p class="p">
         This feature is turned off by default with the
-        <code class="ph codeph">‑‑hms_event_polling_interval_s</code> flag set to <code class="ph codeph">0</code>.
+        <code class="ph codeph">‑‑hms_event_polling_interval_s</code> flag set to
+        <code class="ph codeph">0</code>.
       </p>
 
 
@@ -236,19 +391,51 @@
       <div class="body conbody">
 
         <p class="p">
-          As the first step to use the HMS event based metadata sync, add the following entry to
-          the <code class="ph codeph">hive-site.xml</code> of Hive metastore service.
+          To use the HMS event based metadata sync:
         </p>
 
 
+        <ol class="ol">
+          <li class="li">
+            Add the following entries to the <code class="ph codeph">hive-site.xml</code> of the Hive
+            Metastore service.
 <pre class="pre codeblock"><code> &lt;property&gt;
     &lt;name&gt;hive.metastore.transactional.event.listeners&lt;/name&gt;
     &lt;value&gt;org.apache.hive.hcatalog.listener.DbNotificationListener&lt;/value&gt;
-  &lt;/property&gt;</code></pre>
 
-        <p class="p">
-          Save <code class="ph codeph">hive-site.xml</code> and restart Hive.
-        </p>
+    &lt;name&gt;hive.metastore.dml.events&lt;/name&gt;
+    &lt;value&gt;true&lt;/true&gt;
+  &lt;/property&gt;</code></pre>
+          </li>
+
+
+          <li class="li">
+            Save <code class="ph codeph">hive-site.xml</code>.
+          </li>
+
+
+          <li class="li">
+            Set the <code class="ph codeph">hive.metastore.dml.events</code> configuration key to
+            <code class="ph codeph">true</code> in HiveServer2 service's <code class="ph codeph">hive-site.xml</code>. This
+            configuration key needs to be set to <code class="ph codeph">true</code> in both Hive services,
+            HiveServer2 and Hive Metastore.
+          </li>
+
+
+          <li class="li">
+            If applicable, set the <code class="ph codeph">hive.metastore.dml.events</code> configuration key
+            to <code class="ph codeph">true</code> in <code class="ph codeph">hive-site.xml</code> used by the Spark
+            applications (typically, <code class="ph codeph">/etc/hive/conf/hive-site.xml</code>) so that the
+            <code class="ph codeph">INSERT</code> events are generated when the Spark application inserts data
+            into existing tables and partitions.
+          </li>
+
+
+          <li class="li">
+            Restart the HiveServer2, Hive Metastore, and Spark (if applicable) services.
+          </li>
+
+        </ol>
 
 
       </div>
@@ -350,19 +537,13 @@
       <h3 class="title topictitle3" id="ariaid-title7">Metrics for Event Based Automatic Metadata Sync</h3>
 
 
+
+
       <div class="body conbody">
 
         <p class="p">
           You can use the web UI of the <code class="ph codeph">catalogd</code> to check the state of the
           automatic invalidate event processor.
-        </p>
-
-
-        <p class="p">
-          By default, the debug web UI of <code class="ph codeph">catalogd</code> is at
-          <code class="ph codeph">http://<var class="keyword varname">impala-server-hostname</var>:25020</code> (non-secure
-          cluster) or <code class="ph codeph">https://<var class="keyword varname">impala-server-hostname</var>:25020</code>
-          (secure cluster).
         </p>
 
 
@@ -406,14 +587,14 @@
           </p>
 
 
-
+          
 <div class="tablenoborder"><table cellpadding="4" cellspacing="0" summary="" id="concept_gch_xzm_1hb__events-tbl" class="table" frame="border" border="1" rules="all"><colgroup><col style="width:27.932960893854748%" /><col style="width:72.06703910614524%" /></colgroup><thead class="thead" style="text-align:left;">
                 <tr class="row">
-                  <th class="entry nocellnorowborder" style="vertical-align:top;" id="d116733e470">
+                  <th class="entry nocellnorowborder" style="vertical-align:top;" id="d121288e628">
                     Name
                   </th>
 
-                  <th class="entry cell-norowborder" style="vertical-align:top;" id="d116733e473">
+                  <th class="entry cell-norowborder" style="vertical-align:top;" id="d121288e631">
                     Description
                   </th>
 
@@ -422,44 +603,44 @@
               </thead>
 <tbody class="tbody">
                 <tr class="row">
-                  <td class="entry nocellnorowborder" style="vertical-align:top;" headers="d116733e470 ">
+                  <td class="entry nocellnorowborder" style="vertical-align:top;" headers="d121288e628 ">
                     events-processor.avg-events-fetch-duration
                   </td>
 
-                  <td class="entry cell-norowborder" style="vertical-align:top;" headers="d116733e473 ">
+                  <td class="entry cell-norowborder" style="vertical-align:top;" headers="d121288e631 ">
                     Average duration to fetch a batch of events and process it.
                   </td>
 
                 </tr>
 
                 <tr class="row">
-                  <td class="entry nocellnorowborder" style="vertical-align:top;" headers="d116733e470 ">
+                  <td class="entry nocellnorowborder" style="vertical-align:top;" headers="d121288e628 ">
                     events-processor.avg-events-process-duration
                   </td>
 
-                  <td class="entry cell-norowborder" style="vertical-align:top;" headers="d116733e473 ">
-                    Average time taken to process a batch of events received from metastore.
+                  <td class="entry cell-norowborder" style="vertical-align:top;" headers="d121288e631 ">
+                    Average time taken to process a batch of events received from the Metastore.
                   </td>
 
                 </tr>
 
                 <tr class="row">
-                  <td class="entry nocellnorowborder" style="vertical-align:top;" headers="d116733e470 ">
+                  <td class="entry nocellnorowborder" style="vertical-align:top;" headers="d121288e628 ">
                     events-processor.events-received
                   </td>
 
-                  <td class="entry cell-norowborder" style="vertical-align:top;" headers="d116733e473 ">
-                    Total number of metastore events received.
+                  <td class="entry cell-norowborder" style="vertical-align:top;" headers="d121288e631 ">
+                    Total number of the Metastore events received.
                   </td>
 
                 </tr>
 
                 <tr class="row">
-                  <td class="entry nocellnorowborder" style="vertical-align:top;" headers="d116733e470 ">
+                  <td class="entry nocellnorowborder" style="vertical-align:top;" headers="d121288e628 ">
                     events-processor.events-received-15min-rate
                   </td>
 
-                  <td class="entry cell-norowborder" style="vertical-align:top;" headers="d116733e473 ">
+                  <td class="entry cell-norowborder" style="vertical-align:top;" headers="d121288e631 ">
                     Exponentially weighted moving average (EWMA) of number of events received in
                     last 15 min.
 
@@ -473,11 +654,11 @@
                 </tr>
 
                 <tr class="row">
-                  <td class="entry nocellnorowborder" style="vertical-align:top;" headers="d116733e470 ">
+                  <td class="entry nocellnorowborder" style="vertical-align:top;" headers="d121288e628 ">
                     events-processor.events-received-1min-rate
                   </td>
 
-                  <td class="entry cell-norowborder" style="vertical-align:top;" headers="d116733e473 ">
+                  <td class="entry cell-norowborder" style="vertical-align:top;" headers="d121288e631 ">
                     Exponentially weighted moving average (EWMA) of number of events received in
                     last 1 min.
 
@@ -491,11 +672,11 @@
                 </tr>
 
                 <tr class="row">
-                  <td class="entry nocellnorowborder" style="vertical-align:top;" headers="d116733e470 ">
+                  <td class="entry nocellnorowborder" style="vertical-align:top;" headers="d121288e628 ">
                     events-processor.events-received-5min-rate
                   </td>
 
-                  <td class="entry cell-norowborder" style="vertical-align:top;" headers="d116733e473 ">
+                  <td class="entry cell-norowborder" style="vertical-align:top;" headers="d121288e631 ">
                     Exponentially weighted moving average (EWMA) of number of events received in
                     last 5 min.
 
@@ -509,12 +690,12 @@
                 </tr>
 
                 <tr class="row">
-                  <td class="entry nocellnorowborder" style="vertical-align:top;" headers="d116733e470 ">
+                  <td class="entry nocellnorowborder" style="vertical-align:top;" headers="d121288e628 ">
                     events-processor.events-skipped
                   </td>
 
-                  <td class="entry cell-norowborder" style="vertical-align:top;" headers="d116733e473 ">
-                    Total number of metastore events skipped.
+                  <td class="entry cell-norowborder" style="vertical-align:top;" headers="d121288e631 ">
+                    Total number of the Metastore events skipped.
 
                     <div class="p">
                       Events can be skipped based on certain flags are table and database level.
@@ -540,11 +721,11 @@
                 </tr>
 
                 <tr class="row">
-                  <td class="entry row-nocellborder" style="vertical-align:top;" headers="d116733e470 ">
+                  <td class="entry row-nocellborder" style="vertical-align:top;" headers="d121288e628 ">
                     events-processor.status
                   </td>
 
-                  <td class="entry cellrowborder" style="vertical-align:top;" headers="d116733e473 ">
+                  <td class="entry cellrowborder" style="vertical-align:top;" headers="d121288e631 ">
                     Metastore event processor status to see if there are events being received
                     or not. Possible states are:
 

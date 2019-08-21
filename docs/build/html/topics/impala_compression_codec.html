@@ -11,8 +11,8 @@
 <meta name="DC.Relation" scheme="URI" content="../topics/impala_query_options.html" />
 <meta name="prodname" content="Impala" />
 <meta name="prodname" content="Impala" />
-<meta name="version" content="Impala 3.2.x" />
-<meta name="version" content="Impala 3.2.x" />
+<meta name="version" content="Impala 3.3.x" />
+<meta name="version" content="Impala 3.3.x" />
 <meta name="DC.Format" content="XHTML" />
 <meta name="DC.Identifier" content="compression_codec" />
 <link rel="stylesheet" type="text/css" href="../commonltr.css" />
@@ -39,7 +39,7 @@
     </p>
 
 
-    <div class="note note"><span class="notetitle">Note:</span>
+    <div class="note note"><span class="notetitle">Note:</span> 
       Prior to Impala 2.0, this option was named <code class="ph codeph">PARQUET_COMPRESSION_CODEC</code>. In Impala 2.0 and
       later, the <code class="ph codeph">PARQUET_COMPRESSION_CODEC</code> name is not recognized. Use the more general name
       <code class="ph codeph">COMPRESSION_CODEC</code> for new code.
@@ -51,15 +51,25 @@
       </p>
 
 
-<pre class="pre codeblock"><code>SET COMPRESSION_CODEC=<var class="keyword varname">codec_name</var>;</code></pre>
+<pre class="pre codeblock"><code>SET COMPRESSION_CODEC=<var class="keyword varname">codec_name</var>; // Supported for all codecs.
+SET COMPRESSION_CODEC=<var class="keyword varname">codec_name</var>:<var class="keyword varname">compression_level</var>; // Only supported for ZSTD.
+</code></pre>
 
     <p class="p">
       The allowed values for this query option are <code class="ph codeph">SNAPPY</code> (the default), <code class="ph codeph">GZIP</code>,
-      and <code class="ph codeph">NONE</code>.
+      <code class="ph codeph">ZSTD</code>, <code class="ph codeph">LZ4</code>, and <code class="ph codeph">NONE</code>.
     </p>
 
 
-    <div class="note note"><span class="notetitle">Note:</span>
+    <p class="p">
+      <code class="ph codeph">ZSTD</code> also supports setting a compression level. The lower the level, the faster the speed at
+      the cost of compression ratio. Compression levels from 1 up to 22 are supported for <code class="ph codeph">ZSTD</code>.
+      The default compression level 3 is used, if one is not passed using the <code class="ph codeph">compression_codec</code>
+      query option.
+    </p>
+
+
+    <div class="note note"><span class="notetitle">Note:</span> 
       A Parquet file created with <code class="ph codeph">COMPRESSION_CODEC=NONE</code> is still typically smaller than the
       original data, due to encoding schemes such as run-length encoding and dictionary encoding that are applied
       separately from compression.
@@ -97,7 +107,17 @@
       </p>
 
 
-<pre class="pre codeblock"><code>set compression_codec=gzip;
+<pre class="pre codeblock"><code>
+set compression_codec=lz4;
+insert into parquet_table_lz4_compressed select * from t1;
+
+set compression_codec=zstd; // Default compression level 3.
+insert into parquet_table_zstd_default_compressed select * from t1;
+
+set compression_codec=zstd:12; // Compression level 12.
+insert into parquet_table_zstd_highly_compressed select * from t1;
+
+set compression_codec=gzip;
 insert into parquet_table_highly_compressed select * from t1;
 
 set compression_codec=snappy;
@@ -118,7 +138,7 @@ ERROR: Invalid compression codec: foo
 
     <p class="p">
       For information about how compressing Parquet data files affects query performance, see
-      <a class="xref" href="impala_parquet.html#parquet_compression">Snappy and GZip Compression for Parquet Data Files</a>.
+      <a class="xref" href="impala_parquet.html#parquet_compression">Compressions for Parquet Data Files</a>.
     </p>
 
   </div>

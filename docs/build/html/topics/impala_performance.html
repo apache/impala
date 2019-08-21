@@ -15,13 +15,14 @@
 <meta name="DC.Relation" scheme="URI" content="../topics/impala_perf_resources.html" />
 <meta name="DC.Relation" scheme="URI" content="../topics/impala_runtime_filtering.html" />
 <meta name="DC.Relation" scheme="URI" content="../topics/impala_perf_hdfs_caching.html" />
+<meta name="DC.Relation" scheme="URI" content="../topics/impala_perf_skew.html" />
+<meta name="DC.Relation" scheme="URI" content="../topics/impala_data_cache.html" />
 <meta name="DC.Relation" scheme="URI" content="../topics/impala_perf_testing.html" />
 <meta name="DC.Relation" scheme="URI" content="../topics/impala_explain_plan.html" />
-<meta name="DC.Relation" scheme="URI" content="../topics/impala_perf_skew.html" />
 <meta name="prodname" content="Impala" />
 <meta name="prodname" content="Impala" />
-<meta name="version" content="Impala 3.2.x" />
-<meta name="version" content="Impala 3.2.x" />
+<meta name="version" content="Impala 3.3.x" />
+<meta name="version" content="Impala 3.3.x" />
 <meta name="DC.Format" content="XHTML" />
 <meta name="DC.Identifier" content="performance" />
 <link rel="stylesheet" type="text/css" href="../commonltr.css" />
@@ -54,7 +55,7 @@
     </p>
 
 
-    <div class="note note"><span class="notetitle">Note:</span>
+    <div class="note note"><span class="notetitle">Note:</span> 
       <p class="p">
         Before starting any performance tuning or benchmarking, make sure your system is configured with all the
         recommended minimum hardware requirements from <a class="xref" href="impala_prereqs.html#prereqs_hardware">Hardware Requirements</a> and
@@ -126,8 +127,9 @@
 
     <p class="p">
         A good source of tips related to scalability and performance tuning is the
-        <a class="xref" href="http://www.slideshare.net/cloudera/the-impala-cookbook-42530186" target="_blank">Impala Cookbook</a>
-        presentation. These slides are updated periodically as new features come out and new benchmarks are performed.
+        <a class="xref" href="http://www.slideshare.net/cloudera/the-impala-cookbook-42530186" target="_blank">Impala
+        Cookbook</a> presentation. These slides are updated periodically as new features come
+        out and new benchmarks are performed.
       </p>
 
 
@@ -173,11 +175,13 @@
 </li>
 <li class="link ulchildlink"><strong><a href="../topics/impala_perf_hdfs_caching.html">Using HDFS Caching with Impala (Impala 2.1 or higher only)</a></strong><br />
 </li>
+<li class="link ulchildlink"><strong><a href="../topics/impala_perf_skew.html">Detecting and Correcting HDFS Block Skew Conditions</a></strong><br />
+</li>
+<li class="link ulchildlink"><strong><a href="../topics/impala_data_cache.html">Data Cache for Remote Reads</a></strong><br />
+</li>
 <li class="link ulchildlink"><strong><a href="../topics/impala_perf_testing.html">Testing Impala Performance</a></strong><br />
 </li>
 <li class="link ulchildlink"><strong><a href="../topics/impala_explain_plan.html">Understanding Impala Query Performance - EXPLAIN Plans and Query Profiles</a></strong><br />
-</li>
-<li class="link ulchildlink"><strong><a href="../topics/impala_perf_skew.html">Detecting and Correcting HDFS Block Skew Conditions</a></strong><br />
 </li>
 </ul>
 </div></body>

@@ -11,8 +11,8 @@
 <meta name="DC.Relation" scheme="URI" content="../topics/impala_troubleshooting.html" />
 <meta name="prodname" content="Impala" />
 <meta name="prodname" content="Impala" />
-<meta name="version" content="Impala 3.2.x" />
-<meta name="version" content="Impala 3.2.x" />
+<meta name="version" content="Impala 3.3.x" />
+<meta name="version" content="Impala 3.3.x" />
 <meta name="DC.Format" content="XHTML" />
 <meta name="DC.Identifier" content="webui" />
 <link rel="stylesheet" type="text/css" href="../commonltr.css" />
@@ -23,70 +23,95 @@
 
   <h1 class="title topictitle1" id="webui__webui_title">Impala Web User Interface for Debugging</h1>
 
+
   
+
   
 
   <div class="body conbody">
 
-    <div class="p" id="webui__webui_intro">Each of the Impala daemons (<span class="keyword cmdname">impalad</span>,
-        <span class="keyword cmdname">statestored</span>, and <span class="keyword cmdname">catalogd</span>)
-      includes a built-in web server that displays diagnostic and status
-      information: <ul class="ul">
-        <li class="li">
-          <p class="p"> The <span class="keyword cmdname">impalad</span> web UI (default port: 25000)
-            includes information about configuration settings, running and
-            completed queries, and associated performance and resource usage for
-            queries. In particular, the <span class="ph uicontrol">Details</span> link for
-            each query displays alternative views of the query including a
-            graphical representation of the plan, and the output of the
-              <code class="ph codeph">EXPLAIN</code>, <code class="ph codeph">SUMMARY</code>, and
-              <code class="ph codeph">PROFILE</code> statements from
-              <span class="keyword cmdname">impala-shell</span>. Each host that runs the
-              <span class="keyword cmdname">impalad</span> daemon has its own instance of the web
-            UI, with details about those queries for which that host served as
-            the coordinator. The <span class="keyword cmdname">impalad</span> web UI is mainly for
-            diagnosing query problems that can be traced to a particular node.
+    <p class="p" id="webui__webui_intro">
+      Each of the Impala daemons (<span class="keyword cmdname">impalad</span>, <span class="keyword cmdname">statestored</span>,
+      and <span class="keyword cmdname">catalogd</span>) includes a built-in web server that displays diagnostic
+      and status information.
+    </p>
+
+
+    <dl class="dl">
+      
+
+        <dt class="dt dlterm">
+          impalad Web UI
+        </dt>
+
+
+        <dd class="dd">
+          <p class="p">
+            The <span class="keyword cmdname">impalad</span> Web UI includes information about configuration
+            settings, running and completed queries, and associated performance and resource
+            usage for queries. In particular, the <span class="ph uicontrol">Details</span> link for each
+            query displays alternative views of the query including a graphical representation
+            of the plan, and the output of the <code class="ph codeph">EXPLAIN</code>,
+            <code class="ph codeph">SUMMARY</code>, and <code class="ph codeph">PROFILE</code> statements from
+            <span class="keyword cmdname">impala-shell</span>. Each host that runs the <span class="keyword cmdname">impalad</span>
+            daemon has its own instance of the Web UI, with details about those queries for
+            which that host served as the coordinator. The <span class="keyword cmdname">impalad</span> Web UI is
+            primarily used for diagnosing query problems that can be traced to a particular
+            node.
           </p>
 
-        </li>
-
-        <li class="li">
-          <p class="p"> The <span class="keyword cmdname">statestored</span> web UI (default port: 25010)
-            includes information about memory usage, configuration settings, and
-            ongoing health checks performed by this daemon. Because there is
-            only a single instance of this daemon within any cluster, you view
-            the web UI only on the particular host that serves as the Impala
-            StateStore. </p>
-
-        </li>
-
-        <li class="li">
-          <p class="p"> The <span class="keyword cmdname">catalogd</span> web UI (default port: 25020)
-            includes information about the databases, tables, and other objects
-            managed by Impala, in addition to the resource usage and
-            configuration settings of the daemon itself. The catalog information
-            is represented as the underlying Thrift data structures. Because
-            there is only a single instance of this daemon within any cluster,
-            you view the web UI only on the particular host that serves as the
-            Impala Catalog Server. </p>
-
-        </li>
-
-      </ul>
-
-    </div>
+        </dd>
 
 
-    <div class="note note"><span class="notetitle">Note:</span>
-      <p class="p">
-        The web user interface is primarily for problem diagnosis and troubleshooting. The items listed and their
-        formats are subject to change.
-      </p>
+      
 
-    </div>
+      
+
+        <dt class="dt dlterm">
+          statestored Web UI
+        </dt>
+
+
+        <dd class="dd">
+          <p class="p">
+            The <span class="keyword cmdname">statestored</span> Web UI includes information about memory usage,
+            configuration settings, and ongoing health checks performed by
+            <code class="ph codeph">statestored</code>. Because there is only a single instance of the
+            <code class="ph codeph">statestored</code> within any Impala cluster, you access the Web UI only
+            on the particular host that serves as the Impala StateStore.
+          </p>
+
+        </dd>
+
+
+      
+
+      
+
+        <dt class="dt dlterm">
+          catalogd Web UI
+        </dt>
+
+
+        <dd class="dd">
+          <p class="p">
+            The <span class="keyword cmdname">catalogd</span> Web UI includes information about the databases,
+            tables, and other objects managed by Impala, in addition to the resource usage and
+            configuration settings of the <code class="ph codeph">catalogd</code>. Because there is only a
+            single instance of the <code class="ph codeph">catalogd</code> within any Impala cluster, you
+            access the Web UI only on the particular host that serves as the Impala Catalog
+            Server.
+          </p>
+
+        </dd>
+
+
+      
+    </dl>
 
 
     <p class="p toc inpage"></p>
+
 
   </div>
 
@@ -95,384 +120,1354 @@
 <div class="familylinks">
 <div class="parentlink"><strong>Parent topic:</strong> <a class="link" href="../topics/impala_troubleshooting.html">Troubleshooting Impala</a></div>
 </div>
-</div><div class="topic concept nested1" aria-labelledby="ariaid-title2" id="webui_impalad">
+</div><div class="topic concept nested1" aria-labelledby="ariaid-title2" id="concept_xfx_r1t_43b">
 
-    <h2 class="title topictitle2" id="ariaid-title2">Debug Web UI for impalad</h2>
+    <h2 class="title topictitle2" id="ariaid-title2">Configuring Debug Web UIs</h2>
+
+
+    <div class="body conbody">
+
+      <p class="p"></p>
+
+
+    </div>
+
+
+    <div class="topic concept nested2" aria-labelledby="ariaid-title3" id="webui_impalad_disabling">
+
+      <h3 class="title topictitle3" id="ariaid-title3">Turning off the Web UI</h3>
+
+
+      <div class="body conbody">
+
+        <p class="p">
+          To disable Web UI for the <code class="ph codeph">impalad</code>, <code class="ph codeph">statestored</code>, or
+          <code class="ph codeph">catalogd</code>:
+        </p>
+
+
+        <ol class="ol">
+          <li class="li">
+            Stop the Impala role you want to turn off the Web UI for, <code class="ph codeph">impalad</code>,
+            <code class="ph codeph">statestored</code>, or <code class="ph codeph">catalogd</code>.
+          </li>
+
+
+          <li class="li">
+            Restart the role with the <code class="ph codeph">‑‑enable_webserver=false</code>
+            startup flag.
+          </li>
+
+        </ol>
+
+
+      </div>
+
+
+    </div>
+
+
+    <div class="topic concept nested2" aria-labelledby="ariaid-title4" id="concept_g5j_ydt_43b">
+
+      <h3 class="title topictitle3" id="ariaid-title4">Using Kerberos HTTP SPNEGO Authentication for Web UI</h3>
+
+
+      <div class="body conbody">
+
+        <p class="p">
+          To provide security through Kerberos, Impala Web UIs support SPNEGO, a protocol for
+          securing HTTP requests with Kerberos by passing negotiation tokens through HTTP
+          headers.
+        </p>
+
+
+        <p class="p">
+          To enable authorization using SPNEGO, set the
+          <code class="ph codeph">--webserver_require_spnego=true</code> startup flag and restart the Impala
+          roles, <code class="ph codeph">impalad</code>, <code class="ph codeph">statestored</code>, or
+          <code class="ph codeph">catalogd</code>.
+        </p>
+
+
+      </div>
+
+
+    </div>
+
+
+  </div>
+
+
+  <div class="topic concept nested1" aria-labelledby="ariaid-title5" id="webui_impalad">
+
+    <h2 class="title topictitle2" id="ariaid-title5">Debug Web UI for impalad</h2>
 
 
     <div class="body conbody">
 
       <p class="p">
-        To debug and troubleshoot the <span class="keyword cmdname">impalad</span> daemon using a web-based interface, open the URL
-        <code class="ph codeph">http://<var class="keyword varname">impala-server-hostname</var>:25000/</code> in a browser. (For secure
-        clusters, use the prefix <code class="ph codeph">https://</code> instead of <code class="ph codeph">http://</code>.) Because each
-        Impala node produces its own set of debug information, choose a specific node that you are curious about or
-        suspect is having problems.
+        To debug and troubleshoot an <span class="keyword cmdname">impalad</span> using a web-based interface,
+        open the URL
+        <code class="ph codeph">http://<var class="keyword varname">impala‑server‑hostname</var>:25000/</code> in
+        a browser. (For secure clusters, use the prefix <code class="ph codeph">https://</code> instead of
+        <code class="ph codeph">http://</code>.)
+      </p>
+
+
+      <p class="p">
+        Because each Impala node produces its own set of debug information, you should choose a
+        specific node that you want to investigate an issue on.
       </p>
 
 
     </div>
 
 
-    
+    <div class="topic concept nested2" aria-labelledby="ariaid-title6" id="webui_impalad_main">
 
-    <div class="topic concept nested2" aria-labelledby="ariaid-title3" id="webui_impalad_main">
-
-      <h3 class="title topictitle3" id="ariaid-title3">Main Page</h3>
+      <h3 class="title topictitle3" id="ariaid-title6">Main Page</h3>
 
 
       <div class="body conbody">
 
         <p class="p">
-          By default, the main page of the debug web UI is at
-          <code class="ph codeph">http://<var class="keyword varname">impala-server-hostname</var>:25000/</code> (non-secure cluster) or
-          <code class="ph codeph">https://<var class="keyword varname">impala-server-hostname</var>:25000/</code> (secure cluster).
+          The main <code class="ph codeph">impalad</code> Web UI page at <strong class="ph b">/</strong> lists the following
+          information about the <code class="ph codeph">impalad</code>:
         </p>
 
-
-        <p class="p">
-          This page lists the version of the <span class="keyword cmdname">impalad</span> daemon, plus basic hardware and software
-          information about the corresponding host, such as information about the CPU, memory, disks, and operating
-          system version.
-        </p>
-
-      </div>
-
-    </div>
-
-    <div class="topic concept nested2" aria-labelledby="ariaid-title4" id="webui_impalad_admission">
-      <h3 class="title topictitle3" id="ariaid-title4">Admission Control Page</h3>
-
-      <div class="body conbody">
-        <p class="p"> By default, the <span class="ph uicontrol">admission</span> page of the debug
-          web UI is at
-            <code class="ph codeph">http://<var class="keyword varname">impala-server-hostname</var>:25000/admission</code>
-          (non-secure cluster) or
-              <code class="ph codeph">https://<var class="keyword varname">impala-server-hostname</var>:25000/admission</code>
-          (secure cluster). </p>
-
-        <p class="p">Use the <span class="ph uicontrol">admission</span> page to troubleshoot queued
-          queries and the admission control.</p>
-
-        <p class="p">The <span class="ph uicontrol">admission</span> page provides the following
-          information about each resource pool to which queries have been
-          submitted at least once:</p>
 
         <ul class="ul">
-          <li class="li">Time since the <code class="ph codeph">statestored</code> received the last
-            update</li>
+          <li class="li">
+            The version of the <span class="keyword cmdname">impalad</span> daemon
+            <p class="p">
+              The <strong class="ph b">Version</strong> section also contains other information, such as when Impala
+              was built and what build flags were used.
+            </p>
 
-          <li class="li">A warning if this <code class="ph codeph">impalad</code> is considered
-            disconnected from the <code class="ph codeph">statestored</code> and thus the
-            information on this page could be stale.</li>
+          </li>
 
-          <li class="li">Pool configuration</li>
 
-          <li class="li">Queued queries submitted to this coordinator, in the order of
-            submission</li>
+          <li class="li">
+            Process start time
+          </li>
 
-          <li class="li">Running queries submitted to this coordinator</li>
 
-          <li class="li">Pool stats<ul class="ul">
-              <li class="li">Average of time in queue<p class="p">This is an exponential moving
-                  average with the factor of 0.2, which considers approximately
-                  past 10 queries. If a query is admitted immediately, the wait
-                  time of 0 is used in calculating this average wait
-                time.</p>
-</li>
+          <li class="li">
+            Hardware information
+          </li>
 
-            </ul>
-</li>
 
-          <li class="li">Histogram of the distribution of peak memory used by queries
-            admitted to the pool<p class="p">Use the histogram to figure out the minimum
-              and maximum query <code class="ph codeph">MEM_LIMIT</code> ranges of the this
-              pool.</p>
-<p class="p">The histogram displays data for all queries admitted
-              to the pool, including the queries finished, got canceled, or hit
-              an error. </p>
-</li>
+          <li class="li">
+            OS information
+          </li>
+
+
+          <li class="li">
+            Process information
+          </li>
+
+
+          <li class="li">
+            CGroup information
+          </li>
 
         </ul>
 
-        <p class="p">Click on the pool name to only display information relevant to that
-          pool. You can then refresh the debug page to see only the information
-          for that specific pool.</p>
-
-        <p class="p">You can reset the stats that keep track of historical data, such as
-            <strong class="ph b">Totals</strong> stats, <strong class="ph b">Time in queue (exponential moving
-            average)</strong>, and the histogram.</p>
-
-        <div class="p">The above information is also available as a JSON object from the
-          following HTTP
-          endpoint:<pre class="pre codeblock"><code><code class="ph codeph">http://<var class="keyword varname">impala-server-hostname</var>:<var class="keyword varname">port</var>/admission?json</code></code></pre></div>
-
-        <p class="p">See <a class="xref" href="impala_admission.html#admission_control">Admission Control and Query Queuing</a> for the
-          description of the properties in admission control.</p>
 
       </div>
+
 
     </div>
 
 
-    <div class="topic concept nested2" aria-labelledby="ariaid-title5" id="webui_impalad_backends">
+    <div class="topic concept nested2" aria-labelledby="ariaid-title7" id="webui_impalad_admission">
 
-      <h3 class="title topictitle3" id="ariaid-title5">Backends Page</h3>
+      <h3 class="title topictitle3" id="ariaid-title7">Admission Controller Page</h3>
 
 
       <div class="body conbody">
 
         <p class="p">
-          By default, the <span class="ph uicontrol">backends</span> page of the debug web UI is at
-          <code class="ph codeph">http://<var class="keyword varname">impala-server-hostname</var>:25000/backends</code> (non-secure cluster) or
-          <code class="ph codeph">https://<var class="keyword varname">impala-server-hostname</var>:25000/backends</code> (secure cluster).
-        </p>
-
-
-        <p class="p"> This page lists the host and port info for each of the
-            <span class="keyword cmdname">impalad</span> nodes in the cluster. Because each
-            <span class="keyword cmdname">impalad</span> daemon knows about every other
-            <span class="keyword cmdname">impalad</span> daemon through the StateStore, this
-          information should be the same regardless of which node you select.
-          Links take you to the corresponding debug web pages for any of the
-          other nodes in the cluster. </p>
-
-      </div>
-
-    </div>
-
-
-    <div class="topic concept nested2" aria-labelledby="ariaid-title6" id="webui_impalad_catalog">
-
-      <h3 class="title topictitle3" id="ariaid-title6">Catalog Page</h3>
-
-
-      <div class="body conbody">
-
-        <p class="p">
-          By default, the <span class="ph uicontrol">catalog</span> page of the debug web UI is at
-          <code class="ph codeph">http://<var class="keyword varname">impala-server-hostname</var>:25000/catalog</code> (non-secure cluster) or
-          <code class="ph codeph">https://<var class="keyword varname">impala-server-hostname</var>:25000/catalog</code> (secure cluster).
+          The <strong class="ph b">Admission Controller</strong> <code class="ph codeph">impalad</code> debug Web UI is at
+          <span class="ph uicontrol">/admission</span> page under the main <code class="ph codeph">impalad</code> Web UI.
         </p>
 
 
         <p class="p">
-          This page displays a list of databases and associated tables recognized by this instance of
-          <span class="keyword cmdname">impalad</span>. You can use this page to locate which database a table is in, check the
-          exact spelling of a database or table name, look for identical table names in multiple databases, and so
-          on.
-        </p>
-
-      </div>
-
-    </div>
-
-
-    <div class="topic concept nested2" aria-labelledby="ariaid-title7" id="webui_impalad_logs">
-
-      <h3 class="title topictitle3" id="ariaid-title7">Logs Page</h3>
-
-  
-
-      <div class="body conbody">
-
-        <p class="p">
-          By default, the <span class="ph uicontrol">logs</span> page of the debug web UI is at
-          <code class="ph codeph">http://<var class="keyword varname">impala-server-hostname</var>:25000/logs</code> (non-secure cluster) or
-          <code class="ph codeph">https://<var class="keyword varname">impala-server-hostname</var>:25000/logs</code> (secure cluster).
+          Use the <span class="ph uicontrol">/admission</span> page to troubleshoot queued queries and the
+          admission control.
         </p>
 
 
         <p class="p">
-          This page shows the last portion of the <span class="ph filepath">impalad.INFO</span> log file, the most detailed of
-          the info, warning, and error logs for the <span class="keyword cmdname">impalad</span> daemon. You can refer here to see
-          the details of the most recent operations, whether the operations succeeded or encountered errors. This
-          central page can be more convenient than looking around the filesystem for the log files, which could be
-          in different locations on clusters that use cluster management software.
+          The <span class="ph uicontrol">admission</span> page provides the following information about
+          each resource pool to which queries have been submitted at least once:
         </p>
 
 
-      </div>
-
-    </div>
-
-
-    <div class="topic concept nested2" aria-labelledby="ariaid-title8" id="webui_impalad_memz">
-
-      <h3 class="title topictitle3" id="ariaid-title8">Memz Page</h3>
+        <ul class="ul">
+          <li class="li">
+            Time since the <code class="ph codeph">statestored</code> received the last update
+          </li>
 
 
-      <div class="body conbody">
+          <li class="li">
+            A warning if this <code class="ph codeph">impalad</code> is considered disconnected from the
+            <code class="ph codeph">statestored</code> and thus the information on this page could be stale.
+          </li>
+
+
+          <li class="li">
+            Pool configuration
+          </li>
+
+
+          <li class="li">
+            Queued queries submitted to this coordinator, in the order of submission
+          </li>
+
+
+          <li class="li">
+            Running queries submitted to this coordinator
+          </li>
+
+
+          <li class="li">
+            Pool stats
+            <ul class="ul">
+              <li class="li">
+                Average of time in queue: An exponential moving average which represents the
+                average time in queue over the last 10 to 12 queries. If a query is admitted
+                immediately, the wait time of 0 is used in calculating this average wait time.
+              </li>
+
+            </ul>
+
+          </li>
+
+
+          <li class="li">
+            Histogram of the distribution of peak memory used by queries admitted to the pool
+            <p class="p">
+              Use the histogram to figure out settings for the minimum and maximum query
+              <code class="ph codeph">MEM_LIMIT</code> ranges for this pool.
+            </p>
+
+
+            <p class="p">
+              The histogram displays data for all queries admitted to the pool, including the
+              queries that finished, got canceled, or hit an error.
+            </p>
+
+          </li>
+
+        </ul>
+
 
         <p class="p">
-          By default, the <span class="ph uicontrol">memz</span> page of the debug web UI is at
-          <code class="ph codeph">http://<var class="keyword varname">impala-server-hostname</var>:25000/memz</code> (non-secure cluster) or
-          <code class="ph codeph">https://<var class="keyword varname">impala-server-hostname</var>:25000/memz</code> (secure cluster).
+          Click on the pool name to only display information relevant to that pool. You can then
+          refresh the debug page to see only the information for that specific pool.
         </p>
 
 
         <p class="p">
-          This page displays summary and detailed information about memory usage by the <span class="keyword cmdname">impalad</span>
-          daemon. You can see the memory limit in effect for the node, and how much of that memory Impala is
-          currently using.
-        </p>
-
-      </div>
-
-    </div>
-
-
-    <div class="topic concept nested2" aria-labelledby="ariaid-title9" id="webui_impalad_metrics">
-
-      <h3 class="title topictitle3" id="ariaid-title9">Metrics Page</h3>
-
-
-      <div class="body conbody">
-
-        <p class="p">
-          By default, the <span class="ph uicontrol">metrics</span> page of the debug web UI is at
-          <code class="ph codeph">http://<var class="keyword varname">impala-server-hostname</var>:25000/metrics</code> (non-secure cluster) or
-          <code class="ph codeph">https://<var class="keyword varname">impala-server-hostname</var>:25000/metrics</code> (secure cluster).
+          Click <strong class="ph b">Reset informational stats for all pools</strong> to reset the stats that keep
+          track of historical data, such as <strong class="ph b">Totals</strong> stats, <strong class="ph b">Time in queue (exponential
+          moving average)</strong>, and the histogram.
         </p>
 
 
+        <div class="p">
+          The above information is also available as a JSON object from the following HTTP
+          endpoint:
+<pre class="pre codeblock"><code><code class="ph codeph">http://<var class="keyword varname">impala-server-hostname</var>:<var class="keyword varname">port</var>/admission?json</code></code></pre>
+        </div>
+
+
         <p class="p">
-          This page displays the current set of metrics: counters and flags representing various aspects of
-          <span class="keyword cmdname">impalad</span> internal operation.
+          See <a class="xref" href="impala_admission.html#admission_control">Admission Control and Query Queuing</a> for the description of the
+          properties in admission control.
         </p>
 
 
       </div>
 
+
     </div>
 
 
-    <div class="topic concept nested2" aria-labelledby="ariaid-title10" id="webui_impalad_queries">
+    <div class="topic concept nested2" aria-labelledby="ariaid-title8" id="webui_impalad_backends">
 
-      <h3 class="title topictitle3" id="ariaid-title10">Queries Page</h3>
+      <h3 class="title topictitle3" id="ariaid-title8">Known Backends Page</h3>
 
 
       <div class="body conbody">
 
         <p class="p">
-          By default, the <span class="ph uicontrol">queries</span> page of the debug web UI is at
-          <code class="ph codeph">http://<var class="keyword varname">impala-server-hostname</var>:25000/queries</code> (non-secure cluster) or
-          <code class="ph codeph">https://<var class="keyword varname">impala-server-hostname</var>:25000/queries</code> (secure cluster).
+          The <strong class="ph b">Known backends</strong> page of the <code class="ph codeph">impalad</code> debug Web UI is at
+          <strong class="ph b">/backends</strong> under the main <code class="ph codeph">impalad</code> Web UI.
         </p>
 
 
         <p class="p">
-          This page lists all currently running queries, plus any completed queries whose details still reside in
-          memory. The queries are listed in reverse chronological order, with the most recent at the top. (You can
-          control the amount of memory devoted to completed queries by specifying the
-          <code class="ph codeph">--query_log_size</code> startup option for <span class="keyword cmdname">impalad</span>.)
+          This page lists the following info for each of the <span class="keyword cmdname">impalad</span> nodes in
+          the cluster. Because each <span class="keyword cmdname">impalad</span> daemon knows about every other
+          <span class="keyword cmdname">impalad</span> daemon through the StateStore, this information should be
+          the same regardless of which node you select.
+        </p>
+
+
+        <ul class="ul">
+          <li class="li">
+            Address of the node: Host name and port
+          </li>
+
+
+          <li class="li">
+            KRPC address: The KRPC address of the <code class="ph codeph">impalad</code>. Use this address
+            when you issue the <code class="ph codeph">SHUTDOWN</code> command for this
+            <code class="ph codeph">impalad</code>.
+          </li>
+
+
+          <li class="li">
+            Whether acting as a coordinator
+          </li>
+
+
+          <li class="li">
+            Whether acting as an executor
+          </li>
+
+
+          <li class="li">
+            Quiescing status: Specify whether the graceful shutdown process has been initiated
+            on this <code class="ph codeph">impalad</code>.
+          </li>
+
+
+          <li class="li">
+            Memory limit for admission: The amount of memory that can be admitted to this
+            backend by the admission controller.
+          </li>
+
+
+          <li class="li">
+            Memory reserved: The amount of memory reserved by queries that are active, either
+            currently executing or finished but not yet closed, on this backend.
+            <p class="p">
+              The memory reserved for a query that is currently executing is its memory limit,
+              if set. Otherwise, if the query has no limit or if the query finished executing,
+              the current consumption is used.
+            </p>
+
+          </li>
+
+
+          <li class="li">
+            Memory of the queries admitted to this coordinator: The memory submitted to this
+            particular host by the queries admitted by this coordinator.
+          </li>
+
+        </ul>
+
+
+      </div>
+
+
+    </div>
+
+
+    <div class="topic concept nested2" aria-labelledby="ariaid-title9" id="webui_impalad_catalog">
+
+      <h3 class="title topictitle3" id="ariaid-title9">Catalog Page</h3>
+
+
+      <div class="body conbody">
+
+        <p class="p">
+          The <strong class="ph b">Catalog</strong> page of the <code class="ph codeph">impalad</code> debug Web UI is at
+          <strong class="ph b">/catalog</strong> under the main <code class="ph codeph">impalad</code> Web UI.
         </p>
 
 
         <p class="p">
-          On this page, you can see at a glance how many SQL statements are failing (<code class="ph codeph">State</code> value
-          of <code class="ph codeph">EXCEPTION</code>), how large the result sets are (<code class="ph codeph"># rows fetched</code>), and how
-          long each statement took (<code class="ph codeph">Start Time</code> and <code class="ph codeph">End Time</code>).
+          This page displays a list of databases and associated tables recognized by this
+          instance of <span class="keyword cmdname">impalad</span>. You can use this page to locate which database
+          a table is in, check the exact spelling of a database or table name, look for
+          identical table names in multiple databases. The primary debugging use case would be
+          to check if an <code class="ph codeph">impalad</code> instance has knowledge of a particular table
+          that someone expects to be in a particular database.
+        </p>
+
+
+      </div>
+
+
+    </div>
+
+
+    <div class="topic concept nested2" aria-labelledby="ariaid-title10" id="webui_impalad_hadoop-varz">
+
+      <h3 class="title topictitle3" id="ariaid-title10">Hadoop Configuration</h3>
+
+
+      <div class="body conbody">
+
+        <p class="p">
+          The <strong class="ph b">Hadoop Configuration</strong> page of the <code class="ph codeph">impalad</code> debug Web UI is
+          at <strong class="ph b">/hadoop-varz</strong> under the main <code class="ph codeph">impalad</code> Web UI.
         </p>
 
 
         <p class="p">
-          Each query has an associated link that displays the detailed query profile, which you can examine to
-          understand the performance characteristics of that query. See
+          This page displays the Hadoop common configurations that Impala is running with.
+        </p>
+
+
+      </div>
+
+
+    </div>
+
+
+    <div class="topic concept nested2" aria-labelledby="ariaid-title11" id="webui_impalad_jmx">
+
+      <h3 class="title topictitle3" id="ariaid-title11">JMX</h3>
+
+
+      <div class="body conbody">
+
+        <p class="p">
+          The <strong class="ph b">JMX</strong> page of the <code class="ph codeph">impalad</code> debug Web UI is at <strong class="ph b">/jmx</strong>
+          under the main <code class="ph codeph">impalad</code> Web UI.
+        </p>
+
+
+        <p class="p">
+          This page displays monitoring information about various JVM subsystems, such as memory
+          pools, thread management, runtime. etc.
+        </p>
+
+
+      </div>
+
+
+    </div>
+
+
+    <div class="topic concept nested2" aria-labelledby="ariaid-title12" id="webui_impalad_log_level">
+
+      <h3 class="title topictitle3" id="ariaid-title12">Java Log Level</h3>
+
+
+      <div class="body conbody">
+
+        <p class="p">
+          The <strong class="ph b">Change log level</strong> page of the <code class="ph codeph">impalad</code> debug Web UI is at
+          <strong class="ph b">/log_level</strong> under the main <code class="ph codeph">impalad</code> Web UI.
+        </p>
+
+
+        <p class="p">
+          This page displays the current Java and backend log levels, and it allows you to
+          change the log levels dynamically without having to restart the
+          <code class="ph codeph">impalad</code>.
+        </p>
+
+
+      </div>
+
+
+    </div>
+
+
+    <div class="topic concept nested2" aria-labelledby="ariaid-title13" id="webui_impalad_logs">
+
+      <h3 class="title topictitle3" id="ariaid-title13">Logs Page</h3>
+
+
+      <div class="body conbody">
+
+        <p class="p">
+          The <strong class="ph b">INFO logs</strong> page of the <code class="ph codeph">impalad</code> debug Web UI is at
+          <strong class="ph b">/logs</strong> under the main <code class="ph codeph">impalad</code> Web UI.
+        </p>
+
+
+        <p class="p">
+          This page shows the last portion of the <code class="ph codeph">impalad.INFO</code> log file,
+          including the info, warning, and error logs for the <span class="keyword cmdname">impalad</span>. You
+          can see the details of the most recent operations, whether the operations succeeded or
+          encountered errors. This page provides one central place for the log files and saves
+          you from looking around the filesystem for the log files, which could be in different
+          locations on clusters that use cluster management software.
+        </p>
+
+
+      </div>
+
+
+    </div>
+
+
+    <div class="topic concept nested2" aria-labelledby="ariaid-title14" id="webui_impalad_memz">
+
+      <h3 class="title topictitle3" id="ariaid-title14">Memz Page</h3>
+
+
+      <div class="body conbody">
+
+        <p class="p">
+          The <strong class="ph b">Memory Usage</strong> page of the <code class="ph codeph">impalad</code> debug Web UI is at
+          <strong class="ph b">/memz</strong> under the main <code class="ph codeph">impalad</code> Web UI.
+        </p>
+
+
+        <p class="p">
+          This page displays the summary and detailed information about memory usage by the
+          <code class="ph codeph">impalad</code>.
+        </p>
+
+
+      </div>
+
+
+    </div>
+
+
+    <div class="topic concept nested2" aria-labelledby="ariaid-title15" id="webui_impalad_metrics">
+
+      <h3 class="title topictitle3" id="ariaid-title15">Metrics Page</h3>
+
+
+      <div class="body conbody">
+
+        <p class="p">
+          The <strong class="ph b">Metrics</strong> page of the <code class="ph codeph">impalad</code> debug Web UI is at
+          <strong class="ph b">/metrics</strong> under the main <code class="ph codeph">impalad</code> Web UI.
+        </p>
+
+
+        <p class="p">
+          This page displays the current set of metrics, counters and flags representing various
+          aspects of <code class="ph codeph">impalad</code> internal operations.
+        </p>
+
+
+      </div>
+
+
+    </div>
+
+
+    <div class="topic concept nested2" aria-labelledby="ariaid-title16" id="webui_impalad_queries">
+
+      <h3 class="title topictitle3" id="ariaid-title16">Queries Page</h3>
+
+
+      <div class="body conbody">
+
+        <p class="p">
+          The <strong class="ph b">Queries</strong> page of the <code class="ph codeph">impalad</code> debug Web UI is at
+          <strong class="ph b">/queries</strong> under the main <code class="ph codeph">impalad</code> Web UI.
+        </p>
+
+
+        <div class="p">
+          This page lists:
+          <ul class="ul">
+            <li class="li">
+              Currently running queries
+            </li>
+
+
+            <li class="li">
+              Queries that have completed their execution, but have not been closed yet
+            </li>
+
+
+            <li class="li">
+              Completed queries whose details still reside in memory
+            </li>
+
+          </ul>
+
+          The queries are listed in reverse chronological order, with the most recent at the
+          top. You can control the amount of memory devoted to completed queries by specifying
+          the <code class="ph codeph">-‑-‑query_log_size</code> startup option for
+          <code class="ph codeph">impalad</code>.
+        </div>
+
+
+        <div class="p">
+          This page provides:
+          <ul class="ul">
+            <li class="li">
+              How many SQL statements are failing (<code class="ph codeph">State</code> value of
+              <code class="ph codeph">EXCEPTION</code>)
+            </li>
+
+
+            <li class="li">
+              How large the result sets are (<code class="ph codeph"># rows fetched</code>)
+            </li>
+
+
+            <li class="li">
+              How long each statement took (<code class="ph codeph">Start Time</code> and <code class="ph codeph">End
+              Time</code>)
+            </li>
+
+          </ul>
+
+        </div>
+
+
+        <p class="p">
+          Each query has an associated link that displays the detailed query profile, which you
+          can examine to understand the performance characteristics of that query. See
           <a class="xref" href="impala_explain_plan.html#perf_profile">Using the Query Profile for Performance Tuning</a> for details.
         </p>
 
+
+        <p class="p">
+          The <strong class="ph b">Queries</strong> page also includes the <strong class="ph b">Query Locations</strong> section that lists
+          the number of running queries with fragments on this host.
+        </p>
+
+
       </div>
+
 
     </div>
 
 
-    <div class="topic concept nested2" aria-labelledby="ariaid-title11" id="webui_impalad_sessions">
+    <div class="topic concept nested2" aria-labelledby="ariaid-title17" id="webui_impalad_rpcz">
 
-      <h3 class="title topictitle3" id="ariaid-title11">Sessions Page</h3>
+      <h3 class="title topictitle3" id="ariaid-title17">RPC Services Page</h3>
 
 
       <div class="body conbody">
 
         <p class="p">
-          By default, the <span class="ph uicontrol">sessions</span> page of the debug web UI is at
-          <code class="ph codeph">http://<var class="keyword varname">impala-server-hostname</var>:25000/sessions</code> (non-secure cluster) or
-          <code class="ph codeph">https://<var class="keyword varname">impala-server-hostname</var>:25000/sessions</code> (secure cluster).
+          The <strong class="ph b">RPC durations</strong> page of the <code class="ph codeph">impalad</code> debug Web UI is at
+          <strong class="ph b">/rpcz</strong> under the main <code class="ph codeph">impalad</code> Web UI.
         </p>
 
 
         <p class="p">
-          This page displays information about the sessions currently connected to this <span class="keyword cmdname">impalad</span>
-          instance. For example, sessions could include connections from the <span class="keyword cmdname">impala-shell</span>
-          command, JDBC or ODBC applications, or the Impala Query UI in the Hue web interface.
+          This page displays information, such as the duration, about the RPC communications of
+          this <code class="ph codeph">impalad</code> with other Impala daemons.
         </p>
 
+
       </div>
+
 
     </div>
 
 
-    <div class="topic concept nested2" aria-labelledby="ariaid-title12" id="webui_impalad_threadz">
+    <div class="topic concept nested2" aria-labelledby="ariaid-title18" id="webui_impalad_sessions">
 
-      <h3 class="title topictitle3" id="ariaid-title12">Threadz Page</h3>
+      <h3 class="title topictitle3" id="ariaid-title18">Sessions Page</h3>
 
 
       <div class="body conbody">
 
         <p class="p">
-          By default, the <span class="ph uicontrol">threadz</span> page of the debug web UI is at
-          <code class="ph codeph">http://<var class="keyword varname">impala-server-hostname</var>:25000/threadz</code> (non-secure cluster) or
-          <code class="ph codeph">https://<var class="keyword varname">impala-server-hostname</var>:25000/threadz</code> (secure cluster).
+          The <strong class="ph b">Sessions</strong> page of the <code class="ph codeph">impalad</code> debug Web UI is at
+          <strong class="ph b">/session</strong> under the main <code class="ph codeph">impalad</code> Web UI.
         </p>
 
 
         <p class="p">
-          This page displays information about the threads used by this instance of <span class="keyword cmdname">impalad</span>,
-          and shows which categories they are grouped into. Making use of this information requires substantial
-          knowledge about Impala internals.
+          This page displays information about the sessions currently connected to this
+          <span class="keyword cmdname">impalad</span> instance. For example, sessions could include connections
+          from the <code class="ph codeph">impala-shell</code> command, JDBC or ODBC applications, or the
+          Impala Query UI in the Hue web interface.
         </p>
 
+
       </div>
+
 
     </div>
 
 
-    <div class="topic concept nested2" aria-labelledby="ariaid-title13" id="webui_impalad_varz">
+    <div class="topic concept nested2" aria-labelledby="ariaid-title19" id="webui_impalad_threadz">
 
-      <h3 class="title topictitle3" id="ariaid-title13">Varz Page</h3>
+      <h3 class="title topictitle3" id="ariaid-title19">Threadz Page</h3>
 
 
       <div class="body conbody">
 
         <p class="p">
-          By default, the <span class="ph uicontrol">varz</span> page of the debug web UI is at
-          <code class="ph codeph">http://<var class="keyword varname">impala-server-hostname</var>:25000/varz</code> (non-secure cluster) or
-          <code class="ph codeph">https://<var class="keyword varname">impala-server-hostname</var>:25000/varz</code> (secure cluster).
+          The <strong class="ph b">Threads</strong> page of the <code class="ph codeph">impalad</code> debug Web UI is at
+          <strong class="ph b">/threadz</strong> under the main <code class="ph codeph">impalad</code> Web UI.
         </p>
 
 
         <p class="p">
-          This page shows the configuration settings in effect when this instance of <span class="keyword cmdname">impalad</span>
-          communicates with other Hadoop components such as HDFS and YARN. These settings are collected from a set
-          of configuration files; Impala might not actually make use of all settings.
+          This page displays information about the threads used by this instance of
+          <code class="ph codeph">impalad</code>, and it shows which categories they are grouped into. Making
+          use of this information requires substantial knowledge about Impala internals.
+        </p>
+
+
+      </div>
+
+
+    </div>
+
+
+    <div class="topic concept nested2" aria-labelledby="ariaid-title20" id="webui_impalad_varz">
+
+      <h3 class="title topictitle3" id="ariaid-title20">Varz Page</h3>
+
+
+      <div class="body conbody">
+
+        <p class="p">
+          The <strong class="ph b">Varz</strong> page of the <code class="ph codeph">impalad</code> debug Web UI is at <strong class="ph b">/varz</strong>
+          under the main <code class="ph codeph">impalad</code> Web UI.
         </p>
 
 
         <p class="p">
-          The bottom of this page also lists all the command-line settings in effect for this instance of
-          <span class="keyword cmdname">impalad</span>. See <a class="xref" href="impala_config_options.html#config_options">Modifying Impala Startup Options</a> for information
+          This page shows the configuration settings in effect when this instance of
+          <code class="ph codeph">impalad</code> communicates with other Hadoop components such as HDFS and
+          YARN. These settings are collected from a set of configuration files.
+        </p>
+
+
+        <p class="p">
+          The bottom of this page also lists all the command-line settings in effect for this
+          instance of <code class="ph codeph">impalad</code>. See
+          <a class="xref" href="impala_config_options.html#config_options">Modifying Impala Startup Options</a> for information
           about modifying these values.
         </p>
 
+
       </div>
 
+
     </div>
+
 
   </div>
 
 
-  
+  <div class="topic concept nested1" aria-labelledby="ariaid-title21" id="webui_statestored">
 
-  
+    <h2 class="title topictitle2" id="ariaid-title21">Debug Web UI for statestored</h2>
+
+
+    <div class="body conbody">
+
+      <p class="p">
+        To debug and troubleshoot the <code class="ph codeph">statestored</code> daemon using a web-based
+        interface, open the URL
+        <code class="ph codeph">http://<var class="keyword varname">impala‑server‑hostname</var>:25010/</code> in
+        a browser. (For secure clusters, use the prefix <code class="ph codeph">https://</code> instead of
+        <code class="ph codeph">http://</code>.)
+      </p>
+
+
+    </div>
+
+
+    <div class="topic concept nested2" aria-labelledby="ariaid-title22" id="webui_statestored_main">
+
+      <h3 class="title topictitle3" id="ariaid-title22">Main Page</h3>
+
+
+      <div class="body conbody">
+
+        <p class="p">
+          The main <code class="ph codeph">statestored</code> Web UI page at <strong class="ph b">/</strong> lists the following
+          information about the <code class="ph codeph">statestored</code>:
+        </p>
+
+
+        <ul class="ul">
+          <li class="li">
+            The version of the <code class="ph codeph">statestored</code> daemon
+          </li>
+
+
+          <li class="li">
+            Process start time
+          </li>
+
+
+          <li class="li">
+            Hardware information
+          </li>
+
+
+          <li class="li">
+            OS information
+          </li>
+
+
+          <li class="li">
+            Process information
+          </li>
+
+
+          <li class="li">
+            CGroup information
+          </li>
+
+        </ul>
+
+
+      </div>
+
+
+    </div>
+
+
+    <div class="topic concept nested2" aria-labelledby="ariaid-title23" id="webui_statestored_logs">
+
+      <h3 class="title topictitle3" id="ariaid-title23">Logs Page</h3>
+
+
+      <div class="body conbody">
+
+        <p class="p">
+          The <strong class="ph b">INFO logs</strong> page of the debug Web UI is at <strong class="ph b">/logs</strong> under the main
+          <code class="ph codeph">statestored</code> Web UI.
+        </p>
+
+
+        <p class="p">
+          This page shows the last portion of the <span class="ph filepath">statestored.INFO</span> log
+          file, including the info, warning, and error logs for the
+          <code class="ph codeph">statestored</code>. You can refer here to see the details of the most recent
+          operations, whether the operations succeeded or encountered errors. This page provides
+          one central place for the log files and saves you from looking around the filesystem
+          for the log files, which could be in different locations on clusters that use cluster
+          management software.
+        </p>
+
+
+      </div>
+
+
+    </div>
+
+
+    <div class="topic concept nested2" aria-labelledby="ariaid-title24" id="webui_statestored_memz">
+
+      <h3 class="title topictitle3" id="ariaid-title24">Memz Page</h3>
+
+
+      <div class="body conbody">
+
+        <p class="p">
+          The <strong class="ph b">Memory Usage</strong> page of the debug Web UI is at <strong class="ph b">/memz</strong> under the main
+          <code class="ph codeph">statestored</code> Web UI.
+        </p>
+
+
+        <p class="p">
+          This page displays summary and detailed information about memory usage by the
+          <code class="ph codeph">statestored</code>. You can see the memory limit in effect for the node, and
+          how much of that memory Impala is currently using.
+        </p>
+
+
+      </div>
+
+
+    </div>
+
+
+    <div class="topic concept nested2" aria-labelledby="ariaid-title25" id="webui_statestored_metrics">
+
+      <h3 class="title topictitle3" id="ariaid-title25">Metrics Page</h3>
+
+
+      <div class="body conbody">
+
+        <p class="p">
+          The <strong class="ph b">Metrics</strong> page of the debug Web UI is at <strong class="ph b">/metrics</strong> under the main
+          <code class="ph codeph">statestored</code> Web UI.
+        </p>
+
+
+        <p class="p">
+          This page displays the current set of metrics: counters and flags representing various
+          aspects of <code class="ph codeph">statestored</code> internal operation.
+        </p>
+
+
+      </div>
+
+
+    </div>
+
+
+    <div class="topic concept nested2" aria-labelledby="ariaid-title26" id="webui_statestored_rpcz">
+
+      <h3 class="title topictitle3" id="ariaid-title26">RPC Services Page</h3>
+
+
+      <div class="body conbody">
+
+        <p class="p">
+          The <strong class="ph b">RPC durations</strong> page of the <code class="ph codeph">statestored</code> debug Web UI is at
+          <strong class="ph b">/rpcz</strong> under the main <code class="ph codeph">statestored</code> Web UI.
+        </p>
+
+
+        <p class="p">
+          This page displays information, such as the durations, about the RPC communications of
+          this <code class="ph codeph">statestored</code> with other Impala daemons.
+        </p>
+
+
+      </div>
+
+
+    </div>
+
+
+    <div class="topic concept nested2" aria-labelledby="ariaid-title27" id="webui_statestored_subscribers">
+
+      <h3 class="title topictitle3" id="ariaid-title27">Subscribers Page</h3>
+
+
+      <div class="body conbody">
+
+        <p class="p">
+          The <strong class="ph b">Subscribers</strong> page of the debug Web UI is at <strong class="ph b">/subscribers</strong> under the
+          main <code class="ph codeph">statestored</code> Web UI.
+        </p>
+
+
+        <p class="p">
+          This page displays information about the other Impala daemons that have registered
+          with the <code class="ph codeph">statestored</code> to receive and send updates.
+        </p>
+
+
+      </div>
+
+
+    </div>
+
+
+    <div class="topic concept nested2" aria-labelledby="ariaid-title28" id="webui_statestored_threadz">
+
+      <h3 class="title topictitle3" id="ariaid-title28">Threadz Page</h3>
+
+
+      <div class="body conbody">
+
+        <p class="p">
+          The <strong class="ph b">Threads</strong> page of the debug Web UI is at <strong class="ph b">/threadz</strong> under the main
+          <code class="ph codeph">statestored</code> Web UI.
+        </p>
+
+
+        <p class="p">
+          This page displays information about the threads used by this instance of
+          <code class="ph codeph">statestored</code>, and shows which categories they are grouped into. Making
+          use of this information requires substantial knowledge about Impala internals.
+        </p>
+
+
+      </div>
+
+
+    </div>
+
+
+    <div class="topic concept nested2" aria-labelledby="ariaid-title29" id="webui_statestored_topics">
+
+      <h3 class="title topictitle3" id="ariaid-title29">Topics Page</h3>
+
+
+      <div class="body conbody">
+
+        <p class="p">
+          The <strong class="ph b">Topics</strong> page of the debug Web UI is at <strong class="ph b">/topics</strong> under the main
+          <code class="ph codeph">statestored</code> Web UI.
+        </p>
+
+
+        <p class="p">
+          This page displays information about the topics to which the other Impala daemons have
+          registered to receive updates.
+        </p>
+
+
+      </div>
+
+
+    </div>
+
+
+    <div class="topic concept nested2" aria-labelledby="ariaid-title30" id="webui_statestored_varz">
+
+      <h3 class="title topictitle3" id="ariaid-title30">Varz Page</h3>
+
+
+      <div class="body conbody">
+
+        <p class="p">
+          The <strong class="ph b">Varz</strong> page of the debug Web UI is at <strong class="ph b">/varz</strong> under the main
+          <code class="ph codeph">statestored</code> Web UI.
+        </p>
+
+
+        <p class="p">
+          This page shows the configuration settings in effect when this instance of
+          <code class="ph codeph">statestored</code> communicates with other Hadoop components such as HDFS
+          and YARN. These settings are collected from a set of configuration files.
+        </p>
+
+
+        <p class="p">
+          The bottom of this page also lists all the command-line settings in effect for this
+          instance of <code class="ph codeph">statestored</code>. See
+          <a class="xref" href="impala_config_options.html#config_options">Modifying Impala Startup Options</a> for information
+          about modifying these values.
+        </p>
+
+
+      </div>
+
+
+    </div>
+
+
+  </div>
+
+
+  <div class="topic concept nested1" aria-labelledby="ariaid-title31" id="webui_catalogd">
+
+    <h2 class="title topictitle2" id="ariaid-title31">Debug Web UI for catalogd</h2>
+
+
+    <div class="body conbody">
+
+      <p class="p">
+        The main page of the debug Web UI is at
+        <code class="ph codeph">http://<var class="keyword varname">impala‑server‑hostname</var>:25020/</code>
+        (non-secure cluster) or
+        <code class="ph codeph">https://<var class="keyword varname">impala‑server‑hostname</var>:25020/</code>
+        (secure cluster).
+      </p>
+
+
+    </div>
+
+
+    <div class="topic concept nested2" aria-labelledby="ariaid-title32" id="webui_catalogd_main">
+
+      <h3 class="title topictitle3" id="ariaid-title32">Main Page</h3>
+
+
+      <div class="body conbody">
+
+        <p class="p">
+          The main <code class="ph codeph">catalogd</code> Web UI page at <strong class="ph b">/</strong> lists the following
+          information about the <code class="ph codeph">catalogd</code>:
+        </p>
+
+
+        <ul class="ul">
+          <li class="li">
+            The version of the <code class="ph codeph">catalogd</code> daemon
+          </li>
+
+
+          <li class="li">
+            Process start time
+          </li>
+
+
+          <li class="li">
+            Hardware information
+          </li>
+
+
+          <li class="li">
+            OS information
+          </li>
+
+
+          <li class="li">
+            Process information
+          </li>
+
+
+          <li class="li">
+            CGroup information
+          </li>
+
+        </ul>
+
+
+      </div>
+
+
+    </div>
+
+
+    <div class="topic concept nested2" aria-labelledby="ariaid-title33" id="webui_catalogd_catalog">
+
+      <h3 class="title topictitle3" id="ariaid-title33">Catalog Page</h3>
+
+
+      <div class="body conbody">
+
+        <p class="p">
+          The <strong class="ph b">Catalog</strong> page of the debug Web UI is at <strong class="ph b">/catalog</strong> under the main
+          <code class="ph codeph">catalogd</code> Web UI.
+        </p>
+
+
+        <p class="p">
+          This page displays a list of databases and associated tables recognized by this
+          instance of <code class="ph codeph">catalogd</code>. You can use this page to locate which database
+          a table is in, check the exact spelling of a database or table name, look for
+          identical table names in multiple databases. The catalog information is represented as
+          the underlying Thrift data structures.
+        </p>
+
+
+      </div>
+
+
+    </div>
+
+
+    <div class="topic concept nested2" aria-labelledby="ariaid-title34" id="webui_catalogd_jmx">
+
+      <h3 class="title topictitle3" id="ariaid-title34">JMX</h3>
+
+
+      <div class="body conbody">
+
+        <p class="p">
+          The <strong class="ph b">JMX</strong> page of the <code class="ph codeph">catalogd</code> debug Web UI is at <strong class="ph b">/jmx</strong>
+          under the main <code class="ph codeph">catalogd</code> Web UI.
+        </p>
+
+
+        <p class="p">
+          This page displays monitoring information about various JVM subsystems, such as memory
+          pools, thread management, runtime. etc.
+        </p>
+
+
+      </div>
+
+
+    </div>
+
+
+    <div class="topic concept nested2" aria-labelledby="ariaid-title35" id="webui_catalogd_log_level">
+
+      <h3 class="title topictitle3" id="ariaid-title35">Java Log Level</h3>
+
+
+      <div class="body conbody">
+
+        <p class="p">
+          The <strong class="ph b">Change log level</strong> page of the <code class="ph codeph">catalogd</code> debug Web UI is at
+          <strong class="ph b">/log_level</strong> under the main <code class="ph codeph">catalogd</code> Web UI.
+        </p>
+
+
+        <p class="p">
+          The page displays the current Java and backend log levels and allows you to change the
+          log levels dynamically without having to restart the <code class="ph codeph">catalogd</code>
+        </p>
+
+
+      </div>
+
+
+    </div>
+
+
+    <div class="topic concept nested2" aria-labelledby="ariaid-title36" id="webui_catalogd_logs">
+
+      <h3 class="title topictitle3" id="ariaid-title36">Logs Page</h3>
+
+
+      <div class="body conbody">
+
+        <p class="p">
+          The <strong class="ph b">INFO logs</strong> page of the debug Web UI is at <strong class="ph b">/logs</strong> under the main
+          <code class="ph codeph">catalogd</code> Web UI.
+        </p>
+
+
+        <p class="p">
+          This page shows the last portion of the <code class="ph codeph">catalogd.INFO</code> log file,
+          including the info, warning, and error logs for the <code class="ph codeph">catalogd</code> daemon.
+          You can refer here to see the details of the most recent operations, whether the
+          operations succeeded or encountered errors. This page provides one central place for
+          the log files and saves you from looking around the filesystem for the log files,
+          which could be in different locations on clusters that use cluster management
+          software.
+        </p>
+
+
+      </div>
+
+
+    </div>
+
+
+    <div class="topic concept nested2" aria-labelledby="ariaid-title37" id="webui_catalogd_memz">
+
+      <h3 class="title topictitle3" id="ariaid-title37">Memz Page</h3>
+
+
+      <div class="body conbody">
+
+        <p class="p">
+          The <strong class="ph b">Memory Usage</strong> page of the debug Web UI is at <strong class="ph b">/memz</strong> under the main
+          <code class="ph codeph">catalogd</code> Web UI.
+        </p>
+
+
+        <p class="p">
+          This page displays summary and detailed information about memory usage by the
+          <code class="ph codeph">catalogd</code>. You can see the memory limit in effect for the node, and
+          how much of that memory Impala is currently using.
+        </p>
+
+
+      </div>
+
+
+    </div>
+
+
+    <div class="topic concept nested2" aria-labelledby="ariaid-title38" id="webui_catalogd_metrics">
+
+      <h3 class="title topictitle3" id="ariaid-title38">Metrics Page</h3>
+
+
+      <div class="body conbody">
+
+        <p class="p">
+          The <strong class="ph b">Metrics</strong> page of the debug Web UI is at <strong class="ph b">/metrics</strong> under the main
+          <code class="ph codeph">catalogd</code> Web UI.
+        </p>
+
+
+        <p class="p">
+          This page displays the current set of metrics: counters and flags representing various
+          aspects of <code class="ph codeph">catalogd</code> internal operation.
+        </p>
+
+
+        <p class="p"></p>
+
+
+      </div>
+
+
+    </div>
+
+
+    <div class="topic concept nested2" aria-labelledby="ariaid-title39" id="webui_catalogd_rpcz">
+
+      <h3 class="title topictitle3" id="ariaid-title39">RPC Services Page</h3>
+
+
+      <div class="body conbody">
+
+        <p class="p">
+          The <strong class="ph b">RPC durations</strong> page of the <code class="ph codeph">catalogd</code> debug Web UI is at
+          <strong class="ph b">/rpcz</strong> under the main <code class="ph codeph">catalogd</code> Web UI.
+        </p>
+
+
+        <p class="p">
+          This page displays information, such as the durations, about the RPC communications of
+          this <code class="ph codeph">catalogd</code> with other Impala daemons.
+        </p>
+
+
+      </div>
+
+
+    </div>
+
+
+    <div class="topic concept nested2" aria-labelledby="ariaid-title40" id="webui_catalogd_threadz">
+
+      <h3 class="title topictitle3" id="ariaid-title40">Threadz Page</h3>
+
+
+      <div class="body conbody">
+
+        <p class="p">
+          The <strong class="ph b">Threads</strong> page of the debug Web UI is at <strong class="ph b">/threadz</strong> under the main
+          <code class="ph codeph">catalogd</code> Web UI.
+        </p>
+
+
+        <p class="p">
+          This page displays information about the threads used by this instance of
+          <code class="ph codeph">catalogd</code>, and shows which categories they are grouped into. Making
+          use of this information requires substantial knowledge about Impala internals.
+        </p>
+
+
+      </div>
+
+
+    </div>
+
+
+    <div class="topic concept nested2" aria-labelledby="ariaid-title41" id="webui_catalogd_varz">
+
+      <h3 class="title topictitle3" id="ariaid-title41">Varz Page</h3>
+
+
+      <div class="body conbody">
+
+        <p class="p">
+          The <strong class="ph b">Varz</strong> page of the debug Web UI is at <strong class="ph b">/varz</strong> under the main
+          <code class="ph codeph">catalogd</code> Web UI.
+        </p>
+
+
+        <p class="p">
+          This page shows the configuration settings in effect when this instance of
+          <code class="ph codeph">catalogd</code> communicates with other Hadoop components such as HDFS and
+          YARN. These settings are collected from a set of configuration files.
+        </p>
+
+
+        <p class="p">
+          The bottom of this page also lists all the command-line settings in effect for this
+          instance of <code class="ph codeph">catalogd</code>. See
+          <a class="xref" href="impala_config_options.html#config_options">Modifying Impala Startup Options</a> for information
+          about modifying these values.
+        </p>
+
+
+      </div>
+
+
+    </div>
+
+
+  </div>
+
+
 </body>
 </html>

@@ -11,8 +11,8 @@
 <meta name="DC.Relation" scheme="URI" content="../topics/impala_query_options.html" />
 <meta name="prodname" content="Impala" />
 <meta name="prodname" content="Impala" />
-<meta name="version" content="Impala 3.2.x" />
-<meta name="version" content="Impala 3.2.x" />
+<meta name="version" content="Impala 3.3.x" />
+<meta name="version" content="Impala 3.3.x" />
 <meta name="DC.Format" content="XHTML" />
 <meta name="DC.Identifier" content="mem_limit" />
 <link rel="stylesheet" type="text/css" href="../commonltr.css" />
@@ -23,44 +23,48 @@
 
   <h1 class="title topictitle1" id="ariaid-title1">MEM_LIMIT Query Option</h1>
 
+
   
+
   
 
   <div class="body conbody">
 
     <p class="p">
-      The MEM_LIMIT query option defines the maximum amount of memory a query
-      can allocate on each node. The total memory that can be used by a query is
-      the <code class="ph codeph">MEM_LIMIT</code> times the number of nodes.
+      The MEM_LIMIT query option defines the maximum amount of memory a query can allocate on
+      each node. The total memory that can be used by a query is the <code class="ph codeph">MEM_LIMIT</code>
+      times the number of nodes.
     </p>
 
 
     <p class="p">
-      There are two levels of memory limit for Impala.
-      The <code class="ph codeph">-mem_limit</code> startup option sets an overall limit for the <span class="keyword cmdname">impalad</span> process
-      (which handles multiple queries concurrently). That process memory limit can be expressed either as a percentage
-      of RAM available to the process such as <code class="ph codeph">-mem_limit=70%</code> or as a fixed
-      amount of memory, such as <code class="ph codeph">100gb</code>. The memory available to the process is based on the host's
-      physical memory and, since Impala 3.2, memory limits from Linux Control Groups. E.g. if an
-      <span class="keyword cmdname">impalad</span> process is running in a Docker container on a host with 100GB of memory, the memory
-      available is 100GB or the Docker container's memory limit, whichever is less.
-    </p>
-
-
-
-    <p class="p">
-      The <code class="ph codeph">MEM_LIMIT</code> query option, which you set through <span class="keyword cmdname">impala-shell</span>
-      or the <code class="ph codeph">SET</code> statement in a JDBC or ODBC application, applies to each individual query.
-      The <code class="ph codeph">MEM_LIMIT</code> query option is usually expressed as a fixed size such as <code class="ph codeph">10gb</code>,
-      and must always be less than the <span class="keyword cmdname">impalad</span> memory limit.
+      There are two levels of memory limit for Impala. The
+      <code class="ph codeph">‑‑mem_limit</code> startup option sets an overall limit for the
+      <span class="keyword cmdname">impalad</span> process (which handles multiple queries concurrently). That
+      process memory limit can be expressed either as a percentage of RAM available to the
+      process such as <code class="ph codeph">‑‑mem_limit=70%</code> or as a fixed amount of
+      memory, such as <code class="ph codeph">100gb</code>. The memory available to the process is based on
+      the host's physical memory and, since Impala 3.2, memory limits from Linux Control Groups.
+      E.g. if an <span class="keyword cmdname">impalad</span> process is running in a Docker container on a host
+      with 100GB of memory, the memory available is 100GB or the Docker container's memory
+      limit, whichever is less.
     </p>
 
 
     <p class="p">
-      If query processing exceeds the specified memory limit on any node, either the per-query limit or the
-      <span class="keyword cmdname">impalad</span> limit, Impala cancels the query automatically.
-      Memory limits are checked periodically during query processing, so the actual memory in use
-      might briefly exceed the limit without the query being cancelled.
+      The <code class="ph codeph">MEM_LIMIT</code> query option, which you set through
+      <span class="keyword cmdname">impala-shell</span> or the <code class="ph codeph">SET</code> statement in a JDBC or ODBC
+      application, applies to each individual query. The <code class="ph codeph">MEM_LIMIT</code> query option
+      is usually expressed as a fixed size such as <code class="ph codeph">10gb</code>, and must always be
+      less than the <span class="keyword cmdname">impalad</span> memory limit.
+    </p>
+
+
+    <p class="p">
+      If query processing exceeds the specified memory limit on any node, either the per-query
+      limit or the <span class="keyword cmdname">impalad</span> limit, Impala cancels the query automatically.
+      Memory limits are checked periodically during query processing, so the actual memory in
+      use might briefly exceed the limit without the query being cancelled.
     </p>
 
 
@@ -70,9 +74,10 @@
 
 
     <p class="p">
-      <strong class="ph b">Units:</strong> A numeric argument represents memory size in bytes; you can also use a suffix of <code class="ph codeph">m</code> or <code class="ph codeph">mb</code>
-      for megabytes, or more commonly <code class="ph codeph">g</code> or <code class="ph codeph">gb</code> for gigabytes. If you specify a value with unrecognized
-      formats, subsequent queries fail with an error.
+      <strong class="ph b">Units:</strong> A numeric argument represents memory size in bytes; you can also use a
+      suffix of <code class="ph codeph">m</code> or <code class="ph codeph">mb</code> for megabytes, or more commonly
+      <code class="ph codeph">g</code> or <code class="ph codeph">gb</code> for gigabytes. If you specify a value with
+      unrecognized formats, subsequent queries fail with an error.
     </p>
 
 
@@ -88,18 +93,18 @@
 
     <p class="p">
       The <code class="ph codeph">MEM_LIMIT</code> setting is primarily useful in a high-concurrency setting,
-      or on a cluster with a workload shared between Impala and other data processing components.
-      You can prevent any query from accidentally using much more memory than expected,
-      which could negatively impact other Impala queries.
+      or on a cluster with a workload shared between Impala and other data processing
+      components. You can prevent any query from accidentally using much more memory than
+      expected, which could negatively impact other Impala queries.
     </p>
 
 
     <p class="p">
       Use the output of the <code class="ph codeph">SUMMARY</code> command in <span class="keyword cmdname">impala-shell</span>
-      to get a report of memory used for each phase of your most heavyweight queries on each node,
-      and then set a <code class="ph codeph">MEM_LIMIT</code> somewhat higher than that.
-      See <a class="xref" href="impala_explain_plan.html#perf_summary">Using the SUMMARY Report for Performance Tuning</a> for usage information about
-      the <code class="ph codeph">SUMMARY</code> command.
+      to get a report of memory used for each phase of your most heavyweight queries on each
+      node, and then set a <code class="ph codeph">MEM_LIMIT</code> somewhat higher than that. See
+      <a class="xref" href="impala_explain_plan.html#perf_summary">Using the SUMMARY Report for Performance Tuning</a> for usage information about the
+      <code class="ph codeph">SUMMARY</code> command.
     </p>
 
 
@@ -109,8 +114,8 @@
 
 
     <p class="p">
-      The following examples show how to set the <code class="ph codeph">MEM_LIMIT</code> query option
-      using a fixed number of bytes, or suffixes representing gigabytes or megabytes.
+      The following examples show how to set the <code class="ph codeph">MEM_LIMIT</code> query option using a
+      fixed number of bytes, or suffixes representing gigabytes or megabytes.
     </p>
 
 
@@ -161,16 +166,16 @@ MEM_LIMIT set to 3mb
 </code></pre>
 
     <p class="p">
-      The following examples show how unrecognized <code class="ph codeph">MEM_LIMIT</code>
-      values lead to errors for subsequent queries.
+      The following examples show how unrecognized <code class="ph codeph">MEM_LIMIT</code> values lead to
+      errors for subsequent queries.
     </p>
 
 
 <pre class="pre codeblock"><code>
-[localhost:21000] &gt; set mem_limit=3tb;
-MEM_LIMIT set to 3tb
+[localhost:21000] &gt; set mem_limit=3pb;
+MEM_LIMIT set to 3pb
 [localhost:21000] &gt; select 5;
-ERROR: Failed to parse query memory limit from '3tb'.
+ERROR: Failed to parse query memory limit from '3pb'.
 
 [localhost:21000] &gt; set mem_limit=xyz;
 MEM_LIMIT set to xyz
@@ -180,12 +185,10 @@ ERROR: Failed to parse query memory limit from 'xyz'.
 </code></pre>
 
     <p class="p">
-      The following examples shows the automatic query cancellation
-      when the <code class="ph codeph">MEM_LIMIT</code> value is exceeded
-      on any host involved in the Impala query. First it runs a
-      successful query and checks the largest amount of memory
-      used on any node for any stage of the query.
-      Then it sets an artificially low <code class="ph codeph">MEM_LIMIT</code>
+      The following examples shows the automatic query cancellation when the
+      <code class="ph codeph">MEM_LIMIT</code> value is exceeded on any host involved in the Impala query.
+      First it runs a successful query and checks the largest amount of memory used on any node
+      for any stage of the query. Then it sets an artificially low <code class="ph codeph">MEM_LIMIT</code>
       setting so that the same query cannot run.
     </p>
 
@@ -230,6 +233,7 @@ Query did not have enough memory to get the minimum required buffers in the bloc
 </code></pre>
 
   </div>
+
 
 <div class="related-links">
 <div class="familylinks">

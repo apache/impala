@@ -16,8 +16,8 @@
 <meta name="DC.Relation" scheme="URI" content="../topics/impala_seqfile.html" />
 <meta name="prodname" content="Impala" />
 <meta name="prodname" content="Impala" />
-<meta name="version" content="Impala 3.2.x" />
-<meta name="version" content="Impala 3.2.x" />
+<meta name="version" content="Impala 3.3.x" />
+<meta name="version" content="Impala 3.3.x" />
 <meta name="DC.Format" content="XHTML" />
 <meta name="DC.Identifier" content="file_formats" />
 <link rel="stylesheet" type="text/css" href="../commonltr.css" />
@@ -69,26 +69,26 @@
     </p>
 
 
-
+    
 <div class="tablenoborder"><table cellpadding="4" cellspacing="0" summary="" class="table" frame="border" border="1" rules="all"><colgroup><col style="width:10%" /><col style="width:10%" /><col style="width:20%" /><col style="width:30%" /><col style="width:30%" /></colgroup><thead class="thead" style="text-align:left;">
           <tr class="row">
-            <th class="entry nocellnorowborder" style="vertical-align:top;" id="d64802e92">
+            <th class="entry nocellnorowborder" style="vertical-align:top;" id="d68905e92">
               File Type
             </th>
 
-            <th class="entry nocellnorowborder" style="vertical-align:top;" id="d64802e95">
+            <th class="entry nocellnorowborder" style="vertical-align:top;" id="d68905e95">
               Format
             </th>
 
-            <th class="entry nocellnorowborder" style="vertical-align:top;" id="d64802e98">
+            <th class="entry nocellnorowborder" style="vertical-align:top;" id="d68905e98">
               Compression Codecs
             </th>
 
-            <th class="entry nocellnorowborder" style="vertical-align:top;" id="d64802e101">
+            <th class="entry nocellnorowborder" style="vertical-align:top;" id="d68905e101">
               Impala Can CREATE?
             </th>
 
-            <th class="entry cell-norowborder" style="vertical-align:top;" id="d64802e104">
+            <th class="entry cell-norowborder" style="vertical-align:top;" id="d68905e104">
               Impala Can INSERT?
             </th>
 
@@ -97,23 +97,21 @@
         </thead>
 <tbody class="tbody">
           <tr id="file_formats__parquet_support" class="row">
-            <td class="entry nocellnorowborder" style="vertical-align:top;" headers="d64802e92 ">
+            <td class="entry nocellnorowborder" style="vertical-align:top;" headers="d68905e92 ">
               <a class="xref" href="impala_parquet.html#parquet">Parquet</a>
             </td>
 
-            <td class="entry nocellnorowborder" style="vertical-align:top;" headers="d64802e95 ">
+            <td class="entry nocellnorowborder" style="vertical-align:top;" headers="d68905e95 ">
               Structured
             </td>
 
-            <td class="entry nocellnorowborder" style="vertical-align:top;" headers="d64802e98 ">
-              Snappy, gzip; currently Snappy by default
-            </td>
+            <td class="entry nocellnorowborder" style="vertical-align:top;" headers="d68905e98 "> Snappy, gzip, zstd, lz4; currently Snappy by default </td>
 
-            <td class="entry nocellnorowborder" style="vertical-align:top;" headers="d64802e101 ">
+            <td class="entry nocellnorowborder" style="vertical-align:top;" headers="d68905e101 ">
               Yes.
             </td>
 
-            <td class="entry cell-norowborder" style="vertical-align:top;" headers="d64802e104 ">
+            <td class="entry cell-norowborder" style="vertical-align:top;" headers="d68905e104 ">
               Yes: <code class="ph codeph">CREATE TABLE</code>, <code class="ph codeph">INSERT</code>, <code class="ph codeph">LOAD
               DATA</code>, and query.
             </td>
@@ -121,19 +119,19 @@
           </tr>
 
           <tr id="file_formats__orc_support" class="row">
-            <td class="entry nocellnorowborder" style="vertical-align:top;" headers="d64802e92 ">
+            <td class="entry nocellnorowborder" style="vertical-align:top;" headers="d68905e92 ">
               <a class="xref" href="impala_orc.html#orc">ORC</a>
             </td>
 
-            <td class="entry nocellnorowborder" style="vertical-align:top;" headers="d64802e95 ">
+            <td class="entry nocellnorowborder" style="vertical-align:top;" headers="d68905e95 ">
               Structured
             </td>
 
-            <td class="entry nocellnorowborder" style="vertical-align:top;" headers="d64802e98 ">
+            <td class="entry nocellnorowborder" style="vertical-align:top;" headers="d68905e98 ">
               gzip, Snappy, LZO, LZ4; currently gzip by default
             </td>
 
-            <td class="entry nocellnorowborder" style="vertical-align:top;" headers="d64802e101 ">
+            <td class="entry nocellnorowborder" style="vertical-align:top;" headers="d68905e101 ">
               Yes, in Impala 2.12.0 and higher.
 
               <p class="p">
@@ -144,7 +142,7 @@
 
             </td>
 
-            <td class="entry cell-norowborder" style="vertical-align:top;" headers="d64802e104 ">
+            <td class="entry cell-norowborder" style="vertical-align:top;" headers="d68905e104 ">
               No. Import data by using <code class="ph codeph">LOAD DATA</code> on data files already in the
               right format, or use <code class="ph codeph">INSERT</code> in Hive followed by <code class="ph codeph">REFRESH
               <var class="keyword varname">table_name</var></code> in Impala.
@@ -153,25 +151,25 @@
           </tr>
 
           <tr id="file_formats__txtfile_support" class="row">
-            <td class="entry nocellnorowborder" style="vertical-align:top;" headers="d64802e92 ">
+            <td class="entry nocellnorowborder" style="vertical-align:top;" headers="d68905e92 ">
               <a class="xref" href="impala_txtfile.html#txtfile">Text</a>
             </td>
 
-            <td class="entry nocellnorowborder" style="vertical-align:top;" headers="d64802e95 ">
+            <td class="entry nocellnorowborder" style="vertical-align:top;" headers="d68905e95 ">
               Unstructured
             </td>
 
-            <td class="entry nocellnorowborder" style="vertical-align:top;" headers="d64802e98 ">
+            <td class="entry nocellnorowborder" style="vertical-align:top;" headers="d68905e98 ">
               LZO, gzip, bzip2, Snappy
             </td>
 
-            <td class="entry nocellnorowborder" style="vertical-align:top;" headers="d64802e101 ">
+            <td class="entry nocellnorowborder" style="vertical-align:top;" headers="d68905e101 ">
               Yes. For <code class="ph codeph">CREATE TABLE</code> with no <code class="ph codeph">STORED AS</code> clause,
               the default file format is uncompressed text, with values separated by ASCII
               <code class="ph codeph">0x01</code> characters (typically represented as Ctrl-A).
             </td>
 
-            <td class="entry cell-norowborder" style="vertical-align:top;" headers="d64802e104 ">
+            <td class="entry cell-norowborder" style="vertical-align:top;" headers="d68905e104 ">
               Yes: <code class="ph codeph">CREATE TABLE</code>, <code class="ph codeph">INSERT</code>, <code class="ph codeph">LOAD
               DATA</code>, and query. If LZO compression is used, you must create the table
               and load data in Hive. If other kinds of compression are used, you must load data
@@ -181,23 +179,23 @@
           </tr>
 
           <tr id="file_formats__avro_support" class="row">
-            <td class="entry nocellnorowborder" style="vertical-align:top;" headers="d64802e92 ">
+            <td class="entry nocellnorowborder" style="vertical-align:top;" headers="d68905e92 ">
               <a class="xref" href="impala_avro.html#avro">Avro</a>
             </td>
 
-            <td class="entry nocellnorowborder" style="vertical-align:top;" headers="d64802e95 ">
+            <td class="entry nocellnorowborder" style="vertical-align:top;" headers="d68905e95 ">
               Structured
             </td>
 
-            <td class="entry nocellnorowborder" style="vertical-align:top;" headers="d64802e98 ">
+            <td class="entry nocellnorowborder" style="vertical-align:top;" headers="d68905e98 ">
               Snappy, gzip, deflate
             </td>
 
-            <td class="entry nocellnorowborder" style="vertical-align:top;" headers="d64802e101 ">
+            <td class="entry nocellnorowborder" style="vertical-align:top;" headers="d68905e101 ">
               Yes, in Impala 1.4.0 and higher. In lower versions, create the table using Hive.
             </td>
 
-            <td class="entry cell-norowborder" style="vertical-align:top;" headers="d64802e104 ">
+            <td class="entry cell-norowborder" style="vertical-align:top;" headers="d68905e104 ">
               No. Import data by using <code class="ph codeph">LOAD DATA</code> on data files already in the
               right format, or use <code class="ph codeph">INSERT</code> in Hive followed by <code class="ph codeph">REFRESH
               <var class="keyword varname">table_name</var></code> in Impala.
@@ -207,23 +205,23 @@
           </tr>
 
           <tr id="file_formats__rcfile_support" class="row">
-            <td class="entry nocellnorowborder" style="vertical-align:top;" headers="d64802e92 ">
+            <td class="entry nocellnorowborder" style="vertical-align:top;" headers="d68905e92 ">
               <a class="xref" href="impala_rcfile.html#rcfile">RCFile</a>
             </td>
 
-            <td class="entry nocellnorowborder" style="vertical-align:top;" headers="d64802e95 ">
+            <td class="entry nocellnorowborder" style="vertical-align:top;" headers="d68905e95 ">
               Structured
             </td>
 
-            <td class="entry nocellnorowborder" style="vertical-align:top;" headers="d64802e98 ">
+            <td class="entry nocellnorowborder" style="vertical-align:top;" headers="d68905e98 ">
               Snappy, gzip, deflate, bzip2
             </td>
 
-            <td class="entry nocellnorowborder" style="vertical-align:top;" headers="d64802e101 ">
+            <td class="entry nocellnorowborder" style="vertical-align:top;" headers="d68905e101 ">
               Yes.
             </td>
 
-            <td class="entry cell-norowborder" style="vertical-align:top;" headers="d64802e104 ">
+            <td class="entry cell-norowborder" style="vertical-align:top;" headers="d68905e104 ">
               No. Import data by using <code class="ph codeph">LOAD DATA</code> on data files already in the
               right format, or use <code class="ph codeph">INSERT</code> in Hive followed by <code class="ph codeph">REFRESH
               <var class="keyword varname">table_name</var></code> in Impala.
@@ -233,23 +231,23 @@
           </tr>
 
           <tr id="file_formats__sequencefile_support" class="row">
-            <td class="entry row-nocellborder" style="vertical-align:top;" headers="d64802e92 ">
+            <td class="entry row-nocellborder" style="vertical-align:top;" headers="d68905e92 ">
               <a class="xref" href="impala_seqfile.html#seqfile">SequenceFile</a>
             </td>
 
-            <td class="entry row-nocellborder" style="vertical-align:top;" headers="d64802e95 ">
+            <td class="entry row-nocellborder" style="vertical-align:top;" headers="d68905e95 ">
               Structured
             </td>
 
-            <td class="entry row-nocellborder" style="vertical-align:top;" headers="d64802e98 ">
+            <td class="entry row-nocellborder" style="vertical-align:top;" headers="d68905e98 ">
               Snappy, gzip, deflate, bzip2
             </td>
 
-            <td class="entry row-nocellborder" style="vertical-align:top;" headers="d64802e101 ">
+            <td class="entry row-nocellborder" style="vertical-align:top;" headers="d68905e101 ">
               Yes.
             </td>
 
-            <td class="entry cellrowborder" style="vertical-align:top;" headers="d64802e104 ">
+            <td class="entry cellrowborder" style="vertical-align:top;" headers="d68905e104 ">
               No. Import data by using <code class="ph codeph">LOAD DATA</code> on data files already in the
               right format, or use <code class="ph codeph">INSERT</code> in Hive followed by <code class="ph codeph">REFRESH
               <var class="keyword varname">table_name</var></code> in Impala.
@@ -269,7 +267,7 @@
 
 
     <dl class="dl">
-
+      
 
         <dt class="dt dlterm">
           Snappy
@@ -286,9 +284,9 @@
         </dd>
 
 
+      
 
-
-
+      
 
         <dt class="dt dlterm">
           Gzip
@@ -305,9 +303,9 @@
         </dd>
 
 
+      
 
-
-
+      
 
         <dt class="dt dlterm">
           Deflate
@@ -315,14 +313,16 @@
 
 
         <dd class="dd">
-          <p class="p"></p>
+          <p class="p">
+            Not supported for text files.
+          </p>
 
         </dd>
 
 
+      
 
-
-
+      
 
         <dt class="dt dlterm">
           Bzip2
@@ -337,9 +337,9 @@
         </dd>
 
 
+      
 
-
-
+      
 
         <dt class="dt dlterm">
           LZO
@@ -356,7 +356,20 @@
         </dd>
 
 
+      
+      
+        <dt class="dt dlterm">Zstd</dt>
 
+        <dd class="dd">For Parquet files only.</dd>
+
+      
+
+      
+        <dt class="dt dlterm">Lz4</dt>
+
+        <dd class="dd">For Parquet files only.</dd>
+
+      
     </dl>
 
 
@@ -383,7 +396,7 @@
     <h2 class="title topictitle2" id="ariaid-title2">Choosing the File Format for a Table</h2>
 
 
-
+    
 
     <div class="body conbody">
 

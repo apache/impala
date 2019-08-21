@@ -11,8 +11,8 @@
 <meta name="DC.Relation" scheme="URI" content="../topics/impala_functions.html" />
 <meta name="prodname" content="Impala" />
 <meta name="prodname" content="Impala" />
-<meta name="version" content="Impala 3.2.x" />
-<meta name="version" content="Impala 3.2.x" />
+<meta name="version" content="Impala 3.3.x" />
+<meta name="version" content="Impala 3.3.x" />
 <meta name="DC.Format" content="XHTML" />
 <meta name="DC.Identifier" content="math_functions" />
 <link rel="stylesheet" type="text/css" href="../commonltr.css" />
@@ -38,7 +38,7 @@
     </p>
 
 
-    <div class="note note"><span class="notetitle">Note:</span>
+    <div class="note note"><span class="notetitle">Note:</span> 
       In Impala, exponentiation uses the <code class="ph codeph">pow()</code> function rather than an
       exponentiation operator such as <code class="ph codeph">**</code>.
     </div>
@@ -1033,9 +1033,10 @@ select fmod(9.9,3.3);
         <dd class="dd">
           <strong class="ph b">Purpose:</strong> Returns the largest value from a list of expressions.
           <p class="p">
-        <strong class="ph b">Return type:</strong> same as the initial argument value, except that integer values are promoted to
-        <code class="ph codeph">BIGINT</code> and floating-point values are promoted to <code class="ph codeph">DOUBLE</code>; use
-        <code class="ph codeph">CAST()</code> when inserting into a smaller numeric column
+        <strong class="ph b">Return type:</strong> same as the initial argument value, except that integer values are
+        promoted to <code class="ph codeph">BIGINT</code> and floating-point values are promoted to
+        <code class="ph codeph">DOUBLE</code>; use <code class="ph codeph">CAST()</code> when inserting into a smaller
+        numeric column
       </p>
 
         </dd>
@@ -1083,11 +1084,12 @@ select fmod(9.9,3.3);
 
 
           <p class="p">
-        Infinity and NaN can be specified in text data files as <code class="ph codeph">inf</code> and <code class="ph codeph">nan</code>
-        respectively, and Impala interprets them as these special values. They can also be produced by certain
-        arithmetic expressions; for example, <code class="ph codeph">1/0</code> returns <code class="ph codeph">Infinity</code> and
-        <code class="ph codeph">pow(-1, 0.5)</code> returns <code class="ph codeph">NaN</code>. Or you can cast the literal values, such as <code class="ph codeph">CAST('nan' AS
-        DOUBLE)</code> or <code class="ph codeph">CAST('inf' AS DOUBLE)</code>.
+        Infinity and NaN can be specified in text data files as <code class="ph codeph">inf</code> and
+        <code class="ph codeph">nan</code> respectively, and Impala interprets them as these special values.
+        They can also be produced by certain arithmetic expressions; for example,
+        <code class="ph codeph">1/0</code> returns <code class="ph codeph">Infinity</code> and <code class="ph codeph">pow(-1, 0.5)</code>
+        returns <code class="ph codeph">NaN</code>. Or you can cast the literal values, such as
+        <code class="ph codeph">CAST('nan' AS DOUBLE)</code> or <code class="ph codeph">CAST('inf' AS DOUBLE)</code>.
       </p>
 
         </dd>
@@ -1116,11 +1118,12 @@ select fmod(9.9,3.3);
 
 
           <p class="p">
-        Infinity and NaN can be specified in text data files as <code class="ph codeph">inf</code> and <code class="ph codeph">nan</code>
-        respectively, and Impala interprets them as these special values. They can also be produced by certain
-        arithmetic expressions; for example, <code class="ph codeph">1/0</code> returns <code class="ph codeph">Infinity</code> and
-        <code class="ph codeph">pow(-1, 0.5)</code> returns <code class="ph codeph">NaN</code>. Or you can cast the literal values, such as <code class="ph codeph">CAST('nan' AS
-        DOUBLE)</code> or <code class="ph codeph">CAST('inf' AS DOUBLE)</code>.
+        Infinity and NaN can be specified in text data files as <code class="ph codeph">inf</code> and
+        <code class="ph codeph">nan</code> respectively, and Impala interprets them as these special values.
+        They can also be produced by certain arithmetic expressions; for example,
+        <code class="ph codeph">1/0</code> returns <code class="ph codeph">Infinity</code> and <code class="ph codeph">pow(-1, 0.5)</code>
+        returns <code class="ph codeph">NaN</code>. Or you can cast the literal values, such as
+        <code class="ph codeph">CAST('nan' AS DOUBLE)</code> or <code class="ph codeph">CAST('inf' AS DOUBLE)</code>.
       </p>
 
         </dd>
@@ -1140,9 +1143,10 @@ select fmod(9.9,3.3);
         <dd class="dd">
           <strong class="ph b">Purpose:</strong> Returns the smallest value from a list of expressions.
           <p class="p">
-        <strong class="ph b">Return type:</strong> same as the initial argument value, except that integer values are promoted to
-        <code class="ph codeph">BIGINT</code> and floating-point values are promoted to <code class="ph codeph">DOUBLE</code>; use
-        <code class="ph codeph">CAST()</code> when inserting into a smaller numeric column
+        <strong class="ph b">Return type:</strong> same as the initial argument value, except that integer values are
+        promoted to <code class="ph codeph">BIGINT</code> and floating-point values are promoted to
+        <code class="ph codeph">DOUBLE</code>; use <code class="ph codeph">CAST()</code> when inserting into a smaller
+        numeric column
       </p>
 
         </dd>
@@ -1488,9 +1492,9 @@ select mod(9.9,3.0);
         </dd>
 
 
+      
 
-
-
+      
 
         <dt class="dt dlterm" id="math_functions__negative">
           NEGATIVE(numeric_type a)
@@ -1688,11 +1692,13 @@ select pmod(5,-2);
 
 
           <div class="p">
-        The following examples demonstrate how to check the precision and scale of numeric literals or other
-        numeric expressions. Impala represents numeric literals in the smallest appropriate type. 5 is a
-        <code class="ph codeph">TINYINT</code> value, which ranges from -128 to 127, therefore 3 decimal digits are needed to
-        represent the entire range, and because it is an integer value there are no fractional digits. 1.333 is
-        interpreted as a <code class="ph codeph">DECIMAL</code> value, with 4 digits total and 3 digits after the decimal point.
+        The following examples demonstrate how to check the precision and scale of numeric
+        literals or other numeric expressions. Impala represents numeric literals in the
+        smallest appropriate type. 5 is a <code class="ph codeph">TINYINT</code> value, which ranges from -128
+        to 127, therefore 3 decimal digits are needed to represent the entire range, and because
+        it is an integer value there are no fractional digits. 1.333 is interpreted as a
+        <code class="ph codeph">DECIMAL</code> value, with 4 digits total and 3 digits after the decimal
+        point.
 <pre class="pre codeblock"><code>[localhost:21000] &gt; select precision(5), scale(5);
 +--------------+----------+
 | precision(5) | scale(5) |
@@ -1931,11 +1937,13 @@ select x, unix_timestamp(now()), rand(unix_timestamp(now()))
 
 
           <div class="p">
-        The following examples demonstrate how to check the precision and scale of numeric literals or other
-        numeric expressions. Impala represents numeric literals in the smallest appropriate type. 5 is a
-        <code class="ph codeph">TINYINT</code> value, which ranges from -128 to 127, therefore 3 decimal digits are needed to
-        represent the entire range, and because it is an integer value there are no fractional digits. 1.333 is
-        interpreted as a <code class="ph codeph">DECIMAL</code> value, with 4 digits total and 3 digits after the decimal point.
+        The following examples demonstrate how to check the precision and scale of numeric
+        literals or other numeric expressions. Impala represents numeric literals in the
+        smallest appropriate type. 5 is a <code class="ph codeph">TINYINT</code> value, which ranges from -128
+        to 127, therefore 3 decimal digits are needed to represent the entire range, and because
+        it is an integer value there are no fractional digits. 1.333 is interpreted as a
+        <code class="ph codeph">DECIMAL</code> value, with 4 digits total and 3 digits after the decimal
+        point.
 <pre class="pre codeblock"><code>[localhost:21000] &gt; select precision(5), scale(5);
 +--------------+----------+
 | precision(5) | scale(5) |
@@ -2313,9 +2321,9 @@ select trunc(d) from dbl order by d;
         </dd>
 
 
+      
 
-
-
+      
 
         <dt class="dt dlterm" id="math_functions__width_bucket">
           WIDTH_BUCKET(DECIMAL expr, DECIMAL min_value, DECIMAL max_value, INT num_buckets)

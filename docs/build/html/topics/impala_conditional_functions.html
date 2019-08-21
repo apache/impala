@@ -11,8 +11,8 @@
 <meta name="DC.Relation" scheme="URI" content="../topics/impala_functions.html" />
 <meta name="prodname" content="Impala" />
 <meta name="prodname" content="Impala" />
-<meta name="version" content="Impala 3.2.x" />
-<meta name="version" content="Impala 3.2.x" />
+<meta name="version" content="Impala 3.3.x" />
+<meta name="version" content="Impala 3.3.x" />
 <meta name="DC.Format" content="XHTML" />
 <meta name="DC.Identifier" content="conditional_functions" />
 <link rel="stylesheet" type="text/css" href="../commonltr.css" />
@@ -141,9 +141,10 @@
           <strong class="ph b">Purpose:</strong> Compares an expression to one or more possible values, and returns a
           corresponding result when a match is found.
           <p class="p">
-        <strong class="ph b">Return type:</strong> same as the initial argument value, except that integer values are promoted to
-        <code class="ph codeph">BIGINT</code> and floating-point values are promoted to <code class="ph codeph">DOUBLE</code>; use
-        <code class="ph codeph">CAST()</code> when inserting into a smaller numeric column
+        <strong class="ph b">Return type:</strong> same as the initial argument value, except that integer values are
+        promoted to <code class="ph codeph">BIGINT</code> and floating-point values are promoted to
+        <code class="ph codeph">DOUBLE</code>; use <code class="ph codeph">CAST()</code> when inserting into a smaller
+        numeric column
       </p>
 
 
@@ -199,9 +200,10 @@
           <code class="ph codeph">TRUE</code>, and returns a corresponding result for the first true
           expression.
           <p class="p">
-        <strong class="ph b">Return type:</strong> same as the initial argument value, except that integer values are promoted to
-        <code class="ph codeph">BIGINT</code> and floating-point values are promoted to <code class="ph codeph">DOUBLE</code>; use
-        <code class="ph codeph">CAST()</code> when inserting into a smaller numeric column
+        <strong class="ph b">Return type:</strong> same as the initial argument value, except that integer values are
+        promoted to <code class="ph codeph">BIGINT</code> and floating-point values are promoted to
+        <code class="ph codeph">DOUBLE</code>; use <code class="ph codeph">CAST()</code> when inserting into a smaller
+        numeric column
       </p>
 
 
@@ -289,9 +291,10 @@
           <code class="ph codeph">NULL</code>, or <code class="ph codeph">NULL</code> if all arguments are
           <code class="ph codeph">NULL</code>.
           <p class="p">
-        <strong class="ph b">Return type:</strong> same as the initial argument value, except that integer values are promoted to
-        <code class="ph codeph">BIGINT</code> and floating-point values are promoted to <code class="ph codeph">DOUBLE</code>; use
-        <code class="ph codeph">CAST()</code> when inserting into a smaller numeric column
+        <strong class="ph b">Return type:</strong> same as the initial argument value, except that integer values are
+        promoted to <code class="ph codeph">BIGINT</code> and floating-point values are promoted to
+        <code class="ph codeph">DOUBLE</code>; use <code class="ph codeph">CAST()</code> when inserting into a smaller
+        numeric column
       </p>
 
         </dd>
@@ -487,12 +490,12 @@
       </p>
 
 
-          <p class="p"> In
-          <span class="keyword">Impala 2.11</span> and higher, you can use the
-        operators <code class="ph codeph">IS [NOT] TRUE</code> and <code class="ph codeph">IS [NOT]
-          FALSE</code> as equivalents for the built-in functions
-          <code class="ph codeph">ISTRUE()</code>, <code class="ph codeph">ISNOTTRUE()</code>,
-          <code class="ph codeph">ISFALSE()</code>, and <code class="ph codeph">ISNOTFALSE()</code>. </p>
+          <p class="p">
+        In <span class="keyword">Impala 2.11</span> and higher, you can use the operators <code class="ph codeph">IS
+        [NOT] TRUE</code> and <code class="ph codeph">IS [NOT] FALSE</code> as equivalents for the built-in
+        functions <code class="ph codeph">ISTRUE()</code>, <code class="ph codeph">ISNOTTRUE()</code>,
+        <code class="ph codeph">ISFALSE()</code>, and <code class="ph codeph">ISNOTFALSE()</code>.
+      </p>
 
         </dd>
 
@@ -527,7 +530,8 @@
 
 
           <p class="p">
-        <strong class="ph b">Usage notes:</strong> Primarily for compatibility with code containing industry extensions to SQL.
+        <strong class="ph b">Usage notes:</strong> Primarily for compatibility with code containing industry extensions
+        to SQL.
       </p>
 
 
@@ -541,12 +545,12 @@
       </p>
 
 
-          <p class="p"> In
-          <span class="keyword">Impala 2.11</span> and higher, you can use the
-        operators <code class="ph codeph">IS [NOT] TRUE</code> and <code class="ph codeph">IS [NOT]
-          FALSE</code> as equivalents for the built-in functions
-          <code class="ph codeph">ISTRUE()</code>, <code class="ph codeph">ISNOTTRUE()</code>,
-          <code class="ph codeph">ISFALSE()</code>, and <code class="ph codeph">ISNOTFALSE()</code>. </p>
+          <p class="p">
+        In <span class="keyword">Impala 2.11</span> and higher, you can use the operators <code class="ph codeph">IS
+        [NOT] TRUE</code> and <code class="ph codeph">IS [NOT] FALSE</code> as equivalents for the built-in
+        functions <code class="ph codeph">ISTRUE()</code>, <code class="ph codeph">ISNOTTRUE()</code>,
+        <code class="ph codeph">ISFALSE()</code>, and <code class="ph codeph">ISNOTFALSE()</code>.
+      </p>
 
         </dd>
 
@@ -590,12 +594,12 @@
       </p>
 
 
-          <p class="p"> In
-          <span class="keyword">Impala 2.11</span> and higher, you can use the
-        operators <code class="ph codeph">IS [NOT] TRUE</code> and <code class="ph codeph">IS [NOT]
-          FALSE</code> as equivalents for the built-in functions
-          <code class="ph codeph">ISTRUE()</code>, <code class="ph codeph">ISNOTTRUE()</code>,
-          <code class="ph codeph">ISFALSE()</code>, and <code class="ph codeph">ISNOTFALSE()</code>. </p>
+          <p class="p">
+        In <span class="keyword">Impala 2.11</span> and higher, you can use the operators <code class="ph codeph">IS
+        [NOT] TRUE</code> and <code class="ph codeph">IS [NOT] FALSE</code> as equivalents for the built-in
+        functions <code class="ph codeph">ISTRUE()</code>, <code class="ph codeph">ISNOTTRUE()</code>,
+        <code class="ph codeph">ISFALSE()</code>, and <code class="ph codeph">ISNOTFALSE()</code>.
+      </p>
 
         </dd>
 
@@ -657,7 +661,8 @@
 
 
           <p class="p">
-        <strong class="ph b">Usage notes:</strong> Primarily for compatibility with code containing industry extensions to SQL.
+        <strong class="ph b">Usage notes:</strong> Primarily for compatibility with code containing industry extensions
+        to SQL.
       </p>
 
 
@@ -671,12 +676,12 @@
       </p>
 
 
-          <p class="p"> In
-          <span class="keyword">Impala 2.11</span> and higher, you can use the
-        operators <code class="ph codeph">IS [NOT] TRUE</code> and <code class="ph codeph">IS [NOT]
-          FALSE</code> as equivalents for the built-in functions
-          <code class="ph codeph">ISTRUE()</code>, <code class="ph codeph">ISNOTTRUE()</code>,
-          <code class="ph codeph">ISFALSE()</code>, and <code class="ph codeph">ISNOTFALSE()</code>. </p>
+          <p class="p">
+        In <span class="keyword">Impala 2.11</span> and higher, you can use the operators <code class="ph codeph">IS
+        [NOT] TRUE</code> and <code class="ph codeph">IS [NOT] FALSE</code> as equivalents for the built-in
+        functions <code class="ph codeph">ISTRUE()</code>, <code class="ph codeph">ISNOTTRUE()</code>,
+        <code class="ph codeph">ISFALSE()</code>, and <code class="ph codeph">ISNOTFALSE()</code>.
+      </p>
 
         </dd>
 
@@ -709,7 +714,8 @@
 
 
           <p class="p">
-        <strong class="ph b">Usage notes:</strong> Primarily for compatibility with code containing industry extensions to SQL.
+        <strong class="ph b">Usage notes:</strong> Primarily for compatibility with code containing industry extensions
+        to SQL.
       </p>
 
 
@@ -760,9 +766,10 @@ END</code></pre>
 
 
           <p class="p">
-        <strong class="ph b">Return type:</strong> same as the initial argument value, except that integer values are promoted to
-        <code class="ph codeph">BIGINT</code> and floating-point values are promoted to <code class="ph codeph">DOUBLE</code>; use
-        <code class="ph codeph">CAST()</code> when inserting into a smaller numeric column
+        <strong class="ph b">Return type:</strong> same as the initial argument value, except that integer values are
+        promoted to <code class="ph codeph">BIGINT</code> and floating-point values are promoted to
+        <code class="ph codeph">DOUBLE</code>; use <code class="ph codeph">CAST()</code> when inserting into a smaller
+        numeric column
       </p>
 
 
@@ -832,7 +839,8 @@ END</code></pre>
 
 
           <p class="p">
-        <strong class="ph b">Usage notes:</strong> Primarily for compatibility with code containing industry extensions to SQL.
+        <strong class="ph b">Usage notes:</strong> Primarily for compatibility with code containing industry extensions
+        to SQL.
       </p>
 
 

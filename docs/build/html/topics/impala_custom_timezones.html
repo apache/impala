@@ -10,7 +10,7 @@
 <meta name="DC.Title" content="Customizing Time Zones" />
 <meta name="DC.Relation" scheme="URI" content="../topics/impala_timestamp.html" />
 <meta name="prodname" content="Impala" />
-<meta name="version" content="Impala 3.2.x" />
+<meta name="version" content="Impala 3.3.x" />
 <meta name="DC.Format" content="XHTML" />
 <meta name="DC.Identifier" content="custom_timezone" />
 <link rel="stylesheet" type="text/css" href="../commonltr.css" />
@@ -22,9 +22,9 @@
   <h1 class="title topictitle1" id="ariaid-title1">Customizing Time Zones</h1>
 
 
+  
 
-
-
+  
 
   <div class="body conbody">
 
@@ -50,24 +50,24 @@
 
           <ul class="ul">
             <li class="li">
-              <code class="ph codeph">--hdfs_zone_info_zip</code>: This flag allows Impala administrators to
-              specify a custom timezone database. The flag should be set to a shared (not
-              necessarily HDFS) path that points to a zip archive of a custom IANA timezone
-              database. The timezone database is expected to be in a compiled binary format. If
-              the startup flag is set, Impala will use the specified timezone database instead
-              of the default <code class="ph codeph">/usr/share/zoneinfo </code>database. The timezone db
-              upgrade process is described in detail below.
+              <code class="ph codeph">‑‑hdfs_zone_info_zip</code>: This flag allows Impala
+              administrators to specify a custom timezone database. The flag should be set to a
+              shared (not necessarily HDFS) path that points to a zip archive of a custom IANA
+              timezone database. The timezone database is expected to be in a compiled binary
+              format. If the startup flag is set, Impala will use the specified timezone
+              database instead of the default <code class="ph codeph">/usr/share/zoneinfo </code>database. The
+              timezone db upgrade process is described in detail below.
             </li>
 
 
             <li class="li">
               <p class="p">
-                <code class="ph codeph">--hdfs_zone_alias_conf</code>: This flag allows Impala administrators
-                to specify definitions for custom timezone aliases. The flag should be set to a
-                shared (not necessarily HDFS) path that specifies a config file containing
-                custom timezone alias definitions. This config file can be used as a workaround
-                for users who want to keep using their legacy timezone names. Configuring custom
-                aliases is described in detail below.
+                <code class="ph codeph">‑‑hdfs_zone_alias_conf</code>: This flag allows Impala
+                administrators to specify definitions for custom timezone aliases. The flag
+                should be set to a shared (not necessarily HDFS) path that specifies a config
+                file containing custom timezone alias definitions. This config file can be used
+                as a workaround for users who want to keep using their legacy timezone names.
+                Configuring custom aliases is described in detail below.
               </p>
 
             </li>
@@ -124,7 +124,7 @@ hdfs dfs -copyFromLocal ./tzdata/etc/zoneinfo.zip /tzdb/latest</code></pre>
 
 
         <li class="li">
-          Set the <code class="ph codeph">--hdfs_zone_info_zip</code> startup flag to
+          Set the <code class="ph codeph">‑‑hdfs_zone_info_zip</code> startup flag to
           <code class="ph codeph">/tzdb/latest/zoneinfo.zip</code> as an <code class="ph codeph">impalad </code>safety
           valve.
         </li>
@@ -172,7 +172,7 @@ hdfs dfs -copyFromLocal tzalias.conf /tzdb</code></pre>
 
 
         <li class="li">
-          Set the <code class="ph codeph">--hdfs_zone_alias_conf</code> startup flag to
+          Set the <code class="ph codeph">‑‑hdfs_zone_alias_conf</code> startup flag to
           <code class="ph codeph">/tzdb/tzalias.conf</code> as an <code class="ph codeph">impalad </code>safety valve.
         </li>
 

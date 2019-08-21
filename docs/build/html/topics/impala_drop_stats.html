@@ -11,8 +11,8 @@
 <meta name="DC.Relation" scheme="URI" content="../topics/impala_langref_sql.html" />
 <meta name="prodname" content="Impala" />
 <meta name="prodname" content="Impala" />
-<meta name="version" content="Impala 3.2.x" />
-<meta name="version" content="Impala 3.2.x" />
+<meta name="version" content="Impala 3.3.x" />
+<meta name="version" content="Impala 3.3.x" />
 <meta name="DC.Format" content="XHTML" />
 <meta name="DC.Identifier" content="drop_stats" />
 <link rel="stylesheet" type="text/css" href="../commonltr.css" />
@@ -47,12 +47,14 @@ DROP INCREMENTAL STATS [<var class="keyword varname">database_name</var>.]<var c
 </code></pre>
 
     <p class="p">
-        The <code class="ph codeph">PARTITION</code> clause is only allowed in combination with the <code class="ph codeph">INCREMENTAL</code>
-        clause. It is optional for <code class="ph codeph">COMPUTE INCREMENTAL STATS</code>, and required for <code class="ph codeph">DROP
-        INCREMENTAL STATS</code>. Whenever you specify partitions through the <code class="ph codeph">PARTITION
-        (<var class="keyword varname">partition_spec</var>)</code> clause in a <code class="ph codeph">COMPUTE INCREMENTAL STATS</code> or
-        <code class="ph codeph">DROP INCREMENTAL STATS</code> statement, you must include all the partitioning columns in the
-        specification, and specify constant values for all the partition key columns.
+        The <code class="ph codeph">PARTITION</code> clause is only allowed in combination with the
+        <code class="ph codeph">INCREMENTAL</code> clause. It is optional for <code class="ph codeph">COMPUTE INCREMENTAL
+        STATS</code>, and required for <code class="ph codeph">DROP INCREMENTAL STATS</code>. Whenever you
+        specify partitions through the <code class="ph codeph">PARTITION
+        (<var class="keyword varname">partition_spec</var>)</code> clause in a <code class="ph codeph">COMPUTE INCREMENTAL
+        STATS</code> or <code class="ph codeph">DROP INCREMENTAL STATS</code> statement, you must include
+        all the partitioning columns in the specification, and specify constant values for all
+        the partition key columns.
       </p>
 
 
@@ -204,7 +206,7 @@ show column stats item_partitioned;
     </p>
 
 
-    <div class="note note"><span class="notetitle">Note:</span>
+    <div class="note note"><span class="notetitle">Note:</span> 
       (It is possible that the row count might be preserved in future after a <code class="ph codeph">DROP INCREMENTAL
       STATS</code> statement. Check the resolution of the issue
       <a class="xref" href="https://issues.apache.org/jira/browse/IMPALA-1615" target="_blank">IMPALA-1615</a>.)
