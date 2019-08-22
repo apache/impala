@@ -217,13 +217,17 @@ class TestHmsIntegration(ImpalaTestSuite):
         result[line_elements[0]] = line_elements[1]
     return result
 
-  def hive_column_stats(self, table, column):
+  def hive_column_stats(self, table, column, remove_stats_accurate=False):
     """Returns a dictionary of stats for a column according to Hive."""
     output = self.run_stmt_in_hive('describe formatted %s %s' % (table, column))
+    result = {}
     if HIVE_MAJOR_VERSION == 2:
-      return self.parse_hive2_describe_formatted_output(output)
+      result = self.parse_hive2_describe_formatted_output(output)
     else:
-      return self.parse_hive3_describe_formatted_output(output)
+      result = self.parse_hive3_describe_formatted_output(output)
+    if remove_stats_accurate:
+      result.pop('COLUMN_STATS_ACCURATE', None)
+    return result
 
   def impala_columns(self, table_name):
     """
@@ -387,8 +391,10 @@ class TestHmsIntegration(ImpalaTestSuite):
         hive_y_stats = self.hive_column_stats(table_name, 'y')
         impala_stats = self.impala_all_column_stats(table_name)
         self.client.execute('alter table %s drop column z' % table_name)
-        assert hive_x_stats == self.hive_column_stats(table_name, 'x')
-        assert hive_y_stats == self.hive_column_stats(table_name, 'y')
+        assert hive_x_stats == self.hive_column_stats(table_name, 'x',
+                                                      remove_stats_accurate=True)
+        assert hive_y_stats == self.hive_column_stats(table_name, 'y',
+                                                      remove_stats_accurate=True)
         assert impala_stats['x'] == self.impala_all_column_stats(table_name)[
             'x']
         assert impala_stats['y'] == self.impala_all_column_stats(table_name)[
@@ -396,7 +402,8 @@ class TestHmsIntegration(ImpalaTestSuite):
         self.run_stmt_in_hive(
             'alter table %s replace columns (x int)' %
             table_name)
-        assert hive_x_stats == self.hive_column_stats(table_name, 'x')
+        assert hive_x_stats == self.hive_column_stats(table_name, 'x',
+                                                      remove_stats_accurate=True)
         assert impala_stats['x'] == self.impala_all_column_stats(table_name)[
             'x']
 
