@@ -20,6 +20,7 @@
 # directories.
 
 import os
+import re
 from subprocess import check_call
 
 from tests.util.filesystem_utils import get_fs_path
@@ -71,15 +72,16 @@ def create_table_and_copy_files(impala_client, create_stmt, unique_database, tab
   impala_client.execute(create_stmt)
 
 
-def grep_dir(dir, search):
-  '''Recursively search for files that contain 'search' and return a list of matched
-     lines grouped by file.
+def grep_dir(dir, search, filename_search=""):
+  '''Recursively search for files that contain 'search' and have a filename that matches
+     'filename_search' and return a list of matched lines grouped by file.
   '''
+  filename_matcher = re.compile(filename_search)
   matching_files = dict()
   for dir_name, _, file_names in os.walk(dir):
     for file_name in file_names:
       file_path = os.path.join(dir_name, file_name)
-      if os.path.islink(file_path):
+      if os.path.islink(file_path) or not filename_matcher.search(file_path):
         continue
       with open(file_path) as file:
         matching_lines = grep_file(file, search)
@@ -89,12 +91,13 @@ def grep_dir(dir, search):
 
 
 def grep_file(file, search):
-  '''Return lines in 'file' that contain the 'search' term. 'file' must already be
+  '''Return lines in 'file' that match the 'search' regex. 'file' must already be
      opened.
   '''
+  matcher = re.compile(search)
   matching_lines = list()
   for line in file:
-    if search in line:
+    if matcher.search(line):
       matching_lines.append(line)
   return matching_lines
 

@@ -28,7 +28,7 @@ under the License.
 {{?include_log4j_handlers}}
 <h2>Change Java log level (log4j)</h2>
 <div class="log-level">
-<form action="get_java_loglevel">
+<form action="get_java_loglevel">{{>www/form-hidden-inputs.tmpl}}
   <div class="form-group">
     <input type="text" class="form-control" name="class" placeholder="e.g. org.apache.impala.analysis.Analyzer">
   </div>
@@ -36,7 +36,7 @@ under the License.
   <label>{{get_java_loglevel_result}}</label>
 </form>
 <br>
-<form action="set_java_loglevel">
+<form action="set_java_loglevel">{{>www/form-hidden-inputs.tmpl}}
   <div class="form-group" name="level">
     <input type="text" class="form-control" name="class" placeholder="e.g. org.apache.impala.analysis.Analyzer">
     <br>
@@ -59,7 +59,7 @@ under the License.
     </div>
   </div>
 </form>
-<form action="reset_java_loglevel">
+<form action="reset_java_loglevel">{{>www/form-hidden-inputs.tmpl}}
   <div class="col-xs-20">
     <button type="submit" class="btn btn-primary btn-sm">Reset Java Log Levels</button>
     <strong>{{reset_java_loglevel_result}}</strong>
@@ -68,7 +68,7 @@ under the License.
 {{/include_log4j_handlers}}
 
 <h2>Change backend logging level (glog)</h2>
-<form action="set_glog_level">
+<form action="set_glog_level">{{>www/form-hidden-inputs.tmpl}}
   <div class="form-group" name="level">
     <div class="col-xs-20">
       <label>Log level:</label>
@@ -86,7 +86,7 @@ under the License.
     </div>
   </div>
 </form>
-<form action="reset_glog_level">
+<form action="reset_glog_level">{{>www/form-hidden-inputs.tmpl}}
   <div class="col-xs-20">
     <button type="submit" class="btn btn-primary btn-sm">Reset Glog Levels</button>
     {{?reset_glog_level_result}}

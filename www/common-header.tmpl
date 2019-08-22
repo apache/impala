@@ -21,12 +21,12 @@ common-footer.tmpl) }}
 <!DOCTYPE html>
 <html>
   <head><title>Apache Impala</title>
-    <script src='/www/jquery/jquery-3.4.1.min.js'></script>
-    <script src='/www/bootstrap/js/bootstrap.min.js'></script>
-    <script src='/www/scripts/util.js'></script>
-    <link rel="stylesheet" type="text/css" href="/www/datatables.min.css"/>
-    <script type="text/javascript" src="/www/datatables.min.js"></script>
-    <link href='/www/bootstrap/css/bootstrap.min.css' rel='stylesheet' media='screen'>
+    <script src='{{ __common__.host-url }}/www/jquery/jquery-3.4.1.min.js'></script>
+    <script src='{{ __common__.host-url }}/www/bootstrap/js/bootstrap.min.js'></script>
+    <script src='{{ __common__.host-url }}/www/scripts/util.js'></script>
+    <link rel="stylesheet" type="text/css" href="{{ __common__.host-url }}/www/datatables.min.css"/>
+    <script type="text/javascript" src="{{ __common__.host-url }}/www/datatables.min.js"></script>
+    <link href='{{ __common__.host-url }}/www/bootstrap/css/bootstrap.min.css' rel='stylesheet' media='screen'>
     <style>
       @media (min-width: 1300px) {
         #nav-options {
@@ -39,12 +39,12 @@ common-footer.tmpl) }}
     <header class="navbar navbar-default navbar-static-top" id="top" role="banner">
       <div id="nav-options" class="container">
         <div class="navbar-header">
-          <a class='navbar-brand' href='/'>{{ __common__.process-name }}</a>
+          <a class='navbar-brand' href='{{ __common__.host-url }}/'>{{ __common__.process-name }}</a>
         </div>
         <nav class="collapse navbar-collapse bs-navbar-collapse" role="navigation">
           <ul class="nav navbar-nav">
             {{#__common__.navbar}}
-            <li><a href="{{link}}">{{title}}</a></li>
+            <li><a href="{{ __common__.host-url }}{{link}}">{{title}}</a></li>
             {{/__common__.navbar}}
           </ul>
         </nav>

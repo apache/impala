@@ -174,6 +174,7 @@ be/src/thirdparty/pcg-cpp-0.98/LICENSE.txt
 # a larger file where the larger file would have duplicate licensing headers.
 www/all_child_groups.tmpl
 www/common-footer.tmpl
+www/form-hidden-inputs.tmpl
 
 # GNU tar artifact
 pax_global_header

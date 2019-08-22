@@ -454,7 +454,7 @@ void ImpalaServer::PingImpalaService(TPingImpalaServiceResp& return_val) {
 
   VLOG_RPC << "PingImpalaService()";
   return_val.version = GetVersionString(true);
-  return_val.webserver_address = ExecEnv::GetInstance()->webserver()->Url();
+  return_val.webserver_address = ExecEnv::GetInstance()->webserver()->url();
   VLOG_RPC << "PingImpalaService(): return_val=" << ThriftDebugString(return_val);
 }
 

@@ -203,13 +203,13 @@ function reset_method(pool_name) {
 </h2>
 {{^get_all_pools}}
 <p id="show_all_pools" class="lead">
-  <a href='/admission'> < Show all Resource Pools</a>
+  <a href='{{ __common__.host-url }}/admission'> < Show all Resource Pools</a>
 </p>
 {{/get_all_pools}}
 <p class="lead">
   This page lists all resource pools to which queries have been submitted
   at least once and their corresponding state and statistics.<br>See the
-  <a href='/backends'>backends</a> debug page for memory admitted and reserved per
+  <a href='{{ __common__.host-url }}/backends'>backends</a> debug page for memory admitted and reserved per
   backend.
 </p>
 <p class="lead">
@@ -220,7 +220,7 @@ Time since last statestore update containing admission control topic state (ms):
 </p>
 {{#resource_pools}}
 <div class="container-fluid">
-  <h3><a href='/admission?pool_name={{pool_name}}'>{{pool_name}}</a></h3>
+  <h3><a href='{{ __common__.host-url }}/admission?pool_name={{pool_name}}'>{{pool_name}}</a></h3>
 
   <h4>Pool Config</h4>
   <table class='table table-hover table-border'>
@@ -285,7 +285,7 @@ Time since last statestore update containing admission control topic state (ms):
       <td class='memory'>{{coord_mem_limit}}</td>
       <td class='memory'>{{coord_mem_to_admit}}</td>
       <td>{{num_backends}}</td>
-      <td><a href='/query_plan?query_id={{query_id}}'>Details</a></td>
+      <td><a href='{{ __common__.host-url }}/query_plan?query_id={{query_id}}'>Details</a></td>
     </tr>
     {{/queued_queries}}
   </table>
@@ -309,7 +309,7 @@ Time since last statestore update containing admission control topic state (ms):
       <td class='memory'>{{coord_mem_limit}}</td>
       <td class='memory'>{{coord_mem_to_admit}}</td>
       <td>{{num_backends}}</td>
-      <td><a href='/query_plan?query_id={{query_id}}'>Details</a></td>
+      <td><a href='{{ __common__.host-url }}/query_plan?query_id={{query_id}}'>Details</a></td>
     </tr>
     {{/running_queries}}
   </table>

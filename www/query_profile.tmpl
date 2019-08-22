@@ -27,13 +27,13 @@ under the License.
 <div>
     <h4>Download Profile (Available Formats):
         <a style="font-size:16px;" class="btn btn-primary"
-            href="/query_profile_encoded?query_id={{query_id}}"
+            href="{{ __common__.host-url }}/query_profile_encoded?query_id={{query_id}}"
             download="thrift_profile_{{query_id}}">Thrift</a>
         <a style="font-size:16px;" class="btn btn-primary"
-            href="/query_profile_json?query_id={{query_id}}"
+            href="{{ __common__.host-url }}/query_profile_json?query_id={{query_id}}"
             download="json_profile_{{query_id}}">Json</a>
         <a style="font-size:16px;" class="btn btn-primary"
-            href="/query_profile_plain_text?query_id={{query_id}}"
+            href="{{ __common__.host-url }}/query_profile_plain_text?query_id={{query_id}}"
             download="profile_{{query_id}}">Text</a>
     </h4>
 </div>

@@ -55,8 +55,8 @@ archived in memory. The size of that archive is controlled with the
     <td><samp>{{last_event}}</samp></td>
     <td>{{rows_fetched}}</td>
     <td>{{resource_pool}}</td>
-    <td><a href='/query_plan?query_id={{query_id}}'>Details</a></td>
-    <td><a href='/cancel_query?query_id={{query_id}}'>Cancel</a></td>
+    <td><a href='{{ __common__.host-url }}/query_plan?query_id={{query_id}}'>Details</a></td>
+    <td><a href='{{ __common__.host-url }}/cancel_query?query_id={{query_id}}'>Cancel</a></td>
   </tr>
 {{/executing}}
 {{/in_flight_queries}}
@@ -100,8 +100,8 @@ archived in memory. The size of that archive is controlled with the
     <td><samp>{{last_event}}</samp></td>
     <td>{{rows_fetched}}</td>
     <td>{{resource_pool}}</td>
-    <td><a href='/query_plan?query_id={{query_id}}'>Details</a></td>
-    <td><a href='/cancel_query?query_id={{query_id}}'>Close</a></td>
+    <td><a href='{{ __common__.host-url }}/query_plan?query_id={{query_id}}'>Details</a></td>
+    <td><a href='{{ __common__.host-url }}/cancel_query?query_id={{query_id}}'>Close</a></td>
   </tr>
 {{/waiting}}
 {{/in_flight_queries}}
@@ -137,7 +137,7 @@ archived in memory. The size of that archive is controlled with the
     <td><samp>{{state}}</samp></td>
     <td>{{rows_fetched}}</td>
     <td>{{resource_pool}}</td>
-    <td><a href='/query_plan?query_id={{query_id}}'>Details</a></td>
+    <td><a href='{{ __common__.host-url }}/query_plan?query_id={{query_id}}'>Details</a></td>
   </tr>
 {{/completed_queries}}
 </table>

@@ -16,6 +16,7 @@
 # under the License.
 
 from tests.common.environ import ImpalaTestClusterFlagsDetector
+from tests.common.file_utils import grep_dir
 from tests.common.skip import SkipIfBuildType
 from tests.common.impala_cluster import ImpalaCluster
 from tests.common.impala_test_suite import ImpalaTestSuite
@@ -655,3 +656,18 @@ class TestWebPage(ImpalaTestSuite):
     """Test to check that the /healthz endpoint returns 200 OK."""
     page = requests.get("http://localhost:25000/healthz")
     assert page.status_code == requests.codes.ok
+
+  def test_knox_compatability(self):
+    """Checks that the template files conform to the requirements for compatability with
+    the Apache Knox service definition."""
+    # Matches all 'a' links with an 'href' that doesn't start with either '#' (which stays
+    # on the same page an so doesn't need to the hostname) or '{{ __common__.host-url }}'
+    # Note that if we ever need to add a link that doesn't conform to this, we will
+    # probably also have to change the Knox service definition.
+    href_regex = "<a .*? href=['\"](?!({{ __common__.host-url }})|#)"
+    # Matches all 'form' tags that are not followed by including the hidden inputs.
+    form_regex = "<form [^{]*?>(?!{{>www/form-hidden-inputs.tmpl}})"
+    regex = "(%s)|(%s)" % (href_regex, form_regex)
+    results = grep_dir("/home/thomas/Impala/www", regex, ".*\.tmpl")
+    assert len(results) == 0, \
+        "All links on the webui must include the webserver host: %s" % results

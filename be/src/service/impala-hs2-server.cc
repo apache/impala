@@ -1053,7 +1053,7 @@ void ImpalaServer::PingImpalaHS2Service(TPingImpalaHS2ServiceResp& return_val,
   }
 
   return_val.__set_version(GetVersionString(true));
-  return_val.__set_webserver_address(ExecEnv::GetInstance()->webserver()->Url());
+  return_val.__set_webserver_address(ExecEnv::GetInstance()->webserver()->url());
   VLOG_RPC << "PingImpalaHS2Service(): return_val=" << ThriftDebugString(return_val);
 }
 }

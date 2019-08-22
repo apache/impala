@@ -43,11 +43,11 @@ under the License.
             since metadata is partially fetched on demand. -->
           {{?use_local_catalog}} {{name}} {{/use_local_catalog}}
           {{^use_local_catalog}}
-           <a href="catalog_object?object_type=TABLE&object_name={{fqtn}}">{{name}}</a>
+           <a href="{{ __common__.host-url }}/catalog_object?object_type=TABLE&object_name={{fqtn}}">{{name}}</a>
           {{/use_local_catalog}}
           </td>
           <td>{{mem_estimate}}</td>
-          <td><a href="table_metrics?name={{name}}">{{name}}-metrics</a></td>
+          <td><a href="{{ __common__.host-url }}/table_metrics?name={{name}}">{{name}}-metrics</a></td>
         </tr>
         {{/large_tables}}
       </tbody>
@@ -88,11 +88,11 @@ under the License.
           <td>
           {{?use_local_catalog}} {{name}} {{/use_local_catalog}}
           {{^use_local_catalog}}
-           <a href="catalog_object?object_type=TABLE&object_name={{fqtn}}">{{name}}</a>
+           <a href="{{ __common__.host-url }}/catalog_object?object_type=TABLE&object_name={{fqtn}}">{{name}}</a>
           {{/use_local_catalog}}
           </td>
           <td>{{num_metadata_ops}}</td>
-          <td><a href="table_metrics?name={{name}}">{{name}}-metrics</a></td>
+          <td><a href="{{ __common__.host-url }}/table_metrics?name={{name}}">{{name}}-metrics</a></td>
         </tr>
         {{/frequent_tables}}
       </tbody>
@@ -132,11 +132,11 @@ under the License.
           <td>
           {{?use_local_catalog}} {{name}} {{/use_local_catalog}}
           {{^use_local_catalog}}
-           <a href="catalog_object?object_type=TABLE&object_name={{fqtn}}">{{name}}</a>
+           <a href="{{ __common__.host-url }}/catalog_object?object_type=TABLE&object_name={{fqtn}}">{{name}}</a>
           {{/use_local_catalog}}
           </td>
           <td>{{num_files}}</td>
-          <td><a href="table_metrics?name={{name}}">{{name}}-metrics</a></td>
+          <td><a href="{{ __common__.host-url }}/table_metrics?name={{name}}">{{name}}-metrics</a></td>
         </tr>
         {{/high_file_count_tables}}
       </tbody>
@@ -166,7 +166,7 @@ under the License.
 <div class="panel panel-info">
   <div class="panel-heading">
   {{^use_local_catalog}}
-    <a href='catalog_object?object_type=DATABASE&object_name={{name}}'>
+    <a href='{{ __common__.host-url }}/catalog_object?object_type=DATABASE&object_name={{name}}'>
   {{/use_local_catalog}}
       <h2 class="panel-title" id='{{name}}'>{{name}}
       <span class="pull-right">{{num_tables}} table(s)</span></h2>
@@ -190,11 +190,11 @@ under the License.
           <td>
           {{?use_local_catalog}} {{name}} {{/use_local_catalog}}
           {{^use_local_catalog}}
-           <a href="catalog_object?object_type=TABLE&object_name={{fqtn}}">{{name}}</a>
+           <a href="{{ __common__.host-url }}/catalog_object?object_type=TABLE&object_name={{fqtn}}">{{name}}</a>
           {{/use_local_catalog}}
           </td>
           {{?has_metrics}}
-          <td><a href="table_metrics?name={{fqtn}}">{{name}}-metrics</a></td>
+          <td><a href="{{ __common__.host-url }}/table_metrics?name={{fqtn}}">{{name}}-metrics</a></td>
           {{/has_metrics}}
         </tr>
         {{/tables}}

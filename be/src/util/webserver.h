@@ -105,7 +105,7 @@ class Webserver {
   bool IsSecure() const;
 
   /// Returns the URL to the webserver as a string.
-  string Url();
+  string url() { return url_; }
 
   /// Returns the appropriate MIME type for a given ContentType.
   static const std::string GetMimeType(const ContentType& content_type);
@@ -150,6 +150,9 @@ class Webserver {
     /// document root.
     std::string template_filename_;
   };
+
+  /// Sets the values of 'url_' and 'hostname_'.
+  void Init();
 
   /// Squeasel callback for log events. Returns squeasel success code.
   static int LogMessageCallbackStatic(const struct sq_connection* connection,
@@ -202,6 +205,12 @@ class Webserver {
 
   /// The address of the interface on which to run this webserver.
   TNetworkAddress http_address_;
+
+  /// Formatted string representing 'http_address_'.
+  std::string url_;
+
+  /// The resolved hostname from 'http_address_'.
+  std::string hostname_;
 
   /// Handle to Squeasel context; owned and freed by Squeasel internally
   struct sq_context* context_;

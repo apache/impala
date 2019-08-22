@@ -241,6 +241,7 @@ Webserver::Webserver()
   http_address_ = MakeNetworkAddress(
       FLAGS_webserver_interface.empty() ? "0.0.0.0" : FLAGS_webserver_interface,
       FLAGS_webserver_port);
+  Init();
 }
 
 Webserver::Webserver(const int port)
@@ -248,6 +249,7 @@ Webserver::Webserver(const int port)
       error_handler_(UrlHandler(bind<void>(&Webserver::ErrorHandler, this, _1, _2),
           "error.tmpl", false)) {
   http_address_ = MakeNetworkAddress("0.0.0.0", port);
+  Init();
 }
 
 Webserver::~Webserver() {
@@ -282,17 +284,6 @@ void Webserver::BuildArgumentMap(const string& args, ArgumentMap* output) {
 
 bool Webserver::IsSecure() const {
   return !FLAGS_webserver_certificate_file.empty();
-}
-
-string Webserver::Url() {
-  string hostname = http_address_.hostname;
-  if (IsWildcardAddress(http_address_.hostname)) {
-    if (!GetHostname(&hostname).ok()) {
-      hostname = http_address_.hostname;
-    }
-  }
-  return Substitute("$0://$1:$2", IsSecure() ? "https" : "http",
-      hostname, http_address_.port);
 }
 
 Status Webserver::Start() {
@@ -429,12 +420,37 @@ void Webserver::Stop() {
   }
 }
 
+void Webserver::Init() {
+  hostname_ = http_address_.hostname;
+  if (IsWildcardAddress(http_address_.hostname)) {
+    if (!GetHostname(&hostname_).ok()) {
+      hostname_ = http_address_.hostname;
+    }
+  }
+  url_ = Substitute(
+      "$0://$1:$2", IsSecure() ? "https" : "http", hostname_, http_address_.port);
+}
+
 void Webserver::GetCommonJson(Document* document) {
   DCHECK(document != nullptr);
   Value obj(kObjectType);
   obj.AddMember("process-name",
       rapidjson::StringRef(google::ProgramInvocationShortName()),
       document->GetAllocator());
+
+  // We require that all links on the webui are qualified with the url.
+  Value url_value(url().c_str(), document->GetAllocator());
+  obj.AddMember("host-url", url_value, document->GetAllocator());
+
+  Value scheme_value(IsSecure() ? "https" : "http", document->GetAllocator());
+  obj.AddMember("scheme", scheme_value, document->GetAllocator());
+
+  Value hostname_value(hostname_.c_str(), document->GetAllocator());
+  obj.AddMember("hostname", hostname_value, document->GetAllocator());
+
+  Value port_value;
+  port_value.SetInt(http_address_.port);
+  obj.AddMember("port", port_value, document->GetAllocator());
 
   Value lst(kArrayType);
   for (const UrlHandlerMap::value_type& handler: url_handlers_) {
