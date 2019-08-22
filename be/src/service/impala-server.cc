@@ -77,7 +77,6 @@
 #include "util/error-util.h"
 #include "util/histogram-metric.h"
 #include "util/impalad-metrics.h"
-#include "util/lineage-util.h"
 #include "util/metrics.h"
 #include "util/network-util.h"
 #include "util/openssl-util.h"
@@ -521,78 +520,6 @@ Status ImpalaServer::PopulateAuthorizedProxyConfig(
   return Status::OK();
 }
 
-Status ImpalaServer::LogLineageRecord(const ClientRequestState& client_request_state) {
-  const TExecRequest& request = client_request_state.exec_request();
-  if (!request.__isset.query_exec_request && !request.__isset.catalog_op_request) {
-    return Status::OK();
-  }
-  TLineageGraph lineage_graph;
-  if (request.__isset.query_exec_request &&
-      request.query_exec_request.__isset.lineage_graph) {
-    lineage_graph = request.query_exec_request.lineage_graph;
-  } else if (request.__isset.catalog_op_request &&
-      request.catalog_op_request.__isset.lineage_graph) {
-    lineage_graph = request.catalog_op_request.lineage_graph;
-  } else {
-    return Status::OK();
-  }
-
-  if (client_request_state.catalog_op_type() == TCatalogOpType::DDL) {
-    const TDdlExecResponse* ddl_exec_response = client_request_state.ddl_exec_response();
-    // Update vertices that have -1 table_create_time for a newly created table/view.
-    if (ddl_exec_response->__isset.table_name &&
-        ddl_exec_response->__isset.table_create_time) {
-      for (auto &vertex: lineage_graph.vertices) {
-        if (!vertex.__isset.metadata) continue;
-        if (vertex.metadata.table_name == ddl_exec_response->table_name &&
-            vertex.metadata.table_create_time == -1) {
-          vertex.metadata.__set_table_create_time(ddl_exec_response->table_create_time);
-        }
-      }
-    }
-  }
-
-  // Set the query end time in TLineageGraph. Must use UNIX time directly rather than
-  // e.g. converting from client_request_state.end_time() (IMPALA-4440).
-  lineage_graph.__set_ended(UnixMillis() / 1000);
-
-  string lineage_record;
-  LineageUtil::TLineageToJSON(lineage_graph, &lineage_record);
-
-  if (AreQueryHooksEnabled()) {
-    // invoke QueryEventHooks
-    TQueryCompleteContext query_complete_context;
-    query_complete_context.__set_lineage_string(lineage_record);
-    const Status& status = exec_env_->frontend()->CallQueryCompleteHooks(
-        query_complete_context);
-
-    if (!status.ok()) {
-      LOG(ERROR) << "Failed to send query lineage info to FE CallQueryCompleteHooks"
-                 << status.GetDetail();
-      if (FLAGS_abort_on_failed_lineage_event) {
-        CLEAN_EXIT_WITH_ERROR("Shutting down Impala Server due to "
-            "abort_on_failed_lineage_event=true");
-      }
-    }
-  }
-
-  // lineage logfile writing is deprecated in favor of the
-  // QueryEventHooks (see FE).  this behavior is being retained
-  // for now but may be removed in the future.
-  if (IsLineageLoggingEnabled()) {
-    const Status& status = lineage_logger_->AppendEntry(lineage_record);
-    if (!status.ok()) {
-      LOG(ERROR) << "Unable to record query lineage record: " << status.GetDetail();
-      if (FLAGS_abort_on_failed_lineage_event) {
-        CLEAN_EXIT_WITH_ERROR("Shutting down Impala Server due to "
-            "abort_on_failed_lineage_event=true");
-      }
-    }
-    return status;
-  }
-  return Status::OK();
-}
-
 bool ImpalaServer::IsCoordinator() { return is_coordinator_; }
 
 bool ImpalaServer::IsExecutor() { return is_executor_; }
@@ -639,81 +566,6 @@ Status ImpalaServer::InitLineageLogging() {
   return Status::OK();
 }
 
-Status ImpalaServer::LogAuditRecord(const ClientRequestState& request_state,
-    const TExecRequest& request) {
-  stringstream ss;
-  rapidjson::StringBuffer buffer;
-  rapidjson::Writer<rapidjson::StringBuffer> writer(buffer);
-
-  writer.StartObject();
-  // Each log entry is a timestamp mapped to a JSON object
-  ss << UnixMillis();
-  writer.String(ss.str().c_str());
-  writer.StartObject();
-  writer.String("query_id");
-  writer.String(PrintId(request_state.query_id()).c_str());
-  writer.String("session_id");
-  writer.String(PrintId(request_state.session_id()).c_str());
-  writer.String("start_time");
-  writer.String(ToStringFromUnixMicros(request_state.start_time_us()).c_str());
-  writer.String("authorization_failure");
-  writer.Bool(Frontend::IsAuthorizationError(request_state.query_status()));
-  writer.String("status");
-  writer.String(request_state.query_status().GetDetail().c_str());
-  writer.String("user");
-  writer.String(request_state.effective_user().c_str());
-  writer.String("impersonator");
-  if (request_state.do_as_user().empty()) {
-    // If there is no do_as_user() is empty, the "impersonator" field should be Null.
-    writer.Null();
-  } else {
-    // Otherwise, the delegator is the current connected user.
-    writer.String(request_state.connected_user().c_str());
-  }
-  writer.String("statement_type");
-  if (request.stmt_type == TStmtType::DDL) {
-    if (request.catalog_op_request.op_type == TCatalogOpType::DDL) {
-      writer.String(
-          PrintThriftEnum(request.catalog_op_request.ddl_params.ddl_type).c_str());
-    } else {
-      writer.String(PrintThriftEnum(request.catalog_op_request.op_type).c_str());
-    }
-  } else {
-    writer.String(PrintThriftEnum(request.stmt_type).c_str());
-  }
-  writer.String("network_address");
-  writer.String(TNetworkAddressToString(
-      request_state.session()->network_address).c_str());
-  writer.String("sql_statement");
-  string stmt = replace_all_copy(request_state.sql_stmt(), "\n", " ");
-  Redact(&stmt);
-  writer.String(stmt.c_str());
-  writer.String("catalog_objects");
-  writer.StartArray();
-  for (const TAccessEvent& event: request.access_events) {
-    writer.StartObject();
-    writer.String("name");
-    writer.String(event.name.c_str());
-    writer.String("object_type");
-    writer.String(PrintThriftEnum(event.object_type).c_str());
-    writer.String("privilege");
-    writer.String(event.privilege.c_str());
-    writer.EndObject();
-  }
-  writer.EndArray();
-  writer.EndObject();
-  writer.EndObject();
-  Status status = audit_event_logger_->AppendEntry(buffer.GetString());
-  if (!status.ok()) {
-    LOG(ERROR) << "Unable to record audit event record: " << status.GetDetail();
-    if (FLAGS_abort_on_failed_audit_event) {
-      CLEAN_EXIT_WITH_ERROR("Shutting down Impala Server due to "
-          "abort_on_failed_audit_event=true");
-    }
-  }
-  return status;
-}
-
 bool ImpalaServer::IsAuditEventLoggingEnabled() {
   return !FLAGS_audit_event_log_dir.empty();
 }
@@ -732,52 +584,6 @@ Status ImpalaServer::InitAuditEventLogging() {
   return Status::OK();
 }
 
-void ImpalaServer::LogQueryEvents(const ClientRequestState& request_state) {
-  Status status = request_state.query_status();
-  bool log_events = true;
-  switch (request_state.stmt_type()) {
-    case TStmtType::QUERY: {
-      // If the query didn't finish, log audit and lineage events only if the
-      // the client issued at least one fetch.
-      if (!status.ok() && !request_state.fetched_rows()) log_events = false;
-      break;
-    }
-    case TStmtType::DML: {
-      if (!status.ok()) log_events = false;
-      break;
-    }
-    case TStmtType::DDL: {
-      if (request_state.catalog_op_type() == TCatalogOpType::DDL) {
-        // For a DDL operation, log audit and lineage events only if the
-        // operation finished.
-        if (!status.ok()) log_events = false;
-      } else {
-        // This case covers local catalog operations such as SHOW and DESCRIBE.
-        if (!status.ok() && !request_state.fetched_rows()) log_events = false;
-      }
-      break;
-    }
-    case TStmtType::EXPLAIN:
-    case TStmtType::LOAD:
-    case TStmtType::SET:
-    case TStmtType::ADMIN_FN:
-    default:
-      break;
-  }
-  // Log audit events that are due to an AuthorizationException.
-  if (IsAuditEventLoggingEnabled() &&
-      (Frontend::IsAuthorizationError(request_state.query_status()) || log_events)) {
-    // TODO: deal with an error status
-    discard_result(LogAuditRecord(request_state, request_state.exec_request()));
-  }
-
-  if (log_events &&
-      (AreQueryHooksEnabled() || IsLineageLoggingEnabled())) {
-    // TODO: deal with an error status
-    discard_result(LogLineageRecord(request_state));
-  }
-}
-
 Status ImpalaServer::InitProfileLogging() {
   if (!FLAGS_log_query_to_file) return Status::OK();
 
@@ -794,6 +600,16 @@ Status ImpalaServer::InitProfileLogging() {
       &ImpalaServer::LogFileFlushThread, this, &profile_log_file_flush_thread_));
 
   return Status::OK();
+}
+
+Status ImpalaServer::AppendAuditEntry(const string& entry ) {
+  DCHECK(IsAuditEventLoggingEnabled());
+  return audit_event_logger_->AppendEntry(entry);
+}
+
+Status ImpalaServer::AppendLineageEntry(const string& entry ) {
+  DCHECK(IsLineageLoggingEnabled());
+  return lineage_logger_->AppendEntry(entry);
 }
 
 Status ImpalaServer::GetRuntimeProfileOutput(const TUniqueId& query_id,
@@ -1339,9 +1155,6 @@ Status ImpalaServer::UnregisterQuery(const TUniqueId& query_id, bool check_infli
       ImpaladMetrics::QUERY_DURATIONS->Update(duration_ms);
     }
   }
-  // TODO (IMPALA-8572): move LogQueryEvents to before query unregistration
-  LogQueryEvents(*request_state.get());
-
   {
     lock_guard<mutex> l(request_state->session()->lock);
     request_state->session()->inflight_queries.erase(query_id);

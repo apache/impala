@@ -21,6 +21,10 @@
 #include <boost/algorithm/string/predicate.hpp>
 #include <limits>
 #include <gutil/strings/substitute.h>
+#include <rapidjson/rapidjson.h>
+#include <rapidjson/stringbuffer.h>
+#include <rapidjson/writer.h>
+#include <rapidjson/error/en.h>
 
 #include "common/status.h"
 #include "exec/kudu-util.h"
@@ -40,8 +44,11 @@
 #include "service/query-result-set.h"
 #include "util/debug-util.h"
 #include "util/impalad-metrics.h"
+#include "util/lineage-util.h"
 #include "util/metrics.h"
 #include "util/pretty-printer.h"
+#include "util/promise.h"
+#include "util/redactor.h"
 #include "util/runtime-profile-counters.h"
 #include "util/time.h"
 
@@ -57,12 +64,15 @@
 
 using boost::algorithm::iequals;
 using boost::algorithm::join;
+using boost::algorithm::replace_all_copy;
 using kudu::rpc::RpcController;
 using namespace apache::hive::service::cli::thrift;
 using namespace apache::thrift;
 using namespace beeswax;
 using namespace strings;
 
+DECLARE_bool(abort_on_failed_audit_event);
+DECLARE_bool(abort_on_failed_lineage_event);
 DECLARE_int32(krpc_port);
 DECLARE_int32(catalog_service_port);
 DECLARE_string(catalog_service_host);
@@ -727,11 +737,24 @@ void ClientRequestState::Done() {
   if (InTransaction()) AbortTransaction();
 
   UpdateEndTime();
-  unique_lock<mutex> l(lock_);
-  query_events_->MarkEvent("Unregister query");
-  // Update result set cache metrics, and update mem limit accounting before tearing
-  // down the coordinator.
-  ClearResultCache();
+
+  {
+    unique_lock<mutex> l(lock_);
+    query_events_->MarkEvent("Unregister query");
+    // Update result set cache metrics, and update mem limit accounting before tearing
+    // down the coordinator.
+    ClearResultCache();
+  }
+  // Wait until the audit events are flushed.
+  if (wait_thread_.get() != nullptr) {
+    wait_thread_->Join();
+    wait_thread_.reset();
+  } else {
+    // The query failed in the fe even before a wait thread is launched. Synchronously
+    // flush log events to audit authorization errors, if any.
+    LogQueryEvents();
+  }
+  DCHECK(wait_thread_.get() == nullptr);
 }
 
 Status ClientRequestState::Exec(const TMetadataOpRequest& exec_request) {
@@ -754,24 +777,10 @@ Status ClientRequestState::WaitAsync() {
 
 void ClientRequestState::BlockOnWait() {
   unique_lock<mutex> l(lock_);
-  if (wait_thread_.get() == NULL) return;
-  if (!is_block_on_wait_joining_) {
-    // No other thread is already joining on wait_thread_, so this thread needs to do
-    // it.  Other threads will need to block on the cond-var.
-    is_block_on_wait_joining_ = true;
-    l.unlock();
-    wait_thread_->Join();
-    l.lock();
-    is_block_on_wait_joining_ = false;
-    wait_thread_.reset();
-    block_on_wait_cv_.NotifyAll();
-  } else {
-    // Another thread is already joining with wait_thread_.  Block on the cond-var
-    // until the Join() executed in the other thread has completed.
-    do {
-      block_on_wait_cv_.Wait(l);
-    } while (is_block_on_wait_joining_);
-  }
+  // Some metadata operations like GET_COLUMNS do not rely on WaitAsync() to launch
+  // the wait thread. In such cases this method is expected to be a no-op.
+  if (wait_thread_.get() == nullptr) return;
+  while (!is_wait_done_) block_on_wait_cv_.Wait(l);
 }
 
 void ClientRequestState::Wait() {
@@ -786,6 +795,7 @@ void ClientRequestState::Wait() {
     }
     discard_result(UpdateQueryStatus(status));
   }
+
   if (status.ok()) {
     if (stmt_type() == TStmtType::DDL) {
       DCHECK(catalog_op_type() != TCatalogOpType::DDL || request_result_set_ != nullptr);
@@ -795,6 +805,14 @@ void ClientRequestState::Wait() {
   // UpdateQueryStatus() or UpdateNonErrorOperationState() have updated operation_state_.
   DCHECK(operation_state_ == TOperationState::FINISHED_STATE ||
       operation_state_ == TOperationState::ERROR_STATE);
+  // Notify all the threads blocked on Wait() to finish and then log the query events,
+  // if any.
+  {
+    unique_lock<mutex> l(lock_);
+    is_wait_done_ = true;
+  }
+  block_on_wait_cv_.NotifyAll();
+  LogQueryEvents();
 }
 
 Status ClientRequestState::WaitInternal() {
@@ -1370,6 +1388,192 @@ void ClientRequestState::AbortTransaction() {
 void ClientRequestState::ClearTransactionState() {
   DCHECK(InTransaction());
   transaction_closed_ = true;
+}
+
+void ClientRequestState::LogQueryEvents() {
+  // Wait until the results are available. This guarantees the completion of non QUERY
+  // statemens like DDL/DML etc. Query events are logged if the query reaches a FINISHED
+  // state. For certain query types, events are logged regardless of the query state.
+  Status status;
+  {
+    lock_guard<mutex> l(lock_);
+    status = query_status();
+  }
+  bool log_events = true;
+  switch (stmt_type()) {
+    case TStmtType::QUERY:
+    case TStmtType::DML:
+    case TStmtType::DDL:
+      log_events = status.ok();
+      break;
+    case TStmtType::EXPLAIN:
+    case TStmtType::LOAD:
+    case TStmtType::SET:
+    case TStmtType::ADMIN_FN:
+    default:
+      break;
+  }
+
+  // Log audit events that are due to an AuthorizationException.
+  if (parent_server_->IsAuditEventLoggingEnabled() &&
+      (Frontend::IsAuthorizationError(status) || log_events)) {
+    // TODO: deal with an error status
+    discard_result(LogAuditRecord(status));
+  }
+
+  if (log_events && (parent_server_->AreQueryHooksEnabled() ||
+      parent_server_->IsLineageLoggingEnabled())) {
+    // TODO: deal with an error status
+    discard_result(LogLineageRecord());
+  }
+}
+
+Status ClientRequestState::LogAuditRecord(const Status& query_status) {
+  const TExecRequest& request = exec_request();
+  stringstream ss;
+  rapidjson::StringBuffer buffer;
+  rapidjson::Writer<rapidjson::StringBuffer> writer(buffer);
+
+  writer.StartObject();
+  // Each log entry is a timestamp mapped to a JSON object
+  ss << UnixMillis();
+  writer.String(ss.str().c_str());
+  writer.StartObject();
+  writer.String("query_id");
+  writer.String(PrintId(query_id()).c_str());
+  writer.String("session_id");
+  writer.String(PrintId(session_id()).c_str());
+  writer.String("start_time");
+  writer.String(ToStringFromUnixMicros(start_time_us()).c_str());
+  writer.String("authorization_failure");
+  writer.Bool(Frontend::IsAuthorizationError(query_status));
+  writer.String("status");
+  writer.String(query_status.GetDetail().c_str());
+  writer.String("user");
+  writer.String(effective_user().c_str());
+  writer.String("impersonator");
+  if (do_as_user().empty()) {
+    // If there is no do_as_user() is empty, the "impersonator" field should be Null.
+    writer.Null();
+  } else {
+    // Otherwise, the delegator is the current connected user.
+    writer.String(connected_user().c_str());
+  }
+  writer.String("statement_type");
+  if (request.stmt_type == TStmtType::DDL) {
+    if (request.catalog_op_request.op_type == TCatalogOpType::DDL) {
+      writer.String(
+          PrintThriftEnum(request.catalog_op_request.ddl_params.ddl_type).c_str());
+    } else {
+      writer.String(PrintThriftEnum(request.catalog_op_request.op_type).c_str());
+    }
+  } else {
+    writer.String(PrintThriftEnum(request.stmt_type).c_str());
+  }
+  writer.String("network_address");
+  writer.String(TNetworkAddressToString(
+      session()->network_address).c_str());
+  writer.String("sql_statement");
+  string stmt = replace_all_copy(sql_stmt(), "\n", " ");
+  Redact(&stmt);
+  writer.String(stmt.c_str());
+  writer.String("catalog_objects");
+
+  writer.StartArray();
+  for (const TAccessEvent& event: request.access_events) {
+    writer.StartObject();
+    writer.String("name");
+    writer.String(event.name.c_str());
+    writer.String("object_type");
+    writer.String(PrintThriftEnum(event.object_type).c_str());
+    writer.String("privilege");
+    writer.String(event.privilege.c_str());
+    writer.EndObject();
+  }
+  writer.EndArray();
+  writer.EndObject();
+  writer.EndObject();
+  Status status = parent_server_->AppendAuditEntry(buffer.GetString());
+  if (!status.ok()) {
+    LOG(ERROR) << "Unable to record audit event record: " << status.GetDetail();
+    if (FLAGS_abort_on_failed_audit_event) {
+      CLEAN_EXIT_WITH_ERROR("Shutting down Impala Server due to "
+          "abort_on_failed_audit_event=true");
+    }
+  }
+  return status;
+}
+
+Status ClientRequestState::LogLineageRecord() {
+  const TExecRequest& request = exec_request();
+  if (!request.__isset.query_exec_request && !request.__isset.catalog_op_request) {
+    return Status::OK();
+  }
+  TLineageGraph lineage_graph;
+  if (request.__isset.query_exec_request &&
+      request.query_exec_request.__isset.lineage_graph) {
+    lineage_graph = request.query_exec_request.lineage_graph;
+  } else if (request.__isset.catalog_op_request &&
+      request.catalog_op_request.__isset.lineage_graph) {
+    lineage_graph = request.catalog_op_request.lineage_graph;
+  } else {
+    return Status::OK();
+  }
+
+  if (catalog_op_type() == TCatalogOpType::DDL) {
+    const TDdlExecResponse* response = ddl_exec_response();
+    // Update vertices that have -1 table_create_time for a newly created table/view.
+    if (response->__isset.table_name &&
+        response->__isset.table_create_time) {
+      for (auto &vertex: lineage_graph.vertices) {
+        if (!vertex.__isset.metadata) continue;
+        if (vertex.metadata.table_name == response->table_name &&
+            vertex.metadata.table_create_time == -1) {
+          vertex.metadata.__set_table_create_time(response->table_create_time);
+        }
+      }
+    }
+  }
+
+  // Set the query end time in TLineageGraph. Must use UNIX time directly rather than
+  // e.g. converting from end_time() (IMPALA-4440).
+  lineage_graph.__set_ended(UnixMillis() / 1000);
+
+  string lineage_record;
+  LineageUtil::TLineageToJSON(lineage_graph, &lineage_record);
+
+  if (parent_server_->AreQueryHooksEnabled()) {
+    // invoke QueryEventHooks
+    TQueryCompleteContext query_complete_context;
+    query_complete_context.__set_lineage_string(lineage_record);
+    const Status& status = exec_env_->frontend()->CallQueryCompleteHooks(
+        query_complete_context);
+
+    if (!status.ok()) {
+      LOG(ERROR) << "Failed to send query lineage info to FE CallQueryCompleteHooks"
+                 << status.GetDetail();
+      if (FLAGS_abort_on_failed_lineage_event) {
+        CLEAN_EXIT_WITH_ERROR("Shutting down Impala Server due to "
+            "abort_on_failed_lineage_event=true");
+      }
+    }
+  }
+
+  // lineage logfile writing is deprecated in favor of the
+  // QueryEventHooks (see FE).  this behavior is being retained
+  // for now but may be removed in the future.
+  if (parent_server_->IsLineageLoggingEnabled()) {
+    const Status& status = parent_server_->AppendLineageEntry(lineage_record);
+    if (!status.ok()) {
+      LOG(ERROR) << "Unable to record query lineage record: " << status.GetDetail();
+      if (FLAGS_abort_on_failed_lineage_event) {
+        CLEAN_EXIT_WITH_ERROR("Shutting down Impala Server due to "
+            "abort_on_failed_lineage_event=true");
+      }
+    }
+    return status;
+  }
+  return Status::OK();
 }
 
 }

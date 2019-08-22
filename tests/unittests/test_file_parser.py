@@ -32,6 +32,9 @@ s
 'Hi'
 ---- TYPES
 string
+---- LINEAGE
+test_lineage_str > 'foo' AND 'bar'
+multi_line
 ====
 ---- QUERY
 SELECT 2
@@ -57,7 +60,7 @@ int
 ====
 """
 
-VALID_SECTIONS = ['QUERY', 'RESULTS', 'TYPES']
+VALID_SECTIONS = ['QUERY', 'RESULTS', 'TYPES', 'LINEAGE']
 
 class TestTestFileParser(BaseTestSuite):
   def test_valid_parse(self):
@@ -65,7 +68,8 @@ class TestTestFileParser(BaseTestSuite):
     assert len(results) == 3
     print results[0]
     expected_results = {'QUERY': '# comment\nSELECT blah from Foo\ns\n',
-                        'TYPES': 'string\n', 'RESULTS': "'Hi'\n"}
+                        'TYPES': 'string\n', 'RESULTS': "'Hi'\n",
+                        'LINEAGE': "test_lineage_str > 'foo' AND 'bar'\nmulti_line\n"}
     assert results[0] == expected_results
 
   def test_invalid_section(self):

@@ -1,0 +1,5648 @@
+====
+---- QUERY
+drop database if exists lineage_test_db cascade
+====
+---- QUERY
+create database lineage_test_db
+====
+---- QUERY
+create table lineage_test_db.alltypes like functional_hbase.alltypes
+====
+---- QUERY
+create table lineage_test_db.alltypesnopart like functional.alltypesnopart
+====
+---- QUERY
+create table lineage_test_db.alltypessmall like functional.alltypessmall
+====
+---- QUERY
+create table lineage_test_db.alltypesinsert like functional.alltypesinsert
+====
+---- QUERY
+create view lineage_test_db.alltypes_view as select * from lineage_test_db.alltypes
+====
+---- LINEAGE
+{
+  "hash": "aba4b39bf3c34b5a9ce8fd782acc0a26",
+  "timestamp": 1568097481,
+  "vertices": [
+    {
+      "vertexType": "COLUMN",
+      "vertexId": "x",
+      "id": 0
+    },
+    {
+      "vertexType": "COLUMN",
+      "vertexId": "functional.alltypes.bigint_col",
+      "id": 1,
+      "metadata": {
+        "tableCreateTime": 1568093675,
+        "tableName": "functional.alltypes"
+      }
+    },
+    {
+      "vertexType": "COLUMN",
+      "vertexId": "functional.alltypes.int_col",
+      "id": 2,
+      "metadata": {
+        "tableCreateTime": 1568093675,
+        "tableName": "functional.alltypes"
+      }
+    },
+    {
+      "vertexType": "COLUMN",
+      "vertexId": "functional.alltypes.tinyint_col",
+      "id": 3,
+      "metadata": {
+        "tableCreateTime": 1568093675,
+        "tableName": "functional.alltypes"
+      }
+    }
+  ],
+  "edges": [
+    {
+      "sources": [
+        1,
+        2,
+        3
+      ],
+      "targets": [
+        0
+      ],
+      "edgeType": "PROJECTION"
+    }
+  ],
+  "queryId": "eb4368837f0c4468:ef6841f500000000",
+  "user": "bharath",
+  "queryText": "select * from (   select tinyint_col + int_col x from functional.alltypes   union all   select sum(bigint_col) y from (select bigint_col from functional.alltypes) v1) v2",
+  "endTime": 1568097481
+}
+---- QUERY
+# Simple query to introduce projection dependencies. Shows resolution
+# through inline views, unions, and materialization points.
+select * from (
+  select tinyint_col + int_col x from functional.alltypes
+  union all
+  select sum(bigint_col) y from (select bigint_col from functional.alltypes) v1) v2
+====
+---- LINEAGE
+{
+  "hash": "2540c828f7397099c11558544485e97c",
+  "timestamp": 1568097487,
+  "vertices": [
+    {
+      "vertexType": "COLUMN",
+      "vertexId": "sum(a.tinyint_col) OVER(...)",
+      "id": 0
+    },
+    {
+      "vertexType": "COLUMN",
+      "vertexId": "functional.alltypes.tinyint_col",
+      "id": 1,
+      "metadata": {
+        "tableCreateTime": 1568093675,
+        "tableName": "functional.alltypes"
+      }
+    },
+    {
+      "vertexType": "COLUMN",
+      "vertexId": "functional.alltypes.id",
+      "id": 2,
+      "metadata": {
+        "tableCreateTime": 1568093675,
+        "tableName": "functional.alltypes"
+      }
+    },
+    {
+      "vertexType": "COLUMN",
+      "vertexId": "functional.alltypes.smallint_col",
+      "id": 3,
+      "metadata": {
+        "tableCreateTime": 1568093675,
+        "tableName": "functional.alltypes"
+      }
+    },
+    {
+      "vertexType": "COLUMN",
+      "vertexId": "count(b.string_col)",
+      "id": 4
+    },
+    {
+      "vertexType": "COLUMN",
+      "vertexId": "functional.alltypessmall.string_col",
+      "id": 5,
+      "metadata": {
+        "tableCreateTime": 1568093682,
+        "tableName": "functional.alltypessmall"
+      }
+    },
+    {
+      "vertexType": "COLUMN",
+      "vertexId": "timestamp_col",
+      "id": 6
+    },
+    {
+      "vertexType": "COLUMN",
+      "vertexId": "functional.alltypessmall.timestamp_col",
+      "id": 7,
+      "metadata": {
+        "tableCreateTime": 1568093682,
+        "tableName": "functional.alltypessmall"
+      }
+    },
+    {
+      "vertexType": "COLUMN",
+      "vertexId": "functional.alltypes.int_col",
+      "id": 8,
+      "metadata": {
+        "tableCreateTime": 1568093675,
+        "tableName": "functional.alltypes"
+      }
+    },
+    {
+      "vertexType": "COLUMN",
+      "vertexId": "functional.alltypes.year",
+      "id": 9,
+      "metadata": {
+        "tableCreateTime": 1568093675,
+        "tableName": "functional.alltypes"
+      }
+    },
+    {
+      "vertexType": "COLUMN",
+      "vertexId": "functional.alltypessmall.bigint_col",
+      "id": 10,
+      "metadata": {
+        "tableCreateTime": 1568093682,
+        "tableName": "functional.alltypessmall"
+      }
+    },
+    {
+      "vertexType": "COLUMN",
+      "vertexId": "functional.alltypessmall.float_col",
+      "id": 11,
+      "metadata": {
+        "tableCreateTime": 1568093682,
+        "tableName": "functional.alltypessmall"
+      }
+    },
+    {
+      "vertexType": "COLUMN",
+      "vertexId": "functional.alltypessmall.id",
+      "id": 12,
+      "metadata": {
+        "tableCreateTime": 1568093682,
+        "tableName": "functional.alltypessmall"
+      }
+    }
+  ],
+  "edges": [
+    {
+      "sources": [
+        1
+      ],
+      "targets": [
+        0
+      ],
+      "edgeType": "PROJECTION"
+    },
+    {
+      "sources": [
+        2,
+        3
+      ],
+      "targets": [
+        0
+      ],
+      "edgeType": "PREDICATE"
+    },
+    {
+      "sources": [
+        5
+      ],
+      "targets": [
+        4
+      ],
+      "edgeType": "PROJECTION"
+    },
+    {
+      "sources": [
+        7
+      ],
+      "targets": [
+        6
+      ],
+      "edgeType": "PROJECTION"
+    },
+    {
+      "sources": [
+        1,
+        2,
+        3,
+        5,
+        7,
+        8,
+        9,
+        10,
+        11,
+        12
+      ],
+      "targets": [
+        0,
+        4,
+        6
+      ],
+      "edgeType": "PREDICATE"
+    }
+  ],
+  "queryId": "b04c96bc7cd037bf:950c0e9700000000",
+  "user": "bharath",
+  "queryText": "select sum(a.tinyint_col) over (partition by a.smallint_col order by a.id),   count(b.string_col), b.timestamp_col from functional.alltypes a join functional.alltypessmall b on (a.id = b.id) where a.year = 2010 and b.float_col > 0 group by a.tinyint_col, a.smallint_col, a.id, b.string_col, b.timestamp_col, b.bigint_col having count(a.int_col) > 10 order by b.bigint_col limit 10",
+  "endTime": 1568097487
+}
+---- QUERY
+# Simple query to introduce predicate dependencies. Shows conjuncts in WHERE, ON, and
+# HAVING clause, as well dependencies introduced by GROUP BY and ORDER BY clauses and
+# analytic functions.
+select sum(a.tinyint_col) over (partition by a.smallint_col order by a.id),
+  count(b.string_col), b.timestamp_col
+from functional.alltypes a join functional.alltypessmall b on (a.id = b.id)
+where a.year = 2010 and b.float_col > 0
+group by a.tinyint_col, a.smallint_col, a.id, b.string_col, b.timestamp_col, b.bigint_col
+having count(a.int_col) > 10
+order by b.bigint_col limit 10
+====
+---- LINEAGE
+{
+  "hash": "b9d4145e873d7ee55e485690a6465421",
+  "timestamp": 1568097492,
+  "vertices": [
+    {
+      "vertexType": "COLUMN",
+      "vertexId": "int_col",
+      "id": 0,
+      "metadata": {
+        "tableCreateTime": 1568097492,
+        "tableName": "lineage_test_db.lineage_test_tbl1"
+      }
+    },
+    {
+      "vertexType": "COLUMN",
+      "vertexId": "functional.alltypes.int_col",
+      "id": 1,
+      "metadata": {
+        "tableCreateTime": 1568093675,
+        "tableName": "functional.alltypes"
+      }
+    },
+    {
+      "vertexType": "COLUMN",
+      "vertexId": "tinyint_col",
+      "id": 2,
+      "metadata": {
+        "tableCreateTime": 1568097492,
+        "tableName": "lineage_test_db.lineage_test_tbl1"
+      }
+    },
+    {
+      "vertexType": "COLUMN",
+      "vertexId": "functional.alltypes.tinyint_col",
+      "id": 3,
+      "metadata": {
+        "tableCreateTime": 1568093675,
+        "tableName": "functional.alltypes"
+      }
+    }
+  ],
+  "edges": [
+    {
+      "sources": [
+        1
+      ],
+      "targets": [
+        0
+      ],
+      "edgeType": "PROJECTION"
+    },
+    {
+      "sources": [
+        3
+      ],
+      "targets": [
+        2
+      ],
+      "edgeType": "PROJECTION"
+    }
+  ],
+  "queryId": "cd4196096bc21335:cc080f1c00000000",
+  "user": "bharath",
+  "queryText": "create table lineage_test_db.lineage_test_tbl1 as select int_col, tinyint_col from functional.alltypes",
+  "endTime": 1568097493
+}
+---- QUERY
+# CTAS queries
+create table lineage_test_db.lineage_test_tbl1 as select int_col, tinyint_col from functional.alltypes
+====
+---- LINEAGE
+{
+  "hash": "bbd2400879f7304bba4182220c138651",
+  "timestamp": 1568097498,
+  "vertices": [
+    {
+      "vertexType": "COLUMN",
+      "vertexId": "int_col",
+      "id": 0,
+      "metadata": {
+        "tableCreateTime": 1568097498,
+        "tableName": "lineage_test_db.lineage_test_tbl2"
+      }
+    },
+    {
+      "vertexType": "COLUMN",
+      "vertexId": "functional.alltypes.int_col",
+      "id": 1,
+      "metadata": {
+        "tableCreateTime": 1568093675,
+        "tableName": "functional.alltypes"
+      }
+    },
+    {
+      "vertexType": "COLUMN",
+      "vertexId": "string_col",
+      "id": 2,
+      "metadata": {
+        "tableCreateTime": 1568097498,
+        "tableName": "lineage_test_db.lineage_test_tbl2"
+      }
+    },
+    {
+      "vertexType": "COLUMN",
+      "vertexId": "functional.alltypes.string_col",
+      "id": 3,
+      "metadata": {
+        "tableCreateTime": 1568093675,
+        "tableName": "functional.alltypes"
+      }
+    },
+    {
+      "vertexType": "COLUMN",
+      "vertexId": "functional.alltypes.id",
+      "id": 4,
+      "metadata": {
+        "tableCreateTime": 1568093675,
+        "tableName": "functional.alltypes"
+      }
+    },
+    {
+      "vertexType": "COLUMN",
+      "vertexId": "functional.alltypes.year",
+      "id": 5,
+      "metadata": {
+        "tableCreateTime": 1568093675,
+        "tableName": "functional.alltypes"
+      }
+    },
+    {
+      "vertexType": "COLUMN",
+      "vertexId": "functional.alltypessmall.id",
+      "id": 6,
+      "metadata": {
+        "tableCreateTime": 1568093682,
+        "tableName": "functional.alltypessmall"
+      }
+    },
+    {
+      "vertexType": "COLUMN",
+      "vertexId": "functional.alltypessmall.month",
+      "id": 7,
+      "metadata": {
+        "tableCreateTime": 1568093682,
+        "tableName": "functional.alltypessmall"
+      }
+    }
+  ],
+  "edges": [
+    {
+      "sources": [
+        1
+      ],
+      "targets": [
+        0
+      ],
+      "edgeType": "PROJECTION"
+    },
+    {
+      "sources": [
+        3
+      ],
+      "targets": [
+        2
+      ],
+      "edgeType": "PROJECTION"
+    },
+    {
+      "sources": [
+        4,
+        5,
+        6,
+        7
+      ],
+      "targets": [
+        0,
+        2
+      ],
+      "edgeType": "PREDICATE"
+    }
+  ],
+  "queryId": "69419851b45132ca:21275fb100000000",
+  "user": "bharath",
+  "queryText": "create table lineage_test_db.lineage_test_tbl2 as select distinct a.int_col, a.string_col from functional.alltypes a inner join functional.alltypessmall b on (a.id = b.id) where a.year = 2009 and b.month = 2",
+  "endTime": 1568097499
+}
+---- QUERY
+create table lineage_test_db.lineage_test_tbl2 as
+select distinct a.int_col, a.string_col from functional.alltypes a
+inner join functional.alltypessmall b on (a.id = b.id)
+where a.year = 2009 and b.month = 2
+====
+---- LINEAGE
+{
+  "hash": "8f43e2adb3da2eac5d00d1eba96bb553",
+  "timestamp": 1568097504,
+  "vertices": [
+    {
+      "vertexType": "COLUMN",
+      "vertexId": "int_col",
+      "id": 0,
+      "metadata": {
+        "tableCreateTime": 1568097504,
+        "tableName": "lineage_test_db.lineage_test_tbl3"
+      }
+    },
+    {
+      "vertexType": "COLUMN",
+      "vertexId": "functional.alltypestiny.int_col",
+      "id": 1,
+      "metadata": {
+        "tableCreateTime": 1568093689,
+        "tableName": "functional.alltypestiny"
+      }
+    }
+  ],
+  "edges": [
+    {
+      "sources": [
+        1
+      ],
+      "targets": [
+        0
+      ],
+      "edgeType": "PROJECTION"
+    }
+  ],
+  "queryId": "bc4fbd39b756403c:101d778c00000000",
+  "user": "bharath",
+  "queryText": "create table lineage_test_db.lineage_test_tbl3 as select * from   (select * from      (select int_col from functional.alltypestiny limit 1) v1 ) v2",
+  "endTime": 1568097504
+}
+---- QUERY
+create table lineage_test_db.lineage_test_tbl3 as
+select * from
+  (select * from
+     (select int_col from functional.alltypestiny limit 1) v1 ) v2
+====
+---- LINEAGE
+{
+  "hash": "502d2de3774289b12a705777da61baae",
+  "timestamp": 1568097509,
+  "vertices": [
+    {
+      "vertexType": "COLUMN",
+      "vertexId": "id",
+      "id": 0,
+      "metadata": {
+        "tableCreateTime": 1568097510,
+        "tableName": "lineage_test_db.lineage_test_tbl4"
+      }
+    },
+    {
+      "vertexType": "COLUMN",
+      "vertexId": "functional_hbase.alltypes.id",
+      "id": 1,
+      "metadata": {
+        "tableCreateTime": 1568094417,
+        "tableName": "functional_hbase.alltypes"
+      }
+    },
+    {
+      "vertexType": "COLUMN",
+      "vertexId": "bigint_col",
+      "id": 2,
+      "metadata": {
+        "tableCreateTime": 1568097510,
+        "tableName": "lineage_test_db.lineage_test_tbl4"
+      }
+    },
+    {
+      "vertexType": "COLUMN",
+      "vertexId": "functional_hbase.alltypes.bigint_col",
+      "id": 3,
+      "metadata": {
+        "tableCreateTime": 1568094417,
+        "tableName": "functional_hbase.alltypes"
+      }
+    },
+    {
+      "vertexType": "COLUMN",
+      "vertexId": "bool_col",
+      "id": 4,
+      "metadata": {
+        "tableCreateTime": 1568097510,
+        "tableName": "lineage_test_db.lineage_test_tbl4"
+      }
+    },
+    {
+      "vertexType": "COLUMN",
+      "vertexId": "functional_hbase.alltypes.bool_col",
+      "id": 5,
+      "metadata": {
+        "tableCreateTime": 1568094417,
+        "tableName": "functional_hbase.alltypes"
+      }
+    },
+    {
+      "vertexType": "COLUMN",
+      "vertexId": "date_string_col",
+      "id": 6,
+      "metadata": {
+        "tableCreateTime": 1568097510,
+        "tableName": "lineage_test_db.lineage_test_tbl4"
+      }
+    },
+    {
+      "vertexType": "COLUMN",
+      "vertexId": "functional_hbase.alltypes.date_string_col",
+      "id": 7,
+      "metadata": {
+        "tableCreateTime": 1568094417,
+        "tableName": "functional_hbase.alltypes"
+      }
+    },
+    {
+      "vertexType": "COLUMN",
+      "vertexId": "double_col",
+      "id": 8,
+      "metadata": {
+        "tableCreateTime": 1568097510,
+        "tableName": "lineage_test_db.lineage_test_tbl4"
+      }
+    },
+    {
+      "vertexType": "COLUMN",
+      "vertexId": "functional_hbase.alltypes.double_col",
+      "id": 9,
+      "metadata": {
+        "tableCreateTime": 1568094417,
+        "tableName": "functional_hbase.alltypes"
+      }
+    },
+    {
+      "vertexType": "COLUMN",
+      "vertexId": "float_col",
+      "id": 10,
+      "metadata": {
+        "tableCreateTime": 1568097510,
+        "tableName": "lineage_test_db.lineage_test_tbl4"
+      }
+    },
+    {
+      "vertexType": "COLUMN",
+      "vertexId": "functional_hbase.alltypes.float_col",
+      "id": 11,
+      "metadata": {
+        "tableCreateTime": 1568094417,
+        "tableName": "functional_hbase.alltypes"
+      }
+    },
+    {
+      "vertexType": "COLUMN",
+      "vertexId": "int_col",
+      "id": 12,
+      "metadata": {
+        "tableCreateTime": 1568097510,
+        "tableName": "lineage_test_db.lineage_test_tbl4"
+      }
+    },
+    {
+      "vertexType": "COLUMN",
+      "vertexId": "functional_hbase.alltypes.int_col",
+      "id": 13,
+      "metadata": {
+        "tableCreateTime": 1568094417,
+        "tableName": "functional_hbase.alltypes"
+      }
+    },
+    {
+      "vertexType": "COLUMN",
+      "vertexId": "month",
+      "id": 14,
+      "metadata": {
+        "tableCreateTime": 1568097510,
+        "tableName": "lineage_test_db.lineage_test_tbl4"
+      }
+    },
+    {
+      "vertexType": "COLUMN",
+      "vertexId": "functional_hbase.alltypes.month",
+      "id": 15,
+      "metadata": {
+        "tableCreateTime": 1568094417,
+        "tableName": "functional_hbase.alltypes"
+      }
+    },
+    {
+      "vertexType": "COLUMN",
+      "vertexId": "smallint_col",
+      "id": 16,
+      "metadata": {
+        "tableCreateTime": 1568097510,
+        "tableName": "lineage_test_db.lineage_test_tbl4"
+      }
+    },
+    {
+      "vertexType": "COLUMN",
+      "vertexId": "functional_hbase.alltypes.smallint_col",
+      "id": 17,
+      "metadata": {
+        "tableCreateTime": 1568094417,
+        "tableName": "functional_hbase.alltypes"
+      }
+    },
+    {
+      "vertexType": "COLUMN",
+      "vertexId": "string_col",
+      "id": 18,
+      "metadata": {
+        "tableCreateTime": 1568097510,
+        "tableName": "lineage_test_db.lineage_test_tbl4"
+      }
+    },
+    {
+      "vertexType": "COLUMN",
+      "vertexId": "functional_hbase.alltypes.string_col",
+      "id": 19,
+      "metadata": {
+        "tableCreateTime": 1568094417,
+        "tableName": "functional_hbase.alltypes"
+      }
+    },
+    {
+      "vertexType": "COLUMN",
+      "vertexId": "timestamp_col",
+      "id": 20,
+      "metadata": {
+        "tableCreateTime": 1568097510,
+        "tableName": "lineage_test_db.lineage_test_tbl4"
+      }
+    },
+    {
+      "vertexType": "COLUMN",
+      "vertexId": "functional_hbase.alltypes.timestamp_col",
+      "id": 21,
+      "metadata": {
+        "tableCreateTime": 1568094417,
+        "tableName": "functional_hbase.alltypes"
+      }
+    },
+    {
+      "vertexType": "COLUMN",
+      "vertexId": "tinyint_col",
+      "id": 22,
+      "metadata": {
+        "tableCreateTime": 1568097510,
+        "tableName": "lineage_test_db.lineage_test_tbl4"
+      }
+    },
+    {
+      "vertexType": "COLUMN",
+      "vertexId": "functional_hbase.alltypes.tinyint_col",
+      "id": 23,
+      "metadata": {
+        "tableCreateTime": 1568094417,
+        "tableName": "functional_hbase.alltypes"
+      }
+    },
+    {
+      "vertexType": "COLUMN",
+      "vertexId": "year",
+      "id": 24,
+      "metadata": {
+        "tableCreateTime": 1568097510,
+        "tableName": "lineage_test_db.lineage_test_tbl4"
+      }
+    },
+    {
+      "vertexType": "COLUMN",
+      "vertexId": "functional_hbase.alltypes.year",
+      "id": 25,
+      "metadata": {
+        "tableCreateTime": 1568094417,
+        "tableName": "functional_hbase.alltypes"
+      }
+    }
+  ],
+  "edges": [
+    {
+      "sources": [
+        1
+      ],
+      "targets": [
+        0
+      ],
+      "edgeType": "PROJECTION"
+    },
+    {
+      "sources": [
+        3
+      ],
+      "targets": [
+        2
+      ],
+      "edgeType": "PROJECTION"
+    },
+    {
+      "sources": [
+        5
+      ],
+      "targets": [
+        4
+      ],
+      "edgeType": "PROJECTION"
+    },
+    {
+      "sources": [
+        7
+      ],
+      "targets": [
+        6
+      ],
+      "edgeType": "PROJECTION"
+    },
+    {
+      "sources": [
+        9
+      ],
+      "targets": [
+        8
+      ],
+      "edgeType": "PROJECTION"
+    },
+    {
+      "sources": [
+        11
+      ],
+      "targets": [
+        10
+      ],
+      "edgeType": "PROJECTION"
+    },
+    {
+      "sources": [
+        13
+      ],
+      "targets": [
+        12
+      ],
+      "edgeType": "PROJECTION"
+    },
+    {
+      "sources": [
+        15
+      ],
+      "targets": [
+        14
+      ],
+      "edgeType": "PROJECTION"
+    },
+    {
+      "sources": [
+        17
+      ],
+      "targets": [
+        16
+      ],
+      "edgeType": "PROJECTION"
+    },
+    {
+      "sources": [
+        19
+      ],
+      "targets": [
+        18
+      ],
+      "edgeType": "PROJECTION"
+    },
+    {
+      "sources": [
+        21
+      ],
+      "targets": [
+        20
+      ],
+      "edgeType": "PROJECTION"
+    },
+    {
+      "sources": [
+        23
+      ],
+      "targets": [
+        22
+      ],
+      "edgeType": "PROJECTION"
+    },
+    {
+      "sources": [
+        25
+      ],
+      "targets": [
+        24
+      ],
+      "edgeType": "PROJECTION"
+    }
+  ],
+  "queryId": "774dfa27d60b670b:37bf45ec00000000",
+  "user": "bharath",
+  "queryText": "create table lineage_test_db.lineage_test_tbl4 as select * from functional_hbase.alltypes limit 5",
+  "endTime": 1568097511
+}
+---- QUERY
+# CTAS from HBase table
+create table lineage_test_db.lineage_test_tbl4 as select * from functional_hbase.alltypes limit 5
+====
+---- LINEAGE
+{
+  "hash": "2fa5d0ab4e1c38a9d7abde595f4c60c8",
+  "timestamp": 1568097516,
+  "vertices": [
+    {
+      "vertexType": "COLUMN",
+      "vertexId": "id",
+      "id": 0,
+      "metadata": {
+        "tableCreateTime": 1568097478,
+        "tableName": "lineage_test_db.alltypes"
+      }
+    },
+    {
+      "vertexType": "COLUMN",
+      "vertexId": "bigint_col",
+      "id": 1,
+      "metadata": {
+        "tableCreateTime": 1568097478,
+        "tableName": "lineage_test_db.alltypes"
+      }
+    },
+    {
+      "vertexType": "COLUMN",
+      "vertexId": "bool_col",
+      "id": 2,
+      "metadata": {
+        "tableCreateTime": 1568097478,
+        "tableName": "lineage_test_db.alltypes"
+      }
+    },
+    {
+      "vertexType": "COLUMN",
+      "vertexId": "date_string_col",
+      "id": 3,
+      "metadata": {
+        "tableCreateTime": 1568097478,
+        "tableName": "lineage_test_db.alltypes"
+      }
+    },
+    {
+      "vertexType": "COLUMN",
+      "vertexId": "double_col",
+      "id": 4,
+      "metadata": {
+        "tableCreateTime": 1568097478,
+        "tableName": "lineage_test_db.alltypes"
+      }
+    },
+    {
+      "vertexType": "COLUMN",
+      "vertexId": "float_col",
+      "id": 5,
+      "metadata": {
+        "tableCreateTime": 1568097478,
+        "tableName": "lineage_test_db.alltypes"
+      }
+    },
+    {
+      "vertexType": "COLUMN",
+      "vertexId": "int_col",
+      "id": 6,
+      "metadata": {
+        "tableCreateTime": 1568097478,
+        "tableName": "lineage_test_db.alltypes"
+      }
+    },
+    {
+      "vertexType": "COLUMN",
+      "vertexId": "month",
+      "id": 7,
+      "metadata": {
+        "tableCreateTime": 1568097478,
+        "tableName": "lineage_test_db.alltypes"
+      }
+    },
+    {
+      "vertexType": "COLUMN",
+      "vertexId": "smallint_col",
+      "id": 8,
+      "metadata": {
+        "tableCreateTime": 1568097478,
+        "tableName": "lineage_test_db.alltypes"
+      }
+    },
+    {
+      "vertexType": "COLUMN",
+      "vertexId": "string_col",
+      "id": 9,
+      "metadata": {
+        "tableCreateTime": 1568097478,
+        "tableName": "lineage_test_db.alltypes"
+      }
+    },
+    {
+      "vertexType": "COLUMN",
+      "vertexId": "timestamp_col",
+      "id": 10,
+      "metadata": {
+        "tableCreateTime": 1568097478,
+        "tableName": "lineage_test_db.alltypes"
+      }
+    },
+    {
+      "vertexType": "COLUMN",
+      "vertexId": "tinyint_col",
+      "id": 11,
+      "metadata": {
+        "tableCreateTime": 1568097478,
+        "tableName": "lineage_test_db.alltypes"
+      }
+    },
+    {
+      "vertexType": "COLUMN",
+      "vertexId": "year",
+      "id": 12,
+      "metadata": {
+        "tableCreateTime": 1568097478,
+        "tableName": "lineage_test_db.alltypes"
+      }
+    }
+  ],
+  "edges": [
+    {
+      "sources": [],
+      "targets": [
+        0
+      ],
+      "edgeType": "PROJECTION"
+    },
+    {
+      "sources": [],
+      "targets": [
+        1
+      ],
+      "edgeType": "PROJECTION"
+    },
+    {
+      "sources": [],
+      "targets": [
+        2
+      ],
+      "edgeType": "PROJECTION"
+    },
+    {
+      "sources": [],
+      "targets": [
+        3
+      ],
+      "edgeType": "PROJECTION"
+    },
+    {
+      "sources": [],
+      "targets": [
+        4
+      ],
+      "edgeType": "PROJECTION"
+    },
+    {
+      "sources": [],
+      "targets": [
+        5
+      ],
+      "edgeType": "PROJECTION"
+    },
+    {
+      "sources": [],
+      "targets": [
+        6
+      ],
+      "edgeType": "PROJECTION"
+    },
+    {
+      "sources": [],
+      "targets": [
+        7
+      ],
+      "edgeType": "PROJECTION"
+    },
+    {
+      "sources": [],
+      "targets": [
+        8
+      ],
+      "edgeType": "PROJECTION"
+    },
+    {
+      "sources": [],
+      "targets": [
+        9
+      ],
+      "edgeType": "PROJECTION"
+    },
+    {
+      "sources": [],
+      "targets": [
+        10
+      ],
+      "edgeType": "PROJECTION"
+    },
+    {
+      "sources": [],
+      "targets": [
+        11
+      ],
+      "edgeType": "PROJECTION"
+    },
+    {
+      "sources": [],
+      "targets": [
+        12
+      ],
+      "edgeType": "PROJECTION"
+    }
+  ],
+  "queryId": "454b0e7178b98fe4:6d85e21300000000",
+  "user": "bharath",
+  "queryText": "insert into lineage_test_db.alltypes   values (1, 1, true, \"1999-12-01\", 2.0, 1.0, 1, 12, 2, \"abs\",   cast(now() as timestamp), 1, 1999)",
+  "endTime": 1568097516
+}
+---- QUERY
+# Insert into an HBase table
+insert into
+lineage_test_db.alltypes
+  values (1, 1, true, "1999-12-01", 2.0, 1.0, 1, 12, 2, "abs",
+  cast(now() as timestamp), 1, 1999)
+====
+---- LINEAGE
+{
+  "hash": "e3af61c7dc3e8cd9ab632c3c935df032",
+  "timestamp": 1568097521,
+  "vertices": [
+    {
+      "vertexType": "COLUMN",
+      "vertexId": "id",
+      "id": 0,
+      "metadata": {
+        "tableCreateTime": 1568097479,
+        "tableName": "lineage_test_db.alltypesnopart"
+      }
+    },
+    {
+      "vertexType": "COLUMN",
+      "vertexId": "functional.alltypes.id",
+      "id": 1,
+      "metadata": {
+        "tableCreateTime": 1568093675,
+        "tableName": "functional.alltypes"
+      }
+    },
+    {
+      "vertexType": "COLUMN",
+      "vertexId": "bool_col",
+      "id": 2,
+      "metadata": {
+        "tableCreateTime": 1568097479,
+        "tableName": "lineage_test_db.alltypesnopart"
+      }
+    },
+    {
+      "vertexType": "COLUMN",
+      "vertexId": "functional.alltypes.bool_col",
+      "id": 3,
+      "metadata": {
+        "tableCreateTime": 1568093675,
+        "tableName": "functional.alltypes"
+      }
+    },
+    {
+      "vertexType": "COLUMN",
+      "vertexId": "tinyint_col",
+      "id": 4,
+      "metadata": {
+        "tableCreateTime": 1568097479,
+        "tableName": "lineage_test_db.alltypesnopart"
+      }
+    },
+    {
+      "vertexType": "COLUMN",
+      "vertexId": "smallint_col",
+      "id": 5,
+      "metadata": {
+        "tableCreateTime": 1568097479,
+        "tableName": "lineage_test_db.alltypesnopart"
+      }
+    },
+    {
+      "vertexType": "COLUMN",
+      "vertexId": "int_col",
+      "id": 6,
+      "metadata": {
+        "tableCreateTime": 1568097479,
+        "tableName": "lineage_test_db.alltypesnopart"
+      }
+    },
+    {
+      "vertexType": "COLUMN",
+      "vertexId": "bigint_col",
+      "id": 7,
+      "metadata": {
+        "tableCreateTime": 1568097479,
+        "tableName": "lineage_test_db.alltypesnopart"
+      }
+    },
+    {
+      "vertexType": "COLUMN",
+      "vertexId": "float_col",
+      "id": 8,
+      "metadata": {
+        "tableCreateTime": 1568097479,
+        "tableName": "lineage_test_db.alltypesnopart"
+      }
+    },
+    {
+      "vertexType": "COLUMN",
+      "vertexId": "double_col",
+      "id": 9,
+      "metadata": {
+        "tableCreateTime": 1568097479,
+        "tableName": "lineage_test_db.alltypesnopart"
+      }
+    },
+    {
+      "vertexType": "COLUMN",
+      "vertexId": "date_string_col",
+      "id": 10,
+      "metadata": {
+        "tableCreateTime": 1568097479,
+        "tableName": "lineage_test_db.alltypesnopart"
+      }
+    },
+    {
+      "vertexType": "COLUMN",
+      "vertexId": "string_col",
+      "id": 11,
+      "metadata": {
+        "tableCreateTime": 1568097479,
+        "tableName": "lineage_test_db.alltypesnopart"
+      }
+    },
+    {
+      "vertexType": "COLUMN",
+      "vertexId": "timestamp_col",
+      "id": 12,
+      "metadata": {
+        "tableCreateTime": 1568097479,
+        "tableName": "lineage_test_db.alltypesnopart"
+      }
+    },
+    {
+      "vertexType": "COLUMN",
+      "vertexId": "functional.alltypes.timestamp_col",
+      "id": 13,
+      "metadata": {
+        "tableCreateTime": 1568093675,
+        "tableName": "functional.alltypes"
+      }
+    }
+  ],
+  "edges": [
+    {
+      "sources": [
+        1
+      ],
+      "targets": [
+        0
+      ],
+      "edgeType": "PROJECTION"
+    },
+    {
+      "sources": [
+        3
+      ],
+      "targets": [
+        2
+      ],
+      "edgeType": "PROJECTION"
+    },
+    {
+      "sources": [],
+      "targets": [
+        4
+      ],
+      "edgeType": "PROJECTION"
+    },
+    {
+      "sources": [],
+      "targets": [
+        5
+      ],
+      "edgeType": "PROJECTION"
+    },
+    {
+      "sources": [],
+      "targets": [
+        6
+      ],
+      "edgeType": "PROJECTION"
+    },
+    {
+      "sources": [],
+      "targets": [
+        7
+      ],
+      "edgeType": "PROJECTION"
+    },
+    {
+      "sources": [],
+      "targets": [
+        8
+      ],
+      "edgeType": "PROJECTION"
+    },
+    {
+      "sources": [],
+      "targets": [
+        9
+      ],
+      "edgeType": "PROJECTION"
+    },
+    {
+      "sources": [],
+      "targets": [
+        10
+      ],
+      "edgeType": "PROJECTION"
+    },
+    {
+      "sources": [],
+      "targets": [
+        11
+      ],
+      "edgeType": "PROJECTION"
+    },
+    {
+      "sources": [
+        13
+      ],
+      "targets": [
+        12
+      ],
+      "edgeType": "PROJECTION"
+    }
+  ],
+  "queryId": "ad4f9e564b46993a:df41be2500000000",
+  "user": "bharath",
+  "queryText": "insert into table lineage_test_db.alltypesnopart (id, bool_col, timestamp_col) select id, bool_col, timestamp_col from functional.alltypes",
+  "endTime": 1568097521
+}
+---- QUERY
+insert into table lineage_test_db.alltypesnopart (id, bool_col, timestamp_col)
+select id, bool_col, timestamp_col
+from functional.alltypes
+====
+---- LINEAGE
+{
+  "hash": "453abb733b2b21ba827f80897fe3b579",
+  "timestamp": 1568097527,
+  "vertices": [
+    {
+      "vertexType": "COLUMN",
+      "vertexId": "year",
+      "id": 0,
+      "metadata": {
+        "tableCreateTime": 1568097480,
+        "tableName": "lineage_test_db.alltypessmall"
+      }
+    },
+    {
+      "vertexType": "COLUMN",
+      "vertexId": "month",
+      "id": 1,
+      "metadata": {
+        "tableCreateTime": 1568097480,
+        "tableName": "lineage_test_db.alltypessmall"
+      }
+    },
+    {
+      "vertexType": "COLUMN",
+      "vertexId": "id",
+      "id": 2,
+      "metadata": {
+        "tableCreateTime": 1568097480,
+        "tableName": "lineage_test_db.alltypessmall"
+      }
+    },
+    {
+      "vertexType": "COLUMN",
+      "vertexId": "bool_col",
+      "id": 3,
+      "metadata": {
+        "tableCreateTime": 1568097480,
+        "tableName": "lineage_test_db.alltypessmall"
+      }
+    },
+    {
+      "vertexType": "COLUMN",
+      "vertexId": "tinyint_col",
+      "id": 4,
+      "metadata": {
+        "tableCreateTime": 1568097480,
+        "tableName": "lineage_test_db.alltypessmall"
+      }
+    },
+    {
+      "vertexType": "COLUMN",
+      "vertexId": "smallint_col",
+      "id": 5,
+      "metadata": {
+        "tableCreateTime": 1568097480,
+        "tableName": "lineage_test_db.alltypessmall"
+      }
+    },
+    {
+      "vertexType": "COLUMN",
+      "vertexId": "functional.alltypes.smallint_col",
+      "id": 6,
+      "metadata": {
+        "tableCreateTime": 1568093675,
+        "tableName": "functional.alltypes"
+      }
+    },
+    {
+      "vertexType": "COLUMN",
+      "vertexId": "int_col",
+      "id": 7,
+      "metadata": {
+        "tableCreateTime": 1568097480,
+        "tableName": "lineage_test_db.alltypessmall"
+      }
+    },
+    {
+      "vertexType": "COLUMN",
+      "vertexId": "functional.alltypes.int_col",
+      "id": 8,
+      "metadata": {
+        "tableCreateTime": 1568093675,
+        "tableName": "functional.alltypes"
+      }
+    },
+    {
+      "vertexType": "COLUMN",
+      "vertexId": "bigint_col",
+      "id": 9,
+      "metadata": {
+        "tableCreateTime": 1568097480,
+        "tableName": "lineage_test_db.alltypessmall"
+      }
+    },
+    {
+      "vertexType": "COLUMN",
+      "vertexId": "float_col",
+      "id": 10,
+      "metadata": {
+        "tableCreateTime": 1568097480,
+        "tableName": "lineage_test_db.alltypessmall"
+      }
+    },
+    {
+      "vertexType": "COLUMN",
+      "vertexId": "double_col",
+      "id": 11,
+      "metadata": {
+        "tableCreateTime": 1568097480,
+        "tableName": "lineage_test_db.alltypessmall"
+      }
+    },
+    {
+      "vertexType": "COLUMN",
+      "vertexId": "date_string_col",
+      "id": 12,
+      "metadata": {
+        "tableCreateTime": 1568097480,
+        "tableName": "lineage_test_db.alltypessmall"
+      }
+    },
+    {
+      "vertexType": "COLUMN",
+      "vertexId": "string_col",
+      "id": 13,
+      "metadata": {
+        "tableCreateTime": 1568097480,
+        "tableName": "lineage_test_db.alltypessmall"
+      }
+    },
+    {
+      "vertexType": "COLUMN",
+      "vertexId": "timestamp_col",
+      "id": 14,
+      "metadata": {
+        "tableCreateTime": 1568097480,
+        "tableName": "lineage_test_db.alltypessmall"
+      }
+    },
+    {
+      "vertexType": "COLUMN",
+      "vertexId": "functional.alltypes.month",
+      "id": 15,
+      "metadata": {
+        "tableCreateTime": 1568093675,
+        "tableName": "functional.alltypes"
+      }
+    },
+    {
+      "vertexType": "COLUMN",
+      "vertexId": "functional.alltypes.year",
+      "id": 16,
+      "metadata": {
+        "tableCreateTime": 1568093675,
+        "tableName": "functional.alltypes"
+      }
+    }
+  ],
+  "edges": [
+    {
+      "sources": [],
+      "targets": [
+        0
+      ],
+      "edgeType": "PROJECTION"
+    },
+    {
+      "sources": [],
+      "targets": [
+        1
+      ],
+      "edgeType": "PROJECTION"
+    },
+    {
+      "sources": [],
+      "targets": [
+        2
+      ],
+      "edgeType": "PROJECTION"
+    },
+    {
+      "sources": [],
+      "targets": [
+        3
+      ],
+      "edgeType": "PROJECTION"
+    },
+    {
+      "sources": [],
+      "targets": [
+        4
+      ],
+      "edgeType": "PROJECTION"
+    },
+    {
+      "sources": [
+        6
+      ],
+      "targets": [
+        5
+      ],
+      "edgeType": "PROJECTION"
+    },
+    {
+      "sources": [
+        8
+      ],
+      "targets": [
+        7
+      ],
+      "edgeType": "PROJECTION"
+    },
+    {
+      "sources": [],
+      "targets": [
+        9
+      ],
+      "edgeType": "PROJECTION"
+    },
+    {
+      "sources": [],
+      "targets": [
+        10
+      ],
+      "edgeType": "PROJECTION"
+    },
+    {
+      "sources": [],
+      "targets": [
+        11
+      ],
+      "edgeType": "PROJECTION"
+    },
+    {
+      "sources": [],
+      "targets": [
+        12
+      ],
+      "edgeType": "PROJECTION"
+    },
+    {
+      "sources": [],
+      "targets": [
+        13
+      ],
+      "edgeType": "PROJECTION"
+    },
+    {
+      "sources": [],
+      "targets": [
+        14
+      ],
+      "edgeType": "PROJECTION"
+    },
+    {
+      "sources": [
+        15,
+        16
+      ],
+      "targets": [
+        0,
+        1,
+        2,
+        3,
+        4,
+        5,
+        7,
+        9,
+        10,
+        11,
+        12,
+        13,
+        14
+      ],
+      "edgeType": "PREDICATE"
+    }
+  ],
+  "queryId": "b04704db216d74a2:b2a1d75a00000000",
+  "user": "bharath",
+  "queryText": "insert into table lineage_test_db.alltypessmall (smallint_col, int_col) partition (year=2009, month=04) select smallint_col, int_col from functional.alltypes where year=2009 and month=05",
+  "endTime": 1568097527
+}
+---- QUERY
+insert into table lineage_test_db.alltypessmall (smallint_col, int_col)
+partition (year=2009, month=04)
+select smallint_col, int_col
+from functional.alltypes
+where year=2009 and month=05
+====
+---- LINEAGE
+{
+  "hash": "b6bcec64b3eace721772f4b1d4e2cb57",
+  "timestamp": 1568097532,
+  "vertices": [
+    {
+      "vertexType": "COLUMN",
+      "vertexId": "year",
+      "id": 0,
+      "metadata": {
+        "tableCreateTime": 1568097480,
+        "tableName": "lineage_test_db.alltypessmall"
+      }
+    },
+    {
+      "vertexType": "COLUMN",
+      "vertexId": "functional_seq_snap.alltypes.year",
+      "id": 1,
+      "metadata": {
+        "tableCreateTime": 1568093699,
+        "tableName": "functional_seq_snap.alltypes"
+      }
+    },
+    {
+      "vertexType": "COLUMN",
+      "vertexId": "month",
+      "id": 2,
+      "metadata": {
+        "tableCreateTime": 1568097480,
+        "tableName": "lineage_test_db.alltypessmall"
+      }
+    },
+    {
+      "vertexType": "COLUMN",
+      "vertexId": "functional_seq_snap.alltypes.month",
+      "id": 3,
+      "metadata": {
+        "tableCreateTime": 1568093699,
+        "tableName": "functional_seq_snap.alltypes"
+      }
+    },
+    {
+      "vertexType": "COLUMN",
+      "vertexId": "id",
+      "id": 4,
+      "metadata": {
+        "tableCreateTime": 1568097480,
+        "tableName": "lineage_test_db.alltypessmall"
+      }
+    },
+    {
+      "vertexType": "COLUMN",
+      "vertexId": "functional_seq_snap.alltypes.id",
+      "id": 5,
+      "metadata": {
+        "tableCreateTime": 1568093699,
+        "tableName": "functional_seq_snap.alltypes"
+      }
+    },
+    {
+      "vertexType": "COLUMN",
+      "vertexId": "bool_col",
+      "id": 6,
+      "metadata": {
+        "tableCreateTime": 1568097480,
+        "tableName": "lineage_test_db.alltypessmall"
+      }
+    },
+    {
+      "vertexType": "COLUMN",
+      "vertexId": "tinyint_col",
+      "id": 7,
+      "metadata": {
+        "tableCreateTime": 1568097480,
+        "tableName": "lineage_test_db.alltypessmall"
+      }
+    },
+    {
+      "vertexType": "COLUMN",
+      "vertexId": "smallint_col",
+      "id": 8,
+      "metadata": {
+        "tableCreateTime": 1568097480,
+        "tableName": "lineage_test_db.alltypessmall"
+      }
+    },
+    {
+      "vertexType": "COLUMN",
+      "vertexId": "int_col",
+      "id": 9,
+      "metadata": {
+        "tableCreateTime": 1568097480,
+        "tableName": "lineage_test_db.alltypessmall"
+      }
+    },
+    {
+      "vertexType": "COLUMN",
+      "vertexId": "functional_seq_snap.alltypes.int_col",
+      "id": 10,
+      "metadata": {
+        "tableCreateTime": 1568093699,
+        "tableName": "functional_seq_snap.alltypes"
+      }
+    },
+    {
+      "vertexType": "COLUMN",
+      "vertexId": "bigint_col",
+      "id": 11,
+      "metadata": {
+        "tableCreateTime": 1568097480,
+        "tableName": "lineage_test_db.alltypessmall"
+      }
+    },
+    {
+      "vertexType": "COLUMN",
+      "vertexId": "float_col",
+      "id": 12,
+      "metadata": {
+        "tableCreateTime": 1568097480,
+        "tableName": "lineage_test_db.alltypessmall"
+      }
+    },
+    {
+      "vertexType": "COLUMN",
+      "vertexId": "double_col",
+      "id": 13,
+      "metadata": {
+        "tableCreateTime": 1568097480,
+        "tableName": "lineage_test_db.alltypessmall"
+      }
+    },
+    {
+      "vertexType": "COLUMN",
+      "vertexId": "date_string_col",
+      "id": 14,
+      "metadata": {
+        "tableCreateTime": 1568097480,
+        "tableName": "lineage_test_db.alltypessmall"
+      }
+    },
+    {
+      "vertexType": "COLUMN",
+      "vertexId": "string_col",
+      "id": 15,
+      "metadata": {
+        "tableCreateTime": 1568097480,
+        "tableName": "lineage_test_db.alltypessmall"
+      }
+    },
+    {
+      "vertexType": "COLUMN",
+      "vertexId": "functional_seq_snap.alltypes.string_col",
+      "id": 16,
+      "metadata": {
+        "tableCreateTime": 1568093699,
+        "tableName": "functional_seq_snap.alltypes"
+      }
+    },
+    {
+      "vertexType": "COLUMN",
+      "vertexId": "timestamp_col",
+      "id": 17,
+      "metadata": {
+        "tableCreateTime": 1568097480,
+        "tableName": "lineage_test_db.alltypessmall"
+      }
+    }
+  ],
+  "edges": [
+    {
+      "sources": [
+        1
+      ],
+      "targets": [
+        0
+      ],
+      "edgeType": "PROJECTION"
+    },
+    {
+      "sources": [
+        3
+      ],
+      "targets": [
+        2
+      ],
+      "edgeType": "PROJECTION"
+    },
+    {
+      "sources": [
+        5
+      ],
+      "targets": [
+        4
+      ],
+      "edgeType": "PROJECTION"
+    },
+    {
+      "sources": [],
+      "targets": [
+        6
+      ],
+      "edgeType": "PROJECTION"
+    },
+    {
+      "sources": [],
+      "targets": [
+        7
+      ],
+      "edgeType": "PROJECTION"
+    },
+    {
+      "sources": [],
+      "targets": [
+        8
+      ],
+      "edgeType": "PROJECTION"
+    },
+    {
+      "sources": [
+        10
+      ],
+      "targets": [
+        9
+      ],
+      "edgeType": "PROJECTION"
+    },
+    {
+      "sources": [],
+      "targets": [
+        11
+      ],
+      "edgeType": "PROJECTION"
+    },
+    {
+      "sources": [],
+      "targets": [
+        12
+      ],
+      "edgeType": "PROJECTION"
+    },
+    {
+      "sources": [],
+      "targets": [
+        13
+      ],
+      "edgeType": "PROJECTION"
+    },
+    {
+      "sources": [],
+      "targets": [
+        14
+      ],
+      "edgeType": "PROJECTION"
+    },
+    {
+      "sources": [
+        16
+      ],
+      "targets": [
+        15
+      ],
+      "edgeType": "PROJECTION"
+    },
+    {
+      "sources": [],
+      "targets": [
+        17
+      ],
+      "edgeType": "PROJECTION"
+    },
+    {
+      "sources": [
+        1,
+        3
+      ],
+      "targets": [
+        0,
+        2,
+        4,
+        6,
+        7,
+        8,
+        9,
+        11,
+        12,
+        13,
+        14,
+        15,
+        17
+      ],
+      "edgeType": "PREDICATE"
+    }
+  ],
+  "queryId": "0848da428c8561da:15695de800000000",
+  "user": "bharath",
+  "queryText": "insert into table lineage_test_db.alltypessmall (id, string_col, int_col) partition (year, month) select id, string_col, int_col, year, month from functional_seq_snap.alltypes where year=2009 and month>10",
+  "endTime": 1568097533
+}
+---- QUERY
+insert into table lineage_test_db.alltypessmall (id, string_col, int_col)
+partition (year, month)
+select id, string_col, int_col, year, month
+from functional_seq_snap.alltypes
+where year=2009 and month>10
+====
+---- LINEAGE
+{
+  "hash": "2b82f76becf76311633c26498d9f57d8",
+  "timestamp": 1568097538,
+  "vertices": [
+    {
+      "vertexType": "COLUMN",
+      "vertexId": "year",
+      "id": 0,
+      "metadata": {
+        "tableCreateTime": 1568097480,
+        "tableName": "lineage_test_db.alltypessmall"
+      }
+    },
+    {
+      "vertexType": "COLUMN",
+      "vertexId": "month",
+      "id": 1,
+      "metadata": {
+        "tableCreateTime": 1568097480,
+        "tableName": "lineage_test_db.alltypessmall"
+      }
+    },
+    {
+      "vertexType": "COLUMN",
+      "vertexId": "functional.alltypes.month",
+      "id": 2,
+      "metadata": {
+        "tableCreateTime": 1568093675,
+        "tableName": "functional.alltypes"
+      }
+    },
+    {
+      "vertexType": "COLUMN",
+      "vertexId": "id",
+      "id": 3,
+      "metadata": {
+        "tableCreateTime": 1568097480,
+        "tableName": "lineage_test_db.alltypessmall"
+      }
+    },
+    {
+      "vertexType": "COLUMN",
+      "vertexId": "functional.alltypes.id",
+      "id": 4,
+      "metadata": {
+        "tableCreateTime": 1568093675,
+        "tableName": "functional.alltypes"
+      }
+    },
+    {
+      "vertexType": "COLUMN",
+      "vertexId": "bool_col",
+      "id": 5,
+      "metadata": {
+        "tableCreateTime": 1568097480,
+        "tableName": "lineage_test_db.alltypessmall"
+      }
+    },
+    {
+      "vertexType": "COLUMN",
+      "vertexId": "functional.alltypes.bool_col",
+      "id": 6,
+      "metadata": {
+        "tableCreateTime": 1568093675,
+        "tableName": "functional.alltypes"
+      }
+    },
+    {
+      "vertexType": "COLUMN",
+      "vertexId": "tinyint_col",
+      "id": 7,
+      "metadata": {
+        "tableCreateTime": 1568097480,
+        "tableName": "lineage_test_db.alltypessmall"
+      }
+    },
+    {
+      "vertexType": "COLUMN",
+      "vertexId": "functional.alltypes.tinyint_col",
+      "id": 8,
+      "metadata": {
+        "tableCreateTime": 1568093675,
+        "tableName": "functional.alltypes"
+      }
+    },
+    {
+      "vertexType": "COLUMN",
+      "vertexId": "smallint_col",
+      "id": 9,
+      "metadata": {
+        "tableCreateTime": 1568097480,
+        "tableName": "lineage_test_db.alltypessmall"
+      }
+    },
+    {
+      "vertexType": "COLUMN",
+      "vertexId": "functional.alltypes.smallint_col",
+      "id": 10,
+      "metadata": {
+        "tableCreateTime": 1568093675,
+        "tableName": "functional.alltypes"
+      }
+    },
+    {
+      "vertexType": "COLUMN",
+      "vertexId": "int_col",
+      "id": 11,
+      "metadata": {
+        "tableCreateTime": 1568097480,
+        "tableName": "lineage_test_db.alltypessmall"
+      }
+    },
+    {
+      "vertexType": "COLUMN",
+      "vertexId": "functional.alltypes.int_col",
+      "id": 12,
+      "metadata": {
+        "tableCreateTime": 1568093675,
+        "tableName": "functional.alltypes"
+      }
+    },
+    {
+      "vertexType": "COLUMN",
+      "vertexId": "bigint_col",
+      "id": 13,
+      "metadata": {
+        "tableCreateTime": 1568097480,
+        "tableName": "lineage_test_db.alltypessmall"
+      }
+    },
+    {
+      "vertexType": "COLUMN",
+      "vertexId": "functional.alltypes.bigint_col",
+      "id": 14,
+      "metadata": {
+        "tableCreateTime": 1568093675,
+        "tableName": "functional.alltypes"
+      }
+    },
+    {
+      "vertexType": "COLUMN",
+      "vertexId": "float_col",
+      "id": 15,
+      "metadata": {
+        "tableCreateTime": 1568097480,
+        "tableName": "lineage_test_db.alltypessmall"
+      }
+    },
+    {
+      "vertexType": "COLUMN",
+      "vertexId": "functional.alltypes.float_col",
+      "id": 16,
+      "metadata": {
+        "tableCreateTime": 1568093675,
+        "tableName": "functional.alltypes"
+      }
+    },
+    {
+      "vertexType": "COLUMN",
+      "vertexId": "double_col",
+      "id": 17,
+      "metadata": {
+        "tableCreateTime": 1568097480,
+        "tableName": "lineage_test_db.alltypessmall"
+      }
+    },
+    {
+      "vertexType": "COLUMN",
+      "vertexId": "functional.alltypes.double_col",
+      "id": 18,
+      "metadata": {
+        "tableCreateTime": 1568093675,
+        "tableName": "functional.alltypes"
+      }
+    },
+    {
+      "vertexType": "COLUMN",
+      "vertexId": "date_string_col",
+      "id": 19,
+      "metadata": {
+        "tableCreateTime": 1568097480,
+        "tableName": "lineage_test_db.alltypessmall"
+      }
+    },
+    {
+      "vertexType": "COLUMN",
+      "vertexId": "functional.alltypes.date_string_col",
+      "id": 20,
+      "metadata": {
+        "tableCreateTime": 1568093675,
+        "tableName": "functional.alltypes"
+      }
+    },
+    {
+      "vertexType": "COLUMN",
+      "vertexId": "string_col",
+      "id": 21,
+      "metadata": {
+        "tableCreateTime": 1568097480,
+        "tableName": "lineage_test_db.alltypessmall"
+      }
+    },
+    {
+      "vertexType": "COLUMN",
+      "vertexId": "functional.alltypes.string_col",
+      "id": 22,
+      "metadata": {
+        "tableCreateTime": 1568093675,
+        "tableName": "functional.alltypes"
+      }
+    },
+    {
+      "vertexType": "COLUMN",
+      "vertexId": "timestamp_col",
+      "id": 23,
+      "metadata": {
+        "tableCreateTime": 1568097480,
+        "tableName": "lineage_test_db.alltypessmall"
+      }
+    },
+    {
+      "vertexType": "COLUMN",
+      "vertexId": "functional.alltypes.timestamp_col",
+      "id": 24,
+      "metadata": {
+        "tableCreateTime": 1568093675,
+        "tableName": "functional.alltypes"
+      }
+    },
+    {
+      "vertexType": "COLUMN",
+      "vertexId": "functional.alltypes.year",
+      "id": 25,
+      "metadata": {
+        "tableCreateTime": 1568093675,
+        "tableName": "functional.alltypes"
+      }
+    }
+  ],
+  "edges": [
+    {
+      "sources": [],
+      "targets": [
+        0
+      ],
+      "edgeType": "PROJECTION"
+    },
+    {
+      "sources": [
+        2
+      ],
+      "targets": [
+        1
+      ],
+      "edgeType": "PROJECTION"
+    },
+    {
+      "sources": [
+        4
+      ],
+      "targets": [
+        3
+      ],
+      "edgeType": "PROJECTION"
+    },
+    {
+      "sources": [
+        6
+      ],
+      "targets": [
+        5
+      ],
+      "edgeType": "PROJECTION"
+    },
+    {
+      "sources": [
+        8
+      ],
+      "targets": [
+        7
+      ],
+      "edgeType": "PROJECTION"
+    },
+    {
+      "sources": [
+        10
+      ],
+      "targets": [
+        9
+      ],
+      "edgeType": "PROJECTION"
+    },
+    {
+      "sources": [
+        12
+      ],
+      "targets": [
+        11
+      ],
+      "edgeType": "PROJECTION"
+    },
+    {
+      "sources": [
+        14
+      ],
+      "targets": [
+        13
+      ],
+      "edgeType": "PROJECTION"
+    },
+    {
+      "sources": [
+        16
+      ],
+      "targets": [
+        15
+      ],
+      "edgeType": "PROJECTION"
+    },
+    {
+      "sources": [
+        18
+      ],
+      "targets": [
+        17
+      ],
+      "edgeType": "PROJECTION"
+    },
+    {
+      "sources": [
+        20
+      ],
+      "targets": [
+        19
+      ],
+      "edgeType": "PROJECTION"
+    },
+    {
+      "sources": [
+        22
+      ],
+      "targets": [
+        21
+      ],
+      "edgeType": "PROJECTION"
+    },
+    {
+      "sources": [
+        24
+      ],
+      "targets": [
+        23
+      ],
+      "edgeType": "PROJECTION"
+    },
+    {
+      "sources": [
+        2,
+        4,
+        25
+      ],
+      "targets": [
+        0,
+        1,
+        3,
+        5,
+        7,
+        9,
+        11,
+        13,
+        15,
+        17,
+        19,
+        21,
+        23
+      ],
+      "edgeType": "PREDICATE"
+    }
+  ],
+  "queryId": "c64f079557552c0b:13fdd21300000000",
+  "user": "bharath",
+  "queryText": "insert into table lineage_test_db.alltypessmall partition (year=2009, month) select min(id), min(bool_col), min(tinyint_col), min(smallint_col), min(int_col), min(bigint_col), min(float_col), min(double_col), min(date_string_col), min(string_col), min(timestamp_col), month from functional.alltypes where year=2009 and month>10 group by month having min(id) > 10",
+  "endTime": 1568097538
+}
+---- QUERY
+insert into table lineage_test_db.alltypessmall
+partition (year=2009, month)
+select min(id), min(bool_col), min(tinyint_col), min(smallint_col), min(int_col),
+min(bigint_col), min(float_col), min(double_col), min(date_string_col), min(string_col),
+min(timestamp_col), month
+from functional.alltypes
+where year=2009 and month>10
+group by month
+having min(id) > 10
+====
+---- LINEAGE
+{
+  "hash": "33162d783545a2bdc1e8a3a95553971f",
+  "timestamp": 1568097543,
+  "vertices": [
+    {
+      "vertexType": "COLUMN",
+      "vertexId": "max(tinyint_col) OVER(...)",
+      "id": 0
+    },
+    {
+      "vertexType": "COLUMN",
+      "vertexId": "functional.alltypes.tinyint_col",
+      "id": 1,
+      "metadata": {
+        "tableCreateTime": 1568093675,
+        "tableName": "functional.alltypes"
+      }
+    },
+    {
+      "vertexType": "COLUMN",
+      "vertexId": "functional.alltypes.int_col",
+      "id": 2,
+      "metadata": {
+        "tableCreateTime": 1568093675,
+        "tableName": "functional.alltypes"
+      }
+    }
+  ],
+  "edges": [
+    {
+      "sources": [
+        1
+      ],
+      "targets": [
+        0
+      ],
+      "edgeType": "PROJECTION"
+    },
+    {
+      "sources": [
+        2
+      ],
+      "targets": [
+        0
+      ],
+      "edgeType": "PREDICATE"
+    }
+  ],
+  "queryId": "71437ef9b661a370:78d5443c00000000",
+  "user": "bharath",
+  "queryText": "select max(tinyint_col) over(partition by int_col) from functional.alltypes group by int_col, tinyint_col",
+  "endTime": 1568097544
+}
+---- QUERY
+# Select statements with analytic functions
+select
+max(tinyint_col) over(partition by int_col)
+from functional.alltypes
+group by int_col, tinyint_col
+====
+---- LINEAGE
+{
+  "hash": "4f1ecaaed571d2ed9f09f091f399c311",
+  "timestamp": 1568097549,
+  "vertices": [
+    {
+      "vertexType": "COLUMN",
+      "vertexId": "int_col",
+      "id": 0
+    },
+    {
+      "vertexType": "COLUMN",
+      "vertexId": "functional.alltypesagg.int_col",
+      "id": 1,
+      "metadata": {
+        "tableCreateTime": 1568093721,
+        "tableName": "functional.alltypesagg"
+      }
+    },
+    {
+      "vertexType": "COLUMN",
+      "vertexId": "rank() OVER(...)",
+      "id": 2
+    }
+  ],
+  "edges": [
+    {
+      "sources": [
+        1
+      ],
+      "targets": [
+        0
+      ],
+      "edgeType": "PROJECTION"
+    },
+    {
+      "sources": [],
+      "targets": [
+        2
+      ],
+      "edgeType": "PROJECTION"
+    },
+    {
+      "sources": [
+        1
+      ],
+      "targets": [
+        2
+      ],
+      "edgeType": "PREDICATE"
+    }
+  ],
+  "queryId": "af40268c951b5907:486c9bf100000000",
+  "user": "bharath",
+  "queryText": "select int_col, rank() over(order by int_col) from functional.alltypesagg",
+  "endTime": 1568097549
+}
+---- QUERY
+select int_col, rank() over(order by int_col) from functional.alltypesagg
+====
+---- LINEAGE
+{
+  "hash": "83067b3ed65f566ee2a7c97259b3f485",
+  "timestamp": 1568097554,
+  "vertices": [
+    {
+      "vertexType": "COLUMN",
+      "vertexId": "tinyint_col",
+      "id": 0
+    },
+    {
+      "vertexType": "COLUMN",
+      "vertexId": "functional.alltypes.tinyint_col",
+      "id": 1,
+      "metadata": {
+        "tableCreateTime": 1568093675,
+        "tableName": "functional.alltypes"
+      }
+    },
+    {
+      "vertexType": "COLUMN",
+      "vertexId": "int_col",
+      "id": 2
+    },
+    {
+      "vertexType": "COLUMN",
+      "vertexId": "functional.alltypes.int_col",
+      "id": 3,
+      "metadata": {
+        "tableCreateTime": 1568093675,
+        "tableName": "functional.alltypes"
+      }
+    },
+    {
+      "vertexType": "COLUMN",
+      "vertexId": "count(a.double_col) OVER(...)",
+      "id": 4
+    },
+    {
+      "vertexType": "COLUMN",
+      "vertexId": "functional.alltypes.double_col",
+      "id": 5,
+      "metadata": {
+        "tableCreateTime": 1568093675,
+        "tableName": "functional.alltypes"
+      }
+    },
+    {
+      "vertexType": "COLUMN",
+      "vertexId": "functional.alltypes.id",
+      "id": 6,
+      "metadata": {
+        "tableCreateTime": 1568093675,
+        "tableName": "functional.alltypes"
+      }
+    },
+    {
+      "vertexType": "COLUMN",
+      "vertexId": "functional.alltypessmall.id",
+      "id": 7,
+      "metadata": {
+        "tableCreateTime": 1568093682,
+        "tableName": "functional.alltypessmall"
+      }
+    }
+  ],
+  "edges": [
+    {
+      "sources": [
+        1
+      ],
+      "targets": [
+        0
+      ],
+      "edgeType": "PROJECTION"
+    },
+    {
+      "sources": [
+        3
+      ],
+      "targets": [
+        2
+      ],
+      "edgeType": "PROJECTION"
+    },
+    {
+      "sources": [
+        5
+      ],
+      "targets": [
+        4
+      ],
+      "edgeType": "PROJECTION"
+    },
+    {
+      "sources": [
+        1,
+        3
+      ],
+      "targets": [
+        4
+      ],
+      "edgeType": "PREDICATE"
+    },
+    {
+      "sources": [
+        6,
+        7
+      ],
+      "targets": [
+        0,
+        2,
+        4
+      ],
+      "edgeType": "PREDICATE"
+    }
+  ],
+  "queryId": "254e0097e54345b3:17adb7a400000000",
+  "user": "bharath",
+  "queryText": "select a.tinyint_col, a.int_col, count(a.double_col)   over(partition by a.tinyint_col order by a.int_col desc rows between 1 preceding and 1 following) from functional.alltypes a inner join functional.alltypessmall b on a.id = b.id order by a.tinyint_col, a.int_col",
+  "endTime": 1568097555
+}
+---- QUERY
+select a.tinyint_col, a.int_col, count(a.double_col)
+  over(partition by a.tinyint_col order by a.int_col desc rows between 1 preceding and 1 following)
+from functional.alltypes a inner join functional.alltypessmall b on a.id = b.id
+order by a.tinyint_col, a.int_col
+====
+---- LINEAGE
+{
+  "hash": "7bda479e44e923018a8e83435a4e7567",
+  "timestamp": 1568097560,
+  "vertices": [
+    {
+      "vertexType": "COLUMN",
+      "vertexId": "double_col",
+      "id": 0
+    },
+    {
+      "vertexType": "COLUMN",
+      "vertexId": "functional.alltypes.double_col",
+      "id": 1,
+      "metadata": {
+        "tableCreateTime": 1568093675,
+        "tableName": "functional.alltypes"
+      }
+    },
+    {
+      "vertexType": "COLUMN",
+      "vertexId": "a",
+      "id": 2
+    },
+    {
+      "vertexType": "COLUMN",
+      "vertexId": "functional.alltypes.int_col",
+      "id": 3,
+      "metadata": {
+        "tableCreateTime": 1568093675,
+        "tableName": "functional.alltypes"
+      }
+    },
+    {
+      "vertexType": "COLUMN",
+      "vertexId": "b",
+      "id": 4
+    },
+    {
+      "vertexType": "COLUMN",
+      "vertexId": "functional.alltypes.bigint_col",
+      "id": 5,
+      "metadata": {
+        "tableCreateTime": 1568093675,
+        "tableName": "functional.alltypes"
+      }
+    },
+    {
+      "vertexType": "COLUMN",
+      "vertexId": "functional.alltypes.bool_col",
+      "id": 6,
+      "metadata": {
+        "tableCreateTime": 1568093675,
+        "tableName": "functional.alltypes"
+      }
+    },
+    {
+      "vertexType": "COLUMN",
+      "vertexId": "a + b",
+      "id": 7
+    },
+    {
+      "vertexType": "COLUMN",
+      "vertexId": "double_col + a",
+      "id": 8
+    }
+  ],
+  "edges": [
+    {
+      "sources": [
+        1
+      ],
+      "targets": [
+        0
+      ],
+      "edgeType": "PROJECTION"
+    },
+    {
+      "sources": [
+        3
+      ],
+      "targets": [
+        2
+      ],
+      "edgeType": "PROJECTION"
+    },
+    {
+      "sources": [
+        3,
+        5
+      ],
+      "targets": [
+        4
+      ],
+      "edgeType": "PROJECTION"
+    },
+    {
+      "sources": [
+        6
+      ],
+      "targets": [
+        4
+      ],
+      "edgeType": "PREDICATE"
+    },
+    {
+      "sources": [
+        3,
+        5
+      ],
+      "targets": [
+        7
+      ],
+      "edgeType": "PROJECTION"
+    },
+    {
+      "sources": [
+        6
+      ],
+      "targets": [
+        7
+      ],
+      "edgeType": "PREDICATE"
+    },
+    {
+      "sources": [
+        1,
+        3
+      ],
+      "targets": [
+        8
+      ],
+      "edgeType": "PROJECTION"
+    }
+  ],
+  "queryId": "bb4227a0b4b7f483:759587c600000000",
+  "user": "bharath",
+  "queryText": "with v2 as   (select    double_col,    count(int_col) over() a,    sum(int_col + bigint_col) over(partition by bool_col) b    from      (select * from functional.alltypes) v1) select double_col, a, b, a + b, double_col + a from v2 order by 2, 3, 4",
+  "endTime": 1568097560
+}
+---- QUERY
+with v2 as
+  (select
+   double_col,
+   count(int_col) over() a,
+   sum(int_col + bigint_col) over(partition by bool_col) b
+   from
+     (select * from functional.alltypes) v1)
+select double_col, a, b, a + b, double_col + a from v2
+order by 2, 3, 4
+====
+---- LINEAGE
+{
+  "hash": "f91d8724a1537af46652415e14f0067e",
+  "timestamp": 1568097565,
+  "vertices": [
+    {
+      "vertexType": "COLUMN",
+      "vertexId": "double_col",
+      "id": 0
+    },
+    {
+      "vertexType": "COLUMN",
+      "vertexId": "functional.alltypes.double_col",
+      "id": 1,
+      "metadata": {
+        "tableCreateTime": 1568093675,
+        "tableName": "functional.alltypes"
+      }
+    },
+    {
+      "vertexType": "COLUMN",
+      "vertexId": "a",
+      "id": 2
+    },
+    {
+      "vertexType": "COLUMN",
+      "vertexId": "functional.alltypes.int_col",
+      "id": 3,
+      "metadata": {
+        "tableCreateTime": 1568093675,
+        "tableName": "functional.alltypes"
+      }
+    },
+    {
+      "vertexType": "COLUMN",
+      "vertexId": "b",
+      "id": 4
+    },
+    {
+      "vertexType": "COLUMN",
+      "vertexId": "functional.alltypes.bigint_col",
+      "id": 5,
+      "metadata": {
+        "tableCreateTime": 1568093675,
+        "tableName": "functional.alltypes"
+      }
+    },
+    {
+      "vertexType": "COLUMN",
+      "vertexId": "functional.alltypes.bool_col",
+      "id": 6,
+      "metadata": {
+        "tableCreateTime": 1568093675,
+        "tableName": "functional.alltypes"
+      }
+    },
+    {
+      "vertexType": "COLUMN",
+      "vertexId": "a + b",
+      "id": 7
+    },
+    {
+      "vertexType": "COLUMN",
+      "vertexId": "double_col + a",
+      "id": 8
+    }
+  ],
+  "edges": [
+    {
+      "sources": [
+        1
+      ],
+      "targets": [
+        0
+      ],
+      "edgeType": "PROJECTION"
+    },
+    {
+      "sources": [
+        3
+      ],
+      "targets": [
+        2
+      ],
+      "edgeType": "PROJECTION"
+    },
+    {
+      "sources": [
+        3,
+        5
+      ],
+      "targets": [
+        4
+      ],
+      "edgeType": "PROJECTION"
+    },
+    {
+      "sources": [
+        6
+      ],
+      "targets": [
+        4
+      ],
+      "edgeType": "PREDICATE"
+    },
+    {
+      "sources": [
+        3,
+        5
+      ],
+      "targets": [
+        7
+      ],
+      "edgeType": "PROJECTION"
+    },
+    {
+      "sources": [
+        6
+      ],
+      "targets": [
+        7
+      ],
+      "edgeType": "PREDICATE"
+    },
+    {
+      "sources": [
+        1,
+        3
+      ],
+      "targets": [
+        8
+      ],
+      "edgeType": "PROJECTION"
+    }
+  ],
+  "queryId": "e349f417ef593b44:f75a453900000000",
+  "user": "bharath",
+  "queryText": "select double_col, a, b, a + b, double_col + a from   (select    double_col,    count(int_col) over() a,    sum(int_col + bigint_col) over(partition by bool_col) b    from      (select * from functional.alltypes) v1) v2 order by 2, 3, 4",
+  "endTime": 1568097565
+}
+---- QUERY
+select double_col, a, b, a + b, double_col + a from
+  (select
+   double_col,
+   count(int_col) over() a,
+   sum(int_col + bigint_col) over(partition by bool_col) b
+   from
+     (select * from functional.alltypes) v1) v2
+order by 2, 3, 4
+====
+---- LINEAGE
+{
+  "hash": "43098e753e37a70f008726178e10dadf",
+  "timestamp": 1568097570,
+  "vertices": [
+    {
+      "vertexType": "COLUMN",
+      "vertexId": "month",
+      "id": 0
+    },
+    {
+      "vertexType": "COLUMN",
+      "vertexId": "functional.alltypes.month",
+      "id": 1,
+      "metadata": {
+        "tableCreateTime": 1568093675,
+        "tableName": "functional.alltypes"
+      }
+    },
+    {
+      "vertexType": "COLUMN",
+      "vertexId": "year",
+      "id": 2
+    },
+    {
+      "vertexType": "COLUMN",
+      "vertexId": "functional.alltypes.year",
+      "id": 3,
+      "metadata": {
+        "tableCreateTime": 1568093675,
+        "tableName": "functional.alltypes"
+      }
+    },
+    {
+      "vertexType": "COLUMN",
+      "vertexId": "int_col",
+      "id": 4
+    },
+    {
+      "vertexType": "COLUMN",
+      "vertexId": "functional.alltypessmall.int_col",
+      "id": 5,
+      "metadata": {
+        "tableCreateTime": 1568093682,
+        "tableName": "functional.alltypessmall"
+      }
+    },
+    {
+      "vertexType": "COLUMN",
+      "vertexId": "functional.alltypessmall.month",
+      "id": 6,
+      "metadata": {
+        "tableCreateTime": 1568093682,
+        "tableName": "functional.alltypessmall"
+      }
+    }
+  ],
+  "edges": [
+    {
+      "sources": [
+        1
+      ],
+      "targets": [
+        0
+      ],
+      "edgeType": "PROJECTION"
+    },
+    {
+      "sources": [
+        3
+      ],
+      "targets": [
+        2
+      ],
+      "edgeType": "PROJECTION"
+    },
+    {
+      "sources": [
+        5
+      ],
+      "targets": [
+        4
+      ],
+      "edgeType": "PROJECTION"
+    },
+    {
+      "sources": [
+        6
+      ],
+      "targets": [
+        0
+      ],
+      "edgeType": "PROJECTION"
+    },
+    {
+      "sources": [
+        1,
+        6
+      ],
+      "targets": [
+        0,
+        2,
+        4
+      ],
+      "edgeType": "PREDICATE"
+    }
+  ],
+  "queryId": "054c112eb283a265:317a9e3700000000",
+  "user": "bharath",
+  "queryText": "select a.month, a.year, b.int_col, b.month from   (select year, month from functional.alltypes    union all    select year, month from functional.alltypes) a   inner join   functional.alltypessmall b   on (a.month = b.month) where b.month = 1",
+  "endTime": 1568097571
+}
+---- QUERY
+# Union statements
+select a.month, a.year, b.int_col, b.month
+from
+  (select year, month from functional.alltypes
+   union all
+   select year, month from functional.alltypes) a
+  inner join
+  functional.alltypessmall b
+  on (a.month = b.month)
+where b.month = 1
+====
+---- LINEAGE
+{
+  "hash": "20cdd5a4921f1d865bcc1f8b984839ae",
+  "timestamp": 1568097576,
+  "vertices": [
+    {
+      "vertexType": "COLUMN",
+      "vertexId": "int_col",
+      "id": 0
+    },
+    {
+      "vertexType": "COLUMN",
+      "vertexId": "functional.alltypessmall.int_col",
+      "id": 1,
+      "metadata": {
+        "tableCreateTime": 1568093682,
+        "tableName": "functional.alltypessmall"
+      }
+    },
+    {
+      "vertexType": "COLUMN",
+      "vertexId": "month",
+      "id": 2
+    },
+    {
+      "vertexType": "COLUMN",
+      "vertexId": "functional.alltypes.month",
+      "id": 3,
+      "metadata": {
+        "tableCreateTime": 1568093675,
+        "tableName": "functional.alltypes"
+      }
+    },
+    {
+      "vertexType": "COLUMN",
+      "vertexId": "t2.int_col + 1",
+      "id": 4
+    },
+    {
+      "vertexType": "COLUMN",
+      "vertexId": "functional.alltypes.int_col",
+      "id": 5,
+      "metadata": {
+        "tableCreateTime": 1568093675,
+        "tableName": "functional.alltypes"
+      }
+    },
+    {
+      "vertexType": "COLUMN",
+      "vertexId": "functional.alltypessmall.month",
+      "id": 6,
+      "metadata": {
+        "tableCreateTime": 1568093682,
+        "tableName": "functional.alltypessmall"
+      }
+    }
+  ],
+  "edges": [
+    {
+      "sources": [
+        1
+      ],
+      "targets": [
+        0
+      ],
+      "edgeType": "PROJECTION"
+    },
+    {
+      "sources": [
+        3
+      ],
+      "targets": [
+        2
+      ],
+      "edgeType": "PROJECTION"
+    },
+    {
+      "sources": [
+        5
+      ],
+      "targets": [
+        4
+      ],
+      "edgeType": "PROJECTION"
+    },
+    {
+      "sources": [
+        1,
+        3,
+        5,
+        6
+      ],
+      "targets": [
+        0,
+        2,
+        4
+      ],
+      "edgeType": "PREDICATE"
+    }
+  ],
+  "queryId": "724e262b77839d11:a27f72be00000000",
+  "user": "bharath",
+  "queryText": "select t1.int_col, t2.month, t2.int_col + 1 from (   select int_col, count(*)   from functional.alltypessmall   where month = 1   group by int_col   having count(*) > 1   order by count(*) desc limit 5   ) t1 join functional.alltypes t2 on (t1.int_col = t2.int_col) where month = 1",
+  "endTime": 1568097576
+}
+---- QUERY
+# Select statements with inline views
+select t1.int_col, t2.month, t2.int_col + 1
+from (
+  select int_col, count(*)
+  from functional.alltypessmall
+  where month = 1
+  group by int_col
+  having count(*) > 1
+  order by count(*) desc limit 5
+  ) t1
+join functional.alltypes t2 on (t1.int_col = t2.int_col)
+where month = 1
+====
+---- LINEAGE
+{
+  "hash": "1b739655724090be8f3dd8bb018fe536",
+  "timestamp": 1568097581,
+  "vertices": [
+    {
+      "vertexType": "COLUMN",
+      "vertexId": "smallint_col",
+      "id": 0
+    },
+    {
+      "vertexType": "COLUMN",
+      "vertexId": "functional.alltypesagg.smallint_col",
+      "id": 1,
+      "metadata": {
+        "tableCreateTime": 1568093721,
+        "tableName": "functional.alltypesagg"
+      }
+    },
+    {
+      "vertexType": "COLUMN",
+      "vertexId": "id",
+      "id": 2
+    },
+    {
+      "vertexType": "COLUMN",
+      "vertexId": "functional.alltypessmall.id",
+      "id": 3,
+      "metadata": {
+        "tableCreateTime": 1568093682,
+        "tableName": "functional.alltypessmall"
+      }
+    },
+    {
+      "vertexType": "COLUMN",
+      "vertexId": "tinyint_col",
+      "id": 4
+    },
+    {
+      "vertexType": "COLUMN",
+      "vertexId": "functional.alltypesagg.tinyint_col",
+      "id": 5,
+      "metadata": {
+        "tableCreateTime": 1568093721,
+        "tableName": "functional.alltypesagg"
+      }
+    },
+    {
+      "vertexType": "COLUMN",
+      "vertexId": "int_col",
+      "id": 6
+    },
+    {
+      "vertexType": "COLUMN",
+      "vertexId": "functional.alltypesagg.int_col",
+      "id": 7,
+      "metadata": {
+        "tableCreateTime": 1568093721,
+        "tableName": "functional.alltypesagg"
+      }
+    },
+    {
+      "vertexType": "COLUMN",
+      "vertexId": "float_col",
+      "id": 8
+    },
+    {
+      "vertexType": "COLUMN",
+      "vertexId": "functional.alltypessmall.float_col",
+      "id": 9,
+      "metadata": {
+        "tableCreateTime": 1568093682,
+        "tableName": "functional.alltypessmall"
+      }
+    },
+    {
+      "vertexType": "COLUMN",
+      "vertexId": "string_col",
+      "id": 10
+    },
+    {
+      "vertexType": "COLUMN",
+      "vertexId": "functional.alltypessmall.string_col",
+      "id": 11,
+      "metadata": {
+        "tableCreateTime": 1568093682,
+        "tableName": "functional.alltypessmall"
+      }
+    },
+    {
+      "vertexType": "COLUMN",
+      "vertexId": "functional.alltypesagg.day",
+      "id": 12,
+      "metadata": {
+        "tableCreateTime": 1568093721,
+        "tableName": "functional.alltypesagg"
+      }
+    },
+    {
+      "vertexType": "COLUMN",
+      "vertexId": "functional.alltypesagg.month",
+      "id": 13,
+      "metadata": {
+        "tableCreateTime": 1568093721,
+        "tableName": "functional.alltypesagg"
+      }
+    }
+  ],
+  "edges": [
+    {
+      "sources": [
+        1
+      ],
+      "targets": [
+        0
+      ],
+      "edgeType": "PROJECTION"
+    },
+    {
+      "sources": [
+        3
+      ],
+      "targets": [
+        2
+      ],
+      "edgeType": "PROJECTION"
+    },
+    {
+      "sources": [
+        5
+      ],
+      "targets": [
+        4
+      ],
+      "edgeType": "PROJECTION"
+    },
+    {
+      "sources": [
+        3
+      ],
+      "targets": [
+        2
+      ],
+      "edgeType": "PROJECTION"
+    },
+    {
+      "sources": [
+        7
+      ],
+      "targets": [
+        6
+      ],
+      "edgeType": "PROJECTION"
+    },
+    {
+      "sources": [
+        9
+      ],
+      "targets": [
+        8
+      ],
+      "edgeType": "PROJECTION"
+    },
+    {
+      "sources": [
+        11
+      ],
+      "targets": [
+        10
+      ],
+      "edgeType": "PROJECTION"
+    },
+    {
+      "sources": [
+        1,
+        3,
+        5,
+        7,
+        9,
+        11,
+        12,
+        13
+      ],
+      "targets": [
+        0,
+        2,
+        4,
+        6,
+        8,
+        10
+      ],
+      "edgeType": "PREDICATE"
+    }
+  ],
+  "queryId": "394bc5f6a9764ca2:9cd14c5f00000000",
+  "user": "bharath",
+  "queryText": "select x.smallint_col, x.id, x.tinyint_col, c.id, x.int_col, x.float_col, c.string_col from functional.alltypessmall c join (    select a.smallint_col smallint_col, a.tinyint_col tinyint_col, a.day day,            a.int_col int_col, a.month month, b.float_col float_col, b.id id    from ( select * from functional.alltypesagg a where month=1 ) a    join functional.alltypessmall b on (a.smallint_col = b.id)  ) x on (x.tinyint_col = c.id) where x.day=1 and x.int_col > 899 and x.float_col > 4.5 and c.string_col < '7' and x.int_col + x.float_col + cast(c.string_col as float) < 1000",
+  "endTime": 1568097582
+}
+---- QUERY
+select x.smallint_col, x.id, x.tinyint_col, c.id, x.int_col, x.float_col, c.string_col
+from functional.alltypessmall c
+join (
+   select a.smallint_col smallint_col, a.tinyint_col tinyint_col, a.day day,
+           a.int_col int_col, a.month month, b.float_col float_col, b.id id
+   from ( select * from functional.alltypesagg a where month=1 ) a
+   join functional.alltypessmall b on (a.smallint_col = b.id)
+ ) x on (x.tinyint_col = c.id)
+where x.day=1
+and x.int_col > 899
+and x.float_col > 4.5
+and c.string_col < '7'
+and x.int_col + x.float_col + cast(c.string_col as float) < 1000
+====
+---- LINEAGE
+{
+  "hash": "b91dd6944864a3c14ecefb697ca95459",
+  "timestamp": 1568097587,
+  "vertices": [
+    {
+      "vertexType": "COLUMN",
+      "vertexId": "c1",
+      "id": 0
+    },
+    {
+      "vertexType": "COLUMN",
+      "vertexId": "functional_hbase.alltypessmall.int_col",
+      "id": 1,
+      "metadata": {
+        "tableCreateTime": 1568094418,
+        "tableName": "functional_hbase.alltypessmall"
+      }
+    },
+    {
+      "vertexType": "COLUMN",
+      "vertexId": "c2",
+      "id": 2
+    },
+    {
+      "vertexType": "COLUMN",
+      "vertexId": "functional_hbase.alltypessmall.float_col",
+      "id": 3,
+      "metadata": {
+        "tableCreateTime": 1568094418,
+        "tableName": "functional_hbase.alltypessmall"
+      }
+    },
+    {
+      "vertexType": "COLUMN",
+      "vertexId": "c3",
+      "id": 4
+    }
+  ],
+  "edges": [
+    {
+      "sources": [
+        1
+      ],
+      "targets": [
+        0
+      ],
+      "edgeType": "PROJECTION"
+    },
+    {
+      "sources": [
+        3
+      ],
+      "targets": [
+        2
+      ],
+      "edgeType": "PROJECTION"
+    },
+    {
+      "sources": [
+        3
+      ],
+      "targets": [
+        4
+      ],
+      "edgeType": "PROJECTION"
+    },
+    {
+      "sources": [
+        1,
+        3
+      ],
+      "targets": [
+        0,
+        2,
+        4
+      ],
+      "edgeType": "PREDICATE"
+    }
+  ],
+  "queryId": "884c215284a67dd0:d3e3af0e00000000",
+  "user": "bharath",
+  "queryText": "select c1, c2, c3 from   (select c1, c2, c3    from      (select int_col c1, sum(float_col) c2, min(float_col) c3       from functional_hbase.alltypessmall       group by 1) x     order by 2,3 desc     limit 5 ) y",
+  "endTime": 1568097587
+}
+---- QUERY
+select c1, c2, c3
+from
+  (select c1, c2, c3
+   from
+     (select int_col c1, sum(float_col) c2, min(float_col) c3
+      from functional_hbase.alltypessmall
+      group by 1) x
+    order by 2,3 desc
+    limit 5
+) y
+====
+---- LINEAGE
+{
+  "hash": "e59cf0e0de9015036a15df76e9e61c85",
+  "timestamp": 1568097593,
+  "vertices": [
+    {
+      "vertexType": "COLUMN",
+      "vertexId": "c1",
+      "id": 0
+    },
+    {
+      "vertexType": "COLUMN",
+      "vertexId": "functional_hbase.alltypessmall.int_col",
+      "id": 1,
+      "metadata": {
+        "tableCreateTime": 1568094418,
+        "tableName": "functional_hbase.alltypessmall"
+      }
+    },
+    {
+      "vertexType": "COLUMN",
+      "vertexId": "x2",
+      "id": 2
+    },
+    {
+      "vertexType": "COLUMN",
+      "vertexId": "functional_hbase.alltypessmall.tinyint_col",
+      "id": 3,
+      "metadata": {
+        "tableCreateTime": 1568094418,
+        "tableName": "functional_hbase.alltypessmall"
+      }
+    }
+  ],
+  "edges": [
+    {
+      "sources": [
+        1
+      ],
+      "targets": [
+        0
+      ],
+      "edgeType": "PROJECTION"
+    },
+    {
+      "sources": [
+        3
+      ],
+      "targets": [
+        2
+      ],
+      "edgeType": "PROJECTION"
+    },
+    {
+      "sources": [
+        1,
+        3
+      ],
+      "targets": [
+        0,
+        2
+      ],
+      "edgeType": "PREDICATE"
+    }
+  ],
+  "queryId": "a240cc4e302873cd:798d478b00000000",
+  "user": "bharath",
+  "queryText": "select c1, x2 from (   select c1, min(c2) x2   from (     select c1, c2, c3     from (       select int_col c1, tinyint_col c2, min(float_col) c3       from functional_hbase.alltypessmall       group by 1, 2       order by 1,2       limit 1     ) x   ) x2   group by c1 ) y order by 2,1 desc limit 0",
+  "endTime": 1568097593
+}
+---- QUERY
+select c1, x2
+from (
+  select c1, min(c2) x2
+  from (
+    select c1, c2, c3
+    from (
+      select int_col c1, tinyint_col c2, min(float_col) c3
+      from functional_hbase.alltypessmall
+      group by 1, 2
+      order by 1,2
+      limit 1
+    ) x
+  ) x2
+  group by c1
+) y
+order by 2,1 desc
+limit 0
+====
+---- LINEAGE
+{
+  "hash": "cf15009df42b7aea0f6abaeea3381b85",
+  "timestamp": 1568097598,
+  "vertices": [
+    {
+      "vertexType": "COLUMN",
+      "vertexId": "id",
+      "id": 0
+    },
+    {
+      "vertexType": "COLUMN",
+      "vertexId": "functional.alltypes.id",
+      "id": 1,
+      "metadata": {
+        "tableCreateTime": 1568093675,
+        "tableName": "functional.alltypes"
+      }
+    }
+  ],
+  "edges": [
+    {
+      "sources": [
+        1
+      ],
+      "targets": [
+        0
+      ],
+      "edgeType": "PROJECTION"
+    }
+  ],
+  "queryId": "c74a33f33cef2014:feaa957900000000",
+  "user": "bharath",
+  "queryText": "select id from functional.view_view",
+  "endTime": 1568097598
+}
+---- QUERY
+# Views
+select id from functional.view_view
+====
+---- LINEAGE
+{
+  "hash": "5dc06563b62b39278652242034a2a70d",
+  "timestamp": 1568097603,
+  "vertices": [
+    {
+      "vertexType": "COLUMN",
+      "vertexId": "id",
+      "id": 0
+    },
+    {
+      "vertexType": "COLUMN",
+      "vertexId": "functional.alltypes.id",
+      "id": 1,
+      "metadata": {
+        "tableCreateTime": 1568093675,
+        "tableName": "functional.alltypes"
+      }
+    }
+  ],
+  "edges": [
+    {
+      "sources": [
+        1
+      ],
+      "targets": [
+        0
+      ],
+      "edgeType": "PROJECTION"
+    },
+    {
+      "sources": [
+        1
+      ],
+      "targets": [
+        0
+      ],
+      "edgeType": "PREDICATE"
+    }
+  ],
+  "queryId": "5f46e701ed4868bc:b58d892a00000000",
+  "user": "bharath",
+  "queryText": "select t.id from (select id from functional.alltypes_view) t where t.id < 10",
+  "endTime": 1568097603
+}
+---- QUERY
+select t.id from (select id from functional.alltypes_view) t
+where t.id < 10
+====
+---- LINEAGE
+{
+  "hash": "c9e45730cafb6910b54eaa5c53dc44b1",
+  "timestamp": 1568097608,
+  "vertices": [
+    {
+      "vertexType": "COLUMN",
+      "vertexId": "string_col",
+      "id": 0
+    },
+    {
+      "vertexType": "COLUMN",
+      "vertexId": "functional.alltypes.string_col",
+      "id": 1,
+      "metadata": {
+        "tableCreateTime": 1568093675,
+        "tableName": "functional.alltypes"
+      }
+    },
+    {
+      "vertexType": "COLUMN",
+      "vertexId": "float_col",
+      "id": 2
+    },
+    {
+      "vertexType": "COLUMN",
+      "vertexId": "functional.alltypes.float_col",
+      "id": 3,
+      "metadata": {
+        "tableCreateTime": 1568093675,
+        "tableName": "functional.alltypes"
+      }
+    },
+    {
+      "vertexType": "COLUMN",
+      "vertexId": "bool_col",
+      "id": 4
+    },
+    {
+      "vertexType": "COLUMN",
+      "vertexId": "functional.alltypes.bool_col",
+      "id": 5,
+      "metadata": {
+        "tableCreateTime": 1568093675,
+        "tableName": "functional.alltypes"
+      }
+    },
+    {
+      "vertexType": "COLUMN",
+      "vertexId": "functional.alltypes.id",
+      "id": 6,
+      "metadata": {
+        "tableCreateTime": 1568093675,
+        "tableName": "functional.alltypes"
+      }
+    },
+    {
+      "vertexType": "COLUMN",
+      "vertexId": "functional.alltypesagg.id",
+      "id": 7,
+      "metadata": {
+        "tableCreateTime": 1568093721,
+        "tableName": "functional.alltypesagg"
+      }
+    }
+  ],
+  "edges": [
+    {
+      "sources": [
+        1
+      ],
+      "targets": [
+        0
+      ],
+      "edgeType": "PROJECTION"
+    },
+    {
+      "sources": [
+        3
+      ],
+      "targets": [
+        2
+      ],
+      "edgeType": "PROJECTION"
+    },
+    {
+      "sources": [
+        5
+      ],
+      "targets": [
+        4
+      ],
+      "edgeType": "PROJECTION"
+    },
+    {
+      "sources": [
+        6,
+        7
+      ],
+      "targets": [
+        0,
+        2,
+        4
+      ],
+      "edgeType": "PREDICATE"
+    }
+  ],
+  "queryId": "8945d3c9252417af:74f47ae100000000",
+  "user": "bharath",
+  "queryText": "select string_col, float_col, bool_col from functional.alltypes where id in   (select id from functional.alltypesagg)",
+  "endTime": 1568097609
+}
+---- QUERY
+# Subqueries
+select string_col, float_col, bool_col
+from functional.alltypes
+where id in
+  (select id from functional.alltypesagg)
+====
+---- LINEAGE
+{
+  "hash": "1d2fa8025e9279488af58b5b8dd614d9",
+  "timestamp": 1568097614,
+  "vertices": [
+    {
+      "vertexType": "COLUMN",
+      "vertexId": "1",
+      "id": 0
+    },
+    {
+      "vertexType": "COLUMN",
+      "vertexId": "functional.alltypesagg.tinyint_col",
+      "id": 1,
+      "metadata": {
+        "tableCreateTime": 1568093721,
+        "tableName": "functional.alltypesagg"
+      }
+    },
+    {
+      "vertexType": "COLUMN",
+      "vertexId": "functional.alltypestiny.tinyint_col",
+      "id": 2,
+      "metadata": {
+        "tableCreateTime": 1568093689,
+        "tableName": "functional.alltypestiny"
+      }
+    }
+  ],
+  "edges": [
+    {
+      "sources": [],
+      "targets": [
+        0
+      ],
+      "edgeType": "PROJECTION"
+    },
+    {
+      "sources": [
+        1,
+        2
+      ],
+      "targets": [
+        0
+      ],
+      "edgeType": "PREDICATE"
+    }
+  ],
+  "queryId": "004853208b5ec985:38f0fe7a00000000",
+  "user": "bharath",
+  "queryText": "select 1 from functional.alltypesagg a where exists   (select id, count(int_col) over (partition by bool_col)    from functional.alltypestiny b    where a.tinyint_col = b.tinyint_col    group by id, int_col, bool_col) and tinyint_col < 10",
+  "endTime": 1568097614
+}
+---- QUERY
+select 1
+from functional.alltypesagg a
+where exists
+  (select id, count(int_col) over (partition by bool_col)
+   from functional.alltypestiny b
+   where a.tinyint_col = b.tinyint_col
+   group by id, int_col, bool_col)
+and tinyint_col < 10
+====
+---- LINEAGE
+{
+  "hash": "7e678cde53c9d120a6f79134551a8c41",
+  "timestamp": 1568097619,
+  "vertices": [
+    {
+      "vertexType": "COLUMN",
+      "vertexId": "int_col + 1",
+      "id": 0
+    },
+    {
+      "vertexType": "COLUMN",
+      "vertexId": "functional.alltypes.int_col",
+      "id": 1,
+      "metadata": {
+        "tableCreateTime": 1568093675,
+        "tableName": "functional.alltypes"
+      }
+    },
+    {
+      "vertexType": "COLUMN",
+      "vertexId": "tinyint_col - 1",
+      "id": 2
+    },
+    {
+      "vertexType": "COLUMN",
+      "vertexId": "functional.alltypes.tinyint_col",
+      "id": 3,
+      "metadata": {
+        "tableCreateTime": 1568093675,
+        "tableName": "functional.alltypes"
+      }
+    },
+    {
+      "vertexType": "COLUMN",
+      "vertexId": "functional.alltypes.bigint_col",
+      "id": 4,
+      "metadata": {
+        "tableCreateTime": 1568093675,
+        "tableName": "functional.alltypes"
+      }
+    },
+    {
+      "vertexType": "COLUMN",
+      "vertexId": "functional.alltypesagg.bool_col",
+      "id": 5,
+      "metadata": {
+        "tableCreateTime": 1568093721,
+        "tableName": "functional.alltypesagg"
+      }
+    },
+    {
+      "vertexType": "COLUMN",
+      "vertexId": "functional.alltypesagg.int_col",
+      "id": 6,
+      "metadata": {
+        "tableCreateTime": 1568093721,
+        "tableName": "functional.alltypesagg"
+      }
+    }
+  ],
+  "edges": [
+    {
+      "sources": [
+        1
+      ],
+      "targets": [
+        0
+      ],
+      "edgeType": "PROJECTION"
+    },
+    {
+      "sources": [
+        3
+      ],
+      "targets": [
+        2
+      ],
+      "edgeType": "PROJECTION"
+    },
+    {
+      "sources": [
+        1,
+        4,
+        5,
+        6
+      ],
+      "targets": [
+        0,
+        2
+      ],
+      "edgeType": "PREDICATE"
+    }
+  ],
+  "queryId": "5c45bae6daa5b536:110be36c00000000",
+  "user": "bharath",
+  "queryText": "select int_col + 1, tinyint_col - 1 from functional.alltypes a where a.int_col <   (select max(int_col) from functional.alltypesagg g where g.bool_col = true) and a.bigint_col > 10",
+  "endTime": 1568097619
+}
+---- QUERY
+select int_col + 1, tinyint_col - 1
+from functional.alltypes a
+where a.int_col <
+  (select max(int_col) from functional.alltypesagg g where g.bool_col = true)
+and a.bigint_col > 10
+====
+---- LINEAGE
+{
+  "hash": "a7ab58d90540f28a8dfd69703632ad7a",
+  "timestamp": 1568097624,
+  "vertices": [
+    {
+      "vertexType": "COLUMN",
+      "vertexId": "x",
+      "id": 0
+    },
+    {
+      "vertexType": "COLUMN",
+      "vertexId": "functional.alltypes.int_col",
+      "id": 1,
+      "metadata": {
+        "tableCreateTime": 1568093675,
+        "tableName": "functional.alltypes"
+      }
+    },
+    {
+      "vertexType": "COLUMN",
+      "vertexId": "y",
+      "id": 2
+    },
+    {
+      "vertexType": "COLUMN",
+      "vertexId": "functional.alltypes.bigint_col",
+      "id": 3,
+      "metadata": {
+        "tableCreateTime": 1568093675,
+        "tableName": "functional.alltypes"
+      }
+    }
+  ],
+  "edges": [
+    {
+      "sources": [
+        1
+      ],
+      "targets": [
+        0
+      ],
+      "edgeType": "PROJECTION"
+    },
+    {
+      "sources": [
+        3
+      ],
+      "targets": [
+        2
+      ],
+      "edgeType": "PROJECTION"
+    }
+  ],
+  "queryId": "214d40171885157a:b422c0b100000000",
+  "user": "bharath",
+  "queryText": "with t as (select int_col x, bigint_col y from functional.alltypes) select x, y from t",
+  "endTime": 1568097624
+}
+---- QUERY
+# With clause
+with t as (select int_col x, bigint_col y from functional.alltypes) select x, y from t
+====
+---- LINEAGE
+{
+  "hash": "59c56529d835660a4f776c0edc60ecc1",
+  "timestamp": 1568097629,
+  "vertices": [
+    {
+      "vertexType": "COLUMN",
+      "vertexId": "year",
+      "id": 0,
+      "metadata": {
+        "tableCreateTime": 1568097480,
+        "tableName": "lineage_test_db.alltypesinsert"
+      }
+    },
+    {
+      "vertexType": "COLUMN",
+      "vertexId": "functional.alltypestiny.year",
+      "id": 1,
+      "metadata": {
+        "tableCreateTime": 1568093689,
+        "tableName": "functional.alltypestiny"
+      }
+    },
+    {
+      "vertexType": "COLUMN",
+      "vertexId": "month",
+      "id": 2,
+      "metadata": {
+        "tableCreateTime": 1568097480,
+        "tableName": "lineage_test_db.alltypesinsert"
+      }
+    },
+    {
+      "vertexType": "COLUMN",
+      "vertexId": "functional.alltypestiny.month",
+      "id": 3,
+      "metadata": {
+        "tableCreateTime": 1568093689,
+        "tableName": "functional.alltypestiny"
+      }
+    },
+    {
+      "vertexType": "COLUMN",
+      "vertexId": "id",
+      "id": 4,
+      "metadata": {
+        "tableCreateTime": 1568097480,
+        "tableName": "lineage_test_db.alltypesinsert"
+      }
+    },
+    {
+      "vertexType": "COLUMN",
+      "vertexId": "functional.alltypestiny.id",
+      "id": 5,
+      "metadata": {
+        "tableCreateTime": 1568093689,
+        "tableName": "functional.alltypestiny"
+      }
+    },
+    {
+      "vertexType": "COLUMN",
+      "vertexId": "bool_col",
+      "id": 6,
+      "metadata": {
+        "tableCreateTime": 1568097480,
+        "tableName": "lineage_test_db.alltypesinsert"
+      }
+    },
+    {
+      "vertexType": "COLUMN",
+      "vertexId": "tinyint_col",
+      "id": 7,
+      "metadata": {
+        "tableCreateTime": 1568097480,
+        "tableName": "lineage_test_db.alltypesinsert"
+      }
+    },
+    {
+      "vertexType": "COLUMN",
+      "vertexId": "smallint_col",
+      "id": 8,
+      "metadata": {
+        "tableCreateTime": 1568097480,
+        "tableName": "lineage_test_db.alltypesinsert"
+      }
+    },
+    {
+      "vertexType": "COLUMN",
+      "vertexId": "int_col",
+      "id": 9,
+      "metadata": {
+        "tableCreateTime": 1568097480,
+        "tableName": "lineage_test_db.alltypesinsert"
+      }
+    },
+    {
+      "vertexType": "COLUMN",
+      "vertexId": "functional.alltypestiny.int_col",
+      "id": 10,
+      "metadata": {
+        "tableCreateTime": 1568093689,
+        "tableName": "functional.alltypestiny"
+      }
+    },
+    {
+      "vertexType": "COLUMN",
+      "vertexId": "bigint_col",
+      "id": 11,
+      "metadata": {
+        "tableCreateTime": 1568097480,
+        "tableName": "lineage_test_db.alltypesinsert"
+      }
+    },
+    {
+      "vertexType": "COLUMN",
+      "vertexId": "float_col",
+      "id": 12,
+      "metadata": {
+        "tableCreateTime": 1568097480,
+        "tableName": "lineage_test_db.alltypesinsert"
+      }
+    },
+    {
+      "vertexType": "COLUMN",
+      "vertexId": "double_col",
+      "id": 13,
+      "metadata": {
+        "tableCreateTime": 1568097480,
+        "tableName": "lineage_test_db.alltypesinsert"
+      }
+    },
+    {
+      "vertexType": "COLUMN",
+      "vertexId": "date_string_col",
+      "id": 14,
+      "metadata": {
+        "tableCreateTime": 1568097480,
+        "tableName": "lineage_test_db.alltypesinsert"
+      }
+    },
+    {
+      "vertexType": "COLUMN",
+      "vertexId": "string_col",
+      "id": 15,
+      "metadata": {
+        "tableCreateTime": 1568097480,
+        "tableName": "lineage_test_db.alltypesinsert"
+      }
+    },
+    {
+      "vertexType": "COLUMN",
+      "vertexId": "functional.alltypestiny.string_col",
+      "id": 16,
+      "metadata": {
+        "tableCreateTime": 1568093689,
+        "tableName": "functional.alltypestiny"
+      }
+    },
+    {
+      "vertexType": "COLUMN",
+      "vertexId": "timestamp_col",
+      "id": 17,
+      "metadata": {
+        "tableCreateTime": 1568097480,
+        "tableName": "lineage_test_db.alltypesinsert"
+      }
+    }
+  ],
+  "edges": [
+    {
+      "sources": [
+        1
+      ],
+      "targets": [
+        0
+      ],
+      "edgeType": "PROJECTION"
+    },
+    {
+      "sources": [
+        3
+      ],
+      "targets": [
+        2
+      ],
+      "edgeType": "PROJECTION"
+    },
+    {
+      "sources": [
+        5
+      ],
+      "targets": [
+        4
+      ],
+      "edgeType": "PROJECTION"
+    },
+    {
+      "sources": [],
+      "targets": [
+        6
+      ],
+      "edgeType": "PROJECTION"
+    },
+    {
+      "sources": [],
+      "targets": [
+        7
+      ],
+      "edgeType": "PROJECTION"
+    },
+    {
+      "sources": [],
+      "targets": [
+        8
+      ],
+      "edgeType": "PROJECTION"
+    },
+    {
+      "sources": [
+        10
+      ],
+      "targets": [
+        9
+      ],
+      "edgeType": "PROJECTION"
+    },
+    {
+      "sources": [],
+      "targets": [
+        11
+      ],
+      "edgeType": "PROJECTION"
+    },
+    {
+      "sources": [],
+      "targets": [
+        12
+      ],
+      "edgeType": "PROJECTION"
+    },
+    {
+      "sources": [],
+      "targets": [
+        13
+      ],
+      "edgeType": "PROJECTION"
+    },
+    {
+      "sources": [],
+      "targets": [
+        14
+      ],
+      "edgeType": "PROJECTION"
+    },
+    {
+      "sources": [
+        16
+      ],
+      "targets": [
+        15
+      ],
+      "edgeType": "PROJECTION"
+    },
+    {
+      "sources": [],
+      "targets": [
+        17
+      ],
+      "edgeType": "PROJECTION"
+    }
+  ],
+  "queryId": "1f4b1f66d4cc207e:f0435aee00000000",
+  "user": "bharath",
+  "queryText": "with t1 as (select * from functional.alltypestiny) insert into lineage_test_db.alltypesinsert (id, int_col, string_col) partition(year, month) select id, int_col, string_col, year, month from t1",
+  "endTime": 1568097630
+}
+---- QUERY
+with t1 as (select * from functional.alltypestiny)
+insert into lineage_test_db.alltypesinsert (id, int_col, string_col) partition(year, month)
+select id, int_col, string_col, year, month from t1
+====
+---- LINEAGE
+{
+  "hash": "36f0326d13fc4d2bd03196549624a15a",
+  "timestamp": 1568097635,
+  "vertices": [
+    {
+      "vertexType": "COLUMN",
+      "vertexId": "lead(a, 1, NULL) OVER(...)",
+      "id": 0
+    },
+    {
+      "vertexType": "COLUMN",
+      "vertexId": "functional.alltypes.id",
+      "id": 1,
+      "metadata": {
+        "tableCreateTime": 1568093675,
+        "tableName": "functional.alltypes"
+      }
+    },
+    {
+      "vertexType": "COLUMN",
+      "vertexId": "functional.alltypes.bigint_col",
+      "id": 2,
+      "metadata": {
+        "tableCreateTime": 1568093675,
+        "tableName": "functional.alltypes"
+      }
+    },
+    {
+      "vertexType": "COLUMN",
+      "vertexId": "functional.alltypes.bool_col",
+      "id": 3,
+      "metadata": {
+        "tableCreateTime": 1568093675,
+        "tableName": "functional.alltypes"
+      }
+    },
+    {
+      "vertexType": "COLUMN",
+      "vertexId": "functional.alltypes.int_col",
+      "id": 4,
+      "metadata": {
+        "tableCreateTime": 1568093675,
+        "tableName": "functional.alltypes"
+      }
+    },
+    {
+      "vertexType": "COLUMN",
+      "vertexId": "functional.alltypes.string_col",
+      "id": 5,
+      "metadata": {
+        "tableCreateTime": 1568093675,
+        "tableName": "functional.alltypes"
+      }
+    },
+    {
+      "vertexType": "COLUMN",
+      "vertexId": "functional.alltypes.tinyint_col",
+      "id": 6,
+      "metadata": {
+        "tableCreateTime": 1568093675,
+        "tableName": "functional.alltypes"
+      }
+    }
+  ],
+  "edges": [
+    {
+      "sources": [
+        1
+      ],
+      "targets": [
+        0
+      ],
+      "edgeType": "PROJECTION"
+    },
+    {
+      "sources": [
+        1,
+        2,
+        3,
+        4,
+        5,
+        6
+      ],
+      "targets": [
+        0
+      ],
+      "edgeType": "PREDICATE"
+    }
+  ],
+  "queryId": "2a4397fae87ec604:390fe7d600000000",
+  "user": "bharath",
+  "queryText": "select lead(a) over (partition by b order by c) from   (select lead(id) over (partition by int_col order by bigint_col) as a,    max(id) over (partition by tinyint_col order by int_col) as b,    min(int_col) over (partition by string_col order by bool_col) as c    from functional.alltypes) v",
+  "endTime": 1568097636
+}
+---- QUERY
+# Nested analytic functions
+select lead(a) over (partition by b order by c)
+from
+  (select lead(id) over (partition by int_col order by bigint_col) as a,
+   max(id) over (partition by tinyint_col order by int_col) as b,
+   min(int_col) over (partition by string_col order by bool_col) as c
+   from functional.alltypes) v
+====
+---- LINEAGE
+{
+  "hash": "f6683b020d20b90902603bbe7f6635e8",
+  "timestamp": 1568097641,
+  "vertices": [
+    {
+      "vertexType": "COLUMN",
+      "vertexId": "id",
+      "id": 0,
+      "metadata": {
+        "tableCreateTime": 1568097641,
+        "tableName": "lineage_test_db.lineage_test_view1"
+      }
+    },
+    {
+      "vertexType": "COLUMN",
+      "vertexId": "functional.alltypestiny.id",
+      "id": 1,
+      "metadata": {
+        "tableCreateTime": 1568093689,
+        "tableName": "functional.alltypestiny"
+      }
+    }
+  ],
+  "edges": [
+    {
+      "sources": [
+        1
+      ],
+      "targets": [
+        0
+      ],
+      "edgeType": "PROJECTION"
+    }
+  ],
+  "queryId": "a14c35049f6dde68:643393e500000000",
+  "user": "bharath",
+  "queryText": "create view lineage_test_db.lineage_test_view1 as select id from functional.alltypestiny",
+  "endTime": 1568097641
+}
+---- QUERY
+# Create view statement (IMPALA-4219)
+create view lineage_test_db.lineage_test_view1 as select id from functional.alltypestiny
+====
+---- LINEAGE
+{
+  "hash": "d1217e5cde0f930466e6ccfe7c261a53",
+  "timestamp": 1568097646,
+  "vertices": [
+    {
+      "vertexType": "COLUMN",
+      "vertexId": "a",
+      "id": 0,
+      "metadata": {
+        "tableCreateTime": 1568097646,
+        "tableName": "lineage_test_db.lineage_test_view2"
+      }
+    },
+    {
+      "vertexType": "COLUMN",
+      "vertexId": "functional_hbase.alltypessmall.int_col",
+      "id": 1,
+      "metadata": {
+        "tableCreateTime": 1568094418,
+        "tableName": "functional_hbase.alltypessmall"
+      }
+    },
+    {
+      "vertexType": "COLUMN",
+      "vertexId": "b",
+      "id": 2,
+      "metadata": {
+        "tableCreateTime": 1568097646,
+        "tableName": "lineage_test_db.lineage_test_view2"
+      }
+    },
+    {
+      "vertexType": "COLUMN",
+      "vertexId": "functional_hbase.alltypessmall.tinyint_col",
+      "id": 3,
+      "metadata": {
+        "tableCreateTime": 1568094418,
+        "tableName": "functional_hbase.alltypessmall"
+      }
+    }
+  ],
+  "edges": [
+    {
+      "sources": [
+        1
+      ],
+      "targets": [
+        0
+      ],
+      "edgeType": "PROJECTION"
+    },
+    {
+      "sources": [
+        3
+      ],
+      "targets": [
+        2
+      ],
+      "edgeType": "PROJECTION"
+    },
+    {
+      "sources": [
+        1,
+        3
+      ],
+      "targets": [
+        0,
+        2
+      ],
+      "edgeType": "PREDICATE"
+    }
+  ],
+  "queryId": "774c6a2b13d69002:ee0b793e00000000",
+  "user": "bharath",
+  "queryText": "create view lineage_test_db.lineage_test_view2 (a, b) as select c1, x2 from (   select c1, min(c2) x2   from (     select c1, c2, c3     from (       select int_col c1, tinyint_col c2, min(float_col) c3       from functional_hbase.alltypessmall       group by 1, 2       order by 1,2       limit 1     ) x   ) x2   group by c1 ) y order by 2,1 desc limit 0",
+  "endTime": 1568097646
+}
+---- QUERY
+# Create view with nested inline views (IMPALA-4219)
+create view lineage_test_db.lineage_test_view2 (a, b) as select c1, x2
+from (
+  select c1, min(c2) x2
+  from (
+    select c1, c2, c3
+    from (
+      select int_col c1, tinyint_col c2, min(float_col) c3
+      from functional_hbase.alltypessmall
+      group by 1, 2
+      order by 1,2
+      limit 1
+    ) x
+  ) x2
+  group by c1
+) y
+order by 2,1 desc
+limit 0
+====
+---- LINEAGE
+{
+  "hash": "7fbb84397e7103b32ee785085027ffcf",
+  "timestamp": 1568097651,
+  "vertices": [
+    {
+      "vertexType": "COLUMN",
+      "vertexId": "a1",
+      "id": 0,
+      "metadata": {
+        "tableCreateTime": 1568097651,
+        "tableName": "lineage_test_db.lineage_test_view3"
+      }
+    },
+    {
+      "vertexType": "COLUMN",
+      "vertexId": "functional.alltypesagg.smallint_col",
+      "id": 1,
+      "metadata": {
+        "tableCreateTime": 1568093721,
+        "tableName": "functional.alltypesagg"
+      }
+    },
+    {
+      "vertexType": "COLUMN",
+      "vertexId": "a2",
+      "id": 2,
+      "metadata": {
+        "tableCreateTime": 1568097651,
+        "tableName": "lineage_test_db.lineage_test_view3"
+      }
+    },
+    {
+      "vertexType": "COLUMN",
+      "vertexId": "functional.alltypessmall.id",
+      "id": 3,
+      "metadata": {
+        "tableCreateTime": 1568093682,
+        "tableName": "functional.alltypessmall"
+      }
+    },
+    {
+      "vertexType": "COLUMN",
+      "vertexId": "a3",
+      "id": 4,
+      "metadata": {
+        "tableCreateTime": 1568097651,
+        "tableName": "lineage_test_db.lineage_test_view3"
+      }
+    },
+    {
+      "vertexType": "COLUMN",
+      "vertexId": "functional.alltypesagg.tinyint_col",
+      "id": 5,
+      "metadata": {
+        "tableCreateTime": 1568093721,
+        "tableName": "functional.alltypesagg"
+      }
+    },
+    {
+      "vertexType": "COLUMN",
+      "vertexId": "a4",
+      "id": 6,
+      "metadata": {
+        "tableCreateTime": 1568097651,
+        "tableName": "lineage_test_db.lineage_test_view3"
+      }
+    },
+    {
+      "vertexType": "COLUMN",
+      "vertexId": "a5",
+      "id": 7,
+      "metadata": {
+        "tableCreateTime": 1568097651,
+        "tableName": "lineage_test_db.lineage_test_view3"
+      }
+    },
+    {
+      "vertexType": "COLUMN",
+      "vertexId": "functional.alltypesagg.int_col",
+      "id": 8,
+      "metadata": {
+        "tableCreateTime": 1568093721,
+        "tableName": "functional.alltypesagg"
+      }
+    },
+    {
+      "vertexType": "COLUMN",
+      "vertexId": "a6",
+      "id": 9,
+      "metadata": {
+        "tableCreateTime": 1568097651,
+        "tableName": "lineage_test_db.lineage_test_view3"
+      }
+    },
+    {
+      "vertexType": "COLUMN",
+      "vertexId": "functional.alltypessmall.float_col",
+      "id": 10,
+      "metadata": {
+        "tableCreateTime": 1568093682,
+        "tableName": "functional.alltypessmall"
+      }
+    },
+    {
+      "vertexType": "COLUMN",
+      "vertexId": "a7",
+      "id": 11,
+      "metadata": {
+        "tableCreateTime": 1568097651,
+        "tableName": "lineage_test_db.lineage_test_view3"
+      }
+    },
+    {
+      "vertexType": "COLUMN",
+      "vertexId": "functional.alltypessmall.string_col",
+      "id": 12,
+      "metadata": {
+        "tableCreateTime": 1568093682,
+        "tableName": "functional.alltypessmall"
+      }
+    },
+    {
+      "vertexType": "COLUMN",
+      "vertexId": "functional.alltypesagg.day",
+      "id": 13,
+      "metadata": {
+        "tableCreateTime": 1568093721,
+        "tableName": "functional.alltypesagg"
+      }
+    },
+    {
+      "vertexType": "COLUMN",
+      "vertexId": "functional.alltypesagg.month",
+      "id": 14,
+      "metadata": {
+        "tableCreateTime": 1568093721,
+        "tableName": "functional.alltypesagg"
+      }
+    }
+  ],
+  "edges": [
+    {
+      "sources": [
+        1
+      ],
+      "targets": [
+        0
+      ],
+      "edgeType": "PROJECTION"
+    },
+    {
+      "sources": [
+        3
+      ],
+      "targets": [
+        2
+      ],
+      "edgeType": "PROJECTION"
+    },
+    {
+      "sources": [
+        5
+      ],
+      "targets": [
+        4
+      ],
+      "edgeType": "PROJECTION"
+    },
+    {
+      "sources": [
+        3
+      ],
+      "targets": [
+        6
+      ],
+      "edgeType": "PROJECTION"
+    },
+    {
+      "sources": [
+        8
+      ],
+      "targets": [
+        7
+      ],
+      "edgeType": "PROJECTION"
+    },
+    {
+      "sources": [
+        10
+      ],
+      "targets": [
+        9
+      ],
+      "edgeType": "PROJECTION"
+    },
+    {
+      "sources": [
+        12
+      ],
+      "targets": [
+        11
+      ],
+      "edgeType": "PROJECTION"
+    },
+    {
+      "sources": [
+        1,
+        3,
+        5,
+        8,
+        10,
+        12,
+        13,
+        14
+      ],
+      "targets": [
+        0,
+        2,
+        4,
+        6,
+        7,
+        9,
+        11
+      ],
+      "edgeType": "PREDICATE"
+    }
+  ],
+  "queryId": "bb458a67da0ec51a:8bacb37800000000",
+  "user": "bharath",
+  "queryText": "create view lineage_test_db.lineage_test_view3 (a1, a2, a3, a4, a5, a6, a7) as   select x.smallint_col, x.id, x.tinyint_col, c.id, x.int_col, x.float_col, c.string_col   from functional.alltypessmall c   join (      select a.smallint_col smallint_col, a.tinyint_col tinyint_col, a.day day,            a.int_col int_col, a.month month, b.float_col float_col, b.id id      from ( select * from functional.alltypesagg a where month=1 ) a      join functional.alltypessmall b on (a.smallint_col = b.id)    ) x on (x.tinyint_col = c.id)   where x.day=1   and x.int_col > 899   and x.float_col > 4.5   and c.string_col < '7'   and x.int_col + x.float_col + cast(c.string_col as float) < 1000",
+  "endTime": 1568097652
+}
+---- QUERY
+# Create view with complex select statement (IMPALA-4219)
+create view lineage_test_db.lineage_test_view3 (a1, a2, a3, a4, a5, a6, a7) as
+  select x.smallint_col, x.id, x.tinyint_col, c.id, x.int_col, x.float_col, c.string_col
+  from functional.alltypessmall c
+  join (
+     select a.smallint_col smallint_col, a.tinyint_col tinyint_col, a.day day,
+           a.int_col int_col, a.month month, b.float_col float_col, b.id id
+     from ( select * from functional.alltypesagg a where month=1 ) a
+     join functional.alltypessmall b on (a.smallint_col = b.id)
+   ) x on (x.tinyint_col = c.id)
+  where x.day=1
+  and x.int_col > 899
+  and x.float_col > 4.5
+  and c.string_col < '7'
+  and x.int_col + x.float_col + cast(c.string_col as float) < 1000
+====
+---- LINEAGE
+{
+  "hash": "80ed48e4969ac7e03d08d5eb6600f4bf",
+  "timestamp": 1568097657,
+  "vertices": [
+    {
+      "vertexType": "COLUMN",
+      "vertexId": "_c0",
+      "id": 0,
+      "metadata": {
+        "tableCreateTime": 1568097657,
+        "tableName": "lineage_test_db.lineage_test_view4"
+      }
+    },
+    {
+      "vertexType": "COLUMN",
+      "vertexId": "functional.alltypes.tinyint_col",
+      "id": 1,
+      "metadata": {
+        "tableCreateTime": 1568093675,
+        "tableName": "functional.alltypes"
+      }
+    },
+    {
+      "vertexType": "COLUMN",
+      "vertexId": "functional.alltypes.id",
+      "id": 2,
+      "metadata": {
+        "tableCreateTime": 1568093675,
+        "tableName": "functional.alltypes"
+      }
+    },
+    {
+      "vertexType": "COLUMN",
+      "vertexId": "functional.alltypes.smallint_col",
+      "id": 3,
+      "metadata": {
+        "tableCreateTime": 1568093675,
+        "tableName": "functional.alltypes"
+      }
+    },
+    {
+      "vertexType": "COLUMN",
+      "vertexId": "_c1",
+      "id": 4,
+      "metadata": {
+        "tableCreateTime": 1568097657,
+        "tableName": "lineage_test_db.lineage_test_view4"
+      }
+    },
+    {
+      "vertexType": "COLUMN",
+      "vertexId": "functional.alltypessmall.string_col",
+      "id": 5,
+      "metadata": {
+        "tableCreateTime": 1568093682,
+        "tableName": "functional.alltypessmall"
+      }
+    },
+    {
+      "vertexType": "COLUMN",
+      "vertexId": "timestamp_col",
+      "id": 6,
+      "metadata": {
+        "tableCreateTime": 1568097657,
+        "tableName": "lineage_test_db.lineage_test_view4"
+      }
+    },
+    {
+      "vertexType": "COLUMN",
+      "vertexId": "functional.alltypessmall.timestamp_col",
+      "id": 7,
+      "metadata": {
+        "tableCreateTime": 1568093682,
+        "tableName": "functional.alltypessmall"
+      }
+    },
+    {
+      "vertexType": "COLUMN",
+      "vertexId": "functional.alltypes.int_col",
+      "id": 8,
+      "metadata": {
+        "tableCreateTime": 1568093675,
+        "tableName": "functional.alltypes"
+      }
+    },
+    {
+      "vertexType": "COLUMN",
+      "vertexId": "functional.alltypes.year",
+      "id": 9,
+      "metadata": {
+        "tableCreateTime": 1568093675,
+        "tableName": "functional.alltypes"
+      }
+    },
+    {
+      "vertexType": "COLUMN",
+      "vertexId": "functional.alltypessmall.bigint_col",
+      "id": 10,
+      "metadata": {
+        "tableCreateTime": 1568093682,
+        "tableName": "functional.alltypessmall"
+      }
+    },
+    {
+      "vertexType": "COLUMN",
+      "vertexId": "functional.alltypessmall.float_col",
+      "id": 11,
+      "metadata": {
+        "tableCreateTime": 1568093682,
+        "tableName": "functional.alltypessmall"
+      }
+    },
+    {
+      "vertexType": "COLUMN",
+      "vertexId": "functional.alltypessmall.id",
+      "id": 12,
+      "metadata": {
+        "tableCreateTime": 1568093682,
+        "tableName": "functional.alltypessmall"
+      }
+    }
+  ],
+  "edges": [
+    {
+      "sources": [
+        1
+      ],
+      "targets": [
+        0
+      ],
+      "edgeType": "PROJECTION"
+    },
+    {
+      "sources": [
+        2,
+        3
+      ],
+      "targets": [
+        0
+      ],
+      "edgeType": "PREDICATE"
+    },
+    {
+      "sources": [
+        5
+      ],
+      "targets": [
+        4
+      ],
+      "edgeType": "PROJECTION"
+    },
+    {
+      "sources": [
+        7
+      ],
+      "targets": [
+        6
+      ],
+      "edgeType": "PROJECTION"
+    },
+    {
+      "sources": [
+        1,
+        2,
+        3,
+        5,
+        7,
+        8,
+        9,
+        10,
+        11,
+        12
+      ],
+      "targets": [
+        0,
+        4,
+        6
+      ],
+      "edgeType": "PREDICATE"
+    }
+  ],
+  "queryId": "55492fe4dc145adc:7c69c17b00000000",
+  "user": "bharath",
+  "queryText": "create view lineage_test_db.lineage_test_view4 as   select * from (     select sum(a.tinyint_col) over (partition by a.smallint_col order by a.id),       count(b.string_col), b.timestamp_col     from functional.alltypes a join functional.alltypessmall b on (a.id = b.id)     where a.year = 2010 and b.float_col > 0     group by a.tinyint_col, a.smallint_col, a.id, b.string_col, b.timestamp_col, b.bigint_col     having count(a.int_col) > 10     order by b.bigint_col limit 10) t",
+  "endTime": 1568097657
+}
+---- QUERY
+# Create view with select statement containing an analytic function (IMPALA-4219)
+create view lineage_test_db.lineage_test_view4 as
+  select * from (
+    select sum(a.tinyint_col) over (partition by a.smallint_col order by a.id),
+      count(b.string_col), b.timestamp_col
+    from functional.alltypes a join functional.alltypessmall b on (a.id = b.id)
+    where a.year = 2010 and b.float_col > 0
+    group by a.tinyint_col, a.smallint_col, a.id, b.string_col, b.timestamp_col, b.bigint_col
+    having count(a.int_col) > 10
+    order by b.bigint_col limit 10) t
+====
+---- LINEAGE
+{
+  "hash": "561916b21b73cf61397e1ca9aa2fb682",
+  "timestamp": 1568097662,
+  "vertices": [
+    {
+      "vertexType": "COLUMN",
+      "vertexId": "id",
+      "id": 0,
+      "metadata": {
+        "tableCreateTime": 1568097481,
+        "tableName": "lineage_test_db.alltypes_view"
+      }
+    },
+    {
+      "vertexType": "COLUMN",
+      "vertexId": "functional.alltypestiny.id",
+      "id": 1,
+      "metadata": {
+        "tableCreateTime": 1568093689,
+        "tableName": "functional.alltypestiny"
+      }
+    }
+  ],
+  "edges": [
+    {
+      "sources": [
+        1
+      ],
+      "targets": [
+        0
+      ],
+      "edgeType": "PROJECTION"
+    }
+  ],
+  "queryId": "21456fbe86072029:b489dd3400000000",
+  "user": "bharath",
+  "queryText": "alter view lineage_test_db.alltypes_view as select id from functional.alltypestiny",
+  "endTime": 1568097663
+}
+---- QUERY
+# Alter view statement (IMPALA-4219)
+alter view lineage_test_db.alltypes_view as select id from functional.alltypestiny
+====
+---- LINEAGE
+{
+  "hash": "e771fd2a8795e5aaad3e86c266b9a039",
+  "timestamp": 1568097668,
+  "vertices": [
+    {
+      "vertexType": "COLUMN",
+      "vertexId": "x",
+      "id": 0
+    },
+    {
+      "vertexType": "COLUMN",
+      "vertexId": "functional.allcomplextypes.complex_struct_col.f1",
+      "id": 1,
+      "metadata": {
+        "tableCreateTime": 1568093741,
+        "tableName": "functional.allcomplextypes"
+      }
+    },
+    {
+      "vertexType": "COLUMN",
+      "vertexId": "functional.allcomplextypes.int_struct_col.f1",
+      "id": 2,
+      "metadata": {
+        "tableCreateTime": 1568093741,
+        "tableName": "functional.allcomplextypes"
+      }
+    },
+    {
+      "vertexType": "COLUMN",
+      "vertexId": "functional.allcomplextypes.int_struct_col.f2",
+      "id": 3,
+      "metadata": {
+        "tableCreateTime": 1568093741,
+        "tableName": "functional.allcomplextypes"
+      }
+    },
+    {
+      "vertexType": "COLUMN",
+      "vertexId": "functional.allcomplextypes.nested_struct_col.f2.f12.f21",
+      "id": 4,
+      "metadata": {
+        "tableCreateTime": 1568093741,
+        "tableName": "functional.allcomplextypes"
+      }
+    },
+    {
+      "vertexType": "COLUMN",
+      "vertexId": "functional.allcomplextypes.year",
+      "id": 5,
+      "metadata": {
+        "tableCreateTime": 1568093741,
+        "tableName": "functional.allcomplextypes"
+      }
+    }
+  ],
+  "edges": [
+    {
+      "sources": [
+        1,
+        2,
+        3
+      ],
+      "targets": [
+        0
+      ],
+      "edgeType": "PROJECTION"
+    },
+    {
+      "sources": [
+        4,
+        5
+      ],
+      "targets": [
+        0
+      ],
+      "edgeType": "PREDICATE"
+    }
+  ],
+  "queryId": "09445f3d714f391c:18975f3400000000",
+  "user": "bharath",
+  "queryText": "select * from (   select int_struct_col.f1 + int_struct_col.f2 x from functional.allcomplextypes   where year = 2000   order by nested_struct_col.f2.f12.f21 limit 10   union all   select sum(f1) y from     (select complex_struct_col.f1 f1 from functional.allcomplextypes      group by 1) v1) v2",
+  "endTime": 1568097668
+}
+---- QUERY
+# Test references to struct fields.
+select * from (
+  select int_struct_col.f1 + int_struct_col.f2 x from functional.allcomplextypes
+  where year = 2000
+  order by nested_struct_col.f2.f12.f21 limit 10
+  union all
+  select sum(f1) y from
+    (select complex_struct_col.f1 f1 from functional.allcomplextypes
+     group by 1) v1) v2
+====
+---- LINEAGE
+{
+  "hash": "63df7e3a395b2f9d56928ccd655edef5",
+  "timestamp": 1568097673,
+  "vertices": [
+    {
+      "vertexType": "COLUMN",
+      "vertexId": "item",
+      "id": 0
+    },
+    {
+      "vertexType": "COLUMN",
+      "vertexId": "functional.allcomplextypes.int_array_col.item",
+      "id": 1,
+      "metadata": {
+        "tableCreateTime": 1568093741,
+        "tableName": "functional.allcomplextypes"
+      }
+    },
+    {
+      "vertexType": "COLUMN",
+      "vertexId": "key",
+      "id": 2
+    },
+    {
+      "vertexType": "COLUMN",
+      "vertexId": "functional.allcomplextypes.struct_map_col.key",
+      "id": 3,
+      "metadata": {
+        "tableCreateTime": 1568093741,
+        "tableName": "functional.allcomplextypes"
+      }
+    },
+    {
+      "vertexType": "COLUMN",
+      "vertexId": "f1",
+      "id": 4
+    },
+    {
+      "vertexType": "COLUMN",
+      "vertexId": "functional.allcomplextypes.struct_map_col.value.f1",
+      "id": 5,
+      "metadata": {
+        "tableCreateTime": 1568093741,
+        "tableName": "functional.allcomplextypes"
+      }
+    },
+    {
+      "vertexType": "COLUMN",
+      "vertexId": "f2",
+      "id": 6
+    },
+    {
+      "vertexType": "COLUMN",
+      "vertexId": "functional.allcomplextypes.struct_map_col.value.f2",
+      "id": 7,
+      "metadata": {
+        "tableCreateTime": 1568093741,
+        "tableName": "functional.allcomplextypes"
+      }
+    }
+  ],
+  "edges": [
+    {
+      "sources": [
+        1
+      ],
+      "targets": [
+        0
+      ],
+      "edgeType": "PROJECTION"
+    },
+    {
+      "sources": [
+        3
+      ],
+      "targets": [
+        2
+      ],
+      "edgeType": "PROJECTION"
+    },
+    {
+      "sources": [
+        5
+      ],
+      "targets": [
+        4
+      ],
+      "edgeType": "PROJECTION"
+    },
+    {
+      "sources": [
+        7
+      ],
+      "targets": [
+        6
+      ],
+      "edgeType": "PROJECTION"
+    },
+    {
+      "sources": [
+        1,
+        5
+      ],
+      "targets": [
+        0,
+        2,
+        4,
+        6
+      ],
+      "edgeType": "PREDICATE"
+    }
+  ],
+  "queryId": "0344bc3c25ad0f7f:2f22a35700000000",
+  "user": "bharath",
+  "queryText": "select * from functional.allcomplextypes.int_array_col a inner join   functional.allcomplextypes.struct_map_col m on (a.item = m.f1)",
+  "endTime": 1568097673
+}
+---- QUERY
+# Test absolute collection table refs. Ensure that the vertex ids of sources are
+# always an absolute explicit path.
+select * from functional.allcomplextypes.int_array_col a inner join
+  functional.allcomplextypes.struct_map_col m on (a.item = m.f1)
+====
+---- LINEAGE
+{
+  "hash": "6df49e42edeccad1139432ad33ad037a",
+  "timestamp": 1568097678,
+  "vertices": [
+    {
+      "vertexType": "COLUMN",
+      "vertexId": "id",
+      "id": 0
+    },
+    {
+      "vertexType": "COLUMN",
+      "vertexId": "functional.allcomplextypes.id",
+      "id": 1,
+      "metadata": {
+        "tableCreateTime": 1568093741,
+        "tableName": "functional.allcomplextypes"
+      }
+    },
+    {
+      "vertexType": "COLUMN",
+      "vertexId": "year",
+      "id": 2
+    },
+    {
+      "vertexType": "COLUMN",
+      "vertexId": "functional.allcomplextypes.year",
+      "id": 3,
+      "metadata": {
+        "tableCreateTime": 1568093741,
+        "tableName": "functional.allcomplextypes"
+      }
+    },
+    {
+      "vertexType": "COLUMN",
+      "vertexId": "month",
+      "id": 4
+    },
+    {
+      "vertexType": "COLUMN",
+      "vertexId": "functional.allcomplextypes.month",
+      "id": 5,
+      "metadata": {
+        "tableCreateTime": 1568093741,
+        "tableName": "functional.allcomplextypes"
+      }
+    },
+    {
+      "vertexType": "COLUMN",
+      "vertexId": "item",
+      "id": 6
+    },
+    {
+      "vertexType": "COLUMN",
+      "vertexId": "functional.allcomplextypes.int_array_col.item",
+      "id": 7,
+      "metadata": {
+        "tableCreateTime": 1568093741,
+        "tableName": "functional.allcomplextypes"
+      }
+    },
+    {
+      "vertexType": "COLUMN",
+      "vertexId": "key",
+      "id": 8
+    },
+    {
+      "vertexType": "COLUMN",
+      "vertexId": "functional.allcomplextypes.struct_map_col.key",
+      "id": 9,
+      "metadata": {
+        "tableCreateTime": 1568093741,
+        "tableName": "functional.allcomplextypes"
+      }
+    },
+    {
+      "vertexType": "COLUMN",
+      "vertexId": "f1",
+      "id": 10
+    },
+    {
+      "vertexType": "COLUMN",
+      "vertexId": "functional.allcomplextypes.struct_map_col.value.f1",
+      "id": 11,
+      "metadata": {
+        "tableCreateTime": 1568093741,
+        "tableName": "functional.allcomplextypes"
+      }
+    },
+    {
+      "vertexType": "COLUMN",
+      "vertexId": "f2",
+      "id": 12
+    },
+    {
+      "vertexType": "COLUMN",
+      "vertexId": "functional.allcomplextypes.struct_map_col.value.f2",
+      "id": 13,
+      "metadata": {
+        "tableCreateTime": 1568093741,
+        "tableName": "functional.allcomplextypes"
+      }
+    },
+    {
+      "vertexType": "COLUMN",
+      "vertexId": "functional.allcomplextypes.int_array_col",
+      "id": 14,
+      "metadata": {
+        "tableCreateTime": 1568093741,
+        "tableName": "functional.allcomplextypes"
+      }
+    },
+    {
+      "vertexType": "COLUMN",
+      "vertexId": "functional.allcomplextypes.struct_map_col",
+      "id": 15,
+      "metadata": {
+        "tableCreateTime": 1568093741,
+        "tableName": "functional.allcomplextypes"
+      }
+    }
+  ],
+  "edges": [
+    {
+      "sources": [
+        1
+      ],
+      "targets": [
+        0
+      ],
+      "edgeType": "PROJECTION"
+    },
+    {
+      "sources": [
+        3
+      ],
+      "targets": [
+        2
+      ],
+      "edgeType": "PROJECTION"
+    },
+    {
+      "sources": [
+        5
+      ],
+      "targets": [
+        4
+      ],
+      "edgeType": "PROJECTION"
+    },
+    {
+      "sources": [
+        7
+      ],
+      "targets": [
+        6
+      ],
+      "edgeType": "PROJECTION"
+    },
+    {
+      "sources": [
+        9
+      ],
+      "targets": [
+        8
+      ],
+      "edgeType": "PROJECTION"
+    },
+    {
+      "sources": [
+        11
+      ],
+      "targets": [
+        10
+      ],
+      "edgeType": "PROJECTION"
+    },
+    {
+      "sources": [
+        13
+      ],
+      "targets": [
+        12
+      ],
+      "edgeType": "PROJECTION"
+    },
+    {
+      "sources": [
+        7,
+        11,
+        14,
+        15
+      ],
+      "targets": [
+        0,
+        2,
+        4,
+        6,
+        8,
+        10,
+        12
+      ],
+      "edgeType": "PREDICATE"
+    }
+  ],
+  "queryId": "c942b32cc2a9e45e:47fc681100000000",
+  "user": "bharath",
+  "queryText": "select * from functional.allcomplextypes t, t.int_array_col a, t.struct_map_col m   where a.item = m.f1",
+  "endTime": 1568097678
+}
+---- QUERY
+# Test relative collection table refs. Ensure that the vertex ids of sources are
+# always an absolute explicit path.
+select * from functional.allcomplextypes t, t.int_array_col a, t.struct_map_col m
+  where a.item = m.f1
+====
+---- LINEAGE
+{
+  "hash": "f6e042b9788a1583e212cf90c616dfd3",
+  "timestamp": 1568097683,
+  "vertices": [
+    {
+      "vertexType": "COLUMN",
+      "vertexId": "ab",
+      "id": 0
+    },
+    {
+      "vertexType": "COLUMN",
+      "vertexId": "functional.allcomplextypes.int_array_col.item",
+      "id": 1,
+      "metadata": {
+        "tableCreateTime": 1568093741,
+        "tableName": "functional.allcomplextypes"
+      }
+    },
+    {
+      "vertexType": "COLUMN",
+      "vertexId": "functional.allcomplextypes.struct_map_col.value.f1",
+      "id": 2,
+      "metadata": {
+        "tableCreateTime": 1568093741,
+        "tableName": "functional.allcomplextypes"
+      }
+    },
+    {
+      "vertexType": "COLUMN",
+      "vertexId": "c",
+      "id": 3
+    },
+    {
+      "vertexType": "COLUMN",
+      "vertexId": "functional.allcomplextypes.map_map_col.value.value",
+      "id": 4,
+      "metadata": {
+        "tableCreateTime": 1568093741,
+        "tableName": "functional.allcomplextypes"
+      }
+    },
+    {
+      "vertexType": "COLUMN",
+      "vertexId": "functional.allcomplextypes.map_map_col.value.key",
+      "id": 5,
+      "metadata": {
+        "tableCreateTime": 1568093741,
+        "tableName": "functional.allcomplextypes"
+      }
+    },
+    {
+      "vertexType": "COLUMN",
+      "vertexId": "d",
+      "id": 6
+    },
+    {
+      "vertexType": "COLUMN",
+      "vertexId": "functional.allcomplextypes.int_map_col.value",
+      "id": 7,
+      "metadata": {
+        "tableCreateTime": 1568093741,
+        "tableName": "functional.allcomplextypes"
+      }
+    },
+    {
+      "vertexType": "COLUMN",
+      "vertexId": "e",
+      "id": 8
+    },
+    {
+      "vertexType": "COLUMN",
+      "vertexId": "functional.allcomplextypes.complex_nested_struct_col.f2.item.f12.value.f21",
+      "id": 9,
+      "metadata": {
+        "tableCreateTime": 1568093741,
+        "tableName": "functional.allcomplextypes"
+      }
+    },
+    {
+      "vertexType": "COLUMN",
+      "vertexId": "functional.allcomplextypes.complex_nested_struct_col.f2.item.f12.key",
+      "id": 10,
+      "metadata": {
+        "tableCreateTime": 1568093741,
+        "tableName": "functional.allcomplextypes"
+      }
+    },
+    {
+      "vertexType": "COLUMN",
+      "vertexId": "functional.allcomplextypes.struct_map_col.key",
+      "id": 11,
+      "metadata": {
+        "tableCreateTime": 1568093741,
+        "tableName": "functional.allcomplextypes"
+      }
+    }
+  ],
+  "edges": [
+    {
+      "sources": [
+        1,
+        2
+      ],
+      "targets": [
+        0
+      ],
+      "edgeType": "PROJECTION"
+    },
+    {
+      "sources": [
+        4
+      ],
+      "targets": [
+        3
+      ],
+      "edgeType": "PROJECTION"
+    },
+    {
+      "sources": [
+        5
+      ],
+      "targets": [
+        3
+      ],
+      "edgeType": "PREDICATE"
+    },
+    {
+      "sources": [
+        1,
+        7
+      ],
+      "targets": [
+        6
+      ],
+      "edgeType": "PROJECTION"
+    },
+    {
+      "sources": [
+        9
+      ],
+      "targets": [
+        8
+      ],
+      "edgeType": "PROJECTION"
+    },
+    {
+      "sources": [
+        1,
+        10,
+        11
+      ],
+      "targets": [
+        0,
+        3,
+        6,
+        8
+      ],
+      "edgeType": "PREDICATE"
+    }
+  ],
+  "queryId": "c64f53b771511f69:143fbcbe00000000",
+  "user": "bharath",
+  "queryText": "select a + b as ab, c, d, e from functional.allcomplextypes t,   (select sum(item) a from t.int_array_col    where item < 10) v1,   (select count(f1) b from t.struct_map_col    group by key) v2,   (select avg(value) over(partition by key) c from t.map_map_col.value) v3,   (select item d from t.int_array_col    union all    select value from t.int_map_col) v4,   (select f21 e from t.complex_nested_struct_col.f2.f12 order by key limit 10) v5",
+  "endTime": 1568097684
+}
+---- QUERY
+# Test relative collection table refs in inline views.
+select a + b as ab, c, d, e from functional.allcomplextypes t,
+  (select sum(item) a from t.int_array_col
+   where item < 10) v1,
+  (select count(f1) b from t.struct_map_col
+   group by key) v2,
+  (select avg(value) over(partition by key) c from t.map_map_col.value) v3,
+  (select item d from t.int_array_col
+   union all
+   select value from t.int_map_col) v4,
+  (select f21 e from t.complex_nested_struct_col.f2.f12 order by key limit 10) v5
+====
+---- LINEAGE
+{
+  "hash": "a0b32156f73829f9d72d35d5e6091684",
+  "timestamp": 1568097689,
+  "vertices": [
+    {
+      "vertexType": "COLUMN",
+      "vertexId": "id",
+      "id": 0,
+      "metadata": {
+        "tableCreateTime": 1568097689,
+        "tableName": "lineage_test_db.lineage_test_view5"
+      }
+    },
+    {
+      "vertexType": "COLUMN",
+      "vertexId": "functional.alltypes.id",
+      "id": 1,
+      "metadata": {
+        "tableCreateTime": 1568093675,
+        "tableName": "functional.alltypes"
+      }
+    }
+  ],
+  "edges": [
+    {
+      "sources": [
+        1
+      ],
+      "targets": [
+        0
+      ],
+      "edgeType": "PROJECTION"
+    },
+    {
+      "sources": [
+        1
+      ],
+      "targets": [
+        0
+      ],
+      "edgeType": "PREDICATE"
+    }
+  ],
+  "queryId": "0d41edb23b146ceb:b9565e1000000000",
+  "user": "bharath",
+  "queryText": "create view lineage_test_db.lineage_test_view5 as select id from functional.alltypes_view v where not exists (select 1 from functional.alltypes a where v.id = a.id)",
+  "endTime": 1568097689
+}
+---- QUERY
+# IMPALA-4206: Test creating a view whose definition has a subquery and a view reference.
+create view lineage_test_db.lineage_test_view5 as
+select id from functional.alltypes_view v
+where not exists (select 1 from functional.alltypes a where v.id = a.id)
+====

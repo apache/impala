@@ -39,6 +39,13 @@ COLUMN_REGEX_PREFIX = re.compile(COLUMN_REGEX_PREFIX_PATTERN, re.I)
 ROW_REGEX_PREFIX_PATTERN = 'row_regex:'
 ROW_REGEX_PREFIX = re.compile(ROW_REGEX_PREFIX_PATTERN, re.I)
 
+# Json keys that are skipped during comparison of two lineage JSON objects.
+# Lineages contain keys like timestamps, query_ids etc that are not expected
+# to match with other lineages. This list maintains the keys that are skipped
+# during comparison.
+DEFAULT_LINEAGE_SKIP_KEYS = ['tableCreateTime', 'queryId', 'timestamp', 'endTime',
+    'user']
+
 # Represents a single test result (row set)
 class QueryTestResult(object):
   def __init__(self, result_list, column_types, column_labels, order_matters):
@@ -619,6 +626,21 @@ def verify_runtime_profile(expected, actual, update_section=False):
             "\n\nPROFILE:\n%s\n"
             % (function, field, expected_value, actual_value, actual))
   return updated_aggregations
+
+
+def verify_lineage(expected, actual, lineage_skip_json_keys=DEFAULT_LINEAGE_SKIP_KEYS):
+  """Compares the lineage JSON objects expected and actual."""
+  def recursive_sort(obj):
+    if isinstance(obj, dict):
+      return sorted((k, recursive_sort(v))
+          for k, v in obj.items() if k not in lineage_skip_json_keys)
+    if isinstance(obj, list):
+      return sorted(recursive_sort(x) for x in obj)
+    return obj
+  sort_expected = recursive_sort(expected)
+  sort_actual = recursive_sort(actual)
+  assert sort_expected == sort_actual,\
+      "Lineage mismatch. EXPECTED:\n%s\n\nACTUAL:\n %s\n" % (sort_expected, sort_actual)
 
 def get_node_exec_options(profile_string, exec_node_id):
   """ Return a list with all of the ExecOption strings for the given exec node id. """

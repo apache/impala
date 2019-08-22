@@ -88,16 +88,24 @@ class ClientRequestState {
   /// Call this to ensure that rows are ready when calling FetchRows(). Updates the
   /// query_status_, and advances operation_state_ to FINISHED or EXCEPTION. Must be
   /// preceded by call to Exec(). Waits for all child queries to complete. Takes lock_.
+  /// Since this is a blocking operation, it is invoked from a separate thread
+  /// (WaitAsync()) and all the callers that intend to block until Wait() completes
+  /// are expected to use BlockOnWait().
+  ///
+  /// Logs the query events once the query reaches the FINISHED state. Threads blocked
+  /// on Wait() are signalled *before* logging the events so that they can resume their
+  /// execution (like fetching the results) and are not blocked until the event logging
+  /// is complete.
   void Wait();
 
   /// Calls Wait() asynchronously in a thread and returns immediately.
   Status WaitAsync();
 
   /// BlockOnWait() may be called after WaitAsync() has been called in order to wait
-  /// for the asynchronous thread (wait_thread_) to complete. It is safe to call this
-  /// from multiple threads (all threads will block until wait_thread_ has completed)
-  /// and multiple times (non-blocking once wait_thread_ has completed). Do not call
-  /// while holding lock_.
+  /// for the asynchronous thread (wait_thread_) to signal block_on_wait_cv_. It is
+  /// thread-safe and all the caller threads will block until wait_thread_ has
+  /// completed) and multiple times (non-blocking once wait_thread_ has completed).
+  /// Do not call while holding lock_.
   void BlockOnWait();
 
   /// Return at most max_rows from the current batch. If the entire current batch has
@@ -330,12 +338,12 @@ protected:
   /// Thread for asynchronously running Wait().
   std::unique_ptr<Thread> wait_thread_;
 
-  /// Condition variable to make BlockOnWait() thread-safe. One thread joins
-  /// wait_thread_, and all other threads block on this cv. Used with lock_.
+  /// Condition variable used to signal the threads that are blocked on Wait() to finish.
+  /// Callers are expected to use BlockOnWait() for Wait() to finish.
   ConditionVariable block_on_wait_cv_;
 
-  /// Used in conjunction with block_on_wait_cv_ to make BlockOnWait() thread-safe.
-  bool is_block_on_wait_joining_ = false;
+  /// Wait condition used in conjunction with block_on_wait_cv_.
+  bool is_wait_done_ = false;
 
   /// Session that this query is from
   std::shared_ptr<ImpalaServer::SessionState> session_;
@@ -553,6 +561,18 @@ protected:
 
   /// Invoke this function when the transaction is committed or aborted.
   void ClearTransactionState();
+
+  /// helper that logs the audit record for this query id. Takes the query_status
+  /// as input parameter so that it operates on the same status polled in the
+  /// beginning of LogQueryEvents().
+  Status LogAuditRecord(const Status& query_status) WARN_UNUSED_RESULT;
+
+  /// Helper that logs the lineage record for this query id.
+  Status LogLineageRecord() WARN_UNUSED_RESULT;
+
+  /// Logs audit and column lineage events. Expects that Wait() has already finished.
+  /// Grabs lock_ for polling the query_status(). Hence do not call it under lock_.
+  void LogQueryEvents();
 };
 
 }

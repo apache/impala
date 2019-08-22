@@ -17,6 +17,7 @@
 #
 # The base class that should be used for almost all Impala tests
 
+import glob
 import grp
 import json
 import logging
@@ -51,6 +52,7 @@ from tests.common.test_dimensions import (
     load_table_info_dimension)
 from tests.common.test_result_verifier import (
     try_compile_regex,
+    verify_lineage,
     verify_raw_results,
     verify_runtime_profile)
 from tests.common.test_vector import ImpalaTestDimension
@@ -120,6 +122,7 @@ COMMENT_LINES_REGEX = r'(?:\s*--.*\n)*'
 SET_PATTERN = re.compile(
     COMMENT_LINES_REGEX + r'\s*set\s*([a-zA-Z_][a-zA-Z0-9_]*)\s*=*', re.I)
 METRICS_URL = 'http://localhost:25000/metrics?json'
+VARZ_URL = 'http://localhost:25000/varz?json'
 
 GROUP_NAME = grp.getgrgid(pwd.getpwnam(getuser()).pw_gid).gr_name
 
@@ -326,6 +329,16 @@ class ImpalaTestSuite(BaseTestSuite):
     assert response.status_code == requests.codes.ok
     return json.loads(response.text)
 
+  def get_var_current_val(self, var):
+    """Returns the current value of a given Impalad flag variable."""
+    # Parse the /varz endpoint to get the flag information.
+    varz = self.get_debug_page(VARZ_URL)
+    assert 'flags' in varz.keys()
+    filtered_varz = filter(lambda flag: flag['name'] == var, varz['flags'])
+    assert len(filtered_varz) == 1
+    assert 'current' in filtered_varz[0].keys()
+    return filtered_varz[0]['current'].strip()
+
   def get_metric(self, name):
     """Finds the metric with name 'name' and returns its value as an int."""
     def iter_metrics(group):
@@ -524,6 +537,8 @@ class ImpalaTestSuite(BaseTestSuite):
 
     sections = self.load_query_test_file(self.get_workload(), test_file_name,
         encoding=encoding)
+    # Assumes that it is same across all the coordinators.
+    lineage_log_dir = self.get_var_current_val('lineage_event_log_dir')
     for test_section in sections:
       if 'HIVE_MAJOR_VERSION' in test_section:
         needed_hive_major_version = int(test_section['HIVE_MAJOR_VERSION'])
@@ -622,6 +637,20 @@ class ImpalaTestSuite(BaseTestSuite):
         if pytest.config.option.update_results:
           test_section[rt_profile_info] = "".join(rt_profile)
 
+      if 'LINEAGE' in test_section:
+         # Lineage flusher thread runs every 5s by default and is not configurable. Wait
+         # for that period. (TODO) Get rid of this for faster test execution.
+         time.sleep(5)
+         current_query_lineage = self.get_query_lineage(result.query_id, lineage_log_dir)
+         assert current_query_lineage is not "",\
+             "No lineage found for query %s in dir %s" %\
+             (result.query_id, lineage_log_dir)
+         if pytest.config.option.update_results:
+           test_section['LINEAGE'] = json.dumps(current_query_lineage, indent=2,
+               separators=(',', ': '))
+         else:
+           verify_lineage(json.loads(test_section['LINEAGE']), current_query_lineage)
+
       if 'DML_RESULTS' in test_section:
         assert 'ERRORS' not in test_section
         # The limit is specified to ensure the queries aren't unbounded. We shouldn't have
@@ -636,6 +665,28 @@ class ImpalaTestSuite(BaseTestSuite):
       output_file = os.path.join(EE_TEST_LOGS_DIR,
                                  test_file_name.replace('/','_') + ".test")
       write_test_file(output_file, sections, encoding=encoding)
+
+  def get_query_lineage(self, query_id, lineage_dir):
+    """Walks through the lineage files in lineage_dir to look for a given query_id.
+    This is an expensive operation is lineage_dir is large, so use carefully."""
+    assert lineage_dir and os.path.isdir(lineage_dir),\
+        "Invalid lineage dir %s" % (lineage_dir)
+    lineage_files = glob.glob(os.path.join(lineage_dir, 'impala_lineage_log_1.0*'))
+    assert len(lineage_files) > 0, "Directory %s is empty" % (lineage_dir)
+    # Sort by mtime. Optimized for most recently written lineages.
+    lineage_files.sort(key=lambda f: os.path.getmtime(f), reverse=True)
+    for f in lineage_files:
+      with open(f) as fd:
+        # A single file can contain a maxmimum of 5000 entries by default.
+        lines = fd.readlines()
+        for line in reversed(lines):
+          line = line.strip()
+          if len(line) == 0: continue
+          lineage = json.loads(line)
+          assert 'queryId' in lineage.keys()
+          if lineage['queryId'] == query_id:
+            return lineage
+    return ""
 
   def execute_test_case_setup(self, setup_section, table_format):
     """

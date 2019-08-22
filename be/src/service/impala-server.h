@@ -418,6 +418,9 @@ class ImpalaServer : public ImpalaServiceIf,
   /// Returns true if query execution (FE) hooks are enabled, false otherwise.
   bool AreQueryHooksEnabled();
 
+  /// Returns true if audit event logging is enabled, false otherwise.
+  bool IsAuditEventLoggingEnabled();
+
   /// Retuns true if this is a coordinator, false otherwise.
   bool IsCoordinator();
 
@@ -478,6 +481,12 @@ class ImpalaServer : public ImpalaServiceIf,
 
   /// Convert the shutdown status to a human-readable string.
   static std::string ShutdownStatusToString(const ShutdownStatusPB& shutdown_status);
+
+  /// Appends the audit_entry to audit_event_logger_.
+  Status AppendAuditEntry(const std::string& audit_entry);
+
+  /// Appends the lineage_entry to lineage_logger_.
+  Status AppendLineageEntry(const std::string& lineage_entry);
 
   // Mapping between query option names and levels
   QueryOptionLevels query_option_levels_;
@@ -764,18 +773,6 @@ class ImpalaServer : public ImpalaServiceIf,
   /// Initializes a logging directory, creating the directory if it does not already
   /// exist. If there is any error creating the directory an error will be returned.
   static Status InitLoggingDir(const std::string& log_dir) WARN_UNUSED_RESULT;
-
-  /// Returns true if audit event logging is enabled, false otherwise.
-  bool IsAuditEventLoggingEnabled();
-
-  Status LogAuditRecord(
-      const ClientRequestState& exec_state, const TExecRequest& request)
-      WARN_UNUSED_RESULT;
-
-  Status LogLineageRecord(const ClientRequestState& exec_state) WARN_UNUSED_RESULT;
-
-  /// Log audit and column lineage events
-  void LogQueryEvents(const ClientRequestState& exec_state);
 
   /// Runs once every 5s to flush the profile log file to disk.
   [[noreturn]] void LogFileFlushThread();

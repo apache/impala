@@ -33,10 +33,15 @@ LOG = logging.getLogger(__name__)
 class TestLineage(CustomClusterTestSuite):
   START_END_TIME_LINEAGE_LOG_DIR = tempfile.mkdtemp(prefix="start_end_time")
   CREATE_TABLE_TIME_LINEAGE_LOG_DIR = tempfile.mkdtemp(prefix="create_table_time")
+  LINEAGE_TESTS_DIR = tempfile.mkdtemp(prefix="test_lineage")
 
   @classmethod
   def setup_class(cls):
     super(TestLineage, cls).setup_class()
+
+  @classmethod
+  def get_workload(cls):
+    return 'functional-query'
 
   @pytest.mark.execute_serially
   @CustomClusterTestSuite.with_args("--lineage_event_log_dir={0}"
@@ -100,3 +105,14 @@ class TestLineage(CustomClusterTestSuite):
               table_create_time = int(vertex["metadata"]["tableCreateTime"])
               assert "{0}.lineage_test_tbl".format(unique_database) == table_name
               assert table_create_time != -1
+
+  @pytest.mark.execute_serially
+  @CustomClusterTestSuite.with_args("--lineage_event_log_dir={0}"
+                                    .format(LINEAGE_TESTS_DIR))
+  def test_lineage_output(self, vector):
+    try:
+      self.run_test_case('QueryTest/lineage', vector)
+    finally:
+      # Clean up the test database
+      db_cleanup = "drop database if exists lineage_test_db cascade"
+      self.execute_query_expect_success(self.client, db_cleanup)
