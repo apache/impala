@@ -46,11 +46,15 @@ if os.path.isfile(IMPALA_LOCAL_VERSION_INFO):
     raise Exception("Could not find VERSION in {0}".format(IMPALA_LOCAL_VERSION_INFO))
 
 # Check if it is Red Hat/CentOS Linux
-dist = platform.linux_distribution()[0].lower()
-if dist.find('centos') or dist.find('red hat'):
+distribution = platform.linux_distribution()
+distname = distribution[0].lower()
+version = distribution[1]
+IS_REDHAT_6_DERIVATIVE = False
+IS_REDHAT_DERIVATIVE = False
+if distname.find('centos') or distname.find('red hat'):
   IS_REDHAT_DERIVATIVE = True
-else:
-  IS_REDHAT_DERIVATIVE = False
+  if len(re.findall('^6\.*', version)) > 0:
+    IS_REDHAT_6_DERIVATIVE = True
 
 # Find the likely BuildType of the running Impala. Assume it's found through the path
 # $IMPALA_HOME/be/build/latest as a fallback.

@@ -41,7 +41,8 @@ from tests.common.skip import (
     SkipIfABFS,
     SkipIfADLS,
     SkipIfEC,
-    SkipIfNotHdfsMinicluster)
+    SkipIfNotHdfsMinicluster,
+    SkipIfOS)
 from tests.common.test_dimensions import (
     create_single_exec_option_dimension,
     create_uncompressed_text_dimension)
@@ -1797,6 +1798,7 @@ class TestAdmissionControllerStress(TestAdmissionControllerBase):
         raise thread.error
 
   @pytest.mark.execute_serially
+  @SkipIfOS.redhat6
   @CustomClusterTestSuite.with_args(
       impalad_args=impalad_admission_ctrl_flags(max_requests=MAX_NUM_CONCURRENT_QUERIES,
         max_queued=MAX_NUM_QUEUED_QUERIES, pool_max_mem=-1, queue_wait_timeout_ms=600000),
@@ -1812,6 +1814,7 @@ class TestAdmissionControllerStress(TestAdmissionControllerBase):
       'mem_limit': sys.maxint})
 
   @pytest.mark.execute_serially
+  @SkipIfOS.redhat6
   @CustomClusterTestSuite.with_args(
     impalad_args=impalad_admission_ctrl_config_args(
       fs_allocation_file="fair-scheduler-test2.xml",
@@ -1833,6 +1836,7 @@ class TestAdmissionControllerStress(TestAdmissionControllerBase):
     return limit_metrics[0]
 
   @pytest.mark.execute_serially
+  @SkipIfOS.redhat6
   @CustomClusterTestSuite.with_args(
       impalad_args=impalad_admission_ctrl_flags(
         max_requests=MAX_NUM_CONCURRENT_QUERIES * 30, max_queued=MAX_NUM_QUEUED_QUERIES,
