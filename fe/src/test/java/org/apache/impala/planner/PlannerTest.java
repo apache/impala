@@ -85,6 +85,15 @@ public class PlannerTest extends PlannerTestBase {
         ImmutableSet.of(PlannerTestOption.VALIDATE_CARDINALITY));
   }
 
+  /**
+   * Cardinality for aggregations.
+   */
+  @Test
+  public void testAggCardinality() {
+    runPlannerTestFile("card-agg",
+        ImmutableSet.of(PlannerTestOption.VALIDATE_CARDINALITY));
+  }
+
   @Test
   public void testPredicatePropagation() {
     runPlannerTestFile("predicate-propagation");
