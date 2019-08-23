@@ -2,12 +2,12 @@
 ---- QUERY
 alter table functional.insert_only_transactional_table change column x y bigint;
 ---- CATCH
-AnalysisException: Table functional.insert_only_transactional_table not supported. Transactional (ACID) tables are only supported for read.
+AnalysisException: ALTER TABLE not supported on transactional (ACID) table: functional.insert_only_transactional_table
 ====
 ---- QUERY
 drop stats functional.insert_only_transactional_table;
 ---- CATCH
-AnalysisException: Table functional.insert_only_transactional_table not supported. Transactional (ACID) tables are only supported for read.
+AnalysisException: DROP STATS not supported on transactional (ACID) table: functional.insert_only_transactional_table
 ====
 ---- QUERY
 select * from functional_orc_def.full_transactional_table;

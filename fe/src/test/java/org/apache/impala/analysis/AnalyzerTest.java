@@ -540,13 +540,8 @@ public class AnalyzerTest extends FrontendTestBase {
       "Table functional_orc_def.full_transactional_table not supported. Transactional (ACID)" +
           " tables are only supported when they are configured as insert_only.";
 
-    String insertOnlyErrorMsg =
-      "Table functional.insert_only_transactional_table not supported. " +
-          "Transactional (ACID) tables are only supported for read.";
-
-    String insertOnlyErrorForFullMsg =
-      "Table functional_orc_def.full_transactional_table not supported. " +
-          "Transactional (ACID) tables are only supported for read.";
+    String insertOnlyErrorMsg = "%s not supported on " +
+      "transactional (ACID) table: functional.insert_only_transactional_table";
 
     AnalysisError(
         "create table test as select * from functional_orc_def.full_transactional_table",
@@ -580,14 +575,14 @@ public class AnalyzerTest extends FrontendTestBase {
 
     AnalysisError(
         "drop table functional_orc_def.full_transactional_table",
-        insertOnlyErrorForFullMsg);
+         errorMsg);
     AnalyzesOk("drop table functional.insert_only_transactional_table");
 
     AnalysisError(
         "truncate table functional_orc_def.full_transactional_table",
-        insertOnlyErrorForFullMsg);
+        errorMsg);
     AnalysisError("truncate table functional.insert_only_transactional_table",
-        insertOnlyErrorMsg);
+        String.format(insertOnlyErrorMsg, "TRUNCATE TABLE"));
 
     AnalysisError(
         "alter table functional_orc_def.full_transactional_table " +
@@ -596,13 +591,13 @@ public class AnalyzerTest extends FrontendTestBase {
     AnalysisError(
         "alter table functional.insert_only_transactional_table " +
             "add columns (col2 string)",
-        insertOnlyErrorMsg);
+        String.format(insertOnlyErrorMsg, "ALTER TABLE"));
 
     AnalysisError(
         "drop stats functional_orc_def.full_transactional_table",
         errorMsg);
     AnalysisError("drop stats functional.insert_only_transactional_table",
-        insertOnlyErrorMsg);
+        String.format(insertOnlyErrorMsg, "DROP STATS"));
 
     AnalyzesOk("describe functional.insert_only_transactional_table");
     AnalyzesOk("describe functional_orc_def.full_transactional_table");

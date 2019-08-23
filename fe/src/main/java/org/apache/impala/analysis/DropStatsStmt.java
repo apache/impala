@@ -103,7 +103,7 @@ public class DropStatsStmt extends StatementBase {
     }
     tableRef_.analyze(analyzer);
     // There is no transactional HMS API to drop stats at the moment (HIVE-22104).
-    analyzer.ensureTableNotTransactional(tableRef_.getTable());
+    analyzer.ensureTableNotTransactional(tableRef_.getTable(), "DROP STATS");
     if (partitionSet_ != null) {
       partitionSet_.setTableName(tableRef_.getTable().getTableName());
       partitionSet_.setPrivilegeRequirement(Privilege.ALTER);

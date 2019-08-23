@@ -145,8 +145,7 @@ public class Analyzer {
       "Table %s not supported. Transactional (ACID) tables are " +
       "only supported when they are configured as insert_only.";
   private static final String TRANSACTIONAL_TABLE_NOT_SUPPORTED =
-      "Table %s not supported. Transactional (ACID) tables are " +
-      "only supported for read.";
+      "%s not supported on transactional (ACID) table: %s" ;
   private static final String BUCKETED_TABLE_NOT_SUPPORTED =
       "%s is a bucketed table. Only read operations are supported on such tables.";
   private static final String TABLE_NOT_SUPPORTED =
@@ -236,11 +235,11 @@ public class Analyzer {
         table.getFullName());
   }
 
-  public static void ensureTableNotTransactional(FeTable table)
+  public static void ensureTableNotTransactional(FeTable table, String operationStr)
       throws AnalysisException {
     if (AcidUtils.isTransactionalTable(table.getMetaStoreTable().getParameters())) {
       throw new AnalysisException(String.format(TRANSACTIONAL_TABLE_NOT_SUPPORTED,
-          table.getFullName()));
+          operationStr, table.getFullName()));
     }
   }
 
@@ -292,13 +291,13 @@ public class Analyzer {
       if (KuduTable.isKuduTable(table.getMetaStoreTable())) return;
       if (!MetastoreShim.hasTableCapability(table.getMetaStoreTable(), writeRequires)) {
         // Error messages with explanations.
-        ensureTableNotTransactional(table);
+        ensureTableNotFullAcid(table);
         throw new AnalysisException(String.format(TABLE_NOT_SUPPORTED, "Write",
             table.getFullName(),
             MetastoreShim.getTableAccessType(table.getMetaStoreTable())));
       }
     } else {
-      ensureTableNotTransactional(table);
+      ensureTableNotTransactional(table, "Write");
     }
   }
 
@@ -322,7 +321,7 @@ public class Analyzer {
             MetastoreShim.getTableAccessType(table.getMetaStoreTable())));
       }
     } else {
-      ensureTableNotTransactional(table);
+      ensureTableNotTransactional(table, "Operation");
     }
   }
 
