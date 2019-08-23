@@ -117,13 +117,6 @@ public class KuduTable extends Table implements FeKuduTable {
     super(msTable, db, name, owner);
     kuduTableName_ = msTable.getParameters().get(KuduTable.KEY_TABLE_NAME);
     kuduMasters_ = msTable.getParameters().get(KuduTable.KEY_MASTER_HOSTS);
-    if (kuduTableName_ == null || kuduTableName_.isEmpty()) {
-      // When 'kudu.table_name' property is empty, it implies Kudu/HMS
-      // integration is enabled.
-      // TODO: remove this hack once Kudu support 'kudu.table_name'
-      // property with the new storage handler.
-      populateDefaultTableName(msTable, /* isHMSIntegrationEnabled */true);
-    }
   }
 
   @Override
@@ -163,17 +156,6 @@ public class KuduTable extends Table implements FeKuduTable {
   public List<KuduPartitionParam> getPartitionBy() {
     Preconditions.checkState(partitionBy_ != null);
     return ImmutableList.copyOf(partitionBy_);
-  }
-
-  /**
-   * Populates the default table name.
-   */
-  private void populateDefaultTableName(
-      org.apache.hadoop.hive.metastore.api.Table msTbl,
-      boolean isHMSIntegrationEnabled) {
-    kuduTableName_ = KuduUtil.getDefaultKuduTableName(
-        msTbl.getDbName(), msTbl.getTableName(), isHMSIntegrationEnabled);
-    msTbl.getParameters().put(KuduTable.KEY_TABLE_NAME, kuduTableName_);
   }
 
   /**
@@ -297,13 +279,6 @@ public class KuduTable extends Table implements FeKuduTable {
       // Copy the table to check later if anything has changed.
       msTable_ = msTbl.deepCopy();
       kuduTableName_ = msTable_.getParameters().get(KuduTable.KEY_TABLE_NAME);
-      if (kuduTableName_ == null || kuduTableName_.isEmpty()) {
-        // When 'kudu.table_name' property is empty, it implies Kudu/HMS
-        // integration is enabled.
-        // TODO: remove this hack once Kudu support 'kudu.table_name'
-        // property with the new storage handler.
-        populateDefaultTableName(msTable_, /* isHMSIntegrationEnabled */true);
-      }
       kuduMasters_ = msTable_.getParameters().get(KuduTable.KEY_MASTER_HOSTS);
       if (kuduMasters_ == null || kuduMasters_.isEmpty()) {
         throw new TableLoadingException("No " + KuduTable.KEY_MASTER_HOSTS +
