@@ -192,8 +192,10 @@ error_codes = (
   ("STALE_METADATA_FILE_TOO_SHORT", 59, "Metadata for file '$0' appears stale. "
    "Try running \\\"refresh $1\\\" to reload the file metadata."),
 
-  ("PARQUET_BAD_VERSION_NUMBER", 60, "File '$0' has an invalid version number: $1\\n"
-   "This could be due to stale metadata. Try running \\\"refresh $2\\\"."),
+  ("PARQUET_BAD_VERSION_NUMBER", 60, "File '$0' has an invalid Parquet version number: "
+   "$1\\n. Please check that it is a valid Parquet file. "
+   "This error can also occur due to stale metadata. "
+   "If you believe this is a valid Parquet file, try running \\\"refresh $2\\\"."),
 
   ("SCANNER_INCOMPLETE_READ", 61, "Tried to read $0 bytes but could only read $1 bytes. "
    "This may indicate data file corruption. (file $2, byte offset: $3)"),

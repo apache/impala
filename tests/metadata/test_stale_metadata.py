@@ -89,12 +89,14 @@ class TestRewrittenFile(ImpalaTestSuite):
   def test_new_file_longer(self, vector, unique_database):
     """Rewrites an existing file with a new longer file."""
     # Full error is something like:
-    #   File '...' has an invalid version number: ff4C
-    #   This could be due to stale metadata. Try running "refresh
-    #   unique_database_name.new_file_longer".
+    # "File '..' has an invalid Parquet version number: ff4C
+    # Please check that it is a valid Parquet file. his error can also occur due to
+    # stale metadata. If you believe this is a valid Parquet file, try running
+    # "refresh ...".
     table_name = "new_file_longer"
     self.__overwrite_file_and_query(unique_database, table_name,
-      self.SHORT_FILE, self.LONG_FILE, 'invalid version number', self.LONG_FILE_NUM_ROWS)
+      self.SHORT_FILE, self.LONG_FILE, 'invalid Parquet version number',
+      self.LONG_FILE_NUM_ROWS)
 
   def test_delete_file(self, vector, unique_database):
     """Deletes an existing file without refreshing metadata."""

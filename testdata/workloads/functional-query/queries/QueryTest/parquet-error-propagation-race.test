@@ -9,5 +9,5 @@ INSERT INTO bad_magic_number SELECT 'good';
 set debug_action="0:SCANNER_ERROR:DELAY";
 SELECT * FROM bad_magic_number
 ---- CATCH
-invalid version number
+invalid Parquet version number
 ====
