@@ -69,7 +69,7 @@ public class AlterTableOrViewRenameStmt extends AlterTableStmt {
 
   @Override
   public void analyze(Analyzer analyzer) throws AnalysisException {
-    newTableName_.analyze();
+    analyzer.getFqTableName(newTableName_).analyze();
     table_ = analyzer.getTable(tableName_, Privilege.ALL);
     if (table_ instanceof FeView && renameTable_) {
       throw new AnalysisException(String.format(

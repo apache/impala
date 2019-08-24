@@ -77,6 +77,8 @@ DECLARE_string(query_event_hook_classes);
 DECLARE_int32(query_event_hook_nthreads);
 DECLARE_bool(is_executor);
 DECLARE_bool(use_dedicated_coordinator_estimates);
+DECLARE_string(blacklisted_dbs);
+DECLARE_string(blacklisted_tables);
 
 namespace impala {
 
@@ -157,6 +159,8 @@ Status GetThriftBackendGflags(JNIEnv* jni_env, jbyteArray* cfg_bytes) {
   cfg.__set_is_executor(FLAGS_is_executor);
   cfg.__set_use_dedicated_coordinator_estimates(
       FLAGS_use_dedicated_coordinator_estimates);
+  cfg.__set_blacklisted_dbs(FLAGS_blacklisted_dbs);
+  cfg.__set_blacklisted_tables(FLAGS_blacklisted_tables);
   RETURN_IF_ERROR(SerializeThriftMsg(jni_env, &cfg, cfg_bytes));
   return Status::OK();
 }

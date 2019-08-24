@@ -84,6 +84,7 @@ import org.apache.impala.thrift.TTableUsage;
 import org.apache.impala.thrift.TTableUsageMetrics;
 import org.apache.impala.thrift.TUniqueId;
 import org.apache.impala.thrift.TUpdateTableUsageRequest;
+import org.apache.impala.util.CatalogBlacklistUtils;
 import org.apache.impala.util.FunctionUtils;
 import org.apache.impala.util.PatternMatcher;
 import org.apache.impala.util.TUniqueIdUtil;
@@ -266,6 +267,11 @@ public class CatalogServiceCatalog extends Catalog {
 
   private AuthorizationManager authzManager_;
 
+  // Databases that will be skipped in loading.
+  private final Set<String> blacklistedDbs_;
+  // Tables that will be skipped in loading.
+  private final Set<TableName> blacklistedTables_;
+
   /**
    * Initialize the CatalogServiceCatalog using a given MetastoreClientPool impl.
    *
@@ -279,6 +285,10 @@ public class CatalogServiceCatalog extends Catalog {
       MetaStoreClientPool metaStoreClientPool)
       throws ImpalaException {
     super(metaStoreClientPool);
+    blacklistedDbs_ = CatalogBlacklistUtils.parseBlacklistedDbs(
+        BackendConfig.INSTANCE.getBlacklistedDbs(), LOG);
+    blacklistedTables_ = CatalogBlacklistUtils.parseBlacklistedTables(
+        BackendConfig.INSTANCE.getBlacklistedTables(), LOG);
     catalogServiceId_ = catalogServiceId;
     tableLoadingMgr_ = new TableLoadingMgr(this, numLoadingThreads);
     loadInBackground_ = loadInBackground;
@@ -315,6 +325,27 @@ public class CatalogServiceCatalog extends Catalog {
     this(loadInBackground, numLoadingThreads, catalogServiceId, localLibraryPath,
         new MetaStoreClientPool(INITIAL_META_STORE_CLIENT_POOL_SIZE,
             initialHmsCnxnTimeoutSec));
+  }
+
+  /**
+   * Check whether the database is in blacklist
+   */
+  public boolean isBlacklistedDb(String dbName) {
+    return blacklistedDbs_.contains(dbName);
+  }
+
+  /**
+   * Check whether the table is in blacklist
+   */
+  public boolean isBlacklistedTable(TableName table) {
+    return blacklistedTables_.contains(table);
+  }
+
+  /**
+   * Check whether the table is in blacklist
+   */
+  public boolean isBlacklistedTable(String db, String table) {
+    return isBlacklistedTable(new TableName(db, table));
   }
 
   public void setAuthzManager(AuthorizationManager authzManager) {
@@ -1380,6 +1411,10 @@ public class CatalogServiceCatalog extends Catalog {
 
       List<TTableName> tblsToBackgroundLoad = new ArrayList<>();
       for (String tableName: msClient.getHiveClient().getAllTables(dbName)) {
+        if (isBlacklistedTable(dbName, tableName.toLowerCase())) {
+          LOG.info("skip blacklisted table: " + dbName + "." + tableName);
+          continue;
+        }
         Table incompleteTbl = IncompleteTable.createUninitializedTable(newDb, tableName);
         incompleteTbl.setCatalogVersion(incrementAndGetCatalogVersion());
         newDb.addTable(incompleteTbl);
@@ -1486,6 +1521,10 @@ public class CatalogServiceCatalog extends Catalog {
         List<String> allDbs = msClient.getHiveClient().getAllDatabases();
         int numComplete = 0;
         for (String dbName: allDbs) {
+          if (isBlacklistedDb(dbName)) {
+            LOG.info("skip blacklisted db: " + dbName);
+            continue;
+          }
           String annotation = String.format("invalidating metadata - %s/%s dbs complete",
               numComplete++, allDbs.size());
           try (ThreadNameAnnotator tna = new ThreadNameAnnotator(annotation)) {
@@ -2042,6 +2081,10 @@ public class CatalogServiceCatalog extends Catalog {
     dbWasAdded.setRef(false);
     String dbName = tableName.getDb_name();
     String tblName = tableName.getTable_name();
+    if (isBlacklistedTable(dbName, tblName)) {
+      LOG.info("Skip invalidating blacklisted table: " + tableName);
+      return null;
+    }
     LOG.info(String.format("Invalidating table metadata: %s.%s", dbName, tblName));
 
     // Stores whether the table exists in the metastore. Can have three states:

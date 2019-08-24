@@ -41,7 +41,7 @@ public class CreateViewStmt extends CreateOrAlterViewStmtBase {
   public void analyze(Analyzer analyzer) throws AnalysisException {
     Preconditions.checkState(tableName_ != null && !tableName_.isEmpty());
 
-    tableName_.analyze();
+    analyzer.getFqTableName(tableName_).analyze();
     // Use a child analyzer to let views have complex-typed columns.
     Analyzer viewAnalyzerr = new Analyzer(analyzer);
     // Enforce Hive column labels for view compatibility.

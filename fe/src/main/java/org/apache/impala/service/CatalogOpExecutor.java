@@ -86,7 +86,6 @@ import org.apache.impala.catalog.KuduTable;
 import org.apache.impala.catalog.MetaStoreClientPool.MetaStoreClient;
 import org.apache.impala.catalog.PartitionNotFoundException;
 import org.apache.impala.catalog.PartitionStatsUtil;
-import org.apache.impala.catalog.PrunablePartition;
 import org.apache.impala.catalog.RowFormat;
 import org.apache.impala.catalog.ScalarFunction;
 import org.apache.impala.catalog.Table;
@@ -268,6 +267,12 @@ public class CatalogOpExecutor {
   // Format string for exceptions returned by Hive Metastore RPCs.
   private final static String HMS_RPC_ERROR_FORMAT_STR =
       "Error making '%s' RPC to Hive Metastore: ";
+  // Error string for inconsistent blacklisted dbs/tables configs between catalogd and
+  // coordinators.
+  private final static String BLACKLISTED_DBS_INCONSISTENT_ERR_STR =
+      "--blacklisted_dbs may be inconsistent between catalogd and coordinators";
+  private final static String BLACKLISTED_TABLES_INCONSISTENT_ERR_STR =
+      "--blacklisted_tables may be inconsistent between catalogd and coordinators";
 
   // Table capabilities property name
   private static final String CAPABILITIES_KEY = "OBJCAPABILITIES";
@@ -541,6 +546,14 @@ public class CatalogOpExecutor {
     TableName tableName = TableName.fromThrift(params.getTable_name());
     Table tbl = getExistingTable(tableName.getDb(), tableName.getTbl(),
         "Load for ALTER TABLE");
+    if (params.getAlter_type() == TAlterTableType.RENAME_VIEW
+        || params.getAlter_type() == TAlterTableType.RENAME_TABLE) {
+      TableName newTableName = TableName.fromThrift(
+          params.getRename_params().getNew_table_name());
+      Preconditions.checkState(!catalog_.isBlacklistedTable(newTableName),
+          String.format("Can't rename to blacklisted table name: %s. %s", newTableName,
+              BLACKLISTED_DBS_INCONSISTENT_ERR_STR));
+    }
     tryLock(tbl);
     // Get a new catalog version to assign to the table being altered.
     long newCatalogVersion = catalog_.incrementAndGetCatalogVersion();
@@ -1153,6 +1166,9 @@ public class CatalogOpExecutor {
     String dbName = params.getDb();
     Preconditions.checkState(dbName != null && !dbName.isEmpty(),
         "Null or empty database name passed as argument to Catalog.createDatabase");
+    Preconditions.checkState(!catalog_.isBlacklistedDb(dbName),
+        String.format("Can't create blacklisted database: %s. %s", dbName,
+            BLACKLISTED_DBS_INCONSISTENT_ERR_STR));
     Db existingDb = catalog_.getDb(dbName);
     if (params.if_not_exists && existingDb != null) {
       if (LOG.isTraceEnabled()) {
@@ -1492,11 +1508,20 @@ public class CatalogOpExecutor {
   private void dropDatabase(TDropDbParams params, TDdlExecResponse resp)
       throws ImpalaException {
     Preconditions.checkNotNull(params);
-    Preconditions.checkState(params.getDb() != null && !params.getDb().isEmpty(),
+    String dbName = params.getDb();
+    Preconditions.checkState(dbName != null && !dbName.isEmpty(),
         "Null or empty database name passed as argument to Catalog.dropDatabase");
+    Preconditions.checkState(!catalog_.isBlacklistedDb(dbName) || params.if_exists,
+        String.format("Can't drop blacklisted database: %s. %s", dbName,
+            BLACKLISTED_DBS_INCONSISTENT_ERR_STR));
+    if (catalog_.isBlacklistedDb(dbName)) {
+      // It's expected to go here if "if_exists" is set to true.
+      addSummary(resp, "Can't drop blacklisted database: " + dbName);
+      return;
+    }
 
-    LOG.trace("Dropping database " + params.getDb());
-    Db db = catalog_.getDb(params.db);
+    LOG.trace("Dropping database " + dbName);
+    Db db = catalog_.getDb(dbName);
     if (db != null && db.numFunctions() > 0 && !params.cascade) {
       throw new CatalogException("Database " + db.getName() + " is not empty");
     }
@@ -1514,7 +1539,7 @@ public class CatalogOpExecutor {
         // ignoreIfUnknown as false and catch the NoSuchObjectFoundException and
         // determine if we should throw or not
         msClient.getHiveClient().dropDatabase(
-            params.getDb(), /* deleteData */true, /* ignoreIfUnknown */false,
+            dbName, /* deleteData */true, /* ignoreIfUnknown */false,
             params.cascade);
         addSummary(resp, "Database has been dropped.");
       } catch (TException e) {
@@ -1526,7 +1551,7 @@ public class CatalogOpExecutor {
               String.format(HMS_RPC_ERROR_FORMAT_STR, "dropDatabase"), e);
         }
       }
-      Db removedDb = catalog_.removeDb(params.getDb());
+      Db removedDb = catalog_.removeDb(dbName);
 
       if (removedDb == null) {
         // Nothing was removed from the catalogd's cache.
@@ -1539,7 +1564,7 @@ public class CatalogOpExecutor {
       }
       removedObject = removedDb.toTCatalogObject();
       if (authzConfig_.isEnabled()) {
-        authzManager_.updateDatabaseOwnerPrivilege(params.server_name, db.getName(),
+        authzManager_.updateDatabaseOwnerPrivilege(params.server_name, dbName,
             db.getMetaStoreDb().getOwnerName(), db.getMetaStoreDb().getOwnerType(),
             /* newOwner */ null, /* newOwnerType */ null, resp);
       }
@@ -1615,6 +1640,14 @@ public class CatalogOpExecutor {
       throws ImpalaException {
     TableName tableName = TableName.fromThrift(params.getTable_name());
     Preconditions.checkState(tableName != null && tableName.isFullyQualified());
+    Preconditions.checkState(!catalog_.isBlacklistedTable(tableName) || params.if_exists,
+        String.format("Can't drop blacklisted table: %s. %s", tableName,
+            BLACKLISTED_TABLES_INCONSISTENT_ERR_STR));
+    if (catalog_.isBlacklistedTable(tableName)) {
+      // It's expected to go here if "if_exists" is set to true.
+      addSummary(resp, "Can't drop blacklisted table: " + tableName);
+      return;
+    }
     LOG.trace(String.format("Dropping table/view %s", tableName));
 
     // If the table exists, ensure that it is loaded before we try to operate on it.
@@ -1996,6 +2029,9 @@ public class CatalogOpExecutor {
     Preconditions.checkState(tableName != null && tableName.isFullyQualified());
     Preconditions.checkState(params.getColumns() != null,
         "Null column list given as argument to Catalog.createTable");
+    Preconditions.checkState(!catalog_.isBlacklistedTable(tableName),
+        String.format("Can't create blacklisted table: %s. %s", tableName,
+            BLACKLISTED_TABLES_INCONSISTENT_ERR_STR));
 
     Table existingTbl = catalog_.getTableNoThrow(tableName.getDb(), tableName.getTbl());
     if (params.if_not_exists && existingTbl != null) {
@@ -2241,6 +2277,9 @@ public class CatalogOpExecutor {
     Preconditions.checkState(params.getColumns() != null &&
         params.getColumns().size() > 0,
           "Null or empty column list given as argument to DdlExecutor.createView");
+    Preconditions.checkState(!catalog_.isBlacklistedTable(tableName),
+        String.format("Can't create view with blacklisted table name: %s. %s", tableName,
+            BLACKLISTED_TABLES_INCONSISTENT_ERR_STR));
     if (params.if_not_exists &&
         catalog_.containsTable(tableName.getDb(), tableName.getTbl())) {
       LOG.trace(String.format("Skipping view creation because %s already exists and " +
@@ -2266,9 +2305,8 @@ public class CatalogOpExecutor {
    * table's metadata on the next access.
    * @param  syncDdl tells is SYNC_DDL is enabled for this DDL request.
    */
-  private void createTableLike(TCreateTableLikeParams params, TDdlExecResponse response
-      , boolean syncDdl)
-      throws ImpalaException {
+  private void createTableLike(TCreateTableLikeParams params, TDdlExecResponse response,
+      boolean syncDdl) throws ImpalaException {
     Preconditions.checkNotNull(params);
 
     THdfsFileFormat fileFormat =
@@ -2278,6 +2316,9 @@ public class CatalogOpExecutor {
     TableName srcTblName = TableName.fromThrift(params.getSrc_table_name());
     Preconditions.checkState(tblName != null && tblName.isFullyQualified());
     Preconditions.checkState(srcTblName != null && srcTblName.isFullyQualified());
+    Preconditions.checkState(!catalog_.isBlacklistedTable(tblName),
+        String.format("Can't create blacklisted table: %s. %s", tblName,
+            BLACKLISTED_TABLES_INCONSISTENT_ERR_STR));
 
     Table existingTbl = catalog_.getTableNoThrow(tblName.getDb(), tblName.getTbl());
     if (params.if_not_exists && existingTbl != null) {
@@ -3769,6 +3810,9 @@ public class CatalogOpExecutor {
     resp.getResult().setCatalog_service_id(JniCatalog.getServiceId());
 
     if (req.isSetDb_name()) {
+      Preconditions.checkState(!catalog_.isBlacklistedDb(req.getDb_name()),
+          String.format("Can't refresh functions in blacklisted database: %s. %s",
+              req.getDb_name(), BLACKLISTED_DBS_INCONSISTENT_ERR_STR));
       // This is a "refresh functions" operation.
       synchronized (metastoreDdlLock_) {
         try (MetaStoreClient msClient = catalog_.getMetaStoreClient()) {

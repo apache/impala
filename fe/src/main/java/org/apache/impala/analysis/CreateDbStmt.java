@@ -24,6 +24,7 @@ import org.apache.impala.catalog.FeDb;
 import org.apache.impala.common.AnalysisException;
 import org.apache.impala.compat.MetastoreShim;
 import org.apache.impala.thrift.TCreateDbParams;
+import org.apache.impala.util.CatalogBlacklistUtils;
 
 /**
  * Represents a CREATE DATABASE statement
@@ -91,6 +92,7 @@ public class CreateDbStmt extends StatementBase {
     if (!MetastoreShim.validateName(dbName_)) {
       throw new AnalysisException("Invalid database name: " + dbName_);
     }
+    CatalogBlacklistUtils.verifyDbName(dbName_);
 
     // Note: It is possible that a database with the same name was created external to
     // this Impala instance. If that happens, the caller will not get an

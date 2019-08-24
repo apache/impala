@@ -19,12 +19,15 @@ package org.apache.impala.analysis;
 
 import java.util.List;
 
+import org.apache.impala.catalog.Catalog;
 import org.apache.impala.common.AnalysisException;
 import org.apache.impala.compat.MetastoreShim;
 import org.apache.impala.thrift.TTableName;
 
 import com.google.common.base.Preconditions;
+import com.google.common.base.Splitter;
 import com.google.common.collect.Lists;
+import org.apache.impala.util.CatalogBlacklistUtils;
 
 /**
  * Represents a table/view name that optionally includes its database (a fully qualified
@@ -45,23 +48,44 @@ public class TableName {
     this.tbl_ = tbl;
   }
 
+  /**
+   * Parse the given full name (in format <db>.<tbl>) and return a TableName object.
+   * Return null for any failures. Note that we keep table names in lower case so the
+   * string will be converted to lower case first.
+   */
+  public static TableName parse(String fullName) {
+    // Avoid "db1." and ".tbl1" being treated as the same. We resolve ".tbl1" as
+    // "default.tbl1". But we reject "db1." since it only gives the database name.
+    if (fullName == null || fullName.trim().endsWith(".")) return null;
+    // TODO: upgrade Guava to 15+ to use splitToList instead
+    List<String> parts = Lists.newArrayList(Splitter.on('.').trimResults()
+        .omitEmptyStrings().split(fullName.toLowerCase()));
+    if (parts.size() == 1) {
+      return new TableName(Catalog.DEFAULT_DB, parts.get(0));
+    }
+    if (parts.size() == 2) {
+      return new TableName(parts.get(0), parts.get(1));
+    }
+    return null;
+  }
+
   public String getDb() { return db_; }
   public String getTbl() { return tbl_; }
   public boolean isEmpty() { return tbl_.isEmpty(); }
 
   /**
-   * Checks whether the db and table name meet the Metastore's requirements.
+   * Checks whether the db and table name meet the Metastore's requirements. and not in
+   * our blacklist. 'db_' is assumed to be resolved.
    */
   public void analyze() throws AnalysisException {
-    if (db_ != null) {
-      if (!MetastoreShim.validateName(db_)) {
-        throw new AnalysisException("Invalid database name: " + db_);
-      }
+    Preconditions.checkNotNull(isFullyQualified());
+    if (!MetastoreShim.validateName(db_)) {
+      throw new AnalysisException("Invalid database name: " + db_);
     }
-    Preconditions.checkNotNull(tbl_);
     if (!MetastoreShim.validateName(tbl_)) {
       throw new AnalysisException("Invalid table/view name: " + tbl_);
     }
+    CatalogBlacklistUtils.verifyTableName(this);
   }
 
   /**

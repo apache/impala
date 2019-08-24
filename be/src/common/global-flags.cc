@@ -249,6 +249,15 @@ DEFINE_int32(hms_event_polling_interval_s, 0,
     "feature and not recommended to be deployed on production systems until it is "
     "made generally available.");
 
+DEFINE_string(blacklisted_dbs, "sys,information_schema",
+    "Comma separated list for blacklisted databases. Configure which databases to be "
+    "skipped for loading (in startup and global INVALIDATE METADATA). Users can't access,"
+    " create, or drop databases which are blacklisted.");
+DEFINE_string(blacklisted_tables, "",
+    "Comma separated full names (in format: <db>.<table>) of blacklisted tables. "
+    "Configure which tables to be skipped for loading (in startup and reseting metadata "
+    "of the table). Users can't access, create, or drop tables which are blacklisted");
+
 DEFINE_double_hidden(invalidate_tables_gc_old_gen_full_threshold, 0.6, "The threshold "
     "above which CatalogdTableInvalidator would consider the old generation to be almost "
     "full and trigger an invalidation on recently unused tables");

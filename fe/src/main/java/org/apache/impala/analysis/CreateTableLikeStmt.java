@@ -173,7 +173,7 @@ public class CreateTableLikeStmt extends StatementBase {
           "not supported.");
     }
     srcDbName_ = srcTable.getDb().getName();
-    tableName_.analyze();
+    analyzer.getFqTableName(tableName_).analyze();
     dbName_ = analyzer.getTargetDbName(tableName_);
     owner_ = analyzer.getUserShortName();
     // Set the servername here if authorization is enabled because analyzer_ is not

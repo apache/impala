@@ -135,4 +135,8 @@ struct TBackendGflags {
   55: required bool is_executor
 
   56: required bool use_dedicated_coordinator_estimates
+
+  57: required string blacklisted_dbs
+
+  58: required string blacklisted_tables
 }
