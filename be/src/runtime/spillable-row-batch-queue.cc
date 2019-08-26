@@ -84,7 +84,8 @@ Status SpillableRowBatchQueue::AddBatch(RowBatch* batch) {
       DCHECK_EQ(batch_queue_->bytes_unpinned(), 0);
 
       // Unpin the stream and then add the row.
-      batch_queue_->UnpinStream(BufferedTupleStream::UNPIN_ALL_EXCEPT_CURRENT);
+      RETURN_IF_ERROR(
+          batch_queue_->UnpinStream(BufferedTupleStream::UNPIN_ALL_EXCEPT_CURRENT));
 
       // Append "Spilled" to the "ExecOption" info string in the runtime profile.
       profile_->AppendExecOption("Spilled");

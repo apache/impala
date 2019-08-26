@@ -210,7 +210,7 @@ string BufferedTupleStream::Page::DebugString() const {
 }
 
 Status BufferedTupleStream::Init(const string& caller_label, bool pinned) {
-  if (!pinned) UnpinStream(UNPIN_ALL_EXCEPT_CURRENT);
+  if (!pinned) RETURN_IF_ERROR(UnpinStream(UNPIN_ALL_EXCEPT_CURRENT));
   caller_label_ = caller_label;
   return Status::OK();
 }
@@ -659,7 +659,7 @@ Status BufferedTupleStream::PinStream(bool* pinned) {
   return Status::OK();
 }
 
-void BufferedTupleStream::UnpinStream(UnpinMode mode) {
+Status BufferedTupleStream::UnpinStream(UnpinMode mode) {
   CHECK_CONSISTENCY_FULL();
   DCHECK(!closed_);
   if (mode == UNPIN_ALL) {
@@ -670,6 +670,11 @@ void BufferedTupleStream::UnpinStream(UnpinMode mode) {
 
   if (pinned_) {
     CHECK_CONSISTENCY_FULL();
+    if (&*read_page_ != write_page_ && read_page_ != pages_.end()
+        && read_page_rows_returned_ == read_page_->num_rows) {
+      RETURN_IF_ERROR(NextReadPage());
+    }
+
     // If the stream was pinned, there may be some remaining pinned pages that should
     // be unpinned at this point.
     for (Page& page : pages_) UnpinPageIfNeeded(&page, false);
@@ -684,6 +689,7 @@ void BufferedTupleStream::UnpinStream(UnpinMode mode) {
     pinned_ = false;
   }
   CHECK_CONSISTENCY_FULL();
+  return Status::OK();
 }
 
 Status BufferedTupleStream::GetNext(RowBatch* batch, bool* eos) {

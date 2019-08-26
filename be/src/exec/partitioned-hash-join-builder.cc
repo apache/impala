@@ -361,7 +361,8 @@ Status PhjBuilder::BuildHashTablesAndPrepareProbeStreams() {
       partition->Close(NULL);
     } else if (partition->is_spilled()) {
       // We don't need any build-side data for spilled partitions in memory.
-      partition->build_rows()->UnpinStream(BufferedTupleStream::UNPIN_ALL);
+      RETURN_IF_ERROR(
+          partition->build_rows()->UnpinStream(BufferedTupleStream::UNPIN_ALL));
     }
   }
 
@@ -628,7 +629,7 @@ Status PhjBuilder::Partition::Spill(BufferedTupleStream::UnpinMode mode) {
     hash_tbl_->Close();
     hash_tbl_.reset();
   }
-  build_rows_->UnpinStream(mode);
+  RETURN_IF_ERROR(build_rows_->UnpinStream(mode));
   if (!is_spilled_) {
     COUNTER_ADD(parent_->num_spilled_partitions_, 1);
     if (parent_->num_spilled_partitions_->value() == 1) {

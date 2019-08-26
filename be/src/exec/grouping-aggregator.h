@@ -586,7 +586,7 @@ class GroupingAggregator : public Aggregator {
   /// 'spilled_partitions_' uses LIFO so more finely partitioned partitions are processed
   /// first). This allows us to delete pages earlier and bottom out the recursion
   /// earlier and also improves time locality of access to spilled data on disk.
-  void PushSpilledPartition(Partition* partition);
+  Status PushSpilledPartition(Partition* partition) WARN_UNUSED_RESULT;
 
   /// Calls Close() on 'output_partition_' and every Partition in
   /// 'aggregated_partitions_', 'spilled_partitions_', and 'hash_partitions_' and then

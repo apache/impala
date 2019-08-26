@@ -755,7 +755,7 @@ Status GroupingAggregator::BuildSpilledPartition(Partition** built_partition) {
   hash_partitions_.clear();
 
   if (dst_partition->is_spilled()) {
-    PushSpilledPartition(dst_partition);
+    RETURN_IF_ERROR(PushSpilledPartition(dst_partition));
     *built_partition = nullptr;
     // Spilled the partition - we should not be using any reservation except from
     // 'serialize_stream_'.
@@ -790,7 +790,8 @@ Status GroupingAggregator::RepartitionSpilledPartition() {
     if (!hash_partition->is_spilled()) continue;
     // The aggregated rows have been repartitioned. Free up at least a buffer's worth of
     // reservation and use it to pin the unaggregated write buffer.
-    hash_partition->aggregated_row_stream->UnpinStream(BufferedTupleStream::UNPIN_ALL);
+    RETURN_IF_ERROR(hash_partition->aggregated_row_stream->UnpinStream(
+        BufferedTupleStream::UNPIN_ALL));
     bool got_buffer;
     RETURN_IF_ERROR(
         hash_partition->unaggregated_row_stream->PrepareForWrite(&got_buffer));
@@ -907,7 +908,7 @@ Status GroupingAggregator::MoveHashPartitions(int64_t num_input_rows) {
     if (total_rows == 0) {
       partition->Close(false);
     } else if (partition->is_spilled()) {
-      PushSpilledPartition(partition);
+      RETURN_IF_ERROR(PushSpilledPartition(partition));
     } else {
       aggregated_partitions_.push_back(partition);
     }
@@ -917,15 +918,18 @@ Status GroupingAggregator::MoveHashPartitions(int64_t num_input_rows) {
   return Status::OK();
 }
 
-void GroupingAggregator::PushSpilledPartition(Partition* partition) {
+Status GroupingAggregator::PushSpilledPartition(Partition* partition) {
   DCHECK(partition->is_spilled());
   DCHECK(partition->hash_tbl == nullptr);
   // Ensure all pages in the spilled partition's streams are unpinned by invalidating
   // the streams' read and write iterators. We may need all the memory to process the
   // next spilled partitions.
-  partition->aggregated_row_stream->UnpinStream(BufferedTupleStream::UNPIN_ALL);
-  partition->unaggregated_row_stream->UnpinStream(BufferedTupleStream::UNPIN_ALL);
+  RETURN_IF_ERROR(
+      partition->aggregated_row_stream->UnpinStream(BufferedTupleStream::UNPIN_ALL));
+  RETURN_IF_ERROR(
+      partition->unaggregated_row_stream->UnpinStream(BufferedTupleStream::UNPIN_ALL));
   spilled_partitions_.push_front(partition);
+  return Status::OK();
 }
 
 void GroupingAggregator::ClosePartitions() {

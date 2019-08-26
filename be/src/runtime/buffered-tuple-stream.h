@@ -316,7 +316,7 @@ class BufferedTupleStream {
   };
 
   /// Unpins stream with the given 'mode' as described above.
-  void UnpinStream(UnpinMode mode);
+  Status UnpinStream(UnpinMode mode) WARN_UNUSED_RESULT;
 
   /// Get the next batch of output rows, which are backed by the stream's memory.
   ///

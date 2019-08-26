@@ -421,7 +421,8 @@ Status PartitionedHashJoinNode::PrepareSpilledPartitionForProbe(
     // Spill to free memory from hash tables and pinned streams for use in new partitions.
     RETURN_IF_ERROR(build_partition->Spill(BufferedTupleStream::UNPIN_ALL));
     // Temporarily free up the probe buffer to use when repartitioning.
-    input_partition_->probe_rows()->UnpinStream(BufferedTupleStream::UNPIN_ALL);
+    RETURN_IF_ERROR(
+        input_partition_->probe_rows()->UnpinStream(BufferedTupleStream::UNPIN_ALL));
     DCHECK_EQ(build_partition->build_rows()->BytesPinned(false), 0) << NodeDebugString();
     DCHECK_EQ(input_partition_->probe_rows()->BytesPinned(false), 0) << NodeDebugString();
     int64_t num_input_rows = build_partition->build_rows()->num_rows();
@@ -992,9 +993,10 @@ Status PartitionedHashJoinNode::PrepareForProbe() {
   if (join_op_ == TJoinOp::NULL_AWARE_LEFT_ANTI_JOIN
       && (have_spilled_hash_partitions
              || builder_->null_aware_partition()->is_spilled())) {
-    null_probe_rows_->UnpinStream(BufferedTupleStream::UNPIN_ALL_EXCEPT_CURRENT);
-    null_aware_probe_partition_->probe_rows()->UnpinStream(
-        BufferedTupleStream::UNPIN_ALL_EXCEPT_CURRENT);
+    RETURN_IF_ERROR(
+        null_probe_rows_->UnpinStream(BufferedTupleStream::UNPIN_ALL_EXCEPT_CURRENT));
+    RETURN_IF_ERROR(null_aware_probe_partition_->probe_rows()->UnpinStream(
+        BufferedTupleStream::UNPIN_ALL_EXCEPT_CURRENT));
   }
 
   // Initialize the hash_tbl_ caching array.
@@ -1034,7 +1036,8 @@ bool PartitionedHashJoinNode::AppendProbeRowSlow(
   if (!status->ok()) return false; // Check if AddRow() set status.
   *status = runtime_state_->StartSpilling(mem_tracker());
   if (!status->ok()) return false;
-  stream->UnpinStream(BufferedTupleStream::UNPIN_ALL_EXCEPT_CURRENT);
+  *status = stream->UnpinStream(BufferedTupleStream::UNPIN_ALL_EXCEPT_CURRENT);
+  if (!status->ok()) return false;
   return stream->AddRow(row, status);
 }
 
@@ -1119,9 +1122,11 @@ Status PartitionedHashJoinNode::CleanUpHashPartitions(
       // can recurse the algorithm and create new hash partitions from spilled partitions.
       // TODO: we shouldn't need to unpin the build stream if we stop spilling
       // while probing.
-      build_partition->build_rows()->UnpinStream(BufferedTupleStream::UNPIN_ALL);
+      RETURN_IF_ERROR(
+          build_partition->build_rows()->UnpinStream(BufferedTupleStream::UNPIN_ALL));
       DCHECK_EQ(build_partition->build_rows()->BytesPinned(false), 0);
-      probe_partition->probe_rows()->UnpinStream(BufferedTupleStream::UNPIN_ALL);
+      RETURN_IF_ERROR(
+          probe_partition->probe_rows()->UnpinStream(BufferedTupleStream::UNPIN_ALL));
 
       if (probe_partition->probe_rows()->num_rows() != 0
           || NeedToProcessUnmatchedBuildRows()) {

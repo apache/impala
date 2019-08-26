@@ -185,9 +185,10 @@ Status GroupingAggregator::Partition::Spill(bool more_aggregate_rows) {
   DCHECK(aggregated_row_stream->has_write_iterator());
   DCHECK(!unaggregated_row_stream->has_write_iterator());
   if (more_aggregate_rows) {
-    aggregated_row_stream->UnpinStream(BufferedTupleStream::UNPIN_ALL_EXCEPT_CURRENT);
+    RETURN_IF_ERROR(aggregated_row_stream->UnpinStream(
+        BufferedTupleStream::UNPIN_ALL_EXCEPT_CURRENT));
   } else {
-    aggregated_row_stream->UnpinStream(BufferedTupleStream::UNPIN_ALL);
+    RETURN_IF_ERROR(aggregated_row_stream->UnpinStream(BufferedTupleStream::UNPIN_ALL));
     bool got_buffer;
     RETURN_IF_ERROR(unaggregated_row_stream->PrepareForWrite(&got_buffer));
     DCHECK(got_buffer) << "Accounted in min reservation"

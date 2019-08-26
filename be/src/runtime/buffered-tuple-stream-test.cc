@@ -326,7 +326,7 @@ class SimpleTupleStreamTest : public testing::Test {
     ASSERT_TRUE(got_write_reservation);
 
     if (unpin_stream) {
-      stream.UnpinStream(BufferedTupleStream::UNPIN_ALL_EXCEPT_CURRENT);
+      ASSERT_OK(stream.UnpinStream(BufferedTupleStream::UNPIN_ALL_EXCEPT_CURRENT));
     }
     // Add rows to the stream
     int offset = 0;
@@ -369,7 +369,7 @@ class SimpleTupleStreamTest : public testing::Test {
     ASSERT_OK(stream.PrepareForReadWrite(true, &got_reservation));
     ASSERT_TRUE(got_reservation);
     if (unpin_stream) {
-      stream.UnpinStream(BufferedTupleStream::UNPIN_ALL_EXCEPT_CURRENT);
+      ASSERT_OK(stream.UnpinStream(BufferedTupleStream::UNPIN_ALL_EXCEPT_CURRENT));
     }
 
     vector<int> results;
@@ -640,7 +640,7 @@ void SimpleTupleStreamTest::TestUnpinPin(bool varlen_data, bool read_write) {
     // Make sure we can switch between pinned and unpinned states while writing.
     if (num_batches % 10 == 0) {
       bool pinned;
-      stream.UnpinStream(BufferedTupleStream::UNPIN_ALL_EXCEPT_CURRENT);
+      ASSERT_OK(stream.UnpinStream(BufferedTupleStream::UNPIN_ALL_EXCEPT_CURRENT));
       ASSERT_OK(stream.PinStream(&pinned));
       DCHECK(pinned);
     }
@@ -658,7 +658,7 @@ void SimpleTupleStreamTest::TestUnpinPin(bool varlen_data, bool read_write) {
     ++num_batches;
   }
 
-  stream.UnpinStream(BufferedTupleStream::UNPIN_ALL_EXCEPT_CURRENT);
+  ASSERT_OK(stream.UnpinStream(BufferedTupleStream::UNPIN_ALL_EXCEPT_CURRENT));
 
   bool pinned = false;
   ASSERT_OK(stream.PinStream(&pinned));
@@ -1116,7 +1116,7 @@ TEST_F(SimpleTupleStreamTest, BigRowMemoryUse) {
   bool success = stream.AddRow(batch->GetRow(0), &status);
   ASSERT_FALSE(success);
   ASSERT_OK(status);
-  stream.UnpinStream(BufferedTupleStream::UNPIN_ALL_EXCEPT_CURRENT);
+  ASSERT_OK(stream.UnpinStream(BufferedTupleStream::UNPIN_ALL_EXCEPT_CURRENT));
   success = stream.AddRow(batch->GetRow(0), &status);
   ASSERT_TRUE(success);
   // Read all the rows back and verify.
@@ -1187,7 +1187,7 @@ TEST_F(SimpleTupleStreamTest, BigStringReadWrite) {
   bool success = stream.AddRow(write_row, &status);
   ASSERT_FALSE(success);
   ASSERT_OK(status);
-  stream.UnpinStream(BufferedTupleStream::UNPIN_ALL_EXCEPT_CURRENT);
+  ASSERT_OK(stream.UnpinStream(BufferedTupleStream::UNPIN_ALL_EXCEPT_CURRENT));
   success = stream.AddRow(write_row, &status);
   ASSERT_TRUE(success);
 
@@ -1208,6 +1208,72 @@ TEST_F(SimpleTupleStreamTest, BigStringReadWrite) {
     }
   }
   stream.Close(nullptr, RowBatch::FlushMode::NO_FLUSH_RESOURCES);
+}
+
+// Test that UnpinStream advances the read page if all rows from the read page are
+// attached to a returned RowBatch.
+TEST_F(SimpleTupleStreamTest, UnpinReadPage) {
+  int num_rows = 1024;
+  int buffer_size = 4 * 1024;
+  Init(100 * buffer_size);
+
+  bool eos;
+  bool got_reservation;
+  Status status;
+  RowBatch* write_batch = CreateIntBatch(0, num_rows, false);
+
+  {
+    // Test unpinning a stream when the read page has been attached to the output batch.
+    BufferedTupleStream stream(
+        runtime_state_, int_desc_, &client_, buffer_size, buffer_size);
+    ASSERT_OK(stream.Init("SimpleTupleStreamTest::UnpinReadPage", true));
+    ASSERT_OK(stream.PrepareForReadWrite(true, &got_reservation));
+    ASSERT_TRUE(got_reservation);
+
+    // Add rows to stream.
+    for (int i = 0; i < write_batch->num_rows(); ++i) {
+      EXPECT_TRUE(stream.AddRow(write_batch->GetRow(i), &status));
+      ASSERT_OK(status);
+    }
+
+    // Read until the read page is attached to the output.
+    RowBatch read_batch(int_desc_, num_rows, &tracker_);
+    ASSERT_OK(stream.GetNext(&read_batch, &eos));
+    // If GetNext did hit the capacity of the RowBatch, then the read page should have
+    // been attached to read_batch.
+    ASSERT_TRUE(read_batch.num_rows() < num_rows);
+    ASSERT_TRUE(!eos);
+    read_batch.Reset();
+
+    // Unpin the stream.
+    ASSERT_OK(stream.UnpinStream(BufferedTupleStream::UNPIN_ALL_EXCEPT_CURRENT));
+    stream.Close(nullptr, RowBatch::FlushMode::NO_FLUSH_RESOURCES);
+  }
+
+  {
+    // Test unpinning an empty stream (all rows have been attached to RowBatches).
+    BufferedTupleStream stream(
+        runtime_state_, int_desc_, &client_, buffer_size, buffer_size);
+    ASSERT_OK(stream.Init("SimpleTupleStreamTest::UnpinReadPage", true));
+    ASSERT_OK(stream.PrepareForReadWrite(true, &got_reservation));
+    ASSERT_TRUE(got_reservation);
+
+    for (int i = 0; i < write_batch->num_rows(); ++i) {
+      EXPECT_TRUE(stream.AddRow(write_batch->GetRow(i), &status));
+      ASSERT_OK(status);
+    }
+
+    // Read and validate all contents of the stream.
+    vector<int> results;
+    ReadValues(&stream, int_desc_, &results);
+    VerifyResults<int>(*int_desc_, results, num_rows, false);
+
+    // Unpin and close the stream.
+    ASSERT_OK(stream.UnpinStream(BufferedTupleStream::UNPIN_ALL_EXCEPT_CURRENT));
+    stream.Close(nullptr, RowBatch::FlushMode::NO_FLUSH_RESOURCES);
+  }
+
+  write_batch->Reset();
 }
 
 // Basic API test. No data should be going to disk.
