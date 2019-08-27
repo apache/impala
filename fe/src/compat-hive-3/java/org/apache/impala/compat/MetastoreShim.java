@@ -237,11 +237,11 @@ public class MetastoreShim {
       ) throws InvalidOperationException, MetaException, TException {
     for (Partition part : partitions) {
       part.setWriteId(tblTxn.writeId);
-      // Correct validWriteIdList is needed
-      // to commit the alter partitions operation in hms side.
-      client.alter_partitions(dbName, tblName, partitions, null,
-           tblTxn.validWriteIds, tblTxn.writeId);
     }
+    // Correct validWriteIdList is needed
+    // to commit the alter partitions operation in hms side.
+    client.alter_partitions(dbName, tblName, partitions, null,
+        tblTxn.validWriteIds, tblTxn.writeId);
   }
 
   /**
