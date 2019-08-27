@@ -176,11 +176,15 @@ void THttpServer::headersDone() {
   // Try authenticating with cookies first.
   if (use_cookies_ && !cookie_value_.empty()) {
     StripWhiteSpace(&cookie_value_);
-    if (callbacks_.cookie_auth_fn(cookie_value_)) {
-      authorized = true;
-      if (metrics_enabled_) http_metrics_->total_cookie_auth_success_->Increment(1);
-    } else if (metrics_enabled_) {
-      http_metrics_->total_cookie_auth_failure_->Increment(1);
+    // If a 'Cookie' header was provided with an empty value, we ignore it rather than
+    // counting it as a failed cookie attempt.
+    if (!cookie_value_.empty()) {
+      if (callbacks_.cookie_auth_fn(cookie_value_)) {
+        authorized = true;
+        if (metrics_enabled_) http_metrics_->total_cookie_auth_success_->Increment(1);
+      } else if (metrics_enabled_) {
+        http_metrics_->total_cookie_auth_failure_->Increment(1);
+      }
     }
   }
 
