@@ -557,7 +557,7 @@ sq_callback_result_t Webserver::BeginRequestCallback(struct sq_connection* conne
   stringstream output;
   if (!url_handler->use_templates()) {
     content_type = PLAIN;
-    url_handler->raw_callback()(req, &output);
+    url_handler->raw_callback()(req, &output, &response);
   } else {
     RenderUrlWithTemplate(req, *url_handler, &output, &content_type);
   }

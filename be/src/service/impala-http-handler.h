@@ -18,10 +18,14 @@
 #ifndef IMPALA_SERVICE_IMPALA_HTTP_HANDLER_H
 #define IMPALA_SERVICE_IMPALA_HTTP_HANDLER_H
 
+#include <sstream>
 #include <rapidjson/document.h>
+#include "kudu/util/web_callback_registry.h"
 #include "util/webserver.h"
 
 #include "service/impala-server.h"
+
+using kudu::HttpStatusCode;
 
 namespace impala {
 
@@ -37,6 +41,10 @@ class ImpalaHttpHandler {
 
  private:
   ImpalaServer* server_;
+
+  /// Raw callback to indicate whether the server is ready to accept queries.
+  void HealthzHandler(const Webserver::WebRequest& req, std::stringstream* data,
+      HttpStatusCode* response);
 
   /// Json callback for /hadoop-varz. Produces Json with a list, 'configs', of (key,
   /// value) pairs, one for each Hadoop configuration value.

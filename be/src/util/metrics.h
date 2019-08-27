@@ -31,10 +31,13 @@
 #include "common/logging.h"
 #include "common/object-pool.h"
 #include "common/status.h"
+#include "kudu/util/web_callback_registry.h"
 #include "util/debug-util.h"
 #include "util/metrics-fwd.h"
 #include "util/spinlock.h"
 #include "util/webserver.h"
+
+using kudu::HttpStatusCode;
 
 namespace impala {
 
@@ -457,7 +460,8 @@ class MetricGroup {
   /// each representing metric group, and each including a list of metrics, and a list
   /// of immediate children.  If args contains a paramater 'metric', only the json for
   /// that metric is returned.
-  void PrometheusCallback(const Webserver::WebRequest& req, std::stringstream* data);
+  void PrometheusCallback(const Webserver::WebRequest& req, std::stringstream* data,
+      HttpStatusCode* response);
 
   /// Legacy webpage callback for CM 5.0 and earlier. Produces a flattened map of (key,
   /// value) pairs for all metrics in this hierarchy.

@@ -90,6 +90,12 @@ static Status ParseIdFromRequest(const Webserver::WebRequest& req, TUniqueId* id
 void ImpalaHttpHandler::RegisterHandlers(Webserver* webserver) {
   DCHECK(webserver != NULL);
 
+  Webserver::RawUrlCallback healthz_callback =
+    [this](const auto& req, auto* data, auto* response) {
+      return this->HealthzHandler(req, data, response);
+    };
+  webserver->RegisterUrlCallback("/healthz", healthz_callback);
+
   webserver->RegisterUrlCallback("/backends", "backends.tmpl",
       MakeCallback(this, &ImpalaHttpHandler::BackendsHandler), true);
 
@@ -165,6 +171,17 @@ void ImpalaHttpHandler::RegisterHandlers(Webserver* webserver) {
       MakeCallback(this, &ImpalaHttpHandler::ResetResourcePoolStatsHandler), false);
 
   RegisterLogLevelCallbacks(webserver, true);
+}
+
+void ImpalaHttpHandler::HealthzHandler(const Webserver::WebRequest& req,
+    std::stringstream* data, HttpStatusCode* response) {
+  if (server_->IsHealthy()) {
+    (*data) << "OK";
+    *response = HttpStatusCode::Ok;
+    return;
+  }
+  *(data) << "Not Available";
+  *response = HttpStatusCode::ServiceUnavailable;
 }
 
 void ImpalaHttpHandler::HadoopVarzHandler(const Webserver::WebRequest& req,

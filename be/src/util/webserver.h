@@ -49,11 +49,12 @@ class Webserver {
  public:
   using ArgumentMap = kudu::WebCallbackRegistry::ArgumentMap;
   using WebRequest = kudu::WebCallbackRegistry::WebRequest;
+  using HttpStatusCode = kudu::HttpStatusCode;
 
   typedef boost::function<void (const WebRequest& req, rapidjson::Document* json)>
       UrlCallback;
-  typedef boost::function<void (const WebRequest& req, std::stringstream* output)>
-      RawUrlCallback;
+  typedef boost::function<void (const WebRequest& req, std::stringstream* output,
+      HttpStatusCode* response)> RawUrlCallback;
 
   /// Any callback may add a member to their Json output with key ENABLE_RAW_HTML_KEY;
   /// this causes the result of the template rendering process to be sent to the browser

@@ -594,7 +594,10 @@ Status ImpalaServer::LogLineageRecord(const ClientRequestState& client_request_s
 }
 
 bool ImpalaServer::IsCoordinator() { return is_coordinator_; }
+
 bool ImpalaServer::IsExecutor() { return is_executor_; }
+
+bool ImpalaServer::IsHealthy() { return services_started_.load(); }
 
 int ImpalaServer::GetThriftBackendPort() {
   DCHECK(thrift_be_server_ != nullptr);

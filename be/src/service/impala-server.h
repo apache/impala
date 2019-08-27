@@ -424,6 +424,9 @@ class ImpalaServer : public ImpalaServiceIf,
   /// Returns true if this is an executor, false otherwise.
   bool IsExecutor();
 
+  /// Returns whether this backend is healthy, i.e. able to accept queries.
+  bool IsHealthy();
+
   /// Returns the port that the thrift backend server is listening on. Valid to call after
   /// the server has started successfully.
   int GetThriftBackendPort();

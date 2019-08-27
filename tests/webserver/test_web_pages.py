@@ -650,3 +650,8 @@ class TestWebPage(ImpalaTestSuite):
     assert len(resp) == 3
     # check if metric shows up
     assert 'impala_statestore_subscriber_heartbeat_interval_time_min' in resp[0].text
+
+  def test_healthz_endpoint(self):
+    """Test to check that the /healthz endpoint returns 200 OK."""
+    page = requests.get("http://localhost:25000/healthz")
+    assert page.status_code == requests.codes.ok

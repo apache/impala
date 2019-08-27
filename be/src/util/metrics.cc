@@ -149,7 +149,7 @@ Status MetricGroup::Init(Webserver* webserver) {
     webserver->RegisterUrlCallback("/metrics", "metrics.tmpl", json_callback, true);
 
     Webserver::RawUrlCallback prometheus_callback =
-        bind<void>(mem_fn(&MetricGroup::PrometheusCallback), this, _1, _2);
+        bind<void>(mem_fn(&MetricGroup::PrometheusCallback), this, _1, _2, _3);
     webserver->RegisterUrlCallback("/metrics_prometheus", prometheus_callback);
   }
 
@@ -233,7 +233,7 @@ void MetricGroup::TemplateCallback(const Webserver::WebRequest& req,
 }
 
 void MetricGroup::PrometheusCallback(
-    const Webserver::WebRequest& req, stringstream* data) {
+    const Webserver::WebRequest& req, stringstream* data, HttpStatusCode* response) {
   const auto& args = req.parsed_args;
   Webserver::ArgumentMap::const_iterator metric_group = args.find("metric_group");
 

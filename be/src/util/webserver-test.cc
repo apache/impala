@@ -422,7 +422,8 @@ TEST(Webserver, FrameAllowEmbeddingTest) {
 
 const string STRING_WITH_NULL = "123456789\0ABCDE";
 
-void NullCharCallback(const Webserver::WebRequest& req, stringstream* out) {
+void NullCharCallback(const Webserver::WebRequest& req, stringstream* out,
+    kudu::HttpStatusCode* response) {
   (*out) << STRING_WITH_NULL;
 }
 
