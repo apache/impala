@@ -195,7 +195,6 @@ Status ImpalaServer::FetchInternal(ClientRequestState* request_state,
   RETURN_IF_ERROR(request_state->query_status());
 
   if (request_state->num_rows_fetched() == 0) {
-    request_state->query_events()->MarkEvent("First row fetched");
     request_state->set_fetched_rows();
   }
 

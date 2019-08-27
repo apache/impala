@@ -543,7 +543,6 @@ Status ImpalaServer::FetchInternal(ClientRequestState* request_state,
   lock_guard<mutex> l(*request_state->lock());
 
   if (request_state->num_rows_fetched() == 0) {
-    request_state->query_events()->MarkEvent("First row fetched");
     request_state->set_fetched_rows();
   }
 

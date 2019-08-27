@@ -681,6 +681,10 @@ Status Coordinator::GetNext(QueryResultSet* results, int max_rows, bool* eos) {
   RuntimeState* runtime_state = coord_instance_->runtime_state();
 
   Status status = coord_sink_->GetNext(runtime_state, results, max_rows, eos);
+  if (!first_row_fetched_ && results->size() > 0) {
+    query_events_->MarkEvent("First row fetched");
+    first_row_fetched_ = true;
+  }
   RETURN_IF_ERROR(UpdateExecState(
           status, &runtime_state->fragment_instance_id(), FLAGS_hostname));
   if (*eos) RETURN_IF_ERROR(SetNonErrorTerminalState(ExecState::RETURNED_RESULTS));

@@ -452,6 +452,14 @@ enum TImpalaQueryOptions {
   // Disable the normal key sampling of HBase tables in row count and row size estimation.
   // Set this to true will force the use of HMS table stats.
   DISABLE_HBASE_NUM_ROWS_ESTIMATE = 92
+
+  // The maximum amount of time, in milliseconds, a fetch rows request (TFetchResultsReq)
+  // from the client should spend fetching results (including waiting for results to
+  // become available and materialize). When result spooling is enabled, a fetch request
+  // to may read multiple RowBatches, in which case, the timeout controls how long the
+  // client waits for all returned RowBatches to be produced. If the timeout is hit, the
+  // client returns whatever rows it has already read. Defaults to 10000 milliseconds.
+  FETCH_ROWS_TIMEOUT_MS = 93
 }
 
 // The summary of a DML statement.

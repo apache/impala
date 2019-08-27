@@ -865,6 +865,18 @@ Status impala::SetQueryOption(const string& key, const string& value,
         query_options->__set_disable_hbase_num_rows_estimate(IsTrue(value));
         break;
       }
+      case TImpalaQueryOptions::FETCH_ROWS_TIMEOUT_MS: {
+        StringParser::ParseResult result;
+        const int64_t requested_timeout =
+            StringParser::StringToInt<int64_t>(value.c_str(), value.length(), &result);
+        if (result != StringParser::PARSE_SUCCESS || requested_timeout < 0) {
+          return Status(
+              Substitute("Invalid fetch rows timeout: '$0'. "
+                         "Only non-negative numbers are allowed.", value));
+        }
+        query_options->__set_fetch_rows_timeout_ms(requested_timeout);
+        break;
+      }
       default:
         if (IsRemovedQueryOption(key)) {
           LOG(WARNING) << "Ignoring attempt to set removed query option '" << key << "'";

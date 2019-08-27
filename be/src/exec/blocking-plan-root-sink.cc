@@ -106,6 +106,11 @@ void BlockingPlanRootSink::Cancel(RuntimeState* state) {
 
 Status BlockingPlanRootSink::GetNext(
     RuntimeState* state, QueryResultSet* results, int num_results, bool* eos) {
+  // Used to track how long the consumer waits for RowBatches to be produced and
+  // materialized.
+  MonotonicStopWatch wait_timeout_timer;
+  wait_timeout_timer.Start();
+
   unique_lock<mutex> l(lock_);
 
   // Set the shared QueryResultSet pointer 'results_' to the given 'results' object and
@@ -114,11 +119,30 @@ Status BlockingPlanRootSink::GetNext(
   num_rows_requested_ = num_results;
   sender_cv_.NotifyAll();
 
+  // True if the consumer timed out waiting for the producer to send rows, false
+  // otherwise.
+  bool timed_out = false;
+
   // Wait while the sender is still producing rows and hasn't filled in the current
   // result set.
   while (sender_state_ == SenderState::ROWS_PENDING && results_ != nullptr
-      && !state->is_cancelled()) {
-    consumer_cv_.Wait(l);
+      && !state->is_cancelled() && !timed_out) {
+    // It is possible for the timeout to expire, and for the QueryResultSet to still have
+    // some rows appended to it. This can happen if the producer acquires the lock, the
+    // timeout expires, and then the producer appends rows to the QueryResultSet. This
+    // does not affect correctness because the producer always sets 'results_' to nullptr
+    // if it appends any rows to the QueryResultSet and it always appends either an entire
+    // RowBatch, or as many rows as requested.
+    uint64_t wait_duration = max(static_cast<uint64_t>(1),
+        PlanRootSink::fetch_rows_timeout_us() - wait_timeout_timer.ElapsedTime());
+    if (!consumer_cv_.WaitFor(l, wait_duration)) {
+      timed_out = true;
+
+      // If the consumer timed out, make sure results_ is set to nullptr because the
+      // consumer will destroy the current QueryResultSet and create a new one for the
+      // next fetch request.
+      results_ = nullptr;
+    }
   }
 
   *eos = sender_state_ == SenderState::EOS;

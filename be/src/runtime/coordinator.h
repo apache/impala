@@ -396,6 +396,9 @@ class Coordinator { // NOLINT: The member variables could be re-ordered to save 
   /// safe to concurrently read from filter_routing_table_.
   bool filter_routing_table_complete_ = false;
 
+  /// True if the first row has been fetched, false otherwise.
+  bool first_row_fetched_ = false;
+
   /// Returns a local object pool.
   ObjectPool* obj_pool() { return obj_pool_.get(); }
 

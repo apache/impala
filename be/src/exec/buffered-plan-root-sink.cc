@@ -139,6 +139,11 @@ void BufferedPlanRootSink::Cancel(RuntimeState* state) {
 Status BufferedPlanRootSink::GetNext(
     RuntimeState* state, QueryResultSet* results, int num_results, bool* eos) {
   {
+    // Used to track how long the consumer waits for RowBatches to be produced and
+    // materialized.
+    MonotonicStopWatch wait_timeout_timer;
+    wait_timeout_timer.Start();
+
     unique_lock<mutex> l(lock_);
     *eos = false;
 
@@ -152,13 +157,23 @@ Status BufferedPlanRootSink::GetNext(
     int num_rows_to_read =
         num_results <= 0 ? FETCH_NUM_BATCHES * state->batch_size() : num_results;
 
+    // True if the consumer timed out waiting for the producer to send rows or if the
+    // consumer timed out while materializing rows, false otherwise.
+    bool timed_out = false;
+
     // Read from the queue until all requested rows have been read, or eos is hit.
-    while (!*eos && num_rows_read < num_rows_to_read) {
+    while (!*eos && num_rows_read < num_rows_to_read && !timed_out) {
       // Wait for the queue to have rows in it.
       while (IsQueueEmpty() && sender_state_ == SenderState::ROWS_PENDING
-          && !state->is_cancelled()) {
+          && !state->is_cancelled() && !timed_out) {
+        // Wait fetch_rows_timeout_us_ - row_batches_get_wait_timer_ microseconds for
+        // rows to become available before returning to the client. Subtracting
+        // wait_timeout_timer ensures the client only ever waits up to
+        // fetch_rows_timeout_us_ microseconds before returning.
+        uint64_t wait_duration = max(static_cast<uint64_t>(1),
+            PlanRootSink::fetch_rows_timeout_us() - wait_timeout_timer.ElapsedTime());
         SCOPED_TIMER(row_batches_get_wait_timer_);
-        rows_available_.Wait(l);
+        timed_out = !rows_available_.WaitFor(l, wait_duration);
       }
 
       // If the query was cancelled while the sink was waiting for rows to become
@@ -201,6 +216,8 @@ Status BufferedPlanRootSink::GetNext(
         // Prevent expr result allocations from accumulating.
         expr_results_pool_->Clear();
       }
+      timed_out = timed_out
+          || wait_timeout_timer.ElapsedTime() >= PlanRootSink::fetch_rows_timeout_us();
       *eos = IsQueueEmpty() && sender_state_ == SenderState::EOS;
     }
     if (*eos) consumer_eos_.NotifyOne();

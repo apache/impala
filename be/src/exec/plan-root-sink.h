@@ -106,9 +106,17 @@ class PlanRootSink : public DataSink {
   enum class SenderState { ROWS_PENDING, EOS, CLOSED_NOT_EOS };
   SenderState sender_state_ = SenderState::ROWS_PENDING;
 
+  /// Returns the FETCH_ROWS_TIMEOUT_MS value for this query (converted to microseconds).
+  uint64_t fetch_rows_timeout_us() const { return fetch_rows_timeout_us_; }
+
  private:
   /// Limit on the number of rows produced by this query, initialized by the constructor.
   const int64_t num_rows_produced_limit_;
+
+  /// Timeout, in microseconds, when waiting for rows to become available. How long the
+  /// consumer thread waits for the producer thread to produce RowBatches. Derived from
+  /// query option FETCH_ROWS_TIMEOUT_MS.
+  const uint64_t fetch_rows_timeout_us_;
 
   /// Updated by CheckRowsProducedLimit() to indicate the total number of rows produced
   /// by query execution.

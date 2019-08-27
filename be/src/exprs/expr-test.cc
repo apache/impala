@@ -286,6 +286,11 @@ class ExprTest : public testing::TestWithParam<std::tuple<bool, bool>> {
     executor_->PushExecOption("EXEC_SINGLE_NODE_ROWS_THRESHOLD=0");
     executor_->PushExecOption("DISABLE_CODEGEN_ROWS_THRESHOLD=0");
 
+    // Some tests select rows that take a long time to materialize (e.g.
+    // "select length(unhex(repeat('a', 1024 * 1024 * 1024)))") so set the client fetch
+    // timeout to a high value.
+    executor_->PushExecOption("FETCH_ROWS_TIMEOUT_MS=100000");
+
     min_int_values_[TYPE_TINYINT] = 1;
     min_int_values_[TYPE_SMALLINT] =
         static_cast<int64_t>(numeric_limits<int8_t>::max()) + 1;
