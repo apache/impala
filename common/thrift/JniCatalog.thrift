@@ -781,6 +781,9 @@ struct TEventProcessorMetrics {
 
   // Average number events skipped in a polling interval
   9: optional double events_skipped_per_poll_mean
+
+  // Last metastore event id that the catalog server synced to
+  10: optional i64 last_synced_event_id
 }
 
 // Response to GetCatalogServerMetrics() call.

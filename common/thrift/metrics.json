@@ -2473,6 +2473,16 @@
     "key": "events-processor.events-received-15min-rate"
   },
   {
+    "description": "Last metastore event id that the catalog server processed and synced to",
+    "contexts": [
+      "CATALOGSERVER"
+    ],
+    "label": "Last Synced Event Id",
+    "units": "NONE",
+    "kind" : "COUNTER",
+    "key" : "events-processor.last-synced-event-id"
+  },
+  {
     "description": "Total number of executor groups that have at least one executor",
     "contexts": [
       "IMPALAD"

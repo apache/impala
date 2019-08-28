@@ -55,6 +55,9 @@ class MetastoreEventMetrics {
   /// EWMA of number of events received in last 15 min
   static DoubleGauge* EVENTS_RECEIVED_15MIN_RATE;
 
+  /// Last metastore event id that the catalog server synced to.
+  static IntCounter* LAST_SYNCED_EVENT_ID;
+
  private:
   /// Following metric names must match with the key in metrics.json
 
@@ -81,6 +84,9 @@ class MetastoreEventMetrics {
 
   /// metric name for EWMA of number of events in last 15 min
   static string EVENTS_RECEIVED_15MIN_METRIC_NAME;
+
+  /// Metric name for last metastore event id that the catalog server synced to.
+  static string LAST_SYNCED_EVENT_ID_METRIC_NAME;
 };
 
 } // namespace impala

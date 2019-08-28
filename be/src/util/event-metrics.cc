@@ -37,6 +37,8 @@ string MetastoreEventMetrics::EVENTS_RECEIVED_5MIN_METRIC_NAME =
     "events-processor.events-received-5min-rate";
 string MetastoreEventMetrics::EVENTS_RECEIVED_15MIN_METRIC_NAME =
     "events-processor.events-received-15min-rate";
+string MetastoreEventMetrics::LAST_SYNCED_EVENT_ID_METRIC_NAME =
+    "events-processor.last-synced-event-id";
 
 IntCounter* MetastoreEventMetrics::NUM_EVENTS_RECEIVED_COUNTER = nullptr;
 IntCounter* MetastoreEventMetrics::NUM_EVENTS_SKIPPED_COUNTER = nullptr;
@@ -49,6 +51,7 @@ StringProperty* MetastoreEventMetrics::EVENT_PROCESSOR_STATUS = nullptr;
 DoubleGauge* MetastoreEventMetrics::EVENTS_RECEIVED_1MIN_RATE = nullptr;
 DoubleGauge* MetastoreEventMetrics::EVENTS_RECEIVED_5MIN_RATE = nullptr;
 DoubleGauge* MetastoreEventMetrics::EVENTS_RECEIVED_15MIN_RATE = nullptr;
+IntCounter* MetastoreEventMetrics::LAST_SYNCED_EVENT_ID = nullptr;
 
 // Initialize all the metrics for the events metric group
 void MetastoreEventMetrics::InitMetastoreEventMetrics(MetricGroup* metric_group) {
@@ -73,6 +76,8 @@ void MetastoreEventMetrics::InitMetastoreEventMetrics(MetricGroup* metric_group)
       event_metrics->AddDoubleGauge(EVENTS_RECEIVED_5MIN_METRIC_NAME, 0.0);
   EVENTS_RECEIVED_15MIN_RATE =
       event_metrics->AddDoubleGauge(EVENTS_RECEIVED_15MIN_METRIC_NAME, 0.0);
+  LAST_SYNCED_EVENT_ID =
+      event_metrics->AddCounter(LAST_SYNCED_EVENT_ID_METRIC_NAME, 0);
 }
 
 void MetastoreEventMetrics::refresh(TEventProcessorMetrics* response) {
@@ -103,6 +108,9 @@ void MetastoreEventMetrics::refresh(TEventProcessorMetrics* response) {
   }
   if (response->__isset.events_received_15min_rate) {
     EVENTS_RECEIVED_15MIN_RATE->SetValue(response->events_received_15min_rate);
+  }
+  if(response->__isset.last_synced_event_id){
+    LAST_SYNCED_EVENT_ID->SetValue(response->last_synced_event_id);
   }
 }
 } // namespace impala

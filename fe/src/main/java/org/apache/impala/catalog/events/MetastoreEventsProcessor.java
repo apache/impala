@@ -199,7 +199,7 @@ public class MetastoreEventsProcessor implements ExternalEventsProcessor {
   public static final String EVENTS_SKIPPED_METRIC = "events-skipped";
   // name of the event processor status metric
   public static final String STATUS_METRIC = "status";
-  // last sycned event id
+  // last synced event id
   public static final String LAST_SYNCED_ID_METRIC = "last-synced-event-id";
   // metric name which counts the number of self-events which are skipped
   public static final String NUMBER_OF_SELF_EVENTS = "self-events-skipped";
@@ -525,6 +525,7 @@ public class MetastoreEventsProcessor implements ExternalEventsProcessor {
     TEventProcessorMetrics eventProcessorMetrics = new TEventProcessorMetrics();
     EventProcessorStatus currentStatus = getStatus();
     eventProcessorMetrics.setStatus(currentStatus.toString());
+    eventProcessorMetrics.setLast_synced_event_id(getLastSyncedEventId());
     if (currentStatus != EventProcessorStatus.ACTIVE) return eventProcessorMetrics;
 
     long eventsReceived = metrics_.getMeter(EVENTS_RECEIVED_METRIC).getCount();

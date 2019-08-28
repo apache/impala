@@ -1463,6 +1463,7 @@ public class MetastoreEventsProcessorTest {
     TEventProcessorMetrics responseBefore = eventsProcessor_.getEventProcessorMetrics();
     long numEventsReceivedBefore = responseBefore.getEvents_received();
     long numEventsSkippedBefore = responseBefore.getEvents_skipped();
+    long lastEventSyncId = responseBefore.getLast_synced_event_id();
     final String testTblName = "testEventProcessorMetrics";
     // event 1
     createDatabase(TEST_DB_NAME, null);
@@ -1495,6 +1496,7 @@ public class MetastoreEventsProcessorTest {
     TEventProcessorMetricsSummaryResponse summaryResponse =
         catalog_.getEventProcessorSummary();
     assertNotNull(summaryResponse);
+    assertTrue(response.getLast_synced_event_id() > lastEventSyncId);
   }
 
   /**
@@ -1518,6 +1520,8 @@ public class MetastoreEventsProcessorTest {
       TEventProcessorMetricsSummaryResponse summaryResponse =
           eventsProcessor_.getEventProcessorSummary();
       assertNotNull(summaryResponse);
+      // Last synced id must be set even when event processor is not active.
+      assertTrue(response.isSetLast_synced_event_id());
     } finally {
       // reset the state of event process once the test completes
       eventsProcessor_.start();
