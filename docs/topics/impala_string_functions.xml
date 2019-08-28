@@ -454,7 +454,9 @@ SELECT chr(97);
 
         <dd>
           <b>Purpose:</b> Returns a single string representing all the argument values joined
-          together.
+          together. If any argument is <codeph>NULL</codeph>, it returns <codeph>NULL</codeph>.
+          <p></p>
+
           <p>
             <b>Return type:</b> <codeph>STRING</codeph>
           </p>
@@ -1423,26 +1425,33 @@ select replace('hello world','xyz','abc');
             The <varname>delimiter</varname> can consist of multiple characters, not just a
             single character.
           </p>
+
           <p>
             All matching of the delimiter is done exactly, not using any regular expression
             patterns.
           </p>
+
           <p>
             <b>Return type:</b> <codeph>STRING</codeph>
           </p>
+
           <p conref="../shared/impala_common.xml#common/example_blurb"
               />
+
           <p>
             <codeph>SPLIT_PART('x,y,z',',',2)</codeph> returns <codeph>'y'</codeph>.
           </p>
+
           <p>
             <codeph>SPLIT_PART('one***two***three','***',2)</codeph> returns
             <codeph>'two'</codeph>.
           </p>
+
           <p>
             <codeph>SPLIT_PART('abc@@def@@ghi', '@@', 3)</codeph> returns
             <codeph>'ghi'</codeph>.
           </p>
+
           <p>
             <codeph>SPLIT_PART('abc@@def@@ghi', '@@', -3)</codeph> returns
             <codeph>'abc'</codeph>.
