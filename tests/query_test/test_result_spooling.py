@@ -81,7 +81,7 @@ class TestResultSpooling(ImpalaTestSuite):
 
     # Amount of time to wait for the PeakUnpinnedBytes counter in the PLAN_ROOT_SINK
     # section of the profile to reach a non-zero value.
-    timeout = 10
+    timeout = 30
 
     # Regexes to look for in the runtime profiles.
     # PeakUnpinnedBytes can show up in exec nodes as well, so we only look for the
