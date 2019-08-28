@@ -33,6 +33,7 @@
 #include "util/debug-util.h"
 #include "util/metrics-fwd.h"
 #include "util/network-util.h"
+#include "util/time.h"
 
 #include "common/status.h"
 
@@ -274,26 +275,34 @@ class ClientConnection {
     static RpcStatus OK() { return {Status::OK(), false}; }
   };
 
-  /// Helper that retries constructing a client and calling DoRpc() up the three times
-  /// and handles both RPC failures and failures to get a client from 'client_cache'.
-  /// 'debug_fn' is a Status-returning function that can be used to inject errors into
-  /// the RPC.
+  /// Helper that retries constructing a client and calling DoRpc() up to 'retries' times
+  /// with 'delay_ms' delay between retries. This handles both RPC failures and failures
+  /// to get a client from 'client_cache'.  'debug_fn' is a Status-returning function that
+  /// can be used to inject errors into the RPC.
   template <class F, class DebugF, class Request, class Response>
   static RpcStatus DoRpcWithRetry(ClientCache<T>* client_cache, TNetworkAddress address,
-      const F& f, const Request& request, const DebugF& debug_fn, Response* response) {
+      const F& f, const Request& request, int retries, int64_t delay_ms,
+      const DebugF& debug_fn, Response* response) {
     Status rpc_status;
     Status client_status;
 
-    // Try to send the RPC 3 times before failing.
-    for (int i = 0; i < 3; ++i) {
-      ImpalaBackendConnection client(client_cache, address, &client_status);
+    // Try to send the RPC as many times as requested before failing.
+    for (int i = 0; i < retries; ++i) {
+      if (i > 0) SleepForMs(delay_ms); // Delay before retrying.
+      ClientConnection<T> client(client_cache, address, &client_status);
       if (!client_status.ok()) continue;
 
       rpc_status = debug_fn();
-      if (!rpc_status.ok()) continue;
+      if (!rpc_status.ok()) {
+        LOG(INFO) << "Injected RPC error to " << TNetworkAddressToString(address) << ": "
+                  << rpc_status.GetDetail();
+        continue;
+      }
 
       rpc_status = client.DoRpc(f, request, response);
       if (rpc_status.ok()) break;
+      LOG(INFO) << "RPC to " << TNetworkAddressToString(address) << " failed "
+                << rpc_status.GetDetail();
     }
     if (!client_status.ok()) return {client_status, true};
     if (!rpc_status.ok()) return {rpc_status, false};

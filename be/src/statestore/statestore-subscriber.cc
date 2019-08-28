@@ -64,6 +64,7 @@ DEFINE_int64_hidden(statestore_subscriber_recovery_grace_period_ms, 30000L, "Per
     "considered fully recovered. After a successful reconnect attempt, updates to the "
     "cluster membership will only become effective after this period has elapsed.");
 
+DECLARE_string(debug_actions);
 DECLARE_string(ssl_client_ca_certificate);
 DECLARE_string(ssl_server_certificate);
 DECLARE_string(ssl_private_key);
@@ -124,8 +125,7 @@ StatestoreSubscriber::StatestoreSubscriber(const string& subscriber_id,
       failure_detector_(new TimeoutFailureDetector(
           seconds(FLAGS_statestore_subscriber_timeout_seconds),
           seconds(FLAGS_statestore_subscriber_timeout_seconds / 2))),
-      client_cache_(new StatestoreClientCache(FLAGS_statestore_subscriber_cnxn_attempts,
-                FLAGS_statestore_subscriber_cnxn_retry_interval_ms, 0, 0, "",
+      client_cache_(new StatestoreClientCache(1, 0, 0, 0, "",
                 !FLAGS_ssl_client_ca_certificate.empty())),
       metrics_(metrics->GetOrCreateChildGroup("statestore-subscriber")),
       heartbeat_address_(heartbeat_address),
@@ -172,9 +172,6 @@ Status StatestoreSubscriber::AddTopic(const Statestore::TopicId& topic_id,
 
 Status StatestoreSubscriber::Register() {
   Status client_status;
-  StatestoreServiceConn client(client_cache_.get(), statestore_address_, &client_status);
-  RETURN_IF_ERROR(client_status);
-
   TRegisterSubscriberRequest request;
   for (const auto& registration : topic_registrations_) {
     TTopicRegistration thrift_topic;
@@ -189,8 +186,19 @@ Status StatestoreSubscriber::Register() {
   request.subscriber_location = heartbeat_address_;
   request.subscriber_id = subscriber_id_;
   TRegisterSubscriberResponse response;
-  RETURN_IF_ERROR(client.DoRpc(&StatestoreServiceClientWrapper::RegisterSubscriber,
-      request, &response));
+  int attempt = 0; // Used for debug action only.
+  StatestoreServiceConn::RpcStatus rpc_status =
+      StatestoreServiceConn::DoRpcWithRetry(client_cache_.get(), statestore_address_,
+          &StatestoreServiceClientWrapper::RegisterSubscriber, request,
+          FLAGS_statestore_subscriber_cnxn_attempts,
+          FLAGS_statestore_subscriber_cnxn_retry_interval_ms,
+          [&attempt]() {
+            return attempt++ == 0 ?
+                DebugAction(FLAGS_debug_actions, "REGISTER_SUBSCRIBER_FIRST_ATTEMPT") :
+                Status::OK();
+          },
+          &response);
+  RETURN_IF_ERROR(rpc_status.status);
   Status status = Status(response.status);
   if (status.ok()) {
     connected_to_statestore_metric_->SetValue(true);
