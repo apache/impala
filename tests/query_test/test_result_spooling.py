@@ -154,12 +154,12 @@ class TestResultSpooling(ImpalaTestSuite):
     """Tests results spooling when the client is blocked waiting for Impala to add more
     results to the queue. Validates that RowBatchGetWaitTime (amount of time the client
     spends waiting for Impala to buffer query results) is updated properly."""
-    query = "select id from functional.alltypes order by id limit 10"
+    query = "select id from functional.alltypes"
 
-    # Add a delay to the EXCHANGE_NODE in the query above to simulate a "slow" query. The
+    # Add a delay to the SCAN_NODE in the query above to simulate a "slow" query. The
     # delay should give the client enough time to issue a fetch request and block until
     # Impala produces results.
-    vector.get_value('exec_option')['debug_action'] = '2:GETNEXT:DELAY'
+    vector.get_value('exec_option')['debug_action'] = '0:GETNEXT:DELAY'
     vector.get_value('exec_option')['spool_query_results'] = 'true'
 
     # Regex to look for in the runtime profile.
@@ -173,6 +173,7 @@ class TestResultSpooling(ImpalaTestSuite):
           self.create_impala_client().fetch(query, handle))
       thread.start()
       self.wait_for_state(handle, self.client.QUERY_STATES['FINISHED'], 10)
+      thread.join()
       assert re.search(get_wait_time_regex, self.client.get_runtime_profile(handle)) \
           is not None
     finally:
