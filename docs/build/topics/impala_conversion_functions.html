@@ -1,0 +1,218 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE html
+  PUBLIC "-//W3C//DTD XHTML 1.0 Transitional//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-transitional.dtd">
+<html xmlns="http://www.w3.org/1999/xhtml" xml:lang="en" lang="en">
+<head><meta http-equiv="Content-Type" content="text/html; charset=UTF-8" />
+
+<meta name="copyright" content="(C) Copyright 2019" />
+<meta name="DC.rights.owner" content="(C) Copyright 2019" />
+<meta name="DC.Type" content="concept" />
+<meta name="DC.Title" content="Impala Type Conversion Functions" />
+<meta name="DC.Relation" scheme="URI" content="../topics/impala_functions.html" />
+<meta name="prodname" content="Impala" />
+<meta name="prodname" content="Impala" />
+<meta name="version" content="Impala 3.3.x" />
+<meta name="version" content="Impala 3.3.x" />
+<meta name="DC.Format" content="XHTML" />
+<meta name="DC.Identifier" content="conversion_functions" />
+<link rel="stylesheet" type="text/css" href="../commonltr.css" />
+<title>Impala Type Conversion Functions</title>
+</head>
+<body id="conversion_functions">
+
+
+  <h1 class="title topictitle1" id="ariaid-title1">Impala Type Conversion Functions</h1>
+
+
+
+
+
+
+  <div class="body conbody">
+
+    <p class="p">
+      Conversion functions are typically used in combination with other functions to explicitly
+      pass the expected data types. Impala has strict rules regarding data types for function
+      parameters. For example, Impala does not automatically convert a <code class="ph codeph">DOUBLE</code>
+      value to <code class="ph codeph">FLOAT</code>, a <code class="ph codeph">BIGINT</code> value to <code class="ph codeph">INT</code>,
+      or other conversion where precision could be lost or overflow could occur. Also, for
+      reporting or dealing with loosely defined schemas in big data contexts, you might need to
+      convert values to or from the <code class="ph codeph">STRING</code> type.
+    </p>
+
+
+    <p class="p">
+      <strong class="ph b">Function reference:</strong>
+    </p>
+
+
+    <p class="p">
+      Impala supports the following type conversion functions:
+    </p>
+
+
+    <ul class="ul">
+      <li class="li">
+        <a class="xref" href="#conversion_functions__cast">CAST</a>
+      </li>
+
+
+      <li class="li">
+        <a class="xref" href="#conversion_functions__typeof">TYPEOF</a>
+      </li>
+
+    </ul>
+
+
+    <dl class="dl">
+
+
+        <dt class="dt dlterm" id="conversion_functions__cast">
+          CAST(expression AS type)
+        </dt>
+
+
+        <dd class="dd">
+          <strong class="ph b">Purpose:</strong> Returns <var class="keyword varname">expression</var> converted to the
+          <var class="keyword varname">type</var> data type.
+          <div class="p">
+            If the <var class="keyword varname">expression</var> value is of a type that cannot be converted to
+            the target <var class="keyword varname">type</var>:
+            <ul class="ul">
+              <li class="li">
+                Of <code class="ph codeph">DECIMAL</code>, <code class="ph codeph">DATE</code>, and
+                <code class="ph codeph">BOOLEAN</code>, the function returns an error.
+              </li>
+
+
+              <li class="li">
+                Of all other types, the function returns <code class="ph codeph">NULL</code>.
+              </li>
+
+            </ul>
+
+          </div>
+
+
+          <p class="p">
+            <strong class="ph b">Usage notes:</strong>
+          </p>
+
+
+          <p class="p">
+            Use <code class="ph codeph">CAST</code> when passing a column value or literal to a function that
+            expects a parameter with a different type. Frequently used in SQL operations such as
+            <code class="ph codeph">CREATE TABLE AS SELECT</code> and <code class="ph codeph">INSERT ... VALUES</code> to
+            ensure that values from various sources are of the appropriate type for the
+            destination columns.
+          </p>
+
+
+          <p class="p">
+            Where practical, do a one-time <code class="ph codeph">CAST()</code> operation during the
+            ingestion process to make each column into the appropriate type, rather than using
+            many <code class="ph codeph">CAST()</code> operations in each query; doing type conversions for
+            each row during each query can be expensive for tables with millions or billions of
+            rows.
+          </p>
+
+
+          <p class="p">
+        The way this function deals with time zones when converting to or from
+        <code class="ph codeph">TIMESTAMP</code> values is affected by the
+        <code class="ph codeph">‑‑use_local_tz_for_unix_timestamp_conversions</code> startup flag
+        for the <span class="keyword cmdname">impalad</span> daemon. See
+        <a class="xref" href="../shared/../topics/impala_timestamp.html#timestamp">TIMESTAMP Data Type</a> for details about how
+        Impala handles time zone considerations for the <code class="ph codeph">TIMESTAMP</code> data type.
+      </p>
+
+
+          <p class="p">
+        <strong class="ph b">Related information:</strong>
+      </p>
+
+
+          <p class="p">
+            For details of casts from each kind of data type, see the description of the
+            appropriate type: <a class="xref" href="impala_tinyint.html#tinyint">TINYINT Data Type</a>,
+            <a class="xref" href="impala_smallint.html#smallint">SMALLINT Data Type</a>,
+            <a class="xref" href="impala_int.html#int">INT Data Type</a>,
+            <a class="xref" href="impala_bigint.html#bigint">BIGINT Data Type</a>,
+            <a class="xref" href="impala_float.html#float">FLOAT Data Type</a>,
+            <a class="xref" href="impala_double.html#double">DOUBLE Data Type</a>,
+            <a class="xref" href="impala_decimal.html#decimal">DECIMAL Data Type</a>,
+            <a class="xref" href="impala_string.html#string">STRING Data Type</a>,
+            <a class="xref" href="impala_char.html#char">CHAR Data Type</a>,
+            <a class="xref" href="impala_varchar.html#varchar">VARCHAR Data Type</a>,
+            <a class="xref" href="impala_timestamp.html#timestamp">TIMESTAMP Data Type</a>,
+            <a class="xref" href="impala_boolean.html#boolean">BOOLEAN Data Type</a>
+          </p>
+
+        </dd>
+
+
+
+
+
+
+        
+
+
+
+
+        <dt class="dt dlterm" id="conversion_functions__typeof">
+          TYPEOF(expression)
+        </dt>
+
+
+        <dd class="dd">
+          <strong class="ph b">Purpose:</strong> Returns the name of the data type corresponding to
+          <var class="keyword varname">expression</var>. For types with extra attributes, such as length for
+          <code class="ph codeph">CHAR</code> and <code class="ph codeph">VARCHAR</code>, or precision and scale for
+          <code class="ph codeph">DECIMAL</code>, includes the full specification of the type.
+          <p class="p">
+            <strong class="ph b">Return type:</strong> <code class="ph codeph">STRING</code>
+          </p>
+
+
+          <p class="p">
+            <strong class="ph b">Usage notes:</strong> Typically used in interactive exploration of a schema, or in
+            application code that programmatically generates schema definitions such as
+            <code class="ph codeph">CREATE TABLE</code> statements, for example, to get the type of an
+            expression such as <code class="ph codeph">col1 / col2</code> or <code class="ph codeph">CONCAT(col1, col2,
+            col3)</code>. This function is especially useful for arithmetic expressions
+            involving <code class="ph codeph">DECIMAL</code> types because the precision and scale of the
+            result is can be different than that of the operands.
+          </p>
+
+
+          <p class="p">
+        <strong class="ph b">Examples:</strong>
+      </p>
+
+
+          <p class="p">
+            <code class="ph codeph">TYPEOF(2)</code> returns <code class="ph codeph">TINYINT</code>.
+          </p>
+
+
+          <p class="p">
+            <code class="ph codeph">TYPEOF(NOW())</code> returns <code class="ph codeph">TIMESTAMP</code>.
+          </p>
+
+        </dd>
+
+
+
+    </dl>
+
+
+  </div>
+
+
+<div class="related-links">
+<div class="familylinks">
+<div class="parentlink"><strong>Parent topic:</strong> <a class="link" href="../topics/impala_functions.html">Impala Built-In Functions</a></div>
+</div>
+</div></body>
+</html>
