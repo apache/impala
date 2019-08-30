@@ -1143,7 +1143,7 @@ Per-Host Resources: mem-estimate=88.00MB mem-reservation=8.00MB thread-reservati
    tuple-ids=0 row-size=88B cardinality=unavailable
    in pipelines: 00(GETNEXT)
 ---- PARALLELPLANS
-Max Per-Host Resource Reservation: Memory=16.00MB Threads=5
+Max Per-Host Resource Reservation: Memory=16.00MB Threads=3
 Per-Host Resource Estimates: Memory=176MB
 WARNING: The following tables are missing relevant table and/or column statistics.
 tpch_avro.orders
@@ -1160,14 +1160,14 @@ PLAN-ROOT SINK
 |  in pipelines: 00(GETNEXT)
 |
 F00:PLAN FRAGMENT [RANDOM] hosts=2 instances=4
-Per-Host Resources: mem-estimate=176.00MB mem-reservation=16.00MB thread-reservation=4
+Per-Host Resources: mem-estimate=176.00MB mem-reservation=16.00MB thread-reservation=2
 00:SCAN HDFS [tpch_avro.orders, RANDOM]
    partitions=1/1 files=2 size=156.92MB
    stored statistics:
      table: rows=unavailable size=156.92MB
      columns: unavailable
    extrapolated-rows=disabled max-scan-range-rows=unavailable
-   mem-estimate=88.00MB mem-reservation=8.00MB thread-reservation=1
+   mem-estimate=88.00MB mem-reservation=8.00MB thread-reservation=0
    tuple-ids=0 row-size=88B cardinality=unavailable
    in pipelines: 00(GETNEXT)
 ====
@@ -1215,34 +1215,6 @@ PLAN-ROOT SINK
 |
 F00:PLAN FRAGMENT [RANDOM] hosts=3 instances=3
 Per-Host Resources: mem-estimate=64.00MB mem-reservation=8.00MB thread-reservation=2
-00:SCAN HDFS [tpch_avro.orders, RANDOM]
-   HDFS partitions=1/1 files=3 size=156.92MB
-   stored statistics:
-     table: rows=unavailable size=156.92MB
-     columns: unavailable
-   extrapolated-rows=disabled max-scan-range-rows=unavailable
-   mem-estimate=64.00MB mem-reservation=8.00MB thread-reservation=1
-   tuple-ids=0 row-size=88B cardinality=unavailable
-   in pipelines: 00(GETNEXT)
----- PARALLELPLANS
-Max Per-Host Resource Reservation: Memory=16.00MB Threads=5
-Per-Host Resource Estimates: Memory=129MB
-WARNING: The following tables are missing relevant table and/or column statistics.
-tpch_avro.orders
-Analyzed query: SELECT * FROM tpch_avro.orders
-
-F01:PLAN FRAGMENT [UNPARTITIONED] hosts=1 instances=1
-|  Per-Host Resources: mem-estimate=551.97KB mem-reservation=0B thread-reservation=1
-PLAN-ROOT SINK
-|  mem-estimate=0B mem-reservation=0B thread-reservation=0
-|
-01:EXCHANGE [UNPARTITIONED]
-|  mem-estimate=551.97KB mem-reservation=0B thread-reservation=0
-|  tuple-ids=0 row-size=88B cardinality=unavailable
-|  in pipelines: 00(GETNEXT)
-|
-F00:PLAN FRAGMENT [RANDOM] hosts=3 instances=6
-Per-Host Resources: mem-estimate=128.00MB mem-reservation=16.00MB thread-reservation=4
 00:SCAN HDFS [tpch_avro.orders, RANDOM]
    HDFS partitions=1/1 files=3 size=156.92MB
    stored statistics:
@@ -1305,7 +1277,7 @@ Per-Host Resources: mem-estimate=32.00MB mem-reservation=8.00MB thread-reservati
    tuple-ids=0 row-size=78B cardinality=unavailable
    in pipelines: 00(GETNEXT)
 ---- PARALLELPLANS
-Max Per-Host Resource Reservation: Memory=16.00MB Threads=5
+Max Per-Host Resource Reservation: Memory=16.00MB Threads=3
 Per-Host Resource Estimates: Memory=64MB
 WARNING: The following tables are missing relevant table and/or column statistics.
 tpch_rc.customer
@@ -1322,14 +1294,14 @@ PLAN-ROOT SINK
 |  in pipelines: 00(GETNEXT)
 |
 F00:PLAN FRAGMENT [RANDOM] hosts=1 instances=2
-Per-Host Resources: mem-estimate=64.00MB mem-reservation=16.00MB thread-reservation=4
+Per-Host Resources: mem-estimate=64.00MB mem-reservation=16.00MB thread-reservation=2
 00:SCAN HDFS [tpch_rc.customer, RANDOM]
    partitions=1/1 files=1 size=22.47MB
    stored statistics:
      table: rows=unavailable size=22.47MB
      columns: unavailable
    extrapolated-rows=disabled max-scan-range-rows=unavailable
-   mem-estimate=32.00MB mem-reservation=8.00MB thread-reservation=1
+   mem-estimate=32.00MB mem-reservation=8.00MB thread-reservation=0
    tuple-ids=0 row-size=78B cardinality=unavailable
    in pipelines: 00(GETNEXT)
 ====
@@ -1385,7 +1357,7 @@ Per-Host Resources: mem-estimate=16.00MB mem-reservation=8.00MB thread-reservati
    tuple-ids=0 row-size=104B cardinality=unavailable
    in pipelines: 00(GETNEXT)
 ---- PARALLELPLANS
-Max Per-Host Resource Reservation: Memory=16.00MB Threads=5
+Max Per-Host Resource Reservation: Memory=16.00MB Threads=3
 Per-Host Resource Estimates: Memory=32MB
 WARNING: The following tables are missing relevant table and/or column statistics.
 tpcds_seq_snap.web_returns
@@ -1402,14 +1374,14 @@ PLAN-ROOT SINK
 |  in pipelines: 00(GETNEXT)
 |
 F00:PLAN FRAGMENT [RANDOM] hosts=1 instances=2
-Per-Host Resources: mem-estimate=32.00MB mem-reservation=16.00MB thread-reservation=4
+Per-Host Resources: mem-estimate=32.00MB mem-reservation=16.00MB thread-reservation=2
 00:SCAN HDFS [tpcds_seq_snap.web_returns, RANDOM]
    partitions=1/1 files=1 size=6.61MB
    stored statistics:
      table: rows=unavailable size=6.61MB
      columns: unavailable
    extrapolated-rows=disabled max-scan-range-rows=unavailable
-   mem-estimate=16.00MB mem-reservation=8.00MB thread-reservation=1
+   mem-estimate=16.00MB mem-reservation=8.00MB thread-reservation=0
    tuple-ids=0 row-size=104B cardinality=unavailable
    in pipelines: 00(GETNEXT)
 ====
@@ -1591,7 +1563,7 @@ Per-Host Resources: mem-estimate=16.00MB mem-reservation=88.00KB thread-reservat
    tuple-ids=0 row-size=80B cardinality=unavailable
    in pipelines: 00(GETNEXT)
 ---- PARALLELPLANS
-Max Per-Host Resource Reservation: Memory=176.00KB Threads=5
+Max Per-Host Resource Reservation: Memory=176.00KB Threads=3
 Per-Host Resource Estimates: Memory=32MB
 WARNING: The following tables are missing relevant table and/or column statistics.
 functional.alltypesmixedformat
@@ -1608,7 +1580,7 @@ PLAN-ROOT SINK
 |  in pipelines: 00(GETNEXT)
 |
 F00:PLAN FRAGMENT [RANDOM] hosts=3 instances=6
-Per-Host Resources: mem-estimate=32.00MB mem-reservation=176.00KB thread-reservation=4
+Per-Host Resources: mem-estimate=32.00MB mem-reservation=176.00KB thread-reservation=2
 00:SCAN HDFS [functional.alltypesmixedformat, RANDOM]
    partitions=4/4 files=4 size=66.12KB
    stored statistics:
@@ -1616,7 +1588,7 @@ Per-Host Resources: mem-estimate=32.00MB mem-reservation=176.00KB thread-reserva
      partitions: 0/4 rows=unavailable
      columns missing stats: id, bool_col, tinyint_col, smallint_col, int_col, bigint_col, float_col, double_col, date_string_col, string_col, timestamp_col
    extrapolated-rows=disabled max-scan-range-rows=unavailable
-   mem-estimate=16.00MB mem-reservation=88.00KB thread-reservation=1
+   mem-estimate=16.00MB mem-reservation=88.00KB thread-reservation=0
    tuple-ids=0 row-size=80B cardinality=unavailable
    in pipelines: 00(GETNEXT)
 ====

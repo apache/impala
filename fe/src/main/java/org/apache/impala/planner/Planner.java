@@ -255,9 +255,6 @@ public class Planner {
     } else {
       parallelPlans = Collections.singletonList(distrPlan.get(0));
     }
-    // Only use one scanner thread per scan-node instance since intra-node
-    // parallelism is achieved via multiple fragment instances.
-    ctx_.getQueryOptions().setNum_scanner_threads(1);
     ctx_.getTimeline().markEvent("Parallel plans created");
     return parallelPlans;
   }

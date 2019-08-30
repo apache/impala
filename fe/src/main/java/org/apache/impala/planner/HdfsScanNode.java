@@ -412,18 +412,8 @@ public class HdfsScanNode extends ScanNode {
     // compute scan range locations with optional sampling
     computeScanRangeLocations(analyzer);
 
-    // Determine backend scan node implementation to use. The optimized MT implementation
-    // is currently supported for Parquet, ORC and Text.
-    if (analyzer.getQueryOptions().isSetMt_dop() &&
-        analyzer.getQueryOptions().mt_dop > 0 &&
-        fileFormats_.size() == 1 &&
-        (fileFormats_.contains(HdfsFileFormat.PARQUET)
-          || fileFormats_.contains(HdfsFileFormat.ORC)
-          || fileFormats_.contains(HdfsFileFormat.TEXT))) {
-      useMtScanNode_ = true;
-    } else {
-      useMtScanNode_ = false;
-    }
+    useMtScanNode_ =
+        analyzer.getQueryOptions().isSetMt_dop() && analyzer.getQueryOptions().mt_dop > 0;
 
     if (fileFormats_.contains(HdfsFileFormat.PARQUET)) {
       // Compute min-max conjuncts only if the PARQUET_READ_STATISTICS query option is
