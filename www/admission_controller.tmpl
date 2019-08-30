@@ -180,17 +180,21 @@ function formatMemory(val) {
 function reset_all() {
   if (!confirm('Are you sure you want to reset stats for all resource pools ?')) return;
   var xhr = new XMLHttpRequest();
-  xhr.open('GET', "/resource_pool_reset", true);
+  xhr.onload = function(ignored_arg) {
+    window.location.reload(true);
+  }
+  xhr.open('GET', make_url("/resource_pool_reset"), true);
   xhr.send();
-  window.location.reload(true);
 }
 
 function reset_method(pool_name) {
   if (!confirm('Are you sure you want to reset stats for ' + pool_name +' ?')) return;
   var xhr = new XMLHttpRequest();
-  xhr.open('GET', "/resource_pool_reset?pool_name=" + pool_name, true);
+  xhr.onload = function(ignored_arg) {
+    window.location.reload(true);
+  }
+  xhr.open('GET', make_url("/resource_pool_reset?pool_name=" + pool_name), true);
   xhr.send();
-  window.location.reload(true);
 }
 </script>
 

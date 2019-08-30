@@ -145,19 +145,19 @@ under the License.
 <script>
 function reset_all() {
   var xhr = new XMLHttpRequest();
-  xhr.open('GET', "/rpcz_reset", true);
+  xhr.open('GET', make_url("/rpcz_reset"), true);
   xhr.send();
 }
 
 function reset_method(server, method) {
   var xhr = new XMLHttpRequest();
-  xhr.open('GET', "/rpcz_reset?server=" + server + "&method=" + method, true);
+  xhr.open('GET', make_url("/rpcz_reset?server=" + server + "&method=" + method), true);
   xhr.send();
 }
 
 function reset_server(server) {
   var xhr = new XMLHttpRequest();
-  xhr.open('GET', "/rpcz_reset?server=" + server, true);
+  xhr.open('GET', make_url("/rpcz_reset?server=" + server), true);
   xhr.send();
 }
 
@@ -257,7 +257,7 @@ function refresh() {
   }
 
   xhr.ontimeout = function() {}
-  xhr.open('GET', "/rpcz?json", true);
+  xhr.open('GET', make_url("/rpcz?json"), true);
   xhr.send();
 }
 

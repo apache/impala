@@ -50,7 +50,7 @@ function refresh() {
     document.getElementById("last-updated").textContent = new Date();
   }
   xhr.ontimeout = function(){ }
-  xhr.open('GET', "/query_summary?query_id={{query_id}}&json", true);
+  xhr.open('GET', make_url("/query_summary?query_id={{query_id}}&json"), true);
   xhr.send();
 }
 

@@ -215,7 +215,7 @@ function renderGraph(ignored_arg) {
 function refresh() {
   req = new XMLHttpRequest();
   req.onload = renderGraph;
-  req.open("GET", "/query_plan?query_id={{query_id}}&json", true);
+  req.open("GET", make_url("/query_plan?query_id={{query_id}}&json"), true);
   req.send();
 }
 

@@ -21,6 +21,7 @@ from tests.common.skip import SkipIfBuildType
 from tests.common.impala_cluster import ImpalaCluster
 from tests.common.impala_test_suite import ImpalaTestSuite
 import json
+import os
 import pytest
 import re
 import requests
@@ -667,7 +668,9 @@ class TestWebPage(ImpalaTestSuite):
     href_regex = "<a .*? href=['\"](?!({{ __common__.host-url }})|#)"
     # Matches all 'form' tags that are not followed by including the hidden inputs.
     form_regex = "<form [^{]*?>(?!{{>www/form-hidden-inputs.tmpl}})"
-    regex = "(%s)|(%s)" % (href_regex, form_regex)
-    results = grep_dir("/home/thomas/Impala/www", regex, ".*\.tmpl")
+    # Matches XMLHttpRequest.open() in javascript that are not followed with make_url().
+    javascript_regex = "open\(['\"]GET['\"], (?!make_url)"
+    regex = "(%s)|(%s)|(%s)" % (href_regex, form_regex, javascript_regex)
+    results = grep_dir(os.path.join(os.environ['IMPALA_HOME'], "www"), regex, ".*\.tmpl")
     assert len(results) == 0, \
         "All links on the webui must include the webserver host: %s" % results

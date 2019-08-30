@@ -54,7 +54,7 @@ common-footer.tmpl) }}
     <header class="navbar navbar-default navbar-expand bg-light navbar-static-top" id="top" role="banner">
       <div id="nav-options" class="container">
         <div class="navbar-header">
-          <a class='navbar-brand' href='{{ __common__.host-url }}/'>{{ __common__.process-name }}</a>
+          <a class='navbar-brand' href='{{ __common__.host-url }}/' id='root-link'>{{ __common__.process-name }}</a>
         </div>
         <nav class="collapse navbar-collapse bs-navbar-collapse" role="navigation">
           <ul class="nav navbar-nav">
@@ -72,3 +72,21 @@ common-footer.tmpl) }}
   {{.}}
 </div>
 {{/error}}
+<script>
+// For Apache Knox compatibility, all urls that are accessed by javascript should have
+// their path wrapped with this.
+function make_url(path) {
+  var root_link = document.getElementById('root-link');
+  var s  = root_link.href.split("?");
+  url = s[0] + path;
+  if (s.length > 1) {
+    if (path.includes("?")) {
+      url += "&"
+    } else {
+      url += "?";
+    }
+    url += s[1];
+  }
+  return url;
+}
+</script>
