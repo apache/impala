@@ -393,6 +393,9 @@ public interface FeHBaseTable extends FeTable {
 
         // Collects stats samples from at least MIN_NUM_REGIONS_TO_CHECK
         // and at most all regions until the delta is small enough.
+        if (LOG.isTraceEnabled()) {
+          LOG.trace("Start rows sampling on " + locations.size() + " regions");
+        }
         while ((statsSize.count() < MIN_NUM_REGIONS_TO_CHECK ||
             statsSize.stddev() > statsSize.mean() * DELTA_FROM_AVERAGE) &&
             statsSize.count() < locations.size()) {
@@ -402,6 +405,12 @@ public interface FeHBaseTable extends FeTable {
                   clusterStatus);
           totalEstimatedRows += tmp.first;
           statsSize.addSample(tmp.second);
+          if (LOG.isTraceEnabled()) {
+            LOG.trace(String.format("Estimation state: totalEstimatedRows=%d, " +
+                    "statsSize.count=%d, statsSize.stddev=%f, statsSize.mean=%f",
+                totalEstimatedRows, statsSize.count(), statsSize.stddev(),
+                statsSize.mean()));
+          }
         }
 
         // Sum up the total size for all regions in range.

@@ -21,6 +21,7 @@ import java.io.IOException;
 import java.nio.ByteBuffer;
 import java.util.ArrayList;
 import java.util.Arrays;
+import java.util.Collections;
 import java.util.HashMap;
 import java.util.List;
 import java.util.ListIterator;
@@ -99,11 +100,11 @@ public class HBaseScanNode extends ScanNode {
   // One range per clustering column. The range bounds are expected to be constants.
   // A null entry means there's no range restriction for that particular key.
   // If keyRanges is non-null it always contains as many entries as there are clustering
-  // cols.
+  // cols. Don't replace this variable after init().
   private List<ValueRange> keyRanges_ = new ArrayList<>();
 
-  // The list of conjuncts used to create the key ranges. Used if we
-  // must estimate cardinality based on row count stats.
+  // The list of conjuncts used to create the key ranges. Used if we must estimate
+  // cardinality based on row count stats. Don't replace this variable after init().
   private List<Expr> keyConjuncts_ = new ArrayList<>();
 
   // derived from keyRanges_; empty means unbounded;
@@ -155,6 +156,12 @@ public class HBaseScanNode extends ScanNode {
     computeMemLayout(analyzer);
     computeScanRangeLocations(analyzer);
     Preconditions.checkState(!scanRangeSpecs_.isSetSplit_specs());
+
+    // Make sure key ranges are not changed any more. So startKey_ and stopKey_ are
+    // stable too. These invariants make it safe to reuse row estimation results in
+    // computeStats.
+    keyRanges_ = Collections.unmodifiableList(keyRanges_);
+    keyConjuncts_ = Collections.unmodifiableList(keyConjuncts_);
 
     // Call computeStats() after materializing slots and computing the mem layout.
     computeStats(analyzer);
@@ -285,12 +292,23 @@ public class HBaseScanNode extends ScanNode {
   public void computeStats(Analyzer analyzer) {
     super.computeStats(analyzer);
     FeHBaseTable tbl = (FeHBaseTable) desc_.getTable();
-
+    if (LOG.isTraceEnabled()) {
+      LOG.trace("computing stats for HbaseScan on " + tbl.getHBaseTableName());
+    }
     ValueRange rowRange = keyRanges_.get(0);
     if (isEmpty_) {
       cardinality_ = 0;
     } else if (rowRange != null && rowRange.isEqRange()) {
       cardinality_ = 1;
+    } else if (inputCardinality_ >= 0) {
+      // We have run computeStats successfully. Don't need to estimate cardinality again
+      // (IMPALA-8912). Check some invariants if computeStats has been called.
+      Preconditions.checkState(numNodes_ > 0);
+      Preconditions.checkState(cardinality_ >= 0);
+      cardinality_ = inputCardinality_;
+      if (LOG.isTraceEnabled()) {
+        LOG.trace("Reuse last stats: inputCardinality_=" + inputCardinality_);
+      }
     } else {
       Pair<Long, Long> estimate;
       if (analyzer.getQueryCtx().isDisable_hbase_row_est()) {
@@ -319,7 +337,7 @@ public class HBaseScanNode extends ScanNode {
         cardinality_ = estimate.first;
         if (estimate.second > 0) {
           suggestedCaching_ = (int)
-              Math.max(MAX_HBASE_FETCH_BATCH_SIZE / estimate.second.longValue(), 1);
+              Math.max(MAX_HBASE_FETCH_BATCH_SIZE / estimate.second, 1);
         }
       }
     }
@@ -329,7 +347,7 @@ public class HBaseScanNode extends ScanNode {
     cardinality_ = Math.max(1, cardinality_);
     cardinality_ = capCardinalityAtLimit(cardinality_);
     if (LOG.isTraceEnabled()) {
-      LOG.trace("computeStats HbaseScan: cardinality=" + Long.toString(cardinality_));
+      LOG.trace("computeStats HbaseScan: cardinality=" + cardinality_);
     }
 
     // Assume that each executor in the cluster gets a scan range, unless there are fewer
@@ -337,7 +355,7 @@ public class HBaseScanNode extends ScanNode {
     numNodes_ = Math.max(1, Math.min(scanRangeSpecs_.getConcrete_rangesSize(),
                                 ExecutorMembershipSnapshot.getCluster().numExecutors()));
     if (LOG.isTraceEnabled()) {
-      LOG.trace("computeStats HbaseScan: #nodes=" + Integer.toString(numNodes_));
+      LOG.trace("computeStats HbaseScan: #nodes=" + numNodes_);
     }
   }
 
