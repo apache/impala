@@ -448,6 +448,10 @@ enum TImpalaQueryOptions {
   // SPOOL_QUERY_RESULTS is true. Setting this to 0 or -1 means the memory is unbounded.
   // Cannot be set to values below -1.
   MAX_SPILLED_RESULT_SPOOLING_MEM = 91
+
+  // Disable the normal key sampling of HBase tables in row count and row size estimation.
+  // Set this to true will force the use of HMS table stats.
+  DISABLE_HBASE_NUM_ROWS_ESTIMATE = 92
 }
 
 // The summary of a DML statement.

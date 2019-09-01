@@ -861,6 +861,10 @@ Status impala::SetQueryOption(const string& key, const string& value,
         query_options->__set_disable_data_cache(IsTrue(value));
         break;
       }
+      case TImpalaQueryOptions::DISABLE_HBASE_NUM_ROWS_ESTIMATE: {
+        query_options->__set_disable_hbase_num_rows_estimate(IsTrue(value));
+        break;
+      }
       default:
         if (IsRemovedQueryOption(key)) {
           LOG(WARNING) << "Ignoring attempt to set removed query option '" << key << "'";

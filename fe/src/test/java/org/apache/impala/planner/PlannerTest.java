@@ -191,8 +191,9 @@ public class PlannerTest extends PlannerTestBase {
    */
   @Test
   public void testHbaseNoKeyEstimate() {
-    runPlannerTestFile("hbase-no-key-est",
-        ImmutableSet.of(PlannerTestOption.DISABLE_HBASE_KEY_ESTIMATE));
+    TQueryOptions options = defaultQueryOptions();
+    options.setDisable_hbase_num_rows_estimate(true);
+    runPlannerTestFile("hbase-no-key-est", options);
   }
 
   @Test

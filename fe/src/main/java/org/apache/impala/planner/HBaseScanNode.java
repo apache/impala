@@ -311,7 +311,7 @@ public class HBaseScanNode extends ScanNode {
       }
     } else {
       Pair<Long, Long> estimate;
-      if (analyzer.getQueryCtx().isDisable_hbase_row_est()) {
+      if (analyzer.getQueryOptions().isDisable_hbase_num_rows_estimate()) {
         estimate = new Pair<>(-1L, -1L);
       } else {
         // Set maxCaching so that each fetch from hbase won't return a batch of more than
@@ -324,10 +324,13 @@ public class HBaseScanNode extends ScanNode {
         // This works only if HBase stats are available in HMS. This is true
         // for the Impala tests, and may be true for some applications.
         cardinality_ = tbl.getTTableStats().getNum_rows();
+        if (LOG.isTraceEnabled()) {
+          LOG.trace("Fallback to use table stats in HMS: num_rows=" + cardinality_);
+        }
         // TODO: What do do if neither HBase nor HMS provide a row count estimate?
         // Is there some third, ulitimate fallback?
         // Apply estimated key range selectivity from original key conjuncts
-        if (cardinality_ != -1 && keyConjuncts_ != null) {
+        if (cardinality_ > 0 && keyConjuncts_ != null) {
           cardinality_ *= computeCombinedSelectivity(keyConjuncts_);
         }
       } else {
@@ -343,8 +346,15 @@ public class HBaseScanNode extends ScanNode {
     }
     inputCardinality_ = cardinality_;
 
-    cardinality_ *= computeSelectivity();
-    cardinality_ = Math.max(1, cardinality_);
+    if (cardinality_ > 0) {
+      cardinality_ = Math.round(cardinality_ * computeSelectivity());
+      // IMPALA-2165: Avoid setting the cardinality to 0 after rounding.
+      cardinality_ = Math.max(1, cardinality_);
+    } else {
+      // Safe guard for cardinality_ < -1, e.g. when hbase sampling fails and numRows
+      // in HMS is abnormally set to be < -1.
+      cardinality_ = Math.max(-1, cardinality_);
+    }
     cardinality_ = capCardinalityAtLimit(cardinality_);
     if (LOG.isTraceEnabled()) {
       LOG.trace("computeStats HbaseScan: cardinality=" + cardinality_);

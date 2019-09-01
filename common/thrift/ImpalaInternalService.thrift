@@ -388,6 +388,9 @@ struct TQueryOptions {
 
   // See comment in ImpalaService.thrift
   92: optional i64 max_spilled_result_spooling_mem = 1073741824;
+
+  // See comment in ImpalaService.thrift
+  93: optional bool disable_hbase_num_rows_estimate = false;
 }
 
 // Impala currently has two types of sessions: Beeswax and HiveServer2
@@ -540,7 +543,7 @@ struct TQueryCtx {
   // When disabled, scan cardinality is estimated from HMS table row count
   // stats and key column predicate selectivity. Generally only disabled
   // for testing.
-  20: optional bool disable_hbase_row_est = false;
+  20: optional bool disable_hbase_num_rows_estimate = false;
 
   // Flag to enable tracing of resource usage consumption for all fragment instances of a
   // query. Set in ImpalaServer::PrepareQueryContext().
