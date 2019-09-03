@@ -187,6 +187,7 @@ function update_impala_services(json) {
 
 // Update all krpc metrics from the "services" member of "json".
 function update_krpc_services(json) {
+  if (!json["services"]) return;
   // Update each service
   for (var i = 0; i < json["services"].length; ++i) {
     var svc_json = json["services"][i];

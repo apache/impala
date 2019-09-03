@@ -75,12 +75,6 @@ int StatestoredMain(int argc, char** argv) {
   Statestore statestore(metrics.get());
   ABORT_IF_ERROR(statestore.Init(FLAGS_state_store_port));
   statestore.RegisterWebpages(webserver.get());
-  boost::shared_ptr<TProcessor> processor(
-      new StatestoreServiceProcessor(statestore.thrift_iface()));
-  boost::shared_ptr<TProcessorEventHandler> event_handler(
-      new RpcEventHandler("statestore", metrics.get()));
-  processor->setEventHandler(event_handler);
-
   statestore.MainLoop();
 
   return 0;
