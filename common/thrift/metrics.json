@@ -560,6 +560,36 @@
     "key": "impala-server.io-mgr.total-bytes"
   },
   {
+    "description": "IO Manager device name.",
+    "contexts": [
+      "IMPALAD"
+    ],
+    "label": "Impala Server Io Mgr Queue Device Name",
+    "units": "NONE",
+    "kind": "PROPERTY",
+    "key": "impala-server.io-mgr.queue-$0.device-name"
+  },
+  {
+    "description": "Histogram of read operation times on disk.",
+    "contexts": [
+      "IMPALAD"
+    ],
+    "label": "Impala Server Io Mgr Read Latency Histogram",
+    "units": "TIME_NS",
+    "kind": "HISTOGRAM",
+    "key": "impala-server.io-mgr.queue-$0.read-latency"
+  },
+  {
+    "description": "Histogram of read operation sizes on disk.",
+    "contexts": [
+      "IMPALAD"
+    ],
+    "label": "Impala Server Io Mgr Read Size Histogram",
+    "units": "BYTES",
+    "kind": "HISTOGRAM",
+    "key": "impala-server.io-mgr.queue-$0.read-size"
+  },
+  {
     "description": "The number of HDFS files currently open for writing.",
     "contexts": [
       "IMPALAD"

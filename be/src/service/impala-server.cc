@@ -418,10 +418,6 @@ ImpalaServer::ImpalaServer(ExecEnv* exec_env)
     ERR_load_crypto_strings();
   }
 
-  // Initialize impalad metrics
-  ImpaladMetrics::CreateMetrics(
-      exec_env_->metrics()->GetOrCreateChildGroup("impala-server"));
-
   ABORT_IF_ERROR(ExternalDataSourceExecutor::InitJNI(exec_env_->metrics()));
 
   // Register the catalog update callback if running in a real cluster as a coordinator.

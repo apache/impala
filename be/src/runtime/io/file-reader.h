@@ -27,6 +27,7 @@ namespace impala {
 namespace io {
 
 class DiskIoMgr;
+class DiskQueue;
 class RequestContext;
 class ScanRange;
 
@@ -47,7 +48,9 @@ public:
   /// Reads bytes from given position ('file_offset'). Tries to read
   /// 'bytes_to_read' amount of bytes. 'bytes_read' contains the number of
   /// bytes actually read. 'eof' is set to true when end of file has reached.
-  virtual Status ReadFromPos(int64_t file_offset, uint8_t* buffer,
+  /// Metrics in 'queue' are updated with the size and latencies of the read
+  /// operations on the underlying file system.
+  virtual Status ReadFromPos(DiskQueue* queue, int64_t file_offset, uint8_t* buffer,
       int64_t bytes_to_read, int64_t* bytes_read, bool* eof) = 0;
 
   /// ***Currently only for HDFS***

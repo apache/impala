@@ -18,8 +18,10 @@
 #include <algorithm>
 #include <stdio.h>
 
+#include "runtime/io/disk-io-mgr-internal.h"
 #include "runtime/io/local-file-reader.h"
 #include "runtime/io/request-ranges.h"
+#include "util/histogram-metric.h"
 #include "util/impalad-metrics.h"
 #include "util/metrics.h"
 
@@ -49,8 +51,8 @@ Status LocalFileReader::Open(bool use_file_handle_cache) {
   return Status::OK();
 }
 
-Status LocalFileReader::ReadFromPos(int64_t file_offset, uint8_t* buffer,
-    int64_t bytes_to_read, int64_t* bytes_read, bool* eof) {
+Status LocalFileReader::ReadFromPos(DiskQueue* queue, int64_t file_offset,
+    uint8_t* buffer, int64_t bytes_to_read, int64_t* bytes_read, bool* eof) {
   DCHECK(scan_range_->read_in_flight());
   DCHECK_GE(bytes_to_read, 0);
   // Delay before acquiring the lock, to allow triggering IMPALA-6587 race.
@@ -70,11 +72,14 @@ Status LocalFileReader::ReadFromPos(int64_t file_offset, uint8_t* buffer,
     fclose(file_);
     file_ = nullptr;
     return Status(TErrorCode::DISK_IO_ERROR, GetBackendString(),
-        Substitute("Could not seek to $0 "
-            "for file: $1: $2", scan_range_->offset(),
-            *scan_range_->file_string(), GetStrErrMsg()));
+        Substitute("Could not seek to $0 for file: $1: $2",
+            scan_range_->offset(), *scan_range_->file_string(), GetStrErrMsg()));
   }
-  *bytes_read = fread(buffer, 1, bytes_to_read, file_);
+  queue->read_size()->Update(bytes_to_read);
+  {
+    ScopedHistogramTimer read_timer(queue->read_latency());
+    *bytes_read = fread(buffer, 1, bytes_to_read, file_);
+  }
   DCHECK_GE(*bytes_read, 0);
   DCHECK_LE(*bytes_read, bytes_to_read);
   if (*bytes_read < bytes_to_read) {

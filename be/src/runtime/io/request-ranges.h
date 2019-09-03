@@ -351,8 +351,9 @@ class ScanRange : public RequestRange {
 
   /// Called from a disk I/O thread to read the next buffer of data for this range. The
   /// returned ReadOutcome describes what the result of the read was. 'disk_id' is the
-  /// ID of the disk queue. Caller must not hold 'lock_'.
-  ReadOutcome DoRead(int disk_id);
+  /// ID of the disk queue. 'queue' is updated with the sizes and latencies of reads from
+  /// the underlying filesystem. Caller must not hold 'lock_'.
+  ReadOutcome DoRead(DiskQueue* queue, int disk_id);
 
   /// Cleans up a buffer that was not returned to the client.
   /// Either ReturnBuffer() or CleanUpBuffer() is called for every BufferDescriptor.
@@ -442,8 +443,9 @@ class ScanRange : public RequestRange {
 
   /// Read the sub-ranges into buffer and track the current position in 'sub_range_pos_'.
   /// If cached data is available, then memcpy() from it instead of actually reading the
-  /// files.
-  Status ReadSubRanges(BufferDescriptor* buffer, bool* eof);
+  /// files. 'queue' is updated with the latencies and sizes of reads from the underlying
+  /// filesystem.
+  Status ReadSubRanges(DiskQueue* queue, BufferDescriptor* buffer, bool* eof);
 
   /// Validates the internal state of this range. lock_ must be taken
   /// before calling this.

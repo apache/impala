@@ -41,7 +41,7 @@ public:
     return Status::OK();
   }
 
-  virtual Status ReadFromPos(int64_t file_offset, uint8_t* buffer,
+  virtual Status ReadFromPos(DiskQueue* queue, int64_t file_offset, uint8_t* buffer,
       int64_t bytes_to_read, int64_t* bytes_read, bool* eof) override {
     DCHECK(false);
     return Status("Not implemented");

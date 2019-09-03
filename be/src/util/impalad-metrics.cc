@@ -137,73 +137,74 @@ const char* ImpaladMetricKeys::HEDGED_READ_OPS_WIN =
 // These are created by impala-server during startup.
 // =======
 // Counters
-IntCounter* ImpaladMetrics::BACKEND_NUM_QUERIES_EXECUTED = NULL;
-IntGauge* ImpaladMetrics::BACKEND_NUM_QUERIES_EXECUTING = NULL;
-IntCounter* ImpaladMetrics::IMPALA_SERVER_NUM_QUERIES = NULL;
-IntCounter* ImpaladMetrics::IMPALA_SERVER_NUM_FRAGMENTS = NULL;
-IntGauge* ImpaladMetrics::IMPALA_SERVER_NUM_FRAGMENTS_IN_FLIGHT = NULL;
-IntCounter* ImpaladMetrics::NUM_QUERIES_EXPIRED = NULL;
-IntCounter* ImpaladMetrics::NUM_QUERIES_SPILLED = NULL;
-IntCounter* ImpaladMetrics::NUM_RANGES_MISSING_VOLUME_ID = NULL;
-IntCounter* ImpaladMetrics::NUM_RANGES_PROCESSED = NULL;
-IntCounter* ImpaladMetrics::NUM_SESSIONS_EXPIRED = NULL;
-IntCounter* ImpaladMetrics::IO_MGR_BYTES_READ = NULL;
-IntCounter* ImpaladMetrics::IO_MGR_LOCAL_BYTES_READ = NULL;
-IntCounter* ImpaladMetrics::IO_MGR_SHORT_CIRCUIT_BYTES_READ = NULL;
-IntCounter* ImpaladMetrics::IO_MGR_CACHED_BYTES_READ = NULL;
-IntCounter* ImpaladMetrics::IO_MGR_REMOTE_DATA_CACHE_HIT_BYTES = NULL;
-IntCounter* ImpaladMetrics::IO_MGR_REMOTE_DATA_CACHE_MISS_BYTES = NULL;
-IntCounter* ImpaladMetrics::IO_MGR_REMOTE_DATA_CACHE_DROPPED_BYTES = NULL;
-IntCounter* ImpaladMetrics::IO_MGR_BYTES_WRITTEN = NULL;
-IntCounter* ImpaladMetrics::IO_MGR_CACHED_FILE_HANDLES_REOPENED = NULL;
-IntCounter* ImpaladMetrics::HEDGED_READ_OPS = NULL;
-IntCounter* ImpaladMetrics::HEDGED_READ_OPS_WIN = NULL;
-IntCounter* ImpaladMetrics::CATALOG_CACHE_EVICTION_COUNT = NULL;
-IntCounter* ImpaladMetrics::CATALOG_CACHE_HIT_COUNT = NULL;
-IntCounter* ImpaladMetrics::CATALOG_CACHE_LOAD_COUNT = NULL;
-IntCounter* ImpaladMetrics::CATALOG_CACHE_LOAD_EXCEPTION_COUNT = NULL;
-IntCounter* ImpaladMetrics::CATALOG_CACHE_LOAD_SUCCESS_COUNT = NULL;
-IntCounter* ImpaladMetrics::CATALOG_CACHE_MISS_COUNT = NULL;
-IntCounter* ImpaladMetrics::CATALOG_CACHE_REQUEST_COUNT = NULL;
-IntCounter* ImpaladMetrics::CATALOG_CACHE_TOTAL_LOAD_TIME = NULL;
+IntCounter* ImpaladMetrics::BACKEND_NUM_QUERIES_EXECUTED = nullptr;
+IntGauge* ImpaladMetrics::BACKEND_NUM_QUERIES_EXECUTING = nullptr;
+IntCounter* ImpaladMetrics::IMPALA_SERVER_NUM_QUERIES = nullptr;
+IntCounter* ImpaladMetrics::IMPALA_SERVER_NUM_FRAGMENTS = nullptr;
+IntGauge* ImpaladMetrics::IMPALA_SERVER_NUM_FRAGMENTS_IN_FLIGHT = nullptr;
+IntCounter* ImpaladMetrics::NUM_QUERIES_EXPIRED = nullptr;
+IntCounter* ImpaladMetrics::NUM_QUERIES_SPILLED = nullptr;
+IntCounter* ImpaladMetrics::NUM_RANGES_MISSING_VOLUME_ID = nullptr;
+IntCounter* ImpaladMetrics::NUM_RANGES_PROCESSED = nullptr;
+IntCounter* ImpaladMetrics::NUM_SESSIONS_EXPIRED = nullptr;
+IntCounter* ImpaladMetrics::IO_MGR_BYTES_READ = nullptr;
+IntCounter* ImpaladMetrics::IO_MGR_LOCAL_BYTES_READ = nullptr;
+IntCounter* ImpaladMetrics::IO_MGR_SHORT_CIRCUIT_BYTES_READ = nullptr;
+IntCounter* ImpaladMetrics::IO_MGR_CACHED_BYTES_READ = nullptr;
+IntCounter* ImpaladMetrics::IO_MGR_REMOTE_DATA_CACHE_HIT_BYTES = nullptr;
+IntCounter* ImpaladMetrics::IO_MGR_REMOTE_DATA_CACHE_MISS_BYTES = nullptr;
+IntCounter* ImpaladMetrics::IO_MGR_REMOTE_DATA_CACHE_DROPPED_BYTES = nullptr;
+IntCounter* ImpaladMetrics::IO_MGR_BYTES_WRITTEN = nullptr;
+IntCounter* ImpaladMetrics::IO_MGR_CACHED_FILE_HANDLES_REOPENED = nullptr;
+IntCounter* ImpaladMetrics::HEDGED_READ_OPS = nullptr;
+IntCounter* ImpaladMetrics::HEDGED_READ_OPS_WIN = nullptr;
+IntCounter* ImpaladMetrics::CATALOG_CACHE_EVICTION_COUNT = nullptr;
+IntCounter* ImpaladMetrics::CATALOG_CACHE_HIT_COUNT = nullptr;
+IntCounter* ImpaladMetrics::CATALOG_CACHE_LOAD_COUNT = nullptr;
+IntCounter* ImpaladMetrics::CATALOG_CACHE_LOAD_EXCEPTION_COUNT = nullptr;
+IntCounter* ImpaladMetrics::CATALOG_CACHE_LOAD_SUCCESS_COUNT = nullptr;
+IntCounter* ImpaladMetrics::CATALOG_CACHE_MISS_COUNT = nullptr;
+IntCounter* ImpaladMetrics::CATALOG_CACHE_REQUEST_COUNT = nullptr;
+IntCounter* ImpaladMetrics::CATALOG_CACHE_TOTAL_LOAD_TIME = nullptr;
 
 // Gauges
-IntGauge* ImpaladMetrics::CATALOG_NUM_DBS = NULL;
-IntGauge* ImpaladMetrics::CATALOG_NUM_TABLES = NULL;
-IntGauge* ImpaladMetrics::CATALOG_VERSION = NULL;
-IntGauge* ImpaladMetrics::CATALOG_TOPIC_VERSION = NULL;
-IntGauge* ImpaladMetrics::IMPALA_SERVER_NUM_OPEN_BEESWAX_SESSIONS = NULL;
-IntGauge* ImpaladMetrics::IMPALA_SERVER_NUM_OPEN_HS2_SESSIONS = NULL;
-IntGauge* ImpaladMetrics::IO_MGR_NUM_BUFFERS = NULL;
-IntGauge* ImpaladMetrics::IO_MGR_NUM_OPEN_FILES = NULL;
-IntGauge* ImpaladMetrics::IO_MGR_NUM_UNUSED_BUFFERS = NULL;
-IntGauge* ImpaladMetrics::IO_MGR_NUM_CACHED_FILE_HANDLES = NULL;
-IntGauge* ImpaladMetrics::IO_MGR_NUM_FILE_HANDLES_OUTSTANDING = NULL;
-IntGauge* ImpaladMetrics::IO_MGR_CACHED_FILE_HANDLES_HIT_COUNT = NULL;
-IntGauge* ImpaladMetrics::IO_MGR_CACHED_FILE_HANDLES_MISS_COUNT = NULL;
-IntGauge* ImpaladMetrics::IO_MGR_REMOTE_DATA_CACHE_TOTAL_BYTES = NULL;
-IntGauge* ImpaladMetrics::NUM_FILES_OPEN_FOR_INSERT = NULL;
-IntGauge* ImpaladMetrics::NUM_QUERIES_REGISTERED = NULL;
-IntGauge* ImpaladMetrics::RESULTSET_CACHE_TOTAL_NUM_ROWS = NULL;
-IntGauge* ImpaladMetrics::RESULTSET_CACHE_TOTAL_BYTES = NULL;
-DoubleGauge* ImpaladMetrics::CATALOG_CACHE_AVG_LOAD_TIME = NULL;
-DoubleGauge* ImpaladMetrics::CATALOG_CACHE_HIT_RATE = NULL;
-DoubleGauge* ImpaladMetrics::CATALOG_CACHE_LOAD_EXCEPTION_RATE = NULL;
-DoubleGauge* ImpaladMetrics::CATALOG_CACHE_MISS_RATE = NULL;
+IntGauge* ImpaladMetrics::CATALOG_NUM_DBS = nullptr;
+IntGauge* ImpaladMetrics::CATALOG_NUM_TABLES = nullptr;
+IntGauge* ImpaladMetrics::CATALOG_VERSION = nullptr;
+IntGauge* ImpaladMetrics::CATALOG_TOPIC_VERSION = nullptr;
+IntGauge* ImpaladMetrics::IMPALA_SERVER_NUM_OPEN_BEESWAX_SESSIONS = nullptr;
+IntGauge* ImpaladMetrics::IMPALA_SERVER_NUM_OPEN_HS2_SESSIONS = nullptr;
+MetricGroup* ImpaladMetrics::IO_MGR_METRICS = nullptr;
+IntGauge* ImpaladMetrics::IO_MGR_NUM_BUFFERS = nullptr;
+IntGauge* ImpaladMetrics::IO_MGR_NUM_OPEN_FILES = nullptr;
+IntGauge* ImpaladMetrics::IO_MGR_NUM_UNUSED_BUFFERS = nullptr;
+IntGauge* ImpaladMetrics::IO_MGR_NUM_CACHED_FILE_HANDLES = nullptr;
+IntGauge* ImpaladMetrics::IO_MGR_NUM_FILE_HANDLES_OUTSTANDING = nullptr;
+IntGauge* ImpaladMetrics::IO_MGR_CACHED_FILE_HANDLES_HIT_COUNT = nullptr;
+IntGauge* ImpaladMetrics::IO_MGR_CACHED_FILE_HANDLES_MISS_COUNT = nullptr;
+IntGauge* ImpaladMetrics::IO_MGR_REMOTE_DATA_CACHE_TOTAL_BYTES = nullptr;
+IntGauge* ImpaladMetrics::NUM_FILES_OPEN_FOR_INSERT = nullptr;
+IntGauge* ImpaladMetrics::NUM_QUERIES_REGISTERED = nullptr;
+IntGauge* ImpaladMetrics::RESULTSET_CACHE_TOTAL_NUM_ROWS = nullptr;
+IntGauge* ImpaladMetrics::RESULTSET_CACHE_TOTAL_BYTES = nullptr;
+DoubleGauge* ImpaladMetrics::CATALOG_CACHE_AVG_LOAD_TIME = nullptr;
+DoubleGauge* ImpaladMetrics::CATALOG_CACHE_HIT_RATE = nullptr;
+DoubleGauge* ImpaladMetrics::CATALOG_CACHE_LOAD_EXCEPTION_RATE = nullptr;
+DoubleGauge* ImpaladMetrics::CATALOG_CACHE_MISS_RATE = nullptr;
 
 // Properties
-BooleanProperty* ImpaladMetrics::CATALOG_READY = NULL;
-BooleanProperty* ImpaladMetrics::IMPALA_SERVER_READY = NULL;
-StringProperty* ImpaladMetrics::IMPALA_SERVER_VERSION = NULL;
-StringProperty* ImpaladMetrics::CATALOG_SERVICE_ID = NULL;
+BooleanProperty* ImpaladMetrics::CATALOG_READY = nullptr;
+BooleanProperty* ImpaladMetrics::IMPALA_SERVER_READY = nullptr;
+StringProperty* ImpaladMetrics::IMPALA_SERVER_VERSION = nullptr;
+StringProperty* ImpaladMetrics::CATALOG_SERVICE_ID = nullptr;
 
 // Histograms
-HistogramMetric* ImpaladMetrics::QUERY_DURATIONS = NULL;
-HistogramMetric* ImpaladMetrics::DDL_DURATIONS = NULL;
+HistogramMetric* ImpaladMetrics::QUERY_DURATIONS = nullptr;
+HistogramMetric* ImpaladMetrics::DDL_DURATIONS = nullptr;
 
 // Other
 StatsMetric<uint64_t, StatsType::MEAN>*
-ImpaladMetrics::IO_MGR_CACHED_FILE_HANDLES_HIT_RATIO = NULL;
+ImpaladMetrics::IO_MGR_CACHED_FILE_HANDLES_HIT_RATIO = nullptr;
 
 void ImpaladMetrics::InitCatalogMetrics(MetricGroup* m) {
   // Initialize catalog metrics
@@ -292,43 +293,44 @@ void ImpaladMetrics::CreateMetrics(MetricGroup* m) {
       ImpaladMetricKeys::NUM_FILES_OPEN_FOR_INSERT, 0);
 
   // Initialize IO mgr metrics
-  IO_MGR_NUM_OPEN_FILES = m->AddGauge(
+  IO_MGR_METRICS = m->GetOrCreateChildGroup("io-mgr");
+  IO_MGR_NUM_OPEN_FILES = IO_MGR_METRICS->AddGauge(
       ImpaladMetricKeys::IO_MGR_NUM_OPEN_FILES, 0);
-  IO_MGR_NUM_CACHED_FILE_HANDLES = m->AddGauge(
+  IO_MGR_NUM_CACHED_FILE_HANDLES = IO_MGR_METRICS->AddGauge(
       ImpaladMetricKeys::IO_MGR_NUM_CACHED_FILE_HANDLES, 0);
-  IO_MGR_NUM_FILE_HANDLES_OUTSTANDING = m->AddGauge(
+  IO_MGR_NUM_FILE_HANDLES_OUTSTANDING = IO_MGR_METRICS->AddGauge(
       ImpaladMetricKeys::IO_MGR_NUM_FILE_HANDLES_OUTSTANDING, 0);
 
-  IO_MGR_CACHED_FILE_HANDLES_HIT_COUNT = m->AddGauge(
+  IO_MGR_CACHED_FILE_HANDLES_HIT_COUNT = IO_MGR_METRICS->AddGauge(
       ImpaladMetricKeys::IO_MGR_CACHED_FILE_HANDLES_HIT_COUNT, 0);
 
-  IO_MGR_CACHED_FILE_HANDLES_MISS_COUNT = m->AddGauge(
+  IO_MGR_CACHED_FILE_HANDLES_MISS_COUNT = IO_MGR_METRICS->AddGauge(
       ImpaladMetricKeys::IO_MGR_CACHED_FILE_HANDLES_MISS_COUNT, 0);
 
-  IO_MGR_CACHED_FILE_HANDLES_REOPENED = m->AddCounter(
+  IO_MGR_CACHED_FILE_HANDLES_REOPENED = IO_MGR_METRICS->AddCounter(
       ImpaladMetricKeys::IO_MGR_CACHED_FILE_HANDLES_REOPENED, 0);
 
-  IO_MGR_BYTES_READ = m->AddCounter(ImpaladMetricKeys::IO_MGR_BYTES_READ, 0);
-  IO_MGR_LOCAL_BYTES_READ = m->AddCounter(
+  IO_MGR_BYTES_READ = IO_MGR_METRICS->AddCounter(ImpaladMetricKeys::IO_MGR_BYTES_READ, 0);
+  IO_MGR_LOCAL_BYTES_READ = IO_MGR_METRICS->AddCounter(
       ImpaladMetricKeys::IO_MGR_LOCAL_BYTES_READ, 0);
-  IO_MGR_CACHED_BYTES_READ = m->AddCounter(
+  IO_MGR_CACHED_BYTES_READ = IO_MGR_METRICS->AddCounter(
       ImpaladMetricKeys::IO_MGR_CACHED_BYTES_READ, 0);
-  IO_MGR_SHORT_CIRCUIT_BYTES_READ = m->AddCounter(
+  IO_MGR_SHORT_CIRCUIT_BYTES_READ = IO_MGR_METRICS->AddCounter(
       ImpaladMetricKeys::IO_MGR_SHORT_CIRCUIT_BYTES_READ, 0);
-  IO_MGR_BYTES_WRITTEN = m->AddCounter(
+  IO_MGR_BYTES_WRITTEN = IO_MGR_METRICS->AddCounter(
       ImpaladMetricKeys::IO_MGR_BYTES_WRITTEN, 0);
 
-  IO_MGR_REMOTE_DATA_CACHE_HIT_BYTES = m->AddCounter(
+  IO_MGR_REMOTE_DATA_CACHE_HIT_BYTES = IO_MGR_METRICS->AddCounter(
       ImpaladMetricKeys::IO_MGR_REMOTE_DATA_CACHE_HIT_BYTES, 0);
-  IO_MGR_REMOTE_DATA_CACHE_MISS_BYTES = m->AddCounter(
+  IO_MGR_REMOTE_DATA_CACHE_MISS_BYTES = IO_MGR_METRICS->AddCounter(
       ImpaladMetricKeys::IO_MGR_REMOTE_DATA_CACHE_MISS_BYTES, 0);
-  IO_MGR_REMOTE_DATA_CACHE_TOTAL_BYTES = m->AddGauge(
+  IO_MGR_REMOTE_DATA_CACHE_TOTAL_BYTES = IO_MGR_METRICS->AddGauge(
       ImpaladMetricKeys::IO_MGR_REMOTE_DATA_CACHE_TOTAL_BYTES, 0);
-  IO_MGR_REMOTE_DATA_CACHE_DROPPED_BYTES = m->AddCounter(
+  IO_MGR_REMOTE_DATA_CACHE_DROPPED_BYTES = IO_MGR_METRICS->AddCounter(
       ImpaladMetricKeys::IO_MGR_REMOTE_DATA_CACHE_DROPPED_BYTES, 0);
 
   IO_MGR_CACHED_FILE_HANDLES_HIT_RATIO =
-      StatsMetric<uint64_t, StatsType::MEAN>::CreateAndRegister(m,
+      StatsMetric<uint64_t, StatsType::MEAN>::CreateAndRegister(IO_MGR_METRICS,
       ImpaladMetricKeys::IO_MGR_CACHED_FILE_HANDLES_HIT_RATIO);
 
   InitCatalogMetrics(m);

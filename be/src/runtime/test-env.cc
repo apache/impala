@@ -51,6 +51,8 @@ Status TestEnv::Init() {
     static_metrics_.reset(new MetricGroup("test-env-static-metrics"));
     ImpaladMetrics::CreateMetrics(static_metrics_.get());
     RETURN_IF_ERROR(RegisterMemoryMetrics(static_metrics_.get(), true, nullptr, nullptr));
+    ImpaladMetrics::CreateMetrics(
+        static_metrics_->GetOrCreateChildGroup("impala-server"));
   }
 
   exec_env_.reset(new ExecEnv);

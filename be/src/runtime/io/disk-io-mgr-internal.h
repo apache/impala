@@ -50,6 +50,8 @@ DECLARE_uint64(max_cached_file_handles);
  } while (false);
 
 namespace impala {
+class HistogramMetric;
+
 namespace io {
 
 // Indicates if file handle caching should be used
@@ -91,6 +93,18 @@ class DiskQueue {
   /// Append debug string to 'ss'. Acquires the DiskQueue lock.
   void DebugString(std::stringstream* ss);
 
+  void set_read_latency(HistogramMetric* read_latency) {
+    DCHECK(read_latency_ == nullptr);
+    read_latency_ = read_latency;
+  }
+  void set_read_size(HistogramMetric* read_size) {
+    DCHECK(read_size_ == nullptr);
+    read_size_ = read_size;
+  }
+
+  HistogramMetric* read_latency() const { return read_latency_; }
+  HistogramMetric* read_size() const { return read_size_; }
+
  private:
   /// Called from the disk thread to get the next range to process. Wait until a scan
   /// is available to process, a write range is available, or 'shut_down_' is set to
@@ -100,6 +114,12 @@ class DiskQueue {
 
   /// Disk id (0-based)
   const int disk_id_;
+
+  /// Metric that tracks read latency for this queue.
+  HistogramMetric* read_latency_ = nullptr;
+
+  /// Metric that tracks read size for this queue.
+  HistogramMetric* read_size_ = nullptr;
 
   /// Lock that protects below members.
   boost::mutex lock_;

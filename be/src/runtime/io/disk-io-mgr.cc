@@ -29,11 +29,13 @@
 
 #include "gutil/strings/substitute.h"
 #include "util/bit-util.h"
+#include "util/collection-metrics.h"
 #include "util/disk-info.h"
 #include "util/filesystem-util.h"
 #include "util/hdfs-util.h"
-#include "util/collection-metrics.h"
+#include "util/histogram-metric.h"
 #include "util/metrics.h"
+#include "util/test-info.h"
 #include "util/time.h"
 
 #ifndef NDEBUG
@@ -145,6 +147,13 @@ DEFINE_bool(cache_remote_file_handles, true, "Enable the file handle cache for "
 // This parameter controls whether S3 file handles are cached.
 DEFINE_bool(cache_s3_file_handles, true, "Enable the file handle cache for "
     "S3 files.");
+
+static const char* DEVICE_NAME_METRIC_KEY_TEMPLATE =
+    "impala-server.io-mgr.queue-$0.device-name";
+static const char* READ_LATENCY_METRIC_KEY_TEMPLATE =
+    "impala-server.io-mgr.queue-$0.read-latency";
+static const char* READ_SIZE_METRIC_KEY_TEMPLATE =
+    "impala-server.io-mgr.queue-$0.read-size";
 
 AtomicInt32 DiskIoMgr::next_disk_id_;
 
@@ -271,6 +280,36 @@ Status DiskIoMgr::Init() {
       // During tests, i may not point to an existing disk.
       device_name = i < DiskInfo::num_disks() ? DiskInfo::device_name(i) : to_string(i);
     }
+    const string& i_string = Substitute("$0", i);
+
+    // Unit tests may create multiple DiskIoMgrs, so we need to avoid re-registering the
+    // same metrics.
+    if (!TestInfo::is_test()
+        || ImpaladMetrics::IO_MGR_METRICS->FindMetricForTesting<StringProperty>(
+               Substitute(DEVICE_NAME_METRIC_KEY_TEMPLATE, i_string))
+            == nullptr) {
+      ImpaladMetrics::IO_MGR_METRICS->AddProperty<string>(
+          DEVICE_NAME_METRIC_KEY_TEMPLATE, device_name, i_string);
+    }
+    int64_t ONE_HOUR_IN_NS = 60L * 60L * NANOS_PER_SEC;
+    HistogramMetric* read_latency = nullptr;
+    HistogramMetric* read_size = nullptr;
+    if (TestInfo::is_test()) {
+      read_latency =
+        ImpaladMetrics::IO_MGR_METRICS->FindMetricForTesting<HistogramMetric>(
+            Substitute(READ_LATENCY_METRIC_KEY_TEMPLATE, i_string));
+      read_size =
+        ImpaladMetrics::IO_MGR_METRICS->FindMetricForTesting<HistogramMetric>(
+            Substitute(READ_SIZE_METRIC_KEY_TEMPLATE, i_string));
+    }
+    disk_queues_[i]->set_read_latency(read_latency != nullptr ? read_latency :
+            ImpaladMetrics::IO_MGR_METRICS->RegisterMetric(new HistogramMetric(
+                MetricDefs::Get(READ_LATENCY_METRIC_KEY_TEMPLATE, i_string),
+                ONE_HOUR_IN_NS, 3)));
+    int64_t ONE_GB = 1024L * 1024L * 1024L;
+    disk_queues_[i]->set_read_size(read_size != nullptr ? read_size :
+            ImpaladMetrics::IO_MGR_METRICS->RegisterMetric(new HistogramMetric(
+                MetricDefs::Get(READ_SIZE_METRIC_KEY_TEMPLATE, i_string), ONE_GB, 3)));
     for (int j = 0; j < num_threads_per_disk; ++j) {
       stringstream ss;
       ss << "work-loop(Disk: " << device_name << ", Thread: " << j << ")";
@@ -446,7 +485,7 @@ void DiskQueue::DiskThreadLoop(DiskIoMgr* io_mgr) {
 
     if (range->request_type() == RequestType::READ) {
       ScanRange* scan_range = static_cast<ScanRange*>(range);
-      ReadOutcome outcome = scan_range->DoRead(disk_id_);
+      ReadOutcome outcome = scan_range->DoRead(this, disk_id_);
       worker_context->ReadDone(disk_id_, outcome, scan_range);
     } else {
       DCHECK(range->request_type() == RequestType::WRITE);

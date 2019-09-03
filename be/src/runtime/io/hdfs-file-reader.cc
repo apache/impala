@@ -24,6 +24,7 @@
 #include "runtime/io/request-context.h"
 #include "runtime/io/request-ranges.h"
 #include "util/hdfs-util.h"
+#include "util/histogram-metric.h"
 #include "util/impalad-metrics.h"
 #include "util/metrics.h"
 #include "util/pretty-printer.h"
@@ -71,7 +72,7 @@ Status HdfsFileReader::Open(bool use_file_handle_cache) {
   return Status::OK();
 }
 
-Status HdfsFileReader::ReadFromPos(int64_t file_offset, uint8_t* buffer,
+Status HdfsFileReader::ReadFromPos(DiskQueue* queue, int64_t file_offset, uint8_t* buffer,
     int64_t bytes_to_read, int64_t* bytes_read, bool* eof) {
   DCHECK(scan_range_->read_in_flight());
   DCHECK_GE(bytes_to_read, 0);
@@ -137,7 +138,7 @@ Status HdfsFileReader::ReadFromPos(int64_t file_offset, uint8_t* buffer,
 
       // ReadFromPosInternal() might fail due to a bad file handle.
       // If that was the case, allow for a retry to fix it.
-      status = ReadFromPosInternal(hdfs_file, position_in_file,
+      status = ReadFromPosInternal(hdfs_file, queue, position_in_file,
           buffer + *bytes_read, chunk_size, &current_bytes_read);
 
       // Retry if:
@@ -148,15 +149,14 @@ Status HdfsFileReader::ReadFromPos(int64_t file_offset, uint8_t* buffer,
         // The error may be due to a bad file handle. Reopen the file handle and retry.
         // Exclude this time from the read timers.
         req_context_read_timer.Stop();
-        RETURN_IF_ERROR(io_mgr->ReopenCachedHdfsFileHandle(hdfs_fs_,
-                scan_range_->file_string(), scan_range_->mtime(),
-                request_context, &borrowed_hdfs_fh));
+        RETURN_IF_ERROR(
+            io_mgr->ReopenCachedHdfsFileHandle(hdfs_fs_, scan_range_->file_string(),
+                scan_range_->mtime(), request_context, &borrowed_hdfs_fh));
         hdfs_file = borrowed_hdfs_fh->file();
-        VLOG_FILE << "Reopening file " << scan_range_->file_string()
-                  << " with mtime " << scan_range_->mtime()
-                  << " offset " << file_offset;
+        VLOG_FILE << "Reopening file " << scan_range_->file_string() << " with mtime "
+                  << scan_range_->mtime() << " offset " << file_offset;
         req_context_read_timer.Start();
-        status = ReadFromPosInternal(hdfs_file, position_in_file,
+        status = ReadFromPosInternal(hdfs_file, queue, position_in_file,
             buffer + *bytes_read, chunk_size, &current_bytes_read);
       }
       if (!status.ok()) {
@@ -185,8 +185,10 @@ Status HdfsFileReader::ReadFromPos(int64_t file_offset, uint8_t* buffer,
   return status;
 }
 
-Status HdfsFileReader::ReadFromPosInternal(hdfsFile hdfs_file, int64_t position_in_file,
-    uint8_t* buffer, int64_t chunk_size, int* bytes_read) {
+Status HdfsFileReader::ReadFromPosInternal(hdfsFile hdfs_file, DiskQueue* queue,
+    int64_t position_in_file, uint8_t* buffer, int64_t chunk_size, int* bytes_read) {
+  queue->read_size()->Update(chunk_size);
+  ScopedHistogramTimer read_timer(queue->read_latency());
   // For file handles from the cache, any of the below file operations may fail
   // due to a bad file handle.
   if (FLAGS_use_hdfs_pread) {

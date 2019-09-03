@@ -58,6 +58,7 @@
 #include "util/debug-util.h"
 #include "util/default-path-handlers.h"
 #include "util/hdfs-bulk-ops.h"
+#include "util/impalad-metrics.h"
 #include "util/mem-info.h"
 #include "util/memory-metrics.h"
 #include "util/metrics.h"
@@ -328,6 +329,9 @@ Status ExecEnv::Init() {
   catalogd_client_cache_->InitMetrics(metrics_.get(), "catalog.server");
   RETURN_IF_ERROR(RegisterMemoryMetrics(
       metrics_.get(), true, buffer_reservation_.get(), buffer_pool_.get()));
+  // Initialize impalad metrics
+  ImpaladMetrics::CreateMetrics(
+      exec_env_->metrics()->GetOrCreateChildGroup("impala-server"));
 
   // Resolve hostname to IP address.
   RETURN_IF_ERROR(HostnameToIpAddr(FLAGS_hostname, &ip_address_));

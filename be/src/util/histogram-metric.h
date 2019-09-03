@@ -20,6 +20,7 @@
 #include "util/hdr-histogram.h"
 #include "util/metrics.h"
 #include "util/spinlock.h"
+#include "util/stopwatch.h"
 
 namespace impala {
 
@@ -68,4 +69,16 @@ class HistogramMetric : public Metric {
 
   DISALLOW_COPY_AND_ASSIGN(HistogramMetric);
 };
-}
+
+// Utility class to update histogram with elapsed time in code block.
+class ScopedHistogramTimer {
+ public:
+  ScopedHistogramTimer(HistogramMetric* metric) : metric_(metric) { sw_.Start(); }
+
+  ~ScopedHistogramTimer() { metric_->Update(sw_.ElapsedTime()); }
+
+ private:
+  HistogramMetric* const metric_;
+  MonotonicStopWatch sw_;
+};
+} // namespace impala

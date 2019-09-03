@@ -35,7 +35,7 @@ public:
   ~HdfsFileReader();
 
   virtual Status Open(bool use_file_handle_cache) override;
-  virtual Status ReadFromPos(int64_t file_offset, uint8_t* buffer,
+  virtual Status ReadFromPos(DiskQueue* queue, int64_t file_offset, uint8_t* buffer,
       int64_t bytes_to_read, int64_t* bytes_read, bool* eof) override;
   virtual void Close() override;
   virtual void ResetState() override;
@@ -70,8 +70,9 @@ private:
   /// into 'buffer'. Update 'bytes_read' on success. Returns error status on
   /// failure. When not using HDFS pread, this function will always implicitly
   /// seek to 'position_in_file' if 'hdfs_file' is not at it already.
-  Status ReadFromPosInternal(hdfsFile hdfs_file, int64_t position_in_file,
-      uint8_t* buffer, int64_t chunk_size, int* bytes_read);
+  /// 'disk_queue' metrics are updated based on the operation.
+  Status ReadFromPosInternal(hdfsFile hdfs_file, DiskQueue* disk_queue,
+      int64_t position_in_file, uint8_t* buffer, int64_t chunk_size, int* bytes_read);
 
   void GetHdfsStatistics(hdfsFile hdfs_file);
 

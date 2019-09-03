@@ -259,6 +259,7 @@ class ImpaladMetrics {
   static DoubleGauge* CATALOG_CACHE_MISS_RATE;
   static IntGauge* IMPALA_SERVER_NUM_OPEN_BEESWAX_SESSIONS;
   static IntGauge* IMPALA_SERVER_NUM_OPEN_HS2_SESSIONS;
+  static MetricGroup* IO_MGR_METRICS;
   static IntGauge* IO_MGR_NUM_BUFFERS;
   static IntGauge* IO_MGR_NUM_OPEN_FILES;
   static IntGauge* IO_MGR_NUM_UNUSED_BUFFERS;

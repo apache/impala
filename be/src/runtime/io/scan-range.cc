@@ -168,7 +168,7 @@ unique_ptr<BufferDescriptor> ScanRange::GetUnusedBuffer(
   return result;
 }
 
-ReadOutcome ScanRange::DoRead(int disk_id) {
+ReadOutcome ScanRange::DoRead(DiskQueue* queue, int disk_id) {
   int64_t bytes_remaining = bytes_to_read_ - bytes_read_;
   DCHECK_GT(bytes_remaining, 0);
 
@@ -220,11 +220,11 @@ ReadOutcome ScanRange::DoRead(int disk_id) {
 
     if (sub_ranges_.empty()) {
       DCHECK(cache_.data == nullptr);
-      read_status = file_reader_->ReadFromPos(offset_ + bytes_read_, buffer_desc->buffer_,
-          min(len() - bytes_read_, buffer_desc->buffer_len_),
+      read_status = file_reader_->ReadFromPos(queue, offset_ + bytes_read_,
+          buffer_desc->buffer_, min(len() - bytes_read_, buffer_desc->buffer_len_),
           &buffer_desc->len_, &eof);
     } else {
-      read_status = ReadSubRanges(buffer_desc.get(), &eof);
+      read_status = ReadSubRanges(queue, buffer_desc.get(), &eof);
     }
 
     COUNTER_ADD_IF_NOT_NULL(reader_->bytes_read_counter_, buffer_desc->len_);
@@ -266,10 +266,11 @@ ReadOutcome ScanRange::DoRead(int disk_id) {
   return eosr ? ReadOutcome::SUCCESS_EOSR : ReadOutcome::SUCCESS_NO_EOSR;
 }
 
-Status ScanRange::ReadSubRanges(BufferDescriptor* buffer_desc, bool* eof) {
+Status ScanRange::ReadSubRanges(
+    DiskQueue* queue, BufferDescriptor* buffer_desc, bool* eof) {
   buffer_desc->len_ = 0;
-  while (buffer_desc->len() < buffer_desc->buffer_len() &&
-      sub_range_pos_.index < sub_ranges_.size()) {
+  while (buffer_desc->len() < buffer_desc->buffer_len()
+      && sub_range_pos_.index < sub_ranges_.size()) {
     SubRange& sub_range = sub_ranges_[sub_range_pos_.index];
     int64_t offset = sub_range.offset + sub_range_pos_.bytes_read;
     int64_t bytes_to_read = min(sub_range.length - sub_range_pos_.bytes_read,
@@ -280,7 +281,7 @@ Status ScanRange::ReadSubRanges(BufferDescriptor* buffer_desc, bool* eof) {
           cache_.data + offset, bytes_to_read);
     } else {
       int64_t current_bytes_read;
-      Status read_status = file_reader_->ReadFromPos(offset,
+      Status read_status = file_reader_->ReadFromPos(queue, offset,
           buffer_desc->buffer_ + buffer_desc->len(), bytes_to_read, &current_bytes_read,
           eof);
       if (!read_status.ok()) return read_status;
