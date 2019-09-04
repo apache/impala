@@ -168,7 +168,7 @@ under the License.
   {{^use_local_catalog}}
     <a href='{{ __common__.host-url }}/catalog_object?object_type=DATABASE&object_name={{name}}'>
   {{/use_local_catalog}}
-      <h5 class="card-title">{{name}}
+      <h5 class="card-title" id='{{name}}'>{{name}}
       <span class="float-right">{{num_tables}} table(s)</span></h5>
   {{^use_local_catalog}}
     </a>
