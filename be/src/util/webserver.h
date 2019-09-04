@@ -45,6 +45,20 @@ enum ContentType {
 /// Wrapper class for the Squeasel web server library. Clients may register callback
 /// methods which produce Json documents which are rendered via a template file to either
 /// HTML or text.
+///
+/// Apache Knox Integration
+/// -----------------------
+/// In order to be compatible with the Knox 'impalaui' service definition, there are a few
+/// requirements that template files served by this webserver have to conform to:
+/// - Any relative links to pages on this server must be proceeded by
+///   {{ __common__.host-url }} so that they can be made into absolute urls when Knox
+///   proxying is being used.
+/// - Any forms must contain {{>www/form-hidden-inputs.tmpl}}, which adds some hidden
+///   fields when Knox proxying is being used.
+/// - Any relative urls that are accessed via javascript should be constructed with the
+///   make_url() function in common-header.tmpl.
+/// See: https://github.com/apache/knox/tree/master/gateway-service-definitions/
+///     src/main/resources/services/impalaui/1.0.0
 class Webserver {
  public:
   using ArgumentMap = kudu::WebCallbackRegistry::ArgumentMap;
@@ -179,7 +193,8 @@ class Webserver {
   /// - Argument 'raw' renders the page with PLAIN ContentType.
   /// - Argument 'json' renders the page with JSON ContentType. The underlying JSON is
   ///   pretty-printed.
-  void RenderUrlWithTemplate(const WebRequest& arguments, const UrlHandler& url_handler,
+  void RenderUrlWithTemplate(const struct sq_connection* connection,
+      const WebRequest& arguments, const UrlHandler& url_handler,
       std::stringstream* output, ContentType* content_type);
 
   /// Called when an error is encountered, e.g. when a handler for a URI cannot be found.
@@ -192,7 +207,8 @@ class Webserver {
 
   /// Adds a __common__ object to document with common data that every webpage might want
   /// to read (e.g. the names of links to write to the navbar).
-  void GetCommonJson(rapidjson::Document* document);
+  void GetCommonJson(rapidjson::Document* document,
+      const struct sq_connection* connection, const WebRequest& req);
 
   /// Lock guarding the path_handlers_ map
   boost::shared_mutex url_handlers_lock_;

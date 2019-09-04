@@ -149,7 +149,8 @@ class TestWebPage(ImpalaTestSuite):
       except ValueError:
         assert False, "Invalid JSON returned from /jmx endpoint: %s" % jmx_json
 
-  def get_and_check_status(self, url, string_to_search="", ports_to_test=None):
+  def get_and_check_status(
+      self, url, string_to_search="", ports_to_test=None, regex=False, headers=None):
     """Helper method that polls a given url and asserts the return code is ok and
     the response contains the input string."""
     if ports_to_test is None:
@@ -158,11 +159,15 @@ class TestWebPage(ImpalaTestSuite):
     responses = []
     for port in ports_to_test:
       input_url = url.format(port)
-      response = requests.get(input_url)
+      response = requests.get(input_url, headers=headers)
       assert response.status_code == requests.codes.ok, "URL: {0} Str:'{1}'\nResp:{2}"\
         .format(input_url, string_to_search, response.text)
-      assert string_to_search in response.text, "URL: {0} Str:'{1}'\nResp:{2}".format(
-        input_url, string_to_search, response.text)
+      if regex:
+        assert re.search(string_to_search, response.text), "URL: {0} Str:'{1}'\nResp:{2}"\
+          .format(input_url, string_to_search, response.text)
+      else:
+        assert string_to_search in response.text, "URL: {0} Str:'{1}'\nResp:{2}".format(
+          input_url, string_to_search, response.text)
       responses.append(response)
     return responses
 
@@ -658,8 +663,8 @@ class TestWebPage(ImpalaTestSuite):
     page = requests.get("http://localhost:25000/healthz")
     assert page.status_code == requests.codes.ok
 
-  def test_knox_compatability(self):
-    """Checks that the template files conform to the requirements for compatability with
+  def test_knox_compatibility(self):
+    """Checks that the template files conform to the requirements for compatibility with
     the Apache Knox service definition."""
     # Matches all 'a' links with an 'href' that doesn't start with either '#' (which stays
     # on the same page an so doesn't need to the hostname) or '{{ __common__.host-url }}'
@@ -674,3 +679,12 @@ class TestWebPage(ImpalaTestSuite):
     results = grep_dir(os.path.join(os.environ['IMPALA_HOME'], "www"), regex, ".*\.tmpl")
     assert len(results) == 0, \
         "All links on the webui must include the webserver host: %s" % results
+
+    # Check that when Knox integration is not being used, the links are relative, by
+    # checking for the root link from the header.
+    self.get_and_check_status(self.ROOT_URL, "href='/'", self.IMPALAD_TEST_PORT)
+    # Check that if the 'x-forwarded-context' header is present in the request, the links
+    # are written as absolute.
+    self.get_and_check_status(self.ROOT_URL,
+        "href='http://.*:%s/'" % self.IMPALAD_TEST_PORT[0], self.IMPALAD_TEST_PORT,
+        regex=True, headers={'X-Forwarded-Context': '/gateway'})

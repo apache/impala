@@ -431,26 +431,34 @@ void Webserver::Init() {
       "$0://$1:$2", IsSecure() ? "https" : "http", hostname_, http_address_.port);
 }
 
-void Webserver::GetCommonJson(Document* document) {
+void Webserver::GetCommonJson(
+    Document* document, const struct sq_connection* connection, const WebRequest& req) {
   DCHECK(document != nullptr);
   Value obj(kObjectType);
   obj.AddMember("process-name",
       rapidjson::StringRef(google::ProgramInvocationShortName()),
       document->GetAllocator());
 
-  // We require that all links on the webui are qualified with the url.
-  Value url_value(url().c_str(), document->GetAllocator());
-  obj.AddMember("host-url", url_value, document->GetAllocator());
+  // If Apacke Knox is being used to proxy connections to the webserver, the
+  // 'x-forwarded-context' header will be present.
+  if (sq_get_header(connection, "x-forwarded-context")) {
+    // When proxying connections through Apache Knox, we make all links on the webui
+    // absolute, which allows Knox to rewrite the links to point to the Knox host while
+    // including 'scheme', 'host', and 'port' parameters which tell Knox where do forward
+    // the request to.
+    Value url_value(url().c_str(), document->GetAllocator());
+    obj.AddMember("host-url", url_value, document->GetAllocator());
 
-  Value scheme_value(IsSecure() ? "https" : "http", document->GetAllocator());
-  obj.AddMember("scheme", scheme_value, document->GetAllocator());
-
-  Value hostname_value(hostname_.c_str(), document->GetAllocator());
-  obj.AddMember("hostname", hostname_value, document->GetAllocator());
-
-  Value port_value;
-  port_value.SetInt(http_address_.port);
-  obj.AddMember("port", port_value, document->GetAllocator());
+    // These are used to add hidden form fields when Knox is being used to add the 'host'
+    // and related parameters to the form's request.
+    Value scheme_value(IsSecure() ? "https" : "http", document->GetAllocator());
+    obj.AddMember("scheme", scheme_value, document->GetAllocator());
+    Value hostname_value(hostname_.c_str(), document->GetAllocator());
+    obj.AddMember("hostname", hostname_value, document->GetAllocator());
+    Value port_value;
+    port_value.SetInt(http_address_.port);
+    obj.AddMember("port", port_value, document->GetAllocator());
+  }
 
   Value lst(kArrayType);
   for (const UrlHandlerMap::value_type& handler: url_handlers_) {
@@ -575,7 +583,7 @@ sq_callback_result_t Webserver::BeginRequestCallback(struct sq_connection* conne
     content_type = PLAIN;
     url_handler->raw_callback()(req, &output, &response);
   } else {
-    RenderUrlWithTemplate(req, *url_handler, &output, &content_type);
+    RenderUrlWithTemplate(connection, req, *url_handler, &output, &content_type);
   }
 
   VLOG(3) << "Rendering page " << request_info->uri << " took "
@@ -679,11 +687,12 @@ sq_callback_result_t Webserver::HandleSpnego(
   return SQ_CONTINUE_HANDLING;
 }
 
-void Webserver::RenderUrlWithTemplate(const WebRequest& req,
-    const UrlHandler& url_handler, stringstream* output, ContentType* content_type) {
+void Webserver::RenderUrlWithTemplate(const struct sq_connection* connection,
+    const WebRequest& req, const UrlHandler& url_handler, stringstream* output,
+    ContentType* content_type) {
   Document document;
   document.SetObject();
-  GetCommonJson(&document);
+  GetCommonJson(&document, connection, req);
 
   const auto& arguments = req.parsed_args;
   url_handler.callback()(req, &document);
