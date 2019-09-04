@@ -21,13 +21,16 @@
 # succeed as long all previously fetched rows fit into the bounded result cache.
 
 import pytest
+
+from ImpalaService import ImpalaHiveServer2Service
 from tests.hs2.hs2_test_suite import HS2TestSuite, needs_session
 from TCLIService import TCLIService
 from tests.common.impala_cluster import ImpalaCluster
 
+
 class TestFetchFirst(HS2TestSuite):
   TEST_DB = 'fetch_first_db'
-  IMPALA_RESULT_CACHING_OPT = "impala.resultset.cache.size";
+  IMPALA_RESULT_CACHING_OPT = "impala.resultset.cache.size"
 
   def __test_invalid_result_caching(self, sql_stmt):
     """ Tests that invalid requests for query-result caching fail
@@ -111,17 +114,60 @@ class TestFetchFirst(HS2TestSuite):
   def test_query_stmts_v1(self):
     self.run_query_stmts_test()
 
-  @pytest.mark.xfail(reason="Unsupported until IMPALA-8819 is completed")
   @pytest.mark.execute_serially
   @needs_session(TCLIService.TProtocolVersion.HIVE_CLI_SERVICE_PROTOCOL_V6)
   def test_query_stmts_v6_with_result_spooling(self):
     self.run_query_stmts_test({'spool_query_results': 'true'})
 
-  @pytest.mark.xfail(reason="Unsupported until IMPALA-8819 is completed")
   @pytest.mark.execute_serially
   @needs_session(TCLIService.TProtocolVersion.HIVE_CLI_SERVICE_PROTOCOL_V1)
   def test_query_stmts_v1_with_result_spooling(self):
     self.run_query_stmts_test({'spool_query_results': 'true'})
+
+  @pytest.mark.execute_serially
+  @needs_session
+  def test_rows_materialized_counters(self):
+    """Test that NumRowsFetched is updated even when a fetch request is served by the
+    results cache, and that RowsMaterialized is only updated when rows are first created
+    (e.g. not when they are served from the cache)."""
+    num_rows = 10
+    statement = "SELECT * FROM functional.alltypes LIMIT {0}".format(num_rows)
+    num_rows_fetched = "NumRowsFetched: {0} ({0})"
+    num_rows_fetched_from_cache = "NumRowsFetchedFromCache: {0} ({0})"
+
+    # Execute the query with the results cache enabled.
+    execute_statement_req = TCLIService.TExecuteStatementReq()
+    execute_statement_req.confOverlay[self.IMPALA_RESULT_CACHING_OPT] = str(num_rows)
+    execute_statement_req.statement = statement
+    execute_statement_resp = self.hs2_client.ExecuteStatement(execute_statement_req)
+    HS2TestSuite.check_response(execute_statement_resp)
+
+    # Fetch all rows from the query and verify they have been cached.
+    self.fetch_until(execute_statement_resp.operationHandle,
+        TCLIService.TFetchOrientation.FETCH_NEXT, num_rows)
+    self.__verify_num_cached_rows(num_rows)
+
+    # Get the runtime profile and validate that NumRowsFetched and RowsMaterialized both
+    # equal the number of rows fetched by the query.
+    profile = self.__get_runtime_profile(execute_statement_resp.operationHandle)
+    assert num_rows_fetched.format(num_rows) in profile
+
+    # Fetch all rows again and confirm that RowsMaterialized is unchanged, but
+    # NumRowsFetched is double the number of rows returned by the query.
+    self.fetch_until(execute_statement_resp.operationHandle,
+        TCLIService.TFetchOrientation.FETCH_FIRST, num_rows)
+    profile = self.__get_runtime_profile(execute_statement_resp.operationHandle)
+    assert num_rows_fetched.format(num_rows) in profile
+    assert num_rows_fetched_from_cache.format(num_rows) in profile
+
+  def __get_runtime_profile(self, op_handle):
+    """Helper method to get the runtime profile from a given operation handle."""
+    get_profile_req = ImpalaHiveServer2Service.TGetRuntimeProfileReq()
+    get_profile_req.operationHandle = op_handle
+    get_profile_req.sessionHandle = self.session_handle
+    get_profile_resp = self.hs2_client.GetRuntimeProfile(get_profile_req)
+    HS2TestSuite.check_response(get_profile_resp)
+    return get_profile_resp.profile
 
   def run_query_stmts_test(self, conf_overlay=dict()):
     """Tests Impala's limited support for the FETCH_FIRST fetch orientation for queries.
@@ -146,7 +192,7 @@ class TestFetchFirst(HS2TestSuite):
       # Fetch 10 rows with the FETCH_NEXT orientation.
       expected_num_rows = 10
       if i == 4:
-        expected_num_rows = 0;
+        expected_num_rows = 0
       self.fetch_until(execute_statement_resp.operationHandle,
                  TCLIService.TFetchOrientation.FETCH_NEXT, 10, expected_num_rows)
       # Fetch 10 rows with the FETCH_FIRST orientation, expecting an error.

@@ -109,6 +109,13 @@ ClientRequestState::ClientRequestState(
       "DEBUG build of Impala. Use RELEASE builds to measure query performance.");
 #endif
   row_materialization_timer_ = ADD_TIMER(server_profile_, "RowMaterializationTimer");
+  num_rows_fetched_counter_ = ADD_COUNTER(server_profile_, "NumRowsFetched", TUnit::UNIT);
+  row_materialization_rate_ =
+      server_profile_->AddDerivedCounter("RowMaterializationRate", TUnit::UNIT_PER_SECOND,
+          bind<int64_t>(&RuntimeProfile::UnitsPerSecond, num_rows_fetched_counter_,
+                                             row_materialization_timer_));
+  num_rows_fetched_from_cache_counter_ =
+      ADD_COUNTER(server_profile_, "NumRowsFetchedFromCache", TUnit::UNIT);
   client_wait_timer_ = ADD_TIMER(server_profile_, "ClientFetchWaitTimer");
   query_events_ = summary_profile_->AddEventSequence("Query Timeline");
   query_events_->Start();
@@ -957,6 +964,7 @@ Status ClientRequestState::FetchRowsInternal(const int32_t max_rows,
     num_rows_fetched_from_cache =
         fetched_rows->AddRows(result_cache_.get(), num_rows_fetched_, cache_fetch_size);
     num_rows_fetched_ += num_rows_fetched_from_cache;
+    COUNTER_ADD(num_rows_fetched_from_cache_counter_, num_rows_fetched_from_cache);
     if (num_rows_fetched_from_cache >= max_rows) return Status::OK();
   }
 
@@ -980,6 +988,7 @@ Status ClientRequestState::FetchRowsInternal(const int32_t max_rows,
     DCHECK(max_coord_rows <= 0 || num_fetched <= max_coord_rows) << Substitute(
         "Fetched more rows ($0) than asked for ($1)", num_fetched, max_coord_rows);
     num_rows_fetched_ += num_fetched;
+    COUNTER_ADD(num_rows_fetched_counter_, num_fetched);
 
     RETURN_IF_ERROR(status);
     // Check if query status has changed during GetNext() call

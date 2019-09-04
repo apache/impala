@@ -109,6 +109,14 @@ class PlanRootSink : public DataSink {
   /// Returns the FETCH_ROWS_TIMEOUT_MS value for this query (converted to microseconds).
   uint64_t fetch_rows_timeout_us() const { return fetch_rows_timeout_us_; }
 
+  /// The number of rows sent to this PlanRootSink via Send(). Initialized in
+  /// Prepare().
+  RuntimeProfile::Counter* rows_sent_counter_ = nullptr;
+
+  /// The rate at which rows are sent to this PlanRootSink via Send(). Initialized in
+  /// Prepare().
+  RuntimeProfile::Counter* rows_sent_rate_ = nullptr;
+
  private:
   /// Limit on the number of rows produced by this query, initialized by the constructor.
   const int64_t num_rows_produced_limit_;

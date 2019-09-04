@@ -38,7 +38,7 @@ BlockingPlanRootSink::BlockingPlanRootSink(
 
 Status BlockingPlanRootSink::Prepare(
     RuntimeState* state, MemTracker* parent_mem_tracker) {
-  return DataSink::Prepare(state, parent_mem_tracker);
+  return PlanRootSink::Prepare(state, parent_mem_tracker);
 }
 
 Status BlockingPlanRootSink::Send(RuntimeState* state, RowBatch* batch) {
@@ -73,6 +73,7 @@ Status BlockingPlanRootSink::Send(RuntimeState* state, RowBatch* batch) {
     results_ = nullptr;
     consumer_cv_.NotifyAll();
   }
+  rows_sent_counter_->Add(batch->num_rows());
   return Status::OK();
 }
 

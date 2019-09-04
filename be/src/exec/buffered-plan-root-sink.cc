@@ -37,7 +37,7 @@ BufferedPlanRootSink::BufferedPlanRootSink(TDataSinkId sink_id,
 
 Status BufferedPlanRootSink::Prepare(
     RuntimeState* state, MemTracker* parent_mem_tracker) {
-  RETURN_IF_ERROR(DataSink::Prepare(state, parent_mem_tracker));
+  RETURN_IF_ERROR(PlanRootSink::Prepare(state, parent_mem_tracker));
   row_batches_send_wait_timer_ = ADD_TIMER(profile(), "RowBatchSendWaitTime");
   row_batches_get_wait_timer_ = ADD_TIMER(profile(), "RowBatchGetWaitTime");
   return Status::OK();
@@ -81,6 +81,7 @@ Status BufferedPlanRootSink::Send(RuntimeState* state, RowBatch* batch) {
 
     // Add the batch to the queue and then notify the consumer that rows are available.
     RETURN_IF_ERROR(batch_queue_->AddBatch(batch));
+    rows_sent_counter_->Add(batch->num_rows());
   }
   // Release the lock before calling notify so the consumer thread can immediately acquire
   // the lock.

@@ -16,6 +16,7 @@
 # under the License.
 
 import pytest
+import re
 
 from tests.common.custom_cluster_test_suite import CustomClusterTestSuite
 from tests.common.test_dimensions import (
@@ -24,7 +25,6 @@ from tests.common.test_dimensions import (
 from tests.util.web_pages_util import (
     get_num_completed_backends,
     get_mem_admitted_backends_debug_page)
-from time import sleep
 
 
 class TestDedicatedCoordinator(CustomClusterTestSuite):
@@ -49,7 +49,9 @@ class TestDedicatedCoordinator(CustomClusterTestSuite):
     """Test the following when result spooling is enabled on a cluster with a dedicated
     coordinator when all results are spooled: (1) all backends are shutdown besides the
     coordinator and (2) all non-coordinator memory is released."""
-    query = "select id from functional_parquet.alltypes order by id limit 2000"
+    num_rows = 2000
+    query = "select id from functional_parquet.alltypes order by id limit {0}".format(
+        num_rows)
     vector.get_value('exec_option')['spool_query_results'] = 'true'
 
     # Amount of time to wait for the query to reach the finished state before throwing a
@@ -61,10 +63,9 @@ class TestDedicatedCoordinator(CustomClusterTestSuite):
       # Wait for the query to finish (all rows are spooled). Assert that the executor
       # has been shutdown and its memory has been released.
       self.wait_for_state(handle, self.client.QUERY_STATES['FINISHED'], timeout)
-      # Since FINISHED does not necessarily mean all results are spooled, sleep for
-      # enough time to allow for all results to be spooled. This can be better enforced
-      # once the metrics in IMPALA-8825 have been added.
-      sleep(1)
+      self.assert_eventually(timeout, 0.5,
+          lambda: re.search("RowsSent:.*({0})".format(num_rows),
+          self.client.get_runtime_profile(handle)))
       assert "NumCompletedBackends: 1 (1)" in self.client.get_runtime_profile(handle)
       mem_admitted = get_mem_admitted_backends_debug_page(self.cluster)
       assert mem_admitted['executor'][0] == 0

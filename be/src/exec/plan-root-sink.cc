@@ -17,8 +17,8 @@
 
 #include "exec/plan-root-sink.h"
 
-#include "exprs/scalar-expr.h"
 #include "exprs/scalar-expr-evaluator.h"
+#include "exprs/scalar-expr.h"
 #include "runtime/row-batch.h"
 #include "runtime/tuple-row.h"
 #include "service/query-result-set.h"
@@ -41,6 +41,15 @@ PlanRootSink::PlanRootSink(
         MICROS_PER_MILLI * state->query_options().fetch_rows_timeout_ms) {}
 
 PlanRootSink::~PlanRootSink() {}
+
+Status PlanRootSink::Prepare(RuntimeState* state, MemTracker* parent_mem_tracker) {
+  RETURN_IF_ERROR(DataSink::Prepare(state, parent_mem_tracker));
+  rows_sent_counter_ = ADD_COUNTER(profile_, "RowsSent", TUnit::UNIT);
+  rows_sent_rate_ = profile_->AddDerivedCounter("RowsSentRate", TUnit::UNIT_PER_SECOND,
+      bind<int64_t>(&RuntimeProfile::UnitsPerSecond, rows_sent_counter_,
+                                                    profile_->total_time_counter()));
+  return Status::OK();
+}
 
 void PlanRootSink::ValidateCollectionSlots(
     const RowDescriptor& row_desc, RowBatch* batch) {

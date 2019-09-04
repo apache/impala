@@ -1049,6 +1049,19 @@ class ImpalaTestSuite(BaseTestSuite):
     raise Exception("Table {0}.{1} didn't show up after {2}s", db_name, table_name,
                     timeout_s)
 
+  def assert_eventually(self, timeout_s, period_s, condition):
+    """Assert that the condition (a function with no parameters) returns True within the
+    given timeout. The condition is executed every period_s seconds. The check assumes
+    that once the condition returns True, it continues to return True. Throws a Timeout
+    if the condition does not return true within timeout_s seconds."""
+    count = 0
+    start_time = time.time()
+    while not condition() and time.time() - start_time < timeout_s:
+      time.sleep(period_s)
+      count += 1
+    if not condition():
+      raise Timeout("Check failed to return True after {0} tries and {1} seconds".format(
+          count, timeout_s))
 
   def assert_impalad_log_contains(self, level, line_regex, expected_count=1):
     """

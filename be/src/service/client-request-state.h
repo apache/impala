@@ -415,7 +415,16 @@ protected:
   RuntimeProfile* const frontend_profile_;
   RuntimeProfile* const server_profile_;
   RuntimeProfile* const summary_profile_;
+
+  /// Tracks the time spent materializing rows and converting them into a QueryResultSet.
+  /// The QueryResultSet format used depends on the client, for Beeswax clients an ASCII
+  /// representation is used, whereas for HS2 clients (using TCLIService.thrift) rows are
+  /// converted into a TRowSet. Materializing rows includes evaluating any yet unevaluated
+  /// expressions using ScalarExprEvaluators.
   RuntimeProfile::Counter* row_materialization_timer_;
+
+  /// Tracks the rate that rows are materialized.
+  RuntimeProfile::Counter* row_materialization_rate_;
 
   /// Tracks how long we are idle waiting for a client to fetch rows.
   RuntimeProfile::Counter* client_wait_timer_;
@@ -442,6 +451,18 @@ protected:
 
   TResultSetMetadata result_metadata_; // metadata for select query
   int num_rows_fetched_ = 0; // number of rows fetched by client for the entire query
+
+  /// The total number of rows fetched for this query, the counter is not reset if the
+  /// fetch is restarted. It does not include any rows read from the results cache. It
+  /// only counts the number of materialized rows and it is used for deriving the
+  /// row_materialization_rate_. It is not set for non QUERY statements such as EXPLAIN,
+  /// SHOW, etc.
+  RuntimeProfile::Counter* num_rows_fetched_counter_ = nullptr;
+
+  /// Similar to the 'num_rows_fetched_counter_' except it tracks the number of rows read
+  /// from the results cache. The counter is not reset if the fetch is restarted and it
+  /// is not set for non QUERY statements.
+  RuntimeProfile::Counter* num_rows_fetched_from_cache_counter_ = nullptr;
 
   /// True if a fetch was attempted by a client, regardless of whether a result set
   /// (or error) was returned to the client.
