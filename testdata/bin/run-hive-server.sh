@@ -21,8 +21,6 @@ set -euo pipefail
 . $IMPALA_HOME/bin/report_build_error.sh
 setup_report_build_error
 
-. ${IMPALA_HOME}/bin/set-pythonpath.sh
-
 HIVE_SERVER_PORT=10000
 export HIVE_SERVER2_THRIFT_PORT=11050
 HIVE_METASTORE_PORT=9083

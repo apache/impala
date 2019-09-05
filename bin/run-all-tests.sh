@@ -25,8 +25,6 @@ set -euo pipefail
 . $IMPALA_HOME/bin/report_build_error.sh
 setup_report_build_error
 
-. "$IMPALA_HOME/bin/set-pythonpath.sh"
-
 # Allow picking up strategy from environment
 : ${EXPLORATION_STRATEGY:=core}
 : ${NUM_TEST_ITERATIONS:=1}

@@ -735,9 +735,6 @@ export IMPALA_MAKE_FLAGS=${IMPALA_MAKE_FLAGS-}
 # Some environments (like the packaging build) might not have $USER set.  Fix that here.
 export USER="${USER-`id -un`}"
 
-# Configure python path
-. "$IMPALA_HOME/bin/set-pythonpath.sh"
-
 # These arguments are, despite the name, passed to every JVM created
 # by an impalad.
 # - Enable JNI check
@@ -803,7 +800,6 @@ echo "HADOOP_LZO              = $HADOOP_LZO"
 echo "IMPALA_LZO              = $IMPALA_LZO"
 echo "CLASSPATH               = $CLASSPATH"
 echo "LIBHDFS_OPTS            = $LIBHDFS_OPTS"
-echo "PYTHONPATH              = $PYTHONPATH"
 echo "JAVA_HOME               = $JAVA_HOME"
 echo "LD_LIBRARY_PATH         = $LD_LIBRARY_PATH"
 echo "LD_PRELOAD              = $LD_PRELOAD"

@@ -15,16 +15,21 @@
 # specific language governing permissions and limitations
 # under the License.
 
-# set the python path for test modules and beeswax
-# setting USE_THRIFT11_GEN_PY will add Thrift 11 Python generated code rather than the
-# default Thrift Python code
-PYTHONPATH=${IMPALA_HOME}
+# Sets up the python path for impala-python. This is needed because tests and other
+# utility scripts depend on some modules external to infra/python/env.
+# TODO: we should try to reduce our reliance on PYTHONPATH if possible.
+#
+# Setting USE_THRIFT11_GEN_PY will add Thrift 11 Python generated code rather than the
+# default Thrift Python code.
+# Used to allow importing testdata, test, etc modules from other scripts.
+export PYTHONPATH=${IMPALA_HOME}
+
+# Generated Thrift files are used by tests and other scripts.
 if [ -n "${USE_THRIFT11_GEN_PY:-}" ]; then
   PYTHONPATH=${PYTHONPATH}:${IMPALA_HOME}/shell/build/thrift-11-gen/gen-py
 else
   PYTHONPATH=${PYTHONPATH}:${IMPALA_HOME}/shell/gen-py
 fi
-PYTHONPATH=${PYTHONPATH}:${IMPALA_HOME}/testdata/
 
 # There should be just a single version of python that created the
 # site-packages directory. We find it by performing shell independent expansion
@@ -42,10 +47,3 @@ done
 
 # Add Hive after Thrift because Hive supplies its own Thrift modules
 PYTHONPATH=${PYTHONPATH}:${HIVE_HOME}/lib/py
-
-# Add all the built eggs to the python path
-for EGG in `find ${IMPALA_HOME}/shell/ext-py/ -name '*\.egg'`; do
-  PYTHONPATH=${PYTHONPATH}:${EGG}
-done
-
-export PYTHONPATH
