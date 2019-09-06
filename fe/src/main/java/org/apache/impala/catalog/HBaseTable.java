@@ -138,7 +138,7 @@ public class HBaseTable extends Table implements FeHBaseTable {
   }
 
   @Override
-  public synchronized Pair<Long, Long> getEstimatedRowStats(byte[] startRowKey,
+  public Pair<Long, Long> getEstimatedRowStats(byte[] startRowKey,
       byte[] endRowKey) {
     return Util.getEstimatedRowStats(this, startRowKey, endRowKey);
   }

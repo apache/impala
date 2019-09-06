@@ -55,7 +55,8 @@ import org.apache.impala.thrift.TResultSet;
 import org.apache.impala.thrift.TResultSetMetadata;
 import org.apache.impala.util.StatsHelper;
 import org.apache.impala.util.TResultRowBuilder;
-import org.apache.log4j.Logger;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 import com.google.common.base.Charsets;
 import com.google.common.base.Preconditions;
@@ -98,7 +99,7 @@ public interface FeHBaseTable extends FeTable {
     static final int ROW_COUNT_ESTIMATE_BATCH_SIZE = 10;
     // Keep the conf around
     static final Configuration HBASE_CONF = HBaseConfiguration.create();
-    private static final Logger LOG = Logger.getLogger(FeHBaseTable.class);
+    private static final Logger LOG = LoggerFactory.getLogger(FeHBaseTable.class);
     // Maximum deviation from the average to stop querying more regions
     // to estimate the row count
     private static final double DELTA_FROM_AVERAGE = 0.15;
@@ -354,10 +355,6 @@ public interface FeHBaseTable extends FeTable {
      * <p>
      * Currently, the algorithm does not consider the case that the key range used as a
      * parameter might be generally of different size than the rest of the region.
-     * <p>
-     * The values computed here should be cached so that in high qps workloads
-     * the nn is not overwhelmed. Could be done in load(); Synchronized to make
-     * sure that only one thread at a time is using the htable.
      *
      * @param startRowKey First row key in the range
      * @param endRowKey   Last row key in the range
@@ -369,6 +366,12 @@ public interface FeHBaseTable extends FeTable {
       Preconditions.checkNotNull(startRowKey);
       Preconditions.checkNotNull(endRowKey);
 
+      if (LOG.isTraceEnabled()) {
+        LOG.trace("getEstimatedRowStats for {} for key range ('{}', '{}')",
+            tbl.getHBaseTableName(), Bytes.toString(startRowKey),
+            Bytes.toString(endRowKey));
+      }
+      long startTime = System.currentTimeMillis();
       boolean isCompressed = false;
       long rowCount;
       long rowSize;
@@ -406,10 +409,10 @@ public interface FeHBaseTable extends FeTable {
           totalEstimatedRows += tmp.first;
           statsSize.addSample(tmp.second);
           if (LOG.isTraceEnabled()) {
-            LOG.trace(String.format("Estimation state: totalEstimatedRows=%d, " +
-                    "statsSize.count=%d, statsSize.stddev=%f, statsSize.mean=%f",
+            LOG.trace("Estimation state: totalEstimatedRows={}, statsSize.count={}, " +
+                    "statsSize.stddev={}, statsSize.mean={}",
                 totalEstimatedRows, statsSize.count(), statsSize.stddev(),
-                statsSize.mean()));
+                statsSize.mean());
           }
         }
 
@@ -424,16 +427,19 @@ public interface FeHBaseTable extends FeTable {
           // No meaningful row width found. The < 1 handles both the
           // no row case and the potential case where the average is
           // too small to be meaningful.
-          LOG.warn(String.format("Table %s: no data available to compute " +
-              "row count estimate for key range ('%s', '%s')",
-              tbl.getFullName(),
-              new String(startRowKey, Charsets.UTF_8),
-              new String(endRowKey, Charsets.UTF_8)));
+          LOG.warn("Table {}: no data available to compute " +
+              "row count estimate for key range ('{}', '{}')",
+              tbl.getFullName(), Bytes.toString(startRowKey), Bytes.toString(endRowKey));
           return new Pair<>(-1L, -1L);
         } else {
           rowCount = (long) (totalSize / statsSize.mean());
         }
         rowSize = (long) statsSize.mean();
+        if (LOG.isTraceEnabled()) {
+          LOG.trace("getEstimatedRowStats results: rowCount={}, rowSize={}, " +
+              "timeElapsed={}ms", rowCount, rowSize,
+              System.currentTimeMillis() - startTime);
+        }
         return new Pair<>(rowCount, rowSize);
       } catch (IOException ioe) {
         // Print the stack trace, but we'll ignore it
@@ -644,6 +650,7 @@ public interface FeHBaseTable extends FeTable {
      */
     public static List<HRegionLocation> getRegionsInRange(FeHBaseTable tbl,
         final byte[] startKey, final byte[] endKey) throws IOException {
+      long startTime = System.currentTimeMillis();
       try (org.apache.hadoop.hbase.client.Table hbaseTbl = getHBaseTable(tbl)) {
         final boolean endKeyIsEndOfTable = Bytes.equals(endKey, HConstants.EMPTY_END_ROW);
         if ((Bytes.compareTo(startKey, endKey) > 0) && !endKeyIsEndOfTable) {
@@ -662,6 +669,10 @@ public interface FeHBaseTable extends FeTable {
           currentKey = regionLocation.getRegionInfo().getEndKey();
         } while (!Bytes.equals(currentKey, HConstants.EMPTY_END_ROW) &&
             (endKeyIsEndOfTable || Bytes.compareTo(currentKey, endKey) < 0));
+        if (LOG.isTraceEnabled()) {
+          LOG.trace("getRegionsInRange timeElapsed={}ms",
+              System.currentTimeMillis() - startTime);
+        }
         return regionList;
       }
     }
