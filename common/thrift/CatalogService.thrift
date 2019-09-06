@@ -45,7 +45,8 @@ const string CATALOG_TOPIC_V2_PREFIX = "2:";
 // This would require changes in BDR and break their compatibility story. We should
 // coordinate a joint change somewhere down the line.
 struct TCatalogServiceRequestHeader {
-  // The effective user who submitted this request.
+  // The effective user who submitted this request. When kerberos is enabled, this
+  // contains the fully qualified user principal.
   1: optional string requesting_user
 
   // The redacted SQL statement to be logged.

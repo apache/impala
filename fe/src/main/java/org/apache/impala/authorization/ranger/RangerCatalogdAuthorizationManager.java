@@ -123,9 +123,9 @@ public class RangerCatalogdAuthorizationManager implements AuthorizationManager 
   public void grantPrivilegeToUser(TCatalogServiceRequestHeader header,
       TGrantRevokePrivParams params, TDdlExecResponse response) throws ImpalaException {
     List<GrantRevokeRequest> requests = createGrantRevokeRequests(
-        header.getRequesting_user(), true, params.getPrincipal_name(),
-        Collections.emptyList(), plugin_.get().getClusterName(),
-        header.getClient_ip(), params.getPrivileges());
+        new User(header.getRequesting_user()).getShortName(), true,
+        params.getPrincipal_name(), Collections.emptyList(),
+        plugin_.get().getClusterName(), header.getClient_ip(), params.getPrivileges());
 
     grantPrivilege(requests, header.getRedacted_sql_stmt(), header.getClient_ip());
     refreshAuthorization(response);
@@ -135,9 +135,9 @@ public class RangerCatalogdAuthorizationManager implements AuthorizationManager 
   public void revokePrivilegeFromUser(TCatalogServiceRequestHeader header,
       TGrantRevokePrivParams params, TDdlExecResponse response) throws ImpalaException {
     List<GrantRevokeRequest> requests = createGrantRevokeRequests(
-        header.getRequesting_user(), false, params.getPrincipal_name(),
-        Collections.emptyList(), plugin_.get().getClusterName(),
-        header.getClient_ip(), params.getPrivileges());
+        new User(header.getRequesting_user()).getShortName(), false,
+        params.getPrincipal_name(), Collections.emptyList(),
+        plugin_.get().getClusterName(), header.getClient_ip(), params.getPrivileges());
 
     revokePrivilege(requests, header.getRedacted_sql_stmt(), header.getClient_ip());
     refreshAuthorization(response);
@@ -147,7 +147,7 @@ public class RangerCatalogdAuthorizationManager implements AuthorizationManager 
   public void grantPrivilegeToGroup(TCatalogServiceRequestHeader header,
       TGrantRevokePrivParams params, TDdlExecResponse response) throws ImpalaException {
     List<GrantRevokeRequest> requests = createGrantRevokeRequests(
-        header.getRequesting_user(), true, null,
+        new User(header.getRequesting_user()).getShortName(), true, null,
         Collections.singletonList(params.getPrincipal_name()),
         plugin_.get().getClusterName(), header.getClient_ip(), params.getPrivileges());
 
@@ -159,7 +159,7 @@ public class RangerCatalogdAuthorizationManager implements AuthorizationManager 
   public void revokePrivilegeFromGroup(TCatalogServiceRequestHeader header,
       TGrantRevokePrivParams params, TDdlExecResponse response) throws ImpalaException {
     List<GrantRevokeRequest> requests = createGrantRevokeRequests(
-        header.getRequesting_user(), false, null,
+        new User(header.getRequesting_user()).getShortName(), false, null,
         Collections.singletonList(params.getPrincipal_name()),
         plugin_.get().getClusterName(), header.getClient_ip(), params.getPrivileges());
 
