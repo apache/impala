@@ -475,6 +475,14 @@ enum TImpalaQueryOptions {
   // Parquet files written by Impala (Impala writes Parquet files with a single row
   // group per file). Must be >= 1 MB.
   PARQUET_OBJECT_STORE_SPLIT_SIZE = 95
+
+  // For testing purposes only. A per executor approximate limit on the memory consumption
+  // of this query. Only applied if MEM_LIMIT is not specified.
+  // unspecified or a limit of 0 means no limit;
+  // Otherwise specified either as:
+  // a) an int (= number of bytes);
+  // b) a float followed by "M" (MB) or "G" (GB)
+  MEM_LIMIT_EXECUTORS = 96
 }
 
 // The summary of a DML statement.

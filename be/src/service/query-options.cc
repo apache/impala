@@ -899,6 +899,14 @@ Status impala::SetQueryOption(const string& key, const string& value,
             parquet_object_store_split_size);
         break;
       }
+      case TImpalaQueryOptions::MEM_LIMIT_EXECUTORS: {
+        // Parse the mem limit spec and validate it.
+        int64_t bytes_limit;
+        RETURN_IF_ERROR(
+            ParseMemValue(value, "query memory limit for executors", &bytes_limit));
+        query_options->__set_mem_limit_executors(bytes_limit);
+        break;
+      }
       default:
         if (IsRemovedQueryOption(key)) {
           LOG(WARNING) << "Ignoring attempt to set removed query option '" << key << "'";

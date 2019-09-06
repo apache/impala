@@ -279,14 +279,14 @@ void QuerySchedule::UpdateMemoryRequirements(const TPoolConfig& pool_cfg) {
 
   per_backend_mem_to_admit_ = 0;
   coord_backend_mem_to_admit_ = 0;
-  bool has_query_option = false;
+  bool is_mem_limit_set = false;
   if (query_options().__isset.mem_limit && query_options().mem_limit > 0) {
     per_backend_mem_to_admit_ = query_options().mem_limit;
     coord_backend_mem_to_admit_ = query_options().mem_limit;
-    has_query_option = true;
+    is_mem_limit_set = true;
   }
 
-  if (!has_query_option) {
+  if (!is_mem_limit_set) {
     per_backend_mem_to_admit_ = GetPerExecutorMemoryEstimate();
     coord_backend_mem_to_admit_ = use_dedicated_coord_estimates ?
         GetDedicatedCoordMemoryEstimate() :
@@ -302,11 +302,11 @@ void QuerySchedule::UpdateMemoryRequirements(const TPoolConfig& pool_cfg) {
     }
   }
 
-  if (!has_query_option || pool_cfg.clamp_mem_limit_query_option) {
+  if (!is_mem_limit_set || pool_cfg.clamp_mem_limit_query_option) {
     if (pool_cfg.min_query_mem_limit > 0) {
       per_backend_mem_to_admit_ =
           max(per_backend_mem_to_admit_, pool_cfg.min_query_mem_limit);
-      if (!use_dedicated_coord_estimates || has_query_option) {
+      if (!use_dedicated_coord_estimates || is_mem_limit_set) {
         // The minimum mem limit option does not apply to dedicated coordinators -
         // this would result in over-reserving of memory. Treat coordinator and
         // executor mem limits the same if the query option was explicitly set.
@@ -332,12 +332,19 @@ void QuerySchedule::UpdateMemoryRequirements(const TPoolConfig& pool_cfg) {
     per_backend_mem_to_admit_ = 0;
   }
 
-  if (mimic_old_behaviour && !has_query_option) {
+  if (mimic_old_behaviour && !is_mem_limit_set) {
     per_backend_mem_limit_ = -1;
     coord_backend_mem_limit_ = -1;
   } else {
     per_backend_mem_limit_ = per_backend_mem_to_admit_;
     coord_backend_mem_limit_ = coord_backend_mem_to_admit_;
+  }
+
+  // Finally, enforce the MEM_LIMIT_EXECUTORS query option if MEM_LIMIT is not specified.
+  if (!is_mem_limit_set && query_options().__isset.mem_limit_executors
+      && query_options().mem_limit_executors > 0) {
+    per_backend_mem_to_admit_ = query_options().mem_limit_executors;
+    per_backend_mem_limit_ = per_backend_mem_to_admit_;
   }
 }
 

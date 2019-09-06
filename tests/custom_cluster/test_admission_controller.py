@@ -630,13 +630,30 @@ class TestAdmissionController(TestAdmissionControllerBase, HS2TestSuite):
     """Planner tests to add coverage for coordinator estimates when using dedicated
     coordinators. Also includes coverage for verifying cluster memory admitted."""
     vector_copy = copy(vector)
-    exec_options = vector.get_value('exec_option')
+    exec_options = vector_copy.get_value('exec_option')
     # Remove num_nodes from the options to allow test case runner to set it in one of
     # the test cases.
     del exec_options['num_nodes']
     exec_options['num_scanner_threads'] = 1  # To make estimates consistently reproducible
     self.run_test_case('QueryTest/dedicated-coord-mem-estimates', vector_copy,
                        unique_database)
+
+  @SkipIfNotHdfsMinicluster.tuned_for_minicluster
+  @pytest.mark.execute_serially
+  @CustomClusterTestSuite.with_args(num_exclusive_coordinators=1, cluster_size=2)
+  def test_mem_limit_executors(self, vector, unique_database):
+    """Verify that the query option mem_limit_executors is only enforced on the
+    executors."""
+    expected_exec_mem_limit = "999999999"
+    ImpalaTestSuite.change_database(self.client, vector.get_value('table_format'))
+    self.client.set_configuration({"MEM_LIMIT_EXECUTORS": expected_exec_mem_limit})
+    handle = self.client.execute_async(QUERY.format(1))
+    self.client.wait_for_finished_timeout(handle, 1000)
+    expected_mem_limits = self.__get_mem_limits_admission_debug_page()
+    assert expected_mem_limits['executor'] > expected_mem_limits[
+      'coordinator'], expected_mem_limits
+    assert expected_mem_limits['executor'] == float(
+      expected_exec_mem_limit), expected_mem_limits
 
   @pytest.mark.execute_serially
   @CustomClusterTestSuite.with_args(
