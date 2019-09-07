@@ -35,7 +35,7 @@ class TestHooks(CustomClusterTestSuite):
   @CustomClusterTestSuite.with_args(
       impala_log_dir=tempfile.mkdtemp(prefix="test_hooks_", dir=os.getenv("LOG_DIR")),
       impalad_args="--query_event_hook_classes={0} "
-                   "--minidump_path={1} "
+                   "--minidump_path={1} -logbuflevel=-1"
                    .format(DUMMY_HOOK, MINIDUMP_PATH),
       catalogd_args="--minidump_path={0}".format(MINIDUMP_PATH))
   def test_query_event_hooks_execute(self, unique_database):
@@ -45,8 +45,13 @@ class TestHooks(CustomClusterTestSuite):
     """
     # Dummy hook should log something (See org.apache.impala.testutil.DummyQueryEventHook)
     self.assert_impalad_log_contains("INFO",
-                                     "{0}.onImpalaStartup".format(self.DUMMY_HOOK),
-                                     expected_count=-1)
+        "{0}.onImpalaStartup".format(self.DUMMY_HOOK), expected_count=-1)
+    # Run a test query that triggers a lineage event.
+    self.execute_query_expect_success(
+        self.client, "select count(*) from functional.alltypes")
+    # onQueryComplete() is invoked by the lineage logger.
+    self.assert_impalad_log_contains("INFO",
+        "{0}.onQueryComplete".format(self.DUMMY_HOOK), expected_count=-1)
 
 
 class TestHooksStartupFail(CustomClusterTestSuite):

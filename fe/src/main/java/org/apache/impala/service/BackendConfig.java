@@ -51,7 +51,11 @@ public class BackendConfig {
   public TBackendGflags getBackendCfg() { return backendCfg_; }
   public long getReadSize() { return backendCfg_.read_size; }
   public boolean getComputeLineage() {
-    return !Strings.isNullOrEmpty(backendCfg_.lineage_event_log_dir);
+    // Lineage is computed in the fe if --lineage_event_log_dir is configured or
+    // a query event hook is configured with --query_event_hook_classes. The hook
+    // may or may not consume the lineage but we still include it.
+    return !Strings.isNullOrEmpty(backendCfg_.lineage_event_log_dir) ||
+        !Strings.isNullOrEmpty(getQueryExecHookClasses());
   }
   public long getIncStatsMaxSize() { return backendCfg_.inc_stats_size_limit_bytes; }
   public boolean isStatsExtrapolationEnabled() {
