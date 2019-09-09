@@ -284,6 +284,19 @@ public class AnalyticPlanner {
       TupleDescriptor tupleDesc = analyzer_.getTupleDesc(tid);
       for (SlotDescriptor inputSlotDesc: tupleDesc.getSlots()) {
         if (!inputSlotDesc.isMaterialized()) continue;
+        if (inputSlotDesc.getType().isComplexType()) {
+          // Project out collection slots since they won't be used anymore and may cause
+          // troubles like IMPALA-8718. They won't be used since outputs of the analytic
+          // node must be in the select list of the block with the analytic, and we don't
+          // allow collection types to be returned from a select block, and also don't
+          // support any builtin or UDF functions that take collection types as an
+          // argument.
+          if (LOG.isTraceEnabled()) {
+            LOG.trace("Project out collection slot in sort tuple of analytic: slot={}",
+                inputSlotDesc.debugString());
+          }
+          continue;
+        }
         inputSlotRefs.add(new SlotRef(inputSlotDesc));
       }
     }

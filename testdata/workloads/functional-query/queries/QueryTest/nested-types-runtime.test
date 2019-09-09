@@ -466,3 +466,31 @@ select id, m from complextypestbl t,
 ---- TYPES
 BIGINT,STRING
 ====
+---- QUERY
+# IMPALA-8718: Test collection slots are not passed outside the analytic node.
+select leftSide.id, rnk
+from complextypestbl leftSide
+left outer join (
+    select t.id, rank() over (order by t.id) as rnk
+    from complextypestbl t left outer join t.int_array
+) rightSide
+on leftSide.id = rightSide.id;
+---- RESULTS
+1,1
+1,1
+1,1
+2,4
+2,4
+2,4
+2,4
+2,4
+2,4
+3,10
+4,11
+5,12
+6,13
+7,14
+8,15
+---- TYPES
+BIGINT,BIGINT
+====

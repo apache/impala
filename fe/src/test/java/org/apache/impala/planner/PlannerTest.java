@@ -167,7 +167,8 @@ public class PlannerTest extends PlannerTestBase {
 
   @Test
   public void testAnalyticFns() {
-    runPlannerTestFile("analytic-fns");
+    runPlannerTestFile("analytic-fns",
+        ImmutableSet.of(PlannerTestOption.VALIDATE_CARDINALITY));
   }
 
   @Test

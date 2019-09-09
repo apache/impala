@@ -1329,11 +1329,11 @@ PLAN-ROOT SINK
 |
 12:SORT
 |  order by: min(id) OVER(...) DESC NULLS FIRST
-|  row-size=4B cardinality=7.41K
+|  row-size=8B cardinality=7.41K
 |
 08:UNION
 |  pass-through-operands: 07
-|  row-size=4B cardinality=7.41K
+|  row-size=8B cardinality=7.41K
 |
 |--11:ANALYTIC
 |  |  functions: sum(bigint_col)
@@ -1352,10 +1352,10 @@ PLAN-ROOT SINK
 |
 07:AGGREGATE [FINALIZE]
 |  group by: min(id) OVER(...)
-|  row-size=4B cardinality=7.40K
+|  row-size=8B cardinality=7.40K
 |
 00:UNION
-|  row-size=4B cardinality=7.40K
+|  row-size=8B cardinality=7.40K
 |
 |--06:ANALYTIC
 |  |  functions: max(id)
@@ -1390,11 +1390,11 @@ PLAN-ROOT SINK
 |
 12:SORT
 |  order by: min(id) OVER(...) DESC NULLS FIRST
-|  row-size=4B cardinality=7.41K
+|  row-size=8B cardinality=7.41K
 |
 08:UNION
 |  pass-through-operands: 16
-|  row-size=4B cardinality=7.41K
+|  row-size=8B cardinality=7.41K
 |
 |--11:ANALYTIC
 |  |  functions: sum(bigint_col)
@@ -1415,16 +1415,16 @@ PLAN-ROOT SINK
 |
 16:AGGREGATE [FINALIZE]
 |  group by: min(id) OVER(...)
-|  row-size=4B cardinality=7.40K
+|  row-size=8B cardinality=7.40K
 |
 15:EXCHANGE [HASH(min(id) OVER(...))]
 |
 07:AGGREGATE [STREAMING]
 |  group by: min(id) OVER(...)
-|  row-size=4B cardinality=7.40K
+|  row-size=8B cardinality=7.40K
 |
 00:UNION
-|  row-size=4B cardinality=7.40K
+|  row-size=8B cardinality=7.40K
 |
 |--06:ANALYTIC
 |  |  functions: max(id)
@@ -2086,10 +2086,10 @@ PLAN-ROOT SINK
 |
 05:SELECT
 |  predicates: id IS NULL, tinyint_col != 5
-|  row-size=5B cardinality=730
+|  row-size=9B cardinality=730
 |
 00:UNION
-|  row-size=5B cardinality=7.30K
+|  row-size=9B cardinality=7.30K
 |
 |--04:ANALYTIC
 |  |  functions: dense_rank()
@@ -2124,10 +2124,10 @@ PLAN-ROOT SINK
 |
 05:SELECT
 |  predicates: id IS NULL, tinyint_col != 5
-|  row-size=5B cardinality=730
+|  row-size=9B cardinality=730
 |
 00:UNION
-|  row-size=5B cardinality=7.30K
+|  row-size=9B cardinality=7.30K
 |
 |--08:EXCHANGE [RANDOM]
 |  |
@@ -3010,4 +3010,83 @@ PLAN-ROOT SINK
 00:SCAN HDFS [functional.alltypes]
    HDFS partitions=24/24 files=24 size=478.45KB
    row-size=25B cardinality=7.30K
+====
+# IMPALA-8718: Collection slots are removed by the projection in creating sort tuple of
+# analytic node. So row size of sort shrinks to 8B. Output row size of analytic shrinks
+# to 16B.
+select t.c_custkey, rank() over(order by t.c_custkey) as rnk
+from tpch_nested_parquet.customer t left outer join t.c_orders
+---- PLAN
+PLAN-ROOT SINK
+|
+06:ANALYTIC
+|  functions: rank()
+|  order by: c_custkey ASC
+|  window: RANGE BETWEEN UNBOUNDED PRECEDING AND CURRENT ROW
+|  row-size=16B cardinality=150.00K
+|
+05:SORT
+|  order by: c_custkey ASC
+|  row-size=8B cardinality=150.00K
+|
+01:SUBPLAN
+|  row-size=20B cardinality=150.00K
+|
+|--04:NESTED LOOP JOIN [RIGHT OUTER JOIN]
+|  |  row-size=20B cardinality=1
+|  |
+|  |--02:SINGULAR ROW SRC
+|  |     row-size=20B cardinality=1
+|  |
+|  03:UNNEST [t.c_orders]
+|     row-size=0B cardinality=10
+|
+00:SCAN HDFS [tpch_nested_parquet.customer t]
+   HDFS partitions=1/1 files=4 size=292.39MB
+   row-size=20B cardinality=150.00K
+====
+# IMPALA-8718: No more collection slots in the output of the inline view of analytics.
+select leftSide.c_custkey, c_name, rnk
+from tpch_nested_parquet.customer leftSide
+left outer join (
+    select t.c_custkey, rank() over(order by t.c_custkey) as rnk
+    from tpch_nested_parquet.customer t left outer join t.c_orders
+) rightSide
+on leftSide.c_custkey = rightSide.c_custkey
+---- PLAN
+PLAN-ROOT SINK
+|
+08:HASH JOIN [LEFT OUTER JOIN]
+|  hash predicates: leftSide.c_custkey = c_custkey
+|  row-size=54B cardinality=150.00K
+|
+|--07:ANALYTIC
+|  |  functions: rank()
+|  |  order by: c_custkey ASC
+|  |  window: RANGE BETWEEN UNBOUNDED PRECEDING AND CURRENT ROW
+|  |  row-size=16B cardinality=150.00K
+|  |
+|  06:SORT
+|  |  order by: c_custkey ASC
+|  |  row-size=8B cardinality=150.00K
+|  |
+|  02:SUBPLAN
+|  |  row-size=20B cardinality=150.00K
+|  |
+|  |--05:NESTED LOOP JOIN [RIGHT OUTER JOIN]
+|  |  |  row-size=20B cardinality=1
+|  |  |
+|  |  |--03:SINGULAR ROW SRC
+|  |  |     row-size=20B cardinality=1
+|  |  |
+|  |  04:UNNEST [t.c_orders]
+|  |     row-size=0B cardinality=10
+|  |
+|  01:SCAN HDFS [tpch_nested_parquet.customer t]
+|     HDFS partitions=1/1 files=4 size=289.00MB
+|     row-size=20B cardinality=150.00K
+|
+00:SCAN HDFS [tpch_nested_parquet.customer leftside]
+   HDFS partitions=1/1 files=4 size=289.00MB
+   row-size=38B cardinality=150.00K
 ====
