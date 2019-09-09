@@ -376,6 +376,9 @@ class ImpalaClient(object):
           " HTTP transport.")
 
     # HTTP server implemententations do not support SPNEGO yet.
+    # TODO: when we add support for Kerberos+HTTP, we need to re-enable the automatic
+    # kerberos retry logic in impala_shell.py that was disabled for HTTP because of
+    # IMPALA-8932.
     if self.use_kerberos or self.kerberos_host_fqdn:
       print_to_stderr("Kerberos not supported with HTTP endpoints.")
       raise NotImplementedError()

@@ -813,7 +813,8 @@ class ImpalaShell(object, cmd.Cmd):
     # If the connection fails and the Kerberos has not been enabled,
     # check for a valid kerberos ticket and retry the connection
     # with kerberos enabled.
-    if not self.imp_client.connected and not self.use_kerberos:
+    # IMPALA-8932: Kerberos is not yet supported for hs2-http, so don't retry.
+    if not self.imp_client.connected and not self.use_kerberos and protocol != 'hs2-http':
       try:
         if call(["klist", "-s"]) == 0:
           print_to_stderr("Kerberos ticket found in the credentials cache, retrying "
