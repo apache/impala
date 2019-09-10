@@ -60,7 +60,7 @@ var refresh = function () {
 
 $(document).ready(function() {
     table = $('#backends').DataTable({
-        ajax: { url: "/query_backends?query_id={{query_id}}&json",
+        ajax: { url: make_url("/query_backends?query_id={{query_id}}&json"),
                 dataSrc: "backend_states",
               },
         "columns": [ {data: 'host'},

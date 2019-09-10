@@ -90,7 +90,7 @@ function unpackJson(json) {
 
 $(document).ready(function() {
     table = $('#finstances').DataTable({
-        ajax: { url: "/query_finstances?query_id={{query_id}}&json",
+        ajax: { url: make_url("/query_finstances?query_id={{query_id}}&json"),
                 dataSrc: unpackJson,
               },
         "columns": [ {data: 'host'},
