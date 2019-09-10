@@ -102,8 +102,8 @@ public class RangerAuditLogTest extends AuthorizationTestBase {
         onUri("hdfs://localhost:20500/test-warehouse/new_table", TPrivilegeLevel.ALL));
 
     authzOk(events -> {
-      // Only the table event.
-      assertEquals(1, events.size());
+      // Table event and 2 column events
+      assertEquals(3, events.size());
       assertEventEquals("@table", "select", "functional/alltypes", 1, events.get(0));
       assertEquals("select id, string_col from functional.alltypes",
           events.get(0).getRequestData());

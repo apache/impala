@@ -231,7 +231,12 @@ public abstract class BaseAuthorizationChecker implements AuthorizationChecker {
       } else {
         Preconditions.checkState(
             request.getAuthorizable().getType() == Authorizable.Type.COLUMN);
-        if (hasTableSelectPriv) continue;
+        // In order to support deny policies on columns
+        if (hasTableSelectPriv &&
+                request.getPrivilege() != Privilege.SELECT &&
+                request.getPrivilege() != Privilege.INSERT) {
+          continue;
+        }
         if (hasAccess(authzCtx, analyzer.getUser(), request)) {
           hasColumnSelectPriv = true;
           continue;
