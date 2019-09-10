@@ -44,9 +44,10 @@ Status BufferedPlanRootSink::Prepare(
 }
 
 Status BufferedPlanRootSink::Open(RuntimeState* state) {
+  // Debug action before Open is called.
+  RETURN_IF_ERROR(DebugAction(state->query_options(), "BPRS_BEFORE_OPEN"));
   RETURN_IF_ERROR(DataSink::Open(state));
-  current_batch_ =
-      make_unique<RowBatch>(row_desc_, state->batch_size(), mem_tracker());
+  current_batch_ = make_unique<RowBatch>(row_desc_, state->batch_size(), mem_tracker());
   batch_queue_.reset(new SpillableRowBatchQueue(name_,
       state->query_options().max_spilled_result_spooling_mem, state, mem_tracker(),
       profile(), row_desc_, resource_profile_, debug_options_));
@@ -79,6 +80,9 @@ Status BufferedPlanRootSink::Send(RuntimeState* state, RowBatch* batch) {
     }
     RETURN_IF_CANCELLED(state);
 
+    // Debug action before AddBatch is called.
+    RETURN_IF_ERROR(DebugAction(state->query_options(), "BPRS_BEFORE_ADD_BATCH"));
+
     // Add the batch to the queue and then notify the consumer that rows are available.
     RETURN_IF_ERROR(batch_queue_->AddBatch(batch));
     rows_sent_counter_->Add(batch->num_rows());
@@ -91,6 +95,8 @@ Status BufferedPlanRootSink::Send(RuntimeState* state, RowBatch* batch) {
 
 Status BufferedPlanRootSink::FlushFinal(RuntimeState* state) {
   SCOPED_TIMER(profile()->total_time_counter());
+  // Debug action before FlushFinal is called.
+  RETURN_IF_ERROR(DebugAction(state->query_options(), "BPRS_BEFORE_FLUSH_FINAL"));
   DCHECK(!closed_);
   unique_lock<mutex> l(lock_);
   sender_state_ = SenderState::EOS;
@@ -155,18 +161,20 @@ Status BufferedPlanRootSink::GetNext(
     // Track the number of rows read from the queue and the number of rows to read.
     int num_rows_read = 0;
     // If 'num_results' <= 0 then by default fetch FETCH_NUM_BATCHES batches.
-    int num_rows_to_read =
+    const int num_rows_to_read =
         num_results <= 0 ? FETCH_NUM_BATCHES * state->batch_size() : num_results;
 
     // True if the consumer timed out waiting for the producer to send rows or if the
     // consumer timed out while materializing rows, false otherwise.
     bool timed_out = false;
 
-    // Read from the queue until all requested rows have been read, or eos is hit.
-    while (!*eos && num_rows_read < num_rows_to_read && !timed_out) {
+    // Read from the queue until the query is cancelled or the sink is closed, eos is
+    // hit, all requested rows have been read, or the timeout has been hit.
+    while (!IsCancelledOrClosed(state) && !*eos && num_rows_read < num_rows_to_read
+        && !timed_out) {
       // Wait for the queue to have rows in it.
-      while (IsQueueEmpty() && sender_state_ == SenderState::ROWS_PENDING
-          && !state->is_cancelled() && !timed_out) {
+      while (!IsCancelledOrClosed(state) && IsQueueEmpty(state)
+          && sender_state_ == SenderState::ROWS_PENDING && !timed_out) {
         // Wait fetch_rows_timeout_us_ - row_batches_get_wait_timer_ microseconds for
         // rows to become available before returning to the client. Subtracting
         // wait_timeout_timer ensures the client only ever waits up to
@@ -182,9 +190,11 @@ Status BufferedPlanRootSink::GetNext(
       // eos and then return. The queue could be empty if the sink was closed while
       // waiting for rows to become available, or if the sink was closed before the
       // current call to GetNext.
-      if (!state->is_cancelled() && !IsQueueEmpty()) {
+      if (!IsCancelledOrClosed(state) && !IsQueueEmpty(state)) {
         // If current_batch_ is empty, then read directly from the queue.
         if (current_batch_row_ == 0) {
+          // Debug action before GetBatch is called.
+          RETURN_IF_ERROR(DebugAction(state->query_options(), "BPRS_BEFORE_GET_BATCH"));
           RETURN_IF_ERROR(batch_queue_->GetBatch(current_batch_.get()));
 
           // After reading a RowBatch from the queue, it now has additional capacity,
@@ -219,8 +229,11 @@ Status BufferedPlanRootSink::GetNext(
       }
       timed_out = timed_out
           || wait_timeout_timer.ElapsedTime() >= PlanRootSink::fetch_rows_timeout_us();
-      *eos = IsQueueEmpty() && sender_state_ == SenderState::EOS;
+      // If we have read all rows, then break out of the while loop.
+      *eos = IsGetNextEos(state);
     }
+    // If the query was cancelled while reading rows, update eos and return.
+    *eos = IsGetNextEos(state);
     if (*eos) consumer_eos_.NotifyOne();
   }
   return state->GetQueryStatus();

@@ -760,13 +760,14 @@ class ImpalaTestSuite(BaseTestSuite):
     assert result.success
     return result
 
+  @classmethod
   @execute_wrapper
-  def execute_query_expect_failure(self, impalad_client, query, query_options=None,
+  def execute_query_expect_failure(cls, impalad_client, query, query_options=None,
       user=None):
     """Executes a query and asserts if the query succeeds"""
     result = None
     try:
-      result = self.__execute_query(impalad_client, query, query_options, user)
+      result = cls.__execute_query(impalad_client, query, query_options, user)
     except Exception, e:
       return e
 

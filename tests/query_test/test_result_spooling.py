@@ -25,6 +25,7 @@ from tests.common.impala_test_suite import ImpalaTestSuite
 from tests.common.test_dimensions import create_exec_option_dimension
 from tests.common.test_vector import ImpalaTestDimension
 from tests.util.cancel_util import cancel_query_and_validate_state
+from tests.util.failpoints_util import execute_query_expect_debug_action_failure
 
 
 class TestResultSpooling(ImpalaTestSuite):
@@ -178,6 +179,19 @@ class TestResultSpooling(ImpalaTestSuite):
           is not None
     finally:
       self.client.close_query(handle)
+
+  def test_exec_tree_failpoint(self, vector):
+    """Inject a failure during exec tree execution. The GETNEXT:DELAY is necessary to
+    ensure the client issues a fetch request before the MEM_LIMIT_EXCEEDED exception is
+    thrown. Unlike the tests in TestResultSpoolingFailpoints this test injects a fail
+    during the execution of the exec tree, rather than in the result spooling code."""
+    vector.get_value('exec_option')['batch_size'] = 10
+    vector.get_value('exec_option')['debug_action'] = \
+        '4:GETNEXT:MEM_LIMIT_EXCEEDED|0:GETNEXT:DELAY'
+    vector.get_value('exec_option')['spool_query_results'] = 'true'
+    query = "select 1 from functional.alltypessmall a join functional.alltypessmall b " \
+        "on a.id = b.id"
+    execute_query_expect_debug_action_failure(self, query, vector)
 
   def __validate_query(self, query, exec_options):
     """Compares the results of the given query with and without result spooling
@@ -344,3 +358,47 @@ class TestResultSpoolingCancellation(ImpalaTestSuite):
           "Unexpected status code from cancel request: {0}".format(cancel_result)
     finally:
       if handle: self.client.close_query(handle)
+
+
+class TestResultSpoolingFailpoints(ImpalaTestSuite):
+  """Test result spooling failure handling. Uses debug actions to inject failures at
+  various points of result spooling execution (e.g. the when results are actually getting
+  spooled)."""
+
+  _debug_actions = [
+      # Inject a failure in BufferedPlanRootSink::Open.
+      'BPRS_BEFORE_OPEN:FAIL',
+      # Inject a failure immediately before BufferedPlanRootSink::Send adds a batch to
+      # the queue. The probability ensures that the error is thrown on a random
+      # RowBatch.
+      'BPRS_BEFORE_ADD_BATCH:FAIL@1.0',
+      # Inject a failure in BufferedPlanRootSink::FlushFinal.
+      'BPRS_BEFORE_FLUSH_FINAL:FAIL',
+      # Inject a failure immediately before the BufferedPlanRootSink::GetNext reads a
+      # batch from the queue. The probability ensures that the error is thrown on a
+      # random RowBatch.
+      'BPRS_BEFORE_GET_BATCH:FAIL@1.0']
+
+  _query = "select * from functional.alltypes"
+
+  @classmethod
+  def get_workload(cls):
+    return 'functional-query'
+
+  @classmethod
+  def add_test_dimensions(cls):
+    super(TestResultSpoolingFailpoints, cls).add_test_dimensions()
+    cls.ImpalaTestMatrix.add_dimension(ImpalaTestDimension('debug_action',
+        *cls._debug_actions))
+
+    # Result spooling should be independent of file format, so only testing for
+    # table_format=parquet/none in order to avoid a test dimension explosion.
+    cls.ImpalaTestMatrix.add_constraint(lambda v:
+        v.get_value('table_format').file_format == 'parquet' and
+        v.get_value('table_format').compression_codec == 'none')
+
+  def test_failpoints(self, vector):
+    vector.get_value('exec_option')['batch_size'] = 10
+    vector.get_value('exec_option')['debug_action'] = vector.get_value('debug_action')
+    vector.get_value('exec_option')['spool_query_results'] = 'true'
+    execute_query_expect_debug_action_failure(self, self._query, vector)

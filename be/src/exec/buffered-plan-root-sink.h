@@ -140,11 +140,26 @@ class BufferedPlanRootSink : public PlanRootSink {
   /// 'GetNext'. If 'current_batch_' is nullptr, the value of 'current_batch_row_' is 0.
   int current_batch_row_ = 0;
 
-  /// Returns true if the 'queue' is empty (not the 'batch_queue_'). 'queue' refers to
+  /// Returns true if the 'queue' (not the 'batch_queue_') is empty. 'queue' refers to
   /// the logical queue of RowBatches and thus includes any RowBatch that
-  /// 'current_batch_' points to. Must be called while holding 'lock_'.
-  bool IsQueueEmpty() const {
+  /// 'current_batch_' points to. Must be called while holding 'lock_'. Cannot be called
+  /// once the query has been cancelled or closed.
+  bool IsQueueEmpty(RuntimeState* state) const {
+    DCHECK(!IsCancelledOrClosed(state));
     return batch_queue_->IsEmpty() && current_batch_row_ == 0;
+  }
+
+  /// Sets the value of eos inside GetNext. eos is set to true if the queue is closed or
+  /// empty and the producer has set sender_state_ to EOS.
+  bool IsGetNextEos(RuntimeState* state) const {
+    return (IsCancelledOrClosed(state) || IsQueueEmpty(state))
+        && sender_state_ == SenderState::EOS;
+  }
+
+  /// Returns true if the query has been cancelled or if the PlanRootSink has been
+  /// closed, returns false otherwise.
+  bool IsCancelledOrClosed(RuntimeState* state) const {
+    return state->is_cancelled() || closed_;
   }
 };
 }
