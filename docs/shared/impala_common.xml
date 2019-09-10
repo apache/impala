@@ -1098,12 +1098,13 @@ select concat('abc','mno','xyz');</codeblock>
 </codeblock>
       </p>
 
-      <p id="column_ordinals" rev="IMPALA-6415 IMPALA-5191">
-        You can also refer to <codeph>SELECT</codeph>-list items by their ordinal position.
-        Impala supports ordinals in the <codeph>GROUP BY</codeph>, <codeph>HAVING</codeph>, and
-        <codeph>ORDER BY</codeph> clauses. From Impala 3.0, ordinals can only be used at the top
-        level. For example, the following statements are allowed:
-<codeblock>
+      <p id="column_ordinals" rev="IMPALA-6415 IMPALA-5191"> You can refer to
+          <codeph>SELECT</codeph>-list items by their ordinal position. Impala
+        supports ordinals in the <codeph>GROUP BY</codeph>,
+          <codeph>HAVING</codeph>, and <codeph>ORDER BY</codeph> clauses. From
+        Impala 3.0, ordinals can only be used at the top level. For example, the
+        following statements are allowed:
+        <codeblock>
   SELECT int_col / 2, sum(x)
   FROM t
   GROUP BY 1;
@@ -1118,7 +1119,7 @@ select concat('abc','mno','xyz');</codeblock>
   HAVING 1;
 </codeblock>
         Numbers in subexpressions are not interpreted as ordinals:
-<codeblock>
+        <codeblock>
   SELECT int_col / 2, sum(x)
   FROM t
   GROUP BY 1 * 2;
