@@ -23,6 +23,7 @@ under the License.
 <table id="backends" class='table table-hover table-bordered'>
   <thead>
     <tr>
+      <th></th>
       <th>Address</th>
       <th>Krpc Address</th>
       <th>Coordinator</th>
@@ -39,6 +40,7 @@ under the License.
   <tbody>
     {{#backends}}
     <tr>
+      <td><a href='{{webserver_url}}'>Web UI</a></td>
       <td>{{address}}</td>
       <td>{{krpc_address}}</td>
       <td>{{is_coordinator}}</td>

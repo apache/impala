@@ -594,6 +594,10 @@ class TestWebPage(ImpalaTestSuite):
     # Look at results for a single backend - they are not sorted.
     backend_row = response_json['backends'][0]
 
+    assert len(backend_row['webserver_url']) > 0
+    webserver_ports = ('25000', '25001', '25002')
+    assert backend_row['webserver_url'].endswith(webserver_ports)
+
     # The 'address' column is the backend port of the impalad.
     assert len(backend_row['address']) > 0
     be_ports = ('22000', '22001', '22002')

@@ -934,6 +934,11 @@ void ImpalaHttpHandler::BackendsHandler(const Webserver::WebRequest& req,
         TNetworkAddressToString(backend.krpc_address).c_str(), document->GetAllocator());
     backend_obj.AddMember("address", str, document->GetAllocator());
     backend_obj.AddMember("krpc_address", krpc_address, document->GetAllocator());
+    string webserver_url =
+        Substitute("$0://$1", backend.secure_webserver ? "https" : "http",
+            TNetworkAddressToString(backend.debug_http_address));
+    Value webserver_url_val(webserver_url.c_str(), document->GetAllocator());
+    backend_obj.AddMember("webserver_url", webserver_url_val, document->GetAllocator());
     backend_obj.AddMember("is_coordinator", backend.is_coordinator,
         document->GetAllocator());
     backend_obj.AddMember("is_executor", backend.is_executor, document->GetAllocator());
