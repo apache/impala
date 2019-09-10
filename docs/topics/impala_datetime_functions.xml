@@ -408,6 +408,7 @@ under the License.
             start of a query. All calls to <codeph>CURRENT_DATE()</codeph> within the same query
             return the same value, and the value does not depend on how long the query takes.
           </p>
+
           <p>
             <b>Return type:</b> <codeph>DATE</codeph>
           </p>
@@ -1236,7 +1237,7 @@ select date_sub(cast('2016-05-31' as timestamp), interval 1 months) as 'april_31
       <dlentry id="from_unixtime">
 
         <dt>
-          FROM_UNIXTIME(BIGINT unixtime[, STRING format])
+          FROM_UNIXTIME(BIGINT unixtime [, STRING pattern])
         </dt>
 
         <dd>
@@ -1245,47 +1246,171 @@ select date_sub(cast('2016-05-31' as timestamp), interval 1 months) as 'april_31
           <p>
             <b>Return type:</b> <codeph>STRING</codeph>
           </p>
-
-          <p conref="../shared/impala_common.xml#common/y2k38"/>
-
-          <p conref="../shared/impala_common.xml#common/usage_notes_blurb"/>
-
-          <p>
-            The format string accepts the variations allowed for the <codeph>TIMESTAMP</codeph>
-            data type: date plus time, date by itself, time by itself, and optional fractional
-            seconds for the time. See <xref href="impala_timestamp.xml#timestamp"/> for details.
-          </p>
-
           <p rev="1.3.0">
-            Currently, the format string is case-sensitive, especially to distinguish
-            <codeph>m</codeph> for minutes and <codeph>M</codeph> for months. In Impala 1.3 and
-            later, you can switch the order of elements, use alternative separator characters,
-            and use a different number of placeholders for each unit. Adding more instances of
-            <codeph>y</codeph>, <codeph>d</codeph>, <codeph>H</codeph>, and so on produces
-            output strings zero-padded to the requested number of characters. The exception is
-            <codeph>M</codeph> for months, where <codeph>M</codeph> produces a non-padded value
-            such as <codeph>3</codeph>, <codeph>MM</codeph> produces a zero-padded value such as
-            <codeph>03</codeph>, <codeph>MMM</codeph> produces an abbreviated month name such as
-            <codeph>Mar</codeph>, and sequences of 4 or more <codeph>M</codeph> are not allowed.
+            The <varname>pattern</varname> string supports the following subset of Java
+            SimpleDateFormat.
+          </p>
+          <table frame="all"
+            rowsep="1" colsep="1" id="table_dzg_zpm_1jb">
+            <tgroup cols="2" align="left">
+              <thead>
+                <row>
+                  <entry>
+                    Pattern
+                  </entry>
+                  <entry>
+                    Description
+                  </entry>
+                </row>
+              </thead>
+              <tbody>
+                <row>
+                  <entry>
+                    <codeph>y</codeph>
+                  </entry>
+                  <entry>
+                    Year
+                  </entry>
+                </row>
+                <row>
+                  <entry>
+                    <codeph>M</codeph>
+                  </entry>
+                  <entry>
+                    Month
+                  </entry>
+                </row>
+                <row>
+                  <entry>
+                    <codeph>d</codeph>
+                  </entry>
+                  <entry>
+                    Day
+                  </entry>
+                </row>
+                <row>
+                  <entry>
+                    <codeph>H</codeph>
+                  </entry>
+                  <entry>
+                    Hour
+                  </entry>
+                </row>
+                <row>
+                  <entry>
+                    <codeph>m</codeph>
+                  </entry>
+                  <entry>
+                    Minute
+                  </entry>
+                </row>
+                <row>
+                  <entry>
+                    <codeph>s</codeph>
+                  </entry>
+                  <entry>
+                    Second
+                  </entry>
+                </row>
+                <row>
+                  <entry>
+                    <codeph>S</codeph>
+                  </entry>
+                  <entry>
+                    Fractional second
+                  </entry>
+                </row>
+                <row>
+                  <entry>
+                    <codeph>+/-hh:mm</codeph>
+                  </entry>
+                  <entry>
+                    Time zone offset
+                  </entry>
+                </row>
+                <row>
+                  <entry>
+                    <codeph>+/-hhmm</codeph>
+                  </entry>
+                  <entry>
+                    Time zone offset
+                  </entry>
+                </row>
+                <row>
+                  <entry>
+                    <codeph>+/-hh</codeph>
+                  </entry>
+                  <entry>
+                    Time zone offset
+                  </entry>
+                </row>
+              </tbody>
+            </tgroup>
+          </table>
+          <p>
+            The following rules apply to the <varname>pattern</varname> string:
+          </p>
+          <ul>
+            <li>
+              The <varname>pattern</varname> string is case-sensitive.
+            </li>
+
+            <li>
+              All fields are variable length, and thus must use separators to specify the
+              boundaries of the fields, with the exception of the time zone values.
+            </li>
+
+            <li>
+              Time zone offset formats must be at the end of the <varname>pattern</varname>
+              string.
+            </li>
+
+            <li>
+              Formatting character groups can appear in any order along with any separators
+              except for the time zone offset. For example:
+              <ul>
+                <li>
+                  <codeph>yyyy/MM/dd</codeph>
+                </li>
+
+                <li>
+                  <codeph>dd-MMM-yy</codeph>
+                </li>
+
+                <li>
+                  <codeph>(dd)(MM)(yyyy) HH:mm:ss</codeph>
+                </li>
+
+                <li>
+                  <codeph>yyyy-MM-dd HH:mm:ss+hh:mm</codeph>
+                </li>
+              </ul>
+            </li>
+          </ul>
+          <p rev="1.3.0">
+            In Impala 1.3 and later, you can switch the order of elements, use alternative
+            separator characters, and use a different number of placeholders for each unit.
+            Adding more instances of <codeph>y</codeph>, <codeph>d</codeph>, <codeph>H</codeph>,
+            and so on produces output strings zero-padded to the requested number of characters.
+            The exception is <codeph>M</codeph> for months, where <codeph>M</codeph> produces a
+            non-padded value such as <codeph>3</codeph>, <codeph>MM</codeph> produces a
+            zero-padded value such as <codeph>03</codeph>, <codeph>MMM</codeph> produces an
+            abbreviated month name such as <codeph>Mar</codeph>, and sequences of 4 or more
+            <codeph>M</codeph> are not allowed.
+          </p>
+          <p rev="1.3.0">
             A date string including all fields could be <codeph>'yyyy-MM-dd
             HH:mm:ss.SSSSSS'</codeph>, <codeph>'dd/MM/yyyy HH:mm:ss.SSSSSS'</codeph>,
             <codeph>'MMM dd, yyyy HH.mm.ss (SSSSSS)'</codeph> or other combinations of
             placeholders and separator characters.
           </p>
-
           <p
-            conref="../shared/impala_common.xml#common/timezone_conversion_caveat"/>
-
-          <note rev="1.3.0">
-            <p rev="1.3.0">
-              The more flexible format strings allowed with the built-in functions do not change
-              the rules about using <codeph>CAST()</codeph> to convert from a string to a
-              <codeph>TIMESTAMP</codeph> value. Strings being converted through
-              <codeph>CAST()</codeph> must still have the elements in the specified order and
-              use the specified delimiter characters, as described in
-              <xref href="impala_timestamp.xml#timestamp"/>.
-            </p>
-          </note>
+            conref="../shared/impala_common.xml#common/y2k38"/>
+          <p
+            conref="../shared/impala_common.xml#common/usage_notes_blurb"/>
+          <p
+            conref="../shared/impala_common.xml#common/timezone_conversion_caveat"
+          />
         </dd>
 
       </dlentry>
@@ -2560,7 +2685,7 @@ select now() as 'Current time in California USA',
 
         <dt>
           UNIX_TIMESTAMP(), UNIX_TIMESTAMP(STRING datetime), UNIX_TIMESTAMP(STRING datetime,
-          STRING format), UNIX_TIMESTAMP(TIMESTAMP datetime)
+          STRING pattern), UNIX_TIMESTAMP(TIMESTAMP datetime)
         </dt>
 
         <dd>
@@ -2577,7 +2702,7 @@ select now() as 'Current time in California USA',
 
           <p rev="1.3.0">
             See <codeph>FROM_UNIXTIME()</codeph> for details about the patterns you can use in
-            the <codeph>format</codeph> string to represent the position of year, month, day,
+            the <varname>pattern</varname> string to represent the position of year, month, day,
             and so on in the <codeph>date</codeph> string. In Impala 1.3 and higher, you have
             more flexibility to switch the positions of elements and use different separator
             characters.
@@ -2590,12 +2715,13 @@ select now() as 'Current time in California USA',
 
           <p rev="2.3.0">
             In <keyword keyref="impala23_full"/> and higher, you can include a timezone offset
-            specified as minutes and hours, provided you also specify the details in the format
-            string argument. The offset is specified in the format string as a plus or minus
-            sign followed by <codeph>hh:mm</codeph>, <codeph>hhmm</codeph>, or
-            <codeph>hh</codeph>. The <codeph>hh</codeph> must be lowercase, to distinguish it
-            from the <codeph>HH</codeph> represent hours in the actual time value. Currently,
-            only numeric timezone offsets are allowed, not symbolic names.
+            specified as minutes and hours, provided you also specify the details in the
+            <varname>pattern</varname> string argument. The offset is specified in the
+            <varname>pattern</varname> string as a plus or minus sign followed by
+            <codeph>hh:mm</codeph>, <codeph>hhmm</codeph>, or <codeph>hh</codeph>. The
+            <codeph>hh</codeph> must be lowercase, to distinguish it from the
+            <codeph>HH</codeph> represent hours in the actual time value. Currently, only
+            numeric timezone offsets are allowed, not symbolic names.
           </p>
 
           <p conref="../shared/impala_common.xml#common/y2k38"/>
@@ -2610,17 +2736,18 @@ select now() as 'Current time in California USA',
 
           <p>
             The following examples show different ways of turning the same date and time into an
-            integer value. A format string that Impala recognizes by default is interpreted as a
-            UTC date and time. The trailing <codeph>Z</codeph> is a confirmation that the
-            timezone is UTC. If the date and time string is formatted differently, a second
-            argument specifies the position and units for each of the date and time values.
+            integer value. A <varname>pattern</varname> string that Impala recognizes by default
+            is interpreted as a UTC date and time. The trailing <codeph>Z</codeph> is a
+            confirmation that the timezone is UTC. If the date and time string is formatted
+            differently, a second argument specifies the position and units for each of the date
+            and time values.
           </p>
 
           <p>
             The final two examples show how to specify a timezone offset of Pacific Daylight
             Saving Time, which is 7 hours earlier than UTC. You can use the numeric offset
             <codeph>-07:00</codeph> and the equivalent suffix of <codeph>-hh:mm</codeph> in the
-            format string, or specify the mnemonic name for the time zone in a call to
+            pattern string, or specify the mnemonic name for the time zone in a call to
             <codeph>TO_UTC_TIMESTAMP()</codeph>. This particular date and time expressed in PDT
             translates to a different number than the same date and time expressed in UTC.
           </p>
