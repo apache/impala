@@ -295,6 +295,6 @@ class TestCoordinators(CustomClusterTestSuite):
     present."""
     result = self.execute_query_expect_failure(self.client, "select 2")
     expected_error = "Query aborted:Admission for query exceeded timeout 60000ms in " \
-                     "pool default-pool. Queued reason: No healthy executor groups " \
-                     "found for pool default-pool."
+                     "pool default-pool. Queued reason: Waiting for executors to " \
+                     "start. Only DDL queries can currently run."
     assert expected_error in str(result)

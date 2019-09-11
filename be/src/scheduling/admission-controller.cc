@@ -214,7 +214,8 @@ const string REASON_THREAD_RESERVATION_AGG_LIMIT_EXCEEDED =
 // $0 is the error message returned by the scheduler.
 const string REASON_SCHEDULER_ERROR = "Error during scheduling: $0";
 const string REASON_LOCAL_BACKEND_NOT_STARTED = "Local backend has not started up yet.";
-const string REASON_NO_EXECUTOR_GROUPS = "No healthy executor groups found for pool $0.";
+const string REASON_NO_EXECUTOR_GROUPS = "Waiting for executors to start. Only DDL "
+    "queries can currently run.";
 
 // Queue decision details
 // $0 = num running queries, $1 = num queries limit, $2 = num queries limit explanation,
@@ -1193,7 +1194,7 @@ Status AdmissionController::ComputeGroupSchedules(
       membership_snapshot->executor_groups, pool_name, &executor_groups);
 
   if (executor_groups.empty()) {
-    queue_node->not_admitted_reason = Substitute(REASON_NO_EXECUTOR_GROUPS, pool_name);
+    queue_node->not_admitted_reason = REASON_NO_EXECUTOR_GROUPS;
     LOG(WARNING) << queue_node->not_admitted_reason;
     return Status::OK();
   }

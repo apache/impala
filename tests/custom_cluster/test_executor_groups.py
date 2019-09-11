@@ -109,7 +109,7 @@ class TestExecutorGroups(CustomClusterTestSuite):
     client = self.client
     handle = client.execute_async(QUERY)
     profile = client.get_runtime_profile(handle)
-    assert "No healthy executor groups found for pool" in profile
+    assert "Waiting for executors to start" in profile
     assert self.coordinator.service.get_metric_value(
       "cluster-membership.executor-groups.total-healthy") == 0
     self._add_executor_group("group1", 2)
@@ -138,7 +138,7 @@ class TestExecutorGroups(CustomClusterTestSuite):
     # Run query and observe timeout
     handle = client.execute_async(QUERY)
     profile = client.get_runtime_profile(handle)
-    assert "No healthy executor groups found for pool" in profile, profile
+    assert "Waiting for executors to start" in profile, profile
     # Restart executor
     executor.start()
     # Query should now finish
@@ -286,8 +286,7 @@ class TestExecutorGroups(CustomClusterTestSuite):
     client = self.client
     handle = client.execute_async(QUERY)
     profile = client.get_runtime_profile(handle)
-    assert "Initial admission queue reason: No healthy executor groups found for pool" \
-        in profile
+    assert "Initial admission queue reason: Waiting for executors to start" in profile
     initial_state = client.get_state(handle)
     # Start another executor and observe that the query stays queued
     self._add_executor_group("group1", 3, num_executors=1)
@@ -324,8 +323,8 @@ class TestExecutorGroups(CustomClusterTestSuite):
     # Run query to make sure it times out
     result = self.execute_query_expect_failure(self.client, QUERY)
     expected_error = "Query aborted:Admission for query exceeded timeout 2000ms in " \
-                     "pool default-pool. Queued reason: No healthy executor groups " \
-                     "found for pool default-pool."
+                     "pool default-pool. Queued reason: Waiting for executors to " \
+                     "start. Only DDL queries can currently run."
     assert expected_error in str(result)
     assert self.coordinator.service.get_metric_value(
       "cluster-membership.executor-groups.total-healthy") == 0
