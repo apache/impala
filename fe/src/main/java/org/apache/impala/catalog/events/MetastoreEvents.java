@@ -1378,8 +1378,12 @@ public class MetastoreEvents {
      static void setTrivialParameters(Map<String, String> parametersBefore,
         Map<String, String> parametersAfter) {
       for (String parameter: parametersToIgnore) {
-        parametersAfter.put(parameter,
-            parametersBefore.get(parameter));
+        String val = parametersBefore.get(parameter);
+        if (val == null) {
+          parametersAfter.remove(parameter);
+        } else {
+          parametersAfter.put(parameter, val);
+        }
       }
     }
 
