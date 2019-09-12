@@ -733,7 +733,10 @@ under the License.
           <p> Set <codeph>fs.s3a.block.size</codeph> to 134217728 (128 MB in
             bytes) if most Parquet files queried by Impala were written by Hive
             or ParquetMR jobs. Set the block size to 268435456 (256 MB in bytes)
-            if most Parquet files queried by Impala were written by Impala. </p>
+            if most Parquet files queried by Impala were written by Impala.
+            As of Impala 3.4.0, the query option <codeph>PARQUET_OBJECT_STORE_SPLIT_SIZE</codeph>
+            controls the Parquet split size for non-block stores (e.g. S3, ADLS, etc.).
+            The default value is 256 MB.</p>
         </li>
         <li>
           <p>

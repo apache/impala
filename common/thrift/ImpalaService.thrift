@@ -464,6 +464,17 @@ enum TImpalaQueryOptions {
   // For testing purposes only. This can provide a datetime string to use as now() for
   // tests.
   NOW_STRING = 94
+
+  // The split size of Parquet files when scanning non-block-based storage systems (e.g.
+  // S3, ADLS, etc.). When reading from block-based storage systems (e.g. HDFS), Impala
+  // sets the split size for Parquet files to the size of the blocks. This is done
+  // because Impala assumes Parquet files have a single row group per block (which is
+  // the recommended way Parquet files should be written). However, since non-block-based
+  // storage systems have no concept of blocks, there is no way to derive a good default
+  // value for Parquet split sizes. Defaults to 256 MB, which is the default size of
+  // Parquet files written by Impala (Impala writes Parquet files with a single row
+  // group per file). Must be >= 1 MB.
+  PARQUET_OBJECT_STORE_SPLIT_SIZE = 95
 }
 
 // The summary of a DML statement.

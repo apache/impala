@@ -881,6 +881,24 @@ Status impala::SetQueryOption(const string& key, const string& value,
         query_options->__set_now_string(value);
         break;
       }
+      case TImpalaQueryOptions::PARQUET_OBJECT_STORE_SPLIT_SIZE: {
+        int64_t parquet_object_store_split_size;
+        RETURN_IF_ERROR(ParseMemValue(
+            value, "parquet object store split size", &parquet_object_store_split_size));
+        // The MIN_SYNTHETIC_BLOCK_SIZE from HdfsPartition.java. HdfsScanNode.java forces
+        // the block size to be greater than or equal to this value, so reject any
+        // attempt to set PARQUET_OBJECT_STORE_SPLIT_SIZE to a value lower than
+        // MIN_SYNTHETIC_BLOCK_SIZE.
+        int min_synthetic_block_size = 1024 * 1024;
+        if (parquet_object_store_split_size < min_synthetic_block_size) {
+          return Status(Substitute("Invalid parquet object store split size: '$0'. Must "
+                                   "be greater than or equal to '$1'.",
+              value, min_synthetic_block_size));
+        }
+        query_options->__set_parquet_object_store_split_size(
+            parquet_object_store_split_size);
+        break;
+      }
       default:
         if (IsRemovedQueryOption(key)) {
           LOG(WARNING) << "Ignoring attempt to set removed query option '" << key << "'";

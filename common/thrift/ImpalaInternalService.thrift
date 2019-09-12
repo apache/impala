@@ -397,6 +397,9 @@ struct TQueryOptions {
 
   // For testing purposes
   95: optional string now_string = "";
+
+  // See comment in ImpalaService.thrift
+  96: optional i64 parquet_object_store_split_size = 268435456;
 }
 
 // Impala currently has two types of sessions: Beeswax and HiveServer2

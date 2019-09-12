@@ -962,6 +962,55 @@ class TestTpchScanRangeLengths(ImpalaTestSuite):
     vector.get_value('exec_option')['max_scan_range_length'] = max_scan_range_length
     self.run_test_case('tpch-scan-range-lengths', vector)
 
+
+@SkipIf.not_s3
+class TestParquetScanRangeAssigment(ImpalaTestSuite):
+  """Test scan range assignment for Parquet files on S3. Since scan range assignment
+  cannot be validated in the S3PlannerTest (see IMPALA-8942), validate it here."""
+
+  @classmethod
+  def get_workload(cls):
+    return 'tpch'
+
+  @classmethod
+  def add_test_dimensions(cls):
+    super(TestParquetScanRangeAssigment, cls).add_test_dimensions()
+    cls.ImpalaTestMatrix.add_constraint(lambda v:
+        v.get_value('table_format').file_format == 'parquet')
+
+  def test_scan_range_skew(self, vector):
+    """Validate that each scanner reads an even number of row groups (e.g. there is no
+    skew). While scan ranges might be assigned evenly, scanners skip Parquet scan ranges
+    that do not process a range that overlaps the Parquet row-group midpoint."""
+
+    # Run TPC-H Q6, which re-produces the scan range assignment bug described in
+    # IMPALA-3453.
+    result = self.execute_query("select sum(l_extendedprice * l_discount) as revenue "
+        "from tpch_parquet.lineitem where l_shipdate >= '1994-01-01' and "
+        "l_shipdate < '1995-01-01' and l_discount between 0.05 and 0.07 and "
+        "l_quantity < 24")
+
+    # NumRowGroups tracks the number of row groups actually read, not necessarily the
+    # number assigned. Assert that each fragment processed exactly one row group.
+    self.__assert_counter_equals(r'NumRowGroups: (\d+)', 1, result.runtime_profile)
+    # ScanRangesComplete tracks the number of scan ranges assigned to each fragment.
+    # Assert that each fragment was assigned exactly one scan range.
+    self.__assert_counter_equals(r'ScanRangesComplete: (\d+)', 1, result.runtime_profile)
+    # NumScannersWithNoReads tracks the number of scan ranges that did not trigger any
+    # reads. In the case of Parquet, this counter would be > 0 if a fragment was assigned
+    # a scan range that does *not* contain the midpoint of a Parquet row group. Assert
+    # that this value is always 0.
+    self.__assert_counter_equals(r'NumScannersWithNoReads: (\d+)', 0,
+        result.runtime_profile)
+
+  def __assert_counter_equals(self, counter_regex, value, runtime_profile):
+    """Helper method that asserts that the given counter_regex is in the given
+    runtime_profile and that each occurence of the counter matches the expected value."""
+    num_row_groups_counters = re.findall(counter_regex, runtime_profile)
+    assert len(num_row_groups_counters) > 1
+    for num_row_groups in num_row_groups_counters: assert int(num_row_groups) == value
+
+
 # More tests for text scanner
 # 1. Test file that ends w/o tuple delimiter
 # 2. Test file with escape character

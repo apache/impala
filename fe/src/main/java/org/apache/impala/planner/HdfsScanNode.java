@@ -887,9 +887,11 @@ public class HdfsScanNode extends ScanNode {
       boolean fsHasBlocks = FileSystemUtil.supportsStorageIds(partitionFs);
       if (!fsHasBlocks) {
         // Limit the scan range length if generating scan ranges.
+        long defaultBlockSize = partition.getFileFormat() == HdfsFileFormat.PARQUET ?
+            analyzer.getQueryOptions().parquet_object_store_split_size :
+            partitionFs.getDefaultBlockSize(partition.getLocationPath());
         long maxBlockSize =
-            Math.max(partitionFs.getDefaultBlockSize(partition.getLocationPath()),
-                FileDescriptor.MIN_SYNTHETIC_BLOCK_SIZE);
+            Math.max(defaultBlockSize, FileDescriptor.MIN_SYNTHETIC_BLOCK_SIZE);
         if (scanRangeBytesLimit > 0) {
           scanRangeBytesLimit = Math.min(scanRangeBytesLimit, maxBlockSize);
         } else {
