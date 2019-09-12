@@ -139,11 +139,13 @@ DEFINE_int32(backend_client_connection_num_retries, 3, "Retry backend connection
 DEFINE_int32(backend_client_rpc_timeout_ms, 300000, "(Advanced) The underlying "
     "TSocket send/recv timeout in milliseconds for a backend client RPC. ");
 
-DEFINE_int32(catalog_client_connection_num_retries, 3, "Retry catalog connections.");
+DEFINE_int32(catalog_client_connection_num_retries, 10, "The number of times connections "
+    "or RPCs to the catalog should be retried.");
 DEFINE_int32(catalog_client_rpc_timeout_ms, 0, "(Advanced) The underlying TSocket "
     "send/recv timeout in milliseconds for a catalog client RPC.");
-DEFINE_int32(catalog_client_rpc_retry_interval_ms, 10000, "(Advanced) The time to wait "
-    "before retrying when the catalog RPC client fails to connect to catalogd.");
+DEFINE_int32(catalog_client_rpc_retry_interval_ms, 3000, "(Advanced) The time to wait "
+    "before retrying when the catalog RPC client fails to connect to catalogd or when "
+    "RPCs to the catalogd fail.");
 
 const static string DEFAULT_FS = "fs.defaultFS";
 
@@ -174,9 +176,12 @@ ExecEnv::ExecEnv(int backend_port, int krpc_port,
         new ImpalaBackendClientCache(FLAGS_backend_client_connection_num_retries, 0,
             FLAGS_backend_client_rpc_timeout_ms, FLAGS_backend_client_rpc_timeout_ms, "",
             !FLAGS_ssl_client_ca_certificate.empty())),
+    // Create the CatalogServiceClientCache with num_retries = 1 and wait_ms = 0.
+    // Connections are still retried, but the retry mechanism is driven by
+    // DoRpcWithRetry. Clients should always use DoRpcWithRetry rather than DoRpc to
+    // ensure that both RPCs and connections are retried.
     catalogd_client_cache_(
-        new CatalogServiceClientCache(FLAGS_catalog_client_connection_num_retries,
-            FLAGS_catalog_client_rpc_retry_interval_ms,
+        new CatalogServiceClientCache(1, 0,
             FLAGS_catalog_client_rpc_timeout_ms, FLAGS_catalog_client_rpc_timeout_ms, "",
             !FLAGS_ssl_client_ca_certificate.empty())),
     htable_factory_(new HBaseTableFactory()),

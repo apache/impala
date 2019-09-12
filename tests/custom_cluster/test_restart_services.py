@@ -23,6 +23,7 @@ import re
 import signal
 import socket
 import time
+import threading
 
 from subprocess import check_call
 from tests.common.environ import build_flavor_timeout
@@ -90,6 +91,54 @@ class TestRestart(CustomClusterTestSuite):
         sleep(3)
 
       client.close()
+
+  @pytest.mark.execute_serially
+  def test_catalog_connection_retries(self):
+    """Test that connections to the catalogd are retried, both new connections and cached
+    connections."""
+    # Since this is a custom cluster test, each impalad should start off with no cached
+    # connections to the catalogd. So the first call to __test_catalog_connection_retries
+    # should test that new connections are retried.
+    coordinator_service = self.cluster.impalads[0].service
+    assert coordinator_service.get_metric_value(
+        "catalog.server.client-cache.total-clients") == 0
+    self.__test_catalog_connection_retries()
+
+    # Since a query was just run that required loading metadata from the catalogd, there
+    # should be a cached connection to the catalogd, so the second call to
+    # __test_catalog_connection_retries should assert that broken cached connections are
+    # retried.
+    assert coordinator_service.get_metric_value(
+        "catalog.server.client-cache.total-clients") == 1
+    self.__test_catalog_connection_retries()
+
+  def __test_catalog_connection_retries(self):
+    """Test that a query retries connecting to the catalogd. Kills the catalogd, launches
+    a query that requires catalogd access, starts the catalogd, and then validates that
+    the query eventually finishes successfully."""
+    self.cluster.catalogd.kill_and_wait_for_exit()
+
+    query = "select * from functional.alltypes limit 10"
+    query_handle = []
+
+    # self.execute_query_async has to be run in a dedicated thread because it does not
+    # truly run a query asynchronously. The query compilation has to complete before
+    # execute_query_async can return. Since compilation requires catalogd access,
+    # execute_query_async won't return until the catalogd is up and running.
+    def execute_query_async():
+      query_handle.append(self.execute_query_async(query))
+
+    thread = threading.Thread(target=execute_query_async)
+    thread.start()
+    # Sleep until the query actually starts to try and access the catalogd. Set an
+    # explicitly high value to avoid any race conditions. The connection is retried 3
+    # times by default with a 10 second interval, so a high sleep time should not cause
+    # any timeouts.
+    sleep(5)
+
+    self.cluster.catalogd.start()
+    thread.join()
+    self.wait_for_state(query_handle[0], QueryState.FINISHED, 30000)
 
   SUBSCRIBER_TIMEOUT_S = 2
   CANCELLATION_GRACE_PERIOD_S = 5
