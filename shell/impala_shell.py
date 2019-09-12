@@ -790,12 +790,12 @@ class ImpalaShell(object, cmd.Cmd):
     tokens = args.split(" ")
     # validate the connection string.
     host_port = [val for val in tokens[0].split(':') if val.strip()]
+    protocol = options.protocol.lower()
     if (':' in tokens[0] and len(host_port) != 2):
       print_to_stderr("Connection string must either be empty, or of the form "
                       "<hostname[:port]>")
       return CmdStatus.ERROR
     elif len(host_port) == 1:
-      protocol = options.protocol.lower()
       if protocol == 'hs2':
         port = str(DEFAULT_HS2_PORT)
       elif protocol == 'hs2-http':
