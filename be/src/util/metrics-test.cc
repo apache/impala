@@ -758,16 +758,15 @@ TEST_F(MetricsTest, HistogramPrometheus) {
   std::stringstream val;
   metrics.ToPrometheus(true, &val);
   AssertPrometheus(val, "impala_histogram_metric",
-      "impala_histogram_metric{le=\"0.2\"} 2.5\n"
-      "impala_histogram_metric{le=\"0.5\"} 5\n"
-      "impala_histogram_metric{le=\"0.7\"} 7.5\n"
-      "impala_histogram_metric{le=\"0.9\"} 9\n"
-      "impala_histogram_metric{le=\"0.95\"} 9.496\n"
-      "impala_histogram_metric{le=\"0.999\"} 9.984\n"
-      "impala_histogram_metric_max 10.001\n"
-      "impala_histogram_metric_min 0\n"
-      "impala_histogram_metric_count 10002",
-      "", "histogram");
+      "impala_histogram_metric{quantile=\"0.2\"} 2.5\n"
+      "impala_histogram_metric{quantile=\"0.5\"} 5\n"
+      "impala_histogram_metric{quantile=\"0.7\"} 7.5\n"
+      "impala_histogram_metric{quantile=\"0.9\"} 9\n"
+      "impala_histogram_metric{quantile=\"0.95\"} 9.496\n"
+      "impala_histogram_metric{quantile=\"0.999\"} 9.984\n"
+      "impala_histogram_metric_count 10002\n"
+      "impala_histogram_metric_sum 50015",
+      "", "summary");
 }
 
 TEST_F(MetricsTest, HistogramTimeNSPrometheus) {
@@ -784,16 +783,15 @@ TEST_F(MetricsTest, HistogramTimeNSPrometheus) {
   std::stringstream val;
   metrics.ToPrometheus(true, &val);
   AssertPrometheus(val, "impala_histogram_metric",
-      "impala_histogram_metric{le=\"0.2\"} 2.5e-06\n"
-      "impala_histogram_metric{le=\"0.5\"} 5e-06\n"
-      "impala_histogram_metric{le=\"0.7\"} 7.5e-06\n"
-      "impala_histogram_metric{le=\"0.9\"} 9e-06\n"
-      "impala_histogram_metric{le=\"0.95\"} 9.496e-06\n"
-      "impala_histogram_metric{le=\"0.999\"} 9.984e-06\n"
-      "impala_histogram_metric_max 1.0001e-05\n"
-      "impala_histogram_metric_min 0\n"
-      "impala_histogram_metric_count 10002",
-      "", "histogram");
+      "impala_histogram_metric{quantile=\"0.2\"} 2.5e-06\n"
+      "impala_histogram_metric{quantile=\"0.5\"} 5e-06\n"
+      "impala_histogram_metric{quantile=\"0.7\"} 7.5e-06\n"
+      "impala_histogram_metric{quantile=\"0.9\"} 9e-06\n"
+      "impala_histogram_metric{quantile=\"0.95\"} 9.496e-06\n"
+      "impala_histogram_metric{quantile=\"0.999\"} 9.984e-06\n"
+      "impala_histogram_metric_count 10002\n"
+      "impala_histogram_metric_sum 0.050015",
+      "", "summary");
 }
 
 TEST_F(MetricsTest, HistogramTimeSPrometheus) {
@@ -810,16 +808,15 @@ TEST_F(MetricsTest, HistogramTimeSPrometheus) {
   std::stringstream val;
   metrics.ToPrometheus(true, &val);
   AssertPrometheus(val, "impala_histogram_metric",
-      "impala_histogram_metric{le=\"0.2\"} 2500\n"
-      "impala_histogram_metric{le=\"0.5\"} 5000\n"
-      "impala_histogram_metric{le=\"0.7\"} 7500\n"
-      "impala_histogram_metric{le=\"0.9\"} 9000\n"
-      "impala_histogram_metric{le=\"0.95\"} 9496\n"
-      "impala_histogram_metric{le=\"0.999\"} 9984\n"
-      "impala_histogram_metric_max 10001\n"
-      "impala_histogram_metric_min 0\n"
-      "impala_histogram_metric_count 10002",
-      "", "histogram");
+      "impala_histogram_metric{quantile=\"0.2\"} 2500\n"
+      "impala_histogram_metric{quantile=\"0.5\"} 5000\n"
+      "impala_histogram_metric{quantile=\"0.7\"} 7500\n"
+      "impala_histogram_metric{quantile=\"0.9\"} 9000\n"
+      "impala_histogram_metric{quantile=\"0.95\"} 9496\n"
+      "impala_histogram_metric{quantile=\"0.999\"} 9984\n"
+      "impala_histogram_metric_count 10002\n"
+      "impala_histogram_metric_sum 50015001",
+      "", "summary");
 }
 
 TEST_F(MetricsTest, HistogramBytesPrometheus) {
@@ -836,16 +833,15 @@ TEST_F(MetricsTest, HistogramBytesPrometheus) {
   std::stringstream val;
   metrics.ToPrometheus(true, &val);
   AssertPrometheus(val, "impala_histogram_metric",
-      "impala_histogram_metric{le=\"0.2\"} 2500\n"
-      "impala_histogram_metric{le=\"0.5\"} 5000\n"
-      "impala_histogram_metric{le=\"0.7\"} 7500\n"
-      "impala_histogram_metric{le=\"0.9\"} 9000\n"
-      "impala_histogram_metric{le=\"0.95\"} 9496\n"
-      "impala_histogram_metric{le=\"0.999\"} 9984\n"
-      "impala_histogram_metric_max 10001\n"
-      "impala_histogram_metric_min 0\n"
-      "impala_histogram_metric_count 10002",
-      "", "histogram");
+      "impala_histogram_metric{quantile=\"0.2\"} 2500\n"
+      "impala_histogram_metric{quantile=\"0.5\"} 5000\n"
+      "impala_histogram_metric{quantile=\"0.7\"} 7500\n"
+      "impala_histogram_metric{quantile=\"0.9\"} 9000\n"
+      "impala_histogram_metric{quantile=\"0.95\"} 9496\n"
+      "impala_histogram_metric{quantile=\"0.999\"} 9984\n"
+      "impala_histogram_metric_count 10002\n"
+      "impala_histogram_metric_sum 50015001",
+      "", "summary");
 }
 
 TEST_F(MetricsTest, HistogramUnitPrometheus) {
@@ -862,16 +858,15 @@ TEST_F(MetricsTest, HistogramUnitPrometheus) {
   std::stringstream val;
   metrics.ToPrometheus(true, &val);
   AssertPrometheus(val, "impala_histogram_metric",
-      "impala_histogram_metric{le=\"0.2\"} 2500\n"
-      "impala_histogram_metric{le=\"0.5\"} 5000\n"
-      "impala_histogram_metric{le=\"0.7\"} 7500\n"
-      "impala_histogram_metric{le=\"0.9\"} 9000\n"
-      "impala_histogram_metric{le=\"0.95\"} 9496\n"
-      "impala_histogram_metric{le=\"0.999\"} 9984\n"
-      "impala_histogram_metric_max 10001\n"
-      "impala_histogram_metric_min 0\n"
-      "impala_histogram_metric_count 10002",
-      "", "histogram");
+      "impala_histogram_metric{quantile=\"0.2\"} 2500\n"
+      "impala_histogram_metric{quantile=\"0.5\"} 5000\n"
+      "impala_histogram_metric{quantile=\"0.7\"} 7500\n"
+      "impala_histogram_metric{quantile=\"0.9\"} 9000\n"
+      "impala_histogram_metric{quantile=\"0.95\"} 9496\n"
+      "impala_histogram_metric{quantile=\"0.999\"} 9984\n"
+      "impala_histogram_metric_count 10002\n"
+      "impala_histogram_metric_sum 50015001",
+      "", "summary");
 }
 
 TEST_F(MetricsTest, MetricGroupPrometheus) {

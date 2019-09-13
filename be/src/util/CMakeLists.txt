@@ -114,6 +114,7 @@ add_library(UtilTests STATIC
   filesystem-util-test.cc
   fixed-size-hash-table-test.cc
   hdfs-util-test.cc
+  hdr-histogram-test.cc
   logging-support-test.cc
   lru-cache-test.cc
   metrics-test.cc
@@ -172,6 +173,7 @@ ADD_UNIFIED_BE_LSAN_TEST(error-util-test "ErrorMsg.*")
 ADD_UNIFIED_BE_LSAN_TEST(filesystem-util-test "FilesystemUtil.*")
 ADD_UNIFIED_BE_LSAN_TEST(fixed-size-hash-table-test "FixedSizeHash.*")
 ADD_UNIFIED_BE_LSAN_TEST(hdfs-util-test HdfsUtilTest.*)
+ADD_UNIFIED_BE_LSAN_TEST(hdr-histogram-test HdrHistogramTest.*)
 # internal-queue-test has a non-standard main(), so it needs a small amount of thought
 # to use a unified executable
 ADD_BE_LSAN_TEST(internal-queue-test)

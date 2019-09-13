@@ -102,6 +102,9 @@ class HdrHistogram {
   // Count of all events recorded.
   uint64_t TotalCount() const { return base::subtle::NoBarrier_Load(&total_count_); }
 
+  // Sum of all events recorded.
+  uint64_t TotalSum() const { return base::subtle::NoBarrier_Load(&total_sum_); }
+
   // Return number of items at index.
   uint64_t CountAt(int bucket_index, int sub_bucket_index) const;
 
@@ -183,6 +186,7 @@ class HdrHistogram {
 
   // Also hot.
   base::subtle::Atomic64 total_count_;
+  base::subtle::Atomic64 total_sum_;
   base::subtle::Atomic64 min_value_;
   base::subtle::Atomic64 max_value_;
   gscoped_array<base::subtle::Atomic64> counts_;

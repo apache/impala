@@ -46,6 +46,7 @@ HdrHistogram::HdrHistogram(uint64_t highest_trackable_value, int num_significant
     sub_bucket_half_count_(0),
     sub_bucket_mask_(0),
     total_count_(0),
+    total_sum_(0),
     min_value_(std::numeric_limits<Atomic64>::max()),
     max_value_(0),
     counts_(0) {
@@ -62,6 +63,7 @@ HdrHistogram::HdrHistogram(const HdrHistogram& other)
     sub_bucket_half_count_(0),
     sub_bucket_mask_(0),
     total_count_(0),
+    total_sum_(0),
     min_value_(std::numeric_limits<Atomic64>::max()),
     max_value_(0),
     counts_(0) {
@@ -69,6 +71,7 @@ HdrHistogram::HdrHistogram(const HdrHistogram& other)
 
   // Not a consistent snapshot but we try to roughly keep it close.
   // Copy the min first.
+  NoBarrier_Store(&total_sum_, NoBarrier_Load(&other.total_sum_));
   NoBarrier_Store(&min_value_, NoBarrier_Load(&other.min_value_));
   uint64_t total_copied_count = 0;
   // Copy the counts in order of ascending magnitude.
@@ -154,6 +157,7 @@ void HdrHistogram::IncrementBy(int64_t value, int64_t count) {
   // Increment bucket & total.
   NoBarrier_AtomicIncrement(&counts_[counts_index], count);
   NoBarrier_AtomicIncrement(&total_count_, count);
+  NoBarrier_AtomicIncrement(&total_sum_, value * count);
 
   // Update min, if needed.
   {

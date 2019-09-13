@@ -80,66 +80,64 @@ TMetricKind::type HistogramMetric::ToPrometheus(
     // check if unit its 'TIME_MS','TIME_US' or 'TIME_NS' and convert it to seconds,
     // this is because prometheus only supports time format in seconds
     if (IsUnitTimeBased(unit_)) {
-      *value << name << "{le=\"0.2\"} "
+      *value << name << "{quantile=\"0.2\"} "
              << ConvertToPrometheusSecs(histogram_->ValueAtPercentile(25), unit_) << "\n";
     } else {
-      *value << name << "{le=\"0.2\"} " << histogram_->ValueAtPercentile(25) << "\n";
+      *value << name << "{quantile=\"0.2\"} " << histogram_->ValueAtPercentile(25)
+             << "\n";
     }
 
     if (IsUnitTimeBased(unit_)) {
-      *value << name << "{le=\"0.5\"} "
+      *value << name << "{quantile=\"0.5\"} "
              << ConvertToPrometheusSecs(histogram_->ValueAtPercentile(50), unit_) << "\n";
     } else {
-      *value << name << "{le=\"0.5\"} " << histogram_->ValueAtPercentile(50) << "\n";
+      *value << name << "{quantile=\"0.5\"} " << histogram_->ValueAtPercentile(50)
+             << "\n";
     }
 
     if (IsUnitTimeBased(unit_)) {
-      *value << name << "{le=\"0.7\"} "
+      *value << name << "{quantile=\"0.7\"} "
              << ConvertToPrometheusSecs(histogram_->ValueAtPercentile(75), unit_) << "\n";
     } else {
-      *value << name << "{le=\"0.7\"} " << histogram_->ValueAtPercentile(75) << "\n";
+      *value << name << "{quantile=\"0.7\"} " << histogram_->ValueAtPercentile(75)
+             << "\n";
     }
 
     if (IsUnitTimeBased(unit_)) {
-      *value << name << "{le=\"0.9\"} "
+      *value << name << "{quantile=\"0.9\"} "
              << ConvertToPrometheusSecs(histogram_->ValueAtPercentile(90), unit_) << "\n";
     } else {
-      *value << name << "{le=\"0.9\"} " << histogram_->ValueAtPercentile(90) << "\n";
+      *value << name << "{quantile=\"0.9\"} " << histogram_->ValueAtPercentile(90)
+             << "\n";
     }
 
     if (IsUnitTimeBased(unit_)) {
-      *value << name << "{le=\"0.95\"} "
+      *value << name << "{quantile=\"0.95\"} "
              << ConvertToPrometheusSecs(histogram_->ValueAtPercentile(95), unit_) << "\n";
     } else {
-      *value << name << "{le=\"0.95\"} " << histogram_->ValueAtPercentile(95) << "\n";
+      *value << name << "{quantile=\"0.95\"} " << histogram_->ValueAtPercentile(95)
+             << "\n";
     }
 
     if (IsUnitTimeBased(unit_)) {
-      *value << name << "{le=\"0.999\"} "
+      *value << name << "{quantile=\"0.999\"} "
              << ConvertToPrometheusSecs(histogram_->ValueAtPercentile(99.9), unit_)
              << "\n";
     } else {
-      *value << name << "{le=\"0.999\"} " << histogram_->ValueAtPercentile(99.9) << "\n";
+      *value << name << "{quantile=\"0.999\"} " << histogram_->ValueAtPercentile(99.9)
+             << "\n";
     }
+
+    *value << name << "_count " << histogram_->TotalCount() << "\n";
 
     if (IsUnitTimeBased(unit_)) {
-      *value << name << "_max " << ConvertToPrometheusSecs(histogram_->MaxValue(), unit_)
-             << "\n";
+      *value << name << "_sum " << ConvertToPrometheusSecs(histogram_->TotalSum(), unit_);
     } else {
-      *value << name << "_max " << histogram_->MaxValue() << "\n";
+      *value << name << "_sum " << histogram_->TotalSum();
     }
-
-    if (IsUnitTimeBased(unit_)) {
-      *value << name << "_min " << ConvertToPrometheusSecs(histogram_->MinValue(), unit_)
-             << "\n";
-    } else {
-      *value << name << "_min " << histogram_->MinValue() << "\n";
-    }
-
-    *value << name << "_count " << histogram_->TotalCount();
   }
 
-  *metric_kind << "# TYPE " << name << " histogram";
+  *metric_kind << "# TYPE " << name << " summary";
   return TMetricKind::HISTOGRAM;
 }
 
