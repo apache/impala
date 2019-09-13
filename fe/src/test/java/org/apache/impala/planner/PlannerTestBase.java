@@ -40,7 +40,6 @@ import org.apache.impala.catalog.CatalogException;
 import org.apache.impala.common.FrontendTestBase;
 import org.apache.impala.common.ImpalaException;
 import org.apache.impala.common.RuntimeEnv;
-import org.apache.impala.datagenerator.HBaseTestDataRegionAssignment;
 import org.apache.impala.service.Frontend.PlanCtx;
 import org.apache.impala.testutil.TestFileParser;
 import org.apache.impala.testutil.TestFileParser.Section;
@@ -115,12 +114,6 @@ public class PlannerTestBase extends FrontendTestBase {
     String logDir = System.getenv("IMPALA_FE_TEST_LOGS_DIR");
     if (logDir == null) logDir = "/tmp";
     outDir_ = Paths.get(logDir, "PlannerTest");
-
-    // Rebalance the HBase tables
-    HBaseTestDataRegionAssignment assignment = new HBaseTestDataRegionAssignment();
-    assignment.performAssignment("functional_hbase.alltypessmall");
-    assignment.performAssignment("functional_hbase.alltypesagg");
-    assignment.close();
   }
 
   @Before
@@ -423,7 +416,9 @@ public class PlannerTestBase extends FrontendTestBase {
     TExecRequest singleNodeExecRequest = testPlan(testCase, Section.PLAN, queryCtx.deepCopy(),
         testOptions, errorLog, actualOutput);
     validateTableIds(singleNodeExecRequest);
-    checkScanRangeLocations(testCase, singleNodeExecRequest, errorLog, actualOutput);
+    if (scanRangeLocationsCheckEnabled()) {
+      checkScanRangeLocations(testCase, singleNodeExecRequest, errorLog, actualOutput);
+    }
     checkColumnLineage(testCase, singleNodeExecRequest, errorLog, actualOutput);
     checkLimitCardinality(query, singleNodeExecRequest, errorLog);
     // Test distributed plan.
@@ -932,5 +927,13 @@ public class PlannerTestBase extends FrontendTestBase {
   protected void runPlannerTestFile(String testFile, String dbName) {
     runPlannerTestFile(testFile, dbName, defaultQueryOptions(),
         Collections.<PlannerTestOption>emptySet());
+  }
+
+  /**
+   * Returns true if {@link #checkScanRangeLocations(TestCase, TExecRequest,
+   * StringBuilder, StringBuilder)} should be run, returns false if it should not be run.
+   */
+  protected boolean scanRangeLocationsCheckEnabled() {
+    return true;
   }
 }

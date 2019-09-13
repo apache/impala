@@ -195,7 +195,7 @@ do
     MVN_ARGS=""
     if [[ "${TARGET_FILESYSTEM}" == "s3" ]]; then
       # When running against S3, only run the S3 frontend tests.
-      MVN_ARGS="-Dtest=S3* "
+      MVN_ARGS="-Ps3-tests "
     fi
     if [[ "$CODE_COVERAGE" == true ]]; then
       MVN_ARGS+="-DcodeCoverage"

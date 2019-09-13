@@ -24,12 +24,15 @@ import java.net.URI;
 import org.apache.hadoop.fs.Path;
 import org.junit.Assert;
 import org.junit.Before;
+import org.junit.Ignore;
 import org.junit.Test;
+import org.junit.experimental.categories.Category;
 
-import org.apache.impala.planner.PlannerTestBase;
+import com.google.common.collect.ImmutableSet;
 
 // S3 specific planner tests go here, and will run against tables in S3.  These tests
 // are run only when test.fs.s3a.name is set in the configuration.
+@Category(S3Tests.class)
 public class S3PlannerTest extends PlannerTestBase {
 
   // The path that will replace the value of TEST_FS_S3A_NAME in file paths.
@@ -43,7 +46,8 @@ public class S3PlannerTest extends PlannerTestBase {
    * If not, then skip this test.  Also remember the scheme://bucket for later.
    */
   @Before
-  public void setUpTest() {
+  public void setUpTest() throws Exception {
+    super.setUpTest();
     String targetFs = System.getenv("TARGET_FILESYSTEM");
     // Skip if the config property was not set. i.e. not running against S3.
     assumeTrue(targetFs != null && targetFs.equals("s3"));
@@ -70,6 +74,7 @@ public class S3PlannerTest extends PlannerTestBase {
   /**
    * Verify that S3 scan ranges are generated correctly.
    */
+  @Ignore("IMPALA-8944, IMPALA-5931")
   @Test
   public void testS3ScanRanges() {
     runPlannerTestFile("s3");
@@ -105,6 +110,7 @@ public class S3PlannerTest extends PlannerTestBase {
     runPlannerTestFile("nested-collections");
   }
 
+  @Ignore("IMPALA-8949")
   @Test
   public void testJoinOrder() {
     runPlannerTestFile("join-order");
@@ -125,6 +131,7 @@ public class S3PlannerTest extends PlannerTestBase {
     runPlannerTestFile("inline-view-limit");
   }
 
+  @Ignore("IMPALA-8949")
   @Test
   public void testSubqueryRewrite() {
     runPlannerTestFile("subquery-rewrite");
@@ -155,17 +162,27 @@ public class S3PlannerTest extends PlannerTestBase {
     runPlannerTestFile("data-source-tables");
   }
 
+  @Ignore("IMPALA-8949")
   @Test
   public void testTpch() {
-    runPlannerTestFile("tpch-all");
+    runPlannerTestFile("tpch-all", "tpch",
+        ImmutableSet.of(PlannerTestOption.INCLUDE_RESOURCE_HEADER,
+            PlannerTestOption.VALIDATE_RESOURCES));
   }
 
+  @Ignore("IMPALA-8949")
   @Test
   public void testTpcds() {
     // Uses ss_sold_date_sk as the partition key of store_sales to allow static partition
     // pruning. The original predicates were rephrased in terms of the ss_sold_date_sk
     // partition key, with the query semantics identical to the original queries.
-    runPlannerTestFile("tpcds-all", "tpcds");
+    runPlannerTestFile("tpcds-all", "tpcds",
+        ImmutableSet.of(PlannerTestOption.INCLUDE_RESOURCE_HEADER,
+            PlannerTestOption.VALIDATE_RESOURCES));
   }
 
+  @Override
+  public boolean scanRangeLocationsCheckEnabled() {
+    return false;
+  }
 }

@@ -29,6 +29,7 @@ import org.apache.impala.catalog.HBaseColumn;
 import org.apache.impala.catalog.Type;
 import org.apache.impala.common.ImpalaException;
 import org.apache.impala.common.RuntimeEnv;
+import org.apache.impala.datagenerator.HBaseTestDataRegionAssignment;
 import org.apache.impala.service.Frontend.PlanCtx;
 import org.apache.impala.testutil.TestUtils;
 import org.apache.impala.testutil.TestUtils.IgnoreValueFilter;
@@ -40,6 +41,7 @@ import org.apache.impala.thrift.TQueryOptions;
 import org.apache.impala.thrift.TRuntimeFilterMode;
 import org.junit.Assert;
 import org.junit.Assume;
+import org.junit.BeforeClass;
 import org.junit.Test;
 
 import com.google.common.base.Preconditions;
@@ -48,6 +50,17 @@ import com.google.common.collect.Lists;
 
 // All planner tests, except for S3 specific tests should go here.
 public class PlannerTest extends PlannerTestBase {
+
+  @BeforeClass
+  public static void setUp() throws Exception {
+    PlannerTestBase.setUp();
+    // Rebalance the HBase tables. This is necessary because some tests rely on HBase
+    // tables being arranged in a deterministic way. See IMPALA-7061 for details.
+    HBaseTestDataRegionAssignment assignment = new HBaseTestDataRegionAssignment();
+    assignment.performAssignment("functional_hbase.alltypessmall");
+    assignment.performAssignment("functional_hbase.alltypesagg");
+    assignment.close();
+  }
 
   /**
    * Scan node cardinality test

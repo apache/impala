@@ -611,6 +611,7 @@ under the License.
           <reportsDirectory>${surefire.reports.dir}</reportsDirectory>
           <redirectTestOutputToFile>true</redirectTestOutputToFile>
           <argLine>${surefireJacocoArg}</argLine>
+          <groups>${testcase.groups}</groups>
         </configuration>
       </plugin>
 
@@ -1263,6 +1264,13 @@ under the License.
         <properties>
           <buildOutputDirectory>${project.build.directory}/${eclipse.output.directory}</buildOutputDirectory>
         </properties>
+    </profile>
+
+    <profile>
+      <id>s3-tests</id>
+      <properties>
+        <testcase.groups>org.apache.impala.planner.S3Tests</testcase.groups>
+      </properties>
     </profile>
   </profiles>
 
