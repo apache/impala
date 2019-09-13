@@ -71,8 +71,6 @@ PhjBuilder::PhjBuilder(int join_node_id, const string& join_node_label,
     largest_partition_percent_(NULL),
     max_partition_level_(NULL),
     num_build_rows_partitioned_(NULL),
-    num_hash_collisions_(NULL),
-    num_hash_buckets_(NULL),
     num_spilled_partitions_(NULL),
     num_repartitions_(NULL),
     partition_build_rows_timer_(NULL),
@@ -133,8 +131,7 @@ Status PhjBuilder::Prepare(RuntimeState* state, MemTracker* parent_mem_tracker) 
       profile()->AddHighWaterMarkCounter("MaxPartitionLevel", TUnit::UNIT);
   num_build_rows_partitioned_ =
       ADD_COUNTER(profile(), "BuildRowsPartitioned", TUnit::UNIT);
-  num_hash_collisions_ = ADD_COUNTER(profile(), "HashCollisions", TUnit::UNIT);
-  num_hash_buckets_ = ADD_COUNTER(profile(), "HashBuckets", TUnit::UNIT);
+  ht_stats_profile_ = HashTable::AddHashTableCounters(profile());
   num_spilled_partitions_ = ADD_COUNTER(profile(), "SpilledPartitions", TUnit::UNIT);
   num_repartitions_ = ADD_COUNTER(profile(), "NumRepartitions", TUnit::UNIT);
   partition_build_rows_timer_ = ADD_TIMER(profile(), "BuildRowsPartitionTime");
@@ -609,7 +606,7 @@ void PhjBuilder::Partition::Close(RowBatch* batch) {
   if (IsClosed()) return;
 
   if (hash_tbl_ != NULL) {
-    COUNTER_ADD(parent_->num_hash_collisions_, hash_tbl_->NumHashCollisions());
+    hash_tbl_->StatsCountersAdd(parent_->ht_stats_profile_.get());
     hash_tbl_->Close();
   }
 
@@ -711,7 +708,8 @@ Status PhjBuilder::Partition::BuildHashTable(bool* built) {
   DCHECK(*built);
   DCHECK(hash_tbl_ != NULL);
   is_spilled_ = false;
-  COUNTER_ADD(parent_->num_hash_buckets_, hash_tbl_->num_buckets());
+  COUNTER_ADD(parent_->ht_stats_profile_->num_hash_buckets_,
+      hash_tbl_->num_buckets());
   return Status::OK();
 
 not_built:

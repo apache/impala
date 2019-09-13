@@ -214,7 +214,10 @@ void GroupingAggregator::Partition::Close(bool finalize_rows) {
     }
     aggregated_row_stream->Close(nullptr, RowBatch::FlushMode::NO_FLUSH_RESOURCES);
   }
-  if (hash_tbl.get() != nullptr) hash_tbl->Close();
+  if (hash_tbl.get() != nullptr) {
+    hash_tbl->StatsCountersAdd(parent->ht_stats_profile_.get());
+    hash_tbl->Close();
+  }
   if (unaggregated_row_stream.get() != nullptr) {
     unaggregated_row_stream->Close(nullptr, RowBatch::FlushMode::NO_FLUSH_RESOURCES);
   }

@@ -134,7 +134,7 @@ Status GroupingAggregator::Prepare(RuntimeState* state) {
 
   ht_resize_timer_ = ADD_TIMER(runtime_profile(), "HTResizeTime");
   get_results_timer_ = ADD_TIMER(runtime_profile(), "GetResultsTime");
-  num_hash_buckets_ = ADD_COUNTER(runtime_profile(), "HashBuckets", TUnit::UNIT);
+  ht_stats_profile_ = HashTable::AddHashTableCounters(runtime_profile());
   partitions_created_ = ADD_COUNTER(runtime_profile(), "PartitionsCreated", TUnit::UNIT);
   largest_partition_percent_ =
       runtime_profile()->AddHighWaterMarkCounter("LargestPartitionPercent", TUnit::UNIT);
@@ -722,7 +722,8 @@ Status GroupingAggregator::NextPartition() {
 
   output_partition_ = partition;
   output_iterator_ = output_partition_->hash_tbl->Begin(ht_ctx_.get());
-  COUNTER_ADD(num_hash_buckets_, output_partition_->hash_tbl->num_buckets());
+  COUNTER_ADD(this->ht_stats_profile_->num_hash_buckets_,
+      output_partition_->hash_tbl->num_buckets());
   return Status::OK();
 }
 

@@ -245,8 +245,8 @@ class GroupingAggregator : public Aggregator {
   /// Time spent returning the aggregated rows
   RuntimeProfile::Counter* get_results_timer_ = nullptr;
 
-  /// Total number of hash buckets across all partitions.
-  RuntimeProfile::Counter* num_hash_buckets_ = nullptr;
+  /// Counters and profile objects for HashTable stats
+  std::unique_ptr<HashTableStatsProfile> ht_stats_profile_;
 
   /// Total number of partitions created.
   RuntimeProfile::Counter* partitions_created_ = nullptr;

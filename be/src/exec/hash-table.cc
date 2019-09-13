@@ -416,6 +416,24 @@ Status HashTable::Init(bool* got_memory) {
   return Status::OK();
 }
 
+unique_ptr<HashTableStatsProfile> HashTable::AddHashTableCounters(
+    RuntimeProfile* parent_profile) {
+  unique_ptr<HashTableStatsProfile> stats_profile(new HashTableStatsProfile());
+  RuntimeProfile *hashtable_profile = stats_profile->hashtable_profile =
+      parent_profile->CreateChild("Hash Table", true, true);
+  stats_profile->num_hash_probes_ =
+      ADD_COUNTER(hashtable_profile, "Probes", TUnit::UNIT);
+  stats_profile->num_hash_travels_ =
+      ADD_COUNTER(hashtable_profile, "Travel", TUnit::UNIT);
+  stats_profile->num_hash_collisions_ =
+      ADD_COUNTER(hashtable_profile, "HashCollisions", TUnit::UNIT);
+  stats_profile->num_hash_buckets_ =
+      ADD_COUNTER(hashtable_profile, "HashBuckets", TUnit::UNIT);
+  stats_profile->num_hash_resizes_ =
+      ADD_COUNTER(hashtable_profile, "Resizes", TUnit::UNIT);
+  return stats_profile;
+}
+
 void HashTable::Close() {
   // Print statistics only for the large or heavily used hash tables.
   // TODO: Tweak these numbers/conditions, or print them always?
@@ -426,6 +444,13 @@ void HashTable::Close() {
   for (auto& data_page : data_pages_) allocator_->Free(move(data_page));
   data_pages_.clear();
   if (bucket_allocation_ != nullptr) allocator_->Free(move(bucket_allocation_));
+}
+
+void HashTable::StatsCountersAdd(HashTableStatsProfile* profile) {
+  COUNTER_ADD(profile->num_hash_collisions_, num_hash_collisions_);
+  COUNTER_ADD(profile->num_hash_probes_, num_probes_);
+  COUNTER_ADD(profile->num_hash_travels_, travel_length_);
+  COUNTER_ADD(profile->num_hash_resizes_, this->num_resizes_);
 }
 
 Status HashTable::CheckAndResize(

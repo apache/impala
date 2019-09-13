@@ -133,6 +133,8 @@ class PhjBuilder : public DataSink {
   /// depends on the join type and the equijoin conjuncts.
   bool HashTableStoresNulls() const;
 
+  void AddHashTableStatsToProfile(RuntimeProfile* profile);
+
   /// Accessor functions, mainly required to expose state to PartitionedHashJoinNode.
   inline bool non_empty_build() const { return non_empty_build_; }
   inline const std::vector<bool>& is_not_distinct_from() const {
@@ -423,6 +425,9 @@ class PhjBuilder : public DataSink {
   /// The level is set to the same level as 'hash_partitions_'.
   boost::scoped_ptr<HashTableCtx> ht_ctx_;
 
+  /// Counters and profile objects for HashTable stats
+  std::unique_ptr<HashTableStatsProfile> ht_stats_profile_;
+
   /// Total number of partitions created.
   RuntimeProfile::Counter* partitions_created_;
 
@@ -435,12 +440,6 @@ class PhjBuilder : public DataSink {
 
   /// Number of build rows that have been partitioned.
   RuntimeProfile::Counter* num_build_rows_partitioned_;
-
-  /// Number of hash collisions - unequal rows that have identical hash values
-  RuntimeProfile::Counter* num_hash_collisions_;
-
-  /// Total number of hash buckets across all partitions.
-  RuntimeProfile::Counter* num_hash_buckets_;
 
   /// Number of partitions that have been spilled.
   RuntimeProfile::Counter* num_spilled_partitions_;

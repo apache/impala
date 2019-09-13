@@ -709,3 +709,31 @@ class TestObservability(ImpalaTestSuite):
     # Call the second time, no metastore loading needed.
     runtime_profile = self.execute_query(query).runtime_profile
     assert storageLoadTime not in runtime_profile
+
+  def __verify_hashtable_stats_profile(self, runtime_profile):
+    assert "Hash Table" in runtime_profile
+    assert "Probes:" in runtime_profile
+    assert "Travel:" in runtime_profile
+    assert "HashCollisions:" in runtime_profile
+    assert "Resizes:" in runtime_profile
+    nprobes = re.search('Probes:.*\((\d+)\)', runtime_profile)
+    # Probes and travel can be 0. The number can be an integer or float with K.
+    assert nprobes and len(nprobes.groups()) == 1 and nprobes.group(1) >= 0
+    ntravel = re.search('Travel:.*\((\d+)\)', runtime_profile)
+    assert ntravel and len(ntravel.groups()) == 1 and ntravel.group(1) >= 0
+
+  def test_query_profle_hashtable(self):
+    """Test that the profile for join/aggregate contains hash table related
+    information."""
+    # Join
+    query = """select a.int_col, a.string_col from functional.alltypes a
+        inner join functional.alltypessmall b on a.id = b.id"""
+    result = self.execute_query(query)
+    assert result.success
+    self.__verify_hashtable_stats_profile(result.runtime_profile)
+    # Group by
+    query = """select year, count(*) from
+        functional.alltypesagg where int_col < 7 and year = 2010 group by year"""
+    result = self.execute_query(query)
+    assert result.success
+    self.__verify_hashtable_stats_profile(result.runtime_profile)

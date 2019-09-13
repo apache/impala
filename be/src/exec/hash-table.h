@@ -34,6 +34,7 @@
 #include "runtime/tuple-row.h"
 #include "util/bitmap.h"
 #include "util/hash-util.h"
+#include "util/runtime-profile.h"
 
 namespace llvm {
   class Function;
@@ -528,6 +529,30 @@ class HashTableCtx {
   MemPool* probe_expr_results_pool_;
 };
 
+/// HashTableStatsProfile encapsulates hash tables stats. It tracks the stats of all the
+/// hash tables created by a node. It should be created, stored by the node, and be
+/// released when the node is released.
+struct HashTableStatsProfile {
+  /// Profile object for HashTable Stats
+  RuntimeProfile* hashtable_profile = nullptr;
+
+  /// Number of hash collisions - unequal rows that have identical hash values
+  RuntimeProfile::Counter* num_hash_collisions_ = nullptr;
+
+  /// Number of hash table probes.
+  RuntimeProfile::Counter* num_hash_probes_ = nullptr;
+
+  /// Total distance traveled for each hash table probe.
+  RuntimeProfile::Counter* num_hash_travels_ = nullptr;
+
+  /// Number of hash table resized
+  RuntimeProfile::Counter* num_hash_resizes_ = nullptr;
+
+  /// Total number of hash buckets across all partitions.
+  RuntimeProfile::Counter* num_hash_buckets_ = nullptr;
+
+};
+
 /// The hash table consists of a contiguous array of buckets that contain a pointer to the
 /// data, the hash value and three flags: whether this bucket is filled, whether this
 /// entry has been matched (used in right and full joins) and whether this entry has
@@ -618,8 +643,20 @@ class HashTable {
   /// enough memory for the initial buckets was allocated from the Suballocator.
   Status Init(bool* got_memory) WARN_UNUSED_RESULT;
 
+  /// Create the counters for HashTable stats and put them into the child profile
+  /// "Hash Table".
+  /// Returns a HashTableStatsProfile object.
+  static std::unique_ptr<HashTableStatsProfile> AddHashTableCounters(
+      RuntimeProfile* parent_profile);
+
   /// Call to cleanup any resources. Must be called once.
   void Close();
+
+  /// Add operations stats of this hash table to the counters in profile.
+  /// This method should only be called once for each HashTable and be called during
+  /// closing the owner object of the HashTable. Not all the counters are added with the
+  /// method, only counters for Probes, travels, collisions and resizes are affected.
+  void StatsCountersAdd(HashTableStatsProfile* profile);
 
   /// Inserts the row to the hash table. The caller is responsible for ensuring that the
   /// table has free buckets. Returns true if the insertion was successful. Always
@@ -736,9 +773,6 @@ class HashTable {
 
   /// Update and print some statistics that can be used for performance debugging.
   std::string PrintStats() const;
-
-  /// Number of hash collisions so far in the lifetime of this object
-  int64_t NumHashCollisions() const { return num_hash_collisions_; }
 
   /// stl-like iterator interface.
   class Iterator {
