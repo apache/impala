@@ -14,23 +14,23 @@ alter table alltypes_clone set column stats string_col ('maxSize'='555','avgSize
 ---- QUERY
 show column stats alltypes_clone
 ---- LABELS
-COLUMN, TYPE, #DISTINCT VALUES, #NULLS, MAX SIZE, AVG SIZE
+COLUMN, TYPE, #DISTINCT VALUES, #NULLS, MAX SIZE, AVG SIZE, #TRUES, #FALSES
 ---- RESULTS
-'id','INT',-1,-1,4,4
-'bool_col','BOOLEAN',-1,-1,1,1
-'tinyint_col','TINYINT',-1,-1,1,1
-'smallint_col','SMALLINT',-1,-1,2,2
-'int_col','INT',100,20,4,4
-'bigint_col','BIGINT',-1,-1,8,8
-'float_col','FLOAT',-1,-1,4,4
-'double_col','DOUBLE',2,-1,8,8
-'date_string_col','STRING',-1,-1,-1,-1
-'string_col','STRING',-1,-1,555,60
-'timestamp_col','TIMESTAMP',-1,9,16,16
-'year','INT',2,0,4,4
-'month','INT',12,0,4,4
+'id','INT',-1,-1,4,4,-1,-1
+'bool_col','BOOLEAN',-1,-1,1,1,-1,-1
+'tinyint_col','TINYINT',-1,-1,1,1,-1,-1
+'smallint_col','SMALLINT',-1,-1,2,2,-1,-1
+'int_col','INT',100,20,4,4,-1,-1
+'bigint_col','BIGINT',-1,-1,8,8,-1,-1
+'float_col','FLOAT',-1,-1,4,4,-1,-1
+'double_col','DOUBLE',2,-1,8,8,-1,-1
+'date_string_col','STRING',-1,-1,-1,-1,-1,-1
+'string_col','STRING',-1,-1,555,60,-1,-1
+'timestamp_col','TIMESTAMP',-1,9,16,16,-1,-1
+'year','INT',2,0,4,4,-1,-1
+'month','INT',12,0,4,4,-1,-1
 ---- TYPES
-STRING, STRING, BIGINT, BIGINT, BIGINT, DOUBLE
+STRING, STRING, BIGINT, BIGINT, BIGINT, DOUBLE, BIGINT, BIGINT
 ====
 ---- QUERY
 # Make sure compute stats still works.
@@ -50,23 +50,23 @@ alter table alltypes_clone set column stats string_col ('maxSize'='-1','avgSize'
 ---- QUERY
 show column stats alltypes_clone
 ---- LABELS
-COLUMN, TYPE, #DISTINCT VALUES, #NULLS, MAX SIZE, AVG SIZE
+COLUMN, TYPE, #DISTINCT VALUES, #NULLS, MAX SIZE, AVG SIZE, #TRUES, #FALSES
 ---- RESULTS
-'id','INT',7300,0,4,4
-'bool_col','BOOLEAN',2,0,1,1
-'tinyint_col','TINYINT',10,0,1,1
-'smallint_col','SMALLINT',10,0,2,2
-'int_col','INT',-1,-1,4,4
-'bigint_col','BIGINT',10,0,8,8
-'float_col','FLOAT',10,0,4,4
-'double_col','DOUBLE',-1,0,8,8
-'date_string_col','STRING',736,0,8,8
-'string_col','STRING',10,0,-1,-1
-'timestamp_col','TIMESTAMP',7300,-1,16,16
-'year','INT',2,0,4,4
-'month','INT',12,0,4,4
+'id','INT',7300,0,4,4,-1,-1
+'bool_col','BOOLEAN',2,0,1,1,3650,3650
+'tinyint_col','TINYINT',10,0,1,1,-1,-1
+'smallint_col','SMALLINT',10,0,2,2,-1,-1
+'int_col','INT',-1,-1,4,4,-1,-1
+'bigint_col','BIGINT',10,0,8,8,-1,-1
+'float_col','FLOAT',10,0,4,4,-1,-1
+'double_col','DOUBLE',-1,0,8,8,-1,-1
+'date_string_col','STRING',736,0,8,8,-1,-1
+'string_col','STRING',10,0,-1,-1,-1,-1
+'timestamp_col','TIMESTAMP',7300,-1,16,16,-1,-1
+'year','INT',2,0,4,4,-1,-1
+'month','INT',12,0,4,4,-1,-1
 ---- TYPES
-STRING, STRING, BIGINT, BIGINT, BIGINT, DOUBLE
+STRING, STRING, BIGINT, BIGINT, BIGINT, DOUBLE, BIGINT, BIGINT
 ====
 ---- QUERY
 # Also alter a few 'numRows' parameters to make sure manually setting all stats works.
@@ -103,23 +103,23 @@ alter table alltypes_hbase_clone set column stats string_col ('maxSize'='555','a
 ---- QUERY
 show column stats alltypes_hbase_clone
 ---- LABELS
-COLUMN, TYPE, #DISTINCT VALUES, #NULLS, MAX SIZE, AVG SIZE
+COLUMN, TYPE, #DISTINCT VALUES, #NULLS, MAX SIZE, AVG SIZE, #TRUES, #FALSES
 ---- RESULTS
-'id','INT',-1,-1,4,4
-'bool_col','BOOLEAN',-1,-1,1,1
-'tinyint_col','TINYINT',-1,-1,1,1
-'smallint_col','SMALLINT',-1,-1,2,2
-'int_col','INT',100,20,4,4
-'bigint_col','BIGINT',-1,-1,8,8
-'float_col','FLOAT',-1,-1,4,4
-'double_col','DOUBLE',2,-1,8,8
-'date_string_col','STRING',-1,-1,-1,-1
-'string_col','STRING',-1,-1,555,60
-'timestamp_col','TIMESTAMP',-1,9,16,16
-'year','INT',-1,-1,4,4
-'month','INT',-1,-1,4,4
+'id','INT',-1,-1,4,4,-1,-1
+'bool_col','BOOLEAN',-1,-1,1,1,-1,-1
+'tinyint_col','TINYINT',-1,-1,1,1,-1,-1
+'smallint_col','SMALLINT',-1,-1,2,2,-1,-1
+'int_col','INT',100,20,4,4,-1,-1
+'bigint_col','BIGINT',-1,-1,8,8,-1,-1
+'float_col','FLOAT',-1,-1,4,4,-1,-1
+'double_col','DOUBLE',2,-1,8,8,-1,-1
+'date_string_col','STRING',-1,-1,-1,-1,-1,-1
+'string_col','STRING',-1,-1,555,60,-1,-1
+'timestamp_col','TIMESTAMP',-1,9,16,16,-1,-1
+'year','INT',-1,-1,4,4,-1,-1
+'month','INT',-1,-1,4,4,-1,-1
 ---- TYPES
-STRING, STRING, BIGINT, BIGINT, BIGINT, DOUBLE
+STRING, STRING, BIGINT, BIGINT, BIGINT, DOUBLE, BIGINT, BIGINT
 ====
 ---- QUERY
 # Reset the column stats to an unknown state by setting the values to -1
@@ -131,21 +131,21 @@ alter table alltypes_hbase_clone set column stats string_col ('maxSize'='-1','av
 ---- QUERY
 show column stats alltypes_hbase_clone
 ---- LABELS
-COLUMN, TYPE, #DISTINCT VALUES, #NULLS, MAX SIZE, AVG SIZE
+COLUMN, TYPE, #DISTINCT VALUES, #NULLS, MAX SIZE, AVG SIZE, #TRUES, #FALSES
 ---- RESULTS
-'id','INT',-1,-1,4,4
-'bool_col','BOOLEAN',-1,-1,1,1
-'tinyint_col','TINYINT',-1,-1,1,1
-'smallint_col','SMALLINT',-1,-1,2,2
-'int_col','INT',-1,-1,4,4
-'bigint_col','BIGINT',-1,-1,8,8
-'float_col','FLOAT',-1,-1,4,4
-'double_col','DOUBLE',-1,-1,8,8
-'date_string_col','STRING',-1,-1,-1,-1
-'string_col','STRING',-1,-1,-1,-1
-'timestamp_col','TIMESTAMP',-1,-1,16,16
-'year','INT',-1,-1,4,4
-'month','INT',-1,-1,4,4
+'id','INT',-1,-1,4,4,-1,-1
+'bool_col','BOOLEAN',-1,-1,1,1,-1,-1
+'tinyint_col','TINYINT',-1,-1,1,1,-1,-1
+'smallint_col','SMALLINT',-1,-1,2,2,-1,-1
+'int_col','INT',-1,-1,4,4,-1,-1
+'bigint_col','BIGINT',-1,-1,8,8,-1,-1
+'float_col','FLOAT',-1,-1,4,4,-1,-1
+'double_col','DOUBLE',-1,-1,8,8,-1,-1
+'date_string_col','STRING',-1,-1,-1,-1,-1,-1
+'string_col','STRING',-1,-1,-1,-1,-1,-1
+'timestamp_col','TIMESTAMP',-1,-1,16,16,-1,-1
+'year','INT',-1,-1,4,4,-1,-1
+'month','INT',-1,-1,4,4,-1,-1
 ---- TYPES
-STRING, STRING, BIGINT, BIGINT, BIGINT, DOUBLE
+STRING, STRING, BIGINT, BIGINT, BIGINT, DOUBLE, BIGINT, BIGINT
 ====

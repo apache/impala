@@ -652,6 +652,8 @@ public class CatalogTest {
   private void assertStatsUnknown(Column column) {
     assertEquals(-1, column.getStats().getNumDistinctValues());
     assertEquals(-1, column.getStats().getNumNulls());
+    assertEquals(-1, column.getStats().getNumTrues());
+    assertEquals(-1, column.getStats().getNumFalses());
     double expectedSize = column.getType().isFixedLengthType() ?
         column.getType().getSlotSize() : -1;
     assertEquals(expectedSize, column.getStats().getAvgSerializedSize(), 0.0001);

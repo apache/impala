@@ -113,13 +113,15 @@ string DecodeNdv(const string& ndv, bool is_encoded) {
 }
 
 void PerColumnStats::Update(const string& ndv, int64_t num_new_rows, double new_avg_width,
-    int32_t max_new_width, int64_t num_new_nulls) {
-  DCHECK_EQ(intermediate_ndv.size(), ndv.size())
-      << "Incompatible intermediate NDVs";
+    int32_t max_new_width, int64_t num_new_nulls, int64_t num_new_trues,
+    int64_t num_new_falses) {
+  DCHECK_EQ(intermediate_ndv.size(), ndv.size()) << "Incompatible intermediate NDVs";
   DCHECK_GE(num_new_rows, 0);
   DCHECK_GE(max_new_width, 0);
   DCHECK_GE(new_avg_width, 0);
   DCHECK_GE(num_new_nulls, -1); // '-1' needed to be backward compatible
+  DCHECK_GE(num_trues, 0);
+  DCHECK_GE(num_falses, 0);
   for (int j = 0; j < ndv.size(); ++j) {
     intermediate_ndv[j] = ::max(intermediate_ndv[j], ndv[j]);
   }
@@ -132,6 +134,9 @@ void PerColumnStats::Update(const string& ndv, int64_t num_new_rows, double new_
       num_nulls = -1;
     }
   }
+
+  num_trues += num_new_trues;
+  num_falses += num_new_falses;
   max_width = ::max(max_width, max_new_width);
   total_width += (new_avg_width * num_new_rows);
   num_rows += num_new_rows;
@@ -149,13 +154,15 @@ TColumnStats PerColumnStats::ToTColumnStats() const {
   col_stats.__set_num_nulls(num_nulls);
   col_stats.__set_max_size(max_width);
   col_stats.__set_avg_size(avg_width);
+  col_stats.__set_num_trues(num_trues);
+  col_stats.__set_num_falses(num_falses);
   return col_stats;
 }
 
 string PerColumnStats::DebugString() const {
-  return Substitute(
-      "ndv: $0, num_nulls: $1, max_width: $2, avg_width: $3, num_rows: $4",
-      ndv_estimate, num_nulls, max_width, avg_width, num_rows);
+  return Substitute("ndv: $0, num_nulls: $1, max_width: $2, avg_width: $3, num_rows: "
+                    "$4, num_trues: $5, num_falses: $6",
+      ndv_estimate, num_nulls, max_width, avg_width, num_rows, num_trues, num_falses);
 }
 
 namespace impala {
@@ -165,9 +172,10 @@ void FinalizePartitionedColumnStats(const TTableSchema& col_stats_schema,
     const vector<vector<string>>& expected_partitions, const TRowSet& rowset,
     int32_t num_partition_cols, TAlterTableUpdateStatsParams* params) {
   // The rowset should have the following schema: for every column in the source table,
-  // five columns are produced, one row per partition.
-  // <ndv buckets>, <num nulls>, <max width>, <avg width>, <count rows>
-  static const int COLUMNS_PER_STAT = 5;
+  // seven columns are produced, one row per partition.
+  // <ndv buckets>, <num nulls>, <max width>, <avg width>, <count rows>,
+  // <num trues>, <num falses>
+  static const int COLUMNS_PER_STAT = 7;
 
   const int num_cols =
       (col_stats_schema.columns.size() - num_partition_cols) / COLUMNS_PER_STAT;
@@ -198,8 +206,15 @@ void FinalizePartitionedColumnStats(const TTableSchema& col_stats_schema,
         double avg_width = col_stats_row.colVals[i + 3].doubleVal.value;
         int32_t max_width = col_stats_row.colVals[i + 2].i32Val.value;
         int64_t num_nulls = col_stats_row.colVals[i + 1].i64Val.value;
+        int64_t num_trues = col_stats_row.colVals[i + 5].i64Val.value;
+        int64_t num_falses = col_stats_row.colVals[i + 6].i64Val.value;
 
-        stat->Update(ndv, num_rows, avg_width, max_width, num_nulls);
+        VLOG(3) << "Updated statistics for column=["
+                << col_stats_schema.columns[i].columnName << "]," << " statistics={"
+                << ndv << "," << num_rows << "，" << avg_width << "," << num_trues
+                << "," << max_width << "," << num_nulls << "," << num_falses << "}";
+        stat->Update(
+            ndv, num_rows, avg_width, max_width, num_nulls, num_trues, num_falses);
 
         // Save the intermediate state per-column, per-partition
         TIntermediateColumnStats int_stats;
@@ -210,6 +225,8 @@ void FinalizePartitionedColumnStats(const TTableSchema& col_stats_schema,
         int_stats.__set_max_width(max_width);
         int_stats.__set_avg_width(avg_width);
         int_stats.__set_num_rows(num_rows);
+        int_stats.__set_num_trues(num_trues);
+        int_stats.__set_num_falses(num_falses);
 
         part_stat->intermediate_col_stats[col_stats_schema.columns[i].columnName] =
             int_stats;
@@ -229,6 +246,8 @@ void FinalizePartitionedColumnStats(const TTableSchema& col_stats_schema,
   empty_column_stats.__set_max_width(0);
   empty_column_stats.__set_avg_width(0);
   empty_column_stats.__set_num_rows(0);
+  empty_column_stats.__set_num_trues(0);
+  empty_column_stats.__set_num_falses(0);
   TPartitionStats empty_part_stats;
   for (int i = 0; i < num_cols * COLUMNS_PER_STAT; i += COLUMNS_PER_STAT) {
     empty_part_stats.intermediate_col_stats[col_stats_schema.columns[i].columnName] =
@@ -260,9 +279,14 @@ void FinalizePartitionedColumnStats(const TTableSchema& col_stats_schema,
       }
 
       const TIntermediateColumnStats& int_stats = it->second;
+      VLOG(3) << "Updated intermediate value for column=[" << col_name << "], "
+              << "statistics={" << int_stats.intermediate_ndv << ","
+              << int_stats.num_rows << "，" << int_stats.avg_width << ","
+              << int_stats.max_width << ","<< int_stats.num_nulls << ","
+              << int_stats.num_trues << "," << int_stats.num_falses << "}";
       stats[i].Update(DecodeNdv(int_stats.intermediate_ndv, int_stats.is_ndv_encoded),
           int_stats.num_rows, int_stats.avg_width, int_stats.max_width,
-          int_stats.num_nulls);
+          int_stats.num_nulls, int_stats.num_trues, int_stats.num_falses);
     }
   }
 
