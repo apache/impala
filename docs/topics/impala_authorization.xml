@@ -88,7 +88,7 @@ under the License.
         individual columns.
       </p>
 
-      <p conref="../shared/impala_common.xml#common/sentry_privileges_objects"/>
+      <p conref="../shared/impala_common.xml#common/privileges_objects"/>
 
       <p>
         Privileges are managed via the <codeph>GRANT</codeph> and <codeph>REVOKE</codeph> SQL
@@ -140,6 +140,49 @@ under the License.
         DATABASE</codeph>, <codeph>ALTER TABLE</codeph>, or <codeph>ALTER VIEW</codeph> with the
         <codeph>SET OWNER</codeph> clause.
       </p>
+
+    </conbody>
+
+  </concept>
+
+  <concept id="concept_fgf_smj_bjb">
+
+    <title>Object Ownership in Ranger</title>
+
+    <conbody>
+
+      <p>
+        Object ownership for tables, views and databases is enabled by default in Impala.
+      </p>
+
+      <p>
+        To define owner specific privileges, go to ranger UI and define appropriate policies on
+        the <codeph>{OWNER}</codeph> user.
+      </p>
+
+      <p>
+        The <codeph>CREATE</codeph> statements implicitly make the user running the statement
+        the owner of the object. For example, if <varname>User A</varname> creates a database,
+        <varname>foo</varname>, via the <codeph>CREATE DATABASE</codeph> statement,
+        <varname>User A</varname> now owns the <varname>foo</varname> database and is authorized
+        to perform any operation on the <varname>foo</varname> database.
+      </p>
+
+      <p>
+        An ownership can be transferred to another user or role via the <codeph>ALTER
+        DATABASE</codeph>, <codeph>ALTER TABLE</codeph>, or <codeph>ALTER VIEW</codeph> with the
+        <codeph>SET OWNER</codeph> clause.
+      </p>
+
+      <note id="impala-8937">
+        Currently, due to a known issue
+        (<xref
+          href="https://issues.apache.org/jira/browse/IMPALA-8937" format="html"
+          scope="external">IMPALA-8937</xref>),
+        until the ownership information is fully loaded in the coordinator catalog cache, the
+        owner of a table might not be able to see the table when executing the <codeph>SHOW
+        TABLES</codeph> statement The owner can still query the table.
+      </note>
 
     </conbody>
 

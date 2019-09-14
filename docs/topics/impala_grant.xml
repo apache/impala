@@ -120,7 +120,7 @@ GRANT <varname>privilege</varname> ON <varname>object_type</varname> <varname>ob
       Finer-grained privileges mentioned below on a <codeph>URI</codeph> are not supported.
     </p>
 
-    <p conref="../shared/impala_common.xml#common/sentry_privileges_objects"/>
+    <p conref="../shared/impala_common.xml#common/privileges_objects"/>
 
     <p conref="../shared/impala_common.xml#common/compatibility_blurb"/>
 

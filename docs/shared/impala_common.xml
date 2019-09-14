@@ -110,21 +110,22 @@ under the License.
 
     </section>
 
-    <section id="sentry">
+    <section id="authz">
 
-      <title>Sentry-Related Content</title>
+      <title>Authorization Content</title>
 
-      <p>
-        Material related to Sentry security, intended to be reused between Hive and Impala.
-        Complicated by the fact that most of it will probably be multi-paragraph or involve
-        subheads, might need to be represented as nested topics at the end of this file.
-      </p>
+      <p> Material related to Sentry and Ranger security, intended to be reused
+        between Hive and Impala. Complicated by the fact that most of it will
+        probably be multi-paragraph or involve subheads, might need to be
+        represented as nested topics at the end of this file. </p>
 
-      <p id="sentry_privileges_objects">
+      <p id="privileges_objects">
         The table below lists the minimum level of privileges and the scope required to execute
         SQL statements in <keyword keyref="impala30_full"/> and higher. The following notations
         are used:
         <ul>
+          <li>The <b>SERVER</b> resource type in Ranger implies all databases,
+            all tables, all columns, all UDFs, and all URIs.</li>
           <li>
             <b>ANY</b> denotes the <codeph>SELECT</codeph>, <codeph>INSERT</codeph>,
             <codeph>CREATE</codeph>, <codeph>ALTER</codeph>, <codeph>DROP</codeph>,
