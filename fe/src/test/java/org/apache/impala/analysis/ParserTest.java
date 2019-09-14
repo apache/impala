@@ -2442,6 +2442,9 @@ public class ParserTest extends FrontendTestBase {
     // Test SET COLUMN STATS.
     ParsesOk("ALTER TABLE Foo SET COLUMN STATS col ('numDVs'='10')");
     ParsesOk("ALTER TABLE Foo SET COLUMN STATS col ('numDVs'='10','maxSize'='20')");
+    ParsesOk("ALTER TABLE Foo SET COLUMN STATS col ('NUM_TRUES'='10')");
+    ParsesOk("ALTER TABLE Foo SET COLUMN STATS col ('NUM_FALSES'='20')");
+    ParsesOk("ALTER TABLE Foo SET COLUMN STATS col ('NUM_TRUES'='10','NUM_FALSES'='20')");
     ParsesOk("ALTER TABLE TestDb.Foo SET COLUMN STATS col ('avgSize'='20')");
     ParserError("ALTER TABLE SET COLUMN STATS col ('numDVs'='10'");
     ParserError("ALTER TABLE Foo SET COLUMN STATS ('numDVs'='10'");

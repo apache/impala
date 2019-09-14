@@ -28,23 +28,23 @@ STRING, STRING, BIGINT, STRING
 ---- QUERY
 show column stats alltypessmall_hbase
 ---- LABELS
-COLUMN, TYPE, #DISTINCT VALUES, #NULLS, MAX SIZE, AVG SIZE
+COLUMN, TYPE, #DISTINCT VALUES, #NULLS, MAX SIZE, AVG SIZE, #TRUES, #FALSES
 ---- RESULTS
-'id','INT',99,0,4,4
-'bigint_col','BIGINT',10,0,8,8
-'bool_col','BOOLEAN',2,0,1,1
-'date_string_col','STRING',12,0,8,8
-'double_col','DOUBLE',10,0,8,8
-'float_col','FLOAT',10,0,4,4
-'int_col','INT',10,0,4,4
-'month','INT',4,0,4,4
-'smallint_col','SMALLINT',10,0,2,2
-'string_col','STRING',10,0,1,1
-'timestamp_col','TIMESTAMP',100,0,16,16
-'tinyint_col','TINYINT',10,0,1,1
-'year','INT',1,0,4,4
+'id','INT',99,0,4,4,-1,-1
+'bigint_col','BIGINT',10,0,8,8,-1,-1
+'bool_col','BOOLEAN',2,0,1,1,50,50
+'date_string_col','STRING',12,0,8,8,-1,-1
+'double_col','DOUBLE',10,0,8,8,-1,-1
+'float_col','FLOAT',10,0,4,4,-1,-1
+'int_col','INT',10,0,4,4,-1,-1
+'month','INT',4,0,4,4,-1,-1
+'smallint_col','SMALLINT',10,0,2,2,-1,-1
+'string_col','STRING',10,0,1,1,-1,-1
+'timestamp_col','TIMESTAMP',100,0,16,16,-1,-1
+'tinyint_col','TINYINT',10,0,1,1,-1,-1
+'year','INT',1,0,4,4,-1,-1
 ---- TYPES
-STRING, STRING, BIGINT, BIGINT, BIGINT, DOUBLE
+STRING, STRING, BIGINT, BIGINT, BIGINT, DOUBLE, BIGINT, BIGINT
 ====
 ---- QUERY
 # test computing stats on an binary HBase table
@@ -69,23 +69,23 @@ STRING, STRING, BIGINT, STRING
 ---- QUERY
 show column stats alltypessmall_hbase_bin
 ---- LABELS
-COLUMN, TYPE, #DISTINCT VALUES, #NULLS, MAX SIZE, AVG SIZE
+COLUMN, TYPE, #DISTINCT VALUES, #NULLS, MAX SIZE, AVG SIZE, #TRUES, #FALSES
 ---- RESULTS
-'id','INT',99,0,4,4
-'bigint_col','BIGINT',10,0,8,8
-'bool_col','BOOLEAN',2,0,1,1
-'date_string_col','STRING',12,0,8,8
-'double_col','DOUBLE',10,0,8,8
-'float_col','FLOAT',10,0,4,4
-'int_col','INT',10,0,4,4
-'month','INT',4,0,4,4
-'smallint_col','SMALLINT',10,0,2,2
-'string_col','STRING',10,0,1,1
-'timestamp_col','TIMESTAMP',100,0,16,16
-'tinyint_col','TINYINT',10,0,1,1
-'year','INT',1,0,4,4
+'id','INT',99,0,4,4,-1,-1
+'bigint_col','BIGINT',10,0,8,8,-1,-1
+'bool_col','BOOLEAN',2,0,1,1,50,50
+'date_string_col','STRING',12,0,8,8,-1,-1
+'double_col','DOUBLE',10,0,8,8,-1,-1
+'float_col','FLOAT',10,0,4,4,-1,-1
+'int_col','INT',10,0,4,4,-1,-1
+'month','INT',4,0,4,4,-1,-1
+'smallint_col','SMALLINT',10,0,2,2,-1,-1
+'string_col','STRING',10,0,1,1,-1,-1
+'timestamp_col','TIMESTAMP',100,0,16,16,-1,-1
+'tinyint_col','TINYINT',10,0,1,1,-1,-1
+'year','INT',1,0,4,4,-1,-1
 ---- TYPES
-STRING, STRING, BIGINT, BIGINT, BIGINT, DOUBLE
+STRING, STRING, BIGINT, BIGINT, BIGINT, DOUBLE, BIGINT, BIGINT
 ====
 ---- QUERY
 # IMP-1227: Test computing stats on an HBase table that has a
@@ -111,25 +111,25 @@ STRING, STRING, BIGINT, STRING
 ---- QUERY
 show column stats allcomplextypes_hbase
 ---- LABELS
-COLUMN, TYPE, #DISTINCT VALUES, #NULLS, MAX SIZE, AVG SIZE
+COLUMN, TYPE, #DISTINCT VALUES, #NULLS, MAX SIZE, AVG SIZE, #TRUES, #FALSES
 ---- RESULTS
-'id','INT',0,0,4,4
-'array_array_col','ARRAY<ARRAY<INT>>',-1,-1,-1,-1
-'array_map_col','MAP<STRING,ARRAY<INT>>',-1,-1,-1,-1
-'complex_nested_struct_col','STRUCT<f1:INT,f2:ARRAY<STRUCT<f11:BIGINT,f12:MAP<STRING,STRUCT<f21:BIGINT>>>>>',-1,-1,-1,-1
-'complex_struct_col','STRUCT<f1:INT,f2:ARRAY<INT>,f3:MAP<STRING,INT>>',-1,-1,-1,-1
-'int_array_col','ARRAY<INT>',-1,-1,-1,-1
-'int_map_col','MAP<STRING,INT>',-1,-1,-1,-1
-'int_struct_col','STRUCT<f1:INT,f2:INT>',-1,-1,-1,-1
-'map_array_col','ARRAY<MAP<STRING,INT>>',-1,-1,-1,-1
-'map_map_col','MAP<STRING,MAP<STRING,INT>>',-1,-1,-1,-1
-'month','INT',0,0,4,4
-'nested_struct_col','STRUCT<f1:INT,f2:STRUCT<f11:BIGINT,f12:STRUCT<f21:BIGINT>>>',-1,-1,-1,-1
-'struct_array_col','ARRAY<STRUCT<f1:BIGINT,f2:STRING>>',-1,-1,-1,-1
-'struct_map_col','MAP<STRING,STRUCT<f1:BIGINT,f2:STRING>>',-1,-1,-1,-1
-'year','INT',0,0,4,4
+'id','INT',0,0,4,4,-1,-1
+'array_array_col','ARRAY<ARRAY<INT>>',-1,-1,-1,-1,-1,-1
+'array_map_col','MAP<STRING,ARRAY<INT>>',-1,-1,-1,-1,-1,-1
+'complex_nested_struct_col','STRUCT<f1:INT,f2:ARRAY<STRUCT<f11:BIGINT,f12:MAP<STRING,STRUCT<f21:BIGINT>>>>>',-1,-1,-1,-1,-1,-1
+'complex_struct_col','STRUCT<f1:INT,f2:ARRAY<INT>,f3:MAP<STRING,INT>>',-1,-1,-1,-1,-1,-1
+'int_array_col','ARRAY<INT>',-1,-1,-1,-1,-1,-1
+'int_map_col','MAP<STRING,INT>',-1,-1,-1,-1,-1,-1
+'int_struct_col','STRUCT<f1:INT,f2:INT>',-1,-1,-1,-1,-1,-1
+'map_array_col','ARRAY<MAP<STRING,INT>>',-1,-1,-1,-1,-1,-1
+'map_map_col','MAP<STRING,MAP<STRING,INT>>',-1,-1,-1,-1,-1,-1
+'month','INT',0,0,4,4,-1,-1
+'nested_struct_col','STRUCT<f1:INT,f2:STRUCT<f11:BIGINT,f12:STRUCT<f21:BIGINT>>>',-1,-1,-1,-1,-1,-1
+'struct_array_col','ARRAY<STRUCT<f1:BIGINT,f2:STRING>>',-1,-1,-1,-1,-1,-1
+'struct_map_col','MAP<STRING,STRUCT<f1:BIGINT,f2:STRING>>',-1,-1,-1,-1,-1,-1
+'year','INT',0,0,4,4,-1,-1
 ---- TYPES
-STRING, STRING, BIGINT, BIGINT, BIGINT, DOUBLE
+STRING, STRING, BIGINT, BIGINT, BIGINT, DOUBLE, BIGINT, BIGINT
 ====
 ---- QUERY
 # test computing stats on an HBase table
@@ -160,11 +160,11 @@ STRING, STRING, BIGINT, STRING
 ---- QUERY
 show column stats date_tbl_hbase
 ---- LABELS
-COLUMN, TYPE, #DISTINCT VALUES, #NULLS, MAX SIZE, AVG SIZE
+COLUMN, TYPE, #DISTINCT VALUES, #NULLS, MAX SIZE, AVG SIZE, #TRUES, #FALSES
 ---- RESULTS
-'id_col','INT',22,0,4,4
-'date_col','DATE',16,2,4,4
-'date_part','DATE',4,0,4,4
+'id_col','INT',22,0,4,4,-1,-1
+'date_col','DATE',16,2,4,4,-1,-1
+'date_part','DATE',4,0,4,4,-1,-1
 ---- TYPES
-STRING, STRING, BIGINT, BIGINT, BIGINT, DOUBLE
+STRING, STRING, BIGINT, BIGINT, BIGINT, DOUBLE, BIGINT, BIGINT
 ====

@@ -82,25 +82,25 @@ TEST(IncrStatsUtilTest, TestNumNullAggregation) {
   PerColumnStats* stat = new PerColumnStats();
   ASSERT_EQ(0, stat->ToTColumnStats().num_nulls);
 
-  stat->Update(string(AggregateFunctions::HLL_LEN, 0), 0, 0, 0, 1);
+  stat->Update(string(AggregateFunctions::HLL_LEN, 0), 0, 0, 0, 1, 0, 0);
   ASSERT_EQ(1, stat->ToTColumnStats().num_nulls);
 
-  stat->Update(string(AggregateFunctions::HLL_LEN, 0), 0, 0, 0, 0);
+  stat->Update(string(AggregateFunctions::HLL_LEN, 0), 0, 0, 0, 0, 0, 0);
   ASSERT_EQ(1, stat->ToTColumnStats().num_nulls);
 
-  stat->Update(string(AggregateFunctions::HLL_LEN, 0), 0, 0, 0, 2);
+  stat->Update(string(AggregateFunctions::HLL_LEN, 0), 0, 0, 0, 2, 0, 0);
   ASSERT_EQ(3, stat->ToTColumnStats().num_nulls);
 
-  stat->Update(string(AggregateFunctions::HLL_LEN, 0), 0, 0, 0, -1);
+  stat->Update(string(AggregateFunctions::HLL_LEN, 0), 0, 0, 0, -1, 0, 0);
   ASSERT_EQ(-1, stat->ToTColumnStats().num_nulls);
 
-  stat->Update(string(AggregateFunctions::HLL_LEN, 0), 0, 0, 0, 0);
+  stat->Update(string(AggregateFunctions::HLL_LEN, 0), 0, 0, 0, 0, 0, 0);
   ASSERT_EQ(-1, stat->ToTColumnStats().num_nulls);
 
-  stat->Update(string(AggregateFunctions::HLL_LEN, 0), 0, 0, 0, 3);
+  stat->Update(string(AggregateFunctions::HLL_LEN, 0), 0, 0, 0, 3, 0, 0);
   ASSERT_EQ(-1, stat->ToTColumnStats().num_nulls);
 
-  stat->Update(string(AggregateFunctions::HLL_LEN, 0), 0, 0, 0, -1);
+  stat->Update(string(AggregateFunctions::HLL_LEN, 0), 0, 0, 0, -1, 0, 0);
   ASSERT_EQ(-1, stat->ToTColumnStats().num_nulls);
 }
 
@@ -112,15 +112,15 @@ TEST(IncrStatsUtilTest, TestNumNullAggregation) {
 TEST(IncrStatsUtilTest, TestAvgSizehAggregation) {
   PerColumnStats* stat = new PerColumnStats();
 
-  stat->Update(string(AggregateFunctions::HLL_LEN, 0), 1, 4, 0, 0);
+  stat->Update(string(AggregateFunctions::HLL_LEN, 0), 1, 4, 0, 0, 0, 0);
   stat->Finalize();
   ASSERT_EQ(4, stat->ToTColumnStats().avg_size);
 
-  stat->Update(string(AggregateFunctions::HLL_LEN, 0), 2, 7, 0, 0);
+  stat->Update(string(AggregateFunctions::HLL_LEN, 0), 2, 7, 0, 0, 0, 0);
   stat->Finalize();
   ASSERT_EQ(6, stat->ToTColumnStats().avg_size);
 
-  stat->Update(string(AggregateFunctions::HLL_LEN, 0), 0, 0, 0, 0);
+  stat->Update(string(AggregateFunctions::HLL_LEN, 0), 0, 0, 0, 0, 0, 0);
   stat->Finalize();
   ASSERT_EQ(6, stat->ToTColumnStats().avg_size);
 }

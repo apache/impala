@@ -42,6 +42,12 @@ struct PerColumnStats {
   // The total number of rows
   int64_t num_rows;
 
+  // The total number of true
+  int64_t num_trues;
+
+  // The total number of false
+  int64_t num_falses;
+
   // The sum of avg_width * num_rows for each partition, so that avg_width can be
   // correctly computed during Finalize()
   double total_width;
@@ -54,12 +60,18 @@ struct PerColumnStats {
   double avg_width;
 
   PerColumnStats()
-      : intermediate_ndv(AggregateFunctions::HLL_LEN, 0), num_nulls(0),
-      max_width(0), num_rows(0), total_width(0) { }
+    : intermediate_ndv(AggregateFunctions::HLL_LEN, 0),
+      num_nulls(0),
+      max_width(0),
+      num_rows(0),
+      num_trues(0),
+      num_falses(0),
+      total_width(0) {}
 
   /// Updates all aggregate statistics with a new set of measurements.
   void Update(const string& ndv, int64_t num_new_rows, double new_avg_width,
-      int32_t max_new_width, int64_t num_new_nulls);
+      int32_t max_new_width, int64_t num_new_nulls, int64_t num_new_trues,
+      int64_t num_new_falses);
 
   /// Performs any stats computations that are not distributive, that is they may not be
   /// computed in part during Update(). After this method returns, ndv_estimate and

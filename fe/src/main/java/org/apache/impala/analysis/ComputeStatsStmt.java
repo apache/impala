@@ -287,6 +287,17 @@ public class ComputeStatsStmt extends StatementBase {
         // Need the count in order to properly combine per-partition column stats
         columnStatsSelectList.add("COUNT(" + colRefSql + ")");
       }
+
+      // For boolean column, compute the numTrue and numFalse
+      if (type.isBoolean()) {
+        columnStatsSelectList.add(
+            "COUNT(CASE WHEN " + colRefSql + " = TRUE THEN 1 ELSE NULL END)");
+        columnStatsSelectList.add(
+            "COUNT(CASE WHEN " + colRefSql + " = FALSE THEN 1 ELSE NULL END)");
+      } else {
+        columnStatsSelectList.add("NULL");
+        columnStatsSelectList.add("NULL");
+      }
     }
     return columnStatsSelectList;
   }

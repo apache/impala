@@ -40,23 +40,23 @@ STRING, STRING, BIGINT, BIGINT, STRING, STRING, STRING, STRING, STRING, STRING
 ---- QUERY
 show column stats t1;
 ---- LABELS
-COLUMN, TYPE, #DISTINCT VALUES, #NULLS, MAX SIZE, AVG SIZE
+COLUMN, TYPE, #DISTINCT VALUES, #NULLS, MAX SIZE, AVG SIZE, #TRUES, #FALSES
 ---- RESULTS
-'id','INT',7300,0,4,4
-'bool_col','BOOLEAN',2,0,1,1
-'tinyint_col','TINYINT',10,0,1,1
-'smallint_col','SMALLINT',10,0,2,2
-'int_col','INT',10,0,4,4
-'bigint_col','BIGINT',10,0,8,8
-'float_col','FLOAT',10,0,4,4
-'double_col','DOUBLE',10,0,8,8
-'date_string_col','STRING',736,0,8,8
-'string_col','STRING',10,0,1,1
-'timestamp_col','TIMESTAMP',7300,0,16,16
-'year','INT',2,0,4,4
-'month','INT',12,0,4,4
+'id','INT',7300,0,4,4,-1,-1
+'bool_col','BOOLEAN',2,0,1,1,3650,3650
+'tinyint_col','TINYINT',10,0,1,1,-1,-1
+'smallint_col','SMALLINT',10,0,2,2,-1,-1
+'int_col','INT',10,0,4,4,-1,-1
+'bigint_col','BIGINT',10,0,8,8,-1,-1
+'float_col','FLOAT',10,0,4,4,-1,-1
+'double_col','DOUBLE',10,0,8,8,-1,-1
+'date_string_col','STRING',736,0,8,8,-1,-1
+'string_col','STRING',10,0,1,1,-1,-1
+'timestamp_col','TIMESTAMP',7300,0,16,16,-1,-1
+'year','INT',2,0,4,4,-1,-1
+'month','INT',12,0,4,4,-1,-1
 ---- TYPES
-STRING, STRING, BIGINT, BIGINT, BIGINT, DOUBLE
+STRING, STRING, BIGINT, BIGINT, BIGINT, DOUBLE, BIGINT, BIGINT
 ====
 ---- QUERY
 # Show that the truncation removed all files, table stats, and incremental stats,
@@ -98,23 +98,23 @@ STRING, STRING, BIGINT, BIGINT, STRING, STRING, STRING, STRING, STRING, STRING
 # Show that the truncation removed the column stats.
 show column stats t1;
 ---- LABELS
-COLUMN, TYPE, #DISTINCT VALUES, #NULLS, MAX SIZE, AVG SIZE
+COLUMN, TYPE, #DISTINCT VALUES, #NULLS, MAX SIZE, AVG SIZE, #TRUES, #FALSES
 ---- RESULTS
-'id','INT',-1,-1,4,4
-'bool_col','BOOLEAN',-1,-1,1,1
-'tinyint_col','TINYINT',-1,-1,1,1
-'smallint_col','SMALLINT',-1,-1,2,2
-'int_col','INT',-1,-1,4,4
-'bigint_col','BIGINT',-1,-1,8,8
-'float_col','FLOAT',-1,-1,4,4
-'double_col','DOUBLE',-1,-1,8,8
-'date_string_col','STRING',-1,-1,-1,-1
-'string_col','STRING',-1,-1,-1,-1
-'timestamp_col','TIMESTAMP',-1,-1,16,16
-'year','INT',2,0,4,4
-'month','INT',12,0,4,4
+'id','INT',-1,-1,4,4,-1,-1
+'bool_col','BOOLEAN',-1,-1,1,1,-1,-1
+'tinyint_col','TINYINT',-1,-1,1,1,-1,-1
+'smallint_col','SMALLINT',-1,-1,2,2,-1,-1
+'int_col','INT',-1,-1,4,4,-1,-1
+'bigint_col','BIGINT',-1,-1,8,8,-1,-1
+'float_col','FLOAT',-1,-1,4,4,-1,-1
+'double_col','DOUBLE',-1,-1,8,8,-1,-1
+'date_string_col','STRING',-1,-1,-1,-1,-1,-1
+'string_col','STRING',-1,-1,-1,-1,-1,-1
+'timestamp_col','TIMESTAMP',-1,-1,16,16,-1,-1
+'year','INT',2,0,4,4,-1,-1
+'month','INT',12,0,4,4,-1,-1
 ---- TYPES
-STRING, STRING, BIGINT, BIGINT, BIGINT, DOUBLE
+STRING, STRING, BIGINT, BIGINT, BIGINT, DOUBLE, BIGINT, BIGINT
 ====
 ---- QUERY
 # Create an unpartitioned table.
@@ -133,12 +133,12 @@ BIGINT, BIGINT, STRING, STRING, STRING, STRING, STRING, STRING
 ---- QUERY
 show column stats t2;
 ---- LABELS
-COLUMN, TYPE, #DISTINCT VALUES, #NULLS, MAX SIZE, AVG SIZE
+COLUMN, TYPE, #DISTINCT VALUES, #NULLS, MAX SIZE, AVG SIZE, #TRUES, #FALSES
 ---- RESULTS
-'a','STRING',3,0,8,6.666666507720947
-'b','STRING',3,0,7,4
+'a','STRING',3,0,8,6.666666507720947,-1,-1
+'b','STRING',3,0,7,4,-1,-1
 ---- TYPES
-STRING, STRING, BIGINT, BIGINT, BIGINT, DOUBLE
+STRING, STRING, BIGINT, BIGINT, BIGINT, DOUBLE, BIGINT, BIGINT
 ====
 ---- QUERY
 # Show that the truncation removed all files, table stats, and incremental stats.
@@ -155,12 +155,12 @@ BIGINT, BIGINT, STRING, STRING, STRING, STRING, STRING, STRING
 # Show that the truncation removed the column stats.
 show column stats t2;
 ---- LABELS
-COLUMN, TYPE, #DISTINCT VALUES, #NULLS, MAX SIZE, AVG SIZE
+COLUMN, TYPE, #DISTINCT VALUES, #NULLS, MAX SIZE, AVG SIZE, #TRUES, #FALSES
 ---- RESULTS
-'a','STRING',-1,-1,-1,-1
-'b','STRING',-1,-1,-1,-1
+'a','STRING',-1,-1,-1,-1,-1,-1
+'b','STRING',-1,-1,-1,-1,-1,-1
 ---- TYPES
-STRING, STRING, BIGINT, BIGINT, BIGINT, DOUBLE
+STRING, STRING, BIGINT, BIGINT, BIGINT, DOUBLE, BIGINT, BIGINT
 ====
 ---- QUERY
 # TRUNCATE IF EXISTS does not fail on non existent table

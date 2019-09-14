@@ -129,48 +129,48 @@ STRING, STRING, BIGINT, BIGINT, STRING, STRING, STRING, STRING, STRING, STRING
 # Column stats on an HdfsTable
 show column stats alltypes
 ---- LABELS
-COLUMN, TYPE, #DISTINCT VALUES, #NULLS, MAX SIZE, AVG SIZE
+COLUMN, TYPE, #DISTINCT VALUES, #NULLS, MAX SIZE, AVG SIZE, #TRUES, #FALSES
 ---- RESULTS
-'id','INT',7300,0,4,4
-'bool_col','BOOLEAN',2,0,1,1
-'tinyint_col','TINYINT',10,0,1,1
-'smallint_col','SMALLINT',10,0,2,2
-'int_col','INT',10,0,4,4
-'bigint_col','BIGINT',10,0,8,8
-'float_col','FLOAT',10,0,4,4
-'double_col','DOUBLE',10,0,8,8
-'date_string_col','STRING',736,0,8,8
-'string_col','STRING',10,0,1,1
-'timestamp_col','TIMESTAMP',7300,0,16,16
-'year','INT',2,0,4,4
-'month','INT',12,0,4,4
+'id','INT',7300,0,4,4,-1,-1
+'bool_col','BOOLEAN',2,0,1,1,3650,3650
+'tinyint_col','TINYINT',10,0,1,1,-1,-1
+'smallint_col','SMALLINT',10,0,2,2,-1,-1
+'int_col','INT',10,0,4,4,-1,-1
+'bigint_col','BIGINT',10,0,8,8,-1,-1
+'float_col','FLOAT',10,0,4,4,-1,-1
+'double_col','DOUBLE',10,0,8,8,-1,-1
+'date_string_col','STRING',736,0,8,8,-1,-1
+'string_col','STRING',10,0,1,1,-1,-1
+'timestamp_col','TIMESTAMP',7300,0,16,16,-1,-1
+'year','INT',2,0,4,4,-1,-1
+'month','INT',12,0,4,4,-1,-1
 ---- TYPES
-STRING, STRING, BIGINT, BIGINT, BIGINT, DOUBLE
+STRING, STRING, BIGINT, BIGINT, BIGINT, DOUBLE, BIGINT, BIGINT
 ====
 ---- QUERY
 # Column stats for a table with complex types.
 # TODO: when complex type stats are supported revisit: compute-stats-complextype-warning.test
 show column stats functional.allcomplextypes
 ---- LABELS
-COLUMN, TYPE, #DISTINCT VALUES, #NULLS, MAX SIZE, AVG SIZE
+COLUMN, TYPE, #DISTINCT VALUES, #NULLS, MAX SIZE, AVG SIZE, #TRUES, #FALSES
 ---- RESULTS
-'id','INT',-1,-1,4,4
-'int_array_col','ARRAY<INT>',-1,-1,-1,-1
-'array_array_col','ARRAY<ARRAY<INT>>',-1,-1,-1,-1
-'map_array_col','ARRAY<MAP<STRING,INT>>',-1,-1,-1,-1
-'struct_array_col','ARRAY<STRUCT<f1:BIGINT,f2:STRING>>',-1,-1,-1,-1
-'int_map_col','MAP<STRING,INT>',-1,-1,-1,-1
-'array_map_col','MAP<STRING,ARRAY<INT>>',-1,-1,-1,-1
-'map_map_col','MAP<STRING,MAP<STRING,INT>>',-1,-1,-1,-1
-'struct_map_col','MAP<STRING,STRUCT<f1:BIGINT,f2:STRING>>',-1,-1,-1,-1
-'int_struct_col','STRUCT<f1:INT,f2:INT>',-1,-1,-1,-1
-'complex_struct_col','STRUCT<f1:INT,f2:ARRAY<INT>,f3:MAP<STRING,INT>>',-1,-1,-1,-1
-'nested_struct_col','STRUCT<f1:INT,f2:STRUCT<f11:BIGINT,f12:STRUCT<f21:BIGINT>>>',-1,-1,-1,-1
-'complex_nested_struct_col','STRUCT<f1:INT,f2:ARRAY<STRUCT<f11:BIGINT,f12:MAP<STRING,STRUCT<f21:BIGINT>>>>>',-1,-1,-1,-1
-'year','INT',0,0,4,4
-'month','INT',0,0,4,4
+'id','INT',-1,-1,4,4,-1,-1
+'int_array_col','ARRAY<INT>',-1,-1,-1,-1,-1,-1
+'array_array_col','ARRAY<ARRAY<INT>>',-1,-1,-1,-1,-1,-1
+'map_array_col','ARRAY<MAP<STRING,INT>>',-1,-1,-1,-1,-1,-1
+'struct_array_col','ARRAY<STRUCT<f1:BIGINT,f2:STRING>>',-1,-1,-1,-1,-1,-1
+'int_map_col','MAP<STRING,INT>',-1,-1,-1,-1,-1,-1
+'array_map_col','MAP<STRING,ARRAY<INT>>',-1,-1,-1,-1,-1,-1
+'map_map_col','MAP<STRING,MAP<STRING,INT>>',-1,-1,-1,-1,-1,-1
+'struct_map_col','MAP<STRING,STRUCT<f1:BIGINT,f2:STRING>>',-1,-1,-1,-1,-1,-1
+'int_struct_col','STRUCT<f1:INT,f2:INT>',-1,-1,-1,-1,-1,-1
+'complex_struct_col','STRUCT<f1:INT,f2:ARRAY<INT>,f3:MAP<STRING,INT>>',-1,-1,-1,-1,-1,-1
+'nested_struct_col','STRUCT<f1:INT,f2:STRUCT<f11:BIGINT,f12:STRUCT<f21:BIGINT>>>',-1,-1,-1,-1,-1,-1
+'complex_nested_struct_col','STRUCT<f1:INT,f2:ARRAY<STRUCT<f11:BIGINT,f12:MAP<STRING,STRUCT<f21:BIGINT>>>>>',-1,-1,-1,-1,-1,-1
+'year','INT',0,0,4,4,-1,-1
+'month','INT',0,0,4,4,-1,-1
 ---- TYPES
-STRING, STRING, BIGINT, BIGINT, BIGINT, DOUBLE
+STRING, STRING, BIGINT, BIGINT, BIGINT, DOUBLE, BIGINT, BIGINT
 ====
 ---- QUERY
 # IMPALA-7784: Show unescaped partition string values. Note that in our test framework,

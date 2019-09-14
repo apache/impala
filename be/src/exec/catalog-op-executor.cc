@@ -284,13 +284,16 @@ void CatalogOpExecutor::SetColumnStats(const TTableSchema& col_stats_schema,
   // Set per-column stats. For a column at position i in its source table,
   // the NDVs and the number of NULLs are at position i and i + 1 of the
   // col_stats_row, respectively. Positions i + 2 and i + 3 contain the max/avg
-  // length for string columns, and -1 for non-string columns.
-  for (int i = 0; i < col_stats_row.colVals.size(); i += 4) {
+  // length for string columns, Positions i+4 and i+5 contains the numTrues/numFalses
+  // and -1 for non-string columns.
+  for (int i = 0; i < col_stats_row.colVals.size(); i += 6) {
     TColumnStats col_stats;
     col_stats.__set_num_distinct_values(col_stats_row.colVals[i].i64Val.value);
     col_stats.__set_num_nulls(col_stats_row.colVals[i + 1].i64Val.value);
     col_stats.__set_max_size(col_stats_row.colVals[i + 2].i32Val.value);
     col_stats.__set_avg_size(col_stats_row.colVals[i + 3].doubleVal.value);
+    col_stats.__set_num_trues(col_stats_row.colVals[i + 4].i64Val.value);
+    col_stats.__set_num_falses(col_stats_row.colVals[i + 5].i64Val.value);
     params->column_stats[col_stats_schema.columns[i].columnName] = col_stats;
   }
   params->__isset.column_stats = true;
