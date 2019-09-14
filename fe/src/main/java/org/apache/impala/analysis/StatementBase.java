@@ -85,7 +85,7 @@ public abstract class StatementBase extends StmtNode {
    */
   public List<String> getColLabels() { return Collections.<String>emptyList();  }
 
-  /**
+  /**ComputeStatsStmt
    * Sets the column labels of this statement, if applicable. No-op of the statement does
    * not produce an output result set.
    */

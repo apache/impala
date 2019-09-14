@@ -167,6 +167,9 @@ struct TColumnStats {
 
   // Estimated number of null values.
   4: required i64 num_nulls
+
+  5: required i64 num_trues
+  6: required i64 num_falses
 }
 
 // Intermediate state for the computation of per-column stats. Impala can aggregate these
@@ -189,6 +192,9 @@ struct TIntermediateColumnStats {
 
   // The number of rows counted, needed to compute NDVs from intermediate_ndv
   6: optional i64 num_rows
+
+  7: required i64 num_trues
+  8: required i64 num_falses
 }
 
 // Per-partition statistics
