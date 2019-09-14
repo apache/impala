@@ -899,15 +899,24 @@ public class Frontend {
     resultSchema.addToColumns(new TColumn("#Nulls", Type.BIGINT.toThrift()));
     resultSchema.addToColumns(new TColumn("Max Size", Type.BIGINT.toThrift()));
     resultSchema.addToColumns(new TColumn("Avg Size", Type.DOUBLE.toThrift()));
+    resultSchema.addToColumns(new TColumn("#Trues", Type.BIGINT.toThrift()));
+    resultSchema.addToColumns(new TColumn("#Falses", Type.BIGINT.toThrift()));
+
 
     for (Column c: table.getColumnsInHiveOrder()) {
       TResultRowBuilder rowBuilder = new TResultRowBuilder();
       // Add name, type, NDVs, numNulls, max size and avg size.
       rowBuilder.add(c.getName()).add(c.getType().toSql())
           .add(c.getStats().getNumDistinctValues()).add(c.getStats().getNumNulls())
-          .add(c.getStats().getMaxSize()).add(c.getStats().getAvgSize());
+          .add(c.getStats().getMaxSize()).add(c.getStats().getAvgSize())
+          .add(c.getStats().getNumTrues()).add(c.getStats().getNumFalses());
       result.addToRows(rowBuilder.get());
+      LOG.info("Geting column stats and the result is " + c.getName()
+              + " , " + c.getStats().getNumDistinctValues()
+      + c.getStats().getAvgSize() + "," + c.getStats().getNumNulls()
+              + ", "+ c.getStats().getNumTrues() + "," + c.getStats().getNumFalses());
     }
+
     return result;
   }
 
