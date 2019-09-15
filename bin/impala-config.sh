@@ -856,3 +856,4 @@ EOF
   $JAVA -version
   echo
 fi
+/Applications/IntelliJ\ IDEA.app/Contents/MacOS/idea

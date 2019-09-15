@@ -498,6 +498,8 @@ public class ColumnStats {
     Preconditions.checkState(maxSize_ == -1 || maxSize_ >= 0, this);
     Preconditions.checkState(numDistinctValues_ == -1 || numDistinctValues_ >= 0, this);
     Preconditions.checkState(numNulls_ == -1 || numNulls_ >= 0, this);
+    Preconditions.checkState(numTrues_ == -1 || numTrues_ >= 0, this);
+    Preconditions.checkState(numFalses_ == -1 || numFalses_ >= 0, this);
     if (colType != null && colType.isFixedLengthType()) {
       Preconditions.checkState(avgSize_ == colType.getSlotSize(), this);
       Preconditions.checkState(avgSerializedSize_ == colType.getSlotSize(), this);
