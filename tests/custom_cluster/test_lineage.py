@@ -26,6 +26,7 @@ import tempfile
 import time
 
 from tests.common.custom_cluster_test_suite import CustomClusterTestSuite
+from tests.common.skip import SkipIfS3
 
 LOG = logging.getLogger(__name__)
 
@@ -106,6 +107,7 @@ class TestLineage(CustomClusterTestSuite):
               assert "{0}.lineage_test_tbl".format(unique_database) == table_name
               assert table_create_time != -1
 
+  @SkipIfS3.hbase
   @pytest.mark.execute_serially
   @CustomClusterTestSuite.with_args("--lineage_event_log_dir={0}"
                                     .format(LINEAGE_TESTS_DIR))
