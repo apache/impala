@@ -1045,19 +1045,20 @@ SELECT COUNT(DISTINCT(visitor_id)) FROM web_traffic WHERE month IN ('January','J
 
     <conbody>
 
-      <p>
-        <indexterm audience="hidden">IS DISTINCT FROM operator</indexterm>
-
-        <indexterm audience="hidden">IS NOT DISTINCT FROM operator</indexterm>
-        The <codeph>IS DISTINCT FROM</codeph> operator, and its converse the <codeph>IS NOT DISTINCT FROM</codeph> operator, test whether or
-        not values are identical. <codeph>IS NOT DISTINCT FROM</codeph> is similar to the <codeph>=</codeph> operator, and <codeph>IS
-        DISTINCT FROM</codeph> is similar to the <codeph>!=</codeph> operator, except that <codeph>NULL</codeph> values are treated as
-        identical. Therefore, <codeph>IS NOT DISTINCT FROM</codeph> returns <codeph>true</codeph> rather than <codeph>NULL</codeph>, and
-        <codeph>IS DISTINCT FROM</codeph> returns <codeph>false</codeph> rather than <codeph>NULL</codeph>, when comparing two
-        <codeph>NULL</codeph> values. If one of the values being compared is <codeph>NULL</codeph> and the other is not, <codeph>IS DISTINCT
-        FROM</codeph> returns <codeph>true</codeph> and <codeph>IS NOT DISTINCT FROM</codeph> returns <codeph>false</codeph>, again instead
-        of returning <codeph>NULL</codeph> in both cases.
-      </p>
+      <p> The <codeph>IS DISTINCT FROM</codeph> operator, and its converse the
+          <codeph>IS NOT DISTINCT FROM</codeph> operator, test whether or not
+        values are identical. <codeph>IS NOT DISTINCT FROM</codeph> is similar
+        to the <codeph>=</codeph> operator, and <codeph>IS DISTINCT
+          FROM</codeph> is similar to the <codeph>!=</codeph> operator, except
+        that <codeph>NULL</codeph> values are treated as identical. Therefore,
+          <codeph>IS NOT DISTINCT FROM</codeph> returns <codeph>true</codeph>
+        rather than <codeph>NULL</codeph>, and <codeph>IS DISTINCT FROM</codeph>
+        returns <codeph>false</codeph> rather than <codeph>NULL</codeph>, when
+        comparing two <codeph>NULL</codeph> values. If one of the values being
+        compared is <codeph>NULL</codeph> and the other is not, <codeph>IS
+          DISTINCT FROM</codeph> returns <codeph>true</codeph> and <codeph>IS
+          NOT DISTINCT FROM</codeph> returns <codeph>false</codeph>, again
+        instead of returning <codeph>NULL</codeph> in both cases. </p>
 
       <p conref="../shared/impala_common.xml#common/syntax_blurb"/>
 
@@ -1083,12 +1084,11 @@ SELECT COUNT(DISTINCT(visitor_id)) FROM web_traffic WHERE month IN ('January','J
         <codeph>=</codeph> or <codeph>!=</codeph> operator.
       </p>
 
-      <p>
-        The <codeph>&lt;=&gt;</codeph> operator, used like an equality operator in a join query,
-        is more efficient than the equivalent clause: <codeph>A = B OR (A IS NULL AND B IS NULL)</codeph>.
-        The <codeph>&lt;=&gt;</codeph> operator can use a hash join, while the <codeph>OR</codeph> expression
-        cannot.
-      </p>
+      <p> The <codeph>&lt;=&gt;</codeph> operator, used like an equality
+        operator in a join query, is more efficient than the equivalent clause:
+          <codeph>IF (A IS NULL OR B IS NULL, A IS NULL AND B IS NULL, A =
+          B)</codeph>. The <codeph>&lt;=&gt;</codeph> operator can use a hash
+        join, while the <codeph>IF</codeph> expression cannot. </p>
 
       <p conref="../shared/impala_common.xml#common/example_blurb"/>
 
