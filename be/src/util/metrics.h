@@ -274,6 +274,8 @@ class AtomicHighWaterMarkGauge : public ScalarMetric<int64_t, TMetricKind::GAUGE
     UpdateMax(new_val);
   }
 
+  IntGauge* current_value() const { return current_value_; }
+
  private:
   FRIEND_TEST(MetricsTest, AtomicHighWaterMarkGauge);
   friend class TmpFileMgrTest;

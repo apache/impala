@@ -566,7 +566,8 @@ Status TmpFileMgr::FileGroup::ScratchAllocationFailedStatus(
   }
   Status status(TErrorCode::SCRATCH_ALLOCATION_FAILED, join(tmp_dir_paths, ","),
       GetBackendString(),
-      PrettyPrinter::PrintBytes(scratch_space_bytes_used_counter_->value()),
+      PrettyPrinter::PrintBytes(
+        tmp_file_mgr_->scratch_bytes_used_metric_->current_value()->GetValue()),
       PrettyPrinter::PrintBytes(current_bytes_allocated_),
       join(at_capacity_dir_paths, ","));
   // Include all previous errors that may have caused the failure.

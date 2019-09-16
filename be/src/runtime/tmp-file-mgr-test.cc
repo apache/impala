@@ -787,8 +787,18 @@ TEST_F(TmpFileMgrTest, TestDirectoryLimitsExhausted) {
   // The directories are at capacity, so allocations should fail.
   Status err1 = GroupAllocateSpace(&file_group_1, ALLOC_SIZE, &alloc_file, &offset);
   ASSERT_EQ(err1.code(), TErrorCode::SCRATCH_ALLOCATION_FAILED);
+  EXPECT_STR_CONTAINS(err1.GetDetail(), "Could not create files in any configured "
+      "scratch directories (--scratch_dirs=/tmp/tmp-file-mgr-test.1/impala-scratch,"
+      "/tmp/tmp-file-mgr-test.2/impala-scratch)");
+  EXPECT_STR_CONTAINS(err1.GetDetail(), "1.25 MB of scratch is currently in use by "
+      "this Impala Daemon (1.25 MB by this query)");
   Status err2 = GroupAllocateSpace(&file_group_2, ALLOC_SIZE, &alloc_file, &offset);
   ASSERT_EQ(err2.code(), TErrorCode::SCRATCH_ALLOCATION_FAILED);
+  EXPECT_STR_CONTAINS(err2.GetDetail(), "Could not create files in any configured "
+      "scratch directories (--scratch_dirs=/tmp/tmp-file-mgr-test.1/impala-scratch,"
+      "/tmp/tmp-file-mgr-test.2/impala-scratch)");
+  EXPECT_STR_CONTAINS(err2.GetDetail(), "1.25 MB of scratch is currently in use by "
+      "this Impala Daemon (0 by this query)");
 
   // A FileGroup should recover once allocations are released, i.e. it does not
   // permanently block allocating files from the group.
