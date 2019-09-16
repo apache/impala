@@ -155,12 +155,11 @@ under the License.
               the default file format is uncompressed text, with values separated by ASCII
               <codeph>0x01</codeph> characters (typically represented as Ctrl-A).
             </entry>
-            <entry>
-              Yes: <codeph>CREATE TABLE</codeph>, <codeph>INSERT</codeph>, <codeph>LOAD
-              DATA</codeph>, and query. If LZO compression is used, you must create the table
-              and load data in Hive. If other kinds of compression are used, you must load data
-              through <codeph>LOAD DATA</codeph>, Hive, or manually in HDFS.
-            </entry>
+            <entry> Yes if uncompressed.<p>No if compressed.</p><p>If LZO
+                compression is used, you must create the table and load data in
+                Hive.</p><p>If other kinds of compression are used, you must
+                load data through <codeph>LOAD DATA</codeph>, Hive, or manually
+                in HDFS. </p></entry>
           </row>
           <row id="avro_support">
             <entry>
