@@ -653,18 +653,18 @@ class TestRanger(CustomClusterTestSuite):
     test_user = getuser()
     test_db = "test_ranger_ownership_" + get_random_id(5).lower()
     # Create a test database as "admin" user. Owner is set accordingly.
-    self._run_query_as_user("create database {}".format(test_db), ADMIN, True)
+    self._run_query_as_user("create database {0}".format(test_db), ADMIN, True)
     try:
       # Try to create a table under test_db as current user. It should fail.
       self._run_query_as_user(
-          "create table {}.foo(a int)".format(test_db), test_user, False)
+          "create table {0}.foo(a int)".format(test_db), test_user, False)
       # Change the owner of the database to the current user.
       self._run_query_as_user(
-          "alter database {} set owner user {}".format(test_db, test_user), ADMIN, True)
+          "alter database {0} set owner user {1}".format(test_db, test_user), ADMIN, True)
       # Try creating a table under it again. It should still fail due to lack of ownership
       # privileges
       self._run_query_as_user(
-          "create table {}.foo(a int)".format(test_db), test_user, False)
+          "create table {0}.foo(a int)".format(test_db), test_user, False)
       # Create ranger ownership poicy for the current user on test_db.
       resource = {
         "database": test_db,
@@ -677,7 +677,7 @@ class TestRanger(CustomClusterTestSuite):
       try:
         # Create should succeed now.
         self._run_query_as_user(
-            "create table {}.foo(a int)".format(test_db), test_user, True)
+            "create table {0}.foo(a int)".format(test_db), test_user, True)
         # Run show tables on the db. The resulting list should be empty. This happens
         # because the created table's ownership information is not aggresively cached
         # by the current Catalog implementations. Hence the analysis pass does not
@@ -685,34 +685,34 @@ class TestRanger(CustomClusterTestSuite):
         # user is actually the owner. We need to fix this by caching the HMS metadata
         # more aggressively when the table loads. TODO(IMPALA-8937).
         result =\
-            self._run_query_as_user("show tables in {}".format(test_db), test_user, True)
+            self._run_query_as_user("show tables in {0}".format(test_db), test_user, True)
         assert len(result.data) == 0
         # Run a simple query that warms up the table metadata and repeat SHOW TABLES.
-        self._run_query_as_user("select * from {}.foo".format(test_db), test_user, True)
+        self._run_query_as_user("select * from {0}.foo".format(test_db), test_user, True)
         result =\
-            self._run_query_as_user("show tables in {}".format(test_db), test_user, True)
+            self._run_query_as_user("show tables in {0}".format(test_db), test_user, True)
         assert len(result.data) == 1
         assert "foo" in result.data
         # Change the owner of the db back to the admin user
         self._run_query_as_user(
-            "alter database {} set owner user {}".format(test_db, ADMIN), ADMIN, True)
-        result =\
-            self._run_query_as_user("show tables in {}".format(test_db), test_user, False)
-        err = "User '{}' does not have privileges to access: {}.*.*".\
+            "alter database {0} set owner user {1}".format(test_db, ADMIN), ADMIN, True)
+        result = self._run_query_as_user(
+            "show tables in {0}".format(test_db), test_user, False)
+        err = "User '{0}' does not have privileges to access: {1}.*.*".\
             format(test_user, test_db)
         assert err in str(result)
         # test_user is still the owner of the table, so select should work fine.
-        self._run_query_as_user("select * from {}.foo".format(test_db), test_user, True)
+        self._run_query_as_user("select * from {0}.foo".format(test_db), test_user, True)
         # Change the table owner back to admin.
         self._run_query_as_user(
-            "alter table {}.foo set owner user {}".format(test_db, ADMIN), ADMIN, True)
+            "alter table {0}.foo set owner user {1}".format(test_db, ADMIN), ADMIN, True)
         # test_user should not be authorized to run the queries anymore.
         result = self._run_query_as_user(
-            "select * from {}.foo".format(test_db), test_user, False)
-        err = ("AuthorizationException: User '{}' does not have privileges to execute" +
-            " 'SELECT' on: {}.foo").format(test_user, test_db)
+            "select * from {0}.foo".format(test_db), test_user, False)
+        err = ("AuthorizationException: User '{0}' does not have privileges to execute" +
+            " 'SELECT' on: {1}.foo").format(test_user, test_db)
         assert err in str(result)
       finally:
         TestRanger._revoke_ranger_privilege("{OWNER}", resource, access)
     finally:
-      self._run_query_as_user("drop database {} cascade".format(test_db), ADMIN, True)
+      self._run_query_as_user("drop database {0} cascade".format(test_db), ADMIN, True)
