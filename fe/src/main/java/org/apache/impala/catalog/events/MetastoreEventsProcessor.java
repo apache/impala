@@ -23,6 +23,7 @@ import com.codahale.metrics.Timer;
 import com.google.common.annotations.VisibleForTesting;
 import com.google.common.base.Preconditions;
 import com.google.common.util.concurrent.ThreadFactoryBuilder;
+import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collections;
 import java.util.List;
@@ -258,23 +259,33 @@ public class MetastoreEventsProcessor implements ExternalEventsProcessor {
    * Fetches the required metastore config values and validates them against the
    * expected values. The configurations to validate are different for HMS-2 v/s HMS-3
    * and hence it uses MetastoreShim to get the configurations which need to be validated.
-   * @throws CatalogException if the validation fails or if metastore is not accessible
+   * @throws CatalogException if one or more validations fail or if metastore is not
+   * accessible
    */
   @VisibleForTesting
   void validateConfigs() throws CatalogException {
+    List<ValidationResult> validationErrors = new ArrayList<>();
     for (MetastoreEventProcessorConfig config : getEventProcessorConfigsToValidate()) {
       String configKey = config.getValidator().getConfigKey();
       try {
         String value = getConfigValueFromMetastore(configKey, "");
         ValidationResult result = config.validate(value);
-        if (!result.isValid()) {
-          throw new CatalogException(result.getReason());
-        }
+        if (!result.isValid()) validationErrors.add(result);
       } catch (TException e) {
         String msg = String.format("Unable to get configuration %s from metastore. Check "
             + "if metastore is accessible", configKey);
         LOG.error(msg, e);
         throw new CatalogException(msg);
+      }
+      if (!validationErrors.isEmpty()) {
+        LOG.error("Found {} incorrect metastore configuration(s).",
+            validationErrors.size());
+        for (ValidationResult invalidConfig: validationErrors) {
+          LOG.error(invalidConfig.getReason());
+        }
+        throw new CatalogException(String.format("Found %d incorrect metastore "
+            + "configuration(s). Events processor cannot start. See ERROR log for more "
+            + "details.", validationErrors.size()));
       }
     }
   }
@@ -283,7 +294,7 @@ public class MetastoreEventsProcessor implements ExternalEventsProcessor {
    * Returns the list of Metastore configurations to validate depending on the hive
    * version
    */
-  private List<MetastoreEventProcessorConfig> getEventProcessorConfigsToValidate() {
+  public static List<MetastoreEventProcessorConfig> getEventProcessorConfigsToValidate() {
     if (MetastoreShim.getMajorVersion() >= 2) {
       return Arrays.asList(MetastoreEventProcessorConfig.FIRE_EVENTS_FOR_DML);
     }

@@ -136,6 +136,7 @@ import org.junit.Test;
 
 import com.google.common.collect.Lists;
 
+import org.mockito.Mockito;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -235,6 +236,32 @@ public class MetastoreEventsProcessorTest {
   public void testConfigValidation() throws CatalogException {
     assertEquals(EventProcessorStatus.ACTIVE, eventsProcessor_.getStatus());
     eventsProcessor_.validateConfigs();
+  }
+
+  /**
+   * Test if validateConfigs() works as expected. If more than one configuration keys
+   * in metastore are incorrect, we present all of those incorrect results together so
+   * users can change them in one go. This test will assert the number of failed
+   * configurations for Hive major version >=2 or otherwise.
+   * @throws TException
+   */
+  @Test
+  public void testValidateConfig() throws TException {
+    MetastoreEventsProcessor mockMetastoreEventsProcessor =
+        Mockito.spy(eventsProcessor_);
+    for (MetastoreEventProcessorConfig config: MetastoreEventProcessorConfig.values()) {
+      String configKey = config.getValidator().getConfigKey();
+      Mockito.when(mockMetastoreEventsProcessor.getConfigValueFromMetastore(configKey,
+          "")).thenReturn("false");
+    }
+    try {
+      mockMetastoreEventsProcessor.validateConfigs();
+    } catch (CatalogException e) {
+      String errorMessage = "Found %d incorrect metastore configuration(s).";
+      // Use MetastoreShim to determine the number of failed configs.
+      assertTrue(e.getMessage().contains(String.format(errorMessage,
+          MetastoreEventsProcessor.getEventProcessorConfigsToValidate().size())));
+    }
   }
 
   /**
