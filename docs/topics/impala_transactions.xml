@@ -50,8 +50,8 @@ under the License.
 
     <p>
       For insert-only transactional tables, you can perform the following statements:
-      <codeph>CREATE TABLE</codeph>, <codeph>DROP TABLE</codeph>, <codeph>INSERT</codeph>,
-      <codeph>SELECT</codeph>
+      <codeph>CREATE TABLE</codeph>, <codeph>DROP TABLE</codeph>, <codeph>TRUNCATE</codeph>,
+      <codeph>INSERT</codeph>, <codeph>SELECT</codeph>
     </p>
 
     <p>
