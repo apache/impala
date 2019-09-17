@@ -127,6 +127,26 @@ under the License.
       </li>
 
       <li>
+        <xref href="#string_functions/jaro_distance">JARO_DISTANCE, JARO_DIST</xref>
+      </li>
+
+      <li>
+        <xref href="#string_functions/jaro_similarity">JARO_SIMILARITY, JARO_SIM</xref>
+      </li>
+
+      <li>
+        <xref href="#string_functions/jaro_winkler_distance"
+          >JARO_WINKER_DISTANCE,
+        JW_DST</xref>
+      </li>
+
+      <li>
+        <xref href="#string_functions/jaro_winkler_similarity"
+          >JARO_WINKER_SIMILARITY,
+        JW_SIM</xref>
+      </li>
+
+      <li>
         <xref href="#string_functions/left">LEFT</xref>
       </li>
 
@@ -455,7 +475,7 @@ SELECT chr(97);
         <dd>
           <b>Purpose:</b> Returns a single string representing all the argument values joined
           together. If any argument is <codeph>NULL</codeph>, it returns <codeph>NULL</codeph>.
-          <p></p>
+          <p/>
 
           <p>
             <b>Return type:</b> <codeph>STRING</codeph>
@@ -578,24 +598,15 @@ SELECT chr(97);
           <p>
             If the substring is not present in the string, the function returns 0:
           </p>
-<codeblock rev="IMPALA-3973 2.8.0">
-select instr('foo bar bletch', 'z');
-+------------------------------+
-| instr('foo bar bletch', 'z') |
-+------------------------------+
-| 0                            |
-+------------------------------+
-</codeblock>
+
           <p rev="IMPALA-3973 2.8.0">
             The optional third and fourth arguments let you find instances of the substring
             other than the first instance starting from the left:
           </p>
           <ul>
             <li>
-              <p>
-                The third argument lets you specify a starting point within the string other
-                than 1:
-              </p>
+              The third argument lets you specify a starting point within the string other than
+              1.
 <codeblock>
 -- Restricting the search to positions 7..end,
 -- the first occurrence of 'b' is at position 9.
@@ -605,16 +616,14 @@ select instr('foo bar bletch', 'b', 7);
 +---------------------------------+
 | 9                               |
 +---------------------------------+
-
--- If there are no more occurrences after the
--- specified position, the result is 0.
-select instr('foo bar bletch', 'b', 10);
-+----------------------------------+
-| instr('foo bar bletch', 'b', 10) |
-+----------------------------------+
-| 0                                |
-+----------------------------------+
 </codeblock>
+            </li>
+
+            <li>
+              If there are no more occurrences after the specified position, the result is 0.
+            </li>
+
+            <li>
               <p>
                 If the third argument is negative, the search works right-to-left starting that
                 many characters from the right. The return value still represents the position
@@ -630,24 +639,6 @@ select instr('hello world','o',-1);
 | 8                             |
 +-------------------------------+
 
--- Scanning right to left, starting from the 6th character
--- from the right, the first occurrence of 'o' is at
--- position 5 (5th character from the left).
-select instr('hello world','o',-6);
-+-------------------------------+
-| instr('hello world', 'o', -6) |
-+-------------------------------+
-| 5                             |
-+-------------------------------+
-
--- If there are no more occurrences after the
--- specified position, the result is 0.
-select instr('hello world','o',-10);
-+--------------------------------+
-| instr('hello world', 'o', -10) |
-+--------------------------------+
-| 0                              |
-+--------------------------------+
 </codeblock>
             </li>
 
@@ -663,49 +654,21 @@ select instr('foo bar bletch', 'b', 1, 2);
 +------------------------------------+
 | 9                                  |
 +------------------------------------+
-
--- Negative position argument means scan right-to-left.
--- This example finds second instance of 'b' from the right.
-select instr('foo bar bletch', 'b', -1, 2);
-+-------------------------------------+
-| instr('foo bar bletch', 'b', -1, 2) |
-+-------------------------------------+
-| 5                                   |
-+-------------------------------------+
 </codeblock>
-              <p>
-                If the fourth argument is greater than the number of matching occurrences, the
-                function returns 0:
-              </p>
-<codeblock>
--- There is no 3rd occurrence within the string.
-select instr('foo bar bletch', 'b', 1, 3);
-+------------------------------------+
-| instr('foo bar bletch', 'b', 1, 3) |
-+------------------------------------+
-| 0                                  |
-+------------------------------------+
+            </li>
 
--- There is not even 1 occurrence when scanning
--- the string starting at position 10.
-select instr('foo bar bletch', 'b', 10, 1);
-+-------------------------------------+
-| instr('foo bar bletch', 'b', 10, 1) |
-+-------------------------------------+
-| 0                                   |
-+-------------------------------------+
-</codeblock>
-              <p>
-                The fourth argument cannot be negative or zero. A non-positive value for this
-                argument causes an error:
-              </p>
-<codeblock>
-select instr('foo bar bletch', 'b', 1, 0);
-ERROR: UDF ERROR: Invalid occurrence parameter to instr function: 0
+            <li>
+              Negative position argument means scan right-to-left.
+            </li>
 
-select instr('aaaaaaaaa','aa', 1, -1);
-ERROR: UDF ERROR: Invalid occurrence parameter to instr function: -1
-</codeblock>
+            <li>
+              If the fourth argument is greater than the number of matching occurrences, the
+              function returns 0:
+            </li>
+
+            <li>
+              The fourth argument cannot be negative or zero. A non-positive value for this
+              argument causes an error:
             </li>
 
             <li>
@@ -713,23 +676,241 @@ ERROR: UDF ERROR: Invalid occurrence parameter to instr function: -1
                 If either of the optional arguments is <codeph>NULL</codeph>, the function also
                 returns <codeph>NULL</codeph>:
               </p>
-<codeblock>
-select instr('foo bar bletch', 'b', null);
-+------------------------------------+
-| instr('foo bar bletch', 'b', null) |
-+------------------------------------+
-| NULL                               |
-+------------------------------------+
-
-select instr('foo bar bletch', 'b', 1, null);
-+---------------------------------------+
-| instr('foo bar bletch', 'b', 1, null) |
-+---------------------------------------+
-| NULL                                  |
-+---------------------------------------+
-</codeblock>
             </li>
           </ul>
+        </dd>
+
+      </dlentry>
+
+      <dlentry id="jaro_distance">
+
+        <dt>
+          JARO_DISTANCE(STRING str1, STRING str2), JARO_DST(STRING str1, STRING str2)
+        </dt>
+
+        <dd>
+          <b>Purpose:</b> Returns the
+          <xref
+            href="https://ipfs.io/ipfs/QmXoypizjW3WknFiJnKLwHCnL72vedxjQkDDP1mXWo6uco/wiki/Jaro%E2%80%93Winkler_distance.html"
+            format="html" scope="external">Jaro
+          distance</xref> between two input strings. The Jaro distance is a measure of
+          similarity between two strings and is the complementary of
+          <codeph>JARO_SIMILARITY()</codeph>, i.e. (1 - <codeph>JARO_SIMILARITY()</codeph>).
+          <p>
+            <b>Return type:</b> <codeph>DOUBLE</codeph>
+          </p>
+
+          <p>
+            <b>Usage notes:</b>
+          </p>
+
+          <p>
+            If the two input strings are identical, the function returns 0.0.
+          </p>
+
+          <p>
+            If there is no matching character between the input strings, the function returns
+            1.0.
+          </p>
+
+          <p>
+            If either input strings is <codeph>NULL</codeph>, the function returns
+            <codeph>NULL</codeph>.
+          </p>
+
+          <p>
+            If the length of either input string is bigger than 255 characters, the function
+            returns an error.
+          </p>
+        </dd>
+
+      </dlentry>
+
+      <dlentry id="jaro_similarity">
+
+        <dt>
+          JARO_SIMILARITY(STRING str1, STRING str2), JARO_SIM(STRING str1, STRING str2)
+        </dt>
+
+        <dd>
+          <b>Purpose:</b> Returns the
+          <xref
+            href="https://ipfs.io/ipfs/QmXoypizjW3WknFiJnKLwHCnL72vedxjQkDDP1mXWo6uco/wiki/Jaro%E2%80%93Winkler_distance.html"
+            format="html" scope="external">Jaro
+          similarity</xref> of two strings. The higher the Jaro similarity for two strings is,
+          the more similar the strings are.
+          <p>
+            <b>Return type:</b> <codeph>DOUBLE</codeph>
+          </p>
+
+          <p>
+            <b>Usage notes:</b>
+          </p>
+
+          <p>
+            If the two input strings are identical, the function returns 1.0.
+          </p>
+
+          <p>
+            If there is no matching character between the input strings, the function returns
+            0.0.
+          </p>
+
+          <p>
+            If either input strings is <codeph>NULL</codeph>, the function returns
+            <codeph>NULL</codeph>.
+          </p>
+
+          <p>
+            If the length of either input string is bigger than 255 characters, the function
+            returns an error.
+          </p>
+        </dd>
+
+      </dlentry>
+
+      <dlentry id="jaro_winkler_distance">
+
+        <dt>
+          JARO_WINKLER_DISTANCE(STRING str1, STRING str2[, DOUBLE scaling_factor, DOUBLE
+          boost_threshold]), JW_DST(STRING str1, STRING str2[, DOUBLE scaling_factor, DOUBLE
+          boost_threshold])
+        </dt>
+
+        <dd>
+          <b>Purpose:</b> Returns the
+          <xref
+            href="https://ipfs.io/ipfs/QmXoypizjW3WknFiJnKLwHCnL72vedxjQkDDP1mXWo6uco/wiki/Jaro%E2%80%93Winkler_distance.html"
+            format="html" scope="external">Jaro-Winkler
+          distance</xref> of two input strings. It is the complementary of
+          <codeph>JARO_WINKLER_SIMILARITY()</codeph>, i.e. 1 -
+          <codeph>JARO_WINKLER_SIMILARITY()</codeph>.
+          <p>
+            <b>Return type:</b> <codeph>DOUBLE</codeph>
+          </p>
+
+          <p>
+            <b>Usage notes:</b>
+          </p>
+
+          <p>
+            If the two input strings are identical, the function returns 0.0.
+          </p>
+
+          <p>
+            If there is no matching character between the input strings, the function returns
+            1.0.
+          </p>
+
+          <p>
+            The function returns an error in the following cases:
+            <ul>
+              <li>
+                The length of either input string is bigger than 255 characters.
+              </li>
+
+              <li>
+                <varname>scaling_factor</varname> &lt; 0.0 or <varname>scaling_factor</varname>
+                > 0.25
+              </li>
+
+              <li>
+                <varname>boost_threshold</varname> &lt; 0.0 or
+                <varname>boost_threshold</varname> > 1.0
+              </li>
+            </ul>
+          </p>
+
+          <p>
+            If either input strings is <codeph>NULL</codeph>, the function returns
+            <codeph>NULL</codeph>.
+          </p>
+
+          <p>
+            The default <varname>scaling factor</varname> is 0.1.
+          </p>
+
+          <p>
+            The prefix weight will only be applied if the Jaro-distance exceeds the optional
+            <varname>boost_threshold</varname>. By default, the
+            <varname>boost_threshold</varname> value is 0.7.
+          </p>
+        </dd>
+
+      </dlentry>
+
+      <dlentry id="jaro_winkler_similarity">
+
+        <dt>
+          JARO_WINKLER_SIMILARITY(STRING str1, STRING str2[, DOUBLE scaling_factor, DOUBLE
+          boost_threshold]), JARO_SIM(STRING str1, STRING str2[, DOUBLE scaling_factor, DOUBLE
+          boost_threshold])
+        </dt>
+
+        <dd>
+          <b>Purpose:</b> Returns the
+          <xref
+            href="https://ipfs.io/ipfs/QmXoypizjW3WknFiJnKLwHCnL72vedxjQkDDP1mXWo6uco/wiki/Jaro%E2%80%93Winkler_distance.html"
+            format="html" scope="external">Jaro-Winkler
+          Similarity</xref> between two input strings. The Jaro-Winkler similarity uses a prefix
+          weight, specified by <varname>scaling factor</varname>, which gives more favorable
+          ratings to strings that match from the beginning for a set prefix length, up to a
+          maximum of four characters.
+          <p>
+            Use Jaro or Jaro-Winkler functions to perform fuzzy matches on relatively short
+            strings, e.g. to scrub user inputs of names against the records in the database.
+          </p>
+
+          <p>
+            <b>Return type:</b> <codeph>DOUBLE</codeph>
+          </p>
+
+          <p>
+            <b>Usage notes:</b>
+          </p>
+
+          <p>
+            If the two input strings are identical, the function returns 1.0.
+          </p>
+
+          <p>
+            If there is no matching character between the input strings, the function returns
+            0.0.
+          </p>
+
+          <p>
+            The function returns an error in the following cases:
+            <ul>
+              <li>
+                The length of either input string is bigger than 255 characters.
+              </li>
+
+              <li>
+                <varname>scaling_factor</varname> &lt; 0.0 or <varname>scaling_factor</varname>
+                > 0.25
+              </li>
+
+              <li>
+                <varname>boost_threshold</varname> &lt; 0.0 or
+                <varname>boost_threshold</varname> > 1.0
+              </li>
+            </ul>
+          </p>
+
+          <p>
+            If either input strings is <codeph>NULL</codeph>, the function returns
+            <codeph>NULL</codeph>.
+          </p>
+
+          <p>
+            The default <varname>scaling factor</varname> is 0.1.
+          </p>
+
+          <p>
+            The prefix weight will only be applied if the Jaro-similarity exceeds the optional
+            <varname>boost_threshold</varname>. By default, the
+            <varname>boost_threshold</varname> value is 0.7.
+          </p>
         </dd>
 
       </dlentry>
