@@ -154,19 +154,17 @@ under the License.
           represented as symbolic links to the latest applicable log files.
         </li>
 
-        <li>
-          The init script for the <codeph>impala-server</codeph> service also produces a
-          consolidated log file <codeph>/var/logs/impalad/impala-server.log</codeph>, with all
-          the same information as the corresponding<codeph>.INFO</codeph>,
-          <codeph>.WARNING</codeph>, and <codeph>.ERROR</codeph> files.
-        </li>
+        <li> The init script for the <codeph>impala-server</codeph> service also
+          produces a consolidated log file
+            <codeph>/var/log/impalad/impala-server.log</codeph>, with all the
+          same information as the corresponding<codeph>.INFO</codeph>,
+            <codeph>.WARNING</codeph>, and <codeph>.ERROR</codeph> files. </li>
 
-        <li>
-          The init script for the <codeph>impala-state-store</codeph> service also produces a
-          consolidated log file <codeph>/var/logs/impalad/impala-state-store.log</codeph>, with
-          all the same information as the corresponding<codeph>.INFO</codeph>,
-          <codeph>.WARNING</codeph>, and <codeph>.ERROR</codeph> files.
-        </li>
+        <li> The init script for the <codeph>impala-state-store</codeph> service
+          also produces a consolidated log file
+            <codeph>/var/log/impalad/impala-state-store.log</codeph>, with all
+          the same information as the corresponding<codeph>.INFO</codeph>,
+            <codeph>.WARNING</codeph>, and <codeph>.ERROR</codeph> files. </li>
       </ul>
 
       <p>
@@ -289,15 +287,15 @@ under the License.
 
     <conbody>
 
-      <p>
-        By default, the Impala log is stored at <codeph>/var/logs/impalad/</codeph>. The most
-        comprehensive log, showing informational, warning, and error messages, is in the file
-        name <filepath>impalad.INFO</filepath>. View log file contents by using the web
-        interface or by examining the contents of the log file. (When you examine the logs
-        through the file system, you can troubleshoot problems by reading the
-        <filepath>impalad.WARNING</filepath> and/or <filepath>impalad.ERROR</filepath> files,
-        which contain the subsets of messages indicating potential problems.)
-      </p>
+      <p> By default, the Impala log is stored at
+          <codeph>/var/log/impalad/</codeph>. The most comprehensive log,
+        showing informational, warning, and error messages, is in the file name
+          <filepath>impalad.INFO</filepath>. View log file contents by using the
+        web interface or by examining the contents of the log file. (When you
+        examine the logs through the file system, you can troubleshoot problems
+        by reading the <filepath>impalad.WARNING</filepath> and/or
+          <filepath>impalad.ERROR</filepath> files, which contain the subsets of
+        messages indicating potential problems.) </p>
 
       <p>
         On a machine named <codeph>impala.example.com</codeph> with default settings, you could
