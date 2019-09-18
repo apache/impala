@@ -37,7 +37,7 @@ class IsoSqlFormatTokenizer {
 public:
   IsoSqlFormatTokenizer(DateTimeFormatContext* dt_ctx, CastDirection cast_mode,
       bool time_toks) : dt_ctx_(dt_ctx), cast_mode_(cast_mode),
-      accept_time_toks_(time_toks) {}
+      accept_time_toks_(time_toks), fm_modifier_active_(false) {}
 
   void Reset(DateTimeFormatContext* dt_ctx, CastDirection cast_mode, bool time_toks) {
     dt_ctx_ = dt_ctx;
@@ -88,12 +88,18 @@ private:
 
   /// The context that is used for the input of the parsing. It is also populated during
   /// the parsing process. Not owned by this class.
+  /// Note, that 'dt_ctx_->fmt' is a null-terminated string so it's safe to use string
+  /// functions that make this assumption.
   DateTimeFormatContext* dt_ctx_;
 
   /// Decides whether this is a 'datetime to string' or a 'string to datetime' cast.
   CastDirection cast_mode_;
 
   bool accept_time_toks_;
+
+  /// True when the FM modifier has to be applied to the following non-separator token.
+  /// It is set back to false once applied on a token.
+  bool fm_modifier_active_;
 
   /// Iterates through all the consecutive separator characters from a given pointer
   /// 'current' and saves them to 'dt_ctx_'.
@@ -114,10 +120,32 @@ private:
   bool IsMeridiemIndicatorProvided() const;
 
   /// Checks if the end product of the parsing contains format tokens that collide with
-  /// each other like YYYY and RR. Note, this is mostly relevant for a 'string to
-  /// datetime' conversion. The only restriction for 'datetime to string' path is that
-  /// timezone tokens are not allowed since Impala doesn't store timezone information.
+  /// each other like YYYY and RR.
   FormatTokenizationResult CheckIncompatibilities() const;
+
+  /// Checks if '*current_pos' points to an FX modifier and advances '*current_pos' after
+  /// the FX modifier. Sets 'dt_ctx_->fx_modifier' to true if '*current_pos' points to an
+  /// FX modifier. Call this when '*current_pos' points to the first character of the
+  /// format string.
+  void ProcessFXModifier(const char** current_pos);
+
+  /// Returns true if 'current_pos' points to either a double quote or to a backslash
+  /// that is followed by a double quote.
+  static bool IsStartOfTextToken(const char* current_pos);
+
+  /// Finds the end of the text token and saves metadata about the token into 'dt_ctx_'.
+  /// This has to be called when '*current_pos' points to the beginning of a text token
+  /// or in other words if IsStartOfTextToken(*current_pos) is true. As a side effect
+  /// 'current_pos' is advanced right after the closing double qoute of the text token.
+  FormatTokenizationResult ProcessTextToken(const char** current_pos,
+      const char* str_begin, const char* str_end);
+
+  // Starting from 'str_start' finds the closing quotation mark of the text token even
+  // if it's escaped. 'str_start' has to point to the first character of the text token
+  // right after the opening quote. Returns a pointer pointing right after the closing
+  // double quote of the text token or nullptr if the text token is unclosed.
+  static const char* FindEndOfTextToken(const char* str_start, const char* str_end,
+      bool is_escaped);
 };
 
 }

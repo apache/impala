@@ -52,6 +52,7 @@ void DateTimeFormatContext::Reset(const char* fmt, int fmt_len) {
   this->fmt_out_len = fmt_len;
   this->has_date_toks = false;
   this->has_time_toks = false;
+  this->fx_modifier = false;
   this->toks.clear();
   this->century_break_ptime = boost::posix_time::not_a_date_time;
   this->current_time = nullptr;
@@ -107,6 +108,15 @@ void ReportBadFormat(FunctionContext* context, FormatTokenizationResult error_ty
         break;
       case CONFLICTING_FRACTIONAL_SECOND_TOKENS_ERROR:
         ss << "PARSE ERROR: Multiple fractional second token provided.";
+        break;
+      case TEXT_TOKEN_NOT_CLOSED:
+        ss << "PARSE ERROR: Missing closing quotation mark.";
+        break;
+      case NO_DATETIME_TOKENS_ERROR:
+        ss << "PARSE ERROR: No datetime tokens provided.";
+        break;
+      case MISPLACED_FX_MODIFIER_ERROR:
+        ss << "PARSE ERROR: FX modifier should be at the beginning of the format string.";
         break;
       default:
         const StringValue& fmt = StringValue::FromStringVal(format);
@@ -175,6 +185,42 @@ bool GetMonthAndDayFromDaysSinceJan1(int year, int days_since_jan1, int* month,
   *day = days_since_jan1 - month_ranges[*month - 1] + 1;
   return (*day >= 1 && *day <= 31);
 }
+
+string FormatTextToken(const DateTimeFormatToken& tok) {
+  DCHECK(tok.type == TEXT);
+  string result;
+  result.reserve(tok.len);
+  for (const char* text_it = tok.val; text_it < tok.val + tok.len; ++text_it) {
+    if (*text_it != '\\') {
+      result.append(text_it, 1);
+      continue;
+    }
+    if (tok.is_double_escaped && strncmp(text_it, "\\\\\\\"", 4) == 0) {
+      result.append("\"");
+      text_it += 3;
+    } else if (!tok.is_double_escaped && strncmp(text_it, "\\\"", 2) == 0) {
+      result.append("\"");
+      ++text_it;
+    } else if (strncmp(text_it, "\\\\", 2) == 0) {
+      result.append("\\");
+      ++text_it;
+    } else if (strncmp(text_it, "\\b", 2) == 0) {
+      result.append("\b");
+      ++text_it;
+    } else if (strncmp(text_it, "\\n", 2) == 0) {
+      result.append("\n");
+      ++text_it;
+    } else if (strncmp(text_it, "\\r", 2) == 0) {
+      result.append("\r");
+      ++text_it;
+    } else if (strncmp(text_it, "\\t", 2) == 0) {
+      result.append("\t");
+      ++text_it;
+    }
+  }
+  return result;
+}
+
 
 }
 }

@@ -69,7 +69,10 @@ enum FormatTokenizationResult {
   TIMEZONE_OFFSET_NOT_ALLOWED_ERROR,
   MISSING_TZH_TOKEN_ERROR,
   DATE_WITH_TIME_ERROR,
-  CONFLICTING_FRACTIONAL_SECOND_TOKENS_ERROR
+  CONFLICTING_FRACTIONAL_SECOND_TOKENS_ERROR,
+  TEXT_TOKEN_NOT_CLOSED,
+  NO_DATETIME_TOKENS_ERROR,
+  MISPLACED_FX_MODIFIER_ERROR
 };
 
 /// Holds all the token types that serve as building blocks for datetime format patterns.
@@ -93,7 +96,10 @@ enum DateTimeFormatTokenType {
   TIMEZONE_MIN,
   MERIDIEM_INDICATOR,
   ISO8601_TIME_INDICATOR,
-  ISO8601_ZULU_INDICATOR
+  ISO8601_ZULU_INDICATOR,
+  TEXT,
+  FM_MODIFIER,
+  FX_MODIFIER
 };
 
 /// Indicates whether the cast is a 'datetime to string' or a 'string to datetime' cast.
@@ -121,12 +127,17 @@ struct DateTimeFormatToken {
   int len;
   /// A pointer to the beginning of this token in the format string.
   const char* val;
+  /// True if FM modifier is active for this token. This overrides the FX modifier active
+  /// for the whole format.
+  bool fm_modifier;
+
+  /// True if this is a text token that is surrounded by escaped double quotes making the
+  /// content of the token double-escaped.
+  bool is_double_escaped;
 
   DateTimeFormatToken(DateTimeFormatTokenType type, int pos, int len, const char* val)
-    : type(type),
-      pos(pos),
-      len(len),
-      val(val) {
+    : type(type), pos(pos), len(len), val(val), fm_modifier(false),
+      is_double_escaped(false) {
   }
 };
 
@@ -151,6 +162,10 @@ struct DateTimeFormatContext {
   std::vector<DateTimeFormatToken> toks;
   bool has_date_toks;
   bool has_time_toks;
+
+  /// True if the format contains an FX modifier effective for all the tokens.
+  bool fx_modifier;
+
   /// Used for casting with SimpleDateFormat to handle rounded year. Make sure you call
   /// SetCenturyBreakAndCurrentTime() before using this member.
   boost::posix_time::ptime century_break_ptime;
@@ -226,5 +241,10 @@ int GetDayInYear(int year, int month, int day_in_month);
 /// 365. Returns true on success.
 bool GetMonthAndDayFromDaysSinceJan1(int year, int days_since_jan1, int* month, int* day)
     WARN_UNUSED_RESULT;
+
+// Receives a text token and gives its string formatted representation. This is used in
+// a string to datetime conversion path.
+std::string FormatTextToken(const DateTimeFormatToken& tok);
+
 }
 }

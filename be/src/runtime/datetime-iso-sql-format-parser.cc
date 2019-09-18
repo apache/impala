@@ -17,7 +17,6 @@
 
 #include "runtime/datetime-iso-sql-format-parser.h"
 
-#include <boost/algorithm/string.hpp>
 #include <cmath>
 
 #include "common/names.h"
@@ -40,19 +39,46 @@ bool IsoSqlFormatParser::ParseDateTime(const char* input_str, int input_len,
   const char* current_pos = input_str;
   const char* end_pos = input_str + input_len;
   for (int i = 0; i < dt_ctx.toks.size(); ++i) {
-    if (current_pos >= end_pos) return false;
     const DateTimeFormatToken* tok = &dt_ctx.toks[i];
+    if (current_pos >= end_pos) {
+      // Accept empty text tokens at the end of the format.
+      if (tok->type == TEXT && tok->len == 0) continue;
+      return false;
+    }
+
     if (tok->type == SEPARATOR) {
-      bool res = ProcessSeparators(&current_pos, end_pos, dt_ctx, &i);
-      if (!res || current_pos == end_pos) return res;
-      DCHECK(i < dt_ctx.toks.size());
-      // Next token, following the separator sequence.
-      tok = &dt_ctx.toks[i];
+      if (dt_ctx.fx_modifier) {
+        DCHECK(tok->len == 1);
+        if (*current_pos != *tok->val) return false;
+        ++current_pos;
+        continue;
+      } else {
+        bool res = ProcessSeparatorSequence(&current_pos, end_pos, dt_ctx, &i);
+        if (!res || current_pos >= end_pos) return res;
+        DCHECK(i < dt_ctx.toks.size());
+        // Next token, following the separator sequence.
+        tok = &dt_ctx.toks[i];
+      }
+    }
+
+    if (tok->type == TEXT) {
+      const char* format_it = tok->val;
+      const char* format_end = tok->val + tok->len;
+      while (format_it < format_end && current_pos < end_pos) {
+        char format_char_to_compare = GetNextCharFromTextToken(&format_it, tok);
+        if (format_char_to_compare != *current_pos) return false;
+        ++format_it;
+        ++current_pos;
+      }
+      if (format_it < format_end) return false;
+      continue;
     }
 
     const char* token_end_pos = FindEndOfToken(current_pos, end_pos - current_pos, *tok);
     if (token_end_pos == nullptr) return false;
     int token_len = token_end_pos - current_pos;
+
+    if (dt_ctx.fx_modifier && !tok->fm_modifier && token_len != tok->len) return false;
 
     switch(tok->type) {
       case YEAR: {
@@ -181,11 +207,36 @@ bool IsoSqlFormatParser::ParseDateTime(const char* input_str, int input_len,
   return true;
 }
 
-bool IsoSqlFormatParser::ProcessSeparators(const char** current_pos, const char* end_pos,
-    const DateTimeFormatContext& dt_ctx, int* current_tok_idx) {
+char IsoSqlFormatParser::GetNextCharFromTextToken(const char** format,
+    const DateTimeFormatToken* tok) {
+  DCHECK(format != nullptr && *format != nullptr);
+  DCHECK(tok != nullptr);
+  DCHECK(tok->val <= *format && *format < tok->val + tok->len);
+  if (**format != '\\') return **format;
+  const char* format_end = tok->val + tok->len;
+  // Take care of the double escaped quotes.
+  if (tok->is_double_escaped && format_end - *format >= 4 &&
+      (strncmp(*format, "\\\\\\\"", 4) == 0 || strncmp(*format, "\\\\\\'", 4) == 0)) {
+    *format += 3;
+    return **format;
+  }
+  // Skip the escaping backslash.
+  ++(*format);
+  switch (**format) {
+    case 'b': return '\b';
+    case 'n': return '\n';
+    case 'r': return '\r';
+    case 't': return '\t';
+  }
+  return **format;
+}
+
+bool IsoSqlFormatParser::ProcessSeparatorSequence(const char** current_pos,
+    const char* end_pos, const DateTimeFormatContext& dt_ctx, int* current_tok_idx) {
   DCHECK(current_pos != nullptr && *current_pos != nullptr);
   DCHECK(end_pos != nullptr);
   DCHECK(current_tok_idx != nullptr && *current_tok_idx < dt_ctx.toks.size());
+  DCHECK(dt_ctx.toks[*current_tok_idx].type == SEPARATOR);
   if (!IsoSqlFormatTokenizer::IsSeparator(**current_pos)) return false;
   // Advance to the end of the separator sequence.
   ++(*current_pos);
@@ -201,6 +252,14 @@ bool IsoSqlFormatParser::ProcessSeparators(const char** current_pos, const char*
 
   // If we reached the end of input or the end of token sequence, we can return.
   if (*current_pos >= end_pos || *current_tok_idx >= dt_ctx.toks.size()) {
+    // Skip trailing empty text tokens in format.
+    if (*current_pos >= end_pos && *current_tok_idx < dt_ctx.toks.size()) {
+      while (*current_tok_idx < dt_ctx.toks.size() &&
+          dt_ctx.toks[*current_tok_idx].type == TEXT &&
+          dt_ctx.toks[*current_tok_idx].len == 0) {
+        ++(*current_tok_idx);
+      }
+    }
     return (*current_pos >= end_pos && *current_tok_idx >= dt_ctx.toks.size());
   }
 

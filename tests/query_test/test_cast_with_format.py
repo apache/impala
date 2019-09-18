@@ -575,6 +575,345 @@ class TestCastWithFormat(ImpalaTestSuite):
         "FORMAT 'YYYY-MM-DD HH24:MI:SS TZH:TZM')")
     assert result.data == ["NULL"]
 
+  def test_text_token(self):
+    # Parse ISO:8601 tokens using the text token.
+    result = self.client.execute(r'''select cast('1985-11-19T01:02:03Z' as timestamp '''
+        r'''format 'YYYY-MM-DD"T"HH24:MI:SS"Z"')''')
+    assert result.data == ["1985-11-19 01:02:03"]
+
+    # Free text at the end of the input
+    result = self.client.execute(r'''select cast('1985-11-19text' as timestamp '''
+        r'''format 'YYYY-MM-DD"text"')''')
+    assert result.data == ["1985-11-19 00:00:00"]
+
+    # Free text at the beginning of the input
+    result = self.client.execute(r'''select cast('19801985-11-20' as timestamp '''
+        r'''format '"1980"YYYY-MM-DD')''')
+    assert result.data == ["1985-11-20 00:00:00"]
+
+    # Empty text in format
+    result = self.client.execute(r'''select cast('1985-11-21' as timestamp '''
+        r'''format '""YYYY""-""MM""-""DD""')''')
+    assert result.data == ["1985-11-21 00:00:00"]
+
+    result = self.client.execute(r'''select cast('1985-11-22' as timestamp '''
+        r'''format 'YYYY-MM-DD""""""')''')
+    assert result.data == ["1985-11-22 00:00:00"]
+
+    result = self.client.execute(r'''select cast('1985-12-09-' as timestamp '''
+        r'''format 'YYYY-MM-DD-""')''')
+    assert result.data == ["1985-12-09 00:00:00"]
+
+    result = self.client.execute(r'''select cast('1985-12-10-' as date '''
+        r'''format 'FXYYYY-MM-DD-""')''')
+    assert result.data == ["1985-12-10"]
+
+    result = self.client.execute(r'''select cast('1985-11-23' as timestamp '''
+        r'''format 'YYYY-MM-DD""""""HH24')''')
+    assert result.data == ["NULL"]
+
+    # Text in input doesn't match with the text in format
+    result = self.client.execute(r'''select cast('1985-11-24Z01:02:03Z' as timestamp '''
+        r'''format 'YYYY-MM-DD"T"HH24:MI:SS"Z"')''')
+    assert result.data == ["NULL"]
+
+    result = self.client.execute(r'''select cast('1985-11-24T01:02:04T' as timestamp '''
+        r'''format 'YYYY-MM-DD"T"HH24:MI:SS"Z"')''')
+    assert result.data == ["NULL"]
+
+    result = self.client.execute(r'''select cast('1985-11-2401:02:05Z' as timestamp '''
+        r'''format 'YYYY-MM-DD"T"HH24:MI:SS"Z"')''')
+    assert result.data == ["NULL"]
+
+    result = self.client.execute(r'''select cast('1985-11-24T01:02:06' as timestamp '''
+        r'''format 'YYYY-MM-DD"T"HH24:MI:SS"Z"')''')
+    assert result.data == ["NULL"]
+
+    result = self.client.execute(r'''select cast('1985-11-24 01:02:07te' as timestamp '''
+        r'''format 'YYYY-MM-DD HH24:MI:SS"text"')''')
+    assert result.data == ["NULL"]
+
+    result = self.client.execute(r'''select cast('1985-11-24 01:02:08text' as '''
+        r'''timestamp format 'YYYY-MM-DD HH24:MI:SS"te"')''')
+    assert result.data == ["NULL"]
+
+    # Consecutive text tokens
+    result = self.client.execute(r'''select cast('1985-11text1text2-25' as timestamp '''
+        r'''format 'YYYY-MM"text1""text2"-DD')''')
+    assert result.data == ["1985-11-25 00:00:00"]
+
+    # Separators in text token
+    result = self.client.execute(r'''select cast("1985-11 -'./,:-25" as date '''
+        r'''format "YYYY-MM\" -'./,:\"-DD")''')
+    assert result.data == ["1985-11-25"]
+
+    # Known limitation: If a text token containing separator characters at the beginning
+    # is right after a separator token sequence then parsing can't find where to stop when
+    # parsing the consecutive separators. Use FX modifier in this case for strict
+    # matching.
+    result = self.client.execute(r'''select cast("1986-11'25" as date '''
+        r'''format "YYYY-MM\"'\"DD")''')
+    assert result.data == ["1986-11-25"]
+
+    result = self.client.execute(r'''select cast("1986-11-'25" as timestamp '''
+        r'''format "YYYY-MM-\"'\"DD")''')
+    assert result.data == ["NULL"]
+
+    result = self.client.execute(r'''select cast("1986-10-'25" as timestamp '''
+        r'''format "FXYYYY-MM-\"'\"DD")''')
+    assert result.data == ["1986-10-25 00:00:00"]
+
+    # Escaped quotation mark is in the text token.
+    result = self.client.execute(r'''select cast('1985-11a"b26' as timestamp '''
+        r'''format 'YYYY-MM"a\"b"DD')''')
+    assert result.data == ["1985-11-26 00:00:00"]
+
+    # Format part is surrounded by double quotes so the quotes indicating the start and
+    # end of the text token has to be escaped.
+    result = self.client.execute('select cast("year: 1985, month: 11, day: 27" as date'
+        r''' format "\"year: \"YYYY\", month: \"MM\", day: \"DD")''')
+    assert result.data == ["1985-11-27"]
+
+    # Scenario when there is an escaped double quote inside a text token that is itself
+    # surrounded by escaped double quotes.
+    result = self.client.execute(r'''select cast("1985 some \"text 11-28" as date'''
+        r''' format "YYYY\" some \\\"text \"MM-DD")''')
+    assert result.data == ["1985-11-28"]
+
+    # When format is surrounded by single quotes and there is a single quote inside the
+    # text token that has to be escaped.
+    result = self.client.execute(r'''select cast("1985 some 'text 11-29" as date'''
+        r''' format 'YYYY" some \'text "MM-DD')''')
+    assert result.data == ["1985-11-29"]
+    result = self.client.execute(r'''select cast("1985 some 'text 11-29" as timestamp'''
+        r''' format 'YYYY" some \'text "MM-DD')''')
+    assert result.data == ["1985-11-29 00:00:00"]
+
+    # Datetime to string path: Simple text token.
+    result = self.client.execute(r'''select cast(cast("1985-11-30" as date) as string '''
+        r'''format "YYYY-\"text\"MM-DD")''')
+    assert result.data == ["1985-text11-30"]
+
+    # Datetime to string path: Consecutive text tokens.
+    result = self.client.execute(r'''select cast(cast("1985-12-01" as date) as string '''
+        r'''format "YYYY-\"text1\"\"text2\"MM-DD")''')
+    assert result.data == ["1985-text1text212-01"]
+    result = self.client.execute(r'''select cast(cast("1985-12-01" as timestamp) as '''
+        r'''string format "YYYY-\"text1\"\"text2\"MM-DD")''')
+    assert result.data == ["1985-text1text212-01"]
+
+    # Datetime to string path: Text token containing separators.
+    result = self.client.execute(r'''select cast(cast("1985-12-02" as date) as '''
+        r'''string format "YYYY-\" -'./,:\"MM-DD")''')
+    assert result.data == ["1985- -'./,:12-02"]
+    result = self.client.execute(r'''select cast(cast("1985-12-02" as timestamp) as '''
+        r'''string format "YYYY-\" -'./,:\"MM-DD")''')
+    assert result.data == ["1985- -'./,:12-02"]
+
+    # Datetime to string path: Text token containing a double quote.
+    result = self.client.execute(r'''select cast(cast('1985-12-03' as date) as string '''
+        r'''format 'YYYY-"some \"text"MM-DD')''')
+    assert result.data == ['1985-some "text12-03']
+    result = self.client.execute(r'''select cast(cast('1985-12-03' as timestamp) as '''
+        r'''string format 'YYYY-"some \"text"MM-DD')''')
+    assert result.data == ['1985-some "text12-03']
+
+    # Datetime to string path: Text token containing a double quote where the text token
+    # itself is covered by escaped double quotes.
+    result = self.client.execute(r'''select cast(cast("1985-12-04" as date) as string '''
+        r'''format "YYYY-\"some \\\"text\"MM-DD")''')
+    assert result.data == ['1985-some "text12-04']
+    result = self.client.execute(r'''select cast(cast("1985-12-04" as timestamp) as '''
+        r'''string format "YYYY-\"some \\\"text\"MM-DD")''')
+    assert result.data == ['1985-some "text12-04']
+
+    # Backslash in format that escapes non-special chars.
+    result = self.client.execute(r'''select cast("1985- some \ text12-05" as date '''
+        r'''format 'YYYY-"some \ text"MM-DD')''')
+    assert result.data == ['1985-12-05']
+    result = self.client.execute(r'''select cast(cast("1985-12-06" as date) as string '''
+        r'''format 'YYYY-"some \ text"MM-DD')''')
+    assert result.data == ['1985-some  text12-06']
+
+    result = self.client.execute(r'''select cast("1985-some text12-07" as date '''
+        r'''format 'YYYY-"\some text"MM-DD')''')
+    assert result.data == ['1985-12-07']
+    result = self.client.execute(r'''select cast(cast("1985-12-08" as date) as string '''
+        r'''format 'YYYY-"\some text"MM-DD')''')
+    assert result.data == ['1985-some text12-08']
+
+    # Backslash in format that escapes special chars.
+    result = self.client.execute(r'''select cast("1985-\b\n\r\t12-09" as '''
+        r'''date format 'YYYY-"\b\n\r\t"MM-DD')''')
+    assert result.data == ['1985-12-09']
+    result = self.client.execute(r'''select cast(cast("1985-12-10" as date) as string '''
+        r'''format 'YYYY"\ttext\n"MM-DD')''')
+    assert result.data == [r'''1985	text
+12-10''']
+    result = self.client.execute(r'''select cast(cast("1985-12-11" as date) as string '''
+        r'''format "YYYY\"\ttext\n\"MM-DD")''')
+    assert result.data == [r'''1985	text
+12-11''']
+    result = self.client.execute(r'''select cast(cast("1985-12-12" as timestamp) as '''
+        r'''string format 'YYYY"\ttext\n"MM-DD')''')
+    assert result.data == [r'''1985	text
+12-12''']
+    result = self.client.execute(r'''select cast(cast("1985-12-13" as timestamp) as '''
+        r'''string format "YYYY\"\ttext\n\"MM-DD")''')
+    assert result.data == [r'''1985	text
+12-13''']
+
+    # Escaped backslash in text token.
+    result = self.client.execute(r'''select cast(cast("1985-12-14" as date) as string '''
+        r'''format 'YYYY"some\\text"MM-DD')''')
+    assert result.data == [r'''1985some\text12-14''']
+    result = self.client.execute(r'''select cast(cast("1985-12-15" as timestamp) as '''
+        r'''string format 'YYYY"\\"MM"\\"DD')''')
+    assert result.data == [r'''1985\12\15''']
+    result = self.client.execute(r'''select cast("1985\\12\\14 01:12:10" as timestamp '''
+        r'''format 'YYYY"\\"MM"\\"DD HH12:MI:SS')''')
+    assert result.data == [r'''1985-12-14 01:12:10''']
+    # Known limitation: When the format token is surrounded by escaped quotes then an
+    # escaped backslash at the end of the token together with the closing double quote is
+    # taken as a double escaped quote.
+    err = self.execute_query_expect_failure(self.client,
+        r'''select cast(cast("1985-12-16" as timestamp) as string format '''
+        r'''"YYYY\"\\\"MM\"\\\"DD")''')
+    assert "Bad date/time conversion format" in str(err)
+
+  def test_fm_fx_modifiers(self):
+    # Exact mathcing for the whole format.
+    result = self.client.execute("select cast('2001-03-01 03:10:15.123456 -01:30' as "
+        "timestamp format 'FXYYYY-MM-DD HH12:MI:SS.FF6 TZH:TZM')")
+    assert result.data == ["2001-03-01 03:10:15.123456000"]
+
+    # Strict separator matching.
+    result = self.client.execute("select cast('2001-03-02 03:10:15' as timestamp format"
+        "'FXYYYY MM-DD HH12:MI:SS')")
+    assert result.data == ["NULL"]
+
+    result = self.client.execute("select cast('2001-03-03 03:10:15' as timestamp format"
+        "'FXYYYY-MM-DD HH12::MI:SS')")
+    assert result.data == ["NULL"]
+
+    result = self.client.execute("select cast('2001-03-04    ' as timestamp format"
+        "'FXYYYY-MM-DD ')")
+    assert result.data == ["NULL"]
+
+    # Strict token length matching.
+    result = self.client.execute("select cast('2001-3-05' as timestamp format "
+        "'FXYYYY-MM-DD')")
+    assert result.data == ["NULL"]
+
+    result = self.client.execute("select cast('15-03-06' as timestamp format "
+        "'FXYYYY-MM-DD')")
+    assert result.data == ["NULL"]
+
+    result = self.client.execute("select cast('15-03-07' as date format 'FXYY-MM-DD')")
+    assert result.data == ["2015-03-07"]
+
+    result = self.client.execute("select cast('2001-03-08 03:15:00 AM' as timestamp "
+        "format 'FXYYYY-MM-DD HH12:MI:SS PM')")
+    assert result.data == ["2001-03-08 03:15:00"]
+
+    result = self.client.execute("select cast('2001-03-08 03:15:00 AM' as timestamp "
+        "format 'FXYYYY-MM-DD HH12:MI:SS P.M.')")
+    assert result.data == ["NULL"]
+
+    result = self.client.execute("select cast('2001-03-09 03:15:00.1234' as timestamp "
+        "format 'FXYYYY-MM-DD HH12:MI:SS.FF4')")
+    assert result.data == ["2001-03-09 03:15:00.123400000"]
+
+    result = self.client.execute("select cast('2001-03-09 03:15:00.12345' as timestamp "
+        "format 'FXYYYY-MM-DD HH12:MI:SS.FF4')")
+    assert result.data == ["NULL"]
+
+    result = self.client.execute("select cast('2001-03-09 03:15:00.12345' as timestamp "
+        "format 'FXYYYY-MM-DD HH12:MI:SS.FF')")
+    assert result.data == ["NULL"]
+
+    # Strict token length matching with text token containing escaped double quote.
+    result = self.client.execute(r'''select cast('2001-03-09 some "text03:25:00' '''
+        r'''as timestamp format "FXYYYY-MM-DD \"some \\\"text\"HH12:MI:SS")''')
+    assert result.data == ["2001-03-09 03:25:00"]
+
+    # Use FM to ignore FX modifier for some of the tokens.
+    result = self.client.execute("select cast('2001-03-10 03:15:00.12345' as timestamp "
+        "format 'FXYYYY-MM-DD HH12:MI:SS.FMFF')")
+    assert result.data == ["2001-03-10 03:15:00.123450000"]
+
+    result = self.client.execute("select cast('019-03-10 04:15:00' as timestamp "
+        "format 'FXFMYYYY-MM-DD HH12:MI:SS')")
+    assert result.data == ["2019-03-10 04:15:00"]
+
+    # Multiple FM modifiers in a format.
+    result = self.client.execute("select cast('2001-3-11 3:15:00.12345' as timestamp "
+        "format 'FXYYYY-FMMM-DD FMHH12:MI:SS.FMFF')")
+    assert result.data == ["2001-03-11 03:15:00.123450000"]
+
+    result = self.client.execute("select cast('2001-3-11 3:15:30' as timestamp "
+        "format 'FXYYYY-FMMM-DD FMFMHH12:MI:SS')")
+    assert result.data == ["2001-03-11 03:15:30"]
+
+    # FM modifier effects only the next token.
+    result = self.client.execute("select cast('2001-3-12 3:1:00.12345' as timestamp "
+        "format 'FXYYYY-FMMM-DD FMHH12:MI:SS.FMFF')")
+    assert result.data == ["NULL"]
+
+    # FM modifier before text token is valid for the text token and not for the token
+    # right after the text token.
+    result = self.client.execute(r'''select cast('1999-10text1' as timestamp format '''
+        ''' 'FXYYYY-MMFM"text"DD')''')
+    assert result.data == ["NULL"]
+
+    # FM modifier skips the separators and effects the next non-separator token.
+    result = self.client.execute(r'''select cast('1999-10-2' as timestamp format '''
+        ''' 'FXYYYY-MMFM-DD')''')
+    assert result.data == ["1999-10-02 00:00:00"]
+
+    # FM modifier at the end has no effect.
+    result = self.client.execute("select cast('2001-03-13 03:01:00' as timestamp "
+        "format 'FXYYYY-MM-DD HH12:MI:SSFM')")
+    assert result.data == ["2001-03-13 03:01:00"]
+
+    result = self.client.execute("select cast('2001-03-13 03:01:0' as timestamp "
+        "format 'FXYYYY-MM-DD HH12:MI:SSFM')")
+    assert result.data == ["NULL"]
+
+    # In a datetime to string path FX is the default so it works with FX as it would
+    # without.
+    result = self.client.execute("select cast(cast('2001-03-05 03:10:15.123456' as "
+        "timestamp) as string format 'FXYYYY-MM-DD HH24:MI:SS.FF7')")
+    assert result.data == ["2001-03-05 03:10:15.1234560"]
+
+    # Datetime to string path: Tokens with FM modifier don't pad output to a given
+    # length.
+    result = self.client.execute("select cast(cast('2001-03-14 03:06:08' as timestamp) "
+        "as string format 'YYYY-MM-DD FMHH24:FMMI:FMSS')")
+    assert result.data == ["2001-03-14 3:6:8"]
+
+    result = self.client.execute("select cast(cast('0001-03-09' as date) "
+        "as string format 'FMYYYY-FMMM-FMDD')")
+    assert result.data == ["1-3-9"]
+
+    result = self.client.execute("select cast(date'0001-03-10' as string format "
+        "'FMYY-FMMM-FMDD')")
+    assert result.data == ["1-3-10"]
+
+    # Datetime to string path: FM modifier is effective even if FX modifier is also
+    # given.
+    result = self.client.execute("select cast(cast('2001-03-15 03:06:08' as "
+        "timestamp) as string format 'FXYYYY-MM-DD FMHH24:FMMI:FMSS')")
+    assert result.data == ["2001-03-15 3:6:8"]
+
+    result = self.client.execute("select cast(cast('0001-04-09' as date) "
+        "as string format 'FXYYYY-FMMM-FMDD')")
+    assert result.data == ["0001-4-9"]
+
+    result = self.client.execute("select cast(cast('0001-04-10' as date) "
+        "as string format 'FXFMYYYY-FMMM-FMDD')")
+    assert result.data == ["1-4-10"]
+
   def test_format_parse_errors(self):
     # Invalid format
     err = self.execute_query_expect_failure(self.client,
@@ -731,3 +1070,64 @@ class TestCastWithFormat(ImpalaTestSuite):
     err = self.execute_query_expect_failure(self.client,
         "select cast('2017-05-01' as timestamp format 'YYYY-MM-DD-RR--')")
     assert "Both year and round year are provided" in str(err)
+
+    # Unclosed quotation in text pattern
+    err = self.execute_query_expect_failure(self.client,
+        r'''select cast('1985-11-20text' as timestamp format 'YYYY-MM-DD"text')''')
+    assert "Missing closing quotation mark." in str(err)
+
+    err = self.execute_query_expect_failure(self.client,
+        r'''select cast('1985-11-21text' as timestamp format 'YYYY-MM-DD\"text"')''')
+    assert "Missing closing quotation mark." in str(err)
+
+    err = self.execute_query_expect_failure(self.client,
+        r'''select cast(date"1985-12-08" as string format 'YYYY-MM-DD \"X"');''')
+    assert "Missing closing quotation mark." in str(err)
+
+    err = self.execute_query_expect_failure(self.client,
+        r'''select cast(date"1985-12-09" as string format 'YYYY-MM-DD "X');''')
+    assert "Missing closing quotation mark." in str(err)
+
+    # Format containing text token only.
+    err = self.execute_query_expect_failure(self.client,
+        r'''select cast("1985-11-29" as date format '" some text "')''')
+    assert "No datetime tokens provided." in str(err)
+
+    err = self.execute_query_expect_failure(self.client,
+        r'''select cast(cast("1985-12-02" as date) as string format "\"free text\"")''')
+    assert "No datetime tokens provided." in str(err)
+
+    # FX modifier not at the begining of the format.
+    err = self.execute_query_expect_failure(self.client,
+        'select cast("2001-03-01 00:10:02" as timestamp format '
+        '"YYYY-MM-DD FXHH12:MI:SS")')
+    assert "FX modifier should be at the beginning of the format string." in str(err)
+
+    err = self.execute_query_expect_failure(self.client,
+        'select cast("2001-03-01 00:10:02" as timestamp format '
+        '"YYYY-MM-DD HH12:MI:SS FX")')
+    assert "FX modifier should be at the beginning of the format string." in str(err)
+
+    err = self.execute_query_expect_failure(self.client,
+        'select cast(date"2001-03-01" as string format "YYYYFX-MM-DD")')
+    assert "FX modifier should be at the beginning of the format string." in str(err)
+
+    err = self.execute_query_expect_failure(self.client,
+        'select cast(date"2001-03-02" as string format "FXFMFXYYYY-MM-DD")')
+    assert "FX modifier should be at the beginning of the format string." in str(err)
+
+    err = self.execute_query_expect_failure(self.client,
+        'select cast(date"2001-03-03" as string format "FXFXYYYY-MM-DD")')
+    assert "FX modifier should be at the beginning of the format string." in str(err)
+
+    err = self.execute_query_expect_failure(self.client,
+        'select cast(date"2001-03-04" as string format "FMFXYYYY-MM-DD")')
+    assert "FX modifier should be at the beginning of the format string." in str(err)
+
+    err = self.execute_query_expect_failure(self.client,
+        'select cast(date"2001-03-03" as string format "-FXYYYY-MM-DD")')
+    assert "FX modifier should be at the beginning of the format string." in str(err)
+
+    err = self.execute_query_expect_failure(self.client,
+        r'''select cast(date"2001-03-03" as string format '"text"FXYYYY-MM-DD')''')
+    assert "FX modifier should be at the beginning of the format string." in str(err)

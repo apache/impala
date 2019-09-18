@@ -60,7 +60,9 @@ const unordered_map<string, IsoSqlFormatTokenizer::TokenItem>
   {"TZH", IsoSqlFormatTokenizer::TokenItem(TIMEZONE_HOUR, false, true)},
   {"TZM", IsoSqlFormatTokenizer::TokenItem(TIMEZONE_MIN, false, true)},
   {"T", IsoSqlFormatTokenizer::TokenItem(ISO8601_TIME_INDICATOR, false, true)},
-  {"Z", IsoSqlFormatTokenizer::TokenItem(ISO8601_ZULU_INDICATOR, false, true)}
+  {"Z", IsoSqlFormatTokenizer::TokenItem(ISO8601_ZULU_INDICATOR, false, true)},
+  {"FM", IsoSqlFormatTokenizer::TokenItem(FM_MODIFIER, false, false)},
+  {"FX", IsoSqlFormatTokenizer::TokenItem(FX_MODIFIER, false, false)}
 });
 
 const unordered_map<string, int> IsoSqlFormatTokenizer::SPECIAL_LENGTHS({
@@ -73,14 +75,15 @@ const unsigned IsoSqlFormatTokenizer::MAX_TOKEN_SIZE = 5;
 const int IsoSqlFormatTokenizer::MAX_FORMAT_LENGTH = 100;
 
 FormatTokenizationResult IsoSqlFormatTokenizer::Tokenize() {
-  DCHECK(dt_ctx_ != NULL);
-  DCHECK(dt_ctx_->fmt != NULL);
+  DCHECK(dt_ctx_ != nullptr);
+  DCHECK(dt_ctx_->fmt != nullptr);
   DCHECK(dt_ctx_->fmt_len > 0);
   DCHECK(dt_ctx_->toks.size() == 0);
   DCHECK(used_tokens_.empty());
   if (dt_ctx_->fmt_len > MAX_FORMAT_LENGTH) return TOO_LONG_FORMAT_ERROR;
   const char* str_end = dt_ctx_->fmt + dt_ctx_->fmt_len;
   const char* current_pos = dt_ctx_->fmt;
+  ProcessFXModifier(&current_pos);
   while (current_pos < str_end) {
     ProcessSeparators(&current_pos);
     if (current_pos == str_end) break;
@@ -104,10 +107,14 @@ void IsoSqlFormatTokenizer::ProcessSeparators(const char** current_pos) {
 
 FormatTokenizationResult IsoSqlFormatTokenizer::ProcessNextToken(
     const char** current_pos) {
-  DCHECK(*current_pos != nullptr);
+  DCHECK(current_pos != nullptr && *current_pos != nullptr);
   const char* str_begin = dt_ctx_->fmt;
   const char* str_end = dt_ctx_->fmt + dt_ctx_->fmt_len;
-  DCHECK(*current_pos < str_end);
+  DCHECK(str_begin <= *current_pos && *current_pos < str_end);
+  if (IsStartOfTextToken(*current_pos)) {
+    fm_modifier_active_ = false;
+    return ProcessTextToken(current_pos, str_begin, str_end);
+  }
   unsigned curr_token_size =
       min(MAX_TOKEN_SIZE, static_cast<unsigned>(str_end - *current_pos));
   string token_to_probe(*current_pos, curr_token_size);
@@ -116,10 +123,21 @@ FormatTokenizationResult IsoSqlFormatTokenizer::ProcessNextToken(
     token_to_probe.resize(curr_token_size);
     const auto token = VALID_TOKENS.find(token_to_probe);
     if (token != VALID_TOKENS.end()) {
+      if (token->second.type == FX_MODIFIER) return MISPLACED_FX_MODIFIER_ERROR;
+      if (token->second.type == FM_MODIFIER) {
+        fm_modifier_active_ = true;
+        *current_pos += curr_token_size;
+        return SUCCESS;
+      }
       if (cast_mode_ == PARSE && IsUsedToken(token_to_probe)) return DUPLICATE_FORMAT;
       if (!accept_time_toks_ && token->second.time_token) return DATE_WITH_TIME_ERROR;
-      dt_ctx_->toks.push_back(DateTimeFormatToken(token->second.type,
+      DateTimeFormatToken format_token(DateTimeFormatToken(token->second.type,
           *current_pos - str_begin, GetMaxTokenLength(token->first), *current_pos));
+      if (fm_modifier_active_) {
+        fm_modifier_active_ = false;
+        format_token.fm_modifier = true;
+      }
+      dt_ctx_->toks.push_back(format_token);
       dt_ctx_->has_date_toks |= token->second.date_token;
       dt_ctx_->has_time_toks |= token->second.time_token;
       used_tokens_.insert(token_to_probe);
@@ -147,6 +165,9 @@ bool IsoSqlFormatTokenizer::IsMeridiemIndicatorProvided() const {
 }
 
 FormatTokenizationResult IsoSqlFormatTokenizer::CheckIncompatibilities() const {
+  DCHECK(dt_ctx_ != nullptr);
+  if (!dt_ctx_->has_date_toks && !dt_ctx_->has_time_toks) return NO_DATETIME_TOKENS_ERROR;
+
   if (cast_mode_ == FORMAT) {
     if (IsUsedToken("TZH") || IsUsedToken("TZM")) {
       return TIMEZONE_OFFSET_NOT_ALLOWED_ERROR;
@@ -209,6 +230,74 @@ FormatTokenizationResult IsoSqlFormatTokenizer::CheckIncompatibilities() const {
 bool IsoSqlFormatTokenizer::IsSeparator(char c) {
   return c == '-' || c == ':' || c== ' ' || c == '.' || c == '/' || c== ',' ||
       c == '\'' || c == ';' ;
+}
+
+void IsoSqlFormatTokenizer::ProcessFXModifier(const char** current_pos) {
+  DCHECK(current_pos != nullptr && *current_pos != nullptr);
+  DCHECK(*current_pos == dt_ctx_->fmt);
+  if (strncmp(*current_pos, "FX", 2) == 0) {
+    dt_ctx_->fx_modifier = true;
+    *current_pos += 2;
+  }
+}
+
+bool IsoSqlFormatTokenizer::IsStartOfTextToken(const char* current_pos) {
+  DCHECK(current_pos != nullptr);
+  if (*current_pos == '"' || strncmp(current_pos, "\\\"", 2) == 0) return true;
+  return false;
+}
+
+FormatTokenizationResult IsoSqlFormatTokenizer::ProcessTextToken(
+    const char** current_pos, const char* str_begin, const char* str_end) {
+  DCHECK(dt_ctx_ != nullptr);
+  DCHECK(current_pos != nullptr);
+  DCHECK(*current_pos != nullptr);
+  DCHECK(str_begin != nullptr);
+  DCHECK(str_end != nullptr);
+  DCHECK(str_begin <= *current_pos && *current_pos < str_end);
+  bool is_escaped = (**current_pos == '\\');
+  // Exclude opening quotation marks from the stored token.
+  *current_pos += is_escaped ? 2 : 1;
+  const char* start_of_content = *current_pos;
+  *current_pos = FindEndOfTextToken(*current_pos, str_end, is_escaped);
+  if (*current_pos == nullptr) return TEXT_TOKEN_NOT_CLOSED;
+  DateTimeFormatToken token(TEXT, start_of_content - str_begin,
+      *current_pos - start_of_content - 1 - is_escaped, start_of_content);
+  token.is_double_escaped = is_escaped;
+  dt_ctx_->toks.push_back(token);
+  return SUCCESS;
+}
+
+const char* IsoSqlFormatTokenizer::FindEndOfTextToken(const char* str_start,
+    const char* str_end, bool is_escaped) {
+  DCHECK(str_start != nullptr);
+  const char* current_pos = str_start;
+  while (current_pos < str_end) {
+    // Skip escaped double quotes.
+    if (!is_escaped && strncmp(current_pos, "\\\"", 2) == 0) {
+      current_pos += 2;
+      continue;
+    }
+    if (is_escaped && strncmp(current_pos, "\\\\\\\"", 4) == 0) {
+      current_pos += 4;
+      continue;
+    }
+    // Skip escaped backslash.
+    if (strncmp(current_pos, "\\\\", 2) == 0) {
+      current_pos += 2;
+      continue;
+    }
+    if (!is_escaped && *current_pos == '"') {
+      ++current_pos;
+      return current_pos;
+    }
+    if (is_escaped && strncmp(current_pos, "\\\"", 2) == 0) {
+      current_pos += 2;
+      return current_pos;
+    }
+    ++current_pos;
+  }
+  return nullptr;
 }
 
 }

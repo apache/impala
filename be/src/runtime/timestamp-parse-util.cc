@@ -224,8 +224,6 @@ string TimestampParser::Format(const DateTimeFormatContext& dt_ctx, const date& 
   result.reserve(dt_ctx.fmt_out_len);
   for (const DateTimeFormatToken& tok: dt_ctx.toks) {
     int32_t num_val = -1;
-    const char* str_val = NULL;
-    int str_val_len = 0;
     switch (tok.type) {
       case YEAR:
       case ROUND_YEAR: {
@@ -238,8 +236,7 @@ string TimestampParser::Format(const DateTimeFormatContext& dt_ctx, const date& 
       }
       case MONTH_IN_YEAR: num_val = d.month().as_number(); break;
       case MONTH_IN_YEAR_SLT: {
-        str_val = d.month().as_short_string();
-        str_val_len = 3;
+        result.append(d.month().as_short_string(), 3);
         break;
       }
       case DAY_IN_MONTH: num_val = d.day(); break;
@@ -259,8 +256,8 @@ string TimestampParser::Format(const DateTimeFormatContext& dt_ctx, const date& 
         if (t.hours() >= 12) {
           indicator_txt = (tok.len == 2) ? &PM : &PM_LONG;
         }
-        str_val_len = tok.len;
-        str_val = (isupper(*tok.val)) ? indicator_txt->first : indicator_txt->second;
+        result.append((isupper(*tok.val)) ? indicator_txt->first : indicator_txt->second,
+            tok.len);
         break;
       }
       case MINUTE_IN_HOUR: num_val = t.minutes(); break;
@@ -277,22 +274,24 @@ string TimestampParser::Format(const DateTimeFormatContext& dt_ctx, const date& 
       case SEPARATOR:
       case ISO8601_TIME_INDICATOR:
       case ISO8601_ZULU_INDICATOR: {
-        str_val = tok.val;
-        str_val_len = tok.len;
+        result.append(tok.val, tok.len);
         break;
       }
       case TZ_OFFSET: {
+        break;
+      }
+      case TEXT: {
+        result.append(FormatTextToken(tok));
         break;
       }
       default: DCHECK(false) << "Unknown date/time format token";
     }
     if (num_val > -1) {
       string tmp_str = std::to_string(num_val);
-      if (tmp_str.length() < tok.len) tmp_str.insert(0, tok.len - tmp_str.length(), '0');
+      if (!tok.fm_modifier && tmp_str.length() < tok.len) {
+        tmp_str.insert(0, tok.len - tmp_str.length(), '0');
+      }
       result.append(tmp_str);
-    } else {
-      DCHECK(str_val != nullptr && str_val_len > 0);
-      result.append(str_val, str_val_len);
     }
   }
   return result;

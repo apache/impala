@@ -34,6 +34,7 @@ class IsoSqlFormatParser {
 public:
   /// Given a list of format tokens in 'dt_ctx' runs through 'input_str' and parses it
   /// into 'result'. Return value indicates if the parsing was successful.
+  /// The caller has to make sure that 'dt_ctx.fmt' is a null-terminated string.
   static bool ParseDateTime(const char* input_str, int input_len,
       const DateTimeFormatContext& dt_ctx, DateTimeParseResult* result)
       WARN_UNUSED_RESULT;
@@ -71,8 +72,18 @@ private:
   /// that '**tok' is of type SEPARATOR. Returns false if '**current_pos' is not a
   /// separator or if either the input ends while having remaining items in 'dt_ctx->toks'
   /// or the other way around.
-  static bool ProcessSeparators(const char** current_pos, const char* end_pos,
+  static bool ProcessSeparatorSequence(const char** current_pos, const char* end_pos,
       const DateTimeFormatContext& dt_ctx, int* dt_ctx_it);
+
+  // Gets the next character starting from '*format' that can be used for input
+  // matching. Takes care of the escaping backslashes regardless if the text token inside
+  // the format is itself double escped or not. Returns the next character in a form
+  // expected in the input. If '*format' points at the beginning of an escape sequence,
+  // '*format' is moved to the last character of the escape sequence. Otherwise,
+  // '*format' is not changed. E.g. If the text token is "\"abc" then this returns '"'
+  // after skipping the backslash and moves '*format' to '"'.
+  static char GetNextCharFromTextToken(const char** format,
+      const DateTimeFormatToken* tok);
 };
 
 }

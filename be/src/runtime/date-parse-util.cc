@@ -142,8 +142,6 @@ string DateParser::Format(const DateTimeFormatContext& dt_ctx, const DateValue& 
   result.reserve(dt_ctx.fmt_out_len);
   for (const DateTimeFormatToken& tok: dt_ctx.toks) {
     int32_t num_val = -1;
-    const char* str_val = nullptr;
-    int str_val_len = 0;
     switch (tok.type) {
       case YEAR:
       case ROUND_YEAR: {
@@ -156,8 +154,7 @@ string DateParser::Format(const DateTimeFormatContext& dt_ctx, const DateValue& 
       }
       case MONTH_IN_YEAR: num_val = month; break;
       case MONTH_IN_YEAR_SLT: {
-        str_val = TimestampFunctions::MONTH_ARRAY[month - 1].c_str();
-        str_val_len = 3;
+        result.append(TimestampFunctions::MONTH_ARRAY[month - 1]);
         break;
       }
       case DAY_IN_MONTH: num_val = day; break;
@@ -166,19 +163,21 @@ string DateParser::Format(const DateTimeFormatContext& dt_ctx, const DateValue& 
         break;
       }
       case SEPARATOR: {
-        str_val = tok.val;
-        str_val_len = tok.len;
+        result.append(tok.val, tok.len);
+        break;
+      }
+      case TEXT: {
+        result.append(FormatTextToken(tok));
         break;
       }
       default: DCHECK(false) << "Unknown date format token";
     }
     if (num_val > -1) {
       string tmp_str = std::to_string(num_val);
-      if (tmp_str.length() < tok.len) tmp_str.insert(0, tok.len - tmp_str.length(), '0');
+      if (!tok.fm_modifier && tmp_str.length() < tok.len) {
+        tmp_str.insert(0, tok.len - tmp_str.length(), '0');
+      }
       result.append(tmp_str);
-    } else {
-      DCHECK(str_val != nullptr && str_val_len > 0);
-      result.append(str_val, str_val_len);
     }
   }
   return result;
