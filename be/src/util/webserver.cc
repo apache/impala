@@ -234,21 +234,13 @@ string BuildHeaderString(HttpStatusCode response, ContentType content_type) {
       Webserver::GetMimeType(content_type), FLAGS_webserver_x_frame_options.c_str());
 }
 
-Webserver::Webserver()
-    : context_(nullptr),
-      error_handler_(UrlHandler(bind<void>(&Webserver::ErrorHandler, this, _1, _2),
-          "error.tmpl", false)) {
-  http_address_ = MakeNetworkAddress(
-      FLAGS_webserver_interface.empty() ? "0.0.0.0" : FLAGS_webserver_interface,
-      FLAGS_webserver_port);
-  Init();
-}
+Webserver::Webserver() : Webserver(FLAGS_webserver_interface, FLAGS_webserver_port) {}
 
-Webserver::Webserver(const int port)
+Webserver::Webserver(const string& interface, const int port)
     : context_(nullptr),
       error_handler_(UrlHandler(bind<void>(&Webserver::ErrorHandler, this, _1, _2),
           "error.tmpl", false)) {
-  http_address_ = MakeNetworkAddress("0.0.0.0", port);
+  http_address_ = MakeNetworkAddress(interface.empty() ? "0.0.0.0" : interface, port);
   Init();
 }
 
@@ -289,8 +281,10 @@ bool Webserver::IsSecure() const {
 Status Webserver::Start() {
   LOG(INFO) << "Starting webserver on " << TNetworkAddressToString(http_address_);
 
+  IpAddr ip;
+  RETURN_IF_ERROR(HostnameToIpAddr(http_address_.hostname, &ip));
   stringstream listening_spec;
-  listening_spec << TNetworkAddressToString(http_address_);
+  listening_spec << ip << ":" << http_address_.port;
 
   if (IsSecure()) {
     LOG(INFO) << "Webserver: Enabling HTTPS support";

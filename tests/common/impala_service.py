@@ -42,8 +42,10 @@ LOG.setLevel(level=logging.DEBUG)
 # Base class for all Impala services
 # TODO: Refactor the retry/timeout logic into a common place.
 class BaseImpalaService(object):
-  def __init__(self, hostname, webserver_port, webserver_certificate_file):
+  def __init__(self, hostname, webserver_interface, webserver_port,
+      webserver_certificate_file):
     self.hostname = hostname
+    self.webserver_interface = webserver_interface
     self.webserver_port = webserver_port
     self.webserver_certificate_file = webserver_certificate_file
 
@@ -56,7 +58,7 @@ class BaseImpalaService(object):
         if self.webserver_certificate_file != "":
           protocol = "https"
         url = "%s://%s:%d/%s" % \
-            (protocol, self.hostname, int(self.webserver_port), page_name)
+            (protocol, self.webserver_interface, int(self.webserver_port), page_name)
         return requests.get(url, verify=self.webserver_certificate_file)
       except Exception as e:
         LOG.info("Debug webpage not yet available: %s", str(e))
@@ -156,10 +158,11 @@ class BaseImpalaService(object):
 # Allows for interacting with an Impalad instance to perform operations such as creating
 # new connections or accessing the debug webpage.
 class ImpaladService(BaseImpalaService):
-  def __init__(self, hostname, webserver_port=25000, beeswax_port=21000, be_port=22000,
-               hs2_port=21050, hs2_http_port=28000, webserver_certificate_file=""):
+  def __init__(self, hostname, webserver_interface="127.0.0.1", webserver_port=25000,
+      beeswax_port=21000, be_port=22000, hs2_port=21050, hs2_http_port=28000,
+      webserver_certificate_file=""):
     super(ImpaladService, self).__init__(
-        hostname, webserver_port, webserver_certificate_file)
+        hostname, webserver_interface, webserver_port, webserver_certificate_file)
     self.beeswax_port = beeswax_port
     self.be_port = be_port
     self.hs2_port = hs2_port
@@ -370,9 +373,10 @@ class ImpaladService(BaseImpalaService):
 # Allows for interacting with the StateStore service to perform operations such as
 # accessing the debug webpage.
 class StateStoredService(BaseImpalaService):
-  def __init__(self, hostname, webserver_port, webserver_certificate_file):
+  def __init__(self, hostname, webserver_interface, webserver_port,
+      webserver_certificate_file):
     super(StateStoredService, self).__init__(
-        hostname, webserver_port, webserver_certificate_file)
+        hostname, webserver_interface, webserver_port, webserver_certificate_file)
 
   def wait_for_live_subscribers(self, num_subscribers, timeout=15, interval=1):
     self.wait_for_metric_value('statestore.live-backends', num_subscribers,
@@ -382,9 +386,10 @@ class StateStoredService(BaseImpalaService):
 # Allows for interacting with the Catalog service to perform operations such as
 # accessing the debug webpage.
 class CatalogdService(BaseImpalaService):
-  def __init__(self, hostname, webserver_port, webserver_certificate_file, service_port):
+  def __init__(self, hostname, webserver_interface, webserver_port,
+      webserver_certificate_file, service_port):
     super(CatalogdService, self).__init__(
-        hostname, webserver_port, webserver_certificate_file)
+        hostname, webserver_interface, webserver_port, webserver_certificate_file)
     self.service_port = service_port
 
   def get_catalog_version(self, timeout=10, interval=1):

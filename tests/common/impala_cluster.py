@@ -228,7 +228,7 @@ class ImpalaCluster(object):
       # the construction of the *Process objects.
       cmdline = ''
       try:
-        cmdline = process.cmdline
+        cmdline = process.cmdline()
       except psutil.NoSuchProcess:
         # IMPALA-8320: psutil.Process.cmdline is a property and the process could have
         # disappeared between the time we built the process list and now.
@@ -354,13 +354,13 @@ class Process(object):
 
     # In non-containerised case, search for process based on matching command lines.
     pids = []
-    for pid in psutil.get_pid_list():
+    for pid in psutil.pids():
       try:
         process = psutil.Process(pid)
-        if set(self.cmd) == set(process.cmdline):
+        if set(self.cmd) == set(process.cmdline()):
           pids.append(pid)
       except psutil.NoSuchProcess:
-        # A process from get_pid_list() no longer exists, continue. We don't log this
+        # A process from psutil.pids() no longer exists, continue. We don't log this
         # error since it can refer to arbitrary processes outside of our testing code.
         pass
     return pids
@@ -413,6 +413,7 @@ class BaseImpalaProcess(Process):
   def __init__(self, cmd, container_id=None, port_map=None):
     super(BaseImpalaProcess, self).__init__(cmd, container_id, port_map)
     self.hostname = self._get_hostname()
+    self.webserver_interface = self._get_webserver_interface()
 
   def get_webserver_port(self):
     """Return the port for the webserver of this process."""
@@ -428,6 +429,9 @@ class BaseImpalaProcess(Process):
 
   def _get_hostname(self):
     return self._get_arg_value("hostname", socket.gethostname())
+
+  def _get_webserver_interface(self):
+    return self._get_arg_value("webserver_interface", socket.gethostname())
 
   def _get_arg_value(self, arg_name, default=None):
     """Gets the argument value for given argument name"""
@@ -451,10 +455,10 @@ class BaseImpalaProcess(Process):
 class ImpaladProcess(BaseImpalaProcess):
   def __init__(self, cmd, container_id=None, port_map=None):
     super(ImpaladProcess, self).__init__(cmd, container_id, port_map)
-    self.service = ImpaladService(self.hostname, self.get_webserver_port(),
-                                  self.__get_beeswax_port(), self.__get_be_port(),
-                                  self.__get_hs2_port(), self.__get_hs2_http_port(),
-                                  self._get_webserver_certificate_file())
+    self.service = ImpaladService(self.hostname, self.webserver_interface,
+        self.get_webserver_port(), self.__get_beeswax_port(), self.__get_be_port(),
+        self.__get_hs2_port(), self.__get_hs2_http_port(),
+        self._get_webserver_certificate_file())
 
   def _get_default_webserver_port(self):
     return DEFAULT_IMPALAD_WEBSERVER_PORT
@@ -512,7 +516,7 @@ class ImpaladProcess(BaseImpalaProcess):
 class StateStoreProcess(BaseImpalaProcess):
   def __init__(self, cmd, container_id=None, port_map=None):
     super(StateStoreProcess, self).__init__(cmd, container_id, port_map)
-    self.service = StateStoredService(self.hostname,
+    self.service = StateStoredService(self.hostname, self.webserver_interface,
         self.get_webserver_port(), self._get_webserver_certificate_file())
 
   def _get_default_webserver_port(self):
@@ -523,8 +527,9 @@ class StateStoreProcess(BaseImpalaProcess):
 class CatalogdProcess(BaseImpalaProcess):
   def __init__(self, cmd, container_id=None, port_map=None):
     super(CatalogdProcess, self).__init__(cmd, container_id, port_map)
-    self.service = CatalogdService(self.hostname, self.get_webserver_port(),
-        self._get_webserver_certificate_file(), self.__get_port())
+    self.service = CatalogdService(self.hostname, self.webserver_interface,
+        self.get_webserver_port(), self._get_webserver_certificate_file(),
+        self.__get_port())
 
   def _get_default_webserver_port(self):
     return DEFAULT_CATALOGD_WEBSERVER_PORT
@@ -546,11 +551,11 @@ def find_user_processes(binaries):
   """Returns an iterator over all processes owned by the current user with a matching
   binary name from the provided list. Return a iterable of tuples, with each tuple
   containing the binary name and the psutil.Process object."""
-  for pid in psutil.get_pid_list():
+  for pid in psutil.pids():
     try:
       process = psutil.Process(pid)
-      cmdline = process.cmdline
-      if process.username != getuser() or len(cmdline) == 0:
+      cmdline = process.cmdline()
+      if process.username() != getuser() or len(cmdline) == 0:
         continue
       # IMPALA-8820 - sometimes the process name does not reflect the executed binary
       # because the process can change its own name at runtime. Checking the command

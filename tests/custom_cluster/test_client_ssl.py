@@ -122,7 +122,8 @@ class TestClientSsl(CustomClusterTestSuite):
 
   WEBSERVER_SSL_ARGS = ("--webserver_certificate_file=%(cert_dir)s/server-cert.pem "
                         "--webserver_private_key_file=%(cert_dir)s/server-key.pem "
-                        "--hostname=localhost"  # Must match hostname in certificate
+                        "--hostname=localhost "  # Must match hostname in certificate
+                        "--webserver_interface=localhost "
                         % {'cert_dir': CERT_DIR})
 
   @classmethod
@@ -145,6 +146,7 @@ class TestClientSsl(CustomClusterTestSuite):
                    "--ssl_cipher_list=ECDHE-RSA-AES128-GCM-SHA256 "
                    "--webserver_certificate_file=%(cert_dir)s/server-cert.pem "
                    "--webserver_private_key_file=%(cert_dir)s/server-key.pem "
+                   "--webserver_interface=localhost "
                    % {'cert_dir': CERT_DIR})
 
   @pytest.mark.execute_serially

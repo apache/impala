@@ -80,9 +80,9 @@ class Webserver {
   /// as pretty printed JSON plain text.
   static const char* ENABLE_PLAIN_JSON_KEY;
 
-
-  /// Using this constructor, the webserver will bind to all available interfaces.
-  Webserver(const int port);
+  /// Using this constructor, the webserver will bind to 'interface', or all available
+  /// interfaces if not specified.
+  Webserver(const std::string& interface, const int port);
 
   /// Uses FLAGS_webserver_{port, interface}
   Webserver();

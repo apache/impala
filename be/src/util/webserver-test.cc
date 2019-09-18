@@ -102,7 +102,7 @@ Status HttpGet(const string& host, const int32_t& port, const string& url_path,
 }
 
 TEST(Webserver, SmokeTest) {
-  Webserver webserver(FLAGS_webserver_port);
+  Webserver webserver("", FLAGS_webserver_port);
   ASSERT_OK(webserver.Start());
   AddDefaultUrlCallbacks(&webserver);
 
@@ -117,7 +117,7 @@ void AssertArgsCallback(bool* success, const Webserver::WebRequest& req,
 }
 
 TEST(Webserver, ArgsTest) {
-  Webserver webserver(FLAGS_webserver_port);
+  Webserver webserver("", FLAGS_webserver_port);
 
   const string ARGS_TEST_PATH = "/args-test";
   bool success = false;
@@ -147,7 +147,7 @@ void JsonCallback(bool always_text, const Webserver::WebRequest& req,
 }
 
 TEST(Webserver, JsonTest) {
-  Webserver webserver(FLAGS_webserver_port);
+  Webserver webserver("", FLAGS_webserver_port);
 
   const string JSON_TEST_PATH = "/json-test";
   const string RAW_TEXT_PATH = "/text";
@@ -189,7 +189,7 @@ TEST(Webserver, JsonTest) {
 }
 
 TEST(Webserver, EscapingTest) {
-  Webserver webserver(FLAGS_webserver_port);
+  Webserver webserver("", FLAGS_webserver_port);
 
   const string JSON_TEST_PATH = "/json-test";
   Webserver::UrlCallback callback = bind<void>(JsonCallback, false, _1, _2);
@@ -202,7 +202,7 @@ TEST(Webserver, EscapingTest) {
 }
 
 TEST(Webserver, EscapeErrorUriTest) {
-  Webserver webserver(FLAGS_webserver_port);
+  Webserver webserver("", FLAGS_webserver_port);
   ASSERT_OK(webserver.Start());
   stringstream contents;
   ASSERT_OK(HttpGet("localhost", FLAGS_webserver_port,
@@ -218,7 +218,7 @@ TEST(Webserver, SslTest) {
   auto key = ScopedFlagSetter<string>::Make(&FLAGS_webserver_private_key_file,
       Substitute("$0/be/src/testutil/server-key.pem", getenv("IMPALA_HOME")));
 
-  Webserver webserver(FLAGS_webserver_port);
+  Webserver webserver("", FLAGS_webserver_port);
   ASSERT_OK(webserver.Start());
 }
 
@@ -228,7 +228,7 @@ TEST(Webserver, SslBadCertTest) {
   auto key = ScopedFlagSetter<string>::Make(&FLAGS_webserver_private_key_file,
       Substitute("$0/be/src/testutil/server-key.pem", getenv("IMPALA_HOME")));
 
-  Webserver webserver(FLAGS_webserver_port);
+  Webserver webserver("", FLAGS_webserver_port);
   ASSERT_FALSE(webserver.Start().ok());
 }
 
@@ -240,7 +240,7 @@ TEST(Webserver, SslWithPrivateKeyPasswordTest) {
   auto cmd = ScopedFlagSetter<string>::Make(
       &FLAGS_webserver_private_key_password_cmd, "echo password");
 
-  Webserver webserver(FLAGS_webserver_port);
+  Webserver webserver("", FLAGS_webserver_port);
   ASSERT_OK(webserver.Start());
 }
 
@@ -252,7 +252,7 @@ TEST(Webserver, SslBadPrivateKeyPasswordTest) {
   auto cmd = ScopedFlagSetter<string>::Make(
       &FLAGS_webserver_private_key_password_cmd, "echo wrongpassword");
 
-  Webserver webserver(FLAGS_webserver_port);
+  Webserver webserver("", FLAGS_webserver_port);
   ASSERT_FALSE(webserver.Start().ok());
 }
 
@@ -267,14 +267,14 @@ TEST(Webserver, SslCipherSuite) {
   {
     auto ciphers = ScopedFlagSetter<string>::Make(
         &FLAGS_ssl_cipher_list, "not_a_cipher");
-    Webserver webserver(FLAGS_webserver_port);
+    Webserver webserver("", FLAGS_webserver_port);
     ASSERT_FALSE(webserver.Start().ok());
   }
 
   {
     auto ciphers = ScopedFlagSetter<string>::Make(
         &FLAGS_ssl_cipher_list, "AES128-SHA");
-    Webserver webserver(FLAGS_webserver_port);
+    Webserver webserver("", FLAGS_webserver_port);
     ASSERT_OK(webserver.Start());
   }
 }
@@ -290,7 +290,7 @@ TEST(Webserver, SslBadTlsVersion) {
   auto ssl_version = ScopedFlagSetter<string>::Make(
       &FLAGS_ssl_minimum_version, "not_a_version");
 
-  Webserver webserver(FLAGS_webserver_port);
+  Webserver webserver("", FLAGS_webserver_port);
   ASSERT_FALSE(webserver.Start().ok());
 }
 
@@ -313,14 +313,14 @@ TEST(Webserver, SslGoodTlsVersion) {
     auto ssl_version = ScopedFlagSetter<string>::Make(
         &FLAGS_ssl_minimum_version, v);
 
-    Webserver webserver(FLAGS_webserver_port);
+    Webserver webserver("", FLAGS_webserver_port);
     ASSERT_OK(webserver.Start());
   }
 
   for (auto v : unsupported_versions) {
     auto ssl_version = ScopedFlagSetter<string>::Make(&FLAGS_ssl_minimum_version, v);
 
-    Webserver webserver(FLAGS_webserver_port);
+    Webserver webserver("", FLAGS_webserver_port);
     EXPECT_FALSE(webserver.Start().ok()) << "Version: " << v;
   }
 }
@@ -341,7 +341,7 @@ TEST(Webserver, TestWithSpnego) {
   gflags::FlagSaver saver;
   FLAGS_webserver_require_spnego = true;
 
-  Webserver webserver(FLAGS_webserver_port);
+  Webserver webserver("", FLAGS_webserver_port);
   ASSERT_OK(webserver.Start());
 
   // Don't expect HTTP requests to work without Kerberos credentials.
@@ -358,7 +358,7 @@ TEST(Webserver, StartWithPasswordFileTest) {
   auto password =
       ScopedFlagSetter<string>::Make(&FLAGS_webserver_password_file, password_file.str());
 
-  Webserver webserver(FLAGS_webserver_port);
+  Webserver webserver("", FLAGS_webserver_port);
   ASSERT_OK(webserver.Start());
 
   // Don't expect HTTP requests to work without a password
@@ -372,12 +372,12 @@ TEST(Webserver, StartWithMissingPasswordFileTest) {
   auto password =
       ScopedFlagSetter<string>::Make(&FLAGS_webserver_password_file, password_file.str());
 
-  Webserver webserver(FLAGS_webserver_port);
+  Webserver webserver("", FLAGS_webserver_port);
   ASSERT_FALSE(webserver.Start().ok());
 }
 
 TEST(Webserver, DirectoryListingDisabledTest) {
-  Webserver webserver(FLAGS_webserver_port);
+  Webserver webserver("", FLAGS_webserver_port);
   ASSERT_OK(webserver.Start());
   stringstream contents;
   ASSERT_OK(HttpGet("localhost", FLAGS_webserver_port,
@@ -393,7 +393,7 @@ void FrameCallback(const Webserver::WebRequest& req, Document* document) {
 
 TEST(Webserver, NoFrameEmbeddingTest) {
   const string FRAME_TEST_PATH = "/frames_test";
-  Webserver webserver(FLAGS_webserver_port);
+  Webserver webserver("", FLAGS_webserver_port);
   Webserver::UrlCallback callback = bind<void>(FrameCallback, _1, _2);
   webserver.RegisterUrlCallback(FRAME_TEST_PATH, "raw_text.tmpl", callback, true);
   ASSERT_OK(webserver.Start());
@@ -408,7 +408,7 @@ TEST(Webserver, FrameAllowEmbeddingTest) {
   const string FRAME_TEST_PATH = "/frames_test";
   auto x_frame_opt =
       ScopedFlagSetter<string>::Make(&FLAGS_webserver_x_frame_options, "ALLOWALL");
-  Webserver webserver(FLAGS_webserver_port);
+  Webserver webserver("", FLAGS_webserver_port);
   Webserver::UrlCallback callback = bind<void>(FrameCallback, _1, _2);
   webserver.RegisterUrlCallback(FRAME_TEST_PATH, "raw_text.tmpl", callback, true);
   ASSERT_OK(webserver.Start());
@@ -429,7 +429,7 @@ void NullCharCallback(const Webserver::WebRequest& req, stringstream* out,
 
 TEST(Webserver, NullCharTest) {
   const string NULL_CHAR_TEST_PATH = "/null-char-test";
-  Webserver webserver(FLAGS_webserver_port);
+  Webserver webserver("", FLAGS_webserver_port);
   webserver.RegisterUrlCallback(NULL_CHAR_TEST_PATH, NullCharCallback);
   ASSERT_OK(webserver.Start());
   stringstream contents;

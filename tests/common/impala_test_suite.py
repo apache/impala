@@ -242,9 +242,11 @@ class ImpalaTestSuite(BaseTestSuite):
           "Not yet implemented: only one HS2 host/port can be configured")
 
   @classmethod
-  def create_impala_service(cls, host_port=IMPALAD, webserver_port=25000):
+  def create_impala_service(
+      cls, host_port=IMPALAD, webserver_interface="127.0.0.1", webserver_port=25000):
     host, port = host_port.split(':')
-    return ImpaladService(host, beeswax_port=port, webserver_port=webserver_port)
+    return ImpaladService(host, beeswax_port=port,
+        webserver_interface=webserver_interface, webserver_port=webserver_port)
 
   @classmethod
   def create_hdfs_client(cls):

@@ -16,7 +16,10 @@
 # under the License.
 
 import json
+import random
+import re
 import requests
+import psutil
 import pytest
 
 from tests.common.custom_cluster_test_suite import CustomClusterTestSuite
@@ -65,3 +68,39 @@ class TestWebPage(CustomClusterTestSuite):
     ok_post_content = "c" * 100
     response = requests.post("http://localhost:25000/", ok_post_content)
     assert response.status_code == requests.codes.ok
+
+  @pytest.mark.execute_serially
+  @CustomClusterTestSuite.with_args()
+  def test_webserver_interface(self):
+    addrs = psutil.net_if_addrs()
+    print("net_if_addrs returned: %s" % addrs)
+    ip_matcher = re.compile("\d{1,3}\.\d{1,3}\.\d{1,3}\.\d{1,3}")
+    ip_addrs = []
+    for addr in addrs:
+      for snic in addrs[addr]:
+        if ip_matcher.match(snic.address):
+          ip_addrs.append(snic.address)
+
+    # There must be at least one available interface on the machine.
+    assert len(ip_addrs) > 0, addrs
+
+    ports = ["25000", "25010", "25020"]
+    # With default args, the webserver should be accessible over all interfaces for all
+    # daemons.
+    for ip in ip_addrs:
+      for port in ports:
+        response = requests.get("http://%s:%s/" % (ip, port))
+        assert response.status_code == requests.codes.ok, ip
+
+    # Pick a random interface and restart with the webserver on that interface.
+    interface = random.choice(ip_addrs)
+    self._start_impala_cluster(["--impalad_args=--webserver_interface=%s" % interface])
+
+    # Now the webserver should only be accessible over the choosen interface.
+    for ip in ip_addrs:
+      try:
+        response = requests.get("http://%s:25000/" % ip)
+        assert ip == interface
+        assert response.status_code == requests.codes.ok, ip
+      except requests.exceptions.ConnectionError:
+        assert ip != interface

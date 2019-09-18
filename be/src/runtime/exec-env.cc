@@ -122,6 +122,7 @@ DECLARE_string(buffer_pool_clean_pages_limit);
 DECLARE_int64(min_buffer_size);
 DECLARE_bool(is_coordinator);
 DECLARE_bool(is_executor);
+DECLARE_string(webserver_interface);
 DECLARE_int32(webserver_port);
 DECLARE_int64(tcmalloc_max_total_thread_cache_bytes);
 
@@ -207,7 +208,7 @@ ExecEnv::ExecEnv(int backend_port, int krpc_port,
             !FLAGS_ssl_client_ca_certificate.empty())),
     htable_factory_(new HBaseTableFactory()),
     disk_io_mgr_(new io::DiskIoMgr()),
-    webserver_(new Webserver(webserver_port)),
+    webserver_(new Webserver(FLAGS_webserver_interface, webserver_port)),
     pool_mem_trackers_(new PoolMemTrackerRegistry),
     thread_mgr_(new ThreadResourceMgr),
     tmp_file_mgr_(new TmpFileMgr),
