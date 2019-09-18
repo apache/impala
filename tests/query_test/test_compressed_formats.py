@@ -71,13 +71,15 @@ class TestCompressedFormats(ImpalaTestSuite):
   def test_compressed_formats(self, vector):
     file_format = vector.get_value('file_format')
     extension, suffix = vector.get_value('compression_format')
-    if file_format in ['rc', 'seq', 'text']:
+    if file_format in ['rc', 'seq']:
       # TODO: How about LZO?
       # Test that {gzip,snappy,bzip,deflate}-compressed
       # {RC,sequence,text} files are supported.
       db_suffix = '_%s_%s' % (file_format, suffix)
       self._copy_and_query_compressed_file(
         'tinytable', db_suffix, suffix, '000000_0', extension)
+    elif file_format is 'text':
+        pytest.xfail('IMPALA-9004: TestCompressedFormats is broken for text files')
     else:
       assert False, "Unknown file_format: %s" % file_format
 
@@ -103,7 +105,7 @@ class TestCompressedFormats(ImpalaTestSuite):
 
     # Create the table
     self.run_stmt_in_hive(hive_cmd)
-    call(["hadoop", "fs", "-cp", src_file, dest_file])
+    self.filesystem_client.copy(src_file, dest_file, overwrite=True)
     # Try to read the compressed file with extension
     query = 'select count(*) from %s' % dest_table
     try:
@@ -112,6 +114,7 @@ class TestCompressedFormats(ImpalaTestSuite):
       result = self.execute_scalar(query)
       # Fail iff we expected an error
       assert expected_error is None, 'Query is expected to fail'
+      assert result and int(result) > 0
     except Exception as e:
       error_msg = str(e)
       print error_msg
@@ -207,7 +210,7 @@ class TestLargeCompressedFile(ImpalaTestSuite):
     # Total uncompressed size of a nested structure.
     total_chunk_size = num_blocks_per_chunk * payload_size
 
-    hdfs_put = subprocess.Popen(["hadoop", "fs", "-put", "-f", "-", file_name],
+    hdfs_put = subprocess.Popen(["hdfs", "dfs", "-put", "-d", "-f", "-", file_name],
         stdin=subprocess.PIPE, bufsize=-1)
     for i in range(num_chunks):
       hdfs_put.stdin.write(struct.pack('>i', total_chunk_size))

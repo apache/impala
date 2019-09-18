@@ -333,8 +333,8 @@ class TestHdfsParquetTableWriter(ImpalaTestSuite):
     file has the same column type metadata as the generated one."""
     hdfs_path = (os.environ['DEFAULT_FS'] + "/test-warehouse/{0}.db/"
                  "signed_integer_logical_types.parquet").format(unique_database)
-    check_call(['hdfs', 'dfs', '-copyFromLocal', os.environ['IMPALA_HOME'] +
-                '/testdata/data/signed_integer_logical_types.parquet', hdfs_path])
+    self.filesystem_client.copy_from_local(os.environ['IMPALA_HOME'] +
+        '/testdata/data/signed_integer_logical_types.parquet', hdfs_path)
     # Create table with signed integer logical types
     src_tbl = "{0}.{1}".format(unique_database, "read_write_logical_type_src")
     create_tbl_stmt = """create table {0} like parquet "{1}"

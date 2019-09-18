@@ -93,7 +93,7 @@ class TestParquetMaxPageHeader(CustomClusterTestSuite):
         for i in xrange(self.MAX_STRING_LENGTH)])
     random_text2 = "".join([random.choice(string.letters)
         for i in xrange(self.MAX_STRING_LENGTH)])
-    put = subprocess.Popen(["hadoop", "fs", "-put", "-f", "-", file_name],
+    put = subprocess.Popen(["hdfs", "dfs", "-put", "-d", "-f", "-", file_name],
         stdin=subprocess.PIPE, bufsize=-1)
     put.stdin.write(random_text1 + "\n")
     put.stdin.write(random_text2)

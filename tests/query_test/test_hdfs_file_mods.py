@@ -56,7 +56,8 @@ class TestHdfsFileMods(ImpalaTestSuite):
     # Use HDFS commands to clone the table's files at the hdfs level
     old_table_location = "{0}/test-warehouse/tinytable".format(FILESYSTEM_PREFIX)
     call(["hdfs", "dfs", "-mkdir", new_table_location])
-    call(["hdfs", "dfs", "-cp", old_table_location + "/*", new_table_location])
+    self.filesystem_client.copy(old_table_location + "/*", new_table_location,
+        overwrite=True)
 
     # Create an external table with the new files (tinytable has two string columns)
     create_table = "create external table {0}.t1 (a string, b string) "\

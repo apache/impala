@@ -213,7 +213,7 @@ class TestRefreshPartition(ImpalaTestSuite):
     result = self.client.execute("select count(*) from %s" % table_name)
     assert result.data == [str(0)]
     dst_path = "%s/year=2010/month=1/%s" % (table_location, file_name)
-    check_call(["hadoop", "fs", "-cp", "-f", src_file, dst_path], shell=False)
+    self.filesystem_client.copy(src_file, dst_path, overwrite=True)
     # Check that data added is not visible before refresh
     result = self.client.execute("select count(*) from %s" % table_name)
     assert result.data == [str(0)]
@@ -250,8 +250,7 @@ class TestRefreshPartition(ImpalaTestSuite):
     assert result.data == [str(0)]
     dst_path = table_location + "/year=2010/month=%s/" + file_name
     for month in [1, 2]:
-        check_call(["hadoop", "fs", "-cp", "-f", src_file, dst_path % month],
-                   shell=False)
+        self.filesystem_client.copy(src_file, dst_path % month, overwrite=True)
     # Check that data added is not visible before refresh
     result = self.client.execute("select count(*) from %s" % table_name)
     assert result.data == [str(0)]

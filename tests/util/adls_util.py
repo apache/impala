@@ -23,6 +23,7 @@
 from azure.datalake.store import core, lib, multithread, exceptions
 from tests.util.filesystem_base import BaseFilesystem
 from tests.util.filesystem_utils import ADLS_CLIENT_ID, ADLS_TENANT_ID, ADLS_CLIENT_SECRET
+from tests.util.hdfs_util import HadoopFsCommandLineClient
 
 class ADLSClient(BaseFilesystem):
 
@@ -31,6 +32,7 @@ class ADLSClient(BaseFilesystem):
                           client_secret = ADLS_CLIENT_SECRET,
                           client_id = ADLS_CLIENT_ID)
     self.adlsclient = core.AzureDLFileSystem(self.token, store_name=store)
+    self.adls_cli_client = HadoopFsCommandLineClient("ADLS")
 
   def create_file(self, path, file_data, overwrite=True):
     if not overwrite and self.exists(path): return False
@@ -43,13 +45,11 @@ class ADLSClient(BaseFilesystem):
     self.adlsclient.mkdir(path)
     return True
 
-  def copy(self, src, dst):
-    # The ADLS Python client doesn't support cp() yet, so we have to download and
-    # reupload to the destination.
-    src_contents = self.adlsclient.cat(src)
-    self.create_file(dst, src_contents, overwrite=True)
-    assert self.exists(dst), \
-        'ADLS copy failed: Destination file {dst} does not exist'.format(dst=dst)
+  def copy(self, src, dst, overwrite=True):
+    self.adls_cli_client.copy(src, dst, overwrite)
+
+  def copy_from_local(self, src, dst):
+    self.adls_cli_client.copy_from_local(src, dst)
 
   def ls(self, path):
     file_paths = self.adlsclient.ls(path)

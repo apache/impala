@@ -136,4 +136,4 @@ class TestRewrittenFile(ImpalaTestSuite):
   def __copy_file_to_test_table(self, src_path, table_location):
     """Copies the provided path to the test table, overwriting any previous file."""
     dst_path = "%s/%s" % (table_location, self.FILE_NAME)
-    check_call(["hadoop", "fs", "-cp", "-f", src_path, dst_path], shell=False)
+    self.filesystem_client.copy(src_path, dst_path, overwrite=True)

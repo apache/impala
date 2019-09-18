@@ -49,10 +49,10 @@ class TestMultipleFilesystems(ImpalaTestSuite):
     call(["hadoop", "fs", "-mkdir", get_secondary_fs_path("/multi_fs_tests/")], shell=False)
     check_call(["hadoop", "fs", "-mkdir",
                 get_secondary_fs_path("/multi_fs_tests/%s.db/" % db_name)], shell=False)
-    check_call(["hadoop", "fs", "-cp", "/test-warehouse/alltypes_parquet/",
-                get_secondary_fs_path("/multi_fs_tests/%s.db/" % db_name)], shell=False)
-    check_call(["hadoop", "fs", "-cp", "/test-warehouse/tinytable/",
-                get_secondary_fs_path("/multi_fs_tests/%s.db/" % db_name)], shell=False)
+    self.filesystem_client.copy("/test-warehouse/alltypes_parquet/",
+        get_secondary_fs_path("/multi_fs_tests/%s.db/" % db_name), overwrite=True)
+    self.filesystem_client.copy("/test-warehouse/tinytable/", get_secondary_fs_path(
+        "/multi_fs_tests/%s.db/" % db_name), overwrite=True)
 
   @pytest.mark.execute_serially
   def test_multiple_filesystems(self, vector, unique_database):

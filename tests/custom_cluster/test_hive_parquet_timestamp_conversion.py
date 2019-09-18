@@ -158,8 +158,8 @@ class TestHiveParquetTimestampConversion(CustomClusterTestSuite):
        "create table %s.t (i int, d timestamp) stored as parquet" % unique_database)
 
     tbl_loc = get_fs_path("/test-warehouse/%s.db/t" % unique_database)
-    check_call(['hdfs', 'dfs', '-copyFromLocal', os.environ['IMPALA_HOME'] +
-        "/testdata/data/hive_single_value_timestamp.parq", tbl_loc])
+    self.filesystem_client.copy_from_local(os.environ['IMPALA_HOME'] +
+        "/testdata/data/hive_single_value_timestamp.parq", tbl_loc)
 
     # TODO: other tests in this file could also use query option 'timezone' to enable
     #       real data validation

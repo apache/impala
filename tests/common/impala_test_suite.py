@@ -63,6 +63,7 @@ from tests.util.filesystem_utils import (
     IS_S3,
     IS_ABFS,
     IS_ADLS,
+    IS_HDFS,
     S3_BUCKET_NAME,
     S3GUARD_ENABLED,
     ADLS_STORE_NAME,
@@ -71,9 +72,10 @@ from tests.util.filesystem_utils import (
 
 from tests.util.hdfs_util import (
   HdfsConfig,
-  get_hdfs_client,
-  get_hdfs_client_from_conf,
+  get_webhdfs_client,
+  get_webhdfs_client_from_conf,
   NAMENODE,
+  DelegatingHdfsClient,
   HadoopFsCommandLineClient)
 from tests.util.test_file_parser import (
   QueryTestSectionReader,
@@ -173,11 +175,41 @@ class ImpalaTestSuite(BaseTestSuite):
 
     # Default query options are populated on demand.
     cls.default_query_options = {}
-
     cls.impalad_test_service = cls.create_impala_service()
-    cls.hdfs_client = cls.create_hdfs_client()
-    cls.filesystem_client = cls.hdfs_client
-    if IS_S3:
+
+    # There are multiple clients for interacting with the underlying storage service.
+    #
+    # There are two main types of clients: filesystem-specific clients and CLI clients.
+    # CLI clients all use the 'hdfs dfs' CLI to execute operations against a target
+    # filesystem.
+    #
+    # 'filesystem_client' is a generic interface for doing filesystem operations that
+    # works across all the filesystems that Impala supports. 'filesystem_client' uses
+    # either the HDFS command line (e.g. 'hdfs dfs'), a filesystem-specific library, or
+    # a wrapper around both, to implement common HDFS operations.
+    #
+    # *Test writers should always use 'filesystem_client' unless they are using filesystem
+    # specific functionality (e.g. HDFS ACLs).*
+    #
+    # The implementation of 'filesystem_client' for each filesystem is:
+    #     HDFS: uses a mixture of pywebhdfs (which is faster than the HDFS CLI) and the
+    #           HDFS CLI
+    #     S3:   uses the HDFS CLI
+    #     ABFS: uses the HDFS CLI
+    #     ADLS: uses a mixture of azure-data-lake-store-python and the HDFS CLI (TODO:
+    #           this should completely switch to the HDFS CLI once we test it)
+    #
+    # 'hdfs_client' is a HDFS-specific client library, and it only works when running on
+    # HDFS. When using 'hdfs_client', the test must be skipped on everything other than
+    # HDFS. This is only really useful for tests that do HDFS ACL operations. The
+    # 'hdfs_client' supports all the methods and functionality of the 'filesystem_client',
+    # with additional support for ACL operations such as chmod, chown, getacl, and setacl.
+    # 'hdfs_client' is set to None on non-HDFS systems.
+
+    if IS_HDFS:
+      cls.hdfs_client = cls.create_hdfs_client()
+      cls.filesystem_client = cls.hdfs_client
+    elif IS_S3:
       # S3Guard needs filesystem operations to go through the s3 connector. Use the
       # HDFS command line client.
       cls.filesystem_client = HadoopFsCommandLineClient("S3")
@@ -253,11 +285,11 @@ class ImpalaTestSuite(BaseTestSuite):
   @classmethod
   def create_hdfs_client(cls):
     if pytest.config.option.namenode_http_address is None:
-      hdfs_client = get_hdfs_client_from_conf(HDFS_CONF)
+      webhdfs_client = get_webhdfs_client_from_conf(HDFS_CONF)
     else:
       host, port = pytest.config.option.namenode_http_address.split(":")
-      hdfs_client = get_hdfs_client(host, port)
-    return hdfs_client
+      webhdfs_client = get_webhdfs_client(host, port)
+    return DelegatingHdfsClient(webhdfs_client, HadoopFsCommandLineClient())
 
   @classmethod
   def all_db_names(cls):

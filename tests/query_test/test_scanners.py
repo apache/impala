@@ -714,7 +714,6 @@ class TestParquet(ImpalaTestSuite):
     assert c_schema_elt.converted_type == ConvertedType.UTF8
     assert d_schema_elt.converted_type == None
 
-  @SkipIfS3.eventually_consistent
   def test_resolution_by_name(self, vector, unique_database):
     self.run_test_case('QueryTest/parquet-resolution-by-name', vector,
                        use_db=unique_database)
@@ -1117,7 +1116,7 @@ class TestTextSplitDelimiters(ImpalaTestSuite):
     with tempfile.NamedTemporaryFile() as f:
       f.write(data)
       f.flush()
-      check_call(['hadoop', 'fs', '-copyFromLocal', f.name, location])
+      self.filesystem_client.copy_from_local(f.name, location)
     self.client.execute("refresh %s" % qualified_table_name);
 
     vector.get_value('exec_option')['max_scan_range_length'] = max_scan_range_length
@@ -1270,7 +1269,7 @@ class TestOrc(ImpalaTestSuite):
     tbl_loc = get_fs_path("/test-warehouse/%s.db/%s" % (db, tbl))
     # set block size to 156672 so lineitem_threeblocks.orc occupies 3 blocks,
     # lineitem_sixblocks.orc occupies 6 blocks.
-    check_call(['hdfs', 'dfs', '-Ddfs.block.size=156672', '-copyFromLocal',
+    check_call(['hdfs', 'dfs', '-Ddfs.block.size=156672', '-copyFromLocal', '-d', '-f',
         os.environ['IMPALA_HOME'] + "/testdata/LineItemMultiBlock/" + file, tbl_loc])
 
   def _misaligned_orc_stripes_helper(

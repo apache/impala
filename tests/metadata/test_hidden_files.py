@@ -61,35 +61,35 @@ class TestHiddenFiles(ImpalaTestSuite):
     ALLTYPES_LOC = "%s/alltypes" % WAREHOUSE
     TEST_TBL_LOC = "%s/%s.db/%s" % (WAREHOUSE, db_name, tbl_name)
     # Copy a visible file into one of the partitions.
-    check_call(["hadoop", "fs", "-cp",
+    self.filesystem_client.copy(
           "%s/year=2010/month=1/100101.txt" % ALLTYPES_LOC,
-          "%s/year=2010/month=1/100101.txt" % TEST_TBL_LOC], shell=False)
+          "%s/year=2010/month=1/100101.txt" % TEST_TBL_LOC, overwrite=True)
     # Add hidden files to the non-empty partition. Use upper case hidden suffixes.
-    check_call(["hadoop", "fs", "-cp",
+    self.filesystem_client.copy(
           "%s/year=2010/month=1/100101.txt" % ALLTYPES_LOC,
-          "%s/year=2010/month=1/.100101.txt" % TEST_TBL_LOC], shell=False)
-    check_call(["hadoop", "fs", "-cp",
+          "%s/year=2010/month=1/.100101.txt" % TEST_TBL_LOC, overwrite=True)
+    self.filesystem_client.copy(
           "%s/year=2010/month=1/100101.txt" % ALLTYPES_LOC,
-          "%s/year=2010/month=1/_100101.txt" % TEST_TBL_LOC], shell=False)
-    check_call(["hadoop", "fs", "-cp",
+          "%s/year=2010/month=1/_100101.txt" % TEST_TBL_LOC, overwrite=True)
+    self.filesystem_client.copy(
           "%s/year=2010/month=1/100101.txt" % ALLTYPES_LOC,
-          "%s/year=2010/month=1/100101.txt.COPYING" % TEST_TBL_LOC], shell=False)
-    check_call(["hadoop", "fs", "-cp",
+          "%s/year=2010/month=1/100101.txt.COPYING" % TEST_TBL_LOC, overwrite=True)
+    self.filesystem_client.copy(
           "%s/year=2010/month=1/100101.txt" % ALLTYPES_LOC,
-          "%s/year=2010/month=1/100101.txt.TMP" % TEST_TBL_LOC], shell=False)
+          "%s/year=2010/month=1/100101.txt.TMP" % TEST_TBL_LOC, overwrite=True)
     # Add hidden files to the empty partition. Use lower case hidden suffixes.
-    check_call(["hadoop", "fs", "-cp",
+    self.filesystem_client.copy(
           "%s/year=2010/month=2/100201.txt" % ALLTYPES_LOC,
-          "%s/year=2010/month=2/.100201.txt" % TEST_TBL_LOC], shell=False)
-    check_call(["hadoop", "fs", "-cp",
+          "%s/year=2010/month=2/.100201.txt" % TEST_TBL_LOC, overwrite=True)
+    self.filesystem_client.copy(
           "%s/year=2010/month=2/100201.txt" % ALLTYPES_LOC,
-          "%s/year=2010/month=2/_100201.txt" % TEST_TBL_LOC], shell=False)
-    check_call(["hadoop", "fs", "-cp",
+          "%s/year=2010/month=2/_100201.txt" % TEST_TBL_LOC, overwrite=True)
+    self.filesystem_client.copy(
           "%s/year=2010/month=2/100201.txt" % ALLTYPES_LOC,
-          "%s/year=2010/month=2/100201.txt.copying" % TEST_TBL_LOC], shell=False)
-    check_call(["hadoop", "fs", "-cp",
+          "%s/year=2010/month=2/100201.txt.copying" % TEST_TBL_LOC, overwrite=True)
+    self.filesystem_client.copy(
           "%s/year=2010/month=2/100201.txt" % ALLTYPES_LOC,
-          "%s/year=2010/month=2/100201.txt.tmp" % TEST_TBL_LOC], shell=False)
+          "%s/year=2010/month=2/100201.txt.tmp" % TEST_TBL_LOC, overwrite=True)
 
   def test_hidden_files_load(self, vector, unique_database):
     """Tests that an incremental refresh ignores hidden files."""

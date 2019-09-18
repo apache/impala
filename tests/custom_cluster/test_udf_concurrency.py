@@ -159,7 +159,7 @@ class TestUdfConcurrency(CustomClusterTestSuite):
 
     # use a unique jar for this test to avoid interactions with other tests
     # that use the same jar
-    check_call(["hadoop", "fs", "-put", "-f", udf_src_path, udf_tgt_path])
+    self.filesystem_client.copy_from_local(udf_src_path, udf_tgt_path)
 
     # create all the functions.
     setup_client = self.create_impala_client()

@@ -20,7 +20,10 @@ import pytest
 from tests.common.custom_cluster_test_suite import CustomClusterTestSuite
 from tests.common.skip import SkipIfS3, SkipIfABFS, SkipIfADLS, SkipIfLocal
 from tests.util.filesystem_utils import IS_ISILON, WAREHOUSE
-from tests.util.hdfs_util import HdfsConfig, get_hdfs_client, get_hdfs_client_from_conf
+from tests.util.hdfs_util import (
+    HdfsConfig,
+    get_webhdfs_client,
+    get_webhdfs_client_from_conf)
 
 TEST_TBL = "insert_inherit_permission"
 
@@ -34,10 +37,10 @@ class TestInsertBehaviourCustomCluster(CustomClusterTestSuite):
     super(TestInsertBehaviourCustomCluster, cls).setup_class()
     if pytest.config.option.namenode_http_address is None:
       hdfs_conf = HdfsConfig(pytest.config.option.minicluster_xml_conf)
-      cls.hdfs_client = get_hdfs_client_from_conf(hdfs_conf)
+      cls.hdfs_client = get_webhdfs_client_from_conf(hdfs_conf)
     else:
       host, port = pytest.config.option.namenode_http_address.split(":")
-      cls.hdfs_client = get_hdfs_client(host, port)
+      cls.hdfs_client = get_webhdfs_client(host, port)
 
   def _check_partition_perms(self, part, perms):
     ls = self.hdfs_client.get_file_dir_status("test-warehouse/%s/%s" % (TEST_TBL, part))

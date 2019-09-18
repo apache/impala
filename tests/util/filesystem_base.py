@@ -36,8 +36,15 @@ class BaseFilesystem(object):
     pass
 
   @abstractmethod
-  def copy(self, src, dst):
+  def copy(self, src, dst, overwrite):
     """Copy a file from 'src' to 'dst'. Throws an exception if unsuccessful."""
+    pass
+
+  @abstractmethod
+  def copy_from_local(self, src, dst):
+    """Copies a file from 'src' file on the local filesystem to the 'dst', which can be
+    on any HDFS compatible filesystem. Fails if the src file is not on the local
+    filesystem. Throws an exception if unsuccessful."""
     pass
 
   @abstractmethod

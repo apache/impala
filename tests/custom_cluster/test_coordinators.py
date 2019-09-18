@@ -149,7 +149,7 @@ class TestCoordinators(CustomClusterTestSuite):
 
     # copy jar with TestUpdateUdf (old) to tmp.jar
     check_call(["hadoop", "fs", "-mkdir", "-p", tgt_dir])
-    check_call(["hadoop", "fs", "-put", "-f", old_src_path, tgt_path])
+    self.filesystem_client.copy_from_local(old_src_path, tgt_path)
 
     coordinator = self.cluster.impalads[0]
     try:
@@ -173,7 +173,7 @@ class TestCoordinators(CustomClusterTestSuite):
       assert result.data == ['7300']
 
       # copy a new jar with TestUpdateUdf (new) and NewReplaceStringUdf to tmp.jar.
-      check_call(["hadoop", "fs", "-put", "-f", new_src_path, tgt_path])
+      self.filesystem_client.copy_from_local(new_src_path, tgt_path)
 
       # create a function for the updated TestUpdateUdf.
       create_new_fn = (
@@ -210,7 +210,7 @@ class TestCoordinators(CustomClusterTestSuite):
 
       # Copy jar to a new path.
       tgt_path_2 = tgt_dir + "/tmp2.jar"
-      check_call(["hadoop", "fs", "-put", "-f", old_src_path, tgt_path_2])
+      self.filesystem_client.copy_from_local(old_src_path, tgt_path_2)
 
       # Add the function.
       create_mismatch_fn = (
@@ -227,7 +227,7 @@ class TestCoordinators(CustomClusterTestSuite):
       # Overwrite the jar, giving it a new mtime. The sleep prevents the write to
       # happen too quickly so that its within mtime granularity (1 second).
       time.sleep(2)
-      check_call(["hadoop", "fs", "-put", "-f", new_src_path, tgt_path_2])
+      self.filesystem_client.copy_from_local(new_src_path, tgt_path_2)
 
       # Run the query. Expect the query fails due to mismatched libs at the
       # coordinator and one of the executors.

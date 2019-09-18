@@ -72,9 +72,9 @@ string,string
 create table nested_resolution_by_name_test like functional_parquet.complextypestbl;
 ====
 ---- SHELL
-hadoop fs -cp $FILESYSTEM_PREFIX/test-warehouse/complextypestbl_parquet/nullable.parq \
+hdfs dfs -cp -d -f $FILESYSTEM_PREFIX/test-warehouse/complextypestbl_parquet/nullable.parq \
 $FILESYSTEM_PREFIX/test-warehouse/$DATABASE.db/nested_resolution_by_name_test/
-hadoop fs -cp $FILESYSTEM_PREFIX/test-warehouse/complextypestbl_parquet/nonnullable.parq \
+hdfs dfs -cp -d -f $FILESYSTEM_PREFIX/test-warehouse/complextypestbl_parquet/nonnullable.parq \
 $FILESYSTEM_PREFIX/test-warehouse/$DATABASE.db/nested_resolution_by_name_test/
 ====
 ---- QUERY
@@ -191,7 +191,7 @@ create table switched_map_fields_resolution_test (int_map map<string,int>)
 stored as parquet;
 ====
 ---- SHELL
-hadoop fs -copyFromLocal \
+hdfs dfs -copyFromLocal -d -f \
 $IMPALA_HOME/testdata/parquet_schema_resolution/switched_map.parq \
 $FILESYSTEM_PREFIX/test-warehouse/$DATABASE.db/switched_map_fields_resolution_test/
 ====

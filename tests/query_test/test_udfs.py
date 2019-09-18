@@ -338,7 +338,7 @@ class TestUdfExecution(TestUdfBase):
     try:
       with open(dir_name, "w") as f:
         f.write("Hello World")
-      check_call(["hadoop", "fs", "-put", "-f", f.name, hdfs_path])
+      self.filesystem_client.copy_from_local(f.name, hdfs_path)
       if vector.get_value('exec_option')['disable_codegen']:
         self.run_test_case('QueryTest/udf-errors', vector, use_db=unique_database)
     finally:
@@ -436,7 +436,7 @@ class TestUdfTargeted(TestUdfBase):
             unique_database, tgt_udf_path))
     query = "select `{0}`.fn_invalid_symbol('test')".format(unique_database)
 
-    check_call(["hadoop", "fs", "-put", "-f", src_udf_path, tgt_udf_path])
+    self.filesystem_client.copy_from_local(src_udf_path, tgt_udf_path)
     self.client.execute(drop_fn_stmt)
     self.client.execute(create_fn_stmt)
     for _ in xrange(5):
@@ -471,7 +471,7 @@ class TestUdfTargeted(TestUdfBase):
     jar_path = get_fs_path("/test-warehouse/{0}.db/".format(unique_database)
                            + get_random_id(5) + ".jar")
     hive_jar = get_fs_path("/test-warehouse/hive-exec.jar")
-    check_call(["hadoop", "fs", "-cp", hive_jar, jar_path])
+    self.filesystem_client.copy(hive_jar, jar_path)
     drop_fn_stmt = (
         "drop function if exists "
         "`{0}`.`pi_missing_jar`()".format(unique_database))
@@ -528,14 +528,14 @@ class TestUdfTargeted(TestUdfBase):
     query_stmt = "select `{0}`.`udf_update_test_drop`()".format(unique_database)
 
     # Put the old UDF binary on HDFS, make the UDF in Impala and run it.
-    check_call(["hadoop", "fs", "-put", "-f", old_udf, udf_dst])
+    self.filesystem_client.copy_from_local(old_udf, udf_dst)
     self.execute_query_expect_success(self.client, drop_fn_stmt, exec_options)
     self.execute_query_expect_success(self.client, create_fn_stmt, exec_options)
     self._run_query_all_impalads(exec_options, query_stmt, ["Old UDF"])
 
     # Update the binary, drop and create the function again. The new binary should
     # be running.
-    check_call(["hadoop", "fs", "-put", "-f", new_udf, udf_dst])
+    self.filesystem_client.copy_from_local(new_udf, udf_dst)
     self.execute_query_expect_success(self.client, drop_fn_stmt, exec_options)
     self.execute_query_expect_success(self.client, create_fn_stmt, exec_options)
     self._run_query_all_impalads(exec_options, query_stmt, ["New UDF"])
@@ -568,7 +568,7 @@ class TestUdfTargeted(TestUdfBase):
     query_template = "select `{0}`.`{{0}}`()".format(unique_database)
 
     # Put the old UDF binary on HDFS, make the UDF in Impala and run it.
-    check_call(["hadoop", "fs", "-put", "-f", old_udf, udf_dst])
+    self.filesystem_client.copy_from_local(old_udf, udf_dst)
     self.execute_query_expect_success(
         self.client, create_fn_template.format(old_function_name), exec_options)
     self._run_query_all_impalads(
@@ -576,7 +576,7 @@ class TestUdfTargeted(TestUdfBase):
 
     # Update the binary, and create a new function using the binary. The new binary
     # should be running.
-    check_call(["hadoop", "fs", "-put", "-f", new_udf, udf_dst])
+    self.filesystem_client.copy_from_local(new_udf, udf_dst)
     self.execute_query_expect_success(
         self.client, create_fn_template.format(new_function_name), exec_options)
     self._run_query_all_impalads(

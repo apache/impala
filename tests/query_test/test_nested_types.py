@@ -552,7 +552,6 @@ class TestParquetArrayEncodings(ImpalaTestSuite):
   # ...f22 = 220
   # ..F11 = 110
   # ..F12 = 120
-  @SkipIfS3.eventually_consistent
   def test_ambiguous_list(self, vector, unique_database):
     """IMPALA-4725: Tests the schema-resolution behavior with different values for the
     PARQUET_ARRAY_RESOLUTION and PARQUET_FALLBACK_SCHEMA_RESOLUTION query options.
@@ -589,7 +588,7 @@ class TestParquetArrayEncodings(ImpalaTestSuite):
     self.client.execute("create table %s.%s (%s) stored as parquet location '%s'" %
                         (dbname, tablename, columns, location))
     local_path = self.TESTFILE_DIR + "/" + filename
-    check_call(["hadoop", "fs", "-put", local_path, location], shell=False)
+    self.filesystem_client.copy_from_local(local_path, location)
 
 class TestMaxNestingDepth(ImpalaTestSuite):
   # Should be kept in sync with the FE's Type.MAX_NESTING_DEPTH
@@ -623,9 +622,9 @@ class TestMaxNestingDepth(ImpalaTestSuite):
   def __create_parquet_tables(self, unique_database, as_target=True):
     """Create Parquet tables from files. If 'as_target' is False, the Parquet tables will
      be used to create ORC tables, so we add a suffix in the table names."""
-    check_call(["hdfs", "dfs", "-copyFromLocal",
+    self.filesystem_client.copy_from_local(
       "%s/testdata/max_nesting_depth" % os.environ['IMPALA_HOME'],
-      "%s/%s.db/" % (WAREHOUSE, unique_database)], shell=False)
+      "%s/%s.db/" % (WAREHOUSE, unique_database))
     tbl_suffix = '' if as_target else self.TEMP_TABLE_SUFFIX
     for tbl in self.TABLES:
       tbl_name = "%s.%s_tbl%s" % (unique_database, tbl, tbl_suffix)
