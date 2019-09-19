@@ -412,16 +412,11 @@ class HdfsParquetTableWriter::ColumnWriter :
       plain_encoded_value_size_(
           ParquetPlainEncoder::EncodedByteSize(eval->root().type())) {
     DCHECK_NE(eval->root().type().type, TYPE_BOOLEAN);
-    // IMPALA-7304: Don't write column index for floating-point columns until
-    // PARQUET-1222 is resolved.
-    if (std::is_floating_point<T>::value) valid_column_index_ = false;
   }
 
   virtual void Reset() {
     BaseColumnWriter::Reset();
-    // IMPALA-7304: Don't write column index for floating-point columns until
-    // PARQUET-1222 is resolved.
-    if (std::is_floating_point<T>::value) valid_column_index_ = false;
+    valid_column_index_ = true;
     // Default to dictionary encoding.  If the cardinality ends up being too high,
     // it will fall back to plain.
     current_encoding_ = parquet::Encoding::PLAIN_DICTIONARY;
@@ -440,6 +435,7 @@ class HdfsParquetTableWriter::ColumnWriter :
 
  protected:
   virtual bool ProcessValue(void* value, int64_t* bytes_needed) {
+    T* val = CastValue(value);
     if (current_encoding_ == parquet::Encoding::PLAIN_DICTIONARY) {
       if (UNLIKELY(num_values_since_dict_size_check_ >=
                    DICTIONARY_DATA_PAGE_SIZE_CHECK_PERIOD)) {
@@ -447,7 +443,7 @@ class HdfsParquetTableWriter::ColumnWriter :
         if (dict_encoder_->EstimatedDataEncodedSize() >= page_size_) return false;
       }
       ++num_values_since_dict_size_check_;
-      *bytes_needed = dict_encoder_->Put(*CastValue(value));
+      *bytes_needed = dict_encoder_->Put(*val);
       // If the dictionary contains the maximum number of values, switch to plain
       // encoding for the next page. The current page is full and must be written out.
       if (UNLIKELY(*bytes_needed < 0)) {
@@ -456,23 +452,31 @@ class HdfsParquetTableWriter::ColumnWriter :
       }
       parent_->file_size_estimate_ += *bytes_needed;
     } else if (current_encoding_ == parquet::Encoding::PLAIN) {
-      T* v = CastValue(value);
       *bytes_needed = plain_encoded_value_size_ < 0 ?
-          ParquetPlainEncoder::ByteSize<T>(*v) :
+          ParquetPlainEncoder::ByteSize<T>(*val) :
           plain_encoded_value_size_;
       if (current_page_->header.uncompressed_page_size + *bytes_needed > page_size_) {
         return false;
       }
       uint8_t* dst_ptr = values_buffer_ + current_page_->header.uncompressed_page_size;
       int64_t written_len =
-          ParquetPlainEncoder::Encode(*v, plain_encoded_value_size_, dst_ptr);
+          ParquetPlainEncoder::Encode(*val, plain_encoded_value_size_, dst_ptr);
       DCHECK_EQ(*bytes_needed, written_len);
       current_page_->header.uncompressed_page_size += written_len;
     } else {
       // TODO: support other encodings here
       DCHECK(false);
     }
-    page_stats_->Update(*CastValue(value));
+    // IMPALA-8498: Write column index for floating types when NaN is not present
+    if (std::is_same<float, std::remove_cv_t<T>>::value &&
+        UNLIKELY(std::isnan(*static_cast<float*>(value)))) {
+      valid_column_index_ = false;
+    } else if (std::is_same<double, std::remove_cv_t<T>>::value &&
+        UNLIKELY(std::isnan(*static_cast<double*>(value)))) {
+      valid_column_index_ = false;
+    }
+
+    page_stats_->Update(*val);
     return true;
   }
 

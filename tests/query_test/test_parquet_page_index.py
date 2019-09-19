@@ -231,11 +231,6 @@ class TestHdfsParquetTableIndexWriter(ImpalaTestSuite):
           index_size = len(column_info.offset_index.page_locations)
           assert index_size > 0
           self._validate_page_locations(column_info.offset_index.page_locations)
-          # IMPALA-7304: Impala doesn't write column index for floating-point columns
-          # until PARQUET-1222 is resolved.
-          if column_info.schema.type in [4, 5]:
-            assert column_info.column_index is None
-            continue
           self._validate_null_stats(index_size, column_info)
           self._validate_min_max_values(index_size, column_info)
           self._validate_boundary_order(column_info)
@@ -274,8 +269,8 @@ class TestHdfsParquetTableIndexWriter(ImpalaTestSuite):
     qualified_source_table = "{0}.{1}".format(unique_database, source_table)
     self._validate_parquet_page_index(hdfs_path, tmpdir.join(qualified_source_table))
 
-  def _create_string_table_with_values(self, vector, unique_database, table_name,
-                                       values_sql):
+  def _create_table_with_values_of_type(self, col_type, vector, unique_database,
+                                       table_name, values_sql):
     """Creates a parquet table that has a single string column, then invokes an insert
     statement on it with the 'values_sql' parameter. E.g. 'values_sql' is "('asdf')".
     It returns the HDFS path for the table.
@@ -283,8 +278,8 @@ class TestHdfsParquetTableIndexWriter(ImpalaTestSuite):
     qualified_table_name = "{0}.{1}".format(unique_database, table_name)
     self.execute_query("drop table if exists {0}".format(qualified_table_name))
     vector.get_value('exec_option')['num_nodes'] = 1
-    query = ("create table {0} (str string) stored as parquet").format(
-        qualified_table_name)
+    query = ("create table {0} (x {1}) stored as parquet").format(
+        qualified_table_name, col_type)
     self.execute_query(query, vector.get_value('exec_option'))
     self.execute_query("insert into {0} values {1}".format(qualified_table_name,
         values_sql), vector.get_value('exec_option'))
@@ -345,23 +340,26 @@ class TestHdfsParquetTableIndexWriter(ImpalaTestSuite):
   def test_max_string_values(self, vector, unique_database, tmpdir):
     """Test string values that are all 0xFFs or end with 0xFFs."""
 
+    col_type = "STRING"
     # String value is all of 0xFFs but its length is less than PAGE_INDEX_TRUNCATE_LENGTH.
     short_tbl = "short_tbl"
-    short_hdfs_path = self._create_string_table_with_values(vector, unique_database,
-        short_tbl, "(rpad('', {0}, chr(255)))".format(PAGE_INDEX_MAX_STRING_LENGTH - 1))
+    short_hdfs_path = self._create_table_with_values_of_type(col_type, vector,
+        unique_database, short_tbl,
+        "(rpad('', {0}, chr(255)))".format(PAGE_INDEX_MAX_STRING_LENGTH - 1))
     self._validate_parquet_page_index(short_hdfs_path, tmpdir.join(short_tbl))
 
     # String value is all of 0xFFs and its length is PAGE_INDEX_TRUNCATE_LENGTH.
     fit_tbl = "fit_tbl"
-    fit_hdfs_path = self._create_string_table_with_values(vector, unique_database,
-        fit_tbl, "(rpad('', {0}, chr(255)))".format(PAGE_INDEX_MAX_STRING_LENGTH))
+    fit_hdfs_path = self._create_table_with_values_of_type(col_type, vector,
+        unique_database, fit_tbl,
+        "(rpad('', {0}, chr(255)))".format(PAGE_INDEX_MAX_STRING_LENGTH))
     self._validate_parquet_page_index(fit_hdfs_path, tmpdir.join(fit_tbl))
 
     # All bytes are 0xFFs and the string is longer then PAGE_INDEX_TRUNCATE_LENGTH, so we
     # should not write page statistics.
     too_long_tbl = "too_long_tbl"
-    too_long_hdfs_path = self._create_string_table_with_values(vector, unique_database,
-        too_long_tbl, "(rpad('', {0}, chr(255)))".format(
+    too_long_hdfs_path = self._create_table_with_values_of_type(col_type, vector,
+        unique_database, too_long_tbl, "(rpad('', {0}, chr(255)))".format(
             PAGE_INDEX_MAX_STRING_LENGTH + 1))
     row_group_indexes = self._get_row_groups_from_hdfs_folder(too_long_hdfs_path,
         tmpdir.join(too_long_tbl))
@@ -373,8 +371,9 @@ class TestHdfsParquetTableIndexWriter(ImpalaTestSuite):
     # Test string with value that starts with 'aaa' following with 0xFFs and its length is
     # greater than PAGE_INDEX_TRUNCATE_LENGTH. Max value should be 'aab'.
     aaa_tbl = "aaa_tbl"
-    aaa_hdfs_path = self._create_string_table_with_values(vector, unique_database,
-        aaa_tbl, "(rpad('aaa', {0}, chr(255)))".format(PAGE_INDEX_MAX_STRING_LENGTH + 1))
+    aaa_hdfs_path = self._create_table_with_values_of_type(col_type, vector,
+        unique_database, aaa_tbl,
+        "(rpad('aaa', {0}, chr(255)))".format(PAGE_INDEX_MAX_STRING_LENGTH + 1))
     row_group_indexes = self._get_row_groups_from_hdfs_folder(aaa_hdfs_path,
         tmpdir.join(aaa_tbl))
     column = row_group_indexes[0][0]
@@ -409,8 +408,8 @@ class TestHdfsParquetTableIndexWriter(ImpalaTestSuite):
     """
     vector.get_value('exec_option')['parquet_page_row_count_limit'] = 2
     null_tbl = 'null_table'
-    null_tbl_path = self._create_string_table_with_values(vector, unique_database,
-        null_tbl, "(NULL), (NULL), ('foo'), (NULL), (NULL), (NULL)")
+    null_tbl_path = self._create_table_with_values_of_type("STRING", vector,
+        unique_database, null_tbl, "(NULL), (NULL), ('foo'), (NULL), (NULL), (NULL)")
     row_group_indexes = self._get_row_groups_from_hdfs_folder(null_tbl_path,
         tmpdir.join(null_tbl))
     column = row_group_indexes[0][0]
@@ -435,3 +434,59 @@ class TestHdfsParquetTableIndexWriter(ImpalaTestSuite):
       for column in row_group:
         assert column.offset_index is None
         assert column.column_index is None
+
+  def test_nan_values_for_floating_types(self, vector, unique_database, tmpdir):
+    """ IMPALA-7304: Impala doesn't write column index for floating-point columns
+    until PARQUET-1222 is resolved. This is modified by:
+    IMPALA-8498: Write column index for floating types when NaN is not present.
+    """
+    for col_type in ["float", "double"]:
+      nan_val = "(CAST('NaN' as " + col_type + "))"
+      # Table contains no NaN values.
+      no_nan_tbl = "no_nan_tbl_" + col_type
+      no_nan_hdfs_path = self._create_table_with_values_of_type(col_type, vector,
+          unique_database, no_nan_tbl, "(1.5), (2.3), (4.5), (42.42), (3.1415), (0.0)")
+      self._validate_parquet_page_index(no_nan_hdfs_path, tmpdir.join(no_nan_tbl))
+      row_group_indexes = self._get_row_groups_from_hdfs_folder(no_nan_hdfs_path,
+          tmpdir.join(no_nan_tbl))
+      column = row_group_indexes[0][0]
+      assert column.column_index is not None
+
+      # Table contains NaN as first value.
+      first_nan_tbl = "first_nan_tbl_" + col_type
+      first_nan_hdfs_path = self._create_table_with_values_of_type(col_type, vector,
+          unique_database, first_nan_tbl,
+          nan_val + ", (2.3), (4.5), (42.42), (3.1415), (0.0)")
+      row_group_indexes = self._get_row_groups_from_hdfs_folder(first_nan_hdfs_path,
+          tmpdir.join(first_nan_tbl))
+      column = row_group_indexes[0][0]
+      assert column.column_index is None
+
+      # Table contains NaN as last value.
+      last_nan_tbl = "last_nan_tbl_" + col_type
+      last_nan_hdfs_path = self._create_table_with_values_of_type(col_type, vector,
+          unique_database, last_nan_tbl,
+          "(1.5), (2.3), (42.42), (3.1415), (0.0), " + nan_val)
+      row_group_indexes = self._get_row_groups_from_hdfs_folder(last_nan_hdfs_path,
+          tmpdir.join(last_nan_tbl))
+      column = row_group_indexes[0][0]
+      assert column.column_index is None
+
+      # Table contains NaN value in the middle.
+      mid_nan_tbl = "mid_nan_tbl_" + col_type
+      mid_nan_hdfs_path = self._create_table_with_values_of_type(col_type, vector,
+          unique_database, mid_nan_tbl,
+          "(2.3), (4.5), " + nan_val + ", (42.42), (3.1415), (0.0)")
+      row_group_indexes = self._get_row_groups_from_hdfs_folder(mid_nan_hdfs_path,
+          tmpdir.join(mid_nan_tbl))
+      column = row_group_indexes[0][0]
+      assert column.column_index is None
+
+      # Table contains only NaN values.
+      only_nan_tbl = "only_nan_tbl_" + col_type
+      only_nan_hdfs_path = self._create_table_with_values_of_type(col_type, vector,
+          unique_database, only_nan_tbl, (nan_val + ", ") * 3 + nan_val)
+      row_group_indexes = self._get_row_groups_from_hdfs_folder(only_nan_hdfs_path,
+          tmpdir.join(only_nan_tbl))
+      column = row_group_indexes[0][0]
+      assert column.column_index is None
