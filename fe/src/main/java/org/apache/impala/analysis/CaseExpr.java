@@ -31,6 +31,7 @@ import org.apache.impala.thrift.TCaseExpr;
 import org.apache.impala.thrift.TExprNode;
 import org.apache.impala.thrift.TExprNodeType;
 import com.google.common.annotations.VisibleForTesting;
+import com.google.common.base.Objects;
 import com.google.common.base.Preconditions;
 import com.google.common.collect.Lists;
 import com.google.common.collect.Sets;
@@ -441,6 +442,16 @@ public class CaseExpr extends Expr {
   private boolean isDecode() { return decodeExpr_ != null; }
   public boolean hasCaseExpr() { return hasCaseExpr_; }
   public boolean hasElseExpr() { return hasElseExpr_; }
+
+  @Override
+  public String debugString() {
+    return Objects.toStringHelper(this)
+        .add("decodeExpr_", decodeExpr_ == null ? "null" : decodeExpr_.debugString())
+        .add("hasCaseExpr", hasCaseExpr_)
+        .add("hasElseExpr", hasElseExpr_)
+        .addValue(super.debugString())
+        .toString();
+  }
 
   @Override
   public Expr clone() { return new CaseExpr(this); }

@@ -88,12 +88,10 @@ Status SlotRef::Init(
     if (tuple_idx_ == RowDescriptor::INVALID_IDX) {
       TupleDescriptor* d =
           state->desc_tbl().GetTupleDescriptor(slot_desc->parent()->id());
-      LOG(INFO) << "invalid idx: " << slot_desc->DebugString()
-                << "\nparent=" << d->DebugString()
-                << "\nrow=" << row_desc.DebugString();
-      stringstream error;
-      error << "invalid tuple_idx";
-      return Status(error.str());
+      string error = Substitute("invalid tuple_idx: $0\nparent=$1\nrow=$2",
+          slot_desc->DebugString(), d->DebugString(), row_desc.DebugString());
+      LOG(INFO) << error;
+      return Status(error);
     }
     DCHECK(tuple_idx_ != RowDescriptor::INVALID_IDX);
     tuple_is_nullable_ = row_desc.TupleIsNullable(tuple_idx_);

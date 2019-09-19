@@ -2616,8 +2616,8 @@ PLAN-ROOT SINK
 |  row-size=8B cardinality=1
 |
 02:HASH JOIN [LEFT OUTER JOIN]
-|  hash predicates: t1.id = if(TupleIsNull(), NULL, 1)
-|  other predicates: if(TupleIsNull(), NULL, 1) IN (if(TupleIsNull(), NULL, 1), 10)
+|  hash predicates: t1.id = if(TupleIsNull(1), NULL, 1)
+|  other predicates: if(TupleIsNull(1), NULL, 1) IN (if(TupleIsNull(1), NULL, 1), 10)
 |  row-size=4B cardinality=8
 |
 |--01:SCAN HDFS [functional.alltypessmall]

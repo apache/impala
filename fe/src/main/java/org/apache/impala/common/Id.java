@@ -18,10 +18,9 @@
 package org.apache.impala.common;
 
 import java.util.ArrayList;
-import java.util.List;
+import java.util.Collection;
 
 import com.google.common.base.Joiner;
-import com.google.common.collect.Lists;
 
 /**
  * Integer ids that cannot accidentally be compared with ints.
@@ -62,8 +61,8 @@ public class Id<IdType extends Id<IdType>> implements Comparable<Id<IdType>> {
     return list;
   }
 
-  public static <C extends Id> String printIds(List<C> ids) {
-    ArrayList<String> l = Lists.newArrayList();
+  public static <C extends Id> String printIds(Collection<C> ids) {
+    ArrayList<String> l = new ArrayList<>();
     for (C id: ids) {
       l.add(id.toString());
     }

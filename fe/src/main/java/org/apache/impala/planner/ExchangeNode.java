@@ -17,6 +17,8 @@
 
 package org.apache.impala.planner;
 
+import java.util.List;
+
 import org.apache.impala.analysis.Analyzer;
 import org.apache.impala.analysis.Expr;
 import org.apache.impala.analysis.SortInfo;
@@ -102,37 +104,11 @@ public class ExchangeNode extends PlanNode {
 
   @Override
   public void computeStats(Analyzer analyzer) {
-    Preconditions.checkState(!children_.isEmpty(),
-        "ExchangeNode must have at least one child");
-    cardinality_ = 0;
-    for (PlanNode child: children_) {
-      if (child.getCardinality() == -1) {
-        cardinality_ = -1;
-        break;
-      }
-      cardinality_ = checkedAdd(cardinality_, child.getCardinality());
-    }
-
-    if (hasLimit()) {
-      if (cardinality_ == -1) {
-        cardinality_ = limit_;
-      } else {
-        cardinality_ = Math.min(limit_, cardinality_);
-      }
-    }
-
+    super.computeStats(analyzer);
+    Preconditions.checkState(children_.size() == 1);
+    cardinality_ = capCardinalityAtLimit(children_.get(0).getCardinality());
     // Apply the offset correction if there's a valid cardinality
-    if (cardinality_ > -1) {
-      cardinality_ = Math.max(0, cardinality_ - offset_);
-    }
-
-    // Pick the max numNodes_ and avgRowSize_ of all children.
-    numNodes_ = Integer.MIN_VALUE;
-    avgRowSize_ = Integer.MIN_VALUE;
-    for (PlanNode child: children_) {
-      numNodes_ = Math.max(child.numNodes_, numNodes_);
-      avgRowSize_ = Math.max(child.avgRowSize_, avgRowSize_);
-    }
+    if (cardinality_ > -1) cardinality_ = Math.max(0, cardinality_ - offset_);
   }
 
   /**

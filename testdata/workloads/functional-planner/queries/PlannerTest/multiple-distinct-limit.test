@@ -7,7 +7,7 @@ limit 10
 PLAN-ROOT SINK
 |
 03:AGGREGATE [FINALIZE]
-|  output: aggif(valid_tid() = 2, count(tinyint_col)), aggif(valid_tid() = 4, count(smallint_col)), aggif(valid_tid() = 5, min(timestamp_col)), aggif(valid_tid() = 5, max(timestamp_col))
+|  output: aggif(valid_tid(2,4,5) = 2, count(tinyint_col)), aggif(valid_tid(2,4,5) = 4, count(smallint_col)), aggif(valid_tid(2,4,5) = 5, min(timestamp_col)), aggif(valid_tid(2,4,5) = 5, max(timestamp_col))
 |  limit: 10
 |  row-size=48B cardinality=1
 |
@@ -27,16 +27,16 @@ PLAN-ROOT SINK
 |    group by: smallint_col
 |  Class 2
 |    output: min(timestamp_col), max(timestamp_col)
-|  row-size=35B cardinality=31
+|  row-size=35B cardinality=21
 |
 00:SCAN HDFS [functional.alltypes]
-   partitions=24/24 files=24 size=478.45KB
+   HDFS partitions=24/24 files=24 size=478.45KB
    row-size=19B cardinality=7.30K
 ---- DISTRIBUTEDPLAN
 PLAN-ROOT SINK
 |
 03:AGGREGATE [FINALIZE]
-|  output: aggif(valid_tid() = 2, count(tinyint_col)), aggif(valid_tid() = 4, count(smallint_col)), aggif(valid_tid() = 5, min(timestamp_col)), aggif(valid_tid() = 5, max(timestamp_col))
+|  output: aggif(valid_tid(2,4,5) = 2, count(tinyint_col)), aggif(valid_tid(2,4,5) = 4, count(smallint_col)), aggif(valid_tid(2,4,5) = 5, min(timestamp_col)), aggif(valid_tid(2,4,5) = 5, max(timestamp_col))
 |  limit: 10
 |  row-size=48B cardinality=1
 |
@@ -67,9 +67,9 @@ PLAN-ROOT SINK
 |    group by: smallint_col
 |  Class 2
 |    output: min:merge(timestamp_col), max:merge(timestamp_col)
-|  row-size=35B cardinality=31
+|  row-size=35B cardinality=21
 |
-04:EXCHANGE [HASH(CASE valid_tid() WHEN 1 THEN murmur_hash(tinyint_col) WHEN 3 THEN murmur_hash(smallint_col) WHEN 5 THEN 0 END)]
+04:EXCHANGE [HASH(CASE valid_tid(1,3,5) WHEN 1 THEN murmur_hash(tinyint_col) WHEN 3 THEN murmur_hash(smallint_col) WHEN 5 THEN 0 END)]
 |
 01:AGGREGATE [STREAMING]
 |  Class 0
@@ -78,10 +78,10 @@ PLAN-ROOT SINK
 |    group by: smallint_col
 |  Class 2
 |    output: min(timestamp_col), max(timestamp_col)
-|  row-size=35B cardinality=31
+|  row-size=35B cardinality=21
 |
 00:SCAN HDFS [functional.alltypes]
-   partitions=24/24 files=24 size=478.45KB
+   HDFS partitions=24/24 files=24 size=478.45KB
    row-size=19B cardinality=7.30K
 ====
 # Test correct placement of limit. Simplifies to a single class with one distinct agg.
@@ -99,7 +99,7 @@ PLAN-ROOT SINK
 |  row-size=16B cardinality=1
 |
 00:SCAN HDFS [functional.alltypes]
-   partitions=24/24 files=24 size=478.45KB
+   HDFS partitions=24/24 files=24 size=478.45KB
    row-size=16B cardinality=7.30K
 ---- DISTRIBUTEDPLAN
 PLAN-ROOT SINK
@@ -116,7 +116,7 @@ PLAN-ROOT SINK
 |  row-size=16B cardinality=1
 |
 00:SCAN HDFS [functional.alltypes]
-   partitions=24/24 files=24 size=478.45KB
+   HDFS partitions=24/24 files=24 size=478.45KB
    row-size=16B cardinality=7.30K
 ====
 # Test correct placement of limit. Simplifies to a single class with a non-distinct agg.
@@ -134,7 +134,7 @@ PLAN-ROOT SINK
 |  row-size=16B cardinality=1
 |
 00:SCAN HDFS [functional.alltypes]
-   partitions=24/24 files=24 size=478.45KB
+   HDFS partitions=24/24 files=24 size=478.45KB
    row-size=16B cardinality=7.30K
 ---- DISTRIBUTEDPLAN
 PLAN-ROOT SINK
@@ -151,7 +151,7 @@ PLAN-ROOT SINK
 |  row-size=16B cardinality=1
 |
 00:SCAN HDFS [functional.alltypes]
-   partitions=24/24 files=24 size=478.45KB
+   HDFS partitions=24/24 files=24 size=478.45KB
    row-size=16B cardinality=7.30K
 ====
 # Test correct placement of limit. Simplifies to a single class with distinct
@@ -175,7 +175,7 @@ PLAN-ROOT SINK
 |  row-size=18B cardinality=10
 |
 00:SCAN HDFS [functional.alltypes]
-   partitions=24/24 files=24 size=478.45KB
+   HDFS partitions=24/24 files=24 size=478.45KB
    row-size=18B cardinality=7.30K
 ---- DISTRIBUTEDPLAN
 PLAN-ROOT SINK
@@ -204,6 +204,6 @@ PLAN-ROOT SINK
 |  row-size=18B cardinality=10
 |
 00:SCAN HDFS [functional.alltypes]
-   partitions=24/24 files=24 size=478.45KB
+   HDFS partitions=24/24 files=24 size=478.45KB
    row-size=18B cardinality=7.30K
 ====

@@ -475,7 +475,7 @@ left outer join (
     from complextypestbl t left outer join t.int_array
 ) rightSide
 on leftSide.id = rightSide.id;
----- RESULTS
+---- RESULTS: VERIFY_IS_EQUAL_SORTED
 1,1
 1,1
 1,1

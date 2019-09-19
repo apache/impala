@@ -125,7 +125,7 @@ public class ColumnStats {
    */
   public static ColumnStats fromExpr(Expr expr) {
     Preconditions.checkNotNull(expr);
-    Preconditions.checkState(expr.getType().isValid());
+    Preconditions.checkState(expr.getType().isValid(), expr);
     Type colType = expr.getType();
     ColumnStats stats = new ColumnStats(colType);
     stats.setNumDistinctValues(expr.getNumDistinctValues());

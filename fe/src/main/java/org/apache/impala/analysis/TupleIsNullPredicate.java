@@ -18,6 +18,7 @@
 package org.apache.impala.analysis;
 
 import java.util.ArrayList;
+import java.util.Collections;
 import java.util.List;
 import java.util.Set;
 
@@ -27,6 +28,7 @@ import org.apache.impala.thrift.TExprNode;
 import org.apache.impala.thrift.TExprNodeType;
 import org.apache.impala.thrift.TTupleIsNullPredicate;
 
+import com.google.common.base.Joiner;
 import com.google.common.base.Preconditions;
 import com.google.common.collect.Lists;
 import com.google.common.collect.Sets;
@@ -47,6 +49,10 @@ public class TupleIsNullPredicate extends Predicate {
   public TupleIsNullPredicate(List<TupleId> tupleIds) {
     Preconditions.checkState(tupleIds != null && !tupleIds.isEmpty());
     this.tupleIds_ = Sets.newHashSet(tupleIds);
+  }
+
+  public TupleIsNullPredicate(TupleId tupleId) {
+    this(Collections.singletonList(tupleId));
   }
 
   /**
@@ -94,7 +100,7 @@ public class TupleIsNullPredicate extends Predicate {
 
   @Override
   protected String toSqlImpl(ToSqlOptions options) {
-    return "TupleIsNull()";
+    return "TupleIsNull(" + Joiner.on(",").join(tupleIds_) + ")";
   }
 
   public Set<TupleId> getTupleIds() { return tupleIds_; }

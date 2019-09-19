@@ -51,7 +51,8 @@ public class SortInfo {
   private final List<Boolean> isAscOrder_;
   // True if "NULLS FIRST", false if "NULLS LAST", null if not specified.
   private final List<Boolean> nullsFirstParams_;
-  // Descriptor of tuples materialized, sorted, and output by a SortNode/TopNNode.
+  // The single tuple that is materialized, sorted, and output by a sort operator
+  // (i.e. SortNode or TopNNode)
   private TupleDescriptor sortTupleDesc_;
   // List of exprs evaluated against the sort input and materialized into the sort tuple.
   // One expr per slot in 'sortTupleDesc_'.

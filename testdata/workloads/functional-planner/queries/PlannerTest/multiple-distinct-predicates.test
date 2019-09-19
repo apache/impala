@@ -8,8 +8,8 @@ having count(distinct tinyint_col) < 10
 PLAN-ROOT SINK
 |
 03:AGGREGATE [FINALIZE]
-|  output: aggif(valid_tid() = 2, count(tinyint_col)), aggif(valid_tid() = 4, count(smallint_col)), aggif(valid_tid() = 5, max(string_col))
-|  having: aggif(valid_tid() = 2, count(tinyint_col)) < 10, aggif(valid_tid() = 4, count(smallint_col)) <= 30, aggif(valid_tid() = 4, count(smallint_col)) >= 20, aggif(valid_tid() = 5, max(string_col)) = 'test'
+|  output: aggif(valid_tid(2,4,5) = 2, count(tinyint_col)), aggif(valid_tid(2,4,5) = 4, count(smallint_col)), aggif(valid_tid(2,4,5) = 5, max(string_col))
+|  having: aggif(valid_tid(2,4,5) = 2, count(tinyint_col)) < 10, aggif(valid_tid(2,4,5) = 4, count(smallint_col)) <= 30, aggif(valid_tid(2,4,5) = 4, count(smallint_col)) >= 20, aggif(valid_tid(2,4,5) = 5, max(string_col)) = 'test'
 |  row-size=28B cardinality=0
 |
 02:AGGREGATE [FINALIZE]
@@ -28,17 +28,17 @@ PLAN-ROOT SINK
 |    group by: smallint_col
 |  Class 2
 |    output: max(string_col)
-|  row-size=15B cardinality=31
+|  row-size=15B cardinality=21
 |
 00:SCAN HDFS [functional.alltypes]
-   partitions=24/24 files=24 size=478.45KB
+   HDFS partitions=24/24 files=24 size=478.45KB
    row-size=16B cardinality=7.30K
 ---- DISTRIBUTEDPLAN
 PLAN-ROOT SINK
 |
 03:AGGREGATE [FINALIZE]
-|  output: aggif(valid_tid() = 2, count(tinyint_col)), aggif(valid_tid() = 4, count(smallint_col)), aggif(valid_tid() = 5, max(string_col))
-|  having: aggif(valid_tid() = 2, count(tinyint_col)) < 10, aggif(valid_tid() = 4, count(smallint_col)) <= 30, aggif(valid_tid() = 4, count(smallint_col)) >= 20, aggif(valid_tid() = 5, max(string_col)) = 'test'
+|  output: aggif(valid_tid(2,4,5) = 2, count(tinyint_col)), aggif(valid_tid(2,4,5) = 4, count(smallint_col)), aggif(valid_tid(2,4,5) = 5, max(string_col))
+|  having: aggif(valid_tid(2,4,5) = 2, count(tinyint_col)) < 10, aggif(valid_tid(2,4,5) = 4, count(smallint_col)) <= 30, aggif(valid_tid(2,4,5) = 4, count(smallint_col)) >= 20, aggif(valid_tid(2,4,5) = 5, max(string_col)) = 'test'
 |  row-size=28B cardinality=0
 |
 07:AGGREGATE [FINALIZE]
@@ -68,9 +68,9 @@ PLAN-ROOT SINK
 |    group by: smallint_col
 |  Class 2
 |    output: max:merge(string_col)
-|  row-size=15B cardinality=31
+|  row-size=15B cardinality=21
 |
-04:EXCHANGE [HASH(CASE valid_tid() WHEN 1 THEN murmur_hash(tinyint_col) WHEN 3 THEN murmur_hash(smallint_col) WHEN 5 THEN 0 END)]
+04:EXCHANGE [HASH(CASE valid_tid(1,3,5) WHEN 1 THEN murmur_hash(tinyint_col) WHEN 3 THEN murmur_hash(smallint_col) WHEN 5 THEN 0 END)]
 |
 01:AGGREGATE [STREAMING]
 |  Class 0
@@ -79,10 +79,10 @@ PLAN-ROOT SINK
 |    group by: smallint_col
 |  Class 2
 |    output: max(string_col)
-|  row-size=15B cardinality=31
+|  row-size=15B cardinality=21
 |
 00:SCAN HDFS [functional.alltypes]
-   partitions=24/24 files=24 size=478.45KB
+   HDFS partitions=24/24 files=24 size=478.45KB
    row-size=16B cardinality=7.30K
 ====
 # HAVING predicate references multiple aggregates. No group by.
@@ -93,8 +93,8 @@ having count(distinct tinyint_col) < count(distinct smallint_col)
 PLAN-ROOT SINK
 |
 03:AGGREGATE [FINALIZE]
-|  output: aggif(valid_tid() = 2, count(tinyint_col)), aggif(valid_tid() = 4, count(smallint_col)), aggif(valid_tid() = 5, max(string_col))
-|  having: aggif(valid_tid() = 2, count(tinyint_col)) < aggif(valid_tid() = 4, count(smallint_col))
+|  output: aggif(valid_tid(2,4,5) = 2, count(tinyint_col)), aggif(valid_tid(2,4,5) = 4, count(smallint_col)), aggif(valid_tid(2,4,5) = 5, max(string_col))
+|  having: aggif(valid_tid(2,4,5) = 2, count(tinyint_col)) < aggif(valid_tid(2,4,5) = 4, count(smallint_col))
 |  row-size=28B cardinality=0
 |
 02:AGGREGATE [FINALIZE]
@@ -113,17 +113,17 @@ PLAN-ROOT SINK
 |    group by: smallint_col
 |  Class 2
 |    output: max(string_col)
-|  row-size=15B cardinality=31
+|  row-size=15B cardinality=21
 |
 00:SCAN HDFS [functional.alltypes]
-   partitions=24/24 files=24 size=478.45KB
+   HDFS partitions=24/24 files=24 size=478.45KB
    row-size=16B cardinality=7.30K
 ---- DISTRIBUTEDPLAN
 PLAN-ROOT SINK
 |
 03:AGGREGATE [FINALIZE]
-|  output: aggif(valid_tid() = 2, count(tinyint_col)), aggif(valid_tid() = 4, count(smallint_col)), aggif(valid_tid() = 5, max(string_col))
-|  having: aggif(valid_tid() = 2, count(tinyint_col)) < aggif(valid_tid() = 4, count(smallint_col))
+|  output: aggif(valid_tid(2,4,5) = 2, count(tinyint_col)), aggif(valid_tid(2,4,5) = 4, count(smallint_col)), aggif(valid_tid(2,4,5) = 5, max(string_col))
+|  having: aggif(valid_tid(2,4,5) = 2, count(tinyint_col)) < aggif(valid_tid(2,4,5) = 4, count(smallint_col))
 |  row-size=28B cardinality=0
 |
 07:AGGREGATE [FINALIZE]
@@ -153,9 +153,9 @@ PLAN-ROOT SINK
 |    group by: smallint_col
 |  Class 2
 |    output: max:merge(string_col)
-|  row-size=15B cardinality=31
+|  row-size=15B cardinality=21
 |
-04:EXCHANGE [HASH(CASE valid_tid() WHEN 1 THEN murmur_hash(tinyint_col) WHEN 3 THEN murmur_hash(smallint_col) WHEN 5 THEN 0 END)]
+04:EXCHANGE [HASH(CASE valid_tid(1,3,5) WHEN 1 THEN murmur_hash(tinyint_col) WHEN 3 THEN murmur_hash(smallint_col) WHEN 5 THEN 0 END)]
 |
 01:AGGREGATE [STREAMING]
 |  Class 0
@@ -164,10 +164,10 @@ PLAN-ROOT SINK
 |    group by: smallint_col
 |  Class 2
 |    output: max(string_col)
-|  row-size=15B cardinality=31
+|  row-size=15B cardinality=21
 |
 00:SCAN HDFS [functional.alltypes]
-   partitions=24/24 files=24 size=478.45KB
+   HDFS partitions=24/24 files=24 size=478.45KB
    row-size=16B cardinality=7.30K
 ====
 # Predicates assigned through inline view. No group by.
@@ -179,8 +179,8 @@ where a < b and b between 20 and 30 and c = 'test'
 PLAN-ROOT SINK
 |
 03:AGGREGATE [FINALIZE]
-|  output: aggif(valid_tid() = 2, count(tinyint_col)), aggif(valid_tid() = 4, count(smallint_col)), aggif(valid_tid() = 5, max(string_col))
-|  having: aggif(valid_tid() = 2, count(tinyint_col)) < aggif(valid_tid() = 4, count(smallint_col)), aggif(valid_tid() = 4, count(smallint_col)) <= 30, aggif(valid_tid() = 4, count(smallint_col)) >= 20, aggif(valid_tid() = 5, max(string_col)) = 'test'
+|  output: aggif(valid_tid(2,4,5) = 2, count(tinyint_col)), aggif(valid_tid(2,4,5) = 4, count(smallint_col)), aggif(valid_tid(2,4,5) = 5, max(string_col))
+|  having: aggif(valid_tid(2,4,5) = 2, count(tinyint_col)) < aggif(valid_tid(2,4,5) = 4, count(smallint_col)), aggif(valid_tid(2,4,5) = 4, count(smallint_col)) <= 30, aggif(valid_tid(2,4,5) = 4, count(smallint_col)) >= 20, aggif(valid_tid(2,4,5) = 5, max(string_col)) = 'test'
 |  row-size=28B cardinality=0
 |
 02:AGGREGATE [FINALIZE]
@@ -199,17 +199,17 @@ PLAN-ROOT SINK
 |    group by: smallint_col
 |  Class 2
 |    output: max(string_col)
-|  row-size=15B cardinality=31
+|  row-size=15B cardinality=21
 |
 00:SCAN HDFS [functional.alltypes]
-   partitions=24/24 files=24 size=478.45KB
+   HDFS partitions=24/24 files=24 size=478.45KB
    row-size=16B cardinality=7.30K
 ---- DISTRIBUTEDPLAN
 PLAN-ROOT SINK
 |
 03:AGGREGATE [FINALIZE]
-|  output: aggif(valid_tid() = 2, count(tinyint_col)), aggif(valid_tid() = 4, count(smallint_col)), aggif(valid_tid() = 5, max(string_col))
-|  having: aggif(valid_tid() = 2, count(tinyint_col)) < aggif(valid_tid() = 4, count(smallint_col)), aggif(valid_tid() = 4, count(smallint_col)) <= 30, aggif(valid_tid() = 4, count(smallint_col)) >= 20, aggif(valid_tid() = 5, max(string_col)) = 'test'
+|  output: aggif(valid_tid(2,4,5) = 2, count(tinyint_col)), aggif(valid_tid(2,4,5) = 4, count(smallint_col)), aggif(valid_tid(2,4,5) = 5, max(string_col))
+|  having: aggif(valid_tid(2,4,5) = 2, count(tinyint_col)) < aggif(valid_tid(2,4,5) = 4, count(smallint_col)), aggif(valid_tid(2,4,5) = 4, count(smallint_col)) <= 30, aggif(valid_tid(2,4,5) = 4, count(smallint_col)) >= 20, aggif(valid_tid(2,4,5) = 5, max(string_col)) = 'test'
 |  row-size=28B cardinality=0
 |
 07:AGGREGATE [FINALIZE]
@@ -239,9 +239,9 @@ PLAN-ROOT SINK
 |    group by: smallint_col
 |  Class 2
 |    output: max:merge(string_col)
-|  row-size=15B cardinality=31
+|  row-size=15B cardinality=21
 |
-04:EXCHANGE [HASH(CASE valid_tid() WHEN 1 THEN murmur_hash(tinyint_col) WHEN 3 THEN murmur_hash(smallint_col) WHEN 5 THEN 0 END)]
+04:EXCHANGE [HASH(CASE valid_tid(1,3,5) WHEN 1 THEN murmur_hash(tinyint_col) WHEN 3 THEN murmur_hash(smallint_col) WHEN 5 THEN 0 END)]
 |
 01:AGGREGATE [STREAMING]
 |  Class 0
@@ -250,10 +250,10 @@ PLAN-ROOT SINK
 |    group by: smallint_col
 |  Class 2
 |    output: max(string_col)
-|  row-size=15B cardinality=31
+|  row-size=15B cardinality=21
 |
 00:SCAN HDFS [functional.alltypes]
-   partitions=24/24 files=24 size=478.45KB
+   HDFS partitions=24/24 files=24 size=478.45KB
    row-size=16B cardinality=7.30K
 ====
 # Predicates assigned through inline view. No group by.
@@ -265,8 +265,8 @@ where a < b and b between 20 and 30 and c = 'test'
 PLAN-ROOT SINK
 |
 03:AGGREGATE [FINALIZE]
-|  output: aggif(valid_tid() = 2, count(tinyint_col)), aggif(valid_tid() = 4, count(smallint_col)), aggif(valid_tid() = 5, max(string_col))
-|  having: aggif(valid_tid() = 2, count(tinyint_col)) < aggif(valid_tid() = 4, count(smallint_col)), aggif(valid_tid() = 4, count(smallint_col)) <= 30, aggif(valid_tid() = 4, count(smallint_col)) >= 20, aggif(valid_tid() = 5, max(string_col)) = 'test'
+|  output: aggif(valid_tid(2,4,5) = 2, count(tinyint_col)), aggif(valid_tid(2,4,5) = 4, count(smallint_col)), aggif(valid_tid(2,4,5) = 5, max(string_col))
+|  having: aggif(valid_tid(2,4,5) = 2, count(tinyint_col)) < aggif(valid_tid(2,4,5) = 4, count(smallint_col)), aggif(valid_tid(2,4,5) = 4, count(smallint_col)) <= 30, aggif(valid_tid(2,4,5) = 4, count(smallint_col)) >= 20, aggif(valid_tid(2,4,5) = 5, max(string_col)) = 'test'
 |  row-size=28B cardinality=0
 |
 02:AGGREGATE [FINALIZE]
@@ -285,17 +285,17 @@ PLAN-ROOT SINK
 |    group by: smallint_col
 |  Class 2
 |    output: max(string_col)
-|  row-size=15B cardinality=31
+|  row-size=15B cardinality=21
 |
 00:SCAN HDFS [functional.alltypes]
-   partitions=24/24 files=24 size=478.45KB
+   HDFS partitions=24/24 files=24 size=478.45KB
    row-size=16B cardinality=7.30K
 ---- DISTRIBUTEDPLAN
 PLAN-ROOT SINK
 |
 03:AGGREGATE [FINALIZE]
-|  output: aggif(valid_tid() = 2, count(tinyint_col)), aggif(valid_tid() = 4, count(smallint_col)), aggif(valid_tid() = 5, max(string_col))
-|  having: aggif(valid_tid() = 2, count(tinyint_col)) < aggif(valid_tid() = 4, count(smallint_col)), aggif(valid_tid() = 4, count(smallint_col)) <= 30, aggif(valid_tid() = 4, count(smallint_col)) >= 20, aggif(valid_tid() = 5, max(string_col)) = 'test'
+|  output: aggif(valid_tid(2,4,5) = 2, count(tinyint_col)), aggif(valid_tid(2,4,5) = 4, count(smallint_col)), aggif(valid_tid(2,4,5) = 5, max(string_col))
+|  having: aggif(valid_tid(2,4,5) = 2, count(tinyint_col)) < aggif(valid_tid(2,4,5) = 4, count(smallint_col)), aggif(valid_tid(2,4,5) = 4, count(smallint_col)) <= 30, aggif(valid_tid(2,4,5) = 4, count(smallint_col)) >= 20, aggif(valid_tid(2,4,5) = 5, max(string_col)) = 'test'
 |  row-size=28B cardinality=0
 |
 07:AGGREGATE [FINALIZE]
@@ -325,9 +325,9 @@ PLAN-ROOT SINK
 |    group by: smallint_col
 |  Class 2
 |    output: max:merge(string_col)
-|  row-size=15B cardinality=31
+|  row-size=15B cardinality=21
 |
-04:EXCHANGE [HASH(CASE valid_tid() WHEN 1 THEN murmur_hash(tinyint_col) WHEN 3 THEN murmur_hash(smallint_col) WHEN 5 THEN 0 END)]
+04:EXCHANGE [HASH(CASE valid_tid(1,3,5) WHEN 1 THEN murmur_hash(tinyint_col) WHEN 3 THEN murmur_hash(smallint_col) WHEN 5 THEN 0 END)]
 |
 01:AGGREGATE [STREAMING]
 |  Class 0
@@ -336,10 +336,10 @@ PLAN-ROOT SINK
 |    group by: smallint_col
 |  Class 2
 |    output: max(string_col)
-|  row-size=15B cardinality=31
+|  row-size=15B cardinality=21
 |
 00:SCAN HDFS [functional.alltypes]
-   partitions=24/24 files=24 size=478.45KB
+   HDFS partitions=24/24 files=24 size=478.45KB
    row-size=16B cardinality=7.30K
 ====
 # HAVING predicate assignment. With group by.
@@ -354,10 +354,10 @@ having count(distinct tinyint_col) < 10
 PLAN-ROOT SINK
 |
 03:AGGREGATE [FINALIZE]
-|  output: aggif(valid_tid() = 2, count(tinyint_col)), aggif(valid_tid() = 4, count(smallint_col)), aggif(valid_tid() = 5, max(string_col))
-|  group by: CASE valid_tid() WHEN 2 THEN date_string_col WHEN 4 THEN date_string_col WHEN 5 THEN date_string_col END, CASE valid_tid() WHEN 2 THEN timestamp_col WHEN 4 THEN timestamp_col WHEN 5 THEN timestamp_col END
-|  having: aggif(valid_tid() = 2, count(tinyint_col)) < 10, CAST(CASE valid_tid() WHEN 2 THEN timestamp_col WHEN 4 THEN timestamp_col WHEN 5 THEN timestamp_col END AS BIGINT) = aggif(valid_tid() = 2, count(tinyint_col)), CAST(CASE valid_tid() WHEN 2 THEN timestamp_col WHEN 4 THEN timestamp_col WHEN 5 THEN timestamp_col END AS STRING) < CASE valid_tid() WHEN 2 THEN date_string_col WHEN 4 THEN date_string_col WHEN 5 THEN date_string_col END
-|  row-size=56B cardinality=730
+|  output: aggif(valid_tid(2,4,5) = 2, count(tinyint_col)), aggif(valid_tid(2,4,5) = 4, count(smallint_col)), aggif(valid_tid(2,4,5) = 5, max(string_col))
+|  group by: CASE valid_tid(2,4,5) WHEN 2 THEN date_string_col WHEN 4 THEN date_string_col WHEN 5 THEN date_string_col END, CASE valid_tid(2,4,5) WHEN 2 THEN timestamp_col WHEN 4 THEN timestamp_col WHEN 5 THEN timestamp_col END
+|  having: aggif(valid_tid(2,4,5) = 2, count(tinyint_col)) < 10, CAST(CASE valid_tid(2,4,5) WHEN 2 THEN timestamp_col WHEN 4 THEN timestamp_col WHEN 5 THEN timestamp_col END AS BIGINT) = aggif(valid_tid(2,4,5) = 2, count(tinyint_col)), CAST(CASE valid_tid(2,4,5) WHEN 2 THEN timestamp_col WHEN 4 THEN timestamp_col WHEN 5 THEN timestamp_col END AS STRING) < CASE valid_tid(2,4,5) WHEN 2 THEN date_string_col WHEN 4 THEN date_string_col WHEN 5 THEN date_string_col END
+|  row-size=56B cardinality=657
 |
 02:AGGREGATE [FINALIZE]
 |  Class 0
@@ -369,7 +369,7 @@ PLAN-ROOT SINK
 |  Class 2
 |    output: max:merge(string_col)
 |    group by: date_string_col, timestamp_col
-|  row-size=136B cardinality=730
+|  row-size=136B cardinality=6.57K
 |
 01:AGGREGATE
 |  Class 0
@@ -379,10 +379,10 @@ PLAN-ROOT SINK
 |  Class 2
 |    output: max(string_col)
 |    group by: date_string_col, timestamp_col
-|  row-size=123B cardinality=730
+|  row-size=123B cardinality=2.19K
 |
 00:SCAN HDFS [functional.alltypes]
-   partitions=24/24 files=24 size=478.45KB
+   HDFS partitions=24/24 files=24 size=478.45KB
    predicates: functional.alltypes.date_string_col <= 'test2', functional.alltypes.date_string_col >= 'test1', CAST(functional.alltypes.timestamp_col AS STRING) < functional.alltypes.date_string_col
    row-size=52B cardinality=730
 ---- DISTRIBUTEDPLAN
@@ -391,10 +391,10 @@ PLAN-ROOT SINK
 08:EXCHANGE [UNPARTITIONED]
 |
 03:AGGREGATE [FINALIZE]
-|  output: aggif(valid_tid() = 2, count(tinyint_col)), aggif(valid_tid() = 4, count(smallint_col)), aggif(valid_tid() = 5, max(string_col))
-|  group by: CASE valid_tid() WHEN 2 THEN date_string_col WHEN 4 THEN date_string_col WHEN 5 THEN date_string_col END, CASE valid_tid() WHEN 2 THEN timestamp_col WHEN 4 THEN timestamp_col WHEN 5 THEN timestamp_col END
-|  having: aggif(valid_tid() = 2, count(tinyint_col)) < 10, CAST(CASE valid_tid() WHEN 2 THEN timestamp_col WHEN 4 THEN timestamp_col WHEN 5 THEN timestamp_col END AS BIGINT) = aggif(valid_tid() = 2, count(tinyint_col)), CAST(CASE valid_tid() WHEN 2 THEN timestamp_col WHEN 4 THEN timestamp_col WHEN 5 THEN timestamp_col END AS STRING) < CASE valid_tid() WHEN 2 THEN date_string_col WHEN 4 THEN date_string_col WHEN 5 THEN date_string_col END
-|  row-size=56B cardinality=730
+|  output: aggif(valid_tid(2,4,5) = 2, count(tinyint_col)), aggif(valid_tid(2,4,5) = 4, count(smallint_col)), aggif(valid_tid(2,4,5) = 5, max(string_col))
+|  group by: CASE valid_tid(2,4,5) WHEN 2 THEN date_string_col WHEN 4 THEN date_string_col WHEN 5 THEN date_string_col END, CASE valid_tid(2,4,5) WHEN 2 THEN timestamp_col WHEN 4 THEN timestamp_col WHEN 5 THEN timestamp_col END
+|  having: aggif(valid_tid(2,4,5) = 2, count(tinyint_col)) < 10, CAST(CASE valid_tid(2,4,5) WHEN 2 THEN timestamp_col WHEN 4 THEN timestamp_col WHEN 5 THEN timestamp_col END AS BIGINT) = aggif(valid_tid(2,4,5) = 2, count(tinyint_col)), CAST(CASE valid_tid(2,4,5) WHEN 2 THEN timestamp_col WHEN 4 THEN timestamp_col WHEN 5 THEN timestamp_col END AS STRING) < CASE valid_tid(2,4,5) WHEN 2 THEN date_string_col WHEN 4 THEN date_string_col WHEN 5 THEN date_string_col END
+|  row-size=56B cardinality=657
 |
 07:AGGREGATE [FINALIZE]
 |  Class 0
@@ -406,9 +406,9 @@ PLAN-ROOT SINK
 |  Class 2
 |    output: max:merge(string_col)
 |    group by: date_string_col, timestamp_col
-|  row-size=136B cardinality=730
+|  row-size=136B cardinality=6.57K
 |
-06:EXCHANGE [HASH(CASE valid_tid() WHEN 2 THEN murmur_hash(date_string_col) WHEN 4 THEN murmur_hash(date_string_col) WHEN 5 THEN murmur_hash(date_string_col) END,CASE valid_tid() WHEN 2 THEN murmur_hash(timestamp_col) WHEN 4 THEN murmur_hash(timestamp_col) WHEN 5 THEN murmur_hash(timestamp_col) END)]
+06:EXCHANGE [HASH(CASE valid_tid(2,4,5) WHEN 2 THEN murmur_hash(date_string_col) WHEN 4 THEN murmur_hash(date_string_col) WHEN 5 THEN murmur_hash(date_string_col) END,CASE valid_tid(2,4,5) WHEN 2 THEN murmur_hash(timestamp_col) WHEN 4 THEN murmur_hash(timestamp_col) WHEN 5 THEN murmur_hash(timestamp_col) END)]
 |
 02:AGGREGATE [STREAMING]
 |  Class 0
@@ -420,7 +420,7 @@ PLAN-ROOT SINK
 |  Class 2
 |    output: max:merge(string_col)
 |    group by: date_string_col, timestamp_col
-|  row-size=136B cardinality=730
+|  row-size=136B cardinality=6.57K
 |
 05:AGGREGATE
 |  Class 0
@@ -430,9 +430,9 @@ PLAN-ROOT SINK
 |  Class 2
 |    output: max:merge(string_col)
 |    group by: date_string_col, timestamp_col
-|  row-size=123B cardinality=730
+|  row-size=123B cardinality=2.19K
 |
-04:EXCHANGE [HASH(CASE valid_tid() WHEN 1 THEN murmur_hash(date_string_col) WHEN 3 THEN murmur_hash(date_string_col) WHEN 5 THEN murmur_hash(date_string_col) END,CASE valid_tid() WHEN 1 THEN murmur_hash(timestamp_col) WHEN 3 THEN murmur_hash(timestamp_col) WHEN 5 THEN murmur_hash(timestamp_col) END,CASE valid_tid() WHEN 1 THEN murmur_hash(tinyint_col) WHEN 3 THEN murmur_hash(smallint_col) WHEN 5 THEN 0 END)]
+04:EXCHANGE [HASH(CASE valid_tid(1,3,5) WHEN 1 THEN murmur_hash(date_string_col) WHEN 3 THEN murmur_hash(date_string_col) WHEN 5 THEN murmur_hash(date_string_col) END,CASE valid_tid(1,3,5) WHEN 1 THEN murmur_hash(timestamp_col) WHEN 3 THEN murmur_hash(timestamp_col) WHEN 5 THEN murmur_hash(timestamp_col) END,CASE valid_tid(1,3,5) WHEN 1 THEN murmur_hash(tinyint_col) WHEN 3 THEN murmur_hash(smallint_col) WHEN 5 THEN 0 END)]
 |
 01:AGGREGATE [STREAMING]
 |  Class 0
@@ -442,10 +442,10 @@ PLAN-ROOT SINK
 |  Class 2
 |    output: max(string_col)
 |    group by: date_string_col, timestamp_col
-|  row-size=123B cardinality=730
+|  row-size=123B cardinality=2.19K
 |
 00:SCAN HDFS [functional.alltypes]
-   partitions=24/24 files=24 size=478.45KB
+   HDFS partitions=24/24 files=24 size=478.45KB
    predicates: functional.alltypes.date_string_col <= 'test2', functional.alltypes.date_string_col >= 'test1', CAST(functional.alltypes.timestamp_col AS STRING) < functional.alltypes.date_string_col
    row-size=52B cardinality=730
 ====
@@ -461,10 +461,10 @@ where a < 10 and gby1 between 'test1' and 'test2' and cast(gby2 as string) < gby
 PLAN-ROOT SINK
 |
 03:AGGREGATE [FINALIZE]
-|  output: aggif(valid_tid() = 2, count(tinyint_col)), aggif(valid_tid() = 4, count(smallint_col)), aggif(valid_tid() = 5, max(string_col))
-|  group by: CASE valid_tid() WHEN 2 THEN date_string_col WHEN 4 THEN date_string_col WHEN 5 THEN date_string_col END, CASE valid_tid() WHEN 2 THEN timestamp_col WHEN 4 THEN timestamp_col WHEN 5 THEN timestamp_col END
-|  having: aggif(valid_tid() = 2, count(tinyint_col)) < 10, CAST(CASE valid_tid() WHEN 2 THEN timestamp_col WHEN 4 THEN timestamp_col WHEN 5 THEN timestamp_col END AS BIGINT) = aggif(valid_tid() = 2, count(tinyint_col)), CAST(CASE valid_tid() WHEN 2 THEN timestamp_col WHEN 4 THEN timestamp_col WHEN 5 THEN timestamp_col END AS STRING) < CASE valid_tid() WHEN 2 THEN date_string_col WHEN 4 THEN date_string_col WHEN 5 THEN date_string_col END
-|  row-size=56B cardinality=730
+|  output: aggif(valid_tid(2,4,5) = 2, count(tinyint_col)), aggif(valid_tid(2,4,5) = 4, count(smallint_col)), aggif(valid_tid(2,4,5) = 5, max(string_col))
+|  group by: CASE valid_tid(2,4,5) WHEN 2 THEN date_string_col WHEN 4 THEN date_string_col WHEN 5 THEN date_string_col END, CASE valid_tid(2,4,5) WHEN 2 THEN timestamp_col WHEN 4 THEN timestamp_col WHEN 5 THEN timestamp_col END
+|  having: aggif(valid_tid(2,4,5) = 2, count(tinyint_col)) < 10, CAST(CASE valid_tid(2,4,5) WHEN 2 THEN timestamp_col WHEN 4 THEN timestamp_col WHEN 5 THEN timestamp_col END AS BIGINT) = aggif(valid_tid(2,4,5) = 2, count(tinyint_col)), CAST(CASE valid_tid(2,4,5) WHEN 2 THEN timestamp_col WHEN 4 THEN timestamp_col WHEN 5 THEN timestamp_col END AS STRING) < CASE valid_tid(2,4,5) WHEN 2 THEN date_string_col WHEN 4 THEN date_string_col WHEN 5 THEN date_string_col END
+|  row-size=56B cardinality=657
 |
 02:AGGREGATE [FINALIZE]
 |  Class 0
@@ -476,7 +476,7 @@ PLAN-ROOT SINK
 |  Class 2
 |    output: max:merge(string_col)
 |    group by: date_string_col, timestamp_col
-|  row-size=136B cardinality=730
+|  row-size=136B cardinality=6.57K
 |
 01:AGGREGATE
 |  Class 0
@@ -486,10 +486,10 @@ PLAN-ROOT SINK
 |  Class 2
 |    output: max(string_col)
 |    group by: date_string_col, timestamp_col
-|  row-size=123B cardinality=730
+|  row-size=123B cardinality=2.19K
 |
 00:SCAN HDFS [functional.alltypes]
-   partitions=24/24 files=24 size=478.45KB
+   HDFS partitions=24/24 files=24 size=478.45KB
    predicates: functional.alltypes.date_string_col <= 'test2', functional.alltypes.date_string_col >= 'test1', CAST(functional.alltypes.timestamp_col AS STRING) < functional.alltypes.date_string_col
    row-size=52B cardinality=730
 ---- DISTRIBUTEDPLAN
@@ -498,10 +498,10 @@ PLAN-ROOT SINK
 08:EXCHANGE [UNPARTITIONED]
 |
 03:AGGREGATE [FINALIZE]
-|  output: aggif(valid_tid() = 2, count(tinyint_col)), aggif(valid_tid() = 4, count(smallint_col)), aggif(valid_tid() = 5, max(string_col))
-|  group by: CASE valid_tid() WHEN 2 THEN date_string_col WHEN 4 THEN date_string_col WHEN 5 THEN date_string_col END, CASE valid_tid() WHEN 2 THEN timestamp_col WHEN 4 THEN timestamp_col WHEN 5 THEN timestamp_col END
-|  having: aggif(valid_tid() = 2, count(tinyint_col)) < 10, CAST(CASE valid_tid() WHEN 2 THEN timestamp_col WHEN 4 THEN timestamp_col WHEN 5 THEN timestamp_col END AS BIGINT) = aggif(valid_tid() = 2, count(tinyint_col)), CAST(CASE valid_tid() WHEN 2 THEN timestamp_col WHEN 4 THEN timestamp_col WHEN 5 THEN timestamp_col END AS STRING) < CASE valid_tid() WHEN 2 THEN date_string_col WHEN 4 THEN date_string_col WHEN 5 THEN date_string_col END
-|  row-size=56B cardinality=730
+|  output: aggif(valid_tid(2,4,5) = 2, count(tinyint_col)), aggif(valid_tid(2,4,5) = 4, count(smallint_col)), aggif(valid_tid(2,4,5) = 5, max(string_col))
+|  group by: CASE valid_tid(2,4,5) WHEN 2 THEN date_string_col WHEN 4 THEN date_string_col WHEN 5 THEN date_string_col END, CASE valid_tid(2,4,5) WHEN 2 THEN timestamp_col WHEN 4 THEN timestamp_col WHEN 5 THEN timestamp_col END
+|  having: aggif(valid_tid(2,4,5) = 2, count(tinyint_col)) < 10, CAST(CASE valid_tid(2,4,5) WHEN 2 THEN timestamp_col WHEN 4 THEN timestamp_col WHEN 5 THEN timestamp_col END AS BIGINT) = aggif(valid_tid(2,4,5) = 2, count(tinyint_col)), CAST(CASE valid_tid(2,4,5) WHEN 2 THEN timestamp_col WHEN 4 THEN timestamp_col WHEN 5 THEN timestamp_col END AS STRING) < CASE valid_tid(2,4,5) WHEN 2 THEN date_string_col WHEN 4 THEN date_string_col WHEN 5 THEN date_string_col END
+|  row-size=56B cardinality=657
 |
 07:AGGREGATE [FINALIZE]
 |  Class 0
@@ -513,9 +513,9 @@ PLAN-ROOT SINK
 |  Class 2
 |    output: max:merge(string_col)
 |    group by: date_string_col, timestamp_col
-|  row-size=136B cardinality=730
+|  row-size=136B cardinality=6.57K
 |
-06:EXCHANGE [HASH(CASE valid_tid() WHEN 2 THEN murmur_hash(date_string_col) WHEN 4 THEN murmur_hash(date_string_col) WHEN 5 THEN murmur_hash(date_string_col) END,CASE valid_tid() WHEN 2 THEN murmur_hash(timestamp_col) WHEN 4 THEN murmur_hash(timestamp_col) WHEN 5 THEN murmur_hash(timestamp_col) END)]
+06:EXCHANGE [HASH(CASE valid_tid(2,4,5) WHEN 2 THEN murmur_hash(date_string_col) WHEN 4 THEN murmur_hash(date_string_col) WHEN 5 THEN murmur_hash(date_string_col) END,CASE valid_tid(2,4,5) WHEN 2 THEN murmur_hash(timestamp_col) WHEN 4 THEN murmur_hash(timestamp_col) WHEN 5 THEN murmur_hash(timestamp_col) END)]
 |
 02:AGGREGATE [STREAMING]
 |  Class 0
@@ -527,7 +527,7 @@ PLAN-ROOT SINK
 |  Class 2
 |    output: max:merge(string_col)
 |    group by: date_string_col, timestamp_col
-|  row-size=136B cardinality=730
+|  row-size=136B cardinality=6.57K
 |
 05:AGGREGATE
 |  Class 0
@@ -537,9 +537,9 @@ PLAN-ROOT SINK
 |  Class 2
 |    output: max:merge(string_col)
 |    group by: date_string_col, timestamp_col
-|  row-size=123B cardinality=730
+|  row-size=123B cardinality=2.19K
 |
-04:EXCHANGE [HASH(CASE valid_tid() WHEN 1 THEN murmur_hash(date_string_col) WHEN 3 THEN murmur_hash(date_string_col) WHEN 5 THEN murmur_hash(date_string_col) END,CASE valid_tid() WHEN 1 THEN murmur_hash(timestamp_col) WHEN 3 THEN murmur_hash(timestamp_col) WHEN 5 THEN murmur_hash(timestamp_col) END,CASE valid_tid() WHEN 1 THEN murmur_hash(tinyint_col) WHEN 3 THEN murmur_hash(smallint_col) WHEN 5 THEN 0 END)]
+04:EXCHANGE [HASH(CASE valid_tid(1,3,5) WHEN 1 THEN murmur_hash(date_string_col) WHEN 3 THEN murmur_hash(date_string_col) WHEN 5 THEN murmur_hash(date_string_col) END,CASE valid_tid(1,3,5) WHEN 1 THEN murmur_hash(timestamp_col) WHEN 3 THEN murmur_hash(timestamp_col) WHEN 5 THEN murmur_hash(timestamp_col) END,CASE valid_tid(1,3,5) WHEN 1 THEN murmur_hash(tinyint_col) WHEN 3 THEN murmur_hash(smallint_col) WHEN 5 THEN 0 END)]
 |
 01:AGGREGATE [STREAMING]
 |  Class 0
@@ -549,10 +549,10 @@ PLAN-ROOT SINK
 |  Class 2
 |    output: max(string_col)
 |    group by: date_string_col, timestamp_col
-|  row-size=123B cardinality=730
+|  row-size=123B cardinality=2.19K
 |
 00:SCAN HDFS [functional.alltypes]
-   partitions=24/24 files=24 size=478.45KB
+   HDFS partitions=24/24 files=24 size=478.45KB
    predicates: functional.alltypes.date_string_col <= 'test2', functional.alltypes.date_string_col >= 'test1', CAST(functional.alltypes.timestamp_col AS STRING) < functional.alltypes.date_string_col
    row-size=52B cardinality=730
 ====

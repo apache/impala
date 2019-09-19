@@ -40,7 +40,8 @@ import com.google.common.collect.Lists;
 public class DataPartition {
   private final TPartitionType type_;
 
-  // for hash partition: exprs used to compute hash value
+  // Used for any partitioning that requires computing the partition.
+  // Always non-null.
   private List<Expr> partitionExprs_;
 
   private DataPartition(TPartitionType type, List<Expr> exprs) {

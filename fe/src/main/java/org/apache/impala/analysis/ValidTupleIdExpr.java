@@ -25,6 +25,7 @@ import org.apache.impala.common.AnalysisException;
 import org.apache.impala.thrift.TExprNode;
 import org.apache.impala.thrift.TExprNodeType;
 
+import com.google.common.base.Joiner;
 import com.google.common.base.Preconditions;
 import com.google.common.collect.Sets;
 
@@ -82,7 +83,7 @@ public class ValidTupleIdExpr extends Expr {
 
   @Override
   protected String toSqlImpl(ToSqlOptions options) {
-    return "valid_tid()";
+    return "valid_tid(" + Joiner.on(",").join(tupleIds_) + ")";
   }
 
   @Override
