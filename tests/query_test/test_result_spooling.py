@@ -88,11 +88,11 @@ class TestResultSpooling(ImpalaTestSuite):
     start_time = time.time()
     handle = self.execute_query_async(query, exec_options)
     try:
-      while re.search(unpinned_bytes_regex, self.client.get_runtime_profile(handle)) \
-          is None and time.time() - start_time < timeout:
+      while not re.search(unpinned_bytes_regex, self.client.get_runtime_profile(handle)) \
+          and time.time() - start_time < timeout:
         time.sleep(0.5)
       profile = self.client.get_runtime_profile(handle)
-      if re.search(unpinned_bytes_regex, profile) is None:
+      if not re.search(unpinned_bytes_regex, profile):
         raise Timeout("Query {0} did not spill spooled results within the timeout {1}"
                       .format(query, timeout))
       # At this point PLAN_ROOT_SINK must have spilled, so spilled_exec_option_regex
@@ -134,20 +134,24 @@ class TestResultSpooling(ImpalaTestSuite):
     # Amount of time to wait for the query to reach a running state before through a
     # Timeout exception.
     timeout = 10
-    # Regex to look for in the runtime profile.
+    # Regexes to look for in the runtime profile.
     send_wait_time_regex = "RowBatchSendWaitTime: [1-9]"
+    queue_spilled_regex = "PLAN_ROOT_SINK[\s\S]*?ExecOption: Spilled"
 
-    # Execute the query asynchronously, wait a bit for the result spooling queue to fill
-    # up, start fetching results, and then validate that RowBatchSendWaitTime shows a
-    # non-zero value in the profile.
+    # Execute the query asynchronously, wait for the queue to fill up, start fetching
+    # results, and then validate that RowBatchSendWaitTime shows a non-zero value in the
+    # profile. Result spooling is configured so that max_result_spooling_mem ==
+    # max_spilled_result_spooling_mem. This means that once the queue spills, the queue
+    # is guaranteed to be full.
     handle = self.execute_query_async(query, exec_options)
     try:
-      self.wait_for_any_state(handle, [self.client.QUERY_STATES['RUNNING'],
-          self.client.QUERY_STATES['FINISHED']], timeout)
-      time.sleep(5)
-      self.client.fetch(query, handle, max_rows=fetch_size)
-      assert re.search(send_wait_time_regex, self.client.get_runtime_profile(handle)) \
-          is not None
+      self.wait_for_state(handle, self.client.QUERY_STATES['FINISHED'], timeout)
+      self.assert_eventually(30, 1, lambda: re.search(queue_spilled_regex,
+          self.client.get_runtime_profile(handle)))
+      # A fetch request is necessary to unblock the producer thread and trigger an update
+      # of the RowBatchSendWaitTime counter.
+      assert self.client.fetch(query, handle, max_rows=fetch_size).success
+      assert re.search(send_wait_time_regex, self.client.get_runtime_profile(handle))
     finally:
       self.client.close_query(handle)
 
@@ -175,8 +179,7 @@ class TestResultSpooling(ImpalaTestSuite):
       thread.start()
       self.wait_for_state(handle, self.client.QUERY_STATES['FINISHED'], 10)
       thread.join()
-      assert re.search(get_wait_time_regex, self.client.get_runtime_profile(handle)) \
-          is not None
+      assert re.search(get_wait_time_regex, self.client.get_runtime_profile(handle))
     finally:
       self.client.close_query(handle)
 

@@ -64,6 +64,8 @@ Status BlockingPlanRootSink::Send(RuntimeState* state, RowBatch* batch) {
     DCHECK(results_ != nullptr);
     int num_to_fetch = batch->num_rows() - current_batch_row;
     if (num_rows_requested_ > 0) num_to_fetch = min(num_to_fetch, num_rows_requested_);
+    // Debug action before AddBatch is called.
+    RETURN_IF_ERROR(DebugAction(state->query_options(), "BPRS_BEFORE_ADD_ROWS"));
     RETURN_IF_ERROR(
         results_->AddRows(output_expr_evals_, batch, current_batch_row, num_to_fetch));
     current_batch_row += num_to_fetch;
