@@ -4,10 +4,11 @@ select * from functional.alltypes tablesample system(10) repeatable(1234)
 F00:PLAN FRAGMENT [UNPARTITIONED] hosts=1 instances=1
 |  Per-Host Resources: mem-estimate=32.00MB mem-reservation=32.00KB thread-reservation=2
 PLAN-ROOT SINK
+|  output exprs: functional.alltypes.id, functional.alltypes.bool_col, functional.alltypes.tinyint_col, functional.alltypes.smallint_col, functional.alltypes.int_col, functional.alltypes.bigint_col, functional.alltypes.float_col, functional.alltypes.double_col, functional.alltypes.date_string_col, functional.alltypes.string_col, functional.alltypes.timestamp_col, functional.alltypes.year, functional.alltypes.month
 |  mem-estimate=0B mem-reservation=0B thread-reservation=0
 |
 00:SCAN HDFS [functional.alltypes]
-   partitions=3/24 files=3 size=60.68KB
+   HDFS partitions=3/24 files=3 size=60.68KB
    stored statistics:
      table: rows=7.30K size=478.45KB
      partitions: 24/24 rows=7.30K
@@ -23,10 +24,11 @@ select * from functional.alltypes tablesample system(50) repeatable(1234)
 F00:PLAN FRAGMENT [UNPARTITIONED] hosts=1 instances=1
 |  Per-Host Resources: mem-estimate=80.00MB mem-reservation=32.00KB thread-reservation=2
 PLAN-ROOT SINK
+|  output exprs: functional.alltypes.id, functional.alltypes.bool_col, functional.alltypes.tinyint_col, functional.alltypes.smallint_col, functional.alltypes.int_col, functional.alltypes.bigint_col, functional.alltypes.float_col, functional.alltypes.double_col, functional.alltypes.date_string_col, functional.alltypes.string_col, functional.alltypes.timestamp_col, functional.alltypes.year, functional.alltypes.month
 |  mem-estimate=0B mem-reservation=0B thread-reservation=0
 |
 00:SCAN HDFS [functional.alltypes]
-   partitions=12/24 files=12 size=239.26KB
+   HDFS partitions=12/24 files=12 size=239.26KB
    stored statistics:
      table: rows=7.30K size=478.45KB
      partitions: 24/24 rows=7.30K
@@ -44,10 +46,11 @@ where id < 10
 F00:PLAN FRAGMENT [UNPARTITIONED] hosts=1 instances=1
 |  Per-Host Resources: mem-estimate=80.00MB mem-reservation=32.00KB thread-reservation=2
 PLAN-ROOT SINK
+|  output exprs: functional.alltypes.id, functional.alltypes.bool_col, functional.alltypes.tinyint_col, functional.alltypes.smallint_col, functional.alltypes.int_col, functional.alltypes.bigint_col, functional.alltypes.float_col, functional.alltypes.double_col, functional.alltypes.date_string_col, functional.alltypes.string_col, functional.alltypes.timestamp_col, functional.alltypes.year, functional.alltypes.month
 |  mem-estimate=0B mem-reservation=0B thread-reservation=0
 |
 00:SCAN HDFS [functional.alltypes]
-   partitions=12/24 files=12 size=239.26KB
+   HDFS partitions=12/24 files=12 size=239.26KB
    predicates: id < CAST(10 AS INT)
    stored statistics:
      table: rows=7.30K size=478.45KB
@@ -65,11 +68,12 @@ where year = 2009
 F00:PLAN FRAGMENT [UNPARTITIONED] hosts=1 instances=1
 |  Per-Host Resources: mem-estimate=48.00MB mem-reservation=32.00KB thread-reservation=2
 PLAN-ROOT SINK
+|  output exprs: functional.alltypes.id, functional.alltypes.bool_col, functional.alltypes.tinyint_col, functional.alltypes.smallint_col, functional.alltypes.int_col, functional.alltypes.bigint_col, functional.alltypes.float_col, functional.alltypes.double_col, functional.alltypes.date_string_col, functional.alltypes.string_col, functional.alltypes.timestamp_col, functional.alltypes.year, functional.alltypes.month
 |  mem-estimate=0B mem-reservation=0B thread-reservation=0
 |
 00:SCAN HDFS [functional.alltypes]
    partition predicates: `year` = CAST(2009 AS INT)
-   partitions=6/24 files=6 size=119.70KB
+   HDFS partitions=6/24 files=6 size=119.70KB
    stored statistics:
      table: rows=7.30K size=478.45KB
      partitions: 12/12 rows=3.65K
@@ -85,6 +89,7 @@ select * from functional.alltypes tablesample system(0)
 F00:PLAN FRAGMENT [UNPARTITIONED] hosts=1 instances=1
 |  Per-Host Resources: mem-estimate=0B mem-reservation=0B thread-reservation=1
 PLAN-ROOT SINK
+|  output exprs: functional.alltypes.id, functional.alltypes.bool_col, functional.alltypes.tinyint_col, functional.alltypes.smallint_col, functional.alltypes.int_col, functional.alltypes.bigint_col, functional.alltypes.float_col, functional.alltypes.double_col, functional.alltypes.date_string_col, functional.alltypes.string_col, functional.alltypes.timestamp_col, functional.alltypes.year, functional.alltypes.month
 |  mem-estimate=0B mem-reservation=0B thread-reservation=0
 |
 00:SCAN HDFS [functional.alltypes]
@@ -104,10 +109,11 @@ select * from functional.alltypes tablesample system(1) repeatable(1234)
 F00:PLAN FRAGMENT [UNPARTITIONED] hosts=1 instances=1
 |  Per-Host Resources: mem-estimate=32.00MB mem-reservation=32.00KB thread-reservation=2
 PLAN-ROOT SINK
+|  output exprs: functional.alltypes.id, functional.alltypes.bool_col, functional.alltypes.tinyint_col, functional.alltypes.smallint_col, functional.alltypes.int_col, functional.alltypes.bigint_col, functional.alltypes.float_col, functional.alltypes.double_col, functional.alltypes.date_string_col, functional.alltypes.string_col, functional.alltypes.timestamp_col, functional.alltypes.year, functional.alltypes.month
 |  mem-estimate=0B mem-reservation=0B thread-reservation=0
 |
 00:SCAN HDFS [functional.alltypes]
-   partitions=1/24 files=1 size=19.95KB
+   HDFS partitions=1/24 files=1 size=19.95KB
    stored statistics:
      table: rows=7.30K size=478.45KB
      partitions: 24/24 rows=7.30K
@@ -124,11 +130,12 @@ where year = 2010
 F00:PLAN FRAGMENT [UNPARTITIONED] hosts=1 instances=1
 |  Per-Host Resources: mem-estimate=32.00MB mem-reservation=32.00KB thread-reservation=2
 PLAN-ROOT SINK
+|  output exprs: functional.alltypes.id, functional.alltypes.bool_col, functional.alltypes.tinyint_col, functional.alltypes.smallint_col, functional.alltypes.int_col, functional.alltypes.bigint_col, functional.alltypes.float_col, functional.alltypes.double_col, functional.alltypes.date_string_col, functional.alltypes.string_col, functional.alltypes.timestamp_col, functional.alltypes.year, functional.alltypes.month
 |  mem-estimate=0B mem-reservation=0B thread-reservation=0
 |
 00:SCAN HDFS [functional.alltypes]
    partition predicates: `year` = CAST(2010 AS INT)
-   partitions=1/24 files=1 size=20.36KB
+   HDFS partitions=1/24 files=1 size=20.36KB
    stored statistics:
      table: rows=7.30K size=478.45KB
      partitions: 12/12 rows=3.65K
@@ -144,10 +151,11 @@ select * from functional.alltypes tablesample system (100)
 F00:PLAN FRAGMENT [UNPARTITIONED] hosts=1 instances=1
 |  Per-Host Resources: mem-estimate=128.00MB mem-reservation=32.00KB thread-reservation=2
 PLAN-ROOT SINK
+|  output exprs: functional.alltypes.id, functional.alltypes.bool_col, functional.alltypes.tinyint_col, functional.alltypes.smallint_col, functional.alltypes.int_col, functional.alltypes.bigint_col, functional.alltypes.float_col, functional.alltypes.double_col, functional.alltypes.date_string_col, functional.alltypes.string_col, functional.alltypes.timestamp_col, functional.alltypes.year, functional.alltypes.month
 |  mem-estimate=0B mem-reservation=0B thread-reservation=0
 |
 00:SCAN HDFS [functional.alltypes]
-   partitions=24/24 files=24 size=478.45KB
+   HDFS partitions=24/24 files=24 size=478.45KB
    stored statistics:
      table: rows=7.30K size=478.45KB
      partitions: 24/24 rows=7.30K
@@ -163,17 +171,18 @@ select id from functional_parquet.alltypes tablesample system(10) repeatable(123
 F00:PLAN FRAGMENT [UNPARTITIONED] hosts=1 instances=1
 |  Per-Host Resources: mem-estimate=16.00MB mem-reservation=16.00KB thread-reservation=2
 PLAN-ROOT SINK
+|  output exprs: id
 |  mem-estimate=0B mem-reservation=0B thread-reservation=0
 |
 00:SCAN HDFS [functional_parquet.alltypes]
-   partitions=3/24 files=3 size=23.96KB
+   HDFS partitions=3/24 files=3 size=25.50KB
    stored statistics:
      table: rows=unavailable size=unavailable
      partitions: 0/24 rows=unavailable
      columns: unavailable
    extrapolated-rows=disabled max-scan-range-rows=unavailable
    mem-estimate=16.00MB mem-reservation=16.00KB thread-reservation=1
-   tuple-ids=0 row-size=4B cardinality=unavailable
+   tuple-ids=0 row-size=4B cardinality=1.27K
    in pipelines: 00(GETNEXT)
 ====
 # Sampling in a subquery.
@@ -184,6 +193,7 @@ select id from functional.alltypes t1 where exists (
 F00:PLAN FRAGMENT [UNPARTITIONED] hosts=1 instances=1
 |  Per-Host Resources: mem-estimate=162.94MB mem-reservation=2.98MB thread-reservation=3 runtime-filters-memory=1.00MB
 PLAN-ROOT SINK
+|  output exprs: id
 |  mem-estimate=0B mem-reservation=0B thread-reservation=0
 |
 02:HASH JOIN [LEFT SEMI JOIN]
@@ -194,7 +204,7 @@ PLAN-ROOT SINK
 |  in pipelines: 00(GETNEXT), 01(OPEN)
 |
 |--01:SCAN HDFS [functional.alltypessmall t2]
-|     partitions=1/4 files=1 size=1.57KB
+|     HDFS partitions=1/4 files=1 size=1.57KB
 |     stored statistics:
 |       table: rows=100 size=6.32KB
 |       partitions: 4/4 rows=100
@@ -205,7 +215,7 @@ PLAN-ROOT SINK
 |     in pipelines: 01(GETNEXT)
 |
 00:SCAN HDFS [functional.alltypes t1]
-   partitions=24/24 files=24 size=478.45KB
+   HDFS partitions=24/24 files=24 size=478.45KB
    runtime filters: RF000[bloom] -> t1.id
    stored statistics:
      table: rows=7.30K size=478.45KB
@@ -223,10 +233,11 @@ select id from t
 F00:PLAN FRAGMENT [UNPARTITIONED] hosts=1 instances=1
 |  Per-Host Resources: mem-estimate=32.00MB mem-reservation=32.00KB thread-reservation=2
 PLAN-ROOT SINK
+|  output exprs: functional.alltypes.id
 |  mem-estimate=0B mem-reservation=0B thread-reservation=0
 |
 00:SCAN HDFS [functional.alltypes]
-   partitions=3/24 files=3 size=60.68KB
+   HDFS partitions=3/24 files=3 size=60.68KB
    stored statistics:
      table: rows=7.30K size=478.45KB
      partitions: 24/24 rows=7.30K

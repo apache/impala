@@ -69,7 +69,7 @@ Status DataSink::Create(const TPlanFragmentCtx& fragment_ctx,
     const TPlanFragmentInstanceCtx& fragment_instance_ctx, const RowDescriptor* row_desc,
     RuntimeState* state, DataSink** sink) {
   const TDataSink& thrift_sink = fragment_ctx.fragment.output_sink;
-  const vector<TExpr>& thrift_output_exprs = fragment_ctx.fragment.output_exprs;
+  const vector<TExpr>& thrift_output_exprs = thrift_sink.output_exprs;
   ObjectPool* pool = state->obj_pool();
   // We have one fragment per sink, so we can use the fragment index as the sink ID.
   TDataSinkId sink_id = fragment_ctx.fragment.idx;

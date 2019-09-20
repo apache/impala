@@ -51,11 +51,11 @@ public class DeleteStmt extends ModifyStmt {
   }
 
   @Override
-  public DataSink createDataSink() {
+  public DataSink createDataSink(List<Expr> resultExprs) {
     // analyze() must have been called before.
     Preconditions.checkState(table_ != null);
     TableSink tableSink = TableSink.create(table_, TableSink.Op.DELETE,
-        ImmutableList.<Expr>of(), referencedColumns_, false, false,
+        ImmutableList.<Expr>of(), resultExprs, referencedColumns_, false, false,
         ImmutableList.<Integer>of());
     Preconditions.checkState(!referencedColumns_.isEmpty());
     return tableSink;

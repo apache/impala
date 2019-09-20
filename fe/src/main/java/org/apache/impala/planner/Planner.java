@@ -144,7 +144,6 @@ public class Planner {
 
     rootFragment.verifyTree();
     ExprSubstitutionMap rootNodeSmap = rootFragment.getPlanRoot().getOutputSmap();
-    List<Expr> resultExprs = null;
     if (ctx_.isInsertOrCtas()) {
       InsertStmt insertStmt = ctx_.getAnalysisResult().getInsertStmt();
       insertStmt.substituteResultExprs(rootNodeSmap, ctx_.getRootAnalyzer());
@@ -157,22 +156,23 @@ public class Planner {
       createPreInsertSort(insertStmt, rootFragment, ctx_.getRootAnalyzer());
       // set up table sink for root fragment
       rootFragment.setSink(insertStmt.createDataSink());
-      resultExprs = insertStmt.getResultExprs();
     } else {
-      if (ctx_.isUpdate()) {
-        // Set up update sink for root fragment
-        rootFragment.setSink(ctx_.getAnalysisResult().getUpdateStmt().createDataSink());
-      } else if (ctx_.isDelete()) {
-        // Set up delete sink for root fragment
-        rootFragment.setSink(ctx_.getAnalysisResult().getDeleteStmt().createDataSink());
-      } else if (ctx_.isQuery()) {
-        rootFragment.setSink(ctx_.getAnalysisResult().getQueryStmt().createDataSink());
-      }
       QueryStmt queryStmt = ctx_.getQueryStmt();
       queryStmt.substituteResultExprs(rootNodeSmap, ctx_.getRootAnalyzer());
-      resultExprs = queryStmt.getResultExprs();
+      List<Expr> resultExprs = queryStmt.getResultExprs();
+      if (ctx_.isUpdate()) {
+        // Set up update sink for root fragment
+        rootFragment.setSink(
+            ctx_.getAnalysisResult().getUpdateStmt().createDataSink(resultExprs));
+      } else if (ctx_.isDelete()) {
+        // Set up delete sink for root fragment
+        rootFragment.setSink(
+            ctx_.getAnalysisResult().getDeleteStmt().createDataSink(resultExprs));
+      } else if (ctx_.isQuery()) {
+        rootFragment.setSink(
+            ctx_.getAnalysisResult().getQueryStmt().createDataSink(resultExprs));
+      }
     }
-    rootFragment.setOutputExprs(resultExprs);
 
     // The check for disabling codegen uses estimates of rows per node so must be done
     // on the distributed plan.
@@ -180,7 +180,8 @@ public class Planner {
 
     if (LOG.isTraceEnabled()) {
       LOG.trace("desctbl: " + ctx_.getRootAnalyzer().getDescTbl().debugString());
-      LOG.trace("resultexprs: " + Expr.debugString(rootFragment.getOutputExprs()));
+      LOG.trace("root sink: " + rootFragment.getSink().getExplainString(
+            "", "", ctx_.getQueryOptions(), TExplainLevel.VERBOSE));
       LOG.trace("finalize plan fragments");
     }
     for (PlanFragment fragment: fragments) {
@@ -197,7 +198,6 @@ public class Planner {
       // Compute the column lineage graph
       if (ctx_.isInsertOrCtas()) {
         InsertStmt insertStmt = ctx_.getAnalysisResult().getInsertStmt();
-        List<Expr> exprs = new ArrayList<>();
         FeTable targetTable = insertStmt.getTargetTable();
         Preconditions.checkNotNull(targetTable);
         if (targetTable instanceof FeKuduTable) {
@@ -215,23 +215,19 @@ public class Planner {
           } else {
             graph.addTargetColumnLabels(targetTable);
           }
-          exprs.addAll(resultExprs);
         } else if (targetTable instanceof FeHBaseTable) {
           graph.addTargetColumnLabels(targetTable);
-          exprs.addAll(resultExprs);
         } else {
           graph.addTargetColumnLabels(targetTable);
-          exprs.addAll(ctx_.getAnalysisResult().getInsertStmt().getPartitionKeyExprs());
-          exprs.addAll(resultExprs.subList(0,
-              targetTable.getNonClusteringColumns().size()));
         }
-        graph.computeLineageGraph(exprs, ctx_.getRootAnalyzer());
       } else {
         graph.addTargetColumnLabels(ctx_.getQueryStmt().getColLabels().stream()
             .map(col -> new ColumnLabel(col))
             .collect(Collectors.toList()));
-        graph.computeLineageGraph(resultExprs, ctx_.getRootAnalyzer());
       }
+      List<Expr> outputExprs = new ArrayList<>();
+      rootFragment.getSink().collectExprs(outputExprs);
+      graph.computeLineageGraph(outputExprs, ctx_.getRootAnalyzer());
       if (LOG.isTraceEnabled()) LOG.trace("lineage: " + graph.debugString());
       ctx_.getTimeline().markEvent("Lineage info computed");
     }

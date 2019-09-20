@@ -105,11 +105,11 @@ public class NestedLoopJoinNode extends JoinNode {
       }
       if (!otherJoinConjuncts_.isEmpty()) {
         output.append(detailPrefix + "join predicates: ")
-            .append(getExplainString(otherJoinConjuncts_, detailLevel) + "\n");
+            .append(Expr.getExplainString(otherJoinConjuncts_, detailLevel) + "\n");
       }
       if (!conjuncts_.isEmpty()) {
         output.append(detailPrefix + "predicates: ")
-            .append(getExplainString(conjuncts_, detailLevel) + "\n");
+            .append(Expr.getExplainString(conjuncts_, detailLevel) + "\n");
       }
     }
     return output.toString();

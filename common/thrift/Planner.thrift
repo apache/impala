@@ -40,10 +40,6 @@ struct TPlanFragment {
   // no plan or descriptor table: query without From clause
   3: optional PlanNodes.TPlan plan
 
-  // exprs that produce values for slots of output tuple (one expr per slot);
-  // if not set, plan fragment materializes full rows of plan_tree
-  4: optional list<Exprs.TExpr> output_exprs
-
   // Specifies the destination of this plan fragment's output rows.
   // For example, the destination could be a stream sink which forwards
   // the data to a remote plan fragment, or a sink which writes to a table (for

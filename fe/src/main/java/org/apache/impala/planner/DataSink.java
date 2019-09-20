@@ -17,6 +17,9 @@
 
 package org.apache.impala.planner;
 
+import java.util.List;
+
+import org.apache.impala.analysis.Expr;
 import org.apache.impala.thrift.TDataSink;
 import org.apache.impala.thrift.TDataSinkType;
 import org.apache.impala.thrift.TExecStats;
@@ -96,5 +99,10 @@ public abstract class DataSink {
    * Compute the resource profile for an instance of this DataSink.
    */
   public abstract void computeResourceProfile(TQueryOptions queryOptions);
+
+  /**
+   * Collect all expressions evaluated by this data sink.
+   */
+  public abstract void collectExprs(List<Expr> exprs);
 
 }

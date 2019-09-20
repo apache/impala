@@ -99,4 +99,9 @@ public class JoinBuildSink extends DataSink {
     // The memory consumption is counted against the join PlanNode.
     resourceProfile_ = ResourceProfile.noReservation(0);
   }
+
+  @Override
+  public void collectExprs(List<Expr> exprs) {
+    exprs.addAll(buildExprs_);
+  }
 }

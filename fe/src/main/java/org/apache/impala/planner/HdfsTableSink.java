@@ -51,6 +51,7 @@ public class HdfsTableSink extends TableSink {
 
   // Exprs for computing the output partition(s).
   protected final List<Expr> partitionKeyExprs_;
+
   // Whether to overwrite the existing partition(s).
   protected final boolean overwrite_;
 
@@ -71,9 +72,10 @@ public class HdfsTableSink extends TableSink {
   private long writeId_;
 
   public HdfsTableSink(FeTable targetTable, List<Expr> partitionKeyExprs,
+      List<Expr> outputExprs,
       boolean overwrite, boolean inputIsClustered, List<Integer> sortColumns,
       long writeId) {
-    super(targetTable, Op.INSERT);
+    super(targetTable, Op.INSERT, outputExprs);
     Preconditions.checkState(targetTable instanceof FeFsTable);
     partitionKeyExprs_ = partitionKeyExprs;
     overwrite_ = overwrite;
@@ -176,6 +178,10 @@ public class HdfsTableSink extends TableSink {
       }
       output.append("\n");
     }
+    if (explainLevel.ordinal() >= TExplainLevel.EXTENDED.ordinal()) {
+      output.append(detailPrefix + "output exprs: ")
+          .append(Expr.getExplainString(outputExprs_, explainLevel) + "\n");
+    }
   }
 
   @Override
@@ -202,10 +208,18 @@ public class HdfsTableSink extends TableSink {
         TTableSinkType.HDFS, sinkOp_.toThrift());
     tTableSink.hdfs_table_sink = hdfsTableSink;
     tsink.table_sink = tTableSink;
+    tsink.output_exprs = Expr.treesToThrift(outputExprs_);
   }
 
   @Override
   protected TDataSinkType getSinkType() {
     return TDataSinkType.TABLE_SINK;
+  }
+
+  @Override
+  public void collectExprs(List<Expr> exprs) {
+    exprs.addAll(partitionKeyExprs_);
+    // Avoid adding any partition exprs redundantly.
+    exprs.addAll(outputExprs_.subList(0, targetTable_.getNonClusteringColumns().size()));
   }
 }

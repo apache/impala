@@ -73,6 +73,7 @@ row_regex:.*Analyzed query: SELECT id FROM test_stats_extrapolation_.*.alltypes.
 'F00:PLAN FRAGMENT [UNPARTITIONED] hosts=1 instances=1'
 row_regex:.*Per-Host Resources: mem-estimate=.* mem-reservation=.*
 'PLAN-ROOT SINK'
+'|  output exprs: id'
 row_regex:.*mem-estimate=.* mem-reservation=.*
 '|'
 '00:SCAN $FILESYSTEM_NAME [$DATABASE.alltypes]'
@@ -101,6 +102,7 @@ row_regex:.*Analyzed query: SELECT id FROM test_stats_extrapolation_.*.alltypes 
 'F00:PLAN FRAGMENT [UNPARTITIONED] hosts=1 instances=1'
 row_regex:.*mem-estimate=.* mem-reservation=.*
 'PLAN-ROOT SINK'
+'|  output exprs: id'
 row_regex:.*mem-estimate=.* mem-reservation=.*
 '|'
 '00:SCAN $FILESYSTEM_NAME [$DATABASE.alltypes]'
@@ -130,6 +132,7 @@ row_regex:.*Analyzed query: SELECT id FROM test_stats_extrapolation_.*.alltypes.
 'F00:PLAN FRAGMENT [UNPARTITIONED] hosts=1 instances=1'
 row_regex:.*Per-Host Resources: mem-estimate=.* mem-reservation=.*
 'PLAN-ROOT SINK'
+'|  output exprs: id'
 row_regex:.*mem-estimate=.* mem-reservation=.*
 '|'
 '00:SCAN $FILESYSTEM_NAME [$DATABASE.alltypes]'
@@ -160,6 +163,7 @@ row_regex:.*Analyzed query: SELECT id FROM test_stats_extrapolation_.*.alltypes 
 'F00:PLAN FRAGMENT [UNPARTITIONED] hosts=1 instances=1'
 row_regex:.*Per-Host Resources: mem-estimate=.* mem-reservation=.*
 'PLAN-ROOT SINK'
+'|  output exprs: id'
 row_regex:.*mem-estimate=.* mem-reservation=.*
 '|'
 '00:SCAN $FILESYSTEM_NAME [$DATABASE.alltypes]'
@@ -190,6 +194,7 @@ row_regex:.*Analyzed query: SELECT id FROM test_stats_extrapolation_.*.alltypes 
 'F00:PLAN FRAGMENT [UNPARTITIONED] hosts=1 instances=1'
 row_regex:.*Per-Host Resources: mem-estimate=.* mem-reservation=.*
 'PLAN-ROOT SINK'
+'|  output exprs: id'
 row_regex:.*mem-estimate=.* mem-reservation=.*
 '|'
 '00:SCAN $FILESYSTEM_NAME [$DATABASE.alltypes]'

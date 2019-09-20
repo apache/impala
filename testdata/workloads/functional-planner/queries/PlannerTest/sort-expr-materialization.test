@@ -4,6 +4,7 @@ select * from functional.alltypes order by random()
 F00:PLAN FRAGMENT [UNPARTITIONED] hosts=1 instances=1
 |  Per-Host Resources: mem-estimate=140.00MB mem-reservation=12.03MB thread-reservation=2
 PLAN-ROOT SINK
+|  output exprs: id, bool_col, tinyint_col, smallint_col, int_col, bigint_col, float_col, double_col, date_string_col, string_col, timestamp_col, year, month
 |  mem-estimate=0B mem-reservation=0B thread-reservation=0
 |
 01:SORT
@@ -14,7 +15,7 @@ PLAN-ROOT SINK
 |  in pipelines: 01(GETNEXT), 00(OPEN)
 |
 00:SCAN HDFS [functional.alltypes]
-   partitions=24/24 files=24 size=478.45KB
+   HDFS partitions=24/24 files=24 size=478.45KB
    stored statistics:
      table: rows=7.30K size=478.45KB
      partitions: 24/24 rows=7.30K
@@ -30,6 +31,7 @@ select * from functional.alltypes order by abs(id) + abs(id)
 F00:PLAN FRAGMENT [UNPARTITIONED] hosts=1 instances=1
 |  Per-Host Resources: mem-estimate=140.00MB mem-reservation=12.03MB thread-reservation=2
 PLAN-ROOT SINK
+|  output exprs: id, bool_col, tinyint_col, smallint_col, int_col, bigint_col, float_col, double_col, date_string_col, string_col, timestamp_col, year, month
 |  mem-estimate=0B mem-reservation=0B thread-reservation=0
 |
 01:SORT
@@ -40,7 +42,7 @@ PLAN-ROOT SINK
 |  in pipelines: 01(GETNEXT), 00(OPEN)
 |
 00:SCAN HDFS [functional.alltypes]
-   partitions=24/24 files=24 size=478.45KB
+   HDFS partitions=24/24 files=24 size=478.45KB
    stored statistics:
      table: rows=7.30K size=478.45KB
      partitions: 24/24 rows=7.30K
@@ -56,6 +58,7 @@ select * from functional.alltypes order by tinyint_col + 1
 F00:PLAN FRAGMENT [UNPARTITIONED] hosts=1 instances=1
 |  Per-Host Resources: mem-estimate=140.00MB mem-reservation=12.03MB thread-reservation=2
 PLAN-ROOT SINK
+|  output exprs: id, bool_col, tinyint_col, smallint_col, int_col, bigint_col, float_col, double_col, date_string_col, string_col, timestamp_col, year, month
 |  mem-estimate=0B mem-reservation=0B thread-reservation=0
 |
 01:SORT
@@ -65,7 +68,7 @@ PLAN-ROOT SINK
 |  in pipelines: 01(GETNEXT), 00(OPEN)
 |
 00:SCAN HDFS [functional.alltypes]
-   partitions=24/24 files=24 size=478.45KB
+   HDFS partitions=24/24 files=24 size=478.45KB
    stored statistics:
      table: rows=7.30K size=478.45KB
      partitions: 24/24 rows=7.30K
@@ -82,6 +85,7 @@ order by dayofweek(timestamp_col), true, id + 1, string_col = date_string_col, i
 F00:PLAN FRAGMENT [UNPARTITIONED] hosts=1 instances=1
 |  Per-Host Resources: mem-estimate=140.00MB mem-reservation=12.03MB thread-reservation=2
 PLAN-ROOT SINK
+|  output exprs: id, bool_col, tinyint_col, smallint_col, int_col, bigint_col, float_col, double_col, date_string_col, string_col, timestamp_col, year, month
 |  mem-estimate=0B mem-reservation=0B thread-reservation=0
 |
 01:SORT
@@ -92,7 +96,7 @@ PLAN-ROOT SINK
 |  in pipelines: 01(GETNEXT), 00(OPEN)
 |
 00:SCAN HDFS [functional.alltypes]
-   partitions=24/24 files=24 size=478.45KB
+   HDFS partitions=24/24 files=24 size=478.45KB
    stored statistics:
      table: rows=7.30K size=478.45KB
      partitions: 24/24 rows=7.30K
@@ -109,6 +113,7 @@ from functional.alltypes
 F00:PLAN FRAGMENT [UNPARTITIONED] hosts=1 instances=1
 |  Per-Host Resources: mem-estimate=144.00MB mem-reservation=16.03MB thread-reservation=2
 PLAN-ROOT SINK
+|  output exprs: last_value(id)
 |  mem-estimate=0B mem-reservation=0B thread-reservation=0
 |
 02:ANALYTIC
@@ -127,7 +132,7 @@ PLAN-ROOT SINK
 |  in pipelines: 01(GETNEXT), 00(OPEN)
 |
 00:SCAN HDFS [functional.alltypes]
-   partitions=24/24 files=24 size=478.45KB
+   HDFS partitions=24/24 files=24 size=478.45KB
    stored statistics:
      table: rows=7.30K size=478.45KB
      partitions: 24/24 rows=7.30K
@@ -144,6 +149,7 @@ regexp_replace(string_col, 'a.*b', 'c') limit 10
 F00:PLAN FRAGMENT [UNPARTITIONED] hosts=1 instances=1
 |  Per-Host Resources: mem-estimate=128.00MB mem-reservation=32.00KB thread-reservation=2
 PLAN-ROOT SINK
+|  output exprs: id
 |  mem-estimate=0B mem-reservation=0B thread-reservation=0
 |
 01:TOP-N [LIMIT=10]
@@ -154,7 +160,7 @@ PLAN-ROOT SINK
 |  in pipelines: 01(GETNEXT), 00(OPEN)
 |
 00:SCAN HDFS [functional.alltypes]
-   partitions=24/24 files=24 size=478.45KB
+   HDFS partitions=24/24 files=24 size=478.45KB
    stored statistics:
      table: rows=7.30K size=478.45KB
      partitions: 24/24 rows=7.30K
@@ -170,6 +176,7 @@ select * from functional.alltypes order by TestFn(double_col)
 F00:PLAN FRAGMENT [UNPARTITIONED] hosts=1 instances=1
 |  Per-Host Resources: mem-estimate=140.00MB mem-reservation=12.03MB thread-reservation=2
 PLAN-ROOT SINK
+|  output exprs: id, bool_col, tinyint_col, smallint_col, int_col, bigint_col, float_col, double_col, date_string_col, string_col, timestamp_col, year, month
 |  mem-estimate=0B mem-reservation=0B thread-reservation=0
 |
 01:SORT
@@ -180,7 +187,7 @@ PLAN-ROOT SINK
 |  in pipelines: 01(GETNEXT), 00(OPEN)
 |
 00:SCAN HDFS [functional.alltypes]
-   partitions=24/24 files=24 size=478.45KB
+   HDFS partitions=24/24 files=24 size=478.45KB
    stored statistics:
      table: rows=7.30K size=478.45KB
      partitions: 24/24 rows=7.30K
@@ -196,6 +203,7 @@ select concat(date_string_col, string_col) c from functional.alltypes order by c
 F00:PLAN FRAGMENT [UNPARTITIONED] hosts=1 instances=1
 |  Per-Host Resources: mem-estimate=140.00MB mem-reservation=12.03MB thread-reservation=2
 PLAN-ROOT SINK
+|  output exprs: concat(date_string_col, string_col)
 |  mem-estimate=0B mem-reservation=0B thread-reservation=0
 |
 01:SORT
@@ -206,7 +214,7 @@ PLAN-ROOT SINK
 |  in pipelines: 01(GETNEXT), 00(OPEN)
 |
 00:SCAN HDFS [functional.alltypes]
-   partitions=24/24 files=24 size=478.45KB
+   HDFS partitions=24/24 files=24 size=478.45KB
    stored statistics:
      table: rows=7.30K size=478.45KB
      partitions: 24/24 rows=7.30K
@@ -226,6 +234,7 @@ order by id
 F00:PLAN FRAGMENT [UNPARTITIONED] hosts=1 instances=1
 |  Per-Host Resources: mem-estimate=42.00MB mem-reservation=16.00MB thread-reservation=2
 PLAN-ROOT SINK
+|  output exprs: id, row_number()
 |  mem-estimate=0B mem-reservation=0B thread-reservation=0
 |
 03:SORT
@@ -251,7 +260,7 @@ PLAN-ROOT SINK
 |  in pipelines: 01(GETNEXT), 00(OPEN)
 |
 00:SCAN HDFS [functional.alltypestiny]
-   partitions=4/4 files=4 size=460B
+   HDFS partitions=4/4 files=4 size=460B
    stored statistics:
      table: rows=8 size=460B
      partitions: 4/4 rows=8

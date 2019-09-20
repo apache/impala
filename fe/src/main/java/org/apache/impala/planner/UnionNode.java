@@ -319,7 +319,7 @@ public class UnionNode extends PlanNode {
     // and the enclosing select stmt has predicates referring to the inline view.
     if (!conjuncts_.isEmpty()) {
       output.append(detailPrefix
-          + "predicates: " + getExplainString(conjuncts_, detailLevel) + "\n");
+          + "predicates: " + Expr.getExplainString(conjuncts_, detailLevel) + "\n");
     }
     if (!constExprLists_.isEmpty()) {
       output.append(detailPrefix + "constant-operands=" + constExprLists_.size() + "\n");

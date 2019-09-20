@@ -11,6 +11,7 @@ CAST(0 AS BIGINT)
 F00:PLAN FRAGMENT [UNPARTITIONED] hosts=1 instances=1
 |  Per-Host Resources: mem-estimate=264.00MB mem-reservation=16.00MB thread-reservation=2
 PLAN-ROOT SINK
+|  output exprs: CAST(1 AS TINYINT)
 |  mem-estimate=0B mem-reservation=0B thread-reservation=0
 |
 01:SUBPLAN
@@ -58,14 +59,14 @@ PLAN-ROOT SINK
 |     in pipelines: 00(GETNEXT)
 |
 00:SCAN HDFS [tpch_nested_parquet.customer c]
-   partitions=1/1 files=4 size=288.99MB
+   HDFS partitions=1/1 files=4 size=288.99MB
    predicates: c_custkey > CAST(10 AS BIGINT), !empty(c.c_orders)
    predicates on o: !empty(o.o_lineitems), o_orderkey = CAST(4 AS BIGINT)
    predicates on o_lineitems: CAST(20 AS BIGINT) + CAST(l_linenumber AS BIGINT) < CAST(0 AS BIGINT)
    stored statistics:
-     table: rows=150.00K size=288.98MB
+     table: rows=150.00K size=288.99MB
      columns missing stats: c_orders
-   extrapolated-rows=disabled max-scan-range-rows=44.23K
+   extrapolated-rows=disabled max-scan-range-rows=50.12K
    parquet statistics predicates: c_custkey > CAST(10 AS BIGINT)
    parquet statistics predicates on o: o_orderkey = CAST(4 AS BIGINT)
    parquet dictionary predicates: c_custkey > CAST(10 AS BIGINT)
@@ -85,6 +86,7 @@ AND tinyint_col = CAST(5 AS TINYINT) AND id >= '10' AND id <= '20'
 F00:PLAN FRAGMENT [UNPARTITIONED] hosts=1 instances=1
 |  Per-Host Resources: mem-estimate=4.00KB mem-reservation=0B thread-reservation=1
 PLAN-ROOT SINK
+|  output exprs: functional_hbase.stringids.id, functional_hbase.stringids.bigint_col, functional_hbase.stringids.bool_col, functional_hbase.stringids.date_string_col, functional_hbase.stringids.day, functional_hbase.stringids.double_col, functional_hbase.stringids.float_col, functional_hbase.stringids.int_col, functional_hbase.stringids.month, functional_hbase.stringids.smallint_col, functional_hbase.stringids.string_col, functional_hbase.stringids.timestamp_col, functional_hbase.stringids.tinyint_col, functional_hbase.stringids.year
 |  mem-estimate=0B mem-reservation=0B thread-reservation=0
 |
 00:SCAN HBASE [functional_hbase.stringids]
@@ -110,6 +112,7 @@ FLOAT) AND int_col < CAST(2 AS INT)
 F00:PLAN FRAGMENT [UNPARTITIONED] hosts=1 instances=1
 |  Per-Host Resources: mem-estimate=1.00GB mem-reservation=0B thread-reservation=1
 PLAN-ROOT SINK
+|  output exprs: functional.alltypes_datasource.id, functional.alltypes_datasource.bool_col, functional.alltypes_datasource.tinyint_col, functional.alltypes_datasource.smallint_col, functional.alltypes_datasource.int_col, functional.alltypes_datasource.bigint_col, functional.alltypes_datasource.float_col, functional.alltypes_datasource.double_col, functional.alltypes_datasource.timestamp_col, functional.alltypes_datasource.string_col, functional.alltypes_datasource.dec_col1, functional.alltypes_datasource.dec_col2, functional.alltypes_datasource.dec_col3, functional.alltypes_datasource.dec_col4, functional.alltypes_datasource.dec_col5, functional.alltypes_datasource.date_col
 |  mem-estimate=0B mem-reservation=0B thread-reservation=0
 |
 00:SCAN DATA SOURCE [functional.alltypes_datasource]
@@ -136,6 +139,7 @@ AS BIGINT) + CAST(id AS BIGINT)) <= CAST(10 AS BIGINT)
 F00:PLAN FRAGMENT [UNPARTITIONED] hosts=1 instances=1
 |  Per-Host Resources: mem-estimate=138.00MB mem-reservation=1.97MB thread-reservation=2
 PLAN-ROOT SINK
+|  output exprs: sum(2 + id)
 |  mem-estimate=0B mem-reservation=0B thread-reservation=0
 |
 01:AGGREGATE [FINALIZE]
@@ -147,7 +151,7 @@ PLAN-ROOT SINK
 |  in pipelines: 01(GETNEXT), 00(OPEN)
 |
 00:SCAN HDFS [functional.alltypes]
-   partitions=24/24 files=24 size=478.45KB
+   HDFS partitions=24/24 files=24 size=478.45KB
    stored statistics:
      table: rows=7.30K size=478.45KB
      partitions: 24/24 rows=7.30K
@@ -173,6 +177,7 @@ DECIMAL(6,1))
 F00:PLAN FRAGMENT [UNPARTITIONED] hosts=1 instances=1
 |  Per-Host Resources: mem-estimate=257.94MB mem-reservation=2.00MB thread-reservation=3
 PLAN-ROOT SINK
+|  output exprs: CAST(1 AS TINYINT)
 |  mem-estimate=0B mem-reservation=0B thread-reservation=0
 |
 02:HASH JOIN [LEFT OUTER JOIN]
@@ -185,7 +190,7 @@ PLAN-ROOT SINK
 |  in pipelines: 00(GETNEXT), 01(OPEN)
 |
 |--01:SCAN HDFS [functional.alltypes b]
-|     partitions=24/24 files=24 size=478.45KB
+|     HDFS partitions=24/24 files=24 size=478.45KB
 |     predicates: CAST(b.double_col AS DECIMAL(3,2)) > CAST(11.1 AS DECIMAL(6,1))
 |     stored statistics:
 |       table: rows=7.30K size=478.45KB
@@ -197,7 +202,7 @@ PLAN-ROOT SINK
 |     in pipelines: 01(GETNEXT)
 |
 00:SCAN HDFS [functional.alltypes a]
-   partitions=24/24 files=24 size=478.45KB
+   HDFS partitions=24/24 files=24 size=478.45KB
    stored statistics:
      table: rows=7.30K size=478.45KB
      partitions: 24/24 rows=7.30K
@@ -224,6 +229,7 @@ DECIMAL(6,1))
 F00:PLAN FRAGMENT [UNPARTITIONED] hosts=1 instances=1
 |  Per-Host Resources: mem-estimate=256.01MB mem-reservation=64.00KB thread-reservation=3
 PLAN-ROOT SINK
+|  output exprs: CAST(1 AS TINYINT)
 |  mem-estimate=0B mem-reservation=0B thread-reservation=0
 |
 02:NESTED LOOP JOIN [LEFT OUTER JOIN]
@@ -234,7 +240,7 @@ PLAN-ROOT SINK
 |  in pipelines: 00(GETNEXT), 01(OPEN)
 |
 |--01:SCAN HDFS [functional.alltypes b]
-|     partitions=24/24 files=24 size=478.45KB
+|     HDFS partitions=24/24 files=24 size=478.45KB
 |     predicates: CAST(b.double_col AS DECIMAL(3,2)) > CAST(11.1 AS DECIMAL(6,1))
 |     stored statistics:
 |       table: rows=7.30K size=478.45KB
@@ -246,7 +252,7 @@ PLAN-ROOT SINK
 |     in pipelines: 01(GETNEXT)
 |
 00:SCAN HDFS [functional.alltypes a]
-   partitions=24/24 files=24 size=478.45KB
+   HDFS partitions=24/24 files=24 size=478.45KB
    stored statistics:
      table: rows=7.30K size=478.45KB
      partitions: 24/24 rows=7.30K
@@ -269,6 +275,7 @@ BIGINT)
 F00:PLAN FRAGMENT [UNPARTITIONED] hosts=1 instances=1
 |  Per-Host Resources: mem-estimate=138.00MB mem-reservation=3.88MB thread-reservation=2
 PLAN-ROOT SINK
+|  output exprs: sum(2 + id)
 |  mem-estimate=0B mem-reservation=0B thread-reservation=0
 |
 02:AGGREGATE [FINALIZE]
@@ -287,7 +294,7 @@ PLAN-ROOT SINK
 |  in pipelines: 01(GETNEXT), 00(OPEN)
 |
 00:SCAN HDFS [functional.alltypes]
-   partitions=24/24 files=24 size=478.45KB
+   HDFS partitions=24/24 files=24 size=478.45KB
    stored statistics:
      table: rows=7.30K size=478.45KB
      partitions: 24/24 rows=7.30K
@@ -308,6 +315,7 @@ BIGINT) = CAST(0 AS BIGINT)
 F00:PLAN FRAGMENT [UNPARTITIONED] hosts=1 instances=1
 |  Per-Host Resources: mem-estimate=138.00MB mem-reservation=1.97MB thread-reservation=2
 PLAN-ROOT SINK
+|  output exprs: sum(2 + id)
 |  mem-estimate=0B mem-reservation=0B thread-reservation=0
 |
 02:AGGREGATE [FINALIZE]
@@ -325,7 +333,7 @@ PLAN-ROOT SINK
 |  in pipelines: 01(GETNEXT), 00(OPEN)
 |
 00:SCAN HDFS [functional.alltypes]
-   partitions=24/24 files=24 size=478.45KB
+   HDFS partitions=24/24 files=24 size=478.45KB
    stored statistics:
      table: rows=7.30K size=478.45KB
      partitions: 24/24 rows=7.30K
@@ -347,6 +355,7 @@ bigint_col) ASC) FROM functional.alltypes
 F00:PLAN FRAGMENT [UNPARTITIONED] hosts=1 instances=1
 |  Per-Host Resources: mem-estimate=144.00MB mem-reservation=16.03MB thread-reservation=2
 PLAN-ROOT SINK
+|  output exprs: first_value(2 + int_col - 0)
 |  mem-estimate=0B mem-reservation=0B thread-reservation=0
 |
 02:ANALYTIC
@@ -366,7 +375,7 @@ PLAN-ROOT SINK
 |  in pipelines: 01(GETNEXT), 00(OPEN)
 |
 00:SCAN HDFS [functional.alltypes]
-   partitions=24/24 files=24 size=478.45KB
+   HDFS partitions=24/24 files=24 size=478.45KB
    stored statistics:
      table: rows=7.30K size=478.45KB
      partitions: 24/24 rows=7.30K
@@ -385,6 +394,7 @@ AS DOUBLE) ASC
 F00:PLAN FRAGMENT [UNPARTITIONED] hosts=1 instances=1
 |  Per-Host Resources: mem-estimate=134.00MB mem-reservation=6.03MB thread-reservation=2
 PLAN-ROOT SINK
+|  output exprs: int_col
 |  mem-estimate=0B mem-reservation=0B thread-reservation=0
 |
 01:SORT
@@ -394,7 +404,7 @@ PLAN-ROOT SINK
 |  in pipelines: 01(GETNEXT), 00(OPEN)
 |
 00:SCAN HDFS [functional.alltypes]
-   partitions=24/24 files=24 size=478.45KB
+   HDFS partitions=24/24 files=24 size=478.45KB
    stored statistics:
      table: rows=7.30K size=478.45KB
      partitions: 24/24 rows=7.30K
@@ -416,6 +426,7 @@ F00:PLAN FRAGMENT [UNPARTITIONED] hosts=1 instances=1
 |  Per-Host Resources: mem-estimate=38.00MB mem-reservation=6.01MB thread-reservation=2
 WRITE TO HDFS [functional.alltypes, OVERWRITE=false, PARTITION-KEYS=(CAST(3 + year AS INT),CAST(month - -1 AS INT))]
 |  partitions=4
+|  output exprs: id, NULL, NULL, NULL, int_col, NULL, NULL, NULL, NULL, NULL, NULL, CAST(CAST(3 AS BIGINT) + CAST(year AS BIGINT) AS INT), CAST(CAST(month AS BIGINT) - CAST(-1 AS BIGINT) AS INT)
 |  mem-estimate=1.56KB mem-reservation=0B thread-reservation=0
 |
 01:SORT
@@ -425,7 +436,7 @@ WRITE TO HDFS [functional.alltypes, OVERWRITE=false, PARTITION-KEYS=(CAST(3 + ye
 |  in pipelines: 01(GETNEXT), 00(OPEN)
 |
 00:SCAN HDFS [functional.alltypessmall]
-   partitions=4/4 files=4 size=6.32KB
+   HDFS partitions=4/4 files=4 size=6.32KB
    stored statistics:
      table: rows=100 size=6.32KB
      partitions: 4/4 rows=100
@@ -450,6 +461,7 @@ functional.alltypes LIMIT CAST(2 AS TINYINT)) v1) v2) v3
 F00:PLAN FRAGMENT [UNPARTITIONED] hosts=1 instances=1
 |  Per-Host Resources: mem-estimate=138.00MB mem-reservation=32.00KB thread-reservation=2
 PLAN-ROOT SINK
+|  output exprs: sum(id + c3)
 |  mem-estimate=0B mem-reservation=0B thread-reservation=0
 |
 01:AGGREGATE [FINALIZE]
@@ -459,7 +471,7 @@ PLAN-ROOT SINK
 |  in pipelines: 01(GETNEXT), 00(OPEN)
 |
 00:SCAN HDFS [functional.alltypes]
-   partitions=24/24 files=24 size=478.45KB
+   HDFS partitions=24/24 files=24 size=478.45KB
    stored statistics:
      table: rows=7.30K size=478.45KB
      partitions: 24/24 rows=7.30K

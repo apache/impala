@@ -17,11 +17,16 @@
 
 package org.apache.impala.planner;
 
+import java.util.List;
+
+import org.apache.impala.analysis.Expr;
 import org.apache.impala.thrift.TDataSink;
 import org.apache.impala.thrift.TDataSinkType;
 import org.apache.impala.thrift.TExplainLevel;
 import org.apache.impala.thrift.TPlanRootSink;
 import org.apache.impala.thrift.TQueryOptions;
+
+import com.google.common.base.Preconditions;
 
 
 /**
@@ -36,10 +41,22 @@ public class PlanRootSink extends DataSink {
   // IMPALA-4268 for details on how this value was chosen.
   private static final long DEFAULT_RESULT_SPOOLING_ESTIMATED_MEMORY = 10 * 1024 * 1024;
 
+  // One expression per result column for the query.
+  private final List<Expr> outputExprs_;
+
+  public PlanRootSink(List<Expr> outputExprs) {
+    Preconditions.checkState(outputExprs != null);
+    outputExprs_ = outputExprs;
+  }
+
   @Override
   public void appendSinkExplainString(String prefix, String detailPrefix,
       TQueryOptions queryOptions, TExplainLevel explainLevel, StringBuilder output) {
     output.append(String.format("%sPLAN-ROOT SINK\n", prefix));
+    if (explainLevel.ordinal() >= TExplainLevel.EXTENDED.ordinal()) {
+      output.append(detailPrefix + "output exprs: ")
+          .append(Expr.getExplainString(outputExprs_, explainLevel) + "\n");
+    }
   }
 
   @Override
@@ -101,10 +118,16 @@ public class PlanRootSink extends DataSink {
   protected void toThriftImpl(TDataSink tsink) {
     TPlanRootSink tPlanRootSink = new TPlanRootSink(resourceProfile_.toThrift());
     tsink.setPlan_root_sink(tPlanRootSink);
+    tsink.output_exprs = Expr.treesToThrift(outputExprs_);
   }
 
   @Override
   protected TDataSinkType getSinkType() {
     return TDataSinkType.PLAN_ROOT_SINK;
+  }
+
+  @Override
+  public void collectExprs(List<Expr> exprs) {
+    exprs.addAll(outputExprs_);
   }
 }

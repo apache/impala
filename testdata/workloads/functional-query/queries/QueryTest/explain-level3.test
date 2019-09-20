@@ -13,6 +13,7 @@ row_regex:.*Per-Host Resource Estimates: Memory=[0-9.]*MB.*
 'F02:PLAN FRAGMENT [UNPARTITIONED] hosts=1 instances=1'
 row_regex:.*Per-Host Resources: mem-estimate=[0-9.]*[A-Z]*B mem-reservation=[0-9.]*[A-Z]*B thread-reservation=1
 '  PLAN-ROOT SINK'
+'  |  output exprs: tpch.lineitem.l_orderkey, tpch.lineitem.l_partkey, tpch.lineitem.l_suppkey, tpch.lineitem.l_linenumber, tpch.lineitem.l_quantity, tpch.lineitem.l_extendedprice, tpch.lineitem.l_discount, tpch.lineitem.l_tax, tpch.lineitem.l_returnflag, tpch.lineitem.l_linestatus, tpch.lineitem.l_shipdate, tpch.lineitem.l_commitdate, tpch.lineitem.l_receiptdate, tpch.lineitem.l_shipinstruct, tpch.lineitem.l_shipmode, tpch.lineitem.l_comment, tpch.orders.o_orderkey, tpch.orders.o_custkey, tpch.orders.o_orderstatus, tpch.orders.o_totalprice, tpch.orders.o_orderdate, tpch.orders.o_orderpriority, tpch.orders.o_clerk, tpch.orders.o_shippriority, tpch.orders.o_comment'
 row_regex:.*mem-estimate=[0-9.]*[A-Z]*B mem-reservation=[0-9.]*[A-Z]*B thread-reservation=0
 '  |'
 '  04:EXCHANGE [UNPARTITIONED]'

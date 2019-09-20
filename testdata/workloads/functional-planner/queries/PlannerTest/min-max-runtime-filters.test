@@ -5,6 +5,7 @@ where a.int_col = b.tinyint_col + 1 and a.string_col = b.string_col
 F00:PLAN FRAGMENT [UNPARTITIONED] hosts=1 instances=1
 |  Per-Host Resources: mem-estimate=13.44MB mem-reservation=1.94MB thread-reservation=3
 PLAN-ROOT SINK
+|  output exprs: count(*)
 |  mem-estimate=0B mem-reservation=0B thread-reservation=0
 |
 03:AGGREGATE [FINALIZE]
@@ -42,6 +43,7 @@ where a.int_col + 1 = b.int_col
 F00:PLAN FRAGMENT [UNPARTITIONED] hosts=1 instances=1
 |  Per-Host Resources: mem-estimate=14.19MB mem-reservation=1.94MB thread-reservation=3
 PLAN-ROOT SINK
+|  output exprs: count(*)
 |  mem-estimate=0B mem-reservation=0B thread-reservation=0
 |
 03:AGGREGATE [FINALIZE]
@@ -78,6 +80,7 @@ where a.tinyint_col = b.bigint_col
 F00:PLAN FRAGMENT [UNPARTITIONED] hosts=1 instances=1
 |  Per-Host Resources: mem-estimate=14.94MB mem-reservation=1.94MB thread-reservation=3
 PLAN-ROOT SINK
+|  output exprs: count(*)
 |  mem-estimate=0B mem-reservation=0B thread-reservation=0
 |
 03:AGGREGATE [FINALIZE]
@@ -113,6 +116,7 @@ where a.int_col = b.int_col and a.int_col = c.int_col
 F00:PLAN FRAGMENT [UNPARTITIONED] hosts=1 instances=1
 |  Per-Host Resources: mem-estimate=2.02GB mem-reservation=36.95MB thread-reservation=4 runtime-filters-memory=1.00MB
 PLAN-ROOT SINK
+|  output exprs: count(*)
 |  mem-estimate=0B mem-reservation=0B thread-reservation=0
 |
 05:AGGREGATE [FINALIZE]
@@ -143,7 +147,7 @@ PLAN-ROOT SINK
 |  in pipelines: 00(GETNEXT), 01(OPEN)
 |
 |--01:SCAN HDFS [functional_parquet.alltypes b]
-|     partitions=24/24 files=24 size=189.28KB
+|     HDFS partitions=24/24 files=24 size=200.33KB
 |     runtime filters: RF000[bloom] -> b.int_col
 |     stored statistics:
 |       table: rows=unavailable size=unavailable

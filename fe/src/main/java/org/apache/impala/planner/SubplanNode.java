@@ -20,6 +20,7 @@ package org.apache.impala.planner;
 import java.util.ArrayList;
 
 import org.apache.impala.analysis.Analyzer;
+import org.apache.impala.analysis.Expr;
 import org.apache.impala.common.InternalException;
 import org.apache.impala.thrift.TExecNodePhase;
 import org.apache.impala.thrift.TExplainLevel;
@@ -139,7 +140,7 @@ public class SubplanNode extends PlanNode {
     if (detailLevel.ordinal() >= TExplainLevel.STANDARD.ordinal()) {
       if (!conjuncts_.isEmpty()) {
         output.append(detailPrefix
-            + "predicates: " + getExplainString(conjuncts_, detailLevel) + "\n");
+            + "predicates: " + Expr.getExplainString(conjuncts_, detailLevel) + "\n");
       }
     }
     return output.toString();

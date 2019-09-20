@@ -3,6 +3,7 @@ select * from functional_kudu.zipcode_incomes where id = '8600000US00601'
 F00:PLAN FRAGMENT [UNPARTITIONED] hosts=1 instances=1
 Per-Host Resources: mem-estimate=1.88MB mem-reservation=0B thread-reservation=2
   PLAN-ROOT SINK
+  |  output exprs: functional_kudu.zipcode_incomes.id, functional_kudu.zipcode_incomes.zip, functional_kudu.zipcode_incomes.description1, functional_kudu.zipcode_incomes.description2, functional_kudu.zipcode_incomes.income
   |  mem-estimate=0B mem-reservation=0B thread-reservation=0
   |
   00:SCAN KUDU [functional_kudu.zipcode_incomes]
@@ -14,6 +15,7 @@ Per-Host Resources: mem-estimate=1.88MB mem-reservation=0B thread-reservation=2
 F01:PLAN FRAGMENT [UNPARTITIONED] hosts=1 instances=1
 Per-Host Resources: mem-estimate=16.00KB mem-reservation=0B thread-reservation=1
   PLAN-ROOT SINK
+  |  output exprs: functional_kudu.zipcode_incomes.id, functional_kudu.zipcode_incomes.zip, functional_kudu.zipcode_incomes.description1, functional_kudu.zipcode_incomes.description2, functional_kudu.zipcode_incomes.income
   |  mem-estimate=0B mem-reservation=0B thread-reservation=0
   |
   01:EXCHANGE [UNPARTITIONED]
@@ -37,6 +39,7 @@ select * from functional_kudu.zipcode_incomes where id != '1' and zip = '2'
 F00:PLAN FRAGMENT [UNPARTITIONED] hosts=1 instances=1
 Per-Host Resources: mem-estimate=3.75MB mem-reservation=0B thread-reservation=2
   PLAN-ROOT SINK
+  |  output exprs: functional_kudu.zipcode_incomes.id, functional_kudu.zipcode_incomes.zip, functional_kudu.zipcode_incomes.description1, functional_kudu.zipcode_incomes.description2, functional_kudu.zipcode_incomes.income
   |  mem-estimate=0B mem-reservation=0B thread-reservation=0
   |
   00:SCAN KUDU [functional_kudu.zipcode_incomes]
@@ -49,6 +52,7 @@ Per-Host Resources: mem-estimate=3.75MB mem-reservation=0B thread-reservation=2
 F01:PLAN FRAGMENT [UNPARTITIONED] hosts=1 instances=1
 Per-Host Resources: mem-estimate=16.00KB mem-reservation=0B thread-reservation=1
   PLAN-ROOT SINK
+  |  output exprs: functional_kudu.zipcode_incomes.id, functional_kudu.zipcode_incomes.zip, functional_kudu.zipcode_incomes.description1, functional_kudu.zipcode_incomes.description2, functional_kudu.zipcode_incomes.income
   |  mem-estimate=0B mem-reservation=0B thread-reservation=0
   |
   01:EXCHANGE [UNPARTITIONED]
@@ -72,6 +76,7 @@ select * from functional_kudu.zipcode_incomes where id > '1' and zip > '2'
 F00:PLAN FRAGMENT [UNPARTITIONED] hosts=1 instances=1
 Per-Host Resources: mem-estimate=3.75MB mem-reservation=0B thread-reservation=2
   PLAN-ROOT SINK
+  |  output exprs: functional_kudu.zipcode_incomes.id, functional_kudu.zipcode_incomes.zip, functional_kudu.zipcode_incomes.description1, functional_kudu.zipcode_incomes.description2, functional_kudu.zipcode_incomes.income
   |  mem-estimate=0B mem-reservation=0B thread-reservation=0
   |
   00:SCAN KUDU [functional_kudu.zipcode_incomes]
@@ -83,6 +88,7 @@ Per-Host Resources: mem-estimate=3.75MB mem-reservation=0B thread-reservation=2
 F01:PLAN FRAGMENT [UNPARTITIONED] hosts=1 instances=1
 Per-Host Resources: mem-estimate=517.89KB mem-reservation=0B thread-reservation=1
   PLAN-ROOT SINK
+  |  output exprs: functional_kudu.zipcode_incomes.id, functional_kudu.zipcode_incomes.zip, functional_kudu.zipcode_incomes.description1, functional_kudu.zipcode_incomes.description2, functional_kudu.zipcode_incomes.income
   |  mem-estimate=0B mem-reservation=0B thread-reservation=0
   |
   01:EXCHANGE [UNPARTITIONED]
@@ -105,6 +111,7 @@ select * from functional_kudu.zipcode_incomes where id = '1' or id = '2' or zip 
 F00:PLAN FRAGMENT [UNPARTITIONED] hosts=1 instances=1
 Per-Host Resources: mem-estimate=3.75MB mem-reservation=0B thread-reservation=2
   PLAN-ROOT SINK
+  |  output exprs: functional_kudu.zipcode_incomes.id, functional_kudu.zipcode_incomes.zip, functional_kudu.zipcode_incomes.description1, functional_kudu.zipcode_incomes.description2, functional_kudu.zipcode_incomes.income
   |  mem-estimate=0B mem-reservation=0B thread-reservation=0
   |
   00:SCAN KUDU [functional_kudu.zipcode_incomes]
@@ -116,6 +123,7 @@ Per-Host Resources: mem-estimate=3.75MB mem-reservation=0B thread-reservation=2
 F01:PLAN FRAGMENT [UNPARTITIONED] hosts=1 instances=1
 Per-Host Resources: mem-estimate=16.00KB mem-reservation=0B thread-reservation=1
   PLAN-ROOT SINK
+  |  output exprs: functional_kudu.zipcode_incomes.id, functional_kudu.zipcode_incomes.zip, functional_kudu.zipcode_incomes.description1, functional_kudu.zipcode_incomes.description2, functional_kudu.zipcode_incomes.income
   |  mem-estimate=0B mem-reservation=0B thread-reservation=0
   |
   01:EXCHANGE [UNPARTITIONED]
@@ -161,6 +169,7 @@ id in (int_col)
 F00:PLAN FRAGMENT [UNPARTITIONED] hosts=1 instances=1
 Per-Host Resources: mem-estimate=9.75MB mem-reservation=0B thread-reservation=2
   PLAN-ROOT SINK
+  |  output exprs: functional_kudu.alltypes.id, functional_kudu.alltypes.bool_col, functional_kudu.alltypes.tinyint_col, functional_kudu.alltypes.smallint_col, functional_kudu.alltypes.int_col, functional_kudu.alltypes.bigint_col, functional_kudu.alltypes.float_col, functional_kudu.alltypes.double_col, functional_kudu.alltypes.date_string_col, functional_kudu.alltypes.string_col, functional_kudu.alltypes.timestamp_col, functional_kudu.alltypes.year, functional_kudu.alltypes.month
   |  mem-estimate=0B mem-reservation=0B thread-reservation=0
   |
   00:SCAN KUDU [functional_kudu.alltypes]
@@ -176,6 +185,7 @@ select * from functional_kudu.decimal_tbl where d1 in (1234, 12345);
 F00:PLAN FRAGMENT [UNPARTITIONED] hosts=1 instances=1
 Per-Host Resources: mem-estimate=4.50MB mem-reservation=0B thread-reservation=2
   PLAN-ROOT SINK
+  |  output exprs: functional_kudu.decimal_tbl.d1, functional_kudu.decimal_tbl.d2, functional_kudu.decimal_tbl.d3, functional_kudu.decimal_tbl.d4, functional_kudu.decimal_tbl.d5, functional_kudu.decimal_tbl.d6
   |  mem-estimate=0B mem-reservation=0B thread-reservation=0
   |
   00:SCAN KUDU [functional_kudu.decimal_tbl]
@@ -194,6 +204,7 @@ timestamp_col < (seconds_add(cast('9999-12-31 24:59:59' as timestamp), 10))
 F00:PLAN FRAGMENT [UNPARTITIONED] hosts=1 instances=1
 Per-Host Resources: mem-estimate=9.75MB mem-reservation=0B thread-reservation=2
   PLAN-ROOT SINK
+  |  output exprs: functional_kudu.alltypes.id, functional_kudu.alltypes.bool_col, functional_kudu.alltypes.tinyint_col, functional_kudu.alltypes.smallint_col, functional_kudu.alltypes.int_col, functional_kudu.alltypes.bigint_col, functional_kudu.alltypes.float_col, functional_kudu.alltypes.double_col, functional_kudu.alltypes.date_string_col, functional_kudu.alltypes.string_col, functional_kudu.alltypes.timestamp_col, functional_kudu.alltypes.year, functional_kudu.alltypes.month
   |  mem-estimate=0B mem-reservation=0B thread-reservation=0
   |
   00:SCAN KUDU [functional_kudu.alltypes]
@@ -210,6 +221,7 @@ timestamp_col in (cast('2010-03-01 00:00:00' as timestamp),
 F00:PLAN FRAGMENT [UNPARTITIONED] hosts=1 instances=1
 Per-Host Resources: mem-estimate=9.75MB mem-reservation=0B thread-reservation=2
   PLAN-ROOT SINK
+  |  output exprs: functional_kudu.alltypes.id, functional_kudu.alltypes.bool_col, functional_kudu.alltypes.tinyint_col, functional_kudu.alltypes.smallint_col, functional_kudu.alltypes.int_col, functional_kudu.alltypes.bigint_col, functional_kudu.alltypes.float_col, functional_kudu.alltypes.double_col, functional_kudu.alltypes.date_string_col, functional_kudu.alltypes.string_col, functional_kudu.alltypes.timestamp_col, functional_kudu.alltypes.year, functional_kudu.alltypes.month
   |  mem-estimate=0B mem-reservation=0B thread-reservation=0
   |
   00:SCAN KUDU [functional_kudu.alltypes]
@@ -226,6 +238,7 @@ timestamp_col in (cast('2010-03-01 00:00:00' as timestamp),
 F00:PLAN FRAGMENT [UNPARTITIONED] hosts=1 instances=1
 Per-Host Resources: mem-estimate=9.75MB mem-reservation=0B thread-reservation=2
   PLAN-ROOT SINK
+  |  output exprs: functional_kudu.alltypes.id, functional_kudu.alltypes.bool_col, functional_kudu.alltypes.tinyint_col, functional_kudu.alltypes.smallint_col, functional_kudu.alltypes.int_col, functional_kudu.alltypes.bigint_col, functional_kudu.alltypes.float_col, functional_kudu.alltypes.double_col, functional_kudu.alltypes.date_string_col, functional_kudu.alltypes.string_col, functional_kudu.alltypes.timestamp_col, functional_kudu.alltypes.year, functional_kudu.alltypes.month
   |  mem-estimate=0B mem-reservation=0B thread-reservation=0
   |
   00:SCAN KUDU [functional_kudu.alltypes]

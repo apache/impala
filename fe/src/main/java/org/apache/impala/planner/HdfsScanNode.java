@@ -94,7 +94,6 @@ import com.google.common.base.Joiner;
 import com.google.common.base.Objects;
 import com.google.common.base.Objects.ToStringHelper;
 import com.google.common.base.Preconditions;
-import com.google.common.collect.ImmutableMap;
 import com.google.common.collect.ImmutableSet;
 import com.google.common.collect.Lists;
 import com.google.common.collect.Sets;
@@ -1412,7 +1411,7 @@ public class HdfsScanNode extends ScanNode {
       if (partitionConjuncts_ != null && !partitionConjuncts_.isEmpty()) {
         output.append(detailPrefix)
           .append(String.format("partition predicates: %s\n",
-              getExplainString(partitionConjuncts_, detailLevel)));
+              Expr.getExplainString(partitionConjuncts_, detailLevel)));
       }
       String partMetaTemplate = "partitions=%d/%d files=%d size=%s\n";
       if (!numPartitionsPerFs_.isEmpty()) {
@@ -1444,7 +1443,7 @@ public class HdfsScanNode extends ScanNode {
       if (!conjuncts_.isEmpty()) {
         output.append(detailPrefix)
           .append(String.format("predicates: %s\n",
-            getExplainString(conjuncts_, detailLevel)));
+              Expr.getExplainString(conjuncts_, detailLevel)));
       }
       if (!collectionConjuncts_.isEmpty()) {
         for (Map.Entry<TupleDescriptor, List<Expr>> entry:
@@ -1452,7 +1451,7 @@ public class HdfsScanNode extends ScanNode {
           String alias = entry.getKey().getAlias();
           output.append(detailPrefix)
             .append(String.format("predicates on %s: %s\n", alias,
-              getExplainString(entry.getValue(), detailLevel)));
+                Expr.getExplainString(entry.getValue(), detailLevel)));
         }
       }
       if (!runtimeFilters_.isEmpty()) {
@@ -1501,11 +1500,11 @@ public class HdfsScanNode extends ScanNode {
       if (tupleDesc == getTupleDesc()) {
         output.append(prefix)
         .append(String.format("parquet statistics predicates: %s\n",
-            getExplainString(exprs, detailLevel)));
+            Expr.getExplainString(exprs, detailLevel)));
       } else {
         output.append(prefix)
         .append(String.format("parquet statistics predicates on %s: %s\n",
-            tupleDesc.getAlias(), getExplainString(exprs, detailLevel)));
+            tupleDesc.getAlias(), Expr.getExplainString(exprs, detailLevel)));
       }
     }
     return output.toString();
@@ -1550,7 +1549,7 @@ public class HdfsScanNode extends ScanNode {
         exprList.add(conjuncts.get(idx));
       }
       output.append(String.format("%sparquet dictionary predicates%s: %s\n", prefix,
-          tupleName, getExplainString(exprList, detailLevel)));
+          tupleName, Expr.getExplainString(exprList, detailLevel)));
     }
     return output.toString();
   }

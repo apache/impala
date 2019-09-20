@@ -110,7 +110,7 @@ MemPool mem_pool(&tracker);
 static Status PrepareSelectList(
     const TExecRequest& request, ScalarExprEvaluator** eval) {
   const TQueryExecRequest& query_request = request.query_exec_request;
-  vector<TExpr> texprs = query_request.plan_exec_info[0].fragments[0].output_exprs;
+  vector<TExpr> texprs = query_request.plan_exec_info[0].fragments[0].output_sink.output_exprs;
   DCHECK_EQ(texprs.size(), 1);
   RuntimeState* state = planner->GetRuntimeState();
   ScalarExpr* expr;

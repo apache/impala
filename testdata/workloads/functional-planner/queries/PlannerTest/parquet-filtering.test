@@ -10,6 +10,7 @@ and int_col > tinyint_col;
 F00:PLAN FRAGMENT [UNPARTITIONED] hosts=1 instances=1
 |  Per-Host Resources: mem-estimate=42.00MB mem-reservation=16.00KB thread-reservation=2
 PLAN-ROOT SINK
+|  output exprs: count(*)
 |  mem-estimate=0B mem-reservation=0B thread-reservation=0
 |
 01:AGGREGATE [FINALIZE]
@@ -19,7 +20,7 @@ PLAN-ROOT SINK
 |  in pipelines: 01(GETNEXT), 00(OPEN)
 |
 00:SCAN HDFS [functional_parquet.alltypes]
-   partitions=24/24 files=24 size=189.28KB
+   HDFS partitions=24/24 files=24 size=200.33KB
    predicates: int_col IS NULL, int_col > CAST(1 AS INT), int_col > CAST(tinyint_col AS INT), CAST(int_col AS DOUBLE) * rand() > CAST(50 AS DOUBLE)
    stored statistics:
      table: rows=unavailable size=unavailable
@@ -29,7 +30,7 @@ PLAN-ROOT SINK
    parquet statistics predicates: int_col > CAST(1 AS INT)
    parquet dictionary predicates: int_col > CAST(1 AS INT)
    mem-estimate=32.00MB mem-reservation=16.00KB thread-reservation=1
-   tuple-ids=0 row-size=5B cardinality=unavailable
+   tuple-ids=0 row-size=5B cardinality=1.27K
    in pipelines: 00(GETNEXT)
 ====
 # Test non-parquet types to ensure that parquet predicates are skipped
@@ -40,6 +41,7 @@ and int_col > tinyint_col;
 F00:PLAN FRAGMENT [UNPARTITIONED] hosts=1 instances=1
 |  Per-Host Resources: mem-estimate=138.00MB mem-reservation=32.00KB thread-reservation=2
 PLAN-ROOT SINK
+|  output exprs: count(*)
 |  mem-estimate=0B mem-reservation=0B thread-reservation=0
 |
 01:AGGREGATE [FINALIZE]
@@ -49,7 +51,7 @@ PLAN-ROOT SINK
 |  in pipelines: 01(GETNEXT), 00(OPEN)
 |
 00:SCAN HDFS [functional.alltypes]
-   partitions=24/24 files=24 size=478.45KB
+   HDFS partitions=24/24 files=24 size=478.45KB
    predicates: int_col IS NULL, int_col > CAST(1 AS INT), int_col > CAST(tinyint_col AS INT), CAST(int_col AS DOUBLE) * rand() > CAST(50 AS DOUBLE)
    stored statistics:
      table: rows=7.30K size=478.45KB
@@ -72,6 +74,7 @@ and year > 2000 and month < 12;
 F00:PLAN FRAGMENT [UNPARTITIONED] hosts=1 instances=1
 |  Per-Host Resources: mem-estimate=138.00MB mem-reservation=88.00KB thread-reservation=2
 PLAN-ROOT SINK
+|  output exprs: count(*)
 |  mem-estimate=0B mem-reservation=0B thread-reservation=0
 |
 01:AGGREGATE [FINALIZE]
@@ -82,7 +85,7 @@ PLAN-ROOT SINK
 |
 00:SCAN HDFS [functional_parquet.alltypes]
    partition predicates: `year` > CAST(2000 AS INT), `month` < CAST(12 AS INT)
-   partitions=22/24 files=22 size=173.16KB
+   HDFS partitions=22/24 files=22 size=183.48KB
    predicates: bool_col, bigint_col < CAST(5000 AS BIGINT), double_col > CAST(100.00 AS DOUBLE), float_col > CAST(50.00 AS FLOAT), id = CAST(1 AS INT), tinyint_col < CAST(50 AS TINYINT), int_col % CAST(2 AS INT) = CAST(1 AS INT), string_col IN ('aaaa', 'bbbb', 'cccc'), smallint_col IN (CAST(1 AS SMALLINT), CAST(2 AS SMALLINT), CAST(3 AS SMALLINT), CAST(4 AS SMALLINT), CAST(5 AS SMALLINT)), timestamp_cmp(timestamp_col, TIMESTAMP '2016-11-20 00:00:00') = CAST(1 AS INT), date_string_col > '1993-10-01'
    stored statistics:
      table: rows=unavailable size=unavailable
@@ -92,7 +95,7 @@ PLAN-ROOT SINK
    parquet statistics predicates: bigint_col < CAST(5000 AS BIGINT), double_col > CAST(100.00 AS DOUBLE), float_col > CAST(50.00 AS FLOAT), id = CAST(1 AS INT), tinyint_col < CAST(50 AS TINYINT), string_col IN ('aaaa', 'bbbb', 'cccc'), smallint_col IN (CAST(1 AS SMALLINT), CAST(2 AS SMALLINT), CAST(3 AS SMALLINT), CAST(4 AS SMALLINT), CAST(5 AS SMALLINT)), date_string_col > '1993-10-01'
    parquet dictionary predicates: bool_col, bigint_col < CAST(5000 AS BIGINT), double_col > CAST(100.00 AS DOUBLE), float_col > CAST(50.00 AS FLOAT), id = CAST(1 AS INT), tinyint_col < CAST(50 AS TINYINT), int_col % CAST(2 AS INT) = CAST(1 AS INT), string_col IN ('aaaa', 'bbbb', 'cccc'), smallint_col IN (CAST(1 AS SMALLINT), CAST(2 AS SMALLINT), CAST(3 AS SMALLINT), CAST(4 AS SMALLINT), CAST(5 AS SMALLINT)), timestamp_cmp(timestamp_col, TIMESTAMP '2016-11-20 00:00:00') = CAST(1 AS INT), date_string_col > '1993-10-01'
    mem-estimate=128.00MB mem-reservation=88.00KB thread-reservation=1
-   tuple-ids=0 row-size=72B cardinality=unavailable
+   tuple-ids=0 row-size=72B cardinality=1.17K
    in pipelines: 00(GETNEXT)
 ====
 # Test non-parquet files for a variety of predicates
@@ -107,6 +110,7 @@ and year > 2000 and month < 12;
 F00:PLAN FRAGMENT [UNPARTITIONED] hosts=1 instances=1
 |  Per-Host Resources: mem-estimate=138.00MB mem-reservation=32.00KB thread-reservation=2
 PLAN-ROOT SINK
+|  output exprs: count(*)
 |  mem-estimate=0B mem-reservation=0B thread-reservation=0
 |
 01:AGGREGATE [FINALIZE]
@@ -117,7 +121,7 @@ PLAN-ROOT SINK
 |
 00:SCAN HDFS [functional.alltypes]
    partition predicates: `year` > CAST(2000 AS INT), `month` < CAST(12 AS INT)
-   partitions=22/24 files=22 size=437.72KB
+   HDFS partitions=22/24 files=22 size=437.72KB
    predicates: id = CAST(1 AS INT), string_col IN ('aaaa', 'bbbb', 'cccc'), smallint_col IN (CAST(1 AS SMALLINT), CAST(2 AS SMALLINT), CAST(3 AS SMALLINT), CAST(4 AS SMALLINT), CAST(5 AS SMALLINT)), bool_col, bigint_col < CAST(5000 AS BIGINT), double_col > CAST(100.00 AS DOUBLE), float_col > CAST(50.00 AS FLOAT), tinyint_col < CAST(50 AS TINYINT), int_col % CAST(2 AS INT) = CAST(1 AS INT), timestamp_cmp(timestamp_col, TIMESTAMP '2016-11-20 00:00:00') = CAST(1 AS INT), date_string_col > '1993-10-01'
    stored statistics:
      table: rows=7.30K size=478.45KB
@@ -141,6 +145,7 @@ and id IN (int_col);
 F00:PLAN FRAGMENT [UNPARTITIONED] hosts=1 instances=1
 |  Per-Host Resources: mem-estimate=58.00MB mem-reservation=24.00KB thread-reservation=2
 PLAN-ROOT SINK
+|  output exprs: count(*)
 |  mem-estimate=0B mem-reservation=0B thread-reservation=0
 |
 01:AGGREGATE [FINALIZE]
@@ -150,7 +155,7 @@ PLAN-ROOT SINK
 |  in pipelines: 01(GETNEXT), 00(OPEN)
 |
 00:SCAN HDFS [functional_parquet.alltypes]
-   partitions=24/24 files=24 size=189.28KB
+   HDFS partitions=24/24 files=24 size=200.33KB
    predicates: id IN (int_col), id NOT IN (CAST(0 AS INT), CAST(1 AS INT), CAST(2 AS INT)), int_col % CAST(50 AS INT) IN (CAST(0 AS INT), CAST(1 AS INT)), string_col IN ('aaaa', 'bbbb', 'cccc', NULL)
    stored statistics:
      table: rows=unavailable size=unavailable
@@ -159,7 +164,7 @@ PLAN-ROOT SINK
    extrapolated-rows=disabled max-scan-range-rows=unavailable
    parquet dictionary predicates: id NOT IN (CAST(0 AS INT), CAST(1 AS INT), CAST(2 AS INT)), int_col % CAST(50 AS INT) IN (CAST(0 AS INT), CAST(1 AS INT)), string_col IN ('aaaa', 'bbbb', 'cccc', NULL)
    mem-estimate=48.00MB mem-reservation=24.00KB thread-reservation=1
-   tuple-ids=0 row-size=20B cardinality=unavailable
+   tuple-ids=0 row-size=20B cardinality=1.27K
    in pipelines: 00(GETNEXT)
 ====
 # Test collection types where all collections on the path are required (inner
@@ -171,11 +176,12 @@ where a.item.e < -10;
 F00:PLAN FRAGMENT [UNPARTITIONED] hosts=1 instances=1
 |  Per-Host Resources: mem-estimate=48.00MB mem-reservation=24.00KB thread-reservation=2
 PLAN-ROOT SINK
+|  output exprs: id
 |  mem-estimate=0B mem-reservation=0B thread-reservation=0
 |
 01:SUBPLAN
 |  mem-estimate=0B mem-reservation=0B thread-reservation=0
-|  tuple-ids=2,1,0 row-size=36B cardinality=unavailable
+|  tuple-ids=2,1,0 row-size=36B cardinality=440.00K
 |  in pipelines: 00(GETNEXT)
 |
 |--08:NESTED LOOP JOIN [CROSS JOIN]
@@ -218,7 +224,7 @@ PLAN-ROOT SINK
 |     in pipelines: 00(GETNEXT)
 |
 00:SCAN HDFS [functional_parquet.complextypestbl c]
-   partitions=1/1 files=2 size=6.92KB
+   HDFS partitions=1/1 files=2 size=6.92KB
    predicates: !empty(c.nested_struct.c.d)
    predicates on cn: !empty(cn.item)
    predicates on a: a.item.e < CAST(-10 AS INT)
@@ -229,7 +235,7 @@ PLAN-ROOT SINK
    parquet statistics predicates on a: a.item.e < CAST(-10 AS INT)
    parquet dictionary predicates on a: a.item.e < CAST(-10 AS INT)
    mem-estimate=48.00MB mem-reservation=24.00KB thread-reservation=1
-   tuple-ids=0 row-size=20B cardinality=unavailable
+   tuple-ids=0 row-size=20B cardinality=4.40K
    in pipelines: 00(GETNEXT)
 ====
 # Test collection types where the lower collection in the path is optional
@@ -243,11 +249,12 @@ where a.item.e < -10;
 F00:PLAN FRAGMENT [UNPARTITIONED] hosts=1 instances=1
 |  Per-Host Resources: mem-estimate=48.00MB mem-reservation=24.00KB thread-reservation=2
 PLAN-ROOT SINK
+|  output exprs: id
 |  mem-estimate=0B mem-reservation=0B thread-reservation=0
 |
 01:SUBPLAN
 |  mem-estimate=0B mem-reservation=0B thread-reservation=0
-|  tuple-ids=2N,1,0 row-size=36B cardinality=unavailable
+|  tuple-ids=2N,1,0 row-size=36B cardinality=44.00K
 |  in pipelines: 00(GETNEXT)
 |
 |--08:SUBPLAN
@@ -291,7 +298,7 @@ PLAN-ROOT SINK
 |     in pipelines: 00(GETNEXT)
 |
 00:SCAN HDFS [functional_parquet.complextypestbl c]
-   partitions=1/1 files=2 size=6.92KB
+   HDFS partitions=1/1 files=2 size=6.92KB
    predicates: !empty(c.nested_struct.c.d)
    predicates on a: a.item.e < CAST(-10 AS INT)
    stored statistics:
@@ -299,7 +306,7 @@ PLAN-ROOT SINK
      columns missing stats: id
    extrapolated-rows=disabled max-scan-range-rows=unavailable
    mem-estimate=48.00MB mem-reservation=24.00KB thread-reservation=1
-   tuple-ids=0 row-size=20B cardinality=unavailable
+   tuple-ids=0 row-size=20B cardinality=4.40K
    in pipelines: 00(GETNEXT)
 ====
 # Tests collection types where the outer is optional (outer join descent)
@@ -311,11 +318,12 @@ left outer join c.nested_struct.c.d cn, cn.item a where a.item.e < -10;
 F00:PLAN FRAGMENT [UNPARTITIONED] hosts=1 instances=1
 |  Per-Host Resources: mem-estimate=48.00MB mem-reservation=24.00KB thread-reservation=2
 PLAN-ROOT SINK
+|  output exprs: id
 |  mem-estimate=0B mem-reservation=0B thread-reservation=0
 |
 01:SUBPLAN
 |  mem-estimate=0B mem-reservation=0B thread-reservation=0
-|  tuple-ids=2,1N,0 row-size=36B cardinality=unavailable
+|  tuple-ids=2,1N,0 row-size=36B cardinality=44.00K
 |  in pipelines: 00(GETNEXT)
 |
 |--08:SUBPLAN
@@ -358,14 +366,14 @@ PLAN-ROOT SINK
 |     in pipelines: 00(GETNEXT)
 |
 00:SCAN HDFS [functional_parquet.complextypestbl c]
-   partitions=1/1 files=2 size=6.92KB
+   HDFS partitions=1/1 files=2 size=6.92KB
    predicates on a: a.item.e < CAST(-10 AS INT)
    stored statistics:
      table: rows=unavailable size=unavailable
      columns missing stats: id
    extrapolated-rows=disabled max-scan-range-rows=unavailable
    mem-estimate=48.00MB mem-reservation=24.00KB thread-reservation=1
-   tuple-ids=0 row-size=20B cardinality=unavailable
+   tuple-ids=0 row-size=20B cardinality=4.40K
    in pipelines: 00(GETNEXT)
 ====
 # Test collections so that each level has a filter applied.
@@ -375,6 +383,7 @@ o.o_lineitems l where c_custkey > 0 and o.o_orderkey > 0 and l.l_partkey > 0;
 F00:PLAN FRAGMENT [UNPARTITIONED] hosts=1 instances=1
 |  Per-Host Resources: mem-estimate=264.00MB mem-reservation=16.00MB thread-reservation=2
 PLAN-ROOT SINK
+|  output exprs: c_custkey
 |  mem-estimate=0B mem-reservation=0B thread-reservation=0
 |
 01:SUBPLAN
@@ -422,14 +431,14 @@ PLAN-ROOT SINK
 |     in pipelines: 00(GETNEXT)
 |
 00:SCAN HDFS [tpch_nested_parquet.customer c]
-   partitions=1/1 files=4 size=288.99MB
+   HDFS partitions=1/1 files=4 size=288.99MB
    predicates: c_custkey > CAST(0 AS BIGINT), !empty(c.c_orders)
    predicates on o: !empty(o.o_lineitems), o.o_orderkey > CAST(0 AS BIGINT)
    predicates on l: l.l_partkey > CAST(0 AS BIGINT)
    stored statistics:
-     table: rows=150.00K size=288.98MB
+     table: rows=150.00K size=288.99MB
      columns missing stats: c_orders
-   extrapolated-rows=disabled max-scan-range-rows=44.23K
+   extrapolated-rows=disabled max-scan-range-rows=50.12K
    parquet statistics predicates: c_custkey > CAST(0 AS BIGINT)
    parquet statistics predicates on o: o.o_orderkey > CAST(0 AS BIGINT)
    parquet statistics predicates on l: l.l_partkey > CAST(0 AS BIGINT)
@@ -448,6 +457,7 @@ select count(*) from functional_parquet.complextypestbl c left outer join
 F00:PLAN FRAGMENT [UNPARTITIONED] hosts=1 instances=1
 |  Per-Host Resources: mem-estimate=26.00MB mem-reservation=8.00KB thread-reservation=2
 PLAN-ROOT SINK
+|  output exprs: count(*)
 |  mem-estimate=0B mem-reservation=0B thread-reservation=0
 |
 05:AGGREGATE [FINALIZE]
@@ -458,7 +468,7 @@ PLAN-ROOT SINK
 |
 01:SUBPLAN
 |  mem-estimate=0B mem-reservation=0B thread-reservation=0
-|  tuple-ids=1N,0 row-size=16B cardinality=unavailable
+|  tuple-ids=1N,0 row-size=16B cardinality=4.40K
 |  in pipelines: 00(GETNEXT)
 |
 |--04:NESTED LOOP JOIN [RIGHT OUTER JOIN]
@@ -479,14 +489,14 @@ PLAN-ROOT SINK
 |     in pipelines: 00(GETNEXT)
 |
 00:SCAN HDFS [functional_parquet.complextypestbl c]
-   partitions=1/1 files=2 size=6.92KB
+   HDFS partitions=1/1 files=2 size=6.92KB
    predicates on int_array: item > CAST(10 AS INT)
    stored statistics:
      table: rows=unavailable size=unavailable
      columns: unavailable
    extrapolated-rows=disabled max-scan-range-rows=unavailable
    mem-estimate=16.00MB mem-reservation=8.00KB thread-reservation=1
-   tuple-ids=0 row-size=12B cardinality=unavailable
+   tuple-ids=0 row-size=12B cardinality=4.40K
    in pipelines: 00(GETNEXT)
 ====
 # Multiple nested collection values (at the same nesting level) where dictionary
@@ -500,6 +510,7 @@ l.l_comment is null;
 F00:PLAN FRAGMENT [UNPARTITIONED] hosts=1 instances=1
 |  Per-Host Resources: mem-estimate=616.00MB mem-reservation=32.00MB thread-reservation=2
 PLAN-ROOT SINK
+|  output exprs: c_name, o.o_clerk
 |  mem-estimate=0B mem-reservation=0B thread-reservation=0
 |
 01:SUBPLAN
@@ -547,14 +558,14 @@ PLAN-ROOT SINK
 |     in pipelines: 00(GETNEXT)
 |
 00:SCAN HDFS [tpch_nested_parquet.customer c]
-   partitions=1/1 files=4 size=288.99MB
+   HDFS partitions=1/1 files=4 size=288.99MB
    predicates: !empty(c.c_orders)
    predicates on o: !empty(o.o_lineitems)
    predicates on l: l.l_shipdate = '1994-08-19', l.l_receiptdate = '1994-08-24', l.l_shipmode = 'RAIL', l.l_returnflag = 'R', l.l_comment IS NULL
    stored statistics:
-     table: rows=150.00K size=288.98MB
+     table: rows=150.00K size=288.99MB
      columns missing stats: c_orders
-   extrapolated-rows=disabled max-scan-range-rows=44.23K
+   extrapolated-rows=disabled max-scan-range-rows=50.12K
    parquet statistics predicates on l: l.l_shipdate = '1994-08-19', l.l_receiptdate = '1994-08-24', l.l_shipmode = 'RAIL', l.l_returnflag = 'R'
    parquet dictionary predicates on l: l.l_shipdate = '1994-08-19', l.l_receiptdate = '1994-08-24', l.l_shipmode = 'RAIL', l.l_returnflag = 'R'
    mem-estimate=616.00MB mem-reservation=32.00MB thread-reservation=1
@@ -574,6 +585,7 @@ and year > 2000 and month < 12;
 F00:PLAN FRAGMENT [UNPARTITIONED] hosts=1 instances=1
 |  Per-Host Resources: mem-estimate=138.00MB mem-reservation=88.00KB thread-reservation=2
 PLAN-ROOT SINK
+|  output exprs: count(*)
 |  mem-estimate=0B mem-reservation=0B thread-reservation=0
 |
 01:AGGREGATE [FINALIZE]
@@ -584,7 +596,7 @@ PLAN-ROOT SINK
 |
 00:SCAN HDFS [functional.alltypesmixedformat]
    partition predicates: `year` > CAST(2000 AS INT), `month` < CAST(12 AS INT)
-   partitions=4/4 files=4 size=66.12KB
+   HDFS partitions=4/4 files=4 size=66.33KB
    predicates: bool_col, bigint_col < CAST(5000 AS BIGINT), double_col > CAST(100.00 AS DOUBLE), float_col > CAST(50.00 AS FLOAT), id = CAST(1 AS INT), tinyint_col < CAST(50 AS TINYINT), int_col % CAST(2 AS INT) = CAST(1 AS INT), string_col IN ('aaaa', 'bbbb', 'cccc'), smallint_col IN (CAST(1 AS SMALLINT), CAST(2 AS SMALLINT), CAST(3 AS SMALLINT), CAST(4 AS SMALLINT), CAST(5 AS SMALLINT)), timestamp_cmp(timestamp_col, TIMESTAMP '2016-11-20 00:00:00') = CAST(1 AS INT), date_string_col > '1993-10-01'
    stored statistics:
      table: rows=unavailable size=unavailable
@@ -594,7 +606,7 @@ PLAN-ROOT SINK
    parquet statistics predicates: bigint_col < CAST(5000 AS BIGINT), double_col > CAST(100.00 AS DOUBLE), float_col > CAST(50.00 AS FLOAT), id = CAST(1 AS INT), tinyint_col < CAST(50 AS TINYINT), string_col IN ('aaaa', 'bbbb', 'cccc'), smallint_col IN (CAST(1 AS SMALLINT), CAST(2 AS SMALLINT), CAST(3 AS SMALLINT), CAST(4 AS SMALLINT), CAST(5 AS SMALLINT)), date_string_col > '1993-10-01'
    parquet dictionary predicates: bool_col, bigint_col < CAST(5000 AS BIGINT), double_col > CAST(100.00 AS DOUBLE), float_col > CAST(50.00 AS FLOAT), id = CAST(1 AS INT), tinyint_col < CAST(50 AS TINYINT), int_col % CAST(2 AS INT) = CAST(1 AS INT), string_col IN ('aaaa', 'bbbb', 'cccc'), smallint_col IN (CAST(1 AS SMALLINT), CAST(2 AS SMALLINT), CAST(3 AS SMALLINT), CAST(4 AS SMALLINT), CAST(5 AS SMALLINT)), timestamp_cmp(timestamp_col, TIMESTAMP '2016-11-20 00:00:00') = CAST(1 AS INT), date_string_col > '1993-10-01'
    mem-estimate=128.00MB mem-reservation=88.00KB thread-reservation=1
-   tuple-ids=0 row-size=72B cardinality=unavailable
+   tuple-ids=0 row-size=72B cardinality=254
    in pipelines: 00(GETNEXT)
 ====
 # Test a variety of predicates on a mixed format table.
@@ -610,12 +622,13 @@ and year != 2009 and month != 4;
 F00:PLAN FRAGMENT [UNPARTITIONED] hosts=1 instances=1
 |  Per-Host Resources: mem-estimate=10.00MB mem-reservation=0B thread-reservation=1
 PLAN-ROOT SINK
+|  output exprs: count(*)
 |  mem-estimate=0B mem-reservation=0B thread-reservation=0
 |
 01:AGGREGATE [FINALIZE]
 |  output: count(*)
 |  mem-estimate=10.00MB mem-reservation=0B spill-buffer=2.00MB thread-reservation=0
-|  tuple-ids=1 row-size=8B cardinality=0
+|  tuple-ids=1 row-size=8B cardinality=1
 |  in pipelines: 01(GETNEXT), 00(OPEN)
 |
 00:SCAN HDFS [functional.alltypesmixedformat]

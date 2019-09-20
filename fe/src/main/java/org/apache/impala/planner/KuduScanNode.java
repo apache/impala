@@ -313,11 +313,11 @@ public class KuduScanNode extends ScanNode {
       case VERBOSE: {
         if (!conjuncts_.isEmpty()) {
           result.append(detailPrefix
-              + "predicates: " + getExplainString(conjuncts_, detailLevel) + "\n");
+              + "predicates: " + Expr.getExplainString(conjuncts_, detailLevel) + "\n");
         }
         if (!kuduConjuncts_.isEmpty()) {
           result.append(detailPrefix + "kudu predicates: "
-              + getExplainString(kuduConjuncts_, detailLevel) + "\n");
+              + Expr.getExplainString(kuduConjuncts_, detailLevel) + "\n");
         }
         if (!runtimeFilters_.isEmpty()) {
           result.append(detailPrefix + "runtime filters: ");

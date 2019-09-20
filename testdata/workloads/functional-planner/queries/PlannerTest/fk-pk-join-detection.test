@@ -7,6 +7,7 @@ where c_salutation = 'Mrs.'
 F00:PLAN FRAGMENT [UNPARTITIONED] hosts=1 instances=1
 |  Per-Host Resources: mem-estimate=181.75MB mem-reservation=21.75MB thread-reservation=3 runtime-filters-memory=1.00MB
 PLAN-ROOT SINK
+|  output exprs: tpcds.store_sales.ss_sold_time_sk, tpcds.store_sales.ss_item_sk, tpcds.store_sales.ss_customer_sk, tpcds.store_sales.ss_cdemo_sk, tpcds.store_sales.ss_hdemo_sk, tpcds.store_sales.ss_addr_sk, tpcds.store_sales.ss_store_sk, tpcds.store_sales.ss_promo_sk, tpcds.store_sales.ss_ticket_number, tpcds.store_sales.ss_quantity, tpcds.store_sales.ss_wholesale_cost, tpcds.store_sales.ss_list_price, tpcds.store_sales.ss_sales_price, tpcds.store_sales.ss_ext_discount_amt, tpcds.store_sales.ss_ext_sales_price, tpcds.store_sales.ss_ext_wholesale_cost, tpcds.store_sales.ss_ext_list_price, tpcds.store_sales.ss_ext_tax, tpcds.store_sales.ss_coupon_amt, tpcds.store_sales.ss_net_paid, tpcds.store_sales.ss_net_paid_inc_tax, tpcds.store_sales.ss_net_profit, tpcds.store_sales.ss_sold_date_sk, tpcds.customer.c_customer_sk, tpcds.customer.c_customer_id, tpcds.customer.c_current_cdemo_sk, tpcds.customer.c_current_hdemo_sk, tpcds.customer.c_current_addr_sk, tpcds.customer.c_first_shipto_date_sk, tpcds.customer.c_first_sales_date_sk, tpcds.customer.c_salutation, tpcds.customer.c_first_name, tpcds.customer.c_last_name, tpcds.customer.c_preferred_cust_flag, tpcds.customer.c_birth_day, tpcds.customer.c_birth_month, tpcds.customer.c_birth_year, tpcds.customer.c_birth_country, tpcds.customer.c_login, tpcds.customer.c_email_address, tpcds.customer.c_last_review_date
 |  mem-estimate=0B mem-reservation=0B thread-reservation=0
 |
 02:HASH JOIN [INNER JOIN]
@@ -18,7 +19,7 @@ PLAN-ROOT SINK
 |  in pipelines: 00(GETNEXT), 01(OPEN)
 |
 |--01:SCAN HDFS [tpcds.customer]
-|     partitions=1/1 files=1 size=12.60MB
+|     HDFS partitions=1/1 files=1 size=12.60MB
 |     predicates: c_salutation = 'Mrs.'
 |     stored statistics:
 |       table: rows=100.00K size=12.60MB
@@ -29,7 +30,7 @@ PLAN-ROOT SINK
 |     in pipelines: 01(GETNEXT)
 |
 00:SCAN HDFS [tpcds.store_sales]
-   partitions=1824/1824 files=1824 size=346.60MB
+   HDFS partitions=1824/1824 files=1824 size=346.60MB
    runtime filters: RF000[bloom] -> ss_customer_sk
    stored statistics:
      table: rows=2.88M size=346.60MB
@@ -50,6 +51,7 @@ where c_salutation = 'Mrs.'
 F00:PLAN FRAGMENT [UNPARTITIONED] hosts=1 instances=1
 |  Per-Host Resources: mem-estimate=180.75MB mem-reservation=20.75MB thread-reservation=3
 PLAN-ROOT SINK
+|  output exprs: tpcds.store_sales.ss_sold_time_sk, tpcds.store_sales.ss_item_sk, tpcds.store_sales.ss_customer_sk, tpcds.store_sales.ss_cdemo_sk, tpcds.store_sales.ss_hdemo_sk, tpcds.store_sales.ss_addr_sk, tpcds.store_sales.ss_store_sk, tpcds.store_sales.ss_promo_sk, tpcds.store_sales.ss_ticket_number, tpcds.store_sales.ss_quantity, tpcds.store_sales.ss_wholesale_cost, tpcds.store_sales.ss_list_price, tpcds.store_sales.ss_sales_price, tpcds.store_sales.ss_ext_discount_amt, tpcds.store_sales.ss_ext_sales_price, tpcds.store_sales.ss_ext_wholesale_cost, tpcds.store_sales.ss_ext_list_price, tpcds.store_sales.ss_ext_tax, tpcds.store_sales.ss_coupon_amt, tpcds.store_sales.ss_net_paid, tpcds.store_sales.ss_net_paid_inc_tax, tpcds.store_sales.ss_net_profit, tpcds.store_sales.ss_sold_date_sk, tpcds.customer.c_customer_sk, tpcds.customer.c_customer_id, tpcds.customer.c_current_cdemo_sk, tpcds.customer.c_current_hdemo_sk, tpcds.customer.c_current_addr_sk, tpcds.customer.c_first_shipto_date_sk, tpcds.customer.c_first_sales_date_sk, tpcds.customer.c_salutation, tpcds.customer.c_first_name, tpcds.customer.c_last_name, tpcds.customer.c_preferred_cust_flag, tpcds.customer.c_birth_day, tpcds.customer.c_birth_month, tpcds.customer.c_birth_year, tpcds.customer.c_birth_country, tpcds.customer.c_login, tpcds.customer.c_email_address, tpcds.customer.c_last_review_date
 |  mem-estimate=0B mem-reservation=0B thread-reservation=0
 |
 02:HASH JOIN [LEFT OUTER JOIN]
@@ -61,7 +63,7 @@ PLAN-ROOT SINK
 |  in pipelines: 00(GETNEXT), 01(OPEN)
 |
 |--01:SCAN HDFS [tpcds.customer]
-|     partitions=1/1 files=1 size=12.60MB
+|     HDFS partitions=1/1 files=1 size=12.60MB
 |     predicates: c_salutation = 'Mrs.'
 |     stored statistics:
 |       table: rows=100.00K size=12.60MB
@@ -72,7 +74,7 @@ PLAN-ROOT SINK
 |     in pipelines: 01(GETNEXT)
 |
 00:SCAN HDFS [tpcds.store_sales]
-   partitions=1824/1824 files=1824 size=346.60MB
+   HDFS partitions=1824/1824 files=1824 size=346.60MB
    stored statistics:
      table: rows=2.88M size=346.60MB
      partitions: 1824/1824 rows=2.88M
@@ -92,6 +94,7 @@ where c_salutation = 'Mrs.'
 F00:PLAN FRAGMENT [UNPARTITIONED] hosts=1 instances=1
 |  Per-Host Resources: mem-estimate=181.75MB mem-reservation=21.75MB thread-reservation=3 runtime-filters-memory=1.00MB
 PLAN-ROOT SINK
+|  output exprs: tpcds.store_sales.ss_sold_time_sk, tpcds.store_sales.ss_item_sk, tpcds.store_sales.ss_customer_sk, tpcds.store_sales.ss_cdemo_sk, tpcds.store_sales.ss_hdemo_sk, tpcds.store_sales.ss_addr_sk, tpcds.store_sales.ss_store_sk, tpcds.store_sales.ss_promo_sk, tpcds.store_sales.ss_ticket_number, tpcds.store_sales.ss_quantity, tpcds.store_sales.ss_wholesale_cost, tpcds.store_sales.ss_list_price, tpcds.store_sales.ss_sales_price, tpcds.store_sales.ss_ext_discount_amt, tpcds.store_sales.ss_ext_sales_price, tpcds.store_sales.ss_ext_wholesale_cost, tpcds.store_sales.ss_ext_list_price, tpcds.store_sales.ss_ext_tax, tpcds.store_sales.ss_coupon_amt, tpcds.store_sales.ss_net_paid, tpcds.store_sales.ss_net_paid_inc_tax, tpcds.store_sales.ss_net_profit, tpcds.store_sales.ss_sold_date_sk, tpcds.customer.c_customer_sk, tpcds.customer.c_customer_id, tpcds.customer.c_current_cdemo_sk, tpcds.customer.c_current_hdemo_sk, tpcds.customer.c_current_addr_sk, tpcds.customer.c_first_shipto_date_sk, tpcds.customer.c_first_sales_date_sk, tpcds.customer.c_salutation, tpcds.customer.c_first_name, tpcds.customer.c_last_name, tpcds.customer.c_preferred_cust_flag, tpcds.customer.c_birth_day, tpcds.customer.c_birth_month, tpcds.customer.c_birth_year, tpcds.customer.c_birth_country, tpcds.customer.c_login, tpcds.customer.c_email_address, tpcds.customer.c_last_review_date
 |  mem-estimate=0B mem-reservation=0B thread-reservation=0
 |
 02:HASH JOIN [RIGHT OUTER JOIN]
@@ -103,7 +106,7 @@ PLAN-ROOT SINK
 |  in pipelines: 00(GETNEXT), 01(OPEN)
 |
 |--01:SCAN HDFS [tpcds.customer]
-|     partitions=1/1 files=1 size=12.60MB
+|     HDFS partitions=1/1 files=1 size=12.60MB
 |     predicates: c_salutation = 'Mrs.'
 |     stored statistics:
 |       table: rows=100.00K size=12.60MB
@@ -114,7 +117,7 @@ PLAN-ROOT SINK
 |     in pipelines: 01(GETNEXT)
 |
 00:SCAN HDFS [tpcds.store_sales]
-   partitions=1824/1824 files=1824 size=346.60MB
+   HDFS partitions=1824/1824 files=1824 size=346.60MB
    runtime filters: RF000[bloom] -> ss_customer_sk
    stored statistics:
      table: rows=2.88M size=346.60MB
@@ -134,6 +137,7 @@ where sr_return_quantity < 10
 F00:PLAN FRAGMENT [UNPARTITIONED] hosts=1 instances=1
 |  Per-Host Resources: mem-estimate=214.75MB mem-reservation=22.75MB thread-reservation=3 runtime-filters-memory=2.00MB
 PLAN-ROOT SINK
+|  output exprs: tpcds.store_sales.ss_sold_time_sk, tpcds.store_sales.ss_item_sk, tpcds.store_sales.ss_customer_sk, tpcds.store_sales.ss_cdemo_sk, tpcds.store_sales.ss_hdemo_sk, tpcds.store_sales.ss_addr_sk, tpcds.store_sales.ss_store_sk, tpcds.store_sales.ss_promo_sk, tpcds.store_sales.ss_ticket_number, tpcds.store_sales.ss_quantity, tpcds.store_sales.ss_wholesale_cost, tpcds.store_sales.ss_list_price, tpcds.store_sales.ss_sales_price, tpcds.store_sales.ss_ext_discount_amt, tpcds.store_sales.ss_ext_sales_price, tpcds.store_sales.ss_ext_wholesale_cost, tpcds.store_sales.ss_ext_list_price, tpcds.store_sales.ss_ext_tax, tpcds.store_sales.ss_coupon_amt, tpcds.store_sales.ss_net_paid, tpcds.store_sales.ss_net_paid_inc_tax, tpcds.store_sales.ss_net_profit, tpcds.store_sales.ss_sold_date_sk, tpcds.store_returns.sr_returned_date_sk, tpcds.store_returns.sr_return_time_sk, tpcds.store_returns.sr_item_sk, tpcds.store_returns.sr_customer_sk, tpcds.store_returns.sr_cdemo_sk, tpcds.store_returns.sr_hdemo_sk, tpcds.store_returns.sr_addr_sk, tpcds.store_returns.sr_store_sk, tpcds.store_returns.sr_reason_sk, tpcds.store_returns.sr_ticket_number, tpcds.store_returns.sr_return_quantity, tpcds.store_returns.sr_return_amt, tpcds.store_returns.sr_return_tax, tpcds.store_returns.sr_return_amt_inc_tax, tpcds.store_returns.sr_fee, tpcds.store_returns.sr_return_ship_cost, tpcds.store_returns.sr_refunded_cash, tpcds.store_returns.sr_reversed_charge, tpcds.store_returns.sr_store_credit, tpcds.store_returns.sr_net_loss
 |  mem-estimate=0B mem-reservation=0B thread-reservation=0
 |
 02:HASH JOIN [INNER JOIN]
@@ -145,7 +149,7 @@ PLAN-ROOT SINK
 |  in pipelines: 00(GETNEXT), 01(OPEN)
 |
 |--01:SCAN HDFS [tpcds.store_returns]
-|     partitions=1/1 files=1 size=31.19MB
+|     HDFS partitions=1/1 files=1 size=31.19MB
 |     predicates: sr_return_quantity < CAST(10 AS INT)
 |     stored statistics:
 |       table: rows=287.51K size=31.19MB
@@ -156,7 +160,7 @@ PLAN-ROOT SINK
 |     in pipelines: 01(GETNEXT)
 |
 00:SCAN HDFS [tpcds.store_sales]
-   partitions=1824/1824 files=1824 size=346.60MB
+   HDFS partitions=1824/1824 files=1824 size=346.60MB
    runtime filters: RF000[bloom] -> ss_item_sk, RF001[bloom] -> ss_ticket_number
    stored statistics:
      table: rows=2.88M size=346.60MB
@@ -175,6 +179,7 @@ on ss_sold_time_sk = ws_sold_time_sk
 F00:PLAN FRAGMENT [UNPARTITIONED] hosts=1 instances=1
 |  Per-Host Resources: mem-estimate=397.67MB mem-reservation=51.00MB thread-reservation=3 runtime-filters-memory=1.00MB
 PLAN-ROOT SINK
+|  output exprs: tpcds.store_sales.ss_sold_time_sk, tpcds.store_sales.ss_item_sk, tpcds.store_sales.ss_customer_sk, tpcds.store_sales.ss_cdemo_sk, tpcds.store_sales.ss_hdemo_sk, tpcds.store_sales.ss_addr_sk, tpcds.store_sales.ss_store_sk, tpcds.store_sales.ss_promo_sk, tpcds.store_sales.ss_ticket_number, tpcds.store_sales.ss_quantity, tpcds.store_sales.ss_wholesale_cost, tpcds.store_sales.ss_list_price, tpcds.store_sales.ss_sales_price, tpcds.store_sales.ss_ext_discount_amt, tpcds.store_sales.ss_ext_sales_price, tpcds.store_sales.ss_ext_wholesale_cost, tpcds.store_sales.ss_ext_list_price, tpcds.store_sales.ss_ext_tax, tpcds.store_sales.ss_coupon_amt, tpcds.store_sales.ss_net_paid, tpcds.store_sales.ss_net_paid_inc_tax, tpcds.store_sales.ss_net_profit, tpcds.store_sales.ss_sold_date_sk, tpcds.web_sales.ws_sold_date_sk, tpcds.web_sales.ws_sold_time_sk, tpcds.web_sales.ws_ship_date_sk, tpcds.web_sales.ws_item_sk, tpcds.web_sales.ws_bill_customer_sk, tpcds.web_sales.ws_bill_cdemo_sk, tpcds.web_sales.ws_bill_hdemo_sk, tpcds.web_sales.ws_bill_addr_sk, tpcds.web_sales.ws_ship_customer_sk, tpcds.web_sales.ws_ship_cdemo_sk, tpcds.web_sales.ws_ship_hdemo_sk, tpcds.web_sales.ws_ship_addr_sk, tpcds.web_sales.ws_web_page_sk, tpcds.web_sales.ws_web_site_sk, tpcds.web_sales.ws_ship_mode_sk, tpcds.web_sales.ws_warehouse_sk, tpcds.web_sales.ws_promo_sk, tpcds.web_sales.ws_order_number, tpcds.web_sales.ws_quantity, tpcds.web_sales.ws_wholesale_cost, tpcds.web_sales.ws_list_price, tpcds.web_sales.ws_sales_price, tpcds.web_sales.ws_ext_discount_amt, tpcds.web_sales.ws_ext_sales_price, tpcds.web_sales.ws_ext_wholesale_cost, tpcds.web_sales.ws_ext_list_price, tpcds.web_sales.ws_ext_tax, tpcds.web_sales.ws_coupon_amt, tpcds.web_sales.ws_ext_ship_cost, tpcds.web_sales.ws_net_paid, tpcds.web_sales.ws_net_paid_inc_tax, tpcds.web_sales.ws_net_paid_inc_ship, tpcds.web_sales.ws_net_paid_inc_ship_tax, tpcds.web_sales.ws_net_profit
 |  mem-estimate=0B mem-reservation=0B thread-reservation=0
 |
 02:HASH JOIN [INNER JOIN]
@@ -186,7 +191,7 @@ PLAN-ROOT SINK
 |  in pipelines: 00(GETNEXT), 01(OPEN)
 |
 |--01:SCAN HDFS [tpcds.web_sales]
-|     partitions=1/1 files=1 size=140.07MB
+|     HDFS partitions=1/1 files=1 size=140.07MB
 |     stored statistics:
 |       table: rows=719.38K size=140.07MB
 |       columns: all
@@ -196,7 +201,7 @@ PLAN-ROOT SINK
 |     in pipelines: 01(GETNEXT)
 |
 00:SCAN HDFS [tpcds.store_sales]
-   partitions=1824/1824 files=1824 size=346.60MB
+   HDFS partitions=1824/1824 files=1824 size=346.60MB
    runtime filters: RF000[bloom] -> ss_sold_time_sk
    stored statistics:
      table: rows=2.88M size=346.60MB
@@ -216,6 +221,7 @@ where a.d_holiday = "Y"
 F00:PLAN FRAGMENT [UNPARTITIONED] hosts=1 instances=1
 |  Per-Host Resources: mem-estimate=114.00MB mem-reservation=34.00MB thread-reservation=3 runtime-filters-memory=1.00MB
 PLAN-ROOT SINK
+|  output exprs: a.d_date_sk, a.d_date_id, a.d_date, a.d_month_seq, a.d_week_seq, a.d_quarter_seq, a.d_year, a.d_dow, a.d_moy, a.d_dom, a.d_qoy, a.d_fy_year, a.d_fy_quarter_seq, a.d_fy_week_seq, a.d_day_name, a.d_quarter_name, a.d_holiday, a.d_weekend, a.d_following_holiday, a.d_first_dom, a.d_last_dom, a.d_same_day_ly, a.d_same_day_lq, a.d_current_day, a.d_current_week, a.d_current_month, a.d_current_quarter, a.d_current_year, b.d_date_sk, b.d_date_id, b.d_date, b.d_month_seq, b.d_week_seq, b.d_quarter_seq, b.d_year, b.d_dow, b.d_moy, b.d_dom, b.d_qoy, b.d_fy_year, b.d_fy_quarter_seq, b.d_fy_week_seq, b.d_day_name, b.d_quarter_name, b.d_holiday, b.d_weekend, b.d_following_holiday, b.d_first_dom, b.d_last_dom, b.d_same_day_ly, b.d_same_day_lq, b.d_current_day, b.d_current_week, b.d_current_month, b.d_current_quarter, b.d_current_year
 |  mem-estimate=0B mem-reservation=0B thread-reservation=0
 |
 02:HASH JOIN [INNER JOIN]
@@ -227,7 +233,7 @@ PLAN-ROOT SINK
 |  in pipelines: 01(GETNEXT), 00(OPEN)
 |
 |--00:SCAN HDFS [tpcds.date_dim a]
-|     partitions=1/1 files=1 size=9.84MB
+|     HDFS partitions=1/1 files=1 size=9.84MB
 |     predicates: a.d_holiday = 'Y'
 |     stored statistics:
 |       table: rows=73.05K size=9.84MB
@@ -238,7 +244,7 @@ PLAN-ROOT SINK
 |     in pipelines: 00(GETNEXT)
 |
 01:SCAN HDFS [tpcds.date_dim b]
-   partitions=1/1 files=1 size=9.84MB
+   HDFS partitions=1/1 files=1 size=9.84MB
    runtime filters: RF000[bloom] -> b.d_date_sk
    stored statistics:
      table: rows=73.05K size=9.84MB
@@ -261,6 +267,7 @@ where ss_item_sk = sr_item_sk and ss_ticket_number = sr_ticket_number
 F00:PLAN FRAGMENT [UNPARTITIONED] hosts=1 instances=1
 |  Per-Host Resources: mem-estimate=362.81MB mem-reservation=50.81MB thread-reservation=6 runtime-filters-memory=5.00MB
 PLAN-ROOT SINK
+|  output exprs: CAST(1 AS TINYINT)
 |  mem-estimate=0B mem-reservation=0B thread-reservation=0
 |
 08:HASH JOIN [INNER JOIN]
@@ -272,7 +279,7 @@ PLAN-ROOT SINK
 |  in pipelines: 01(GETNEXT), 02(OPEN)
 |
 |--02:SCAN HDFS [tpcds.customer]
-|     partitions=1/1 files=1 size=12.60MB
+|     HDFS partitions=1/1 files=1 size=12.60MB
 |     stored statistics:
 |       table: rows=100.00K size=12.60MB
 |       columns: all
@@ -290,7 +297,7 @@ PLAN-ROOT SINK
 |  in pipelines: 01(GETNEXT), 04(OPEN)
 |
 |--04:SCAN HDFS [tpcds.date_dim d2]
-|     partitions=1/1 files=1 size=9.84MB
+|     HDFS partitions=1/1 files=1 size=9.84MB
 |     stored statistics:
 |       table: rows=73.05K size=9.84MB
 |       columns: all
@@ -316,7 +323,7 @@ PLAN-ROOT SINK
 |  |  in pipelines: 00(GETNEXT), 03(OPEN)
 |  |
 |  |--03:SCAN HDFS [tpcds.date_dim d1]
-|  |     partitions=1/1 files=1 size=9.84MB
+|  |     HDFS partitions=1/1 files=1 size=9.84MB
 |  |     predicates: d1.d_fy_week_seq = CAST(1000 AS INT)
 |  |     stored statistics:
 |  |       table: rows=73.05K size=9.84MB
@@ -327,7 +334,7 @@ PLAN-ROOT SINK
 |  |     in pipelines: 03(GETNEXT)
 |  |
 |  00:SCAN HDFS [tpcds.store_sales]
-|     partitions=1824/1824 files=1824 size=346.60MB
+|     HDFS partitions=1824/1824 files=1824 size=346.60MB
 |     runtime filters: RF000[bloom] -> ss_addr_sk, RF008[bloom] -> ss_sold_date_sk
 |     stored statistics:
 |       table: rows=2.88M size=346.60MB
@@ -339,7 +346,7 @@ PLAN-ROOT SINK
 |     in pipelines: 00(GETNEXT)
 |
 01:SCAN HDFS [tpcds.store_returns]
-   partitions=1/1 files=1 size=31.19MB
+   HDFS partitions=1/1 files=1 size=31.19MB
    runtime filters: RF002[bloom] -> sr_returned_date_sk, RF004[bloom] -> sr_item_sk, RF005[bloom] -> sr_ticket_number
    stored statistics:
      table: rows=287.51K size=31.19MB
@@ -357,6 +364,7 @@ on ss_customer_sk % 10 = c_customer_sk / 100
 F00:PLAN FRAGMENT [UNPARTITIONED] hosts=1 instances=1
 |  Per-Host Resources: mem-estimate=211.00MB mem-reservation=51.00MB thread-reservation=3 runtime-filters-memory=1.00MB
 PLAN-ROOT SINK
+|  output exprs: tpcds.store_sales.ss_sold_time_sk, tpcds.store_sales.ss_item_sk, tpcds.store_sales.ss_customer_sk, tpcds.store_sales.ss_cdemo_sk, tpcds.store_sales.ss_hdemo_sk, tpcds.store_sales.ss_addr_sk, tpcds.store_sales.ss_store_sk, tpcds.store_sales.ss_promo_sk, tpcds.store_sales.ss_ticket_number, tpcds.store_sales.ss_quantity, tpcds.store_sales.ss_wholesale_cost, tpcds.store_sales.ss_list_price, tpcds.store_sales.ss_sales_price, tpcds.store_sales.ss_ext_discount_amt, tpcds.store_sales.ss_ext_sales_price, tpcds.store_sales.ss_ext_wholesale_cost, tpcds.store_sales.ss_ext_list_price, tpcds.store_sales.ss_ext_tax, tpcds.store_sales.ss_coupon_amt, tpcds.store_sales.ss_net_paid, tpcds.store_sales.ss_net_paid_inc_tax, tpcds.store_sales.ss_net_profit, tpcds.store_sales.ss_sold_date_sk, tpcds.customer.c_customer_sk, tpcds.customer.c_customer_id, tpcds.customer.c_current_cdemo_sk, tpcds.customer.c_current_hdemo_sk, tpcds.customer.c_current_addr_sk, tpcds.customer.c_first_shipto_date_sk, tpcds.customer.c_first_sales_date_sk, tpcds.customer.c_salutation, tpcds.customer.c_first_name, tpcds.customer.c_last_name, tpcds.customer.c_preferred_cust_flag, tpcds.customer.c_birth_day, tpcds.customer.c_birth_month, tpcds.customer.c_birth_year, tpcds.customer.c_birth_country, tpcds.customer.c_login, tpcds.customer.c_email_address, tpcds.customer.c_last_review_date
 |  mem-estimate=0B mem-reservation=0B thread-reservation=0
 |
 02:HASH JOIN [INNER JOIN]
@@ -368,7 +376,7 @@ PLAN-ROOT SINK
 |  in pipelines: 00(GETNEXT), 01(OPEN)
 |
 |--01:SCAN HDFS [tpcds.customer]
-|     partitions=1/1 files=1 size=12.60MB
+|     HDFS partitions=1/1 files=1 size=12.60MB
 |     stored statistics:
 |       table: rows=100.00K size=12.60MB
 |       columns: all
@@ -378,7 +386,7 @@ PLAN-ROOT SINK
 |     in pipelines: 01(GETNEXT)
 |
 00:SCAN HDFS [tpcds.store_sales]
-   partitions=1824/1824 files=1824 size=346.60MB
+   HDFS partitions=1824/1824 files=1824 size=346.60MB
    runtime filters: RF000[bloom] -> ss_customer_sk % 10
    stored statistics:
      table: rows=2.88M size=346.60MB
@@ -398,6 +406,7 @@ on ss_customer_sk = c_customer_sk
 F00:PLAN FRAGMENT [UNPARTITIONED] hosts=1 instances=1
 |  Per-Host Resources: mem-estimate=2.17GB mem-reservation=51.00MB thread-reservation=3 runtime-filters-memory=1.00MB
 PLAN-ROOT SINK
+|  output exprs: CAST(1 AS TINYINT)
 |  mem-estimate=0B mem-reservation=0B thread-reservation=0
 |
 02:HASH JOIN [INNER JOIN]
@@ -409,7 +418,7 @@ PLAN-ROOT SINK
 |  in pipelines: 00(GETNEXT), 01(OPEN)
 |
 |--01:SCAN HDFS [tpcds_seq_snap.customer]
-|     partitions=1/1 files=1 size=8.58MB
+|     HDFS partitions=1/1 files=1 size=8.58MB
 |     stored statistics:
 |       table: rows=unavailable size=8.58MB
 |       columns: unavailable
@@ -419,7 +428,7 @@ PLAN-ROOT SINK
 |     in pipelines: 01(GETNEXT)
 |
 00:SCAN HDFS [tpcds.store_sales]
-   partitions=1824/1824 files=1824 size=346.60MB
+   HDFS partitions=1824/1824 files=1824 size=346.60MB
    runtime filters: RF000[bloom] -> ss_customer_sk
    stored statistics:
      table: rows=2.88M size=346.60MB
@@ -438,6 +447,7 @@ on ss_customer_sk = c_customer_sk
 F00:PLAN FRAGMENT [UNPARTITIONED] hosts=1 instances=1
 |  Per-Host Resources: mem-estimate=178.94MB mem-reservation=18.94MB thread-reservation=3 runtime-filters-memory=1.00MB
 PLAN-ROOT SINK
+|  output exprs: CAST(1 AS TINYINT)
 |  mem-estimate=0B mem-reservation=0B thread-reservation=0
 |
 02:HASH JOIN [INNER JOIN]
@@ -449,7 +459,7 @@ PLAN-ROOT SINK
 |  in pipelines: 00(GETNEXT), 01(OPEN)
 |
 |--01:SCAN HDFS [tpcds.customer]
-|     partitions=1/1 files=1 size=12.60MB
+|     HDFS partitions=1/1 files=1 size=12.60MB
 |     stored statistics:
 |       table: rows=100.00K size=12.60MB
 |       columns: all
@@ -459,7 +469,7 @@ PLAN-ROOT SINK
 |     in pipelines: 01(GETNEXT)
 |
 00:SCAN HDFS [tpcds_seq_snap.store_sales]
-   partitions=1824/1824 files=1824 size=212.80MB
+   HDFS partitions=1824/1824 files=1824 size=212.80MB
    runtime filters: RF000[bloom] -> ss_customer_sk
    stored statistics:
      table: rows=unavailable size=unavailable
@@ -480,6 +490,7 @@ on ss_sold_time_sk = ws_sold_time_sk
 F00:PLAN FRAGMENT [UNPARTITIONED] hosts=1 instances=1
 |  Per-Host Resources: mem-estimate=299.00MB mem-reservation=18.94MB thread-reservation=3 runtime-filters-memory=1.00MB
 PLAN-ROOT SINK
+|  output exprs: tpcds.store_sales.ss_sold_time_sk, tpcds.store_sales.ss_item_sk, tpcds.store_sales.ss_customer_sk, tpcds.store_sales.ss_cdemo_sk, tpcds.store_sales.ss_hdemo_sk, tpcds.store_sales.ss_addr_sk, tpcds.store_sales.ss_store_sk, tpcds.store_sales.ss_promo_sk, tpcds.store_sales.ss_ticket_number, tpcds.store_sales.ss_quantity, tpcds.store_sales.ss_wholesale_cost, tpcds.store_sales.ss_list_price, tpcds.store_sales.ss_sales_price, tpcds.store_sales.ss_ext_discount_amt, tpcds.store_sales.ss_ext_sales_price, tpcds.store_sales.ss_ext_wholesale_cost, tpcds.store_sales.ss_ext_list_price, tpcds.store_sales.ss_ext_tax, tpcds.store_sales.ss_coupon_amt, tpcds.store_sales.ss_net_paid, tpcds.store_sales.ss_net_paid_inc_tax, tpcds.store_sales.ss_net_profit, tpcds.store_sales.ss_sold_date_sk, ws_sold_time_sk
 |  mem-estimate=0B mem-reservation=0B thread-reservation=0
 |
 03:HASH JOIN [INNER JOIN]
@@ -497,7 +508,7 @@ PLAN-ROOT SINK
 |  |  in pipelines: 02(GETNEXT), 01(OPEN)
 |  |
 |  01:SCAN HDFS [tpcds.web_sales]
-|     partitions=1/1 files=1 size=140.07MB
+|     HDFS partitions=1/1 files=1 size=140.07MB
 |     stored statistics:
 |       table: rows=719.38K size=140.07MB
 |       columns: all
@@ -507,7 +518,7 @@ PLAN-ROOT SINK
 |     in pipelines: 01(GETNEXT)
 |
 00:SCAN HDFS [tpcds.store_sales]
-   partitions=1824/1824 files=1824 size=346.60MB
+   HDFS partitions=1824/1824 files=1824 size=346.60MB
    runtime filters: RF000[bloom] -> ss_sold_time_sk
    stored statistics:
      table: rows=2.88M size=346.60MB

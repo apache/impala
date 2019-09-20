@@ -17,6 +17,9 @@
 
 package org.apache.impala.planner;
 
+import java.util.List;
+
+import org.apache.impala.analysis.Expr;
 import org.apache.impala.thrift.TDataSink;
 import org.apache.impala.thrift.TDataSinkType;
 import org.apache.impala.thrift.TDataStreamSink;
@@ -72,4 +75,9 @@ public class DataStreamSink extends DataSink {
   }
 
   public DataPartition getOutputPartition() { return outputPartition_; }
+
+  @Override
+  public void collectExprs(List<Expr> exprs) {
+    exprs.addAll(outputPartition_.getPartitionExprs());
+  }
 }

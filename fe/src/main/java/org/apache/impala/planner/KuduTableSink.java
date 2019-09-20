@@ -21,6 +21,7 @@ package org.apache.impala.planner;
 import java.util.List;
 
 import org.apache.impala.analysis.DescriptorTable;
+import org.apache.impala.analysis.Expr;
 import org.apache.impala.catalog.FeTable;
 import org.apache.impala.service.BackendConfig;
 import org.apache.impala.thrift.TDataSink;
@@ -44,8 +45,8 @@ public class KuduTableSink extends TableSink {
   private final List<Integer> targetColIdxs_;
 
   public KuduTableSink(FeTable targetTable, Op sinkOp,
-      List<Integer> referencedColumns) {
-    super(targetTable, sinkOp);
+      List<Integer> referencedColumns, List<Expr> outputExprs) {
+    super(targetTable, sinkOp, outputExprs);
     targetColIdxs_ = referencedColumns != null
         ? Lists.newArrayList(referencedColumns) : null;
   }
@@ -55,6 +56,10 @@ public class KuduTableSink extends TableSink {
       TQueryOptions queryOptions, TExplainLevel explainLevel, StringBuilder output) {
     output.append(prefix + sinkOp_.toExplainString());
     output.append(" KUDU [" + targetTable_.getFullName() + "]\n");
+    if (explainLevel.ordinal() >= TExplainLevel.EXTENDED.ordinal()) {
+      output.append(detailPrefix + "output exprs: ")
+          .append(Expr.getExplainString(outputExprs_, explainLevel) + "\n");
+    }
   }
 
   @Override
@@ -84,10 +89,16 @@ public class KuduTableSink extends TableSink {
     tKuduSink.setReferenced_columns(targetColIdxs_);
     tTableSink.setKudu_table_sink(tKuduSink);
     tsink.table_sink = tTableSink;
+    tsink.output_exprs = Expr.treesToThrift(outputExprs_);
   }
 
   @Override
   protected TDataSinkType getSinkType() {
     return TDataSinkType.TABLE_SINK;
+  }
+
+  @Override
+  public void collectExprs(List<Expr> exprs) {
+    exprs.addAll(outputExprs_);
   }
 }

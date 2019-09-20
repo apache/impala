@@ -12,6 +12,7 @@ on ss_customer_sk = c_customer_sk
 F00:PLAN FRAGMENT [UNPARTITIONED] hosts=1 instances=1
 |  Per-Host Resources: mem-estimate=178.94MB mem-reservation=18.94MB thread-reservation=3 runtime-filters-memory=1.00MB
 PLAN-ROOT SINK
+|  output exprs: CAST(1 AS TINYINT)
 |  mem-estimate=0B mem-reservation=0B thread-reservation=0
 |
 02:HASH JOIN [INNER JOIN]
@@ -23,7 +24,7 @@ PLAN-ROOT SINK
 |  in pipelines: 00(GETNEXT), 01(OPEN)
 |
 |--01:SCAN HDFS [tpcds_seq_snap.customer]
-|     partitions=1/1 files=1 size=8.58MB
+|     HDFS partitions=1/1 files=1 size=8.58MB
 |     stored statistics:
 |       table: rows=unavailable size=8.58MB
 |       columns: unavailable
@@ -33,7 +34,7 @@ PLAN-ROOT SINK
 |     in pipelines: 01(GETNEXT)
 |
 00:SCAN HDFS [tpcds.store_sales]
-   partitions=1824/1824 files=1824 size=346.60MB
+   HDFS partitions=1824/1824 files=1824 size=346.60MB
    runtime filters: RF000[bloom] -> ss_customer_sk
    stored statistics:
      table: rows=2.88M size=346.60MB
@@ -52,6 +53,7 @@ on ss_customer_sk = c_customer_sk
 F00:PLAN FRAGMENT [UNPARTITIONED] hosts=1 instances=1
 |  Per-Host Resources: mem-estimate=178.94MB mem-reservation=18.94MB thread-reservation=3 runtime-filters-memory=1.00MB
 PLAN-ROOT SINK
+|  output exprs: CAST(1 AS TINYINT)
 |  mem-estimate=0B mem-reservation=0B thread-reservation=0
 |
 02:HASH JOIN [INNER JOIN]
@@ -63,7 +65,7 @@ PLAN-ROOT SINK
 |  in pipelines: 00(GETNEXT), 01(OPEN)
 |
 |--01:SCAN HDFS [tpcds.customer]
-|     partitions=1/1 files=1 size=12.60MB
+|     HDFS partitions=1/1 files=1 size=12.60MB
 |     stored statistics:
 |       table: rows=100.00K size=12.60MB
 |       columns: all
@@ -73,7 +75,7 @@ PLAN-ROOT SINK
 |     in pipelines: 01(GETNEXT)
 |
 00:SCAN HDFS [tpcds_seq_snap.store_sales]
-   partitions=1824/1824 files=1824 size=212.80MB
+   HDFS partitions=1824/1824 files=1824 size=212.80MB
    runtime filters: RF000[bloom] -> ss_customer_sk
    stored statistics:
      table: rows=unavailable size=unavailable

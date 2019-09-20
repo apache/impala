@@ -188,11 +188,11 @@ public class HashJoinNode extends JoinNode {
 
       if (!otherJoinConjuncts_.isEmpty()) {
         output.append(detailPrefix + "other join predicates: ")
-            .append(getExplainString(otherJoinConjuncts_, detailLevel) + "\n");
+            .append(Expr.getExplainString(otherJoinConjuncts_, detailLevel) + "\n");
       }
       if (!conjuncts_.isEmpty()) {
         output.append(detailPrefix + "other predicates: ")
-            .append(getExplainString(conjuncts_, detailLevel) + "\n");
+            .append(Expr.getExplainString(conjuncts_, detailLevel) + "\n");
       }
       if (!runtimeFilters_.isEmpty()) {
         output.append(detailPrefix + "runtime filters: ");

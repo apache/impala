@@ -458,7 +458,7 @@ public class AggregationNode extends PlanNode {
       if (!conjuncts_.isEmpty()) {
         output.append(detailPrefix)
             .append("having: ")
-            .append(getExplainString(conjuncts_, detailLevel))
+            .append(Expr.getExplainString(conjuncts_, detailLevel))
             .append("\n");
       }
     }
@@ -473,13 +473,13 @@ public class AggregationNode extends PlanNode {
     if (!aggExprs.isEmpty()) {
       output.append(prefix)
           .append("output: ")
-          .append(getExplainString(aggExprs, detailLevel))
+          .append(Expr.getExplainString(aggExprs, detailLevel))
           .append("\n");
     }
     if (!groupingExprs.isEmpty()) {
       output.append(prefix)
           .append("group by: ")
-          .append(getExplainString(groupingExprs, detailLevel))
+          .append(Expr.getExplainString(groupingExprs, detailLevel))
           .append("\n");
     }
     return output;

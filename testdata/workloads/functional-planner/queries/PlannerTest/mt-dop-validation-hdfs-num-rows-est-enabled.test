@@ -11,6 +11,7 @@ functional_parquet.alltypestiny b
 F00:PLAN FRAGMENT [UNPARTITIONED] hosts=1 instances=1
 |  Per-Host Resources: mem-estimate=42.00MB mem-reservation=16.00KB thread-reservation=1
 PLAN-ROOT SINK
+|  output exprs: count(*)
 |  mem-estimate=0B mem-reservation=0B thread-reservation=0
 |
 03:AGGREGATE [FINALIZE]
@@ -57,6 +58,7 @@ where a.id = b.id
 F00:PLAN FRAGMENT [UNPARTITIONED] hosts=1 instances=1
 |  Per-Host Resources: mem-estimate=28.94MB mem-reservation=2.95MB thread-reservation=1 runtime-filters-memory=1.00MB
 PLAN-ROOT SINK
+|  output exprs: count(*)
 |  mem-estimate=0B mem-reservation=0B thread-reservation=0
 |
 03:AGGREGATE [FINALIZE]
@@ -108,6 +110,7 @@ limit 10
 F00:PLAN FRAGMENT [UNPARTITIONED] hosts=1 instances=1
 |  Per-Host Resources: mem-estimate=144.00MB mem-reservation=34.02MB thread-reservation=1
 PLAN-ROOT SINK
+|  output exprs: count(int_col)
 |  mem-estimate=0B mem-reservation=0B thread-reservation=0
 |
 02:TOP-N [LIMIT=10]
@@ -124,7 +127,7 @@ PLAN-ROOT SINK
 |  in pipelines: 01(GETNEXT), 00(OPEN)
 |
 00:SCAN HDFS [functional_parquet.alltypes]
-   HDFS partitions=24/24 files=24 size=200.43KB
+   HDFS partitions=24/24 files=24 size=200.33KB
    predicates: id < CAST(10 AS INT)
    stored statistics:
      table: rows=unavailable size=unavailable
@@ -140,6 +143,7 @@ PLAN-ROOT SINK
 F02:PLAN FRAGMENT [UNPARTITIONED] hosts=1 instances=1
 |  Per-Host Resources: mem-estimate=16.00KB mem-reservation=0B thread-reservation=1
 PLAN-ROOT SINK
+|  output exprs: count(int_col)
 |  mem-estimate=0B mem-reservation=0B thread-reservation=0
 |
 05:MERGING-EXCHANGE [UNPARTITIONED]
@@ -165,7 +169,7 @@ Per-Host Resources: mem-estimate=384.55MB mem-reservation=102.00MB thread-reserv
 |  in pipelines: 04(GETNEXT), 00(OPEN)
 |
 03:EXCHANGE [HASH(bigint_col)]
-|  mem-estimate=186.64KB mem-reservation=0B thread-reservation=0
+|  mem-estimate=186.63KB mem-reservation=0B thread-reservation=0
 |  tuple-ids=1 row-size=16B cardinality=1.27K
 |  in pipelines: 00(GETNEXT)
 |
@@ -179,7 +183,7 @@ Per-Host Resources: mem-estimate=432.00MB mem-reservation=102.07MB thread-reserv
 |  in pipelines: 00(GETNEXT)
 |
 00:SCAN HDFS [functional_parquet.alltypes, RANDOM]
-   HDFS partitions=24/24 files=24 size=200.43KB
+   HDFS partitions=24/24 files=24 size=200.33KB
    predicates: id < CAST(10 AS INT)
    stored statistics:
      table: rows=unavailable size=unavailable
@@ -200,6 +204,7 @@ where id < 10
 F00:PLAN FRAGMENT [UNPARTITIONED] hosts=1 instances=1
 |  Per-Host Resources: mem-estimate=26.00MB mem-reservation=10.02MB thread-reservation=1
 PLAN-ROOT SINK
+|  output exprs: row_number()
 |  mem-estimate=0B mem-reservation=0B thread-reservation=0
 |
 02:ANALYTIC
@@ -218,7 +223,7 @@ PLAN-ROOT SINK
 |  in pipelines: 01(GETNEXT), 00(OPEN)
 |
 00:SCAN HDFS [functional_parquet.alltypes]
-   HDFS partitions=24/24 files=24 size=200.43KB
+   HDFS partitions=24/24 files=24 size=200.33KB
    predicates: id < CAST(10 AS INT)
    stored statistics:
      table: rows=unavailable size=unavailable
@@ -232,12 +237,13 @@ PLAN-ROOT SINK
    in pipelines: 00(GETNEXT)
 ---- PARALLELPLANS
 F02:PLAN FRAGMENT [UNPARTITIONED] hosts=1 instances=1
-|  Per-Host Resources: mem-estimate=222.64KB mem-reservation=0B thread-reservation=1
+|  Per-Host Resources: mem-estimate=222.63KB mem-reservation=0B thread-reservation=1
 PLAN-ROOT SINK
+|  output exprs: row_number()
 |  mem-estimate=0B mem-reservation=0B thread-reservation=0
 |
 04:EXCHANGE [UNPARTITIONED]
-|  mem-estimate=222.64KB mem-reservation=0B thread-reservation=0
+|  mem-estimate=222.63KB mem-reservation=0B thread-reservation=0
 |  tuple-ids=4,3 row-size=16B cardinality=1.27K
 |  in pipelines: 01(GETNEXT)
 |
@@ -266,7 +272,7 @@ Per-Host Resources: mem-estimate=30.33MB mem-reservation=30.00MB thread-reservat
 F00:PLAN FRAGMENT [RANDOM] hosts=3 instances=9
 Per-Host Resources: mem-estimate=48.00MB mem-reservation=48.00KB thread-reservation=3
 00:SCAN HDFS [functional_parquet.alltypes, RANDOM]
-   HDFS partitions=24/24 files=24 size=200.43KB
+   HDFS partitions=24/24 files=24 size=200.33KB
    predicates: id < CAST(10 AS INT)
    stored statistics:
      table: rows=unavailable size=unavailable

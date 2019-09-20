@@ -92,7 +92,7 @@ public class UnnestNode extends PlanNode {
     if (detailLevel.ordinal() >= TExplainLevel.STANDARD.ordinal()) {
       if (!conjuncts_.isEmpty()) {
         output.append(detailPrefix
-            + "predicates: " + getExplainString(conjuncts_, detailLevel) + "\n");
+            + "predicates: " + Expr.getExplainString(conjuncts_, detailLevel) + "\n");
       }
     }
     return output.toString();

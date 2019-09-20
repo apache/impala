@@ -7,6 +7,7 @@ Per-Host Resource Estimates: Memory=20MB
 F01:PLAN FRAGMENT [UNPARTITIONED] hosts=1 instances=1
 |  Per-Host Resources: mem-estimate=4.02MB mem-reservation=4.00MB thread-reservation=1
 PLAN-ROOT SINK
+|  output exprs: id, bool_col, tinyint_col, smallint_col, int_col, bigint_col, float_col, double_col, date_string_col, string_col, timestamp_col, year, month
 |  mem-estimate=4.00MB mem-reservation=4.00MB spill-buffer=2.00MB thread-reservation=0
 |
 02:MERGING-EXCHANGE [UNPARTITIONED]
@@ -40,6 +41,7 @@ Per-Host Resource Estimates: Memory=36MB
 F01:PLAN FRAGMENT [UNPARTITIONED] hosts=1 instances=1
 |  Per-Host Resources: mem-estimate=4.02MB mem-reservation=4.00MB thread-reservation=1
 PLAN-ROOT SINK
+|  output exprs: id, bool_col, tinyint_col, smallint_col, int_col, bigint_col, float_col, double_col, date_string_col, string_col, timestamp_col, year, month
 |  mem-estimate=4.00MB mem-reservation=4.00MB spill-buffer=2.00MB thread-reservation=0
 |
 02:MERGING-EXCHANGE [UNPARTITIONED]
@@ -77,6 +79,7 @@ Per-Host Resource Estimates: Memory=257MB
 F01:PLAN FRAGMENT [UNPARTITIONED] hosts=1 instances=1
 |  Per-Host Resources: mem-estimate=130.69MB mem-reservation=4.00MB thread-reservation=1
 PLAN-ROOT SINK
+|  output exprs: l_orderkey, l_partkey, l_suppkey, l_linenumber, l_quantity, l_extendedprice, l_discount, l_tax, l_returnflag, l_linestatus, l_shipdate, l_commitdate, l_receiptdate, l_shipinstruct, l_shipmode, l_comment
 |  mem-estimate=100.00MB mem-reservation=4.00MB spill-buffer=2.00MB thread-reservation=0
 |
 02:MERGING-EXCHANGE [UNPARTITIONED]
@@ -108,6 +111,7 @@ Per-Host Resource Estimates: Memory=413MB
 F01:PLAN FRAGMENT [UNPARTITIONED] hosts=1 instances=1
 |  Per-Host Resources: mem-estimate=161.38MB mem-reservation=4.00MB thread-reservation=1
 PLAN-ROOT SINK
+|  output exprs: l_orderkey, l_partkey, l_suppkey, l_linenumber, l_quantity, l_extendedprice, l_discount, l_tax, l_returnflag, l_linestatus, l_shipdate, l_commitdate, l_receiptdate, l_shipinstruct, l_shipmode, l_comment
 |  mem-estimate=100.00MB mem-reservation=4.00MB spill-buffer=2.00MB thread-reservation=0
 |
 02:MERGING-EXCHANGE [UNPARTITIONED]
@@ -133,3 +137,4 @@ Per-Host Resources: mem-estimate=252.00MB mem-reservation=40.00MB thread-reserva
    mem-estimate=88.00MB mem-reservation=8.00MB thread-reservation=0
    tuple-ids=0 row-size=231B cardinality=6.00M
    in pipelines: 00(GETNEXT)
+====

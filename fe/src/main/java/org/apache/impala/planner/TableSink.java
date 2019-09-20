@@ -76,10 +76,14 @@ public abstract class TableSink extends DataSink {
   protected final FeTable targetTable_;
   // The type of operation to be performed by this sink.
   protected final Op sinkOp_;
+  // One expression per result column for the query. Always non-null.
+  protected final List<Expr> outputExprs_;
 
-  public TableSink(FeTable targetTable, Op sinkAction) {
+  public TableSink(FeTable targetTable, Op sinkAction, List<Expr> outputExprs) {
+    Preconditions.checkState(outputExprs != null);
     targetTable_ = targetTable;
     sinkOp_ = sinkAction;
+    outputExprs_ = outputExprs;
   }
 
   /**
@@ -91,17 +95,19 @@ public abstract class TableSink extends DataSink {
    * columns of the target table that are stored in the 'sort.columns' table property.
    */
   public static TableSink create(FeTable table, Op sinkAction,
-      List<Expr> partitionKeyExprs,  List<Integer> referencedColumns,
+      List<Expr> partitionKeyExprs, List<Expr> outputExprs,
+      List<Integer> referencedColumns,
       boolean overwrite, boolean inputIsClustered, List<Integer> sortColumns) {
-    return create(table, sinkAction, partitionKeyExprs, referencedColumns, overwrite,
-        inputIsClustered, sortColumns, -1);
+    return create(table, sinkAction, partitionKeyExprs, outputExprs, referencedColumns,
+        overwrite, inputIsClustered, sortColumns, -1);
   }
 
   /**
    * Same as above, plus it takes an ACID write id in parameter 'writeId'.
    */
   public static TableSink create(FeTable table, Op sinkAction,
-      List<Expr> partitionKeyExprs,  List<Integer> referencedColumns,
+      List<Expr> partitionKeyExprs, List<Expr> outputExprs,
+      List<Integer> referencedColumns,
       boolean overwrite, boolean inputIsClustered, List<Integer> sortColumns,
       long writeId) {
     Preconditions.checkNotNull(partitionKeyExprs);
@@ -112,8 +118,8 @@ public abstract class TableSink extends DataSink {
       Preconditions.checkState(sinkAction == Op.INSERT);
       // Referenced columns don't make sense for an Hdfs table.
       Preconditions.checkState(referencedColumns.isEmpty());
-      return new HdfsTableSink(table, partitionKeyExprs, overwrite, inputIsClustered,
-          sortColumns, writeId);
+      return new HdfsTableSink(table, partitionKeyExprs,outputExprs, overwrite,
+          inputIsClustered, sortColumns, writeId);
     } else if (table instanceof FeHBaseTable) {
       // HBase only supports inserts.
       Preconditions.checkState(sinkAction == Op.INSERT);
@@ -126,13 +132,13 @@ public abstract class TableSink extends DataSink {
       // Sort columns are not supported for HBase tables.
       Preconditions.checkState(sortColumns.isEmpty());
       // Create the HBaseTableSink and return it.
-      return new HBaseTableSink(table);
+      return new HBaseTableSink(table, outputExprs);
     } else if (table instanceof FeKuduTable) {
       // Kudu doesn't have a way to perform INSERT OVERWRITE.
       Preconditions.checkState(overwrite == false);
       // Sort columns are not supported for Kudu tables.
       Preconditions.checkState(sortColumns.isEmpty());
-      return new KuduTableSink(table, sinkAction, referencedColumns);
+      return new KuduTableSink(table, sinkAction, referencedColumns, outputExprs);
     } else {
       throw new UnsupportedOperationException(
           "Cannot create data sink into table of type: " + table.getClass().getName());

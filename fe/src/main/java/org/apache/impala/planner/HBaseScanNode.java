@@ -45,7 +45,6 @@ import org.apache.impala.catalog.PrimitiveType;
 import org.apache.impala.catalog.Type;
 import org.apache.impala.common.ImpalaException;
 import org.apache.impala.common.Pair;
-import org.apache.impala.service.FeSupport;
 import org.apache.impala.thrift.TExplainLevel;
 import org.apache.impala.thrift.THBaseFilter;
 import org.apache.impala.thrift.THBaseKeyRange;
@@ -562,8 +561,8 @@ public class HBaseScanNode extends ScanNode {
         displayName_, table.getFullName(), aliasStr));
     if (detailLevel.ordinal() >= TExplainLevel.STANDARD.ordinal()) {
       if (!keyConjuncts_.isEmpty()) {
-        output.append(detailPrefix
-            + "key predicates: " + getExplainString(keyConjuncts_, detailLevel) + "\n");
+        output.append(detailPrefix + "key predicates: " +
+            Expr.getExplainString(keyConjuncts_, detailLevel) + "\n");
       }
       if (!Bytes.equals(startKey_, HConstants.EMPTY_START_ROW)) {
         output.append(detailPrefix + "start key: " + printKey(startKey_) + "\n");
@@ -590,7 +589,7 @@ public class HBaseScanNode extends ScanNode {
       }
       if (!conjuncts_.isEmpty()) {
         output.append(detailPrefix
-            + "predicates: " + getExplainString(conjuncts_, detailLevel) + "\n");
+            + "predicates: " + Expr.getExplainString(conjuncts_, detailLevel) + "\n");
       }
     }
     if (detailLevel.ordinal() >= TExplainLevel.EXTENDED.ordinal()) {

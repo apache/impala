@@ -12,6 +12,7 @@ JOIN tpch_parquet.nation ON c_nationkey = n_nationkey
 F02:PLAN FRAGMENT [UNPARTITIONED] hosts=1 instances=1
 |  Per-Host Resources: mem-estimate=10.33MB mem-reservation=0B thread-reservation=1
 PLAN-ROOT SINK
+|  output exprs: tpch_parquet.customer.c_custkey, tpch_parquet.customer.c_name, tpch_parquet.customer.c_address, tpch_parquet.customer.c_nationkey, tpch_parquet.customer.c_phone, tpch_parquet.customer.c_acctbal, tpch_parquet.customer.c_mktsegment, tpch_parquet.customer.c_comment, tpch_parquet.nation.n_nationkey, tpch_parquet.nation.n_name, tpch_parquet.nation.n_regionkey, tpch_parquet.nation.n_comment
 |  mem-estimate=0B mem-reservation=0B thread-reservation=0
 |
 04:EXCHANGE [UNPARTITIONED]
@@ -37,9 +38,9 @@ Per-Host Resources: mem-estimate=41.95MB mem-reservation=33.94MB thread-reservat
 |  F01:PLAN FRAGMENT [RANDOM] hosts=1 instances=1
 |  Per-Host Resources: mem-estimate=16.00MB mem-reservation=32.00KB thread-reservation=2
 |  01:SCAN HDFS [tpch_parquet.nation, RANDOM]
-|     partitions=1/1 files=1 size=2.75KB
+|     HDFS partitions=1/1 files=1 size=3.04KB
 |     stored statistics:
-|       table: rows=25 size=2.75KB
+|       table: rows=25 size=3.04KB
 |       columns: all
 |     extrapolated-rows=disabled max-scan-range-rows=25
 |     mem-estimate=16.00MB mem-reservation=32.00KB thread-reservation=1
@@ -47,10 +48,10 @@ Per-Host Resources: mem-estimate=41.95MB mem-reservation=33.94MB thread-reservat
 |     in pipelines: 01(GETNEXT)
 |
 00:SCAN HDFS [tpch_parquet.customer, RANDOM]
-   partitions=1/1 files=1 size=12.31MB
+   HDFS partitions=1/1 files=1 size=12.34MB
    runtime filters: RF000[bloom] -> c_nationkey
    stored statistics:
-     table: rows=150.00K size=12.31MB
+     table: rows=150.00K size=12.34MB
      columns: all
    extrapolated-rows=disabled max-scan-range-rows=150.00K
    mem-estimate=24.00MB mem-reservation=16.00MB thread-reservation=1
@@ -71,6 +72,7 @@ OUTER JOIN tpch_parquet.orders ON l_orderkey = o_orderkey
 F02:PLAN FRAGMENT [UNPARTITIONED] hosts=1 instances=1
 |  Per-Host Resources: mem-estimate=11.20MB mem-reservation=0B thread-reservation=1
 PLAN-ROOT SINK
+|  output exprs: tpch_parquet.lineitem.l_orderkey, tpch_parquet.lineitem.l_partkey, tpch_parquet.lineitem.l_suppkey, tpch_parquet.lineitem.l_linenumber, tpch_parquet.lineitem.l_quantity, tpch_parquet.lineitem.l_extendedprice, tpch_parquet.lineitem.l_discount, tpch_parquet.lineitem.l_tax, tpch_parquet.lineitem.l_returnflag, tpch_parquet.lineitem.l_linestatus, tpch_parquet.lineitem.l_shipdate, tpch_parquet.lineitem.l_commitdate, tpch_parquet.lineitem.l_receiptdate, tpch_parquet.lineitem.l_shipinstruct, tpch_parquet.lineitem.l_shipmode, tpch_parquet.lineitem.l_comment, tpch_parquet.orders.o_orderkey, tpch_parquet.orders.o_custkey, tpch_parquet.orders.o_orderstatus, tpch_parquet.orders.o_totalprice, tpch_parquet.orders.o_orderdate, tpch_parquet.orders.o_orderpriority, tpch_parquet.orders.o_clerk, tpch_parquet.orders.o_shippriority, tpch_parquet.orders.o_comment
 |  mem-estimate=0B mem-reservation=0B thread-reservation=0
 |
 04:EXCHANGE [UNPARTITIONED]
@@ -95,9 +97,9 @@ Per-Host Resources: mem-estimate=359.29MB mem-reservation=86.00MB thread-reserva
 |  F01:PLAN FRAGMENT [RANDOM] hosts=2 instances=2
 |  Per-Host Resources: mem-estimate=40.00MB mem-reservation=24.00MB thread-reservation=2
 |  01:SCAN HDFS [tpch_parquet.orders, RANDOM]
-|     partitions=1/1 files=2 size=54.07MB
+|     HDFS partitions=1/1 files=2 size=54.21MB
 |     stored statistics:
-|       table: rows=1.50M size=54.07MB
+|       table: rows=1.50M size=54.21MB
 |       columns: all
 |     extrapolated-rows=disabled max-scan-range-rows=1.18M
 |     mem-estimate=40.00MB mem-reservation=24.00MB thread-reservation=1
@@ -105,9 +107,9 @@ Per-Host Resources: mem-estimate=359.29MB mem-reservation=86.00MB thread-reserva
 |     in pipelines: 01(GETNEXT)
 |
 00:SCAN HDFS [tpch_parquet.lineitem, RANDOM]
-   partitions=1/1 files=3 size=193.60MB
+   HDFS partitions=1/1 files=3 size=193.99MB
    stored statistics:
-     table: rows=6.00M size=193.59MB
+     table: rows=6.00M size=193.99MB
      columns: all
    extrapolated-rows=disabled max-scan-range-rows=2.14M
    mem-estimate=80.00MB mem-reservation=40.00MB thread-reservation=1
@@ -128,6 +130,7 @@ Analyzed query: SELECT * FROM tpch_parquet.lineitem NULL AWARE LEFT ANTI JOIN
 F02:PLAN FRAGMENT [UNPARTITIONED] hosts=1 instances=1
 |  Per-Host Resources: mem-estimate=10.69MB mem-reservation=0B thread-reservation=1
 PLAN-ROOT SINK
+|  output exprs: tpch_parquet.lineitem.l_orderkey, tpch_parquet.lineitem.l_partkey, tpch_parquet.lineitem.l_suppkey, tpch_parquet.lineitem.l_linenumber, tpch_parquet.lineitem.l_quantity, tpch_parquet.lineitem.l_extendedprice, tpch_parquet.lineitem.l_discount, tpch_parquet.lineitem.l_tax, tpch_parquet.lineitem.l_returnflag, tpch_parquet.lineitem.l_linestatus, tpch_parquet.lineitem.l_shipdate, tpch_parquet.lineitem.l_commitdate, tpch_parquet.lineitem.l_receiptdate, tpch_parquet.lineitem.l_shipinstruct, tpch_parquet.lineitem.l_shipmode, tpch_parquet.lineitem.l_comment
 |  mem-estimate=0B mem-reservation=0B thread-reservation=0
 |
 04:EXCHANGE [UNPARTITIONED]
@@ -151,9 +154,9 @@ Per-Host Resources: mem-estimate=124.02MB mem-reservation=74.00MB thread-reserva
 |  F01:PLAN FRAGMENT [RANDOM] hosts=2 instances=2
 |  Per-Host Resources: mem-estimate=40.00MB mem-reservation=4.00MB thread-reservation=2
 |  01:SCAN HDFS [tpch_parquet.orders, RANDOM]
-|     partitions=1/1 files=2 size=54.07MB
+|     HDFS partitions=1/1 files=2 size=54.21MB
 |     stored statistics:
-|       table: rows=1.50M size=54.07MB
+|       table: rows=1.50M size=54.21MB
 |       columns: all
 |     extrapolated-rows=disabled max-scan-range-rows=1.18M
 |     mem-estimate=40.00MB mem-reservation=4.00MB thread-reservation=1
@@ -161,9 +164,9 @@ Per-Host Resources: mem-estimate=124.02MB mem-reservation=74.00MB thread-reserva
 |     in pipelines: 01(GETNEXT)
 |
 00:SCAN HDFS [tpch_parquet.lineitem, RANDOM]
-   partitions=1/1 files=3 size=193.60MB
+   HDFS partitions=1/1 files=3 size=193.99MB
    stored statistics:
-     table: rows=6.00M size=193.59MB
+     table: rows=6.00M size=193.99MB
      columns: all
    extrapolated-rows=disabled max-scan-range-rows=2.14M
    mem-estimate=80.00MB mem-reservation=40.00MB thread-reservation=1
@@ -188,6 +191,7 @@ BIGINT)
 F04:PLAN FRAGMENT [UNPARTITIONED] hosts=1 instances=1
 |  Per-Host Resources: mem-estimate=10.10MB mem-reservation=0B thread-reservation=1
 PLAN-ROOT SINK
+|  output exprs: l_orderkey, o_orderstatus, count(*)
 |  mem-estimate=0B mem-reservation=0B thread-reservation=0
 |
 08:EXCHANGE [UNPARTITIONED]
@@ -235,9 +239,9 @@ Per-Host Resources: mem-estimate=99.65MB mem-reservation=66.00MB thread-reservat
 |  F01:PLAN FRAGMENT [RANDOM] hosts=2 instances=2
 |  Per-Host Resources: mem-estimate=40.00MB mem-reservation=8.00MB thread-reservation=2
 |  01:SCAN HDFS [tpch_parquet.orders, RANDOM]
-|     partitions=1/1 files=2 size=54.07MB
+|     HDFS partitions=1/1 files=2 size=54.21MB
 |     stored statistics:
-|       table: rows=1.50M size=54.07MB
+|       table: rows=1.50M size=54.21MB
 |       columns: all
 |     extrapolated-rows=disabled max-scan-range-rows=1.18M
 |     mem-estimate=40.00MB mem-reservation=8.00MB thread-reservation=1
@@ -252,10 +256,10 @@ Per-Host Resources: mem-estimate=99.65MB mem-reservation=66.00MB thread-reservat
 F00:PLAN FRAGMENT [RANDOM] hosts=3 instances=3
 Per-Host Resources: mem-estimate=81.00MB mem-reservation=5.00MB thread-reservation=2 runtime-filters-memory=1.00MB
 00:SCAN HDFS [tpch_parquet.lineitem, RANDOM]
-   partitions=1/1 files=3 size=193.60MB
+   HDFS partitions=1/1 files=3 size=193.99MB
    runtime filters: RF000[bloom] -> l_orderkey
    stored statistics:
-     table: rows=6.00M size=193.59MB
+     table: rows=6.00M size=193.99MB
      columns: all
    extrapolated-rows=disabled max-scan-range-rows=2.14M
    mem-estimate=80.00MB mem-reservation=4.00MB thread-reservation=1
@@ -274,6 +278,7 @@ Analyzed query: SELECT DISTINCT * FROM tpch_parquet.lineitem
 F02:PLAN FRAGMENT [UNPARTITIONED] hosts=1 instances=1
 |  Per-Host Resources: mem-estimate=10.69MB mem-reservation=0B thread-reservation=1
 PLAN-ROOT SINK
+|  output exprs: tpch_parquet.lineitem.l_orderkey, tpch_parquet.lineitem.l_partkey, tpch_parquet.lineitem.l_suppkey, tpch_parquet.lineitem.l_linenumber, tpch_parquet.lineitem.l_quantity, tpch_parquet.lineitem.l_extendedprice, tpch_parquet.lineitem.l_discount, tpch_parquet.lineitem.l_tax, tpch_parquet.lineitem.l_returnflag, tpch_parquet.lineitem.l_linestatus, tpch_parquet.lineitem.l_shipdate, tpch_parquet.lineitem.l_commitdate, tpch_parquet.lineitem.l_receiptdate, tpch_parquet.lineitem.l_shipinstruct, tpch_parquet.lineitem.l_shipmode, tpch_parquet.lineitem.l_comment
 |  mem-estimate=0B mem-reservation=0B thread-reservation=0
 |
 04:EXCHANGE [UNPARTITIONED]
@@ -303,9 +308,9 @@ Per-Host Resources: mem-estimate=806.43MB mem-reservation=74.00MB thread-reserva
 |  in pipelines: 00(GETNEXT)
 |
 00:SCAN HDFS [tpch_parquet.lineitem, RANDOM]
-   partitions=1/1 files=3 size=193.60MB
+   HDFS partitions=1/1 files=3 size=193.99MB
    stored statistics:
-     table: rows=6.00M size=193.59MB
+     table: rows=6.00M size=193.99MB
      columns: all
    extrapolated-rows=disabled max-scan-range-rows=2.14M
    mem-estimate=80.00MB mem-reservation=40.00MB thread-reservation=1
@@ -326,6 +331,7 @@ FROM tpch_parquet.lineitem GROUP BY l_orderkey, l_partkey
 F02:PLAN FRAGMENT [UNPARTITIONED] hosts=1 instances=1
 |  Per-Host Resources: mem-estimate=10.09MB mem-reservation=0B thread-reservation=1
 PLAN-ROOT SINK
+|  output exprs: l_orderkey, l_partkey, group_concat(l_linestatus, ',')
 |  mem-estimate=0B mem-reservation=0B thread-reservation=0
 |
 04:EXCHANGE [UNPARTITIONED]
@@ -357,9 +363,9 @@ Per-Host Resources: mem-estimate=168.14MB mem-reservation=50.00MB thread-reserva
 |  in pipelines: 00(GETNEXT)
 |
 00:SCAN HDFS [tpch_parquet.lineitem, RANDOM]
-   partitions=1/1 files=3 size=193.60MB
+   HDFS partitions=1/1 files=3 size=193.99MB
    stored statistics:
-     table: rows=6.00M size=193.59MB
+     table: rows=6.00M size=193.99MB
      columns: all
    extrapolated-rows=disabled max-scan-range-rows=2.14M
    mem-estimate=80.00MB mem-reservation=16.00MB thread-reservation=1
@@ -380,6 +386,7 @@ functional.alltypes
 F02:PLAN FRAGMENT [UNPARTITIONED] hosts=1 instances=1
 |  Per-Host Resources: mem-estimate=56.26KB mem-reservation=0B thread-reservation=1
 PLAN-ROOT SINK
+|  output exprs: max(tinyint_col)
 |  mem-estimate=0B mem-reservation=0B thread-reservation=0
 |
 04:EXCHANGE [UNPARTITIONED]
@@ -410,7 +417,7 @@ Per-Host Resources: mem-estimate=40.04MB mem-reservation=40.00MB thread-reservat
 F00:PLAN FRAGMENT [RANDOM] hosts=3 instances=3
 Per-Host Resources: mem-estimate=16.00MB mem-reservation=32.00KB thread-reservation=2
 00:SCAN HDFS [functional.alltypes, RANDOM]
-   partitions=24/24 files=24 size=478.45KB
+   HDFS partitions=24/24 files=24 size=478.45KB
    stored statistics:
      table: rows=7.30K size=478.45KB
      partitions: 24/24 rows=7.30K

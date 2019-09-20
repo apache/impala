@@ -313,7 +313,7 @@ public abstract class ModifyStmt extends StatementBase {
   }
 
   public QueryStmt getQueryStmt() { return sourceStmt_; }
-  public abstract DataSink createDataSink();
+  public abstract DataSink createDataSink(List<Expr> resultExprs);
   @Override
   public abstract String toSql(ToSqlOptions options);
 }

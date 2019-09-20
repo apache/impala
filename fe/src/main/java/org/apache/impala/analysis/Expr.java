@@ -41,6 +41,7 @@ import org.apache.impala.common.TreeNode;
 import org.apache.impala.rewrite.ExprRewriter;
 import org.apache.impala.service.FeSupport;
 import org.apache.impala.thrift.TColumnValue;
+import org.apache.impala.thrift.TExplainLevel;
 import org.apache.impala.thrift.TExpr;
 import org.apache.impala.thrift.TExprNode;
 import org.apache.impala.thrift.TFunction;
@@ -1590,6 +1591,21 @@ abstract public class Expr extends TreeNode<Expr> implements ParseNode, Cloneabl
         }
     };
     return Joiner.on(",").join(Iterables.transform(exprs, toSql));
+  }
+
+  public static String getExplainString(
+      List<? extends Expr> exprs, TExplainLevel detailLevel) {
+    if (exprs == null) return "";
+    ToSqlOptions toSqlOptions =
+        detailLevel.ordinal() >= TExplainLevel.EXTENDED.ordinal() ?
+        ToSqlOptions.SHOW_IMPLICIT_CASTS :
+        ToSqlOptions.DEFAULT;
+    StringBuilder output = new StringBuilder();
+    for (int i = 0; i < exprs.size(); ++i) {
+      if (i > 0) output.append(", ");
+      output.append(exprs.get(i).toSql(toSqlOptions));
+    }
+    return output.toString();
   }
 
   /**
