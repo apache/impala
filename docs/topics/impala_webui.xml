@@ -602,9 +602,13 @@ under the License.
         </p>
 
         <p>
-          Each query has an associated link that displays the detailed query profile, which you
-          can examine to understand the performance characteristics of that query. See
-          <xref href="impala_explain_plan.xml#perf_profile"/> for details.
+          Click the <uicontrol>Details</uicontrol> link for a query to display the detailed
+          performance characteristics of that query, such as the profile output.
+        </p>
+
+        <p>
+          On the query detail page, in the <uicontrol>Profile</uicontrol> tab, you have options
+          to export the query profile output to the Thrift, text, or Json format.
         </p>
 
         <p>
