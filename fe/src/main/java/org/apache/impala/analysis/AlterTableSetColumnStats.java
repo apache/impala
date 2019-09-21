@@ -111,7 +111,9 @@ public class AlterTableSetColumnStats extends AlterTableStmt {
 
     if (statsKey == ColumnStats.StatsKey.NUM_DISTINCT_VALUES ||
         statsKey == ColumnStats.StatsKey.NUM_NULLS ||
-        statsKey == ColumnStats.StatsKey.MAX_SIZE) {
+        statsKey == ColumnStats.StatsKey.MAX_SIZE ||
+        statsKey == ColumnStats.StatsKey.NUM_TRUES ||
+        statsKey == ColumnStats.StatsKey.NUM_FALSES ) {
       Long statsVal = null;
       try {
         statsVal = Long.parseLong(statsValue);
