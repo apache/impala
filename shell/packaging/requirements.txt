@@ -1,0 +1,8 @@
+bitarray==1.0.1
+prettytable==0.7.1
+sasl==0.2.1
+setuptools>=36.8.0
+six==1.11.0
+sqlparse==0.1.19
+thrift==0.9.3
+thrift_sasl==0.2.1

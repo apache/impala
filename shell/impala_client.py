@@ -939,6 +939,8 @@ class ImpalaBeeswaxClient(ImpalaClient):
       if t.type == TApplicationException.UNKNOWN_METHOD:
         raise MissingThriftMethodException(t.message)
       raise
+    except TTransportException as e:
+      raise DisconnectedException("Error communicating with impalad: %s" % e)
     return (resp.version, resp.webserver_address)
 
   def _create_query_req(self, query_str, set_query_options):
@@ -1094,4 +1096,39 @@ class ImpalaBeeswaxClient(ImpalaClient):
       if t.type == TApplicationException.UNKNOWN_METHOD:
         raise MissingThriftMethodException(t.message)
       raise RPCException("Application Exception : %s" % t)
+    except Exception as e:
+      # This final except clause should ONLY be exercised in the case of Impala
+      # shell being installed as a standalone python package from public PyPI,
+      # rather than being included as part of a typical Impala deployment.
+      #
+      # Essentially, it's a hack that is required due to issues stemming from
+      # IMPALA-6808. Because of the way the Impala python environment has been
+      # somewhat haphazardly constructed, we end up polluting the top level Impala
+      # python environment with modules that should really be sub-modules. One of
+      # the principal places this occurs is with the various modules required by
+      # the Impala shell. This isn't a concern when the shell is invoked via a
+      # specially installed version of python that belongs to Impala, but it does
+      # become an issue when the shell is being run using the system python.
+      #
+      # When we install the shell as a standalone package, we need to construct
+      # it in such a way that all of the internal modules are contained within
+      # a top-level impala_shell namespace. However, this then breaks various
+      # imports and, in this case, exception handling in the original code.
+      # As far as I can tell, there's no clean way to address this without fully
+      # resolving IMPALA-6808.
+      #
+      # Without taking some additional measure here to recognize certain common
+      # exceptions, especially Beeswax exceptions raised by RPC calls, when
+      # errors occur during a standalone shell session, we wind up falling
+      # entirely through this block and returning nothing to the caller (which
+      # happens to be the primary command loop in impala_shell.py). This in turn
+      # has the result of disconnecting the shell in the case of, say, even simple
+      # typos in database or table names.
+      if suppress_error_on_cancel and self.is_query_cancelled:
+        raise QueryCancelledByShellException()
+      else:
+        if "BeeswaxException" in str(e):
+          raise RPCException("ERROR: %s" % e.message)
+        if "QueryNotFoundException" in str(e):
+          raise QueryStateException('Error: Stale query handle')
 

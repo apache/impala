@@ -1,0 +1,3 @@
+include *.txt *.md *.py
+recursive-include impala_shell *.py
+recursive-exclude impala_shell *.pyc
