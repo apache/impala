@@ -48,7 +48,7 @@ STRING, STRING, BIGINT, BIGINT, STRING, STRING, STRING, STRING, STRING, STRING
 ---- QUERY
 show column stats alltypes
 ---- LABELS
-COLUMN, TYPE, #DISTINCT VALUES, #NULLS, MAX SIZE, AVG SIZE
+COLUMN, TYPE, #DISTINCT VALUES, #NULLS, MAX SIZE, AVG SIZE, #TRUES, #FALSES
 ---- RESULTS
 'id','INT',7300,0,4,4
 'bool_col','BOOLEAN',2,0,1,1
@@ -64,7 +64,7 @@ COLUMN, TYPE, #DISTINCT VALUES, #NULLS, MAX SIZE, AVG SIZE
 'year','INT',2,0,4,4
 'month','INT',12,0,4,4
 ---- TYPES
-STRING, STRING, BIGINT, BIGINT, BIGINT, DOUBLE
+STRING, STRING, BIGINT, BIGINT, BIGINT, DOUBLE, BIGINT, BIGINT
 ====
 ---- QUERY
 # Adding a column shouldn't cause the stats to be dropped.
@@ -75,7 +75,7 @@ alter table alltypes add columns (new_col int)
 ---- QUERY
 show column stats alltypes
 ---- LABELS
-COLUMN, TYPE, #DISTINCT VALUES, #NULLS, MAX SIZE, AVG SIZE
+COLUMN, TYPE, #DISTINCT VALUES, #NULLS, MAX SIZE, AVG SIZE, #TRUES, #FALSES
 ---- RESULTS
 'id','INT',7300,0,4,4
 'bool_col','BOOLEAN',2,0,1,1
@@ -92,7 +92,7 @@ COLUMN, TYPE, #DISTINCT VALUES, #NULLS, MAX SIZE, AVG SIZE
 'year','INT',2,0,4,4
 'month','INT',12,0,4,4
 ---- TYPES
-STRING, STRING, BIGINT, BIGINT, BIGINT, DOUBLE
+STRING, STRING, BIGINT, BIGINT, BIGINT, DOUBLE, BIGINT, BIGINT
 ====
 ---- QUERY
 # Changing a column shouldn't cause the stats of other columns to be dropped.
@@ -105,7 +105,7 @@ alter table alltypes change new_col new_col2 int
 ---- QUERY
 show column stats alltypes
 ---- LABELS
-COLUMN, TYPE, #DISTINCT VALUES, #NULLS, MAX SIZE, AVG SIZE
+COLUMN, TYPE, #DISTINCT VALUES, #NULLS, MAX SIZE, AVG SIZE, #TRUES, #FALSES
 ---- RESULTS
 'id','INT',7300,0,4,4
 'bool_col','BOOLEAN',2,0,1,1
@@ -122,7 +122,7 @@ COLUMN, TYPE, #DISTINCT VALUES, #NULLS, MAX SIZE, AVG SIZE
 'year','INT',2,0,4,4
 'month','INT',12,0,4,4
 ---- TYPES
-STRING, STRING, BIGINT, BIGINT, BIGINT, DOUBLE
+STRING, STRING, BIGINT, BIGINT, BIGINT, DOUBLE, BIGINT, BIGINT
 ====
 ---- QUERY
 # Removing a column shouldn't cause the stats to be dropped.
@@ -133,7 +133,7 @@ alter table alltypes drop column new_col2
 ---- QUERY
 show column stats alltypes
 ---- LABELS
-COLUMN, TYPE, #DISTINCT VALUES, #NULLS, MAX SIZE, AVG SIZE
+COLUMN, TYPE, #DISTINCT VALUES, #NULLS, MAX SIZE, AVG SIZE, #TRUES, #FALSES
 ---- RESULTS
 'id','INT',7300,0,4,4
 'bool_col','BOOLEAN',2,0,1,1
@@ -149,7 +149,7 @@ COLUMN, TYPE, #DISTINCT VALUES, #NULLS, MAX SIZE, AVG SIZE
 'year','INT',2,0,4,4
 'month','INT',12,0,4,4
 ---- TYPES
-STRING, STRING, BIGINT, BIGINT, BIGINT, DOUBLE
+STRING, STRING, BIGINT, BIGINT, BIGINT, DOUBLE, BIGINT, BIGINT
 ====
 ---- QUERY
 # drop stats from this table
@@ -192,7 +192,7 @@ STRING, STRING, BIGINT, BIGINT, STRING, STRING, STRING, STRING, STRING, STRING
 # Note - the NDV for partition columns is read from the table metadata.
 show column stats alltypes
 ---- LABELS
-COLUMN, TYPE, #DISTINCT VALUES, #NULLS, MAX SIZE, AVG SIZE
+COLUMN, TYPE, #DISTINCT VALUES, #NULLS, MAX SIZE, AVG SIZE, #TRUES, #FALSES
 ---- RESULTS
 'id','INT',-1,-1,4,4
 'bool_col','BOOLEAN',-1,-1,1,1
@@ -208,7 +208,7 @@ COLUMN, TYPE, #DISTINCT VALUES, #NULLS, MAX SIZE, AVG SIZE
 'year','INT',2,0,4,4
 'month','INT',12,0,4,4
 ---- TYPES
-STRING, STRING, BIGINT, BIGINT, BIGINT, DOUBLE
+STRING, STRING, BIGINT, BIGINT, BIGINT, DOUBLE, BIGINT, BIGINT
 ====
 ---- QUERY
 # Restricts stats to a subset of columns.
@@ -259,7 +259,7 @@ STRING, STRING, BIGINT, BIGINT, STRING, STRING, STRING, STRING, STRING, STRING
 ---- QUERY
 show column stats alltypes_for_coltest
 ---- LABELS
-COLUMN, TYPE, #DISTINCT VALUES, #NULLS, MAX SIZE, AVG SIZE
+COLUMN, TYPE, #DISTINCT VALUES, #NULLS, MAX SIZE, AVG SIZE, #TRUES, #FALSES
 ---- RESULTS
 'id','INT',-1,-1,4,4
 'bool_col','BOOLEAN',-1,-1,1,1
@@ -275,7 +275,7 @@ COLUMN, TYPE, #DISTINCT VALUES, #NULLS, MAX SIZE, AVG SIZE
 'year','INT',2,0,4,4
 'month','INT',12,0,4,4
 ---- TYPES
-STRING, STRING, BIGINT, BIGINT, BIGINT, DOUBLE
+STRING, STRING, BIGINT, BIGINT, BIGINT, DOUBLE, BIGINT, BIGINT
 ====
 ---- QUERY
 # Computes only table statistics; no column statistics.
@@ -326,23 +326,23 @@ STRING, STRING, BIGINT, BIGINT, STRING, STRING, STRING, STRING, STRING, STRING
 ---- QUERY
 show column stats alltypes_no_col_stats
 ---- LABELS
-COLUMN, TYPE, #DISTINCT VALUES, #NULLS, MAX SIZE, AVG SIZE
+COLUMN, TYPE, #DISTINCT VALUES, #NULLS, MAX SIZE, AVG SIZE, #TRUES, #FALSES
 ---- RESULTS
-'id','INT',-1,-1,4,4
-'bool_col','BOOLEAN',-1,-1,1,1
-'tinyint_col','TINYINT',-1,-1,1,1
-'smallint_col','SMALLINT',-1,-1,2,2
-'int_col','INT',-1,-1,4,4
-'bigint_col','BIGINT',-1,-1,8,8
-'float_col','FLOAT',-1,-1,4,4
-'double_col','DOUBLE',-1,-1,8,8
-'date_string_col','STRING',-1,-1,-1,-1
-'string_col','STRING',-1,-1,-1,-1
-'timestamp_col','TIMESTAMP',-1,-1,16,16
-'year','INT',2,0,4,4
-'month','INT',12,0,4,4
+'id','INT',-1,-1,4,4,-1,-1
+'bool_col','BOOLEAN',-1,-1,1,1,-1,-1
+'tinyint_col','TINYINT',-1,-1,1,1,-1,-1
+'smallint_col','SMALLINT',-1,-1,2,2,-1,-1
+'int_col','INT',-1,-1,4,4,-1,-1
+'bigint_col','BIGINT',-1,-1,8,8,-1,-1
+'float_col','FLOAT',-1,-1,4,4,-1,-1
+'double_col','DOUBLE',-1,-1,8,8,-1,-1
+'date_string_col','STRING',-1,-1,-1,-1,-1,-1
+'string_col','STRING',-1,-1,-1,-1,-1,-1
+'timestamp_col','TIMESTAMP',-1,-1,16,16,-1,-1
+'year','INT',2,0,4,4,-1,-1
+'month','INT',12,0,4,4,-1,-1
 ---- TYPES
-STRING, STRING, BIGINT, BIGINT, BIGINT, DOUBLE
+STRING, STRING, BIGINT, BIGINT, BIGINT, DOUBLE, BIGINT, BIGINT
 ====
 ---- QUERY
 # Add partitions with NULL values and check for stats.
@@ -353,23 +353,23 @@ alter table alltypes add partition (year=NULL, month=NULL)
 ---- QUERY
 show column stats alltypes
 ---- LABELS
-COLUMN, TYPE, #DISTINCT VALUES, #NULLS, MAX SIZE, AVG SIZE
+COLUMN, TYPE, #DISTINCT VALUES, #NULLS, MAX SIZE, AVG SIZE, #TRUES, #FALSES
 ---- RESULTS
-'id','INT',-1,-1,4,4
-'bool_col','BOOLEAN',-1,-1,1,1
-'tinyint_col','TINYINT',-1,-1,1,1
-'smallint_col','SMALLINT',-1,-1,2,2
-'int_col','INT',-1,-1,4,4
-'bigint_col','BIGINT',-1,-1,8,8
-'float_col','FLOAT',-1,-1,4,4
-'double_col','DOUBLE',-1,-1,8,8
-'date_string_col','STRING',-1,-1,-1,-1
-'string_col','STRING',-1,-1,-1,-1
-'timestamp_col','TIMESTAMP',-1,-1,16,16
-'year','INT',3,1,4,4
-'month','INT',13,1,4,4
+'id','INT',-1,-1,4,4,-1,-1
+'bool_col','BOOLEAN',-1,-1,1,1,-1,-1
+'tinyint_col','TINYINT',-1,-1,1,1,-1,-1
+'smallint_col','SMALLINT',-1,-1,2,2,-1,-1
+'int_col','INT',-1,-1,4,4,-1,-1
+'bigint_col','BIGINT',-1,-1,8,8,-1,-1
+'float_col','FLOAT',-1,-1,4,4,-1,-1
+'double_col','DOUBLE',-1,-1,8,8,-1,-1
+'date_string_col','STRING',-1,-1,-1,-1,-1,-1
+'string_col','STRING',-1,-1,-1,-1,-1,-1
+'timestamp_col','TIMESTAMP',-1,-1,16,16,-1,-1
+'year','INT',3,1,4,4,-1,-1
+'month','INT',13,1,4,4,-1,-1
 ---- TYPES
-STRING, STRING, BIGINT, BIGINT, BIGINT, DOUBLE
+STRING, STRING, BIGINT, BIGINT, BIGINT, DOUBLE, BIGINT, BIGINT
 ====
 ---- QUERY
 alter table alltypes add partition (year=2011, month=NULL)
@@ -379,7 +379,7 @@ alter table alltypes add partition (year=2011, month=NULL)
 ---- QUERY
 show column stats alltypes
 ---- LABELS
-COLUMN, TYPE, #DISTINCT VALUES, #NULLS, MAX SIZE, AVG SIZE
+COLUMN, TYPE, #DISTINCT VALUES, #NULLS, MAX SIZE, AVG SIZE, #TRUES, #FALSES
 ---- RESULTS
 'id','INT',-1,-1,4,4
 'bool_col','BOOLEAN',-1,-1,1,1
@@ -395,7 +395,7 @@ COLUMN, TYPE, #DISTINCT VALUES, #NULLS, MAX SIZE, AVG SIZE
 'year','INT',4,1,4,4
 'month','INT',13,2,4,4
 ---- TYPES
-STRING, STRING, BIGINT, BIGINT, BIGINT, DOUBLE
+STRING, STRING, BIGINT, BIGINT, BIGINT, DOUBLE, BIGINT, BIGINT
 ====
 ---- QUERY
 # Drop the partitions with NULL values and check for stats.
@@ -406,7 +406,7 @@ alter table alltypes drop partition (year=NULL, month=NULL)
 ---- QUERY
 show column stats alltypes
 ---- LABELS
-COLUMN, TYPE, #DISTINCT VALUES, #NULLS, MAX SIZE, AVG SIZE
+COLUMN, TYPE, #DISTINCT VALUES, #NULLS, MAX SIZE, AVG SIZE, #TRUES, #FALSES
 ---- RESULTS
 'id','INT',-1,-1,4,4
 'bool_col','BOOLEAN',-1,-1,1,1
@@ -422,7 +422,7 @@ COLUMN, TYPE, #DISTINCT VALUES, #NULLS, MAX SIZE, AVG SIZE
 'year','INT',3,0,4,4
 'month','INT',13,1,4,4
 ---- TYPES
-STRING, STRING, BIGINT, BIGINT, BIGINT, DOUBLE
+STRING, STRING, BIGINT, BIGINT, BIGINT, DOUBLE, BIGINT, BIGINT
 ====
 ---- QUERY
 alter table alltypes drop partition (year=2011, month=NULL)
@@ -432,7 +432,7 @@ alter table alltypes drop partition (year=2011, month=NULL)
 ---- QUERY
 show column stats alltypes
 ---- LABELS
-COLUMN, TYPE, #DISTINCT VALUES, #NULLS, MAX SIZE, AVG SIZE
+COLUMN, TYPE, #DISTINCT VALUES, #NULLS, MAX SIZE, AVG SIZE, #TRUES, #FALSES
 ---- RESULTS
 'id','INT',-1,-1,4,4
 'bool_col','BOOLEAN',-1,-1,1,1
@@ -448,7 +448,7 @@ COLUMN, TYPE, #DISTINCT VALUES, #NULLS, MAX SIZE, AVG SIZE
 'year','INT',2,0,4,4
 'month','INT',12,0,4,4
 ---- TYPES
-STRING, STRING, BIGINT, BIGINT, BIGINT, DOUBLE
+STRING, STRING, BIGINT, BIGINT, BIGINT, DOUBLE, BIGINT, BIGINT
 ====
 ---- QUERY
 # drop stats from this table a second time, should not throw an error.
@@ -481,7 +481,7 @@ BIGINT, BIGINT, STRING, STRING, STRING, STRING, STRING, STRING
 ---- QUERY
 show column stats alltypesnopart
 ---- LABELS
-COLUMN, TYPE, #DISTINCT VALUES, #NULLS, MAX SIZE, AVG SIZE
+COLUMN, TYPE, #DISTINCT VALUES, #NULLS, MAX SIZE, AVG SIZE, #TRUES, #FALSES
 ---- RESULTS
 'id','INT',99,0,4,4
 'bool_col','BOOLEAN',2,0,1,1
@@ -495,7 +495,7 @@ COLUMN, TYPE, #DISTINCT VALUES, #NULLS, MAX SIZE, AVG SIZE
 'string_col','STRING',10,0,1,1
 'timestamp_col','TIMESTAMP',100,0,16,16
 ---- TYPES
-STRING, STRING, BIGINT, BIGINT, BIGINT, DOUBLE
+STRING, STRING, BIGINT, BIGINT, BIGINT, DOUBLE, BIGINT, BIGINT
 ====
 ---- QUERY
 # IMPALA-4767: Test that ALTER TABLE commands preserve table stats.
@@ -560,7 +560,7 @@ STRING, STRING, BIGINT, BIGINT, STRING, STRING, STRING, STRING, STRING, STRING
 ---- QUERY
 show column stats alltypes_parquet
 ---- LABELS
-COLUMN, TYPE, #DISTINCT VALUES, #NULLS, MAX SIZE, AVG SIZE
+COLUMN, TYPE, #DISTINCT VALUES, #NULLS, MAX SIZE, AVG SIZE, #TRUES, #FALSES
 ---- RESULTS
 'id','INT',7300,0,4,4
 'bool_col','BOOLEAN',2,0,1,1
@@ -576,7 +576,7 @@ COLUMN, TYPE, #DISTINCT VALUES, #NULLS, MAX SIZE, AVG SIZE
 'year','INT',2,0,4,4
 'month','INT',12,0,4,4
 ---- TYPES
-STRING, STRING, BIGINT, BIGINT, BIGINT, DOUBLE
+STRING, STRING, BIGINT, BIGINT, BIGINT, DOUBLE, BIGINT, BIGINT
 ====
 ---- QUERY
 # IMPALA-4767: Test that ALTER TABLE commands preserve table stats.
@@ -638,7 +638,7 @@ STRING, STRING, BIGINT, BIGINT, STRING, STRING, STRING, STRING, STRING, STRING
 ---- QUERY
 show column stats alltypes_empty
 ---- LABELS
-COLUMN, TYPE, #DISTINCT VALUES, #NULLS, MAX SIZE, AVG SIZE
+COLUMN, TYPE, #DISTINCT VALUES, #NULLS, MAX SIZE, AVG SIZE, #TRUES, #FALSES
 ---- RESULTS
 'id','INT',0,0,4,4
 'bool_col','BOOLEAN',2,0,1,1
@@ -654,7 +654,7 @@ COLUMN, TYPE, #DISTINCT VALUES, #NULLS, MAX SIZE, AVG SIZE
 'year','INT',0,0,4,4
 'month','INT',0,0,4,4
 ---- TYPES
-STRING, STRING, BIGINT, BIGINT, BIGINT, DOUBLE
+STRING, STRING, BIGINT, BIGINT, BIGINT, DOUBLE, BIGINT, BIGINT
 ====
 ---- QUERY
 # IMPALA-883: Compute table stats for an empty partition.
@@ -789,7 +789,7 @@ STRING
 ---- QUERY
 show column stats chars_tbl
 ---- LABELS
-COLUMN, TYPE, #DISTINCT VALUES, #NULLS, MAX SIZE, AVG SIZE
+COLUMN, TYPE, #DISTINCT VALUES, #NULLS, MAX SIZE, AVG SIZE, #TRUES, #FALSES
 ---- RESULTS
 'id','INT',2915,0,4,4
 'ch1','CHAR(1)',1,0,1,1
@@ -802,7 +802,7 @@ COLUMN, TYPE, #DISTINCT VALUES, #NULLS, MAX SIZE, AVG SIZE
 'year','CHAR(5)',1,0,5,5
 'day','VARCHAR(13)',3,1,-1,-1
 ---- TYPES
-STRING, STRING, BIGINT, BIGINT, BIGINT, DOUBLE
+STRING, STRING, BIGINT, BIGINT, BIGINT, DOUBLE, BIGINT, BIGINT
 ====
 ---- QUERY
 # Test that compute stats works on wide tables.
@@ -1818,7 +1818,7 @@ show column stats widetable_1000_cols
 'double_col125','DOUBLE',5,0,8,8
 'string_col125','STRING',5,0,1,1
 ---- TYPES
-STRING, STRING, BIGINT, BIGINT, BIGINT, DOUBLE
+STRING, STRING, BIGINT, BIGINT, BIGINT, DOUBLE, BIGINT, BIGINT
 ====
 ---- QUERY
 # Tests that the child query error status is propagated back to the parent
