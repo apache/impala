@@ -652,6 +652,33 @@ under the License.
           </row>
           <row>
             <entry>
+              <xref href="impala_string_functions.xml#string_functions/jaro_distance">JARO_DISTANCE,
+              JARO_DIST</xref>
+            </entry>
+          </row>
+          <row>
+            <entry>
+              <xref href="impala_string_functions.xml#string_functions/jaro_similarity"
+                >JARO_SIMILARITY,
+              JARO_SIM</xref>
+            </entry>
+          </row>
+          <row>
+            <entry>
+              <xref href="impala_string_functions.xml#string_functions/jaro_winkler_distance"
+                >JARO_WINKER_DISTANCE,
+              JW_DST</xref>
+            </entry>
+          </row>
+          <row>
+            <entry>
+              <xref href="impala_string_functions.xml#string_functions/jaro_winkler_similarity"
+                >JARO_WINKER_SIMILARITY,
+              JW_SIM</xref>
+            </entry>
+          </row>
+          <row>
+            <entry>
               <xref href="impala_analytic_functions.xml#lag">LAG</xref>
             </entry>
           </row>
