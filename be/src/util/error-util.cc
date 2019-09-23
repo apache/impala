@@ -231,8 +231,6 @@ TErrorCode::type HS2TStatusCodeToTErrorCode(const TStatusCode::type& hs2Code) {
   // So we return a "GENERAL" error type for ERROR_STATUS code. This lets the callers
   // pick their own error message for substitution.
   switch (hs2Code) {
-    case TStatusCode::SUCCESS_STATUS:
-      return TErrorCode::OK;
     case TStatusCode::ERROR_STATUS:
       return TErrorCode::GENERAL;
     default:

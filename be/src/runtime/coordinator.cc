@@ -666,7 +666,8 @@ Status Coordinator::Wait() {
   return Status::OK();
 }
 
-Status Coordinator::GetNext(QueryResultSet* results, int max_rows, bool* eos) {
+Status Coordinator::GetNext(QueryResultSet* results, int max_rows, bool* eos,
+    int64_t block_on_wait_time_us) {
   VLOG_ROW << "GetNext() query_id=" << PrintId(query_id());
   DCHECK(has_called_wait_);
   SCOPED_TIMER(query_profile_->total_time_counter());
@@ -680,7 +681,22 @@ Status Coordinator::GetNext(QueryResultSet* results, int max_rows, bool* eos) {
   DCHECK(coord_sink_ != nullptr)     << "Exec() should be called first";
   RuntimeState* runtime_state = coord_instance_->runtime_state();
 
-  Status status = coord_sink_->GetNext(runtime_state, results, max_rows, eos);
+  // If FETCH_ROWS_TIMEOUT_MS is 0, then the timeout passed to PlanRootSink::GetNext()
+  // should be 0 as well so that the method waits for rows indefinitely.
+  // If the first row has been fetched, then set the timeout to FETCH_ROWS_TIMEOUT_MS. If
+  // the first row has not been fetched, then it is possible the client spent time
+  // waiting for the query to 'finish' before issuing a GetNext() request.
+  int64_t timeout_us;
+  if (parent_request_state_->fetch_rows_timeout_us() == 0) {
+    timeout_us = 0;
+  } else {
+    timeout_us = !first_row_fetched_ ?
+        max(static_cast<int64_t>(1),
+            parent_request_state_->fetch_rows_timeout_us() - block_on_wait_time_us) :
+        parent_request_state_->fetch_rows_timeout_us();
+  }
+
+  Status status = coord_sink_->GetNext(runtime_state, results, max_rows, eos, timeout_us);
   if (!first_row_fetched_ && results->size() > 0) {
     query_events_->MarkEvent("First row fetched");
     first_row_fetched_ = true;

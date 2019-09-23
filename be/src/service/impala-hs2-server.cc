@@ -186,7 +186,14 @@ Status ImpalaServer::FetchInternal(ClientRequestState* request_state,
   // ensures that rows are ready to be fetched (e.g., Wait() opens
   // ClientRequestState::output_exprs_, which are evaluated in
   // ClientRequestState::FetchRows() below).
-  request_state->BlockOnWait();
+  int64_t block_on_wait_time_us = 0;
+  if (!request_state->BlockOnWait(
+          request_state->fetch_rows_timeout_us(), &block_on_wait_time_us)) {
+    fetch_results->status.__set_statusCode(thrift::TStatusCode::STILL_EXECUTING_STATUS);
+    fetch_results->__set_hasMoreRows(true);
+    fetch_results->__isset.results = false;
+    return Status::OK();
+  }
 
   lock_guard<mutex> frl(*request_state->fetch_rows_lock());
   lock_guard<mutex> l(*request_state->lock());
@@ -209,7 +216,8 @@ Status ImpalaServer::FetchInternal(ClientRequestState* request_state,
       TProtocolVersion::HIVE_CLI_SERVICE_PROTOCOL_V1 : session->hs2_version;
   scoped_ptr<QueryResultSet> result_set(QueryResultSet::CreateHS2ResultSet(
       version, *(request_state->result_metadata()), &(fetch_results->results)));
-  RETURN_IF_ERROR(request_state->FetchRows(fetch_size, result_set.get()));
+  RETURN_IF_ERROR(
+      request_state->FetchRows(fetch_size, result_set.get(), block_on_wait_time_us));
   fetch_results->__isset.results = true;
   fetch_results->__set_hasMoreRows(!request_state->eos());
   return Status::OK();
@@ -852,8 +860,8 @@ void ImpalaServer::FetchResults(TFetchResultsResp& return_val,
       discard_result(UnregisterQuery(query_id, false, &status));
     }
     HS2_RETURN_ERROR(return_val, status.GetDetail(), SQLSTATE_GENERAL_ERROR);
+    return_val.status.__set_statusCode(thrift::TStatusCode::SUCCESS_STATUS);
   }
-  return_val.status.__set_statusCode(thrift::TStatusCode::SUCCESS_STATUS);
 }
 
 void ImpalaServer::GetLog(TGetLogResp& return_val, const TGetLogReq& request) {

@@ -168,7 +168,8 @@ class HS2TestSuite(ImpalaTestSuite):
     close_op_resp = self.hs2_client.CloseOperation(close_op_req)
     assert close_op_resp.status.statusCode == TCLIService.TStatusCode.SUCCESS_STATUS
 
-  def get_num_rows(self, result_set):
+  @staticmethod
+  def get_num_rows(result_set):
     # rows will always be set, so the only way to tell if we should use it is to see if
     # any columns are set
     if result_set.columns is None or len(result_set.columns) == 0:
@@ -182,6 +183,21 @@ class HS2TestSuite(ImpalaTestSuite):
 
     assert False
 
+  def fetch(self, fetch_results_req):
+    """Wrapper around ImpalaHiveServer2Service.FetchResults(fetch_results_req) that
+    issues the given fetch request until the TCLIService.TStatusCode transitions from
+    STILL_EXECUTING_STATUS to SUCCESS_STATUS. If a fetch response contains the
+    STILL_EXECUTING_STATUS then rows are not yet available for consumption (e.g. the
+    query is still running and has not produced any rows yet). This status may be
+    returned to the client if the FETCH_ROWS_TIMEOUT_MS is hit."""
+    fetch_results_resp = None
+    while fetch_results_resp is None or \
+        fetch_results_resp.status.statusCode == \
+          TCLIService.TStatusCode.STILL_EXECUTING_STATUS:
+      fetch_results_resp = self.hs2_client.FetchResults(fetch_results_req)
+    HS2TestSuite.check_response(fetch_results_resp)
+    return fetch_results_resp
+
   def fetch_at_most(self, handle, orientation, size, expected_num_rows = None):
     """Fetches at most size number of rows from the query identified by the given
     operation handle. Uses the given fetch orientation. Asserts that the fetch returns a
@@ -194,8 +210,7 @@ class HS2TestSuite(ImpalaTestSuite):
     fetch_results_req.operationHandle = handle
     fetch_results_req.orientation = orientation
     fetch_results_req.maxRows = size
-    fetch_results_resp = self.hs2_client.FetchResults(fetch_results_req)
-    HS2TestSuite.check_response(fetch_results_resp)
+    fetch_results_resp = self.fetch(fetch_results_req)
     if expected_num_rows is not None:
       assert self.get_num_rows(fetch_results_resp.results) == expected_num_rows
     return fetch_results_resp
@@ -212,16 +227,14 @@ class HS2TestSuite(ImpalaTestSuite):
     fetch_results_req.operationHandle = handle
     fetch_results_req.orientation = orientation
     fetch_results_req.maxRows = size
-    fetch_results_resp = self.hs2_client.FetchResults(fetch_results_req)
-    HS2TestSuite.check_response(fetch_results_resp)
+    fetch_results_resp = self.fetch(fetch_results_req)
     num_rows_fetched = self.get_num_rows(fetch_results_resp.results)
     if expected_num_rows is None: expected_num_rows = size
     while num_rows_fetched < expected_num_rows:
       # Always try to fetch at most 'size'
       fetch_results_req.maxRows = size - num_rows_fetched
       fetch_results_req.orientation = TCLIService.TFetchOrientation.FETCH_NEXT
-      fetch_results_resp = self.hs2_client.FetchResults(fetch_results_req)
-      HS2TestSuite.check_response(fetch_results_resp)
+      fetch_results_resp = self.fetch(fetch_results_req)
       last_fetch_size = self.get_num_rows(fetch_results_resp.results)
       assert last_fetch_size > 0
       num_rows_fetched += last_fetch_size

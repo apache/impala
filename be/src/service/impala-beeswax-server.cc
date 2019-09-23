@@ -537,7 +537,15 @@ Status ImpalaServer::FetchInternal(ClientRequestState* request_state,
   // ensures that rows are ready to be fetched (e.g., Wait() opens
   // ClientRequestState::output_exprs_, which are evaluated in
   // ClientRequestState::FetchRows() below).
-  request_state->BlockOnWait();
+  int64_t block_on_wait_time_us = 0;
+  if (!request_state->BlockOnWait(
+          request_state->fetch_rows_timeout_us(), &block_on_wait_time_us)) {
+    query_results->__set_ready(false);
+    query_results->__set_has_more(true);
+    query_results->__isset.columns = false;
+    query_results->__isset.data = false;
+    return Status::OK();
+  }
 
   lock_guard<mutex> frl(*request_state->fetch_rows_lock());
   lock_guard<mutex> l(*request_state->lock());
@@ -578,7 +586,8 @@ Status ImpalaServer::FetchInternal(ClientRequestState* request_state,
   if (!request_state->eos()) {
     scoped_ptr<QueryResultSet> result_set(QueryResultSet::CreateAsciiQueryResultSet(
         *request_state->result_metadata(), &query_results->data));
-    fetch_rows_status = request_state->FetchRows(fetch_size, result_set.get());
+    fetch_rows_status =
+        request_state->FetchRows(fetch_size, result_set.get(), block_on_wait_time_us);
   }
   query_results->__set_has_more(!request_state->eos());
   query_results->__isset.data = true;

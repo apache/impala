@@ -36,9 +36,7 @@ namespace impala {
 PlanRootSink::PlanRootSink(
     TDataSinkId sink_id, const RowDescriptor* row_desc, RuntimeState* state)
   : DataSink(sink_id, row_desc, "PLAN_ROOT_SINK", state),
-    num_rows_produced_limit_(state->query_options().num_rows_produced_limit),
-    fetch_rows_timeout_us_(
-        MICROS_PER_MILLI * state->query_options().fetch_rows_timeout_ms) {}
+    num_rows_produced_limit_(state->query_options().num_rows_produced_limit) {}
 
 PlanRootSink::~PlanRootSink() {}
 

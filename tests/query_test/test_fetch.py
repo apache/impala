@@ -99,3 +99,50 @@ class TestFetchAndSpooling(ImpalaTestSuite):
     rows_sent_rate = re.search("RowsSentRate: (\d*\.?\d*)", result.runtime_profile)
     assert rows_sent_rate
     assert float(rows_sent_rate.group(1)) > 0
+
+
+class TestFetchTimeout(ImpalaTestSuite):
+  """A few basic tests for FETCH_ROWS_TIMEOUT_MS that are not specific to the HS2 protocol
+  (e.g. in contrast to the tests in tests/hs2/test_fetch_timeout.py). These tests are
+  necessary because part of the FETCH_ROWS_TIMEOUT_MS code is HS2/Beeswax specific.
+  Unlike the tests in hs2/test_fetch_timeout.py, these tests do not validate that
+  individual RPC calls timeout, instead they set a low value for the timeout and assert
+  that the query works end-to-end."""
+
+  @classmethod
+  def add_test_dimensions(cls):
+    super(TestFetchTimeout, cls).add_test_dimensions()
+    # Result fetching should be independent of file format, so only test against
+    # Parquet files.
+    cls.ImpalaTestMatrix.add_constraint(lambda v:
+        v.get_value('table_format').file_format == 'parquet')
+    extend_exec_option_dimension(cls, 'spool_query_results', 'true')
+
+  @classmethod
+  def get_workload(cls):
+    return 'functional-query'
+
+  def test_fetch_timeout(self, vector):
+    """A simple test that runs a query with a low timeout and introduces delays in
+    RowBatch production. Asserts that the query succeeds and returns the expected number
+    of rows."""
+    num_rows = 100
+    query = "select * from functional.alltypes limit {0}".format(num_rows)
+    vector.get_value('exec_option')['batch_size'] = 1
+    vector.get_value('exec_option')['fetch_rows_timeout_ms'] = 1
+    vector.get_value('exec_option')['debug_action'] = '0:GETNEXT:DELAY'
+    results = self.execute_query(query, vector.get_value('exec_option'))
+    assert results.success
+    assert len(results.data) == num_rows
+
+  def test_fetch_before_finished_timeout(self, vector):
+    """Tests that the FETCH_ROWS_TIMEOUT_MS timeout applies to queries that are not in
+    the 'finished' state. Similar to the test tests/hs2/test_fetch_timeout.py::
+    TestFetchTimeout::test_fetch_before_finished_timeout(_with_result_spooling)."""
+    num_rows = 10
+    query = "select * from functional.alltypes limit {0}".format(num_rows)
+    vector.get_value('exec_option')['debug_action'] = 'CRS_BEFORE_COORD_STARTS:SLEEP@5000'
+    vector.get_value('exec_option')['fetch_rows_timeout_ms'] = '1000'
+    results = self.execute_query(query, vector.get_value('exec_option'))
+    assert results.success
+    assert len(results.data) == num_rows

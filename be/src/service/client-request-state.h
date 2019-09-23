@@ -105,8 +105,12 @@ class ClientRequestState {
   /// for the asynchronous thread (wait_thread_) to signal block_on_wait_cv_. It is
   /// thread-safe and all the caller threads will block until wait_thread_ has
   /// completed) and multiple times (non-blocking once wait_thread_ has completed).
-  /// Do not call while holding lock_.
-  void BlockOnWait();
+  /// Do not call while holding lock_. 'timeout' is the amount of time (in microseconds)
+  /// that the thread waits for WaitAsync() to complete before returning. If WaitAsync()
+  /// completed within the timeout, this method returns true, false otherwise. A value of
+  /// 0 causes this method to wait indefinitely. 'block_on_wait_time_us_' is the amount of
+  /// time the client spent (in microseconds) waiting in BlockOnWait().
+  bool BlockOnWait(int64_t timeout_us, int64_t* block_on_wait_time_us);
 
   /// Return at most max_rows from the current batch. If the entire current batch has
   /// been returned, fetch another batch first.
@@ -114,8 +118,10 @@ class ClientRequestState {
   /// Caller should verify that EOS has not be reached before calling.
   /// Must be preceeded by call to Wait() (or WaitAsync()/BlockOnWait()).
   /// Also updates operation_state_/query_status_ in case of error.
-  Status FetchRows(const int32_t max_rows, QueryResultSet* fetched_rows)
-      WARN_UNUSED_RESULT;
+  /// 'block_on_wait_time_us' is the amount of time spent waiting in BlockOnWait(). It
+  /// should be 0 if BlockOnWait() was never called.
+  Status FetchRows(const int32_t max_rows, QueryResultSet* fetched_rows,
+      int64_t block_on_wait_time_us) WARN_UNUSED_RESULT;
 
   /// Resets the state of this query such that the next fetch() returns results from the
   /// beginning of the query result set (by using the using result_cache_).
@@ -277,6 +283,10 @@ class ClientRequestState {
   const TDdlExecResponse* ddl_exec_response() const {
     return catalog_op_executor_->ddl_exec_response();
   }
+
+  /// Returns the FETCH_ROWS_TIMEOUT_MS value for this query (converted to microseconds).
+  int64_t fetch_rows_timeout_us() const { return fetch_rows_timeout_us_; }
+
 protected:
   /// Updates the end_time_us_ of this query if it isn't set. The end time is determined
   /// when this function is called for the first time, calling it multiple times does not
@@ -482,6 +492,10 @@ protected:
   /// coordinator relases its admission control resources.
   AtomicInt64 end_time_us_{0};
 
+  /// Timeout, in microseconds, when waiting for rows to become available. Derived from
+  /// the query option FETCH_ROWS_TIMEOUT_MS.
+  const int64_t fetch_rows_timeout_us_;
+
   /// Executes a local catalog operation (an operation that does not need to execute
   /// against the catalog service). Includes USE, SHOW, DESCRIBE, and EXPLAIN statements.
   Status ExecLocalCatalogOp(const TCatalogOpRequest& catalog_op) WARN_UNUSED_RESULT;
@@ -518,9 +532,10 @@ protected:
   Status WaitInternal() WARN_UNUSED_RESULT;
 
   /// Core logic of FetchRows(). Does not update operation_state_/query_status_.
-  /// Caller needs to hold fetch_rows_lock_ and lock_.
-  Status FetchRowsInternal(const int32_t max_rows, QueryResultSet* fetched_rows)
-      WARN_UNUSED_RESULT;
+  /// Caller needs to hold fetch_rows_lock_ and lock_. 'block_on_wait_time_us_' is the
+  /// amount of time the client spent (in microseconds) waiting in BlockOnWait().
+  Status FetchRowsInternal(const int32_t max_rows, QueryResultSet* fetched_rows,
+      int64_t block_on_wait_time_us) WARN_UNUSED_RESULT;
 
   /// Gather and publish all required updates to the metastore.
   /// For transactional queries:

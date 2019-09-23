@@ -143,8 +143,7 @@ class TestFetch(HS2TestSuite):
     fetch_results_req = TCLIService.TFetchResultsReq()
     fetch_results_req.operationHandle = execute_statement_resp.operationHandle
     fetch_results_req.maxRows = 1024
-    fetch_results_resp = self.hs2_client.FetchResults(fetch_results_req)
-    HS2TestSuite.check_response(fetch_results_resp)
+    fetch_results_resp = self.fetch(fetch_results_req)
 
     return fetch_results_resp
 
@@ -219,8 +218,7 @@ class TestFetch(HS2TestSuite):
     fetch_results_req = TCLIService.TFetchResultsReq()
     fetch_results_req.operationHandle = execute_statement_resp.operationHandle
     fetch_results_req.maxRows = 100
-    fetch_results_resp = self.hs2_client.FetchResults(fetch_results_req)
-    HS2TestSuite.check_response(fetch_results_resp)
+    fetch_results_resp = self.fetch(fetch_results_req)
 
     assert len(fetch_results_resp.results.rows) == 1
     assert fetch_results_resp.results.startRowOffset == 0
@@ -253,8 +251,7 @@ class TestFetch(HS2TestSuite):
     fetch_results_req = TCLIService.TFetchResultsReq()
     fetch_results_req.operationHandle = execute_statement_resp.operationHandle
     fetch_results_req.maxRows = 1
-    fetch_results_resp = self.hs2_client.FetchResults(fetch_results_req)
-    HS2TestSuite.check_response(fetch_results_resp)
+    fetch_results_resp = self.fetch(fetch_results_req)
     assert fetch_results_resp.results.columns[0].boolVal is not None
 
     assert self.column_results_to_string(
@@ -296,99 +293,3 @@ class TestFetch(HS2TestSuite):
         TCLIService.TGetResultSetMetadataReq(operationHandle=good_handle)))
     HS2TestSuite.check_response(self.hs2_client.CloseOperation(
         TCLIService.TCloseOperationReq(operationHandle=good_handle)))
-
-  @needs_session()
-  def test_fetch_timeout(self):
-    """Test FETCH_ROWS_TIMEOUT_MS with default configs."""
-    self.__test_fetch_timeout()
-    self.__test_fetch_materialization_timeout()
-
-  @needs_session(conf_overlay={'spool_query_results': 'true'})
-  def test_fetch_result_spooling_timeout(self):
-    """Test FETCH_ROWS_TIMEOUT_MS with result spooling enabled, and test that the timeout
-    applies when reading multiple RowBatches."""
-    self.__test_fetch_timeout()
-    self.__test_fetch_materialization_timeout()
-
-    # Validate that the timeout applies when reading multiple RowBatches.
-    num_rows = 100
-    statement = "select id from functional.alltypes limit {0}".format(num_rows)
-    execute_statement_resp = self.execute_statement(statement,
-        conf_overlay={'batch_size': '10',
-                      'debug_action': '0:GETNEXT:DELAY',
-                      'fetch_rows_timeout_ms': '500'})
-    HS2TestSuite.check_response(execute_statement_resp)
-
-    # Issue a fetch request to read all rows, and validate that only a subset of the rows
-    # are returned.
-    fetch_results_resp = self.hs2_client.FetchResults(TCLIService.TFetchResultsReq(
-        operationHandle=execute_statement_resp.operationHandle, maxRows=num_rows))
-    HS2TestSuite.check_response(fetch_results_resp)
-    num_rows_fetched = self.get_num_rows(fetch_results_resp.results)
-    assert num_rows_fetched > 0 and num_rows_fetched < num_rows
-    assert fetch_results_resp.hasMoreRows
-
-    self.__fetch_remaining(execute_statement_resp.operationHandle,
-        num_rows - num_rows_fetched, statement)
-
-  def __test_fetch_timeout(self):
-    """Test the query option FETCH_ROWS_TIMEOUT_MS by running a query with a DELAY
-    DEBUG_ACTION and a low value for the fetch timeout. Validates that when the timeout
-    is hit, 0 rows are returned."""
-    num_rows = 1
-    statement = "select id from functional.alltypes limit {0}".format(num_rows)
-    execute_statement_resp = self.execute_statement(statement,
-        conf_overlay={'debug_action': '0:GETNEXT:DELAY', 'fetch_rows_timeout_ms': '1'})
-    HS2TestSuite.check_response(execute_statement_resp)
-
-    # Assert that the first fetch request returns 0 rows.
-    fetch_results_resp = self.hs2_client.FetchResults(TCLIService.TFetchResultsReq(
-        operationHandle=execute_statement_resp.operationHandle, maxRows=1024))
-    HS2TestSuite.check_response(fetch_results_resp)
-    assert self.get_num_rows(fetch_results_resp.results) == 0
-    assert fetch_results_resp.hasMoreRows
-
-    # Assert that all remaining rows can be fetched.
-    self.__fetch_remaining(execute_statement_resp.operationHandle, num_rows, statement)
-
-  def __test_fetch_materialization_timeout(self):
-    """Test the query option FETCH_ROWS_TIMEOUT_MS applies to the time taken to
-    materialize rows. Runs a query with a sleep() which is evaluated during
-    materialization and validates the timeout is applied appropriately."""
-    num_rows = 2
-    statement = "select sleep(2500) from functional.alltypes limit {0}".format(num_rows)
-    execute_statement_resp = self.execute_statement(statement,
-        conf_overlay={'batch_size': '1', 'fetch_rows_timeout_ms': '3750'})
-    HS2TestSuite.check_response(execute_statement_resp)
-
-    # Only one row should be returned because the timeout should be hit after
-    # materializing the first row, but before materializing the second one.
-    fetch_results_resp = self.hs2_client.FetchResults(TCLIService.TFetchResultsReq(
-        operationHandle=execute_statement_resp.operationHandle, maxRows=2))
-    HS2TestSuite.check_response(fetch_results_resp)
-    assert self.get_num_rows(fetch_results_resp.results) == 1
-
-    # Assert that all remaining rows can be fetched.
-    self.__fetch_remaining(execute_statement_resp.operationHandle, num_rows - 1,
-        statement)
-
-  def __fetch_remaining(self, op_handle, num_rows, statement):
-    """Fetch the remaining rows in the given op_handle and validate that the number of
-    rows returned matches the expected number of rows. If the op_handle does not return
-    the expected number of rows within a timeout, an error is thrown."""
-    # The timeout to wait for fetch requests to fetch all rows.
-    timeout = 10
-
-    start_time = time()
-    num_fetched = 0
-
-    # Fetch results until either the timeout is hit or all rows have been fetched.
-    while num_fetched != num_rows and time() - start_time < timeout:
-      sleep(0.5)
-      fetch_results_resp = self.hs2_client.FetchResults(TCLIService.TFetchResultsReq(
-          operationHandle=op_handle, maxRows=1024))
-      HS2TestSuite.check_response(fetch_results_resp)
-      num_fetched += self.get_num_rows(fetch_results_resp.results)
-    if num_fetched != num_rows:
-      raise Timeout("Query {0} did not fetch all results within the timeout {1}"
-                    .format(statement, timeout))

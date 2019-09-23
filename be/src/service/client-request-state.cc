@@ -103,7 +103,8 @@ ClientRequestState::ClientRequestState(
     summary_profile_(RuntimeProfile::Create(&profile_pool_, "Summary")),
     frontend_(frontend),
     parent_server_(server),
-    start_time_us_(UnixMicros()) {
+    start_time_us_(UnixMicros()),
+    fetch_rows_timeout_us_(MICROS_PER_MILLI * query_options().fetch_rows_timeout_ms) {
 #ifndef NDEBUG
   profile_->AddInfoString("DEBUG MODE WARNING", "Query profile created while running a "
       "DEBUG build of Impala. Use RELEASE builds to measure query performance.");
@@ -721,7 +722,9 @@ void ClientRequestState::Done() {
   MarkActive();
   // Make sure we join on wait_thread_ before we finish (and especially before this object
   // is destroyed).
-  BlockOnWait();
+  int64_t block_on_wait_time_us = 0;
+  BlockOnWait(0, &block_on_wait_time_us);
+  DCHECK_EQ(block_on_wait_time_us, 0);
 
   // Update latest observed Kudu timestamp stored in the session from the coordinator.
   // Needs to take the session_ lock which must not be taken while holding lock_, so this
@@ -782,12 +785,28 @@ Status ClientRequestState::WaitAsync() {
       &ClientRequestState::Wait, this, &wait_thread_, false);
 }
 
-void ClientRequestState::BlockOnWait() {
+bool ClientRequestState::BlockOnWait(int64_t timeout_us, int64_t* block_on_wait_time_us) {
+  DCHECK_GE(timeout_us, 0);
   unique_lock<mutex> l(lock_);
+  *block_on_wait_time_us = 0;
   // Some metadata operations like GET_COLUMNS do not rely on WaitAsync() to launch
   // the wait thread. In such cases this method is expected to be a no-op.
-  if (wait_thread_.get() == nullptr) return;
-  while (!is_wait_done_) block_on_wait_cv_.Wait(l);
+  if (wait_thread_.get() == nullptr) return true;
+  while (!is_wait_done_) {
+    if (timeout_us == 0) {
+      block_on_wait_cv_.Wait(l);
+      return true;
+    } else {
+      MonotonicStopWatch wait_timeout_timer;
+      wait_timeout_timer.Start();
+      bool notified = block_on_wait_cv_.WaitFor(l, timeout_us);
+      if (notified) {
+        *block_on_wait_time_us = wait_timeout_timer.ElapsedTime() / NANOS_PER_MICRO;
+      }
+      return notified;
+    }
+  }
+  return true;
 }
 
 void ClientRequestState::Wait() {
@@ -868,12 +887,13 @@ Status ClientRequestState::WaitInternal() {
 }
 
 Status ClientRequestState::FetchRows(const int32_t max_rows,
-    QueryResultSet* fetched_rows) {
+    QueryResultSet* fetched_rows, int64_t block_on_wait_time_us) {
   // Pause the wait timer, since the client has instructed us to do work on its behalf.
   MarkActive();
 
   // ImpalaServer::FetchInternal has already taken our lock_
-  discard_result(UpdateQueryStatus(FetchRowsInternal(max_rows, fetched_rows)));
+  discard_result(UpdateQueryStatus(
+      FetchRowsInternal(max_rows, fetched_rows, block_on_wait_time_us)));
 
   MarkInactive();
   return query_status_;
@@ -931,7 +951,7 @@ Status ClientRequestState::UpdateQueryStatus(const Status& status) {
 }
 
 Status ClientRequestState::FetchRowsInternal(const int32_t max_rows,
-    QueryResultSet* fetched_rows) {
+    QueryResultSet* fetched_rows, int64_t block_on_wait_time_us) {
   // Wait() guarantees that we've transitioned at least to FINISHED_STATE (and any
   // state beyond that should have a non-OK query_status_ set).
   DCHECK(operation_state_ == TOperationState::FINISHED_STATE);
@@ -982,7 +1002,8 @@ Status ClientRequestState::FetchRowsInternal(const int32_t max_rows,
     // concurrently.
     // TODO: Simplify this.
     lock_.unlock();
-    Status status = coordinator->GetNext(fetched_rows, max_coord_rows, &eos_);
+    Status status =
+        coordinator->GetNext(fetched_rows, max_coord_rows, &eos_, block_on_wait_time_us);
     lock_.lock();
     int num_fetched = fetched_rows->size() - before;
     DCHECK(max_coord_rows <= 0 || num_fetched <= max_coord_rows) << Substitute(

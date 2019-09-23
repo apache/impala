@@ -143,11 +143,12 @@ void BufferedPlanRootSink::Cancel(RuntimeState* state) {
   batch_queue_has_capacity_.NotifyAll();
 }
 
-Status BufferedPlanRootSink::GetNext(
-    RuntimeState* state, QueryResultSet* results, int num_results, bool* eos) {
+Status BufferedPlanRootSink::GetNext(RuntimeState* state, QueryResultSet* results,
+    int num_results, bool* eos, int64_t timeout_us) {
   {
     // Used to track how long the consumer waits for RowBatches to be produced and
     // materialized.
+    DCHECK_GE(timeout_us, 0);
     MonotonicStopWatch wait_timeout_timer;
     wait_timeout_timer.Start();
 
@@ -175,14 +176,19 @@ Status BufferedPlanRootSink::GetNext(
       // Wait for the queue to have rows in it.
       while (!IsCancelledOrClosed(state) && IsQueueEmpty(state)
           && sender_state_ == SenderState::ROWS_PENDING && !timed_out) {
-        // Wait fetch_rows_timeout_us_ - row_batches_get_wait_timer_ microseconds for
-        // rows to become available before returning to the client. Subtracting
-        // wait_timeout_timer ensures the client only ever waits up to
-        // fetch_rows_timeout_us_ microseconds before returning.
-        uint64_t wait_duration = max(static_cast<uint64_t>(1),
-            PlanRootSink::fetch_rows_timeout_us() - wait_timeout_timer.ElapsedTime());
-        SCOPED_TIMER(row_batches_get_wait_timer_);
-        timed_out = !rows_available_.WaitFor(l, wait_duration);
+        if (timeout_us == 0) {
+          rows_available_.Wait(l);
+        } else {
+          // Wait fetch_rows_timeout_us_ - row_batches_get_wait_timer_ microseconds for
+          // rows to become available before returning to the client. Subtracting
+          // wait_timeout_timer ensures the client only ever waits up to
+          // fetch_rows_timeout_us_ microseconds before returning.
+          int64_t wait_duration_us = max(static_cast<int64_t>(1),
+              timeout_us - static_cast<int64_t>(round(
+                               wait_timeout_timer.ElapsedTime() / NANOS_PER_MICRO)));
+          SCOPED_TIMER(row_batches_get_wait_timer_);
+          timed_out = !rows_available_.WaitFor(l, wait_duration_us);
+        }
       }
 
       // If the query was cancelled while the sink was waiting for rows to become
@@ -227,8 +233,8 @@ Status BufferedPlanRootSink::GetNext(
         // Prevent expr result allocations from accumulating.
         expr_results_pool_->Clear();
       }
-      timed_out = timed_out
-          || wait_timeout_timer.ElapsedTime() >= PlanRootSink::fetch_rows_timeout_us();
+      timed_out =
+          timed_out || wait_timeout_timer.ElapsedTime() / NANOS_PER_MICRO >= timeout_us;
       // If we have read all rows, then break out of the while loop.
       *eos = IsGetNextEos(state);
     }

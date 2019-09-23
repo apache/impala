@@ -70,8 +70,8 @@ class BufferedPlanRootSink : public PlanRootSink {
   /// Blocks until rows are available for consumption. GetNext() always returns 'num_rows'
   /// rows unless (1) there are not enough rows left in the result set to return
   /// 'num_rows' rows, or (2) the value of 'num_rows' exceeds MAX_FETCH_SIZE.
-  virtual Status GetNext(
-      RuntimeState* state, QueryResultSet* result_set, int num_rows, bool* eos) override;
+  virtual Status GetNext(RuntimeState* state, QueryResultSet* result_set, int num_rows,
+      bool* eos, int64_t timeout_us) override;
 
   /// Notifies both consumer and producer threads so they can check the cancellation
   /// status.

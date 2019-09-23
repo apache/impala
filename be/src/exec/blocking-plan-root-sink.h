@@ -68,8 +68,8 @@ class BlockingPlanRootSink : public PlanRootSink {
 
   /// Only a single RowBatch is passed from the producer at a time, so QueryResultSet will
   /// only be filled up to 'min(num_rows, batch->num_rows())'.
-  virtual Status GetNext(
-      RuntimeState* state, QueryResultSet* result_set, int num_rows, bool* eos) override;
+  virtual Status GetNext(RuntimeState* state, QueryResultSet* result_set, int num_rows,
+      bool* eos, int64_t timeout_us) override;
 
   /// Notifies both consumer and producer threads so they can check the cancellation
   /// status.

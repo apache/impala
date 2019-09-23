@@ -120,11 +120,15 @@ class Coordinator { // NOLINT: The member variables could be re-ordered to save 
   /// rows, but will not return more. If *eos is true, all rows have been returned.
   /// Returns a non-OK status if an error was encountered either locally or by any of
   /// the executing backends, or if the query was cancelled via Cancel().  After *eos
-  /// is true, subsequent calls to GetNext() will be a no-op.
+  /// is true, subsequent calls to GetNext() will be a no-op. 'block_on_wait_time_us' is
+  /// the amount of time the client spent (in microseconds) waiting in BlockOnWait(). It
+  /// is used to set the correct timeout value for
+  /// PlanRootSink::GetNext(..., int64_t timeout_us).
   ///
   /// GetNext() is not thread-safe: multiple threads must not make concurrent GetNext()
   /// calls.
-  Status GetNext(QueryResultSet* results, int max_rows, bool* eos) WARN_UNUSED_RESULT;
+  Status GetNext(QueryResultSet* results, int max_rows, bool* eos,
+      int64_t block_on_wait_time_us) WARN_UNUSED_RESULT;
 
   /// Cancel execution of query and sets the overall query status to CANCELLED if the
   /// query is still executing. Idempotent.

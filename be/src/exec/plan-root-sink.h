@@ -77,8 +77,14 @@ class PlanRootSink : public DataSink {
   /// there are no more rows to consume. If Cancel() or Close() are called concurrently,
   /// GetNext() will return and may not populate 'result_set'. All subsequent calls
   /// after Cancel() or Close() set eos and then return the current query status.
-  virtual Status GetNext(
-      RuntimeState* state, QueryResultSet* result_set, int num_rows, bool* eos) = 0;
+  /// 'timeout' is the amount of time (in microseonds) this method should wait for enough
+  /// rows to become available before returning (e.g. how long the consumer thread waits
+  /// for the producer thread to produce RowBatches). If the timeout is hit, GetNext() can
+  /// return before adding 'num_rows' rows to 'result_set'. It is possible 0 rows are
+  /// added to the 'result_set' if the producer thread does not produce rows within the
+  /// timeout. A timeout of 0 causes this method to wait indefinitely.
+  virtual Status GetNext(RuntimeState* state, QueryResultSet* result_set, int num_rows,
+      bool* eos, int64_t timeout_us) = 0;
 
   /// Notifies both the consumer and sender that the query has been cancelled so they can
   /// check the cancellation flag in the RuntimeState. The cancellation flag should be set
@@ -106,9 +112,6 @@ class PlanRootSink : public DataSink {
   enum class SenderState { ROWS_PENDING, EOS, CLOSED_NOT_EOS };
   SenderState sender_state_ = SenderState::ROWS_PENDING;
 
-  /// Returns the FETCH_ROWS_TIMEOUT_MS value for this query (converted to microseconds).
-  uint64_t fetch_rows_timeout_us() const { return fetch_rows_timeout_us_; }
-
   /// The number of rows sent to this PlanRootSink via Send(). Initialized in
   /// Prepare().
   RuntimeProfile::Counter* rows_sent_counter_ = nullptr;
@@ -120,11 +123,6 @@ class PlanRootSink : public DataSink {
  private:
   /// Limit on the number of rows produced by this query, initialized by the constructor.
   const int64_t num_rows_produced_limit_;
-
-  /// Timeout, in microseconds, when waiting for rows to become available. How long the
-  /// consumer thread waits for the producer thread to produce RowBatches. Derived from
-  /// query option FETCH_ROWS_TIMEOUT_MS.
-  const uint64_t fetch_rows_timeout_us_;
 
   /// Updated by CheckRowsProducedLimit() to indicate the total number of rows produced
   /// by query execution.

@@ -458,7 +458,8 @@ enum TImpalaQueryOptions {
   // become available and materialize). When result spooling is enabled, a fetch request
   // to may read multiple RowBatches, in which case, the timeout controls how long the
   // client waits for all returned RowBatches to be produced. If the timeout is hit, the
-  // client returns whatever rows it has already read. Defaults to 10000 milliseconds.
+  // client returns whatever rows it has already read. Defaults to 10000 milliseconds. A
+  // value of 0 causes fetch requests to wait indefinitely.
   FETCH_ROWS_TIMEOUT_MS = 93
 
   // For testing purposes only. This can provide a datetime string to use as now() for
