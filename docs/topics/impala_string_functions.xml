@@ -507,7 +507,7 @@ SELECT chr(97);
       <dlentry id="find_in_set">
 
         <dt>
-          FIND_IN_SEt(STRING str, STRING strList)
+          FIND_IN_SET(STRING str, STRING strList)
         </dt>
 
         <dd>
