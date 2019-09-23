@@ -587,27 +587,22 @@ SELECT chr(97);
         </dt>
 
         <dd>
-          <b>Purpose:</b> Returns the position (starting from 1) of the first occurrence of a
-          substring within a longer string.
-          <p>
-            <b>Return type:</b> <codeph>INT</codeph>
+          <b>Purpose:</b> Returns the position (starting from 1) of the first
+          occurrence of a <varname>substr</varname> within a longer string. <p>
+            <b>Return type:</b>
+            <codeph>INT</codeph>
           </p>
-
           <p conref="../shared/impala_common.xml#common/usage_notes_blurb"/>
-
-          <p>
-            If the substring is not present in the string, the function returns 0:
-          </p>
-
-          <p rev="IMPALA-3973 2.8.0">
-            The optional third and fourth arguments let you find instances of the substring
-            other than the first instance starting from the left:
-          </p>
+          <p> If the <varname>substr</varname> is not present in
+              <varname>str</varname>, the function returns 0. </p>
+          <p rev="IMPALA-3973 2.8.0"> The optional third and fourth arguments
+            let you find instances of the <varname>substr</varname> other than
+            the first instance starting from the left. </p>
           <ul>
-            <li>
-              The third argument lets you specify a starting point within the string other than
-              1.
-<codeblock>
+            <li> The third argument, <varname>position</varname>, lets you
+              specify a starting point within the <varname>str</varname> other
+              than 1.
+              <codeblock>
 -- Restricting the search to positions 7..end,
 -- the first occurrence of 'b' is at position 9.
 select instr('foo bar bletch', 'b', 7);
@@ -618,18 +613,13 @@ select instr('foo bar bletch', 'b', 7);
 +---------------------------------+
 </codeblock>
             </li>
-
-            <li>
-              If there are no more occurrences after the specified position, the result is 0.
-            </li>
-
-            <li>
-              <p>
-                If the third argument is negative, the search works right-to-left starting that
-                many characters from the right. The return value still represents the position
-                starting from the left side of the string.
-              </p>
-<codeblock rev="IMPALA-3973 2.8.0">
+            <li> If there are no more occurrences after the specified position,
+              the result is 0. </li>
+            <li> If <varname>position</varname> is negative, the search works
+              right-to-left starting that many characters from the right. The
+              return value still represents the position starting from the left
+              side of <varname>str</varname>.
+              <codeblock rev="IMPALA-3973 2.8.0">
 -- Scanning right to left, the first occurrence of 'o'
 -- is at position 8. (8th character from the left.)
 select instr('hello world','o',-1);
@@ -639,14 +629,10 @@ select instr('hello world','o',-1);
 | 8                             |
 +-------------------------------+
 
-</codeblock>
-            </li>
-
-            <li>
-              <p>
-                The fourth argument lets you specify an occurrence other than the first:
-              </p>
-<codeblock rev="IMPALA-3973 2.8.0">
+</codeblock></li>
+            <li> The fourth argument, <varname>occurrence</varname>, lets you
+              specify an occurrence other than the first.
+              <codeblock rev="IMPALA-3973 2.8.0">
 -- 2nd occurrence of 'b' is at position 9.
 select instr('foo bar bletch', 'b', 1, 2);
 +------------------------------------+
@@ -654,29 +640,16 @@ select instr('foo bar bletch', 'b', 1, 2);
 +------------------------------------+
 | 9                                  |
 +------------------------------------+
-</codeblock>
-            </li>
-
+</codeblock></li>
+            <li> If <varname>occurrence</varname> is greater than the number of
+              matching occurrences, the function returns 0. </li>
             <li>
-              Negative position argument means scan right-to-left.
-            </li>
-
-            <li>
-              If the fourth argument is greater than the number of matching occurrences, the
-              function returns 0:
-            </li>
-
-            <li>
-              The fourth argument cannot be negative or zero. A non-positive value for this
-              argument causes an error:
-            </li>
-
-            <li>
-              <p>
-                If either of the optional arguments is <codeph>NULL</codeph>, the function also
-                returns <codeph>NULL</codeph>:
-              </p>
-            </li>
+              <varname>occurrence</varname> cannot be negative or zero. A
+              non-positive value for this argument causes an error. </li>
+            <li> If either of the optional arguments,
+                <varname>position</varname> or <varname>occurrence</varname>, is
+                <codeph>NULL</codeph>, the function also returns
+                <codeph>NULL</codeph>.</li>
           </ul>
         </dd>
 
