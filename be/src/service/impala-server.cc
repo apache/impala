@@ -1542,6 +1542,8 @@ Status ImpalaServer::AuthorizeProxyUser(const string& user, const string& do_as_
 void ImpalaServer::CatalogUpdateVersionInfo::UpdateCatalogVersionMetrics()
 {
   ImpaladMetrics::CATALOG_VERSION->SetValue(catalog_version);
+  ImpaladMetrics::CATALOG_OBJECT_VERSION_LOWER_BOUND->SetValue(
+      catalog_object_version_lower_bound);
   ImpaladMetrics::CATALOG_TOPIC_VERSION->SetValue(catalog_topic_version);
   ImpaladMetrics::CATALOG_SERVICE_ID->SetValue(PrintId(catalog_service_id));
 }
@@ -1577,12 +1579,13 @@ void ImpalaServer::CatalogUpdateCallback(
       if (catalog_update_info_.catalog_version != resp.new_catalog_version) {
         LOG(INFO) << "Catalog topic update applied with version: " <<
             resp.new_catalog_version << " new min catalog object version: " <<
-            resp.min_catalog_object_version;
+            resp.catalog_object_version_lower_bound;
       }
       catalog_update_info_.catalog_version = resp.new_catalog_version;
       catalog_update_info_.catalog_topic_version = delta.to_version;
       catalog_update_info_.catalog_service_id = resp.catalog_service_id;
-      catalog_update_info_.min_catalog_object_version = resp.min_catalog_object_version;
+      catalog_update_info_.catalog_object_version_lower_bound =
+          resp.catalog_object_version_lower_bound;
       catalog_update_info_.UpdateCatalogVersionMetrics();
     }
     ImpaladMetrics::CATALOG_READY->SetValue(resp.new_catalog_version > 0);
@@ -1640,22 +1643,23 @@ void ImpalaServer::WaitForCatalogUpdateTopicPropagation(
 void ImpalaServer::WaitForMinCatalogUpdate(const int64_t min_req_catalog_object_version,
     const TUniqueId& catalog_service_id) {
   unique_lock<mutex> unique_lock(catalog_version_lock_);
-  int64_t min_catalog_object_version =
-      catalog_update_info_.min_catalog_object_version;
-  // TODO: Set a timeout to eventually break out of this loop is something goes
-  // wrong?
+  int64_t catalog_object_version_lower_bound =
+      catalog_update_info_.catalog_object_version_lower_bound;
+  // TODO: Set a timeout to eventually break out of this loop if something goes
+  //  wrong?
   VLOG_QUERY << "Waiting for local minimum catalog object version to be > "
-      << min_req_catalog_object_version << ", current local minimum version: "
-      << min_catalog_object_version;
-  while (catalog_update_info_.min_catalog_object_version <= min_req_catalog_object_version
-      && catalog_update_info_.catalog_service_id == catalog_service_id) {
+      << min_req_catalog_object_version << ", current lower bound of local versions: "
+      << catalog_object_version_lower_bound;
+  while (catalog_update_info_.catalog_service_id == catalog_service_id
+      && catalog_update_info_.catalog_object_version_lower_bound <=
+          min_req_catalog_object_version) {
     catalog_version_update_cv_.Wait(unique_lock);
   }
 
   if (catalog_update_info_.catalog_service_id != catalog_service_id) {
     VLOG_QUERY << "Detected change in catalog service ID";
   } else {
-    VLOG_QUERY << "Updated minimum catalog object version: "
+    VLOG_QUERY << "Updated catalog object version lower bound: "
         << min_req_catalog_object_version;
   }
 }

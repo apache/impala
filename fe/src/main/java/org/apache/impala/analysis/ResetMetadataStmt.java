@@ -205,10 +205,6 @@ public class ResetMetadataStmt extends StatementBase {
             builder.onServer(analyzer.getServerName())
                 .allOf(Privilege.REFRESH)
                 .build());
-        if (BackendConfig.INSTANCE.getBackendCfg().use_local_catalog) {
-          throw new AnalysisException("Global INVALIDATE METADATA is not supported " +
-              "when --use_local_catalog is configured.");
-        }
         break;
       default:
         throw new IllegalStateException("Invalid reset metadata action: " + action_);

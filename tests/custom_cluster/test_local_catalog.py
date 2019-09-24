@@ -26,8 +26,11 @@ import time
 from multiprocessing.pool import ThreadPool
 
 from tests.common.custom_cluster_test_suite import CustomClusterTestSuite
+from tests.util.filesystem_utils import WAREHOUSE
 
 RETRY_PROFILE_MSG = 'Retried query planning due to inconsistent metadata'
+CATALOG_VERSION_LOWER_BOUND = 'catalog.catalog-object-version-lower-bound'
+
 
 class TestCompactCatalogUpdates(CustomClusterTestSuite):
 
@@ -92,24 +95,21 @@ class TestCompactCatalogUpdates(CustomClusterTestSuite):
 
       # It should be immediately visible from client 2.
       self.execute_query_expect_success(client2, "describe %s" % view)
+
+      # Test global INVALIDATE METADATA
+      new_db = unique_database + '_new'
+      self.execute_query_expect_success(
+        client1, "create database if not exists %s" % new_db, query_options)
+      # The new database should be immediately visible from client 2.
+      self.execute_query_expect_success(client2, "describe database %s" % new_db)
+      # Drop database in Hive. Params: name, deleteData, cascade
+      self.hive_client.drop_database(new_db, True, True)
+      self.execute_query_expect_success(client1, "invalidate metadata", query_options)
+      err = self.execute_query_expect_failure(client2, "describe database %s" % new_db)
+      assert 'Database does not exist' in str(err)
     finally:
       client1.close()
       client2.close()
-
-    # Global 'INVALIDATE METADATA' is not supported on any impalads running in
-    # local_catalog mode, but should work on impalads running in the default
-    # mode.
-    # TODO(IMPALA-7506): support this!
-    for impalad in self.cluster.impalads:
-      client = impalad.service.create_beeswax_client()
-      try:
-        if "--use_local_catalog=true" in impalad.cmd:
-          err = self.execute_query_expect_failure(client, 'INVALIDATE METADATA')
-          assert 'not supported' in str(err)
-        else:
-          self.execute_query_expect_success(client, "INVALIDATE METADATA")
-      finally:
-        client.close()
 
   @pytest.mark.execute_serially
   @CustomClusterTestSuite.with_args(
@@ -153,6 +153,41 @@ class TestCompactCatalogUpdates(CustomClusterTestSuite):
 
     finally:
       client.close()
+
+  @pytest.mark.execute_serially
+  @CustomClusterTestSuite.with_args(
+    impalad_args="--use_local_catalog=true",
+    catalogd_args="--catalog_topic_mode=minimal")
+  def test_global_invalidate_metadata_with_sync_ddl(self, unique_database):
+    try:
+      impalad1 = self.cluster.impalads[0]
+      impalad2 = self.cluster.impalads[1]
+      client1 = impalad1.service.create_beeswax_client()
+      client2 = impalad2.service.create_beeswax_client()
+
+      # Create something to make the cache not empty.
+      self.execute_query_expect_success(
+        client1, "CREATE TABLE %s.my_tbl (i int)" % unique_database)
+      self.execute_query_expect_success(
+        client1, "CREATE FUNCTION %s.my_func LOCATION '%s/impala-hive-udfs.jar' "
+                 "SYMBOL='org.apache.impala.TestUdf'" % (unique_database, WAREHOUSE))
+      self.execute_query_expect_success(
+        client1, "select * from functional.alltypestiny")
+      version_lower_bound = impalad1.service.get_metric_value(
+        CATALOG_VERSION_LOWER_BOUND)
+
+      # Reset catalog with SYNC_DDL from client 2.
+      query_options = {"sync_ddl": 1}
+      self.execute_query_expect_success(client2, "INVALIDATE METADATA", query_options)
+      assert version_lower_bound < impalad1.service.get_metric_value(
+        CATALOG_VERSION_LOWER_BOUND)
+      version_lower_bound = impalad1.service.get_metric_value(
+        CATALOG_VERSION_LOWER_BOUND)
+      assert version_lower_bound == impalad2.service.get_metric_value(
+        CATALOG_VERSION_LOWER_BOUND)
+    finally:
+      client1.close()
+      client2.close()
 
 
 class TestLocalCatalogRetries(CustomClusterTestSuite):

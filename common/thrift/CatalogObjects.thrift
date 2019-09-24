@@ -622,6 +622,9 @@ struct TAuthzCacheInvalidation {
 struct TCatalog {
   // The CatalogService service ID.
   1: required Types.TUniqueId catalog_service_id
+
+  // The catalog version last time when we reset the entire catalog
+  2: required i64 last_reset_catalog_version
 }
 
 // Union of all Thrift Catalog objects

@@ -509,6 +509,17 @@ public abstract class Table extends CatalogObjectImpl implements FeTable {
     return catalogObject;
   }
 
+  /**
+   * Override parent implementation that will finally call toThrift() which requires
+   * holding the table lock. However, it's not guaranteed that caller holds the table
+   * lock (IMPALA-9136). Here we use toMinimalTCatalogObject() directly since only db
+   * name and table name are needed.
+   */
+  @Override
+  public final String getUniqueName() {
+    return Catalog.toCatalogObjectKey(toMinimalTCatalogObject());
+  }
+
   @Override
   protected void setTCatalogObject(TCatalogObject catalogObject) {
     catalogObject.setTable(toThrift());

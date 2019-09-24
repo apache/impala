@@ -340,6 +340,16 @@
     "key": "catalog.curr-version"
   },
   {
+    "description": "Lower bound of catalog object version in local catalog cache.",
+    "contexts": [
+      "IMPALAD"
+    ],
+    "label": "Catalog object version lower bound",
+    "units": "NONE",
+    "kind": "GAUGE",
+    "key": "catalog.catalog-object-version-lower-bound"
+  },
+  {
     "description": "Statestore topic update version.",
     "contexts": [
       "IMPALAD"

@@ -41,7 +41,7 @@ abstract public class CatalogObjectImpl implements CatalogObject {
   public String getName() { return ""; }
 
   @Override
-  public final String getUniqueName() {
+  public String getUniqueName() {
     return Catalog.toCatalogObjectKey(toTCatalogObject());
   }
 

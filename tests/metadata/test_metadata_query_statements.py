@@ -172,14 +172,9 @@ class TestMetadataQueryStatements(ImpalaTestSuite):
       if cluster_properties.is_event_polling_enabled():
         # Using HMS event processor - wait until the database shows up.
         self.wait_for_db_to_appear("hive_test_desc_db", timeout_s=30)
-      elif not cluster_properties.is_catalog_v2_cluster():
-        # Hive created database is visible
-        # Using traditional catalog - need to invalidate to pick up hive-created db.
-        self.client.execute("invalidate metadata")
       else:
-        # In local catalog mode global invalidate metadata is not supported.
-        # TODO Once IMPALA-7506 is fixed, re-enable global invalidate for catalog-v2
-        pass
+        # Invalidate metadata to pick up hive-created db.
+        self.client.execute("invalidate metadata")
       self.run_test_case('QueryTest/describe-db', vector)
       if not cluster_properties.is_catalog_v2_cluster():
         self.run_test_case('QueryTest/describe-hive-db', vector)

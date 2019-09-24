@@ -271,12 +271,6 @@ class SkipIfCatalogV2:
       reason="IMPALA-7539: support HDFS permission checks for LocalCatalog")
 
   @classmethod
-  def impala_7506(self):
-    return pytest.mark.skipif(
-      IMPALA_TEST_CLUSTER_PROPERTIES.is_catalog_v2_cluster(),
-      reason="IMPALA-7506: Support global INVALIDATE METADATA on fetch-on-demand impalad")
-
-  @classmethod
   def hms_event_polling_enabled(self):
     return pytest.mark.skipif(
       IMPALA_TEST_CLUSTER_PROPERTIES.is_catalog_v2_cluster(),

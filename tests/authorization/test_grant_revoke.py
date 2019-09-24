@@ -361,16 +361,18 @@ class TestGrantRevoke(SentryCacheTestSuite):
       self.client.execute("grant all on server to {0}".format(role_name))
       self.client.execute("grant role {0} to group `{1}`".format(
           role_name, grp.getgrnam(getuser()).gr_name))
+      self.client.execute("grant role {0} to group foobar".format(role_name))
+      self.client.execute("grant role {0} to group FOOBAR".format(role_name))
 
       # User names are case sensitive, so "foobar" and "FOOBAR" users should be treated
       # as two different catalog objects.
 
       # This will create "foobar" user catalog object.
       self.user_query(foobar_impalad_client, "create database {0}_db1"
-                      .format(db_prefix, user="foobar"))
+                      .format(db_prefix), user="foobar")
       # This will create "FOOBAR" user catalog object.
       self.user_query(FOOBAR_impalad_client, "create database {0}_db2"
-                      .format(db_prefix, user="FOOBAR"))
+                      .format(db_prefix), user="FOOBAR")
 
       # Verify that running invalidate metadata won't hang due to having the same name
       # in both user and role.

@@ -1286,7 +1286,7 @@ class ImpalaServer : public ImpalaServiceIf,
     CatalogUpdateVersionInfo() :
       catalog_version(0L),
       catalog_topic_version(0L),
-      min_catalog_object_version(0L) {
+      catalog_object_version_lower_bound(0L) {
     }
     /// Update the metrics to store the current version of catalog, current topic and
     /// current service id used by impalad.
@@ -1297,8 +1297,8 @@ class ImpalaServer : public ImpalaServiceIf,
     TUniqueId catalog_service_id;
     /// The statestore catalog topic version this update was received in.
     int64_t catalog_topic_version;
-    /// Minimum catalog object version after a call to UpdateCatalog()
-    int64_t min_catalog_object_version;
+    /// Lower bound of catalog object versions after a call to UpdateCatalog()
+    int64_t catalog_object_version_lower_bound;
   };
 
   /// The version information from the last successfull call to UpdateCatalog().

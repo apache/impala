@@ -116,6 +116,10 @@ class ImpaladMetricKeys {
   /// Current version of catalog with impalad.
   static const char* CATALOG_VERSION;
 
+  /// Lower bound of catalog object version in local catalog cache. All catalog objects
+  /// have catalog version larger than this.
+  static const char* CATALOG_OBJECT_VERSION_LOWER_BOUND;
+
   /// Catalog topic version  with impalad.
   static const char* CATALOG_TOPIC_VERSION;
 
@@ -252,6 +256,7 @@ class ImpaladMetrics {
   static IntGauge* CATALOG_NUM_DBS;
   static IntGauge* CATALOG_NUM_TABLES;
   static IntGauge* CATALOG_VERSION;
+  static IntGauge* CATALOG_OBJECT_VERSION_LOWER_BOUND;
   static IntGauge* CATALOG_TOPIC_VERSION;
   static DoubleGauge* CATALOG_CACHE_AVG_LOAD_TIME;
   static DoubleGauge* CATALOG_CACHE_HIT_RATE;

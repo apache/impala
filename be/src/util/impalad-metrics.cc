@@ -85,6 +85,8 @@ const char* ImpaladMetricKeys::CATALOG_NUM_DBS =
 const char* ImpaladMetricKeys::CATALOG_NUM_TABLES =
     "catalog.num-tables";
 const char* ImpaladMetricKeys::CATALOG_VERSION = "catalog.curr-version";
+const char* ImpaladMetricKeys::CATALOG_OBJECT_VERSION_LOWER_BOUND =
+    "catalog.catalog-object-version-lower-bound";
 const char* ImpaladMetricKeys::CATALOG_TOPIC_VERSION = "catalog.curr-topic";
 const char* ImpaladMetricKeys::CATALOG_SERVICE_ID = "catalog.curr-serviceid";
 const char* ImpaladMetricKeys::CATALOG_READY = "catalog.ready";
@@ -171,6 +173,7 @@ IntCounter* ImpaladMetrics::CATALOG_CACHE_TOTAL_LOAD_TIME = nullptr;
 IntGauge* ImpaladMetrics::CATALOG_NUM_DBS = nullptr;
 IntGauge* ImpaladMetrics::CATALOG_NUM_TABLES = nullptr;
 IntGauge* ImpaladMetrics::CATALOG_VERSION = nullptr;
+IntGauge* ImpaladMetrics::CATALOG_OBJECT_VERSION_LOWER_BOUND = nullptr;
 IntGauge* ImpaladMetrics::CATALOG_TOPIC_VERSION = nullptr;
 IntGauge* ImpaladMetrics::IMPALA_SERVER_NUM_OPEN_BEESWAX_SESSIONS = nullptr;
 IntGauge* ImpaladMetrics::IMPALA_SERVER_NUM_OPEN_HS2_SESSIONS = nullptr;
@@ -213,6 +216,8 @@ void ImpaladMetrics::InitCatalogMetrics(MetricGroup* m) {
   CATALOG_NUM_TABLES =
       catalog_metrics->AddGauge(ImpaladMetricKeys::CATALOG_NUM_TABLES, 0);
   CATALOG_VERSION = catalog_metrics->AddGauge(ImpaladMetricKeys::CATALOG_VERSION, 0);
+  CATALOG_OBJECT_VERSION_LOWER_BOUND = catalog_metrics->AddGauge(
+      ImpaladMetricKeys::CATALOG_OBJECT_VERSION_LOWER_BOUND, 0);
   CATALOG_TOPIC_VERSION =
       catalog_metrics->AddGauge(ImpaladMetricKeys::CATALOG_TOPIC_VERSION, 0);
   CATALOG_SERVICE_ID =
