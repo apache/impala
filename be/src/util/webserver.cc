@@ -490,6 +490,12 @@ sq_callback_result_t Webserver::BeginRequestCallbackStatic(
 
 sq_callback_result_t Webserver::BeginRequestCallback(struct sq_connection* connection,
     struct sq_request_info* request_info) {
+  if (strncmp("OPTIONS", request_info->request_method, 7) == 0) {
+    // Let Squeasel deal with the request. OPTIONS requests should not require
+    // authentication, so do this before doing SPNEGO.
+    return SQ_CONTINUE_HANDLING;
+  }
+
   if (FLAGS_webserver_require_spnego){
     sq_callback_result_t spnego_result = HandleSpnego(connection, request_info);
     if (spnego_result != SQ_CONTINUE_HANDLING) {

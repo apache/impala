@@ -59,13 +59,13 @@ const string ESCAPED_VALUE = "&lt;script language=&apos;javascript&apos;&gt;";
 // Adapted from:
 // http://stackoverflow.com/questions/10982717/get-html-without-header-with-boostasio
 Status HttpGet(const string& host, const int32_t& port, const string& url_path,
-    ostream* out, int expected_code = 200) {
+    ostream* out, int expected_code = 200, const string& method = "GET") {
   try {
     tcp::iostream request_stream;
     request_stream.connect(host, lexical_cast<string>(port));
     if (!request_stream) return Status("Could not connect request_stream");
 
-    request_stream << "GET " << url_path << " HTTP/1.1\r\n";
+    request_stream << method << " " << url_path << " HTTP/1.1\r\n";
     request_stream << "Host: " << host << ":" << port <<  "\r\n";
     request_stream << "Accept: */*\r\n";
     request_stream << "Cache-Control: no-cache\r\n";
@@ -348,8 +348,14 @@ TEST(Webserver, TestWithSpnego) {
   stringstream contents;
   ASSERT_FALSE(HttpGet("localhost", FLAGS_webserver_port, "/", &contents).ok());
 
-  // TODO(todd): import curl into native-toolchain and test this with
+  // TODO(todd) IMPALA-8987: import curl into native-toolchain and test this with
   // authentication.
+  // Test that OPTIONS works with and without having kinit-ed.
+  //string options_cmd = Substitute(
+  //   "curl -X OPTIONS -v --negotiate -u : 'http://127.0.0.1:$0'", FLAGS_webserver_port);
+  //system(options_cmd.c_str());
+  //KUDU_ASSERT_OK(kdc.Kinit("alice"));
+  //system(options_cmd.c_str());
 }
 
 TEST(Webserver, StartWithPasswordFileTest) {
@@ -438,6 +444,14 @@ TEST(Webserver, NullCharTest) {
   ASSERT_TRUE(contents.str().find(STRING_WITH_NULL) != string::npos);
 }
 
+TEST(Webserver, Options) {
+  Webserver webserver("", FLAGS_webserver_port);
+  ASSERT_OK(webserver.Start());
+  stringstream contents;
+  ASSERT_OK(HttpGet("localhost", FLAGS_webserver_port, "/", &contents, 200, "OPTIONS"));
+  ASSERT_FALSE(contents.str().find("Allow: GET, POST, HEAD, OPTIONS, PROPFIND, MKCOL")
+      == string::npos);
+}
 
 int main(int argc, char **argv) {
   ::testing::InitGoogleTest(&argc, argv);

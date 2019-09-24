@@ -209,7 +209,7 @@ struct socket {
 };
 
 char* SAFE_HTTP_METHODS[] = {
-  "GET", "POST", "HEAD", "PROPFIND", "MKCOL" };
+  "GET", "POST", "HEAD", "PROPFIND", "MKCOL", "OPTIONS" };
 
 // See https://www.owasp.org/index.php/Test_HTTP_Methods_(OTG-CONFIG-006) for details.
 #ifdef ALLOW_UNSAFE_HTTP_METHODS
@@ -3246,9 +3246,16 @@ static void handle_ssi_file_request(struct sq_connection *conn,
 static void send_options(struct sq_connection *conn) {
   conn->status_code = 200;
 
+  #ifdef ALLOW_UNSAFE_HTTP_METHODS
   sq_printf(conn, "%s", "HTTP/1.1 200 OK\r\n"
             "Allow: GET, POST, HEAD, CONNECT, PUT, DELETE, OPTIONS, PROPFIND, MKCOL\r\n"
-            "DAV: 1\r\n\r\n");
+            "DAV: 1\r\n"
+            "Content-Length: 0\r\n\r\n");
+  #else
+    sq_printf(conn, "%s", "HTTP/1.1 200 OK\r\n"
+            "Allow: GET, POST, HEAD, OPTIONS, PROPFIND, MKCOL\r\n"
+            "Content-Length: 0\r\n\r\n");
+  #endif
 }
 
 // Writes PROPFIND properties for a collection element
