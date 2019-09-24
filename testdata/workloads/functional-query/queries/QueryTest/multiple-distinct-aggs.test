@@ -437,3 +437,19 @@ BIGINT,BIGINT,BIGINT
 ---- RESULTS
 1464556,1500000,2406
 ====
+---- QUERY
+# IMPALA-8969: Grouping aggregator can cause segmentation fault when doing multiple
+# aggregations.
+select sum(len_orderkey), sum(len_comment)
+from (
+  select
+    length(group_concat(distinct cast(l_orderkey as string))) len_orderkey,
+    length(group_concat(distinct(l_comment))) len_comment
+    from tpch.lineitem
+    group by l_comment
+  ) v
+---- TYPES
+BIGINT,BIGINT
+---- RESULTS
+43737923,135857609
+====

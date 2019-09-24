@@ -201,7 +201,7 @@ Status GroupingAggregator::AddBatchStreamingImpl(int agg_idx, bool needs_seriali
 ret:
   if (needs_serialize) {
     FOREACH_ROW(out_batch, 0, out_batch_iter) {
-      AggFnEvaluator::Serialize(agg_fn_evals_, out_batch_iter.Get()->GetTuple(0));
+      AggFnEvaluator::Serialize(agg_fn_evals_, out_batch_iter.Get()->GetTuple(agg_idx));
     }
   }
 
