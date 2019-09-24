@@ -2213,6 +2213,19 @@ public class CatalogServiceCatalog extends Catalog {
   }
 
   /**
+   * Update DB if it exists in catalog. Returns true if updateDb() succeeds, false
+   * otherwise.
+   */
+  public boolean updateDbIfExists(Database msdb) {
+    try {
+      updateDb(msdb);
+    } catch (DatabaseNotFoundException e) {
+      return false;
+    }
+    return true;
+  }
+
+  /**
    * Adds a new role with the given name and grant groups to the AuthorizationPolicy.
    * If a role with the same name already exists it will be overwritten.
    */

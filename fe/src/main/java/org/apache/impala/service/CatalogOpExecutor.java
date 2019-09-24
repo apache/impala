@@ -1261,6 +1261,10 @@ public class CatalogOpExecutor {
       if (db == null) {
         throw new CatalogException("Database: " + fn.dbName() + " does not exist.");
       }
+      // Get a new catalog version to assign to the database being altered. This is
+      // needed for events processor as this method creates alter database events.
+      long newCatalogVersion = catalog_.incrementAndGetCatalogVersion();
+      addCatalogServiceIdentifiers(db, catalog_.getCatalogServiceId(), newCatalogVersion);
       // Search for existing functions with the same name or signature that would
       // conflict with the function being added.
       for (Function function: db.getFunctions(fn.functionName())) {
@@ -1304,6 +1308,9 @@ public class CatalogOpExecutor {
           // Flush DB changes to metastore
           applyAlterDatabase(db.getMetaStoreDb());
           addedFunctions.add(fn.toTCatalogObject());
+          // now that HMS alter database has succeeded, add this version to list of
+          // inflight events in catalog database if event processing is enabled.
+          catalog_.addVersionsForInflightEvents(db, newCatalogVersion);
         }
       }
 
@@ -1974,6 +1981,10 @@ public class CatalogOpExecutor {
         addSummary(resp, "Database does not exist.");
         return;
       }
+      // Get a new catalog version to assign to the database being altered. This is
+      // needed for events processor as this method creates alter database events.
+      long newCatalogVersion = catalog_.incrementAndGetCatalogVersion();
+      addCatalogServiceIdentifiers(db, catalog_.getCatalogServiceId(), newCatalogVersion);
       List<TCatalogObject> removedFunctions = Lists.newArrayList();
       if (!params.isSetSignature()) {
         dropJavaFunctionFromHms(fName.getDb(), fName.getFunction(), params.if_exists);
@@ -2001,6 +2012,9 @@ public class CatalogOpExecutor {
           // Flush DB changes to metastore
           applyAlterDatabase(db.getMetaStoreDb());
           removedFunctions.add(fn.toTCatalogObject());
+          // now that HMS alter operation has succeeded, add this version to list of
+          // inflight events in catalog database if event processing is enabled.
+          catalog_.addVersionsForInflightEvents(db, newCatalogVersion);
         }
       }
 

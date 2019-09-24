@@ -1216,13 +1216,21 @@ public class MetastoreEvents {
      * the Db object from the event
      */
     @Override
-    public void process() throws CatalogException {
+    public void process() throws CatalogException, MetastoreNotificationException {
       if (isSelfEvent()) {
         infoLog("Not processing the event as it is a self-event");
         return;
       }
+      Preconditions.checkNotNull(alteredDatabase_);
       // If not self event, copy Db object from event to catalog
-      catalog_.updateDb(alteredDatabase_);
+      if (!catalog_.updateDbIfExists(alteredDatabase_)) {
+        // Okay to skip this event. Events processor will not error out.
+        debugLog("Update database {} failed as the database is not present in the "
+            + "catalog.", alteredDatabase_.getName());
+      } else {
+        infoLog("Database {} updated after alter database event.",
+            alteredDatabase_.getName());
+      }
     }
 
     @Override
