@@ -312,11 +312,20 @@ public class CardinalityTest extends PlannerTestBase {
     // Estimated cardinality of functional.tinytable is 2.
     // Estimated cardinality of the resulting AggregationNode's involving
     // GROUP BY is 2 for both AggregationNode's.
-    verifyApproxCardinality("SELECT COUNT(a) FROM functional.tinytable "
+    verifyCardinality("SELECT COUNT(a) FROM functional.tinytable "
         + "GROUP BY a", 2, true, ImmutableSet.of(),
         pathToFirstAggregationNode, AggregationNode.class);
-    verifyApproxCardinality("SELECT COUNT(a) FROM functional.tinytable "
+    verifyCardinality("SELECT COUNT(a) FROM functional.tinytable "
         + "GROUP BY a", 2, true, ImmutableSet.of(),
+        pathToSecondAggregationNode, AggregationNode.class);
+
+    // Test that having predicate reduces cardinality on merge aggregation
+    // but not to zero. Preaggregation should not be affected.
+    verifyCardinality("SELECT COUNT(a) FROM functional.tinytable "
+        + "GROUP BY a HAVING COUNT(a) > 0", 1, true, ImmutableSet.of(),
+        pathToFirstAggregationNode, AggregationNode.class);
+    verifyCardinality("SELECT COUNT(a) FROM functional.tinytable "
+        + "GROUP BY a HAVING COUNT(a) > 0", 2, true, ImmutableSet.of(),
         pathToSecondAggregationNode, AggregationNode.class);
   }
 
@@ -604,14 +613,6 @@ public class CardinalityTest extends PlannerTestBase {
         path, HdfsScanNode.class);
   }
 
-  // TODO(IMPALA-8647): It seems that the cardinality of the SelectNode should be 1
-  // instead of 0. Specifically, if we had executed "compute stats
-  // functional_parquet.alltypestiny" before issuing this
-  // SQL statement, the returned cardinality of this SelectNode would be 1
-  // instead of 0. Not very sure if this is a bug. It looks like the cardinality
-  // of a SelectNode depends on whether there is stats information associated
-  // with its child node. The cardinality of a SelectNode would still be 0
-  // even if its child node (ExchangeNode in this case) has a non-zero cardinality.
   @Test
   public void testSelectNode() {
     // Create the path to the SelectNode of interest
@@ -621,15 +622,28 @@ public class CardinalityTest extends PlannerTestBase {
     // There is no available statistics in functional_parquet.alltypestiny.
     // True cardinality of functional_parquet.alltypestiny is 8.
     // Estimated cardinality of functional_parquet.alltypestiny is 523.
-    // There is no available statistics in functional_parquet.alltypessmall.
-    // True cardinality of functional_parquet.alltypessmall is 100.
-    // Estimated cardinality of functional_parquet.alltypessmall is 649.
-    String subQuery = "(SELECT int_col "
+    String singleRowSubQuery = "(SELECT int_col "
         + "FROM functional_parquet.alltypestiny "
         + "LIMIT 1)";
+    // There are no available statistics in functional_parquet.alltypessmall.
+    // True cardinality of functional_parquet.alltypessmall is 100.
+    // Estimated cardinality of functional_parquet.alltypessmall is 649.
     verifyApproxCardinality("SELECT * "
         + "FROM functional_parquet.alltypessmall "
-        + "WHERE 1 IN " + subQuery, 0, true,
+        + "WHERE 1 IN " + singleRowSubQuery, 1, true,
+        ImmutableSet.of(), path, SelectNode.class);
+
+
+    String manyRowSubQuery = "(SELECT int_col "
+        + "FROM functional_parquet.alltypes "
+        + "LIMIT 1000)";
+    // There are no available statistics in functional_parquet.alltypes.
+    // True cardinality of functional_parquet.alltypes is 7300.
+    // Estimated cardinality of functional_parquet.alltypes is 12740.
+    // Estimated selectivity of predicate is 10%.
+    verifyApproxCardinality("SELECT * "
+        + "FROM functional_parquet.alltypessmall "
+        + "WHERE 1 IN " + manyRowSubQuery, 100, true,
         ImmutableSet.of(), path, SelectNode.class);
   }
 
@@ -639,16 +653,16 @@ public class CardinalityTest extends PlannerTestBase {
     // in a distributed plan.
     List<Integer> path = Arrays.asList(0, 1, 0);
 
-    // There is no available statistics in functional_parquet.alltypestiny.
+    // There are no available statistics in functional_parquet.alltypestiny.
     // True cardinality of functional_parquet.alltypestiny is 8.
-    // There is no available statistics in functional_parquet.alltypessmall.
+    // There are no available statistics in functional_parquet.alltypessmall.
     // True cardinality of functional_parquet.alltypessmall is 100.
     String subQuery = "(SELECT int_col "
         + "FROM functional_parquet.alltypestiny "
         + "LIMIT 1)";
     verifyApproxCardinality("SELECT * "
-        + "FROM functional_parquet.alltypessmall "
-        + "WHERE 1 IN " + subQuery, 0, true,
+        + "FROM functional_parquet.alltypes "
+        + "WHERE 1 IN " + subQuery, 1, true,
         ImmutableSet.of(PlannerTestOption.DISABLE_HDFS_NUM_ROWS_ESTIMATE),
         path, SelectNode.class);
   }

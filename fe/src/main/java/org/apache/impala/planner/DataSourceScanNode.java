@@ -267,7 +267,7 @@ public class DataSourceScanNode extends ScanNode {
     super.computeStats(analyzer);
     inputCardinality_ = numRowsEstimate_;
     cardinality_ = numRowsEstimate_;
-    cardinality_ *= computeSelectivity();
+    cardinality_ = applyConjunctsSelectivity(cardinality_);
     cardinality_ = Math.max(1, cardinality_);
     cardinality_ = capCardinalityAtLimit(cardinality_);
 

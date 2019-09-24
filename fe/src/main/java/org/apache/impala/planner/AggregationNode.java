@@ -229,7 +229,7 @@ public class AggregationNode extends PlanNode {
 
     // Take conjuncts into account.
     if (cardinality_ > 0) {
-      cardinality_ = (long) Math.round((double) cardinality_ * computeSelectivity());
+      cardinality_ = applyConjunctsSelectivity(cardinality_);
     }
     cardinality_ = capCardinalityAtLimit(cardinality_);
   }

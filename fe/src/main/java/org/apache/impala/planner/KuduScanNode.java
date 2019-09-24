@@ -263,8 +263,7 @@ public class KuduScanNode extends ScanNode {
 
     // Update the cardinality
     inputCardinality_ = cardinality_ = kuduTable_.getNumRows();
-    cardinality_ *= computeSelectivity();
-    cardinality_ = Math.min(Math.max(1, cardinality_), kuduTable_.getNumRows());
+    cardinality_ = applyConjunctsSelectivity(cardinality_);
     cardinality_ = capCardinalityAtLimit(cardinality_);
     if (LOG.isTraceEnabled()) {
       LOG.trace("computeStats KuduScan: cardinality=" + Long.toString(cardinality_));

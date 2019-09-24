@@ -330,7 +330,8 @@ public class HBaseScanNode extends ScanNode {
         // Is there some third, ulitimate fallback?
         // Apply estimated key range selectivity from original key conjuncts
         if (cardinality_ > 0 && keyConjuncts_ != null) {
-          cardinality_ *= computeCombinedSelectivity(keyConjuncts_);
+          cardinality_ =
+            applySelectivity(cardinality_, computeCombinedSelectivity(keyConjuncts_));
         }
       } else {
         // Use the HBase sampling scan to estimate cardinality. Note that,
@@ -346,9 +347,7 @@ public class HBaseScanNode extends ScanNode {
     inputCardinality_ = cardinality_;
 
     if (cardinality_ > 0) {
-      cardinality_ = Math.round(cardinality_ * computeSelectivity());
-      // IMPALA-2165: Avoid setting the cardinality to 0 after rounding.
-      cardinality_ = Math.max(1, cardinality_);
+      cardinality_ = applyConjunctsSelectivity(cardinality_);
     } else {
       // Safe guard for cardinality_ < -1, e.g. when hbase sampling fails and numRows
       // in HMS is abnormally set to be < -1.

@@ -71,8 +71,7 @@ public class SelectNode extends PlanNode {
     if (getChild(0).cardinality_ == -1) {
       cardinality_ = -1;
     } else {
-      cardinality_ =
-          Math.round(((double) getChild(0).cardinality_) * computeSelectivity());
+      cardinality_ = applyConjunctsSelectivity(getChild(0).cardinality_);
       Preconditions.checkState(cardinality_ >= 0);
     }
     cardinality_ = capCardinalityAtLimit(cardinality_);

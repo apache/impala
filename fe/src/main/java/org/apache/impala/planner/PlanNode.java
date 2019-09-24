@@ -610,6 +610,20 @@ abstract public class PlanNode extends TreeNode<PlanNode> {
     return computeCombinedSelectivity(conjuncts_);
   }
 
+  // Compute the cardinality after applying conjuncts_ based on 'preConjunctCardinality'.
+  protected long applyConjunctsSelectivity(long preConjunctCardinality) {
+    return applySelectivity(preConjunctCardinality, computeSelectivity());
+  }
+
+  // Compute the cardinality after applying conjuncts with 'selectivity', based on
+  // 'preConjunctCardinality'.
+  protected long applySelectivity(long preConjunctCardinality, double selectivity) {
+    long cardinality = (long) Math.round(preConjunctCardinality * selectivity);
+    // IMPALA-8647: don't round cardinality down to zero for safety.
+    if (cardinality == 0 && preConjunctCardinality > 0) return 1;
+    return cardinality;
+  }
+
   // Convert this plan node into msg (excluding children), which requires setting
   // the node type and the node-specific field.
   protected abstract void toThrift(TPlanNode msg);

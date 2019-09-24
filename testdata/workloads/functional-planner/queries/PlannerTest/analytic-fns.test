@@ -2166,7 +2166,7 @@ PLAN-ROOT SINK
 |
 03:SELECT
 |  predicates: id = 1, int_col < 10, sum(int_col) = 4
-|  row-size=20B cardinality=0
+|  row-size=20B cardinality=1
 |
 02:ANALYTIC
 |  functions: sum(int_col)
@@ -2315,7 +2315,7 @@ PLAN-ROOT SINK
 |
 03:SELECT
 |  predicates: month = int_col
-|  row-size=29B cardinality=0
+|  row-size=29B cardinality=1
 |
 02:ANALYTIC
 |  functions: sum(id)

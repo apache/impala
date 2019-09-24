@@ -4,7 +4,7 @@ select int_col, string_col from functional.alltypes_view
 PLAN-ROOT SINK
 |
 00:SCAN HDFS [functional.alltypes]
-   partitions=24/24 files=24 size=478.45KB
+   HDFS partitions=24/24 files=24 size=478.45KB
    row-size=17B cardinality=7.30K
 ---- DISTRIBUTEDPLAN
 PLAN-ROOT SINK
@@ -12,7 +12,7 @@ PLAN-ROOT SINK
 01:EXCHANGE [UNPARTITIONED]
 |
 00:SCAN HDFS [functional.alltypes]
-   partitions=24/24 files=24 size=478.45KB
+   HDFS partitions=24/24 files=24 size=478.45KB
    row-size=17B cardinality=7.30K
 ====
 # Basic test with a complex view.
@@ -22,13 +22,13 @@ PLAN-ROOT SINK
 |
 04:TOP-N [LIMIT=100]
 |  order by: b.string_col ASC
-|  row-size=21B cardinality=0
+|  row-size=21B cardinality=1
 |
 03:AGGREGATE [FINALIZE]
 |  output: count(a.bigint_col)
 |  group by: b.string_col
 |  having: count(a.bigint_col) > 1
-|  row-size=21B cardinality=0
+|  row-size=21B cardinality=1
 |
 02:HASH JOIN [INNER JOIN]
 |  hash predicates: a.id = b.id
@@ -36,11 +36,11 @@ PLAN-ROOT SINK
 |  row-size=29B cardinality=1
 |
 |--01:SCAN HDFS [functional.alltypestiny b]
-|     partitions=4/4 files=4 size=460B
+|     HDFS partitions=4/4 files=4 size=460B
 |     row-size=17B cardinality=8
 |
 00:SCAN HDFS [functional.alltypesagg a]
-   partitions=11/11 files=11 size=814.73KB
+   HDFS partitions=11/11 files=11 size=814.73KB
    predicates: a.bigint_col < 50
    runtime filters: RF000 -> a.id
    row-size=12B cardinality=1.10K
@@ -53,13 +53,13 @@ PLAN-ROOT SINK
 |
 04:TOP-N [LIMIT=100]
 |  order by: b.string_col ASC
-|  row-size=21B cardinality=0
+|  row-size=21B cardinality=1
 |
 07:AGGREGATE [FINALIZE]
 |  output: count:merge(a.bigint_col)
 |  group by: b.string_col
 |  having: count(a.bigint_col) > 1
-|  row-size=21B cardinality=0
+|  row-size=21B cardinality=1
 |
 06:EXCHANGE [HASH(b.string_col)]
 |
@@ -76,11 +76,11 @@ PLAN-ROOT SINK
 |--05:EXCHANGE [BROADCAST]
 |  |
 |  01:SCAN HDFS [functional.alltypestiny b]
-|     partitions=4/4 files=4 size=460B
+|     HDFS partitions=4/4 files=4 size=460B
 |     row-size=17B cardinality=8
 |
 00:SCAN HDFS [functional.alltypesagg a]
-   partitions=11/11 files=11 size=814.73KB
+   HDFS partitions=11/11 files=11 size=814.73KB
    predicates: a.bigint_col < 50
    runtime filters: RF000 -> a.id
    row-size=12B cardinality=1.10K
@@ -91,7 +91,7 @@ select int_col, string_col from functional.view_view
 PLAN-ROOT SINK
 |
 00:SCAN HDFS [functional.alltypes]
-   partitions=24/24 files=24 size=478.45KB
+   HDFS partitions=24/24 files=24 size=478.45KB
    row-size=17B cardinality=7.30K
 ---- DISTRIBUTEDPLAN
 PLAN-ROOT SINK
@@ -99,7 +99,7 @@ PLAN-ROOT SINK
 01:EXCHANGE [UNPARTITIONED]
 |
 00:SCAN HDFS [functional.alltypes]
-   partitions=24/24 files=24 size=478.45KB
+   HDFS partitions=24/24 files=24 size=478.45KB
    row-size=17B cardinality=7.30K
 ====
 # view used in a union.
@@ -112,12 +112,12 @@ PLAN-ROOT SINK
 |  row-size=89B cardinality=8.03K
 |
 |--02:SCAN HDFS [functional.alltypes]
-|     partitions=24/24 files=24 size=478.45KB
+|     HDFS partitions=24/24 files=24 size=478.45KB
 |     predicates: functional.alltypes.id < 10
 |     row-size=89B cardinality=730
 |
 01:SCAN HDFS [functional.alltypes]
-   partitions=24/24 files=24 size=478.45KB
+   HDFS partitions=24/24 files=24 size=478.45KB
    row-size=89B cardinality=7.30K
 ---- DISTRIBUTEDPLAN
 PLAN-ROOT SINK
@@ -128,12 +128,12 @@ PLAN-ROOT SINK
 |  row-size=89B cardinality=8.03K
 |
 |--02:SCAN HDFS [functional.alltypes]
-|     partitions=24/24 files=24 size=478.45KB
+|     HDFS partitions=24/24 files=24 size=478.45KB
 |     predicates: functional.alltypes.id < 10
 |     row-size=89B cardinality=730
 |
 01:SCAN HDFS [functional.alltypes]
-   partitions=24/24 files=24 size=478.45KB
+   HDFS partitions=24/24 files=24 size=478.45KB
    row-size=89B cardinality=7.30K
 ====
 # view used in an inline view.
@@ -143,7 +143,7 @@ where t.id < 10
 PLAN-ROOT SINK
 |
 00:SCAN HDFS [functional.alltypes]
-   partitions=24/24 files=24 size=478.45KB
+   HDFS partitions=24/24 files=24 size=478.45KB
    predicates: functional.alltypes.id < 10
    row-size=4B cardinality=730
 ---- DISTRIBUTEDPLAN
@@ -152,7 +152,7 @@ PLAN-ROOT SINK
 01:EXCHANGE [UNPARTITIONED]
 |
 00:SCAN HDFS [functional.alltypes]
-   partitions=24/24 files=24 size=478.45KB
+   HDFS partitions=24/24 files=24 size=478.45KB
    predicates: functional.alltypes.id < 10
    row-size=4B cardinality=730
 ====
@@ -169,13 +169,13 @@ PLAN-ROOT SINK
 |
 |--06:TOP-N [LIMIT=100]
 |  |  order by: b.string_col ASC
-|  |  row-size=21B cardinality=0
+|  |  row-size=21B cardinality=1
 |  |
 |  05:AGGREGATE [FINALIZE]
 |  |  output: count(a.bigint_col)
 |  |  group by: b.string_col
 |  |  having: count(a.bigint_col) > 1
-|  |  row-size=21B cardinality=0
+|  |  row-size=21B cardinality=1
 |  |
 |  04:HASH JOIN [INNER JOIN]
 |  |  hash predicates: a.id = b.id
@@ -183,11 +183,11 @@ PLAN-ROOT SINK
 |  |  row-size=29B cardinality=1
 |  |
 |  |--03:SCAN HDFS [functional.alltypestiny b]
-|  |     partitions=4/4 files=4 size=460B
+|  |     HDFS partitions=4/4 files=4 size=460B
 |  |     row-size=17B cardinality=8
 |  |
 |  02:SCAN HDFS [functional.alltypesagg a]
-|     partitions=11/11 files=11 size=814.73KB
+|     HDFS partitions=11/11 files=11 size=814.73KB
 |     predicates: a.bigint_col < 50
 |     runtime filters: RF004 -> a.id
 |     row-size=12B cardinality=1.10K
@@ -198,13 +198,13 @@ PLAN-ROOT SINK
 |  row-size=122B cardinality=730
 |
 |--01:SCAN HDFS [functional.alltypes]
-|     partitions=24/24 files=24 size=478.45KB
+|     HDFS partitions=24/24 files=24 size=478.45KB
 |     predicates: functional.alltypes.int_col > 1
 |     runtime filters: RF000 -> int_col
 |     row-size=33B cardinality=730
 |
 00:SCAN HDFS [functional.alltypes]
-   partitions=24/24 files=24 size=478.45KB
+   HDFS partitions=24/24 files=24 size=478.45KB
    predicates: functional.alltypes.id > 1
    runtime filters: RF000 -> functional.alltypes.id, RF002 -> functional.alltypes.id
    row-size=89B cardinality=730
@@ -213,12 +213,12 @@ PLAN-ROOT SINK
 |
 16:EXCHANGE [UNPARTITIONED]
 |
-08:HASH JOIN [INNER JOIN, BROADCAST]
+08:HASH JOIN [INNER JOIN, PARTITIONED]
 |  hash predicates: int_col = count(a.bigint_col)
 |  runtime filters: RF000 <- count(a.bigint_col)
 |  row-size=143B cardinality=730
 |
-|--15:EXCHANGE [BROADCAST]
+|--15:EXCHANGE [HASH(count(a.bigint_col))]
 |  |
 |  14:MERGING-EXCHANGE [UNPARTITIONED]
 |  |  order by: b.string_col ASC
@@ -226,13 +226,13 @@ PLAN-ROOT SINK
 |  |
 |  06:TOP-N [LIMIT=100]
 |  |  order by: b.string_col ASC
-|  |  row-size=21B cardinality=0
+|  |  row-size=21B cardinality=1
 |  |
 |  13:AGGREGATE [FINALIZE]
 |  |  output: count:merge(a.bigint_col)
 |  |  group by: b.string_col
 |  |  having: count(a.bigint_col) > 1
-|  |  row-size=21B cardinality=0
+|  |  row-size=21B cardinality=1
 |  |
 |  12:EXCHANGE [HASH(b.string_col)]
 |  |
@@ -249,11 +249,11 @@ PLAN-ROOT SINK
 |  |--11:EXCHANGE [BROADCAST]
 |  |  |
 |  |  03:SCAN HDFS [functional.alltypestiny b]
-|  |     partitions=4/4 files=4 size=460B
+|  |     HDFS partitions=4/4 files=4 size=460B
 |  |     row-size=17B cardinality=8
 |  |
 |  02:SCAN HDFS [functional.alltypesagg a]
-|     partitions=11/11 files=11 size=814.73KB
+|     HDFS partitions=11/11 files=11 size=814.73KB
 |     predicates: a.bigint_col < 50
 |     runtime filters: RF004 -> a.id
 |     row-size=12B cardinality=1.10K
@@ -266,7 +266,7 @@ PLAN-ROOT SINK
 |--10:EXCHANGE [HASH(int_col)]
 |  |
 |  01:SCAN HDFS [functional.alltypes]
-|     partitions=24/24 files=24 size=478.45KB
+|     HDFS partitions=24/24 files=24 size=478.45KB
 |     predicates: functional.alltypes.int_col > 1
 |     runtime filters: RF000 -> int_col
 |     row-size=33B cardinality=730
@@ -274,7 +274,7 @@ PLAN-ROOT SINK
 09:EXCHANGE [HASH(functional.alltypes.id)]
 |
 00:SCAN HDFS [functional.alltypes]
-   partitions=24/24 files=24 size=478.45KB
+   HDFS partitions=24/24 files=24 size=478.45KB
    predicates: functional.alltypes.id > 1
    runtime filters: RF000 -> functional.alltypes.id, RF002 -> functional.alltypes.id
    row-size=89B cardinality=730
@@ -293,7 +293,7 @@ PLAN-ROOT SINK
 |  row-size=267B cardinality=7.30K
 |
 |--02:SCAN HDFS [functional.alltypes]
-|     partitions=24/24 files=24 size=478.45KB
+|     HDFS partitions=24/24 files=24 size=478.45KB
 |     row-size=89B cardinality=7.30K
 |
 03:HASH JOIN [INNER JOIN]
@@ -302,12 +302,12 @@ PLAN-ROOT SINK
 |  row-size=178B cardinality=7.30K
 |
 |--01:SCAN HDFS [functional.alltypes]
-|     partitions=24/24 files=24 size=478.45KB
+|     HDFS partitions=24/24 files=24 size=478.45KB
 |     runtime filters: RF000 -> functional.alltypes.id
 |     row-size=89B cardinality=7.30K
 |
 00:SCAN HDFS [functional.alltypes]
-   partitions=24/24 files=24 size=478.45KB
+   HDFS partitions=24/24 files=24 size=478.45KB
    runtime filters: RF000 -> functional.alltypes.id, RF002 -> functional.alltypes.id
    row-size=89B cardinality=7.30K
 ---- DISTRIBUTEDPLAN
@@ -323,7 +323,7 @@ PLAN-ROOT SINK
 |--07:EXCHANGE [HASH(functional.alltypes.id)]
 |  |
 |  02:SCAN HDFS [functional.alltypes]
-|     partitions=24/24 files=24 size=478.45KB
+|     HDFS partitions=24/24 files=24 size=478.45KB
 |     row-size=89B cardinality=7.30K
 |
 03:HASH JOIN [INNER JOIN, PARTITIONED]
@@ -334,14 +334,14 @@ PLAN-ROOT SINK
 |--06:EXCHANGE [HASH(functional.alltypes.id)]
 |  |
 |  01:SCAN HDFS [functional.alltypes]
-|     partitions=24/24 files=24 size=478.45KB
+|     HDFS partitions=24/24 files=24 size=478.45KB
 |     runtime filters: RF000 -> functional.alltypes.id
 |     row-size=89B cardinality=7.30K
 |
 05:EXCHANGE [HASH(functional.alltypes.id)]
 |
 00:SCAN HDFS [functional.alltypes]
-   partitions=24/24 files=24 size=478.45KB
+   HDFS partitions=24/24 files=24 size=478.45KB
    runtime filters: RF000 -> functional.alltypes.id, RF002 -> functional.alltypes.id
    row-size=89B cardinality=7.30K
 ====
@@ -359,7 +359,7 @@ PLAN-ROOT SINK
 |  row-size=267B cardinality=7.30K
 |
 |--02:SCAN HDFS [functional.alltypes]
-|     partitions=24/24 files=24 size=478.45KB
+|     HDFS partitions=24/24 files=24 size=478.45KB
 |     row-size=89B cardinality=7.30K
 |
 03:HASH JOIN [INNER JOIN]
@@ -368,12 +368,12 @@ PLAN-ROOT SINK
 |  row-size=178B cardinality=7.30K
 |
 |--01:SCAN HDFS [functional.alltypes]
-|     partitions=24/24 files=24 size=478.45KB
+|     HDFS partitions=24/24 files=24 size=478.45KB
 |     runtime filters: RF000 -> functional.alltypes.id
 |     row-size=89B cardinality=7.30K
 |
 00:SCAN HDFS [functional.alltypes]
-   partitions=24/24 files=24 size=478.45KB
+   HDFS partitions=24/24 files=24 size=478.45KB
    runtime filters: RF000 -> functional.alltypes.id, RF002 -> functional.alltypes.id
    row-size=89B cardinality=7.30K
 ---- DISTRIBUTEDPLAN
@@ -389,7 +389,7 @@ PLAN-ROOT SINK
 |--07:EXCHANGE [HASH(functional.alltypes.id)]
 |  |
 |  02:SCAN HDFS [functional.alltypes]
-|     partitions=24/24 files=24 size=478.45KB
+|     HDFS partitions=24/24 files=24 size=478.45KB
 |     row-size=89B cardinality=7.30K
 |
 03:HASH JOIN [INNER JOIN, PARTITIONED]
@@ -400,14 +400,14 @@ PLAN-ROOT SINK
 |--06:EXCHANGE [HASH(functional.alltypes.id)]
 |  |
 |  01:SCAN HDFS [functional.alltypes]
-|     partitions=24/24 files=24 size=478.45KB
+|     HDFS partitions=24/24 files=24 size=478.45KB
 |     runtime filters: RF000 -> functional.alltypes.id
 |     row-size=89B cardinality=7.30K
 |
 05:EXCHANGE [HASH(functional.alltypes.id)]
 |
 00:SCAN HDFS [functional.alltypes]
-   partitions=24/24 files=24 size=478.45KB
+   HDFS partitions=24/24 files=24 size=478.45KB
    runtime filters: RF000 -> functional.alltypes.id, RF002 -> functional.alltypes.id
    row-size=89B cardinality=7.30K
 ====
@@ -424,7 +424,7 @@ PLAN-ROOT SINK
 |  row-size=267B cardinality=14.60K
 |
 |--02:SCAN HDFS [functional.alltypes]
-|     partitions=24/24 files=24 size=478.45KB
+|     HDFS partitions=24/24 files=24 size=478.45KB
 |     row-size=89B cardinality=7.30K
 |
 03:HASH JOIN [LEFT OUTER JOIN]
@@ -432,11 +432,11 @@ PLAN-ROOT SINK
 |  row-size=178B cardinality=7.30K
 |
 |--01:SCAN HDFS [functional.alltypes]
-|     partitions=24/24 files=24 size=478.45KB
+|     HDFS partitions=24/24 files=24 size=478.45KB
 |     row-size=89B cardinality=7.30K
 |
 00:SCAN HDFS [functional.alltypes]
-   partitions=24/24 files=24 size=478.45KB
+   HDFS partitions=24/24 files=24 size=478.45KB
    row-size=89B cardinality=7.30K
 ---- DISTRIBUTEDPLAN
 PLAN-ROOT SINK
@@ -450,7 +450,7 @@ PLAN-ROOT SINK
 |--07:EXCHANGE [HASH(functional.alltypes.id)]
 |  |
 |  02:SCAN HDFS [functional.alltypes]
-|     partitions=24/24 files=24 size=478.45KB
+|     HDFS partitions=24/24 files=24 size=478.45KB
 |     row-size=89B cardinality=7.30K
 |
 03:HASH JOIN [LEFT OUTER JOIN, PARTITIONED]
@@ -460,13 +460,13 @@ PLAN-ROOT SINK
 |--06:EXCHANGE [HASH(functional.alltypes.id)]
 |  |
 |  01:SCAN HDFS [functional.alltypes]
-|     partitions=24/24 files=24 size=478.45KB
+|     HDFS partitions=24/24 files=24 size=478.45KB
 |     row-size=89B cardinality=7.30K
 |
 05:EXCHANGE [HASH(functional.alltypes.id)]
 |
 00:SCAN HDFS [functional.alltypes]
-   partitions=24/24 files=24 size=478.45KB
+   HDFS partitions=24/24 files=24 size=478.45KB
    row-size=89B cardinality=7.30K
 ====
 # Self-join of view to make sure join hints are properly set
@@ -485,7 +485,7 @@ PLAN-ROOT SINK
 |  row-size=267B cardinality=7.30K
 |
 |--02:SCAN HDFS [functional.alltypes]
-|     partitions=24/24 files=24 size=478.45KB
+|     HDFS partitions=24/24 files=24 size=478.45KB
 |     row-size=89B cardinality=7.30K
 |
 03:HASH JOIN [INNER JOIN]
@@ -494,12 +494,12 @@ PLAN-ROOT SINK
 |  row-size=178B cardinality=7.30K
 |
 |--01:SCAN HDFS [functional.alltypes]
-|     partitions=24/24 files=24 size=478.45KB
+|     HDFS partitions=24/24 files=24 size=478.45KB
 |     runtime filters: RF000 -> functional.alltypes.id
 |     row-size=89B cardinality=7.30K
 |
 00:SCAN HDFS [functional.alltypes]
-   partitions=24/24 files=24 size=478.45KB
+   HDFS partitions=24/24 files=24 size=478.45KB
    runtime filters: RF000 -> functional.alltypes.id, RF002 -> functional.alltypes.id
    row-size=89B cardinality=7.30K
 ---- DISTRIBUTEDPLAN
@@ -515,7 +515,7 @@ PLAN-ROOT SINK
 |--07:EXCHANGE [HASH(functional.alltypes.id)]
 |  |
 |  02:SCAN HDFS [functional.alltypes]
-|     partitions=24/24 files=24 size=478.45KB
+|     HDFS partitions=24/24 files=24 size=478.45KB
 |     row-size=89B cardinality=7.30K
 |
 06:EXCHANGE [HASH(functional.alltypes.id)]
@@ -528,12 +528,12 @@ PLAN-ROOT SINK
 |--05:EXCHANGE [BROADCAST]
 |  |
 |  01:SCAN HDFS [functional.alltypes]
-|     partitions=24/24 files=24 size=478.45KB
+|     HDFS partitions=24/24 files=24 size=478.45KB
 |     runtime filters: RF000 -> functional.alltypes.id
 |     row-size=89B cardinality=7.30K
 |
 00:SCAN HDFS [functional.alltypes]
-   partitions=24/24 files=24 size=478.45KB
+   HDFS partitions=24/24 files=24 size=478.45KB
    runtime filters: RF000 -> functional.alltypes.id, RF002 -> functional.alltypes.id
    row-size=89B cardinality=7.30K
 ====
@@ -545,7 +545,7 @@ PLAN-ROOT SINK
 |
 00:SCAN HDFS [functional.alltypes]
    partition predicates: `year` = 2009, `month` = 1
-   partitions=1/24 files=1 size=19.95KB
+   HDFS partitions=1/24 files=1 size=19.95KB
    predicates: (int_col < 100 OR bool_col = FALSE)
    row-size=89B cardinality=31
 ---- DISTRIBUTEDPLAN
@@ -555,7 +555,7 @@ PLAN-ROOT SINK
 |
 00:SCAN HDFS [functional.alltypes]
    partition predicates: `year` = 2009, `month` = 1
-   partitions=1/24 files=1 size=19.95KB
+   HDFS partitions=1/24 files=1 size=19.95KB
    predicates: (int_col < 100 OR bool_col = FALSE)
    row-size=89B cardinality=31
 ====
@@ -566,7 +566,7 @@ select bool_col FROM ( SELECT bool_col FROM functional.alltypes t ) t WHERE t.bo
 PLAN-ROOT SINK
 |
 00:SCAN HDFS [functional.alltypes t]
-   partitions=24/24 files=24 size=478.45KB
+   HDFS partitions=24/24 files=24 size=478.45KB
    predicates: bool_col
    row-size=1B cardinality=730
 ---- DISTRIBUTEDPLAN
@@ -575,7 +575,7 @@ PLAN-ROOT SINK
 01:EXCHANGE [UNPARTITIONED]
 |
 00:SCAN HDFS [functional.alltypes t]
-   partitions=24/24 files=24 size=478.45KB
+   HDFS partitions=24/24 files=24 size=478.45KB
    predicates: bool_col
    row-size=1B cardinality=730
 ====
