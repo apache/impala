@@ -346,7 +346,7 @@ int64_t BlockingJoinNode::LocalTimeCounterFn(const RuntimeProfile::Counter* tota
     const RuntimeProfile::Counter* right_child_time,
     const MonotonicStopWatch* child_overlap_timer) {
   int64_t local_time = total_time->value() - left_child_time->value() -
-      (right_child_time->value() - child_overlap_timer->TotalElapsedTime());
+      (right_child_time->value() - child_overlap_timer->ElapsedTime());
   // While the calculation is correct at the end of the execution, counter value
   // and the stop watch reading is not accurate during execution.
   // If the child time counter is updated before the parent time counter, then the child

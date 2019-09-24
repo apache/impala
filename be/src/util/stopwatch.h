@@ -59,20 +59,14 @@ class StopWatch {
   }
 
   void Stop() {
-    if (running_) {
-      total_time_ += Rdtsc() - start_;
-      running_ = false;
-    }
+    total_time_ += RunningTime();
+    running_ = false;
   }
 
-  /// Returns time in cpu ticks.
+  /// Returns total time in cpu ticks for which the stopwatch was running, including
+  /// the time since Start() was called, if it is currently running.
   uint64_t ElapsedTime() const {
-    return running_ ? Rdtsc() - start_ : total_time_;
-  }
-
-  /// Returns the total time accumulated
-  uint64_t TotalElapsedTime() const {
-    return total_time_ + (running_ ? Rdtsc() - start_ : 0);
+    return total_time_ + RunningTime();
   }
 
   static uint64_t Rdtsc() {
@@ -85,6 +79,11 @@ class StopWatch {
   }
 
  private:
+  /// Returns total time in cpu ticks since Start() was called. If not running, returns 0.
+  uint64_t RunningTime() const {
+    return running_ ? Rdtsc() - start_ : 0;
+  }
+
   uint64_t start_, total_time_;
   bool running_;
 };
@@ -113,10 +112,8 @@ class MonotonicStopWatch {
   }
 
   void Stop() {
-    if (running_) {
-      total_time_ += ElapsedTime();
-      running_ = false;
-    }
+    total_time_ += RunningTime();
+    running_ = false;
   }
 
   /// Set the time ceiling of the stop watch to Now(). The stop watch won't run past the
@@ -125,7 +122,7 @@ class MonotonicStopWatch {
 
   /// Restarts the timer. Returns the elapsed time until this point.
   uint64_t Reset() {
-    uint64_t ret = ElapsedTime();
+    uint64_t ret = RunningTime();
     if (running_) {
       start_ = Now();
       time_ceiling_ = 0;
@@ -133,16 +130,10 @@ class MonotonicStopWatch {
     return ret;
   }
 
-  /// Returns time in nanosecond.
+  /// Returns total time in nanoseconds for which the stopwatch was running, including
+  /// the time since Start() was called, if it is currently running.
   uint64_t ElapsedTime() const {
-    if (running_) return RunningTime();
-    return total_time_;
-  }
-
-  /// Returns the total time accumulated
-  uint64_t TotalElapsedTime() const {
-    if (running_) return total_time_ + RunningTime();
-    return total_time_;
+    return total_time_ + RunningTime();
   }
 
   /// Returns an representation of the current time in nanoseconds. It can be used to
@@ -176,9 +167,10 @@ class MonotonicStopWatch {
   /// True if stopwatch is running.
   bool running_;
 
-  /// Returns the time since start.
+  /// Returns the time since Start() was called, if running. Otherwise return 0.
   /// If time_ceiling_ is set, the stop watch won't run pass the ceiling.
   uint64_t RunningTime() const {
+    if (!running_) return 0;
     uint64_t end = Now();
     if (time_ceiling_ > 0) {
       if (time_ceiling_ < start_) return 0;
@@ -221,13 +213,13 @@ class ConcurrentStopWatch {
   /// Returns delta wall time since last time LapTime() is called.
   uint64_t LapTime() {
     boost::lock_guard<SpinLock> l(thread_counter_lock_);
-    uint64_t now = msw_.TotalElapsedTime();
+    uint64_t now = msw_.ElapsedTime();
     uint64_t lap_duration = now - last_lap_start_;
     last_lap_start_ = now;
     return lap_duration;
   }
 
-  uint64_t TotalRunningTime() const {  return msw_.TotalElapsedTime(); }
+  uint64_t TotalRunningTime() const {  return msw_.ElapsedTime(); }
 
  private:
   MonotonicStopWatch msw_;
