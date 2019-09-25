@@ -503,6 +503,23 @@ static int SaslGetPath(void* context, const char** path) {
   return SASL_OK;
 }
 
+bool CookieAuth(ThriftServer::ConnectionContext* connection_context,
+    const AuthenticationHash& hash, const std::string& cookie_header) {
+  string username;
+  Status cookie_status = AuthenticateCookie(hash, cookie_header, &username);
+  if (cookie_status.ok()) {
+    connection_context->username = username;
+    return true;
+  }
+
+  LOG(INFO) << "Invalid cookie provided: " << cookie_header
+            << " from: " << TNetworkAddressToString(connection_context->network_address)
+            << ": " << cookie_status.GetDetail();
+  connection_context->return_headers.push_back(
+      Substitute("Set-Cookie: $0", GetDeleteCookie()));
+  return false;
+}
+
 bool BasicAuth(ThriftServer::ConnectionContext* connection_context,
     const AuthenticationHash& hash, const std::string& base64) {
   if (base64.empty()) {
@@ -1062,8 +1079,8 @@ void SecureAuthProvider::SetupConnectionContext(
       callbacks.path_fn = std::bind(
           HttpPathFn, connection_ptr.get(), std::placeholders::_1, std::placeholders::_2);
       callbacks.return_headers_fn = std::bind(ReturnHeaders, connection_ptr.get());
-      callbacks.cookie_auth_fn = std::bind(
-          AuthenticateCookie, connection_ptr.get(), hash_, std::placeholders::_1);
+      callbacks.cookie_auth_fn =
+          std::bind(CookieAuth, connection_ptr.get(), hash_, std::placeholders::_1);
       if (has_ldap_) {
         callbacks.basic_auth_fn =
             std::bind(BasicAuth, connection_ptr.get(), hash_, std::placeholders::_1);

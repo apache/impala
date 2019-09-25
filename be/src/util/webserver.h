@@ -26,7 +26,9 @@
 #include "common/status.h"
 #include "kudu/util/web_callback_registry.h"
 #include "thirdparty/squeasel/squeasel.h"
+#include "util/metrics-fwd.h"
 #include "util/network-util.h"
+#include "util/openssl-util.h"
 
 namespace impala {
 
@@ -82,10 +84,10 @@ class Webserver {
 
   /// Using this constructor, the webserver will bind to 'interface', or all available
   /// interfaces if not specified.
-  Webserver(const std::string& interface, const int port);
+  Webserver(const std::string& interface, const int port, MetricGroup* metrics);
 
   /// Uses FLAGS_webserver_{port, interface}
-  Webserver();
+  Webserver(MetricGroup* metrics);
 
   ~Webserver();
 
@@ -184,9 +186,8 @@ class Webserver {
   // Handle SPNEGO authentication for this request. Returns SQ_CONTINUE_HANDLING
   // if authentication was successful, otherwise responds to the request and
   // returns SQ_HANDLED_OK.
-  sq_callback_result_t HandleSpnego(
-      struct sq_connection* connection,
-      struct sq_request_info* request_info);
+  sq_callback_result_t HandleSpnego(struct sq_connection* connection,
+      struct sq_request_info* request_info, std::vector<std::string>* response_headers);
 
   /// Renders URLs through the Mustache templating library.
   /// - Default ContentType is HTML.
@@ -233,6 +234,22 @@ class Webserver {
 
   /// Catch-all handler for error messages
   UrlHandler error_handler_;
+
+  /// Used to generate and verify signatures for cookies.
+  AuthenticationHash hash_;
+
+  /// If true and SPNEGO is in use, cookies will be used for authentication.
+  bool use_cookies_;
+
+  /// If 'FLAGS_webserver_require_spnego' is true, metrics for the number of successful
+  /// and failed Negotiate auth attempts.
+  IntCounter* total_negotiate_auth_success_ = nullptr;
+  IntCounter* total_negotiate_auth_failure_ = nullptr;
+
+  /// If 'use_cookies_' is true, metrics for the number of successful and failed cookie
+  /// auth attempts.
+  IntCounter* total_cookie_auth_success_ = nullptr;
+  IntCounter* total_cookie_auth_failure_ = nullptr;
 };
 
 }

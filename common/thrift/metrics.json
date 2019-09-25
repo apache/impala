@@ -2530,5 +2530,53 @@
   "units": "UNIT",
   "kind": "GAUGE",
   "key": "admission-controller.executor-group.num-queries-executing.$0"
+  },
+  {
+    "description": "The number of HTTP connection requests to this daemon's webserver that were successfully authenticated with Kerberos",
+    "contexts": [
+      "IMPALAD",
+      "CATALOGSERVER",
+      "STATESTORE"
+    ],
+    "label": "Webserver HTTP Connection Kerberos Auth Success",
+    "units": "NONE",
+    "kind": "COUNTER",
+    "key": "impala.webserver.total-negotiate-auth-success"
+  },
+  {
+    "description": "The number of HTTP connection requests to this daemon's webserver that attempted to authenticate with Kerberos but were unsuccessful.",
+    "contexts": [
+      "IMPALAD",
+      "CATALOGSERVER",
+      "STATESTORE"
+    ],
+    "label": "Webserver HTTP Connection Kerberos Auth Failure",
+    "units": "NONE",
+    "kind": "COUNTER",
+    "key": "impala.webserver.total-negotiate-auth-failure"
+  },
+    {
+    "description": "The number of HTTP connection requests to this daemon's webserver that were successfully authenticated using a cookie.",
+    "contexts": [
+      "IMPALAD",
+      "CATALOGSERVER",
+      "STATESTORE"
+    ],
+    "label": "Webserver HTTP Connection Cookie Auth Success",
+    "units": "NONE",
+    "kind": "COUNTER",
+    "key": "impala.webserver.total-cookie-auth-success"
+  },
+  {
+    "description": "The number of HTTP connection requests to this daemon's webserver that provided an invalid cookie.",
+    "contexts": [
+      "IMPALAD",
+      "CATALOGSERVER",
+      "STATESTORE"
+    ],
+    "label": "Webserver HTTP Connection Cookie Auth Failure",
+    "units": "NONE",
+    "kind": "COUNTER",
+    "key": "impala.webserver.total-cookie-auth-failure"
   }
 ]

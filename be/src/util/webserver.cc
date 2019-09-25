@@ -40,6 +40,7 @@
 #include "kudu/util/logging.h"
 #include "kudu/util/net/sockaddr.h"
 #include "kudu/security/gssapi.h"
+#include "rpc/cookie-util.h"
 #include "rpc/thrift-util.h"
 #include "runtime/exec-env.h"
 #include "service/impala-server.h"
@@ -50,6 +51,7 @@
 #include "util/debug-util.h"
 #include "util/disk-info.h"
 #include "util/mem-info.h"
+#include "util/metrics.h"
 #include "util/os-info.h"
 #include "util/os-util.h"
 #include "util/pretty-printer.h"
@@ -116,6 +118,7 @@ DEFINE_bool(webserver_require_spnego, false,
             "using SPNEGO.");
 
 DECLARE_bool(is_coordinator);
+DECLARE_int64(max_cookie_lifetime_s);
 DECLARE_string(ssl_minimum_version);
 DECLARE_string(ssl_cipher_list);
 
@@ -174,18 +177,20 @@ string HttpStatusCodeToString(HttpStatusCode code) {
   return "";
 }
 
-
-void SendPlainResponse(struct sq_connection* connection,
-                       const string& response_code_line,
-                       const string& content,
-                       const vector<string>& header_lines) {
+void SendResponse(struct sq_connection* connection, const string& response_code_line,
+    const string& context_type, const string& content,
+    const vector<string>& header_lines) {
   sq_printf(connection, "HTTP/1.1 %s\r\n", response_code_line.c_str());
   for (const auto& h : header_lines) {
     sq_printf(connection, "%s\r\n", h.c_str());
   }
-  sq_printf(connection, "Content-Type: text/plain\r\n");
-  sq_printf(connection, "Content-Length: %zd\r\n\r\n", content.size());
-  sq_printf(connection, "%s", content.c_str());
+  sq_printf(connection,
+      "X-Frame-Options: %s\r\n"
+      "Content-Type: %s\r\n"
+      "Content-Length: %zd\r\n\r\n",
+      FLAGS_webserver_x_frame_options.c_str(), context_type.c_str(), content.size());
+  // Make sure to use sq_write for printing the body; sq_printf truncates at 8kb
+  sq_write(connection, content.c_str(), content.length());
 }
 
 // Return the address of the remote user from the squeasel request info.
@@ -202,15 +207,15 @@ kudu::Sockaddr GetRemoteAddress(const struct sq_request_info* req) {
 // 'authz_header' and running it through GSSAPI. If authentication fails or the header
 // is invalid, a bad Status will be returned (and the other out-parameters left
 // untouched).
-kudu::Status RunSpnegoStep(const char* authz_header, string* resp_header,
-                     string* authn_user) {
+kudu::Status RunSpnegoStep(
+    const char* authz_header, vector<string>* response_headers, string* authn_user) {
   string neg_token;
   if (authz_header && !TryStripPrefixString(authz_header, "Negotiate ", &neg_token)) {
     return kudu::Status::InvalidArgument("bad Negotiate header");
   }
 
   if (!authz_header) {
-    *resp_header = "WWW-Authenticate: Negotiate";
+    response_headers->push_back("WWW-Authenticate: Negotiate");
     return kudu::Status::Incomplete("authn incomplete");
   }
 
@@ -220,33 +225,37 @@ kudu::Status RunSpnegoStep(const char* authz_header, string* resp_header,
       neg_token, &resp_token_b64, &is_complete, authn_user));
 
   if (!resp_token_b64.empty()) {
-    *resp_header = Substitute("WWW-Authenticate: Negotiate $0", resp_token_b64);
+    response_headers->push_back(
+        Substitute("WWW-Authenticate: Negotiate $0", resp_token_b64));
   }
    return is_complete ? kudu::Status::OK() : kudu::Status::Incomplete("authn incomplete");
 }
 
 } // anonymous namespace
 
-// Builds a valid HTTP header given the response code and a content type.
-string BuildHeaderString(HttpStatusCode response, ContentType content_type) {
-  static const string RESPONSE_TEMPLATE = "HTTP/1.1 $0\r\n"
-      "Content-Type: $1\r\n"
-      "Content-Length: %d\r\n"
-      "X-Frame-Options: $2\r\n"
-      "\r\n";
+Webserver::Webserver(MetricGroup* metrics)
+  : Webserver(FLAGS_webserver_interface, FLAGS_webserver_port, metrics) {}
 
-  return Substitute(RESPONSE_TEMPLATE, HttpStatusCodeToString(response),
-      Webserver::GetMimeType(content_type), FLAGS_webserver_x_frame_options.c_str());
-}
-
-Webserver::Webserver() : Webserver(FLAGS_webserver_interface, FLAGS_webserver_port) {}
-
-Webserver::Webserver(const string& interface, const int port)
-    : context_(nullptr),
-      error_handler_(UrlHandler(bind<void>(&Webserver::ErrorHandler, this, _1, _2),
-          "error.tmpl", false)) {
+Webserver::Webserver(const string& interface, const int port, MetricGroup* metrics)
+  : context_(nullptr),
+    error_handler_(UrlHandler(
+        bind<void>(&Webserver::ErrorHandler, this, _1, _2), "error.tmpl", false)),
+    use_cookies_(FLAGS_max_cookie_lifetime_s > 0) {
   http_address_ = MakeNetworkAddress(interface.empty() ? "0.0.0.0" : interface, port);
   Init();
+
+  if (FLAGS_webserver_require_spnego) {
+    total_negotiate_auth_success_ =
+        metrics->AddCounter("impala.webserver.total-negotiate-auth-success", 0);
+    total_negotiate_auth_failure_ =
+        metrics->AddCounter("impala.webserver.total-negotiate-auth-failure", 0);
+    if (use_cookies_) {
+      total_cookie_auth_success_ =
+          metrics->AddCounter("impala.webserver.total-cookie-auth-success", 0);
+      total_cookie_auth_failure_ =
+          metrics->AddCounter("impala.webserver.total-cookie-auth-failure", 0);
+    }
+  }
 }
 
 Webserver::~Webserver() {
@@ -501,10 +510,51 @@ sq_callback_result_t Webserver::BeginRequestCallback(struct sq_connection* conne
     return SQ_CONTINUE_HANDLING;
   }
 
+  vector<string> response_headers;
   if (FLAGS_webserver_require_spnego){
-    sq_callback_result_t spnego_result = HandleSpnego(connection, request_info);
-    if (spnego_result != SQ_CONTINUE_HANDLING) {
-      return spnego_result;
+    bool authenticated = false;
+    // Try authenticating with a cookie first, if enabled.
+    if (use_cookies_) {
+      const char* cookie_header = sq_get_header(connection, "Cookie");
+      string username;
+      if (cookie_header != nullptr) {
+        Status cookie_status = AuthenticateCookie(hash_, cookie_header, &username);
+        if (cookie_status.ok()) {
+          authenticated = true;
+          request_info->remote_user = strdup(username.c_str());
+          total_cookie_auth_success_->Increment(1);
+        } else {
+          LOG(INFO) << "Invalid cookie provided: " << cookie_header << ": "
+                    << cookie_status.GetDetail();
+          response_headers.push_back(Substitute("Set-Cookie: $0", GetDeleteCookie()));
+          total_cookie_auth_failure_->Increment(1);
+        }
+      }
+    }
+
+    if (!authenticated) {
+      sq_callback_result_t spnego_result =
+          HandleSpnego(connection, request_info, &response_headers);
+      if (spnego_result == SQ_CONTINUE_HANDLING) {
+        // Spnego negotiation was successful.
+        if (use_cookies_) {
+          // If cookie auth failed above and we generated a 'delete cookie' header,
+          // remove it.
+          auto eq = [](const string& header) {
+            return header.rfind("Set-Cookie", 0) == 0;
+          };
+          auto it = find_if(response_headers.begin(), response_headers.end(), eq);
+          if (it != response_headers.end()) {
+            response_headers.erase(it);
+          }
+          // Generate a cookie to return.
+          response_headers.push_back(Substitute(
+              "Set-Cookie: $0", GenerateCookie(request_info->remote_user, hash_)));
+        }
+      } else {
+        // Spnego negotiation is incomplete or failed, stop processing the request.
+        return spnego_result;
+      }
     }
   }
 
@@ -594,32 +644,21 @@ sq_callback_result_t Webserver::BeginRequestCallback(struct sq_connection* conne
   VLOG(3) << "Rendering page " << request_info->uri << " took "
           << PrettyPrinter::Print(sw.ElapsedTime(), TUnit::TIME_NS);
 
-  const string& str = output.str();
+  SendResponse(connection, HttpStatusCodeToString(response),
+      Webserver::GetMimeType(content_type), output.str(), response_headers);
 
-  const string& headers = BuildHeaderString(response, content_type);
-
-  // printf with a non-literal format string is a security concern, but BuildHeaderString
-  // returns a limited set of strings and all members of that set are safe.
-#pragma clang diagnostic push
-#pragma clang diagnostic ignored "-Wformat-nonliteral"
-  sq_printf(connection, headers.c_str(), (int)str.length());
-#pragma clang diagnostic pop
-
-  // Make sure to use sq_write for printing the body; sq_printf truncates at 8kb
-  sq_write(connection, str.c_str(), str.length());
   return SQ_HANDLED_OK;
 }
 
-sq_callback_result_t Webserver::HandleSpnego(
-    struct sq_connection* connection,
-    struct sq_request_info* request_info) {
+sq_callback_result_t Webserver::HandleSpnego(struct sq_connection* connection,
+    struct sq_request_info* request_info, vector<string>* response_headers) {
   const char* authz_header = sq_get_header(connection, "Authorization");
-  string resp_header, authn_princ;
-  kudu::Status s = RunSpnegoStep(authz_header, &resp_header, &authn_princ);
+  string authn_princ;
+  kudu::Status s = RunSpnegoStep(authz_header, response_headers, &authn_princ);
   if (s.IsIncomplete()) {
-    SendPlainResponse(connection, "401 Authentication Required",
-                      "Must authenticate with SPNEGO.",
-                      { resp_header });
+    SendResponse(connection, "401 Authentication Required", "text/plain",
+        "Must authenticate with SPNEGO.", *response_headers);
+    total_negotiate_auth_failure_->Increment(1);
     return SQ_HANDLED_OK;
   }
   if (s.ok() && authn_princ.empty()) {
@@ -638,57 +677,14 @@ sq_callback_result_t Webserver::HandleSpnego(
     const char* http_status = s.IsNotAuthorized() ? "401 Authentication Required" :
         "500 Internal Server Error";
 
-    SendPlainResponse(connection, http_status, s.ToString(), {});
+    SendResponse(connection, http_status, "text/plain", s.ToString(), *response_headers);
+    total_negotiate_auth_failure_->Increment(1);
     return SQ_HANDLED_OK;
   }
 
-
   request_info->remote_user = strdup(authn_princ.c_str());
 
-  // NOTE: According to the SPNEGO RFC (https://tools.ietf.org/html/rfc4559) it
-  // is possible that a non-empty token will be returned along with the HTTP 200
-  // response:
-  //
-  //     A status code 200 status response can also carry a "WWW-Authenticate"
-  //     response header containing the final leg of an authentication.  In
-  //     this case, the gssapi-data will be present.  Before using the
-  //     contents of the response, the gssapi-data should be processed by
-  //     gss_init_security_context to determine the state of the security
-  //     context.  If this function indicates success, the response can be
-  //     used by the application.  Otherwise, an appropriate action, based on
-  //     the authentication status, should be taken.
-  //
-  //     For example, the authentication could have failed on the final leg if
-  //     mutual authentication was requested and the server was not able to
-  //     prove its identity.  In this case, the returned results are suspect.
-  //     It is not always possible to mutually authenticate the server before
-  //     the HTTP operation.  POST methods are in this category.
-  //
-  // In fact, from inspecting the MIT krb5 source code, it appears that this
-  // only happens when the client requests mutual authentication by passing
-  // 'GSS_C_MUTUAL_FLAG' when establishing its side of the protocol. In practice,
-  // this seems to be widely unimplemented:
-  //
-  // - curl has some source code to support GSS_C_MUTUAL_FLAG, but in order to
-  //   enable it, you have to modify a FALSE constant to TRUE and recompile curl.
-  //   In fact, it was broken for all of 2015 without anyone noticing (see curl
-  //   commit 73f1096335d468b5be7c3cc99045479c3314f433)
-  //
-  // - Chrome doesn't support mutual auth at all -- see DelegationTypeToFlag(...)
-  //   in src/net/http/http_auth_gssapi_posix.cc.
-  //
-  // In practice, users depend on TLS to authenticate the server, and SPNEGO
-  // is used to authenticate the client.
-  //
-  // Given this, and because actually sending back the token on an OK response
-  // would require significant code restructuring (eg buffering the header until
-  // after the response handler has run) we just ignore any response token, but
-  // log a periodic warning just in case it turns out we're wrong about the above.
-  if (!resp_header.empty()) {
-    KLOG_EVERY_N_SECS(WARNING, 5) << "ignoring SPNEGO token on HTTP 200 response "
-                                  << "for user " << authn_princ << " at host "
-                                  << GetRemoteAddress(request_info).ToString();
-  }
+  total_negotiate_auth_success_->Increment(1);
   return SQ_CONTINUE_HANDLING;
 }
 

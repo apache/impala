@@ -49,8 +49,8 @@ int StatestoredMain(int argc, char** argv) {
   FLAGS_webserver_port = 25010;
   InitCommonRuntime(argc, argv, false);
 
-  scoped_ptr<Webserver> webserver(new Webserver());
   scoped_ptr<MetricGroup> metrics(new MetricGroup("statestore"));
+  scoped_ptr<Webserver> webserver(new Webserver(metrics.get()));
 
   if (FLAGS_enable_webserver) {
     AddDefaultUrlCallbacks(webserver.get(), metrics.get());

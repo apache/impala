@@ -62,8 +62,8 @@ int CatalogdMain(int argc, char** argv) {
   InitCommonRuntime(argc, argv, true);
   InitFeSupport();
 
-  scoped_ptr<Webserver> webserver(new Webserver());
   scoped_ptr<MetricGroup> metrics(new MetricGroup("catalog"));
+  scoped_ptr<Webserver> webserver(new Webserver(metrics.get()));
 
   if (FLAGS_enable_webserver) {
     AddDefaultUrlCallbacks(webserver.get(), metrics.get());

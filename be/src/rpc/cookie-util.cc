@@ -41,7 +41,7 @@ static const string COOKIE_SEPARATOR = "&";
 
 // Cookies generated and processed by the HTTP server will be of the form:
 // COOKIE_NAME=<cookie>
-static const string COOKIE_NAME = "impala.hs2.auth";
+static const string COOKIE_NAME = "impala.auth";
 
 // The maximum lenth for the base64 encoding of a SHA256 hash.
 static const int SHA256_BASE64_LEN =
@@ -53,9 +53,8 @@ static const int SHA256_BASE64_LEN =
 // find the first one with COOKIE_NAME.
 static const int MAX_COOKIES_TO_CHECK = 5;
 
-bool AuthenticateCookie(ThriftServer::ConnectionContext* connection_context,
-    const AuthenticationHash& hash, const string& cookie_header) {
-  string error_str = "";
+Status AuthenticateCookie(
+    const AuthenticationHash& hash, const string& cookie_header, string* username) {
   // The 'Cookie' header allows sending multiple name/value pairs separated by ';'.
   vector<string> cookies = strings::Split(cookie_header, ";");
   if (cookies.size() > MAX_COOKIES_TO_CHECK) {
@@ -68,64 +67,55 @@ bool AuthenticateCookie(ThriftServer::ConnectionContext* connection_context,
     StripWhiteSpace(&cookie_pair);
     string cookie;
     if (!TryStripPrefixString(cookie_pair, StrCat(COOKIE_NAME, "="), &cookie)) {
-      error_str = Substitute("Did not find expected cookie name: $0", COOKIE_NAME);
       continue;
+    }
+    if (cookie[0] == '"' && cookie[cookie.length() - 1] == '"') {
+      cookie = cookie.substr(1, cookie.length() - 2);
     }
     // Split the cookie into the signature and the cookie value.
     vector<string> cookie_split = Split(cookie, delimiter::Limit(COOKIE_SEPARATOR, 1));
     if (cookie_split.size() != 2) {
-      error_str = "The cookie has an invalid format.";
-      goto error;
+      return Status("The cookie has an invalid format.");
     }
     const string& base64_signature = cookie_split[0];
     const string& cookie_value = cookie_split[1];
 
     string signature;
     if (!WebSafeBase64Unescape(base64_signature, &signature)) {
-      error_str = "Unable to decode base64 signature.";
-      goto error;
+      return Status("Unable to decode base64 signature.");
     }
     if (signature.length() != AuthenticationHash::HashLen()) {
-      error_str = "Signature is an incorrect length.";
-      goto error;
+      return Status("Signature is an incorrect length.");
     }
     bool verified = hash.Verify(reinterpret_cast<const uint8_t*>(cookie_value.data()),
         cookie_value.length(), reinterpret_cast<const uint8_t*>(signature.data()));
     if (!verified) {
-      error_str = "The signature is incorrect.";
-      goto error;
+      return Status("The signature is incorrect.");
     }
 
     // Split the cookie value into username, timestamp, and random number.
     vector<string> cookie_value_split = Split(cookie_value, COOKIE_SEPARATOR);
     if (cookie_value_split.size() != 3) {
-      error_str = "The cookie value has an invalid format.";
-      goto error;
+      return Status("The cookie value has an invalid format.");
     }
     StringParser::ParseResult result;
     int64_t create_time = StringParser::StringToInt<int64_t>(
         cookie_value_split[1].c_str(), cookie_value_split[1].length(), &result);
     if (result != StringParser::PARSE_SUCCESS) {
-      error_str = "Could not parse cookie timestamp.";
-      goto error;
+      return Status("Could not parse cookie timestamp.");
     }
     // Check that the timestamp contained in the cookie is recent enough for the cookie
     // to still be valid.
     if (MonotonicMillis() - create_time <= FLAGS_max_cookie_lifetime_s * 1000) {
       // We've successfully authenticated.
-      connection_context->username = cookie_value_split[0];
-      return true;
+      *username = cookie_value_split[0];
+      return Status::OK();
     } else {
-      error_str = "Cookie is past its max lifetime.";
-      goto error;
+      return Status("Cookie is past its max lifetime.");
     }
   }
 
-error:
-  LOG(INFO) << "Invalid cookie provided: " << cookie_header
-            << " from: " << TNetworkAddressToString(connection_context->network_address)
-            << ": " << error_str;
-  return false;
+  return Status(Substitute("Did not find expected cookie name: $0", COOKIE_NAME));
 }
 
 string GenerateCookie(const string& username, const AuthenticationHash& hash) {
@@ -155,8 +145,12 @@ string GenerateCookie(const string& username, const AuthenticationHash& hash) {
     // connections. This is for testing only.
     secure_flag = "";
   }
-  return Substitute("$0=$1$2$3;HttpOnly;MaxAge=$4$5", COOKIE_NAME, base64_signature,
+  return Substitute("$0=$1$2$3;HttpOnly;Max-Age=$4$5", COOKIE_NAME, base64_signature,
       COOKIE_SEPARATOR, cookie_value, FLAGS_max_cookie_lifetime_s, secure_flag);
+}
+
+string GetDeleteCookie() {
+  return Substitute("$0=;HttpOnly;Max-Age=0", COOKIE_NAME);
 }
 
 } // namespace impala

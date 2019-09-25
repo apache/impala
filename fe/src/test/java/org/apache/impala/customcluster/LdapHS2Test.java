@@ -223,6 +223,7 @@ public class LdapHS2Test {
         "invalid-format", // invalid cookie format
         "x&impala&0&0", // signature value that is invalid base64
         "eA==&impala&0&0", // signature decodes to an incorrect length
+        "\"eA==&impala&0&0\"", // signature decodes to an incorrect length
         "eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHg=&impala&0&0" // incorrect signature
     };
     for (String cookieStr : badCookies) {
