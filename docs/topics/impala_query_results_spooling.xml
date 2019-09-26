@@ -1,0 +1,131 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!--
+Licensed to the Apache Software Foundation (ASF) under one
+or more contributor license agreements.  See the NOTICE file
+distributed with this work for additional information
+regarding copyright ownership.  The ASF licenses this file
+to you under the Apache License, Version 2.0 (the
+"License"); you may not use this file except in compliance
+with the License.  You may obtain a copy of the License at
+
+  http://www.apache.org/licenses/LICENSE-2.0
+
+Unless required by applicable law or agreed to in writing,
+software distributed under the License is distributed on an
+"AS IS" BASIS, WITHOUT WARRANTIES OR CONDITIONS OF ANY
+KIND, either express or implied.  See the License for the
+specific language governing permissions and limitations
+under the License.
+-->
+<!DOCTYPE concept PUBLIC "-//OASIS//DTD DITA Concept//EN" "concept.dtd">
+<concept id="data_sink">
+  <title>Spooling Impala Query Results</title>
+  <conbody>
+    <p>In Impala, you can control how query results are materialized and
+      returned to clients, e.g. impala-shell, Hue, JDBC apps.</p>
+    <ul>
+      <li>When query result spooling is disabled, Impala relies on clients to
+        fetch results to trigger the generation of more result row batches until
+        all the result rows have been produced. If a client issues a query
+        without fetching all the results, the query fragments continue to
+        consume the resources until the query is cancelled and unregistered,
+        potentially tying up resources and causing other queries to wait for an
+        extended period of time in admission control.<p>Impala would materialize
+          rows on-demand where rows are created only when the client requests
+          them.</p></li>
+      <li>When query result spooling is enabled, result sets of queries are
+        eagerly fetched and spooled in the spooling location, either in memory
+        or on disk. <p>Once all result rows have been fetched and stored in the
+          spooling location, the resources are freed up. Incoming client fetches
+          can get the data from the spooled results.</p></li>
+    </ul>
+    <p>Result spooling is turned off by default, but can be enabled via the
+        <codeph>SPOOL_QUERY_RESULTS</codeph> query option.</p>
+    <section id="section_av4_hsy_2jb">
+      <title>Admission Control and Result Spooling</title>
+      <p>Query results spooling collects and stores query results in memory that
+        is controlled by admission control. Use the following query options to
+        calibrate how much memory to use and when to spill to disk.<dl>
+          <dlentry>
+            <dt>MAX_RESULT_SPOOLING_MEM</dt>
+            <dd>
+              <p>The maximum amount of memory used when spooling query results.
+                If this value is exceeded when spooling results, all memory will
+                most likely be spilled to disk. Set to 100 MB by default. </p>
+            </dd>
+          </dlentry>
+          <dlentry>
+            <dt>MAX_SPILLED_RESULT_SPOOLING_MEM</dt>
+            <dd>
+              <p>The maximum amount of memory that can be spilled to disk when
+                spooling query results. Must be greater than or equal to
+                  <codeph>MAX_RESULT_SPOOLING_MEM</codeph>. If this value is
+                exceeded, the coordinator fragment will block until the client
+                has consumed enough rows to free up more memory. Set to 1 GB by
+                default.</p>
+            </dd>
+          </dlentry>
+        </dl></p>
+    </section>
+    <section id="section_oh2_fsy_2jb">
+      <title>Fetch Timeout</title>
+      <p>Resources for a query are released when the query completes its
+        execution. To prevent clients from indefinitely waiting for query
+        results, use the <codeph>FETCH_ROWS_TIMEOUT_MS</codeph> query option to
+        set the timeout when clients fetch rows. Timeout applies both when query
+        result spooling is enabled and disabled:<ul>
+          <li>When result spooling is disabled (<codeph>SPOOL_QUERY_RESULTS =
+              FALSE</codeph>), the timeout controls how long a client waits for
+            a single row batch to be produced by the coordinator. </li>
+          <li>When result spooling is enabled ( (<codeph>SPOOL_QUERY_RESULTS =
+              TRUE</codeph>), a client can fetch multiple row batches at a time,
+            so this timeout controls the total time a client waits for row
+            batches to be produced.</li>
+        </ul></p>
+    </section>
+    <section id="section_ahm_bsy_2jb">
+      <title>Explain Plans</title>
+      <p>Below is the part of the <codeph>EXPLAIN</codeph> plan output for
+        result spooling.<codeblock>F01:PLAN FRAGMENT [UNPARTITIONED] hosts=1 instances=1
+|  Per-Host Resources: mem-estimate=4.02MB mem-reservation=4.00MB thread-reservation=1
+PLAN-ROOT SINK
+|  mem-estimate=4.00MB mem-reservation=4.00MB spill-buffer=2.00MB thread-reservation=0</codeblock><ul>
+          <li>The <codeph>mem-estimate</codeph> for the <codeph>PLAN-ROOT
+              SINK</codeph> is an estimate of the amount of memory needed to
+            spool all the rows returned by the query.</li>
+          <li>The <codeph>mem-reservation</codeph> is the number and size of the
+            buffers necessary to spool the query results. By default, the read
+            and write buffers are 2 MB in size each, which is why the default is
+            4 MB.</li>
+        </ul></p>
+    </section>
+    <section id="section_ovl_ksy_2jb">
+      <title>PlanRootSink</title>
+      <p dir="ltr">In Impala, the <codeph>PlanRootSink</codeph> class controls
+        the passing of batches of rows to the clients and acts as a queue of
+        rows to be sent to clients.</p>
+      <p>
+        <ul>
+          <li>
+            <p>When result spooling is disabled, a single batch or rows is sent
+              to the <codeph>PlanRootSink</codeph>, and then the client must
+              consume that batch before another one can be sent.</p>
+          </li>
+          <li>
+            <p>When result spooling is enabled, multiple batches of rows can be
+              sent to the <codeph>PlanRootSink</codeph>, and multiple batches
+              can be consumed by the client.</p>
+          </li>
+        </ul>
+      </p>
+    </section>
+    <section>
+      <p><b>Related information:</b>
+        <xref href="impala_max_result_spooling_mem.xml#MAX_RESULT_SPOOLING_MEM"
+        />, <xref
+          href="impala_max_spilled_result_spooling_mem.xml#MAX_SPILLED_RESULT_SPOOLING_MEM"
+        />, <xref href="impala_spool_query_results.xml#SPOOL_QUERY_RESULTS"
+        /></p>
+    </section>
+  </conbody>
+</concept>

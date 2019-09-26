@@ -21,6 +21,9 @@ under the License.
 <concept id="intro_client">
 
   <title>Impala Client Access</title>
+  <titlealts audience="PDF">
+    <navtitle>Client Access</navtitle>
+  </titlealts>
 
   <conbody>
 

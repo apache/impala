@@ -194,6 +194,7 @@ under the License.
           <topicref href="topics/impala_exec_single_node_rows_threshold.xml"/>
           <topicref href="topics/impala_exec_time_limit_s.xml"/>
           <topicref href="topics/impala_explain_level.xml"/>
+          <topicref href="topics/impala_fetch_rows_timeout_ms.xml"/>
           <topicref href="topics/impala_hbase_cache_blocks.xml"/>
           <topicref href="topics/impala_hbase_caching.xml"/>
           <topicref href="topics/impala_idle_session_timeout.xml"/>
@@ -202,9 +203,11 @@ under the License.
           <topicref href="topics/impala_live_summary.xml"/>
           <topicref href="topics/impala_max_errors.xml"/>
           <topicref rev="3.1 IMPALA-6847" href="topics/impala_max_mem_estimate_for_admission.xml"/>
-          <topicref rev="2.10.0 IMPALA-3200" href="topics/impala_max_row_size.xml"/>
           <topicref rev="2.5.0" href="topics/impala_max_num_runtime_filters.xml"/>
+          <topicref href="topics/impala_max_result_spooling_mem.xml"/>
+          <topicref rev="2.10.0 IMPALA-3200" href="topics/impala_max_row_size.xml"/>
           <topicref href="topics/impala_max_scan_range_length.xml"/>
+          <topicref href="topics/impala_max_spilled_result_spooling_mem.xml"/>
           <topicref href="topics/impala_mem_limit.xml"/>
           <topicref rev="2.10.0 IMPALA-3200" href="topics/impala_min_spillable_buffer_size.xml"/>
           <topicref rev="2.8.0" href="topics/impala_mt_dop.xml"/>
@@ -240,6 +243,7 @@ under the License.
           <!-- This option is for internal use only and might go away without ever being documented. -->
           <!-- <topicref href="topics/impala_seq_compression_mode.xml"/> -->
           <topicref href="topics/impala_shuffle_distinct_exprs.xml"/>
+          <topicref href="topics/impala_spool_query_results.xml"/>
           <topicref href="topics/impala_support_start_over.xml"/>
           <topicref href="topics/impala_sync_ddl.xml"/>
           <topicref href="topics/impala_thread_reservation_aggregate_limit.xml"/>
@@ -329,6 +333,7 @@ under the License.
     </topicref>
     <topicref href="topics/impala_odbc.xml"/>
     <topicref href="topics/impala_jdbc.xml"/>
+    <topicref href="topics/impala_query_results_spooling.xml"/>
   </topicref>
   <topicref href="topics/impala_troubleshooting.xml">
     <topicref href="topics/impala_webui.xml"/>
