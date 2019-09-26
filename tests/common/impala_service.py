@@ -46,6 +46,9 @@ class BaseImpalaService(object):
       webserver_certificate_file):
     self.hostname = hostname
     self.webserver_interface = webserver_interface
+    if webserver_interface == "":
+      # If no webserver interface was specified, just use the hostname.
+      self.webserver_interface = hostname
     self.webserver_port = webserver_port
     self.webserver_certificate_file = webserver_certificate_file
 
@@ -158,7 +161,7 @@ class BaseImpalaService(object):
 # Allows for interacting with an Impalad instance to perform operations such as creating
 # new connections or accessing the debug webpage.
 class ImpaladService(BaseImpalaService):
-  def __init__(self, hostname, webserver_interface="127.0.0.1", webserver_port=25000,
+  def __init__(self, hostname, webserver_interface="", webserver_port=25000,
       beeswax_port=21000, be_port=22000, hs2_port=21050, hs2_http_port=28000,
       webserver_certificate_file=""):
     super(ImpaladService, self).__init__(

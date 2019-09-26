@@ -243,8 +243,10 @@ class ImpalaTestSuite(BaseTestSuite):
 
   @classmethod
   def create_impala_service(
-      cls, host_port=IMPALAD, webserver_interface="127.0.0.1", webserver_port=25000):
+      cls, host_port=IMPALAD, webserver_interface="", webserver_port=25000):
     host, port = host_port.split(':')
+    if webserver_interface == "":
+      webserver_interface = host
     return ImpaladService(host, beeswax_port=port,
         webserver_interface=webserver_interface, webserver_port=webserver_port)
 
