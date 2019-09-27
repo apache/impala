@@ -102,11 +102,13 @@ if IS_ADLS:
 IMPALAD_HOST_PORT_LIST = pytest.config.option.impalad.split(',')
 assert len(IMPALAD_HOST_PORT_LIST) > 0, 'Must specify at least 1 impalad to target'
 IMPALAD = IMPALAD_HOST_PORT_LIST[0]
+IMPALAD_HOSTNAME = IMPALAD.split(':')[0]
+
 IMPALAD_BEESWAX_HOST_PORT = IMPALAD_HOST_PORT_LIST[0]
 IMPALAD_HS2_HOST_PORT =\
-    IMPALAD.split(':')[0] + ":" + pytest.config.option.impalad_hs2_port
+    IMPALAD_HOSTNAME + ":" + pytest.config.option.impalad_hs2_port
 IMPALAD_HS2_HTTP_HOST_PORT =\
-    IMPALAD.split(':')[0] + ":" + pytest.config.option.impalad_hs2_http_port
+    IMPALAD_HOSTNAME + ":" + pytest.config.option.impalad_hs2_http_port
 HIVE_HS2_HOST_PORT = pytest.config.option.hive_server2
 WORKLOAD_DIR = os.environ['IMPALA_WORKLOAD_DIR']
 HDFS_CONF = HdfsConfig(pytest.config.option.minicluster_xml_conf)
@@ -123,8 +125,9 @@ EE_TEST_LOGS_DIR = os.getenv("IMPALA_EE_TEST_LOGS_DIR")
 COMMENT_LINES_REGEX = r'(?:\s*--.*\n)*'
 SET_PATTERN = re.compile(
     COMMENT_LINES_REGEX + r'\s*set\s*([a-zA-Z_][a-zA-Z0-9_]*)\s*=*', re.I)
-METRICS_URL = 'http://localhost:25000/metrics?json'
-VARZ_URL = 'http://localhost:25000/varz?json'
+
+METRICS_URL = 'http://{0}:25000/metrics?json'.format(IMPALAD_HOSTNAME)
+VARZ_URL = 'http://{0}:25000/varz?json'.format(IMPALAD_HOSTNAME)
 
 GROUP_NAME = grp.getgrgid(pwd.getpwnam(getuser()).pw_gid).gr_name
 
