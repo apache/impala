@@ -19,7 +19,7 @@
 # cache as well as Sentry privilege refresh.
 
 from tests.common.custom_cluster_test_suite import CustomClusterTestSuite
-
+from tests.util.filesystem_utils import FILESYSTEM_PREFIX
 
 class SentryCacheTestSuite(CustomClusterTestSuite):
   @staticmethod
@@ -120,8 +120,8 @@ class TestObject(object):
       self.table_def = "(col1 int)"
     elif obj_type == TestObject.FUNCTION:
       self.grant_name = TestObject.FUNCTION
-      self.func_def = "RETURNS INT LOCATION 'hdfs:///test-warehouse/libTestUdfs.so'\
-       SYMBOL='Fn'"
+      self.func_def = "RETURNS INT LOCATION '{0}/test-warehouse/libTestUdfs.so'\
+       SYMBOL='Fn'".format(FILESYSTEM_PREFIX)
     else:
       self.grant_name = obj_type
     self.grant = grant

@@ -25,6 +25,7 @@ from os import getenv
 from tests.common.sentry_cache_test_suite import SentryCacheTestSuite, TestObject
 from tests.common.test_dimensions import create_uncompressed_text_dimension
 from tests.common.skip import SkipIfHive3
+from tests.util.filesystem_utils import FILESYSTEM_PREFIX
 
 # Sentry long polling frequency to make Sentry refresh not run.
 SENTRY_LONG_POLLING_FREQUENCY_S = 3600
@@ -169,8 +170,8 @@ class TestOwnerPrivileges(SentryCacheTestSuite):
     # oo_user1 needs permissions to create a view based of functional.alltypes
     self.execute_query("grant select on database functional to oo_user1_role")
     # oo_user1 needs permissions to create a function based of libTestUdfs.so
-    self.execute_query("grant all on uri 'hdfs:///test-warehouse/libTestUdfs.so' to"
-        " oo_user1_role")
+    self.execute_query("grant all on uri '{0}/test-warehouse/libTestUdfs.so' to"
+        " oo_user1_role".format(FILESYSTEM_PREFIX))
     # We need to provide explicit privileges to drop functions
     self.execute_query("grant drop on database {0} to "
         "oo_user1_role".format(unique_database))
