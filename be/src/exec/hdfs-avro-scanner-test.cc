@@ -317,11 +317,11 @@ TEST_F(HdfsAvroScannerTest, DateTest) {
   TestReadAvroDate(data, len + 1, invalid_dv, -1, TErrorCode::AVRO_INVALID_DATE);
   TestReadAvroDate(data, len - 1, invalid_dv, -1, TErrorCode::SCANNER_INVALID_INT);
 
-  // Test lower limit: 0000-01-01.
-  const int32_t MIN_DATE_DAYS_SINCE_EPOCH = -719528;
+  // Test lower limit: 0001-01-01.
+  const int32_t MIN_DATE_DAYS_SINCE_EPOCH = -719162;
   len = ReadWriteUtil::PutZInt(MIN_DATE_DAYS_SINCE_EPOCH, data);
-  TestReadAvroDate(data, len, DateValue(0, 1, 1), len);
-  TestReadAvroDate(data, len + 1, DateValue(0, 1, 1), len);
+  TestReadAvroDate(data, len, DateValue(1, 1, 1), len);
+  TestReadAvroDate(data, len + 1, DateValue(1, 1, 1), len);
   TestReadAvroDate(data, len - 1, invalid_dv, -1, TErrorCode::SCANNER_INVALID_INT);
 
   len = ReadWriteUtil::PutZInt(MIN_DATE_DAYS_SINCE_EPOCH - 1, data);

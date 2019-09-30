@@ -300,13 +300,14 @@ TEST(DateTest, ParseFormatEdgeCases) {
   const TimestampValue now(date(1980, 2, 28), time_duration(16, 14, 24));
 
   vector<DateTC> test_cases{
-      // Test year upper/lower bound
-      DateTC("yyyy-MM-dd", "0000-01-01", true, 0, 1, 1),
+      // Test year lower/upper bound
+      DateTC("yyyy-MM-dd", "0001-01-01", true, 1, 1, 1),
+      DateTC("yyyy-MM-dd", "0000-01-01", false, true),
       DateTC("yyyy-MM-dd", "-001-01-01", false, true),
       DateTC("yyyy-MM-dd", "9999-12-31", true, 9999, 12, 31),
       DateTC("yyyyy-MM-dd", "10000-12-31", false, true),
       // Test Feb 29 in leap years
-      DateTC("yyyy-MM-dd", "0000-02-29", true, 0, 2, 29),
+      DateTC("yyyy-MM-dd", "0004-02-29", true, 4, 2, 29),
       DateTC("yyyy-MM-dd", "1904-02-29", true, 1904, 2, 29),
       DateTC("yyyy-MM-dd", "2000-02-29", true, 2000, 2, 29),
       // Test Feb 29 in non-leap years
@@ -538,16 +539,17 @@ TEST(DateTest, FormatComplexFormats) {
 TEST(DateTest, DateValueEdgeCases) {
   // Test min supported date.
   // MIN_DATE_DAYS_SINCE_EPOCH was calculated using the Proleptic Gregorian calendar. This
-  // is expected to be different then how Hive written Parquet files represent 0000-01-01.
-  const int32_t MIN_DATE_DAYS_SINCE_EPOCH = -719528;
-  const DateValue min_date1 = ParseValidateDate("0000-01-01", true, 0, 1, 1);
-  const DateValue min_date2 = ParseValidateDate("0000-01-01 00:00:00", true, 0, 1, 1);
+  // is expected to be different then how Hive2 written Parquet files represent
+  // 0001-01-01.
+  const int32_t MIN_DATE_DAYS_SINCE_EPOCH = -719162;
+  const DateValue min_date1 = ParseValidateDate("0001-01-01", true, 1, 1, 1);
+  const DateValue min_date2 = ParseValidateDate("0001-01-01 00:00:00", true, 1, 1, 1);
   EXPECT_EQ(min_date1, min_date2);
   int32_t min_days;
   EXPECT_TRUE(min_date1.ToDaysSinceEpoch(&min_days));
   EXPECT_EQ(MIN_DATE_DAYS_SINCE_EPOCH, min_days);
-  EXPECT_EQ("0000-01-01", min_date1.ToString());
-  EXPECT_EQ("0000-01-01", min_date2.ToString());
+  EXPECT_EQ("0001-01-01", min_date1.ToString());
+  EXPECT_EQ("0001-01-01", min_date2.ToString());
 
   const DateValue min_date3(MIN_DATE_DAYS_SINCE_EPOCH);
   EXPECT_TRUE(min_date3.IsValid());
@@ -576,7 +578,7 @@ TEST(DateTest, DateValueEdgeCases) {
   EXPECT_FALSE(too_late.IsValid());
 
   // Test that Feb 29 is valid in leap years.
-  for (int leap_year: {0, 1904, 1980, 1996, 2000, 2004, 2104, 9996}) {
+  for (int leap_year: {4, 1904, 1980, 1996, 2000, 2004, 2104, 9996}) {
     EXPECT_TRUE(DateValue(leap_year, 2, 29).IsValid()) << "year:" << leap_year;
   }
 
@@ -612,26 +614,26 @@ TEST(DateTest, AddDays) {
   EXPECT_FALSE(dv.AddDays(13).IsValid());
 
   // Test lower limit.
-  dv = DateValue(0, 1, 10);
-  EXPECT_EQ(DateValue(0, 1, 1), dv.AddDays(-9));
+  dv = DateValue(1, 1, 10);
+  EXPECT_EQ(DateValue(1, 1, 1), dv.AddDays(-9));
   EXPECT_FALSE(dv.AddDays(-10).IsValid());
   EXPECT_FALSE(dv.AddDays(-11).IsValid());
 
   // Test adding days to cover the entire range.
   int32_t min_dse, max_dse;
-  EXPECT_TRUE(DateValue(0, 1, 1).ToDaysSinceEpoch(&min_dse));
+  EXPECT_TRUE(DateValue(1, 1, 1).ToDaysSinceEpoch(&min_dse));
   EXPECT_GT(0, min_dse);
   min_dse = -min_dse;
   EXPECT_TRUE(DateValue(9999, 12, 31).ToDaysSinceEpoch(&max_dse));
   EXPECT_LT(0, max_dse);
 
-  dv = DateValue(0, 1, 1);
+  dv = DateValue(1, 1, 1);
   EXPECT_EQ(DateValue(9999, 12, 31), dv.AddDays(min_dse + max_dse));
   EXPECT_FALSE(dv.AddDays(min_dse + max_dse + 1).IsValid());
   EXPECT_FALSE(dv.AddDays(std::numeric_limits<int64_t>::max()).IsValid());
 
   dv = DateValue(9999, 12, 31);
-  EXPECT_EQ(DateValue(0, 1, 1), dv.AddDays(-(min_dse + max_dse)));
+  EXPECT_EQ(DateValue(1, 1, 1), dv.AddDays(-(min_dse + max_dse)));
   EXPECT_FALSE(dv.AddDays(-(min_dse + max_dse + 1)).IsValid());
   EXPECT_FALSE(dv.AddDays(std::numeric_limits<int64_t>::min()).IsValid());
 
@@ -692,19 +694,19 @@ TEST(DateTest, AddMonths) {
   EXPECT_FALSE(dv.AddMonths(14, true).IsValid());
 
   // Test lower limit.
-  dv = DateValue(0, 11, 30);
-  EXPECT_EQ(DateValue(0, 1, 31), dv.AddMonths(-10, true));
+  dv = DateValue(1, 11, 30);
+  EXPECT_EQ(DateValue(1, 1, 31), dv.AddMonths(-10, true));
   EXPECT_FALSE(dv.AddMonths(-11, true).IsValid());
 
   // Test adding months to cover the entire range.
-  dv = DateValue(0, 1, 1);
-  EXPECT_EQ(DateValue(9999, 12, 1), dv.AddMonths(9999 * 12 + 11, false));
-  EXPECT_FALSE(dv.AddMonths(9999 * 12 + 12, false).IsValid());
+  dv = DateValue(1, 1, 1);
+  EXPECT_EQ(DateValue(9999, 12, 1), dv.AddMonths(9998 * 12 + 11, false));
+  EXPECT_FALSE(dv.AddMonths(9998 * 12 + 12, false).IsValid());
   EXPECT_FALSE(dv.AddMonths(std::numeric_limits<int64_t>::max(), false).IsValid());
 
   dv = DateValue(9999, 12, 31);
-  EXPECT_EQ(DateValue(0, 1, 31), dv.AddMonths(-9999 * 12 - 11, false));
-  EXPECT_FALSE(dv.AddMonths(-9999 * 12 - 12, false).IsValid());
+  EXPECT_EQ(DateValue(1, 1, 31), dv.AddMonths(-9998 * 12 - 11, false));
+  EXPECT_FALSE(dv.AddMonths(-9998 * 12 - 12, false).IsValid());
   EXPECT_FALSE(dv.AddMonths(std::numeric_limits<int64_t>::min(), false).IsValid());
 }
 
@@ -726,20 +728,20 @@ TEST(DateTest, AddYears) {
   EXPECT_FALSE(dv.AddYears(11).IsValid());
 
   // Test lower limit.
-  dv = DateValue(10, 1, 1);
-  EXPECT_EQ(DateValue(0, 1, 1), dv.AddYears(-10));
+  dv = DateValue(11, 1, 1);
+  EXPECT_EQ(DateValue(1, 1, 1), dv.AddYears(-10));
   EXPECT_FALSE(dv.AddYears(-11).IsValid());
   EXPECT_FALSE(dv.AddYears(-12).IsValid());
 
   // Test adding years to cover the entire range.
-  dv = DateValue(0, 1, 1);
-  EXPECT_EQ(DateValue(9999, 1, 1), dv.AddYears(9999));
-  EXPECT_FALSE(dv.AddYears(9999 + 1).IsValid());
+  dv = DateValue(1, 1, 1);
+  EXPECT_EQ(DateValue(9999, 1, 1), dv.AddYears(9998));
+  EXPECT_FALSE(dv.AddYears(9998 + 1).IsValid());
   EXPECT_FALSE(dv.AddYears(std::numeric_limits<int64_t>::max()).IsValid());
 
   dv = DateValue(9999, 12, 31);
-  EXPECT_EQ(DateValue(0, 12, 31), dv.AddYears(-9999));
-  EXPECT_FALSE(dv.AddYears(-9999 - 1).IsValid());
+  EXPECT_EQ(DateValue(1, 12, 31), dv.AddYears(-9998));
+  EXPECT_FALSE(dv.AddYears(-9998 - 1).IsValid());
   EXPECT_FALSE(dv.AddYears(std::numeric_limits<int64_t>::min()).IsValid());
 
   // Test leap year.
@@ -769,8 +771,8 @@ TEST(DateTest, WeekDay) {
   // Test lower limit.
   // 0001-01-01 is Monday.
   EXPECT_EQ(0, DateValue(1, 1, 1).WeekDay());
-  // 0000-01-01 is Saturday.
-  EXPECT_EQ(5, DateValue(0, 1, 1).WeekDay());
+  // 0002-01-01 is Tuesday.
+  EXPECT_EQ(1, DateValue(2, 1, 1).WeekDay());
 }
 
 TEST(DateTest, ToYearMonthDay) {
@@ -784,9 +786,9 @@ TEST(DateTest, ToYearMonthDay) {
 
   // Test that ToYearMonthDay() and ToYear() return the same values as
   // cctz::civil_day::year()/month()/day().
-  // The following loop iterates through all valid dates (0000-01-01..9999-12-31):
+  // The following loop iterates through all valid dates (0001-01-01..9999-12-31):
   cctz::civil_day epoch(1970, 1, 1);
-  cctz::civil_day cd(0, 1, 1);
+  cctz::civil_day cd(1, 1, 1);
   do {
     DateValue dv(cd - epoch);
     EXPECT_TRUE(dv.IsValid());
@@ -808,7 +810,7 @@ TEST(DateTest, DayOfYear) {
   EXPECT_EQ(-1, invalid_dv.DayOfYear());
 
   // Test lower limit.
-  EXPECT_EQ(1, DateValue(0, 1, 1).DayOfYear());
+  EXPECT_EQ(1, DateValue(1, 1, 1).DayOfYear());
   // Test upper limit.
   EXPECT_EQ(365, DateValue(9999, 12,31).DayOfYear());
 
@@ -848,17 +850,17 @@ TEST(DateTest, WeekOfYear) {
   EXPECT_EQ(1, DateValue(2020, 1, 5).WeekOfYear());
   EXPECT_EQ(2, DateValue(2020, 1, 6).WeekOfYear());
 
+  // 0002-01-01 is Tuesday. Test days around 0002-01-01.
+  EXPECT_EQ(51, DateValue(1, 12, 23).WeekOfYear());
+  EXPECT_EQ(52, DateValue(1, 12, 30).WeekOfYear());
+  EXPECT_EQ(1, DateValue(1, 12, 31).WeekOfYear());
+  EXPECT_EQ(1, DateValue(2, 1, 1).WeekOfYear());
+  EXPECT_EQ(1, DateValue(2, 1, 6).WeekOfYear());
+  EXPECT_EQ(2, DateValue(2, 1, 7).WeekOfYear());
   // 0001-01-01 is Monday. Test days around 0001-01-01.
-  EXPECT_EQ(51, DateValue(0, 12, 24).WeekOfYear());
-  EXPECT_EQ(52, DateValue(0, 12, 25).WeekOfYear());
-  EXPECT_EQ(52, DateValue(0, 12, 31).WeekOfYear());
   EXPECT_EQ(1, DateValue(1, 1, 1).WeekOfYear());
-  EXPECT_EQ(1, DateValue(1, 1, 7).WeekOfYear());
+  EXPECT_EQ(1, DateValue(1, 1, 2).WeekOfYear());
   EXPECT_EQ(2, DateValue(1, 1, 8).WeekOfYear());
-  // 0000-01-01 is Saturday. Test days around 0000-01-01.
-  EXPECT_EQ(52, DateValue(0, 1, 1).WeekOfYear());
-  EXPECT_EQ(52, DateValue(0, 1, 2).WeekOfYear());
-  EXPECT_EQ(1, DateValue(0, 1, 3).WeekOfYear());
 
   // 9999-12-31 is Friday. Test days around 9999-12-31.
   EXPECT_EQ(52, DateValue(9999, 12, 31).WeekOfYear());
@@ -892,8 +894,8 @@ TEST(DateTest, LastDay) {
   EXPECT_EQ(DateValue(9999, 12, 31), DateValue(9999, 12, 31).LastDay());
 
   // Test lower limit.
-  EXPECT_EQ(DateValue(0, 1, 31), DateValue(0, 1, 1).LastDay());
-  EXPECT_EQ(DateValue(0, 1, 31), DateValue(0, 1, 31).LastDay());
+  EXPECT_EQ(DateValue(1, 1, 31), DateValue(1, 1, 1).LastDay());
+  EXPECT_EQ(DateValue(1, 1, 31), DateValue(1, 1, 31).LastDay());
 }
 
 // These macros add scoped trace to provide the line number of the caller upon failure.
@@ -944,16 +946,16 @@ TEST(DateTest, MonthsBetween) {
       -29/31.0);
 
   // Test entire range w/o fractional part.
-  TEST_MONTHS_BW(DateValue(0, 1, 1), DateValue(9999, 12, 1), -9999 * 12 - 11);
-  TEST_MONTHS_BW(DateValue(9999, 12, 31), DateValue(0, 1, 31), 9999 * 12 + 11);
+  TEST_MONTHS_BW(DateValue(1, 1, 1), DateValue(9999, 12, 1), -9998 * 12 - 11);
+  TEST_MONTHS_BW(DateValue(9999, 12, 31), DateValue(1, 1, 31), 9998 * 12 + 11);
 
   // Test entire range w/ fractional part.
-  // There are (-9999*12 - 11 - 30/31.0) months between 0000-01-01 and 9999-12-31.
-  TEST_MONTHS_BW_RANGE(DateValue(0, 1, 1), DateValue(9999, 12, 31), -10000 * 12.0,
-      -9999 * 12 - 11 - 29/31.0);
-  // There are (9999*12 + 11 + 30/31.0) months between 9999-12-31 and 0000-01-01.
-  TEST_MONTHS_BW_RANGE(DateValue(9999, 12, 31), DateValue(0, 1, 1),
-      9999 * 12 + 11 + 29/31.0, 10000 * 12.0);
+  // There are (-9998*12 - 11 - 30/31.0) months between 0001-01-01 and 9999-12-31.
+  TEST_MONTHS_BW_RANGE(DateValue(1, 1, 1), DateValue(9999, 12, 31), -9999 * 12.0,
+      -9998 * 12 - 11 - 29/31.0);
+  // There are (9998*12 + 11 + 30/31.0) months between 9999-12-31 and 0001-01-01.
+  TEST_MONTHS_BW_RANGE(DateValue(9999, 12, 31), DateValue(1, 1, 1),
+      9998 * 12 + 11 + 29/31.0, 9999 * 12.0);
 }
 
 }

@@ -523,11 +523,12 @@ TEST(StringToDate, Basic) {
   TestDateValue("2018-11-1", DateValue(2018, 11, 1), StringParser::PARSE_SUCCESS);
 
   // Test min/max dates.
-  TestDateValue("0000-01-01", DateValue(0, 1, 1), StringParser::PARSE_SUCCESS);
+  TestDateValue("0001-01-01", DateValue(1, 1, 1), StringParser::PARSE_SUCCESS);
   TestDateValue("9999-12-31", DateValue(9999, 12, 31), StringParser::PARSE_SUCCESS);
 
   // Test less than min and greater than max dates.
   DateValue invalid_date;
+  TestDateValue("0000-12-31", invalid_date, StringParser::PARSE_FAILURE);
   TestDateValue("-0001-12-31", invalid_date, StringParser::PARSE_FAILURE);
   TestDateValue("10000-01-01", invalid_date, StringParser::PARSE_FAILURE);
 

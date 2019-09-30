@@ -1484,7 +1484,7 @@ TEST_P(ExprTest, LiteralConstruction) {
   TestSingleLiteralConstruction(TYPE_SMALLINT, s_val, "-32768");
   TestSingleLiteralConstruction(TYPE_INT, i_val, "-2147483648");
   TestSingleLiteralConstruction(TYPE_BIGINT, l_val, "-9223372036854775808");
-  TestSingleLiteralConstruction(TYPE_DATE, DateValue(0, 1, 1), "0000-01-01");
+  TestSingleLiteralConstruction(TYPE_DATE, DateValue(1, 1, 1), "0001-01-01");
 }
 
 
@@ -3533,8 +3533,8 @@ TEST_P(ExprTest, CastDateExprs) {
   TestError("cast('  \t\r\n' as date)");
 
   // Test String <-> Date boundary cases.
-  TestDateValue("cast('0000-01-01' as date)", DateValue(0, 1, 1));
-  TestStringValue("cast(date '0000-01-01' as string)", "0000-01-01");
+  TestDateValue("cast('0001-01-01' as date)", DateValue(1, 1, 1));
+  TestStringValue("cast(date '0001-01-01' as string)", "0001-01-01");
   TestDateValue("cast('9999-12-31' as date)", DateValue(9999, 12, 31));
   TestStringValue("cast(date '9999-12-31' as string)", "9999-12-31");
   TestError("cast('10000-01-01' as date)");
@@ -7634,20 +7634,20 @@ TEST_P(ExprTest, TruncForDateTest) {
   TestDateValue("trunc(date'9999-12-31', 'DAY')", DateValue(9999, 12, 27));
 
   // Test lower limit
-  TestDateValue("trunc(date'0000-01-01', 'YYYY')", DateValue(0, 1, 1));
-  TestDateValue("trunc(date'0000-01-01', 'Q')", DateValue(0, 1, 1));
-  TestDateValue("trunc(date'0000-03-31', 'Q')", DateValue(0, 1, 1));
-  TestDateValue("trunc(date'0000-01-01', 'MONTH')", DateValue(0, 1, 1));
-  TestDateValue("trunc(date'0000-01-01', 'W')", DateValue(0, 1, 1));
-  TestDateValue("trunc(date'0000-01-07', 'W')", DateValue(0, 1, 1));
-  TestDateValue("trunc(date'0000-01-08', 'W')", DateValue(0, 1, 8));
-  TestDateValue("trunc(date'0000-01-01', 'WW')", DateValue(0, 1, 1));
-  TestDateValue("trunc(date'0000-01-07', 'WW')", DateValue(0, 1, 1));
-  TestDateValue("trunc(date'0000-01-08', 'WW')", DateValue(0, 1, 8));
-  TestDateValue("trunc(date'0000-01-04', 'DAY')", DateValue(0, 1, 3));
-  TestDateValue("trunc(date'0000-01-03', 'DAY')", DateValue(0, 1, 3));
-  TestIsNull("trunc(date'0000-01-02', 'DAY')", TYPE_DATE);
-  TestIsNull("trunc(date'0000-01-01', 'DAY')", TYPE_DATE);
+  TestDateValue("trunc(date'0001-01-01', 'YYYY')", DateValue(1, 1, 1));
+  TestDateValue("trunc(date'0001-01-01', 'Q')", DateValue(1, 1, 1));
+  TestDateValue("trunc(date'0001-03-31', 'Q')", DateValue(1, 1, 1));
+  TestDateValue("trunc(date'0001-01-01', 'MONTH')", DateValue(1, 1, 1));
+  // 0001-01-01 is Monday
+  TestDateValue("trunc(date'0001-01-01', 'W')", DateValue(1, 1, 1));
+  TestDateValue("trunc(date'0001-01-07', 'W')", DateValue(1, 1, 1));
+  TestDateValue("trunc(date'0001-01-08', 'W')", DateValue(1, 1, 8));
+  TestDateValue("trunc(date'0001-01-01', 'WW')", DateValue(1, 1, 1));
+  TestDateValue("trunc(date'0001-01-07', 'WW')", DateValue(1, 1, 1));
+  TestDateValue("trunc(date'0001-01-08', 'WW')", DateValue(1, 1, 8));
+  TestDateValue("trunc(date'0001-01-01', 'DAY')", DateValue(1, 1, 1));
+  TestDateValue("trunc(date'0001-01-07', 'DAY')", DateValue(1, 1, 1));
+  TestDateValue("trunc(date'0001-01-08', 'DAY')", DateValue(1, 1, 8));
 
   // Truncating date to hour or minute returns an error
   for (const string& unit: { "HH", "HH12", "HH24", "MI" }) {
@@ -7697,28 +7697,26 @@ TEST_P(ExprTest, DateTruncForDateTest) {
   TestDateValue("date_trunc('MILLENNIUM', date '1001-01-01')", DateValue(1001, 1, 1));
   TestDateValue("date_trunc('MILLENNIUM', date '1000-01-01')", DateValue(1, 1, 1));
   TestDateValue("date_trunc('MILLENNIUM', date '0001-01-01')", DateValue(1, 1, 1));
-  TestIsNull("date_trunc('MILLENNIUM', date '0000-01-01')", TYPE_DATE);
 
   // Test lower limit for century
   TestDateValue("date_trunc('CENTURY', date '0101-01-01')", DateValue(101, 1, 1));
   TestDateValue("date_trunc('CENTURY', date '0100-01-01')", DateValue(1, 1, 1));
   TestDateValue("date_trunc('CENTURY', date '0001-01-01')", DateValue(1, 1, 1));
-  TestIsNull("date_trunc('CENTURY', date '0000-01-01')", TYPE_DATE);
 
   // Test lower limit for decade
-  TestDateValue("date_trunc('DECADE', date '0001-01-01')", DateValue(0, 1, 1));
-  TestDateValue("date_trunc('DECADE', date '0000-01-01')", DateValue(0, 1, 1));
+  TestDateValue("date_trunc('DECADE', date '0011-01-01')", DateValue(10, 1, 1));
+  TestDateValue("date_trunc('DECADE', date '0010-01-01')", DateValue(10, 1, 1));
+  TestIsNull("date_trunc('DECADE', date '0001-01-01')", TYPE_DATE);
 
   // Test lower limit for year, month, day
-  TestDateValue("date_trunc('YEAR', date '0000-01-01')", DateValue(0, 1, 1));
-  TestDateValue("date_trunc('MONTH', date '0000-01-01')", DateValue(0, 1, 1));
-  TestDateValue("date_trunc('DAY', date '0000-01-01')", DateValue(0, 1, 1));
+  TestDateValue("date_trunc('YEAR', date '0001-01-01')", DateValue(1, 1, 1));
+  TestDateValue("date_trunc('MONTH', date '0001-01-01')", DateValue(1, 1, 1));
+  TestDateValue("date_trunc('DAY', date '0001-01-01')", DateValue(1, 1, 1));
 
   // Test lower limit for week
-  TestDateValue("date_trunc('WEEK', date '0000-01-09')", DateValue(0, 1, 3));
-  TestDateValue("date_trunc('WEEK', date '0000-01-03')", DateValue(0, 1, 3));
-  TestIsNull("date_trunc('WEEK', date '0000-01-02')", TYPE_DATE);
-  TestIsNull("date_trunc('WEEK', date '0000-01-01')", TYPE_DATE);
+  TestDateValue("date_trunc('WEEK', date '0001-01-08')", DateValue(1, 1, 8));
+  TestDateValue("date_trunc('WEEK', date '0001-01-07')", DateValue(1, 1, 1));
+  TestDateValue("date_trunc('WEEK', date '0001-01-01')", DateValue(1, 1, 1));
 
   // Test invalid input.
   // Truncating date to hour or minute returns an error
@@ -7760,10 +7758,10 @@ TEST_P(ExprTest, ExtractAndDatePartForDateTest) {
   TestValue("extract(DAY from date '9999-12-31')", TYPE_BIGINT, 31);
 
   // Test lower limit
-  TestValue("extract(date '0000-01-01', 'YEAR')", TYPE_BIGINT, 0);
-  TestValue("extract(quarter from date '0000-01-01')", TYPE_BIGINT, 1);
-  TestValue("extract(date '0000-01-01', 'month')", TYPE_BIGINT, 1);
-  TestValue("extract(DAY from date '0000-01-01')", TYPE_BIGINT, 1);
+  TestValue("extract(date '0001-01-01', 'YEAR')", TYPE_BIGINT, 1);
+  TestValue("extract(quarter from date '0001-01-01')", TYPE_BIGINT, 1);
+  TestValue("extract(date '0001-01-01', 'month')", TYPE_BIGINT, 1);
+  TestValue("extract(DAY from date '0001-01-01')", TYPE_BIGINT, 1);
 
   // Time of day extract fields are not supported
   for (const string& field: { "MINUTE", "SECOND", "MILLISECOND", "EPOCH" }) {
@@ -7795,10 +7793,10 @@ TEST_P(ExprTest, ExtractAndDatePartForDateTest) {
   TestValue("date_part('DAY', date '9999-12-31')", TYPE_BIGINT, 31);
 
   // Test lower limit
-  TestValue("date_part('year', date '0000-01-01')", TYPE_BIGINT, 0);
-  TestValue("date_part('quarter', date '0000-01-01')", TYPE_BIGINT, 1);
-  TestValue("date_part('MONTH', date '0000-01-01')", TYPE_BIGINT, 1);
-  TestValue("date_part('DAY', date '0000-01-01')", TYPE_BIGINT, 1);
+  TestValue("date_part('year', date '0001-01-01')", TYPE_BIGINT, 1);
+  TestValue("date_part('quarter', date '0001-01-01')", TYPE_BIGINT, 1);
+  TestValue("date_part('MONTH', date '0001-01-01')", TYPE_BIGINT, 1);
+  TestValue("date_part('DAY', date '0001-01-01')", TYPE_BIGINT, 1);
 
   // Time of day extract fields are not supported
   for (const string& field: { "MINUTE", "SECOND", "MILLISECOND", "EPOCH" }) {
@@ -7822,7 +7820,7 @@ TEST_P(ExprTest, DateFunctions) {
   // year:
   TestValue("year(date '2019-06-05')", TYPE_INT, 2019);
   TestValue("year(date '9999-12-31')", TYPE_INT, 9999);
-  TestValue("year(date '0000-01-01')", TYPE_INT, 0);
+  TestValue("year(date '0001-01-01')", TYPE_INT, 1);
   TestIsNull("year(cast(NULL as date))", TYPE_INT);
 
   // Test that the name-resolution algorithm picks up the TIMESTAMP-version of year() if
@@ -7840,23 +7838,23 @@ TEST_P(ExprTest, DateFunctions) {
   // month:
   TestValue("month(date '2019-06-05')", TYPE_INT, 6);
   TestValue("month(date '9999-12-31')", TYPE_INT, 12);
-  TestValue("month(date '0000-01-01')", TYPE_INT, 1);
+  TestValue("month(date '0001-01-01')", TYPE_INT, 1);
   TestIsNull("month(cast(NULL as date))", TYPE_INT);
 
   // monthname:
   TestStringValue("monthname(date '2019-06-05')", "June");
   TestStringValue("monthname(date '9999-12-31')", "December");
-  TestStringValue("monthname(date '0000-01-01')", "January");
+  TestStringValue("monthname(date '0001-01-01')", "January");
   TestIsNull("monthname(cast(NULL as date))", TYPE_STRING);
 
   // day, dayofmonth:
   TestValue("day(date '2019-06-05')", TYPE_INT, 5);
   TestValue("day(date '9999-12-31')", TYPE_INT, 31);
-  TestValue("day(date '0000-01-01')", TYPE_INT, 1);
+  TestValue("day(date '0001-01-01')", TYPE_INT, 1);
   TestIsNull("day(cast(NULL as date))", TYPE_INT);
   TestValue("dayofmonth(date '2019-06-07')", TYPE_INT, 7);
   TestValue("dayofmonth(date '9999-12-31')", TYPE_INT, 31);
-  TestValue("dayofmonth(date '0000-01-01')", TYPE_INT, 1);
+  TestValue("dayofmonth(date '0001-01-01')", TYPE_INT, 1);
   TestIsNull("dayofmonth(cast(NULL as date))", TYPE_INT);
 
   // quarter:
@@ -7869,15 +7867,15 @@ TEST_P(ExprTest, DateFunctions) {
   TestValue("quarter(date '2019-10-01')", TYPE_INT, 4);
   TestValue("quarter(date '2019-12-31')", TYPE_INT, 4);
   TestValue("quarter(date '9999-12-31')", TYPE_INT, 4);
-  TestValue("quarter(date '0000-01-01')", TYPE_INT, 1);
+  TestValue("quarter(date '0001-01-01')", TYPE_INT, 1);
   TestIsNull("quarter(cast(NULL as date))", TYPE_INT);
 
   // dayofweek:
   TestValue("dayofweek(date '2019-06-05')", TYPE_INT, 4);
   // 9999-12-31 is Friday.
   TestValue("dayofweek(date '9999-12-31')", TYPE_INT, 6);
-  // 0000-01-01 is Saturday.
-  TestValue("dayofweek(date '0000-01-01')", TYPE_INT, 7);
+  // 0001-01-01 is Monday.
+  TestValue("dayofweek(date '0001-01-01')", TYPE_INT, 2);
   TestIsNull("dayofweek(cast(NULL as date))", TYPE_INT);
 
   // dayname:
@@ -7889,7 +7887,7 @@ TEST_P(ExprTest, DateFunctions) {
   TestStringValue("dayname(date '2019-06-08')", "Saturday");
   TestStringValue("dayname(date '2019-06-09')", "Sunday");
   TestStringValue("dayname(date '9999-12-31')", "Friday");
-  TestStringValue("dayname(date '0000-01-01')", "Saturday");
+  TestStringValue("dayname(date '0001-01-01')", "Monday");
   TestIsNull("dayname(cast(NULL as date))", TYPE_STRING);
 
   // dayofyear:
@@ -7899,7 +7897,7 @@ TEST_P(ExprTest, DateFunctions) {
   TestValue("dayofyear(date '2016-12-31')", TYPE_INT, 366);
   TestValue("dayofyear(date '2016-06-05')", TYPE_INT, 31 + 29 + 31 + 30 + 31 + 5);
   TestValue("dayofyear(date '9999-12-31')", TYPE_INT, 365);
-  TestValue("dayofyear(date '0000-01-01')", TYPE_INT, 1);
+  TestValue("dayofyear(date '0001-01-01')", TYPE_INT, 1);
   TestIsNull("dayofyear(cast(NULL as date))", TYPE_INT);
 
   // week, weekofyear
@@ -7923,9 +7921,9 @@ TEST_P(ExprTest, DateFunctions) {
   TestValue("week(date '2019-12-29')", TYPE_INT, 52);
   TestValue("week(date '2019-12-30')", TYPE_INT, 1);
   TestValue("week(date '2015-12-31')", TYPE_INT, 53);
-  // 0000-01-01 is Saturday. It belongs to the last week of the previous year.
-  TestValue("weekofyear(date '0000-01-01')", TYPE_INT, 52);
-  TestValue("week(date '0000-01-01')", TYPE_INT, 52);
+  // 0001-01-01 is Monday. It belongs to the first week of the year.
+  TestValue("weekofyear(date '0001-01-01')", TYPE_INT, 1);
+  TestValue("week(date '0001-01-01')", TYPE_INT, 1);
   // 9999-12-31 is Friday. It belongs to the last week of the year.
   TestValue("weekofyear(date '9999-12-31')", TYPE_INT, 52);
   TestValue("week(date '9999-12-31')", TYPE_INT, 52);
@@ -7941,9 +7939,9 @@ TEST_P(ExprTest, DateFunctions) {
   TestDateValue("next_day(date '2019-06-05', 'fRI')", DateValue(2019, 6, 7));
   TestDateValue("next_day(date '2019-06-05', 'saturDAY')", DateValue(2019, 6, 8));
   TestDateValue("next_day(date '2019-06-05', 'suN')", DateValue(2019, 6, 9));
-  // 0000-01-01 is Saturday
-  TestDateValue("next_day(date '0000-01-01', 'SAT')", DateValue(0, 1, 8));
-  TestDateValue("next_day(date '0000-01-01', 'friday')", DateValue(0, 1, 7));
+  // 0001-01-01 is Monday
+  TestDateValue("next_day(date '0001-01-01', 'MON')", DateValue(1, 1, 8));
+  TestDateValue("next_day(date '0001-01-01', 'sunday')", DateValue(1, 1, 7));
   // 9999-12-31 is Friday
   TestDateValue("next_day(date'9999-12-30', 'FRI')", DateValue(9999, 12, 31));
   TestIsNull("next_day(date'9999-12-30', 'THU')", TYPE_DATE);
@@ -7964,7 +7962,7 @@ TEST_P(ExprTest, DateFunctions) {
   TestDateValue("last_day(date'2019-05-31')", DateValue(2019, 5, 31));
   // 2016 is leap year
   TestDateValue("last_day(date'2016-02-05')", DateValue(2016, 2, 29));
-  TestDateValue("last_day(date'0000-01-01')", DateValue(0, 1, 31));
+  TestDateValue("last_day(date'0001-01-01')", DateValue(1, 1, 31));
   TestDateValue("last_day(date'9999-12-31')", DateValue(9999, 12, 31));
   TestIsNull("last_day(cast(NULL as date))", TYPE_DATE);
 
@@ -7972,20 +7970,20 @@ TEST_P(ExprTest, DateFunctions) {
   TestDateValue("years_add(date '0125-05-24', 0)", DateValue(125, 5, 24));
   TestDateValue("years_sub(date '0125-05-24', 0)", DateValue(125, 5, 24));
   TestDateValue("years_add(date '0125-05-24', 125)", DateValue(250, 5, 24));
-  TestDateValue("years_add(date '0125-05-24', -125)", DateValue(0, 5, 24));
-  TestDateValue("years_sub(date '0125-05-24', 125)", DateValue(0, 5, 24));
+  TestDateValue("years_add(date '0125-05-24', -124)", DateValue(1, 5, 24));
+  TestDateValue("years_sub(date '0125-05-24', 124)", DateValue(1, 5, 24));
   // Test leap years.
   TestDateValue("years_add(date '2000-02-29', 1)", DateValue(2001, 2, 28));
   TestDateValue("years_add(date '2000-02-29', 4)", DateValue(2004, 2, 29));
   TestDateValue("years_sub(date '2000-02-29', 1)", DateValue(1999, 2, 28));
   TestDateValue("years_sub(date '2000-02-29', 4)", DateValue(1996, 2, 29));
   // Test upper and lower limit
-  TestDateValue("years_add(date'0000-12-31', 9999)", DateValue(9999, 12, 31));
-  TestIsNull("years_add(date'0000-12-31', 10000)", TYPE_DATE);
-  TestDateValue("years_sub(date'9999-01-01', 9999)", DateValue(0, 1, 1));
-  TestIsNull("years_sub(date'9999-01-01', 10000)", TYPE_DATE);
+  TestDateValue("years_add(date'0001-12-31', 9998)", DateValue(9999, 12, 31));
+  TestIsNull("years_add(date'0001-12-31', 9999)", TYPE_DATE);
+  TestDateValue("years_sub(date'9999-01-01', 9998)", DateValue(1, 1, 1));
+  TestIsNull("years_sub(date'9999-01-01', 9999)", TYPE_DATE);
   // Test max int64
-  TestIsNull("years_add(date'0000-01-01', 2147483647)", TYPE_DATE);
+  TestIsNull("years_add(date'0001-01-01', 2147483647)", TYPE_DATE);
   TestIsNull("years_sub(date'9999-12-31', 2147483647)", TYPE_DATE);
   // Test NULL values
   TestIsNull("years_add(cast(NULL as date), 1)", TYPE_DATE);
@@ -7995,9 +7993,9 @@ TEST_P(ExprTest, DateFunctions) {
   // months_add, add_months, months_sub:
   TestDateValue("months_add(date '0005-01-29', 0)", DateValue(5, 1, 29));
   TestDateValue("months_sub(date '0005-01-29', 0)", DateValue(5, 1, 29));
-  TestDateValue("add_months(date '0005-01-29', -60)", DateValue(0, 1, 29));
-  TestDateValue("months_add(date '0005-01-29', -60)", DateValue(0, 1, 29));
-  TestDateValue("months_sub(date '0005-01-29', 60)", DateValue(0, 1, 29));
+  TestDateValue("add_months(date '0005-01-29', -48)", DateValue(1, 1, 29));
+  TestDateValue("months_add(date '0005-01-29', -48)", DateValue(1, 1, 29));
+  TestDateValue("months_sub(date '0005-01-29', 48)", DateValue(1, 1, 29));
   TestDateValue("add_months(date '9995-01-29', 59)", DateValue(9999, 12, 29));
   TestDateValue("months_add(date '9995-01-29', 59)", DateValue(9999, 12, 29));
   TestDateValue("months_sub(date '9995-01-29', -59)", DateValue(9999, 12, 29));
@@ -8008,13 +8006,13 @@ TEST_P(ExprTest, DateFunctions) {
   TestDateValue("months_sub(date '2000-03-31', 1)", DateValue(2000, 2, 29));
   TestDateValue("months_add(date '2000-03-31', -2)", DateValue(2000, 1, 31));
   // Test upper and lower limit.
-  // 12 * 9999 == 119988
-  TestDateValue("months_add(date '0000-12-31', 119988)", DateValue(9999, 12, 31));
-  TestIsNull("months_add(date'0000-12-31', 119989)", TYPE_DATE);
-  TestDateValue("months_sub(date '9999-01-01', 119988)", DateValue(0, 1, 1));
-  TestIsNull("months_sub(date'9999-01-01', 119989)", TYPE_DATE);
+  // 12 * 9998 == 119976
+  TestDateValue("months_add(date '0001-12-31', 119976)", DateValue(9999, 12, 31));
+  TestIsNull("months_add(date'0001-12-31', 119977)", TYPE_DATE);
+  TestDateValue("months_sub(date '9999-01-01', 119976)", DateValue(1, 1, 1));
+  TestIsNull("months_sub(date'9999-01-01', 119977)", TYPE_DATE);
   // Test max int64
-  TestIsNull("months_add(date'0000-01-01', 2147483647)", TYPE_DATE);
+  TestIsNull("months_add(date'0001-01-01', 2147483647)", TYPE_DATE);
   TestIsNull("months_sub(date'9999-12-31', 2147483647)", TYPE_DATE);
   // Test NULL values
   TestIsNull("months_add(cast(NULL as date), 1)", TYPE_DATE);
@@ -8029,14 +8027,14 @@ TEST_P(ExprTest, DateFunctions) {
   TestDateValue("weeks_sub(date'2019-06-12', 24)", DateValue(2018, 12, 26));
   // Test leap year
   TestDateValue("weeks_add(date '2016-01-04', 8)", DateValue(2016, 2, 29));
-  // Test upper and ower limit. There are 3652424 days between 0000-01-01 and 9999-12-31.
-  // 3652424 days is 521774 weeks + 6 days.
-  TestDateValue("weeks_add(date'0000-01-01', 521774)", DateValue(9999, 12, 25));
-  TestIsNull("weeks_add(date'0000-01-01', 521775)", TYPE_DATE);
-  TestDateValue("weeks_sub(date'9999-12-31', 521774)", DateValue(0, 1, 7));
-  TestIsNull("weeks_sub(date'9999-12-31', 521775)", TYPE_DATE);
+  // Test upper and ower limit. There are 3652058 days between 0001-01-01 and 9999-12-31.
+  // 3652058 days is 521722 weeks + 4 days.
+  TestDateValue("weeks_add(date'0001-01-01', 521722)", DateValue(9999, 12, 27));
+  TestIsNull("weeks_add(date'0001-01-01', 521723)", TYPE_DATE);
+  TestDateValue("weeks_sub(date'9999-12-31', 521722)", DateValue(1, 1, 5));
+  TestIsNull("weeks_sub(date'9999-12-31', 521723)", TYPE_DATE);
   // Test max int64
-  TestIsNull("weeks_add(date'0000-01-01', 2147483647)", TYPE_DATE);
+  TestIsNull("weeks_add(date'0001-01-01', 2147483647)", TYPE_DATE);
   TestIsNull("weeks_sub(date'9999-12-31', 2147483647)", TYPE_DATE);
   // Test NULL values
   TestIsNull("weeks_sub(cast(NULL as date), 1)", TYPE_DATE);
@@ -8051,13 +8049,13 @@ TEST_P(ExprTest, DateFunctions) {
   // Test leap year
   TestDateValue("date_add(date'2016-01-01', 366)", DateValue(2017, 1, 1));
   TestDateValue("subdate(date'2016-12-31', 366)", DateValue(2015, 12, 31));
-  // Test uper and lower limit. There are 3652424 days between 0000-01-01 and 9999-12-31.
-  TestDateValue("days_add(date '0000-01-01', 3652424)", DateValue(9999, 12, 31));
-  TestIsNull("date_add(date '0000-01-01', 3652425)", TYPE_DATE);
-  TestDateValue("days_sub(date '9999-12-31', 3652424)", DateValue(0, 1, 1));
-  TestIsNull("date_sub(date '9999-12-31', 3652425)", TYPE_DATE);
+  // Test upper and lower limit. There are 3652058 days between 0001-01-01 and 9999-12-31.
+  TestDateValue("days_add(date '0001-01-01', 3652058)", DateValue(9999, 12, 31));
+  TestIsNull("date_add(date '0001-01-01', 3652059)", TYPE_DATE);
+  TestDateValue("days_sub(date '9999-12-31', 3652058)", DateValue(1, 1, 1));
+  TestIsNull("date_sub(date '9999-12-31', 3652059)", TYPE_DATE);
   // Test max int64
-  TestIsNull("days_add(date'0000-01-01', 2147483647)", TYPE_DATE);
+  TestIsNull("days_add(date'0001-01-01', 2147483647)", TYPE_DATE);
   TestIsNull("days_sub(date'9999-12-31', 2147483647)", TYPE_DATE);
   // Test NULL values
   TestIsNull("days_add(cast(NULL as date), 1)", TYPE_DATE);
@@ -8072,9 +8070,9 @@ TEST_P(ExprTest, DateFunctions) {
   TestDateValue("date_sub(date '2000-02-29', interval 4 year)", DateValue(1996, 2, 29));
   TestDateValue("date '2000-02-29' + interval 1 year", DateValue(2001, 2, 28));
   TestDateValue("date '2000-02-29' + interval 4 years", DateValue(2004, 2, 29));
-  TestDateValue("date '0000-12-31' + interval 9999 years", DateValue(9999, 12, 31));
-  TestIsNull("date '0000-12-31' + interval 10000 years", TYPE_DATE);
-  TestIsNull("date '0000-01-01' + interval 2147483647 years", TYPE_DATE);
+  TestDateValue("date '0001-12-31' + interval 9998 years", DateValue(9999, 12, 31));
+  TestIsNull("date '0001-12-31' + interval 9999 years", TYPE_DATE);
+  TestIsNull("date '0001-01-01' + interval 2147483647 years", TYPE_DATE);
   // Test month interval expressions. Keep-last-day-of-month behavior is not enforced.
   TestDateValue("date_add(date '2000-02-29', interval 1 month)", DateValue(2000, 3, 29));
   TestDateValue("date_add(date '1999-02-28', interval 12 months)",
@@ -8084,8 +8082,8 @@ TEST_P(ExprTest, DateFunctions) {
       DateValue(2000, 1, 31));
   TestDateValue("date '2000-02-29' + interval 1 month", DateValue(2000, 3, 29));
   TestDateValue("date '2000-03-31' - interval 2 months", DateValue(2000, 1, 31));
-  TestDateValue("date '9999-01-01' - interval 119988 months", DateValue(0, 1, 1));
-  TestIsNull("date'9999-01-01' - interval 119989 months", TYPE_DATE);
+  TestDateValue("date '9999-01-01' - interval 119976 months", DateValue(1, 1, 1));
+  TestIsNull("date'9999-01-01' - interval 119977 months", TYPE_DATE);
   TestIsNull("date'9999-12-31' - interval 2147483647 months", TYPE_DATE);
   // Test week interval expressions.
   TestDateValue("date_add(date'2019-06-12', interval -24 weeks)",
@@ -8094,15 +8092,15 @@ TEST_P(ExprTest, DateFunctions) {
   TestDateValue("date_add(date '2016-01-04', interval 8 weeks)", DateValue(2016, 2, 29));
   TestDateValue("date '2019-06-12' - interval 24 weeks", DateValue(2018, 12, 26));
   TestDateValue("date '2018-12-26' + interval 24 weeks", DateValue(2019, 6, 12));
-  TestDateValue("date '9999-12-31' - interval 521774 weeks", DateValue(0, 1, 7));
-  TestIsNull("date '9999-12-31' - interval 521775 weeks", TYPE_DATE);
+  TestDateValue("date '9999-12-31' - interval 521722 weeks", DateValue(1, 1, 5));
+  TestIsNull("date '9999-12-31' - interval 521723 weeks", TYPE_DATE);
   TestIsNull("date'9999-12-31' - interval 2147483647 weeks", TYPE_DATE);
   // Test day interval expressions.
   TestDateValue("date_add(date '2019-01-01', interval 365 days)", DateValue(2020, 1, 1));
   TestDateValue("date_sub(date '2016-12-31', interval 366 days)",
       DateValue(2015, 12, 31));
-  TestDateValue("date '0000-01-01' + interval 3652424 days", DateValue(9999, 12, 31));
-  TestIsNull("date '0000-01-01' + interval 3652425 days", TYPE_DATE);
+  TestDateValue("date '0001-01-01' + interval 3652058 days", DateValue(9999, 12, 31));
+  TestIsNull("date '0001-01-01' + interval 3652059 days", TYPE_DATE);
   TestIsNull("date '9999-12-31' - interval 2147483647 days", TYPE_DATE);
   // Test NULL values.
   TestIsNull("date_add(date '2019-01-01', interval cast(NULL as BIGINT) days)",
@@ -8122,10 +8120,10 @@ TEST_P(ExprTest, DateFunctions) {
   TestValue("datediff(date'2021-01-01', date '2020-01-01')", TYPE_INT, 366);
   TestValue("datediff('2020-01-01', date '2021-01-01')", TYPE_INT, -366);
   // Test difference between min and max date
-  TestValue("datediff(date'9999-12-31', date '0000-01-01')", TYPE_INT, 3652424);
-  TestValue("datediff(date'0000-01-01', '9999-12-31')", TYPE_INT, -3652424);
+  TestValue("datediff(date'9999-12-31', date '0001-01-01')", TYPE_INT, 3652058);
+  TestValue("datediff(date'0001-01-01', '9999-12-31')", TYPE_INT, -3652058);
   // Test NULL values
-  TestIsNull("datediff(cast(NULL as DATE), date '0000-01-01')", TYPE_INT);
+  TestIsNull("datediff(cast(NULL as DATE), date '0001-01-01')", TYPE_INT);
   TestIsNull("datediff(date'9999-12-31', cast(NULL as date))", TYPE_INT);
   TestIsNull("datediff(cast(NULL as DATE), cast(NULL as date))", TYPE_INT);
 
@@ -8138,7 +8136,7 @@ TEST_P(ExprTest, DateFunctions) {
   TestIsNull("date_cmp(cast(NULL as date), date '2019-06-11')", TYPE_INT);
   TestIsNull("date_cmp(cast(NULL as DATE), cast(NULL as date))", TYPE_INT);
   // Test upper and lower limit
-  TestValue("date_cmp(date '9999-12-31', '0000-01-01')", TYPE_INT, 1);
+  TestValue("date_cmp(date '9999-12-31', '0001-01-01')", TYPE_INT, 1);
 
   // int_months_between:
   TestValue("int_months_between(date '1967-07-19','1966-06-04')", TYPE_INT, 13);
@@ -8146,8 +8144,8 @@ TEST_P(ExprTest, DateFunctions) {
   TestValue("int_months_between(date '1967-07-19','1967-07-19')", TYPE_INT, 0);
   TestValue("int_months_between('2015-07-19', date '2015-08-18')", TYPE_INT, 0);
   // Test lower and upper limit
-  TestValue("int_months_between(date '9999-12-31','0000-01-01')", TYPE_INT,
-      9999 * 12 + 11);
+  TestValue("int_months_between(date '9999-12-31','0001-01-01')", TYPE_INT,
+      9998 * 12 + 11);
   // Test NULL values
   TestIsNull("int_months_between(date '1999-11-25', cast(NULL as date))", TYPE_INT);
   TestIsNull("int_months_between(cast(NULL as DATE), date '1999-11-25')", TYPE_INT);

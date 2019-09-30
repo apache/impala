@@ -584,7 +584,7 @@ struct TimestampVal : public AnyVal {
 };
 
 /// Represents a DATE value.
-/// - The minimum and maximum dates are 0000-01-01 and 9999-12-31. Valid dates must fall
+/// - The minimum and maximum dates are 0001-01-01 and 9999-12-31. Valid dates must fall
 ///   in this range.
 /// - Internally represents DATE values as number of days since 1970-01-01.
 /// - This representation was chosen to be the same (bit-by-bit) as Parquet's date type.

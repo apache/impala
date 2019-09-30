@@ -42,7 +42,7 @@ bigint
 ---- QUERY
 select count(*) from date_tbl
 where date_col in ('2017-11-28', '0001-1-1', DATE '9999-12-31', '0001-06-25',
-DATE '0001-6-23', '2018-12-31', '0000-01-01', '2018-12-31')
+DATE '0001-6-23', '2018-12-31', '0001-01-01', '2018-12-31')
 ---- RESULTS
 9
 ---- TYPES
@@ -59,7 +59,7 @@ bigint
 ---- QUERY
 select count(*) from date_tbl
 where date_col not in ('2017-11-28', '0001-1-1', DATE '9999-12-31', '0001-06-25',
-DATE '0001-6-23', '2018-12-31', '0000-01-01', '2018-12-31')
+DATE '0001-6-23', '2018-12-31', '0001-01-01', '2018-12-31')
 ---- RESULTS
 11
 ---- TYPES
@@ -91,12 +91,18 @@ not between '2017-11-28' and '2017-11-28'
 bigint
 ====
 ---- QUERY
-# Test 0000-01-01 date handling during string to date conversion.
-select CAST("0000-01-01" AS DATE);
+# Test 0001-01-01 date handling during string to date conversion.
+select CAST("0001-01-01" AS DATE);
 ---- RESULTS
-0000-01-01
+0001-01-01
 ---- TYPES
 DATE
+====
+---- QUERY
+# Test < 0001 date handling during string to date conversion.
+select CAST("0000-01-01" AS DATE);
+---- CATCH
+UDF ERROR: String to Date parse failed. Invalid string val: "0000-01-01"
 ====
 ---- QUERY
 # Test <1400 date handling during string to date conversion.
@@ -125,12 +131,18 @@ select CAST("not a date" AS DATE);
 UDF ERROR: String to Date parse failed. Invalid string val: "not a date"
 ====
 ---- QUERY
-# Test 0000-01-01 and 9999-12-31 date literal
-select DATE "0000-01-01", DATE '9999-12-31';
+# Test 0001-01-01 and 9999-12-31 date literal
+select DATE "0001-01-01", DATE '9999-12-31';
 ---- RESULTS
-0000-01-01,9999-12-31
+0001-01-01,9999-12-31
 ---- TYPES
 DATE,DATE
+====
+---- QUERY
+# Test < 0001 date literal.
+select DATE "0000-01-01";
+---- CATCH
+AnalysisException: Invalid date literal: '0000-01-01'
 ====
 ---- QUERY
 # Test >=10000 date literal.
@@ -854,9 +866,9 @@ PARSE ERROR: Time tokens provided with date type.
 ====
 ---- QUERY
 # Boundary tests with FORMAT clause
-select cast("0000-01-01" as date FORMAT "YYYY-MM-DD");
+select cast("0001-01-01" as date FORMAT "YYYY-MM-DD");
 ---- RESULTS
-0000-01-01
+0001-01-01
 ====
 ---- QUERY
 select cast("9999-12-31" as date FORMAT "YYYY-MM-DD");

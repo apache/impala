@@ -323,9 +323,9 @@ public class ColumnStats {
         colStatsData.setLongStats(new LongColumnStatsData(numNulls, ndv));
         break;
       case DATE:
-        // Number of distinct dates in the 0000-01-01..9999-12-31 inclusive range is
-        // 3652425.
-        ndv = Math.min(ndv, 3652425);
+        // Number of distinct dates in the 0001-01-01..9999-12-31 inclusive range is
+        // 3652059.
+        ndv = Math.min(ndv, 3652059);
         colStatsData.setDateStats(new DateColumnStatsData(numNulls, ndv));
         break;
       case BIGINT:

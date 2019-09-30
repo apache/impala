@@ -42,7 +42,7 @@ select * from bad_avro_date_out_of_range;
 DATE
 ---- ERRORS
 Problem parsing file $NAMENODE/test-warehouse/bad_avro_date_out_of_range_avro_snap/out_of_range_date.avro at 204
-Avro file '$NAMENODE/test-warehouse/bad_avro_date_out_of_range_avro_snap/out_of_range_date.avro' is corrupt: out of range date value -719530 at offset 204. The valid date range is -719528..2932896 (0000-01-01..9999-12-31).
+Avro file '$NAMENODE/test-warehouse/bad_avro_date_out_of_range_avro_snap/out_of_range_date.avro' is corrupt: out of range date value -719530 at offset 204. The valid date range is -719162..2932896 (0001-01-01..9999-12-31).
 ====
 ---- QUERY
 # Query an avro table created by Hive 2.1.1 containig the following dates:

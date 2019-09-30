@@ -4,15 +4,11 @@
 ---- QUERY
 # TODO: Once DATE type is supported across all fileformats, move this test to
 # hdfs-scan-node.test.
+# Avro table was created by Hive2. Inserting '0001-01-01' to date_col resulted as
+# '0000-12-30' (because Hive2 uses Julian calendar for writing dates before 1582-10-15)
+# which is outside of the supported date range.
 select id_col, date_part, date_col from date_tbl;
 ---- RESULTS
-0,0001-01-01,0000-12-30
-1,0001-01-01,0001-12-29
-2,0001-01-01,0001-12-30
-3,0001-01-01,1400-01-08
-4,0001-01-01,2017-11-28
-5,0001-01-01,9999-12-31
-6,0001-01-01,NULL
 10,1399-06-27,2017-11-28
 11,1399-06-27,NULL
 12,1399-06-27,2018-12-31
@@ -30,6 +26,9 @@ select id_col, date_part, date_col from date_tbl;
 31,9999-12-31,9999-12-31
 ---- TYPES
 INT,DATE,DATE
+---- ERRORS
+Problem parsing file __HDFS_FILENAME__ at 253
+Avro file '__HDFS_FILENAME__' is corrupt: out of range date value -719164 at offset 253. The valid date range is -719162..2932896 (0001-01-01..9999-12-31).
 ====
 ---- HIVE_MAJOR_VERSION
 3
@@ -61,6 +60,25 @@ select id_col, date_part, date_col from date_tbl;
 ---- TYPES
 INT,DATE,DATE
 ====
+---- HIVE_MAJOR_VERSION
+2
+---- QUERY
+# Avro table was created by Hive2. Inserting '0001-01-01' to date_col resulted as
+# '0000-12-30' (because Hive2 uses Julian calendar for writing dates before 1582-10-15)
+# which is outside of the supported date range.
+select date_part, count(date_col) from date_tbl group by date_part;
+---- RESULTS
+2017-11-27,10
+1399-06-27,2
+9999-12-31,2
+---- TYPES
+DATE, BIGINT
+---- ERRORS
+Problem parsing file __HDFS_FILENAME__ at 253
+Avro file '__HDFS_FILENAME__' is corrupt: out of range date value -719164 at offset 253. The valid date range is -719162..2932896 (0001-01-01..9999-12-31).
+====
+---- HIVE_MAJOR_VERSION
+3
 ---- QUERY
 select date_part, count(date_col) from date_tbl group by date_part;
 ---- RESULTS
@@ -74,11 +92,17 @@ DATE, BIGINT
 ---- HIVE_MAJOR_VERSION
 2
 ---- QUERY
+# Avro table was created by Hive2. Inserting '0001-01-01' to date_col resulted as
+# '0000-12-30' (because Hive2 uses Julian calendar for writing dates before 1582-10-15)
+# which is outside of the supported date range.
 select min(date_part), max(date_part), min(date_col), max(date_col) from date_tbl;
 ---- RESULTS
-0001-01-01,9999-12-31,0000-12-30,9999-12-31
+1399-06-27,9999-12-31,0001-06-19,9999-12-31
 ---- TYPES
 DATE, DATE, DATE, DATE
+---- ERRORS
+Problem parsing file __HDFS_FILENAME__ at 253
+Avro file '__HDFS_FILENAME__' is corrupt: out of range date value -719164 at offset 253. The valid date range is -719162..2932896 (0001-01-01..9999-12-31).
 ====
 ---- HIVE_MAJOR_VERSION
 3
@@ -92,14 +116,19 @@ DATE, DATE, DATE, DATE
 ---- HIVE_MAJOR_VERSION
 2
 ---- QUERY
+# Avro table was created by Hive2. Inserting '0001-01-01' to date_col resulted as
+# '0000-12-30' (because Hive2 uses Julian calendar for writing dates before 1582-10-15)
+# which is outside of the supported date range.
 select date_part, min(date_col), max(date_col) from date_tbl group by date_part;
 ---- RESULTS
 2017-11-27,0001-06-19,2017-11-28
 1399-06-27,2017-11-28,2018-12-31
 9999-12-31,9999-12-01,9999-12-31
-0001-01-01,0000-12-30,9999-12-31
 ---- TYPES
 DATE, DATE, DATE
+---- ERRORS
+Problem parsing file __HDFS_FILENAME__ at 253
+Avro file '__HDFS_FILENAME__' is corrupt: out of range date value -719164 at offset 253. The valid date range is -719162..2932896 (0001-01-01..9999-12-31).
 ====
 ---- HIVE_MAJOR_VERSION
 3

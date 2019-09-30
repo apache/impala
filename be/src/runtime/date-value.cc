@@ -31,7 +31,7 @@ using datetime_parse_util::GetMonthAndDayFromDaysSinceJan1;
 using datetime_parse_util::IsLeapYear;
 
 const int EPOCH_YEAR = 1970;
-const int MIN_YEAR = 0;
+const int MIN_YEAR = 1;
 const int MAX_YEAR = 9999;
 
 const cctz::civil_day EPOCH_DATE(EPOCH_YEAR, 1, 1);
@@ -230,11 +230,9 @@ int DateValue::WeekOfYear() const {
     last_sunday = cctz::prev_weekday(dec31, cctz::weekday::sunday);
   }
 
-  if (UNLIKELY(today.year() == 0 && today < first_monday)) {
-    // 0000-01-01 is Saturday in the proleptic Gregorian calendar.
-    // 0000-01-01 and 0000-01-02 belong to the previous year.
-    return 52;
-  } else if (today >= first_monday && today <= last_sunday) {
+  // 0001-01-01 is Monday in the proleptic Gregorian calendar.
+  // 0001-01-01 belongs to year 0001.
+  if (today >= first_monday && today <= last_sunday) {
     return (today - first_monday) / 7 + 1;
   } else if (today > last_sunday) {
     return 1;
@@ -254,7 +252,11 @@ int DateValue::WeekOfYear() const {
 }
 
 DateValue DateValue::AddDays(int64_t days) const {
-  if (UNLIKELY(!IsValid())) return DateValue();
+  if (UNLIKELY(!IsValid()
+      || days < MIN_DAYS_SINCE_EPOCH - days_since_epoch_
+      || days > MAX_DAYS_SINCE_EPOCH - days_since_epoch_)) {
+    return DateValue();
+  }
   return DateValue(days_since_epoch_ + days);
 }
 
@@ -262,6 +264,11 @@ DateValue DateValue::AddMonths(int64_t months, bool keep_last_day) const {
   if (UNLIKELY(!IsValid())) return DateValue();
 
   const cctz::civil_day today = EPOCH_DATE + days_since_epoch_;
+  int64_t total_months = today.year()*12 + today.month() - 1;
+  if (UNLIKELY(months < MIN_YEAR*12 - total_months
+      || months > MAX_YEAR*12 + 11 - total_months)) {
+    return DateValue();
+  }
   const cctz::civil_month month = cctz::civil_month(today);
   const cctz::civil_month result_month = month + months;
   const cctz::civil_day last_day_of_result_month =
@@ -285,6 +292,9 @@ DateValue DateValue::AddYears(int64_t years) const {
   if (UNLIKELY(!IsValid())) return DateValue();
 
   const cctz::civil_day today = EPOCH_DATE + days_since_epoch_;
+  if (UNLIKELY(years < MIN_YEAR - today.year() || years > MAX_YEAR - today.year())) {
+    return DateValue();
+  }
   const int64_t result_year = today.year() + years;
 
   // Feb 29 in leap years requires special attention.

@@ -49,7 +49,7 @@ TEST_F(RawValueTest, Compare) {
   EXPECT_GT(RawValue::Compare(&s1, &s2, TYPE_SMALLINT), 0);
   EXPECT_LT(RawValue::Compare(&s2, &s1, TYPE_SMALLINT), 0);
 
-  DateValue d1(-719528), d2(719528);
+  DateValue d1(-719162), d2(719162);
   EXPECT_LT(RawValue::Compare(&d1, &d2, TYPE_DATE), 0);
   EXPECT_GT(RawValue::Compare(&d2, &d1, TYPE_DATE), 0);
 }

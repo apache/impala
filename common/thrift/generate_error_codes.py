@@ -410,7 +410,7 @@ error_codes = (
 
   ("PARQUET_DATE_OUT_OF_RANGE", 134,
    "Parquet file '$0' column '$1' contains an out of range date. "
-   "The valid date range is 0000-01-01..9999-12-31."),
+   "The valid date range is 0001-01-01..9999-12-31."),
 
   ("DISCONNECTED_SESSION_CLOSED", 135,
    "Session closed because it has no active connections"),
@@ -437,7 +437,7 @@ error_codes = (
    "maximum statement length ($1 bytes)"),
 
   ("AVRO_INVALID_DATE", 144, "Avro file '$0' is corrupt: out of range date value $1 "
-   "at offset $2. The valid date range is -719528..2932896 (0000-01-01..9999-12-31)."),
+   "at offset $2. The valid date range is -719162..2932896 (0001-01-01..9999-12-31)."),
 )
 
 import sys

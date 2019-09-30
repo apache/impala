@@ -7,8 +7,8 @@ SELECT * FROM $DATABASE.out_of_range_date;
 DATE
 ---- RESULTS
 NULL
-0000-01-01
-0000-01-02
+NULL
+NULL
 1969-12-31
 1970-01-01
 1970-01-02
@@ -16,12 +16,12 @@ NULL
 9999-12-31
 NULL
 ---- ERRORS
-Parquet file '$NAMENODE/test-warehouse/$DATABASE.db/out_of_range_date/out_of_range_date.parquet' column 'v' contains an out of range date. The valid date range is 0000-01-01..9999-12-31. (1 of 2 similar)
+Parquet file '$NAMENODE/test-warehouse/$DATABASE.db/out_of_range_date/out_of_range_date.parquet' column 'v' contains an out of range date. The valid date range is 0001-01-01..9999-12-31. (1 of 4 similar)
 ====
 ---- QUERY
 # Out of range DATE values in a parquet table.
 set abort_on_error=1;
 SELECT * FROM $DATABASE.out_of_range_date;
 ---- CATCH
-Parquet file '$NAMENODE/test-warehouse/$DATABASE.db/out_of_range_date/out_of_range_date.parquet' column 'v' contains an out of range date. The valid date range is 0000-01-01..9999-12-31.
+Parquet file '$NAMENODE/test-warehouse/$DATABASE.db/out_of_range_date/out_of_range_date.parquet' column 'v' contains an out of range date. The valid date range is 0001-01-01..9999-12-31.
 ====
