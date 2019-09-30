@@ -1319,6 +1319,16 @@ abstract public class Expr extends TreeNode<Expr> implements ParseNode, Cloneabl
   }
 
   /**
+   * Return true if and only if all exprs in 'exprs' are constant.
+   */
+  public static boolean allConstant(List<Expr> exprs) {
+    for (Expr p: exprs) {
+      if (!p.isConstant()) return false;
+    }
+    return true;
+  }
+
+  /**
    * Return true if this expr is a scalar subquery.
    */
   public boolean isScalarSubquery() {

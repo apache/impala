@@ -27,13 +27,8 @@ import org.apache.impala.analysis.AnalyticExpr;
 import org.apache.impala.analysis.AnalyticInfo;
 import org.apache.impala.analysis.AnalyticWindow;
 import org.apache.impala.analysis.Analyzer;
-import org.apache.impala.analysis.BinaryPredicate;
-import org.apache.impala.analysis.BoolLiteral;
-import org.apache.impala.analysis.CompoundPredicate;
-import org.apache.impala.analysis.CompoundPredicate.Operator;
 import org.apache.impala.analysis.Expr;
 import org.apache.impala.analysis.ExprSubstitutionMap;
-import org.apache.impala.analysis.IsNullPredicate;
 import org.apache.impala.analysis.OrderByElement;
 import org.apache.impala.analysis.SlotDescriptor;
 import org.apache.impala.analysis.SlotRef;
@@ -81,18 +76,6 @@ public class AnalyticPlanner {
     analyticInfo_ = analyticInfo;
     analyzer_ = analyzer;
     ctx_ = ctx;
-  }
-
-  /**
-   * Return true if and only if exprs is non-empty and contains non-constant
-   * expressions.
-   */
-  private boolean activeExprs(List<Expr> exprs) {
-    if (exprs.isEmpty())  return false;
-    for (Expr p: exprs) {
-      if (!p.isConstant()) { return true; }
-    }
-    return false;
   }
 
   /**
@@ -248,7 +231,7 @@ public class AnalyticPlanner {
     // remove the non-partitioning group from partitionGroups
     PartitionGroup nonPartitioning = null;
     for (PartitionGroup pg: partitionGroups) {
-      if (!activeExprs(pg.partitionByExprs)) {
+      if (Expr.allConstant(pg.partitionByExprs)) {
         nonPartitioning = pg;
         break;
       }
@@ -349,12 +332,7 @@ public class AnalyticPlanner {
       List<Expr> partitionExprs) throws ImpalaException {
     List<Expr> partitionByExprs = sortGroup.partitionByExprs;
     List<OrderByElement> orderByElements = sortGroup.orderByElements;
-    ExprSubstitutionMap sortSmap = null;
-    TupleId sortTupleId = null;
-    TupleDescriptor bufferedTupleDesc = null;
-    // map from input to buffered tuple
-    ExprSubstitutionMap bufferedSmap = new ExprSubstitutionMap();
-    boolean activePartition = activeExprs(partitionByExprs);
+    boolean hasActivePartition = !Expr.allConstant(partitionByExprs);
 
     // IMPALA-8069: Ignore something like ORDER BY 0
     boolean isConstSort = true;
@@ -362,7 +340,7 @@ public class AnalyticPlanner {
       isConstSort = isConstSort && elmt.getExpr().isConstant();
     }
     // sort on partition by (pb) + order by (ob) exprs and create pb/ob predicates
-    if (activePartition || !isConstSort) {
+    if (hasActivePartition || !isConstSort) {
       // first sort on partitionExprs (direction doesn't matter)
       List<Expr> sortExprs = Lists.newArrayList(partitionByExprs);
       List<Boolean> isAsc =
@@ -389,12 +367,12 @@ public class AnalyticPlanner {
 
       // if this sort group does not have partitioning exprs, we want the sort
       // to be executed like a regular distributed sort
-      if (activePartition) sortNode.setIsAnalyticSort(true);
+      if (hasActivePartition) sortNode.setIsAnalyticSort(true);
 
       if (partitionExprs != null) {
         // create required input partition
         DataPartition inputPartition = DataPartition.UNPARTITIONED;
-        if (activePartition) {
+        if (hasActivePartition) {
           inputPartition = DataPartition.hashPartitioned(partitionExprs);
         }
         sortNode.setInputPartition(inputPartition);
@@ -403,106 +381,17 @@ public class AnalyticPlanner {
       root = sortNode;
       root.init(analyzer_);
     }
-    if (activePartition || !orderByElements.isEmpty()) {
-      sortSmap = root.getOutputSmap();
-
-      // create bufferedTupleDesc and bufferedSmap
-      sortTupleId = root.tupleIds_.get(0);
-      bufferedTupleDesc =
-          analyzer_.getDescTbl().copyTupleDescriptor(sortTupleId, "buffered-tuple");
-      if (LOG.isTraceEnabled()) {
-        LOG.trace("desctbl: " + analyzer_.getDescTbl().debugString());
-      }
-
-      List<SlotDescriptor> inputSlots = analyzer_.getTupleDesc(sortTupleId).getSlots();
-      List<SlotDescriptor> bufferedSlots = bufferedTupleDesc.getSlots();
-      for (int i = 0; i < inputSlots.size(); ++i) {
-        bufferedSmap.put(
-            new SlotRef(inputSlots.get(i)), new SlotRef(bufferedSlots.get(i)));
-      }
-    }
 
     // create one AnalyticEvalNode per window group
     for (WindowGroup windowGroup: sortGroup.windowGroups) {
-      // Create partition-by (pb) and order-by (ob) less-than predicates between the
-      // input tuple (the output of the preceding sort) and a buffered tuple that is
-      // identical to the input tuple. We need a different tuple descriptor for the
-      // buffered tuple because the generated predicates should compare two different
-      // tuple instances from the same input stream (i.e., the predicates should be
-      // evaluated over a row that is composed of the input and the buffered tuple).
-
-      // we need to remap the pb/ob exprs to a) the sort output, b) our buffer of the
-      // sort input
-      Expr partitionByEq = null;
-      if (activeExprs(windowGroup.partitionByExprs)) {
-        partitionByEq = createNullMatchingEquals(
-            Expr.substituteList(windowGroup.partitionByExprs, sortSmap, analyzer_, false),
-            sortTupleId, bufferedSmap);
-        if (LOG.isTraceEnabled()) {
-          LOG.trace("partitionByEq: " + partitionByEq.debugString());
-        }
-      }
-      Expr orderByEq = null;
-      if (!windowGroup.orderByElements.isEmpty()) {
-        orderByEq = createNullMatchingEquals(
-            OrderByElement.getOrderByExprs(OrderByElement.substitute(
-                windowGroup.orderByElements, sortSmap, analyzer_)),
-            sortTupleId, bufferedSmap);
-        if (LOG.isTraceEnabled()) {
-          LOG.trace("orderByEq: " + orderByEq.debugString());
-        }
-      }
-
       root = new AnalyticEvalNode(ctx_.getNextNodeId(), root,
           windowGroup.analyticFnCalls, windowGroup.partitionByExprs,
           windowGroup.orderByElements, windowGroup.window,
           windowGroup.physicalIntermediateTuple, windowGroup.physicalOutputTuple,
-          windowGroup.logicalToPhysicalSmap,
-          partitionByEq, orderByEq, bufferedTupleDesc);
+          windowGroup.logicalToPhysicalSmap);
       root.init(analyzer_);
     }
     return root;
-  }
-
-  /**
-   * Create a predicate that checks if all exprs are equal or both sides are null.
-   */
-  private Expr createNullMatchingEquals(List<Expr> exprs, TupleId inputTid,
-      ExprSubstitutionMap bufferedSmap) {
-    Preconditions.checkState(!exprs.isEmpty());
-    Expr result = createNullMatchingEqualsAux(exprs, 0, inputTid, bufferedSmap);
-    result.analyzeNoThrow(analyzer_);
-    return result;
-  }
-
-  /**
-   * Create an unanalyzed predicate that checks if elements >= i are equal or
-   * both sides are null.
-   *
-   * The predicate has the form
-   * ((lhs[i] is null && rhs[i] is null) || (
-   *   lhs[i] is not null && rhs[i] is not null && lhs[i] = rhs[i]))
-   * && <createEqualsAux(i + 1)>
-   */
-  private Expr createNullMatchingEqualsAux(List<Expr> elements, int i,
-      TupleId inputTid, ExprSubstitutionMap bufferedSmap) {
-    if (i > elements.size() - 1) return new BoolLiteral(true);
-
-    // compare elements[i]
-    Expr lhs = elements.get(i);
-    Preconditions.checkState(lhs.isBound(inputTid));
-    Expr rhs = lhs.substitute(bufferedSmap, analyzer_, false);
-
-    Expr bothNull = new CompoundPredicate(Operator.AND,
-        new IsNullPredicate(lhs, false), new IsNullPredicate(rhs, false));
-    Expr lhsEqRhsNotNull = new CompoundPredicate(Operator.AND,
-        new CompoundPredicate(Operator.AND,
-            new IsNullPredicate(lhs, true), new IsNullPredicate(rhs, true)),
-        new BinaryPredicate(BinaryPredicate.Operator.EQ, lhs, rhs));
-    Expr remainder = createNullMatchingEqualsAux(elements, i + 1, inputTid, bufferedSmap);
-    return new CompoundPredicate(CompoundPredicate.Operator.AND,
-        new CompoundPredicate(Operator.OR, bothNull, lhsEqRhsNotNull),
-        remainder);
   }
 
   /**

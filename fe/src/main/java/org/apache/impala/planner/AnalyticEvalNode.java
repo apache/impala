@@ -25,10 +25,18 @@ import org.slf4j.LoggerFactory;
 
 import org.apache.impala.analysis.AnalyticWindow;
 import org.apache.impala.analysis.Analyzer;
+import org.apache.impala.analysis.BinaryPredicate;
+import org.apache.impala.analysis.BoolLiteral;
+import org.apache.impala.analysis.CompoundPredicate;
 import org.apache.impala.analysis.Expr;
 import org.apache.impala.analysis.ExprSubstitutionMap;
+import org.apache.impala.analysis.IsNullPredicate;
 import org.apache.impala.analysis.OrderByElement;
+import org.apache.impala.analysis.SlotDescriptor;
+import org.apache.impala.analysis.SlotRef;
 import org.apache.impala.analysis.TupleDescriptor;
+import org.apache.impala.analysis.TupleId;
+import org.apache.impala.analysis.CompoundPredicate.Operator;
 import org.apache.impala.thrift.TAnalyticNode;
 import org.apache.impala.thrift.TExplainLevel;
 import org.apache.impala.thrift.TPlanNode;
@@ -62,18 +70,18 @@ public class AnalyticEvalNode extends PlanNode {
   // physical output slots in outputTupleDesc_
   private final ExprSubstitutionMap logicalToPhysicalSmap_;
 
-  // predicates constructed from partitionExprs_/orderingExprs_ to
-  // compare input to buffered tuples
-  private final Expr partitionByEq_;
-  private final Expr orderByEq_;
-  private final TupleDescriptor bufferedTupleDesc_;
+  // Predicates constructed from partitionExprs_/orderingExprs_ to
+  // compare input to buffered tuples. Initialized by constructEqExprs().
+  // Must be recomputed if the sort tuple is changed, e.g. by projection.
+  private Expr partitionByEq_;
+  private Expr orderByEq_;
+  private TupleDescriptor bufferedTupleDesc_;
 
   public AnalyticEvalNode(
       PlanNodeId id, PlanNode input, List<Expr> analyticFnCalls,
       List<Expr> partitionExprs, List<OrderByElement> orderByElements,
       AnalyticWindow analyticWindow, TupleDescriptor intermediateTupleDesc,
-      TupleDescriptor outputTupleDesc, ExprSubstitutionMap logicalToPhysicalSmap,
-      Expr partitionByEq, Expr orderByEq, TupleDescriptor bufferedTupleDesc) {
+      TupleDescriptor outputTupleDesc, ExprSubstitutionMap logicalToPhysicalSmap) {
     super(id, "ANALYTIC");
     Preconditions.checkState(!tupleIds_.contains(outputTupleDesc.getId()));
     analyticFnCalls_ = analyticFnCalls;
@@ -83,9 +91,6 @@ public class AnalyticEvalNode extends PlanNode {
     intermediateTupleDesc_ = intermediateTupleDesc;
     outputTupleDesc_ = outputTupleDesc;
     logicalToPhysicalSmap_ = logicalToPhysicalSmap;
-    partitionByEq_ = partitionByEq;
-    orderByEq_ = orderByEq;
-    bufferedTupleDesc_ = bufferedTupleDesc;
     children_.add(input);
     computeTupleIds();
   }
@@ -131,7 +136,99 @@ public class AnalyticEvalNode extends PlanNode {
     substitutedPartitionExprs_ = Expr.substituteList(partitionExprs_, childSmap,
         analyzer, false);
     orderByElements_ = OrderByElement.substitute(orderByElements_, childSmap, analyzer);
+    constructEqExprs(analyzer);
     if (LOG.isTraceEnabled()) LOG.trace("evalnode: " + debugString());
+  }
+
+  /**
+   * Create partition-by (pb) and order-by (ob) less-than predicates between the input
+   * tuple (the output of the preceding sort, which is always the first tuple in the
+   * input row) and a buffered tuple that is identical to the input tuple. We need a
+   * different tuple descriptor for the buffered tuple because the generated predicates
+   * should compare two different tuple instances from the same input stream (i.e., the
+   * predicates should be evaluated over a row that is composed of the input and the
+   * buffered tuple).
+   *
+   * Requires 'substitutedPartitionExprs_' and 'orderByElements_' to be initialized.
+   * Sets 'partitionByEq_', 'orderByEq_' and 'bufferedTupleDesc_'.
+   */
+  private void constructEqExprs(Analyzer analyzer) {
+    // we need to remap the pb/ob exprs to a) the sort output, b) our buffer of the
+    // sort input
+    ExprSubstitutionMap bufferedSmap = new ExprSubstitutionMap();
+    TupleId sortTupleId = getChild(0).getTupleIds().get(0);
+    boolean hasActivePartition = !Expr.allConstant(substitutedPartitionExprs_);
+    boolean hasOrderBy = !orderByElements_.isEmpty();
+    if (hasActivePartition || hasOrderBy) {
+      // create bufferedTupleDesc and bufferedSmap
+      bufferedTupleDesc_ =
+          analyzer.getDescTbl().copyTupleDescriptor(sortTupleId, "buffered-tuple");
+      if (LOG.isTraceEnabled()) {
+        LOG.trace("desctbl: " + analyzer.getDescTbl().debugString());
+      }
+
+      List<SlotDescriptor> inputSlots = analyzer.getTupleDesc(sortTupleId).getSlots();
+      List<SlotDescriptor> bufferedSlots = bufferedTupleDesc_.getSlots();
+      for (int i = 0; i < inputSlots.size(); ++i) {
+        bufferedSmap.put(
+            new SlotRef(inputSlots.get(i)), new SlotRef(bufferedSlots.get(i)));
+      }
+    }
+    if (hasActivePartition) {
+      partitionByEq_ =
+          createNullMatchingEquals(analyzer, substitutedPartitionExprs_, sortTupleId, bufferedSmap);
+      if (LOG.isTraceEnabled()) {
+        LOG.trace("partitionByEq: " + partitionByEq_.debugString());
+      }
+    }
+    if (hasOrderBy) {
+      orderByEq_ = createNullMatchingEquals(analyzer,
+          OrderByElement.getOrderByExprs(orderByElements_), sortTupleId, bufferedSmap);
+      if (LOG.isTraceEnabled()) {
+        LOG.trace("orderByEq: " + orderByEq_.debugString());
+      }
+    }
+  }
+
+  /**
+   * Create a predicate that checks if all exprs are equal or both sides are null.
+   */
+  private Expr createNullMatchingEquals(Analyzer analyzer, List<Expr> exprs,
+      TupleId inputTid, ExprSubstitutionMap bufferedSmap) {
+    Preconditions.checkState(!exprs.isEmpty());
+    Expr result = createNullMatchingEqualsAux(analyzer, exprs, 0, inputTid, bufferedSmap);
+    result.analyzeNoThrow(analyzer);
+    return result;
+  }
+
+  /**
+   * Create an unanalyzed predicate that checks if elements >= i are equal or
+   * both sides are null.
+   *
+   * The predicate has the form
+   * ((lhs[i] is null && rhs[i] is null) || (
+   *   lhs[i] is not null && rhs[i] is not null && lhs[i] = rhs[i]))
+   * && <createEqualsAux(i + 1)>
+   */
+  private Expr createNullMatchingEqualsAux(Analyzer analyzer, List<Expr> elements, int i,
+      TupleId inputTid, ExprSubstitutionMap bufferedSmap) {
+    if (i > elements.size() - 1) return new BoolLiteral(true);
+
+    // compare elements[i]
+    Expr lhs = elements.get(i);
+    Preconditions.checkState(lhs.isBound(inputTid));
+    Expr rhs = lhs.substitute(bufferedSmap, analyzer, false);
+
+    Expr bothNull = new CompoundPredicate(
+        Operator.AND, new IsNullPredicate(lhs, false), new IsNullPredicate(rhs, false));
+    Expr lhsEqRhsNotNull = new CompoundPredicate(Operator.AND,
+        new CompoundPredicate(
+            Operator.AND, new IsNullPredicate(lhs, true), new IsNullPredicate(rhs, true)),
+        new BinaryPredicate(BinaryPredicate.Operator.EQ, lhs, rhs));
+    Expr remainder =
+        createNullMatchingEqualsAux(analyzer, elements, i + 1, inputTid, bufferedSmap);
+    return new CompoundPredicate(CompoundPredicate.Operator.AND,
+        new CompoundPredicate(Operator.OR, bothNull, lhsEqRhsNotNull), remainder);
   }
 
   @Override
