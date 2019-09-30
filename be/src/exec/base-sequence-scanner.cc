@@ -333,7 +333,7 @@ void BaseSequenceScanner::CloseFileRanges(const char* filename) {
       context_->partition_descriptor()->id(), filename);
   const vector<ScanRange*>& splits = desc->splits;
   for (int i = 0; i < splits.size(); ++i) {
-    COUNTER_ADD(bytes_skipped_counter_, splits[i]->len());
+    COUNTER_ADD(bytes_skipped_counter_, splits[i]->bytes_to_read());
   }
   scan_node_->SkipFile(file_format(), desc);
 }

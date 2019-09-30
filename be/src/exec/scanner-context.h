@@ -141,12 +141,14 @@ class ScannerContext {
     void set_read_past_size_cb(ReadPastSizeCallback cb) { read_past_size_cb_ = cb; }
 
     /// Return the number of bytes left in the range for this stream.
-    int64_t bytes_left() { return scan_range_->len() - total_bytes_returned_; }
+    int64_t bytes_left() { return scan_range_->bytes_to_read() - total_bytes_returned_; }
 
     /// If true, all bytes in this scan range have been returned from this ScannerContext
     /// to callers or we hit eof before reaching the end of the scan range. Callers can
     /// continue to call Read*()/Get*()/Skip*() methods on the stream until eof() is true.
-    bool eosr() const { return total_bytes_returned_ >= scan_range_->len() || eof(); }
+    bool eosr() const {
+      return total_bytes_returned_ >= scan_range_->bytes_to_read() || eof();
+    }
 
     /// If true, the stream has reached the end of the file. After this is true, any
     /// Read*()/Get*()/Skip*() methods will not succeed.

@@ -53,3 +53,11 @@ row_regex:.*InitialRangeActualReservation.*Avg: 4.00 MB.*
 row_regex:.*ParquetRowGroupIdealReservation.*Avg: 24.00 MB.*
 row_regex:.*ParquetRowGroupActualReservation.*Avg: 4.00 MB.*
 ====
+---- QUERY
+# IMPALA-8742: Use ScanRange::bytes_to_read() instead of len(), it has an effect
+# on the calculated ideal reservation.
+select * from tpch_parquet.lineitem
+where l_orderkey < 10;
+---- RUNTIME_PROFILE
+row_regex:.*ParquetRowGroupIdealReservation.*Avg: 3.50 MB.*
+====

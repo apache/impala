@@ -362,6 +362,11 @@ Status DiskIoMgr::ValidateScanRange(ScanRange* range) {
     return Status(TErrorCode::DISK_IO_ERROR, GetBackendString(),
         Substitute("Invalid scan range. Non-positive length $0", range->len()));
   }
+  if (range->bytes_to_read() <= 0) {
+    return Status(TErrorCode::DISK_IO_ERROR, GetBackendString(),
+        Substitute("Invalid scan range. Non-positive bytes to read $0",
+                   range->bytes_to_read()));
+  }
   return Status::OK();
 }
 

@@ -560,7 +560,7 @@ Status HdfsScanNodeBase::StartNextScanRange(int64_t* reservation,
     // improve throughput. Note that if this is a columnar format like Parquet,
     // '*scan_range' is the small footer range only so we won't request an increase.
     int64_t ideal_scan_range_reservation =
-        io_mgr->ComputeIdealBufferReservation((*scan_range)->len());
+        io_mgr->ComputeIdealBufferReservation((*scan_range)->bytes_to_read());
     *reservation = IncreaseReservationIncrementally(*reservation, ideal_scan_range_reservation);
     initial_range_ideal_reservation_stats_->UpdateCounter(ideal_scan_range_reservation);
     initial_range_actual_reservation_stats_->UpdateCounter(*reservation);

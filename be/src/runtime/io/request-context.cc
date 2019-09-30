@@ -396,7 +396,7 @@ Status RequestContext::AddScanRanges(
   // Add each range to the queue of the disk the range is on
   for (ScanRange* range : ranges) {
     // Don't add empty ranges.
-    DCHECK_NE(range->len(), 0);
+    DCHECK_NE(range->bytes_to_read(), 0);
     AddActiveScanRangeLocked(lock, range);
     if (range->UseHdfsCache()) {
       cached_ranges_.Enqueue(range);
@@ -479,7 +479,7 @@ Status RequestContext::StartScanRange(ScanRange* range, bool* needs_buffers) {
   DCHECK(Validate()) << endl << DebugString();
   if (state_ == RequestContext::Cancelled) return CONTEXT_CANCELLED;
 
-  DCHECK_NE(range->len(), 0);
+  DCHECK_NE(range->bytes_to_read(), 0);
   if (range->UseHdfsCache()) {
     bool cached_read_succeeded;
     RETURN_IF_ERROR(TryReadFromCache(lock, range, &cached_read_succeeded,

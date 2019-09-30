@@ -221,7 +221,8 @@ ReadOutcome ScanRange::DoRead(DiskQueue* queue, int disk_id) {
     if (sub_ranges_.empty()) {
       DCHECK(cache_.data == nullptr);
       read_status = file_reader_->ReadFromPos(queue, offset_ + bytes_read_,
-          buffer_desc->buffer_, min(len() - bytes_read_, buffer_desc->buffer_len_),
+          buffer_desc->buffer_,
+          min(bytes_to_read() - bytes_read_, buffer_desc->buffer_len_),
           &buffer_desc->len_, &eof);
     } else {
       read_status = ReadSubRanges(queue, buffer_desc.get(), &eof);

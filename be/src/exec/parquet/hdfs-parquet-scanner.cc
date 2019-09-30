@@ -1700,7 +1700,7 @@ Status HdfsParquetScanner::DivideReservationBetweenColumns(
 
   vector<int64_t> col_range_lengths(column_readers.size());
   for (int i = 0; i < column_readers.size(); ++i) {
-    col_range_lengths[i] = column_readers[i]->scan_range()->len();
+    col_range_lengths[i] = column_readers[i]->scan_range()->bytes_to_read();
   }
 
   // The scanner-wide stream was used only to read the file footer.  Each column has added
