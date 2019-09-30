@@ -58,7 +58,7 @@ under the License.
          so it's important to depend on the same one -->
     <guava.version>14.0.1</guava.version>
     <derby.version>10.14.2.0</derby.version>
-    <jackson-databind.version>2.9.9.2</jackson-databind.version>
+    <jackson-databind.version>2.10.0</jackson-databind.version>
     <project.build.sourceEncoding>UTF-8</project.build.sourceEncoding>
   </properties>
 
