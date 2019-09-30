@@ -66,6 +66,8 @@ import com.google.common.collect.Sets;
 public class KuduCatalogOpExecutor {
   public static final Logger LOG = Logger.getLogger(KuduCatalogOpExecutor.class);
 
+  private static final Object kuduDdlLock_ = new Object();
+
   /**
    * Create a table in Kudu with a schema equivalent to the schema stored in 'msTbl'.
    * Throws an exception if 'msTbl' represents an external table or if the table couldn't
@@ -84,28 +86,31 @@ public class KuduCatalogOpExecutor {
     }
     KuduClient kudu = KuduUtil.getKuduClient(masterHosts);
     try {
-      // TODO: The IF NOT EXISTS case should be handled by Kudu to ensure atomicity.
-      // (see KUDU-1710).
-      boolean tableExists = kudu.tableExists(kuduTableName);
-      if (tableExists && params.if_not_exists) return;
+      // Acquire lock to protect table existence check and table creation, see IMPALA-8984
+      synchronized (kuduDdlLock_) {
+        // TODO: The IF NOT EXISTS case should be handled by Kudu to ensure atomicity.
+        // (see KUDU-1710).
+        boolean tableExists = kudu.tableExists(kuduTableName);
+        if (tableExists && params.if_not_exists) return;
 
-      // if table is managed or external with external.purge.table = true in
-      // tblproperties we should create the Kudu table if it does not exist
-      if (tableExists) {
-        throw new ImpalaRuntimeException(String.format(
-            "Table '%s' already exists in Kudu.", kuduTableName));
-      }
-      Preconditions.checkState(!Strings.isNullOrEmpty(kuduTableName));
-      Schema schema = createTableSchema(params);
-      CreateTableOptions tableOpts = buildTableOptions(msTbl, params, schema);
-      org.apache.kudu.client.KuduTable table =
-          kudu.createTable(kuduTableName, schema, tableOpts);
-      // Populate table ID from Kudu table if Kudu's integration with the Hive
-      // Metastore is enabled.
-      if (KuduTable.isHMSIntegrationEnabled(masterHosts)) {
-        String tableId = table.getTableId();
-        Preconditions.checkNotNull(tableId);
-        msTbl.getParameters().put(KuduTable.KEY_TABLE_ID, tableId);
+        // if table is managed or external with external.purge.table = true in
+        // tblproperties we should create the Kudu table if it does not exist
+        if (tableExists) {
+          throw new ImpalaRuntimeException(String.format(
+              "Table '%s' already exists in Kudu.", kuduTableName));
+        }
+        Preconditions.checkState(!Strings.isNullOrEmpty(kuduTableName));
+        Schema schema = createTableSchema(params);
+        CreateTableOptions tableOpts = buildTableOptions(msTbl, params, schema);
+        org.apache.kudu.client.KuduTable table =
+            kudu.createTable(kuduTableName, schema, tableOpts);
+        // Populate table ID from Kudu table if Kudu's integration with the Hive
+        // Metastore is enabled.
+        if (KuduTable.isHMSIntegrationEnabled(masterHosts)) {
+          String tableId = table.getTableId();
+          Preconditions.checkNotNull(tableId);
+          msTbl.getParameters().put(KuduTable.KEY_TABLE_ID, tableId);
+        }
       }
     } catch (Exception e) {
       throw new ImpalaRuntimeException(String.format("Error creating Kudu table '%s'",

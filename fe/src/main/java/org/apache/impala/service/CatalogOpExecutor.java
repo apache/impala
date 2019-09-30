@@ -2245,7 +2245,15 @@ public class CatalogOpExecutor {
       synchronized (metastoreDdlLock_) {
         if (createHMSTable) {
           try (MetaStoreClient msClient = catalog_.getMetaStoreClient()) {
-            msClient.getHiveClient().createTable(newTable);
+            boolean tableInMetastore =
+                msClient.getHiveClient().tableExists(newTable.getDbName(),
+                                                     newTable.getTableName());
+            if (!tableInMetastore) {
+              msClient.getHiveClient().createTable(newTable);
+            } else {
+              addSummary(response, "Table already exists.");
+              return false;
+            }
           }
         }
         // Add the table to the catalog cache
