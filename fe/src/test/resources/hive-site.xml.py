@@ -22,6 +22,7 @@ import os
 hive_major_version = int(os.environ['IMPALA_HIVE_VERSION'][0])
 kerberize = os.environ.get('IMPALA_KERBERIZE') == '1'
 variant = os.environ.get('HIVE_VARIANT')
+kudu_variant = os.environ.get('KUDU_VARIANT')
 
 CONFIG = {
   'dfs.replication': '3'
@@ -141,6 +142,9 @@ CONFIG.update({
  'hcatalog.message.factory.impl.json': 'org.apache.sentry.binding.metastore.messaging.json.SentryJSONMessageFactory',
  'hive.metastore.dml.events': 'true',
 })
+
+if kudu_variant == 'without_hms_config':
+  CONFIG.clear()
 
 # Database and JDO-related configs:
 db_type = os.environ.get('HMS_DB_TYPE', 'postgres')

@@ -228,8 +228,9 @@ public class KuduTable extends Table implements FeKuduTable {
    */
   public static boolean isHMSIntegrationEnabledAndValidate(String kuduMasters,
       String hmsUris) throws ImpalaRuntimeException {
-    Preconditions.checkNotNull(hmsUris);
-    Preconditions.checkArgument(!hmsUris.isEmpty());
+    if (hmsUris == null || hmsUris.isEmpty()) {
+      return false;
+    }
     HiveMetastoreConfig hmsConfig = getHiveMetastoreConfig(kuduMasters);
     if (hmsConfig == null) {
       return false;
