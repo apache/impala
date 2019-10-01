@@ -218,6 +218,7 @@ under the License.
           <topicref href="topics/impala_parquet_dictionary_filtering.xml"/>
           <topicref rev="2.6.0 IMPALA-2835" href="topics/impala_parquet_fallback_schema_resolution.xml"/>
           <topicref href="topics/impala_parquet_file_size.xml"/>
+          <topicref href="topics/impala_parquet_object_store_split_size.xml"/>
           <topicref href="topics/impala_parquet_page_row_count_limit.xml"/>
           <topicref href="topics/impala_parquet_read_statistics.xml"/>
           <topicref href="topics/impala_parquet_read_page_index.xml"/>

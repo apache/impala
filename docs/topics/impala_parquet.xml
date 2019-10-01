@@ -336,6 +336,10 @@ under the License.
       </p>
 
       <p conref="../shared/impala_common.xml#common/s3_block_splitting"/>
+      <p>Starting in Impala 3.4.0, use the query option
+          <codeph>PARQUET_OBJECT_STORE_SPLIT_SIZE</codeph> to control the
+        Parquet split size for non-block stores (e.g. S3, ADLS, etc.). The
+        default value is 256 MB.</p>
 
       <p rev="IMPALA-3909">
         In <keyword keyref="impala29"/> and higher, Parquet files written by Impala include
