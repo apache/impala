@@ -15,6 +15,7 @@
 # specific language governing permissions and limitations
 # under the License.
 
+import pytest
 import re
 import time
 import threading
@@ -103,11 +104,13 @@ class TestResultSpooling(ImpalaTestSuite):
     finally:
       self.client.close_query(handle)
 
+  @pytest.mark.xfail(run=False, reason="IMPALA-8926")
   def test_full_queue(self, vector):
     """Delegates to _test_full_queue."""
     query = "select * from functional.alltypes order by id limit 1500"
     self._test_full_queue(vector, query)
 
+  @pytest.mark.xfail(run=False, reason="IMPALA-8926")
   def test_full_queue_large_fetch(self, vector):
     """Delegates to _test_full_queue, but specifies a fetch size equal to the number of
     rows returned by the query. This tests that clients can fetch all rows from a full

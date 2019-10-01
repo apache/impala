@@ -1334,8 +1334,9 @@ class TestAdmissionController(TestAdmissionControllerBase, HS2TestSuite):
       # complete, and then validate that one of the executor backends shutdowns and
       # releases its admitted memory.
       self.wait_for_state(handle, self.client.QUERY_STATES['RUNNING'], timeout)
-      sleep(10)  # Wait for the 'lineitem' scan to complete
-      assert "NumCompletedBackends: 1 (1)" in self.client.get_runtime_profile(handle)
+      # Once the 'lineitem' scan completes, NumCompletedBackends should be 1.
+      self.assert_eventually(60, 1, lambda: "NumCompletedBackends: 1 (1)"
+          in self.client.get_runtime_profile(handle))
       get_num_completed_backends(self.cluster.impalads[0].service,
         handle.get_handle().id) == 1
       mem_admitted = get_mem_admitted_backends_debug_page(self.cluster)
