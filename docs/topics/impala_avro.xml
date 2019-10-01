@@ -104,11 +104,6 @@ under the License.
         <p conref="../shared/impala_common.xml#common/avro_no_timestamp"/>
       </note>
 
-      <!--
-        To do: Expand these examples to show switching between impala-shell and Hive, loading some data, and then
-        doing DESCRIBE and querying the table.
-      -->
-
       <p>
         The following examples demonstrate creating an Avro table in Impala, using either an inline column
         specification or one taken from a JSON file stored in HDFS:
@@ -502,41 +497,92 @@ ALTER TABLE avro_table SET TBLPROPERTIES (
     <title>Data Type Considerations for Avro Tables</title>
 
     <conbody>
-
-      <p>
-        The Avro format defines a set of data types whose names differ from the names of the corresponding Impala
-        data types. If you are preparing Avro files using other Hadoop components such as Pig or MapReduce, you
-        might need to work with the type names defined by Avro. The following figure lists the Avro-defined types
-        and the equivalent types in Impala.
-      </p>
-
-<codeblock><![CDATA[Primitive Types (Avro -> Impala)
---------------------------------
-STRING -> STRING
-STRING -> CHAR
-STRING -> VARCHAR
-INT -> INT
-BOOLEAN -> BOOLEAN
-LONG ->  BIGINT
-FLOAT ->  FLOAT
-DOUBLE -> DOUBLE
-
-Logical Types
--------------
-BYTES + logicalType = "decimal" -> DECIMAL
-
-Avro Types with No Impala Equivalent
-------------------------------------
-RECORD, MAP, ARRAY, UNION,  ENUM, FIXED, NULL
-
-Impala Types with No Avro Equivalent
-------------------------------------
-TIMESTAMP
-]]>
-</codeblock>
-
-      <p conref="../shared/impala_common.xml#common/avro_2gb_strings"/>
-
+      <p> The Avro format defines a set of data types whose names differ from
+        the names of the corresponding Impala data types. If you are preparing
+        Avro files using other Hadoop components such as Pig or MapReduce, you
+        might need to work with the type names defined by Avro. The following
+        figure lists the Avro-defined types and the equivalent types in Impala. </p>
+      <p><b>Primitive types:</b></p>
+      <table frame="all" rowsep="1" colsep="1" id="table_uvv_plj_gjb">
+        <tgroup cols="2" align="left">
+          <colspec colname="c1" colnum="1" colwidth="143.44pt"/>
+          <colspec colname="c2" colnum="2" colwidth="165.77pt"/>
+          <thead>
+            <row>
+              <entry>Avro type</entry>
+              <entry>Impala type</entry>
+            </row>
+          </thead>
+          <tbody>
+            <row>
+              <entry>STRING</entry>
+              <entry>STRING</entry>
+            </row>
+            <row>
+              <entry>STRING</entry>
+              <entry>CHAR</entry>
+            </row>
+            <row>
+              <entry>STRING</entry>
+              <entry>VARCHAR</entry>
+            </row>
+            <row>
+              <entry>INT</entry>
+              <entry>INT</entry>
+            </row>
+            <row>
+              <entry>BOOLEAN</entry>
+              <entry>BOOLEAN</entry>
+            </row>
+            <row>
+              <entry>LONG</entry>
+              <entry>BIGINT</entry>
+            </row>
+            <row>
+              <entry>FLOAT</entry>
+              <entry>FLOAT</entry>
+            </row>
+            <row>
+              <entry>DOUBLE</entry>
+              <entry>DOUBLE</entry>
+            </row>
+          </tbody>
+        </tgroup>
+      </table>
+      <p>The Avro specification allows string values up to 2**64 bytes in
+        length. Impala queries for Avro tables use 32-bit integers to hold
+        string lengths. </p>
+      <p>In <keyword keyref="impala25_full"/> and higher, Impala truncates
+          <codeph>CHAR</codeph> and <codeph>VARCHAR</codeph> values in Avro
+        tables to (2**31)-1 bytes. If a query encounters a
+          <codeph>STRING</codeph> value longer than (2**31)-1 bytes in an Avro
+        table, the query fails. In earlier releases, encountering such long
+        values in an Avro table could cause a crash.</p>
+      <p><b>Logical types:</b></p>
+      <table frame="all" rowsep="1" colsep="1" id="table_ch2_1mj_gjb">
+        <tgroup cols="2" align="left">
+          <colspec colname="c1" colnum="1" colwidth="151.26pt"/>
+          <colspec colname="c2" colnum="2" colwidth="149.58pt"/>
+          <thead>
+            <row>
+              <entry>Avro type</entry>
+              <entry>Impala type</entry>
+            </row>
+          </thead>
+          <tbody>
+            <row>
+              <entry>BYTES annotated</entry>
+              <entry>DECIMAL</entry>
+            </row>
+            <row>
+              <entry>INT32 annotated</entry>
+              <entry>DATE</entry>
+            </row>
+          </tbody>
+        </tgroup>
+      </table>
+      <p>Impala does not support the following Avro data types: RECORD, MAP,
+        ARRAY, UNION,  ENUM, FIXED, NULL</p>
     </conbody>
   </concept>
 

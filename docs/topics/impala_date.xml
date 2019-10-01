@@ -41,44 +41,38 @@ under the License.
 
   <conbody>
 
-    <p>
-      Use the <codeph>DATE</codeph> data type to store date values. The <codeph>DATE</codeph>
-      type is supported for HBase, Text, and Parquet.
-    </p>
+    <p> Use the <codeph>DATE</codeph> data type to store date values. The
+        <codeph>DATE</codeph> type is supported for HBase, Text, Avro, and
+      Parquet. </p>
 
     <p>
       <b>Range:</b>
     </p>
 
-    <p>
-      0000-01-01 to 9999-12-31
-    </p>
+    <p> 0001-01-01 to 9999-12-31 </p>
 
     <p>
       <b>Literals and expressions:</b>
     </p>
 
-    <p>
-      The <codeph>DATE</codeph> literals are in the form of <codeph>DATE'YYYY-MM-DD'</codeph>.
-      For example, <codeph>DATE '2013-01-01'</codeph>
+    <p> The <codeph>DATE</codeph> literals are in the form of
+        <codeph>DATE'YYYY-MM-DD'</codeph>. For examplep, <codeph>DATE
+        '2013-01-01'</codeph>
     </p>
 
     <p>
-      <b>Parquet considerations:</b>
+      <b>Parquet and Avro considerations:</b>
     </p>
 
-    <p>
-      Parquet uses <codeph>DATE</codeph> logical type for dates. The <codeph>DATE</codeph>
-      logical type annotates an <codeph>INT32</codeph> that stores the number of days from the
-      Unix epoch, January 1, 1970. This representation introduces a parquet interoperability
-      issue between Impala and older versions of Hive:
-    </p>
+    <p> Parquet and Avro use <codeph>DATE</codeph> logical type for dates. The
+        <codeph>DATE</codeph> logical type annotates an <codeph>INT32</codeph>
+      that stores the number of days from the Unix epoch, January 1, 1970. This
+      representation introduces an interoperability issue between Impala and
+      older versions of Hive: </p>
 
-    <p>
-      If Hive versions lower than 3.1 wrote dates earlier than 1582-10-15 to a parquet table,
-      those dates will be read back incorrectly by Impala and vice versa. In Hive 3.1 and
-      higher, this is no longer an issue.
-    </p>
+    <p> If Hive versions lower than 3.1 wrote dates earlier than 1582-10-15 to a
+      Parquet or Avro table, those dates would be read back incorrectly by
+      Impala and vice versa. In Hive 3.1 and higher, this is no longer an issue. </p>
 
     <p>
       <b>Explicit casting between DATE and other data types:</b>
