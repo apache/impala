@@ -17,6 +17,12 @@
 #
 # Verifier for common impalad metrics
 
+import logging
+from time import time, sleep
+
+LOG = logging.getLogger('test_verify_metrics')
+LOG.setLevel(level=logging.DEBUG)
+
 # List of metrics that should be equal to zero when there are no outstanding queries.
 METRIC_LIST = [
                "impala-server.num-queries-registered",
@@ -59,3 +65,21 @@ class MetricVerifier(object):
 
   def wait_for_metric(self, metric_name, expected_value, timeout=60):
     self.impalad_service.wait_for_metric_value(metric_name, expected_value, timeout)
+
+  def wait_for_backend_admission_control_state(self, timeout=60):
+    """Wait for the admission-control-related values on the /backends page to go to
+    zero (i.e. consistent with an idle cluster)."""
+    start_time = time()
+    while time() - start_time < timeout:
+      try:
+        self.__assert_backend_ac_value_are_zero()
+        break  # Success!
+      except AssertionError as e:
+        LOG.info("Not yet quiesced: %s", str(e))
+        sleep(0.1)
+
+  def __assert_backend_ac_value_are_zero(self):
+    response = self.impalad_service.get_debug_webpage_json("/backends")
+    for backend in response['backends']:
+      for key in ['num_admitted', 'admission_slots_in_use', 'mem_admitted']:
+        assert str(backend[key]) == '0'

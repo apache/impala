@@ -172,7 +172,7 @@ class ExecEnv {
       kudu::client::KuduClient** client) WARN_UNUSED_RESULT;
 
   int64_t admit_mem_limit() const { return admit_mem_limit_; }
-  int64_t admit_num_queries_limit() const { return admit_num_queries_limit_; }
+  int64_t admission_slots() const { return admission_slots_; }
 
  private:
   boost::scoped_ptr<ObjectPool> obj_pool_;
@@ -264,8 +264,15 @@ class ExecEnv {
   /// such as the JVM if --mem_limit_includes_jvm=true. Set in Init().
   int64_t admit_mem_limit_;
 
-  /// The maximum number of queries that this host can run concurrently.
-  int64_t admit_num_queries_limit_;
+  /// The maximum number of admission slots that should be used on this host. This
+  /// only takes effect if the admission slot functionality is enabled in admission
+  /// control. Until IMPALA-8757 is fixed, the slots are only checked for non-default
+  /// executor groups.
+  ///
+  /// By default, the number of slots is based on the number of cores in the system.
+  /// The number of slots limits the number of queries that can run concurrently on
+  /// this backend. Queries take up multiple slots only when mt_dop > 1.
+  int64_t admission_slots_;
 
   /// Choose a memory limit (returned in *bytes_limit) based on the --mem_limit flag and
   /// the memory available to the daemon process. Returns an error if the memory limit is

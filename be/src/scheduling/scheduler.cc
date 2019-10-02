@@ -708,6 +708,27 @@ void Scheduler::ComputeBackendExecParams(
     }
   }
 
+  // Compute 'slots_to_use' for each backend based on the max # of instances of
+  // any fragment on that backend.
+  for (auto& backend : per_backend_params) {
+    int be_max_instances = 0;
+    // Instances for a fragment are clustered together because of how the vector is
+    // constructed above. So we can compute the max # of instances of any fragment
+    // with a single pass over the vector.
+    const FragmentExecParams* curr_fragment = nullptr;
+    int curr_instance_count = 0; // Number of instances of the current fragment seen.
+    for (auto& finstance : backend.second.instance_params) {
+      if (curr_fragment == nullptr ||
+          curr_fragment != &finstance->fragment_exec_params) {
+        curr_fragment = &finstance->fragment_exec_params;
+        curr_instance_count = 0;
+      }
+      ++curr_instance_count;
+      be_max_instances = max(be_max_instances, curr_instance_count);
+    }
+    backend.second.slots_to_use = be_max_instances;
+  }
+
   // This also ensures an entry always exists for the coordinator backend.
   int64_t coord_min_reservation = 0;
   const TNetworkAddress& coord_addr = executor_config.local_be_desc.address;

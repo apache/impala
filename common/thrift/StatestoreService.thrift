@@ -92,8 +92,9 @@ struct TBackendDescriptor {
   // is set, and currently must contain exactly one entry.
   10: required list<TExecutorGroupDesc> executor_groups;
 
-  // The number of queries that can be admitted to this backend.
-  11: required i64 admit_num_queries_limit;
+  // The number of admission slots for this backend that can be occupied by running
+  // queries.
+  11: required i64 admission_slots;
 }
 
 // Description of a single entry in a topic

@@ -167,9 +167,11 @@ class TestCancellation(ImpalaTestSuite):
     client = self.hs2_client
     # Start query
     handle = client.execute_async(query)
-    # Wait up to 5 seconds for the query to start
-    assert any(client.get_state(handle) == 'RUNNING_STATE' or sleep(1)
-               for _ in range(5)), 'Query failed to start'
+    # Wait for the query to start (with a long timeout to account for admission control
+    # queuing).
+    WAIT_SECONDS = 60 * 30
+    assert any(client.get_state(handle) == 'RUNNING_STATE' or sleep(0.1)
+               for _ in range(10 * WAIT_SECONDS)), 'Query failed to start'
 
     client.cancel(handle)
     # Wait up to 5 seconds for the query to get cancelled

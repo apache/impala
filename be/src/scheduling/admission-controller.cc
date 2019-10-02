@@ -191,6 +191,10 @@ const string REASON_BUFFER_LIMIT_TOO_LOW_FOR_RESERVATION =
     "minimum memory reservation on backend '$0' is greater than memory available to the "
     "query for buffer reservations. Increase the buffer_pool_limit to $1. See the query "
     "profile for more information about the per-node memory requirements.";
+const string REASON_NOT_ENOUGH_SLOTS_ON_BACKEND =
+    "number of admission control slots needed ($0) on backend '$1' is greater than total "
+    "slots available $2. Reduce mt_dop to less than $2 to ensure that the query can "
+    "execute.";
 const string REASON_MIN_RESERVATION_OVER_POOL_MEM =
     "minimum memory reservation needed is greater than pool max mem resources. Pool "
     "max mem resources: $0 ($1). Cluster-wide memory reservation needed: $2. Increase "
@@ -241,8 +245,9 @@ const string HOST_MEM_NOT_AVAILABLE = "Not enough memory available on host $0. "
     "Needed $1 but only $2 out of $3 was available.$4";
 
 // $0 = host name, $1 = num admitted, $2 = max requests
-const string HOST_SLOT_NOT_AVAILABLE = "No query slot available on host $0. "
-                                       "$1/$2 are already admitted.";
+const string HOST_SLOT_NOT_AVAILABLE = "Not enough admission control slots available on "
+                                       "host $0. Needed $1 slots but $2/$3 are already "
+                                       "in use.";
 
 // Parses the pool name and backend_id from the topic key if it is valid.
 // Returns true if the topic key is valid and pool_name and backend_id are set.
@@ -422,7 +427,8 @@ void AdmissionController::UpdateStatsOnReleaseForBackends(
       continue;
     }
     int64_t mem_to_release = GetMemToAdmit(schedule, backend_exec_params->second);
-    UpdateHostStats(host_addr, -mem_to_release, -1);
+    UpdateHostStats(
+        host_addr, -mem_to_release, -1, -backend_exec_params->second.slots_to_use);
     total_mem_to_release += mem_to_release;
   }
   PoolStats* pool_stats = GetPoolStats(schedule);
@@ -434,7 +440,7 @@ void AdmissionController::UpdateStatsOnAdmission(const QuerySchedule& schedule) 
   for (const auto& entry : schedule.per_backend_exec_params()) {
     const TNetworkAddress& host_addr = entry.first;
     int64_t mem_to_admit = GetMemToAdmit(schedule, entry.second);
-    UpdateHostStats(host_addr, mem_to_admit, 1);
+    UpdateHostStats(host_addr, mem_to_admit, 1, entry.second.slots_to_use);
   }
   PoolStats* pool_stats = GetPoolStats(schedule);
   pool_stats->AdmitQueryAndMemory(schedule);
@@ -442,7 +448,8 @@ void AdmissionController::UpdateStatsOnAdmission(const QuerySchedule& schedule) 
 }
 
 void AdmissionController::UpdateHostStats(
-    const TNetworkAddress& host_addr, int64_t mem_to_admit, int num_queries_to_admit) {
+    const TNetworkAddress& host_addr, int64_t mem_to_admit, int num_queries_to_admit,
+    int num_slots_to_admit) {
   const string host = TNetworkAddressToString(host_addr);
   VLOG_ROW << "Update admitted mem reserved for host=" << host
            << " prev=" << PrintBytes(host_stats_[host].mem_admitted)
@@ -454,6 +461,11 @@ void AdmissionController::UpdateHostStats(
            << " new=" << host_stats_[host].num_admitted + num_queries_to_admit;
   host_stats_[host].num_admitted += num_queries_to_admit;
   DCHECK_GE(host_stats_[host].num_admitted, 0);
+  VLOG_ROW << "Update slots in use for host=" << host
+           << " prev=" << host_stats_[host].slots_in_use
+           << " new=" << host_stats_[host].slots_in_use + num_slots_to_admit;
+  host_stats_[host].slots_in_use += num_slots_to_admit;
+  DCHECK_GE(host_stats_[host].slots_in_use, 0);
 }
 
 // Helper method used by CanAccommodateMaxInitialReservation(). Returns true if the given
@@ -550,20 +562,20 @@ bool AdmissionController::HasAvailableMemResources(const QuerySchedule& schedule
   return true;
 }
 
-bool AdmissionController::HasAvailableSlot(const QuerySchedule& schedule,
+bool AdmissionController::HasAvailableSlots(const QuerySchedule& schedule,
     const TPoolConfig& pool_cfg, string* unavailable_reason) {
   for (const auto& entry : schedule.per_backend_exec_params()) {
     const TNetworkAddress& host = entry.first;
     const string host_id = TNetworkAddressToString(host);
-    int64_t admit_num_queries_limit = entry.second.be_desc.admit_num_queries_limit;
-    int64_t num_admitted = host_stats_[host_id].num_admitted;
+    int64_t admission_slots = entry.second.be_desc.admission_slots;
+    int64_t slots_in_use = host_stats_[host_id].slots_in_use;
     VLOG_ROW << "Checking available slot on host=" << host_id
-             << " num_admitted=" << num_admitted << " needs=" << num_admitted + 1
-             << " admit_num_queries_limit=" << admit_num_queries_limit;
-    if (num_admitted >= admit_num_queries_limit) {
-      *unavailable_reason =
-          Substitute(HOST_SLOT_NOT_AVAILABLE, host_id, num_admitted,
-              admit_num_queries_limit);
+             << " slots_in_use=" << slots_in_use
+             << " needs=" << slots_in_use + entry.second.slots_to_use
+             << " executor admission_slots=" << admission_slots;
+    if (slots_in_use + entry.second.slots_to_use > admission_slots) {
+      *unavailable_reason = Substitute(HOST_SLOT_NOT_AVAILABLE, host_id,
+          entry.second.slots_to_use, slots_in_use, admission_slots);
       return false;
     }
   }
@@ -597,7 +609,7 @@ bool AdmissionController::CanAdmitRequest(const QuerySchedule& schedule,
         GetStalenessDetailLocked(" "));
     return false;
   }
-  if (!default_group && !HasAvailableSlot(schedule, pool_cfg, not_admitted_reason)) {
+  if (!default_group && !HasAvailableSlots(schedule, pool_cfg, not_admitted_reason)) {
     // All non-default executor groups are also limited by the number of running queries
     // per executor.
     // TODO(IMPALA-8757): Extend slot based admission to default executor group
@@ -663,6 +675,8 @@ bool AdmissionController::RejectForSchedule(const QuerySchedule& schedule,
     const TPoolConfig& pool_cfg, int64_t cluster_size, int64_t group_size,
     string* rejection_reason) {
   DCHECK(rejection_reason != nullptr && rejection_reason->empty());
+  bool default_group =
+      schedule.executor_group() == ImpalaServer::DEFAULT_EXECUTOR_GROUP_NAME;
 
   // Compute the max (over all backends), the cluster totals (across all backends) for
   // min_mem_reservation_bytes, thread_reservation, the min admit_mem_limit
@@ -677,6 +691,13 @@ bool AdmissionController::RejectForSchedule(const QuerySchedule& schedule,
   int64_t cluster_thread_reservation = 0;
   for (const auto& e : schedule.per_backend_exec_params()) {
     const BackendExecParams& bp = e.second;
+    // TODO(IMPALA-8757): Extend slot based admission to default executor group
+    if (!default_group && bp.slots_to_use > bp.be_desc.admission_slots) {
+      *rejection_reason = Substitute(REASON_NOT_ENOUGH_SLOTS_ON_BACKEND, bp.slots_to_use,
+          TNetworkAddressToString(bp.be_desc.address), bp.be_desc.admission_slots);
+      return true;
+    }
+
     cluster_min_mem_reservation_bytes += bp.min_mem_reservation_bytes;
     if (bp.min_mem_reservation_bytes > largest_min_mem_reservation.second) {
       largest_min_mem_reservation = make_pair(&e.first, bp.min_mem_reservation_bytes);

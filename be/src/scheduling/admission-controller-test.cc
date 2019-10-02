@@ -84,7 +84,8 @@ class AdmissionControllerTest : public testing::Test {
   /// rejection in AdmissionController.
   QuerySchedule* MakeQuerySchedule(string request_pool_name, int64_t mem_limit,
       TPoolConfig& config, const int num_hosts, const int per_host_mem_estimate,
-      const int coord_mem_estimate, bool is_dedicated_coord) {
+      const int coord_mem_estimate, bool is_dedicated_coord,
+      const string& executor_group = ImpalaServer::DEFAULT_EXECUTOR_GROUP_NAME) {
     DCHECK_GT(num_hosts, 0);
     TQueryExecRequest* request = pool_.Add(new TQueryExecRequest());
     request->query_ctx.request_pool = request_pool_name;
@@ -98,7 +99,7 @@ class AdmissionControllerTest : public testing::Test {
     query_options->__set_mem_limit(mem_limit);
     QuerySchedule* query_schedule = pool_.Add(new QuerySchedule(
         *query_id, *request, *query_options, profile));
-    query_schedule->set_executor_group(ImpalaServer::DEFAULT_EXECUTOR_GROUP_NAME);
+    query_schedule->set_executor_group(executor_group);
     SetHostsInQuerySchedule(*query_schedule, num_hosts, is_dedicated_coord);
     query_schedule->UpdateMemoryRequirements(config);
     return query_schedule;
@@ -106,9 +107,10 @@ class AdmissionControllerTest : public testing::Test {
 
   /// Same as previous MakeQuerySchedule with fewer input (more default params).
   QuerySchedule* MakeQuerySchedule(string request_pool_name, TPoolConfig& config,
-      const int num_hosts, const int per_host_mem_estimate) {
+      const int num_hosts, const int per_host_mem_estimate,
+      const string& executor_group = ImpalaServer::DEFAULT_EXECUTOR_GROUP_NAME) {
     return MakeQuerySchedule(request_pool_name, 0, config, num_hosts,
-        per_host_mem_estimate, per_host_mem_estimate, false);
+        per_host_mem_estimate, per_host_mem_estimate, false, executor_group);
   }
 
   /// Replace the per-backend hosts in the schedule with one having 'count' hosts.
@@ -118,23 +120,45 @@ class AdmissionControllerTest : public testing::Test {
   /// if a dedicated coordinator backend exists.
   void SetHostsInQuerySchedule(QuerySchedule& query_schedule, const int count,
       bool is_dedicated_coord, int64_t min_mem_reservation_bytes = 0,
-      int64_t admit_mem_limit = 200L * MEGABYTE) {
+      int64_t admit_mem_limit = 200L * MEGABYTE, int slots_to_use = 1,
+      int slots_available = 8) {
     PerBackendExecParams* per_backend_exec_params = pool_.Add(new PerBackendExecParams());
     for (int i = 0; i < count; ++i) {
+      const string host_name = Substitute("host$0", i);
+      TNetworkAddress host_addr = MakeNetworkAddress(host_name, 25000);
       BackendExecParams* backend_exec_params = pool_.Add(new BackendExecParams());
       backend_exec_params->min_mem_reservation_bytes = min_mem_reservation_bytes;
+      backend_exec_params->slots_to_use = slots_to_use;
       backend_exec_params->be_desc.__set_admit_mem_limit(admit_mem_limit);
+      backend_exec_params->be_desc.__set_admission_slots(slots_available);
       backend_exec_params->be_desc.__set_is_executor(true);
+      backend_exec_params->be_desc.__set_address(host_addr);
       if (i == 0) {
         // Add first element as the coordinator.
         backend_exec_params->is_coord_backend = true;
         backend_exec_params->be_desc.__set_is_executor(!is_dedicated_coord);
       }
-      const string host_name = Substitute("host$0", i);
-      per_backend_exec_params->emplace(
-          MakeNetworkAddress(host_name, 25000), *backend_exec_params);
+      per_backend_exec_params->emplace(host_addr, *backend_exec_params);
     }
     query_schedule.set_per_backend_exec_params(*per_backend_exec_params);
+  }
+
+  /// Extract the host network addresses from 'schedule'.
+  vector<TNetworkAddress> GetHostAddrs(const QuerySchedule& schedule) {
+    vector<TNetworkAddress> host_addrs;
+    for (auto& backend_state : schedule.per_backend_exec_params()) {
+      host_addrs.push_back(backend_state.first);
+    }
+    return host_addrs;
+  }
+
+  /// Set the slots in use for all the hosts in 'host_addrs'.
+  void SetSlotsInUse(AdmissionController* admission_controller,
+      const vector<TNetworkAddress>& host_addrs, int slots_in_use) {
+    for (TNetworkAddress host_addr : host_addrs) {
+      string host = TNetworkAddressToString(host_addr);
+      admission_controller->host_stats_[host].slots_in_use = slots_in_use;
+    }
   }
 
   /// Build a TTopicDelta object for IMPALA_REQUEST_QUEUE_TOPIC.
@@ -455,6 +479,61 @@ TEST_F(AdmissionControllerTest, CanAdmitRequestCount) {
       "with 0.5 queries)");
 }
 
+/// Test CanAdmitRequest() using the slots mechanism that is enabled with non-default
+/// executor groups.
+TEST_F(AdmissionControllerTest, CanAdmitRequestSlots) {
+  // Pass the paths of the configuration files as command line flags.
+  FLAGS_fair_scheduler_allocation_path = GetResourceFile("fair-scheduler-test2.xml");
+  FLAGS_llama_site_path = GetResourceFile("llama-site-test2.xml");
+
+  AdmissionController* admission_controller = MakeAdmissionController();
+  RequestPoolService* request_pool_service = admission_controller->request_pool_service_;
+
+  // Get the PoolConfig for QUEUE_D ("root.queueD").
+  TPoolConfig config_d;
+  ASSERT_OK(request_pool_service->GetPoolConfig(QUEUE_D, &config_d));
+
+  // Create QuerySchedules to run on QUEUE_D on 12 hosts.
+  // Running in both default and non-default executor groups is simulated.
+  int64_t host_count = 12;
+  int64_t slots_per_host = 16;
+  int64_t slots_per_query = 4;
+  QuerySchedule* default_group_schedule =
+      MakeQuerySchedule(QUEUE_D, config_d, host_count, 30L * MEGABYTE);
+  QuerySchedule* other_group_schedule =
+      MakeQuerySchedule(QUEUE_D, config_d, host_count, 30L * MEGABYTE, "other_group");
+  for (QuerySchedule* schedule : {default_group_schedule, other_group_schedule}) {
+    SetHostsInQuerySchedule(*schedule, 2, false,
+        MEGABYTE, 200L * MEGABYTE, slots_per_query, slots_per_host);
+  }
+  vector<TNetworkAddress> host_addrs = GetHostAddrs(*default_group_schedule);
+  string not_admitted_reason;
+
+  // Simulate that there are just enough slots free for the query on all hosts.
+  SetSlotsInUse(admission_controller, host_addrs, slots_per_host - slots_per_query);
+
+  // Enough slots are available so it can be admitted in both cases.
+  ASSERT_TRUE(admission_controller->CanAdmitRequest(
+      *default_group_schedule, config_d, host_count, true, &not_admitted_reason))
+      << not_admitted_reason;
+  ASSERT_TRUE(admission_controller->CanAdmitRequest(
+      *other_group_schedule, config_d, host_count, true, &not_admitted_reason))
+      << not_admitted_reason;
+
+  // Simulate that almost all the slots are in use, which prevents admission in the
+  // non-default group.
+  SetSlotsInUse(admission_controller, host_addrs, slots_per_host - 1);
+
+  ASSERT_TRUE(admission_controller->CanAdmitRequest(
+      *default_group_schedule, config_d, host_count, true, &not_admitted_reason))
+      << not_admitted_reason;
+  ASSERT_FALSE(admission_controller->CanAdmitRequest(
+      *other_group_schedule, config_d, host_count, true, &not_admitted_reason));
+  EXPECT_STR_CONTAINS(not_admitted_reason,
+      "Not enough admission control slots available on host host1:25000. Needed 4 "
+      "slots but 15/16 are already in use.");
+}
+
 /// Tests that query rejection works as expected by calling RejectForSchedule() and
 /// RejectForCluster() directly.
 TEST_F(AdmissionControllerTest, QueryRejection) {
@@ -499,6 +578,34 @@ TEST_F(AdmissionControllerTest, QueryRejection) {
       "max mem resources: 400.00 MB (calculated as 10 backends each with 40.00 MB). "
       "Cluster-wide memory reservation needed: 450.00 MB. Increase the pool max mem "
       "resources.");
+
+  // Adjust the QuerySchedule to require many slots per node.
+  // This will be rejected immediately in non-default executor groups
+  // as the nodes do not have that many slots. Because of IMPALA-8757, this check
+  // does not yet occur for the default executor group.
+  SetHostsInQuerySchedule(*query_schedule, 2, false, MEGABYTE, 200L * MEGABYTE, 16, 4);
+  string rejected_slots_reason;
+  // Don't reject for default executor group.
+  EXPECT_FALSE(admission_controller->RejectForSchedule(
+      *query_schedule, config_d, host_count, host_count, &rejected_slots_reason))
+      << rejected_slots_reason;
+  // Reject for non-default executor group.
+  QuerySchedule* other_group_schedule = MakeQuerySchedule(
+      QUEUE_D, config_d, host_count, 50L * MEGABYTE, "a_different_executor_group");
+  SetHostsInQuerySchedule(
+      *other_group_schedule, 2, false, MEGABYTE, 200L * MEGABYTE, 16, 4);
+  EXPECT_TRUE(admission_controller->RejectForSchedule(
+      *other_group_schedule, config_d, host_count, host_count, &rejected_slots_reason));
+  EXPECT_STR_CONTAINS(rejected_slots_reason, "number of admission control slots needed "
+      "(16) on backend 'host1:25000' is greater than total slots available 4. Reduce "
+      "mt_dop to less than 4 to ensure that the query can execute.");
+  rejected_slots_reason = "";
+  // Reduce mt_dop to ensure it can execute.
+  SetHostsInQuerySchedule(
+      *other_group_schedule, 2, false, MEGABYTE, 200L * MEGABYTE, 4, 4);
+  EXPECT_FALSE(admission_controller->RejectForSchedule(
+      *other_group_schedule, config_d, host_count, host_count, &rejected_slots_reason))
+      << rejected_slots_reason;
 
   // Overwrite min_query_mem_limit and max_query_mem_limit in config_d to test a message.
   // After this config_d is unusable.
@@ -692,9 +799,7 @@ TEST_F(AdmissionControllerTest, PoolStats) {
   ASSERT_EQ(1, pool_stats->agg_num_running());
   ASSERT_EQ(1, pool_stats->metrics()->agg_num_running->GetValue());
   int64_t mem_to_release = 0;
-  vector<TNetworkAddress> host_addrs;
-  for (auto backend_state : query_schedule->per_backend_exec_params()) {
-    host_addrs.push_back(backend_state.first);
+  for (auto& backend_state : query_schedule->per_backend_exec_params()) {
     mem_to_release +=
         admission_controller->GetMemToAdmit(*query_schedule, backend_state.second);
   }

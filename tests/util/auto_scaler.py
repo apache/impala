@@ -253,7 +253,7 @@ class AutoScaler(object):
 
     impalad_args = [
         "-vmodule=admission-controller=3,cluster-membership-mgr=3",
-        "-max_concurrent_queries=%s" % executor_slots,
+        "-admission_control_slots=%s" % executor_slots,
         "-shutdown_grace_period_s=2"]
 
     options += ["--impalad_args=%s" % a for a in impalad_args]

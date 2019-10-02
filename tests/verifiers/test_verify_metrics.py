@@ -18,6 +18,7 @@
 # Verification of impalad metrics after a test run.
 
 from tests.common.impala_test_suite import ImpalaTestSuite
+from tests.common.impala_cluster import ImpalaCluster
 from tests.verifiers.metric_verifier import MetricVerifier
 
 class TestValidateMetrics(ImpalaTestSuite):
@@ -43,3 +44,11 @@ class TestValidateMetrics(ImpalaTestSuite):
     """Test that all buffers are unused"""
     verifier = MetricVerifier(self.impalad_test_service)
     verifier.verify_num_unused_buffers()
+
+  def test_backends_are_idle(self):
+    """Test that the backends state is in a valid state when quiesced - i.e.
+    no queries are running and the admission control state reflects that no
+    resources are used."""
+    for impalad in ImpalaCluster.get_e2e_test_cluster().impalads:
+      verifier = MetricVerifier(impalad.service)
+      verifier.wait_for_backend_admission_control_state()

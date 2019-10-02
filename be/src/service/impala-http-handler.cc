@@ -954,9 +954,11 @@ void ImpalaHttpHandler::BackendsHandler(const Webserver::WebRequest& req,
     Value mem_admitted(PrettyPrinter::PrintBytes(
         host_stats[address].mem_admitted).c_str(), document->GetAllocator());
     backend_obj.AddMember("mem_admitted", mem_admitted, document->GetAllocator());
-    backend_obj.AddMember("admit_num_queries_limit", backend.admit_num_queries_limit,
+    backend_obj.AddMember("admission_slots", backend.admission_slots,
         document->GetAllocator());
     backend_obj.AddMember("num_admitted", host_stats[address].num_admitted,
+        document->GetAllocator());
+    backend_obj.AddMember("admission_slots_in_use", host_stats[address].slots_in_use,
         document->GetAllocator());
     vector<string> group_names;
     for (const auto& group : backend.executor_groups) group_names.push_back(group.name);

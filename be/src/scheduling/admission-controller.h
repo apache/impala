@@ -187,7 +187,7 @@ enum class AdmissionOutcome {
 ///
 /// In addition to the checks described before, admission to executor groups is bounded by
 /// the maximum number of queries that can run concurrently on an executor
-/// (-max_concurrent_queries). An additional check is performed to ensure that each
+/// (-admission_control_slots). An additional check is performed to ensure that each
 /// executor in the group has an available slot to run the query. Admission controllers
 /// include the number of queries that have been admitted to each executor in the
 /// statestore updates.
@@ -240,23 +240,23 @@ enum class AdmissionOutcome {
 /// Consider a cluster with a dedicated coordinator and 2 executor groups
 /// "default-pool-group-1" and "default-pool-group-2" (the number of executors per group
 /// does not matter for this example). Both executor groups will be able to serve requests
-/// from the default resource pool. Consider that each executor can only run one query at
-/// a time, i.e. --max_concurrent_queries=1 is specified for all executors. An incoming
-/// query is submitted through SubmitForAdmission(), which calls
+/// from the default resource pool. Consider that each executor has only one admission
+/// slot i.e. --admission_control_slots=1 is specified for all executors. An incoming
+/// query with mt_dop=1 is submitted through SubmitForAdmission(), which calls
 /// FindGroupToAdmitOrReject(). From there we call ComputeGroupSchedules() which calls
 /// compute schedules for both executor groups. Then we perform rejection tests and
 /// afterwards call CanAdmitRequest() for each of the schedules. Executor groups are
 /// processed in alphanumerically sorted order, so we attempt admission to group
-/// "default-pool-group-1" first. CanAdmitRequest() calls HasAvailableSlot() to check
-/// whether any of the hosts in the group have reached their maximum number of concurrent
-/// queries and since that is not the case, admission succeeds. The query is admitted and
-/// 'num_admitted' is incremented for each host in that group. When a second query arrives
-/// while the first one is still running, we perform the same steps. In particular we
-/// compute schedules for both groups and consider admission to default-pool-group-1
-/// first. However, the check in HasAvailableSlot() now fails and we will consider group
-/// default-pool-group-2 next. For this group, the check succeeds and the query is
-/// admitted, incrementing the num_admitted counter for each host in group
-/// default-pool-group-2.
+/// "default-pool-group-1" first. CanAdmitRequest() calls HasAvailableSlots() to check
+/// whether any of the hosts in the group can fit the new query in their available slots
+/// and since it does fit, admission succeeds. The query is admitted and 'slots_in_use'
+/// is incremented for each host in that group based on the effective parallelism of the
+/// query. When a second query arrives while the first one is still running, we perform
+/// the same steps. In particular we compute schedules for both groups and consider
+/// admission to default-pool-group-1 first. However, the check in HasAvailableSlots()
+/// now fails and we will consider group default-pool-group-2 next. For this group,
+/// the check succeeds and the query is admitted, incrementing the num_admitted counter
+/// for each host in group default-pool-group-2.
 ///
 /// Queuing Behavior:
 /// Once the resources in a pool are consumed, each coordinator receiving requests will
@@ -391,6 +391,8 @@ class AdmissionController {
     int64_t mem_admitted = 0;
     /// The per host number of queries admitted only for the queries admitted locally.
     int64_t num_admitted = 0;
+    /// The per host number of slots in use for the queries admitted locally.
+    int64_t slots_in_use = 0;
   };
 
   typedef std::unordered_map<std::string, HostStats> PerHostStats;
@@ -829,12 +831,12 @@ class AdmissionController {
       const TPoolConfig& pool_cfg, int64_t cluster_size,
       std::string* mem_unavailable_reason);
 
-  /// Returns true if there is an available slot on all executors in the schedule. The
-  /// number of slots per executors does not change with the group or cluster size and
-  /// instead always uses pool_cfg.max_requests. If a host does not have a free slot, this
-  /// returns false and sets 'unavailable_reason'.
+  /// Returns true if there are enough available slots on all executors in the schedule to
+  /// fit the query schedule. The number of slots per executors does not change with the
+  /// group or cluster size and instead always uses pool_cfg.max_requests. If a host does
+  /// not have a free slot, this returns false and sets 'unavailable_reason'.
   /// Must hold admission_ctrl_lock_.
-  bool HasAvailableSlot(const QuerySchedule& schedule, const TPoolConfig& pool_cfg,
+  bool HasAvailableSlots(const QuerySchedule& schedule, const TPoolConfig& pool_cfg,
       string* unavailable_reason);
 
   /// Updates the memory admitted and the num of queries running for each backend in
@@ -850,9 +852,10 @@ class AdmissionController {
       const QuerySchedule& schedule, const std::vector<TNetworkAddress>& host_addrs);
 
   /// Updates the memory admitted and the num of queries running on the specified host by
-  /// adding the specified mem and num_queries to the host stats.
+  /// adding the specified mem, num_queries and slots to the host stats.
   void UpdateHostStats(
-      const TNetworkAddress& host_addr, int64_t mem_to_admit, int num_queries_to_admit);
+      const TNetworkAddress& host_addr, int64_t mem_to_admit, int num_queries_to_admit,
+      int num_slots_to_admit);
 
   /// Rejection happens in several stages
   /// 1) Based on static pool configuration
@@ -1004,6 +1007,7 @@ class AdmissionController {
   FRIEND_TEST(AdmissionControllerTest, PoolStats);
   FRIEND_TEST(AdmissionControllerTest, CanAdmitRequestMemory);
   FRIEND_TEST(AdmissionControllerTest, CanAdmitRequestCount);
+  FRIEND_TEST(AdmissionControllerTest, CanAdmitRequestSlots);
   FRIEND_TEST(AdmissionControllerTest, GetMaxToDequeue);
   FRIEND_TEST(AdmissionControllerTest, QueryRejection);
   FRIEND_TEST(AdmissionControllerTest, DedicatedCoordQuerySchedule);

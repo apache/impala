@@ -50,13 +50,13 @@ class TestExecutorGroups(CustomClusterTestSuite):
     return "default-pool-%s" % name
 
   def _add_executor_group(self, name_suffix, min_size, num_executors=0,
-                          max_concurrent_queries=0):
+                          admission_control_slots=0):
     """Adds an executor group to the cluster. 'min_size' specifies the minimum size for
     the new group to be considered healthy. 'num_executors' specifies the number of
     executors to start and defaults to 'min_size' but can be different from 'min_size' to
-    start an unhealthy group. 'max_concurrent_queries' can be used to override the default
-    (num cores). If 'name_suffix' is empty, no executor group is specified for the new
-    backends and they will end up in the default group."""
+    start an unhealthy group. 'admission_control_slots' can be used to override the
+    default (num cores). If 'name_suffix' is empty, no executor group is specified for
+    the new backends and they will end up in the default group."""
     self.num_groups += 1
     if num_executors == 0:
       num_executors = min_size
@@ -64,7 +64,8 @@ class TestExecutorGroups(CustomClusterTestSuite):
     name = self._group_name(name_suffix)
     LOG.info("Adding %s executors to group %s with minimum size %s" %
              (num_executors, name, min_size))
-    cluster_args = ["--impalad_args=-max_concurrent_queries=%s" % max_concurrent_queries]
+    cluster_args = ["--impalad_args=-admission_control_slots=%s" %
+                    admission_control_slots]
     if len(name_suffix) > 0:
       cluster_args.append("--impalad_args=-executor_groups=%s:%s" % (name, min_size))
     self._start_impala_cluster(options=cluster_args,
@@ -198,9 +199,10 @@ class TestExecutorGroups(CustomClusterTestSuite):
     assert self._get_num_executor_groups(only_healthy=True) == 1
 
   @pytest.mark.execute_serially
-  def test_max_concurrent_queries(self):
-    """Tests that the max_concurrent_queries flag works as expected."""
-    self._add_executor_group("group1", 2, max_concurrent_queries=1)
+  def test_admission_slots(self):
+    """Tests that the admission_control_slots flag works as expected to
+    specify the number of admission slots on the executors."""
+    self._add_executor_group("group1", 2, admission_control_slots=1)
     # Query that runs on every executor
     QUERY = "select * from functional_parquet.alltypestiny \
              where month < 3 and id + random() < sleep(500);"
@@ -209,9 +211,17 @@ class TestExecutorGroups(CustomClusterTestSuite):
     client.wait_for_admission_control(q1)
     q2 = client.execute_async(QUERY)
     profile = client.get_runtime_profile(q2)
-    assert "Initial admission queue reason: No query slot available on host" in profile
+    assert ("Initial admission queue reason: Not enough admission control slots "
+            "available on host" in profile)
     client.cancel(q1)
     client.cancel(q2)
+
+    # Test that a query that would occupy too many slots gets rejected
+    result = self.execute_query_expect_failure(self.client,
+        "select min(ss_list_price) from tpcds_parquet.store_sales", {'mt_dop': 64})
+    assert "number of admission control slots needed" in str(result)
+    assert "is greater than total slots available" in str(result)
+
 
   @pytest.mark.execute_serially
   def test_multiple_executor_groups(self):
@@ -219,8 +229,8 @@ class TestExecutorGroups(CustomClusterTestSuite):
     # Query that runs on every executor
     QUERY = "select * from functional_parquet.alltypestiny \
              where month < 3 and id + random() < sleep(500);"
-    self._add_executor_group("group1", 2, max_concurrent_queries=1)
-    self._add_executor_group("group2", 2, max_concurrent_queries=1)
+    self._add_executor_group("group1", 2, admission_control_slots=1)
+    self._add_executor_group("group2", 2, admission_control_slots=1)
     self._wait_for_num_executor_groups(2, only_healthy=True)
     client = self.client
     q1 = client.execute_async(QUERY)
@@ -233,13 +243,13 @@ class TestExecutorGroups(CustomClusterTestSuite):
     client.cancel(q2)
 
   @pytest.mark.execute_serially
-  @CustomClusterTestSuite.with_args(impalad_args="-max_concurrent_queries=1")
+  @CustomClusterTestSuite.with_args(impalad_args="-admission_control_slots=1")
   def test_coordinator_concurrency(self):
     """Tests that the command line flag to limit the coordinator concurrency works as
     expected."""
     QUERY = "select sleep(1000)"
     # Add group with more slots than coordinator
-    self._add_executor_group("group2", 2, max_concurrent_queries=3)
+    self._add_executor_group("group2", 2, admission_control_slots=3)
     # Try to run two queries and observe that one gets queued
     client = self.client
     q1 = client.execute_async(QUERY)
@@ -251,14 +261,14 @@ class TestExecutorGroups(CustomClusterTestSuite):
     client.cancel(q2)
 
   @pytest.mark.execute_serially
-  @CustomClusterTestSuite.with_args(impalad_args="-max_concurrent_queries=3")
+  @CustomClusterTestSuite.with_args(impalad_args="-admission_control_slots=3")
   def test_executor_concurrency(self):
     """Tests that the command line flag to limit query concurrency on executors works as
     expected."""
     # Query that runs on every executor
     QUERY = "select * from functional_parquet.alltypestiny \
              where month < 3 and id + random() < sleep(500);"
-    self._add_executor_group("group1", 2, max_concurrent_queries=3)
+    self._add_executor_group("group1", 2, admission_control_slots=3)
 
     workload = None
     try:
@@ -323,7 +333,7 @@ class TestExecutorGroups(CustomClusterTestSuite):
     from scheduling."""
     # Start default executor group
     self._add_executor_group("", min_size=2, num_executors=2,
-                             max_concurrent_queries=3)
+                             admission_control_slots=3)
     # Run query to make sure things work
     QUERY = "select count(*) from functional.alltypestiny"
     self.execute_query_expect_success(self.client, QUERY)
@@ -350,11 +360,11 @@ class TestExecutorGroups(CustomClusterTestSuite):
              where month < 3 and id + random() < sleep(500);"
     group_names = ["group1", "group2"]
     self._add_executor_group(group_names[0], min_size=1, num_executors=1,
-                             max_concurrent_queries=1)
+                             admission_control_slots=1)
     # Create an exec group of min size 2 to exercise the case where a group becomes
     # unhealthy.
     self._add_executor_group(group_names[1], min_size=2, num_executors=2,
-                             max_concurrent_queries=1)
+                             admission_control_slots=1)
     self._wait_for_num_executor_groups(2, only_healthy=True)
     # Verify metrics for both groups appear.
     assert all(

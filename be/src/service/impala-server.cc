@@ -1812,7 +1812,7 @@ void ImpalaServer::BuildLocalBackendDescriptorInternal(TBackendDescriptor* be_de
   be_desc->__set_krpc_address(krpc_address);
 
   be_desc->__set_admit_mem_limit(exec_env_->admit_mem_limit());
-  be_desc->__set_admit_num_queries_limit(exec_env_->admit_num_queries_limit());
+  be_desc->__set_admission_slots(exec_env_->admission_slots());
   be_desc->__set_is_quiescing(is_quiescing);
   be_desc->executor_groups = GetExecutorGroups(FLAGS_executor_groups);
 }

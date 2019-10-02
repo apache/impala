@@ -88,9 +88,16 @@ DEFINE_int32(state_store_subscriber_port, 23000,
 DEFINE_int32(num_hdfs_worker_threads, 16,
     "(Advanced) The number of threads in the global HDFS operation pool");
 DEFINE_int32(max_concurrent_queries, 0,
-    "(Advanced) The maximum number of queries to run on this backend concurrently "
-    "(defaults to number of cores / -num_cores for executors, and 8x that value for "
-    "dedicated coordinators).");
+    "(Deprecated) This has been replaced with --admission_control_slots, which "
+    "better accounts for the higher parallelism of queries with mt_dop > 1. "
+    "If --admission_control_slots is not set, the value of --max_concurrent_queries "
+    "is used instead for backward compatibility.");
+DEFINE_int32(admission_control_slots, 0,
+    "(Advanced) The maximum degree of parallelism to run queries with on this backend. "
+    "This determines the number of slots available to queries in admission control for "
+    "this backend. The degree of parallelism of the query determines the number of slots "
+    "that it needs. Defaults to number of cores / -num_cores for executors, and 8x that "
+    "value for dedicated coordinators).");
 
 DEFINE_bool_hidden(use_local_catalog, false,
     "Use experimental implementation of a local catalog. If this is set, "
@@ -153,7 +160,7 @@ const static string DEFAULT_FS = "fs.defaultFS";
 
 // The multiplier for how many queries a dedicated coordinator can run compared to an
 // executor. This is only effective when using non-default settings for executor groups
-// and the absolute value can be overridden by the '--max_concurrent_queries' flag.
+// and the absolute value can be overridden by the '--admission_control_slots' flag.
 const static int COORDINATOR_CONCURRENCY_MULTIPLIER = 8;
 
 namespace {
@@ -313,13 +320,19 @@ Status ExecEnv::Init() {
   }
   InitBufferPool(FLAGS_min_buffer_size, buffer_pool_limit, clean_pages_limit);
 
-  admit_num_queries_limit_ = CpuInfo::num_cores();
-  if (FLAGS_max_concurrent_queries > 0) {
-    admit_num_queries_limit_ = FLAGS_max_concurrent_queries;
+  admission_slots_ = CpuInfo::num_cores();
+  if (FLAGS_admission_control_slots > 0) {
+    if (FLAGS_max_concurrent_queries > 0) {
+      LOG(WARNING) << "Ignored --max_concurrent_queries, --admission_control_slots was "
+                   << "set and takes precedence.";
+    }
+    admission_slots_ = FLAGS_admission_control_slots;
+  } else if (FLAGS_max_concurrent_queries > 0) {
+    admission_slots_ = FLAGS_max_concurrent_queries;
   } else if (FLAGS_is_coordinator && !FLAGS_is_executor) {
     // By default we assume that dedicated coordinators can handle more queries than
     // executors.
-    admit_num_queries_limit_ *= COORDINATOR_CONCURRENCY_MULTIPLIER;
+    admission_slots_ *= COORDINATOR_CONCURRENCY_MULTIPLIER;
   }
 
   InitSystemStateInfo();

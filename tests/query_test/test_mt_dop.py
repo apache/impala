@@ -23,7 +23,7 @@ from copy import deepcopy
 from tests.common.environ import ImpalaTestClusterProperties
 from tests.common.impala_test_suite import ImpalaTestSuite
 from tests.common.kudu_test_suite import KuduTestSuite
-from tests.common.skip import SkipIfEC
+from tests.common.skip import SkipIfEC, SkipIfNotHdfsMinicluster
 from tests.common.test_vector import ImpalaTestDimension
 
 # COMPUTE STATS on Parquet tables automatically sets MT_DOP=4, so include
@@ -119,4 +119,26 @@ class TestMtDopKudu(KuduTestSuite):
   def test_kudu(self, vector, unique_database):
     vector.get_value('exec_option')['mt_dop'] = vector.get_value('mt_dop')
     self.run_test_case('QueryTest/mt-dop-kudu', vector, use_db=unique_database)
+
+
+@SkipIfNotHdfsMinicluster.tuned_for_minicluster
+class TestMtDopAdmissionSlots(ImpalaTestSuite):
+  """Test the number of admission slots calculated for different queries. This
+  is always at most mt_dop, but is less where there are fewer fragment instances per
+  host. The slot calculation logic is orthogonal to file format, so we only need
+  to test on one format."""
+  @classmethod
+  def get_workload(cls):
+    return 'functional-query'
+
+  @classmethod
+  def add_test_dimensions(cls):
+    super(TestMtDopAdmissionSlots, cls).add_test_dimensions()
+    cls.ImpalaTestMatrix.add_dimension(ImpalaTestDimension('mt_dop', 4))
+    cls.ImpalaTestMatrix.add_constraint(
+        lambda v: v.get_value('table_format').file_format == 'parquet')
+
+  def test_admission_slots(self, vector):
+    vector.get_value('exec_option')['mt_dop'] = vector.get_value('mt_dop')
+    self.run_test_case('QueryTest/mt-dop-parquet-admission-slots', vector)
 

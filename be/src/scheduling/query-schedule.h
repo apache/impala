@@ -78,6 +78,12 @@ struct BackendExecParams {
   // concurrently-executing fragment instances at any point in query execution.
   int64_t thread_reservation = 0;
 
+  // Number of slots that this query should count for in admission control.
+  // This is calculated as the maximum # of instances of any fragment on this backend.
+  // I.e. 1 if mt_dop is not used and at most the mt_dop value if mt_dop is specified
+  // (but less if the query is not actually running with mt_dop instances on this node).
+  int slots_to_use = 0;
+
   // Indicates whether this backend is the coordinator.
   bool is_coord_backend = false;
 };

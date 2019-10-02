@@ -40,6 +40,7 @@
 #include "util/error-util-internal.h"
 #include "util/network-util.h"
 #include "util/pretty-printer.h"
+#include "util/runtime-profile-counters.h"
 #include "util/scope-exit-trigger.h"
 #include "util/uid-util.h"
 
@@ -76,6 +77,9 @@ void Coordinator::BackendState::Init(const vector<FragmentStats*>& fragment_stat
 
   host_profile_ = RuntimeProfile::Create(obj_pool, TNetworkAddressToString(host_));
   host_profile_parent->AddChild(host_profile_);
+  RuntimeProfile::Counter* admission_slots =
+      ADD_COUNTER(host_profile_, "AdmissionSlots", TUnit::UNIT);
+  admission_slots->Set(backend_exec_params_->slots_to_use);
 
   // populate instance_stats_map_ and install instance
   // profiles as child profiles in fragment_stats' profile

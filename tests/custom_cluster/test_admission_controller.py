@@ -52,6 +52,7 @@ from tests.util.web_pages_util import (
     get_num_completed_backends,
     get_mem_admitted_backends_debug_page)
 from tests.verifiers.mem_usage_verifier import MemUsageVerifier
+from tests.verifiers.metric_verifier import MetricVerifier
 from ImpalaService import ImpalaHiveServer2Service
 from TCLIService import TCLIService
 
@@ -129,12 +130,18 @@ RESOURCES_DIR = os.path.join(os.environ['IMPALA_HOME'], "fe", "src", "test", "re
 
 
 def impalad_admission_ctrl_flags(max_requests, max_queued, pool_max_mem,
-                                 proc_mem_limit=None, queue_wait_timeout_ms=None):
+                                 proc_mem_limit=None, queue_wait_timeout_ms=None,
+                                 admission_control_slots=None, executor_groups=None):
   extra_flags = ""
   if proc_mem_limit is not None:
     extra_flags += " -mem_limit={0}".format(proc_mem_limit)
   if queue_wait_timeout_ms is not None:
     extra_flags += " -queue_wait_timeout_ms={0}".format(queue_wait_timeout_ms)
+  if admission_control_slots is not None:
+    extra_flags += " -admission_control_slots={0}".format(admission_control_slots)
+  if executor_groups is not None:
+    extra_flags += " -executor_groups={0}".format(executor_groups)
+
   return ("-vmodule admission-controller=3 -default_pool_max_requests {0} "
           "-default_pool_max_queued {1} -default_pool_mem_limit {2} {3}".format(
             max_requests, max_queued, pool_max_mem, extra_flags))
@@ -864,6 +871,46 @@ class TestAdmissionController(TestAdmissionControllerBase, HS2TestSuite):
     """Return a list of the 'Admission Queue details' strings found in 'profiles'"""
     matches = [re.search(INITIAL_QUEUE_REASON_REGEX, profile) for profile in profiles]
     return [match.group(0) for match in matches if match is not None]
+
+  @pytest.mark.execute_serially
+  @CustomClusterTestSuite.with_args(
+      impalad_args=impalad_admission_ctrl_flags(max_requests=100, max_queued=10,
+          pool_max_mem=-1, admission_control_slots=4,
+          executor_groups="default-pool-group1"),
+      statestored_args=_STATESTORED_ARGS)
+  def test_queue_reasons_slots(self):
+    """Test that queue details appear in the profile when queued based on number of
+    slots."""
+    # Run a bunch of queries - one should get admitted immediately, the rest should
+    # be dequeued one-by-one.
+    STMT = "select min(ss_wholesale_cost) from tpcds_parquet.store_sales"
+    TIMEOUT_S = 60
+    EXPECTED_REASON = "Latest admission queue reason: Not enough admission control " +\
+                      "slots available on host"
+    NUM_QUERIES = 5
+    profiles = self._execute_and_collect_profiles([STMT for i in xrange(NUM_QUERIES)],
+        TIMEOUT_S, config_options={"mt_dop": 4})
+
+    num_reasons = len([profile for profile in profiles if EXPECTED_REASON in profile])
+    assert num_reasons == NUM_QUERIES - 1, \
+        "All queries except first should have been queued: " + '\n===\n'.join(profiles)
+    init_queue_reasons = self.__extract_init_queue_reasons(profiles)
+    assert len(init_queue_reasons) == NUM_QUERIES - 1, \
+        "All queries except first should have been queued: " + '\n===\n'.join(profiles)
+    over_limit_details = [detail
+        for detail in init_queue_reasons
+        if "Not enough admission control slots available on host" in detail]
+    assert len(over_limit_details) == 1, \
+        "One query initially queued because of slots: " + '\n===\n'.join(profiles)
+    queue_not_empty_details = [detail
+        for detail in init_queue_reasons if 'queue is not empty' in detail]
+    assert len(queue_not_empty_details) == NUM_QUERIES - 2, \
+        "Others queued because of non-empty queue: " + '\n===\n'.join(profiles)
+
+    # Confirm that the cluster quiesces and all metrics return to zero.
+    for impalad in self.cluster.impalads:
+      verifier = MetricVerifier(impalad.service)
+      verifier.wait_for_backend_admission_control_state()
 
   @pytest.mark.execute_serially
   @CustomClusterTestSuite.with_args(
