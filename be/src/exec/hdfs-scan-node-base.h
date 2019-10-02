@@ -198,7 +198,9 @@ class HdfsScanNodeBase : public ScanNode {
   const AvroSchemaElement& avro_schema() const { return *avro_schema_.get(); }
   int skip_header_line_count() const { return skip_header_line_count_; }
   io::RequestContext* reader_context() const { return reader_context_.get(); }
-  bool optimize_parquet_count_star() const { return optimize_parquet_count_star_; }
+  bool optimize_parquet_count_star() const {
+    return parquet_count_star_slot_offset_ != -1;
+  }
   int parquet_count_star_slot_offset() const { return parquet_count_star_slot_offset_; }
 
   typedef std::unordered_map<TupleId, std::vector<ScalarExprEvaluator*>>
@@ -417,13 +419,10 @@ class HdfsScanNodeBase : public ScanNode {
   /// Tuple id resolved in Prepare() to set tuple_desc_
   const int tuple_id_;
 
-  /// Set to true when this scan node can optimize a count(*) query by populating the
-  /// tuple with data from the Parquet num rows statistic. See
+  /// The byte offset of the slot for Parquet metadata if Parquet count star optimization
+  /// is enabled. When set, this scan node can optimize a count(*) query by populating
+  /// the tuple with data from the Parquet num rows statistic. See
   /// applyParquetCountStartOptimization() in HdfsScanNode.java.
-  const bool optimize_parquet_count_star_;
-
-  // The byte offset of the slot for Parquet metadata if Parquet count star optimization
-  // is enabled.
   const int parquet_count_star_slot_offset_;
 
   /// RequestContext object to use with the disk-io-mgr for reads.

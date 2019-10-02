@@ -24,10 +24,15 @@ import java.util.List;
 import java.util.ListIterator;
 import java.util.Set;
 
+import org.apache.impala.analysis.AggregateInfo;
 import org.apache.impala.analysis.Analyzer;
 import org.apache.impala.analysis.BinaryPredicate;
 import org.apache.impala.analysis.BoolLiteral;
 import org.apache.impala.analysis.Expr;
+import org.apache.impala.analysis.ExprSubstitutionMap;
+import org.apache.impala.analysis.FunctionCallExpr;
+import org.apache.impala.analysis.FunctionName;
+import org.apache.impala.analysis.FunctionParams;
 import org.apache.impala.analysis.InPredicate;
 import org.apache.impala.analysis.IsNullPredicate;
 import org.apache.impala.analysis.LiteralExpr;
@@ -37,6 +42,7 @@ import org.apache.impala.analysis.SlotRef;
 import org.apache.impala.analysis.StringLiteral;
 import org.apache.impala.analysis.TupleDescriptor;
 import org.apache.impala.catalog.FeKuduTable;
+import org.apache.impala.catalog.HdfsFileFormat;
 import org.apache.impala.catalog.KuduColumn;
 import org.apache.impala.catalog.Type;
 import org.apache.impala.common.ImpalaRuntimeException;
@@ -103,11 +109,19 @@ public class KuduScanNode extends ScanNode {
   // Exprs in kuduConjuncts_ converted to KuduPredicates.
   private final List<KuduPredicate> kuduPredicates_ = new ArrayList<>();
 
-  public KuduScanNode(PlanNodeId id, TupleDescriptor desc, List<Expr> conjuncts) {
+  // Slot that is used to record the Kudu metadata for the count(*) aggregation if
+  // this scan node has the count(*) optimization enabled.
+  private SlotDescriptor countStarSlot_ = null;
+
+  public KuduScanNode(PlanNodeId id, TupleDescriptor desc, List<Expr> conjuncts,
+      AggregateInfo aggInfo) {
     super(id, desc, "SCAN KUDU");
     kuduTable_ = (FeKuduTable) desc_.getTable();
     conjuncts_ = conjuncts;
+    aggInfo_ = aggInfo;
   }
+
+  public ExprSubstitutionMap getOptimizedAggSmap() { return optimizedAggSmap_; }
 
   @Override
   public void init(Analyzer analyzer) throws ImpalaRuntimeException {
@@ -118,6 +132,12 @@ public class KuduScanNode extends ScanNode {
       org.apache.kudu.client.KuduTable rpcTable =
           client.openTable(kuduTable_.getKuduTableName());
       validateSchema(rpcTable);
+
+      if (canApplyCountStarOptimization(analyzer)) {
+        Preconditions.checkState(desc_.getPath().destTable() != null);
+        Preconditions.checkState(kuduConjuncts_.isEmpty());
+        countStarSlot_ = applyCountStarOptimization(analyzer);
+      }
 
       // Extract predicates that can be evaluated by Kudu.
       extractKuduConjuncts(analyzer, client, rpcTable);
@@ -153,6 +173,7 @@ public class KuduScanNode extends ScanNode {
       throws ImpalaRuntimeException {
     Schema tableSchema = rpcTable.getSchema();
     for (SlotDescriptor desc: getTupleDesc().getSlots()) {
+      if (!desc.isScanSlot()) continue;
       String colName = ((KuduColumn) desc.getColumn()).getKuduName();
       Type colType = desc.getColumn().getType();
       ColumnSchema kuduCol = null;
@@ -240,7 +261,9 @@ public class KuduScanNode extends ScanNode {
       org.apache.kudu.client.KuduTable rpcTable) {
     List<String> projectedCols = new ArrayList<>();
     for (SlotDescriptor desc: getTupleDesc().getSlotsOrderedByOffset()) {
-      projectedCols.add(((KuduColumn) desc.getColumn()).getKuduName());
+      if (!isCountStarOptimizationDescriptor(desc)) {
+        projectedCols.add(((KuduColumn) desc.getColumn()).getKuduName());
+      }
     }
     KuduScanTokenBuilder tokenBuilder = client.newScanTokenBuilder(rpcTable);
     tokenBuilder.setProjectedColumnNames(projectedCols);
@@ -332,6 +355,11 @@ public class KuduScanNode extends ScanNode {
     node.node_type = TPlanNodeType.KUDU_SCAN_NODE;
     node.kudu_scan_node = new TKuduScanNode(desc_.getId().asInt());
     node.kudu_scan_node.setUse_mt_scan_node(useMtScanNode_);
+
+    Preconditions.checkState((optimizedAggSmap_ == null) == (countStarSlot_ == null));
+    if (countStarSlot_ != null) {
+      node.kudu_scan_node.setCount_star_slot_offset(countStarSlot_.getByteOffset());
+    }
   }
 
   /**

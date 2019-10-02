@@ -623,6 +623,11 @@ public class PlannerTest extends PlannerTestBase {
   }
 
   @Test
+  public void testKuduStatsAgg() {
+    runPlannerTestFile("kudu-stats-agg");
+  }
+
+  @Test
   public void testMtDopValidation() {
     // Tests that queries supported with mt_dop > 0 produce a parallel plan, or
     // throw a NotImplementedException otherwise (e.g. plan has a distributed join).

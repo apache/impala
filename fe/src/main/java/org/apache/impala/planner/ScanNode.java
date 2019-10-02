@@ -20,7 +20,15 @@ package org.apache.impala.planner;
 import java.util.ArrayList;
 import java.util.List;
 
+import org.apache.impala.analysis.AggregateInfo;
+import org.apache.impala.analysis.Analyzer;
+import org.apache.impala.analysis.Expr;
+import org.apache.impala.analysis.ExprSubstitutionMap;
+import org.apache.impala.analysis.FunctionCallExpr;
+import org.apache.impala.analysis.FunctionName;
+import org.apache.impala.analysis.FunctionParams;
 import org.apache.impala.analysis.SlotDescriptor;
+import org.apache.impala.analysis.SlotRef;
 import org.apache.impala.analysis.TupleDescriptor;
 import org.apache.impala.catalog.FeTable;
 import org.apache.impala.catalog.HdfsFileFormat;
@@ -56,6 +64,21 @@ abstract public class ScanNode extends PlanNode {
   // Scan-range specs. Populated in init().
   protected TScanRangeSpec scanRangeSpecs_;
 
+  // The AggregationInfo from the query block of this scan node. Used for determining if
+  // the count(*) optimization can be applied.
+  // Count(*) aggregation optimization flow:
+  // The caller passes in an AggregateInfo to the constructor that this scan node uses to
+  // determine whether to apply the optimization or not. The produced smap must then be
+  // applied to the AggregateInfo in this query block. We do not apply the smap in this
+  // class directly to avoid side effects and make it easier to reason about.
+  protected AggregateInfo aggInfo_ = null;
+  protected static final String STATS_NUM_ROWS = "stats: num_rows";
+
+  // Should be applied to the AggregateInfo from the same query block. We cannot use the
+  // PlanNode.outputSmap_ for this purpose because we don't want the smap entries to be
+  // propagated outside the query block.
+  protected ExprSubstitutionMap optimizedAggSmap_;
+
   public ScanNode(PlanNodeId id, TupleDescriptor desc, String displayName) {
     super(id, desc.getId().asList(), displayName);
     desc_ = desc;
@@ -86,6 +109,48 @@ abstract public class ScanNode extends PlanNode {
             Joiner.on(", ").join(HdfsFileFormat.complexTypesFormats())));
       }
     }
+  }
+
+  protected boolean isCountStarOptimizationDescriptor(SlotDescriptor desc) {
+    return desc.getLabel().equals(STATS_NUM_ROWS);
+  }
+
+  /**
+   * Adds a new slot descriptor to the tuple descriptor of this scan. The new slot will be
+   * used for storing the data extracted from the Kudu num rows statistic. Also adds an
+   * entry to 'optimizedAggSmap_' that substitutes count(*) with
+   * sum_init_zero(<new-slotref>). Returns the new slot descriptor.
+   */
+  protected SlotDescriptor applyCountStarOptimization(Analyzer analyzer) {
+    FunctionCallExpr countFn = new FunctionCallExpr(new FunctionName("count"),
+        FunctionParams.createStarParam());
+    countFn.analyzeNoThrow(analyzer);
+
+    // Create the sum function.
+    SlotDescriptor sd = analyzer.addSlotDescriptor(getTupleDesc());
+    sd.setType(Type.BIGINT);
+    sd.setIsMaterialized(true);
+    sd.setIsNullable(false);
+    sd.setLabel(STATS_NUM_ROWS);
+    List<Expr> args = new ArrayList<>();
+    args.add(new SlotRef(sd));
+    FunctionCallExpr sumFn = new FunctionCallExpr("sum_init_zero", args);
+    sumFn.analyzeNoThrow(analyzer);
+
+    optimizedAggSmap_ = new ExprSubstitutionMap();
+    optimizedAggSmap_.put(countFn, sumFn);
+    return sd;
+  }
+
+  /**
+   * Returns true if the count(*) optimization can be applied to the query block
+   * of this scan node.
+   */
+  protected boolean canApplyCountStarOptimization(Analyzer analyzer) {
+    if (analyzer.getNumTableRefs() != 1)  return false;
+    if (aggInfo_ == null || !aggInfo_.hasCountStarOnly()) return false;
+    if (!conjuncts_.isEmpty()) return false;
+    return desc_.getMaterializedSlots().isEmpty() || desc_.hasClusteringColsOnly();
   }
 
   /**

@@ -105,18 +105,51 @@ void KuduScanner::KeepKuduScannerAlive() {
   last_alive_time_micros_ = now;
 }
 
+Status KuduScanner::GetNextWithCountStarOptimization(RowBatch* row_batch, bool* eos) {
+  int64_t counter = 0;
+  while (scanner_->HasMoreRows()) {
+    RETURN_IF_CANCELLED(state_);
+    RETURN_IF_ERROR(GetNextScannerBatch());
+
+    cur_kudu_batch_num_read_ = static_cast<int64_t>(cur_kudu_batch_.NumRows());
+    counter += cur_kudu_batch_num_read_;
+  }
+  *eos = true;
+  int64_t tuple_buffer_size;
+  uint8_t* tuple_buffer;
+  int capacity = 1;
+  RETURN_IF_ERROR(row_batch->ResizeAndAllocateTupleBuffer(state_,
+      row_batch->tuple_data_pool(), row_batch->row_desc()->GetRowSize(), &capacity,
+      &tuple_buffer_size, &tuple_buffer));
+  Tuple* tuple = reinterpret_cast<Tuple*>(tuple_buffer);
+  Tuple::ClearNullBits(tuple, scan_node_->tuple_desc()->null_bytes_offset(),
+      scan_node_->tuple_desc()->num_null_bytes());
+  int64_t* counter_slot = tuple->GetBigIntSlot(scan_node_->count_star_slot_offset());
+  *counter_slot = counter;
+  TupleRow* dst_row = row_batch->GetRow(row_batch->AddRow());
+  dst_row->SetTuple(0, tuple);
+  row_batch->CommitLastRow();
+
+  CloseCurrentClientScanner();
+  return Status::OK();
+}
+
 Status KuduScanner::GetNext(RowBatch* row_batch, bool* eos) {
   SCOPED_TIMER(scan_node_->materialize_tuple_timer());
+  // Optimized scanning for count(*), only write the NumRows
+  if (scan_node_->optimize_count_star()) {
+    return GetNextWithCountStarOptimization(row_batch, eos);
+  }
   int64_t tuple_buffer_size;
   uint8_t* tuple_buffer;
   RETURN_IF_ERROR(
       row_batch->ResizeAndAllocateTupleBuffer(state_, &tuple_buffer_size, &tuple_buffer));
-  Tuple* tuple = reinterpret_cast<Tuple*>(tuple_buffer);
 
   // Main scan loop:
   // Tries to fill 'row_batch' with rows from cur_kudu_batch_.
   // If there are no rows to decode, tries to get the next row batch from kudu.
   // If this scanner has no more rows, the scanner is closed and eos is returned.
+  Tuple* tuple = reinterpret_cast<Tuple*>(tuple_buffer);
   while (!*eos) {
     RETURN_IF_CANCELLED(state_);
 
@@ -277,7 +310,7 @@ Status KuduScanner::HandleEmptyProjection(RowBatch* row_batch) {
 }
 
 Status KuduScanner::DecodeRowsIntoRowBatch(RowBatch* row_batch, Tuple** tuple_mem) {
-  // Short-circuit the count(*) case.
+  // Short-circuit for empty projection cases.
   if (scan_node_->tuple_desc()->slots().empty()) {
     return HandleEmptyProjection(row_batch);
   }

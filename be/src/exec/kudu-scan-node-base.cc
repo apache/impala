@@ -53,7 +53,10 @@ const string KuduScanNodeBase::KUDU_CLIENT_TIME = "KuduClientTime";
 KuduScanNodeBase::KuduScanNodeBase(
     ObjectPool* pool, const TPlanNode& tnode, const DescriptorTbl& descs)
   : ScanNode(pool, tnode, descs),
-    tuple_id_(tnode.kudu_scan_node.tuple_id) {
+    tuple_id_(tnode.kudu_scan_node.tuple_id),
+    count_star_slot_offset_(
+            tnode.kudu_scan_node.__isset.count_star_slot_offset ?
+            tnode.kudu_scan_node.count_star_slot_offset : -1) {
   DCHECK(KuduIsAvailable());
 }
 

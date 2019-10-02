@@ -122,13 +122,6 @@ import com.google.common.collect.Sets;
  * conjuncts can be used to prune a row group by evaluating conjuncts on the
  * column dictionaries.
  *
- * Count(*) aggregation optimization flow:
- * The caller passes in an AggregateInfo to the constructor that this scan node uses to
- * determine whether to apply the optimization or not. The produced smap must then be
- * applied to the AggregateInfo in this query block. We do not apply the smap in this
- * class directly to avoid side effects and make it easier to reason about.
- * See HdfsScanNode.applyParquetCountStartOptimization().
- *
  * TODO: pass in range restrictions.
  */
 public class HdfsScanNode extends ScanNode {
@@ -207,10 +200,6 @@ public class HdfsScanNode extends ScanNode {
   private final TReplicaPreference replicaPreference_;
   private final boolean randomReplica_;
 
-  // The AggregationInfo from the query block of this scan node. Used for determining if
-  // the Parquet count(*) optimization can be applied.
-  private final AggregateInfo aggInfo_;
-
   // Number of partitions, files and bytes scanned. Set in computeScanRangeLocations().
   // Might not match 'partitions_' due to table sampling. Grouped by the FsType, so
   // each key value pair maps how many partitions / files / bytes are stored on each fs.
@@ -242,11 +231,6 @@ public class HdfsScanNode extends ScanNode {
 
   // True if this scan node should use the MT implementation in the backend.
   private boolean useMtScanNode_;
-
-  // Should be applied to the AggregateInfo from the same query block. We cannot use the
-  // PlanNode.outputSmap_ for this purpose because we don't want the smap entries to be
-  // propagated outside the query block.
-  protected ExprSubstitutionMap optimizedAggSmap_;
 
   // Conjuncts that can be evaluated while materializing the items (tuples) of
   // collection-typed slots. Maps from tuple descriptor to the conjuncts bound by that
@@ -358,44 +342,14 @@ public class HdfsScanNode extends ScanNode {
   }
 
   /**
-   * Adds a new slot descriptor to the tuple descriptor of this scan. The new slot will be
-   * used for storing the data extracted from the Parquet num rows statistic. Also adds an
-   * entry to 'optimizedAggSmap_' that substitutes count(*) with
-   * sum_init_zero(<new-slotref>). Returns the new slot descriptor.
-   */
-  private SlotDescriptor applyParquetCountStartOptimization(Analyzer analyzer) {
-    FunctionCallExpr countFn = new FunctionCallExpr(new FunctionName("count"),
-        FunctionParams.createStarParam());
-    countFn.analyzeNoThrow(analyzer);
-
-    // Create the sum function.
-    SlotDescriptor sd = analyzer.addSlotDescriptor(getTupleDesc());
-    sd.setType(Type.BIGINT);
-    sd.setIsMaterialized(true);
-    sd.setIsNullable(false);
-    sd.setLabel("parquet-stats: num_rows");
-    List<Expr> args = new ArrayList<>();
-    args.add(new SlotRef(sd));
-    FunctionCallExpr sumFn = new FunctionCallExpr("sum_init_zero", args);
-    sumFn.analyzeNoThrow(analyzer);
-
-    optimizedAggSmap_ = new ExprSubstitutionMap();
-    optimizedAggSmap_.put(countFn, sumFn);
-    return sd;
-  }
-
-  /**
    * Returns true if the Parquet count(*) optimization can be applied to the query block
    * of this scan node.
    */
-  private boolean canApplyParquetCountStarOptimization(Analyzer analyzer,
+  private boolean canApplyCountStarOptimization(Analyzer analyzer,
       Set<HdfsFileFormat> fileFormats) {
-    if (analyzer.getNumTableRefs() != 1) return false;
-    if (aggInfo_ == null || !aggInfo_.hasCountStarOnly()) return false;
     if (fileFormats.size() != 1) return false;
     if (!fileFormats.contains(HdfsFileFormat.PARQUET)) return false;
-    if (!conjuncts_.isEmpty()) return false;
-    return desc_.getMaterializedSlots().isEmpty() || desc_.hasClusteringColsOnly();
+    return canApplyCountStarOptimization(analyzer);
   }
 
   /**
@@ -427,10 +381,10 @@ public class HdfsScanNode extends ScanNode {
       }
     }
 
-    if (canApplyParquetCountStarOptimization(analyzer, fileFormats_)) {
+    if (canApplyCountStarOptimization(analyzer, fileFormats_)) {
       Preconditions.checkState(desc_.getPath().destTable() != null);
       Preconditions.checkState(collectionConjuncts_.isEmpty());
-      countStarSlot_ = applyParquetCountStartOptimization(analyzer);
+      countStarSlot_ = applyCountStarOptimization(analyzer);
     }
 
     computeMemLayout(analyzer);

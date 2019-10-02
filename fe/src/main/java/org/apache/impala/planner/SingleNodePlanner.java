@@ -663,10 +663,16 @@ public class SingleNodePlanner {
     // Add aggregation, if any.
     if (multiAggInfo != null) {
       // Apply substitution for optimized scan/agg plan,
-      if (scanAggInfo != null && root instanceof HdfsScanNode) {
-        scanAggInfo.substitute(((HdfsScanNode) root).getOptimizedAggSmap(), analyzer);
-        scanAggInfo.getMergeAggInfo().substitute(
-            ((HdfsScanNode) root).getOptimizedAggSmap(), analyzer);
+      if (scanAggInfo != null) {
+        if (root instanceof HdfsScanNode) {
+          scanAggInfo.substitute(((HdfsScanNode) root).getOptimizedAggSmap(), analyzer);
+          scanAggInfo.getMergeAggInfo().substitute(
+              ((HdfsScanNode) root).getOptimizedAggSmap(), analyzer);
+        } else if (root instanceof KuduScanNode) {
+          scanAggInfo.substitute(((KuduScanNode) root).getOptimizedAggSmap(), analyzer);
+          scanAggInfo.getMergeAggInfo().substitute(
+              ((KuduScanNode) root).getOptimizedAggSmap(), analyzer);
+        }
       }
       root = createAggregationPlan(selectStmt, analyzer, root);
     }
@@ -1357,7 +1363,7 @@ public class SingleNodePlanner {
    * Create node for scanning all data files of a particular table.
    *
    * The given 'aggInfo' is used for detecting and applying optimizations that span both
-   * the scan and aggregation. Only applicable to HDFS table refs.
+   * the scan and aggregation. Only applicable to HDFS and Kudu table refs.
    *
    * Throws if a PlanNode.init() failed or if planning of the given
    * table ref is not implemented.
@@ -1405,7 +1411,8 @@ public class SingleNodePlanner {
       scanNode.init(analyzer);
       return scanNode;
     } else if (tblRef.getTable() instanceof FeKuduTable) {
-      scanNode = new KuduScanNode(ctx_.getNextNodeId(), tblRef.getDesc(), conjuncts);
+      scanNode = new KuduScanNode(ctx_.getNextNodeId(), tblRef.getDesc(), conjuncts,
+          aggInfo);
       scanNode.init(analyzer);
       return scanNode;
     } else {
@@ -1570,7 +1577,7 @@ public class SingleNodePlanner {
    * CollectionTableRef or an InlineViewRef.
    *
    * The given 'aggInfo' is used for detecting and applying optimizations that span both
-   * the scan and aggregation. Only applicable to HDFS table refs.
+   * the scan and aggregation. Only applicable to HDFS and Kudu table refs.
    *
    * Throws if a PlanNode.init() failed or if planning of the given
    * table ref is not implemented.

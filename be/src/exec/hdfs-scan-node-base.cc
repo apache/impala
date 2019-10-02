@@ -80,8 +80,6 @@ HdfsScanNodeBase::HdfsScanNodeBase(ObjectPool* pool, const TPlanNode& tnode,
       skip_header_line_count_(tnode.hdfs_scan_node.__isset.skip_header_line_count ?
           tnode.hdfs_scan_node.skip_header_line_count : 0),
       tuple_id_(tnode.hdfs_scan_node.tuple_id),
-      optimize_parquet_count_star_(
-          tnode.hdfs_scan_node.__isset.parquet_count_star_slot_offset),
       parquet_count_star_slot_offset_(
           tnode.hdfs_scan_node.__isset.parquet_count_star_slot_offset ?
           tnode.hdfs_scan_node.parquet_count_star_slot_offset : -1),

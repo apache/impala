@@ -24,7 +24,7 @@ PLAN-ROOT SINK
 |     row-size=0B cardinality=7.30K
 |
 |--06:AGGREGATE [FINALIZE]
-|  |  output: sum_init_zero(functional_parquet.alltypes.parquet-stats: num_rows)
+|  |  output: sum_init_zero(functional_parquet.alltypes.stats: num_rows)
 |  |  row-size=8B cardinality=1
 |  |
 |  05:SCAN HDFS [functional_parquet.alltypes]
@@ -32,7 +32,7 @@ PLAN-ROOT SINK
 |     row-size=8B cardinality=unavailable
 |
 |--04:AGGREGATE [FINALIZE]
-|  |  output: sum_init_zero(functional_parquet.alltypes.parquet-stats: num_rows)
+|  |  output: sum_init_zero(functional_parquet.alltypes.stats: num_rows)
 |  |  row-size=8B cardinality=1
 |  |
 |  03:SCAN HDFS [functional_parquet.alltypes]
@@ -40,7 +40,7 @@ PLAN-ROOT SINK
 |     row-size=8B cardinality=unavailable
 |
 02:AGGREGATE [FINALIZE]
-|  output: sum_init_zero(functional_parquet.alltypes.parquet-stats: num_rows)
+|  output: sum_init_zero(functional_parquet.alltypes.stats: num_rows)
 |  row-size=8B cardinality=1
 |
 01:SCAN HDFS [functional_parquet.alltypes]
@@ -74,7 +74,7 @@ PLAN-ROOT SINK
 |  13:EXCHANGE [UNPARTITIONED]
 |  |
 |  06:AGGREGATE
-|  |  output: sum_init_zero(functional_parquet.alltypes.parquet-stats: num_rows)
+|  |  output: sum_init_zero(functional_parquet.alltypes.stats: num_rows)
 |  |  row-size=8B cardinality=1
 |  |
 |  05:SCAN HDFS [functional_parquet.alltypes]
@@ -88,7 +88,7 @@ PLAN-ROOT SINK
 |  11:EXCHANGE [UNPARTITIONED]
 |  |
 |  04:AGGREGATE
-|  |  output: sum_init_zero(functional_parquet.alltypes.parquet-stats: num_rows)
+|  |  output: sum_init_zero(functional_parquet.alltypes.stats: num_rows)
 |  |  row-size=8B cardinality=1
 |  |
 |  03:SCAN HDFS [functional_parquet.alltypes]
@@ -102,7 +102,7 @@ PLAN-ROOT SINK
 09:EXCHANGE [UNPARTITIONED]
 |
 02:AGGREGATE
-|  output: sum_init_zero(functional_parquet.alltypes.parquet-stats: num_rows)
+|  output: sum_init_zero(functional_parquet.alltypes.stats: num_rows)
 |  row-size=8B cardinality=1
 |
 01:SCAN HDFS [functional_parquet.alltypes]
@@ -116,7 +116,7 @@ select count(*), count(1), count(123) from functional_parquet.alltypes
 PLAN-ROOT SINK
 |
 01:AGGREGATE [FINALIZE]
-|  output: sum_init_zero(functional_parquet.alltypes.parquet-stats: num_rows)
+|  output: sum_init_zero(functional_parquet.alltypes.stats: num_rows)
 |  row-size=8B cardinality=1
 |
 00:SCAN HDFS [functional_parquet.alltypes]
@@ -143,7 +143,7 @@ select month, count(*) from functional_parquet.alltypes group by month, year
 PLAN-ROOT SINK
 |
 01:AGGREGATE [FINALIZE]
-|  output: sum_init_zero(functional_parquet.alltypes.parquet-stats: num_rows)
+|  output: sum_init_zero(functional_parquet.alltypes.stats: num_rows)
 |  group by: `month`, `year`
 |  row-size=16B cardinality=24
 |
@@ -201,7 +201,7 @@ select 1 from functional_parquet.alltypes having count(*) > 1
 PLAN-ROOT SINK
 |
 01:AGGREGATE [FINALIZE]
-|  output: sum_init_zero(functional_parquet.alltypes.parquet-stats: num_rows)
+|  output: sum_init_zero(functional_parquet.alltypes.stats: num_rows)
 |  having: count(*) > 1
 |  row-size=8B cardinality=0
 |
@@ -219,7 +219,7 @@ PLAN-ROOT SINK
 |  row-size=16B cardinality=1
 |
 01:AGGREGATE [FINALIZE]
-|  output: sum_init_zero(functional_parquet.alltypes.parquet-stats: num_rows)
+|  output: sum_init_zero(functional_parquet.alltypes.stats: num_rows)
 |  row-size=8B cardinality=1
 |
 00:SCAN HDFS [functional_parquet.alltypes]
@@ -240,7 +240,7 @@ PLAN-ROOT SINK
 |  row-size=101B cardinality=7.30K
 |
 |--02:AGGREGATE [FINALIZE]
-|  |  output: sum_init_zero(functional_parquet.alltypes.parquet-stats: num_rows)
+|  |  output: sum_init_zero(functional_parquet.alltypes.stats: num_rows)
 |  |  group by: `year`
 |  |  row-size=12B cardinality=2
 |  |
@@ -279,7 +279,7 @@ select count(1) from functional_parquet.alltypes where year < 2010 and month > 8
 PLAN-ROOT SINK
 |
 01:AGGREGATE [FINALIZE]
-|  output: sum_init_zero(functional_parquet.alltypes.parquet-stats: num_rows)
+|  output: sum_init_zero(functional_parquet.alltypes.stats: num_rows)
 |  row-size=8B cardinality=1
 |
 00:SCAN HDFS [functional_parquet.alltypes]
@@ -308,7 +308,7 @@ select count(1 + 2 + 3) from functional_parquet.alltypes
 PLAN-ROOT SINK
 |
 01:AGGREGATE [FINALIZE]
-|  output: sum_init_zero(functional_parquet.alltypes.parquet-stats: num_rows)
+|  output: sum_init_zero(functional_parquet.alltypes.stats: num_rows)
 |  row-size=8B cardinality=1
 |
 00:SCAN HDFS [functional_parquet.alltypes]
@@ -412,7 +412,7 @@ select year, cnt from (
 PLAN-ROOT SINK
 |
 01:AGGREGATE [FINALIZE]
-|  output: sum_init_zero(functional_parquet.alltypes.parquet-stats: num_rows)
+|  output: sum_init_zero(functional_parquet.alltypes.stats: num_rows)
 |  group by: `year`
 |  row-size=12B cardinality=2
 |

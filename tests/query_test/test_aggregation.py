@@ -268,6 +268,15 @@ class TestAggregationQueries(ImpalaTestSuite):
     vector.get_value('exec_option')['batch_size'] = 1
     self.run_test_case('QueryTest/parquet-stats-agg', vector, unique_database)
 
+  def test_kudu_count_star_optimization(self, vector, unique_database):
+    if (vector.get_value('table_format').file_format != 'text' or
+       vector.get_value('table_format').compression_codec != 'none'):
+      # No need to run this test on all file formats
+      pytest.skip()
+    self.run_test_case('QueryTest/kudu-stats-agg', vector, unique_database)
+    vector.get_value('exec_option')['batch_size'] = 1
+    self.run_test_case('QueryTest/kudu-stats-agg', vector, unique_database)
+
   def test_sampled_ndv(self, vector, unique_database):
     """The SAMPLED_NDV() function is inherently non-deterministic and cannot be
     reasonably made deterministic with existing options so we test it separately.

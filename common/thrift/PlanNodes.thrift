@@ -324,6 +324,9 @@ struct TKuduScanNode {
   // Indicates whether the MT scan node implementation should be used.
   // If this is true, then the MT_DOP query option must be > 0.
   2: optional bool use_mt_scan_node
+
+  // The byte offset of the slot for Kudu metadata if count star optimization is enabled.
+  3: optional i32 count_star_slot_offset
 }
 
 struct TEqJoinCondition {

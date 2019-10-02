@@ -42,6 +42,10 @@ class KuduScanNodeBase : public ScanNode {
   virtual Status Open(RuntimeState* state) override;
   virtual Status GetNext(RuntimeState* state, RowBatch* row_batch, bool* eos)
       override = 0;
+
+  bool optimize_count_star() const { return count_star_slot_offset_ != -1; }
+  int count_star_slot_offset() const { return count_star_slot_offset_; }
+
  protected:
   virtual void DebugString(int indentation_level, std::stringstream* out) const override;
 
@@ -78,6 +82,12 @@ class KuduScanNodeBase : public ScanNode {
 
   /// The next index in 'scan_tokens_' to be assigned.
   int next_scan_token_idx_ = 0;
+
+  /// The byte offset of the slot for Kudu metadata if count star optimization is enabled.
+  /// When set, this scan node can optimize a count(*) query by populating the
+  /// tuple with data from the num rows statistic.
+  /// See applyCountStartOptimization() in KuduScanNode.java.
+  const int count_star_slot_offset_;
 
   RuntimeProfile::Counter* kudu_round_trips_ = nullptr;
   RuntimeProfile::Counter* kudu_remote_tokens_ = nullptr;

@@ -1,0 +1,100 @@
+====
+---- QUERY
+# Tests the correctness of the Kudu count(*) optimization.
+select count(1)
+from functional_kudu.alltypes
+---- RESULTS
+7300
+---- TYPES
+bigint
+=====
+---- QUERY
+# Kudu count(*) optimization with predicates on the partition columns.
+select count(1)
+from functional_kudu.alltypes where year < 2010 and month > 8
+---- RESULTS
+1220
+---- TYPES
+bigint
+=====
+---- QUERY
+# Kudu count(*) optimization with group by partition columns.
+select year, month, count(1)
+from functional_kudu.alltypes group by year, month
+---- RESULTS
+2009,1,310
+2009,2,280
+2009,3,310
+2009,4,300
+2009,5,310
+2009,6,300
+2009,7,310
+2009,8,310
+2009,9,300
+2009,10,310
+2009,11,300
+2009,12,310
+2010,1,310
+2010,2,280
+2010,3,310
+2010,4,300
+2010,5,310
+2010,6,300
+2010,7,310
+2010,8,310
+2010,9,300
+2010,10,310
+2010,11,300
+2010,12,310
+---- TYPES
+int, int, bigint
+=====
+---- QUERY
+# Kudu count(*) optimization with both group by and predicates on partition columns.
+select count(1)
+from functional_kudu.alltypes where year < 2010 and month > 8
+group by month
+---- RESULTS
+310
+300
+310
+300
+---- TYPES
+bigint
+=====
+---- QUERY
+# Kudu count(*) optimization with the result going into a join.
+select x.bigint_col from functional.alltypes x
+  inner join (
+    select count(1) as a from functional_kudu.alltypes group by year
+  ) t on x.id = t.a;
+---- RESULTS
+0
+0
+---- TYPES
+bigint
+=====
+---- QUERY
+# Kudu count(*) optimization with the agg function in the having clause.
+select 1 from functional_kudu.alltypes having count(*) > 1
+---- RESULTS
+1
+---- TYPES
+tinyint
+====
+---- QUERY
+# Verify that 0 is returned for count(*) on an empty table.
+select count(1) from functional_kudu.emptytable
+---- RESULTS
+0
+---- TYPES
+bigint
+=====
+---- QUERY
+# Verify that 0 is returned when all partitions are pruned.
+select count(1) from functional_kudu.alltypes where year = -1
+---- RESULTS
+0
+---- TYPES
+bigint
+=====
