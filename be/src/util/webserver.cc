@@ -209,6 +209,11 @@ kudu::Status RunSpnegoStep(const char* authz_header, string* resp_header,
     return kudu::Status::InvalidArgument("bad Negotiate header");
   }
 
+  if (!authz_header) {
+    *resp_header = "WWW-Authenticate: Negotiate";
+    return kudu::Status::Incomplete("authn incomplete");
+  }
+
   string resp_token_b64;
   bool is_complete;
   RETURN_NOT_OK(kudu::gssapi::SpnegoStep(

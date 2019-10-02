@@ -545,6 +545,11 @@ bool BasicAuth(ThriftServer::ConnectionContext* connection_context,
 // encountered and the connection should be closed.
 bool NegotiateAuth(ThriftServer::ConnectionContext* connection_context,
     const AuthenticationHash& hash, const std::string& header_token, bool* is_complete) {
+  if (header_token.empty()) {
+    connection_context->return_headers.push_back("WWW-Authenticate: Negotiate");
+    *is_complete = false;
+    return false;
+  }
   std::string token;
   // Note: according to RFC 2616, the correct format for the header is:
   // 'Authorization: Negotiate <token>'. However, beeline incorrectly adds an additional
