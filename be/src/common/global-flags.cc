@@ -269,6 +269,10 @@ DEFINE_double_hidden(invalidate_tables_fraction_on_memory_pressure, 0.1,
 DEFINE_bool_hidden(unlock_mt_dop, false,
     "(Experimental) If true, allow specifying mt_dop for all queries.");
 
+DEFINE_bool_hidden(mt_dop_auto_fallback, false,
+    "(Experimental) If true, fall back to non-mt_dop if mt_dop query option is set and "
+    "a query does not support it. Has no effect if --unlock_mt_dop is true.");
+
 DEFINE_bool_hidden(recursively_list_partitions, true,
     "If true, recursively list the content of partition directories.");
 

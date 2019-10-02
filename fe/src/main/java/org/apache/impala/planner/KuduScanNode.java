@@ -96,6 +96,7 @@ public class KuduScanNode extends ScanNode {
   private final FeKuduTable kuduTable_;
 
   // True if this scan node should use the MT implementation in the backend.
+  // Set in computeNodeResourceProfile().
   private boolean useMtScanNode_;
 
   // Indexes for the set of hosts that will be used for the query.
@@ -154,15 +155,6 @@ public class KuduScanNode extends ScanNode {
     } catch (Exception e) {
       throw new ImpalaRuntimeException("Unable to initialize the Kudu scan node", e);
     }
-
-    // Determine backend scan node implementation to use.
-    if (analyzer.getQueryOptions().isSetMt_dop() &&
-        analyzer.getQueryOptions().mt_dop > 0) {
-      useMtScanNode_ = true;
-    } else {
-      useMtScanNode_ = false;
-    }
-
     computeStats(analyzer);
   }
 
@@ -314,6 +306,7 @@ public class KuduScanNode extends ScanNode {
         kudu_scanner_thread_max_estimated_bytes;
     long mem_estimate_per_thread = Math.min(num_cols *
         estimated_bytes_per_column_per_thread, max_estimated_bytes_per_thread);
+    useMtScanNode_ = queryOptions.mt_dop > 0;
     nodeResourceProfile_ = new ResourceProfileBuilder()
         .setMemEstimateBytes(mem_estimate_per_thread * maxScannerThreads)
         .setThreadReservation(useMtScanNode_ ? 0 : 1).build();

@@ -182,7 +182,7 @@ public class AnalysisContext {
     }
 
     public boolean isDmlStmt() {
-      return isInsertStmt();
+      return isInsertStmt() || isUpdateStmt() || isDeleteStmt();
     }
 
     /**

@@ -160,9 +160,10 @@ class TestCancellation(ImpalaTestSuite):
     if not debug_action and ('count' in query or 'limit' in query):
       self.execute_query(query, vector.get_value('exec_option'))
 
+  @pytest.mark.execute_serially
   def test_misformatted_profile_text(self):
     """Tests that canceled queries have no whitespace formatting errors in their profiles
-    (IMPALA-2063)."""
+    (IMPALA-2063). Executes serially because it is timing-dependent and can be flaky."""
     query = "select count(*) from functional_parquet.alltypes where bool_col = sleep(100)"
     client = self.hs2_client
     # Start query

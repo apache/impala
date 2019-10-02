@@ -143,4 +143,6 @@ struct TBackendGflags {
   59: required bool unlock_zorder_sort
 
   60: required bool simplify_check_on_show_tables
+
+  61: required bool mt_dop_auto_fallback
 }

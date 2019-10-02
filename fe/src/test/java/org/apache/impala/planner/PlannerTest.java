@@ -668,16 +668,17 @@ public class PlannerTest extends PlannerTestBase {
       // MT_DOP is not set automatically for stmt other than COMPUTE STATS.
       testEffectiveMtDop(
           "select * from functional_parquet.alltypes", mtDop, effectiveMtDop);
-      // MT_DOP is not set automatically for COMPUTE STATS on non-Parquet tables.
+
+      // MT_DOP is set automatically for COMPUTE STATS, but can be overridden by a
+      // user-provided MT_DOP.
+      int computeStatsEffectiveMtDop = (mtDop != -1) ? mtDop : 4;
       testEffectiveMtDop(
-          "compute stats functional.alltypes", mtDop, effectiveMtDop);
+          "compute stats functional_parquet.alltypes", mtDop, computeStatsEffectiveMtDop);
+      testEffectiveMtDop(
+          "compute stats functional.alltypes", mtDop, computeStatsEffectiveMtDop);
+      testEffectiveMtDop(
+          "compute stats functional_kudu.alltypes", mtDop, computeStatsEffectiveMtDop);
     }
-    // MT_DOP is set automatically for COMPUTE STATS on Parquet tables,
-    // but can be overridden by a user-provided MT_DOP.
-    testEffectiveMtDop("compute stats functional_parquet.alltypes", -1, 4);
-    testEffectiveMtDop("compute stats functional_parquet.alltypes", 0, 0);
-    testEffectiveMtDop("compute stats functional_parquet.alltypes", 1, 1);
-    testEffectiveMtDop("compute stats functional_parquet.alltypes", 16, 16);
   }
 
   /**

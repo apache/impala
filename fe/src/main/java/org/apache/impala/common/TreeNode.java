@@ -131,7 +131,7 @@ public abstract class TreeNode<NodeType extends TreeNode<NodeType>> {
   @SuppressWarnings("unchecked")
   public <C extends TreeNode<NodeType>, D extends C> void collect(
       Class<D> cl, Collection<D> matches) {
-    if (cl.equals(getClass())) {
+    if (cl.isAssignableFrom(getClass())) {
       matches.add((D) this);
       return;
     }
@@ -183,7 +183,7 @@ public abstract class TreeNode<NodeType extends TreeNode<NodeType>> {
    * Return true if this node or any of its children is an instance of class 'cl'.
    */
   public <C extends TreeNode<NodeType>> boolean contains(Class<C> cl) {
-    if (cl.equals(getClass())) return true;
+    if (cl.isAssignableFrom(getClass())) return true;
     for (NodeType child: children_) if (child.contains(cl)) return true;
     return false;
   }
@@ -221,7 +221,7 @@ public abstract class TreeNode<NodeType extends TreeNode<NodeType>> {
    */
   @SuppressWarnings("unchecked")
   public <C extends NodeType> C findFirstOf(Class<C> cl) {
-    if (this.getClass().equals(cl)) return (C) this;
+    if (cl.isAssignableFrom(getClass())) return (C) this;
     for (NodeType child: children_) {
       NodeType result = child.findFirstOf(cl);
       if (result != null) return (C) result;

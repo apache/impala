@@ -230,6 +230,7 @@ public class HdfsScanNode extends ScanNode {
   private long maxScanRangeNumRows_ = -1;
 
   // True if this scan node should use the MT implementation in the backend.
+  // Set in computeNodeResourceProfile().
   private boolean useMtScanNode_;
 
   // Conjuncts that can be evaluated while materializing the items (tuples) of
@@ -364,9 +365,6 @@ public class HdfsScanNode extends ScanNode {
 
     // compute scan range locations with optional sampling
     computeScanRangeLocations(analyzer);
-
-    useMtScanNode_ =
-        analyzer.getQueryOptions().isSetMt_dop() && analyzer.getQueryOptions().mt_dop > 0;
 
     if (fileFormats_.contains(HdfsFileFormat.PARQUET)) {
       // Compute min-max conjuncts only if the PARQUET_READ_STATISTICS query option is
@@ -1564,6 +1562,7 @@ public class HdfsScanNode extends ScanNode {
     }
 
     // The non-MT scan node requires at least one scanner thread.
+    useMtScanNode_ = queryOptions.mt_dop > 0;
     int requiredThreads = useMtScanNode_ ? 0 : 1;
     int maxScannerThreads = computeMaxNumberOfScannerThreads(queryOptions,
         perHostScanRanges);

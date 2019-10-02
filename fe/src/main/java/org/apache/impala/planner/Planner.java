@@ -38,6 +38,7 @@ import org.apache.impala.catalog.FeHBaseTable;
 import org.apache.impala.catalog.FeKuduTable;
 import org.apache.impala.catalog.FeTable;
 import org.apache.impala.common.ImpalaException;
+import org.apache.impala.common.NotImplementedException;
 import org.apache.impala.common.PrintUtils;
 import org.apache.impala.common.RuntimeEnv;
 import org.apache.impala.service.BackendConfig;
@@ -123,6 +124,27 @@ public class Planner {
     // Join rewrites.
     invertJoins(singleNodePlan, ctx_.isSingleNodeExec());
     singleNodePlan = useNljForSingularRowBuilds(singleNodePlan, ctx_.getRootAnalyzer());
+
+    // MT_DOP > 0 is not supported by default for plans with base table joins or table
+    // sinks: we only allow MT_DOP > 0 with such plans if --unlock_mt_dop=true is
+    // specified. We allow single node plans with mt_dop since there is no actual
+    // parallelism.
+    if (!ctx_.isSingleNodeExec()
+        && ctx_.getQueryOptions().mt_dop > 0
+        && !RuntimeEnv.INSTANCE.isTestEnv()
+        && !BackendConfig.INSTANCE.isMtDopUnlocked()
+        && (ctx_.hasTableSink() ||
+            singleNodePlanner.hasUnsupportedMtDopJoin(singleNodePlan))) {
+      if (BackendConfig.INSTANCE.mtDopAutoFallback()) {
+        // Fall back to non-dop mode. This assumes that the mt_dop value is only used
+        // in the distributed planning process, which should be generally true as long
+        // as the value isn't cached in any plan nodes.
+        ctx_.getQueryOptions().setMt_dop(0);
+      } else {
+        throw new NotImplementedException(
+            "MT_DOP not supported for plans with base table joins or table sinks.");
+      }
+    }
 
     singleNodePlanner.validatePlan(singleNodePlan);
 

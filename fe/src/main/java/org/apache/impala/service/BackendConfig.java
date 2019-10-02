@@ -145,6 +145,10 @@ public class BackendConfig {
     return backendCfg_.unlock_mt_dop;
   }
 
+  public boolean mtDopAutoFallback() {
+    return backendCfg_.mt_dop_auto_fallback;
+  }
+
   public boolean recursivelyListPartitions() {
     return backendCfg_.recursively_list_partitions;
   }

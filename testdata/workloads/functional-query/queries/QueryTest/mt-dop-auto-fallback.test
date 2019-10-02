@@ -1,0 +1,33 @@
+====
+---- QUERY
+select min(l_orderkey), min(p_name)
+from tpch.lineitem join tpch.part on l_partkey = p_partkey;
+---- RESULTS
+1,'almond antique blue royal burnished'
+---- TYPES
+BIGINT,STRING
+---- RUNTIME_PROFILE
+row_regex:.*Query Options \(set by configuration and planner\):.*MT_DOP=0.*
+row_regex:.*All 3 execution backends \(5 fragment instances\) started.*
+row_regex:.*NumScannerThreadsStarted.*
+====
+---- QUERY
+select min(l_orderkey), min(p_name)
+from tpch_kudu.lineitem join tpch_kudu.part on l_partkey = p_partkey;
+---- RESULTS
+1,'almond antique blue royal burnished'
+---- TYPES
+BIGINT,STRING
+---- RUNTIME_PROFILE
+row_regex:.*Query Options \(set by configuration and planner\):.*MT_DOP=0.*
+row_regex:.*All 3 execution backends \(7 fragment instances\) started.*
+row_regex:.*NumScannerThreadsStarted.*
+====
+---- QUERY
+create table tmp as
+select * from functional.alltypes
+---- RUNTIME_PROFILE
+row_regex:.*Query Options \(set by configuration and planner\):.*MT_DOP=0.*
+row_regex:.*All 3 execution backends \(3 fragment instances\) started.*
+row_regex:.*NumScannerThreadsStarted.*
+====

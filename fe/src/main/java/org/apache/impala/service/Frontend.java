@@ -34,8 +34,6 @@ import java.util.concurrent.atomic.AtomicReference;
 
 import org.apache.hadoop.fs.FileSystem;
 import org.apache.hadoop.fs.Path;
-import org.apache.hadoop.hive.conf.HiveConf;
-import org.apache.hadoop.hive.metastore.HiveMetaStoreClient;
 import org.apache.hadoop.hive.metastore.IMetaStoreClient;
 import org.apache.hadoop.hive.metastore.api.DataOperationType;
 import org.apache.hadoop.hive.metastore.api.LockComponent;
@@ -1170,7 +1168,7 @@ public class Frontend {
       Planner planner, PlanCtx planCtx) throws ImpalaException {
     TQueryCtx queryCtx = planner.getQueryCtx();
     AnalysisResult analysisResult = planner.getAnalysisResult();
-    boolean isMtExec = analysisResult.isQueryStmt()
+    boolean isMtExec = (analysisResult.isQueryStmt() || analysisResult.isDmlStmt())
         && queryCtx.client_request.query_options.isSetMt_dop()
         && queryCtx.client_request.query_options.mt_dop > 0;
 
@@ -1430,10 +1428,9 @@ public class Frontend {
    */
   private static void setMtDopForCatalogOp(
       AnalysisResult analysisResult, TQueryOptions queryOptions) {
-    // Set MT_DOP=4 for COMPUTE STATS on Parquet/ORC tables, unless the user has already
-    // provided another value for MT_DOP.
-    if (!queryOptions.isSetMt_dop() && analysisResult.isComputeStatsStmt()
-        && analysisResult.getComputeStatsStmt().isColumnar()) {
+    // Set MT_DOP=4 for COMPUTE STATS, unless the user has already provided another
+    // value for MT_DOP.
+    if (!queryOptions.isSetMt_dop() && analysisResult.isComputeStatsStmt()) {
       queryOptions.setMt_dop(4);
     }
     // If unset, set MT_DOP to 0 to simplify the rest of the code.
@@ -1503,8 +1500,7 @@ public class Frontend {
       AnalysisResult analysisResult, EventSequence timeline)
       throws ImpalaException {
     Preconditions.checkState(analysisResult.isQueryStmt() || analysisResult.isDmlStmt()
-        || analysisResult.isCreateTableAsSelectStmt() || analysisResult.isUpdateStmt()
-        || analysisResult.isDeleteStmt());
+        || analysisResult.isCreateTableAsSelectStmt());
     TQueryCtx queryCtx = planCtx.getQueryContext();
     Planner planner = new Planner(analysisResult, queryCtx, timeline);
     TQueryExecRequest queryExecRequest = createExecRequest(planner, planCtx);
