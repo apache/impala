@@ -46,6 +46,7 @@ public class Transaction implements AutoCloseable {
     hmsClient_ = hmsClient;
     keepalive_ = keepalive;
     transactionId_ = MetastoreShim.openTransaction(hmsClient_);
+    LOG.info("Opened transaction: " + String.valueOf(transactionId_));
     keepalive_.addTransaction(transactionId_, ctx);
   }
 

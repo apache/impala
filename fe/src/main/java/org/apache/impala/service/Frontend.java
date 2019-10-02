@@ -1288,6 +1288,7 @@ public class Frontend {
         queryCtx.client_request.stmt, queryCtx.client_request.query_options);
     StmtMetadataLoader metadataLoader =
         new StmtMetadataLoader(this, queryCtx.session.database, timeline);
+    //TODO (IMPALA-8788): should load table write ids in transaction context.
     StmtTableCache stmtTableCache = metadataLoader.loadTables(stmt);
 
     // Analyze and authorize stmt
@@ -1318,16 +1319,12 @@ public class Frontend {
         FeTable targetTable = insertStmt.getTargetTable();
         if (AcidUtils.isTransactionalTable(
             targetTable.getMetaStoreTable().getParameters())) {
-          // TODO (IMPALA-8788): should load table write ids in transaction context.
           long txnId = openTransaction(queryCtx);
-          queryCtx.setTransaction_id(txnId);
           timeline.markEvent("Transaction opened (" + String.valueOf(txnId) + ")");
-          Long writeId = allocateWriteIdIfNeeded(queryCtx, targetTable);
-          if (writeId != null) {
-            Collection<FeTable> tables = stmtTableCache.tables.values();
-            createLockForInsert(txnId, tables, targetTable, insertStmt.isOverwrite());
-            insertStmt.setWriteId(writeId);
-          }
+          Collection<FeTable> tables = stmtTableCache.tables.values();
+          createLockForInsert(txnId, tables, targetTable, insertStmt.isOverwrite());
+          long writeId = allocateWriteId(queryCtx, targetTable);
+          insertStmt.setWriteId(writeId);
         }
       } else if (analysisResult.isLoadDataStmt()) {
         result.stmt_type = TStmtType.LOAD;
@@ -1684,6 +1681,8 @@ public class Frontend {
       long transactionId = MetastoreShim.openTransaction(hmsClient);
       HeartbeatContext ctx = new HeartbeatContext(queryCtx, System.nanoTime());
       transactionKeepalive_.addTransaction(transactionId, ctx);
+      LOG.info("Opened transaction: " + Long.toString(transactionId));
+      queryCtx.setTransaction_id(transactionId);
       return transactionId;
     }
   }
@@ -1713,20 +1712,18 @@ public class Frontend {
   }
 
   /**
-   * Checks whether we should allocate a write id for 'table'. If so, it does the
-   * allocation and returns the write id, otherwise returns null.
+   * Allocates write id for transactional table.
    * @param queryCtx the query context that contains the transaction id.
    * @param table the target table of the write operation.
-   * @return the allocated write id, or null
+   * @return the allocated write id
    * @throws TransactionException
    */
-  private Long allocateWriteIdIfNeeded(TQueryCtx queryCtx, FeTable table)
+  private long allocateWriteId(TQueryCtx queryCtx, FeTable table)
       throws TransactionException {
-    if (!queryCtx.isSetTransaction_id()) return null;
-    if (!(table instanceof FeFsTable)) return null;
-    if (!AcidUtils.isTransactionalTable(table.getMetaStoreTable().getParameters())) {
-      return null;
-    }
+    Preconditions.checkState(queryCtx.isSetTransaction_id());
+    Preconditions.checkState(table instanceof FeFsTable);
+    Preconditions.checkState(
+        AcidUtils.isTransactionalTable(table.getMetaStoreTable().getParameters()));
     try (MetaStoreClient client = metaStoreClientPool_.getClient()) {
       IMetaStoreClient hmsClient = client.getHiveClient();
       long txnId = queryCtx.getTransaction_id();

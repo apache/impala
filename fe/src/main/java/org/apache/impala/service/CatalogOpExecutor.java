@@ -530,6 +530,17 @@ public class CatalogOpExecutor {
   }
 
   /**
+   * This method checks if the write lock of 'catalog_' is unlocked. If it's still locked
+   * then it logs an error and unlocks it.
+   */
+  private void UnlockWriteLockIfErronouslyLocked() {
+    if(catalog_.getLock().isWriteLockedByCurrentThread()) {
+      LOG.error("Write lock should have been released.");
+      catalog_.getLock().writeLock().unlock();
+    }
+  }
+
+  /**
    * Execute the ALTER TABLE command according to the TAlterTableParams and refresh the
    * table metadata, except for RENAME, ADD PARTITION and DROP PARTITION. This call is
    * thread-safe, i.e. concurrent operations on the same table are serialized.
@@ -749,7 +760,7 @@ public class CatalogOpExecutor {
       catalog_.addVersionsForInflightEvents(tbl, newCatalogVersion);
     } finally {
       context.stop();
-      Preconditions.checkState(!catalog_.getLock().isWriteLockedByCurrentThread());
+      UnlockWriteLockIfErronouslyLocked();
       tbl.getLock().unlock();
     }
   }
@@ -909,7 +920,7 @@ public class CatalogOpExecutor {
       tbl.setCatalogVersion(newCatalogVersion);
       addTableToCatalogUpdate(tbl, resp.result);
     } finally {
-      Preconditions.checkState(!catalog_.getLock().isWriteLockedByCurrentThread());
+      UnlockWriteLockIfErronouslyLocked();
       tbl.getLock().unlock();
     }
   }
@@ -1380,10 +1391,7 @@ public class CatalogOpExecutor {
     Preconditions.checkState(!AcidUtils.isTransactionalTable(
         table.getMetaStoreTable().getParameters()));
 
-    if (!catalog_.tryLockTable(table)) {
-      throw new InternalException(String.format("Error dropping stats for table %s " +
-          "due to lock contention", table.getFullName()));
-    }
+    tryLock(table, "dropping stats");
     try {
       long newCatalogVersion = catalog_.incrementAndGetCatalogVersion();
       catalog_.getLock().writeLock().unlock();
@@ -1416,7 +1424,7 @@ public class CatalogOpExecutor {
       addTableToCatalogUpdate(table, resp.result);
       addSummary(resp, "Stats have been dropped.");
     } finally {
-      Preconditions.checkState(!catalog_.getLock().isWriteLockedByCurrentThread());
+      UnlockWriteLockIfErronouslyLocked();
       table.getLock().unlock();
     }
   }
@@ -1854,39 +1862,34 @@ public class CatalogOpExecutor {
           String.format("TRUNCATE TABLE not supported on non-HDFS table: %s",
           table.getFullName()));
     }
-    if (!catalog_.tryLockTable(table)) {
-      throw new InternalException(String.format("Error truncating table %s due to lock " +
-          "contention", table.getFullName()));
-    }
+    // Lock table to check transactional properties.
+    // If non-transactional, the lock will be held during truncation.
+    // If transactional, the lock will be released for some time to acquire the HMS Acid
+    // lock. It's safe because transactional -> non-transactional conversion is not
+    // allowed.
+    tryLock(table, "truncating");
     try {
-      long newCatalogVersion = catalog_.incrementAndGetCatalogVersion();
-      catalog_.getLock().writeLock().unlock();
+      long newCatalogVersion = 0;
       try {
-        if (MetastoreShim.getMajorVersion() > 2 && AcidUtils.isTransactionalTable(
-            table.getMetaStoreTable().getParameters())) {
-          truncateTransactionalTable(params, table);
+        if (AcidUtils.isTransactionalTable(table.getMetaStoreTable().getParameters())) {
+          newCatalogVersion = truncateTransactionalTable(params, table);
         } else {
-          HdfsTable hdfsTable = (HdfsTable)table;
-          Collection<? extends FeFsPartition> parts =
-              FeCatalogUtils.loadAllPartitions(hdfsTable);
-          for (FeFsPartition part: parts) {
-            FileSystemUtil.deleteAllVisibleFiles(new Path(part.getLocation()));
-          }
-          dropColumnStats(table);
-          dropTableStats(table);
+          newCatalogVersion = truncateNonTransactionalTable(params, table);
         }
       } catch (Exception e) {
         String fqName = tblName.db_name + "." + tblName.table_name;
         throw new CatalogException(String.format("Failed to truncate table: %s.\n" +
             "Table may be in a partially truncated state.", fqName), e);
       }
+      Preconditions.checkState(newCatalogVersion > 0);
       addSummary(resp, "Table has been truncated.");
-
       loadTableMetadata(table, newCatalogVersion, true, true, null, "TRUNCATE");
       addTableToCatalogUpdate(table, resp.result);
     } finally {
-      Preconditions.checkState(!catalog_.getLock().isWriteLockedByCurrentThread());
-      table.getLock().unlock();
+      UnlockWriteLockIfErronouslyLocked();
+      if (table.getLock().isHeldByCurrentThread()) {
+        table.getLock().unlock();
+      }
     }
   }
 
@@ -1898,18 +1901,29 @@ public class CatalogOpExecutor {
    * After that empty directory creation it removes stats-related parameters of
    * the table and its partitions.
    */
-  private void truncateTransactionalTable(TTruncateParams params, Table table)
+  private long truncateTransactionalTable(TTruncateParams params, Table table)
       throws ImpalaException {
+    Preconditions.checkState(table.getLock().isHeldByCurrentThread());
+    Preconditions.checkState(catalog_.getLock().isWriteLockedByCurrentThread());
+    catalog_.getLock().writeLock().unlock();
     TableName tblName = TableName.fromThrift(params.getTable_name());
     try (MetaStoreClient msClient = catalog_.getMetaStoreClient()) {
+      long newCatalogVersion = 0;
       IMetaStoreClient hmsClient = msClient.getHiveClient();
       HeartbeatContext ctx = new HeartbeatContext(
           String.format("Truncate table %s.%s", tblName.getDb(), tblName.getTbl()),
           System.nanoTime());
       try (Transaction txn = catalog_.openTransaction(hmsClient, ctx)) {
         Preconditions.checkState(txn.getId() > 0);
+        // We need to release catalog table lock here, because HMS Acid table lock
+        // must be locked in advance to avoid dead lock.
+        table.getLock().unlock();
+        //TODO: if possible, set DataOperationType to something better than NO_TXN.
         catalog_.lockTableInTransaction(tblName.getDb(), tblName.getTbl(), txn,
-            DataOperationType.DELETE, ctx);
+            DataOperationType.NO_TXN, ctx);
+        tryLock(table, "truncating");
+        newCatalogVersion = catalog_.incrementAndGetCatalogVersion();
+        catalog_.getLock().writeLock().unlock();
         TblTransaction tblTxn = MetastoreShim.createTblTransaction(hmsClient,
             table.getMetaStoreTable(), txn.getId());
         HdfsTable hdfsTable = (HdfsTable)table;
@@ -1941,10 +1955,28 @@ public class CatalogOpExecutor {
         unsetTableColStats(table.getMetaStoreTable(), tblTxn);
         txn.commit();
       }
+      return newCatalogVersion;
     } catch (Exception e) {
       throw new ImpalaRuntimeException(
           String.format(HMS_RPC_ERROR_FORMAT_STR, "truncateTable"), e);
     }
+  }
+
+  private long truncateNonTransactionalTable(TTruncateParams params, Table table)
+      throws Exception {
+    Preconditions.checkState(table.getLock().isHeldByCurrentThread());
+    Preconditions.checkState(catalog_.getLock().isWriteLockedByCurrentThread());
+    long newCatalogVersion = catalog_.incrementAndGetCatalogVersion();
+    catalog_.getLock().writeLock().unlock();
+    HdfsTable hdfsTable = (HdfsTable) table;
+    Collection<? extends FeFsPartition> parts = FeCatalogUtils
+        .loadAllPartitions(hdfsTable);
+    for (FeFsPartition part : parts) {
+      FileSystemUtil.deleteAllVisibleFiles(new Path(part.getLocation()));
+    }
+    dropColumnStats(table);
+    dropTableStats(table);
+    return newCatalogVersion;
   }
 
   /**
@@ -3982,9 +4014,7 @@ public class CatalogOpExecutor {
           update.getTarget_table());
     }
 
-    if (!catalog_.tryLockTable(table)) {
-      throw new InternalException("Error updating the catalog due to lock contention.");
-    }
+    tryLock(table, "updating the catalog");
     final Timer.Context context
         = table.getMetrics().getTimer(HdfsTable.CATALOG_UPDATE_DURATION_METRIC).time();
 
@@ -4194,7 +4224,7 @@ public class CatalogOpExecutor {
       addTableToCatalogUpdate(table, response.result);
     } finally {
       context.stop();
-      Preconditions.checkState(!catalog_.getLock().isWriteLockedByCurrentThread());
+      UnlockWriteLockIfErronouslyLocked();
       table.getLock().unlock();
     }
 
@@ -4529,10 +4559,18 @@ public class CatalogOpExecutor {
    * unable to lock the given table.
    */
   private void tryLock(Table tbl) throws InternalException {
+    tryLock(tbl, "altering");
+  }
+
+  /**
+   * Try to lock a table in the catalog for a given operation. Throw an InternalException
+   * if the catalog is unable to lock the given table.
+   */
+  private void tryLock(Table tbl, String operation) throws InternalException {
     String type = tbl instanceof View ? "view" : "table";
     if (!catalog_.tryLockTable(tbl)) {
-      throw new InternalException(String.format("Error altering %s %s due to " +
-          "lock contention.", type, tbl.getFullName()));
+      throw new InternalException(String.format("Error %s (for) %s %s due to " +
+          "lock contention.", operation, type, tbl.getFullName()));
     }
   }
 
@@ -4544,6 +4582,7 @@ public class CatalogOpExecutor {
   private void commitTransaction(long transactionId) throws TransactionException {
     try (MetaStoreClient msClient = catalog_.getMetaStoreClient()) {
       MetastoreShim.commitTransaction(msClient.getHiveClient(), transactionId);
+      LOG.info("Committed transaction: " + Long.toString(transactionId));
     }
   }
 

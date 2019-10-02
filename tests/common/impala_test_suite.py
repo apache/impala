@@ -246,6 +246,17 @@ class ImpalaTestSuite(BaseTestSuite):
     return client
 
   @classmethod
+  def get_impalad_cluster_size(cls):
+    return len(cls.__get_cluster_host_ports('beeswax'))
+
+  @classmethod
+  def create_client_for_nth_impalad(cls, nth=0):
+    # TODO Extended it to other protocols
+    protocol = 'beeswax'
+    host_port = cls.__get_cluster_host_ports(protocol)[nth]
+    return ImpalaTestSuite.create_impala_client(host_port, protocol=protocol)
+
+  @classmethod
   def close_impala_clients(cls):
     """Close Impala clients created by setup_class()."""
     if cls.client:

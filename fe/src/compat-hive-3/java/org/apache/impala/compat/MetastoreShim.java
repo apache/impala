@@ -676,7 +676,8 @@ public class MetastoreShim {
       long txnId, long lockId) throws TransactionException {
     String errorMsg = "Caught exception during heartbeating transaction " +
         String.valueOf(txnId) + " lock " + String.valueOf(lockId);
-    LOG.info("Sending heartbeat");
+    LOG.info("Sending heartbeat for transaction " + String.valueOf(txnId) +
+        " lock " + String.valueOf(lockId));
     try {
       client.heartbeat(txnId, lockId);
     } catch (NoSuchLockException e) {
@@ -720,6 +721,10 @@ public class MetastoreShim {
       int retries = 0;
       while (lockResponse.getState() == LockState.WAITING && retries < LOCK_RETRIES) {
         try {
+          //TODO: add profile counter for lock waits.
+          LOG.info("Waiting " + String.valueOf(LOCK_RETRY_WAIT_SECONDS) +
+              " seconds for lock " + String.valueOf(lockId) + " of transaction " +
+              Long.toString(txnId));
           Thread.sleep(LOCK_RETRY_WAIT_SECONDS * 1000);
           ++retries;
           lockResponse = client.checkLock(lockId);

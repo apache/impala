@@ -113,7 +113,7 @@ public class TransactionKeepalive {
           long durationOfHeartbeatingMillis = 0;
           if (!copyOfTransactions.isEmpty() || !copyOfLocks.isEmpty()) {
             LOG.info("There are " + String.valueOf(copyOfTransactions.size()) +
-                " open transactions and " + String.valueOf(copyOfLocks) +
+                " open transactions and " + String.valueOf(copyOfLocks.size()) +
                 " independent locks in TransactionKeepalive. Start heartbeating them.");
             long startHeartbeating = System.nanoTime();
             sendHeartbeatsFor(copyOfTransactions, copyOfLocks);
