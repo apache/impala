@@ -23,6 +23,10 @@
 #
 # Usage:
 # ------
+# This script assumes that the Impala repository is checked out and that the
+# toolchain has been bootstrapped in the toolchain subdirectory of the impala
+# repository.
+#
 # The script expects to be run as root and requires that the user specify a range of
 # IPs that it should accept connections from. E.g. To configure a distcc server that
 # accepts connections from the 172.* private IP address block. The IP address argument
@@ -39,6 +43,10 @@
 # CCACHE_DIR: directory to use for distccd's ccache.
 # CCACHE_SIZE: size of ccache, passed to ccache's -M option
 set -eu -o pipefail
+
+# Find the absolute path to repo root.
+export IMPALA_HOME=$(cd "$(dirname "$0")/../.."; pwd)
+
 . $IMPALA_HOME/bin/report_build_error.sh
 setup_report_build_error
 
@@ -48,9 +56,6 @@ if [[ $# != 1 ]]; then
 fi
 set -x
 ALLOWED_NETS=$1
-
-# Find the absolute path to repo root.
-IMPALA_HOME=$(cd "$(dirname "$0")/../.."; pwd)
 
 LSB_ID=$(lsb_release -is)
 LSB_VERSION=$(lsb_release -rs)
