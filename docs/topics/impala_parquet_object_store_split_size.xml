@@ -42,7 +42,6 @@ under the License.
     <p><b>Type:</b>
       <codeph>INT</codeph></p>
     <p><b>Default:</b> 256 MB</p>
-    <p>Usage notes:</p>
     <p><b>Added in:</b> Impala 3.4</p>
   </conbody>
 </concept>
