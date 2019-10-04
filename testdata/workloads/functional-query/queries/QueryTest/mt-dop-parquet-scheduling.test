@@ -1,0 +1,133 @@
+====
+---- QUERY
+# 24 partitions across 3 backends means that we'll get 4 finstances per backend
+# (since mt_dop=4, which limits us to 4 finstances per backend).
+select min(string_col) from alltypes
+---- RESULTS
+'0'
+---- RUNTIME_PROFILE
+row_regex:.*AdmissionSlots: 4.*
+====
+---- QUERY
+# 2 partitions across 3 backends means that we'll get 1 finstance per backend
+# and one unused backend.
+select min(string_col) from alltypes where month = 1
+---- RESULTS
+'0'
+---- RUNTIME_PROFILE
+row_regex:.*AdmissionSlots: 1.*
+====
+---- QUERY
+# 7 partitions across 3 backends results in 3 finstances on one backend and 2
+# finstances on the others. This test illustrates that the slots can vary between
+# backends.
+select min(string_col) from alltypes where month <= 7 and year = 2009
+---- RESULTS
+'0'
+---- RUNTIME_PROFILE
+row_regex:.*AdmissionSlots: 2.*
+row_regex:.*AdmissionSlots: 3.*
+====
+---- QUERY
+# This query should have three scans in the same fragment. The scan of 'alltypes'
+# has 24 files - enough scan ranges to result in 4 finstances per backend.
+select min(string_col) from (
+  select * from alltypes
+  union all
+  select * from alltypessmall
+  union all
+  select * from alltypestiny) v
+---- RESULTS
+'0'
+---- RUNTIME_PROFILE
+row_regex:.*AdmissionSlots: 4 .*
+row_regex:.*F04:ROOT * 1 .*
+row_regex:.*04:AGGREGATE * 12 .*
+row_regex:.*00:UNION * 12 *
+row_regex:.*02:SCAN HDFS * 12 .*alltypessmall.*
+row_regex:.*03:SCAN HDFS * 12 .*alltypestiny.*
+row_regex:.*01:SCAN HDFS * 12 .*alltypes.*
+====
+---- QUERY
+# Same idea, but with smallest scan first to check that the scheduler is taking the
+# max # ranges over the branches of the union when deciding parallelism.
+select min(string_col) from (
+  select * from alltypestiny
+  union all
+  select * from alltypessmall
+  union all
+  select * from alltypes) v
+---- RESULTS
+'0'
+---- RUNTIME_PROFILE
+row_regex:.*AdmissionSlots: 4 .*
+row_regex:.*F04:ROOT * 1 .*
+row_regex:.*04:AGGREGATE * 12 .*
+row_regex:.*00:UNION * 12 *
+row_regex:.*02:SCAN HDFS * 12 .*alltypessmall.*
+row_regex:.*03:SCAN HDFS * 12 .*alltypes.*
+row_regex:.*01:SCAN HDFS * 12 .*alltypestiny.*
+====
+---- QUERY
+# This query should have one scan and one exchange in the interior fragment.
+# The scan of 'alltypes' has 24 files - enough scan ranges to result in 4 finstances per
+# backend.
+select min(string_col) from (
+  select * from alltypestiny
+  union all
+  select distinct * from alltypes) v
+---- RESULTS
+'0'
+---- RUNTIME_PROFILE
+row_regex:.*AdmissionSlots: 4.*
+row_regex:.*F04:ROOT * 1 .*
+row_regex:.*04:AGGREGATE * 12 .*
+row_regex:.*06:AGGREGATE * 12 .*
+row_regex:.*03:AGGREGATE * 12 .*
+row_regex:.*00:UNION * 12 *
+row_regex:.*02:SCAN HDFS * 12 .*alltypes.*
+row_regex:.*01:SCAN HDFS * 12 .*alltypestiny.*
+====
+---- QUERY
+# This query should have one scan and one exchange in the interior fragment.
+# The scan of 'alltypes' has 24 files - enough scan ranges to result in 4 finstances per
+# backend (12 total), but the scan of alltypestiny only results in 4 scan ranges total.
+# So the parallelism of the interior fragment is higher than the alltypestiny
+# scan fragment.
+select min(string_col) from (
+  select * from alltypes
+  union all
+  select distinct * from alltypestiny) v
+---- RESULTS
+'0'
+---- RUNTIME_PROFILE
+row_regex:.*AdmissionSlots: 4.*
+row_regex:.*F04:ROOT * 1 .*
+row_regex:.*04:AGGREGATE * 12 .*
+row_regex:.*06:AGGREGATE * 12 .*
+row_regex:.*03:AGGREGATE * 4 .*
+row_regex:.*00:UNION * 12 *
+row_regex:.*02:SCAN HDFS * 4 .*alltypestiny.*
+row_regex:.*01:SCAN HDFS * 12 .*alltypes.*
+====
+---- QUERY
+# This query should have one scan and two exchanges in the interior fragment.
+# The input scans to the exchanges have 2 finstances each per node, so the
+# parallelism of the interior fragment should be 2 also.
+select min(string_col) from (
+  select * from alltypestiny
+  union all
+  select distinct * from alltypes where month >= 7 and year = 2010
+  union all
+  select distinct * from alltypes where month <= 6 and year = 2009) v
+---- RESULTS
+'0'
+---- RUNTIME_PROFILE
+row_regex:.*F06:ROOT * 1 .*
+row_regex:.*AdmissionSlots: 2.*
+row_regex:.*00:UNION * 6 .*
+row_regex:.*08:AGGREGATE * 6 .*
+row_regex:.*03:AGGREGATE * 6 .*
+row_regex:.*04:SCAN HDFS * 6 .*
+row_regex:.*01:SCAN HDFS * 6 .*
+====

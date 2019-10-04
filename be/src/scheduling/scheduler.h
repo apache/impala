@@ -264,6 +264,11 @@ class Scheduler {
   const TBackendDescriptor& LookUpBackendDesc(
       const ExecutorConfig& executor_config, const TNetworkAddress& host);
 
+  /// Returns the KRPC host in 'executor_config' based on the thrift backend address
+  /// 'backend_host'. Will DCHECK if the KRPC address is not valid.
+  TNetworkAddress LookUpKrpcHost(
+      const ExecutorConfig& executor_config, const TNetworkAddress& backend_host);
+
   /// Determine the pool for a user and query options via request_pool_service_.
   Status GetRequestPool(const std::string& user, const TQueryOptions& query_options,
       std::string* pool) const;
@@ -365,33 +370,27 @@ class Scheduler {
       QuerySchedule* schedule);
 
   /// Create instances of the fragment corresponding to fragment_params, which contains
-  /// a Union node.
-  /// UnionNodes are special because they can consume multiple partitioned inputs,
-  /// as well as execute multiple scans in the same fragment.
-  /// Fragments containing a UnionNode are executed on the union of hosts of all
-  /// scans in the fragment as well as the hosts of all its input fragments (s.t.
-  /// a UnionNode with partitioned joins or grouping aggregates as children runs on
-  /// at least as many hosts as the input to those children).
-  /// TODO: is this really necessary? If not, revise.
-  void CreateUnionInstances(const ExecutorConfig& executor_config,
-      FragmentExecParams* fragment_params, QuerySchedule* schedule);
-
-  /// Create instances of the fragment corresponding to fragment_params to run on the
-  /// selected replica hosts of the scan ranges of the node with id scan_id.
-  /// The maximum number of instances is the value of query option mt_dop.
-  /// For HDFS, this attempts to load balance among instances by computing the average
-  /// number of bytes per instances and then in a single pass assigning scan ranges to
-  /// each instance to roughly meet that average.
-  /// For all other storage mgrs, it load-balances the number of splits per instance.
-  void CreateScanInstances(const ExecutorConfig& executor_config, PlanNodeId scan_id,
+  /// either a Union node, one or more scan nodes, or both.
+  ///
+  /// This fragment is scheduled on the union of hosts of all scans in the fragment
+  /// as well as the hosts of all its input fragments (s.t. a UnionNode with partitioned
+  /// joins or grouping aggregates as children runs on at least as many hosts as the
+  /// input to those children).
+  ///
+  /// The maximum number of instances per host is the value of query option mt_dop.
+  /// For HDFS, this load balances among instances within a host using
+  /// AssignRangesToInstances().
+  void CreateCollocatedAndScanInstances(const ExecutorConfig& executor_config,
       FragmentExecParams* fragment_params, QuerySchedule* schedule);
 
   /// Compute an assignment of scan ranges 'ranges' that were assigned to a host to
-  /// 'num_instances' fragment instances running on the same host. Attempts to minimize
-  /// skew across the instances. 'num_ranges' must be positive. May reorder ranges in
-  /// 'ranges'.
+  /// at most 'max_num_instances' fragment instances running on the same host.
+  /// Attempts to minimize skew across the instances. 'max_num_ranges' must be
+  /// positive. Only returns non-empty vectors: if there are not enough ranges
+  /// to create 'max_num_instances', fewer instances are assigned ranges.
+  /// May reorder ranges in 'ranges'.
   static std::vector<std::vector<TScanRangeParams>> AssignRangesToInstances(
-      int num_instances, std::vector<TScanRangeParams>* ranges);
+      int max_num_instances, std::vector<TScanRangeParams>* ranges);
 
   /// For each instance of fragment_params's input fragment, create a collocated
   /// instance for fragment_params's fragment.
@@ -399,23 +398,27 @@ class Scheduler {
   void CreateCollocatedInstances(
       FragmentExecParams* fragment_params, QuerySchedule* schedule);
 
-  /// Return the id of the leftmost node of any of the given types in 'plan', or
-  /// INVALID_PLAN_NODE_ID if no such node present.
-  PlanNodeId FindLeftmostNode(
-      const TPlan& plan, const std::vector<TPlanNodeType::type>& types);
-  /// Same for scan nodes.
-  PlanNodeId FindLeftmostScan(const TPlan& plan);
-
-  /// Add all hosts the given scan is executed on to scan_hosts.
-  void GetScanHosts(const TBackendDescriptor& local_be_desc, TPlanNodeId scan_id,
-      const FragmentExecParams& params, std::vector<TNetworkAddress>* scan_hosts);
+  /// Add all hosts that the scans identified by 'scan_ids' are executed on to
+  /// 'scan_hosts'.
+  void GetScanHosts(const TBackendDescriptor& local_be_desc,
+      const std::vector<TPlanNodeId>& scan_ids, const FragmentExecParams& params,
+      std::vector<TNetworkAddress>* scan_hosts);
 
   /// Return true if 'plan' contains a node of the given type.
   bool ContainsNode(const TPlan& plan, TPlanNodeType::type type);
 
+  /// Return true if 'plan' contains a node of one of the given types.
+  bool ContainsNode(const TPlan& plan, const std::vector<TPlanNodeType::type>& types);
+
+  /// Return true if 'plan' contains a scan node.
+  bool ContainsScanNode(const TPlan& plan);
+
   /// Return all ids of nodes in 'plan' of any of the given types.
-  void FindNodes(const TPlan& plan, const std::vector<TPlanNodeType::type>& types,
-      std::vector<TPlanNodeId>* results);
+  std::vector<TPlanNodeId> FindNodes(
+      const TPlan& plan, const std::vector<TPlanNodeType::type>& types);
+
+  /// Return all ids of all scan nodes in 'plan'.
+  std::vector<TPlanNodeId> FindScanNodes(const TPlan& plan);
 
   friend class impala::test::SchedulerWrapper;
   FRIEND_TEST(SimpleAssignmentTest, ComputeAssignmentDeterministicNonCached);

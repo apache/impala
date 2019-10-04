@@ -119,6 +119,10 @@ public class UnionNode extends PlanNode {
         totalChildCardinality = checkedAdd(totalChildCardinality, child.cardinality_);
         haveChildWithCardinality = true;
       }
+      // Union fragments are scheduled on the union of hosts of all scans in the fragment
+      // and the hosts of all its input fragments. Approximate this with max(), which is
+      // correct iff the child fragments run on sets of nodes that are supersets or
+      // subsets of each other, i.e. not just partly overlapping.
       numNodes_ = Math.max(child.getNumNodes(), numNodes_);
     }
     // Consider estimate valid if we have at least one child with known cardinality, or

@@ -19,6 +19,7 @@
 
 #include <algorithm>
 #include <random>
+#include <unordered_map>
 #include <vector>
 #include <boost/algorithm/string.hpp>
 #include <boost/algorithm/string/join.hpp>
@@ -58,6 +59,10 @@ static const string LOCAL_ASSIGNMENTS_KEY("simple-scheduler.local-assignments.to
 static const string ASSIGNMENTS_KEY("simple-scheduler.assignments.total");
 static const string SCHEDULER_INIT_KEY("simple-scheduler.initialized");
 
+static const vector<TPlanNodeType::type> SCAN_NODE_TYPES{TPlanNodeType::HDFS_SCAN_NODE,
+    TPlanNodeType::HBASE_SCAN_NODE, TPlanNodeType::DATA_SOURCE_NODE,
+    TPlanNodeType::KUDU_SCAN_NODE};
+
 // Consistent scheduling requires picking up to k distinct candidates out of n nodes.
 // Since each iteration can pick a node that it already picked (i.e. it is sampling with
 // replacement), it may need more than k iterations to pick k distinct candidates.
@@ -90,6 +95,16 @@ const TBackendDescriptor& Scheduler::LookUpBackendDesc(
     desc = &local_be_desc;
   }
   return *desc;
+}
+
+TNetworkAddress Scheduler::LookUpKrpcHost(
+    const ExecutorConfig& executor_config, const TNetworkAddress& backend_host) {
+  const TBackendDescriptor& backend_descriptor =
+      LookUpBackendDesc(executor_config, backend_host);
+  DCHECK(backend_descriptor.__isset.krpc_address);
+  TNetworkAddress krpc_host = backend_descriptor.krpc_address;
+  DCHECK(IsResolvedAddress(krpc_host));
+  return krpc_host;
 }
 
 Status Scheduler::GenerateScanRanges(const vector<TFileSplitGeneratorSpec>& specs,
@@ -271,68 +286,16 @@ void Scheduler::ComputeFragmentExecParams(const ExecutorConfig& executor_config,
     return;
   }
 
-  if (ContainsNode(fragment.plan, TPlanNodeType::UNION_NODE)) {
-    CreateUnionInstances(executor_config, fragment_params, schedule);
-    return;
-  }
-
-  PlanNodeId leftmost_scan_id = FindLeftmostScan(fragment.plan);
-  if (leftmost_scan_id != g_ImpalaInternalService_constants.INVALID_PLAN_NODE_ID) {
-    // case 2: leaf fragment with leftmost scan
-    // TODO: check that there's only one scan in this fragment
-    CreateScanInstances(executor_config, leftmost_scan_id, fragment_params, schedule);
+  if (ContainsNode(fragment.plan, TPlanNodeType::UNION_NODE)
+      || ContainsScanNode(fragment.plan)) {
+    // case 2: leaf fragment (i.e. no input fragments) with a single scan node.
+    // case 3: union fragment, which may have scan nodes and may have input fragments.
+    CreateCollocatedAndScanInstances(executor_config, fragment_params, schedule);
   } else {
-    // case 3: interior fragment without leftmost scan
-    // we assign the same hosts as those of our leftmost input fragment (so that a
-    // merge aggregation fragment runs on the hosts that provide the input data)
+    // case 4: interior (non-leaf) fragment without a scan or union.
+    // We assign the same hosts as those of our leftmost input fragment (so that a
+    // merge aggregation fragment runs on the hosts that provide the input data).
     CreateCollocatedInstances(fragment_params, schedule);
-  }
-}
-
-void Scheduler::CreateUnionInstances(const ExecutorConfig& executor_config,
-    FragmentExecParams* fragment_params, QuerySchedule* schedule) {
-  const TPlanFragment& fragment = fragment_params->fragment;
-  DCHECK(ContainsNode(fragment.plan, TPlanNodeType::UNION_NODE));
-
-  // Add hosts of scan nodes.
-  vector<TPlanNodeType::type> scan_node_types{TPlanNodeType::HDFS_SCAN_NODE,
-      TPlanNodeType::HBASE_SCAN_NODE, TPlanNodeType::DATA_SOURCE_NODE,
-      TPlanNodeType::KUDU_SCAN_NODE};
-  vector<TPlanNodeId> scan_node_ids;
-  FindNodes(fragment.plan, scan_node_types, &scan_node_ids);
-  vector<TNetworkAddress> scan_hosts;
-  for (TPlanNodeId id : scan_node_ids) {
-    GetScanHosts(executor_config.local_be_desc, id, *fragment_params, &scan_hosts);
-  }
-
-  unordered_set<TNetworkAddress> hosts(scan_hosts.begin(), scan_hosts.end());
-
-  // Add hosts of input fragments.
-  for (FragmentIdx idx : fragment_params->input_fragments) {
-    const FragmentExecParams& input_params = *schedule->GetFragmentExecParams(idx);
-    for (const FInstanceExecParams& instance_params : input_params.instance_exec_params) {
-      hosts.insert(instance_params.host);
-    }
-  }
-  DCHECK(!hosts.empty()) << "no hosts for fragment " << fragment.idx
-                         << " with a UnionNode";
-
-  // create a single instance per host
-  // TODO-MT: figure out how to parallelize Union
-  int per_fragment_idx = 0;
-  for (const TNetworkAddress& host : hosts) {
-    const TBackendDescriptor& backend_descriptor = LookUpBackendDesc(
-        executor_config, host);
-    DCHECK(backend_descriptor.__isset.krpc_address);
-    const TNetworkAddress& krpc_host = backend_descriptor.krpc_address;
-    DCHECK(IsResolvedAddress(krpc_host));
-    fragment_params->instance_exec_params.emplace_back(schedule->GetNextInstanceId(),
-        host, krpc_host, per_fragment_idx++, *fragment_params);
-    // assign all scan ranges
-    FInstanceExecParams& instance_params = fragment_params->instance_exec_params.back();
-    if (fragment_params->scan_range_assignment.count(host) > 0) {
-      instance_params.per_node_scan_ranges = fragment_params->scan_range_assignment[host];
-    }
   }
 }
 
@@ -364,62 +327,155 @@ struct InstanceAssignment {
   bool operator<(InstanceAssignment& other) const { return weight > other.weight; }
 };
 
-void Scheduler::CreateScanInstances(const ExecutorConfig& executor_config,
-    PlanNodeId leftmost_scan_id, FragmentExecParams* fragment_params,
-    QuerySchedule* schedule) {
-  int max_num_instances =
-      schedule->request().query_ctx.client_request.query_options.mt_dop;
-  if (max_num_instances == 0) max_num_instances = 1;
+// Maybe the easiest way to understand the objective of this algorithm is as a
+// generalization of two simpler instance creation algorithms that decide how many
+// instances of a fragment to create on each node, given a set of nodes that were
+// already chosen by previous scheduling steps:
+// 1. Instance creation for an interior fragment (i.e. a fragment without scans)
+//    without a UNION, where we create one finstance for each instance of the leftmost
+//    input fragment.
+// 2. Instance creation for a fragment with a single scan and no UNION, where we create
+//    finstances on each host with a scan range, with one finstance per scan range,
+//    up to mt_dop finstances.
+//
+// This algorithm more-or-less creates the union of all finstances that would be created
+// by applying the above algorithms to each input fragment and scan node. I.e. the
+// parallelism on each host is the max of the parallelism that would result from each
+// of the above algorithms. Note that step 1 is modified to run on fragments with union
+// nodes, by considering all input fragments and not just the leftmost because we expect
+// unions to be symmetrical for purposes of planning, unlike joins.
+//
+// The high-level steps are:
+// 1. Compute the set of hosts that this fragment should run on and the parallelism on
+//    each host.
+// 2. Instantiate finstances on each host.
+//    a) Map scan ranges to finstances for each scan node with AssignRangesToInstances().
+//    b) Create the finstances, based on the computed parallelism and assign the scan
+//       ranges to it.
+void Scheduler::CreateCollocatedAndScanInstances(const ExecutorConfig& executor_config,
+    FragmentExecParams* fragment_params, QuerySchedule* schedule) {
+  const TPlanFragment& fragment = fragment_params->fragment;
+  bool has_union = ContainsNode(fragment.plan, TPlanNodeType::UNION_NODE);
+  DCHECK(has_union || ContainsScanNode(fragment.plan));
+  // Build a map of hosts to the num instances this fragment should have, before we take
+  // into account scan ranges. If this fragment has input fragments, we always run with
+  // at least the same num instances as the input fragment.
+  std::unordered_map<TNetworkAddress, int> instances_per_host;
 
-  if (fragment_params->scan_range_assignment.empty()) {
-    const TBackendDescriptor& local_be_desc = executor_config.local_be_desc;
-    DCHECK(local_be_desc.__isset.krpc_address);
-    DCHECK(IsResolvedAddress(local_be_desc.krpc_address));
-    // this scan doesn't have any scan ranges: run a single instance on the coordinator
-    fragment_params->instance_exec_params.emplace_back(schedule->GetNextInstanceId(),
-        local_be_desc.address, local_be_desc.krpc_address, 0,
-        *fragment_params);
-    return;
+  // Add hosts of input fragments, counting the number of instances of the fragment.
+  // Only do this if there's a union - otherwise only consider the parallelism of
+  // the input scan, for consistency with the previous behaviour of only using
+  // the parallelism of the scan.
+  if (has_union) {
+    for (FragmentIdx idx : fragment_params->input_fragments) {
+      std::unordered_map<TNetworkAddress, int> input_fragment_instances_per_host;
+      const FragmentExecParams& input_params = *schedule->GetFragmentExecParams(idx);
+      for (const FInstanceExecParams& instance_params :
+          input_params.instance_exec_params) {
+        ++input_fragment_instances_per_host[instance_params.host];
+      }
+      // Merge with the existing hosts by taking the max num instances.
+      if (instances_per_host.empty()) {
+        // Optimization for the common case of one input fragment.
+        instances_per_host = move(input_fragment_instances_per_host);
+      } else {
+        for (auto& entry : input_fragment_instances_per_host) {
+          int& num_instances = instances_per_host[entry.first];
+          num_instances = max(num_instances, entry.second);
+        }
+      }
+    }
   }
 
-  int per_fragment_instance_idx = 0;
-  for (auto& assignment_entry : fragment_params->scan_range_assignment) {
-    // evenly divide up the scan ranges of the leftmost scan between at most
-    // <dop> instances
-    const TNetworkAddress& host = assignment_entry.first;
-    const TBackendDescriptor& backend_descriptor = LookUpBackendDesc(
-        executor_config, host);
-    DCHECK(backend_descriptor.__isset.krpc_address);
-    TNetworkAddress krpc_host = backend_descriptor.krpc_address;
-    DCHECK(IsResolvedAddress(krpc_host));
-    auto scan_ranges_it = assignment_entry.second.find(leftmost_scan_id);
-    DCHECK(scan_ranges_it != assignment_entry.second.end());
+  // Add hosts of scan nodes.
+  vector<TPlanNodeId> scan_node_ids = FindScanNodes(fragment.plan);
+  DCHECK(has_union || scan_node_ids.size() == 1) << "This method may need revisiting "
+      << "for plans with no union and multiple scans per fragment";
+  vector<TNetworkAddress> scan_hosts;
+  GetScanHosts(
+      executor_config.local_be_desc, scan_node_ids, *fragment_params, &scan_hosts);
+  for (const TNetworkAddress& host_addr : scan_hosts) {
+    // Ensure that the num instances is at least as many as input fragments. We don't
+    // want to increment if there were already some instances from the input fragment,
+    // since that could result in too high a num_instances.
+    int& host_num_instances = instances_per_host[host_addr];
+    host_num_instances = max(1, host_num_instances);
+  }
+  DCHECK(!instances_per_host.empty()) << "no hosts for fragment " << fragment.idx;
 
-    // We reorder the scan ranges vector in-place to avoid creating another copy of it.
-    // This should be safe since the code is single-threaded and other code does not
-    // depend on the order of the vector.
-    vector<TScanRangeParams>* params_list = &scan_ranges_it->second;
-    int num_instances = ::min(max_num_instances, static_cast<int>(params_list->size()));
-    vector<vector<TScanRangeParams>> per_instance_ranges =
-        AssignRangesToInstances(num_instances, params_list);
-    for (vector<TScanRangeParams>& instance_ranges : per_instance_ranges) {
+  // Number of instances should be bounded by mt_dop.
+  int max_num_instances =
+      max(1, schedule->request().query_ctx.client_request.query_options.mt_dop);
+  // Track the index of the next instance to be created for this fragment.
+  int per_fragment_instance_idx = 0;
+  for (const auto& entry : instances_per_host) {
+    const TNetworkAddress& host = entry.first;
+    TNetworkAddress krpc_host = LookUpKrpcHost(executor_config, host);
+    FragmentScanRangeAssignment& sra = fragment_params->scan_range_assignment;
+    auto assignment_it = sra.find(host);
+    // One entry in outer vector per scan node in 'scan_node_ids'.
+    // The inner vectors are the output of AssignRangesToInstances().
+    // The vector may be ragged - i.e. different nodes have different numbers
+    // of instances.
+    vector<vector<vector<TScanRangeParams>>> per_scan_per_instance_ranges;
+    for (TPlanNodeId scan_node_id : scan_node_ids) {
+      // Ensure empty list is created if no scan ranges are scheduled on this host.
+      per_scan_per_instance_ranges.emplace_back();
+      if (assignment_it == sra.end()) continue;
+      auto scan_ranges_it = assignment_it->second.find(scan_node_id);
+      if (scan_ranges_it == assignment_it->second.end()) continue;
+
+      // We reorder the scan ranges vector in-place to avoid creating another copy of it.
+      // This should be safe since the code is single-threaded and other code does not
+      // depend on the order of the vector.
+      per_scan_per_instance_ranges.back() =
+          AssignRangesToInstances(max_num_instances, &scan_ranges_it->second);
+      DCHECK_LE(per_scan_per_instance_ranges.back().size(), max_num_instances);
+    }
+
+    // The number of instances to create, based on the scan with the most ranges and
+    // the input parallelism that we computed for the host above.
+    int num_instances = entry.second;
+    DCHECK_GE(num_instances, 1);
+    DCHECK_LE(num_instances, max_num_instances)
+        << "Input parallelism too high for mt_dop";
+    for (const auto& per_scan_ranges : per_scan_per_instance_ranges) {
+      num_instances = max(num_instances, static_cast<int>(per_scan_ranges.size()));
+    }
+
+    // Create the finstances. Must do this even if there are no scan range assignments
+    // because we may have other input fragments.
+    int host_finstance_start_idx = fragment_params->instance_exec_params.size();
+    for (int i = 0; i < num_instances; ++i) {
       fragment_params->instance_exec_params.emplace_back(schedule->GetNextInstanceId(),
           host, krpc_host, per_fragment_instance_idx++, *fragment_params);
-      FInstanceExecParams& instance_params = fragment_params->instance_exec_params.back();
-      instance_params.per_node_scan_ranges[leftmost_scan_id] = move(instance_ranges);
+    }
+    // Allocate scan ranges to the finstances if needed. Currently we simply allocate
+    // them to fragment instances in order. This may be suboptimal in cases where the
+    // amount of work is somewhat uneven in each scan and we could even out the overall
+    // amount of work by shuffling the ranges between finstances.
+    for (int scan_idx = 0; scan_idx < per_scan_per_instance_ranges.size(); ++scan_idx) {
+      const auto& per_instance_ranges = per_scan_per_instance_ranges[scan_idx];
+      for (int inst_idx = 0; inst_idx < per_instance_ranges.size(); ++inst_idx) {
+        FInstanceExecParams& instance_params =
+            fragment_params->instance_exec_params[host_finstance_start_idx + inst_idx];
+        instance_params.per_node_scan_ranges[scan_node_ids[scan_idx]] =
+            move(per_instance_ranges[inst_idx]);
+      }
     }
   }
 }
 
 vector<vector<TScanRangeParams>> Scheduler::AssignRangesToInstances(
-    int num_instances, vector<TScanRangeParams>* ranges) {
+    int max_num_instances, vector<TScanRangeParams>* ranges) {
   // We need to assign scan ranges to instances. We would like the assignment to be
   // as even as possible, so that each instance does about the same amount of work.
   // Use longest-processing time (LPT) algorithm, which is a good approximation of the
   // optimal solution (there is a theoretic bound of ~4/3 of the optimal solution
   // in the worst case). It also guarantees that at least one scan range is assigned
   // to each instance.
-  DCHECK_GT(num_instances, 0);
+  DCHECK_GT(max_num_instances, 0);
+  int num_instances = min(max_num_instances, static_cast<int>(ranges->size()));
   vector<vector<TScanRangeParams>> per_instance_ranges(num_instances);
   if (num_instances < 2) {
     // Short-circuit the assignment algorithm for the single instance case.
@@ -610,31 +666,6 @@ Status Scheduler::ComputeScanRangeAssignment(const ExecutorConfig& executor_conf
   return Status::OK();
 }
 
-PlanNodeId Scheduler::FindLeftmostNode(
-    const TPlan& plan, const vector<TPlanNodeType::type>& types) {
-  // the first node with num_children == 0 is the leftmost node
-  int node_idx = 0;
-  while (node_idx < plan.nodes.size() && plan.nodes[node_idx].num_children != 0) {
-    ++node_idx;
-  }
-  if (node_idx == plan.nodes.size()) {
-    return g_ImpalaInternalService_constants.INVALID_PLAN_NODE_ID;
-  }
-  const TPlanNode& node = plan.nodes[node_idx];
-
-  for (int i = 0; i < types.size(); ++i) {
-    if (node.node_type == types[i]) return node.node_id;
-  }
-  return g_ImpalaInternalService_constants.INVALID_PLAN_NODE_ID;
-}
-
-PlanNodeId Scheduler::FindLeftmostScan(const TPlan& plan) {
-  vector<TPlanNodeType::type> scan_node_types{TPlanNodeType::HDFS_SCAN_NODE,
-      TPlanNodeType::HBASE_SCAN_NODE, TPlanNodeType::DATA_SOURCE_NODE,
-      TPlanNodeType::KUDU_SCAN_NODE};
-  return FindLeftmostNode(plan, scan_node_types);
-}
-
 bool Scheduler::ContainsNode(const TPlan& plan, TPlanNodeType::type type) {
   for (int i = 0; i < plan.nodes.size(); ++i) {
     if (plan.nodes[i].node_type == type) return true;
@@ -642,36 +673,58 @@ bool Scheduler::ContainsNode(const TPlan& plan, TPlanNodeType::type type) {
   return false;
 }
 
-void Scheduler::FindNodes(const TPlan& plan, const vector<TPlanNodeType::type>& types,
-    vector<TPlanNodeId>* results) {
+bool Scheduler::ContainsNode(
+    const TPlan& plan, const std::vector<TPlanNodeType::type>& types) {
+  for (int i = 0; i < plan.nodes.size(); ++i) {
+    for (int j = 0; j < types.size(); ++j) {
+      if (plan.nodes[i].node_type == types[j]) return true;
+    }
+  }
+  return false;
+}
+
+bool Scheduler::ContainsScanNode(const TPlan& plan) {
+  return ContainsNode(plan, SCAN_NODE_TYPES);
+}
+
+std::vector<TPlanNodeId> Scheduler::FindNodes(
+    const TPlan& plan, const vector<TPlanNodeType::type>& types) {
+  vector<TPlanNodeId> results;
   for (int i = 0; i < plan.nodes.size(); ++i) {
     for (int j = 0; j < types.size(); ++j) {
       if (plan.nodes[i].node_type == types[j]) {
-        results->push_back(plan.nodes[i].node_id);
+        results.push_back(plan.nodes[i].node_id);
         break;
       }
     }
   }
+  return results;
 }
 
-void Scheduler::GetScanHosts(const TBackendDescriptor& local_be_desc, TPlanNodeId scan_id,
-    const FragmentExecParams& params, vector<TNetworkAddress>* scan_hosts) {
-  // Get the list of impalad host from scan_range_assignment_
-  for (const FragmentScanRangeAssignment::value_type& scan_range_assignment :
-      params.scan_range_assignment) {
-    const PerNodeScanRanges& per_node_scan_ranges = scan_range_assignment.second;
-    if (per_node_scan_ranges.find(scan_id) != per_node_scan_ranges.end()) {
-      scan_hosts->push_back(scan_range_assignment.first);
-    }
-  }
+std::vector<TPlanNodeId> Scheduler::FindScanNodes(const TPlan& plan) {
+  return FindNodes(plan, SCAN_NODE_TYPES);
+}
 
-  if (scan_hosts->empty()) {
-    // this scan node doesn't have any scan ranges; run it on the coordinator
-    // TODO: we'll need to revisit this strategy once we can partition joins
-    // (in which case this fragment might be executing a right outer join
-    // with a large build table)
-    scan_hosts->push_back(local_be_desc.address);
-    return;
+void Scheduler::GetScanHosts(const TBackendDescriptor& local_be_desc,
+    const vector<TPlanNodeId>& scan_ids, const FragmentExecParams& params,
+    vector<TNetworkAddress>* scan_hosts) {
+  for (const TPlanNodeId& scan_id : scan_ids) {
+    // Get the list of impalad host from scan_range_assignment_
+    for (const FragmentScanRangeAssignment::value_type& scan_range_assignment :
+        params.scan_range_assignment) {
+      const PerNodeScanRanges& per_node_scan_ranges = scan_range_assignment.second;
+      if (per_node_scan_ranges.find(scan_id) != per_node_scan_ranges.end()) {
+        scan_hosts->push_back(scan_range_assignment.first);
+      }
+    }
+
+    if (scan_hosts->empty()) {
+      // this scan node doesn't have any scan ranges; run it on the coordinator
+      // TODO: we'll need to revisit this strategy once we can partition joins
+      // (in which case this fragment might be executing a right outer join
+      // with a large build table)
+      scan_hosts->push_back(local_be_desc.address);
+    }
   }
 }
 

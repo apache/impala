@@ -804,5 +804,4 @@ TEST_F(SchedulerTest, TestMultipleFinstances) {
     }
   }
 }
-
 } // end namespace impala

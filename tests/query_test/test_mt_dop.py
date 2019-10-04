@@ -122,23 +122,23 @@ class TestMtDopKudu(KuduTestSuite):
 
 
 @SkipIfNotHdfsMinicluster.tuned_for_minicluster
-class TestMtDopAdmissionSlots(ImpalaTestSuite):
-  """Test the number of admission slots calculated for different queries. This
-  is always at most mt_dop, but is less where there are fewer fragment instances per
-  host. The slot calculation logic is orthogonal to file format, so we only need
-  to test on one format."""
+class TestMtDopScheduling(ImpalaTestSuite):
+  """Test the number of fragment instances and admission slots computed by the scheduler
+  for different queries. This is always at most mt_dop per host, but is less where there
+  are fewer fragment instances per host. The mt_dop scheduling and slot calculation is
+  orthogonal to file format, so we only need to test on one format."""
   @classmethod
   def get_workload(cls):
     return 'functional-query'
 
   @classmethod
   def add_test_dimensions(cls):
-    super(TestMtDopAdmissionSlots, cls).add_test_dimensions()
+    super(TestMtDopScheduling, cls).add_test_dimensions()
     cls.ImpalaTestMatrix.add_dimension(ImpalaTestDimension('mt_dop', 4))
     cls.ImpalaTestMatrix.add_constraint(
         lambda v: v.get_value('table_format').file_format == 'parquet')
 
-  def test_admission_slots(self, vector):
+  def test_scheduling(self, vector):
     vector.get_value('exec_option')['mt_dop'] = vector.get_value('mt_dop')
-    self.run_test_case('QueryTest/mt-dop-parquet-admission-slots', vector)
+    self.run_test_case('QueryTest/mt-dop-parquet-scheduling', vector)
 

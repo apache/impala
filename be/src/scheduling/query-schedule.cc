@@ -174,7 +174,8 @@ void QuerySchedule::Validate() const {
       for (const PerNodeScanRanges::value_type& node_assignment:
           assignment_entry.second) {
         TPlanNodeId node_id = node_assignment.first;
-        DCHECK_GT(node_map.count(node_id), 0);
+        DCHECK_GT(node_map.count(node_id), 0)
+            << host.hostname << " " << host.port << " node_id=" << node_id;
         DCHECK_EQ(node_map[node_id], node_assignment.second.size());
       }
     }
