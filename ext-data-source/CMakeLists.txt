@@ -15,6 +15,8 @@
 # specific language governing permissions and limitations
 # under the License.
 
-add_custom_target(ext-data-source ALL DEPENDS gen-deps impala-parent
+# The dependency on shaded-deps is only added to avoid parallel downloads
+# of dependencies. For more details see IMPALA-7051, which was a similar issue.
+add_custom_target(ext-data-source ALL DEPENDS gen-deps impala-parent shaded-deps
   COMMAND $ENV{IMPALA_HOME}/bin/mvn-quiet.sh -B install -DskipTests
 )
