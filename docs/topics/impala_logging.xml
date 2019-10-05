@@ -153,18 +153,6 @@ under the License.
           <codeph>.WARNING</codeph>, and <codeph>.ERROR</codeph> files are physically
           represented as symbolic links to the latest applicable log files.
         </li>
-
-        <li> The init script for the <codeph>impala-server</codeph> service also
-          produces a consolidated log file
-            <codeph>/var/log/impalad/impala-server.log</codeph>, with all the
-          same information as the corresponding<codeph>.INFO</codeph>,
-            <codeph>.WARNING</codeph>, and <codeph>.ERROR</codeph> files. </li>
-
-        <li> The init script for the <codeph>impala-state-store</codeph> service
-          also produces a consolidated log file
-            <codeph>/var/log/impalad/impala-state-store.log</codeph>, with all
-          the same information as the corresponding<codeph>.INFO</codeph>,
-            <codeph>.WARNING</codeph>, and <codeph>.ERROR</codeph> files. </li>
       </ul>
 
       <p>
@@ -187,27 +175,6 @@ under the License.
           to disk immediately.
         </li>
       </ul>
-
-    </conbody>
-
-  </concept>
-
-  <concept id="logs_managing">
-
-    <title>Managing Impala Logs</title>
-
-    <prolog>
-      <metadata>
-        <data name="Category" value="Administrators"/>
-      </metadata>
-    </prolog>
-
-    <conbody>
-
-      <p>
-        Review Impala log files on each host, when you have traced an issue back to a specific
-        system.
-      </p>
 
     </conbody>
 
@@ -297,12 +264,6 @@ under the License.
           <filepath>impalad.ERROR</filepath> files, which contain the subsets of
         messages indicating potential problems.) </p>
 
-      <p>
-        On a machine named <codeph>impala.example.com</codeph> with default settings, you could
-        view the Impala logs on that machine by using a browser to access
-        <codeph>http://impala.example.com:25000/logs</codeph>.
-      </p>
-
       <note>
         <p>
           The web interface limits the amount of logging information displayed. To view every
@@ -371,26 +332,6 @@ I0107 08:42:12.292706 14876 logging.cc:76] Flags (see also /varz are on debug we
 
         <li>
           The number of available disks.
-        </li>
-      </ul>
-
-      <p>
-        There is information about each job Impala has run. Because each Impala job creates an
-        additional set of data about queries, the amount of job specific data may be very large.
-        Logs may contained detailed information on jobs. These detailed log entries may include:
-      </p>
-
-      <ul>
-        <li>
-          The composition of the query.
-        </li>
-
-        <li>
-          The degree of data locality.
-        </li>
-
-        <li>
-          Statistics on data throughput and response times.
         </li>
       </ul>
 
@@ -482,15 +423,14 @@ I0107 08:42:12.292706 14876 logging.cc:76] Flags (see also /varz are on debug we
     <conbody>
 
       <p>
-        <indexterm audience="hidden">redaction</indexterm>
-        <term>Log redaction</term> is a security feature that prevents sensitive information
-        from being displayed in locations used by administrators for monitoring and
-        troubleshooting, such as log files and the Impala debug web user interface. You
-        configure regular expressions that match sensitive types of information processed by
-        your system, such as credit card numbers or tax IDs, and literals matching these
-        patterns are obfuscated wherever they would normally be recorded in log files or
-        displayed in administration or debugging user interfaces.
-      </p>
+        <term>Log redaction</term> is a security feature that prevents sensitive
+        information from being displayed in locations used by administrators for
+        monitoring and troubleshooting, such as log files and the Impala debug
+        web user interface. You configure regular expressions that match
+        sensitive types of information processed by your system, such as credit
+        card numbers or tax IDs, and literals matching these patterns are
+        obfuscated wherever they would normally be recorded in log files or
+        displayed in administration or debugging user interfaces. </p>
 
       <p>
         In a security context, the log redaction feature is complementary to the Sentry
