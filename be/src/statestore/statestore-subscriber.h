@@ -198,6 +198,8 @@ class StatestoreSubscriber {
 
   /// Address that the heartbeat service should be started on. Initialised in constructor,
   /// updated in Start() with the actual port if the wildcard port 0 was specified.
+  /// If FLAGS_statestore_subscriber_use_resolved_address is true, this is set to the
+  /// resolved IP address in Start().
   TNetworkAddress heartbeat_address_;
 
   /// Set to true after Register(...) is successful, after which no

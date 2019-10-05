@@ -59,6 +59,9 @@ DEFINE_int32(statestore_subscriber_cnxn_attempts, 10, "The number of times to re
     "RPC connection to the statestore. A setting of 0 means retry indefinitely");
 DEFINE_int32(statestore_subscriber_cnxn_retry_interval_ms, 3000, "The interval, in ms, "
     "to wait between attempts to make an RPC connection to the statestore.");
+DEFINE_bool(statestore_subscriber_use_resolved_address, false, "If set to true, the "
+    "subscriber will register with statestore using its resolved IP address. Note that "
+    "using resolved IP address may cause mismatch with the TLS certificate.");
 DEFINE_int64_hidden(statestore_subscriber_recovery_grace_period_ms, 30000L, "Period "
     "after the last successful subscription attempt until the subscriber will be "
     "considered fully recovered. After a successful reconnect attempt, updates to the "
@@ -250,6 +253,16 @@ Status StatestoreSubscriber::Start() {
     RETURN_IF_ERROR(builder.Build(&server));
     heartbeat_server_.reset(server);
     RETURN_IF_ERROR(heartbeat_server_->Start());
+
+    // Resolve the heartbeat address if necessary. Also specify the port which
+    // the heartbeat server is listening on.
+    if (FLAGS_statestore_subscriber_use_resolved_address) {
+      IpAddr ip_address;
+      RETURN_IF_ERROR(HostnameToIpAddr(heartbeat_address_.hostname, &ip_address));
+      heartbeat_address_.hostname = ip_address;
+      LOG(INFO) << Substitute("Registering with statestore with resolved address $0",
+          ip_address);
+    }
     heartbeat_address_.port = heartbeat_server_->port();
 
     LOG(INFO) << "Registering with statestore";

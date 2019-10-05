@@ -227,7 +227,11 @@ ExecEnv::ExecEnv(int backend_port, int krpc_port,
     enable_webserver_(FLAGS_enable_webserver && webserver_port > 0),
     configured_backend_address_(MakeNetworkAddress(FLAGS_hostname, backend_port)) {
 
-  // KRPC relies on resolved IP address. It's set in Init().
+  // Resolve hostname to IP address.
+  ABORT_IF_ERROR(HostnameToIpAddr(FLAGS_hostname, &ip_address_));
+
+  // KRPC relies on resolved IP address.
+  krpc_address_.__set_hostname(ip_address_);
   krpc_address_.__set_port(krpc_port);
   rpc_mgr_.reset(new RpcMgr(IsInternalTlsConfigured()));
   stream_mgr_.reset(new KrpcDataStreamMgr(metrics_.get()));
@@ -346,13 +350,9 @@ Status ExecEnv::Init() {
   ImpaladMetrics::CreateMetrics(
       exec_env_->metrics()->GetOrCreateChildGroup("impala-server"));
 
-  // Resolve hostname to IP address.
-  RETURN_IF_ERROR(HostnameToIpAddr(FLAGS_hostname, &ip_address_));
-
   InitMemTracker(bytes_limit);
 
   // Initializes the RPCMgr, ControlServices and DataStreamServices.
-  krpc_address_.__set_hostname(ip_address_);
   // Initialization needs to happen in the following order due to dependencies:
   // - RPC manager, DataStreamService and DataStreamManager.
   RETURN_IF_ERROR(rpc_mgr_->Init());

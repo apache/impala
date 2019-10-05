@@ -86,3 +86,17 @@ class TestCustomStatestore(CustomClusterTestSuite):
       else:
         assert 'Maximum subscriber limit reached:' in ''.join(response.status.error_msgs)
         return
+
+  @pytest.mark.execute_serially
+  @CustomClusterTestSuite.with_args(
+      impalad_args="--statestore_subscriber_use_resolved_address=true",
+      catalogd_args="--statestore_subscriber_use_resolved_address=true")
+  def test_subscriber_with_resolved_address(self, vector):
+    # Ensure cluster has started up by running a query.
+    result = self.execute_query("select count(*) from functional_parquet.alltypes")
+    assert result.success, str(result)
+
+    self.assert_impalad_log_contains("INFO",
+        "Registering with statestore with resolved address")
+    self.assert_catalogd_log_contains("INFO",
+        "Registering with statestore with resolved address")
