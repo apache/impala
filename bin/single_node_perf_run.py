@@ -269,7 +269,7 @@ def parse_options():
   parser.add_option("--iterations", default=30, help="number of times to run each query")
   parser.add_option("--table_formats", default="parquet/none", help="comma-separated "
                     "list of table formats. Default: parquet/none")
-  parser.add_option("--num_impalads", default=3, help="number of impalads. Default: 1")
+  parser.add_option("--num_impalads", default=1, help="number of impalads. Default: 1")
   # Less commonly-used options:
   parser.add_option("--query_names",
                     help="comma-separated list of regular expressions. A query is "
