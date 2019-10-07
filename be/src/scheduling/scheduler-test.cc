@@ -15,11 +15,15 @@
 // specific language governing permissions and limitations
 // under the License.
 
+#include <algorithm>
+#include <random>
+
 #include "common/logging.h"
 #include "scheduling/cluster-membership-mgr.h"
 #include "scheduling/scheduler.h"
 #include "scheduling/scheduler-test-util.h"
 #include "testutil/gtest-util.h"
+#include "testutil/rand-util.h"
 
 using namespace impala;
 using namespace impala::test;
@@ -29,6 +33,13 @@ namespace impala {
 class SchedulerTest : public testing::Test {
  protected:
   SchedulerTest() { srand(0); }
+
+  virtual void SetUp() {
+    RandTestUtil::SeedRng("SCHEDULER_TEST_SEED", &rng_);
+  }
+
+  /// Per-test random number generator. Seeded before every test.
+  std::mt19937 rng_;
 };
 
 static const vector<BlockNamingPolicy> BLOCK_NAMING_POLICIES(
@@ -709,6 +720,89 @@ TEST_F(SchedulerTest, TestExecAtCoordWithoutLocalBackend) {
   bool exec_at_coord = true;
   Status status = scheduler.Compute(exec_at_coord, &result);
   EXPECT_TRUE(status.ok());
+}
+
+// Test scheduling algorithm for load-balancing scan ranges within a host.
+// This exercises the provide AssignRangesToInstances() method that implements the core
+// of the algorithm.
+TEST_F(SchedulerTest, TestMultipleFinstances) {
+  const int NUM_RANGES = 16;
+  std::vector<TScanRangeParams> fs_ranges(NUM_RANGES);
+  std::vector<TScanRangeParams> kudu_ranges(NUM_RANGES);
+  // Create ranges with lengths 1, 2, ..., etc.
+  for (int i = 0; i < NUM_RANGES; ++i) {
+    fs_ranges[i].scan_range.__set_hdfs_file_split(THdfsFileSplit());
+    fs_ranges[i].scan_range.hdfs_file_split.length = i + 1;
+    kudu_ranges[i].scan_range.__set_kudu_scan_token("fake token");
+  }
+
+  // Test handling of the single instance case - all ranges go to the same instance.
+  vector<vector<TScanRangeParams>> fs_one_instance =
+      Scheduler::AssignRangesToInstances(1, &fs_ranges);
+  ASSERT_EQ(1, fs_one_instance.size());
+  EXPECT_EQ(NUM_RANGES, fs_one_instance[0].size());
+  vector<vector<TScanRangeParams>> kudu_one_instance =
+    Scheduler::AssignRangesToInstances(1, &kudu_ranges);
+  ASSERT_EQ(1, kudu_one_instance.size());
+  EXPECT_EQ(NUM_RANGES, kudu_one_instance[0].size());
+
+  // Ensure that each executor gets one range regardless of input order.
+  for (int attempt = 0; attempt < 20; ++attempt) {
+    std::shuffle(fs_ranges.begin(), fs_ranges.end(), rng_);
+    vector<vector<TScanRangeParams>> range_per_instance =
+      Scheduler::AssignRangesToInstances(NUM_RANGES, &fs_ranges);
+    EXPECT_EQ(NUM_RANGES, range_per_instance.size());
+    // Confirm each range is present and each instance got exactly one range.
+    vector<int> range_length_count(NUM_RANGES);
+    for (const auto& instance_ranges : range_per_instance) {
+      ASSERT_EQ(1, instance_ranges.size());
+      ++range_length_count[instance_ranges[0].scan_range.hdfs_file_split.length - 1];
+    }
+    for (int i = 0; i < NUM_RANGES; ++i) {
+      EXPECT_EQ(1, range_length_count[i]) << i;
+    }
+  }
+
+  // Test load balancing FS ranges across 4 instances. We should get an even assignment
+  // across the instances regardless of input order.
+  for (int attempt = 0; attempt < 20; ++attempt) {
+    std::shuffle(fs_ranges.begin(), fs_ranges.end(), rng_);
+    vector<vector<TScanRangeParams>> range_per_instance =
+        Scheduler::AssignRangesToInstances(4, &fs_ranges);
+    EXPECT_EQ(4, range_per_instance.size());
+    // Ensure we got a range of each length in the output.
+    vector<int> range_length_count(NUM_RANGES);
+    for (const auto& instance_ranges : range_per_instance) {
+      EXPECT_EQ(4, instance_ranges.size());
+      int64_t instance_bytes = 0;
+      for (const auto& range : instance_ranges) {
+        instance_bytes += range.scan_range.hdfs_file_split.length;
+        ++range_length_count[range.scan_range.hdfs_file_split.length - 1];
+      }
+      // Expect each instance to get sum([1, 2, ..., 16]) / 4 bytes when things are
+      // distributed evenly.
+      EXPECT_EQ(34, instance_bytes);
+    }
+    for (int i = 0; i < NUM_RANGES; ++i) {
+      EXPECT_EQ(1, range_length_count[i]) << i;
+    }
+  }
+
+  // Test load balancing Kudu ranges across 4 instances. We should get an even assignment
+  // across the instances regardless of input order. We don't know the size of each Kudu
+  // range, so we just need to check the # of ranges.
+  for (int attempt = 0; attempt < 20; ++attempt) {
+    std::shuffle(kudu_ranges.begin(), kudu_ranges.end(), rng_);
+    vector<vector<TScanRangeParams>> range_per_instance =
+        Scheduler::AssignRangesToInstances(4, &kudu_ranges);
+    EXPECT_EQ(4, range_per_instance.size());
+    for (const auto& instance_ranges : range_per_instance) {
+      EXPECT_EQ(4, instance_ranges.size());
+      for (const auto& range : instance_ranges) {
+        EXPECT_TRUE(range.scan_range.__isset.kudu_scan_token);
+      }
+    }
+  }
 }
 
 } // end namespace impala

@@ -46,6 +46,8 @@
 #include "common/names.h"
 
 using boost::algorithm::join;
+using std::pop_heap;
+using std::push_heap;
 using namespace apache::thrift;
 using namespace org::apache::impala::fb;
 using namespace strings;
@@ -334,6 +336,34 @@ void Scheduler::CreateUnionInstances(const ExecutorConfig& executor_config,
   }
 }
 
+/// Returns a numeric weight that is proportional to the estimated processing time for
+/// the scan range represented by 'params'. Weights from different scan node
+/// implementations, e.g. FS vs Kudu, are not comparable.
+static int64_t ScanRangeWeight(const TScanRangeParams& params) {
+  if (params.scan_range.__isset.hdfs_file_split) {
+    return params.scan_range.hdfs_file_split.length;
+  } else {
+    // Give equal weight to each Kudu and Hbase split.
+    // TODO: implement more accurate logic for Kudu and Hbase
+    return 1;
+  }
+}
+
+/// Helper class used in CreateScanInstances() to track the amount of work assigned
+/// to each instance so far.
+struct InstanceAssignment {
+  // The weight assigned so far.
+  int64_t weight;
+
+  // The index of the instance in 'per_instance_ranges'
+  int instance_idx;
+
+  // Comparator for use in a heap as part of the longest processing time algo.
+  // Invert the comparison order because the *_heap functions implement a max-heap
+  // and we want to assign to the least-loaded instance first.
+  bool operator<(InstanceAssignment& other) const { return weight > other.weight; }
+};
+
 void Scheduler::CreateScanInstances(const ExecutorConfig& executor_config,
     PlanNodeId leftmost_scan_id, FragmentExecParams* fragment_params,
     QuerySchedule* schedule) {
@@ -353,7 +383,7 @@ void Scheduler::CreateScanInstances(const ExecutorConfig& executor_config,
   }
 
   int per_fragment_instance_idx = 0;
-  for (const auto& assignment_entry : fragment_params->scan_range_assignment) {
+  for (auto& assignment_entry : fragment_params->scan_range_assignment) {
     // evenly divide up the scan ranges of the leftmost scan between at most
     // <dop> instances
     const TNetworkAddress& host = assignment_entry.first;
@@ -364,63 +394,57 @@ void Scheduler::CreateScanInstances(const ExecutorConfig& executor_config,
     DCHECK(IsResolvedAddress(krpc_host));
     auto scan_ranges_it = assignment_entry.second.find(leftmost_scan_id);
     DCHECK(scan_ranges_it != assignment_entry.second.end());
-    const vector<TScanRangeParams>& params_list = scan_ranges_it->second;
 
-    int64 total_size = 0;
-    for (const TScanRangeParams& params : params_list) {
-      if (params.scan_range.__isset.hdfs_file_split) {
-        total_size += params.scan_range.hdfs_file_split.length;
-      } else {
-        // fake load-balancing for Kudu and Hbase: every split has length 1
-        // TODO: implement more accurate logic for Kudu and Hbase
-        ++total_size;
-      }
-    }
-
-    // try to load-balance scan ranges by assigning just beyond the average number of
-    // bytes to each instance
-    // TODO: fix shortcomings introduced by uneven split sizes,
-    // this could end up assigning 0 scan ranges to an instance
-    int num_instances = ::min(max_num_instances, static_cast<int>(params_list.size()));
-    DCHECK_GT(num_instances, 0);
-    float avg_bytes_per_instance = static_cast<float>(total_size) / num_instances;
-    int64_t total_assigned_bytes = 0;
-    int params_idx = 0; // into params_list
-    for (int i = 0; i < num_instances; ++i) {
+    // We reorder the scan ranges vector in-place to avoid creating another copy of it.
+    // This should be safe since the code is single-threaded and other code does not
+    // depend on the order of the vector.
+    vector<TScanRangeParams>* params_list = &scan_ranges_it->second;
+    int num_instances = ::min(max_num_instances, static_cast<int>(params_list->size()));
+    vector<vector<TScanRangeParams>> per_instance_ranges =
+        AssignRangesToInstances(num_instances, params_list);
+    for (vector<TScanRangeParams>& instance_ranges : per_instance_ranges) {
       fragment_params->instance_exec_params.emplace_back(schedule->GetNextInstanceId(),
           host, krpc_host, per_fragment_instance_idx++, *fragment_params);
       FInstanceExecParams& instance_params = fragment_params->instance_exec_params.back();
-
-      // Threshold beyond which we want to assign to the next instance.
-      int64_t threshold_total_bytes = avg_bytes_per_instance * (i + 1);
-
-      // Assign each scan range in params_list. When the per-instance threshold is
-      // reached, move on to the next instance.
-      while (params_idx < params_list.size()) {
-        const TScanRangeParams& scan_range_params = params_list[params_idx];
-        instance_params.per_node_scan_ranges[leftmost_scan_id].push_back(
-            scan_range_params);
-        if (scan_range_params.scan_range.__isset.hdfs_file_split) {
-          total_assigned_bytes += scan_range_params.scan_range.hdfs_file_split.length;
-        } else {
-          // for Kudu and Hbase every split has length 1
-          ++total_assigned_bytes;
-        }
-        ++params_idx;
-        // If this assignment pushes this instance past the threshold, move on to the next
-        // instance. However, if this is the last instance, assign any remaining scan
-        // ranges here since there are no further instances to load-balance across. There
-        // may be leftover scan ranges because threshold_total_bytes only approximates the
-        // per-node byte threshold.
-        if (total_assigned_bytes >= threshold_total_bytes && i != num_instances - 1) {
-          break;
-        }
-      }
-      if (params_idx == params_list.size()) break; // nothing left to assign
+      instance_params.per_node_scan_ranges[leftmost_scan_id] = move(instance_ranges);
     }
-    DCHECK_EQ(params_idx, params_list.size()); // everything got assigned
-    DCHECK_EQ(total_assigned_bytes, total_size);
   }
+}
+
+vector<vector<TScanRangeParams>> Scheduler::AssignRangesToInstances(
+    int num_instances, vector<TScanRangeParams>* ranges) {
+  // We need to assign scan ranges to instances. We would like the assignment to be
+  // as even as possible, so that each instance does about the same amount of work.
+  // Use longest-processing time (LPT) algorithm, which is a good approximation of the
+  // optimal solution (there is a theoretic bound of ~4/3 of the optimal solution
+  // in the worst case). It also guarantees that at least one scan range is assigned
+  // to each instance.
+  DCHECK_GT(num_instances, 0);
+  vector<vector<TScanRangeParams>> per_instance_ranges(num_instances);
+  if (num_instances < 2) {
+    // Short-circuit the assignment algorithm for the single instance case.
+    per_instance_ranges[0] = *ranges;
+  } else {
+    // The LPT algorithm is straightforward:
+    // 1. sort the scan ranges to be assigned by descending weight.
+    // 2. assign each item to the instance with the least weight assigned so far.
+    vector<InstanceAssignment> instance_heap;
+    instance_heap.reserve(num_instances);
+    for (int i = 0; i < num_instances; ++i) {
+      instance_heap.emplace_back(InstanceAssignment{0, i});
+    }
+    std::sort(ranges->begin(), ranges->end(),
+        [](const TScanRangeParams& a, const TScanRangeParams& b) {
+          return ScanRangeWeight(a) > ScanRangeWeight(b);
+        });
+    for (TScanRangeParams& range : *ranges) {
+      per_instance_ranges[instance_heap[0].instance_idx].push_back(range);
+      instance_heap[0].weight += ScanRangeWeight(range);
+      pop_heap(instance_heap.begin(), instance_heap.end());
+      push_heap(instance_heap.begin(), instance_heap.end());
+    }
+  }
+  return per_instance_ranges;
 }
 
 void Scheduler::CreateCollocatedInstances(

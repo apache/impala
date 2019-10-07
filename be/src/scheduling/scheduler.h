@@ -386,6 +386,13 @@ class Scheduler {
   void CreateScanInstances(const ExecutorConfig& executor_config, PlanNodeId scan_id,
       FragmentExecParams* fragment_params, QuerySchedule* schedule);
 
+  /// Compute an assignment of scan ranges 'ranges' that were assigned to a host to
+  /// 'num_instances' fragment instances running on the same host. Attempts to minimize
+  /// skew across the instances. 'num_ranges' must be positive. May reorder ranges in
+  /// 'ranges'.
+  static std::vector<std::vector<TScanRangeParams>> AssignRangesToInstances(
+      int num_instances, std::vector<TScanRangeParams>* ranges);
+
   /// For each instance of fragment_params's input fragment, create a collocated
   /// instance for fragment_params's fragment.
   /// Expects that fragment_params only has a single input fragment.
@@ -415,6 +422,7 @@ class Scheduler {
   FRIEND_TEST(SimpleAssignmentTest, ComputeAssignmentRandomNonCached);
   FRIEND_TEST(SimpleAssignmentTest, ComputeAssignmentRandomDiskLocal);
   FRIEND_TEST(SimpleAssignmentTest, ComputeAssignmentRandomRemote);
+  FRIEND_TEST(SchedulerTest, TestMultipleFinstances);
 };
 
 }
