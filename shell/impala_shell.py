@@ -147,6 +147,8 @@ class ImpalaShell(object, cmd.Cmd):
   HISTORY_FILE_QUERY_DELIM = '_IMP_DELIM_'
   # Strings that are interpreted as True for some shell options.
   TRUE_STRINGS = ("true", "TRUE", "True", "1")
+  # List of quit commands
+  QUIT_COMMANDS = ("quit", "exit")
 
   VALID_SHELL_OPTIONS = {
     'LIVE_PROGRESS' : (lambda x: x in ImpalaShell.TRUE_STRINGS, "print_progress"),
@@ -580,6 +582,10 @@ class ImpalaShell(object, cmd.Cmd):
         print_to_stderr("Failed to reconnect and close (try %i/%i): %s" % (
             cancel_try + 1, ImpalaShell.CANCELLATION_TRIES, err_msg))
 
+  def _is_quit_command(self, command):
+    # Do a case insensitive check
+    return command.lower() in ImpalaShell.QUIT_COMMANDS
+
   def set_prompt(self, db):
     self.prompt = ImpalaShell.PROMPT_FORMAT.format(
         host=self.impalad[0], port=self.impalad[1], db=db)
@@ -597,7 +603,8 @@ class ImpalaShell(object, cmd.Cmd):
       # If cmdqueue is populated, then commands are executed from the cmdqueue, and user
       # input is ignored. Send an empty string as the user input just to be safe.
       return str()
-    if not self.imp_client.is_connected():
+    # There is no need to reconnect if we are quitting.
+    if not self.imp_client.is_connected() and not self._is_quit_command(args):
       print_to_stderr("Connection lost, reconnecting...")
       self._connect()
       self._validate_database(immediately=True)

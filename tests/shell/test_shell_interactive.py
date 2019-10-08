@@ -238,6 +238,21 @@ class TestImpalaShellInteractive(ImpalaTestSuite):
                                           wait_until_connected=False)
     assert ImpalaShellClass.DISCONNECTED_PROMPT in result.stdout, result.stderr
 
+  def test_quit_no_reconnect(self, vector):
+    """Test that a disconnected shell does not try to reconnect if quitting"""
+    result = run_impala_shell_interactive(vector, 'quit;', shell_args=['-ifoo'],
+                                          wait_until_connected=False)
+    assert "reconnect" not in result.stderr
+
+    result = run_impala_shell_interactive(vector, 'exit;', shell_args=['-ifoo'],
+                                          wait_until_connected=False)
+    assert "reconnect" not in result.stderr
+
+    # Null case: This is not quitting, so it will result in an attempt to reconnect.
+    result = run_impala_shell_interactive(vector, 'show tables;', shell_args=['-ifoo'],
+                                          wait_until_connected=False)
+    assert "reconnect" in result.stderr
+
   def test_bash_cmd_timing(self, vector):
     """Test existence of time output in bash commands run from shell"""
     args = ["! ls;"]
