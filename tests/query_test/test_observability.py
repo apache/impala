@@ -710,8 +710,10 @@ class TestObservability(ImpalaTestSuite):
       storageLoadTime = "storage-load-time"
     assert storageLoadTime in runtime_profile
     # Call the second time, no metastore loading needed.
-    runtime_profile = self.execute_query(query).runtime_profile
-    assert storageLoadTime not in runtime_profile
+    # Only check this part in Catalog V1 because of V2's random behavior
+    if not cluster_properties.is_catalog_v2_cluster():
+      runtime_profile = self.execute_query(query).runtime_profile
+      assert storageLoadTime not in runtime_profile
 
   def __verify_hashtable_stats_profile(self, runtime_profile):
     assert "Hash Table" in runtime_profile
