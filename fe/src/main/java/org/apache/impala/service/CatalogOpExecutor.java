@@ -26,7 +26,6 @@ import java.io.IOException;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collection;
-import java.util.Collections;
 import java.util.HashMap;
 import java.util.HashSet;
 import java.util.Iterator;
@@ -1616,7 +1615,8 @@ public class CatalogOpExecutor {
       }
     }
     for (org.apache.hadoop.hive.metastore.api.Table msTable: msTables) {
-      if (!KuduTable.isKuduTable(msTable) || Table.isExternalTable(msTable)) continue;
+      if (!KuduTable.isKuduTable(msTable) || !KuduTable
+          .isSynchronizedTable(msTable)) continue;
       // The operation will be aborted if the Kudu table cannot be dropped. If for
       // some reason Kudu is permanently stuck in a non-functional state, the user is
       // expected to ALTER TABLE to either set the table to UNMANAGED or set the format
@@ -1729,9 +1729,9 @@ public class CatalogOpExecutor {
           LOG.error(String.format(HMS_RPC_ERROR_FORMAT_STR, "getTable") + e.getMessage());
         }
       }
-      boolean isManagedKuduTable = msTbl != null &&
-              KuduTable.isKuduTable(msTbl) && !Table.isExternalTable(msTbl);
-      if (isManagedKuduTable) {
+      boolean isSynchronizedTable = msTbl != null &&
+              KuduTable.isKuduTable(msTbl) && KuduTable.isSynchronizedTable(msTbl);
+      if (isSynchronizedTable) {
         KuduCatalogOpExecutor.dropTable(msTbl, /* if exists */ true);
       }
 
@@ -1755,7 +1755,7 @@ public class CatalogOpExecutor {
       // When Kudu's HMS integration is enabled, Kudu will drop the managed table
       // entries automatically. In all other cases, we need to drop the HMS table
       // entry ourselves.
-      if (!isManagedKuduTable || !isKuduHmsIntegrationEnabled(msTbl)) {
+      if (!isSynchronizedTable || !isKuduHmsIntegrationEnabled(msTbl)) {
         try (MetaStoreClient msClient = catalog_.getMetaStoreClient()) {
           msClient.getHiveClient().dropTable(
               tableName.getDb(), tableName.getTbl(), true,
@@ -2030,9 +2030,9 @@ public class CatalogOpExecutor {
 
   /**
    * Creates a new table in the metastore and adds an entry to the metadata cache to
-   * lazily load the new metadata on the next access. If this is a managed Kudu table,
-   * the table is also created in the Kudu storage engine. Re-throws any HMS or Kudu
-   * exceptions encountered during the create.
+   * lazily load the new metadata on the next access. If this is a Synchronized Kudu
+   * table, the table is also created in the Kudu storage engine. Re-throws any HMS or
+   * Kudu exceptions encountered during the create.
    * @param  syncDdl tells if SYNC_DDL option is enabled on this DDL request.
    * @return true if a new table has been created with the given params, false
    * otherwise.
@@ -2159,7 +2159,11 @@ public class CatalogOpExecutor {
   }
 
   /**
-   * Creates a new Kudu table.
+   * Creates a new Kudu table. It should be noted that since HIVE-22158, HMS transforms
+   * a create managed Kudu table request to a create external Kudu table with
+   * <code>external.table.purge</code> property set to true. Such transformed Kudu
+   * tables should be treated as managed (synchronized) tables to keep the user facing
+   * behavior consistent.
    *
    * For managed tables:
    *  1. If Kudu's integration with the Hive Metastore is not enabled, the Kudu
@@ -2178,14 +2182,14 @@ public class CatalogOpExecutor {
   private boolean createKuduTable(org.apache.hadoop.hive.metastore.api.Table newTable,
       TCreateTableParams params, TDdlExecResponse response) throws ImpalaException {
     Preconditions.checkState(KuduTable.isKuduTable(newTable));
-    if (Table.isExternalTable(newTable)) {
+    if (KuduTable.isExternalTable(newTable)) {
       KuduCatalogOpExecutor.populateExternalTableColsFromKudu(newTable);
     } else {
       KuduCatalogOpExecutor.createManagedTable(newTable, params);
     }
     // When Kudu's integration with the Hive Metastore is enabled, Kudu will create
     // the HMS table for managed tables.
-    boolean createsHMSTable = Table.isExternalTable(newTable) ?
+    boolean createsHMSTable = KuduTable.isExternalTable(newTable) ?
         true : !isKuduHmsIntegrationEnabled(newTable);
     try {
       // Add the table to the HMS and the catalog cache. Acquire metastoreDdlLock_ to
@@ -2203,7 +2207,7 @@ public class CatalogOpExecutor {
     } catch (Exception e) {
       try {
         // Error creating the table in HMS, drop the managed table from Kudu.
-        if (!Table.isExternalTable(newTable)) {
+        if (!KuduTable.isExternalTable(newTable)) {
           KuduCatalogOpExecutor.dropTable(newTable, false);
         }
       } catch (Exception logged) {
@@ -2875,11 +2879,11 @@ public class CatalogOpExecutor {
     msTbl.setDbName(newTableName.getDb());
     msTbl.setTableName(newTableName.getTbl());
 
-    // If oldTbl is a managed Kudu table, rename the underlying Kudu table.
-    boolean isManagedKuduTable = (oldTbl instanceof KuduTable) &&
-                                 !Table.isExternalTable(msTbl);
+    // If oldTbl is a synchronized Kudu table, rename the underlying Kudu table.
+    boolean isSynchronizedTable = (oldTbl instanceof KuduTable) &&
+                                 KuduTable.isSynchronizedTable(msTbl);
     boolean altersHMSTable = true;
-    if (isManagedKuduTable) {
+    if (isSynchronizedTable) {
       Preconditions.checkState(KuduTable.isKuduTable(msTbl));
       boolean isKuduHmsIntegrationEnabled = isKuduHmsIntegrationEnabled(msTbl);
       altersHMSTable = !isKuduHmsIntegrationEnabled;
@@ -3099,13 +3103,13 @@ public class CatalogOpExecutor {
       switch (params.getTarget()) {
         case TBL_PROPERTY:
           if (KuduTable.isKuduTable(msTbl)) {
-            // If 'kudu.table_name' is specified and this is a managed table, rename
+            // If 'kudu.table_name' is specified and this is a synchronized table, rename
             // the underlying Kudu table.
             // TODO(IMPALA-8618): this should be disallowed since IMPALA-5654
             if (properties.containsKey(KuduTable.KEY_TABLE_NAME)
                 && !properties.get(KuduTable.KEY_TABLE_NAME).equals(
                     msTbl.getParameters().get(KuduTable.KEY_TABLE_NAME))
-                && !Table.isExternalTable(msTbl)) {
+                && KuduTable.isSynchronizedTable(msTbl)) {
               KuduCatalogOpExecutor.renameTable((KuduTable) tbl,
                   properties.get(KuduTable.KEY_TABLE_NAME));
             }

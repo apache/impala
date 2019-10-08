@@ -502,6 +502,12 @@ public class AnalyzeKuduDDLTest extends FrontendTestBase {
         "('kudu.table_name'='t', 'kudu.table_id'='123456')",
         String.format("Table property %s should not be specified when creating " +
             "a Kudu table.", KuduTable.KEY_TABLE_ID));
+    // External table is not allowed to set table property 'external.table.purge'
+    // to true.
+    AnalysisError("create external table t stored as kudu tblproperties " +
+        "('external.table.purge'='true', 'kudu.table_name'='t')",
+        "Table property 'external.table.purge' cannot be set " +
+        "to true with an external Kudu table.");
   }
 
   @Test
@@ -606,6 +612,11 @@ public class AnalyzeKuduDDLTest extends FrontendTestBase {
     AnalysisError("ALTER TABLE functional_kudu.testtbl SET " +
         "TBLPROPERTIES ('kudu.table_id' = '1234')",
         "Property 'kudu.table_id' cannot be altered for Kudu tables");
+
+    // Setting 'external.table.purge' is not allowed for Kudu tables.
+    AnalysisError("ALTER TABLE functional_kudu.testtbl SET " +
+        "TBLPROPERTIES ('external.table.purge' = 'true')",
+        "Property 'external.table.purge' cannot be altered for Kudu tables");
 
     // Rename the underlying Kudu table is not supported for managed Kudu tables.
     AnalysisError("ALTER TABLE functional_kudu.testtbl SET " +

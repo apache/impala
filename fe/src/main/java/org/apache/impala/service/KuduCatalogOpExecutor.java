@@ -27,7 +27,6 @@ import org.apache.hadoop.hive.metastore.api.FieldSchema;
 import org.apache.impala.catalog.FeKuduTable;
 import org.apache.impala.catalog.KuduColumn;
 import org.apache.impala.catalog.KuduTable;
-import org.apache.impala.catalog.Table;
 import org.apache.impala.catalog.TableNotFoundException;
 import org.apache.impala.catalog.Type;
 import org.apache.impala.common.ImpalaRuntimeException;
@@ -73,7 +72,7 @@ public class KuduCatalogOpExecutor {
    */
   static void createManagedTable(org.apache.hadoop.hive.metastore.api.Table msTbl,
       TCreateTableParams params) throws ImpalaRuntimeException {
-    Preconditions.checkState(!Table.isExternalTable(msTbl));
+    Preconditions.checkState(!KuduTable.isExternalTable(msTbl));
     Preconditions.checkState(
         msTbl.getParameters().get(KuduTable.KEY_TABLE_ID) == null);
     String kuduTableName = msTbl.getParameters().get(KuduTable.KEY_TABLE_NAME);
@@ -250,7 +249,7 @@ public class KuduCatalogOpExecutor {
    */
   static void dropTable(org.apache.hadoop.hive.metastore.api.Table msTbl,
       boolean ifExists) throws ImpalaRuntimeException, TableNotFoundException {
-    Preconditions.checkState(!Table.isExternalTable(msTbl));
+    Preconditions.checkState(KuduTable.isSynchronizedTable(msTbl));
     String tableName = msTbl.getParameters().get(KuduTable.KEY_TABLE_NAME);
     String masterHosts = msTbl.getParameters().get(KuduTable.KEY_MASTER_HOSTS);
     if (LOG.isTraceEnabled()) {
@@ -284,7 +283,7 @@ public class KuduCatalogOpExecutor {
     org.apache.hadoop.hive.metastore.api.Table msTblCopy = msTbl.deepCopy();
     List<FieldSchema> cols = msTblCopy.getSd().getCols();
     // External table should not have table ID.
-    Preconditions.checkState(Table.isExternalTable(msTbl));
+    Preconditions.checkState(KuduTable.isExternalTable(msTbl));
     Preconditions.checkState(
         msTblCopy.getParameters().get(KuduTable.KEY_TABLE_ID) == null);
     String kuduTableName = msTblCopy.getParameters().get(KuduTable.KEY_TABLE_NAME);

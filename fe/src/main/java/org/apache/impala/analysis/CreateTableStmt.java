@@ -338,6 +338,13 @@ public class CreateTableStmt extends StatementBase {
     AnalysisUtils.throwIfNotNull(getTblProperties().get(KuduTable.KEY_TABLET_REPLICAS),
         String.format("Table property '%s' cannot be used with an external Kudu table.",
             KuduTable.KEY_TABLET_REPLICAS));
+    // External table cannot have 'external.table.purge' property set, which is considered
+    // equivalent to managed table.
+    if (Boolean.parseBoolean(
+            getTblProperties().get(KuduTable.TBL_PROP_EXTERNAL_TABLE_PURGE))) {
+      throw new AnalysisException(String.format("Table property '%s' cannot be set to " +
+          "true with an external Kudu table.", KuduTable.TBL_PROP_EXTERNAL_TABLE_PURGE));
+    }
     AnalysisUtils.throwIfNotEmpty(getColumnDefs(),
         "Columns cannot be specified with an external Kudu table.");
     AnalysisUtils.throwIfNotEmpty(getKuduPartitionParams(),

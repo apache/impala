@@ -26,6 +26,7 @@ import java.util.Set;
 
 import org.apache.hadoop.hive.common.StatsSetupConst;
 import org.apache.hadoop.hive.metastore.IMetaStoreClient;
+import org.apache.hadoop.hive.metastore.TableType;
 import org.apache.hadoop.hive.metastore.api.FieldSchema;
 import org.apache.hadoop.hive.metastore.api.hive_metastoreConstants;
 import org.apache.impala.analysis.ColumnDef;
@@ -117,6 +118,53 @@ public class KuduTable extends Table implements FeKuduTable {
     super(msTable, db, name, owner);
     kuduTableName_ = msTable.getParameters().get(KuduTable.KEY_TABLE_NAME);
     kuduMasters_ = msTable.getParameters().get(KuduTable.KEY_MASTER_HOSTS);
+  }
+
+  /**
+   * A synchronized Kudu table is a table where operations like (drop, rename)
+   * on the table are pushed down to Kudu along with HMS. This method returns
+   * true if given metastore table is a synchronized Kudu table. For older HMS
+   * versions (HMS 2 and below) this is just checking if the table is managed or not.
+   * However, since HIVE-22158 this also checks if the external table has
+   * <code>external.table.purge</code> property set to true. After HIVE-22158 HMS
+   * transforms a managed table into external table if it is not transactional and sets
+   * <code>external.table.purge</code> to true to indicate that table data will be
+   * dropped when it is dropped. From the perspective of
+   * Impala, if a Kudu table has <code>external.table.purge</code> set to true and it
+   * is an external HMS table, it should treat it like a managed table so the user facing
+   * behavior is not changed when compared to previous versions of HMS.
+   *
+   * A table is synchronized table if its Managed table or if its a external table with
+   * <code>external.table.purge</code> property set to true.
+   */
+  public static boolean isSynchronizedTable(
+      org.apache.hadoop.hive.metastore.api.Table msTbl) {
+    Preconditions.checkState(isKuduTable(msTbl));
+    // HIVE-22158: A translated table can have external purge property set to true
+    // in such case we sync operations in Impala and Kudu
+    // it is possible that in older versions of HMS a managed Kudu table is present
+    return isManagedTable(msTbl) || (isExternalTable(msTbl) && Boolean
+        .parseBoolean(msTbl.getParameters().get(TBL_PROP_EXTERNAL_TABLE_PURGE)));
+  }
+
+  /**
+   * Returns if this metastore table has managed table type
+   */
+  private static boolean isManagedTable(
+      org.apache.hadoop.hive.metastore.api.Table msTbl) {
+    return msTbl.getTableType().equalsIgnoreCase(TableType.MANAGED_TABLE.toString());
+  }
+
+  /**
+   * Returns if the given HMS table is external table or not based on table type or table
+   * properties. Implementation is based on org.apache.hadoop.hive.metastore.utils
+   * .MetaStoreUtils.isExternalTable()
+   */
+  public static boolean isExternalTable(
+      org.apache.hadoop.hive.metastore.api.Table msTbl) {
+    // HIVE-19253: table property can also indicate an external table.
+    return (msTbl.getTableType().equalsIgnoreCase(TableType.EXTERNAL_TABLE.toString()) ||
+        ("TRUE").equalsIgnoreCase(msTbl.getParameters().get(TBL_PROP_EXTERNAL_TABLE)));
   }
 
   @Override

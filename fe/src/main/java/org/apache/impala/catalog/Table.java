@@ -152,7 +152,10 @@ public abstract class Table extends CatalogObjectImpl implements FeTable {
       "impala.lastComputeStatsTime";
 
   // Table property key for storing table type externality.
-  private static final String TBL_PROP_EXTERNAL_TABLE = "EXTERNAL";
+  public static final String TBL_PROP_EXTERNAL_TABLE = "EXTERNAL";
+
+  // Table property key to determined if HMS translated a managed table to external table
+  public static final String TBL_PROP_EXTERNAL_TABLE_PURGE = "external.table.purge";
 
   protected Table(org.apache.hadoop.hive.metastore.api.Table msTable, Db db,
       String name, String owner) {
@@ -633,14 +636,6 @@ public abstract class Table extends CatalogObjectImpl implements FeTable {
 
   @Override // FeTable
   public ArrayType getType() { return type_; }
-
-  public static boolean isExternalTable(
-      org.apache.hadoop.hive.metastore.api.Table msTbl) {
-    // HIVE-19253: table property can also indicate an external table.
-    // See org.apache.hadoop.hive.metastore.utils.MetaStoreUtils.isExternalTable().
-    return msTbl.getTableType().equalsIgnoreCase(TableType.EXTERNAL_TABLE.toString()) ||
-           ("TRUE").equalsIgnoreCase(msTbl.getParameters().get(TBL_PROP_EXTERNAL_TABLE));
-  }
 
   /**
    * If the table is cached, it returns a <cache pool name, replication factor> pair
