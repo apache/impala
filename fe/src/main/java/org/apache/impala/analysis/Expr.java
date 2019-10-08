@@ -1182,15 +1182,20 @@ abstract public class Expr extends TreeNode<Expr> implements ParseNode, Cloneabl
    */
   public static boolean optimizeConjuncts(List<Expr> conjuncts, Analyzer analyzer) {
     Preconditions.checkNotNull(conjuncts);
+    List<Expr> tmpConjuncts = new ArrayList<>();
     try {
       BitSet candidates = new BitSet(conjuncts.size());
       candidates.set(0, Math.min(conjuncts.size(), CONST_PROPAGATION_EXPR_LIMIT));
       int transfers = 0;
-
+      tmpConjuncts.addAll(conjuncts);
       // Constant propagation may make other slots constant, so repeat the process
       // until there are no more changes.
       while (!candidates.isEmpty()) {
-        BitSet changed = propagateConstants(conjuncts, candidates, analyzer);
+        // Use tmpConjuncts instead of conjuncts because propagateConstants can
+        // change the content of the first input param. We do not want to
+        // change the expr in conjucts before make sure the constant propagation
+        // does not cause analysis failures.
+        BitSet changed = propagateConstants(tmpConjuncts, candidates, analyzer);
         candidates.clear();
         int pruned = 0;
         for (int i = changed.nextSetBit(0); i >= 0; i = changed.nextSetBit(i+1)) {
@@ -1200,12 +1205,13 @@ abstract public class Expr extends TreeNode<Expr> implements ParseNode, Cloneabl
           int index = i - pruned;
           Preconditions.checkState(index >= 0);
           ExprRewriter rewriter = analyzer.getExprRewriter();
-          Expr rewritten = rewriter.rewrite(conjuncts.get(index), analyzer);
+          Expr rewritten = rewriter.rewrite(tmpConjuncts.get(index), analyzer);
           // Re-analyze to add implicit casts and update cost
           rewritten.reset();
           rewritten.analyze(analyzer);
           if (!rewritten.isConstant()) {
             conjuncts.set(index, rewritten);
+            tmpConjuncts.set(index, rewritten);
             if (++transfers < CONST_PROPAGATION_EXPR_LIMIT) candidates.set(index, true);
             continue;
           }
@@ -1221,6 +1227,7 @@ abstract public class Expr extends TreeNode<Expr> implements ParseNode, Cloneabl
           if (IS_TRUE_LITERAL.apply(rewritten)) {
             pruned++;
             conjuncts.remove(index);
+            tmpConjuncts.remove(index);
           }
         }
       }

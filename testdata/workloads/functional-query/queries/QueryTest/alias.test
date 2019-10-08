@@ -85,3 +85,12 @@ select sum(id) over(order by id) a from alltypestiny order by a
 ---- TYPES
 bigint
 ====
+---- QUERY
+# literal alias
+# IMPALA-9025: When constant propagation optimization fails, the query fails
+# with "ERROR: IllegalStateException: null"
+select * from (select t.* from alltypestiny t
+inner join (select 10 bigint_col) d where
+t.int_col < d.bigint_col ) q
+where int_col <> bigint_col and int_col = 10
+====
