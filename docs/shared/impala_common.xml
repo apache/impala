@@ -2363,25 +2363,14 @@ SELECT s FROM yy WHERE year IN (SELECT year FROM yy2); -- Returns 3 rows from yy
 PROFILE;
 </codeblock>
 
-      <p id="order_by_scratch_dir">
-        By default, intermediate files used during large sort, join, aggregation, or analytic
-        function operations are stored in the directory <filepath>/tmp/impala-scratch</filepath>
-        . These files are removed when the operation finishes. (Multiple concurrent queries can
-        perform operations that use the <q>spill to disk</q> technique, without any name
-        conflicts for these temporary files.) You can specify a different location by starting
-        the <cmdname>impalad</cmdname> daemon with the
-        <codeph>&#8209;&#8209;scratch_dirs="<varname>path_to_directory</varname>"</codeph>
-        configuration option. You can specify a single directory, or a comma-separated list of
-        directories. The scratch directories must be on the local filesystem, not in HDFS. You
-        might specify different directory paths for different hosts, depending on the capacity
-        and speed of the available storage devices. In <keyword keyref="impala23_full"/> or
-        higher, Impala successfully starts (with a warning Impala successfully starts (with a
-        warning written to the log) if it cannot create or read and write files in one of the
-        scratch directories. If there is less than 1 GB free on the filesystem where that
-        directory resides, Impala still runs, but writes a warning message to its log. If Impala
-        encounters an error reading or writing files in a scratch directory during a query,
-        Impala logs the error and the query fails.
-      </p>
+      <p id="order_by_scratch_dir"> By default, intermediate files used during
+        large sort, join, aggregation, or analytic function operations are
+        stored in the directory <filepath>/tmp/impala-scratch</filepath>, and
+        these intermediate files are removed when the operation finishes. You
+        can specify a different location by starting the
+          <cmdname>impalad</cmdname> daemon with the
+            <codeph>&#8209;&#8209;scratch_dirs="<varname>path_to_directory</varname>"</codeph>
+        configuration option. </p>
 
       <p id="order_by_view_restriction">
         An <codeph>ORDER BY</codeph> clause without an additional <codeph>LIMIT</codeph> clause

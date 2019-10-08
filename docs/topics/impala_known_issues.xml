@@ -852,7 +852,8 @@ ALTER TABLE table_name SET TBLPROPERTIES('EXTERNAL'='TRUE');
       </p>
 
     </conbody>
-    <concept id="IMPALA-8829">
+    <!--IMPALA8376 fixed the issue below.-->
+    <concept id="IMPALA-8829" audience="hidden">
       <title>Unable to Correctly Parse the Terabyte Unit</title>
       <conbody>
         <p>Impala does not support parsing strings that contain "TB" when used
