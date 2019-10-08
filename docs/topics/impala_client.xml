@@ -21,8 +21,11 @@ under the License.
 <concept id="intro_client">
 
   <title>Impala Client Access</title>
+
   <titlealts audience="PDF">
+
     <navtitle>Client Access</navtitle>
+
   </titlealts>
 
   <conbody>
@@ -220,6 +223,33 @@ under the License.
         <dlentry>
 
           <dt>
+            --hs2_http_port
+          </dt>
+
+          <dd>
+            Specifies the port for clients to connect to Impala server over HTTP.
+            <p>
+              The default port is 28000.
+            </p>
+
+            <p>
+              You can disable the HTTP end point for clients by setting the flag to
+              <codeph>0</codeph>.
+            </p>
+
+            <p>
+              To enable TLS/SSL for HiveServer2 HTTP endpoint use
+              <codeph>--ssl_server_certificate</codeph> and <codeph>--ssl_private_key</codeph>.
+              See <xref
+                href="impala_ssl.xml#ssl"/> for detail.
+            </p>
+          </dd>
+
+        </dlentry>
+
+        <dlentry>
+
+          <dt>
             --idle_client_poll_time_s
           </dt>
 
@@ -252,21 +282,38 @@ under the License.
         <dlentry>
 
           <dt>
-            --hs2_http_port
+            --max_cookie_lifetime_s
           </dt>
 
           <dd>
-            Specifies the port for clients to connect to Impala server over HTTP.
+            Starting in Impala 3.4.0, Impala uses cookies for authentication when clients
+            connect via HiveServer2 over HTTP. Use the <codeph>--max_cookie_lifetime_s</codeph>
+            startup flag to control how long generated cookies are valid for.
             <p>
-              You can disable the HTTP end point for clients by setting the flag to
-              <codeph>0</codeph>.
+              Specify the value in seconds.
+            </p>
+            <p>
+              The default value is 1 day.
             </p>
 
             <p>
-              To enable TLS/SSL for HiveServer2 HTTP endpoint use
-              <codeph>--ssl_server_certificate</codeph> and <codeph>--ssl_private_key</codeph>.
-              See <xref
-                href="impala_ssl.xml#ssl"/> for detail.
+              Setting the flag to <codeph>0</codeph> disables cookie support.
+            </p>
+
+            <p>
+              When an unexpired cookie is successfully verified, the user name contained in the
+              cookie is set on the connection.
+            </p>
+
+            <p>
+              Each <codeph>impalad</codeph> uses its own key to generate the signature, so
+              clients that reconnect to a different <codeph>impalad</codeph> have to
+              re-authenticate.
+            </p>
+
+            <p>
+              On a single <codeph>impalad</codeph>, cookies are valid across sessions and
+              connections.
             </p>
           </dd>
 
