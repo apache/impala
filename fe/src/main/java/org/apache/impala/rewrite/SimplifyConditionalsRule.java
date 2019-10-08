@@ -250,7 +250,7 @@ public class SimplifyConditionalsRule implements ExprRewriteRule {
           if (newWhenClauses.size() == 0) {
             // This WHEN is always TRUE, and any cases preceding it are constant
             // FALSE/NULL, so just return its THEN.
-            return expr.getChild(i + 1).castTo(expr.getType());
+            return expr.getChild(i + 1);
           } else {
             // This WHEN is always TRUE, so the cases after it can never be reached.
             elseExpr = expr.getChild(i + 1);

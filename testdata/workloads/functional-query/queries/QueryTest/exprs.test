@@ -3072,3 +3072,25 @@ SELECT * FROM W WHERE W.Q<=>W.P
 ---- TYPES
 FLOAT, FLOAT, FLOAT, FLOAT
 ====
+---- QUERY
+# IMPALA-9023 - verify that case when true appears in where clause will not throw IllegalStateException
+select id, bool_col from functional.alltypessmall where case when true then id = 50 END
+---- RESULTS
+50,true
+---- TYPES
+int, boolean
+====
+---- QUERY
+select distinct year from functional.alltypes where case when true = true then year < 2010 when false then year > 2010 end;
+---- RESULTS
+2009
+---- TYPES
+int
+====
+---- QUERY
+select distinct year from functional.alltypes where case when year = 2010 then month < 5 when year = 2009 then month < 4 end AND year = 2010;
+---- RESULTS
+2010
+---- TYPES
+int
+====

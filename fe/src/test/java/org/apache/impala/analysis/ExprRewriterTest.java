@@ -254,6 +254,25 @@ public class ExprRewriterTest extends AnalyzerTest {
         "VALUES((1, '2', 3, 4.1), (1, '2', 3, 4.1))",
         "SELECT 1, '2', 3, 4.1 UNION ALL SELECT 1, '2', 3, 4.1");
 
+    assertToSql(ctx,
+        "select case when 1 = 1 then 1 else 2.0 end from functional.alltypes",
+        "SELECT CASE WHEN 1 = 1 THEN 1 ELSE 2.0 END FROM functional.alltypes",
+        "SELECT 1.0 FROM functional.alltypes");
+
+    assertToSql(ctx,
+        "select case when false then 1.0 else 2 end from functional.alltypes",
+        "SELECT CASE WHEN FALSE THEN 1.0 ELSE 2 END FROM functional.alltypes",
+        "SELECT 2.0 FROM functional.alltypes");
+
+    assertToSql(ctx,
+        "select * from functional.alltypes where case " +
+        "when true = true then year < 2019 " +
+        "when false then year > 2010 end",
+        "SELECT * FROM functional.alltypes WHERE CASE " +
+        "WHEN TRUE = TRUE THEN `year` < 2019 " +
+        "WHEN FALSE THEN `year` > 2010 END",
+        "SELECT * FROM functional.alltypes WHERE `year` < 2019");
+
     //-------------------------
     // Test subquery rewrites.
     //-------------------------

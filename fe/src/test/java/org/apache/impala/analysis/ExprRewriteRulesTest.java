@@ -465,7 +465,7 @@ public class ExprRewriteRulesTest extends FrontendTestBase {
     rules.add(FoldConstantsRule.INSTANCE);
     rules.add(rule);
 
-    // Single TRUE case with no predecing non-constant case.
+    // Single TRUE case with no preceding non-constant case.
     RewritesOk("case when FALSE then 0 when TRUE then 1 end", rule, "1");
     // Single TRUE case with preceding non-constant case.
     RewritesOk("case when id = 0 then 0 when true then 1 when id = 2 then 2 end", rule,
@@ -489,6 +489,17 @@ public class ExprRewriteRulesTest extends FrontendTestBase {
     RewritesOk("case when id = 1 then 10 when false then 20 " +
         "when true then 30 else 40 end", rule,
         "CASE WHEN id = 1 THEN 10 ELSE 30 END");
+    // IMPALA-9023: Fix IllegalStateException in SimplifyConditionalsRule
+    // Test case function appears in where clause
+    // Single TRUE case
+    RewritesOkWhereExpr("case when true then id < 50 end", rule, "id < 50");
+    // Single TRUE case and the preceding FALSE case should be removed
+    RewritesOkWhereExpr("case when false then id > 50 "
+        + "when true then id < 50 END", rule, "id < 50");
+    // Multiple TRUE cases and it should only take first one
+    RewritesOkWhereExpr("case when true then id > 30 when true then id = 30 "
+        + "when true then id < 30 "
+        + "END", rule, "id > 30");
   }
 
   @Test
