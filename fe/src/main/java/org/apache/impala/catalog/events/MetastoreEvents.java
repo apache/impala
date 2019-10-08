@@ -983,21 +983,15 @@ public class MetastoreEvents {
       TTableName newTTableName =
           new TTableName(tableAfter_.getDbName(), tableAfter_.getTableName());
 
-      // atomically rename the old table to new table
-      Pair<Boolean, Boolean> result = null;
-      result = catalog_.renameOrAddTableIfNotExists(oldTTableName, newTTableName);
-
-      // old table was not found. This could be because catalogD is stale and didn't
-      // have any entry for the oldTable
-      if (!result.first) {
+      // Table is renamed only if old table existed in the catalog. Otherwise the event
+      // is skipped.
+      if (!catalog_.renameTableIfExists(oldTTableName, newTTableName)) {
         debugLog("Did not remove old table to rename table {} to {} since "
                 + "it does not exist anymore", qualify(oldTTableName),
             qualify(newTTableName));
-      }
-      // the new table from the event was not added since it was already present
-      if (!result.second) {
-        debugLog("Did not add new table name while renaming table {} to {}",
-            qualify(oldTTableName), qualify(newTTableName));
+      } else {
+        infoLog("Renamed old table {} to new table {}.", qualify(oldTTableName),
+            qualify(newTTableName));
       }
     }
 

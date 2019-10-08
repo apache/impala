@@ -1957,30 +1957,28 @@ public class CatalogServiceCatalog extends Catalog {
   }
 
   /**
-   * Renames the table by atomically removing oldTable and adding the newTable. If the
-   * oldTable is not found this operation becomes a add new table if not exists
-   * operation.
-   *
-   * @return a pair of booleans. The first of the pair is set if the oldTableName was
-   *     found and removed. The second boolean is set if the new table didn't exist before
-   *     and hence was added.
+   * Renames the table by atomically removing oldTable and adding the newTable.
+   * @return true if oldTable was removed and newTable was added, false if oldTable or
+   * it's db are not in catalog.
    */
-  public Pair<Boolean, Boolean> renameOrAddTableIfNotExists(TTableName oldTableName,
-      TTableName newTableName)
-      throws CatalogException {
-    boolean oldTableRemoved = false;
-    boolean newTableAdded;
+  public boolean renameTableIfExists(TTableName oldTableName,
+      TTableName newTableName) {
+    boolean tableRenamed = false;
     versionLock_.writeLock().lock();
     try {
       Db db = getDb(oldTableName.db_name);
       if (db != null) {
-        // remove the oldTable if it exists
-        oldTableRemoved =
-            removeTable(oldTableName.db_name, oldTableName.table_name) != null;
+        Table existingTable = removeTable(oldTableName.db_name, oldTableName.table_name);
+        // Add the newTable only if oldTable existed.
+        if (existingTable != null) {
+          Table incompleteTable = IncompleteTable.createUninitializedTable(db,
+              newTableName.getTable_name());
+          incompleteTable.setCatalogVersion(incrementAndGetCatalogVersion());
+          db.addTable(incompleteTable);
+          tableRenamed = true;
+        }
       }
-      // add the new tbl if it doesn't exist
-      newTableAdded = addTableIfNotExists(newTableName.db_name, newTableName.table_name);
-      return new Pair<>(oldTableRemoved, newTableAdded);
+      return tableRenamed;
     } finally {
       versionLock_.writeLock().unlock();
     }
