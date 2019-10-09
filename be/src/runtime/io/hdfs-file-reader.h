@@ -74,7 +74,9 @@ private:
   Status ReadFromPosInternal(hdfsFile hdfs_file, DiskQueue* disk_queue,
       int64_t position_in_file, uint8_t* buffer, int64_t chunk_size, int* bytes_read);
 
-  void GetHdfsStatistics(hdfsFile hdfs_file);
+  /// Update counters with HDFS read statistics from 'hdfs_file'. If 'log_stats' is
+  /// true, the statistics are logged.
+  void GetHdfsStatistics(hdfsFile hdfs_file, bool log_stats);
 
   /// Hadoop filesystem that contains the file being read.
   hdfsFS const hdfs_fs_;

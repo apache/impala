@@ -659,6 +659,9 @@ class ScopedTimer {
 
   bool IsCancelled() { return is_cancelled_ != nullptr && *is_cancelled_; }
 
+  /// Return the total elapsed time accumulated by this timer so far.
+  int64_t ElapsedTime() { return sw_.ElapsedTime(); }
+
   /// Update counter when object is destroyed
   ~ScopedTimer() {
     sw_.Stop();

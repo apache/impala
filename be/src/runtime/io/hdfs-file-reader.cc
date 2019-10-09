@@ -23,6 +23,7 @@
 #include "runtime/io/hdfs-file-reader.h"
 #include "runtime/io/request-context.h"
 #include "runtime/io/request-ranges.h"
+#include "util/debug-util.h"
 #include "util/hdfs-util.h"
 #include "util/histogram-metric.h"
 #include "util/impalad-metrics.h"
@@ -35,6 +36,10 @@
 DEFINE_bool(use_hdfs_pread, false, "Enables using hdfsPread() instead of hdfsRead() "
     "when performing HDFS read operations. This is necessary to use HDFS hedged reads "
     "(assuming the HDFS client is configured to do so).");
+
+DEFINE_int64(fs_slow_read_log_threshold_ms, 10L * 1000L,
+    "Log diagnostics about I/Os issued via the HDFS client that take longer than this "
+    "threshold.");
 
 #ifndef NDEBUG
 DECLARE_int32(stress_disk_read_delay_ms);
@@ -159,6 +164,25 @@ Status HdfsFileReader::ReadFromPos(DiskQueue* queue, int64_t file_offset, uint8_
         status = ReadFromPosInternal(hdfs_file, queue, position_in_file,
             buffer + *bytes_read, chunk_size, &current_bytes_read);
       }
+      // Log diagnostics for failed and successful reads.
+      int64_t elapsed_time = req_context_read_timer.ElapsedTime();
+      bool is_slow_read = elapsed_time
+          > FLAGS_fs_slow_read_log_threshold_ms * NANOS_PER_MICRO * MICROS_PER_MILLI;
+      if (is_slow_read) {
+        LOG(INFO) << "Slow FS I/O operation on " << *scan_range_->file_string() << " for "
+                  << "instance " << PrintId(scan_range_->reader_->instance_id())
+                  << " of query " << PrintId(scan_range_->reader_->query_id()) << ". "
+                  << "Last read returned "
+                  << PrettyPrinter::PrintBytes(current_bytes_read) << ". "
+                  << "This thread has read "
+                  << PrettyPrinter::PrintBytes(*bytes_read + current_bytes_read)
+                  << "/" << PrettyPrinter::PrintBytes(bytes_to_read)
+                  << " starting at offset " << file_offset << " in this I/O scheduling "
+                  << "quantum and taken "
+                  << PrettyPrinter::Print(elapsed_time, TUnit::TIME_NS) << " so far. "
+                  << "I/O status: " << (status.ok() ? "OK" : status.GetDetail());
+      }
+
       if (!status.ok()) {
         break;
       }
@@ -171,7 +195,7 @@ Status HdfsFileReader::ReadFromPos(DiskQueue* queue, int64_t file_offset, uint8_
       *bytes_read += current_bytes_read;
 
       // Collect and accumulate statistics
-      GetHdfsStatistics(hdfs_file);
+      GetHdfsStatistics(hdfs_file, is_slow_read);
     }
 
     int64_t cached_bytes_missed = *bytes_read - cached_read;
@@ -274,7 +298,7 @@ void HdfsFileReader::WriteDataCache(DataCache* remote_data_cache, int64_t file_o
 void HdfsFileReader::Close() {
   unique_lock<SpinLock> hdfs_lock(lock_);
   if (exclusive_hdfs_fh_ != nullptr) {
-    GetHdfsStatistics(exclusive_hdfs_fh_->file());
+    GetHdfsStatistics(exclusive_hdfs_fh_->file(), false);
 
     if (cached_buffer_ != nullptr) {
       hadoopRzBufferFree(exclusive_hdfs_fh_->file(), cached_buffer_);
@@ -314,7 +338,7 @@ void HdfsFileReader::Close() {
   }
 }
 
-void HdfsFileReader::GetHdfsStatistics(hdfsFile hdfs_file) {
+void HdfsFileReader::GetHdfsStatistics(hdfsFile hdfs_file, bool log_stats) {
   struct hdfsReadStatistics* stats;
   if (IsHdfsPath(scan_range_->file())) {
     int success = hdfsFileGetReadStatistics(hdfs_file, &stats);
@@ -325,6 +349,13 @@ void HdfsFileReader::GetHdfsStatistics(hdfsFile hdfs_file) {
       scan_range_->reader_->bytes_read_dn_cache_.Add(stats->totalZeroCopyBytesRead);
       if (stats->totalLocalBytesRead != stats->totalBytesRead) {
         num_remote_bytes_ += stats->totalBytesRead - stats->totalLocalBytesRead;
+      }
+      if (log_stats) {
+        LOG(INFO) << "Stats for last read by this I/O thread:"
+                  << " totalBytesRead=" << stats->totalBytesRead
+                  << " totalLocalBytesRead=" << stats->totalLocalBytesRead
+                  << " totalShortCircuitBytesRead=" << stats->totalShortCircuitBytesRead
+                  << " totalZeroCopyBytesRead=" << stats->totalZeroCopyBytesRead;
       }
       hdfsFileFreeReadStatistics(stats);
     }
