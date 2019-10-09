@@ -10790,7 +10790,6 @@ under the License.
   <keydef rev="2.10.0 IMPALA-3200" href="topics/impala_default_spillable_buffer_size.xml" keys="default_spillable_buffer_size"/>
   <keydef href="topics/impala_disable_codegen.xml" keys="disable_codegen"/>
   <keydef href="topics/impala_disable_codegen_rows_threshold.xml" keys="disable_codegen_rows_threshold"/>
-  <keydef href="topics/impala_disable_outermost_topn.xml" keys="disable_outermost_topn"/>
   <keydef href="topics/impala_disable_row_runtime_filtering.xml" keys="disable_row_runtime_filtering"/>
   <keydef href="topics/impala_disable_streaming_preaggregations.xml" keys="disable_streaming_preaggregations"/>
   <keydef href="topics/impala_disable_unsafe_spills.xml" keys="disable_unsafe_spills"/>

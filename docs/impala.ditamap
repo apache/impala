@@ -186,7 +186,7 @@ under the License.
           <topicref rev="3.3.0" href="topics/impala_default_transactional_type.xml"/>
           <topicref href="topics/impala_disable_codegen.xml"/>
           <topicref rev="2.10.0 IMPALA-5483" href="topics/impala_disable_codegen_rows_threshold.xml"/>
-          <topicref audience="hidden" href="topics/impala_disable_outermost_topn.xml"/>
+          <topicref href="topics/impala_disable_hbase_num_rows_estimate.xml"/>
           <topicref rev="2.5.0" href="topics/impala_disable_row_runtime_filtering.xml"/>
           <topicref rev="2.5.0" href="topics/impala_disable_streaming_preaggregations.xml"/>
           <topicref href="topics/impala_disable_unsafe_spills.xml"/>
