@@ -37,8 +37,11 @@ from tests.common.file_utils import assert_file_in_dir_contains,\
     assert_no_files_in_dir_contain
 
 SENTRY_CONFIG_DIR = os.getenv('IMPALA_HOME') + '/fe/src/test/resources/'
+SENTRY_BASE_LOG_DIR = os.getenv('IMPALA_CLUSTER_LOGS_DIR') + "/sentry"
 SENTRY_CONFIG_FILE = SENTRY_CONFIG_DIR + 'sentry-site.xml'
-
+SENTRY_CONFIG_FILE_OO = SENTRY_CONFIG_DIR + 'sentry-site_oo.xml'
+PRIVILEGES = ['all', 'alter', 'drop', 'insert', 'refresh', 'select']
+ADMIN = "admin"
 
 class TestAuthorization(CustomClusterTestSuite):
   def setup(self):
@@ -482,3 +485,78 @@ class TestAuthorization(CustomClusterTestSuite):
       assert any("refresh" in x for x in result.data)
       self.execute_query_expect_success(client,
                                         "select * from functional.alltypes limit 1")
+
+  @pytest.mark.execute_serially
+  @CustomClusterTestSuite.with_args(
+    impalad_args="--server_name=server1 --sentry_config=%s "
+                 "--authorized_proxy_user_config=%s=* "
+                 "--simplify_check_on_show_tables=true" %
+                 (SENTRY_CONFIG_FILE, getuser()),
+    catalogd_args="--sentry_config={0}".format(SENTRY_CONFIG_FILE),
+    sentry_config=SENTRY_CONFIG_FILE_OO,  # Enable Sentry Object Ownership
+    sentry_log_dir="{0}/test_fast_show_tables_with_sentry".format(SENTRY_BASE_LOG_DIR))
+  def test_fast_show_tables_with_sentry(self, unique_role, unique_name):
+    unique_db = unique_name + "_db"
+    # TODO: can we create and use a temp username instead of using root?
+    another_user = 'root'
+    another_user_grp = 'root'
+    self.role_cleanup(unique_role)
+    try:
+      self.client.execute("create role %s" % unique_role)
+      self.client.execute("grant create on server to role %s" % unique_role)
+      self.client.execute("grant drop on server to role %s" % unique_role)
+      self.client.execute("grant role %s to group %s" %
+                          (unique_role, grp.getgrnam(getuser()).gr_name))
+
+      self.client.execute("drop database if exists %s cascade" % unique_db)
+      self.client.execute("create database %s" % unique_db)
+      for priv in PRIVILEGES:
+        self.client.execute("create table %s.tbl_%s (i int)" % (unique_db, priv))
+        self.client.execute("grant {0} on table {1}.tbl_{2} to role {3}"
+                            .format(priv, unique_db, priv, unique_role))
+      self.client.execute("grant role %s to group %s" %
+                          (unique_role, another_user_grp))
+
+      # Owner (current user) can still see all the tables
+      result = self.client.execute("show tables in %s" % unique_db)
+      assert result.data == ["tbl_%s" % p for p in PRIVILEGES]
+
+      # Check SHOW TABLES using another username
+      # Create another client so we can user another username
+      root_impalad_client = self.create_impala_client()
+      result = self.execute_query_expect_success(
+        root_impalad_client, "show tables in %s" % unique_db, user=another_user)
+      # Only show tables with privileges implying SELECT privilege
+      assert result.data == ['tbl_all', 'tbl_select']
+    finally:
+      self.role_cleanup(unique_role)
+      self.client.execute("drop database if exists %s cascade" % unique_db)
+
+  @pytest.mark.execute_serially
+  @CustomClusterTestSuite.with_args(
+    impalad_args="--server-name=server1 --ranger_service_type=hive "
+                 "--ranger_app_id=impala --authorization_provider=ranger "
+                 "--simplify_check_on_show_tables=true",
+    catalogd_args="--server-name=server1 --ranger_service_type=hive "
+                  "--ranger_app_id=impala --authorization_provider=ranger")
+  def test_fast_show_tables_with_ranger(self, unique_role, unique_name):
+    unique_db = unique_name + "_db"
+    admin_client = self.create_impala_client()
+    try:
+      admin_client.execute("drop database if exists %s cascade" % unique_db, user=ADMIN)
+      admin_client.execute("create database %s" % unique_db, user=ADMIN)
+      for priv in PRIVILEGES:
+        admin_client.execute("create table %s.tbl_%s (i int)" % (unique_db, priv))
+        admin_client.execute("grant {0} on table {1}.tbl_{2} to user {3}"
+                            .format(priv, unique_db, priv, getuser()))
+
+      # Admin can still see all the tables
+      result = admin_client.execute("show tables in %s" % unique_db)
+      assert result.data == ["tbl_%s" % p for p in PRIVILEGES]
+
+      # Check SHOW TABLES using another username
+      result = self.client.execute("show tables in %s" % unique_db)
+      # Only show tables with privileges implying SELECT privilege
+      assert result.data == ['tbl_all', 'tbl_select']
+    finally:
+      admin_client.execute("drop database if exists %s cascade" % unique_db)

@@ -189,6 +189,10 @@ public class BackendConfig {
     backendCfg_.setUnlock_zorder_sort(zOrdering);
   }
 
+  public boolean simplifyCheckOnShowTables() {
+    return backendCfg_.simplify_check_on_show_tables;
+  }
+
   // Inits the auth_to_local configuration in the static KerberosName class.
   private static void initAuthToLocal() {
     // If auth_to_local is enabled, we read the configuration hadoop.security.auth_to_local

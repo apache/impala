@@ -275,6 +275,13 @@ DEFINE_bool_hidden(recursively_list_partitions, true,
 DEFINE_bool(unlock_zorder_sort, false,
     "(Experimental) If true, enables using ZORDER option for SORT BY.");
 
+DEFINE_bool(simplify_check_on_show_tables, false,
+    "If true, only check SELECT privilege on SHOW TABLES or GET_TABLES when enabling "
+    "authorization. If false, all privileges will be checked for visibility of a table. "
+    "A table will show up if the user has any privileges on it. This flag is used to "
+    "improve SHOW TABLES performance when using Sentry and have thousands of candidate "
+    "tables to be checked. No performance gain is found in using Ranger");
+
 // ++========================++
 // || Startup flag graveyard ||
 // ++========================++

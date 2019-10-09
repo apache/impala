@@ -773,6 +773,10 @@ public class Frontend {
     FeCatalog catalog = getCatalog();
     List<String> tblNames = catalog.getTableNames(dbName, matcher);
     if (authzFactory_.getAuthorizationConfig().isEnabled()) {
+      Privilege requiredPrivilege = Privilege.ANY;
+      if (BackendConfig.INSTANCE.simplifyCheckOnShowTables()) {
+        requiredPrivilege = Privilege.SELECT;
+      }
       Iterator<String> iter = tblNames.iterator();
       while (iter.hasNext()) {
         String tblName = iter.next();
@@ -791,7 +795,7 @@ public class Frontend {
         }
         PrivilegeRequest privilegeRequest = new PrivilegeRequestBuilder(
             authzFactory_.getAuthorizableFactory())
-            .any().onAnyColumn(dbName, tblName, tableOwner).build();
+            .allOf(requiredPrivilege).onAnyColumn(dbName, tblName, tableOwner).build();
         if (!authzChecker_.get().hasAccess(user, privilegeRequest)) {
           iter.remove();
         }

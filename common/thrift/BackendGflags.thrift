@@ -141,4 +141,6 @@ struct TBackendGflags {
   58: required string blacklisted_tables
 
   59: required bool unlock_zorder_sort
+
+  60: required bool simplify_check_on_show_tables
 }

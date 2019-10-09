@@ -22,17 +22,20 @@ import com.google.common.base.Preconditions;
 import java.util.EnumSet;
 
 /**
- * List of Impala privileges.
+ * List of Impala privileges. Declare them in the order from least allowing to most
+ * allowing privilege so EnumSet used in {@link Privilege#getImpliedPrivileges()} can
+ * iterate them in this order. This helps in more efficiently checking for VIEW_METADATA
+ * and ANY privilege if the user does have access to the resource.
  */
 public enum Privilege {
-  ALL,
-  OWNER,
+  SELECT,
+  INSERT,
+  REFRESH,
   ALTER,
   DROP,
   CREATE,
-  INSERT,
-  SELECT,
-  REFRESH,
+  ALL,
+  OWNER,
   // Privileges required to view metadata on a server object.
   VIEW_METADATA(true),
   // Special privilege that is used to determine if the user has any valid privileges
