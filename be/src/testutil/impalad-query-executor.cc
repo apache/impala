@@ -58,7 +58,7 @@ Status ImpaladQueryExecutor::Setup() {
 Status ImpaladQueryExecutor::Close() {
   if (!query_in_progress_) return Status::OK();
   try {
-    client_->iface()->close(query_handle_);
+    client_->iface()->close(beeswax_handle_);
   } catch (BeeswaxException& e) {
     stringstream ss;
     ss << e.SQLState << ": " << e.message;
@@ -83,8 +83,8 @@ Status ImpaladQueryExecutor::Exec(
   // does not provide a constant for it.
   ResultsMetadata resultsMetadata;
   try {
-    client_->iface()->executeAndWait(query_handle_, query, "");
-    client_->iface()->get_results_metadata(resultsMetadata, query_handle_);
+    client_->iface()->executeAndWait(beeswax_handle_, query, "");
+    client_->iface()->get_results_metadata(resultsMetadata, beeswax_handle_);
   } catch (BeeswaxException& e) {
     stringstream ss;
     ss << e.SQLState << ": " << e.message;
@@ -105,7 +105,7 @@ Status ImpaladQueryExecutor::FetchResult(string* row) {
   // from ImpalaServer
   if (!query_results_.__isset.data || current_row_ >= query_results_.data.size()) {
     try {
-      client_->iface()->fetch(query_results_, query_handle_, false, 0);
+      client_->iface()->fetch(query_results_, beeswax_handle_, false, 0);
     } catch (BeeswaxException& e) {
       stringstream ss;
       ss << e.SQLState << ": " << e.message;

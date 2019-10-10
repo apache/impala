@@ -419,6 +419,9 @@ struct TQueryOptions {
 
   // See comment in ImpalaService.thrift
   102: optional i64 kudu_snapshot_read_timestamp_micros = 0;
+
+  // See comment in ImpalaService.thrift
+  103: optional bool retry_failed_queries = false;
 }
 
 // Impala currently has two types of sessions: Beeswax and HiveServer2

@@ -478,14 +478,16 @@ class ImpaladProcess(BaseImpalaProcess):
   def __get_hs2_http_port(self):
     return int(self._get_port('hs2_http_port', DEFAULT_HS2_HTTP_PORT))
 
-  def start(self, wait_until_ready=True):
-    """Starts the impalad and waits until the service is ready to accept connections."""
+  def start(self, wait_until_ready=True, timeout=30):
+    """Starts the impalad and waits until the service is ready to accept connections.
+    'timeout' is the amount of time to wait for the Impala server to be in the
+    ready state."""
     restart_args = self.cmd[1:]
     LOG.info("Starting Impalad process with args: {0}".format(restart_args))
     run_daemon("impalad", restart_args)
     if wait_until_ready:
       self.service.wait_for_metric_value('impala-server.ready',
-                                         expected_value=1, timeout=30)
+                                         expected_value=1, timeout=timeout)
 
   def wait_for_catalog(self):
     """Waits for a catalog copy to be received by the impalad. When its received,

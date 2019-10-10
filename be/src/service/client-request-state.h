@@ -37,7 +37,6 @@ namespace impala {
 
 class ClientRequestStateCleaner;
 class Coordinator;
-class ExecEnv;
 class Expr;
 class Frontend;
 class ReportExecStatusRequestPB;
@@ -65,19 +64,26 @@ enum class AdmissionOutcome;
 /// the TStmtType). Successful QUERY / DML queries transition from INITIALIZED to PENDING
 /// to RUNNING to FINISHED whereas DDL queries skip the PENDING phase.
 ///
+/// Retry State:
+/// The retry state is only used when the query corresponding to this ClientRequestState
+/// is retried. Otherwise, the default state is NOT_RETRIED. MarkAsRetrying and
+/// MarkAsRetried set the state to RETRYING and RETRIED, respectively. Queries can only
+/// transition from NOT_RETRIED to RETRYING and then finally to RETRIED.
+///
 /// TODO: Compute stats is the only stmt that requires child queries. Once the
 /// CatalogService performs background stats gathering the concept of child queries
 /// will likely become obsolete. Remove all child-query related code from this class.
 class ClientRequestState {
  public:
-  ClientRequestState(const TQueryCtx& query_ctx, ExecEnv* exec_env, Frontend* frontend,
-      ImpalaServer* server, std::shared_ptr<ImpalaServer::SessionState> session);
+  ClientRequestState(const TQueryCtx& query_ctx, Frontend* frontend, ImpalaServer* server,
+      std::shared_ptr<ImpalaServer::SessionState> session, TExecRequest* exec_request,
+      QueryDriver* query_driver);
 
   ~ClientRequestState();
 
-  enum class ExecState {
-    INITIALIZED, PENDING, RUNNING, FINISHED, ERROR
-  };
+  enum class ExecState { INITIALIZED, PENDING, RUNNING, FINISHED, ERROR };
+
+  enum class RetryState { RETRYING, RETRIED, NOT_RETRIED };
 
   /// Sets the profile that is produced by the frontend. The frontend creates the
   /// profile during planning and returns it to the backend via TExecRequest,
@@ -162,7 +168,7 @@ class ClientRequestState {
   Status UpdateQueryStatus(const Status& status) WARN_UNUSED_RESULT;
 
   /// Cancels the child queries and the coordinator with the given cause.
-  /// If cause is NULL, it assume this was deliberately cancelled by the user while in
+  /// If cause is NULL, it assumes this was deliberately cancelled by the user while in
   /// FINISHED state. Otherwise, sets state to ERROR (TODO: IMPALA-1262: use CANCELLED).
   /// Does nothing if the query has reached EOS or already cancelled.
   ///
@@ -200,14 +206,19 @@ class ClientRequestState {
   /// Caller must not hold 'lock()'.
   bool GetDmlStats(TDmlResult* dml_result, Status* query_status);
 
-  /// Creates and sets the TExecRequest for the query associated with this
-  /// ClientRequestState. The TExecRequest is created by the Impala frontend via the
-  /// method Frontend::GetExecRequest(TQueryCtx, TExecRequest). The TQueryCtx is created
-  /// by the ImpalaServer and contains the full query string
-  /// (TQueryCtx::TClientRequest::stmt).
-  Status InitExecRequest(const TQueryCtx& query_ctx);
+  /// Blocks until this query has been retried. Waits until the ExecState has transitioned
+  /// to RETRIED (e.g. once MarkAsRetried() has been called). Can only be called if the
+  /// current state is either RETRIED or RETRYING. Takes lock_.
+  void WaitUntilRetried();
 
-  ImpalaServer::SessionState* session() const { return session_.get(); }
+  /// Converts the given ExecState to a string representation.
+  static std::string ExecStateToString(ExecState state);
+
+  /// Converts the given RetryState to a string representation.
+  static std::string RetryStateToString(RetryState state);
+
+  /// Returns the session for this query.
+  std::shared_ptr<ImpalaServer::SessionState> session() const { return session_; }
 
   /// Queries are run and authorized on behalf of the effective_user.
   const std::string& effective_user() const;
@@ -244,23 +255,32 @@ class ClientRequestState {
   /// Contents are only valid after InitExecRequest(TQueryCtx) initializes the
   /// TExecRequest.
   const TExecRequest& exec_request() const {
-    return exec_request_;
+    DCHECK(exec_request_ != nullptr);
+    return *exec_request_;
   }
-  TStmtType::type stmt_type() const { return exec_request_.stmt_type; }
+  TStmtType::type stmt_type() const { return exec_request_->stmt_type; }
   TCatalogOpType::type catalog_op_type() const {
-    return exec_request_.catalog_op_request.op_type;
+    return exec_request_->catalog_op_request.op_type;
   }
   TDdlType::type ddl_type() const {
-    return exec_request_.catalog_op_request.ddl_params.ddl_type;
+    return exec_request_->catalog_op_request.ddl_params.ddl_type;
   }
   std::mutex* lock() { return &lock_; }
   std::mutex* fetch_rows_lock() { return &fetch_rows_lock_; }
+
   /// ExecState is stored using an AtomicEnum, so reads do not require holding lock_.
   ExecState exec_state() const { return exec_state_.Load(); }
-  /// Translate exec_state_ to a TOperationState.
+
+  /// RetryState is stored using an AtomicEnum, so reads do not require holding lock_.
+  RetryState retry_state() const { return retry_state_.Load(); }
+
+  /// Translate exec_state_ to a TOperationState. Returns the current TOperationState.
   apache::hive::service::cli::thrift::TOperationState::type TOperationState() const;
-  /// Translate exec_state_ to a beeswax::QueryState.
+
+  /// Translate exec_state_ to a beeswax::QueryState. Returns the current
+  /// beeswax::QueryState.
   beeswax::QueryState::type BeeswaxQueryState() const;
+
   const Status& query_status() const { return query_status_; }
   void set_result_metadata(const TResultSetMetadata& md) { result_metadata_ = md; }
   void set_user_profile_access(bool user_has_profile_access) {
@@ -278,7 +298,7 @@ class ClientRequestState {
   TUniqueId parent_query_id() const { return query_ctx_.parent_query_id; }
 
   const std::vector<std::string>& GetAnalysisWarnings() const {
-    return exec_request_.analysis_warnings;
+    return exec_request_->analysis_warnings;
   }
 
   inline int64_t last_active_ms() const {
@@ -313,10 +333,56 @@ class ClientRequestState {
   /// Returns the FETCH_ROWS_TIMEOUT_MS value for this query (converted to microseconds).
   int64_t fetch_rows_timeout_us() const { return fetch_rows_timeout_us_; }
 
-  /// True if Finalize() was called.
-  bool started_finalize() const { return started_finalize_.Load(); }
+  /// Returns the max size of the result_cache_ in number of rows.
+  int64_t result_cache_max_size() const { return result_cache_max_size_; }
 
-protected:
+  /// Sets the RetryState to RETRYING. Updates the runtime profile with the retry status
+  /// and cause. Must be called while 'lock_' is held. Sets the query_status_. Future
+  /// calls to UpdateQueryStatus will not have any effect. This is necessary to prevent
+  /// any future calls to UpdateQueryStatus from updating the ExecState to ERROR. The
+  /// ExecState should not be set to ERROR when a query is being retried in order to
+  /// prevent any error statuses from being exposed to the client.
+  void MarkAsRetrying(const Status& status);
+
+  /// Sets the RetryState to RETRIED and wakes up any threads waiting for the query to be
+  /// RETRIED. 'retried_id' is the query id of the newly retried query (e.g. not the id
+  /// of the "original" query that was submitted by the user, but the id of the new query
+  /// that was created because the "original" query failed and had to be retried).
+  void MarkAsRetried(const TUniqueId& retried_id);
+
+  /// Returns true if this ClientRequestState was created as a retry of a previously
+  /// failed query, false otherwise. This is different from WasRetried() which tracks
+  /// if this ClientRequestState was retried (retries are done in a new
+  /// ClientRequestState).
+  bool IsRetriedQuery() const { return original_id_ != nullptr; }
+
+  /// Only called if this is a "retried" query - e.g. it was created as a result of
+  /// retrying a failed query. It sets the 'original_id_' field, which is the query id of
+  /// the original query attempt that failed. The original query id is added to the
+  /// runtime profile as well.
+  void SetOriginalId(const TUniqueId& original_id);
+
+  /// Returns true if this ClientRequestState has already been retried, e.g. the
+  /// RetryState is either RETRYING or RETRIED.
+  bool WasRetried() const {
+    RetryState retry_state = retry_state_.Load();
+    return retry_state == RetryState::RETRYING || retry_state == RetryState::RETRIED;
+  }
+
+  /// Can only be called if this query is the result of retrying a previously failed
+  /// query. Returns the query id of the original query.
+  const TUniqueId& original_id() const {
+    DCHECK(original_id_ != nullptr);
+    return *original_id_;
+  }
+
+  /// Returns the QueryDriver that owns this ClientRequestState.
+  QueryDriver* parent_driver() const { return parent_driver_; }
+
+  /// Returns true if results cacheing is enabled, false otherwise.
+  bool IsResultCacheingEnabled() const { return result_cache_max_size_ >= 0; }
+
+ protected:
   /// Updates the end_time_us_ of this query if it isn't set. The end time is determined
   /// when this function is called for the first time, calling it multiple times does not
   /// change the end time.
@@ -370,9 +436,6 @@ protected:
   /// IMPALA-3882 is fixed, it can indirectly block progress on all other queries.
   /// See "Locking" in the class comment for lock acquisition order.
   std::mutex lock_;
-
-  /// TODO: remove and use ExecEnv::GetInstance() instead
-  ExecEnv* exec_env_;
 
   /// Thread for asynchronously running Wait().
   std::unique_ptr<Thread> wait_thread_;
@@ -480,14 +543,17 @@ protected:
   /// UpdateExecState(), to ensure that the query profile is also updated.
   AtomicEnum<ExecState> exec_state_{ExecState::INITIALIZED};
 
+  /// The current RetryState of the query.
+  AtomicEnum<RetryState> retry_state_{RetryState::NOT_RETRIED};
+
   /// The current status of the query tracked by this ClientRequestState. Updated by
-  /// UpdateQueryStatus(Status).
+  /// UpdateQueryStatus(Status) or MarkAsRetrying(Status).
   Status query_status_;
 
   /// The TExecRequest for the query tracked by this ClientRequestState. The TExecRequest
-  /// is initialized in InitExecRequest(TQueryCtx). It should not be used until
-  /// InitExecRequest(TQueryCtx) has been called.
-  TExecRequest exec_request_;
+  /// is initialized in QueryDriver::RunFrontendPlanner(TQueryCtx).The TExecRequest is
+  /// owned by the parent QueryDriver.
+  TExecRequest* exec_request_;
 
   /// If true, effective_user() has access to the runtime profile and execution
   /// summary.
@@ -526,13 +592,23 @@ protected:
   /// the coordinator releases its admission control resources.
   AtomicInt64 end_time_us_{0};
 
-  /// True if a thread has called Finalize(). Threads calling Finalize()
-  /// do a compare-and-swap on this so that only one thread can proceed.
-  AtomicBool started_finalize_{false};
-
   /// Timeout, in microseconds, when waiting for rows to become available. Derived from
   /// the query option FETCH_ROWS_TIMEOUT_MS.
   const int64_t fetch_rows_timeout_us_;
+
+  /// If this ClientRequestState was created as a retry of a previously failed query, the
+  /// original_id_ is set to the query id of the original query that failed. The
+  /// "original" query is the query that was submitted by the user that failed and had to
+  /// be retried.
+  std::unique_ptr<const TUniqueId> original_id_ = nullptr;
+
+  /// Condition variable used to signal any threads that are waiting until the query has
+  /// been retried.
+  ConditionVariable block_until_retried_cv_;
+
+  /// The QueryDriver that owns this ClientRequestState. The reference is set in the
+  /// constructor. It always outlives the ClientRequestState.
+  QueryDriver* parent_driver_;
 
   /// Executes a local catalog operation (an operation that does not need to execute
   /// against the catalog service). Includes USE, SHOW, DESCRIBE, and EXPLAIN statements.
@@ -646,9 +722,6 @@ protected:
   /// Logs audit and column lineage events. Expects that Wait() has already finished.
   /// Grabs lock_ for polling the query_status(). Hence do not call it under lock_.
   void LogQueryEvents();
-
-  /// Converts the given ExecState to a string representation.
-  std::string ExecStateToString(ExecState state) const;
 };
 
 }

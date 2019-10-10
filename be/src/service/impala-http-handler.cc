@@ -32,6 +32,7 @@
 #include "runtime/coordinator.h"
 #include "runtime/exec-env.h"
 #include "runtime/mem-tracker.h"
+#include "runtime/query-driver.h"
 #include "runtime/query-state.h"
 #include "runtime/timestamp-value.h"
 #include "runtime/timestamp-value.inline.h"
@@ -326,9 +327,9 @@ void ImpalaHttpHandler::QueryProfileJsonHandler(const Webserver::WebRequest& req
 void ImpalaHttpHandler::InflightQueryIdsHandler(const Webserver::WebRequest& req,
     Document* document) {
   stringstream ss;
-  server_->client_request_state_map_.DoFuncForAllEntries(
-      [&](const std::shared_ptr<ClientRequestState>& request_state) {
-          ss << PrintId(request_state->query_id()) << "\n";
+  server_->query_driver_map_.DoFuncForAllEntries(
+      [&](const std::shared_ptr<QueryDriver>& query_driver) {
+        ss << PrintId(query_driver->GetActiveClientRequestState()->query_id()) << "\n";
       });
   document->AddMember(rapidjson::StringRef(Webserver::ENABLE_RAW_HTML_KEY), true,
       document->GetAllocator());
@@ -416,8 +417,7 @@ void ImpalaHttpHandler::QueryStateToJson(const ImpalaServer::QueryStateRecord& r
   Value progress_json(progress.c_str(), document->GetAllocator());
   value->AddMember("progress", progress_json, document->GetAllocator());
 
-  Value state(_QueryState_VALUES_TO_NAMES.find(record.query_state)->second,
-      document->GetAllocator());
+  Value state(record.query_state.c_str(), document->GetAllocator());
   value->AddMember("state", state, document->GetAllocator());
 
   value->AddMember("rows_fetched", record.num_rows_fetched, document->GetAllocator());
@@ -432,7 +432,7 @@ void ImpalaHttpHandler::QueryStateToJson(const ImpalaServer::QueryStateRecord& r
   }
 
   // Waiting to be closed.
-  bool waiting = record.query_state == beeswax::QueryState::EXCEPTION ||
+  bool waiting = record.beeswax_query_state == beeswax::QueryState::EXCEPTION ||
       record.all_rows_returned;
   value->AddMember("waiting", waiting, document->GetAllocator());
   value->AddMember("executing", !waiting, document->GetAllocator());
@@ -454,9 +454,10 @@ void ImpalaHttpHandler::QueryStateHandler(const Webserver::WebRequest& req,
   set<ImpalaServer::QueryStateRecord, ImpalaServer::QueryStateRecordLessThan>
       sorted_query_records;
 
-  server_->client_request_state_map_.DoFuncForAllEntries(
-      [&](const std::shared_ptr<ClientRequestState>& request_state) {
-          sorted_query_records.insert(ImpalaServer::QueryStateRecord(*request_state));
+  server_->query_driver_map_.DoFuncForAllEntries(
+      [&](const std::shared_ptr<QueryDriver>& query_driver) {
+        sorted_query_records.insert(
+            ImpalaServer::QueryStateRecord(*query_driver->GetActiveClientRequestState()));
       });
 
   unordered_set<TUniqueId> in_flight_query_ids;
@@ -805,12 +806,14 @@ void ImpalaHttpHandler::QueryBackendsHandler(
     return;
   }
 
-  shared_ptr<ClientRequestState> request_state = server_->GetClientRequestState(query_id);
-  if (request_state.get() == nullptr || request_state->GetCoordinator() == nullptr) {
-    return;
+  QueryHandle query_handle;
+  status = server_->GetQueryHandle(query_id, &query_handle);
+  if (status.ok()) {
+    if (query_handle->GetCoordinator() == nullptr) {
+      return;
+    }
+    query_handle->GetCoordinator()->BackendsToJson(document);
   }
-
-  request_state->GetCoordinator()->BackendsToJson(document);
 }
 
 void ImpalaHttpHandler::QueryFInstancesHandler(
@@ -826,12 +829,14 @@ void ImpalaHttpHandler::QueryFInstancesHandler(
     return;
   }
 
-  shared_ptr<ClientRequestState> request_state = server_->GetClientRequestState(query_id);
-  if (request_state.get() == nullptr || request_state->GetCoordinator() == nullptr) {
-    return;
+  QueryHandle query_handle;
+  status = server_->GetQueryHandle(query_id, &query_handle);
+  if (status.ok()) {
+    if (query_handle->GetCoordinator() == nullptr) {
+      return;
+    }
+    query_handle->GetCoordinator()->FInstanceStatsToJson(document);
   }
-
-  request_state->GetCoordinator()->FInstanceStatsToJson(document);
 }
 
 void ImpalaHttpHandler::QuerySummaryHandler(bool include_json_plan, bool include_summary,
@@ -856,30 +861,30 @@ void ImpalaHttpHandler::QuerySummaryHandler(bool include_json_plan, bool include
 
   // Search the in-flight queries first, followed by the archived ones.
   {
-    shared_ptr<ClientRequestState> request_state =
-        server_->GetClientRequestState(query_id);
-    if (request_state != nullptr) {
+    QueryHandle query_handle;
+    status = server_->GetQueryHandle(query_id, &query_handle);
+    if (status.ok()) {
       found = true;
       // If the query plan isn't generated, avoid waiting for the request
       // state lock to be acquired, since it could potentially be an expensive
       // call, if the table Catalog metadata loading is in progress. Instead
       // update the caller that the plan information is unavailable.
-      if (request_state->exec_state() == ClientRequestState::ExecState::INITIALIZED) {
+      if (query_handle->exec_state() == ClientRequestState::ExecState::INITIALIZED) {
         document->AddMember(
             "plan_metadata_unavailable", "true", document->GetAllocator());
         return;
       }
-      lock_guard<mutex> l(*request_state->lock());
-      query_status = request_state->query_status();
-      stmt = request_state->sql_stmt();
-      plan = request_state->exec_request().query_exec_request.query_plan;
+      lock_guard<mutex> l(*(*query_handle).lock());
+      query_status = query_handle->query_status();
+      stmt = query_handle->sql_stmt();
+      plan = query_handle->exec_request().query_exec_request.query_plan;
       if ((include_json_plan || include_summary)
-          && request_state->GetCoordinator() != nullptr) {
-        request_state->GetCoordinator()->GetTExecSummary(&summary);
+          && query_handle->GetCoordinator() != nullptr) {
+        query_handle->GetCoordinator()->GetTExecSummary(&summary);
       }
       if (include_json_plan) {
         for (const TPlanExecInfo& plan_exec_info:
-            request_state->exec_request().query_exec_request.plan_exec_info) {
+            query_handle->exec_request().query_exec_request.plan_exec_info) {
           for (const TPlanFragment& fragment: plan_exec_info.fragments) {
             fragments.push_back(fragment);
           }
@@ -1055,9 +1060,10 @@ void ImpalaHttpHandler::AdmissionStateHandler(
     unsigned long num_backends;
   };
   unordered_map<string, vector<QueryInfo>> running_queries;
-  server_->client_request_state_map_.DoFuncForAllEntries([&running_queries](
-      const std::shared_ptr<ClientRequestState>& request_state) {
+  server_->query_driver_map_.DoFuncForAllEntries([&running_queries](
+      const std::shared_ptr<QueryDriver>& query_driver) {
     // Make sure only queries past admission control are added.
+    ClientRequestState* request_state = query_driver->GetActiveClientRequestState();
     auto query_state = request_state->exec_state();
     if (query_state != ClientRequestState::ExecState::INITIALIZED
         && query_state != ClientRequestState::ExecState::PENDING

@@ -38,7 +38,7 @@
 #include "rpc/thrift-server.h"
 #include "runtime/types.h"
 #include "scheduling/query-schedule.h"
-#include "service/client-request-state-map.h"
+#include "service/query-driver-map.h"
 #include "service/query-options.h"
 #include "statestore/statestore-subscriber.h"
 #include "util/condition-variable.h"
@@ -71,6 +71,8 @@ class TQueryOptions;
 class TGetExecSummaryResp;
 class TGetExecSummaryReq;
 class ClientRequestState;
+class QueryDriver;
+struct QueryHandle;
 class QuerySchedule;
 class SimpleLogger;
 class UpdateFilterParamsPB;
@@ -215,18 +217,18 @@ class ImpalaServer : public ImpalaServiceIf,
   void Join();
 
   /// ImpalaService rpcs: Beeswax API (implemented in impala-beeswax-server.cc)
-  virtual void query(beeswax::QueryHandle& query_handle, const beeswax::Query& query);
-  virtual void executeAndWait(beeswax::QueryHandle& query_handle,
+  virtual void query(beeswax::QueryHandle& beeswax_handle, const beeswax::Query& query);
+  virtual void executeAndWait(beeswax::QueryHandle& beeswax_handle,
       const beeswax::Query& query, const beeswax::LogContextId& client_ctx);
   virtual void explain(beeswax::QueryExplanation& query_explanation,
       const beeswax::Query& query);
   virtual void fetch(beeswax::Results& query_results,
-      const beeswax::QueryHandle& query_handle, const bool start_over,
+      const beeswax::QueryHandle& beeswax_handle, const bool start_over,
       const int32_t fetch_size);
   virtual void get_results_metadata(beeswax::ResultsMetadata& results_metadata,
-      const beeswax::QueryHandle& handle);
-  virtual void close(const beeswax::QueryHandle& handle);
-  virtual beeswax::QueryState::type get_state(const beeswax::QueryHandle& handle);
+      const beeswax::QueryHandle& beeswax_handle);
+  virtual void close(const beeswax::QueryHandle& beeswax_handle);
+  virtual beeswax::QueryState::type get_state(const beeswax::QueryHandle& beeswax_handle);
   virtual void echo(std::string& echo_string, const std::string& input_string);
   virtual void clean(const beeswax::LogContextId& log_context);
   virtual void get_log(std::string& log, const beeswax::LogContextId& context);
@@ -244,18 +246,19 @@ class ImpalaServer : public ImpalaServiceIf,
 
   /// ImpalaService rpcs: extensions over Beeswax (implemented in
   /// impala-beeswax-server.cc)
-  virtual void Cancel(impala::TStatus& status, const beeswax::QueryHandle& query_id);
-  virtual void CloseInsert(impala::TDmlResult& dml_result,
-      const beeswax::QueryHandle& query_handle);
+  virtual void Cancel(
+      impala::TStatus& status, const beeswax::QueryHandle& beeswax_handle);
+  virtual void CloseInsert(
+      impala::TDmlResult& dml_result, const beeswax::QueryHandle& beeswax_handle);
 
   /// Pings the Impala service and gets the server version string.
   virtual void PingImpalaService(TPingImpalaServiceResp& return_val);
 
   virtual void GetRuntimeProfile(std::string& profile_output,
-      const beeswax::QueryHandle& query_id);
+      const beeswax::QueryHandle& beeswax_handle);
 
   virtual void GetExecSummary(impala::TExecSummary& result,
-      const beeswax::QueryHandle& query_id);
+      const beeswax::QueryHandle& beeswax_handle);
 
   /// Performs a full catalog metadata reset, invalidating all table and database
   /// metadata.
@@ -633,6 +636,7 @@ class ImpalaServer : public ImpalaServiceIf,
   friend class ImpalaHttpHandler;
   friend struct SessionState;
   friend class ImpalaServerTest;
+  friend class QueryDriver;
 
   boost::scoped_ptr<ImpalaHttpHandler> http_handler_;
 
@@ -641,13 +645,6 @@ class ImpalaServer : public ImpalaServiceIf,
   static const char* SQLSTATE_SYNTAX_ERROR_OR_ACCESS_VIOLATION;
   static const char* SQLSTATE_GENERAL_ERROR;
   static const char* SQLSTATE_OPTIONAL_FEATURE_NOT_IMPLEMENTED;
-
-  /// Return exec state for given query_id, or NULL if not found. If
-  /// 'return_unregistered' is true, queries that have started unregistration
-  /// may be returned. Otherwise queries that have started unregistration will
-  /// not be returned.
-  std::shared_ptr<ClientRequestState> GetClientRequestState(
-      const TUniqueId& query_id, bool return_unregistered=false);
 
   /// Used in situations where the client provides a session ID and a query ID and the
   /// caller needs to validate that the query can be accessed from the session. The two
@@ -667,24 +664,24 @@ class ImpalaServer : public ImpalaServiceIf,
 
   /// Depending on the query type, this either submits the query to the admission
   /// controller for performing async admission control or starts asynchronous execution
-  /// of query. Creates ClientRequestState (returned in exec_state), registers it and
-  /// calls ClientRequestState::Execute(). If it returns with an error status, exec_state
-  /// will be NULL and nothing will have been registered in client_request_state_map_.
-  /// session_state is a ptr to the session running this query and must have been checked
-  /// out.
+  /// of query. Creates ClientRequestState (returned in query_handle), registers it and
+  /// calls ClientRequestState::Execute(). If it returns with an error status,
+  /// query_driver->request_state will be NULL and nothing will have been registered in
+  /// query_driver_map_. session_state is a ptr to the session running this query and must
+  /// have been checked out.
   Status Execute(TQueryCtx* query_ctx, std::shared_ptr<SessionState> session_state,
-      std::shared_ptr<ClientRequestState>* exec_state) WARN_UNUSED_RESULT;
+      QueryHandle* query_handle) WARN_UNUSED_RESULT;
 
   /// Implements Execute() logic, but doesn't unregister query on error.
   Status ExecuteInternal(const TQueryCtx& query_ctx,
-      std::shared_ptr<SessionState> session_state, bool* registered_exec_state,
-      std::shared_ptr<ClientRequestState>* exec_state) WARN_UNUSED_RESULT;
+      std::shared_ptr<SessionState> session_state, bool* registered_query,
+      QueryHandle* query_handle);
 
-  /// Registers the query exec state with client_request_state_map_ using the
-  /// globally unique query_id.
-  /// The caller must have checked out the session state.
-  Status RegisterQuery(std::shared_ptr<SessionState> session_state,
-      const std::shared_ptr<ClientRequestState>& exec_state) WARN_UNUSED_RESULT;
+  /// Registers the query with query_driver_map_ using the globally unique query_id. The
+  /// caller must have checked out the session state.
+  Status RegisterQuery(const TUniqueId& query_id,
+      std::shared_ptr<SessionState> session_state,
+      QueryHandle* query_handle) WARN_UNUSED_RESULT;
 
   /// Adds the query to the set of in-flight queries for the session. The query remains
   /// in-flight until the query is unregistered.  Until a query is in-flight, an attempt
@@ -696,26 +693,31 @@ class ImpalaServer : public ImpalaServiceIf,
   /// The query must have already been registered using RegisterQuery().  The caller
   /// must have checked out the session state.
   Status SetQueryInflight(std::shared_ptr<SessionState> session_state,
-      const std::shared_ptr<ClientRequestState>& exec_state) WARN_UNUSED_RESULT;
+      const QueryHandle& query_handle) WARN_UNUSED_RESULT;
 
   /// Starts the process of unregistering the query. The query is cancelled on the
   /// current thread, then asynchronously the query's entry is removed from
-  /// client_request_state_map_ and the session state's in-flight query list.
+  /// query_driver_map_ and the session state's in-flight query list.
   /// If check_inflight is true, then return an error if the query
   /// is not yet in-flight. Otherwise, proceed even if the query isn't yet in-flight (for
   /// cleaning up after an error on the query issuing path).
   Status UnregisterQuery(const TUniqueId& query_id, bool check_inflight,
       const Status* cause = NULL) WARN_UNUSED_RESULT;
 
+  /// Delegates to UnregisterQuery. If UnregisterQuery returns an error Status, the
+  /// status is logged and then discarded.
+  void UnregisterQueryDiscardResult(
+      const TUniqueId& query_id, bool check_inflight, const Status* cause = NULL);
+
   /// Unregisters the provided query, does all required finalization and removes it from
-  /// 'client_request_state_' map.
-  void FinishUnregisterQuery(std::shared_ptr<ClientRequestState>&& request_state);
+  /// 'query_driver_map_'.
+  void FinishUnregisterQuery(const QueryHandle& query_handle);
 
   /// Performs finalization of 'request_state' before the request state is removed from
   /// the server and deleted. Runs asynchronously after the request is reported done
   /// to the client. Removes the query from the inflight queries list, updates
   /// query_locations_, and archives the query.
-  void CloseClientRequestState(const std::shared_ptr<ClientRequestState>& request_state);
+  void CloseClientRequestState(const QueryHandle& query_handle);
 
   /// Initiates query cancellation triggered by the user (i.e. deliberate cancellation).
   /// Returns an error if query_id is not found or if the query is not yet in flight.
@@ -755,7 +757,7 @@ class ImpalaServer : public ImpalaServiceIf,
       TExecSummary* result) WARN_UNUSED_RESULT;
 
   /// Collect ExecSummary and update it to the profile in request_state
-  void UpdateExecSummary(std::shared_ptr<ClientRequestState> request_state) const;
+  void UpdateExecSummary(const QueryHandle& query_handle) const;
 
   /// Initialize "default_configs_" to show the default values for ImpalaQueryOptions and
   /// "support_start_over/false" to indicate that Impala does not support start over
@@ -804,7 +806,7 @@ class ImpalaServer : public ImpalaServiceIf,
   /// Copies a query's state into the query log. Called immediately prior to a
   /// ClientRequestState's deletion. Also writes the query profile to the profile log
   /// on disk.
-  void ArchiveQuery(ClientRequestState* query);
+  void ArchiveQuery(const QueryHandle& query_handle);
 
   /// Checks whether the given user is allowed to delegate as the specified do_as_user.
   /// Returns OK if the authorization suceeds, otherwise returns an status with details
@@ -859,8 +861,17 @@ class ImpalaServer : public ImpalaServiceIf,
     /// The number of rows fetched by the client
     int64_t num_rows_fetched;
 
-    /// The state of the query as of this snapshot
-    beeswax::QueryState::type query_state;
+    /// The state of the query as of this snapshot. The possible values for the
+    /// query_state = union(beeswax::QueryState, ClientRequestState::RetryState). This is
+    /// necessary so that the query_state can accurately reflect if a query has been
+    /// retried or not. This string is not displayed in the runtime profiles, it is only
+    /// displayed on the /queries endpoint of the Web UI when listing out the state of
+    /// each query. This is necessary so that users can clearly see if a query has been
+    /// retried or not.
+    std::string query_state;
+
+    /// The beeswax::QueryState of the query as of this snapshot.
+    beeswax::QueryState::type beeswax_query_state;
 
     /// Start and end time of the query, in Unix microseconds.
     /// A query whose end_time_us is 0 indicates that it is an in-flight query.
@@ -911,19 +922,42 @@ class ImpalaServer : public ImpalaServiceIf,
     bool operator() (const QueryStateRecord& lhs, const QueryStateRecord& rhs) const;
   };
 
+  /// Returns the active QueryHandle for this query id. The QueryHandle contains the
+  /// active ClientRequestState. Returns an error Status if the query id cannot be found.
+  /// See QueryDriver for a description of active ClientRequestStates.
+  Status GetActiveQueryHandle(
+      const TUniqueId& query_id, QueryHandle* query_handle);
+
+  /// Similar to 'GetActiveQueryHandle' except it does not return the active handle, it
+  /// returns the handle directly associated with the given query id. Returns an error
+  /// Status if the query id cannot be found. See QueryDriver for a description of active
+  /// ClientRequestStates. See 'GetQueryDriver' for a description of the
+  /// 'return_unregistered' parameter.
+  Status GetQueryHandle(const TUniqueId& query_id, QueryHandle* query_handle,
+      bool return_unregistered = false);
+
+  /// Returns the QueryDriver for the given query_id, or nullptr if not found. If
+  /// 'return_unregistered' is true, queries that have started unregistration
+  /// may be returned. Otherwise queries that have started unregistration will
+  /// not be returned.
+  std::shared_ptr<QueryDriver> GetQueryDriver(
+      const TUniqueId& query_id, bool return_unregistered = false);
+
   /// Beeswax private methods
 
   /// Helper functions to translate between Beeswax and Impala structs
-  Status QueryToTQueryContext(const beeswax::Query& query, TQueryCtx* query_ctx)
-      WARN_UNUSED_RESULT;
-  void TUniqueIdToQueryHandle(const TUniqueId& query_id, beeswax::QueryHandle* handle);
-  void QueryHandleToTUniqueId(const beeswax::QueryHandle& handle, TUniqueId* query_id);
+  Status QueryToTQueryContext(
+      const beeswax::Query& query, TQueryCtx* query_ctx) WARN_UNUSED_RESULT;
+  void TUniqueIdToBeeswaxHandle(
+      const TUniqueId& query_id, beeswax::QueryHandle* beeswax_handle);
+  void BeeswaxHandleToTUniqueId(
+      const beeswax::QueryHandle& beeswax_handle, TUniqueId* query_id);
 
   /// Helper function to raise BeeswaxException
   [[noreturn]] void RaiseBeeswaxException(const std::string& msg, const char* sql_state);
 
   /// Executes the fetch logic. Doesn't clean up the exec state if an error occurs.
-  Status FetchInternal(ClientRequestState* request_state, bool start_over,
+  Status FetchInternal(TUniqueId query_id, bool start_over,
       int32_t fetch_size, beeswax::Results* query_results) WARN_UNUSED_RESULT;
 
   /// Populate dml_result and clean up exec state. If the query
@@ -936,9 +970,9 @@ class ImpalaServer : public ImpalaServiceIf,
   /// HiveServer2 private methods (implemented in impala-hs2-server.cc)
 
   /// Starts the synchronous execution of a HiverServer2 metadata operation.
-  /// If the execution succeeds, an ClientRequestState will be created and registered in
-  /// client_request_state_map_. Otherwise, nothing will be registered in
-  /// client_request_state_map_ and an error status will be returned. As part of this
+  /// If the execution succeeds, a QueryDriver and ClientRequestState will be created
+  /// and registered in query_driver_map_. Otherwise, nothing will be registered in
+  /// query_driver_map_ and an error status will be returned. As part of this
   /// call, the TMetadataOpRequest struct will be populated with the requesting user's
   /// session state.
   /// Returns a TOperationHandle and TStatus.
@@ -950,12 +984,22 @@ class ImpalaServer : public ImpalaServiceIf,
 
   /// Executes the fetch logic for HiveServer2 FetchResults and stores result size in
   /// 'num_results'. If fetch_first is true, then the query's state should be reset to
-  /// fetch from the beginning of the result set. Doesn't clean up 'request_state' if an
+  /// fetch from the beginning of the result set. Doesn't clean up exec state if an
   /// error occurs.
-  Status FetchInternal(ClientRequestState* request_state, SessionState* session,
-      int32_t fetch_size, bool fetch_first,
+  Status FetchInternal(TUniqueId query_id, SessionState* session, int32_t fetch_size,
+      bool fetch_first,
       apache::hive::service::cli::thrift::TFetchResultsResp* fetch_results,
       int32_t* num_results) WARN_UNUSED_RESULT;
+
+  /// Setup the results cache. The results cache saves the results for a query so that
+  /// clients can re-read rows they have already fetched. The cache is used to support
+  /// TFetchOrientation::FETCH_FIRST option in TFetchResultsReq. Results cacheing only
+  /// saves results for as long as the query is open; results are not shared between
+  /// queries. This feature is useful for clients such as Hue, which allow users to
+  /// dynamically scroll through the results, but also allow users to download a file
+  /// containing all the results for a query.
+  Status SetupResultsCacheing(const QueryHandle& query_handle,
+      std::shared_ptr<SessionState> session, int64_t cache_num_rows) WARN_UNUSED_RESULT;
 
   /// Helper functions to translate between HiveServer2 and Impala structs
 
@@ -970,12 +1014,26 @@ class ImpalaServer : public ImpalaServiceIf,
       const apache::hive::service::cli::thrift::TExecuteStatementReq execute_request,
       TQueryCtx* query_ctx) WARN_UNUSED_RESULT;
 
+  /// Blocks until results are available. Handles any query retries that might occur
+  /// while waiting for results to be produced. It uses 'BlockOnWait' to wait for
+  /// results to be available. It is possible for a query to be retried while BlockOnWait
+  /// is running. If that happens, this method will first check if the query has been
+  /// retried. If it has been retried, it waits until the retry has started and then calls
+  /// BlockOnWait again, but with the QueryHandle of the retried query.
+  Status WaitForResults(const TUniqueId& query_id, QueryHandle* query_handle,
+      int64_t* block_on_wait_time_us, bool* timed_out);
+
+  /// Blocks until results from the given QueryHandle are ready to be fetched, or
+  /// until the given timeout is hit. 'timed_out' is set to true if the timeout
+  /// 'block_on_wait_time_us' was exceeded, false otherwise.
+  void BlockOnWait(
+      QueryHandle& query_handle, bool* timed_out, int64_t* block_on_wait_time_us);
+
   /// Helper method to process cancellations that result from failed backends, called from
   /// the cancellation thread pool. The cancellation_work contains the query id to cancel
   /// and a cause listing the failed backends that led to cancellation. Calls
   /// CancelInternal directly, but has a signature compatible with the thread pool.
-  void CancelFromThreadPool(uint32_t thread_id,
-      const CancellationWork& cancellation_work);
+  void CancelFromThreadPool(const CancellationWork& cancellation_work);
 
   /// Helper method to add the pool name and query options to the query_ctx. Must be
   /// called before ExecuteInternal() at which point the TQueryCtx is const and cannot
@@ -1041,7 +1099,7 @@ class ImpalaServer : public ImpalaServiceIf,
   std::mutex query_log_lock_;
 
   /// FIFO list of query records, which are written after the query finishes executing.
-  /// Queries may briefly have entries in 'query_log_' and 'client_request_state_map_'
+  /// Queries may briefly have entries in 'query_log_' and 'query_driver_map_'
   /// while the query is being unregistered.
   typedef std::list<std::unique_ptr<QueryStateRecord>> QueryLog;
   QueryLog query_log_;
@@ -1081,8 +1139,8 @@ class ImpalaServer : public ImpalaServiceIf,
   boost::scoped_ptr<ThreadPool<CancellationWork>> cancellation_thread_pool_;
 
   /// Thread pool to unregister queries asynchronously from RPCs. FinishUnregisterQuery()
-  /// is called on all ClientRequestStates added to this pool.
-  boost::scoped_ptr<ThreadPool<std::shared_ptr<ClientRequestState>>> unreg_thread_pool_;
+  /// is called on all QueryHandles added to this pool.
+  boost::scoped_ptr<ThreadPool<QueryHandle>> unreg_thread_pool_;
 
   /// Thread that runs SessionMaintenance. It will wake up periodically to check for
   /// sessions which are idle for more their timeout values.
@@ -1101,11 +1159,11 @@ class ImpalaServer : public ImpalaServiceIf,
   /// Thread that runs UnresponsiveBackendThread().
   std::unique_ptr<Thread> unresponsive_backend_thread_;
 
-  /// A ClientRequestStateMap maps query ids to ClientRequestStates. The
-  /// ClientRequestStates are owned by the ImpalaServer and ClientRequestStateMap
-  /// references them using shared_ptr to allow asynchronous deletion.
+  /// The QueryDriverMap maps query ids to QueryDrivers. The QueryDrivers are owned by the
+  /// ImpalaServer and QueryDriverMap references them using shared_ptr to allow
+  /// asynchronous deletion.
   ///
-  /// ClientRequestStates are unregistered from the server as follows:
+  /// QueryDrivers are unregistered from the server as follows:
   /// 1. UnregisterQuery() is called, which calls ClientRequestState::Finalize() to cancel
   ///    query execution and start the unregistration process. At this point the query is
   ///    considered unregistered from the client's point of view.
@@ -1113,8 +1171,8 @@ class ImpalaServer : public ImpalaServiceIf,
   ///    unregistration asynchronously.
   /// 3. Additional cleanup work is done by CloseClientRequestState(), and an entry
   ///    is added to 'query_log_' for this query.
-  /// 4. The ClientRequestState is removed from this map.
-  ClientRequestStateMap client_request_state_map_;
+  /// 4. The QueryDriver is removed from this map.
+  QueryDriverMap query_driver_map_;
 
   /// Default query options in the form of TQueryOptions and beeswax::ConfigVariable
   TQueryOptions default_query_options_;
@@ -1284,6 +1342,12 @@ class ImpalaServer : public ImpalaServiceIf,
     DCHECK_GT(session->ref_count, 0);
     --session->ref_count;
     session->last_accessed_ms = UnixMillis();
+  }
+
+  /// Increment the session's reference counter.
+  inline void MarkSessionActive(std::shared_ptr<SessionState> session) {
+    std::lock_guard<std::mutex> l(session->lock);
+    ++session->ref_count;
   }
 
   /// Associate the current connection context with the given session in

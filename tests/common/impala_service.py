@@ -224,7 +224,13 @@ class ImpaladService(BaseImpalaService):
     return None
 
   def get_in_flight_queries(self, timeout=30, interval=1):
+    """Returns the number of in flight queries."""
     return self.get_queries_json()['in_flight_queries']
+
+  def get_completed_queries(self, timeout=30, interval=1):
+    """Returns the number of completed queries."""
+    result = json.loads(self.read_debug_webpage('queries?json', timeout, interval))
+    return result['completed_queries']
 
   def _get_pool_counter(self, pool_name, counter_name, timeout=30, interval=1):
     """Returns the value of the field 'counter_name' in pool 'pool_name' or 0 if the pool

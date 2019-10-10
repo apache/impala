@@ -42,6 +42,7 @@
 #include "runtime/coordinator.h"
 #include "runtime/exec-env.h"
 #include "runtime/raw-value.h"
+#include "runtime/query-driver.h"
 #include "scheduling/admission-controller.h"
 #include "service/client-request-state.h"
 #include "service/hs2-util.h"
@@ -136,7 +137,6 @@ void ImpalaServer::ExecuteMetadataOp(const THandleIdentifier& session_handle,
   session->ToThrift(session_id, &query_ctx.session);
   request->__set_session(query_ctx.session);
 
-  shared_ptr<ClientRequestState> request_state;
   // There is no user-supplied query text available because this metadata operation comes
   // from an RPC. As a best effort, we use the type of the operation.
   map<int, const char*>::const_iterator query_text_it =
@@ -144,9 +144,9 @@ void ImpalaServer::ExecuteMetadataOp(const THandleIdentifier& session_handle,
   const string& query_text = query_text_it == _TMetadataOpcode_VALUES_TO_NAMES.end() ?
       "N/A" : query_text_it->second;
   query_ctx.client_request.stmt = query_text;
-  request_state.reset(new ClientRequestState(query_ctx, exec_env_,
-      exec_env_->frontend(), this, session));
-  Status register_status = RegisterQuery(session, request_state);
+  QueryHandle query_handle;
+  QueryDriver::CreateNewDriver(this, &query_handle, query_ctx, session);
+  Status register_status = RegisterQuery(query_ctx.query_id, session, &query_handle);
   if (!register_status.ok()) {
     status->__set_statusCode(thrift::TStatusCode::ERROR_STATUS);
     status->__set_errorMessage(register_status.GetDetail());
@@ -154,20 +154,20 @@ void ImpalaServer::ExecuteMetadataOp(const THandleIdentifier& session_handle,
     return;
   }
 
-  Status exec_status = request_state->Exec(*request);
+  Status exec_status = query_handle->Exec(*request);
   if (!exec_status.ok()) {
-    discard_result(UnregisterQuery(request_state->query_id(), false, &exec_status));
+    discard_result(UnregisterQuery(query_handle->query_id(), false, &exec_status));
     status->__set_statusCode(thrift::TStatusCode::ERROR_STATUS);
     status->__set_errorMessage(exec_status.GetDetail());
     status->__set_sqlState(SQLSTATE_GENERAL_ERROR);
     return;
   }
 
-  request_state->UpdateNonErrorExecState(ClientRequestState::ExecState::FINISHED);
+  query_handle->UpdateNonErrorExecState(ClientRequestState::ExecState::FINISHED);
 
-  Status inflight_status = SetQueryInflight(session, request_state);
+  Status inflight_status = SetQueryInflight(session, query_handle);
   if (!inflight_status.ok()) {
-    discard_result(UnregisterQuery(request_state->query_id(), false, &inflight_status));
+    discard_result(UnregisterQuery(query_handle->query_id(), false, &inflight_status));
     status->__set_statusCode(thrift::TStatusCode::ERROR_STATUS);
     status->__set_errorMessage(inflight_status.GetDetail());
     status->__set_sqlState(SQLSTATE_GENERAL_ERROR);
@@ -175,53 +175,52 @@ void ImpalaServer::ExecuteMetadataOp(const THandleIdentifier& session_handle,
   }
   handle->__set_hasResultSet(true);
   // Secret is inherited from session.
-  TUniqueId operation_id = request_state->query_id();
+  TUniqueId operation_id = query_handle->query_id();
   TUniqueIdToTHandleIdentifier(operation_id, secret, &(handle->operationId));
   status->__set_statusCode(thrift::TStatusCode::SUCCESS_STATUS);
 }
 
-Status ImpalaServer::FetchInternal(ClientRequestState* request_state,
-    SessionState* session, int32_t fetch_size, bool fetch_first,
-    TFetchResultsResp* fetch_results, int32_t* num_results) {
-  // Make sure ClientRequestState::Wait() has completed before fetching rows. Wait()
-  // ensures that rows are ready to be fetched (e.g., Wait() opens
-  // ClientRequestState::output_exprs_, which are evaluated in
-  // ClientRequestState::FetchRows() below).
+Status ImpalaServer::FetchInternal(TUniqueId query_id, SessionState* session,
+    int32_t fetch_size, bool fetch_first, TFetchResultsResp* fetch_results,
+    int32_t* num_results) {
+  bool timed_out = false;
   int64_t block_on_wait_time_us = 0;
-  if (!request_state->BlockOnWait(
-          request_state->fetch_rows_timeout_us(), &block_on_wait_time_us)) {
+  QueryHandle query_handle;
+  RETURN_IF_ERROR(
+      WaitForResults(query_id, &query_handle, &block_on_wait_time_us, &timed_out));
+  if (timed_out) {
     fetch_results->status.__set_statusCode(thrift::TStatusCode::STILL_EXECUTING_STATUS);
     fetch_results->__set_hasMoreRows(true);
     fetch_results->__isset.results = false;
     return Status::OK();
   }
 
-  lock_guard<mutex> frl(*request_state->fetch_rows_lock());
-  lock_guard<mutex> l(*request_state->lock());
+  lock_guard<mutex> frl(*query_handle->fetch_rows_lock());
+  lock_guard<mutex> l(*query_handle->lock());
 
   // Check for cancellation or an error.
-  RETURN_IF_ERROR(request_state->query_status());
+  RETURN_IF_ERROR(query_handle->query_status());
 
-  if (request_state->num_rows_fetched() == 0) {
-    request_state->set_fetched_rows();
+  if (query_handle->num_rows_fetched() == 0) {
+    query_handle->set_fetched_rows();
   }
 
-  if (fetch_first) RETURN_IF_ERROR(request_state->RestartFetch());
+  if (fetch_first) RETURN_IF_ERROR(query_handle->RestartFetch());
 
-  fetch_results->results.__set_startRowOffset(request_state->num_rows_fetched());
+  fetch_results->results.__set_startRowOffset(query_handle->num_rows_fetched());
 
   // Child queries should always return their results in row-major format, rather than
   // inheriting the parent session's setting.
-  bool is_child_query = request_state->parent_query_id() != TUniqueId();
+  bool is_child_query = query_handle->parent_query_id() != TUniqueId();
   TProtocolVersion::type version = is_child_query ?
       TProtocolVersion::HIVE_CLI_SERVICE_PROTOCOL_V1 : session->hs2_version;
   scoped_ptr<QueryResultSet> result_set(QueryResultSet::CreateHS2ResultSet(
-      version, *(request_state->result_metadata()), &(fetch_results->results)));
+      version, *(query_handle->result_metadata()), &(fetch_results->results)));
   RETURN_IF_ERROR(
-      request_state->FetchRows(fetch_size, result_set.get(), block_on_wait_time_us));
+      query_handle->FetchRows(fetch_size, result_set.get(), block_on_wait_time_us));
   *num_results = result_set->size();
   fetch_results->__isset.results = true;
-  fetch_results->__set_hasMoreRows(!request_state->eos());
+  fetch_results->__set_hasMoreRows(!query_handle->eos());
   return Status::OK();
 }
 
@@ -482,31 +481,27 @@ void ImpalaServer::ExecuteStatement(TExecuteStatementResp& return_val,
     }
   }
 
-  shared_ptr<ClientRequestState> request_state;
-  status = Execute(&query_ctx, session, &request_state);
+  QueryHandle query_handle;
+  status = Execute(&query_ctx, session, &query_handle);
   HS2_RETURN_IF_ERROR(return_val, status, SQLSTATE_GENERAL_ERROR);
 
   // Start thread to wait for results to become available.
-  status = request_state->WaitAsync();
+  status = query_handle->WaitAsync();
   if (!status.ok()) goto return_error;
 
   // Optionally enable result caching on the ClientRequestState.
-  if (cache_num_rows > 0) {
-    status = request_state->SetResultCache(
-        QueryResultSet::CreateHS2ResultSet(
-            session->hs2_version, *request_state->result_metadata(), nullptr),
-        cache_num_rows);
-    if (!status.ok()) goto return_error;
-  }
+  status = SetupResultsCacheing(query_handle, session, cache_num_rows);
+  if (!status.ok()) goto return_error;
+
   // Once the query is running do a final check for session closure and add it to the
   // set of in-flight queries.
-  status = SetQueryInflight(session, request_state);
+  status = SetQueryInflight(session, query_handle);
   if (!status.ok()) goto return_error;
   return_val.__isset.operationHandle = true;
   return_val.operationHandle.__set_operationType(TOperationType::EXECUTE_STATEMENT);
-  return_val.operationHandle.__set_hasResultSet(request_state->returns_result_set());
+  return_val.operationHandle.__set_hasResultSet(query_handle->returns_result_set());
   // Secret is inherited from session.
-  TUniqueIdToTHandleIdentifier(request_state->query_id(), secret,
+  TUniqueIdToTHandleIdentifier(query_handle->query_id(), secret,
                                &return_val.operationHandle.operationId);
   return_val.status.__set_statusCode(
       apache::hive::service::cli::thrift::TStatusCode::SUCCESS_STATUS);
@@ -515,8 +510,20 @@ void ImpalaServer::ExecuteStatement(TExecuteStatementResp& return_val,
   return;
 
  return_error:
-  discard_result(UnregisterQuery(request_state->query_id(), false, &status));
+  discard_result(UnregisterQuery(query_handle->query_id(), false, &status));
   HS2_RETURN_ERROR(return_val, status.GetDetail(), SQLSTATE_GENERAL_ERROR);
+}
+
+Status ImpalaServer::SetupResultsCacheing(const QueryHandle& query_handle,
+    shared_ptr<SessionState> session, int64_t cache_num_rows) {
+  // Optionally enable result caching on the ClientRequestState.
+  if (cache_num_rows > 0) {
+    const TResultSetMetadata* result_set_md = query_handle->result_metadata();
+    QueryResultSet* result_set =
+        QueryResultSet::CreateHS2ResultSet(session->hs2_version, *result_set_md, nullptr);
+    RETURN_IF_ERROR(query_handle->SetResultCache(result_set, cache_num_rows));
+  }
+  return Status::OK();
 }
 
 void ImpalaServer::GetTypeInfo(TGetTypeInfoResp& return_val,
@@ -708,15 +715,12 @@ void ImpalaServer::GetOperationStatus(TGetOperationStatusResp& return_val,
       SQLSTATE_GENERAL_ERROR);
   VLOG_ROW << "GetOperationStatus(): query_id=" << PrintId(query_id);
 
-  shared_ptr<ClientRequestState> request_state = GetClientRequestState(query_id);
-  if (UNLIKELY(request_state.get() == nullptr)) {
-    Status err = Status::Expected(TErrorCode::INVALID_QUERY_HANDLE, PrintId(query_id));
-    string err_msg = err.GetDetail();
-    HS2_RETURN_ERROR(return_val, err_msg, SQLSTATE_GENERAL_ERROR);
-  }
+  QueryHandle query_handle;
+  HS2_RETURN_IF_ERROR(
+      return_val, GetActiveQueryHandle(query_id, &query_handle), SQLSTATE_GENERAL_ERROR);
 
   ScopedSessionState session_handle(this);
-  const TUniqueId session_id = request_state->session_id();
+  const TUniqueId session_id = query_handle->session_id();
   shared_ptr<SessionState> session;
   HS2_RETURN_IF_ERROR(return_val,
       session_handle.WithSession(
@@ -724,15 +728,19 @@ void ImpalaServer::GetOperationStatus(TGetOperationStatusResp& return_val,
       SQLSTATE_GENERAL_ERROR);
 
   {
-    lock_guard<mutex> l(*request_state->lock());
-    TOperationState::type operation_state = request_state->TOperationState();
+    lock_guard<mutex> l(*query_handle->lock());
+    TOperationState::type operation_state = query_handle->TOperationState();
     return_val.__set_operationState(operation_state);
     if (operation_state == TOperationState::ERROR_STATE) {
-      DCHECK(!request_state->query_status().ok());
-      return_val.__set_errorMessage(request_state->query_status().GetDetail());
+      DCHECK(!query_handle->query_status().ok());
+      return_val.__set_errorMessage(query_handle->query_status().GetDetail());
       return_val.__set_sqlState(SQLSTATE_GENERAL_ERROR);
     } else {
-      DCHECK(request_state->query_status().ok());
+      ClientRequestState::RetryState retry_state = query_handle->retry_state();
+      if (retry_state != ClientRequestState::RetryState::RETRYING
+          && retry_state != ClientRequestState::RetryState::RETRIED) {
+        DCHECK(query_handle->query_status().ok());
+      }
     }
   }
 }
@@ -746,14 +754,12 @@ void ImpalaServer::CancelOperation(TCancelOperationResp& return_val,
       SQLSTATE_GENERAL_ERROR);
   VLOG_QUERY << "CancelOperation(): query_id=" << PrintId(query_id);
 
-  shared_ptr<ClientRequestState> request_state = GetClientRequestState(query_id);
-  if (UNLIKELY(request_state.get() == nullptr)) {
-    Status err = Status::Expected(TErrorCode::INVALID_QUERY_HANDLE, PrintId(query_id));
-    string err_msg = err.GetDetail();
-    HS2_RETURN_ERROR(return_val, err_msg, SQLSTATE_GENERAL_ERROR);
-  }
+  QueryHandle query_handle;
+  HS2_RETURN_IF_ERROR(
+      return_val, GetActiveQueryHandle(query_id, &query_handle), SQLSTATE_GENERAL_ERROR);
+
   ScopedSessionState session_handle(this);
-  const TUniqueId session_id = request_state->session_id();
+  const TUniqueId session_id = query_handle->session_id();
   HS2_RETURN_IF_ERROR(return_val,
       session_handle.WithSession(session_id, SecretArg::Operation(op_secret, query_id)),
       SQLSTATE_GENERAL_ERROR);
@@ -779,24 +785,23 @@ void ImpalaServer::CloseImpalaOperation(TCloseImpalaOperationResp& return_val,
       SQLSTATE_GENERAL_ERROR);
   VLOG_QUERY << "CloseOperation(): query_id=" << PrintId(query_id);
 
-  shared_ptr<ClientRequestState> request_state = GetClientRequestState(query_id);
-  if (UNLIKELY(request_state.get() == nullptr)) {
-    Status err = Status::Expected(TErrorCode::INVALID_QUERY_HANDLE, PrintId(query_id));
-    HS2_RETURN_ERROR(return_val, err.GetDetail(), SQLSTATE_GENERAL_ERROR);
-  }
+  QueryHandle query_handle;
+  HS2_RETURN_IF_ERROR(
+      return_val, GetActiveQueryHandle(query_id, &query_handle), SQLSTATE_GENERAL_ERROR);
+
   ScopedSessionState session_handle(this);
-  const TUniqueId session_id = request_state->session_id();
+  const TUniqueId session_id = query_handle->session_id();
   HS2_RETURN_IF_ERROR(return_val,
       session_handle.WithSession(session_id, SecretArg::Operation(op_secret, query_id)),
       SQLSTATE_GENERAL_ERROR);
-  if (request_state->stmt_type() == TStmtType::DML) {
+  if (query_handle->stmt_type() == TStmtType::DML) {
     Status query_status;
-    if (request_state->GetDmlStats(&return_val.dml_result, &query_status)) {
+    if (query_handle->GetDmlStats(&return_val.dml_result, &query_status)) {
       return_val.__isset.dml_result = true;
     }
   }
 
-  // TODO: use timeout to get rid of unwanted request_state.
+  // TODO: use timeout to get rid of unwanted query_handle.
   HS2_RETURN_IF_ERROR(return_val, UnregisterQuery(query_id, true),
       SQLSTATE_GENERAL_ERROR);
   return_val.status.__set_statusCode(thrift::TStatusCode::SUCCESS_STATUS);
@@ -812,22 +817,20 @@ void ImpalaServer::GetResultSetMetadata(TGetResultSetMetadataResp& return_val,
       SQLSTATE_GENERAL_ERROR);
   VLOG_QUERY << "GetResultSetMetadata(): query_id=" << PrintId(query_id);
 
-  shared_ptr<ClientRequestState> request_state = GetClientRequestState(query_id);
-  if (UNLIKELY(request_state.get() == nullptr)) {
-    VLOG_QUERY << "GetResultSetMetadata(): invalid query handle";
-    Status err = Status::Expected(TErrorCode::INVALID_QUERY_HANDLE, PrintId(query_id));
-    HS2_RETURN_ERROR(return_val, err.GetDetail(), SQLSTATE_GENERAL_ERROR);
-  }
+  QueryHandle query_handle;
+  HS2_RETURN_IF_ERROR(
+      return_val, GetActiveQueryHandle(query_id, &query_handle), SQLSTATE_GENERAL_ERROR);
+
   ScopedSessionState session_handle(this);
-  const TUniqueId session_id = request_state->session_id();
+  const TUniqueId session_id = query_handle->session_id();
   HS2_RETURN_IF_ERROR(return_val,
       session_handle.WithSession(session_id, SecretArg::Operation(op_secret, query_id)),
       SQLSTATE_GENERAL_ERROR);
   {
-    lock_guard<mutex> l(*request_state->lock());
+    lock_guard<mutex> l(*query_handle->lock());
 
     // Convert TResultSetMetadata to TGetResultSetMetadataResp
-    const TResultSetMetadata* result_set_md = request_state->result_metadata();
+    const TResultSetMetadata* result_set_md = query_handle->result_metadata();
     DCHECK(result_set_md != NULL);
     if (result_set_md->columns.size() > 0) {
       return_val.__isset.schema = true;
@@ -865,17 +868,14 @@ void ImpalaServer::FetchResults(TFetchResultsResp& return_val,
   VLOG_ROW << "FetchResults(): query_id=" << PrintId(query_id)
            << " fetch_size=" << request.maxRows;
 
-  shared_ptr<ClientRequestState> request_state = GetClientRequestState(query_id);
-  if (UNLIKELY(request_state == nullptr)) {
-    Status err = Status::Expected(TErrorCode::INVALID_QUERY_HANDLE, PrintId(query_id));
-    string err_msg = err.GetDetail();
-    VLOG(1) << err_msg;
-    HS2_RETURN_ERROR(return_val, err_msg, SQLSTATE_GENERAL_ERROR);
-  }
+
+  QueryHandle query_handle;
+  HS2_RETURN_IF_ERROR(
+      return_val, GetActiveQueryHandle(query_id, &query_handle), SQLSTATE_GENERAL_ERROR);
 
   // Validate the secret and keep the session that originated the query alive.
   ScopedSessionState session_handle(this);
-  const TUniqueId session_id = request_state->session_id();
+  const TUniqueId session_id = query_handle->session_id();
   shared_ptr<SessionState> session;
   HS2_RETURN_IF_ERROR(return_val,
       session_handle.WithSession(
@@ -883,7 +883,7 @@ void ImpalaServer::FetchResults(TFetchResultsResp& return_val,
       SQLSTATE_GENERAL_ERROR);
 
   int32_t num_results = 0;
-  Status status = FetchInternal(request_state.get(), session.get(), request.maxRows,
+  Status status = FetchInternal(query_id, session.get(), request.maxRows,
       fetch_first, &return_val, &num_results);
 
   VLOG_ROW << "FetchResults(): query_id=" << PrintId(query_id)
@@ -912,23 +912,21 @@ void ImpalaServer::GetLog(TGetLogResp& return_val, const TGetLogReq& request) {
       request.operationHandle.operationId, &query_id, &op_secret),
       SQLSTATE_GENERAL_ERROR);
 
-  shared_ptr<ClientRequestState> request_state = GetClientRequestState(query_id);
-  if (UNLIKELY(request_state.get() == nullptr)) {
-    Status err = Status::Expected(TErrorCode::INVALID_QUERY_HANDLE, PrintId(query_id));
-    string err_msg = err.GetDetail();
-    HS2_RETURN_ERROR(return_val, err_msg, SQLSTATE_GENERAL_ERROR);
-  }
+
+  QueryHandle query_handle;
+  HS2_RETURN_IF_ERROR(
+      return_val, GetActiveQueryHandle(query_id, &query_handle), SQLSTATE_GENERAL_ERROR);
 
   // GetLog doesn't have an associated session handle, so we presume that this request
   // should keep alive the same session that orignated the query.
   ScopedSessionState session_handle(this);
-  const TUniqueId session_id = request_state->session_id();
+  const TUniqueId session_id = query_handle->session_id();
   HS2_RETURN_IF_ERROR(return_val,
       session_handle.WithSession(session_id, SecretArg::Operation(op_secret, query_id)),
       SQLSTATE_GENERAL_ERROR);
 
   stringstream ss;
-  Coordinator* coord = request_state->GetCoordinator();
+  Coordinator* coord = query_handle->GetCoordinator();
   if (coord != nullptr) {
     // Report progress
     ss << coord->progress().ToString() << "\n";
@@ -937,24 +935,24 @@ void ImpalaServer::GetLog(TGetLogResp& return_val, const TGetLogReq& request) {
   {
     // Take the lock to ensure that if the client sees a query_state == EXCEPTION, it is
     // guaranteed to see the error query_status.
-    lock_guard<mutex> l(*request_state->lock());
-    Status query_status = request_state->query_status();
-    DCHECK_EQ(request_state->exec_state() == ClientRequestState::ExecState::ERROR,
+    lock_guard<mutex> l(*query_handle->lock());
+    Status query_status = query_handle->query_status();
+    DCHECK_EQ(query_handle->exec_state() == ClientRequestState::ExecState::ERROR,
         !query_status.ok());
     // If the query status is !ok, include the status error message at the top of the log.
     if (!query_status.ok()) ss << query_status.GetDetail();
   }
 
   // Report analysis errors
-  ss << join(request_state->GetAnalysisWarnings(), "\n");
+  ss << join(query_handle->GetAnalysisWarnings(), "\n");
   // Report queuing reason if the admission controller queued the query.
-  const string* admission_result = request_state->summary_profile()->GetInfoString(
+  const string* admission_result = query_handle->summary_profile()->GetInfoString(
       AdmissionController::PROFILE_INFO_KEY_ADMISSION_RESULT);
   if (admission_result != nullptr) {
     if (*admission_result == AdmissionController::PROFILE_INFO_VAL_QUEUED) {
       ss << AdmissionController::PROFILE_INFO_KEY_ADMISSION_RESULT << " : "
          << *admission_result << "\n";
-      const string* queued_reason = request_state->summary_profile()->GetInfoString(
+      const string* queued_reason = query_handle->summary_profile()->GetInfoString(
           AdmissionController::PROFILE_INFO_KEY_LAST_QUEUED_REASON);
       if (queued_reason != nullptr) {
         ss << AdmissionController::PROFILE_INFO_KEY_LAST_QUEUED_REASON << " : "
@@ -1023,9 +1021,20 @@ void ImpalaServer::GetRuntimeProfile(
       request.operationHandle.operationId, &query_id, &op_secret),
       SQLSTATE_GENERAL_ERROR);
 
+  VLOG_RPC << "GetRuntimeProfile(): query_id=" << PrintId(query_id);
+
   stringstream ss;
   TRuntimeProfileTree thrift_profile;
   rapidjson::Document json_profile(rapidjson::kObjectType);
+
+  // If the query was retried, fetch the profile for the most recent attempt of the query
+  // The original query profile should still be accessible via the web ui.
+  QueryHandle query_handle;
+  Status status = GetActiveQueryHandle(query_id, &query_handle);
+  if (LIKELY(status.ok())) {
+    query_id = query_handle->query_id();
+  }
+
   HS2_RETURN_IF_ERROR(return_val,
       GetRuntimeProfileOutput(query_id, GetEffectiveUser(*session), request.format, &ss,
           &thrift_profile, &json_profile),
