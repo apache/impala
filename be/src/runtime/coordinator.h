@@ -50,6 +50,7 @@ class FragmentInstanceState;
 class MemTracker;
 class ObjectPool;
 class PlanRootSink;
+class QueryDriver;
 class QueryResultSet;
 class QuerySchedule;
 class QueryState;
@@ -244,8 +245,12 @@ class Coordinator { // NOLINT: The member variables could be re-ordered to save 
   class FilterState;
   class FragmentStats;
 
+  /// The parent QueryDriver object for this coordinator. The reference is set in the
+  /// constructor. It always outlives the coordinator.
+  QueryDriver* parent_query_driver_;
+
   /// The parent ClientRequestState object for this coordinator. The reference is set in
-  /// the constructor. It always outlives the this coordinator.
+  /// the constructor. It always outlives the coordinator.
   ClientRequestState* parent_request_state_;
 
   /// owned by the ClientRequestState that owns this coordinator
@@ -583,7 +588,16 @@ class Coordinator { // NOLINT: The member variables could be re-ordered to save 
   /// AuxErrorInfoPB to classify specific nodes as "faulty" and then blacklists them. A
   /// node might be considered "faulty" if, for example, a RPC to that node failed, or a
   /// fragment on that node failed due to a disk IO error.
-  void UpdateBlacklistWithAuxErrorInfo(std::vector<AuxErrorInfoPB>* aux_error_info);
+  /// 'status' is the Status of the given BackendState. 'backend_state' is the
+  /// BackendState that reported an error.
+  /// Returns the Status object used when blacklising a backend, or Status::OK if no
+  /// backends were blacklisted.
+  Status UpdateBlacklistWithAuxErrorInfo(std::vector<AuxErrorInfoPB>* aux_error_info,
+      const Status& status, BackendState* backend_state) WARN_UNUSED_RESULT;
+
+  /// Called if the Exec RPC to the given vector of BackendStates failed. Currently, just
+  /// triggers a retry of the query.
+  void HandleFailedExecRpcs(std::vector<BackendState*> failed_backend_states);
 
   /// Deletes the query-level staging directory.
   Status DeleteQueryLevelStagingDir();

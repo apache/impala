@@ -520,6 +520,13 @@ enum TImpalaQueryOptions {
   // Set the timestamp for Kudu snapshot reads in Unix time micros. Only valid if
   // KUDU_READ_MODE is set to READ_AT_SNAPSHOT.
   KUDU_SNAPSHOT_READ_TIMESTAMP_MICROS = 101
+
+  // Transparently retry queries that fail due to cluster membership changes. A cluster
+  // membership change includes blacklisting a node and the statestore detecting that a
+  // node has been removed from the cluster membership. From Impala's perspective, a
+  // retried query is a brand new query. From the client perspective, requests for the
+  // failed query are transparently re-routed to the new query.
+  RETRY_FAILED_QUERIES = 102
 }
 
 // The summary of a DML statement.

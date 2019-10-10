@@ -28,6 +28,7 @@
 #include "runtime/exec-env.h"
 #include "runtime/mem-tracker.h"
 #include "runtime/query-exec-mgr.h"
+#include "runtime/query-driver.h"
 #include "runtime/query-state.h"
 #include "service/client-request-state.h"
 #include "service/impala-server.h"
@@ -165,13 +166,14 @@ void ControlService::ExecQueryFInstances(const ExecQueryFInstancesRequestPB* req
 void ControlService::ReportExecStatus(const ReportExecStatusRequestPB* request,
     ReportExecStatusResponsePB* response, RpcContext* rpc_context) {
   const TUniqueId query_id = ProtoToQueryId(request->query_id());
-  shared_ptr<ClientRequestState> request_state =
-      ExecEnv::GetInstance()->impala_server()->GetClientRequestState(query_id);
+  QueryHandle query_handle;
+  Status status =
+      ExecEnv::GetInstance()->impala_server()->GetQueryHandle(query_id, &query_handle);
 
   // This failpoint is to allow jitter to be injected.
   DebugActionNoFail(FLAGS_debug_actions, "REPORT_EXEC_STATUS_DELAY");
 
-  if (request_state.get() == nullptr) {
+  if (!status.ok()) {
     // This is expected occasionally (since a report RPC might be in flight while
     // cancellation is happening). Return an error to the caller to get it to stop.
     const string& err = Substitute("ReportExecStatus(): Received report for unknown "
@@ -190,10 +192,10 @@ void ControlService::ReportExecStatus(const ReportExecStatusRequestPB* request,
   TRuntimeProfileForest thrift_profiles;
   if (LIKELY(request->has_thrift_profiles_sidecar_idx())) {
     const Status& profile_status =
-        GetProfile(*request, *request_state.get(), rpc_context, &thrift_profiles);
+        GetProfile(*request, *query_handle, rpc_context, &thrift_profiles);
     if (UNLIKELY(!profile_status.ok())) {
       LOG(ERROR) << Substitute("ReportExecStatus(): Failed to deserialize profile "
-          "for query ID $0: $1", PrintId(request_state->query_id()),
+          "for query ID $0: $1", PrintId(query_handle->query_id()),
           profile_status.GetDetail());
       // Do not expose a partially deserialized profile.
       TRuntimeProfileForest empty_profiles;
@@ -201,7 +203,7 @@ void ControlService::ReportExecStatus(const ReportExecStatusRequestPB* request,
     }
   }
 
-  Status resp_status = request_state->UpdateBackendExecStatus(*request, thrift_profiles);
+  Status resp_status = query_handle->UpdateBackendExecStatus(*request, thrift_profiles);
   RespondAndReleaseRpc(resp_status, response, rpc_context);
 }
 

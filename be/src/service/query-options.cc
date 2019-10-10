@@ -862,6 +862,9 @@ Status impala::SetQueryOption(const string& key, const string& value,
             ParseMemValue(value, "broadcast bytes limit for join operations",
                 &broadcast_bytes_limit));
         query_options->__set_broadcast_bytes_limit(broadcast_bytes_limit);
+      }
+      case TImpalaQueryOptions::RETRY_FAILED_QUERIES: {
+        query_options->__set_retry_failed_queries(IsTrue(value));
         break;
       }
       case TImpalaQueryOptions::PREAGG_BYTES_LIMIT: {
