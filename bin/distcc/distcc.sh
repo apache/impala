@@ -35,6 +35,13 @@ if [[ -z "$DISTCC_HOSTS" || -z "$CXX_COMPILER" ]]; then
   exit 1
 fi
 
+EXPECTED_VERSION=3
+if [[ -z "${IMPALA_DISTCC_ENV_VERSION:-}" || \
+      "$IMPALA_DISTCC_ENV_VERSION" -ne $EXPECTED_VERSION ]]; then
+  echo "Expected IMPALA_DISTCC_ENV_VERSION=$EXPECTED_VERSION, re-source distcc_env.sh"
+  exit 1
+fi
+
 REMOTE_TOOLCHAIN_DIR=/opt/Impala-Toolchain
 
 if $IMPALA_DISTCC_LOCAL; then
@@ -47,4 +54,5 @@ else
   CMD="$CXX_COMPILER"
 fi
 
-exec $CMD "$@"
+# Disable CCACHE_PREFIX to avoid recursive distcc invocations.
+CCACHE_PREFIX="" exec $CMD "$@"

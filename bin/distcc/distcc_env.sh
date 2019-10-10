@@ -48,6 +48,16 @@ if ! cmd_exists distcc; then
   fi
 fi
 
+# Cleans old CMake files, this is required after installing ccache, since we need
+# CMake to insert ccache into all the command lines.
+function clean_cmake_files {
+  if [[ -z "$IMPALA_HOME" || ! -d "$IMPALA_HOME" ]]; then
+    echo IMPALA_HOME=$IMPALA_HOME is not valid. 1>&2
+    return 1
+  fi
+  $IMPALA_HOME/bin/clean-cmake.sh
+}
+
 # Install CCache if necessary.
 if ! cmd_exists ccache; then
   echo "ccache command not found, attempting installation"
@@ -55,6 +65,12 @@ if ! cmd_exists ccache; then
     echo "Unable to automatically install ccache"
     return 1
   fi
+  if ! clean_cmake_files; then
+    echo Failed to clean cmake files. 1>&2
+    return 1
+  fi
+  echo "distcc is not fully enabled, run 'buildall.sh' to complete the change." \
+    "Run 'disable_distcc' or 'switch_compiler local' to disable."
 fi
 
 # Don't include localhost in the list. It is already the slowest part of the build because
@@ -66,13 +82,15 @@ DISTCC_HOSTS+=" --localslots_cpp=$(nproc)"
 DISTCC_HOSTS+=" --randomize"
 DISTCC_HOSTS+=" ${BUILD_FARM}"
 
-# Set to true to enable the distcc.sh wrapper script. Takes effect when CMake is next run.
-export IMPALA_DISTCC_ENABLED=true
-
 # Set to false to make distcc.sh use local compilation instead of distcc. Takes effect
 # immediately if the distcc.sh wrapper script is used.
 : ${IMPALA_DISTCC_LOCAL=}
 export IMPALA_DISTCC_LOCAL
+
+# This is picked up by ccache as the command it should prefix all compiler invocations
+# with. We only support enabling distcc if ccache is available, so pointing this at
+# our distcc wrapper script is sufficient to enable distcc.
+export CCACHE_PREFIX=""
 
 # Even after generating make files, some state about compiler options would only exist in
 # environment vars. Any such vars should be saved to this file so they can be restored.
@@ -80,52 +98,39 @@ if [[ -z "$IMPALA_HOME" ]]; then
   echo '$IMPALA_HOME must be set before sourcing this file.' 1>&2
   return 1
 fi
-IMPALA_COMPILER_CONFIG_FILE="$IMPALA_HOME/.impala_compiler_opts_v2"
+
+export IMPALA_DISTCC_ENV_VERSION=3
+IMPALA_COMPILER_CONFIG_FILE="$IMPALA_HOME/.impala_compiler_opts_v${IMPALA_DISTCC_ENV_VERSION}"
 
 # Completely disable anything that could have been setup using this script and clean
 # the make files.
 function disable_distcc {
-  export IMPALA_DISTCC_ENABLED=false
   export IMPALA_BUILD_THREADS=$(nproc)
   save_compiler_opts
-  if ! clean_cmake_files; then
-    echo Failed to clean cmake files. 1>&2
-    return 1
-  fi
-  echo "distcc is not fully disabled, run 'buildall.sh' to complete the change." \
-    "Run 'enable_distcc' to enable."
 }
 
 function enable_distcc {
-  export IMPALA_DISTCC_ENABLED=true
   switch_compiler distcc
-  if ! clean_cmake_files; then
-    echo Failed to clean cmake files. 1>&2
-    return 1
-  fi
-  echo "distcc is not fully enabled, run 'buildall.sh' to complete the change." \
-    "Run 'disable_distcc' or 'switch_compiler local' to disable."
-}
-
-# Cleans old CMake files, this is required when switching between distcc.sh and direct
-# compilation.
-function clean_cmake_files {
-  if [[ -z "$IMPALA_HOME" || ! -d "$IMPALA_HOME" ]]; then
-    echo IMPALA_HOME=$IMPALA_HOME is not valid. 1>&2
-    return 1
-  fi
-  $IMPALA_HOME/bin/clean-cmake.sh
 }
 
 function switch_compiler {
   for ARG in "$@"; do
     case "$ARG" in
       "local")
+        export
         IMPALA_DISTCC_LOCAL=false
-        IMPALA_BUILD_THREADS=$(nproc);;
+        IMPALA_BUILD_THREADS=$(nproc)
+        CCACHE_PREFIX=""
+        ;;
       distcc)
         IMPALA_DISTCC_LOCAL=true
-        IMPALA_BUILD_THREADS=$(distcc -j);;
+        echo HERE
+        local DISTCC_SLOT_COUNT=$(distcc -j)
+        # Set the parallelism based on the number of distcc slots, but cap it to avoid
+        # overwhelming this host  if a large distcc cluster is configured.
+        IMPALA_BUILD_THREADS=$((DISTCC_SLOT_COUNT < 128 ? DISTCC_SLOT_COUNT : 128))
+        CCACHE_PREFIX="${IMPALA_HOME}/bin/distcc/distcc.sh"
+        ;;
       *) echo "Valid compiler options are:
     'local'  - Don't use distcc and set -j value to $(nproc).
     'distcc' - Use distcc and set -j value to $(distcc -j)." 2>&1
@@ -138,7 +143,7 @@ function switch_compiler {
 function save_compiler_opts {
   rm -f "$IMPALA_COMPILER_CONFIG_FILE"
   cat <<EOF > "$IMPALA_COMPILER_CONFIG_FILE"
-IMPALA_DISTCC_ENABLED=$IMPALA_DISTCC_ENABLED
+CCACHE_PREFIX=$CCACHE_PREFIX
 IMPALA_BUILD_THREADS=$IMPALA_BUILD_THREADS
 IMPALA_DISTCC_LOCAL=$IMPALA_DISTCC_LOCAL
 EOF
