@@ -226,7 +226,7 @@ class HadoopFsCommandLineClient(BaseFilesystem):
     (status, stdout, stderr) = self._hadoop_fs_shell(['-mkdir', '-p', fixed_path])
     return status == 0
 
-  def copy(self, src, dst, overwrite):
+  def copy(self, src, dst, overwrite=False):
     """Copy the source file to the destination. Specifes the '-d' option by default, which
     'Skip[s] creation of temporary file with the suffix ._COPYING_.' to avoid extraneous
     copies on S3. If overwrite is true, the destination file is overwritten, set to false
