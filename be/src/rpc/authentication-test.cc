@@ -184,8 +184,25 @@ TEST(Auth, KerbAndSslEnabled) {
       sa_external.InitKerberos("service_name/_HOST@some.realm", "/etc/hosts"));
 }
 
+// Test principal with slash in hostname
+TEST(Auth, InternalPrincipalWithSlash) {
+  SecureAuthProvider sa(false); // false means it's external
+  ASSERT_OK(sa.InitKerberos("service_name/local\\/host@some.realm", "/etc/hosts"));
+  ASSERT_OK(sa.Start());
+  ASSERT_EQ("service_name", sa.service_name());
+  ASSERT_EQ("local/host", sa.hostname());
+  ASSERT_EQ("some.realm", sa.realm());
 }
 
+// Test bad principal format exception
+TEST(Auth, BadPrincipalFormat) {
+  SecureAuthProvider sa(false); // false means it's external
+  EXPECT_ERROR(sa.InitKerberos("", "/etc/hosts"), 2);
+  EXPECT_ERROR(sa.InitKerberos("service_name@some.realm", "/etc/hosts"), 2);
+  EXPECT_ERROR(sa.InitKerberos("service_name/localhost", "/etc/hosts"), 2);
+}
+
+}
 int main(int argc, char** argv) {
   ::testing::InitGoogleTest(&argc, argv);
   impala::InitCommonRuntime(argc, argv, true, impala::TestInfo::BE_TEST);

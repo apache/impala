@@ -22,6 +22,8 @@
 #include "service/client-request-state.h"
 #include "util/network-util.h"
 #include "gen-cpp/ImpalaInternalService_types.h"
+#include "kudu/security/init.h"
+#include "exec/kudu-util.h"
 
 using namespace std;
 using boost::algorithm::is_any_of;
@@ -86,21 +88,8 @@ Status GetInternalKerberosPrincipal(string* out_principal) {
 
 Status ParseKerberosPrincipal(const string& principal, string* service_name,
     string* hostname, string* realm) {
-  // TODO: IMPALA-7504: replace this with krb5_parse_name().
-  vector<string> names;
-
-  split(names, principal, is_any_of("/"));
-  if (names.size() != 2) return Status(TErrorCode::BAD_PRINCIPAL_FORMAT, principal);
-
-  *service_name = names[0];
-
-  string remaining_principal = names[1];
-  split(names, remaining_principal, is_any_of("@"));
-  if (names.size() != 2) return Status(TErrorCode::BAD_PRINCIPAL_FORMAT, principal);
-
-  *hostname = names[0];
-  *realm = names[1];
-
+  KUDU_RETURN_IF_ERROR(kudu::security::Krb5ParseName(principal, service_name,
+      hostname, realm), strings::Substitute("bad principal format $0", principal));
   return Status::OK();
 }
 
