@@ -536,8 +536,11 @@ public class ColumnLineageGraph {
    */
   public void computeLineageGraph(List<Expr> resultExprs, Analyzer rootAnalyzer) {
     init(rootAnalyzer);
-    computeProjectionDependencies(resultExprs, rootAnalyzer);
-    computeResultPredicateDependencies(rootAnalyzer);
+    // Compute the dependencies only if result expressions are available.
+    if (resultExprs != null && !resultExprs.isEmpty()) {
+      computeProjectionDependencies(resultExprs, rootAnalyzer);
+      computeResultPredicateDependencies(rootAnalyzer);
+    }
   }
 
   /**

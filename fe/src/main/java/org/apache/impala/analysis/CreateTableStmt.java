@@ -28,6 +28,8 @@ import org.apache.impala.catalog.KuduTable;
 import org.apache.impala.catalog.RowFormat;
 import org.apache.impala.common.AnalysisException;
 import org.apache.impala.common.ImpalaRuntimeException;
+import org.apache.impala.common.RuntimeEnv;
+import org.apache.impala.service.BackendConfig;
 import org.apache.impala.thrift.TCreateTableParams;
 import org.apache.impala.thrift.THdfsFileFormat;
 import org.apache.impala.thrift.TSortingOrder;
@@ -214,6 +216,21 @@ public class CreateTableStmt extends StatementBase {
       }
       AvroSchemaUtils.setFromSerdeComment(getColumnDefs());
     }
+
+    // If lineage logging is enabled, compute minimal lineage graph.
+    if (BackendConfig.INSTANCE.getComputeLineage() || RuntimeEnv.INSTANCE.isTestEnv()) {
+       computeLineageGraph(analyzer);
+    }
+  }
+
+  /**
+   * Computes a minimal column lineage graph for create statement. This will just
+   * populate a few fields of the graph including query text. If this is a CTAS,
+   * the graph is enhanced during the "insert" phase of CTAS.
+   */
+  protected void computeLineageGraph(Analyzer analyzer) {
+    ColumnLineageGraph graph = analyzer.getColumnLineageGraph();
+    graph.computeLineageGraph(new ArrayList(), analyzer);
   }
 
   /**

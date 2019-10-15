@@ -17,6 +17,21 @@ create table lineage_test_db.alltypessmall like functional.alltypessmall
 ---- QUERY
 create table lineage_test_db.alltypesinsert like functional.alltypesinsert
 ====
+---- LINEAGE
+{
+  "hash":"b0d53e4deafb2467c4108c17667653b5",
+  "timestamp":1571178583,
+  "vertices":[],
+  "edges":[],
+  "queryId":"524cc93f26a86671:e8455a9500000000",
+  "user":"anurag",
+  "queryText":"create table lineage_test_db.foo (id int)",
+  "endTime":1571178584
+}
+---- QUERY
+# Test lineage is created with queryText populated for DDLs.
+create table lineage_test_db.foo (id int)
+====
 ---- QUERY
 create view lineage_test_db.alltypes_view as select * from lineage_test_db.alltypes
 ====

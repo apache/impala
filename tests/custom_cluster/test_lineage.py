@@ -34,6 +34,7 @@ LOG = logging.getLogger(__name__)
 class TestLineage(CustomClusterTestSuite):
   START_END_TIME_LINEAGE_LOG_DIR = tempfile.mkdtemp(prefix="start_end_time")
   CREATE_TABLE_TIME_LINEAGE_LOG_DIR = tempfile.mkdtemp(prefix="create_table_time")
+  DDL_LINEAGE_LOG_DIR = tempfile.mkdtemp(prefix="ddl_lineage")
   LINEAGE_TESTS_DIR = tempfile.mkdtemp(prefix="test_lineage")
 
   @classmethod
@@ -106,6 +107,29 @@ class TestLineage(CustomClusterTestSuite):
               table_create_time = int(vertex["metadata"]["tableCreateTime"])
               assert "{0}.lineage_test_tbl".format(unique_database) == table_name
               assert table_create_time != -1
+
+  @pytest.mark.execute_serially
+  @CustomClusterTestSuite.with_args("--lineage_event_log_dir={0}"
+                                    .format(DDL_LINEAGE_LOG_DIR))
+  def test_ddl_lineage(self, unique_database):
+    """ Test that DDLs like 'create table' have query text populated in the lineage
+    graph."""
+    query = "create external table {0}.ddl_lineage_tbl (id int)".format(unique_database)
+    result = self.execute_query_expect_success(self.client, query)
+    profile_query_id = re.search("Query \(id=(.*)\):", result.runtime_profile).group(1)
+
+    # Wait to flush the lineage log files.
+    time.sleep(3)
+
+    for log_filename in os.listdir(self.DDL_LINEAGE_LOG_DIR):
+      log_path = os.path.join(self.DDL_LINEAGE_LOG_DIR, log_filename)
+      # Only the coordinator's log file will be populated.
+      if os.path.getsize(log_path) > 0:
+        with open(log_path) as log_file:
+          lineage_json = json.load(log_file)
+          assert lineage_json["queryId"] == profile_query_id
+          assert lineage_json["queryText"] is not None
+          assert lineage_json["queryText"] == query
 
   @SkipIfS3.hbase
   @pytest.mark.execute_serially
