@@ -211,14 +211,24 @@ public class MetastoreEvents {
       for (NotificationEvent event : events) {
         metastoreEvents.add(get(event));
       }
-      Iterator<MetastoreEvent> it = metastoreEvents.iterator();
       // filter out the create events which has a corresponding drop event later
       int sizeBefore = metastoreEvents.size();
       int numFilteredEvents = 0;
       int i = 0;
       while (i < metastoreEvents.size()) {
         MetastoreEvent currentEvent = metastoreEvents.get(i);
-        if (currentEvent.isRemovedAfter(metastoreEvents.subList(i + 1,
+        String eventDb = currentEvent.getDbName();
+        String eventTbl = currentEvent.getTableName();
+        // if the event is on blacklisted db or table we should filter it out
+        if (catalog_.isBlacklistedDb(eventDb) || (eventTbl != null && catalog_
+            .isBlacklistedTable(eventDb, eventTbl))) {
+          String blacklistedObject = eventTbl != null ? new TableName(eventDb,
+              eventTbl).toString() : eventDb;
+          LOG.info(currentEvent.debugString("Filtering out this event since it is on a "
+              + "blacklisted database or table %s", blacklistedObject));
+          metastoreEvents.remove(i);
+          numFilteredEvents++;
+        } else if (currentEvent.isRemovedAfter(metastoreEvents.subList(i + 1,
             metastoreEvents.size()))) {
           LOG.info(currentEvent.debugString("Filtering out this event since the object is "
               + "either removed or renamed later in the event stream"));
@@ -299,6 +309,10 @@ public class MetastoreEvents {
       this.metastoreNotificationEvent_ = event;
       this.metrics_ = metrics;
     }
+
+    public String getDbName() { return dbName_; }
+
+    public String getTableName() { return tblName_; }
 
     /**
      * Process this event if it is enabled based on the flags on this object

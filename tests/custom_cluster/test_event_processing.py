@@ -41,6 +41,32 @@ class TestEventProcessing(CustomClusterTestSuite):
   PROCESSING_TIMEOUT_S = 10
 
   @pytest.mark.execute_serially
+  @CustomClusterTestSuite.with_args(
+    impalad_args="--blacklisted_dbs=testBlackListedDb "
+                 "--blacklisted_tables=functional_parquet.testBlackListedTbl",
+    catalogd_args="--blacklisted_dbs=testBlackListedDb "
+                  "--blacklisted_tables=functional_parquet.testBlackListedTbl "
+                  "--hms_event_polling_interval_s=1")
+  def test_events_on_blacklisted_objects(self):
+    """Executes hive queries on blacklisted database and tables and makes sure that
+    event processor does not error out
+    """
+    try:
+      self.run_stmt_in_hive("create database testBlackListedDb")
+      self.run_stmt_in_hive("create table testBlackListedDb.testtbl (id int)")
+      self.run_stmt_in_hive(
+        "create table functional_parquet.testBlackListedTbl (id int, val string)"
+        " partitioned by (part int) stored as parquet")
+      self.run_stmt_in_hive(
+        "alter table functional_parquet.testBlackListedTbl add partition (part=1)")
+      # wait until all the events generated above are processed
+      EventProcessorUtils.wait_for_event_processing(self.hive_client)
+      assert EventProcessorUtils.get_event_processor_status() == "ACTIVE"
+    finally:
+      self.run_stmt_in_hive("drop database testBlackListedDb cascade")
+      self.run_stmt_in_hive("drop table functional_parquet.testBlackListedTbl")
+
+  @pytest.mark.execute_serially
   @CustomClusterTestSuite.with_args(catalogd_args="--hms_event_polling_interval_s=2")
   @SkipIfHive2.acid
   def test_insert_events_transactional(self):
