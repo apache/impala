@@ -133,6 +133,8 @@ static const char* COMMON_JSON_KEY = "__common__";
 // handler.
 static const char* ERROR_KEY = "__error_msg__";
 
+static const char* CRLF = "\r\n";
+
 // Returns $IMPALA_HOME if set, otherwise /tmp/impala_www
 const char* GetDefaultDocumentRoot() {
   stringstream ss;
@@ -178,19 +180,24 @@ string HttpStatusCodeToString(HttpStatusCode code) {
 }
 
 void SendResponse(struct sq_connection* connection, const string& response_code_line,
-    const string& context_type, const string& content,
+    const string& content_type, const string& content,
     const vector<string>& header_lines) {
-  sq_printf(connection, "HTTP/1.1 %s\r\n", response_code_line.c_str());
+  // Buffer the output and send it in a single call to sq_write in order to avoid
+  // triggering an interaction between Nagle's algorithm and TCP delayed acks.
+  std::ostringstream oss;
+  oss << "HTTP/1.1 " << response_code_line << CRLF;
   for (const auto& h : header_lines) {
-    sq_printf(connection, "%s\r\n", h.c_str());
+    oss << h << CRLF;
   }
-  sq_printf(connection,
-      "X-Frame-Options: %s\r\n"
-      "Content-Type: %s\r\n"
-      "Content-Length: %zd\r\n\r\n",
-      FLAGS_webserver_x_frame_options.c_str(), context_type.c_str(), content.size());
+  oss << "X-Frame-Options: " << FLAGS_webserver_x_frame_options << CRLF;
+  oss << "Content-Type: " << content_type << CRLF;
+  oss << "Content-Length: " << content.size() << CRLF;
+  oss << CRLF;
+  oss << content;
+
   // Make sure to use sq_write for printing the body; sq_printf truncates at 8kb
-  sq_write(connection, content.c_str(), content.length());
+  string output = oss.str();
+  sq_write(connection, output.c_str(), output.length());
 }
 
 // Return the address of the remote user from the squeasel request info.
