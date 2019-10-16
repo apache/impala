@@ -450,7 +450,7 @@ string TimestampFunctions::ShortDayName(FunctionContext* context,
   IntVal dow = DayOfWeek(context, ts);
   DCHECK_GT(dow.val, 0);
   DCHECK_LT(dow.val, 8);
-  return DAY_ARRAY[dow.val - 1];
+  return SHORT_DAY_NAMES[CAPITALIZED][dow.val - 1];
 }
 
 StringVal TimestampFunctions::LongDayName(FunctionContext* context,
@@ -459,8 +459,9 @@ StringVal TimestampFunctions::LongDayName(FunctionContext* context,
   IntVal dow = DayOfWeek(context, ts);
   DCHECK_GT(dow.val, 0);
   DCHECK_LT(dow.val, 8);
-  const string& day_name = DAYNAME_ARRAY[dow.val - 1];
-  return StringVal(reinterpret_cast<uint8_t*>(const_cast<char*>(day_name.data())), day_name.size());
+  const string& day_name = DAY_NAMES[CAPITALIZED][dow.val - 1];
+  return StringVal(reinterpret_cast<uint8_t*>(const_cast<char*>(day_name.data())),
+      day_name.size());
 }
 
 string TimestampFunctions::ShortMonthName(FunctionContext* context,
@@ -469,7 +470,7 @@ string TimestampFunctions::ShortMonthName(FunctionContext* context,
   IntVal mth = Month(context, ts);
   DCHECK_GT(mth.val, 0);
   DCHECK_LT(mth.val, 13);
-  return MONTH_ARRAY[mth.val - 1];
+  return SHORT_MONTH_NAMES[CAPITALIZED][mth.val - 1];
 }
 
 StringVal TimestampFunctions::LongMonthName(FunctionContext* context,
@@ -478,7 +479,7 @@ StringVal TimestampFunctions::LongMonthName(FunctionContext* context,
   IntVal mth = Month(context, ts);
   DCHECK_GT(mth.val, 0);
   DCHECK_LT(mth.val, 13);
-  const string& mn = MONTHNAME_ARRAY[mth.val - 1];
+  const string& mn = MONTH_NAMES[CAPITALIZED][mth.val - 1];
   return StringVal(reinterpret_cast<uint8_t*>(const_cast<char*>(mn.data())), mn.size());
 }
 

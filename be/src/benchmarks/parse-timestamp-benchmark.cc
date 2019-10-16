@@ -235,7 +235,6 @@ int main(int argc, char **argv) {
   cout << Benchmark::GetMachineInfo() << endl;
 
   SimpleDateFormatTokenizer::InitCtx();
-  SimpleDateFormatParser::InitCtx();
 
   TestData dates, times, datetimes, tzdatetimes;
 

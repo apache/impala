@@ -67,13 +67,32 @@ class TimestampFunctions {
   static const int64_t MAX_MILLI_INTERVAL = MAX_SEC_INTERVAL * 1000;
   static const int64_t MAX_MICRO_INTERVAL = MAX_MILLI_INTERVAL * 1000;
 
-  /// Static result values for ShortMonthName() function.
-  /// Short month names are also used in DateParser.
-  static const std::string MONTH_ARRAY[12];
-  /// Static result values for ShortDayName() and LongMonthName() functions.
-  /// These are also used in DateFunctions.
-  static const std::string DAYNAME_ARRAY[7];
-  static const std::string MONTHNAME_ARRAY[12];
+  /// Use this as the first index for SHORT_MONTH_NAMES, MONTH_NAMES etc.
+  enum TextCase {CAPITALIZED, LOWERCASE, UPPERCASE};
+
+  /// Contains the short names of the months in 3 different case: Capitalized, full
+  /// lowercase and full uppercase.
+  static const std::string SHORT_MONTH_NAMES[3][12];
+
+  /// Contains the full names of the months in 3 different case: Capitalized, full
+  /// lowercase and full uppercase. E.g. "January", "january", "JANUARY", etc.
+  static const std::string MONTH_NAMES[3][12];
+
+  /// Similar to MONTH_NAMES but here the values are padded with spaces to the maximum
+  /// length.
+  static const std::string MONTH_NAMES_PADDED[3][12];
+
+  /// Contains the short day names in 3 different case: Capitalized, full
+  /// lowercase and full uppercase. E.g. "Sun", "sun", "SUN", etc.
+  static const std::string SHORT_DAY_NAMES[3][7];
+
+  /// Contains the full names of the days in 3 different case: Capitalized, full
+  /// lowercase and full uppercase. E.g. "Sunday", "sunday", "SUNDAY", etc.
+  static const std::string DAY_NAMES[3][7];
+
+  /// Similar to DAY_NAMES but here the values are padded with spaces to the maximum
+  /// length.
+  static const std::string DAY_NAMES_PADDED[3][7];
 
   /// Maps full and abbreviated lowercase names of day-of-week to an int in the 0-6 range.
   /// Sunday is mapped to 0 and Saturday is mapped to 6.
@@ -238,10 +257,6 @@ class TimestampFunctions {
   /// Helper function to check date/time format strings.
   /// TODO: eventually return format converted from Java to Boost.
   static StringValue* CheckFormat(StringValue* format);
-
- private:
-  /// Static result values for DayName() function.
-  static const std::string DAY_ARRAY[7];
 };
 
 } // namespace impala

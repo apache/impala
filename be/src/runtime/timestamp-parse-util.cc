@@ -234,14 +234,37 @@ string TimestampParser::Format(const DateTimeFormatContext& dt_ctx, const date& 
         }
         break;
       }
+      case QUARTER_OF_YEAR: {
+        num_val = GetQuarter(d.month());
+        break;
+      }
       case MONTH_IN_YEAR: num_val = d.month().as_number(); break;
-      case MONTH_IN_YEAR_SLT: {
-        result.append(d.month().as_short_string(), 3);
+      case MONTH_NAME:
+      case MONTH_NAME_SHORT: {
+        result.append(FormatMonthName(d.month().as_number(), tok));
+        break;
+      }
+      case WEEK_OF_YEAR: {
+        num_val = GetWeekOfYear(d.year(), d.month(), d.day());
+        break;
+      }
+      case WEEK_OF_MONTH: {
+        num_val = GetWeekOfMonth(d.day());
+        break;
+      }
+      case DAY_OF_WEEK: {
+        // Value in [1-7] where 1 represents Sunday, 2 represents Monday, etc.
+        num_val = d.day_of_week() + 1;
         break;
       }
       case DAY_IN_MONTH: num_val = d.day(); break;
       case DAY_IN_YEAR: {
         num_val = GetDayInYear(d.year(), d.month(), d.day());
+        break;
+      }
+      case DAY_NAME:
+      case DAY_NAME_SHORT: {
+        result.append(FormatDayName(d.day_of_week() + 1, tok));
         break;
       }
       case HOUR_IN_DAY: num_val = t.hours(); break;

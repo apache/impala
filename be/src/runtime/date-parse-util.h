@@ -80,6 +80,10 @@ class DateParser {
   /// Helper for parse functions to produce return value and set output parameter to an
   /// invalid DateValue when parsing fails.
   static bool IndicateDateParseFailure(DateValue* date);
+
+  /// Returns a number between 1 and 7 that represents the day of the week where Sunday
+  /// is 1.
+  static int GetDayOfWeek(const DateValue& date);
 };
 
 }

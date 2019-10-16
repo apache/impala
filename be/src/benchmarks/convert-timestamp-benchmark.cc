@@ -707,7 +707,6 @@ int main(int argc, char* argv[]) {
   DCHECK(PTR_CCTZ_LOCAL_TZ != nullptr);
 
   SimpleDateFormatTokenizer::InitCtx();
-  SimpleDateFormatParser::InitCtx();
 
   const vector<TimestampValue> tsvalue_data =
       AddTestDataDateTimes(1000, "1953-04-22 01:02:03");

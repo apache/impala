@@ -62,13 +62,22 @@ const unordered_map<string, IsoSqlFormatTokenizer::TokenItem>
   {"T", IsoSqlFormatTokenizer::TokenItem(ISO8601_TIME_INDICATOR, false, true)},
   {"Z", IsoSqlFormatTokenizer::TokenItem(ISO8601_ZULU_INDICATOR, false, true)},
   {"FM", IsoSqlFormatTokenizer::TokenItem(FM_MODIFIER, false, false)},
-  {"FX", IsoSqlFormatTokenizer::TokenItem(FX_MODIFIER, false, false)}
+  {"FX", IsoSqlFormatTokenizer::TokenItem(FX_MODIFIER, false, false)},
+  {"MONTH", IsoSqlFormatTokenizer::TokenItem(MONTH_NAME, true, false)},
+  {"MON", IsoSqlFormatTokenizer::TokenItem(MONTH_NAME_SHORT, true, false)},
+  {"DAY", IsoSqlFormatTokenizer::TokenItem(DAY_NAME, true, false)},
+  {"DY", IsoSqlFormatTokenizer::TokenItem(DAY_NAME_SHORT, true, false)},
+  {"D", IsoSqlFormatTokenizer::TokenItem(DAY_OF_WEEK, true, false)},
+  {"Q", IsoSqlFormatTokenizer::TokenItem(QUARTER_OF_YEAR, true, false)},
+  {"WW", IsoSqlFormatTokenizer::TokenItem(WEEK_OF_YEAR, true, false)},
+  {"W", IsoSqlFormatTokenizer::TokenItem(WEEK_OF_MONTH, true, false)}
 });
 
 const unordered_map<string, int> IsoSqlFormatTokenizer::SPECIAL_LENGTHS({
-  {"HH", 2}, {"HH12", 2}, {"HH24", 2}, {"FF", 9}, {"FF1", 1}, {"FF2", 2}, {"FF3", 3},
-  {"FF4", 4}, {"FF5", 5}, {"FF6", 6}, {"FF7", 7}, {"FF8", 8}, {"FF9", 9}, {"TZM", 2}
-});
+  {"HH12", 2}, {"HH24", 2}, {"FF", 9}, {"FF1", 1}, {"FF2", 2}, {"FF4", 4}, {"FF5", 5},
+  {"FF6", 6}, {"FF7", 7}, {"FF8", 8}, {"FF9", 9}, {"TZM", 2},
+  {"MONTH", MAX_MONTH_NAME_LENGTH}, {"DAY", MAX_DAY_NAME_LENGTH},
+  {"DY", SHORT_DAY_NAME_LENGTH}});
 
 const unsigned IsoSqlFormatTokenizer::MAX_TOKEN_SIZE = 5;
 
@@ -186,9 +195,21 @@ FormatTokenizationResult IsoSqlFormatTokenizer::CheckIncompatibilities() const {
     return YEAR_WITH_ROUNDED_YEAR_ERROR;
   }
 
-  if (IsUsedToken("DDD") && (IsUsedToken("DD") || IsUsedToken("MM"))) {
+  if (IsUsedToken("Q")) return QUARTER_NOT_ALLOWED_FOR_PARSING;
+
+  short provided_month_tokens = IsUsedToken("MM") + IsUsedToken("MONTH") +
+      IsUsedToken("MON");
+  if (provided_month_tokens > 1) return CONFLICTING_MONTH_TOKENS_ERROR;
+
+  if (IsUsedToken("WW") || IsUsedToken("W")) return WEEK_NUMBER_NOT_ALLOWED_FOR_PARSING;
+
+  if (IsUsedToken("DDD") && (IsUsedToken("DD") || provided_month_tokens == 1)) {
     return DAY_OF_YEAR_TOKEN_CONFLICT;
   }
+
+  if (IsUsedToken("D")) return DAY_OF_WEEK_NOT_ALLOWED_FOR_PARSING;
+
+  if (IsUsedToken("DAY") || IsUsedToken("DY")) return DAY_NAME_NOT_ALLOWED_FOR_PARSING;
 
   short provided_hour_tokens = IsUsedToken("HH") + IsUsedToken("HH12") +
       IsUsedToken("HH24");
@@ -198,9 +219,7 @@ FormatTokenizationResult IsoSqlFormatTokenizer::CheckIncompatibilities() const {
 
   short provided_median_tokens = IsUsedToken("AM") + IsUsedToken("A.M.") +
       IsUsedToken("PM") + IsUsedToken("P.M.");
-  if (provided_median_tokens > 1) {
-    return CONFLICTING_MERIDIEM_TOKENS_ERROR;
-  }
+  if (provided_median_tokens > 1) return CONFLICTING_MERIDIEM_TOKENS_ERROR;
 
   if (IsMeridiemIndicatorProvided() && IsUsedToken("HH24")) {
     return MERIDIEM_CONFLICTS_WITH_HOUR_ERROR;

@@ -310,7 +310,6 @@ void impala::InitCommonRuntime(int argc, char** argv, bool init_jvm,
 #endif
   impala::InitThreading();
   impala::datetime_parse_util::SimpleDateFormatTokenizer::InitCtx();
-  impala::datetime_parse_util::SimpleDateFormatParser::InitCtx();
   impala::SeedOpenSSLRNG();
   ABORT_IF_ERROR(impala::InitAuth(argv[0]));
 

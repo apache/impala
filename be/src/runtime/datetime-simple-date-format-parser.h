@@ -165,15 +165,6 @@ public:
   /// Return true if the date/time was successfully parsed.
   static bool ParseDateTime(const char* str, int len,
       const DateTimeFormatContext& dt_ctx, DateTimeParseResult* dt_result);
-
-  // Initializes REV_MONTH_INDEX;
-  static void InitCtx();
-private:
-  /// Used to indicate if the state has been initialized.
-  static bool initialized;
-
-  /// Lazily initialized pseudo-constant hashmap for mapping month names to an index.
-  static boost::unordered_map<StringValue, int> REV_MONTH_INDEX;
 };
 
 }

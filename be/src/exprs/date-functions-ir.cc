@@ -111,7 +111,8 @@ StringVal DateFunctions::LongDayName(FunctionContext* context, const DateVal& d_
   DCHECK_GE(wday, 0);
   DCHECK_LE(wday, 6);
   wday = (wday + 1) % 7;
-  const string& day_name = TimestampFunctions::DAYNAME_ARRAY[wday];
+  const string& day_name =
+      TimestampFunctions::DAY_NAMES[TimestampFunctions::CAPITALIZED][wday];
   return StringVal(reinterpret_cast<uint8_t*>(const_cast<char*>(day_name.data())),
       day_name.size());
 }
@@ -125,7 +126,8 @@ StringVal DateFunctions::LongMonthName(FunctionContext* context, const DateVal& 
 
   DCHECK_GE(month, 1);
   DCHECK_LE(month, 12);
-  const string& mn = TimestampFunctions::MONTHNAME_ARRAY[month - 1];
+  const string& mn =
+      TimestampFunctions::MONTH_NAMES[TimestampFunctions::CAPITALIZED][month - 1];
   return StringVal(reinterpret_cast<uint8_t*>(const_cast<char*>(mn.data())), mn.size());
 }
 

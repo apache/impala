@@ -19,9 +19,11 @@
 
 #include <boost/date_time/posix_time/ptime.hpp>
 #include "gutil/macros.h"
+#include <unordered_map>
 #include <unordered_set>
 #include <vector>
 
+#include "exprs/timestamp-functions.h"
 #include "runtime/timestamp-value.h"
 #include "udf/udf.h"
 
@@ -30,35 +32,68 @@ namespace impala {
 using impala_udf::FunctionContext;
 using impala_udf::StringVal;
 
-// Impala provides multiple algorithms to parse datetime formats:
-//   - SimpleDateFormat: This is the one that is traditionally used with functions such
-//     as to_timestamp() and from_timestamp().
-//   - ISO SQL:2016 compliant datetime pattern matching. CAST(..FORMAT..) comes with
-//     support for this pattern only.
-// This is a collection of the logic that is shared between the 2 types of pattern
-// matching including result codes, error reporting, format token types etc.
+/// Impala provides multiple algorithms to parse datetime formats:
+///   - SimpleDateFormat: This is the one that is traditionally used with functions such
+///     as to_timestamp() and from_timestamp().
+///   - ISO SQL:2016 compliant datetime pattern matching. CAST(..FORMAT..) comes with
+///     support for this pattern only.
+/// This is a collection of the logic that is shared between the 2 types of pattern
+/// matching including result codes, error reporting, format token types etc.
 namespace datetime_parse_util {
-const int MONTH_LENGTHS[12] = {31, 28, 31, 30, 31, 30, 31, 31, 30, 31, 30, 31};
-
 const int FRACTIONAL_SECOND_MAX_LENGTH = 9;
 
-// Describes ranges for months in a non-leap year expressed as number of days since
-// January 1.
+/// Describes ranges for months in a non-leap year expressed as number of days since
+/// January 1.
 const std::vector<int> MONTH_RANGES = {
     0, 31, 59, 90, 120, 151, 181, 212, 243, 273, 304, 334, 365 };
 
-// Describes ranges for months in a leap year expressed as number of days since January 1.
+/// Describes ranges for months in a leap year expressed as number of days since
+/// January 1.
 const std::vector<int> LEAP_YEAR_MONTH_RANGES = {
     0, 31, 60, 91, 121, 152, 182, 213, 244, 274, 305, 335, 366 };
 
-// Contains all the possible result codes that can come from parsing a datetime format
-// pattern.
+/// Maps the 3-letter prefix of a month name to the suffix of the month name and the
+/// ordinal number of month. The key of this map can be used to uniquely identify the
+/// month while the suffix part of the value can be used for checking if the full month
+/// name was given correctly in the input of a string to datetime conversion. The number
+/// part of the value can be used as a result of the string to datetime conversion.
+const std::unordered_map<std::string, std::pair<std::string, int>>
+    MONTH_PREFIX_TO_SUFFIX = {
+        {"jan", {"uary", 1}},
+        {"feb", {"ruary", 2}},
+        {"mar", {"ch", 3}},
+        {"apr", {"il", 4}},
+        {"may", {"", 5}},
+        {"jun", {"e", 6}},
+        {"jul", {"y", 7}},
+        {"aug", {"ust", 8}},
+        {"sep", {"tember", 9}},
+        {"oct", {"ober", 10}},
+        {"nov", {"ember", 11}},
+        {"dec", {"ember", 12}}
+};
+
+/// Length of short month names like 'JAN', 'FEB', etc.
+const int SHORT_MONTH_NAME_LENGTH = 3;
+
+/// Length of the longest month name 'SEPTEMBER'.
+const int MAX_MONTH_NAME_LENGTH = 9;
+
+/// Length of short day names like 'MON', 'TUE', etc.
+const int SHORT_DAY_NAME_LENGTH = 3;
+
+/// Length of the longest day name 'WEDNESDAY'.
+const int MAX_DAY_NAME_LENGTH = 9;
+
+/// Contains all the possible result codes that can come from parsing a datetime format
+/// pattern.
 enum FormatTokenizationResult {
   SUCCESS,
   GENERAL_ERROR,
   DUPLICATE_FORMAT,
   YEAR_WITH_ROUNDED_YEAR_ERROR,
   CONFLICTING_YEAR_TOKENS_ERROR,
+  CONFLICTING_MONTH_TOKENS_ERROR,
   DAY_OF_YEAR_TOKEN_CONFLICT,
   CONFLICTING_HOUR_TOKENS_ERROR,
   CONFLICTING_MERIDIEM_TOKENS_ERROR,
@@ -72,7 +107,11 @@ enum FormatTokenizationResult {
   CONFLICTING_FRACTIONAL_SECOND_TOKENS_ERROR,
   TEXT_TOKEN_NOT_CLOSED,
   NO_DATETIME_TOKENS_ERROR,
-  MISPLACED_FX_MODIFIER_ERROR
+  MISPLACED_FX_MODIFIER_ERROR,
+  QUARTER_NOT_ALLOWED_FOR_PARSING,
+  DAY_OF_WEEK_NOT_ALLOWED_FOR_PARSING,
+  DAY_NAME_NOT_ALLOWED_FOR_PARSING,
+  WEEK_NUMBER_NOT_ALLOWED_FOR_PARSING
 };
 
 /// Holds all the token types that serve as building blocks for datetime format patterns.
@@ -82,7 +121,6 @@ enum DateTimeFormatTokenType {
   YEAR,
   ROUND_YEAR,
   MONTH_IN_YEAR,
-  MONTH_IN_YEAR_SLT,
   DAY_IN_MONTH,
   DAY_IN_YEAR,
   HOUR_IN_DAY,
@@ -99,7 +137,15 @@ enum DateTimeFormatTokenType {
   ISO8601_ZULU_INDICATOR,
   TEXT,
   FM_MODIFIER,
-  FX_MODIFIER
+  FX_MODIFIER,
+  MONTH_NAME,
+  MONTH_NAME_SHORT,
+  DAY_NAME,
+  DAY_NAME_SHORT,
+  DAY_OF_WEEK,
+  QUARTER_OF_YEAR,
+  WEEK_OF_YEAR,
+  WEEK_OF_MONTH
 };
 
 /// Indicates whether the cast is a 'datetime to string' or a 'string to datetime' cast.
@@ -224,15 +270,31 @@ void ReportBadFormat(FunctionContext* context, FormatTokenizationResult error_ty
 bool ParseAndValidate(const char* token, int token_len, int min, int max,
     int* result) WARN_UNUSED_RESULT;
 
+// Given the month calculates the quarter of year.
+int GetQuarter(int month);
+
 bool ParseFractionToken(const char* token, int token_len,
     DateTimeParseResult* result) WARN_UNUSED_RESULT;
+
+/// Gets a month name token (either full or short name) and converts it to the ordinal
+/// number of month between 1 and 12. Make sure 'tok.type' is either MONTH_NAME or
+/// MONTH_NAME_SHORT. Result is stored in 'month'. Returns false if the given month name
+/// is invalid. 'fx_modifier' indicates if there is an active FX modifier on the whole
+/// format.
+/// If the month part of the input is not followed by a separator then the end of the
+/// month part is found using MONTH_PREFIX_TO_SUFFIX. First, the 3 letter prefix of the
+/// month name identifies a particular month and then checks if the rest of the month
+/// name matches. If it does then '*token_end' is adjusted to point to the character
+/// right after the end of the month part.
+bool ParseMonthNameToken(const DateTimeFormatToken& tok, const char* token_start,
+    const char** token_end, bool fx_modifier, int* month)
+    WARN_UNUSED_RESULT;
 
 inline bool IsLeapYear(int year) {
   return year % 4 == 0 && (year % 100 != 0 || year % 400 == 0);
 }
 
-/// Given the year, month and the day in month calculates the day in year using
-/// MONTH_LENGTHS.
+/// Given the year, month and the day in month calculates the day in year.
 int GetDayInYear(int year, int month, int day_in_month);
 
 /// Gets a year and the number of days passed since 1st of January that year. Calculates
@@ -246,5 +308,29 @@ bool GetMonthAndDayFromDaysSinceJan1(int year, int days_since_jan1, int* month, 
 // a string to datetime conversion path.
 std::string FormatTextToken(const DateTimeFormatToken& tok);
 
+/// Taking 'num_of_month' this function provides the name of the month. Based on the
+/// casing of the month format token in 'tok' this can format the results in 3 cases:
+/// Capitalized, full lowercase and full uppercase. E.g. "March", "march" and "MARCH".
+const std::string& FormatMonthName(int num_of_month, const DateTimeFormatToken& tok);
+
+/// Gets 'day' as a number between 1 and 7 that represents the day of week where Sunday
+/// is 1 and returns the name of the day. Based on the casing of the day format token in
+/// 'tok' this can format the results in 3 cases: Capitalized, full lowercase and full
+/// uppercase. E.g. "Monday", "monday" and "MONDAY".
+const std::string& FormatDayName(int day, const DateTimeFormatToken& tok);
+
+/// Returns how the output of a month or day token should be formatted. Make sure to
+/// call this when 'tok.type' is any of the month or day name tokens.
+TimestampFunctions::TextCase GetOutputCase(const DateTimeFormatToken& tok);
+
+/// Given the year, month and the day in month calculates the week in year where the
+/// first week of the year starts from 1st January.
+int GetWeekOfYear(int year, int month, int day);
+
+/// Given the day of month calculates the week in the month where the first week of the
+/// month starts from the first day of the month.
+int GetWeekOfMonth(int day);
+
 }
+
 }

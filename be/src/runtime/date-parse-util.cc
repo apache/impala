@@ -20,7 +20,6 @@
 #include <boost/date_time/gregorian/gregorian.hpp>
 
 #include "cctz/civil_time.h"
-#include "exprs/timestamp-functions.h"
 #include "runtime/datetime-iso-sql-format-parser.h"
 #include "runtime/datetime-simple-date-format-parser.h"
 #include "runtime/string-value.inline.h"
@@ -152,14 +151,36 @@ string DateParser::Format(const DateTimeFormatContext& dt_ctx, const DateValue& 
         }
         break;
       }
+      case QUARTER_OF_YEAR: {
+        num_val = GetQuarter(month);
+        break;
+      }
       case MONTH_IN_YEAR: num_val = month; break;
-      case MONTH_IN_YEAR_SLT: {
-        result.append(TimestampFunctions::MONTH_ARRAY[month - 1]);
+      case MONTH_NAME:
+      case MONTH_NAME_SHORT: {
+        result.append(FormatMonthName(month, tok));
+        break;
+      }
+      case WEEK_OF_YEAR: {
+        num_val = GetWeekOfYear(year, month, day);
+        break;
+      }
+      case WEEK_OF_MONTH: {
+        num_val = GetWeekOfMonth(day);
+        break;
+      }
+      case DAY_OF_WEEK: {
+        num_val = GetDayOfWeek(date);
         break;
       }
       case DAY_IN_MONTH: num_val = day; break;
       case DAY_IN_YEAR: {
         num_val = GetDayInYear(year, month, day);
+        break;
+      }
+      case DAY_NAME:
+      case DAY_NAME_SHORT: {
+        result.append(FormatDayName(GetDayOfWeek(date), tok));
         break;
       }
       case SEPARATOR: {
@@ -186,6 +207,14 @@ string DateParser::Format(const DateTimeFormatContext& dt_ctx, const DateValue& 
 bool DateParser::IndicateDateParseFailure(DateValue* date) {
   *date = DateValue();
   return false;
+}
+
+int DateParser::GetDayOfWeek(const DateValue& date) {
+  DCHECK(date.IsValid());
+  // DateValue::WeekDay() returns [0-6] where Monday is 0.
+  int dow = date.WeekDay();
+  // Convert to [1-7] where Sunday is 1.
+  return (dow + 1) % 7 + 1;
 }
 
 }

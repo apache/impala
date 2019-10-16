@@ -329,6 +329,424 @@ class TestCastWithFormat(ImpalaTestSuite):
         "format 'RR')", query_options)
     assert result.data == ["19"]
 
+  def test_month_name(self):
+    # Test different lowercase vs uppercase scenarios with the string to datetime path.
+    result = self.execute_query("select cast('2010-February-11' as timestamp FORMAT "
+        "'YYYY-MONTH-DD')")
+    assert result.data == ["2010-02-11 00:00:00"]
+
+    result = self.execute_query("select cast('2010-march-12' as timestamp FORMAT "
+        "'YYYY-MONTH-DD')")
+    assert result.data == ["2010-03-12 00:00:00"]
+
+    result = self.execute_query("select cast('APRIL 13 2010' as date FORMAT "
+        "'MONTH DD YYYY')")
+    assert result.data == ["2010-04-13"]
+
+    result = self.execute_query("select cast('2010 14 MAY' as timestamp FORMAT "
+        "'YYYY DD MONTH')")
+    assert result.data == ["2010-05-14 00:00:00"]
+
+    result = self.execute_query("select cast('2010 14 June' as timestamp FORMAT "
+        "'YYYY DD MONTH')")
+    assert result.data == ["2010-06-14 00:00:00"]
+
+    result = self.execute_query("select cast('2010 14 july' as timestamp FORMAT "
+        "'YYYY DD MONTH')")
+    assert result.data == ["2010-07-14 00:00:00"]
+
+    result = self.execute_query("select cast('2010 14 AUGUST' as timestamp FORMAT "
+        "'YYYY DD MONTH')")
+    assert result.data == ["2010-08-14 00:00:00"]
+
+    result = self.execute_query("select cast('2010 14 September' as date FORMAT "
+        "'YYYY DD month')")
+    assert result.data == ["2010-09-14"]
+
+    result = self.execute_query("select cast('2010 14 october' as date FORMAT "
+        "'YYYY DD month')")
+    assert result.data == ["2010-10-14"]
+
+    result = self.execute_query("select cast('2010 14 NOVEMBER' as date FORMAT "
+        "'YYYY DD month')")
+    assert result.data == ["2010-11-14"]
+
+    result = self.execute_query("select cast('2010 14 December' as date FORMAT "
+        "'YYYY DD month')")
+    assert result.data == ["2010-12-14"]
+
+    result = self.execute_query("select cast('2010 14 january' as date FORMAT "
+        "'YYYY DD month')")
+    assert result.data == ["2010-01-14"]
+
+    # Test different lowercase vs uppercase scenarios with the datetime to string path.
+    result = self.execute_query("select cast(date'2010-10-18' as string FORMAT "
+        "'MONTH Month month')")
+    assert result.data == ["OCTOBER   October   october  "]
+
+    result = self.execute_query("select cast(cast('2010-11-18' as timestamp) as string "
+        "FORMAT 'MONTH Month month')")
+    assert result.data == ["NOVEMBER  November  november "]
+
+    result = self.execute_query("select cast(date'2010-12-19' as string FORMAT "
+        "'MONTH Month month')")
+    assert result.data == ["DECEMBER  December  december "]
+
+    result = self.execute_query("select cast(date'2010-01-19' as string FORMAT "
+        "'MONTH Month month')")
+    assert result.data == ["JANUARY   January   january  "]
+
+    result = self.execute_query("select cast(date'2010-02-19' as string FORMAT "
+        "'MONTH Month month')")
+    assert result.data == ["FEBRUARY  February  february "]
+
+    result = self.execute_query("select cast(date'2010-03-19' as string FORMAT "
+        "'MONTH Month month')")
+    assert result.data == ["MARCH     March     march    "]
+
+    result = self.execute_query("select cast(date'2010-04-19' as string FORMAT "
+        "'MONTH Month month')")
+    assert result.data == ["APRIL     April     april    "]
+
+    result = self.execute_query("select cast(date'2010-05-19' as string FORMAT "
+        "'MONTH Month month')")
+    assert result.data == ["MAY       May       may      "]
+
+    result = self.execute_query("select cast(date'2010-06-19' as string FORMAT "
+        "'MONTH Month month')")
+    assert result.data == ["JUNE      June      june     "]
+
+    result = self.execute_query("select cast(date'2010-07-19' as string FORMAT "
+        "'MONTH Month month')")
+    assert result.data == ["JULY      July      july     "]
+
+    result = self.execute_query("select cast(date'2010-08-19' as string FORMAT "
+        "'MONTH Month month')")
+    assert result.data == ["AUGUST    August    august   "]
+
+    result = self.execute_query("select cast(date'2010-09-19' as string FORMAT "
+        "'MONTH Month month')")
+    assert result.data == ["SEPTEMBER September september"]
+
+    # Test odd casing of month token.
+    result = self.execute_query("select cast(date'2010-09-20' as string FORMAT "
+        "'MOnth MONth MONTh')")
+    assert result.data == ["SEPTEMBER SEPTEMBER SEPTEMBER"]
+
+    result = self.execute_query("select cast(date'2010-09-21' as string FORMAT "
+        "'montH monTH moNTH moNTH')")
+    assert result.data == ["september september september september"]
+
+    # Test different lowercase vs uppercase scenarios with the datetime to string path
+    # when FM is provided.
+    result = self.execute_query("select cast(date'2010-10-18' as string FORMAT "
+        "'FMMONTH FMMonth FMmonth')")
+    assert result.data == ["OCTOBER October october"]
+
+    result = self.execute_query("select cast(cast('2010-11-18' as timestamp) as string "
+        "FORMAT 'FMMONTH FMMonth FMmonth')")
+    assert result.data == ["NOVEMBER November november"]
+
+    result = self.execute_query("select cast(date'2010-12-19' as string FORMAT "
+        "'FMMONTH FMMonth FMmonth')")
+    assert result.data == ["DECEMBER December december"]
+
+    result = self.execute_query("select cast(date'2010-01-19' as string FORMAT "
+        "'FMMONTH FMMonth FMmonth')")
+    assert result.data == ["JANUARY January january"]
+
+    result = self.execute_query("select cast(date'2010-02-19' as string FORMAT "
+        "'FMMONTH FMMonth FMmonth')")
+    assert result.data == ["FEBRUARY February february"]
+
+    result = self.execute_query("select cast(date'2010-03-19' as string FORMAT "
+        "'FMMONTH FMMonth FMmonth')")
+    assert result.data == ["MARCH March march"]
+
+    result = self.execute_query("select cast(date'2010-04-19' as string FORMAT "
+        "'FMMONTH FMMonth FMmonth')")
+    assert result.data == ["APRIL April april"]
+
+    result = self.execute_query("select cast(date'2010-05-19' as string FORMAT "
+        "'FMMONTH FMMonth FMmonth')")
+    assert result.data == ["MAY May may"]
+
+    result = self.execute_query("select cast(date'2010-06-19' as string FORMAT "
+        "'FMMONTH FMMonth FMmonth')")
+    assert result.data == ["JUNE June june"]
+
+    result = self.execute_query("select cast(date'2010-07-19' as string FORMAT "
+        "'FMMONTH FMMonth FMmonth')")
+    assert result.data == ["JULY July july"]
+
+    result = self.execute_query("select cast(date'2010-08-19' as string FORMAT "
+        "'FMMONTH FMMonth FMmonth')")
+    assert result.data == ["AUGUST August august"]
+
+    result = self.execute_query("select cast(date'2010-09-19' as string FORMAT "
+        "'FMMONTH FMMonth FMmonth')")
+    assert result.data == ["SEPTEMBER September september"]
+
+    # Incorrect month name.
+    result = self.execute_query("select cast('2010 15 JU' as timestamp FORMAT "
+        "'YYYY DD MONTH')")
+    assert result.data == ["NULL"]
+
+    # MONTH token without surrounding separators.
+    result = self.execute_query("select cast('2010SEPTEMBER17' as date FORMAT "
+        "'YYYYMONTHDD')")
+    assert result.data == ["2010-09-17"]
+
+    result = self.execute_query("select cast('2010OCTOBER17' as timestamp FORMAT "
+        "'YYYYMONTHDD')")
+    assert result.data == ["2010-10-17 00:00:00"]
+
+    # Applying FX and FM modifiers on Month token.
+    result = self.execute_query("select cast(cast('2010-07-20' as timestamp) as string "
+        "FORMAT 'YYYYmonthDD')")
+    assert result.data == ["2010july     20"]
+
+    result = self.execute_query("select cast(date'2010-09-20' as string "
+        "FORMAT 'YYYYmonthDD')")
+    assert result.data == ["2010september20"]
+
+    result = self.execute_query("select cast(cast('2010-08-20' as timestamp) as string "
+        "FORMAT 'YYYYFMMonthDD')")
+    assert result.data == ["2010August20"]
+
+    result = self.execute_query("select cast(cast('2010-10-20' as timestamp) as string "
+        "FORMAT 'FXYYYYFMMONTHDD')")
+    assert result.data == ["2010OCTOBER20"]
+
+    result = self.execute_query("select cast('2010-February-19' as timestamp FORMAT "
+        "'FXYYYY-MONTH-DD')")
+    assert result.data == ["NULL"]
+
+    result = self.execute_query("select cast('2010-February -21' as timestamp FORMAT "
+        "'FXYYYY-MONTH-DD')")
+    assert result.data == ["2010-02-21 00:00:00"]
+
+    result = self.execute_query("select cast('2010-February 22' as date FORMAT "
+        "'FXYYYY-MONTHDD')")
+    assert result.data == ["2010-02-22"]
+
+    result = self.execute_query("select cast('2010-February-20' as timestamp FORMAT "
+        "'FXYYYY-FMMONTH-DD')")
+    assert result.data == ["2010-02-20 00:00:00"]
+
+  def test_short_month_name(self):
+    # Test different lowercase vs uppercase scenarios with the string to datetime path.
+    result = self.execute_query("select cast('2015-Feb-11' as timestamp FORMAT "
+        "'YYYY-MON-DD')")
+    assert result.data == ["2015-02-11 00:00:00"]
+
+    result = self.execute_query("select cast('2015-mar-12' as timestamp FORMAT "
+        "'YYYY-MON-DD')")
+    assert result.data == ["2015-03-12 00:00:00"]
+
+    result = self.execute_query("select cast('APR 13 2015' as timestamp FORMAT "
+        "'MON DD YYYY')")
+    assert result.data == ["2015-04-13 00:00:00"]
+
+    result = self.execute_query("select cast('2015 14 MAY' as timestamp FORMAT "
+        "'YYYY DD MON')")
+    assert result.data == ["2015-05-14 00:00:00"]
+
+    result = self.execute_query("select cast('2015 14 jun' as timestamp FORMAT "
+        "'YYYY DD MON')")
+    assert result.data == ["2015-06-14 00:00:00"]
+
+    result = self.execute_query("select cast('2015 14 Jul' as timestamp FORMAT "
+        "'YYYY DD MON')")
+    assert result.data == ["2015-07-14 00:00:00"]
+
+    result = self.execute_query("select cast('2015 14 AUG' as timestamp FORMAT "
+        "'YYYY DD MON')")
+    assert result.data == ["2015-08-14 00:00:00"]
+
+    result = self.execute_query("select cast('2015 14 Sep' as timestamp FORMAT "
+        "'YYYY DD mon')")
+    assert result.data == ["2015-09-14 00:00:00"]
+
+    result = self.execute_query("select cast('2015 14 oct' as timestamp FORMAT "
+        "'YYYY DD mon')")
+    assert result.data == ["2015-10-14 00:00:00"]
+
+    result = self.execute_query("select cast('2015 14 nov' as timestamp FORMAT "
+        "'YYYY DD mon')")
+    assert result.data == ["2015-11-14 00:00:00"]
+
+    result = self.execute_query("select cast('2015 14 DEC' as timestamp FORMAT "
+        "'YYYY DD mon')")
+    assert result.data == ["2015-12-14 00:00:00"]
+
+    result = self.execute_query("select cast('2015 14 Jan' as timestamp FORMAT "
+        "'YYYY DD mon')")
+    assert result.data == ["2015-01-14 00:00:00"]
+
+    # Test different lowercase vs uppercase scenarios with the datetime to string path.
+    result = self.execute_query("select cast(date'2015-10-18' as string FORMAT "
+        "'MON Mon mon')")
+    assert result.data == ["OCT Oct oct"]
+
+    result = self.execute_query("select cast(cast('2015-11-18' as timestamp) as string "
+        "FORMAT 'MON Mon mon')")
+    assert result.data == ["NOV Nov nov"]
+
+    result = self.execute_query("select cast(date'2015-12-19' as string FORMAT "
+        "'MON Mon mon')")
+    assert result.data == ["DEC Dec dec"]
+
+    result = self.execute_query("select cast(date'2015-01-19' as string FORMAT "
+        "'MON Mon mon')")
+    assert result.data == ["JAN Jan jan"]
+
+    result = self.execute_query("select cast(date'2015-02-19' as string FORMAT "
+        "'MON Mon mon')")
+    assert result.data == ["FEB Feb feb"]
+
+    result = self.execute_query("select cast(date'2015-03-19' as string FORMAT "
+        "'MON Mon mon')")
+    assert result.data == ["MAR Mar mar"]
+
+    result = self.execute_query("select cast(date'2015-04-19' as string FORMAT "
+        "'MON Mon mon')")
+    assert result.data == ["APR Apr apr"]
+
+    result = self.execute_query("select cast(date'2015-05-19' as string FORMAT "
+        "'MON Mon mon')")
+    assert result.data == ["MAY May may"]
+
+    result = self.execute_query("select cast(date'2015-06-19' as string FORMAT "
+        "'MON Mon mon')")
+    assert result.data == ["JUN Jun jun"]
+
+    result = self.execute_query("select cast(date'2015-07-19' as string FORMAT "
+        "'MON Mon mon')")
+    assert result.data == ["JUL Jul jul"]
+
+    result = self.execute_query("select cast(date'2015-08-19' as string FORMAT "
+        "'MON Mon mon')")
+    assert result.data == ["AUG Aug aug"]
+
+    result = self.execute_query("select cast(date'2015-09-19' as string FORMAT "
+        "'MON Mon mon')")
+    assert result.data == ["SEP Sep sep"]
+
+    # Test odd casing of short month token.
+    result = self.execute_query("select cast(date'2010-09-22' as string FORMAT "
+        "'MOn mON moN')")
+    assert result.data == ["SEP sep sep"]
+
+    # Incorrect month name.
+    result = self.execute_query("select cast('2015 15 JU' as timestamp FORMAT "
+        "'YYYY DD MON')")
+    assert result.data == ["NULL"]
+
+    # MON token without separators in the format.
+    result = self.execute_query("select cast('2015AUG17' as date FORMAT "
+        "'YYYYMONDD')")
+    assert result.data == ["2015-08-17"]
+
+    result = self.execute_query("select cast(cast('2015-07-20' as timestamp) as string "
+        "FORMAT 'YYYYmonDD')")
+    assert result.data == ["2015jul20"]
+
+    # FX/FM has no effect on MON.
+    result = self.execute_query("select cast(cast('2015-08-21' as timestamp) as string "
+        "FORMAT 'FXYYYYmonDD')")
+    assert result.data == ["2015aug21"]
+
+    result = self.execute_query("select cast(date'2015-09-22' as string "
+        "FORMAT 'FXYYYYFMMonDD')")
+    assert result.data == ["2015Sep22"]
+
+  def test_week_of_year(self):
+    result = self.execute_query("select cast(cast('2019-01-01' as timestamp) as string "
+        "FORMAT 'WW')")
+    assert result.data == ["01"]
+
+    result = self.execute_query("select cast(date'2019-01-07' as string "
+        "FORMAT 'WW')")
+    assert result.data == ["01"]
+
+    result = self.execute_query("select cast(cast('2019-01-08' as timestamp) as string "
+        "FORMAT 'WW')")
+    assert result.data == ["02"]
+
+    result = self.execute_query("select cast(date'2019-02-01' as string "
+        "FORMAT 'WW')")
+    assert result.data == ["05"]
+
+    result = self.execute_query("select cast(cast('2019-02-05' as timestamp) as string "
+        "FORMAT 'WW')")
+    assert result.data == ["06"]
+
+    result = self.execute_query("select cast(date'2019-12-01' as string "
+        "FORMAT 'WW')")
+    assert result.data == ["48"]
+
+    result = self.execute_query("select cast(cast('2019-12-02' as timestamp) as string "
+        "FORMAT 'WW')")
+    assert result.data == ["48"]
+
+    result = self.execute_query("select cast(date'2019-12-03' as string "
+        "FORMAT 'WW')")
+    assert result.data == ["49"]
+
+    result = self.execute_query("select cast(cast('2019-12-30' as timestamp) as string "
+        "FORMAT 'WW')")
+    assert result.data == ["52"]
+
+    result = self.execute_query("select cast(date'2019-12-31' as string "
+        "FORMAT 'WW')")
+    assert result.data == ["53"]
+
+    result = self.execute_query("select cast(cast('2020-01-01' as timestamp) as string "
+        "FORMAT 'WW')")
+    assert result.data == ["01"]
+
+  def test_week_of_month(self):
+    result = self.execute_query("select cast(cast('2019-01-01' as timestamp) as string "
+        "FORMAT 'W')")
+    assert result.data == ["1"]
+
+    result = self.execute_query("select cast(date'2019-01-07' as string "
+        "FORMAT 'W')")
+    assert result.data == ["1"]
+
+    result = self.execute_query("select cast(cast('2019-01-08' as timestamp) as string "
+        "FORMAT 'W')")
+    assert result.data == ["2"]
+
+    result = self.execute_query("select cast(date'2019-01-14' as string "
+        "FORMAT 'W')")
+    assert result.data == ["2"]
+
+    result = self.execute_query("select cast(cast('2019-01-15' as timestamp) as string "
+        "FORMAT 'W')")
+    assert result.data == ["3"]
+
+    result = self.execute_query("select cast(date'2019-01-21' as string "
+        "FORMAT 'W')")
+    assert result.data == ["3"]
+
+    result = self.execute_query("select cast(cast('2019-01-22' as timestamp) as string "
+        "FORMAT 'W')")
+    assert result.data == ["4"]
+
+    result = self.execute_query("select cast(date'2019-01-28' as string "
+        "FORMAT 'W')")
+    assert result.data == ["4"]
+
+    result = self.execute_query("select cast(cast('2019-01-29' as timestamp) as string "
+        "FORMAT 'W')")
+    assert result.data == ["5"]
+
+    result = self.execute_query("select cast(date'2019-02-01' as string "
+        "FORMAT 'W')")
+    assert result.data == ["1"]
+
   def test_day_in_year(self):
     # Test "day in year" token in a non leap year scenario
     result = self.execute_query("select cast('2019 1' as timestamp FORMAT 'YYYY DDD')")
@@ -384,6 +802,104 @@ class TestCastWithFormat(ImpalaTestSuite):
         "format 'YYYY DDD') as string format'DDD')")
     assert result.data == ["123"]
 
+  def test_day_name(self):
+    # Different lowercase and uppercase scenarios.
+    result = self.execute_query("select cast(date'2019-11-13' as string "
+        "format 'DAY Day day DY Dy dy')")
+    assert result.data == ["WEDNESDAY Wednesday wednesday WED Wed wed"]
+
+    result = self.execute_query("select cast(cast('2019-11-14' as timestamp) as string "
+        "format 'DAY Day day DY Dy dy')")
+    assert result.data == ["THURSDAY  Thursday  thursday  THU Thu thu"]
+
+    result = self.execute_query("select cast(date'2019-11-15' as string "
+        "format 'DAY Day day DY Dy dy')")
+    assert result.data == ["FRIDAY    Friday    friday    FRI Fri fri"]
+
+    result = self.execute_query("select cast(cast('2019-11-16' as timestamp) as string "
+        "format 'DAY Day day DY Dy dy')")
+    assert result.data == ["SATURDAY  Saturday  saturday  SAT Sat sat"]
+
+    result = self.execute_query("select cast(date'2019-11-17' as string "
+        "format 'DAY Day day DY Dy dy')")
+    assert result.data == ["SUNDAY    Sunday    sunday    SUN Sun sun"]
+
+    result = self.execute_query("select cast(cast('2019-11-18' as timestamp) as string "
+        "format 'DAY Day day DY Dy dy')")
+    assert result.data == ["MONDAY    Monday    monday    MON Mon mon"]
+
+    result = self.execute_query("select cast(date'2019-11-19' as string "
+        "format 'DAY Day day DY Dy dy')")
+    assert result.data == ["TUESDAY   Tuesday   tuesday   TUE Tue tue"]
+
+    # Different lowercase and uppercase scenarios when FM is provided.
+    result = self.execute_query("select cast(cast('2019-11-13' as timestamp) as string "
+        "format 'FMDAY FMDay FMday FMDY FMDy FMdy')")
+    assert result.data == ["WEDNESDAY Wednesday wednesday WED Wed wed"]
+
+    result = self.execute_query("select cast(date'2019-11-14' as string "
+        "format 'FMDAY FMDay FMday FMDY FMDy FMdy')")
+    assert result.data == ["THURSDAY Thursday thursday THU Thu thu"]
+
+    result = self.execute_query("select cast(cast('2019-11-15' as timestamp) as string "
+        "format 'FMDAY FMDay FMday FMDY FMDy FMdy')")
+    assert result.data == ["FRIDAY Friday friday FRI Fri fri"]
+
+    result = self.execute_query("select cast(date'2019-11-16' as string "
+        "format 'FMDAY FMDay FMday FMDY FMDy FMdy')")
+    assert result.data == ["SATURDAY Saturday saturday SAT Sat sat"]
+
+    result = self.execute_query("select cast(cast('2019-11-17' as timestamp) as string "
+        "format 'FMDAY FMDay FMday FMDY FMDy FMdy')")
+    assert result.data == ["SUNDAY Sunday sunday SUN Sun sun"]
+
+    result = self.execute_query("select cast(date'2019-11-18' as string "
+        "format 'FMDAY FMDay FMday FMDY FMDy FMdy')")
+    assert result.data == ["MONDAY Monday monday MON Mon mon"]
+
+    result = self.execute_query("select cast(cast('2019-11-19' as timestamp) as string "
+        "format 'FMDAY FMDay FMday FMDY FMDy FMdy')")
+    assert result.data == ["TUESDAY Tuesday tuesday TUE Tue tue"]
+
+    # Test odd casing of day token.
+    result = self.execute_query("select cast(date'2010-01-20' as string FORMAT "
+        "'DAy dAY daY dY')")
+    assert result.data == ["WEDNESDAY wednesday wednesday wed"]
+
+    # Day token without surrounding separators
+    result = self.execute_query("select cast(date'2019-11-11' as string "
+        "format 'YYYYDayMonth')")
+    assert result.data == ["2019Monday   November "]
+
+    result = self.execute_query("select cast(cast('2019-11-12' as timestamp) as string "
+        "format 'YYYYDYDD')")
+    assert result.data == ["2019TUE12"]
+
+    result = self.execute_query("select cast(date'2019-11-11' as string "
+        "format 'YYYYDayMonth')")
+    assert result.data == ["2019Monday   November "]
+
+    result = self.execute_query("select cast(cast('2019-11-12' as timestamp) as string "
+        "format 'YYYYDYDD')")
+    assert result.data == ["2019TUE12"]
+
+    # Day token with FM and FX modifiers.
+    result = self.execute_query("select cast(cast('2019-01-01' as timestamp) as string "
+        "format 'FXYYYY DAY DD')")
+    assert result.data == ["2019 TUESDAY   01"]
+
+    result = self.execute_query("select cast(date'2019-01-01' as string "
+        "format 'FXYYYY FMDAY DD')")
+    assert result.data == ["2019 TUESDAY 01"]
+
+    result = self.execute_query("select cast(cast('2019-02-02' as timestamp) as string "
+        "format 'FXYYYY DY DD')")
+    assert result.data == ["2019 SAT 02"]
+
+    result = self.execute_query("select cast(date'2019-02-02' as string "
+        "format 'FXYYYY FMDY DD')")
+    assert result.data == ["2019 SAT 02"]
+
   def test_second_of_day(self):
     # Check boundaries
     result = self.client.execute("select cast('2019-11-10 86399.11' as "
@@ -416,6 +932,43 @@ class TestCastWithFormat(ImpalaTestSuite):
     result = self.client.execute("select cast(cast('2019-01-01 23:59:59' as timestamp) "
         "as string format 'SSSSS')")
     assert result.data == ["86399"]
+
+  def test_day_of_week(self):
+    # Sunday is 1
+    result = self.execute_query("select cast(cast('2019-11-03' as timestamp) as string "
+        "FORMAT 'D')")
+    assert result.data == ["1"]
+
+    result = self.execute_query("select cast(cast('2019-11-03' as date) as string "
+        "FORMAT 'D')")
+    assert result.data == ["1"]
+
+    # Wednesday is 4
+    result = self.execute_query("select cast(cast('2019-11-06' as timestamp) as string "
+        "FORMAT 'D')")
+    assert result.data == ["4"]
+
+    result = self.execute_query("select cast(cast('2019-11-06' as date) as string "
+        "FORMAT 'D')")
+    assert result.data == ["4"]
+
+    # Saturday is 7
+    result = self.execute_query("select cast(cast('2019-11-09' as timestamp) as string "
+        "FORMAT 'D')")
+    assert result.data == ["7"]
+
+    result = self.execute_query("select cast(cast('2019-11-09' as date) as string "
+        "FORMAT 'D')")
+    assert result.data == ["7"]
+
+    # FX and FM modifier does not pad day of week values with zeros.
+    result = self.execute_query("select cast(cast('2019-12-01' as date) as string "
+        "FORMAT 'FXD')")
+    assert result.data == ["1"]
+
+    result = self.execute_query("select cast(cast('2019-12-02' as date) as string "
+        "FORMAT 'FXFMD')")
+    assert result.data == ["2"]
 
   def test_fraction_seconds(self):
     result = self.execute_query("select cast('2019-11-08 123456789' as "
@@ -977,6 +1530,39 @@ class TestCastWithFormat(ImpalaTestSuite):
         "'fxYYYY-fmMM-DD')")
     assert result.data == ["2019-05-10"]
 
+  def test_quarter(self):
+    result = self.client.execute("select cast(date'2001-01-01' as string "
+        "FORMAT 'YYYY Q MM')")
+    assert result.data == ["2001 1 01"]
+
+    result = self.client.execute("select cast(date'2001-03-31' as string "
+        "FORMAT 'YYYY Q MM')")
+    assert result.data == ["2001 1 03"]
+
+    result = self.client.execute("select cast(date'2001-4-1' as string "
+        "FORMAT 'YYYY Q MM')")
+    assert result.data == ["2001 2 04"]
+
+    result = self.client.execute("select cast(date'2001-6-30' as string "
+        "FORMAT 'YYYY Q MM')")
+    assert result.data == ["2001 2 06"]
+
+    result = self.client.execute("select cast(date'2001-7-1' as string "
+        "FORMAT 'YYYY Q MM')")
+    assert result.data == ["2001 3 07"]
+
+    result = self.client.execute("select cast(date'2001-9-30' as string "
+        "FORMAT 'YYYY Q MM')")
+    assert result.data == ["2001 3 09"]
+
+    result = self.client.execute("select cast(date'2001-10-1' as string "
+        "FORMAT 'YYYY Q MM')")
+    assert result.data == ["2001 4 10"]
+
+    result = self.client.execute("select cast(date'2001-12-31' as string "
+        "FORMAT 'YYYY Q MM')")
+    assert result.data == ["2001 4 12"]
+
   def test_format_parse_errors(self):
     # Invalid format
     err = self.execute_query_expect_failure(self.client,
@@ -997,14 +1583,14 @@ class TestCastWithFormat(ImpalaTestSuite):
         "select cast('2017-05-01' as timestamp format 'YYYY-MM-DD-YYYY')")
     assert "Invalid duplication of format element" in str(err)
 
-    # Multiple year token provided
+    # Multiple year tokens provided
     err = self.execute_query_expect_failure(self.client,
         "select cast('2017-05-01' as timestamp format 'YYYY-MM-DD-YY')")
-    assert "Multiple year token provided" in str(err)
+    assert "Multiple year tokens provided" in str(err)
 
     err = self.execute_query_expect_failure(self.client,
         "select cast('2017-05-01' as timestamp format 'YYY-MM-DD-Y')")
-    assert "Multiple year token provided" in str(err)
+    assert "Multiple year tokens provided" in str(err)
 
     # Year and round year conflict
     err = self.execute_query_expect_failure(self.client,
@@ -1015,6 +1601,36 @@ class TestCastWithFormat(ImpalaTestSuite):
         "select cast('2017-05-01' as timestamp format 'RR-MM-DD-YYY')")
     assert "Both year and round year are provided" in str(err)
 
+    # Quarter token not allowed in a string to datetime conversion.
+    err = self.execute_query_expect_failure(self.client,
+        "select cast('2017-1-01' as timestamp format 'YYYY-Q-DDD')")
+    assert "Quarter token is not allowed in a string to datetime conversion" in str(err)
+
+    # Conflict between MM, MONTH and MON tokens
+    err = self.execute_query_expect_failure(self.client,
+        "select cast('2017-05-01' as timestamp format 'YYYY-MM-DD-MONTH')")
+    assert "Multiple month tokens provided" in str(err)
+
+    err = self.execute_query_expect_failure(self.client,
+        "select cast('2017-05-01' as timestamp format 'YYYY-MM-DD-MON')")
+    assert "Multiple month tokens provided" in str(err)
+
+    err = self.execute_query_expect_failure(self.client,
+        "select cast('2017-05-01' as timestamp format 'YYYY-MONTH-DD-MON')")
+    assert "Multiple month tokens provided" in str(err)
+
+    # Week of year token not allowed in a string to datetime conversion.
+    err = self.execute_query_expect_failure(self.client,
+        "select cast('2017-1-01' as timestamp format 'YYYY-WW-DD')")
+    assert "Week number token is not allowed in a string to datetime conversion" in \
+        str(err)
+
+    # Week of month token not allowed in a string to datetime conversion.
+    err = self.execute_query_expect_failure(self.client,
+        "select cast('2017-1-01' as timestamp format 'YYYY-W-DD')")
+    assert "Week number token is not allowed in a string to datetime conversion" in \
+        str(err)
+
     # Day of year conflict
     err = self.execute_query_expect_failure(self.client,
         "select cast('2017-05-01' as timestamp format 'YYYY-MM-DDD')")
@@ -1023,6 +1639,26 @@ class TestCastWithFormat(ImpalaTestSuite):
     err = self.execute_query_expect_failure(self.client,
         "select cast('2017-05-01' as timestamp format 'YYYY-DD-DDD')")
     assert "Day of year provided with day or month token" in str(err)
+
+    err = self.execute_query_expect_failure(self.client,
+        "select cast('2017-MAY-01' as timestamp format 'YYYY-MONTH-DDD')")
+    assert "Day of year provided with day or month token" in str(err)
+
+    err = self.execute_query_expect_failure(self.client,
+        "select cast('2017-JUN-01' as timestamp format 'YYYY-MON-DDD')")
+    assert "Day of year provided with day or month token" in str(err)
+
+    # Day of week token not allowed in a string to datetime conversion.
+    err = self.execute_query_expect_failure(self.client,
+        "select cast('2017-1-02' as timestamp format 'YYYY-D-MM')")
+    assert "Day of week token is not allowed in a string to datetime conversion" in \
+        str(err)
+
+    # Day name token not allowed in a string to datetime conversion.
+    err = self.execute_query_expect_failure(self.client,
+        "select cast('2017-1-02 Monday' as timestamp format 'YYYY-DD-MM DAY')")
+    assert "Day name token is not allowed in a string to datetime conversion" in \
+        str(err)
 
     # Conflict between hour tokens
     err = self.execute_query_expect_failure(self.client,

@@ -74,7 +74,8 @@ bool IsoSqlFormatParser::ParseDateTime(const char* input_str, int input_len,
       continue;
     }
 
-    const char* token_end_pos = FindEndOfToken(current_pos, end_pos - current_pos, *tok);
+    const char* token_end_pos =
+        FindEndOfToken(current_pos, end_pos - current_pos, *tok, dt_ctx.fx_modifier);
     if (token_end_pos == nullptr) return false;
     int token_len = token_end_pos - current_pos;
 
@@ -102,6 +103,14 @@ bool IsoSqlFormatParser::ParseDateTime(const char* input_str, int input_len,
       }
       case MONTH_IN_YEAR: {
         if (!ParseAndValidate(current_pos, token_len, 1, 12, &result->month)) {
+          return false;
+        }
+        break;
+      }
+      case MONTH_NAME:
+      case MONTH_NAME_SHORT: {
+        if (!ParseMonthNameToken(*tok, current_pos, &token_end_pos, dt_ctx.fx_modifier,
+            &result->month)) {
           return false;
         }
         break;
@@ -272,7 +281,7 @@ bool IsoSqlFormatParser::ProcessSeparatorSequence(const char** current_pos,
 }
 
 const char* IsoSqlFormatParser::FindEndOfToken(const char* input_str,
-    int input_len, const DateTimeFormatToken& tok) {
+    int input_len, const DateTimeFormatToken& tok, bool fx_provided) {
   DCHECK(input_str != nullptr);
   DCHECK(input_len >= 0);
 
@@ -284,6 +293,11 @@ const char* IsoSqlFormatParser::FindEndOfToken(const char* input_str,
   // in the input. E.g. "AM" should match with "P.M.".
   if (tok.type == MERIDIEM_INDICATOR) {
     return ParseMeridiemIndicatorFromInput(input_str, input_len);
+  }
+
+  if (tok.type == MONTH_NAME && fx_provided && !tok.fm_modifier) {
+    if (input_len < MAX_MONTH_NAME_LENGTH) return nullptr;
+    return input_str + MAX_MONTH_NAME_LENGTH;
   }
 
   int max_tok_len = min(input_len, tok.len);

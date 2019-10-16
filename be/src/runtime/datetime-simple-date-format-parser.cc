@@ -33,7 +33,6 @@ namespace impala {
 namespace datetime_parse_util {
 
 bool SimpleDateFormatTokenizer::initialized = false;
-bool SimpleDateFormatParser::initialized = false;
 
 const int SimpleDateFormatTokenizer::DEFAULT_DATE_FMT_LEN = 10;
 const int SimpleDateFormatTokenizer::DEFAULT_TIME_FMT_LEN = 8;
@@ -48,8 +47,6 @@ DateTimeFormatContext SimpleDateFormatTokenizer::DEFAULT_TIME_CTX;
 DateTimeFormatContext SimpleDateFormatTokenizer::DEFAULT_DATE_TIME_CTX[10];
 DateTimeFormatContext SimpleDateFormatTokenizer::DEFAULT_ISO_DATE_TIME_CTX[10];
 DateTimeFormatContext SimpleDateFormatTokenizer::DEFAULT_TIME_FRAC_CTX[10];
-
-unordered_map<StringValue, int> SimpleDateFormatParser::REV_MONTH_INDEX;
 
 void SimpleDateFormatTokenizer::InitCtx() {
   if (initialized) return;
@@ -94,23 +91,6 @@ void SimpleDateFormatTokenizer::InitCtx() {
   }
 
   // Flag that the parser is ready.
-  initialized = true;
-}
-
-void SimpleDateFormatParser::InitCtx() {
-  if (initialized) return;
-  // This needs to be lazily init'd because a StringValues hash function will be invoked
-  // for each entry that's placed in the map. The hash function expects that
-  // CpuInfo::Init() has already been called.
-  REV_MONTH_INDEX = boost::unordered_map<StringValue, int>({
-    {StringValue("jan"), 1}, {StringValue("feb"), 2},
-    {StringValue("mar"), 3}, {StringValue("apr"), 4},
-    {StringValue("may"), 5}, {StringValue("jun"), 6},
-    {StringValue("jul"), 7}, {StringValue("aug"), 8},
-    {StringValue("sep"), 9}, {StringValue("oct"), 10},
-    {StringValue("nov"), 11}, {StringValue("dec"), 12}
-  });
-
   initialized = true;
 }
 
@@ -201,7 +181,7 @@ bool SimpleDateFormatTokenizer::Tokenize(DateTimeFormatContext* dt_ctx,
     }
     if (tok_type == MONTH_IN_YEAR) {
       if (UNLIKELY(tok_len > 3)) return false;
-      if (tok_len == 3) tok_type = MONTH_IN_YEAR_SLT;
+      if (tok_len == 3) tok_type = MONTH_NAME_SHORT;
     }
     // In an output scenario, fmt_out_len is used to determine the print buffer size.
     // If the format uses short tokens e.g. yyyy-MM-d, there must to be enough room in
@@ -450,7 +430,6 @@ const DateTimeFormatContext* SimpleDateFormatTokenizer::GetDefaultFormatContext(
 
 bool SimpleDateFormatParser::ParseDateTime(const char* str, int str_len,
     const DateTimeFormatContext& dt_ctx, DateTimeParseResult* dt_result) {
-  DCHECK(initialized);
   DCHECK(dt_ctx.fmt_len > 0);
   DCHECK(dt_ctx.toks.size() > 0);
   DCHECK(dt_result != NULL);
@@ -486,14 +465,12 @@ bool SimpleDateFormatParser::ParseDateTime(const char* str, int str_len,
         if (!ParseAndValidate(tok_val, tok_len, 1, 12, &dt_result->month)) return false;
         break;
       }
-      case MONTH_IN_YEAR_SLT: {
-        char raw_buff[tok.len];
-        std::transform(tok_val, tok_val + tok.len, raw_buff, ::tolower);
-        StringValue buff(raw_buff, tok.len);
-        boost::unordered_map<StringValue, int>::const_iterator iter =
-            REV_MONTH_INDEX.find(buff);
-        if (UNLIKELY(iter == REV_MONTH_INDEX.end())) return false;
-        dt_result->month = iter->second;
+      case MONTH_NAME_SHORT: {
+        const char* tok_end = tok_val + tok_len;
+        if (!ParseMonthNameToken(tok, tok_val, &tok_end, dt_ctx.fx_modifier,
+            &dt_result->month)) {
+          return false;
+        }
         break;
       }
       case DAY_IN_MONTH: {
@@ -560,4 +537,4 @@ bool SimpleDateFormatParser::ParseDateTime(const char* str, int str_len,
 
 } // namespace datetime_parse_util
 
-} // nmespace impala
+} // namespace impala

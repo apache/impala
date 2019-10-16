@@ -34,15 +34,45 @@ namespace impala {
 
 using namespace datetime_parse_util;
 
-const string TimestampFunctions::DAY_ARRAY[7] = {"Sun", "Mon", "Tue", "Wed", "Thu",
-    "Fri", "Sat"};
-const string TimestampFunctions::DAYNAME_ARRAY[7] = {"Sunday", "Monday", "Tuesday",
-    "Wednesday", "Thursday", "Friday", "Saturday"};
-const string TimestampFunctions::MONTH_ARRAY[12] = {"Jan", "Feb", "Mar", "Apr", "May",
-    "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"};
-const string TimestampFunctions::MONTHNAME_ARRAY[12] = {"January", "February", "March",
-    "April", "May", "June", "July", "August", "September", "October", "November",
-    "December"};
+const string TimestampFunctions::SHORT_MONTH_NAMES[3][12] = {
+    {"Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"},
+    {"jan", "feb", "mar", "apr", "may", "jun", "jul", "aug", "sep", "oct", "nov", "dec"},
+    {"JAN", "FEB", "MAR", "APR", "MAY", "JUN", "JUL", "AUG", "SEP", "OCT", "NOV", "DEC"}
+};
+
+const string TimestampFunctions::MONTH_NAMES[3][12] = {
+    {"January", "February", "March", "April", "May", "June", "July", "August",
+     "September", "October", "November", "December"},
+    {"january", "february", "march", "april", "may", "june", "july", "august",
+     "september", "october", "november", "december"},
+    {"JANUARY", "FEBRUARY", "MARCH", "APRIL", "MAY", "JUNE", "JULY", "AUGUST",
+     "SEPTEMBER", "OCTOBER", "NOVEMBER", "DECEMBER"}};
+
+const string TimestampFunctions::MONTH_NAMES_PADDED[3][12] = {
+    {"January  ", "February ", "March    ", "April    ", "May      ", "June     ",
+     "July     ", "August   ", "September", "October  ", "November ", "December "},
+    {"january  ", "february ", "march    ", "april    ", "may      ", "june     ",
+     "july     ", "august   ", "september", "october  ", "november ", "december "},
+    {"JANUARY  ", "FEBRUARY ", "MARCH    ", "APRIL    ", "MAY      ", "JUNE     ",
+     "JULY     ", "AUGUST   ", "SEPTEMBER", "OCTOBER  ", "NOVEMBER ", "DECEMBER "}};
+
+const string TimestampFunctions::SHORT_DAY_NAMES[3][7] = {
+    {"Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"},
+    {"sun", "mon", "tue", "wed", "thu", "fri", "sat"},
+    {"SUN", "MON", "TUE", "WED", "THU", "FRI", "SAT"}};
+
+const string TimestampFunctions::DAY_NAMES[3][7] = {
+    {"Sunday", "Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday"},
+    {"sunday", "monday", "tuesday", "wednesday", "thursday", "friday", "saturday"},
+    {"SUNDAY", "MONDAY", "TUESDAY", "WEDNESDAY", "THURSDAY", "FRIDAY", "SATURDAY"}};
+
+const string TimestampFunctions::DAY_NAMES_PADDED[3][7] = {
+    {"Sunday   ", "Monday   ", "Tuesday  ", "Wednesday", "Thursday ", "Friday   ",
+     "Saturday "},
+    {"sunday   ", "monday   ", "tuesday  ", "wednesday", "thursday ", "friday   ",
+     "saturday "},
+    {"SUNDAY   ", "MONDAY   ", "TUESDAY  ", "WEDNESDAY", "THURSDAY ", "FRIDAY   ",
+     "SATURDAY "}};
 
 // Sunday is mapped to 0 and Saturday is mapped to 6.
 const map<string, int> TimestampFunctions::DAYNAME_MAP = {

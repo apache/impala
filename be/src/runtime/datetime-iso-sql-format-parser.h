@@ -42,12 +42,16 @@ public:
 private:
   /// 'input_str' points to a location in the input string where the parsing stands now.
   /// Given 'tok' as the next token in the list of tokens created by the tokenizer this
-  /// functions finds the end of the next token.
+  /// function finds the end of the next token.
   /// 'input_len' is used for stopping when we reach the end of the input string.
-  /// Return a pointer pointing one position after the last character of the found token.
+  /// Returns a pointer pointing one position after the last character of the found token.
   /// If can't identify the next token then returns nullptr.
+  /// If a MONTH_NAME token is not followed by a separator then the end of the month name
+  /// in the input can't be found by this function. In this case MAX_MONTH_NAME_LENGTH is
+  /// expected as the lenght of the month token and later on ParseMonthNameToken() will
+  /// adjust the end of the token.
   static const char* FindEndOfToken(const char* input_str, int input_len,
-      const DateTimeFormatToken& tok) WARN_UNUSED_RESULT;
+      const DateTimeFormatToken& tok, bool fx_provided) WARN_UNUSED_RESULT;
 
   /// Has to call this function when 'input_str' points to the fist character of a
   /// meridiem indicator. Identifies the last position of a meridiem indicator and returns

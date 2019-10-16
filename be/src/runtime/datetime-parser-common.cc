@@ -17,11 +17,16 @@
 
 #include "datetime-parser-common.h"
 
+#include <boost/algorithm/string/classification.hpp>
+#include <boost/algorithm/string/trim.hpp>
 #include <boost/date_time/gregorian/gregorian.hpp>
 
+#include "gutil/strings/ascii_ctype.h"
+#include "runtime/datetime-iso-sql-format-tokenizer.h"
 #include "runtime/string-value.h"
 #include "util/string-parser.h"
 
+using boost::algorithm::is_any_of;
 using std::string;
 using std::unordered_set;
 
@@ -73,7 +78,10 @@ void ReportBadFormat(FunctionContext* context, FormatTokenizationResult error_ty
         ss << "PARSE ERROR: Both year and round year are provided";
         break;
       case CONFLICTING_YEAR_TOKENS_ERROR:
-        ss << "PARSE ERROR: Multiple year token provided";
+        ss << "PARSE ERROR: Multiple year tokens provided";
+        break;
+      case CONFLICTING_MONTH_TOKENS_ERROR:
+        ss << "PARSE ERROR: Multiple month tokens provided";
         break;
       case DAY_OF_YEAR_TOKEN_CONFLICT:
         ss << "PARSE ERROR: Day of year provided with day or month token";
@@ -118,6 +126,22 @@ void ReportBadFormat(FunctionContext* context, FormatTokenizationResult error_ty
       case MISPLACED_FX_MODIFIER_ERROR:
         ss << "PARSE ERROR: FX modifier should be at the beginning of the format string.";
         break;
+      case QUARTER_NOT_ALLOWED_FOR_PARSING:
+        ss << "PARSE_ERROR: Quarter token is not allowed in a string to datetime "
+            "conversion";
+        break;
+      case DAY_OF_WEEK_NOT_ALLOWED_FOR_PARSING:
+        ss << "PARSE_ERROR: Day of week token is not allowed in a string to datetime "
+            "conversion";
+        break;
+      case DAY_NAME_NOT_ALLOWED_FOR_PARSING:
+        ss << "PARSE_ERROR: Day name token is not allowed in a string to datetime "
+            "conversion";
+        break;
+      case WEEK_NUMBER_NOT_ALLOWED_FOR_PARSING:
+        ss << "PARSE_ERROR: Week number token is not allowed in a string to datetime "
+            "conversion";
+        break;
       default:
         const StringValue& fmt = StringValue::FromStringVal(format);
         ss << "Bad date/time conversion format: " << fmt.DebugString();
@@ -157,6 +181,56 @@ bool ParseFractionToken(const char* token, int token_len,
   if (token_len < FRACTIONAL_SECOND_MAX_LENGTH) {
     result->fraction *= std::pow(10, FRACTIONAL_SECOND_MAX_LENGTH - token_len);
   }
+  return true;
+}
+
+int GetQuarter(int month) {
+  DCHECK(month > 0 && month <= 12);
+  return (month - 1) / 3 + 1;
+}
+
+bool ParseMonthNameToken(const DateTimeFormatToken& tok, const char* token_start,
+    const char** token_end, bool fx_modifier, int* month) {
+  DCHECK(token_start != nullptr);
+  DCHECK(tok.type == MONTH_NAME || tok.type == MONTH_NAME_SHORT);
+  DCHECK(month != nullptr);
+  DCHECK(token_end != nullptr && *token_end != nullptr);
+  DCHECK(token_start <= *token_end);
+  int token_len = *token_end - token_start;
+  if (token_len < SHORT_MONTH_NAME_LENGTH) return false;
+
+  string buff(token_start, token_len);
+  boost::to_lower(buff);
+  const string& prefix = buff.substr(0, SHORT_MONTH_NAME_LENGTH);
+  const auto month_iter = MONTH_PREFIX_TO_SUFFIX.find(prefix);
+  if (UNLIKELY(month_iter == MONTH_PREFIX_TO_SUFFIX.end())) return false;
+  if (tok.type == MONTH_NAME_SHORT) {
+    *month = month_iter->second.second;
+    return true;
+  }
+
+  DCHECK(tok.type == MONTH_NAME);
+  if (fx_modifier && !tok.fm_modifier) {
+    DCHECK(buff.length() == MAX_MONTH_NAME_LENGTH);
+    trim_right_if(buff, is_any_of(" "));
+  }
+
+  // Check if the remaining characters match.
+  const string& expected_suffix = month_iter->second.first;
+  if (buff.length() - SHORT_MONTH_NAME_LENGTH < expected_suffix.length()) return false;
+  const char* actual_suffix = buff.c_str() + SHORT_MONTH_NAME_LENGTH;
+  if (strncmp(actual_suffix, expected_suffix.c_str(), expected_suffix.length()) != 0) {
+    return false;
+  }
+  *month = month_iter->second.second;
+
+  // If the end of the month token wasn't identified because it wasn't followed by a
+  // separator then the end of the month token has to be adjusted.
+  if (prefix.length() + expected_suffix.length() < buff.length()) {
+    if (fx_modifier && !tok.fm_modifier) return false;
+    *token_end = token_start + prefix.length() + expected_suffix.length();
+  }
+
   return true;
 }
 
@@ -221,6 +295,53 @@ string FormatTextToken(const DateTimeFormatToken& tok) {
   return result;
 }
 
+const string& FormatMonthName(int num_of_month, const DateTimeFormatToken& tok) {
+  DCHECK(num_of_month >= 1 && num_of_month <= 12);
+  DCHECK((tok.type == MONTH_NAME && tok.len == MAX_MONTH_NAME_LENGTH) ||
+         (tok.type == MONTH_NAME_SHORT && tok.len == SHORT_MONTH_NAME_LENGTH));
+  TimestampFunctions::TextCase text_case = GetOutputCase(tok);
+  if (tok.type == MONTH_NAME_SHORT) {
+    return TimestampFunctions::SHORT_MONTH_NAMES[text_case][num_of_month - 1];
+  }
+  if (tok.fm_modifier) {
+    return TimestampFunctions::MONTH_NAMES[text_case][num_of_month - 1];
+  }
+  return TimestampFunctions::MONTH_NAMES_PADDED[text_case][num_of_month - 1];
+}
+
+const string& FormatDayName(int day, const DateTimeFormatToken& tok) {
+  DCHECK(day >= 1 && day <= 7);
+  DCHECK((tok.type == DAY_NAME && tok.len == MAX_DAY_NAME_LENGTH) ||
+         (tok.type == DAY_NAME_SHORT && tok.len == SHORT_DAY_NAME_LENGTH));
+  TimestampFunctions::TextCase text_case = GetOutputCase(tok);
+  if (tok.type == DAY_NAME_SHORT) {
+     return TimestampFunctions::SHORT_DAY_NAMES[text_case][day - 1];
+  }
+  if (tok.fm_modifier) return TimestampFunctions::DAY_NAMES[text_case][day - 1];
+  return TimestampFunctions::DAY_NAMES_PADDED[text_case][day - 1];
+}
+
+TimestampFunctions::TextCase GetOutputCase(const DateTimeFormatToken& tok) {
+  DCHECK(tok.type == DAY_NAME || tok.type == DAY_NAME_SHORT || tok.type == MONTH_NAME ||
+      tok.type == MONTH_NAME_SHORT);
+  DCHECK(tok.val != nullptr);
+  DCHECK(tok.len >= SHORT_DAY_NAME_LENGTH && tok.len >= SHORT_MONTH_NAME_LENGTH);
+  if (strncmp(tok.val, "MMM", 3) == 0) return TimestampFunctions::CAPITALIZED;
+  if (ascii_islower(*tok.val)) {
+    return TimestampFunctions::LOWERCASE;
+  } else if  (ascii_isupper(*(tok.val + 1))) {
+    return TimestampFunctions::UPPERCASE;
+  }
+  return TimestampFunctions::CAPITALIZED;
+}
+
+int GetWeekOfYear(int year, int month, int day) {
+  return (GetDayInYear(year, month, day) - 1) / 7 + 1;
+}
+
+int GetWeekOfMonth(int day) {
+  return (day - 1) / 7 + 1;
+}
 
 }
 }
