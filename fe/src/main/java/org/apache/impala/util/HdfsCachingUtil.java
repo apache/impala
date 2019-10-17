@@ -26,7 +26,6 @@ import org.apache.hadoop.hdfs.DFSConfigKeys;
 import org.apache.hadoop.hdfs.DistributedFileSystem;
 import org.apache.hadoop.hdfs.protocol.CacheDirectiveEntry;
 import org.apache.hadoop.hdfs.protocol.CacheDirectiveInfo;
-import org.apache.hadoop.hdfs.protocol.CacheDirectiveInfo.Expiration;
 import org.apache.hadoop.ipc.RemoteException;
 import org.apache.log4j.Logger;
 
@@ -317,7 +316,6 @@ public class HdfsCachingUtil {
     Preconditions.checkNotNull(path);
     Preconditions.checkState(poolName != null && !poolName.isEmpty());
     CacheDirectiveInfo info = new CacheDirectiveInfo.Builder()
-        .setExpiration(Expiration.NEVER)
         .setPool(poolName)
         .setReplication(replication)
         .setPath(path).build();
@@ -371,7 +369,6 @@ public class HdfsCachingUtil {
     Preconditions.checkState(poolName != null && !poolName.isEmpty());
     CacheDirectiveInfo info = new CacheDirectiveInfo.Builder()
         .setId(id)
-        .setExpiration(Expiration.NEVER)
         .setPool(poolName)
         .setReplication(replication)
         .setPath(path).build();

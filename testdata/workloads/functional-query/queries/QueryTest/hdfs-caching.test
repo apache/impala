@@ -385,3 +385,8 @@ show partitions cached_tbl_local;
 ---- TYPES
 STRING, BIGINT, BIGINT, STRING, STRING, STRING, STRING, STRING, STRING
 ====
+---- QUERY
+# IMPALA-9055: Cannot cache table in pool with max TTL.
+create table cached_tbl_ttl (i int) cached in 'testPoolWithTtl';
+alter table cached_tbl_ttl set cached in 'testPoolWithTtl' with replication = 4;
+====
