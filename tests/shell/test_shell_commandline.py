@@ -36,7 +36,8 @@ from tests.common.skip import SkipIf
 from tests.common.test_dimensions import create_client_protocol_dimension
 from time import sleep, time
 from util import (get_impalad_host_port, assert_var_substitution, run_impala_shell_cmd,
-                  ImpalaShell, IMPALA_SHELL_EXECUTABLE, SHELL_IS_PYTHON_2)
+                  ImpalaShell, IMPALA_SHELL_EXECUTABLE, SHELL_IS_PYTHON_2,
+                  build_shell_env)
 from contextlib import closing
 
 
@@ -800,7 +801,8 @@ class TestImpalaShell(ImpalaTestSuite):
     with open(os.devnull, 'w') as devnull:
       try:
         connection = None
-        impala_shell = Popen(shell_cmd + args, stdout=devnull, stderr=devnull)
+        impala_shell = Popen(shell_cmd + args, stdout=devnull, stderr=devnull,
+                             env=build_shell_env())
         # IMPALA-9547: retry accept(). This is required in Python < 3.5 because some
         # EINTR return calls from syscalls are not automatically retried. See PEP475.
         while True:

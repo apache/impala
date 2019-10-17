@@ -303,6 +303,11 @@ if [[ ! -e "$JAVA" ]]; then
   return 1
 fi
 
+# Java libraries required by executables and java tests.
+export LIB_JAVA=$(find "${JAVA_HOME}/" -name libjava.so | head -1)
+export LIB_JSIG=$(find "${JAVA_HOME}/" -name libjsig.so | head -1)
+export LIB_JVM=$(find "${JAVA_HOME}/" -name libjvm.so  | head -1)
+
 #########################################################################################
 # Below here are variables that can be overridden by impala-config-*.sh and environment #
 # vars, variables computed based on other variables, and variables that cannot be       #
@@ -770,28 +775,7 @@ LIBHDFS_OPTS+=" -XX:ErrorFile=${IMPALA_LOGS_DIR}/hs_err_pid%p.log"
 # running tests that load UDF jars.
 LIBHDFS_OPTS="${LIBHDFS_OPTS} -XX:MaxPermSize=128m"
 
-export IMPALA_SNAPPY_PATH="${IMPALA_TOOLCHAIN}/snappy-${IMPALA_SNAPPY_VERSION}/lib"
-
-export JAVA_LIBRARY_PATH="${IMPALA_SNAPPY_PATH}"
-
-# So that the frontend tests and PlanService can pick up required libraries
-LIB_JAVA=`find "${JAVA_HOME}/"   -name libjava.so | head -1`
-LIB_JSIG=`find "${JAVA_HOME}/"   -name libjsig.so | head -1`
-LIB_JVM=` find "${JAVA_HOME}/"   -name libjvm.so  | head -1`
-export LD_LIBRARY_PATH="${LD_LIBRARY_PATH:-}:`dirname ${LIB_JAVA}`:`dirname ${LIB_JSIG}`"
-LD_LIBRARY_PATH="${LD_LIBRARY_PATH}:`dirname ${LIB_JVM}`"
-LD_LIBRARY_PATH="${LD_LIBRARY_PATH}:${HADOOP_LIB_DIR}/native"
-LD_LIBRARY_PATH="${LD_LIBRARY_PATH}:${IMPALA_SNAPPY_PATH}"
-LD_LIBRARY_PATH="${LD_LIBRARY_PATH}:${IMPALA_LZO}/build"
-
-if [ $USE_SYSTEM_GCC -eq 0 ]; then
-  IMPALA_TOOLCHAIN_GCC_LIB="${IMPALA_TOOLCHAIN}/gcc-${IMPALA_GCC_VERSION}/lib64"
-  LD_LIBRARY_PATH="${LD_LIBRARY_PATH}:${IMPALA_TOOLCHAIN_GCC_LIB}"
-fi
-
-export LD_PRELOAD="${LD_PRELOAD-}:${LIB_JSIG}"
-
-export CLASSPATH="$IMPALA_FE_DIR/target/dependency:${CLASSPATH-}"
+export CLASSPATH="$IMPALA_FE_DIR/target/dependency:${CLASSPATH:+:${CLASSPATH}}"
 CLASSPATH="$IMPALA_FE_DIR/target/classes:$CLASSPATH"
 CLASSPATH="$IMPALA_FE_DIR/src/test/resources:$CLASSPATH"
 CLASSPATH="$LZO_JAR_PATH:$CLASSPATH"
@@ -820,8 +804,6 @@ echo "IMPALA_LZO              = $IMPALA_LZO"
 echo "CLASSPATH               = $CLASSPATH"
 echo "LIBHDFS_OPTS            = $LIBHDFS_OPTS"
 echo "JAVA_HOME               = $JAVA_HOME"
-echo "LD_LIBRARY_PATH         = $LD_LIBRARY_PATH"
-echo "LD_PRELOAD              = $LD_PRELOAD"
 echo "POSTGRES_JDBC_DRIVER    = $POSTGRES_JDBC_DRIVER"
 echo "IMPALA_TOOLCHAIN        = $IMPALA_TOOLCHAIN"
 echo "METASTORE_DB            = $METASTORE_DB"

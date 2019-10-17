@@ -43,7 +43,7 @@ from tests.common.impala_test_suite import ImpalaTestSuite
 from tests.common.skip import SkipIfLocal
 from tests.common.test_dimensions import create_client_protocol_dimension
 from util import (assert_var_substitution, ImpalaShell, get_impalad_port, get_shell_cmd,
-                  get_open_sessions_metric, IMPALA_SHELL_EXECUTABLE)
+                  get_open_sessions_metric, IMPALA_SHELL_EXECUTABLE, spawn_shell)
 import SimpleHTTPServer
 import SocketServer
 
@@ -123,8 +123,7 @@ class TestImpalaShellInteractive(ImpalaTestSuite):
 
   def test_local_shell_options(self, vector):
     """Test that setting the local shell options works"""
-    shell_cmd = get_shell_cmd(vector)
-    proc = pexpect.spawn(shell_cmd[0], shell_cmd[1:])
+    proc = spawn_shell(get_shell_cmd(vector))
     proc.expect(":{0}] default>".format(get_impalad_port(vector)))
     self._expect_with_cmd(proc, "set", vector,
         ("LIVE_PROGRESS: True", "LIVE_SUMMARY: False"))
@@ -157,7 +156,7 @@ class TestImpalaShellInteractive(ImpalaTestSuite):
     p.send_cmd("select * from nation")
     result = p.get_result()
     assert "+----------------+" not in result.stdout
-    assert "21\tVIETNAM\t2" in result.stdout
+    assert "21\tVIETNAM\t2" in result.stdout, result.stdout
 
   @pytest.mark.execute_serially
   def test_change_delimiter(self, vector):
@@ -252,7 +251,7 @@ class TestImpalaShellInteractive(ImpalaTestSuite):
         "line 1\n", "line 2\n", "line 3\n\n", "line 4 and", " 5\n",
         "line 6\n", "line 7\n", "line 8\n", "line 9\n", "line 10"]
     # Check when the last line before Ctrl-C doesn't end with newline.
-    child_proc = pexpect.spawn(shell_cmd[0], shell_cmd[1:])
+    child_proc = spawn_shell(shell_cmd)
     for query in queries:
       child_proc.send(query)
     child_proc.sendintr()
@@ -261,7 +260,7 @@ class TestImpalaShellInteractive(ImpalaTestSuite):
     child_proc.sendline('quit;')
     child_proc.wait()
     # Check when the last line before Ctrl-C ends with newline.
-    child_proc = pexpect.spawn(shell_cmd[0], shell_cmd[1:])
+    child_proc = spawn_shell(shell_cmd)
     for query in queries:
       child_proc.send(query)
     # Sending in a newline so it will end with one
@@ -421,8 +420,7 @@ class TestImpalaShellInteractive(ImpalaTestSuite):
     Additionally, also test that comments are preserved.
     """
     # readline gets its input from tty, so using stdin does not work.
-    shell_cmd = get_shell_cmd(vector)
-    child_proc = pexpect.spawn(shell_cmd[0], shell_cmd[1:])
+    child_proc = spawn_shell(get_shell_cmd(vector))
     # List of (input query, expected text in output).
     # The expected output is usually the same as the input with a number prefix, except
     # where the shell strips newlines before a semicolon.
@@ -452,7 +450,7 @@ class TestImpalaShellInteractive(ImpalaTestSuite):
     occur."""
     # readline gets its input from tty, so using stdin does not work.
     shell_cmd = get_shell_cmd(vector)
-    child_proc = pexpect.spawn(shell_cmd[0], shell_cmd[1:])
+    child_proc = spawn_shell(shell_cmd)
     # set up history
     child_proc.expect(PROMPT_REGEX)
     child_proc.sendline("select 1;")
@@ -460,7 +458,7 @@ class TestImpalaShellInteractive(ImpalaTestSuite):
     child_proc.expect(PROMPT_REGEX)
     child_proc.sendline("quit;")
     child_proc.wait()
-    child_proc = pexpect.spawn(shell_cmd[0], shell_cmd[1:])
+    child_proc = spawn_shell(shell_cmd)
     child_proc.expect(PROMPT_REGEX)
 
     # send SIGINT then quit to save history
@@ -488,7 +486,7 @@ class TestImpalaShellInteractive(ImpalaTestSuite):
     """
     with NamedTemporaryFile() as new_hist:
       shell_cmd = get_shell_cmd(vector) + ["--history_file=%s" % new_hist.name]
-      child_proc = pexpect.spawn(shell_cmd[0], shell_cmd[1:])
+      child_proc = spawn_shell(shell_cmd)
       child_proc.expect(":{0}] default>".format(get_impalad_port(vector)))
       self._expect_with_cmd(child_proc, "select 'hi'", vector, ('hi'))
       child_proc.sendline('exit;')
@@ -498,8 +496,7 @@ class TestImpalaShellInteractive(ImpalaTestSuite):
 
   def test_rerun(self, vector, tmp_history_file):
     """Smoke test for the 'rerun' command"""
-    shell_cmd = get_shell_cmd(vector)
-    child_proc = pexpect.spawn(shell_cmd[0], shell_cmd[1:])
+    child_proc = spawn_shell(get_shell_cmd(vector))
     child_proc.expect(":{0}] default>".format(get_impalad_port(vector)))
     self._expect_with_cmd(child_proc, "@1", vector, ("Command index out of range"))
     self._expect_with_cmd(child_proc, "rerun -1", vector,
@@ -880,7 +877,7 @@ class TestImpalaShellInteractive(ImpalaTestSuite):
 
   def test_shell_prompt(self, vector):
     shell_cmd = get_shell_cmd(vector)
-    proc = pexpect.spawn(shell_cmd[0], shell_cmd[1:])
+    proc = spawn_shell(shell_cmd)
     proc.expect(":{0}] default>".format(get_impalad_port(vector)))
     self._expect_with_cmd(proc, "use foo", vector, (), 'default')
     self._expect_with_cmd(proc, "use functional", vector, (), 'functional')
@@ -888,20 +885,20 @@ class TestImpalaShellInteractive(ImpalaTestSuite):
     self._expect_with_cmd(proc, 'use `tpch`', vector, (), 'tpch')
     self._expect_with_cmd(proc, 'use ` tpch `', vector, (), 'tpch')
 
-    proc = pexpect.spawn(shell_cmd[0], shell_cmd[1:] + ['-d', 'functional'])
+    proc = spawn_shell(shell_cmd + ['-d', 'functional'])
     proc.expect(":{0}] functional>".format(get_impalad_port(vector)))
     self._expect_with_cmd(proc, "use foo", vector, (), 'functional')
     self._expect_with_cmd(proc, "use tpch", vector, (), 'tpch')
     self._expect_with_cmd(proc, "use foo", vector, (), 'tpch')
 
-    proc = pexpect.spawn(shell_cmd[0], shell_cmd[1:] + ['-d', ' functional '])
+    proc = spawn_shell(shell_cmd + ['-d', ' functional '])
     proc.expect(":{0}] functional>".format(get_impalad_port(vector)))
 
-    proc = pexpect.spawn(shell_cmd[0], shell_cmd[1:] + ['-d', '` functional `'])
+    proc = spawn_shell(shell_cmd + ['-d', '` functional `'])
     proc.expect(":{0}] functional>".format(get_impalad_port(vector)))
 
     # Start an Impala shell with an invalid DB.
-    proc = pexpect.spawn(shell_cmd[0], shell_cmd[1:] + ['-d', 'foo'])
+    proc = spawn_shell(shell_cmd + ['-d', 'foo'])
     proc.expect(":{0}] default>".format(get_impalad_port(vector)))
     self._expect_with_cmd(proc, "use foo", vector, (), 'default')
     self._expect_with_cmd(proc, "use functional", vector, (), 'functional')
@@ -1012,7 +1009,7 @@ class TestImpalaShellInteractive(ImpalaTestSuite):
 
       # Check that we get a message about the 503 error when we try to connect.
       shell_args = ["--protocol={0}".format(protocol), "-i{0}:{1}".format(HOST, PORT)]
-      shell_proc = pexpect.spawn(IMPALA_SHELL_EXECUTABLE, shell_args)
+      shell_proc = spawn_shell([IMPALA_SHELL_EXECUTABLE] + shell_args)
       shell_proc.expect("HTTP code 503", timeout=10)
     finally:
       # Clean up.

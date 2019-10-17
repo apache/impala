@@ -1,3 +1,5 @@
+#!/bin/bash
+#
 # Licensed to the Apache Software Foundation (ASF) under one
 # or more contributor license agreements.  See the NOTICE file
 # distributed with this work for additional information
@@ -15,17 +17,15 @@
 # specific language governing permissions and limitations
 # under the License.
 
-# This file is intended to be sourced to perform common setup for
-# $IMPALA_HOME/bin/impala-py* executables.
+# Runs the provided command line with the required environment variables for
+# binaries compiled in the dev environment, i.e. LD_LIBRARY_PATH and LD_PRELOAD.
+# Also sets CLASSPATH for the embedded JVM started by many binaries.
 
 set -euo pipefail
-. $IMPALA_HOME/bin/report_build_error.sh
-setup_report_build_error
 
-. $IMPALA_HOME/bin/set-pythonpath.sh
+. "${IMPALA_HOME}/bin/set-classpath.sh"
+. "${IMPALA_HOME}/bin/set-ld-library-path.sh"
 
-export LD_LIBRARY_PATH="$(python "$IMPALA_HOME/infra/python/bootstrap_virtualenv.py" \
-  --print-ld-library-path)"
-
-PY_DIR="$(dirname "$0")/../infra/python"
-python "$PY_DIR/bootstrap_virtualenv.py"
+# LLVM must be on path to symbolise sanitiser stack traces.
+export PATH="${IMPALA_TOOLCHAIN}/llvm-${IMPALA_LLVM_VERSION}/bin:${PATH}"
+exec "$@"

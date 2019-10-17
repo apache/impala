@@ -709,6 +709,20 @@ under the License.
           <redirectTestOutputToFile>true</redirectTestOutputToFile>
           <argLine>${surefireJacocoArg}</argLine>
           <groups>${testcase.groups}</groups>
+          <environmentVariables>
+            <!-- Set LD_LIBRARY_PATH and LD_PRELOAD to pick up libraries required for
+                 running fe tests:
+                 * LD_LIBRARY_PATH needs to include the GCC libraries that libfesupport.so
+                   was built against.
+                 * LD_PRELOAD needs to include libjsig.so for JVM/native signal handling.
+            -->
+            <LD_LIBRARY_PATH>
+              ${env.IMPALA_TOOLCHAIN}/gcc-${env.IMPALA_GCC_VERSION}/lib64
+            </LD_LIBRARY_PATH>
+            <LD_PRELOAD>
+              ${env.LIB_JSIG}
+            </LD_PRELOAD>
+          </environmentVariables>
         </configuration>
       </plugin>
 

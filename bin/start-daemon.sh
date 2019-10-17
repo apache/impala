@@ -26,8 +26,4 @@ set -euo pipefail
 if ${CLUSTER_DIR}/admin is_kerberized; then
   . ${MINIKDC_ENV}
 fi
-
-. ${IMPALA_HOME}/bin/set-classpath.sh
-# LLVM must be on path to symbolise sanitiser stack traces.
-export PATH="${IMPALA_TOOLCHAIN}/llvm-${IMPALA_LLVM_VERSION}/bin:${PATH}"
-exec "$@"
+exec "${IMPALA_HOME}/bin/run-jvm-binary.sh" "$@"

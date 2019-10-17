@@ -329,14 +329,6 @@ fi
 
 echo ">>> Configuring system"
 
-# IMPALA-3932, IMPALA-3926
-if [[ $UBUNTU = true && ( $DISTRIB_RELEASE = 16.04 || $DISTRIB_RELEASE = 18.04 ) ]]
-then
-  SET_LD_LIBRARY_PATH="export LD_LIBRARY_PATH=/usr/lib/${ARCH_NAME}-linux-gnu/${LD_LIBRARY_PATH:+:$LD_LIBRARY_PATH}"
-  echo -e "\n$SET_LD_LIBRARY_PATH" >> "${IMPALA_HOME}/bin/impala-config-local.sh"
-  eval "$SET_LD_LIBRARY_PATH"
-fi
-
 redhat6 sudo service postgresql initdb
 redhat6 sudo service postgresql stop
 redhat7 notindocker sudo service postgresql initdb

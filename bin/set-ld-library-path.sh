@@ -1,3 +1,5 @@
+#!/bin/bash
+#
 # Licensed to the Apache Software Foundation (ASF) under one
 # or more contributor license agreements.  See the NOTICE file
 # distributed with this work for additional information
@@ -15,17 +17,17 @@
 # specific language governing permissions and limitations
 # under the License.
 
-# This file is intended to be sourced to perform common setup for
-# $IMPALA_HOME/bin/impala-py* executables.
+# This file should be sourced to set up LD_LIBRARY_PATH and LD_PRELOAD to
+# run Impala binaries in the context of a dev environment.
+export LD_LIBRARY_PATH="${LD_LIBRARY_PATH:+${LD_LIBRARY_PATH}:}"
 
-set -euo pipefail
-. $IMPALA_HOME/bin/report_build_error.sh
-setup_report_build_error
+# Impala-lzo is loaded at runtime, so needs to be on the search path.
+LD_LIBRARY_PATH="${LD_LIBRARY_PATH}:${IMPALA_LZO}/build"
 
-. $IMPALA_HOME/bin/set-pythonpath.sh
+# We built against toolchain GCC so we need to dynamically link against matching
+# library versions. (the rpath isn't baked into the binaries)
+IMPALA_TOOLCHAIN_GCC_LIB="${IMPALA_TOOLCHAIN}/gcc-${IMPALA_GCC_VERSION}/lib64"
+LD_LIBRARY_PATH="${LD_LIBRARY_PATH}:${IMPALA_TOOLCHAIN_GCC_LIB}"
 
-export LD_LIBRARY_PATH="$(python "$IMPALA_HOME/infra/python/bootstrap_virtualenv.py" \
-  --print-ld-library-path)"
+export LD_PRELOAD="${LD_PRELOAD:+${LD_PRELOAD}:}${LIB_JSIG}"
 
-PY_DIR="$(dirname "$0")/../infra/python"
-python "$PY_DIR/bootstrap_virtualenv.py"

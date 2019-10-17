@@ -17,15 +17,18 @@
 # specific language governing permissions and limitations
 # under the License.
 
+import os
 import subprocess
 import sys
 from optparse import OptionParser
 
+IMPALA_HOME = os.environ['IMPALA_HOME']
 
 def get_set_of_tests(unified_binary, filters):
     # Run the unified_binary with the specified filters. If filters is None, run
     # without filters. Process the output to get fully qualified tests.
-    command = [unified_binary, "--gtest_list_tests"]
+    command = [os.path.join(IMPALA_HOME, "bin/run-binary.sh"), unified_binary,
+               "--gtest_list_tests"]
     if filters is not None:
         command.append("--gtest_filter={0}".format(filters))
     p = subprocess.Popen(command, stdout=subprocess.PIPE)
