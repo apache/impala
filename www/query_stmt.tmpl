@@ -26,8 +26,8 @@ under the License.
 
 <!-- Enable the 'highlight' library, which does syntax highlighting of query
      statements -->
-<link rel="stylesheet" href="www/highlight/styles/default.css">
-<script src="www/highlight/highlight.pack.js"></script>
+<link rel="stylesheet" href="{{ __common__.host-url }}/www/highlight/styles/default.css">
+<script src="{{ __common__.host-url }}/www/highlight/highlight.pack.js"></script>
 <script>hljs.initHighlightingOnLoad();</script>
 
 {{?stmt}}<pre class="code"><code>{{stmt}}</code></pre>{{/stmt}}

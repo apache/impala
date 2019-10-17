@@ -683,15 +683,17 @@ class TestWebPage(ImpalaTestSuite):
     # on the same page an so doesn't need to the hostname) or '{{ __common__.host-url }}'
     # Note that if we ever need to add a link that doesn't conform to this, we will
     # probably also have to change the Knox service definition.
-    href_regex = "<a .*? href=['\"](?!({{ __common__.host-url }})|#)"
+    href_regex = "<(a|link) .*? href=['\"](?!({{ __common__.host-url }})|#)"
+    # Matches all 'script' tags that aren't absoluve urls.
+    script_regex = "<script .*?src=['\"](?!({{ __common__.host-url }})|http)"
     # Matches all 'form' tags that are not followed by including the hidden inputs.
     form_regex = "<form [^{]*?>(?!{{>www/form-hidden-inputs.tmpl}})"
     # Matches XMLHttpRequest.open() in javascript that are not followed with make_url().
     javascript_regex = "open\(['\"]GET['\"], (?!make_url)"
     # Matches urls in json parameters passed to DataTables.
     datatables_regex = "url: ['\"](?!make_url)"
-    regex = "(%s)|(%s)|(%s)|(%s)" % \
-        (href_regex, form_regex, javascript_regex, datatables_regex)
+    regex = "(%s)|(%s)|(%s)|(%s)|(%s)" % \
+        (href_regex, script_regex, form_regex, javascript_regex, datatables_regex)
     results = grep_dir(os.path.join(os.environ['IMPALA_HOME'], "www"), regex, ".*\.tmpl")
     assert len(results) == 0, \
         "All links on the webui must include the webserver host: %s" % results

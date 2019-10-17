@@ -36,6 +36,7 @@ www/DataTables*/*
 www/datatables-1.10.18.*
 www/bootstrap/css/bootstrap*
 www/bootstrap/js/bootstrap*
+www/favicon.ico
 tests/comparison/leopard/static/css/bootstrap*
 tests/comparison/leopard/static/fonts/glyphicons-halflings*
 tests/comparison/leopard/static/js/bootstrap*

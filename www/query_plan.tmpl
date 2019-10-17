@@ -67,8 +67,8 @@ under the License.
 
 {{> www/common-footer.tmpl }}
 
-<script src="www/d3.v3.min.js" charset="utf-8"></script>
-<script src="www/dagre-d3.min.js"></script>
+<script src="{{ __common__.host-url }}/www/d3.v3.min.js" charset="utf-8"></script>
+<script src="{{ __common__.host-url }}/www/dagre-d3.min.js"></script>
 
 <!-- Builds and then renders a plan graph using Dagre / D3. The JSON for the current query
 is retrieved by an HTTP call, and then the graph of nodes and edges is built by walking
