@@ -237,10 +237,10 @@ redhat sudo yum clean all
 
 # Download ant for centos
 redhat sudo wget -nv \
-  https://www-us.apache.org/dist/ant/binaries/apache-ant-1.9.13-bin.tar.gz
-redhat sha512sum -c - <<< 'c8321aa223f70d7e64d3d0274263000cfffb46fbea61488534e26f9f0245d99e9872d0888e35cd3274416392a13f80c748c07750caaeffa5f9cae1220020715f  apache-ant-1.9.13-bin.tar.gz'
-redhat sudo tar -C /usr/local -xzf apache-ant-1.9.13-bin.tar.gz
-redhat sudo ln -s /usr/local/apache-ant-1.9.13/bin/ant /usr/local/bin
+  https://www-us.apache.org/dist/ant/binaries/apache-ant-1.9.14-bin.tar.gz
+redhat sha512sum -c - <<< '487dbd1d7f678a92924ba884a57e910ccb4fe565c554278795a8fdfc80c4e88d81ebc2ccecb5a8f353f0b2076572bb921499a2cadb064e0f44fc406a3c31da20  apache-ant-1.9.14-bin.tar.gz'
+redhat sudo tar -C /usr/local -xzf apache-ant-1.9.14-bin.tar.gz
+redhat sudo ln -s /usr/local/apache-ant-1.9.14/bin/ant /usr/local/bin
 
 # Download maven for all OSes, since the OS-packaged version can be
 # pretty old.
