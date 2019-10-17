@@ -139,7 +139,7 @@ class RpcMgrTest : public testing::Test {
     ASSERT_OK(HostnameToIpAddr(FLAGS_hostname, &ip));
     krpc_address_ = MakeNetworkAddress(ip, SERVICE_PORT);
     exec_env_.reset(new ExecEnv());
-    ASSERT_OK(rpc_mgr_.Init());
+    ASSERT_OK(rpc_mgr_.Init(krpc_address_));
   }
 
   virtual void TearDown() {
@@ -303,7 +303,7 @@ Status RpcMgrTest::RunMultipleServicesTest(
 
   FLAGS_num_acceptor_threads = 2;
   FLAGS_num_reactor_threads = 10;
-  RETURN_IF_ERROR(rpc_mgr->StartServices(krpc_address));
+  RETURN_IF_ERROR(rpc_mgr->StartServices());
 
   unique_ptr<PingServiceProxy> ping_proxy;
   RETURN_IF_ERROR(static_cast<PingServiceImpl*>(ping_impl)->GetProxy(krpc_address,

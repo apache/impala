@@ -31,7 +31,6 @@
 #include "runtime/query-state.h"
 #include "service/client-request-state.h"
 #include "service/impala-server.h"
-#include "testutil/fault-injection-util.h"
 #include "util/debug-util.h"
 #include "util/memory-metrics.h"
 #include "util/parse-util.h"

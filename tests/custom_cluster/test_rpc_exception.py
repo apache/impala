@@ -24,6 +24,16 @@ from tests.common.skip import SkipIf, SkipIfBuildType
 class TestRPCException(CustomClusterTestSuite):
   """Tests Impala exception handling in TransmitData() RPC to make sure no
      duplicated row batches are sent. """
+  # DataStreamService rpc names
+  TRANSMIT_DATA_RPC = "TransmitData"
+  END_DATA_STREAM_RPC = "EndDataStream"
+
+  # Error to specify for ImpalaServicePool to reject rpcs with a 'server too busy' error.
+  REJECT_TOO_BUSY_MSG = "REJECT_TOO_BUSY"
+
+  # The BE krpc port of the impalad these tests simulate rpc errors at.
+  KRPC_PORT = 27002
+
   # This query ends up calling TransmitData() more than 2048 times to ensure
   # proper test coverage.
   TEST_QUERY = "select count(*) from tpch_parquet.lineitem t1, tpch_parquet.lineitem t2 \
@@ -40,55 +50,74 @@ class TestRPCException(CustomClusterTestSuite):
       pytest.skip('runs only in exhaustive')
     super(TestRPCException, cls).setup_class()
 
-  # Execute TEST_QUERY. If 'exception_string' is None, it's expected to complete
-  # sucessfully with result matching EXPECTED_RESULT. Otherwise, it's expected
-  # to fail with 'exception_string'.
+  def _get_num_fails(self, impalad):
+    num_fails = impalad.service.get_metric_value("impala.debug_action.fail")
+    if num_fails is None:
+      return 0
+    return num_fails
+
+  # Execute TEST_QUERY repeatedly until the FAIL debug action has been hit. If
+  # 'exception_string' is None, it's expected to always complete sucessfully with result
+  # matching EXPECTED_RESULT. Otherwise, it's expected to fail with 'exception_string' if
+  # the debug action has been hit.
   def execute_test_query(self, exception_string):
-    try:
-      result = self.client.execute(self.TEST_QUERY)
-      assert result.data == self.EXPECTED_RESULT
-      assert not exception_string
-    except ImpalaBeeswaxException as e:
-      if exception_string is None:
-        raise e
-      assert exception_string in str(e)
+    impalad = self.cluster.impalads[2]
+    assert impalad.service.krpc_port == self.KRPC_PORT
+    # Re-run the query until the metrics show that we hit the debug action or we've run 10
+    # times. Each test in this file has at least a 50% chance of hitting the action per
+    # run, so there's at most a (1/2)^10 chance that this loop will fail spuriously.
+    i = 0
+    while self._get_num_fails(impalad) == 0 and i < 10:
+      i += 1
+      try:
+        result = self.client.execute(self.TEST_QUERY)
+        assert result.data == self.EXPECTED_RESULT
+        assert not exception_string or self._get_num_fails(impalad) == 0
+      except ImpalaBeeswaxException as e:
+        if exception_string is None:
+          raise e
+        assert exception_string in str(e)
+    assert self._get_num_fails(impalad) > 0
+
+  def _get_fail_action(rpc, error=None, port=KRPC_PORT, p=0.1):
+    """Returns a debug action that causes rpcs with the name 'rpc' that are sent to the
+    impalad at 'port' to FAIL with probability 'p' and return 'error' if specified."""
+    debug_action = "IMPALA_SERVICE_POOL:127.0.0.1:{port}:{rpc}:FAIL@{probability}" \
+        .format(rpc=rpc, probability=p, port=port)
+    if error is not None:
+      debug_action += "@" + error
+    return debug_action
 
   @pytest.mark.execute_serially
-  @CustomClusterTestSuite.with_args("--fault_injection_rpc_exception_type=1")
-  def test_rpc_send_closed_connection(self, vector):
+  @CustomClusterTestSuite.with_args("--debug_actions=" +
+      _get_fail_action(rpc=TRANSMIT_DATA_RPC, error=REJECT_TOO_BUSY_MSG))
+  def test_transmit_data_retry(self):
+    """Run a query where TransmitData may fail with a "server too busy" error. We should
+    always retry in this case, so the query should always eventually succeed."""
     self.execute_test_query(None)
 
   @pytest.mark.execute_serially
-  @CustomClusterTestSuite.with_args("--fault_injection_rpc_exception_type=2")
-  def test_rpc_send_stale_connection(self, vector):
+  @CustomClusterTestSuite.with_args("--debug_actions=" +
+      _get_fail_action(rpc=TRANSMIT_DATA_RPC, error=REJECT_TOO_BUSY_MSG) +
+      "|" + _get_fail_action(rpc=TRANSMIT_DATA_RPC))
+  def test_transmit_data_error(self):
+    """Run a query where TransmitData may fail with a "server too busy" or with a generic
+    error. The query should either succeed or fail with the given error."""
+    self.execute_test_query("Debug Action: IMPALA_SERVICE_POOL:FAIL@0.1")
+
+  @pytest.mark.execute_serially
+  @CustomClusterTestSuite.with_args("--debug_actions=" +
+      _get_fail_action(rpc=END_DATA_STREAM_RPC, error=REJECT_TOO_BUSY_MSG, p=0.5))
+  def test_end_data_stream_retry(self):
+    """Run a query where EndDataStream may fail with a "server too busy" error. We should
+    always retry in this case, so the query should always eventually succeed."""
     self.execute_test_query(None)
 
   @pytest.mark.execute_serially
-  @CustomClusterTestSuite.with_args("--fault_injection_rpc_exception_type=3")
-  def test_rpc_send_timed_out(self, vector):
-    self.execute_test_query(None)
-
-  @pytest.mark.execute_serially
-  @CustomClusterTestSuite.with_args("--fault_injection_rpc_exception_type=5")
-  def test_rpc_recv_timed_out(self, vector):
-    self.execute_test_query(None)
-
-  @pytest.mark.execute_serially
-  @CustomClusterTestSuite.with_args("--fault_injection_rpc_exception_type=6")
-  def test_rpc_secure_send_closed_connection(self, vector):
-    self.execute_test_query(None)
-
-  @pytest.mark.execute_serially
-  @CustomClusterTestSuite.with_args("--fault_injection_rpc_exception_type=7")
-  def test_rpc_secure_send_stale_connection(self, vector):
-    self.execute_test_query(None)
-
-  @pytest.mark.execute_serially
-  @CustomClusterTestSuite.with_args("--fault_injection_rpc_exception_type=8")
-  def test_rpc_secure_send_timed_out(self, vector):
-    self.execute_test_query(None)
-
-  @pytest.mark.execute_serially
-  @CustomClusterTestSuite.with_args("--fault_injection_rpc_exception_type=10")
-  def test_rpc_secure_recv_timed_out(self, vector):
-    self.execute_test_query(None)
+  @CustomClusterTestSuite.with_args("--debug_actions=" +
+      _get_fail_action(rpc=END_DATA_STREAM_RPC, error=REJECT_TOO_BUSY_MSG, p=0.5) +
+      "|" + _get_fail_action(rpc=END_DATA_STREAM_RPC, p=0.5))
+  def test_end_data_stream_error(self):
+    """Run a query where EndDataStream may fail with a "server too busy" or with a generic
+    error. The query should either succeed or fail with the given error."""
+    self.execute_test_query("Debug Action: IMPALA_SERVICE_POOL:FAIL@0.5")

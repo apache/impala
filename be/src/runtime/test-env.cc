@@ -79,7 +79,7 @@ Status TestEnv::Init() {
   IpAddr ip_address;
   RETURN_IF_ERROR(HostnameToIpAddr(FLAGS_hostname, &ip_address));
   exec_env_->krpc_address_.__set_hostname(ip_address);
-  RETURN_IF_ERROR(exec_env_->rpc_mgr_->Init());
+  RETURN_IF_ERROR(exec_env_->rpc_mgr_->Init(exec_env_->krpc_address_));
   exec_env_->control_svc_.reset(new ControlService(exec_env_->rpc_metrics_));
   RETURN_IF_ERROR(exec_env_->control_svc_->Init());
 

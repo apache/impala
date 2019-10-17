@@ -19,7 +19,6 @@
 #define IMPALA_BACKEND_CLIENT_H
 
 #include "runtime/client-cache.h"
-#include "testutil/fault-injection-util.h"
 #include "util/runtime-profile-counters.h"
 
 #include "gen-cpp/ImpalaInternalService.h"

@@ -74,7 +74,7 @@ TEST_F(RpcMgrKerberizedTest, MultipleServicesTls) {
 
   // Enable TLS.
   ScopedSetTlsFlags s(SERVER_CERT, PRIVATE_KEY, SERVER_CERT);
-  ASSERT_OK(tls_rpc_mgr.Init());
+  ASSERT_OK(tls_rpc_mgr.Init(tls_krpc_address));
 
   ASSERT_OK(RunMultipleServicesTest(&tls_rpc_mgr, tls_krpc_address));
   tls_rpc_mgr.Shutdown();
@@ -95,7 +95,7 @@ TEST_F(RpcMgrKerberizedTest, AuthorizationFail) {
       static_cast<ScanMemServiceImpl*>(scan_mem_impl)->mem_tracker()));
   FLAGS_num_acceptor_threads = 2;
   FLAGS_num_reactor_threads = 10;
-  ASSERT_OK(rpc_mgr_.StartServices(krpc_address_));
+  ASSERT_OK(rpc_mgr_.StartServices());
 
   // Switch over to a credentials cache which only contains the dummy credential.
   // Kinit done in InitAuth() uses a different credentials cache.

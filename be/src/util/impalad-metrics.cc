@@ -24,6 +24,7 @@
 
 #include "common/names.h"
 
+DECLARE_string(debug_actions);
 DECLARE_bool(use_local_catalog);
 
 namespace impala {
@@ -135,6 +136,7 @@ const char* ImpaladMetricKeys::HEDGED_READ_OPS =
     "impala-server.hedged-read-ops";
 const char* ImpaladMetricKeys::HEDGED_READ_OPS_WIN =
     "impala-server.hedged-read-ops-win";
+const char* ImpaladMetricKeys::DEBUG_ACTION_NUM_FAIL = "impala.debug_action.fail";
 
 // These are created by impala-server during startup.
 // =======
@@ -168,6 +170,7 @@ IntCounter* ImpaladMetrics::CATALOG_CACHE_LOAD_SUCCESS_COUNT = nullptr;
 IntCounter* ImpaladMetrics::CATALOG_CACHE_MISS_COUNT = nullptr;
 IntCounter* ImpaladMetrics::CATALOG_CACHE_REQUEST_COUNT = nullptr;
 IntCounter* ImpaladMetrics::CATALOG_CACHE_TOTAL_LOAD_TIME = nullptr;
+IntCounter* ImpaladMetrics::DEBUG_ACTION_NUM_FAIL = nullptr;
 
 // Gauges
 IntGauge* ImpaladMetrics::CATALOG_NUM_DBS = nullptr;
@@ -354,6 +357,9 @@ void ImpaladMetrics::CreateMetrics(MetricGroup* m) {
   HEDGED_READ_OPS = m->AddCounter(ImpaladMetricKeys::HEDGED_READ_OPS, 0);
   HEDGED_READ_OPS_WIN = m->AddCounter(ImpaladMetricKeys::HEDGED_READ_OPS_WIN, 0);
 
+  if (!FLAGS_debug_actions.empty()) {
+    DEBUG_ACTION_NUM_FAIL = m->AddCounter(ImpaladMetricKeys::DEBUG_ACTION_NUM_FAIL, 0);
+  }
 }
 
 }

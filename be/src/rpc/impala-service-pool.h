@@ -45,9 +45,11 @@ class ImpalaServicePool : public kudu::rpc::RpcService {
   ///
   /// 'service_mem_tracker' is the MemTracker for tracking the memory usage of RPC
   /// payloads in the service queue.
+  ///
+  /// 'address' is the ip address and port that 'service' runs on.
   ImpalaServicePool(const scoped_refptr<kudu::MetricEntity>& entity,
       int service_queue_length, kudu::rpc::GeneratedServiceIf* service,
-      MemTracker* service_mem_tracker);
+      MemTracker* service_mem_tracker, const TNetworkAddress& address);
 
   virtual ~ImpalaServicePool();
 
@@ -110,6 +112,10 @@ class ImpalaServicePool : public kudu::rpc::RpcService {
   /// Consider removing lock.
   boost::mutex shutdown_lock_;
   bool closing_ = false;
+
+  /// The address this service is running on.
+  const std::string hostname_;
+  const std::string port_;
 
   DISALLOW_COPY_AND_ASSIGN(ImpalaServicePool);
 };

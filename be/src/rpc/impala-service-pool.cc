@@ -24,6 +24,7 @@
 #include <vector>
 
 #include "exec/kudu-util.h"
+#include "gutil/strings/numbers.h"
 #include "kudu/gutil/gscoped_ptr.h"
 #include "kudu/gutil/ref_counted.h"
 #include "kudu/gutil/strings/join.h"
@@ -58,11 +59,13 @@ const char * ImpalaServicePool::RPC_QUEUE_OVERFLOW_METRIC_KEY =
 
 ImpalaServicePool::ImpalaServicePool(const scoped_refptr<kudu::MetricEntity>& entity,
     int service_queue_length, kudu::rpc::GeneratedServiceIf* service,
-    MemTracker* service_mem_tracker)
+    MemTracker* service_mem_tracker, const TNetworkAddress& address)
   : service_mem_tracker_(service_mem_tracker),
     service_(service),
     service_queue_(service_queue_length),
-    incoming_queue_time_(METRIC_impala_incoming_queue_time.Instantiate(entity)) {
+    incoming_queue_time_(METRIC_impala_incoming_queue_time.Instantiate(entity)),
+    hostname_(address.hostname),
+    port_(SimpleItoa(address.port)) {
   DCHECK(service_mem_tracker_ != nullptr);
   const TMetricDef& overflow_metric_def =
       MetricDefs::Get(RPC_QUEUE_OVERFLOW_METRIC_KEY, service_->service_name());
@@ -188,10 +191,22 @@ kudu::Status ImpalaServicePool::QueueInboundCall(
     service_mem_tracker_->Consume(transfer_size);
   }
 
-  Status debug_status = DebugAction(FLAGS_debug_actions, "SERVICE_POOL_SERVER_BUSY");
+  // Debug action for simulating rpc errors. To use, specify:
+  // --debug_actions=IMPALA_SERVICE_POOL:<hostname>:<port>:<rpc>:<action>
+  // where <hostname> and <port> represent the impalad receiving the rpc, <port> is the BE
+  // krpc port (default 27000), <rpc> is the name of an rpc in the service, eg.
+  // 'TransmitData' or 'ReportExecStatus', and <action> is any of the debug actions, eg.
+  // FAIL or SLEEP.
+  Status debug_status = DebugAction(FLAGS_debug_actions, "IMPALA_SERVICE_POOL",
+      {hostname_, port_, c->remote_method().method_name()});
   if (UNLIKELY(!debug_status.ok())) {
-    // Simulate the service being too busy.
-    RejectTooBusy(c);
+    if (debug_status.msg().msg() == "REJECT_TOO_BUSY") {
+      // Simulate the service being too busy.
+      RejectTooBusy(c);
+    } else {
+      FailAndReleaseRpc(kudu::rpc::ErrorStatusPB::FATAL_UNKNOWN,
+          kudu::Status::RuntimeError(debug_status.msg().msg()), c);
+    }
     return kudu::Status::OK();
   }
 

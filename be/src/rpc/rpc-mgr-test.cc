@@ -51,7 +51,7 @@ TEST_F(RpcMgrTest, MultipleServicesTls) {
   tls_krpc_address = MakeNetworkAddress(ip, tls_service_port);
 
   ScopedSetTlsFlags s(SERVER_CERT, PRIVATE_KEY, SERVER_CERT);
-  ASSERT_OK(tls_rpc_mgr.Init());
+  ASSERT_OK(tls_rpc_mgr.Init(tls_krpc_address));
 
   ASSERT_OK(RunMultipleServicesTest(&tls_rpc_mgr, tls_krpc_address));
   tls_rpc_mgr.Shutdown();
@@ -74,7 +74,7 @@ TEST_F(RpcMgrTest, BadCertificateTls) {
   int32_t tls_service_port = FindUnusedEphemeralPort();
   tls_krpc_address = MakeNetworkAddress(ip, tls_service_port);
 
-  ASSERT_FALSE(tls_rpc_mgr.Init().ok());
+  ASSERT_FALSE(tls_rpc_mgr.Init(tls_krpc_address).ok());
   tls_rpc_mgr.Shutdown();
 }
 
@@ -91,7 +91,7 @@ TEST_F(RpcMgrTest, BadPasswordTls) {
   int32_t tls_service_port = FindUnusedEphemeralPort();
   tls_krpc_address = MakeNetworkAddress(ip, tls_service_port);
 
-  ASSERT_FALSE(tls_rpc_mgr.Init().ok());
+  ASSERT_FALSE(tls_rpc_mgr.Init(tls_krpc_address).ok());
   tls_rpc_mgr.Shutdown();
 }
 
@@ -108,7 +108,7 @@ TEST_F(RpcMgrTest, CorrectPasswordTls) {
   int32_t tls_service_port = FindUnusedEphemeralPort();
   tls_krpc_address = MakeNetworkAddress(ip, tls_service_port);
 
-  ASSERT_OK(tls_rpc_mgr.Init());
+  ASSERT_OK(tls_rpc_mgr.Init(tls_krpc_address));
   ASSERT_OK(RunMultipleServicesTest(&tls_rpc_mgr, tls_krpc_address));
   tls_rpc_mgr.Shutdown();
 }
@@ -125,7 +125,7 @@ TEST_F(RpcMgrTest, BadCiphersTls) {
   int32_t tls_service_port = FindUnusedEphemeralPort();
   tls_krpc_address = MakeNetworkAddress(ip, tls_service_port);
 
-  ASSERT_FALSE(tls_rpc_mgr.Init().ok());
+  ASSERT_FALSE(tls_rpc_mgr.Init(tls_krpc_address).ok());
   tls_rpc_mgr.Shutdown();
 }
 
@@ -142,7 +142,7 @@ TEST_F(RpcMgrTest, ValidCiphersTls) {
   int32_t tls_service_port = FindUnusedEphemeralPort();
   tls_krpc_address = MakeNetworkAddress(ip, tls_service_port);
 
-  ASSERT_OK(tls_rpc_mgr.Init());
+  ASSERT_OK(tls_rpc_mgr.Init(tls_krpc_address));
   ASSERT_OK(RunMultipleServicesTest(&tls_rpc_mgr, tls_krpc_address));
   tls_rpc_mgr.Shutdown();
 }
@@ -161,7 +161,7 @@ TEST_F(RpcMgrTest, ValidMultiCiphersTls) {
   int32_t tls_service_port = FindUnusedEphemeralPort();
   tls_krpc_address = MakeNetworkAddress(ip, tls_service_port);
 
-  ASSERT_OK(tls_rpc_mgr.Init());
+  ASSERT_OK(tls_rpc_mgr.Init(tls_krpc_address));
   ASSERT_OK(RunMultipleServicesTest(&tls_rpc_mgr, tls_krpc_address));
   tls_rpc_mgr.Shutdown();
 }
@@ -186,7 +186,7 @@ TEST_F(RpcMgrTest, SlowCallback) {
 
   FLAGS_num_acceptor_threads = 2;
   FLAGS_num_reactor_threads = 10;
-  ASSERT_OK(rpc_mgr_.StartServices(krpc_address_));
+  ASSERT_OK(rpc_mgr_.StartServices());
 
   unique_ptr<PingServiceProxy> proxy;
   ASSERT_OK(static_cast<PingServiceImpl*>(ping_impl)->GetProxy(krpc_address_,
@@ -216,7 +216,7 @@ TEST_F(RpcMgrTest, AsyncCall) {
 
   FLAGS_num_acceptor_threads = 2;
   FLAGS_num_reactor_threads = 10;
-  ASSERT_OK(rpc_mgr_.StartServices(krpc_address_));
+  ASSERT_OK(rpc_mgr_.StartServices());
 
   RpcController controller;
   srand(0);
@@ -251,7 +251,7 @@ TEST_F(RpcMgrTest, NegotiationTimeout) {
   int32_t secondary_service_port = FindUnusedEphemeralPort();
   secondary_krpc_address = MakeNetworkAddress(ip, secondary_service_port);
 
-  ASSERT_OK(secondary_rpc_mgr.Init());
+  ASSERT_OK(secondary_rpc_mgr.Init(secondary_krpc_address));
   ASSERT_FALSE(RunMultipleServicesTest(&secondary_rpc_mgr, secondary_krpc_address).ok());
   secondary_rpc_mgr.Shutdown();
 }
@@ -299,7 +299,7 @@ TEST_F(RpcMgrTest, BusyService) {
       static_cast<PingServiceImpl*>(ping_impl)->mem_tracker()));
   FLAGS_num_acceptor_threads = 2;
   FLAGS_num_reactor_threads = 10;
-  ASSERT_OK(rpc_mgr_.StartServices(krpc_address_));
+  ASSERT_OK(rpc_mgr_.StartServices());
 
   // Find the counter which tracks the number of times the service queue is too full.
   const string& overflow_count = Substitute(
@@ -318,8 +318,9 @@ TEST_F(RpcMgrTest, BusyService) {
 
   // Use DebugAction to make the Impala Service Pool reject 50% of Krpc calls as if the
   // service is too busy.
-  auto s = ScopedFlagSetter<string>::Make(
-      &FLAGS_debug_actions, "SERVICE_POOL_SERVER_BUSY:FAIL@0.5");
+  auto s = ScopedFlagSetter<string>::Make(&FLAGS_debug_actions,
+      Substitute("IMPALA_SERVICE_POOL:$0:$1:Ping:FAIL@0.5@REJECT_TOO_BUSY",
+          krpc_address_.hostname, krpc_address_.port));
   PingRequestPB request;
   PingResponsePB response;
   const int64_t timeout_ms = 10 * MILLIS_PER_SEC;

@@ -457,7 +457,7 @@ class ImpaladProcess(BaseImpalaProcess):
     super(ImpaladProcess, self).__init__(cmd, container_id, port_map)
     self.service = ImpaladService(self.hostname, self.webserver_interface,
         self.get_webserver_port(), self.__get_beeswax_port(), self.__get_be_port(),
-        self.__get_hs2_port(), self.__get_hs2_http_port(),
+        self.__get_krpc_port(), self.__get_hs2_port(), self.__get_hs2_http_port(),
         self._get_webserver_certificate_file())
 
   def _get_default_webserver_port(self):
@@ -468,6 +468,9 @@ class ImpaladProcess(BaseImpalaProcess):
 
   def __get_be_port(self):
     return int(self._get_port('be_port', DEFAULT_BE_PORT))
+
+  def __get_krpc_port(self):
+    return int(self._get_port('krpc_port', DEFAULT_KRPC_PORT))
 
   def __get_hs2_port(self):
     return int(self._get_port('hs2_port', DEFAULT_HS2_PORT))

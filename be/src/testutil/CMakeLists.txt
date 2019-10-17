@@ -26,7 +26,6 @@ set(EXECUTABLE_OUTPUT_PATH "${BUILD_OUTPUT_ROOT_DIRECTORY}/testutil")
 
 add_library(TestUtil
   desc-tbl-builder.cc
-  fault-injection-util.cc
   impalad-query-executor.cc
   in-process-servers.cc
   mini-kdc-wrapper.cc

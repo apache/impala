@@ -89,15 +89,28 @@ enum TImpalaQueryOptions {
   //  invalid, the option is ignored.
   //
   // 2. Global actions
-  //  "<global label>:<command>@<param0>@<param1>@...<paramN>",
-  //  global labels are marked in the code with DEBUG_ACTION*() macros.
+  //  "<global label>:<arg0>:...:<argN>:<command>@<param0>@<param1>@...<paramN>",
+  //  Used with the DebugAction() call, the action will be performed if the label and
+  //  optional arguments all match. The arguments can be used to make the debug action
+  //  context dependent, for example to only fail rpcs when a particular hostname matches.
+  //  Note that some debug actions must be specified as a query option while others must
+  //  be passed in with the startup flag.
   //  Available global actions:
   //  - SLEEP@<ms> will sleep for the 'ms' milliseconds.
   //  - JITTER@<ms>[@<probability>] will sleep for a random amount of time between 0
   //    and 'ms' milliseconds with the given probability. If <probability> is omitted,
   //    it is 1.0.
-  //  - FAIL[@<probability>] returns an INTERNAL_ERROR status with the given
-  //    probability. If <probability> is omitted, it is 1.0.
+  //  - FAIL[@<probability>][@<error>] returns an INTERNAL_ERROR status with the given
+  //    probability and error. If <probability> is omitted, it is 1.0. If 'error' is
+  //    omitted, a generic error of the form: 'Debug Action: <label>:<action>' is used.
+  //    The code executing the debug action may respond to different error messages by
+  //    exercising different error paths.
+  // Examples:
+  // - CRS_BEFORE_ADMISSION:SLEEP@1000
+  //   Causes a 1 second sleep before queries are submitted to the admission controller.
+  // - IMPALA_SERVICE_POOL:127.0.0.1:27002:TransmitData:FAIL@0.1@REJECT_TOO_BUSY
+  //   Causes TransmitData rpcs to the third minicluster impalad to fail 10% of the time
+  //   with a "service too busy" error.
   //
   // Only a single ExecNode action is allowed, but multiple global actions can be
   // specified. To specify multiple actions, separate them with "|".

@@ -142,16 +142,18 @@ DebugActionTokens TokenizeDebugActions(const string& debug_actions);
 std::vector<std::string> TokenizeDebugActionParams(const string& action);
 
 /// Slow path implementing DebugAction() for the case where 'debug_action' is non-empty.
-Status DebugActionImpl(const string& debug_action, const char* label) WARN_UNUSED_RESULT;
+Status DebugActionImpl(const string& debug_action, const char* label,
+    const std::vector<string>& args) WARN_UNUSED_RESULT;
 
 /// If debug_action query option has a "global action" (i.e. not exec-node specific)
-/// and matches the given 'label', apply the the action. See ImpalaService.thrift for
-/// details of the format and available global actions. For ExecNode code, use
-/// ExecNode::ExecDebugAction() instead.
-WARN_UNUSED_RESULT static inline Status DebugAction(
-    const string& debug_action, const char* label) {
+/// and matches the given 'label' and 'args', apply the the action. See
+/// ImpalaService.thrift for details of the format and available global actions. For
+/// ExecNode code, use ExecNode::ExecDebugAction() instead. Will return OK unless either
+/// an invalid debug action is specified or the FAIL action is executed.
+WARN_UNUSED_RESULT static inline Status DebugAction(const string& debug_action,
+    const char* label, const std::vector<string>& args = std::vector<string>()) {
   if (LIKELY(debug_action.empty())) return Status::OK();
-  return DebugActionImpl(debug_action, label);
+  return DebugActionImpl(debug_action, label, args);
 }
 
 WARN_UNUSED_RESULT static inline Status DebugAction(

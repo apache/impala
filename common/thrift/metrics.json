@@ -2618,5 +2618,15 @@
     "units": "NONE",
     "kind": "COUNTER",
     "key": "impala.webserver.total-cookie-auth-failure"
+  },
+  {
+    "description": "The number of times the FAIL debug action returned an error. For testing only.",
+    "contexts": [
+      "IMPALAD"
+    ],
+    "label": "FAIL debug action hits",
+    "units": "NONE",
+    "kind": "COUNTER",
+    "key": "impala.debug_action.fail"
   }
 ]

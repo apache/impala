@@ -102,16 +102,16 @@ class RpcMgr {
  public:
   RpcMgr(bool use_tls = false) : use_tls_(use_tls) {}
 
-  /// Initializes the reactor threads, and prepares for sending outbound RPC requests.
-  Status Init() WARN_UNUSED_RESULT;
+  /// Initializes the reactor threads, and prepares for sending outbound RPC requests. All
+  /// services will be started on 'address', which must be a resolved IP address.
+  Status Init(const TNetworkAddress& address) WARN_UNUSED_RESULT;
 
   bool is_inited() const { return messenger_.get() != nullptr; }
 
-  /// Start the acceptor threads which listen on 'address', making KRPC services
-  /// available. 'address' has to be a resolved IP address. Before this method is called,
-  /// remote clients will get a 'connection refused' error when trying to invoke an RPC
-  /// on this host.
-  Status StartServices(const TNetworkAddress& address) WARN_UNUSED_RESULT;
+  /// Start the acceptor threads which listen on 'address_', making KRPC services
+  /// available. Before this method is called, remote clients will get a 'connection
+  /// refused' error when trying to invoke an RPC on this host.
+  Status StartServices() WARN_UNUSED_RESULT;
 
   /// Register a new service.
   ///
@@ -223,6 +223,9 @@ class RpcMgr {
   /// True if TLS is configured for communication between Impala backends. messenger_ will
   /// be configured to use TLS if this is set.
   const bool use_tls_;
+
+  /// The host/port the rpc services are run on.
+  TNetworkAddress address_;
 };
 
 } // namespace impala

@@ -492,12 +492,12 @@ class DataStreamTest : public testing::Test {
   void StartKrpcBackend() {
     RpcMgr* rpc_mgr = exec_env_->rpc_mgr();
     KrpcDataStreamMgr* krpc_stream_mgr = exec_env_->stream_mgr();
-    ASSERT_OK(rpc_mgr->Init());
+    ASSERT_OK(rpc_mgr->Init(krpc_address_));
     test_service_.reset(new ImpalaKRPCTestBackend(rpc_mgr, krpc_stream_mgr,
         exec_env_->process_mem_tracker()));
     ASSERT_OK(test_service_->Init());
     ASSERT_OK(krpc_stream_mgr->Init(test_service_->mem_tracker()));
-    ASSERT_OK(rpc_mgr->StartServices(krpc_address_));
+    ASSERT_OK(rpc_mgr->StartServices());
   }
 
   void StopKrpcBackend() {

@@ -90,7 +90,10 @@ DEFINE_bool(rpc_use_loopback, false,
 
 namespace impala {
 
-Status RpcMgr::Init() {
+Status RpcMgr::Init(const TNetworkAddress& address) {
+  DCHECK(IsResolvedAddress(address));
+  address_ = address;
+
   // Log any RPCs which take longer than this threshold on the server.
   FLAGS_rpc_duration_too_long_ms = FLAGS_impala_slow_rpc_threshold_ms;
 
@@ -147,8 +150,9 @@ Status RpcMgr::RegisterService(int32_t num_service_threads, int32_t service_queu
     GeneratedServiceIf* service_ptr, MemTracker* service_mem_tracker) {
   DCHECK(is_inited()) << "Must call Init() before RegisterService()";
   DCHECK(!services_started_) << "Cannot call RegisterService() after StartServices()";
-  scoped_refptr<ImpalaServicePool> service_pool = new ImpalaServicePool(
-      messenger_->metric_entity(), service_queue_depth, service_ptr, service_mem_tracker);
+  scoped_refptr<ImpalaServicePool> service_pool =
+      new ImpalaServicePool(messenger_->metric_entity(), service_queue_depth, service_ptr,
+          service_mem_tracker, address_);
   // Start the thread pool first before registering the service in case the startup fails.
   RETURN_IF_ERROR(service_pool->Init(num_service_threads));
   KUDU_RETURN_IF_ERROR(
@@ -185,20 +189,19 @@ bool RpcMgr::Authorize(const string& service_name, RpcContext* context,
   return true;
 }
 
-Status RpcMgr::StartServices(const TNetworkAddress& address) {
+Status RpcMgr::StartServices() {
   DCHECK(is_inited()) << "Must call Init() before StartServices()";
   DCHECK(!services_started_) << "May not call StartServices() twice";
 
-  // Convert 'address' to Kudu's Sockaddr
-  DCHECK(IsResolvedAddress(address));
+  // Convert 'address_' to Kudu's Sockaddr
   Sockaddr sockaddr;
   if (FLAGS_rpc_use_loopback) {
     // Listen on all addresses, including loopback.
-    sockaddr.set_port(address.port);
+    sockaddr.set_port(address_.port);
     DCHECK(sockaddr.IsWildcard()) << sockaddr.ToString();
   } else {
     // Only listen on the canonical address for KRPC.
-    RETURN_IF_ERROR(TNetworkAddressToSockaddr(address, &sockaddr));
+    RETURN_IF_ERROR(TNetworkAddressToSockaddr(address_, &sockaddr));
   }
 
   // Call the messenger to create an AcceptorPool for us.

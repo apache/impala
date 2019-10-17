@@ -32,7 +32,6 @@
 #include "runtime/row-batch.h"
 #include "util/memory-metrics.h"
 #include "util/parse-util.h"
-#include "testutil/fault-injection-util.h"
 
 #include "gen-cpp/data_stream_service.pb.h"
 #include "gen-cpp/data_stream_service.proxy.h"

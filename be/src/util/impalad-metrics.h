@@ -209,6 +209,10 @@ class ImpaladMetricKeys {
   /// (i.e. returned faster than original read).
   static const char* HEDGED_READ_OPS_WIN;
 
+  /// Total number of times the FAIL debug action is hit. The counter is only created if
+  /// --debug_actions is set.
+  static const char* DEBUG_ACTION_NUM_FAIL;
+
 };
 
 /// Global impalad-wide metrics.  This is useful for objects that want to update metrics
@@ -251,6 +255,7 @@ class ImpaladMetrics {
   static IntCounter* CATALOG_CACHE_MISS_COUNT;
   static IntCounter* CATALOG_CACHE_REQUEST_COUNT;
   static IntCounter* CATALOG_CACHE_TOTAL_LOAD_TIME;
+  static IntCounter* DEBUG_ACTION_NUM_FAIL;
 
   // Gauges
   static IntGauge* CATALOG_NUM_DBS;

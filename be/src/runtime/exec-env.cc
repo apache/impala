@@ -355,7 +355,7 @@ Status ExecEnv::Init() {
   // Initializes the RPCMgr, ControlServices and DataStreamServices.
   // Initialization needs to happen in the following order due to dependencies:
   // - RPC manager, DataStreamService and DataStreamManager.
-  RETURN_IF_ERROR(rpc_mgr_->Init());
+  RETURN_IF_ERROR(rpc_mgr_->Init(krpc_address_));
   control_svc_.reset(new ControlService(rpc_metrics_));
   RETURN_IF_ERROR(control_svc_->Init());
   data_svc_.reset(new DataStreamService(rpc_metrics_));
@@ -508,7 +508,7 @@ Status ExecEnv::StartStatestoreSubscriberService() {
 
 Status ExecEnv::StartKrpcService() {
   LOG(INFO) << "Starting KRPC service";
-  RETURN_IF_ERROR(rpc_mgr_->StartServices(krpc_address_));
+  RETURN_IF_ERROR(rpc_mgr_->StartServices());
   return Status::OK();
 }
 

@@ -26,10 +26,13 @@
 #include "common/version.h"
 #include "runtime/collection-value.h"
 #include "runtime/descriptors.h"
+#include "runtime/exec-env.h"
 #include "runtime/raw-value.inline.h"
 #include "runtime/tuple-row.h"
 #include "runtime/row-batch.h"
 #include "util/cpu-info.h"
+#include "util/impalad-metrics.h"
+#include "util/metrics.h"
 #include "util/string-parser.h"
 #include "util/uid-util.h"
 #include "util/time.h"
@@ -329,63 +332,82 @@ static bool ParseProbability(const string& prob_str, bool* should_execute) {
   return true;
 }
 
-Status DebugActionImpl(const string& debug_action, const char* label) {
+Status DebugActionImpl(
+    const string& debug_action, const char* label, const std::vector<string>& args) {
   const DebugActionTokens& action_list = TokenizeDebugActions(debug_action);
   static const char ERROR_MSG[] = "Invalid debug_action $0:$1 ($2)";
   for (const vector<string>& components : action_list) {
-    // size() != 2 check filters out ExecNode debug actions.
-    if (components.size() != 2 || !iequals(components[0], label)) continue;
+    // 'components' should be of the form {label, arg_0, ..., arg_n, action}
+    if (components.size() != 2 + args.size() || !iequals(components[0], label)) {
+      continue;
+    }
+    // Check if the arguments match.
+    bool matches = true;
+    for (int i = 0; i < args.size(); ++i) {
+      if (!iequals(components[i + 1], args[i])) {
+        matches = false;
+        break;
+      }
+    }
+    if (!matches) continue;
+    const string& action_str = components[args.size() + 1];
     // 'tokens' becomes {command, param0, param1, ... }
-    vector<string> tokens = TokenizeDebugActionParams(components[1]);
+    vector<string> tokens = TokenizeDebugActionParams(action_str);
     DCHECK_GE(tokens.size(), 1);
     const string& cmd = tokens[0];
     int sleep_millis = 0;
     if (iequals(cmd, "SLEEP")) {
       // SLEEP@<millis>
       if (tokens.size() != 2) {
-        return Status(Substitute(ERROR_MSG, components[0], components[1],
-                "expected SLEEP@<ms>"));
+        return Status(
+            Substitute(ERROR_MSG, components[0], action_str, "expected SLEEP@<ms>"));
       }
       sleep_millis = atoi(tokens[1].c_str());
     } else if (iequals(cmd, "JITTER")) {
       // JITTER@<millis>[@<probability>}
       if (tokens.size() < 2 || tokens.size() > 3) {
-        return Status(Substitute(ERROR_MSG, components[0], components[1],
-                "expected JITTER@<ms>[@<probability>]"));
+        return Status(Substitute(ERROR_MSG, components[0], action_str,
+            "expected JITTER@<ms>[@<probability>]"));
       }
       int max_millis = atoi(tokens[1].c_str());
       if (tokens.size() == 3) {
         bool should_execute = true;
         if (!ParseProbability(tokens[2], &should_execute)) {
-          return Status(Substitute(ERROR_MSG, components[0], components[1],
-                  "invalid probability"));
+          return Status(
+              Substitute(ERROR_MSG, components[0], action_str, "invalid probability"));
         }
         if (!should_execute) continue;
       }
       sleep_millis = rand() % (max_millis + 1);
     } else if (iequals(cmd, "FAIL")) {
-      // FAIL[@<probability>]
-      if (tokens.size() > 2) {
-        return Status(Substitute(ERROR_MSG, components[0], components[1],
-                "expected FAIL[@<probability>]"));
+      // FAIL[@<probability>][@<error message>]
+      if (tokens.size() > 3) {
+        return Status(Substitute(ERROR_MSG, components[0], action_str,
+            "expected FAIL[@<probability>][@<error message>]"));
       }
-      if (tokens.size() == 2) {
+      if (tokens.size() >= 2) {
         bool should_execute = true;
         if (!ParseProbability(tokens[1], &should_execute)) {
-          return Status(Substitute(ERROR_MSG, components[0], components[1],
-                  "invalid probability"));
+          return Status(
+              Substitute(ERROR_MSG, components[0], action_str, "invalid probability"));
         }
         if (!should_execute) continue;
       }
-      return Status(TErrorCode::INTERNAL_ERROR, Substitute("Debug Action: $0:$1",
-              components[0], components[1]));
+      string error_msg = tokens.size() == 3 ?
+          tokens[2] :
+          Substitute("Debug Action: $0:$1", components[0], action_str);
+
+      if (ImpaladMetrics::DEBUG_ACTION_NUM_FAIL != nullptr) {
+        ImpaladMetrics::DEBUG_ACTION_NUM_FAIL->Increment(1l);
+      }
+      return Status(TErrorCode::INTERNAL_ERROR, error_msg);
     } else {
-      return Status(Substitute(ERROR_MSG, components[0], components[1],
-              "invalid command"));
+      DCHECK(false) << "Invalid debug action";
+      return Status(Substitute(ERROR_MSG, components[0], action_str, "invalid command"));
     }
     if (sleep_millis > 0) {
-      VLOG(1) << Substitute("Debug Action: $0:$1 sleeping for $2 ms",
-          components[0], components[1], sleep_millis);
+      VLOG(1) << Substitute("Debug Action: $0:$1 sleeping for $2 ms", components[0],
+          action_str, sleep_millis);
       SleepForMs(sleep_millis);
     }
   }
