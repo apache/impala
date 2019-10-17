@@ -143,9 +143,9 @@ class BufferedPlanRootSink : public PlanRootSink {
   /// Returns true if the 'queue' (not the 'batch_queue_') is empty. 'queue' refers to
   /// the logical queue of RowBatches and thus includes any RowBatch that
   /// 'current_batch_' points to. Must be called while holding 'lock_'. Cannot be called
-  /// once the query has been cancelled or closed.
+  /// once the sink has been closed.
   bool IsQueueEmpty(RuntimeState* state) const {
-    DCHECK(!IsCancelledOrClosed(state));
+    DCHECK(!closed_);
     return batch_queue_->IsEmpty() && current_batch_row_ == 0;
   }
 
@@ -157,7 +157,8 @@ class BufferedPlanRootSink : public PlanRootSink {
   }
 
   /// Returns true if the query has been cancelled or if the PlanRootSink has been
-  /// closed, returns false otherwise.
+  /// closed, returns false otherwise. Cancellation can occur asynchronously, so this
+  /// may become true at any point.
   bool IsCancelledOrClosed(RuntimeState* state) const {
     return state->is_cancelled() || closed_;
   }

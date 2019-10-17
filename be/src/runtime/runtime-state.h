@@ -26,6 +26,7 @@
 
 // NOTE: try not to add more headers here: runtime-state.h is included in many many files.
 #include "common/global-types.h"  // for PlanNodeId
+#include "common/atomic.h"
 #include "runtime/client-cache-types.h"
 #include "runtime/dml-exec-state.h"
 #include "util/error-util-internal.h"
@@ -230,8 +231,8 @@ class RuntimeState {
   /// true or the error is not recoverable and should be handled upstream.
   Status LogOrReturnError(const ErrorMsg& message);
 
-  bool is_cancelled() const { return is_cancelled_; }
-  void set_is_cancelled() { is_cancelled_ = true; }
+  bool is_cancelled() const { return is_cancelled_.Load(); }
+  void Cancel();
 
   RuntimeProfile::Counter* total_storage_wait_timer() {
     return total_storage_wait_timer_;
@@ -385,8 +386,11 @@ class RuntimeState {
   /// execution. Owned by 'query_state_'.
   ReservationTracker* const instance_buffer_reservation_;
 
-  /// if true, execution should stop with a CANCELLED status
-  bool is_cancelled_ = false;
+  /// If true, execution should stop, either because the query was cancelled by the
+  /// client, or because execution of the fragment instance is finished. If the main
+  /// fragment instance thread is still running, it should terminate with a CANCELLED
+  /// status once it notices is_cancelled_ == true.
+  AtomicBool is_cancelled_{false};
 
   /// if true, ReleaseResources() was called.
   bool released_resources_ = false;

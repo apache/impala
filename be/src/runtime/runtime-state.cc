@@ -236,6 +236,11 @@ Status RuntimeState::LogOrReturnError(const ErrorMsg& message) {
   return Status::OK();
 }
 
+void RuntimeState::Cancel() {
+  is_cancelled_.Store(true);
+  if (filter_bank_ != nullptr) filter_bank_->Cancel();
+}
+
 double RuntimeState::ComputeExchangeScanRatio() const {
   int64_t bytes_read = 0;
   for (const auto& c : bytes_read_counters_) bytes_read += c->value();

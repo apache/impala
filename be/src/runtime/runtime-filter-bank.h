@@ -124,6 +124,10 @@ class RuntimeFilterBank {
   /// Default hash seed to use when computing hashed values to insert into filters.
   static int32_t IR_ALWAYS_INLINE DefaultHashSeed() { return 1234; }
 
+  /// Called to signal that the query is being cancelled. Wakes up any threads blocked
+  /// waiting for filters to allow them to finish.
+  void Cancel();
+
   /// Releases all memory allocated for BloomFilters.
   void Close();
 
@@ -131,6 +135,9 @@ class RuntimeFilterBank {
   static const int64_t MAX_BLOOM_FILTER_SIZE = 512 * 1024 * 1024;  // 512MB
 
  private:
+  /// Implementation of Cancel(). 'runtime_filter_lock_' must be held by caller.
+  void CancelLocked();
+
   /// Lock protecting produced_filters_ and consumed_filters_.
   boost::mutex runtime_filter_lock_;
 
@@ -151,6 +158,9 @@ class RuntimeFilterBank {
 
   /// MemTracker to track Bloom filter memory.
   boost::scoped_ptr<MemTracker> filter_mem_tracker_;
+
+  /// True iff Cancel() or Close() has been called. Protected by 'runtime_filter_lock_'.
+  bool cancelled_ = false;
 
   /// True iff Close() has been called. Used to prevent races between
   /// AllocateScratchBloomFilter() and Close().

@@ -122,7 +122,7 @@ done:
 
 void FragmentInstanceState::Cancel() {
   DCHECK(runtime_state_ != nullptr);
-  runtime_state_->set_is_cancelled();
+  runtime_state_->Cancel();
   if (root_sink_ != nullptr) root_sink_->Cancel(runtime_state_);
   ExecEnv::GetInstance()->stream_mgr()->Cancel(runtime_state_->fragment_instance_id());
 }
@@ -383,6 +383,12 @@ Status FragmentInstanceState::ExecInternal() {
 
 void FragmentInstanceState::Close() {
   DCHECK(runtime_state_ != nullptr);
+
+  // Required to wake up any threads that might be blocked waiting for filters, e.g.
+  // scanner threads.
+  // TODO: we might be able to remove this with mt_dop, since we only need to worry
+  // have the fragment thread (i.e. the current thread).
+  Cancel();
 
   // If we haven't already released this thread token in Prepare(), release
   // it before calling Close().

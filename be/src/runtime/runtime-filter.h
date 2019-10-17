@@ -19,10 +19,12 @@
 #ifndef IMPALA_RUNTIME_RUNTIME_FILTER_H
 #define IMPALA_RUNTIME_RUNTIME_FILTER_H
 
+#include <boost/thread/mutex.hpp>
+
 #include "runtime/raw-value.h"
 #include "runtime/runtime-filter-bank.h"
 #include "util/bloom-filter.h"
-#include "util/spinlock.h"
+#include "util/condition-variable.h"
 #include "util/time.h"
 
 namespace impala {
@@ -50,7 +52,7 @@ class RuntimeFilter {
   }
 
   /// Returns true if SetFilter() has been called.
-  bool HasFilter() const { return arrival_time_.Load() != 0; }
+  bool HasFilter() const { return has_filter_.Load(); }
 
   const TRuntimeFilterDesc& filter_desc() const { return filter_desc_; }
   int32_t id() const { return filter_desc().filter_id; }
@@ -67,7 +69,11 @@ class RuntimeFilter {
 
   /// Sets the internal filter bloom_filter to 'bloom_filter'. Can only legally be called
   /// once per filter. Does not acquire the memory associated with 'bloom_filter'.
-  inline void SetFilter(BloomFilter* bloom_filter, MinMaxFilter* min_max_filter);
+  void SetFilter(BloomFilter* bloom_filter, MinMaxFilter* min_max_filter);
+
+  /// Signal that no filter should be arriving, waking up any threads blocked in
+  /// WaitForArrival().
+  void Cancel();
 
   /// Returns false iff 'bloom_filter_' has been set via SetBloomFilter() and hash[val] is
   /// not in that 'bloom_filter_'. Otherwise returns true. Is safe to call concurrently
@@ -113,14 +119,25 @@ class RuntimeFilter {
   /// Reference to the filter's thrift descriptor in the thrift Plan tree.
   const TRuntimeFilterDesc& filter_desc_;
 
-  /// Time, in ms, that the filter was registered.
+  /// Time in ms (from MonotonicMillis()), that the filter was registered.
   const int64_t registration_time_;
 
-  /// Time, in ms, that the global filter arrived. Set in SetFilter().
+  /// Time, in ms (from MonotonicMillis()), that the global filter arrived, or the
+  /// filter was cancelled. Set in SetFilter() or Cancel().
   AtomicInt64 arrival_time_;
+
+  /// Only set after arrival_time_, if SetFilter() was called.
+  AtomicBool has_filter_{false};
 
   /// The size of the Bloom filter, in bytes.
   const int64_t filter_size_;
+
+  /// Lock to protect 'arrival_cv_'
+  mutable boost::mutex arrival_mutex_;
+
+  /// Signalled when a filter arrives or the filter is cancelled. Paired with
+  /// 'arrival_mutex_'
+  mutable ConditionVariable arrival_cv_;
 };
 
 }

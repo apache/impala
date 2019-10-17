@@ -85,6 +85,10 @@ RuntimeFilter* RuntimeFilterBank::RegisterFilter(const TRuntimeFilterDesc& filte
   } else {
     if (consumed_filters_.find(filter_desc.filter_id) == consumed_filters_.end()) {
       ret = obj_pool_.Add(new RuntimeFilter(filter_desc, filter_desc.filter_size_bytes));
+      // The filter bank may have already been cancelled. In that case, still allocate the
+      // filter but cancel it immediately, so that callers of RuntimeFilterBank don't need
+      // to have separate handling of that case.
+      if (cancelled_) ret->Cancel();
       consumed_filters_[filter_desc.filter_id] = ret;
       VLOG(2) << "registered consumer filter " << filter_desc.filter_id;
     } else {
@@ -261,8 +265,21 @@ bool RuntimeFilterBank::FpRateTooHigh(int64_t filter_size, int64_t observed_ndv)
   return fpp > FLAGS_max_filter_error_rate;
 }
 
+void RuntimeFilterBank::Cancel() {
+  lock_guard<mutex> l(runtime_filter_lock_);
+  CancelLocked();
+}
+
+void RuntimeFilterBank::CancelLocked() {
+  if (cancelled_) return;
+  // Cancel all filters that a thread might be waiting on.
+  for (auto& entry : consumed_filters_) entry.second->Cancel();
+  cancelled_ = true;
+}
+
 void RuntimeFilterBank::Close() {
   lock_guard<mutex> l(runtime_filter_lock_);
+  CancelLocked();
   closed_ = true;
   for (BloomFilter* filter : bloom_filters_) filter->Close();
   for (MinMaxFilter* filter : min_max_filters_) filter->Close();
