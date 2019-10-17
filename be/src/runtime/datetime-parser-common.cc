@@ -28,6 +28,7 @@
 
 using boost::algorithm::is_any_of;
 using std::string;
+using std::unordered_map;
 using std::unordered_set;
 
 namespace impala {
@@ -115,7 +116,7 @@ void ReportBadFormat(FunctionContext* context, FormatTokenizationResult error_ty
         ss << "PARSE ERROR: Time tokens provided with date type.";
         break;
       case CONFLICTING_FRACTIONAL_SECOND_TOKENS_ERROR:
-        ss << "PARSE ERROR: Multiple fractional second token provided.";
+        ss << "PARSE ERROR: Multiple fractional second tokens provided.";
         break;
       case TEXT_TOKEN_NOT_CLOSED:
         ss << "PARSE ERROR: Missing closing quotation mark.";
@@ -125,6 +126,16 @@ void ReportBadFormat(FunctionContext* context, FormatTokenizationResult error_ty
         break;
       case MISPLACED_FX_MODIFIER_ERROR:
         ss << "PARSE ERROR: FX modifier should be at the beginning of the format string.";
+      case CONFLICTING_DAY_OF_WEEK_TOKENS_ERROR:
+        ss << "PARSE ERROR: Multiple day of week tokens provided.";
+        break;
+      case MISSING_ISO8601_WEEK_BASED_TOKEN_ERROR:
+        ss << "PARSE ERROR: One or more required ISO 8601 week-based date tokens "
+              "(i.e. IYYY, IW, ID) are missing.";
+        break;
+      case CONFLICTING_DATE_TOKENS_ERROR:
+        ss << "PARSE ERROR: ISO 8601 week-based date tokens (i.e. IYYY, IW, ID) are not "
+           << "allowed to be used with regular date tokens.";
         break;
       case QUARTER_NOT_ALLOWED_FOR_PARSING:
         ss << "PARSE_ERROR: Quarter token is not allowed in a string to datetime "
@@ -136,7 +147,7 @@ void ReportBadFormat(FunctionContext* context, FormatTokenizationResult error_ty
         break;
       case DAY_NAME_NOT_ALLOWED_FOR_PARSING:
         ss << "PARSE_ERROR: Day name token is not allowed in a string to datetime "
-            "conversion";
+            "conversion except with IYYY|IYY|IY|I and IW tokens";
         break;
       case WEEK_NUMBER_NOT_ALLOWED_FOR_PARSING:
         ss << "PARSE_ERROR: Week number token is not allowed in a string to datetime "
@@ -189,6 +200,67 @@ int GetQuarter(int month) {
   return (month - 1) / 3 + 1;
 }
 
+namespace {
+// Helper function used by ParseMonthNameToken() and ParseDayNameToken().
+// Parses 'token_start' string and returns true if it finds a valid short or normal name.
+// The valid name prefixes are stored as keys in 'prefix_to_suffix' map. The valid name
+// prefixes are expected to be equal to the corresponding valid short names.
+// The valid name suffixes and the corresponding int IDs are stored as values in
+// 'prefix_to_suffix' map.
+// Returns true iff parsing was successful.
+// If the parsed name in 'token_start' is not followed by a separator then the end of the
+// name is found using 'prefix_to_suffix'. If parsing is successful, '*token_end' is
+// adjusted to point to the character right after the end of the name.
+bool ParseNameTokenHelper(
+    bool is_short_name, int short_name_len, int max_name_len,
+    const char* token_start, const char** token_end,
+    bool is_strict_matching,
+    const unordered_map<string, pair<string, int>>& prefix_to_suffix,
+    int* ret_val) {
+  DCHECK(token_start != nullptr);
+  DCHECK(ret_val != nullptr);
+  DCHECK(token_end != nullptr && *token_end != nullptr);
+  DCHECK(token_start <= *token_end);
+  int token_len = *token_end - token_start;
+  if (token_len < short_name_len) return false;
+
+  string buff(token_start, token_len);
+  boost::to_lower(buff);
+  const string& prefix = buff.substr(0, short_name_len);
+  const auto it = prefix_to_suffix.find(prefix);
+  if (UNLIKELY(it == prefix_to_suffix.end())) return false;
+  if (is_short_name) {
+    DCHECK(token_len == short_name_len);
+    *ret_val = it->second.second;
+    return true;
+  }
+
+  if (is_strict_matching) {
+    DCHECK(buff.length() == max_name_len);
+    trim_right_if(buff, is_any_of(" "));
+  }
+
+  // Check if the remaining characters match.
+  const string& expected_suffix = it->second.first;
+  if (buff.length() - short_name_len < expected_suffix.length()) return false;
+  const char* actual_suffix = buff.c_str() + short_name_len;
+  if (strncmp(actual_suffix, expected_suffix.c_str(), expected_suffix.length()) != 0) {
+    return false;
+  }
+  *ret_val = it->second.second;
+
+  // If the end of the name token wasn't identified because it wasn't followed by a
+  // separator then the end of the name token has to be adjusted.
+  if (prefix.length() + expected_suffix.length() < buff.length()) {
+    if (is_strict_matching) return false;
+    *token_end = token_start + prefix.length() + expected_suffix.length();
+  }
+
+  return true;
+}
+
+}
+
 bool ParseMonthNameToken(const DateTimeFormatToken& tok, const char* token_start,
     const char** token_end, bool fx_modifier, int* month) {
   DCHECK(token_start != nullptr);
@@ -196,42 +268,31 @@ bool ParseMonthNameToken(const DateTimeFormatToken& tok, const char* token_start
   DCHECK(month != nullptr);
   DCHECK(token_end != nullptr && *token_end != nullptr);
   DCHECK(token_start <= *token_end);
-  int token_len = *token_end - token_start;
-  if (token_len < SHORT_MONTH_NAME_LENGTH) return false;
 
-  string buff(token_start, token_len);
-  boost::to_lower(buff);
-  const string& prefix = buff.substr(0, SHORT_MONTH_NAME_LENGTH);
-  const auto month_iter = MONTH_PREFIX_TO_SUFFIX.find(prefix);
-  if (UNLIKELY(month_iter == MONTH_PREFIX_TO_SUFFIX.end())) return false;
-  if (tok.type == MONTH_NAME_SHORT) {
-    *month = month_iter->second.second;
-    return true;
-  }
+  return ParseNameTokenHelper(
+      tok.type == MONTH_NAME_SHORT,
+      SHORT_MONTH_NAME_LENGTH, MAX_MONTH_NAME_LENGTH,
+      token_start, token_end,
+      fx_modifier && !tok.fm_modifier,
+      MONTH_PREFIX_TO_SUFFIX,
+      month);
+}
 
-  DCHECK(tok.type == MONTH_NAME);
-  if (fx_modifier && !tok.fm_modifier) {
-    DCHECK(buff.length() == MAX_MONTH_NAME_LENGTH);
-    trim_right_if(buff, is_any_of(" "));
-  }
+bool ParseDayNameToken(const DateTimeFormatToken& tok, const char* token_start,
+    const char** token_end, bool fx_modifier, int* day) {
+  DCHECK(token_start != nullptr);
+  DCHECK(tok.type == DAY_NAME || tok.type == DAY_NAME_SHORT);
+  DCHECK(day != nullptr);
+  DCHECK(token_end != nullptr && *token_end != nullptr);
+  DCHECK(token_start <= *token_end);
 
-  // Check if the remaining characters match.
-  const string& expected_suffix = month_iter->second.first;
-  if (buff.length() - SHORT_MONTH_NAME_LENGTH < expected_suffix.length()) return false;
-  const char* actual_suffix = buff.c_str() + SHORT_MONTH_NAME_LENGTH;
-  if (strncmp(actual_suffix, expected_suffix.c_str(), expected_suffix.length()) != 0) {
-    return false;
-  }
-  *month = month_iter->second.second;
-
-  // If the end of the month token wasn't identified because it wasn't followed by a
-  // separator then the end of the month token has to be adjusted.
-  if (prefix.length() + expected_suffix.length() < buff.length()) {
-    if (fx_modifier && !tok.fm_modifier) return false;
-    *token_end = token_start + prefix.length() + expected_suffix.length();
-  }
-
-  return true;
+  return ParseNameTokenHelper(
+      tok.type == DAY_NAME_SHORT,
+      SHORT_DAY_NAME_LENGTH, MAX_DAY_NAME_LENGTH,
+      token_start, token_end,
+      fx_modifier && !tok.fm_modifier,
+      DAY_PREFIX_TO_SUFFIX,
+      day);
 }
 
 int GetDayInYear(int year, int month, int day_in_month) {
@@ -341,6 +402,14 @@ int GetWeekOfYear(int year, int month, int day) {
 
 int GetWeekOfMonth(int day) {
   return (day - 1) / 7 + 1;
+}
+
+int AdjustYearToLength(int year, int len) {
+  if (len < 4) {
+    int adjust_factor = std::pow(10, len);
+    return year % adjust_factor;
+  }
+  return year;
 }
 
 }

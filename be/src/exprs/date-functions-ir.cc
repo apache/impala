@@ -95,7 +95,7 @@ IntVal DateFunctions::WeekOfYear(FunctionContext* context, const DateVal& d_val)
   if (d_val.is_null) return IntVal::null();
   DateValue dv = DateValue::FromDateVal(d_val);
 
-  int yweek = dv.WeekOfYear();
+  int yweek = dv.Iso8601WeekOfYear();
   if (yweek == -1) return IntVal::null();
   return IntVal(yweek);
 }

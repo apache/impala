@@ -102,6 +102,14 @@ class TimestampParser {
   /// to 24 or zero otherwise.
   static int AdjustWithTimezone(boost::posix_time::time_duration* t,
       const boost::posix_time::time_duration& tz_offset);
+
+  /// Returns the year that the current week belongs to. Returned value is in the
+  /// [d.year() - 1, d.year() + 1] range.
+  /// Weeks start with Monday. Each week's year is the Gregorian year in which the
+  /// Thursday falls.
+  /// 'd' date is expected to fall in the [1400, 9999] year range. The returned week
+  /// numbering year must also fall in the [1400, 9999] range.
+  static int GetIso8601WeekNumberingYear(const boost::gregorian::date& d);
 };
 
 }

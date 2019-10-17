@@ -58,6 +58,71 @@ DateValue::DateValue(int64_t year, int64_t month, int64_t day)
   }
 }
 
+namespace {
+
+inline int32_t CalcFirstDayOfYearSinceEpoch(int year) {
+  int m400 = year % 400;
+  int m100 = m400 % 100;
+  int m4 = m100 % 4;
+
+  return (year - EPOCH_YEAR) * 365
+      + ((year - EPOCH_YEAR / 4 * 4 + ((m4 != 0) ? 4 - m4 : 0)) / 4 - 1)
+      - ((year - EPOCH_YEAR / 100 * 100 + ((m100 != 0) ? 100 - m100 : 0)) / 100 - 1)
+      + ((year - EPOCH_YEAR / 400 * 400 + ((m400 != 0) ? 400 - m400 : 0)) / 400 - 1);
+}
+
+// Returns the Monday that belongs to the first ISO 8601 week of 'year'. That is:
+// - If Jan 1 falls on Monday, Tuesday, Wednesday or Thursday, then the week of Jan 1 is
+//   the first ISO 8601 week of 'year'. Therefore the Monday of the first ISO 8601 week in
+//   'year' is the first Monday before Jan 2.
+// - If Jan 1 falls on Friday, Saturday or Sunday, then the week of Jan 1 is the last ISO
+//   8601 week of the previous year. Therefore the Monday of the first ISO 8601 week in
+//   'year' is the first Monday following Jan 1.
+inline cctz::civil_day GetFirstIso8601MondayOfYear(int year) {
+  cctz::civil_day jan1 = cctz::civil_day(year, 1, 1);
+  if (cctz::get_weekday(jan1) <= cctz::weekday::thursday) {
+    // Get the previous Monday if 'jan1' is not already a Monday.
+    return cctz::next_weekday(jan1, cctz::weekday::monday) - 7;
+  } else {
+    // Get the next Monday.
+    return cctz::next_weekday(jan1, cctz::weekday::monday);
+  }
+}
+
+// Returns Sunday that belongs to the last ISO 8601 week of 'year'. That is:
+// - If Dec 31 falls on Thursday, Friday, Saturday or Sunday, then the week of Dec 31
+//   is the last ISO 8601 week of 'year'. Therefore the Sunday of the last ISO 8601 week
+//   in 'year' is the first Sunday after Dec 30.
+// - If Dec 31 falls on Monday, Tuesday or Wednesday, then the week of Dec 31 is the first
+//   ISO 8601 week of the next year. Therefore the Sunday of the last ISO 8601 week in
+//   'year' is the first Sunday previous to Dec 31.
+inline cctz::civil_day GetLastIso8601SundayOfYear(int year) {
+  cctz::civil_day dec31 = cctz::civil_day(year, 12, 31);
+  if (cctz::get_weekday(dec31) >= cctz::weekday::thursday) {
+    // Get the next Sunday if 'dec31' is not already a Sunday.
+    return cctz::prev_weekday(dec31, cctz::weekday::sunday) + 7;
+  } else {
+    // Get the previous Sunday.
+    return cctz::prev_weekday(dec31, cctz::weekday::sunday);
+  }
+}
+
+}
+
+DateValue DateValue::CreateFromIso8601WeekBasedDateVals(int year,
+    int week_of_year, int day_of_week) {
+  if (year >= MIN_YEAR && year <= MAX_YEAR
+      && week_of_year >= 1 && week_of_year <= 53
+      && 1 <= day_of_week && day_of_week <= 7) {
+    const cctz::civil_day first_monday = GetFirstIso8601MondayOfYear(year);
+    const cctz::civil_day last_sunday = GetLastIso8601SundayOfYear(year);
+
+    const cctz::civil_day today = first_monday + (week_of_year - 1) * 7 + day_of_week - 1;
+    if (today <= last_sunday) return DateValue(today - EPOCH_DATE);
+  }
+  return DateValue();
+}
+
 DateValue DateValue::ParseSimpleDateFormat(const char* str, int len,
     bool accept_time_toks) {
   DateValue dv;
@@ -85,21 +150,6 @@ DateValue DateValue::ParseIsoSqlFormat(const char* str, int len,
 
 string DateValue::Format(const DateTimeFormatContext& dt_ctx) const {
   return DateParser::Format(dt_ctx, *this);
-}
-
-namespace {
-
-inline int32_t CalcFirstDayOfYearSinceEpoch(int year) {
-  int m400 = year % 400;
-  int m100 = m400 % 100;
-  int m4 = m100 % 4;
-
-  return (year - EPOCH_YEAR) * 365
-      + ((year - EPOCH_YEAR / 4 * 4 + ((m4 != 0) ? 4 - m4 : 0)) / 4 - 1)
-      - ((year - EPOCH_YEAR / 100 * 100 + ((m100 != 0) ? 100 - m100 : 0)) / 100 - 1)
-      + ((year - EPOCH_YEAR / 400 * 400 + ((m400 != 0) ? 400 - m400 : 0)) / 400 - 1);
-}
-
 }
 
 bool DateValue::ToYear(int* year) const {
@@ -144,7 +194,7 @@ bool DateValue::ToYear(int* year) const {
   // f(year) = - ((m4 != 0) ? (4 - m4) * 100 : 0)
   //           + ((m100 != 0) ? (100 - m100) * 4 : 0)
   //           - ((m400 != 0) ? 400 - m400 : 0)
-  // and 'year' is in the [0, 9999] range, then it follows that (B):
+  // and 'year' is in the [1, 9999] range, then it follows that (B):
   // f(year) must fall into the [-591, 288] range.
   //
   // Finally, if we put (A) and (B) together we can conclude that 'year' must fall into
@@ -206,38 +256,24 @@ int DateValue::DayOfYear() const {
   return static_cast<int>(cctz::get_yearday(cd));
 }
 
-int DateValue::WeekOfYear() const {
+int DateValue::Iso8601WeekOfYear() const {
   if (UNLIKELY(!IsValid())) return -1;
   const cctz::civil_day today = EPOCH_DATE + days_since_epoch_;
-
-  cctz::civil_day jan1 = cctz::civil_day(today.year(), 1, 1);
-  cctz::civil_day first_monday;
-  if (cctz::get_weekday(jan1) <= cctz::weekday::thursday) {
-    // Get the previous Monday if 'jan1' is not already a Monday.
-    first_monday = cctz::next_weekday(jan1, cctz::weekday::monday) - 7;
-  } else {
-    // Get the next Monday.
-    first_monday = cctz::next_weekday(jan1, cctz::weekday::monday);
-  }
-
-  cctz::civil_day dec31 = cctz::civil_day(today.year(), 12, 31);
-  cctz::civil_day last_sunday;
-  if (cctz::get_weekday(dec31) >= cctz::weekday::thursday) {
-    // Get the next Sunday if 'dec31' is not already a Sunday.
-    last_sunday = cctz::prev_weekday(dec31, cctz::weekday::sunday) + 7;
-  } else {
-    // Get the previous Sunday.
-    last_sunday = cctz::prev_weekday(dec31, cctz::weekday::sunday);
-  }
+  const cctz::civil_day first_monday = GetFirstIso8601MondayOfYear(today.year());
+  const cctz::civil_day last_sunday = GetLastIso8601SundayOfYear(today.year());
 
   // 0001-01-01 is Monday in the proleptic Gregorian calendar.
   // 0001-01-01 belongs to year 0001.
+  // 9999-12-31 is Friday in the proleptic Gregorian calendar.
+  // 9999-12-31 belongs to year 9999.
   if (today >= first_monday && today <= last_sunday) {
     return (today - first_monday) / 7 + 1;
   } else if (today > last_sunday) {
+    DCHECK(today.year() >= MIN_YEAR && today.year() < MAX_YEAR);
     return 1;
   } else {
-    // today < first_monday && today.year() > 0
+    DCHECK(today < first_monday);
+    DCHECK(today.year() > MIN_YEAR && today.year() <= MAX_YEAR);
     cctz::civil_day prev_jan1 = cctz::civil_day(today.year() - 1, 1, 1);
     cctz::civil_day prev_first_monday;
     if (cctz::get_weekday(prev_jan1) <= cctz::weekday::thursday) {
@@ -248,6 +284,28 @@ int DateValue::WeekOfYear() const {
       prev_first_monday = cctz::next_weekday(prev_jan1, cctz::weekday::monday);
     }
     return (today - prev_first_monday) / 7 + 1;
+  }
+}
+
+int DateValue::Iso8601WeekNumberingYear() const {
+  if (UNLIKELY(!IsValid())) return -1;
+  const cctz::civil_day today = EPOCH_DATE + days_since_epoch_;
+  const cctz::civil_day first_monday = GetFirstIso8601MondayOfYear(today.year());
+  const cctz::civil_day last_sunday = GetLastIso8601SundayOfYear(today.year());
+
+  // 0001-01-01 is Monday in the proleptic Gregorian calendar.
+  // 0001-01-01 belongs to year 0001.
+  // 9999-12-31 is Friday in the proleptic Gregorian calendar.
+  // 9999-12-31 belongs to year 9999.
+  if (today >= first_monday && today <= last_sunday) {
+    return today.year();
+  } else if (today > last_sunday) {
+    DCHECK(today.year() >= MIN_YEAR && today.year() < MAX_YEAR);
+    return today.year() + 1;
+  } else {
+    DCHECK(today < first_monday);
+    DCHECK(today.year() > MIN_YEAR && today.year() <= MAX_YEAR);
+    return today.year() - 1;
   }
 }
 

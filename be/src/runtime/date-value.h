@@ -71,6 +71,15 @@ class DateValue {
 
   DateValue(int64_t year, int64_t month, int64_t day);
 
+  /// Creates a DateValue instance from the ISO 8601 week-based date values:
+  /// 'year' is expected to be in the [1, 9999] range.
+  /// 'week_of_year' is expected to be in the [1, 53] range.
+  /// 'day_of_week' is expected to be in the [1, 7] range.
+  /// If any of the parameters is out of range or 'year' has less than 'week_of_year'
+  /// ISO 8601 weeks, returns an invalid DateValue instance.
+  static DateValue CreateFromIso8601WeekBasedDateVals(int week_numbering_year,
+      int week_of_year, int day_of_week);
+
   bool IsValid() const {
     return days_since_epoch_ != INVALID_DAYS_SINCE_EPOCH;
   }
@@ -99,10 +108,20 @@ class DateValue {
   /// Otherwise, return -1.
   int DayOfYear() const;
 
-  /// Returns the week corresponding to his date. Returned value is in the [1, 53] range.
-  /// Weeks start with Monday. Each week's year is the Gregorian year in which the
-  /// Thursday falls.
-  int WeekOfYear() const;
+  /// Returns the ISO 8601 week corresponding to this date.
+  /// If this DateValue instance is invalid, the return value is -1; otherwise the return
+  /// value is in the [1, 53] range.
+  /// ISO 8601 weeks start with Monday. Each ISO 8601 week's year is the Gregorian year in
+  /// which the Thursday falls.
+  int Iso8601WeekOfYear() const;
+
+  /// Returns the year that the current ISO 8601 week belongs to.
+  /// If this DateValue instance is invalid, the return value is -1; otherwise the return
+  /// value is in the [current_year - 1, current_year + 1] range, which always falls into
+  /// the [1, 9999] range.
+  /// ISO 8601 weeks start with Monday. Each ISO 8601 week's year is the Gregorian year in
+  /// which the Thursday falls.
+  int Iso8601WeekNumberingYear() const;
 
   /// If this DateValue instance valid, add 'days' days to it and return the result.
   /// Otherwise, return an invalid DateValue instance.

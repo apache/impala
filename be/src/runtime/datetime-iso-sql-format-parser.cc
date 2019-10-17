@@ -30,11 +30,14 @@ namespace datetime_parse_util {
 bool IsoSqlFormatParser::ParseDateTime(const char* input_str, int input_len,
       const DateTimeFormatContext& dt_ctx, DateTimeParseResult* result) {
   DCHECK(dt_ctx.toks.size() > 0);
+  DCHECK(dt_ctx.current_time != nullptr);
+  DCHECK(dt_ctx.current_time->HasDateAndTime());
   DCHECK(result != nullptr);
   DCHECK(result->hour == 0);
   if (input_str == nullptr || input_len <= 0) return false;
 
   int day_in_year = -1;
+  Iso8601WeekBasedDateParseResult iso8601_week_based_date_values;
 
   const char* current_pos = input_str;
   const char* end_pos = input_str + input_len;
@@ -87,7 +90,8 @@ bool IsoSqlFormatParser::ParseDateTime(const char* input_str, int input_len,
           return false;
         }
         if (token_len < 4) {
-            PrefixYearFromCurrentYear(token_len, dt_ctx.current_time, result);
+          result->year = PrefixYearFromCurrentYear(result->year, token_len,
+              dt_ctx.current_time->date().year());
         }
         break;
       }
@@ -95,9 +99,13 @@ bool IsoSqlFormatParser::ParseDateTime(const char* input_str, int input_len,
         if (!ParseAndValidate(current_pos, token_len, 0, 9999, &result->year)) {
           return false;
         }
-        if (token_len == 2) GetRoundYear(dt_ctx.current_time, result);
+        if (token_len == 2) {
+          result->year = RoundYearFromCurrentYear(result->year,
+              dt_ctx.current_time->date().year());
+        }
         if (token_len == 3 || token_len == 1) {
-            PrefixYearFromCurrentYear(token_len, dt_ctx.current_time, result);
+          result->year = PrefixYearFromCurrentYear(result->year, token_len,
+              dt_ctx.current_time->date().year());
         }
         break;
       }
@@ -111,6 +119,14 @@ bool IsoSqlFormatParser::ParseDateTime(const char* input_str, int input_len,
       case MONTH_NAME_SHORT: {
         if (!ParseMonthNameToken(*tok, current_pos, &token_end_pos, dt_ctx.fx_modifier,
             &result->month)) {
+          return false;
+        }
+        break;
+      }
+      case DAY_NAME:
+      case DAY_NAME_SHORT: {
+        if (!ParseDayNameToken(*tok, current_pos, &token_end_pos, dt_ctx.fx_modifier,
+            &iso8601_week_based_date_values.day_of_week)) {
           return false;
         }
         break;
@@ -194,6 +210,32 @@ bool IsoSqlFormatParser::ParseDateTime(const char* input_str, int input_len,
         if (toupper(*current_pos) != toupper(*tok->val)) return false;
         break;
       }
+      case ISO8601_WEEK_NUMBERING_YEAR: {
+        if (!ParseAndValidate(current_pos, token_len, 0, 9999,
+            &iso8601_week_based_date_values.year)) {
+          return false;
+        }
+        if (token_len < 4) {
+          iso8601_week_based_date_values.year = PrefixYearFromCurrentYear(
+              iso8601_week_based_date_values.year, token_len,
+              GetIso8601WeekNumberingYear(dt_ctx.current_time));
+        }
+        break;
+      }
+      case ISO8601_WEEK_OF_YEAR: {
+        if (!ParseAndValidate(current_pos, token_len, 1, 53,
+            &iso8601_week_based_date_values.week_of_year)) {
+          return false;
+        }
+        break;
+      }
+      case ISO8601_DAY_OF_WEEK: {
+        if (!ParseAndValidate(current_pos, token_len, 1, 7,
+            &iso8601_week_based_date_values.day_of_week)) {
+          return false;
+        }
+        break;
+      }
       default: {
         return false;
       }
@@ -211,6 +253,10 @@ bool IsoSqlFormatParser::ParseDateTime(const char* input_str, int input_len,
         &result->day)) {
       return false;
     }
+  }
+
+  if (iso8601_week_based_date_values.IsSet()) {
+    if (!iso8601_week_based_date_values.ExtractYearMonthDay(result)) return false;
   }
 
   return true;
@@ -299,6 +345,10 @@ const char* IsoSqlFormatParser::FindEndOfToken(const char* input_str,
     if (input_len < MAX_MONTH_NAME_LENGTH) return nullptr;
     return input_str + MAX_MONTH_NAME_LENGTH;
   }
+  if (tok.type == DAY_NAME && fx_provided && !tok.fm_modifier) {
+    if (input_len < MAX_DAY_NAME_LENGTH) return nullptr;
+    return input_str + MAX_DAY_NAME_LENGTH;
+  }
 
   int max_tok_len = min(input_len, tok.len);
   const char* start_of_token = input_str;
@@ -335,25 +385,40 @@ const char* IsoSqlFormatParser::ParseMeridiemIndicatorFromInput(
   return nullptr;
 }
 
-void IsoSqlFormatParser::PrefixYearFromCurrentYear(int actual_token_len,
-    const TimestampValue* now,  DateTimeParseResult* result) {
-  DCHECK(actual_token_len > 0 && actual_token_len < 4);
-  DCHECK(now != nullptr);
-  DCHECK(result != nullptr);
-  int adjust_factor = pow(10, actual_token_len);
-  int adjustment = (now->date().year() / adjust_factor) * adjust_factor;
-  result->year += adjustment;
+int IsoSqlFormatParser::PrefixYearFromCurrentYear(int year, int year_token_len,
+    int current_year) {
+  DCHECK(year >= 0 && year < 1000);
+  DCHECK(year_token_len > 0 && year_token_len < 4);
+  int adjust_factor = pow(10, year_token_len);
+  int adjustment = (current_year / adjust_factor) * adjust_factor;
+  return year + adjustment;
 }
 
-void IsoSqlFormatParser::GetRoundYear(const TimestampValue* now,
-    DateTimeParseResult* result) {
+int IsoSqlFormatParser::RoundYearFromCurrentYear(int year, int current_year) {
+  DCHECK(year >= 0 && year < 100);
+  int postfix_of_curr_year = current_year % 100;
+  if (year < 50 && postfix_of_curr_year > 49) year += 100;
+  if (year > 49 && postfix_of_curr_year < 50) year -= 100;
+  return year + (current_year / 100) * 100;
+}
+
+int IsoSqlFormatParser::GetIso8601WeekNumberingYear(const TimestampValue* now) {
   DCHECK(now != nullptr);
+  DCHECK(now->HasDate());
+
+  static const boost::gregorian::date EPOCH(1970, 1, 1);
+  DateValue dv = DateValue((now->date() - EPOCH).days());
+  DCHECK(dv.IsValid());
+  return dv.Iso8601WeekNumberingYear();
+}
+
+bool IsoSqlFormatParser::Iso8601WeekBasedDateParseResult::ExtractYearMonthDay(
+    DateTimeParseResult* result) const {
   DCHECK(result != nullptr);
-  DCHECK(result->year >= 0 && result->year < 100);
-  int postfix_of_curr_year = now->date().year() % 100;
-  if (result->year < 50 && postfix_of_curr_year > 49) result->year += 100;
-  if (result->year > 49 && postfix_of_curr_year < 50) result->year -= 100;
-  result->year += (now->date().year() / 100) * 100;
+  DCHECK(IsSet());
+  DateValue dv = DateValue::CreateFromIso8601WeekBasedDateVals(year, week_of_year,
+      day_of_week);
+  return dv.ToYearMonthDay(&result->year, &result->month, &result->day);
 }
 
 }

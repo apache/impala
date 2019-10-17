@@ -73,6 +73,20 @@ const std::unordered_map<std::string, std::pair<std::string, int>>
         {"dec", {"ember", 12}}
 };
 
+/// Similar to 'MONTH_PREFIX_TO_SUFFIX' but maps the 3-letter prefix of a day name to the
+/// suffix of the day name and the ordinal number of the day (1 means Monday and 7 means
+/// Sunday).
+const std::unordered_map<std::string, std::pair<std::string, int>>
+    DAY_PREFIX_TO_SUFFIX = {
+        {"mon", {"day", 1}},
+        {"tue", {"sday", 2}},
+        {"wed", {"nesday", 3}},
+        {"thu", {"rsday", 4}},
+        {"fri", {"day", 5}},
+        {"sat", {"urday", 6}},
+        {"sun", {"day", 7}}
+};
+
 /// Length of short month names like 'JAN', 'FEB', etc.
 const int SHORT_MONTH_NAME_LENGTH = 3;
 
@@ -111,7 +125,10 @@ enum FormatTokenizationResult {
   QUARTER_NOT_ALLOWED_FOR_PARSING,
   DAY_OF_WEEK_NOT_ALLOWED_FOR_PARSING,
   DAY_NAME_NOT_ALLOWED_FOR_PARSING,
-  WEEK_NUMBER_NOT_ALLOWED_FOR_PARSING
+  WEEK_NUMBER_NOT_ALLOWED_FOR_PARSING,
+  CONFLICTING_DAY_OF_WEEK_TOKENS_ERROR,
+  MISSING_ISO8601_WEEK_BASED_TOKEN_ERROR,
+  CONFLICTING_DATE_TOKENS_ERROR
 };
 
 /// Holds all the token types that serve as building blocks for datetime format patterns.
@@ -145,7 +162,10 @@ enum DateTimeFormatTokenType {
   DAY_OF_WEEK,
   QUARTER_OF_YEAR,
   WEEK_OF_YEAR,
-  WEEK_OF_MONTH
+  WEEK_OF_MONTH,
+  ISO8601_WEEK_NUMBERING_YEAR,
+  ISO8601_WEEK_OF_YEAR,
+  ISO8601_DAY_OF_WEEK
 };
 
 /// Indicates whether the cast is a 'datetime to string' or a 'string to datetime' cast.
@@ -290,6 +310,20 @@ bool ParseMonthNameToken(const DateTimeFormatToken& tok, const char* token_start
     const char** token_end, bool fx_modifier, int* month)
     WARN_UNUSED_RESULT;
 
+/// Gets a day name token (either full or short name) and converts it to the ordinal
+/// number of day between 1 and 7. Make sure 'tok.type' is either DAY_NAME or
+/// DAY_NAME_SHORT.
+/// Result is stored in 'day'. Returns false if the given day name is invalid.
+/// 'fx_modifier' indicates if there is an active FX modifier on the whole format.
+/// If the day part of the input is not followed by a separator then the end of the day
+/// part is found using DAY_PREFIX_TO_SUFFIX. First, the 3 letter prefix of the day name
+/// identifies a particular day and then checks if the rest of the day name matches. If it
+/// does then '*token_end' is adjusted to point to the character right after the end of
+/// the day part.
+bool ParseDayNameToken(const DateTimeFormatToken& tok, const char* token_start,
+    const char** token_end, bool fx_modifier, int* day)
+    WARN_UNUSED_RESULT;
+
 inline bool IsLeapYear(int year) {
   return year % 4 == 0 && (year % 100 != 0 || year % 400 == 0);
 }
@@ -331,6 +365,9 @@ int GetWeekOfYear(int year, int month, int day);
 /// month starts from the first day of the month.
 int GetWeekOfMonth(int day);
 
+/// Returns the year adjusted to 'len' digits.
+/// E.g. AdjustYearToLength(1789, 3) returns 789.
+int AdjustYearToLength(int year, int len);
 }
 
 }

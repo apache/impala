@@ -824,10 +824,10 @@ TEST(DateTest, DayOfYear) {
   EXPECT_EQ(366, DateValue(2000, 12, 31).DayOfYear());
 }
 
-TEST(DateTest, WeekOfYear) {
+TEST(DateTest, Iso8601WeekOfYear) {
   // Test that it returns -1 for invalid dates.
   DateValue invalid_dv;
-  EXPECT_EQ(-1, invalid_dv.WeekOfYear());
+  EXPECT_EQ(-1, invalid_dv.Iso8601WeekOfYear());
 
   // Iterate through days of 2019.
   // 2019-01-01 is Tuesday and 2019-12-31 is Tuesday too.
@@ -836,36 +836,144 @@ TEST(DateTest, WeekOfYear) {
   for (DateValue dv = jan1;
       dv <= DateValue(2019, 12, 29);
       dv = dv.AddDays(1)) {
-    EXPECT_EQ(weekday_offset / 7 + 1, dv.WeekOfYear());
+    EXPECT_EQ(weekday_offset / 7 + 1, dv.Iso8601WeekOfYear());
     ++weekday_offset;
   }
 
   // Year 2015 has 53 weeks. 2015-12-31 is Thursday.
-  EXPECT_EQ(53, DateValue(2015, 12, 31).WeekOfYear());
+  EXPECT_EQ(53, DateValue(2015, 12, 31).Iso8601WeekOfYear());
 
   // 2019-12-30 (Monday) and 2019-12-31 (Tuesday) belong to year 2020.
-  EXPECT_EQ(1, DateValue(2019, 12, 30).WeekOfYear());
-  EXPECT_EQ(1, DateValue(2019, 12, 31).WeekOfYear());
-  EXPECT_EQ(1, DateValue(2020, 1, 1).WeekOfYear());
-  EXPECT_EQ(1, DateValue(2020, 1, 5).WeekOfYear());
-  EXPECT_EQ(2, DateValue(2020, 1, 6).WeekOfYear());
+  EXPECT_EQ(1, DateValue(2019, 12, 30).Iso8601WeekOfYear());
+  EXPECT_EQ(1, DateValue(2019, 12, 31).Iso8601WeekOfYear());
+  EXPECT_EQ(1, DateValue(2020, 1, 1).Iso8601WeekOfYear());
+  EXPECT_EQ(1, DateValue(2020, 1, 5).Iso8601WeekOfYear());
+  EXPECT_EQ(2, DateValue(2020, 1, 6).Iso8601WeekOfYear());
 
   // 0002-01-01 is Tuesday. Test days around 0002-01-01.
-  EXPECT_EQ(51, DateValue(1, 12, 23).WeekOfYear());
-  EXPECT_EQ(52, DateValue(1, 12, 30).WeekOfYear());
-  EXPECT_EQ(1, DateValue(1, 12, 31).WeekOfYear());
-  EXPECT_EQ(1, DateValue(2, 1, 1).WeekOfYear());
-  EXPECT_EQ(1, DateValue(2, 1, 6).WeekOfYear());
-  EXPECT_EQ(2, DateValue(2, 1, 7).WeekOfYear());
+  EXPECT_EQ(51, DateValue(1, 12, 23).Iso8601WeekOfYear());
+  EXPECT_EQ(52, DateValue(1, 12, 30).Iso8601WeekOfYear());
+  EXPECT_EQ(1, DateValue(1, 12, 31).Iso8601WeekOfYear());
+  EXPECT_EQ(1, DateValue(2, 1, 1).Iso8601WeekOfYear());
+  EXPECT_EQ(1, DateValue(2, 1, 6).Iso8601WeekOfYear());
+  EXPECT_EQ(2, DateValue(2, 1, 7).Iso8601WeekOfYear());
   // 0001-01-01 is Monday. Test days around 0001-01-01.
-  EXPECT_EQ(1, DateValue(1, 1, 1).WeekOfYear());
-  EXPECT_EQ(1, DateValue(1, 1, 2).WeekOfYear());
-  EXPECT_EQ(2, DateValue(1, 1, 8).WeekOfYear());
+  EXPECT_EQ(1, DateValue(1, 1, 1).Iso8601WeekOfYear());
+  EXPECT_EQ(1, DateValue(1, 1, 2).Iso8601WeekOfYear());
+  EXPECT_EQ(2, DateValue(1, 1, 8).Iso8601WeekOfYear());
 
   // 9999-12-31 is Friday. Test days around 9999-12-31.
-  EXPECT_EQ(52, DateValue(9999, 12, 31).WeekOfYear());
-  EXPECT_EQ(52, DateValue(9999, 12, 27).WeekOfYear());
-  EXPECT_EQ(51, DateValue(9999, 12, 26).WeekOfYear());
+  EXPECT_EQ(52, DateValue(9999, 12, 31).Iso8601WeekOfYear());
+  EXPECT_EQ(52, DateValue(9999, 12, 27).Iso8601WeekOfYear());
+  EXPECT_EQ(51, DateValue(9999, 12, 26).Iso8601WeekOfYear());
+}
+
+TEST(DateTest, Iso8601WeekNumberingYear) {
+  // Test that it returns -1 for invalid dates.
+  DateValue invalid_dv;
+  EXPECT_EQ(-1, invalid_dv.Iso8601WeekNumberingYear());
+
+  // Iterate through days of 2019.
+  // 2019-01-01 is Tuesday and 2019-12-29 is Sunday.
+  DateValue jan1(2019, 1, 1);
+  for (DateValue dv = jan1;
+      dv <= DateValue(2019, 12, 29);
+      dv = dv.AddDays(1)) {
+    EXPECT_EQ(2019, dv.Iso8601WeekNumberingYear());
+  }
+  // 2019-12-30 (Monday) and 2019-12-31 (Tuesday) belong to year 2020.
+  EXPECT_EQ(2020, DateValue(2019, 12, 30).Iso8601WeekNumberingYear());
+  EXPECT_EQ(2020, DateValue(2019, 12, 31).Iso8601WeekNumberingYear());
+  EXPECT_EQ(2020, DateValue(2020, 1, 1).Iso8601WeekNumberingYear());
+
+  // 2015-01-01 is Thursday and 2015-12-31 is Thursday too.
+  // Both days belong to year 2015.
+  EXPECT_EQ(2015, DateValue(2015, 1, 1).Iso8601WeekNumberingYear());
+  EXPECT_EQ(2015, DateValue(2015, 12, 31).Iso8601WeekNumberingYear());
+
+  // 2040-01-01 is Sunday and 2040-12-31 is Monday.
+  // Neither days belong to year 2040.
+  EXPECT_EQ(2039, DateValue(2040, 1, 1).Iso8601WeekNumberingYear());
+  EXPECT_EQ(2041, DateValue(2040, 12, 31).Iso8601WeekNumberingYear());
+
+  // 0002-01-01 is Tuesday. Test days around 0002-01-01.
+  EXPECT_EQ(1, DateValue(1, 12, 29).Iso8601WeekNumberingYear());
+  EXPECT_EQ(1, DateValue(1, 12, 30).Iso8601WeekNumberingYear());
+  EXPECT_EQ(2, DateValue(1, 12, 31).Iso8601WeekNumberingYear());
+  EXPECT_EQ(2, DateValue(2, 1, 1).Iso8601WeekNumberingYear());
+  EXPECT_EQ(2, DateValue(2, 1, 2).Iso8601WeekNumberingYear());
+  // 0001-01-01 is Monday. Test days around 0001-01-01.
+  EXPECT_EQ(1, DateValue(1, 1, 1).Iso8601WeekNumberingYear());
+  EXPECT_EQ(1, DateValue(1, 1, 2).Iso8601WeekNumberingYear());
+
+  // 9999-12-31 is Friday. Test days around 9999-12-31.
+  EXPECT_EQ(9999, DateValue(9999, 12, 30).Iso8601WeekNumberingYear());
+  EXPECT_EQ(9999, DateValue(9999, 12, 31).Iso8601WeekNumberingYear());
+}
+
+TEST(DateTest, CreateFromIso8601WeekBasedDateVals) {
+  // Invalid week numbering year.
+  EXPECT_FALSE(DateValue::CreateFromIso8601WeekBasedDateVals(-1, 1, 1).IsValid());
+  EXPECT_FALSE(DateValue::CreateFromIso8601WeekBasedDateVals(0, 1, 1).IsValid());
+  EXPECT_FALSE(DateValue::CreateFromIso8601WeekBasedDateVals(10000, 1, 1).IsValid());
+
+  // Test invalid week of year.
+  // Year 2020 has 53 weeks.
+  EXPECT_FALSE(DateValue::CreateFromIso8601WeekBasedDateVals(2020, 54, 1).IsValid());
+  EXPECT_FALSE(DateValue::CreateFromIso8601WeekBasedDateVals(2020, 0, 1).IsValid());
+  // Year 2019 has 52 weeks.
+  EXPECT_FALSE(DateValue::CreateFromIso8601WeekBasedDateVals(2019, 53, 1).IsValid());
+
+  // Test invalid week day.
+  EXPECT_FALSE(DateValue::CreateFromIso8601WeekBasedDateVals(2020, 1, 0).IsValid());
+  EXPECT_FALSE(DateValue::CreateFromIso8601WeekBasedDateVals(2020, 1, 8).IsValid());
+
+  // 0001-01-01 is Monday. It belongs to the first week of year 1.
+  // Test days around 0001-01-01.
+  EXPECT_EQ(DateValue(1, 1, 1), DateValue::CreateFromIso8601WeekBasedDateVals(1, 1, 1));
+  EXPECT_EQ(DateValue(1, 1, 2), DateValue::CreateFromIso8601WeekBasedDateVals(1, 1, 2));
+  EXPECT_EQ(DateValue(1, 1, 7), DateValue::CreateFromIso8601WeekBasedDateVals(1, 1, 7));
+  EXPECT_EQ(DateValue(1, 1, 8), DateValue::CreateFromIso8601WeekBasedDateVals(1, 2, 1));
+  // 0001-12-30 is Sunday, belongs to week 52 of year 1.
+  EXPECT_EQ(DateValue(1, 12, 30),
+      DateValue::CreateFromIso8601WeekBasedDateVals(1, 52, 7));
+  // 0001-12-31 is Monday, belongs to year 2.
+  EXPECT_EQ(DateValue(1, 12, 31), DateValue::CreateFromIso8601WeekBasedDateVals(2, 1, 1));
+  EXPECT_EQ(DateValue(2, 1, 1), DateValue::CreateFromIso8601WeekBasedDateVals(2, 1, 2));
+
+  // Test 2020 ISO 8601 week numbering year.
+  // 2019-12-30 is Monday, belongs to week 1 of year 2020.
+  // 2021-01-03 is Sunday, belongs to week 53 of year 2020.
+  int week_of_year = 1, day_of_week = 1;
+  for (DateValue dv(2019, 12, 30);
+      dv <= DateValue(2021, 1, 3);
+      dv = dv.AddDays(1)) {
+    DateValue dv_iso8601 = DateValue::CreateFromIso8601WeekBasedDateVals(2020,
+        week_of_year, day_of_week);
+    EXPECT_TRUE(dv_iso8601.IsValid());
+    EXPECT_EQ(dv, dv_iso8601);
+
+    if (day_of_week == 7) ++week_of_year;
+    day_of_week = day_of_week % 7 + 1;
+  }
+  EXPECT_EQ(54, week_of_year);
+  EXPECT_EQ(1, day_of_week);
+
+  // 9998-12-31 is Thursday, belongs to week 53 of year 9998.
+  EXPECT_EQ(DateValue(9998, 12, 31),
+      DateValue::CreateFromIso8601WeekBasedDateVals(9998, 53, 4));
+  EXPECT_EQ(DateValue(9999, 1, 1),
+      DateValue::CreateFromIso8601WeekBasedDateVals(9998, 53, 5));
+  EXPECT_EQ(DateValue(9999, 1, 2),
+      DateValue::CreateFromIso8601WeekBasedDateVals(9998, 53, 6));
+  EXPECT_EQ(DateValue(9999, 1, 3),
+      DateValue::CreateFromIso8601WeekBasedDateVals(9998, 53, 7));
+  EXPECT_EQ(DateValue(9999, 1, 4),
+      DateValue::CreateFromIso8601WeekBasedDateVals(9999, 1, 1));
+  // 9999-12-31 is Friday, belongs to week 52 of year 9999.
+  EXPECT_EQ(DateValue(9999, 12, 31),
+      DateValue::CreateFromIso8601WeekBasedDateVals(9999, 52, 5));
+  EXPECT_FALSE(DateValue::CreateFromIso8601WeekBasedDateVals(9999, 52, 6).IsValid());
 }
 
 TEST(DateTest, LastDay) {

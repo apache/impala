@@ -20,9 +20,9 @@
 #include "common/names.h"
 #include "runtime/datetime-iso-sql-format-parser.h"
 #include "runtime/datetime-simple-date-format-parser.h"
+#include "runtime/date-value.h"
 #include "runtime/runtime-state.h"
 #include "runtime/string-value.inline.h"
-#include "runtime/timestamp-value.h"
 #include "udf/udf-internal.h"
 #include "util/string-parser.h"
 
@@ -227,11 +227,7 @@ string TimestampParser::Format(const DateTimeFormatContext& dt_ctx, const date& 
     switch (tok.type) {
       case YEAR:
       case ROUND_YEAR: {
-        num_val = d.year();
-        if (tok.len < 4) {
-          int adjust_factor = std::pow(10, tok.len);
-          num_val %= adjust_factor;
-        }
+        num_val = AdjustYearToLength(d.year(), tok.len);
         break;
       }
       case QUARTER_OF_YEAR: {
@@ -307,6 +303,21 @@ string TimestampParser::Format(const DateTimeFormatContext& dt_ctx, const date& 
         result.append(FormatTextToken(tok));
         break;
       }
+      case ISO8601_WEEK_NUMBERING_YEAR: {
+        num_val = AdjustYearToLength(GetIso8601WeekNumberingYear(d), tok.len);
+        break;
+      }
+      case ISO8601_WEEK_OF_YEAR: {
+        num_val = d.week_number();
+        break;
+      }
+      case ISO8601_DAY_OF_WEEK: {
+        // day_of_week() returns 0 for Sunday, 1 for Monday and 6 for Saturday.
+        num_val = d.day_of_week();
+        // We need to output 1 for Monday and 7 for Sunday.
+        if (num_val == 0) num_val = 7;
+        break;
+      }
       default: DCHECK(false) << "Unknown date/time format token";
     }
     if (num_val > -1) {
@@ -318,6 +329,21 @@ string TimestampParser::Format(const DateTimeFormatContext& dt_ctx, const date& 
     }
   }
   return result;
+}
+
+int TimestampParser::GetIso8601WeekNumberingYear(const boost::gregorian::date& d) {
+  DCHECK(!d.is_special());
+  DCHECK(1400 <= d.year() && d.year() <= 9999);
+
+  static const boost::gregorian::date epoch(1970, 1, 1);
+  DateValue dv((d - epoch).days());
+  DCHECK(dv.IsValid());
+
+  int week_numbering_year = dv.Iso8601WeekNumberingYear();
+  // 1400.01.01 is Wednesday. 9999.12.31 is Friday.
+  // This means that week_numbering_year must fall in the [1400, 9999] range.
+  DCHECK(1400 <= week_numbering_year && week_numbering_year <= 9999);
+  return week_numbering_year;
 }
 
 }

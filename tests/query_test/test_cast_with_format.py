@@ -154,7 +154,7 @@ class TestCastWithFormat(ImpalaTestSuite):
         "timestamp FORMAT 'YYYY-MM-DDTHH24:MI:SSZ')")
     assert result.data == ["2018-11-10 15:11:04"]
 
-    # ISO8601 format elements are case-insensitive
+    # ISO 8601 format elements are case-insensitive
     result = self.client.execute("select cast('2018-11-09t15:11:04Z' as "
         "timestamp FORMAT 'YYYY-MM-DDTHH24:MI:SSz')")
     assert result.data == ["2018-11-09 15:11:04"]
@@ -803,7 +803,70 @@ class TestCastWithFormat(ImpalaTestSuite):
     assert result.data == ["123"]
 
   def test_day_name(self):
-    # Different lowercase and uppercase scenarios.
+    # String to datetime: Test different lowercase vs uppercase scenarios.
+    result = self.execute_query(
+        "select cast('2010-08-Tuesday' as timestamp FORMAT 'IYYY-IW-DAY'), "
+        "       cast('2010-monday-08' as timestamp FORMAT 'IYYY-DAY-IW'), "
+        "       cast('2010-Wednesday-08' as date FORMAT 'IYYY-DAY-IW'), "
+        "       cast('2010 08 THURSDAY' as timestamp FORMAT 'IYYY IW DAY'), "
+        "       cast('2010 08 Friday' as date FORMAT 'IYYY IW DAY'), "
+        "       cast('2010 08 saturday' as timestamp FORMAT 'IYYY IW DAY'), "
+        "       cast('sUnDay 2010 08' as date FORMAT 'DAY IYYY IW'), "
+        "       cast('Monday 2010 09' as date FORMAT 'DAY IYYY IW')")
+    assert result.data == [
+        "2010-02-23 00:00:00\t2010-02-22 00:00:00\t2010-02-24\t"
+        "2010-02-25 00:00:00\t2010-02-26\t2010-02-27 00:00:00\t"
+        "2010-02-28\t2010-03-01"]
+    # And now with short day names.
+    result = self.execute_query(
+        "select cast('2010-08-Tue' as timestamp FORMAT 'IYYY-IW-DY'), "
+        "       cast('2010-mon-08' as timestamp FORMAT 'IYYY-DY-IW'), "
+        "       cast('2010-Wed-08' as date FORMAT 'IYYY-DY-IW'), "
+        "       cast('2010 08 THU' as timestamp FORMAT 'IYYY IW DY'), "
+        "       cast('2010 08 Fri' as date FORMAT 'IYYY IW DY'), "
+        "       cast('2010 08 sat' as timestamp FORMAT 'IYYY IW DY'), "
+        "       cast('sUn 2010 08' as date FORMAT 'DY IYYY IW'), "
+        "       cast('Mon 2010 09' as date FORMAT 'DY IYYY IW')")
+    assert result.data == [
+        "2010-02-23 00:00:00\t2010-02-22 00:00:00\t2010-02-24\t"
+        "2010-02-25 00:00:00\t2010-02-26\t2010-02-27 00:00:00\t"
+        "2010-02-28\t2010-03-01"]
+
+    # String to datetime: Incorrect day name.
+    result = self.execute_query("select cast('2010 09 Mondau' as timestamp FORMAT "
+        "'IYYY IW DAY')")
+    assert result.data == ["NULL"]
+
+    # String to datetime: DAY token without surrounding separators.
+    result = self.execute_query(
+        "select cast('2010MONDAY09' as date FORMAT 'IYYYDAYIW'), "
+        "       cast('2010WEDNESDAY9' as timestamp FORMAT 'IYYYDAYIW')")
+    assert result.data == ["2010-03-01\t2010-03-03 00:00:00"]
+    # And now with short day names.
+    result = self.execute_query(
+        "select cast('2010MON09' as date FORMAT 'IYYYDYIW'), "
+        "       cast('2010WED9' as timestamp FORMAT 'IYYYDYIW')")
+    assert result.data == ["2010-03-01\t2010-03-03 00:00:00"]
+
+    # String to datetime: FX and FM modifiers.
+    result = self.execute_query(
+        "select cast('2010-Monday-09' as timestamp FORMAT 'FXIYYY-DAY-IW'), "
+        "       cast('2010-Monday  X-09' as timestamp FORMAT 'FXIYYY-DAY-IW')")
+    assert result.data == ["NULL\tNULL"]
+
+    result = self.execute_query(
+        "select cast('2010-Monday   -09' as timestamp FORMAT 'FXIYYY-DAY-IW'), "
+        "       cast('2010-Monday   09' as date FORMAT 'FXIYYY-DAYIW')")
+    assert result.data == ["2010-03-01 00:00:00\t2010-03-01"]
+
+    result = self.execute_query(
+        "select cast('2010-Monday-09' as timestamp FORMAT 'FXIYYY-FMDAY-IW'), "
+        "       cast('2010-Monday09' as timestamp FORMAT 'FXIYYY-FMDAYIW'), "
+        "       cast('2010Monday09' as date FORMAT 'FXIYYYFMDAYIW')")
+    assert result.data == ["2010-03-01 00:00:00\t2010-03-01 00:00:00\t"
+                           "2010-03-01"]
+
+    # Datetime to string: Different lowercase and uppercase scenarios.
     result = self.execute_query("select cast(date'2019-11-13' as string "
         "format 'DAY Day day DY Dy dy')")
     assert result.data == ["WEDNESDAY Wednesday wednesday WED Wed wed"]
@@ -832,7 +895,7 @@ class TestCastWithFormat(ImpalaTestSuite):
         "format 'DAY Day day DY Dy dy')")
     assert result.data == ["TUESDAY   Tuesday   tuesday   TUE Tue tue"]
 
-    # Different lowercase and uppercase scenarios when FM is provided.
+    # Datetime to string: Different lowercase and uppercase scenarios when FM is provided.
     result = self.execute_query("select cast(cast('2019-11-13' as timestamp) as string "
         "format 'FMDAY FMDay FMday FMDY FMDy FMdy')")
     assert result.data == ["WEDNESDAY Wednesday wednesday WED Wed wed"]
@@ -861,12 +924,12 @@ class TestCastWithFormat(ImpalaTestSuite):
         "format 'FMDAY FMDay FMday FMDY FMDy FMdy')")
     assert result.data == ["TUESDAY Tuesday tuesday TUE Tue tue"]
 
-    # Test odd casing of day token.
+    # Datetime to string: Test odd casing of day token.
     result = self.execute_query("select cast(date'2010-01-20' as string FORMAT "
         "'DAy dAY daY dY')")
     assert result.data == ["WEDNESDAY wednesday wednesday wed"]
 
-    # Day token without surrounding separators
+    # Datetime to string: Day token without surrounding separators.
     result = self.execute_query("select cast(date'2019-11-11' as string "
         "format 'YYYYDayMonth')")
     assert result.data == ["2019Monday   November "]
@@ -883,7 +946,7 @@ class TestCastWithFormat(ImpalaTestSuite):
         "format 'YYYYDYDD')")
     assert result.data == ["2019TUE12"]
 
-    # Day token with FM and FX modifiers.
+    # Datetime to string: Day token with FM and FX modifiers.
     result = self.execute_query("select cast(cast('2019-01-01' as timestamp) as string "
         "format 'FXYYYY DAY DD')")
     assert result.data == ["2019 TUESDAY   01"]
@@ -1388,6 +1451,143 @@ class TestCastWithFormat(ImpalaTestSuite):
         r''' 'FXYYYY-"\\\'"-MM-DD') ''')
     assert result.data == ["2010-02-01"]
 
+  def test_iso8601_week_based_date_tokens(self):
+    # Format 0001-01-01 and 9999-12-31 dates.
+    # 0001-01-01 is Monday, belongs to the 1st week of year 1.
+    # 9999-12-31 is Friday, belongs to the 52nd week of year 9999.
+    result = self.client.execute(
+        "select cast(date'0001-01-01' as string format 'IYYY/IW/ID'), "
+        "       cast(date'9999-12-31' as string format 'IYYY/IW/ID')")
+    assert result.data == ["0001/01/01\t9999/52/05"]
+
+    # Parse 0001-01-01 and 9999-12-31 dates.
+    result = self.client.execute(
+        "select cast('0001/01/01' as date format 'IYYY/IW/ID'), "
+        "       cast('9999/52/05' as date format 'IYYY/IW/ID')")
+    assert result.data == ["0001-01-01\t9999-12-31"]
+
+    # Parse out-of-range dates.
+    # Year 9999 has 52 weeks. 9999-12-31 is Friday.
+    err = self.execute_query_expect_failure(self.client,
+        "select cast('9999/52/06' as date format 'IYYY/IW/ID')")
+    assert 'String to Date parse failed. Invalid string val: "9999/52/06"' in str(err)
+    err = self.execute_query_expect_failure(self.client,
+        "select cast('9999/53/01' as date format 'IYYY/IW/ID')")
+    assert 'String to Date parse failed. Invalid string val: "9999/53/01"' in str(err)
+
+    # Format 1400-01-01 and 9999-12-31 timestamps.
+    # 1400-01-01 is Wednesday, belongs to the 1st week of year 1400.
+    # 9999-12-31 is Friday, belongs to the 52nd week of year 9999.
+    result = self.client.execute(
+        "select cast(cast('1400-01-01' as timestamp) as string format 'IYYY/IW/ID'), "
+        "       cast(cast('9999-12-31' as timestamp) as string format 'IYYY/IW/ID')")
+    assert result.data == ["1400/01/03\t9999/52/05"]
+
+    # Parse 1400-01-01 and 9999-12-31 timestamps.
+    result = self.client.execute(
+        "select cast('1400/01/03' as timestamp format 'IYYY/IW/ID'), "
+        "       cast('9999/52/05' as timestamp format 'IYYY/IW/ID')")
+    assert result.data == ["1400-01-01 00:00:00\t9999-12-31 00:00:00"]
+
+    # Parse out-of-range timestamps.
+    # - Tuesday of the 1st week of year 1400 is 1399-12-31, which is out of the valid
+    # timestamp range.
+    # - Year 9999 has 52 weeks. 9999-12-31 is Friday.
+    result = self.client.execute(
+        "select cast('1400/01/02' as timestamp format 'IYYY/IW/ID'), "
+        "       cast('9999/52/06' as timestamp format 'IYYY/IW/ID'), "
+        "       cast('9999/53/01' as timestamp format 'IYYY/IW/ID')")
+    assert result.data == ["NULL\tNULL\tNULL"]
+
+    # Formatting dates arond Dec 31.
+    # 2019-12-31 is Tuesday, belongs to 1st week of year 2020.
+    # 2020-12-31 is Thursday, belongs to 53rd week of year 2020.
+    result = self.client.execute(
+        "select cast(date'2019-12-29' as string format 'IYYY/IW/ID'), "
+        "       cast(date'2019-12-30' as string format 'IYYY/IW/ID'), "
+        "       cast(date'2019-12-31' as string format 'IYYY/IW/ID'), "
+        "       cast(date'2020-01-01' as string format 'IYYY/IW/ID'), "
+        "       cast(date'2020-12-31' as string format 'IYYY/IW/ID'), "
+        "       cast(date'2021-01-01' as string format 'IYYY/IW/ID')")
+    assert result.data == [
+        "2019/52/07\t2020/01/01\t2020/01/02\t2020/01/03\t2020/53/04\t2020/53/05"]
+
+    # Parsing dates around Dec 31.
+    result = self.client.execute(
+        "select cast('2019/52/07' as date format 'IYYY/IW/ID'), "
+        "       cast('2020/01/01' as date format 'IYYY/IW/ID'), "
+        "       cast('2020/01/02' as date format 'IYYY/IW/ID'), "
+        "       cast('2020/01/03' as date format 'IYYY/IW/ID'), "
+        "       cast('2020/53/04' as date format 'IYYY/IW/ID'), "
+        "       cast('2020/53/05' as date format 'IYYY/IW/ID')")
+    assert result.data == [
+        "2019-12-29\t2019-12-30\t2019-12-31\t2020-01-01\t2020-12-31\t2021-01-01"]
+
+    err = self.execute_query_expect_failure(self.client,
+        "select cast('2019/53/01' as date format 'IYYY/IW/ID')")
+    assert 'String to Date parse failed. Invalid string val: "2019/53/01"' in str(err)
+
+    # Format 4, 3, 2, 1-digit week numbering year.
+    # 2020-01-01 is Wednesday, belongs to week 1 of year 2020.
+    query_options = dict({'now_string': '2019-01-01 11:11:11'})
+    result = self.execute_query(
+        "select cast(date'2020-01-01' as string format 'IYYY/IW/ID'), "
+        "       cast(date'2020-01-01' as string format 'IYY/IW/ID'), "
+        "       cast(date'2020-01-01' as string format 'IY/IW/ID'), "
+        "       cast(date'2020-01-01' as string format 'I/IW/ID')", query_options)
+    assert result.data == ["2020/01/03\t020/01/03\t20/01/03\t0/01/03"]
+
+    # Parse 4, 3, 2, 1-digit week numbering year.
+    result = self.execute_query(
+        "select cast('2020/01/03' as date format 'IYYY/IW/ID'), "
+        "       cast('020/01/03' as date format 'IYYY/IW/ID'), "
+        "       cast('20/01/03' as date format 'IYYY/IW/ID'), "
+        "       cast('0/01/03' as date format 'IYYY/IW/ID'), "
+        "       cast('020/01/03' as date format 'IYY/IW/ID'), "
+        "       cast('20/01/03' as date format 'IYY/IW/ID'), "
+        "       cast('0/01/03' as date format 'IYY/IW/ID'), "
+        "       cast('20/01/03' as date format 'IY/IW/ID'), "
+        "       cast('0/01/03' as date format 'IY/IW/ID'), "
+        "       cast('0/01/03' as date format 'I/IW/ID')", query_options)
+    assert result.data == ['2020-01-01\t2020-01-01\t2020-01-01\t2010-01-06\t'
+                           '2020-01-01\t2020-01-01\t2010-01-06\t'
+                           '2020-01-01\t2010-01-06\t'
+                           '2010-01-06']
+
+    # 2000-01-01 is Saturday, so it belongs to the 1999 ISO 8601 week-numbering year.
+    # Test that 1999 is used for prefixing 3, 2, 1-digit week numbering year.
+    query_options = dict({'now_string': '2000-01-01 11:11:11'})
+    result = self.execute_query(
+        "select cast('2005/01/01' as date format 'IYYY/IW/ID'), "
+        "       cast('005/01/01' as date format 'IYYY/IW/ID'), "
+        "       cast('05/01/01' as date format 'IYYY/IW/ID'), "
+        "       cast('5/01/01' as date format 'IYYY/IW/ID'), "
+        "       cast('05/01/01' as date format 'IY/IW/ID'), "
+        "       cast('5/01/01' as date format 'IY/IW/ID'), "
+        "       cast('5/01/01' as date format 'I/IW/ID')", query_options)
+    assert result.data == ['2005-01-03\t1004-12-31\t1905-01-02\t1995-01-02\t'
+                           '1905-01-02\t1995-01-02\t'
+                           '1995-01-02']
+
+    # Parse 1-digit week of year and 1-digit week day.
+    result = self.client.execute(
+        "select cast('2020/53/4' as date format 'IYYY/IW/ID'), "
+        "       cast('2020/1/3' as date format 'IYYY/IW/ID')")
+    assert result.data == ["2020-12-31\t2020-01-01"]
+
+    # Parse dayname with week-based tokens
+    result = self.client.execute(
+        "select cast('2020/wed/1' as date format 'IYYY/DY/IW'), "
+        "       cast('2020/wed1' as date format 'iyyy/dyiw'), "
+        "       cast('2020wed1' as date format 'IYYYDYIW'), "
+        "       cast('2020WEd1' as date format 'iyyydyiw'), "
+        "       cast('2020/wednesday/1' as date format 'IYYY/DAY/IW'), "
+        "       cast('2020/wednesday1' as date format 'iyyy/dayiw'), "
+        "       cast('2020wednesday1' as date format 'IYYYDAYIW'), "
+        "       cast('2020wEdnESday1' as date format 'iyyydayiw')")
+    assert result.data == ["2020-01-01\t2020-01-01\t2020-01-01\t2020-01-01\t"
+                           "2020-01-01\t2020-01-01\t2020-01-01\t2020-01-01"]
+
   def test_fm_fx_modifiers(self):
     # Exact mathcing for the whole format.
     result = self.client.execute("select cast('2001-03-01 03:10:15.123456 -01:30' as "
@@ -1456,6 +1656,32 @@ class TestCastWithFormat(ImpalaTestSuite):
         "format 'FXYYYY-MM-DD HH12:MI:SS.FF')")
     assert result.data == ["NULL"]
 
+    # Strict week-based token length matching.
+    result = self.client.execute(
+        "select cast('2015/3/05' as timestamp format 'FXIYYY/IW/ID'), "
+        "       cast('2015/03/5' as timestamp format 'FXIYYY/IW/ID'), "
+        "       cast('015/03/05' as timestamp format 'FXIYYY/IW/ID'), "
+        "       cast('15/03/05' as timestamp format 'FXIYYY/IW/ID'), "
+        "       cast('5/03/05' as timestamp format 'FXIYYY/IW/ID')")
+    assert result.data == ["NULL\tNULL\tNULL\tNULL\tNULL"]
+    err = self.execute_query_expect_failure(self.client,
+        "select cast('2015/3/05' as date format 'FXIYYY/IW/ID')")
+    assert 'String to Date parse failed. Invalid string val: "2015/3/05"' in str(err)
+
+    query_options = dict({'now_string': '2019-01-01 11:11:11'})
+    result = self.execute_query(
+        "select cast('2015/03/05' as timestamp format 'FXIYYY/IW/ID'), "
+        "       cast('015/03/05' as timestamp format 'FXIYY/IW/ID'), "
+        "       cast('15/03/05' as timestamp format 'FXIY/IW/ID'), "
+        "       cast('5/03/05' as timestamp format 'FXI/IW/ID'), "
+        "       cast('2015/03/05' as date format 'FXIYYY/IW/ID'), "
+        "       cast('015/03/05' as date format 'FXIYY/IW/ID'), "
+        "       cast('15/03/05' as date format 'FXIY/IW/ID'), "
+        "       cast('5/03/05' as date format 'FXI/IW/ID')", query_options)
+    assert result.data == ["2015-01-16 00:00:00\t2015-01-16 00:00:00\t"
+        "2015-01-16 00:00:00\t2015-01-16 00:00:00\t"
+        "2015-01-16\t2015-01-16\t2015-01-16\t2015-01-16"]
+
     # Strict token length matching with text token containing escaped double quote.
     result = self.client.execute(r'''select cast('2001-03-09 some "text03:25:00' '''
         r'''as timestamp format "FXYYYY-MM-DD \"some \\\"text\"HH12:MI:SS")''')
@@ -1514,6 +1740,11 @@ class TestCastWithFormat(ImpalaTestSuite):
         "timestamp) as string format 'FXYYYY-MM-DD HH24:MI:SS.FF7')")
     assert result.data == ["2001-03-05 03:10:15.1234560"]
 
+    result = self.client.execute(
+        "select cast(date'0001-01-10' as string format 'FXIYYY-IW-ID'), "
+        "       cast(date'0001-10-10' as string format 'FXIYYY-IW-ID')")
+    assert result.data == ["0001-02-03\t0001-41-03"]
+
     # Datetime to string path: Tokens with FM modifier don't pad output to a given
     # length.
     result = self.client.execute("select cast(cast('2001-03-14 03:06:08' as timestamp) "
@@ -1527,6 +1758,11 @@ class TestCastWithFormat(ImpalaTestSuite):
     result = self.client.execute("select cast(date'0001-03-10' as string format "
         "'FMYY-FMMM-FMDD')")
     assert result.data == ["1-3-10"]
+
+    result = self.client.execute(
+        "select cast(date'0001-01-10' as string format 'FMIYYY-FMIW-FMID'), "
+        "       cast(date'0001-10-10' as string format 'FMIYYY-FMIW-FMID')")
+    assert result.data == ["1-2-3\t1-41-3"]
 
     # Datetime to string path: FM modifier is effective even if FX modifier is also
     # given.
@@ -1542,10 +1778,16 @@ class TestCastWithFormat(ImpalaTestSuite):
         "as string format 'FXFMYYYY-FMMM-FMDD')")
     assert result.data == ["1-4-10"]
 
+    result = self.client.execute(
+        "select cast(date'0001-01-10' as string format 'FXFMIYYY-FMIW-FMID'), "
+        "       cast(date'0001-10-10' as string format 'FXFMIYYY-FMIW-FMID')")
+    assert result.data == ["1-2-3\t1-41-3"]
+
     # FX and FM modifiers are case-insensitive.
     result = self.client.execute("select cast('2019-5-10' as date format "
         "'fxYYYY-fmMM-DD')")
     assert result.data == ["2019-05-10"]
+
 
   def test_quarter(self):
     result = self.client.execute("select cast(date'2001-01-01' as string "
@@ -1636,6 +1878,19 @@ class TestCastWithFormat(ImpalaTestSuite):
         "select cast('2017-05-01' as timestamp format 'YYYY-MONTH-DD-MON')")
     assert "Multiple month tokens provided" in str(err)
 
+    # Conflict between DAY, DY and ID tokens.
+    err = self.execute_query_expect_failure(self.client,
+        "select cast('2017-05-01-Monday' as timestamp format 'IYYY-IW-ID-DAY')")
+    assert "Multiple day of week tokens provided" in str(err)
+
+    err = self.execute_query_expect_failure(self.client,
+        "select cast('2017-05-01-Mon' as timestamp format 'IYYY-IW-ID-DY')")
+    assert "Multiple day of week tokens provided" in str(err)
+
+    err = self.execute_query_expect_failure(self.client,
+        "select cast('2017-05-Monday-Mon' as timestamp format 'IYYY-IW-DAY-DY')")
+    assert "Multiple day of week tokens provided" in str(err)
+
     # Week of year token not allowed in a string to datetime conversion.
     err = self.execute_query_expect_failure(self.client,
         "select cast('2017-1-01' as timestamp format 'YYYY-WW-DD')")
@@ -1674,8 +1929,8 @@ class TestCastWithFormat(ImpalaTestSuite):
     # Day name token not allowed in a string to datetime conversion.
     err = self.execute_query_expect_failure(self.client,
         "select cast('2017-1-02 Monday' as timestamp format 'YYYY-DD-MM DAY')")
-    assert "Day name token is not allowed in a string to datetime conversion" in \
-        str(err)
+    assert "Day name token is not allowed in a string to datetime conversion except " \
+        "with IYYY|IYY|IY|I and IW tokens" in str(err)
 
     # Conflict between hour tokens
     err = self.execute_query_expect_failure(self.client,
@@ -1764,23 +2019,77 @@ class TestCastWithFormat(ImpalaTestSuite):
     # Multiple fraction second token conflict
     err = self.execute_query_expect_failure(self.client,
         "select cast('2018-10-10' as timestamp format 'FF FF1')")
-    assert "Multiple fractional second token provided." in str(err)
+    assert "Multiple fractional second tokens provided." in str(err)
 
     err = self.execute_query_expect_failure(self.client,
         "select cast('2018-10-10' as timestamp format 'FF2 FF3')")
-    assert "Multiple fractional second token provided." in str(err)
+    assert "Multiple fractional second tokens provided." in str(err)
 
     err = self.execute_query_expect_failure(self.client,
         "select cast('2018-10-10' as timestamp format 'FF4 FF5')")
-    assert "Multiple fractional second token provided." in str(err)
+    assert "Multiple fractional second tokens provided." in str(err)
 
     err = self.execute_query_expect_failure(self.client,
         "select cast('2018-10-10' as timestamp format 'FF6 FF7')")
-    assert "Multiple fractional second token provided." in str(err)
+    assert "Multiple fractional second tokens provided." in str(err)
 
     err = self.execute_query_expect_failure(self.client,
         "select cast('2018-10-10' as timestamp format 'FF8 FF9')")
-    assert "Multiple fractional second token provided." in str(err)
+    assert "Multiple fractional second tokens provided." in str(err)
+
+    # ISO 8601 Week-based and normal date pattern tokens must not be mixed.
+    err = self.execute_query_expect_failure(self.client,
+        "select cast('2018-10-01' as date format 'IYYY-MM-ID')")
+    assert "ISO 8601 week-based date tokens (i.e. IYYY, IW, ID) are not allowed to be " \
+           "used with regular date tokens." in str(err)
+    err = self.execute_query_expect_failure(self.client,
+        "select cast('2018-10-01 01:00' as timestamp format 'IYYY-MM-ID HH24:MI')")
+    assert "ISO 8601 week-based date tokens (i.e. IYYY, IW, ID) are not allowed to be " \
+           "used with regular date tokens." in str(err)
+
+    err = self.execute_query_expect_failure(self.client,
+        "select cast('2018-10-01' as date format 'YYYY-IW-DD')")
+    assert "ISO 8601 week-based date tokens (i.e. IYYY, IW, ID) are not allowed to be " \
+           "used with regular date tokens." in str(err)
+    err = self.execute_query_expect_failure(self.client,
+        "select cast('2018-10-01' as timestamp format 'IYYY-IW-DD')")
+    assert "ISO 8601 week-based date tokens (i.e. IYYY, IW, ID) are not allowed to be " \
+           "used with regular date tokens." in str(err)
+
+    # Missing ISO 8601 week-based pattern tokens.
+    err = self.execute_query_expect_failure(self.client,
+        "select cast('2018-10' as date format 'IYYY-IW')")
+    assert "One or more required ISO 8601 week-based date tokens (i.e. IYYY, IW, ID) " \
+           "are missing." in str(err)
+    err = self.execute_query_expect_failure(self.client,
+        "select cast('2018-10 01:00' as timestamp format 'IYYY-IW HH24:MI')")
+    assert "One or more required ISO 8601 week-based date tokens (i.e. IYYY, IW, ID) " \
+           "are missing." in str(err)
+
+    err = self.execute_query_expect_failure(self.client,
+        "select cast('18-07' as date format 'IY-ID')")
+    assert "One or more required ISO 8601 week-based date tokens (i.e. IYYY, IW, ID) " \
+           "are missing." in str(err)
+    err = self.execute_query_expect_failure(self.client,
+        "select cast('18-07 01:00' as timestamp format 'IY-ID HH24:MI')")
+    assert "One or more required ISO 8601 week-based date tokens (i.e. IYYY, IW, ID) " \
+           "are missing." in str(err)
+
+    # ISO 8601 Week numbering year conflict
+    err = self.execute_query_expect_failure(self.client,
+        "select cast('2018-018-10-01' as date format 'IYYY-IYY-IW-DD')")
+    assert "Multiple year tokens provided" in str(err)
+    err = self.execute_query_expect_failure(self.client,
+        "select cast('2018-018-10-01 01:00' as timestamp format "
+        "'IYYY-IYY-IW-DD HH24:MI')")
+    assert "Multiple year tokens provided" in str(err)
+
+    err = self.execute_query_expect_failure(self.client,
+        "select cast('018-8-10-01' as date format 'IYY-I-IW-DD')")
+    assert "Multiple year tokens provided" in str(err)
+    err = self.execute_query_expect_failure(self.client,
+        "select cast('018-8-10-01 01:00' as timestamp format 'IYY-I-IW-DD HH24:MI')")
+    assert "Multiple year tokens provided" in str(err)
 
     # Verify that conflict check is not skipped when format ends with separators.
     err = self.execute_query_expect_failure(self.client,

@@ -40,6 +40,24 @@ public:
       WARN_UNUSED_RESULT;
 
 private:
+  // Struct used for capturing ISO 8601 week-based tokens during parsing.
+  struct Iso8601WeekBasedDateParseResult {
+    int year = -1;
+    int week_of_year = -1;
+    int day_of_week = -1;
+
+    bool IsSet() const {
+      return (year != -1 || week_of_year != -1 || day_of_week != -1);
+    }
+
+    /// Calcuates year/month/day date values corresponding to the ISO 8601 week-based
+    /// date values stored in this instance.
+    /// If the ISO 8601 week-based date values are valid, the resulting year/month/day
+    /// values are copied to 'result' and true is returned.
+    /// Otherwise, 'result' is left intact and false is returned.
+    bool ExtractYearMonthDay(DateTimeParseResult* result) const WARN_UNUSED_RESULT;
+  };
+
   /// 'input_str' points to a location in the input string where the parsing stands now.
   /// Given 'tok' as the next token in the list of tokens created by the tokenizer this
   /// function finds the end of the next token.
@@ -60,15 +78,16 @@ private:
   static const char* ParseMeridiemIndicatorFromInput(const char* input_str,
       int input_len);
 
-  /// If the year part of the input is shorter than 4 digits then prefixes the year with
-  /// digits from the current year. Puts the result into 'result->year'.
-  static void PrefixYearFromCurrentYear(int actual_token_len, const TimestampValue* now,
-      DateTimeParseResult* result);
+  /// Takes 'year' that is shorter than 4 digits and prefixes it with digits from
+  /// 'current_year'. Returns the resulting 4-digit year.
+  static int PrefixYearFromCurrentYear(int year, int year_token_len, int current_year);
 
-  /// Uses 'result->year' as an input. Can call this function for 2-digit years and it
-  /// constructs a 4-digit year based on the year provided and the current date. Puts the
-  /// result back to 'result->year'.
-  static void GetRoundYear(const TimestampValue* now, DateTimeParseResult* result);
+  /// This function takes a 2-digit 'year' and constructs a 4-digit year from it based on
+  /// the 'current_year'. Returns the resulting year.
+  static int RoundYearFromCurrentYear(int year, int current_year);
+
+  /// Returns the ISO 8601 week numbering year corresponding to 'now' date.
+  static int GetIso8601WeekNumberingYear(const TimestampValue* now);
 
   /// Gets a pointer to the current char in the input string and an index to the current
   /// token being processed within 'dt_ctx->toks'. Advances these pointers to the end of

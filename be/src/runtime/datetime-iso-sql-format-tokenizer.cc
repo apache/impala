@@ -70,7 +70,13 @@ const unordered_map<string, IsoSqlFormatTokenizer::TokenItem>
   {"D", IsoSqlFormatTokenizer::TokenItem(DAY_OF_WEEK, true, false)},
   {"Q", IsoSqlFormatTokenizer::TokenItem(QUARTER_OF_YEAR, true, false)},
   {"WW", IsoSqlFormatTokenizer::TokenItem(WEEK_OF_YEAR, true, false)},
-  {"W", IsoSqlFormatTokenizer::TokenItem(WEEK_OF_MONTH, true, false)}
+  {"W", IsoSqlFormatTokenizer::TokenItem(WEEK_OF_MONTH, true, false)},
+  {"IYYY", IsoSqlFormatTokenizer::TokenItem(ISO8601_WEEK_NUMBERING_YEAR, true, false)},
+  {"IYY", IsoSqlFormatTokenizer::TokenItem(ISO8601_WEEK_NUMBERING_YEAR, true, false)},
+  {"IY", IsoSqlFormatTokenizer::TokenItem(ISO8601_WEEK_NUMBERING_YEAR, true, false)},
+  {"I", IsoSqlFormatTokenizer::TokenItem(ISO8601_WEEK_NUMBERING_YEAR, true, false)},
+  {"IW", IsoSqlFormatTokenizer::TokenItem(ISO8601_WEEK_OF_YEAR, true, false)},
+  {"ID", IsoSqlFormatTokenizer::TokenItem(ISO8601_DAY_OF_WEEK, true, false)}
 });
 
 const unordered_map<string, int> IsoSqlFormatTokenizer::SPECIAL_LENGTHS({
@@ -187,7 +193,11 @@ FormatTokenizationResult IsoSqlFormatTokenizer::CheckIncompatibilities() const {
   short provided_year_count = IsUsedToken("YYYY") + IsUsedToken("YYY") +
       IsUsedToken("YY") + IsUsedToken("Y");
   short provided_round_year_count = IsUsedToken("RRRR") + IsUsedToken("RR");
-  if (provided_year_count > 1 || provided_round_year_count > 1) {
+  short provided_iso8601_week_numbering_year_count = IsUsedToken("IYYY") +
+      IsUsedToken("IYY") + IsUsedToken("IY") + IsUsedToken("I");
+
+  if (provided_year_count > 1 || provided_round_year_count > 1 ||
+      provided_iso8601_week_numbering_year_count > 1) {
     return CONFLICTING_YEAR_TOKENS_ERROR;
   }
 
@@ -197,19 +207,19 @@ FormatTokenizationResult IsoSqlFormatTokenizer::CheckIncompatibilities() const {
 
   if (IsUsedToken("Q")) return QUARTER_NOT_ALLOWED_FOR_PARSING;
 
-  short provided_month_tokens = IsUsedToken("MM") + IsUsedToken("MONTH") +
-      IsUsedToken("MON");
-  if (provided_month_tokens > 1) return CONFLICTING_MONTH_TOKENS_ERROR;
-
   if (IsUsedToken("WW") || IsUsedToken("W")) return WEEK_NUMBER_NOT_ALLOWED_FOR_PARSING;
 
-  if (IsUsedToken("DDD") && (IsUsedToken("DD") || provided_month_tokens == 1)) {
+  short provided_month_count = IsUsedToken("MM") + IsUsedToken("MONTH")
+      + IsUsedToken("MON");
+  if (provided_month_count > 1) return CONFLICTING_MONTH_TOKENS_ERROR;
+
+  bool is_used_day_of_year = IsUsedToken("DDD");
+  bool is_used_day_of_month = IsUsedToken("DD");
+  if (is_used_day_of_year && (is_used_day_of_month || provided_month_count == 1)) {
     return DAY_OF_YEAR_TOKEN_CONFLICT;
   }
 
   if (IsUsedToken("D")) return DAY_OF_WEEK_NOT_ALLOWED_FOR_PARSING;
-
-  if (IsUsedToken("DAY") || IsUsedToken("DY")) return DAY_NAME_NOT_ALLOWED_FOR_PARSING;
 
   short provided_hour_tokens = IsUsedToken("HH") + IsUsedToken("HH12") +
       IsUsedToken("HH24");
@@ -243,6 +253,27 @@ FormatTokenizationResult IsoSqlFormatTokenizer::CheckIncompatibilities() const {
   if (provided_fractional_second_count > 1) {
     return CONFLICTING_FRACTIONAL_SECOND_TOKENS_ERROR;
   }
+
+  short provided_day_of_week_count = IsUsedToken("ID") + IsUsedToken("DAY") +
+      IsUsedToken("DY");
+  if (provided_day_of_week_count > 1) return CONFLICTING_DAY_OF_WEEK_TOKENS_ERROR;
+
+  bool is_used_iso8601_week_of_year = IsUsedToken("IW");
+  if (provided_iso8601_week_numbering_year_count == 1 || is_used_iso8601_week_of_year ||
+      provided_day_of_week_count == 1) {
+    if (provided_year_count == 1 || provided_round_year_count == 1 ||
+        provided_month_count == 1 || is_used_day_of_year || is_used_day_of_month) {
+      if (IsUsedToken("DAY") || IsUsedToken("DY")) {
+        return DAY_NAME_NOT_ALLOWED_FOR_PARSING;
+      }
+      return CONFLICTING_DATE_TOKENS_ERROR;
+    }
+    if (provided_iso8601_week_numbering_year_count == 0 ||
+        !is_used_iso8601_week_of_year || provided_day_of_week_count == 0) {
+      return MISSING_ISO8601_WEEK_BASED_TOKEN_ERROR;
+    }
+  }
+
   return SUCCESS;
 }
 

@@ -137,6 +137,7 @@ string DateParser::Format(const DateTimeFormatContext& dt_ctx, const DateValue& 
   int year, month, day;
   if (!date.ToYearMonthDay(&year, &month, &day)) return "";
 
+  DCHECK(date.IsValid());
   string result;
   result.reserve(dt_ctx.fmt_out_len);
   for (const DateTimeFormatToken& tok: dt_ctx.toks) {
@@ -144,11 +145,7 @@ string DateParser::Format(const DateTimeFormatContext& dt_ctx, const DateValue& 
     switch (tok.type) {
       case YEAR:
       case ROUND_YEAR: {
-        num_val = year;
-        if (tok.len < 4) {
-          int adjust_factor = std::pow(10, tok.len);
-          num_val %= adjust_factor;
-        }
+        num_val = AdjustYearToLength(year, tok.len);
         break;
       }
       case QUARTER_OF_YEAR: {
@@ -189,6 +186,20 @@ string DateParser::Format(const DateTimeFormatContext& dt_ctx, const DateValue& 
       }
       case TEXT: {
         result.append(FormatTextToken(tok));
+        break;
+      }
+      case ISO8601_WEEK_NUMBERING_YEAR: {
+        num_val = AdjustYearToLength(date.Iso8601WeekNumberingYear(), tok.len);
+        break;
+      }
+      case ISO8601_WEEK_OF_YEAR: {
+        num_val = date.Iso8601WeekOfYear();
+        break;
+      }
+      case ISO8601_DAY_OF_WEEK: {
+        // WeekDay() returns 0 for Monday and 6 for Sunday.
+        // We need to output 1 for Monday and 7 for Sunday.
+        num_val = date.WeekDay() + 1;
         break;
       }
       default: DCHECK(false) << "Unknown date format token";
