@@ -38,6 +38,7 @@ from tests.util.get_parquet_metadata import (decode_stats_value,
     get_parquet_metadata_from_hdfs_folder)
 
 PARQUET_CODECS = ['none', 'snappy', 'gzip', 'zstd', 'lz4']
+IMPALA_HOME = os.environ['IMPALA_HOME']
 
 
 class RoundFloat():
@@ -265,7 +266,8 @@ class TestHdfsParquetTableWriter(ImpalaTestSuite):
       for f in files:
         if not f.endswith('parq'):
           continue
-        check_call([os.path.join(impalad_basedir, 'util/parquet-reader'), '--file',
+        check_call([os.path.join(IMPALA_HOME, "bin/run-binary.sh"),
+                    os.path.join(impalad_basedir, 'util/parquet-reader'), '--file',
                     os.path.join(tmpdir.strpath, str(f))])
 
   def test_sorting_columns(self, vector, unique_database, tmpdir):

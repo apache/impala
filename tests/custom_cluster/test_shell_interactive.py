@@ -22,7 +22,7 @@ import os
 from tests.common.custom_cluster_test_suite import CustomClusterTestSuite
 from tests.common.test_vector import ImpalaTestVector
 from tests.common.test_dimensions import create_client_protocol_dimension
-from tests.shell.util import get_shell_cmd, get_impalad_port
+from tests.shell.util import get_shell_cmd, get_impalad_port, spawn_shell
 
 
 class TestShellInteractive(CustomClusterTestSuite):
@@ -41,8 +41,7 @@ class TestShellInteractive(CustomClusterTestSuite):
     # Iterate over test vector within test function to avoid restarting cluster.
     for vector in\
         [ImpalaTestVector([value]) for value in create_client_protocol_dimension()]:
-      cmd = get_shell_cmd(vector)
-      proc = pexpect.spawn(cmd[0], cmd[1:])
+      proc = spawn_shell(get_shell_cmd(vector))
       # Check with only live_summary set to true.
       proc.expect("{0}] default>".format(get_impalad_port(vector)))
       proc.sendline("set live_summary=true;")

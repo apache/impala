@@ -35,6 +35,7 @@ script_header_template = textwrap.dedent("""\
 # The script body uses shell variables for all of its key components. It requires
 # no substitutions.
 script_body = textwrap.dedent(r"""
+    ${IMPALA_HOME}/bin/run-jvm-binary.sh \
     ${IMPALA_HOME}/be/build/latest/service/unifiedbetests \
       --gtest_filter=${GTEST_FILTER} \
       --gtest_output=xml:${IMPALA_BE_TEST_LOGS_DIR}/${TEST_EXEC_NAME}.xml \

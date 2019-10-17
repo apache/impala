@@ -20,6 +20,7 @@
 
 import logging
 import os
+import pexpect
 import pytest
 import re
 import shlex
@@ -54,6 +55,20 @@ if IMPALA_SHELL_EXECUTABLE is None:
         IMPALA_HOME, "shell/build", "impala-shell-" + IMPALA_LOCAL_BUILD_VERSION,
         "impala-shell")
 
+    
+def build_shell_env(env=None):
+  """ Construct the environment for the shell to run in based on 'env', or the current
+  process's environment if env is None."""
+  if not env: env = os.environ
+  # Don't inherit PYTHONPATH or LD_LIBRARY_PATH - the shell launch script must set
+  # these to include dependencies. Copy 'env' to avoid mutating argument or os.environ.
+  env = dict(env)
+  if "PYTHONPATH" in env:
+    del env["PYTHONPATH"]
+  if "LD_LIBRARY_PATH" in env:
+    del env["LD_LIBRARY_PATH"]
+  return env
+
 
 def get_python_version_for_shell_env():
   """
@@ -74,7 +89,7 @@ def get_python_version_for_shell_env():
   older thrift gen-py files are not py3 compatible.
   """
   version_check = Popen([IMPALA_SHELL_EXECUTABLE, '-q', 'version()'],
-                        stdout=PIPE, stderr=PIPE)
+                        stdout=PIPE, stderr=PIPE, env=build_shell_env())
   stdout, stderr = version_check.communicate()
 
   if "No module named \'ttypes\'" in stderr:
@@ -214,6 +229,11 @@ def get_shell_cmd(vector):
           "-i{0}".format(get_impalad_host_port(vector))]
 
 
+def spawn_shell(shell_cmd):
+  """Spawn a shell process with the provided command line. Returns the Pexpect object."""
+  return pexpect.spawn(shell_cmd[0], shell_cmd[1:], env=build_shell_env())
+
+
 def get_open_sessions_metric(vector):
   """Get the name of the vector that tracks open sessions for the protocol in vector."""
   protocol = vector.get_value("protocol")
@@ -289,11 +309,5 @@ class ImpalaShell(object):
     """Starts a shell process and returns the process handle"""
     cmd = get_shell_cmd(vector)
     if args is not None: cmd += args
-    if not env: env = os.environ
-    # Don't inherit PYTHONPATH - the shell launch script should set up PYTHONPATH
-    # to include dependencies. Copy 'env' to avoid mutating argument or os.environ.
-    env = dict(env)
-    if "PYTHONPATH" in env:
-      del env["PYTHONPATH"]
     return Popen(cmd, shell=False, stdout=PIPE, stdin=PIPE, stderr=PIPE,
-                 env=env)
+                 env=build_shell_env(env))
