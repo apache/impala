@@ -31,7 +31,7 @@ from subprocess import call
 
 from tests.common.environ import HIVE_MAJOR_VERSION
 from tests.common.impala_test_suite import ImpalaTestSuite
-from tests.common.skip import (SkipIfS3, SkipIfABFS, SkipIfADLS, SkipIfHive2,
+from tests.common.skip import (SkipIfS3, SkipIfABFS, SkipIfADLS, SkipIfHive2, SkipIfHive3,
     SkipIfIsilon, SkipIfLocal, SkipIfCatalogV2)
 from tests.common.test_dimensions import (
     create_single_exec_option_dimension,
@@ -470,6 +470,7 @@ class TestHmsIntegration(ImpalaTestSuite):
             table_name,
             'Duplicate column name: v')
 
+  @SkipIfHive3.col_stat_separated_by_engine
   @pytest.mark.execute_serially
   def test_compute_stats_get_to_hive(self, vector):
     """Stats computed in Impala are also visible in Hive."""
@@ -485,6 +486,7 @@ class TestHmsIntegration(ImpalaTestSuite):
             'show column stats %s' % table_name)
         assert hive_stats != self.hive_column_stats(table_name, 'x')
 
+  @SkipIfHive3.col_stat_separated_by_engine
   @pytest.mark.execute_serially
   def test_compute_stats_get_to_impala(self, vector):
     """Column stats computed in Hive are also visible in Impala."""
@@ -509,6 +511,105 @@ class TestHmsIntegration(ImpalaTestSuite):
         new_impala_stats = self.impala_all_column_stats(table_name)
         assert impala_stats != new_impala_stats
         assert '0' == new_impala_stats['x']['#nulls']
+
+  @SkipIfHive2.col_stat_not_separated_by_engine
+  def test_engine_separates_col_stats(self, vector):
+    """
+    The 'engine' column in TAB_COL_STATS and PART_COL_STATS HMS tables is used to
+    differentiate among column stats computed by different engines.
+
+    IMPALA-8842: Test that Impala sets 'engine' column correctly when writing/reading
+    column statistics for a non-partitioned table. Both Hive and Impala use TAB_COL_STATS
+    to store the non-partitioned table column statistics.
+
+    The test is executed for transactional and non-transactional tables.
+    """
+    trans_tbl_prop = \
+        "TBLPROPERTIES('transactional'='true', 'transactional_properties'='insert_only')"
+    for tbl_prop in [trans_tbl_prop, '']:
+      with self.ImpalaDbWrapper(self, self.unique_string()) as db_name:
+        with self.ImpalaTableWrapper(self, '%s.%s' % (db_name, self.unique_string()),
+            '(x int) %s' % tbl_prop) as table_name:
+          self.run_stmt_in_hive('insert into %s values (0), (1), (2), (3)' % table_name)
+          self.run_stmt_in_hive(
+              'use %s; analyze table %s compute statistics for columns' %
+              (db_name, table_name.split('.')[1]))
+          hive_x_stats = self.hive_column_stats(table_name, 'x')
+          assert '4' == hive_x_stats['distinct_count']
+          assert '0' == hive_x_stats['num_nulls']
+
+          # Impala doesn't read column stats written by Hive.
+          self.client.execute('invalidate metadata %s' % table_name)
+          impala_stats = self.impala_all_column_stats(table_name)
+          assert '-1' == impala_stats['x']['#nulls']
+          assert '-1' == impala_stats['x']['ndv']
+          # Impala writes and reads its own column stats
+          self.client.execute('compute stats %s' % table_name)
+          impala_stats = self.impala_all_column_stats(table_name)
+          assert '0' == impala_stats['x']['#nulls']
+          assert '4' == impala_stats['x']['ndv']
+          # Insert additional rows and recalculate stats in Impala.
+          self.client.execute('insert into %s values (10), (11), (12), (13)' % table_name)
+          self.client.execute('compute stats %s' % table_name)
+          impala_stats = self.impala_all_column_stats(table_name)
+          assert '0' == impala_stats['x']['#nulls']
+          assert '8' == impala_stats['x']['ndv']
+
+          # Hive doesn't read column stats written by Impala
+          hive_x_stats = self.hive_column_stats(table_name, 'x')
+          assert '4' == hive_x_stats['distinct_count']
+          assert '0' == hive_x_stats['num_nulls']
+
+  @SkipIfHive2.col_stat_not_separated_by_engine
+  def test_engine_separates_partitioned_col_stats(self, vector):
+    """
+    The 'engine' column in TAB_COL_STATS and PART_COL_STATS HMS tables is used to
+    differentiate among column stats computed by different engines.
+
+    IMPALA-8842: Test that Impala sets 'engine' column correctly when writing/reading
+    column statistics for a partitioned table. Note, that Hive uses PART_COL_STATS to
+    store parttioned table column statistics whereas Impala stores them in TAB_COL_STATS,
+    therefore column stats would have been separated even without IMPALA-8842.
+
+    The test is executed for transactional and non-transactional tables.
+    """
+    trans_tbl_prop = \
+        "TBLPROPERTIES('transactional'='true', 'transactional_properties'='insert_only')"
+    for tbl_prop in [trans_tbl_prop, '']:
+      with self.ImpalaDbWrapper(self, self.unique_string()) as db_name:
+        with self.ImpalaTableWrapper(self, '%s.%s' % (db_name, self.unique_string()),
+            '(x int) partitioned by (y int) %s' % tbl_prop) as table_name:
+          self.run_stmt_in_hive(
+              'insert into %s partition (y=0) values (0), (1), (2), (3)' % table_name)
+          self.run_stmt_in_hive(
+              'use %s; analyze table %s compute statistics for columns' %
+              (db_name, table_name.split('.')[1]))
+          hive_x_stats = self.hive_column_stats(table_name, 'x')
+          assert '4' == hive_x_stats['distinct_count']
+          assert '0' == hive_x_stats['num_nulls']
+
+          # Impala doesn't read column stats written by Hive.
+          self.client.execute('invalidate metadata %s' % table_name)
+          impala_stats = self.impala_all_column_stats(table_name)
+          assert '-1' == impala_stats['x']['#nulls']
+          assert '-1' == impala_stats['x']['ndv']
+          # Impala writes and reads its own column stats
+          self.client.execute('compute stats %s' % table_name)
+          impala_stats = self.impala_all_column_stats(table_name)
+          assert '0' == impala_stats['x']['#nulls']
+          assert '4' == impala_stats['x']['ndv']
+          # Insert additional rows and recalculate stats in Impala.
+          self.client.execute(
+              'insert into %s partition (y=0) values (10), (11), (12), (13)' % table_name)
+          self.client.execute('compute stats %s' % table_name)
+          impala_stats = self.impala_all_column_stats(table_name)
+          assert '0' == impala_stats['x']['#nulls']
+          assert '8' == impala_stats['x']['ndv']
+
+          # Hive doesn't read column stats written by Impala
+          hive_x_stats = self.hive_column_stats(table_name, 'x')
+          assert '4' == hive_x_stats['distinct_count']
+          assert '0' == hive_x_stats['num_nulls']
 
   @pytest.mark.execute_serially
   def test_drop_partition(self, vector):

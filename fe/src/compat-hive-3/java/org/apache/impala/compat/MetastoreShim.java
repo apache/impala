@@ -242,7 +242,7 @@ public class MetastoreShim {
   public static List<ColumnStatisticsObj> getTableColumnStatistics(
       IMetaStoreClient client, String dbName, String tableName, List<String> colNames)
       throws NoSuchObjectException, MetaException, TException {
-    return client.getTableColumnStatisticsV2(dbName, tableName, colNames,
+    return client.getTableColumnStatistics(dbName, tableName, colNames,
         /*engine*/IMPALA_ENGINE);
   }
 
@@ -254,7 +254,7 @@ public class MetastoreShim {
       String dbName, String tableName, String colName)
       throws NoSuchObjectException, MetaException, InvalidObjectException, TException,
              InvalidInputException {
-    return client.deleteTableColumnStatisticsV2(dbName, tableName, colName,
+    return client.deleteTableColumnStatistics(dbName, tableName, colName,
         /*engine*/IMPALA_ENGINE);
   }
 

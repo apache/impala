@@ -213,11 +213,15 @@ class SkipIfHive3:
       reason="Sentry HMS follower does not work with HMS-3. See SENTRY-2518 for details")
   kudu_hms_notifications_not_supported = pytest.mark.skipif(HIVE_MAJOR_VERSION >= 3,
       reason="Kudu is not tested with Hive 3 notifications yet, see IMPALA-8751.")
+  col_stat_separated_by_engine = pytest.mark.skipif(HIVE_MAJOR_VERSION >= 3,
+      reason="Hive 3 separates column statistics by engine")
 
 
 class SkipIfHive2:
   acid = pytest.mark.skipif(HIVE_MAJOR_VERSION == 2,
       reason="Acid tables are only supported with Hive 3.")
+  col_stat_not_separated_by_engine = pytest.mark.skipif(HIVE_MAJOR_VERSION == 2,
+      reason="Hive 2 doesnt support separating column statistics by engine")
 
 
 class SkipIfCatalogV2:
