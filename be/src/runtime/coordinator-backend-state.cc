@@ -145,33 +145,13 @@ void Coordinator::BackendState::SetRpcParams(const DebugOptions& debug_options,
 
     if (filter_mode_ == TRuntimeFilterMode::OFF) continue;
 
-    // Remove filters that weren't selected during filter routing table construction.
-    // TODO: do this more efficiently, we're looping over the entire plan for each
-    // instance separately
     int instance_idx = GetInstanceIdx(params.instance_id);
-    for (TPlanNode& plan_node : sidecar->fragment_ctxs.back().fragment.plan.nodes) {
-      if (!plan_node.__isset.hash_join_node) continue;
-      if (!plan_node.__isset.runtime_filters) continue;
-
-      vector<TRuntimeFilterDesc> required_filters;
-      for (const TRuntimeFilterDesc& desc: plan_node.runtime_filters) {
-        FilterRoutingTable::const_iterator filter_it =
-            filter_routing_table.find(desc.filter_id);
-        // filter was dropped in Coordinator::InitFilterRoutingTable()
-        if (filter_it == filter_routing_table.end()) continue;
-        const FilterState& f = filter_it->second;
-        if (f.src_fragment_instance_idxs().find(instance_idx)
-            == f.src_fragment_instance_idxs().end()) {
-          DCHECK(desc.is_broadcast_join);
-          continue;
-        }
-        // We don't need a target-side check here, because a filter is either sent to
-        // all its targets or none, and the none case is handled by checking if the
-        // filter is in the routing table.
-        required_filters.push_back(desc);
-      }
-      plan_node.__set_runtime_filters(required_filters);
-    }
+    auto& produced_map = filter_routing_table.finstance_filters_produced;
+    auto produced_it = produced_map.find(instance_idx);
+    if (produced_it == produced_map.end()) continue;
+    // Finstance needs list of source filters that were selected during filter routing
+    // table construction.
+    instance_ctx.__set_filters_produced(produced_it->second);
   }
 }
 

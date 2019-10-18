@@ -98,6 +98,15 @@ Status PhjBuilder::InitExprsAndFilters(RuntimeState* state,
         filter_desc.is_broadcast_join || state->query_options().num_nodes == 1);
     DCHECK(!state->query_options().disable_row_runtime_filtering ||
         filter_desc.applied_on_partition_columns);
+    // Skip over filters that are not produced by this instance of the join, i.e.
+    // broadcast filters where this instance was not selected as a filter producer.
+    const vector<TRuntimeFilterSource> filters_produced =
+        state->instance_ctx().filters_produced;
+    auto it = std::find_if(filters_produced.begin(), filters_produced.end(),
+        [this, &filter_desc](const TRuntimeFilterSource f) {
+          return f.src_node_id == join_node_id_ && f.filter_id == filter_desc.filter_id;
+        });
+    if (it == filters_produced.end()) continue;
     ScalarExpr* filter_expr;
     RETURN_IF_ERROR(
         ScalarExpr::Create(filter_desc.src_expr, *row_desc_, state, &filter_expr));

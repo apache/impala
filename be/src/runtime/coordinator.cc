@@ -78,7 +78,8 @@ Coordinator::Coordinator(ClientRequestState* parent, const QuerySchedule& schedu
     obj_pool_(new ObjectPool()),
     query_events_(events),
     exec_rpcs_complete_barrier_(schedule_.per_backend_exec_params().size()),
-    backend_released_barrier_(schedule_.per_backend_exec_params().size()) {}
+    backend_released_barrier_(schedule_.per_backend_exec_params().size()),
+    filter_routing_table_(new FilterRoutingTable) {}
 
 Coordinator::~Coordinator() {
   // Must have entered a terminal exec state guaranteeing resources were released.
@@ -122,10 +123,6 @@ Status Coordinator::Exec() {
   // the latter in the FragmentStats' root profile
   InitBackendStates();
   exec_summary_.Init(schedule_);
-
-  // TODO-MT: populate the runtime filter routing table
-  // This requires local aggregation of filters prior to sending
-  // for broadcast joins in order to avoid more complicated merge logic here.
 
   if (filter_mode_ != TRuntimeFilterMode::OFF) {
     DCHECK_EQ(request.plan_exec_info.size(), 1);
@@ -290,10 +287,10 @@ void Coordinator::ExecSummary::Init(const QuerySchedule& schedule) {
 void Coordinator::InitFilterRoutingTable() {
   DCHECK_NE(filter_mode_, TRuntimeFilterMode::OFF)
       << "InitFilterRoutingTable() called although runtime filters are disabled";
-  DCHECK(!filter_routing_table_complete_)
-      << "InitFilterRoutingTable() called after setting filter_routing_table_complete_";
+  DCHECK(!filter_routing_table_->is_complete)
+      << "InitFilterRoutingTable() called after table marked as complete";
 
-  lock_guard<shared_mutex> lock(filter_lock_);
+  lock_guard<shared_mutex> lock(filter_routing_table_->lock); // Exclusive lock.
   for (const FragmentExecParams& fragment_params: schedule_.fragment_exec_params()) {
     int num_instances = fragment_params.instance_exec_params.size();
     DCHECK_GT(num_instances, 0);
@@ -302,7 +299,7 @@ void Coordinator::InitFilterRoutingTable() {
       if (!plan_node.__isset.runtime_filters) continue;
       for (const TRuntimeFilterDesc& filter: plan_node.runtime_filters) {
         DCHECK(filter_mode_ == TRuntimeFilterMode::GLOBAL || filter.has_local_targets);
-        FilterRoutingTable::iterator i = filter_routing_table_.emplace(
+        auto i = filter_routing_table_->id_to_filter.emplace(
             filter.filter_id, FilterState(filter, plan_node.node_id)).first;
         FilterState* f = &(i->second);
 
@@ -328,9 +325,14 @@ void Coordinator::InitFilterRoutingTable() {
             random_shuffle(src_idxs.begin(), src_idxs.end());
             src_idxs.resize(MAX_BROADCAST_FILTER_PRODUCERS);
           }
-          f->src_fragment_instance_idxs()->insert(src_idxs.begin(), src_idxs.end());
-
-        // target plan node of filter
+          for (int src_idx : src_idxs) {
+            TRuntimeFilterSource filter_src;
+            filter_src.src_node_id = plan_node.node_id;
+            filter_src.filter_id = filter.filter_id;
+            filter_routing_table_->finstance_filters_produced[src_idx].emplace_back(
+                filter_src);
+          }
+          f->set_num_producers(src_idxs.size());
         } else if (plan_node.__isset.hdfs_scan_node || plan_node.__isset.kudu_scan_node) {
           auto it = filter.planid_to_target_ndx.find(plan_node.node_id);
           DCHECK(it != filter.planid_to_target_ndx.end());
@@ -346,10 +348,10 @@ void Coordinator::InitFilterRoutingTable() {
   }
 
   query_profile_->AddInfoString(
-      "Number of filters", Substitute("$0", filter_routing_table_.size()));
+      "Number of filters", Substitute("$0", filter_routing_table_->num_filters()));
   query_profile_->AddInfoString("Filter routing table", FilterDebugString());
   if (VLOG_IS_ON(2)) VLOG_QUERY << FilterDebugString();
-  filter_routing_table_complete_ = true;
+  filter_routing_table_->is_complete = true;
 }
 
 void Coordinator::StartBackendExec() {
@@ -366,8 +368,14 @@ void Coordinator::StartBackendExec() {
     ExecEnv::GetInstance()->exec_rpc_thread_pool()->Offer(
         [backend_state, this, &debug_options]() {
           DebugActionNoFail(schedule_.query_options(), "COORD_BEFORE_EXEC_RPC");
+          // Safe for Exec() to read 'filter_routing_table_' because it is complete
+          // at this point and won't be destroyed while this function is executing,
+          // because it won't be torn down until 'exec_rpcs_complete_barrier_' is
+          // signalled.
+          DCHECK(filter_mode_ == TRuntimeFilterMode::OFF
+              || filter_routing_table_->is_complete);
           backend_state->Exec(
-              debug_options, filter_routing_table_, &exec_rpcs_complete_barrier_);
+              debug_options, *filter_routing_table_, &exec_rpcs_complete_barrier_);
         });
   }
   exec_rpcs_complete_barrier_.Wait();
@@ -436,7 +444,7 @@ string Coordinator::FilterDebugString() {
     table_printer.AddColumn("Completed", false);
   }
   table_printer.AddColumn("Enabled", false);
-  for (FilterRoutingTable::value_type& v: filter_routing_table_) {
+  for (auto& v: filter_routing_table_->id_to_filter) {
     vector<string> row;
     const FilterState& state = v.second;
     row.push_back(lexical_cast<string>(v.first));
@@ -455,8 +463,7 @@ string Coordinator::FilterDebugString() {
 
     if (filter_mode_ == TRuntimeFilterMode::GLOBAL) {
       int pending_count = state.completion_time() != 0L ? 0 : state.pending_count();
-      row.push_back(Substitute("$0 ($1)", pending_count,
-          state.src_fragment_instance_idxs().size()));
+      row.push_back(Substitute("$0 ($1)", pending_count, state.num_producers()));
       if (state.first_arrival_time() == 0L) {
         row.push_back("N/A");
       } else {
@@ -922,12 +929,12 @@ string Coordinator::GetErrorLog() {
 }
 
 void Coordinator::ReleaseExecResources() {
-  lock_guard<shared_mutex> lock(filter_lock_);
-  if (filter_routing_table_.size() > 0) {
+  lock_guard<shared_mutex> lock(filter_routing_table_->lock); // Exclusive lock.
+  if (filter_routing_table_->num_filters() > 0) {
     query_profile_->AddInfoString("Final filter table", FilterDebugString());
   }
 
-  for (auto& filter : filter_routing_table_) {
+  for (auto& filter : filter_routing_table_->id_to_filter) {
     FilterState* state = &filter.second;
     state->Disable(filter_mem_tracker_);
   }
@@ -995,27 +1002,27 @@ vector<TNetworkAddress> Coordinator::GetActiveBackends(
 }
 
 void Coordinator::UpdateFilter(const TUpdateFilterParams& params) {
-  shared_lock<shared_mutex> lock(filter_lock_);
+  shared_lock<shared_mutex> lock(filter_routing_table_->lock);
   DCHECK_NE(filter_mode_, TRuntimeFilterMode::OFF)
       << "UpdateFilter() called although runtime filters are disabled";
   DCHECK(backend_exec_complete_barrier_.get() != nullptr)
       << "Filters received before fragments started!";
 
   exec_rpcs_complete_barrier_.Wait();
-  DCHECK(filter_routing_table_complete_)
+  DCHECK(filter_routing_table_->is_complete)
       << "Filter received before routing table complete";
 
   TPublishFilterParams rpc_params;
   unordered_set<int> target_fragment_idxs;
   {
-    lock_guard<SpinLock> l(filter_update_lock_);
+    lock_guard<SpinLock> l(filter_routing_table_->update_lock);
     if (!IsExecuting()) {
       LOG(INFO) << "Filter update received for non-executing query with id: "
                 << query_id();
       return;
     }
-    FilterRoutingTable::iterator it = filter_routing_table_.find(params.filter_id);
-    if (it == filter_routing_table_.end()) {
+    auto it = filter_routing_table_->id_to_filter.find(params.filter_id);
+    if (it == filter_routing_table_->id_to_filter.end()) {
       LOG(INFO) << "Could not find filter with id: " << params.filter_id;
       return;
     }

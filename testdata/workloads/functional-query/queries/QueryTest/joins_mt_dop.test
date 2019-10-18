@@ -25,3 +25,27 @@ where a.id < 10 and c.bigint_col = 10
 ---- RESULTS
 291990
 ====
+---- QUERY
+# Regression IMPALA-9019: fix runtime filter propagation with mt_dop.
+# This plan has a global BROADCAST filter sent from the scan of alltypestiny
+# to the scan of alltypes. Before the bug was fixed, this filter would not
+# be produced, but was expected by the destination. Setting the wait time
+# higher than the time limit caused this query to reliably fail because
+# the destination scan would block waiting for the filter to arrive.
+set exec_time_limit_s=30;
+set runtime_filter_wait_time_ms=120000;
+select straight_join t1.id, t1.int_col
+from (select distinct * from alltypes) t1
+  join /*+broadcast*/ alltypestiny t2 on t1.id = t2.id;
+---- TYPES
+int,int
+---- RESULTS
+0,0
+1,1
+2,2
+3,3
+4,4
+5,5
+6,6
+7,7
+====

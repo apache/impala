@@ -17,6 +17,7 @@
 
 
 #include <memory>
+#include <utility>
 #include <vector>
 #include <boost/unordered_set.hpp>
 
@@ -58,8 +59,7 @@ struct Coordinator::FilterTarget {
 class Coordinator::FilterState {
  public:
   FilterState(const TRuntimeFilterDesc& desc, const TPlanNodeId& src)
-    : desc_(desc), src_(src), pending_count_(0), first_arrival_time_(0L),
-      completion_time_(0L) {
+    : desc_(desc), src_(src) {
     // bloom_filter_ is a disjunction so the unit value is always_false.
     bloom_filter_.always_false = true;
     min_max_filter_.always_false = true;
@@ -67,12 +67,6 @@ class Coordinator::FilterState {
 
   TBloomFilter& bloom_filter() { return bloom_filter_; }
   TMinMaxFilter& min_max_filter() { return min_max_filter_; }
-  boost::unordered_set<int>* src_fragment_instance_idxs() {
-    return &src_fragment_instance_idxs_;
-  }
-  const boost::unordered_set<int>& src_fragment_instance_idxs() const {
-    return src_fragment_instance_idxs_;
-  }
   std::vector<FilterTarget>* targets() { return &targets_; }
   const std::vector<FilterTarget>& targets() const { return targets_; }
   int64_t first_arrival_time() const { return first_arrival_time_; }
@@ -83,6 +77,8 @@ class Coordinator::FilterState {
   bool is_min_max_filter() const { return desc_.type == TRuntimeFilterType::MIN_MAX; }
   int pending_count() const { return pending_count_; }
   void set_pending_count(int pending_count) { pending_count_ = pending_count; }
+  int num_producers() const { return num_producers_; }
+  void set_num_producers(int num_producers) { num_producers_ = num_producers; }
   bool disabled() const {
     if (is_bloom_filter()) {
       return bloom_filter_.always_true;
@@ -106,11 +102,12 @@ class Coordinator::FilterState {
   TPlanNodeId src_;
   std::vector<FilterTarget> targets_;
 
-  // Indices of source fragment instances (as returned by GetInstanceIdx()).
-  boost::unordered_set<int> src_fragment_instance_idxs_;
-
   /// Number of remaining backends to hear from before filter is complete.
-  int pending_count_;
+  int pending_count_ = 0;
+
+  /// Number of fragment instances producing this filter. The full information about the
+  /// producer instances is tracked in 'finstance_filters_produced'.
+  int num_producers_ = 0;
 
   /// Filters aggregated from all source plan nodes, to be broadcast to all
   /// destination plan fragment instances. Only set for partitioned joins (broadcast joins
@@ -122,14 +119,45 @@ class Coordinator::FilterState {
   TMinMaxFilter min_max_filter_;
 
   /// Time at which first local filter arrived.
-  int64_t first_arrival_time_;
+  int64_t first_arrival_time_ = 0L;
 
   /// Time at which all local filters arrived.
-  int64_t completion_time_;
+  int64_t completion_time_ = 0L;
 
-  /// TODO: Add a per-object lock so that we can avoid holding the global filter_lock_
-  /// for every filter update.
-
+  /// TODO: Add a per-object lock so that we can avoid holding the global routing table
+  /// lock for every filter update.
 };
 
+/// Struct to contain all of the data structures for filter routing. Coordinator
+/// has access to all the internals of this structure and must protect invariants.
+struct Coordinator::FilterRoutingTable {
+  int64_t num_filters() const { return id_to_filter.size(); }
+
+  /// Maps the filter ID to the state of that filter.
+  boost::unordered_map<int32_t, FilterState> id_to_filter;
+
+  // List of runtime filters that this fragment instance is the source for.
+  // The key of the map is the instance index returned by GetInstanceIdx().
+  // The value is source plan node id and the filter ID.
+  boost::unordered_map<int, std::vector<TRuntimeFilterSource>> finstance_filters_produced;
+
+  /// Synchronizes updates to the state of this routing table.
+  SpinLock update_lock;
+
+  /// Protects this routing table.
+  /// Usage pattern:
+  /// 1. To update the routing table: Acquire shared access on 'lock' and
+  ///    upgrade to exclusive access by subsequently acquiring 'update_lock'.
+  /// 2. To read the routing table: if 'is_complete' is true and no threads
+  ///    will be destroying the table concurrently, it is safe to read the
+  ///    routing table without acquiring a lock. Otherwise, acquire shared
+  ///    access on 'lock'
+  /// 3. To initialize/destroy the routing table: Directly acquire exclusive
+  ///    access on 'lock'.
+  boost::shared_mutex lock;
+
+  /// Set to true when all calls to UpdateFilterRoutingTable() have finished, and it's
+  /// safe to concurrently read from this routing table.
+  bool is_complete = false;
+};
 }

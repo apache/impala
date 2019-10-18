@@ -603,6 +603,12 @@ struct TScanRangeParams {
   4: optional bool is_remote
 }
 
+// Descriptor that indicates that a runtime filter is produced by a plan node.
+struct TRuntimeFilterSource {
+  1: required Types.TPlanNodeId src_node_id
+  2: required i32 filter_id
+}
+
 // Execution parameters of a single fragment instance.
 struct TPlanFragmentInstanceCtx {
   // TPlanFragment.idx
@@ -634,6 +640,9 @@ struct TPlanFragmentInstanceCtx {
   6: optional i32 sender_id
 
   7: optional TDebugOptions debug_options
+
+  // List of runtime filters produced by nodes in the finstance.
+  8: optional list<TRuntimeFilterSource> filters_produced
 }
 
 

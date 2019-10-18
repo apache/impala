@@ -18,9 +18,9 @@
 #ifndef IMPALA_RUNTIME_COORDINATOR_H
 #define IMPALA_RUNTIME_COORDINATOR_H
 
+#include <memory>
 #include <string>
 #include <vector>
-#include <boost/scoped_ptr.hpp>
 #include <boost/thread/shared_mutex.hpp>
 #include <boost/unordered_map.hpp>
 #include <rapidjson/document.h>
@@ -230,6 +230,7 @@ class Coordinator { // NOLINT: The member variables could be re-ordered to save 
   class BackendState;
   class BackendResourceState;
   struct FilterTarget;
+  struct FilterRoutingTable;
   class FilterState;
   class FragmentStats;
 
@@ -312,7 +313,7 @@ class Coordinator { // NOLINT: The member variables could be re-ordered to save 
   MemTracker* filter_mem_tracker_ = nullptr;
 
   /// Object pool owned by the coordinator.
-  boost::scoped_ptr<ObjectPool> obj_pool_;
+  std::unique_ptr<ObjectPool> obj_pool_;
 
   /// Execution summary for a single query.
   /// A wrapper around TExecSummary, with supporting structures.
@@ -354,7 +355,7 @@ class Coordinator { // NOLINT: The member variables could be re-ordered to save 
   /// Barrier that is released when all backends have indicated execution completion,
   /// or when all backends are cancelled due to an execution error or client requested
   /// cancellation. Initialized in StartBackendExec().
-  boost::scoped_ptr<CountingBarrier> backend_exec_complete_barrier_;
+  std::unique_ptr<CountingBarrier> backend_exec_complete_barrier_;
 
   /// Barrier that is released when all Backends have released their admission control
   /// resources.
@@ -381,24 +382,8 @@ class Coordinator { // NOLINT: The member variables could be re-ordered to save 
   /// - ERROR: error status
   Status exec_status_;
 
-  /// Synchronizes updates to the filter_routing_table_.
-  SpinLock filter_update_lock_;
-
-  /// Protects filter_routing_table_.
-  /// Usage pattern:
-  /// 1. To update filter_routing_table_: Acquire shared access on filter_lock_ and
-  ///    upgrade to exclusive access by subsequently acquiring filter_update_lock_.
-  /// 2. To read, initialize/destroy filter_routing_table: Directly acquire exclusive
-  ///    access on filter_lock_.
-  boost::shared_mutex filter_lock_;
-
-  /// Map from filter ID to filter.
-  typedef boost::unordered_map<int32_t, FilterState> FilterRoutingTable;
-  FilterRoutingTable filter_routing_table_;
-
-  /// Set to true when all calls to UpdateFilterRoutingTable() have finished, and it's
-  /// safe to concurrently read from filter_routing_table_.
-  bool filter_routing_table_complete_ = false;
+  /// Contains all the state about filters being handled by this coordinator.
+  std::unique_ptr<FilterRoutingTable> filter_routing_table_;
 
   /// True if the first row has been fetched, false otherwise.
   bool first_row_fetched_ = false;
