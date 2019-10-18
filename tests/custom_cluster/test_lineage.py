@@ -130,6 +130,7 @@ class TestLineage(CustomClusterTestSuite):
           assert lineage_json["queryId"] == profile_query_id
           assert lineage_json["queryText"] is not None
           assert lineage_json["queryText"] == query
+          assert lineage_json["tableLocation"] is not None
 
   @SkipIfS3.hbase
   @pytest.mark.execute_serially

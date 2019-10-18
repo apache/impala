@@ -2242,10 +2242,21 @@ public class CatalogOpExecutor {
         // TODO (HIVE-21807): Creating a table and retrieving the table information is
         // not atomic.
         addSummary(response, "Table has been created.");
-        long tableCreateTime = msClient.getHiveClient().getTable(
-            newTable.getDbName(), newTable.getTableName()).getCreateTime();
+        org.apache.hadoop.hive.metastore.api.Table msTable = msClient.getHiveClient()
+            .getTable(newTable.getDbName(), newTable.getTableName());
+        long tableCreateTime = msTable.getCreateTime();
         response.setTable_name(newTable.getDbName() + "." + newTable.getTableName());
         response.setTable_create_time(tableCreateTime);
+        // For external tables set table location needed for lineage generation.
+        if (newTable.getTableType() == TableType.EXTERNAL_TABLE.toString()) {
+          String tableLocation = newTable.getSd().getLocation();
+          // If location was not specified in the query, get it from newly created
+          // metastore table.
+          if (tableLocation == null) {
+            tableLocation = msTable.getSd().getLocation();
+          }
+          response.setTable_location(tableLocation);
+        }
         // If this table should be cached, and the table location was not specified by
         // the user, an extra step is needed to read the table to find the location.
         if (cacheOp != null && cacheOp.isSet_cached() &&

@@ -115,6 +115,11 @@ class LineageUtil {
         TVertexToJSON(lineage.vertices[i], &writer);
       }
       writer.EndArray();
+      // Write location if it is available.
+      if (lineage.__isset.table_location) {
+        writer.String("tableLocation");
+        writer.String(lineage.table_location.c_str());
+      }
       writer.EndObject();
       *out = buffer.GetString();
     }

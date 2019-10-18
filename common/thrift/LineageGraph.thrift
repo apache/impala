@@ -78,4 +78,8 @@ struct TLineageGraph {
 
   // Query id in TQueryCtx
   8: required Types.TUniqueId query_id
+
+  // Set only for external tables to establish
+  // lineage between the table and it's location.
+  9: optional string table_location
 }

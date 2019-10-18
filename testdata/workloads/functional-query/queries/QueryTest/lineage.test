@@ -19,18 +19,420 @@ create table lineage_test_db.alltypesinsert like functional.alltypesinsert
 ====
 ---- LINEAGE
 {
-  "hash":"b0d53e4deafb2467c4108c17667653b5",
-  "timestamp":1571178583,
-  "vertices":[],
-  "edges":[],
-  "queryId":"524cc93f26a86671:e8455a9500000000",
-  "user":"anurag",
-  "queryText":"create table lineage_test_db.foo (id int)",
-  "endTime":1571178584
+  "hash": "b0d53e4deafb2467c4108c17667653b5",
+  "timestamp": 1571508467,
+  "vertices": [],
+  "edges": [],
+  "queryId": "3c45b7f59b52b79b:1b4c7fe800000000",
+  "user": "anurag",
+  "queryText": "create table lineage_test_db.foo (id int)",
+  "endTime": 1571508467
 }
 ---- QUERY
-# Test lineage is created with queryText populated for DDLs.
+# Test lineage is created for DDLs.
 create table lineage_test_db.foo (id int)
+====
+---- LINEAGE
+{
+  "hash": "6e50d3f5f3b80dd14c5daf6797302f4d",
+  "timestamp": 1571508472,
+  "vertices": [],
+  "edges": [],
+  "queryId": "f64ecc4d6bfedbd6:a347442700000000",
+  "user": "anurag",
+  "queryText": "create external table lineage_test_db.ext_tbl_loc (id int) location '/test-warehouse/lineage_test_db.db/'",
+  "endTime": 1571508473,
+  "tableLocation": "hdfs://localhost:20500/test-warehouse/lineage_test_db.db"
+}
+---- QUERY
+# Test location is populated for create external table with location specified.
+create external table lineage_test_db.ext_tbl_loc (id int) location
+'/test-warehouse/lineage_test_db.db/'
+====
+---- LINEAGE
+{
+  "hash": "ba35824e6e53501ffd80d9f63e25bfd8",
+  "timestamp": 1571508478,
+  "vertices": [],
+  "edges": [],
+  "queryId": "8a4711d053812adc:42e4563800000000",
+  "user": "anurag",
+  "queryText": "create external table lineage_test_db.ext_tbl (id int)",
+  "endTime": 1571508478,
+  "tableLocation": "hdfs://localhost:20500/test-warehouse/lineage_test_db.db/ext_tbl"
+}
+---- QUERY
+# Test location is populated for create external table when location is not specified.
+create external table lineage_test_db.ext_tbl (id int)
+====
+---- LINEAGE
+{
+  "hash": "2560798c9dd478ee73cf5fae27ebb17f",
+  "timestamp": 1571508483,
+  "vertices": [
+    {
+      "vertexType": "COLUMN",
+      "vertexId": "id",
+      "id": 0,
+      "metadata": {
+        "tableCreateTime": 1571508484,
+        "tableName": "lineage_test_db.ext_ctas"
+      }
+    },
+    {
+      "vertexType": "COLUMN",
+      "vertexId": "lineage_test_db.alltypes.id",
+      "id": 1,
+      "metadata": {
+        "tableCreateTime": 1571508463,
+        "tableName": "lineage_test_db.alltypes"
+      }
+    },
+    {
+      "vertexType": "COLUMN",
+      "vertexId": "bigint_col",
+      "id": 2,
+      "metadata": {
+        "tableCreateTime": 1571508484,
+        "tableName": "lineage_test_db.ext_ctas"
+      }
+    },
+    {
+      "vertexType": "COLUMN",
+      "vertexId": "lineage_test_db.alltypes.bigint_col",
+      "id": 3,
+      "metadata": {
+        "tableCreateTime": 1571508463,
+        "tableName": "lineage_test_db.alltypes"
+      }
+    },
+    {
+      "vertexType": "COLUMN",
+      "vertexId": "bool_col",
+      "id": 4,
+      "metadata": {
+        "tableCreateTime": 1571508484,
+        "tableName": "lineage_test_db.ext_ctas"
+      }
+    },
+    {
+      "vertexType": "COLUMN",
+      "vertexId": "lineage_test_db.alltypes.bool_col",
+      "id": 5,
+      "metadata": {
+        "tableCreateTime": 1571508463,
+        "tableName": "lineage_test_db.alltypes"
+      }
+    },
+    {
+      "vertexType": "COLUMN",
+      "vertexId": "date_string_col",
+      "id": 6,
+      "metadata": {
+        "tableCreateTime": 1571508484,
+        "tableName": "lineage_test_db.ext_ctas"
+      }
+    },
+    {
+      "vertexType": "COLUMN",
+      "vertexId": "lineage_test_db.alltypes.date_string_col",
+      "id": 7,
+      "metadata": {
+        "tableCreateTime": 1571508463,
+        "tableName": "lineage_test_db.alltypes"
+      }
+    },
+    {
+      "vertexType": "COLUMN",
+      "vertexId": "double_col",
+      "id": 8,
+      "metadata": {
+        "tableCreateTime": 1571508484,
+        "tableName": "lineage_test_db.ext_ctas"
+      }
+    },
+    {
+      "vertexType": "COLUMN",
+      "vertexId": "lineage_test_db.alltypes.double_col",
+      "id": 9,
+      "metadata": {
+        "tableCreateTime": 1571508463,
+        "tableName": "lineage_test_db.alltypes"
+      }
+    },
+    {
+      "vertexType": "COLUMN",
+      "vertexId": "float_col",
+      "id": 10,
+      "metadata": {
+        "tableCreateTime": 1571508484,
+        "tableName": "lineage_test_db.ext_ctas"
+      }
+    },
+    {
+      "vertexType": "COLUMN",
+      "vertexId": "lineage_test_db.alltypes.float_col",
+      "id": 11,
+      "metadata": {
+        "tableCreateTime": 1571508463,
+        "tableName": "lineage_test_db.alltypes"
+      }
+    },
+    {
+      "vertexType": "COLUMN",
+      "vertexId": "int_col",
+      "id": 12,
+      "metadata": {
+        "tableCreateTime": 1571508484,
+        "tableName": "lineage_test_db.ext_ctas"
+      }
+    },
+    {
+      "vertexType": "COLUMN",
+      "vertexId": "lineage_test_db.alltypes.int_col",
+      "id": 13,
+      "metadata": {
+        "tableCreateTime": 1571508463,
+        "tableName": "lineage_test_db.alltypes"
+      }
+    },
+    {
+      "vertexType": "COLUMN",
+      "vertexId": "month",
+      "id": 14,
+      "metadata": {
+        "tableCreateTime": 1571508484,
+        "tableName": "lineage_test_db.ext_ctas"
+      }
+    },
+    {
+      "vertexType": "COLUMN",
+      "vertexId": "lineage_test_db.alltypes.month",
+      "id": 15,
+      "metadata": {
+        "tableCreateTime": 1571508463,
+        "tableName": "lineage_test_db.alltypes"
+      }
+    },
+    {
+      "vertexType": "COLUMN",
+      "vertexId": "smallint_col",
+      "id": 16,
+      "metadata": {
+        "tableCreateTime": 1571508484,
+        "tableName": "lineage_test_db.ext_ctas"
+      }
+    },
+    {
+      "vertexType": "COLUMN",
+      "vertexId": "lineage_test_db.alltypes.smallint_col",
+      "id": 17,
+      "metadata": {
+        "tableCreateTime": 1571508463,
+        "tableName": "lineage_test_db.alltypes"
+      }
+    },
+    {
+      "vertexType": "COLUMN",
+      "vertexId": "string_col",
+      "id": 18,
+      "metadata": {
+        "tableCreateTime": 1571508484,
+        "tableName": "lineage_test_db.ext_ctas"
+      }
+    },
+    {
+      "vertexType": "COLUMN",
+      "vertexId": "lineage_test_db.alltypes.string_col",
+      "id": 19,
+      "metadata": {
+        "tableCreateTime": 1571508463,
+        "tableName": "lineage_test_db.alltypes"
+      }
+    },
+    {
+      "vertexType": "COLUMN",
+      "vertexId": "timestamp_col",
+      "id": 20,
+      "metadata": {
+        "tableCreateTime": 1571508484,
+        "tableName": "lineage_test_db.ext_ctas"
+      }
+    },
+    {
+      "vertexType": "COLUMN",
+      "vertexId": "lineage_test_db.alltypes.timestamp_col",
+      "id": 21,
+      "metadata": {
+        "tableCreateTime": 1571508463,
+        "tableName": "lineage_test_db.alltypes"
+      }
+    },
+    {
+      "vertexType": "COLUMN",
+      "vertexId": "tinyint_col",
+      "id": 22,
+      "metadata": {
+        "tableCreateTime": 1571508484,
+        "tableName": "lineage_test_db.ext_ctas"
+      }
+    },
+    {
+      "vertexType": "COLUMN",
+      "vertexId": "lineage_test_db.alltypes.tinyint_col",
+      "id": 23,
+      "metadata": {
+        "tableCreateTime": 1571508463,
+        "tableName": "lineage_test_db.alltypes"
+      }
+    },
+    {
+      "vertexType": "COLUMN",
+      "vertexId": "year",
+      "id": 24,
+      "metadata": {
+        "tableCreateTime": 1571508484,
+        "tableName": "lineage_test_db.ext_ctas"
+      }
+    },
+    {
+      "vertexType": "COLUMN",
+      "vertexId": "lineage_test_db.alltypes.year",
+      "id": 25,
+      "metadata": {
+        "tableCreateTime": 1571508463,
+        "tableName": "lineage_test_db.alltypes"
+      }
+    }
+  ],
+  "edges": [
+    {
+      "sources": [
+        1
+      ],
+      "targets": [
+        0
+      ],
+      "edgeType": "PROJECTION"
+    },
+    {
+      "sources": [
+        3
+      ],
+      "targets": [
+        2
+      ],
+      "edgeType": "PROJECTION"
+    },
+    {
+      "sources": [
+        5
+      ],
+      "targets": [
+        4
+      ],
+      "edgeType": "PROJECTION"
+    },
+    {
+      "sources": [
+        7
+      ],
+      "targets": [
+        6
+      ],
+      "edgeType": "PROJECTION"
+    },
+    {
+      "sources": [
+        9
+      ],
+      "targets": [
+        8
+      ],
+      "edgeType": "PROJECTION"
+    },
+    {
+      "sources": [
+        11
+      ],
+      "targets": [
+        10
+      ],
+      "edgeType": "PROJECTION"
+    },
+    {
+      "sources": [
+        13
+      ],
+      "targets": [
+        12
+      ],
+      "edgeType": "PROJECTION"
+    },
+    {
+      "sources": [
+        15
+      ],
+      "targets": [
+        14
+      ],
+      "edgeType": "PROJECTION"
+    },
+    {
+      "sources": [
+        17
+      ],
+      "targets": [
+        16
+      ],
+      "edgeType": "PROJECTION"
+    },
+    {
+      "sources": [
+        19
+      ],
+      "targets": [
+        18
+      ],
+      "edgeType": "PROJECTION"
+    },
+    {
+      "sources": [
+        21
+      ],
+      "targets": [
+        20
+      ],
+      "edgeType": "PROJECTION"
+    },
+    {
+      "sources": [
+        23
+      ],
+      "targets": [
+        22
+      ],
+      "edgeType": "PROJECTION"
+    },
+    {
+      "sources": [
+        25
+      ],
+      "targets": [
+        24
+      ],
+      "edgeType": "PROJECTION"
+    }
+  ],
+  "queryId": "8d41cd60bf8542c1:7dd8442f00000000",
+  "user": "anurag",
+  "queryText": "create external table lineage_test_db.ext_ctas as select * from lineage_test_db.alltypes",
+  "endTime": 1571508486,
+  "tableLocation": "hdfs://localhost:20500/test-warehouse/lineage_test_db.db/ext_ctas"
+}
+---- QUERY
+# Test lineage is populate for create external table as select.
+create external table lineage_test_db.ext_ctas as select * from lineage_test_db.alltypes
 ====
 ---- QUERY
 create view lineage_test_db.alltypes_view as select * from lineage_test_db.alltypes
@@ -38,7 +440,7 @@ create view lineage_test_db.alltypes_view as select * from lineage_test_db.allty
 ---- LINEAGE
 {
   "hash": "aba4b39bf3c34b5a9ce8fd782acc0a26",
-  "timestamp": 1568097481,
+  "timestamp": 1571508491,
   "vertices": [
     {
       "vertexType": "COLUMN",
@@ -50,7 +452,7 @@ create view lineage_test_db.alltypes_view as select * from lineage_test_db.allty
       "vertexId": "functional.alltypes.bigint_col",
       "id": 1,
       "metadata": {
-        "tableCreateTime": 1568093675,
+        "tableCreateTime": 1571175281,
         "tableName": "functional.alltypes"
       }
     },
@@ -59,7 +461,7 @@ create view lineage_test_db.alltypes_view as select * from lineage_test_db.allty
       "vertexId": "functional.alltypes.int_col",
       "id": 2,
       "metadata": {
-        "tableCreateTime": 1568093675,
+        "tableCreateTime": 1571175281,
         "tableName": "functional.alltypes"
       }
     },
@@ -68,7 +470,7 @@ create view lineage_test_db.alltypes_view as select * from lineage_test_db.allty
       "vertexId": "functional.alltypes.tinyint_col",
       "id": 3,
       "metadata": {
-        "tableCreateTime": 1568093675,
+        "tableCreateTime": 1571175281,
         "tableName": "functional.alltypes"
       }
     }
@@ -86,10 +488,10 @@ create view lineage_test_db.alltypes_view as select * from lineage_test_db.allty
       "edgeType": "PROJECTION"
     }
   ],
-  "queryId": "eb4368837f0c4468:ef6841f500000000",
-  "user": "bharath",
+  "queryId": "c04b5eeb5062b043:03d579a100000000",
+  "user": "anurag",
   "queryText": "select * from (   select tinyint_col + int_col x from functional.alltypes   union all   select sum(bigint_col) y from (select bigint_col from functional.alltypes) v1) v2",
-  "endTime": 1568097481
+  "endTime": 1571508492
 }
 ---- QUERY
 # Simple query to introduce projection dependencies. Shows resolution
@@ -102,7 +504,7 @@ select * from (
 ---- LINEAGE
 {
   "hash": "2540c828f7397099c11558544485e97c",
-  "timestamp": 1568097487,
+  "timestamp": 1571508497,
   "vertices": [
     {
       "vertexType": "COLUMN",
@@ -114,7 +516,7 @@ select * from (
       "vertexId": "functional.alltypes.tinyint_col",
       "id": 1,
       "metadata": {
-        "tableCreateTime": 1568093675,
+        "tableCreateTime": 1571175281,
         "tableName": "functional.alltypes"
       }
     },
@@ -123,7 +525,7 @@ select * from (
       "vertexId": "functional.alltypes.id",
       "id": 2,
       "metadata": {
-        "tableCreateTime": 1568093675,
+        "tableCreateTime": 1571175281,
         "tableName": "functional.alltypes"
       }
     },
@@ -132,7 +534,7 @@ select * from (
       "vertexId": "functional.alltypes.smallint_col",
       "id": 3,
       "metadata": {
-        "tableCreateTime": 1568093675,
+        "tableCreateTime": 1571175281,
         "tableName": "functional.alltypes"
       }
     },
@@ -146,7 +548,7 @@ select * from (
       "vertexId": "functional.alltypessmall.string_col",
       "id": 5,
       "metadata": {
-        "tableCreateTime": 1568093682,
+        "tableCreateTime": 1571172085,
         "tableName": "functional.alltypessmall"
       }
     },
@@ -160,7 +562,7 @@ select * from (
       "vertexId": "functional.alltypessmall.timestamp_col",
       "id": 7,
       "metadata": {
-        "tableCreateTime": 1568093682,
+        "tableCreateTime": 1571172085,
         "tableName": "functional.alltypessmall"
       }
     },
@@ -169,7 +571,7 @@ select * from (
       "vertexId": "functional.alltypes.int_col",
       "id": 8,
       "metadata": {
-        "tableCreateTime": 1568093675,
+        "tableCreateTime": 1571175281,
         "tableName": "functional.alltypes"
       }
     },
@@ -178,7 +580,7 @@ select * from (
       "vertexId": "functional.alltypes.year",
       "id": 9,
       "metadata": {
-        "tableCreateTime": 1568093675,
+        "tableCreateTime": 1571175281,
         "tableName": "functional.alltypes"
       }
     },
@@ -187,7 +589,7 @@ select * from (
       "vertexId": "functional.alltypessmall.bigint_col",
       "id": 10,
       "metadata": {
-        "tableCreateTime": 1568093682,
+        "tableCreateTime": 1571172085,
         "tableName": "functional.alltypessmall"
       }
     },
@@ -196,7 +598,7 @@ select * from (
       "vertexId": "functional.alltypessmall.float_col",
       "id": 11,
       "metadata": {
-        "tableCreateTime": 1568093682,
+        "tableCreateTime": 1571172085,
         "tableName": "functional.alltypessmall"
       }
     },
@@ -205,7 +607,7 @@ select * from (
       "vertexId": "functional.alltypessmall.id",
       "id": 12,
       "metadata": {
-        "tableCreateTime": 1568093682,
+        "tableCreateTime": 1571172085,
         "tableName": "functional.alltypessmall"
       }
     }
@@ -269,10 +671,10 @@ select * from (
       "edgeType": "PREDICATE"
     }
   ],
-  "queryId": "b04c96bc7cd037bf:950c0e9700000000",
-  "user": "bharath",
+  "queryId": "cd4c260544d26311:1955bedb00000000",
+  "user": "anurag",
   "queryText": "select sum(a.tinyint_col) over (partition by a.smallint_col order by a.id),   count(b.string_col), b.timestamp_col from functional.alltypes a join functional.alltypessmall b on (a.id = b.id) where a.year = 2010 and b.float_col > 0 group by a.tinyint_col, a.smallint_col, a.id, b.string_col, b.timestamp_col, b.bigint_col having count(a.int_col) > 10 order by b.bigint_col limit 10",
-  "endTime": 1568097487
+  "endTime": 1571508498
 }
 ---- QUERY
 # Simple query to introduce predicate dependencies. Shows conjuncts in WHERE, ON, and
@@ -289,14 +691,14 @@ order by b.bigint_col limit 10
 ---- LINEAGE
 {
   "hash": "b9d4145e873d7ee55e485690a6465421",
-  "timestamp": 1568097492,
+  "timestamp": 1571508503,
   "vertices": [
     {
       "vertexType": "COLUMN",
       "vertexId": "int_col",
       "id": 0,
       "metadata": {
-        "tableCreateTime": 1568097492,
+        "tableCreateTime": 1571508503,
         "tableName": "lineage_test_db.lineage_test_tbl1"
       }
     },
@@ -305,7 +707,7 @@ order by b.bigint_col limit 10
       "vertexId": "functional.alltypes.int_col",
       "id": 1,
       "metadata": {
-        "tableCreateTime": 1568093675,
+        "tableCreateTime": 1571175281,
         "tableName": "functional.alltypes"
       }
     },
@@ -314,7 +716,7 @@ order by b.bigint_col limit 10
       "vertexId": "tinyint_col",
       "id": 2,
       "metadata": {
-        "tableCreateTime": 1568097492,
+        "tableCreateTime": 1571508503,
         "tableName": "lineage_test_db.lineage_test_tbl1"
       }
     },
@@ -323,7 +725,7 @@ order by b.bigint_col limit 10
       "vertexId": "functional.alltypes.tinyint_col",
       "id": 3,
       "metadata": {
-        "tableCreateTime": 1568093675,
+        "tableCreateTime": 1571175281,
         "tableName": "functional.alltypes"
       }
     }
@@ -348,10 +750,10 @@ order by b.bigint_col limit 10
       "edgeType": "PROJECTION"
     }
   ],
-  "queryId": "cd4196096bc21335:cc080f1c00000000",
-  "user": "bharath",
+  "queryId": "9c459e0c9d036062:da24885800000000",
+  "user": "anurag",
   "queryText": "create table lineage_test_db.lineage_test_tbl1 as select int_col, tinyint_col from functional.alltypes",
-  "endTime": 1568097493
+  "endTime": 1571508504
 }
 ---- QUERY
 # CTAS queries
@@ -360,14 +762,14 @@ create table lineage_test_db.lineage_test_tbl1 as select int_col, tinyint_col fr
 ---- LINEAGE
 {
   "hash": "bbd2400879f7304bba4182220c138651",
-  "timestamp": 1568097498,
+  "timestamp": 1571508509,
   "vertices": [
     {
       "vertexType": "COLUMN",
       "vertexId": "int_col",
       "id": 0,
       "metadata": {
-        "tableCreateTime": 1568097498,
+        "tableCreateTime": 1571508509,
         "tableName": "lineage_test_db.lineage_test_tbl2"
       }
     },
@@ -376,7 +778,7 @@ create table lineage_test_db.lineage_test_tbl1 as select int_col, tinyint_col fr
       "vertexId": "functional.alltypes.int_col",
       "id": 1,
       "metadata": {
-        "tableCreateTime": 1568093675,
+        "tableCreateTime": 1571175281,
         "tableName": "functional.alltypes"
       }
     },
@@ -385,7 +787,7 @@ create table lineage_test_db.lineage_test_tbl1 as select int_col, tinyint_col fr
       "vertexId": "string_col",
       "id": 2,
       "metadata": {
-        "tableCreateTime": 1568097498,
+        "tableCreateTime": 1571508509,
         "tableName": "lineage_test_db.lineage_test_tbl2"
       }
     },
@@ -394,7 +796,7 @@ create table lineage_test_db.lineage_test_tbl1 as select int_col, tinyint_col fr
       "vertexId": "functional.alltypes.string_col",
       "id": 3,
       "metadata": {
-        "tableCreateTime": 1568093675,
+        "tableCreateTime": 1571175281,
         "tableName": "functional.alltypes"
       }
     },
@@ -403,7 +805,7 @@ create table lineage_test_db.lineage_test_tbl1 as select int_col, tinyint_col fr
       "vertexId": "functional.alltypes.id",
       "id": 4,
       "metadata": {
-        "tableCreateTime": 1568093675,
+        "tableCreateTime": 1571175281,
         "tableName": "functional.alltypes"
       }
     },
@@ -412,7 +814,7 @@ create table lineage_test_db.lineage_test_tbl1 as select int_col, tinyint_col fr
       "vertexId": "functional.alltypes.year",
       "id": 5,
       "metadata": {
-        "tableCreateTime": 1568093675,
+        "tableCreateTime": 1571175281,
         "tableName": "functional.alltypes"
       }
     },
@@ -421,7 +823,7 @@ create table lineage_test_db.lineage_test_tbl1 as select int_col, tinyint_col fr
       "vertexId": "functional.alltypessmall.id",
       "id": 6,
       "metadata": {
-        "tableCreateTime": 1568093682,
+        "tableCreateTime": 1571172085,
         "tableName": "functional.alltypessmall"
       }
     },
@@ -430,7 +832,7 @@ create table lineage_test_db.lineage_test_tbl1 as select int_col, tinyint_col fr
       "vertexId": "functional.alltypessmall.month",
       "id": 7,
       "metadata": {
-        "tableCreateTime": 1568093682,
+        "tableCreateTime": 1571172085,
         "tableName": "functional.alltypessmall"
       }
     }
@@ -468,10 +870,10 @@ create table lineage_test_db.lineage_test_tbl1 as select int_col, tinyint_col fr
       "edgeType": "PREDICATE"
     }
   ],
-  "queryId": "69419851b45132ca:21275fb100000000",
-  "user": "bharath",
+  "queryId": "504006f6c70b4d6d:e4a30bd900000000",
+  "user": "anurag",
   "queryText": "create table lineage_test_db.lineage_test_tbl2 as select distinct a.int_col, a.string_col from functional.alltypes a inner join functional.alltypessmall b on (a.id = b.id) where a.year = 2009 and b.month = 2",
-  "endTime": 1568097499
+  "endTime": 1571508510
 }
 ---- QUERY
 create table lineage_test_db.lineage_test_tbl2 as
@@ -482,14 +884,14 @@ where a.year = 2009 and b.month = 2
 ---- LINEAGE
 {
   "hash": "8f43e2adb3da2eac5d00d1eba96bb553",
-  "timestamp": 1568097504,
+  "timestamp": 1571508515,
   "vertices": [
     {
       "vertexType": "COLUMN",
       "vertexId": "int_col",
       "id": 0,
       "metadata": {
-        "tableCreateTime": 1568097504,
+        "tableCreateTime": 1571508515,
         "tableName": "lineage_test_db.lineage_test_tbl3"
       }
     },
@@ -498,7 +900,7 @@ where a.year = 2009 and b.month = 2
       "vertexId": "functional.alltypestiny.int_col",
       "id": 1,
       "metadata": {
-        "tableCreateTime": 1568093689,
+        "tableCreateTime": 1571172091,
         "tableName": "functional.alltypestiny"
       }
     }
@@ -514,10 +916,10 @@ where a.year = 2009 and b.month = 2
       "edgeType": "PROJECTION"
     }
   ],
-  "queryId": "bc4fbd39b756403c:101d778c00000000",
-  "user": "bharath",
+  "queryId": "974f555500597d28:867fee2f00000000",
+  "user": "anurag",
   "queryText": "create table lineage_test_db.lineage_test_tbl3 as select * from   (select * from      (select int_col from functional.alltypestiny limit 1) v1 ) v2",
-  "endTime": 1568097504
+  "endTime": 1571508516
 }
 ---- QUERY
 create table lineage_test_db.lineage_test_tbl3 as
@@ -528,14 +930,14 @@ select * from
 ---- LINEAGE
 {
   "hash": "502d2de3774289b12a705777da61baae",
-  "timestamp": 1568097509,
+  "timestamp": 1571508521,
   "vertices": [
     {
       "vertexType": "COLUMN",
       "vertexId": "id",
       "id": 0,
       "metadata": {
-        "tableCreateTime": 1568097510,
+        "tableCreateTime": 1571508521,
         "tableName": "lineage_test_db.lineage_test_tbl4"
       }
     },
@@ -544,7 +946,7 @@ select * from
       "vertexId": "functional_hbase.alltypes.id",
       "id": 1,
       "metadata": {
-        "tableCreateTime": 1568094417,
+        "tableCreateTime": 1571175351,
         "tableName": "functional_hbase.alltypes"
       }
     },
@@ -553,7 +955,7 @@ select * from
       "vertexId": "bigint_col",
       "id": 2,
       "metadata": {
-        "tableCreateTime": 1568097510,
+        "tableCreateTime": 1571508521,
         "tableName": "lineage_test_db.lineage_test_tbl4"
       }
     },
@@ -562,7 +964,7 @@ select * from
       "vertexId": "functional_hbase.alltypes.bigint_col",
       "id": 3,
       "metadata": {
-        "tableCreateTime": 1568094417,
+        "tableCreateTime": 1571175351,
         "tableName": "functional_hbase.alltypes"
       }
     },
@@ -571,7 +973,7 @@ select * from
       "vertexId": "bool_col",
       "id": 4,
       "metadata": {
-        "tableCreateTime": 1568097510,
+        "tableCreateTime": 1571508521,
         "tableName": "lineage_test_db.lineage_test_tbl4"
       }
     },
@@ -580,7 +982,7 @@ select * from
       "vertexId": "functional_hbase.alltypes.bool_col",
       "id": 5,
       "metadata": {
-        "tableCreateTime": 1568094417,
+        "tableCreateTime": 1571175351,
         "tableName": "functional_hbase.alltypes"
       }
     },
@@ -589,7 +991,7 @@ select * from
       "vertexId": "date_string_col",
       "id": 6,
       "metadata": {
-        "tableCreateTime": 1568097510,
+        "tableCreateTime": 1571508521,
         "tableName": "lineage_test_db.lineage_test_tbl4"
       }
     },
@@ -598,7 +1000,7 @@ select * from
       "vertexId": "functional_hbase.alltypes.date_string_col",
       "id": 7,
       "metadata": {
-        "tableCreateTime": 1568094417,
+        "tableCreateTime": 1571175351,
         "tableName": "functional_hbase.alltypes"
       }
     },
@@ -607,7 +1009,7 @@ select * from
       "vertexId": "double_col",
       "id": 8,
       "metadata": {
-        "tableCreateTime": 1568097510,
+        "tableCreateTime": 1571508521,
         "tableName": "lineage_test_db.lineage_test_tbl4"
       }
     },
@@ -616,7 +1018,7 @@ select * from
       "vertexId": "functional_hbase.alltypes.double_col",
       "id": 9,
       "metadata": {
-        "tableCreateTime": 1568094417,
+        "tableCreateTime": 1571175351,
         "tableName": "functional_hbase.alltypes"
       }
     },
@@ -625,7 +1027,7 @@ select * from
       "vertexId": "float_col",
       "id": 10,
       "metadata": {
-        "tableCreateTime": 1568097510,
+        "tableCreateTime": 1571508521,
         "tableName": "lineage_test_db.lineage_test_tbl4"
       }
     },
@@ -634,7 +1036,7 @@ select * from
       "vertexId": "functional_hbase.alltypes.float_col",
       "id": 11,
       "metadata": {
-        "tableCreateTime": 1568094417,
+        "tableCreateTime": 1571175351,
         "tableName": "functional_hbase.alltypes"
       }
     },
@@ -643,7 +1045,7 @@ select * from
       "vertexId": "int_col",
       "id": 12,
       "metadata": {
-        "tableCreateTime": 1568097510,
+        "tableCreateTime": 1571508521,
         "tableName": "lineage_test_db.lineage_test_tbl4"
       }
     },
@@ -652,7 +1054,7 @@ select * from
       "vertexId": "functional_hbase.alltypes.int_col",
       "id": 13,
       "metadata": {
-        "tableCreateTime": 1568094417,
+        "tableCreateTime": 1571175351,
         "tableName": "functional_hbase.alltypes"
       }
     },
@@ -661,7 +1063,7 @@ select * from
       "vertexId": "month",
       "id": 14,
       "metadata": {
-        "tableCreateTime": 1568097510,
+        "tableCreateTime": 1571508521,
         "tableName": "lineage_test_db.lineage_test_tbl4"
       }
     },
@@ -670,7 +1072,7 @@ select * from
       "vertexId": "functional_hbase.alltypes.month",
       "id": 15,
       "metadata": {
-        "tableCreateTime": 1568094417,
+        "tableCreateTime": 1571175351,
         "tableName": "functional_hbase.alltypes"
       }
     },
@@ -679,7 +1081,7 @@ select * from
       "vertexId": "smallint_col",
       "id": 16,
       "metadata": {
-        "tableCreateTime": 1568097510,
+        "tableCreateTime": 1571508521,
         "tableName": "lineage_test_db.lineage_test_tbl4"
       }
     },
@@ -688,7 +1090,7 @@ select * from
       "vertexId": "functional_hbase.alltypes.smallint_col",
       "id": 17,
       "metadata": {
-        "tableCreateTime": 1568094417,
+        "tableCreateTime": 1571175351,
         "tableName": "functional_hbase.alltypes"
       }
     },
@@ -697,7 +1099,7 @@ select * from
       "vertexId": "string_col",
       "id": 18,
       "metadata": {
-        "tableCreateTime": 1568097510,
+        "tableCreateTime": 1571508521,
         "tableName": "lineage_test_db.lineage_test_tbl4"
       }
     },
@@ -706,7 +1108,7 @@ select * from
       "vertexId": "functional_hbase.alltypes.string_col",
       "id": 19,
       "metadata": {
-        "tableCreateTime": 1568094417,
+        "tableCreateTime": 1571175351,
         "tableName": "functional_hbase.alltypes"
       }
     },
@@ -715,7 +1117,7 @@ select * from
       "vertexId": "timestamp_col",
       "id": 20,
       "metadata": {
-        "tableCreateTime": 1568097510,
+        "tableCreateTime": 1571508521,
         "tableName": "lineage_test_db.lineage_test_tbl4"
       }
     },
@@ -724,7 +1126,7 @@ select * from
       "vertexId": "functional_hbase.alltypes.timestamp_col",
       "id": 21,
       "metadata": {
-        "tableCreateTime": 1568094417,
+        "tableCreateTime": 1571175351,
         "tableName": "functional_hbase.alltypes"
       }
     },
@@ -733,7 +1135,7 @@ select * from
       "vertexId": "tinyint_col",
       "id": 22,
       "metadata": {
-        "tableCreateTime": 1568097510,
+        "tableCreateTime": 1571508521,
         "tableName": "lineage_test_db.lineage_test_tbl4"
       }
     },
@@ -742,7 +1144,7 @@ select * from
       "vertexId": "functional_hbase.alltypes.tinyint_col",
       "id": 23,
       "metadata": {
-        "tableCreateTime": 1568094417,
+        "tableCreateTime": 1571175351,
         "tableName": "functional_hbase.alltypes"
       }
     },
@@ -751,7 +1153,7 @@ select * from
       "vertexId": "year",
       "id": 24,
       "metadata": {
-        "tableCreateTime": 1568097510,
+        "tableCreateTime": 1571508521,
         "tableName": "lineage_test_db.lineage_test_tbl4"
       }
     },
@@ -760,7 +1162,7 @@ select * from
       "vertexId": "functional_hbase.alltypes.year",
       "id": 25,
       "metadata": {
-        "tableCreateTime": 1568094417,
+        "tableCreateTime": 1571175351,
         "tableName": "functional_hbase.alltypes"
       }
     }
@@ -884,10 +1286,10 @@ select * from
       "edgeType": "PROJECTION"
     }
   ],
-  "queryId": "774dfa27d60b670b:37bf45ec00000000",
-  "user": "bharath",
+  "queryId": "d2439eef44931b51:d82a952600000000",
+  "user": "anurag",
   "queryText": "create table lineage_test_db.lineage_test_tbl4 as select * from functional_hbase.alltypes limit 5",
-  "endTime": 1568097511
+  "endTime": 1571508521
 }
 ---- QUERY
 # CTAS from HBase table
@@ -896,14 +1298,14 @@ create table lineage_test_db.lineage_test_tbl4 as select * from functional_hbase
 ---- LINEAGE
 {
   "hash": "2fa5d0ab4e1c38a9d7abde595f4c60c8",
-  "timestamp": 1568097516,
+  "timestamp": 1571508526,
   "vertices": [
     {
       "vertexType": "COLUMN",
       "vertexId": "id",
       "id": 0,
       "metadata": {
-        "tableCreateTime": 1568097478,
+        "tableCreateTime": 1571508463,
         "tableName": "lineage_test_db.alltypes"
       }
     },
@@ -912,7 +1314,7 @@ create table lineage_test_db.lineage_test_tbl4 as select * from functional_hbase
       "vertexId": "bigint_col",
       "id": 1,
       "metadata": {
-        "tableCreateTime": 1568097478,
+        "tableCreateTime": 1571508463,
         "tableName": "lineage_test_db.alltypes"
       }
     },
@@ -921,7 +1323,7 @@ create table lineage_test_db.lineage_test_tbl4 as select * from functional_hbase
       "vertexId": "bool_col",
       "id": 2,
       "metadata": {
-        "tableCreateTime": 1568097478,
+        "tableCreateTime": 1571508463,
         "tableName": "lineage_test_db.alltypes"
       }
     },
@@ -930,7 +1332,7 @@ create table lineage_test_db.lineage_test_tbl4 as select * from functional_hbase
       "vertexId": "date_string_col",
       "id": 3,
       "metadata": {
-        "tableCreateTime": 1568097478,
+        "tableCreateTime": 1571508463,
         "tableName": "lineage_test_db.alltypes"
       }
     },
@@ -939,7 +1341,7 @@ create table lineage_test_db.lineage_test_tbl4 as select * from functional_hbase
       "vertexId": "double_col",
       "id": 4,
       "metadata": {
-        "tableCreateTime": 1568097478,
+        "tableCreateTime": 1571508463,
         "tableName": "lineage_test_db.alltypes"
       }
     },
@@ -948,7 +1350,7 @@ create table lineage_test_db.lineage_test_tbl4 as select * from functional_hbase
       "vertexId": "float_col",
       "id": 5,
       "metadata": {
-        "tableCreateTime": 1568097478,
+        "tableCreateTime": 1571508463,
         "tableName": "lineage_test_db.alltypes"
       }
     },
@@ -957,7 +1359,7 @@ create table lineage_test_db.lineage_test_tbl4 as select * from functional_hbase
       "vertexId": "int_col",
       "id": 6,
       "metadata": {
-        "tableCreateTime": 1568097478,
+        "tableCreateTime": 1571508463,
         "tableName": "lineage_test_db.alltypes"
       }
     },
@@ -966,7 +1368,7 @@ create table lineage_test_db.lineage_test_tbl4 as select * from functional_hbase
       "vertexId": "month",
       "id": 7,
       "metadata": {
-        "tableCreateTime": 1568097478,
+        "tableCreateTime": 1571508463,
         "tableName": "lineage_test_db.alltypes"
       }
     },
@@ -975,7 +1377,7 @@ create table lineage_test_db.lineage_test_tbl4 as select * from functional_hbase
       "vertexId": "smallint_col",
       "id": 8,
       "metadata": {
-        "tableCreateTime": 1568097478,
+        "tableCreateTime": 1571508463,
         "tableName": "lineage_test_db.alltypes"
       }
     },
@@ -984,7 +1386,7 @@ create table lineage_test_db.lineage_test_tbl4 as select * from functional_hbase
       "vertexId": "string_col",
       "id": 9,
       "metadata": {
-        "tableCreateTime": 1568097478,
+        "tableCreateTime": 1571508463,
         "tableName": "lineage_test_db.alltypes"
       }
     },
@@ -993,7 +1395,7 @@ create table lineage_test_db.lineage_test_tbl4 as select * from functional_hbase
       "vertexId": "timestamp_col",
       "id": 10,
       "metadata": {
-        "tableCreateTime": 1568097478,
+        "tableCreateTime": 1571508463,
         "tableName": "lineage_test_db.alltypes"
       }
     },
@@ -1002,7 +1404,7 @@ create table lineage_test_db.lineage_test_tbl4 as select * from functional_hbase
       "vertexId": "tinyint_col",
       "id": 11,
       "metadata": {
-        "tableCreateTime": 1568097478,
+        "tableCreateTime": 1571508463,
         "tableName": "lineage_test_db.alltypes"
       }
     },
@@ -1011,7 +1413,7 @@ create table lineage_test_db.lineage_test_tbl4 as select * from functional_hbase
       "vertexId": "year",
       "id": 12,
       "metadata": {
-        "tableCreateTime": 1568097478,
+        "tableCreateTime": 1571508463,
         "tableName": "lineage_test_db.alltypes"
       }
     }
@@ -1109,10 +1511,10 @@ create table lineage_test_db.lineage_test_tbl4 as select * from functional_hbase
       "edgeType": "PROJECTION"
     }
   ],
-  "queryId": "454b0e7178b98fe4:6d85e21300000000",
-  "user": "bharath",
+  "queryId": "5640f06b844acdfc:d01daab300000000",
+  "user": "anurag",
   "queryText": "insert into lineage_test_db.alltypes   values (1, 1, true, \"1999-12-01\", 2.0, 1.0, 1, 12, 2, \"abs\",   cast(now() as timestamp), 1, 1999)",
-  "endTime": 1568097516
+  "endTime": 1571508526
 }
 ---- QUERY
 # Insert into an HBase table
@@ -1124,14 +1526,14 @@ lineage_test_db.alltypes
 ---- LINEAGE
 {
   "hash": "e3af61c7dc3e8cd9ab632c3c935df032",
-  "timestamp": 1568097521,
+  "timestamp": 1571508531,
   "vertices": [
     {
       "vertexType": "COLUMN",
       "vertexId": "id",
       "id": 0,
       "metadata": {
-        "tableCreateTime": 1568097479,
+        "tableCreateTime": 1571508464,
         "tableName": "lineage_test_db.alltypesnopart"
       }
     },
@@ -1140,7 +1542,7 @@ lineage_test_db.alltypes
       "vertexId": "functional.alltypes.id",
       "id": 1,
       "metadata": {
-        "tableCreateTime": 1568093675,
+        "tableCreateTime": 1571175281,
         "tableName": "functional.alltypes"
       }
     },
@@ -1149,7 +1551,7 @@ lineage_test_db.alltypes
       "vertexId": "bool_col",
       "id": 2,
       "metadata": {
-        "tableCreateTime": 1568097479,
+        "tableCreateTime": 1571508464,
         "tableName": "lineage_test_db.alltypesnopart"
       }
     },
@@ -1158,7 +1560,7 @@ lineage_test_db.alltypes
       "vertexId": "functional.alltypes.bool_col",
       "id": 3,
       "metadata": {
-        "tableCreateTime": 1568093675,
+        "tableCreateTime": 1571175281,
         "tableName": "functional.alltypes"
       }
     },
@@ -1167,7 +1569,7 @@ lineage_test_db.alltypes
       "vertexId": "tinyint_col",
       "id": 4,
       "metadata": {
-        "tableCreateTime": 1568097479,
+        "tableCreateTime": 1571508464,
         "tableName": "lineage_test_db.alltypesnopart"
       }
     },
@@ -1176,7 +1578,7 @@ lineage_test_db.alltypes
       "vertexId": "smallint_col",
       "id": 5,
       "metadata": {
-        "tableCreateTime": 1568097479,
+        "tableCreateTime": 1571508464,
         "tableName": "lineage_test_db.alltypesnopart"
       }
     },
@@ -1185,7 +1587,7 @@ lineage_test_db.alltypes
       "vertexId": "int_col",
       "id": 6,
       "metadata": {
-        "tableCreateTime": 1568097479,
+        "tableCreateTime": 1571508464,
         "tableName": "lineage_test_db.alltypesnopart"
       }
     },
@@ -1194,7 +1596,7 @@ lineage_test_db.alltypes
       "vertexId": "bigint_col",
       "id": 7,
       "metadata": {
-        "tableCreateTime": 1568097479,
+        "tableCreateTime": 1571508464,
         "tableName": "lineage_test_db.alltypesnopart"
       }
     },
@@ -1203,7 +1605,7 @@ lineage_test_db.alltypes
       "vertexId": "float_col",
       "id": 8,
       "metadata": {
-        "tableCreateTime": 1568097479,
+        "tableCreateTime": 1571508464,
         "tableName": "lineage_test_db.alltypesnopart"
       }
     },
@@ -1212,7 +1614,7 @@ lineage_test_db.alltypes
       "vertexId": "double_col",
       "id": 9,
       "metadata": {
-        "tableCreateTime": 1568097479,
+        "tableCreateTime": 1571508464,
         "tableName": "lineage_test_db.alltypesnopart"
       }
     },
@@ -1221,7 +1623,7 @@ lineage_test_db.alltypes
       "vertexId": "date_string_col",
       "id": 10,
       "metadata": {
-        "tableCreateTime": 1568097479,
+        "tableCreateTime": 1571508464,
         "tableName": "lineage_test_db.alltypesnopart"
       }
     },
@@ -1230,7 +1632,7 @@ lineage_test_db.alltypes
       "vertexId": "string_col",
       "id": 11,
       "metadata": {
-        "tableCreateTime": 1568097479,
+        "tableCreateTime": 1571508464,
         "tableName": "lineage_test_db.alltypesnopart"
       }
     },
@@ -1239,7 +1641,7 @@ lineage_test_db.alltypes
       "vertexId": "timestamp_col",
       "id": 12,
       "metadata": {
-        "tableCreateTime": 1568097479,
+        "tableCreateTime": 1571508464,
         "tableName": "lineage_test_db.alltypesnopart"
       }
     },
@@ -1248,7 +1650,7 @@ lineage_test_db.alltypes
       "vertexId": "functional.alltypes.timestamp_col",
       "id": 13,
       "metadata": {
-        "tableCreateTime": 1568093675,
+        "tableCreateTime": 1571175281,
         "tableName": "functional.alltypes"
       }
     }
@@ -1338,10 +1740,10 @@ lineage_test_db.alltypes
       "edgeType": "PROJECTION"
     }
   ],
-  "queryId": "ad4f9e564b46993a:df41be2500000000",
-  "user": "bharath",
+  "queryId": "604902011a1d8e57:a86fb43e00000000",
+  "user": "anurag",
   "queryText": "insert into table lineage_test_db.alltypesnopart (id, bool_col, timestamp_col) select id, bool_col, timestamp_col from functional.alltypes",
-  "endTime": 1568097521
+  "endTime": 1571508532
 }
 ---- QUERY
 insert into table lineage_test_db.alltypesnopart (id, bool_col, timestamp_col)
@@ -1351,14 +1753,14 @@ from functional.alltypes
 ---- LINEAGE
 {
   "hash": "453abb733b2b21ba827f80897fe3b579",
-  "timestamp": 1568097527,
+  "timestamp": 1571508537,
   "vertices": [
     {
       "vertexType": "COLUMN",
       "vertexId": "year",
       "id": 0,
       "metadata": {
-        "tableCreateTime": 1568097480,
+        "tableCreateTime": 1571508465,
         "tableName": "lineage_test_db.alltypessmall"
       }
     },
@@ -1367,7 +1769,7 @@ from functional.alltypes
       "vertexId": "month",
       "id": 1,
       "metadata": {
-        "tableCreateTime": 1568097480,
+        "tableCreateTime": 1571508465,
         "tableName": "lineage_test_db.alltypessmall"
       }
     },
@@ -1376,7 +1778,7 @@ from functional.alltypes
       "vertexId": "id",
       "id": 2,
       "metadata": {
-        "tableCreateTime": 1568097480,
+        "tableCreateTime": 1571508465,
         "tableName": "lineage_test_db.alltypessmall"
       }
     },
@@ -1385,7 +1787,7 @@ from functional.alltypes
       "vertexId": "bool_col",
       "id": 3,
       "metadata": {
-        "tableCreateTime": 1568097480,
+        "tableCreateTime": 1571508465,
         "tableName": "lineage_test_db.alltypessmall"
       }
     },
@@ -1394,7 +1796,7 @@ from functional.alltypes
       "vertexId": "tinyint_col",
       "id": 4,
       "metadata": {
-        "tableCreateTime": 1568097480,
+        "tableCreateTime": 1571508465,
         "tableName": "lineage_test_db.alltypessmall"
       }
     },
@@ -1403,7 +1805,7 @@ from functional.alltypes
       "vertexId": "smallint_col",
       "id": 5,
       "metadata": {
-        "tableCreateTime": 1568097480,
+        "tableCreateTime": 1571508465,
         "tableName": "lineage_test_db.alltypessmall"
       }
     },
@@ -1412,7 +1814,7 @@ from functional.alltypes
       "vertexId": "functional.alltypes.smallint_col",
       "id": 6,
       "metadata": {
-        "tableCreateTime": 1568093675,
+        "tableCreateTime": 1571175281,
         "tableName": "functional.alltypes"
       }
     },
@@ -1421,7 +1823,7 @@ from functional.alltypes
       "vertexId": "int_col",
       "id": 7,
       "metadata": {
-        "tableCreateTime": 1568097480,
+        "tableCreateTime": 1571508465,
         "tableName": "lineage_test_db.alltypessmall"
       }
     },
@@ -1430,7 +1832,7 @@ from functional.alltypes
       "vertexId": "functional.alltypes.int_col",
       "id": 8,
       "metadata": {
-        "tableCreateTime": 1568093675,
+        "tableCreateTime": 1571175281,
         "tableName": "functional.alltypes"
       }
     },
@@ -1439,7 +1841,7 @@ from functional.alltypes
       "vertexId": "bigint_col",
       "id": 9,
       "metadata": {
-        "tableCreateTime": 1568097480,
+        "tableCreateTime": 1571508465,
         "tableName": "lineage_test_db.alltypessmall"
       }
     },
@@ -1448,7 +1850,7 @@ from functional.alltypes
       "vertexId": "float_col",
       "id": 10,
       "metadata": {
-        "tableCreateTime": 1568097480,
+        "tableCreateTime": 1571508465,
         "tableName": "lineage_test_db.alltypessmall"
       }
     },
@@ -1457,7 +1859,7 @@ from functional.alltypes
       "vertexId": "double_col",
       "id": 11,
       "metadata": {
-        "tableCreateTime": 1568097480,
+        "tableCreateTime": 1571508465,
         "tableName": "lineage_test_db.alltypessmall"
       }
     },
@@ -1466,7 +1868,7 @@ from functional.alltypes
       "vertexId": "date_string_col",
       "id": 12,
       "metadata": {
-        "tableCreateTime": 1568097480,
+        "tableCreateTime": 1571508465,
         "tableName": "lineage_test_db.alltypessmall"
       }
     },
@@ -1475,7 +1877,7 @@ from functional.alltypes
       "vertexId": "string_col",
       "id": 13,
       "metadata": {
-        "tableCreateTime": 1568097480,
+        "tableCreateTime": 1571508465,
         "tableName": "lineage_test_db.alltypessmall"
       }
     },
@@ -1484,7 +1886,7 @@ from functional.alltypes
       "vertexId": "timestamp_col",
       "id": 14,
       "metadata": {
-        "tableCreateTime": 1568097480,
+        "tableCreateTime": 1571508465,
         "tableName": "lineage_test_db.alltypessmall"
       }
     },
@@ -1493,7 +1895,7 @@ from functional.alltypes
       "vertexId": "functional.alltypes.month",
       "id": 15,
       "metadata": {
-        "tableCreateTime": 1568093675,
+        "tableCreateTime": 1571175281,
         "tableName": "functional.alltypes"
       }
     },
@@ -1502,7 +1904,7 @@ from functional.alltypes
       "vertexId": "functional.alltypes.year",
       "id": 16,
       "metadata": {
-        "tableCreateTime": 1568093675,
+        "tableCreateTime": 1571175281,
         "tableName": "functional.alltypes"
       }
     }
@@ -1626,10 +2028,10 @@ from functional.alltypes
       "edgeType": "PREDICATE"
     }
   ],
-  "queryId": "b04704db216d74a2:b2a1d75a00000000",
-  "user": "bharath",
+  "queryId": "ab47e55fbc39a82c:e2ddd64500000000",
+  "user": "anurag",
   "queryText": "insert into table lineage_test_db.alltypessmall (smallint_col, int_col) partition (year=2009, month=04) select smallint_col, int_col from functional.alltypes where year=2009 and month=05",
-  "endTime": 1568097527
+  "endTime": 1571508538
 }
 ---- QUERY
 insert into table lineage_test_db.alltypessmall (smallint_col, int_col)
@@ -1641,14 +2043,14 @@ where year=2009 and month=05
 ---- LINEAGE
 {
   "hash": "b6bcec64b3eace721772f4b1d4e2cb57",
-  "timestamp": 1568097532,
+  "timestamp": 1571508543,
   "vertices": [
     {
       "vertexType": "COLUMN",
       "vertexId": "year",
       "id": 0,
       "metadata": {
-        "tableCreateTime": 1568097480,
+        "tableCreateTime": 1571508465,
         "tableName": "lineage_test_db.alltypessmall"
       }
     },
@@ -1657,7 +2059,7 @@ where year=2009 and month=05
       "vertexId": "functional_seq_snap.alltypes.year",
       "id": 1,
       "metadata": {
-        "tableCreateTime": 1568093699,
+        "tableCreateTime": 1571175280,
         "tableName": "functional_seq_snap.alltypes"
       }
     },
@@ -1666,7 +2068,7 @@ where year=2009 and month=05
       "vertexId": "month",
       "id": 2,
       "metadata": {
-        "tableCreateTime": 1568097480,
+        "tableCreateTime": 1571508465,
         "tableName": "lineage_test_db.alltypessmall"
       }
     },
@@ -1675,7 +2077,7 @@ where year=2009 and month=05
       "vertexId": "functional_seq_snap.alltypes.month",
       "id": 3,
       "metadata": {
-        "tableCreateTime": 1568093699,
+        "tableCreateTime": 1571175280,
         "tableName": "functional_seq_snap.alltypes"
       }
     },
@@ -1684,7 +2086,7 @@ where year=2009 and month=05
       "vertexId": "id",
       "id": 4,
       "metadata": {
-        "tableCreateTime": 1568097480,
+        "tableCreateTime": 1571508465,
         "tableName": "lineage_test_db.alltypessmall"
       }
     },
@@ -1693,7 +2095,7 @@ where year=2009 and month=05
       "vertexId": "functional_seq_snap.alltypes.id",
       "id": 5,
       "metadata": {
-        "tableCreateTime": 1568093699,
+        "tableCreateTime": 1571175280,
         "tableName": "functional_seq_snap.alltypes"
       }
     },
@@ -1702,7 +2104,7 @@ where year=2009 and month=05
       "vertexId": "bool_col",
       "id": 6,
       "metadata": {
-        "tableCreateTime": 1568097480,
+        "tableCreateTime": 1571508465,
         "tableName": "lineage_test_db.alltypessmall"
       }
     },
@@ -1711,7 +2113,7 @@ where year=2009 and month=05
       "vertexId": "tinyint_col",
       "id": 7,
       "metadata": {
-        "tableCreateTime": 1568097480,
+        "tableCreateTime": 1571508465,
         "tableName": "lineage_test_db.alltypessmall"
       }
     },
@@ -1720,7 +2122,7 @@ where year=2009 and month=05
       "vertexId": "smallint_col",
       "id": 8,
       "metadata": {
-        "tableCreateTime": 1568097480,
+        "tableCreateTime": 1571508465,
         "tableName": "lineage_test_db.alltypessmall"
       }
     },
@@ -1729,7 +2131,7 @@ where year=2009 and month=05
       "vertexId": "int_col",
       "id": 9,
       "metadata": {
-        "tableCreateTime": 1568097480,
+        "tableCreateTime": 1571508465,
         "tableName": "lineage_test_db.alltypessmall"
       }
     },
@@ -1738,7 +2140,7 @@ where year=2009 and month=05
       "vertexId": "functional_seq_snap.alltypes.int_col",
       "id": 10,
       "metadata": {
-        "tableCreateTime": 1568093699,
+        "tableCreateTime": 1571175280,
         "tableName": "functional_seq_snap.alltypes"
       }
     },
@@ -1747,7 +2149,7 @@ where year=2009 and month=05
       "vertexId": "bigint_col",
       "id": 11,
       "metadata": {
-        "tableCreateTime": 1568097480,
+        "tableCreateTime": 1571508465,
         "tableName": "lineage_test_db.alltypessmall"
       }
     },
@@ -1756,7 +2158,7 @@ where year=2009 and month=05
       "vertexId": "float_col",
       "id": 12,
       "metadata": {
-        "tableCreateTime": 1568097480,
+        "tableCreateTime": 1571508465,
         "tableName": "lineage_test_db.alltypessmall"
       }
     },
@@ -1765,7 +2167,7 @@ where year=2009 and month=05
       "vertexId": "double_col",
       "id": 13,
       "metadata": {
-        "tableCreateTime": 1568097480,
+        "tableCreateTime": 1571508465,
         "tableName": "lineage_test_db.alltypessmall"
       }
     },
@@ -1774,7 +2176,7 @@ where year=2009 and month=05
       "vertexId": "date_string_col",
       "id": 14,
       "metadata": {
-        "tableCreateTime": 1568097480,
+        "tableCreateTime": 1571508465,
         "tableName": "lineage_test_db.alltypessmall"
       }
     },
@@ -1783,7 +2185,7 @@ where year=2009 and month=05
       "vertexId": "string_col",
       "id": 15,
       "metadata": {
-        "tableCreateTime": 1568097480,
+        "tableCreateTime": 1571508465,
         "tableName": "lineage_test_db.alltypessmall"
       }
     },
@@ -1792,7 +2194,7 @@ where year=2009 and month=05
       "vertexId": "functional_seq_snap.alltypes.string_col",
       "id": 16,
       "metadata": {
-        "tableCreateTime": 1568093699,
+        "tableCreateTime": 1571175280,
         "tableName": "functional_seq_snap.alltypes"
       }
     },
@@ -1801,7 +2203,7 @@ where year=2009 and month=05
       "vertexId": "timestamp_col",
       "id": 17,
       "metadata": {
-        "tableCreateTime": 1568097480,
+        "tableCreateTime": 1571508465,
         "tableName": "lineage_test_db.alltypessmall"
       }
     }
@@ -1931,10 +2333,10 @@ where year=2009 and month=05
       "edgeType": "PREDICATE"
     }
   ],
-  "queryId": "0848da428c8561da:15695de800000000",
-  "user": "bharath",
+  "queryId": "b944749834207a6e:2af1b52500000000",
+  "user": "anurag",
   "queryText": "insert into table lineage_test_db.alltypessmall (id, string_col, int_col) partition (year, month) select id, string_col, int_col, year, month from functional_seq_snap.alltypes where year=2009 and month>10",
-  "endTime": 1568097533
+  "endTime": 1571508543
 }
 ---- QUERY
 insert into table lineage_test_db.alltypessmall (id, string_col, int_col)
@@ -1946,14 +2348,14 @@ where year=2009 and month>10
 ---- LINEAGE
 {
   "hash": "2b82f76becf76311633c26498d9f57d8",
-  "timestamp": 1568097538,
+  "timestamp": 1571508549,
   "vertices": [
     {
       "vertexType": "COLUMN",
       "vertexId": "year",
       "id": 0,
       "metadata": {
-        "tableCreateTime": 1568097480,
+        "tableCreateTime": 1571508465,
         "tableName": "lineage_test_db.alltypessmall"
       }
     },
@@ -1962,7 +2364,7 @@ where year=2009 and month>10
       "vertexId": "month",
       "id": 1,
       "metadata": {
-        "tableCreateTime": 1568097480,
+        "tableCreateTime": 1571508465,
         "tableName": "lineage_test_db.alltypessmall"
       }
     },
@@ -1971,7 +2373,7 @@ where year=2009 and month>10
       "vertexId": "functional.alltypes.month",
       "id": 2,
       "metadata": {
-        "tableCreateTime": 1568093675,
+        "tableCreateTime": 1571175281,
         "tableName": "functional.alltypes"
       }
     },
@@ -1980,7 +2382,7 @@ where year=2009 and month>10
       "vertexId": "id",
       "id": 3,
       "metadata": {
-        "tableCreateTime": 1568097480,
+        "tableCreateTime": 1571508465,
         "tableName": "lineage_test_db.alltypessmall"
       }
     },
@@ -1989,7 +2391,7 @@ where year=2009 and month>10
       "vertexId": "functional.alltypes.id",
       "id": 4,
       "metadata": {
-        "tableCreateTime": 1568093675,
+        "tableCreateTime": 1571175281,
         "tableName": "functional.alltypes"
       }
     },
@@ -1998,7 +2400,7 @@ where year=2009 and month>10
       "vertexId": "bool_col",
       "id": 5,
       "metadata": {
-        "tableCreateTime": 1568097480,
+        "tableCreateTime": 1571508465,
         "tableName": "lineage_test_db.alltypessmall"
       }
     },
@@ -2007,7 +2409,7 @@ where year=2009 and month>10
       "vertexId": "functional.alltypes.bool_col",
       "id": 6,
       "metadata": {
-        "tableCreateTime": 1568093675,
+        "tableCreateTime": 1571175281,
         "tableName": "functional.alltypes"
       }
     },
@@ -2016,7 +2418,7 @@ where year=2009 and month>10
       "vertexId": "tinyint_col",
       "id": 7,
       "metadata": {
-        "tableCreateTime": 1568097480,
+        "tableCreateTime": 1571508465,
         "tableName": "lineage_test_db.alltypessmall"
       }
     },
@@ -2025,7 +2427,7 @@ where year=2009 and month>10
       "vertexId": "functional.alltypes.tinyint_col",
       "id": 8,
       "metadata": {
-        "tableCreateTime": 1568093675,
+        "tableCreateTime": 1571175281,
         "tableName": "functional.alltypes"
       }
     },
@@ -2034,7 +2436,7 @@ where year=2009 and month>10
       "vertexId": "smallint_col",
       "id": 9,
       "metadata": {
-        "tableCreateTime": 1568097480,
+        "tableCreateTime": 1571508465,
         "tableName": "lineage_test_db.alltypessmall"
       }
     },
@@ -2043,7 +2445,7 @@ where year=2009 and month>10
       "vertexId": "functional.alltypes.smallint_col",
       "id": 10,
       "metadata": {
-        "tableCreateTime": 1568093675,
+        "tableCreateTime": 1571175281,
         "tableName": "functional.alltypes"
       }
     },
@@ -2052,7 +2454,7 @@ where year=2009 and month>10
       "vertexId": "int_col",
       "id": 11,
       "metadata": {
-        "tableCreateTime": 1568097480,
+        "tableCreateTime": 1571508465,
         "tableName": "lineage_test_db.alltypessmall"
       }
     },
@@ -2061,7 +2463,7 @@ where year=2009 and month>10
       "vertexId": "functional.alltypes.int_col",
       "id": 12,
       "metadata": {
-        "tableCreateTime": 1568093675,
+        "tableCreateTime": 1571175281,
         "tableName": "functional.alltypes"
       }
     },
@@ -2070,7 +2472,7 @@ where year=2009 and month>10
       "vertexId": "bigint_col",
       "id": 13,
       "metadata": {
-        "tableCreateTime": 1568097480,
+        "tableCreateTime": 1571508465,
         "tableName": "lineage_test_db.alltypessmall"
       }
     },
@@ -2079,7 +2481,7 @@ where year=2009 and month>10
       "vertexId": "functional.alltypes.bigint_col",
       "id": 14,
       "metadata": {
-        "tableCreateTime": 1568093675,
+        "tableCreateTime": 1571175281,
         "tableName": "functional.alltypes"
       }
     },
@@ -2088,7 +2490,7 @@ where year=2009 and month>10
       "vertexId": "float_col",
       "id": 15,
       "metadata": {
-        "tableCreateTime": 1568097480,
+        "tableCreateTime": 1571508465,
         "tableName": "lineage_test_db.alltypessmall"
       }
     },
@@ -2097,7 +2499,7 @@ where year=2009 and month>10
       "vertexId": "functional.alltypes.float_col",
       "id": 16,
       "metadata": {
-        "tableCreateTime": 1568093675,
+        "tableCreateTime": 1571175281,
         "tableName": "functional.alltypes"
       }
     },
@@ -2106,7 +2508,7 @@ where year=2009 and month>10
       "vertexId": "double_col",
       "id": 17,
       "metadata": {
-        "tableCreateTime": 1568097480,
+        "tableCreateTime": 1571508465,
         "tableName": "lineage_test_db.alltypessmall"
       }
     },
@@ -2115,7 +2517,7 @@ where year=2009 and month>10
       "vertexId": "functional.alltypes.double_col",
       "id": 18,
       "metadata": {
-        "tableCreateTime": 1568093675,
+        "tableCreateTime": 1571175281,
         "tableName": "functional.alltypes"
       }
     },
@@ -2124,7 +2526,7 @@ where year=2009 and month>10
       "vertexId": "date_string_col",
       "id": 19,
       "metadata": {
-        "tableCreateTime": 1568097480,
+        "tableCreateTime": 1571508465,
         "tableName": "lineage_test_db.alltypessmall"
       }
     },
@@ -2133,7 +2535,7 @@ where year=2009 and month>10
       "vertexId": "functional.alltypes.date_string_col",
       "id": 20,
       "metadata": {
-        "tableCreateTime": 1568093675,
+        "tableCreateTime": 1571175281,
         "tableName": "functional.alltypes"
       }
     },
@@ -2142,7 +2544,7 @@ where year=2009 and month>10
       "vertexId": "string_col",
       "id": 21,
       "metadata": {
-        "tableCreateTime": 1568097480,
+        "tableCreateTime": 1571508465,
         "tableName": "lineage_test_db.alltypessmall"
       }
     },
@@ -2151,7 +2553,7 @@ where year=2009 and month>10
       "vertexId": "functional.alltypes.string_col",
       "id": 22,
       "metadata": {
-        "tableCreateTime": 1568093675,
+        "tableCreateTime": 1571175281,
         "tableName": "functional.alltypes"
       }
     },
@@ -2160,7 +2562,7 @@ where year=2009 and month>10
       "vertexId": "timestamp_col",
       "id": 23,
       "metadata": {
-        "tableCreateTime": 1568097480,
+        "tableCreateTime": 1571508465,
         "tableName": "lineage_test_db.alltypessmall"
       }
     },
@@ -2169,7 +2571,7 @@ where year=2009 and month>10
       "vertexId": "functional.alltypes.timestamp_col",
       "id": 24,
       "metadata": {
-        "tableCreateTime": 1568093675,
+        "tableCreateTime": 1571175281,
         "tableName": "functional.alltypes"
       }
     },
@@ -2178,7 +2580,7 @@ where year=2009 and month>10
       "vertexId": "functional.alltypes.year",
       "id": 25,
       "metadata": {
-        "tableCreateTime": 1568093675,
+        "tableCreateTime": 1571175281,
         "tableName": "functional.alltypes"
       }
     }
@@ -2323,10 +2725,10 @@ where year=2009 and month>10
       "edgeType": "PREDICATE"
     }
   ],
-  "queryId": "c64f079557552c0b:13fdd21300000000",
-  "user": "bharath",
+  "queryId": "5e4e1056fd8287ac:0ee1847500000000",
+  "user": "anurag",
   "queryText": "insert into table lineage_test_db.alltypessmall partition (year=2009, month) select min(id), min(bool_col), min(tinyint_col), min(smallint_col), min(int_col), min(bigint_col), min(float_col), min(double_col), min(date_string_col), min(string_col), min(timestamp_col), month from functional.alltypes where year=2009 and month>10 group by month having min(id) > 10",
-  "endTime": 1568097538
+  "endTime": 1571508549
 }
 ---- QUERY
 insert into table lineage_test_db.alltypessmall
@@ -2342,7 +2744,7 @@ having min(id) > 10
 ---- LINEAGE
 {
   "hash": "33162d783545a2bdc1e8a3a95553971f",
-  "timestamp": 1568097543,
+  "timestamp": 1571508554,
   "vertices": [
     {
       "vertexType": "COLUMN",
@@ -2354,7 +2756,7 @@ having min(id) > 10
       "vertexId": "functional.alltypes.tinyint_col",
       "id": 1,
       "metadata": {
-        "tableCreateTime": 1568093675,
+        "tableCreateTime": 1571175281,
         "tableName": "functional.alltypes"
       }
     },
@@ -2363,7 +2765,7 @@ having min(id) > 10
       "vertexId": "functional.alltypes.int_col",
       "id": 2,
       "metadata": {
-        "tableCreateTime": 1568093675,
+        "tableCreateTime": 1571175281,
         "tableName": "functional.alltypes"
       }
     }
@@ -2388,10 +2790,10 @@ having min(id) > 10
       "edgeType": "PREDICATE"
     }
   ],
-  "queryId": "71437ef9b661a370:78d5443c00000000",
-  "user": "bharath",
+  "queryId": "ca4eb4dcd9be24d8:59f4b26c00000000",
+  "user": "anurag",
   "queryText": "select max(tinyint_col) over(partition by int_col) from functional.alltypes group by int_col, tinyint_col",
-  "endTime": 1568097544
+  "endTime": 1571508554
 }
 ---- QUERY
 # Select statements with analytic functions
@@ -2403,7 +2805,7 @@ group by int_col, tinyint_col
 ---- LINEAGE
 {
   "hash": "4f1ecaaed571d2ed9f09f091f399c311",
-  "timestamp": 1568097549,
+  "timestamp": 1571508560,
   "vertices": [
     {
       "vertexType": "COLUMN",
@@ -2415,7 +2817,7 @@ group by int_col, tinyint_col
       "vertexId": "functional.alltypesagg.int_col",
       "id": 1,
       "metadata": {
-        "tableCreateTime": 1568093721,
+        "tableCreateTime": 1571172137,
         "tableName": "functional.alltypesagg"
       }
     },
@@ -2452,10 +2854,10 @@ group by int_col, tinyint_col
       "edgeType": "PREDICATE"
     }
   ],
-  "queryId": "af40268c951b5907:486c9bf100000000",
-  "user": "bharath",
+  "queryId": "bb405c0eac26f5f4:eefbb34a00000000",
+  "user": "anurag",
   "queryText": "select int_col, rank() over(order by int_col) from functional.alltypesagg",
-  "endTime": 1568097549
+  "endTime": 1571508560
 }
 ---- QUERY
 select int_col, rank() over(order by int_col) from functional.alltypesagg
@@ -2463,7 +2865,7 @@ select int_col, rank() over(order by int_col) from functional.alltypesagg
 ---- LINEAGE
 {
   "hash": "83067b3ed65f566ee2a7c97259b3f485",
-  "timestamp": 1568097554,
+  "timestamp": 1571508565,
   "vertices": [
     {
       "vertexType": "COLUMN",
@@ -2475,7 +2877,7 @@ select int_col, rank() over(order by int_col) from functional.alltypesagg
       "vertexId": "functional.alltypes.tinyint_col",
       "id": 1,
       "metadata": {
-        "tableCreateTime": 1568093675,
+        "tableCreateTime": 1571175281,
         "tableName": "functional.alltypes"
       }
     },
@@ -2489,7 +2891,7 @@ select int_col, rank() over(order by int_col) from functional.alltypesagg
       "vertexId": "functional.alltypes.int_col",
       "id": 3,
       "metadata": {
-        "tableCreateTime": 1568093675,
+        "tableCreateTime": 1571175281,
         "tableName": "functional.alltypes"
       }
     },
@@ -2503,7 +2905,7 @@ select int_col, rank() over(order by int_col) from functional.alltypesagg
       "vertexId": "functional.alltypes.double_col",
       "id": 5,
       "metadata": {
-        "tableCreateTime": 1568093675,
+        "tableCreateTime": 1571175281,
         "tableName": "functional.alltypes"
       }
     },
@@ -2512,7 +2914,7 @@ select int_col, rank() over(order by int_col) from functional.alltypesagg
       "vertexId": "functional.alltypes.id",
       "id": 6,
       "metadata": {
-        "tableCreateTime": 1568093675,
+        "tableCreateTime": 1571175281,
         "tableName": "functional.alltypes"
       }
     },
@@ -2521,7 +2923,7 @@ select int_col, rank() over(order by int_col) from functional.alltypesagg
       "vertexId": "functional.alltypessmall.id",
       "id": 7,
       "metadata": {
-        "tableCreateTime": 1568093682,
+        "tableCreateTime": 1571172085,
         "tableName": "functional.alltypessmall"
       }
     }
@@ -2577,10 +2979,10 @@ select int_col, rank() over(order by int_col) from functional.alltypesagg
       "edgeType": "PREDICATE"
     }
   ],
-  "queryId": "254e0097e54345b3:17adb7a400000000",
-  "user": "bharath",
+  "queryId": "ae44be2f241c986d:31c15abf00000000",
+  "user": "anurag",
   "queryText": "select a.tinyint_col, a.int_col, count(a.double_col)   over(partition by a.tinyint_col order by a.int_col desc rows between 1 preceding and 1 following) from functional.alltypes a inner join functional.alltypessmall b on a.id = b.id order by a.tinyint_col, a.int_col",
-  "endTime": 1568097555
+  "endTime": 1571508566
 }
 ---- QUERY
 select a.tinyint_col, a.int_col, count(a.double_col)
@@ -2591,7 +2993,7 @@ order by a.tinyint_col, a.int_col
 ---- LINEAGE
 {
   "hash": "7bda479e44e923018a8e83435a4e7567",
-  "timestamp": 1568097560,
+  "timestamp": 1571508571,
   "vertices": [
     {
       "vertexType": "COLUMN",
@@ -2603,7 +3005,7 @@ order by a.tinyint_col, a.int_col
       "vertexId": "functional.alltypes.double_col",
       "id": 1,
       "metadata": {
-        "tableCreateTime": 1568093675,
+        "tableCreateTime": 1571175281,
         "tableName": "functional.alltypes"
       }
     },
@@ -2617,7 +3019,7 @@ order by a.tinyint_col, a.int_col
       "vertexId": "functional.alltypes.int_col",
       "id": 3,
       "metadata": {
-        "tableCreateTime": 1568093675,
+        "tableCreateTime": 1571175281,
         "tableName": "functional.alltypes"
       }
     },
@@ -2631,7 +3033,7 @@ order by a.tinyint_col, a.int_col
       "vertexId": "functional.alltypes.bigint_col",
       "id": 5,
       "metadata": {
-        "tableCreateTime": 1568093675,
+        "tableCreateTime": 1571175281,
         "tableName": "functional.alltypes"
       }
     },
@@ -2640,7 +3042,7 @@ order by a.tinyint_col, a.int_col
       "vertexId": "functional.alltypes.bool_col",
       "id": 6,
       "metadata": {
-        "tableCreateTime": 1568093675,
+        "tableCreateTime": 1571175281,
         "tableName": "functional.alltypes"
       }
     },
@@ -2723,10 +3125,10 @@ order by a.tinyint_col, a.int_col
       "edgeType": "PROJECTION"
     }
   ],
-  "queryId": "bb4227a0b4b7f483:759587c600000000",
-  "user": "bharath",
+  "queryId": "054bea589253d94c:82fb1bae00000000",
+  "user": "anurag",
   "queryText": "with v2 as   (select    double_col,    count(int_col) over() a,    sum(int_col + bigint_col) over(partition by bool_col) b    from      (select * from functional.alltypes) v1) select double_col, a, b, a + b, double_col + a from v2 order by 2, 3, 4",
-  "endTime": 1568097560
+  "endTime": 1571508571
 }
 ---- QUERY
 with v2 as
@@ -2742,7 +3144,7 @@ order by 2, 3, 4
 ---- LINEAGE
 {
   "hash": "f91d8724a1537af46652415e14f0067e",
-  "timestamp": 1568097565,
+  "timestamp": 1571508576,
   "vertices": [
     {
       "vertexType": "COLUMN",
@@ -2754,7 +3156,7 @@ order by 2, 3, 4
       "vertexId": "functional.alltypes.double_col",
       "id": 1,
       "metadata": {
-        "tableCreateTime": 1568093675,
+        "tableCreateTime": 1571175281,
         "tableName": "functional.alltypes"
       }
     },
@@ -2768,7 +3170,7 @@ order by 2, 3, 4
       "vertexId": "functional.alltypes.int_col",
       "id": 3,
       "metadata": {
-        "tableCreateTime": 1568093675,
+        "tableCreateTime": 1571175281,
         "tableName": "functional.alltypes"
       }
     },
@@ -2782,7 +3184,7 @@ order by 2, 3, 4
       "vertexId": "functional.alltypes.bigint_col",
       "id": 5,
       "metadata": {
-        "tableCreateTime": 1568093675,
+        "tableCreateTime": 1571175281,
         "tableName": "functional.alltypes"
       }
     },
@@ -2791,7 +3193,7 @@ order by 2, 3, 4
       "vertexId": "functional.alltypes.bool_col",
       "id": 6,
       "metadata": {
-        "tableCreateTime": 1568093675,
+        "tableCreateTime": 1571175281,
         "tableName": "functional.alltypes"
       }
     },
@@ -2874,10 +3276,10 @@ order by 2, 3, 4
       "edgeType": "PROJECTION"
     }
   ],
-  "queryId": "e349f417ef593b44:f75a453900000000",
-  "user": "bharath",
+  "queryId": "a942e08210071938:5a00a1e800000000",
+  "user": "anurag",
   "queryText": "select double_col, a, b, a + b, double_col + a from   (select    double_col,    count(int_col) over() a,    sum(int_col + bigint_col) over(partition by bool_col) b    from      (select * from functional.alltypes) v1) v2 order by 2, 3, 4",
-  "endTime": 1568097565
+  "endTime": 1571508576
 }
 ---- QUERY
 select double_col, a, b, a + b, double_col + a from
@@ -2892,7 +3294,7 @@ order by 2, 3, 4
 ---- LINEAGE
 {
   "hash": "43098e753e37a70f008726178e10dadf",
-  "timestamp": 1568097570,
+  "timestamp": 1571508581,
   "vertices": [
     {
       "vertexType": "COLUMN",
@@ -2904,7 +3306,7 @@ order by 2, 3, 4
       "vertexId": "functional.alltypes.month",
       "id": 1,
       "metadata": {
-        "tableCreateTime": 1568093675,
+        "tableCreateTime": 1571175281,
         "tableName": "functional.alltypes"
       }
     },
@@ -2918,7 +3320,7 @@ order by 2, 3, 4
       "vertexId": "functional.alltypes.year",
       "id": 3,
       "metadata": {
-        "tableCreateTime": 1568093675,
+        "tableCreateTime": 1571175281,
         "tableName": "functional.alltypes"
       }
     },
@@ -2932,7 +3334,7 @@ order by 2, 3, 4
       "vertexId": "functional.alltypessmall.int_col",
       "id": 5,
       "metadata": {
-        "tableCreateTime": 1568093682,
+        "tableCreateTime": 1571172085,
         "tableName": "functional.alltypessmall"
       }
     },
@@ -2941,7 +3343,7 @@ order by 2, 3, 4
       "vertexId": "functional.alltypessmall.month",
       "id": 6,
       "metadata": {
-        "tableCreateTime": 1568093682,
+        "tableCreateTime": 1571172085,
         "tableName": "functional.alltypessmall"
       }
     }
@@ -2996,10 +3398,10 @@ order by 2, 3, 4
       "edgeType": "PREDICATE"
     }
   ],
-  "queryId": "054c112eb283a265:317a9e3700000000",
-  "user": "bharath",
+  "queryId": "f340737f0f5a5a7c:e1f8020300000000",
+  "user": "anurag",
   "queryText": "select a.month, a.year, b.int_col, b.month from   (select year, month from functional.alltypes    union all    select year, month from functional.alltypes) a   inner join   functional.alltypessmall b   on (a.month = b.month) where b.month = 1",
-  "endTime": 1568097571
+  "endTime": 1571508582
 }
 ---- QUERY
 # Union statements
@@ -3016,7 +3418,7 @@ where b.month = 1
 ---- LINEAGE
 {
   "hash": "20cdd5a4921f1d865bcc1f8b984839ae",
-  "timestamp": 1568097576,
+  "timestamp": 1571508587,
   "vertices": [
     {
       "vertexType": "COLUMN",
@@ -3028,7 +3430,7 @@ where b.month = 1
       "vertexId": "functional.alltypessmall.int_col",
       "id": 1,
       "metadata": {
-        "tableCreateTime": 1568093682,
+        "tableCreateTime": 1571172085,
         "tableName": "functional.alltypessmall"
       }
     },
@@ -3042,7 +3444,7 @@ where b.month = 1
       "vertexId": "functional.alltypes.month",
       "id": 3,
       "metadata": {
-        "tableCreateTime": 1568093675,
+        "tableCreateTime": 1571175281,
         "tableName": "functional.alltypes"
       }
     },
@@ -3056,7 +3458,7 @@ where b.month = 1
       "vertexId": "functional.alltypes.int_col",
       "id": 5,
       "metadata": {
-        "tableCreateTime": 1568093675,
+        "tableCreateTime": 1571175281,
         "tableName": "functional.alltypes"
       }
     },
@@ -3065,7 +3467,7 @@ where b.month = 1
       "vertexId": "functional.alltypessmall.month",
       "id": 6,
       "metadata": {
-        "tableCreateTime": 1568093682,
+        "tableCreateTime": 1571172085,
         "tableName": "functional.alltypessmall"
       }
     }
@@ -3113,10 +3515,10 @@ where b.month = 1
       "edgeType": "PREDICATE"
     }
   ],
-  "queryId": "724e262b77839d11:a27f72be00000000",
-  "user": "bharath",
+  "queryId": "3342a4c38b48f764:9fc9ef0f00000000",
+  "user": "anurag",
   "queryText": "select t1.int_col, t2.month, t2.int_col + 1 from (   select int_col, count(*)   from functional.alltypessmall   where month = 1   group by int_col   having count(*) > 1   order by count(*) desc limit 5   ) t1 join functional.alltypes t2 on (t1.int_col = t2.int_col) where month = 1",
-  "endTime": 1568097576
+  "endTime": 1571508587
 }
 ---- QUERY
 # Select statements with inline views
@@ -3135,7 +3537,7 @@ where month = 1
 ---- LINEAGE
 {
   "hash": "1b739655724090be8f3dd8bb018fe536",
-  "timestamp": 1568097581,
+  "timestamp": 1571508592,
   "vertices": [
     {
       "vertexType": "COLUMN",
@@ -3147,7 +3549,7 @@ where month = 1
       "vertexId": "functional.alltypesagg.smallint_col",
       "id": 1,
       "metadata": {
-        "tableCreateTime": 1568093721,
+        "tableCreateTime": 1571172137,
         "tableName": "functional.alltypesagg"
       }
     },
@@ -3161,7 +3563,7 @@ where month = 1
       "vertexId": "functional.alltypessmall.id",
       "id": 3,
       "metadata": {
-        "tableCreateTime": 1568093682,
+        "tableCreateTime": 1571172085,
         "tableName": "functional.alltypessmall"
       }
     },
@@ -3175,7 +3577,7 @@ where month = 1
       "vertexId": "functional.alltypesagg.tinyint_col",
       "id": 5,
       "metadata": {
-        "tableCreateTime": 1568093721,
+        "tableCreateTime": 1571172137,
         "tableName": "functional.alltypesagg"
       }
     },
@@ -3189,7 +3591,7 @@ where month = 1
       "vertexId": "functional.alltypesagg.int_col",
       "id": 7,
       "metadata": {
-        "tableCreateTime": 1568093721,
+        "tableCreateTime": 1571172137,
         "tableName": "functional.alltypesagg"
       }
     },
@@ -3203,7 +3605,7 @@ where month = 1
       "vertexId": "functional.alltypessmall.float_col",
       "id": 9,
       "metadata": {
-        "tableCreateTime": 1568093682,
+        "tableCreateTime": 1571172085,
         "tableName": "functional.alltypessmall"
       }
     },
@@ -3217,7 +3619,7 @@ where month = 1
       "vertexId": "functional.alltypessmall.string_col",
       "id": 11,
       "metadata": {
-        "tableCreateTime": 1568093682,
+        "tableCreateTime": 1571172085,
         "tableName": "functional.alltypessmall"
       }
     },
@@ -3226,7 +3628,7 @@ where month = 1
       "vertexId": "functional.alltypesagg.day",
       "id": 12,
       "metadata": {
-        "tableCreateTime": 1568093721,
+        "tableCreateTime": 1571172137,
         "tableName": "functional.alltypesagg"
       }
     },
@@ -3235,7 +3637,7 @@ where month = 1
       "vertexId": "functional.alltypesagg.month",
       "id": 13,
       "metadata": {
-        "tableCreateTime": 1568093721,
+        "tableCreateTime": 1571172137,
         "tableName": "functional.alltypesagg"
       }
     }
@@ -3326,10 +3728,10 @@ where month = 1
       "edgeType": "PREDICATE"
     }
   ],
-  "queryId": "394bc5f6a9764ca2:9cd14c5f00000000",
-  "user": "bharath",
+  "queryId": "9f4bf31f2f1c6362:cd7abf3600000000",
+  "user": "anurag",
   "queryText": "select x.smallint_col, x.id, x.tinyint_col, c.id, x.int_col, x.float_col, c.string_col from functional.alltypessmall c join (    select a.smallint_col smallint_col, a.tinyint_col tinyint_col, a.day day,            a.int_col int_col, a.month month, b.float_col float_col, b.id id    from ( select * from functional.alltypesagg a where month=1 ) a    join functional.alltypessmall b on (a.smallint_col = b.id)  ) x on (x.tinyint_col = c.id) where x.day=1 and x.int_col > 899 and x.float_col > 4.5 and c.string_col < '7' and x.int_col + x.float_col + cast(c.string_col as float) < 1000",
-  "endTime": 1568097582
+  "endTime": 1571508593
 }
 ---- QUERY
 select x.smallint_col, x.id, x.tinyint_col, c.id, x.int_col, x.float_col, c.string_col
@@ -3349,7 +3751,7 @@ and x.int_col + x.float_col + cast(c.string_col as float) < 1000
 ---- LINEAGE
 {
   "hash": "b91dd6944864a3c14ecefb697ca95459",
-  "timestamp": 1568097587,
+  "timestamp": 1571508598,
   "vertices": [
     {
       "vertexType": "COLUMN",
@@ -3361,7 +3763,7 @@ and x.int_col + x.float_col + cast(c.string_col as float) < 1000
       "vertexId": "functional_hbase.alltypessmall.int_col",
       "id": 1,
       "metadata": {
-        "tableCreateTime": 1568094418,
+        "tableCreateTime": 1571172706,
         "tableName": "functional_hbase.alltypessmall"
       }
     },
@@ -3375,7 +3777,7 @@ and x.int_col + x.float_col + cast(c.string_col as float) < 1000
       "vertexId": "functional_hbase.alltypessmall.float_col",
       "id": 3,
       "metadata": {
-        "tableCreateTime": 1568094418,
+        "tableCreateTime": 1571172706,
         "tableName": "functional_hbase.alltypessmall"
       }
     },
@@ -3426,10 +3828,10 @@ and x.int_col + x.float_col + cast(c.string_col as float) < 1000
       "edgeType": "PREDICATE"
     }
   ],
-  "queryId": "884c215284a67dd0:d3e3af0e00000000",
-  "user": "bharath",
+  "queryId": "104e75ae4804d393:0359fc8000000000",
+  "user": "anurag",
   "queryText": "select c1, c2, c3 from   (select c1, c2, c3    from      (select int_col c1, sum(float_col) c2, min(float_col) c3       from functional_hbase.alltypessmall       group by 1) x     order by 2,3 desc     limit 5 ) y",
-  "endTime": 1568097587
+  "endTime": 1571508598
 }
 ---- QUERY
 select c1, c2, c3
@@ -3446,7 +3848,7 @@ from
 ---- LINEAGE
 {
   "hash": "e59cf0e0de9015036a15df76e9e61c85",
-  "timestamp": 1568097593,
+  "timestamp": 1571508604,
   "vertices": [
     {
       "vertexType": "COLUMN",
@@ -3458,7 +3860,7 @@ from
       "vertexId": "functional_hbase.alltypessmall.int_col",
       "id": 1,
       "metadata": {
-        "tableCreateTime": 1568094418,
+        "tableCreateTime": 1571172706,
         "tableName": "functional_hbase.alltypessmall"
       }
     },
@@ -3472,7 +3874,7 @@ from
       "vertexId": "functional_hbase.alltypessmall.tinyint_col",
       "id": 3,
       "metadata": {
-        "tableCreateTime": 1568094418,
+        "tableCreateTime": 1571172706,
         "tableName": "functional_hbase.alltypessmall"
       }
     }
@@ -3508,10 +3910,10 @@ from
       "edgeType": "PREDICATE"
     }
   ],
-  "queryId": "a240cc4e302873cd:798d478b00000000",
-  "user": "bharath",
+  "queryId": "764b5090c1d0c1bd:c02d06b000000000",
+  "user": "anurag",
   "queryText": "select c1, x2 from (   select c1, min(c2) x2   from (     select c1, c2, c3     from (       select int_col c1, tinyint_col c2, min(float_col) c3       from functional_hbase.alltypessmall       group by 1, 2       order by 1,2       limit 1     ) x   ) x2   group by c1 ) y order by 2,1 desc limit 0",
-  "endTime": 1568097593
+  "endTime": 1571508604
 }
 ---- QUERY
 select c1, x2
@@ -3535,7 +3937,7 @@ limit 0
 ---- LINEAGE
 {
   "hash": "cf15009df42b7aea0f6abaeea3381b85",
-  "timestamp": 1568097598,
+  "timestamp": 1571508609,
   "vertices": [
     {
       "vertexType": "COLUMN",
@@ -3547,7 +3949,7 @@ limit 0
       "vertexId": "functional.alltypes.id",
       "id": 1,
       "metadata": {
-        "tableCreateTime": 1568093675,
+        "tableCreateTime": 1571175281,
         "tableName": "functional.alltypes"
       }
     }
@@ -3563,10 +3965,10 @@ limit 0
       "edgeType": "PROJECTION"
     }
   ],
-  "queryId": "c74a33f33cef2014:feaa957900000000",
-  "user": "bharath",
+  "queryId": "a04a81a6265056ed:0b50f93200000000",
+  "user": "anurag",
   "queryText": "select id from functional.view_view",
-  "endTime": 1568097598
+  "endTime": 1571508609
 }
 ---- QUERY
 # Views
@@ -3575,7 +3977,7 @@ select id from functional.view_view
 ---- LINEAGE
 {
   "hash": "5dc06563b62b39278652242034a2a70d",
-  "timestamp": 1568097603,
+  "timestamp": 1571508614,
   "vertices": [
     {
       "vertexType": "COLUMN",
@@ -3587,7 +3989,7 @@ select id from functional.view_view
       "vertexId": "functional.alltypes.id",
       "id": 1,
       "metadata": {
-        "tableCreateTime": 1568093675,
+        "tableCreateTime": 1571175281,
         "tableName": "functional.alltypes"
       }
     }
@@ -3612,10 +4014,10 @@ select id from functional.view_view
       "edgeType": "PREDICATE"
     }
   ],
-  "queryId": "5f46e701ed4868bc:b58d892a00000000",
-  "user": "bharath",
+  "queryId": "db445bcc830329d4:ba5c19a300000000",
+  "user": "anurag",
   "queryText": "select t.id from (select id from functional.alltypes_view) t where t.id < 10",
-  "endTime": 1568097603
+  "endTime": 1571508614
 }
 ---- QUERY
 select t.id from (select id from functional.alltypes_view) t
@@ -3624,7 +4026,7 @@ where t.id < 10
 ---- LINEAGE
 {
   "hash": "c9e45730cafb6910b54eaa5c53dc44b1",
-  "timestamp": 1568097608,
+  "timestamp": 1571508619,
   "vertices": [
     {
       "vertexType": "COLUMN",
@@ -3636,7 +4038,7 @@ where t.id < 10
       "vertexId": "functional.alltypes.string_col",
       "id": 1,
       "metadata": {
-        "tableCreateTime": 1568093675,
+        "tableCreateTime": 1571175281,
         "tableName": "functional.alltypes"
       }
     },
@@ -3650,7 +4052,7 @@ where t.id < 10
       "vertexId": "functional.alltypes.float_col",
       "id": 3,
       "metadata": {
-        "tableCreateTime": 1568093675,
+        "tableCreateTime": 1571175281,
         "tableName": "functional.alltypes"
       }
     },
@@ -3664,7 +4066,7 @@ where t.id < 10
       "vertexId": "functional.alltypes.bool_col",
       "id": 5,
       "metadata": {
-        "tableCreateTime": 1568093675,
+        "tableCreateTime": 1571175281,
         "tableName": "functional.alltypes"
       }
     },
@@ -3673,7 +4075,7 @@ where t.id < 10
       "vertexId": "functional.alltypes.id",
       "id": 6,
       "metadata": {
-        "tableCreateTime": 1568093675,
+        "tableCreateTime": 1571175281,
         "tableName": "functional.alltypes"
       }
     },
@@ -3682,7 +4084,7 @@ where t.id < 10
       "vertexId": "functional.alltypesagg.id",
       "id": 7,
       "metadata": {
-        "tableCreateTime": 1568093721,
+        "tableCreateTime": 1571172137,
         "tableName": "functional.alltypesagg"
       }
     }
@@ -3728,10 +4130,10 @@ where t.id < 10
       "edgeType": "PREDICATE"
     }
   ],
-  "queryId": "8945d3c9252417af:74f47ae100000000",
-  "user": "bharath",
+  "queryId": "c74cad8af7ffad25:6e4c9a7a00000000",
+  "user": "anurag",
   "queryText": "select string_col, float_col, bool_col from functional.alltypes where id in   (select id from functional.alltypesagg)",
-  "endTime": 1568097609
+  "endTime": 1571508620
 }
 ---- QUERY
 # Subqueries
@@ -3743,7 +4145,7 @@ where id in
 ---- LINEAGE
 {
   "hash": "1d2fa8025e9279488af58b5b8dd614d9",
-  "timestamp": 1568097614,
+  "timestamp": 1571508625,
   "vertices": [
     {
       "vertexType": "COLUMN",
@@ -3755,7 +4157,7 @@ where id in
       "vertexId": "functional.alltypesagg.tinyint_col",
       "id": 1,
       "metadata": {
-        "tableCreateTime": 1568093721,
+        "tableCreateTime": 1571172137,
         "tableName": "functional.alltypesagg"
       }
     },
@@ -3764,7 +4166,7 @@ where id in
       "vertexId": "functional.alltypestiny.tinyint_col",
       "id": 2,
       "metadata": {
-        "tableCreateTime": 1568093689,
+        "tableCreateTime": 1571172091,
         "tableName": "functional.alltypestiny"
       }
     }
@@ -3788,10 +4190,10 @@ where id in
       "edgeType": "PREDICATE"
     }
   ],
-  "queryId": "004853208b5ec985:38f0fe7a00000000",
-  "user": "bharath",
+  "queryId": "564e0392a35a1590:c102f3f900000000",
+  "user": "anurag",
   "queryText": "select 1 from functional.alltypesagg a where exists   (select id, count(int_col) over (partition by bool_col)    from functional.alltypestiny b    where a.tinyint_col = b.tinyint_col    group by id, int_col, bool_col) and tinyint_col < 10",
-  "endTime": 1568097614
+  "endTime": 1571508625
 }
 ---- QUERY
 select 1
@@ -3806,7 +4208,7 @@ and tinyint_col < 10
 ---- LINEAGE
 {
   "hash": "7e678cde53c9d120a6f79134551a8c41",
-  "timestamp": 1568097619,
+  "timestamp": 1571508630,
   "vertices": [
     {
       "vertexType": "COLUMN",
@@ -3818,7 +4220,7 @@ and tinyint_col < 10
       "vertexId": "functional.alltypes.int_col",
       "id": 1,
       "metadata": {
-        "tableCreateTime": 1568093675,
+        "tableCreateTime": 1571175281,
         "tableName": "functional.alltypes"
       }
     },
@@ -3832,7 +4234,7 @@ and tinyint_col < 10
       "vertexId": "functional.alltypes.tinyint_col",
       "id": 3,
       "metadata": {
-        "tableCreateTime": 1568093675,
+        "tableCreateTime": 1571175281,
         "tableName": "functional.alltypes"
       }
     },
@@ -3841,7 +4243,7 @@ and tinyint_col < 10
       "vertexId": "functional.alltypes.bigint_col",
       "id": 4,
       "metadata": {
-        "tableCreateTime": 1568093675,
+        "tableCreateTime": 1571175281,
         "tableName": "functional.alltypes"
       }
     },
@@ -3850,7 +4252,7 @@ and tinyint_col < 10
       "vertexId": "functional.alltypesagg.bool_col",
       "id": 5,
       "metadata": {
-        "tableCreateTime": 1568093721,
+        "tableCreateTime": 1571172137,
         "tableName": "functional.alltypesagg"
       }
     },
@@ -3859,7 +4261,7 @@ and tinyint_col < 10
       "vertexId": "functional.alltypesagg.int_col",
       "id": 6,
       "metadata": {
-        "tableCreateTime": 1568093721,
+        "tableCreateTime": 1571172137,
         "tableName": "functional.alltypesagg"
       }
     }
@@ -3897,10 +4299,10 @@ and tinyint_col < 10
       "edgeType": "PREDICATE"
     }
   ],
-  "queryId": "5c45bae6daa5b536:110be36c00000000",
-  "user": "bharath",
+  "queryId": "0e4439be9321f134:66210f4300000000",
+  "user": "anurag",
   "queryText": "select int_col + 1, tinyint_col - 1 from functional.alltypes a where a.int_col <   (select max(int_col) from functional.alltypesagg g where g.bool_col = true) and a.bigint_col > 10",
-  "endTime": 1568097619
+  "endTime": 1571508630
 }
 ---- QUERY
 select int_col + 1, tinyint_col - 1
@@ -3912,7 +4314,7 @@ and a.bigint_col > 10
 ---- LINEAGE
 {
   "hash": "a7ab58d90540f28a8dfd69703632ad7a",
-  "timestamp": 1568097624,
+  "timestamp": 1571508636,
   "vertices": [
     {
       "vertexType": "COLUMN",
@@ -3924,7 +4326,7 @@ and a.bigint_col > 10
       "vertexId": "functional.alltypes.int_col",
       "id": 1,
       "metadata": {
-        "tableCreateTime": 1568093675,
+        "tableCreateTime": 1571175281,
         "tableName": "functional.alltypes"
       }
     },
@@ -3938,7 +4340,7 @@ and a.bigint_col > 10
       "vertexId": "functional.alltypes.bigint_col",
       "id": 3,
       "metadata": {
-        "tableCreateTime": 1568093675,
+        "tableCreateTime": 1571175281,
         "tableName": "functional.alltypes"
       }
     }
@@ -3963,10 +4365,10 @@ and a.bigint_col > 10
       "edgeType": "PROJECTION"
     }
   ],
-  "queryId": "214d40171885157a:b422c0b100000000",
-  "user": "bharath",
+  "queryId": "30433ec4beec363a:3d8db54f00000000",
+  "user": "anurag",
   "queryText": "with t as (select int_col x, bigint_col y from functional.alltypes) select x, y from t",
-  "endTime": 1568097624
+  "endTime": 1571508636
 }
 ---- QUERY
 # With clause
@@ -3975,14 +4377,14 @@ with t as (select int_col x, bigint_col y from functional.alltypes) select x, y 
 ---- LINEAGE
 {
   "hash": "59c56529d835660a4f776c0edc60ecc1",
-  "timestamp": 1568097629,
+  "timestamp": 1571508641,
   "vertices": [
     {
       "vertexType": "COLUMN",
       "vertexId": "year",
       "id": 0,
       "metadata": {
-        "tableCreateTime": 1568097480,
+        "tableCreateTime": 1571508466,
         "tableName": "lineage_test_db.alltypesinsert"
       }
     },
@@ -3991,7 +4393,7 @@ with t as (select int_col x, bigint_col y from functional.alltypes) select x, y 
       "vertexId": "functional.alltypestiny.year",
       "id": 1,
       "metadata": {
-        "tableCreateTime": 1568093689,
+        "tableCreateTime": 1571172091,
         "tableName": "functional.alltypestiny"
       }
     },
@@ -4000,7 +4402,7 @@ with t as (select int_col x, bigint_col y from functional.alltypes) select x, y 
       "vertexId": "month",
       "id": 2,
       "metadata": {
-        "tableCreateTime": 1568097480,
+        "tableCreateTime": 1571508466,
         "tableName": "lineage_test_db.alltypesinsert"
       }
     },
@@ -4009,7 +4411,7 @@ with t as (select int_col x, bigint_col y from functional.alltypes) select x, y 
       "vertexId": "functional.alltypestiny.month",
       "id": 3,
       "metadata": {
-        "tableCreateTime": 1568093689,
+        "tableCreateTime": 1571172091,
         "tableName": "functional.alltypestiny"
       }
     },
@@ -4018,7 +4420,7 @@ with t as (select int_col x, bigint_col y from functional.alltypes) select x, y 
       "vertexId": "id",
       "id": 4,
       "metadata": {
-        "tableCreateTime": 1568097480,
+        "tableCreateTime": 1571508466,
         "tableName": "lineage_test_db.alltypesinsert"
       }
     },
@@ -4027,7 +4429,7 @@ with t as (select int_col x, bigint_col y from functional.alltypes) select x, y 
       "vertexId": "functional.alltypestiny.id",
       "id": 5,
       "metadata": {
-        "tableCreateTime": 1568093689,
+        "tableCreateTime": 1571172091,
         "tableName": "functional.alltypestiny"
       }
     },
@@ -4036,7 +4438,7 @@ with t as (select int_col x, bigint_col y from functional.alltypes) select x, y 
       "vertexId": "bool_col",
       "id": 6,
       "metadata": {
-        "tableCreateTime": 1568097480,
+        "tableCreateTime": 1571508466,
         "tableName": "lineage_test_db.alltypesinsert"
       }
     },
@@ -4045,7 +4447,7 @@ with t as (select int_col x, bigint_col y from functional.alltypes) select x, y 
       "vertexId": "tinyint_col",
       "id": 7,
       "metadata": {
-        "tableCreateTime": 1568097480,
+        "tableCreateTime": 1571508466,
         "tableName": "lineage_test_db.alltypesinsert"
       }
     },
@@ -4054,7 +4456,7 @@ with t as (select int_col x, bigint_col y from functional.alltypes) select x, y 
       "vertexId": "smallint_col",
       "id": 8,
       "metadata": {
-        "tableCreateTime": 1568097480,
+        "tableCreateTime": 1571508466,
         "tableName": "lineage_test_db.alltypesinsert"
       }
     },
@@ -4063,7 +4465,7 @@ with t as (select int_col x, bigint_col y from functional.alltypes) select x, y 
       "vertexId": "int_col",
       "id": 9,
       "metadata": {
-        "tableCreateTime": 1568097480,
+        "tableCreateTime": 1571508466,
         "tableName": "lineage_test_db.alltypesinsert"
       }
     },
@@ -4072,7 +4474,7 @@ with t as (select int_col x, bigint_col y from functional.alltypes) select x, y 
       "vertexId": "functional.alltypestiny.int_col",
       "id": 10,
       "metadata": {
-        "tableCreateTime": 1568093689,
+        "tableCreateTime": 1571172091,
         "tableName": "functional.alltypestiny"
       }
     },
@@ -4081,7 +4483,7 @@ with t as (select int_col x, bigint_col y from functional.alltypes) select x, y 
       "vertexId": "bigint_col",
       "id": 11,
       "metadata": {
-        "tableCreateTime": 1568097480,
+        "tableCreateTime": 1571508466,
         "tableName": "lineage_test_db.alltypesinsert"
       }
     },
@@ -4090,7 +4492,7 @@ with t as (select int_col x, bigint_col y from functional.alltypes) select x, y 
       "vertexId": "float_col",
       "id": 12,
       "metadata": {
-        "tableCreateTime": 1568097480,
+        "tableCreateTime": 1571508466,
         "tableName": "lineage_test_db.alltypesinsert"
       }
     },
@@ -4099,7 +4501,7 @@ with t as (select int_col x, bigint_col y from functional.alltypes) select x, y 
       "vertexId": "double_col",
       "id": 13,
       "metadata": {
-        "tableCreateTime": 1568097480,
+        "tableCreateTime": 1571508466,
         "tableName": "lineage_test_db.alltypesinsert"
       }
     },
@@ -4108,7 +4510,7 @@ with t as (select int_col x, bigint_col y from functional.alltypes) select x, y 
       "vertexId": "date_string_col",
       "id": 14,
       "metadata": {
-        "tableCreateTime": 1568097480,
+        "tableCreateTime": 1571508466,
         "tableName": "lineage_test_db.alltypesinsert"
       }
     },
@@ -4117,7 +4519,7 @@ with t as (select int_col x, bigint_col y from functional.alltypes) select x, y 
       "vertexId": "string_col",
       "id": 15,
       "metadata": {
-        "tableCreateTime": 1568097480,
+        "tableCreateTime": 1571508466,
         "tableName": "lineage_test_db.alltypesinsert"
       }
     },
@@ -4126,7 +4528,7 @@ with t as (select int_col x, bigint_col y from functional.alltypes) select x, y 
       "vertexId": "functional.alltypestiny.string_col",
       "id": 16,
       "metadata": {
-        "tableCreateTime": 1568093689,
+        "tableCreateTime": 1571172091,
         "tableName": "functional.alltypestiny"
       }
     },
@@ -4135,7 +4537,7 @@ with t as (select int_col x, bigint_col y from functional.alltypes) select x, y 
       "vertexId": "timestamp_col",
       "id": 17,
       "metadata": {
-        "tableCreateTime": 1568097480,
+        "tableCreateTime": 1571508466,
         "tableName": "lineage_test_db.alltypesinsert"
       }
     }
@@ -4243,10 +4645,10 @@ with t as (select int_col x, bigint_col y from functional.alltypes) select x, y 
       "edgeType": "PROJECTION"
     }
   ],
-  "queryId": "1f4b1f66d4cc207e:f0435aee00000000",
-  "user": "bharath",
+  "queryId": "0d45f5c5a8a417ab:85d11ec200000000",
+  "user": "anurag",
   "queryText": "with t1 as (select * from functional.alltypestiny) insert into lineage_test_db.alltypesinsert (id, int_col, string_col) partition(year, month) select id, int_col, string_col, year, month from t1",
-  "endTime": 1568097630
+  "endTime": 1571508641
 }
 ---- QUERY
 with t1 as (select * from functional.alltypestiny)
@@ -4256,7 +4658,7 @@ select id, int_col, string_col, year, month from t1
 ---- LINEAGE
 {
   "hash": "36f0326d13fc4d2bd03196549624a15a",
-  "timestamp": 1568097635,
+  "timestamp": 1571508646,
   "vertices": [
     {
       "vertexType": "COLUMN",
@@ -4268,7 +4670,7 @@ select id, int_col, string_col, year, month from t1
       "vertexId": "functional.alltypes.id",
       "id": 1,
       "metadata": {
-        "tableCreateTime": 1568093675,
+        "tableCreateTime": 1571175281,
         "tableName": "functional.alltypes"
       }
     },
@@ -4277,7 +4679,7 @@ select id, int_col, string_col, year, month from t1
       "vertexId": "functional.alltypes.bigint_col",
       "id": 2,
       "metadata": {
-        "tableCreateTime": 1568093675,
+        "tableCreateTime": 1571175281,
         "tableName": "functional.alltypes"
       }
     },
@@ -4286,7 +4688,7 @@ select id, int_col, string_col, year, month from t1
       "vertexId": "functional.alltypes.bool_col",
       "id": 3,
       "metadata": {
-        "tableCreateTime": 1568093675,
+        "tableCreateTime": 1571175281,
         "tableName": "functional.alltypes"
       }
     },
@@ -4295,7 +4697,7 @@ select id, int_col, string_col, year, month from t1
       "vertexId": "functional.alltypes.int_col",
       "id": 4,
       "metadata": {
-        "tableCreateTime": 1568093675,
+        "tableCreateTime": 1571175281,
         "tableName": "functional.alltypes"
       }
     },
@@ -4304,7 +4706,7 @@ select id, int_col, string_col, year, month from t1
       "vertexId": "functional.alltypes.string_col",
       "id": 5,
       "metadata": {
-        "tableCreateTime": 1568093675,
+        "tableCreateTime": 1571175281,
         "tableName": "functional.alltypes"
       }
     },
@@ -4313,7 +4715,7 @@ select id, int_col, string_col, year, month from t1
       "vertexId": "functional.alltypes.tinyint_col",
       "id": 6,
       "metadata": {
-        "tableCreateTime": 1568093675,
+        "tableCreateTime": 1571175281,
         "tableName": "functional.alltypes"
       }
     }
@@ -4343,10 +4745,10 @@ select id, int_col, string_col, year, month from t1
       "edgeType": "PREDICATE"
     }
   ],
-  "queryId": "2a4397fae87ec604:390fe7d600000000",
-  "user": "bharath",
+  "queryId": "dc4337031d719a94:9eddd4c600000000",
+  "user": "anurag",
   "queryText": "select lead(a) over (partition by b order by c) from   (select lead(id) over (partition by int_col order by bigint_col) as a,    max(id) over (partition by tinyint_col order by int_col) as b,    min(int_col) over (partition by string_col order by bool_col) as c    from functional.alltypes) v",
-  "endTime": 1568097636
+  "endTime": 1571508647
 }
 ---- QUERY
 # Nested analytic functions
@@ -4360,14 +4762,14 @@ from
 ---- LINEAGE
 {
   "hash": "f6683b020d20b90902603bbe7f6635e8",
-  "timestamp": 1568097641,
+  "timestamp": 1571508652,
   "vertices": [
     {
       "vertexType": "COLUMN",
       "vertexId": "id",
       "id": 0,
       "metadata": {
-        "tableCreateTime": 1568097641,
+        "tableCreateTime": 1571508652,
         "tableName": "lineage_test_db.lineage_test_view1"
       }
     },
@@ -4376,7 +4778,7 @@ from
       "vertexId": "functional.alltypestiny.id",
       "id": 1,
       "metadata": {
-        "tableCreateTime": 1568093689,
+        "tableCreateTime": 1571172091,
         "tableName": "functional.alltypestiny"
       }
     }
@@ -4392,10 +4794,10 @@ from
       "edgeType": "PROJECTION"
     }
   ],
-  "queryId": "a14c35049f6dde68:643393e500000000",
-  "user": "bharath",
+  "queryId": "b649619dd79a7dab:d67c9f4900000000",
+  "user": "anurag",
   "queryText": "create view lineage_test_db.lineage_test_view1 as select id from functional.alltypestiny",
-  "endTime": 1568097641
+  "endTime": 1571508652
 }
 ---- QUERY
 # Create view statement (IMPALA-4219)
@@ -4404,14 +4806,14 @@ create view lineage_test_db.lineage_test_view1 as select id from functional.allt
 ---- LINEAGE
 {
   "hash": "d1217e5cde0f930466e6ccfe7c261a53",
-  "timestamp": 1568097646,
+  "timestamp": 1571508657,
   "vertices": [
     {
       "vertexType": "COLUMN",
       "vertexId": "a",
       "id": 0,
       "metadata": {
-        "tableCreateTime": 1568097646,
+        "tableCreateTime": 1571508657,
         "tableName": "lineage_test_db.lineage_test_view2"
       }
     },
@@ -4420,7 +4822,7 @@ create view lineage_test_db.lineage_test_view1 as select id from functional.allt
       "vertexId": "functional_hbase.alltypessmall.int_col",
       "id": 1,
       "metadata": {
-        "tableCreateTime": 1568094418,
+        "tableCreateTime": 1571172706,
         "tableName": "functional_hbase.alltypessmall"
       }
     },
@@ -4429,7 +4831,7 @@ create view lineage_test_db.lineage_test_view1 as select id from functional.allt
       "vertexId": "b",
       "id": 2,
       "metadata": {
-        "tableCreateTime": 1568097646,
+        "tableCreateTime": 1571508657,
         "tableName": "lineage_test_db.lineage_test_view2"
       }
     },
@@ -4438,7 +4840,7 @@ create view lineage_test_db.lineage_test_view1 as select id from functional.allt
       "vertexId": "functional_hbase.alltypessmall.tinyint_col",
       "id": 3,
       "metadata": {
-        "tableCreateTime": 1568094418,
+        "tableCreateTime": 1571172706,
         "tableName": "functional_hbase.alltypessmall"
       }
     }
@@ -4474,10 +4876,10 @@ create view lineage_test_db.lineage_test_view1 as select id from functional.allt
       "edgeType": "PREDICATE"
     }
   ],
-  "queryId": "774c6a2b13d69002:ee0b793e00000000",
-  "user": "bharath",
+  "queryId": "f74ccc4de79bace3:ea11d35600000000",
+  "user": "anurag",
   "queryText": "create view lineage_test_db.lineage_test_view2 (a, b) as select c1, x2 from (   select c1, min(c2) x2   from (     select c1, c2, c3     from (       select int_col c1, tinyint_col c2, min(float_col) c3       from functional_hbase.alltypessmall       group by 1, 2       order by 1,2       limit 1     ) x   ) x2   group by c1 ) y order by 2,1 desc limit 0",
-  "endTime": 1568097646
+  "endTime": 1571508658
 }
 ---- QUERY
 # Create view with nested inline views (IMPALA-4219)
@@ -4502,14 +4904,14 @@ limit 0
 ---- LINEAGE
 {
   "hash": "7fbb84397e7103b32ee785085027ffcf",
-  "timestamp": 1568097651,
+  "timestamp": 1571508663,
   "vertices": [
     {
       "vertexType": "COLUMN",
       "vertexId": "a1",
       "id": 0,
       "metadata": {
-        "tableCreateTime": 1568097651,
+        "tableCreateTime": 1571508663,
         "tableName": "lineage_test_db.lineage_test_view3"
       }
     },
@@ -4518,7 +4920,7 @@ limit 0
       "vertexId": "functional.alltypesagg.smallint_col",
       "id": 1,
       "metadata": {
-        "tableCreateTime": 1568093721,
+        "tableCreateTime": 1571172137,
         "tableName": "functional.alltypesagg"
       }
     },
@@ -4527,7 +4929,7 @@ limit 0
       "vertexId": "a2",
       "id": 2,
       "metadata": {
-        "tableCreateTime": 1568097651,
+        "tableCreateTime": 1571508663,
         "tableName": "lineage_test_db.lineage_test_view3"
       }
     },
@@ -4536,7 +4938,7 @@ limit 0
       "vertexId": "functional.alltypessmall.id",
       "id": 3,
       "metadata": {
-        "tableCreateTime": 1568093682,
+        "tableCreateTime": 1571172085,
         "tableName": "functional.alltypessmall"
       }
     },
@@ -4545,7 +4947,7 @@ limit 0
       "vertexId": "a3",
       "id": 4,
       "metadata": {
-        "tableCreateTime": 1568097651,
+        "tableCreateTime": 1571508663,
         "tableName": "lineage_test_db.lineage_test_view3"
       }
     },
@@ -4554,7 +4956,7 @@ limit 0
       "vertexId": "functional.alltypesagg.tinyint_col",
       "id": 5,
       "metadata": {
-        "tableCreateTime": 1568093721,
+        "tableCreateTime": 1571172137,
         "tableName": "functional.alltypesagg"
       }
     },
@@ -4563,7 +4965,7 @@ limit 0
       "vertexId": "a4",
       "id": 6,
       "metadata": {
-        "tableCreateTime": 1568097651,
+        "tableCreateTime": 1571508663,
         "tableName": "lineage_test_db.lineage_test_view3"
       }
     },
@@ -4572,7 +4974,7 @@ limit 0
       "vertexId": "a5",
       "id": 7,
       "metadata": {
-        "tableCreateTime": 1568097651,
+        "tableCreateTime": 1571508663,
         "tableName": "lineage_test_db.lineage_test_view3"
       }
     },
@@ -4581,7 +4983,7 @@ limit 0
       "vertexId": "functional.alltypesagg.int_col",
       "id": 8,
       "metadata": {
-        "tableCreateTime": 1568093721,
+        "tableCreateTime": 1571172137,
         "tableName": "functional.alltypesagg"
       }
     },
@@ -4590,7 +4992,7 @@ limit 0
       "vertexId": "a6",
       "id": 9,
       "metadata": {
-        "tableCreateTime": 1568097651,
+        "tableCreateTime": 1571508663,
         "tableName": "lineage_test_db.lineage_test_view3"
       }
     },
@@ -4599,7 +5001,7 @@ limit 0
       "vertexId": "functional.alltypessmall.float_col",
       "id": 10,
       "metadata": {
-        "tableCreateTime": 1568093682,
+        "tableCreateTime": 1571172085,
         "tableName": "functional.alltypessmall"
       }
     },
@@ -4608,7 +5010,7 @@ limit 0
       "vertexId": "a7",
       "id": 11,
       "metadata": {
-        "tableCreateTime": 1568097651,
+        "tableCreateTime": 1571508663,
         "tableName": "lineage_test_db.lineage_test_view3"
       }
     },
@@ -4617,7 +5019,7 @@ limit 0
       "vertexId": "functional.alltypessmall.string_col",
       "id": 12,
       "metadata": {
-        "tableCreateTime": 1568093682,
+        "tableCreateTime": 1571172085,
         "tableName": "functional.alltypessmall"
       }
     },
@@ -4626,7 +5028,7 @@ limit 0
       "vertexId": "functional.alltypesagg.day",
       "id": 13,
       "metadata": {
-        "tableCreateTime": 1568093721,
+        "tableCreateTime": 1571172137,
         "tableName": "functional.alltypesagg"
       }
     },
@@ -4635,7 +5037,7 @@ limit 0
       "vertexId": "functional.alltypesagg.month",
       "id": 14,
       "metadata": {
-        "tableCreateTime": 1568093721,
+        "tableCreateTime": 1571172137,
         "tableName": "functional.alltypesagg"
       }
     }
@@ -4727,10 +5129,10 @@ limit 0
       "edgeType": "PREDICATE"
     }
   ],
-  "queryId": "bb458a67da0ec51a:8bacb37800000000",
-  "user": "bharath",
+  "queryId": "9341dd951689a79a:dbf11b6400000000",
+  "user": "anurag",
   "queryText": "create view lineage_test_db.lineage_test_view3 (a1, a2, a3, a4, a5, a6, a7) as   select x.smallint_col, x.id, x.tinyint_col, c.id, x.int_col, x.float_col, c.string_col   from functional.alltypessmall c   join (      select a.smallint_col smallint_col, a.tinyint_col tinyint_col, a.day day,            a.int_col int_col, a.month month, b.float_col float_col, b.id id      from ( select * from functional.alltypesagg a where month=1 ) a      join functional.alltypessmall b on (a.smallint_col = b.id)    ) x on (x.tinyint_col = c.id)   where x.day=1   and x.int_col > 899   and x.float_col > 4.5   and c.string_col < '7'   and x.int_col + x.float_col + cast(c.string_col as float) < 1000",
-  "endTime": 1568097652
+  "endTime": 1571508663
 }
 ---- QUERY
 # Create view with complex select statement (IMPALA-4219)
@@ -4752,14 +5154,14 @@ create view lineage_test_db.lineage_test_view3 (a1, a2, a3, a4, a5, a6, a7) as
 ---- LINEAGE
 {
   "hash": "80ed48e4969ac7e03d08d5eb6600f4bf",
-  "timestamp": 1568097657,
+  "timestamp": 1571508668,
   "vertices": [
     {
       "vertexType": "COLUMN",
       "vertexId": "_c0",
       "id": 0,
       "metadata": {
-        "tableCreateTime": 1568097657,
+        "tableCreateTime": 1571508668,
         "tableName": "lineage_test_db.lineage_test_view4"
       }
     },
@@ -4768,7 +5170,7 @@ create view lineage_test_db.lineage_test_view3 (a1, a2, a3, a4, a5, a6, a7) as
       "vertexId": "functional.alltypes.tinyint_col",
       "id": 1,
       "metadata": {
-        "tableCreateTime": 1568093675,
+        "tableCreateTime": 1571175281,
         "tableName": "functional.alltypes"
       }
     },
@@ -4777,7 +5179,7 @@ create view lineage_test_db.lineage_test_view3 (a1, a2, a3, a4, a5, a6, a7) as
       "vertexId": "functional.alltypes.id",
       "id": 2,
       "metadata": {
-        "tableCreateTime": 1568093675,
+        "tableCreateTime": 1571175281,
         "tableName": "functional.alltypes"
       }
     },
@@ -4786,7 +5188,7 @@ create view lineage_test_db.lineage_test_view3 (a1, a2, a3, a4, a5, a6, a7) as
       "vertexId": "functional.alltypes.smallint_col",
       "id": 3,
       "metadata": {
-        "tableCreateTime": 1568093675,
+        "tableCreateTime": 1571175281,
         "tableName": "functional.alltypes"
       }
     },
@@ -4795,7 +5197,7 @@ create view lineage_test_db.lineage_test_view3 (a1, a2, a3, a4, a5, a6, a7) as
       "vertexId": "_c1",
       "id": 4,
       "metadata": {
-        "tableCreateTime": 1568097657,
+        "tableCreateTime": 1571508668,
         "tableName": "lineage_test_db.lineage_test_view4"
       }
     },
@@ -4804,7 +5206,7 @@ create view lineage_test_db.lineage_test_view3 (a1, a2, a3, a4, a5, a6, a7) as
       "vertexId": "functional.alltypessmall.string_col",
       "id": 5,
       "metadata": {
-        "tableCreateTime": 1568093682,
+        "tableCreateTime": 1571172085,
         "tableName": "functional.alltypessmall"
       }
     },
@@ -4813,7 +5215,7 @@ create view lineage_test_db.lineage_test_view3 (a1, a2, a3, a4, a5, a6, a7) as
       "vertexId": "timestamp_col",
       "id": 6,
       "metadata": {
-        "tableCreateTime": 1568097657,
+        "tableCreateTime": 1571508668,
         "tableName": "lineage_test_db.lineage_test_view4"
       }
     },
@@ -4822,7 +5224,7 @@ create view lineage_test_db.lineage_test_view3 (a1, a2, a3, a4, a5, a6, a7) as
       "vertexId": "functional.alltypessmall.timestamp_col",
       "id": 7,
       "metadata": {
-        "tableCreateTime": 1568093682,
+        "tableCreateTime": 1571172085,
         "tableName": "functional.alltypessmall"
       }
     },
@@ -4831,7 +5233,7 @@ create view lineage_test_db.lineage_test_view3 (a1, a2, a3, a4, a5, a6, a7) as
       "vertexId": "functional.alltypes.int_col",
       "id": 8,
       "metadata": {
-        "tableCreateTime": 1568093675,
+        "tableCreateTime": 1571175281,
         "tableName": "functional.alltypes"
       }
     },
@@ -4840,7 +5242,7 @@ create view lineage_test_db.lineage_test_view3 (a1, a2, a3, a4, a5, a6, a7) as
       "vertexId": "functional.alltypes.year",
       "id": 9,
       "metadata": {
-        "tableCreateTime": 1568093675,
+        "tableCreateTime": 1571175281,
         "tableName": "functional.alltypes"
       }
     },
@@ -4849,7 +5251,7 @@ create view lineage_test_db.lineage_test_view3 (a1, a2, a3, a4, a5, a6, a7) as
       "vertexId": "functional.alltypessmall.bigint_col",
       "id": 10,
       "metadata": {
-        "tableCreateTime": 1568093682,
+        "tableCreateTime": 1571172085,
         "tableName": "functional.alltypessmall"
       }
     },
@@ -4858,7 +5260,7 @@ create view lineage_test_db.lineage_test_view3 (a1, a2, a3, a4, a5, a6, a7) as
       "vertexId": "functional.alltypessmall.float_col",
       "id": 11,
       "metadata": {
-        "tableCreateTime": 1568093682,
+        "tableCreateTime": 1571172085,
         "tableName": "functional.alltypessmall"
       }
     },
@@ -4867,7 +5269,7 @@ create view lineage_test_db.lineage_test_view3 (a1, a2, a3, a4, a5, a6, a7) as
       "vertexId": "functional.alltypessmall.id",
       "id": 12,
       "metadata": {
-        "tableCreateTime": 1568093682,
+        "tableCreateTime": 1571172085,
         "tableName": "functional.alltypessmall"
       }
     }
@@ -4931,10 +5333,10 @@ create view lineage_test_db.lineage_test_view3 (a1, a2, a3, a4, a5, a6, a7) as
       "edgeType": "PREDICATE"
     }
   ],
-  "queryId": "55492fe4dc145adc:7c69c17b00000000",
-  "user": "bharath",
+  "queryId": "ab49fdda00d2153e:43e77eb700000000",
+  "user": "anurag",
   "queryText": "create view lineage_test_db.lineage_test_view4 as   select * from (     select sum(a.tinyint_col) over (partition by a.smallint_col order by a.id),       count(b.string_col), b.timestamp_col     from functional.alltypes a join functional.alltypessmall b on (a.id = b.id)     where a.year = 2010 and b.float_col > 0     group by a.tinyint_col, a.smallint_col, a.id, b.string_col, b.timestamp_col, b.bigint_col     having count(a.int_col) > 10     order by b.bigint_col limit 10) t",
-  "endTime": 1568097657
+  "endTime": 1571508669
 }
 ---- QUERY
 # Create view with select statement containing an analytic function (IMPALA-4219)
@@ -4951,14 +5353,14 @@ create view lineage_test_db.lineage_test_view4 as
 ---- LINEAGE
 {
   "hash": "561916b21b73cf61397e1ca9aa2fb682",
-  "timestamp": 1568097662,
+  "timestamp": 1571508674,
   "vertices": [
     {
       "vertexType": "COLUMN",
       "vertexId": "id",
       "id": 0,
       "metadata": {
-        "tableCreateTime": 1568097481,
+        "tableCreateTime": 1571508491,
         "tableName": "lineage_test_db.alltypes_view"
       }
     },
@@ -4967,7 +5369,7 @@ create view lineage_test_db.lineage_test_view4 as
       "vertexId": "functional.alltypestiny.id",
       "id": 1,
       "metadata": {
-        "tableCreateTime": 1568093689,
+        "tableCreateTime": 1571172091,
         "tableName": "functional.alltypestiny"
       }
     }
@@ -4983,10 +5385,10 @@ create view lineage_test_db.lineage_test_view4 as
       "edgeType": "PROJECTION"
     }
   ],
-  "queryId": "21456fbe86072029:b489dd3400000000",
-  "user": "bharath",
+  "queryId": "80476e74195f4624:2391cdd800000000",
+  "user": "anurag",
   "queryText": "alter view lineage_test_db.alltypes_view as select id from functional.alltypestiny",
-  "endTime": 1568097663
+  "endTime": 1571508674
 }
 ---- QUERY
 # Alter view statement (IMPALA-4219)
@@ -4995,7 +5397,7 @@ alter view lineage_test_db.alltypes_view as select id from functional.alltypesti
 ---- LINEAGE
 {
   "hash": "e771fd2a8795e5aaad3e86c266b9a039",
-  "timestamp": 1568097668,
+  "timestamp": 1571508679,
   "vertices": [
     {
       "vertexType": "COLUMN",
@@ -5007,7 +5409,7 @@ alter view lineage_test_db.alltypes_view as select id from functional.alltypesti
       "vertexId": "functional.allcomplextypes.complex_struct_col.f1",
       "id": 1,
       "metadata": {
-        "tableCreateTime": 1568093741,
+        "tableCreateTime": 1571172144,
         "tableName": "functional.allcomplextypes"
       }
     },
@@ -5016,7 +5418,7 @@ alter view lineage_test_db.alltypes_view as select id from functional.alltypesti
       "vertexId": "functional.allcomplextypes.int_struct_col.f1",
       "id": 2,
       "metadata": {
-        "tableCreateTime": 1568093741,
+        "tableCreateTime": 1571172144,
         "tableName": "functional.allcomplextypes"
       }
     },
@@ -5025,7 +5427,7 @@ alter view lineage_test_db.alltypes_view as select id from functional.alltypesti
       "vertexId": "functional.allcomplextypes.int_struct_col.f2",
       "id": 3,
       "metadata": {
-        "tableCreateTime": 1568093741,
+        "tableCreateTime": 1571172144,
         "tableName": "functional.allcomplextypes"
       }
     },
@@ -5034,7 +5436,7 @@ alter view lineage_test_db.alltypes_view as select id from functional.alltypesti
       "vertexId": "functional.allcomplextypes.nested_struct_col.f2.f12.f21",
       "id": 4,
       "metadata": {
-        "tableCreateTime": 1568093741,
+        "tableCreateTime": 1571172144,
         "tableName": "functional.allcomplextypes"
       }
     },
@@ -5043,7 +5445,7 @@ alter view lineage_test_db.alltypes_view as select id from functional.alltypesti
       "vertexId": "functional.allcomplextypes.year",
       "id": 5,
       "metadata": {
-        "tableCreateTime": 1568093741,
+        "tableCreateTime": 1571172144,
         "tableName": "functional.allcomplextypes"
       }
     }
@@ -5071,10 +5473,10 @@ alter view lineage_test_db.alltypes_view as select id from functional.alltypesti
       "edgeType": "PREDICATE"
     }
   ],
-  "queryId": "09445f3d714f391c:18975f3400000000",
-  "user": "bharath",
+  "queryId": "1e4e184fe1e92114:278af40100000000",
+  "user": "anurag",
   "queryText": "select * from (   select int_struct_col.f1 + int_struct_col.f2 x from functional.allcomplextypes   where year = 2000   order by nested_struct_col.f2.f12.f21 limit 10   union all   select sum(f1) y from     (select complex_struct_col.f1 f1 from functional.allcomplextypes      group by 1) v1) v2",
-  "endTime": 1568097668
+  "endTime": 1571508679
 }
 ---- QUERY
 # Test references to struct fields.
@@ -5090,7 +5492,7 @@ select * from (
 ---- LINEAGE
 {
   "hash": "63df7e3a395b2f9d56928ccd655edef5",
-  "timestamp": 1568097673,
+  "timestamp": 1571508684,
   "vertices": [
     {
       "vertexType": "COLUMN",
@@ -5102,7 +5504,7 @@ select * from (
       "vertexId": "functional.allcomplextypes.int_array_col.item",
       "id": 1,
       "metadata": {
-        "tableCreateTime": 1568093741,
+        "tableCreateTime": 1571172144,
         "tableName": "functional.allcomplextypes"
       }
     },
@@ -5116,7 +5518,7 @@ select * from (
       "vertexId": "functional.allcomplextypes.struct_map_col.key",
       "id": 3,
       "metadata": {
-        "tableCreateTime": 1568093741,
+        "tableCreateTime": 1571172144,
         "tableName": "functional.allcomplextypes"
       }
     },
@@ -5130,7 +5532,7 @@ select * from (
       "vertexId": "functional.allcomplextypes.struct_map_col.value.f1",
       "id": 5,
       "metadata": {
-        "tableCreateTime": 1568093741,
+        "tableCreateTime": 1571172144,
         "tableName": "functional.allcomplextypes"
       }
     },
@@ -5144,7 +5546,7 @@ select * from (
       "vertexId": "functional.allcomplextypes.struct_map_col.value.f2",
       "id": 7,
       "metadata": {
-        "tableCreateTime": 1568093741,
+        "tableCreateTime": 1571172144,
         "tableName": "functional.allcomplextypes"
       }
     }
@@ -5200,10 +5602,10 @@ select * from (
       "edgeType": "PREDICATE"
     }
   ],
-  "queryId": "0344bc3c25ad0f7f:2f22a35700000000",
-  "user": "bharath",
+  "queryId": "154d1807a8d2a566:a6f7b3b500000000",
+  "user": "anurag",
   "queryText": "select * from functional.allcomplextypes.int_array_col a inner join   functional.allcomplextypes.struct_map_col m on (a.item = m.f1)",
-  "endTime": 1568097673
+  "endTime": 1571508685
 }
 ---- QUERY
 # Test absolute collection table refs. Ensure that the vertex ids of sources are
@@ -5214,7 +5616,7 @@ select * from functional.allcomplextypes.int_array_col a inner join
 ---- LINEAGE
 {
   "hash": "6df49e42edeccad1139432ad33ad037a",
-  "timestamp": 1568097678,
+  "timestamp": 1571508690,
   "vertices": [
     {
       "vertexType": "COLUMN",
@@ -5226,7 +5628,7 @@ select * from functional.allcomplextypes.int_array_col a inner join
       "vertexId": "functional.allcomplextypes.id",
       "id": 1,
       "metadata": {
-        "tableCreateTime": 1568093741,
+        "tableCreateTime": 1571172144,
         "tableName": "functional.allcomplextypes"
       }
     },
@@ -5240,7 +5642,7 @@ select * from functional.allcomplextypes.int_array_col a inner join
       "vertexId": "functional.allcomplextypes.year",
       "id": 3,
       "metadata": {
-        "tableCreateTime": 1568093741,
+        "tableCreateTime": 1571172144,
         "tableName": "functional.allcomplextypes"
       }
     },
@@ -5254,7 +5656,7 @@ select * from functional.allcomplextypes.int_array_col a inner join
       "vertexId": "functional.allcomplextypes.month",
       "id": 5,
       "metadata": {
-        "tableCreateTime": 1568093741,
+        "tableCreateTime": 1571172144,
         "tableName": "functional.allcomplextypes"
       }
     },
@@ -5268,7 +5670,7 @@ select * from functional.allcomplextypes.int_array_col a inner join
       "vertexId": "functional.allcomplextypes.int_array_col.item",
       "id": 7,
       "metadata": {
-        "tableCreateTime": 1568093741,
+        "tableCreateTime": 1571172144,
         "tableName": "functional.allcomplextypes"
       }
     },
@@ -5282,7 +5684,7 @@ select * from functional.allcomplextypes.int_array_col a inner join
       "vertexId": "functional.allcomplextypes.struct_map_col.key",
       "id": 9,
       "metadata": {
-        "tableCreateTime": 1568093741,
+        "tableCreateTime": 1571172144,
         "tableName": "functional.allcomplextypes"
       }
     },
@@ -5296,7 +5698,7 @@ select * from functional.allcomplextypes.int_array_col a inner join
       "vertexId": "functional.allcomplextypes.struct_map_col.value.f1",
       "id": 11,
       "metadata": {
-        "tableCreateTime": 1568093741,
+        "tableCreateTime": 1571172144,
         "tableName": "functional.allcomplextypes"
       }
     },
@@ -5310,7 +5712,7 @@ select * from functional.allcomplextypes.int_array_col a inner join
       "vertexId": "functional.allcomplextypes.struct_map_col.value.f2",
       "id": 13,
       "metadata": {
-        "tableCreateTime": 1568093741,
+        "tableCreateTime": 1571172144,
         "tableName": "functional.allcomplextypes"
       }
     },
@@ -5319,7 +5721,7 @@ select * from functional.allcomplextypes.int_array_col a inner join
       "vertexId": "functional.allcomplextypes.int_array_col",
       "id": 14,
       "metadata": {
-        "tableCreateTime": 1568093741,
+        "tableCreateTime": 1571172144,
         "tableName": "functional.allcomplextypes"
       }
     },
@@ -5328,7 +5730,7 @@ select * from functional.allcomplextypes.int_array_col a inner join
       "vertexId": "functional.allcomplextypes.struct_map_col",
       "id": 15,
       "metadata": {
-        "tableCreateTime": 1568093741,
+        "tableCreateTime": 1571172144,
         "tableName": "functional.allcomplextypes"
       }
     }
@@ -5416,10 +5818,10 @@ select * from functional.allcomplextypes.int_array_col a inner join
       "edgeType": "PREDICATE"
     }
   ],
-  "queryId": "c942b32cc2a9e45e:47fc681100000000",
-  "user": "bharath",
+  "queryId": "e24d1c92fe46e7e4:df57585500000000",
+  "user": "anurag",
   "queryText": "select * from functional.allcomplextypes t, t.int_array_col a, t.struct_map_col m   where a.item = m.f1",
-  "endTime": 1568097678
+  "endTime": 1571508690
 }
 ---- QUERY
 # Test relative collection table refs. Ensure that the vertex ids of sources are
@@ -5430,7 +5832,7 @@ select * from functional.allcomplextypes t, t.int_array_col a, t.struct_map_col 
 ---- LINEAGE
 {
   "hash": "f6e042b9788a1583e212cf90c616dfd3",
-  "timestamp": 1568097683,
+  "timestamp": 1571508695,
   "vertices": [
     {
       "vertexType": "COLUMN",
@@ -5442,7 +5844,7 @@ select * from functional.allcomplextypes t, t.int_array_col a, t.struct_map_col 
       "vertexId": "functional.allcomplextypes.int_array_col.item",
       "id": 1,
       "metadata": {
-        "tableCreateTime": 1568093741,
+        "tableCreateTime": 1571172144,
         "tableName": "functional.allcomplextypes"
       }
     },
@@ -5451,7 +5853,7 @@ select * from functional.allcomplextypes t, t.int_array_col a, t.struct_map_col 
       "vertexId": "functional.allcomplextypes.struct_map_col.value.f1",
       "id": 2,
       "metadata": {
-        "tableCreateTime": 1568093741,
+        "tableCreateTime": 1571172144,
         "tableName": "functional.allcomplextypes"
       }
     },
@@ -5465,7 +5867,7 @@ select * from functional.allcomplextypes t, t.int_array_col a, t.struct_map_col 
       "vertexId": "functional.allcomplextypes.map_map_col.value.value",
       "id": 4,
       "metadata": {
-        "tableCreateTime": 1568093741,
+        "tableCreateTime": 1571172144,
         "tableName": "functional.allcomplextypes"
       }
     },
@@ -5474,7 +5876,7 @@ select * from functional.allcomplextypes t, t.int_array_col a, t.struct_map_col 
       "vertexId": "functional.allcomplextypes.map_map_col.value.key",
       "id": 5,
       "metadata": {
-        "tableCreateTime": 1568093741,
+        "tableCreateTime": 1571172144,
         "tableName": "functional.allcomplextypes"
       }
     },
@@ -5488,7 +5890,7 @@ select * from functional.allcomplextypes t, t.int_array_col a, t.struct_map_col 
       "vertexId": "functional.allcomplextypes.int_map_col.value",
       "id": 7,
       "metadata": {
-        "tableCreateTime": 1568093741,
+        "tableCreateTime": 1571172144,
         "tableName": "functional.allcomplextypes"
       }
     },
@@ -5502,7 +5904,7 @@ select * from functional.allcomplextypes t, t.int_array_col a, t.struct_map_col 
       "vertexId": "functional.allcomplextypes.complex_nested_struct_col.f2.item.f12.value.f21",
       "id": 9,
       "metadata": {
-        "tableCreateTime": 1568093741,
+        "tableCreateTime": 1571172144,
         "tableName": "functional.allcomplextypes"
       }
     },
@@ -5511,7 +5913,7 @@ select * from functional.allcomplextypes t, t.int_array_col a, t.struct_map_col 
       "vertexId": "functional.allcomplextypes.complex_nested_struct_col.f2.item.f12.key",
       "id": 10,
       "metadata": {
-        "tableCreateTime": 1568093741,
+        "tableCreateTime": 1571172144,
         "tableName": "functional.allcomplextypes"
       }
     },
@@ -5520,7 +5922,7 @@ select * from functional.allcomplextypes t, t.int_array_col a, t.struct_map_col 
       "vertexId": "functional.allcomplextypes.struct_map_col.key",
       "id": 11,
       "metadata": {
-        "tableCreateTime": 1568093741,
+        "tableCreateTime": 1571172144,
         "tableName": "functional.allcomplextypes"
       }
     }
@@ -5588,10 +5990,10 @@ select * from functional.allcomplextypes t, t.int_array_col a, t.struct_map_col 
       "edgeType": "PREDICATE"
     }
   ],
-  "queryId": "c64f53b771511f69:143fbcbe00000000",
-  "user": "bharath",
+  "queryId": "f343f3dbb3ca2a4b:7636d52400000000",
+  "user": "anurag",
   "queryText": "select a + b as ab, c, d, e from functional.allcomplextypes t,   (select sum(item) a from t.int_array_col    where item < 10) v1,   (select count(f1) b from t.struct_map_col    group by key) v2,   (select avg(value) over(partition by key) c from t.map_map_col.value) v3,   (select item d from t.int_array_col    union all    select value from t.int_map_col) v4,   (select f21 e from t.complex_nested_struct_col.f2.f12 order by key limit 10) v5",
-  "endTime": 1568097684
+  "endTime": 1571508695
 }
 ---- QUERY
 # Test relative collection table refs in inline views.
@@ -5609,14 +6011,14 @@ select a + b as ab, c, d, e from functional.allcomplextypes t,
 ---- LINEAGE
 {
   "hash": "a0b32156f73829f9d72d35d5e6091684",
-  "timestamp": 1568097689,
+  "timestamp": 1571508700,
   "vertices": [
     {
       "vertexType": "COLUMN",
       "vertexId": "id",
       "id": 0,
       "metadata": {
-        "tableCreateTime": 1568097689,
+        "tableCreateTime": 1571508700,
         "tableName": "lineage_test_db.lineage_test_view5"
       }
     },
@@ -5625,7 +6027,7 @@ select a + b as ab, c, d, e from functional.allcomplextypes t,
       "vertexId": "functional.alltypes.id",
       "id": 1,
       "metadata": {
-        "tableCreateTime": 1568093675,
+        "tableCreateTime": 1571175281,
         "tableName": "functional.alltypes"
       }
     }
@@ -5650,10 +6052,10 @@ select a + b as ab, c, d, e from functional.allcomplextypes t,
       "edgeType": "PREDICATE"
     }
   ],
-  "queryId": "0d41edb23b146ceb:b9565e1000000000",
-  "user": "bharath",
+  "queryId": "91461ace6cbd0cf4:5618eea700000000",
+  "user": "anurag",
   "queryText": "create view lineage_test_db.lineage_test_view5 as select id from functional.alltypes_view v where not exists (select 1 from functional.alltypes a where v.id = a.id)",
-  "endTime": 1568097689
+  "endTime": 1571508700
 }
 ---- QUERY
 # IMPALA-4206: Test creating a view whose definition has a subquery and a view reference.

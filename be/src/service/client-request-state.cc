@@ -1552,6 +1552,11 @@ Status ClientRequestState::LogLineageRecord() {
 
   if (catalog_op_type() == TCatalogOpType::DDL) {
     const TDdlExecResponse* response = ddl_exec_response();
+    //Set table location in the lineage graph. Currently, this is only set for external
+    // tables in frontend.
+    if (response->__isset.table_location) {
+        lineage_graph.__set_table_location(response->table_location);
+    }
     // Update vertices that have -1 table_create_time for a newly created table/view.
     if (response->__isset.table_name &&
         response->__isset.table_create_time) {

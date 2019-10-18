@@ -179,6 +179,11 @@ struct TDdlExecResponse {
   // The table/view create time stored in HMS. Set only for CREATE TABLE,
   // CREATE TABLE AS SELECT, CREATE TABLE LIKE, and CREATE VIEW statements.
   5: optional i64 table_create_time
+
+  // Set only for CREATE EXTERNAL TABLE. This is the table location from the newly
+  // created table. This is useful for establishing lineage between table and it's
+  // location for external tables.
+  6: optional string table_location
 }
 
 // Updates the metastore with new partition information and returns a response
