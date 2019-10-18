@@ -531,7 +531,7 @@ public class PlannerTest extends PlannerTestBase {
   public void testMemLimit() {
     // TODO: Create a new test case section for specifying options
     TQueryOptions options = new TQueryOptions();
-    options.setMem_limit(500);
+    options.setMem_limit(5000);
     runPlannerTestFile("mem-limit-broadcast-join", options);
   }
 
@@ -707,7 +707,7 @@ public class PlannerTest extends PlannerTestBase {
   }
 
   @Test
-  public void testResourceRequirementsWithHDFSNumRowsEstDisabled() {
+  public void testResourceRequirements() {
     // Tests the resource requirement computation from the planner.
     TQueryOptions options = defaultQueryOptions();
     options.setNum_scanner_threads(1); // Required so that output doesn't vary by machine
@@ -719,7 +719,7 @@ public class PlannerTest extends PlannerTestBase {
   }
 
   @Test
-  public void testSpillableBufferSizingWithHDFSNumRowsEstDisabled() {
+  public void testSpillableBufferSizing() {
     // Tests the resource requirement computation from the planner when it is allowed to
     // vary the spillable buffer size.
     TQueryOptions options = defaultQueryOptions();

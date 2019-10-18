@@ -103,6 +103,7 @@ public class AnalyticPlanner {
       g.init();
     }
     List<PartitionGroup> partitionGroups = collectPartitionGroups(sortGroups);
+    // TODO-MT: this maybe should be instances
     mergePartitionGroups(partitionGroups, root.getNumNodes());
     orderGroups(partitionGroups);
     if (groupingExprs != null) {

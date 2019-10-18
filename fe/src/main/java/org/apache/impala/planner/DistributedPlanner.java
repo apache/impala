@@ -449,18 +449,22 @@ public class DistributedPlanner {
     PlanNode rhsTree = rightChildFragment.getPlanRoot();
     long rhsDataSize = -1;
     long broadcastCost = -1;
+    // TODO: IMPALA-4224: update this once we can share the broadcast join data between
+    // finstances.
+    int mt_dop = ctx_.getQueryOptions().mt_dop;
+    int leftChildInstances = leftChildFragment.getNumInstances(mt_dop);
     if (rhsTree.getCardinality() != -1) {
       rhsDataSize = Math.round(
           rhsTree.getCardinality() * ExchangeNode.getAvgSerializedRowSize(rhsTree));
-      if (leftChildFragment.getNumNodes() != -1) {
-        broadcastCost = 2 * rhsDataSize * leftChildFragment.getNumNodes();
+      if (leftChildInstances != -1) {
+        broadcastCost = 2 * rhsDataSize * leftChildInstances;
       }
     }
     if (LOG.isTraceEnabled()) {
       LOG.trace("broadcast: cost=" + Long.toString(broadcastCost));
       LOG.trace("card=" + Long.toString(rhsTree.getCardinality()) + " row_size="
-          + Float.toString(rhsTree.getAvgRowSize()) + " #nodes="
-          + Integer.toString(leftChildFragment.getNumNodes()));
+          + Float.toString(rhsTree.getAvgRowSize()) + " #instances="
+          + Integer.toString(leftChildInstances));
     }
 
     // repartition: both left- and rightChildFragment are partitioned on the
@@ -553,7 +557,11 @@ public class DistributedPlanner {
    }
 
    // Decide the distribution mode based on the estimated costs and the mem limit.
+   int mt_dop = ctx_.getQueryOptions().mt_dop;
    long htSize = Math.round(rhsDataSize * PlannerContext.HASH_TBL_SPACE_OVERHEAD);
+   // TODO: IMPALA-4224: update this once we can share the broadcast join data between
+   // finstances.
+   if (mt_dop > 1) htSize *= mt_dop;
    long memLimit = ctx_.getQueryOptions().mem_limit;
    if (broadcastCost <= partitionCost && (memLimit == 0 || htSize <= memLimit)) {
      return DistributionMode.BROADCAST;

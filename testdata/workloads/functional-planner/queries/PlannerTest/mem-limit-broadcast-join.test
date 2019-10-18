@@ -1,24 +1,80 @@
-select * from tpch.nation n1
+# IMPALA-2425: Broadcast hint should override planner decision, even
+# if the expected memory consumption of the join is much larger than
+# the memory limit.
+select * from tpch.lineitem
 join[broadcast]
-tpch.nation n2 on n1.n_regionkey=n2.n_regionkey
+tpch.orders on l_orderkey = o_orderkey
 ---- DISTRIBUTEDPLAN
 PLAN-ROOT SINK
 |
 04:EXCHANGE [UNPARTITIONED]
 |
 02:HASH JOIN [INNER JOIN, BROADCAST]
-|  hash predicates: n1.n_regionkey = n2.n_regionkey
-|  runtime filters: RF000 <- n2.n_regionkey
-|  row-size=219B cardinality=125
+|  hash predicates: l_orderkey = o_orderkey
+|  runtime filters: RF000 <- o_orderkey
+|  row-size=402B cardinality=5.76M
 |
 |--03:EXCHANGE [BROADCAST]
 |  |
-|  01:SCAN HDFS [tpch.nation n2]
-|     partitions=1/1 files=1 size=2.15KB
+|  01:SCAN HDFS [tpch.orders]
+|     HDFS partitions=1/1 files=1 size=162.56MB
+|     row-size=171B cardinality=1.50M
+|
+00:SCAN HDFS [tpch.lineitem]
+   HDFS partitions=1/1 files=1 size=718.94MB
+   runtime filters: RF000 -> l_orderkey
+   row-size=231B cardinality=6.00M
+====
+# Decision should take into account mt_dop. This query is calibrated
+# so that it is a broadcast join with mt_dop=0 and a shuffle join
+# with mt_dop >= 2 and mem_limit=5k.
+select * from tpch.customer
+join
+tpch.nation on c_nationkey = n_nationkey
+---- DISTRIBUTEDPLAN
+PLAN-ROOT SINK
+|
+04:EXCHANGE [UNPARTITIONED]
+|
+02:HASH JOIN [INNER JOIN, BROADCAST]
+|  hash predicates: c_nationkey = n_nationkey
+|  runtime filters: RF000 <- n_nationkey
+|  row-size=327B cardinality=150.00K
+|
+|--03:EXCHANGE [BROADCAST]
+|  |
+|  01:SCAN HDFS [tpch.nation]
+|     HDFS partitions=1/1 files=1 size=2.15KB
 |     row-size=109B cardinality=25
 |
-00:SCAN HDFS [tpch.nation n1]
-   partitions=1/1 files=1 size=2.15KB
-   runtime filters: RF000 -> n1.n_regionkey
-   row-size=109B cardinality=25
+00:SCAN HDFS [tpch.customer]
+   HDFS partitions=1/1 files=1 size=23.08MB
+   runtime filters: RF000 -> c_nationkey
+   row-size=218B cardinality=150.00K
+---- PARALLELPLANS
+PLAN-ROOT SINK
+|
+05:EXCHANGE [UNPARTITIONED]
+|
+02:HASH JOIN [INNER JOIN, PARTITIONED]
+|  hash predicates: c_nationkey = n_nationkey
+|  runtime filters: RF000 <- n_nationkey
+|  row-size=327B cardinality=150.00K
+|
+|--JOIN BUILD
+|  |  join-table-id=00 plan-id=01 cohort-id=01
+|  |  build expressions: n_nationkey
+|  |
+|  04:EXCHANGE [HASH(n_nationkey)]
+|  |
+|  01:SCAN HDFS [tpch.nation]
+|     HDFS partitions=1/1 files=1 size=2.15KB
+|     row-size=109B cardinality=25
+|
+03:EXCHANGE [HASH(c_nationkey)]
+|
+00:SCAN HDFS [tpch.customer]
+   HDFS partitions=1/1 files=1 size=23.08MB
+   runtime filters: RF000 -> c_nationkey
+   row-size=218B cardinality=150.00K
 ====

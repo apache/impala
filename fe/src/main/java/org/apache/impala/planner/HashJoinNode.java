@@ -212,11 +212,12 @@ public class HashJoinNode extends JoinNode {
       perInstanceMemEstimate = DEFAULT_PER_INSTANCE_MEM;
       perInstanceDataBytes = -1;
     } else {
+      // TODO: IMPALA-4224: update this once we can share the broadcast join data between
+      // finstances. Currently this implicitly assumes that each instance has a copy of
+      // the hash tables.
       perInstanceDataBytes = (long) Math.ceil(getChild(1).cardinality_
           * getChild(1).avgRowSize_);
       // Assume the rows are evenly divided among instances.
-      // TODO-MT: this estimate is not quite right with parallel plans. Fix it before
-      // we allow executing parallel plans with joins.
       if (distrMode_ == DistributionMode.PARTITIONED) {
         perInstanceDataBytes /= numInstances;
       }
