@@ -57,22 +57,14 @@ class ComparatorWrapper {
   }
 };
 
-/// Compares two TupleRows based on a set of exprs, in order.
+/// Interface for comparing two TupleRows based on a set of exprs.
 class TupleRowComparator {
  public:
   /// 'ordering_exprs': the ordering expressions for tuple comparison.
-  /// 'is_asc' determines, for each expr, if it should be ascending or descending sort
-  /// order.
-  /// 'nulls_first' determines, for each expr, if nulls should come before or after all
-  /// other values.
-  TupleRowComparator(const std::vector<ScalarExpr*>& ordering_exprs,
-      const std::vector<bool>& is_asc, const std::vector<bool>& nulls_first)
+  TupleRowComparator(const std::vector<ScalarExpr*>& ordering_exprs)
     : ordering_exprs_(ordering_exprs),
-      is_asc_(is_asc),
-      codegend_compare_fn_(nullptr) {
-    DCHECK_EQ(is_asc_.size(), ordering_exprs.size());
-    for (bool null_first : nulls_first) nulls_first_.push_back(null_first ? -1 : 1);
-  }
+      codegend_compare_fn_(nullptr) { }
+  virtual ~TupleRowComparator() {}
 
   /// Create the evaluators for the ordering expressions and store them in 'pool'. The
   /// evaluators use 'expr_perm_pool' and 'expr_results_pool' for permanent and result
@@ -113,15 +105,7 @@ class TupleRowComparator {
     return Less(lhs_row, rhs_row);
   }
 
- private:
-  /// Interpreted implementation of Compare().
-  int CompareInterpreted(const TupleRow* lhs, const TupleRow* rhs) const;
-
-  /// Codegen Compare(). Returns a non-OK status if codegen is unsuccessful.
-  /// TODO: inline this at codegen'd callsites instead of indirectly calling via function
-  /// pointer.
-  Status CodegenCompare(LlvmCodeGen* codegen, llvm::Function** fn);
-
+ protected:
   /// References to ordering expressions owned by the Exec node which owns this
   /// TupleRowComparator.
   const std::vector<ScalarExpr*>& ordering_exprs_;
@@ -130,9 +114,6 @@ class TupleRowComparator {
   /// created via cloning the evaluator after it has been Opened().
   std::vector<ScalarExprEvaluator*> ordering_expr_evals_lhs_;
   std::vector<ScalarExprEvaluator*> ordering_expr_evals_rhs_;
-
-  const std::vector<bool>& is_asc_;
-  std::vector<int8_t> nulls_first_;
 
   /// We store a pointer to the codegen'd function pointer (adding an extra level of
   /// indirection) so that copies of this TupleRowComparator will have the same pointer to
@@ -144,6 +125,85 @@ class TupleRowComparator {
   typedef int (*CompareFn)(ScalarExprEvaluator* const*, ScalarExprEvaluator* const*,
       const TupleRow*, const TupleRow*);
   CompareFn* codegend_compare_fn_;
+ private:
+  /// Interpreted implementation of Compare().
+  virtual int CompareInterpreted(const TupleRow* lhs, const TupleRow* rhs) const = 0;
+
+  /// Codegen Compare(). Returns a non-OK status if codegen is unsuccessful.
+  /// TODO: inline this at codegen'd callsites instead of indirectly calling via function
+  /// pointer.
+  virtual Status CodegenCompare(LlvmCodeGen* codegen, llvm::Function** fn) = 0;
+};
+
+/// Compares two TupleRows based on a set of exprs, in lexicographical order.
+class TupleRowLexicalComparator : public TupleRowComparator {
+ public:
+  /// 'ordering_exprs': the ordering expressions for tuple comparison.
+  /// 'is_asc' determines, for each expr, if it should be ascending or descending sort
+  /// order.
+  /// 'nulls_first' determines, for each expr, if nulls should come before or after all
+  /// other values.
+  TupleRowLexicalComparator(const std::vector<ScalarExpr*>& ordering_exprs,
+      const std::vector<bool>& is_asc, const std::vector<bool>& nulls_first)
+    : TupleRowComparator(ordering_exprs),
+      is_asc_(is_asc) {
+    DCHECK_EQ(is_asc_.size(), ordering_exprs.size());
+    for (bool null_first : nulls_first) nulls_first_.push_back(null_first ? -1 : 1);
+  }
+
+ private:
+  const std::vector<bool>& is_asc_;
+  std::vector<int8_t> nulls_first_;
+
+  int CompareInterpreted(const TupleRow* lhs, const TupleRow* rhs) const override;
+
+  /// TODO: implement it.
+  Status CodegenCompare(LlvmCodeGen* codegen, llvm::Function** fn) override;
+};
+
+/// Compares two TupleRows based on a set of exprs, in Z-order.
+class TupleRowZOrderComparator : public TupleRowComparator {
+ public:
+  /// 'ordering_exprs': the ordering expressions for tuple comparison.
+  TupleRowZOrderComparator(const std::vector<ScalarExpr*>& ordering_exprs)
+    : TupleRowComparator(ordering_exprs) { }
+
+ private:
+  typedef __uint128_t uint128_t;
+
+  int CompareInterpreted(const TupleRow* lhs, const TupleRow* rhs) const override;
+  Status CodegenCompare(LlvmCodeGen* codegen, llvm::Function** fn) override;
+
+  /// Compares the rows using Z-ordering. The function does not calculate the actual
+  /// Z-value, only looks for the column with the most significant dimension, and compares
+  /// the values of that column. To make this possible, a unified type is necessary where
+  /// all values share the same bit-representation. The three common types which all the
+  /// others are converted to are uint32_t, uint64_t and uint128_t. Comparing smaller
+  /// types (ie. having less bits) with bigger ones would make the bigger type much more
+  /// dominant therefore the bits of these smaller types are shifted up.
+  template<typename U>
+  int CompareBasedOnSize(const TupleRow* lhs, const TupleRow* rhs) const;
+
+  /// We transform the original a and b values to their "shared representation", a' and b'
+  /// in a way that if a < b then a' is lexically less than b' regarding to their bits.
+  /// Thus, for ints INT_MIN would be 0, INT_MIN+1 would be 1, and so on, and in the end
+  /// INT_MAX would be 111..111.
+  /// The basic concept of getting the shared representation is as follows:
+  /// 1. Reinterpret void* as the actual type
+  /// 2. Convert the number to the chosen unsigned type (U)
+  /// 3. If U is bigger than the actual type, the bits of the small type are shifted up.
+  /// 4. Flip the sign bit because the value was converted to unsigned.
+  /// Note that floating points are represented differently, where for negative values all
+  /// bits have to get flipped.
+  /// Null values will be treated as the minimum value (unsigned 0).
+  template <typename U>
+  U GetSharedRepresentation(void* val, ColumnType type) const;
+  template <typename U>
+  U inline GetSharedStringRepresentation(const char* char_ptr, int length) const;
+  template <typename U, typename T>
+  U inline GetSharedIntRepresentation(const T val, U mask) const;
+  template <typename U, typename T>
+  U inline GetSharedFloatRepresentation(void* val, U mask) const;
 };
 
 /// Compares the equality of two Tuples, going slot by slot.

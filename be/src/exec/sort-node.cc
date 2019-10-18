@@ -37,6 +37,8 @@ Status SortPlanNode::Init(const TPlanNode& tnode, RuntimeState* state) {
       *children_[0]->row_descriptor_, state, &sort_tuple_slot_exprs_));
   is_asc_order_ = tnode.sort_node.sort_info.is_asc_order;
   nulls_first_ = tnode.sort_node.sort_info.nulls_first;
+  sorting_order_ = static_cast<TSortingOrder::type>(
+      tnode.sort_node.sort_info.sorting_order);
   return Status::OK();
 }
 
@@ -56,6 +58,7 @@ SortNode::SortNode(
   sort_tuple_exprs_ = pnode.sort_tuple_slot_exprs_;
   is_asc_order_ = pnode.is_asc_order_;
   nulls_first_ = pnode.nulls_first_;
+  sorting_order_ = pnode.sorting_order_;
   runtime_profile()->AddInfoString("SortType", "Total");
 }
 
@@ -67,7 +70,8 @@ Status SortNode::Prepare(RuntimeState* state) {
   RETURN_IF_ERROR(ExecNode::Prepare(state));
   sorter_.reset(new Sorter(ordering_exprs_, is_asc_order_, nulls_first_,
       sort_tuple_exprs_, &row_descriptor_, mem_tracker(), buffer_pool_client(),
-      resource_profile_.spillable_buffer_size, runtime_profile(), state, label(), true));
+      resource_profile_.spillable_buffer_size, runtime_profile(), state, label(), true,
+      sorting_order_));
   RETURN_IF_ERROR(sorter_->Prepare(pool_));
   DCHECK_GE(resource_profile_.min_reservation, sorter_->ComputeMinReservation());
   state->CheckAndAddCodegenDisabledMessage(runtime_profile());

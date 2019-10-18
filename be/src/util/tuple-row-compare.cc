@@ -24,7 +24,9 @@
 #include "exprs/scalar-expr.h"
 #include "exprs/scalar-expr-evaluator.h"
 #include "runtime/runtime-state.h"
+#include "runtime/multi-precision.h"
 #include "util/runtime-profile-counters.h"
+#include "util/bit-util.h"
 
 using namespace impala;
 using namespace strings;
@@ -50,7 +52,17 @@ void TupleRowComparator::Close(RuntimeState* state) {
   ScalarExprEvaluator::Close(ordering_expr_evals_lhs_, state);
 }
 
-int TupleRowComparator::CompareInterpreted(
+Status TupleRowComparator::Codegen(RuntimeState* state) {
+  llvm::Function* fn;
+  LlvmCodeGen* codegen = state->codegen();
+  DCHECK(codegen != NULL);
+  RETURN_IF_ERROR(CodegenCompare(codegen, &fn));
+  codegend_compare_fn_ = state->obj_pool()->Add(new CompareFn);
+  codegen->AddFunctionToJit(fn, reinterpret_cast<void**>(codegend_compare_fn_));
+  return Status::OK();
+}
+
+int TupleRowLexicalComparator::CompareInterpreted(
     const TupleRow* lhs, const TupleRow* rhs) const {
   DCHECK_EQ(ordering_exprs_.size(), ordering_expr_evals_lhs_.size());
   DCHECK_EQ(ordering_expr_evals_lhs_.size(), ordering_expr_evals_rhs_.size());
@@ -69,16 +81,6 @@ int TupleRowComparator::CompareInterpreted(
     // Otherwise, try the next Expr
   }
   return 0; // fully equivalent key
-}
-
-Status TupleRowComparator::Codegen(RuntimeState* state) {
-  llvm::Function* fn;
-  LlvmCodeGen* codegen = state->codegen();
-  DCHECK(codegen != NULL);
-  RETURN_IF_ERROR(CodegenCompare(codegen, &fn));
-  codegend_compare_fn_ = state->obj_pool()->Add(new CompareFn);
-  codegen->AddFunctionToJit(fn, reinterpret_cast<void**>(codegend_compare_fn_));
-  return Status::OK();
 }
 
 // Codegens an unrolled version of Compare(). Uses codegen'd key exprs and injects
@@ -202,7 +204,8 @@ Status TupleRowComparator::Codegen(RuntimeState* state) {
 // next_key2:                                        ; preds = %rhs_non_null12, %next_key
 //   ret i32 0
 // }
-Status TupleRowComparator::CodegenCompare(LlvmCodeGen* codegen, llvm::Function** fn) {
+Status TupleRowLexicalComparator::CodegenCompare(LlvmCodeGen* codegen,
+    llvm::Function** fn) {
   llvm::LLVMContext& context = codegen->context();
   const vector<ScalarExpr*>& ordering_exprs = ordering_exprs_;
   llvm::Function* key_fns[ordering_exprs.size()];
@@ -307,3 +310,154 @@ Status TupleRowComparator::CodegenCompare(LlvmCodeGen* codegen, llvm::Function**
   }
   return Status::OK();
 }
+
+int TupleRowZOrderComparator::CompareInterpreted(const TupleRow* lhs,
+    const TupleRow* rhs) const {
+  DCHECK_EQ(ordering_exprs_.size(), ordering_expr_evals_lhs_.size());
+  DCHECK_EQ(ordering_expr_evals_lhs_.size(), ordering_expr_evals_rhs_.size());
+
+  // The algorithm requires all values having a common type, without loss of data.
+  // This means we have to find the biggest type.
+  int max_size = ordering_exprs_[0]->type().GetByteSize();
+  for (int i = 1; i < ordering_exprs_.size(); ++i) {
+    if (ordering_exprs_[i]->type().GetByteSize() > max_size) {
+      max_size = ordering_exprs_[i]->type().GetByteSize();
+    }
+  }
+  if (max_size <= 4) {
+    return CompareBasedOnSize<uint32_t>(lhs, rhs);
+  } else if (max_size <= 8) {
+    return CompareBasedOnSize<uint64_t>(lhs, rhs);
+  } else {
+    return CompareBasedOnSize<uint128_t>(lhs, rhs);
+  }
+}
+
+template<typename U>
+int TupleRowZOrderComparator::CompareBasedOnSize(const TupleRow* lhs,
+    const TupleRow* rhs) const {
+  auto less_msb = [](U x, U y) { return x < y && x < (x ^ y); };
+  ColumnType type = ordering_exprs_[0]->type();
+  // Values of the most significant dimension from both sides.
+  U msd_lhs = GetSharedRepresentation<U>(ordering_expr_evals_lhs_[0]->GetValue(lhs),
+      type);
+  U msd_rhs = GetSharedRepresentation<U>(ordering_expr_evals_rhs_[0]->GetValue(rhs),
+      type);
+  for (int i = 1; i < ordering_exprs_.size(); ++i) {
+    type = ordering_exprs_[i]->type();
+    void* lhs_v = ordering_expr_evals_lhs_[i]->GetValue(lhs);
+    void* rhs_v = ordering_expr_evals_rhs_[i]->GetValue(rhs);
+
+    U lhsi = GetSharedRepresentation<U>(lhs_v, type);
+    U rhsi = GetSharedRepresentation<U>(rhs_v, type);
+
+    if (less_msb(msd_lhs ^ msd_rhs, lhsi ^ rhsi)) {
+      msd_lhs = lhsi;
+      msd_rhs = rhsi;
+    }
+  }
+  return msd_lhs < msd_rhs ? -1 : (msd_lhs > msd_rhs ? 1 : 0);
+}
+
+template <typename U>
+U TupleRowZOrderComparator::GetSharedRepresentation(void* val, ColumnType type) const {
+  // The mask used for setting the sign bit correctly.
+  if (val == NULL) return 0;
+  constexpr U mask = (U)1 << (sizeof(U) * 8 - 1);
+  switch (type.type) {
+    case TYPE_NULL:
+      return 0;
+    case TYPE_BOOLEAN:
+      return static_cast<U>(*reinterpret_cast<const bool*>(val)) << (sizeof(U) * 8 - 1);
+    case TYPE_TINYINT:
+      return GetSharedIntRepresentation<U, int8_t>(
+          *reinterpret_cast<const int8_t*>(val), mask);
+    case TYPE_SMALLINT:
+      return GetSharedIntRepresentation<U, int16_t>(
+          *reinterpret_cast<const int16_t*>(val), mask);
+    case TYPE_INT:
+      return GetSharedIntRepresentation<U, int32_t>(
+          *reinterpret_cast<const int32_t*>(val), mask);
+    case TYPE_BIGINT:
+      return GetSharedIntRepresentation<U, int64_t>(
+          *reinterpret_cast<const int64_t*>(val), mask);
+    case TYPE_DATE:
+      return GetSharedIntRepresentation<U, int32_t>(
+          reinterpret_cast<const DateValue*>(val)->Value(), mask);
+    case TYPE_FLOAT:
+      return GetSharedFloatRepresentation<U, float>(val, mask);
+    case TYPE_DOUBLE:
+      return GetSharedFloatRepresentation<U, double>(val, mask);
+    case TYPE_STRING:
+    case TYPE_VARCHAR: {
+      const StringValue* string_value = reinterpret_cast<const StringValue*>(val);
+      return GetSharedStringRepresentation<U>(string_value->ptr, string_value->len);
+    }
+    case TYPE_CHAR:
+      return GetSharedStringRepresentation<U>(
+          reinterpret_cast<const char*>(val), type.len);
+    case TYPE_TIMESTAMP: {
+      const TimestampValue* ts = reinterpret_cast<const TimestampValue*>(val);
+      const uint128_t nanosnds = static_cast<uint128_t>(ts->time().total_nanoseconds());
+      const uint128_t days = static_cast<uint128_t>(ts->date().day_number());
+      return (days << 64) | nanosnds;
+    }
+    case TYPE_DECIMAL:
+      switch (type.GetByteSize()) {
+        case 4:
+          return GetSharedIntRepresentation<U, int32_t>(
+              reinterpret_cast<const Decimal4Value*>(val)->value(), mask);
+        case 8:
+          return GetSharedIntRepresentation<U, int64_t>(
+              reinterpret_cast<const Decimal8Value*>(val)->value(), mask);
+        case 16: // value is of int128_t, big enough that no shifts are needed
+          return static_cast<U>(
+              reinterpret_cast<const Decimal16Value*>(val)->value()) ^ mask;
+        default:
+          DCHECK(false) << type;
+          return 0;
+      }
+    default:
+      return 0;
+  }
+}
+
+template <typename U, typename T>
+U inline TupleRowZOrderComparator::GetSharedIntRepresentation(const T val, U mask) const {
+  return (static_cast<U>(val) <<
+      std::max((sizeof(U) - sizeof(T)) * 8, (uint64_t)0)) ^ mask;
+}
+
+template <typename U, typename T>
+U inline TupleRowZOrderComparator::GetSharedFloatRepresentation(void* val, U mask) const {
+  int64_t tmp;
+  T floating_value = *reinterpret_cast<const T*>(val);
+  memcpy(&tmp, &floating_value, sizeof(T));
+  if (UNLIKELY(std::isnan(floating_value))) return 0;
+  if (floating_value < 0.0) {
+    // Flipping all bits for negative values.
+    return static_cast<U>(~tmp) << std::max((sizeof(U) - sizeof(T)) * 8, (uint64_t)0);
+  } else {
+    // Flipping only first bit.
+    return (static_cast<U>(tmp) << std::max((sizeof(U) - sizeof(T)) * 8, (uint64_t)0)) ^
+        mask;
+  }
+}
+
+template <typename U>
+U inline TupleRowZOrderComparator::GetSharedStringRepresentation(const char* char_ptr,
+    int length) const {
+  int len = length < sizeof(U) ? length : sizeof(U);
+  if (len == 0) return 0;
+  U dst = 0;
+  // We copy the bytes from the string but swap the bytes because of integer endianness.
+  BitUtil::ByteSwap(&dst, char_ptr, len);
+  return dst << ((sizeof(U) - len) * 8);
+}
+
+Status TupleRowZOrderComparator::CodegenCompare(LlvmCodeGen* codegen,
+    llvm::Function** fn) {
+  LOG(WARNING) << "TupleRowZOrderComparator::CodegenCompare is not yet implemented.";
+  return Status("TupleRowZOrderComparator has no Codegen'd comperator.");
+}
+

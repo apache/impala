@@ -173,6 +173,7 @@ class HdfsTableSink : public DataSink {
 
   int skip_header_line_count() const { return skip_header_line_count_; }
   const vector<int32_t>& sort_columns() const { return sort_columns_; }
+  TSortingOrder::type sorting_order() const { return sorting_order_; }
   const HdfsTableDescriptor& TableDesc() { return *table_desc_; }
 
   RuntimeProfile::Counter* rows_inserted_counter() { return rows_inserted_counter_; }
@@ -290,6 +291,9 @@ class HdfsTableSink : public DataSink {
   // are stored in the 'sort.columns' table property. This is used in the backend to
   // populate the RowGroup::sorting_columns list in parquet files.
   const std::vector<int32_t>& sort_columns_;
+
+  // Represents the sorting order used in SORT BY queries.
+  const TSortingOrder::type sorting_order_;
 
   /// Stores the current partition during clustered inserts across subsequent row batches.
   /// Only set if 'input_is_clustered_' is true.

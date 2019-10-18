@@ -39,6 +39,7 @@ class PartialSortPlanNode : public PlanNode {
 
   std::vector<bool> is_asc_order_;
   std::vector<bool> nulls_first_;
+  TSortingOrder::type sorting_order_;
 };
 
 /// Node that implements a partial sort, where its input is divided up into runs, each
@@ -85,6 +86,7 @@ class PartialSortNode : public ExecNode {
 
   std::vector<bool> is_asc_order_;
   std::vector<bool> nulls_first_;
+  TSortingOrder::type sorting_order_;
 
   /////////////////////////////////////////
   /// BEGIN: Members that must be Reset()

@@ -667,19 +667,6 @@ class TableDef {
             "equivalent to SORT BY. Please, use the latter, if that was your " +
             "intention."));
       }
-
-      List<? extends Type> notSupportedTypes = Arrays.asList(Type.STRING, Type.VARCHAR,
-          Type.FLOAT, Type.DOUBLE);
-      for (Integer position : colIdxs) {
-        Type colType = columnTypes.get(position);
-
-        if (notSupportedTypes.stream().anyMatch(type -> colType.matchesType(type))) {
-          throw new AnalysisException(String.format("SORT BY ZORDER does not support "
-              + "column types: %s", String.join(", ",
-                  notSupportedTypes.stream().map(type -> type.toString())
-                  .collect(Collectors.toList()))));
-        }
-      }
     }
 
     Preconditions.checkState(numColumns == colIdxs.size());

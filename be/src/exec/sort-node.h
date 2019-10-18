@@ -39,6 +39,7 @@ class SortPlanNode : public PlanNode {
 
   std::vector<bool> is_asc_order_;
   std::vector<bool> nulls_first_;
+  TSortingOrder::type sorting_order_;
 };
 
 /// Node that implements a full sort of its input with a fixed memory budget, spilling
@@ -82,6 +83,7 @@ class SortNode : public ExecNode {
 
   std::vector<bool> is_asc_order_;
   std::vector<bool> nulls_first_;
+  TSortingOrder::type sorting_order_;
 
   /// Whether the previous call to GetNext() returned a buffer attached to the RowBatch.
   /// Used to avoid unnecessary calls to ReleaseUnusedReservation().

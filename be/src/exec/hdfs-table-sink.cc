@@ -82,6 +82,7 @@ HdfsTableSink::HdfsTableSink(TDataSinkId sink_id, const HdfsTableSinkConfig& sin
     overwrite_(hdfs_sink.overwrite),
     input_is_clustered_(hdfs_sink.input_is_clustered),
     sort_columns_(hdfs_sink.sort_columns),
+    sorting_order_((TSortingOrder::type)hdfs_sink.sorting_order),
     current_clustered_partition_(nullptr),
     partition_key_exprs_(sink_config.partition_key_exprs_) {
   if (hdfs_sink.__isset.write_id) {

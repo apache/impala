@@ -763,12 +763,13 @@ Sorter::Sorter(const std::vector<ScalarExpr*>& ordering_exprs,
     const vector<ScalarExpr*>& sort_tuple_exprs, RowDescriptor* output_row_desc,
     MemTracker* mem_tracker, BufferPool::ClientHandle* buffer_pool_client,
     int64_t page_len, RuntimeProfile* profile, RuntimeState* state,
-    const string& node_label, bool enable_spilling)
+    const string& node_label, bool enable_spilling,
+    TSortingOrder::type sorting_order)
   : node_label_(node_label),
     state_(state),
     expr_perm_pool_(mem_tracker),
     expr_results_pool_(mem_tracker),
-    compare_less_than_(ordering_exprs, is_asc_order, nulls_first),
+    compare_less_than_(nullptr),
     in_mem_tuple_sorter_(nullptr),
     buffer_pool_client_(buffer_pool_client),
     page_len_(page_len),
@@ -784,7 +785,19 @@ Sorter::Sorter(const std::vector<ScalarExpr*>& ordering_exprs,
     num_merges_counter_(nullptr),
     in_mem_sort_timer_(nullptr),
     sorted_data_size_(nullptr),
-    run_sizes_(nullptr) {}
+    run_sizes_(nullptr) {
+  switch (sorting_order) {
+    case TSortingOrder::LEXICAL:
+      compare_less_than_.reset(new TupleRowLexicalComparator(ordering_exprs, is_asc_order,
+          nulls_first));
+      break;
+    case TSortingOrder::ZORDER:
+      compare_less_than_.reset(new TupleRowZOrderComparator(ordering_exprs));
+      break;
+    default:
+      DCHECK(false);
+  }
+}
 
 Sorter::~Sorter() {
   DCHECK(sorted_runs_.empty());
@@ -812,7 +825,7 @@ Status Sorter::Prepare(ObjectPool* obj_pool) {
   }
   has_var_len_slots_ = sort_tuple_desc->HasVarlenSlots();
   in_mem_tuple_sorter_.reset(
-      new TupleSorter(this, compare_less_than_, sort_tuple_desc->byte_size(), state_));
+      new TupleSorter(this, *compare_less_than_, sort_tuple_desc->byte_size(), state_));
 
   if (enable_spilling_) {
     initial_runs_counter_ = ADD_COUNTER(profile_, "InitialRunsCreated", TUnit::UNIT);
@@ -831,13 +844,13 @@ Status Sorter::Prepare(ObjectPool* obj_pool) {
 }
 
 Status Sorter::Codegen(RuntimeState* state) {
-  return compare_less_than_.Codegen(state);
+  return compare_less_than_->Codegen(state);
 }
 
 Status Sorter::Open() {
   DCHECK(in_mem_tuple_sorter_ != nullptr) << "Not prepared";
   DCHECK(unsorted_run_ == nullptr) << "Already open";
-  RETURN_IF_ERROR(compare_less_than_.Open(&obj_pool_, state_, &expr_perm_pool_,
+  RETURN_IF_ERROR(compare_less_than_->Open(&obj_pool_, state_, &expr_perm_pool_,
       &expr_results_pool_));
   TupleDescriptor* sort_tuple_desc = output_row_desc_->tuple_descriptors()[0];
   unsorted_run_ = run_pool_.Add(new Run(this, sort_tuple_desc, true));
@@ -927,12 +940,12 @@ void Sorter::Reset() {
   merger_.reset();
   // Free resources from the current runs.
   CleanupAllRuns();
-  compare_less_than_.Close(state_);
+  compare_less_than_->Close(state_);
 }
 
 void Sorter::Close(RuntimeState* state) {
   CleanupAllRuns();
-  compare_less_than_.Close(state);
+  compare_less_than_->Close(state);
   ScalarExprEvaluator::Close(sort_tuple_expr_evals_, state);
   expr_perm_pool_.FreeAll();
   expr_results_pool_.FreeAll();
@@ -1069,7 +1082,7 @@ Status Sorter::CreateMerger(int num_runs) {
   // from the runs being merged. This is unnecessary overhead that is not required if we
   // correctly transfer resources.
   merger_.reset(
-      new SortedRunMerger(compare_less_than_, output_row_desc_, profile_, true));
+      new SortedRunMerger(*compare_less_than_, output_row_desc_, profile_, true));
 
   vector<function<Status (RowBatch**)>> merge_runs;
   merge_runs.reserve(num_runs);

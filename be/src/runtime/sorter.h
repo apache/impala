@@ -108,7 +108,7 @@ class Sorter {
       const std::vector<ScalarExpr*>& sort_tuple_exprs, RowDescriptor* output_row_desc,
       MemTracker* mem_tracker, BufferPool::ClientHandle* client, int64_t page_len,
       RuntimeProfile* profile, RuntimeState* state, const std::string& node_label,
-      bool enable_spilling);
+      bool enable_spilling, TSortingOrder::type sorting_order);
   ~Sorter();
 
   /// Initial set-up of the sorter for execution.
@@ -221,7 +221,7 @@ class Sorter {
   MemPool expr_results_pool_;
 
   /// In memory sorter and less-than comparator.
-  TupleRowComparator compare_less_than_;
+  boost::scoped_ptr<TupleRowComparator> compare_less_than_;
   boost::scoped_ptr<TupleSorter> in_mem_tuple_sorter_;
 
   /// Client used to allocate pages from the buffer pool. Not owned.

@@ -1394,13 +1394,17 @@ Status HdfsParquetTableWriter::FlushCurrentRowGroup() {
   }
 
   // Populate RowGroup::sorting_columns with all columns specified by the Frontend.
-  for (int col_idx : parent_->sort_columns()) {
-    current_row_group_->sorting_columns.push_back(parquet::SortingColumn());
-    parquet::SortingColumn& sorting_column = current_row_group_->sorting_columns.back();
-    sorting_column.column_idx = col_idx;
-    sorting_column.descending = false;
-    sorting_column.nulls_first = false;
+  // Do that only, if the sorting type is lexical.
+  if (parent_->sorting_order() == TSortingOrder::LEXICAL){
+    for (int col_idx : parent_->sort_columns()) {
+      current_row_group_->sorting_columns.push_back(parquet::SortingColumn());
+      parquet::SortingColumn& sorting_column = current_row_group_->sorting_columns.back();
+      sorting_column.column_idx = col_idx;
+      sorting_column.descending = false;
+      sorting_column.nulls_first = false;
+    }
   }
+
   current_row_group_->__isset.sorting_columns =
       !current_row_group_->sorting_columns.empty();
 

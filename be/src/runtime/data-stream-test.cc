@@ -346,7 +346,7 @@ class DataStreamTest : public testing::Test {
     SlotRef* lhs_slot = obj_pool_.Add(new SlotRef(TYPE_BIGINT, 0));
     ASSERT_OK(lhs_slot->Init(RowDescriptor(), true, runtime_state_.get()));
     ordering_exprs_.push_back(lhs_slot);
-    less_than_ = obj_pool_.Add(new TupleRowComparator(ordering_exprs_,
+    less_than_ = obj_pool_.Add(new TupleRowLexicalComparator(ordering_exprs_,
         is_asc_, nulls_first_));
     ASSERT_OK(less_than_->Open(
         &obj_pool_, runtime_state_.get(), mem_pool_.get(), mem_pool_.get()));
