@@ -711,7 +711,7 @@ under the License.
       </conbody>
 
     </concept>
-    <concept id="concept_l5h_cwx_ljb">
+    <concept id="webui_impalad_prometheus">
       <title>Prometheus Metrics Page</title>
       <conbody>
         <p>At <b>/metrics_prometheus</b> under the main <codeph>impalad</codeph>
@@ -954,17 +954,17 @@ under the License.
         </p>
 
       </conbody>
-      <concept id="concept_dkw_cyx_ljb">
-        <title>Prometheus Metrics Page</title>
-        <conbody>
-          <p>At <b>/metrics_prometheus</b> under the main
-              <codeph>statestored</codeph> Web UI, the metrics are generated in
-            Prometheus exposition format that Prometheus can consumes for event
-            monitoring and alerting. The <b>/metrics_prometheus</b> is not shown
-            in the Web UI list of pages.</p>
-        </conbody>
-      </concept>
 
+    </concept>
+    <concept id="webui_statestored_prometheus">
+      <title>Prometheus Metrics Page</title>
+      <conbody>
+        <p>At <b>/metrics_prometheus</b> under the main
+            <codeph>statestored</codeph> Web UI, the metrics are generated in
+          Prometheus exposition format that Prometheus can consumes for event
+          monitoring and alerting. The <b>/metrics_prometheus</b> is not shown
+          in the Web UI list of pages.</p>
+      </conbody>
     </concept>
 
   </concept>
@@ -1103,7 +1103,7 @@ under the License.
           about modifying these values. </p>
       </conbody>
     </concept>
-    <concept id="concept_chs_fdy_ljb">
+    <concept id="webui_catalogd_prometheus">
       <title>Prometheus Metrics Page</title>
       <conbody>
         <p>At <b>/metrics_prometheus</b> under the main
