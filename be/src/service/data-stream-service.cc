@@ -125,7 +125,6 @@ void DataStreamService::PublishFilter(
   DebugActionNoFail(FLAGS_debug_actions, "PUBLISH_FILTER_DELAY");
   DCHECK(req->has_filter_id());
   DCHECK(req->has_dst_query_id());
-  DCHECK(req->has_dst_fragment_idx());
   DCHECK(req->has_bloom_filter() || req->has_min_max_filter());
   QueryState::ScopedRef qs(ProtoToQueryId(req->dst_query_id()));
 

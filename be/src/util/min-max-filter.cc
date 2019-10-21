@@ -323,6 +323,7 @@ void StringMinMaxFilter::CopyToBuffer(
 
 void StringMinMaxFilter::SetAlwaysTrue() {
   always_true_ = true;
+  always_false_ = false;
   max_buffer_.Clear();
   min_buffer_.Clear();
   min_.ptr = nullptr;
@@ -454,7 +455,7 @@ void DecimalMinMaxFilter::ToProtobuf(MinMaxFilterPB* protobuf) const {
   protobuf->set_always_true(false);
 }
 
-void DecimalMinMaxFilter::Insert(void* val) {
+void DecimalMinMaxFilter::Insert(const void* val) {
   if (val == nullptr) return;
   switch (size_) {
     case 4:
@@ -602,6 +603,18 @@ MinMaxFilter* MinMaxFilter::Create(const MinMaxFilterPB& protobuf, ColumnType ty
       DCHECK(false) << "Unsupported MinMaxFilter type: " << type;
   }
   return nullptr;
+}
+
+void MinMaxFilter::Or(const MinMaxFilter& other) {
+  if (other.AlwaysFalse()) return; // Updating with always false is a no-op.
+  if (other.AlwaysTrue()) {
+    SetAlwaysTrue();
+    return;
+  }
+  // 'other' should have valid min and max values, so we can simply update this
+  // filter with those to get the correct result.
+  Insert(other.GetMin());
+  Insert(other.GetMax());
 }
 
 void MinMaxFilter::Or(

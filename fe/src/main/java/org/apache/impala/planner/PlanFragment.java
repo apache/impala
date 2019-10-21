@@ -18,10 +18,9 @@
 package org.apache.impala.planner;
 
 import java.util.ArrayList;
-import java.util.HashSet;
+import java.util.HashMap;
 import java.util.List;
-import java.util.Set;
-
+import java.util.Map;
 import org.apache.impala.analysis.Analyzer;
 import org.apache.impala.analysis.Expr;
 import org.apache.impala.common.AnalysisException;
@@ -100,18 +99,34 @@ public class PlanFragment extends TreeNode<PlanFragment> {
   // Resource requirements and estimates for an instance of this plan fragment.
   // Initialized with a dummy value. Gets set correctly in
   // computeResourceProfile().
-  private ResourceProfile resourceProfile_ = ResourceProfile.invalid();
+  private ResourceProfile perInstanceResourceProfile_ = ResourceProfile.invalid();
+
+  // Resource requirements and estimates for per-host resources that are consumed
+  // on a backend running an instance of this plan fragment. Initialized with a
+  // dummy value. Gets set correctly in computeResourceProfile().
+  private ResourceProfile perBackendResourceProfile_ = ResourceProfile.invalid();
 
   // The total of initial memory reservations (in bytes) that will be claimed over the
-  // lifetime of this fragment. Computed in computeResourceProfile().
-  private long initialMemReservationTotalClaims_ = -1;
+  // lifetime of a fragment executing on a backend. Computed in computeResourceProfile().
+  // Split between the per-instance amounts and reservations shared across all instance
+  // on a backend.
+  private long perInstanceInitialMemReservationTotalClaims_ = -1;
+  private long perBackendInitialMemReservationTotalClaims_ = -1;
 
-  // The total memory (in bytes) required for the runtime filters used by the plan nodes
-  // managed by this fragment.
-  private long runtimeFiltersMemReservationBytes_ = 0;
+  // The total memory (in bytes) required for the runtime filters produced by the
+  // plan nodes in this fragment. Each instance of the fragment will produce a separate
+  // copy of the filter, so requires its own memory.
+  private long producedRuntimeFiltersMemReservationBytes_ = 0;
 
-  public long getRuntimeFiltersMemReservationBytes() {
-    return runtimeFiltersMemReservationBytes_;
+  // The total memory (in bytes) required for global runtime filters consumed by the
+  // plan nodes in this fragment. Memory for locally produced filters is accounted
+  // for in producedRuntimeFiltersMemReservationBytes_.
+  // A single instance of the filter is shared between all instances of a fragment
+  // on a backend.
+  private long consumedGlobalRuntimeFiltersMemReservationBytes_ = 0;
+
+  public long getProducedRuntimeFiltersMemReservationBytes() {
+    return producedRuntimeFiltersMemReservationBytes_;
   }
 
   /**
@@ -225,24 +240,14 @@ public class PlanFragment extends TreeNode<PlanFragment> {
   public void computeResourceProfile(Analyzer analyzer) {
     // Compute resource profiles for all plan nodes and sinks in the fragment.
     sink_.computeResourceProfile(analyzer.getQueryOptions());
-    Set<RuntimeFilterId> filterSet = new HashSet<>();
-    for (PlanNode node: collectPlanNodes()) {
-      node.computeNodeResourceProfile(analyzer.getQueryOptions());
-      for (RuntimeFilter filter: node.getRuntimeFilters()) {
-        // A filter can be a part of both produced and consumed filters in a fragment,
-        // so only add it once.
-        if (!filterSet.contains(filter.getFilterId())) {
-          filterSet.add(filter.getFilterId());
-          runtimeFiltersMemReservationBytes_ += filter.getFilterSize();
-        }
-      }
-    }
+    computeRuntimeFilterResources(analyzer);
 
     if (sink_ instanceof JoinBuildSink) {
       // Resource consumption of fragments with join build sinks is included in the
       // parent fragment because the join node blocks waiting for the join build to
       // finish - see JoinNode.computeTreeResourceProfiles().
-      resourceProfile_ = ResourceProfile.invalid();
+      perBackendResourceProfile_ = ResourceProfile.invalid();
+      perInstanceResourceProfile_ = ResourceProfile.invalid();
       return;
     }
 
@@ -252,20 +257,73 @@ public class PlanFragment extends TreeNode<PlanFragment> {
     ResourceProfile fInstancePostOpenProfile =
         planTreeProfile.postOpenProfile.sum(sink_.getResourceProfile());
     // One thread is required to execute the plan tree.
-    resourceProfile_ = new ResourceProfileBuilder()
-        .setMemEstimateBytes(runtimeFiltersMemReservationBytes_)
-        .setMinMemReservationBytes(runtimeFiltersMemReservationBytes_)
-        .setThreadReservation(1).build()
-        .sum(planTreeProfile.duringOpenProfile.max(fInstancePostOpenProfile));
-    initialMemReservationTotalClaims_ = sink_.getResourceProfile().getMinMemReservationBytes() +
-        runtimeFiltersMemReservationBytes_;
-    for (PlanNode node: collectPlanNodes()) {
-      initialMemReservationTotalClaims_ +=
+    perInstanceResourceProfile_ =
+        new ResourceProfileBuilder()
+            .setMemEstimateBytes(producedRuntimeFiltersMemReservationBytes_)
+            .setMinMemReservationBytes(producedRuntimeFiltersMemReservationBytes_)
+            .setThreadReservation(1)
+            .build()
+            .sum(planTreeProfile.duringOpenProfile.max(fInstancePostOpenProfile));
+    perBackendResourceProfile_ =
+        new ResourceProfileBuilder()
+            .setMemEstimateBytes(consumedGlobalRuntimeFiltersMemReservationBytes_)
+            .setMinMemReservationBytes(consumedGlobalRuntimeFiltersMemReservationBytes_)
+            .setThreadReservation(0)
+            .build();
+    perBackendInitialMemReservationTotalClaims_ =
+        consumedGlobalRuntimeFiltersMemReservationBytes_;
+    perInstanceInitialMemReservationTotalClaims_ =
+        sink_.getResourceProfile().getMinMemReservationBytes()
+        + producedRuntimeFiltersMemReservationBytes_;
+    for (PlanNode node : collectPlanNodes()) {
+      perInstanceInitialMemReservationTotalClaims_ +=
           node.getNodeResourceProfile().getMinMemReservationBytes();
     }
   }
 
-  public ResourceProfile getResourceProfile() { return resourceProfile_; }
+  /**
+   * Helper for computeResourceProfile(). Populates
+   * producedRuntimeFiltersMemReservationBytes_ and
+   * consumedGlobalRuntimeFiltersMemReservationBytes_.
+   */
+  private void computeRuntimeFilterResources(Analyzer analyzer) {
+    Map<RuntimeFilterId, RuntimeFilter> consumedFilters = new HashMap<>();
+    Map<RuntimeFilterId, RuntimeFilter> producedFilters = new HashMap<>();
+    for (PlanNode node : collectPlanNodes()) {
+      node.computeNodeResourceProfile(analyzer.getQueryOptions());
+      boolean isFilterProducer = node instanceof JoinNode;
+      for (RuntimeFilter filter : node.getRuntimeFilters()) {
+        if (isFilterProducer) {
+          producedFilters.put(filter.getFilterId(), filter);
+        } else {
+          consumedFilters.put(filter.getFilterId(), filter);
+        }
+      }
+    }
+    for (RuntimeFilter f : producedFilters.values()) {
+      producedRuntimeFiltersMemReservationBytes_ += f.getFilterSize();
+    }
+    for (RuntimeFilter f : consumedFilters.values()) {
+      if (!producedFilters.containsKey(f.getFilterId())) {
+        consumedGlobalRuntimeFiltersMemReservationBytes_ += f.getFilterSize();
+      }
+    }
+  }
+
+  public ResourceProfile getPerInstanceResourceProfile() {
+    return perInstanceResourceProfile_;
+  }
+  public ResourceProfile getPerBackendResourceProfile() {
+    return perBackendResourceProfile_;
+  }
+
+  /*
+   * Return the resource profile for all instances on a single backend.
+   */
+  public ResourceProfile getTotalPerBackendResourceProfile(int mtDop) {
+    return perInstanceResourceProfile_.multiply(getNumInstancesPerHost(mtDop))
+        .sum(perBackendResourceProfile_);
+  }
 
   /**
    * Return the number of nodes on which the plan fragment will execute.
@@ -329,16 +387,30 @@ public class PlanFragment extends TreeNode<PlanFragment> {
     if (planRoot_ != null) result.setPlan(planRoot_.treeToThrift());
     if (sink_ != null) result.setOutput_sink(sink_.toThrift());
     result.setPartition(dataPartition_.toThrift());
-    if (resourceProfile_.isValid()) {
-      Preconditions.checkArgument(initialMemReservationTotalClaims_ > -1);
-      result.setMin_mem_reservation_bytes(resourceProfile_.getMinMemReservationBytes());
-      result.setInitial_mem_reservation_total_claims(initialMemReservationTotalClaims_);
-      result.setRuntime_filters_reservation_bytes(runtimeFiltersMemReservationBytes_);
-      result.setThread_reservation(resourceProfile_.getThreadReservation());
+    if (perInstanceResourceProfile_.isValid()) {
+      Preconditions.checkState(perBackendResourceProfile_.isValid());
+      Preconditions.checkArgument(perInstanceInitialMemReservationTotalClaims_ > -1);
+      Preconditions.checkArgument(perBackendInitialMemReservationTotalClaims_ > -1);
+      result.setInstance_min_mem_reservation_bytes(
+          perInstanceResourceProfile_.getMinMemReservationBytes());
+      result.setBackend_min_mem_reservation_bytes(
+          perBackendResourceProfile_.getMinMemReservationBytes());
+      result.setInstance_initial_mem_reservation_total_claims(
+          perInstanceInitialMemReservationTotalClaims_);
+      result.setBackend_initial_mem_reservation_total_claims(
+          perBackendInitialMemReservationTotalClaims_);
+      result.setProduced_runtime_filters_reservation_bytes(
+          producedRuntimeFiltersMemReservationBytes_);
+      result.setConsumed_runtime_filters_reservation_bytes(
+          consumedGlobalRuntimeFiltersMemReservationBytes_);
+      result.setThread_reservation(perInstanceResourceProfile_.getThreadReservation());
     } else {
-      result.setMin_mem_reservation_bytes(0);
-      result.setInitial_mem_reservation_total_claims(0);
-      result.setRuntime_filters_reservation_bytes(0);
+      result.setBackend_min_mem_reservation_bytes(0);
+      result.setInstance_min_mem_reservation_bytes(0);
+      result.setBackend_initial_mem_reservation_total_claims(0);
+      result.setInstance_initial_mem_reservation_total_claims(0);
+      result.setProduced_runtime_filters_reservation_bytes(0);
+      result.setConsumed_runtime_filters_reservation_bytes(0);
     }
     return result;
   }
@@ -415,19 +487,61 @@ public class PlanFragment extends TreeNode<PlanFragment> {
     builder.append(PrintUtils.printNumHosts(" ", getNumNodes()));
     builder.append(PrintUtils.printNumInstances(" ", getNumInstances(mt_dop)));
     builder.append("\n");
-    builder.append(detailPrefix);
-    builder.append("Per-Host Resources: ");
+    String perHostPrefix = mt_dop == 0 ?
+        "Per-Host Resources: " : "Per-Host Shared Resources: ";
+    String perHostExplainString = null;
+    String perInstanceExplainString = null;
     if (sink_ instanceof JoinBuildSink) {
-      builder.append("included in parent fragment");
+      perHostExplainString = "included in parent fragment";
+      perInstanceExplainString = mt_dop == 0 ? null : "included in parent fragment";
+    } else if (mt_dop == 0) {
+      // There is no point separating out per-host and per-instance resources when there
+      // is only a single instance per host so combine them together.
+      ResourceProfile perHostProfile = getTotalPerBackendResourceProfile(mt_dop);
+      StringBuilder perHostBuilder = new StringBuilder(perHostProfile.getExplainString());
+      long totalRuntimeFilterReservation = producedRuntimeFiltersMemReservationBytes_
+          + consumedGlobalRuntimeFiltersMemReservationBytes_;
+      if (perHostProfile.isValid() && totalRuntimeFilterReservation > 0) {
+        perHostBuilder.append(" runtime-filters-memory=");
+        perHostBuilder.append(PrintUtils.printBytes(totalRuntimeFilterReservation));
+      }
+      perHostExplainString = perHostBuilder.toString();
     } else {
-      builder.append(resourceProfile_.multiply(getNumInstancesPerHost(mt_dop))
-          .getExplainString());
-      if (resourceProfile_.isValid() && runtimeFiltersMemReservationBytes_ > 0) {
-        builder.append(" runtime-filters-memory=");
-        builder.append(PrintUtils.printBytes(runtimeFiltersMemReservationBytes_));
+      if (perBackendResourceProfile_.isValid()
+          && perBackendResourceProfile_.isNonZero()) {
+        StringBuilder perHostBuilder =
+            new StringBuilder(perBackendResourceProfile_.getExplainString());
+        if (consumedGlobalRuntimeFiltersMemReservationBytes_ > 0) {
+          perHostBuilder.append(" runtime-filters-memory=");
+          perHostBuilder.append(
+              PrintUtils.printBytes(consumedGlobalRuntimeFiltersMemReservationBytes_));
+        }
+        perHostExplainString = perHostBuilder.toString();
+      }
+      if (perInstanceResourceProfile_.isValid()) {
+        StringBuilder perInstanceBuilder =
+            new StringBuilder(perInstanceResourceProfile_.getExplainString());
+        if (producedRuntimeFiltersMemReservationBytes_ > 0) {
+          perInstanceBuilder.append(" runtime-filters-memory=");
+          perInstanceBuilder.append(
+              PrintUtils.printBytes(producedRuntimeFiltersMemReservationBytes_));
+        }
+        perInstanceExplainString = perInstanceBuilder.toString();
       }
     }
-    builder.append("\n");
+
+    if (perHostExplainString != null) {
+      builder.append(detailPrefix);
+      builder.append(perHostPrefix);
+      builder.append(perHostExplainString);
+      builder.append("\n");
+    }
+    if (perInstanceExplainString != null) {
+      builder.append(detailPrefix);
+      builder.append("Per-Instance Resources: ");
+      builder.append(perInstanceExplainString);
+      builder.append("\n");
+    }
     return builder.toString();
   }
 

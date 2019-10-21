@@ -47,8 +47,8 @@ class MinMaxFilter {
 
   /// Returns the min/max values in the tuple slot representation. It is not valid to call
   /// these functions if AlwaysFalse() returns true.
-  virtual void* GetMin() = 0;
-  virtual void* GetMax() = 0;
+  virtual const void* GetMin() const = 0;
+  virtual const void* GetMax() const = 0;
 
   /// Returns the min/max values in the out paramsters 'out_min'/'out_max', converted to
   /// fit into 'type', eg. if the calculated max value is greater than the max value for
@@ -61,7 +61,7 @@ class MinMaxFilter {
   virtual PrimitiveType type() = 0;
 
   /// Add a new value, updating the current min/max.
-  virtual void Insert(void* val) = 0;
+  virtual void Insert(const void* val) = 0;
 
   /// If true, this filter allows all rows to pass.
   virtual bool AlwaysTrue() const = 0;
@@ -87,6 +87,9 @@ class MinMaxFilter {
   static MinMaxFilter* Create(const MinMaxFilterPB& protobuf, ColumnType type,
       ObjectPool* pool, MemTracker* mem_tracker);
 
+  /// Updates this filter with the logical OR of this filter and 'other'.
+  void Or(const MinMaxFilter& other);
+
   /// Computes the logical OR of 'in' with 'out' and stores the result in 'out'.
   static void Or(
       const MinMaxFilterPB& in, MinMaxFilterPB* out, const ColumnType& columnType);
@@ -99,6 +102,11 @@ class MinMaxFilter {
 
   /// Returns the IRFunction::Type for Insert() for the given type.
   static IRFunction::Type GetInsertIRFunctionType(ColumnType col_type);
+
+ protected:
+  /// Makes this filter always return true. Only valid to call for filter implementations
+  /// where AlwaysTrue() can actually return true (e.g. not TIMESTAMP).
+  virtual void SetAlwaysTrue() = 0;
 };
 
 #define NUMERIC_MIN_MAX_FILTER(NAME, TYPE)                                    \
@@ -110,16 +118,19 @@ class MinMaxFilter {
     }                                                                         \
     NAME##MinMaxFilter(const MinMaxFilterPB& protobuf);                       \
     virtual ~NAME##MinMaxFilter() {}                                          \
-    virtual void* GetMin() override { return &min_; }                         \
-    virtual void* GetMax() override { return &max_; }                         \
+    virtual const void* GetMin() const override { return &min_; }             \
+    virtual const void* GetMax() const override { return &max_; }             \
     virtual bool GetCastIntMinMax(                                            \
         const ColumnType& type, int64_t* out_min, int64_t* out_max) override; \
     virtual PrimitiveType type() override;                                    \
-    virtual void Insert(void* val) override;                                  \
+    virtual void Insert(const void* val) override;                            \
     virtual bool AlwaysTrue() const override { return false; }                \
     virtual bool AlwaysFalse() const override {                               \
       return min_ == std::numeric_limits<TYPE>::max()                         \
           && max_ == std::numeric_limits<TYPE>::lowest();                     \
+    }                                                                         \
+    virtual void SetAlwaysTrue() override {                                   \
+      DCHECK(false) << "Numeric filters cannot be always true.";              \
     }                                                                         \
     virtual void ToProtobuf(MinMaxFilterPB* protobuf) const override;         \
     virtual std::string DebugString() const override;                         \
@@ -152,13 +163,14 @@ class StringMinMaxFilter : public MinMaxFilter {
   virtual ~StringMinMaxFilter() {}
   virtual void Close() override { mem_pool_.FreeAll(); }
 
-  virtual void* GetMin() override { return &min_; }
-  virtual void* GetMax() override { return &max_; }
+  virtual const void* GetMin() const override { return &min_; }
+  virtual const void* GetMax() const override { return &max_; }
   virtual PrimitiveType type() override;
 
-  virtual void Insert(void* val) override;
+  virtual void Insert(const void* val) override;
   virtual bool AlwaysTrue() const override { return always_true_; }
   virtual bool AlwaysFalse() const override { return always_false_; }
+  virtual void SetAlwaysTrue() override;
 
   /// Copies the values pointed to by 'min_'/'max_' into 'min_buffer_'/'max_buffer_',
   /// truncating them if necessary.
@@ -178,10 +190,6 @@ class StringMinMaxFilter : public MinMaxFilter {
   /// point to 'buffer'. If an oom is hit, disables the filter by setting 'always_true_'
   /// to true.
   void CopyToBuffer(StringBuffer* buffer, StringValue* value, int64_t len);
-
-  /// Sets 'always_true_' to true and clears the values of 'min_', 'max_', 'min_buffer_',
-  /// and 'max_buffer_'.
-  void SetAlwaysTrue();
 
   /// The maximum length of string to store in 'min_str_' or 'max_str_'. Strings inserted
   /// into this filter that are longer than this will be truncated.
@@ -211,14 +219,17 @@ class TimestampMinMaxFilter : public MinMaxFilter {
   TimestampMinMaxFilter(const MinMaxFilterPB& protobuf);
   virtual ~TimestampMinMaxFilter() {}
 
-  virtual void* GetMin() override { return &min_; }
-  virtual void* GetMax() override { return &max_; }
+  virtual const void* GetMin() const override { return &min_; }
+  virtual const void* GetMax() const override { return &max_; }
   virtual PrimitiveType type() override;
 
-  virtual void Insert(void* val) override;
+  virtual void Insert(const void* val) override;
   virtual bool AlwaysTrue() const override { return false; }
   virtual bool AlwaysFalse() const override { return always_false_; }
   virtual void ToProtobuf(MinMaxFilterPB* protobuf) const override;
+  virtual void SetAlwaysTrue() override {
+    DCHECK(false) << "Timestamp filters cannot be always true.";
+  }
   virtual std::string DebugString() const override;
 
   static void Or(const MinMaxFilterPB& in, MinMaxFilterPB* out);
@@ -272,29 +283,32 @@ class DecimalMinMaxFilter : public MinMaxFilter {
   DecimalMinMaxFilter(const MinMaxFilterPB& protobuf, int precision);
   virtual ~DecimalMinMaxFilter() {}
 
-  virtual void* GetMin() override {
+  virtual const void* GetMin() const override {
     GET_MINMAX(min);
     return nullptr;
   }
 
-  virtual void* GetMax() override {
+  virtual const void* GetMax() const override {
     GET_MINMAX(max);
     return nullptr;
   }
 
-  virtual void Insert(void* val) override;
+  virtual void Insert(const void* val) override;
   virtual PrimitiveType type() override;
   virtual bool AlwaysTrue() const override { return false; }
   virtual bool AlwaysFalse() const override { return always_false_; }
+  virtual void SetAlwaysTrue() override {
+    DCHECK(false) << "Decimal filters cannot be always true.";
+  }
   virtual void ToProtobuf(MinMaxFilterPB* protobuf) const override;
   virtual std::string DebugString() const override;
 
   static void Or(const MinMaxFilterPB& in, MinMaxFilterPB* out, int precision);
   static void Copy(const MinMaxFilterPB& in, MinMaxFilterPB* out);
 
-  void Insert4(void* val);
-  void Insert8(void* val);
-  void Insert16(void* val);
+  void Insert4(const void* val);
+  void Insert8(const void* val);
+  void Insert16(const void* val);
 
   /// Struct name in LLVM IR.
   static const char* LLVM_CLASS_NAME;

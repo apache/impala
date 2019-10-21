@@ -159,9 +159,6 @@ Status FragmentInstanceState::Prepare() {
   // Exercise debug actions at the first point where errors are possible in Prepare().
   RETURN_IF_ERROR(DebugAction(query_state_->query_options(), "FIS_IN_PREPARE"));
 
-  RETURN_IF_ERROR(runtime_state_->InitFilterBank(
-      fragment_ctx_.fragment.runtime_filters_reservation_bytes));
-
   avg_thread_tokens_ = profile()->AddSamplingCounter("AverageThreadTokens",
       bind<int64_t>(mem_fn(&ThreadResourcePool::num_threads),
           runtime_state_->resource_pool()));
@@ -528,13 +525,6 @@ void FragmentInstanceState::ReleaseThreadToken() {
 
 Status FragmentInstanceState::WaitForOpen() {
   return opened_promise_.Get();
-}
-
-void FragmentInstanceState::PublishFilter(
-    const PublishFilterParamsPB& params, RpcContext* context) {
-  VLOG_FILE << "PublishFilter(): instance_id=" << PrintId(instance_id())
-            << " filter_id=" << params.filter_id();
-  runtime_state_->filter_bank()->PublishGlobalFilter(params, context);
 }
 
 const string& FragmentInstanceState::ExecStateToString(FInstanceExecStatePB state) {

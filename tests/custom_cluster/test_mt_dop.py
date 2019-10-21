@@ -77,6 +77,17 @@ class TestMtDopFlags(CustomClusterTestSuite):
   def test_mt_dop_runtime_filters_one_node(self, vector):
     """Runtime filter tests, which assume 3 fragment instances, can also be run on a single
     node cluster to test multiple filter sources/destinations per backend."""
+    # Runtime filter test with RUNTIME_PROFILE seconds modified to reflect
+    # the different filter aggregation pattern with mt_dop.
     vector.get_value('exec_option')['mt_dop'] = 3
-    self.run_test_case('QueryTest/runtime_filters', vector,
+    self.run_test_case('QueryTest/runtime_filters_mt_dop', vector,
+        test_file_vars={'$RUNTIME_FILTER_WAIT_TIME_MS': str(WAIT_TIME_MS)})
+    vector.get_value('table_format').file_format = 'parquet'
+    self.run_test_case('QueryTest/runtime_filters_mt_dop', vector,
+        test_file_vars={'$RUNTIME_FILTER_WAIT_TIME_MS': str(WAIT_TIME_MS)})
+
+    # Also run with kudu to test min-max filters. Need to modify table_format directly
+    # so that the Kudu RUNTIME_PROFILE section is correctly used.
+    vector.get_value('table_format').file_format = 'kudu'
+    self.run_test_case('QueryTest/runtime_filters_mt_dop', vector,
         test_file_vars={'$RUNTIME_FILTER_WAIT_TIME_MS': str(WAIT_TIME_MS)})

@@ -72,6 +72,17 @@ class RuntimeFilter {
   /// once per filter. Does not acquire the memory associated with 'bloom_filter'.
   void SetFilter(BloomFilter* bloom_filter, MinMaxFilter* min_max_filter);
 
+  /// Set the internal bloom or min-max filter to the equivalent filter from 'other'.
+  /// The parameters of 'other' must be compatible and the filters must have the same
+  /// ID. Can only legally be called once per filter. Does not acquire the memory from
+  /// the other filter.
+  void SetFilter(RuntimeFilter* other);
+
+  /// Merge 'bloom_filter' or 'min_max_filter' into this filter. The caller must provide
+  /// the appropriate kind of filter for this RuntimeFilter instance.
+  /// Not thread-safe.
+  void Or(RuntimeFilter* other);
+
   /// Signal that no filter should be arriving, waking up any threads blocked in
   /// WaitForArrival().
   void Cancel();

@@ -116,8 +116,8 @@ PLAN-ROOT SINK
    runtime filters: RF000 -> store_sales.ss_sold_date_sk, RF002 -> store_sales.ss_item_sk
    row-size=16B cardinality=2.88M
 ---- PARALLELPLANS
-Max Per-Host Resource Reservation: Memory=69.62MB Threads=11
-Per-Host Resource Estimates: Memory=167MB
+Max Per-Host Resource Reservation: Memory=68.62MB Threads=11
+Per-Host Resource Estimates: Memory=166MB
 PLAN-ROOT SINK
 |
 12:MERGING-EXCHANGE [UNPARTITIONED]
@@ -342,8 +342,8 @@ PLAN-ROOT SINK
    runtime filters: RF000 -> ss_item_sk, RF002 -> ss_promo_sk, RF004 -> ss_cdemo_sk, RF006 -> ss_sold_date_sk
    row-size=36B cardinality=2.88M
 ---- PARALLELPLANS
-Max Per-Host Resource Reservation: Memory=101.50MB Threads=15
-Per-Host Resource Estimates: Memory=408MB
+Max Per-Host Resource Reservation: Memory=98.50MB Threads=15
+Per-Host Resource Estimates: Memory=405MB
 PLAN-ROOT SINK
 |
 18:MERGING-EXCHANGE [UNPARTITIONED]
@@ -664,8 +664,8 @@ PLAN-ROOT SINK
    runtime filters: RF002 -> store_sales.ss_store_sk
    row-size=8B cardinality=84.40K
 ---- PARALLELPLANS
-Max Per-Host Resource Reservation: Memory=94.27MB Threads=17
-Per-Host Resource Estimates: Memory=288MB
+Max Per-Host Resource Reservation: Memory=91.27MB Threads=17
+Per-Host Resource Estimates: Memory=285MB
 PLAN-ROOT SINK
 |
 21:MERGING-EXCHANGE [UNPARTITIONED]
@@ -974,8 +974,8 @@ PLAN-ROOT SINK
    runtime filters: RF000 -> ss_store_sk, RF004 -> ss_customer_sk, RF006 -> ss_sold_date_sk, RF008 -> ss_item_sk
    row-size=24B cardinality=86.28K
 ---- PARALLELPLANS
-Max Per-Host Resource Reservation: Memory=108.27MB Threads=19
-Per-Host Resource Estimates: Memory=303MB
+Max Per-Host Resource Reservation: Memory=105.27MB Threads=19
+Per-Host Resource Estimates: Memory=300MB
 PLAN-ROOT SINK
 |
 22:MERGING-EXCHANGE [UNPARTITIONED]
@@ -1252,8 +1252,8 @@ PLAN-ROOT SINK
    runtime filters: RF000 -> ss_item_sk, RF002 -> ss_store_sk, RF004 -> ss_cdemo_sk, RF006 -> ss_sold_date_sk
    row-size=36B cardinality=2.88M
 ---- PARALLELPLANS
-Max Per-Host Resource Reservation: Memory=101.39MB Threads=15
-Per-Host Resource Estimates: Memory=408MB
+Max Per-Host Resource Reservation: Memory=98.39MB Threads=15
+Per-Host Resource Estimates: Memory=405MB
 PLAN-ROOT SINK
 |
 18:MERGING-EXCHANGE [UNPARTITIONED]
@@ -1529,8 +1529,8 @@ PLAN-ROOT SINK
    runtime filters: RF000 -> tpcds.store_sales.ss_customer_sk, RF002 -> store_sales.ss_store_sk, RF004 -> store_sales.ss_sold_date_sk, RF006 -> store_sales.ss_hdemo_sk
    row-size=24B cardinality=2.88M
 ---- PARALLELPLANS
-Max Per-Host Resource Reservation: Memory=87.52MB Threads=15
-Per-Host Resource Estimates: Memory=278MB
+Max Per-Host Resource Reservation: Memory=86.52MB Threads=15
+Per-Host Resource Estimates: Memory=277MB
 PLAN-ROOT SINK
 |
 18:MERGING-EXCHANGE [UNPARTITIONED]
@@ -2221,8 +2221,8 @@ PLAN-ROOT SINK
    runtime filters: RF002 -> tpcds.store_sales.ss_customer_sk, RF004 -> store_sales.ss_addr_sk, RF006 -> store_sales.ss_store_sk, RF008 -> store_sales.ss_sold_date_sk, RF010 -> store_sales.ss_hdemo_sk
    row-size=36B cardinality=2.88M
 ---- PARALLELPLANS
-Max Per-Host Resource Reservation: Memory=143.02MB Threads=19
-Per-Host Resource Estimates: Memory=361MB
+Max Per-Host Resource Reservation: Memory=141.02MB Threads=19
+Per-Host Resource Estimates: Memory=359MB
 PLAN-ROOT SINK
 |
 24:MERGING-EXCHANGE [UNPARTITIONED]
@@ -2668,8 +2668,8 @@ PLAN-ROOT SINK
    runtime filters: RF000 -> ss_store_sk, RF002 -> ss_sold_date_sk, RF004 -> ss_item_sk
    row-size=20B cardinality=2.88M
 ---- PARALLELPLANS
-Max Per-Host Resource Reservation: Memory=77.52MB Threads=13
-Per-Host Resource Estimates: Memory=206MB
+Max Per-Host Resource Reservation: Memory=75.52MB Threads=13
+Per-Host Resource Estimates: Memory=204MB
 PLAN-ROOT SINK
 |
 15:MERGING-EXCHANGE [UNPARTITIONED]
@@ -3224,8 +3224,8 @@ PLAN-ROOT SINK
    runtime filters: RF004 -> tpcds.store_sales.ss_store_sk, RF008 -> ss_sold_date_sk
    row-size=12B cardinality=2.88M
 ---- PARALLELPLANS
-Max Per-Host Resource Reservation: Memory=202.53MB Threads=23
-Per-Host Resource Estimates: Memory=483MB
+Max Per-Host Resource Reservation: Memory=195.53MB Threads=23
+Per-Host Resource Estimates: Memory=476MB
 PLAN-ROOT SINK
 |
 30:MERGING-EXCHANGE [UNPARTITIONED]
@@ -3555,8 +3555,8 @@ PLAN-ROOT SINK
    runtime filters: RF000 -> ss_store_sk, RF002 -> ss_sold_date_sk, RF004 -> ss_item_sk
    row-size=20B cardinality=546.31K
 ---- PARALLELPLANS
-Max Per-Host Resource Reservation: Memory=82.52MB Threads=15
-Per-Host Resource Estimates: Memory=226MB
+Max Per-Host Resource Reservation: Memory=80.52MB Threads=15
+Per-Host Resource Estimates: Memory=224MB
 PLAN-ROOT SINK
 |
 19:MERGING-EXCHANGE [UNPARTITIONED]
@@ -3898,8 +3898,8 @@ PLAN-ROOT SINK
    runtime filters: RF000 -> tpcds.store_sales.ss_store_sk, RF002 -> tpcds.store_sales.ss_item_sk, RF004 -> tpcds.store_sales.ss_store_sk, RF006 -> ss_sold_date_sk
    row-size=20B cardinality=2.88M
 ---- PARALLELPLANS
-Max Per-Host Resource Reservation: Memory=153.02MB Threads=21
-Per-Host Resource Estimates: Memory=392MB
+Max Per-Host Resource Reservation: Memory=149.02MB Threads=21
+Per-Host Resource Estimates: Memory=388MB
 PLAN-ROOT SINK
 |
 27:MERGING-EXCHANGE [UNPARTITIONED]
@@ -4260,8 +4260,8 @@ PLAN-ROOT SINK
    runtime filters: RF002 -> tpcds.store_sales.ss_customer_sk, RF004 -> store_sales.ss_addr_sk, RF006 -> store_sales.ss_store_sk, RF008 -> store_sales.ss_sold_date_sk, RF010 -> store_sales.ss_hdemo_sk
    row-size=40B cardinality=2.88M
 ---- PARALLELPLANS
-Max Per-Host Resource Reservation: Memory=204.64MB Threads=17
-Per-Host Resource Estimates: Memory=401MB
+Max Per-Host Resource Reservation: Memory=202.64MB Threads=17
+Per-Host Resource Estimates: Memory=399MB
 PLAN-ROOT SINK
 |
 23:MERGING-EXCHANGE [UNPARTITIONED]
@@ -4559,8 +4559,8 @@ PLAN-ROOT SINK
    runtime filters: RF000 -> tpcds.store_sales.ss_customer_sk, RF002 -> store_sales.ss_store_sk, RF004 -> store_sales.ss_sold_date_sk, RF006 -> store_sales.ss_hdemo_sk
    row-size=24B cardinality=2.88M
 ---- PARALLELPLANS
-Max Per-Host Resource Reservation: Memory=87.52MB Threads=15
-Per-Host Resource Estimates: Memory=279MB
+Max Per-Host Resource Reservation: Memory=86.52MB Threads=15
+Per-Host Resource Estimates: Memory=278MB
 PLAN-ROOT SINK
 |
 18:MERGING-EXCHANGE [UNPARTITIONED]
@@ -4833,8 +4833,8 @@ PLAN-ROOT SINK
    runtime filters: RF000 -> tpcds.store_sales.ss_customer_sk, RF002 -> store_sales.ss_sold_date_sk, RF004 -> store_sales.ss_store_sk, RF006 -> store_sales.ss_hdemo_sk
    row-size=36B cardinality=2.88M
 ---- PARALLELPLANS
-Max Per-Host Resource Reservation: Memory=83.77MB Threads=15
-Per-Host Resource Estimates: Memory=270MB
+Max Per-Host Resource Reservation: Memory=82.77MB Threads=15
+Per-Host Resource Estimates: Memory=269MB
 PLAN-ROOT SINK
 |
 18:MERGING-EXCHANGE [UNPARTITIONED]
@@ -5507,8 +5507,8 @@ PLAN-ROOT SINK
    runtime filters: RF000 -> ss_sold_date_sk, RF002 -> ss_item_sk
    row-size=16B cardinality=29.76K
 ---- PARALLELPLANS
-Max Per-Host Resource Reservation: Memory=115.75MB Threads=11
-Per-Host Resource Estimates: Memory=203MB
+Max Per-Host Resource Reservation: Memory=113.75MB Threads=11
+Per-Host Resource Estimates: Memory=201MB
 PLAN-ROOT SINK
 |
 14:MERGING-EXCHANGE [UNPARTITIONED]
@@ -5822,8 +5822,8 @@ PLAN-ROOT SINK
    runtime filters: RF004 -> s.ss_item_sk, RF006 -> s.ss_sold_date_sk, RF010 -> s.ss_customer_sk
    row-size=16B cardinality=2.88M
 ---- PARALLELPLANS
-Max Per-Host Resource Reservation: Memory=176.88MB Threads=22
-Per-Host Resource Estimates: Memory=433MB
+Max Per-Host Resource Reservation: Memory=173.88MB Threads=22
+Per-Host Resource Estimates: Memory=430MB
 PLAN-ROOT SINK
 |
 30:MERGING-EXCHANGE [UNPARTITIONED]
@@ -7052,8 +7052,8 @@ PLAN-ROOT SINK
    runtime filters: RF010 -> ss_sold_date_sk, RF008 -> ss_item_sk, RF006 -> ss_promo_sk, RF002 -> ss_customer_sk, RF004 -> ss_store_sk
    row-size=28B cardinality=2.88M
 ---- PARALLELPLANS
-Max Per-Host Resource Reservation: Memory=236.78MB Threads=32
-Per-Host Resource Estimates: Memory=621MB
+Max Per-Host Resource Reservation: Memory=232.78MB Threads=32
+Per-Host Resource Estimates: Memory=617MB
 PLAN-ROOT SINK
 |
 27:SORT

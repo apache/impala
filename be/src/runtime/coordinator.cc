@@ -343,6 +343,8 @@ void Coordinator::InitFilterRoutingTable() {
   for (const FragmentExecParams& fragment_params: schedule_.fragment_exec_params()) {
     int num_instances = fragment_params.instance_exec_params.size();
     DCHECK_GT(num_instances, 0);
+    int num_backends = fragment_params.GetNumBackends();
+    DCHECK_GT(num_backends, 0);
 
     for (const TPlanNode& plan_node: fragment_params.fragment.plan.nodes) {
       if (!plan_node.__isset.runtime_filters) continue;
@@ -359,13 +361,24 @@ void Coordinator::InitFilterRoutingTable() {
         if (plan_node.__isset.hash_join_node) {
           // Set the 'pending_count_' to zero to indicate that for a filter with
           // local-only targets the coordinator does not expect to receive any filter
-          // updates.
+          // updates. We expect to receive a single aggregated filter from each backend
+          // for partitioned joins.
           int pending_count = filter.is_broadcast_join
-              ? (filter.has_remote_targets ? 1 : 0) : num_instances;
+              ? (filter.has_remote_targets ? 1 : 0) : num_backends;
           f->set_pending_count(pending_count);
 
           // determine source instances
-          // TODO: store this in FInstanceExecParams, not in FilterState
+          // TODO: IMPALA-9333: having a shared RuntimeFilterBank between all fragments on
+          // a backend allows further optimizations to reduce the number of broadcast join
+          // filters sent over the network, by considering cross-fragment filters on
+          // the same backend as local filters:
+          // 1. Produce a local filter on any backend with a destination fragment.
+          // 2. Only produce one local filter per backend (although, this would be made
+          //    redundant by IMPALA-4224 - sharing broadcast join hash tables).
+          // 3. Don't produce a global filter if all targets can be satisfied with
+          //    local producers.
+          // This work was deferred from the IMPALA-4400 change because it provides only
+          // incremental performance benefits.
           vector<int> src_idxs = fragment_params.GetInstanceIdxs();
 
           // If this is a broadcast join with only non-local targets, build and publish it
@@ -1104,7 +1117,7 @@ Coordinator::ResourceUtilization Coordinator::ComputeQueryResourceUtilization() 
 vector<TNetworkAddress> Coordinator::GetActiveBackends(
     const vector<TNetworkAddress>& candidates) {
   // Build set from vector so that runtime of this function is O(backend_states.size()).
-  unordered_set<TNetworkAddress> candidate_set(candidates.begin(), candidates.end());
+  std::unordered_set<TNetworkAddress> candidate_set(candidates.begin(), candidates.end());
   vector<TNetworkAddress> result;
   lock_guard<SpinLock> l(backend_states_init_lock_);
   for (BackendState* backend_state : backend_states_) {
@@ -1117,6 +1130,7 @@ vector<TNetworkAddress> Coordinator::GetActiveBackends(
 }
 
 void Coordinator::UpdateFilter(const UpdateFilterParamsPB& params, RpcContext* context) {
+  VLOG(2) << "UpdateFilter(filter_id=" << params.filter_id() << ")";
   shared_lock<shared_mutex> lock(filter_routing_table_->lock);
   DCHECK_NE(filter_mode_, TRuntimeFilterMode::OFF)
       << "UpdateFilter() called although runtime filters are disabled";
@@ -1128,7 +1142,7 @@ void Coordinator::UpdateFilter(const UpdateFilterParamsPB& params, RpcContext* c
       << "Filter received before routing table complete";
 
   PublishFilterParamsPB rpc_params;
-  unordered_set<int> target_fragment_idxs;
+  std::unordered_set<int> target_fragment_idxs;
   if (!IsExecuting()) {
     LOG(INFO) << "Filter update received for non-executing query with id: "
         << query_id();
@@ -1200,17 +1214,17 @@ void Coordinator::UpdateFilter(const UpdateFilterParamsPB& params, RpcContext* c
 
     // Waited for exec_rpcs_complete_barrier_ so backend_states_ is valid.
     for (BackendState* bs : backend_states_) {
-      for (int fragment_idx : target_fragment_idxs) {
-        if (!IsExecuting()) {
-          if (rpc_params.has_bloom_filter()) {
-            filter_mem_tracker_->Release(state->bloom_filter_directory().size());
-            state->bloom_filter_directory().clear();
-            state->bloom_filter_directory().shrink_to_fit();
-          }
+      if (!IsExecuting()) {
+        if (rpc_params.has_bloom_filter()) {
+          filter_mem_tracker_->Release(state->bloom_filter_directory().size());
+          state->bloom_filter_directory().clear();
+          state->bloom_filter_directory().shrink_to_fit();
           return;
         }
+      }
 
-        rpc_params.set_dst_fragment_idx(fragment_idx);
+      if (bs->HasFragmentIdx(target_fragment_idxs)) {
+        rpc_params.set_filter_id(params.filter_id());
         RpcController* controller = obj_pool()->Add(new RpcController);
         PublishFilterResultPB* res = obj_pool()->Add(new PublishFilterResultPB);
         if (rpc_params.has_bloom_filter() && !rpc_params.bloom_filter().always_false()

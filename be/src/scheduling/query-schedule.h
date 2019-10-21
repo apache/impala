@@ -142,6 +142,9 @@ struct FragmentExecParams {
 
   // Fragments that are inputs to an ExchangeNode of this fragment.
   std::vector<FragmentIdx> exchange_input_fragments;
+
+  // Instances of this fragment. Instances on a backend are clustered together - i.e. all
+  // instances for a given backend will be consecutive entries in the vector.
   std::vector<FInstanceExecParams> instance_exec_params;
 
   FragmentExecParams(const TPlanFragment& fragment)
@@ -149,6 +152,9 @@ struct FragmentExecParams {
 
   // extract instance indices from instance_exec_params.instance_id
   std::vector<int> GetInstanceIdxs() const;
+
+  // Calculate distinct number of backends finstances are scheduled on.
+  int GetNumBackends() const;
 };
 
 /// A QuerySchedule contains all necessary information for a query coordinator to

@@ -21,7 +21,6 @@
 #include <memory>
 #include <mutex>
 #include <unordered_map>
-#include <boost/scoped_ptr.hpp>
 
 #include "common/atomic.h"
 #include "common/object-pool.h"
@@ -43,6 +42,7 @@ class RpcContext;
 namespace impala {
 
 class ControlServiceProxy;
+class RuntimeFilterBank;
 class FragmentInstanceState;
 class InitialReservations;
 class MemTracker;
@@ -137,6 +137,7 @@ class QueryState {
     return query_ctx_.client_request.query_options;
   }
   MemTracker* query_mem_tracker() const { return query_mem_tracker_; }
+  RuntimeProfile* host_profile() const { return host_profile_; }
 
   /// The following getters are only valid after Init().
   ScannerMemLimiter* scanner_mem_limiter() const { return scanner_mem_limiter_; }
@@ -148,14 +149,12 @@ class QueryState {
     DCHECK_GT(backend_resource_refcnt_.Load(), 0);
     return buffer_reservation_;
   }
-  InitialReservations* initial_reservations() const {
-    DCHECK_GT(backend_resource_refcnt_.Load(), 0);
-    return initial_reservations_;
-  }
+  InitialReservations* initial_reservations() const { return initial_reservations_; }
   TmpFileMgr::FileGroup* file_group() const {
     DCHECK_GT(backend_resource_refcnt_.Load(), 0);
     return file_group_;
   }
+  RuntimeFilterBank* filter_bank() const { return filter_bank_.get(); }
 
   /// The following getters are only valid after StartFInstances().
   int64_t fragment_events_start_time() const { return fragment_events_start_time_; }
@@ -347,6 +346,10 @@ class QueryState {
   /// enabled. Set in Prepare().
   TmpFileMgr::FileGroup* file_group_ = nullptr;
 
+  /// Manages runtime filters that are either produced or consumed (or both!) by plan
+  /// nodes on this backend.
+  std::unique_ptr<RuntimeFilterBank> filter_bank_;
+
   /// created in StartFInstances(), owned by obj_pool_
   DescriptorTbl* desc_tbl_ = nullptr;
 
@@ -365,13 +368,6 @@ class QueryState {
   /// StartFInstances(); Not valid to read from until 'instances_prepared_barrier_'
   /// is set (i.e. readers should always call WaitForPrepare()).
   std::unordered_map<TUniqueId, FragmentInstanceState*> fis_map_;
-
-  /// map from fragment index to its instances (owned by obj_pool_), populated in
-  /// StartFInstances(). Only written by the query state thread (i.e. the thread
-  /// which executes StartFInstances()). Not valid to read from until
-  /// 'instances_prepared_barrier_' is set (i.e. accessor should always call
-  /// WaitForPrepare()).
-  std::unordered_map<int, std::vector<FragmentInstanceState*>> fragment_map_;
 
   ObjectPool obj_pool_;
   AtomicInt32 refcnt_;
@@ -415,6 +411,11 @@ class QueryState {
 
   /// Called from Init() to set up buffer reservations and the file group.
   Status InitBufferPoolState() WARN_UNUSED_RESULT;
+
+  /// Initializes the runtime filter bank and claims the initial buffer reservation
+  /// for it. The initial reservation must be claimed by 'init_reservations_' before
+  /// calling this.
+  Status InitFilterBank();
 
   /// Releases resources used for query backend execution. Guaranteed to be called only
   /// once. Must be called before destroying the QueryState. Not idempotent and not

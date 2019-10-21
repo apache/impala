@@ -38,6 +38,7 @@
 #include "runtime/initial-reservations.h"
 #include "runtime/mem-tracker.h"
 #include "runtime/query-exec-mgr.h"
+#include "runtime/runtime-filter-bank.h"
 #include "runtime/runtime-state.h"
 #include "runtime/scanner-mem-limiter.h"
 #include "service/control-service.h"
@@ -108,6 +109,7 @@ void QueryState::ReleaseBackendResources() {
   DCHECK(!released_backend_resources_);
   // Clean up temporary files.
   if (file_group_ != nullptr) file_group_->Close();
+  if (filter_bank_ != nullptr) filter_bank_->Close();
   // Release any remaining reservation.
   if (initial_reservations_ != nullptr) initial_reservations_->ReleaseResources();
   if (buffer_reservation_ != nullptr) buffer_reservation_->Close();
@@ -218,6 +220,7 @@ Status QueryState::Init(const ExecQueryFInstancesRequestPB* exec_rpc_params,
           query_mem_tracker_, exec_rpc_params->initial_mem_reservation_total_claims()));
   RETURN_IF_ERROR(initial_reservations_->Init(
       query_id(), exec_rpc_params->min_mem_reservation_bytes()));
+  RETURN_IF_ERROR(InitFilterBank());
   scanner_mem_limiter_ = obj_pool_.Add(new ScannerMemLimiter);
   return Status::OK();
 }
@@ -249,6 +252,49 @@ Status QueryState::InitBufferPoolState() {
             host_profile_, query_id(), query_options().scratch_limit));
   }
   return Status::OK();
+}
+
+Status QueryState::InitFilterBank() {
+  int64_t runtime_filters_reservation_bytes = 0;
+  int fragment_ctx_idx = -1;
+  const vector<TPlanFragmentCtx>& fragment_ctxs = fragment_info_.fragment_ctxs;
+  const vector<TPlanFragmentInstanceCtx>& instance_ctxs =
+      fragment_info_.fragment_instance_ctxs;
+  // Add entries for all filters.
+  unordered_map<int32_t, int> produced_filter_counts;
+  for (const TPlanFragmentCtx& fragment_ctx : fragment_ctxs) {
+    for (const TPlanNode& plan_node : fragment_ctx.fragment.plan.nodes) {
+      if (!plan_node.__isset.runtime_filters) continue;
+      for (const TRuntimeFilterDesc& filter : plan_node.runtime_filters) {
+        produced_filter_counts.emplace(filter.filter_id, 0);
+      }
+    }
+  }
+  for (const TPlanFragmentInstanceCtx& instance_ctx : instance_ctxs) {
+    bool first_instance_of_fragment = fragment_ctx_idx == -1
+        || fragment_ctxs[fragment_ctx_idx].fragment.idx != instance_ctx.fragment_idx;
+    if (first_instance_of_fragment) {
+      ++fragment_ctx_idx;
+      DCHECK_EQ(fragment_ctxs[fragment_ctx_idx].fragment.idx, instance_ctx.fragment_idx);
+    }
+    // TODO: this over-reserves memory a bit in a couple of cases:
+    // * if different fragments on this backend consume or produce the same filter.
+    // * if a finstance was chosen not to produce a global broadcast filter.
+    const TPlanFragment& fragment = fragment_ctxs[fragment_ctx_idx].fragment;
+    runtime_filters_reservation_bytes +=
+        fragment.produced_runtime_filters_reservation_bytes;
+    if (first_instance_of_fragment) {
+      // Consumed filters are shared between all instances.
+      runtime_filters_reservation_bytes +=
+          fragment.consumed_runtime_filters_reservation_bytes;
+    }
+    for (const TRuntimeFilterSource& produced_filter : instance_ctx.filters_produced) {
+      ++produced_filter_counts[produced_filter.filter_id];
+    }
+  }
+  filter_bank_.reset(new RuntimeFilterBank(
+      this, produced_filter_counts, runtime_filters_reservation_bytes));
+  return filter_bank_->ClaimBufferReservation();
 }
 
 const char* QueryState::BackendExecStateToString(const BackendExecState& state) {
@@ -545,11 +591,6 @@ bool QueryState::StartFInstances() {
     // spawned or we may race with users of 'fis_map_'.
     fis_map_.emplace(fis->instance_id(), fis);
 
-    // Update fragment_map_. Has to happen before the thread is spawned below or
-    // we may race with users of 'fragment_map_'.
-    vector<FragmentInstanceState*>& fis_list = fragment_map_[instance_ctx.fragment_idx];
-    fis_list.push_back(fis);
-
     string thread_name = Substitute("$0 (finst:$1)",
         FragmentInstanceState::FINST_THREAD_NAME_PREFIX,
         PrintId(instance_ctx.fragment_instance_id));
@@ -562,7 +603,6 @@ bool QueryState::StartFInstances() {
             [this, fis]() { this->ExecFInstance(fis); }, &t, true);
     if (!start_finstances_status.ok()) {
       fis_map_.erase(fis->instance_id());
-      fis_list.pop_back();
       // Undo refcnt increments done immediately prior to Thread::Create(). The
       // reference counts were both greater than zero before the increments, so
       // neither of these decrements will free any structures.
@@ -673,15 +713,13 @@ void QueryState::Cancel() {
   VLOG_QUERY << "Cancel: query_id=" << PrintId(query_id());
   discard_result(WaitForPrepare());
   if (!is_cancelled_.CompareAndSwap(0, 1)) return;
+  if (filter_bank_ != nullptr) filter_bank_->Cancel();
   for (auto entry: fis_map_) entry.second->Cancel();
 }
 
 void QueryState::PublishFilter(const PublishFilterParamsPB& params, RpcContext* context) {
   if (!WaitForPrepare().ok()) return;
-  DCHECK_EQ(fragment_map_.count(params.dst_fragment_idx()), 1);
-  for (FragmentInstanceState* fis : fragment_map_[params.dst_fragment_idx()]) {
-    fis->PublishFilter(params, context);
-  }
+  filter_bank_->PublishGlobalFilter(params, context);
 }
 
 Status QueryState::StartSpilling(RuntimeState* runtime_state, MemTracker* mem_tracker) {

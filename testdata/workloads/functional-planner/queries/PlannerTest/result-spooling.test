@@ -39,7 +39,7 @@ Per-Host Resources: mem-estimate=16.00MB mem-reservation=32.00KB thread-reservat
 Max Per-Host Resource Reservation: Memory=4.06MB Threads=3
 Per-Host Resource Estimates: Memory=36MB
 F01:PLAN FRAGMENT [UNPARTITIONED] hosts=1 instances=1
-|  Per-Host Resources: mem-estimate=4.02MB mem-reservation=4.00MB thread-reservation=1
+|  Per-Instance Resources: mem-estimate=4.02MB mem-reservation=4.00MB thread-reservation=1
 PLAN-ROOT SINK
 |  output exprs: id, bool_col, tinyint_col, smallint_col, int_col, bigint_col, float_col, double_col, date_string_col, string_col, timestamp_col, year, month
 |  mem-estimate=4.00MB mem-reservation=4.00MB spill-buffer=2.00MB thread-reservation=0
@@ -52,7 +52,7 @@ PLAN-ROOT SINK
 |  in pipelines: 01(GETNEXT)
 |
 F00:PLAN FRAGMENT [RANDOM] hosts=3 instances=6
-Per-Host Resources: mem-estimate=32.00MB mem-reservation=64.00KB thread-reservation=2
+Per-Instance Resources: mem-estimate=16.00MB mem-reservation=32.00KB thread-reservation=1
 01:TOP-N [LIMIT=10]
 |  order by: id ASC
 |  mem-estimate=890B mem-reservation=0B thread-reservation=0
@@ -109,7 +109,7 @@ Per-Host Resources: mem-estimate=126.00MB mem-reservation=20.00MB thread-reserva
 Max Per-Host Resource Reservation: Memory=44.00MB Threads=3
 Per-Host Resource Estimates: Memory=413MB
 F01:PLAN FRAGMENT [UNPARTITIONED] hosts=1 instances=1
-|  Per-Host Resources: mem-estimate=161.38MB mem-reservation=4.00MB thread-reservation=1
+|  Per-Instance Resources: mem-estimate=161.38MB mem-reservation=4.00MB thread-reservation=1
 PLAN-ROOT SINK
 |  output exprs: l_orderkey, l_partkey, l_suppkey, l_linenumber, l_quantity, l_extendedprice, l_discount, l_tax, l_returnflag, l_linestatus, l_shipdate, l_commitdate, l_receiptdate, l_shipinstruct, l_shipmode, l_comment
 |  mem-estimate=100.00MB mem-reservation=4.00MB spill-buffer=2.00MB thread-reservation=0
@@ -121,7 +121,7 @@ PLAN-ROOT SINK
 |  in pipelines: 01(GETNEXT)
 |
 F00:PLAN FRAGMENT [RANDOM] hosts=3 instances=6
-Per-Host Resources: mem-estimate=252.00MB mem-reservation=40.00MB thread-reservation=2
+Per-Instance Resources: mem-estimate=126.00MB mem-reservation=20.00MB thread-reservation=1
 01:SORT
 |  order by: l_orderkey ASC
 |  mem-estimate=38.00MB mem-reservation=12.00MB spill-buffer=2.00MB thread-reservation=0

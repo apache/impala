@@ -41,14 +41,14 @@ TEST(MinMaxFilterTest, TestBoolMinMaxFilter) {
   EXPECT_TRUE(filter->AlwaysFalse());
   bool b1 = true;
   filter->Insert(&b1);
-  EXPECT_EQ(*reinterpret_cast<bool*>(filter->GetMin()), b1);
-  EXPECT_EQ(*reinterpret_cast<bool*>(filter->GetMax()), b1);
+  EXPECT_EQ(*reinterpret_cast<const bool*>(filter->GetMin()), b1);
+  EXPECT_EQ(*reinterpret_cast<const bool*>(filter->GetMax()), b1);
   EXPECT_FALSE(filter->AlwaysFalse());
 
   bool b2 = false;
   filter->Insert(&b2);
-  EXPECT_EQ(*reinterpret_cast<bool*>(filter->GetMin()), b2);
-  EXPECT_EQ(*reinterpret_cast<bool*>(filter->GetMax()), b1);
+  EXPECT_EQ(*reinterpret_cast<const bool*>(filter->GetMin()), b2);
+  EXPECT_EQ(*reinterpret_cast<const bool*>(filter->GetMax()), b1);
 
   // Check the behavior of Or.
   MinMaxFilterPB pFilter1;
@@ -61,12 +61,24 @@ TEST(MinMaxFilterTest, TestBoolMinMaxFilter) {
   EXPECT_FALSE(pFilter2.min().bool_val());
   EXPECT_TRUE(pFilter2.max().bool_val());
 
+  MinMaxFilter* f1 = MinMaxFilter::Create(
+      pFilter1, ColumnType(PrimitiveType::TYPE_BOOLEAN), &obj_pool, &mem_tracker);
+  MinMaxFilter* f2 = MinMaxFilter::Create(
+      pFilter2, ColumnType(PrimitiveType::TYPE_BOOLEAN), &obj_pool, &mem_tracker);
+  f1->Or(*f2);
+  EXPECT_FALSE(*reinterpret_cast<const bool*>(f1->GetMin()));
+  EXPECT_TRUE(*reinterpret_cast<const bool*>(f1->GetMax()));
+  EXPECT_FALSE(f1->AlwaysTrue());
+  EXPECT_FALSE(f1->AlwaysFalse());
+
   filter->Close();
+  f1->Close();
+  f2->Close();
 }
 
 void CheckIntVals(MinMaxFilter* filter, int32_t min, int32_t max) {
-  EXPECT_EQ(*reinterpret_cast<int32_t*>(filter->GetMin()), min);
-  EXPECT_EQ(*reinterpret_cast<int32_t*>(filter->GetMax()), max);
+  EXPECT_EQ(*reinterpret_cast<const int32_t*>(filter->GetMin()), min);
+  EXPECT_EQ(*reinterpret_cast<const int32_t*>(filter->GetMax()), max);
   EXPECT_FALSE(filter->AlwaysFalse());
   EXPECT_FALSE(filter->AlwaysTrue());
 }
@@ -130,14 +142,24 @@ TEST(MinMaxFilterTest, TestNumericMinMaxFilter) {
   EXPECT_EQ(pFilter2.min().int_val(), 2);
   EXPECT_EQ(pFilter2.max().int_val(), 8);
 
+  MinMaxFilter* f1 = MinMaxFilter::Create(pFilter1, int_type, &obj_pool, &mem_tracker);
+  MinMaxFilter* f2 = MinMaxFilter::Create(pFilter2, int_type, &obj_pool, &mem_tracker);
+  f1->Or(*f2);
+  EXPECT_EQ(2, *reinterpret_cast<const int32_t*>(f1->GetMin()));
+  EXPECT_EQ(8, *reinterpret_cast<const int32_t*>(f1->GetMax()));
+  EXPECT_FALSE(f1->AlwaysTrue());
+  EXPECT_FALSE(f1->AlwaysFalse());
+
   int_filter->Close();
   empty_filter->Close();
   int_filter2->Close();
+  f1->Close();
+  f2->Close();
 }
 
 void CheckStringVals(MinMaxFilter* filter, const string& min, const string& max) {
-  StringValue actual_min = *reinterpret_cast<StringValue*>(filter->GetMin());
-  StringValue actual_max = *reinterpret_cast<StringValue*>(filter->GetMax());
+  StringValue actual_min = *reinterpret_cast<const StringValue*>(filter->GetMin());
+  StringValue actual_max = *reinterpret_cast<const StringValue*>(filter->GetMax());
   StringValue expected_min(min);
   StringValue expected_max(max);
   EXPECT_EQ(actual_min, expected_min);
@@ -292,17 +314,55 @@ TEST(MinMaxFilterTest, TestStringMinMaxFilter) {
   EXPECT_EQ(pFilter2.min().string_val(), "a");
   EXPECT_EQ(pFilter2.max().string_val(), "e");
 
+  MinMaxFilter* f1 = MinMaxFilter::Create(pFilter1, string_type, &obj_pool, &mem_tracker);
+  MinMaxFilter* f2 = MinMaxFilter::Create(pFilter2, string_type, &obj_pool, &mem_tracker);
+  f1->Or(*f2);
+  EXPECT_EQ("a", reinterpret_cast<const StringValue*>(f1->GetMin())->DebugString());
+  EXPECT_EQ("e", reinterpret_cast<const StringValue*>(f1->GetMax())->DebugString());
+  EXPECT_FALSE(f1->AlwaysTrue());
+  EXPECT_FALSE(f1->AlwaysFalse());
+  // Make sure AlwaysFalse() is handled correctly.
+  MinMaxFilter* always_false = MinMaxFilter::Create(string_type, &obj_pool, &mem_tracker);
+  f1->Or(*always_false); // This is a no-op.
+  EXPECT_EQ("a", reinterpret_cast<const StringValue*>(f1->GetMin())->DebugString());
+  EXPECT_EQ("e", reinterpret_cast<const StringValue*>(f1->GetMax())->DebugString());
+  EXPECT_FALSE(f1->AlwaysTrue());
+  EXPECT_FALSE(f1->AlwaysFalse());
+  always_false->Or(*f1); // Update the always false filter.
+  EXPECT_EQ(
+      "a", reinterpret_cast<const StringValue*>(always_false->GetMin())->DebugString());
+  EXPECT_EQ(
+      "e", reinterpret_cast<const StringValue*>(always_false->GetMax())->DebugString());
+  EXPECT_FALSE(always_false->AlwaysTrue());
+  EXPECT_FALSE(always_false->AlwaysFalse());
+
+  // Make sure AlwaysTrue() is handled correctly.
+  always_false = MinMaxFilter::Create(string_type, &obj_pool, &mem_tracker);
+  // Merge always true into another filter.
+  f1->Or(*always_true_filter);
+  EXPECT_TRUE(f1->AlwaysTrue());
+  EXPECT_FALSE(f1->AlwaysFalse());
+  always_false->Or(*always_true_filter);
+  EXPECT_TRUE(always_false->AlwaysTrue());
+  EXPECT_FALSE(always_false->AlwaysFalse());
+  always_true_filter->Or(*f2); // This is a no-op.
+  EXPECT_TRUE(always_true_filter->AlwaysTrue());
+  EXPECT_FALSE(always_true_filter->AlwaysFalse());
+
   filter->Close();
   empty_filter->Close();
   filter2->Close();
   limit_filter->Close();
   always_true_filter->Close();
+  f1->Close();
+  f2->Close();
+  always_false->Close();
 }
 
 void CheckTimestampVals(
     MinMaxFilter* filter, const TimestampValue& min, const TimestampValue& max) {
-  EXPECT_EQ(*reinterpret_cast<TimestampValue*>(filter->GetMin()), min);
-  EXPECT_EQ(*reinterpret_cast<TimestampValue*>(filter->GetMax()), max);
+  EXPECT_EQ(*reinterpret_cast<const TimestampValue*>(filter->GetMin()), min);
+  EXPECT_EQ(*reinterpret_cast<const TimestampValue*>(filter->GetMax()), max);
   EXPECT_FALSE(filter->AlwaysFalse());
   EXPECT_FALSE(filter->AlwaysTrue());
 }
@@ -368,12 +428,12 @@ TEST(MinMaxFilterTest, TestTimestampMinMaxFilter) {
   filter2->Close();
 }
 
-#define DECIMAL_CHECK(SIZE)                                                     \
-  do {                                                                          \
-    EXPECT_EQ(*reinterpret_cast<Decimal##SIZE##Value*>(filter->GetMin()), min); \
-    EXPECT_EQ(*reinterpret_cast<Decimal##SIZE##Value*>(filter->GetMax()), max); \
-    EXPECT_FALSE(filter->AlwaysFalse());                                        \
-    EXPECT_FALSE(filter->AlwaysTrue());                                         \
+#define DECIMAL_CHECK(SIZE)                                                           \
+  do {                                                                                \
+    EXPECT_EQ(*reinterpret_cast<const Decimal##SIZE##Value*>(filter->GetMin()), min); \
+    EXPECT_EQ(*reinterpret_cast<const Decimal##SIZE##Value*>(filter->GetMax()), max); \
+    EXPECT_FALSE(filter->AlwaysFalse());                                              \
+    EXPECT_FALSE(filter->AlwaysTrue());                                               \
   } while (false)
 
 void CheckDecimalVals(

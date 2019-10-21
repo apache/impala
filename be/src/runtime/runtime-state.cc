@@ -40,7 +40,6 @@
 #include "runtime/krpc-data-stream-recvr.h"
 #include "runtime/mem-tracker.h"
 #include "runtime/query-state.h"
-#include "runtime/runtime-filter-bank.h"
 #include "runtime/thread-resource-mgr.h"
 #include "runtime/timestamp-value.h"
 #include "util/auth-util.h" // for GetEffectiveUser()
@@ -160,12 +159,6 @@ void RuntimeState::Init() {
   }
 }
 
-Status RuntimeState::InitFilterBank(long runtime_filters_reservation_bytes) {
-  filter_bank_.reset(
-      new RuntimeFilterBank(query_ctx(), this, runtime_filters_reservation_bytes));
-  return filter_bank_->ClaimBufferReservation();
-}
-
 Status RuntimeState::CreateCodegen() {
   if (codegen_.get() != NULL) return Status::OK();
   // TODO: add the fragment ID to the codegen ID as well
@@ -238,7 +231,6 @@ Status RuntimeState::LogOrReturnError(const ErrorMsg& message) {
 
 void RuntimeState::Cancel() {
   is_cancelled_.Store(true);
-  if (filter_bank_ != nullptr) filter_bank_->Cancel();
 }
 
 double RuntimeState::ComputeExchangeScanRatio() const {
@@ -288,7 +280,6 @@ Status RuntimeState::CheckQueryState() {
 
 void RuntimeState::ReleaseResources() {
   DCHECK(!released_resources_);
-  if (filter_bank_ != nullptr) filter_bank_->Close();
   if (resource_pool_ != nullptr) {
     ExecEnv::GetInstance()->thread_mgr()->DestroyPool(move(resource_pool_));
   }
@@ -358,6 +349,11 @@ const TQueryOptions& RuntimeState::query_options() const {
 MemTracker* RuntimeState::query_mem_tracker() {
   DCHECK(query_state_ != nullptr);
   return query_state_->query_mem_tracker();
+}
+
+RuntimeFilterBank* RuntimeState::filter_bank() const {
+  DCHECK(query_state_ != nullptr);
+  return query_state_->filter_bank();
 }
 
 }

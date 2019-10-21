@@ -58,54 +58,73 @@ DEFINE_double(max_filter_error_rate, 0.75, "(Advanced) The maximum probability o
 const int64_t RuntimeFilterBank::MIN_BLOOM_FILTER_SIZE;
 const int64_t RuntimeFilterBank::MAX_BLOOM_FILTER_SIZE;
 
-RuntimeFilterBank::RuntimeFilterBank(const TQueryCtx& query_ctx, RuntimeState* state,
+RuntimeFilterBank::RuntimeFilterBank(QueryState* query_state,
+    const unordered_map<int32_t, int>& produced_filter_counts,
     long total_filter_mem_required)
-  : state_(state),
-    filter_mem_tracker_(
-        new MemTracker(-1, "Runtime Filter Bank", state->instance_mem_tracker(), false)),
-    closed_(false),
-    total_bloom_filter_mem_required_(total_filter_mem_required) {
-  bloom_memory_allocated_ =
-      state->runtime_profile()->AddCounter("BloomFilterBytes", TUnit::BYTES);
+  : filters_(BuildFilterMap(produced_filter_counts)),
+    query_state_(query_state),
+    filter_mem_tracker_(query_state->obj_pool()->Add(new MemTracker(
+        -1, "Runtime Filter Bank", query_state->query_mem_tracker(), false))),
+    bloom_memory_allocated_(
+        query_state->host_profile()->AddCounter("BloomFilterBytes", TUnit::BYTES)),
+    total_bloom_filter_mem_required_(total_filter_mem_required) {}
+
+RuntimeFilterBank::~RuntimeFilterBank() {}
+
+unordered_map<int32_t, unique_ptr<RuntimeFilterBank::PerFilterState>>
+RuntimeFilterBank::BuildFilterMap(
+    const unordered_map<int32_t, int>& produced_filter_counts) {
+  unordered_map<int32_t, unique_ptr<PerFilterState>> result;
+  for (auto& entry : produced_filter_counts) {
+    result.emplace(entry.first, make_unique<PerFilterState>(entry.second));
+  }
+  return result;
 }
 
 Status RuntimeFilterBank::ClaimBufferReservation() {
   DCHECK(!buffer_pool_client_.is_registered());
-  string filter_bank_name = Substitute(
-      "RuntimeFilterBank (Fragment Id: $0)", PrintId(state_->fragment_instance_id()));
+  string filter_bank_name =
+      Substitute("RuntimeFilterBank (Query Id: $0)", PrintId(query_state_->query_id()));
   RETURN_IF_ERROR(ExecEnv::GetInstance()->buffer_pool()->RegisterClient(filter_bank_name,
-      state_->query_state()->file_group(), state_->instance_buffer_reservation(),
-      filter_mem_tracker_.get(), total_bloom_filter_mem_required_,
-      state_->runtime_profile(), &buffer_pool_client_));
+      query_state_->file_group(), query_state_->buffer_reservation(),
+      filter_mem_tracker_, total_bloom_filter_mem_required_,
+      query_state_->host_profile(), &buffer_pool_client_));
   VLOG_FILE << filter_bank_name << " claiming reservation "
             << total_bloom_filter_mem_required_;
-  state_->query_state()->initial_reservations()->Claim(
+  query_state_->initial_reservations()->Claim(
       &buffer_pool_client_, total_bloom_filter_mem_required_);
   return Status::OK();
 }
 
-RuntimeFilter* RuntimeFilterBank::RegisterFilter(const TRuntimeFilterDesc& filter_desc,
-    bool is_producer) {
+RuntimeFilter* RuntimeFilterBank::RegisterFilter(
+    const TRuntimeFilterDesc& filter_desc, bool is_producer) {
+  auto it = filters_.find(filter_desc.filter_id);
+  DCHECK(it != filters_.end()) << "Filter ID " << filter_desc.filter_id
+                               << " not registered";
+  PerFilterState* fs = it->second.get();
   RuntimeFilter* ret = nullptr;
-  lock_guard<mutex> l(runtime_filter_lock_);
+  lock_guard<SpinLock> l(fs->lock);
   if (is_producer) {
-    DCHECK(produced_filters_.find(filter_desc.filter_id) == produced_filters_.end());
-    ret = obj_pool_.Add(new RuntimeFilter(filter_desc, filter_desc.filter_size_bytes));
-    produced_filters_[filter_desc.filter_id] = ret;
+    if (fs->produced_filter.result_filter == nullptr) {
+      ret = obj_pool_.Add(new RuntimeFilter(filter_desc, filter_desc.filter_size_bytes));
+      fs->produced_filter.result_filter = ret;
+    } else {
+      ret = fs->produced_filter.result_filter;
+      DCHECK_EQ(filter_desc.filter_size_bytes, ret->filter_size());
+    }
   } else {
-    if (consumed_filters_.find(filter_desc.filter_id) == consumed_filters_.end()) {
+    if (fs->consumed_filter == nullptr) {
       ret = obj_pool_.Add(new RuntimeFilter(filter_desc, filter_desc.filter_size_bytes));
       // The filter bank may have already been cancelled. In that case, still allocate the
       // filter but cancel it immediately, so that callers of RuntimeFilterBank don't need
       // to have separate handling of that case.
       if (cancelled_) ret->Cancel();
-      consumed_filters_[filter_desc.filter_id] = ret;
+      fs->consumed_filter = ret;
       VLOG(2) << "registered consumer filter " << filter_desc.filter_id;
     } else {
       // The filter has already been registered in this filter bank by another
-      // target node.
-      DCHECK_GT(filter_desc.targets.size(), 1);
-      ret = consumed_filters_[filter_desc.filter_id];
+      // fragment instance or target node.
+      ret = fs->consumed_filter;
       VLOG_QUERY << "re-registered consumer filter " << filter_desc.filter_id;
     }
   }
@@ -136,7 +155,7 @@ void RuntimeFilterBank::UpdateFilterCompleteCb(
 
 void RuntimeFilterBank::UpdateFilterFromLocal(
     int32_t filter_id, BloomFilter* bloom_filter, MinMaxFilter* min_max_filter) {
-  DCHECK_NE(state_->query_options().runtime_filter_mode, TRuntimeFilterMode::OFF)
+  DCHECK_NE(query_state_->query_options().runtime_filter_mode, TRuntimeFilterMode::OFF)
       << "Should not be calling UpdateFilterFromLocal() if filtering is disabled";
   // This function is only called from ExecNode::Open() or more specifically
   // PartitionedHashJoinNode::Open().
@@ -144,34 +163,91 @@ void RuntimeFilterBank::UpdateFilterFromLocal(
   // A runtime filter may have both local and remote targets.
   bool has_local_target = false;
   bool has_remote_target = false;
-  TRuntimeFilterType::type type;
+  RuntimeFilter* complete_filter = nullptr; // Set if the filter should be sent out.
+  auto it = filters_.find(filter_id);
+  DCHECK(it != filters_.end()) << "Tried to update unregistered filter: " << filter_id;
+  PerFilterState* fs = it->second.get();
   {
-    lock_guard<mutex> l(runtime_filter_lock_);
-    RuntimeFilterMap::iterator it = produced_filters_.find(filter_id);
-    DCHECK(it != produced_filters_.end()) << "Tried to update unregistered filter: "
-                                          << filter_id;
-    it->second->SetFilter(bloom_filter, min_max_filter);
-    has_local_target = it->second->filter_desc().has_local_targets;
-    has_remote_target = it->second->filter_desc().has_remote_targets;
-    type = it->second->filter_desc().type;
-  }
-
-  if (has_local_target) {
-    // Do a short circuit publication by pushing the same filter to the consumer side.
-    RuntimeFilter* filter;
-    {
-      lock_guard<mutex> l(runtime_filter_lock_);
-      RuntimeFilterMap::iterator it = consumed_filters_.find(filter_id);
-      if (it == consumed_filters_.end()) return;
-      filter = it->second;
+    unique_lock<SpinLock> l(fs->lock);
+    ProducedFilter& produced_filter = fs->produced_filter;
+    RuntimeFilter* result_filter = produced_filter.result_filter;
+    DCHECK(result_filter != nullptr)
+        << "Tried to update unregistered filter: " << filter_id;
+    DCHECK_GT(produced_filter.pending_producers, 0);
+    if (result_filter->filter_desc().is_broadcast_join) {
+      // For broadcast joins, the first filter to arrived is used, and the rest are
+      // ignored (because they should have identical contents).
+      if (result_filter->HasFilter()) {
+        // Don't need to merge, the previous broadcast filter contained all values.
+        VLOG(3) << "Dropping redundant broadcast filter " << filter_id;
+        return;
+      }
+      VLOG(3) << "Setting broadcast filter " << filter_id;
+      result_filter->SetFilter(bloom_filter, min_max_filter);
+      complete_filter = result_filter;
+    } else {
+      // Merge partitioned join filters in parallel - each thread setting the filter will
+      // try to merge its filter with a previously merged filter, looping until either
+      // it has produced the final filter or it runs out of other filters to merge.
+      unique_ptr<RuntimeFilter> tmp_filter = make_unique<RuntimeFilter>(
+          result_filter->filter_desc(), result_filter->filter_size());
+      tmp_filter->SetFilter(bloom_filter, min_max_filter);
+      while (produced_filter.pending_merge_filter != nullptr) {
+        unique_ptr<RuntimeFilter> pending_merge =
+            std::move(produced_filter.pending_merge_filter);
+        // Drop the lock while doing the merge so that other merges can proceed in
+        // parallel.
+        l.unlock();
+        VLOG(3) << "Merging partitioned join filter " << filter_id;
+        tmp_filter->Or(pending_merge.get());
+        l.lock();
+      }
+      // At this point, either we've merged all the filters or we're waiting for more
+      // filters.
+      if (produced_filter.pending_producers > 1) {
+        // A subsequent caller of UpdateFilterFromLocal() is responsible for merging this
+        // filter into the final one.
+        produced_filter.pending_merge_filter = std::move(tmp_filter);
+      } else {
+        // Everything was merged into 'tmp_filter'. It is therefore the result filter.
+        result_filter->SetFilter(tmp_filter.get());
+        complete_filter = result_filter;
+        VLOG(3) << "Partitioned join filter " << filter_id << " is locally complete.";
+      }
     }
-    filter->SetFilter(bloom_filter, min_max_filter);
-    state_->runtime_profile()->AddInfoString(Substitute("Filter $0 arrival", filter_id),
-        PrettyPrinter::Print(filter->arrival_delay_ms(), TUnit::TIME_MS));
+    int remaining_producers = --produced_filter.pending_producers;
+    VLOG(3) << "Filter " << filter_id << " updated. " << remaining_producers
+            << " producers left on the backend.";
+    DCHECK(remaining_producers > 0 || result_filter != nullptr);
+    has_local_target = result_filter->filter_desc().has_local_targets;
+    has_remote_target = result_filter->filter_desc().has_remote_targets;
   }
 
-  if (has_remote_target
-      && state_->query_options().runtime_filter_mode == TRuntimeFilterMode::GLOBAL) {
+  if (complete_filter != nullptr && has_local_target) {
+    // Do a short circuit publication by pushing the same filter to the consumer side.
+    RuntimeFilter* consumed_filter;
+    {
+      lock_guard<SpinLock> l(fs->lock);
+      if (fs->consumed_filter == nullptr) return;
+      consumed_filter = fs->consumed_filter;
+    }
+    if (consumed_filter->HasFilter()) {
+      // Multiple instances may produce the same filter for broadcast joins.
+      // TODO: we would ideally update the coordinator logic to avoid creating duplicates
+      // on the same node, but sending out a few duplicate filters is relatively
+      // inconsequential for performance.
+      DCHECK(consumed_filter->filter_desc().is_broadcast_join)
+          << consumed_filter->filter_desc();
+    } else {
+      consumed_filter->SetFilter(complete_filter);
+      query_state_->host_profile()->AddInfoString(
+          Substitute("Filter $0 arrival", filter_id),
+          PrettyPrinter::Print(consumed_filter->arrival_delay_ms(), TUnit::TIME_MS));
+    }
+  }
+
+  if (complete_filter != nullptr && has_remote_target &&
+      query_state_->query_options().runtime_filter_mode == TRuntimeFilterMode::GLOBAL) {
     UpdateFilterParamsPB params;
     // The memory associated with the following 2 objects needs to live until
     // the asynchronous KRPC call proxy->UpdateFilterAsync() is completed.
@@ -179,16 +255,17 @@ void RuntimeFilterBank::UpdateFilterFromLocal(
     UpdateFilterResultPB* res = obj_pool_.Add(new UpdateFilterResultPB);
     RpcController* controller = obj_pool_.Add(new RpcController);
 
-    TUniqueIdToUniqueIdPB(state_->query_id(), params.mutable_query_id());
+    TUniqueIdToUniqueIdPB(query_state_->query_id(), params.mutable_query_id());
     params.set_filter_id(filter_id);
+    TRuntimeFilterType::type type = complete_filter->filter_desc().type;
     if (type == TRuntimeFilterType::BLOOM) {
       BloomFilter::ToProtobuf(bloom_filter, controller, params.mutable_bloom_filter());
     } else {
       DCHECK_EQ(type, TRuntimeFilterType::MIN_MAX);
       min_max_filter->ToProtobuf(params.mutable_min_max_filter());
     }
-    const TNetworkAddress& krpc_address = state_->query_ctx().coord_krpc_address;
-    const TNetworkAddress& host_address = state_->query_ctx().coord_address;
+    const TNetworkAddress& krpc_address = query_state_->query_ctx().coord_krpc_address;
+    const TNetworkAddress& host_address = query_state_->query_ctx().coord_address;
 
     // Use 'proxy' to send the filter to the coordinator.
     unique_ptr<DataStreamServiceProxy> proxy;
@@ -201,7 +278,6 @@ void RuntimeFilterBank::UpdateFilterFromLocal(
           host_address.hostname, get_proxy_status.msg().msg());
       return;
     }
-
     // Increment 'num_inflight_rpcs_' to make sure that the filter will not be deallocated
     // in Close() until all in-flight RPCs complete.
     {
@@ -217,15 +293,24 @@ void RuntimeFilterBank::UpdateFilterFromLocal(
 
 void RuntimeFilterBank::PublishGlobalFilter(
     const PublishFilterParamsPB& params, RpcContext* context) {
-  lock_guard<mutex> l(runtime_filter_lock_);
+  VLOG(3) << "PublishGlobalFilter(filter_id=" << params.filter_id() << ")";
+  auto it = filters_.find(params.filter_id());
+  DCHECK(it != filters_.end()) << "Filter ID " << params.filter_id() << " not registered";
+  PerFilterState* fs = it->second.get();
+  lock_guard<SpinLock> l(fs->lock);
   if (closed_) return;
-  RuntimeFilterMap::iterator it = consumed_filters_.find(params.filter_id());
-  DCHECK(it != consumed_filters_.end()) << "Tried to publish unregistered filter: "
-                                        << params.filter_id();
-
+  if (fs->consumed_filter->HasFilter()) {
+    // The filter routing in the Coordinator sometimes can redundantly send broadcast
+    // filters that were already produced on this backend and consumed locally.
+    // It is safe to drop the filter because we already have a filter with the same
+    // contents.
+    DCHECK(fs->consumed_filter->filter_desc().is_broadcast_join)
+        << "Got duplicate partitioned join filter";
+    return;
+  }
   BloomFilter* bloom_filter = nullptr;
   MinMaxFilter* min_max_filter = nullptr;
-  if (it->second->is_bloom_filter()) {
+  if (fs->consumed_filter->is_bloom_filter()) {
     DCHECK(params.has_bloom_filter());
     if (params.bloom_filter().always_true()) {
       bloom_filter = BloomFilter::ALWAYS_TRUE_FILTER;
@@ -258,34 +343,35 @@ void RuntimeFilterBank::PublishGlobalFilter(
                      << status.GetDetail();
           bloom_filter = BloomFilter::ALWAYS_TRUE_FILTER;
         } else {
-          bloom_filters_.push_back(bloom_filter);
+          fs->bloom_filters.push_back(bloom_filter);
           DCHECK_EQ(required_space, bloom_filter->GetBufferPoolSpaceUsed());
           bloom_memory_allocated_->Add(bloom_filter->GetBufferPoolSpaceUsed());
         }
       }
     }
   } else {
-    DCHECK(it->second->is_min_max_filter());
+    DCHECK(fs->consumed_filter->is_min_max_filter());
     DCHECK(params.has_min_max_filter());
-    min_max_filter = MinMaxFilter::Create(params.min_max_filter(), it->second->type(),
-        &obj_pool_, filter_mem_tracker_.get());
-    min_max_filters_.push_back(min_max_filter);
+    min_max_filter = MinMaxFilter::Create(params.min_max_filter(),
+        fs->consumed_filter->type(), &obj_pool_, filter_mem_tracker_);
+    fs->min_max_filters.push_back(min_max_filter);
   }
-  it->second->SetFilter(bloom_filter, min_max_filter);
-  state_->runtime_profile()->AddInfoString(
+  fs->consumed_filter->SetFilter(bloom_filter, min_max_filter);
+  query_state_->host_profile()->AddInfoString(
       Substitute("Filter $0 arrival", params.filter_id()),
-      PrettyPrinter::Print(it->second->arrival_delay_ms(), TUnit::TIME_MS));
+      PrettyPrinter::Print(fs->consumed_filter->arrival_delay_ms(), TUnit::TIME_MS));
 }
 
 BloomFilter* RuntimeFilterBank::AllocateScratchBloomFilter(int32_t filter_id) {
-  lock_guard<mutex> l(runtime_filter_lock_);
+  auto it = filters_.find(filter_id);
+  DCHECK(it != filters_.end()) << "Filter ID " << filter_id << " not registered";
+  PerFilterState* fs = it->second.get();
+  lock_guard<SpinLock> l(fs->lock);
   if (closed_) return nullptr;
 
-  RuntimeFilterMap::iterator it = produced_filters_.find(filter_id);
-  DCHECK(it != produced_filters_.end()) << "Filter ID " << filter_id << " not registered";
-
   // Track required space
-  int64_t log_filter_size = BitUtil::Log2Ceiling64(it->second->filter_size());
+  int64_t log_filter_size =
+      BitUtil::Log2Ceiling64(fs->produced_filter.result_filter->filter_size());
   int64_t required_space = BloomFilter::GetExpectedMemoryUsed(log_filter_size);
   DCHECK_GE(buffer_pool_client_.GetUnusedReservation(), required_space)
       << "BufferPool Client should have enough reservation to fulfill bloom filter "
@@ -296,7 +382,7 @@ BloomFilter* RuntimeFilterBank::AllocateScratchBloomFilter(int32_t filter_id) {
     LOG(ERROR) << "Unable to allocate memory for bloom filter: " << status.GetDetail();
     return nullptr;
   }
-  bloom_filters_.push_back(bloom_filter);
+  fs->bloom_filters.push_back(bloom_filter);
   DCHECK_EQ(required_space, bloom_filter->GetBufferPoolSpaceUsed());
   bloom_memory_allocated_->Add(bloom_filter->GetBufferPoolSpaceUsed());
   return bloom_filter;
@@ -304,15 +390,15 @@ BloomFilter* RuntimeFilterBank::AllocateScratchBloomFilter(int32_t filter_id) {
 
 MinMaxFilter* RuntimeFilterBank::AllocateScratchMinMaxFilter(
     int32_t filter_id, ColumnType type) {
-  lock_guard<mutex> l(runtime_filter_lock_);
+  auto it = filters_.find(filter_id);
+  DCHECK(it != filters_.end()) << "Filter ID " << filter_id << " not registered";
+  PerFilterState* fs = it->second.get();
+  lock_guard<SpinLock> l(fs->lock);
   if (closed_) return nullptr;
 
-  RuntimeFilterMap::iterator it = produced_filters_.find(filter_id);
-  DCHECK(it != produced_filters_.end()) << "Filter ID " << filter_id << " not registered";
-
   MinMaxFilter* min_max_filter =
-      MinMaxFilter::Create(type, &obj_pool_, filter_mem_tracker_.get());
-  min_max_filters_.push_back(min_max_filter);
+      MinMaxFilter::Create(type, &obj_pool_, filter_mem_tracker_);
+  fs->min_max_filters.push_back(min_max_filter);
   return min_max_filter;
 }
 
@@ -322,15 +408,23 @@ bool RuntimeFilterBank::FpRateTooHigh(int64_t filter_size, int64_t observed_ndv)
   return fpp > FLAGS_max_filter_error_rate;
 }
 
+vector<unique_lock<SpinLock>> RuntimeFilterBank::LockAllFilters() {
+  vector<unique_lock<SpinLock>> locks;
+  for (auto& entry : filters_) locks.emplace_back(entry.second->lock);
+  return locks;
+}
+
 void RuntimeFilterBank::Cancel() {
-  lock_guard<mutex> l(runtime_filter_lock_);
+  auto all_locks = LockAllFilters();
   CancelLocked();
 }
 
 void RuntimeFilterBank::CancelLocked() {
   if (cancelled_) return;
   // Cancel all filters that a thread might be waiting on.
-  for (auto& entry : consumed_filters_) entry.second->Cancel();
+  for (auto& entry : filters_) {
+    if (entry.second->consumed_filter != nullptr) entry.second->consumed_filter->Cancel();
+  }
   cancelled_ = true;
 }
 
@@ -342,26 +436,33 @@ void RuntimeFilterBank::Close() {
       krpcs_done_cv_.wait(l1);
     }
   }
-
-  lock_guard<mutex> l2(runtime_filter_lock_);
+  auto all_locks = LockAllFilters();
   CancelLocked();
   // We do not have to set 'closed_' to true before waiting for all in-flight RPCs to
   // drain because the async build thread in
   // BlockingJoinNode::ProcessBuildInputAndOpenProbe() should have exited by the time
   // Close() is called so there shouldn't be any new RPCs being issued when this function
   // is called.
+  if (closed_) return;
   closed_ = true;
-  for (BloomFilter* filter : bloom_filters_) filter->Close();
-  for (MinMaxFilter* filter : min_max_filters_) filter->Close();
+  for (auto& entry : filters_) {
+    for (BloomFilter* filter : entry.second->bloom_filters) filter->Close();
+    for (MinMaxFilter* filter : entry.second->min_max_filters) filter->Close();
+  }
   obj_pool_.Clear();
   if (buffer_pool_client_.is_registered()) {
-    VLOG_FILE << "RuntimeFilterBank (Fragment Id: "
-              << PrintId(state_->fragment_instance_id())
+    VLOG_FILE << "RuntimeFilterBank (Query Id: " << PrintId(query_state_->query_id())
               << ") returning reservation " << total_bloom_filter_mem_required_;
-    state_->query_state()->initial_reservations()->Return(
+    query_state_->initial_reservations()->Return(
         &buffer_pool_client_, total_bloom_filter_mem_required_);
     ExecEnv::GetInstance()->buffer_pool()->DeregisterClient(&buffer_pool_client_);
   }
   DCHECK_EQ(filter_mem_tracker_->consumption(), 0);
   filter_mem_tracker_->Close();
 }
+
+RuntimeFilterBank::ProducedFilter::ProducedFilter(int pending_producers)
+  : pending_producers(pending_producers) {}
+
+RuntimeFilterBank::PerFilterState::PerFilterState(int pending_producers)
+  : produced_filter(pending_producers) {}

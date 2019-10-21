@@ -370,6 +370,36 @@ TEST_F(BloomFilterTest, Protobuf) {
   EXPECT_EQ(to_protobuf.always_true(), true);
 }
 
+// Basic test for the Or() operation on BloomFilter objects.
+// ThriftOr() tests the low-level implementation more exhaustively.
+TEST_F(BloomFilterTest, Or) {
+  BloomFilter* bf1 = CreateBloomFilter(BloomFilter::MinLogSpace(100, 0.01));
+  BloomFilter* bf2 = CreateBloomFilter(BloomFilter::MinLogSpace(100, 0.01));
+
+  for (int i = 60; i < 80; ++i) BfInsert(*bf2, i);
+  for (int i = 0; i < 10; ++i) BfInsert(*bf1, i);
+
+  bf1->Or(*bf2);
+  for (int i = 0; i < 10; ++i) ASSERT_TRUE(BfFind(*bf1, i)) << i;
+  for (int i = 60; i < 80; ++i) ASSERT_TRUE(BfFind(*bf1, i)) << i;
+
+  // Insert another value to aggregated BloomFilter.
+  for (int i = 11; i < 50; ++i) BfInsert(*bf1, i);
+
+  for (int i = 11; i < 50; ++i) ASSERT_TRUE(BfFind(*bf1, i));
+  ASSERT_FALSE(BfFind(*bf1, 81));
+
+  // Check that AlwaysFalse() is updated correctly.
+  BloomFilter* bf3 = CreateBloomFilter(BloomFilter::MinLogSpace(100, 0.01));
+  BloomFilter* always_false = CreateBloomFilter(BloomFilter::MinLogSpace(100, 0.01));
+  bf3->Or(*always_false);
+  EXPECT_TRUE(bf3->AlwaysFalse());
+  bf3->Or(*bf2);
+  EXPECT_FALSE(bf3->AlwaysFalse());
+  for (int i = 60; i < 80; ++i) ASSERT_TRUE(BfFind(*bf1, i)) << i;
+  ASSERT_FALSE(BfFind(*bf1, 81));
+}
+
 TEST_F(BloomFilterTest, ProtobufOr) {
   BloomFilter* bf1 = CreateBloomFilter(BloomFilter::MinLogSpace(100, 0.01));
   BloomFilter* bf2 = CreateBloomFilter(BloomFilter::MinLogSpace(100, 0.01));

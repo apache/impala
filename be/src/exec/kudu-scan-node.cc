@@ -77,9 +77,6 @@ Status KuduScanNode::Open(RuntimeState* state) {
   ScopedOpenEventAdder ea(this);
   RETURN_IF_ERROR(KuduScanNodeBase::Open(state));
   thread_state_.Open(this, FLAGS_kudu_max_row_batches);
-
-  if (filter_ctxs_.size() > 0) WaitForRuntimeFilters();
-
   thread_avail_cb_id_ = state->resource_pool()->AddThreadAvailableCb(
       bind<void>(mem_fn(&KuduScanNode::ThreadAvailableCb), this, _1));
   ThreadAvailableCb(state->resource_pool());

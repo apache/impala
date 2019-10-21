@@ -24,9 +24,9 @@ using std::string;
 namespace impala {
 
 #define NUMERIC_MIN_MAX_FILTER_INSERT(NAME, TYPE) \
-  void NAME##MinMaxFilter::Insert(void* val) {    \
+  void NAME##MinMaxFilter::Insert(const void* val) {    \
     if (val == nullptr) return;                   \
-    TYPE* value = reinterpret_cast<TYPE*>(val);   \
+    const TYPE* value = reinterpret_cast<const TYPE*>(val);   \
     if (*value < min_) min_ = *value;             \
     if (*value > max_) max_ = *value;             \
   }
@@ -39,7 +39,7 @@ NUMERIC_MIN_MAX_FILTER_INSERT(BigInt, int64_t);
 NUMERIC_MIN_MAX_FILTER_INSERT(Float, float);
 NUMERIC_MIN_MAX_FILTER_INSERT(Double, double);
 
-void StringMinMaxFilter::Insert(void* val) {
+void StringMinMaxFilter::Insert(const void* val) {
   if (val == nullptr || always_true_) return;
   const StringValue* value = reinterpret_cast<const StringValue*>(val);
   if (always_false_) {
@@ -57,7 +57,7 @@ void StringMinMaxFilter::Insert(void* val) {
   }
 }
 
-void TimestampMinMaxFilter::Insert(void* val) {
+void TimestampMinMaxFilter::Insert(const void* val) {
   if (val == nullptr) return;
   const TimestampValue* value = reinterpret_cast<const TimestampValue*>(val);
   if (always_false_) {
@@ -91,15 +91,15 @@ void TimestampMinMaxFilter::Insert(void* val) {
     }                                                       \
   } while (false)
 
-void DecimalMinMaxFilter::Insert4(void* val) {
+void DecimalMinMaxFilter::Insert4(const void* val) {
   INSERT_DECIMAL_MINMAX(4);
 }
 
-void DecimalMinMaxFilter::Insert8(void* val) {
+void DecimalMinMaxFilter::Insert8(const void* val) {
   INSERT_DECIMAL_MINMAX(8);
 }
 
-void DecimalMinMaxFilter::Insert16(void* val) {
+void DecimalMinMaxFilter::Insert16(const void* val) {
   INSERT_DECIMAL_MINMAX(16);
 }
 

@@ -30,13 +30,6 @@
 
 namespace impala {
 
-inline const RuntimeFilter* RuntimeFilterBank::GetRuntimeFilter(int32_t filter_id) {
-  boost::lock_guard<boost::mutex> l(runtime_filter_lock_);
-  RuntimeFilterMap::iterator it = consumed_filters_.find(filter_id);
-  if (it == consumed_filters_.end()) return NULL;
-  return it->second;
-}
-
 inline bool RuntimeFilter::AlwaysTrue() const {
   if (is_bloom_filter()) {
     return HasFilter() && bloom_filter_.Load() == BloomFilter::ALWAYS_TRUE_FILTER;

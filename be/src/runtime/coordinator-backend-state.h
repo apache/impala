@@ -104,8 +104,8 @@ class Coordinator::BackendState {
   /// Update completion_times, rates, and avg_profile for all fragment_stats.
   void UpdateExecStats(const std::vector<FragmentStats*>& fragment_stats);
 
-  /// Make a PublishFilter rpc with given params if this backend has instances of the
-  /// fragment with idx == rpc_params->dst_fragment_idx, otherwise do nothing.
+  /// Make a PublishFilter rpc with given params to this backend. The backend
+  /// must be one of the filter targets for the filter being published.
   void PublishFilter(FilterState* state, MemTracker* mem_tracker,
       const PublishFilterParamsPB& rpc_params, kudu::rpc::RpcController& controller,
       PublishFilterResultPB& res);
@@ -140,6 +140,14 @@ class Coordinator::BackendState {
 
   /// Merge the accumulated error log into 'merged'.
   void MergeErrorLog(ErrorLogMap* merged);
+
+  /// Return true if this backend has instances of the fragment with the index
+  /// 'fragment_idx'
+  bool HasFragmentIdx(int fragment_idx) const;
+
+  /// Return true if this backend has instances of a fragment with an index in
+  /// 'fragment_idxs'
+  bool HasFragmentIdx(const std::unordered_set<int>& fragment_idxs) const;
 
   const TNetworkAddress& impalad_address() const { return host_; }
   const TNetworkAddress& krpc_impalad_address() const { return krpc_host_; }

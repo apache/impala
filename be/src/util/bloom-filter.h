@@ -119,8 +119,13 @@ class BloomFilter {
   /// high probabilty) if it is not.
   bool Find(const uint32_t hash) const noexcept;
 
+  /// Computes the logical OR of this filter with 'other' and stores the result in this
+  /// filter.
+  void Or(const BloomFilter& other);
+
   /// This function computes the logical OR of 'directory_in' with 'directory_out'
-  /// and stores the result in 'directory_out'.
+  /// and stores the result in 'directory_out'. 'in' must be a valid filter object
+  /// (i.e. not ALWAYS_TRUE_FILTER).
   /// Additional checks are also performed to make sure the related fields of
   /// 'in' and 'out' are well-defined.
   static void Or(const BloomFilterPB& in, const uint8_t* directory_in, BloomFilterPB* out,

@@ -27,6 +27,7 @@ using namespace std;
 namespace impala {
 
 constexpr uint32_t BloomFilter::REHASH[8] __attribute__((aligned(32)));
+constexpr BloomFilter* const BloomFilter::ALWAYS_TRUE_FILTER;
 
 BloomFilter::BloomFilter(BufferPool::ClientHandle* client)
   : buffer_pool_client_(client) {}
@@ -208,10 +209,10 @@ namespace {
 // Computes out[i] |= in[i] for the arrays 'in' and 'out' of length 'n' using AVX
 // instructions. 'n' must be a multiple of 32.
 void __attribute__((target("avx")))
-OrEqualArrayAvx(size_t n, const char* __restrict__ in, char* __restrict__ out) {
+OrEqualArrayAvx(size_t n, const uint8_t* __restrict__ in, uint8_t* __restrict__ out) {
   constexpr size_t AVX_REGISTER_BYTES = sizeof(__m256d);
   DCHECK_EQ(n % AVX_REGISTER_BYTES, 0) << "Invalid Bloom Filter directory size";
-  const char* const in_end = in + n;
+  const uint8_t* const in_end = in + n;
   for (; in != in_end; (in += AVX_REGISTER_BYTES), (out += AVX_REGISTER_BYTES)) {
     const double* double_in = reinterpret_cast<const double*>(in);
     double* double_out = reinterpret_cast<double*>(out);
@@ -219,19 +220,8 @@ OrEqualArrayAvx(size_t n, const char* __restrict__ in, char* __restrict__ out) {
         _mm256_or_pd(_mm256_loadu_pd(double_out), _mm256_loadu_pd(double_in)));
   }
 }
-} //namespace
 
-void BloomFilter::Or(const BloomFilterPB& in, const uint8_t* directory_in,
-    BloomFilterPB* out, uint8_t* directory_out, size_t directory_size) {
-  DCHECK(out != nullptr);
-  DCHECK(&in != out);
-  // These cases are impossible in current code. If they become possible in the future,
-  // memory usage should be tracked accordingly.
-  DCHECK(!out->always_false());
-  DCHECK(!out->always_true());
-  DCHECK(!in.always_true());
-  if (in.always_false()) return;
-  DCHECK_EQ(in.log_bufferpool_space(), out->log_bufferpool_space());
+void OrEqualArray(size_t n, const uint8_t* __restrict__ in, uint8_t* __restrict__ out) {
   // The trivial loop out[i] |= in[i] should auto-vectorize with gcc at -O3, but it is not
   // written in a way that is very friendly to auto-vectorization. Instead, we manually
   // vectorize, increasing the speed by up to 56x.
@@ -239,14 +229,12 @@ void BloomFilter::Or(const BloomFilterPB& in, const uint8_t* directory_in,
   // TODO: Tune gcc flags to auto-vectorize the trivial loop instead of hand-vectorizing
   // it. This might not be possible.
   if (CpuInfo::IsSupported(CpuInfo::AVX)) {
-    OrEqualArrayAvx(directory_size, reinterpret_cast<const char*>(directory_in),
-        reinterpret_cast<char*>(directory_out));
+    OrEqualArrayAvx(n, in, out);
   } else {
-    const __m128i* simd_in = reinterpret_cast<const __m128i*>(directory_in);
-    const __m128i* const simd_in_end =
-        reinterpret_cast<const __m128i*>(directory_in + directory_size);
-    __m128i* simd_out = reinterpret_cast<__m128i*>(directory_out);
-    // directory_in has a size (in bytes) that is a multiple of 32. Since sizeof(__m128i)
+    const __m128i* simd_in = reinterpret_cast<const __m128i*>(in);
+    const __m128i* const simd_in_end = reinterpret_cast<const __m128i*>(in + n);
+    __m128i* simd_out = reinterpret_cast<__m128i*>(out);
+    // in.directory has a size (in bytes) that is a multiple of 32. Since sizeof(__m128i)
     // == 16, we can do two _mm_or_si128's in each iteration without checking array
     // bounds.
     while (simd_in != simd_in_end) {
@@ -257,6 +245,32 @@ void BloomFilter::Or(const BloomFilterPB& in, const uint8_t* directory_in,
     }
   }
 }
+} // namespace
+
+void BloomFilter::Or(const BloomFilter& other) {
+  DCHECK_NE(this, &other);
+  DCHECK_NE(&other, ALWAYS_TRUE_FILTER);
+  if (other.AlwaysFalse()) return;
+  DCHECK_EQ(directory_size(), other.directory_size());
+  OrEqualArray(directory_size(), reinterpret_cast<uint8_t*>(other.directory_),
+               reinterpret_cast<uint8_t*>(directory_));
+  always_false_ = false;
+}
+
+void BloomFilter::Or(const BloomFilterPB& in, const uint8_t* directory_in,
+    BloomFilterPB* out, uint8_t* directory_out, size_t directory_size) {
+  DCHECK(out != nullptr);
+  DCHECK_NE(&in, out);
+  // These cases are impossible in current code. If they become possible in the future,
+  // memory usage should be tracked accordingly.
+  DCHECK(!out->always_false());
+  DCHECK(!out->always_true());
+  DCHECK(!in.always_true());
+  if (in.always_false()) return;
+  DCHECK_EQ(in.log_bufferpool_space(), out->log_bufferpool_space());
+  OrEqualArray(directory_size, directory_in, directory_out);
+}
+
 
 // The following three methods are derived from
 //

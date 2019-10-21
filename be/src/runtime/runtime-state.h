@@ -60,10 +60,19 @@ namespace io {
   class DiskIoMgr;
 }
 
-/// A collection of items that are part of the global state of a query and shared across
-/// all execution nodes of that query. After initialisation, callers must call
-/// ReleaseResources() to ensure that all resources are correctly freed before
-/// destruction.
+/// Shared state for Impala's runtime query execution. Used in two contexts:
+/// * Within execution of a fragment instance to hold shared state for the fragment
+///   instance (i.e. there is a 1:1 relationship with FragmentInstanceState).
+/// * A standalone mode for other cases where query execution infrastructure is used
+///   outside the context of a fragment instance, e.g. tests, evaluation of constant
+///   expressions, etc. In this case the RuntimeState sets up all the required
+///   infrastructure.
+///
+/// RuntimeState is shared between multiple threads and so methods must generally be
+/// thread-safe.
+///
+/// After initialisation, callers must call ReleaseResources() to ensure that all
+/// resources are correctly freed before destruction.
 class RuntimeState {
  public:
   /// query_state, fragment_ctx, and instance_ctx need to be alive at least as long as
@@ -78,10 +87,6 @@ class RuntimeState {
 
   /// Empty d'tor to avoid issues with scoped_ptr.
   ~RuntimeState();
-
-  /// Initializes the runtime filter bank and claims the initial buffer reservation
-  /// for it.
-  Status InitFilterBank(long runtime_filters_reservation_bytes);
 
   QueryState* query_state() const { return query_state_; }
   /// Return the query's ObjectPool
@@ -125,7 +130,7 @@ class RuntimeState {
   /// See comment on root_node_id_. We add one to prevent having a hash seed of 0.
   uint32_t fragment_hash_seed() const { return root_node_id_ + 1; }
 
-  RuntimeFilterBank* filter_bank() { return filter_bank_.get(); }
+  RuntimeFilterBank* filter_bank() const;
 
   DmlExecState* dml_exec_state() { return &dml_exec_state_; }
 
@@ -431,10 +436,6 @@ class RuntimeState {
   /// details.
   PlanNodeId root_node_id_ = -1;
 
-  /// Manages runtime filters that are either produced or consumed (or both!) by plan
-  /// nodes that share this runtime state.
-  boost::scoped_ptr<RuntimeFilterBank> filter_bank_;
-
   /// Lock protecting aux_error_info_.
   SpinLock aux_error_info_lock_;
 
@@ -447,7 +448,6 @@ class RuntimeState {
 
   /// prohibit copies
   RuntimeState(const RuntimeState&);
-
 };
 
 #define RETURN_IF_CANCELLED(state) \

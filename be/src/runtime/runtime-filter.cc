@@ -40,6 +40,29 @@ void RuntimeFilter::SetFilter(BloomFilter* bloom_filter, MinMaxFilter* min_max_f
   arrival_cv_.NotifyAll();
 }
 
+void RuntimeFilter::SetFilter(RuntimeFilter* other) {
+  DCHECK_EQ(id(), other->id());
+  SetFilter(is_bloom_filter() ? other->bloom_filter_.Load() : nullptr,
+      is_min_max_filter() ? other->min_max_filter_.Load() : nullptr);
+}
+
+void RuntimeFilter::Or(RuntimeFilter* other) {
+  // Or() is a no-op for AlwaysTrue() destination filter.
+  if (AlwaysTrue()) return;
+  if (is_bloom_filter()) {
+    DCHECK(bloom_filter_.Load() != nullptr);
+    BloomFilter* bloom_filter = other->bloom_filter_.Load();
+    if (bloom_filter == BloomFilter::ALWAYS_TRUE_FILTER) {
+      bloom_filter_.Store(BloomFilter::ALWAYS_TRUE_FILTER);
+    } else {
+      bloom_filter_.Load()->Or(*bloom_filter);
+    }
+  } else {
+    DCHECK(is_min_max_filter());
+    min_max_filter_.Load()->Or(*other->get_min_max());
+  }
+}
+
 void RuntimeFilter::Cancel() {
   if (arrival_time_.Load() != 0) return;
   arrival_time_.Store(MonotonicMillis());

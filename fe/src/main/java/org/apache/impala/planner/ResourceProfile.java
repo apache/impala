@@ -98,6 +98,14 @@ public class ResourceProfile {
   public long getMaxRowBufferBytes() { return maxRowBufferBytes_; }
   public long getThreadReservation() { return threadReservation_; }
 
+  /**
+   * Returns true if this uses some resources. Must only call on valid profiles.
+   */
+  public boolean isNonZero() {
+    Preconditions.checkState(isValid_);
+    return memEstimateBytes_ > 0 || minMemReservationBytes_ > 0 || threadReservation_ > 0;
+  }
+
   // Return a string with the resource profile information suitable for display in an
   // explain plan in a format like: "resource1=value resource2=value"
   public String getExplainString() {

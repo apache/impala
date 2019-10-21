@@ -229,7 +229,7 @@ ColumnType KuduDataTypeToColumnType(
   }
 }
 
-Status CreateKuduValue(const ColumnType& col_type, void* value, KuduValue** out) {
+Status CreateKuduValue(const ColumnType& col_type, const void* value, KuduValue** out) {
   PrimitiveType type = col_type.type;
   switch (type) {
     case TYPE_VARCHAR:

@@ -111,6 +111,7 @@ Status KuduScanNodeBase::Open(RuntimeState* state) {
       "Unable to open Kudu table");
 
   runtime_profile_->AddInfoString("Table Name", table_desc->fully_qualified_name());
+  if (filter_ctxs_.size() > 0) WaitForRuntimeFilters();
   return Status::OK();
 }
 

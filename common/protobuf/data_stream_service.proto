@@ -132,14 +132,11 @@ message PublishFilterParamsPB {
   // Query that this filter is for.
   optional UniqueIdPB dst_query_id = 2;
 
-  // Index of fragment to receive this filter
-  optional int32 dst_fragment_idx = 3;
-
   // Actual bloom_filter payload
-  optional BloomFilterPB bloom_filter = 4;
+  optional BloomFilterPB bloom_filter = 3;
 
   // Actual min_max_filter payload
-  optional MinMaxFilterPB min_max_filter = 5;
+  optional MinMaxFilterPB min_max_filter = 4;
 }
 
 message PublishFilterResultPB {

@@ -333,6 +333,18 @@ void Coordinator::BackendState::MergeErrorLog(ErrorLogMap* merged) {
   if (error_log_.size() > 0)  MergeErrorMaps(error_log_, merged);
 }
 
+bool Coordinator::BackendState::HasFragmentIdx(int fragment_idx) const {
+  return fragments_.count(fragment_idx) > 0;
+}
+
+bool Coordinator::BackendState::HasFragmentIdx(
+    const std::unordered_set<int>& fragment_idxs) const {
+  for (int fragment_idx : fragment_idxs) {
+    if (HasFragmentIdx(fragment_idx)) return true;
+  }
+  return false;
+}
+
 void Coordinator::BackendState::LogFirstInProgress(
     std::vector<Coordinator::BackendState*> backend_states) {
   for (Coordinator::BackendState* backend_state : backend_states) {
@@ -558,8 +570,8 @@ void Coordinator::BackendState::PublishFilter(FilterState* state,
   // If the backend is already done, it's not waiting for this filter, so we skip
   // sending it in this case.
   if (IsDone()) return;
-
-  if (fragments_.count(rpc_params.dst_fragment_idx()) == 0) return;
+  VLOG(2) << "PublishFilter filter_id=" << rpc_params.filter_id()
+          << " backend=" << TNetworkAddressToString(host_);
   Status status;
 
   std::unique_ptr<DataStreamServiceProxy> proxy;
@@ -836,4 +848,4 @@ void Coordinator::BackendState::InstanceStatsToJson(Value* value, Document* docu
   value->AddMember("host", val, document->GetAllocator());
 }
 
-}
+} // namespace impala

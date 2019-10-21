@@ -226,8 +226,8 @@ Status KuduScanner::OpenNextScanToken(const string& scan_token, bool* eos) {
           DCHECK(col_name != "");
           const ColumnType& col_type = ColumnType::FromThrift(target_desc.kudu_col_type);
 
-          void* min = filter->GetMin();
-          void* max = filter->GetMax();
+          const void* min = filter->GetMin();
+          const void* max = filter->GetMax();
           // If the type of the filter is not the same as the type of the target column,
           // there must be an implicit integer cast and we need to ensure the min/max we
           // pass to Kudu are within the range of the target column.

@@ -436,11 +436,13 @@ public class Planner {
       // instances run on all backends with max DOP, and can consume their peak resources
       // at the same time, i.e. that the query-wide peak resources is the sum of the
       // per-fragment-instance peak resources.
-      maxPerHostPeakResources = maxPerHostPeakResources.sum(
-          fragment.getResourceProfile().multiply(fragment.getNumInstancesPerHost(mtDop)));
+      maxPerHostPeakResources =
+          maxPerHostPeakResources.sum(fragment.getTotalPerBackendResourceProfile(mtDop));
       // Coordinator has to have a copy of each of the runtime filters to perform filter
-      // aggregation.
-      totalRuntimeFilterMemBytes += fragment.getRuntimeFiltersMemReservationBytes();
+      // aggregation. Note that this overestimates because it includes local runtime
+      // filters that do not go via the coordinator.
+      totalRuntimeFilterMemBytes +=
+          fragment.getProducedRuntimeFiltersMemReservationBytes();
     }
     rootFragment.computePipelineMembership();
 
@@ -457,9 +459,14 @@ public class Planner {
     request.setMax_per_host_thread_reservation(
         maxPerHostPeakResources.getThreadReservation());
     if (getAnalysisResult().isQueryStmt()) {
-      request.setDedicated_coord_mem_estimate(MathUtil.saturatingAdd(rootFragment
-          .getResourceProfile().getMemEstimateBytes(), totalRuntimeFilterMemBytes +
-          DEDICATED_COORD_SAFETY_BUFFER_BYTES));
+      // Only one instance of root fragment, so don't need to multiply instance resource
+      // profile.
+      ResourceProfile rootFragmentResourceProfile =
+          rootFragment.getPerInstanceResourceProfile().sum(
+              rootFragment.getPerBackendResourceProfile());
+      request.setDedicated_coord_mem_estimate(
+          MathUtil.saturatingAdd(rootFragmentResourceProfile.getMemEstimateBytes(),
+              totalRuntimeFilterMemBytes + DEDICATED_COORD_SAFETY_BUFFER_BYTES));
     } else {
       // For queries that don't have a coordinator fragment, estimate a small
       // amount of memory that the query state spwaned on the coordinator can use.

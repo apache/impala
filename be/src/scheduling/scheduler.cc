@@ -780,6 +780,7 @@ void Scheduler::ComputeBackendExecParams(
     const ExecutorConfig& executor_config, QuerySchedule* schedule) {
   PerBackendExecParams per_backend_params;
   for (const FragmentExecParams& f : schedule->fragment_exec_params()) {
+    const TNetworkAddress* prev_host = nullptr;
     for (const FInstanceExecParams& i : f.instance_exec_params) {
       BackendExecParams& be_params = per_backend_params[i.host];
       be_params.instance_params.push_back(&i);
@@ -789,10 +790,20 @@ void Scheduler::ComputeBackendExecParams(
       // instances on this backend can consume their peak resources at the same time,
       // i.e. that this backend's peak resources is the sum of the per-fragment-instance
       // peak resources for the instances executing on this backend.
-      be_params.min_mem_reservation_bytes += f.fragment.min_mem_reservation_bytes;
+      be_params.min_mem_reservation_bytes +=
+          f.fragment.instance_min_mem_reservation_bytes;
       be_params.initial_mem_reservation_total_claims +=
-          f.fragment.initial_mem_reservation_total_claims;
+          f.fragment.instance_initial_mem_reservation_total_claims;
       be_params.thread_reservation += f.fragment.thread_reservation;
+      // Some memory is shared between fragments on a host. Only add it for the first
+      // instance of this fragment on the host.
+      if (prev_host == nullptr || *prev_host != i.host) {
+        be_params.min_mem_reservation_bytes +=
+            f.fragment.backend_min_mem_reservation_bytes;
+        be_params.initial_mem_reservation_total_claims +=
+            f.fragment.backend_initial_mem_reservation_total_claims;
+        prev_host = &i.host;
+      }
     }
   }
 

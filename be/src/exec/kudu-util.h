@@ -69,7 +69,7 @@ Status WriteKuduValue(int col, const ColumnType& col_type, const void* value,
 
 /// Casts 'value' according to the column type in 'col_type' and create a
 /// new KuduValue containing 'value' which is returned in 'out'.
-Status CreateKuduValue(const ColumnType& col_type, void* value,
+Status CreateKuduValue(const ColumnType& col_type, const void* value,
     kudu::client::KuduValue** out) WARN_UNUSED_RESULT;
 
 /// Takes a Kudu client DataType and KuduColumnTypeAttributes and

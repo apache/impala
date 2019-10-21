@@ -245,6 +245,18 @@ vector<int> FragmentExecParams::GetInstanceIdxs() const {
   return result;
 }
 
+int FragmentExecParams::GetNumBackends() const {
+  int result = 0;
+  const TNetworkAddress* prev_krpc_host = nullptr;
+  for (const FInstanceExecParams& instance_params: instance_exec_params) {
+    if (prev_krpc_host == nullptr || *prev_krpc_host != instance_params.krpc_host) {
+      ++result;
+      prev_krpc_host = &instance_params.krpc_host;
+    }
+  }
+  return result;
+}
+
 int QuerySchedule::GetNumFragmentInstances() const {
   int total = 0;
   for (const FragmentExecParams& p: fragment_exec_params_) {

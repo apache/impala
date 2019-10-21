@@ -4,7 +4,7 @@ functional_parquet.alltypestiny a,
 functional_parquet.alltypestiny b
 ---- PLAN
 F00:PLAN FRAGMENT [UNPARTITIONED] hosts=1 instances=1
-|  Per-Host Resources: mem-estimate=2.04GB mem-reservation=16.00KB thread-reservation=1
+|  Per-Instance Resources: mem-estimate=2.04GB mem-reservation=16.00KB thread-reservation=1
 PLAN-ROOT SINK
 |  output exprs: count(*)
 |  mem-estimate=0B mem-reservation=0B thread-reservation=0
@@ -22,7 +22,8 @@ PLAN-ROOT SINK
 |  in pipelines: 00(GETNEXT), 01(OPEN)
 |
 |--F01:PLAN FRAGMENT [UNPARTITIONED] hosts=1 instances=1
-|  |  Per-Host Resources: included in parent fragment
+|  |  Per-Host Shared Resources: included in parent fragment
+|  |  Per-Instance Resources: included in parent fragment
 |  JOIN BUILD
 |  |  join-table-id=00 plan-id=01 cohort-id=01
 |  |  mem-estimate=0B mem-reservation=0B thread-reservation=0
@@ -58,7 +59,7 @@ functional_parquet.alltypestiny b
 where a.id = b.id
 ---- PLAN
 F00:PLAN FRAGMENT [UNPARTITIONED] hosts=1 instances=1
-|  Per-Host Resources: mem-estimate=2.03GB mem-reservation=35.01MB thread-reservation=1 runtime-filters-memory=1.00MB
+|  Per-Instance Resources: mem-estimate=2.03GB mem-reservation=35.01MB thread-reservation=1 runtime-filters-memory=1.00MB
 PLAN-ROOT SINK
 |  output exprs: count(*)
 |  mem-estimate=0B mem-reservation=0B thread-reservation=0
@@ -79,7 +80,8 @@ PLAN-ROOT SINK
 |  in pipelines: 00(GETNEXT), 01(OPEN)
 |
 |--F01:PLAN FRAGMENT [UNPARTITIONED] hosts=1 instances=1
-|  |  Per-Host Resources: included in parent fragment
+|  |  Per-Host Shared Resources: included in parent fragment
+|  |  Per-Instance Resources: included in parent fragment
 |  JOIN BUILD
 |  |  join-table-id=00 plan-id=01 cohort-id=01
 |  |  build expressions: b.id
@@ -145,7 +147,7 @@ NotImplementedException: MT_DOP not supported for plans with base table joins or
 create table ctas_mt_dop_test as select * from functional_parquet.alltypes
 ---- PLAN
 F00:PLAN FRAGMENT [UNPARTITIONED] hosts=1 instances=1
-|  Per-Host Resources: mem-estimate=16.10MB mem-reservation=88.00KB thread-reservation=1
+|  Per-Instance Resources: mem-estimate=16.10MB mem-reservation=88.00KB thread-reservation=1
 WRITE TO HDFS [default.ctas_mt_dop_test, OVERWRITE=false]
 |  partitions=1
 |  output exprs: functional_parquet.alltypes.id, functional_parquet.alltypes.bool_col, functional_parquet.alltypes.tinyint_col, functional_parquet.alltypes.smallint_col, functional_parquet.alltypes.int_col, functional_parquet.alltypes.bigint_col, functional_parquet.alltypes.float_col, functional_parquet.alltypes.double_col, functional_parquet.alltypes.date_string_col, functional_parquet.alltypes.string_col, functional_parquet.alltypes.timestamp_col, functional_parquet.alltypes.year, functional_parquet.alltypes.month
@@ -172,7 +174,7 @@ order by cnt, bigint_col
 limit 10
 ---- PLAN
 F00:PLAN FRAGMENT [UNPARTITIONED] hosts=1 instances=1
-|  Per-Host Resources: mem-estimate=144.00MB mem-reservation=34.02MB thread-reservation=1
+|  Per-Instance Resources: mem-estimate=144.00MB mem-reservation=34.02MB thread-reservation=1
 PLAN-ROOT SINK
 |  output exprs: count(int_col)
 |  mem-estimate=0B mem-reservation=0B thread-reservation=0
@@ -205,7 +207,7 @@ PLAN-ROOT SINK
    in pipelines: 00(GETNEXT)
 ---- PARALLELPLANS
 F02:PLAN FRAGMENT [UNPARTITIONED] hosts=1 instances=1
-|  Per-Host Resources: mem-estimate=16.00KB mem-reservation=0B thread-reservation=1
+|  Per-Instance Resources: mem-estimate=16.00KB mem-reservation=0B thread-reservation=1
 PLAN-ROOT SINK
 |  output exprs: count(int_col)
 |  mem-estimate=0B mem-reservation=0B thread-reservation=0
@@ -218,7 +220,7 @@ PLAN-ROOT SINK
 |  in pipelines: 02(GETNEXT)
 |
 F01:PLAN FRAGMENT [HASH(bigint_col)] hosts=3 instances=9
-Per-Host Resources: mem-estimate=384.53MB mem-reservation=102.00MB thread-reservation=3
+Per-Instance Resources: mem-estimate=128.18MB mem-reservation=34.00MB thread-reservation=1
 02:TOP-N [LIMIT=10]
 |  order by: count(int_col) ASC, bigint_col ASC
 |  mem-estimate=160B mem-reservation=0B thread-reservation=0
@@ -238,7 +240,7 @@ Per-Host Resources: mem-estimate=384.53MB mem-reservation=102.00MB thread-reserv
 |  in pipelines: 00(GETNEXT)
 |
 F00:PLAN FRAGMENT [RANDOM] hosts=3 instances=9
-Per-Host Resources: mem-estimate=432.00MB mem-reservation=102.07MB thread-reservation=3
+Per-Instance Resources: mem-estimate=144.00MB mem-reservation=34.02MB thread-reservation=1
 01:AGGREGATE [STREAMING]
 |  output: count(int_col)
 |  group by: bigint_col
@@ -266,7 +268,7 @@ from functional_parquet.alltypes
 where id < 10
 ---- PLAN
 F00:PLAN FRAGMENT [UNPARTITIONED] hosts=1 instances=1
-|  Per-Host Resources: mem-estimate=26.00MB mem-reservation=10.02MB thread-reservation=1
+|  Per-Instance Resources: mem-estimate=26.00MB mem-reservation=10.02MB thread-reservation=1
 PLAN-ROOT SINK
 |  output exprs: row_number()
 |  mem-estimate=0B mem-reservation=0B thread-reservation=0
@@ -301,7 +303,7 @@ PLAN-ROOT SINK
    in pipelines: 00(GETNEXT)
 ---- PARALLELPLANS
 F02:PLAN FRAGMENT [UNPARTITIONED] hosts=1 instances=1
-|  Per-Host Resources: mem-estimate=216.00KB mem-reservation=0B thread-reservation=1
+|  Per-Instance Resources: mem-estimate=216.00KB mem-reservation=0B thread-reservation=1
 PLAN-ROOT SINK
 |  output exprs: row_number()
 |  mem-estimate=0B mem-reservation=0B thread-reservation=0
@@ -312,7 +314,7 @@ PLAN-ROOT SINK
 |  in pipelines: 01(GETNEXT)
 |
 F01:PLAN FRAGMENT [HASH(int_col)] hosts=3 instances=9
-Per-Host Resources: mem-estimate=30.32MB mem-reservation=30.00MB thread-reservation=3
+Per-Instance Resources: mem-estimate=10.11MB mem-reservation=10.00MB thread-reservation=1
 02:ANALYTIC
 |  functions: row_number()
 |  partition by: int_col
@@ -334,7 +336,7 @@ Per-Host Resources: mem-estimate=30.32MB mem-reservation=30.00MB thread-reservat
 |  in pipelines: 00(GETNEXT)
 |
 F00:PLAN FRAGMENT [RANDOM] hosts=3 instances=9
-Per-Host Resources: mem-estimate=48.00MB mem-reservation=48.00KB thread-reservation=3
+Per-Instance Resources: mem-estimate=16.00MB mem-reservation=16.00KB thread-reservation=1
 00:SCAN HDFS [functional_parquet.alltypes, RANDOM]
    HDFS partitions=24/24 files=24 size=201.80KB
    predicates: id < CAST(10 AS INT)
@@ -355,7 +357,7 @@ from tpch_nested_parquet.customer c, c.c_orders o, o.o_lineitems
 where c_custkey < 10 and o_orderkey < 5 and l_linenumber < 3
 ---- PLAN
 F00:PLAN FRAGMENT [UNPARTITIONED] hosts=1 instances=1
-|  Per-Host Resources: mem-estimate=104.00MB mem-reservation=104.00MB thread-reservation=1
+|  Per-Instance Resources: mem-estimate=104.00MB mem-reservation=104.00MB thread-reservation=1
 PLAN-ROOT SINK
 |  output exprs: c.c_custkey, c.c_name, c.c_address, c.c_nationkey, c.c_phone, c.c_acctbal, c.c_mktsegment, c.c_comment, o.item.o_orderkey, o.item.o_orderstatus, o.item.o_totalprice, o.item.o_orderdate, o.item.o_orderpriority, o.item.o_clerk, o.item.o_shippriority, o.item.o_comment, o_lineitems.item.l_partkey, o_lineitems.item.l_suppkey, o_lineitems.item.l_linenumber, o_lineitems.item.l_quantity, o_lineitems.item.l_extendedprice, o_lineitems.item.l_discount, o_lineitems.item.l_tax, o_lineitems.item.l_returnflag, o_lineitems.item.l_linestatus, o_lineitems.item.l_shipdate, o_lineitems.item.l_commitdate, o_lineitems.item.l_receiptdate, o_lineitems.item.l_shipinstruct, o_lineitems.item.l_shipmode, o_lineitems.item.l_comment
 |  mem-estimate=0B mem-reservation=0B thread-reservation=0
@@ -424,7 +426,7 @@ PLAN-ROOT SINK
    in pipelines: 00(GETNEXT)
 ---- PARALLELPLANS
 F01:PLAN FRAGMENT [UNPARTITIONED] hosts=1 instances=1
-|  Per-Host Resources: mem-estimate=14.34MB mem-reservation=0B thread-reservation=1
+|  Per-Instance Resources: mem-estimate=14.34MB mem-reservation=0B thread-reservation=1
 PLAN-ROOT SINK
 |  output exprs: c.c_custkey, c.c_name, c.c_address, c.c_nationkey, c.c_phone, c.c_acctbal, c.c_mktsegment, c.c_comment, o.item.o_orderkey, o.item.o_orderstatus, o.item.o_totalprice, o.item.o_orderdate, o.item.o_orderpriority, o.item.o_clerk, o.item.o_shippriority, o.item.o_comment, o_lineitems.item.l_partkey, o_lineitems.item.l_suppkey, o_lineitems.item.l_linenumber, o_lineitems.item.l_quantity, o_lineitems.item.l_extendedprice, o_lineitems.item.l_discount, o_lineitems.item.l_tax, o_lineitems.item.l_returnflag, o_lineitems.item.l_linestatus, o_lineitems.item.l_shipdate, o_lineitems.item.l_commitdate, o_lineitems.item.l_receiptdate, o_lineitems.item.l_shipinstruct, o_lineitems.item.l_shipmode, o_lineitems.item.l_comment
 |  mem-estimate=0B mem-reservation=0B thread-reservation=0
@@ -435,7 +437,7 @@ PLAN-ROOT SINK
 |  in pipelines: 00(GETNEXT)
 |
 F00:PLAN FRAGMENT [RANDOM] hosts=3 instances=9
-Per-Host Resources: mem-estimate=312.00MB mem-reservation=312.00MB thread-reservation=3
+Per-Instance Resources: mem-estimate=104.00MB mem-reservation=104.00MB thread-reservation=1
 01:SUBPLAN
 |  mem-estimate=0B mem-reservation=0B thread-reservation=0
 |  tuple-ids=2,1,0 row-size=482B cardinality=1.50M
@@ -505,7 +507,7 @@ from tpch_nested_parquet.customer c, c.c_orders o1, c.c_orders o2
 where o1.o_orderkey = o2.o_orderkey + 2 and o1.o_orderkey < 5
 ---- PLAN
 F00:PLAN FRAGMENT [UNPARTITIONED] hosts=1 instances=1
-|  Per-Host Resources: mem-estimate=89.94MB mem-reservation=17.94MB thread-reservation=1
+|  Per-Instance Resources: mem-estimate=89.94MB mem-reservation=17.94MB thread-reservation=1
 PLAN-ROOT SINK
 |  output exprs: c.c_custkey, c.c_name, c.c_address, c.c_nationkey, c.c_phone, c.c_acctbal, c.c_mktsegment, c.c_comment
 |  mem-estimate=0B mem-reservation=0B thread-reservation=0
@@ -560,7 +562,7 @@ PLAN-ROOT SINK
    in pipelines: 00(GETNEXT)
 ---- PARALLELPLANS
 F01:PLAN FRAGMENT [UNPARTITIONED] hosts=1 instances=1
-|  Per-Host Resources: mem-estimate=12.37MB mem-reservation=0B thread-reservation=1
+|  Per-Instance Resources: mem-estimate=12.37MB mem-reservation=0B thread-reservation=1
 PLAN-ROOT SINK
 |  output exprs: c.c_custkey, c.c_name, c.c_address, c.c_nationkey, c.c_phone, c.c_acctbal, c.c_mktsegment, c.c_comment
 |  mem-estimate=0B mem-reservation=0B thread-reservation=0
@@ -571,7 +573,7 @@ PLAN-ROOT SINK
 |  in pipelines: 00(GETNEXT)
 |
 F00:PLAN FRAGMENT [RANDOM] hosts=3 instances=9
-Per-Host Resources: mem-estimate=269.81MB mem-reservation=53.81MB thread-reservation=3
+Per-Instance Resources: mem-estimate=89.94MB mem-reservation=17.94MB thread-reservation=1
 01:SUBPLAN
 |  mem-estimate=0B mem-reservation=0B thread-reservation=0
 |  tuple-ids=1,0,2 row-size=258B cardinality=1.50M
