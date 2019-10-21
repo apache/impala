@@ -716,7 +716,7 @@ under the License.
       <conbody>
         <p>At <b>/metrics_prometheus</b> under the main <codeph>impalad</codeph>
           Web UI, the metrics are generated in Prometheus exposition format that
-          Prometheus can consumes for event monitoring and alerting. The
+          Prometheus can consume for event monitoring and alerting. The
             <b>/metrics_prometheus</b> is not shown in the Web UI list of
           pages.</p>
       </conbody>
@@ -961,7 +961,7 @@ under the License.
       <conbody>
         <p>At <b>/metrics_prometheus</b> under the main
             <codeph>statestored</codeph> Web UI, the metrics are generated in
-          Prometheus exposition format that Prometheus can consumes for event
+          Prometheus exposition format that Prometheus can consume for event
           monitoring and alerting. The <b>/metrics_prometheus</b> is not shown
           in the Web UI list of pages.</p>
       </conbody>
@@ -1108,7 +1108,7 @@ under the License.
       <conbody>
         <p>At <b>/metrics_prometheus</b> under the main
             <codeph>catalogd</codeph> Web UI, the metrics are generated in
-          Prometheus exposition format that Prometheus can consumes for event
+          Prometheus exposition format that Prometheus can consume for event
           monitoring and alerting. The <b>/metrics_prometheus</b> is not shown
           in the Web UI list of pages.</p>
       </conbody>
