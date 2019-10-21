@@ -711,6 +711,16 @@ under the License.
       </conbody>
 
     </concept>
+    <concept id="concept_l5h_cwx_ljb">
+      <title>Prometheus Metrics Page</title>
+      <conbody>
+        <p>At <b>/metrics_prometheus</b> under the main <codeph>impalad</codeph>
+          Web UI, the metrics are generated in Prometheus exposition format that
+          Prometheus can consumes for event monitoring and alerting. The
+            <b>/metrics_prometheus</b> is not shown in the Web UI list of
+          pages.</p>
+      </conbody>
+    </concept>
 
   </concept>
 
@@ -944,269 +954,165 @@ under the License.
         </p>
 
       </conbody>
+      <concept id="concept_dkw_cyx_ljb">
+        <title>Prometheus Metrics Page</title>
+        <conbody>
+          <p>At <b>/metrics_prometheus</b> under the main
+              <codeph>statestored</codeph> Web UI, the metrics are generated in
+            Prometheus exposition format that Prometheus can consumes for event
+            monitoring and alerting. The <b>/metrics_prometheus</b> is not shown
+            in the Web UI list of pages.</p>
+        </conbody>
+      </concept>
 
     </concept>
 
   </concept>
 
   <concept id="webui_catalogd">
-
     <title>Debug Web UI for catalogd</title>
-
     <conbody>
-
-      <p>
-        The main page of the debug Web UI is at
-        <codeph>http://<varname>impala&#8209;server&#8209;hostname</varname>:25020/</codeph>
+      <p> The main page of the debug Web UI is at
+            <codeph>http://<varname>impala&#8209;server&#8209;hostname</varname>:25020/</codeph>
         (non-secure cluster) or
-        <codeph>https://<varname>impala&#8209;server&#8209;hostname</varname>:25020/</codeph>
-        (secure cluster).
-      </p>
-
+            <codeph>https://<varname>impala&#8209;server&#8209;hostname</varname>:25020/</codeph>
+        (secure cluster). </p>
     </conbody>
-
     <concept id="webui_catalogd_main">
-
       <title>Main Page</title>
-
       <conbody>
-
-        <p>
-          The main <codeph>catalogd</codeph> Web UI page at <b>/</b> lists the following
-          information about the <codeph>catalogd</codeph>:
-        </p>
-
+        <p> The main <codeph>catalogd</codeph> Web UI page at <b>/</b> lists the
+          following information about the <codeph>catalogd</codeph>: </p>
         <ul>
-          <li>
-            The version of the <codeph>catalogd</codeph> daemon
-          </li>
-
-          <li>
-            Process start time
-          </li>
-
-          <li>
-            Hardware information
-          </li>
-
-          <li>
-            OS information
-          </li>
-
-          <li>
-            Process information
-          </li>
-
-          <li>
-            CGroup information
-          </li>
+          <li> The version of the <codeph>catalogd</codeph> daemon </li>
+          <li> Process start time </li>
+          <li> Hardware information </li>
+          <li> OS information </li>
+          <li> Process information </li>
+          <li> CGroup information </li>
         </ul>
-
       </conbody>
-
     </concept>
-
     <concept id="webui_catalogd_catalog">
-
       <title>Catalog Page</title>
-
       <conbody>
-
-        <p>
-          The <b>Catalog</b> page of the debug Web UI is at <b>/catalog</b> under the main
-          <codeph>catalogd</codeph> Web UI.
-        </p>
-
-        <p>
-          This page displays a list of databases and associated tables recognized by this
-          instance of <codeph>catalogd</codeph>. You can use this page to locate which database
-          a table is in, check the exact spelling of a database or table name, look for
-          identical table names in multiple databases. The catalog information is represented as
-          the underlying Thrift data structures.
-        </p>
-
+        <p> The <b>Catalog</b> page of the debug Web UI is at <b>/catalog</b>
+          under the main <codeph>catalogd</codeph> Web UI. </p>
+        <p> This page displays a list of databases and associated tables
+          recognized by this instance of <codeph>catalogd</codeph>. You can use
+          this page to locate which database a table is in, check the exact
+          spelling of a database or table name, look for identical table names
+          in multiple databases. The catalog information is represented as the
+          underlying Thrift data structures. </p>
       </conbody>
-
     </concept>
-
     <concept id="webui_catalogd_jmx">
-
       <title>JMX</title>
-
       <conbody>
-
-        <p>
-          The <b>JMX</b> page of the <codeph>catalogd</codeph> debug Web UI is at <b>/jmx</b>
-          under the main <codeph>catalogd</codeph> Web UI.
+        <p> The <b>JMX</b> page of the <codeph>catalogd</codeph> debug Web UI is
+          at <b>/jmx</b> under the main <codeph>catalogd</codeph> Web UI. </p>
+        <p> This page displays monitoring information about various JVM
+          subsystems, such as memory pools, thread management, runtime. etc.
         </p>
-
-        <p>
-          This page displays monitoring information about various JVM subsystems, such as memory
-          pools, thread management, runtime. etc.
-        </p>
-
       </conbody>
-
     </concept>
-
     <concept id="webui_catalogd_log_level">
-
       <title>Java Log Level</title>
-
       <conbody>
-
-        <p>
-          The <b>Change log level</b> page of the <codeph>catalogd</codeph> debug Web UI is at
-          <b>/log_level</b> under the main <codeph>catalogd</codeph> Web UI.
+        <p> The <b>Change log level</b> page of the <codeph>catalogd</codeph>
+          debug Web UI is at <b>/log_level</b> under the main
+            <codeph>catalogd</codeph> Web UI. </p>
+        <p> The page displays the current Java and backend log levels and allows
+          you to change the log levels dynamically without having to restart the
+            <codeph>catalogd</codeph>
         </p>
-
-        <p>
-          The page displays the current Java and backend log levels and allows you to change the
-          log levels dynamically without having to restart the <codeph>catalogd</codeph>
-        </p>
-
       </conbody>
-
     </concept>
-
     <concept id="webui_catalogd_logs">
-
       <title>Logs Page</title>
-
       <conbody>
-
-        <p>
-          The <b>INFO logs</b> page of the debug Web UI is at <b>/logs</b> under the main
-          <codeph>catalogd</codeph> Web UI.
+        <p> The <b>INFO logs</b> page of the debug Web UI is at <b>/logs</b>
+          under the main <codeph>catalogd</codeph> Web UI. </p>
+        <p> This page shows the last portion of the
+            <codeph>catalogd.INFO</codeph> log file, including the info,
+          warning, and error logs for the <codeph>catalogd</codeph> daemon. You
+          can refer here to see the details of the most recent operations,
+          whether the operations succeeded or encountered errors. This page
+          provides one central place for the log files and saves you from
+          looking around the filesystem for the log files, which could be in
+          different locations on clusters that use cluster management software.
         </p>
-
-        <p>
-          This page shows the last portion of the <codeph>catalogd.INFO</codeph> log file,
-          including the info, warning, and error logs for the <codeph>catalogd</codeph> daemon.
-          You can refer here to see the details of the most recent operations, whether the
-          operations succeeded or encountered errors. This page provides one central place for
-          the log files and saves you from looking around the filesystem for the log files,
-          which could be in different locations on clusters that use cluster management
-          software.
-        </p>
-
       </conbody>
-
     </concept>
-
     <concept id="webui_catalogd_memz">
-
       <title>Memz Page</title>
-
       <conbody>
-
-        <p>
-          The <b>Memory Usage</b> page of the debug Web UI is at <b>/memz</b> under the main
-          <codeph>catalogd</codeph> Web UI.
-        </p>
-
-        <p>
-          This page displays summary and detailed information about memory usage by the
-          <codeph>catalogd</codeph>. You can see the memory limit in effect for the node, and
-          how much of that memory Impala is currently using.
-        </p>
-
+        <p> The <b>Memory Usage</b> page of the debug Web UI is at <b>/memz</b>
+          under the main <codeph>catalogd</codeph> Web UI. </p>
+        <p> This page displays summary and detailed information about memory
+          usage by the <codeph>catalogd</codeph>. You can see the memory limit
+          in effect for the node, and how much of that memory Impala is
+          currently using. </p>
       </conbody>
-
     </concept>
-
     <concept id="webui_catalogd_metrics">
-
       <title>Metrics Page</title>
-
       <conbody>
-
-        <p>
-          The <b>Metrics</b> page of the debug Web UI is at <b>/metrics</b> under the main
-          <codeph>catalogd</codeph> Web UI.
-        </p>
-
-        <p>
-          This page displays the current set of metrics: counters and flags representing various
-          aspects of <codeph>catalogd</codeph> internal operation.
-        </p>
-
+        <p> The <b>Metrics</b> page of the debug Web UI is at <b>/metrics</b>
+          under the main <codeph>catalogd</codeph> Web UI. </p>
+        <p> This page displays the current set of metrics: counters and flags
+          representing various aspects of <codeph>catalogd</codeph> internal
+          operation. </p>
         <p/>
-
       </conbody>
-
     </concept>
-
     <concept id="webui_catalogd_rpcz">
-
       <title>RPC Services Page</title>
-
       <conbody>
-
-        <p>
-          The <b>RPC durations</b> page of the <codeph>catalogd</codeph> debug Web UI is at
-          <b>/rpcz</b> under the main <codeph>catalogd</codeph> Web UI.
-        </p>
-
-        <p>
-          This page displays information, such as the durations, about the RPC communications of
-          this <codeph>catalogd</codeph> with other Impala daemons.
-        </p>
-
+        <p> The <b>RPC durations</b> page of the <codeph>catalogd</codeph> debug
+          Web UI is at <b>/rpcz</b> under the main <codeph>catalogd</codeph> Web
+          UI. </p>
+        <p> This page displays information, such as the durations, about the RPC
+          communications of this <codeph>catalogd</codeph> with other Impala
+          daemons. </p>
       </conbody>
-
     </concept>
-
     <concept id="webui_catalogd_threadz">
-
       <title>Threadz Page</title>
-
       <conbody>
-
-        <p>
-          The <b>Threads</b> page of the debug Web UI is at <b>/threadz</b> under the main
-          <codeph>catalogd</codeph> Web UI.
-        </p>
-
-        <p>
-          This page displays information about the threads used by this instance of
-          <codeph>catalogd</codeph>, and shows which categories they are grouped into. Making
-          use of this information requires substantial knowledge about Impala internals.
-        </p>
-
+        <p> The <b>Threads</b> page of the debug Web UI is at <b>/threadz</b>
+          under the main <codeph>catalogd</codeph> Web UI. </p>
+        <p> This page displays information about the threads used by this
+          instance of <codeph>catalogd</codeph>, and shows which categories they
+          are grouped into. Making use of this information requires substantial
+          knowledge about Impala internals. </p>
       </conbody>
-
     </concept>
-
     <concept id="webui_catalogd_varz">
-
       <title>Varz Page</title>
-
       <conbody>
-
-        <p>
-          The <b>Varz</b> page of the debug Web UI is at <b>/varz</b> under the main
-          <codeph>catalogd</codeph> Web UI.
-        </p>
-
-        <p>
-          This page shows the configuration settings in effect when this instance of
-          <codeph>catalogd</codeph> communicates with other Hadoop components such as HDFS and
-          YARN. These settings are collected from a set of configuration files.
-        </p>
-
-        <p>
-          The bottom of this page also lists all the command-line settings in effect for this
-          instance of <codeph>catalogd</codeph>. See
-          <xref
+        <p> The <b>Varz</b> page of the debug Web UI is at <b>/varz</b> under
+          the main <codeph>catalogd</codeph> Web UI. </p>
+        <p> This page shows the configuration settings in effect when this
+          instance of <codeph>catalogd</codeph> communicates with other Hadoop
+          components such as HDFS and YARN. These settings are collected from a
+          set of configuration files. </p>
+        <p> The bottom of this page also lists all the command-line settings in
+          effect for this instance of <codeph>catalogd</codeph>. See <xref
             href="impala_config_options.xml#config_options"/> for information
-          about modifying these values.
-        </p>
-
+          about modifying these values. </p>
       </conbody>
-
     </concept>
-
+    <concept id="concept_chs_fdy_ljb">
+      <title>Prometheus Metrics Page</title>
+      <conbody>
+        <p>At <b>/metrics_prometheus</b> under the main
+            <codeph>catalogd</codeph> Web UI, the metrics are generated in
+          Prometheus exposition format that Prometheus can consumes for event
+          monitoring and alerting. The <b>/metrics_prometheus</b> is not shown
+          in the Web UI list of pages.</p>
+      </conbody>
+    </concept>
   </concept>
 
 </concept>
