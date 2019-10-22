@@ -41,10 +41,19 @@ namespace impala {
 #define EXPECT_STR_CONTAINS(str, substr) \
   EXPECT_PRED_FORMAT2(testing::IsSubstring, substr, str)
 
+// Error code matches.
 #define EXPECT_ERROR(status, err)                                       \
   do {                                                                  \
     const Status& status_ = (status);                                   \
     EXPECT_EQ(status_.code(), err) << "Error: " << status_.GetDetail(); \
+  } while (0)
+
+// Text of error message matches.
+#define ASSERT_ERROR_MSG(status, err)                                        \
+  do {                                                                       \
+    const Status& status_ = (status);                                        \
+    ASSERT_FALSE(status_.ok());                                              \
+    ASSERT_EQ(status_.msg().msg(), err) << "Error: " << status_.msg().msg(); \
   } while (0)
 
 // Basic main() function to be used in gtest unit tests. Does not start a JVM and does

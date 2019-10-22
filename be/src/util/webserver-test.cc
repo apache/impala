@@ -383,7 +383,8 @@ TEST(Webserver, TestWithSpnego) {
 
   // Don't expect HTTP requests to work without Kerberos credentials.
   stringstream contents;
-  ASSERT_FALSE(HttpGet("localhost", FLAGS_webserver_port, "/", &contents).ok());
+  ASSERT_ERROR_MSG(HttpGet("localhost", FLAGS_webserver_port, "/", &contents),
+      "Unexpected status code: 401");
   // There should be one failed auth attempt.
   CheckAuthMetrics(&metrics, 0, 1, 0, 0);
 
@@ -445,7 +446,8 @@ TEST(Webserver, StartWithPasswordFileTest) {
 
   // Don't expect HTTP requests to work without a password
   stringstream contents;
-  ASSERT_FALSE(HttpGet("localhost", FLAGS_webserver_port, "/", &contents).ok());
+  ASSERT_ERROR_MSG(HttpGet("localhost", FLAGS_webserver_port, "/", &contents),
+      "Unexpected status code: 401");
 }
 
 TEST(Webserver, StartWithMissingPasswordFileTest) {
