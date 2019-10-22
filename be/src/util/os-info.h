@@ -32,6 +32,15 @@ class OsInfo {
   /// Initialize OsInfo.
   static void Init();
 
+  /// Simple name of the OS.
+  /// If Docker is used this is the name of Container OS.
+  static const std::string os_distribution() {
+    DCHECK(initialized_);
+    return os_distribution_;
+  }
+
+  /// The version of Linux kernel and the version of the compiler used to build it.
+  /// If Docker is used this is the host kernel.
   static const std::string os_version() {
     DCHECK(initialized_);
     return os_version_;
@@ -48,6 +57,7 @@ class OsInfo {
 
  private:
   static bool initialized_;
+  static std::string os_distribution_;
   static std::string os_version_;
   static clockid_t fast_clock_;
   static std::string clock_name_;

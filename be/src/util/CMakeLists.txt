@@ -120,6 +120,7 @@ add_library(UtilTests STATIC
   metrics-test.cc
   min-max-filter-test.cc
   openssl-util-test.cc
+  os-info-test.cc
   os-util-test.cc
   parse-util-test.cc
   pretty-printer-test.cc
@@ -182,6 +183,7 @@ ADD_UNIFIED_BE_LSAN_TEST(lru-cache-test "FifoMultimap.*")
 ADD_UNIFIED_BE_LSAN_TEST(metrics-test "MetricsTest.*")
 ADD_UNIFIED_BE_LSAN_TEST(min-max-filter-test "MinMaxFilterTest.*")
 ADD_UNIFIED_BE_LSAN_TEST(openssl-util-test "OpenSSLUtilTest.*")
+ADD_UNIFIED_BE_LSAN_TEST(os-info-test "OsInfo.*")
 ADD_UNIFIED_BE_LSAN_TEST(os-util-test "OsUtil.*")
 ADD_UNIFIED_BE_LSAN_TEST(parse-util-test "ParseMemSpecs.*")
 ADD_UNIFIED_BE_LSAN_TEST(pretty-printer-test "PrettyPrinterTest.*")

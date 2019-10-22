@@ -17,19 +17,26 @@
 
 #include "util/os-info.h"
 
-#include <iostream>
-#include <fstream>
-#include <sstream>
 #include <stdlib.h>
 #include <string.h>
+#include <fstream>
+#include <iostream>
+#include <sstream>
 
 #include <unistd.h>
+#include <boost/algorithm/string.hpp>
+#include <sys/stat.h>
 
 #include "common/names.h"
+
+using boost::algorithm::is_any_of;
+using boost::algorithm::split;
+using boost::algorithm::token_compress_on;
 
 namespace impala {
 
 bool OsInfo::initialized_ = false;
+string OsInfo::os_distribution_ = "Unknown";
 string OsInfo::os_version_ = "Unknown";
 clockid_t OsInfo::fast_clock_ = CLOCK_MONOTONIC;
 std::string OsInfo::clock_name_ =
@@ -46,10 +53,36 @@ std::string OsInfo::clock_name_ =
 
 void OsInfo::Init() {
   DCHECK(!initialized_);
+  struct stat info;
+  // Read from /etc/os-release
+  if (stat("/etc/os-release", &info) == 0) {
+    ifstream os_distribution("/etc/os-release", ios::in);
+    string line;
+    while (os_distribution.good() && !os_distribution.eof()) {
+      getline(os_distribution, line);
+      vector<string> fields;
+      split(fields, line, is_any_of("="), token_compress_on);
+      if (fields[0].compare("PRETTY_NAME") == 0) {
+        os_distribution_ = fields[1].data();
+        // remove quotes around os distribution
+        os_distribution_.erase(
+            remove(os_distribution_.begin(), os_distribution_.end(), '\"'),
+            os_distribution_.end());
+        break;
+      }
+    }
+    if (os_distribution.is_open()) os_distribution.close();
+  } else if (stat("/etc/redhat-release", &info) == 0) {
+    // Only old distributions like centos 6, redhat 6
+    ifstream os_distribution("/etc/redhat-release", ios::in);
+    if (os_distribution.good()) getline(os_distribution, os_distribution_);
+    if (os_distribution.is_open()) os_distribution.close();
+  }
+
   // Read from /proc/version
-  ifstream version("/proc/version", ios::in);
-  if (version.good()) getline(version, os_version_);
-  if (version.is_open()) version.close();
+  ifstream os_version("/proc/version", ios::in);
+  if (os_version.good()) getline(os_version, os_version_);
+  if (os_version.is_open()) os_version.close();
 
   // Read the current clocksource to see if CLOCK_MONOTONIC is known to be fast. "tsc" is
   // fast, while "xen" is slow (40 times slower than "tsc" on EC2). If CLOCK_MONOTONIC is
@@ -76,9 +109,10 @@ void OsInfo::Init() {
 string OsInfo::DebugString() {
   DCHECK(initialized_);
   stringstream stream;
-  stream << "OS version: " << os_version_ << endl
+  stream << "OS distribution: " << os_distribution_ << endl
+         << "OS version: " << os_version_ << endl
          << "Clock: " << clock_name_ << endl;
   return stream.str();
 }
 
-}
+} // namespace impala
