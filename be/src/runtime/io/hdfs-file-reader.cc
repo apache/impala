@@ -121,6 +121,7 @@ Status HdfsFileReader::ReadFromPos(DiskQueue* queue, int64_t file_offset, uint8_
   {
     ScopedTimer<MonotonicStopWatch> req_context_read_timer(
         scan_range_->reader_->read_timer_);
+    bool logged_slow_read = false; // True if we already logged about a slow read.
 
     // Try reading from the remote data cache if it's enabled for the scan range.
     DataCache* remote_data_cache = io_mgr->remote_data_cache();
@@ -168,7 +169,12 @@ Status HdfsFileReader::ReadFromPos(DiskQueue* queue, int64_t file_offset, uint8_
       int64_t elapsed_time = req_context_read_timer.ElapsedTime();
       bool is_slow_read = elapsed_time
           > FLAGS_fs_slow_read_log_threshold_ms * NANOS_PER_MICRO * MICROS_PER_MILLI;
-      if (is_slow_read) {
+      bool log_slow_read = is_slow_read && (!logged_slow_read || !status.ok()
+                 || *bytes_read + current_bytes_read == bytes_to_read);
+      // Log at most two slow read errors in each invocation of this function. Always log
+      // the first read where we exceeded the threshold and the last read before exiting
+      // this loop.
+      if (log_slow_read) {
         LOG(INFO) << "Slow FS I/O operation on " << *scan_range_->file_string() << " for "
                   << "instance " << PrintId(scan_range_->reader_->instance_id())
                   << " of query " << PrintId(scan_range_->reader_->query_id()) << ". "
@@ -181,6 +187,7 @@ Status HdfsFileReader::ReadFromPos(DiskQueue* queue, int64_t file_offset, uint8_
                   << "quantum and taken "
                   << PrettyPrinter::Print(elapsed_time, TUnit::TIME_NS) << " so far. "
                   << "I/O status: " << (status.ok() ? "OK" : status.GetDetail());
+        logged_slow_read = true;
       }
 
       if (!status.ok()) {
@@ -195,7 +202,7 @@ Status HdfsFileReader::ReadFromPos(DiskQueue* queue, int64_t file_offset, uint8_
       *bytes_read += current_bytes_read;
 
       // Collect and accumulate statistics
-      GetHdfsStatistics(hdfs_file, is_slow_read);
+      GetHdfsStatistics(hdfs_file, log_slow_read);
     }
 
     int64_t cached_bytes_missed = *bytes_read - cached_read;
