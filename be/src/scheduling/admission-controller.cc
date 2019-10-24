@@ -324,6 +324,7 @@ AdmissionController::~AdmissionController() {
     // Lock to ensure the dequeue thread will see the update to done_
     lock_guard<mutex> l(admission_ctrl_lock_);
     done_ = true;
+    pending_dequeue_ = true;
     dequeue_cv_.NotifyOne();
   }
   dequeue_thread_->Join();
@@ -992,6 +993,7 @@ void AdmissionController::ReleaseQuery(
     UpdateExecGroupMetric(schedule.executor_group(), -1);
     VLOG_RPC << "Released query id=" << PrintId(schedule.query_id()) << " "
              << stats->DebugString();
+    pending_dequeue_ = true;
   }
   dequeue_cv_.NotifyOne();
 }
@@ -1021,6 +1023,7 @@ void AdmissionController::ReleaseQueryBackends(
          << GetPoolStats(schedule)->DebugString();
       VLOG(2) << ss.str();
     }
+    pending_dequeue_ = true;
   }
   dequeue_cv_.NotifyOne();
 }
@@ -1055,6 +1058,7 @@ void AdmissionController::UpdatePoolStats(
     }
     UpdateClusterAggregates();
     last_topic_update_time_ms_ = MonotonicMillis();
+    pending_dequeue_ = true;
   }
   dequeue_cv_.NotifyOne(); // Dequeue and admit queries on the dequeue thread
 }
@@ -1369,10 +1373,13 @@ void AdmissionController::AddPoolUpdates(vector<TTopicDelta>* topic_updates) {
 }
 
 void AdmissionController::DequeueLoop() {
+  unique_lock<mutex> lock(admission_ctrl_lock_);
   while (true) {
-    unique_lock<mutex> lock(admission_ctrl_lock_);
     if (done_) break;
-    dequeue_cv_.Wait(lock);
+    while (!pending_dequeue_) {
+      dequeue_cv_.Wait(lock);
+    }
+    pending_dequeue_ = false;
     ClusterMembershipMgr::SnapshotPtr membership_snapshot =
         cluster_membership_mgr_->GetSnapshot();
 

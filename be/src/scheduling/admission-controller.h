@@ -732,6 +732,10 @@ class AdmissionController {
   typedef boost::unordered_map<std::string, TPoolConfig> PoolConfigMap;
   PoolConfigMap pool_config_map_;
 
+  /// Indicates whether a change in pool stats warrants an attempt by the dequeuing
+  /// thread to dequeue.
+  bool pending_dequeue_ = true;
+
   /// Notifies the dequeuing thread that pool stats have changed and it may be
   /// possible to dequeue and admit queries.
   ConditionVariable dequeue_cv_;
