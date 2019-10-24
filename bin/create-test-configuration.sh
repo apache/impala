@@ -140,6 +140,11 @@ rm -f authz-provider.ini
 # if needed
 
 $IMPALA_HOME/bin/generate_xml_config.py hive-site.xml.py hive-site.xml
+export HIVE_VARIANT=changed_external_dir
+$IMPALA_HOME/bin/generate_xml_config.py hive-site.xml.py hive-site_ext.xml
+mkdir -p hive-site-ext
+rm -f hive-site-ext/hive-site.xml
+ln -s "${CONFIG_DIR}/hive-site_ext.xml" hive-site-ext/hive-site.xml
 
 generate_config hive-log4j2.properties.template hive-log4j2.properties
 

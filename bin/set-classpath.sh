@@ -47,4 +47,7 @@ fi
 
 CLASSPATH=$(cat "$IMPALA_HOME"/fe/target/build-classpath.txt):"$CLASSPATH"
 
+: ${CUSTOM_CLASSPATH=}
+CLASSPATH="$CUSTOM_CLASSPATH:$CLASSPATH"
+
 export CLASSPATH

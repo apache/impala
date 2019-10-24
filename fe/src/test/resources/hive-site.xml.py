@@ -21,6 +21,7 @@ import os
 
 hive_major_version = int(os.environ['IMPALA_HIVE_VERSION'][0])
 kerberize = os.environ.get('IMPALA_KERBERIZE') == '1'
+variant = os.environ.get('HIVE_VARIANT')
 
 CONFIG = {
   'dfs.replication': '3'
@@ -58,6 +59,11 @@ CONFIG.update({
   'hive.stats.autogather': 'false',
   'hive.support.concurrency': 'true',
 })
+
+if variant == 'changed_external_dir':
+  CONFIG.update({
+    'hive.metastore.warehouse.external.dir': '${WAREHOUSE_LOCATION_PREFIX}/test-warehouse-external',
+  })
 
 # HBase-related configs.
 # Impala processes need to connect to zookeeper on INTERNAL_LISTEN_HOST for HBase.

@@ -100,6 +100,8 @@ parser.add_option("--log_level", type="int", dest="log_level", default=1,
                    help="Set the impalad backend logging level")
 parser.add_option("--jvm_args", dest="jvm_args", default="",
                   help="Additional arguments to pass to the JVM(s) during startup.")
+parser.add_option("--env_vars", dest="env_vars", default="",
+                  help="Additional environment variables for Impala to run with")
 parser.add_option("--kudu_master_hosts", default=KUDU_MASTER_HOSTS,
                   help="The host name or address of the Kudu master. Multiple masters "
                       "can be specified using a comma separated list.")
@@ -163,6 +165,10 @@ def check_process_exists(binary, attempts=1):
 def run_daemon_with_options(daemon_binary, args, output_file, jvm_debug_port=None):
   """Wrapper around run_daemon() with options determined from command-line options."""
   env_vars = {"JAVA_TOOL_OPTIONS": build_java_tool_options(jvm_debug_port)}
+  if options.env_vars is not None:
+    for kv in options.env_vars.split():
+      k, v = kv.split('=')
+      env_vars[k] = v
   run_daemon(daemon_binary, args, build_type=options.build_type, env_vars=env_vars,
       output_file=output_file)
 

@@ -43,6 +43,7 @@ KUDU_ARGS = 'kudu_args'
 START_ARGS = 'start_args'
 SENTRY_CONFIG = 'sentry_config'
 SENTRY_LOG_DIR = 'sentry_log_dir'
+HIVE_CONF_DIR = 'hive_conf_dir'
 CLUSTER_SIZE = "cluster_size"
 # Default query options passed to the impala daemon command line. Handled separately from
 # other impala daemon arguments to allow merging multiple defaults into a single list.
@@ -103,7 +104,7 @@ class CustomClusterTestSuite(ImpalaTestSuite):
   @staticmethod
   def with_args(impalad_args=None, statestored_args=None, catalogd_args=None,
       start_args=None, sentry_config=None, default_query_options=None,
-      impala_log_dir=None, sentry_log_dir=None, cluster_size=None,
+      impala_log_dir=None, sentry_log_dir=None, hive_conf_dir=None, cluster_size=None,
       num_exclusive_coordinators=None, kudu_args=None, statestored_timeout_s=None,
       impalad_timeout_s=None):
     """Records arguments to be passed to a cluster by adding them to the decorated
@@ -120,6 +121,8 @@ class CustomClusterTestSuite(ImpalaTestSuite):
         func.func_dict[SENTRY_CONFIG] = sentry_config
       if sentry_log_dir is not None:
         func.func_dict[SENTRY_LOG_DIR] = sentry_log_dir
+      if hive_conf_dir is not None:
+        func.func_dict[HIVE_CONF_DIR] = hive_conf_dir
       if kudu_args is not None:
         func.func_dict[KUDU_ARGS] = kudu_args
       if default_query_options is not None:
@@ -144,6 +147,14 @@ class CustomClusterTestSuite(ImpalaTestSuite):
         cluster_args.append("--%s=%s " % (arg, method.func_dict[arg]))
     if START_ARGS in method.func_dict:
       cluster_args.extend(method.func_dict[START_ARGS])
+
+    if HIVE_CONF_DIR in method.func_dict:
+      self._start_hive_service(method.func_dict[HIVE_CONF_DIR])
+      # Should let Impala adopt the same hive-site.xml. The only way is to add it in the
+      # beginning of the CLASSPATH. Because there's already a hive-site.xml in the
+      # default CLASSPATH (see bin/set-classpath.sh).
+      cluster_args.append(
+        '--env_vars=CUSTOM_CLASSPATH=%s ' % method.func_dict[HIVE_CONF_DIR])
 
     if KUDU_ARGS in method.func_dict:
       self._restart_kudu_service(method.func_dict[KUDU_ARGS])
@@ -180,6 +191,8 @@ class CustomClusterTestSuite(ImpalaTestSuite):
     super(CustomClusterTestSuite, self).setup_class()
 
   def teardown_method(self, method):
+    if HIVE_CONF_DIR in method.func_dict:
+      self._start_hive_service(None)  # Restart Hive Service using default configs
     super(CustomClusterTestSuite, self).teardown_class()
 
   @classmethod
@@ -221,6 +234,24 @@ class CustomClusterTestSuite(ImpalaTestSuite):
   def _stop_sentry_service(cls):
     subprocess.check_call([os.path.join(os.environ["IMPALA_HOME"],
                                         "testdata/bin/kill-sentry-service.sh")],
+                          close_fds=True)
+
+  @classmethod
+  def _start_hive_service(cls, hive_conf_dir):
+    hive_env = dict(os.environ)
+    if hive_conf_dir is not None:
+      hive_env['HIVE_CONF_DIR'] = hive_conf_dir
+    call = subprocess.Popen(
+      ['/bin/bash', '-c', os.path.join(IMPALA_HOME, 'testdata/bin/run-hive-server.sh')],
+      env=hive_env)
+    call.wait()
+    if call.returncode != 0:
+      raise RuntimeError("Unable to start Hive")
+
+  @classmethod
+  def _stop_hive_service(cls):
+    subprocess.check_call([os.path.join(IMPALA_HOME,
+                                        "testdata/bin/kill-hive-server.sh")],
                           close_fds=True)
 
   @classmethod

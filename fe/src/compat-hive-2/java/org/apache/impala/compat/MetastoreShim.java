@@ -26,6 +26,7 @@ import com.google.common.collect.ImmutableMap;
 import java.util.EnumSet;
 import java.util.List;
 
+import org.apache.hadoop.fs.Path;
 import org.apache.hadoop.hive.common.FileUtils;
 import org.apache.hadoop.hive.common.StatsSetupConst;
 import org.apache.hadoop.hive.common.ValidWriteIdList;
@@ -37,6 +38,7 @@ import org.apache.hadoop.hive.metastore.TableType;
 import org.apache.hadoop.hive.metastore.Warehouse;
 import org.apache.hadoop.hive.metastore.api.ColumnStatistics;
 import org.apache.hadoop.hive.metastore.api.ColumnStatisticsObj;
+import org.apache.hadoop.hive.metastore.api.Database;
 import org.apache.hadoop.hive.metastore.api.InvalidInputException;
 import org.apache.hadoop.hive.metastore.api.InvalidObjectException;
 import org.apache.hadoop.hive.metastore.api.InvalidOperationException;
@@ -448,5 +450,19 @@ public class MetastoreShim {
    */
   public static long getMajorVersion() {
     return 2;
+  }
+
+  /**
+   * Return the default table path.
+   *
+   * Hive-3 doesn't allow managed table to be non transactional after HIVE-22158.
+   * Creating a non transactional managed table will finally result in an external table
+   * with table property "external.table.purge" set to true. As the table type become
+   * EXTERNAL, the location will be under "metastore.warehouse.external.dir" (HIVE-19837,
+   * introduces in hive-2.7, not in hive-2.1.x-cdh6.x yet).
+   */
+  public static String getNonAcidTablePath(Database db, String tableName)
+      throws MetaException {
+    return new Path(db.getLocationUri(), tableName).toString();
   }
 }

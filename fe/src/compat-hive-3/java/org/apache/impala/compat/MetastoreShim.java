@@ -40,6 +40,7 @@ import org.apache.hadoop.hive.common.ValidReaderWriteIdList;
 import org.apache.hadoop.hive.common.ValidTxnList;
 import org.apache.hadoop.hive.common.ValidTxnWriteIdList;
 import org.apache.hadoop.hive.common.ValidWriteIdList;
+import org.apache.hadoop.hive.conf.HiveConf;
 import org.apache.hadoop.hive.metastore.HiveMetaStoreClient;
 import org.apache.hadoop.hive.metastore.IMetaStoreClient;
 import org.apache.hadoop.hive.metastore.LockRequestBuilder;
@@ -47,6 +48,7 @@ import org.apache.hadoop.hive.metastore.TableType;
 import org.apache.hadoop.hive.metastore.Warehouse;
 import org.apache.hadoop.hive.metastore.api.ColumnStatistics;
 import org.apache.hadoop.hive.metastore.api.ColumnStatisticsObj;
+import org.apache.hadoop.hive.metastore.api.Database;
 import org.apache.hadoop.hive.metastore.api.FieldSchema;
 import org.apache.hadoop.hive.metastore.api.InvalidInputException;
 import org.apache.hadoop.hive.metastore.api.InvalidObjectException;
@@ -67,7 +69,6 @@ import org.apache.hadoop.hive.metastore.api.TxnAbortedException;
 import org.apache.hadoop.hive.metastore.conf.MetastoreConf;
 import org.apache.hadoop.hive.metastore.messaging.AlterTableMessage;
 import org.apache.hadoop.hive.metastore.messaging.EventMessage;
-import org.apache.hadoop.hive.metastore.messaging.InsertMessage;
 import org.apache.hadoop.hive.metastore.messaging.MessageBuilder;
 import org.apache.hadoop.hive.metastore.messaging.MessageDeserializer;
 import org.apache.hadoop.hive.metastore.messaging.MessageEncoder;
@@ -84,8 +85,6 @@ import org.apache.impala.common.ImpalaException;
 import org.apache.impala.common.ImpalaRuntimeException;
 import org.apache.impala.common.Pair;
 import org.apache.impala.common.TransactionException;
-import org.apache.impala.common.TransactionKeepalive;
-import org.apache.impala.compat.HiveMetadataFormatUtils;
 import org.apache.impala.service.BackendConfig;
 import org.apache.impala.service.Frontend;
 import org.apache.impala.service.MetadataOp;
@@ -932,4 +931,21 @@ public class MetastoreShim {
      }
   }
 
+  /**
+   * Return the default table path.
+   *
+   * Hive-3 doesn't allow managed table to be non transactional after HIVE-22158.
+   * Creating a non transactional managed table will finally result in an external table
+   * with table property "external.table.purge" set to true. As the table type become
+   * EXTERNAL, the location will be under "metastore.warehouse.external.dir" (HIVE-19837,
+   * introduces in hive-2.7, not in hive-2.1.x-cdh6.x yet).
+   */
+  public static String getNonAcidTablePath(Database db, String tableName)
+      throws MetaException {
+    Warehouse wh = new Warehouse(new HiveConf());
+    // Non ACID managed tables are all translated to external tables by HMS's default
+    // transformer (HIVE-22158).
+    // TODO(IMPALA-9088): deal with customized transformer in HMS.
+    return wh.getDefaultTablePath(db, tableName, /*isExternal*/ true).toString();
+  }
 }
