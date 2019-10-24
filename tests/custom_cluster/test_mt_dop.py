@@ -20,6 +20,7 @@ from copy import deepcopy
 
 from tests.common.custom_cluster_test_suite import CustomClusterTestSuite
 from tests.common.environ import build_flavor_timeout
+from tests.common.skip import SkipIfNotHdfsMinicluster
 
 WAIT_TIME_MS = build_flavor_timeout(60000, slow_build_timeout=100000)
 
@@ -55,6 +56,7 @@ class TestMtDopFlags(CustomClusterTestSuite):
 
   @pytest.mark.execute_serially
   @CustomClusterTestSuite.with_args(impalad_args="--mt_dop_auto_fallback=true")
+  @SkipIfNotHdfsMinicluster.tuned_for_minicluster
   def test_mt_dop_fallback(self, vector, unique_database):
     """Test joins and inserts fall back to non-mt_dop correctly."""
     vector = deepcopy(vector)
