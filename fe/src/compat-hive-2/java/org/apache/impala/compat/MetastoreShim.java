@@ -453,7 +453,7 @@ public class MetastoreShim {
   }
 
   /**
-   * Return the default table path.
+   * Return the default table path for a new table.
    *
    * Hive-3 doesn't allow managed table to be non transactional after HIVE-22158.
    * Creating a non transactional managed table will finally result in an external table
@@ -461,8 +461,8 @@ public class MetastoreShim {
    * EXTERNAL, the location will be under "metastore.warehouse.external.dir" (HIVE-19837,
    * introduces in hive-2.7, not in hive-2.1.x-cdh6.x yet).
    */
-  public static String getNonAcidTablePath(Database db, String tableName)
+  public static String getPathForNewTable(Database db, Table tbl)
       throws MetaException {
-    return new Path(db.getLocationUri(), tableName).toString();
+    return new Path(db.getLocationUri(), tbl.getTableName().toLowerCase()).toString();
   }
 }

@@ -214,8 +214,8 @@ public class CreateTableAsSelectStmt extends StatementBase {
       // Set a valid location of this table using the same rules as the metastore, unless
       // the user specified a path.
       if (msTbl.getSd().getLocation() == null || msTbl.getSd().getLocation().isEmpty()) {
-        msTbl.getSd().setLocation(MetastoreShim.getNonAcidTablePath(
-            db.getMetaStoreDb(), msTbl.getTableName().toLowerCase()));
+        msTbl.getSd().setLocation(
+            MetastoreShim.getPathForNewTable(db.getMetaStoreDb(), msTbl));
       }
 
       FeTable tmpTable = null;

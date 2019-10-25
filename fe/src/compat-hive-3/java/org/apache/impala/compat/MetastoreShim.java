@@ -90,6 +90,7 @@ import org.apache.impala.service.Frontend;
 import org.apache.impala.service.MetadataOp;
 import org.apache.impala.thrift.TMetadataOpRequest;
 import org.apache.impala.thrift.TResultSet;
+import org.apache.impala.util.AcidUtils;
 import org.apache.impala.util.AcidUtils.TblTransaction;
 import org.apache.log4j.Logger;
 import org.apache.thrift.TException;
@@ -932,7 +933,7 @@ public class MetastoreShim {
   }
 
   /**
-   * Return the default table path.
+   * Return the default table path for a new table.
    *
    * Hive-3 doesn't allow managed table to be non transactional after HIVE-22158.
    * Creating a non transactional managed table will finally result in an external table
@@ -940,12 +941,19 @@ public class MetastoreShim {
    * EXTERNAL, the location will be under "metastore.warehouse.external.dir" (HIVE-19837,
    * introduces in hive-2.7, not in hive-2.1.x-cdh6.x yet).
    */
-  public static String getNonAcidTablePath(Database db, String tableName)
+  public static String getPathForNewTable(Database db, Table tbl)
       throws MetaException {
     Warehouse wh = new Warehouse(new HiveConf());
-    // Non ACID managed tables are all translated to external tables by HMS's default
-    // transformer (HIVE-22158).
+    // Non transactional tables are all translated to external tables by HMS's default
+    // transformer (HIVE-22158). Note that external tables can't be transactional.
+    // So the request and result of the default transformer is:
+    //     non transactional managed table => external table
+    //     non transactional external table => external table
+    //     transactional managed table => managed table
+    //     transactional external table (not allowed)
+    boolean isExternal = !AcidUtils.isTransactionalTable(tbl.getParameters());
     // TODO(IMPALA-9088): deal with customized transformer in HMS.
-    return wh.getDefaultTablePath(db, tableName, /*isExternal*/ true).toString();
+    return wh.getDefaultTablePath(db, tbl.getTableName().toLowerCase(), isExternal)
+        .toString();
   }
 }
