@@ -3992,37 +3992,51 @@ TEST_P(ExprTest, InPredicate) {
 }
 
 TEST_P(ExprTest, StringFunctions) {
-  TestValue("levenshtein('levenshtein', 'frankenstein')", TYPE_INT, 6);
-  TestValue("levenshtein('example', 'samples')", TYPE_INT, 3);
-  TestValue("levenshtein('sturgeon', 'urgently')", TYPE_INT, 6);
-  TestValue("levenshtein('distance', 'difference')", TYPE_INT, 5);
-  TestValue("levenshtein('kitten', 'sitting')", TYPE_INT, 3);
-  TestValue("levenshtein('levenshtein', 'levenshtein')", TYPE_INT, 0);
-  TestValue("levenshtein('', 'levenshtein')", TYPE_INT, 11);
-  TestValue("levenshtein('levenshtein', '')", TYPE_INT, 11);
-  TestIsNull("levenshtein('foo', NULL)", TYPE_INT);
-  TestIsNull("levenshtein(NULL, 'foo')", TYPE_INT);
-  TestIsNull("levenshtein(NULL, NULL)", TYPE_INT);
-  TestErrorString("levenshtein('z', repeat('x', 256))",
-      "levenshtein argument exceeds maximum length of 255 characters\n");
-  TestErrorString("levenshtein(repeat('x', 256), 'z')",
-      "levenshtein argument exceeds maximum length of 255 characters\n");
 
-  TestValue("le_dst('levenshtein', 'frankenstein')", TYPE_INT, 6);
-  TestValue("le_dst('example', 'samples')", TYPE_INT, 3);
-  TestValue("le_dst('sturgeon', 'urgently')", TYPE_INT, 6);
-  TestValue("le_dst('distance', 'difference')", TYPE_INT, 5);
-  TestValue("le_dst('kitten', 'sitting')", TYPE_INT, 3);
-  TestValue("le_dst('levenshtein', 'levenshtein')", TYPE_INT, 0);
-  TestValue("le_dst('', 'levenshtein')", TYPE_INT, 11);
-  TestValue("le_dst('levenshtein', '')", TYPE_INT, 11);
-  TestIsNull("le_dst('foo', NULL)", TYPE_INT);
-  TestIsNull("le_dst(NULL, 'foo')", TYPE_INT);
-  TestIsNull("le_dst(NULL, NULL)", TYPE_INT);
-  TestErrorString("le_dst('z', repeat('x', 256))",
-      "levenshtein argument exceeds maximum length of 255 characters\n");
-  TestErrorString("le_dst(repeat('x', 256), 'z')",
-      "levenshtein argument exceeds maximum length of 255 characters\n");
+  for (const string fn_name: { "levenshtein", "le_dst" }) {
+    TestValue(fn_name + "('levenshtein', 'frankenstein')", TYPE_INT, 6);
+    TestValue(fn_name + "('example', 'samples')", TYPE_INT, 3);
+    TestValue(fn_name + "('sturgeon', 'urgently')", TYPE_INT, 6);
+    TestValue(fn_name + "('distance', 'difference')", TYPE_INT, 5);
+    TestValue(fn_name + "('kitten', 'sitting')", TYPE_INT, 3);
+    TestValue(fn_name + "('levenshtein', 'levenshtein')", TYPE_INT, 0);
+    TestValue(fn_name + "('', 'levenshtein')", TYPE_INT, 11);
+    TestValue(fn_name + "('levenshtein', '')", TYPE_INT, 11);
+    TestIsNull(fn_name + "('foo', NULL)", TYPE_INT);
+    TestIsNull(fn_name + "(NULL, 'foo')", TYPE_INT);
+    TestIsNull(fn_name + "(NULL, NULL)", TYPE_INT);
+    TestErrorString(fn_name + "('z', repeat('x', 256))",
+        "levenshtein argument exceeds maximum length of 255 characters\n");
+    TestErrorString(fn_name + "(repeat('x', 256), 'z')",
+        "levenshtein argument exceeds maximum length of 255 characters\n");
+  }
+
+  for (const string fn_name: { "damerau_levenshtein", "dle_dst" }) {
+    TestValue(fn_name + "('', '')", TYPE_INT, 0);
+    TestValue(fn_name + "('abc', 'abc')", TYPE_INT, 0);
+    TestValue(fn_name + "('a', 'b')", TYPE_INT, 1);
+    TestValue(fn_name + "('a', '')", TYPE_INT, 1);
+    TestValue(fn_name + "('aabc', 'abc')", TYPE_INT, 1);
+    TestValue(fn_name + "('abcc', 'abc')", TYPE_INT, 1);
+    TestValue(fn_name + "('', 'a')", TYPE_INT, 1);
+    TestValue(fn_name + "('abc', 'abcc')", TYPE_INT, 1);
+    TestValue(fn_name + "('abc', 'aabc')", TYPE_INT, 1);
+    TestValue(fn_name + "('teh', 'the')", TYPE_INT, 1);
+    TestValue(fn_name + "('tets', 'test')", TYPE_INT, 1);
+    TestValue(fn_name + "('fuor', 'four')", TYPE_INT, 1);
+    TestValue(fn_name + "('kitten', 'sitting')", TYPE_INT, 3);
+    TestValue(fn_name + "('Saturday', 'Sunday')", TYPE_INT, 3);
+    TestValue(fn_name + "('rosettacode', 'raisethysword')", TYPE_INT, 8);
+    TestValue(fn_name + "('CA', 'ABC')", TYPE_INT, 3);
+    TestValue(fn_name + "(repeat('z', 255), repeat('x', 255))", TYPE_INT, 255);
+    TestIsNull(fn_name + "('foo', NULL)", TYPE_INT);
+    TestIsNull(fn_name + "(NULL, 'foo')", TYPE_INT);
+    TestIsNull(fn_name + "(NULL, NULL)", TYPE_INT);
+    TestErrorString(fn_name + "('z', repeat('x', 256))",
+        "damerau-levenshtein argument exceeds maximum length of 255 characters\n");
+    TestErrorString(fn_name + "(repeat('x', 256), 'z')",
+        "damerau-levenshtein argument exceeds maximum length of 255 characters\n");
+  }
 
   for (const string fn_name: { "jaro_dst", "jaro_distance" }) {
     TestIsNull(fn_name + "('foo', NULL)", TYPE_DOUBLE);
@@ -4039,6 +4053,7 @@ TEST_P(ExprTest, StringFunctions) {
     TestValue(fn_name + "('frog', 'fog')", TYPE_DOUBLE, 0.08333333333333337);
     TestValue(fn_name + "('hello', 'haloa')", TYPE_DOUBLE, 0.2666666666666666);
     TestValue(fn_name + "('atcg', 'tagc')", TYPE_DOUBLE, 0.1666666666666667);
+    TestValue(fn_name + "(repeat('z', 255), repeat('x', 255))", TYPE_DOUBLE, 1.0);
     TestErrorString(fn_name + "('z', repeat('x', 256))",
         "jaro argument exceeds maximum length of 255 characters\n");
     TestErrorString(fn_name + "(repeat('x', 256), 'z')",
@@ -4060,6 +4075,7 @@ TEST_P(ExprTest, StringFunctions) {
     TestValue(fn_name + "('frog', 'fog')", TYPE_DOUBLE, 0.9166666666666666);
     TestValue(fn_name + "('hello', 'haloa')", TYPE_DOUBLE, 0.73333333333333334);
     TestValue(fn_name + "('atcg', 'tagc')", TYPE_DOUBLE, 0.8333333333333333);
+    TestValue(fn_name + "(repeat('z', 255), repeat('x', 255))", TYPE_DOUBLE, 0.0);
     TestErrorString(fn_name + "('z', repeat('x', 256))",
         "jaro argument exceeds maximum length of 255 characters\n");
     TestErrorString(fn_name + "(repeat('x', 256), 'z')",

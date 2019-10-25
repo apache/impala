@@ -586,6 +586,8 @@ visible_functions = [
    'impala::StringFunctions::GetJsonObject'],
   [['levenshtein', 'le_dst'], 'INT', ['STRING', 'STRING'],
    '_ZN6impala15StringFunctions11LevenshteinEPN10impala_udf15FunctionContextERKNS1_9StringValES6_'],
+  [['damerau_levenshtein', 'dle_dst'], 'INT', ['STRING', 'STRING'],
+   '_ZN6impala15StringFunctions18DamerauLevenshteinEPN10impala_udf15FunctionContextERKNS1_9StringValES6_'],
   [['jaro_distance', 'jaro_dst'], 'DOUBLE', ['STRING', 'STRING'],
    '_ZN6impala15StringFunctions12JaroDistanceEPN10impala_udf15FunctionContextERKNS1_9StringValES6_'],
   [['jaro_similarity', 'jaro_sim'], 'DOUBLE', ['STRING', 'STRING'],

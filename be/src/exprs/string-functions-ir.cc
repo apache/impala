@@ -1166,7 +1166,11 @@ IntVal StringFunctions::Levenshtein(
 
   int column_start = 1;
 
-  auto column = reinterpret_cast<int*>(ctx->Allocate(sizeof(int) * (s1len + 1)));
+  int* column = reinterpret_cast<int*>(ctx->Allocate(sizeof(int) * (s1len + 1)));
+  if (UNLIKELY(column == nullptr)) {
+    DCHECK(!ctx->impl()->state()->GetQueryStatus().ok());
+    return IntVal::null();
+  }
 
   std::iota(column + column_start - 1, column + s1len + 1, column_start - 1);
 
@@ -1213,8 +1217,19 @@ DoubleVal StringFunctions::JaroSimilarity(
   // the window size to search for matches in the other string
   int max_range = std::max(0, std::max(s1len, s2len) / 2 - 1);
 
-  int s1_matching[s1len];
-  int s2_matching[s2len];
+  int* s1_matching = reinterpret_cast<int*>(ctx->Allocate(sizeof(int) * (s1len)));
+  if (UNLIKELY(s1_matching == nullptr)) {
+    DCHECK(!ctx->impl()->state()->GetQueryStatus().ok());
+    return DoubleVal::null();
+  }
+
+  int* s2_matching = reinterpret_cast<int*>(ctx->Allocate(sizeof(int) * (s2len)));
+  if (UNLIKELY(s2_matching == nullptr)) {
+    ctx->Free(reinterpret_cast<uint8_t*>(s1_matching));
+    DCHECK(!ctx->impl()->state()->GetQueryStatus().ok());
+    return DoubleVal::null();
+  }
+
   std::fill_n(s1_matching, s1len, -1);
   std::fill_n(s2_matching, s2len, -1);
 
@@ -1236,7 +1251,11 @@ DoubleVal StringFunctions::JaroSimilarity(
     }
   }
 
-  if (matching_characters == 0) return DoubleVal(0.0);
+  if (matching_characters == 0) {
+    ctx->Free(reinterpret_cast<uint8_t*>(s1_matching));
+    ctx->Free(reinterpret_cast<uint8_t*>(s2_matching));
+    return DoubleVal(0.0);
+  }
 
   // transpositions (one-way only)
   double transpositions = 0.0;
@@ -1247,9 +1266,7 @@ DoubleVal StringFunctions::JaroSimilarity(
     while (s2_matching[s2i] == -1) {
       s2i++;
     }
-    if (s1.ptr[s1i] != s2.ptr[s2i]) {
-      transpositions += 0.5;
-    }
+    if (s1.ptr[s1i] != s2.ptr[s2i]) transpositions += 0.5;
     s1i++;
     s2i++;
   }
@@ -1257,6 +1274,9 @@ DoubleVal StringFunctions::JaroSimilarity(
   double jaro_similarity = 1.0 / 3.0  * ( m / static_cast<double>(s1len)
                                         + m / static_cast<double>(s2len)
                                         + (m - transpositions) / m );
+
+  ctx->Free(reinterpret_cast<uint8_t*>(s1_matching));
+  ctx->Free(reinterpret_cast<uint8_t*>(s2_matching));
 
   return DoubleVal(jaro_similarity);
 }
@@ -1358,5 +1378,79 @@ DoubleVal StringFunctions::JaroWinklerSimilarity(FunctionContext* ctx,
       (1.0 - jaro_similarity.val);
   }
   return DoubleVal(jaro_winkler_similarity);
+}
+
+IntVal StringFunctions::DamerauLevenshtein(
+    FunctionContext* ctx, const StringVal& s1, const StringVal& s2) {
+  // Based on https://en.wikipedia.org/wiki/Damerau%E2%80%93Levenshtein_distance
+  // Implements restricted Damerau-Levenshtein (optimal string alignment)
+
+  int s1len = s1.len;
+  int s2len = s2.len;
+
+  // error if either input exceeds 255 characters
+  if (s1len > 255 || s2len > 255) {
+    ctx->SetError("damerau-levenshtein argument exceeds maximum length of 255 "
+                  "characters");
+    return IntVal(-1);
+  }
+
+  // short cut cases:
+  // - null strings
+  // - zero length strings
+  // - identical length and value strings
+  if (s1.is_null || s2.is_null) return IntVal::null();
+  if (s1len == 0) return IntVal(s2len);
+  if (s2len == 0) return IntVal(s1len);
+  if (s1len == s2len && memcmp(s1.ptr, s2.ptr, s1len) == 0) return IntVal(0);
+
+  int i;
+  int j;
+  int l_cost;
+  int ptr_array_length = sizeof(int*) * (s1len + 1);
+  int int_array_length = sizeof(int) * (s2len + 1) * (s1len + 1);
+
+  // Allocating a 2D array (with d being an array of pointers to the start of the rows)
+  int** d = reinterpret_cast<int**>(ctx->Allocate(ptr_array_length));
+  if (UNLIKELY(d == nullptr)) {
+    DCHECK(!ctx->impl()->state()->GetQueryStatus().ok());
+    return IntVal::null();
+  }
+  int* rows = reinterpret_cast<int*>(ctx->Allocate(int_array_length));
+  if (UNLIKELY(rows == nullptr)) {
+    ctx->Free(reinterpret_cast<uint8_t*>(d));
+    DCHECK(!ctx->impl()->state()->GetQueryStatus().ok());
+    return IntVal::null();
+  }
+  // Setting the pointers in the pointer-array to the start of (s2len + 1) length
+  // intervals and initializing its values based on the mentioned algorithm.
+  for (i = 0; i <= s1len; ++i) {
+    d[i] = rows + (s2len + 1) * i;
+    d[i][0] = i;
+  }
+  std::iota(d[0], d[0] + s2len + 1, 0);
+
+  for (i = 1; i <= s1len; ++i) {
+    for (j = 1; j <= s2len; ++j) {
+      if (s1.ptr[i - 1] == s2.ptr[j - 1]) {
+        l_cost = 0;
+      } else {
+        l_cost = 1;
+      }
+      d[i][j] = std::min(d[i - 1][j - 1] + l_cost, // substitution
+                         std::min(d[i][j - 1] + 1, // insertion
+                                  d[i - 1][j] + 1) // deletion
+      );
+      if (i > 1 && j > 1 && s1.ptr[i - 1] == s2.ptr[j - 2]
+          && s1.ptr[i - 2] == s2.ptr[j - 1]) {
+        d[i][j] = std::min(d[i][j], d[i - 2][j - 2] + l_cost); // transposition
+      }
+    }
+  }
+  int result = d[s1len][s2len];
+
+  ctx->Free(reinterpret_cast<uint8_t*>(d));
+  ctx->Free(reinterpret_cast<uint8_t*>(rows));
+  return IntVal(result);
 }
 }

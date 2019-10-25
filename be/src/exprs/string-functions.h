@@ -158,6 +158,9 @@ class StringFunctions {
   static IntVal Levenshtein(
       FunctionContext* context, const StringVal& s1, const StringVal& s2);
 
+  static IntVal DamerauLevenshtein(
+      FunctionContext* context, const StringVal& s1, const StringVal& s2);
+
   static DoubleVal JaroDistance(
       FunctionContext* ctx, const StringVal& s1, const StringVal& s2);
 
