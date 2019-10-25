@@ -997,11 +997,14 @@ public class MetastoreEvents {
       TTableName newTTableName =
           new TTableName(tableAfter_.getDbName(), tableAfter_.getTableName());
 
-      // Table is renamed only if old table existed in the catalog. Otherwise the event
-      // is skipped.
+      // Table is renamed if old db and table exist in catalog. If the rename is to a
+      // different database, we check if this other database exists in catalog. If
+      // either the old table, old database or new database are not in catalog, we skip
+      // this event.
       if (!catalog_.renameTableIfExists(oldTTableName, newTTableName)) {
         debugLog("Did not remove old table to rename table {} to {} since "
-                + "it does not exist anymore", qualify(oldTTableName),
+            + "it does not exist anymore or either the old database or the new "
+            + "database don't exist anymore.", qualify(oldTTableName),
             qualify(newTTableName));
       } else {
         infoLog("Renamed old table {} to new table {}.", qualify(oldTTableName),

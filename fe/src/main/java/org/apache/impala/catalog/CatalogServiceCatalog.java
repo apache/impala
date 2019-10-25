@@ -1959,22 +1959,23 @@ public class CatalogServiceCatalog extends Catalog {
   /**
    * Renames the table by atomically removing oldTable and adding the newTable.
    * @return true if oldTable was removed and newTable was added, false if oldTable or
-   * it's db are not in catalog.
+   * either of oldDb or newDb is not in catalog.
    */
   public boolean renameTableIfExists(TTableName oldTableName,
       TTableName newTableName) {
     boolean tableRenamed = false;
     versionLock_.writeLock().lock();
     try {
-      Db db = getDb(oldTableName.db_name);
-      if (db != null) {
+      Db oldDb = getDb(oldTableName.db_name);
+      Db newDb = getDb(newTableName.db_name);
+      if (oldDb != null && newDb != null) {
         Table existingTable = removeTable(oldTableName.db_name, oldTableName.table_name);
         // Add the newTable only if oldTable existed.
         if (existingTable != null) {
-          Table incompleteTable = IncompleteTable.createUninitializedTable(db,
+          Table incompleteTable = IncompleteTable.createUninitializedTable(newDb,
               newTableName.getTable_name());
           incompleteTable.setCatalogVersion(incrementAndGetCatalogVersion());
-          db.addTable(incompleteTable);
+          newDb.addTable(incompleteTable);
           tableRenamed = true;
         }
       }
