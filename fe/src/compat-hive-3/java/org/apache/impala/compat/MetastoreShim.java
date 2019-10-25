@@ -574,6 +574,13 @@ public class MetastoreShim {
     return new ValidReaderWriteIdList(validWriteIds);
   }
 
+  /**
+   * Returns a ValidTxnList object that helps to identify in-progress and aborted
+   * transactions.
+   */
+  public static ValidTxnList getValidTxns(IMetaStoreClient client) throws TException {
+    return client.getValidTxns();
+  }
 
   /**
    * Get validWriteIds in string with txnId and table name

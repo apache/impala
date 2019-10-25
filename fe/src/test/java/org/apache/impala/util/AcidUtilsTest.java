@@ -25,6 +25,7 @@ import java.util.stream.Collectors;
 
 import org.apache.hadoop.fs.FileStatus;
 import org.apache.hadoop.fs.Path;
+import org.apache.hadoop.hive.common.ValidReadTxnList;
 import org.apache.hadoop.hive.common.ValidWriteIdList;
 import org.apache.impala.compat.MetastoreShim;
 import org.hamcrest.Matchers;
@@ -51,14 +52,19 @@ public class AcidUtilsTest {
 
   private void assertFiltering(String[] relPaths, String validWriteIdListStr,
       String[] expectedRelPaths) {
+    assertFiltering(relPaths, "", validWriteIdListStr, expectedRelPaths);
+  }
 
+  private void assertFiltering(String[] relPaths, String validTxnListStr,
+      String validWriteIdListStr, String[] expectedRelPaths) {
     ValidWriteIdList writeIds = MetastoreShim.getValidWriteIdListFromString(
         validWriteIdListStr);
     List<FileStatus> stats = createMockStats(relPaths);
     List<FileStatus> expectedStats = createMockStats(expectedRelPaths);
 
-    assertThat(AcidUtils.filterFilesForAcidState(stats, BASE_PATH, writeIds, null),
-      Matchers.containsInAnyOrder(expectedStats.toArray()));
+    assertThat(AcidUtils.filterFilesForAcidState(stats, BASE_PATH,
+        new ValidReadTxnList(validTxnListStr), writeIds, null),
+        Matchers.containsInAnyOrder(expectedStats.toArray()));
   }
 
   @Test
@@ -118,6 +124,69 @@ public class AcidUtilsTest {
         new String[]{
           "base_0000005/abc.txt",
           "base_0000005/0000/abc.txt",
+          "delta_0000009_0000009_0000/000000_0",
+          "delta_0000009_0000009_0000/0000/def.txt"});
+  }
+
+  @Test
+  public void testInProgressCompaction() {
+    assertFiltering(new String[]{
+          "base_01.txt",
+          "post_upgrade.txt",
+          "base_0000005_v900/",
+          "base_0000005_v900/abc.txt",
+          "base_0000005_v900/0000/",
+          "base_0000005_v900/0000/abc.txt",
+          "base_0000008_v1000/",
+          "base_0000008_v1000/abc.txt",
+          "delta_0000006_0000006_0000/",
+          "delta_0000006_0000006_0000/000000_0",
+          "delta_0000007_0000007_0000/",
+          "delta_0000007_0000007_0000/000000_0",
+          "delta_0000008_0000008_0000/",
+          "delta_0000008_0000008_0000/000000_0",
+          "delta_0000009_0000009_0000/",
+          "delta_0000009_0000009_0000/000000_0",
+          "delta_0000009_0000009_0000/0000/def.txt"},
+        "1100:1000:1000:", // txn 1000 is open
+        "default.test:10:10::", // write ids are committed
+        new String[]{
+          "base_0000005_v900/abc.txt",
+          "base_0000005_v900/0000/abc.txt",
+          "delta_0000006_0000006_0000/000000_0",
+          "delta_0000007_0000007_0000/000000_0",
+          "delta_0000008_0000008_0000/000000_0",
+          "delta_0000009_0000009_0000/000000_0",
+          "delta_0000009_0000009_0000/0000/def.txt"});
+  }
+
+  @Test
+  public void testAbortedCompaction() {
+    assertFiltering(new String[]{
+          "base_01.txt",
+          "post_upgrade.txt",
+          "base_0000005_v900/",
+          "base_0000005_v900/abc.txt",
+          "base_0000005_v900/0000/",
+          "base_0000005_v900/0000/abc.txt",
+          "base_0000007_v950/",
+          "base_0000007_v950/abc.txt",
+          "base_0000008_v1000/",
+          "base_0000008_v1000/abc.txt",
+          "delta_0000006_0000006_0000/",
+          "delta_0000006_0000006_0000/000000_0",
+          "delta_0000007_0000007_0000/",
+          "delta_0000007_0000007_0000/000000_0",
+          "delta_0000008_0000008_0000/",
+          "delta_0000008_0000008_0000/000000_0",
+          "delta_0000009_0000009_0000/",
+          "delta_0000009_0000009_0000/000000_0",
+          "delta_0000009_0000009_0000/0000/def.txt"},
+        "1100:1100::1000", // txn 1000 is aborted
+        "default.test:10:10::", // write ids are committed
+        new String[]{
+          "base_0000007_v950/abc.txt",
+          "delta_0000008_0000008_0000/000000_0",
           "delta_0000009_0000009_0000/000000_0",
           "delta_0000009_0000009_0000/0000/def.txt"});
   }

@@ -297,6 +297,7 @@ class DirectMetaProvider implements MetaProvider {
         /* recursive= */BackendConfig.INSTANCE.recursivelyListPartitions(),
         /* oldFds= */Collections.emptyList(),
         hostIndex,
+        /* validTxnList=*/null,
         /* writeIds=*/null);
 
     try {

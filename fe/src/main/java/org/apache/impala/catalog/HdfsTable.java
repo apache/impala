@@ -39,6 +39,7 @@ import org.apache.hadoop.fs.FileStatus;
 import org.apache.hadoop.fs.FileSystem;
 import org.apache.hadoop.fs.Path;
 import org.apache.hadoop.fs.RemoteIterator;
+import org.apache.hadoop.hive.common.ValidTxnList;
 import org.apache.hadoop.hive.common.ValidWriteIdList;
 import org.apache.hadoop.hive.conf.HiveConf;
 import org.apache.hadoop.hive.metastore.IMetaStoreClient;
@@ -85,6 +86,7 @@ import org.apache.impala.util.MetaStoreUtil;
 import org.apache.impala.util.TAccessLevelUtil;
 import org.apache.impala.util.TResultRowBuilder;
 import org.apache.impala.util.ThreadNameAnnotator;
+import org.apache.thrift.TException;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -511,7 +513,7 @@ public class HdfsTable extends Table implements FeFsTable {
    * If there are no partitions in the Hive metadata, a single partition is added with no
    * partition keys.
    */
-  private long loadAllPartitions(
+  private long loadAllPartitions(IMetaStoreClient client,
       List<org.apache.hadoop.hive.metastore.api.Partition> msPartitions,
       org.apache.hadoop.hive.metastore.api.Table msTbl) throws IOException,
       CatalogException {
@@ -544,10 +546,20 @@ public class HdfsTable extends Table implements FeFsTable {
       }
     }
     // Load the file metadata from scratch.
-    loadFileMetadataForPartitions(partitionMap_.values(), /*isRefresh=*/false);
+    loadFileMetadataForPartitions(client, partitionMap_.values(), /*isRefresh=*/false);
     return clock.getTick() - startTime;
   }
 
+  /**
+   * Loads valid txn list from HMS. Re-throws exceptions as CatalogException.
+   */
+  private ValidTxnList loadValidTxns(IMetaStoreClient client) throws CatalogException {
+    try {
+      return MetastoreShim.getValidTxns(client);
+    } catch (TException exception) {
+      throw new CatalogException(exception.getMessage());
+    }
+  }
 
   /**
    * Helper method to load the block locations for each partition in 'parts'.
@@ -556,8 +568,8 @@ public class HdfsTable extends Table implements FeFsTable {
    * @param isRefresh whether this is a refresh operation or an initial load. This only
    * affects logging.
    */
-  private void loadFileMetadataForPartitions(Iterable<HdfsPartition> parts,
-      boolean isRefresh) throws CatalogException {
+  private void loadFileMetadataForPartitions(IMetaStoreClient client,
+      Iterable<HdfsPartition> parts, boolean isRefresh) throws CatalogException {
     // Group the partitions by their path (multiple partitions may point to the same
     // path).
     Map<Path, List<HdfsPartition>> partsByPath = Maps.newHashMap();
@@ -569,6 +581,13 @@ public class HdfsTable extends Table implements FeFsTable {
 
     ValidWriteIdList writeIds = validWriteIds_ != null
         ? MetastoreShim.getValidWriteIdListFromString(validWriteIds_) : null;
+    //TODO: maybe it'd be better to load the valid txn list in the context of a
+    // transaction to have consistent valid write ids and valid transaction ids.
+    // Currently tables are loaded when they are first referenced and stay in catalog
+    // until certain actions occur (refresh, invalidate, insert, etc.). However,
+    // Impala doesn't notice when HMS's cleaner removes old transactional directories,
+    // which might lead to FileNotFound exceptions.
+    ValidTxnList validTxnList = writeIds != null ? loadValidTxns(client) : null;
 
     // Create a FileMetadataLoader for each path.
     Map<Path, FileMetadataLoader> loadersByPath = Maps.newHashMap();
@@ -576,7 +595,7 @@ public class HdfsTable extends Table implements FeFsTable {
       List<FileDescriptor> oldFds = e.getValue().get(0).getFileDescriptors();
       FileMetadataLoader loader = new FileMetadataLoader(e.getKey(),
           Utils.shouldRecursivelyListPartitions(this),
-          oldFds, hostIndex_, writeIds);
+          oldFds, hostIndex_, validTxnList, writeIds);
       // If there is a cached partition mapped to this path, we recompute the block
       // locations even if the underlying files have not changed.
       // This is done to keep the cached block metadata up to date.
@@ -687,7 +706,7 @@ public class HdfsTable extends Table implements FeFsTable {
    * Throws CatalogException if one of the supplied storage descriptors contains metadata
    * that Impala can't understand.
    */
-  public List<HdfsPartition> createAndLoadPartitions(
+  public List<HdfsPartition> createAndLoadPartitions(IMetaStoreClient client,
       List<org.apache.hadoop.hive.metastore.api.Partition> msPartitions)
       throws CatalogException {
     List<HdfsPartition> addedParts = new ArrayList<>();
@@ -698,7 +717,7 @@ public class HdfsTable extends Table implements FeFsTable {
       Preconditions.checkNotNull(hdfsPartition);
       addedParts.add(hdfsPartition);
     }
-    loadFileMetadataForPartitions(addedParts, /* isRefresh = */ false);
+    loadFileMetadataForPartitions(client, addedParts, /* isRefresh = */ false);
     return addedParts;
   }
 
@@ -956,7 +975,7 @@ public class HdfsTable extends Table implements FeFsTable {
           storageMetadataLoadTime_ += updateMdFromHmsTable(msTbl);
           if (msTbl.getPartitionKeysSize() == 0) {
             if (loadParitionFileMetadata) {
-              storageMetadataLoadTime_ += updateUnpartitionedTableFileMd();
+              storageMetadataLoadTime_ += updateUnpartitionedTableFileMd(client);
             }
           } else {
             storageMetadataLoadTime_ += updatePartitionsFromHms(
@@ -970,7 +989,7 @@ public class HdfsTable extends Table implements FeFsTable {
               MetaStoreUtil.fetchAllPartitions(
                   client, db_.getName(), name_, NUM_PARTITION_FETCH_RETRIES);
           LOG.info("Fetched partition metadata from the Metastore: " + getFullName());
-          storageMetadataLoadTime_ = loadAllPartitions(msPartitions, msTbl);
+          storageMetadataLoadTime_ = loadAllPartitions(client, msPartitions, msTbl);
         }
         if (loadTableSchema) setAvroSchema(client, msTbl);
         setTableStats(msTbl);
@@ -1017,7 +1036,8 @@ public class HdfsTable extends Table implements FeFsTable {
    * This is optimized for the case where few files have changed. See
    * {@link #refreshFileMetadata(Path, List)} above for details.
    */
-  private long updateUnpartitionedTableFileMd() throws CatalogException {
+  private long updateUnpartitionedTableFileMd(IMetaStoreClient client)
+      throws CatalogException {
     Preconditions.checkState(getNumClusteringCols() == 0);
     if (LOG.isTraceEnabled()) {
       LOG.trace("update unpartitioned table: " + getFullName());
@@ -1040,7 +1060,7 @@ public class HdfsTable extends Table implements FeFsTable {
     part.setFileDescriptors(oldPartition.getFileDescriptors());
     addPartition(part);
     if (isMarkedCached_) part.markCached();
-    loadFileMetadataForPartitions(ImmutableList.of(part), /*isRefresh=*/true);
+    loadFileMetadataForPartitions(client, ImmutableList.of(part), /*isRefresh=*/true);
     return clock.getTick() - startTime;
   }
 
@@ -1128,7 +1148,7 @@ public class HdfsTable extends Table implements FeFsTable {
         // Only reload file metadata of partitions specified in 'partitionsToUpdate'
         partitionsToLoadFiles = getPartitionsForNames(partitionsToUpdate);
       }
-      loadFileMetadataForPartitions(partitionsToLoadFiles, /* isRefresh=*/true);
+      loadFileMetadataForPartitions(client, partitionsToLoadFiles, /* isRefresh=*/true);
       fileLoadMdTime = clock.getTick() - startTime;
     }
     return fileLoadMdTime;
@@ -1289,7 +1309,7 @@ public class HdfsTable extends Table implements FeFsTable {
       if (partition == null) continue;
       partitions.add(partition);
     }
-    loadFileMetadataForPartitions(partitions, /* isRefresh=*/false);
+    loadFileMetadataForPartitions(client, partitions, /* isRefresh=*/false);
     for (HdfsPartition partition : partitions) addPartition(partition);
   }
 
@@ -1858,8 +1878,8 @@ public class HdfsTable extends Table implements FeFsTable {
    * 'hmsPartition'. If old partition is null then nothing is removed and
    * and partition constructed from 'hmsPartition' is simply added.
    */
-  public void reloadPartition(HdfsPartition oldPartition, Partition hmsPartition)
-      throws CatalogException {
+  public void reloadPartition(IMetaStoreClient client, HdfsPartition oldPartition,
+      Partition hmsPartition) throws CatalogException {
     // Instead of updating the existing partition in place, we create a new one
     // so that we reflect any changes in the hmsPartition object and also assign a new
     // ID. This is one step towards eventually implementing IMPALA-7533.
@@ -1870,7 +1890,7 @@ public class HdfsTable extends Table implements FeFsTable {
     if (oldPartition != null) {
       refreshedPartition.setFileDescriptors(oldPartition.getFileDescriptors());
     }
-    loadFileMetadataForPartitions(ImmutableList.of(refreshedPartition),
+    loadFileMetadataForPartitions(client, ImmutableList.of(refreshedPartition),
         /*isRefresh=*/true);
     dropPartition(oldPartition, false);
     addPartition(refreshedPartition);

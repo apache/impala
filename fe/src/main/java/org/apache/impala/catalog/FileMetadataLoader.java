@@ -20,6 +20,7 @@ import com.google.common.base.Objects;
 import com.google.common.base.Preconditions;
 import com.google.common.collect.ImmutableMap;
 import com.google.common.collect.Maps;
+
 import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.fs.BlockLocation;
 import org.apache.hadoop.fs.FileStatus;
@@ -27,6 +28,7 @@ import org.apache.hadoop.fs.FileSystem;
 import org.apache.hadoop.fs.LocatedFileStatus;
 import org.apache.hadoop.fs.Path;
 import org.apache.hadoop.fs.RemoteIterator;
+import org.apache.hadoop.hive.common.ValidTxnList;
 import org.apache.hadoop.hive.common.ValidWriteIdList;
 import org.apache.impala.catalog.HdfsPartition.FileDescriptor;
 import org.apache.impala.common.FileSystemUtil;
@@ -58,6 +60,8 @@ public class FileMetadataLoader {
   private final ListMap<TNetworkAddress> hostIndex_;
   @Nullable
   private final ValidWriteIdList writeIds_;
+  @Nullable
+  private final ValidTxnList validTxnList_;
 
   private boolean forceRefreshLocations = false;
 
@@ -70,18 +74,24 @@ public class FileMetadataLoader {
    * @param oldFds any pre-existing file descriptors loaded for this table, used
    *   to optimize refresh if available.
    * @param hostIndex the host index with which to associate the file descriptors
+   * @param validTxnList if non-null, it can tell whether a given transaction id is
+   *   committed or not. We need it to ignore base directories of in-progress
+   *   compactions.
    * @param writeIds if non-null, a write-id list which will filter the returned
    *   file descriptors to only include those indicated to be valid.
-   *   TODO(todd) we also likely need to pass an open transaction list here to deal
-   *   with ignoring in-progress (not-yet-visible) compactions.
    */
   public FileMetadataLoader(Path partDir, boolean recursive, List<FileDescriptor> oldFds,
-      ListMap<TNetworkAddress> hostIndex, @Nullable ValidWriteIdList writeIds) {
+      ListMap<TNetworkAddress> hostIndex, @Nullable ValidTxnList validTxnList,
+      @Nullable ValidWriteIdList writeIds) {
+    // Either both validTxnList and writeIds are null, or none of them.
+    Preconditions.checkState((validTxnList == null && writeIds == null) ||
+                             (validTxnList != null && writeIds != null));
     partDir_ = Preconditions.checkNotNull(partDir);
     recursive_ = recursive;
     hostIndex_ = Preconditions.checkNotNull(hostIndex);
     oldFdsByRelPath_ = Maps.uniqueIndex(oldFds, FileDescriptor::getRelativePath);
     writeIds_ = writeIds;
+    validTxnList_ = validTxnList;
 
     if (writeIds_ != null) {
       Preconditions.checkArgument(recursive_, "ACID tables must be listed recursively");
@@ -168,8 +178,8 @@ public class FileMetadataLoader {
       }
 
       if (writeIds_ != null) {
-        stats = AcidUtils.filterFilesForAcidState(stats, partDir_, writeIds_,
-            loadStats_);
+        stats = AcidUtils.filterFilesForAcidState(stats, partDir_, validTxnList_,
+            writeIds_, loadStats_);
       }
 
       for (FileStatus fileStatus : stats) {

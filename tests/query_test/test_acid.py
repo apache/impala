@@ -20,10 +20,14 @@
 import pytest
 import time
 
+from hive_metastore.ttypes import CommitTxnRequest, OpenTxnRequest
+from subprocess import check_call
 from tests.common.impala_test_suite import ImpalaTestSuite
 from tests.common.skip import (SkipIfHive2, SkipIfCatalogV2, SkipIfS3, SkipIfABFS,
                                SkipIfADLS, SkipIfIsilon, SkipIfLocal)
 from tests.common.test_dimensions import create_single_exec_option_dimension
+
+
 class TestAcid(ImpalaTestSuite):
   @classmethod
   def get_workload(self):
@@ -204,3 +208,53 @@ class TestAcid(ImpalaTestSuite):
       if txn_dict['user'] != 'Impala':
         continue
       yield txn_dict
+
+  def _open_txn(self):
+     open_txn_req = OpenTxnRequest()
+     open_txn_req.num_txns = 1
+     open_txn_req.user = "AcidTest"
+     open_txn_req.hostname = "localhost"
+     open_txn_resp = self.hive_client.open_txns(open_txn_req)
+     return open_txn_resp.txn_ids[0]
+
+  def _commit_txn(self, txn_id):
+    commit_req = CommitTxnRequest()
+    commit_req.txnid = txn_id
+    return self.hive_client.commit_txn(commit_req)
+
+  @SkipIfHive2.acid
+  @SkipIfS3.hive
+  @SkipIfABFS.hive
+  @SkipIfADLS.hive
+  @SkipIfIsilon.hive
+  @SkipIfLocal.hive
+  def test_in_progress_compactions(self, vector, unique_database):
+    """Checks that in-progress compactions are not visible. The test mimics
+    in-progress compactions by opening a transaction and creating a new base
+    directory. The new base directory is empty and must not have an effect
+    on query results until the transaction is committed."""
+    tbl_name = "{}.{}".format(unique_database, "test_compaction")
+    self.execute_query("create table {} (i int) tblproperties"
+        "('transactional'='true',"
+        "'transactional_properties'='insert_only')".format(tbl_name))
+    self.execute_query("insert into {} values (1)".format(tbl_name))
+
+    # Create new base directory with a valid write id.
+    txn_id = self._open_txn()
+    tbl_file = self.execute_query(
+        "show files in {}".format(tbl_name)).data[0].split("\t")[0]
+    tbl_dir = tbl_file[tbl_file.find("/test-warehouse"):tbl_file.rfind("delta_")]
+    new_base_dir_with_old_write_id = tbl_dir + "base_1_v" + str(txn_id)
+    check_call(['hdfs', 'dfs', '-mkdir', '-p', new_base_dir_with_old_write_id])
+
+    # Transaction is not committed so the new empty base directory must not have
+    # any effect on query results.
+    self.execute_query("refresh {}".format(tbl_name))
+    assert len(self.execute_query("select * from {}".format(tbl_name)).data) != 0
+
+    # Transaction is committed, now the query should see the table as empty. Of course,
+    # real compactions don't remove data, but that verifies that the query reads the
+    # new directory.
+    self._commit_txn(txn_id)
+    self.execute_query("refresh {}".format(tbl_name))
+    assert len(self.execute_query("select * from {}".format(tbl_name)).data) == 0

@@ -29,6 +29,7 @@ import java.util.List;
 import org.apache.hadoop.fs.Path;
 import org.apache.hadoop.hive.common.FileUtils;
 import org.apache.hadoop.hive.common.StatsSetupConst;
+import org.apache.hadoop.hive.common.ValidTxnList;
 import org.apache.hadoop.hive.common.ValidWriteIdList;
 import org.apache.hadoop.hive.ql.metadata.formatting.MetaDataFormatUtils;
 import org.apache.hadoop.hive.conf.HiveConf;
@@ -338,6 +339,13 @@ public class MetastoreShim {
   public static ValidWriteIdList getValidWriteIdListFromString(String validWriteIds) {
     throw new UnsupportedOperationException(
         "getValidWriteIdListFromString not supported");
+  }
+
+  /**
+   * Hive-3 only function
+   */
+  public static ValidTxnList getValidTxns(IMetaStoreClient client) throws TException {
+    throw new UnsupportedOperationException("getValidTxns not supported");
   }
 
   /**

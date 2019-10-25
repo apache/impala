@@ -867,9 +867,12 @@ public class CatalogOpExecutor {
       throw new CatalogException("Table " + tbl.getFullName() + " is not an HDFS table");
     }
     HdfsTable hdfsTable = (HdfsTable) tbl;
-    List<HdfsPartition> hdfsPartitions = hdfsTable.createAndLoadPartitions(partitions);
-    for (HdfsPartition hdfsPartition: hdfsPartitions) {
-      catalog_.addPartition(hdfsPartition);
+    try (MetaStoreClient msClient = catalog_.getMetaStoreClient()) {
+      List<HdfsPartition> hdfsPartitions = hdfsTable.createAndLoadPartitions(
+          msClient.getHiveClient(), partitions);
+      for (HdfsPartition hdfsPartition: hdfsPartitions) {
+        catalog_.addPartition(hdfsPartition);
+      }
     }
     return hdfsTable;
   }

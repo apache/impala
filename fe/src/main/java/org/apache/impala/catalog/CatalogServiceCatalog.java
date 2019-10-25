@@ -2561,7 +2561,7 @@ public class CatalogServiceCatalog extends Catalog {
           throw new CatalogException("Error loading metadata for partition: "
               + hdfsTable.getFullName() + " " + partitionName, e);
         }
-        hdfsTable.reloadPartition(hdfsPartition, hmsPartition);
+        hdfsTable.reloadPartition(msClient.getHiveClient(), hdfsPartition, hmsPartition);
       }
       hdfsTable.setCatalogVersion(newCatalogVersion);
       LOG.info(String.format("Refreshed partition metadata: %s %s",

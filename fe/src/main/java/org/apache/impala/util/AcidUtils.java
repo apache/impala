@@ -22,6 +22,7 @@ import com.google.errorprone.annotations.Immutable;
 
 import org.apache.hadoop.fs.FileStatus;
 import org.apache.hadoop.fs.Path;
+import org.apache.hadoop.hive.common.ValidTxnList;
 import org.apache.hadoop.hive.common.ValidWriteIdList;
 import org.apache.impala.catalog.FileMetadataLoader.LoadStats;
 import org.apache.impala.common.FileSystemUtil;
@@ -142,16 +143,19 @@ public class AcidUtils {
    */
   private static class WriteListBasedPredicate implements Predicate<String> {
 
+    private final ValidTxnList validTxnList;
     private final ValidWriteIdList writeIdList;
 
-    WriteListBasedPredicate(ValidWriteIdList writeIdList) {
+    WriteListBasedPredicate(ValidTxnList validTxnList, ValidWriteIdList writeIdList) {
+      this.validTxnList = Preconditions.checkNotNull(validTxnList);
       this.writeIdList = Preconditions.checkNotNull(writeIdList);
     }
 
     public boolean test(String dirPath) {
-      long baseWriteId = getBaseWriteId(dirPath);
-      if (baseWriteId != SENTINEL_BASE_WRITE_ID) {
-        return writeIdList.isValidBase(baseWriteId);
+      ParsedBase parsedBase = parseBase(dirPath);
+      if (parsedBase.writeId != SENTINEL_BASE_WRITE_ID) {
+        return writeIdList.isValidBase(parsedBase.writeId) &&
+               isTxnValid(parsedBase.visibilityTxnId);
       } else {
         ParsedDelta pd = parseDelta(dirPath);
         if (pd != null) {
@@ -165,15 +169,41 @@ public class AcidUtils {
       // TODO(todd) add an e2e test for this.
       return true;
     }
+
+    private boolean isTxnValid(long visibilityTxnId) {
+      return visibilityTxnId == -1 || validTxnList.isTxnValid(visibilityTxnId);
+    }
+  }
+
+  @Immutable
+  private static final class ParsedBase {
+    final long writeId;
+    final long visibilityTxnId;
+
+    ParsedBase(long writeId, long visibilityTxnId) {
+      this.writeId = writeId;
+      this.visibilityTxnId = visibilityTxnId;
+    }
+  }
+
+  @VisibleForTesting
+  static ParsedBase parseBase(String relPath) {
+    Matcher baseMatcher = BASE_PATTERN.matcher(relPath);
+    if (baseMatcher.matches()) {
+      long writeId = Long.valueOf(baseMatcher.group("writeId"));
+      long visibilityTxnId = -1;
+      String visibilityTxnIdStr = baseMatcher.group("visibilityTxnId");
+      if (visibilityTxnIdStr != null) {
+        visibilityTxnId = Long.valueOf(visibilityTxnIdStr);
+      }
+      return new ParsedBase(writeId, visibilityTxnId);
+    }
+    return new ParsedBase(SENTINEL_BASE_WRITE_ID, -1);
   }
 
   @VisibleForTesting
   static long getBaseWriteId(String relPath) {
-    Matcher baseMatcher = BASE_PATTERN.matcher(relPath);
-    if (baseMatcher.matches()) {
-      return Long.valueOf(baseMatcher.group("writeId"));
-    }
-    return SENTINEL_BASE_WRITE_ID;
+    return parseBase(relPath).writeId;
   }
 
   @Immutable
@@ -215,12 +245,13 @@ public class AcidUtils {
    *    must be used.
    */
   public static List<FileStatus> filterFilesForAcidState(List<FileStatus> stats,
-      Path baseDir, ValidWriteIdList writeIds, @Nullable LoadStats loadStats) {
+      Path baseDir, ValidTxnList validTxnList, ValidWriteIdList writeIds,
+      @Nullable LoadStats loadStats) {
     List<FileStatus> validStats = new ArrayList<>(stats);
 
     // First filter out any paths that are not considered valid write IDs.
     // At the same time, calculate the max valid base write ID.
-    Predicate<String> pred = new WriteListBasedPredicate(writeIds);
+    Predicate<String> pred = new WriteListBasedPredicate(validTxnList, writeIds);
     long maxBaseWriteId = Long.MIN_VALUE;
     for (Iterator<FileStatus> it = validStats.iterator(); it.hasNext(); ) {
       FileStatus stat = it.next();
