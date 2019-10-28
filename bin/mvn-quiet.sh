@@ -31,7 +31,9 @@ Directory $(pwd)
 ========================================================================
 EOF
 
-if ! mvn $IMPALA_MAVEN_OPTIONS "$@" | \
+# Always use maven's batch mode (-B), as it produces output that is easier to parse.
+# Also, add a timestamp to the maven output.
+if ! mvn -B $IMPALA_MAVEN_OPTIONS "$@" | awk '{ print strftime("[%H:%M:%S]"), $0 }' | \
   tee -a "$LOG_FILE" | grep -E -e WARNING -e ERROR -e SUCCESS -e FAILURE -e Test; then
   echo "mvn $IMPALA_MAVEN_OPTIONS $@ exited with code $?"
   exit 1

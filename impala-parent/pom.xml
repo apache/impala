@@ -120,6 +120,9 @@ under the License.
       <snapshots>
         <enabled>false</enabled>
       </snapshots>
+      <releases>
+        <enabled>false</enabled>
+      </releases>
     </repository>
     <repository>
       <!--

@@ -48,6 +48,15 @@ CONFIGS=(
 
 FAILED=""
 
+TMP_DIR=$(mktemp -d)
+function onexit {
+  echo "$0: Cleaning up temporary directory"
+  rm -rf ${TMP_DIR}
+}
+trap onexit EXIT
+
+mkdir -p ${TMP_DIR}
+
 for CONFIG in "${CONFIGS[@]}"; do
   CONFIG2=${CONFIG/-use_cdp_hive/}
   if [[ "$CONFIG" != "$CONFIG2" ]]; then
@@ -73,7 +82,16 @@ for CONFIG in "${CONFIGS[@]}"; do
     FAILED="${FAILED}:${DESCRIPTION}"
   fi
   ccache -s
+  bin/jenkins/get_maven_statistics.sh logs/mvn/mvn.log
+
+  # Keep each maven log from each round of the build
+  cp logs/mvn/mvn.log "${TMP_DIR}/mvn.$(date +%s.%N).log"
+  # Append the maven log to the accumulated maven log
+  cat logs/mvn/mvn.log >> "${TMP_DIR}/mvn_accumulated.log"
 done
+
+# Restore the maven logs (these don't interfere with existing mvn.log)
+cp ${TMP_DIR}/mvn* logs/mvn
 
 if [[ "$FAILED" != "" ]]
 then
@@ -81,3 +99,8 @@ then
   echo "$FAILED"
   exit 1
 fi
+
+# Make a tarball of the .m2 directory
+bin/jenkins/archive_m2_directory.sh logs/mvn/mvn_accumulated.log logs/m2_archive.tar.gz
+
+# Note: The exit callback handles cleanup of the temp directory.
