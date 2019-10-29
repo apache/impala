@@ -258,37 +258,29 @@ Here is an excerpt from a sample audit log file:
 
     <conbody>
 
-      <p>
-        The kinds of SQL queries represented in the audit log are:
-      </p>
+      <p> The following types of SQL operations are recorded in the audit
+        log:</p>
 
       <ul>
-        <li>
-          Queries that are prevented due to lack of authorization.
-        </li>
-
-        <li>
-          Queries that Impala can analyze and parse to determine that they are authorized. The
-          audit data is recorded immediately after Impala finishes its analysis, before the
-          query is actually executed.
-        </li>
+        <li> Queries that are prevented due to lack of authorization. </li>
+        <li> Queries that Impala can analyze and parse to determine that they
+          are authorized. The audit data is recorded immediately after Impala
+          finishes its analysis, before the query is actually executed. </li>
+        <li> Queries whose results are available to be fetched by clients.</li>
+        <li>Finished DDL operations.</li>
       </ul>
 
-      <p>
-        The audit log does not contain entries for queries that could not be parsed and
-        analyzed. For example, a query that fails due to a syntax error is not recorded in the
-        audit log. The audit log also does not contain queries that fail due to a reference to a
-        table that does not exist, if you would be authorized to access the table if it did
-        exist.
-      </p>
+      <p> The audit log does not contain entries for queries that could not be
+        parsed and analyzed. For example, a query that fails due to a syntax
+        error is not recorded in the audit log. </p>
+      <p>The audit log does not contain queries that fail due to a reference to
+        a table that does not exist. </p>
 
-      <p>
-        Certain statements in the <cmdname>impala-shell</cmdname> interpreter, such as
-        <codeph>CONNECT</codeph>, <codeph rev="1.4.0">SUMMARY</codeph>,
-        <codeph>PROFILE</codeph>, <codeph>SET</codeph>, and <codeph>QUIT</codeph>, do not
-        correspond to actual SQL queries, and these statements are not reflected in the audit
-        log.
-      </p>
+      <p> Certain statements in the <cmdname>impala-shell</cmdname> interpreter,
+        such as <codeph>CONNECT</codeph>, <codeph rev="1.4.0">SUMMARY</codeph>,
+          <codeph>PROFILE</codeph>, <codeph>SET</codeph>, and
+          <codeph>QUIT</codeph>, do not correspond to actual SQL queries, and
+        these statements are not recorded in the audit log. </p>
 
     </conbody>
 
