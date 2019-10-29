@@ -42,7 +42,6 @@ CONFIG.update({
   'hive.metastore.client.socket.timeout': '600',
 
   'hive.metastore.uris': 'thrift://${INTERNAL_LISTEN_HOST}:9083',
-  'hive.metastore.warehouse.dir': '${WAREHOUSE_LOCATION_PREFIX}/test-warehouse',
 
   # Location of Hive per-query log files of the form: hive_job_log_<hive_query_id>.txt
   'hive.querylog.location': '${IMPALA_CLUSTER_LOGS_DIR}/hive',
@@ -122,7 +121,16 @@ if hive_major_version >= 3:
 
    # Enable compaction workers. The compaction initiator is off by default
    # but configuring a worker thread allows manual compaction.
-   'hive.compactor.worker.threads': 4
+   'hive.compactor.worker.threads': 4,
+
+   # Hive 3 now requires separate directories for managed vs external tables.
+   # Since only transactional tables are considered managed, most tests run against
+   # tables that are now considered external. So, use /test-warehouse for the external
+   # directory so that most tests don't need to change their paths. Data snapshots
+   # are built around populating /test-warehouse, so use /test-warehouse/managed
+   # to allow that logic to remain the same.
+   'hive.metastore.warehouse.dir': '${WAREHOUSE_LOCATION_PREFIX}/test-warehouse/managed',
+   'hive.metastore.warehouse.external.dir': '${WAREHOUSE_LOCATION_PREFIX}/test-warehouse'
   })
 else:
   CONFIG.update({
@@ -130,7 +138,10 @@ else:
    # HMS-2 based environments have a different set of expected configurations for event processor
    'hive.metastore.alter.notifications.basic': 'false',
    'hive.metastore.notification.parameters.exclude.patterns': '',
-   'hive.metastore.notifications.add.thrift.objects': 'true'
+   'hive.metastore.notifications.add.thrift.objects': 'true',
+    # HMS-2 doesn't have a distinction between external and managed warehouse directories,
+    # so only hive.metastore.warehouse.dir is necessary.
+    'hive.metastore.warehouse.dir': '${WAREHOUSE_LOCATION_PREFIX}/test-warehouse'
   })
 
 # Notifications-related configuration.

@@ -3,7 +3,7 @@
 # Test printing of default database.
 describe database default
 ---- RESULTS
-'default','$NAMENODE/test-warehouse','Default Hive database'
+'default','$NAMENODE/$MANAGED_WAREHOUSE_DIR','Default Hive database'
 ---- TYPES
 string, string, string
 ====
@@ -12,7 +12,7 @@ describe database extended impala_test_desc_db1
 ---- RESULTS
 '','$USER','USER'
 'Owner: ','',''
-'impala_test_desc_db1','$NAMENODE/test-warehouse/impala_test_desc_db1.db',''
+'impala_test_desc_db1','$NAMENODE/$MANAGED_WAREHOUSE_DIR/impala_test_desc_db1.db',''
 ---- TYPES
 string, string, string
 ====
@@ -21,7 +21,7 @@ describe database extended impala_test_desc_db2
 ---- RESULTS
 '','$USER','USER'
 'Owner: ','',''
-'impala_test_desc_db2','$NAMENODE/test-warehouse/impala_test_desc_db2.db','test comment'
+'impala_test_desc_db2','$NAMENODE/$MANAGED_WAREHOUSE_DIR/impala_test_desc_db2.db','test comment'
 ---- TYPES
 string, string, string
 ====

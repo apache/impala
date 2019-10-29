@@ -46,6 +46,7 @@ from zipfile import ZipFile
 
 
 from db_connection import HiveConnection, ImpalaConnection
+from tests.common.environ import HIVE_MAJOR_VERSION
 from tests.common.errors import Timeout
 from tests.util.shell_util import shell as local_shell
 from tests.util.parse_util import parse_glog, parse_mem_to_mb
@@ -501,8 +502,16 @@ class Hive(Service):
   @property
   def warehouse_dir(self):
     if not self._warehouse_dir:
-      self._warehouse_dir = urlparse(
-        self.cluster.get_hadoop_config("hive.metastore.warehouse.dir")).path
+      # Starting in Hive 3, there is a separate directory for external tables. Since
+      # all non-transactional tables are external tables with HIVE-22158, most of the
+      # test tables are located here. To avoid disruption, we use this as the warehouse
+      # directory. Hive 2 doesn't have this distinction and is unchanged.
+      if HIVE_MAJOR_VERSION > 2:
+        self._warehouse_dir = urlparse(
+          self.cluster.get_hadoop_config("hive.metastore.warehouse.external.dir")).path
+      else:
+        self._warehouse_dir = urlparse(
+          self.cluster.get_hadoop_config("hive.metastore.warehouse.dir")).path
     return self._warehouse_dir
 
   def connect(self, db_name=None):

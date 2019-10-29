@@ -73,6 +73,10 @@ if docker_network_search_result is not None:
 IS_DOCKERIZED_TEST_CLUSTER = docker_network is not None
 
 HIVE_MAJOR_VERSION = int(os.environ.get("IMPALA_HIVE_MAJOR_VERSION"))
+if HIVE_MAJOR_VERSION > 2:
+  MANAGED_WAREHOUSE_DIR = 'test-warehouse/managed'
+else:
+  MANAGED_WAREHOUSE_DIR = 'test-warehouse'
 
 # Resolve any symlinks in the path.
 impalad_basedir = \

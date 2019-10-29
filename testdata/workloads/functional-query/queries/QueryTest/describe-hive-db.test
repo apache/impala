@@ -3,7 +3,7 @@
 # Test printing of default database.
 describe database default
 ---- RESULTS
-'default','$NAMENODE/test-warehouse','Default Hive database'
+'default','$NAMENODE/$MANAGED_WAREHOUSE_DIR','Default Hive database'
 ---- TYPES
 string, string, string
 ====
@@ -11,7 +11,7 @@ string, string, string
 # Test printing of hive_test_desc_db database.
 describe database hive_test_desc_db
 ---- RESULTS
-'hive_test_desc_db','$NAMENODE/test-warehouse/hive_test_desc_db.db','test comment'
+'hive_test_desc_db','$NAMENODE/$MANAGED_WAREHOUSE_DIR/hive_test_desc_db.db','test comment'
 ---- TYPES
 string, string, string
 ====
@@ -19,7 +19,7 @@ string, string, string
 # Test printing of hive_test_desc_db database with extended information.
 describe database extended hive_test_desc_db
 ---- RESULTS
-'hive_test_desc_db','$NAMENODE/test-warehouse/hive_test_desc_db.db','test comment'
+'hive_test_desc_db','$NAMENODE/$MANAGED_WAREHOUSE_DIR/hive_test_desc_db.db','test comment'
 'Parameter: ','',''
 '','$USER','USER'
 'Owner: ','',''

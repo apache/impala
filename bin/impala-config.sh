@@ -166,7 +166,6 @@ fi
 
 : ${IMPALA_TOOLCHAIN_HOST:=native-toolchain.s3.amazonaws.com}
 export IMPALA_TOOLCHAIN_HOST
-export CDH_MAJOR_VERSION=6
 export CDH_BUILD_NUMBER=1582079
 export CDH_MAVEN_REPOSITORY=\
 "https://${IMPALA_TOOLCHAIN_HOST}/build/cdh_components/${CDH_BUILD_NUMBER}/maven"
@@ -228,6 +227,7 @@ export USE_CDP_HIVE=${USE_CDP_HIVE-false}
 if $USE_CDP_HIVE; then
   # When USE_CDP_HIVE is set we use the CDP hive version to build as well as deploy in
   # the minicluster
+  export CDH_MAJOR_VERSION=7
   export IMPALA_HIVE_VERSION=${CDP_HIVE_VERSION}
   export IMPALA_HIVE_URL=${CDP_HIVE_URL-}
   export IMPALA_HIVE_SOURCE_URL=${CDP_HIVE_SOURCE_URL-}
@@ -242,6 +242,7 @@ if $USE_CDP_HIVE; then
 else
   # CDH hive version is used to build and deploy in minicluster when USE_CDP_HIVE is
   # false
+  export CDH_MAJOR_VERSION=6
   export IMPALA_HIVE_VERSION=${CDH_HIVE_VERSION}
   export IMPALA_HIVE_URL=${CDH_HIVE_URL-}
   export IMPALA_HADOOP_VERSION=${CDH_HADOOP_VERSION}

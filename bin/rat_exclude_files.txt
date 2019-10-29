@@ -26,6 +26,7 @@ lib/python/impala_py_lib/__init__.py
 lib/python/impala_py_lib/jenkins/__init__.py
 shell/packaging/MANIFEST.in
 shell/packaging/requirements.txt
+testdata/cluster/node_templates/cdh7/etc/init.d/kms
 
 # See $IMPALA_HOME/LICENSE.txt
 be/src/gutil/*

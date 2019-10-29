@@ -22,6 +22,7 @@ import subprocess
 from os.path import join
 from subprocess import call
 
+from tests.common.environ import MANAGED_WAREHOUSE_DIR
 from tests.common.impala_test_suite import ImpalaTestSuite
 from tests.common.skip import SkipIfS3, SkipIfABFS, SkipIfADLS, SkipIfIsilon, SkipIfLocal
 from tests.common.test_dimensions import create_single_exec_option_dimension
@@ -96,8 +97,11 @@ class TestCompressedFormats(ImpalaTestSuite):
 
     # Make sure destination table uses suffix, even if use_suffix=False, so
     # unique tables are created for each compression format
+    # Since Hive makes tables managed by default (only matters on Hive 3+), it
+    # will use the managed warehouse location.
+    dest_base_dir = '/{0}'.format(MANAGED_WAREHOUSE_DIR)
     dest_table = '%s_%s_copy' % (table_name, compression_codec)
-    dest_table_dir = join(base_dir, dest_table)
+    dest_table_dir = join(dest_base_dir, dest_table)
     dest_file = join(dest_table_dir, file_name + extension)
 
     drop_cmd = 'DROP TABLE IF EXISTS %s;' % (dest_table)

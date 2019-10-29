@@ -34,7 +34,7 @@ show files in tt;
 ---- LABELS
 Path,Size,Partition
 ---- RESULTS
-row_regex:'$NAMENODE/test-warehouse/$DATABASE.db/tt/base_0000003_v\d+/000000_0','\d+B',''
+row_regex:'$NAMENODE/$MANAGED_WAREHOUSE_DIR/$DATABASE.db/tt/base_0000003_v\d+/000000_0','\d+B',''
 ---- TYPES
 STRING,STRING,STRING
 ====

@@ -20,6 +20,7 @@
 import pytest
 
 from tests.common.custom_cluster_test_suite import CustomClusterTestSuite
+from tests.common.environ import HIVE_MAJOR_VERSION
 from tests.common.skip import SkipIfS3
 from tests.common.test_dimensions import create_exec_option_dimension
 from tests.common.test_result_verifier import verify_query_result_is_equal
@@ -82,9 +83,18 @@ class TestParquetInterop(CustomClusterTestSuite):
       elif (codec == 'zstd:7'): codec = 'zstd'
       hive_table = "{0}.{1}".format(unique_database, "t1_hive")
       self.run_stmt_in_hive("drop table if exists {0}".format(hive_table))
+      # For Hive 3+, workaround for HIVE-22371 (CTAS puts files in the wrong place) by
+      # explicitly creating an external table so that files are in the external warehouse
+      # directory. Use external.table.purge=true so that it is equivalent to a Hive 2
+      # managed table. Hive 2 stays the same.
+      external = ""
+      tblproperties = ""
+      if HIVE_MAJOR_VERSION >= 3:
+        external = "external"
+        tblproperties = "TBLPROPERTIES('external.table.purge'='TRUE')"
       self.run_stmt_in_hive("set parquet.compression={0};\
-          create table {1} stored as parquet as select * from {2}"
-          .format(codec, hive_table, impala_table))
+          create {1} table {2} stored as parquet {3} as select * from {4}"
+          .format(codec, external, hive_table, tblproperties, impala_table))
 
       # Make sure Impala's metadata is in sync.
       if cluster_properties.is_catalog_v2_cluster():

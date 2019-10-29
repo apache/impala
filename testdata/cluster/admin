@@ -235,9 +235,11 @@ function create_cluster {
     echo "Creating $NODE at $NODE_DIR"
 
     mkdir -p "$NODE_DIR"
-    cp -a "$COMMON_NODE_TEMPLATE"/* "$NODE_DIR"
+    # Copy recursively and dereference symlinks. This allows us to use symlinks
+    # in the node_template directory without worrying about dangling symlinks.
+    cp -RL "$COMMON_NODE_TEMPLATE"/* "$NODE_DIR"
     if [[ -e "$NODE_TEMPLATE" ]]; then
-      cp -a "$NODE_TEMPLATE"/* "$NODE_DIR"
+      cp -RL "$NODE_TEMPLATE"/* "$NODE_DIR"
     fi
     if [[ $NODE_IDX -gt 1 ]]; then
       # Remove master role scripts from slave nodes

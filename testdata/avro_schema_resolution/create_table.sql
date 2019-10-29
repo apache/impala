@@ -44,7 +44,7 @@ WITH SERDEPROPERTIES ('avro.schema.literal'='{
 STORED AS
 INPUTFORMAT 'org.apache.hadoop.hive.ql.io.avro.AvroContainerInputFormat'
 OUTPUTFORMAT 'org.apache.hadoop.hive.ql.io.avro.AvroContainerOutputFormat'
-LOCATION '${hiveconf:hive.metastore.warehouse.dir}/avro_schema_resolution_test/';
+LOCATION '/test-warehouse/avro_schema_resolution_test/';
 
 LOAD DATA LOCAL INPATH '${env:IMPALA_HOME}/testdata/avro_schema_resolution/records1.avro' OVERWRITE INTO TABLE schema_resolution_test;
 LOAD DATA LOCAL INPATH '${env:IMPALA_HOME}/testdata/avro_schema_resolution/records2.avro' INTO TABLE schema_resolution_test;
@@ -64,7 +64,7 @@ STORED AS
 INPUTFORMAT 'org.apache.hadoop.hive.ql.io.avro.AvroContainerInputFormat'
 OUTPUTFORMAT 'org.apache.hadoop.hive.ql.io.avro.AvroContainerOutputFormat'
 LOCATION '/test-warehouse/alltypes_avro_snap'
-TBLPROPERTIES ('avro.schema.url'='${env:DEFAULT_FS}/${hiveconf:hive.metastore.warehouse.dir}/avro_schemas/functional/alltypes.json');
+TBLPROPERTIES ('avro.schema.url'='${env:DEFAULT_FS}/test-warehouse/avro_schemas/functional/alltypes.json');
 
 -- Column definition list has one more column than the Avro schema.
 DROP TABLE IF EXISTS alltypes_extra_coldef;
@@ -86,7 +86,7 @@ STORED AS
 INPUTFORMAT 'org.apache.hadoop.hive.ql.io.avro.AvroContainerInputFormat'
 OUTPUTFORMAT 'org.apache.hadoop.hive.ql.io.avro.AvroContainerOutputFormat'
 LOCATION '/test-warehouse/alltypes_avro_snap'
-TBLPROPERTIES ('avro.schema.url'='${env:DEFAULT_FS}/${hiveconf:hive.metastore.warehouse.dir}/avro_schemas/functional/alltypes.json');
+TBLPROPERTIES ('avro.schema.url'='${env:DEFAULT_FS}/test-warehouse/avro_schemas/functional/alltypes.json');
 
 -- Column definition list is missing 'tinyint_col' and 'timestamp_col' from the Avro schema.
 DROP TABLE IF EXISTS alltypes_missing_coldef;
@@ -105,7 +105,7 @@ STORED AS
 INPUTFORMAT 'org.apache.hadoop.hive.ql.io.avro.AvroContainerInputFormat'
 OUTPUTFORMAT 'org.apache.hadoop.hive.ql.io.avro.AvroContainerOutputFormat'
 LOCATION '/test-warehouse/alltypes_avro_snap'
-TBLPROPERTIES ('avro.schema.url'='${env:DEFAULT_FS}/${hiveconf:hive.metastore.warehouse.dir}/avro_schemas/functional/alltypes.json');
+TBLPROPERTIES ('avro.schema.url'='${env:DEFAULT_FS}/test-warehouse/avro_schemas/functional/alltypes.json');
 
 -- Matching number of columns and column names, but mismatched type (bigint_col is a string).
 DROP TABLE IF EXISTS alltypes_type_mismatch;
@@ -126,7 +126,7 @@ STORED AS
 INPUTFORMAT 'org.apache.hadoop.hive.ql.io.avro.AvroContainerInputFormat'
 OUTPUTFORMAT 'org.apache.hadoop.hive.ql.io.avro.AvroContainerOutputFormat'
 LOCATION '/test-warehouse/alltypes_avro_snap'
-TBLPROPERTIES ('avro.schema.url'='${env:DEFAULT_FS}/${hiveconf:hive.metastore.warehouse.dir}/avro_schemas/functional/alltypes.json');
+TBLPROPERTIES ('avro.schema.url'='${env:DEFAULT_FS}/test-warehouse/avro_schemas/functional/alltypes.json');
 
 -- IMPALA-2798, create two avro tables with same underlying data location, one table
 -- has an extra column at the end. Validate Impala doesn't use codegen decoding function
