@@ -115,13 +115,13 @@ class Webserver {
   /// produce text should use UrlCallback.
   void RegisterUrlCallback(const std::string& path, const RawUrlCallback& callback);
 
-  const TNetworkAddress& http_address() { return http_address_; }
-
   /// True if serving all traffic over SSL, false otherwise
   bool IsSecure() const;
 
   /// Returns the URL to the webserver as a string.
   string url() { return url_; }
+  string hostname() { return hostname_; }
+  int port() { return http_address_.port; }
 
   /// Returns the appropriate MIME type for a given ContentType.
   static const std::string GetMimeType(const ContentType& content_type);

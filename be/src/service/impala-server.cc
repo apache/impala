@@ -1797,13 +1797,8 @@ void ImpalaServer::BuildLocalBackendDescriptorInternal(TBackendDescriptor* be_de
 
   Webserver* webserver = ExecEnv::GetInstance()->webserver();
   if (webserver != nullptr) {
-    const TNetworkAddress& webserver_address = webserver->http_address();
-    if (IsWildcardAddress(webserver_address.hostname)) {
-      be_desc->__set_debug_http_address(
-          MakeNetworkAddress(be_desc->ip_address, webserver_address.port));
-    } else {
-      be_desc->__set_debug_http_address(webserver_address);
-    }
+    be_desc->__set_debug_http_address(
+        MakeNetworkAddress(webserver->hostname(), webserver->port()));
     be_desc->__set_secure_webserver(webserver->IsSecure());
   }
 

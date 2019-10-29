@@ -117,6 +117,7 @@ DEFINE_bool(webserver_require_spnego, false,
             "Require connections to the web server to authenticate via Kerberos "
             "using SPNEGO.");
 
+DECLARE_string(hostname);
 DECLARE_bool(is_coordinator);
 DECLARE_int64(max_cookie_lifetime_s);
 DECLARE_string(ssl_minimum_version);
@@ -438,7 +439,9 @@ void Webserver::Stop() {
 void Webserver::Init() {
   hostname_ = http_address_.hostname;
   if (IsWildcardAddress(http_address_.hostname)) {
-    if (!GetHostname(&hostname_).ok()) {
+    if (!FLAGS_hostname.empty()) {
+      hostname_ = FLAGS_hostname;
+    } else if (!GetHostname(&hostname_).ok()) {
       hostname_ = http_address_.hostname;
     }
   }
