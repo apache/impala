@@ -63,6 +63,11 @@ under the License.
           <groupId>org.eclipse.jetty</groupId>
           <artifactId>*</artifactId>
         </exclusion>
+        <exclusion>
+          <!-- IMPALA-9108: Avoid pulling in leveldbjni, which is unneeded. -->
+          <groupId>org.fusesource.leveldbjni</groupId>
+          <artifactId>*</artifactId>
+        </exclusion>
       </exclusions>
     </dependency>
     <dependency>
@@ -698,6 +703,8 @@ under the License.
                     <exclude>org.eclipse.jetty:*</exclude>
                     <exclude>org.apache.logging.log4j:log4j-slf4j-impl</exclude>
                     <exclude>org.apache.logging.log4j:log4j-1.2-api</exclude>
+                    <!-- IMPALA-9108: Avoid pulling in leveldbjni, which is unneeded. -->
+                    <exclude>org.fusesource.leveldbjni:*</exclude>
                     <!-- Assert that we only use artifacts from only the specified
                          version of these components. -->
                     <exclude>org.apache.hadoop:*</exclude>
@@ -899,6 +906,11 @@ under the License.
               <groupId>org.eclipse.jetty</groupId>
               <artifactId>*</artifactId>
             </exclusion>
+            <exclusion>
+              <!-- IMPALA-9108: Avoid pulling in leveldbjni, which is unneeded. -->
+              <groupId>org.fusesource.leveldbjni</groupId>
+              <artifactId>*</artifactId>
+            </exclusion>
           </exclusions>
         </dependency>
 
@@ -1048,6 +1060,11 @@ under the License.
               <groupId>org.apache.logging.log4j</groupId>
               <artifactId>log4j-slf4j-impl</artifactId>
             </exclusion>
+            <exclusion>
+              <!-- IMPALA-9108: Avoid pulling in leveldbjni, which is unneeded. -->
+              <groupId>org.fusesource.leveldbjni</groupId>
+              <artifactId>*</artifactId>
+            </exclusion>
           </exclusions>
         </dependency>
       </dependencies>
@@ -1109,6 +1126,11 @@ under the License.
             </exclusion>
             <exclusion>
               <groupId>org.eclipse.jetty</groupId>
+              <artifactId>*</artifactId>
+            </exclusion>
+            <exclusion>
+              <!-- IMPALA-9108: Avoid pulling in leveldbjni, which is unneeded. -->
+              <groupId>org.fusesource.leveldbjni</groupId>
               <artifactId>*</artifactId>
             </exclusion>
           </exclusions>
