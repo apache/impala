@@ -236,6 +236,7 @@ class CodegenAnyVal {
   /// Therefore all NaN values need to be converted into a consistent
   /// form where all bits are the same.  This method will do that -
   /// ensure that all NaN values have the same bit pattern.
+  /// Similarly, -0 == +0 is handled here.
   ///
   /// Generically speaking, a canonical form of a value ensures that
   /// all ambiguity is removed from a value's bit settings -- if there
@@ -243,6 +244,10 @@ class CodegenAnyVal {
   /// value of the value. (Currently this only has an impact for NaN
   /// float and double values.)
   void ConvertToCanonicalForm();
+
+  /// Replaces negative floating point zero with positive zero,
+  /// leaves everything else unchanged.
+  llvm::Value* ConvertToPositiveZero(llvm::Value* val);
 
   /// Returns the i1 result of this == other. this and other must be non-null.
   llvm::Value* Eq(CodegenAnyVal* other);

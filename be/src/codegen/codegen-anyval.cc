@@ -482,10 +482,18 @@ void CodegenAnyVal::SetDate(llvm::Value* date) {
   value_ = builder_->CreateInsertValue(value_, v, 0, name_);
 }
 
+llvm::Value* CodegenAnyVal::ConvertToPositiveZero(llvm::Value* val) {
+  // Replaces negative zero with positive, leaves everything else unchanged.
+  llvm::Value* is_negative_zero = builder_->CreateFCmpOEQ(
+      val, llvm::ConstantFP::getNegativeZero(val->getType()), "cmp_zero");
+  return builder_->CreateSelect(is_negative_zero,
+                llvm::ConstantFP::get(val->getType(), 0.0), val);
+}
+
 void CodegenAnyVal::ConvertToCanonicalForm() {
   // Convert the value to a bit pattern that is unambiguous.
   // Specifically, for floating point type values, NaN values are converted to
-  // the same bit pattern.
+  // the same bit pattern, and -0 is converted to +0.
   switch(type_.type) {
     case TYPE_FLOAT:
     case TYPE_DOUBLE: {
@@ -497,7 +505,8 @@ void CodegenAnyVal::ConvertToCanonicalForm() {
         canonical_val = llvm::ConstantFP::getNaN(codegen_->double_type());
       }
       llvm::Value* is_nan = builder_->CreateFCmpUNO(raw, raw, "cmp_nan");
-      SetVal(builder_->CreateSelect(is_nan, canonical_val, raw));
+
+      SetVal(builder_->CreateSelect(is_nan, canonical_val, ConvertToPositiveZero(raw)));
       break;
     }
     default:
@@ -774,6 +783,7 @@ llvm::Value* CodegenAnyVal::EqToNativePtr(llvm::Value* native_ptr,
           local_val, "local_val_is_nan");
       llvm::Value* val_is_nan = builder_->CreateFCmpUNO(val, val, "val_is_nan");
       llvm::Value* both_nan = builder_->CreateAnd(local_is_nan, val_is_nan);
+
       return builder_->CreateOr(cmp_raw, both_nan, "cmp_raw_with_nan");
     }
     case TYPE_STRING:

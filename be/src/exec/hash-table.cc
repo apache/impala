@@ -197,9 +197,7 @@ bool HashTableCtx::EvalRow(const TupleRow* row,
     }
     const ColumnType& expr_type = build_exprs_[i]->type();
     DCHECK_LE(expr_type.GetSlotSize(), sizeof(NULL_VALUE));
-    if (RawValue::IsNaN(val, expr_type)) {
-      val = RawValue::CanonicalNaNValue(expr_type);
-    }
+    val = RawValue::CanonicalValue(val, expr_type);
     RawValue::Write(val, loc, expr_type, NULL);
   }
   return has_null;
@@ -1165,8 +1163,7 @@ Status HashTableCtx::CodegenEquals(
       llvm::Value* llvm_null_byte_loc = builder.CreateInBoundsGEP(
           NULL, expr_values_null, codegen->GetI32Constant(i), "null_byte_loc");
       llvm::Value* null_byte = builder.CreateLoad(llvm_null_byte_loc);
-      row_is_null =
-          builder.CreateICmpNE(null_byte, codegen->GetI8Constant(0));
+      row_is_null = builder.CreateICmpNE(null_byte, codegen->GetI8Constant(0));
     }
     if (inclusive_equality) result.ConvertToCanonicalForm();
 

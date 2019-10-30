@@ -29,9 +29,11 @@
 
 namespace impala {
 
-const int RawValue::ASCII_PRECISION = 16; // print 16 digits for double/float
-const double RawValue::CANONICAL_DOUBLE_NAN = nan("");
-const float RawValue::CANONICAL_FLOAT_NAN = nanf("");
+const int RawValue::ASCII_PRECISION;
+constexpr double RawValue::CANONICAL_DOUBLE_NAN;
+constexpr float RawValue::CANONICAL_FLOAT_NAN;
+constexpr double RawValue::CANONICAL_DOUBLE_ZERO;
+constexpr float RawValue::CANONICAL_FLOAT_ZERO;
 
 void RawValue::PrintValueAsBytes(const void* value, const ColumnType& type,
                                  stringstream* stream) {

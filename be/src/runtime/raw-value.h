@@ -34,14 +34,17 @@ class Tuple;
 /// Useful utility functions for runtime values (which are passed around as void*).
 class RawValue {
  public:
-  /// Ascii output precision for double/float
-  static const int ASCII_PRECISION;
+  /// Ascii output precision for double/float, print 16 digits.
+  static const int ASCII_PRECISION = 16;
 
   /// Single NaN values to ensure all NaN values can be assigned one bit pattern
   /// that will always compare and hash the same way.  Allows for all NaN values
   /// to be put into the same "group by" bucket.
-  static const double CANONICAL_DOUBLE_NAN;
-  static const float CANONICAL_FLOAT_NAN;
+  static constexpr double CANONICAL_DOUBLE_NAN = std::numeric_limits<double>::quiet_NaN();
+  static constexpr float CANONICAL_FLOAT_NAN = std::numeric_limits<float>::quiet_NaN();
+  /// The canonical zero values when comparing negative and positive zeros.
+  static constexpr double CANONICAL_DOUBLE_ZERO = 0.0;
+  static constexpr float CANONICAL_FLOAT_ZERO = 0.0f;
 
   /// Convert 'value' into ascii and write to 'stream'. NULL turns into "NULL". 'scale'
   /// determines how many digits after the decimal are printed for floating point numbers,
@@ -107,9 +110,19 @@ class RawValue {
   /// Returns true if val/type correspond to a NaN floating point value.
   static inline bool IsNaN(const void* val, const ColumnType& type);
 
+  /// Returns true if val/type correspond to a +0/-0 floating point value.
+  static inline bool IsFloatingZero(const void* val, const ColumnType& type);
+
+  /// Returns the canonical form of the given value. Currently this means a unified NaN
+  /// value in case of NaN and +0 in case of +0/-0.
+  static inline const void* CanonicalValue(const void* val, const ColumnType& type);
+
   /// Returns a canonical NaN value for a floating point type
   /// (which will always have the same bit-pattern to maintain consistency in hashing).
   static inline const void* CanonicalNaNValue(const ColumnType& type);
+
+  // Returns positive zero for floating point types.
+  static inline const void* PositiveFloatingZero(const ColumnType& type);
 };
 
 }

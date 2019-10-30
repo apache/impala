@@ -51,12 +51,41 @@ inline bool RawValue::IsNaN(const void* val, const ColumnType& type) {
   }
 }
 
+inline bool RawValue::IsFloatingZero(const void* val, const ColumnType& type) {
+  switch(type.type) {
+  case TYPE_FLOAT:
+    return *reinterpret_cast<const float*>(val) == CANONICAL_FLOAT_ZERO;
+  case TYPE_DOUBLE:
+    return *reinterpret_cast<const double*>(val) == CANONICAL_DOUBLE_ZERO;
+  default:
+    return false;
+  }
+}
+
+inline const void* RawValue::CanonicalValue(const void* val, const ColumnType& type) {
+  if (RawValue::IsNaN(val, type)) return RawValue::CanonicalNaNValue(type);
+  if (RawValue::IsFloatingZero(val, type)) return RawValue::PositiveFloatingZero(type);
+  return val;
+}
+
 inline const void* RawValue::CanonicalNaNValue(const ColumnType& type) {
   switch(type.type) {
   case TYPE_FLOAT:
     return &CANONICAL_FLOAT_NAN;
   case TYPE_DOUBLE:
     return &CANONICAL_DOUBLE_NAN;
+  default:
+    DCHECK(false);
+    return nullptr;
+  }
+}
+
+inline const void* RawValue::PositiveFloatingZero(const ColumnType& type) {
+  switch(type.type) {
+  case TYPE_FLOAT:
+    return &CANONICAL_FLOAT_ZERO;
+  case TYPE_DOUBLE:
+    return &CANONICAL_DOUBLE_ZERO;
   default:
     DCHECK(false);
     return nullptr;

@@ -1402,6 +1402,25 @@ group by P, Q order by P, Q
 bigint, float, float
 ====
 ---- QUERY
+# IMPALA-6660: GROUP BY of -0/+0 values aggregates zeros as one grouping
+select x, count(*)
+from (values(cast("-0" as float) x), (cast("0" as float))) v
+group by x
+---- RESULTS
+0,2
+---- TYPES
+float, bigint
+====
+---- QUERY
+# IMPALA-6660: -0/+0 values are not distinct
+select distinct *
+from (values(cast("-0" as float)), (cast("0" as float))) v;
+---- RESULTS
+0
+---- TYPES
+float
+====
+---- QUERY
 # IMPALA-8140: Test that group by with limit does not crash on Asan
 select count(*) from tpch_parquet.orders o group by o.o_clerk limit 10
 # We don't validate the results since the order is not deterministic.

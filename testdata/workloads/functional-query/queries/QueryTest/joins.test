@@ -831,3 +831,14 @@ select t1.float_col as v
 ---- TYPES
 FLOAT
 ====
+---- QUERY
+# IMPALA-6660: Test that +0 equals -0 when joining
+select * from
+  (select cast("-0" as float) c1) v1,
+  (select cast("+0" as float) c2) v2
+where v1.c1 = v2.c2;
+---- RESULTS
+-0, 0
+---- TYPES
+FLOAT,FLOAT
+====
