@@ -39,11 +39,12 @@ under the License.
       <tbody>
         {{#large_tables}}
         <tr>
+          <td>
           <!-- The /catalog_object endpoint is disabled if local_catalog_mode is used
             since metadata is partially fetched on demand. -->
           {{?use_local_catalog}} {{name}} {{/use_local_catalog}}
           {{^use_local_catalog}}
-           <a href="{{ __common__.host-url }}/catalog_object?object_type=TABLE&object_name={{fqtn}}">{{name}}</a>
+           <a href="{{ __common__.host-url }}/catalog_object?object_type=TABLE&object_name={{name}}">{{name}}</a>
           {{/use_local_catalog}}
           </td>
           <td>{{mem_estimate}}</td>
@@ -88,7 +89,7 @@ under the License.
           <td>
           {{?use_local_catalog}} {{name}} {{/use_local_catalog}}
           {{^use_local_catalog}}
-           <a href="{{ __common__.host-url }}/catalog_object?object_type=TABLE&object_name={{fqtn}}">{{name}}</a>
+           <a href="{{ __common__.host-url }}/catalog_object?object_type=TABLE&object_name={{name}}">{{name}}</a>
           {{/use_local_catalog}}
           </td>
           <td>{{num_metadata_ops}}</td>
@@ -132,7 +133,7 @@ under the License.
           <td>
           {{?use_local_catalog}} {{name}} {{/use_local_catalog}}
           {{^use_local_catalog}}
-           <a href="{{ __common__.host-url }}/catalog_object?object_type=TABLE&object_name={{fqtn}}">{{name}}</a>
+           <a href="{{ __common__.host-url }}/catalog_object?object_type=TABLE&object_name={{name}}">{{name}}</a>
           {{/use_local_catalog}}
           </td>
           <td>{{num_files}}</td>
