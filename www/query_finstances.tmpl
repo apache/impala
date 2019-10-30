@@ -46,8 +46,6 @@ under the License.
 </table>
 
 <script>
-document.getElementById("finstances-tab").className = "active";
-
 var intervalId = 0;
 var table = null;
 var refresh = function () {
@@ -125,5 +123,9 @@ Query <strong>{{query_id}}</strong> has completed, or has not started any backen
 {{^backend_instances}}
 <script>$("#query_finished_alert").css("visibility", "visible");</script>
 {{/backend_instances}}
+
+<script>
+$("#finstances-tab").addClass("active");
+</script>
 
 {{> www/common-footer.tmpl }}

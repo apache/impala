@@ -49,8 +49,6 @@ under the License.
 </table>
 
 <script>
-document.getElementById("backends-tab").className = "active";
-
 var intervalId = 0;
 var table = null;
 var refresh = function () {
@@ -97,5 +95,9 @@ Query <strong>{{query_id}}</strong> has either completed or has no backends or h
 started any backends yet.
 </div>
 {{/backend_states}}
+
+<script>
+$("#backends-tab").addClass("active");
+</script>
 
 {{> www/common-footer.tmpl }}
