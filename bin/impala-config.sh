@@ -167,7 +167,7 @@ fi
 : ${IMPALA_TOOLCHAIN_HOST:=native-toolchain.s3.amazonaws.com}
 export IMPALA_TOOLCHAIN_HOST
 export CDH_MAJOR_VERSION=6
-export CDH_BUILD_NUMBER=1474057
+export CDH_BUILD_NUMBER=1582079
 export CDH_MAVEN_REPOSITORY=\
 "https://${IMPALA_TOOLCHAIN_HOST}/build/cdh_components/${CDH_BUILD_NUMBER}/maven"
 export CDH_HADOOP_VERSION=3.0.0-cdh6.x-SNAPSHOT
