@@ -1675,29 +1675,24 @@ drop database temp;
         Impala handles time zone considerations for the <codeph>TIMESTAMP</codeph> data type.
       </p>
 
-      <p rev="2.6.0 IMPALA-3558" id="s3_drop_table_purge">
-        For best compatibility with the S3 write support in <keyword keyref="impala26_full"/>
-        and higher:
-        <ul>
-          <li>
-            Use native Hadoop techniques to create data files in S3 for querying through Impala.
-          </li>
-
-          <li>
-            Use the <codeph>PURGE</codeph> clause of <codeph>DROP TABLE</codeph> when dropping
-            internal (managed) tables.
-          </li>
-        </ul>
-        By default, when you drop an internal (managed) table, the data files are moved to the
-        HDFS trashcan. This operation is expensive for tables that reside on the Amazon S3
-        filesystem. Therefore, for S3 tables, prefer to use <codeph>DROP TABLE
-        <varname>table_name</varname> PURGE</codeph> rather than the default <codeph>DROP
-        TABLE</codeph> statement. The <codeph>PURGE</codeph> clause makes Impala delete the data
-        files immediately, skipping the HDFS trashcan. For the <codeph>PURGE</codeph> clause to
-        work effectively, you must originally create the data files on S3 using one of the tools
-        from the Hadoop ecosystem, such as <codeph>hadoop fs -cp</codeph>, or
-        <codeph>INSERT</codeph> in Impala or Hive.
-      </p>
+      <p rev="2.6.0 IMPALA-3558" id="s3_drop_table_purge"> For best
+        compatibility with the S3 write support in <keyword
+          keyref="impala26_full"/> and higher: <ul>
+          <li> Use native Hadoop techniques to create data files in S3 for
+            querying through Impala. </li>
+          <li> Use the <codeph>PURGE</codeph> clause of <codeph>DROP
+              TABLE</codeph> when dropping internal (managed) tables. </li>
+        </ul> By default, when you drop an internal (managed) table, the data
+        files are moved to the HDFS trashcan. This operation is expensive for
+        tables that reside on the Amazon S3 object store. Therefore, for S3
+        tables, prefer to use <codeph>DROP TABLE <varname>table_name</varname>
+          PURGE</codeph> rather than the default <codeph>DROP TABLE</codeph>
+        statement. The <codeph>PURGE</codeph> clause makes Impala delete the
+        data files immediately, skipping the HDFS trashcan. For the
+          <codeph>PURGE</codeph> clause to work effectively, you must originally
+        create the data files on S3 using one of the tools from the Hadoop
+        ecosystem, such as <codeph>hadoop fs -cp</codeph>, or
+          <codeph>INSERT</codeph> in Impala or Hive. </p>
 
       <p rev="2.11.0 IMPALA-4252" id="filter_option_bloom_only">
         This query option affects only Bloom filters, not the min/max filters that are applied
@@ -1705,23 +1700,26 @@ drop database temp;
         tables.
       </p>
 
-      <p rev="2.6.0 IMPALA-1878" id="s3_dml_performance">
-        Because of differences between S3 and traditional filesystems, DML operations for S3
-        tables can take longer than for tables on HDFS. For example, both the <codeph>LOAD
-        DATA</codeph> statement and the final stage of the <codeph>INSERT</codeph> and
-        <codeph>CREATE TABLE AS SELECT</codeph> statements involve moving files from one
-        directory to another. (In the case of <codeph>INSERT</codeph> and <codeph>CREATE TABLE
-        AS SELECT</codeph>, the files are moved from a temporary staging directory to the final
-        destination directory.) Because S3 does not support a <q>rename</q> operation for
-        existing objects, in these cases Impala actually copies the data files from one location
-        to another and then removes the original files. In <keyword keyref="impala26_full"/>,
-        the <codeph>S3_SKIP_INSERT_STAGING</codeph> query option provides a way to speed up
-        <codeph>INSERT</codeph> statements for S3 tables and partitions, with the tradeoff that
-        a problem during statement execution could leave data in an inconsistent state. It does
-        not apply to <codeph>INSERT OVERWRITE</codeph> or <codeph>LOAD DATA</codeph> statements.
-        See <xref href="../topics/impala_s3_skip_insert_staging.xml#s3_skip_insert_staging"/>
-        for details.
-      </p>
+      <p rev="2.6.0 IMPALA-1878" id="s3_dml_performance"> Because of differences
+        between S3 and traditional filesystems, DML operations for S3 tables can
+        take longer than for tables on HDFS. For example, both the <codeph>LOAD
+          DATA</codeph> statement and the final stage of the
+          <codeph>INSERT</codeph> and <codeph>CREATE TABLE AS SELECT</codeph>
+        statements involve moving files from one directory to another. (In the
+        case of <codeph>INSERT</codeph> and <codeph>CREATE TABLE AS
+          SELECT</codeph>, the files are moved from a temporary staging
+        directory to the final destination directory.) Because S3 does not
+        support a <q>rename</q> operation for existing objects, in these cases
+        Impala actually copies the data files from one location to another and
+        then removes the original files. In <keyword keyref="impala26_full"/>,
+        the <codeph>S3_SKIP_INSERT_STAGING</codeph> query option provides a way
+        to speed up <codeph>INSERT</codeph> statements for S3 tables and
+        partitions, with the tradeoff that a problem during statement execution
+        could leave data in an inconsistent state. It does not apply to
+          <codeph>INSERT OVERWRITE</codeph> or <codeph>LOAD DATA</codeph>
+        statements. See <xref
+          href="../topics/impala_s3_skip_insert_staging.xml#s3_skip_insert_staging"
+          >S3_SKIP_INSERT_STAGING Query Option</xref> for details. </p>
 
       <p id="adls_block_splitting" rev="IMPALA-5383">
         Because ADLS does not expose the block sizes of data files the way HDFS does, any Impala
@@ -1796,18 +1794,18 @@ drop database temp;
         Impala to query the ADLS data.
       </p>
 
-      <p rev="2.6.0 IMPALA-1878" id="s3_dml">
-        In <keyword keyref="impala26_full"/> and higher, the Impala DML statements
-        (<codeph>INSERT</codeph>, <codeph>LOAD DATA</codeph>, and <codeph>CREATE TABLE AS
-        SELECT</codeph>) can write data into a table or partition that resides in the Amazon
-        Simple Storage Service (S3). The syntax of the DML statements is the same as for any
-        other tables, because the S3 location for tables and partitions is specified by an
-        <codeph>s3a://</codeph> prefix in the <codeph>LOCATION</codeph> attribute of
-        <codeph>CREATE TABLE</codeph> or <codeph>ALTER TABLE</codeph> statements. If you bring
-        data into S3 using the normal S3 transfer mechanisms instead of Impala DML statements,
-        issue a <codeph>REFRESH</codeph> statement for the table before using Impala to query
-        the S3 data.
-      </p>
+      <p rev="2.6.0 IMPALA-1878" id="s3_dml"> In <keyword keyref="impala26_full"
+        /> and higher, the Impala DML statements (<codeph>INSERT</codeph>,
+          <codeph>LOAD DATA</codeph>, and <codeph>CREATE TABLE AS
+          SELECT</codeph>) can write data into a table or partition that resides
+        in S3. The syntax of the DML statements is the same as for any other
+        tables, because the S3 location for tables and partitions is specified
+        by an <codeph>s3a://</codeph> prefix in the <codeph>LOCATION</codeph>
+        attribute of <codeph>CREATE TABLE</codeph> or <codeph>ALTER
+          TABLE</codeph> statements. If you bring data into S3 using the normal
+        S3 transfer mechanisms instead of Impala DML statements, issue a
+          <codeph>REFRESH</codeph> statement for the table before using Impala
+        to query the S3 data. </p>
 
       <p rev="2.2.0" id="s3_metadata">
         Impala caches metadata for tables where the data resides in the Amazon Simple Storage
