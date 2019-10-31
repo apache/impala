@@ -2682,14 +2682,18 @@ public class CatalogServiceCatalog extends Catalog {
   }
 
   /**
-   * Retrieves information about the current catalog usage including the most frequently
-   * accessed tables as well as the tables with the highest memory requirements.
+   * Retrieves information about the current catalog usage including:
+   * 1. the tables with the most frequently accessed.
+   * 2. the tables with the highest memory requirements.
+   * 3. the tables with the highest file counts.
+   * 4. the tables with the longest table loading time.
    */
   public TGetCatalogUsageResponse getCatalogUsage() {
     TGetCatalogUsageResponse usage = new TGetCatalogUsageResponse();
     usage.setLarge_tables(new ArrayList<>());
     usage.setFrequently_accessed_tables(new ArrayList<>());
     usage.setHigh_file_count_tables(new ArrayList<>());
+    usage.setLong_metadata_loading_tables(new ArrayList<>());
     for (Table largeTable: CatalogUsageMonitor.INSTANCE.getLargestTables()) {
       TTableUsageMetrics tableUsageMetrics =
           new TTableUsageMetrics(largeTable.getTableName().toThrift());
@@ -2703,13 +2707,30 @@ public class CatalogServiceCatalog extends Catalog {
       tableUsageMetrics.setNum_metadata_operations(frequentTable.getMetadataOpsCount());
       usage.addToFrequently_accessed_tables(tableUsageMetrics);
     }
-
     for (Table mostFilesTable:
         CatalogUsageMonitor.INSTANCE.getHighFileCountTables()) {
       TTableUsageMetrics tableUsageMetrics =
           new TTableUsageMetrics(mostFilesTable.getTableName().toThrift());
       tableUsageMetrics.setNum_files(mostFilesTable.getNumFiles());
       usage.addToHigh_file_count_tables(tableUsageMetrics);
+    }
+    for (Table longestLoadingTable:
+        CatalogUsageMonitor.INSTANCE.getLongMetadataLoadingTables()) {
+      TTableUsageMetrics tableUsageMetrics =
+          new TTableUsageMetrics(longestLoadingTable.getTableName().toThrift());
+      tableUsageMetrics.setMedian_table_loading_ns(
+          longestLoadingTable.getMedianTableLoadingTime());
+      tableUsageMetrics.setMax_table_loading_ns(
+          longestLoadingTable.getMaxTableLoadingTime());
+      tableUsageMetrics.setP75_loading_time_ns(
+          longestLoadingTable.get75TableLoadingTime());
+      tableUsageMetrics.setP95_loading_time_ns(
+          longestLoadingTable.get95TableLoadingTime());
+      tableUsageMetrics.setP99_loading_time_ns(
+          longestLoadingTable.get99TableLoadingTime());
+      tableUsageMetrics.setNum_table_loading(
+          longestLoadingTable.getTableLoadingCounts());
+      usage.addToLong_metadata_loading_tables(tableUsageMetrics);
     }
     return usage;
   }

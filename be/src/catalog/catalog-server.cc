@@ -470,9 +470,8 @@ void CatalogServer::GetCatalogUsage(Document* document) {
   }
   // Collect information about the largest tables in terms of memory requirements
   Value large_tables(kArrayType);
-  for (int i = 0; i < catalog_usage_result.large_tables.size(); ++i) {
+  for (const auto & large_table : catalog_usage_result.large_tables) {
     Value tbl_obj(kObjectType);
-    const auto& large_table = catalog_usage_result.large_tables[i];
     Value tbl_name(Substitute("$0.$1", large_table.table_name.db_name,
         large_table.table_name.table_name).c_str(), document->GetAllocator());
     tbl_obj.AddMember("name", tbl_name, document->GetAllocator());
@@ -491,9 +490,8 @@ void CatalogServer::GetCatalogUsage(Document* document) {
 
   // Collect information about the most frequently accessed tables.
   Value frequent_tables(kArrayType);
-  for (int i = 0; i < catalog_usage_result.frequently_accessed_tables.size(); ++i) {
+  for (const auto & frequent_table : catalog_usage_result.frequently_accessed_tables) {
     Value tbl_obj(kObjectType);
-    const auto& frequent_table = catalog_usage_result.frequently_accessed_tables[i];
     Value tbl_name(Substitute("$0.$1", frequent_table.table_name.db_name,
         frequent_table.table_name.table_name).c_str(), document->GetAllocator());
     tbl_obj.AddMember("name", tbl_name, document->GetAllocator());
@@ -516,9 +514,8 @@ void CatalogServer::GetCatalogUsage(Document* document) {
 
   // Collect information about the most number of files tables.
   Value high_filecount_tbls(kArrayType);
-  for (int i = 0; i < catalog_usage_result.high_file_count_tables.size(); ++i) {
+  for (const auto & high_filecount_tbl : catalog_usage_result.high_file_count_tables) {
     Value tbl_obj(kObjectType);
-    const auto& high_filecount_tbl = catalog_usage_result.high_file_count_tables[i];
     Value tbl_name(Substitute("$0.$1", high_filecount_tbl.table_name.db_name,
         high_filecount_tbl.table_name.table_name).c_str(), document->GetAllocator());
     tbl_obj.AddMember("name", tbl_name, document->GetAllocator());
@@ -538,6 +535,57 @@ void CatalogServer::GetCatalogUsage(Document* document) {
   Value num_high_filecount_tbls;
   num_high_filecount_tbls.SetInt(catalog_usage_result.high_file_count_tables.size());
   document->AddMember("num_high_file_count_tables", num_high_filecount_tbls,
+      document->GetAllocator());
+
+  // Collect information about the longest metadata loading tables
+  Value longest_loading_tables(kArrayType);
+  for (const auto & longest_table : catalog_usage_result.long_metadata_loading_tables) {
+    Value tbl_obj(kObjectType);
+    Value tbl_name(Substitute("$0.$1", longest_table.table_name.db_name,
+        longest_table.table_name.table_name).c_str(), document->GetAllocator());
+    tbl_obj.AddMember("name", tbl_name, document->GetAllocator());
+    Value median_loading_time;
+    Value max_loading_time;
+    Value p75_loading_time_ns;
+    Value p95_loading_time_ns;
+    Value p99_loading_time_ns;
+    Value table_loading_count;
+    DCHECK(longest_table.__isset.median_table_loading_ns);
+    DCHECK(longest_table.__isset.max_table_loading_ns);
+    DCHECK(longest_table.__isset.p75_loading_time_ns);
+    DCHECK(longest_table.__isset.p95_loading_time_ns);
+    DCHECK(longest_table.__isset.p99_loading_time_ns);
+    DCHECK(longest_table.__isset.num_table_loading);
+    median_loading_time.SetInt64(longest_table.median_table_loading_ns);
+    max_loading_time.SetInt64(longest_table.max_table_loading_ns);
+    p75_loading_time_ns.SetInt64(longest_table.p75_loading_time_ns);
+    p95_loading_time_ns.SetInt64(longest_table.p95_loading_time_ns);
+    p99_loading_time_ns.SetInt64(longest_table.p99_loading_time_ns);
+    table_loading_count.SetInt64(longest_table.num_table_loading);
+    tbl_obj.AddMember("median_metadata_loading_time_ns", median_loading_time,
+        document->GetAllocator());
+    tbl_obj.AddMember("max_metadata_loading_time_ns", max_loading_time,
+        document->GetAllocator());
+    tbl_obj.AddMember("p75_loading_time_ns", p75_loading_time_ns,
+        document->GetAllocator());
+    tbl_obj.AddMember("p95_loading_time_ns", p95_loading_time_ns,
+        document->GetAllocator());
+    tbl_obj.AddMember("p99_loading_time_ns", p99_loading_time_ns,
+        document->GetAllocator());
+    tbl_obj.AddMember("table_loading_count", table_loading_count,
+        document->GetAllocator());
+    longest_loading_tables.PushBack(tbl_obj, document->GetAllocator());
+  }
+  Value has_longest_loading_tables;
+  has_longest_loading_tables.SetBool(true);
+  document->AddMember("has_longest_loading_tables", has_longest_loading_tables,
+      document->GetAllocator());
+  document->AddMember("longest_loading_tables", longest_loading_tables,
+      document->GetAllocator());
+  Value num_longest_loading_tables;
+  num_longest_loading_tables.
+      SetInt(catalog_usage_result.long_metadata_loading_tables.size());
+  document->AddMember("num_longest_loading_tables", num_longest_loading_tables,
       document->GetAllocator());
 }
 

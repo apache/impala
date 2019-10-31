@@ -57,6 +57,7 @@ import org.apache.impala.catalog.HdfsPartition.FileDescriptor;
 import org.apache.impala.common.FileSystemUtil;
 import org.apache.impala.common.ImpalaException;
 import org.apache.impala.common.Pair;
+import org.apache.impala.common.PrintUtils;
 import org.apache.impala.compat.MetastoreShim;
 import org.apache.impala.fb.FbFileBlock;
 import org.apache.impala.thrift.CatalogLookupStatus;
@@ -273,6 +274,8 @@ public class HdfsTable extends Table implements FeFsTable {
   private final FileMetadataStats fileMetadataStats_ = new FileMetadataStats();
 
   private final static Logger LOG = LoggerFactory.getLogger(HdfsTable.class);
+
+  public final static long LOADING_WARNING_TIME_NS = 5000000000L;
 
   // Caching this configuration object makes calls to getFileSystem much quicker
   // (saves ~50ms on a standard plan)
@@ -1003,7 +1006,12 @@ public class HdfsTable extends Table implements FeFsTable {
       }
     } finally {
       storageLdTimer.update(storageMetadataLoadTime_, TimeUnit.NANOSECONDS);
-      context.stop();
+      long load_time_duration = context.stop();
+      if (load_time_duration > LOADING_WARNING_TIME_NS) {
+        LOG.warn("Time taken on loading table " + getFullName() + " exceeded " +
+            "warning threshold. Time: " + load_time_duration + " ns");
+      }
+      updateTableLoadingTime();
     }
   }
 

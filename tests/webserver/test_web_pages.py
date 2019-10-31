@@ -317,6 +317,7 @@ class TestWebPage(ImpalaTestSuite):
     self.__test_table_metrics(unique_database, "foo_part", "num-files")
     self.__test_table_metrics(unique_database, "foo_part", "alter-duration")
     self.__test_catalog_tablesfilesusage(unique_database, "foo_part", "1")
+    self.__test_catalog_tables_loading_time(unique_database, "foo_part")
 
   def __test_catalog_object(self, db_name, tbl_name, cluster_properties):
     """Tests the /catalog_object endpoint for the given db/table. Runs
@@ -364,6 +365,25 @@ class TestWebPage(ImpalaTestSuite):
     self.client.execute("refresh %s.%s" % (db_name, tbl_name))
     self.get_and_check_status(self.TABLE_METRICS_URL +
       "?name=%s.%s" % (db_name, tbl_name), metric, ports_to_test=self.CATALOG_TEST_PORT)
+
+  def __test_catalog_tables_loading_time(self, db_name, tbl_name):
+    """Test the list of tables with the longest loading time in the catalog page.
+    Make sure the table exists. And the table is not empty"""
+    self.client.execute("refresh %s.%s" % (db_name, tbl_name))
+    self.get_and_check_status(self.CATALOG_URL,
+      "Tables with Longest Metadata Loading Time", ports_to_test=self.CATALOG_TEST_PORT)
+    response = self.get_and_check_status(self.CATALOG_URL + "?json",
+      "longest_loading_tables", ports_to_test=self.CATALOG_TEST_PORT)
+    response_json = json.loads(response[0].text)
+    assert "longest_loading_tables" in response_json, \
+      "Response {0}".format(response_json)
+    loading_tables = response_json["longest_loading_tables"]
+    assert len(loading_tables) > 0
+    members = ["median_metadata_loading_time_ns", "max_metadata_loading_time_ns",
+               "p75_loading_time_ns", "p95_loading_time_ns", "p99_loading_time_ns"]
+    for member in members:
+      if member not in loading_tables[0]:
+        assert False, "{0} not in loading tables {1}".format(member, loading_tables)
 
   def __test_catalog_tablesfilesusage(self, db_name, tbl_name, numfiles):
     """Test the list of tables with  most number of files in the catalog page.

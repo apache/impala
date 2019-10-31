@@ -155,6 +155,65 @@ under the License.
 </script>
 {{/has_high_file_count_tables}}
 
+{{?has_longest_loading_tables}}
+<div class="card">
+  <div class="card-header">
+      <h5 class="card-title">
+      Top-{{num_longest_loading_tables}} Tables with Longest Metadata Loading Time
+      </h5>
+  </div>
+  <div class="card-body">
+    <table id="long-metadata-loading-tables" class='table table-hover table-bordered'>
+      <thead>
+        <tr>
+          <th>Name</th>
+          <th>Median Loading Time</th>
+          <th>Maximum Loading Time</th>
+          <th>75th %-ile Loading Time</th>
+          <th>95th %-ile Loading Time</th>
+          <th>99th %-ile Loading Time</th>
+          <th>Table Loading Counts</th>
+          <th>Metrics</th>
+        </tr>
+      </thead>
+      <tbody>
+        {{#longest_loading_tables}}
+        <tr>
+          <td>
+          {{?use_local_catalog}} {{name}} {{/use_local_catalog}}
+          {{^use_local_catalog}}
+           <a href="{{ __common__.host-url }}/catalog_object?object_type=TABLE&object_name={{name}}">{{name}}</a>
+          {{/use_local_catalog}}
+          </td>
+          <td>{{median_metadata_loading_time_ns}}</td>
+          <td>{{max_metadata_loading_time_ns}}</td>
+          <td>{{p75_loading_time_ns}}</td>
+          <td>{{p95_loading_time_ns}}</td>
+          <td>{{p99_loading_time_ns}}</td>
+          <td>{{table_loading_count}}</td>
+          <td><a href="{{ __common__.host-url }}/table_metrics?name={{name}}">{{name}}-metrics</a></td>
+        </tr>
+        {{/longest_loading_tables}}
+      </tbody>
+    </table>
+  </div>
+</div>
+
+<script>
+    $(document).ready(function() {
+        $('#long-metadata-loading-tables').DataTable({
+            "order": [[ 2, "desc" ]],
+            "pageLength": 10,
+            "columnDefs": [{"targets": 1, "render": renderTime},
+                           {"targets": 2, "render": renderTime},
+                           {"targets": 3, "render": renderTime},
+                           {"targets": 4, "render": renderTime},
+                           {"targets": 5, "render": renderTime}],
+        });
+    });
+</script>
+{{/has_longest_loading_tables}}
+
 <h3>Databases</h3>
 <ol class="breadcrumb">
 {{#databases}}

@@ -22,6 +22,51 @@ function getReadableSize(bytes) {
     return (bytes / Math.pow(1024, i)).toFixed(2) + ' ' + units[i];
 }
 
+function getReadableTimeNS(value) {
+    if (value >= 1000000000) {
+        return getReadableTimeMS(value / 1000000)
+    } else if (value >= 1000000) {
+        return (value / 1000000).toFixed(3) + "ms"
+    } else if (value >= 1000) {
+        return (value / 1000).toFixed(3) + "us"
+    } else {
+        return value + "ns"
+    }
+}
+
+function getReadableTimeMS(value) {
+    var hour = false;
+    var minute = false;
+    var second = false;
+    var re = "";
+    if (value >= 3600000) {
+        re += (Math.floor(value / 3600000) + "h");
+        value = value % 3600000;
+        hour = true;
+    }
+    if (value >= 60000) {
+        re += (Math.floor(value / 60000) + "m");
+        value = value % 60000;
+        minute = true;
+    }
+    // if hour is true, the time is large enough and we should
+    // ignore the remaining time on second level
+    if (!hour && value >= 1000) {
+        re += (Math.floor(value / 1000) + "s");
+        value = value % 1000;
+        second = true;
+    }
+    if (!hour && !minute) {
+        if (second) {
+            while (value.toString().length < 3) {
+                value = "0" + value;
+            }
+        }
+        re += (value + "ms")
+    }
+    return re;
+}
+
 /*
  * Useful render function used in DataTable. It renders the size
  * value into human readable format in 'display' and 'filter' modes,
@@ -35,3 +80,15 @@ function renderSize(data, type, row) {
     return data;
 }
 
+/*
+ * Useful render function used in DataTable. It renders the time
+ * value (nano seconds) into human readable format in 'display'
+ * and 'filter' modes, and uses the original value in 'sort' mode.
+ */
+function renderTime(data, type, row) {
+    // If display or filter data is requested, format the data
+    if (type === 'display' || type === 'filter') {
+        return getReadableTimeNS(data);
+    }
+    return data;
+}

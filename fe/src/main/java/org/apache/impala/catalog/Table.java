@@ -179,6 +179,27 @@ public abstract class Table extends CatalogObjectImpl implements FeTable {
   public long getMetadataOpsCount() { return metadataOpsCount_.get(); }
   public long getEstimatedMetadataSize() { return estimatedMetadataSize_.get(); }
   public long getNumFiles() { return numFiles_.get(); }
+  public long getMedianTableLoadingTime() {
+    return (long)metrics_.getTimer(LOAD_DURATION_METRIC).getSnapshot().getMedian();
+  }
+  public long getMaxTableLoadingTime() {
+    return metrics_.getTimer(LOAD_DURATION_METRIC).getSnapshot().getMax();
+  }
+  public long get75TableLoadingTime() {
+    return (long)metrics_.getTimer(LOAD_DURATION_METRIC).
+        getSnapshot().get75thPercentile();
+  }
+  public long get95TableLoadingTime() {
+    return (long)metrics_.getTimer(LOAD_DURATION_METRIC).
+        getSnapshot().get95thPercentile();
+  }
+  public long get99TableLoadingTime() {
+    return (long)metrics_.getTimer(LOAD_DURATION_METRIC).
+        getSnapshot().get99thPercentile();
+  }
+  public long getTableLoadingCounts() {
+    return metrics_.getTimer(LOAD_DURATION_METRIC).getCount();
+  }
 
   public void setEstimatedMetadataSize(long estimatedMetadataSize) {
     estimatedMetadataSize_.set(estimatedMetadataSize);
@@ -191,6 +212,12 @@ public abstract class Table extends CatalogObjectImpl implements FeTable {
     metadataOpsCount_.incrementAndGet();
     if (!isStoredInImpaladCatalogCache()) {
       CatalogUsageMonitor.INSTANCE.updateFrequentlyAccessedTables(this);
+    }
+  }
+
+  public void updateTableLoadingTime() {
+    if (!isStoredInImpaladCatalogCache()) {
+      CatalogUsageMonitor.INSTANCE.updateLongMetadataLoadingTables(this);
     }
   }
 

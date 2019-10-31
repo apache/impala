@@ -40,9 +40,14 @@ public final class CatalogUsageMonitor {
 
   private final TopNCache<Table, Long> highFileCountTables_;
 
+  private final TopNCache<Table, Long> longMetadataLoadingTables_;
+
   private CatalogUsageMonitor() {
     final int num_tables_tracked = Integer.getInteger(
         "org.apache.impala.catalog.CatalogUsageMonitor.NUM_TABLES_TRACKED", 25);
+    final int num_loading_time_tables_tracked = Integer.getInteger(
+        "org.apache.impala.catalog.CatalogUsageMonitor.NUM_LOADING_TIME_TABLES_TRACKED",
+        100);
     frequentlyAccessedTables_ = new TopNCache<Table, Long>(
         new Function<Table, Long>() {
           @Override
@@ -61,6 +66,12 @@ public final class CatalogUsageMonitor {
           public Long apply(Table tbl) { return tbl.getNumFiles(); }
         }, num_tables_tracked, false);
 
+    // sort by maximum loading time by default
+    longMetadataLoadingTables_ = new TopNCache<Table, Long>(
+        new Function<Table, Long>() {
+          @Override
+          public Long apply(Table tbl) { return tbl.getMaxTableLoadingTime(); }
+        }, num_loading_time_tables_tracked, false);
   }
 
   public void updateFrequentlyAccessedTables(Table tbl) {
@@ -73,10 +84,15 @@ public final class CatalogUsageMonitor {
     highFileCountTables_.putOrUpdate(tbl);
   }
 
+  public void updateLongMetadataLoadingTables(Table tbl) {
+    longMetadataLoadingTables_.putOrUpdate(tbl);
+  }
+
   public void removeTable(Table tbl) {
     frequentlyAccessedTables_.remove(tbl);
     largestTables_.remove(tbl);
     highFileCountTables_.remove(tbl);
+    longMetadataLoadingTables_.remove(tbl);
   }
 
   public List<Table> getFrequentlyAccessedTables() {
@@ -87,5 +103,9 @@ public final class CatalogUsageMonitor {
 
   public List<Table> getHighFileCountTables() {
     return highFileCountTables_.listEntries();
+  }
+
+  public List<Table> getLongMetadataLoadingTables() {
+    return longMetadataLoadingTables_.listEntries();
   }
 }

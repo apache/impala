@@ -719,6 +719,24 @@ struct TTableUsageMetrics {
   // Number of files in this table. For partitioned table, this includes file counts
   // across all the partitions.
   4: optional i64 num_files
+
+  // The median time spent on table metadata loading
+  5: optional i64 median_table_loading_ns
+
+  // The maximum time spent on table metadata loading
+  6: optional i64 max_table_loading_ns
+
+  // Number of table loading counts
+  7: optional i64 num_table_loading
+
+  // The 75th percentile table loading time
+  8: optional i64 p75_loading_time_ns
+
+  // The 95th percentile table loading time
+  9: optional i64 p95_loading_time_ns
+
+  // The 99th percentile table loading time
+  10: optional i64 p99_loading_time_ns
 }
 
 // Response to a GetCatalogUsage request.
@@ -732,6 +750,9 @@ struct TGetCatalogUsageResponse{
 
   // List of the tables that have most number of files
   3: required list<TTableUsageMetrics> high_file_count_tables
+
+  // List of the tables that have the longest table metadata loading time
+  4: required list<TTableUsageMetrics> long_metadata_loading_tables
 }
 
 struct TColumnName {

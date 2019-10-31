@@ -182,10 +182,11 @@ class CatalogServer {
       rapidjson::Document* document);
 
   /// Retrieves from the FE information about the current catalog usage and populates
-  /// the /catalog debug webpage. The catalog usage includes information about the TOP-N
-  /// frequently used (in terms of number of metadata operations) tables, the TOP-N
-  /// tables with the highest memory requirements and the TOP-N tables with the most
-  /// number of files.
+  /// the /catalog debug webpage. The catalog usage includes information about
+  /// 1. the TOP-N frequently used (in terms of number of metadata operations) tables,
+  /// 2. the TOP-N tables with the highest memory requirements
+  /// 3. the TOP-N tables with the most number of files.
+  /// 4. the TOP-N tables with the longest metadata loading time (nanoseconds)
   ///
   /// Example output:
   /// "large_tables": [
@@ -204,6 +205,17 @@ class CatalogServer {
   ///      {
   ///        "name": functional.alltypesagg",
   ///        "num_files": 30
+  ///      }
+  ///  ]
+  ///  "long_metadata_loading_tables": [
+  ///      {
+  ///        "name": "tpcds.warehouse",
+  ///        "median_metadata_loading_time_ns": 12361844,
+  ///        "max_metadata_loading_time_ns": 175518387,
+  ///        "p75_loading_time_ns": 12361844,
+  ///        "p95_loading_time_ns": 175518387,
+  ///        "p99_loading_time_ns": 175518387,
+  ///        "table_loading_count": 3
   ///      }
   ///  ]
   void GetCatalogUsage(rapidjson::Document* document);
