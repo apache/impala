@@ -25,4 +25,4 @@ Flask==1.0.2
 # Fabric depends on Paramiko. Additionally, the stress test uses
 # Paramiko directly to keep a persistent SSH connection open to each
 # Impalad host to run in-test monitoring.
-paramiko==2.4.1
+paramiko==2.4.2
