@@ -20,6 +20,7 @@
 from tests.common.custom_cluster_test_suite import CustomClusterTestSuite
 from tests.util.concurrent_workload import ConcurrentWorkload
 
+import json
 import logging
 import pytest
 from time import sleep
@@ -261,7 +262,6 @@ class TestExecutorGroups(CustomClusterTestSuite):
     client.cancel(q2)
 
   @pytest.mark.execute_serially
-  @CustomClusterTestSuite.with_args(impalad_args="-admission_control_slots=3")
   def test_executor_concurrency(self):
     """Tests that the command line flag to limit query concurrency on executors works as
     expected."""
@@ -282,16 +282,23 @@ class TestExecutorGroups(CustomClusterTestSuite):
                   for _ in range(RAMP_UP_TIMEOUT_S)), \
           "Did not admit enough queries within %s s" % RAMP_UP_TIMEOUT_S
 
-      # Sample the number of running queries for while
-      NUM_RUNNING_SAMPLES = 30
-      num_running = []
-      for _ in xrange(NUM_RUNNING_SAMPLES):
-        num_running.append(self._get_num_running_queries())
+      # Sample the number of admitted queries on each backend for while.
+      # Note that the total number of queries in the cluster can higher
+      # than 3 because resources may be released on some backends, allowing
+      # a new query to fit (see IMPALA-9073).
+      NUM_SAMPLES = 30
+      executor_slots_in_use = []
+      for _ in xrange(NUM_SAMPLES):
+        backends_json = json.loads(
+            self.impalad_test_service.read_debug_webpage('backends?json'))
+        for backend in backends_json['backends']:
+          if backend['is_executor']:
+            executor_slots_in_use.append(backend['admission_slots_in_use'])
         sleep(1)
 
       # Must reach 3 but not exceed it
-      assert max(num_running) == 3, \
-          "Unexpected number of running queries: %s" % num_running
+      assert max(executor_slots_in_use) == 3, \
+          "Unexpected number of slots in use: %s" % executor_slots_in_use
 
     finally:
       LOG.info("Stopping workload")
