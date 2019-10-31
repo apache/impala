@@ -287,7 +287,7 @@ public class ComputeStatsStmt extends StatementBase {
         columnStatsSelectList.add("COUNT(" + colRefSql + ")");
       }
 
-      //把新增的两项统计信息放在最后
+      // For boolean column, compute the numTrue and numFalse
       if(type.isBoolean()) {
         columnStatsSelectList.add("COUNT(CASE WHEN " + colRefSql + " = TRUE THEN 1 ELSE NULL END)");
         columnStatsSelectList.add("COUNT(CASE WHEN " + colRefSql + " = FALSE THEN 1 ELSE NULL END)");

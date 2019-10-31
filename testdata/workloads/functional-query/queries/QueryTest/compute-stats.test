@@ -52,7 +52,7 @@ COLUMN, TYPE, #DISTINCT VALUES, #NULLS, MAX SIZE, AVG SIZE, #TRUES, #FALSES
 ---- RESULTS
 'id','INT',7300,0,4,4,-1,-1
 'bool_col','BOOLEAN',2,0,1,1,3650,3650
-'tinyint_col','TINYINT',10,0,1,1
+'tinyint_col','TINYINT',10,0,1,1,-1,-1
 'smallint_col','SMALLINT',10,0,2,2,-1,-1
 'int_col','INT',10,0,4,4,-1,-1
 'bigint_col','BIGINT',10,0,8,8,-1,-1
@@ -261,17 +261,17 @@ show column stats alltypes_for_coltest
 ---- LABELS
 COLUMN, TYPE, #DISTINCT VALUES, #NULLS, MAX SIZE, AVG SIZE, #TRUES, #FALSES
 ---- RESULTS
-'id','INT',-1,-1,4,4
-'bool_col','BOOLEAN',-1,-1,1,1
-'tinyint_col','TINYINT',10,0,1,1
-'smallint_col','SMALLINT',-1,-1,2,2
-'int_col','INT',-1,-1,4,4
-'bigint_col','BIGINT',-1,-1,8,8
-'float_col','FLOAT',10,0,4,4
-'double_col','DOUBLE',-1,-1,8,8
+'id','INT',-1,-1,4,4,-1,-1
+'bool_col','BOOLEAN',-1,-1,1,1,-1,-1
+'tinyint_col','TINYINT',10,0,1,1,-1,-1
+'smallint_col','SMALLINT',-1,-1,2,2,-1,-1
+'int_col','INT',-1,-1,4,4,-1,-1
+'bigint_col','BIGINT',-1,-1,8,8,-1,-1
+'float_col','FLOAT',10,0,4,4,-1,-1
+'double_col','DOUBLE',-1,-1,8,8,-1,-1
 'date_string_col','STRING',-1,-1,-1,-1
-'string_col','STRING',-1,-1,-1,-1
-'timestamp_col','TIMESTAMP',-1,-1,16,16
+'string_col','STRING',-1,-1,-1,-1,-1,-1
+'timestamp_col','TIMESTAMP',-1,-1,16,16,-1,-1
 'year','INT',2,0,4,4
 'month','INT',12,0,4,4
 ---- TYPES
@@ -381,19 +381,19 @@ show column stats alltypes
 ---- LABELS
 COLUMN, TYPE, #DISTINCT VALUES, #NULLS, MAX SIZE, AVG SIZE, #TRUES, #FALSES
 ---- RESULTS
-'id','INT',-1,-1,4,4
-'bool_col','BOOLEAN',-1,-1,1,1
-'tinyint_col','TINYINT',-1,-1,1,1
-'smallint_col','SMALLINT',-1,-1,2,2
-'int_col','INT',-1,-1,4,4
-'bigint_col','BIGINT',-1,-1,8,8
-'float_col','FLOAT',-1,-1,4,4
-'double_col','DOUBLE',-1,-1,8,8
-'date_string_col','STRING',-1,-1,-1,-1
-'string_col','STRING',-1,-1,-1,-1
-'timestamp_col','TIMESTAMP',-1,-1,16,16
-'year','INT',4,1,4,4
-'month','INT',13,2,4,4
+'id','INT',-1,-1,4,4,-1,-1
+'bool_col','BOOLEAN',-1,-1,1,1,-1,-1
+'tinyint_col','TINYINT',-1,-1,1,1,-1,-1
+'smallint_col','SMALLINT',-1,-1,2,2,-1,-1
+'int_col','INT',-1,-1,4,4,-1,-1
+'bigint_col','BIGINT',-1,-1,8,8,-1,-1
+'float_col','FLOAT',-1,-1,4,4,-1,-1
+'double_col','DOUBLE',-1,-1,8,8,-1,-1
+'date_string_col','STRING',-1,-1,-1,-1,-1,-1
+'string_col','STRING',-1,-1,-1,-1,-1,-1
+'timestamp_col','TIMESTAMP',-1,-1,16,16,-1,-1
+'year','INT',4,1,4,4,-1,-1
+'month','INT',13,2,4,4,-1,-1
 ---- TYPES
 STRING, STRING, BIGINT, BIGINT, BIGINT, DOUBLE, BIGINT, BIGINT
 ====
@@ -408,19 +408,19 @@ show column stats alltypes
 ---- LABELS
 COLUMN, TYPE, #DISTINCT VALUES, #NULLS, MAX SIZE, AVG SIZE, #TRUES, #FALSES
 ---- RESULTS
-'id','INT',-1,-1,4,4
-'bool_col','BOOLEAN',-1,-1,1,1
-'tinyint_col','TINYINT',-1,-1,1,1
-'smallint_col','SMALLINT',-1,-1,2,2
-'int_col','INT',-1,-1,4,4
-'bigint_col','BIGINT',-1,-1,8,8
-'float_col','FLOAT',-1,-1,4,4
-'double_col','DOUBLE',-1,-1,8,8
-'date_string_col','STRING',-1,-1,-1,-1
-'string_col','STRING',-1,-1,-1,-1
-'timestamp_col','TIMESTAMP',-1,-1,16,16
-'year','INT',3,0,4,4
-'month','INT',13,1,4,4
+'id','INT',-1,-1,4,4,-1,-1
+'bool_col','BOOLEAN',-1,-1,1,1,-1,-1
+'tinyint_col','TINYINT',-1,-1,1,1,-1,-1
+'smallint_col','SMALLINT',-1,-1,2,2,-1,-1
+'int_col','INT',-1,-1,4,4,-1,-1
+'bigint_col','BIGINT',-1,-1,8,8,-1,-1
+'float_col','FLOAT',-1,-1,4,4,-1,-1
+'double_col','DOUBLE',-1,-1,8,8,-1,-1
+'date_string_col','STRING',-1,-1,-1,-1,-1,-1
+'string_col','STRING',-1,-1,-1,-1,-1,-1
+'timestamp_col','TIMESTAMP',-1,-1,16,16,-1,-1
+'year','INT',3,0,4,4,-1,-1
+'month','INT',13,1,4,4,-1,-1
 ---- TYPES
 STRING, STRING, BIGINT, BIGINT, BIGINT, DOUBLE, BIGINT, BIGINT
 ====
@@ -434,19 +434,19 @@ show column stats alltypes
 ---- LABELS
 COLUMN, TYPE, #DISTINCT VALUES, #NULLS, MAX SIZE, AVG SIZE, #TRUES, #FALSES
 ---- RESULTS
-'id','INT',-1,-1,4,4
-'bool_col','BOOLEAN',-1,-1,1,1
-'tinyint_col','TINYINT',-1,-1,1,1
-'smallint_col','SMALLINT',-1,-1,2,2
-'int_col','INT',-1,-1,4,4
-'bigint_col','BIGINT',-1,-1,8,8
-'float_col','FLOAT',-1,-1,4,4
-'double_col','DOUBLE',-1,-1,8,8
-'date_string_col','STRING',-1,-1,-1,-1
-'string_col','STRING',-1,-1,-1,-1
-'timestamp_col','TIMESTAMP',-1,-1,16,16
-'year','INT',2,0,4,4
-'month','INT',12,0,4,4
+'id','INT',-1,-1,4,4,-1,-1
+'bool_col','BOOLEAN',-1,-1,1,1,-1,-1
+'tinyint_col','TINYINT',-1,-1,1,1,-1,-1
+'smallint_col','SMALLINT',-1,-1,2,2,-1,-1
+'int_col','INT',-1,-1,4,4,-1,-1
+'bigint_col','BIGINT',-1,-1,8,8,-1,-1
+'float_col','FLOAT',-1,-1,4,4,-1,-1
+'double_col','DOUBLE',-1,-1,8,8,-1,-1
+'date_string_col','STRING',-1,-1,-1,-1,-1,-1
+'string_col','STRING',-1,-1,-1,-1,-1,-1
+'timestamp_col','TIMESTAMP',-1,-1,16,16,-1,-1
+'year','INT',2,0,4,4,-1,-1
+'month','INT',12,0,4,4,-1,-1
 ---- TYPES
 STRING, STRING, BIGINT, BIGINT, BIGINT, DOUBLE, BIGINT, BIGINT
 ====
@@ -483,17 +483,17 @@ show column stats alltypesnopart
 ---- LABELS
 COLUMN, TYPE, #DISTINCT VALUES, #NULLS, MAX SIZE, AVG SIZE, #TRUES, #FALSES
 ---- RESULTS
-'id','INT',99,0,4,4
-'bool_col','BOOLEAN',2,0,1,1
-'tinyint_col','TINYINT',10,0,1,1
-'smallint_col','SMALLINT',10,0,2,2
-'int_col','INT',10,0,4,4
-'bigint_col','BIGINT',10,0,8,8
-'float_col','FLOAT',10,0,4,4
-'double_col','DOUBLE',10,0,8,8
-'date_string_col','STRING',12,0,8,8
-'string_col','STRING',10,0,1,1
-'timestamp_col','TIMESTAMP',100,0,16,16
+'id','INT',99,0,4,4,-1,-1
+'bool_col','BOOLEAN',2,0,1,1,50,50
+'tinyint_col','TINYINT',10,0,1,1,-1,-1
+'smallint_col','SMALLINT',10,0,2,2,-1,-1
+'int_col','INT',10,0,4,4,-1,-1
+'bigint_col','BIGINT',10,0,8,8,-1,-1
+'float_col','FLOAT',10,0,4,4,-1,-1
+'double_col','DOUBLE',10,0,8,8,-1,-1
+'date_string_col','STRING',12,0,8,8,-1,-1
+'string_col','STRING',10,0,1,1,-1,-1
+'timestamp_col','TIMESTAMP',100,0,16,16,-1,-1
 ---- TYPES
 STRING, STRING, BIGINT, BIGINT, BIGINT, DOUBLE, BIGINT, BIGINT
 ====
@@ -562,19 +562,19 @@ show column stats alltypes_parquet
 ---- LABELS
 COLUMN, TYPE, #DISTINCT VALUES, #NULLS, MAX SIZE, AVG SIZE, #TRUES, #FALSES
 ---- RESULTS
-'id','INT',7300,0,4,4
-'bool_col','BOOLEAN',2,0,1,1
-'tinyint_col','TINYINT',10,0,1,1
-'smallint_col','SMALLINT',10,0,2,2
-'int_col','INT',10,0,4,4
-'bigint_col','BIGINT',10,0,8,8
-'float_col','FLOAT',10,0,4,4
-'double_col','DOUBLE',10,0,8,8
-'date_string_col','STRING',736,0,8,8
-'string_col','STRING',10,0,1,1
-'timestamp_col','TIMESTAMP',7300,0,16,16
-'year','INT',2,0,4,4
-'month','INT',12,0,4,4
+'id','INT',7300,0,4,4,-1,-1
+'bool_col','BOOLEAN',2,0,1,1,3650,3650
+'tinyint_col','TINYINT',10,0,1,1,-1,-1
+'smallint_col','SMALLINT',10,0,2,2,-1,-1
+'int_col','INT',10,0,4,4,-1,-1
+'bigint_col','BIGINT',10,0,8,8,-1,-1
+'float_col','FLOAT',10,0,4,4,-1,-1
+'double_col','DOUBLE',10,0,8,8,-1,-1
+'date_string_col','STRING',736,0,8,8,-1,-1
+'string_col','STRING',10,0,1,1,-1,-1
+'timestamp_col','TIMESTAMP',7300,0,16,16,-1,-1
+'year','INT',2,0,4,4,-1,-1
+'month','INT',12,0,4,4,-1,-1
 ---- TYPES
 STRING, STRING, BIGINT, BIGINT, BIGINT, DOUBLE, BIGINT, BIGINT
 ====
@@ -640,19 +640,19 @@ show column stats alltypes_empty
 ---- LABELS
 COLUMN, TYPE, #DISTINCT VALUES, #NULLS, MAX SIZE, AVG SIZE, #TRUES, #FALSES
 ---- RESULTS
-'id','INT',0,0,4,4
-'bool_col','BOOLEAN',2,0,1,1
-'tinyint_col','TINYINT',0,0,1,1
-'smallint_col','SMALLINT',0,0,2,2
-'int_col','INT',0,0,4,4
-'bigint_col','BIGINT',0,0,8,8
-'float_col','FLOAT',0,0,4,4
-'double_col','DOUBLE',0,0,8,8
-'date_string_col','STRING',0,0,0,0
-'string_col','STRING',0,0,0,0
-'timestamp_col','TIMESTAMP',0,0,16,16
-'year','INT',0,0,4,4
-'month','INT',0,0,4,4
+'id','INT',0,0,4,4,-1,-1
+'bool_col','BOOLEAN',2,0,1,1,0,0
+'tinyint_col','TINYINT',0,0,1,1,-1,-1
+'smallint_col','SMALLINT',0,0,2,2,-1,-1
+'int_col','INT',0,0,4,4,-1,-1
+'bigint_col','BIGINT',0,0,8,8,-1,-1
+'float_col','FLOAT',0,0,4,4,-1,-1
+'double_col','DOUBLE',0,0,8,8,-1,-1
+'date_string_col','STRING',0,0,0,0,-1,-1
+'string_col','STRING',0,0,0,0,-1,-1
+'timestamp_col','TIMESTAMP',0,0,16,16,-1,-1
+'year','INT',0,0,4,4,-1,-1
+'month','INT',0,0,4,4,-1,-1
 ---- TYPES
 STRING, STRING, BIGINT, BIGINT, BIGINT, DOUBLE, BIGINT, BIGINT
 ====
@@ -791,16 +791,16 @@ show column stats chars_tbl
 ---- LABELS
 COLUMN, TYPE, #DISTINCT VALUES, #NULLS, MAX SIZE, AVG SIZE, #TRUES, #FALSES
 ---- RESULTS
-'id','INT',2915,0,4,4
-'ch1','CHAR(1)',1,0,1,1
-'ch2','CHAR(8)',10,0,8,8
-'ch3','CHAR(20)',10,0,20,20
-'ts','TIMESTAMP',2871,0,16,16
-'vc1','VARCHAR(1)',1,0,1,1
-'vc2','VARCHAR(8)',10,0,8,8
-'vc3','VARCHAR(20)',10,0,8,8
-'year','CHAR(5)',1,0,5,5
-'day','VARCHAR(13)',3,1,-1,-1
+'id','INT',2915,0,4,4,-1,-1
+'ch1','CHAR(1)',1,0,1,1,-1,-1
+'ch2','CHAR(8)',10,0,8,8,-1,-1
+'ch3','CHAR(20)',10,0,20,20,-1,-1
+'ts','TIMESTAMP',2871,0,16,16,-1,-1
+'vc1','VARCHAR(1)',1,0,1,1,-1,-1
+'vc2','VARCHAR(8)',10,0,8,8,-1,-1
+'vc3','VARCHAR(20)',10,0,8,8,-1,-1
+'year','CHAR(5)',1,0,5,5,-1,-1
+'day','VARCHAR(13)',3,1,-1,-1,-1,-1
 ---- TYPES
 STRING, STRING, BIGINT, BIGINT, BIGINT, DOUBLE, BIGINT, BIGINT
 ====
