@@ -341,7 +341,9 @@ class ImpylaHS2Connection(ImpalaConnection):
       raise NotImplementedError("Not yet implemented for HS2 - authentication")
     try:
       self.__cursor.execute_async(sql_stmt, configuration=self.__query_options)
-      return OperationHandle(self.__cursor, sql_stmt)
+      handle = OperationHandle(self.__cursor, sql_stmt)
+      LOG.info("Started query {0}".format(self.get_query_id(handle)))
+      return handle
     except Exception:
       self.__cursor.close_operation()
       raise
@@ -350,6 +352,13 @@ class ImpylaHS2Connection(ImpalaConnection):
     LOG.info("-- canceling operation: {0}".format(operation_handle))
     cursor = operation_handle.get_handle()
     return cursor.cancel_operation(reset_state=False)
+
+  def get_query_id(self, operation_handle):
+    """Return the string representation of the query id."""
+    guid_bytes = \
+        operation_handle.get_handle()._last_operation.handle.operationId.guid
+    return "{0}:{1}".format(guid_bytes[7::-1].encode('hex_codec'),
+                            guid_bytes[16:7:-1].encode('hex_codec'))
 
   def get_state(self, operation_handle):
     LOG.info("-- getting state for operation: {0}".format(operation_handle))
