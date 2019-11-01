@@ -66,13 +66,13 @@ private:
   void WriteDataCache(DataCache* remote_data_cache, int64_t file_offset,
       const uint8_t* buffer, int64_t buffer_len, int64_t cached_bytes_missed);
 
-  /// Read [position_in_file, position_in_file + chunk_size) from 'hdfs_file'
+  /// Read [position_in_file, position_in_file + bytes_to_read) from 'hdfs_file'
   /// into 'buffer'. Update 'bytes_read' on success. Returns error status on
   /// failure. When not using HDFS pread, this function will always implicitly
   /// seek to 'position_in_file' if 'hdfs_file' is not at it already.
   /// 'disk_queue' metrics are updated based on the operation.
   Status ReadFromPosInternal(hdfsFile hdfs_file, DiskQueue* disk_queue,
-      int64_t position_in_file, uint8_t* buffer, int64_t chunk_size, int* bytes_read);
+      int64_t position_in_file, uint8_t* buffer, int64_t bytes_to_read, int* bytes_read);
 
   /// Update counters with HDFS read statistics from 'hdfs_file'. If 'log_stats' is
   /// true, the statistics are logged.

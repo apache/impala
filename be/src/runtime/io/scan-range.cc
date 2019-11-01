@@ -28,15 +28,6 @@
 using namespace impala;
 using namespace impala::io;
 
-// TODO: Run perf tests and empirically settle on the most optimal default value for the
-// read buffer sizes. Currently setting them as 128k for the same reason as for S3, i.e.
-// due to JNI array allocation and memcpy overhead, 128k was emperically found to have the
-// least overhead.
-DEFINE_int64(adls_read_chunk_size, 128 * 1024, "The maximum read chunk size to use when "
-    "reading from ADLS.");
-DEFINE_int64(abfs_read_chunk_size, 128 * 1024, "The maximum read chunk size to use when "
-    "reading from ABFS.");
-
 DECLARE_bool(cache_remote_file_handles);
 DECLARE_bool(cache_s3_file_handles);
 
@@ -568,29 +559,6 @@ void ScanRange::InitInternal(DiskIoMgr* io_mgr, RequestContext* reader) {
 
 void ScanRange::SetFileReader(unique_ptr<FileReader> file_reader) {
   file_reader_ = move(file_reader);
-}
-
-int64_t ScanRange::MaxReadChunkSize() const {
-  // S3 InputStreams don't support DIRECT_READ (i.e. java.nio.ByteBuffer read()
-  // interface).  So, hdfsRead() needs to allocate a Java byte[] and copy the data out.
-  // Profiles show that both the JNI array allocation and the memcpy adds much more
-  // overhead for larger buffers, so limit the size of each read request.  128K was
-  // chosen empirically by trying values between 4K and 8M and optimizing for lower CPU
-  // utilization and higher S3 througput.
-  if (disk_id_ == io_mgr_->RemoteS3DiskId()) {
-    DCHECK(IsS3APath(file()));
-    return 128 * 1024;
-  }
-  if (disk_id_ == io_mgr_->RemoteAdlsDiskId()) {
-    DCHECK(IsADLSPath(file()));
-    return FLAGS_adls_read_chunk_size;
-  }
-  if (disk_id_ == io_mgr_->RemoteAbfsDiskId()) {
-    DCHECK(IsABFSPath(file()));
-    return FLAGS_abfs_read_chunk_size;
-  }
-  // The length argument of hdfsRead() is an int. Ensure we don't overflow it.
-  return numeric_limits<int>::max();
 }
 
 Status ScanRange::ReadFromCache(

@@ -405,9 +405,6 @@ class ScanRange : public RequestRange {
   /// cancelled.
   bool EnqueueReadyBuffer(std::unique_ptr<BufferDescriptor> buffer);
 
-  /// Maximum length in bytes for hdfsRead() calls.
-  int64_t MaxReadChunkSize() const;
-
   /// Get the read statistics from the Hdfs file handle and aggregate them to
   /// the RequestContext. This clears the statistics on this file handle.
   /// It is safe to pass hdfsFile by value, as hdfsFile's underlying type is a

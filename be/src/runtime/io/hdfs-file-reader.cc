@@ -35,7 +35,8 @@
 
 DEFINE_bool(use_hdfs_pread, false, "Enables using hdfsPread() instead of hdfsRead() "
     "when performing HDFS read operations. This is necessary to use HDFS hedged reads "
-    "(assuming the HDFS client is configured to do so).");
+    "(assuming the HDFS client is configured to do so). Preads are always enabled for "
+    "S3A reads.");
 
 DEFINE_int64(fs_slow_read_log_threshold_ms, 10L * 1000L,
     "Log diagnostics about I/Os issued via the HDFS client that take longer than this "
@@ -116,7 +117,6 @@ Status HdfsFileReader::ReadFromPos(DiskQueue* queue, int64_t file_offset, uint8_
     }
   });
 
-  int64_t max_chunk_size = scan_range_->MaxReadChunkSize();
   Status status = Status::OK();
   {
     ScopedTimer<MonotonicStopWatch> req_context_read_timer(
@@ -134,10 +134,10 @@ Status HdfsFileReader::ReadFromPos(DiskQueue* queue, int64_t file_offset, uint8_
     }
 
     while (*bytes_read < bytes_to_read) {
-      int chunk_size = min(bytes_to_read - *bytes_read, max_chunk_size);
-      DCHECK_GT(chunk_size, 0);
+      int bytes_remaining = bytes_to_read - *bytes_read;
+      DCHECK_GT(bytes_remaining, 0);
       // The hdfsRead() length argument is an int.
-      DCHECK_LE(chunk_size, numeric_limits<int>::max());
+      DCHECK_LE(bytes_remaining, numeric_limits<int>::max());
       int current_bytes_read = -1;
       // bytes_read_ is only updated after the while loop
       int64_t position_in_file = file_offset + *bytes_read;
@@ -145,7 +145,7 @@ Status HdfsFileReader::ReadFromPos(DiskQueue* queue, int64_t file_offset, uint8_
       // ReadFromPosInternal() might fail due to a bad file handle.
       // If that was the case, allow for a retry to fix it.
       status = ReadFromPosInternal(hdfs_file, queue, position_in_file,
-          buffer + *bytes_read, chunk_size, &current_bytes_read);
+          buffer + *bytes_read, bytes_remaining, &current_bytes_read);
 
       // Retry if:
       // - first read was not successful
@@ -163,7 +163,7 @@ Status HdfsFileReader::ReadFromPos(DiskQueue* queue, int64_t file_offset, uint8_
                   << scan_range_->mtime() << " offset " << file_offset;
         req_context_read_timer.Start();
         status = ReadFromPosInternal(hdfs_file, queue, position_in_file,
-            buffer + *bytes_read, chunk_size, &current_bytes_read);
+            buffer + *bytes_read, bytes_remaining, &current_bytes_read);
       }
       // Log diagnostics for failed and successful reads.
       int64_t elapsed_time = req_context_read_timer.ElapsedTime();
@@ -217,18 +217,18 @@ Status HdfsFileReader::ReadFromPos(DiskQueue* queue, int64_t file_offset, uint8_
 }
 
 Status HdfsFileReader::ReadFromPosInternal(hdfsFile hdfs_file, DiskQueue* queue,
-    int64_t position_in_file, uint8_t* buffer, int64_t chunk_size, int* bytes_read) {
-  queue->read_size()->Update(chunk_size);
+    int64_t position_in_file, uint8_t* buffer, int64_t bytes_to_read, int* bytes_read) {
   ScopedHistogramTimer read_timer(queue->read_latency());
   // For file handles from the cache, any of the below file operations may fail
   // due to a bad file handle.
-  if (FLAGS_use_hdfs_pread) {
-    *bytes_read = hdfsPread(hdfs_fs_, hdfs_file, position_in_file, buffer, chunk_size);
-    if (*bytes_read == -1) {
+  if (FLAGS_use_hdfs_pread || IsS3APath(scan_range_->file_string()->c_str())) {
+    if (hdfsPreadFully(
+          hdfs_fs_, hdfs_file, position_in_file, buffer, bytes_to_read) == -1) {
       return Status(TErrorCode::DISK_IO_ERROR, GetBackendString(),
           GetHdfsErrorMsg("Error reading from HDFS file: ",
               *scan_range_->file_string()));
     }
+    *bytes_read = bytes_to_read;
   } else {
     const int64_t cur_offset = hdfsTell(hdfs_fs_, hdfs_file);
     if (cur_offset == -1) {
@@ -245,13 +245,14 @@ Status HdfsFileReader::ReadFromPosInternal(hdfsFile hdfs_file, DiskQueue* queue,
                 position_in_file, *scan_range_->file_string(), GetHdfsErrorMsg("")));
       }
     }
-    *bytes_read = hdfsRead(hdfs_fs_, hdfs_file, buffer, chunk_size);
+    *bytes_read = hdfsRead(hdfs_fs_, hdfs_file, buffer, bytes_to_read);
     if (*bytes_read == -1) {
       return Status(TErrorCode::DISK_IO_ERROR, GetBackendString(),
           GetHdfsErrorMsg("Error reading from HDFS file: ",
               *scan_range_->file_string()));
     }
   }
+  queue->read_size()->Update(*bytes_read);
   return Status::OK();
 }
 

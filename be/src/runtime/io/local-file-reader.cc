@@ -75,13 +75,13 @@ Status LocalFileReader::ReadFromPos(DiskQueue* queue, int64_t file_offset,
         Substitute("Could not seek to $0 for file: $1: $2",
             scan_range_->offset(), *scan_range_->file_string(), GetStrErrMsg()));
   }
-  queue->read_size()->Update(bytes_to_read);
   {
     ScopedHistogramTimer read_timer(queue->read_latency());
     *bytes_read = fread(buffer, 1, bytes_to_read, file_);
   }
   DCHECK_GE(*bytes_read, 0);
   DCHECK_LE(*bytes_read, bytes_to_read);
+  queue->read_size()->Update(*bytes_read);
   if (*bytes_read < bytes_to_read) {
     if (ferror(file_) != 0) {
       return Status(TErrorCode::DISK_IO_ERROR, GetBackendString(),
