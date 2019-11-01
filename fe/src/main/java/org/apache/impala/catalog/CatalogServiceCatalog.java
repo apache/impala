@@ -35,6 +35,7 @@ import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicLong;
 import java.util.concurrent.locks.ReentrantReadWriteLock;
 
+import com.google.common.base.Stopwatch;
 import org.apache.hadoop.fs.RemoteIterator;
 import org.apache.hadoop.hdfs.DistributedFileSystem;
 import org.apache.hadoop.hdfs.protocol.CachePoolEntry;
@@ -1546,6 +1547,8 @@ public class CatalogServiceCatalog extends Catalog {
           try (ThreadNameAnnotator tna = new ThreadNameAnnotator(annotation)) {
             dbName = dbName.toLowerCase();
             Db oldDb = oldDbCache.get(dbName);
+            // invalidateDb() will return empty table list
+            // if loadInBackground_ is set to false
             Pair<Db, List<TTableName>> invalidatedDb = invalidateDb(msClient,
                 dbName, oldDb);
             if (invalidatedDb == null) continue;
@@ -2028,12 +2031,17 @@ public class CatalogServiceCatalog extends Catalog {
       versionLock_.writeLock().unlock();
       try (MetaStoreClient msClient = getMetaStoreClient()) {
         org.apache.hadoop.hive.metastore.api.Table msTbl = null;
+        Stopwatch hmsLoadSW = new Stopwatch().start();
+        long hmsLoadTime;
         try {
           msTbl = msClient.getHiveClient().getTable(dbName, tblName);
         } catch (Exception e) {
           throw new TableLoadingException("Error loading metadata for table: " +
               dbName + "." + tblName, e);
+        } finally {
+          hmsLoadTime = hmsLoadSW.elapsed(TimeUnit.NANOSECONDS);
         }
+        tbl.updateHMSLoadTableSchemaTime(hmsLoadTime);
         tbl.load(true, msClient.getHiveClient(), msTbl, reason);
       }
       tbl.setCatalogVersion(newCatalogVersion);

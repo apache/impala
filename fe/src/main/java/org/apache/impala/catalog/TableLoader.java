@@ -64,9 +64,11 @@ public class TableLoader {
          MetaStoreClient msClient = catalog_.getMetaStoreClient()) {
       org.apache.hadoop.hive.metastore.api.Table msTbl = null;
       // All calls to getTable() need to be serialized due to HIVE-5457.
+      Stopwatch hmsLoadSW = new Stopwatch().start();
       synchronized (metastoreAccessLock_) {
         msTbl = msClient.getHiveClient().getTable(db.getName(), tblName);
       }
+      long hmsLoadTime = hmsLoadSW.elapsed(TimeUnit.NANOSECONDS);
       // Check that the Hive TableType is supported
       TableType tableType = TableType.valueOf(msTbl.getTableType());
       if (!MetastoreShim.IMPALA_SUPPORTED_TABLE_TYPES.contains(tableType)) {
@@ -80,6 +82,7 @@ public class TableLoader {
         throw new TableLoadingException(
             "Unrecognized table type for table: " + fullTblName);
       }
+      table.updateHMSLoadTableSchemaTime(hmsLoadTime);
       table.load(false, msClient.getHiveClient(), msTbl, reason);
       table.validate();
     } catch (TableLoadingException e) {

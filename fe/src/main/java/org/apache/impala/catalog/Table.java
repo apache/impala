@@ -24,6 +24,7 @@ import java.util.LinkedList;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
+import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicLong;
 import java.util.concurrent.locks.ReentrantLock;
 
@@ -36,11 +37,12 @@ import org.apache.hadoop.hive.metastore.api.FieldSchema;
 import org.apache.hadoop.hive.metastore.api.SQLForeignKey;
 import org.apache.hadoop.hive.metastore.api.SQLPrimaryKey;
 import org.apache.impala.analysis.TableName;
-import org.apache.impala.compat.MetastoreShim;
 import org.apache.impala.common.ImpalaRuntimeException;
 import org.apache.impala.common.Metrics;
 import org.apache.impala.common.Pair;
+import org.apache.impala.common.PrintUtils;
 import org.apache.impala.common.RuntimeEnv;
+import org.apache.impala.compat.MetastoreShim;
 import org.apache.impala.service.MetadataOp;
 import org.apache.impala.thrift.TAccessLevel;
 import org.apache.impala.thrift.TCatalogObject;
@@ -58,7 +60,9 @@ import org.apache.impala.util.AcidUtils;
 import org.apache.impala.util.HdfsCachingUtil;
 import org.apache.log4j.Logger;
 
+import com.codahale.metrics.Timer;
 import com.google.common.base.Preconditions;
+import com.google.common.base.Stopwatch;
 import com.google.common.collect.ImmutableList;
 import com.google.common.collect.Lists;
 
@@ -149,9 +153,23 @@ public abstract class Table extends CatalogObjectImpl implements FeTable {
   // Table can define additional metrics specific to that table type.
   public static final String REFRESH_DURATION_METRIC = "refresh-duration";
   public static final String ALTER_DURATION_METRIC = "alter-duration";
+
+  // The time to load all the table metadata.
   public static final String LOAD_DURATION_METRIC = "load-duration";
-  public static final String STORAGE_METADATA_LOAD_DURATION_METRIC =
-      "storage-metadata-load-duration";
+
+  // Storage related to file system operations during metadata loading.
+  // The amount of time spent loading metadata from the underlying storage layer.
+  public static final String LOAD_DURATION_STORAGE_METADATA =
+      "load-duration.storage-metadata";
+
+  // The time for HMS to fetch table object and the real schema loading time.
+  // Normally, the code path is "msClient.getHiveClient().getTable(dbName, tblName)"
+  public static final String HMS_LOAD_TBL_SCHEMA = "hms-load-tbl-schema";
+
+  // Load all column stats, this is part of table metadata loading
+  // The code path is HdfsTable.loadAllColumnStats()
+  public static final String LOAD_DURATION_ALL_COLUMN_STATS =
+      "load-duration.all-column-stats";
 
   // Table property key for storing the time of the last DDL operation.
   public static final String TBL_PROP_LAST_DDL_TIME = "transient_lastDdlTime";
@@ -241,7 +259,9 @@ public abstract class Table extends CatalogObjectImpl implements FeTable {
     metrics_.addTimer(REFRESH_DURATION_METRIC);
     metrics_.addTimer(ALTER_DURATION_METRIC);
     metrics_.addTimer(LOAD_DURATION_METRIC);
-    metrics_.addTimer(STORAGE_METADATA_LOAD_DURATION_METRIC);
+    metrics_.addTimer(LOAD_DURATION_STORAGE_METADATA);
+    metrics_.addTimer(HMS_LOAD_TBL_SCHEMA);
+    metrics_.addTimer(LOAD_DURATION_ALL_COLUMN_STATS);
   }
 
   public Metrics getMetrics() { return metrics_; }
@@ -260,6 +280,11 @@ public abstract class Table extends CatalogObjectImpl implements FeTable {
     Preconditions.checkState(lastUsedTime_ != 0 &&
         !isStoredInImpaladCatalogCache());
     return lastUsedTime_;
+  }
+
+  public void updateHMSLoadTableSchemaTime(long hmsLoadTimeNS) {
+    this.metrics_.getTimer(Table.HMS_LOAD_TBL_SCHEMA).
+        update(hmsLoadTimeNS, TimeUnit.NANOSECONDS);
   }
 
   /**
@@ -310,24 +335,29 @@ public abstract class Table extends CatalogObjectImpl implements FeTable {
    * the correctness of the system.
    */
   protected void loadAllColumnStats(IMetaStoreClient client) {
-    if (LOG.isTraceEnabled()) LOG.trace("Loading column stats for table: " + name_);
-    List<ColumnStatisticsObj> colStats;
-
-    // We need to only query those columns which may have stats; asking HMS for other
-    // columns causes loadAllColumnStats() to return nothing.
-    // TODO(todd): this no longer seems to be true - asking for a non-existent column
-    // is just ignored, and the columns that do exist are returned.
-    List<String> colNames = getColumnNamesWithHmsStats();
-
+    final Timer.Context columnStatsLdContext =
+        getMetrics().getTimer(LOAD_DURATION_ALL_COLUMN_STATS).time();
     try {
-      colStats = MetastoreShim.getTableColumnStatistics(client, db_.getName(), name_,
-          colNames);
-    } catch (Exception e) {
-      LOG.warn("Could not load column statistics for: " + getFullName(), e);
-      return;
-    }
+      if (LOG.isTraceEnabled()) LOG.trace("Loading column stats for table: " + name_);
+      List<ColumnStatisticsObj> colStats;
 
-    FeCatalogUtils.injectColumnStats(colStats, this);
+      // We need to only query those columns which may have stats; asking HMS for other
+      // columns causes loadAllColumnStats() to return nothing.
+      // TODO(todd): this no longer seems to be true - asking for a non-existent column
+      // is just ignored, and the columns that do exist are returned.
+      List<String> colNames = getColumnNamesWithHmsStats();
+
+      try {
+        colStats = MetastoreShim.getTableColumnStatistics(client, db_.getName(), name_,
+            colNames);
+      } catch (Exception e) {
+        LOG.warn("Could not load column statistics for: " + getFullName(), e);
+        return;
+      }
+      FeCatalogUtils.injectColumnStats(colStats, this);
+    } finally {
+      columnStatsLdContext.stop();
+    }
   }
 
   /**
@@ -360,6 +390,7 @@ public abstract class Table extends CatalogObjectImpl implements FeTable {
    */
   protected void loadValidWriteIdList(IMetaStoreClient client)
       throws TableLoadingException {
+    Stopwatch sw = new Stopwatch().start();
     Preconditions.checkState(msTable_ != null && msTable_.getParameters() != null);
     if (MetastoreShim.getMajorVersion() > 2 &&
         AcidUtils.isTransactionalTable(msTable_.getParameters())) {
@@ -367,6 +398,8 @@ public abstract class Table extends CatalogObjectImpl implements FeTable {
     } else {
       validWriteIds_ = null;
     }
+    LOG.debug("Load Valid Write Id List Done. Time taken: " +
+        PrintUtils.printTimeNs(sw.elapsed(TimeUnit.NANOSECONDS)));
   }
 
   /**

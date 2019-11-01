@@ -19,6 +19,7 @@ package org.apache.impala.service;
 
 import static org.apache.impala.analysis.Analyzer.ACCESSTYPE_READWRITE;
 
+import com.google.common.base.Stopwatch;
 import com.google.common.collect.Iterables;
 
 import java.io.ByteArrayOutputStream;
@@ -32,6 +33,7 @@ import java.util.Iterator;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
+import java.util.concurrent.TimeUnit;
 import java.util.stream.Collectors;
 
 import org.apache.hadoop.fs.FSDataInputStream;
@@ -1735,12 +1737,17 @@ public class CatalogOpExecutor {
       org.apache.hadoop.hive.metastore.api.Table msTbl = existingTbl.getMetaStoreTable();
       if (msTbl == null) {
         Preconditions.checkState(existingTbl instanceof IncompleteTable);
+        Stopwatch hmsLoadSW = new Stopwatch().start();
+        long hmsLoadTime;
         try (MetaStoreClient msClient = catalog_.getMetaStoreClient()) {
           msTbl = msClient.getHiveClient().getTable(tableName.getDb(),
               tableName.getTbl());
         } catch (TException e) {
           LOG.error(String.format(HMS_RPC_ERROR_FORMAT_STR, "getTable") + e.getMessage());
+        } finally {
+          hmsLoadTime = hmsLoadSW.elapsed(TimeUnit.NANOSECONDS);
         }
+        existingTbl.updateHMSLoadTableSchemaTime(hmsLoadTime);
       }
       boolean isSynchronizedTable = msTbl != null &&
               KuduTable.isKuduTable(msTbl) && KuduTable.isSynchronizedTable(msTbl);
@@ -3833,12 +3840,17 @@ public class CatalogOpExecutor {
     Preconditions.checkNotNull(msClient);
     Db db = tbl.getDb();
     org.apache.hadoop.hive.metastore.api.Table msTbl = null;
+    Stopwatch hmsLoadSW = new Stopwatch().start();
+    long hmsLoadTime;
     try {
       msTbl = msClient.getHiveClient().getTable(db.getName(), tbl.getName());
     } catch (Exception e) {
       throw new TableLoadingException("Error loading metadata for table: " +
           db.getName() + "." + tbl.getName(), e);
+    } finally {
+      hmsLoadTime = hmsLoadSW.elapsed(TimeUnit.NANOSECONDS);
     }
+    tbl.updateHMSLoadTableSchemaTime(hmsLoadTime);
     return msTbl;
   }
 

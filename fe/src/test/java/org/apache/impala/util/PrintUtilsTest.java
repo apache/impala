@@ -157,4 +157,28 @@ public class PrintUtilsTest {
     assertEquals("'a'", PrintUtils.joinQuoted(ImmutableList.of("a")));
     assertEquals("'a', 'b'", PrintUtils.joinQuoted(ImmutableList.of("a", "b")));
   }
+
+  /**
+   * Test for PrintUtils.printTimeNs && PrintUtils.printTimeMs
+   */
+  @Test
+  public void testPrintTime() {
+    assertEquals("", PrintUtils.printTimeNs(-1));
+    assertEquals("0ns", PrintUtils.printTimeNs(0));
+    assertEquals("1ns", PrintUtils.printTimeNs(1));
+    assertEquals("10ns", PrintUtils.printTimeNs(10));
+    assertEquals("100ns", PrintUtils.printTimeNs(100));
+    assertEquals("1.000us", PrintUtils.printTimeNs(1000));
+    assertEquals("10.000us", PrintUtils.printTimeNs(10000));
+    assertEquals("100.000us", PrintUtils.printTimeNs(100000));
+    assertEquals("1.000ms", PrintUtils.printTimeNs(1000000));
+    assertEquals("10.000ms", PrintUtils.printTimeNs(10000000));
+    assertEquals("100.000ms", PrintUtils.printTimeNs(100000000));
+    assertEquals("1s", PrintUtils.printTimeNs(1000000000));
+    assertEquals("10s", PrintUtils.printTimeNs(10000000000L));
+    assertEquals("1m40s", PrintUtils.printTimeNs(100000000000L));
+    assertEquals("16m40s", PrintUtils.printTimeNs(1000000000000L));
+    assertEquals("2h46m", PrintUtils.printTimeNs(10000000000000L));
+    assertEquals("27h46m", PrintUtils.printTimeNs(100000000000000L));
+  }
 }

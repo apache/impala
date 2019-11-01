@@ -335,7 +335,7 @@ public class KuduTable extends Table implements FeKuduTable {
       setTableStats(msTable_);
       // Load metadata from Kudu
       final Timer.Context ctxStorageLdTime =
-          getMetrics().getTimer(Table.STORAGE_METADATA_LOAD_DURATION_METRIC).time();
+          getMetrics().getTimer(Table.LOAD_DURATION_STORAGE_METADATA).time();
       try {
         loadSchemaFromKudu();
       } catch (ImpalaRuntimeException e) {

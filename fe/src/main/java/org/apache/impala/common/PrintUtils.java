@@ -211,4 +211,51 @@ public class PrintUtils {
     if (!it.hasNext()) return "";
     return "'" + Joiner.on("', '").join(it) + "'";
   }
+
+  public static String printTimeNs(long value) {
+    if (value < 0)
+      return "";
+    if (value >= 1000000000) {
+      return printTimeMs(value/1000000);
+    } else if (value >= 1000000) {
+      return String.format("%.3fms", (double)value/1000000);
+    } else if (value >= 1000) {
+      return String.format("%.3fus", (double)value/1000);
+    } else {
+      return value + "ns";
+    }
+  }
+
+  public static String printTimeMs(long value) {
+    if (value < 0) {
+      return "";
+    }
+    boolean hour = false, minute = false, second = false;
+    StringBuilder sb = new StringBuilder();
+    if (value >= 3600000) {
+      sb.append(value / 3600000).append("h");
+      value %= 3600000;
+      hour = true;
+    }
+    if (value >= 60000) {
+      sb.append(value / 60000).append("m");
+      value %= 60000;
+      minute = true;
+    }
+    if (!hour && value >= 1000) {
+      sb.append(value / 1000).append("s");
+      value %= 1000;
+      second = true;
+    }
+    if (!hour && !minute && value != 0) {
+      String remainTime = String.valueOf(value);
+      if (second) {
+        while (remainTime.length() < 3) {
+          remainTime = "0" + remainTime;
+        }
+      }
+      sb.append(remainTime).append("ms");
+    }
+    return sb.toString();
+  }
 }

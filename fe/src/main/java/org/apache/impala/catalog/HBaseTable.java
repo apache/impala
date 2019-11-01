@@ -104,7 +104,7 @@ public class HBaseTable extends Table implements FeHBaseTable {
     try (Timer.Context timer = getMetrics().getTimer(Table.LOAD_DURATION_METRIC).time()) {
       msTable_ = msTbl;
       final Timer.Context storageLoadTimer =
-          getMetrics().getTimer(Table.STORAGE_METADATA_LOAD_DURATION_METRIC).time();
+          getMetrics().getTimer(Table.LOAD_DURATION_STORAGE_METADATA).time();
       List<Column> cols;
       try {
         hbaseTableName_ = Util.getHBaseTableName(getMetaStoreTable());

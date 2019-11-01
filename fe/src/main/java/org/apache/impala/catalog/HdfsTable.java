@@ -160,6 +160,18 @@ public class HdfsTable extends Table implements FeFsTable {
   public static final String MEMORY_ESTIMATE_METRIC = "memory-estimate-bytes";
   public static final String HAS_INCREMENTAL_STATS_METRIC = "has-incremental-stats";
 
+  // Load all partitions time, including fetching all partitions
+  // from HMS and loading all partitions. The code path is
+  // MetaStoreUtil.fetchAllPartitions() and HdfsTable.loadAllPartitions()
+  public static final String LOAD_DURATION_ALL_PARTITIONS =
+      "load-duration.all-partitions";
+
+  // The file metadata loading for all all partitions. This is part of
+  // LOAD_DURATION_ALL_PARTITIONS
+  // Code path: loadFileMetadataForPartitions() inside loadAllPartitions()
+  public static final String LOAD_DURATION_FILE_METADATA_ALL_PARTITIONS =
+      "load-duration.all-partitions.file-metadata";
+
   // string to indicate NULL. set in load() from table properties
   private String nullColumnValue_;
 
@@ -557,7 +569,10 @@ public class HdfsTable extends Table implements FeFsTable {
       }
     }
     // Load the file metadata from scratch.
+    Timer.Context fileMetadataLdContext = getMetrics().getTimer(
+        HdfsTable.LOAD_DURATION_FILE_METADATA_ALL_PARTITIONS).time();
     loadFileMetadataForPartitions(client, partitionMap_.values(), /*isRefresh=*/false);
+    fileMetadataLdContext.stop();
     return clock.getTick() - startTime;
   }
 
@@ -581,6 +596,8 @@ public class HdfsTable extends Table implements FeFsTable {
    */
   private void loadFileMetadataForPartitions(IMetaStoreClient client,
       Iterable<HdfsPartition> parts, boolean isRefresh) throws CatalogException {
+    final Clock clock = Clock.defaultClock();
+    long startTime = clock.getTick();
     // Group the partitions by their path (multiple partitions may point to the same
     // path).
     Map<Path, List<HdfsPartition>> partsByPath = Maps.newHashMap();
@@ -646,7 +663,6 @@ public class HdfsTable extends Table implements FeFsTable {
     }
 
     // TODO(todd): would be good to log a summary of the loading process:
-    // - how long did it take?
     // - how many block locations did we reuse/load individually/load via batch
     // - how many partitions did we read metadata for
     // - etc...
@@ -657,8 +673,9 @@ public class HdfsTable extends Table implements FeFsTable {
           Iterables.size(parts) - 3);
     }
 
-    LOG.info("Loaded file and block metadata for {} partitions: {}", getFullName(),
-        partNames);
+    long duration = clock.getTick() - startTime;
+    LOG.info("Loaded file and block metadata for {} partitions: {}. Time taken: {}",
+        getFullName(), partNames, PrintUtils.printTimeNs(duration));
   }
 
   /**
@@ -963,7 +980,7 @@ public class HdfsTable extends Table implements FeFsTable {
         msTbl.getDbName(), msTbl.getTableName(), reason);
     LOG.info(annotation);
     final Timer storageLdTimer =
-        getMetrics().getTimer(Table.STORAGE_METADATA_LOAD_DURATION_METRIC);
+        getMetrics().getTimer(Table.LOAD_DURATION_STORAGE_METADATA);
     storageMetadataLoadTime_ = 0;
     try (ThreadNameAnnotator tna = new ThreadNameAnnotator(annotation)) {
       // turn all exceptions into TableLoadingException
@@ -995,12 +1012,15 @@ public class HdfsTable extends Table implements FeFsTable {
           LOG.info("Incrementally loaded table metadata for: " + getFullName());
         } else {
           LOG.info("Fetching partition metadata from the Metastore: " + getFullName());
+          final Timer.Context allPartitionsLdContext =
+              getMetrics().getTimer(HdfsTable.LOAD_DURATION_ALL_PARTITIONS).time();
           // Load all partitions from Hive Metastore, including file metadata.
           List<org.apache.hadoop.hive.metastore.api.Partition> msPartitions =
               MetaStoreUtil.fetchAllPartitions(
                   client, db_.getName(), name_, NUM_PARTITION_FETCH_RETRIES);
           LOG.info("Fetched partition metadata from the Metastore: " + getFullName());
           storageMetadataLoadTime_ = loadAllPartitions(client, msPartitions, msTbl);
+          allPartitionsLdContext.stop();
         }
         if (loadTableSchema) setAvroSchema(client, msTbl);
         setTableStats(msTbl);
@@ -1017,7 +1037,7 @@ public class HdfsTable extends Table implements FeFsTable {
       long load_time_duration = context.stop();
       if (load_time_duration > LOADING_WARNING_TIME_NS) {
         LOG.warn("Time taken on loading table " + getFullName() + " exceeded " +
-            "warning threshold. Time: " + load_time_duration + " ns");
+            "warning threshold. Time: " + PrintUtils.printTimeNs(load_time_duration));
       }
       updateTableLoadingTime();
     }

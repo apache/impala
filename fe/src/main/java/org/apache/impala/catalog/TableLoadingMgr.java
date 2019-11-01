@@ -164,8 +164,8 @@ public class TableLoadingMgr {
     numLoadingThreads_ = numLoadingThreads;
     tblLoadingPool_ = Executors.newFixedThreadPool(numLoadingThreads_);
 
-    // Start the background table loading threads.
-    startTableLoadingThreads();
+    // Start the background table loading submitter threads.
+    startTableLoadingSubmitterThreads();
 
     // Start the asyncRefreshThread_. Currently used to wait for cache directives to
     // complete in the background.
@@ -255,15 +255,19 @@ public class TableLoadingMgr {
   }
 
   /**
-   * Starts table loading threads in a fixed sized thread pool with a size
+   * Starts table loading submitter threads in a fixed sized thread pool with a size
    * defined by NUM_TBL_LOADING_THREADS. Each thread polls the tableLoadingDeque_
-   * for new tables to load.
+   * for new tables to load. Note these threads are just for submitting the
+   * load request, the real table loading threads are in tblLoadingPool_.
+   * There is a discussion here: https://issues.apache.org/jira/browse/IMPALA-9140
+   * which well explained the table loading mechanism.
    */
-  private void startTableLoadingThreads() {
-    ExecutorService loadingPool = Executors.newFixedThreadPool(numLoadingThreads_);
+  private void startTableLoadingSubmitterThreads() {
+    ExecutorService submitterLoadingPool =
+        Executors.newFixedThreadPool(numLoadingThreads_);
     try {
       for (int i = 0; i < numLoadingThreads_; ++i) {
-        loadingPool.execute(new Runnable() {
+        submitterLoadingPool.execute(new Runnable() {
           @Override
           public void run() {
             while (true) {
@@ -278,7 +282,7 @@ public class TableLoadingMgr {
         });
       }
     } finally {
-      loadingPool.shutdown();
+      submitterLoadingPool.shutdown();
     }
   }
 
