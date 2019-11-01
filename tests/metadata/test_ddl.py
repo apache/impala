@@ -40,7 +40,6 @@ from tests.common.impala_cluster import ImpalaCluster
 # Validates DDL statements (create, drop)
 class TestDdlStatements(TestDdlBase):
   @SkipIfLocal.hdfs_client
-  @SkipIfABFS.trash
   def test_drop_table_with_purge(self, unique_database):
     """This test checks if the table data is permanently deleted in
     DROP TABLE <tbl> PURGE queries"""
@@ -451,7 +450,6 @@ class TestDdlStatements(TestDdlBase):
         use_db=unique_database, multiple_impalad=self._use_multiple_impalad(vector))
 
   @SkipIfLocal.hdfs_client
-  @SkipIfABFS.trash
   def test_drop_partition_with_purge(self, vector, unique_database):
     """Verfies whether alter <tbl> drop partition purge actually skips trash"""
     self.client.execute(

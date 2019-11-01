@@ -20,7 +20,7 @@ from copy import deepcopy
 
 from tests.common.custom_cluster_test_suite import CustomClusterTestSuite
 from tests.common.environ import build_flavor_timeout
-from tests.common.skip import SkipIfNotHdfsMinicluster
+from tests.common.skip import SkipIfABFS, SkipIfNotHdfsMinicluster
 
 WAIT_TIME_MS = build_flavor_timeout(60000, slow_build_timeout=100000)
 
@@ -36,6 +36,7 @@ class TestMtDopFlags(CustomClusterTestSuite):
 
   @pytest.mark.execute_serially
   @CustomClusterTestSuite.with_args(impalad_args="--unlock_mt_dop=true")
+  @SkipIfABFS.file_or_folder_name_ends_with_period
   def test_mt_dop_all(self, vector, unique_database):
     """Test joins, inserts and runtime filters with mt_dop > 0"""
     vector = deepcopy(vector)

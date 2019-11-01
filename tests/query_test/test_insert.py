@@ -129,7 +129,7 @@ class TestInsertQueries(ImpalaTestSuite):
   # Erasure coding doesn't respect memory limit
   @SkipIfEC.fix_later
   # ABFS partition names cannot end in periods
-  @SkipIfABFS.jira(reason="HADOOP-15860")
+  @SkipIfABFS.file_or_folder_name_ends_with_period
   def test_insert(self, vector):
     if (vector.get_value('table_format').file_format == 'parquet'):
       vector.get_value('exec_option')['COMPRESSION_CODEC'] = \

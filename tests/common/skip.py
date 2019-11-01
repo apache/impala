@@ -75,6 +75,8 @@ class SkipIfABFS:
       reason="HDFS encryption is not supported with ABFS")
   trash = pytest.mark.skipif(IS_ABFS,
       reason="Drop/purge not working as expected on ABFS, IMPALA-7726")
+  file_or_folder_name_ends_with_period = pytest.mark.skipif(IS_ABFS,
+      reason="ABFS does not support file / directories that end with a period")
 
   # These need test infra work to re-enable.
   udfs = pytest.mark.skipif(IS_ABFS, reason="udas/udfs not copied to ABFS")
