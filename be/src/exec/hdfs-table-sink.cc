@@ -340,7 +340,9 @@ Status HdfsTableSink::WriteClusteredRowBatch(RuntimeState* state, RowBatch* batc
 Status HdfsTableSink::CreateNewTmpFile(RuntimeState* state,
     OutputPartition* output_partition) {
   SCOPED_TIMER(ADD_TIMER(profile(), "TmpFileCreateTimer"));
-  string final_location = Substitute("$0.$1.$2",
+  string file_name_pattern =
+      output_partition->writer->file_extension().empty() ? "$0.$1" : "$0.$1.$2";
+  string final_location = Substitute(file_name_pattern,
       output_partition->final_hdfs_file_name_prefix, output_partition->num_files,
       output_partition->writer->file_extension());
 
@@ -351,7 +353,7 @@ Status HdfsTableSink::CreateNewTmpFile(RuntimeState* state,
   if (ShouldSkipStaging(state, output_partition)) {
     output_partition->current_file_name = final_location;
   } else {
-    output_partition->current_file_name = Substitute("$0.$1.$2",
+    output_partition->current_file_name = Substitute(file_name_pattern,
       output_partition->tmp_hdfs_file_name_prefix, output_partition->num_files,
       output_partition->writer->file_extension());
   }

@@ -62,7 +62,7 @@ void HdfsTextTableWriter::Close() {
 
 uint64_t HdfsTextTableWriter::default_block_size() const { return 0; }
 
-string HdfsTextTableWriter::file_extension() const { return ""; }
+string HdfsTextTableWriter::file_extension() const { return "txt"; }
 
 Status HdfsTextTableWriter::AppendRows(
     RowBatch* batch, const vector<int32_t>& row_group_indices, bool* new_file) {

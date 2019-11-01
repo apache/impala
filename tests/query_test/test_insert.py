@@ -309,3 +309,33 @@ class TestInsertNullQueries(ImpalaTestSuite):
   @pytest.mark.execute_serially
   def test_insert_null(self, vector):
     self.run_test_case('QueryTest/insert_null', vector)
+
+
+class TestInsertFileExtension(ImpalaTestSuite):
+  """Tests that files written to a table have the correct file extension. Asserts that
+  Parquet files end with .parq and text files end with .txt."""
+
+  @classmethod
+  def get_workload(self):
+    return 'functional-query'
+
+  @classmethod
+  def add_test_dimensions(cls):
+    cls.ImpalaTestMatrix.add_dimension(ImpalaTestDimension(
+        'table_format_and_file_extension',
+        *[('parquet', '.parq'), ('textfile', '.txt')]))
+
+  @classmethod
+  def setup_class(cls):
+    super(TestInsertFileExtension, cls).setup_class()
+
+  def test_file_extension(self, vector, unique_database):
+    table_format = vector.get_value('table_format_and_file_extension')[0]
+    file_extension = vector.get_value('table_format_and_file_extension')[1]
+    table_name = "{0}_table".format(table_format)
+    ctas_query = "create table {0}.{1} stored as {2} as select 1".format(
+        unique_database, table_name, table_format)
+    self.execute_query_expect_success(self.client, ctas_query)
+    for path in self.filesystem_client.ls("test-warehouse/{0}.db/{1}".format(
+        unique_database, table_name)):
+      if not path.startswith('_'): assert path.endswith(file_extension)
