@@ -855,6 +855,12 @@ public class PlannerTestBase extends FrontendTestBase {
     runPlannerTestFile(testFile, dbName, defaultQueryOptions(), testOptions);
   }
 
+  protected void runPlannerTestFile(
+      String testFile, String dbName, TQueryOptions options) {
+    runPlannerTestFile(testFile, dbName, options,
+        Collections.<PlannerTestOption>emptySet());
+  }
+
   private void runPlannerTestFile(String testFile, String dbName, TQueryOptions options,
         Set<PlannerTestOption> testOptions) {
     String fileName = testDir_.resolve(testFile + ".test").toString();

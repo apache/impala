@@ -907,6 +907,15 @@ Status impala::SetQueryOption(const string& key, const string& value,
         query_options->__set_mem_limit_executors(bytes_limit);
         break;
       }
+      case TImpalaQueryOptions::BROADCAST_BYTES_LIMIT: {
+        // Parse the broadcast_bytes limit and validate it
+        int64_t broadcast_bytes_limit;
+        RETURN_IF_ERROR(
+            ParseMemValue(value, "broadcast bytes limit for join operations",
+                &broadcast_bytes_limit));
+        query_options->__set_broadcast_bytes_limit(broadcast_bytes_limit);
+        break;
+      }
       default:
         if (IsRemovedQueryOption(key)) {
           LOG(WARNING) << "Ignoring attempt to set removed query option '" << key << "'";

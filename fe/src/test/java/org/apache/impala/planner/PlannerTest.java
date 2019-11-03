@@ -1003,4 +1003,19 @@ public class PlannerTest extends PlannerTestBase {
                                         PlannerTestOption.INCLUDE_RESOURCE_HEADER,
                                         PlannerTestOption.VALIDATE_RESOURCES));
   }
+
+  @Test
+  public void testBroadcastBytesLimit() {
+    TQueryOptions options = new TQueryOptions();
+    // broadcast limit is smaller than the build side of hash join, so we should
+    // NOT pick broadcast unless it is overridden through a join hint
+    options.setBroadcast_bytes_limit(100);
+    runPlannerTestFile("broadcast-bytes-limit", "tpch_parquet", options);
+
+    // broadcast limit is larger than the build side of hash join, so we SHOULD
+    // pick broadcast (i.e verify the standard case)
+    options.setBroadcast_bytes_limit(1000000);
+    runPlannerTestFile("broadcast-bytes-limit-large", "tpch_parquet", options);
+  }
+
 }

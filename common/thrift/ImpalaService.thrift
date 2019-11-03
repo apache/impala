@@ -484,6 +484,12 @@ enum TImpalaQueryOptions {
   // a) an int (= number of bytes);
   // b) a float followed by "M" (MB) or "G" (GB)
   MEM_LIMIT_EXECUTORS = 96
+
+  // The max number of estimated bytes eligible for a Broadcast operation during a join.
+  // If the planner thinks the total bytes sent to all destinations of a broadcast
+  // exchange will exceed this limit, it will not consider a broadcast and instead
+  // fall back on a hash partition exchange. 0 or -1 means this has no effect.
+  BROADCAST_BYTES_LIMIT = 97
 }
 
 // The summary of a DML statement.

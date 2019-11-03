@@ -402,7 +402,11 @@ struct TQueryOptions {
   96: optional i64 parquet_object_store_split_size = 268435456;
 
   // See comment in ImpalaService.thrift
-  97: optional i64 mem_limit_executors = 0
+  97: optional i64 mem_limit_executors = 0;
+
+  // See comment in ImpalaService.thrift
+  // The default value is set to 32 GB
+  98: optional i64 broadcast_bytes_limit = 34359738368;
 }
 
 // Impala currently has two types of sessions: Beeswax and HiveServer2

@@ -1,0 +1,24 @@
+# Check that broadcast distribution IS chosen if size of
+# hash join build side input is smaller than broadcast_bytes_limit
+select c_name from customer inner join nation on c_nationkey = n_nationkey
+---- DISTRIBUTEDPLAN
+PLAN-ROOT SINK
+|
+04:EXCHANGE [UNPARTITIONED]
+|
+02:HASH JOIN [INNER JOIN, BROADCAST]
+|  hash predicates: c_nationkey = n_nationkey
+|  runtime filters: RF000 <- n_nationkey
+|  row-size=34B cardinality=150.00K
+|
+|--03:EXCHANGE [BROADCAST]
+|  |
+|  01:SCAN HDFS [tpch_parquet.nation]
+|     HDFS partitions=1/1 files=1 size=3.04KB
+|     row-size=2B cardinality=25
+|
+00:SCAN HDFS [tpch_parquet.customer]
+   HDFS partitions=1/1 files=1 size=12.34MB
+   runtime filters: RF000 -> c_nationkey
+   row-size=32B cardinality=150.00K
+====

@@ -556,14 +556,21 @@ public class DistributedPlanner {
          ctx_.getQueryOptions().getDefault_join_distribution_mode());
    }
 
-   // Decide the distribution mode based on the estimated costs and the mem limit.
    int mt_dop = ctx_.getQueryOptions().mt_dop;
+
+   // Decide the distribution mode based on the estimated costs, the mem limit and
+   // the broadcast bytes limit. The last value is a safety check to ensure we
+   // don't broadcast very large inputs (for example in case the broadcast cost was
+   // not computed correctly and the query mem limit has not been set or set too high)
    long htSize = Math.round(rhsDataSize * PlannerContext.HASH_TBL_SPACE_OVERHEAD);
    // TODO: IMPALA-4224: update this once we can share the broadcast join data between
    // finstances.
    if (mt_dop > 1) htSize *= mt_dop;
    long memLimit = ctx_.getQueryOptions().mem_limit;
-   if (broadcastCost <= partitionCost && (memLimit == 0 || htSize <= memLimit)) {
+   long broadcast_bytes_limit = ctx_.getQueryOptions().getBroadcast_bytes_limit();
+
+   if (broadcastCost <= partitionCost && (memLimit == 0 || htSize <= memLimit) &&
+           (broadcast_bytes_limit == 0 || htSize <= broadcast_bytes_limit)) {
      return DistributionMode.BROADCAST;
    }
    // Partitioned was cheaper or the broadcast HT would not fit within the mem limit.
