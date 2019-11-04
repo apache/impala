@@ -115,7 +115,7 @@ COLUMN, TYPE, #DISTINCT VALUES, #NULLS, MAX SIZE, AVG SIZE, #TRUES, #FALSES
 ---- RESULTS
 'id','INT',0,0,4,4,-1,-1
 'array_array_col','ARRAY<ARRAY<INT>>',-1,-1,-1,-1,-1,-1
-'array_map_col','MAP<STRING,ARRAY<INT>>',-1,-1,-1,-1-1,-1
+'array_map_col','MAP<STRING,ARRAY<INT>>',-1,-1,-1,-1,-1,-1
 'complex_nested_struct_col','STRUCT<f1:INT,f2:ARRAY<STRUCT<f11:BIGINT,f12:MAP<STRING,STRUCT<f21:BIGINT>>>>>',-1,-1,-1,-1,-1,-1
 'complex_struct_col','STRUCT<f1:INT,f2:ARRAY<INT>,f3:MAP<STRING,INT>>',-1,-1,-1,-1,-1,-1
 'int_array_col','ARRAY<INT>',-1,-1,-1,-1,-1,-1
