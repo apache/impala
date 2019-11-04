@@ -44,7 +44,8 @@ create table upgraded_table (x int);
 insert into upgraded_table values (1);
 # Upgrade to the table to insert only acid when there are already values in it.
 alter table upgraded_table set tblproperties
- ('transactional' = 'true', 'transactional_properties' = 'insert_only');
+ ('transactional' = 'true', 'transactional_properties' = 'insert_only',
+    'EXTERNAL'='FALSE');
 insert into upgraded_table values (2);
 insert into upgraded_table values (3);
 ====

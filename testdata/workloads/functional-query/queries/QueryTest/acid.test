@@ -48,9 +48,16 @@ select * from tt order by x;
 ---- QUERY
 create table upgraded_table (x int);
 insert into upgraded_table values (1);
+====
+---- HIVE_QUERY
+use $DATABASE;
 # Upgrade to the table to insert only acid when there are already values in it.
 alter table upgraded_table set tblproperties
- ('transactional' = 'true', 'transactional_properties' = 'insert_only');
+ ('transactional' = 'true', 'transactional_properties' = 'insert_only',
+    'EXTERNAL' = 'FALSE');
+====
+---- QUERY
+refresh upgraded_table;
 insert into upgraded_table values (2);
 insert into upgraded_table values (3);
 ====

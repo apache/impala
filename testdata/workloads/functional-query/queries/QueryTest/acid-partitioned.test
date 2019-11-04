@@ -98,7 +98,8 @@ insert into upgraded_pt partition (p=2) values (20), (21);
 use $DATABASE;
 alter table upgraded_pt set tblproperties (
   'transactional' = 'true',
-  'transactional_properties' = 'insert_only');
+  'transactional_properties' = 'insert_only',
+  'EXTERNAL' = 'FALSE');
 insert into upgraded_pt partition(p=1) values (11);
 insert into upgraded_pt partition (p=2) values (22);
 ====
