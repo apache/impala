@@ -270,6 +270,7 @@ Status HdfsScanNodeBase::Prepare(RuntimeState* state) {
   stringstream str;
   UpdateHdfsSplitStats(*scan_range_params_, &per_volume_stats);
   PrintHdfsSplitStats(per_volume_stats, &str);
+  runtime_profile()->AddInfoString("Table Name", hdfs_table_->fully_qualified_name());
   runtime_profile()->AddInfoString(HDFS_SPLIT_STATS_DESC, str.str());
   state->CheckAndAddCodegenDisabledMessage(runtime_profile());
   return Status::OK();

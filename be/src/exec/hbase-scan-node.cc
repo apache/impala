@@ -115,6 +115,7 @@ Status HBaseScanNode::Prepare(RuntimeState* state) {
       sr.set_stop_key(key_range.stopKey);
     }
   }
+  runtime_profile_->AddInfoString("Table Name", hbase_table->fully_qualified_name());
   return Status::OK();
 }
 

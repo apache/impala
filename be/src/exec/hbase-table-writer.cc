@@ -54,8 +54,8 @@ HBaseTableWriter::HBaseTableWriter(HBaseTableDescriptor* table_desc,
     runtime_profile_(profile) { }
 
 Status HBaseTableWriter::Init(RuntimeState* state) {
-  RETURN_IF_ERROR(ExecEnv::GetInstance()->htable_factory()->GetTable(table_desc_->name(),
-      &table_));
+  RETURN_IF_ERROR(ExecEnv::GetInstance()->htable_factory()->GetTable(
+      table_desc_->table_name(), &table_));
   encoding_timer_ = ADD_TIMER(runtime_profile_, "EncodingTimer");
   htable_put_timer_ = ADD_TIMER(runtime_profile_, "HTablePutTimer");
 

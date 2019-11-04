@@ -107,6 +107,8 @@ Status KuduScanNodeBase::Open(RuntimeState* state) {
 
   KUDU_RETURN_IF_ERROR(client_->OpenTable(table_desc->table_name(), &table_),
       "Unable to open Kudu table");
+
+  runtime_profile_->AddInfoString("Table Name", table_desc->fully_qualified_name());
   return Status::OK();
 }
 
