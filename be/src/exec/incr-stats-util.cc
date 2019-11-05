@@ -309,10 +309,8 @@ void FinalizePartitionedColumnStats(const TTableSchema& col_stats_schema,
           existing_stats.intermediate_col_stats.find(col_name);
       if (it == existing_stats.intermediate_col_stats.end()) {
         VLOG(2) << "Could not find column in existing column stat state: " << col_name;
-        VLOG(1) << "Could not find column in existing column stat state: " << col_name;
         continue;
       }
-
 
       const TIntermediateColumnStats& int_stats = it->second;
       VLOG(1) << "update intermediate value for column  "
@@ -336,6 +334,7 @@ void FinalizePartitionedColumnStats(const TTableSchema& col_stats_schema,
     stats[i].Finalize();
     const string& col_name = col_stats_schema.columns[i * COLUMNS_PER_STAT].columnName;
     params->column_stats[col_name] = stats[i].ToTColumnStats();
+
     VLOG(3) << "Incremental stats result for column: " << col_name << ": "
             << stats[i].DebugString();
   }

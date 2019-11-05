@@ -217,7 +217,6 @@ public class ColumnStats {
     boolean isCompatible = false;
     switch (colType.getPrimitiveType()) {
       case BOOLEAN:
-
         isCompatible = statsData.isSetBooleanStats();
         if (isCompatible) {
           BooleanColumnStatsData boolStats = statsData.getBooleanStats();
@@ -473,7 +472,6 @@ public class ColumnStats {
     colStats.setNum_nulls(numNulls_);
     colStats.setNum_trues(numTrues_);
     colStats.setNum_falses(numFalses_);
-
     return colStats;
   }
 
