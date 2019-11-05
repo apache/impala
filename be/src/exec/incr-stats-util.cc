@@ -209,7 +209,6 @@ void FinalizePartitionedColumnStats(const TTableSchema& col_stats_schema,
 
   const int num_cols =
       (col_stats_schema.columns.size() - num_partition_cols) / COLUMNS_PER_STAT;
-  VLOG(1) << "Start compute incremental column stats and num_cols is " << num_cols;
   unordered_set<vector<string>> seen_partitions;
   vector<PerColumnStats> stats(num_cols);
 
@@ -303,8 +302,8 @@ void FinalizePartitionedColumnStats(const TTableSchema& col_stats_schema,
   // set of partitions.
   for (const TPartitionStats& existing_stats: existing_part_stats) {
     DCHECK_LE(existing_stats.intermediate_col_stats.size(),
-        col_stats_schema.columns.size()); //必须确保已经存在的统计信息的schema和当前的统计信息的schema是一致的
-    for (int i = 0; i < num_cols; ++i) { //对于每一列
+        col_stats_schema.columns.size());
+    for (int i = 0; i < num_cols; ++i) {
       const string& col_name = col_stats_schema.columns[i * COLUMNS_PER_STAT].columnName;
       map<string, TIntermediateColumnStats>::const_iterator it =
           existing_stats.intermediate_col_stats.find(col_name);
@@ -337,7 +336,6 @@ void FinalizePartitionedColumnStats(const TTableSchema& col_stats_schema,
     stats[i].Finalize();
     const string& col_name = col_stats_schema.columns[i * COLUMNS_PER_STAT].columnName;
     params->column_stats[col_name] = stats[i].ToTColumnStats();
-    VLOG(1) << "setup information for column " << col_name;
     VLOG(3) << "Incremental stats result for column: " << col_name << ": "
             << stats[i].DebugString();
   }

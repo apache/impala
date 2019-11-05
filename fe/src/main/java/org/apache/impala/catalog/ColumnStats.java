@@ -332,7 +332,7 @@ public class ColumnStats {
     long numNulls = colStats.getNum_nulls();
     switch(colType.getPrimitiveType()) {
       case BOOLEAN:
-        colStatsData.setBooleanStats(new BooleanColumnStatsData(colStats.getNum_trues(), colStats.getNum_falses(), numNulls));
+        colStatsData.setBooleanStats(new BooleanColumnStatsData(/*numTrues=*/-1, /*numFalse=*/-1, numNulls));
         break;
       case TINYINT:
         ndv = Math.min(ndv, LongMath.pow(2, Byte.SIZE));
