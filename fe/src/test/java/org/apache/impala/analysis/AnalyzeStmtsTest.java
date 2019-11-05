@@ -4015,6 +4015,18 @@ public class AnalyzeStmtsTest extends AnalyzerTest {
           "float_col, double_col, date_string_col, string_col, timestamp_col) " +
           "select * from functional.alltypesnopart");
     }
+
+    // Insert into/overwrite a table with complex columns should return error.
+    AnalysisError("insert " + qualifier + " table functional.allcomplextypes" +
+        "(id, year, month) values (57, 2019, 11)",
+        "Unable to INSERT into target table (functional.allcomplextypes) because the " +
+        "column 'int_array_col' has a complex type 'ARRAY<INT>' and Impala doesn't " +
+        "support inserting into tables containing complex type columns");
+    AnalysisError("insert " + qualifier + " table functional.allcomplextypes " +
+        "select * from functional.allcomplextypes",
+        "Unable to INSERT into target table (functional.allcomplextypes) because the " +
+        "column 'int_array_col' has a complex type 'ARRAY<INT>' and Impala doesn't " +
+        "support inserting into tables containing complex type columns");
   }
 
   /**

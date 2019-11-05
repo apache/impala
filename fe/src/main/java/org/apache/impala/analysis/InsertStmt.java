@@ -451,6 +451,12 @@ public class InsertStmt extends StatementBase {
             "(%s) because the column '%s' has an unsupported type '%s'.",
             getOpName(), targetTableName_, c.getName(), c.getType().toSql()));
       }
+      if (c.getType().isComplexType()) {
+        throw new AnalysisException(String.format("Unable to %s into target table " +
+            "(%s) because the column '%s' has a complex type '%s' and Impala doesn't " +
+            "support inserting into tables containing complex type columns",
+            getOpName(), targetTableName_, c.getName(), c.getType().toSql()));
+      }
     }
 
     // Perform operation-specific analysis.
