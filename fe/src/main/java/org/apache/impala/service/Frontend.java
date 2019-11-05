@@ -912,7 +912,6 @@ public class Frontend {
           .add(c.getStats().getNumTrues()).add(c.getStats().getNumFalses());
       result.addToRows(rowBuilder.get());
     }
-
     return result;
   }
 
