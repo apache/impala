@@ -911,10 +911,6 @@ public class Frontend {
           .add(c.getStats().getMaxSize()).add(c.getStats().getAvgSize())
           .add(c.getStats().getNumTrues()).add(c.getStats().getNumFalses());
       result.addToRows(rowBuilder.get());
-      LOG.info("Geting column stats and the result is " + c.getName()
-              + " , " + c.getStats().getNumDistinctValues()
-      + c.getStats().getAvgSize() + "," + c.getStats().getNumNulls()
-              + ", "+ c.getStats().getNumTrues() + "," + c.getStats().getNumFalses());
     }
 
     return result;
