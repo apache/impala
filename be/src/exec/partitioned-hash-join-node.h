@@ -355,7 +355,7 @@ class PartitionedHashJoinNode : public BlockingJoinNode {
   ///    unmatched rows.
   ///  - If the build partition did not have a hash table, meaning both build and probe
   ///    rows were spilled, move the partition to 'spilled_partitions_'.
-  Status CleanUpHashPartitions(RuntimeState* state, RowBatch* batch) WARN_UNUSED_RESULT;
+  Status DoneProbing(RuntimeState* state, RowBatch* batch) WARN_UNUSED_RESULT;
 
   /// Get the next row batch from the probe (left) side (child(0)). If we are done
   /// consuming the input, sets 'probe_batch_pos_' to -1, otherwise, sets it to 0.
@@ -467,7 +467,7 @@ class PartitionedHashJoinNode : public BlockingJoinNode {
   /// The list of probe partitions that have been spilled and still need more
   /// processing. These partitions could need repartitioning, in which case more
   /// partitions will be added to this list after repartitioning.
-  /// This list is populated at CleanUpHashPartitions().
+  /// This list is populated at DoneProbing().
   std::list<std::unique_ptr<ProbePartition>> spilled_partitions_;
 
   /// The current spilled probe partition being processed as input to repartitioning,
@@ -476,7 +476,7 @@ class PartitionedHashJoinNode : public BlockingJoinNode {
 
   /// In the case of right-outer and full-outer joins, this is the list of the partitions
   /// for which we need to output their unmatched build rows.
-  /// This list is populated at CleanUpHashPartitions().
+  /// This list is populated at DoneProbing().
   std::list<PhjBuilder::Partition*> output_build_partitions_;
 
   /// Whether this join is in a state outputting rows from OutputNullAwareProbeRows().

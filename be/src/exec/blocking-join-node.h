@@ -24,10 +24,9 @@
 #include <string>
 
 #include "exec/exec-node.h"
+#include "exec/join-op.h"
 #include "util/promise.h"
 #include "util/stopwatch.h"
-
-#include "gen-cpp/PlanNodes_types.h"  // for TJoinOp
 
 namespace impala {
 
@@ -153,14 +152,6 @@ class BlockingJoinNode : public ExecNode {
   /// 'build_row' to 'out_row'.
   /// This is replaced by codegen.
   void CreateOutputRow(TupleRow* out_row, TupleRow* probe_row, TupleRow* build_row);
-
-  /// Returns true if the join needs to process unmatched build rows, false
-  /// otherwise.
-  bool NeedToProcessUnmatchedBuildRows() {
-    return join_op_ == TJoinOp::RIGHT_ANTI_JOIN ||
-        join_op_ == TJoinOp::RIGHT_OUTER_JOIN ||
-        join_op_ == TJoinOp::FULL_OUTER_JOIN;
-  }
 
   /// This function calculates the "local time" spent in the join node.
   ///

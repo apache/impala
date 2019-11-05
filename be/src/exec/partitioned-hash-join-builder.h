@@ -20,17 +20,18 @@
 
 #include <boost/scoped_ptr.hpp>
 #include <memory>
+#include <list>
+#include <vector>
 
 #include "common/object-pool.h"
 #include "common/status.h"
 #include "exec/data-sink.h"
 #include "exec/filter-context.h"
 #include "exec/hash-table.h"
+#include "exec/join-op.h"
 #include "runtime/buffered-tuple-stream.h"
 #include "runtime/bufferpool/buffer-pool.h"
 #include "runtime/bufferpool/suballocator.h"
-
-#include "gen-cpp/PlanNodes_types.h"
 
 namespace impala {
 
@@ -70,6 +71,23 @@ class ScalarExprEvaluator;
 /// The full hash join algorithm is documented in PartitionedHashJoinNode.
 class PhjBuilder : public DataSink {
  public:
+  /// Number of initial partitions to create. Must be a power of two.
+  static const int PARTITION_FANOUT = 16;
+
+  /// Needs to be log2(PARTITION_FANOUT).
+  static const int NUM_PARTITIONING_BITS = 4;
+
+  /// Maximum number of times we will repartition. The maximum build table we
+  /// can process is:
+  /// MEM_LIMIT * (PARTITION_FANOUT ^ MAX_PARTITION_DEPTH). With a (low) 1GB
+  /// limit and 64 fanout, we can support 256TB build tables in the case where
+  /// there is no skew.
+  /// In the case where there is skew, repartitioning is unlikely to help (assuming a
+  /// reasonable hash function).
+  /// Note that we need to have at least as many SEED_PRIMES in HashTableCtx.
+  /// TODO: we can revisit and try harder to explicitly detect skew.
+  static const int MAX_PARTITION_DEPTH = 16;
+
   class Partition;
 
   PhjBuilder(int join_node_id, const std::string& join_node_label, TJoinOp::type join_op,
@@ -105,16 +123,23 @@ class PhjBuilder : public DataSink {
   /// writing with a write buffer allocated.
   std::vector<std::unique_ptr<BufferedTupleStream>> TransferProbeStreams();
 
-  /// Clears the current list of hash partitions. Called after probing of the partitions
-  /// is done. The partitions are not closed or destroyed, since they may be spilled or
-  /// may contain unmatched build rows for certain join modes (e.g. right outer join).
-  void ClearHashPartitions() { hash_partitions_.clear(); }
+  /// Called after probing of the partitions is done. Appends in-memory partitions that
+  /// may contain build rows to output to 'output_partitions' for build modes like
+  /// right outer join that output unmatched rows. Close other in-memory partitions,
+  /// attaching any tuple data to 'batch' if 'batch' is non-NULL. Closes spilled
+  /// partitions if 'retain_spilled_partition' is false for that partition index.
+  /// Invalid to call hash_partition() after this is called.
+  void DoneProbing(const bool retain_spilled_partition[PARTITION_FANOUT],
+      std::list<Partition*>* output_partitions, RowBatch* batch);
 
   /// Close the null aware partition (if there is one) and set it to NULL.
-  void CloseNullAwarePartition(RowBatch* out_batch) {
-    if (null_aware_partition_ != NULL) {
-      null_aware_partition_->Close(out_batch);
-      null_aware_partition_ = NULL;
+  void CloseNullAwarePartition() {
+    if (null_aware_partition_ != nullptr) {
+      // We don't need to pass in a batch because the anti-join only returns tuple data
+      // from the probe side - i.e. the RowDescriptor for PartitionedHashJoinNode does
+      // not include the build tuple.
+      null_aware_partition_->Close(nullptr);
+      null_aware_partition_ = nullptr;
     }
   }
 
@@ -149,23 +174,6 @@ class PhjBuilder : public DataSink {
   inline Partition* null_aware_partition() const { return null_aware_partition_; }
 
   std::string DebugString() const;
-
-  /// Number of initial partitions to create. Must be a power of two.
-  static const int PARTITION_FANOUT = 16;
-
-  /// Needs to be log2(PARTITION_FANOUT).
-  static const int NUM_PARTITIONING_BITS = 4;
-
-  /// Maximum number of times we will repartition. The maximum build table we
-  /// can process is:
-  /// MEM_LIMIT * (PARTITION_FANOUT ^ MAX_PARTITION_DEPTH). With a (low) 1GB
-  /// limit and 64 fanout, we can support 256TB build tables in the case where
-  /// there is no skew.
-  /// In the case where there is skew, repartitioning is unlikely to help (assuming a
-  /// reasonable hash function).
-  /// Note that we need to have at least as many SEED_PRIMES in HashTableCtx.
-  /// TODO: we can revisit and try harder to explicitly detect skew.
-  static const int MAX_PARTITION_DEPTH = 16;
 
   /// A partition containing a subset of build rows.
   ///
@@ -474,7 +482,8 @@ class PhjBuilder : public DataSink {
   /// store all the rows for which 'build_expr_evals_' evaluated over the row returns
   /// NULL (i.e. it has a NULL on the eq join slot).
   /// NULL if the join is not null aware or we are done processing this partition.
-  /// This partitions starts off in memory but can be spilled.
+  /// Always NULL once we are done processing the level 0 partitions.
+  /// This partition starts off in memory but can be spilled.
   Partition* null_aware_partition_;
 
   /// Populated during the hash table building phase if any partitions spilled.

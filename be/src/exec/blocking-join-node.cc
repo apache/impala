@@ -54,9 +54,7 @@ BlockingJoinNode::BlockingJoinNode(const string& node_name, const TJoinOp::type 
 
 Status BlockingJoinNode::Init(const TPlanNode& tnode, RuntimeState* state) {
   RETURN_IF_ERROR(ExecNode::Init(tnode, state));
-  DCHECK((join_op_ != TJoinOp::LEFT_SEMI_JOIN && join_op_ != TJoinOp::LEFT_ANTI_JOIN &&
-      join_op_ != TJoinOp::RIGHT_SEMI_JOIN && join_op_ != TJoinOp::RIGHT_ANTI_JOIN &&
-      join_op_ != TJoinOp::NULL_AWARE_LEFT_ANTI_JOIN) || conjuncts_.size() == 0);
+  DCHECK(!IsSemiJoin(join_op_) || conjuncts_.size() == 0);
   runtime_profile_->AddLocalTimeCounter(
       bind<int64_t>(&BlockingJoinNode::LocalTimeCounterFn,
       runtime_profile_->total_time_counter(),
@@ -123,9 +121,7 @@ Status BlockingJoinNode::Prepare(RuntimeState* state) {
   probe_tuple_row_size_ = num_left_tuples * sizeof(Tuple*);
   build_tuple_row_size_ = num_build_tuples * sizeof(Tuple*);
 
-  if (join_op_ == TJoinOp::LEFT_ANTI_JOIN || join_op_ == TJoinOp::LEFT_SEMI_JOIN ||
-      join_op_ == TJoinOp::RIGHT_ANTI_JOIN || join_op_ == TJoinOp::RIGHT_SEMI_JOIN ||
-      join_op_ == TJoinOp::NULL_AWARE_LEFT_ANTI_JOIN) {
+  if (IsSemiJoin(join_op_)) {
     semi_join_staging_row_ = reinterpret_cast<TupleRow*>(
         new char[probe_tuple_row_size_ + build_tuple_row_size_]);
   }
@@ -273,7 +269,7 @@ Status BlockingJoinNode::GetFirstProbeRow(RuntimeState* state) {
     } else if (probe_side_eos_) {
       // If the probe side is exhausted, set the eos_ to true for only those
       // join modes that don't need to process unmatched build rows.
-      eos_ = !NeedToProcessUnmatchedBuildRows();
+      eos_ = !NeedToProcessUnmatchedBuildRows(join_op_);
       return Status::OK();
     }
     probe_batch_->Reset();

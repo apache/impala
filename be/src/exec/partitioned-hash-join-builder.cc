@@ -451,6 +451,28 @@ vector<unique_ptr<BufferedTupleStream>> PhjBuilder::TransferProbeStreams() {
   return std::move(spilled_partition_probe_streams_);
 }
 
+void PhjBuilder::DoneProbing(const bool retain_partition[PARTITION_FANOUT],
+    list<Partition*>* output_partitions, RowBatch* batch) {
+  DCHECK(output_partitions->empty());
+  for (int i = 0; i < PARTITION_FANOUT; ++i) {
+    PhjBuilder::Partition* partition = hash_partitions_[i];
+    if (partition->IsClosed()) continue;
+    if (partition->is_spilled()) {
+      DCHECK(partition->hash_tbl() == nullptr) << DebugString();
+      DCHECK_EQ(partition->build_rows()->BytesPinned(false), 0)
+          << "Build was fully unpinned in BuildHashTablesAndPrepareProbeStreams()";
+      // Release resources associated with completed partitions.
+      if (!retain_partition[i]) partition->Close(nullptr);
+    } else if (NeedToProcessUnmatchedBuildRows(join_op_)) {
+      output_partitions->push_back(partition);
+    } else {
+      // No more processing is required for this partition.
+      partition->Close(batch);
+    }
+  }
+  hash_partitions_.clear();
+}
+
 void PhjBuilder::CloseAndDeletePartitions(RowBatch* row_batch) {
   // Close all the partitions and clean up all references to them.
   for (unique_ptr<Partition>& partition : all_partitions_) partition->Close(row_batch);
@@ -458,7 +480,10 @@ void PhjBuilder::CloseAndDeletePartitions(RowBatch* row_batch) {
   hash_partitions_.clear();
   null_aware_partition_ = NULL;
   for (unique_ptr<BufferedTupleStream>& stream : spilled_partition_probe_streams_) {
-    stream->Close(row_batch, RowBatch::FlushMode::NO_FLUSH_RESOURCES);
+    // Streams need to be cleaned up, but were never handed off to probe, so won't have
+    // any data in them.
+    DCHECK_EQ(0, stream->num_rows());
+    stream->Close(nullptr, RowBatch::FlushMode::NO_FLUSH_RESOURCES);
   }
   spilled_partition_probe_streams_.clear();
 }
