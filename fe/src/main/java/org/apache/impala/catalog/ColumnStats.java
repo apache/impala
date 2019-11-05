@@ -42,7 +42,6 @@ import org.slf4j.LoggerFactory;
  * Statistics for a single column.
  */
 public class ColumnStats {
-  private final static Logger LOG = LoggerFactory.getLogger(ColumnStats.class);
   // Set of the currently supported column stats column types.
   private final static Set<PrimitiveType> SUPPORTED_COL_TYPES = Sets.newHashSet(
       PrimitiveType.BIGINT, PrimitiveType.BINARY, PrimitiveType.BOOLEAN,
@@ -152,7 +151,6 @@ public class ColumnStats {
     }
     stats.numTrues_ = slotStats.getNumTrues();
     stats.numFalses_ = slotStats.getNumFalses();
-    LOG.info("get numTrues and numFalses from expre " + slotStats.getNumTrues() + " , " + slotStats.getNumFalses());
     stats.validate(colType);
     return stats;
   }
@@ -221,7 +219,6 @@ public class ColumnStats {
       case BOOLEAN:
 
         isCompatible = statsData.isSetBooleanStats();
-        LOG.info("Updating boolean stats with compatible " + isCompatible);
         if (isCompatible) {
           BooleanColumnStatsData boolStats = statsData.getBooleanStats();
           numNulls_ = boolStats.getNumNulls();
@@ -235,7 +232,6 @@ public class ColumnStats {
           }
           numTrues_ = boolStats.getNumTrues();
           numFalses_ = boolStats.getNumFalses();
-          LOG.info("Updating boolean stats with true compatible and numTrues" + numTrues_ + " AND numFalses " + numFalses_);
         }
         break;
       case TINYINT:
@@ -336,9 +332,6 @@ public class ColumnStats {
     long numNulls = colStats.getNum_nulls();
     switch(colType.getPrimitiveType()) {
       case BOOLEAN:
-        // TODO(IMPALA-8205): actually compute the count of true/false
-        // values.
-        LOG.info("createHiveColStatsData with numTrues " + colStats.getNum_trues() + " and numFalses " + colStats.getNum_falses());
         colStatsData.setBooleanStats(new BooleanColumnStatsData(colStats.getNum_trues(), colStats.getNum_falses(), numNulls));
         break;
       case TINYINT:

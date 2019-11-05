@@ -548,7 +548,7 @@ public class ComputeStatsStmt extends StatementBase {
     }
     List<String> tableStatsSelectList = Lists.newArrayList(countSql);
     // Add group by columns for incremental stats or with extrapolation disabled.
-    List<String> groupByCols = new ArrayList<>(); //如果是incremental, 则需要用partition作为group key
+    List<String> groupByCols = new ArrayList<>();
     if (!updateTableStatsOnly()) {
       for (Column partCol: hdfsTable.getClusteringColumns()) {
         groupByCols.add(ToSqlUtils.getIdentSql(partCol.getName()));

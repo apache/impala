@@ -208,7 +208,7 @@ void FinalizePartitionedColumnStats(const TTableSchema& col_stats_schema,
   static const int COLUMNS_PER_STAT = 7;
 
   const int num_cols =
-      (col_stats_schema.columns.size() - num_partition_cols) / COLUMNS_PER_STAT; //列数
+      (col_stats_schema.columns.size() - num_partition_cols) / COLUMNS_PER_STAT;
   VLOG(1) << "Start compute incremental column stats and num_cols is " << num_cols;
   unordered_set<vector<string>> seen_partitions;
   vector<PerColumnStats> stats(num_cols);
@@ -216,7 +216,7 @@ void FinalizePartitionedColumnStats(const TTableSchema& col_stats_schema,
   if (rowset.rows.size() > 0) {
     DCHECK_GE(rowset.rows[0].colVals.size(), COLUMNS_PER_STAT);
     params->__isset.partition_stats = true;
-    for (const TRow& col_stats_row: rowset.rows) { //这里一行就是一个一个partition作为group key的一条统计信息
+    for (const TRow& col_stats_row: rowset.rows) {
       // The last few columns are partition columns that the results are grouped by, and
       // so uniquely identify the partition that these stats belong to.
       vector<string> partition_key_vals;
@@ -232,7 +232,6 @@ void FinalizePartitionedColumnStats(const TTableSchema& col_stats_schema,
       part_stat->__isset.intermediate_col_stats = true;
       for (int i = 0; i < num_cols * COLUMNS_PER_STAT; i += COLUMNS_PER_STAT) {
         PerColumnStats* stat = &stats[i / COLUMNS_PER_STAT];
-        //获取当前这个column的七个统计信息
         const string& ndv = col_stats_row.colVals[i].stringVal.value;
         int64_t num_rows = col_stats_row.colVals[i + 4].i64Val.value;
         double avg_width = col_stats_row.colVals[i + 3].doubleVal.value;
@@ -285,9 +284,9 @@ void FinalizePartitionedColumnStats(const TTableSchema& col_stats_schema,
   empty_column_stats.__set_num_trues(0);
   empty_column_stats.__set_num_falses(0);
   TPartitionStats empty_part_stats;
-  for (int i = 0; i < num_cols * COLUMNS_PER_STAT; i += COLUMNS_PER_STAT) { //初始化每一个原始数据的column的统计信息
+  for (int i = 0; i < num_cols * COLUMNS_PER_STAT; i += COLUMNS_PER_STAT) {
     empty_part_stats.intermediate_col_stats[col_stats_schema.columns[i].columnName] =
-        empty_column_stats; //初始化这个column的统计信息
+        empty_column_stats;
   }
   empty_part_stats.__isset.intermediate_col_stats = true;
   TTableStats empty_table_stats;
@@ -295,14 +294,14 @@ void FinalizePartitionedColumnStats(const TTableSchema& col_stats_schema,
   empty_part_stats.stats = empty_table_stats;
   for (const vector<string>& part_key_vals: expected_partitions) {
     DCHECK_EQ(part_key_vals.size(), num_partition_cols);
-    if (seen_partitions.find(part_key_vals) != seen_partitions.end()) continue; //如果seen_partitions中包含这个partition，则跳过
-    params->partition_stats[part_key_vals] = empty_part_stats; //否则，初始化这个partition的统计信息
+    if (seen_partitions.find(part_key_vals) != seen_partitions.end()) continue;
+    params->partition_stats[part_key_vals] = empty_part_stats;
   }
 
   // Now aggregate the existing statistics. The FE will ensure that the set of
   // partitions accessed by the query and this list are disjoint and cover the entire
   // set of partitions.
-  for (const TPartitionStats& existing_stats: existing_part_stats) { //对于每一个partition的统计信息
+  for (const TPartitionStats& existing_stats: existing_part_stats) {
     DCHECK_LE(existing_stats.intermediate_col_stats.size(),
         col_stats_schema.columns.size()); //必须确保已经存在的统计信息的schema和当前的统计信息的schema是一致的
     for (int i = 0; i < num_cols; ++i) { //对于每一列
@@ -316,7 +315,7 @@ void FinalizePartitionedColumnStats(const TTableSchema& col_stats_schema,
       }
 
 
-      const TIntermediateColumnStats& int_stats = it->second; //取出这个列的已经存在的统计信息
+      const TIntermediateColumnStats& int_stats = it->second;
       VLOG(1) << "update intermediate value for column  "
                 << col_name << ","
                 << int_stats.intermediate_ndv << ","
@@ -328,16 +327,16 @@ void FinalizePartitionedColumnStats(const TTableSchema& col_stats_schema,
                 << int_stats.num_falses;
       stats[i].Update(DecodeNdv(int_stats.intermediate_ndv, int_stats.is_ndv_encoded),
           int_stats.num_rows, int_stats.avg_width, int_stats.max_width,
-          int_stats.num_nulls, int_stats.num_trues, int_stats.num_falses); //将已经存在的统计信息更新到stats中
+          int_stats.num_nulls, int_stats.num_trues, int_stats.num_falses);
     }
   }
 
   // Compute the final results now that all aggregations are done, and save those as
   // column stats for each column in turn.
-  for (int i = 0; i < stats.size(); ++i) { //stats里面的每一项信息是一个column的所有统计信息
+  for (int i = 0; i < stats.size(); ++i) {
     stats[i].Finalize();
     const string& col_name = col_stats_schema.columns[i * COLUMNS_PER_STAT].columnName;
-    params->column_stats[col_name] = stats[i].ToTColumnStats(); //把计算好的统计信息更新到params中
+    params->column_stats[col_name] = stats[i].ToTColumnStats();
     VLOG(1) << "setup information for column " << col_name;
     VLOG(3) << "Incremental stats result for column: " << col_name << ": "
             << stats[i].DebugString();

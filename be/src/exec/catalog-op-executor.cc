@@ -285,10 +285,7 @@ void CatalogOpExecutor::SetColumnStats(const TTableSchema& col_stats_schema,
   // col_stats_row, respectively. Positions i + 2 and i + 3 contain the max/avg
   // length for string columns, Positions i+4 and i+5 contains the numTrues/numFalses
   // and -1 for non-string columns.
-  //从ComputeStatsStmt.analyze() 中可以看到，对于non-incremental的statistics的计算，
   for (int i = 0; i < col_stats_row.colVals.size(); i += 6) {
-    //对于每一列，设置这一列的每一项统计信息值，从getBaseColumnStatsQuerySelectList方法可以看到
-    //如果不是incremental， 那么统计信息就只有6项
     TColumnStats col_stats;
     col_stats.__set_num_distinct_values(col_stats_row.colVals[i].i64Val.value);
     col_stats.__set_num_nulls(col_stats_row.colVals[i + 1].i64Val.value);
