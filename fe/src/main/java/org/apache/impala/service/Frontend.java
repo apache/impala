@@ -902,7 +902,6 @@ public class Frontend {
     resultSchema.addToColumns(new TColumn("#Trues", Type.BIGINT.toThrift()));
     resultSchema.addToColumns(new TColumn("#Falses", Type.BIGINT.toThrift()));
 
-
     for (Column c: table.getColumnsInHiveOrder()) {
       TResultRowBuilder rowBuilder = new TResultRowBuilder();
       // Add name, type, NDVs, numNulls, max size and avg size.
