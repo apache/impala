@@ -156,7 +156,7 @@ public class ColumnStats {
   }
 
   /**
-   * Adds other's numDistinctValues and numNulls to this ColumnStats.
+   * Adds other's numDistinctValues, numNulls, numTrues, numFalses to this ColumnStats.
    * If this or other's stats are invalid, sets the corresponding stat to invalid,
    * Returns this with the updated stats.
    * This method is used to aggregate stats for slots that originate from multiple

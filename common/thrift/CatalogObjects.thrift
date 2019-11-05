@@ -168,6 +168,7 @@ struct TColumnStats {
   // Estimated number of null values.
   4: required i64 num_nulls
 
+  // Estimated number of true and false value for boolean type
   5: required i64 num_trues
   6: required i64 num_falses
 }
@@ -193,6 +194,7 @@ struct TIntermediateColumnStats {
   // The number of rows counted, needed to compute NDVs from intermediate_ndv
   6: optional i64 num_rows
 
+  // The number of true and false value, of the column
   7: required i64 num_trues
   8: required i64 num_falses
 }
