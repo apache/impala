@@ -288,9 +288,11 @@ public class ComputeStatsStmt extends StatementBase {
       }
 
       // For boolean column, compute the numTrue and numFalse
-      if(type.isBoolean()) {
-        columnStatsSelectList.add("COUNT(CASE WHEN " + colRefSql + " = TRUE THEN 1 ELSE NULL END)");
-        columnStatsSelectList.add("COUNT(CASE WHEN " + colRefSql + " = FALSE THEN 1 ELSE NULL END)");
+      if (type.isBoolean()) {
+        columnStatsSelectList.add(
+            "COUNT(CASE WHEN " + colRefSql + " = TRUE THEN 1 ELSE NULL END)");
+        columnStatsSelectList.add(
+            "COUNT(CASE WHEN " + colRefSql + " = FALSE THEN 1 ELSE NULL END)");
       } else {
         columnStatsSelectList.add("NULL");
         columnStatsSelectList.add("NULL");

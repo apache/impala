@@ -173,12 +173,12 @@ public class ColumnStats {
     } else {
       numNulls_ += other.numNulls_;
     }
-    if(numTrues_ == -1 || other.numTrues_ == -1) {
+    if (numTrues_ == -1 || other.numTrues_ == -1) {
       numTrues_ = -1;
     } else {
       numTrues_ += other.numTrues_;
     }
-    if(numFalses_ == -1 || other.numFalses_ == -1) {
+    if (numFalses_ == -1 || other.numFalses_ == -1) {
       numFalses_ = -1;
     } else {
       numFalses_ += other.numFalses_;
@@ -199,8 +199,8 @@ public class ColumnStats {
   public long getNumNulls() { return numNulls_; }
   // True iff getAvgSize() and getAvgSerializedSize() will return valid values.
   public boolean hasAvgSize() { return avgSize_ >= 0; }
-  public long getNumTrues() { return numTrues_;}
-  public long getNumFalses() { return numFalses_;}
+  public long getNumTrues() { return numTrues_; }
+  public long getNumFalses() { return numFalses_; }
   public boolean hasNumDistinctValues() { return numDistinctValues_ >= 0; }
   public boolean hasStats() { return numNulls_ != -1 || numDistinctValues_ != -1; }
 
@@ -331,7 +331,8 @@ public class ColumnStats {
     long numNulls = colStats.getNum_nulls();
     switch(colType.getPrimitiveType()) {
       case BOOLEAN:
-        colStatsData.setBooleanStats(new BooleanColumnStatsData(/*numTrues=*/-1, /*numFalse=*/-1, numNulls));
+        colStatsData.setBooleanStats(
+            new BooleanColumnStatsData(/*numTrues=*/-1, /*numFalse=*/-1, numNulls));
         break;
       case TINYINT:
         ndv = Math.min(ndv, LongMath.pow(2, Byte.SIZE));
@@ -425,11 +426,11 @@ public class ColumnStats {
         break;
       }
       case NUM_TRUES: {
-        numTrues_ = (Long)value;
+        numTrues_ = (Long) value;
         break;
       }
       case NUM_FALSES: {
-        numFalses_ = (Long)value;
+        numFalses_ = (Long) value;
         break;
       }
       default: Preconditions.checkState(false);
@@ -454,7 +455,7 @@ public class ColumnStats {
       avgSize_ = Double.valueOf(stats.getAvg_size()).floatValue();
       avgSerializedSize_ = colType.getSlotSize() + avgSize_;
     }
-    if(colType.getPrimitiveType() == PrimitiveType.BOOLEAN) {
+    if (colType.getPrimitiveType() == PrimitiveType.BOOLEAN) {
       numTrues_ = stats.getNum_trues();
       numFalses_ = stats.getNum_falses();
     }

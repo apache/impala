@@ -144,12 +144,18 @@ struct PerColumnStats {
   double avg_width;
 
   PerColumnStats()
-      : intermediate_ndv(AggregateFunctions::HLL_LEN, 0), num_nulls(0),
-        max_width(0), num_rows(0), num_trues(0), num_falses(0), avg_width(0) { }
+    : intermediate_ndv(AggregateFunctions::HLL_LEN, 0),
+      num_nulls(0),
+      max_width(0),
+      num_rows(0),
+      num_trues(0),
+      num_falses(0),
+      avg_width(0) {}
 
   // Updates all aggregate statistics with a new set of measurements.
   void Update(const string& ndv, int64_t num_new_rows, double new_avg_width,
-      int32_t max_new_width, int64_t num_new_nulls, int64_t num_new_trues, int64_t num_new_falses) {
+      int32_t max_new_width, int64_t num_new_nulls, int64_t num_new_trues,
+      int64_t num_new_falses) {
     DCHECK_EQ(intermediate_ndv.size(), ndv.size()) << "Incompatible intermediate NDVs";
     DCHECK_GE(num_new_rows, 0);
     DCHECK_GE(max_new_width, 0);
@@ -190,8 +196,8 @@ struct PerColumnStats {
 
   // Returns a string with debug information for this
   string DebugString() const {
-    return Substitute(
-        "ndv: $0, num_nulls: $1, max_width: $2, avg_width: $3, num_rows: $4, num_trues: $5, num_falses: $6",
+    return Substitute("ndv: $0, num_nulls: $1, max_width: $2, avg_width: $3, num_rows: "
+                      "$4, num_trues: $5, num_falses: $6",
         ndv_estimate, num_nulls, max_width, avg_width, num_rows, num_trues, num_falses);
   }
 };
@@ -204,7 +210,8 @@ void FinalizePartitionedColumnStats(const TTableSchema& col_stats_schema,
     int32_t num_partition_cols, TAlterTableUpdateStatsParams* params) {
   // The rowset should have the following schema: for every column in the source table,
   // seven columns are produced, one row per partition.
-  // <ndv buckets>, <num nulls>, <max width>, <avg width>, <count rows>, <num trues>, <num falses>
+  // <ndv buckets>, <num nulls>, <max width>, <avg width>, <count rows>, <num trues>, <num
+  // falses>
   static const int COLUMNS_PER_STAT = 7;
 
   const int num_cols =
@@ -239,16 +246,11 @@ void FinalizePartitionedColumnStats(const TTableSchema& col_stats_schema,
         int64_t num_trues = col_stats_row.colVals[i + 5].i64Val.value;
         int64_t num_falses = col_stats_row.colVals[i + 6].i64Val.value;
 
-        VLOG(1) << "update statistics value is "
-        << col_stats_schema.columns[i].columnName << ","
-        << ndv << ","
-        << num_rows <<  "，"
-        << avg_width << ","
-        << num_trues << ","
-        << max_width << ","
-        << num_nulls << ","
-        << num_falses;
-        stat->Update(ndv, num_rows, avg_width, max_width, num_nulls, num_trues, num_falses);
+        VLOG(1) << "update statistics value is " << col_stats_schema.columns[i].columnName
+                << "," << ndv << "," << num_rows << "，" << avg_width << "," << num_trues
+                << "," << max_width << "," << num_nulls << "," << num_falses;
+        stat->Update(
+            ndv, num_rows, avg_width, max_width, num_nulls, num_trues, num_falses);
 
         // Save the intermediate state per-column, per-partition
         TIntermediateColumnStats int_stats;
@@ -313,15 +315,11 @@ void FinalizePartitionedColumnStats(const TTableSchema& col_stats_schema,
       }
 
       const TIntermediateColumnStats& int_stats = it->second;
-      VLOG(1) << "update intermediate value for column  "
-                << col_name << ","
-                << int_stats.intermediate_ndv << ","
-                << int_stats.num_rows <<  "，"
-                << int_stats.avg_width << ","
-                << int_stats.max_width << ","
-                << int_stats.num_nulls << ","
-                << int_stats.num_trues << ","
-                << int_stats.num_falses;
+      VLOG(1) << "update intermediate value for column  " << col_name << ","
+              << int_stats.intermediate_ndv << "," << int_stats.num_rows << "，"
+              << int_stats.avg_width << "," << int_stats.max_width << ","
+              << int_stats.num_nulls << "," << int_stats.num_trues << ","
+              << int_stats.num_falses;
       stats[i].Update(DecodeNdv(int_stats.intermediate_ndv, int_stats.is_ndv_encoded),
           int_stats.num_rows, int_stats.avg_width, int_stats.max_width,
           int_stats.num_nulls, int_stats.num_trues, int_stats.num_falses);

@@ -905,10 +905,14 @@ public class Frontend {
     for (Column c: table.getColumnsInHiveOrder()) {
       TResultRowBuilder rowBuilder = new TResultRowBuilder();
       // Add name, type, NDVs, numNulls, max size and avg size.
-      rowBuilder.add(c.getName()).add(c.getType().toSql())
-          .add(c.getStats().getNumDistinctValues()).add(c.getStats().getNumNulls())
-          .add(c.getStats().getMaxSize()).add(c.getStats().getAvgSize())
-          .add(c.getStats().getNumTrues()).add(c.getStats().getNumFalses());
+      rowBuilder.add(c.getName())
+          .add(c.getType().toSql())
+          .add(c.getStats().getNumDistinctValues())
+          .add(c.getStats().getNumNulls())
+          .add(c.getStats().getMaxSize())
+          .add(c.getStats().getAvgSize())
+          .add(c.getStats().getNumTrues())
+          .add(c.getStats().getNumFalses());
       result.addToRows(rowBuilder.get());
     }
     return result;
