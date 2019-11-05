@@ -238,19 +238,24 @@ def print_metrics(substring):
     print "<" * 80
 
 
+def detect_and_remove_flag(flag):
+  """Find any usage of 'flag' in sys.argv and remove them. Return true if the
+     flag is found. Return false otherwise."""
+  flag_exists = False
+  # Handle multiple occurrences of the same flag
+  while flag in sys.argv:
+    flag_exists = True
+    sys.argv.remove(flag)
+  return flag_exists
+
+
 if __name__ == "__main__":
   # Ensure that logging is configured for the 'run-test.py' wrapper itself.
   configure_logging()
   exit_on_error = '-x' in sys.argv or '--exitfirst' in sys.argv
-  skip_serial = '--skip-serial' in sys.argv
-  if skip_serial:
-    sys.argv.remove("--skip-serial")
-  skip_stress = '--skip-stress' in sys.argv
-  if skip_stress:
-    sys.argv.remove("--skip-stress")
-  skip_parallel = '--skip-parallel' in sys.argv
-  if skip_parallel:
-    sys.argv.remove("--skip-parallel")
+  skip_serial = detect_and_remove_flag('--skip-serial')
+  skip_stress = detect_and_remove_flag('--skip-stress')
+  skip_parallel = detect_and_remove_flag('--skip-parallel')
   test_executor = TestExecutor(exit_on_error=exit_on_error)
 
   # If the user is just asking for --help, just print the help test and then exit.
