@@ -210,8 +210,8 @@ void FinalizePartitionedColumnStats(const TTableSchema& col_stats_schema,
     int32_t num_partition_cols, TAlterTableUpdateStatsParams* params) {
   // The rowset should have the following schema: for every column in the source table,
   // seven columns are produced, one row per partition.
-  // <ndv buckets>, <num nulls>, <max width>, <avg width>, <count rows>, <num trues>, <num
-  // falses>
+  // <ndv buckets>, <num nulls>, <max width>, <avg width>, <count rows>,
+  // <num trues>, <num falses>
   static const int COLUMNS_PER_STAT = 7;
 
   const int num_cols =
