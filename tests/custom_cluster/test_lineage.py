@@ -132,6 +132,23 @@ class TestLineage(CustomClusterTestSuite):
           assert lineage_json["queryText"] == query
           assert lineage_json["tableLocation"] is not None
 
+    # Test explain statements don't create lineages.
+    query = "explain create table {0}.lineage_test_tbl as select int_col, " \
+            "tinyint_col from functional.alltypes".format(unique_database)
+    result = self.execute_query_expect_success(self.client, query)
+    profile_query_id = re.search("Query \(id=(.*)\):", result.runtime_profile).group(1)
+
+    # Wait to flush the lineage log files.
+    time.sleep(3)
+
+    for log_filename in os.listdir(self.DDL_LINEAGE_LOG_DIR):
+      log_path = os.path.join(self.DDL_LINEAGE_LOG_DIR, log_filename)
+      # Only the coordinator's log file will be populated.
+      if os.path.getsize(log_path) > 0:
+        with open(log_path) as log_file:
+          lineage_json = json.load(log_file)
+          assert lineage_json["queryId"] is not profile_query_id
+
   @SkipIfABFS.hbase
   @SkipIfADLS.hbase
   @SkipIfS3.hbase

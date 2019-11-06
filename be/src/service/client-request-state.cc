@@ -1536,7 +1536,8 @@ Status ClientRequestState::LogAuditRecord(const Status& query_status) {
 
 Status ClientRequestState::LogLineageRecord() {
   const TExecRequest& request = exec_request();
-  if (!request.__isset.query_exec_request && !request.__isset.catalog_op_request) {
+  if (request.stmt_type == TStmtType::EXPLAIN || (!request.__isset.query_exec_request &&
+      !request.__isset.catalog_op_request)) {
     return Status::OK();
   }
   TLineageGraph lineage_graph;
@@ -1550,7 +1551,7 @@ Status ClientRequestState::LogLineageRecord() {
     return Status::OK();
   }
 
-  if (catalog_op_type() == TCatalogOpType::DDL) {
+  if (catalog_op_executor_ != nullptr && catalog_op_type() == TCatalogOpType::DDL) {
     const TDdlExecResponse* response = ddl_exec_response();
     //Set table location in the lineage graph. Currently, this is only set for external
     // tables in frontend.
