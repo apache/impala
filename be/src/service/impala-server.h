@@ -298,6 +298,12 @@ class ImpalaServer : public ImpalaServiceIf,
   virtual void GetFunctions(
       apache::hive::service::cli::thrift::TGetFunctionsResp& return_val,
       const apache::hive::service::cli::thrift::TGetFunctionsReq& request);
+  virtual void GetPrimaryKeys(
+      apache::hive::service::cli::thrift::TGetPrimaryKeysResp& return_val,
+      const apache::hive::service::cli::thrift::TGetPrimaryKeysReq& request);
+  virtual void GetCrossReference(
+      apache::hive::service::cli::thrift::TGetCrossReferenceResp& return_val,
+      const apache::hive::service::cli::thrift::TGetCrossReferenceReq& request);
   virtual void GetOperationStatus(
       apache::hive::service::cli::thrift::TGetOperationStatusResp& return_val,
       const apache::hive::service::cli::thrift::TGetOperationStatusReq& request);

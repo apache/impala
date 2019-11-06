@@ -523,14 +523,4 @@ public class LocalFsTable extends LocalTable implements FeFsTable {
   public ListMap<TNetworkAddress> getHostIndex() {
     return hostIndex_;
   }
-
-  @Override
-  public List<SQLPrimaryKey> getPrimaryKeys() {
-    return null;
-  }
-
-  @Override
-  public List<SQLForeignKey> getForeignKeys() {
-    return null;
-  }
 }

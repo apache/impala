@@ -30,6 +30,8 @@ import java.util.Set;
 
 import org.apache.hadoop.conf.Configuration;
 import org.apache.hive.service.rpc.thrift.TGetColumnsReq;
+import org.apache.hive.service.rpc.thrift.TGetCrossReferenceReq;
+import org.apache.hive.service.rpc.thrift.TGetPrimaryKeysReq;
 import org.apache.hive.service.rpc.thrift.TGetSchemasReq;
 import org.apache.hive.service.rpc.thrift.TGetTablesReq;
 import org.apache.impala.analysis.AnalysisContext;
@@ -74,7 +76,8 @@ public class AuthorizationTest extends FrontendTestBase {
   // column-level SELECT or INSERT permission. I.e. that should be returned by
   // 'SHOW TABLES'.
   private static final List<String> FUNCTIONAL_VISIBLE_TABLES = Lists.newArrayList(
-      "alltypes", "alltypesagg", "alltypeserror", "alltypessmall", "alltypestiny");
+      "alltypes", "alltypesagg", "alltypeserror", "alltypessmall", "alltypestiny",
+      "child_table", "parent_table", "parent_table_2");
 
   private static final SentryAuthorizationConfig AUTHZ_CONFIG =
       SentryAuthorizationConfig.createHadoopGroupAuthConfig("server1",
@@ -166,6 +169,25 @@ public class AuthorizationTest extends FrontendTestBase {
     // Select on tpch
     privilege = new TPrivilege(TPrivilegeLevel.SELECT, TPrivilegeScope.DATABASE, false);
     privilege.setDb_name("tpch");
+    addRolePrivilege(catalog, privilege, role);
+
+    // Select on parent_table_2
+    privilege = new TPrivilege(TPrivilegeLevel.SELECT, TPrivilegeScope.TABLE, false);
+    privilege.setDb_name("functional");
+    privilege.setTable_name("parent_table_2");
+    addRolePrivilege(catalog, privilege, role);
+
+    // Add privilege on "year" for parent table.
+    privilege = new TPrivilege(TPrivilegeLevel.SELECT, TPrivilegeScope.COLUMN, false);
+    privilege.setDb_name("functional");
+    privilege.setTable_name("parent_table");
+    privilege.setColumn_name("year");
+    addRolePrivilege(catalog, privilege, role);
+
+    // Add SELECT privilege on child_table
+    privilege = new TPrivilege(TPrivilegeLevel.SELECT, TPrivilegeScope.TABLE, false);
+    privilege.setDb_name("functional");
+    privilege.setTable_name("child_table");
     addRolePrivilege(catalog, privilege, role);
 
     for (String group: groups) {
@@ -319,6 +341,47 @@ public class AuthorizationTest extends FrontendTestBase {
     req.get_tables_req.setTableName("%");
     resp = AUTHZ_FE.execHiveServer2MetadataOp(req);
     assertEquals(numTpcdsTables, resp.rows.size());
+  }
+
+  @Test
+  public void TestHs2GetPrimaryKeys() throws ImpalaException {
+    // Only one of the pk columns has privileges. This should not return anything.
+    TMetadataOpRequest req = new TMetadataOpRequest();
+    req.setSession(createSessionState("default", USER));
+    req.opcode = TMetadataOpcode.GET_PRIMARY_KEYS;
+    req.get_primary_keys_req = new TGetPrimaryKeysReq();
+    req.get_primary_keys_req.setSchemaName("functional");
+    req.get_primary_keys_req.setTableName("parent_table");
+
+    TResultSet resp = AUTHZ_FE.execHiveServer2MetadataOp(req);
+    assertEquals(0, resp.rows.size());
+
+    // PK column has privileges, should return it.
+    req = new TMetadataOpRequest();
+    req.setSession(createSessionState("default", USER));
+    req.opcode = TMetadataOpcode.GET_PRIMARY_KEYS;
+    req.get_primary_keys_req = new TGetPrimaryKeysReq();
+    req.get_primary_keys_req.setSchemaName("functional");
+    req.get_primary_keys_req.setTableName("parent_table_2");
+
+    resp = AUTHZ_FE.execHiveServer2MetadataOp(req);
+    assertEquals(1, resp.rows.size());
+  }
+
+  @Test
+  public void TestHs2GetCrossReference() throws ImpalaException {
+    // On parent_table, only one of the pk columns has privileges for USER, hence the
+    // entire SQLPrimaryKey sequence will be filtered out.
+    TMetadataOpRequest req = new TMetadataOpRequest();
+    req.setSession(createSessionState("default", USER));
+    req.opcode = TMetadataOpcode.GET_CROSS_REFERENCE;
+    req.get_cross_reference_req = new TGetCrossReferenceReq();
+    req.get_cross_reference_req.setForeignSchemaName("functional");
+    req.get_cross_reference_req.setForeignTableName("child_table");
+
+    TResultSet resp = AUTHZ_FE.execHiveServer2MetadataOp(req);
+    // Returns just 1 SQLForeignKeys instead of 3.
+    assertEquals(1, resp.rows.size());
   }
 
   @Test

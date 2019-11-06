@@ -45,6 +45,10 @@ class TestHS2Service : public ImpalaHiveServer2ServiceIf {
   virtual void GetTableTypes(TGetTableTypesResp& _return, const TGetTableTypesReq& req) {}
   virtual void GetColumns(TGetColumnsResp& _return, const TGetColumnsReq& req) {}
   virtual void GetFunctions(TGetFunctionsResp& _return, const TGetFunctionsReq& req) {}
+  virtual void GetPrimaryKeys(
+      TGetPrimaryKeysResp& _return, const TGetPrimaryKeysReq& req) {}
+  virtual void GetCrossReference(
+      TGetCrossReferenceResp& _return, const TGetCrossReferenceReq& req) {}
   virtual void GetOperationStatus(
       TGetOperationStatusResp& _return, const TGetOperationStatusReq& req) {}
   virtual void CancelOperation(

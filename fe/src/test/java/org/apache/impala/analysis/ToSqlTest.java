@@ -375,15 +375,14 @@ public class ToSqlTest extends FrontendTestBase {
 
     // Foreign Key test requires a valid primary key table.
     addTestDb("test_pk_fk", "Test DB for PK/FK tests");
-    addTestTable("create table test_pk_fk.pk (id int, year string, primary key (id, "
-        + "year))");
     AnalysisContext ctx = createAnalysisCtx("test_pk_fk");
 
-    testToSql(ctx, "create table fk(id int, year string, FOREIGN KEY (id) "
-        + "REFERENCES pk(id), FOREIGN KEY (year) REFERENCES pk"
-        + "(year))", "CREATE TABLE test_pk_fk.fk ( id INT, year STRING, "
-        + "FOREIGN KEY(id) REFERENCES test_pk_fk.pk(id), FOREIGN KEY(year) REFERENCES "
-        + "test_pk_fk.pk(year) ) STORED AS TEXTFILE", true);
+    testToSql(ctx, "create table fk(seq int, id int, year string, a int, "
+        + "FOREIGN KEY(id, year) REFERENCES functional.parent_table(id, year), FOREIGN "
+        + "KEY (a) REFERENCES functional.parent_table_2(a))", "CREATE TABLE "
+        + "test_pk_fk.fk ( seq INT, id INT, year STRING, a INT, FOREIGN KEY(id, year) "
+        + "REFERENCES functional.parent_table(id, year), FOREIGN KEY(a) REFERENCES "
+        + "functional.parent_table_2(a) ) STORED AS TEXTFILE", true);
   }
 
   @Test

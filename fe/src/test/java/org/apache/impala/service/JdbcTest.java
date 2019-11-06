@@ -423,6 +423,55 @@ public class JdbcTest extends JdbcTestBase {
   }
 
   @Test
+  public void testMetadataGetPrimaryKeys() throws Exception {
+    List<String> pkList = new ArrayList<>(Arrays.asList("id", "year"));
+    ResultSet rs = con_.getMetaData().getPrimaryKeys(null, "functional", "parent_table");
+    ResultSetMetaData md = rs.getMetaData();
+    assertEquals("Incorrect number of columns seen", 6, md.getColumnCount());
+    // TODO (IMPALA-9158): Remove this check.
+    if (!TestUtils.isCatalogV2Enabled("localhost", 25020)) {
+      int pkCount = 0;
+      while (rs.next()) {
+        pkCount++;
+        assertEquals("", rs.getString("TABLE_CAT"));
+        assertEquals("functional", rs.getString("TABLE_SCHEM"));
+        assertEquals("parent_table", rs.getString("TABLE_NAME"));
+        assertTrue(pkList.contains(rs.getString("COLUMN_NAME")));
+        assertTrue(rs.getString("PK_NAME").length() > 0);
+      }
+      assertEquals(2, pkCount);
+    }
+  }
+
+  @Test
+  public void testMetadataGetCrossReference() throws Exception {
+    ResultSet rs = con_.getMetaData().getCrossReference(null, "functional",
+        "parent_table", null,
+        "functional", "child_table");
+    ResultSetMetaData md = rs.getMetaData();
+    assertEquals("Incorrect number of columns seen for primary key.",
+        14, md.getColumnCount());
+    // TODO (IMPALA-9158): Remove this check.
+    if (!TestUtils.isCatalogV2Enabled("localhost", 25020)) {
+      List<String> colList = new ArrayList<>(Arrays.asList("id", "year"));
+      int fkCount = 0;
+      while (rs.next()) {
+        fkCount++;
+        assertEquals("", rs.getString("PKTABLE_CAT"));
+        assertEquals("functional", rs.getString("PKTABLE_SCHEM"));
+        assertEquals("parent_table", rs.getString("PKTABLE_NAME"));
+        assertTrue(colList.contains(rs.getString("PKCOLUMN_NAME")));
+        assertTrue(rs.getString("FK_NAME").length() > 0);
+        assertEquals("", rs.getString("FKTABLE_CAT"));
+        assertEquals("functional", rs.getString("FKTABLE_SCHEM"));
+        assertEquals("child_table", rs.getString("FKTABLE_NAME"));
+        assertTrue(colList.contains(rs.getString("FKCOLUMN_NAME")));
+      }
+      assertEquals(2, fkCount);
+    }
+  }
+
+  @Test
   public void testDecimalGetColumnTypes() throws SQLException {
     // Table has 5 decimal columns
     ResultSet rs = con_.createStatement().executeQuery(

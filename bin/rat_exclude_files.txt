@@ -118,6 +118,9 @@ testdata/cluster/node_templates/common/etc/hadoop/conf/*.xml.tmpl
 testdata/cluster/ranger/setup/*.json.template
 testdata/data/chars-formats.txt
 testdata/data/chars-tiny.txt
+testdata/data/parent_table.txt
+testdata/data/parent_table_2.txt
+testdata/data/child_table.txt
 testdata/data/date_tbl/*.txt
 testdata/data/date_tbl_error/*.txt
 testdata/data/decimal-tiny.txt

@@ -33,6 +33,8 @@ import org.apache.hadoop.hive.metastore.TableType;
 import org.apache.hadoop.hive.metastore.api.ColumnStatisticsData;
 import org.apache.hadoop.hive.metastore.api.ColumnStatisticsObj;
 import org.apache.hadoop.hive.metastore.api.FieldSchema;
+import org.apache.hadoop.hive.metastore.api.SQLForeignKey;
+import org.apache.hadoop.hive.metastore.api.SQLPrimaryKey;
 import org.apache.impala.analysis.TableName;
 import org.apache.impala.compat.MetastoreShim;
 import org.apache.impala.common.ImpalaRuntimeException;
@@ -57,6 +59,7 @@ import org.apache.impala.util.HdfsCachingUtil;
 import org.apache.log4j.Logger;
 
 import com.google.common.base.Preconditions;
+import com.google.common.collect.ImmutableList;
 import com.google.common.collect.Lists;
 
 /**
@@ -108,6 +111,12 @@ public abstract class Table extends CatalogObjectImpl implements FeTable {
 
   // map from lowercase column name to Column object.
   private final Map<String, Column> colsByName_ = new HashMap<>();
+
+  // List of primary keys associated with the table.
+  protected final List<SQLPrimaryKey> primaryKeys_ = new ArrayList<>();
+
+  // List of foreign keys associated with the table.
+  protected final List<SQLForeignKey> foreignKeys_ = new ArrayList<>();
 
   // Type of this table (array of struct) that mirrors the columns. Useful for analysis.
   protected final ArrayType type_ = new ArrayType(new StructType());
@@ -598,6 +607,18 @@ public abstract class Table extends CatalogObjectImpl implements FeTable {
 
   @Override // FeTable
   public List<Column> getColumns() { return colsByPos_; }
+
+  @Override // FeTable
+  public List<SQLPrimaryKey> getPrimaryKeys() {
+    // Prevent clients from modifying the primary keys list.
+    return ImmutableList.copyOf(primaryKeys_);
+  }
+
+  @Override // FeTable
+  public List<SQLForeignKey> getForeignKeys() {
+    // Prevent clients from modifying the foreign keys list.
+    return ImmutableList.copyOf(foreignKeys_);
+  }
 
   @Override // FeTable
   public List<String> getColumnNames() { return Column.toColumnNames(colsByPos_); }

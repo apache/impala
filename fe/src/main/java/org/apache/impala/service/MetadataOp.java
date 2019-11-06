@@ -18,11 +18,15 @@
 package org.apache.impala.service;
 
 import java.sql.DatabaseMetaData;
+import java.util.ArrayList;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Set;
 
-import org.apache.hadoop.hive.metastore.TableType;
+import org.apache.hadoop.hive.metastore.api.SQLForeignKey;
+import org.apache.hadoop.hive.metastore.api.SQLPrimaryKey;
+import org.apache.hive.service.rpc.thrift.TGetCrossReferenceReq;
+import org.apache.hive.service.rpc.thrift.TGetPrimaryKeysReq;
 import org.apache.impala.analysis.StmtMetadataLoader;
 import org.apache.impala.analysis.TableName;
 import org.apache.impala.authorization.User;
@@ -44,6 +48,7 @@ import org.apache.impala.common.ImpalaException;
 import org.apache.impala.compat.MetastoreShim;
 import org.apache.impala.thrift.TColumn;
 import org.apache.impala.thrift.TColumnValue;
+import org.apache.impala.thrift.TMetadataOpRequest;
 import org.apache.impala.thrift.TResultRow;
 import org.apache.impala.thrift.TResultSet;
 import org.apache.impala.thrift.TResultSetMetadata;
@@ -77,6 +82,9 @@ public class MetadataOp {
   private static final TResultSetMetadata GET_TYPEINFO_MD = new TResultSetMetadata();
   private static final TResultSetMetadata GET_TABLE_TYPES_MD = new TResultSetMetadata();
   private static final TResultSetMetadata GET_FUNCTIONS_MD = new TResultSetMetadata();
+  private static final TResultSetMetadata GET_PRIMARY_KEYS_MD = new TResultSetMetadata();
+  private static final TResultSetMetadata GET_CROSS_REFERENCE_MD =
+      new TResultSetMetadata();
 
   // GetTypeInfo contains all primitive types supported by Impala.
   private static final List<TResultRow> GET_TYPEINFO_RESULTS = Lists.newArrayList();
@@ -212,11 +220,54 @@ public class MetadataOp {
         new TColumn("FUNCTION_TYPE", Type.INT.toThrift()));
     GET_FUNCTIONS_MD.addToColumns(
         new TColumn("SPECIFIC_NAME", Type.STRING.toThrift()));
+
+    GET_PRIMARY_KEYS_MD.addToColumns(
+        new TColumn("TABLE_CAT", Type.STRING.toThrift()));
+    GET_PRIMARY_KEYS_MD.addToColumns(
+        new TColumn("TABLE_SCHEM", Type.STRING.toThrift()));
+    GET_PRIMARY_KEYS_MD.addToColumns(
+        new TColumn("TABLE_NAME", Type.STRING.toThrift()));
+    GET_PRIMARY_KEYS_MD.addToColumns(
+        new TColumn("COLUMN_NAME", Type.STRING.toThrift()));
+    GET_PRIMARY_KEYS_MD.addToColumns(
+        new TColumn("KEQ_SEQ", Type.INT.toThrift()));
+    GET_PRIMARY_KEYS_MD.addToColumns(
+        new TColumn("PK_NAME", Type.STRING.toThrift()));
+
+    GET_CROSS_REFERENCE_MD.addToColumns(
+        new TColumn("PKTABLE_CAT", Type.STRING.toThrift()));
+    GET_CROSS_REFERENCE_MD.addToColumns(
+        new TColumn("PKTABLE_SCHEM", Type.STRING.toThrift()));
+    GET_CROSS_REFERENCE_MD.addToColumns(
+        new TColumn("PKTABLE_NAME", Type.STRING.toThrift()));
+    GET_CROSS_REFERENCE_MD.addToColumns(
+        new TColumn("PKCOLUMN_NAME", Type.STRING.toThrift()));
+    GET_CROSS_REFERENCE_MD.addToColumns(
+        new TColumn("FKTABLE_CAT", Type.STRING.toThrift()));
+    GET_CROSS_REFERENCE_MD.addToColumns(
+        new TColumn("FKTABLE_SCHEM", Type.STRING.toThrift()));
+    GET_CROSS_REFERENCE_MD.addToColumns(
+        new TColumn("FKTABLE_NAME", Type.STRING.toThrift()));
+    GET_CROSS_REFERENCE_MD.addToColumns(
+        new TColumn("FKCOLUMN_NAME", Type.STRING.toThrift()));
+    GET_CROSS_REFERENCE_MD.addToColumns(
+        new TColumn("KEQ_SEQ", Type.INT.toThrift()));
+    GET_CROSS_REFERENCE_MD.addToColumns(
+        new TColumn("UPDATE_RULE", Type.INT.toThrift()));
+    GET_CROSS_REFERENCE_MD.addToColumns(
+        new TColumn("DELETE_RULE", Type.INT.toThrift()));
+    GET_CROSS_REFERENCE_MD.addToColumns(
+        new TColumn("FK_NAME", Type.STRING.toThrift()));
+    GET_CROSS_REFERENCE_MD.addToColumns(
+        new TColumn("PK_NAME", Type.STRING.toThrift()));
+    GET_CROSS_REFERENCE_MD.addToColumns(
+        new TColumn("DEFERRABILITY", Type.INT.toThrift()));
   }
 
   /**
    * Contains lists of databases, lists of table belonging to the dbs, list of columns
-   * belonging to the tables, and list of user functions.
+   * belonging to the tables, primary keys and foreign keys belonging to the tables,
+   * and list of user functions.
    */
   private static class DbsMetadata {
      // the list of database
@@ -237,6 +288,12 @@ public class MetadataOp {
 
     // functions[i] are the functions within dbs[i]
     public List<List<Function>> functions = Lists.newArrayList();
+
+    // primaryKeys[i][j] are primary keys of tableNames[j] in dbs[i]
+    public List<List<List<SQLPrimaryKey>>> primaryKeys = Lists.newArrayList();
+
+    // foreignKeys[i][j] are primary keys of tableNames[j] in dbs[i]
+    public List<List<List<SQLForeignKey>>> foreignKeys = Lists.newArrayList();
 
     // Set of tables that are missing (not yet loaded).
     public Set<TableName> missingTbls = new HashSet<TableName>();
@@ -302,6 +359,8 @@ public class MetadataOp {
         List<List<Column>> tablesColumnsList = Lists.newArrayList();
         List<String> tableComments = Lists.newArrayList();
         List<String> tableTypes = Lists.newArrayList();
+        List<List<SQLPrimaryKey>> primaryKeysList = Lists.newArrayList();
+        List<List<SQLForeignKey>> foreignKeysList = Lists.newArrayList();
         for (String tabName: fe.getTableNames(db.getName(), tablePatternMatcher, user)) {
           FeTable table;
           if (columnPatternMatcher == PatternMatcher.MATCHER_MATCH_NONE) {
@@ -317,6 +376,8 @@ public class MetadataOp {
 
           String comment = null;
           List<Column> columns = Lists.newArrayList();
+          List<SQLPrimaryKey> primaryKeys = Lists.newArrayList();
+          List<SQLForeignKey> foreignKeys = Lists.newArrayList();
           // If the table is not yet loaded, the columns will be unknown. Add it
           // to the set of missing tables.
           String tableType = TABLE_TYPE_TABLE;
@@ -331,9 +392,17 @@ public class MetadataOp {
                   .getOrDefault(tableTypeStr, TABLE_TYPE_TABLE);
             }
             columns.addAll(fe.getColumns(table, columnPatternMatcher, user));
+            if (columnPatternMatcher != PatternMatcher.MATCHER_MATCH_NONE) {
+              // It is unnecessary to populate pk/fk information if the request does not
+              // want to match any columns.
+              primaryKeys.addAll(fe.getPrimaryKeys(table, user));
+              foreignKeys.addAll(fe.getForeignKeys(table, user));
+            }
           }
           tableList.add(tabName);
           tablesColumnsList.add(columns);
+          primaryKeysList.add(primaryKeys);
+          foreignKeysList.add(foreignKeys);
           tableComments.add(Strings.nullToEmpty(comment));
           tableTypes.add(tableType);
         }
@@ -341,6 +410,8 @@ public class MetadataOp {
         result.tableNames.add(tableList);
         result.comments.add(tableComments);
         result.columns.add(tablesColumnsList);
+        result.primaryKeys.add(primaryKeysList);
+        result.foreignKeys.add(foreignKeysList);
         result.tableTypes.add(tableTypes);
       }
     }
@@ -537,6 +608,159 @@ public class MetadataOp {
     }
     if (LOG.isTraceEnabled()) LOG.trace("Returning " + result.rows.size() + " tables");
     return result;
+  }
+
+  /**
+   * Executes the GetPrimaryKeys HiveServer2 operation and returns TResultSet.
+   * This queries the Impala catalog to get the primary keys of a given table.
+   * Similar to getColumns, matching primary key columns requires loading the
+   * table metadata, so if any missing tables are found, an RPC to the CatalogServer
+   * will be executed to request loading these tables. The matching process will be
+   * restarted once the required tables have been loaded in the local Impalad Catalog or
+   * the wait timeout has been reached.
+   */
+  public static TResultSet getPrimaryKeys(Frontend fe, TMetadataOpRequest request,
+      User user) throws ImpalaException {
+    TGetPrimaryKeysReq req = request.getGet_primary_keys_req();
+    String catalogName = req.getCatalogName();
+    String schemaName = req.getSchemaName();
+    String tableName = req.getTableName();
+    TResultSet result = createEmptyResultSet(GET_PRIMARY_KEYS_MD);
+    // Get the list of schemas, tables that satisfy the search conditions.
+    PatternMatcher schemaMatcher = PatternMatcher.createJdbcPatternMatcher(schemaName);
+    PatternMatcher tableMatcher = PatternMatcher.createJdbcPatternMatcher(tableName);
+    DbsMetadata dbsMetadata = getDbsMetadata(fe, catalogName, schemaMatcher,
+        tableMatcher, PatternMatcher.MATCHER_MATCH_ALL,
+        PatternMatcher.MATCHER_MATCH_NONE, user);
+
+    if (!dbsMetadata.missingTbls.isEmpty()) {
+      // Need to load tables for column metadata.
+      StmtMetadataLoader mdLoader = new StmtMetadataLoader(fe, Catalog.DEFAULT_DB, null);
+      mdLoader.loadTables(dbsMetadata.missingTbls);
+      dbsMetadata = getDbsMetadata(fe, catalogName, schemaMatcher,
+          tableMatcher, PatternMatcher.MATCHER_MATCH_ALL,
+          PatternMatcher.MATCHER_MATCH_NONE, user);
+    }
+
+    for (int i = 0; i < dbsMetadata.dbs.size(); ++i) {
+      for (int j = 0; j < dbsMetadata.tableNames.get(i).size(); ++j) {
+        TResultRow row = new TResultRow();
+        for (SQLPrimaryKey pk : dbsMetadata.primaryKeys.get(i).get(j)) {
+          row.colVals = Lists.newArrayList();
+          row.colVals.add(EMPTY_COL_VAL);
+          row.colVals.add(createTColumnValue(pk.getTable_db()));
+          row.colVals.add(createTColumnValue(pk.getTable_name()));
+          row.colVals.add(createTColumnValue(pk.getColumn_name()));
+          row.colVals.add(createTColumnValue(pk.getKey_seq()));
+          row.colVals.add(createTColumnValue(pk.getPk_name()));
+          result.rows.add(row);
+        }
+      }
+    }
+    if (LOG.isTraceEnabled()) {
+      LOG.trace("Returning {} primary keys for table {}.", result.rows.size(), tableName);
+    }
+    return result;
+  }
+
+  /**
+   * Executes the GetCrossReference HiveServer2 operation and returns TResultSet.
+   * This queries the Impala catalog to get the foreign keys of a given table.
+   * Similar to getColumns, matching foreign key columns requires loading the
+   * table metadata, so if any missing tables are found, an RPC to the CatalogServer
+   * will be executed to request loading these tables. The matching process will be
+   * restarted once the required tables have been loaded in the local Impalad Catalog or
+   * the wait timeout has been reached. If parent schema and parent table are specified
+   * in the request, we return only the foreign keys related to the parent table. If
+   * not, we return all foreign keys associated with the foreign table.
+   */
+  public static TResultSet getCrossReference(Frontend fe, TMetadataOpRequest request,
+      User user) throws ImpalaException {
+    TGetCrossReferenceReq req = request.getGet_cross_reference_req();
+    String foreignCatalogName = req.getForeignCatalogName();
+    String foreignSchemaName = req.getForeignSchemaName();
+    String foreignTableName = req.getForeignTableName();
+    String parentSchemaName = req.getParentSchemaName();
+    String parentTableName = req.getParentTableName();
+    TResultSet result = createEmptyResultSet(GET_CROSS_REFERENCE_MD);
+    // Get the list of schemas, tables that satisfy the search conditions.
+    PatternMatcher schemaMatcher =
+        PatternMatcher.createJdbcPatternMatcher(foreignSchemaName);
+    PatternMatcher tableMatcher =
+        PatternMatcher.createJdbcPatternMatcher(foreignTableName);
+    DbsMetadata dbsMetadata = getDbsMetadata(fe, foreignCatalogName, schemaMatcher,
+        tableMatcher, PatternMatcher.MATCHER_MATCH_ALL,
+        PatternMatcher.MATCHER_MATCH_NONE, user);
+
+    if (!dbsMetadata.missingTbls.isEmpty()) {
+      // Need to load tables for column metadata.
+      StmtMetadataLoader mdLoader = new StmtMetadataLoader(fe, Catalog.DEFAULT_DB, null);
+      mdLoader.loadTables(dbsMetadata.missingTbls);
+      dbsMetadata = getDbsMetadata(fe, foreignCatalogName, schemaMatcher,
+          tableMatcher, PatternMatcher.MATCHER_MATCH_ALL,
+          PatternMatcher.MATCHER_MATCH_NONE, user);
+    }
+
+    for (int i = 0; i < dbsMetadata.dbs.size(); ++i) {
+      for (int j = 0; j < dbsMetadata.tableNames.get(i).size(); ++j) {
+        // HMS API allows querying FK information for specific pk/fk columns. In Impala,
+        // we store all foreign keys associated with at table together in the Table
+        // object. For this metadata we filter out the foreignKeys which are not matching
+        // given parent and foreign schema information.
+        List<SQLForeignKey> filteredForeignKeys =
+            filterForeignKeys(dbsMetadata.foreignKeys.get(i).get(j), parentSchemaName,
+                parentTableName);
+
+        TResultRow row = new TResultRow();
+        for (SQLForeignKey fk : filteredForeignKeys) {
+          row.colVals = Lists.newArrayList();
+          row.colVals.add(EMPTY_COL_VAL); // PKTABLE_CAT
+          row.colVals.add(createTColumnValue(fk.getPktable_db()));
+          row.colVals.add(createTColumnValue(fk.getPktable_name()));
+          row.colVals.add(createTColumnValue(fk.getPkcolumn_name()));
+          row.colVals.add(EMPTY_COL_VAL); // FKTABLE_CAT
+          row.colVals.add(createTColumnValue(fk.getFktable_db()));
+          row.colVals.add(createTColumnValue(fk.getFktable_name()));
+          row.colVals.add(createTColumnValue(fk.getFkcolumn_name()));
+          row.colVals.add(createTColumnValue(fk.getKey_seq()));
+          row.colVals.add(createTColumnValue(fk.getUpdate_rule()));
+          row.colVals.add(createTColumnValue(fk.getDelete_rule()));
+          row.colVals.add(createTColumnValue(fk.getFk_name()));
+          row.colVals.add(createTColumnValue(fk.getPk_name()));
+          // DEFERRABILITY is currently not supported.
+          row.colVals.add(EMPTY_COL_VAL); // DEFERRABILITY
+          result.rows.add(row);
+        }
+      }
+    }
+    if (LOG.isTraceEnabled()) {
+      LOG.trace("Returning {} foreign keys for table {}.", result.rows.size(),
+          foreignTableName);
+    }
+    return result;
+  }
+
+  /**
+   * Helper to filter foreign keys based on given parent table. If both parent schema
+   * name and parent table name are specified, we return only the foreign keys that are
+   * associated with the parent table. Otherwise, we return all the foreign keys for
+   * this table.
+   */
+  private static List<SQLForeignKey> filterForeignKeys(List<SQLForeignKey> dbForeignKeys,
+      String pkSchemaName, String pkTableName) {
+    // If pkSchema or pkTable are not specified (For example: We want to retrieve all
+    // the foreignKeys from the foreign key side.) we return all the foreign keys.
+    if (pkSchemaName == null || pkTableName == null) {
+      return new ArrayList<>(dbForeignKeys);
+    }
+    List<SQLForeignKey> foreignKeys = new ArrayList<>();
+    for (SQLForeignKey fk : dbForeignKeys) {
+      if (fk.getPktable_db().equals(pkSchemaName) &&
+          fk.getPktable_name().equals(pkTableName)) {
+        foreignKeys.add(fk);
+      }
+    }
+    return foreignKeys;
   }
 
   /**

@@ -2022,6 +2022,54 @@ FROM {db_name}.{table_name};
 ---- DATASET
 functional
 ---- BASE_TABLE_NAME
+parent_table
+---- CREATE
+CREATE EXTERNAL TABLE IF NOT EXISTS {db_name}{db_suffix}.{table_name} (
+id INT, year string, primary key(id, year) DISABLE NOVALIDATE RELY)
+row format delimited fields terminated by ','
+LOCATION '/test-warehouse/{table_name}';
+---- ROW_FORMAT
+delimited fields terminated by '',''
+---- LOAD
+`hadoop fs -mkdir -p /test-warehouse/parent_table && hadoop fs -put -f \
+${IMPALA_HOME}/testdata/data/parent_table.txt /test-warehouse/parent_table/
+====
+---- DATASET
+functional
+---- BASE_TABLE_NAME
+parent_table_2
+---- CREATE
+CREATE EXTERNAL TABLE IF NOT EXISTS {db_name}{db_suffix}.{table_name} (
+a INT, primary key(a) DISABLE NOVALIDATE RELY)
+row format delimited fields terminated by ','
+LOCATION '/test-warehouse/{table_name}';
+---- ROW_FORMAT
+delimited fields terminated by ','
+---- LOAD
+`hadoop fs -mkdir -p /test-warehouse/parent_table_2 && hadoop fs -put -f \
+${IMPALA_HOME}/testdata/data/parent_table_2.txt /test-warehouse/parent_table_2/
+====
+---- DATASET
+functional
+---- BASE_TABLE_NAME
+child_table
+---- CREATE
+CREATE EXTERNAL TABLE IF NOT EXISTS {db_name}{db_suffix}.{table_name} (
+seq int, id int, year string, a int, primary key(seq) DISABLE NOVALIDATE RELY, foreign key
+(id, year) references {db_name}{db_suffix}.parent_table(id, year) DISABLE NOVALIDATE
+RELY, foreign key(a) references {db_name}{db_suffix}.parent_table_2(a) DISABLE
+NOVALIDATE RELY)
+row format delimited fields terminated by ','
+LOCATION '/test-warehouse/{table_name}';
+---- ROW_FORMAT
+delimited fields terminated by ','
+---- LOAD
+`hadoop fs -mkdir -p /test-warehouse/child_table && hadoop fs -put -f \
+${IMPALA_HOME}/testdata/data/child_table.txt /test-warehouse/child_table/
+====
+---- DATASET
+functional
+---- BASE_TABLE_NAME
 chars_tiny
 ---- COLUMNS
 cs CHAR(5)

@@ -572,6 +572,8 @@ enum TMetadataOpcode {
   GET_TABLE_TYPES = 4
   GET_COLUMNS = 5
   GET_FUNCTIONS = 6
+  GET_PRIMARY_KEYS = 7
+  GET_CROSS_REFERENCE = 8
 }
 
 // Input parameter to JniFrontend.hiveServer2MetadataOperation
@@ -594,6 +596,8 @@ struct TMetadataOpRequest {
   // enabled, only the server objects this user has access to will be returned.
   // If not set, access checks will be skipped (used for internal Impala requests)
   10: optional ImpalaInternalService.TSessionState session
+  11: optional TCLIService.TGetPrimaryKeysReq get_primary_keys_req
+  12: optional TCLIService.TGetCrossReferenceReq get_cross_reference_req
 }
 
 // Tracks accesses to Catalog objects for use during auditing. This information, paired

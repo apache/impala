@@ -2364,34 +2364,33 @@ public class AnalyzeDDLTest extends FrontendTestBase {
 
     // Foreign key test needs a valid primary key table to pass.
     addTestDb("test_pk_fk", "Test DB for PK/FK tests");
-    addTestTable("create table test_pk_fk.pk (id int, year string, primary key (id, "
-        + "year) disable novalidate rely)");
-    addTestTable("create table test_pk_fk.non_pk_table(id int)");
     AnalysisContext ctx = createAnalysisCtx("test_pk_fk");
-    AnalysisError("create table foo(id int, year int, foreign key (id) references "
-        + "pk(id) enable novalidate rely)", ctx,"ENABLE feature is "
-        + "not supported yet.");
-    AnalysisError("create table foo(id int, year int, foreign key (id) references "
-        + "pk(id) disable validate rely)", ctx,"VALIDATE feature is "
-        + "not supported yet.");
-    AnalyzesOk("create table fk(id int, year int, primary key (id, year) disable "
-        + "novalidate rely, foreign key(id) REFERENCES pk(id) "
+    AnalysisError("create table foo(seq int, id int, year int, a int, foreign key "
+        + "(id, year) references functional.parent_table(id, year) enable novalidate "
+        + "rely)", ctx,"ENABLE feature is not supported yet.");
+    AnalysisError("create table foo(seq int, id int, year int, a int, foreign key "
+        + "(id, year) references functional.parent_table(id, year) disable validate "
+        + "rely)", ctx,"VALIDATE feature is not supported yet.");
+    AnalyzesOk("create table foo(seq int, id int, year int, a int, "
+        + "foreign key(id, year) references functional.parent_table(id, year) "
         + "DISABLE NOVALIDATE RELY)", ctx);
-    AnalyzesOk("create table foo(id int, year int, foreign key (id) references "
-        + "pk(id) disable novalidate rely)", ctx);
-    AnalyzesOk("create table foo(id int, year int, foreign key (id) references "
-        + "pk(id))", ctx);
-    AnalysisError("create table fk(id int, year string, foreign key(year) references "
-        + "pk2(year))", ctx, "Parent table not found: test_pk_fk.pk2");
+    AnalyzesOk("create table foo(seq int, id int, year int, a int, "
+        + "foreign key(id, year) references functional.parent_table(id, year)"
+        + " disable novalidate rely)", ctx);
+    AnalyzesOk("create table foo(seq int, id int, year int, a int, "
+            + "foreign key(id, year) references functional.parent_table(id, year))", ctx);
+    AnalysisError("create table fk(id int, year string, foreign key(year) "
+        + "references pk2(year))", ctx, "Parent table not found: test_pk_fk.pk2");
     AnalyzesOk("create table fk(id int, year string, foreign key(id, year) references"
-        + " pk(id, year))", ctx);
+        + " functional.parent_table(id, year))", ctx);
     AnalysisError("create table fk(id int, year string, foreign key(id, year) "
         + "references pk(year))", ctx, "The number of foreign key columns should be same"
         + " as the number of parent key columns.");
-    AnalysisError("create table fk(id int, foreign key(id) references pk(foo))", ctx,
-        "Parent column not found: foo");
     AnalysisError("create table fk(id int, foreign key(id) references "
-        + "non_pk_table(id))", ctx, "Parent column id is not part of primary key.");
+            + "functional.parent_table(foo))", ctx, "Parent column not found: foo");
+    AnalysisError("create table fk(id int, foreign key(id) references "
+        + "functional.alltypes(int_col))", ctx, "Parent column int_col is not part of "
+        + "primary key.");
 
     {
       // Check that long_properties fail at the analysis layer

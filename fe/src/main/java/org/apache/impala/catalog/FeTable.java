@@ -20,8 +20,11 @@ import java.util.Comparator;
 import java.util.List;
 import java.util.Set;
 
+import org.apache.hadoop.hive.metastore.api.SQLForeignKey;
+import org.apache.hadoop.hive.metastore.api.SQLPrimaryKey;
 import org.apache.hadoop.hive.metastore.api.Table;
 import org.apache.impala.analysis.TableName;
+import org.apache.impala.common.NotImplementedException;
 import org.apache.impala.thrift.TCatalogObjectType;
 import org.apache.impala.thrift.TTableDescriptor;
 import org.apache.impala.thrift.TTableStats;
@@ -89,6 +92,16 @@ public interface FeTable {
    * @return a list of the column names ordered by position.
    */
   List<String> getColumnNames();
+
+  /**
+   * @return the list of primary keys for this table.
+   */
+  List<SQLPrimaryKey> getPrimaryKeys();
+
+  /**
+   * @return the list of foreign keys for this table.
+   */
+  List<SQLForeignKey> getForeignKeys();
 
   /**
    * @return an unmodifiable list of all partition columns.

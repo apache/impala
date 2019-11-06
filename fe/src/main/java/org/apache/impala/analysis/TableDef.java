@@ -542,9 +542,14 @@ class TableDef {
         // Hive has a bug that prevents foreign keys from being added when pk column is
         // not part of primary key. This can be confusing. Till this bug is fixed, we
         // will not allow foreign keys definition on such columns.
-        if (!((HdfsTable) parentTable).getPrimaryKeysSql().contains(pkCol)) {
-          throw new AnalysisException(String.format("Parent column %s is not part of "
-              + "primary key.", pkCol));
+        if (parentTable instanceof HdfsTable) {
+          // TODO (IMPALA-9158): Modify this check to call FeFsTable.getPrimaryKeysSql()
+          // instead of HdfsTable.getPrimaryKeysSql() when we implement PK/FK feature
+          // for LocalCatalog.
+          if (!((HdfsTable) parentTable).getPrimaryKeysSql().contains(pkCol)) {
+            throw new AnalysisException(String.format("Parent column %s is not part of "
+                + "primary key.", pkCol));
+          }
         }
       }
 

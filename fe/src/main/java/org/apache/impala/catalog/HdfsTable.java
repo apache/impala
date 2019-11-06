@@ -1621,10 +1621,14 @@ public class HdfsTable extends Table implements FeFsTable {
   public ListMap<TNetworkAddress> getHostIndex() { return hostIndex_; }
 
   @Override
-  public List<SQLPrimaryKey> getPrimaryKeys() { return primaryKeys_; }
+  public List<SQLPrimaryKey> getPrimaryKeys() {
+    return ImmutableList.copyOf(primaryKeys_);
+  }
 
   @Override
-  public List<SQLForeignKey> getForeignKeys() { return foreignKeys_; }
+  public List<SQLForeignKey> getForeignKeys() {
+    return ImmutableList.copyOf(foreignKeys_);
+  }
 
   /**
    * Get primary keys column names, useful for toSqlUtils.
@@ -1645,7 +1649,7 @@ public class HdfsTable extends Table implements FeFsTable {
   public List<String> getForeignKeysSql() {
     List<String> foreignKeysSql = new ArrayList<>();
     // Iterate through foreign keys list. This list may contain multiple foreign keys
-    // and each foreign key may contain multiple columns. The outerloop collects
+    // and each foreign key may contain multiple columns. The outer loop collects
     // information common to a foreign key (pk table information). The inner
     // loop collects column information.
     List<SQLForeignKey> foreignKeys = getForeignKeys();

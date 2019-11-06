@@ -650,6 +650,42 @@ void ImpalaServer::GetFunctions(TGetFunctionsResp& return_val,
   VLOG_QUERY << "GetFunctions(): return_val=" << ThriftDebugString(return_val);
 }
 
+void ImpalaServer::GetPrimaryKeys(TGetPrimaryKeysResp& return_val,
+    const TGetPrimaryKeysReq& request) {
+  VLOG_QUERY << "GetPrimaryKeys(): request=" << ThriftDebugString(request);
+  HS2_RETURN_IF_ERROR(return_val, CheckNotShuttingDown(), SQLSTATE_GENERAL_ERROR);
+
+  TMetadataOpRequest req;
+  req.__set_opcode(TMetadataOpcode::GET_PRIMARY_KEYS);
+  req.__set_get_primary_keys_req(request);
+
+  TOperationHandle handle;
+  thrift::TStatus status;
+  ExecuteMetadataOp(request.sessionHandle.sessionId, &req, &handle, &status);
+  return_val.__set_operationHandle(handle);
+  return_val.__set_status(status);
+
+  VLOG_QUERY << "GetPrimaryKeys(): return_val=" << ThriftDebugString(return_val);
+}
+
+void ImpalaServer::GetCrossReference(TGetCrossReferenceResp& return_val,
+    const TGetCrossReferenceReq& request) {
+  VLOG_QUERY << "GetCrossReference(): request=" << ThriftDebugString(request);
+  HS2_RETURN_IF_ERROR(return_val, CheckNotShuttingDown(), SQLSTATE_GENERAL_ERROR);
+
+  TMetadataOpRequest req;
+  req.__set_opcode(TMetadataOpcode::GET_CROSS_REFERENCE);
+  req.__set_get_cross_reference_req(request);
+
+  TOperationHandle handle;
+  thrift::TStatus status;
+  ExecuteMetadataOp(request.sessionHandle.sessionId, &req, &handle, &status);
+  return_val.__set_operationHandle(handle);
+  return_val.__set_status(status);
+
+  VLOG_QUERY << "GetCrossReference(): return_val=" << ThriftDebugString(return_val);
+}
+
 void ImpalaServer::GetOperationStatus(TGetOperationStatusResp& return_val,
     const TGetOperationStatusReq& request) {
   if (request.operationHandle.operationId.guid.size() == 0) {

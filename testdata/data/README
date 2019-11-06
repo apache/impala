@@ -439,3 +439,15 @@ I used Hive 2.1.1 with a modified Parquet-MR, see description at decimals_1_10.p
 I used the following commands to create the file:
 hive  --hiveconf parquet.page.row.count.limit=90 --hiveconf parquet.page.size=90 --hiveconf parquet.enable.dictionary=false  --hiveconf parquet.page.size.row.check.min=7
 create table alltypes_tiny_pages_plain stored as parquet as select * from functional_parquet.alltypes
+
+parent_table:
+Created manually. Contains two columns, an INT and a STRING column. Together they form primary key for the table. This table is used to test primary key and foreign key
+relationships along with parent_table_2 and child_table.
+
+parent_table_2:
+Created manually. Contains just one int column which is also the table's primary key. This table is used to test primary key and foreign key
+relationships along with parent_table and child_table.
+
+child_table:
+Created manually. Contains four columns. 'seq' column is the primary key of this table. ('id', 'year') form a foreign key referring to parent_table('id', 'year') and 'a' is a
+foreign key referring to parent_table_2's primary column 'a'.
