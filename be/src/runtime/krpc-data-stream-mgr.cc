@@ -24,6 +24,7 @@
 
 #include "kudu/rpc/rpc_context.h"
 #include "kudu/util/net/sockaddr.h"
+#include "kudu/util/trace.h"
 
 #include "exec/kudu-util.h"
 #include "runtime/exec-env.h"
@@ -223,10 +224,12 @@ void KrpcDataStreamMgr::AddData(const TransmitDataRequestPB* request,
     // closed_stream_cache_), the sender is timed out by the maintenance thread.
     if (!already_unregistered && recvr == nullptr) {
       AddEarlySender(finst_id, request, response, rpc_context);
+      TRACE_TO(rpc_context->trace(), "Added early sender");
       return;
     }
   }
   if (already_unregistered) {
+    TRACE_TO(rpc_context->trace(), "Sender already unregistered");
     // The receiver may remove itself from the receiver map via DeregisterRecvr() at any
     // time without considering the remaining number of senders. As a consequence,
     // FindRecvr() may return nullptr even though the receiver was once present. We
@@ -282,13 +285,19 @@ void KrpcDataStreamMgr::CloseSender(const EndDataStreamRequestPB* request,
     // rows if no rows are materialized at all in the sender side.
     if (!already_unregistered && recvr == nullptr) {
       AddEarlyClosedSender(finst_id, request, response, rpc_context);
+      TRACE_TO(rpc_context->trace(), "Added early closed sender");
       return;
     }
   }
 
   // If we reach this point, either the receiver is found or it has been unregistered
   // already. In either cases, it's safe to just return an OK status.
-  if (LIKELY(recvr != nullptr)) recvr->RemoveSender(request->sender_id());
+  TRACE_TO(
+      rpc_context->trace(), "Found receiver? $0", recvr != nullptr ? "true" : "false");
+  if (LIKELY(recvr != nullptr)) {
+    recvr->RemoveSender(request->sender_id());
+    TRACE_TO(rpc_context->trace(), "Removed sender from receiver");
+  }
   DataStreamService::RespondAndReleaseRpc(Status::OK(), response, rpc_context,
       service_mem_tracker_);
 }
@@ -348,6 +357,7 @@ void KrpcDataStreamMgr::Cancel(const TUniqueId& finst_id) {
 
 template<typename ContextType, typename RequestPBType>
 void KrpcDataStreamMgr::RespondToTimedOutSender(const std::unique_ptr<ContextType>& ctx) {
+  TRACE_TO(ctx->rpc_context->trace(), "Timed out sender");
   const RequestPBType* request = ctx->request;
   TUniqueId finst_id;
   finst_id.__set_lo(request->dest_fragment_instance_id().lo());

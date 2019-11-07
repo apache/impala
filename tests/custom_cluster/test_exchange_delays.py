@@ -39,7 +39,8 @@ class TestExchangeDelays(CustomClusterTestSuite):
   @pytest.mark.execute_serially
   @CustomClusterTestSuite.with_args(
       "--stress_datastream_recvr_delay_ms={0}".format(DELAY_MS)
-      + " --datastream_sender_timeout_ms=5000")
+      + " --datastream_sender_timeout_ms=5000"
+      + " --impala_slow_rpc_threshold_ms=500")
   def test_exchange_small_delay(self, vector):
     """Test delays in registering data stream receivers where the first one or two
     batches will time out before the receiver registers, but subsequent batches will
@@ -51,7 +52,8 @@ class TestExchangeDelays(CustomClusterTestSuite):
   @pytest.mark.execute_serially
   @CustomClusterTestSuite.with_args(
       "--stress_datastream_recvr_delay_ms={0}".format(DELAY_MS)
-      + " --datastream_sender_timeout_ms=1")
+      + " --datastream_sender_timeout_ms=1"
+      + " --impala_slow_rpc_threshold_ms=500")
   def test_exchange_large_delay(self, vector):
     """Test delays in registering data stream receivers where all of the batches sent
     will time out before the receiver registers. Before IMPALA-2987, this scenario
@@ -72,7 +74,8 @@ class TestExchangeDelays(CustomClusterTestSuite):
   @pytest.mark.execute_serially
   @CustomClusterTestSuite.with_args(
       "--stress_datastream_recvr_delay_ms={0}".format(DELAY_MS)
-      + " --datastream_sender_timeout_ms=1")
+      + " --datastream_sender_timeout_ms=1"
+      + " --impala_slow_rpc_threshold_ms=500")
   def test_exchange_large_delay_zero_rows(self, vector):
     """Test the special case when no batches are sent and the EOS message times out."""
     self.run_test_case('QueryTest/exchange-delays-zero-rows', vector)

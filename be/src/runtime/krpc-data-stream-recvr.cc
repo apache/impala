@@ -26,6 +26,7 @@
 #include "exec/kudu-util.h"
 #include "kudu/rpc/rpc_context.h"
 #include "kudu/util/monotime.h"
+#include "kudu/util/trace.h"
 #include "runtime/fragment-instance-state.h"
 #include "runtime/krpc-data-stream-recvr.h"
 #include "runtime/krpc-data-stream-mgr.h"
@@ -151,7 +152,7 @@ class KrpcDataStreamRecvr::SenderQueue {
   // failed. Returns OK otherwise.
   Status AddBatchWork(int64_t batch_size, const RowBatchHeaderPB& header,
       const kudu::Slice& tuple_offsets, const kudu::Slice& tuple_data,
-      unique_lock<SpinLock>* lock) WARN_UNUSED_RESULT;
+      unique_lock<SpinLock>* lock, RpcContext* rpc_context) WARN_UNUSED_RESULT;
 
   // Receiver of which this queue is a member.
   KrpcDataStreamRecvr* recvr_;
@@ -323,6 +324,7 @@ inline bool KrpcDataStreamRecvr::SenderQueue::CanEnqueue(int64_t batch_size,
 void KrpcDataStreamRecvr::SenderQueue::EnqueueDeferredRpc(
     unique_ptr<TransmitDataCtx> payload, const unique_lock<SpinLock>& lock) {
   DCHECK(lock.owns_lock());
+  TRACE_TO(payload->rpc_context->trace(), "Enqueuing deferred RPC");
   if (deferred_rpcs_.empty()) has_deferred_rpcs_start_time_ns_ = MonotonicNanos();
   deferred_rpcs_.push(move(payload));
   recvr_->num_deferred_rpcs_.Add(1);
@@ -379,7 +381,8 @@ Status KrpcDataStreamRecvr::SenderQueue::UnpackRequest(
 
 Status KrpcDataStreamRecvr::SenderQueue::AddBatchWork(int64_t batch_size,
     const RowBatchHeaderPB& header, const kudu::Slice& tuple_offsets,
-    const kudu::Slice& tuple_data, unique_lock<SpinLock>* lock) {
+    const kudu::Slice& tuple_data, unique_lock<SpinLock>* lock,
+    RpcContext* rpc_context) {
   DCHECK(lock != nullptr);
   DCHECK(lock->owns_lock());
   DCHECK(!is_cancelled_);
@@ -393,6 +396,7 @@ Status KrpcDataStreamRecvr::SenderQueue::AddBatchWork(int64_t batch_size,
   // Deserialization may take some time due to compression and memory allocation.
   // Drop the lock so we can deserialize multiple batches in parallel.
   lock->unlock();
+  TRACE_TO(rpc_context->trace(), "Deserializing batch");
   unique_ptr<RowBatch> batch;
   Status status;
   {
@@ -414,10 +418,12 @@ Status KrpcDataStreamRecvr::SenderQueue::AddBatchWork(int64_t batch_size,
     recvr_->num_buffered_bytes_.Add(-batch_size);
     VLOG_QUERY << "Failed to deserialize batch for "
                << PrintId(recvr_->fragment_instance_id());
+    TRACE_TO(rpc_context->trace(), "Failed to deserialize batch: $0", status.GetDetail());
     MarkErrorStatus(status, *lock);
     return status;
   }
   VLOG_ROW << "added #rows=" << batch->num_rows() << " batch_size=" << batch_size;
+  TRACE_TO(rpc_context->trace(), "Enqueuing deserialized batch");
   COUNTER_ADD(recvr_->total_enqueued_batches_counter_, 1);
   batch_queue_.emplace_back(batch_size, move(batch));
   data_arrival_cv_.notify_one();
@@ -438,6 +444,7 @@ void KrpcDataStreamRecvr::SenderQueue::AddBatch(const TransmitDataRequestPB* req
       unique_lock<SpinLock> l(lock_);
       MarkErrorStatus(status, l);
     }
+    TRACE_TO(rpc_context->trace(), "Error unpacking request: $0", status.GetDetail());
     DataStreamService::RespondRpc(status, response, rpc_context);
     return;
   }
@@ -453,6 +460,7 @@ void KrpcDataStreamRecvr::SenderQueue::AddBatch(const TransmitDataRequestPB* req
     // responded to if we reach here.
     DCHECK_GT(num_remaining_senders_, 0);
     if (UNLIKELY(is_cancelled_)) {
+      TRACE_TO(rpc_context->trace(), "Receiver was cancelled");
       Status cancel_status = Status::Expected(TErrorCode::DATASTREAM_RECVR_CLOSED,
           PrintId(recvr_->fragment_instance_id()), recvr_->dest_node_id());
       DataStreamService::RespondRpc(cancel_status, response, rpc_context);
@@ -473,7 +481,7 @@ void KrpcDataStreamRecvr::SenderQueue::AddBatch(const TransmitDataRequestPB* req
     }
 
     // At this point, we are committed to inserting the row batch into 'batch_queue_'.
-    status = AddBatchWork(batch_size, header, tuple_offsets, tuple_data, &l);
+    status = AddBatchWork(batch_size, header, tuple_offsets, tuple_data, &l, rpc_context);
   }
 
   // Respond to the sender to ack the insertion of the row batches.
@@ -495,6 +503,7 @@ void KrpcDataStreamRecvr::SenderQueue::ProcessDeferredRpc() {
 
     // Try enqueuing the first entry into 'batch_queue_'.
     ctx.swap(deferred_rpcs_.front());
+    TRACE_TO(ctx->rpc_context->trace(), "Processing deferred RPC");
     kudu::Slice tuple_offsets;
     kudu::Slice tuple_data;
     int64_t batch_size;
@@ -502,6 +511,8 @@ void KrpcDataStreamRecvr::SenderQueue::ProcessDeferredRpc() {
         &tuple_data, &batch_size);
     // Reply with error status if the entry cannot be unpacked.
     if (UNLIKELY(!status.ok())) {
+      TRACE_TO(ctx->rpc_context->trace(),
+          "Error unpacking deferred RPC: $0", status.GetDetail());
       MarkErrorStatus(status, l);
       DataStreamService::RespondAndReleaseRpc(status, ctx->response, ctx->rpc_context,
           recvr_->deferred_rpc_tracker());
@@ -512,6 +523,7 @@ void KrpcDataStreamRecvr::SenderQueue::ProcessDeferredRpc() {
     // Stops if inserting the batch causes us to go over the limit.
     // Put 'ctx' back on the queue.
     if (!CanEnqueue(batch_size, l)) {
+      TRACE_TO(ctx->rpc_context->trace(), "Batch queue is full");
       ctx.swap(deferred_rpcs_.front());
       DCHECK(deferred_rpcs_.front().get() != nullptr);
       return;
@@ -520,7 +532,8 @@ void KrpcDataStreamRecvr::SenderQueue::ProcessDeferredRpc() {
     // Dequeues the deferred batch and adds it to 'batch_queue_'.
     DequeueDeferredRpc(l);
     const RowBatchHeaderPB& header = ctx->request->row_batch_header();
-    status = AddBatchWork(batch_size, header, tuple_offsets, tuple_data, &l);
+    status = AddBatchWork(
+        batch_size, header, tuple_offsets, tuple_data, &l, ctx->rpc_context);
     DCHECK(!status.ok() || !batch_queue_.empty());
 
     // Release to MemTracker while still holding the lock to prevent race with Close().
@@ -559,6 +572,7 @@ void KrpcDataStreamRecvr::SenderQueue::TakeOverEarlySender(
   {
     unique_lock<SpinLock> l(lock_);
     if (UNLIKELY(is_cancelled_)) {
+      TRACE_TO(ctx->rpc_context->trace(), "Recvr closed");
       Status cancel_status = Status::Expected(TErrorCode::DATASTREAM_RECVR_CLOSED,
           PrintId(recvr_->fragment_instance_id()), recvr_->dest_node_id());
       DataStreamService::RespondRpc(cancel_status, ctx->response, ctx->rpc_context);

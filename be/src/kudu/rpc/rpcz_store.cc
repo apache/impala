@@ -263,7 +263,11 @@ void RpczStore::LogTrace(InboundCall* call) {
     call->trace()->Dump(&LOG(INFO), true);
   } else if (duration_ms > FLAGS_rpc_duration_too_long_ms) {
     LOG(INFO) << call->ToString() << " took " << duration_ms << "ms. "
-              << "Request Metrics: " << call->trace()->MetricsAsJSON();
+              << "Request Metrics: " << call->trace()->MetricsAsJSON() << "\n";
+    string s = call->trace()->DumpToString();
+    if (!s.empty()) {
+      LOG(INFO) << "Trace:\n" << s;
+    }
   }
 }
 

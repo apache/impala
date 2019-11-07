@@ -44,6 +44,7 @@ Checks: "-*,clang*,\
 -clang-diagnostic-float-equal,\
 -clang-diagnostic-global-constructors,\
 -clang-diagnostic-gnu-anonymous-struct,\
+-clang-diagnostic-gnu-zero-variadic-macro-arguments,\
 -clang-diagnostic-header-hygiene,\
 -clang-diagnostic-implicit-fallthrough,\
 -clang-diagnostic-missing-prototypes,\

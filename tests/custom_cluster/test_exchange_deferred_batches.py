@@ -37,7 +37,8 @@ class TestExchangeDeferredBatches(CustomClusterTestSuite):
     @CustomClusterTestSuite.with_args(
         "--stress_datastream_recvr_delay_ms=3000"
         + " --exchg_node_buffer_size_bytes=1024"
-        + " --datastream_service_num_deserialization_threads=1")
+        + " --datastream_service_num_deserialization_threads=1"
+        + " --impala_slow_rpc_threshold_ms=500")
     def test_exchange_small_buffer(self, vector):
         """Exercise the code which handles deferred row batches. In particular,
         the exchange buffer is set to a small value to cause incoming row batches
