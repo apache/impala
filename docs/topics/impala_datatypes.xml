@@ -34,28 +34,37 @@ under the License.
   </prolog>
 
   <conbody>
-
-    <p>
-      <indexterm audience="hidden">data types</indexterm>
-      Impala supports a set of data types that you can use for table columns, expression values, and function
-      arguments and return values.
-    </p>
-
-    <note>
-      Currently, Impala supports only scalar types, not composite or nested types. Accessing a table containing any
-      columns with unsupported types causes an error.
-    </note>
-
+    <p>Impala supports a set of data types that you can use for table columns,
+      expression values, and function arguments and return values. </p>
+    <note> Currently, Impala supports only scalar types, not composite or nested
+      types. Accessing a table containing any columns with unsupported types
+      causes an error. </note>
     <p outputclass="toc"/>
-
-    <p>
-      For the notation to write literals of each of these data types, see
-      <xref href="impala_literals.xml#literals"/>.
-    </p>
-
-    <p>
-      See <xref href="impala_langref_unsupported.xml#langref_hiveql_delta"/> for differences between Impala and
-      Hive data types.
-    </p>
+    <p> For the notation to write literals of each of these data types, see
+        <xref href="impala_literals.xml#literals"/>. </p>
+    
+      <p> Impala supports a limited set of implicit casts to avoid undesired
+      results from unexpected casting behavior. </p>
+    <ul>
+      <li> Impala does not implicitly cast between string and numeric or Boolean
+        types. Always use <codeph>CAST()</codeph> for these conversions. </li>
+      <li> Impala does perform implicit casts among the numeric types, when
+        going from a smaller or less precise type to a larger or more precise
+        one. For example, Impala will implicitly convert a
+          <codeph>SMALLINT</codeph> to a <codeph>BIGINT</codeph> or
+          <codeph>FLOAT</codeph>, but to convert from <codeph>DOUBLE</codeph> to
+          <codeph>FLOAT</codeph> or <codeph>INT</codeph> to
+          <codeph>TINYINT</codeph> requires a call to <codeph>CAST()</codeph> in
+        the query. </li>
+      <li> Impala does perform implicit casts from <codeph>STRING</codeph> to
+          <codeph>TIMESTAMP</codeph>. Impala has a restricted set of literal
+        formats for the <codeph>TIMESTAMP</codeph> data type and the
+          <codeph>FROM_UNIXTIME()</codeph> format string; see <xref
+          href="impala_timestamp.xml#timestamp"/> for details. </li>
+    </ul>
+    <p>See the topics under this section for full details on implicit and
+      explicit casting for each data type, and see <xref
+        href="impala_conversion_functions.xml#conversion_functions"/> for
+      details about the <codeph>CAST()</codeph> function.</p>
   </conbody>
 </concept>

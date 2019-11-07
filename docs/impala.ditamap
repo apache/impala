@@ -258,6 +258,7 @@ under the License.
       <topicref href="topics/impala_update.xml"/>
       <topicref href="topics/impala_upsert.xml"/>
       <topicref href="topics/impala_use.xml"/>
+      <topicref href="topics/impala_values.xml"/>
       <topicref href="topics/impala_hints.xml"/>
     </topicref>
     <topicref href="topics/impala_functions.xml">

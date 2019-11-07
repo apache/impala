@@ -504,41 +504,6 @@ Inserted 2 rows in 0.16s
         <codeph>NULL</codeph>.
       </p>
 
-<!--
-      <p>
-        does not support specifying a subset of the
-        columns in the table or specifying the columns in a different order. Use a
-        <codeph>VALUES</codeph> clause with all the column values in the same order as
-        the table definition, using <codeph>NULL</codeph> values for any columns you
-        want to omit from the <codeph>INSERT</codeph> operation.
-      </p>
--->
-
-      <p>
-        To use a <codeph>VALUES</codeph> clause like a table in other statements, wrap it in parentheses and use
-        <codeph>AS</codeph> clauses to specify aliases for the entire object and any columns you need to refer to:
-      </p>
-
-<codeblock>[localhost:21000] &gt; select * from (values(4,5,6),(7,8,9)) as t;
-+---+---+---+
-| 4 | 5 | 6 |
-+---+---+---+
-| 4 | 5 | 6 |
-| 7 | 8 | 9 |
-+---+---+---+
-[localhost:21000] &gt; select * from (values(1 as c1, true as c2, 'abc' as c3),(100,false,'xyz')) as t;
-+-----+-------+-----+
-| c1  | c2    | c3  |
-+-----+-------+-----+
-| 1   | true  | abc |
-| 100 | false | xyz |
-+-----+-------+-----+</codeblock>
-
-      <p>
-        For example, you might use a tiny table constructed like this from constant literals or function return
-        values as part of a longer statement involving joins or <codeph>UNION ALL</codeph>.
-      </p>
-
       <p conref="../shared/impala_common.xml#common/hdfs_blurb"/>
 
       <p>

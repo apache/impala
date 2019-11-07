@@ -1,0 +1,101 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!--
+Licensed to the Apache Software Foundation (ASF) under one
+or more contributor license agreements.  See the NOTICE file
+distributed with this work for additional information
+regarding copyright ownership.  The ASF licenses this file
+to you under the Apache License, Version 2.0 (the
+"License"); you may not use this file except in compliance
+with the License.  You may obtain a copy of the License at
+
+  http://www.apache.org/licenses/LICENSE-2.0
+
+Unless required by applicable law or agreed to in writing,
+software distributed under the License is distributed on an
+"AS IS" BASIS, WITHOUT WARRANTIES OR CONDITIONS OF ANY
+KIND, either express or implied.  See the License for the
+specific language governing permissions and limitations
+under the License.
+-->
+<!DOCTYPE concept PUBLIC "-//OASIS//DTD DITA Concept//EN" "concept.dtd">
+<concept id="values">
+
+  <title>VALUES Statement</title>
+  <titlealts audience="PDF"><navtitle>VALUES</navtitle></titlealts>
+  <prolog>
+    <metadata>
+      <data name="Category" value="Impala"/>
+      <data name="Category" value="SQL"/>
+      <data name="Category" value="Developers"/>
+      <data name="Category" value="Data Analysts"/>
+    </metadata>
+  </prolog>
+
+  <conbody>
+    <p> In addition to being part of the <codeph>INSERT</codeph> statement, the
+        <codeph>VALUES</codeph> clause can be used as stand-alone statement or
+      with the <codeph>SELECT</codeph> statement to construct a data set without
+      creating a table. For example, the following statement returns a data set
+      of 2 rows and 3 columns.
+      <codeblock>
+VALUES ('r1_c1', 'r1_c2', 'r1_c3')
+     , ('r2_c1', 'r2_c2', 'r2_c3');</codeblock></p>
+    <p><b>Syntax:</b></p>
+    <codeblock>VALUES (<varname>row</varname>)[, (<varname>row</varname>), ...];
+
+SELECT <varname>select_list</varname> FROM (VALUES (<varname>row</varname>)[, (<varname>row</varname>), ...]) AS <varname>alias</varname>;
+
+<varname>row</varname> ::= <varname>column</varname> [[AS <varname>alias</varname>], <varname>column</varname> [AS <varname>alias</varname>], ...]</codeblock>
+    <ul>
+      <li>The <codeph>VALUES</codeph> keyword is followed by a comma separated
+        list of one or more <varname>row</varname>s.</li>
+      <li><varname>row</varname> is a comma-separated list of one or more
+          <varname>column</varname>s.</li>
+      <li>Each <varname>row</varname> must have the same number of
+          <varname>column</varname>s.</li>
+      <li><varname>column</varname> can be a constant, a variable, or an
+        expression.</li>
+      <li>The corresponding <varname>column</varname>s must have compatible data
+        types in all <varname>row</varname>s. See the third query in the
+        Examples section below.</li>
+      <li>By default, the first row is used to name columns.  But using the
+          <codeph>AS</codeph> keyword, you can optionally give the column an
+          <varname>alias</varname>. </li>
+      <li>If used in the <codeph>SELECT</codeph> statement, the
+          <codeph>AS</codeph> keyword with an <varname>alias</varname> is
+        required.</li>
+      <li>
+        <varname>select_list</varname> is the columns to be selected for the
+        result set.</li>
+    </ul>
+    <p><b>Examples:</b></p>
+    <p>
+      <codeblock>> SELECT * FROM (VALUES(4,5,6),(7,8,9)) AS t;
++---+---+---+
+| 4 | 5 | 6 |
++---+---+---+
+| 4 | 5 | 6 |
+| 7 | 8 | 9 |
++---+---+---+
+
+> SELECT * FROM (VALUES(1 AS c1, true AS c2, 'abc' AS c3),(100,false,'xyz')) AS t;
++-----+-------+-----+
+| c1  | c2    | c3  |
++-----+-------+-----+
+| 1   | true  | abc |
+| 100 | false | xyz |
++-----+-------+-----+
+
+> VALUES (CAST('2019-01-01' AS TIMESTAMP)), ('2019-02-02');
++---------------------------------+
+| cast('2019-01-01' as timestamp) |
++---------------------------------+
+| 2019-01-01 00:00:00             |
+| 2019-02-02 00:00:00             |
++---------------------------------+</codeblock>
+    </p>
+    <p><b>Related information:</b></p>
+    <p>
+      <xref href="impala_select.xml#select"/></p>
+  </conbody>
+</concept>
