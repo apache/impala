@@ -47,6 +47,7 @@
 #include "util/aligned-new.h"
 #include "util/debug-util.h"
 #include "util/network-util.h"
+#include "util/pretty-printer.h"
 
 #include "gen-cpp/data_stream_service.pb.h"
 #include "gen-cpp/data_stream_service.proxy.h"
@@ -60,6 +61,7 @@ using kudu::rpc::RpcController;
 using kudu::rpc::RpcSidecar;
 using kudu::MonoDelta;
 
+DECLARE_int64(impala_slow_rpc_threshold_ms);
 DECLARE_int32(rpc_retry_interval_ms);
 
 namespace impala {
@@ -299,6 +301,22 @@ class KrpcDataStreamSender::Channel : public CacheLineAligned {
   // completion. Expects to be called with 'lock_' held. Called in the context of a
   // reactor thread.
   void MarkDone(const Status& status);
+
+  // Return true if the RPC exceeds the slow RPC threshold and should be logged.
+  inline bool IsSlowRpc(int64_t total_time_ns) {
+    int64_t total_time_ms = total_time_ns / NANOS_PER_MICRO / MICROS_PER_MILLI;
+    return total_time_ms > FLAGS_impala_slow_rpc_threshold_ms;
+  }
+
+  // Logs a slow RPC that took 'total_time_ns'. resp.receiver_latency_ns() is used to
+  // distinguish processing time on the receiver from network time.
+  template <typename ResponsePBType>
+  void LogSlowRpc(
+      const char* rpc_name, int64_t total_time_ns, const ResponsePBType& resp);
+
+  // Logs a slow RPC that took 'total_time_ns' and failed with 'error'.
+  void LogSlowFailedRpc(
+      const char* rpc_name, int64_t total_time_ns, const kudu::Status& err);
 };
 
 Status KrpcDataStreamSender::Channel::Init(RuntimeState* state) {
@@ -321,16 +339,42 @@ void KrpcDataStreamSender::Channel::MarkDone(const Status& status) {
   rpc_start_time_ns_ = 0;
 }
 
+template <typename ResponsePBType>
+void KrpcDataStreamSender::Channel::LogSlowRpc(
+    const char* rpc_name, int64_t total_time_ns, const ResponsePBType& resp) {
+  int64_t network_time_ns = total_time_ns - resp_.receiver_latency_ns();
+  LOG(INFO) << "Slow " << rpc_name << " RPC to " << TNetworkAddressToString(address_)
+            << " (fragment_instance_id=" << PrintId(fragment_instance_id_) << "): "
+            << "took " << PrettyPrinter::Print(total_time_ns, TUnit::TIME_NS) << ". "
+            << "Receiver time: "
+            << PrettyPrinter::Print(resp_.receiver_latency_ns(), TUnit::TIME_NS)
+            << " Network time: " << PrettyPrinter::Print(network_time_ns, TUnit::TIME_NS);
+}
+
+void KrpcDataStreamSender::Channel::LogSlowFailedRpc(
+    const char* rpc_name, int64_t total_time_ns, const kudu::Status& err) {
+  LOG(INFO) << "Slow " << rpc_name << " RPC to " << TNetworkAddressToString(address_)
+            << " (fragment_instance_id=" << PrintId(fragment_instance_id_) << "): "
+            << "took " << PrettyPrinter::Print(total_time_ns, TUnit::TIME_NS) << ". "
+            << "Error: " << err.ToString();
+}
+
 Status KrpcDataStreamSender::Channel::WaitForRpc(std::unique_lock<SpinLock>* lock) {
   DCHECK(lock != nullptr);
   DCHECK(lock->owns_lock());
 
-  SCOPED_TIMER(parent_->profile()->inactive_timer());
-  SCOPED_TIMER(parent_->state_->total_network_send_timer());
+  ScopedTimer<MonotonicStopWatch> timer(parent_->profile()->inactive_timer(),
+      parent_->state_->total_network_send_timer());
 
   // Wait for in-flight RPCs to complete unless the parent sender is closed or cancelled.
   while(rpc_in_flight_ && !ShouldTerminate()) {
     rpc_done_cv_.wait_for(*lock, std::chrono::milliseconds(50));
+  }
+  int64_t elapsed_time_ns = timer.ElapsedTime();
+  if (IsSlowRpc(elapsed_time_ns)) {
+    LOG(INFO) << "Long delay waiting for RPC to " << TNetworkAddressToString(address_)
+              << " (fragment_instance_id=" << PrintId(fragment_instance_id_) << "): "
+              << "took " << PrettyPrinter::Print(elapsed_time_ns, TUnit::TIME_NS);
   }
 
   if (UNLIKELY(ShouldTerminate())) {
@@ -404,7 +448,10 @@ void KrpcDataStreamSender::Channel::TransmitDataCompleteCb() {
       DCHECK_LE(row_batch_size, numeric_limits<int32_t>::max());
       int64_t network_throughput = row_batch_size * NANOS_PER_SEC / network_time;
       parent_->network_throughput_counter_->UpdateCounter(network_throughput);
+      parent_->network_time_stats_->UpdateCounter(network_time);
     }
+    parent_->recvr_time_stats_->UpdateCounter(resp_.receiver_latency_ns());
+    if (IsSlowRpc(total_time)) LogSlowRpc("TransmitData", total_time, resp_);
     Status rpc_status = Status::OK();
     int32_t status_code = resp_.status().status_code();
     if (status_code == TErrorCode::DATASTREAM_RECVR_CLOSED) {
@@ -414,6 +461,9 @@ void KrpcDataStreamSender::Channel::TransmitDataCompleteCb() {
     }
     MarkDone(rpc_status);
   } else {
+    if (IsSlowRpc(total_time)) {
+      LogSlowFailedRpc("TransmitData", total_time, controller_status);
+    }
     DoRpcFn rpc_fn =
         boost::bind(&KrpcDataStreamSender::Channel::DoTransmitDataRpc, this);
     const string& prepend =
@@ -516,10 +566,19 @@ inline Status KrpcDataStreamSender::Channel::AddRow(TupleRow* row) {
 void KrpcDataStreamSender::Channel::EndDataStreamCompleteCb() {
   std::unique_lock<SpinLock> l(lock_);
   DCHECK(rpc_in_flight_);
+  DCHECK_NE(rpc_start_time_ns_, 0);
+  int64_t total_time_ns = MonotonicNanos() - rpc_start_time_ns_;
   const kudu::Status controller_status = rpc_controller_.status();
   if (LIKELY(controller_status.ok())) {
+    int64_t network_time_ns = total_time_ns - resp_.receiver_latency_ns();
+    parent_->network_time_stats_->UpdateCounter(network_time_ns);
+    parent_->recvr_time_stats_->UpdateCounter(eos_resp_.receiver_latency_ns());
+    if (IsSlowRpc(total_time_ns)) LogSlowRpc("EndDataStream", total_time_ns, eos_resp_);
     MarkDone(Status(eos_resp_.status()));
   } else {
+    if (IsSlowRpc(total_time_ns)) {
+      LogSlowFailedRpc("EndDataStream", total_time_ns, controller_status);
+    }
     DoRpcFn rpc_fn =
         boost::bind(&KrpcDataStreamSender::Channel::DoEndDataStreamRpc, this);
     const string& prepend =
@@ -538,6 +597,7 @@ Status KrpcDataStreamSender::Channel::DoEndDataStreamRpc() {
   eos_req.set_sender_id(parent_->sender_id_);
   eos_req.set_dest_node_id(dest_node_id_);
   eos_resp_.Clear();
+  rpc_start_time_ns_ = MonotonicNanos();
   proxy_->EndDataStreamAsync(eos_req, &eos_resp_, &rpc_controller_,
       boost::bind(&KrpcDataStreamSender::Channel::EndDataStreamCompleteCb, this));
   return Status::OK();
@@ -651,6 +711,10 @@ Status KrpcDataStreamSender::Prepare(
       ADD_TIME_SERIES_COUNTER(profile(), "BytesSent", bytes_sent_counter_);
   network_throughput_counter_ =
       ADD_SUMMARY_STATS_COUNTER(profile(), "NetworkThroughput", TUnit::BYTES_PER_SECOND);
+  network_time_stats_ =
+      ADD_SUMMARY_STATS_COUNTER(profile(), "RpcNetworkTime", TUnit::TIME_NS);
+  recvr_time_stats_ =
+      ADD_SUMMARY_STATS_COUNTER(profile(), "RpcRecvrTime", TUnit::TIME_NS);
   eos_sent_counter_ = ADD_COUNTER(profile(), "EosSent", TUnit::UNIT);
   uncompressed_bytes_counter_ =
       ADD_COUNTER(profile(), "UncompressedRowBatchSize", TUnit::BYTES);

@@ -215,6 +215,15 @@ class KrpcDataStreamSender : public DataSink {
   /// the responses.
   RuntimeProfile::SummaryStatsCounter* network_throughput_counter_ = nullptr;
 
+  /// Summary of network time for sending row batches and eos. Network time also includes
+  /// queuing time in KRPC transfer queue for transmitting the RPC requests and receiving
+  /// the responses.
+  RuntimeProfile::SummaryStatsCounter* network_time_stats_ = nullptr;
+
+  /// Summary of network time spent processing requests on the receiver side. The total
+  /// RPC time is the sum of receiver and network time.
+  RuntimeProfile::SummaryStatsCounter* recvr_time_stats_ = nullptr;
+
   /// Identifier of the destination plan node.
   PlanNodeId dest_node_id_;
 

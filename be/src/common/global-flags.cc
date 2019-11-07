@@ -286,6 +286,14 @@ DEFINE_bool(simplify_check_on_show_tables, false,
     "improve SHOW TABLES performance when using Sentry and have thousands of candidate "
     "tables to be checked. No performance gain is found in using Ranger");
 
+// Set the slow RPC threshold to 2 minutes to avoid false positives (since TransmitData
+// RPCs can take some time to process).
+DEFINE_int64(impala_slow_rpc_threshold_ms, 2 * 60 * 1000,
+    "(Advanced) Threshold for considering Impala internal RPCs to be unusually slow. "
+    "Slow RPCs trigger additional logging and other diagnostics. Lowering this value "
+    "may result in false positives"
+    "This overrides KRPC's --rpc_duration_too_long_ms setting.");
+
 // ++========================++
 // || Startup flag graveyard ||
 // ++========================++

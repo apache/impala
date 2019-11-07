@@ -65,6 +65,8 @@ DECLARE_string(ssl_private_key_password_cmd);
 DECLARE_string(ssl_cipher_list);
 DECLARE_string(ssl_minimum_version);
 
+DECLARE_int64(impala_slow_rpc_threshold_ms);
+
 // Defined in kudu/rpc/rpcz_store.cc
 DECLARE_int32(rpc_duration_too_long_ms);
 
@@ -89,8 +91,8 @@ DEFINE_bool(rpc_use_loopback, false,
 namespace impala {
 
 Status RpcMgr::Init() {
-  // Log any RPCs which take longer than 2 minutes.
-  FLAGS_rpc_duration_too_long_ms = 2 * 60 * 1000;
+  // Log any RPCs which take longer than this threshold on the server.
+  FLAGS_rpc_duration_too_long_ms = FLAGS_impala_slow_rpc_threshold_ms;
 
   // IMPALA-4874: Impala requires support for messages up to 2GB. Override KRPC's default
   //              maximum of 50MB.
