@@ -680,7 +680,11 @@ class TestDdlStatements(TestDdlBase):
 
     if HIVE_MAJOR_VERSION > 2:
       assert properties['OBJCAPABILITIES'] == 'EXTREAD,EXTWRITE'
+      assert properties['TRANSLATED_TO_EXTERNAL'] == 'TRUE'
+      assert properties['external.table.purge'] == 'TRUE'
       del properties['OBJCAPABILITIES']
+      del properties['TRANSLATED_TO_EXTERNAL']
+      del properties['external.table.purge']
     assert len(properties) == 2
     # The transient_lastDdlTime is variable, so don't verify the value.
     assert 'transient_lastDdlTime' in properties

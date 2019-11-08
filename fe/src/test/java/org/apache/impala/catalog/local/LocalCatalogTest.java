@@ -52,6 +52,7 @@ import org.apache.impala.util.PatternMatcher;
 import org.hamcrest.CoreMatchers;
 import org.junit.Assert;
 import org.junit.Before;
+import org.junit.Ignore;
 import org.junit.Test;
 
 import com.google.common.base.Joiner;
@@ -247,6 +248,7 @@ public class LocalCatalogTest {
     assertEquals("SELECT * FROM functional.alltypes", v.getQueryStmt().toSql());
   }
 
+  @Ignore("Ignored until IMPALA-9092 is fixed")
   @Test
   public void testKuduTable() throws Exception {
     LocalKuduTable t = (LocalKuduTable) catalog_.getTable("functional_kudu",  "alltypes");

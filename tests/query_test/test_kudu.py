@@ -40,7 +40,7 @@ from pytz import utc
 from tests.common.environ import ImpalaTestClusterProperties
 from tests.common.kudu_test_suite import KuduTestSuite
 from tests.common.impala_cluster import ImpalaCluster
-from tests.common.skip import SkipIfNotHdfsMinicluster, SkipIfKudu
+from tests.common.skip import SkipIfNotHdfsMinicluster, SkipIfKudu, SkipIfHive3
 from tests.common.test_dimensions import add_exec_option_dimension
 from tests.verifiers.metric_verifier import MetricVerifier
 
@@ -825,6 +825,7 @@ class TestShowCreateTable(KuduTestSuite):
         textwrap.dedent(show_create_sql.format(**format_args)).strip()
 
   @SkipIfKudu.hms_integration_enabled
+  @SkipIfHive3.kudu_with_hms_translation
   def test_primary_key_and_distribution(self, cursor):
     # TODO: Add case with BLOCK_SIZE
     self.assert_show_create_equals(cursor,
@@ -926,6 +927,7 @@ class TestShowCreateTable(KuduTestSuite):
             kudu_addr=KUDU_MASTER_HOSTS))
 
   @SkipIfKudu.hms_integration_enabled
+  @SkipIfHive3.kudu_with_hms_translation
   def test_timestamp_default_value(self, cursor):
     create_sql_fmt = """
         CREATE TABLE {table} (c INT, d TIMESTAMP,
@@ -991,6 +993,7 @@ class TestShowCreateTable(KuduTestSuite):
         kudu_client.delete_table(kudu_table_name)
 
   @SkipIfKudu.hms_integration_enabled
+  @SkipIfHive3.kudu_with_hms_translation
   def test_managed_kudu_table_name_with_show_create(self, cursor):
     """Check that the generated kudu.table_name tblproperty is not present with
        show create table with managed Kudu tables.

@@ -689,8 +689,14 @@ public class CatalogTest {
     // alltypesinsert is created using CREATE TABLE LIKE and is a MANAGED table
     table = catalog_.getOrLoadTable("functional", "alltypesinsert", "test");
     assertEquals(System.getProperty("user.name"), table.getMetaStoreTable().getOwner());
-    assertEquals(TableType.MANAGED_TABLE.toString(),
-        table.getMetaStoreTable().getTableType());
+    if (TestUtils.getHiveMajorVersion() == 2) {
+      assertEquals(TableType.MANAGED_TABLE.toString(),
+          table.getMetaStoreTable().getTableType());
+    } else {
+      // in Hive-3 due to HMS translation, this table becomes an external table
+      assertEquals(TableType.EXTERNAL_TABLE.toString(),
+          table.getMetaStoreTable().getTableType());
+    }
   }
 
   @Test

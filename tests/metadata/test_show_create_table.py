@@ -20,7 +20,7 @@ import re
 import shlex
 
 from tests.common.impala_test_suite import ImpalaTestSuite
-from tests.common.skip import SkipIf
+from tests.common.skip import SkipIf, SkipIfHive3
 from tests.common.test_dimensions import create_uncompressed_text_dimension
 from tests.util.test_file_parser import QueryTestSectionReader, remove_comments
 
@@ -54,6 +54,7 @@ class TestShowCreateTable(ImpalaTestSuite):
         lambda v: v.get_value('table_format').file_format == 'text' and
         v.get_value('table_format').compression_codec == 'none')
 
+  @SkipIfHive3.kudu_with_hms_translation
   def test_show_create_table(self, vector, unique_database):
     self.__run_show_create_table_test_case('QueryTest/show-create-table', vector,
                                            unique_database)
@@ -263,6 +264,7 @@ class TestInfraCompat(ImpalaTestSuite):
                              'l_comment')}]
 
   @SkipIf.kudu_not_supported
+  @SkipIfHive3.kudu_with_hms_translation
   @pytest.mark.parametrize('table_primary_keys_map', TABLE_PRIMARY_KEYS_MAPS)
   def test_primary_key_parse(self, impala_testinfra_cursor, table_primary_keys_map):
     """
@@ -274,6 +276,7 @@ class TestInfraCompat(ImpalaTestSuite):
         table_primary_keys_map['table']) == table_primary_keys_map['primary_keys']
 
   @SkipIf.kudu_not_supported
+  @SkipIfHive3.kudu_with_hms_translation
   @pytest.mark.parametrize('table_primary_keys_map', TABLE_PRIMARY_KEYS_MAPS)
   def test_load_table_with_primary_key_attr(self, impala_testinfra_cursor,
                                             table_primary_keys_map):
