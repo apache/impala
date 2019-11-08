@@ -52,6 +52,7 @@
 #include "util/metrics.h"
 #include "util/pretty-printer.h"
 #include "util/runtime-profile-counters.h"
+#include "util/stopwatch.h"
 #include "util/string-parser.h"
 #include "util/uid-util.h"
 
@@ -453,9 +454,8 @@ void ImpalaServer::GetInfo(TGetInfoResp& return_val,
   return_val.status.__set_statusCode(thrift::TStatusCode::SUCCESS_STATUS);
 }
 
-void ImpalaServer::ExecuteStatement(TExecuteStatementResp& return_val,
-    const TExecuteStatementReq& request) {
-  VLOG_QUERY << "ExecuteStatement(): request=" << ThriftDebugString(request);
+void ImpalaServer::ExecuteStatementCommon(TExecuteStatementResp& return_val,
+    const TExecuteStatementReq& request, const TExecRequest* external_exec_request) {
   HS2_RETURN_IF_ERROR(return_val, CheckNotShuttingDown(), SQLSTATE_GENERAL_ERROR);
   // We ignore the runAsync flag here: Impala's queries will always run asynchronously,
   // and will block on fetch. To the client, this looks like Hive's synchronous mode; the
@@ -497,7 +497,7 @@ void ImpalaServer::ExecuteStatement(TExecuteStatementResp& return_val,
   }
 
   QueryHandle query_handle;
-  status = Execute(&query_ctx, session, &query_handle);
+  status = Execute(&query_ctx, session, &query_handle, external_exec_request);
   HS2_RETURN_IF_ERROR(return_val, status, SQLSTATE_GENERAL_ERROR);
 
   // Start thread to wait for results to become available.
@@ -540,6 +540,29 @@ Status ImpalaServer::SetupResultsCacheing(const QueryHandle& query_handle,
   }
   return Status::OK();
 }
+
+void ImpalaServer::ExecuteStatement(TExecuteStatementResp& return_val,
+    const TExecuteStatementReq& request) {
+  VLOG_QUERY << "ExecuteStatement(): request=" << ThriftDebugString(request);
+  ExecuteStatementCommon(return_val, request);
+}
+
+void ImpalaServer::ExecutePlannedStatement(
+      TExecuteStatementResp& return_val,
+      const TExecutePlannedStatementReq& request) {
+  VLOG_QUERY << "ExecutePlannedStatement(): request=" << ThriftDebugString(request);
+  const ThriftServer::ConnectionContext* connection_context =
+      ThriftServer::GetThreadConnectionContext();
+  // This RPC is only supported on the external frontend service and should only be
+  // exposed to trusted clients since it executes provided query plans directly with
+  // no authorization checks (they are assumed to have been done by the trusted client)
+  if (connection_context->server_name != EXTERNAL_FRONTEND_SERVER_NAME) {
+    HS2_RETURN_ERROR(return_val, "Unsupported operation",
+        SQLSTATE_OPTIONAL_FEATURE_NOT_IMPLEMENTED);
+  }
+  ExecuteStatementCommon(return_val, request.statementReq, &request.plan);
+}
+
 
 void ImpalaServer::GetTypeInfo(TGetTypeInfoResp& return_val,
     const TGetTypeInfoReq& request) {
@@ -1206,6 +1229,7 @@ void ImpalaServer::PingImpalaHS2Service(TPingImpalaHS2ServiceResp& return_val,
   } else {
     return_val.__set_webserver_address("");
   }
+  return_val.__set_timestamp(MonotonicStopWatch::Now());
   VLOG_RPC << "PingImpalaHS2Service(): return_val=" << ThriftDebugString(return_val);
 }
 }

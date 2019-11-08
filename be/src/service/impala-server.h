@@ -63,6 +63,7 @@ class CancellationWork;
 class ImpalaHttpHandler;
 class RowDescriptor;
 class TDmlResult;
+class TExecutePlannedStatementReq;
 class TNetworkAddress;
 class TClientRequest;
 class TExecRequest;
@@ -76,6 +77,7 @@ struct QueryHandle;
 class SimpleLogger;
 class UpdateFilterParamsPB;
 class UpdateFilterResultPB;
+class TQueryExecRequest;
 
 /// An ImpalaServer contains both frontend and backend functionality;
 /// it implements ImpalaService (Beeswax), ImpalaHiveServer2Service (HiveServer2)
@@ -344,6 +346,11 @@ class ImpalaServer : public ImpalaServiceIf,
   /// Pings the Impala service and gets the server version string.
   virtual void PingImpalaHS2Service(TPingImpalaHS2ServiceResp& return_val,
       const TPingImpalaHS2ServiceReq& req);
+
+  // Execute the provided Thrift statement/plan
+  virtual void ExecutePlannedStatement(
+      apache::hive::service::cli::thrift::TExecuteStatementResp& return_val,
+      const TExecutePlannedStatementReq& req);
 
   /// Closes an Impala operation and returns additional information about the closed
   /// operation.
@@ -669,13 +676,25 @@ class ImpalaServer : public ImpalaServiceIf,
   /// query_driver->request_state will be NULL and nothing will have been registered in
   /// query_driver_map_. session_state is a ptr to the session running this query and must
   /// have been checked out.
+  /// external_exec_request is a statement that was prepared by an external frontend using
+  /// Impala PlanNodes or null if the external frontend isn't being used.
   Status Execute(TQueryCtx* query_ctx, std::shared_ptr<SessionState> session_state,
-      QueryHandle* query_handle) WARN_UNUSED_RESULT;
+      QueryHandle* query_handle,
+      const TExecRequest* external_exec_request) WARN_UNUSED_RESULT;
 
   /// Implements Execute() logic, but doesn't unregister query on error.
   Status ExecuteInternal(const TQueryCtx& query_ctx,
+      const TExecRequest* external_exec_request,
       std::shared_ptr<SessionState> session_state, bool* registered_query,
       QueryHandle* query_handle);
+
+  /// Common execution logic factored out from Execute to be shared with
+  /// ExecutePlannedStatement. Optional TExecRequest is the provided Thrift
+  /// request to execute instead of parsing and executing the SQL statement.
+  void ExecuteStatementCommon(
+      apache::hive::service::cli::thrift::TExecuteStatementResp& return_val,
+      const apache::hive::service::cli::thrift::TExecuteStatementReq& request,
+      const TExecRequest* external_exec_request = nullptr);
 
   /// Registers the query with query_driver_map_ using the globally unique query_id. The
   /// caller must have checked out the session state.

@@ -430,6 +430,11 @@ under the License.
         </exclusion>
       </exclusions>
     </dependency>
+    <dependency>
+      <groupId>org.apache.hive</groupId>
+      <artifactId>hive-classification</artifactId>
+      <version>${hive.version}</version>
+    </dependency>
 
     <dependency>
       <groupId>org.apache.hive</groupId>

@@ -90,6 +90,10 @@ class ClientRequestState {
   /// which then sets the frontend profile.
   void SetFrontendProfile(TRuntimeProfileNode profile);
 
+  /// Sets the coordinator time that the plan request was submitted at so that
+  /// the backend timeline starts where the frontend timeline ends
+  void SetRemoteSubmitTime(int64_t remote_submit_time);
+
   /// Based on query type, this either initiates execution of this ClientRequestState's
   /// TExecRequest or submits the query to the Admission controller for asynchronous
   /// admission control. When this returns the operation state is either RUNNING_STATE or

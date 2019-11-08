@@ -157,7 +157,8 @@ public class ResetMetadataStmt extends StatementBase {
           if (partitionSpec_ != null) {
             try {
               // Get local table info without reaching out to HMS
-              FeTable table = analyzer.getTable(dbName, tableName_.getTbl());
+              FeTable table = analyzer.getTable(dbName, tableName_.getTbl(),
+                  /* must_exist */ true);
               if (AcidUtils.isTransactionalTable(
                       table.getMetaStoreTable().getParameters())) {
                 throw new AnalysisException("Refreshing a partition is not allowed on " +

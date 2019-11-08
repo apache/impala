@@ -280,7 +280,7 @@ public class PrivilegeSpec extends StmtNode {
     try {
       dbName_ = analyzer.getTargetDbName(tableName_);
       Preconditions.checkNotNull(dbName_);
-      table = analyzer.getTable(dbName_, tableName_.getTbl());
+      table = analyzer.getTable(dbName_, tableName_.getTbl(), /* must_exist */ true);
     } catch (TableLoadingException e) {
       throw new AnalysisException(e.getMessage(), e);
     } catch (AnalysisException e) {

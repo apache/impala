@@ -21,6 +21,9 @@
 #include <unistd.h>
 #include <algorithm>
 #include <exception>
+#include <fstream>
+#include <sstream>
+
 #include <boost/algorithm/string.hpp>
 #include <boost/algorithm/string/join.hpp>
 #include <boost/algorithm/string/replace.hpp>
@@ -312,6 +315,11 @@ DEFINE_string(query_event_hook_classes, "", "Comma-separated list of java QueryE
 DEFINE_int32(query_event_hook_nthreads, 1, "Number of threads to use for "
     "QueryEventHook execution. If this number is >1 then hooks will execute "
     "concurrently.");
+
+// Dumps used for debugging and diffing ExecRequests in text form.
+DEFINE_string(dump_exec_request_path, "",
+    "If set, dump TExecRequest structures to {dump_exec_request_path}/"
+    "TExecRequest-{internal|external}.{query_id.hi}-{query_id.lo}");
 
 DECLARE_bool(compact_catalog_topic);
 
@@ -1084,7 +1092,8 @@ void ImpalaServer::EnforceMaxMtDop(TQueryCtx* query_ctx, int64_t max_mt_dop) {
 }
 
 Status ImpalaServer::Execute(TQueryCtx* query_ctx, shared_ptr<SessionState> session_state,
-    QueryHandle* query_handle) {
+    QueryHandle* query_handle,
+    const TExecRequest* external_exec_request) {
   PrepareQueryContext(query_ctx);
   ScopedThreadContext debug_ctx(GetThreadDebugInfo(), query_ctx->query_id);
   ImpaladMetrics::IMPALA_SERVER_NUM_QUERIES->Increment(1L);
@@ -1095,25 +1104,56 @@ Status ImpalaServer::Execute(TQueryCtx* query_ctx, shared_ptr<SessionState> sess
   query_ctx->client_request.__set_redacted_stmt((const string) stmt);
 
   bool registered_query = false;
-  Status status = ExecuteInternal(*query_ctx, session_state, &registered_query,
-      query_handle);
+  Status status = ExecuteInternal(*query_ctx, external_exec_request, session_state,
+      &registered_query, query_handle);
   if (!status.ok() && registered_query) {
     UnregisterQueryDiscardResult((*query_handle)->query_id(), false, &status);
   }
   return status;
 }
 
+void DumpTExecReq(const TExecRequest& exec_request, const char* dump_type,
+    const TUniqueId& query_id) {
+  if (FLAGS_dump_exec_request_path.empty()) return;
+  int depth = 0;
+  std::stringstream tmpstr;
+  string fn(Substitute("$1/TExecRequest-$2.$3", FLAGS_dump_exec_request_path,
+      dump_type, PrintId(query_id, "-")));
+  std::ofstream ofs(fn);
+  tmpstr << exec_request;
+  const int len = tmpstr.str().length();
+  const char *p = tmpstr.str().c_str();
+  for (int i = 0; i < len; ++i) {
+    const char ch = p[i];
+    ofs << ch;
+    if (ch == '(') {
+      depth++;
+    } else if (ch == ')' && depth > 0) {
+      depth--;
+    } else if (ch == ',') {
+    } else {
+      continue;
+    }
+    ofs << '\n' << std::setw(depth) << " ";
+  }
+}
+
 Status ImpalaServer::ExecuteInternal(const TQueryCtx& query_ctx,
-    shared_ptr<SessionState> session_state, bool* registered_query,
-    QueryHandle* query_handle) {
+    const TExecRequest* external_exec_request, shared_ptr<SessionState> session_state,
+    bool* registered_query, QueryHandle* query_handle) {
   DCHECK(session_state != nullptr);
   DCHECK(query_handle != nullptr);
   DCHECK(registered_query != nullptr);
   *registered_query = false;
-
   // Create the QueryDriver for this query. CreateNewDriver creates the associated
   // ClientRequestState as well.
   QueryDriver::CreateNewDriver(this, query_handle, query_ctx, session_state);
+
+  bool is_external_req = external_exec_request != nullptr;
+
+  if (is_external_req && external_exec_request->remote_submit_time) {
+    (*query_handle)->SetRemoteSubmitTime(external_exec_request->remote_submit_time);
+  }
 
   (*query_handle)->query_events()->MarkEvent("Query submitted");
 
@@ -1144,9 +1184,25 @@ Status ImpalaServer::ExecuteInternal(const TQueryCtx& query_ctx,
           statement_length, max_statement_length));
     }
 
-    // Takes the TQueryCtx and calls into the frontend to initialize the TExecRequest for
-    // this query.
-    RETURN_IF_ERROR(query_handle->query_driver()->RunFrontendPlanner(query_ctx));
+    Status exec_status = Status::OK();
+    TUniqueId query_id = (*query_handle)->query_id();
+    // Generate TExecRequest here if one was not passed in or we want one
+    // from the Impala planner to compare with
+    if (external_exec_request == nullptr || !FLAGS_dump_exec_request_path.empty()) {
+      // Takes the TQueryCtx and calls into the frontend to initialize the
+      // TExecRequest for this query.
+      RETURN_IF_ERROR(query_handle->query_driver()->RunFrontendPlanner(query_ctx));
+      DumpTExecReq((*query_handle)->exec_request(), "internal", query_id);
+    }
+
+    if (external_exec_request != nullptr) {
+      // Use passed in exec_request
+      RETURN_IF_ERROR(query_handle->query_driver()->SetExternalPlan(
+          query_ctx, *external_exec_request));
+
+      exec_status = Status::OK();
+      DumpTExecReq((*query_handle)->exec_request(), "external", query_id);
+    }
 
     const TExecRequest& result = (*query_handle)->exec_request();
     (*query_handle)->query_events()->MarkEvent("Planning finished");

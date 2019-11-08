@@ -47,6 +47,7 @@ import org.apache.impala.testutil.TestFileParser.TestCase;
 import org.apache.impala.testutil.TestUtils;
 import org.apache.impala.testutil.TestUtils.ResultFilter;
 import org.apache.impala.thrift.ImpalaInternalServiceConstants;
+import org.apache.impala.thrift.QueryConstants;
 import org.apache.impala.thrift.TDescriptorTable;
 import org.apache.impala.thrift.TExecRequest;
 import org.apache.impala.thrift.TExplainLevel;
@@ -492,7 +493,7 @@ public class PlannerTestBase extends FrontendTestBase {
     } else {
       // for distributed and parallel execution we want to run on all available nodes
       queryOptions.setNum_nodes(
-          ImpalaInternalServiceConstants.NUM_NODES_ALL);
+          QueryConstants.NUM_NODES_ALL);
     }
     if (section == Section.PARALLELPLANS
         && (!queryOptions.isSetMt_dop() || queryOptions.getMt_dop() == 0)) {

@@ -23,6 +23,7 @@
 #include "service/frontend.h"
 #include "service/impala-server.h"
 #include "util/debug-util.h"
+#include "util/network-util.h"
 #include "util/runtime-profile-counters.h"
 
 #include "common/names.h"
@@ -60,6 +61,30 @@ Status QueryDriver::RunFrontendPlanner(const TQueryCtx& query_ctx) {
   RETURN_IF_ERROR(client_request_state_->UpdateQueryStatus(
       ExecEnv::GetInstance()->frontend()->GetExecRequest(
           query_ctx, exec_request_.get())));
+  return Status::OK();
+}
+
+Status QueryDriver::SetExternalPlan(
+    const TQueryCtx& query_ctx, const TExecRequest& external_exec_request) {
+  // Takes the TQueryCtx and calls into the frontend to initialize the TExecRequest for
+  // this query.
+  DCHECK(client_request_state_ != nullptr);
+  DCHECK(exec_request_ != nullptr);
+  RETURN_IF_ERROR(
+      DebugAction(query_ctx.client_request.query_options, "FRONTEND_PLANNER"));
+  *exec_request_.get() = external_exec_request;
+  // Update query_id in the external request
+  exec_request_->query_exec_request.query_ctx.__set_query_id(
+      client_request_state_->query_id());
+  // Update coordinator related internal addresses in the external request
+  exec_request_->query_exec_request.query_ctx.__set_coord_hostname(
+      ExecEnv::GetInstance()->configured_backend_address().hostname);
+  const TNetworkAddress& address = ExecEnv::GetInstance()->krpc_address();
+  DCHECK(IsResolvedAddress(address));
+  exec_request_->query_exec_request.query_ctx.__set_coord_ip_address(address);
+  // Update local_time_zone in the external request
+  exec_request_->query_exec_request.query_ctx.__set_local_time_zone(
+      query_ctx.local_time_zone);
   return Status::OK();
 }
 

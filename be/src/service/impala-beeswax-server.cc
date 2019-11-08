@@ -70,7 +70,7 @@ void ImpalaServer::query(beeswax::QueryHandle& beeswax_handle, const Query& quer
   // raise Syntax error or access violation; it's likely to be syntax/analysis error
   // TODO: that may not be true; fix this
   QueryHandle query_handle;
-  RAISE_IF_ERROR(Execute(&query_ctx, session, &query_handle),
+  RAISE_IF_ERROR(Execute(&query_ctx, session, &query_handle, nullptr),
       SQLSTATE_SYNTAX_ERROR_OR_ACCESS_VIOLATION);
 
   // start thread to wait for results to become available, which will allow
@@ -118,7 +118,7 @@ void ImpalaServer::executeAndWait(beeswax::QueryHandle& beeswax_handle,
   // raise Syntax error or access violation; it's likely to be syntax/analysis error
   // TODO: that may not be true; fix this
   QueryHandle query_handle;
-  RAISE_IF_ERROR(Execute(&query_ctx, session, &query_handle),
+  RAISE_IF_ERROR(Execute(&query_ctx, session, &query_handle, nullptr),
       SQLSTATE_SYNTAX_ERROR_OR_ACCESS_VIOLATION);
 
   // Once the query is running do a final check for session closure and add it to the

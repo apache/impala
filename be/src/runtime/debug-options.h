@@ -23,6 +23,7 @@
 
 #include "gen-cpp/Frontend_types.h"
 #include "gen-cpp/Types_types.h"
+#include "gen-cpp/ImpalaInternalService_types.h"
 
 namespace impala {
 
