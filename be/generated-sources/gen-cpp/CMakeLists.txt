@@ -84,6 +84,8 @@ set(SRC_FILES
   Planner_types.cpp
   parquet_constants.cpp
   parquet_types.cpp
+  Query_constants.cpp
+  Query_types.cpp
   ResourceProfile_constants.cpp
   ResourceProfile_types.cpp
   RuntimeProfile_constants.cpp

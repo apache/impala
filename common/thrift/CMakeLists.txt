@@ -64,12 +64,9 @@ function(THRIFT_GEN VAR)
       set(CPP_ARGS -r ${CPP_ARGS})
     ENDIF(THRIFT_FILE STREQUAL "beeswax.thrift")
 
-    IF (THRIFT_FILE STREQUAL ${TCLI_SERVICE_THRIFT} OR THRIFT_FILE STREQUAL "parquet.thrift" OR
-        THRIFT_FILE STREQUAL "ImpalaService.thrift")
+    IF (THRIFT_FILE STREQUAL ${TCLI_SERVICE_THRIFT} OR THRIFT_FILE STREQUAL "parquet.thrift")
       # Do not generate Java HiveServer2 and Parquet files because we should use the jar
       # from Hive or Parquet.
-      # Also do not generate ImpalaService.thrift because the generated code doesn't
-      # compile with hive if the thrift version in hive is 0.9.0
       add_custom_command(
         OUTPUT ${OUTPUT_BE_FILE}
         COMMAND ${THRIFT_COMPILER} ${CPP_ARGS} ${THRIFT_FILE}
@@ -78,8 +75,7 @@ function(THRIFT_GEN VAR)
         COMMENT "Running thrift compiler on ${THRIFT_FILE}"
         VERBATIM
       )
-    ELSE (THRIFT_FILE STREQUAL ${TCLI_SERVICE_THRIFT} OR THRIFT_FILE STREQUAL "parquet.thrift" OR
-        THRIFT_FILE STREQUAL "ImpalaService.thrift")
+    ELSE (THRIFT_FILE STREQUAL ${TCLI_SERVICE_THRIFT} OR THRIFT_FILE STREQUAL "parquet.thrift")
       add_custom_command(
         OUTPUT ${OUTPUT_BE_FILE}
         COMMAND ${THRIFT_COMPILER} ${CPP_ARGS} ${THRIFT_FILE}
@@ -89,8 +85,7 @@ function(THRIFT_GEN VAR)
         COMMENT "Running thrift compiler on ${THRIFT_FILE}"
         VERBATIM
     )
-    ENDIF (THRIFT_FILE STREQUAL ${TCLI_SERVICE_THRIFT} OR THRIFT_FILE STREQUAL "parquet.thrift" OR
-        THRIFT_FILE STREQUAL "ImpalaService.thrift")
+    ENDIF (THRIFT_FILE STREQUAL ${TCLI_SERVICE_THRIFT} OR THRIFT_FILE STREQUAL "parquet.thrift")
   endforeach(THRIFT_FILE)
 
   set(${VAR} ${${VAR}} PARENT_SCOPE)
@@ -229,6 +224,7 @@ set (SRC_FILES
   Partitions.thrift
   parquet.thrift
   ResourceProfile.thrift
+  Query.thrift
   Results.thrift
   RuntimeProfile.thrift
   SqlConstraints.thrift

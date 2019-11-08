@@ -1077,7 +1077,7 @@ public class Analyzer {
         TableName tblName = candidateTbls.get(tblNameIdx);
         FeTable tbl = null;
         try {
-          tbl = getTable(tblName.getDb(), tblName.getTbl());
+          tbl = getTable(tblName.getDb(), tblName.getTbl(), /* must_exist */ false);
         } catch (AnalysisException e) {
           // Ignore to allow path resolution to continue.
         }
@@ -2847,11 +2847,14 @@ public class Analyzer {
    * Throws a TableLoadingException if the registered table failed to load.
    * Does not register authorization requests or access events.
    */
-  public FeTable getTable(String dbName, String tableName)
+  public FeTable getTable(String dbName, String tableName, boolean mustExist)
       throws AnalysisException, TableLoadingException {
     TableName tblName = new TableName(dbName, tableName);
     FeTable table = globalState_.stmtTableCache.tables.get(tblName);
     if (table == null) {
+      if (!mustExist) {
+        return null;
+      }
       if (!globalState_.stmtTableCache.dbs.contains(tblName.getDb())) {
         throw new AnalysisException(DB_DOES_NOT_EXIST_ERROR_MSG + tblName.getDb());
       } else {
@@ -2972,7 +2975,7 @@ public class Analyzer {
       }
     }
     // Propagate the AnalysisException if the table/db does not exist.
-    table = getTable(fqTableName.getDb(), fqTableName.getTbl());
+    table = getTable(fqTableName.getDb(), fqTableName.getTbl(), /* must_exist */ true);
     Preconditions.checkNotNull(table);
     if (addAccessEvent) {
       // Add an audit event for this access

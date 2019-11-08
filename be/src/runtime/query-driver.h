@@ -149,6 +149,9 @@ class QueryDriver {
   /// query string (TQueryCtx::TClientRequest::stmt).
   Status RunFrontendPlanner(const TQueryCtx& query_ctx) WARN_UNUSED_RESULT;
 
+  /// Similar to RunFrontendPlanner but takes TExecRequest from and external planner
+  Status SetExternalPlan(const TQueryCtx& query_ctx, const TExecRequest& exec_request);
+
   /// Returns the ClientRequestState corresponding to the given query id.
   ClientRequestState* GetClientRequestState(const TUniqueId& query_id);
 

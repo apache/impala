@@ -19,19 +19,16 @@ namespace cpp impala
 namespace java org.apache.impala.thrift
 
 include "Types.thrift"
-include "ImpalaInternalService.thrift"
-include "PlanNodes.thrift"
-include "Planner.thrift"
 include "RuntimeProfile.thrift"
 include "Descriptors.thrift"
 include "Data.thrift"
 include "Results.thrift"
-include "Exprs.thrift"
 include "TCLIService.thrift"
 include "Status.thrift"
 include "CatalogObjects.thrift"
 include "CatalogService.thrift"
 include "LineageGraph.thrift"
+include "Query.thrift"
 
 // These are supporting structs for JniFrontend.java, which serves as the glue
 // between our C++ execution environment and the Java frontend.
@@ -79,7 +76,7 @@ struct TGetTablesParams {
   // Session state for the user who initiated this request. If authorization is
   // enabled, only the tables this user has access to will be returned. If not
   // set, access checks will be skipped (used for internal Impala requests)
-  3: optional ImpalaInternalService.TSessionState session
+  3: optional Query.TSessionState session
 }
 
 // getTableNames returns a list of unqualified table names
@@ -126,7 +123,7 @@ struct TGetDbsParams {
   // Session state for the user who initiated this request. If authorization is
   // enabled, only the databases this user has access to will be returned. If not
   // set, access checks will be skipped (used for internal Impala requests)
-  2: optional ImpalaInternalService.TSessionState session
+  2: optional Query.TSessionState session
 }
 
 // getDbs returns a list of databases
@@ -188,7 +185,7 @@ struct TDescribeTableParams {
   3: optional Types.TColumnType result_struct
 
   // Session state for the user who initiated this request.
-  4: optional ImpalaInternalService.TSessionState session
+  4: optional Query.TSessionState session
 }
 
 // Results of a call to describeDb() and describeTable()
@@ -284,11 +281,6 @@ struct TShowRolesResult {
   1: required list<string> role_names
 }
 
-// Result of the DESCRIBE HISTORY command.
-struct TGetTableHistoryResult {
-  1: required list<TGetTableHistoryResultItem> result
-}
-
 // Represents one row in the DESCRIBE HISTORY command's result.
 struct TGetTableHistoryResultItem {
   // Timestamp in millis
@@ -296,6 +288,11 @@ struct TGetTableHistoryResultItem {
   2: required i64 snapshot_id
   3: optional i64 parent_id
   4: required bool is_current_ancestor
+}
+
+// Result of the DESCRIBE HISTORY command.
+struct TGetTableHistoryResult {
+  1: required list<TGetTableHistoryResultItem> result
 }
 
 // Parameters for SHOW GRANT ROLE/USER commands
@@ -331,7 +328,7 @@ struct TGetFunctionsParams {
   // Session state for the user who initiated this request. If authorization is
   // enabled, only the functions this user has access to will be returned. If not
   // set, access checks will be skipped (used for internal Impala requests)
-  4: optional ImpalaInternalService.TSessionState session
+  4: optional Query.TSessionState session
 }
 
 // getFunctions() returns a list of function signatures
@@ -351,40 +348,6 @@ struct TUseDbParams {
 struct TExplainResult {
   // each line in the explain plan occupies an entry in the list
   1: required list<Data.TResultRow> results
-}
-
-// Metadata required to finalize a query - that is, to clean up after the query is done.
-// Only relevant for INSERT queries.
-struct TFinalizeParams {
-  // True if the INSERT query was OVERWRITE, rather than INTO
-  1: required bool is_overwrite
-
-  // The base directory in hdfs of the table targeted by this INSERT
-  2: required string hdfs_base_dir
-
-  // The target table name
-  3: required string table_name
-
-  // The target table database
-  4: required string table_db
-
-  // The full path in HDFS of a directory under which temporary files may be written
-  // during an INSERT. For a query with id a:b, files are written to <staging_dir>/.a_b/,
-  // and that entire directory is removed after the INSERT completes.
-  5: optional string staging_dir
-
-  // Identifier for the target table in the query-wide descriptor table (see
-  // TDescriptorTable and TTableDescriptor).
-  6: optional i64 table_id;
-
-  // Stores the ACID transaction id of the target table for transactional INSERTs.
-  7: optional i64 transaction_id;
-
-  // Stores the ACID write id of the target table for transactional INSERTs.
-  8: optional i64 write_id;
-
-  // Stores the Iceberg spec id of the partition spec used for this INSERT.
-  9: optional i32 spec_id;
 }
 
 // Request for a LOAD DATA statement. LOAD DATA is only supported for HDFS backed tables.
@@ -411,67 +374,6 @@ struct TLoadDataResp {
   // A result row that contains information on the result of the LOAD operation. This
   // includes details like the number of files moved as part of the request.
   1: required Data.TResultRow load_summary
-}
-
-// Execution parameters for a single plan; component of TQueryExecRequest
-struct TPlanExecInfo {
-  // fragments[i] may consume the output of fragments[j > i];
-  // fragments[0] is the root fragment and also the coordinator fragment, if
-  // it is unpartitioned.
-  1: required list<Planner.TPlanFragment> fragments
-
-  // A map from scan node ids to a scan range specification.
-  // The node ids refer to scan nodes in fragments[].plan
-  2: optional map<Types.TPlanNodeId, Planner.TScanRangeSpec>
-      per_node_scan_ranges
-}
-
-// Result of call to ImpalaPlanService/JniFrontend.CreateQueryRequest()
-struct TQueryExecRequest {
-  // exec info for all plans; the first one materializes the query result and subsequent
-  // ones materialize join builds that are input for preceding plans in the list.
-  1: optional list<TPlanExecInfo> plan_exec_info
-
-  // Metadata of the query result set (only for select)
-  2: optional Results.TResultSetMetadata result_set_metadata
-
-  // Set if the query needs finalization after it executes
-  3: optional TFinalizeParams finalize_params
-
-  4: required ImpalaInternalService.TQueryCtx query_ctx
-
-  // The same as the output of 'explain <query>'
-  5: optional string query_plan
-
-  // The statement type governs when the coordinator can judge a query to be finished.
-  // DML queries are complete after Wait(), SELECTs may not be. Generally matches
-  // the stmt_type of the parent TExecRequest, but in some cases (such as CREATE TABLE
-  // AS SELECT), these may differ.
-  6: required Types.TStmtType stmt_type
-
-  // List of replica hosts.  Used by the host_idx field of TScanRangeLocation.
-  7: required list<Types.TNetworkAddress> host_list
-
-  // Column lineage graph
-  8: optional LineageGraph.TLineageGraph lineage_graph
-
-  // Estimated per-host peak memory consumption in bytes. Used by admission control.
-  // TODO: Remove when AC doesn't rely on this any more.
-  9: optional i64 per_host_mem_estimate
-
-  // Maximum possible (in the case all fragments are scheduled on all hosts with
-  // max DOP) minimum memory reservation required per host, in bytes.
-  10: optional i64 max_per_host_min_mem_reservation;
-
-  // Maximum possible (in the case all fragments are scheduled on all hosts with
-  // max DOP) required threads per host, i.e. the number of threads that this query
-  // needs to execute successfully. Does not include "optional" threads.
-  11: optional i64 max_per_host_thread_reservation;
-
-  // Estimated coordinator's memory consumption in bytes assuming that the coordinator
-  // fragment will run on a dedicated coordinator. Set by the planner and used by
-  // admission control.
-  12: optional i64 dedicated_coord_mem_estimate;
 }
 
 enum TCatalogOpType {
@@ -622,7 +524,7 @@ struct TMetadataOpRequest {
   // Session state for the user who initiated this request. If authorization is
   // enabled, only the server objects this user has access to will be returned.
   // If not set, access checks will be skipped (used for internal Impala requests)
-  10: optional ImpalaInternalService.TSessionState session
+  10: optional Query.TSessionState session
   11: optional TCLIService.TGetPrimaryKeysReq get_primary_keys_req
   12: optional TCLIService.TGetCrossReferenceReq get_cross_reference_req
 }
@@ -647,11 +549,11 @@ struct TExecRequest {
   1: required Types.TStmtType stmt_type
 
   // Copied from the corresponding TClientRequest
-  2: required ImpalaInternalService.TQueryOptions query_options
+  2: required Query.TQueryOptions query_options
 
   // TQueryExecRequest for the backend
   // Set iff stmt_type is QUERY or DML
-  3: optional TQueryExecRequest query_exec_request
+  3: optional Query.TQueryExecRequest query_exec_request
 
   // Set if stmt_type is DDL
   4: optional TCatalogOpRequest catalog_op_request
@@ -692,6 +594,9 @@ struct TExecRequest {
 
   // Set iff stmt_type is TESTCASE
   15: optional string testcase_data_path
+
+  // Coordinator time when plan was submitted by external frontend
+  16: optional i64 remote_submit_time
 }
 
 // Parameters to FeSupport.cacheJar().

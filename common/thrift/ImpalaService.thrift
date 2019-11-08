@@ -24,6 +24,7 @@ include "Types.thrift"
 include "beeswax.thrift"
 include "TCLIService.thrift"
 include "RuntimeProfile.thrift"
+include "Frontend.thrift"
 
 // ImpalaService accepts query execution options through beeswax.Query.configuration in
 // key:value form. For example, the list of strings could be:
@@ -696,6 +697,9 @@ struct TPingImpalaHS2ServiceResp {
 
   // The Impalad's webserver address.
   3: optional string webserver_address
+
+  // The Impalad's local monotonic time
+  4: optional i64 timestamp
 }
 
 // CloseImpalaOperation()
@@ -806,6 +810,20 @@ struct TGetRuntimeProfileResp {
   5: optional list<RuntimeProfile.TRuntimeProfileTree> failed_thrift_profiles
 }
 
+// ExecutePlannedStatement()
+//
+// Execute a statement where the ExecRequest has been externally supplied.
+// The returned OperationHandle can be used to check on the
+// status of the plan, and to fetch results once the
+// plan has finished executing.
+struct TExecutePlannedStatementReq {
+  1: required TCLIService.TExecuteStatementReq statementReq
+
+  // The plan to be executed
+  2: required Frontend.TExecRequest plan
+}
+
+
 service ImpalaHiveServer2Service extends TCLIService.TCLIService {
   // Returns the exec summary for the given query. The exec summary is only valid for
   // queries that execute with Impala's backend, i.e. QUERY, DML and COMPUTE_STATS
@@ -822,4 +840,7 @@ service ImpalaHiveServer2Service extends TCLIService.TCLIService {
 
   // Same as HS2 CloseOperation but can return additional information.
   TCloseImpalaOperationResp CloseImpalaOperation(1:TCloseImpalaOperationReq req);
+  // Execute statement with supplied ExecRequest
+  TCLIService.TExecuteStatementResp ExecutePlannedStatement(
+      1:TExecutePlannedStatementReq req);
 }

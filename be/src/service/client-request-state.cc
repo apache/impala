@@ -186,6 +186,10 @@ Status ClientRequestState::SetResultCache(QueryResultSet* cache,
   return Status::OK();
 }
 
+void ClientRequestState::SetRemoteSubmitTime(int64_t remote_submit_time) {
+  query_events_->Start(remote_submit_time);
+}
+
 void ClientRequestState::SetFrontendProfile(TRuntimeProfileNode profile) {
   // Should we defer creating and adding the child until here? probably.
   TRuntimeProfileTree prof_tree;
