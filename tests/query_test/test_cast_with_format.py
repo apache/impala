@@ -74,6 +74,38 @@ class TestCastWithFormat(ImpalaTestSuite):
         "timestamp FORMAT '-YYYY--MM---DD---')")
     assert result.data == ["2017-05-01 00:00:00"]
 
+    # Loose separator type matching. Checking if the input/format is surrounded by
+    # either single or double quotes.
+    result = self.client.execute(r'''select cast("2017-./,';: 06-01" as '''
+        r'''timestamp FORMAT "YYYY', -MM;:.DD")''')
+    assert result.data == ["2017-06-01 00:00:00"]
+
+    result = self.client.execute(r'''select cast('2017-./,\';: 07-01' as '''
+        r'''timestamp FORMAT "YYYY', -MM;:.DD")''')
+    assert result.data == ["2017-07-01 00:00:00"]
+
+    result = self.client.execute(r'''select cast("2017-./,';: 08-01" as '''
+        r'''timestamp FORMAT 'YYYY\', -MM;:.DD')''')
+    assert result.data == ["2017-08-01 00:00:00"]
+
+    result = self.client.execute(r'''select cast('2017-./,\';: 09-01' as '''
+        r'''timestamp FORMAT 'YYYY\', -MM;:.DD')''')
+    assert result.data == ["2017-09-01 00:00:00"]
+
+    # Escaped double quotes in the input are not taken as the escaping character for the
+    # following single quote.
+    result = self.client.execute(r'''select cast("2013\\'09-01" as '''
+        r'''timestamp FORMAT "YYYY'MM-DD")''')
+    assert result.data == ["NULL"]
+
+    result = self.client.execute(r'''select cast("2013\\\'09-02" as '''
+        r'''timestamp FORMAT "YYYY'MM-DD")''')
+    assert result.data == ["NULL"]
+
+    result = self.client.execute(r'''select cast("2013\\\\'09-03" as '''
+        r'''timestamp FORMAT "YYYY'MM-DD")''')
+    assert result.data == ["NULL"]
+
     # If the input string has unprocessed tokens
     result = self.client.execute("select cast('2017-05-01 12:30' as "
         "timestamp FORMAT 'YYYY-MM-DD')")
@@ -781,6 +813,11 @@ class TestCastWithFormat(ImpalaTestSuite):
         r'''"YYYY\"\\\"MM\"\\\"DD")''')
     assert "Bad date/time conversion format" in str(err)
 
+    # Free text token where an escaped backslash precedes an escaped single quote.
+    result = self.client.execute(r'''select cast("2010-\\'-02-01" as date format '''
+        r''' 'FXYYYY-"\\\'"-MM-DD') ''')
+    assert result.data == ["2010-02-01"]
+
   def test_fm_fx_modifiers(self):
     # Exact mathcing for the whole format.
     result = self.client.execute("select cast('2001-03-01 03:10:15.123456 -01:30' as "
@@ -799,6 +836,23 @@ class TestCastWithFormat(ImpalaTestSuite):
     result = self.client.execute("select cast('2001-03-04    ' as timestamp format"
         "'FXYYYY-MM-DD ')")
     assert result.data == ["NULL"]
+
+    # Strict matching of single quote separator.
+    result = self.client.execute(r'''select cast('2001\'04-01' as timestamp format'''
+        r''' 'FXYYYY\'MM-DD')''')
+    assert result.data == ["2001-04-01 00:00:00"]
+
+    result = self.client.execute(r'''select cast("2001'04-02" as date format'''
+        r''' 'FXYYYY\'MM-DD')''')
+    assert result.data == ["2001-04-02"]
+
+    result = self.client.execute(r'''select cast('2001\'04-03' as timestamp format'''
+        r''' "FXYYYY'MM-DD")''')
+    assert result.data == ["2001-04-03 00:00:00"]
+
+    result = self.client.execute(r'''select cast("2001'04-04" as date format'''
+        r''' "FXYYYY'MM-DD")''')
+    assert result.data == ["2001-04-04"]
 
     # Strict token length matching.
     result = self.client.execute("select cast('2001-3-05' as timestamp format "
@@ -846,6 +900,10 @@ class TestCastWithFormat(ImpalaTestSuite):
         "format 'FXFMYYYY-MM-DD HH12:MI:SS')")
     assert result.data == ["2019-03-10 04:15:00"]
 
+    result = self.client.execute("select cast('2004-03-08 03:15:00 AM' as timestamp "
+        "format 'FXYYYY-MM-DD HH12:MI:SS FMP.M.')")
+    assert result.data == ["2004-03-08 03:15:00"]
+
     # Multiple FM modifiers in a format.
     result = self.client.execute("select cast('2001-3-11 3:15:00.12345' as timestamp "
         "format 'FXYYYY-FMMM-DD FMHH12:MI:SS.FMFF')")
@@ -866,7 +924,7 @@ class TestCastWithFormat(ImpalaTestSuite):
         ''' 'FXYYYY-MMFM"text"DD')''')
     assert result.data == ["NULL"]
 
-    # FM modifier skips the separators and effects the next non-separator token.
+    # FM modifier skips the separators and affects the next non-separator token.
     result = self.client.execute(r'''select cast('1999-10-2' as timestamp format '''
         ''' 'FXYYYY-MMFM-DD')''')
     assert result.data == ["1999-10-02 00:00:00"]
@@ -913,6 +971,11 @@ class TestCastWithFormat(ImpalaTestSuite):
     result = self.client.execute("select cast(cast('0001-04-10' as date) "
         "as string format 'FXFMYYYY-FMMM-FMDD')")
     assert result.data == ["1-4-10"]
+
+    # FX and FM modifiers are case-insensitive.
+    result = self.client.execute("select cast('2019-5-10' as date format "
+        "'fxYYYY-fmMM-DD')")
+    assert result.data == ["2019-05-10"]
 
   def test_format_parse_errors(self):
     # Invalid format

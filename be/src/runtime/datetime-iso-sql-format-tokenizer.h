@@ -50,8 +50,12 @@ public:
   /// 'dt_ctx_' with metadata about the format string such as tokens found in the string.
   FormatTokenizationResult Tokenize();
 
-  /// Returns true if 'c' is a valid separator
-  static bool IsSeparator(char c);
+  /// Returns true if '*current_pos' points to a valid separator. If
+  /// 'read_escaped_single_quotes' is true then escaped single quotes are also taken as
+  /// valid separators. In this case '*current_pos' is advanced from the escaping
+  /// backslash to the single quote.
+  static bool IsSeparator(const char** current_pos, const char* str_end,
+      bool read_escaped_single_quotes = true);
 private:
   /// Stores metadata about a specific token type.
   struct TokenItem {

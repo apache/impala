@@ -194,6 +194,28 @@ public class CastExpr extends Expr {
     }
   }
 
+  public String getCastFormatWithEscapedSingleQuotes() {
+    Preconditions.checkNotNull(castFormat_);
+    Preconditions.checkState(!castFormat_.isEmpty());
+    StringBuilder result = new StringBuilder();
+    for(int i = 0; i < castFormat_.length(); ++i) {
+      char currentChar = castFormat_.charAt(i);
+      if (currentChar == '\'') {
+        // Count the preceeding backslashes
+        int backslashCount = 0;
+        int j = i - 1;
+        while (j >= 0 && castFormat_.charAt(j) == '\\') {
+          ++backslashCount;
+          --j;
+        }
+        // If the single quote is not escaped then adds an extra backslash to escape it.
+        if (backslashCount % 2 == 0) result.append('\\');
+      }
+      result.append(currentChar);
+    }
+    return result.toString();
+  }
+
   @Override
   public String toSqlImpl(ToSqlOptions options) {
     if (isImplicit_) {
@@ -206,7 +228,7 @@ public class CastExpr extends Expr {
     }
     String formatClause = "";
     if (castFormat_ != null && !castFormat_.isEmpty()) {
-      formatClause = " FORMAT \"" + castFormat_ + "\"";
+      formatClause = " FORMAT '" + getCastFormatWithEscapedSingleQuotes() + "'";
     }
     return "CAST(" + getChild(0).toSql(options) + " AS " + targetTypeDef_.toString()
         + formatClause + ")";

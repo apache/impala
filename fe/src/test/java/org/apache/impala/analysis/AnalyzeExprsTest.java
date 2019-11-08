@@ -3290,13 +3290,38 @@ public class AnalyzeExprsTest extends AnalyzerTest {
 
   @Test
   public void TestToStringOnCastFormatClause() throws AnalysisException {
-    String cast_str = "CAST('05-01-2017' AS TIMESTAMP FORMAT \"MM-dd-yyyy\")";
+    String cast_str = "CAST('05-01-2017' AS TIMESTAMP FORMAT 'MM-dd-yyyy')";
     SelectStmt select = (SelectStmt) AnalyzesOk("select " + cast_str);
     Assert.assertEquals(cast_str, select.getResultExprs().get(0).toSqlImpl());
 
-    cast_str = "CAST('05-01-2017' AS DATE FORMAT \"MM-dd-yyyy\")";
+    cast_str = "CAST('05-01-2017' AS DATE FORMAT 'MM-dd-yyyy')";
     select = (SelectStmt) AnalyzesOk("select " + cast_str);
     Assert.assertEquals(cast_str, select.getResultExprs().get(0).toSqlImpl());
+
+    // Check that escaped single quotes in the format remain escaped in the printout.
+    cast_str = "CAST('2019-01-01te\\\'xt' AS DATE FORMAT " +
+        "'YYYY\\\'MM\\\'DD\"te\\\'xt\"')";
+    select = (SelectStmt) AnalyzesOk("select " + cast_str);
+    Assert.assertEquals(cast_str, select.getResultExprs().get(0).toSqlImpl());
+
+    // Check that non-escaped single quotes in the format are escaped in the printout.
+    // Also check that the surrounding double quotes around the format string are
+    // replaced with single quotes in the output.
+    cast_str = "select CAST(\"2019-01-02te'xt\" AS DATE FORMAT " +
+        "\"YYYY'MM'DD\\\"te'xt\\\"\")";
+    select = (SelectStmt) AnalyzesOk(cast_str);
+    String expected_str = "CAST('2019-01-02te\\\'xt' AS DATE FORMAT " +
+        "'YYYY\\\'MM\\\'DD\\\"te\\\'xt\\\"')";
+    Assert.assertEquals(expected_str, select.getResultExprs().get(0).toSqlImpl());
+
+    // Check that a single quote in a free text token is escaped in the output even if it
+    // is after an escaped backslash.
+    cast_str = "select CAST(\"2019-01-02te\\'xt\" AS DATE FORMAT " +
+        "\"YYYY-MM-DD\\\"te\\\\'xt\\\"\")";
+    select = (SelectStmt) AnalyzesOk(cast_str);
+    expected_str = "CAST('2019-01-02te\\\'xt' AS DATE FORMAT " +
+        "'YYYY-MM-DD\\\"te\\\\\\'xt\\\"')";
+    Assert.assertEquals(expected_str, select.getResultExprs().get(0).toSqlImpl());
   }
 
 }

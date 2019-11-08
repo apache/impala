@@ -216,7 +216,7 @@ char IsoSqlFormatParser::GetNextCharFromTextToken(const char** format,
   const char* format_end = tok->val + tok->len;
   // Take care of the double escaped quotes.
   if (tok->is_double_escaped && format_end - *format >= 4 &&
-      (strncmp(*format, "\\\\\\\"", 4) == 0 || strncmp(*format, "\\\\\\'", 4) == 0)) {
+      (strncmp(*format, "\\\\\\\"", 4) == 0)) {
     *format += 3;
     return **format;
   }
@@ -237,10 +237,11 @@ bool IsoSqlFormatParser::ProcessSeparatorSequence(const char** current_pos,
   DCHECK(end_pos != nullptr);
   DCHECK(current_tok_idx != nullptr && *current_tok_idx < dt_ctx.toks.size());
   DCHECK(dt_ctx.toks[*current_tok_idx].type == SEPARATOR);
-  if (!IsoSqlFormatTokenizer::IsSeparator(**current_pos)) return false;
+  if (!IsoSqlFormatTokenizer::IsSeparator(current_pos, end_pos, false)) return false;
   // Advance to the end of the separator sequence.
   ++(*current_pos);
-  while (*current_pos < end_pos && IsoSqlFormatTokenizer::IsSeparator(**current_pos)) {
+  while (*current_pos < end_pos &&
+      IsoSqlFormatTokenizer::IsSeparator(current_pos, end_pos, false)) {
     ++(*current_pos);
   }
   // Advance to the end of the separator sequence in the expected tokens list.
@@ -297,7 +298,7 @@ const char* IsoSqlFormatParser::FindEndOfToken(const char* input_str,
 
   const char* end_pos = start_of_token;
   while (end_pos < start_of_token + max_tok_len &&
-      !IsoSqlFormatTokenizer::IsSeparator(*end_pos)) {
+      !IsoSqlFormatTokenizer::IsSeparator(&end_pos, input_str + input_len, false)) {
     ++end_pos;
   }
   if (end_pos == input_str) return nullptr;

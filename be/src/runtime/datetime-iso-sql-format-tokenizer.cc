@@ -98,7 +98,7 @@ void IsoSqlFormatTokenizer::ProcessSeparators(const char** current_pos) {
   DCHECK(current_pos != nullptr && *current_pos != nullptr);
   const char* str_begin = dt_ctx_->fmt;
   const char* str_end = dt_ctx_->fmt + dt_ctx_->fmt_len;
-  while (*current_pos < str_end && IsSeparator(**current_pos)) {
+  while (*current_pos < str_end && IsSeparator(current_pos, str_end)) {
     dt_ctx_->toks.push_back(DateTimeFormatToken(SEPARATOR, *current_pos - str_begin, 1,
         *current_pos));
     ++(*current_pos);
@@ -227,15 +227,27 @@ FormatTokenizationResult IsoSqlFormatTokenizer::CheckIncompatibilities() const {
   return SUCCESS;
 }
 
-bool IsoSqlFormatTokenizer::IsSeparator(char c) {
-  return c == '-' || c == ':' || c== ' ' || c == '.' || c == '/' || c== ',' ||
-      c == '\'' || c == ';' ;
+bool IsoSqlFormatTokenizer::IsSeparator(const char** current_pos, const char* str_end,
+    bool read_escaped_single_quotes) {
+  DCHECK(str_end != nullptr);
+  DCHECK(current_pos != nullptr && *current_pos != nullptr && *current_pos < str_end);
+  char c = **current_pos;
+  if (c == '-' || c == ':' || c == ' ' || c == '.' || c == '/' || c == ',' ||
+      c == '\'' || c == ';') {
+    return true;
+  }
+  if (read_escaped_single_quotes && str_end - *current_pos > 1 &&
+      strncmp(*current_pos, "\\'", 2) == 0) {
+    ++(*current_pos);
+    return true;
+  }
+  return false;
 }
 
 void IsoSqlFormatTokenizer::ProcessFXModifier(const char** current_pos) {
   DCHECK(current_pos != nullptr && *current_pos != nullptr);
   DCHECK(*current_pos == dt_ctx_->fmt);
-  if (strncmp(*current_pos, "FX", 2) == 0) {
+  if (strncasecmp(*current_pos, "FX", 2) == 0) {
     dt_ctx_->fx_modifier = true;
     *current_pos += 2;
   }
