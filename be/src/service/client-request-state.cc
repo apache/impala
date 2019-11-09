@@ -136,6 +136,8 @@ ClientRequestState::ClientRequestState(
   summary_profile_->AddInfoString("End Time", "");
   summary_profile_->AddInfoString("Query Type", "N/A");
   summary_profile_->AddInfoString("Query State", PrintThriftEnum(BeeswaxQueryState()));
+  summary_profile_->AddInfoString(
+      "Impala Query State", ExecStateToString(exec_state_.Load()));
   summary_profile_->AddInfoString("Query Status", "OK");
   summary_profile_->AddInfoString("Impala Version", GetVersionString(/* compact */ true));
   summary_profile_->AddInfoString("User", effective_user());
@@ -267,17 +269,16 @@ Status ClientRequestState::Exec() {
     }
     case TStmtType::ADMIN_FN:
       DCHECK(exec_request_.admin_request.type == TAdminRequestType::SHUTDOWN);
-      return ExecShutdownRequest();
+      RETURN_IF_ERROR(ExecShutdownRequest());
+      break;
     default:
       stringstream errmsg;
       errmsg << "Unknown exec request stmt type: " << exec_request_.stmt_type;
       return Status(errmsg.str());
   }
 
-  if (async_exec_thread_.get() != nullptr) {
-    UpdateNonErrorOperationState(TOperationState::PENDING_STATE);
-  } else {
-    UpdateNonErrorOperationState(TOperationState::RUNNING_STATE);
+  if (async_exec_thread_.get() == nullptr) {
+    UpdateNonErrorExecState(ExecState::RUNNING);
   }
   return Status::OK();
 }
@@ -499,6 +500,9 @@ Status ClientRequestState::ExecAsyncQueryOrDmlRequest(
     // Don't start executing the query if Cancel() was called concurrently with Exec().
     if (is_cancelled_) return Status::CANCELLED;
   }
+  // Don't transition to PENDING inside the FinishExecQueryOrDmlRequest thread because
+  // the query should be in the PENDING state before the Exec RPC returns.
+  UpdateNonErrorExecState(ExecState::PENDING);
   RETURN_IF_ERROR(Thread::Create("query-exec-state", "async-exec-thread",
       &ClientRequestState::FinishExecQueryOrDmlRequest, this, &async_exec_thread_, true));
   return Status::OK();
@@ -559,7 +563,7 @@ void ClientRequestState::FinishExecQueryOrDmlRequest() {
   }
 
   profile_->AddChild(coord_->query_profile());
-  UpdateNonErrorOperationState(TOperationState::RUNNING_STATE);
+  UpdateNonErrorExecState(ExecState::RUNNING);
 }
 
 Status ClientRequestState::ExecDdlRequest() {
@@ -774,6 +778,7 @@ Status ClientRequestState::Exec(const TMetadataOpRequest& exec_request) {
       &metadata_op_result));
   result_metadata_ = metadata_op_result.schema;
   request_result_set_.reset(new vector<TResultRow>(metadata_op_result.rows));
+  UpdateNonErrorExecState(ExecState::RUNNING);
   return Status::OK();
 }
 
@@ -825,11 +830,11 @@ void ClientRequestState::Wait() {
     if (stmt_type() == TStmtType::DDL) {
       DCHECK(catalog_op_type() != TCatalogOpType::DDL || request_result_set_ != nullptr);
     }
-    UpdateNonErrorOperationState(TOperationState::FINISHED_STATE);
+    UpdateNonErrorExecState(ExecState::FINISHED);
   }
-  // UpdateQueryStatus() or UpdateNonErrorOperationState() have updated operation_state_.
-  DCHECK(operation_state_ == TOperationState::FINISHED_STATE ||
-      operation_state_ == TOperationState::ERROR_STATE);
+  // UpdateQueryStatus() or UpdateNonErrorExecState() have updated exec_state_.
+  ExecState exec_state = exec_state_.Load();
+  DCHECK(exec_state == ExecState::FINISHED || exec_state == ExecState::ERROR);
   // Notify all the threads blocked on Wait() to finish and then log the query events,
   // if any.
   {
@@ -917,31 +922,47 @@ Status ClientRequestState::RestartFetch() {
   return Status::OK();
 }
 
-void ClientRequestState::UpdateNonErrorOperationState(TOperationState::type new_state) {
+void ClientRequestState::UpdateNonErrorExecState(ExecState new_state) {
   lock_guard<mutex> l(lock_);
+  ExecState old_state = exec_state_.Load();
+  static string error_msg = "Illegal state transition: $0 -> $1";
   switch (new_state) {
-    case TOperationState::PENDING_STATE:
-      if (operation_state_ == TOperationState::INITIALIZED_STATE) {
-        UpdateOperationState(new_state);
+    case ExecState::PENDING:
+      DCHECK(old_state == ExecState::INITIALIZED) << Substitute(
+          error_msg, ExecStateToString(old_state), ExecStateToString(new_state));
+      UpdateExecState(new_state);
+      break;
+    case ExecState::RUNNING:
+      // It is possible for FinishExecQueryOrDmlRequest() to attempt a transition to
+      // running, even after the query has been cancelled with an error status (and is
+      // thus in the ERROR ExecState). In this case, just ignore the transition attempt.
+      if (old_state != ExecState::ERROR) {
+        // DDL statements and metadata ops don't use the PENDING state, so a query can
+        // transition directly from the INITIALIZED to RUNNING state.
+        DCHECK(old_state == ExecState::INITIALIZED || old_state == ExecState::PENDING)
+            << Substitute(
+                error_msg, ExecStateToString(old_state), ExecStateToString(new_state));
+        UpdateExecState(new_state);
       }
       break;
-    case TOperationState::RUNNING_STATE:
-    case TOperationState::FINISHED_STATE:
-      if (operation_state_ == TOperationState::INITIALIZED_STATE
-          || operation_state_ == TOperationState::PENDING_STATE
-          || operation_state_ == TOperationState::RUNNING_STATE) {
-        UpdateOperationState(new_state);
-      }
+    case ExecState::FINISHED:
+      // A query can transition from PENDING to FINISHED if it is cancelled by the
+      // client.
+      DCHECK(old_state == ExecState::PENDING || old_state == ExecState::RUNNING)
+          << Substitute(
+              error_msg, ExecStateToString(old_state), ExecStateToString(new_state));
+      UpdateExecState(new_state);
       break;
     default:
-      DCHECK(false) << "A non-error state expected but got: " << new_state;
+      DCHECK(false) << "A non-error state expected but got: "
+                    << ExecStateToString(new_state);
   }
 }
 
 Status ClientRequestState::UpdateQueryStatus(const Status& status) {
   // Preserve the first non-ok status
   if (!status.ok() && query_status_.ok()) {
-    UpdateOperationState(TOperationState::ERROR_STATE);
+    UpdateExecState(ExecState::ERROR);
     query_status_ = status;
     summary_profile_->AddInfoStringRedacted("Query Status", query_status_.GetDetail());
   }
@@ -951,9 +972,9 @@ Status ClientRequestState::UpdateQueryStatus(const Status& status) {
 
 Status ClientRequestState::FetchRowsInternal(const int32_t max_rows,
     QueryResultSet* fetched_rows, int64_t block_on_wait_time_us) {
-  // Wait() guarantees that we've transitioned at least to FINISHED_STATE (and any
+  // Wait() guarantees that we've transitioned at least to FINISHED state (and any
   // state beyond that should have a non-OK query_status_ set).
-  DCHECK(operation_state_ == TOperationState::FINISHED_STATE);
+  DCHECK(exec_state_.Load() == ExecState::FINISHED);
 
   if (eos_) return Status::OK();
 
@@ -1089,12 +1110,12 @@ Status ClientRequestState::Cancel(bool check_inflight, const Status* cause) {
   {
     lock_guard<mutex> lock(lock_);
     // If the query has reached a terminal state, no need to update the state.
-    bool already_done = eos_ || operation_state_ == TOperationState::ERROR_STATE;
+    bool already_done = eos_ || exec_state_.Load() == ExecState::ERROR;
     if (!already_done && cause != NULL) {
       DCHECK(!cause->ok());
       discard_result(UpdateQueryStatus(*cause));
       query_events_->MarkEvent("Cancelled");
-      DCHECK_EQ(operation_state_, TOperationState::ERROR_STATE);
+      DCHECK(exec_state_.Load() == ExecState::ERROR);
     }
 
     admit_outcome_.Set(AdmissionOutcome::CANCELLED);
@@ -1335,21 +1356,36 @@ void ClientRequestState::ClearResultCache() {
   result_cache_.reset();
 }
 
-void ClientRequestState::UpdateOperationState(
-    TOperationState::type operation_state) {
-  operation_state_ = operation_state;
+void ClientRequestState::UpdateExecState(ExecState exec_state) {
+  exec_state_.Store(exec_state);
   summary_profile_->AddInfoString("Query State", PrintThriftEnum(BeeswaxQueryState()));
+  summary_profile_->AddInfoString("Impala Query State", ExecStateToString(exec_state));
+}
+
+apache::hive::service::cli::thrift::TOperationState::type
+ClientRequestState::TOperationState() const {
+  switch (exec_state_.Load()) {
+    case ExecState::INITIALIZED: return TOperationState::INITIALIZED_STATE;
+    case ExecState::PENDING: return TOperationState::PENDING_STATE;
+    case ExecState::RUNNING: return TOperationState::RUNNING_STATE;
+    case ExecState::FINISHED: return TOperationState::FINISHED_STATE;
+    case ExecState::ERROR: return TOperationState::ERROR_STATE;
+    default: {
+      DCHECK(false) << "Add explicit translation for all used ExecState values";
+      return TOperationState::ERROR_STATE;
+    }
+  }
 }
 
 beeswax::QueryState::type ClientRequestState::BeeswaxQueryState() const {
-  switch (operation_state_) {
-    case TOperationState::INITIALIZED_STATE: return beeswax::QueryState::CREATED;
-    case TOperationState::PENDING_STATE: return beeswax::QueryState::COMPILED;
-    case TOperationState::RUNNING_STATE: return beeswax::QueryState::RUNNING;
-    case TOperationState::FINISHED_STATE: return beeswax::QueryState::FINISHED;
-    case TOperationState::ERROR_STATE: return beeswax::QueryState::EXCEPTION;
+  switch (exec_state_.Load()) {
+    case ExecState::INITIALIZED: return beeswax::QueryState::CREATED;
+    case ExecState::PENDING: return beeswax::QueryState::COMPILED;
+    case ExecState::RUNNING: return beeswax::QueryState::RUNNING;
+    case ExecState::FINISHED: return beeswax::QueryState::FINISHED;
+    case ExecState::ERROR: return beeswax::QueryState::EXCEPTION;
     default: {
-      DCHECK(false) << "Add explicit translation for all used TOperationState values";
+      DCHECK(false) << "Add explicit translation for all used ExecState values";
       return beeswax::QueryState::EXCEPTION;
     }
   }
@@ -1616,4 +1652,13 @@ Status ClientRequestState::LogLineageRecord() {
   return Status::OK();
 }
 
+string ClientRequestState::ExecStateToString(ExecState state) const {
+  static const unordered_map<ClientRequestState::ExecState, const char*>
+      exec_state_strings{{ClientRequestState::ExecState::INITIALIZED, "INITIALIZED"},
+          {ClientRequestState::ExecState::PENDING, "PENDING"},
+          {ClientRequestState::ExecState::RUNNING, "RUNNING"},
+          {ClientRequestState::ExecState::FINISHED, "FINISHED"},
+          {ClientRequestState::ExecState::ERROR, "ERROR"}};
+  return exec_state_strings.at(state);
+}
 }

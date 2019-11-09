@@ -324,10 +324,10 @@ void ImpalaServer::get_log(string& log, const LogContextId& context) {
   stringstream error_log_ss;
 
   {
-    // Take the lock to ensure that if the client sees a query_state == EXCEPTION, it is
+    // Take the lock to ensure that if the client sees a exec_state == ERROR, it is
     // guaranteed to see the error query_status.
     lock_guard<mutex> l(*request_state->lock());
-    DCHECK_EQ(request_state->BeeswaxQueryState() == beeswax::QueryState::EXCEPTION,
+    DCHECK_EQ(request_state->exec_state() == ClientRequestState::ExecState::ERROR,
         !request_state->query_status().ok());
     // If the query status is !ok, include the status error message at the top of the log.
     if (!request_state->query_status().ok()) {

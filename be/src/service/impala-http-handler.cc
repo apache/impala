@@ -847,7 +847,7 @@ void ImpalaHttpHandler::QuerySummaryHandler(bool include_json_plan, bool include
       // state lock to be acquired, since it could potentially be an expensive
       // call, if the table Catalog metadata loading is in progress. Instead
       // update the caller that the plan information is unavailable.
-      if (request_state->operation_state() == TOperationState::INITIALIZED_STATE) {
+      if (request_state->exec_state() == ClientRequestState::ExecState::INITIALIZED) {
         document->AddMember(
             "plan_metadata_unavailable", "true", document->GetAllocator());
         return;
@@ -996,9 +996,9 @@ void ImpalaHttpHandler::AdmissionStateHandler(
   server_->client_request_state_map_.DoFuncForAllEntries([&running_queries](
       const std::shared_ptr<ClientRequestState>& request_state) {
     // Make sure only queries past admission control are added.
-    auto query_state = request_state->operation_state();
-    if (query_state != TOperationState::INITIALIZED_STATE
-        && query_state != TOperationState::PENDING_STATE
+    auto query_state = request_state->exec_state();
+    if (query_state != ClientRequestState::ExecState::INITIALIZED
+        && query_state != ClientRequestState::ExecState::PENDING
         && request_state->schedule() != nullptr)
       running_queries[request_state->request_pool()].push_back(
           {request_state->query_id(), request_state->schedule()->per_backend_mem_limit(),

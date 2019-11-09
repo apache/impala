@@ -621,8 +621,8 @@ Status ImpalaServer::GetRuntimeProfileOutput(const TUniqueId& query_id,
   {
     shared_ptr<ClientRequestState> request_state = GetClientRequestState(query_id);
     if (request_state.get() != nullptr) {
-      // For queries in INITIALIZED_STATE, the profile information isn't populated yet.
-      if (request_state->operation_state() == TOperationState::INITIALIZED_STATE) {
+      // For queries in INITIALIZED state, the profile information isn't populated yet.
+      if (request_state->exec_state() == ClientRequestState::ExecState::INITIALIZED) {
         return Status::Expected("Query plan is not ready.");
       }
       lock_guard<mutex> l(*request_state->lock());
@@ -691,7 +691,7 @@ Status ImpalaServer::GetExecSummary(const TUniqueId& query_id, const string& use
       lock_guard<mutex> l(*request_state->lock());
       RETURN_IF_ERROR(CheckProfileAccess(user, request_state->effective_user(),
           request_state->user_has_profile_access()));
-      if (request_state->operation_state() == TOperationState::PENDING_STATE) {
+      if (request_state->exec_state() == ClientRequestState::ExecState::PENDING) {
         const string* admission_result = request_state->summary_profile()->GetInfoString(
             AdmissionController::PROFILE_INFO_KEY_ADMISSION_RESULT);
         if (admission_result != nullptr) {

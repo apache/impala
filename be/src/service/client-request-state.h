@@ -58,6 +58,15 @@ enum class AdmissionOutcome;
 /// synchronize access explicitly via lock(). See the ImpalaServer class comment for
 /// the required lock acquisition order.
 ///
+/// State Machine:
+/// ExecState represents all possible states and UpdateNonErrorExecState /
+/// UpdateQueryStatus defines all possible state transitions. ExecState starts out in the
+/// INITIALIZED state and eventually transition to either the FINISHED or ERROR state. Any
+/// state can transition to the ERROR state (if an error is hit or a timeout occurs). The
+/// possible state transitions differ for a query depending on its type (e.g. depending on
+/// the TStmtType). Successful QUERY / DML queries transition from INITIALIZED to PENDING
+/// to RUNNING to FINISHED whereas DDL queries skip the PENDING phase.
+///
 /// TODO: Compute stats is the only stmt that requires child queries. Once the
 /// CatalogService performs background stats gathering the concept of child queries
 /// will likely become obsolete. Remove all child-query related code from this class.
@@ -67,6 +76,10 @@ class ClientRequestState {
       ImpalaServer* server, std::shared_ptr<ImpalaServer::SessionState> session);
 
   ~ClientRequestState();
+
+  enum class ExecState {
+    INITIALIZED, PENDING, RUNNING, FINISHED, ERROR
+  };
 
   /// Sets the profile that is produced by the frontend. The frontend creates the
   /// profile during planning and returns it to the backend via TExecRequest,
@@ -134,11 +147,10 @@ class ClientRequestState {
   Status RestartFetch() WARN_UNUSED_RESULT;
 
   /// Update operation state if the requested state isn't already obsolete. This is
-  /// only for non-error states (PENDING_STATE, RUNNING_STATE and FINISHED_STATE) - if the
-  /// query encounters an error the query status needs to be set with information about
-  /// the error so UpdateQueryStatus() must be used instead. Takes lock_.
-  void UpdateNonErrorOperationState(
-      apache::hive::service::cli::thrift::TOperationState::type operation_state);
+  /// only for non-error states (PENDING, RUNNING and FINISHED) - if the query encounters
+  /// an error the query status needs to be set with information about the error so
+  /// UpdateQueryStatus() must be used instead. Takes lock_.
+  void UpdateNonErrorExecState(ExecState exec_state);
 
   /// Update the query status and the "Query Status" summary profile string.
   /// If current status is already != ok, no update is made (we preserve the first error)
@@ -152,8 +164,8 @@ class ClientRequestState {
 
   /// Cancels the child queries and the coordinator with the given cause.
   /// If cause is NULL, it assume this was deliberately cancelled by the user while in
-  /// FINISHED operation state. Otherwise, sets state to ERROR_STATE (TODO: IMPALA-1262:
-  /// use CANCELED_STATE). Does nothing if the query has reached EOS or already cancelled.
+  /// FINISHED state. Otherwise, sets state to ERROR (TODO: IMPALA-1262: use CANCELLED).
+  /// Does nothing if the query has reached EOS or already cancelled.
   ///
   /// Only returns an error if 'check_inflight' is true and the query is not yet
   /// in-flight. Otherwise, proceed and return Status::OK() even if the query isn't
@@ -242,11 +254,11 @@ class ClientRequestState {
   }
   boost::mutex* lock() { return &lock_; }
   boost::mutex* fetch_rows_lock() { return &fetch_rows_lock_; }
-  apache::hive::service::cli::thrift::TOperationState::type operation_state() const {
-    return operation_state_;
-  }
-  // Translate operation_state() to a beeswax::QueryState. TODO: remove calls to this
-  // and replace with uses of operation_state() directly.
+  /// ExecState is stored using an AtomicEnum, so reads do not require holding lock_.
+  ExecState exec_state() const { return exec_state_.Load(); }
+  /// Translate exec_state_ to a TOperationState.
+  apache::hive::service::cli::thrift::TOperationState::type TOperationState() const;
+  /// Translate exec_state_ to a beeswax::QueryState.
   beeswax::QueryState::type BeeswaxQueryState() const;
   const Status& query_status() const { return query_status_; }
   void set_result_metadata(const TResultSetMetadata& md) { result_metadata_ = md; }
@@ -459,11 +471,10 @@ protected:
   bool is_cancelled_ = false; // if true, Cancel() was called.
   bool eos_ = false;  // if true, there are no more rows to return
 
-  /// We enforce the invariant that query_status_ is not OK iff operation_state_ is
-  /// ERROR_STATE, given that lock_ is held. operation_state_ should only be updated
-  /// using UpdateOperationState(), to ensure that the query profile is also updated.
-  apache::hive::service::cli::thrift::TOperationState::type operation_state_ =
-      apache::hive::service::cli::thrift::TOperationState::INITIALIZED_STATE;
+  /// We enforce the invariant that query_status_ is not OK iff exec_state_ is ERROR,
+  /// given that lock_ is held. exec_state_ should only be updated using
+  /// UpdateExecState(), to ensure that the query profile is also updated.
+  AtomicEnum<ExecState> exec_state_{ExecState::INITIALIZED};
 
   /// The current status of the query tracked by this ClientRequestState. Updated by
   /// UpdateQueryStatus(Status).
@@ -594,10 +605,9 @@ protected:
   void ClearResultCache();
 
   /// Update the operation state and the "Query State" summary profile string.
-  /// Does not take lock_, but requires it: caller must ensure lock_
-  /// is taken before calling UpdateOperationState.
-  void UpdateOperationState(
-      apache::hive::service::cli::thrift::TOperationState::type operation_state);
+  /// Does not take lock_, but requires it: caller must ensure lock_ is taken before
+  /// calling UpdateExecState.
+  void UpdateExecState(ExecState exec_state);
 
   /// Gets the query options, their levels and the values for this client request
   /// and populates the result set with them. It covers the subset of options for
@@ -628,6 +638,9 @@ protected:
   /// Logs audit and column lineage events. Expects that Wait() has already finished.
   /// Grabs lock_ for polling the query_status(). Hence do not call it under lock_.
   void LogQueryEvents();
+
+  /// Converts the given ExecState to a string representation.
+  std::string ExecStateToString(ExecState state) const;
 };
 
 }

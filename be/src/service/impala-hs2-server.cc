@@ -162,7 +162,7 @@ void ImpalaServer::ExecuteMetadataOp(const THandleIdentifier& session_handle,
     return;
   }
 
-  request_state->UpdateNonErrorOperationState(TOperationState::FINISHED_STATE);
+  request_state->UpdateNonErrorExecState(ClientRequestState::ExecState::FINISHED);
 
   Status inflight_status = SetQueryInflight(session, request_state);
   if (!inflight_status.ok()) {
@@ -723,7 +723,7 @@ void ImpalaServer::GetOperationStatus(TGetOperationStatusResp& return_val,
 
   {
     lock_guard<mutex> l(*request_state->lock());
-    TOperationState::type operation_state = request_state->operation_state();
+    TOperationState::type operation_state = request_state->TOperationState();
     return_val.__set_operationState(operation_state);
     if (operation_state == TOperationState::ERROR_STATE) {
       DCHECK(!request_state->query_status().ok());
@@ -938,7 +938,7 @@ void ImpalaServer::GetLog(TGetLogResp& return_val, const TGetLogReq& request) {
     // guaranteed to see the error query_status.
     lock_guard<mutex> l(*request_state->lock());
     Status query_status = request_state->query_status();
-    DCHECK_EQ(request_state->operation_state() == TOperationState::ERROR_STATE,
+    DCHECK_EQ(request_state->exec_state() == ClientRequestState::ExecState::ERROR,
         !query_status.ok());
     // If the query status is !ok, include the status error message at the top of the log.
     if (!query_status.ok()) ss << query_status.GetDetail();
