@@ -365,8 +365,9 @@ void IR_ALWAYS_INLINE PartitionedHashJoinNode::EvalAndHashProbePrefetchGroup(
 template <int const JoinOp>
 int PartitionedHashJoinNode::ProcessProbeBatch(TPrefetchMode::type prefetch_mode,
     RowBatch* out_batch, HashTableCtx* __restrict__ ht_ctx, Status* __restrict__ status) {
-  DCHECK(state_ == PARTITIONING_PROBE || state_ == PROBING_SPILLED_PARTITION
-      || state_ == REPARTITIONING_PROBE);
+  DCHECK(state_ == HashJoinState::PARTITIONING_PROBE
+      || state_ == HashJoinState::PROBING_SPILLED_PARTITION
+      || state_ == HashJoinState::REPARTITIONING_PROBE);
   ScalarExprEvaluator* const* other_join_conjunct_evals =
       other_join_conjunct_evals_.data();
   const int num_other_join_conjuncts = other_join_conjunct_evals_.size();

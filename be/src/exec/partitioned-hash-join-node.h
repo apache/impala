@@ -83,6 +83,9 @@ class TupleRow;
 ///      either PROBING_SPILLED_PARTITION or REPARTITIONING_BUILD, depending on whether
 ///      the spilled partition's hash table fits in memory or not.
 ///
+///      This phase has sub-states (see ProbeState) that are used in GetNext() to drive
+///      progress.
+///
 ///   3. [PROBING_SPILLED_PARTITION] Read the probe rows from a spilled partition that
 ///      was brought back into memory and probe the partition's hash table. Finally,
 ///      output unmatched build rows for join modes that require it.
@@ -91,6 +94,9 @@ class TupleRow;
 ///      continues to process one of the remaining spilled partitions by advancing to
 ///      either PROBING_SPILLED_PARTITION or REPARTITIONING_BUILD, depending on whether
 ///      the spilled partition's hash table fits in memory or not.
+///
+///      This phase has sub-states (see ProbeState) that are used in GetNext() to drive
+///      progress.
 ///
 /// Null aware anti-join (NAAJ) extends the above algorithm by accumulating rows with
 /// NULLs into several different streams, which are processed in a separate step to
@@ -121,7 +127,7 @@ class PartitionedHashJoinNode : public BlockingJoinNode {
  private:
   class ProbePartition;
 
-  enum HashJoinState {
+  enum class HashJoinState {
     /// Partitioning the build (right) child's input into the builder's hash partitions.
     PARTITIONING_BUILD,
 
@@ -142,6 +148,73 @@ class PartitionedHashJoinNode : public BlockingJoinNode {
     /// ('input_partition_') with the probe rows of that partition.
     /// Corresponds to PARTITIONING_PROBE but reading from a spilled partition.
     REPARTITIONING_PROBE,
+  };
+
+  // This enum represents a sub-state of the PARTITIONING_PROBE,
+  // PROBING_SPILLED_PARTITION and REPARTITIONING_PROBE states.
+  // This drives the state machine in GetNext() that processes probe batches and generates
+  // output rows. This state machine executes within a HashJoinState state, starting with
+  // PROBING_IN_BATCH and ending with PROBE_COMPLETE.
+  //
+  // The state transition diagram is below. The state machine handles iterating through
+  // probe batches (PROBING_IN_BATCH <-> PROBING_END_BATCH), with each input probe batch
+  // producing a variable number of output rows. Once the last probe batch is processed,
+  // additional rows may need to be emitted from the build side per-partition, e.g.
+  // for right outer join (OUTPUTTING_UNMATCHED). Then PROBE_COMPLETE is entered,
+  // indicating that probing is complete. Then the top-level state machine (described by
+  // HashJoinState) takes over and either the next spilled partition is processed, final
+  // null-aware anti join processing is done, or eos can be returned from GetNext().
+  //
+  // start                     if hash tables
+  //     +------------------+  store matches  +----------------------+
+  //---->+ PROBING_IN_BATCH |  +------------->+ OUTPUTTING_UNMATCHED |
+  //     +-----+-----+------+  |              +------+---------------+
+  //           ^     |         |                     |
+  //           |     |         |                     |
+  //           |     v         |                     v
+  //     +-----+-----+-------+ | otherwise  +--------+-------+
+  // +-->+ PROBING_END_BATCH +-+----------->+ PROBE_COMPLETE |
+  // |   +-------------------+              +--+------+------+
+  // |                                       | |    | if NAAJ
+  // +---------------------------------------+ |    | and no spilled
+  //      if spilled partitions left           |    | partitions left
+  //                                           |    |
+  //                           if not NAAJ     |    |
+  //                           and no spilled  |    +---------------+
+  //                +-------+  partitions left |    | if null-aware | otherwise
+  //                |  EOS  +<-----------------+    | partition     |
+  //                +---+---+                       v has rows      |
+  //                    ^              +------------+----------+    |
+  //                    |              | OUTPUTTING_NULL_AWARE |    |
+  //                    |              +------------+----------+    |
+  //                    |                           |               |
+  //                    |                           v               |
+  //                    |              +------------+----------+    |
+  //                    +--------------+ OUTPUTTING_NULL_PROBE +<---+
+  //                                   +-----------------------+
+  enum class ProbeState {
+    // Processing probe batches and more rows in the current probe batch must be
+    // processed.
+    PROBING_IN_BATCH,
+    // Processing probe batches and no more rows in the current probe batch to process.
+    PROBING_END_BATCH,
+    // All probe batches have been processed, unmatched build rows need to be outputted
+    // from 'output_build_partitions_'.
+    // This state is only used if NeedToProcessUnmatchedBuildRows(join_op_) is true.
+    OUTPUTTING_UNMATCHED,
+    // All input probe rows from the child ExecNode or the current spilled partition have
+    // been processed, and all unmatched rows from the build have been output.
+    PROBE_COMPLETE,
+    // All input has been processed. We need to process builder->null_aware_partition()
+    // and output any rows from it.
+    // This state is only used if join_op_ is NULL_AWARE_ANTI_JOIN.
+    OUTPUTTING_NULL_AWARE,
+    // All input has been processed. We need to process null_probe_rows_ and output any
+    // rows from it.
+    // This state is only used if join_op_ is NULL_AWARE_ANTI_JOIN.
+    OUTPUTTING_NULL_PROBE,
+    // All output rows have been produced - GetNext() should return eos.
+    EOS,
   };
 
   /// Constants from PhjBuilder, added to this node for convenience.
@@ -288,6 +361,10 @@ class PartitionedHashJoinNode : public BlockingJoinNode {
   int ProcessProbeBatch(TPrefetchMode::type, RowBatch* out_batch, HashTableCtx* ht_ctx,
       Status* status);
 
+  /// Wrapper that calls either the interpreted or codegen'd version of
+  /// ProcessProbeBatch() and commits the rows to 'out_batch' on success.
+  Status ProcessProbeBatch(RowBatch* out_batch);
+
   /// Wrapper that calls the templated version of ProcessProbeBatch() based on 'join_op'.
   int ProcessProbeBatch(const TJoinOp::type join_op, TPrefetchMode::type,
       RowBatch* out_batch, HashTableCtx* ht_ctx, Status* status);
@@ -323,12 +400,17 @@ class PartitionedHashJoinNode : public BlockingJoinNode {
   Status InitNullProbeRows() WARN_UNUSED_RESULT;
 
   /// Initializes null_aware_partition_ and nulls_build_batch_ to output rows.
-  Status PrepareNullAwarePartition() WARN_UNUSED_RESULT;
+  /// *has_null_aware_rows is set to true if the null-aware partition has rows that need
+  /// to be processed by calling OutputNullAwareProbeRows(), false otherwise. In both
+  /// cases, null probe rows need to be processed with OutputNullAwareNullProbe().
+  Status PrepareNullAwarePartition(bool* has_null_aware_rows) WARN_UNUSED_RESULT;
 
-  /// Continues processing from null_aware_partition_. Called after we have finished
-  /// processing all build and probe input (including repartitioning them).
+  /// Output rows from builder_->null_aware_partition(). Called when 'probe_state_'
+  /// is OUTPUTTING_NULL_AWARE - after all input is processed, including spilled
+  /// partitions. Sets *done = true if there are no more rows to output from this
+  /// function, false otherwise.
   Status OutputNullAwareProbeRows(
-      RuntimeState* state, RowBatch* out_batch) WARN_UNUSED_RESULT;
+      RuntimeState* state, RowBatch* out_batch, bool* done) WARN_UNUSED_RESULT;
 
   /// Evaluates all other_join_conjuncts against null_probe_rows_ with all the
   /// rows in build. This updates matched_null_probe_, short-circuiting if one of the
@@ -337,17 +419,21 @@ class PartitionedHashJoinNode : public BlockingJoinNode {
   Status EvaluateNullProbe(
       RuntimeState* state, BufferedTupleStream* build) WARN_UNUSED_RESULT;
 
-  /// Prepares to output NULLs on the probe side for NAAJ. Before calling this,
-  /// matched_null_probe_ should have been fully evaluated.
+  /// Prepares to output NULLs on the probe side for NAAJ, when transitioning
+  /// 'probe_state_' to OUTPUTTING_NULL_PROBE. Before calling this, 'matched_null_probe_'
+  /// must be fully evaluated.
   Status PrepareNullAwareNullProbe() WARN_UNUSED_RESULT;
 
   /// Outputs NULLs on the probe side, returning rows where matched_null_probe_[i] is
-  /// false. Used for NAAJ.
+  /// false. Called repeatedly after PrepareNullAwareNullProbe(), when 'probe_state_'
+  /// is OUTPUTTING_NULL_PROBE for NAAJ. Sets *done = true if there are no more rows to
+  /// output from this function, false otherwise.
   Status OutputNullAwareNullProbe(
-      RuntimeState* state, RowBatch* out_batch) WARN_UNUSED_RESULT;
+      RuntimeState* state, RowBatch* out_batch, bool* done) WARN_UNUSED_RESULT;
 
-  /// Call at the end of consuming the probe rows. Cleans up the build and probe hash
-  /// partitions and:
+  /// Call at the end of consuming the probe rows, when 'probe_state_' is
+  /// PROBING_END_BATCH, before transitioning to PROBE_COMPLETE or OUTPUTTING_UNMATCHED.
+  /// Cleans up the build and probe hash partitions, if needed, and:
   ///  - If the build partition had a hash table, close it. The build and probe
   ///    partitions are fully processed. The streams are transferred to 'batch'.
   ///    In the case of right-outer and full-outer joins, instead of closing this
@@ -357,26 +443,37 @@ class PartitionedHashJoinNode : public BlockingJoinNode {
   ///    rows were spilled, move the partition to 'spilled_partitions_'.
   Status DoneProbing(RuntimeState* state, RowBatch* batch) WARN_UNUSED_RESULT;
 
+  /// Get the next row batch from the probe (left) side (child(0)), if we are still
+  /// doing the first pass over the input (i.e. state_ is PARTITIONING_PROBE) or
+  /// from the spilled 'input_partition_' if state_ is REPARTITIONING_PROBE.
+  //. If we are done consuming the input, sets 'probe_batch_pos_' to -1, otherwise,
+  /// sets it to 0.  'probe_state_' must be PROBING_END_BATCH.
+  Status NextProbeRowBatch(
+      RuntimeState* state, RowBatch* out_batch) WARN_UNUSED_RESULT;
+
   /// Get the next row batch from the probe (left) side (child(0)). If we are done
   /// consuming the input, sets 'probe_batch_pos_' to -1, otherwise, sets it to 0.
-  Status NextProbeRowBatch(RuntimeState* state, RowBatch* out_batch) WARN_UNUSED_RESULT;
+  /// 'probe_state_' must be PROBING_END_BATCH.
+  Status NextProbeRowBatchFromChild(
+      RuntimeState* state, RowBatch* out_batch) WARN_UNUSED_RESULT;
 
   /// Get the next probe row batch from 'input_partition_'. If we are done consuming the
   /// input, sets 'probe_batch_pos_' to -1, otherwise, sets it to 0.
+  /// 'probe_state_' must be PROBING_END_BATCH.
   Status NextSpilledProbeRowBatch(
       RuntimeState* state, RowBatch* out_batch) WARN_UNUSED_RESULT;
 
-  /// Moves onto the next spilled partition and initializes 'input_partition_'. This
-  /// function processes the entire build side of 'input_partition_' and when this
-  /// function returns, we are ready to consume the probe side of 'input_partition_'.
+  /// Called when 'probe_state_' is PROBE_COMPLETE to start processing the next spilled
+  /// partition. This function sets 'input_partition_' to the chosen partition, then
+  /// processes the entire build side of 'input_partition_'. When this function returns
+  /// function returns, we are ready to consume probe rows in 'input_partition_'.
   /// If the build side's hash table fits in memory and there are probe rows, we will
   /// construct input_partition_'s hash table. If it does not fit, meaning we need to
   /// repartition, this function will repartition the build rows into
   /// 'builder->hash_partitions_' and prepare for repartitioning the partition's probe
   /// rows. If there are no probe rows, we just prepare the build side to be read by
   /// OutputUnmatchedBuild().
-  Status PrepareSpilledPartitionForProbe(
-      RuntimeState* state, bool* got_partition) WARN_UNUSED_RESULT;
+  Status PrepareSpilledPartitionForProbe() WARN_UNUSED_RESULT;
 
   /// Construct an error status for the null-aware anti-join when it could not fit 'rows'
   /// from the build side in memory.
@@ -387,7 +484,8 @@ class PartitionedHashJoinNode : public BlockingJoinNode {
   /// 'row_batch' is not NULL, transfers ownership of all row-backing resources to it.
   void CloseAndDeletePartitions(RowBatch* row_batch);
 
-  /// Prepares for probing the next batch.
+  /// Prepares for probing the next batch. Called after populating 'probe_batch_'
+  /// with rows and entering 'probe_state_' PROBING_IN_BATCH.
   void ResetForProbe();
 
   /// Codegen function to create output row. Assumes that the probe row is non-NULL.
@@ -432,20 +530,24 @@ class PartitionedHashJoinNode : public BlockingJoinNode {
   HashTable::Iterator hash_tbl_iterator_;
 
   /// Number of probe rows that have been partitioned.
-  RuntimeProfile::Counter* num_probe_rows_partitioned_;
+  RuntimeProfile::Counter* num_probe_rows_partitioned_ = nullptr;
 
   /// Time spent evaluating other_join_conjuncts for NAAJ.
-  RuntimeProfile::Counter* null_aware_eval_timer_;
+  RuntimeProfile::Counter* null_aware_eval_timer_ = nullptr;
 
   /// Number of partitions which had zero probe rows and we therefore didn't build the
   /// hash table.
-  RuntimeProfile::Counter* num_hash_table_builds_skipped_;
+  RuntimeProfile::Counter* num_hash_table_builds_skipped_ = nullptr;
 
   /////////////////////////////////////////
   /// BEGIN: Members that must be Reset()
 
-  /// State of the partitioned hash join algorithm. Used just for debugging.
-  HashJoinState state_;
+  /// State of the partitioned hash join algorithm. See HashJoinState for more
+  /// information.
+  HashJoinState state_ = HashJoinState::PARTITIONING_BUILD;
+
+  /// State of the probing algorithm. Used to drive the state machine in GetNext().
+  ProbeState probe_state_ = ProbeState::PROBE_COMPLETE;
 
   /// The build-side of the join. Initialized in Init().
   boost::scoped_ptr<PhjBuilder> builder_;
@@ -475,12 +577,9 @@ class PartitionedHashJoinNode : public BlockingJoinNode {
   std::unique_ptr<ProbePartition> input_partition_;
 
   /// In the case of right-outer and full-outer joins, this is the list of the partitions
-  /// for which we need to output their unmatched build rows.
-  /// This list is populated at DoneProbing().
+  /// for which we need to output their unmatched build rows. This list is populated at
+  /// DoneProbing(). If this is non-empty, probe_state_ must be OUTPUTTING_UNMATCHED.
   std::list<PhjBuilder::Partition*> output_build_partitions_;
-
-  /// Whether this join is in a state outputting rows from OutputNullAwareProbeRows().
-  bool output_null_aware_probe_rows_running_;
 
   /// Partition used if 'null_aware_' is set. During probing, rows from the probe
   /// side that did not have a match in the hash table are appended to this partition.
@@ -495,24 +594,31 @@ class PartitionedHashJoinNode : public BlockingJoinNode {
   /// conjuncts. Must be unique_ptr so we can release it and transfer to output batches.
   /// The stream starts off in memory but is unpinned if there is memory pressure,
   /// specifically if any partitions spilled or appending to the pinned stream failed.
+  /// Populated during the first pass over the probe input (i.e. while state_ is
+  /// PARTITIONING_PROBE) and then output at the end after all input data is processed.
   std::unique_ptr<BufferedTupleStream> null_probe_rows_;
 
   /// For each row in null_probe_rows_, true if this row has matched any build row
-  /// (i.e. the resulting joined row passes other_join_conjuncts).
-  /// TODO: remove this. We need to be able to put these bits inside the tuple itself.
+  /// (i.e. the resulting joined row passes other_join_conjuncts). Populated
+  /// during the first pass over the probe input (i.e. while state_ is PARTITIONING_PROBE)
+  /// and then evaluated for each build partition.
+  /// TODO: ideally we would store the bits inside the tuple data of 'null_probe_rows_'
+  /// instead of in this untracked auxiliary memory.
   std::vector<bool> matched_null_probe_;
 
   /// The current index into null_probe_rows_/matched_null_probe_ that we are
-  /// outputting.
-  int64_t null_probe_output_idx_;
+  /// outputting. -1 means invalid. Only has a valid index when probe_state_ is
+  /// OUTPUTTING_NULL_PROBE.
+  int64_t null_probe_output_idx_ = -1;
 
   /// Used by OutputAllBuild() to iterate over the entire build side tuple stream of the
-  /// current partition.
+  /// current partition. Only used when probe_state_ is OUTPUTTING_UNMATCHED.
   std::unique_ptr<RowBatch> output_unmatched_batch_;
 
   /// Stores an iterator into 'output_unmatched_batch_' to start from on the next call to
   /// OutputAllBuild(), or NULL if there are no partitions without hash tables needing to
-  /// be processed by OutputUnmatchedBuild().
+  /// be processed by OutputUnmatchedBuild(). Only used when probe_state_ is
+  /// OUTPUTTING_UNMATCHED.
   std::unique_ptr<RowBatch::Iterator> output_unmatched_batch_iter_;
 
   /// END: Members that must be Reset()
@@ -562,9 +668,8 @@ class PartitionedHashJoinNode : public BlockingJoinNode {
   typedef int (*ProcessProbeBatchFn)(PartitionedHashJoinNode*,
       TPrefetchMode::type, RowBatch*, HashTableCtx*, Status*);
   /// Jitted ProcessProbeBatch function pointers.  NULL if codegen is disabled.
-  ProcessProbeBatchFn process_probe_batch_fn_;
-  ProcessProbeBatchFn process_probe_batch_fn_level0_;
-
+  ProcessProbeBatchFn process_probe_batch_fn_ = nullptr;
+  ProcessProbeBatchFn process_probe_batch_fn_level0_ = nullptr;
 };
 
 }
