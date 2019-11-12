@@ -699,3 +699,8 @@ fi
 if [[ $SKIP_RANGER -eq 0 ]]; then
   run-step "Setting up Ranger" setup-ranger.log setup-ranger
 fi
+
+# Restart the minicluster. This is strictly to provide a sanity check that
+# restarting the minicluster works and doesn't impact the tests. This is a common
+# operation for developers, so it is nice to test it.
+restart-cluster

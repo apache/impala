@@ -23,8 +23,10 @@ setup_report_build_error
 
 DIR=$(dirname "$0")
 echo Stopping Hbase
-# Kill region server first, then hmaster, and zookeeper.
-"$DIR"/kill-java-service.sh -c HRegionServer -c HMaster -c HQuorumPeer -s 2
+# Use the stop-hbase.sh script provided by HBase. This does a more graceful shutdown
+# that using our kill-java-service.sh script.
+${HBASE_HOME}/bin/stop-hbase.sh
 
 # Clear up data so that zookeeper/hbase won't do recovery when it starts.
+# TODO: is this still needed when using bin/stop-hbase.sh?
 rm -rf /tmp/hbase-*
