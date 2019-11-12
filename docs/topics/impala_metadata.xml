@@ -127,15 +127,6 @@ under the License.
         </dl>
       </p>
 
-      <p>
-        <b>Limitation:</b>
-      </p>
-
-      <p>
-        Global <codeph>INVALIDATES</codeph> are not supported when this feature is enabled. If
-        your workload requires global <codeph>INVALIDATES</codeph>, do not use this feature.
-      </p>
-
     </conbody>
 
   </concept>
@@ -453,8 +444,6 @@ under the License.
     <concept id="event_processor_metrics">
 
       <title>Metrics for Event Based Automatic Metadata Sync</title>
-
-<!--AR 3/29/2019 Incorporate this section to the web UI doc when this feature goes GA.-->
 
       <conbody>
 
