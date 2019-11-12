@@ -2209,7 +2209,8 @@ public class CatalogOpExecutor {
    * tables should be treated as managed (synchronized) tables to keep the user facing
    * behavior consistent.
    *
-   * For managed tables:
+   * For synchronized tables (managed or external tables with external.table.purge=true
+   * in tblproperties):
    *  1. If Kudu's integration with the Hive Metastore is not enabled, the Kudu
    *     table is first created in Kudu, then in the HMS.
    *  2. Otherwise, when the table is created in Kudu, we rely on Kudu to have
@@ -2226,20 +2227,23 @@ public class CatalogOpExecutor {
   private boolean createKuduTable(org.apache.hadoop.hive.metastore.api.Table newTable,
       TCreateTableParams params, TDdlExecResponse response) throws ImpalaException {
     Preconditions.checkState(KuduTable.isKuduTable(newTable));
-    if (KuduTable.isExternalTable(newTable)) {
+    boolean createHMSTable;
+    if (!KuduTable.isSynchronizedTable(newTable)) {
+      // if this is not a synchronized table, we assume that the table must be existing
+      // in kudu and use the column spec from Kudu
       KuduCatalogOpExecutor.populateExternalTableColsFromKudu(newTable);
+      createHMSTable = true;
     } else {
-      KuduCatalogOpExecutor.createManagedTable(newTable, params);
+      // if this is a synchronized table (managed or external.purge table) then we
+      // create it in Kudu first
+      KuduCatalogOpExecutor.createSynchronizedTable(newTable, params);
+      createHMSTable = !isKuduHmsIntegrationEnabled(newTable);
     }
-    // When Kudu's integration with the Hive Metastore is enabled, Kudu will create
-    // the HMS table for managed tables.
-    boolean createsHMSTable = KuduTable.isExternalTable(newTable) ?
-        true : !isKuduHmsIntegrationEnabled(newTable);
     try {
       // Add the table to the HMS and the catalog cache. Acquire metastoreDdlLock_ to
       // ensure the atomicity of these operations.
       synchronized (metastoreDdlLock_) {
-        if (createsHMSTable) {
+        if (createHMSTable) {
           try (MetaStoreClient msClient = catalog_.getMetaStoreClient()) {
             msClient.getHiveClient().createTable(newTable);
           }
@@ -2251,8 +2255,8 @@ public class CatalogOpExecutor {
       }
     } catch (Exception e) {
       try {
-        // Error creating the table in HMS, drop the managed table from Kudu.
-        if (!KuduTable.isExternalTable(newTable)) {
+        // Error creating the table in HMS, drop the synchronized table from Kudu.
+        if (!KuduTable.isSynchronizedTable(newTable)) {
           KuduCatalogOpExecutor.dropTable(newTable, false);
         }
       } catch (Exception logged) {

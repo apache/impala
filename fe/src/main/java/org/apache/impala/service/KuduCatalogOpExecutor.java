@@ -27,6 +27,7 @@ import org.apache.hadoop.hive.metastore.api.FieldSchema;
 import org.apache.impala.catalog.FeKuduTable;
 import org.apache.impala.catalog.KuduColumn;
 import org.apache.impala.catalog.KuduTable;
+import org.apache.impala.catalog.Table;
 import org.apache.impala.catalog.TableNotFoundException;
 import org.apache.impala.catalog.Type;
 import org.apache.impala.common.ImpalaRuntimeException;
@@ -70,9 +71,9 @@ public class KuduCatalogOpExecutor {
    * Throws an exception if 'msTbl' represents an external table or if the table couldn't
    * be created in Kudu.
    */
-  static void createManagedTable(org.apache.hadoop.hive.metastore.api.Table msTbl,
+  static void createSynchronizedTable(org.apache.hadoop.hive.metastore.api.Table msTbl,
       TCreateTableParams params) throws ImpalaRuntimeException {
-    Preconditions.checkState(!KuduTable.isExternalTable(msTbl));
+    Preconditions.checkState(KuduTable.isSynchronizedTable(msTbl));
     Preconditions.checkState(
         msTbl.getParameters().get(KuduTable.KEY_TABLE_ID) == null);
     String kuduTableName = msTbl.getParameters().get(KuduTable.KEY_TABLE_NAME);
@@ -85,11 +86,16 @@ public class KuduCatalogOpExecutor {
     try {
       // TODO: The IF NOT EXISTS case should be handled by Kudu to ensure atomicity.
       // (see KUDU-1710).
-      if (kudu.tableExists(kuduTableName)) {
-        if (params.if_not_exists) return;
+      boolean tableExists = kudu.tableExists(kuduTableName);
+      if (tableExists && params.if_not_exists) return;
+
+      // if table is managed or external with external.purge.table = true in
+      // tblproperties we should create the Kudu table if it does not exist
+      if (tableExists) {
         throw new ImpalaRuntimeException(String.format(
             "Table '%s' already exists in Kudu.", kuduTableName));
       }
+      Preconditions.checkState(!Strings.isNullOrEmpty(kuduTableName));
       Schema schema = createTableSchema(params);
       CreateTableOptions tableOpts = buildTableOptions(msTbl, params, schema);
       org.apache.kudu.client.KuduTable table =
@@ -283,7 +289,7 @@ public class KuduCatalogOpExecutor {
     org.apache.hadoop.hive.metastore.api.Table msTblCopy = msTbl.deepCopy();
     List<FieldSchema> cols = msTblCopy.getSd().getCols();
     // External table should not have table ID.
-    Preconditions.checkState(KuduTable.isExternalTable(msTbl));
+    Preconditions.checkState(Table.isExternalTable(msTbl));
     Preconditions.checkState(
         msTblCopy.getParameters().get(KuduTable.KEY_TABLE_ID) == null);
     String kuduTableName = msTblCopy.getParameters().get(KuduTable.KEY_TABLE_NAME);

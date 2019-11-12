@@ -217,9 +217,6 @@ class SkipIfHive3:
       reason="Kudu is not tested with Hive 3 notifications yet, see IMPALA-8751.")
   col_stat_separated_by_engine = pytest.mark.skipif(HIVE_MAJOR_VERSION >= 3,
       reason="Hive 3 separates column statistics by engine")
-  kudu_with_hms_translation = pytest.mark.skipif(HIVE_MAJOR_VERSION >= 3,
-      reason="Show create table output is different for HMS translated Kudu tables. "
-             "See IMPALA-9092 for details")
 
 
 class SkipIfHive2:
@@ -227,6 +224,9 @@ class SkipIfHive2:
       reason="Acid tables are only supported with Hive 3.")
   col_stat_not_separated_by_engine = pytest.mark.skipif(HIVE_MAJOR_VERSION == 2,
       reason="Hive 2 doesnt support separating column statistics by engine")
+  create_external_kudu_table = pytest.mark.skipif(HIVE_MAJOR_VERSION == 2,
+      reason="Hive 2 does not support creating external.table.purge Kudu tables."
+             " See IMPALA-9092 for details.")
 
 
 class SkipIfCatalogV2:

@@ -208,7 +208,7 @@ public class FrontendFixture {
         fail("Failed to add test table:\n" + createTableSql);
       }
     } else if (dummyTable instanceof KuduTable) {
-      if (!KuduTable.isExternalTable(msTbl)) {
+      if (!Table.isExternalTable(msTbl)) {
         fail("Failed to add table, external kudu table expected:\n" + createTableSql);
       }
       try {

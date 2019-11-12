@@ -72,7 +72,7 @@ public class ToSqlUtils {
   @VisibleForTesting
   protected static final ImmutableSet<String> HIDDEN_TABLE_PROPERTIES = ImmutableSet.of(
       "EXTERNAL", "comment", AlterTableSortByStmt.TBL_PROP_SORT_COLUMNS,
-      AlterTableSortByStmt.TBL_PROP_SORT_ORDER);
+      AlterTableSortByStmt.TBL_PROP_SORT_ORDER, "TRANSLATED_TO_EXTERNAL");
 
   /**
    * Removes all hidden properties from the given 'tblProperties' map.
@@ -311,8 +311,8 @@ public class ToSqlUtils {
     if (properties.containsKey(Table.TBL_PROP_LAST_DDL_TIME)) {
       properties.remove(Table.TBL_PROP_LAST_DDL_TIME);
     }
-    boolean isExternal = msTable.getTableType() != null &&
-        msTable.getTableType().equals(TableType.EXTERNAL_TABLE.toString());
+    boolean isExternal = Table.isExternalTable(msTable);
+
     List<String> sortColsSql = getSortColumns(properties);
     TSortingOrder sortingOrder = TSortingOrder.valueOf(getSortingOrder(properties));
     String comment = properties.get("comment");
@@ -346,7 +346,7 @@ public class ToSqlUtils {
       storageHandlerClassName = null;
       properties.remove(KuduTable.KEY_STORAGE_HANDLER);
       String kuduTableName = properties.get(KuduTable.KEY_TABLE_NAME);
-      // Remove the hidden table property 'kudu.table_name' for a managed Kudu table.
+      // Remove the hidden table property 'kudu.table_name' for a synchronized Kudu table.
       if (kuduTableName != null &&
           KuduUtil.isDefaultKuduTableName(kuduTableName,
               table.getDb().getName(), table.getName())) {
@@ -357,7 +357,7 @@ public class ToSqlUtils {
       // Internal property, should not be exposed to the user.
       properties.remove(StatsSetupConst.DO_NOT_UPDATE_STATS);
 
-      if (!isExternal) {
+      if (KuduTable.isSynchronizedTable(msTable)) {
         primaryKeySql.addAll(kuduTable.getPrimaryKeyColumnNames());
 
         List<String> paramsSql = new ArrayList<>();
@@ -366,7 +366,8 @@ public class ToSqlUtils {
         }
         kuduPartitionByParams = Joiner.on(", ").join(paramsSql);
       } else {
-        // We shouldn't output the columns for external tables
+        // we don't output the column spec if this is not a synchronized table (not
+        // managed and not external.purge table)
         colsSql = null;
       }
     } else if (table instanceof FeFsTable) {

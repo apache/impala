@@ -143,8 +143,7 @@ public class KuduTable extends Table implements FeKuduTable {
     // HIVE-22158: A translated table can have external purge property set to true
     // in such case we sync operations in Impala and Kudu
     // it is possible that in older versions of HMS a managed Kudu table is present
-    return isManagedTable(msTbl) || (isExternalTable(msTbl) && Boolean
-        .parseBoolean(msTbl.getParameters().get(TBL_PROP_EXTERNAL_TABLE_PURGE)));
+    return isManagedTable(msTbl) || isExternalPurgeTable(msTbl);
   }
 
   /**
@@ -153,18 +152,6 @@ public class KuduTable extends Table implements FeKuduTable {
   private static boolean isManagedTable(
       org.apache.hadoop.hive.metastore.api.Table msTbl) {
     return msTbl.getTableType().equalsIgnoreCase(TableType.MANAGED_TABLE.toString());
-  }
-
-  /**
-   * Returns if the given HMS table is external table or not based on table type or table
-   * properties. Implementation is based on org.apache.hadoop.hive.metastore.utils
-   * .MetaStoreUtils.isExternalTable()
-   */
-  public static boolean isExternalTable(
-      org.apache.hadoop.hive.metastore.api.Table msTbl) {
-    // HIVE-19253: table property can also indicate an external table.
-    return (msTbl.getTableType().equalsIgnoreCase(TableType.EXTERNAL_TABLE.toString()) ||
-        ("TRUE").equalsIgnoreCase(msTbl.getParameters().get(TBL_PROP_EXTERNAL_TABLE)));
   }
 
   @Override

@@ -195,6 +195,29 @@ public abstract class Table extends CatalogObjectImpl implements FeTable {
     initMetrics();
   }
 
+  /**
+   * Returns if the given HMS table is an external table (uses table type if
+   * available or else uses table properties). Implementation is based on org.apache
+   * .hadoop.hive.metastore.utils.MetaStoreUtils.isExternalTable()
+   */
+  public static boolean isExternalTable(
+      org.apache.hadoop.hive.metastore.api.Table msTbl) {
+    // HIVE-19253: table property can also indicate an external table.
+    return (msTbl.getTableType().equalsIgnoreCase(TableType.EXTERNAL_TABLE.toString()) ||
+        ("TRUE").equalsIgnoreCase(msTbl.getParameters().get(TBL_PROP_EXTERNAL_TABLE)));
+  }
+
+  /**
+   * In certain versions of Hive (See HIVE-22158) HMS translates a managed table to a
+   * external and sets additional property of "external.table.purge" = true. This
+   * method can be used to identify such translated tables.
+   */
+  public static boolean isExternalPurgeTable(
+      org.apache.hadoop.hive.metastore.api.Table msTbl) {
+    return isExternalTable(msTbl) && Boolean
+        .parseBoolean(msTbl.getParameters().get(TBL_PROP_EXTERNAL_TABLE_PURGE));
+  }
+
   public ReentrantLock getLock() { return tableLock_; }
   @Override
   public abstract TTableDescriptor toThriftDescriptor(

@@ -42,6 +42,7 @@ import org.apache.impala.service.BackendConfig;
 import org.apache.impala.service.FeSupport;
 import org.apache.impala.service.Frontend;
 import org.apache.impala.service.MetadataOp;
+import org.apache.impala.testutil.TestUtils;
 import org.apache.impala.thrift.TCatalogObjectType;
 import org.apache.impala.thrift.TMetadataOpRequest;
 import org.apache.impala.thrift.TMetadataOpcode;
@@ -248,18 +249,17 @@ public class LocalCatalogTest {
     assertEquals("SELECT * FROM functional.alltypes", v.getQueryStmt().toSql());
   }
 
-  @Ignore("Ignored until IMPALA-9092 is fixed")
   @Test
   public void testKuduTable() throws Exception {
     LocalKuduTable t = (LocalKuduTable) catalog_.getTable("functional_kudu",  "alltypes");
     assertEquals("id,bool_col,tinyint_col,smallint_col,int_col," +
         "bigint_col,float_col,double_col,date_string_col,string_col," +
         "timestamp_col,year,month", Joiner.on(",").join(t.getColumnNames()));
-    // Assert on the generated SQL for the table, but not the table properties, since
-    // those might change based on whether this test runs before or after other
-    // tests which compute stats, etc.
-    Assert.assertThat(ToSqlUtils.getCreateTableSql(t), CoreMatchers.startsWith(
-        "CREATE TABLE functional_kudu.alltypes (\n" +
+    boolean areDefaultSynchronizedTablesExternal = TestUtils.getHiveMajorVersion() > 2;
+    String expectedOutputPrefix = areDefaultSynchronizedTablesExternal ? "CREATE "
+        + "EXTERNAL TABLE" : "CREATE TABLE";
+    String expectedOutput =
+        expectedOutputPrefix + " functional_kudu.alltypes (\n" +
         "  id INT NOT NULL ENCODING AUTO_ENCODING COMPRESSION DEFAULT_COMPRESSION,\n" +
         "  bool_col BOOLEAN NULL ENCODING AUTO_ENCODING COMPRESSION DEFAULT_COMPRESSION,\n" +
         "  tinyint_col TINYINT NULL ENCODING AUTO_ENCODING COMPRESSION DEFAULT_COMPRESSION,\n" +
@@ -277,7 +277,28 @@ public class LocalCatalogTest {
         ")\n" +
         "PARTITION BY HASH (id) PARTITIONS 3\n" +
         "STORED AS KUDU\n" +
-        "TBLPROPERTIES"));
+        "TBLPROPERTIES";
+
+    if (areDefaultSynchronizedTablesExternal) {
+      // Assert on the generated SQL for the table, but not the table properties, since
+      // those might change based on whether this test runs before or after other
+      // tests which compute stats, etc.
+      String output = ToSqlUtils.getCreateTableSql(t);
+      Assert.assertThat(output, CoreMatchers.startsWith(expectedOutput));
+      // the tblproperties have keys which are not in a deterministic order
+      // we will confirm if the 'external.table.purge'='TRUE' is available in the
+      // tblproperties substring separately
+      Assert.assertTrue("Synchronized Kudu tables in Hive-3 must contain external.table"
+          + ".purge table property", output.contains("'external.table.purge'='TRUE'"));
+      Assert.assertFalse("Found internal property TRANSLATED_TO_EXTERNAL in table "
+          + "properties", output.contains("TRANSLATED_TO_EXTERNAL"));
+    } else {
+    // Assert on the generated SQL for the table, but not the table properties, since
+    // those might change based on whether this test runs before or after other
+    // tests which compute stats, etc.
+      Assert.assertThat(ToSqlUtils.getCreateTableSql(t),
+          CoreMatchers.startsWith(expectedOutput));
+    }
   }
 
   @Test

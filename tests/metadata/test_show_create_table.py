@@ -23,6 +23,7 @@ from tests.common.impala_test_suite import ImpalaTestSuite
 from tests.common.skip import SkipIf, SkipIfHive3
 from tests.common.test_dimensions import create_uncompressed_text_dimension
 from tests.util.test_file_parser import QueryTestSectionReader, remove_comments
+from tests.common.environ import HIVE_MAJOR_VERSION
 
 
 # The purpose of the show create table tests are to ensure that the "SHOW CREATE TABLE"
@@ -30,13 +31,15 @@ from tests.util.test_file_parser import QueryTestSectionReader, remove_comments
 # definition. The table is created, then the output of "SHOW CREATE TABLE" is used to
 # test if the table can be recreated. This test class does not support --update-results.
 class TestShowCreateTable(ImpalaTestSuite):
-  VALID_SECTION_NAMES = ["CREATE_TABLE", "CREATE_VIEW", "QUERY", "RESULTS"]
+  VALID_SECTION_NAMES = ["CREATE_TABLE", "CREATE_VIEW", "QUERY", "RESULTS-HIVE",
+                         "RESULTS-HIVE-3"]
   # Properties to filter before comparing results
   FILTER_TBL_PROPERTIES = ["transient_lastDdlTime", "numFiles", "numPartitions",
                            "numRows", "rawDataSize", "totalSize", "COLUMN_STATS_ACCURATE",
                            "STATS_GENERATED_VIA_STATS_TASK", "last_modified_by",
                            "last_modified_time", "numFilesErasureCoded",
-                           "bucketing_version", "OBJCAPABILITIES"]
+                           "bucketing_version", "OBJCAPABILITIES",
+                           "TRANSLATED_TO_EXTERNAL"]
 
   @classmethod
   def get_workload(self):
@@ -54,7 +57,6 @@ class TestShowCreateTable(ImpalaTestSuite):
         lambda v: v.get_value('table_format').file_format == 'text' and
         v.get_value('table_format').compression_codec == 'none')
 
-  @SkipIfHive3.kudu_with_hms_translation
   def test_show_create_table(self, vector, unique_database):
     self.__run_show_create_table_test_case('QueryTest/show-create-table', vector,
                                            unique_database)
@@ -209,7 +211,13 @@ class ShowCreateTableTestCase(object):
       assert 0, 'Error in test file %s. Test cases require a '\
           'CREATE_TABLE section.\n%s' %\
           (test_file_name, pprint.pformat(test_section))
-    expected_result = remove_comments(test_section['RESULTS'])
+    results_key = 'RESULTS-HIVE'
+    if HIVE_MAJOR_VERSION > 2:
+      if 'RESULTS-HIVE-3' in test_section:
+        # If the hive version is greater than 2 use the RESULTS-HIVE-3 available
+        results_key = 'RESULTS-HIVE-3'
+
+    expected_result = remove_comments(test_section[results_key])
     self.expected_result = expected_result.replace(
         ShowCreateTableTestCase.RESULTS_DB_NAME_TOKEN, test_db_name)
 
@@ -264,7 +272,6 @@ class TestInfraCompat(ImpalaTestSuite):
                              'l_comment')}]
 
   @SkipIf.kudu_not_supported
-  @SkipIfHive3.kudu_with_hms_translation
   @pytest.mark.parametrize('table_primary_keys_map', TABLE_PRIMARY_KEYS_MAPS)
   def test_primary_key_parse(self, impala_testinfra_cursor, table_primary_keys_map):
     """
@@ -276,7 +283,6 @@ class TestInfraCompat(ImpalaTestSuite):
         table_primary_keys_map['table']) == table_primary_keys_map['primary_keys']
 
   @SkipIf.kudu_not_supported
-  @SkipIfHive3.kudu_with_hms_translation
   @pytest.mark.parametrize('table_primary_keys_map', TABLE_PRIMARY_KEYS_MAPS)
   def test_load_table_with_primary_key_attr(self, impala_testinfra_cursor,
                                             table_primary_keys_map):

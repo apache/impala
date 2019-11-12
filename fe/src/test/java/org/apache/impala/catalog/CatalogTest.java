@@ -686,17 +686,44 @@ public class CatalogTest {
     assertEquals(System.getProperty("user.name"), table.getMetaStoreTable().getOwner());
     assertEquals(TableType.EXTERNAL_TABLE.toString(),
         table.getMetaStoreTable().getTableType());
+  }
+
+  /**
+   * In Hive-3 the HMS translation layer converts non-transactional managed
+   * table definitions to external tables. This test makes sure that such tables
+   * are seen as EXTERNAL tables when loaded in catalog
+   * @throws CatalogException
+   */
+  @Test
+  public void testCreateTableMetadataHive3() throws CatalogException {
+    Assume.assumeTrue(TestUtils.getHiveMajorVersion() > 2);
     // alltypesinsert is created using CREATE TABLE LIKE and is a MANAGED table
-    table = catalog_.getOrLoadTable("functional", "alltypesinsert", "test");
+    Table table = catalog_.getOrLoadTable("functional", "alltypesinsert", "test");
     assertEquals(System.getProperty("user.name"), table.getMetaStoreTable().getOwner());
-    if (TestUtils.getHiveMajorVersion() == 2) {
-      assertEquals(TableType.MANAGED_TABLE.toString(),
-          table.getMetaStoreTable().getTableType());
-    } else {
-      // in Hive-3 due to HMS translation, this table becomes an external table
-      assertEquals(TableType.EXTERNAL_TABLE.toString(),
-          table.getMetaStoreTable().getTableType());
-    }
+    assertEquals(TableType.EXTERNAL_TABLE.toString(),
+        table.getMetaStoreTable().getTableType());
+    // ACID tables should be loaded as MANAGED tables
+    table = catalog_.getOrLoadTable("functional", "insert_only_transactional_table",
+        "test");
+    assertEquals(System.getProperty("user.name"), table.getMetaStoreTable().getOwner());
+    assertEquals(TableType.MANAGED_TABLE.toString(),
+        table.getMetaStoreTable().getTableType());
+  }
+
+  /**
+   * In Hive-2 there is no HMS translation which converts non-transactional managed
+   * table definitions to external tables. This test makes sure that the such tables
+   * are seen as MANAGED tables in catalog
+   * @throws CatalogException
+   */
+  @Test
+  public void testCreateTableMetadataHive2() throws CatalogException {
+    Assume.assumeTrue(TestUtils.getHiveMajorVersion() <= 2);
+    // alltypesinsert is created using CREATE TABLE LIKE and is a MANAGED table
+    Table table = catalog_.getOrLoadTable("functional", "alltypesinsert", "test");
+    assertEquals(System.getProperty("user.name"), table.getMetaStoreTable().getOwner());
+    assertEquals(TableType.MANAGED_TABLE.toString(),
+        table.getMetaStoreTable().getTableType());
   }
 
   @Test

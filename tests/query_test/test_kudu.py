@@ -37,10 +37,10 @@ import time
 from datetime import datetime
 from pytz import utc
 
-from tests.common.environ import ImpalaTestClusterProperties
+from tests.common.environ import ImpalaTestClusterProperties, HIVE_MAJOR_VERSION
 from tests.common.kudu_test_suite import KuduTestSuite
 from tests.common.impala_cluster import ImpalaCluster
-from tests.common.skip import SkipIfNotHdfsMinicluster, SkipIfKudu, SkipIfHive3
+from tests.common.skip import SkipIfNotHdfsMinicluster, SkipIfKudu, SkipIfHive2
 from tests.common.test_dimensions import add_exec_option_dimension
 from tests.verifiers.metric_verifier import MetricVerifier
 
@@ -809,23 +809,42 @@ class TestCreateExternalTable(KuduTestSuite):
       if kudu_client.table_exists(table_name):
         kudu_client.delete_table(table_name)
 
+
 class TestShowCreateTable(KuduTestSuite):
   column_properties = "ENCODING AUTO_ENCODING COMPRESSION DEFAULT_COMPRESSION"
 
-  def assert_show_create_equals(self, cursor, create_sql, show_create_sql):
+  def assert_show_create_equals(self, cursor, create_sql, show_create_sql,
+                                do_exact_match=False):
     """Executes 'create_sql' to create a table, then runs "SHOW CREATE TABLE" and checks
        that the output is the same as 'show_create_sql'. 'create_sql' and
        'show_create_sql' can be templates that can be used with str.format(). format()
-       will be called with 'table' and 'db' as keyword args.
+       will be called with 'table' and 'db' as keyword args. Also, compares HMS-3 specific
+       output due to HMS translation. If do_exact_match is True does not manipulate the
+       output and compares exactly with the show_create_sql parameter.
     """
     format_args = {"table": self.random_table_name(), "db": cursor.conn.db_name}
     cursor.execute(create_sql.format(**format_args))
     cursor.execute("SHOW CREATE TABLE {table}".format(**format_args))
-    assert cursor.fetchall()[0][0] == \
+    output = cursor.fetchall()[0][0]
+    if not do_exact_match and HIVE_MAJOR_VERSION > 2:
+      # in case of HMS-3 all Kudu tables are translated to external tables with some
+      # additional properties. This code below makes sure that we have the expected table
+      # properties and the table is external
+      # TODO we should move these tests to a query.test file so that we can have better
+      # way to compare the output against different hive versions
+      assert output.startswith("CREATE EXTERNAL TABLE")
+      assert "TBLPROPERTIES ('external.table.purge'='TRUE', " in output
+      # We have made sure that the output starts with CREATE EXTERNAL TABLE, now we can
+      # change it to "CREATE TABLE" to make it easier to compare rest of the str
+      output = output.replace("CREATE EXTERNAL TABLE", "CREATE TABLE")
+      # We should also remove the additional tbl property external.table.purge so that we
+      # can compare the rest of output
+      output = output.replace("TBLPROPERTIES ('external.table.purge'='TRUE', ",
+                              "TBLPROPERTIES (")
+    assert output == \
         textwrap.dedent(show_create_sql.format(**format_args)).strip()
 
   @SkipIfKudu.hms_integration_enabled
-  @SkipIfHive3.kudu_with_hms_translation
   def test_primary_key_and_distribution(self, cursor):
     # TODO: Add case with BLOCK_SIZE
     self.assert_show_create_equals(cursor,
@@ -927,7 +946,6 @@ class TestShowCreateTable(KuduTestSuite):
             kudu_addr=KUDU_MASTER_HOSTS))
 
   @SkipIfKudu.hms_integration_enabled
-  @SkipIfHive3.kudu_with_hms_translation
   def test_timestamp_default_value(self, cursor):
     create_sql_fmt = """
         CREATE TABLE {table} (c INT, d TIMESTAMP,
@@ -987,13 +1005,12 @@ class TestShowCreateTable(KuduTestSuite):
           STORED AS KUDU
           TBLPROPERTIES ('kudu.master_addresses'='{kudu_addr}', {kudu_table})""".format(
               db=cursor.conn.db_name, kudu_addr=KUDU_MASTER_HOSTS,
-              kudu_table=table_name_prop))
+              kudu_table=table_name_prop), True)
     finally:
       if kudu_client.table_exists(kudu_table_name):
         kudu_client.delete_table(kudu_table_name)
 
   @SkipIfKudu.hms_integration_enabled
-  @SkipIfHive3.kudu_with_hms_translation
   def test_managed_kudu_table_name_with_show_create(self, cursor):
     """Check that the generated kudu.table_name tblproperty is not present with
        show create table with managed Kudu tables.
@@ -1012,6 +1029,49 @@ class TestShowCreateTable(KuduTestSuite):
         STORED AS KUDU
         TBLPROPERTIES ('kudu.master_addresses'='{kudu_addr}')""".format(
             db=cursor.conn.db_name, kudu_addr=KUDU_MASTER_HOSTS))
+
+  def test_synchronized_kudu_table_with_show_create(self, cursor):
+    # in this case we do exact match with the provided input since this is specifically
+    # creating a synchronized table
+    self.assert_show_create_equals(cursor,
+        """
+        CREATE EXTERNAL TABLE {table} (
+          id BIGINT,
+          name STRING,
+          PRIMARY KEY(id))
+        PARTITION BY HASH PARTITIONS 16
+        STORED AS KUDU
+        TBLPROPERTIES('external.table.purge'='true')""",
+        """
+        CREATE EXTERNAL TABLE {db}.{{table}} (
+          id BIGINT NOT NULL ENCODING AUTO_ENCODING COMPRESSION DEFAULT_COMPRESSION,
+          name STRING NULL ENCODING AUTO_ENCODING COMPRESSION DEFAULT_COMPRESSION,
+          PRIMARY KEY (id)
+        )
+        PARTITION BY HASH (id) PARTITIONS 16
+        STORED AS KUDU
+        TBLPROPERTIES ('external.table.purge'='true', 'kudu.master_addresses'='{kudu_addr}')"""
+          .format(db=cursor.conn.db_name, kudu_addr=KUDU_MASTER_HOSTS), True)
+
+    self.assert_show_create_equals(cursor,
+        """
+        CREATE EXTERNAL TABLE {table} (
+          id BIGINT PRIMARY KEY,
+          name STRING)
+        PARTITION BY HASH(id) PARTITIONS 16
+        STORED AS KUDU
+        TBLPROPERTIES('external.table.purge'='true')""",
+        """
+        CREATE EXTERNAL TABLE {db}.{{table}} (
+          id BIGINT NOT NULL ENCODING AUTO_ENCODING COMPRESSION DEFAULT_COMPRESSION,
+          name STRING NULL ENCODING AUTO_ENCODING COMPRESSION DEFAULT_COMPRESSION,
+          PRIMARY KEY (id)
+        )
+        PARTITION BY HASH (id) PARTITIONS 16
+        STORED AS KUDU
+        TBLPROPERTIES ('external.table.purge'='true', 'kudu.master_addresses'='{kudu_addr}')"""
+          .format(db=cursor.conn.db_name, kudu_addr=KUDU_MASTER_HOSTS), True)
+
 
 class TestDropDb(KuduTestSuite):
 
@@ -1185,3 +1245,136 @@ class TestKuduMemLimits(KuduTestSuite):
                  for i in ImpalaCluster.get_e2e_test_cluster().impalads]
     for v in verifiers:
       v.wait_for_metric("impala-server.num-fragments-in-flight", 0, timeout=30)
+
+
+@SkipIfHive2.create_external_kudu_table
+class TestCreateSynchronizedTable(KuduTestSuite):
+
+  def test_create_synchronized_table(self, cursor, kudu_client, unique_database):
+    """
+    Creates a synchronized Kudu table and makes sure that the statement does not fail.
+    """
+    table_name = self.random_table_name()
+    # create a external kudu table with external.table.purge=true
+    cursor.execute("""
+      CREATE EXTERNAL TABLE %s.%s (
+        id int PRIMARY KEY,
+        name string)
+      PARTITION BY HASH PARTITIONS 8
+      STORED AS KUDU
+      TBLPROPERTIES ('external.table.purge'='true')
+    """ % (unique_database, table_name))
+    # make sure that the table was created
+    cursor.execute("SHOW TABLES IN %s" % unique_database)
+    assert (table_name,) in cursor.fetchall()
+    # make sure that the kudu table was created with default name
+    assert kudu_client.table_exists(self.to_kudu_table_name(unique_database, table_name))
+    # make sure that the external.table.purge property can be changed
+    cursor.execute("ALTER TABLE %s.%s set TBLPROPERTIES ("
+                   "'external.table.purge'='FALSE')" % (unique_database, table_name))
+    cursor.execute("SHOW TABLES IN %s" % unique_database)
+    assert (table_name,) in cursor.fetchall()
+    cursor.execute("ALTER TABLE %s.%s set TBLPROPERTIES ("
+                   "'external.table.purge'='TRUE')" % (unique_database, table_name))
+    cursor.execute("SHOW TABLES IN %s" % unique_database)
+    assert (table_name,) in cursor.fetchall()
+    # make sure that table can be renamed
+    new_table_name = self.random_table_name()
+    cursor.execute("ALTER TABLE %s.%s rename to %s.%s" %
+                   (unique_database, table_name, unique_database, new_table_name))
+    cursor.execute("SHOW TABLES IN %s" % unique_database)
+    assert (new_table_name,) in cursor.fetchall()
+    # make sure that the kudu table was created with default name
+    assert kudu_client.table_exists(
+      self.to_kudu_table_name(unique_database, new_table_name))
+    # now make sure that table disappears after we remove it
+    cursor.execute("DROP TABLE %s.%s" % (unique_database, new_table_name))
+    cursor.execute("SHOW TABLES IN %s" % unique_database)
+    assert (new_table_name,) not in cursor.fetchall()
+    assert not kudu_client.table_exists(
+      self.to_kudu_table_name(unique_database, new_table_name))
+
+  def test_invalid_sync_table_stmts(self, cursor, kudu_client, unique_database):
+    """
+    Test makes sure that a invalid way to create a synchronized table is erroring out
+    """
+    table_name = self.random_table_name()
+    try:
+      cursor.execute("""
+        CREATE EXTERNAL TABLE %s.%s (
+          a int PRIMARY KEY)
+        PARTITION BY HASH PARTITIONS 8
+        STORED AS KUDU
+        TBLPROPERTIES ('external.table.purge'='false')
+      """ % (unique_database, table_name))
+      assert False,\
+        "Create table statement with external.table.purge=False should error out"
+    except Exception as e:
+      # We throw this exception since the analyzer checks for properties one by one.
+      # This is the first property that it checks for an external table
+      assert "Table property kudu.table_name must be specified when " \
+             "creating an external Kudu table" in str(e)
+
+    try:
+      # missing external.table.purge in TBLPROPERTIES
+      cursor.execute("""
+        CREATE EXTERNAL TABLE %s.%s (
+          a int PRIMARY KEY)
+        PARTITION BY HASH PARTITIONS 8
+        STORED AS KUDU
+        TBLPROPERTIES ('FOO'='BAR')
+        """ % (unique_database, table_name))
+      assert False, \
+        "Create external table statement must include external.table.purge property"
+    except Exception as e:
+      # We throw this exception since the analyzer checks for properties one by one.
+      # This is the first property that it checks for an external table
+      assert "Table property kudu.table_name must be specified when " \
+             "creating an external Kudu table" in str(e)
+
+    try:
+      # Trying to create a managed table with external.purge.table property in it
+      cursor.execute("""
+        CREATE TABLE %s.%s (
+          a int PRIMARY KEY)
+        PARTITION BY HASH PARTITIONS 8
+        STORED AS KUDU
+        TBLPROPERTIES ('external.table.purge'='true')
+              """ % (unique_database, table_name))
+      assert False, \
+        "Managed table creation with external.table.purge property must be disallowed"
+    except Exception as e:
+      assert "Table property 'external.table.purge' cannot be set to true " \
+             "with an managed Kudu table." in str(e)
+
+    # TODO should we block this?
+    cursor.execute("""
+      CREATE TABLE %s.%s (
+        a int PRIMARY KEY)
+      PARTITION BY HASH PARTITIONS 8
+      STORED AS KUDU
+      TBLPROPERTIES ('external.table.purge'='False')""" % (unique_database, table_name))
+    cursor.execute("SHOW TABLES IN %s" % unique_database)
+    assert (table_name,) in cursor.fetchall()
+
+  def test_sync_tbl_with_kudu_table(self, cursor, kudu_client, unique_database):
+    """
+    Test tries to create a synchronized table with an existing Kudu table name and
+    makes sure it fails.
+    """
+    with self.temp_kudu_table(kudu_client, [INT32]) as kudu_table:
+      table_name = self.random_table_name()
+      try:
+        cursor.execute("""
+            CREATE EXTERNAL TABLE %s.%s (
+              a int PRIMARY KEY)
+            PARTITION BY HASH PARTITIONS 8
+            STORED AS KUDU
+            TBLPROPERTIES('external.table.purge'='true', 'kudu.table_name' = '%s')"""
+                       % (unique_database, table_name,
+                          self.get_kudu_table_base_name(kudu_table.name)))
+        assert False, "External tables with external.purge.table property must fail " \
+          "if the kudu table already exists"
+      except Exception as e:
+        assert "Not allowed to set 'kudu.table_name' manually for" \
+               " synchronized Kudu tables" in str(e)
