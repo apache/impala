@@ -214,6 +214,13 @@ public class FrontendTestBase extends AbstractFrontendTest {
     return feFixture_.createAnalysisCtx(queryOptions, authzFactory);
   }
 
+  // This function allows us to specify the requesting user when creating an
+  // analysis context associated with an authorization request.
+  protected AnalysisContext createAnalysisCtx(TQueryOptions queryOptions,
+      AuthorizationFactory authzFactory, String user) {
+    return feFixture_.createAnalysisCtx(queryOptions, authzFactory, user);
+  }
+
   protected AnalysisContext createAnalysisCtx(AuthorizationFactory authzFactory) {
     return feFixture_.createAnalysisCtx(authzFactory);
   }

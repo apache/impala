@@ -1,0 +1,117 @@
+{
+    "allowExceptions": [],
+    "createdBy": "Admin",
+    "dataMaskPolicyItems": [],
+    "denyExceptions": [],
+    "denyPolicyItems": [],
+    "description": "Policy for all - database",
+    "id": 4,
+    "isAuditEnabled": true,
+    "isDenyAllElse": false,
+    "isEnabled": true,
+    "name": "all - database",
+    "options": {},
+    "policyItems": [
+        {
+            "accesses": [
+                {
+                    "isAllowed": true,
+                    "type": "select"
+                },
+                {
+                    "isAllowed": true,
+                    "type": "update"
+                },
+                {
+                    "isAllowed": true,
+                    "type": "create"
+                },
+                {
+                    "isAllowed": true,
+                    "type": "drop"
+                },
+                {
+                    "isAllowed": true,
+                    "type": "alter"
+                },
+                {
+                    "isAllowed": true,
+                    "type": "index"
+                },
+                {
+                    "isAllowed": true,
+                    "type": "lock"
+                },
+                {
+                    "isAllowed": true,
+                    "type": "all"
+                },
+                {
+                    "isAllowed": true,
+                    "type": "read"
+                },
+                {
+                    "isAllowed": true,
+                    "type": "write"
+                },
+                {
+                    "isAllowed": true,
+                    "type": "repladmin"
+                },
+                {
+                    "isAllowed": true,
+                    "type": "serviceadmin"
+                },
+                {
+                    "isAllowed": true,
+                    "type": "tempudfadmin"
+                },
+                {
+                    "isAllowed": true,
+                    "type": "refresh"
+                }
+            ],
+            "conditions": [],
+            "delegateAdmin": true,
+            "groups": [],
+            "roles": [],
+            "users": [
+                "admin"
+            ]
+        },
+        {
+            "accesses": [
+                {
+                    "isAllowed": true,
+                    "type": "all"
+                }
+            ],
+            "conditions": [],
+            "delegateAdmin": true,
+            "groups": [],
+            "roles": [],
+            "users": [
+                "{OWNER}"
+            ]
+        }
+    ],
+    "policyLabels": [],
+    "policyPriority": 0,
+    "policyType": 0,
+    "resources": {
+        "database": {
+            "isExcludes": false,
+            "isRecursive": false,
+            "values": [
+                "*"
+            ]
+        }
+    },
+    "rowFilterPolicyItems": [],
+    "service": "test_impala",
+    "serviceType": "hive",
+    "updatedBy": "Admin",
+    "validitySchedules": [],
+    "version": 1,
+    "zoneName": ""
+}

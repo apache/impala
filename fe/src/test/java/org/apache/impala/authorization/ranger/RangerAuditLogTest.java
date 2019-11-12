@@ -59,10 +59,6 @@ public class RangerAuditLogTest extends AuthorizationTestBase {
     super(AuthorizationProvider.RANGER);
   }
 
-  /**
-   * TODO: Fix this unit test in a follow up commit.
-   */
-  @Ignore("IMPALA-9047")
   @Test
   public void testAuditLogSuccess() throws ImpalaException {
     authzOk(events -> {
@@ -150,10 +146,6 @@ public class RangerAuditLogTest extends AuthorizationTestBase {
         onTable("functional", "alltypes", TPrivilegeLevel.SELECT));
   }
 
-  /**
-   * TODO: Fix this unit test in a follow up commit.
-   */
-  @Ignore("IMPALA-9047")
   @Test
   public void testAuditLogFailure() throws ImpalaException {
     authzError(events -> {

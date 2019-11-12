@@ -319,6 +319,18 @@ public class FrontendFixture {
     return analysisCtx;
   }
 
+  // This function is only called by createAnalysisCtx() in FrontendTestBase.java and
+  // allows us to specify the requesting user when creating an analysis context
+  // associated with an authorization request.
+  public AnalysisContext createAnalysisCtx(TQueryOptions queryOptions,
+      AuthorizationFactory authzFactory, String user) {
+    TQueryCtx queryCtx = TestUtils.createQueryContext(Catalog.DEFAULT_DB, user);
+    queryCtx.client_request.query_options = queryOptions;
+    EventSequence timeline = new EventSequence("Frontend Test Timeline");
+    AnalysisContext analysisCtx = new AnalysisContext(queryCtx, authzFactory, timeline);
+    return analysisCtx;
+  }
+
   public AnalysisContext createAnalysisCtx(AuthorizationFactory authzFactory) {
     return createAnalysisCtx(authzFactory, System.getProperty("user.name"));
   }

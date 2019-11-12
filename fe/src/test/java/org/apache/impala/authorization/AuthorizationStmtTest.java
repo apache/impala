@@ -17,7 +17,7 @@
 
 package org.apache.impala.authorization;
 
-import com.google.common.collect.ImmutableMap;
+import com.google.common.collect.ImmutableSet;
 import com.google.common.collect.Sets;
 
 import org.apache.commons.lang.ArrayUtils;
@@ -56,7 +56,6 @@ import java.util.Set;
 
 import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.assertTrue;
-import static org.junit.Assume.assumeTrue;
 
 /**
  * This class contains authorization tests for SQL statements.
@@ -82,8 +81,12 @@ public class AuthorizationStmtTest extends AuthorizationTestBase {
   @Before
   public void before() throws ImpalaException {
     if (authzProvider_ == AuthorizationProvider.SENTRY) {
-      // Remove existing roles in order to not interfere with these tests.
-      for (TSentryRole role : sentryService_.listAllRoles(USER)) {
+      // Remove existing roles in order to not interfere with these tests. To be able to
+      // list existing roles, we have to invoke listAllRoles() as the user corresponding
+      // to User(System.getProperty("user.name")), which has the privilege to execute
+      // LIST_ROLES.
+      User user = new User(System.getProperty("user.name"));
+      for (TSentryRole role : sentryService_.listAllRoles(user)) {
         authzCatalog_.removeRole(role.getRoleName());
       }
     }
@@ -336,9 +339,6 @@ public class AuthorizationStmtTest extends AuthorizationTestBase {
 
   @Test
   public void testCopyTestCasePrivileges() throws ImpalaException {
-    // TODO: Fix this unit test in a follow up commit.
-    assumeTrue(authzProvider_ == AuthorizationProvider.SENTRY);
-
     // Used for select *, with, and union
     Set<String> expectedAuthorizables = Sets.newHashSet(
         "functional", // For including the DB related metadata in the testcase file.
@@ -432,9 +432,6 @@ public class AuthorizationStmtTest extends AuthorizationTestBase {
 
   @Test
   public void testSelect() throws ImpalaException {
-    // TODO: Fix this unit test in a follow up commit.
-    assumeTrue(authzProvider_ == AuthorizationProvider.SENTRY);
-
     for (AuthzTest authzTest: new AuthzTest[]{
         // Select a specific column on a table.
         authorize("select id from functional.alltypes"),
@@ -782,9 +779,6 @@ public class AuthorizationStmtTest extends AuthorizationTestBase {
 
   @Test
   public void testInsert() throws ImpalaException {
-    // TODO: Fix this unit test in a follow up commit.
-    assumeTrue(authzProvider_ == AuthorizationProvider.SENTRY);
-
     // Basic insert into a table.
     for (AuthzTest test: new AuthzTest[]{
         authorize("insert into functional.zipcode_incomes(id) values('123')"),
@@ -941,9 +935,6 @@ public class AuthorizationStmtTest extends AuthorizationTestBase {
 
   @Test
   public void testUseDb() throws ImpalaException {
-    // TODO: Fix this unit test in a follow up commit.
-    assumeTrue(authzProvider_ == AuthorizationProvider.SENTRY);
-
     AuthzTest test = authorize("use functional");
     for (TPrivilegeLevel privilege: TPrivilegeLevel.values()) {
       test.ok(onServer(privilege))
@@ -965,10 +956,7 @@ public class AuthorizationStmtTest extends AuthorizationTestBase {
 
   @Test
   public void testTruncate() throws ImpalaException {
-    // TODO: Fix this unit test in a follow up commit.
-    assumeTrue(authzProvider_ == AuthorizationProvider.SENTRY);
-
-    // Truncate a table.
+    // Truncate a table
     authorize("truncate table functional.alltypes")
         .ok(onServer(TPrivilegeLevel.ALL))
         .ok(onServer(TPrivilegeLevel.OWNER))
@@ -1003,9 +991,6 @@ public class AuthorizationStmtTest extends AuthorizationTestBase {
 
   @Test
   public void testLoad() throws ImpalaException {
-    // TODO: Fix this unit test in a follow up commit.
-    assumeTrue(authzProvider_ == AuthorizationProvider.SENTRY);
-
     // Load into a table.
     authorize("load data inpath 'hdfs://localhost:20500/test-warehouse/tpch.lineitem' " +
         "into table functional.alltypes partition(month=10, year=2009)")
@@ -1082,9 +1067,6 @@ public class AuthorizationStmtTest extends AuthorizationTestBase {
 
   @Test
   public void testResetMetadata() throws ImpalaException {
-    // TODO: Fix this unit test in a follow up commit.
-    assumeTrue(authzProvider_ == AuthorizationProvider.SENTRY);
-
     // Invalidate metadata/refresh authorization on server.
     for (AuthzTest test: new AuthzTest[]{
         authorize("invalidate metadata"),
@@ -1137,9 +1119,6 @@ public class AuthorizationStmtTest extends AuthorizationTestBase {
 
   @Test
   public void testShow() throws ImpalaException {
-    // TODO: Fix this unit test in a follow up commit.
-    assumeTrue(authzProvider_ == AuthorizationProvider.SENTRY);
-
     // Show databases should always be allowed.
     authorize("show databases").ok();
 
@@ -1211,7 +1190,7 @@ public class AuthorizationStmtTest extends AuthorizationTestBase {
     authorize("show roles").ok();
 
     // Show role grant group should always be allowed.
-    authorize(String.format("show role grant group `%s`", USER.getName())).ok();
+    authorize(String.format("show role grant group `%s`", user_.getName())).ok();
 
     // Show grant role/user should always be allowed.
     try {
@@ -1311,9 +1290,6 @@ public class AuthorizationStmtTest extends AuthorizationTestBase {
    */
   @Test
   public void testDescribe() throws ImpalaException {
-    // TODO: Fix this unit test in a follow up commit.
-    assumeTrue(authzProvider_ == AuthorizationProvider.SENTRY);
-
     // Describe database.
     AuthzTest authzTest = authorize("describe database functional");
     for (TPrivilegeLevel privilege: viewMetadataPrivileges()) {
@@ -1450,7 +1426,7 @@ public class AuthorizationStmtTest extends AuthorizationTestBase {
         TPrivilegeLevel.SELECT))
         .error(accessError("functional.allcomplextypes"));
 
-    for (AuthzTest test: new AuthzTest[]{
+    for (AuthzTest test : new AuthzTest[]{
         // User has access to a different column.
         authorize("describe functional.allcomplextypes.int_struct_col"),
         // Insufficient privileges on complex type column, accessing member
@@ -1464,9 +1440,6 @@ public class AuthorizationStmtTest extends AuthorizationTestBase {
 
   @Test
   public void testStats() throws ImpalaException {
-    // TODO: Fix this unit test in a follow up commit.
-    assumeTrue(authzProvider_ == AuthorizationProvider.SENTRY);
-
     // Compute stats.
     authorize("compute stats functional.alltypes")
         .ok(onServer(TPrivilegeLevel.ALL))
@@ -1549,9 +1522,6 @@ public class AuthorizationStmtTest extends AuthorizationTestBase {
 
   @Test
   public void testCreateDatabase() throws ImpalaException {
-    // TODO: Fix this unit test in a follow up commit.
-    assumeTrue(authzProvider_ == AuthorizationProvider.SENTRY);
-
     for (AuthzTest test: new AuthzTest[]{
         authorize("create database newdb"),
         authorize("create database if not exists newdb")}) {
@@ -1564,23 +1534,21 @@ public class AuthorizationStmtTest extends AuthorizationTestBase {
     }
 
     // Create a database with a specific location.
-    authorize("create database newdb location " +
-        "'hdfs://localhost:20500/test-warehouse/new_location'")
+    String uri = "hdfs://localhost:20500/test-warehouse/new_location";
+    String stmt = "create database newdb location " + "'" + uri + "'";
+    authorize(stmt)
         .ok(onServer(TPrivilegeLevel.ALL))
         .ok(onServer(TPrivilegeLevel.OWNER))
-        .ok(onServer(TPrivilegeLevel.CREATE), onUri(
-            "hdfs://localhost:20500/test-warehouse/new_location", TPrivilegeLevel.ALL))
-        .ok(onServer(TPrivilegeLevel.CREATE), onUri(
-            "hdfs://localhost:20500/test-warehouse/new_location", TPrivilegeLevel.OWNER))
+        .ok(onServer(TPrivilegeLevel.CREATE), onUri(uri, TPrivilegeLevel.ALL))
+        .ok(onServer(TPrivilegeLevel.CREATE), onUri(uri, TPrivilegeLevel.OWNER))
         .error(createError("newdb"))
         .error(createError("newdb"), onServer(allExcept(TPrivilegeLevel.ALL,
-            TPrivilegeLevel.OWNER, TPrivilegeLevel.CREATE)), onUri(
-            "hdfs://localhost:20500/test-warehouse/new_location", TPrivilegeLevel.ALL))
+            TPrivilegeLevel.OWNER, TPrivilegeLevel.CREATE)),
+            onUri(uri, TPrivilegeLevel.ALL))
         .error(createError("newdb"), onServer(allExcept(TPrivilegeLevel.ALL,
-            TPrivilegeLevel.OWNER, TPrivilegeLevel.CREATE)), onUri(
-            "hdfs://localhost:20500/test-warehouse/new_location", TPrivilegeLevel.OWNER))
-        .error(accessError("hdfs://localhost:20500/test-warehouse/new_location"),
-            onServer(TPrivilegeLevel.CREATE));
+            TPrivilegeLevel.OWNER, TPrivilegeLevel.CREATE)),
+            onUri(uri, TPrivilegeLevel.OWNER))
+        .error(accessError(uri), onServer(TPrivilegeLevel.CREATE));
 
     // Database already exists.
     for (AuthzTest test: new AuthzTest[]{
@@ -1598,9 +1566,6 @@ public class AuthorizationStmtTest extends AuthorizationTestBase {
 
   @Test
   public void testCreateTable() throws ImpalaException {
-    // TODO: Fix this unit test in a follow up commit.
-    assumeTrue(authzProvider_ == AuthorizationProvider.SENTRY);
-
     for (AuthzTest test: new AuthzTest[]{
         authorize("create table functional.new_table(i int)"),
         authorize("create external table functional.new_table(i int)")}) {
@@ -1834,9 +1799,6 @@ public class AuthorizationStmtTest extends AuthorizationTestBase {
 
   @Test
   public void testCreateView() throws ImpalaException {
-    // TODO: Fix this unit test in a follow up commit.
-    assumeTrue(authzProvider_ == AuthorizationProvider.SENTRY);
-
     for (AuthzTest test: new AuthzTest[]{
         authorize("create view functional.new_view as " +
             "select int_col from functional.alltypes"),
@@ -1916,9 +1878,6 @@ public class AuthorizationStmtTest extends AuthorizationTestBase {
 
   @Test
   public void testDropDatabase() throws ImpalaException {
-    // TODO: Fix this unit test in a follow up commit.
-    assumeTrue(authzProvider_ == AuthorizationProvider.SENTRY);
-
     for (AuthzTest test: new AuthzTest[]{
         authorize("drop database functional"),
         authorize("drop database functional cascade"),
@@ -1972,9 +1931,6 @@ public class AuthorizationStmtTest extends AuthorizationTestBase {
 
   @Test
   public void testDropTable() throws ImpalaException {
-    // TODO: Fix this unit test in a follow up commit.
-    assumeTrue(authzProvider_ == AuthorizationProvider.SENTRY);
-
     authorize("drop table functional.alltypes")
         .ok(onServer(TPrivilegeLevel.ALL))
         .ok(onServer(TPrivilegeLevel.OWNER))
@@ -2038,9 +1994,6 @@ public class AuthorizationStmtTest extends AuthorizationTestBase {
 
   @Test
   public void testDropView() throws ImpalaException {
-    // TODO: Fix this unit test in a follow up commit.
-    assumeTrue(authzProvider_ == AuthorizationProvider.SENTRY);
-
     authorize("drop view functional.alltypes_view")
         .ok(onServer(TPrivilegeLevel.ALL))
         .ok(onServer(TPrivilegeLevel.OWNER))
@@ -2105,9 +2058,6 @@ public class AuthorizationStmtTest extends AuthorizationTestBase {
 
   @Test
   public void testAlterTable() throws ImpalaException {
-    // TODO: Fix this unit test in a follow up commit.
-    assumeTrue(authzProvider_ == AuthorizationProvider.SENTRY);
-
     BackendConfig.INSTANCE.setZOrderSortUnlocked(true);
     for (AuthzTest test: new AuthzTest[]{
         authorize("alter table functional.alltypes add column c1 int"),
@@ -2177,6 +2127,7 @@ public class AuthorizationStmtTest extends AuthorizationTestBase {
                     TPrivilegeLevel.ALL, TPrivilegeLevel.OWNER)));
         // TODO: Checking if a request is allowed by checking if grant option flag is set
         // is to Sentry.
+        // The following do not result in Ranger authorization errors.
         if (authzProvider_ == AuthorizationProvider.SENTRY) {
           test.error(accessError(true, "functional.alltypes"), onServer(
               TPrivilegeLevel.values()))
@@ -2184,6 +2135,10 @@ public class AuthorizationStmtTest extends AuthorizationTestBase {
                   TPrivilegeLevel.values()))
               .error(accessError(true, "functional.alltypes"), onTable("functional",
                   "alltypes", TPrivilegeLevel.values()));
+        } else {
+          test.ok(onServer(TPrivilegeLevel.values()));
+          test.ok(onDatabase("functional", TPrivilegeLevel.values()));
+          test.ok(onTable("functional", "alltypes", TPrivilegeLevel.values()));
         }
       }
     } finally {
@@ -2321,9 +2276,6 @@ public class AuthorizationStmtTest extends AuthorizationTestBase {
 
   @Test
   public void testAlterView() throws ImpalaException {
-    // TODO: Fix this unit test in a follow up commit.
-    assumeTrue(authzProvider_ == AuthorizationProvider.SENTRY);
-
     for (AuthzTest test: new AuthzTest[] {
         authorize("alter view functional.alltypes_view as " +
             "select int_col from functional.alltypes"),
@@ -2428,6 +2380,7 @@ public class AuthorizationStmtTest extends AuthorizationTestBase {
                     TPrivilegeLevel.OWNER)));
         // TODO: Checking if a request is allowed by checking if grant option flag is set
         // is to Sentry.
+        // The following do not result in Ranger authorization errors.
         if (authzProvider_ == AuthorizationProvider.SENTRY) {
           test.error(accessError(true, "functional.alltypes_view"), onServer(
               TPrivilegeLevel.values()))
@@ -2435,6 +2388,10 @@ public class AuthorizationStmtTest extends AuthorizationTestBase {
                   "functional", TPrivilegeLevel.values()))
               .error(accessError(true, "functional.alltypes_view"), onTable("functional",
                   "alltypes_view", TPrivilegeLevel.values()));
+        } else {
+          test.ok(onServer(TPrivilegeLevel.values()));
+          test.ok(onDatabase("functional", TPrivilegeLevel.values()));
+          test.ok(onTable("functional", "alltypes_view", TPrivilegeLevel.values()));
         }
       }
     } finally {
@@ -2458,9 +2415,6 @@ public class AuthorizationStmtTest extends AuthorizationTestBase {
 
   @Test
   public void testAlterDatabase() throws ImpalaException {
-    // TODO: Fix this unit test in a follow up commit.
-    assumeTrue(authzProvider_ == AuthorizationProvider.SENTRY);
-
     try {
       // We cannot set an owner to a role that doesn't exist
       authzCatalog_.addRole("foo");
@@ -2480,12 +2434,18 @@ public class AuthorizationStmtTest extends AuthorizationTestBase {
                 allExcept(TPrivilegeLevel.ALL, TPrivilegeLevel.OWNER)));
         // TODO: Checking if a request is allowed by checking if grant option flag is set
         // is to Sentry.
+        // The following do not result in Ranger authorization errors.
         if (authzProvider_ == AuthorizationProvider.SENTRY) {
           authorize(String.format("alter database functional set owner %s foo",
               ownerType))
               .error(accessError(true, "functional"), onServer(TPrivilegeLevel.values()))
               .error(accessError(true, "functional"), onDatabase("functional",
                   TPrivilegeLevel.values()));
+        } else {
+          authorize(String.format("alter database functional set owner %s foo",
+              ownerType))
+              .ok(onServer(TPrivilegeLevel.values()))
+              .ok(onDatabase("functional", TPrivilegeLevel.values()));
         }
 
         // Database does not exist.
@@ -2510,9 +2470,6 @@ public class AuthorizationStmtTest extends AuthorizationTestBase {
 
   @Test
   public void testUpdate() throws ImpalaException {
-    // TODO: Fix this unit test in a follow up commit.
-    assumeTrue(authzProvider_ == AuthorizationProvider.SENTRY);
-
     // Update is only supported on Kudu tables.
     for (AuthzTest test: new AuthzTest[]{
         authorize("update functional_kudu.alltypes set int_col = 1"),
@@ -2552,9 +2509,6 @@ public class AuthorizationStmtTest extends AuthorizationTestBase {
 
   @Test
   public void testUpsert() throws ImpalaException {
-    // TODO: Fix this unit test in a follow up commit.
-    assumeTrue(authzProvider_ == AuthorizationProvider.SENTRY);
-
     // Upsert is only supported on Kudu tables.
     for (AuthzTest test: new AuthzTest[]{
         authorize("upsert into table functional_kudu.testtbl(id, name) values(1, 'a')"),
@@ -2623,9 +2577,6 @@ public class AuthorizationStmtTest extends AuthorizationTestBase {
 
   @Test
   public void testDelete() throws ImpalaException {
-    // TODO: Fix this unit test in a follow up commit.
-    assumeTrue(authzProvider_ == AuthorizationProvider.SENTRY);
-
     // Delete is only supported on Kudu tables.
     for (AuthzTest test: new AuthzTest[]{
         authorize("delete from functional_kudu.alltypes"),
@@ -2664,9 +2615,6 @@ public class AuthorizationStmtTest extends AuthorizationTestBase {
 
   @Test
   public void testCommentOn() throws ImpalaException {
-    // TODO: Fix this unit test in a follow up commit.
-    assumeTrue(authzProvider_ == AuthorizationProvider.SENTRY);
-
     // Comment on database.
     authorize("comment on database functional is 'comment'")
         .ok(onServer(TPrivilegeLevel.ALL))
@@ -2764,9 +2712,6 @@ public class AuthorizationStmtTest extends AuthorizationTestBase {
 
   @Test
   public void testFunction() throws ImpalaException {
-    // TODO: Fix this unit test in a follow up commit.
-    assumeTrue(authzProvider_ == AuthorizationProvider.SENTRY);
-
     // Create function.
     authorize("create function functional.f() returns int location " +
         "'/test-warehouse/libTestUdfs.so' symbol='NoArgs'")
@@ -2876,9 +2821,15 @@ public class AuthorizationStmtTest extends AuthorizationTestBase {
       options.setEnable_expr_rewrites(true);
       for (AuthzTest test: new AuthzTest[] {
           authorize("select functional.to_lower('ABCDEF')"),
-          // Also test with expression rewrite enabled.
-          authorize(createAnalysisCtx(options, authzFactory_),
-              "select functional.to_lower('ABCDEF')")}) {
+          // Also test with expression rewrite enabled. Notice that when creating an
+          // analysis context, we have to explicitly specify the requesting user
+          // corresponding to 'user_' defined in AuthorizationTestBase.java. Otherwise,
+          // an analysis context will be created with a user corresponding to
+          // User(System.getProperty("user.name")), resulting in a Sentry authorization
+          // error.
+          authorize(createAnalysisCtx(options, authzFactory_, user_.getName()),
+              "select functional.to_lower('ABCDEF')")
+      }) {
         test.ok(onServer(TPrivilegeLevel.SELECT))
             .ok(onDatabase("functional", TPrivilegeLevel.ALL))
             .ok(onDatabase("functional", TPrivilegeLevel.OWNER))
@@ -2946,7 +2897,7 @@ public class AuthorizationStmtTest extends AuthorizationTestBase {
           "    }\n" +
           "  ]\n" +
           "}", policyName, RANGER_SERVICE_TYPE, RANGER_SERVICE_NAME, tableName,
-          USER.getShortName());
+          user_.getShortName());
 
       try {
         // Clear existing row filter policies, otherwise they will cause different
@@ -3064,7 +3015,7 @@ public class AuthorizationStmtTest extends AuthorizationTestBase {
           "    }\n" +
           "  ]\n" +
           "}", policyName, RANGER_SERVICE_TYPE, RANGER_SERVICE_NAME, tableName,
-          USER.getShortName());
+          user_.getShortName());
 
       try {
         createRangerPolicy(policyName, json);
@@ -3137,99 +3088,114 @@ public class AuthorizationStmtTest extends AuthorizationTestBase {
   }
 
   /**
-   * Validates Ranger's object ownership privileges.
+   * Validates Ranger's object ownership privileges. Note that we no longer have to add a
+   * policy to the Ranger server to explicitly grant a user the access privileges of the
+   * resources if the user is the owner of the resources.
    */
   @Test
   public void testRangerObjectOwnership() throws Exception {
-    // TODO: Fix this unit test in a follow up commit.
-    assumeTrue(authzProvider_ == AuthorizationProvider.SENTRY);
-
     if (authzProvider_ == AuthorizationProvider.SENTRY) return;
-    // Out of the box there are no privileges for the owner on functional db.
-    // So the following set of queries should fail with authz failures.
-    // Maps from a query to the corresponding authz error.
-    ImmutableMap<AuthzTest, String> testQueries = ImmutableMap
-        .<AuthzTest, String>builder()
-        .put(authorize("select count(*) from functional.alltypes"),
-            selectError("functional.alltypes"))
-        .put(authorize("select id from functional.alltypes"),
-            selectError("functional.alltypes"))
-        .put(authorize("select id from functional.alltypes_view"),
-            selectError("functional.alltypes_view"))
-        .put(authorize("show create table functional.alltypes"),
-            accessError("functional.alltypes"))
-        .put(authorize("describe functional.alltypes"),
-            accessError("functional.alltypes"))
-        .put(authorize("show create table functional.alltypes_view"),
-            accessError("functional.alltypes_view"))
-        .put(authorize("describe functional.alltypes_view"),
-            accessError("functional.alltypes_view"))
-        .put(authorize("describe functional.allcomplextypes.int_struct_col"),
-            accessError("functional.allcomplextypes"))
-        .put(authorize("refresh functional.alltypes"),
-            refreshError("functional.alltypes"))
-        .put(authorize("invalidate metadata functional.alltypes"),
-            refreshError("functional.alltypes"))
-        .put(authorize("compute stats functional.alltypes"),
-            alterError("functional.alltypes"))
-        .put(authorize("drop stats functional.alltypes"),
-            alterError("functional.alltypes"))
-        .put(authorize("create table functional.test_tbl(a int)"),
-            createError("functional"))
-        .put(authorize("create table functional.test_tbl like functional.alltypes"),
-            accessError("functional.alltypes"))
-        .put(authorize("create table functional.test_tbl as select 1"),
-            createError("functional"))
-        .put(authorize("create view functional.test_view as select 1"),
-            createError("functional"))
-        .put(authorize("alter table functional.alltypes add column c1 int"),
-            alterError("functional"))
-        .put(authorize("drop table functional.alltypes"),
-            dropError("functional"))
-        .put(authorize("drop view functional.alltypes_view"),
-            dropError("functional"))
-        .put(authorize("alter view functional.alltypes_view as select 1"),
-            alterError("functional.alltypes_view"))
-        .put(authorize("alter database functional set owner user foo"),
-            accessError(true, "functional"))
+
+    // 'as_owner_' is by default set to false for AuthorizationTestBase. But since this
+    // test is meant for testing Ranger's behavior when the requesting user is the owner
+    // of the resources, we set 'as_owner_' to true.
+    as_owner_ = true;
+    TQueryOptions options = new TQueryOptions();
+
+    ImmutableSet<AuthzTest> testQueries = ImmutableSet
+        .<AuthzTest>builder()
+        .add(authorize(createAnalysisCtx(options, authzFactory_,
+            OWNER_USER.getName()),
+            "select count(*) from functional.alltypes"))
+        .add(authorize(createAnalysisCtx(options, authzFactory_,
+            OWNER_USER.getName()),
+            "select id from functional.alltypes"))
+        .add(authorize(createAnalysisCtx(options, authzFactory_,
+            OWNER_USER.getName()),
+            "select id from functional.alltypes_view"))
+        .add(authorize(createAnalysisCtx(options, authzFactory_,
+            OWNER_USER.getName()),
+            "show create table functional.alltypes"))
+        .add(authorize(createAnalysisCtx(options, authzFactory_,
+            OWNER_USER.getName()),
+            "describe functional.alltypes"))
+        .add(authorize(createAnalysisCtx(options, authzFactory_,
+            OWNER_USER.getName()),
+            "show create table functional.alltypes_view"))
+        .add(authorize(createAnalysisCtx(options, authzFactory_,
+            OWNER_USER.getName()),
+            "describe functional.alltypes_view"))
+        .add(authorize(createAnalysisCtx(options, authzFactory_,
+            OWNER_USER.getName()),
+            "describe functional.allcomplextypes.int_struct_col"))
+        .add(authorize(createAnalysisCtx(options, authzFactory_,
+            OWNER_USER.getName()),
+            "refresh functional.alltypes"))
+        .add(authorize(createAnalysisCtx(options, authzFactory_,
+            OWNER_USER.getName()),
+            "invalidate metadata functional.alltypes"))
+        .add(authorize(createAnalysisCtx(options, authzFactory_,
+            OWNER_USER.getName()),
+            "compute stats functional.alltypes"))
+        .add(authorize(createAnalysisCtx(options, authzFactory_,
+            OWNER_USER.getName()),
+            "drop stats functional.alltypes"))
+        .add(authorize(createAnalysisCtx(options, authzFactory_,
+            OWNER_USER.getName()),
+            "create table functional.test_tbl(a int)"))
+        .add(authorize(createAnalysisCtx(options, authzFactory_,
+            OWNER_USER.getName()),
+            "create table functional.test_tbl like functional.alltypes"))
+        .add(authorize(createAnalysisCtx(options, authzFactory_,
+            OWNER_USER.getName()),
+            "create table functional.test_tbl as select 1"))
+        .add(authorize(createAnalysisCtx(options, authzFactory_,
+            OWNER_USER.getName()),
+            "create view functional.test_view as select 1"))
+        .add(authorize(createAnalysisCtx(options, authzFactory_,
+            OWNER_USER.getName()),
+            "alter table functional.alltypes add column c1 int"))
+        .add(authorize(createAnalysisCtx(options, authzFactory_,
+            OWNER_USER.getName()),
+            "drop table functional.alltypes"))
+        .add(authorize(createAnalysisCtx(options, authzFactory_,
+            OWNER_USER.getName()),
+            "drop view functional.alltypes_view"))
+        .add(authorize(createAnalysisCtx(options, authzFactory_,
+            OWNER_USER.getName()),
+            "alter view functional.alltypes_view as select 1"))
+        .add(authorize(createAnalysisCtx(options, authzFactory_,
+            OWNER_USER.getName()),
+            "alter database functional set owner user foo"))
         .build();
     // Run the queries.
-    for (AuthzTest authz: testQueries.keySet()) authz.error(testQueries.get(authz));
-    // Grant ALL privileges on functional db to it's owner. All the above queries
-    // should be authorized now, since we are running as the owner of the db and
-    // ownership should be translated to the tables underneath.
-    String policyName = "functional_owner_" + TestUtils.getRandomString(5);
-    createOwnerPolicy(policyName, "ALL", "functional", "*", "*");
-    try {
-      rangerImpalaPlugin_.refreshPoliciesAndTags();
-      for (AuthzTest authz: testQueries.keySet()) authz.ok();
-    } finally {
-      deleteRangerPolicy(policyName);
-    }
-    rangerImpalaPlugin_.refreshPoliciesAndTags();
+    for (AuthzTest authz: testQueries) authz.ok();
     // Tests for more fine grained {OWNER} privileges.
     //
     // SELECT privilege.
-    // With default privileges, select on both alltypes/alltypes_view should fail.
-    authorize("select count(*) from functional.alltypes")
-        .error(selectError("functional.alltypes"));
-    authorize("select count(*) from functional.alltypes")
-        .error(selectError("functional.alltypes"));
-    policyName = "functional_owner_alltypes" + TestUtils.getRandomString(5);
-    createOwnerPolicy(policyName, "SELECT", "functional", "alltypes", "*");
-    rangerImpalaPlugin_.refreshPoliciesAndTags();
-    // With the new privileges, only the first query should pass. Also,
-    // any other non-SELECT on functional.alltypes should fail.
+    authorize(createAnalysisCtx(options, authzFactory_,
+        OWNER_USER.getName()),
+        "select count(*) from functional.alltypes").ok();
+    authorize(createAnalysisCtx(options, authzFactory_,
+        OWNER_USER.getName()),
+        "select count(*) from functional.alltypes_view").ok();
+
+    // The owner is granted all privileges in the following by default.
     try {
-      authorize("select count(*) from functional.alltypes").ok();
-      authorize("alter table functional.alltypes add column c1 int")
-          .error(alterError("functional"));
-      authorize("drop table functional.alltypes")
-          .error(dropError("functional"));
-      authorize("select count(*) from functional.alltypes_view")
-          .error(selectError("functional.alltypes_view"));
+      authorize(createAnalysisCtx(options, authzFactory_,
+          OWNER_USER.getName()),
+          "select count(*) from functional.alltypes").ok();
+      authorize(createAnalysisCtx(options, authzFactory_,
+          OWNER_USER.getName()),
+          "alter table functional.alltypes add column c1 int").ok();
+      authorize(createAnalysisCtx(options, authzFactory_,
+          OWNER_USER.getName()),
+          "drop table functional.alltypes").ok();
+      authorize(createAnalysisCtx(options, authzFactory_,
+          OWNER_USER.getName()),
+          "select count(*) from functional.alltypes_view").ok();
     } finally {
-      deleteRangerPolicy(policyName);
+      as_owner_ = false;
     }
   }
 

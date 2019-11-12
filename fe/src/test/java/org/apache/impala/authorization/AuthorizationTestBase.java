@@ -77,11 +77,33 @@ public abstract class AuthorizationTestBase extends FrontendTestBase {
   protected static final String RANGER_USER = "admin";
   protected static final String RANGER_PASSWORD = "admin";
   protected static final String SERVER_NAME = "server1";
-  protected static final User USER = new User(System.getProperty("user.name"));
+
+  // For the Ranger tests, 'OWNER_USER' is used to denote a requesting user that is
+  // the owner of the resource.
+  protected static final User OWNER_USER = new User(System.getProperty("user.name"));
+  // For the Ranger tests, 'GROUPS' is used to denote the name of the group where a
+  // non-owner is associated with.
+  protected static final List<String> GROUPS = Collections.singletonList("non_owner");
+  // For the Ranger tests, 'OWNER_GROUPS' is used to denote the name of the group where
+  // an owner is associated with.
+  protected static final List<String> OWNER_GROUPS =
+      Collections.singletonList(System.getProperty("user.name"));
+
   protected static final String RANGER_SERVICE_TYPE = "hive";
   protected static final String RANGER_SERVICE_NAME = "test_impala";
   protected static final String RANGER_APP_ID = "impala";
   protected static final User RANGER_ADMIN = new User("admin");
+
+  // For the Ranger tests, 'user_' is used to denote a requesting user that is not the
+  // owner of the resource. Note that we defer the setup of 'user_' to the constructor
+  // and assign a different name for each authorization provider to avoid the need for
+  // providing a customized group mapping service when instantiating a Sentry
+  // ResourceAuthorizationProvider as we do in TestShortUsernameWithAuthToLocal() of
+  // AuthorizationTest.java.
+  protected static User user_ = null;
+  // For the Ranger tests, 'as_owner_' is used to indicate whether or not the requesting
+  // user in a test query is the owner of the resource.
+  protected static boolean as_owner_ = false;
 
   protected final AuthorizationConfig authzConfig_;
   protected final AuthorizationFactory authzFactory_;
@@ -98,11 +120,12 @@ public abstract class AuthorizationTestBase extends FrontendTestBase {
     authzProvider_ = authzProvider;
     switch (authzProvider) {
       case SENTRY:
+        user_ = new User(System.getProperty("user.name"));
         authzConfig_ = SentryAuthorizationConfig.createHadoopGroupAuthConfig(
             "server1",
             System.getenv("IMPALA_HOME") + "/fe/src/test/resources/sentry-site.xml");
         authzFactory_ = createAuthorizationFactory(authzProvider);
-        authzCtx_ = createAnalysisCtx(authzFactory_, USER.getName());
+        authzCtx_ = createAnalysisCtx(authzFactory_, user_.getName());
         authzCatalog_ = new ImpaladTestCatalog(authzFactory_);
         authzFrontend_ = new Frontend(authzFactory_, authzCatalog_);
         sentryService_ = new SentryPolicyService(
@@ -111,10 +134,11 @@ public abstract class AuthorizationTestBase extends FrontendTestBase {
         rangerRestClient_ = null;
         break;
       case RANGER:
+        user_ = new User("non_owner");
         authzConfig_ = new RangerAuthorizationConfig(RANGER_SERVICE_TYPE, RANGER_APP_ID,
             SERVER_NAME);
         authzFactory_ = createAuthorizationFactory(authzProvider);
-        authzCtx_ = createAnalysisCtx(authzFactory_, USER.getName());
+        authzCtx_ = createAnalysisCtx(authzFactory_, user_.getName());
         authzCatalog_ = new ImpaladTestCatalog(authzFactory_);
         authzFrontend_ = new Frontend(authzFactory_, authzCatalog_);
         rangerImpalaPlugin_ =
@@ -146,11 +170,11 @@ public abstract class AuthorizationTestBase extends FrontendTestBase {
 
   protected abstract class WithSentryPrincipal implements WithPrincipal {
     protected final String role_ = "authz_test_role";
-    protected final String user_ = USER.getName();
+    protected final String sentry_user_ = user_.getName();
 
     protected void createRole(TPrivilege[]... privileges) throws ImpalaException {
       Role role = authzCatalog_.addRole(role_);
-      authzCatalog_.addRoleGrantGroup(role_, USER.getName());
+      authzCatalog_.addRoleGrantGroup(role_, sentry_user_);
       for (TPrivilege[] privs: privileges) {
         for (TPrivilege privilege: privs) {
           privilege.setPrincipal_id(role.getId());
@@ -161,12 +185,12 @@ public abstract class AuthorizationTestBase extends FrontendTestBase {
     }
 
     protected void createUser(TPrivilege[]... privileges) throws ImpalaException {
-      org.apache.impala.catalog.User user = authzCatalog_.addUser(user_);
+      org.apache.impala.catalog.User user = authzCatalog_.addUser(sentry_user_);
       for (TPrivilege[] privs: privileges) {
         for (TPrivilege privilege: privs) {
           privilege.setPrincipal_id(user.getId());
           privilege.setPrincipal_type(TPrincipalType.USER);
-          authzCatalog_.addUserPrivilege(user_, privilege);
+          authzCatalog_.addUserPrivilege(sentry_user_, privilege);
         }
       }
     }
@@ -176,7 +200,7 @@ public abstract class AuthorizationTestBase extends FrontendTestBase {
     }
 
     protected void dropUser() throws ImpalaException {
-      authzCatalog_.removeUser(user_);
+      authzCatalog_.removeUser(sentry_user_);
     }
   }
 
@@ -190,7 +214,7 @@ public abstract class AuthorizationTestBase extends FrontendTestBase {
     public void cleanUp() throws ImpalaException { dropUser(); }
 
     @Override
-    public String getName() { return user_; }
+    public String getName() { return sentry_user_; }
   }
 
   public class WithSentryRole extends WithSentryPrincipal {
@@ -239,15 +263,27 @@ public abstract class AuthorizationTestBase extends FrontendTestBase {
       authzManager.revokePrivilege(grants, "", "127.0.0.1");
     }
 
+    /**
+     * Depending on whether or not the principal is the owner of the resource, we return
+     * either 'OWNER_USER' or 'user_'. This function is used in authzOk() and
+     * anthzError().
+     */
     @Override
-    public String getName() { return USER.getName(); }
+    public String getName() {
+      return (as_owner_ ? OWNER_USER.getName() : user_.getName());
+    }
   }
 
   public class WithRangerUser extends WithRanger {
     @Override
     protected List<GrantRevokeRequest> buildRequest(List<TPrivilege> privileges) {
       return RangerCatalogdAuthorizationManager.createGrantRevokeRequests(
-          RANGER_ADMIN.getName(), true, USER.getName(), Collections.emptyList(),
+          RANGER_ADMIN.getName(), true,
+          // We provide the name of the grantee, which is a user in this case, according
+          // to whether or not we test the query with the requesting user that is the
+          // owner of the resource.
+          getName(),
+          Collections.emptyList(),
           rangerImpalaPlugin_.getClusterName(), "127.0.0.1", privileges);
     }
   }
@@ -255,10 +291,13 @@ public abstract class AuthorizationTestBase extends FrontendTestBase {
   public class WithRangerGroup extends WithRanger {
     @Override
     protected List<GrantRevokeRequest> buildRequest(List<TPrivilege> privileges) {
-      List<String> groups = Collections.singletonList(System.getProperty("user.name"));
-
       return RangerCatalogdAuthorizationManager.createGrantRevokeRequests(
-          RANGER_ADMIN.getName(), true, null, groups,
+          RANGER_ADMIN.getName(), true, null,
+          // We provide the name of the grantee, which is a group in this case, according
+          // to whether or not we test the query with the requesting user that is the
+          // owner of the resource.
+          (as_owner_ ? OWNER_GROUPS : GROUPS),
+          // groups,
           rangerImpalaPlugin_.getClusterName(), "127.0.0.1", privileges);
     }
   }
@@ -312,7 +351,7 @@ public abstract class AuthorizationTestBase extends FrontendTestBase {
               excludedStrings_.length != 0,
           "One or both of included or excluded strings must be defined.");
       List<String> result = resultToStringList(authzFrontend_.describeTable(table,
-          outputStyle_, USER));
+          outputStyle_, user_));
       for (String str: includedStrings_) {
         assertTrue(String.format("\"%s\" is not in the describe output.\n" +
                 "Expected : %s\n Actual   : %s", str, Arrays.toString(includedStrings_),
