@@ -249,6 +249,11 @@ DEFINE_string(executor_groups, "",
     "contains at least that number of executors for the group will it be considered "
     "healthy for admission. Currently only a single group may be specified.");
 
+DEFINE_int32(num_expected_executors, 20, "The number of executors that are expected to "
+    "be available for the execution of a single query. This value is used during "
+    "planning if no executors have started yet. Once a healthy executor group has "
+    "started, its size is used instead.");
+
 // TODO: can we automatically choose a startup grace period based on the max admission
 // control queue timeout + some margin for error?
 DEFINE_int64(shutdown_grace_period_s, 120, "Shutdown startup grace period in seconds. "

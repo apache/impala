@@ -298,3 +298,15 @@ class TestCoordinators(CustomClusterTestSuite):
                      "pool default-pool. Queued reason: Waiting for executors to " \
                      "start. Only DDL queries can currently run."
     assert expected_error in str(result)
+
+  @pytest.mark.execute_serially
+  @CustomClusterTestSuite.with_args(cluster_size=1, num_exclusive_coordinators=1,
+                                    impalad_args="-num_expected_executors=10")
+  def test_num_expected_executors_flag(self):
+    """Verifies that the '-num_expected_executors' flag is effective."""
+    client = self.cluster.impalads[0].service.create_beeswax_client()
+    client.execute("set explain_level=2")
+    ret = client.execute("explain select * from functional.alltypes a inner join "
+                         "functional.alltypes b on a.id = b.id;")
+    num_hosts = "hosts=10 instances=10"
+    assert num_hosts in str(ret)

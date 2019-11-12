@@ -431,3 +431,77 @@ class TestExecutorGroups(CustomClusterTestSuite):
     self.coordinator.service.wait_for_metric_value(
       "admission-controller.executor-group.num-queries-executing.{0}".format(
         self._group_name(group_names[0])), 0, timeout=30)
+
+  @pytest.mark.execute_serially
+  def test_join_strategy_single_executor(self):
+    """Tests that the planner picks the correct join strategy based on the current cluster
+    size. This test uses an executor group with a minimum size of 1."""
+    TABLE = "functional.alltypes"
+    QUERY = "explain select * from %s a inner join %s b on a.id = b.id" % (TABLE, TABLE)
+
+    # Predicates to assert that a certain join type was picked.
+    def assert_broadcast_join():
+      ret = self.execute_query_expect_success(self.client, QUERY)
+      assert ":EXCHANGE [BROADCAST]" in str(ret)
+
+    def assert_hash_join():
+      ret = self.execute_query_expect_success(self.client, QUERY)
+      assert ":EXCHANGE [HASH(b.id)]" in str(ret)
+
+    # Without any executors we default to a hash join.
+    assert_hash_join()
+
+    # Add a healthy executor group of size 1 and observe that we switch to broadcast join.
+    self._add_executor_group("group1", min_size=1, num_executors=1)
+    assert_broadcast_join()
+
+    # Add another executor to the same group and observe that with two executors we pick a
+    # partitioned hash join.
+    self._add_executor_group("group1", min_size=1, num_executors=1)
+    assert_hash_join()
+
+    # Kill an executor. The group remains healthy but its size decreases and we revert
+    # back to a broadcast join.
+    self.cluster.impalads[-1].kill()
+    self.coordinator.service.wait_for_metric_value("cluster-membership.backends.total", 2,
+                                                   timeout=20)
+    assert_broadcast_join()
+
+    # Kill a second executor. The group becomes unhealthy but we cache its last healthy
+    # size and will continue to pick a broadcast join.
+    self.cluster.impalads[-2].kill()
+    self.coordinator.service.wait_for_metric_value("cluster-membership.backends.total", 1,
+                                                   timeout=20)
+    assert_broadcast_join()
+
+  @pytest.mark.execute_serially
+  def test_join_strategy_multiple_executors(self):
+    """Tests that the planner picks the correct join strategy based on the current cluster
+    size. This test uses an executor group which requires multiple executors to be
+    healthy."""
+    TABLE = "functional.alltypes"
+    QUERY = "explain select * from %s a inner join %s b on a.id = b.id" % (TABLE, TABLE)
+
+    # Predicate to assert that the planner decided on a hash join.
+    def assert_hash_join():
+      ret = self.execute_query_expect_success(self.client, QUERY)
+      assert ":EXCHANGE [HASH(b.id)]" in str(ret)
+
+    # Without any executors we default to a hash join.
+    assert_hash_join()
+
+    # Adding an unhealthy group will not affect the planner's decision.
+    self._add_executor_group("group1", min_size=2, num_executors=1)
+    assert_hash_join()
+
+    # Adding a second executor makes the group healthy (note that the resulting join
+    # strategy is the same though).
+    self._add_executor_group("group1", min_size=2, num_executors=1)
+    assert_hash_join()
+
+    # Kill an executor. The unhealthy group does not affect the planner's decision, even
+    # though only one executor is now online.
+    self.cluster.impalads[-1].kill()
+    self.coordinator.service.wait_for_metric_value("cluster-membership.backends.total", 2,
+                                                   timeout=20)
+    assert_hash_join()
