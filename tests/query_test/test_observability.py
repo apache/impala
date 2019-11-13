@@ -311,16 +311,19 @@ class TestObservability(ImpalaTestSuite):
     else:
       load_event_regexes = [
         r'Frontend:',
+        r'CatalogFetch.ColumnStats.Hits',
         r'CatalogFetch.ColumnStats.Misses',
         r'CatalogFetch.ColumnStats.Requests',
         r'CatalogFetch.ColumnStats.Time',
-        # The value of this counter may or not be present if it has a value of zero
-        r'CatalogFetch.Config.Misses|CatalogFetch.Config.Hits',
+        r'CatalogFetch.Config.Hits',
+        r'CatalogFetch.Config.Misses',
         r'CatalogFetch.Config.Requests',
         r'CatalogFetch.Config.Time',
         r'CatalogFetch.DatabaseList.Hits',
+        r'CatalogFetch.DatabaseList.Misses',
         r'CatalogFetch.DatabaseList.Requests',
         r'CatalogFetch.DatabaseList.Time',
+        r'CatalogFetch.PartitionLists.Hits',
         r'CatalogFetch.PartitionLists.Misses',
         r'CatalogFetch.PartitionLists.Requests',
         r'CatalogFetch.PartitionLists.Time',
@@ -333,8 +336,10 @@ class TestObservability(ImpalaTestSuite):
         r'CatalogFetch.RPCs.Time',
         r'CatalogFetch.StorageLoad.Time',
         r'CatalogFetch.TableNames.Hits',
+        r'CatalogFetch.TableNames.Misses',
         r'CatalogFetch.TableNames.Requests',
         r'CatalogFetch.TableNames.Time',
+        r'CatalogFetch.Tables.Hits',
         r'CatalogFetch.Tables.Misses',
         r'CatalogFetch.Tables.Requests',
         r'CatalogFetch.Tables.Time']

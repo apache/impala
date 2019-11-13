@@ -551,12 +551,8 @@ public class CatalogdMetaProvider implements MetaProvider {
     profile.addToCounter(prefix + "Requests", TUnit.NONE, numHits + numMisses);
     profile.addToCounter(prefix + "Time", TUnit.TIME_MS,
         stopwatch.elapsed(TimeUnit.MILLISECONDS));
-    if (numHits > 0) {
-      profile.addToCounter(prefix + "Hits", TUnit.NONE, numHits);
-    }
-    if (numMisses > 0) {
-      profile.addToCounter(prefix + "Misses", TUnit.NONE, numMisses);
-    }
+    profile.addToCounter(prefix + "Hits", TUnit.NONE, numHits);
+    profile.addToCounter(prefix + "Misses", TUnit.NONE, numMisses);
   }
 
   /**

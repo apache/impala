@@ -242,13 +242,15 @@ public class CatalogdMetaProviderTest {
       profile = FrontendProfile.getCurrent();
     }
     TRuntimeProfileNode prof = profile.emitAsThrift();
-    assertEquals(3, prof.counters.size());
+    assertEquals(4, prof.counters.size());
     Collections.sort(prof.counters);
     assertEquals("TCounter(name:CatalogFetch.Tables.Hits, unit:NONE, value:1)",
         prof.counters.get(0).toString());
-    assertEquals("TCounter(name:CatalogFetch.Tables.Requests, unit:NONE, value:1)",
+    assertEquals("TCounter(name:CatalogFetch.Tables.Misses, unit:NONE, value:0)",
         prof.counters.get(1).toString());
-    assertEquals("CatalogFetch.Tables.Time", prof.counters.get(2).name);
+    assertEquals("TCounter(name:CatalogFetch.Tables.Requests, unit:NONE, value:1)",
+        prof.counters.get(2).toString());
+    assertEquals("CatalogFetch.Tables.Time", prof.counters.get(3).name);
   }
 
   @Test
