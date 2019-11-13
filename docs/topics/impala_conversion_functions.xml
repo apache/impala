@@ -158,50 +158,42 @@ under the License.
 
         <dd>
           <b>Purpose:</b> Returns <varname>expression</varname> converted to the
-          <varname>type</varname> data type based on the <varname>pattern</varname> format
-          string. This signature of <codeph>CAST()</codeph> with the <codeph>FORMAT</codeph>
-          clause is supported only for casts between <codeph>STRING</codeph> /
-          <codeph>CHAR</codeph> / <codeph>VARCHAR</codeph> types and <codeph>TIMESTAMP</codeph>
-          / <codeph>DATE</codeph> types.
-          <note>
-            The patterns allowed in the <codeph>FORMAT</codeph> clause support ISO SQL:2016
-            standard patterns. Those patterns are not the same format patterns used with the
-            other Impala conversion functions, e.g. <codeph>TO_TIMESTAMP()</codeph> and
-            <codeph>FROM_TIMESTAMP()</codeph>.
-          </note>
-
-          <p>
-            The following rules apply to <varname>pattern</varname>. Any exceptions to these
-            rules are noted in the Details column of the table below.
-            <ul>
+            <varname>type</varname> data type based on the
+            <varname>pattern</varname> format string. This signature of
+            <codeph>CAST()</codeph> with the <codeph>FORMAT</codeph> clause is
+          supported only for casts between <codeph>STRING</codeph> /
+            <codeph>CHAR</codeph> / <codeph>VARCHAR</codeph> types and
+            <codeph>TIMESTAMP</codeph> / <codeph>DATE</codeph> types. <note> The
+            patterns allowed in the <codeph>FORMAT</codeph> clause support ISO
+            SQL:2016 standard patterns. Those patterns are not the same format
+            patterns used with the other Impala conversion functions, e.g.
+              <codeph>TO_TIMESTAMP()</codeph> and
+              <codeph>FROM_TIMESTAMP()</codeph>. </note>
+          <p> The following rules apply to <varname>pattern</varname>. Any
+            exceptions to these rules are noted in the Details column of the
+            table below. <ul>
               <li>
-                <varname>pattern</varname> is a case-insensitive <codeph>STRING</codeph>.
-              </li>
-
-              <li>
-                If <varname>pattern</varname> is <codeph>NULL</codeph>, an empty string, or a
-                number, an error returns.
-              </li>
-
-              <li>
-                A fewer digits in <varname>expression</varname> than specified in the
-                <varname>pattern</varname> is accepted if a separator is correctly specified in
-                the <varname>pattern</varname>. For example, <codeph>CAST('5-01-2017' AS DATE
-                FORMAT 'MM-dd-yyyy')</codeph> returns <codeph>DATE'2017-05-01'</codeph>.
-              </li>
-
-              <li>
-                If fewer number of digits are in <varname>expression</varname> than specified in
-                the <varname>pattern</varname>, the current date is used to complete the year
-                pattern. For example, <codeph>CAST('19/05' AS DATE FORMAT 'YYYY/MM')</codeph>
-                will return <codeph>DATE'2019-05-01'</codeph> when executed on August 8, 2019.
-              </li>
+                <varname>pattern</varname> is a case-insensitive
+                  <codeph>STRING</codeph>. </li>
+              <li> If <varname>pattern</varname> is <codeph>NULL</codeph>, an
+                empty string, or a number, an error returns. </li>
+              <li> A fewer digits in <varname>expression</varname> than
+                specified in the <varname>pattern</varname> is accepted if a
+                separator is correctly specified in the
+                  <varname>pattern</varname>. For example,
+                  <codeph>CAST('5-01-2017' AS DATE FORMAT 'MM-dd-yyyy')</codeph>
+                returns <codeph>DATE'2017-05-01'</codeph>. </li>
+              <li> If fewer number of digits are in
+                  <varname>expression</varname> than specified in the
+                  <varname>pattern</varname>, the current date is used to
+                complete the year pattern. For example, <codeph>CAST('19/05' AS
+                  DATE FORMAT 'YYYY/MM')</codeph> will return
+                  <codeph>DATE'2019-05-01'</codeph> when executed on August 8,
+                2019. </li>
             </ul>
           </p>
-
-          <p>
-            The following format patterns are supported in the <codeph>FORMAT</codeph> clause.
-            <table frame="all" rowsep="1"
+          <p> The following format patterns are supported in the
+              <codeph>FORMAT</codeph> clause. <table frame="all" rowsep="1"
               colsep="1" id="table_gbt_5ym_r3b">
               <tgroup cols="3" align="left">
                 <colspec colname="c1" colnum="1" colwidth="1*"/>
@@ -209,15 +201,9 @@ under the License.
                 <colspec colname="newCol3" colnum="3" colwidth="6.6*"/>
                 <thead>
                   <row>
-                    <entry>
-                      Pattern
-                    </entry>
-                    <entry>
-                      Description
-                    </entry>
-                    <entry>
-                      Details
-                    </entry>
+                    <entry> Pattern </entry>
+                    <entry> Description </entry>
+                    <entry> Details </entry>
                   </row>
                 </thead>
                 <tbody>
@@ -225,460 +211,314 @@ under the License.
                     <entry>
                       <codeph>YYYY</codeph>
                     </entry>
-                    <entry>
-                      4-digit year.
-                    </entry>
+                    <entry> 4-digit year. </entry>
                     <entry/>
                   </row>
                   <row>
                     <entry>
                       <codeph>YYY</codeph>
                     </entry>
-                    <entry>
-                      Last 3 digits of a year.
-                    </entry>
+                    <entry> Last 3 digits of a year. </entry>
                     <entry/>
                   </row>
                   <row>
                     <entry>
                       <codeph>YY</codeph>
                     </entry>
-                    <entry>
-                      Last 2 digits of a year.
-                    </entry>
+                    <entry> Last 2 digits of a year. </entry>
                     <entry/>
                   </row>
                   <row>
                     <entry>
                       <codeph>Y</codeph>
                     </entry>
-                    <entry>
-                      Last digit of a year
-                    </entry>
+                    <entry> Last digit of a year </entry>
                     <entry/>
                   </row>
                   <row>
                     <entry>
                       <codeph>RRRR</codeph>
                     </entry>
+                    <entry> 4-digit round year </entry>
                     <entry>
-                      4-digit round year
-                    </entry>
-                    <entry>
-                      <p>
-                        If 1,3 or 4-digit year values are provided in
-                        <varname>expression</varname>, treated as <codeph>YYYY</codeph>.
-                      </p>
-
-
-
-                      <p>
-                        If 2-digit years are provided in <varname>expression</varname>, treated
-                        as <codeph>RR</codeph>.
-                      </p>
-
-
-
-                      <p>
-                        For datetime to string conversions, treated as <codeph>YYYY</codeph>.
-                      </p>
-
-
-
-                      <p>
-                        If <codeph>YYYY</codeph>, <codeph>YYY</codeph>, <codeph>YY</codeph>,
-                        <codeph>Y</codeph>, or <codeph>RR</codeph> is given in the same
-                        <varname>pattern</varname> for a string to datetime conversion, an error
-                        returns.
-                      </p>
+                      <p> If 1,3 or 4-digit year values are provided in
+                          <varname>expression</varname>, treated as
+                          <codeph>YYYY</codeph>. </p>
+                      <p> If 2-digit years are provided in
+                          <varname>expression</varname>, treated as
+                          <codeph>RR</codeph>. </p>
+                      <p> For date/time to string conversions, treated as
+                          <codeph>YYYY</codeph>. </p>
+                      <p> If <codeph>YYYY</codeph>, <codeph>YYY</codeph>,
+                          <codeph>YY</codeph>, <codeph>Y</codeph>, or
+                          <codeph>RR</codeph> is given in the same
+                          <varname>pattern</varname> for a string to date/time
+                        conversion, an error returns. </p>
                     </entry>
                   </row>
                   <row>
                     <entry>
                       <codeph>RR</codeph>
                     </entry>
+                    <entry> 2-digit round year. </entry>
                     <entry>
-                      2-digit round year.
-                    </entry>
-                    <entry>
-                      <p>
-                        <ul>
+                      <p>For date/time to string conversions, same as
+                          <codeph>YY</codeph>. </p>
+                      <p>For string to date/time conversions, the first 2 digits
+                        of the year in the return value depends on the specified
+                        two-digit year and the last two digits of the current
+                        year as follows: <ul>
                           <li>
-                            For datetime to string conversion, same as <codeph>YY</codeph>.
-                          </li>
-
-                          <li>
-                            For string to datetime conversions, the first 2 digits of the year
-                            in the return value depends on the specified two-digit year and the
-                            last two digits of the current year as follows:
+                            <p> If the specified 2-digit year is 00 to 49: </p>
                             <ul>
                               <li>
-                                <p>
-                                  If the specified 2-digit year is 00 to 49:
-                                </p>
-                                <ul>
-                                  <li>
-                                    <p>
-                                      If the last 2 digits of the current year are 00 to 49, the
-                                      returned year has the same first 2 digits as the current
-                                      year.
-                                    </p>
-                                  </li>
-
-                                  <li>
-                                    <p>
-                                      If the last 2 digits of the current year are 50 to 99, the
-                                      first 2 digits of the returned year are 1 greater than the
-                                      first 2 digits of the current year.
-                                    </p>
-                                  </li>
-                                </ul>
+                                <p> If the last 2 digits of the current year are
+                                  00 to 49, the returned year has the same first
+                                  2 digits as the current year. </p>
                               </li>
-
                               <li>
-                                <p>
-                                  If the specified 2-digit year is 50 to 99:
-                                </p>
-                                <ul>
-                                  <li>
-                                    <p>
-                                      If the last 2 digits of the current year are 00 to 49, the
-                                      first 2 digits of the returned year are 1 less than the
-                                      first 2 digits of the current year.
-                                    </p>
-                                  </li>
-
-                                  <li>
-                                    <p>
-                                      If the last 2 digits of the current year are 50 to 99, the
-                                      returned year has the same first 2 digits as the current
-                                      year.
-                                    </p>
-                                  </li>
-                                </ul>
+                                <p> If the last 2 digits of the current year are
+                                  50 to 99, the first 2 digits of the returned
+                                  year are 1 greater than the first 2 digits of
+                                  the current year. </p>
                               </li>
                             </ul>
                           </li>
-                        </ul>
-                      </p>
-
-
-
-                      <p>
-                        If <codeph>YYYY</codeph>, <codeph>YYY</codeph>, <codeph>YY</codeph>,
-                        <codeph>Y</codeph>, or <codeph>RR</codeph> is given in the same
-                        <varname>pattern</varname> for a string to datetime conversion, an error
-                        returns.
-                      </p>
-
-
-
-                      <p>
-                        If 1-digit year values are provided in <varname>expression</varname>, it
-                        is treated as <codeph>YYYY</codeph>.
-                      </p>
+                          <li>
+                            <p> If the specified 2-digit year is 50 to 99: </p>
+                            <ul>
+                              <li>
+                                <p> If the last 2 digits of the current year are
+                                  00 to 49, the first 2 digits of the returned
+                                  year are 1 less than the first 2 digits of the
+                                  current year. </p>
+                              </li>
+                              <li>
+                                <p> If the last 2 digits of the current year are
+                                  50 to 99, the returned year has the same first
+                                  2 digits as the current year. </p>
+                              </li>
+                            </ul>
+                          </li>
+                        </ul></p>
+                      <p> If <codeph>YYYY</codeph>, <codeph>YYY</codeph>,
+                          <codeph>YY</codeph>, <codeph>Y</codeph>, or
+                          <codeph>RR</codeph> is given in the same
+                          <varname>pattern</varname> for a string to date/time
+                        conversion, an error returns. </p>
+                      <p> If 1-digit year values are provided in
+                          <varname>expression</varname>, it is treated as
+                          <codeph>YYYY</codeph>. </p>
                     </entry>
                   </row>
                   <row>
                     <entry>
                       <codeph>MM</codeph>
                     </entry>
+                    <entry> Month </entry>
                     <entry>
-                      Month
-                    </entry>
-                    <entry>
-                      <p>
-                        In datetime to string conversions, 1-digit month is prefixed with a
-                        zero.
-                      </p>
+                      <p> In date/time to string conversions, 1-digit month is
+                        prefixed with a zero. </p>
                     </entry>
                   </row>
                   <row>
                     <entry>
                       <codeph>DD</codeph>
                     </entry>
+                    <entry> Day of month (1-31) </entry>
                     <entry>
-                      Day of month (1-31)
-                    </entry>
-                    <entry>
-                      <p>
-                        In datetime to string conversions, one digit day is prefixed with a
-                        zero.
-                      </p>
+                      <p> In date/time to string conversions, one digit day is
+                        prefixed with a zero. </p>
                     </entry>
                   </row>
                   <row>
                     <entry>
                       <codeph>DDD</codeph>
                     </entry>
+                    <entry> Day of year (1-366) </entry>
                     <entry>
-                      Day of year (1-366)
-                    </entry>
-                    <entry>
-                      <p>
-                        In string to datetime conversions, providing <codeph>MM</codeph> and
-                        <codeph>DD</codeph> along with <codeph>DDD</codeph> results an error,
-                        e.g. <codeph>YYYY-MM-DDD</codeph>.
-                      </p>
+                      <p> In string to date/time conversions, providing
+                          <codeph>MM</codeph> and <codeph>DD</codeph> along with
+                          <codeph>DDD</codeph> results an error, e.g.
+                          <codeph>YYYY-MM-DDD</codeph>. </p>
                     </entry>
                   </row>
                   <row>
                     <entry>
                       <codeph>HH</codeph>
-
                       <p>
                         <codeph>HH12</codeph>
                       </p>
                     </entry>
+                    <entry> Hour of day (1-12) </entry>
                     <entry>
-                      Hour of day (1-12)
-                    </entry>
-                    <entry>
-                      <p>
-                        In datetime to string conversions, 1-digit hours are prefixed with a
-                        zero.
-                      </p>
-
-
-
-                      <p>
-                        If provided hour in <varname>expression</varname> is not between 1 and
-                        12, returns an error.
-                      </p>
-
-
-
-                      <p>
-                        If no AM/PM is provided in <varname>expression</varname>, the default is
-                        <codeph>AM</codeph>.
-                      </p>
+                      <p> In date/time to string conversions, 1-digit hours are
+                        prefixed with a zero. </p>
+                      <p> If provided hour in <varname>expression</varname> is
+                        not between 1 and 12, returns an error. </p>
+                      <p> If no AM/PM is provided in
+                          <varname>expression</varname>, the default is
+                          <codeph>AM</codeph>. </p>
                     </entry>
                   </row>
                   <row>
                     <entry>
                       <codeph>HH24</codeph>
                     </entry>
+                    <entry> Hour of day (0-23) </entry>
                     <entry>
-                      Hour of day (0-23)
-                    </entry>
-                    <entry>
-                      <p>
-                        In string to datetime conversions, if <codeph>HH12</codeph>,
-                        <codeph>AM</codeph>, <codeph>PM</codeph> are given in the same
-                        <varname>pattern</varname>, an error returns.
-                      </p>
+                      <p> In string to date/time conversions, if
+                          <codeph>HH12</codeph>, <codeph>AM</codeph>,
+                          <codeph>PM</codeph> are given in the same
+                          <varname>pattern</varname>, an error returns. </p>
                     </entry>
                   </row>
                   <row>
                     <entry>
                       <codeph>MI</codeph>
                     </entry>
+                    <entry> Minute of hour (0-59) </entry>
                     <entry>
-                      Minute of hour (0-59)
-                    </entry>
-                    <entry>
-                      <p>
-                        In datetime to string conversions, 1-digit minutes are prefixed with a
-                        zero.
-                      </p>
+                      <p> In date/time to string conversions, 1-digit minutes
+                        are prefixed with a zero. </p>
                     </entry>
                   </row>
                   <row>
                     <entry>
                       <codeph>SS</codeph>
                     </entry>
+                    <entry> Second of minute (0-59) </entry>
                     <entry>
-                      Second of minute (0-59)
-                    </entry>
-                    <entry>
-                      <p>
-                        In datetime to string conversions, 1-digit seconds are prefixed with a
-                        zero.
-                      </p>
+                      <p> In date/time to string conversions, 1-digit seconds
+                        are prefixed with a zero. </p>
                     </entry>
                   </row>
                   <row>
                     <entry>
                       <codeph>SSSSS</codeph>
                     </entry>
+                    <entry> Second of Day (0-86399) </entry>
                     <entry>
-                      Second of Day (0-86399)
-                    </entry>
-                    <entry>
-                      In string to timestamp conversions, if <codeph>SS</codeph>,
-                      <codeph>HH</codeph>, <codeph>HH12</codeph>, <codeph>HH24</codeph>,
-                      <codeph>MI</codeph>, <codeph>AM</codeph>/<codeph>PM</codeph> are given in
-                      the same <varname>pattern</varname>, an error returns.
+                      <p> In string to timestamp conversions, if
+                          <codeph>SS</codeph>, <codeph>HH</codeph>,
+                          <codeph>HH12</codeph>, <codeph>HH24</codeph>,
+                          <codeph>MI</codeph>,
+                          <codeph>AM</codeph>/<codeph>PM</codeph> are given in
+                        the same <varname>pattern</varname>, an error returns.
+                      </p>
                     </entry>
                   </row>
                   <row>
                     <entry>
                       <codeph>FF</codeph>
-
                       <p>
                         <codeph>FF1</codeph>, ..., <codeph>FF9</codeph>
                       </p>
                     </entry>
+                    <entry> Fractional second </entry>
                     <entry>
-                      Fractional second
-                    </entry>
-                    <entry>
+                      <p> A number, 1 to 9, can be used to indicate the number
+                        of digits. </p>
                       <p>
-                        A number, 1 to 9, can be used to indicate the number of digits.
-                      </p>
-
-
-
-                      <p>
-                        <codeph>FF</codeph> specifies a 9 digits fractional second.
-                      </p>
+                        <codeph>FF</codeph> specifies a 9 digits fractional
+                        second. </p>
                     </entry>
                   </row>
                   <row>
                     <entry>
                       <codeph>AM</codeph>
-
                       <p>
                         <codeph>PM</codeph>
                       </p>
-
-
-
                       <p>
                         <codeph>A.M.</codeph>
                       </p>
-
-
-
                       <p>
                         <codeph>P.M.</codeph>
                       </p>
                     </entry>
+                    <entry> Meridiem indicator </entry>
                     <entry>
-                      Meridiem indicator
-                    </entry>
-                    <entry>
-                      <p>
-                        For datetime to string conversions, <codeph>AM</codeph> and
-                        <codeph>PM</codeph> are treated as synonyms. For example, casting
-                        <codeph>'2019-01-01 11:00 am'</codeph> to <codeph>TIMESTAMP</codeph>
-                        with the <codeph>'YYYY-MM-DD HH12:MI PM'</codeph> pattern returns
-                        <codeph>01-JAN-19 11.00.00.000000 AM</codeph>.
-                      </p>
-
-
-
-                      <p>
-                        For string to datetime conversion, <codeph>HH24</codeph> in the same
-                        <varname>pattern</varname> returns an error.
-                      </p>
+                      <p> For date/time to string conversions,
+                          <codeph>AM</codeph> and <codeph>PM</codeph> are
+                        treated as synonyms. For example, casting
+                          <codeph>'2019-01-01 11:00 am'</codeph> to
+                          <codeph>TIMESTAMP</codeph> with the
+                          <codeph>'YYYY-MM-DD HH12:MI PM'</codeph> pattern
+                        returns <codeph>01-JAN-19 11.00.00.000000 AM</codeph>. </p>
+                      <p> For string to date/time conversion,
+                          <codeph>HH24</codeph> in the same
+                          <varname>pattern</varname> returns an error. </p>
                     </entry>
                   </row>
                   <row>
                     <entry>
                       <codeph>TZH</codeph>
                     </entry>
+                    <entry> Timezone offset hour </entry>
                     <entry>
-                      Timezone offset hour
-                    </entry>
-                    <entry>
-                      <p>
-                        An optional sign, + or -, and 2 digits for the value of signed numbers
-                        are allowed for the source <varname>expression</varname>, e.g.
-                        <codeph>“+10”</codeph>, <codeph>“-05”</codeph>,
-                        <codeph>"04"</codeph>.
-                      </p>
+                      <p> An optional sign, + or -, and 2 digits for the value
+                        of signed numbers are allowed for the source
+                          <varname>expression</varname>, e.g.
+                          <codeph>“+10”</codeph>, <codeph>“-05”</codeph>,
+                          <codeph>"04"</codeph>. </p>
                     </entry>
                   </row>
                   <row>
                     <entry>
                       <codeph>TZM</codeph>
                     </entry>
+                    <entry> Timezone offset minute </entry>
                     <entry>
-                      Timezone offset minute
-                    </entry>
-                    <entry>
-                      <p>
-                        Unsigned numbers are allowed for the source
-                        <varname>expression</varname>.
-                      </p>
+                      <p> Unsigned numbers are allowed for the source
+                          <varname>expression</varname>. </p>
                     </entry>
                   </row>
                   <row>
                     <entry>
                       <codeph>-</codeph>
-
                       <p>
                         <codeph>.</codeph>
                       </p>
-
-
-
                       <p>
                         <codeph>/</codeph>
                       </p>
-
-
-
                       <p>
                         <codeph>,</codeph>
                       </p>
-
-
-
                       <p>
                         <codeph>'</codeph>
                       </p>
-
-
-
                       <p>
                         <codeph>;</codeph>
                       </p>
-
-
-
                       <p>
                         <codeph>:</codeph>
                       </p>
-
-
-
-                      <p>
-                        &lt;space>
-                      </p>
+                      <p> &lt;space> </p>
                     </entry>
+                    <entry> Separator </entry>
                     <entry>
-                      Separator
-                    </entry>
-                    <entry>
-                      <p>
-                        For string to datetime conversions, any separator character in the
-                        <varname>pattern</varname> string would match any separator character in
-                        the input <varname>expression</varname>.
-                      </p>
-
-
-
-                      <p>
-                        For example, <codeph>CAST(“20191010” AS DATE FORMAT
-                        “YYYY-MM-DD”)</codeph> returns an error, but <codeph>CAST("2019-.;10
-                        10" AS DATE FORMAT "YYYY-MM-DD")</codeph> succeeds.
-                      </p>
+                      <p> For string to date/time conversions, any separator
+                        character in the <varname>pattern</varname> string would
+                        match any separator character in the input
+                          <varname>expression</varname>. </p>
+                      <p> For example, <codeph>CAST(“20191010” AS DATE FORMAT
+                          “YYYY-MM-DD”)</codeph> returns an error, but
+                          <codeph>CAST("2019-.;10 10" AS DATE FORMAT
+                          "YYYY-MM-DD")</codeph> succeeds. </p>
                     </entry>
                   </row>
                   <row>
                     <entry>
                       <codeph>T</codeph>
                     </entry>
+                    <entry> Separates the date from the time. </entry>
                     <entry>
-                      Separates the date from the time.
-                    </entry>
-                    <entry>
-                      This pattern is used for accepting ISO 8601 datetime formats.
-
-                      <p>
-                        Example: <codeph>YYYY-MM-DD<b>T</b>HH24:MI:SS.FF9Z</codeph>
+                      <p>This pattern is used for accepting ISO 8601 date/time
+                        formats. </p>
+                      <p> Example:
+                          <codeph>YYYY-MM-DD<b>T</b>HH24:MI:SS.FF9Z</codeph>
                       </p>
                     </entry>
                   </row>
@@ -686,123 +526,258 @@ under the License.
                     <entry>
                       <codeph>Z</codeph>
                     </entry>
+                    <entry> Indicates the zero hour offset from UTC. </entry>
                     <entry>
-                      Indicates the zero hour offset from UTC.
+                      <p>This pattern is used for accepting ISO 8601 date/time
+                        formats. </p>
                     </entry>
+                  </row>
+                  <row>
+                    <entry><codeph>FX</codeph></entry>
+                    <entry>Forces an exact match between the format pattern,
+                        <varname>pattern</varname>, and the input argument,
+                        <varname>expression</varname>.</entry>
                     <entry>
-                      This pattern is used for accepting ISO 8601 datetime formats.
+                      <p>Must be specified at the beginning of the format
+                          <varname>pattern</varname> and is valid for the whole
+                          <varname>pattern</varname>.</p>
+                      <p> In string to date/time conversions:</p>
+                      <ul>
+                        <li>Forces strict separator matching, including the
+                          separator character.</li>
+                        <li>Expects all the tokens to have the maximum possible
+                          length.</li>
+                      </ul>
+                      <p>In date/time to string conversions, the outputs are
+                        padded as follows:</p>
+                      <ul>
+                        <li>Numeric outputs are left padded with zeros.</li>
+                        <li>Text outputs are right padded with spaces.</li>
+                      </ul>
+                    </entry>
+                  </row>
+                  <row>
+                    <entry><codeph>FM</codeph></entry>
+                    <entry>Overrides <codeph>FX</codeph>.</entry>
+                    <entry>
+                      <p>In a date/time to string conversions,
+                          <codeph>FM</codeph> suppresses blank padding for the
+                        element immediately following the <codeph>FM</codeph> in
+                        the <varname>pattern</varname> string,  e.g.
+                          "<codeph>2010-1-9</codeph>".</p>
+                      <p>In string to date/time conversions, <codeph>FM</codeph>
+                        is used to override the effect of <codeph>FX</codeph>
+                        for certain tokens as follows:<ul>
+                          <li>
+                            <p>The length of the token in the input argument can
+                              be shorter than the max length of that token type
+                              if followed by a separator, e.g. 1-digit month,
+                              less than 4-digit year.</p>
+                          </li>
+                          <li>
+                            <p><codeph>FM</codeph> modifier skips the separators
+                              and affects the next non-separator token. For
+                              example, <codeph>CAST('1999-10-2' AS TIMESTAMP
+                                FORMAT 'FXYYYY-MM<b>FM</b>-DD') </codeph>returns
+                                <codeph>1999-10-02 00:00:00</codeph> as
+                                <codeph>FM</codeph> is applied to
+                                <codeph>DD</codeph> and not to the
+                                separator(<codeph>-</codeph>).</p>
+                          </li>
+                        </ul></p>
+                    </entry>
+                  </row>
+                  <row>
+                    <entry>Free text</entry>
+                    <entry>Nested string</entry>
+                    <entry>
+                      <p>You can specify a free text with surrounding double
+                        quotes (") in <varname>pattern</varname> where the same
+                        text is expected in the input argument without
+                        surrounding double quotes.</p>
+                      <p>In date/time to string conversions, the string is
+                        included in the output with the characters' case
+                        preserved.</p>
+                      <p> In string to date/time conversions, the nested string
+                        is not included in the resulting date/time object.
+                        However, the nested string has to match the related part
+                        of the input string, including the case.</p>
+                      <p>The following rules apply:<ul>
+                          <li>
+                            <p>If the <varname>pattern</varname> is surrounded
+                              by double quotes, double quotes surrounding the
+                              free text token must be escaped with a single
+                              backslash (<codeph>\"</codeph>).</p>
+                            <p>For example: <codeph>CAST('"Date:"2019-11-10' AS
+                                DATE FORMAT
+                                "<b>\"Date:\"</b>YYYY-MM-DD")</codeph></p>
+                          </li>
+                          <li>
+                            <p> If the <varname>pattern</varname> is surrounded
+                              by double quotes, and there is an escaped double
+                              quotes inside a text token that is itself
+                              surrounded by escaped double quotes, escape the
+                              double quotes in the free text token with a triple
+                              backslash: (<codeph>\\\"</codeph>)</p>
+                            <p>For example: <codeph>CAST("1985 some \"text
+                                11-28" AS DATE''' FORMAT "YYYY<b>\" some
+                                  \\\"text \"</b>MM-DD")</codeph></p>
+                          </li>
+                          <li>
+                            <p>If the <varname>pattern</varname> is surrounded
+                              by single quotes, the free text token can be
+                              surrounded by (non-escaped) double quotes. To
+                              include double quotes within the free text token,
+                              those double quotes must be escaped by a single
+                              backslash. </p>
+                            <p>For example: <codeph>CAST('"Date:"2019-11-10' AS
+                                DATE FORMAT
+                                '"<b>\"Date:\"</b>"YYYY-MM-DD')</codeph></p>
+                          </li>
+                          <li>
+                            <p> Literal single quotes/apostrophes
+                                (<codeph>'</codeph>) in the nested string must
+                              be escaped with a single backslash if the whole
+                              pattern string is delimited by single quotes.</p>
+                          </li>
+                          <li>
+                            <p>If a free text token contains any separator
+                              characters in the beginning, and the text token is
+                              right after a separator token sequence, an error
+                              returns as it's not trivial to find where the
+                              separator sequence ends and where the free text
+                              starts. In this case, use <codeph>FX</codeph> for
+                              strict matching.</p>
+                            <p>For example: <codeph>CAST("1985-11- ' 10" AS DATE
+                                FORMAT "YYYY-MM-<b>\" ' \"</b>DD")</codeph>
+                              returns an error, but removing the dash before the
+                              text token makes this succeed.</p>
+                          </li>
+                        </ul></p>
                     </entry>
                   </row>
                 </tbody>
               </tgroup>
             </table>
           </p>
-
           <p>
             <b>Examples:</b>
-          </p>
-          <table frame="all" rowsep="1" colsep="1" id="table_qqg_txn_r3b">
+          </p><table frame="all" rowsep="1" colsep="1" id="table_qqg_txn_r3b">
             <tgroup cols="2" align="left">
               <colspec colname="c1" colnum="1" colwidth="1*"/>
               <colspec colname="c2" colnum="2" colwidth="1*"/>
               <thead>
                 <row>
-                  <entry>
-                    Input
-                  </entry>
-                  <entry>
-                    Output
-                  </entry>
+                  <entry> Input </entry>
+                  <entry> Output </entry>
                 </row>
               </thead>
               <tbody>
                 <row>
                   <entry>
-                    <codeph>CAST("02-11-2014" AS DATE FORMAT 'dd-mm-yyyy')</codeph>
+                    <codeblock>CAST("02-11-2014" AS DATE FORMAT 'dd-mm-yyyy')</codeblock>
                   </entry>
+                  <entry> 2014-11-02 </entry>
+                </row>
+                <row>
                   <entry>
-                    2014-11-02
+                    <codeblock>CAST("365 2014" AS DATE FORMAT 'DDD-YYYY')</codeblock>
+                  </entry>
+                  <entry> 2014-12-31 </entry>
+                </row>
+                <row>
+                  <entry>
+                    <codeblock>CAST("5-01-26" AS DATE FORMAT 'YY-MM-DD')</codeblock>
+                  </entry>
+                  <entry> Executed at 2019-01-01 11:11:11: <p> 2015-01-26 </p>
                   </entry>
                 </row>
                 <row>
                   <entry>
-                    <codeph>CAST("365 2014" AS DATE FORMAT 'DDD-YYYY')</codeph>
+                    <codeblock>CAST('2018-11-10T15:11:04Z' AS TIMESTAMP
+   FORMAT 'YYYY-MM-DDTHH24:MI:SSZ')</codeblock>
                   </entry>
+                  <entry> 2018-11-10 15:11:04 </entry>
+                </row>
+                <row>
                   <entry>
-                    2014-12-31
+                    <codeblock>CAST("95-01-28" AS DATE
+   FORMAT 'YYY-MM-DD')</codeblock>
+                  </entry>
+                  <entry> Executed at 2019-01-01 11:11:11: <p> 2095-01-28 </p>
                   </entry>
                 </row>
                 <row>
                   <entry>
-                    <codeph>CAST("5-01-26" AS DATE FORMAT 'YY-MM-DD')</codeph>
+                    <codeblock>CAST("49-01-15" AS DATE 
+   FORMAT 'RR-MM-DD')</codeblock>
                   </entry>
-                  <entry>
-                    Executed at 2019-01-01 11:11:11:
-
-                    <p>
-                      2015-01-26
-                    </p>
+                  <entry> Round year when last 2 digits of current year is
+                    greater than 49. <p> Executed at 2099-01-01 11:11:11: </p>
+                    <p> 2149-01-15 </p>
                   </entry>
                 </row>
                 <row>
                   <entry>
-                    <codeph>CAST('2018-11-10T15:11:04Z' AS TIMESTAMP</codeph>
-
-                    <p>
-                      <codeph>FORMAT 'YYYY-MM-DDTHH24:MI:SSZ')</codeph>
-                    </p>
+                    <codeblock>CAST('2019.10.10 13:30:40.123456 +01:30'
+   AS TIMESTAMP
+   FORMAT 'YYYY-MM-DD HH24:MI:SS.FF9 TZH:TZM') </codeblock>
                   </entry>
-                  <entry>
-                    2018-11-10 15:11:04
-                  </entry>
+                  <entry> 2019-10-10 13:30:40.123456000 </entry>
                 </row>
                 <row>
                   <entry>
-                    <codeph>CAST("95-01-28" AS DATE FORMAT 'YYY-MM-DD')</codeph>
+                    <codeblock>CAST('2001-03-01 03:10:15.123456 -01:30'
+   AS TIMESTAMP
+   FORMAT 'FXYYYY-MM-DD HH12:MI:SS.FF6 TZH:TZM')</codeblock>
                   </entry>
-                  <entry>
-                    Executed at 2019-01-01 11:11:11:
-
-                    <p>
-                      2095-01-28
-                    </p>
-                  </entry>
+                  <entry>2001-03-01 03:10:15.123456000</entry>
                 </row>
                 <row>
                   <entry>
-                    <codeph>CAST("49-01-15" AS DATE FORMAT 'RR-MM-DD')</codeph>
+                    <codeblock>CAST('2001-03-02 03:10:15'
+   AS TIMESTAMP
+   FORMAT 'FXYYYY MM-DD HH12:MI:SS')</codeblock>
                   </entry>
-                  <entry>
-                    Round year when last 2 digits of current year is greater than 49.
-
-                    <p>
-                      Executed at 2099-01-01 11:11:11:
-                    </p>
-
-
-
-                    <p>
-                      2149-01-15
-                    </p>
-                  </entry>
+                  <entry>NULL because the separator between the year and month
+                    do not match.</entry>
                 </row>
                 <row>
                   <entry>
-                    <codeph>CAST('2019.10.10 13:30:40.123456 +01:30' </codeph>
-
-                    <p>
-                      <codeph>AS TIMESTAMP</codeph>
-                    </p>
-
-
-
-                    <p>
-                      <codeph>FORMAT 'YYYY-MM-DD HH24:MI:SS.FF9 TZH:TZM')</codeph>
-                    </p>
+                    <codeblock>CAST('2001-3-05'
+   AS TIMESTAMP
+   FORMAT 'FXYYYY-MM-DD')</codeblock>
                   </entry>
+                  <entry>NULL because the length of the month token does not
+                    match the <varname>pattern</varname>.</entry>
+                </row>
+                <row>
                   <entry>
-                    2019-10-10 13:30:40.123456000
+                    <codeblock>CAST('2001-3-11 3:15:00.12345'
+   AS TIMESTAMP
+   FORMAT 'FXYYYY-FMMM-DD FMHH12:MI:SS.FMFF')</codeblock>
                   </entry>
+                  <entry>2001-03-11 03:15:00.123450000<p>The multiple
+                        <codeph>FM</codeph> modifiers for the month and hour
+                      override the <codeph>FX</codeph> and suppress
+                    padding.</p></entry>
+                </row>
+                <row>
+                  <entry>
+                    <codeblock>CAST('2019-01-01 01:01:01'
+   AS TIMESTAMP
+   FORMAT 'FMHH12:MI:FMSS')</codeblock>
+                  </entry>
+                  <entry>1:01:1</entry>
+                </row>
+                <row>
+                  <entry>
+                    <codeblock>CAST('Date: 2019-11-10'
+   AS DATE
+   FORMAT '"Date: "YYYY-MM-DD')
+</codeblock>
+                  </entry>
+                  <entry>2019-11-10</entry>
                 </row>
               </tbody>
             </tgroup>
