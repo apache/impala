@@ -703,6 +703,8 @@ public final class RuntimeFilterGenerator {
         continue;
       } else if (scanNode instanceof KuduScanNode) {
         if (filter.getType() != TRuntimeFilterType.MIN_MAX) continue;
+        // TODO: IMPALA-9294: Support Kudu Date Min/Max Filters
+        if (targetExpr.getType().isDate()) continue;
         SlotRef slotRef = targetExpr.unwrapSlotRef(true);
         // Kudu only supports targeting a single column, not general exprs, so the target
         // must be a SlotRef pointing to a column. We can allow implicit integer casts

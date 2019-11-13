@@ -350,7 +350,8 @@ public class AnalyzeKuduDDLTest extends FrontendTestBase {
     AnalyzesOk("create table tab (x int primary key, i1 tinyint default null, " +
         "i2 smallint default null, i3 int default null, i4 bigint default null, " +
         "vals string default null, valf float default null, vald double default null, " +
-        "valb boolean default null, valdec decimal(10, 5) default null) " +
+        "valb boolean default null, valdec decimal(10, 5) default null, " +
+        "valdate date default null) " +
         "partition by hash (x) partitions 3 stored as kudu", isExternalPurgeTbl);
     // Use NULL as a default value on a non-nullable column
     AnalysisError("create table tab (x int primary key, y int not null default null) " +
@@ -385,6 +386,7 @@ public class AnalyzeKuduDDLTest extends FrontendTestBase {
         "valf float default cast(1.2 as float), vald double default " +
         "cast(3.1452 as double), valb boolean default true, " +
         "valdec decimal(10, 5) default 3.14159, " +
+        "valdate date default date '1970-01-01', " +
         "primary key (i1, i2, i3, i4, vals)) partition by hash (i1) partitions 3 " +
         "stored as kudu", isExternalPurgeTbl);
     AnalyzesOk("create table tab (i int primary key default 1+1+1) " +
@@ -631,7 +633,7 @@ public class AnalyzeKuduDDLTest extends FrontendTestBase {
     // Columns with different supported data types
     AnalyzesOk("alter table functional_kudu.testtbl add columns (a1 tinyint null, a2 " +
         "smallint null, a3 int null, a4 bigint null, a5 string null, a6 float null, " +
-        "a7 double null, a8 boolean null comment 'boolean')");
+        "a7 double null, a8 boolean null comment 'boolean', a9 date null)");
     // Decimal types
     AnalyzesOk("alter table functional_kudu.testtbl add columns (d1 decimal null, d2 " +
         "decimal(9, 2) null, d3 decimal(15, 15) null, d4 decimal(38, 0) null)");

@@ -34,7 +34,7 @@ import random
 import textwrap
 import threading
 import time
-from datetime import datetime
+from datetime import datetime, date
 from pytz import utc
 
 from tests.common.environ import ImpalaTestClusterProperties, HIVE_MAJOR_VERSION
@@ -409,7 +409,7 @@ class TestKuduOperations(KuduTestSuite):
       pytest.skip("Only runs in exhaustive to reduce core time.")
     table_name = "%s.storage_attrs" % unique_database
     types = ['boolean', 'tinyint', 'smallint', 'int', 'bigint', 'float', 'double', \
-        'string', 'timestamp', 'decimal']
+        'string', 'timestamp', 'decimal', 'date']
     cursor.execute("set kudu_read_mode=READ_AT_SNAPSHOT")
     create_query = "create table %s (id int primary key" % table_name
     for t in types:
@@ -430,10 +430,12 @@ class TestKuduOperations(KuduTestSuite):
           except Exception as err:
             assert "encoding %s not supported for type" % e in str(err)
         cursor.execute("""insert into %s values (%s, true, 0, 0, 0, 0, 0, 0, '0',
-            cast('2009-01-01' as timestamp), cast(0 as decimal))""" % (table_name, i))
+            cast('2009-01-01' as timestamp), cast(0 as decimal),
+            cast('2010-01-01' as date))""" % (table_name, i))
         cursor.execute("select * from %s where id = %s" % (table_name, i))
         assert cursor.fetchall() == \
-            [(i, True, 0, 0, 0, 0, 0.0, 0.0, '0', datetime(2009, 1, 1, 0, 0), 0)]
+            [(i, True, 0, 0, 0, 0, 0.0, 0.0, '0', datetime(2009, 1, 1, 0, 0), 0,
+                 date(2010, 1, 1))]
         i += 1
     cursor.execute("select count(*) from %s" % table_name)
     print cursor.fetchall() == [(i, )]

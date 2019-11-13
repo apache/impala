@@ -87,3 +87,21 @@ NAME,TYPE,COMMENT,PRIMARY_KEY,NULLABLE,DEFAULT_VALUE,ENCODING,COMPRESSION,BLOCK_
 ---- TYPES
 STRING,STRING,STRING,STRING,STRING,STRING,STRING,STRING,STRING
 ====
+---- QUERY
+# Test date columns and primary key
+create table describe_date_test
+(
+ date_pk date PRIMARY KEY,
+ date_val date not null,
+ date_null date null)
+stored as kudu;
+describe describe_date_test;
+---- LABELS
+NAME,TYPE,COMMENT,PRIMARY_KEY,NULLABLE,DEFAULT_VALUE,ENCODING,COMPRESSION,BLOCK_SIZE
+---- RESULTS
+'date_pk','date','','true','false','','AUTO_ENCODING','DEFAULT_COMPRESSION','0'
+'date_val','date','','false','false','','AUTO_ENCODING','DEFAULT_COMPRESSION','0'
+'date_null','date','','false','true','','AUTO_ENCODING','DEFAULT_COMPRESSION','0'
+---- TYPES
+STRING,STRING,STRING,STRING,STRING,STRING,STRING,STRING,STRING
+====

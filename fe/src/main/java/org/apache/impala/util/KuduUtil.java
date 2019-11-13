@@ -21,6 +21,8 @@ import static java.lang.String.format;
 
 import java.math.BigDecimal;
 import java.math.BigInteger;
+import java.sql.Date;
+import java.time.LocalDate;
 import java.util.List;
 import java.util.Map;
 import java.util.concurrent.ConcurrentHashMap;
@@ -176,6 +178,11 @@ public class KuduUtil {
         checkCorrectType(literal.isSetInt_literal(), type, colName, literal);
         key.addLong(pos, literal.getInt_literal().getValue());
         break;
+      case DATE:
+        checkCorrectType(literal.isSetDate_literal(), type, colName, literal);
+        key.addDate(pos, Date.valueOf(LocalDate.ofEpochDay(
+            literal.getDate_literal().getDays_since_epoch())));
+        break;
       case DECIMAL:
         checkCorrectType(literal.isSetDecimal_literal(), type, colName, literal);
         BigInteger unscaledVal = new BigInteger(literal.getDecimal_literal().getValue());
@@ -229,6 +236,10 @@ public class KuduUtil {
       case UNIXTIME_MICROS:
         checkCorrectType(literal.isSetInt_literal(), type, colName, literal);
         return literal.getInt_literal().getValue();
+      case DATE:
+        checkCorrectType(literal.isSetDate_literal(), type, colName, literal);
+        return Date.valueOf(LocalDate.ofEpochDay(
+            literal.getDate_literal().getDays_since_epoch()));
       case DECIMAL:
         checkCorrectType(literal.isSetDecimal_literal(), type, colName, literal);
         BigInteger unscaledVal = new BigInteger(literal.getDecimal_literal().getValue());
@@ -378,7 +389,8 @@ public class KuduUtil {
   }
 
   public static boolean isSupportedKeyType(org.apache.impala.catalog.Type type) {
-    return type.isIntegerType() || type.isStringType() || type.isTimestamp();
+    return type.isIntegerType() || type.isStringType() || type.isTimestamp()
+        || type.isDate();
   }
 
   /**
@@ -427,11 +439,11 @@ public class KuduUtil {
       case FLOAT: return org.apache.kudu.Type.FLOAT;
       case TIMESTAMP: return org.apache.kudu.Type.UNIXTIME_MICROS;
       case DECIMAL: return org.apache.kudu.Type.DECIMAL;
+      case DATE: return org.apache.kudu.Type.DATE;
       /* Fall through below */
       case INVALID_TYPE:
       case NULL_TYPE:
       case BINARY:
-      case DATE:
       case DATETIME:
       case CHAR:
       case VARCHAR:
@@ -453,6 +465,7 @@ public class KuduUtil {
       case INT64: return Type.BIGINT;
       case STRING: return Type.STRING;
       case UNIXTIME_MICROS: return Type.TIMESTAMP;
+      case DATE: return Type.DATE;
       case DECIMAL:
         return ScalarType.createDecimalType(
             typeAttributes.getPrecision(), typeAttributes.getScale());

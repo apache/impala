@@ -30,6 +30,7 @@
 #include "common/logging.h"
 #include "common/names.h"
 #include "common/status.h"
+#include "runtime/date-value.h"
 #include "runtime/decimal-value.h"
 #include "runtime/timestamp-value.h"
 #include "runtime/timestamp-value.inline.h"
@@ -126,6 +127,16 @@ static Status ConvertTimestampValue(const TimestampValue* tv, int64_t* ts_micros
   return Status::OK();
 }
 
+// Converts a DateValue to Kudu's representation which is returned in 'days'.
+static Status ConvertDateValue(const DateValue* dv, int32_t* days) {
+  bool success = dv->ToDaysSinceEpoch(days);
+  DCHECK(success); // If the value was invalid the slot should've been null.
+  if (UNLIKELY(!success)) {
+    return Status(TErrorCode::RUNTIME_ERROR, "Invalid DateValue");
+  }
+  return Status::OK();
+}
+
 Status WriteKuduValue(int col, const ColumnType& col_type, const void* value,
     bool copy_strings, kudu::KuduPartialRow* row) {
   // TODO: codegen this to eliminate branching on type.
@@ -178,6 +189,13 @@ Status WriteKuduValue(int col, const ColumnType& col_type, const void* value,
       KUDU_RETURN_IF_ERROR(
           row->SetUnixTimeMicros(col, ts_micros), "Could not set Kudu row value.");
       break;
+    case TYPE_DATE:
+    {
+      int32_t days = 0;
+      RETURN_IF_ERROR(ConvertDateValue(reinterpret_cast<const DateValue*>(value), &days));
+      KUDU_RETURN_IF_ERROR(row->SetDate(col, days), "Could not set Kudu row value.");
+      break;
+    }
     case TYPE_DECIMAL:
       switch (col_type.GetByteSize()) {
         case 4:
@@ -225,6 +243,7 @@ ColumnType KuduDataTypeToColumnType(
     case DataType::DECIMAL:
       return ColumnType::CreateDecimalType(
           type_attributes.precision(), type_attributes.scale());
+    case DataType::DATE: return ColumnType(PrimitiveType::TYPE_DATE);
     default: return ColumnType(PrimitiveType::INVALID_TYPE);
   }
 }
@@ -265,6 +284,12 @@ Status CreateKuduValue(const ColumnType& col_type, const void* value, KuduValue*
       RETURN_IF_ERROR(ConvertTimestampValue(
           reinterpret_cast<const TimestampValue*>(value), &ts_micros));
       *out = KuduValue::FromInt(ts_micros);
+      break;
+    }
+    case TYPE_DATE: {
+      int32_t days;
+      RETURN_IF_ERROR(ConvertDateValue(reinterpret_cast<const DateValue*>(value), &days));
+      *out = KuduValue::FromInt(days);
       break;
     }
     case TYPE_DECIMAL: {
