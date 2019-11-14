@@ -39,12 +39,12 @@
 #include "runtime/timestamp-value.h"
 #include "runtime/types.h"
 #include "scheduling/query-schedule.h"
+#include "service/client-request-state-map.h"
 #include "service/query-options.h"
 #include "statestore/statestore-subscriber.h"
 #include "util/condition-variable.h"
 #include "util/container-util.h"
 #include "util/runtime-profile.h"
-#include "util/sharded-query-map-util.h"
 #include "util/simple-logger.h"
 #include "util/thread-pool.h"
 #include "util/time.h"
@@ -696,11 +696,18 @@ class ImpalaServer : public ImpalaServiceIf,
 
   /// Unregister the query by cancelling it, removing exec_state from
   /// client_request_state_map_, and removing the query id from session state's
-  /// in-flight query list.  If check_inflight is true, then return an error if the query
-  /// is not yet in-flight.  Otherwise, proceed even if the query isn't yet in-flight (for
+  /// in-flight query list. If check_inflight is true, then return an error if the query
+  /// is not yet in-flight. Otherwise, proceed even if the query isn't yet in-flight (for
   /// cleaning up after an error on the query issuing path).
   Status UnregisterQuery(const TUniqueId& query_id, bool check_inflight,
       const Status* cause = NULL) WARN_UNUSED_RESULT;
+
+  /// Performs any final cleanup necessary before the given ClientRequestState goes out
+  /// of scope and is deleted. Marks the given ClientRequestState as done, removes the
+  /// query from the inflight queries list, updates query_locations_, and archives the
+  /// query. Used when unregistering the query.
+  Status CloseClientRequestState(
+      const std::shared_ptr<ClientRequestState>& request_state);
 
   /// Initiates query cancellation reporting the given cause as the query status.
   /// Assumes deliberate cancellation by the user if the cause is NULL.  Returns an
@@ -1080,10 +1087,9 @@ class ImpalaServer : public ImpalaServiceIf,
   /// Thread that runs UnresponsiveBackendThread().
   std::unique_ptr<Thread> unresponsive_backend_thread_;
 
-  /// maps from query id to exec state; ClientRequestState is owned by us and referenced
-  /// as a shared_ptr to allow asynchronous deletion
-  typedef class ShardedQueryMap<std::shared_ptr<ClientRequestState>>
-      ClientRequestStateMap;
+  /// A ClientRequestStateMap maps query ids to ClientRequestStates. The
+  /// ClientRequestStates are owned by the ImpalaServer and ClientRequestStateMap
+  /// references them using shared_ptr to allow asynchronous deletion.
   ClientRequestStateMap client_request_state_map_;
 
   /// Default query options in the form of TQueryOptions and beeswax::ConfigVariable

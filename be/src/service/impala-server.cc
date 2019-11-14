@@ -907,12 +907,11 @@ Status ImpalaServer::ExecuteInternal(
   DCHECK(session_state != nullptr);
   *registered_request_state = false;
 
-  request_state->reset(new ClientRequestState(query_ctx, exec_env_, exec_env_->frontend(),
-      this, session_state));
+  request_state->reset(new ClientRequestState(
+      query_ctx, exec_env_, exec_env_->frontend(), this, session_state));
 
   (*request_state)->query_events()->MarkEvent("Query submitted");
 
-  TExecRequest result;
   {
     // Keep a lock on request_state so that registration and setting
     // result_metadata are atomic.
@@ -940,9 +939,11 @@ Status ImpalaServer::ExecuteInternal(
           statement_length, max_statement_length));
     }
 
-    RETURN_IF_ERROR((*request_state)->UpdateQueryStatus(
-        exec_env_->frontend()->GetExecRequest(query_ctx, &result)));
+    // Takes the TQueryCtx and calls into the frontend to initialize the TExecRequest for
+    // this query.
+    RETURN_IF_ERROR((*request_state)->InitExecRequest(query_ctx));
 
+    const TExecRequest& result = (*request_state)->exec_request();
     (*request_state)->query_events()->MarkEvent("Planning finished");
     (*request_state)->set_user_profile_access(result.user_has_profile_access);
     (*request_state)->summary_profile()->AddEventSequence(
@@ -952,10 +953,11 @@ Status ImpalaServer::ExecuteInternal(
       (*request_state)->set_result_metadata(result.result_set_metadata);
     }
   }
-  VLOG(2) << "Execution request: " << ThriftDebugString(result);
+  VLOG(2) << "Execution request: "
+          << ThriftDebugString((*request_state)->exec_request());
 
   // start execution of query; also starts fragment status reports
-  RETURN_IF_ERROR((*request_state)->Exec(&result));
+  RETURN_IF_ERROR((*request_state)->Exec());
   Status status = UpdateCatalogMetrics();
   if (!status.ok()) {
     VLOG_QUERY << "Couldn't update catalog metrics: " << status.GetDetail();
@@ -1030,22 +1032,10 @@ Status ImpalaServer::RegisterQuery(shared_ptr<SessionState> session_state,
     return Status::Expected("Session has been closed, ignoring query.");
   }
   const TUniqueId& query_id = request_state->query_id();
-  {
-    DCHECK_EQ(this, ExecEnv::GetInstance()->impala_server());
-    ScopedShardedMapRef<std::shared_ptr<ClientRequestState>> map_ref(query_id,
-        &client_request_state_map_);
-    DCHECK(map_ref.get() != nullptr);
+  DCHECK_EQ(this, ExecEnv::GetInstance()->impala_server());
+  RETURN_IF_ERROR(
+      client_request_state_map_.AddClientRequestState(query_id, request_state));
 
-    auto entry = map_ref->find(query_id);
-    if (entry != map_ref->end()) {
-      // There shouldn't be an active query with that same id.
-      // (query_id is globally unique)
-      stringstream ss;
-      ss << "query id " << PrintId(query_id) << " already exists";
-      return Status(ErrorMsg(TErrorCode::INTERNAL_ERROR, ss.str()));
-    }
-    map_ref->insert(make_pair(query_id, request_state));
-  }
   // Metric is decremented in UnregisterQuery().
   ImpaladMetrics::NUM_QUERIES_REGISTERED->Increment(1L);
   VLOG_QUERY << "Registered query query_id=" << PrintId(query_id)
@@ -1128,26 +1118,23 @@ void ImpalaServer::UpdateExecSummary(
 Status ImpalaServer::UnregisterQuery(const TUniqueId& query_id, bool check_inflight,
     const Status* cause) {
   VLOG_QUERY << "UnregisterQuery(): query_id=" << PrintId(query_id);
-
+  // Cancel the query.
   RETURN_IF_ERROR(CancelInternal(query_id, check_inflight, cause));
 
+  // Delete it from the client_request_state_map_ and from the http_handler_.
+  DCHECK_EQ(this, ExecEnv::GetInstance()->impala_server());
   shared_ptr<ClientRequestState> request_state;
-  {
-    DCHECK_EQ(this, ExecEnv::GetInstance()->impala_server());
-    ScopedShardedMapRef<std::shared_ptr<ClientRequestState>> map_ref(query_id,
-        &client_request_state_map_);
-    DCHECK(map_ref.get() != nullptr);
+  RETURN_IF_ERROR(
+      client_request_state_map_.DeleteClientRequestState(query_id, &request_state));
 
-    auto entry = map_ref->find(query_id);
-    if (entry == map_ref->end()) {
-      VLOG(1) << "Invalid or unknown query handle " << PrintId(query_id);
-      return Status::Expected("Invalid or unknown query handle");
-    } else {
-      request_state = entry->second;
-    }
-    map_ref->erase(entry);
-  }
+  // Close and delete the ClientRequestState.
+  RETURN_IF_ERROR(CloseClientRequestState(request_state));
 
+  return Status::OK();
+}
+
+Status ImpalaServer::CloseClientRequestState(
+    const std::shared_ptr<ClientRequestState>& request_state) {
   request_state->Done();
 
   int64_t duration_us = request_state->end_time_us() - request_state->start_time_us();
@@ -1163,7 +1150,7 @@ Status ImpalaServer::UnregisterQuery(const TUniqueId& query_id, bool check_infli
   }
   {
     lock_guard<mutex> l(request_state->session()->lock);
-    request_state->session()->inflight_queries.erase(query_id);
+    request_state->session()->inflight_queries.erase(request_state->query_id());
   }
 
   if (request_state->GetCoordinator() != nullptr) {

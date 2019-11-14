@@ -177,9 +177,8 @@ void ClientRequestState::SetFrontendProfile(TRuntimeProfileNode profile) {
   frontend_profile_->Update(prof_tree);
 }
 
-Status ClientRequestState::Exec(TExecRequest* exec_request) {
+Status ClientRequestState::Exec() {
   MarkActive();
-  exec_request_ = *exec_request;
 
   profile_->AddChild(server_profile_);
   summary_profile_->AddInfoString("Query Type", PrintThriftEnum(stmt_type()));
@@ -188,7 +187,7 @@ Status ClientRequestState::Exec(TExecRequest* exec_request) {
   summary_profile_->AddInfoString("Query Options (set by configuration and planner)",
       DebugQueryOptions(exec_request_.query_options));
 
-  switch (exec_request->stmt_type) {
+  switch (exec_request_.stmt_type) {
     case TStmtType::QUERY:
     case TStmtType::DML:
       DCHECK(exec_request_.__isset.query_exec_request);
@@ -1115,19 +1114,19 @@ Status ClientRequestState::Cancel(bool check_inflight, const Status* cause) {
 }
 
 Status ClientRequestState::UpdateCatalog() {
-  if (!exec_request().__isset.query_exec_request ||
-      exec_request().query_exec_request.stmt_type != TStmtType::DML) {
+  if (!exec_request_.__isset.query_exec_request ||
+      exec_request_.query_exec_request.stmt_type != TStmtType::DML) {
     return Status::OK();
   }
 
   query_events_->MarkEvent("DML data written");
   SCOPED_TIMER(ADD_TIMER(server_profile_, "MetastoreUpdateTimer"));
 
-  TQueryExecRequest query_exec_request = exec_request().query_exec_request;
+  TQueryExecRequest query_exec_request = exec_request_.query_exec_request;
   if (query_exec_request.__isset.finalize_params) {
     const TFinalizeParams& finalize_params = query_exec_request.finalize_params;
     TUpdateCatalogRequest catalog_update;
-    catalog_update.__set_sync_ddl(exec_request().query_options.sync_ddl);
+    catalog_update.__set_sync_ddl(exec_request_.query_options.sync_ddl);
     catalog_update.__set_header(TCatalogServiceRequestHeader());
     catalog_update.header.__set_requesting_user(effective_user());
     catalog_update.header.__set_client_ip(session()->network_address.hostname);
@@ -1385,6 +1384,11 @@ bool ClientRequestState::GetDmlStats(TDmlResult* dml_result, Status* query_statu
   return true;
 }
 
+Status ClientRequestState::InitExecRequest(const TQueryCtx& query_ctx) {
+  return UpdateQueryStatus(
+      exec_env_->frontend()->GetExecRequest(query_ctx, &exec_request_));
+}
+
 void ClientRequestState::UpdateEndTime() {
   // Update the query's end time only if it isn't set previously.
   if (end_time_us_.CompareAndSwap(0, UnixMicros())) {
@@ -1459,7 +1463,7 @@ void ClientRequestState::LogQueryEvents() {
 }
 
 Status ClientRequestState::LogAuditRecord(const Status& query_status) {
-  const TExecRequest& request = exec_request();
+  const TExecRequest& request = exec_request_;
   stringstream ss;
   rapidjson::StringBuffer buffer;
   rapidjson::Writer<rapidjson::StringBuffer> writer(buffer);
@@ -1535,7 +1539,7 @@ Status ClientRequestState::LogAuditRecord(const Status& query_status) {
 }
 
 Status ClientRequestState::LogLineageRecord() {
-  const TExecRequest& request = exec_request();
+  const TExecRequest& request = exec_request_;
   if (request.stmt_type == TStmtType::EXPLAIN || (!request.__isset.query_exec_request &&
       !request.__isset.catalog_op_request)) {
     return Status::OK();

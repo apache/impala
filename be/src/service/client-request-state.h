@@ -50,7 +50,7 @@ class TRuntimeProfileTree;
 class TupleRow;
 enum class AdmissionOutcome;
 
-/// Execution state of the client-facing side a query. This captures everything
+/// Execution state of the client-facing side of a query. This captures everything
 /// necessary to convert row batches received by the coordinator into results
 /// we can return to the client. It also captures all state required for
 /// servicing query-related requests from the client.
@@ -73,12 +73,13 @@ class ClientRequestState {
   /// which then sets the frontend profile.
   void SetFrontendProfile(TRuntimeProfileNode profile);
 
-  /// Based on query type, this either initiates execution of a exec_request or submits
-  /// the query to the Admission controller for asynchronous admission control. When this
-  /// returns the operation state is either RUNNING_STATE or PENDING_STATE.
+  /// Based on query type, this either initiates execution of this ClientRequestState's
+  /// TExecRequest or submits the query to the Admission controller for asynchronous
+  /// admission control. When this returns the operation state is either RUNNING_STATE or
+  /// PENDING_STATE.
   /// Non-blocking.
   /// Must *not* be called with lock_ held.
-  Status Exec(TExecRequest* exec_request) WARN_UNUSED_RESULT;
+  Status Exec() WARN_UNUSED_RESULT;
 
   /// Execute a HiveServer2 metadata operation
   /// TODO: This is likely a superset of GetTableNames/GetDbs. Coalesce these different
@@ -184,6 +185,13 @@ class ClientRequestState {
   /// Caller must not hold 'lock()'.
   bool GetDmlStats(TDmlResult* dml_result, Status* query_status);
 
+  /// Creates and sets the TExecRequest for the query associated with this
+  /// ClientRequestState. The TExecRequest is created by the Impala frontend via the
+  /// method Frontend::GetExecRequest(TQueryCtx, TExecRequest). The TQueryCtx is created
+  /// by the ImpalaServer and contains the full query string
+  /// (TQueryCtx::TClientRequest::stmt).
+  Status InitExecRequest(const TQueryCtx& query_ctx);
+
   ImpalaServer::SessionState* session() const { return session_.get(); }
 
   /// Queries are run and authorized on behalf of the effective_user.
@@ -219,7 +227,12 @@ class ClientRequestState {
   bool returns_result_set() { return !result_metadata_.columns.empty(); }
   const TResultSetMetadata* result_metadata() const { return &result_metadata_; }
   const TUniqueId& query_id() const { return query_ctx_.query_id; }
-  const TExecRequest& exec_request() const { return exec_request_; }
+  /// Returns the TExecRequest for the query associated with this ClientRequestState.
+  /// Contents are only valid after InitExecRequest(TQueryCtx) initializes the
+  /// TExecRequest.
+  const TExecRequest& exec_request() const {
+    return exec_request_;
+  }
   TStmtType::type stmt_type() const { return exec_request_.stmt_type; }
   TCatalogOpType::type catalog_op_type() const {
     return exec_request_.catalog_op_request.op_type;
@@ -452,7 +465,13 @@ protected:
   apache::hive::service::cli::thrift::TOperationState::type operation_state_ =
       apache::hive::service::cli::thrift::TOperationState::INITIALIZED_STATE;
 
+  /// The current status of the query tracked by this ClientRequestState. Updated by
+  /// UpdateQueryStatus(Status).
   Status query_status_;
+
+  /// The TExecRequest for the query tracked by this ClientRequestState. The TExecRequest
+  /// is initialized in InitExecRequest(TQueryCtx). It should not be used until
+  /// InitExecRequest(TQueryCtx) has been called.
   TExecRequest exec_request_;
 
   /// If true, effective_user() has access to the runtime profile and execution
