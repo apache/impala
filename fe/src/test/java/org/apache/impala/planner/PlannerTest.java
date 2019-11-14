@@ -634,13 +634,14 @@ public class PlannerTest extends PlannerTestBase {
     TQueryOptions options = defaultQueryOptions();
     options.setMt_dop(3);
     options.setDisable_hdfs_num_rows_estimate(false);
+    options.setExplain_level(TExplainLevel.EXTENDED);
     try {
       // Temporarily unset the test env such that unsupported queries with mt_dop > 0
       // throw an exception. Those are otherwise allowed for testing parallel plans.
-      RuntimeEnv.INSTANCE.setTestEnv(false);
+      RuntimeEnv.INSTANCE.setEnableMtDopValidation(true);
       runPlannerTestFile("mt-dop-validation-hdfs-num-rows-est-enabled", options);
     } finally {
-      RuntimeEnv.INSTANCE.setTestEnv(true);
+      RuntimeEnv.INSTANCE.setEnableMtDopValidation(false);
     }
   }
 
@@ -651,13 +652,14 @@ public class PlannerTest extends PlannerTestBase {
     TQueryOptions options = defaultQueryOptions();
     options.setMt_dop(3);
     options.setDisable_hdfs_num_rows_estimate(true);
+    options.setExplain_level(TExplainLevel.EXTENDED);
     try {
       // Temporarily unset the test env such that unsupported queries with mt_dop > 0
       // throw an exception. Those are otherwise allowed for testing parallel plans.
-      RuntimeEnv.INSTANCE.setTestEnv(false);
+      RuntimeEnv.INSTANCE.setEnableMtDopValidation(true);
       runPlannerTestFile("mt-dop-validation", options);
     } finally {
-      RuntimeEnv.INSTANCE.setTestEnv(true);
+      RuntimeEnv.INSTANCE.setEnableMtDopValidation(false);
     }
   }
 

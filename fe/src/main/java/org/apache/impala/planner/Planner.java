@@ -129,12 +129,12 @@ public class Planner {
     // sinks: we only allow MT_DOP > 0 with such plans if --unlock_mt_dop=true is
     // specified. We allow single node plans with mt_dop since there is no actual
     // parallelism.
-    if (!ctx_.isSingleNodeExec()
-        && ctx_.getQueryOptions().mt_dop > 0
-        && !RuntimeEnv.INSTANCE.isTestEnv()
+    if (!ctx_.isSingleNodeExec() && ctx_.getQueryOptions().mt_dop > 0
+        && (!RuntimeEnv.INSTANCE.isTestEnv()
+               || RuntimeEnv.INSTANCE.isMtDopValidationEnabled())
         && !BackendConfig.INSTANCE.isMtDopUnlocked()
-        && (ctx_.hasTableSink() ||
-            singleNodePlanner.hasUnsupportedMtDopJoin(singleNodePlan))) {
+        && (ctx_.hasTableSink()
+               || singleNodePlanner.hasUnsupportedMtDopJoin(singleNodePlan))) {
       if (BackendConfig.INSTANCE.mtDopAutoFallback()) {
         // Fall back to non-dop mode. This assumes that the mt_dop value is only used
         // in the distributed planning process, which should be generally true as long
