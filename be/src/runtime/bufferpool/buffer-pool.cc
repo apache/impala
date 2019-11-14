@@ -344,12 +344,14 @@ bool BufferPool::ClientHandle::TransferReservationTo(
 }
 
 void BufferPool::ClientHandle::SaveReservation(SubReservation* dst, int64_t bytes) {
+  DCHECK(!dst->is_closed());
   DCHECK_EQ(dst->tracker_->parent(), impl_->reservation());
   bool success = impl_->reservation()->TransferReservationTo(dst->tracker_.get(), bytes);
   DCHECK(success); // SubReservation should not have a limit, so this shouldn't fail.
 }
 
 void BufferPool::ClientHandle::RestoreReservation(SubReservation* src, int64_t bytes) {
+  DCHECK(!src->is_closed());
   DCHECK_EQ(src->tracker_->parent(), impl_->reservation());
   bool success = src->tracker_->TransferReservationTo(impl_->reservation(), bytes);
   DCHECK(success); // Transferring reservation to parent shouldn't fail.
@@ -363,7 +365,18 @@ bool BufferPool::ClientHandle::has_unpinned_pages() const {
   return impl_->has_unpinned_pages();
 }
 
+BufferPool::SubReservation::SubReservation() {
+  DCHECK(is_closed()) << "subreservation must be closed.";
+}
+
 BufferPool::SubReservation::SubReservation(ClientHandle* client) {
+  DCHECK(client->is_registered());
+  Init(client);
+}
+
+void BufferPool::SubReservation::Init(ClientHandle* client) {
+  DCHECK(tracker_ == nullptr);
+  DCHECK(client->is_registered());
   tracker_.reset(new ReservationTracker);
   tracker_->InitChildTracker(
       nullptr, client->impl_->reservation(), nullptr, numeric_limits<int64_t>::max());

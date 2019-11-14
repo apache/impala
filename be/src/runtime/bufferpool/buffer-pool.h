@@ -408,14 +408,20 @@ class BufferPool::ClientHandle {
 /// Helper class that allows dividing up a client's reservation into separate buckets.
 class BufferPool::SubReservation {
  public:
+  // Construct without initializing this SubReservation.
+  SubReservation();
+  // Construct and initialize with 'client' as the parent.
   SubReservation(ClientHandle* client);
   ~SubReservation();
+
+  // Initialize with 'client' as the parent.
+  void Init(ClientHandle* client);
 
   /// Returns the amount of reservation stored in this sub-reservation.
   int64_t GetReservation() const;
 
   /// Releases the sub-reservation to the client's tracker. Must be called before
-  /// destruction.
+  /// destruction if this was initialized.
   void Close();
 
   bool is_closed() const { return tracker_ == nullptr; }

@@ -231,10 +231,11 @@ class PartitionedHashJoinNode : public BlockingJoinNode {
   /// After this function returns, all partitions are ready to process probe rows.
   Status PrepareForProbe() WARN_UNUSED_RESULT;
 
-  /// Creates an initialized probe partition at 'partition_idx' in
-  /// 'probe_hash_partitions_'.
-  void CreateProbePartition(
-      int partition_idx, std::unique_ptr<BufferedTupleStream> probe_rows);
+  // Initialize 'probe_hash_partitions_'. Each spilled build partition gets a
+  // corresponding probe partition. Closed or in-memory build partitions do
+  // not get a probe partition. If an error is encountered, 'probe_hash_partitions_'
+  // may be left with some partitions and will be cleaned up by Close().
+  Status CreateProbeHashPartitions(bool* have_spilled_hash_partitions);
 
   /// Append the probe row 'row' to 'stream'. The stream must be unpinned and must have
   /// a write buffer allocated, so this will succeed unless an error is encountered.
@@ -629,12 +630,15 @@ class PartitionedHashJoinNode : public BlockingJoinNode {
   /// disk for later processing.
   class ProbePartition {
    public:
-    /// Create a new probe partition. 'probe_rows' should be an empty unpinned stream
-    /// that has been prepared for writing with an I/O-sized write buffer.
+    /// Create a new probe partition for the same hash partition as 'build_partition'.
     ProbePartition(RuntimeState* state, PartitionedHashJoinNode* parent,
-        PhjBuilder::Partition* build_partition,
-        std::unique_ptr<BufferedTupleStream> probe_rows);
+        PhjBuilder::Partition* build_partition);
     ~ProbePartition();
+
+    /// Prepare to write the probe rows. Allocates the first write block. This stream
+    /// is unpinned so writes should not fail with out of memory if this succeeds.
+    /// Returns an error if the first write block cannot be acquired.
+    Status PrepareForWrite(PartitionedHashJoinNode* parent, bool pinned);
 
     /// Prepare to read the probe rows. Allocates the first read block, so reads will
     /// not fail with out of memory if this succeeds. Returns an error if the first read

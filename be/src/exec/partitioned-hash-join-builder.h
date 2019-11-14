@@ -48,9 +48,9 @@ class ScalarExprEvaluator;
 /// The builder owns the hash tables and build row streams. The builder first does the
 /// level 0 partitioning of build rows. After FlushFinal() the builder has produced some
 /// in-memory partitions and some spilled partitions. The in-memory partitions have hash
-/// tables and the spilled partitions have a probe-side stream prepared with one write
-/// buffer, which is sufficient to spill the partition's probe rows to disk without
-/// allocating additional buffers.
+/// tables and the spilled partitions have memory reserved for a probe-side stream with
+/// one write buffer, which is sufficient to spill the partition's probe rows to disk
+/// without allocating additional buffers.
 ///
 /// After this initial partitioning, the join node probes the in-memory hash partitions.
 /// The join node then drives processing of any spilled partitions, calling
@@ -61,12 +61,9 @@ class ScalarExprEvaluator;
 /// Both the PartitionedHashJoinNode and the builder share a BufferPool client
 /// and the corresponding reservations. Different stages of the spilling algorithm
 /// require different mixes of build and probe buffers and hash tables, so we can
-/// share the reservation to minimize the combined memory requirement. Initial probe-side
-/// buffers are allocated in the builder then handed off to the probe side to implement
-/// this reservation sharing.
-///
-/// TODO: after we have reliable reservations (IMPALA-3200), we can simplify the handoff
-///   to the probe side by using reservations instead of preparing the streams.
+/// share the reservation to minimize the combined memory requirement. Memory for
+/// probe-side buffers is reserved in the builder then handed off to the probe side
+/// to implement this reservation sharing.
 ///
 /// The full hash join algorithm is documented in PartitionedHashJoinNode.
 class PhjBuilder : public DataSink {
@@ -91,9 +88,9 @@ class PhjBuilder : public DataSink {
   class Partition;
 
   PhjBuilder(int join_node_id, const std::string& join_node_label, TJoinOp::type join_op,
-      const RowDescriptor* probe_row_desc, const RowDescriptor* build_row_desc,
-      RuntimeState* state, BufferPool::ClientHandle* buffer_pool_client,
-      int64_t spillable_buffer_size, int64_t max_row_buffer_size);
+      const RowDescriptor* build_row_desc, RuntimeState* state,
+      BufferPool::ClientHandle* buffer_pool_client, int64_t spillable_buffer_size,
+      int64_t max_row_buffer_size);
 
   Status InitExprsAndFilters(RuntimeState* state,
       const std::vector<TEqJoinCondition>& eq_join_conjuncts,
@@ -118,10 +115,9 @@ class PhjBuilder : public DataSink {
   /// Reset the builder to the same state as it was in after calling Open().
   void Reset(RowBatch* row_batch);
 
-  /// Transfer ownership of the probe streams to the caller. One stream was allocated per
-  /// spilled partition in FlushFinal(). The probe streams are empty but prepared for
-  /// writing with a write buffer allocated.
-  std::vector<std::unique_ptr<BufferedTupleStream>> TransferProbeStreams();
+  /// Transfer reservation for probe streams to 'dst'. Memory for one stream was reserved
+  /// per spilled partition in FlushFinal().
+  void TransferProbeStreamReservation(BufferPool::ClientHandle* dst);
 
   /// Called after probing of the partitions is done. Appends in-memory partitions that
   /// may contain build rows to output to 'output_partitions' for build modes like
@@ -143,13 +139,12 @@ class PhjBuilder : public DataSink {
     }
   }
 
-  /// Creates new hash partitions and repartitions 'input_partition'. The previous
-  /// hash partitions must have been cleared with ClearHashPartitions().
-  /// 'level' is the level new partitions should be created with. This functions prepares
-  /// 'input_probe_rows' for reading in "delete_on_read" mode, so that the probe phase
-  /// has enough buffers preallocated to execute successfully.
-  Status RepartitionBuildInput(Partition* input_partition, int level,
-      BufferedTupleStream* input_probe_rows) WARN_UNUSED_RESULT;
+  /// Creates new hash partitions and repartitions 'input_partition' into PARTITION_FANOUT
+  /// new partitions with level input_partition->level() + 1. The previous hash partitions
+  /// must have been cleared with ClearHashPartitions(). This function reserves enough
+  /// memory for a read buffer for the input probe stream and a write buffer for each
+  /// spilled partition after repartitioning.
+  Status RepartitionBuildInput(Partition* input_partition) WARN_UNUSED_RESULT;
 
   /// Returns the largest build row count out of the current hash partitions.
   int64_t LargestPartitionRows() const;
@@ -326,25 +321,32 @@ class PhjBuilder : public DataSink {
   /// Tries to build hash tables for all unspilled hash partitions. Called after
   /// FlushFinal() when all build rows have been partitioned and added to the appropriate
   /// streams. If the hash table could not be built for a partition, the partition is
-  /// spilled (with all build blocks unpinned) and the probe stream is prepared for
-  /// writing (i.e. has an initial probe buffer allocated).
+  /// spilled (with all build blocks unpinned) and memory reservation is set aside
+  /// for a write buffer for the output probe streams, and, if this input is a spilled
+  /// partitioned, a read buffer for the input probe stream.
   ///
   /// When this function returns successfully, each partition is in one of these states:
-  /// 1. closed. No probe partition is created and the build partition is closed.
-  /// 2. in-memory. The build rows are pinned and has a hash table built. No probe
-  ///     partition is created.
+  /// 1. closed. No probe partition is created and the build partition is closed. No
+  ///       probe stream memory is reserved for this partition.
+  /// 2. in-memory. The build rows are pinned and has a hash table built. No
+  ///       probe stream memory is reserved for this partition.
   /// 3. spilled. The build rows are fully unpinned and the probe stream is prepared.
-  Status BuildHashTablesAndPrepareProbeStreams() WARN_UNUSED_RESULT;
+  ///       Memory for a probe stream write buffer is reserved for this partition.
+  Status BuildHashTablesAndReserveProbeBuffers() WARN_UNUSED_RESULT;
 
-  /// Ensures that 'spilled_partition_probe_streams_' has a stream per spilled partition
-  /// in 'hash_partitions_'. May spill additional partitions until it can create enough
-  /// probe streams with write buffers. Returns an error if an error is encountered or
-  /// if it runs out of partitions to spill.
-  Status InitSpilledPartitionProbeStreams() WARN_UNUSED_RESULT;
+  /// Ensures that 'probe_stream_reservation_' has enough reservation for a stream per
+  /// spilled partition in 'hash_partitions_', plus for the input stream if the input
+  /// is a spilled partition (indicated by input_is_spilled). May spill additional
+  /// partitions until it can free enough reservation. Returns an error if an error
+  /// is encountered or if it runs out of partitions to spill.
+  Status ReserveProbeBuffers(bool input_is_spilled) WARN_UNUSED_RESULT;
+
+  /// Returns the number of partitions in 'hash_partitions_' that are spilled.
+  int GetNumSpilledHashPartitions() const;
 
   /// Calls Close() on every Partition, deletes them, and cleans up any pointers that
-  /// may reference them. Also cleans up 'spilled_partition_probe_streams_'. If
-  /// 'row_batch' if not NULL, transfers the ownership of all row-backing resources to it.
+  /// may reference them. If 'row_batch' if not NULL, transfers the ownership of all
+  /// row-backing resources to it.
   void CloseAndDeletePartitions(RowBatch* row_batch);
 
   /// For each filter in filters_, allocate a bloom_filter from the fragment-local
@@ -391,9 +393,6 @@ class PhjBuilder : public DataSink {
   /// The join operation this is building for.
   const TJoinOp::type join_op_;
 
-  /// Descriptor for the probe rows, needed to initialize probe streams.
-  const RowDescriptor* probe_row_desc_;
-
   /// Pool for objects with same lifetime as builder.
   ObjectPool obj_pool_;
 
@@ -406,7 +405,7 @@ class PhjBuilder : public DataSink {
   /// 1:N relationship from builders to join nodes.
   BufferPool::ClientHandle* buffer_pool_client_;
 
-  /// The default and max buffer sizes to use in the build and probe streams.
+  /// The default and max buffer sizes to use in the build streams.
   const int64_t spillable_buffer_size_;
   const int64_t max_row_buffer_size_;
 
@@ -487,19 +486,21 @@ class PhjBuilder : public DataSink {
   Partition* null_aware_partition_;
 
   /// Populated during the hash table building phase if any partitions spilled.
-  /// One probe stream per spilled partition is prepared for writing so that the
-  /// initial write buffer is allocated.
+  /// Reservation for one probe stream write buffer per spilled partition is
+  /// saved to be handed off to PartitionedHashJoinNode for use in buffering
+  /// spilled probe rows.
   ///
-  /// These streams are handed off to PartitionedHashJoinNode for use in buffering
-  /// spilled probe rows. The allocation is done in the builder so that it can divide
-  /// memory between the in-memory build partitions and write buffers based on the size
-  /// of the partitions and available memory. E.g. if all the partitions fit in memory, no
-  /// write buffers need to be allocated, but if some partitions are spilled, more build
-  /// partitions may be spilled to free up memory for write buffers.
+  /// The allocation is done in the builder so that it can divide memory between the
+  /// in-memory build partitions and write buffers based on the size of the partitions
+  /// and available memory. E.g. if all the partitions fit in memory, no write buffers
+  /// need to be allocated, but if some partitions are spilled, more build partitions
+  /// may be spilled to free up memory for write buffers.
   ///
   /// Because of this, at the end of the build phase, we always have sufficient memory
   /// to execute the probe phase of the algorithm without spilling more partitions.
-  std::vector<std::unique_ptr<BufferedTupleStream>> spilled_partition_probe_streams_;
+  ///
+  /// Initialized in Open() and closed in Closed().
+  BufferPool::SubReservation probe_stream_reservation_;
 
   /// END: Members that must be Reset()
   /////////////////////////////////////////

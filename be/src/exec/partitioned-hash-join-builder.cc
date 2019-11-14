@@ -52,8 +52,7 @@ using strings::Substitute;
 const char* PhjBuilder::LLVM_CLASS_NAME = "class.impala::PhjBuilder";
 
 PhjBuilder::PhjBuilder(int join_node_id, const string& join_node_label,
-    TJoinOp::type join_op, const RowDescriptor* probe_row_desc,
-    const RowDescriptor* build_row_desc, RuntimeState* state,
+    TJoinOp::type join_op, const RowDescriptor* build_row_desc, RuntimeState* state,
     BufferPool::ClientHandle* buffer_pool_client, int64_t spillable_buffer_size,
     int64_t max_row_buffer_size)
   : DataSink(-1, build_row_desc,
@@ -62,7 +61,6 @@ PhjBuilder::PhjBuilder(int join_node_id, const string& join_node_label,
     join_node_id_(join_node_id),
     join_node_label_(join_node_label),
     join_op_(join_op),
-    probe_row_desc_(probe_row_desc),
     buffer_pool_client_(buffer_pool_client),
     spillable_buffer_size_(spillable_buffer_size),
     max_row_buffer_size_(max_row_buffer_size),
@@ -77,6 +75,7 @@ PhjBuilder::PhjBuilder(int join_node_id, const string& join_node_label,
     build_hash_table_timer_(NULL),
     repartition_timer_(NULL),
     null_aware_partition_(NULL),
+    probe_stream_reservation_(),
     process_build_batch_fn_(NULL),
     process_build_batch_fn_level0_(NULL),
     insert_batch_fn_(NULL),
@@ -151,6 +150,11 @@ Status PhjBuilder::Prepare(RuntimeState* state, MemTracker* parent_mem_tracker) 
 }
 
 Status PhjBuilder::Open(RuntimeState* state) {
+  // Need to init here instead of constructor so that buffer_pool_client_ is registered.
+  if (probe_stream_reservation_.is_closed()) {
+    probe_stream_reservation_.Init(buffer_pool_client_);
+  }
+
   RETURN_IF_ERROR(ht_ctx_->Open(state));
 
   for (const FilterContext& ctx : filter_ctxs_) {
@@ -239,7 +243,7 @@ Status PhjBuilder::FlushFinal(RuntimeState* state) {
     RETURN_IF_ERROR(null_aware_partition_->Spill(BufferedTupleStream::UNPIN_ALL));
   }
 
-  RETURN_IF_ERROR(BuildHashTablesAndPrepareProbeStreams());
+  RETURN_IF_ERROR(BuildHashTablesAndReserveProbeBuffers());
   return Status::OK();
 }
 
@@ -254,11 +258,13 @@ void PhjBuilder::Close(RuntimeState* state) {
   ScalarExpr::Close(filter_exprs_);
   ScalarExpr::Close(build_exprs_);
   obj_pool_.Clear();
+  probe_stream_reservation_.Close();
   DataSink::Close(state);
   closed_ = true;
 }
 
 void PhjBuilder::Reset(RowBatch* row_batch) {
+  DCHECK_EQ(0, probe_stream_reservation_.GetReservation());
   expr_results_pool_->Clear();
   non_empty_build_ = false;
   CloseAndDeletePartitions(row_batch);
@@ -357,7 +363,7 @@ Status PhjBuilder::SpillPartition(BufferedTupleStream::UnpinMode mode,
 // For now, we go with a greedy solution.
 //
 // TODO: implement the knapsack solution.
-Status PhjBuilder::BuildHashTablesAndPrepareProbeStreams() {
+Status PhjBuilder::BuildHashTablesAndReserveProbeBuffers() {
   DCHECK_EQ(PARTITION_FANOUT, hash_partitions_.size());
 
   for (int i = 0; i < PARTITION_FANOUT; ++i) {
@@ -372,11 +378,17 @@ Status PhjBuilder::BuildHashTablesAndPrepareProbeStreams() {
     }
   }
 
+  // TODO: the below logic could be improved calculating upfront how much memory is needed
+  // for each hash table, and only building hash tables that will eventually fit in
+  // memory. In some cases now we could build a hash table, then spill the partition
+  // later.
+
   // Allocate probe buffers for all partitions that are already spilled. Do this before
   // building hash tables because allocating probe buffers may cause some more partitions
   // to be spilled. This avoids wasted work on building hash tables for partitions that
   // won't fit in memory alongside the required probe buffers.
-  RETURN_IF_ERROR(InitSpilledPartitionProbeStreams());
+  bool input_is_spilled = ht_ctx_->level() > 0;
+  RETURN_IF_ERROR(ReserveProbeBuffers(input_is_spilled));
 
   for (int i = 0; i < PARTITION_FANOUT; ++i) {
     Partition* partition = hash_partitions_[i];
@@ -389,66 +401,55 @@ Status PhjBuilder::BuildHashTablesAndPrepareProbeStreams() {
     // partition (clean up the hash table, unpin build).
     if (!built) RETURN_IF_ERROR(partition->Spill(BufferedTupleStream::UNPIN_ALL));
   }
-
   // We may have spilled additional partitions while building hash tables, we need to
-  // initialize probe buffers for them.
-  // TODO: once we have reliable reservations (IMPALA-3200) this should no longer be
-  // necessary: we will know exactly how many partitions will fit in memory and we can
-  // avoid building then immediately destroying hash tables.
-  RETURN_IF_ERROR(InitSpilledPartitionProbeStreams());
-
-  // TODO: at this point we could have freed enough memory to pin and build some
-  // spilled partitions. This can happen, for example if there is a lot of skew.
-  // Partition 1: 10GB (pinned initially).
-  // Partition 2,3,4: 1GB (spilled during partitioning the build).
-  // In the previous step, we could have unpinned 10GB (because there was not enough
-  // memory to build a hash table over it) which can now free enough memory to
-  // build hash tables over the remaining 3 partitions.
-  // We start by spilling the largest partition though so the build input would have
-  // to be pretty pathological.
-  // Investigate if this is worthwhile.
+  // reserve memory for the probe buffers for those additional spilled partitions.
+  RETURN_IF_ERROR(ReserveProbeBuffers(input_is_spilled));
   return Status::OK();
 }
 
-Status PhjBuilder::InitSpilledPartitionProbeStreams() {
+Status PhjBuilder::ReserveProbeBuffers(bool input_is_spilled) {
   DCHECK_EQ(PARTITION_FANOUT, hash_partitions_.size());
 
-  int num_spilled_partitions = 0;
-  for (int i = 0; i < PARTITION_FANOUT; ++i) {
-    Partition* partition = hash_partitions_[i];
-    if (!partition->IsClosed() && partition->is_spilled()) ++num_spilled_partitions;
-  }
-  int probe_streams_to_create =
-      num_spilled_partitions - spilled_partition_probe_streams_.size();
+  // We need a write buffer for probe rows for each spilled partition, and a read buffer
+  // if the input is a spilled partition (i.e. that we are repartitioning the input).
+  int num_probe_streams = GetNumSpilledHashPartitions() + (input_is_spilled ? 1 : 0);
+  int64_t per_stream_reservation = spillable_buffer_size_;
+  int64_t addtl_reservation = num_probe_streams * per_stream_reservation
+      - probe_stream_reservation_.GetReservation();
 
-  while (probe_streams_to_create > 0) {
-    // Create stream in vector, so that it will be cleaned up after any failure.
-    spilled_partition_probe_streams_.emplace_back(
-        make_unique<BufferedTupleStream>(runtime_state_, probe_row_desc_,
-            buffer_pool_client_, spillable_buffer_size_, max_row_buffer_size_));
-    BufferedTupleStream* probe_stream = spilled_partition_probe_streams_.back().get();
-    RETURN_IF_ERROR(probe_stream->Init(join_node_label_, false));
-
-    // Loop until either the stream gets a buffer or all partitions are spilled (in which
-    // case SpillPartition() returns an error).
-    while (true) {
-      bool got_buffer;
-      RETURN_IF_ERROR(probe_stream->PrepareForWrite(&got_buffer));
-      if (got_buffer) break;
-
-      Partition* spilled_partition;
-      RETURN_IF_ERROR(SpillPartition(
-            BufferedTupleStream::UNPIN_ALL, &spilled_partition));
-      // Don't need to create a probe stream for the null-aware partition.
-      if (spilled_partition != null_aware_partition_) ++probe_streams_to_create;
+  // Loop until either we get enough reservation or all partitions are spilled (in which
+  // case SpillPartition() returns an error).
+  while (addtl_reservation > buffer_pool_client_->GetUnusedReservation()) {
+    Partition* spilled_partition;
+    RETURN_IF_ERROR(SpillPartition(
+          BufferedTupleStream::UNPIN_ALL, &spilled_partition));
+    // Don't need to create a probe stream for the null-aware partition.
+    if (spilled_partition != null_aware_partition_) {
+      addtl_reservation += per_stream_reservation;
     }
-    --probe_streams_to_create;
   }
+  buffer_pool_client_->SaveReservation(&probe_stream_reservation_, addtl_reservation);
   return Status::OK();
 }
 
-vector<unique_ptr<BufferedTupleStream>> PhjBuilder::TransferProbeStreams() {
-  return std::move(spilled_partition_probe_streams_);
+void PhjBuilder::TransferProbeStreamReservation(BufferPool::ClientHandle* dst) {
+  int num_streams = GetNumSpilledHashPartitions();
+  int64_t saved_reservation = probe_stream_reservation_.GetReservation();
+  DCHECK_GE(saved_reservation, spillable_buffer_size_ * num_streams);
+
+  // TODO: in future we may need to support different clients for the probe.
+  DCHECK_EQ(dst, buffer_pool_client_);
+  dst->RestoreReservation(&probe_stream_reservation_, saved_reservation);
+}
+
+int PhjBuilder::GetNumSpilledHashPartitions() const {
+  int num_spilled = 0;
+  for (int i = 0; i < hash_partitions_.size(); ++i) {
+    Partition* partition = hash_partitions_[i];
+    DCHECK(partition != nullptr);
+    if (!partition->IsClosed() && partition->is_spilled()) ++num_spilled;
+  }
+  return num_spilled;
 }
 
 void PhjBuilder::DoneProbing(const bool retain_partition[PARTITION_FANOUT],
@@ -479,13 +480,6 @@ void PhjBuilder::CloseAndDeletePartitions(RowBatch* row_batch) {
   all_partitions_.clear();
   hash_partitions_.clear();
   null_aware_partition_ = NULL;
-  for (unique_ptr<BufferedTupleStream>& stream : spilled_partition_probe_streams_) {
-    // Streams need to be cleaned up, but were never handed off to probe, so won't have
-    // any data in them.
-    DCHECK_EQ(0, stream->num_rows());
-    stream->Close(nullptr, RowBatch::FlushMode::NO_FLUSH_RESOURCES);
-  }
-  spilled_partition_probe_streams_.clear();
 }
 
 void PhjBuilder::AllocateRuntimeFilters() {
@@ -554,23 +548,23 @@ void PhjBuilder::PublishRuntimeFilters(int64_t num_build_rows) {
   }
 }
 
-Status PhjBuilder::RepartitionBuildInput(
-    Partition* input_partition, int level, BufferedTupleStream* input_probe_rows) {
-  DCHECK_GE(level, 1);
+Status PhjBuilder::RepartitionBuildInput(Partition* input_partition) {
+  int new_level = input_partition->level() + 1;
+  DCHECK_GE(new_level, 1);
   SCOPED_TIMER(repartition_timer_);
   COUNTER_ADD(num_repartitions_, 1);
   RuntimeState* state = runtime_state_;
 
   // Setup the read buffer and the new partitions.
   BufferedTupleStream* build_rows = input_partition->build_rows();
-  DCHECK(build_rows != NULL);
+  DCHECK(build_rows != nullptr);
   bool got_read_buffer;
   RETURN_IF_ERROR(build_rows->PrepareForRead(true, &got_read_buffer));
   if (!got_read_buffer) {
     return mem_tracker()->MemLimitExceeded(
         state, Substitute(PREPARE_FOR_READ_FAILED_ERROR_MSG, join_node_id_));
   }
-  RETURN_IF_ERROR(CreateHashPartitions(level));
+  RETURN_IF_ERROR(CreateHashPartitions(new_level));
 
   // Repartition 'input_stream' into 'hash_partitions_'.
   RowBatch build_batch(row_desc_, state->batch_size(), mem_tracker());
@@ -585,19 +579,7 @@ Status PhjBuilder::RepartitionBuildInput(
   }
 
   // Done reading the input, we can safely close it now to free memory.
-  input_partition->Close(NULL);
-
-  // We just freed up the buffer used for reading build rows. Ensure a buffer is
-  // allocated for reading probe rows before we build the hash tables in FlushFinal().
-  // TODO: once we have reliable reservations (IMPALA-3200) we can just hand off the
-  // reservation and avoid this complication.
-  while (true) {
-    bool got_buffer;
-    RETURN_IF_ERROR(input_probe_rows->PrepareForRead(true, &got_buffer));
-    if (got_buffer) break;
-    RETURN_IF_ERROR(SpillPartition(BufferedTupleStream::UNPIN_ALL_EXCEPT_CURRENT));
-  }
-
+  input_partition->Close(nullptr);
   RETURN_IF_ERROR(FlushFinal(state));
   return Status::OK();
 }
