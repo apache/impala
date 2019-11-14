@@ -91,8 +91,10 @@ const char* KrpcDataStreamSender::TOTAL_BYTES_SENT_COUNTER = "TotalBytesSent";
 // When a data stream sender is shut down, it will call Teardown() on all channels to
 // release resources. Teardown() will cancel any in-flight RPC and wait for the
 // completion callback to be called before returning. It's expected that the execution
-// thread to call FlushAndSendEos() before closing the data stream sender to flush all
-// buffered row batches and send the end-of-stream message to the remote receiver.
+// thread to flush all buffered row batches and send the end-of-stream message (by
+// calling FlushBatches(), SendEosAsync() and WaitForRpc()) before closing the data
+// stream sender.
+//
 // Note that the RPC payloads are owned solely by the channel and the KRPC layer will
 // relinquish references of them before the completion callback is invoked so it's
 // safe to free them once the callback has been invoked.
@@ -143,15 +145,26 @@ class KrpcDataStreamSender::Channel : public CacheLineAligned {
   Status ALWAYS_INLINE AddRow(TupleRow* row);
 
   // Shutdowns the channel and frees the row batch allocation. Any in-flight RPC will
-  // be cancelled. It's expected that clients normally call FlushAndSendEos() before
-  // calling Teardown() to flush all buffered row batches to destinations. Teardown()
-  // may be called without FlushAndSendEos() in cases such as cancellation or error.
+  // be cancelled. It's expected that clients normally call FlushBatches(), SendEosAsync()
+  // and WaitForRpc() before calling Teardown() to flush all buffered row batches to
+  // destinations. Teardown() may be called without flushing the channel in cases such
+  // as cancellation or error.
   void Teardown(RuntimeState* state);
 
-  // Flushes any buffered row batches and sends the EOS RPC to close the channel.
-  // Return error status if either the last TransmitData() RPC or EOS RPC failed.
-  // This function blocks until the EOS RPC is complete.
-  Status FlushAndSendEos(RuntimeState* state);
+  // Flushes any buffered row batches. Return error status if the TransmitData() RPC
+  // fails. The RPC is sent asynchrononously. WaitForRpc() must be called to wait
+  // for the RPC. This should be only called from a fragment executor thread.
+  Status FlushBatches();
+
+  // Sends the EOS RPC to close the channel. Return error status if sending the EOS RPC
+  // failed. The RPC is sent asynchrononously. WaitForRpc() must be called to wait for
+  // the RPC. This should be only called from a fragment executor thread.
+  Status SendEosAsync();
+
+  // Waits for the preceding RPC to complete. Return error status if the preceding
+  // RPC fails. Returns CANCELLED if the parent sender is cancelled or shut down.
+  // Returns OK otherwise. This should be only called from a fragment executor thread.
+  Status WaitForRpc();
 
   // The type for a RPC worker function.
   typedef boost::function<Status()> DoRpcFn;
@@ -254,12 +267,9 @@ class KrpcDataStreamSender::Channel : public CacheLineAligned {
   void HandleFailedRPC(const DoRpcFn& rpc_fn, const kudu::Status& controller_status,
       const string& err_msg);
 
-  // Waits for the preceding RPC to complete. Expects to be called with 'lock_' held.
-  // May drop the lock while waiting for the RPC to complete. Return error status if
-  // the preceding RPC fails. Returns CANCELLED if the parent sender is cancelled or
-  // shut down. Returns OK otherwise. This should be only called from a fragment
-  // executor thread.
-  Status WaitForRpc(std::unique_lock<SpinLock>* lock);
+  // Same as WaitForRpc() except expects to be called with 'lock_' held and
+  // may drop the lock while waiting for the RPC to complete.
+  Status WaitForRpcLocked(std::unique_lock<SpinLock>* lock);
 
   // A callback function called from KRPC reactor thread to retry an RPC which failed
   // previously due to remote server being too busy. This will re-arm the request
@@ -359,7 +369,12 @@ void KrpcDataStreamSender::Channel::LogSlowFailedRpc(
             << "Error: " << err.ToString();
 }
 
-Status KrpcDataStreamSender::Channel::WaitForRpc(std::unique_lock<SpinLock>* lock) {
+Status KrpcDataStreamSender::Channel::WaitForRpc() {
+  std::unique_lock<SpinLock> l(lock_);
+  return WaitForRpcLocked(&l);
+}
+
+Status KrpcDataStreamSender::Channel::WaitForRpcLocked(std::unique_lock<SpinLock>* lock) {
   DCHECK(lock != nullptr);
   DCHECK(lock->owns_lock());
 
@@ -518,7 +533,7 @@ Status KrpcDataStreamSender::Channel::TransmitData(
            << PrintId(fragment_instance_id_) << " dest_node=" << dest_node_id_
            << " #rows=" << outbound_batch->header()->num_rows();
   std::unique_lock<SpinLock> l(lock_);
-  RETURN_IF_ERROR(WaitForRpc(&l));
+  RETURN_IF_ERROR(WaitForRpcLocked(&l));
   DCHECK(!rpc_in_flight_);
   DCHECK(rpc_in_flight_batch_ == nullptr);
   // If the remote receiver is closed already, there is no point in sending anything.
@@ -603,8 +618,8 @@ Status KrpcDataStreamSender::Channel::DoEndDataStreamRpc() {
   return Status::OK();
 }
 
-Status KrpcDataStreamSender::Channel::FlushAndSendEos(RuntimeState* state) {
-  VLOG_RPC << "Channel::FlushAndSendEos() fragment_instance_id="
+Status KrpcDataStreamSender::Channel::FlushBatches() {
+  VLOG_RPC << "Channel::FlushBatches() fragment_instance_id="
            << PrintId(fragment_instance_id_) << " dest_node=" << dest_node_id_
            << " #rows= " << batch_->num_rows();
 
@@ -612,9 +627,16 @@ Status KrpcDataStreamSender::Channel::FlushAndSendEos(RuntimeState* state) {
   // we returned will be sent to the coordinator who will then cancel all the remote
   // fragments including the one that this sender is sending to.
   if (batch_->num_rows() > 0) RETURN_IF_ERROR(SendCurrentBatch());
+  return Status::OK();
+}
+
+Status KrpcDataStreamSender::Channel::SendEosAsync() {
+  VLOG_RPC << "Channel::SendEosAsync() fragment_instance_id="
+           << PrintId(fragment_instance_id_) << " dest_node=" << dest_node_id_
+           << " #rows= " << batch_->num_rows();
+  DCHECK_EQ(0, batch_->num_rows()) << "Batches must be flushed";
   {
     std::unique_lock<SpinLock> l(lock_);
-    RETURN_IF_ERROR(WaitForRpc(&l));
     DCHECK(!rpc_in_flight_);
     DCHECK(rpc_status_.ok());
     if (UNLIKELY(remote_recvr_closed_)) return Status::OK();
@@ -623,16 +645,15 @@ Status KrpcDataStreamSender::Channel::FlushAndSendEos(RuntimeState* state) {
     rpc_in_flight_ = true;
     COUNTER_ADD(parent_->eos_sent_counter_, 1);
     RETURN_IF_ERROR(DoEndDataStreamRpc());
-    RETURN_IF_ERROR(WaitForRpc(&l));
   }
   return Status::OK();
 }
 
 void KrpcDataStreamSender::Channel::Teardown(RuntimeState* state) {
-  // Normally, FlushAndSendEos() should have been called before calling Teardown(),
-  // which means that all the data should already be drained. If the fragment was
-  // was closed or cancelled, there may still be some in-flight RPCs and buffered
-  // row batches to be flushed.
+  // Normally, the channel should have been flushed before calling Teardown(), which means
+  // that all the data should already be drained. If the fragment was was closed or
+  // cancelled, there may still be some in-flight RPCs and buffered row batches to be
+  // flushed.
   std::unique_lock<SpinLock> l(lock_);
   shutdown_ = true;
   // Cancel any in-flight RPC.
@@ -991,11 +1012,22 @@ Status KrpcDataStreamSender::FlushFinal(RuntimeState* state) {
   DCHECK(!flushed_);
   DCHECK(!closed_);
   flushed_ = true;
-  for (int i = 0; i < channels_.size(); ++i) {
-    // If we hit an error here, we can return without closing the remaining channels as
-    // the error is propagated back to the coordinator, which in turn cancels the query,
-    // which will cause the remaining open channels to be closed.
-    RETURN_IF_ERROR(channels_[i]->FlushAndSendEos(state));
+
+  // Send out the final row batches and EOS signals on all channels in parallel.
+  // If we hit an error here, we can return without closing the remaining channels as
+  // the error is propagated back to the coordinator, which in turn cancels the query,
+  // which will cause the remaining open channels to be closed.
+  for (Channel* channel : channels_) {
+    RETURN_IF_ERROR(channel->FlushBatches());
+  }
+  for (Channel* channel : channels_) {
+    RETURN_IF_ERROR(channel->WaitForRpc());
+  }
+  for (Channel* channel : channels_) {
+    RETURN_IF_ERROR(channel->SendEosAsync());
+  }
+  for (Channel* channel : channels_) {
+    RETURN_IF_ERROR(channel->WaitForRpc());
   }
   return Status::OK();
 }
