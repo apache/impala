@@ -125,7 +125,8 @@ done:
 void FragmentInstanceState::Cancel() {
   DCHECK(runtime_state_ != nullptr);
   runtime_state_->Cancel();
-  if (root_sink_ != nullptr) root_sink_->Cancel(runtime_state_);
+  PlanRootSink* root_sink = GetRootSink();
+  if (root_sink != nullptr) root_sink->Cancel(runtime_state_);
   ExecEnv::GetInstance()->stream_mgr()->Cancel(runtime_state_->fragment_instance_id());
 }
 
@@ -219,8 +220,8 @@ Status FragmentInstanceState::Prepare() {
   RuntimeProfile* sink_profile = sink_->profile();
   if (sink_profile != nullptr) profile()->AddChild(sink_profile);
 
-  if (fragment_ctx_.fragment.output_sink.type == TDataSinkType::PLAN_ROOT_SINK) {
-    root_sink_ = reinterpret_cast<PlanRootSink*>(sink_);
+  PlanRootSink* root_sink = GetRootSink();
+  if (root_sink != nullptr) {
     // Release the thread token on the root fragment instance. This fragment spends most
     // of the time waiting and doing very little work. Holding on to the token causes
     // underutilization of the machine. If there are 12 queries on this node, that's 12
@@ -542,6 +543,12 @@ const string& FragmentInstanceState::ExecStateToString(FInstanceExecStatePB stat
   DCHECK_LT(state, sizeof(finstance_state_labels) / sizeof(string))
       << "Unknown instance state";
   return finstance_state_labels[state];
+}
+
+PlanRootSink* FragmentInstanceState::GetRootSink() const {
+  return fragment_ctx_.fragment.output_sink.type == TDataSinkType::PLAN_ROOT_SINK ?
+      static_cast<PlanRootSink*>(sink_) :
+      nullptr;
 }
 
 const TQueryCtx& FragmentInstanceState::query_ctx() const {

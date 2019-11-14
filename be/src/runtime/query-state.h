@@ -196,7 +196,11 @@ class QueryState {
   void MonitorFInstances();
 
   /// Blocks until all fragment instances have finished their Prepare phase.
-  FragmentInstanceState* GetFInstanceState(const TUniqueId& instance_id);
+  /// Returns the fragment instance state for 'instance_id' in *fi_state,
+  /// or nullptr if it is not present.
+  /// Returns an error if fragment preparation failed.
+  Status GetFInstanceState(
+      const TUniqueId& instance_id, FragmentInstanceState** fi_state);
 
   /// Blocks until all fragment instances have finished their Prepare phase.
   void PublishFilter(const PublishFilterParamsPB& params, kudu::rpc::RpcContext* context);

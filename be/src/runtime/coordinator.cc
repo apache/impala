@@ -146,18 +146,13 @@ Status Coordinator::Exec() {
   // set coord_instance_ and coord_sink_
   if (schedule_.GetCoordFragment() != nullptr) {
     // this blocks until all fragment instances have finished their Prepare phase
-    coord_instance_ = query_state_->GetFInstanceState(query_id());
-    if (coord_instance_ == nullptr) {
-      // at this point, the query is done with the Prepare phase, and we expect
-      // to have a coordinator instance, but coord_instance_ == nullptr,
-      // which means we failed before or during Prepare().
-      Status query_status = query_state_->WaitForPrepare();
-      DCHECK(!query_status.ok());
-      return UpdateExecState(query_status, nullptr, FLAGS_hostname);
-    }
+    Status query_status = query_state_->GetFInstanceState(query_id(), &coord_instance_);
+    if (!query_status.ok()) return UpdateExecState(query_status, nullptr, FLAGS_hostname);
+    // We expected this query to have a coordinator instance.
+    DCHECK(coord_instance_ != nullptr);
     // When GetFInstanceState() returns the coordinator instance, the Prepare phase is
     // done and the FragmentInstanceState's root sink will be set up.
-    coord_sink_ = coord_instance_->root_sink();
+    coord_sink_ = coord_instance_->GetRootSink();
     DCHECK(coord_sink_ != nullptr);
   }
   return Status::OK();

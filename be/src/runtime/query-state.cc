@@ -290,11 +290,13 @@ void QueryState::UpdateBackendExecState() {
   }
 }
 
-FragmentInstanceState* QueryState::GetFInstanceState(const TUniqueId& instance_id) {
+Status QueryState::GetFInstanceState(
+    const TUniqueId& instance_id, FragmentInstanceState** fi_state) {
   VLOG_FILE << "GetFInstanceState(): instance_id=" << PrintId(instance_id);
-  if (!WaitForPrepare().ok()) return nullptr;
+  RETURN_IF_ERROR(WaitForPrepare());
   auto it = fis_map_.find(instance_id);
-  return it != fis_map_.end() ? it->second : nullptr;
+  *fi_state = it != fis_map_.end() ? it->second : nullptr;
+  return Status::OK();
 }
 
 void QueryState::ConstructReport(bool instances_started,

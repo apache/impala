@@ -112,7 +112,7 @@ class FragmentInstanceState {
 
   /// Returns fragment instance's sink if this is the root fragment instance. Valid after
   /// the Prepare phase. May be nullptr.
-  PlanRootSink* root_sink() { return root_sink_; }
+  PlanRootSink* GetRootSink() const;
 
   /// Returns a string description of 'state'.
   static const string& ExecStateToString(FInstanceExecStatePB state);
@@ -218,10 +218,6 @@ class FragmentInstanceState {
   /// Output sink for rows sent to this fragment. Created in Prepare(), lives in
   /// obj_pool().
   DataSink* sink_ = nullptr;
-
-  /// Set if this fragment instance is the root of the entire plan, so that a consumer can
-  /// pull results by calling root_sink_->GetNext(). Same object as sink_.
-  PlanRootSink* root_sink_ = nullptr;
 
   /// should live in obj_pool(), but managed separately so we can delete it in Close()
   boost::scoped_ptr<RowBatch> row_batch_;
