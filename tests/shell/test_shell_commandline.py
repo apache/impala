@@ -327,7 +327,7 @@ class TestImpalaShell(ImpalaTestSuite):
     args = ['-p', '-q', 'select 1; profile;']
     result_set = run_impala_shell_cmd(vector, args)
     # This regex helps us uniquely identify a profile.
-    regex = re.compile("Operator\s+#Hosts\s+Avg\s+Time")
+    regex = re.compile("Operator\s+#Hosts\s+#Inst\s+Avg\s+Time")
     # We expect two query profiles.
     assert len(re.findall(regex, result_set.stdout)) == 2, \
         "Could not detect two profiles, stdout: %s" % result_set.stdout

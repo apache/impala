@@ -73,6 +73,7 @@ void PrintExecSummary(const TExecSummary& exec_summary, int indent_level,
 
   vector<string> row;
   row.push_back(label_ss.str());
+  row.push_back(lexical_cast<string>(node.num_hosts));
   row.push_back(lexical_cast<string>(node.exec_stats.size())); // Num instances
   row.push_back(PrettyPrinter::Print(avg_time, TUnit::TIME_NS));
   row.push_back(PrettyPrinter::Print(max_stats.latency_ns, TUnit::TIME_NS));
@@ -121,6 +122,7 @@ string impala::PrintExecSummary(const TExecSummary& exec_summary) {
   printer.set_max_output_width(1000);
   printer.AddColumn("Operator", true);
   printer.AddColumn("#Hosts", false);
+  printer.AddColumn("#Inst", false);
   printer.AddColumn("Avg Time", false);
   printer.AddColumn("Max Time", false);
   printer.AddColumn("#Rows", false);

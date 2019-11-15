@@ -560,12 +560,12 @@ class ImpalaClient(object):
     def prettyprint_time(time_val):
       return prettyprint(time_val, ["ns", "us", "ms", "s"], 1000.0)
 
-    hosts = 0
+    instances = 0
     if node.exec_stats is not None:
-      hosts = len(node.exec_stats)
+      instances = len(node.exec_stats)
     is_sink = node.node_id == -1
     row = [ label_prefix + node.label,
-            hosts,
+            node.num_hosts, instances,
             prettyprint_time(avg_time),
             prettyprint_time(max_stats.latency_ns),
             "" if is_sink else prettyprint_units(cardinality),

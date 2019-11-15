@@ -66,6 +66,7 @@ MAX_TIME = 'max_time'
 NAME = 'name'
 NUM_CLIENTS = 'num_clients'
 NUM_HOSTS = 'num_hosts'
+NUM_INSTANCES = 'num_instances'
 NUM_ROWS = 'num_rows'
 OPERATOR = 'operator'
 PEAK_MEM = 'peak_mem'
@@ -687,6 +688,7 @@ class CombinedExecSummaries(object):
     table = prettytable.PrettyTable(
         ["Operator",
           "#Hosts",
+          "#Inst"
           "Avg Time",
           "Std Dev",
           "Max Time",
@@ -698,6 +700,7 @@ class CombinedExecSummaries(object):
     for row in self.rows:
       table_row = [ row[PREFIX] + row[OPERATOR],
           prettyprint_values(row[NUM_HOSTS]),
+          prettyprint_values(row[NUM_INSTANCES]),
           prettyprint_time(row[AVG_TIME]),
           prettyprint_time(row[STDDEV_TIME]),
           prettyprint_time(row[MAX_TIME]),
@@ -805,7 +808,7 @@ class ExecSummaryComparison(object):
         ref_row = self.ref_combined_summary.rows[i]
 
         comparison_row = {}
-        for key in [PREFIX, OPERATOR, NUM_HOSTS, AVG_TIME, STDDEV_TIME,
+        for key in [PREFIX, OPERATOR, NUM_HOSTS, NUM_INSTANCES, AVG_TIME, STDDEV_TIME,
             MAX_TIME, PEAK_MEM, NUM_ROWS, EST_NUM_ROWS, EST_PEAK_MEM, DETAIL]:
           comparison_row[key] = row[key]
 
@@ -859,6 +862,7 @@ class ExecSummaryComparison(object):
             comparison_row[RSTD], comparison_row[REF_RSTD])
 
         comparison_row[NUM_HOSTS] = row[NUM_HOSTS]
+        comparison_row[NUM_INSTANCES] = row[NUM_INSTANCES]
         comparison_row[NUM_ROWS] = row[NUM_ROWS]
         comparison_row[EST_NUM_ROWS] = row[EST_NUM_ROWS]
 
@@ -891,6 +895,7 @@ class ExecSummaryComparison(object):
           'Base StdDev(%)',
           'Delta(StdDev(%))',
           '#Hosts',
+          '#Inst',
           '#Rows',
           'Est #Rows'])
     table.align = 'l'
@@ -903,6 +908,7 @@ class ExecSummaryComparison(object):
           '{0:.2%}'.format(row[REF_RSTD]),
           '{0:+.2%}'.format(row[DELTA_RSTD]),
           prettyprint_values(row[NUM_HOSTS]),
+          prettyprint_values(row[NUM_INSTANCES]),
           prettyprint_values(row[NUM_ROWS]),
           prettyprint_values(row[EST_NUM_ROWS]) ]
 
@@ -943,6 +949,7 @@ class ExecSummaryComparison(object):
           'Base Max',
           'Delta(Max)',
           '#Hosts',
+          '#Inst',
           '#Rows',
           'Est #Rows'])
     table.align = 'l'
@@ -961,6 +968,7 @@ class ExecSummaryComparison(object):
             prettyprint_time(row[BASELINE_MAX]),
             prettyprint_percent(row[DELTA_MAX]),
             prettyprint_values(row[NUM_HOSTS]),
+            prettyprint_values(row[NUM_INSTANCES]),
             prettyprint_values(row[NUM_ROWS]),
             prettyprint_values(row[EST_NUM_ROWS])]
 

@@ -1077,8 +1077,9 @@ class ImpalaShell(object, cmd.Cmd):
       self.last_summary = time.time()
 
   def _default_summary_table(self):
-    return self.construct_table_with_header(["Operator", "#Hosts", "Avg Time", "Max Time",
-                                             "#Rows", "Est. #Rows", "Peak Mem",
+    return self.construct_table_with_header(["Operator", "#Hosts", "#Inst",
+                                             "Avg Time", "Max Time", "#Rows",
+                                             "Est. #Rows", "Peak Mem",
                                              "Est. Peak Mem", "Detail"])
 
   def _execute_stmt(self, query_str, is_dml=False, print_web_link=False):

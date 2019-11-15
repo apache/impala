@@ -41,12 +41,12 @@ select min(string_col) from (
 '0'
 ---- RUNTIME_PROFILE
 row_regex:.*AdmissionSlots: 4 .*
-row_regex:.*F04:ROOT * 1 .*
-row_regex:.*04:AGGREGATE * 12 .*
-row_regex:.*00:UNION * 12 *
-row_regex:.*02:SCAN HDFS * 12 .*alltypessmall.*
-row_regex:.*03:SCAN HDFS * 12 .*alltypestiny.*
-row_regex:.*01:SCAN HDFS * 12 .*alltypes.*
+row_regex:.*F04:ROOT * 1 * 1 .*
+row_regex:.*04:AGGREGATE * 3 * 12 .*
+row_regex:.*00:UNION * 3 * 12 *
+row_regex:.*02:SCAN HDFS * 3 * 12 .*alltypessmall.*
+row_regex:.*03:SCAN HDFS * 3 * 12 .*alltypestiny.*
+row_regex:.*01:SCAN HDFS * 3 * 12 .*alltypes.*
 ====
 ---- QUERY
 # Same idea, but with smallest scan first to check that the scheduler is taking the
@@ -61,12 +61,12 @@ select min(string_col) from (
 '0'
 ---- RUNTIME_PROFILE
 row_regex:.*AdmissionSlots: 4 .*
-row_regex:.*F04:ROOT * 1 .*
-row_regex:.*04:AGGREGATE * 12 .*
-row_regex:.*00:UNION * 12 *
-row_regex:.*02:SCAN HDFS * 12 .*alltypessmall.*
-row_regex:.*03:SCAN HDFS * 12 .*alltypes.*
-row_regex:.*01:SCAN HDFS * 12 .*alltypestiny.*
+row_regex:.*F04:ROOT * 1 * 1 .*
+row_regex:.*04:AGGREGATE * 3 * 12 .*
+row_regex:.*00:UNION * 3 * 12 *
+row_regex:.*02:SCAN HDFS * 3 * 12 .*alltypessmall.*
+row_regex:.*03:SCAN HDFS * 3 * 12 .*alltypes.*
+row_regex:.*01:SCAN HDFS * 3 * 12 .*alltypestiny.*
 ====
 ---- QUERY
 # This query should have one scan and one exchange in the interior fragment.
@@ -80,13 +80,13 @@ select min(string_col) from (
 '0'
 ---- RUNTIME_PROFILE
 row_regex:.*AdmissionSlots: 4.*
-row_regex:.*F04:ROOT * 1 .*
-row_regex:.*04:AGGREGATE * 12 .*
-row_regex:.*06:AGGREGATE * 12 .*
-row_regex:.*03:AGGREGATE * 12 .*
-row_regex:.*00:UNION * 12 *
-row_regex:.*02:SCAN HDFS * 12 .*alltypes.*
-row_regex:.*01:SCAN HDFS * 12 .*alltypestiny.*
+row_regex:.*F04:ROOT * 1 * 1 .*
+row_regex:.*04:AGGREGATE * 3 * 12 .*
+row_regex:.*06:AGGREGATE * 3 * 12 .*
+row_regex:.*03:AGGREGATE * 3 * 12 .*
+row_regex:.*00:UNION * 3 * 12 *
+row_regex:.*02:SCAN HDFS * 3 * 12 .*alltypes.*
+row_regex:.*01:SCAN HDFS * 3 * 12 .*alltypestiny.*
 ====
 ---- QUERY
 # This query should have one scan and one exchange in the interior fragment.
@@ -102,13 +102,13 @@ select min(string_col) from (
 '0'
 ---- RUNTIME_PROFILE
 row_regex:.*AdmissionSlots: 4.*
-row_regex:.*F04:ROOT * 1 .*
-row_regex:.*04:AGGREGATE * 12 .*
-row_regex:.*06:AGGREGATE * 12 .*
-row_regex:.*03:AGGREGATE * 4 .*
-row_regex:.*00:UNION * 12 *
-row_regex:.*02:SCAN HDFS * 4 .*alltypestiny.*
-row_regex:.*01:SCAN HDFS * 12 .*alltypes.*
+row_regex:.*F04:ROOT * 1 * 1 .*
+row_regex:.*04:AGGREGATE * 3 * 12 .*
+row_regex:.*06:AGGREGATE * 3 * 12 .*
+row_regex:.*03:AGGREGATE * 3 * 4 .*
+row_regex:.*00:UNION * 3 * 12 *
+row_regex:.*02:SCAN HDFS * 3 * 4 .*alltypestiny.*
+row_regex:.*01:SCAN HDFS * 3 * 12 .*alltypes.*
 ====
 ---- QUERY
 # This query should have one scan and two exchanges in the interior fragment.
@@ -123,11 +123,11 @@ select min(string_col) from (
 ---- RESULTS
 '0'
 ---- RUNTIME_PROFILE
-row_regex:.*F06:ROOT * 1 .*
+row_regex:.*F06:ROOT * 1 * 1 .*
 row_regex:.*AdmissionSlots: 2.*
-row_regex:.*00:UNION * 6 .*
-row_regex:.*08:AGGREGATE * 6 .*
-row_regex:.*03:AGGREGATE * 6 .*
-row_regex:.*04:SCAN HDFS * 6 .*
-row_regex:.*01:SCAN HDFS * 6 .*
+row_regex:.*00:UNION * 3 * 6 .*
+row_regex:.*08:AGGREGATE * 3 * 6 .*
+row_regex:.*03:AGGREGATE * 3 * 6 .*
+row_regex:.*04:SCAN HDFS * 3 * 6 .*
+row_regex:.*01:SCAN HDFS * 3 * 6 .*
 ====

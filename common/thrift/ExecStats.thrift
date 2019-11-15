@@ -75,6 +75,10 @@ struct TPlanNodeExecSummary {
 
   // If true, this is an exchange node that is the receiver of a broadcast.
   8: optional bool is_broadcast
+
+  // The number of hosts. It cannot be inferred from exec_stats, since the length of the
+  // list can be greater when mt_dop > 0.
+  9: optional i32 num_hosts
 }
 
 // Progress counters for an in-flight query.

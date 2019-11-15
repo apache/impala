@@ -225,8 +225,15 @@ void Coordinator::ExecSummary::Init(const QuerySchedule& schedule) {
 
       const TPlan& plan = fragment.plan;
       const TDataSink& output_sink = fragment.output_sink;
-      int num_instances =
-          schedule.GetFragmentExecParams(fragment.idx).instance_exec_params.size();
+      // Count the number of hosts and instances.
+      const vector<FInstanceExecParams>& instance_params =
+          schedule.GetFragmentExecParams(fragment.idx).instance_exec_params;
+      unordered_set<TNetworkAddress> host_set;
+      for (const FInstanceExecParams& instance: instance_params) {
+        host_set.insert(instance.host);
+      }
+      int num_hosts = host_set.size();
+      int num_instances = instance_params.size();
 
       // Add the data sink at the root of the fragment.
       data_sink_id_to_idx_map[fragment.idx] = thrift_exec_summary.nodes.size();
@@ -241,6 +248,7 @@ void Coordinator::ExecSummary::Init(const QuerySchedule& schedule) {
       node_summary.__set_num_children(1);
       DCHECK(output_sink.__isset.estimated_stats);
       node_summary.__set_estimated_stats(output_sink.estimated_stats);
+      node_summary.__set_num_hosts(num_hosts);
       node_summary.exec_stats.resize(num_instances);
 
       // We don't track rows returned from sinks, but some clients like impala-shell
@@ -262,6 +270,7 @@ void Coordinator::ExecSummary::Init(const QuerySchedule& schedule) {
         node_summary.__set_num_children(node.num_children);
         DCHECK(node.__isset.estimated_stats);
         node_summary.__set_estimated_stats(node.estimated_stats);
+        node_summary.__set_num_hosts(num_hosts);
         node_summary.exec_stats.resize(num_instances);
       }
 
