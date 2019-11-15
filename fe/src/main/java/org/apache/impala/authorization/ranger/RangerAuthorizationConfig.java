@@ -20,7 +20,6 @@ package org.apache.impala.authorization.ranger;
 import com.google.common.base.Preconditions;
 import org.apache.impala.authorization.AuthorizationConfig;
 import org.apache.impala.authorization.AuthorizationProvider;
-import org.apache.ranger.authorization.hadoop.config.RangerConfiguration;
 
 /**
  * Impala authorization config with Ranger.
@@ -29,13 +28,11 @@ public class RangerAuthorizationConfig implements AuthorizationConfig {
   private final String serviceType_;
   private final String appId_;
   private final String serverName_;
-  private final RangerConfiguration rangerConfig_;
 
   public RangerAuthorizationConfig(String serviceType, String appId, String serverName) {
     serviceType_ = Preconditions.checkNotNull(serviceType);
     appId_ = Preconditions.checkNotNull(appId);
     serverName_ = Preconditions.checkNotNull(serverName);
-    rangerConfig_ = RangerConfiguration.getInstance();
   }
 
   @Override
@@ -56,6 +53,4 @@ public class RangerAuthorizationConfig implements AuthorizationConfig {
    * Returns the Ranger application ID.
    */
   public String getAppId() { return appId_; }
-
-  public RangerConfiguration getRangerConfig() { return rangerConfig_; }
 }
