@@ -40,6 +40,31 @@ class RuntimeState;
 class ScalarExpr;
 class ScalarExprEvaluator;
 
+/// See partitioned-hash-join-node.h for explanation of the top-level algorithm and how
+/// these states fit in it.
+enum class HashJoinState {
+  /// Partitioning the build (right) child's input into the builder's hash partitions.
+  PARTITIONING_BUILD,
+
+  /// Processing the probe (left) child's input, probing hash tables and
+  /// spilling probe rows into 'probe_hash_partitions_' if necessary.
+  PARTITIONING_PROBE,
+
+  /// Processing the spilled probe rows of a single spilled partition
+  /// ('input_partition_') that fits in memory.
+  PROBING_SPILLED_PARTITION,
+
+  /// Repartitioning the build rows of a single spilled partition ('input_partition_')
+  /// into the builder's hash partitions.
+  /// Corresponds to PARTITIONING_BUILD but reading from a spilled partition.
+  REPARTITIONING_BUILD,
+
+  /// Probing the repartitioned hash partitions of a single spilled partition
+  /// ('input_partition_') with the probe rows of that partition.
+  /// Corresponds to PARTITIONING_PROBE but reading from a spilled partition.
+  REPARTITIONING_PROBE,
+};
+
 /// The build side for the PartitionedHashJoinNode. Build-side rows are hash-partitioned
 /// into PARTITION_FANOUT partitions, with partitions spilled if the full build side
 /// does not fit in memory. Spilled partitions can be repartitioned with a different
@@ -115,20 +140,88 @@ class PhjBuilder : public DataSink {
   /// Reset the builder to the same state as it was in after calling Open().
   void Reset(RowBatch* row_batch);
 
-  /// Transfer reservation for probe streams to 'dst'. Memory for one stream was reserved
-  /// per spilled partition in FlushFinal().
-  void TransferProbeStreamReservation(BufferPool::ClientHandle* dst);
+  /// Represents a set of hash partitions to be handed off to the probe side.
+  struct HashPartitions {
+    HashPartitions() { Reset(); }
+    HashPartitions(
+        int level, const std::vector<Partition*>* hash_partitions, bool non_empty_build)
+      : level(level),
+        hash_partitions(hash_partitions),
+        non_empty_build(non_empty_build) {}
 
-  /// Called after probing of the partitions is done. Appends in-memory partitions that
-  /// may contain build rows to output to 'output_partitions' for build modes like
-  /// right outer join that output unmatched rows. Close other in-memory partitions,
-  /// attaching any tuple data to 'batch' if 'batch' is non-NULL. Closes spilled
-  /// partitions if 'retain_spilled_partition' is false for that partition index.
-  /// Invalid to call hash_partition() after this is called.
-  void DoneProbing(const bool retain_spilled_partition[PARTITION_FANOUT],
+    void Reset() {
+      level = -1;
+      hash_partitions = nullptr;
+      non_empty_build = false;
+    }
+
+    // The partitioning level of this set of partitions. -1 indicates that this is
+    // invalid.
+    int level;
+
+    // The current set of hash partitions. Always contains PARTITION_FANOUT partitions.
+    // The partitions may be in-memory, spilled, or closed. Valid until
+    // DoneProbingHashPartitions() is called.
+    const std::vector<Partition*>* hash_partitions;
+
+    // True iff the build side had at least one row in a partition.
+    bool non_empty_build;
+  };
+
+  /// Get hash partitions and reservation for the initial partitionining of the probe
+  /// side. Only valid to call once when in state PARTITIONING_PROBE.
+  /// When this function returns successfully, 'probe_client' will have enough
+  /// reservation for a write buffer for each spilled partition.
+  /// Return the current set of hash partitions.
+  /// TODO: IMPALA-9156: this will be a synchronization point for shared join build.
+  HashPartitions BeginInitialProbe(BufferPool::ClientHandle* probe_client);
+
+  /// Prepare to process the probe side of 'partition', either by building a hash
+  /// table over 'partition', or if does not fit in memory, by repartitioning into
+  /// PARTITION_FANOUT new partitions.
+  ///
+  /// When this function returns successfully, 'probe_client' will have enough
+  /// reservation for a read buffer for the input probe stream and, if repartitioning,
+  /// a write buffer for each spilled partition.
+  ///
+  /// If repartitioning, creates new hash partitions and repartitions 'partition' into
+  /// PARTITION_FANOUT new partitions with level input_partition->level() + 1. The
+  /// previous hash partitions must have been cleared with DoneProbingHashPartitions().
+  /// The new hash partitions are returned in 'new_partitions'.
+  /// TODO: IMPALA-9156: this will be a synchronization point for shared join build.
+  Status BeginSpilledProbe(bool empty_probe, Partition* partition,
+      BufferPool::ClientHandle* probe_client, bool* repartitioned, int* level,
+      HashPartitions* new_partitions);
+
+  /// Called after probing of the hash partitions returned by BeginInitialProbe() or
+  /// BeginSpilledProbe() (when *repartitioning as true) is complete,
+  /// i.e. all of the corresponding probe rows have been processed by
+  /// PartitionedHashJoinNode. Appends in-memory partitions that may contain build
+  /// rows to output to 'output_partitions' for build modes like right outer join
+  /// that output unmatched rows. Close other in-memory partitions, attaching any
+  /// tuple data to 'batch' if 'batch' is non-NULL. Closes spilled partitions if
+  /// 'retain_spilled_partition' is false for that partition index.
+  /// TODO: IMPALA-9156: this will be a synchronization point for shared join build.
+  void DoneProbingHashPartitions(const bool retain_spilled_partition[PARTITION_FANOUT],
       std::list<Partition*>* output_partitions, RowBatch* batch);
 
+  /// Called after probing of a single spilled partition returned by
+  /// BeginSpilledProbe() when *repartitioning is false.
+  ///
+  /// If the join op requires outputting unmatched build rows and the partition
+  /// may have build rows to return, it is appended to 'output_partitions'. Partitions
+  /// returned via 'output_partitions' are ready for the caller to read from - either
+  /// they are in-memory with a hash table built or have build_rows() prepared for
+  /// reading.
+  ///
+  /// If no build rows need to be returned, closes the build partition and attaches any
+  /// tuple data to 'batch' if 'batch' is non-NULL.
+  /// TODO: IMPALA-9156: this will be a synchronization point for shared join build.
+  void DoneProbingSinglePartition(
+      Partition* partition, std::list<Partition*>* output_partitions, RowBatch* batch);
+
   /// Close the null aware partition (if there is one) and set it to NULL.
+  /// TODO: IMPALA-9176: improve the encapsulation of the null-aware partition.
   void CloseNullAwarePartition() {
     if (null_aware_partition_ != nullptr) {
       // We don't need to pass in a batch because the anti-join only returns tuple data
@@ -139,33 +232,24 @@ class PhjBuilder : public DataSink {
     }
   }
 
-  /// Creates new hash partitions and repartitions 'input_partition' into PARTITION_FANOUT
-  /// new partitions with level input_partition->level() + 1. The previous hash partitions
-  /// must have been cleared with ClearHashPartitions(). This function reserves enough
-  /// memory for a read buffer for the input probe stream and a write buffer for each
-  /// spilled partition after repartitioning.
-  Status RepartitionBuildInput(Partition* input_partition) WARN_UNUSED_RESULT;
-
-  /// Returns the largest build row count out of the current hash partitions.
-  int64_t LargestPartitionRows() const;
-
   /// True if the hash table may contain rows with one or more NULL join keys. This
   /// depends on the join type and the equijoin conjuncts.
+  /// Valid to call after InitExprsAndFilters(). Thread-safe.
   bool HashTableStoresNulls() const;
 
   void AddHashTableStatsToProfile(RuntimeProfile* profile);
 
-  /// Accessor functions, mainly required to expose state to PartitionedHashJoinNode.
-  inline bool non_empty_build() const { return non_empty_build_; }
+  /// TODO: IMPALA-9156: document thread safety for accessing this from
+  /// multiple PartitionedHashJoinNodes.
+  HashJoinState state() const { return state_; }
+
+  /// Valid to call after InitExprsAndFilters(). Thread-safe.
   inline const std::vector<bool>& is_not_distinct_from() const {
     return is_not_distinct_from_;
   }
-  inline int num_hash_partitions() const { return hash_partitions_.size(); }
-  inline Partition* hash_partition(int partition_idx) const {
-    DCHECK_GE(partition_idx, 0);
-    DCHECK_LT(partition_idx, hash_partitions_.size());
-    return hash_partitions_[partition_idx];
-  }
+
+  /// Accessor to allow PartitionedHashJoinNode to access null_aware_partition_.
+  /// TODO: IMPALA-9176: improve the encapsulation of the null-aware partition.
   inline Partition* null_aware_partition() const { return null_aware_partition_; }
 
   std::string DebugString() const;
@@ -217,7 +301,7 @@ class PhjBuilder : public DataSink {
 
     std::string DebugString();
 
-    bool ALWAYS_INLINE IsClosed() const { return build_rows_ == NULL; }
+    bool ALWAYS_INLINE IsClosed() const { return build_rows_ == nullptr; }
     BufferedTupleStream* ALWAYS_INLINE build_rows() { return build_rows_.get(); }
     HashTable* ALWAYS_INLINE hash_tbl() const { return hash_tbl_.get(); }
     bool ALWAYS_INLINE is_spilled() const { return is_spilled_; }
@@ -279,8 +363,14 @@ class PhjBuilder : public DataSink {
   static const char* LLVM_CLASS_NAME;
 
  private:
+  /// Updates 'state_' to 'next_state', logging the transition.
+  void UpdateState(HashJoinState next_state);
+
+  /// Returns the current 'state_' as a string.
+  std::string PrintState() const;
+
   /// Create and initialize a set of hash partitions for partitioning level 'level'.
-  /// The previous hash partitions must have been cleared with ClearHashPartitions().
+  /// The previous hash partitions must have been cleared with DoneProbing().
   /// After calling this, batches are added to the new partitions by calling Send().
   Status CreateHashPartitions(int level) WARN_UNUSED_RESULT;
 
@@ -341,8 +431,23 @@ class PhjBuilder : public DataSink {
   /// is encountered or if it runs out of partitions to spill.
   Status ReserveProbeBuffers(bool input_is_spilled) WARN_UNUSED_RESULT;
 
-  /// Returns the number of partitions in 'hash_partitions_' that are spilled.
-  int GetNumSpilledHashPartitions() const;
+  /// Returns the number of partitions in 'partitions' that are spilled.
+  static int GetNumSpilledPartitions(const std::vector<Partition*>& partitions);
+
+  /// Transfer reservation for probe streams to 'probe_client'. Memory for one stream was
+  /// reserved per spilled partition in FlushFinal(), plus the input stream if the input
+  /// partition was spilled.
+  void TransferProbeStreamReservation(BufferPool::ClientHandle* probe_client);
+
+  /// Creates new hash partitions and repartitions 'input_partition' into PARTITION_FANOUT
+  /// new partitions with level input_partition->level() + 1. The previous hash partitions
+  /// must have been cleared with ClearHashPartitions(). This function reserves enough
+  /// memory for a read buffer for the input probe stream and a write buffer for each
+  /// spilled partition after repartitioning.
+  Status RepartitionBuildInput(Partition* input_partition) WARN_UNUSED_RESULT;
+
+  /// Returns the largest build row count out of the current hash partitions.
+  int64_t LargestPartitionRows() const;
 
   /// Calls Close() on every Partition, deletes them, and cleans up any pointers that
   /// may reference them. If 'row_batch' if not NULL, transfers the ownership of all
@@ -412,17 +517,16 @@ class PhjBuilder : public DataSink {
   /// Allocator for hash table memory.
   boost::scoped_ptr<Suballocator> ht_allocator_;
 
-  /// If true, the build side has at least one row.
-  bool non_empty_build_;
-
   /// Expressions over input rows for hash table build.
   std::vector<ScalarExpr*> build_exprs_;
 
   /// is_not_distinct_from_[i] is true if and only if the ith equi-join predicate is IS
   /// NOT DISTINCT FROM, rather than equality.
+  /// Set in InitExprsAndFilters() and constant thereafter.
   std::vector<bool> is_not_distinct_from_;
 
   /// Expressions for evaluating input rows for insertion into runtime filters.
+  /// Only includes exprs for filters produced by this builder.
   std::vector<ScalarExpr*> filter_exprs_;
 
   /// List of filters to build. One-to-one correspondence with exprs in 'filter_exprs_'.
@@ -436,36 +540,48 @@ class PhjBuilder : public DataSink {
   std::unique_ptr<HashTableStatsProfile> ht_stats_profile_;
 
   /// Total number of partitions created.
-  RuntimeProfile::Counter* partitions_created_;
+  RuntimeProfile::Counter* partitions_created_ = nullptr;
 
   /// The largest fraction (of build side) after repartitioning. This is expected to be
   /// 1 / PARTITION_FANOUT. A value much larger indicates skew.
-  RuntimeProfile::HighWaterMarkCounter* largest_partition_percent_;
+  RuntimeProfile::HighWaterMarkCounter* largest_partition_percent_ = nullptr;
 
   /// Level of max partition (i.e. number of repartitioning steps).
-  RuntimeProfile::HighWaterMarkCounter* max_partition_level_;
+  RuntimeProfile::HighWaterMarkCounter* max_partition_level_ = nullptr;
 
   /// Number of build rows that have been partitioned.
-  RuntimeProfile::Counter* num_build_rows_partitioned_;
+  RuntimeProfile::Counter* num_build_rows_partitioned_ = nullptr;
 
   /// Number of partitions that have been spilled.
-  RuntimeProfile::Counter* num_spilled_partitions_;
+  RuntimeProfile::Counter* num_spilled_partitions_ = nullptr;
 
   /// Number of partitions that have been repartitioned.
-  RuntimeProfile::Counter* num_repartitions_;
+  RuntimeProfile::Counter* num_repartitions_ = nullptr;
 
   /// Time spent partitioning build rows.
-  RuntimeProfile::Counter* partition_build_rows_timer_;
+  RuntimeProfile::Counter* partition_build_rows_timer_ = nullptr;
 
   /// Time spent building hash tables.
-  RuntimeProfile::Counter* build_hash_table_timer_;
+  RuntimeProfile::Counter* build_hash_table_timer_ = nullptr;
+
+  /// Number of partitions which had zero probe rows and we therefore didn't build the
+  /// hash table.
+  RuntimeProfile::Counter* num_hash_table_builds_skipped_ = nullptr;
 
   /// Time spent repartitioning and building hash tables of any resulting partitions
   /// that were not spilled.
-  RuntimeProfile::Counter* repartition_timer_;
+  RuntimeProfile::Counter* repartition_timer_ = nullptr;
 
   /////////////////////////////////////////
   /// BEGIN: Members that must be Reset()
+
+  /// State of the partitioned hash join algorithm. See HashJoinState for more
+  /// information.
+  HashJoinState state_ = HashJoinState::PARTITIONING_BUILD;
+
+  /// If true, the build side has at least one row.
+  /// Set in FlushFinal() and not modified until Reset().
+  bool non_empty_build_ = false;
 
   /// Vector that owns all of the Partition objects.
   std::vector<std::unique_ptr<Partition>> all_partitions_;
@@ -483,7 +599,7 @@ class PhjBuilder : public DataSink {
   /// NULL if the join is not null aware or we are done processing this partition.
   /// Always NULL once we are done processing the level 0 partitions.
   /// This partition starts off in memory but can be spilled.
-  Partition* null_aware_partition_;
+  Partition* null_aware_partition_ = nullptr;
 
   /// Populated during the hash table building phase if any partitions spilled.
   /// Reservation for one probe stream write buffer per spilled partition is
@@ -511,14 +627,14 @@ class PhjBuilder : public DataSink {
   typedef Status (*ProcessBuildBatchFn)(
       PhjBuilder*, RowBatch*, HashTableCtx*, bool build_filters, bool is_null_aware);
   /// Jitted ProcessBuildBatch function pointers.  NULL if codegen is disabled.
-  ProcessBuildBatchFn process_build_batch_fn_;
-  ProcessBuildBatchFn process_build_batch_fn_level0_;
+  ProcessBuildBatchFn process_build_batch_fn_ = nullptr;
+  ProcessBuildBatchFn process_build_batch_fn_level0_ = nullptr;
 
   typedef bool (*InsertBatchFn)(Partition*, TPrefetchMode::type, HashTableCtx*, RowBatch*,
       const std::vector<BufferedTupleStream::FlatRowPtr>&, Status*);
   /// Jitted Partition::InsertBatch() function pointers. NULL if codegen is disabled.
-  InsertBatchFn insert_batch_fn_;
-  InsertBatchFn insert_batch_fn_level0_;
+  InsertBatchFn insert_batch_fn_ = nullptr;
+  InsertBatchFn insert_batch_fn_level0_ = nullptr;
 };
 }
 

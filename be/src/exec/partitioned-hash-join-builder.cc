@@ -63,23 +63,7 @@ PhjBuilder::PhjBuilder(int join_node_id, const string& join_node_label,
     join_op_(join_op),
     buffer_pool_client_(buffer_pool_client),
     spillable_buffer_size_(spillable_buffer_size),
-    max_row_buffer_size_(max_row_buffer_size),
-    non_empty_build_(false),
-    partitions_created_(NULL),
-    largest_partition_percent_(NULL),
-    max_partition_level_(NULL),
-    num_build_rows_partitioned_(NULL),
-    num_spilled_partitions_(NULL),
-    num_repartitions_(NULL),
-    partition_build_rows_timer_(NULL),
-    build_hash_table_timer_(NULL),
-    repartition_timer_(NULL),
-    null_aware_partition_(NULL),
-    probe_stream_reservation_(),
-    process_build_batch_fn_(NULL),
-    process_build_batch_fn_level0_(NULL),
-    insert_batch_fn_(NULL),
-    insert_batch_fn_level0_(NULL) {}
+    max_row_buffer_size_(max_row_buffer_size) {}
 
 Status PhjBuilder::InitExprsAndFilters(RuntimeState* state,
     const vector<TEqJoinCondition>& eq_join_conjuncts,
@@ -144,6 +128,8 @@ Status PhjBuilder::Prepare(RuntimeState* state, MemTracker* parent_mem_tracker) 
   num_repartitions_ = ADD_COUNTER(profile(), "NumRepartitions", TUnit::UNIT);
   partition_build_rows_timer_ = ADD_TIMER(profile(), "BuildRowsPartitionTime");
   build_hash_table_timer_ = ADD_TIMER(profile(), "HashTablesBuildTime");
+  num_hash_table_builds_skipped_ =
+      ADD_COUNTER(profile(), "NumHashTableBuildsSkipped", TUnit::UNIT);
   repartition_timer_ = ADD_TIMER(profile(), "RepartitionTime");
   state->CheckAndAddCodegenDisabledMessage(profile());
   return Status::OK();
@@ -177,12 +163,12 @@ Status PhjBuilder::Open(RuntimeState* state) {
 Status PhjBuilder::Send(RuntimeState* state, RowBatch* batch) {
   SCOPED_TIMER(partition_build_rows_timer_);
   bool build_filters = ht_ctx_->level() == 0 && filter_ctxs_.size() > 0;
-  if (process_build_batch_fn_ == NULL) {
-      RETURN_IF_ERROR(ProcessBuildBatch(batch, ht_ctx_.get(), build_filters,
-          join_op_ == TJoinOp::NULL_AWARE_LEFT_ANTI_JOIN));
+  if (process_build_batch_fn_ == nullptr) {
+    RETURN_IF_ERROR(ProcessBuildBatch(batch, ht_ctx_.get(), build_filters,
+        join_op_ == TJoinOp::NULL_AWARE_LEFT_ANTI_JOIN));
 
   } else {
-    DCHECK(process_build_batch_fn_level0_ != NULL);
+    DCHECK(process_build_batch_fn_level0_ != nullptr);
     if (ht_ctx_->level() == 0) {
       RETURN_IF_ERROR(
           process_build_batch_fn_level0_(this, batch, ht_ctx_.get(), build_filters,
@@ -244,6 +230,12 @@ Status PhjBuilder::FlushFinal(RuntimeState* state) {
   }
 
   RETURN_IF_ERROR(BuildHashTablesAndReserveProbeBuffers());
+  if (state_ == HashJoinState::PARTITIONING_BUILD) {
+    UpdateState(HashJoinState::PARTITIONING_PROBE);
+  } else {
+    DCHECK_ENUM_EQ(state_, HashJoinState::REPARTITIONING_BUILD);
+    UpdateState(HashJoinState::REPARTITIONING_PROBE);
+  }
   return Status::OK();
 }
 
@@ -265,9 +257,50 @@ void PhjBuilder::Close(RuntimeState* state) {
 
 void PhjBuilder::Reset(RowBatch* row_batch) {
   DCHECK_EQ(0, probe_stream_reservation_.GetReservation());
+  state_ = HashJoinState::PARTITIONING_BUILD;
   expr_results_pool_->Clear();
   non_empty_build_ = false;
   CloseAndDeletePartitions(row_batch);
+}
+
+void PhjBuilder::UpdateState(HashJoinState next_state) {
+  // Validate the state transition.
+  switch (state_) {
+    case HashJoinState::PARTITIONING_BUILD:
+      DCHECK_ENUM_EQ(next_state, HashJoinState::PARTITIONING_PROBE);
+      break;
+    case HashJoinState::PARTITIONING_PROBE:
+    case HashJoinState::REPARTITIONING_PROBE:
+    case HashJoinState::PROBING_SPILLED_PARTITION:
+      DCHECK(next_state == HashJoinState::REPARTITIONING_BUILD
+          || next_state == HashJoinState::PROBING_SPILLED_PARTITION);
+      break;
+    case HashJoinState::REPARTITIONING_BUILD:
+      DCHECK_ENUM_EQ(next_state, HashJoinState::REPARTITIONING_PROBE);
+      break;
+    default:
+      DCHECK(false) << "Invalid state " << static_cast<int>(state_);
+  }
+  state_ = next_state;
+  VLOG(2) << "Transitioned State:" << endl << DebugString();
+}
+
+string PhjBuilder::PrintState() const {
+  switch (state_) {
+    case HashJoinState::PARTITIONING_BUILD:
+      return "PartitioningBuild";
+    case HashJoinState::PARTITIONING_PROBE:
+      return "PartitioningProbe";
+    case HashJoinState::PROBING_SPILLED_PARTITION:
+      return "ProbingSpilledPartition";
+    case HashJoinState::REPARTITIONING_BUILD:
+      return "RepartitioningBuild";
+    case HashJoinState::REPARTITIONING_PROBE:
+      return "RepartitioningProbe";
+    default:
+      DCHECK(false);
+  }
+  return "";
 }
 
 Status PhjBuilder::CreateAndPreparePartition(int level, Partition** partition) {
@@ -322,7 +355,7 @@ Status PhjBuilder::SpillPartition(BufferedTupleStream::UnpinMode mode,
     for (Partition* candidate : hash_partitions_) {
       if (!candidate->CanSpill()) continue;
       int64_t mem = candidate->build_rows()->BytesPinned(false);
-      if (candidate->hash_tbl() != NULL) {
+      if (candidate->hash_tbl() != nullptr) {
         // The hash table should not have matches, since we have not probed it yet.
         // Losing match info would lead to incorrect results (IMPALA-1488).
         DCHECK(!candidate->hash_tbl()->HasMatches());
@@ -370,7 +403,7 @@ Status PhjBuilder::BuildHashTablesAndReserveProbeBuffers() {
     Partition* partition = hash_partitions_[i];
     if (partition->build_rows()->num_rows() == 0) {
       // This partition is empty, no need to do anything else.
-      partition->Close(NULL);
+      partition->Close(nullptr);
     } else if (partition->is_spilled()) {
       // We don't need any build-side data for spilled partitions in memory.
       RETURN_IF_ERROR(
@@ -412,7 +445,8 @@ Status PhjBuilder::ReserveProbeBuffers(bool input_is_spilled) {
 
   // We need a write buffer for probe rows for each spilled partition, and a read buffer
   // if the input is a spilled partition (i.e. that we are repartitioning the input).
-  int num_probe_streams = GetNumSpilledHashPartitions() + (input_is_spilled ? 1 : 0);
+  int num_probe_streams =
+      GetNumSpilledPartitions(hash_partitions_) + (input_is_spilled ? 1 : 0);
   int64_t per_stream_reservation = spillable_buffer_size_;
   int64_t addtl_reservation = num_probe_streams * per_stream_reservation
       - probe_stream_reservation_.GetReservation();
@@ -432,27 +466,38 @@ Status PhjBuilder::ReserveProbeBuffers(bool input_is_spilled) {
   return Status::OK();
 }
 
-void PhjBuilder::TransferProbeStreamReservation(BufferPool::ClientHandle* dst) {
-  int num_streams = GetNumSpilledHashPartitions();
-  int64_t saved_reservation = probe_stream_reservation_.GetReservation();
-  DCHECK_GE(saved_reservation, spillable_buffer_size_ * num_streams);
-
-  // TODO: in future we may need to support different clients for the probe.
-  DCHECK_EQ(dst, buffer_pool_client_);
-  dst->RestoreReservation(&probe_stream_reservation_, saved_reservation);
+PhjBuilder::HashPartitions PhjBuilder::BeginInitialProbe(
+    BufferPool::ClientHandle* probe_client) {
+  DCHECK_ENUM_EQ(state_, HashJoinState::PARTITIONING_PROBE);
+  DCHECK_EQ(PARTITION_FANOUT, hash_partitions_.size());
+  TransferProbeStreamReservation(probe_client);
+  return HashPartitions(ht_ctx_->level(), &hash_partitions_, non_empty_build_);
 }
 
-int PhjBuilder::GetNumSpilledHashPartitions() const {
+void PhjBuilder::TransferProbeStreamReservation(BufferPool::ClientHandle* probe_client) {
+  // An extra buffer is needed for reading spilled input stream, unless we're doing the
+  // initial partitioning of rows from the left child.
+  int num_buffers = GetNumSpilledPartitions(hash_partitions_)
+      + (state_ == HashJoinState::PARTITIONING_PROBE ? 0 : 1);
+  int64_t saved_reservation = probe_stream_reservation_.GetReservation();
+  DCHECK_GE(saved_reservation, spillable_buffer_size_ * num_buffers);
+
+  // TODO: in future we may need to support different clients for the probe.
+  DCHECK_EQ(probe_client, buffer_pool_client_);
+  probe_client->RestoreReservation(&probe_stream_reservation_, saved_reservation);
+}
+
+int PhjBuilder::GetNumSpilledPartitions(const vector<Partition*>& partitions) {
   int num_spilled = 0;
-  for (int i = 0; i < hash_partitions_.size(); ++i) {
-    Partition* partition = hash_partitions_[i];
+  for (int i = 0; i < partitions.size(); ++i) {
+    Partition* partition = partitions[i];
     DCHECK(partition != nullptr);
     if (!partition->IsClosed() && partition->is_spilled()) ++num_spilled;
   }
   return num_spilled;
 }
 
-void PhjBuilder::DoneProbing(const bool retain_partition[PARTITION_FANOUT],
+void PhjBuilder::DoneProbingHashPartitions(const bool retain_partition[PARTITION_FANOUT],
     list<Partition*>* output_partitions, RowBatch* batch) {
   DCHECK(output_partitions->empty());
   for (int i = 0; i < PARTITION_FANOUT; ++i) {
@@ -463,7 +508,10 @@ void PhjBuilder::DoneProbing(const bool retain_partition[PARTITION_FANOUT],
       DCHECK_EQ(partition->build_rows()->BytesPinned(false), 0)
           << "Build was fully unpinned in BuildHashTablesAndPrepareProbeStreams()";
       // Release resources associated with completed partitions.
-      if (!retain_partition[i]) partition->Close(nullptr);
+      if (!retain_partition[i]) {
+        COUNTER_ADD(num_hash_table_builds_skipped_, 1);
+        partition->Close(nullptr);
+      }
     } else if (NeedToProcessUnmatchedBuildRows(join_op_)) {
       output_partitions->push_back(partition);
     } else {
@@ -474,18 +522,31 @@ void PhjBuilder::DoneProbing(const bool retain_partition[PARTITION_FANOUT],
   hash_partitions_.clear();
 }
 
+void PhjBuilder::DoneProbingSinglePartition(
+    Partition* partition, std::list<Partition*>* output_partitions, RowBatch* batch) {
+  if (NeedToProcessUnmatchedBuildRows(join_op_)) {
+    // If the build partition was in memory, we are done probing this partition.
+    // In case of right-outer, right-anti and full-outer joins, we move this partition
+    // to the list of partitions that we need to output their unmatched build rows.
+    output_partitions->push_back(partition);
+  } else {
+    // In any other case, just close the input build partition.
+    partition->Close(IsLeftSemiJoin(join_op_) ? nullptr : batch);
+  }
+}
+
 void PhjBuilder::CloseAndDeletePartitions(RowBatch* row_batch) {
   // Close all the partitions and clean up all references to them.
   for (unique_ptr<Partition>& partition : all_partitions_) partition->Close(row_batch);
   all_partitions_.clear();
   hash_partitions_.clear();
-  null_aware_partition_ = NULL;
+  null_aware_partition_ = nullptr;
 }
 
 void PhjBuilder::AllocateRuntimeFilters() {
   DCHECK(join_op_ != TJoinOp::NULL_AWARE_LEFT_ANTI_JOIN || filter_ctxs_.size() == 0)
       << "Runtime filters not supported with NULL_AWARE_LEFT_ANTI_JOIN";
-  DCHECK(ht_ctx_ != NULL);
+  DCHECK(ht_ctx_ != nullptr);
   for (int i = 0; i < filter_ctxs_.size(); ++i) {
     if (filter_ctxs_[i].filter->is_bloom_filter()) {
       filter_ctxs_[i].local_bloom_filter =
@@ -548,6 +609,81 @@ void PhjBuilder::PublishRuntimeFilters(int64_t num_build_rows) {
   }
 }
 
+Status PhjBuilder::BeginSpilledProbe(bool empty_probe, Partition* partition,
+    BufferPool::ClientHandle* probe_client, bool* repartitioned, int* level,
+    HashPartitions* new_partitions) {
+  DCHECK(partition->is_spilled());
+  DCHECK_EQ(0, hash_partitions_.size());
+
+  if (empty_probe) {
+    // If there are no probe rows, there's no need to build the hash table, and
+    // only partitions with NeedToProcessUnmatcheBuildRows() will have been added
+    // to 'spilled_partitions_' in DoneProbingHashPartitions().
+    DCHECK(NeedToProcessUnmatchedBuildRows(join_op_));
+    bool got_read_buffer = false;
+    RETURN_IF_ERROR(partition->build_rows()->PrepareForRead(true, &got_read_buffer));
+    if (!got_read_buffer) {
+      return mem_tracker()->MemLimitExceeded(
+          runtime_state_, Substitute(PREPARE_FOR_READ_FAILED_ERROR_MSG, join_node_id_));
+    }
+    COUNTER_ADD(num_hash_table_builds_skipped_, 1);
+    UpdateState(HashJoinState::PROBING_SPILLED_PARTITION);
+    *repartitioned = false;
+    *level = partition->level();
+    return Status::OK();
+  }
+
+  // Set aside memory required for reading the probe stream, so that we don't use
+  // it for the hash table.
+  buffer_pool_client_->SaveReservation(
+      &probe_stream_reservation_, spillable_buffer_size_);
+
+  // Try to build a hash table for the spilled build partition.
+  bool built;
+  RETURN_IF_ERROR(partition->BuildHashTable(&built));
+  if (built) {
+    TransferProbeStreamReservation(probe_client);
+    UpdateState(HashJoinState::PROBING_SPILLED_PARTITION);
+    *repartitioned = false;
+    *level = partition->level();
+    return Status::OK();
+  }
+  // This build partition still does not fit in memory, repartition.
+  UpdateState(HashJoinState::REPARTITIONING_BUILD);
+
+  int next_partition_level = partition->level() + 1;
+  if (UNLIKELY(next_partition_level >= MAX_PARTITION_DEPTH)) {
+    return Status(TErrorCode::PARTITIONED_HASH_JOIN_MAX_PARTITION_DEPTH, join_node_id_,
+        MAX_PARTITION_DEPTH);
+  }
+
+  // Spill to free memory from hash tables and pinned streams for use in new partitions.
+  RETURN_IF_ERROR(partition->Spill(BufferedTupleStream::UNPIN_ALL));
+  // Temporarily free up the probe reservation to use when repartitioning. Repartitioning
+  // will reserve as much memory as needed for the probe streams.
+  buffer_pool_client_->RestoreReservation(
+      &probe_stream_reservation_, spillable_buffer_size_);
+
+  DCHECK_EQ(partition->build_rows()->BytesPinned(false), 0) << DebugString();
+  int64_t num_input_rows = partition->build_rows()->num_rows();
+  RETURN_IF_ERROR(RepartitionBuildInput(partition));
+
+  // Check if there was any reduction in the size of partitions after repartitioning.
+  int64_t largest_partition_rows = LargestPartitionRows();
+  DCHECK_GE(num_input_rows, largest_partition_rows) << "Cannot have a partition with "
+                                                       "more rows than the input";
+  if (UNLIKELY(num_input_rows == largest_partition_rows)) {
+    return Status(TErrorCode::PARTITIONED_HASH_JOIN_REPARTITION_FAILS, join_node_id_,
+        next_partition_level, num_input_rows, DebugString(),
+        buffer_pool_client_->DebugString());
+  }
+  TransferProbeStreamReservation(probe_client);
+  *repartitioned = true;
+  *level = ht_ctx_->level();
+  *new_partitions = HashPartitions(ht_ctx_->level(), &hash_partitions_, non_empty_build_);
+  return Status::OK();
+}
+
 Status PhjBuilder::RepartitionBuildInput(Partition* input_partition) {
   int new_level = input_partition->level() + 1;
   DCHECK_GE(new_level, 1);
@@ -588,7 +724,7 @@ int64_t PhjBuilder::LargestPartitionRows() const {
   int64_t max_rows = 0;
   for (int i = 0; i < hash_partitions_.size(); ++i) {
     Partition* partition = hash_partitions_[i];
-    DCHECK(partition != NULL);
+    DCHECK(partition != nullptr);
     if (partition->IsClosed()) continue;
     int64_t rows = partition->build_rows()->num_rows();
     if (rows > max_rows) max_rows = rows;
@@ -621,14 +757,14 @@ int64_t PhjBuilder::Partition::EstimatedInMemSize() const {
 void PhjBuilder::Partition::Close(RowBatch* batch) {
   if (IsClosed()) return;
 
-  if (hash_tbl_ != NULL) {
+  if (hash_tbl_ != nullptr) {
     hash_tbl_->StatsCountersAdd(parent_->ht_stats_profile_.get());
     hash_tbl_->Close();
   }
 
   // Transfer ownership of 'build_rows_' memory to 'batch' if 'batch' is not NULL.
   // Flush out the resources to free up memory for subsequent partitions.
-  if (build_rows_ != NULL) {
+  if (build_rows_ != nullptr) {
     build_rows_->Close(batch, RowBatch::FlushMode::FLUSH_RESOURCES);
     build_rows_.reset();
   }
@@ -638,7 +774,7 @@ Status PhjBuilder::Partition::Spill(BufferedTupleStream::UnpinMode mode) {
   DCHECK(!IsClosed());
   RETURN_IF_ERROR(parent_->runtime_state_->StartSpilling(parent_->mem_tracker()));
   // Close the hash table and unpin the stream backing it to free memory.
-  if (hash_tbl() != NULL) {
+  if (hash_tbl() != nullptr) {
     hash_tbl_->Close();
     hash_tbl_.reset();
   }
@@ -655,7 +791,7 @@ Status PhjBuilder::Partition::Spill(BufferedTupleStream::UnpinMode mode) {
 
 Status PhjBuilder::Partition::BuildHashTable(bool* built) {
   SCOPED_TIMER(parent_->build_hash_table_timer_);
-  DCHECK(build_rows_ != NULL);
+  DCHECK(build_rows_ != nullptr);
   *built = false;
 
   // Before building the hash table, we need to pin the rows in memory.
@@ -698,14 +834,14 @@ Status PhjBuilder::Partition::BuildHashTable(bool* built) {
     DCHECK_EQ(batch.num_rows(), flat_rows.size());
     DCHECK_LE(batch.num_rows(), hash_tbl_->EmptyBuckets());
     TPrefetchMode::type prefetch_mode = state->query_options().prefetch_mode;
-    if (parent_->insert_batch_fn_ != NULL) {
+    if (parent_->insert_batch_fn_ != nullptr) {
       InsertBatchFn insert_batch_fn;
       if (level() == 0) {
         insert_batch_fn = parent_->insert_batch_fn_level0_;
       } else {
         insert_batch_fn = parent_->insert_batch_fn_;
       }
-      DCHECK(insert_batch_fn != NULL);
+      DCHECK(insert_batch_fn != nullptr);
       if (UNLIKELY(
               !insert_batch_fn(this, prefetch_mode, ctx, &batch, flat_rows, &status))) {
         goto not_built;
@@ -722,7 +858,7 @@ Status PhjBuilder::Partition::BuildHashTable(bool* built) {
 
   // The hash table fits in memory and is built.
   DCHECK(*built);
-  DCHECK(hash_tbl_ != NULL);
+  DCHECK(hash_tbl_ != nullptr);
   is_spilled_ = false;
   COUNTER_ADD(parent_->ht_stats_profile_->num_hash_buckets_,
       hash_tbl_->num_buckets());
@@ -730,7 +866,7 @@ Status PhjBuilder::Partition::BuildHashTable(bool* built) {
 
 not_built:
   *built = false;
-  if (hash_tbl_ != NULL) {
+  if (hash_tbl_ != nullptr) {
     hash_tbl_->Close();
     hash_tbl_.reset();
   }
@@ -752,7 +888,7 @@ std::string PhjBuilder::Partition::DebugString() {
      << "    Build Rows: " << build_rows_->num_rows()
      << " (Bytes pinned: " << build_rows_->BytesPinned(false) << ")"
      << endl;
-  if (hash_tbl_ != NULL) {
+  if (hash_tbl_ != nullptr) {
     ss << "    Hash Table Rows: " << hash_tbl_->size();
   }
   return ss.str();
@@ -794,7 +930,8 @@ void PhjBuilder::Codegen(LlvmCodeGen* codegen) {
 
 string PhjBuilder::DebugString() const {
   stringstream ss;
-  ss << "Hash partitions: " << hash_partitions_.size() << ":" << endl;
+  ss << " PhjBuilder state=" << PrintState()
+     << " Hash partitions: " << hash_partitions_.size() << ":" << endl;
   for (int i = 0; i < hash_partitions_.size(); ++i) {
     ss << " Hash partition " << i << " " << hash_partitions_[i]->DebugString() << endl;
   }
@@ -809,7 +946,7 @@ Status PhjBuilder::CodegenProcessBuildBatch(LlvmCodeGen* codegen, llvm::Function
     llvm::Function* insert_filters_fn) {
   llvm::Function* process_build_batch_fn =
       codegen->GetFunction(IRFunction::PHJ_PROCESS_BUILD_BATCH, true);
-  DCHECK(process_build_batch_fn != NULL);
+  DCHECK(process_build_batch_fn != nullptr);
 
   // Replace call sites
   int replaced =
@@ -864,14 +1001,14 @@ Status PhjBuilder::CodegenProcessBuildBatch(LlvmCodeGen* codegen, llvm::Function
 
   // Finalize ProcessBuildBatch functions
   process_build_batch_fn = codegen->FinalizeFunction(process_build_batch_fn);
-  if (process_build_batch_fn == NULL) {
+  if (process_build_batch_fn == nullptr) {
     return Status(
         "Codegen'd PhjBuilder::ProcessBuildBatch() function "
         "failed verification, see log");
   }
   process_build_batch_fn_level0 =
       codegen->FinalizeFunction(process_build_batch_fn_level0);
-  if (process_build_batch_fn == NULL) {
+  if (process_build_batch_fn == nullptr) {
     return Status(
         "Codegen'd level-zero PhjBuilder::ProcessBuildBatch() "
         "function failed verification, see log");
@@ -928,13 +1065,13 @@ Status PhjBuilder::CodegenInsertBatch(LlvmCodeGen* codegen, llvm::Function* hash
   DCHECK_REPLACE_COUNT(replaced, 1);
 
   insert_batch_fn = codegen->FinalizeFunction(insert_batch_fn);
-  if (insert_batch_fn == NULL) {
+  if (insert_batch_fn == nullptr) {
     return Status(
         "PartitionedHashJoinNode::CodegenInsertBatch(): codegen'd "
         "InsertBatch() function failed verification, see log");
   }
   insert_batch_fn_level0 = codegen->FinalizeFunction(insert_batch_fn_level0);
-  if (insert_batch_fn_level0 == NULL) {
+  if (insert_batch_fn_level0 == nullptr) {
     return Status(
         "PartitionedHashJoinNode::CodegenInsertBatch(): codegen'd zero-level "
         "InsertBatch() function failed verification, see log");

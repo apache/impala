@@ -98,6 +98,13 @@ class TupleRow;
 ///      This phase has sub-states (see ProbeState) that are used in GetNext() to drive
 ///      progress.
 ///
+///
+/// TODO: when IMPALA-9156 is implemented, HashJoinState of the builder will drive the
+/// hash join algorithm across all the PartitionedHashJoinNode implementations sharing
+/// the builder. Each PartitionedHashJoinNode implementation will independently execute
+/// its ProbeState state machine, synchronizing via the builder for transitions of the
+/// HashJoinState state machine.
+///
 /// Null aware anti-join (NAAJ) extends the above algorithm by accumulating rows with
 /// NULLs into several different streams, which are processed in a separate step to
 /// produce additional output rows. The NAAJ algorithm is documented in more detail in
@@ -127,30 +134,7 @@ class PartitionedHashJoinNode : public BlockingJoinNode {
  private:
   class ProbePartition;
 
-  enum class HashJoinState {
-    /// Partitioning the build (right) child's input into the builder's hash partitions.
-    PARTITIONING_BUILD,
-
-    /// Processing the probe (left) child's input, probing hash tables and
-    /// spilling probe rows into 'probe_hash_partitions_' if necessary.
-    PARTITIONING_PROBE,
-
-    /// Processing the spilled probe rows of a single spilled partition
-    /// ('input_partition_') that fits in memory.
-    PROBING_SPILLED_PARTITION,
-
-    /// Repartitioning the build rows of a single spilled partition ('input_partition_')
-    /// into the builder's hash partitions.
-    /// Corresponds to PARTITIONING_BUILD but reading from a spilled partition.
-    REPARTITIONING_BUILD,
-
-    /// Probing the repartitioned hash partitions of a single spilled partition
-    /// ('input_partition_') with the probe rows of that partition.
-    /// Corresponds to PARTITIONING_PROBE but reading from a spilled partition.
-    REPARTITIONING_PROBE,
-  };
-
-  // This enum represents a sub-state of the PARTITIONING_PROBE,
+  // This enum drives a different state machine within the PARTITIONING_PROBE,
   // PROBING_SPILLED_PARTITION and REPARTITIONING_PROBE states.
   // This drives the state machine in GetNext() that processes probe batches and generates
   // output rows. This state machine executes within a HashJoinState state, starting with
@@ -225,11 +209,21 @@ class PartitionedHashJoinNode : public BlockingJoinNode {
   /// Initialize 'probe_hash_partitions_' and 'hash_tbls_' before probing. One probe
   /// partition is created per spilled build partition, and 'hash_tbls_' is initialized
   /// with pointers to the hash tables of in-memory partitions and NULL pointers for
-  /// spilled or closed partitions.
+  /// spilled or closed partitions. The builder's hash partitions must be initialized
+  /// initialized and present in 'build_hash_partitions_', i.e. the state must be
+  /// PARTITIONING_PROBE or REPARTITIONING_PROBE.
+  ///
+  /// If we are probing a spilled partition (i.e. the state is REPARTITIONING_PROBE), this
+  /// also prepares 'input_partition_' for reading.
+  ///
   /// Called after the builder has partitioned the build rows and built hash tables,
   /// either in the initial build step, or after repartitioning a spilled partition.
   /// After this function returns, all partitions are ready to process probe rows.
-  Status PrepareForProbe() WARN_UNUSED_RESULT;
+  Status PrepareForPartitionedProbe();
+
+  /// Initialize 'hash_tbls_' and 'input_partition_' so that we can read probe rows
+  /// from 'input_partition_' and probe 'hash_tbls_'.
+  Status PrepareForUnpartitionedProbe();
 
   // Initialize 'probe_hash_partitions_'. Each spilled build partition gets a
   // corresponding probe partition. Closed or in-memory build partitions do
@@ -442,39 +436,45 @@ class PartitionedHashJoinNode : public BlockingJoinNode {
   ///    unmatched rows.
   ///  - If the build partition did not have a hash table, meaning both build and probe
   ///    rows were spilled, move the partition to 'spilled_partitions_'.
+  /// Also cleans up 'input_partition_' (if processing a spilled partition).
   Status DoneProbing(RuntimeState* state, RowBatch* batch) WARN_UNUSED_RESULT;
 
   /// Get the next row batch from the probe (left) side (child(0)), if we are still
   /// doing the first pass over the input (i.e. state_ is PARTITIONING_PROBE) or
   /// from the spilled 'input_partition_' if state_ is REPARTITIONING_PROBE.
   //. If we are done consuming the input, sets 'probe_batch_pos_' to -1, otherwise,
-  /// sets it to 0.  'probe_state_' must be PROBING_END_BATCH.
+  /// sets it to 0.  'probe_state_' must be PROBING_END_BATCH. *eos is true iff
+  /// 'out_batch' contains the last rows from the child or spilled partition.
   Status NextProbeRowBatch(
-      RuntimeState* state, RowBatch* out_batch) WARN_UNUSED_RESULT;
+      RuntimeState* state, RowBatch* out_batch, bool* eos) WARN_UNUSED_RESULT;
 
   /// Get the next row batch from the probe (left) side (child(0)). If we are done
   /// consuming the input, sets 'probe_batch_pos_' to -1, otherwise, sets it to 0.
-  /// 'probe_state_' must be PROBING_END_BATCH.
-  Status NextProbeRowBatchFromChild(
-      RuntimeState* state, RowBatch* out_batch) WARN_UNUSED_RESULT;
+  /// 'probe_state_' must be PROBING_END_BATCH. *eos is true iff 'out_batch'
+  /// contains the last rows from the child.
+  Status NextProbeRowBatchFromChild(RuntimeState* state, RowBatch* out_batch, bool* eos);
 
   /// Get the next probe row batch from 'input_partition_'. If we are done consuming the
   /// input, sets 'probe_batch_pos_' to -1, otherwise, sets it to 0.
-  /// 'probe_state_' must be PROBING_END_BATCH.
-  Status NextSpilledProbeRowBatch(
-      RuntimeState* state, RowBatch* out_batch) WARN_UNUSED_RESULT;
+  /// 'probe_state_' must be PROBING_END_BATCH.. *eos is true iff 'out_batch'
+  /// contains the last rows from 'input_partition_'.
+  Status NextSpilledProbeRowBatch(RuntimeState* state, RowBatch* out_batch, bool* eos);
 
   /// Called when 'probe_state_' is PROBE_COMPLETE to start processing the next spilled
   /// partition. This function sets 'input_partition_' to the chosen partition, then
-  /// processes the entire build side of 'input_partition_'. When this function returns
-  /// function returns, we are ready to consume probe rows in 'input_partition_'.
-  /// If the build side's hash table fits in memory and there are probe rows, we will
-  /// construct input_partition_'s hash table. If it does not fit, meaning we need to
-  /// repartition, this function will repartition the build rows into
-  /// 'builder->hash_partitions_' and prepare for repartitioning the partition's probe
+  /// delegates to 'builder_' to bring all or part of the spilled build side into
+  /// memory' and sets up this node to probe the partition.
+  ///
+  /// If the build side's hash table fits in memory and there are probe rows, then there
+  /// will be a single in-memory partition. If it does not fit, meaning we need to
+  /// repartition, this function will repartition the build rows into PARTITION_FANOUT
+  /// hash partitions and prepare for repartitioning the partition's probe
   /// rows. If there are no probe rows, we just prepare the build side to be read by
   /// OutputUnmatchedBuild().
-  Status PrepareSpilledPartitionForProbe() WARN_UNUSED_RESULT;
+  ///
+  /// When this function returns function returns, we are ready to start reading probe
+  /// rows from 'input_partition_'.
+  Status BeginSpilledProbe() WARN_UNUSED_RESULT;
 
   /// Construct an error status for the null-aware anti-join when it could not fit 'rows'
   /// from the build side in memory.
@@ -497,12 +497,6 @@ class PartitionedHashJoinNode : public BlockingJoinNode {
   /// Returns non-OK if codegen was not possible.
   Status CodegenProcessProbeBatch(
       LlvmCodeGen* codegen, TPrefetchMode::type prefetch_mode) WARN_UNUSED_RESULT;
-
-  /// Returns the current state of the partition as a string.
-  std::string PrintState() const;
-
-  /// Updates 'state_' to 'next_state', logging the transition.
-  void UpdateState(HashJoinState next_state);
 
   std::string NodeDebugString() const;
 
@@ -536,16 +530,8 @@ class PartitionedHashJoinNode : public BlockingJoinNode {
   /// Time spent evaluating other_join_conjuncts for NAAJ.
   RuntimeProfile::Counter* null_aware_eval_timer_ = nullptr;
 
-  /// Number of partitions which had zero probe rows and we therefore didn't build the
-  /// hash table.
-  RuntimeProfile::Counter* num_hash_table_builds_skipped_ = nullptr;
-
   /////////////////////////////////////////
   /// BEGIN: Members that must be Reset()
-
-  /// State of the partitioned hash join algorithm. See HashJoinState for more
-  /// information.
-  HashJoinState state_ = HashJoinState::PARTITIONING_BUILD;
 
   /// State of the probing algorithm. Used to drive the state machine in GetNext().
   ProbeState probe_state_ = ProbeState::PROBE_COMPLETE;
@@ -553,15 +539,19 @@ class PartitionedHashJoinNode : public BlockingJoinNode {
   /// The build-side of the join. Initialized in Init().
   boost::scoped_ptr<PhjBuilder> builder_;
 
-  /// Cache of the per partition hash table to speed up ProcessProbeBatch.
+  /// Last set of hash partitions obtained from builder_. Only valid when the
+  /// builder's state is PARTITIONING_PROBE or REPARTITIONING_PROBE.
+  PhjBuilder::HashPartitions build_hash_partitions_;
+
+  /// Cache of the per partition hash table to speed up ProcessProbeBatch().
   /// In the case where we need to partition the probe:
-  ///  hash_tbls_[i] = builder_->hash_partitions_[i]->hash_tbl();
+  ///  hash_tbls_[i] = (*build_hash_partitions_.hash_partitions)[i]->hash_tbl();
   /// In the case where we don't need to partition the probe:
   ///  hash_tbls_[i] = input_partition_->hash_tbl();
   HashTable* hash_tbls_[PARTITION_FANOUT];
 
   /// Probe partitions, with indices corresponding to the build partitions in
-  /// builder_->hash_partitions(). This is non-empty only in the PARTITIONING_PROBE or
+  /// build_hash_partitions_. This is non-empty only in the PARTITIONING_PROBE or
   /// REPARTITIONING_PROBE states, in which case it has NULL entries for in-memory
   /// build partitions and non-NULL entries for spilled build partitions (so that we
   /// have somewhere to spill the probe rows for the spilled partition).

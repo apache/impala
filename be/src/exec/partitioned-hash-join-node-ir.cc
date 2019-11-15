@@ -272,7 +272,8 @@ bool IR_ALWAYS_INLINE PartitionedHashJoinNode::NextProbeRow(
 
     // Fetch the hash and expr values' nullness for this row.
     if (expr_vals_cache->IsRowNull()) {
-      if (JoinOp == TJoinOp::NULL_AWARE_LEFT_ANTI_JOIN && builder_->non_empty_build()) {
+      if (JoinOp == TJoinOp::NULL_AWARE_LEFT_ANTI_JOIN
+          && build_hash_partitions_.non_empty_build) {
         const int num_other_join_conjuncts = other_join_conjunct_evals_.size();
         // For NAAJ, we need to treat NULLs on the probe carefully. The logic is:
         // 1. No build rows -> Return this row. The check for 'non_empty_build_'
@@ -302,7 +303,8 @@ bool IR_ALWAYS_INLINE PartitionedHashJoinNode::NextProbeRow(
         hash_tbl_iterator_ = hash_tbl->FindProbeRow(ht_ctx);
       } else {
         // The build partition is either empty or spilled.
-        PhjBuilder::Partition* build_partition = builder_->hash_partition(partition_idx);
+        PhjBuilder::Partition* build_partition =
+            (*build_hash_partitions_.hash_partitions)[partition_idx];
         ProbePartition* probe_partition = probe_hash_partitions_[partition_idx].get();
         DCHECK((build_partition->IsClosed() && probe_partition == NULL)
             || (build_partition->is_spilled() && probe_partition != NULL));
@@ -365,9 +367,9 @@ void IR_ALWAYS_INLINE PartitionedHashJoinNode::EvalAndHashProbePrefetchGroup(
 template <int const JoinOp>
 int PartitionedHashJoinNode::ProcessProbeBatch(TPrefetchMode::type prefetch_mode,
     RowBatch* out_batch, HashTableCtx* __restrict__ ht_ctx, Status* __restrict__ status) {
-  DCHECK(state_ == HashJoinState::PARTITIONING_PROBE
-      || state_ == HashJoinState::PROBING_SPILLED_PARTITION
-      || state_ == HashJoinState::REPARTITIONING_PROBE);
+  DCHECK(builder_->state() == HashJoinState::PARTITIONING_PROBE
+      || builder_->state() == HashJoinState::PROBING_SPILLED_PARTITION
+      || builder_->state() == HashJoinState::REPARTITIONING_PROBE);
   ScalarExprEvaluator* const* other_join_conjunct_evals =
       other_join_conjunct_evals_.data();
   const int num_other_join_conjuncts = other_join_conjunct_evals_.size();
