@@ -32,30 +32,19 @@
 
 using namespace impala;
 
-UnionNode::UnionNode(ObjectPool* pool, const TPlanNode& tnode,
-    const DescriptorTbl& descs)
-    : ExecNode(pool, tnode, descs),
-      tuple_id_(tnode.union_node.tuple_id),
-      tuple_desc_(descs.GetTupleDescriptor(tuple_id_)),
-      first_materialized_child_idx_(tnode.union_node.first_materialized_child_idx),
-      child_idx_(0),
-      child_batch_(nullptr),
-      child_row_idx_(0),
-      child_eos_(false),
-      const_exprs_lists_idx_(0),
-      to_close_child_idx_(-1) { }
-
-Status UnionNode::Init(const TPlanNode& tnode, RuntimeState* state) {
-  RETURN_IF_ERROR(ExecNode::Init(tnode, state));
+Status UnionPlanNode::Init(const TPlanNode& tnode, RuntimeState* state) {
+  RETURN_IF_ERROR(PlanNode::Init(tnode, state));
   DCHECK(tnode.__isset.union_node);
   DCHECK_EQ(conjuncts_.size(), 0);
-  DCHECK(tuple_desc_ != nullptr);
+  const TupleDescriptor* tuple_desc =
+      state->desc_tbl().GetTupleDescriptor(tnode.union_node.tuple_id);
+  DCHECK(tuple_desc != nullptr);
   // Create const_exprs_lists_ from thrift exprs.
   const vector<vector<TExpr>>& const_texpr_lists = tnode.union_node.const_expr_lists;
   for (const vector<TExpr>& texprs : const_texpr_lists) {
     vector<ScalarExpr*> const_exprs;
-    RETURN_IF_ERROR(ScalarExpr::Create(texprs, *row_desc(), state, &const_exprs));
-    DCHECK_EQ(const_exprs.size(), tuple_desc_->slots().size());
+    RETURN_IF_ERROR(ScalarExpr::Create(texprs, *row_descriptor_, state, &const_exprs));
+    DCHECK_EQ(const_exprs.size(), tuple_desc->slots().size());
     const_exprs_lists_.push_back(const_exprs);
   }
   // Create child_exprs_lists_ from thrift exprs.
@@ -64,11 +53,33 @@ Status UnionNode::Init(const TPlanNode& tnode, RuntimeState* state) {
     const vector<TExpr>& texprs = thrift_result_exprs[i];
     vector<ScalarExpr*> child_exprs;
     RETURN_IF_ERROR(
-        ScalarExpr::Create(texprs, *child(i)->row_desc(), state, &child_exprs));
+        ScalarExpr::Create(texprs, *children_[i]->row_descriptor_, state, &child_exprs));
     child_exprs_lists_.push_back(child_exprs);
-    DCHECK_EQ(child_exprs.size(), tuple_desc_->slots().size());
+    DCHECK_EQ(child_exprs.size(), tuple_desc->slots().size());
   }
   return Status::OK();
+}
+
+Status UnionPlanNode::CreateExecNode(RuntimeState* state, ExecNode** node) const {
+  ObjectPool* pool = state->obj_pool();
+  *node = pool->Add(new UnionNode(pool, *this, state->desc_tbl()));
+  return Status::OK();
+}
+
+UnionNode::UnionNode(
+    ObjectPool* pool, const UnionPlanNode& pnode, const DescriptorTbl& descs)
+  : ExecNode(pool, pnode, descs),
+    tuple_id_(pnode.tnode_->union_node.tuple_id),
+    tuple_desc_(descs.GetTupleDescriptor(tuple_id_)),
+    first_materialized_child_idx_(pnode.tnode_->union_node.first_materialized_child_idx),
+    child_idx_(0),
+    child_batch_(nullptr),
+    child_row_idx_(0),
+    child_eos_(false),
+    const_exprs_lists_idx_(0),
+    to_close_child_idx_(-1) {
+  const_exprs_lists_ = pnode.const_exprs_lists_;
+  child_exprs_lists_ = pnode.child_exprs_lists_;
 }
 
 Status UnionNode::Prepare(RuntimeState* state) {

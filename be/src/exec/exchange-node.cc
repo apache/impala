@@ -42,32 +42,44 @@ using namespace impala;
 DEFINE_int64(exchg_node_buffer_size_bytes, 1024 * 1024 * 10,
     "(Advanced) Maximum size of per-query receive-side buffer");
 
-ExchangeNode::ExchangeNode(
-    ObjectPool* pool, const TPlanNode& tnode, const DescriptorTbl& descs)
-  : ExecNode(pool, tnode, descs),
-    num_senders_(0),
-    stream_recvr_(),
-    input_row_desc_(descs, tnode.exchange_node.input_row_tuples,
-        vector<bool>(
-          tnode.nullable_tuples.begin(),
-          tnode.nullable_tuples.begin() + tnode.exchange_node.input_row_tuples.size())),
-    next_row_idx_(0),
-    is_merging_(tnode.exchange_node.__isset.sort_info),
-    offset_(tnode.exchange_node.__isset.offset ? tnode.exchange_node.offset : 0),
-    num_rows_skipped_(0) {
-  DCHECK_GE(offset_, 0);
-  DCHECK(is_merging_ || (offset_ == 0));
-}
-
-Status ExchangeNode::Init(const TPlanNode& tnode, RuntimeState* state) {
-  RETURN_IF_ERROR(ExecNode::Init(tnode, state));
-  if (!is_merging_) return Status::OK();
+Status ExchangePlanNode::Init(const TPlanNode& tnode, RuntimeState* state) {
+  RETURN_IF_ERROR(PlanNode::Init(tnode, state));
+  if (!tnode.exchange_node.__isset.sort_info) return Status::OK();
 
   RETURN_IF_ERROR(ScalarExpr::Create(tnode.exchange_node.sort_info.ordering_exprs,
-      row_descriptor_, state, &ordering_exprs_));
+      *row_descriptor_, state, &ordering_exprs_));
   is_asc_order_ = tnode.exchange_node.sort_info.is_asc_order;
   nulls_first_ = tnode.exchange_node.sort_info.nulls_first;
   return Status::OK();
+}
+
+Status ExchangePlanNode::CreateExecNode(RuntimeState* state, ExecNode** node) const {
+  ObjectPool* pool = state->obj_pool();
+  *node = pool->Add(new ExchangeNode(pool, *this, state->desc_tbl()));
+  return Status::OK();
+}
+
+ExchangeNode::ExchangeNode(
+    ObjectPool* pool, const ExchangePlanNode& pnode, const DescriptorTbl& descs)
+  : ExecNode(pool, pnode, descs),
+    num_senders_(0),
+    stream_recvr_(),
+    input_row_desc_(descs, pnode.tnode_->exchange_node.input_row_tuples,
+        vector<bool>(pnode.tnode_->nullable_tuples.begin(),
+                        pnode.tnode_->nullable_tuples.begin()
+                            + pnode.tnode_->exchange_node.input_row_tuples.size())),
+    next_row_idx_(0),
+    is_merging_(pnode.tnode_->exchange_node.__isset.sort_info),
+    offset_(pnode.tnode_->exchange_node.__isset.offset ?
+            pnode.tnode_->exchange_node.offset :
+            0),
+    num_rows_skipped_(0) {
+  DCHECK_GE(offset_, 0);
+  DCHECK(is_merging_ || (offset_ == 0));
+  if (!is_merging_) return;
+  ordering_exprs_ = pnode.ordering_exprs_;
+  is_asc_order_ = pnode.is_asc_order_;
+  nulls_first_ = pnode.nulls_first_;
 }
 
 Status ExchangeNode::Prepare(RuntimeState* state) {

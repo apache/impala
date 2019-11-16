@@ -54,9 +54,9 @@ DEFINE_int64_hidden(kudu_scanner_thread_max_estimated_bytes, 32L * 1024L * 1024L
 
 namespace impala {
 
-KuduScanNode::KuduScanNode(ObjectPool* pool, const TPlanNode& tnode,
+KuduScanNode::KuduScanNode(ObjectPool* pool, const ScanPlanNode& pnode,
     const DescriptorTbl& descs)
-    : KuduScanNodeBase(pool, tnode, descs),
+    : KuduScanNodeBase(pool, pnode, descs),
       done_(false),
       thread_avail_cb_id_(-1) {
   DCHECK(KuduIsAvailable());

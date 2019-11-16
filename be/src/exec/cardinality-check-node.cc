@@ -26,10 +26,17 @@
 
 namespace impala {
 
+Status CardinalityCheckPlanNode::CreateExecNode(
+    RuntimeState* state, ExecNode** node) const {
+  ObjectPool* pool = state->obj_pool();
+  *node = pool->Add(new CardinalityCheckNode(pool, *this, state->desc_tbl()));
+  return Status::OK();
+}
+
 CardinalityCheckNode::CardinalityCheckNode(
-    ObjectPool* pool, const TPlanNode& tnode, const DescriptorTbl& descs)
-    : ExecNode(pool, tnode, descs),
-      display_statement_(tnode.cardinality_check_node.display_statement) {
+    ObjectPool* pool, const CardinalityCheckPlanNode& pnode, const DescriptorTbl& descs)
+    : ExecNode(pool, pnode, descs),
+      display_statement_(pnode.tnode_->cardinality_check_node.display_statement) {
 }
 
 Status CardinalityCheckNode::Prepare(RuntimeState* state) {

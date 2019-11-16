@@ -40,9 +40,31 @@
 using std::priority_queue;
 using namespace impala;
 
-TopNNode::TopNNode(ObjectPool* pool, const TPlanNode& tnode, const DescriptorTbl& descs)
-  : ExecNode(pool, tnode, descs),
-    offset_(tnode.sort_node.__isset.offset ? tnode.sort_node.offset : 0),
+Status TopNPlanNode::Init(const TPlanNode& tnode, RuntimeState* state) {
+  const TSortInfo& tsort_info = tnode.sort_node.sort_info;
+  RETURN_IF_ERROR(PlanNode::Init(tnode, state));
+  RETURN_IF_ERROR(ScalarExpr::Create(tsort_info.ordering_exprs, *row_descriptor_,
+      state, &ordering_exprs_));
+  DCHECK(tsort_info.__isset.sort_tuple_slot_exprs);
+  RETURN_IF_ERROR(ScalarExpr::Create(tsort_info.sort_tuple_slot_exprs,
+      *children_[0]->row_descriptor_, state, &output_tuple_exprs_));
+  is_asc_order_ = tnode.sort_node.sort_info.is_asc_order;
+  nulls_first_ = tnode.sort_node.sort_info.nulls_first;
+  DCHECK_EQ(conjuncts_.size(), 0)
+      << "TopNNode should never have predicates to evaluate.";
+  return Status::OK();
+}
+
+Status TopNPlanNode::CreateExecNode(RuntimeState* state, ExecNode** node) const {
+  ObjectPool* pool = state->obj_pool();
+  *node = pool->Add(new TopNNode(pool, *this, state->desc_tbl()));
+  return Status::OK();
+}
+
+TopNNode::TopNNode(
+    ObjectPool* pool, const TopNPlanNode& pnode, const DescriptorTbl& descs)
+  : ExecNode(pool, pnode, descs),
+    offset_(pnode.tnode_->sort_node.__isset.offset ? pnode.tnode_->sort_node.offset : 0),
     output_tuple_desc_(row_descriptor_.tuple_descriptors()[0]),
     tuple_row_less_than_(NULL),
     tmp_tuple_(NULL),
@@ -51,22 +73,11 @@ TopNNode::TopNNode(ObjectPool* pool, const TPlanNode& tnode, const DescriptorTbl
     rows_to_reclaim_(0),
     tuple_pool_reclaim_counter_(NULL),
     num_rows_skipped_(0) {
-}
-
-Status TopNNode::Init(const TPlanNode& tnode, RuntimeState* state) {
-  const TSortInfo& tsort_info = tnode.sort_node.sort_info;
-  RETURN_IF_ERROR(ExecNode::Init(tnode, state));
-  RETURN_IF_ERROR(ScalarExpr::Create(tsort_info.ordering_exprs, row_descriptor_,
-      state, &ordering_exprs_));
-  DCHECK(tsort_info.__isset.sort_tuple_slot_exprs);
-  RETURN_IF_ERROR(ScalarExpr::Create(tsort_info.sort_tuple_slot_exprs,
-      *child(0)->row_desc(), state, &output_tuple_exprs_));
-  is_asc_order_ = tnode.sort_node.sort_info.is_asc_order;
-  nulls_first_ = tnode.sort_node.sort_info.nulls_first;
-  DCHECK_EQ(conjuncts_.size(), 0)
-      << "TopNNode should never have predicates to evaluate.";
+  ordering_exprs_ = pnode.ordering_exprs_;
+  output_tuple_exprs_ = pnode.output_tuple_exprs_;
+  is_asc_order_ = pnode.is_asc_order_;
+  nulls_first_ = pnode.nulls_first_;
   runtime_profile()->AddInfoString("SortType", "TopN");
-  return Status::OK();
 }
 
 Status TopNNode::Prepare(RuntimeState* state) {

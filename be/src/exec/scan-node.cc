@@ -20,6 +20,10 @@
 #include <boost/algorithm/string/join.hpp>
 #include <boost/bind.hpp>
 
+#include "exec/data-source-scan-node.h"
+#include "exec/hbase-scan-node.h"
+#include "exec/kudu-scan-node-mt.h"
+#include "exec/kudu-scan-node.h"
 #include "exprs/scalar-expr.h"
 #include "runtime/blocking-row-batch-queue.h"
 #include "runtime/io/disk-io-mgr.h"
@@ -92,27 +96,60 @@ PROFILE_DEFINE_HIGH_WATER_MARK_COUNTER(PeakScannerThreadConcurrency, STABLE_LOW,
 
 const string ScanNode::SCANNER_THREAD_COUNTERS_PREFIX = "ScannerThreads";
 
-bool ScanNode::IsDataCacheDisabled() const {
-  return runtime_state()->query_options().disable_data_cache;
-}
-
-Status ScanNode::Init(const TPlanNode& tnode, RuntimeState* state) {
-  RETURN_IF_ERROR(ExecNode::Init(tnode, state));
+Status ScanPlanNode::Init(const TPlanNode& tnode, RuntimeState* state) {
+  RETURN_IF_ERROR(PlanNode::Init(tnode, state));
   const TQueryOptions& query_options = state->query_options();
   for (const TRuntimeFilterDesc& filter_desc : tnode.runtime_filters) {
     auto it = filter_desc.planid_to_target_ndx.find(tnode.node_id);
     DCHECK(it != filter_desc.planid_to_target_ndx.end());
     const TRuntimeFilterTargetDesc& target = filter_desc.targets[it->second];
-    DCHECK(state->query_options().runtime_filter_mode == TRuntimeFilterMode::GLOBAL ||
-        target.is_local_target);
-    DCHECK(!query_options.disable_row_runtime_filtering ||
-        target.is_bound_by_partition_columns);
+    DCHECK(state->query_options().runtime_filter_mode == TRuntimeFilterMode::GLOBAL
+        || target.is_local_target);
+    DCHECK(!query_options.disable_row_runtime_filtering
+        || target.is_bound_by_partition_columns);
     ScalarExpr* filter_expr;
     RETURN_IF_ERROR(
-        ScalarExpr::Create(target.target_expr, *row_desc(), state, &filter_expr));
-    filter_exprs_.push_back(filter_expr);
+        ScalarExpr::Create(target.target_expr, *row_descriptor_, state, &filter_expr));
+    runtime_filter_exprs_.push_back(filter_expr);
+  }
+  return Status::OK();
+}
 
-    // TODO: Move this to Prepare()
+Status ScanPlanNode::CreateExecNode(RuntimeState* state, ExecNode** node) const {
+  ObjectPool* pool = state->obj_pool();
+  switch (tnode_->node_type) {
+    case TPlanNodeType::HBASE_SCAN_NODE:
+      *node = pool->Add(new HBaseScanNode(pool, *this, state->desc_tbl()));
+      break;
+    case TPlanNodeType::DATA_SOURCE_NODE:
+      *node = pool->Add(new DataSourceScanNode(pool, *this, state->desc_tbl()));
+      break;
+    case TPlanNodeType::KUDU_SCAN_NODE:
+      if (tnode_->kudu_scan_node.use_mt_scan_node) {
+        DCHECK_GT(state->query_options().mt_dop, 0);
+        *node = pool->Add(new KuduScanNodeMt(pool, *this, state->desc_tbl()));
+      } else {
+        DCHECK(state->query_options().mt_dop == 0
+            || state->query_options().num_scanner_threads == 1);
+        *node = pool->Add(new KuduScanNode(pool, *this, state->desc_tbl()));
+      }
+      break;
+    default:
+      DCHECK(false) << "Unexpected scan node type: " << tnode_->node_type;
+  }
+  return Status::OK();
+}
+
+bool ScanNode::IsDataCacheDisabled() const {
+  return runtime_state()->query_options().disable_data_cache;
+}
+
+Status ScanNode::Prepare(RuntimeState* state) {
+  SCOPED_TIMER(runtime_profile_->total_time_counter());
+  runtime_state_ = state;
+  RETURN_IF_ERROR(ExecNode::Prepare(state));
+
+  for (const TRuntimeFilterDesc& filter_desc : plan_node_.tnode_->runtime_filters) {
     filter_ctxs_.emplace_back();
     FilterContext& filter_ctx = filter_ctxs_.back();
     filter_ctx.filter = state->filter_bank()->RegisterFilter(filter_desc, false);
@@ -127,14 +164,6 @@ Status ScanNode::Init(const TPlanNode& tnode, RuntimeState* state) {
       filter_ctx.stats = state->obj_pool()->Add(new FilterStats(profile));
     }
   }
-
-  return Status::OK();
-}
-
-Status ScanNode::Prepare(RuntimeState* state) {
-  SCOPED_TIMER(runtime_profile_->total_time_counter());
-  runtime_state_ = state;
-  RETURN_IF_ERROR(ExecNode::Prepare(state));
 
   rows_read_counter_ = PROFILE_RowsRead.Instantiate(runtime_profile());
   materialize_tuple_timer_ = PROFILE_MaterializeTupleTime.Instantiate(runtime_profile());

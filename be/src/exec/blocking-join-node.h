@@ -33,21 +33,26 @@ namespace impala {
 class RowBatch;
 class TupleRow;
 
+class BlockingJoinPlanNode : public PlanNode {
+ public:
+  /// Subclasses should call BlockingJoinNode::Init() and then perform any other Init()
+  /// work, e.g. creating expr trees.
+  virtual Status Init(const TPlanNode& tnode, RuntimeState* state) override;
+  virtual Status CreateExecNode(RuntimeState* state, ExecNode** node) const override = 0;
+};
+
 /// Abstract base class for join nodes that block while consuming all rows from their
 /// right child in Open(). There is no implementation of Reset() because the Open()
 /// sufficiently covers setting members into a 'reset' state.
 /// TODO: Remove the restriction that the tuples in the join's output row have to
 /// correspond to the order of its child exec nodes. See the DCHECKs in Init().
+
 class BlockingJoinNode : public ExecNode {
  public:
   BlockingJoinNode(const std::string& node_name, const TJoinOp::type join_op,
-      ObjectPool* pool, const TPlanNode& tnode, const DescriptorTbl& descs);
+      ObjectPool* pool, const BlockingJoinPlanNode& pnode, const DescriptorTbl& descs);
 
   virtual ~BlockingJoinNode();
-
-  /// Subclasses should call BlockingJoinNode::Init() and then perform any other Init()
-  /// work, e.g. creating expr trees.
-  virtual Status Init(const TPlanNode& tnode, RuntimeState* state);
 
   /// Subclasses should call BlockingJoinNode::Prepare() and then perform any other
   /// Prepare() work, e.g. codegen.

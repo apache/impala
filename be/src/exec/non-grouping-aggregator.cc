@@ -35,10 +35,10 @@
 
 namespace impala {
 
-NonGroupingAggregator::NonGroupingAggregator(ExecNode* exec_node, ObjectPool* pool,
-    const TAggregator& taggregator, const DescriptorTbl& descs, int agg_idx)
-  : Aggregator(exec_node, pool, taggregator, descs,
-        Substitute("NonGroupingAggregator $0", agg_idx), agg_idx) {}
+NonGroupingAggregator::NonGroupingAggregator(
+    ExecNode* exec_node, ObjectPool* pool, const AggregatorConfig& config, int agg_idx)
+  : Aggregator(exec_node, pool, config, Substitute("NonGroupingAggregator $0", agg_idx),
+        agg_idx) {}
 
 Status NonGroupingAggregator::Prepare(RuntimeState* state) {
   RETURN_IF_ERROR(Aggregator::Prepare(state));

@@ -33,9 +33,9 @@ using namespace impala::io;
 
 namespace impala {
 
-HdfsScanNodeMt::HdfsScanNodeMt(ObjectPool* pool, const TPlanNode& tnode,
+HdfsScanNodeMt::HdfsScanNodeMt(ObjectPool* pool, const HdfsScanPlanNode& pnode,
                            const DescriptorTbl& descs)
-    : HdfsScanNodeBase(pool, tnode, descs),
+    : HdfsScanNodeBase(pool, pnode, pnode.tnode_->hdfs_scan_node, descs),
       scan_range_(NULL),
       scanner_(NULL) {
 }

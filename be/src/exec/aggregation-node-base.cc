@@ -17,8 +17,10 @@
 
 #include "exec/aggregation-node-base.h"
 
+#include "exec/aggregation-node.h"
 #include "exec/grouping-aggregator.h"
 #include "exec/non-grouping-aggregator.h"
+#include "exec/streaming-aggregation-node.h"
 #include "runtime/runtime-state.h"
 #include "util/runtime-profile-counters.h"
 
@@ -26,33 +28,56 @@
 
 namespace impala {
 
-AggregationNodeBase::AggregationNodeBase(
-    ObjectPool* pool, const TPlanNode& tnode, const DescriptorTbl& descs)
-  : ExecNode(pool, tnode, descs), replicate_input_(tnode.agg_node.replicate_input) {}
-
-Status AggregationNodeBase::Init(const TPlanNode& tnode, RuntimeState* state) {
-  // The conjuncts will be evaluated in the Aggregator, so don't pass them to the
-  // ExecNode. TODO: remove this once we assign conjuncts directly to Aggregators.
-  TPlanNode tnode_no_conjuncts(tnode);
-  tnode_no_conjuncts.__set_conjuncts(std::vector<TExpr>());
-  RETURN_IF_ERROR(ExecNode::Init(tnode_no_conjuncts, state));
-
-  int num_ags = tnode.agg_node.aggregators.size();
+Status AggregationPlanNode::Init(const TPlanNode& tnode, RuntimeState* state) {
+  RETURN_IF_ERROR(PlanNode::Init(tnode, state));
+  int num_ags = tnode_->agg_node.aggregators.size();
   for (int i = 0; i < num_ags; ++i) {
-    const TAggregator& agg = tnode.agg_node.aggregators[i];
-    unique_ptr<Aggregator> node;
+    const TAggregator& agg = tnode_->agg_node.aggregators[i];
+    AggregatorConfig* node = nullptr;
     if (agg.grouping_exprs.empty()) {
-      node.reset(new NonGroupingAggregator(this, pool_, agg, state->desc_tbl(), i));
+      node = state->obj_pool()->Add(new AggregatorConfig(agg, state, this));
     } else {
-      node.reset(new GroupingAggregator(this, pool_, agg, state->desc_tbl(),
-          tnode.agg_node.estimated_input_cardinality, i));
+      node = state->obj_pool()->Add(new GroupingAggregatorConfig(agg, state, this));
     }
-    aggs_.push_back(std::move(node));
-    RETURN_IF_ERROR(aggs_[i]->Init(agg, state, tnode.conjuncts));
-    runtime_profile_->AddChild(aggs_[i]->runtime_profile());
+    DCHECK(node != nullptr);
+    aggs_.push_back(node);
+    RETURN_IF_ERROR(aggs_[i]->Init(agg, state, this));
   }
   DCHECK(aggs_.size() > 0);
   return Status::OK();
+}
+
+Status AggregationPlanNode::CreateExecNode(RuntimeState* state, ExecNode** node) const {
+  ObjectPool* pool = state->obj_pool();
+  if (tnode_->agg_node.aggregators[0].use_streaming_preaggregation) {
+    *node = pool->Add(new StreamingAggregationNode(pool, *this, state->desc_tbl()));
+  } else {
+    *node = pool->Add(new AggregationNode(pool, *this, state->desc_tbl()));
+  }
+  return Status::OK();
+}
+
+AggregationNodeBase::AggregationNodeBase(
+    ObjectPool* pool, const AggregationPlanNode& pnode, const DescriptorTbl& descs)
+  : ExecNode(pool, pnode, descs),
+    replicate_input_(pnode.tnode_->agg_node.replicate_input) {
+  // Create the Aggregator nodes from their configs.
+  int num_aggs = pnode.aggs_.size();
+  for (int i = 0; i < num_aggs; ++i) {
+    const AggregatorConfig* agg = pnode.aggs_[i];
+    unique_ptr<Aggregator> node;
+    if (agg->grouping_exprs_.empty()) {
+      node.reset(new NonGroupingAggregator(this, pool_, *agg, i));
+    } else {
+      const GroupingAggregatorConfig* grouping_config =
+          static_cast<const GroupingAggregatorConfig*>(agg);
+      DCHECK(grouping_config != nullptr);
+      node.reset(new GroupingAggregator(this, pool_, *grouping_config,
+          pnode.tnode_->agg_node.estimated_input_cardinality, i));
+    }
+    aggs_.push_back(std::move(node));
+    runtime_profile_->AddChild(aggs_[i]->runtime_profile());
+  }
 }
 
 Status AggregationNodeBase::Prepare(RuntimeState* state) {

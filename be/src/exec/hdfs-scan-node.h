@@ -70,7 +70,8 @@ class TPlanNode;
 /// fully functional.
 class HdfsScanNode : public HdfsScanNodeBase {
  public:
-  HdfsScanNode(ObjectPool* pool, const TPlanNode& tnode, const DescriptorTbl& descs);
+  HdfsScanNode(
+      ObjectPool* pool, const HdfsScanPlanNode& pnode, const DescriptorTbl& descs);
   ~HdfsScanNode();
 
   virtual Status Prepare(RuntimeState* state) override WARN_UNUSED_RESULT;

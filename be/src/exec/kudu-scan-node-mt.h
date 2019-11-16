@@ -31,7 +31,7 @@ class KuduScanner;
 /// in the thread calling GetNext().
 class KuduScanNodeMt : public KuduScanNodeBase {
  public:
-  KuduScanNodeMt(ObjectPool* pool, const TPlanNode& tnode, const DescriptorTbl& descs);
+  KuduScanNodeMt(ObjectPool* pool, const ScanPlanNode& pnode, const DescriptorTbl& descs);
 
   ~KuduScanNodeMt();
 

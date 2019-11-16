@@ -68,9 +68,9 @@ const int COMPRESSED_TEXT_COMPRESSION_RATIO = 11;
 // checking if a scanner thread should yield itself back to the global thread pool.
 const int SCANNER_THREAD_WAIT_TIME_MS = 20;
 
-HdfsScanNode::HdfsScanNode(ObjectPool* pool, const TPlanNode& tnode,
+HdfsScanNode::HdfsScanNode(ObjectPool* pool, const HdfsScanPlanNode& pnode,
                            const DescriptorTbl& descs)
-    : HdfsScanNodeBase(pool, tnode, descs) {
+    : HdfsScanNodeBase(pool, pnode, pnode.tnode_->hdfs_scan_node, descs) {
 }
 
 HdfsScanNode::~HdfsScanNode() {

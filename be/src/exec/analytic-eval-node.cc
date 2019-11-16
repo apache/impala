@@ -42,29 +42,85 @@ using namespace strings;
 
 namespace impala {
 
-AnalyticEvalNode::AnalyticEvalNode(
-    ObjectPool* pool, const TPlanNode& tnode, const DescriptorTbl& descs)
-  : ExecNode(pool, tnode, descs),
-    window_(tnode.analytic_node.window),
-    intermediate_tuple_desc_(
-        descs.GetTupleDescriptor(tnode.analytic_node.intermediate_tuple_id)),
-    result_tuple_desc_(
-        descs.GetTupleDescriptor(tnode.analytic_node.output_tuple_id)) {
-  if (tnode.analytic_node.__isset.buffered_tuple_id) {
-    buffered_tuple_desc_ = descs.GetTupleDescriptor(
-        tnode.analytic_node.buffered_tuple_id);
+Status AnalyticEvalPlanNode::Init(const TPlanNode& tnode, RuntimeState* state) {
+  RETURN_IF_ERROR(PlanNode::Init(tnode, state));
+
+  const TAnalyticNode& analytic_node = tnode.analytic_node;
+  TupleDescriptor* intermediate_tuple_desc =
+      state->desc_tbl().GetTupleDescriptor(tnode.analytic_node.intermediate_tuple_id);
+  TupleDescriptor* result_tuple_desc =
+      state->desc_tbl().GetTupleDescriptor(tnode.analytic_node.output_tuple_id);
+  bool has_lead_fn = false;
+
+  for (int i = 0; i < analytic_node.analytic_functions.size(); ++i) {
+    AggFn* analytic_fn;
+    RETURN_IF_ERROR(AggFn::Create(analytic_node.analytic_functions[i],
+        *children_[0]->row_descriptor_, *(intermediate_tuple_desc->slots()[i]),
+        *(result_tuple_desc->slots()[i]), state, &analytic_fn));
+    analytic_fns_.push_back(analytic_fn);
+    DCHECK(!analytic_fn->is_merge());
+    const TFunction& fn = analytic_node.analytic_functions[i].nodes[0].fn;
+    const bool is_lead_fn = fn.name.function_name == "lead";
+    is_lead_fn_.push_back(is_lead_fn);
+    has_lead_fn |= is_lead_fn;
   }
-  if (!tnode.analytic_node.__isset.window) {
+  const TAnalyticWindow& window = tnode.analytic_node.window;
+  DCHECK(!has_lead_fn || !window.__isset.window_start);
+  DCHECK(window.__isset.window_end || !window.__isset.window_start)
+      << "UNBOUNDED FOLLOWING is only supported with UNBOUNDED PRECEDING.";
+
+  if (analytic_node.__isset.partition_by_eq || analytic_node.__isset.order_by_eq) {
+    DCHECK(analytic_node.__isset.buffered_tuple_id);
+    TupleDescriptor* buffered_tuple_desc =
+        state->desc_tbl().GetTupleDescriptor(tnode.analytic_node.buffered_tuple_id);
+    DCHECK(buffered_tuple_desc != nullptr);
+    vector<TTupleId> tuple_ids;
+    tuple_ids.push_back(children_[0]->row_descriptor_->tuple_descriptors()[0]->id());
+    tuple_ids.push_back(buffered_tuple_desc->id());
+    RowDescriptor cmp_row_desc(state->desc_tbl(), tuple_ids, vector<bool>(2, false));
+
+    if (analytic_node.__isset.partition_by_eq) {
+      RETURN_IF_ERROR(ScalarExpr::Create(
+          analytic_node.partition_by_eq, cmp_row_desc, state, &partition_by_eq_expr_));
+    }
+    if (analytic_node.__isset.order_by_eq) {
+      RETURN_IF_ERROR(ScalarExpr::Create(
+          analytic_node.order_by_eq, cmp_row_desc, state, &order_by_eq_expr_));
+    }
+  }
+  return Status::OK();
+}
+
+Status AnalyticEvalPlanNode::CreateExecNode(RuntimeState* state, ExecNode** node) const {
+  ObjectPool* pool = state->obj_pool();
+  *node = pool->Add(
+      new AnalyticEvalNode(pool, *this, this->tnode_->analytic_node, state->desc_tbl()));
+  return Status::OK();
+}
+
+AnalyticEvalNode::AnalyticEvalNode(ObjectPool* pool, const AnalyticEvalPlanNode& pnode,
+      const TAnalyticNode& analytic_node, const DescriptorTbl& descs)
+  : ExecNode(pool, pnode, descs),
+    window_(analytic_node.window),
+    intermediate_tuple_desc_(
+        descs.GetTupleDescriptor(analytic_node.intermediate_tuple_id)),
+    result_tuple_desc_(
+        descs.GetTupleDescriptor(analytic_node.output_tuple_id)) {
+  if (analytic_node.__isset.buffered_tuple_id) {
+    buffered_tuple_desc_ =
+        descs.GetTupleDescriptor(analytic_node.buffered_tuple_id);
+  }
+  if (!analytic_node.__isset.window) {
     fn_scope_ = AnalyticEvalNode::PARTITION;
-  } else if (tnode.analytic_node.window.type == TAnalyticWindowType::RANGE) {
+  } else if (analytic_node.window.type == TAnalyticWindowType::RANGE) {
     fn_scope_ = AnalyticEvalNode::RANGE;
     DCHECK(!window_.__isset.window_start)
-      << "RANGE windows must have UNBOUNDED PRECEDING";
-    DCHECK(!window_.__isset.window_end ||
-        window_.window_end.type == TAnalyticWindowBoundaryType::CURRENT_ROW)
-      << "RANGE window end bound must be CURRENT ROW or UNBOUNDED FOLLOWING";
+        << "RANGE windows must have UNBOUNDED PRECEDING";
+    DCHECK(!window_.__isset.window_end
+        || window_.window_end.type == TAnalyticWindowBoundaryType::CURRENT_ROW)
+        << "RANGE window end bound must be CURRENT ROW or UNBOUNDED FOLLOWING";
   } else {
-    DCHECK_EQ(tnode.analytic_node.window.type, TAnalyticWindowType::ROWS);
+    DCHECK_EQ(analytic_node.window.type, TAnalyticWindowType::ROWS);
     fn_scope_ = AnalyticEvalNode::ROWS;
     if (window_.__isset.window_start) {
       TAnalyticWindowBoundary b = window_.window_start;
@@ -88,55 +144,16 @@ AnalyticEvalNode::AnalyticEvalNode(
     }
   }
   VLOG_FILE << id() << " Window=" << DebugWindowString();
+  // Set the Exprs from the PlanNode
+  partition_by_eq_expr_ = pnode.partition_by_eq_expr_;
+  order_by_eq_expr_ = pnode.order_by_eq_expr_;
+  analytic_fns_ = pnode.analytic_fns_;
+  is_lead_fn_ = pnode.is_lead_fn_;
 }
 
 AnalyticEvalNode::~AnalyticEvalNode() {
   // Check that we didn't leak any memory.
   DCHECK(input_stream_ == nullptr || input_stream_->is_closed());
-}
-
-Status AnalyticEvalNode::Init(const TPlanNode& tnode, RuntimeState* state) {
-  RETURN_IF_ERROR(ExecNode::Init(tnode, state));
-  DCHECK_EQ(conjunct_evals_.size(), 0);
-  state_ = state;
-  const TAnalyticNode& analytic_node = tnode.analytic_node;
-  bool has_lead_fn = false;
-
-  for (int i = 0; i < analytic_node.analytic_functions.size(); ++i) {
-    AggFn* analytic_fn;
-    RETURN_IF_ERROR(AggFn::Create(analytic_node.analytic_functions[i],
-        *child(0)->row_desc(), *(intermediate_tuple_desc_->slots()[i]),
-        *(result_tuple_desc_->slots()[i]), state, &analytic_fn));
-    analytic_fns_.push_back(analytic_fn);
-    DCHECK(!analytic_fn->is_merge());
-    const TFunction& fn = analytic_node.analytic_functions[i].nodes[0].fn;
-    const bool is_lead_fn = fn.name.function_name == "lead";
-    is_lead_fn_.push_back(is_lead_fn);
-    has_lead_fn |= is_lead_fn;
-  }
-  DCHECK(!has_lead_fn || !window_.__isset.window_start);
-  DCHECK(fn_scope_ != PARTITION || analytic_node.order_by_exprs.empty());
-  DCHECK(window_.__isset.window_end || !window_.__isset.window_start)
-      << "UNBOUNDED FOLLOWING is only supported with UNBOUNDED PRECEDING.";
-
-  if (analytic_node.__isset.partition_by_eq || analytic_node.__isset.order_by_eq) {
-    DCHECK(analytic_node.__isset.buffered_tuple_id);
-    DCHECK(buffered_tuple_desc_ != nullptr);
-    vector<TTupleId> tuple_ids;
-    tuple_ids.push_back(child(0)->row_desc()->tuple_descriptors()[0]->id());
-    tuple_ids.push_back(buffered_tuple_desc_->id());
-    RowDescriptor cmp_row_desc(state->desc_tbl(), tuple_ids, vector<bool>(2, false));
-
-    if (analytic_node.__isset.partition_by_eq) {
-      RETURN_IF_ERROR(ScalarExpr::Create(analytic_node.partition_by_eq, cmp_row_desc,
-          state, &partition_by_eq_expr_));
-    }
-    if (analytic_node.__isset.order_by_eq) {
-      RETURN_IF_ERROR(ScalarExpr::Create(analytic_node.order_by_eq, cmp_row_desc,
-          state, &order_by_eq_expr_));
-    }
-  }
-  return Status::OK();
 }
 
 Status AnalyticEvalNode::Prepare(RuntimeState* state) {
@@ -145,6 +162,7 @@ Status AnalyticEvalNode::Prepare(RuntimeState* state) {
   DCHECK(child(0)->row_desc()->IsPrefixOf(*row_desc()));
   DCHECK_GE(resource_profile_.min_reservation,
       resource_profile_.spillable_buffer_size * MIN_REQUIRED_BUFFERS);
+  state_ = state;
   curr_tuple_pool_.reset(new MemPool(mem_tracker()));
   prev_tuple_pool_.reset(new MemPool(mem_tracker()));
   prev_input_tuple_pool_.reset(new MemPool(mem_tracker()));

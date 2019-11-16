@@ -33,6 +33,7 @@
 namespace impala {
 
 class AggFnEvaluator;
+class PlanNode;
 class LlvmCodeGen;
 class RowBatch;
 class RuntimeState;
@@ -112,14 +113,48 @@ class Tuple;
 /// There are so many contexts in use that a plain "ctx" variable should never be used.
 /// Likewise, it's easy to mixup the agg fn ctxs, there should be a way to simplify this.
 /// TODO: support an Init() method with an initial value in the UDAF interface.
+
+class GroupingAggregatorConfig : public AggregatorConfig {
+ public:
+  GroupingAggregatorConfig(
+      const TAggregator& taggregator, RuntimeState* state, PlanNode* pnode);
+  virtual Status Init(
+      const TAggregator& taggregator, RuntimeState* state, PlanNode* pnode) override;
+  ~GroupingAggregatorConfig() {}
+
+  /// Row with the intermediate tuple as its only tuple.
+  /// Construct a new row desc for preparing the build exprs because neither the child's
+  /// nor this node's output row desc may contain the intermediate tuple, e.g.,
+  /// in a single-node plan with an intermediate tuple different from the output tuple.
+  /// Lives in the query state's obj_pool.
+  RowDescriptor intermediate_row_desc_;
+
+  /// True if this is first phase of a two-phase distributed aggregation for which we
+  /// are doing a streaming preaggregation.
+  const bool is_streaming_preagg_;
+
+  /// Resource information sent from the frontend.
+  const TBackendResourceProfile resource_profile_;
+
+  /// True if any of the evaluators require the serialize step.
+  bool needs_serialize_ = false;
+
+  /// Exprs used to insert constructed aggregation tuple into the hash table.
+  /// All the exprs are simply SlotRefs for the intermediate tuple.
+  std::vector<ScalarExpr*> build_exprs_;
+
+  /// Indices of grouping exprs with var-len string types in grouping_exprs_.
+  /// We need to do more work for var-len expressions when allocating and spilling rows.
+  /// All var-len grouping exprs have type string.
+  std::vector<int> string_grouping_exprs_;
+};
+
 class GroupingAggregator : public Aggregator {
  public:
   GroupingAggregator(ExecNode* exec_node, ObjectPool* pool,
-      const TAggregator& taggregator, const DescriptorTbl& descs,
-      int64_t estimated_input_cardinality, int agg_idx);
+      const GroupingAggregatorConfig& config, int64_t estimated_input_cardinality,
+      int agg_idx);
 
-  virtual Status Init(const TAggregator& taggregator, RuntimeState* state,
-      const std::vector<TExpr>& conjuncts) override;
   virtual Status Prepare(RuntimeState* state) override;
   virtual void Codegen(RuntimeState* state) override;
   virtual Status Open(RuntimeState* state) override;
@@ -176,7 +211,7 @@ class GroupingAggregator : public Aggregator {
   /// nor this node's output row desc may contain the intermediate tuple, e.g.,
   /// in a single-node plan with an intermediate tuple different from the output tuple.
   /// Lives in the query state's obj_pool.
-  RowDescriptor intermediate_row_desc_;
+  const RowDescriptor& intermediate_row_desc_;
 
   /// True if this is first phase of a two-phase distributed aggregation for which we
   /// are doing a streaming preaggregation.

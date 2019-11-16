@@ -33,18 +33,29 @@ class Bitmap;
 class RowBatch;
 class TupleRow;
 
+class NestedLoopJoinPlanNode : public BlockingJoinPlanNode {
+ public:
+  /// Join conjuncts.
+  std::vector<ScalarExpr*> join_conjuncts_;
+
+  virtual Status Init(const TPlanNode& tnode, RuntimeState* state) override;
+  virtual Status CreateExecNode(RuntimeState* state, ExecNode** node) const override;
+
+  ~NestedLoopJoinPlanNode(){}
+};
+
 /// Operator to perform nested-loop join. The build side is implemented by NljBuilder.
 /// This operator does not support spill to disk. Supports all join modes except
 /// null-aware left anti-join.
 ///
 /// TODO: Add support for null-aware left-anti join.
+
 class NestedLoopJoinNode : public BlockingJoinNode {
  public:
-  NestedLoopJoinNode(ObjectPool* pool, const TPlanNode& tnode,
-      const DescriptorTbl& descs);
+  NestedLoopJoinNode(
+      ObjectPool* pool, const NestedLoopJoinPlanNode& pnode, const DescriptorTbl& descs);
   virtual ~NestedLoopJoinNode();
 
-  virtual Status Init(const TPlanNode& tnode, RuntimeState* state);
   virtual Status Prepare(RuntimeState* state);
   virtual Status Open(RuntimeState* state);
   virtual Status GetNext(RuntimeState* state, RowBatch* row_batch, bool* eos);

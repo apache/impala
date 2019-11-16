@@ -46,7 +46,7 @@ class RuntimeState;
 class StreamingAggregationNode : public AggregationNodeBase {
  public:
   StreamingAggregationNode(
-      ObjectPool* pool, const TPlanNode& tnode, const DescriptorTbl& descs);
+      ObjectPool* pool, const AggregationPlanNode& pnode, const DescriptorTbl& descs);
 
   virtual Status Open(RuntimeState* state) override;
   virtual Status GetNext(RuntimeState* state, RowBatch* row_batch, bool* eos) override;

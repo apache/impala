@@ -32,9 +32,9 @@
 
 namespace impala {
 
-KuduScanNodeMt::KuduScanNodeMt(ObjectPool* pool, const TPlanNode& tnode,
+KuduScanNodeMt::KuduScanNodeMt(ObjectPool* pool, const ScanPlanNode& pnode,
     const DescriptorTbl& descs)
-    : KuduScanNodeBase(pool, tnode, descs),
+    : KuduScanNodeBase(pool, pnode, descs),
       scan_token_(nullptr) {
   DCHECK(KuduIsAvailable());
 }

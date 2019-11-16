@@ -34,6 +34,7 @@ namespace impala {
 
 class AggFn;
 class AggFnEvaluator;
+class PlanNode;
 class CodegenAnyVal;
 class DescriptorTbl;
 class ExecNode;
@@ -53,6 +54,45 @@ class Tuple;
 class TupleDescriptor;
 class TupleRow;
 
+/// AggregatorConfig contains the static state initialized from its corresponding thrift
+/// structure. It serves as an input for creating instances of the Aggregator class.
+class AggregatorConfig {
+ public:
+  AggregatorConfig(
+      const TAggregator& taggregator, RuntimeState* state, PlanNode* pnode);
+  virtual Status Init(
+      const TAggregator& taggregator, RuntimeState* state, PlanNode* pnode);
+  virtual ~AggregatorConfig() {}
+
+  /// Tuple into which Update()/Merge()/Serialize() results are stored.
+  TupleId intermediate_tuple_id_;
+  TupleDescriptor* intermediate_tuple_desc_;
+
+  /// Tuple into which Finalize() results are stored. Possibly the same as
+  /// the intermediate tuple.
+  TupleId output_tuple_id_;
+  TupleDescriptor* output_tuple_desc_;
+
+  /// The RowDescriptor for the exec node this aggregator corresponds to.
+  const RowDescriptor& row_desc_;
+  /// The RowDescriptor for the child of the exec node this aggregator corresponds to.
+  const RowDescriptor& input_row_desc_;
+
+  /// Certain aggregates require a finalize step, which is the final step of the
+  /// aggregate after consuming all input rows. The finalize step converts the aggregate
+  /// value into its final form. This is true if this aggregator contains aggregate that
+  /// requires a finalize step.
+  const bool needs_finalize_;
+
+  std::vector<ScalarExpr*> conjuncts_;
+
+  /// Exprs used to evaluate input rows
+  std::vector<ScalarExpr*> grouping_exprs_;
+
+  /// The list of all aggregate operations for this aggregator.
+  std::vector<AggFn*> aggregate_functions_;
+};
+
 /// Base class for aggregating rows. Used in the AggregationNode and
 /// StreamingAggregationNode.
 ///
@@ -61,14 +101,12 @@ class TupleRow;
 class Aggregator {
  public:
   /// 'agg_idx' is the index of 'taggregator' in the parent TAggregationNode.
-  Aggregator(ExecNode* exec_node, ObjectPool* pool, const TAggregator& taggregator,
-      const DescriptorTbl& descs, const std::string& name, int agg_idx);
+  Aggregator(ExecNode* exec_node, ObjectPool* pool, const AggregatorConfig& config,
+      const std::string& name, int agg_idx);
   virtual ~Aggregator();
 
   /// Aggregators follow the same lifecycle as ExecNodes, except that after Open() and
   /// before GetNext() rows should be added with AddBatch(), followed by InputDone()[
-  virtual Status Init(const TAggregator& taggregator, RuntimeState* state,
-      const std::vector<TExpr>& conjuncts) WARN_UNUSED_RESULT;
   virtual Status Prepare(RuntimeState* state) WARN_UNUSED_RESULT;
   virtual void Codegen(RuntimeState* state) = 0;
   virtual Status Open(RuntimeState* state) WARN_UNUSED_RESULT;

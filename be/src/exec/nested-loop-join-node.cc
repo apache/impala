@@ -36,30 +36,40 @@
 using namespace impala;
 using namespace strings;
 
-NestedLoopJoinNode::NestedLoopJoinNode(ObjectPool* pool, const TPlanNode& tnode,
-    const DescriptorTbl& descs)
-  : BlockingJoinNode("NestedLoopJoinNode", tnode.nested_loop_join_node.join_op, pool,
-        tnode, descs),
+Status NestedLoopJoinPlanNode::Init(const TPlanNode& tnode, RuntimeState* state) {
+  RETURN_IF_ERROR(BlockingJoinPlanNode::Init(tnode, state));
+  DCHECK(tnode.__isset.nested_loop_join_node);
+  // join_conjunct_evals_ are evaluated in the context of rows assembled from
+  // all inner and outer tuples.
+  RowDescriptor full_row_desc(
+      *children_[0]->row_descriptor_, *children_[1]->row_descriptor_);
+  RETURN_IF_ERROR(ScalarExpr::Create(tnode.nested_loop_join_node.join_conjuncts,
+      full_row_desc, state, &join_conjuncts_));
+  DCHECK(tnode.nested_loop_join_node.join_op != TJoinOp::CROSS_JOIN
+      || join_conjuncts_.size() == 0)
+      << "Join conjuncts in a cross join";
+  return Status::OK();
+}
+
+Status NestedLoopJoinPlanNode::CreateExecNode(
+    RuntimeState* state, ExecNode** node) const {
+  ObjectPool* pool = state->obj_pool();
+  *node = pool->Add(new NestedLoopJoinNode(pool, *this, state->desc_tbl()));
+  return Status::OK();
+}
+
+NestedLoopJoinNode::NestedLoopJoinNode(
+    ObjectPool* pool, const NestedLoopJoinPlanNode& pnode, const DescriptorTbl& descs)
+  : BlockingJoinNode("NestedLoopJoinNode", pnode.tnode_->nested_loop_join_node.join_op,
+        pool, pnode, descs),
     build_batches_(NULL),
     current_build_row_idx_(0),
     process_unmatched_build_rows_(false) {
+  join_conjuncts_ = pnode.join_conjuncts_;
 }
 
 NestedLoopJoinNode::~NestedLoopJoinNode() {
   DCHECK(is_closed());
-}
-
-Status NestedLoopJoinNode::Init(const TPlanNode& tnode, RuntimeState* state) {
-  RETURN_IF_ERROR(BlockingJoinNode::Init(tnode, state));
-  DCHECK(tnode.__isset.nested_loop_join_node);
-  // join_conjunct_evals_ are evaluated in the context of rows assembled from
-  // all inner and outer tuples.
-  RowDescriptor full_row_desc(*child(0)->row_desc(), *child(1)->row_desc());
-  RETURN_IF_ERROR(ScalarExpr::Create(tnode.nested_loop_join_node.join_conjuncts,
-      full_row_desc, state, &join_conjuncts_));
-  DCHECK(tnode.nested_loop_join_node.join_op != TJoinOp::CROSS_JOIN ||
-      join_conjuncts_.size() == 0) << "Join conjuncts in a cross join";
-  return Status::OK();
 }
 
 Status NestedLoopJoinNode::Open(RuntimeState* state) {

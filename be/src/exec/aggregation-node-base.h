@@ -25,14 +25,24 @@
 
 namespace impala {
 
+class AggregationPlanNode : public PlanNode {
+ public:
+  virtual Status Init(const TPlanNode& tnode, RuntimeState* state) override;
+  virtual Status CreateExecNode(RuntimeState* state, ExecNode** node) const override;
+  ~AggregationPlanNode() {}
+  /// Configuration for generating aggregators that will be eventually used to aggregate
+  /// input rows by the exec node.
+  std::vector<AggregatorConfig*> aggs_;
+};
+
 /// Base class containing common code for the ExecNodes that do aggregation,
 /// AggregationNode and StreamingAggregationNode.
+
 class AggregationNodeBase : public ExecNode {
  public:
   AggregationNodeBase(
-      ObjectPool* pool, const TPlanNode& tnode, const DescriptorTbl& descs);
+      ObjectPool* pool, const AggregationPlanNode& pnode, const DescriptorTbl& descs);
 
-  virtual Status Init(const TPlanNode& tnode, RuntimeState* state) override;
   virtual Status Prepare(RuntimeState* state) override;
   virtual void Codegen(RuntimeState* state) override;
   virtual Status Reset(RuntimeState* state, RowBatch* row_batch) override;

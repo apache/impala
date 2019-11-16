@@ -33,12 +33,12 @@
 namespace impala {
 
 StreamingAggregationNode::StreamingAggregationNode(
-    ObjectPool* pool, const TPlanNode& tnode, const DescriptorTbl& descs)
-  : AggregationNodeBase(pool, tnode, descs) {
-  DCHECK(tnode.conjuncts.empty()) << "Preaggs have no conjuncts";
+    ObjectPool* pool, const AggregationPlanNode& pnode, const DescriptorTbl& descs)
+  : AggregationNodeBase(pool, pnode, descs) {
+  DCHECK(pnode.tnode_->conjuncts.empty()) << "Preaggs have no conjuncts";
   DCHECK(limit_ == -1) << "Preaggs have no limits";
-  for (int i = 0; i < tnode.agg_node.aggregators.size(); ++i) {
-    DCHECK(tnode.agg_node.aggregators[i].use_streaming_preaggregation);
+  for (auto& t_agg : pnode.tnode_->agg_node.aggregators) {
+    DCHECK(t_agg.use_streaming_preaggregation);
   }
 }
 

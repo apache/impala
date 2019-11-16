@@ -32,6 +32,27 @@ class AggFnEvaluator;
 class ScalarExpr;
 class ScalarExprEvaluator;
 
+class AnalyticEvalPlanNode : public PlanNode {
+ public:
+  virtual Status Init(const TPlanNode& tnode, RuntimeState* state) override;
+  virtual Status CreateExecNode(RuntimeState* state, ExecNode** node) const override;
+
+  ~AnalyticEvalPlanNode(){}
+
+  /// Analytic functions which live in the runtime-state's objpool.
+  std::vector<AggFn*> analytic_fns_;
+
+  /// Indicates if each evaluator is the lead() fn. Used by ResetLeadFnSlots() to
+  /// determine which slots need to be reset.
+  std::vector<bool> is_lead_fn_;
+
+  /// A predicate that checks if child tuple '<' buffered tuple for partitioning exprs.
+  ScalarExpr* partition_by_eq_expr_ = nullptr;
+
+  /// A predicate that checks if child tuple '<' buffered tuple for order by exprs.
+  ScalarExpr* order_by_eq_expr_ = nullptr;
+};
+
 /// Evaluates analytic functions with a single pass over input rows. It is assumed
 /// that the input has already been sorted on all of the partition exprs and then the
 /// order by exprs. If there is no order by clause or partition clause, the input is
@@ -61,12 +82,13 @@ class ScalarExprEvaluator;
 /// multiple rows have the same values for the order by exprs. The number of buffered
 /// rows may be an entire partition or even the entire input. Therefore, the output
 /// rows are buffered and may spill to disk via the BufferedTupleStream.
+
 class AnalyticEvalNode : public ExecNode {
  public:
-  AnalyticEvalNode(ObjectPool* pool, const TPlanNode& tnode, const DescriptorTbl& descs);
+  AnalyticEvalNode(ObjectPool* pool, const AnalyticEvalPlanNode& pnode,
+      const TAnalyticNode& analytic_node, const DescriptorTbl& descs);
   virtual ~AnalyticEvalNode();
 
-  virtual Status Init(const TPlanNode& tnode, RuntimeState* state);
   virtual Status Prepare(RuntimeState* state);
   virtual Status Open(RuntimeState* state);
   virtual Status GetNext(RuntimeState* state, RowBatch* row_batch, bool* eos);

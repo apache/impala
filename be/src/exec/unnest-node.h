@@ -26,6 +26,29 @@ namespace impala {
 
 class TupleDescriptor;
 
+class UnnestPlanNode : public PlanNode {
+ public:
+  virtual Status Init(const TPlanNode& tnode, RuntimeState* state) override;
+  virtual Status CreateExecNode(RuntimeState* state, ExecNode** node) const override;
+  /// Initializes the expression which produces the collection to be unnested.
+  /// Called by the containing subplan plan-node.
+  Status InitCollExpr(RuntimeState* state);
+
+  ~UnnestPlanNode(){}
+
+  /// Expr that produces the collection to be unnested. Currently always a SlotRef into an
+  /// collection-typed slot. We do not evaluate this expr for setting coll_value_, but
+  /// instead manually retrieve the slot value to support projection (see class comment).
+  ScalarExpr* collection_expr_;
+
+  /// Descriptor of the collection-typed slot referenced by coll_expr_eval_. Set in
+  /// Prepare().  This slot is always set to NULL in Open() as a simple projection.
+  const SlotDescriptor* coll_slot_desc_;
+
+  /// Tuple index corresponding to coll_slot_desc_. Set in Prepare().
+  int coll_tuple_idx_;
+};
+
 /// Exec node that scans an in-memory collection of tuples (a CollectionValue) producing
 /// one output row per tuple in the collection. The output row is composed of a single
 /// tuple - the collection's item tuple.
@@ -51,20 +74,16 @@ class TupleDescriptor;
 /// TODO: Setting the collection-typed slots to NULL should be replaced by a proper
 /// projection at materialization points. The current solution purposely ignores the
 /// conventional NULL semantics of slots - it is a temporary hack which must be removed.
+
 class UnnestNode : public ExecNode {
  public:
-  UnnestNode(ObjectPool* pool, const TPlanNode& tnode, const DescriptorTbl& descs);
+  UnnestNode(ObjectPool* pool, const UnnestPlanNode& pnode, const DescriptorTbl& descs);
 
-  virtual Status Init(const TPlanNode& tnode, RuntimeState* state);
   virtual Status Prepare(RuntimeState* state);
   virtual Status Open(RuntimeState* state);
   virtual Status GetNext(RuntimeState* state, RowBatch* row_batch, bool* eos);
   virtual Status Reset(RuntimeState* state, RowBatch* row_batch);
   virtual void Close(RuntimeState* state);
-
-  /// Initializes the expression which produces the collection to be unnested.
-  /// Called by the containing subplan node.
-  Status InitCollExpr(RuntimeState* state);
 
  private:
   friend class SubplanNode;

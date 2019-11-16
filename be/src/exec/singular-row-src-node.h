@@ -22,12 +22,19 @@
 
 namespace impala {
 
+class SingularRowSrcPlanNode : public PlanNode {
+ public:
+  virtual Status CreateExecNode(RuntimeState* state, ExecNode** node) const override;
+  ~SingularRowSrcPlanNode(){}
+};
+
 /// Exec node that returns a single row from its containing Subplan node.
 /// Does not have any children.
+
 class SingularRowSrcNode : public ExecNode {
  public:
-  SingularRowSrcNode(ObjectPool* pool, const TPlanNode& tnode,
-      const DescriptorTbl& descs);
+  SingularRowSrcNode(
+      ObjectPool* pool, const SingularRowSrcPlanNode& pnode, const DescriptorTbl& descs);
   virtual Status GetNext(RuntimeState* state, RowBatch* row_batch, bool* eos);
 };
 

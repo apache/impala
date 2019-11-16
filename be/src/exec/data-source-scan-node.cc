@@ -69,10 +69,10 @@ const string ERROR_MEM_LIMIT_EXCEEDED = "DataSourceScanNode::$0() failed to allo
 // Size of an encoded TIMESTAMP
 const size_t TIMESTAMP_SIZE = sizeof(int64_t) + sizeof(int32_t);
 
-DataSourceScanNode::DataSourceScanNode(ObjectPool* pool, const TPlanNode& tnode,
+DataSourceScanNode::DataSourceScanNode(ObjectPool* pool, const ScanPlanNode& pnode,
     const DescriptorTbl& descs)
-    : ScanNode(pool, tnode, descs),
-      data_src_node_(tnode.data_source_node),
+    : ScanNode(pool, pnode, descs),
+      data_src_node_(pnode.tnode_->data_source_node),
       tuple_idx_(0),
       num_rows_(0),
       next_row_idx_(0) {

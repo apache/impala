@@ -41,7 +41,8 @@ class Tuple;
 /// closed in Close().
 class DataSourceScanNode : public ScanNode {
  public:
-  DataSourceScanNode(ObjectPool* pool, const TPlanNode& tnode, const DescriptorTbl& descs);
+  DataSourceScanNode(
+      ObjectPool* pool, const ScanPlanNode& pnode, const DescriptorTbl& descs);
 
   ~DataSourceScanNode();
 

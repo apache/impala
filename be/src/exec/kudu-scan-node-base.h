@@ -35,7 +35,8 @@ class KuduScanner;
 /// removed.
 class KuduScanNodeBase : public ScanNode {
  public:
-  KuduScanNodeBase(ObjectPool* pool, const TPlanNode& tnode, const DescriptorTbl& descs);
+  KuduScanNodeBase(
+      ObjectPool* pool, const ScanPlanNode& pnode, const DescriptorTbl& descs);
   ~KuduScanNodeBase();
 
   virtual Status Prepare(RuntimeState* state) override;

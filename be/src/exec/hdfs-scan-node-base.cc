@@ -22,6 +22,8 @@
 #include "exec/hdfs-orc-scanner.h"
 #include "exec/hdfs-plugin-text-scanner.h"
 #include "exec/hdfs-rcfile-scanner.h"
+#include "exec/hdfs-scan-node-mt.h"
+#include "exec/hdfs-scan-node.h"
 #include "exec/hdfs-sequence-scanner.h"
 #include "exec/hdfs-text-scanner.h"
 #include "exec/parquet/hdfs-parquet-scanner.h"
@@ -146,30 +148,8 @@ const string HdfsScanNodeBase::HDFS_SPLIT_STATS_DESC =
 // Determines how many unexpected remote bytes trigger an error in the runtime state
 const int UNEXPECTED_REMOTE_BYTES_WARN_THRESHOLD = 64 * 1024 * 1024;
 
-HdfsScanNodeBase::HdfsScanNodeBase(ObjectPool* pool, const TPlanNode& tnode,
-    const DescriptorTbl& descs)
-    : ScanNode(pool, tnode, descs),
-      min_max_tuple_id_(tnode.hdfs_scan_node.__isset.min_max_tuple_id ?
-          tnode.hdfs_scan_node.min_max_tuple_id : -1),
-      skip_header_line_count_(tnode.hdfs_scan_node.__isset.skip_header_line_count ?
-          tnode.hdfs_scan_node.skip_header_line_count : 0),
-      tuple_id_(tnode.hdfs_scan_node.tuple_id),
-      parquet_count_star_slot_offset_(
-          tnode.hdfs_scan_node.__isset.parquet_count_star_slot_offset ?
-          tnode.hdfs_scan_node.parquet_count_star_slot_offset : -1),
-      tuple_desc_(descs.GetTupleDescriptor(tuple_id_)),
-      thrift_dict_filter_conjuncts_map_(
-          tnode.hdfs_scan_node.__isset.dictionary_filter_conjuncts ?
-          &tnode.hdfs_scan_node.dictionary_filter_conjuncts : nullptr),
-      disks_accessed_bitmap_(TUnit::UNIT, 0),
-      active_hdfs_read_thread_counter_(TUnit::UNIT, 0) {
-}
-
-HdfsScanNodeBase::~HdfsScanNodeBase() {
-}
-
-Status HdfsScanNodeBase::Init(const TPlanNode& tnode, RuntimeState* state) {
-  RETURN_IF_ERROR(ScanNode::Init(tnode, state));
+Status HdfsScanPlanNode::Init(const TPlanNode& tnode, RuntimeState* state) {
+  RETURN_IF_ERROR(ScanPlanNode::Init(tnode, state));
 
   // Add collection item conjuncts
   for (const auto& entry: tnode.hdfs_scan_node.collection_conjuncts) {
@@ -180,19 +160,59 @@ Status HdfsScanNodeBase::Init(const TPlanNode& tnode, RuntimeState* state) {
     RETURN_IF_ERROR(ScalarExpr::Create(entry.second, *collection_row_desc, state,
         &conjuncts_map_[entry.first]));
   }
-  DCHECK(conjuncts_map_[tuple_id_].empty());
-  conjuncts_map_[tuple_id_] = conjuncts_;
+  const TTupleId& tuple_id = tnode.hdfs_scan_node.tuple_id;
+  DCHECK(conjuncts_map_[tuple_id].empty());
+  conjuncts_map_[tuple_id] = conjuncts_;
 
   // Add min max conjuncts
-  if (min_max_tuple_id_ != -1) {
-    min_max_tuple_desc_ = state->desc_tbl().GetTupleDescriptor(min_max_tuple_id_);
-    DCHECK(min_max_tuple_desc_ != nullptr);
+  if (tnode.hdfs_scan_node.__isset.min_max_tuple_id) {
+    TupleDescriptor* min_max_tuple_desc =
+        state->desc_tbl().GetTupleDescriptor(tnode.hdfs_scan_node.min_max_tuple_id);
+    DCHECK(min_max_tuple_desc != nullptr);
     RowDescriptor* min_max_row_desc = state->obj_pool()->Add(
-        new RowDescriptor(min_max_tuple_desc_, /* is_nullable */ false));
+        new RowDescriptor(min_max_tuple_desc, /* is_nullable */ false));
     RETURN_IF_ERROR(ScalarExpr::Create(tnode.hdfs_scan_node.min_max_conjuncts,
         *min_max_row_desc, state, &min_max_conjuncts_));
   }
   return Status::OK();
+}
+
+Status HdfsScanPlanNode::CreateExecNode(RuntimeState* state, ExecNode** node) const {
+  ObjectPool* pool = state->obj_pool();
+  *node = pool->Add(tnode_->hdfs_scan_node.use_mt_scan_node ?
+          static_cast<HdfsScanNodeBase*>(
+              new HdfsScanNodeMt(pool, *this, state->desc_tbl())) :
+          static_cast<HdfsScanNodeBase*>(
+              new HdfsScanNode(pool, *this, state->desc_tbl())));
+  return Status::OK();
+}
+
+HdfsScanNodeBase::HdfsScanNodeBase(ObjectPool* pool, const HdfsScanPlanNode& pnode,
+    const THdfsScanNode& hdfs_scan_node, const DescriptorTbl& descs)
+  : ScanNode(pool, pnode, descs),
+    min_max_tuple_id_(
+        hdfs_scan_node.__isset.min_max_tuple_id ? hdfs_scan_node.min_max_tuple_id : -1),
+    min_max_tuple_desc_(
+        min_max_tuple_id_ == -1 ? nullptr : descs.GetTupleDescriptor(min_max_tuple_id_)),
+    skip_header_line_count_(hdfs_scan_node.__isset.skip_header_line_count ?
+            hdfs_scan_node.skip_header_line_count :
+            0),
+    tuple_id_(hdfs_scan_node.tuple_id),
+    parquet_count_star_slot_offset_(
+        hdfs_scan_node.__isset.parquet_count_star_slot_offset ?
+            hdfs_scan_node.parquet_count_star_slot_offset :
+            -1),
+    tuple_desc_(descs.GetTupleDescriptor(tuple_id_)),
+    thrift_dict_filter_conjuncts_map_(hdfs_scan_node.__isset.dictionary_filter_conjuncts ?
+            &hdfs_scan_node.dictionary_filter_conjuncts :
+            nullptr),
+    disks_accessed_bitmap_(TUnit::UNIT, 0),
+    active_hdfs_read_thread_counter_(TUnit::UNIT, 0) {
+  conjuncts_map_ = pnode.conjuncts_map_;
+  min_max_conjuncts_ = pnode.min_max_conjuncts_;
+}
+
+HdfsScanNodeBase::~HdfsScanNodeBase() {
 }
 
 /// TODO: Break up this very long function.

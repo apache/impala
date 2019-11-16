@@ -31,14 +31,19 @@
 
 namespace impala {
 
-SelectNode::SelectNode(
-    ObjectPool* pool, const TPlanNode& tnode, const DescriptorTbl& descs)
-    : ExecNode(pool, tnode, descs),
-      child_row_batch_(NULL),
-      child_row_idx_(0),
-      child_eos_(false),
-      codegend_copy_rows_fn_(nullptr) {
+Status SelectPlanNode::CreateExecNode(RuntimeState* state, ExecNode** node) const {
+  ObjectPool* pool = state->obj_pool();
+  *node = pool->Add(new SelectNode(pool, *this, state->desc_tbl()));
+  return Status::OK();
 }
+
+SelectNode::SelectNode(
+    ObjectPool* pool, const SelectPlanNode& pnode, const DescriptorTbl& descs)
+  : ExecNode(pool, pnode, descs),
+    child_row_batch_(NULL),
+    child_row_idx_(0),
+    child_eos_(false),
+    codegend_copy_rows_fn_(nullptr) {}
 
 Status SelectNode::Prepare(RuntimeState* state) {
   SCOPED_TIMER(runtime_profile_->total_time_counter());

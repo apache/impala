@@ -71,22 +71,158 @@
 using strings::Substitute;
 
 namespace impala {
+Status PlanNode::Init(const TPlanNode& tnode, RuntimeState* state) {
+  tnode_ = &tnode;
+  row_descriptor_ = state->obj_pool()->Add(
+      new RowDescriptor(state->desc_tbl(), tnode_->row_tuples, tnode_->nullable_tuples));
+
+  if (tnode_->node_type != TPlanNodeType::AGGREGATION_NODE) {
+    // In Agg node the conjuncts are executed by the Aggregators.
+    RETURN_IF_ERROR(
+        ScalarExpr::Create(tnode_->conjuncts, *row_descriptor_, state, &conjuncts_));
+  }
+  return Status::OK();
+}
+
+Status PlanNode::CreateTree(
+      RuntimeState* state, const TPlan& plan, PlanNode** root) {
+  if (plan.nodes.size() == 0) {
+    *root = NULL;
+    return Status::OK();
+  }
+  int node_idx = 0;
+  Status status = CreateTreeHelper(state, plan.nodes, NULL, &node_idx, root);
+  if (status.ok() && node_idx + 1 != plan.nodes.size()) {
+    status = Status(
+        "Plan tree only partially reconstructed. Not all thrift nodes were used.");
+  }
+  if (!status.ok()) {
+    LOG(ERROR) << "Could not construct plan tree:\n"
+               << apache::thrift::ThriftDebugString(plan);
+  }
+  return status;
+}
+
+Status PlanNode::CreateTreeHelper(RuntimeState* state,
+      const std::vector<TPlanNode>& tnodes, PlanNode* parent, int* node_idx,
+      PlanNode** root) {
+  // propagate error case
+  if (*node_idx >= tnodes.size()) {
+    return Status("Failed to reconstruct plan tree from thrift.");
+  }
+  const TPlanNode& tnode = tnodes[*node_idx];
+
+  int num_children = tnode.num_children;
+  PlanNode* node = NULL;
+  RETURN_IF_ERROR(CreatePlanNode(state->obj_pool(), tnode, &node, state));
+  if (parent != NULL) {
+    parent->children_.push_back(node);
+  } else {
+    *root = node;
+  }
+  for (int i = 0; i < num_children; ++i) {
+    ++*node_idx;
+    RETURN_IF_ERROR(CreateTreeHelper(state, tnodes, node, node_idx, NULL));
+    // we are expecting a child, but have used all nodes
+    // this means we have been given a bad tree and must fail
+    if (*node_idx >= tnodes.size()) {
+      return Status("Failed to reconstruct plan tree from thrift.");
+    }
+  }
+
+  // Call Init() after children have been set and Init()'d themselves
+  RETURN_IF_ERROR(node->Init(tnode, state));
+  return Status::OK();
+}
+
+Status PlanNode::CreatePlanNode(ObjectPool* pool, const TPlanNode& tnode, PlanNode** node,
+      RuntimeState* state) {
+  switch (tnode.node_type) {
+    case TPlanNodeType::HDFS_SCAN_NODE:
+      *node = pool->Add(new HdfsScanPlanNode());
+      break;
+    case TPlanNodeType::HBASE_SCAN_NODE:
+    case TPlanNodeType::DATA_SOURCE_NODE:
+    case TPlanNodeType::KUDU_SCAN_NODE:
+      *node = pool->Add(new ScanPlanNode());
+      break;
+    case TPlanNodeType::AGGREGATION_NODE:
+      *node = pool->Add(new AggregationPlanNode());
+      break;
+    case TPlanNodeType::HASH_JOIN_NODE:
+      *node = pool->Add(new PartitionedHashJoinPlanNode());
+      break;
+    case TPlanNodeType::NESTED_LOOP_JOIN_NODE:
+      *node = pool->Add(new NestedLoopJoinPlanNode());
+      break;
+    case TPlanNodeType::EMPTY_SET_NODE:
+      *node = pool->Add(new EmptySetPlanNode());
+      break;
+    case TPlanNodeType::EXCHANGE_NODE:
+      *node = pool->Add(new ExchangePlanNode());
+      break;
+    case TPlanNodeType::SELECT_NODE:
+      *node = pool->Add(new SelectPlanNode());
+      break;
+    case TPlanNodeType::SORT_NODE:
+      if (tnode.sort_node.type == TSortType::PARTIAL) {
+        *node = pool->Add(new PartialSortPlanNode());
+      } else if (tnode.sort_node.type == TSortType::TOPN) {
+        *node = pool->Add(new TopNPlanNode());
+      } else {
+        DCHECK(tnode.sort_node.type == TSortType::TOTAL);
+        *node = pool->Add(new SortPlanNode());
+      }
+      break;
+    case TPlanNodeType::UNION_NODE:
+      *node = pool->Add(new UnionPlanNode());
+      break;
+    case TPlanNodeType::ANALYTIC_EVAL_NODE:
+      *node = pool->Add(new AnalyticEvalPlanNode());
+      break;
+    case TPlanNodeType::SINGULAR_ROW_SRC_NODE:
+      *node = pool->Add(new SingularRowSrcPlanNode());
+      break;
+    case TPlanNodeType::SUBPLAN_NODE:
+      *node = pool->Add(new SubplanPlanNode());
+      break;
+    case TPlanNodeType::UNNEST_NODE:
+      *node = pool->Add(new UnnestPlanNode());
+      break;
+    case TPlanNodeType::CARDINALITY_CHECK_NODE:
+      *node = pool->Add(new CardinalityCheckPlanNode());
+      break;
+    default:
+      map<int, const char*>::const_iterator i =
+          _TPlanNodeType_VALUES_TO_NAMES.find(tnode.node_type);
+      const char* str = "unknown node type";
+      if (i != _TPlanNodeType_VALUES_TO_NAMES.end()) {
+        str = i->second;
+      }
+      stringstream error_msg;
+      error_msg << str << " not implemented";
+      return Status(error_msg.str());
+  }
+  return Status::OK();
+}
 
 const string ExecNode::ROW_THROUGHPUT_COUNTER = "RowsReturnedRate";
 
-ExecNode::ExecNode(ObjectPool* pool, const TPlanNode& tnode, const DescriptorTbl& descs)
-  : id_(tnode.node_id),
-    type_(tnode.node_type),
+ExecNode::ExecNode(ObjectPool* pool, const PlanNode& pnode, const DescriptorTbl& descs)
+  : plan_node_(pnode),
+    id_(pnode.tnode_->node_id),
+    type_(pnode.tnode_->node_type),
     pool_(pool),
-    row_descriptor_(descs, tnode.row_tuples, tnode.nullable_tuples),
-    resource_profile_(tnode.resource_profile),
-    limit_(tnode.limit),
+    conjuncts_(pnode.conjuncts_),
+    row_descriptor_(*(pnode.row_descriptor_)),
+    resource_profile_(pnode.tnode_->resource_profile),
+    limit_(pnode.tnode_->limit),
     runtime_profile_(RuntimeProfile::Create(
-        pool_, Substitute("$0 (id=$1)", PrintThriftEnum(tnode.node_type), id_))),
-    rows_returned_counter_(NULL),
-    rows_returned_rate_(NULL),
-    containing_subplan_(NULL),
-    disable_codegen_(tnode.disable_codegen),
+        pool_, Substitute("$0 (id=$1)", PrintThriftEnum(type_), id_))),
+    rows_returned_counter_(nullptr),
+    rows_returned_rate_(nullptr),
+    containing_subplan_(nullptr),
+    disable_codegen_(pnode.tnode_->disable_codegen),
     num_rows_returned_(0),
     is_closed_(false) {
   runtime_profile_->SetPlanNodeId(id_);
@@ -94,12 +230,6 @@ ExecNode::ExecNode(ObjectPool* pool, const TPlanNode& tnode, const DescriptorTbl
 }
 
 ExecNode::~ExecNode() {
-}
-
-Status ExecNode::Init(const TPlanNode& tnode, RuntimeState* state) {
-  RETURN_IF_ERROR(
-      ScalarExpr::Create(tnode.conjuncts, row_descriptor_, state, &conjuncts_));
-  return Status::OK();
 }
 
 Status ExecNode::Prepare(RuntimeState* state) {
@@ -184,151 +314,24 @@ void ExecNode::Close(RuntimeState* state) {
   if (events_ != nullptr) events_->MarkEvent("Closed");
 }
 
-Status ExecNode::CreateTree(
-    RuntimeState* state, const TPlan& plan, const DescriptorTbl& descs, ExecNode** root) {
-  if (plan.nodes.size() == 0) {
-    *root = NULL;
-    return Status::OK();
+Status ExecNode::CreateTree(RuntimeState* state, const PlanNode& plan_node,
+    const DescriptorTbl& descs, ExecNode** root) {
+  RETURN_IF_ERROR(plan_node.CreateExecNode(state, root));
+  DCHECK(*root != nullptr);
+  for (auto& child : plan_node.children_) {
+    ExecNode* child_node;
+    RETURN_IF_ERROR(CreateTree(state, *child, descs, &child_node));
+    DCHECK(child_node != nullptr);
+    (*root)->children_.push_back(child_node);
   }
-  int node_idx = 0;
-  Status status = CreateTreeHelper(state, plan.nodes, descs, NULL, &node_idx, root);
-  if (status.ok() && node_idx + 1 != plan.nodes.size()) {
-    status = Status(
-        "Plan tree only partially reconstructed. Not all thrift nodes were used.");
-  }
-  if (!status.ok()) {
-    LOG(ERROR) << "Could not construct plan tree:\n"
-               << apache::thrift::ThriftDebugString(plan);
-  }
-  return status;
-}
-
-Status ExecNode::CreateTreeHelper(RuntimeState* state, const vector<TPlanNode>& tnodes,
-    const DescriptorTbl& descs, ExecNode* parent, int* node_idx, ExecNode** root) {
-  // propagate error case
-  if (*node_idx >= tnodes.size()) {
-    return Status("Failed to reconstruct plan tree from thrift.");
-  }
-  const TPlanNode& tnode = tnodes[*node_idx];
-
-  int num_children = tnode.num_children;
-  ExecNode* node = NULL;
-  RETURN_IF_ERROR(CreateNode(state->obj_pool(), tnode, descs, &node, state));
-  if (parent != NULL) {
-    parent->children_.push_back(node);
-  } else {
-    *root = node;
-  }
-  for (int i = 0; i < num_children; ++i) {
-    ++*node_idx;
-    RETURN_IF_ERROR(CreateTreeHelper(state, tnodes, descs, node, node_idx, NULL));
-    // we are expecting a child, but have used all nodes
-    // this means we have been given a bad tree and must fail
-    if (*node_idx >= tnodes.size()) {
-      return Status("Failed to reconstruct plan tree from thrift.");
-    }
-  }
-
-  // Call Init() after children have been set and Init()'d themselves
-  RETURN_IF_ERROR(node->Init(tnode, state));
 
   // build up tree of profiles; add children >0 first, so that when we print
   // the profile, child 0 is printed last (makes the output more readable)
-  for (int i = 1; i < node->children_.size(); ++i) {
-    node->runtime_profile()->AddChild(node->children_[i]->runtime_profile());
+  for (int i = 1; i < (*root)->children_.size(); ++i) {
+    (*root)->runtime_profile()->AddChild((*root)->children_[i]->runtime_profile());
   }
-  if (!node->children_.empty()) {
-    node->runtime_profile()->AddChild(node->children_[0]->runtime_profile(), false);
-  }
-
-  return Status::OK();
-}
-
-Status ExecNode::CreateNode(ObjectPool* pool, const TPlanNode& tnode,
-    const DescriptorTbl& descs, ExecNode** node, RuntimeState* state) {
-  stringstream error_msg;
-  switch (tnode.node_type) {
-    case TPlanNodeType::HDFS_SCAN_NODE:
-      *node = pool->Add(tnode.hdfs_scan_node.use_mt_scan_node ?
-              static_cast<HdfsScanNodeBase*>(new HdfsScanNodeMt(pool, tnode, descs)) :
-              static_cast<HdfsScanNodeBase*>(new HdfsScanNode(pool, tnode, descs)));
-      break;
-    case TPlanNodeType::HBASE_SCAN_NODE:
-      *node = pool->Add(new HBaseScanNode(pool, tnode, descs));
-      break;
-    case TPlanNodeType::DATA_SOURCE_NODE:
-      *node = pool->Add(new DataSourceScanNode(pool, tnode, descs));
-      break;
-    case TPlanNodeType::KUDU_SCAN_NODE:
-      RETURN_IF_ERROR(CheckKuduAvailability());
-      if (tnode.kudu_scan_node.use_mt_scan_node) {
-        DCHECK_GT(state->query_options().mt_dop, 0);
-        *node = pool->Add(new KuduScanNodeMt(pool, tnode, descs));
-      } else {
-        DCHECK(state->query_options().mt_dop == 0
-            || state->query_options().num_scanner_threads == 1);
-        *node = pool->Add(new KuduScanNode(pool, tnode, descs));
-      }
-      break;
-    case TPlanNodeType::AGGREGATION_NODE:
-      if (tnode.agg_node.aggregators[0].use_streaming_preaggregation) {
-        *node = pool->Add(new StreamingAggregationNode(pool, tnode, descs));
-      } else {
-        *node = pool->Add(new AggregationNode(pool, tnode, descs));
-      }
-      break;
-    case TPlanNodeType::HASH_JOIN_NODE:
-      *node = pool->Add(new PartitionedHashJoinNode(pool, tnode, descs));
-      break;
-    case TPlanNodeType::NESTED_LOOP_JOIN_NODE:
-      *node = pool->Add(new NestedLoopJoinNode(pool, tnode, descs));
-      break;
-    case TPlanNodeType::EMPTY_SET_NODE:
-      *node = pool->Add(new EmptySetNode(pool, tnode, descs));
-      break;
-    case TPlanNodeType::EXCHANGE_NODE:
-      *node = pool->Add(new ExchangeNode(pool, tnode, descs));
-      break;
-    case TPlanNodeType::SELECT_NODE:
-      *node = pool->Add(new SelectNode(pool, tnode, descs));
-      break;
-    case TPlanNodeType::SORT_NODE:
-      if (tnode.sort_node.type == TSortType::PARTIAL) {
-        *node = pool->Add(new PartialSortNode(pool, tnode, descs));
-      } else if (tnode.sort_node.type == TSortType::TOPN) {
-        *node = pool->Add(new TopNNode(pool, tnode, descs));
-      } else {
-        DCHECK(tnode.sort_node.type == TSortType::TOTAL);
-        *node = pool->Add(new SortNode(pool, tnode, descs));
-      }
-      break;
-    case TPlanNodeType::UNION_NODE:
-      *node = pool->Add(new UnionNode(pool, tnode, descs));
-      break;
-    case TPlanNodeType::ANALYTIC_EVAL_NODE:
-      *node = pool->Add(new AnalyticEvalNode(pool, tnode, descs));
-      break;
-    case TPlanNodeType::SINGULAR_ROW_SRC_NODE:
-      *node = pool->Add(new SingularRowSrcNode(pool, tnode, descs));
-      break;
-    case TPlanNodeType::SUBPLAN_NODE:
-      *node = pool->Add(new SubplanNode(pool, tnode, descs));
-      break;
-    case TPlanNodeType::UNNEST_NODE:
-      *node = pool->Add(new UnnestNode(pool, tnode, descs));
-      break;
-    case TPlanNodeType::CARDINALITY_CHECK_NODE:
-      *node = pool->Add(new CardinalityCheckNode(pool, tnode, descs));
-      break;
-    default:
-      map<int, const char*>::const_iterator i =
-          _TPlanNodeType_VALUES_TO_NAMES.find(tnode.node_type);
-      const char* str = "unknown node type";
-      if (i != _TPlanNodeType_VALUES_TO_NAMES.end()) {
-        str = i->second;
-      }
-      error_msg << str << " not implemented";
-      return Status(error_msg.str());
+  if (!(*root)->children_.empty()) {
+    (*root)->runtime_profile()->AddChild((*root)->children_[0]->runtime_profile(), false);
   }
   return Status::OK();
 }

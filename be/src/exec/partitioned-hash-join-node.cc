@@ -48,11 +48,52 @@ static const string PREPARE_FOR_READ_FAILED_ERROR_MSG =
 using namespace impala;
 using strings::Substitute;
 
-PartitionedHashJoinNode::PartitionedHashJoinNode(
-    ObjectPool* pool, const TPlanNode& tnode, const DescriptorTbl& descs)
-  : BlockingJoinNode(
-        "PartitionedHashJoinNode", tnode.hash_join_node.join_op, pool, tnode, descs) {
+Status PartitionedHashJoinPlanNode::Init(const TPlanNode& tnode, RuntimeState* state) {
+  RETURN_IF_ERROR(BlockingJoinPlanNode::Init(tnode, state));
+  DCHECK(tnode.__isset.hash_join_node);
+  const vector<TEqJoinCondition>& eq_join_conjuncts =
+      tnode.hash_join_node.eq_join_conjuncts;
+  // TODO: change PhjBuilder::InitExprsAndFilters to accept the runtime filter contexts
+  // and build_exprs_ generated here in init and not create its own. Then pass those in
+  // during Prepare phase.
+
+  for (const TEqJoinCondition& eq_join_conjunct : eq_join_conjuncts) {
+    ScalarExpr* probe_expr;
+    RETURN_IF_ERROR(ScalarExpr::Create(
+        eq_join_conjunct.left,*children_[0]->row_descriptor_, state, &probe_expr));
+    probe_exprs_.push_back(probe_expr);
+    ScalarExpr* build_expr;
+    RETURN_IF_ERROR(ScalarExpr::Create(
+        eq_join_conjunct.right, *children_[1]->row_descriptor_, state, &build_expr));
+    build_exprs_.push_back(build_expr);
+  }
+  // other_join_conjuncts_ are evaluated in the context of rows assembled from all build
+  // and probe tuples; full_row_desc is not necessarily the same as the output row desc,
+  // e.g., because semi joins only return the build xor probe tuples
+  RowDescriptor full_row_desc(
+      *children_[0]->row_descriptor_, *children_[1]->row_descriptor_);
+  RETURN_IF_ERROR(ScalarExpr::Create(tnode.hash_join_node.other_join_conjuncts,
+      full_row_desc, state, &other_join_conjuncts_));
+  DCHECK(tnode.hash_join_node.join_op != TJoinOp::NULL_AWARE_LEFT_ANTI_JOIN
+      || eq_join_conjuncts.size() == 1);
+  return Status::OK();
+}
+
+Status PartitionedHashJoinPlanNode::CreateExecNode(
+    RuntimeState* state, ExecNode** node) const {
+  ObjectPool* pool = state->obj_pool();
+  *node = pool->Add(new PartitionedHashJoinNode(pool, *this, state->desc_tbl()));
+  return Status::OK();
+}
+
+PartitionedHashJoinNode::PartitionedHashJoinNode(ObjectPool* pool,
+    const PartitionedHashJoinPlanNode& pnode, const DescriptorTbl& descs)
+  : BlockingJoinNode("PartitionedHashJoinNode", pnode.tnode_->hash_join_node.join_op,
+        pool, pnode, descs) {
   memset(hash_tbls_, 0, sizeof(HashTable*) * PARTITION_FANOUT);
+  build_exprs_ = pnode.build_exprs_;
+  probe_exprs_ = pnode.probe_exprs_;
+  other_join_conjuncts_ = pnode.other_join_conjuncts_;
 }
 
 PartitionedHashJoinNode::~PartitionedHashJoinNode() {
@@ -60,45 +101,25 @@ PartitionedHashJoinNode::~PartitionedHashJoinNode() {
   DCHECK(null_probe_rows_ == NULL);
 }
 
-Status PartitionedHashJoinNode::Init(const TPlanNode& tnode, RuntimeState* state) {
-  RETURN_IF_ERROR(BlockingJoinNode::Init(tnode, state));
-  DCHECK(tnode.__isset.hash_join_node);
-  const vector<TEqJoinCondition>& eq_join_conjuncts =
-      tnode.hash_join_node.eq_join_conjuncts;
-  // TODO: allow PhjBuilder to be the sink of a separate fragment. For now, PhjBuilder is
-  // owned by this node, but duplicates some state (exprs, etc) in anticipation of it
-  // being separated out further.
-  builder_.reset(new PhjBuilder(id(), label(), join_op_,
-      child(1)->row_desc(), state, buffer_pool_client(),
-      resource_profile_.spillable_buffer_size, resource_profile_.max_row_buffer_size));
-  RETURN_IF_ERROR(
-      builder_->InitExprsAndFilters(state, eq_join_conjuncts, tnode.runtime_filters));
-
-  for (const TEqJoinCondition& eq_join_conjunct : eq_join_conjuncts) {
-    ScalarExpr* probe_expr;
-    RETURN_IF_ERROR(ScalarExpr::Create(
-        eq_join_conjunct.left, *child(0)->row_desc(), state, &probe_expr));
-    probe_exprs_.push_back(probe_expr);
-    ScalarExpr* build_expr;
-    RETURN_IF_ERROR(ScalarExpr::Create(
-        eq_join_conjunct.right, *child(1)->row_desc(), state, &build_expr));
-    build_exprs_.push_back(build_expr);
-  }
-  // other_join_conjuncts_ are evaluated in the context of rows assembled from all build
-  // and probe tuples; full_row_desc is not necessarily the same as the output row desc,
-  // e.g., because semi joins only return the build xor probe tuples
-  RowDescriptor full_row_desc(*child(0)->row_desc(), *child(1)->row_desc());
-  RETURN_IF_ERROR(ScalarExpr::Create(tnode.hash_join_node.other_join_conjuncts,
-      full_row_desc, state, &other_join_conjuncts_));
-  DCHECK(join_op_ != TJoinOp::NULL_AWARE_LEFT_ANTI_JOIN || eq_join_conjuncts.size() == 1);
-  return Status::OK();
-}
-
 Status PartitionedHashJoinNode::Prepare(RuntimeState* state) {
   SCOPED_TIMER(runtime_profile_->total_time_counter());
 
   RETURN_IF_ERROR(BlockingJoinNode::Prepare(state));
   runtime_state_ = state;
+  const vector<TEqJoinCondition>& eq_join_conjuncts =
+      plan_node_.tnode_->hash_join_node.eq_join_conjuncts;
+  // TODO: allow PhjBuilder to be the sink of a separate fragment. For now, PhjBuilder is
+  // owned by this node, but duplicates some state (exprs, etc) in anticipation of it
+  // being separated out further.
+  // TODO: Move the builder creation on Expr Init into the constructor once the PlanRoot
+  // Equivalent of a sink is implemented. build_exprs_ and filter_exprs can be passed
+  // directly from those generated in Phj node, only thing left to do is register the
+  // filters.
+  builder_.reset(new PhjBuilder(id(), label(), join_op_, child(1)->row_desc(), state,
+      buffer_pool_client(), resource_profile_.spillable_buffer_size,
+      resource_profile_.max_row_buffer_size));
+  RETURN_IF_ERROR(builder_->InitExprsAndFilters(
+      state, eq_join_conjuncts, plan_node_.tnode_->runtime_filters));
 
   RETURN_IF_ERROR(builder_->Prepare(state, mem_tracker()));
   runtime_profile()->PrependChild(builder_->profile());

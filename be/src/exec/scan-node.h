@@ -29,6 +29,12 @@ namespace impala {
 class BlockingRowBatchQueue;
 class TScanRange;
 
+class ScanPlanNode : public PlanNode {
+ public:
+  virtual Status Init(const TPlanNode& tnode, RuntimeState* state) override;
+  virtual Status CreateExecNode(RuntimeState* state, ExecNode** node) const override;
+};
+
 /// Abstract base class of all scan nodes. Subclasses support different storage layers
 /// and different threading models.
 ///
@@ -91,13 +97,15 @@ class TScanRange;
 ///   RowBatchQueuePeakMemoryUsage - peak memory consumption of row batches enqueued in
 ///     the scan node's output queue.
 ///
+
 class ScanNode : public ExecNode {
  public:
-  ScanNode(ObjectPool* pool, const TPlanNode& tnode, const DescriptorTbl& descs)
-    : ExecNode(pool, tnode, descs),
-      scan_range_params_(NULL) {}
+  ScanNode(ObjectPool* pool, const ScanPlanNode& pnode, const DescriptorTbl& descs)
+    : ExecNode(pool, pnode, descs),
+      scan_range_params_(NULL) {
+    filter_exprs_ = pnode.runtime_filter_exprs_;
+  }
 
-  virtual Status Init(const TPlanNode& tnode, RuntimeState* state) WARN_UNUSED_RESULT;
   virtual Status Prepare(RuntimeState* state) WARN_UNUSED_RESULT;
   virtual Status Open(RuntimeState* state) WARN_UNUSED_RESULT;
 

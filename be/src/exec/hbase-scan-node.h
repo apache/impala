@@ -35,7 +35,7 @@ class Tuple;
 ///
 class HBaseScanNode : public ScanNode {
  public:
-  HBaseScanNode(ObjectPool* pool, const TPlanNode& tnode, const DescriptorTbl& descs);
+  HBaseScanNode(ObjectPool* pool, const ScanPlanNode& pnode, const DescriptorTbl& descs);
 
   ~HBaseScanNode();
 

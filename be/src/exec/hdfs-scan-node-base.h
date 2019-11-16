@@ -98,6 +98,19 @@ struct ScanRangeMetadata {
       : partition_id(partition_id), original_split(original_split) { }
 };
 
+class HdfsScanPlanNode : public ScanPlanNode {
+ public:
+  virtual Status Init(const TPlanNode& tnode, RuntimeState* state) override;
+  virtual Status CreateExecNode(RuntimeState* state, ExecNode** node) const override;
+
+  /// Conjuncts for each materialized tuple (top-level row batch tuples and collection
+  /// item tuples). Includes a copy of PlanNode.conjuncts_.
+  typedef std::unordered_map<TupleId, std::vector<ScalarExpr*>> ConjunctsMap;
+  ConjunctsMap conjuncts_map_;
+
+  /// Conjuncts to evaluate on parquet::Statistics.
+  std::vector<ScalarExpr*> min_max_conjuncts_;
+};
 
 /// Base class for all Hdfs scan nodes. Contains common members and functions
 /// that are independent of whether batches are materialized by the main thread
@@ -155,13 +168,13 @@ struct ScanRangeMetadata {
 ///
 /// TODO: Once the legacy scan node has been removed, several functions can be made
 /// non-virtual. Also merge this class with HdfsScanNodeMt.
+
 class HdfsScanNodeBase : public ScanNode {
  public:
-  HdfsScanNodeBase(ObjectPool* pool, const TPlanNode& tnode, const DescriptorTbl& descs);
+  HdfsScanNodeBase(ObjectPool* pool, const HdfsScanPlanNode& pnode,
+      const THdfsScanNode& hdfs_scan_node, const DescriptorTbl& descs);
   ~HdfsScanNodeBase();
 
-  virtual Status Init(const TPlanNode& tnode, RuntimeState* state)
-      override WARN_UNUSED_RESULT;
   virtual Status Prepare(RuntimeState* state) override WARN_UNUSED_RESULT;
   virtual void Codegen(RuntimeState* state) override;
   virtual Status Open(RuntimeState* state) override WARN_UNUSED_RESULT;

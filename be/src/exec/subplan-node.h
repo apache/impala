@@ -25,6 +25,21 @@ namespace impala {
 
 class TupleRow;
 
+class SubplanPlanNode : public PlanNode {
+ public:
+  virtual Status Init(const TPlanNode& tnode, RuntimeState* state) override;
+  virtual Status CreateExecNode(RuntimeState* state, ExecNode** node) const override;
+
+  /// Sets 'ancestor' as the containing Subplan in all plan nodes inside the plan-node
+  /// tree rooted at 'node' and does any initialization that is required as a result of
+  /// setting the subplan. Doesn't traverse the second child of SubplanPlanNodes within
+  /// 'node'.
+  Status SetContainingSubplan(
+    RuntimeState* state, SubplanPlanNode* ancestor, PlanNode* node);
+
+  ~SubplanPlanNode(){}
+};
+
 /// For every input row from its first child, a SubplanNode evaluates and pulls all
 /// results from its second child, resetting the second child after every input row.
 /// A SubplanNode does not create any output rows itself. It merely
@@ -46,11 +61,11 @@ class TupleRow;
 /// The resources owned by batches from the first child of this node are always
 /// transferred to the output batch right before fetching a new batch from the
 /// first child.
+
 class SubplanNode : public ExecNode {
  public:
-  SubplanNode(ObjectPool* pool, const TPlanNode& tnode, const DescriptorTbl& descs);
+  SubplanNode(ObjectPool* pool, const SubplanPlanNode& pnode, const DescriptorTbl& descs);
 
-  virtual Status Init(const TPlanNode& tnode, RuntimeState* state);
   virtual Status Prepare(RuntimeState* state);
   virtual Status Open(RuntimeState* state);
   virtual Status GetNext(RuntimeState* state, RowBatch* row_batch, bool* eos);
@@ -62,10 +77,10 @@ class SubplanNode : public ExecNode {
   friend class UnnestNode;
 
   /// Sets 'ancestor' as the containing Subplan in all exec nodes inside the exec-node
-  /// tree rooted at 'node' and does any initialization that is required as a result of
-  /// setting the subplan. Doesn't traverse the second child of SubplanNodes within
-  /// 'node'.
-  Status SetContainingSubplan(RuntimeState* state, SubplanNode* ancestor, ExecNode* node);
+  /// tree rooted at 'node'. Doesn't traverse the second child of SubplanNodes within
+  /// 'node'. Should be called in Prepare before calling ExecNode's Prepare so that all
+  /// the children nodes have this set before prepare is called on them.
+  void SetContainingSubplan(SubplanNode* ancestor, ExecNode* node);
 
   /// Returns the current row from child(0) or NULL if no rows from child(0) have been
   /// retrieved yet (GetNext() has not yet been called). This function is called by

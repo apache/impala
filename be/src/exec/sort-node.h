@@ -23,6 +23,24 @@
 
 namespace impala {
 
+class SortPlanNode : public PlanNode {
+ public:
+  virtual Status Init(const TPlanNode& tnode, RuntimeState* state) override;
+  virtual Status CreateExecNode(RuntimeState* state, ExecNode** node) const override;
+
+  ~SortPlanNode(){}
+
+  /// Expressions and parameters used for tuple comparison.
+  std::vector<ScalarExpr*> ordering_exprs_;
+
+  /// Expressions used to materialize slots in the tuples to be sorted.
+  /// One expr per slot in the materialized tuple.
+  std::vector<ScalarExpr*> sort_tuple_slot_exprs_;
+
+  std::vector<bool> is_asc_order_;
+  std::vector<bool> nulls_first_;
+};
+
 /// Node that implements a full sort of its input with a fixed memory budget, spilling
 /// to disk if the input is larger than available memory.
 /// Uses Sorter for the external sort implementation.
@@ -32,12 +50,12 @@ namespace impala {
 /// in Open() to fill it with sorted rows.
 /// If a merge phase was performed in the sort, sorted rows are deep copied into
 /// the output batch. Otherwise, the sorter instance owns the sorted data.
+
 class SortNode : public ExecNode {
  public:
-  SortNode(ObjectPool* pool, const TPlanNode& tnode, const DescriptorTbl& descs);
+  SortNode(ObjectPool* pool, const SortPlanNode& pnode, const DescriptorTbl& descs);
   ~SortNode();
 
-  virtual Status Init(const TPlanNode& tnode, RuntimeState* state);
   virtual Status Prepare(RuntimeState* state);
   virtual void Codegen(RuntimeState* state);
   virtual Status Open(RuntimeState* state);

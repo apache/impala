@@ -37,7 +37,8 @@ class TPlanNode;
 /// in the thread calling GetNext(). Uses the HdfsScanner::GetNext() interface.
 class HdfsScanNodeMt : public HdfsScanNodeBase {
  public:
-  HdfsScanNodeMt(ObjectPool* pool, const TPlanNode& tnode, const DescriptorTbl& descs);
+  HdfsScanNodeMt(
+      ObjectPool* pool, const HdfsScanPlanNode& pnode, const DescriptorTbl& descs);
   ~HdfsScanNodeMt();
 
   virtual Status Prepare(RuntimeState* state) override WARN_UNUSED_RESULT;

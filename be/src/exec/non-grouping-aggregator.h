@@ -27,6 +27,7 @@
 namespace impala {
 
 class AggFnEvaluator;
+class AggregationPlanNode;
 class DescriptorTbl;
 class ExecNode;
 class LlvmCodeGen;
@@ -41,8 +42,8 @@ class Tuple;
 /// not support streaming preaggregation.
 class NonGroupingAggregator : public Aggregator {
  public:
-  NonGroupingAggregator(ExecNode* exec_node, ObjectPool* pool,
-      const TAggregator& taggregator, const DescriptorTbl& descs, int agg_idx);
+  NonGroupingAggregator(
+      ExecNode* exec_node, ObjectPool* pool, const AggregatorConfig& config, int agg_idx);
 
   virtual Status Prepare(RuntimeState* state) override;
   virtual void Codegen(RuntimeState* state) override;

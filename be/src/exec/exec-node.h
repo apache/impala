@@ -44,29 +44,87 @@ class RowBatch;
 class RuntimeState;
 class ScalarExpr;
 class SubplanNode;
+class SubplanPlanNode;
 class TPlan;
 class TupleRow;
 class TDebugOptions;
+class ExecNode;
 
-/// Superclass of all execution nodes.
+/// PlanNode and ExecNode are the super-classes of all plan nodes and execution nodes
+/// respectively. The plan nodes contain a subset of the static state of their
+/// corresponding ExecNode, of which there is one instance per fragment. ExecNode contains
+/// only runtime state and there can be up to MT_DOP instances of it per fragment.
+/// Hence every ExecNode has a corresponding PlanNode which may or may not be at the same
+/// level of hierarchy as the ExecNode.
+/// TODO: IMPALA-9216: Move all the static state of ExecNode into PlanNode.
 ///
 /// All subclasses need to make sure to check RuntimeState::is_cancelled()
 /// periodically in order to ensure timely termination after the cancellation
 /// flag gets set.
-/// TODO: Move static state of ExecNode into PlanNode, of which there is one instance
-/// per fragment. ExecNode contains only runtime state and there can be up to MT_DOP
-/// instances of it per fragment.
+
+class PlanNode {
+ public:
+  PlanNode() = default;
+
+  /// Initializes this object from the thrift tnode desc. All internal members created and
+  /// initialized here will be owned by state->obj_pool().
+  /// If overridden in subclass, must first call superclass's Init().
+  /// Should only be called after all children have been set and Init()-ed.
+  virtual Status Init(const TPlanNode& tnode, RuntimeState* state);
+
+  /// Create its corresponding exec node. Place exec node in state->obj_pool().
+  virtual Status CreateExecNode(RuntimeState* state, ExecNode** node) const = 0;
+
+  /// Creates plan node tree from list of nodes contained in plan via depth-first
+  /// traversal. All nodes are placed in state->obj_pool() and have Init() called on them.
+  /// Returns error if 'plan' is corrupted, otherwise success.
+  static Status CreateTree(
+      RuntimeState* state, const TPlan& plan, PlanNode** root) WARN_UNUSED_RESULT;
+
+  virtual ~PlanNode(){}
+
+  /// TODO: IMPALA-9216: Add accessor methods for these members instead of making
+  /// them public.
+  /// Reference to the thrift node that represents this PlanNode.
+  const TPlanNode* tnode_ = nullptr;
+
+  /// Conjuncts in this node. 'conjuncts_' live in this exec node's object pool. Note:
+  /// conjunct_evals_ are not created for Aggregation nodes. TODO: move conjuncts to
+  /// query-state's obj pool.
+  std::vector<ScalarExpr*> conjuncts_;
+
+  RowDescriptor* row_descriptor_ = nullptr;
+
+  // Runtime filter's expressions assigned to this plan node.
+  std::vector<ScalarExpr*> runtime_filter_exprs_;
+
+  std::vector<PlanNode*> children_;
+
+  /// Pointer to the containing SubplanPlanNode or NULL if not inside a subplan.
+  /// Set by the containing SubplanPlanNode::Prepare() before Prepare() is called on
+  /// 'this' node. Not owned.
+  SubplanPlanNode* containing_subplan_ = nullptr;
+
+ private:
+  DISALLOW_COPY_AND_ASSIGN(PlanNode);
+
+  /// Create a single exec node derived from thrift node; place exec node in 'pool'.
+  static Status CreatePlanNode(ObjectPool* pool, const TPlanNode& tnode, PlanNode** node,
+      RuntimeState* state) WARN_UNUSED_RESULT;
+
+  static Status CreateTreeHelper(RuntimeState* state,
+      const std::vector<TPlanNode>& tnodes, PlanNode* parent, int* node_idx,
+      PlanNode** root) WARN_UNUSED_RESULT;
+};
+
 class ExecNode {
  public:
-  /// Init conjuncts.
-  ExecNode(ObjectPool* pool, const TPlanNode& tnode, const DescriptorTbl& descs);
+  /// Copies over state from the 'pnode', initializes internal objects from 'pool' that
+  /// cannot fail during initialization and finally initializes references to descriptors
+  /// from 'descs'.
+  ExecNode(ObjectPool* pool, const PlanNode& pnode, const DescriptorTbl& descs);
 
   virtual ~ExecNode();
-
-  /// Initializes this object from the thrift tnode desc. The subclass should
-  /// do any initialization that can fail in Init() rather than the ctor.
-  /// If overridden in subclass, must first call superclass's Init().
-  virtual Status Init(const TPlanNode& tnode, RuntimeState* state) WARN_UNUSED_RESULT;
 
   /// Sets up internal structures, etc., without doing any actual work.
   /// Must be called prior to Open(). Will only be called once in this
@@ -142,9 +200,9 @@ class ExecNode {
   virtual void Close(RuntimeState* state);
 
   /// Creates exec node tree from list of nodes contained in plan via depth-first
-  /// traversal. All nodes are placed in state->obj_pool() and have Init() called on them.
-  /// Returns error if 'plan' is corrupted, otherwise success.
-  static Status CreateTree(RuntimeState* state, const TPlan& plan,
+  /// traversal. All nodes are placed in state->obj_pool().
+  /// Returns error if 'plan_node' is corrupted, otherwise success.
+  static Status CreateTree(RuntimeState* state, const PlanNode& plan_node,
       const DescriptorTbl& descs, ExecNode** root) WARN_UNUSED_RESULT;
 
   /// Set debug action in 'tree' according to debug_options.
@@ -203,9 +261,12 @@ class ExecNode {
 
   ExecNode* child(int i) { return children_[i]; }
   int num_children() const { return children_.size(); }
+
+  /// Valid to call in or after Prepare().
   SubplanNode* get_containing_subplan() const { return containing_subplan_; }
+
   void set_containing_subplan(SubplanNode* sp) {
-    DCHECK(containing_subplan_ == NULL);
+    DCHECK(containing_subplan_ == nullptr);
     containing_subplan_ = sp;
   }
 
@@ -261,8 +322,7 @@ class ExecNode {
   bool IsNodeCodegenDisabled() const;
 
   /// Returns true if this node is inside the right-hand side plan tree of a SubplanNode.
-  /// Valid to call in or after Prepare().
-  bool IsInSubplan() const { return containing_subplan_ != NULL; }
+  bool IsInSubplan() const { return plan_node_.containing_subplan_ != nullptr; }
 
   /// Names of counters shared by all exec nodes
   static const std::string ROW_THROUGHPUT_COUNTER;
@@ -300,6 +360,11 @@ class ExecNode {
     return reservation_manager_.ReleaseUnusedReservation();
   }
 
+  /// Reference to the PlanNode shared across fragment instances.
+  /// TODO: Store a specialized reference directly in the child classes when all static
+  /// state is moved there and accessed directly.
+  const PlanNode& plan_node_;
+
   /// Unique within a single plan tree.
   int id_;
   TPlanNodeType::type type_;
@@ -317,12 +382,12 @@ class ExecNode {
 
   /// Conjuncts and their evaluators in this node. 'conjuncts_' live in the
   /// query-state's object pool while the evaluators live in this exec node's
-  /// object pool.
+  /// object pool. Note: conjunct_evals_ are not created for Aggregation nodes.
   std::vector<ScalarExpr*> conjuncts_;
   std::vector<ScalarExprEvaluator*> conjunct_evals_;
 
   std::vector<ExecNode*> children_;
-  RowDescriptor row_descriptor_;
+  RowDescriptor& row_descriptor_;
 
   /// Resource information sent from the frontend.
   const TBackendResourceProfile resource_profile_;
@@ -356,20 +421,11 @@ class ExecNode {
   boost::scoped_ptr<MemPool> expr_results_pool_;
 
   /// Pointer to the containing SubplanNode or NULL if not inside a subplan.
-  /// Set by SubplanNode::Init(). Not owned.
+  /// Set by SubplanNode::Prepare() before Prepare() is called on 'this' node. Not owned.
   SubplanNode* containing_subplan_;
 
   /// If true, codegen should be disabled for this exec node.
   const bool disable_codegen_;
-
-  /// Create a single exec node derived from thrift node; place exec node in 'pool'.
-  static Status CreateNode(ObjectPool* pool, const TPlanNode& tnode,
-      const DescriptorTbl& descs, ExecNode** node,
-      RuntimeState* state) WARN_UNUSED_RESULT;
-
-  static Status CreateTreeHelper(RuntimeState* state,
-      const std::vector<TPlanNode>& tnodes, const DescriptorTbl& descs, ExecNode* parent,
-      int* node_idx, ExecNode** root) WARN_UNUSED_RESULT;
 
   virtual bool IsScanNode() const { return false; }
 
@@ -429,6 +485,8 @@ class ExecNode {
   bool CheckLimitAndTruncateRowBatchIfNeededShared(RowBatch* row_batch, bool* eos);
 
  private:
+  DISALLOW_COPY_AND_ASSIGN(ExecNode);
+
   /// Keeps track of number of rows returned by an exec node. If this variable is shared
   /// by multiple threads, it should be accessed using thread-safe functions defined
   /// above. The single-threaded code-paths should use non-atomic functions defined

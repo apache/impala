@@ -39,21 +39,21 @@ using namespace impala;
 PROFILE_DEFINE_TIMER(TotalRawHBaseReadTime, STABLE_HIGH,
     "Aggregate wall clock time spent reading from HBase.");
 
-HBaseScanNode::HBaseScanNode(ObjectPool* pool, const TPlanNode& tnode,
+HBaseScanNode::HBaseScanNode(ObjectPool* pool, const ScanPlanNode& pnode,
                              const DescriptorTbl& descs)
-    : ScanNode(pool, tnode, descs),
-      table_name_(tnode.hbase_scan_node.table_name),
-      tuple_id_(tnode.hbase_scan_node.tuple_id),
+    : ScanNode(pool, pnode, descs),
+      table_name_(pnode.tnode_->hbase_scan_node.table_name),
+      tuple_id_(pnode.tnode_->hbase_scan_node.tuple_id),
       tuple_desc_(NULL),
       tuple_idx_(0),
-      filters_(tnode.hbase_scan_node.filters),
+      filters_(pnode.tnode_->hbase_scan_node.filters),
       hbase_scanner_(NULL),
       row_key_slot_(NULL),
       row_key_binary_encoded_(false),
       text_converter_(new TextConverter('\\', "", false)),
       suggested_max_caching_(0) {
-  if (tnode.hbase_scan_node.__isset.suggested_max_caching) {
-    suggested_max_caching_ = tnode.hbase_scan_node.suggested_max_caching;
+  if (pnode.tnode_->hbase_scan_node.__isset.suggested_max_caching) {
+    suggested_max_caching_ = pnode.tnode_->hbase_scan_node.suggested_max_caching;
   }
 }
 

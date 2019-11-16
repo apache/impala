@@ -38,6 +38,22 @@ class RowBatch;
 class RuntimeFilter;
 class TupleRow;
 
+class PartitionedHashJoinPlanNode : public BlockingJoinPlanNode {
+ public:
+  virtual Status Init(const TPlanNode& tnode, RuntimeState* state) override;
+  virtual Status CreateExecNode(RuntimeState* state, ExecNode** node) const override;
+
+  ~PartitionedHashJoinPlanNode(){}
+
+  /// Our equi-join predicates "<lhs> = <rhs>" are separated into
+  /// build_exprs_ (over child(1)) and probe_exprs_ (over child(0))
+  std::vector<ScalarExpr*> build_exprs_;
+  std::vector<ScalarExpr*> probe_exprs_;
+
+  /// Non-equi-join conjuncts from the ON clause.
+  std::vector<ScalarExpr*> other_join_conjuncts_;
+};
+
 /// Operator to perform partitioned hash join, spilling to disk as necessary. This
 /// operator implements multiple join modes with the same code algorithm.
 ///
@@ -109,13 +125,13 @@ class TupleRow;
 /// NULLs into several different streams, which are processed in a separate step to
 /// produce additional output rows. The NAAJ algorithm is documented in more detail in
 /// header comments for the null aware functions and data structures.
+
 class PartitionedHashJoinNode : public BlockingJoinNode {
  public:
-  PartitionedHashJoinNode(ObjectPool* pool, const TPlanNode& tnode,
+  PartitionedHashJoinNode(ObjectPool* pool, const PartitionedHashJoinPlanNode& pnode,
       const DescriptorTbl& descs);
   virtual ~PartitionedHashJoinNode();
 
-  virtual Status Init(const TPlanNode& tnode, RuntimeState* state) override;
   virtual Status Prepare(RuntimeState* state) override;
   virtual void Codegen(RuntimeState* state) override;
   virtual Status Open(RuntimeState* state) override;
@@ -536,7 +552,7 @@ class PartitionedHashJoinNode : public BlockingJoinNode {
   /// State of the probing algorithm. Used to drive the state machine in GetNext().
   ProbeState probe_state_ = ProbeState::PROBE_COMPLETE;
 
-  /// The build-side of the join. Initialized in Init().
+  /// The build-side of the join. Initialized in Prepare().
   boost::scoped_ptr<PhjBuilder> builder_;
 
   /// Last set of hash partitions obtained from builder_. Only valid when the

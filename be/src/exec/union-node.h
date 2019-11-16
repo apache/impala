@@ -36,6 +36,21 @@ class Tuple;
 class TupleRow;
 class TPlanNode;
 
+class UnionPlanNode : public PlanNode {
+ public:
+  virtual Status Init(const TPlanNode& tnode, RuntimeState* state) override;
+  virtual Status CreateExecNode(RuntimeState* state, ExecNode** node) const override;
+
+  ~UnionPlanNode(){}
+
+  /// Const exprs materialized by this node. These exprs don't refer to any children.
+  /// Only materialized by the first fragment instance to avoid duplication.
+  std::vector<std::vector<ScalarExpr*>> const_exprs_lists_;
+
+  /// Exprs materialized by this node. The i-th result expr list refers to the i-th child.
+  std::vector<std::vector<ScalarExpr*>> child_exprs_lists_;
+};
+
 /// Node that merges the results of its children by either materializing their
 /// evaluated expressions into row batches or passing through (forwarding) the
 /// batches if the input tuple layout is identical to the output tuple layout
@@ -43,11 +58,11 @@ class TPlanNode;
 /// such that all passthrough children come before the children that need
 /// materialization. The union node pulls from its children sequentially, i.e.
 /// it exhausts one child completely before moving on to the next one.
+
 class UnionNode : public ExecNode {
  public:
-  UnionNode(ObjectPool* pool, const TPlanNode& tnode, const DescriptorTbl& descs);
+  UnionNode(ObjectPool* pool, const UnionPlanNode& pnode, const DescriptorTbl& descs);
 
-  virtual Status Init(const TPlanNode& tnode, RuntimeState* state);
   virtual Status Prepare(RuntimeState* state);
   virtual void Codegen(RuntimeState* state);
   virtual Status Open(RuntimeState* state);

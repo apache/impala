@@ -33,16 +33,33 @@ class MemPool;
 class RuntimeState;
 class Tuple;
 
+class TopNPlanNode : public PlanNode {
+ public:
+  virtual Status Init(const TPlanNode& tnode, RuntimeState* state) override;
+  virtual Status CreateExecNode(RuntimeState* state, ExecNode** node) const override;
+
+  ~TopNPlanNode(){}
+
+  /// Ordering expressions used for tuple comparison.
+  std::vector<ScalarExpr*> ordering_exprs_;
+
+  /// Materialization exprs for the output tuple and their evaluators.
+  std::vector<ScalarExpr*> output_tuple_exprs_;
+
+  std::vector<bool> is_asc_order_;
+  std::vector<bool> nulls_first_;
+};
+
 /// Node for in-memory TopN (ORDER BY ... LIMIT)
 /// This handles the case where the result fits in memory.
 /// This node will materialize its input rows into a new tuple using the expressions
 /// in sort_tuple_slot_exprs_ in its sort_exec_exprs_ member.
 /// TopN is implemented by storing rows in a priority queue.
+
 class TopNNode : public ExecNode {
  public:
-  TopNNode(ObjectPool* pool, const TPlanNode& tnode, const DescriptorTbl& descs);
+  TopNNode(ObjectPool* pool, const TopNPlanNode& pnode, const DescriptorTbl& descs);
 
-  virtual Status Init(const TPlanNode& tnode, RuntimeState* state);
   virtual Status Prepare(RuntimeState* state);
   virtual void Codegen(RuntimeState* state);
   virtual Status Open(RuntimeState* state);

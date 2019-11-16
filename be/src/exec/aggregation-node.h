@@ -32,7 +32,8 @@ class RuntimeState;
 /// Aggregator, which does the actual work of aggregating.
 class AggregationNode : public AggregationNodeBase {
  public:
-  AggregationNode(ObjectPool* pool, const TPlanNode& tnode, const DescriptorTbl& descs);
+  AggregationNode(
+      ObjectPool* pool, const AggregationPlanNode& pnode, const DescriptorTbl& descs);
 
   virtual Status Open(RuntimeState* state) override;
   virtual Status GetNext(RuntimeState* state, RowBatch* row_batch, bool* eos) override;

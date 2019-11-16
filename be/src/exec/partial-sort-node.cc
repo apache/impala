@@ -27,32 +27,42 @@
 
 namespace impala {
 
+Status PartialSortPlanNode::Init(const TPlanNode& tnode, RuntimeState* state) {
+  DCHECK(!tnode.sort_node.__isset.offset || tnode.sort_node.offset == 0);
+  RETURN_IF_ERROR(PlanNode::Init(tnode, state));
+  const TSortInfo& tsort_info = tnode.sort_node.sort_info;
+  RETURN_IF_ERROR(ScalarExpr::Create(
+      tsort_info.ordering_exprs, *row_descriptor_, state, &ordering_exprs_));
+  DCHECK(tsort_info.__isset.sort_tuple_slot_exprs);
+  RETURN_IF_ERROR(ScalarExpr::Create(tsort_info.sort_tuple_slot_exprs,
+      *children_[0]->row_descriptor_, state, &sort_tuple_slot_exprs_));
+  is_asc_order_ = tnode.sort_node.sort_info.is_asc_order;
+  nulls_first_ = tnode.sort_node.sort_info.nulls_first;
+  return Status::OK();
+}
+
+Status PartialSortPlanNode::CreateExecNode(RuntimeState* state, ExecNode** node) const {
+  ObjectPool* pool = state->obj_pool();
+  *node = pool->Add(new PartialSortNode(pool, *this, state->desc_tbl()));
+  return Status::OK();
+}
+
 PartialSortNode::PartialSortNode(
-    ObjectPool* pool, const TPlanNode& tnode, const DescriptorTbl& descs)
-  : ExecNode(pool, tnode, descs),
+    ObjectPool* pool, const PartialSortPlanNode& pnode, const DescriptorTbl& descs)
+  : ExecNode(pool, pnode, descs),
     sorter_(nullptr),
     input_batch_index_(0),
     input_eos_(false),
-    sorter_eos_(true) {}
+    sorter_eos_(true) {
+  ordering_exprs_ = pnode.ordering_exprs_;
+  sort_tuple_exprs_ = pnode.sort_tuple_slot_exprs_;
+  is_asc_order_ = pnode.is_asc_order_;
+  nulls_first_ = pnode.nulls_first_;
+  runtime_profile()->AddInfoString("SortType", "Partial");
+}
 
 PartialSortNode::~PartialSortNode() {
   DCHECK(input_batch_.get() == nullptr);
-}
-
-Status PartialSortNode::Init(const TPlanNode& tnode, RuntimeState* state) {
-  DCHECK(!tnode.sort_node.__isset.offset || tnode.sort_node.offset == 0);
-  DCHECK(limit_ == -1);
-  const TSortInfo& tsort_info = tnode.sort_node.sort_info;
-  RETURN_IF_ERROR(ExecNode::Init(tnode, state));
-  RETURN_IF_ERROR(ScalarExpr::Create(
-      tsort_info.ordering_exprs, row_descriptor_, state, &ordering_exprs_));
-  DCHECK(tsort_info.__isset.sort_tuple_slot_exprs);
-  RETURN_IF_ERROR(ScalarExpr::Create(tsort_info.sort_tuple_slot_exprs,
-      *child(0)->row_desc(), state, &sort_tuple_exprs_));
-  is_asc_order_ = tnode.sort_node.sort_info.is_asc_order;
-  nulls_first_ = tnode.sort_node.sort_info.nulls_first;
-  runtime_profile()->AddInfoString("SortType", "Partial");
-  return Status::OK();
 }
 
 Status PartialSortNode::Prepare(RuntimeState* state) {

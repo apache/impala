@@ -47,6 +47,7 @@ class TQueryCtx;
 class QueryState;
 class RuntimeProfile;
 class ExecNode;
+class PlanNode;
 class PlanRootSink;
 class Thread;
 class DataSink;
@@ -149,9 +150,10 @@ class FragmentInstanceState {
 
   /// All following member variables that are initialized to nullptr are set
   /// in Prepare().
-
   ExecNode* exec_tree_ = nullptr; // lives in obj_pool()
   RuntimeState* runtime_state_ = nullptr;  // lives in obj_pool()
+  /// Lives in obj_pool(). Not mutated after being initialized.
+  const PlanNode* plan_tree_ = nullptr;
 
   /// A 'fake mutex' to detect any race condition in accessing 'report_seq_no_' below.
   /// There should be only one thread doing status report at the same time.

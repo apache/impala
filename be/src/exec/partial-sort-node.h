@@ -23,6 +23,24 @@
 
 namespace impala {
 
+class PartialSortPlanNode : public PlanNode {
+ public:
+  virtual Status Init(const TPlanNode& tnode, RuntimeState* state) override;
+  virtual Status CreateExecNode(RuntimeState* state, ExecNode** node) const override;
+
+  ~PartialSortPlanNode(){}
+
+    /// Expressions and parameters used for tuple comparison.
+  std::vector<ScalarExpr*> ordering_exprs_;
+
+  /// Expressions used to materialize slots in the tuples to be sorted.
+  /// One expr per slot in the materialized tuple.
+  std::vector<ScalarExpr*> sort_tuple_slot_exprs_;
+
+  std::vector<bool> is_asc_order_;
+  std::vector<bool> nulls_first_;
+};
+
 /// Node that implements a partial sort, where its input is divided up into runs, each
 /// of which is sorted individually.
 ///
@@ -40,12 +58,13 @@ namespace impala {
 /// single tuple is then what the sort operates on.
 ///
 /// PartialSortNode does not support limits or offsets.
+
 class PartialSortNode : public ExecNode {
  public:
-  PartialSortNode(ObjectPool* pool, const TPlanNode& tnode, const DescriptorTbl& descs);
+  PartialSortNode(
+      ObjectPool* pool, const PartialSortPlanNode& pnode, const DescriptorTbl& descs);
   ~PartialSortNode();
 
-  virtual Status Init(const TPlanNode& tnode, RuntimeState* state);
   virtual Status Prepare(RuntimeState* state);
   virtual void Codegen(RuntimeState* state);
   virtual Status Open(RuntimeState* state);

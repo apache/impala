@@ -41,45 +41,57 @@
 
 namespace impala {
 
-const char* Aggregator::LLVM_CLASS_NAME = "class.impala::Aggregator";
-
-Aggregator::Aggregator(ExecNode* exec_node, ObjectPool* pool,
-    const TAggregator& taggregator, const DescriptorTbl& descs, const std::string& name,
-    int agg_idx)
-  : id_(exec_node->id()),
-    exec_node_(exec_node),
-    agg_idx_(agg_idx),
-    pool_(pool),
-    intermediate_tuple_id_(taggregator.intermediate_tuple_id),
-    intermediate_tuple_desc_(descs.GetTupleDescriptor(intermediate_tuple_id_)),
+AggregatorConfig::AggregatorConfig(
+    const TAggregator& taggregator, RuntimeState* state, PlanNode* pnode)
+  : intermediate_tuple_id_(taggregator.intermediate_tuple_id),
+    intermediate_tuple_desc_(
+        state->desc_tbl().GetTupleDescriptor(intermediate_tuple_id_)),
     output_tuple_id_(taggregator.output_tuple_id),
-    output_tuple_desc_(descs.GetTupleDescriptor(output_tuple_id_)),
-    row_desc_(*exec_node->row_desc()),
-    input_row_desc_(*exec_node->child(0)->row_desc()),
-    needs_finalize_(taggregator.need_finalize),
-    runtime_profile_(RuntimeProfile::Create(pool_, name)) {}
+    output_tuple_desc_(state->desc_tbl().GetTupleDescriptor(output_tuple_id_)),
+    row_desc_(*pnode->row_descriptor_),
+    input_row_desc_(*pnode->children_[0]->row_descriptor_),
+    needs_finalize_(taggregator.need_finalize) {}
 
-Aggregator::~Aggregator() {}
-
-Status Aggregator::Init(const TAggregator& taggregator, RuntimeState* state,
-    const std::vector<TExpr>& conjuncts) {
+Status AggregatorConfig::Init(
+    const TAggregator& taggregator, RuntimeState* state, PlanNode* pnode) {
   DCHECK(intermediate_tuple_desc_ != nullptr);
   DCHECK(output_tuple_desc_ != nullptr);
   DCHECK_EQ(intermediate_tuple_desc_->slots().size(), output_tuple_desc_->slots().size());
-
-  int j = GetNumGroupingExprs();
+  int j = taggregator.grouping_exprs.size();
   for (int i = 0; i < taggregator.aggregate_functions.size(); ++i, ++j) {
     SlotDescriptor* intermediate_slot_desc = intermediate_tuple_desc_->slots()[j];
     SlotDescriptor* output_slot_desc = output_tuple_desc_->slots()[j];
     AggFn* agg_fn;
     RETURN_IF_ERROR(AggFn::Create(taggregator.aggregate_functions[i], input_row_desc_,
         *intermediate_slot_desc, *output_slot_desc, state, &agg_fn));
-    agg_fns_.push_back(agg_fn);
+    aggregate_functions_.push_back(agg_fn);
   }
 
-  RETURN_IF_ERROR(ScalarExpr::Create(conjuncts, row_desc_, state, &conjuncts_));
+  RETURN_IF_ERROR(
+      ScalarExpr::Create(pnode->tnode_->conjuncts, row_desc_, state, &conjuncts_));
   return Status::OK();
 }
+
+const char* Aggregator::LLVM_CLASS_NAME = "class.impala::Aggregator";
+
+Aggregator::Aggregator(ExecNode* exec_node, ObjectPool* pool,
+    const AggregatorConfig& config, const std::string& name, int agg_idx)
+  : id_(exec_node->id()),
+    exec_node_(exec_node),
+    agg_idx_(agg_idx),
+    pool_(pool),
+    intermediate_tuple_id_(config.intermediate_tuple_id_),
+    intermediate_tuple_desc_(config.intermediate_tuple_desc_),
+    output_tuple_id_(config.output_tuple_id_),
+    output_tuple_desc_(config.output_tuple_desc_),
+    row_desc_(config.row_desc_),
+    input_row_desc_(config.input_row_desc_),
+    needs_finalize_(config.needs_finalize_),
+    agg_fns_(config.aggregate_functions_),
+    conjuncts_(config.conjuncts_),
+    runtime_profile_(RuntimeProfile::Create(pool_, name)) {}
+
+Aggregator::~Aggregator() {}
 
 Status Aggregator::Prepare(RuntimeState* state) {
   mem_tracker_.reset(new MemTracker(

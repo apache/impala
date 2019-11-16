@@ -27,9 +27,42 @@
 
 namespace impala {
 
-SubplanNode::SubplanNode(ObjectPool* pool, const TPlanNode& tnode,
-    const DescriptorTbl& descs)
-    : ExecNode(pool, tnode, descs),
+Status SubplanPlanNode::Init(const TPlanNode& tnode, RuntimeState* state) {
+  RETURN_IF_ERROR(PlanNode::Init(tnode, state));
+  DCHECK_EQ(children_.size(), 2);
+  RETURN_IF_ERROR(SetContainingSubplan(state, this, children_[1]));
+  return Status::OK();
+}
+
+Status SubplanPlanNode::SetContainingSubplan(
+    RuntimeState* state, SubplanPlanNode* ancestor, PlanNode* node) {
+  node->containing_subplan_ = ancestor;
+  if (node->tnode_->node_type == TPlanNodeType::SUBPLAN_NODE) {
+    // Only traverse the first child and not the second one, because the Subplan
+    // parent of nodes inside it should be 'node' and not 'ancestor'.
+    RETURN_IF_ERROR(SetContainingSubplan(state, ancestor, node->children_[0]));
+  } else {
+    if (node->tnode_->node_type == TPlanNodeType::UNNEST_NODE) {
+      UnnestPlanNode* unnest_node = reinterpret_cast<UnnestPlanNode*>(node);
+      RETURN_IF_ERROR(unnest_node->InitCollExpr(state));
+    }
+    int num_children = node->children_.size();
+    for (int i = 0; i < num_children; ++i) {
+      RETURN_IF_ERROR(SetContainingSubplan(state, ancestor, node->children_[i]));
+    }
+  }
+  return Status::OK();
+}
+
+Status SubplanPlanNode::CreateExecNode(RuntimeState* state, ExecNode** node) const {
+  ObjectPool* pool = state->obj_pool();
+  *node = pool->Add(new SubplanNode(pool, *this, state->desc_tbl()));
+  return Status::OK();
+}
+
+SubplanNode::SubplanNode(
+    ObjectPool* pool, const SubplanPlanNode& pnode, const DescriptorTbl& descs)
+    : ExecNode(pool, pnode, descs),
       input_batch_(NULL),
       input_eos_(false),
       input_row_idx_(0),
@@ -38,35 +71,23 @@ SubplanNode::SubplanNode(ObjectPool* pool, const TPlanNode& tnode,
       subplan_eos_(false) {
 }
 
-Status SubplanNode::Init(const TPlanNode& tnode, RuntimeState* state) {
-  RETURN_IF_ERROR(ExecNode::Init(tnode, state));
-  DCHECK_EQ(children_.size(), 2);
-  RETURN_IF_ERROR(SetContainingSubplan(state, this, child(1)));
-  return Status::OK();
-}
-
-Status SubplanNode::SetContainingSubplan(
-    RuntimeState* state, SubplanNode* ancestor, ExecNode* node) {
+void SubplanNode::SetContainingSubplan(SubplanNode* ancestor, ExecNode* node) {
   node->set_containing_subplan(ancestor);
   if (node->type() == TPlanNodeType::SUBPLAN_NODE) {
     // Only traverse the first child and not the second one, because the Subplan
     // parent of nodes inside it should be 'node' and not 'ancestor'.
-    RETURN_IF_ERROR(SetContainingSubplan(state, ancestor, node->child(0)));
+    SetContainingSubplan(ancestor, node->child(0));
   } else {
-    if (node->type() == TPlanNodeType::UNNEST_NODE) {
-      UnnestNode* unnest_node = reinterpret_cast<UnnestNode*>(node);
-      RETURN_IF_ERROR(unnest_node->InitCollExpr(state));
-    }
     int num_children = node->num_children();
     for (int i = 0; i < num_children; ++i) {
-      RETURN_IF_ERROR(SetContainingSubplan(state, ancestor, node->child(i)));
+      SetContainingSubplan(ancestor, node->child(i));
     }
   }
-  return Status::OK();
 }
 
 Status SubplanNode::Prepare(RuntimeState* state) {
   SCOPED_TIMER(runtime_profile_->total_time_counter());
+  SetContainingSubplan(this, child(1));
   RETURN_IF_ERROR(ExecNode::Prepare(state));
   input_batch_.reset(
       new RowBatch(child(0)->row_desc(), state->batch_size(), mem_tracker()));

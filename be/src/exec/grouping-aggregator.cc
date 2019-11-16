@@ -82,26 +82,15 @@ static const StreamingHtMinReductionEntry STREAMING_HT_MIN_REDUCTION[] = {
     {2 * 1024 * 1024, 2.0},
 };
 
-static const int STREAMING_HT_MIN_REDUCTION_SIZE =
-    sizeof(STREAMING_HT_MIN_REDUCTION) / sizeof(STREAMING_HT_MIN_REDUCTION[0]);
-
-GroupingAggregator::GroupingAggregator(ExecNode* exec_node, ObjectPool* pool,
-    const TAggregator& taggregator, const DescriptorTbl& descs,
-    int64_t estimated_input_cardinality, int agg_idx)
-  : Aggregator(exec_node, pool, taggregator, descs,
-        Substitute("GroupingAggregator $0", agg_idx), agg_idx),
+GroupingAggregatorConfig::GroupingAggregatorConfig(
+    const TAggregator& taggregator, RuntimeState* state, PlanNode* pnode)
+  : AggregatorConfig(taggregator, state, pnode),
     intermediate_row_desc_(intermediate_tuple_desc_, false),
     is_streaming_preagg_(taggregator.use_streaming_preaggregation),
-    resource_profile_(taggregator.resource_profile),
-    is_in_subplan_(exec_node->IsInSubplan()),
-    limit_(exec_node->limit()),
-    estimated_input_cardinality_(estimated_input_cardinality),
-    partition_pool_(new ObjectPool()) {
-  DCHECK_EQ(PARTITION_FANOUT, 1 << NUM_PARTITIONING_BITS);
-}
+    resource_profile_(taggregator.resource_profile){};
 
-Status GroupingAggregator::Init(const TAggregator& taggregator, RuntimeState* state,
-    const std::vector<TExpr>& conjuncts) {
+Status GroupingAggregatorConfig::Init(
+    const TAggregator& taggregator, RuntimeState* state, PlanNode* pnode) {
   RETURN_IF_ERROR(ScalarExpr::Create(
       taggregator.grouping_exprs, input_row_desc_, state, &grouping_exprs_));
 
@@ -110,9 +99,9 @@ Status GroupingAggregator::Init(const TAggregator& taggregator, RuntimeState* st
     SlotDescriptor* desc = intermediate_tuple_desc_->slots()[i];
     DCHECK(desc->type().type == TYPE_NULL || desc->type() == grouping_exprs_[i]->type());
     // Hack to avoid TYPE_NULL SlotRefs.
-    SlotRef* build_expr =
-        pool_->Add(desc->type().type != TYPE_NULL ? new SlotRef(desc) :
-                                                    new SlotRef(desc, TYPE_BOOLEAN));
+    SlotRef* build_expr = state->obj_pool()->Add(desc->type().type != TYPE_NULL ?
+            new SlotRef(desc) :
+            new SlotRef(desc, TYPE_BOOLEAN));
     build_exprs_.push_back(build_expr);
     // Not an entry point because all hash table callers support codegen.
     RETURN_IF_ERROR(
@@ -120,11 +109,33 @@ Status GroupingAggregator::Init(const TAggregator& taggregator, RuntimeState* st
     if (build_expr->type().IsVarLenStringType()) string_grouping_exprs_.push_back(i);
   }
 
-  RETURN_IF_ERROR(Aggregator::Init(taggregator, state, conjuncts));
-  for (int i = 0; i < agg_fns_.size(); ++i) {
-    needs_serialize_ |= agg_fns_[i]->SupportsSerialize();
+  RETURN_IF_ERROR(AggregatorConfig::Init(taggregator, state, pnode));
+  for (int i = 0; i < aggregate_functions_.size(); ++i) {
+    needs_serialize_ |= aggregate_functions_[i]->SupportsSerialize();
   }
   return Status::OK();
+}
+
+static const int STREAMING_HT_MIN_REDUCTION_SIZE =
+    sizeof(STREAMING_HT_MIN_REDUCTION) / sizeof(STREAMING_HT_MIN_REDUCTION[0]);
+
+GroupingAggregator::GroupingAggregator(ExecNode* exec_node, ObjectPool* pool,
+    const GroupingAggregatorConfig& config, int64_t estimated_input_cardinality,
+    int agg_idx)
+  : Aggregator(
+        exec_node, pool, config, Substitute("GroupingAggregator $0", agg_idx), agg_idx),
+    intermediate_row_desc_(config.intermediate_row_desc_),
+    is_streaming_preagg_(config.is_streaming_preagg_),
+    needs_serialize_(config.needs_serialize_),
+    grouping_exprs_(config.grouping_exprs_),
+    build_exprs_(config.build_exprs_),
+    string_grouping_exprs_(config.string_grouping_exprs_),
+    resource_profile_(config.resource_profile_),
+    is_in_subplan_(exec_node->IsInSubplan()),
+    limit_(exec_node->limit()),
+    estimated_input_cardinality_(estimated_input_cardinality),
+    partition_pool_(new ObjectPool()) {
+  DCHECK_EQ(PARTITION_FANOUT, 1 << NUM_PARTITIONING_BITS);
 }
 
 Status GroupingAggregator::Prepare(RuntimeState* state) {

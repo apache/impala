@@ -40,9 +40,22 @@ using namespace impala;
 
 const char* BlockingJoinNode::LLVM_CLASS_NAME = "class.impala::BlockingJoinNode";
 
+Status BlockingJoinPlanNode::Init(const TPlanNode& tnode, RuntimeState* state) {
+  RETURN_IF_ERROR(PlanNode::Init(tnode, state));
+  TJoinOp::type join_op;
+  if (tnode_->node_type == TPlanNodeType::HASH_JOIN_NODE) {
+    join_op = tnode.hash_join_node.join_op;
+  } else {
+    DCHECK(tnode_->node_type == TPlanNodeType::NESTED_LOOP_JOIN_NODE);
+    join_op = tnode.nested_loop_join_node.join_op;
+  }
+  DCHECK(!IsSemiJoin(join_op) || conjuncts_.size() == 0);
+  return Status::OK();
+}
+
 BlockingJoinNode::BlockingJoinNode(const string& node_name, const TJoinOp::type join_op,
-    ObjectPool* pool, const TPlanNode& tnode, const DescriptorTbl& descs)
-  : ExecNode(pool, tnode, descs),
+    ObjectPool* pool, const BlockingJoinPlanNode& pnode, const DescriptorTbl& descs)
+  : ExecNode(pool, pnode, descs),
     node_name_(node_name),
     join_op_(join_op),
     eos_(false),
@@ -50,18 +63,6 @@ BlockingJoinNode::BlockingJoinNode(const string& node_name, const TJoinOp::type 
     probe_batch_pos_(-1),
     current_probe_row_(NULL),
     semi_join_staging_row_(NULL) {
-}
-
-Status BlockingJoinNode::Init(const TPlanNode& tnode, RuntimeState* state) {
-  RETURN_IF_ERROR(ExecNode::Init(tnode, state));
-  DCHECK(!IsSemiJoin(join_op_) || conjuncts_.size() == 0);
-  runtime_profile_->AddLocalTimeCounter(
-      bind<int64_t>(&BlockingJoinNode::LocalTimeCounterFn,
-      runtime_profile_->total_time_counter(),
-      child(0)->runtime_profile()->total_time_counter(),
-      child(1)->runtime_profile()->total_time_counter(),
-      &built_probe_overlap_stop_watch_));
-  return Status::OK();
 }
 
 BlockingJoinNode::~BlockingJoinNode() {
@@ -73,6 +74,11 @@ Status BlockingJoinNode::Prepare(RuntimeState* state) {
   SCOPED_TIMER(runtime_profile_->total_time_counter());
   RETURN_IF_ERROR(ExecNode::Prepare(state));
 
+  runtime_profile_->AddLocalTimeCounter(bind<int64_t>(
+      &BlockingJoinNode::LocalTimeCounterFn, runtime_profile_->total_time_counter(),
+      child(0)->runtime_profile()->total_time_counter(),
+      child(1)->runtime_profile()->total_time_counter(),
+      &built_probe_overlap_stop_watch_));
   build_timer_ = ADD_TIMER(runtime_profile(), "BuildTime");
   probe_timer_ = ADD_TIMER(runtime_profile(), "ProbeTime");
   build_row_counter_ = ADD_COUNTER(runtime_profile(), "BuildRows", TUnit::UNIT);

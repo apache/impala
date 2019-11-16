@@ -24,6 +24,12 @@
 
 namespace impala {
 
+class CardinalityCheckPlanNode : public PlanNode {
+ public:
+  virtual Status CreateExecNode(RuntimeState* state, ExecNode** node) const override;
+  ~CardinalityCheckPlanNode(){}
+};
+
 /// Node that returns an error if its child produces more than a single row.
 /// If successful, this node returns a deep copy of its single input row.
 ///
@@ -32,9 +38,10 @@ namespace impala {
 /// might produce results and incorrectly return them to the client. If the child of this
 /// node produces more than one row it means the SQL query is semantically invalid, so no
 /// rows must be returned to the client.
+
 class CardinalityCheckNode : public ExecNode {
  public:
-  CardinalityCheckNode(ObjectPool* pool, const TPlanNode& tnode,
+  CardinalityCheckNode(ObjectPool* pool, const CardinalityCheckPlanNode& pnode,
       const DescriptorTbl& descs);
 
   virtual Status Prepare(RuntimeState* state) override;

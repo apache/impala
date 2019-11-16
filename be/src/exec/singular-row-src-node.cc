@@ -22,9 +22,16 @@
 
 namespace impala {
 
-SingularRowSrcNode::SingularRowSrcNode(ObjectPool* pool, const TPlanNode& tnode,
-    const DescriptorTbl& descs) : ExecNode(pool, tnode, descs) {
+Status SingularRowSrcPlanNode::CreateExecNode(
+    RuntimeState* state, ExecNode** node) const {
+  ObjectPool* pool = state->obj_pool();
+  *node = pool->Add(new SingularRowSrcNode(pool, *this, state->desc_tbl()));
+  return Status::OK();
 }
+
+SingularRowSrcNode::SingularRowSrcNode(
+    ObjectPool* pool, const SingularRowSrcPlanNode& pnode, const DescriptorTbl& descs)
+  : ExecNode(pool, pnode, descs) {}
 
 Status SingularRowSrcNode::GetNext(RuntimeState* state, RowBatch* row_batch, bool* eos) {
   // We do not time this function, check for cancellation, or perform the usual per-batch

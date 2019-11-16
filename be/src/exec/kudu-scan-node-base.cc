@@ -53,12 +53,12 @@ const string KuduScanNodeBase::KUDU_REMOTE_TOKENS = "KuduRemoteScanTokens";
 const string KuduScanNodeBase::KUDU_CLIENT_TIME = "KuduClientTime";
 
 KuduScanNodeBase::KuduScanNodeBase(
-    ObjectPool* pool, const TPlanNode& tnode, const DescriptorTbl& descs)
-  : ScanNode(pool, tnode, descs),
-    tuple_id_(tnode.kudu_scan_node.tuple_id),
+    ObjectPool* pool, const ScanPlanNode& pnode, const DescriptorTbl& descs)
+  : ScanNode(pool, pnode, descs),
+    tuple_id_(pnode.tnode_->kudu_scan_node.tuple_id),
     count_star_slot_offset_(
-            tnode.kudu_scan_node.__isset.count_star_slot_offset ?
-            tnode.kudu_scan_node.count_star_slot_offset : -1) {
+            pnode.tnode_->kudu_scan_node.__isset.count_star_slot_offset ?
+            pnode.tnode_->kudu_scan_node.count_star_slot_offset : -1) {
   DCHECK(KuduIsAvailable());
 }
 

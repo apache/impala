@@ -172,10 +172,13 @@ Status FragmentInstanceState::Prepare() {
       bind<int64_t>(mem_fn(&ThreadResourcePool::num_threads),
           runtime_state_->resource_pool()));
 
+  PlanNode* plan_tree = nullptr;
+  RETURN_IF_ERROR(
+      PlanNode::CreateTree(runtime_state_, fragment_ctx_.fragment.plan, &plan_tree));
+  plan_tree_ = plan_tree;
   // set up plan
   RETURN_IF_ERROR(ExecNode::CreateTree(
-      runtime_state_, fragment_ctx_.fragment.plan, query_state_->desc_tbl(),
-      &exec_tree_));
+      runtime_state_, *plan_tree_, query_state_->desc_tbl(), &exec_tree_));
   runtime_state_->set_fragment_root_id(exec_tree_->id());
   if (instance_ctx_.__isset.debug_options) {
     ExecNode::SetDebugOptions(instance_ctx_.debug_options, exec_tree_);

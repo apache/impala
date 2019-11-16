@@ -23,11 +23,19 @@
 
 namespace impala {
 
+class EmptySetPlanNode : public PlanNode {
+ public:
+  virtual Status CreateExecNode(RuntimeState* state, ExecNode** node) const override;
+  ~EmptySetPlanNode(){}
+};
+
 /// Node that returns an empty result set, i.e., just sets eos_ in GetNext().
 /// Corresponds to EmptySetNode.java in the FE.
+
 class EmptySetNode : public ExecNode {
  public:
-  EmptySetNode(ObjectPool* pool, const TPlanNode& tnode, const DescriptorTbl& descs);
+  EmptySetNode(
+      ObjectPool* pool, const EmptySetPlanNode& pnode, const DescriptorTbl& descs);
   virtual Status Open(RuntimeState* state) override;
   virtual Status GetNext(RuntimeState* state, RowBatch* row_batch, bool* eos) override;
 };

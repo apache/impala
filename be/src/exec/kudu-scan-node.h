@@ -36,7 +36,7 @@ class ThreadResourcePool;
 /// are used to retrieve the rows for this scan.
 class KuduScanNode : public KuduScanNodeBase {
  public:
-  KuduScanNode(ObjectPool* pool, const TPlanNode& tnode, const DescriptorTbl& descs);
+  KuduScanNode(ObjectPool* pool, const ScanPlanNode& pnode, const DescriptorTbl& descs);
 
   ~KuduScanNode();
 
