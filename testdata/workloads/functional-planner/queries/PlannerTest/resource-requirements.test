@@ -1126,6 +1126,9 @@ Per-Host Resources: mem-estimate=32.00MB mem-reservation=64.00KB thread-reservat
 ====
 # Avro scan.
 select * from tpch_avro.orders
+---- HIVE_MAJOR_VERSION
+# Hive 3 creates different number of files for this table than Hive 2.
+2
 ---- PLAN
 Max Per-Host Resource Reservation: Memory=8.00MB Threads=2
 Per-Host Resource Estimates: Memory=88MB
