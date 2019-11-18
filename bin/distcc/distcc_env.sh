@@ -124,7 +124,6 @@ function switch_compiler {
         ;;
       distcc)
         IMPALA_DISTCC_LOCAL=true
-        echo HERE
         local DISTCC_SLOT_COUNT=$(distcc -j)
         # Set the parallelism based on the number of distcc slots, but cap it to avoid
         # overwhelming this host  if a large distcc cluster is configured.
