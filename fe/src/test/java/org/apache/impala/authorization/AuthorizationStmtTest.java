@@ -2949,6 +2949,9 @@ public class AuthorizationStmtTest extends AuthorizationTestBase {
           USER.getShortName());
 
       try {
+        // Clear existing row filter policies, otherwise they will cause different
+        // error message since we check them before any column masking policies.
+        clearRangerRowFilterPolicies("functional", tableName);
         createRangerPolicy(policyName, json);
         rangerImpalaPlugin_.refreshPoliciesAndTags();
 

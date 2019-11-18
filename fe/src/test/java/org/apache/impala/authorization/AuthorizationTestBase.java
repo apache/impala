@@ -50,8 +50,13 @@ import org.apache.impala.thrift.TTableName;
 import org.apache.ranger.plugin.util.GrantRevokeRequest;
 import org.apache.ranger.plugin.util.RangerRESTClient;
 import org.apache.ranger.plugin.util.RangerRESTUtils;
+import org.json.simple.JSONArray;
+import org.json.simple.JSONObject;
+import org.json.simple.parser.JSONParser;
 
+import javax.ws.rs.core.Response;
 import javax.ws.rs.core.Response.Status.Family;
+import java.io.InputStreamReader;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collections;
@@ -608,6 +613,32 @@ public abstract class AuthorizationTestBase extends FrontendTestBase {
     if (response.getStatusInfo().getFamily() != Family.SUCCESSFUL) {
       throw new RuntimeException(
           String.format("Unable to delete Ranger policy: %s.", policyName));
+    }
+  }
+
+  protected void clearRangerRowFilterPolicies(String dbName, String tableName) {
+    ClientResponse response = rangerRestClient_
+        .getResource("/service/public/v2/api/policy")
+        .queryParam("servicename", RANGER_SERVICE_NAME)
+        .queryParam("policyType", "2")  // Row filter policy type: "2"
+        .queryParam("databases", dbName)
+        .queryParam("tables", tableName)
+        .get(ClientResponse.class);
+    if (response.getStatusInfo().getFamily() != Response.Status.Family.SUCCESSFUL) {
+      throw new RuntimeException(String.format(
+          "Unable to search Ranger policies on %s.%s", dbName, tableName));
+    }
+    JSONParser parser = new JSONParser();
+    JSONArray policies;
+    try {
+      policies = (JSONArray) parser.parse(
+          new InputStreamReader(response.getEntityInputStream()));
+    } catch (Exception e) {
+      throw new RuntimeException("Error parsing ranger response", e);
+    }
+    for (Object obj: policies) {
+      JSONObject policy = (JSONObject) obj;
+      deleteRangerPolicy(policy.get("name").toString());
     }
   }
 
