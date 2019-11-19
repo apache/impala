@@ -43,14 +43,14 @@ DEFINE_int32(log_mem_usage_interval, 0, "If non-zero, impalad will output memory
     "every log_mem_usage_interval'th fragment completion.");
 
 Status QueryExecMgr::StartQuery(const ExecQueryFInstancesRequestPB* request,
-    const TExecQueryFInstancesSidecar& sidecar) {
-  TUniqueId query_id = sidecar.query_ctx.query_id;
+    const TQueryCtx& query_ctx, const TExecPlanFragmentInfo& fragment_info) {
+  TUniqueId query_id = query_ctx.query_id;
   VLOG(2) << "StartQueryFInstances() query_id=" << PrintId(query_id)
-          << " coord=" << TNetworkAddressToString(sidecar.query_ctx.coord_address);
+          << " coord=" << TNetworkAddressToString(query_ctx.coord_address);
   bool dummy;
   QueryState* qs =
-      GetOrCreateQueryState(sidecar.query_ctx, request->per_backend_mem_limit(), &dummy);
-  Status status = qs->Init(request, sidecar);
+      GetOrCreateQueryState(query_ctx, request->per_backend_mem_limit(), &dummy);
+  Status status = qs->Init(request, fragment_info);
   if (!status.ok()) {
     qs->ReleaseBackendResourceRefcount(); // Release refcnt acquired in Init().
     ReleaseQueryState(qs);

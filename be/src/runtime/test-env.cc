@@ -157,15 +157,13 @@ Status TestEnv::CreateQueryState(
   ExecQueryFInstancesRequestPB rpc_params;
   // create dummy -Ctx fields, we need them for FragmentInstance-/RuntimeState
   rpc_params.set_coord_state_idx(0);
-  TExecQueryFInstancesSidecar sidecar;
-  sidecar.__set_query_ctx(TQueryCtx());
-  sidecar.__set_fragment_ctxs(vector<TPlanFragmentCtx>({TPlanFragmentCtx()}));
-  sidecar.__set_fragment_instance_ctxs(
+  TExecPlanFragmentInfo fragment_info;
+  fragment_info.__set_fragment_ctxs(vector<TPlanFragmentCtx>({TPlanFragmentCtx()}));
+  fragment_info.__set_fragment_instance_ctxs(
       vector<TPlanFragmentInstanceCtx>({TPlanFragmentInstanceCtx()}));
-  RETURN_IF_ERROR(qs->Init(&rpc_params, sidecar));
-  FragmentInstanceState* fis = qs->obj_pool()->Add(
-      new FragmentInstanceState(qs, qs->exec_rpc_sidecar().fragment_ctxs[0],
-          qs->exec_rpc_sidecar().fragment_instance_ctxs[0]));
+  RETURN_IF_ERROR(qs->Init(&rpc_params, fragment_info));
+  FragmentInstanceState* fis = qs->obj_pool()->Add(new FragmentInstanceState(qs,
+      qs->fragment_info_.fragment_ctxs[0], qs->fragment_info_.fragment_instance_ctxs[0]));
   RuntimeState* rs = qs->obj_pool()->Add(
       new RuntimeState(qs, fis->fragment_ctx(), fis->instance_ctx(), exec_env_.get()));
   runtime_states_.push_back(rs);

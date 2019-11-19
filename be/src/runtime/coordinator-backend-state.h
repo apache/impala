@@ -39,6 +39,10 @@
 #include "util/runtime-profile.h"
 #include "util/stopwatch.h"
 
+namespace kudu {
+class Slice;
+}
+
 namespace impala {
 
 class ProgressUpdater;
@@ -78,7 +82,7 @@ class Coordinator::BackendState {
   /// on their node_id/instance_idx.
   void Exec(const DebugOptions& debug_options,
       const FilterRoutingTable& filter_routing_table,
-      CountingBarrier* rpc_complete_barrier);
+      const kudu::Slice& serialized_query_ctx, CountingBarrier* rpc_complete_barrier);
 
   /// Update overall execution status, including the instances' exec status/profiles
   /// and the error log, if this backend is not already done. Updates the fragment
@@ -321,11 +325,11 @@ class Coordinator::BackendState {
   /// The query id of the Coordinator that owns this BackendState.
   const TUniqueId& query_id_;
 
-  /// Fill in 'request' and 'sidecar' based on state. Uses filter_routing_table to remove
-  /// filters that weren't selected during its construction.
+  /// Fill in 'request' and 'fragment_info' based on state. Uses 'filter_routing_table' to
+  /// remove filters that weren't selected during its construction.
   void SetRpcParams(const DebugOptions& debug_options,
       const FilterRoutingTable& filter_routing_table,
-      ExecQueryFInstancesRequestPB* request, TExecQueryFInstancesSidecar* sidecar);
+      ExecQueryFInstancesRequestPB* request, TExecPlanFragmentInfo* fragment_info);
 
   /// Expects that 'status' is an error. Sets 'status_' to a formatted version of its
   /// message.

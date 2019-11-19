@@ -113,15 +113,15 @@ Status ControlService::GetProfile(const ReportExecStatusRequestPB& request,
   return Status::OK();
 }
 
-Status ControlService::GetExecQueryFInstancesSidecar(
-    const ExecQueryFInstancesRequestPB& request, RpcContext* rpc_context,
-    TExecQueryFInstancesSidecar* sidecar) {
+// Retrieves the sidecar at 'sidecar_idx' from 'rpc_context' and deserializes it into
+// 'thrift_obj'.
+template <typename T>
+static Status GetSidecar(int sidecar_idx, RpcContext* rpc_context, T* thrift_obj) {
   kudu::Slice sidecar_slice;
-  KUDU_RETURN_IF_ERROR(
-      rpc_context->GetInboundSidecar(request.sidecar_idx(), &sidecar_slice),
-      "Failed to get thrift profile sidecar");
+  KUDU_RETURN_IF_ERROR(rpc_context->GetInboundSidecar(sidecar_idx, &sidecar_slice),
+      "Failed to get sidecar");
   uint32_t len = sidecar_slice.size();
-  RETURN_IF_ERROR(DeserializeThriftMsg(sidecar_slice.data(), &len, true, sidecar));
+  RETURN_IF_ERROR(DeserializeThriftMsg(sidecar_slice.data(), &len, true, thrift_obj));
   return Status::OK();
 }
 
@@ -129,24 +129,35 @@ void ControlService::ExecQueryFInstances(const ExecQueryFInstancesRequestPB* req
     ExecQueryFInstancesResponsePB* response, RpcContext* rpc_context) {
   DebugActionNoFail(FLAGS_debug_actions, "EXEC_QUERY_FINSTANCES_DELAY");
   DCHECK(request->has_coord_state_idx());
-  DCHECK(request->has_sidecar_idx());
-  TExecQueryFInstancesSidecar sidecar;
-  const Status& sidecar_status =
-      GetExecQueryFInstancesSidecar(*request, rpc_context, &sidecar);
-  if (!sidecar_status.ok()) {
-    RespondAndReleaseRpc(sidecar_status, response, rpc_context);
+  DCHECK(request->has_plan_fragment_info_sidecar_idx());
+  DCHECK(request->has_query_ctx_sidecar_idx());
+  // Deserialize the sidecars. The QueryState will make a copy of the TQueryCtx and
+  // TExecPlanFragmentInfo, so we can deallocate the deserialized values after
+  // StartQuery(). TODO: can we avoid this extra copy?
+  TExecPlanFragmentInfo fragment_info;
+  const Status& fragment_info_sidecar_status =
+      GetSidecar(request->plan_fragment_info_sidecar_idx(), rpc_context, &fragment_info);
+  if (!fragment_info_sidecar_status.ok()) {
+    RespondAndReleaseRpc(fragment_info_sidecar_status, response, rpc_context);
     return;
   }
-  ScopedThreadContext scoped_tdi(GetThreadDebugInfo(), sidecar.query_ctx.query_id);
+  TQueryCtx query_ctx;
+  const Status& query_ctx_sidecar_status =
+      GetSidecar(request->query_ctx_sidecar_idx(), rpc_context, &query_ctx);
+  if (!query_ctx_sidecar_status.ok()) {
+    RespondAndReleaseRpc(query_ctx_sidecar_status, response, rpc_context);
+    return;
+  }
+  ScopedThreadContext scoped_tdi(GetThreadDebugInfo(), query_ctx.query_id);
   VLOG_QUERY << "ExecQueryFInstances():"
-             << " query_id=" << PrintId(sidecar.query_ctx.query_id)
-             << " coord=" << TNetworkAddressToString(sidecar.query_ctx.coord_address)
-             << " #instances=" << sidecar.fragment_instance_ctxs.size();
-  Status resp_status =
-      ExecEnv::GetInstance()->query_exec_mgr()->StartQuery(request, sidecar);
+             << " query_id=" << PrintId(query_ctx.query_id)
+             << " coord=" << TNetworkAddressToString(query_ctx.coord_address)
+             << " #instances=" << fragment_info.fragment_instance_ctxs.size();
+  Status resp_status = ExecEnv::GetInstance()->query_exec_mgr()->StartQuery(
+      request, query_ctx, fragment_info);
   if (!resp_status.ok()) {
-    LOG(INFO) << "ExecQueryFInstances() failed: query_id="
-              << PrintId(sidecar.query_ctx.query_id) << ": " << resp_status.GetDetail();
+    LOG(INFO) << "ExecQueryFInstances() failed: query_id=" << PrintId(query_ctx.query_id)
+              << ": " << resp_status.GetDetail();
   }
   RespondAndReleaseRpc(resp_status, response, rpc_context);
 }

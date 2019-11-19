@@ -92,12 +92,6 @@ class ControlService : public ControlServiceIf {
       const ClientRequestState& request_state, kudu::rpc::RpcContext* rpc_context,
       TRuntimeProfileForest* thrift_profiles);
 
-  /// Helper for deserializing the ExecQueryFInstances sidecar attached in the inbound
-  /// call within 'rpc_context'. On success, returns the deserialized sidecar in
-  /// 'sidecar'. On failure, returns the error status;
-  static Status GetExecQueryFInstancesSidecar(const ExecQueryFInstancesRequestPB& request,
-      RpcContext* rpc_context, TExecQueryFInstancesSidecar* sidecar);
-
   /// Helper for serializing 'status' as part of 'response'. Also releases memory
   /// of the RPC payload previously accounted towards the internal memory tracker.
   template <typename ResponsePBType>

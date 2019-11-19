@@ -136,7 +136,7 @@ Status Coordinator::Exec() {
   // runtime-related state changes past this point (examples: fragment instance
   // profiles, etc.)
 
-  StartBackendExec();
+  RETURN_IF_ERROR(StartBackendExec());
   RETURN_IF_ERROR(FinishBackendStartup());
 
   // set coord_instance_ and coord_sink_
@@ -358,7 +358,7 @@ void Coordinator::InitFilterRoutingTable() {
   filter_routing_table_->is_complete = true;
 }
 
-void Coordinator::StartBackendExec() {
+Status Coordinator::StartBackendExec() {
   int num_backends = backend_states_.size();
   backend_exec_complete_barrier_.reset(new CountingBarrier(num_backends));
 
@@ -368,9 +368,21 @@ void Coordinator::StartBackendExec() {
              << PrintId(query_id());
   query_events_->MarkEvent(Substitute("Ready to start on $0 backends", num_backends));
 
+  // Serialize the TQueryCtx once and pass it to each backend. The serialized buffer must
+  // stay valid until exec_rpcs_complete_barrier_ has been signalled.
+  ThriftSerializer serializer(true);
+  uint8_t* serialized_buf = nullptr;
+  uint32_t serialized_len = 0;
+  Status serialize_status =
+      serializer.SerializeToBuffer(&query_ctx(), &serialized_len, &serialized_buf);
+  if (UNLIKELY(!serialize_status.ok())) {
+    return UpdateExecState(serialize_status, nullptr, FLAGS_hostname);
+  }
+  kudu::Slice query_ctx_slice(serialized_buf, serialized_len);
+
   for (BackendState* backend_state: backend_states_) {
     ExecEnv::GetInstance()->exec_rpc_thread_pool()->Offer(
-        [backend_state, this, &debug_options]() {
+        [backend_state, this, &debug_options, &query_ctx_slice]() {
           DebugActionNoFail(schedule_.query_options(), "COORD_BEFORE_EXEC_RPC");
           // Safe for Exec() to read 'filter_routing_table_' because it is complete
           // at this point and won't be destroyed while this function is executing,
@@ -378,8 +390,8 @@ void Coordinator::StartBackendExec() {
           // signalled.
           DCHECK(filter_mode_ == TRuntimeFilterMode::OFF
               || filter_routing_table_->is_complete);
-          backend_state->Exec(
-              debug_options, *filter_routing_table_, &exec_rpcs_complete_barrier_);
+          backend_state->Exec(debug_options, *filter_routing_table_, query_ctx_slice,
+              &exec_rpcs_complete_barrier_);
         });
   }
   exec_rpcs_complete_barrier_.Wait();
@@ -389,6 +401,7 @@ void Coordinator::StartBackendExec() {
   query_events_->MarkEvent(
       Substitute("All $0 execution backends ($1 fragment instances) started",
         num_backends, schedule_.GetNumFragmentInstances()));
+  return Status::OK();
 }
 
 Status Coordinator::FinishBackendStartup() {

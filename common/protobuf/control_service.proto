@@ -222,9 +222,11 @@ message ExecQueryFInstancesRequestPB {
   // the coordinator.
   optional int32 coord_state_idx = 1;
 
-  // Sidecar index of the TExecQueryFInstancesSidecar, which contains the query and plan
-  // fragment contexts.
-  optional int32 sidecar_idx = 2;
+  // Sidecar index of the TQueryCtx.
+  optional int32 query_ctx_sidecar_idx = 2;
+
+  // Sidecar index of the TExecPlanFragmentInfo.
+  optional int32 plan_fragment_info_sidecar_idx = 3;
 
   // The minimum query-wide memory reservation (in bytes) required for the backend
   // executing the instances in fragment_instance_ctxs. This is the peak minimum
@@ -232,17 +234,17 @@ message ExecQueryFInstancesRequestPB {
   // point in query execution. It may be less than the initial reservation total claims
   // (below) if execution of some operators never overlaps, which allows reuse of
   // reservations.
-  optional int64 min_mem_reservation_bytes = 3;
+  optional int64 min_mem_reservation_bytes = 4;
 
   // Total of the initial buffer reservations that we expect to be claimed on this
   // backend for all fragment instances in fragment_instance_ctxs. I.e. the sum over all
   // operators in all fragment instances that execute on this backend. This is used for
   // an optimization in InitialReservation. Measured in bytes.
-  optional int64 initial_mem_reservation_total_claims = 4;
+  optional int64 initial_mem_reservation_total_claims = 5;
 
   // The backend memory limit (in bytes) as set by the admission controller. Used by the
   // query mem tracker to enforce the memory limit.
-  optional int64 per_backend_mem_limit = 5;
+  optional int64 per_backend_mem_limit = 6;
 }
 
 message ExecQueryFInstancesResponsePB {

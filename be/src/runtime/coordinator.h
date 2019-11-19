@@ -485,7 +485,7 @@ class Coordinator { // NOLINT: The member variables could be re-ordered to save 
 
   /// Helper for Exec(). Populates backend_states_, starts query execution at all
   /// backends in parallel, and blocks until startup completes.
-  void StartBackendExec();
+  Status StartBackendExec();
 
   /// Helper for Exec(). Checks for errors encountered when starting backend execution,
   /// using any non-OK status, if any, as the overall status. Returns the overall

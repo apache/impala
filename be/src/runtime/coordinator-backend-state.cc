@@ -26,6 +26,7 @@
 #include "kudu/rpc/rpc_controller.h"
 #include "kudu/rpc/rpc_sidecar.h"
 #include "kudu/util/monotime.h"
+#include "kudu/util/slice.h"
 #include "kudu/util/status.h"
 #include "rpc/rpc-mgr.inline.h"
 #include "runtime/backend-client.h"
@@ -105,7 +106,7 @@ void Coordinator::BackendState::Init(const vector<FragmentStats*>& fragment_stat
 
 void Coordinator::BackendState::SetRpcParams(const DebugOptions& debug_options,
     const FilterRoutingTable& filter_routing_table, ExecQueryFInstancesRequestPB* request,
-    TExecQueryFInstancesSidecar* sidecar) {
+    TExecPlanFragmentInfo* fragment_info) {
   request->set_coord_state_idx(state_idx_);
   request->set_min_mem_reservation_bytes(backend_exec_params_->min_mem_reservation_bytes);
   request->set_initial_mem_reservation_total_claims(
@@ -113,19 +114,20 @@ void Coordinator::BackendState::SetRpcParams(const DebugOptions& debug_options,
   request->set_per_backend_mem_limit(schedule_.per_backend_mem_limit());
 
   // set fragment_ctxs and fragment_instance_ctxs
-  sidecar->__isset.fragment_ctxs = true;
-  sidecar->__isset.fragment_instance_ctxs = true;
-  sidecar->fragment_instance_ctxs.resize(backend_exec_params_->instance_params.size());
+  fragment_info->__isset.fragment_ctxs = true;
+  fragment_info->__isset.fragment_instance_ctxs = true;
+  fragment_info->fragment_instance_ctxs.resize(
+      backend_exec_params_->instance_params.size());
   for (int i = 0; i < backend_exec_params_->instance_params.size(); ++i) {
-    TPlanFragmentInstanceCtx& instance_ctx = sidecar->fragment_instance_ctxs[i];
+    TPlanFragmentInstanceCtx& instance_ctx = fragment_info->fragment_instance_ctxs[i];
     const FInstanceExecParams& params = *backend_exec_params_->instance_params[i];
     int fragment_idx = params.fragment_exec_params.fragment.idx;
 
     // add a TPlanFragmentCtx, if we don't already have it
-    if (sidecar->fragment_ctxs.empty()
-        || sidecar->fragment_ctxs.back().fragment.idx != fragment_idx) {
-      sidecar->fragment_ctxs.emplace_back();
-      TPlanFragmentCtx& fragment_ctx = sidecar->fragment_ctxs.back();
+    if (fragment_info->fragment_ctxs.empty()
+        || fragment_info->fragment_ctxs.back().fragment.idx != fragment_idx) {
+      fragment_info->fragment_ctxs.emplace_back();
+      TPlanFragmentCtx& fragment_ctx = fragment_info->fragment_ctxs.back();
       fragment_ctx.__set_fragment(params.fragment_exec_params.fragment);
       fragment_ctx.__set_destinations(params.fragment_exec_params.destinations);
     }
@@ -163,10 +165,9 @@ void Coordinator::BackendState::SetExecError(const Status& status) {
   status_ = Status::Expected(err_msg);
 }
 
-void Coordinator::BackendState::Exec(
-    const DebugOptions& debug_options,
+void Coordinator::BackendState::Exec(const DebugOptions& debug_options,
     const FilterRoutingTable& filter_routing_table,
-    CountingBarrier* exec_complete_barrier) {
+    const kudu::Slice& serialized_query_ctx, CountingBarrier* exec_complete_barrier) {
   const auto trigger = MakeScopeExitTrigger([&]() {
     // Ensure that 'last_report_time_ms_' is set prior to the barrier being notified.
     last_report_time_ms_ = GenerateReportTimestamp();
@@ -188,9 +189,8 @@ void Coordinator::BackendState::Exec(
   }
 
   ExecQueryFInstancesRequestPB request;
-  TExecQueryFInstancesSidecar sidecar;
-  sidecar.__set_query_ctx(query_ctx_);
-  SetRpcParams(debug_options, filter_routing_table, &request, &sidecar);
+  TExecPlanFragmentInfo fragment_info;
+  SetRpcParams(debug_options, filter_routing_table, &request, &fragment_info);
 
   RpcController rpc_controller;
   rpc_controller.set_timeout(
@@ -202,7 +202,7 @@ void Coordinator::BackendState::Exec(
   uint8_t* serialized_buf = nullptr;
   uint32_t serialized_len = 0;
   Status serialize_status =
-      serializer.SerializeToBuffer(&sidecar, &serialized_len, &serialized_buf);
+      serializer.SerializeToBuffer(&fragment_info, &serialized_len, &serialized_buf);
   if (UNLIKELY(!serialize_status.ok())) {
     SetExecError(serialize_status);
     return;
@@ -212,6 +212,7 @@ void Coordinator::BackendState::Exec(
     return;
   }
 
+  // TODO: eliminate the extra copy here by using a Slice
   unique_ptr<kudu::faststring> sidecar_buf = make_unique<kudu::faststring>();
   sidecar_buf->assign_copy(serialized_buf, serialized_len);
   unique_ptr<RpcSidecar> rpc_sidecar = RpcSidecar::FromFaststring(move(sidecar_buf));
@@ -223,7 +224,19 @@ void Coordinator::BackendState::Exec(
     SetExecError(FromKuduStatus(sidecar_status, "Failed to add sidecar"));
     return;
   }
-  request.set_sidecar_idx(sidecar_idx);
+  request.set_plan_fragment_info_sidecar_idx(sidecar_idx);
+
+  // Add the serialized TQueryCtx as a sidecar.
+  unique_ptr<RpcSidecar> query_ctx_sidecar = RpcSidecar::FromSlice(serialized_query_ctx);
+  int query_ctx_sidecar_idx;
+  kudu::Status query_ctx_sidecar_status =
+      rpc_controller.AddOutboundSidecar(move(query_ctx_sidecar), &query_ctx_sidecar_idx);
+  if (!query_ctx_sidecar_status.ok()) {
+    SetExecError(
+        FromKuduStatus(query_ctx_sidecar_status, "Failed to add TQueryCtx sidecar"));
+    return;
+  }
+  request.set_query_ctx_sidecar_idx(query_ctx_sidecar_idx);
 
   VLOG_FILE << "making rpc: ExecQueryFInstances"
       << " host=" << TNetworkAddressToString(impalad_address()) << " query_id="

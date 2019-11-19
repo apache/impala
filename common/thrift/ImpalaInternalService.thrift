@@ -658,14 +658,15 @@ enum ImpalaInternalServiceVersion {
 
 // The following contains the per-rpc structs for the parameters and the result.
 
-// TODO: convert this fully to protobuf.
-struct TExecQueryFInstancesSidecar {
-  1: optional TQueryCtx query_ctx
-
-  2: optional list<TPlanFragmentCtx> fragment_ctxs
+// Contains info about plan fragment execution needed for the ExecQueryFInstances rpc.
+// Rather than fully coverting this to protobuf, which would be a large change, for now we
+// serialize it ourselves and send it with ExecQueryFInstances as a sidecar.
+// TODO: investigate if it's worth converting this fully to protobuf
+struct TExecPlanFragmentInfo {
+  1: optional list<TPlanFragmentCtx> fragment_ctxs
 
   // the order corresponds to the order of fragments in fragment_ctxs
-  3: optional list<TPlanFragmentInstanceCtx> fragment_instance_ctxs
+  2: optional list<TPlanFragmentInstanceCtx> fragment_instance_ctxs
 }
 
 // Parameters for RequestPoolService.resolveRequestPool()
