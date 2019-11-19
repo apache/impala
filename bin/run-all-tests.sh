@@ -121,7 +121,8 @@ do
   esac
 done
 
-"${IMPALA_HOME}/bin/run-all-tests-timeout-check.sh" $TIMEOUT_FOR_RUN_ALL_TESTS_MINS &
+"${IMPALA_HOME}/bin/script-timeout-check.sh" -timeout $TIMEOUT_FOR_RUN_ALL_TESTS_MINS \
+    -script_name "$(basename $0)" &
 TIMEOUT_PID=$!
 
 # IMPALA-3947: "Exhaustive" tests are actually based on workload. This

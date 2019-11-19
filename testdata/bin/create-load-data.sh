@@ -43,6 +43,8 @@ setup_report_build_error
 : ${REMOTE_LOAD=}
 : ${CM_HOST=}
 : ${IMPALA_SERIAL_DATALOAD=}
+# We don't expect dataload to take more than 2.5 hours.
+: ${TIMEOUT_FOR_CREATE_LOAD_DATA_MINS:= 150}
 
 SKIP_METADATA_LOAD=0
 SKIP_SNAPSHOT_LOAD=0
@@ -90,6 +92,10 @@ do
     -skip_ranger)
       SKIP_RANGER=1
       ;;
+    -timeout)
+      TIMEOUT_FOR_CREATE_LOAD_DATA_MINS=${2-}
+      shift;
+      ;;
     -help|-h|*)
       echo "create-load-data.sh : Creates data and loads from scratch"
       echo "[-skip_metadata_load] : Skips loading of metadata"
@@ -97,6 +103,7 @@ do
       echo "[-snapshot_file] : Loads the test warehouse snapshot into hdfs"
       echo "[-cm_host] : Address of the Cloudera Manager host if loading to a remote cluster"
       echo "[-skip_ranger] : Skip the set-up for Ranger."
+      echo "[-timeout] : The timeout in minutes for loading data."
       exit 1;
       ;;
     esac
@@ -106,6 +113,10 @@ done
 if [[ -n $REMOTE_LOAD ]]; then
   SKIP_RANGER=1
 fi
+
+"${IMPALA_HOME}/bin/script-timeout-check.sh" -timeout $TIMEOUT_FOR_CREATE_LOAD_DATA_MINS \
+    -script_name "$(basename $0)" &
+TIMEOUT_PID=$!
 
 if [[ $SKIP_METADATA_LOAD -eq 0  && "$SNAPSHOT_FILE" = "" ]]; then
   run-step "Generating HBase data" create-hbase.log \
@@ -704,3 +715,8 @@ fi
 # restarting the minicluster works and doesn't impact the tests. This is a common
 # operation for developers, so it is nice to test it.
 restart-cluster
+
+# Kill the spawned timeout process and its child sleep process.
+# There may not be a sleep process, so ignore failure.
+pkill -P $TIMEOUT_PID || true
+kill $TIMEOUT_PID
