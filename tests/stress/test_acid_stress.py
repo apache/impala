@@ -25,7 +25,7 @@ from multiprocessing.pool import ThreadPool
 
 from tests.common.impala_test_suite import ImpalaTestSuite
 from tests.common.parametrize import UniqueDatabase
-from tests.common.skip import SkipIfHive2
+from tests.common.skip import SkipIfHive2, SkipIfS3
 
 NUM_OVERWRITES = 2
 NUM_INSERTS_PER_OVERWRITE = 4
@@ -180,6 +180,7 @@ class TestAcidInsertsBasic(TestAcidStress):
            sleep_seconds=0.1)])
 
   @SkipIfHive2.acid
+  @SkipIfS3.hive
   @pytest.mark.execute_serially
   @pytest.mark.stress
   def test_read_hive_inserts(self, unique_database):
