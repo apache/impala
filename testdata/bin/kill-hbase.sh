@@ -30,3 +30,8 @@ ${HBASE_HOME}/bin/stop-hbase.sh
 # Clear up data so that zookeeper/hbase won't do recovery when it starts.
 # TODO: is this still needed when using bin/stop-hbase.sh?
 rm -rf /tmp/hbase-*
+
+# HACK: Some jobs have seen the HBase master fail to initialize with mesages like:
+# "Master startup cannot progress, in holding-pattern until region onlined."
+# Anecdotally, removing the MasterProcWALs directory avoids the issue.
+hdfs dfs -rm /hbase/MasterProcWALs/* || true
