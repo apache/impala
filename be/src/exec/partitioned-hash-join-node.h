@@ -557,11 +557,11 @@ class PartitionedHashJoinNode : public BlockingJoinNode {
   /// have somewhere to spill the probe rows for the spilled partition).
   std::vector<std::unique_ptr<ProbePartition>> probe_hash_partitions_;
 
-  /// The list of probe partitions that have been spilled and still need more
-  /// processing. These partitions could need repartitioning, in which case more
-  /// partitions will be added to this list after repartitioning.
+  /// Probe partitions that have been spilled and still need more processing. Each of
+  /// these has a corresponding build partition in 'builder_' with the same PartitionId.
   /// This list is populated at DoneProbing().
-  std::list<std::unique_ptr<ProbePartition>> spilled_partitions_;
+  std::unordered_map<PhjBuilder::PartitionId, std::unique_ptr<ProbePartition>>
+      spilled_partitions_;
 
   /// The current spilled probe partition being processed as input to repartitioning,
   /// or the source of the probe rows if the hash table fits in memory.
@@ -570,7 +570,7 @@ class PartitionedHashJoinNode : public BlockingJoinNode {
   /// In the case of right-outer and full-outer joins, this is the list of the partitions
   /// for which we need to output their unmatched build rows. This list is populated at
   /// DoneProbing(). If this is non-empty, probe_state_ must be OUTPUTTING_UNMATCHED.
-  std::list<PhjBuilder::Partition*> output_build_partitions_;
+  std::deque<std::unique_ptr<PhjBuilder::Partition>> output_build_partitions_;
 
   /// Partition used if 'null_aware_' is set. During probing, rows from the probe
   /// side that did not have a match in the hash table are appended to this partition.

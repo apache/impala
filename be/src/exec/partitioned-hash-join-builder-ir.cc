@@ -61,7 +61,7 @@ Status PhjBuilder::ProcessBuildBatch(
     }
     const uint32_t hash = expr_vals_cache->CurExprValuesHash();
     const uint32_t partition_idx = hash >> (32 - NUM_PARTITIONING_BITS);
-    Partition* partition = hash_partitions_[partition_idx];
+    Partition* partition = hash_partitions_[partition_idx].get();
     if (UNLIKELY(!AppendRow(partition->build_rows(), build_row, &status))) {
       return status;
     }
