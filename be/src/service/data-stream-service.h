@@ -63,16 +63,6 @@ class DataStreamService : public DataStreamServiceIf {
   virtual void TransmitData(const TransmitDataRequestPB* request,
       TransmitDataResponsePB* response, kudu::rpc::RpcContext* context);
 
-  /// Called by fragment instances that produce local runtime filters to deliver them to
-  /// the coordinator for aggregation and broadcast.
-  virtual void UpdateFilter(const UpdateFilterParamsPB* req, UpdateFilterResultPB* resp,
-      kudu::rpc::RpcContext* context);
-
-  /// Called by the coordinator to deliver global runtime filters to fragments for
-  /// application at plan nodes.
-  virtual void PublishFilter(const PublishFilterParamsPB* req,
-      PublishFilterResultPB* resp, kudu::rpc::RpcContext* context);
-
   /// Respond to a RPC passed in 'response'/'ctx' with 'status' and release
   /// the payload memory from 'mem_tracker'. Takes ownership of 'ctx'.
   template<typename ResponsePBType>

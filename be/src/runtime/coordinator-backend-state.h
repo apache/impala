@@ -99,8 +99,7 @@ class Coordinator::BackendState {
 
   /// Make a PublishFilter rpc with given params if this backend has instances of the
   /// fragment with idx == rpc_params->dst_fragment_idx, otherwise do nothing.
-  void PublishFilter(
-      const PublishFilterParamsPB& rpc_params, kudu::rpc::RpcController& controller);
+  void PublishFilter(const TPublishFilterParams& rpc_params);
 
   /// Cancel execution at this backend if anything is running. Returns true
   /// if cancellation was attempted, false otherwise.

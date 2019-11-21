@@ -67,8 +67,7 @@ class RuntimeFilter {
 
   MinMaxFilter* get_min_max() const { return min_max_filter_.Load(); }
 
-  /// Sets the internal filter bloom_filter to 'bloom_filter' or 'min_max_filter'
-  /// depending on the type of this RuntimeFilter. Can only legally be called
+  /// Sets the internal filter bloom_filter to 'bloom_filter'. Can only legally be called
   /// once per filter. Does not acquire the memory associated with 'bloom_filter'.
   void SetFilter(BloomFilter* bloom_filter, MinMaxFilter* min_max_filter);
 

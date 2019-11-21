@@ -17,8 +17,6 @@
 
 #include "util/bloom-filter.h"
 
-#include "kudu/rpc/rpc_controller.h"
-#include "kudu/rpc/rpc_sidecar.h"
 #include "runtime/exec-env.h"
 #include "runtime/runtime-state.h"
 
@@ -57,13 +55,12 @@ Status BloomFilter::Init(const int log_bufferpool_space) {
   return Status::OK();
 }
 
-Status BloomFilter::Init(const BloomFilterPB& protobuf, const uint8_t* directory_in,
-    size_t directory_in_size) {
-  RETURN_IF_ERROR(Init(protobuf.log_bufferpool_space()));
-  if (directory_ != nullptr && !protobuf.always_false()) {
+Status BloomFilter::Init(const TBloomFilter& thrift) {
+  RETURN_IF_ERROR(Init(thrift.log_bufferpool_space));
+  if (directory_ != nullptr && !thrift.always_false) {
     always_false_ = false;
-    DCHECK_EQ(directory_in_size, directory_size());
-    memcpy(directory_, directory_in, directory_in_size);
+    DCHECK_EQ(thrift.directory.size(), directory_size());
+    memcpy(directory_, &thrift.directory[0], thrift.directory.size());
   }
   return Status::OK();
 }
@@ -76,66 +73,32 @@ void BloomFilter::Close() {
   }
 }
 
-void BloomFilter::AddDirectorySidecar(BloomFilterPB* rpc_params,
-    kudu::rpc::RpcController* controller, const char* directory,
-    unsigned long directory_size) {
-  DCHECK(rpc_params != nullptr);
-  DCHECK(!rpc_params->always_false());
-  DCHECK(!rpc_params->always_true());
-  kudu::Slice dir_slice(directory, directory_size);
-  unique_ptr<kudu::rpc::RpcSidecar> rpc_sidecar =
-      kudu::rpc::RpcSidecar::FromSlice(dir_slice);
-
-  int sidecar_idx = -1;
-  kudu::Status sidecar_status =
-      controller->AddOutboundSidecar(std::move(rpc_sidecar), &sidecar_idx);
-  if (!sidecar_status.ok()) {
-    LOG(ERROR) << "Cannot add outbound sidecar: " << sidecar_status.message().ToString();
-    // If AddOutboundSidecar() fails, we 'disable' the BloomFilterPB by setting it to
-    // an always true filter.
-    rpc_params->set_always_false(false);
-    rpc_params->set_always_true(true);
-    return;
-  }
-  rpc_params->set_directory_sidecar_idx(sidecar_idx);
-  rpc_params->set_always_false(false);
-  rpc_params->set_always_true(false);
-}
-
-void BloomFilter::AddDirectorySidecar(BloomFilterPB* rpc_params,
-    kudu::rpc::RpcController* controller, const string& directory) {
-      AddDirectorySidecar(rpc_params, controller,
-      reinterpret_cast<const char*>(&(directory[0])),
-      static_cast<unsigned long>(directory.size()));
-}
-
-void BloomFilter::ToProtobuf(
-    BloomFilterPB* protobuf, kudu::rpc::RpcController* controller) const {
-  protobuf->set_log_bufferpool_space(log_num_buckets_ + LOG_BUCKET_BYTE_SIZE);
+void BloomFilter::ToThrift(TBloomFilter* thrift) const {
+  thrift->log_bufferpool_space = log_num_buckets_ + LOG_BUCKET_BYTE_SIZE;
   if (always_false_) {
-    protobuf->set_always_false(true);
-    protobuf->set_always_true(false);
+    thrift->always_false = true;
+    thrift->always_true = false;
     return;
   }
-  BloomFilter::AddDirectorySidecar(protobuf, controller,
-      reinterpret_cast<const char*>(directory_),
+  thrift->directory.assign(reinterpret_cast<const char*>(directory_),
       static_cast<unsigned long>(directory_size()));
+  thrift->always_false = false;
+  thrift->always_true = false;
 }
 
-void BloomFilter::ToProtobuf(const BloomFilter* filter,
-    kudu::rpc::RpcController* controller, BloomFilterPB* protobuf) {
-  DCHECK(protobuf != nullptr);
-  // If filter == nullptr, then this BloomFilter is an always true filter.
+void BloomFilter::ToThrift(const BloomFilter* filter, TBloomFilter* thrift) {
+  DCHECK(thrift != nullptr);
   if (filter == nullptr) {
-    protobuf->set_always_true(true);
-    DCHECK(!protobuf->always_false());
+    thrift->always_true = true;
+    DCHECK_EQ(thrift->always_false, false);
     return;
   }
-  filter->ToProtobuf(protobuf, controller);
+  filter->ToThrift(thrift);
 }
 
 // The SIMD reinterpret_casts technically violate C++'s strict aliasing rules. However, we
 // compile with -fno-strict-aliasing.
+
 void BloomFilter::BucketInsert(const uint32_t bucket_idx, const uint32_t hash) noexcept {
   // new_bucket will be all zeros except for eight 1-bits, one in each 32-bit word. It is
   // 16-byte aligned so it can be read as a __m128i using aligned SIMD loads in the second
@@ -221,17 +184,20 @@ OrEqualArrayAvx(size_t n, const char* __restrict__ in, char* __restrict__ out) {
 }
 } //namespace
 
-void BloomFilter::Or(const BloomFilterPB& in, const uint8_t* directory_in,
-    BloomFilterPB* out, uint8_t* directory_out, size_t directory_size) {
+void BloomFilter::Or(const TBloomFilter& in, TBloomFilter* out) {
   DCHECK(out != nullptr);
   DCHECK(&in != out);
   // These cases are impossible in current code. If they become possible in the future,
   // memory usage should be tracked accordingly.
-  DCHECK(!out->always_false());
-  DCHECK(!out->always_true());
-  DCHECK(!in.always_true());
-  if (in.always_false()) return;
-  DCHECK_EQ(in.log_bufferpool_space(), out->log_bufferpool_space());
+  DCHECK(!out->always_false);
+  DCHECK(!out->always_true);
+  DCHECK(!in.always_true);
+  if (in.always_false) return;
+  DCHECK_EQ(in.log_bufferpool_space, out->log_bufferpool_space);
+  DCHECK_EQ(in.directory.size(), out->directory.size())
+      << "Equal log heap space " << in.log_bufferpool_space
+      << ", but different directory sizes: " << in.directory.size() << ", "
+      << out->directory.size();
   // The trivial loop out[i] |= in[i] should auto-vectorize with gcc at -O3, but it is not
   // written in a way that is very friendly to auto-vectorization. Instead, we manually
   // vectorize, increasing the speed by up to 56x.
@@ -239,14 +205,13 @@ void BloomFilter::Or(const BloomFilterPB& in, const uint8_t* directory_in,
   // TODO: Tune gcc flags to auto-vectorize the trivial loop instead of hand-vectorizing
   // it. This might not be possible.
   if (CpuInfo::IsSupported(CpuInfo::AVX)) {
-    OrEqualArrayAvx(directory_size, reinterpret_cast<const char*>(directory_in),
-        reinterpret_cast<char*>(directory_out));
+    OrEqualArrayAvx(in.directory.size(), &in.directory[0], &out->directory[0]);
   } else {
-    const __m128i* simd_in = reinterpret_cast<const __m128i*>(directory_in);
+    const __m128i* simd_in = reinterpret_cast<const __m128i*>(&in.directory[0]);
     const __m128i* const simd_in_end =
-        reinterpret_cast<const __m128i*>(directory_in + directory_size);
-    __m128i* simd_out = reinterpret_cast<__m128i*>(directory_out);
-    // directory_in has a size (in bytes) that is a multiple of 32. Since sizeof(__m128i)
+        reinterpret_cast<const __m128i*>(&in.directory[0] + in.directory.size());
+    __m128i* simd_out = reinterpret_cast<__m128i*>(&out->directory[0]);
+    // in.directory has a size (in bytes) that is a multiple of 32. Since sizeof(__m128i)
     // == 16, we can do two _mm_or_si128's in each iteration without checking array
     // bounds.
     while (simd_in != simd_in_end) {

@@ -29,9 +29,7 @@
 #include "runtime/krpc-data-stream-mgr.h"
 #include "runtime/exec-env.h"
 #include "runtime/mem-tracker.h"
-#include "runtime/query-state.h"
 #include "runtime/row-batch.h"
-#include "service/impala-server.h"
 #include "util/memory-metrics.h"
 #include "util/parse-util.h"
 #include "testutil/fault-injection-util.h"
@@ -107,38 +105,6 @@ void DataStreamService::TransmitData(const TransmitDataRequestPB* request,
   DebugActionNoFail(FLAGS_debug_actions, "TRANSMIT_DATA_DELAY");
   // AddData() is guaranteed to eventually respond to this RPC so we don't do it here.
   ExecEnv::GetInstance()->stream_mgr()->AddData(request, response, rpc_context);
-}
-
-void DataStreamService::UpdateFilter(
-    const UpdateFilterParamsPB* req, UpdateFilterResultPB* resp, RpcContext* context) {
-  // This failpoint is to allow jitter to be injected.
-  DebugActionNoFail(FLAGS_debug_actions, "UPDATE_FILTER_DELAY");
-  DCHECK(req->has_filter_id());
-  DCHECK(req->has_query_id());
-  DCHECK(req->has_bloom_filter() || req->has_min_max_filter());
-  ExecEnv::GetInstance()->impala_server()->UpdateFilter(resp, *req, context);
-  RespondAndReleaseRpc(Status::OK(), resp, context, mem_tracker_.get());
-}
-
-void DataStreamService::PublishFilter(
-    const PublishFilterParamsPB* req, PublishFilterResultPB* resp, RpcContext* context) {
-  // This failpoint is to allow jitter to be injected.
-  DebugActionNoFail(FLAGS_debug_actions, "PUBLISH_FILTER_DELAY");
-  DCHECK(req->has_filter_id());
-  DCHECK(req->has_dst_query_id());
-  DCHECK(req->has_dst_fragment_idx());
-  DCHECK(req->has_bloom_filter() || req->has_min_max_filter());
-  QueryState::ScopedRef qs(ProtoToQueryId(req->dst_query_id()));
-
-  if (qs.get() != nullptr) {
-    qs->PublishFilter(*req, context);
-    RespondAndReleaseRpc(Status::OK(), resp, context, mem_tracker_.get());
-  } else {
-    string err_msg = Substitute("Query State not found for query_id=$0",
-        PrintId(ProtoToQueryId(req->dst_query_id())));
-    LOG(INFO) << err_msg;
-    RespondAndReleaseRpc(Status(err_msg), resp, context, mem_tracker_.get());
-  }
 }
 
 template<typename ResponsePBType>

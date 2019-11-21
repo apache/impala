@@ -39,20 +39,3 @@ enum CompressionType {
   NONE = 0; // No compression.
   LZ4 = 1;
 }
-
-// This is a union over all possible return types.
-// TODO: if we upgrade to proto3, then we can use the oneof feature in Protobuf 3 in
-// the following to save some memory because only one of the fields below is set at a
-// time.
-message ColumnValuePB {
-  optional bool bool_val = 1;
-  optional int32 byte_val = 6;
-  optional int32 short_val = 7;
-  optional int32 int_val = 2;
-  optional int64 long_val = 3;
-  optional double double_val = 4;
-  optional string string_val = 5;
-  optional string binary_val = 8;
-  optional string timestamp_val = 9;
-  optional bytes decimal_val = 10;
-}

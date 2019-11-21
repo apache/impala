@@ -32,7 +32,6 @@
 #include "exec/hdfs-scan-node-base.h"
 #include "exec/exchange-node.h"
 #include "exec/scan-node.h"
-#include "kudu/rpc/rpc_context.h"
 #include "runtime/exec-env.h"
 #include "runtime/backend-client.h"
 #include "runtime/client-cache.h"
@@ -50,7 +49,6 @@
 #include "util/periodic-counter-updater.h"
 #include "gen-cpp/ImpalaInternalService_types.h"
 
-using kudu::rpc::RpcContext;
 using namespace impala;
 using namespace apache::thrift;
 
@@ -516,11 +514,10 @@ Status FragmentInstanceState::WaitForOpen() {
   return opened_promise_.Get();
 }
 
-void FragmentInstanceState::PublishFilter(
-    const PublishFilterParamsPB& params, RpcContext* context) {
+void FragmentInstanceState::PublishFilter(const TPublishFilterParams& params) {
   VLOG_FILE << "PublishFilter(): instance_id=" << PrintId(instance_id())
-            << " filter_id=" << params.filter_id();
-  runtime_state_->filter_bank()->PublishGlobalFilter(params, context);
+            << " filter_id=" << params.filter_id;
+  runtime_state_->filter_bank()->PublishGlobalFilter(params);
 }
 
 const string& FragmentInstanceState::ExecStateToString(FInstanceExecStatePB state) {

@@ -61,13 +61,12 @@ class Coordinator::FilterState {
   FilterState(const TRuntimeFilterDesc& desc, const TPlanNodeId& src)
     : desc_(desc), src_(src) {
     // bloom_filter_ is a disjunction so the unit value is always_false.
-    bloom_filter_.set_always_false(true);
-    min_max_filter_.set_always_false(true);
+    bloom_filter_.always_false = true;
+    min_max_filter_.always_false = true;
   }
 
-  BloomFilterPB& bloom_filter() { return bloom_filter_; }
-  string& bloom_filter_directory() { return bloom_filter_directory_; }
-  MinMaxFilterPB& min_max_filter() { return min_max_filter_; }
+  TBloomFilter& bloom_filter() { return bloom_filter_; }
+  TMinMaxFilter& min_max_filter() { return min_max_filter_; }
   std::vector<FilterTarget>* targets() { return &targets_; }
   const std::vector<FilterTarget>& targets() const { return targets_; }
   int64_t first_arrival_time() const { return first_arrival_time_; }
@@ -82,17 +81,16 @@ class Coordinator::FilterState {
   void set_num_producers(int num_producers) { num_producers_ = num_producers; }
   bool disabled() const {
     if (is_bloom_filter()) {
-      return bloom_filter_.always_true();
+      return bloom_filter_.always_true;
     } else {
       DCHECK(is_min_max_filter());
-      return min_max_filter_.always_true();
+      return min_max_filter_.always_true;
     }
   }
 
   /// Aggregates partitioned join filters and updates memory consumption.
   /// Disables filter if always_true filter is received or OOM is hit.
-  void ApplyUpdate(const UpdateFilterParamsPB& params, Coordinator* coord,
-      kudu::rpc::RpcContext* context);
+  void ApplyUpdate(const TUpdateFilterParams& params, Coordinator* coord);
 
   /// Disables a filter. A disabled filter consumes no memory.
   void Disable(MemTracker* tracker);
@@ -112,16 +110,13 @@ class Coordinator::FilterState {
   int num_producers_ = 0;
 
   /// Filters aggregated from all source plan nodes, to be broadcast to all
-  /// destination plan fragment instances. Only set for partitioned joins (broadcast
-  /// joins need no aggregation).
+  /// destination plan fragment instances. Only set for partitioned joins (broadcast joins
+  /// need no aggregation).
   /// In order to avoid memory spikes, an incoming filter is moved (vs. copied) to the
   /// output structure in the case of a broadcast join. Similarly, for partitioned joins,
   /// the filter is moved from the following member to the output structure.
-  BloomFilterPB bloom_filter_;
-  /// When the filter is a Bloom filter, we use this string to store the contents of the
-  /// aggregated Bloom filter.
-  string bloom_filter_directory_;
-  MinMaxFilterPB min_max_filter_;
+  TBloomFilter bloom_filter_;
+  TMinMaxFilter min_max_filter_;
 
   /// Time at which first local filter arrived.
   int64_t first_arrival_time_ = 0L;

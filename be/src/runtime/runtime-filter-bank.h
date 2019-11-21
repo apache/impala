@@ -20,7 +20,6 @@
 
 #include "codegen/impala-ir.h"
 #include "common/object-pool.h"
-#include "gen-cpp/data_stream_service.pb.h"
 #include "runtime/bufferpool/buffer-pool.h"
 #include "runtime/mem-pool.h"
 #include "runtime/types.h"
@@ -30,15 +29,6 @@
 #include <boost/thread/lock_guard.hpp>
 #include <boost/unordered_map.hpp>
 
-#include <condition_variable>
-
-namespace kudu {
-namespace rpc {
-class RpcContext;
-class RpcController;
-} // namespace rpc
-} // namespace kudu
-
 namespace impala {
 
 class BloomFilter;
@@ -46,6 +36,7 @@ class MemTracker;
 class MinMaxFilter;
 class RuntimeFilter;
 class RuntimeState;
+class TBloomFilter;
 class TRuntimeFilterDesc;
 class TQueryCtx;
 
@@ -103,8 +94,7 @@ class RuntimeFilterBank {
 
   /// Makes a bloom_filter (aggregated globally from all producer fragments) available for
   /// consumption by operators that wish to use it for filtering.
-  void PublishGlobalFilter(
-      const PublishFilterParamsPB& params, kudu::rpc::RpcContext* context);
+  void PublishGlobalFilter(const TPublishFilterParams& params);
 
   /// Returns true if, according to the observed NDV in 'observed_ndv', a filter of size
   /// 'filter_size' would have an expected false-positive rate which would exceed
@@ -160,16 +150,6 @@ class RuntimeFilterBank {
   /// All filters expected to be consumed by the local plan fragment instance.
   RuntimeFilterMap consumed_filters_;
 
-  /// Lock protecting 'num_inflight_rpcs_' and it should not be taken at the same
-  /// time as runtime_filter_lock_.
-  SpinLock num_inflight_rpcs_lock_;
-  /// Use 'num_inflight_rpcs_' to keep track of the number of current in-flight
-  /// KRPC calls to prevent the memory pointed to by a BloomFilter* being
-  /// deallocated in RuntimeFilterBank::Close() before all KRPC calls have
-  /// been completed.
-  int32_t num_inflight_rpcs_ = 0;
-  std::condition_variable_any krpcs_done_cv_;
-
   /// Fragment instance's runtime state.
   RuntimeState* state_;
 
@@ -204,11 +184,6 @@ class RuntimeFilterBank {
   /// in ClaimBufferReservation(). Reservations are returned to the initial reservations
   /// pool in Close().
   BufferPool::ClientHandle buffer_pool_client_;
-
-  /// This is the callback for the asynchronous rpc UpdateFilterAsync() in
-  /// UpdateFilterFromLocal().
-  void UpdateFilterCompleteCb(
-      const kudu::rpc::RpcController* rpc_controller, const UpdateFilterResultPB* res);
 };
 
 }

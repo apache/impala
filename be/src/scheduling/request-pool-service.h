@@ -20,6 +20,7 @@
 
 #include <jni.h>
 
+#include "gen-cpp/ImpalaInternalService.h"
 #include "common/status.h"
 #include "util/metrics-fwd.h"
 

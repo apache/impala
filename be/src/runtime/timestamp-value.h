@@ -27,7 +27,6 @@
 
 #include "common/global-types.h"
 #include "gen-cpp/Data_types.h"
-#include "gen-cpp/data_stream_service.pb.h"
 #include "udf/udf.h"
 #include "util/hash-util.h"
 
@@ -167,16 +166,17 @@ class TimestampValue {
     *ptp = boost::posix_time::ptime(date_, time_);
   }
 
-  // Store the binary representation of this TimestampValue in 'pvalue'.
-  void ToColumnValuePB(ColumnValuePB* pvalue) const {
+  // Store the binary representation of this TimestampValue in 'tvalue'.
+  void ToTColumnValue(TColumnValue* tvalue) const {
     const uint8_t* data = reinterpret_cast<const uint8_t*>(this);
-    pvalue->mutable_timestamp_val()->assign(data, data + Size());
+    tvalue->timestamp_val.assign(data, data + Size());
+    tvalue->__isset.timestamp_val = true;
   }
 
-  // Returns a new TimestampValue created from the value in 'value_pb'.
-  static TimestampValue FromColumnValuePB(const ColumnValuePB& value_pb) {
+  // Returns a new TimestampValue created from the value in 'tvalue'.
+  static TimestampValue FromTColumnValue(const TColumnValue& tvalue) {
     TimestampValue value;
-    memcpy(&value, value_pb.timestamp_val().c_str(), Size());
+    memcpy(&value, tvalue.timestamp_val.c_str(), Size());
     value.Validate();
     return value;
   }

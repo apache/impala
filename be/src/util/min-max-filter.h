@@ -74,25 +74,25 @@ class MinMaxFilter {
   /// until this is called.
   virtual void MaterializeValues() {}
 
-  /// Convert this filter to a protobuf representation.
-  virtual void ToProtobuf(MinMaxFilterPB* protobuf) const = 0;
+  /// Convert this filter to a thrift representation.
+  virtual void ToThrift(TMinMaxFilter* thrift) const = 0;
 
   virtual std::string DebugString() const = 0;
 
   /// Returns a new MinMaxFilter with the given type, allocated from 'mem_tracker'.
   static MinMaxFilter* Create(ColumnType type, ObjectPool* pool, MemTracker* mem_tracker);
 
-  /// Returns a new MinMaxFilter created from the protobuf representation, allocated from
+  /// Returns a new MinMaxFilter created from the thrift representation, allocated from
   /// 'mem_tracker'.
-  static MinMaxFilter* Create(const MinMaxFilterPB& protobuf, ColumnType type,
+  static MinMaxFilter* Create(const TMinMaxFilter& thrift, ColumnType type,
       ObjectPool* pool, MemTracker* mem_tracker);
 
   /// Computes the logical OR of 'in' with 'out' and stores the result in 'out'.
   static void Or(
-      const MinMaxFilterPB& in, MinMaxFilterPB* out, const ColumnType& columnType);
+      const TMinMaxFilter& in, TMinMaxFilter* out, const ColumnType& columnType);
 
   /// Copies the contents of 'in' into 'out'.
-  static void Copy(const MinMaxFilterPB& in, MinMaxFilterPB* out);
+  static void Copy(const TMinMaxFilter& in, TMinMaxFilter* out);
 
   /// Returns the LLVM_CLASS_NAME for the given type.
   static std::string GetLlvmClassName(PrimitiveType type);
@@ -108,7 +108,7 @@ class MinMaxFilter {
       min_ = std::numeric_limits<TYPE>::max();                                \
       max_ = std::numeric_limits<TYPE>::lowest();                             \
     }                                                                         \
-    NAME##MinMaxFilter(const MinMaxFilterPB& protobuf);                       \
+    NAME##MinMaxFilter(const TMinMaxFilter& thrift);                          \
     virtual ~NAME##MinMaxFilter() {}                                          \
     virtual void* GetMin() override { return &min_; }                         \
     virtual void* GetMax() override { return &max_; }                         \
@@ -121,10 +121,10 @@ class MinMaxFilter {
       return min_ == std::numeric_limits<TYPE>::max()                         \
           && max_ == std::numeric_limits<TYPE>::lowest();                     \
     }                                                                         \
-    virtual void ToProtobuf(MinMaxFilterPB* protobuf) const override;         \
+    virtual void ToThrift(TMinMaxFilter* thrift) const override;              \
     virtual std::string DebugString() const override;                         \
-    static void Or(const MinMaxFilterPB& in, MinMaxFilterPB* out);            \
-    static void Copy(const MinMaxFilterPB& in, MinMaxFilterPB* out);          \
+    static void Or(const TMinMaxFilter& in, TMinMaxFilter* out);              \
+    static void Copy(const TMinMaxFilter& in, TMinMaxFilter* out);            \
     static const char* LLVM_CLASS_NAME;                                       \
                                                                               \
    private:                                                                   \
@@ -148,7 +148,7 @@ class StringMinMaxFilter : public MinMaxFilter {
       max_buffer_(&mem_pool_),
       always_false_(true),
       always_true_(false) {}
-  StringMinMaxFilter(const MinMaxFilterPB& protobuf, MemTracker* mem_tracker);
+  StringMinMaxFilter(const TMinMaxFilter& thrift, MemTracker* mem_tracker);
   virtual ~StringMinMaxFilter() {}
   virtual void Close() override { mem_pool_.FreeAll(); }
 
@@ -164,11 +164,11 @@ class StringMinMaxFilter : public MinMaxFilter {
   /// truncating them if necessary.
   virtual void MaterializeValues() override;
 
-  virtual void ToProtobuf(MinMaxFilterPB* protobuf) const override;
+  virtual void ToThrift(TMinMaxFilter* thrift) const override;
   virtual std::string DebugString() const override;
 
-  static void Or(const MinMaxFilterPB& in, MinMaxFilterPB* out);
-  static void Copy(const MinMaxFilterPB& in, MinMaxFilterPB* out);
+  static void Or(const TMinMaxFilter& in, TMinMaxFilter* out);
+  static void Copy(const TMinMaxFilter& in, TMinMaxFilter* out);
 
   /// Struct name in LLVM IR.
   static const char* LLVM_CLASS_NAME;
@@ -208,7 +208,7 @@ class StringMinMaxFilter : public MinMaxFilter {
 class TimestampMinMaxFilter : public MinMaxFilter {
  public:
   TimestampMinMaxFilter() { always_false_ = true; }
-  TimestampMinMaxFilter(const MinMaxFilterPB& protobuf);
+  TimestampMinMaxFilter(const TMinMaxFilter& thrift);
   virtual ~TimestampMinMaxFilter() {}
 
   virtual void* GetMin() override { return &min_; }
@@ -218,11 +218,11 @@ class TimestampMinMaxFilter : public MinMaxFilter {
   virtual void Insert(void* val) override;
   virtual bool AlwaysTrue() const override { return false; }
   virtual bool AlwaysFalse() const override { return always_false_; }
-  virtual void ToProtobuf(MinMaxFilterPB* protobuf) const override;
+  virtual void ToThrift(TMinMaxFilter* thrift) const override;
   virtual std::string DebugString() const override;
 
-  static void Or(const MinMaxFilterPB& in, MinMaxFilterPB* out);
-  static void Copy(const MinMaxFilterPB& in, MinMaxFilterPB* out);
+  static void Or(const TMinMaxFilter& in, TMinMaxFilter* out);
+  static void Copy(const TMinMaxFilter& in, TMinMaxFilter* out);
 
   /// Struct name in LLVM IR.
   static const char* LLVM_CLASS_NAME;
@@ -269,7 +269,7 @@ class DecimalMinMaxFilter : public MinMaxFilter {
   DecimalMinMaxFilter(int precision)
     : size_(ColumnType::GetDecimalByteSize(precision)), always_false_(true) {}
 
-  DecimalMinMaxFilter(const MinMaxFilterPB& protobuf, int precision);
+  DecimalMinMaxFilter(const TMinMaxFilter& thrift, int precision);
   virtual ~DecimalMinMaxFilter() {}
 
   virtual void* GetMin() override {
@@ -286,11 +286,11 @@ class DecimalMinMaxFilter : public MinMaxFilter {
   virtual PrimitiveType type() override;
   virtual bool AlwaysTrue() const override { return false; }
   virtual bool AlwaysFalse() const override { return always_false_; }
-  virtual void ToProtobuf(MinMaxFilterPB* protobuf) const override;
+  virtual void ToThrift(TMinMaxFilter* thrift) const override;
   virtual std::string DebugString() const override;
 
-  static void Or(const MinMaxFilterPB& in, MinMaxFilterPB* out, int precision);
-  static void Copy(const MinMaxFilterPB& in, MinMaxFilterPB* out);
+  static void Or(const TMinMaxFilter& in, TMinMaxFilter* out, int precision);
+  static void Copy(const TMinMaxFilter& in, TMinMaxFilter* out);
 
   void Insert4(void* val);
   void Insert8(void* val);

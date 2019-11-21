@@ -21,7 +21,6 @@
 #include <unordered_set>
 #include <vector>
 
-#include "kudu/rpc/rpc_controller.h"
 #include "runtime/bufferpool/buffer-pool.h"
 #include "runtime/bufferpool/reservation-tracker.h"
 #include "runtime/mem-tracker.h"
@@ -29,14 +28,11 @@
 #include "service/fe-support.h"
 #include "testutil/gtest-util.h"
 
-#include "gen-cpp/data_stream_service.pb.h"
-
 using namespace std;
 
-using namespace impala;
-using kudu::rpc::RpcController;
+namespace {
 
-namespace bloom_filter_test_util {
+using namespace impala;
 
 // Make a random uint64_t, avoiding the absent high bit and the low-entropy low bits
 // produced by rand().
@@ -72,47 +68,24 @@ bool BfFind(BloomFilter& bf, uint32_t h) {
 // Computes union of 'x' and 'y'. Computes twice with AVX enabled and disabled and
 // verifies both produce the same result. 'success' is set to true if both union
 // computations returned the same result and set to false otherwise.
-void BfUnion(const BloomFilter& x, const BloomFilter& y, int64_t directory_size,
-    bool* success, BloomFilterPB* protobuf, std::string* directory) {
-  BloomFilterPB protobuf_x, protobuf_y;
-  RpcController controller_x;
-  RpcController controller_y;
-  BloomFilter::ToProtobuf(&x, &controller_x, &protobuf_x);
-  BloomFilter::ToProtobuf(&y, &controller_y, &protobuf_y);
-
-  string directory_x(reinterpret_cast<const char*>(x.directory_), directory_size);
-  string directory_y(reinterpret_cast<const char*>(y.directory_), directory_size);
-
-  BloomFilter::Or(protobuf_x, reinterpret_cast<const uint8_t*>(directory_x.data()),
-      &protobuf_y, reinterpret_cast<uint8_t*>(const_cast<char*>(directory_y.data())),
-      directory_size);
-
+TBloomFilter BfUnion(const BloomFilter& x, const BloomFilter& y, bool* success) {
+  TBloomFilter thrift_x, thrift_y;
+  BloomFilter::ToThrift(&x, &thrift_x);
+  BloomFilter::ToThrift(&y, &thrift_y);
+  BloomFilter::Or(thrift_x, &thrift_y);
   {
     CpuInfo::TempDisable t1(CpuInfo::AVX);
     CpuInfo::TempDisable t2(CpuInfo::AVX2);
-    BloomFilterPB protobuf_x2, protobuf_y2;
-    RpcController controller_x2;
-    RpcController controller_y2;
-    BloomFilter::ToProtobuf(&x, &controller_x2, &protobuf_x2);
-    BloomFilter::ToProtobuf(&y, &controller_y2, &protobuf_y2);
-
-    string directory_x2(reinterpret_cast<const char*>(x.directory_), directory_size);
-    string directory_y2(reinterpret_cast<const char*>(y.directory_), directory_size);
-
-    BloomFilter::Or(protobuf_x2, reinterpret_cast<const uint8_t*>(directory_x2.data()),
-        &protobuf_y2, reinterpret_cast<uint8_t*>(const_cast<char*>(directory_y2.data())),
-        directory_size);
-
-    *success = directory_y.compare(directory_y2) == 0;
+    TBloomFilter thrift_x2, thrift_y2;
+    BloomFilter::ToThrift(&x, &thrift_x2);
+    BloomFilter::ToThrift(&y, &thrift_y2);
+    BloomFilter::Or(thrift_x2, &thrift_y2);
+    *success = thrift_y.directory == thrift_y2.directory;
   }
-
-  *protobuf = protobuf_y;
-  *directory = directory_y;
+  return thrift_y;
 }
 
-} // namespace bloom_filter_test_util
-
-using namespace bloom_filter_test_util;
+}  // namespace
 
 namespace impala {
 
@@ -231,15 +204,12 @@ class BloomFilterTest : public testing::Test {
     return bloom_filter;
   }
 
-  BloomFilter* CreateBloomFilter(BloomFilterPB filter_pb, const std::string& directory) {
+  BloomFilter* CreateBloomFilter(TBloomFilter t_filter) {
     int64_t filter_size =
-        BloomFilter::GetExpectedMemoryUsed(filter_pb.log_bufferpool_space());
+        BloomFilter::GetExpectedMemoryUsed(t_filter.log_bufferpool_space);
     EXPECT_TRUE(buffer_pool_client_->IncreaseReservation(filter_size));
     BloomFilter* bloom_filter = pool_.Add(new BloomFilter(buffer_pool_client_.get()));
-
-    EXPECT_OK(bloom_filter->Init(
-        filter_pb, reinterpret_cast<const uint8_t*>(directory.data()), directory.size()));
-
+    EXPECT_OK(bloom_filter->Init(t_filter));
     bloom_filters_.push_back(bloom_filter);
     EXPECT_NE(bloom_filter->GetBufferPoolSpaceUsed(), -1);
     return bloom_filter;
@@ -341,7 +311,7 @@ TEST_F(BloomFilterTest, FindInvalid) {
   }
 }
 
-TEST_F(BloomFilterTest, Protobuf) {
+TEST_F(BloomFilterTest, Thrift) {
   BloomFilter* bf = CreateBloomFilter(BloomFilter::MinLogSpace(100, 0.01));
   for (int i = 0; i < 10; ++i) BfInsert(*bf, i);
   // Check no unexpected new false positives.
@@ -350,27 +320,19 @@ TEST_F(BloomFilterTest, Protobuf) {
     if (!BfFind(*bf, i)) missing_ints.insert(i);
   }
 
-  BloomFilterPB to_protobuf;
+  TBloomFilter to_thrift;
+  BloomFilter::ToThrift(bf, &to_thrift);
+  EXPECT_EQ(to_thrift.always_true, false);
 
-  RpcController controller;
-  BloomFilter::ToProtobuf(bf, &controller, &to_protobuf);
+  BloomFilter* from_thrift = CreateBloomFilter(to_thrift);
+  for (int i = 0; i < 10; ++i) ASSERT_TRUE(BfFind(*from_thrift, i));
+  for (int missing: missing_ints) ASSERT_FALSE(BfFind(*from_thrift, missing));
 
-  EXPECT_EQ(to_protobuf.always_true(), false);
-
-  std::string directory(reinterpret_cast<const char*>(bf->directory_),
-      BloomFilter::GetExpectedMemoryUsed(BloomFilter::MinLogSpace(100, 0.01)));
-
-  BloomFilter* from_protobuf = CreateBloomFilter(to_protobuf, directory);
-
-  for (int i = 0; i < 10; ++i) ASSERT_TRUE(BfFind(*from_protobuf, i));
-  for (int missing : missing_ints) ASSERT_FALSE(BfFind(*from_protobuf, missing));
-
-  RpcController controller_2;
-  BloomFilter::ToProtobuf(nullptr, &controller_2, &to_protobuf);
-  EXPECT_EQ(to_protobuf.always_true(), true);
+  BloomFilter::ToThrift(NULL, &to_thrift);
+  EXPECT_EQ(to_thrift.always_true, true);
 }
 
-TEST_F(BloomFilterTest, ProtobufOr) {
+TEST_F(BloomFilterTest, ThriftOr) {
   BloomFilter* bf1 = CreateBloomFilter(BloomFilter::MinLogSpace(100, 0.01));
   BloomFilter* bf2 = CreateBloomFilter(BloomFilter::MinLogSpace(100, 0.01));
 
@@ -378,15 +340,7 @@ TEST_F(BloomFilterTest, ProtobufOr) {
   for (int i = 0; i < 10; ++i) BfInsert(*bf1, i);
 
   bool success;
-  BloomFilterPB protobuf;
-  std::string directory;
-  int64_t directory_size =
-      BloomFilter::GetExpectedMemoryUsed(BloomFilter::MinLogSpace(100, 0.01));
-
-  BfUnion(*bf1, *bf2, directory_size, &success, &protobuf, &directory);
-
-  BloomFilter* bf3 = CreateBloomFilter(protobuf, directory);
-
+  BloomFilter *bf3 = CreateBloomFilter(BfUnion(*bf1, *bf2, &success));
   ASSERT_TRUE(success) << "SIMD BloomFilter::Union error";
   for (int i = 0; i < 10; ++i) ASSERT_TRUE(BfFind(*bf3, i)) << i;
   for (int i = 60; i < 80; ++i) ASSERT_TRUE(BfFind(*bf3, i)) << i;
@@ -394,10 +348,8 @@ TEST_F(BloomFilterTest, ProtobufOr) {
   // Insert another value to aggregated BloomFilter.
   for (int i = 11; i < 50; ++i) BfInsert(*bf3, i);
 
-  // Apply BloomFilterPB back to BloomFilter and verify if aggregation was correct.
-  BfUnion(*bf1, *bf3, directory_size, &success, &protobuf, &directory);
-  BloomFilter* bf4 = CreateBloomFilter(protobuf, directory);
-
+  // Apply TBloomFilter back to BloomFilter and verify if aggregation was correct.
+  BloomFilter *bf4 = CreateBloomFilter(BfUnion(*bf1, *bf3, &success));
   ASSERT_TRUE(success) << "SIMD BloomFilter::Union error";
   for (int i = 11; i < 50; ++i) ASSERT_TRUE(BfFind(*bf4, i)) << i;
   for (int i = 60; i < 80; ++i) ASSERT_TRUE(BfFind(*bf4, i)) << i;
