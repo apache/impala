@@ -12,7 +12,7 @@
          so as not to reduce query concurrency but high enough that
          queries don't get starved for memory because of low estimates. -->
     <name>impala.admission-control.min-query-mem-limit.root.default</name>
-    <value>268435456</value><!--256MB-->
+    <value>314572800</value><!--300MB-->
   </property>
   <property>
     <!--Allow individual tests to set mem_limit to any value, if needed.-->
