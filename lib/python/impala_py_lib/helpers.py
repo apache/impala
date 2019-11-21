@@ -16,14 +16,20 @@
 # under the License.
 
 import fnmatch
+import logging
 import os
 import re
 import subprocess
+
+logging.basicConfig()
+LOG = logging.getLogger('impala_lib_python_helpers')
 
 
 def exec_local_command(cmd):
   """
   Executes a command for the local bash shell and return stdout as a string.
+
+  Raise CalledProcessError in case of  non-zero return code.
 
   Args:
     cmd: command as a string
@@ -31,7 +37,14 @@ def exec_local_command(cmd):
   Return:
     STDOUT
   """
-  return subprocess.check_output(cmd.split())
+  proc = subprocess.Popen(cmd.split(), stdout=subprocess.PIPE, stderr=subprocess.PIPE)
+  output, error = proc.communicate()
+  retcode = proc.poll()
+  if retcode:
+    LOG.error("{0} returned status {1}: {2}".format(cmd, retcode, error))
+    raise subprocess.CalledProcessError()
+  else:
+    return output
 
 
 def find_all_files(fname_pattern, base_dir=os.getenv('IMPALA_HOME', '.')):
