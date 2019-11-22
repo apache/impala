@@ -34,11 +34,11 @@ under the License.
 
   <conbody>
 
-    <p>
-      You can specify the following options when starting the <codeph>impala-shell</codeph> command to change how
-      shell commands are executed. The table shows the format to use when specifying each option on the command
-      line, or through the <filepath>$HOME/.impalarc</filepath> configuration file.
-    </p>
+    <p> You can specify the following options when starting the
+        <codeph>impala-shell</codeph> command to change how shell commands are
+      executed. The table shows the format to use when specifying each option on
+      the command line, or through the <codeph>impala-shell</codeph>
+      configuration file. </p>
 
     <note>
       <p>
@@ -523,11 +523,10 @@ under the License.
               <entry>
                 N/A
               </entry>
-              <entry>
-                Specifies the path of the file containing <cmdname>impala-shell</cmdname> configuration settings.
-                The default is <filepath>$HOME/.impalarc</filepath>. This setting can only be specified on the
-                command line.
-              </entry>
+              <entry> Specifies the path of the file containing
+                  <cmdname>impala-shell</cmdname> configuration settings. The
+                default is <filepath>/etc/impalarc</filepath>. This setting can
+                only be specified on the command line. </entry>
             </row>
             <row rev="2.3.0">
               <entry>--live_progress</entry>
@@ -593,56 +592,58 @@ under the License.
     <title>impala-shell Configuration File</title>
 
     <conbody>
-
-      <p>
-        You can define a set of default options for your <cmdname>impala-shell</cmdname> environment, stored in the
-        file <filepath>$HOME/.impalarc</filepath>. This file consists of key-value pairs, one option per line.
-        Everything after a <codeph>#</codeph> character on a line is treated as a comment and ignored.
-      </p>
-
-      <p>
-        The configuration file must contain a header label <codeph>[impala]</codeph>, followed by the options
-        specific to <cmdname>impala-shell</cmdname>. (This standard convention for configuration files lets you
-        use a single file to hold configuration options for multiple applications.)
-      </p>
-
-      <p>
-        To specify a different filename or path for the configuration file, specify the argument
-        <codeph>--config_file=<varname>path_to_config_file</varname></codeph> on the
-        <cmdname>impala-shell</cmdname> command line.
-      </p>
-
-      <p>
-        The names of the options in the configuration file are similar (although not necessarily identical) to the
-        long-form command-line arguments to the <cmdname>impala-shell</cmdname> command. For the names to use, see
-        <xref href="impala_shell_options.xml#shell_option_summary"/>.
-      </p>
-
-      <p>
-        Any options you specify on the <cmdname>impala-shell</cmdname> command line override any corresponding
-        options within the configuration file.
-      </p>
+      <p>You can define a set of default options for your
+          <cmdname>impala-shell</cmdname> environment, stored in the
+          <codeph>impala-shell</codeph> configuration file.</p>
+      <p>The <codeph>impala-shell</codeph> configuration file can be specified
+        at the global level in <codeph>/etc/impalarc</codeph>, and at the user
+        level in <codeph>~/.impalarc</codeph>. Note that the global level file
+        does not include a dot (<filepath>.</filepath>) in the file name.</p>
+      <p>To specify a different file name or path for the configuration file,
+        set the <codeph>--config_file</codeph>
+        <cmdname>impala-shell</cmdname> command line option to the path of the
+        configuration file. </p>
+      <p>Typically, an administrator creates the global configuration file for
+        the <cmdname>impala-shell</cmdname>, and if the user-level configuration
+        file exists, the options set in the user configuration file take
+        precedence over those in the global configuration file.</p>
+      <p>In turn, any options you specify on the <cmdname>impala-shell</cmdname>
+        command line override any corresponding options within the configuration
+        file. </p>
+      <p>The default path of the global configuration file can be changed by
+        setting the <codeph>$IMPALA_SHELL_GLOBAL_CONFIG_FILE</codeph>
+        environment variable.</p>
+      <p>The <codeph>impala-shell</codeph> configuration file consists of
+        key-value pairs, one option per line. Everything after a
+          <codeph>#</codeph> character on a line is treated as a comment and
+        ignored. </p>
+      <p> The configuration file must contain a header label
+          <codeph>[impala]</codeph>, followed by the options specific to
+          <cmdname>impala-shell</cmdname>.</p>
+      <p> The names of the options in the configuration file are similar
+        (although not necessarily identical) to the long-form command-line
+        arguments to the <cmdname>impala-shell</cmdname> command. For the names
+        to use, see <xref href="impala_shell_options.xml#shell_option_summary"
+        />. </p>
       <p>You can specify key-value pair options using <codeph>keyval</codeph>,
         similar to the <codeph>--var</codeph> command-line option. For example,
           <codeph>keyval=</codeph><varname>variable1</varname>=<varname>value1</varname>.</p>
-
-      <p>
-        The following example shows a configuration file that you might use during benchmarking tests. It sets
-        verbose mode, so that the output from each SQL query is followed by timing information.
-        <cmdname>impala-shell</cmdname> starts inside the database containing the tables with the benchmark data,
-        avoiding the need to issue a <codeph>USE</codeph> statement or use fully qualified table names.
-      </p>
-
-      <p>
-        In this example, the query output is formatted as delimited text rather than enclosed in ASCII art boxes,
-        and is stored in a file rather than printed to the screen. Those options are appropriate for benchmark
-        situations, so that the overhead of <cmdname>impala-shell</cmdname> formatting and printing the result set
-        does not factor into the timing measurements. It also enables the <codeph>show_profiles</codeph> option.
-        That option prints detailed performance information after each query, which might be valuable in
-        understanding the performance of benchmark queries.
-      </p>
-
-<codeblock>[impala]
+      <p> The following example shows a configuration file that you might use
+        during benchmarking tests. It sets verbose mode, so that the output from
+        each SQL query is followed by timing information.
+          <cmdname>impala-shell</cmdname> starts inside the database containing
+        the tables with the benchmark data, avoiding the need to issue a
+          <codeph>USE</codeph> statement or use fully qualified table names. </p>
+      <p> In this example, the query output is formatted as delimited text
+        rather than enclosed in ASCII art boxes, and is stored in a file rather
+        than printed to the screen. Those options are appropriate for benchmark
+        situations, so that the overhead of <cmdname>impala-shell</cmdname>
+        formatting and printing the result set does not factor into the timing
+        measurements. It also enables the <codeph>show_profiles</codeph> option.
+        That option prints detailed performance information after each query,
+        which might be valuable in understanding the performance of benchmark
+        queries. </p>
+      <codeblock>[impala]
 verbose=true
 default_db=tpc_benchmarking
 write_delimited=true
@@ -650,23 +651,25 @@ output_delimiter=,
 output_file=/home/tester1/benchmark_results.csv
 show_profiles=true
 keyval=msg1=hello,keyval=msg2=world</codeblock>
-
-      <p rev="2.11.0 IMPALA-5736">
-        The following example shows a configuration file that connects to a specific remote Impala node, runs a
-        single query within a particular database, then exits. Any query options predefined under the
-        <codeph>[impala.query_options]</codeph> section in the configuration file take effect during the session.
-      </p>
-
-      <p>
-        You would typically use this kind of single-purpose
-        configuration setting with the <cmdname>impala-shell</cmdname> command-line option
-        <codeph>--config_file=<varname>path_to_config_file</varname></codeph>, to easily select between many
-        predefined queries that could be run against different databases, hosts, or even different clusters. To run
-        a sequence of statements instead of a single query, specify the configuration option
-        <codeph>query_file=<varname>path_to_query_file</varname></codeph> instead.
-      </p>
-
-<codeblock>[impala]
+      <p>Within an <codeph>impala-shell</codeph> configuration file (global or
+        user), query options specified in the <codeph>[impala]</codeph> section
+        override the options specified in the
+          <codeph>[impala.query_options]</codeph> section.</p>
+      <p rev="2.11.0 IMPALA-5736"> The following example shows a configuration
+        file that connects to a specific remote Impala node, runs a single query
+        within a particular database, then exits. Any query options predefined
+        under the <codeph>[impala.query_options]</codeph> section in the
+        configuration file take effect during the session. </p>
+      <p> You would typically use this kind of single-purpose configuration
+        setting with the <cmdname>impala-shell</cmdname> command-line option
+            <codeph>--config_file=<varname>path_to_config_file</varname></codeph>,
+        to easily select between many predefined queries that could be run
+        against different databases, hosts, or even different clusters. To run a
+        sequence of statements instead of a single query, specify the
+        configuration option
+            <codeph>query_file=<varname>path_to_query_file</varname></codeph>
+        instead. </p>
+      <codeblock>[impala]
 impalad=impala-test-node1.example.com
 default_db=site_stats
 # Issue a predefined query and immediately exit.
