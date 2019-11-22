@@ -92,4 +92,12 @@ export BE_TEST=false
 # to make them start up dockerised clusters and will probably make more assumptions
 # about the cluster being tested.
 export CLUSTER_TEST=false
-./bin/run-all-tests.sh
+RET_CODE=0
+if ! ./bin/run-all-tests.sh; then
+  RET_CODE=1
+fi
+
+# Shutdown minicluster at the end
+./testdata/bin/kill-all.sh
+
+exit $RET_CODE

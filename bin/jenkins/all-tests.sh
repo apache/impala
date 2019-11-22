@@ -67,5 +67,8 @@ if ! bin/run-all-tests.sh; then
   RET_CODE=1
 fi
 
+# Shutdown minicluster at the end
+testdata/bin/kill-all.sh
+
 bin/jenkins/finalize.sh
 exit $RET_CODE
