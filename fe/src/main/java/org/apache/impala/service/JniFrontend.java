@@ -127,7 +127,8 @@ public class JniFrontend {
   /**
    * Create a new instance of the Jni Frontend.
    */
-  public JniFrontend(byte[] thriftBackendConfig) throws ImpalaException, TException {
+  public JniFrontend(byte[] thriftBackendConfig, boolean isBackendTest)
+    throws ImpalaException, TException {
     TBackendGflags cfg = new TBackendGflags();
     JniUtil.deserializeThrift(protocolFactory_, cfg, thriftBackendConfig);
 
@@ -140,7 +141,7 @@ public class JniFrontend {
     if (cfg.is_coordinator) {
       final AuthorizationFactory authzFactory =
           AuthorizationUtil.authzFactoryFrom(BackendConfig.INSTANCE);
-      frontend_ = new Frontend(authzFactory);
+      frontend_ = new Frontend(authzFactory, isBackendTest);
     } else {
       // Avoid instantiating Frontend in executor only impalads.
       frontend_ = null;
