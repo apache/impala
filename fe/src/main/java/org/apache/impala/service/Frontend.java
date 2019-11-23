@@ -281,8 +281,9 @@ public class Frontend {
 
   private static ExecutorService checkAuthorizationPool_;
 
-  public Frontend(AuthorizationFactory authzFactory) throws ImpalaException {
-    this(authzFactory, FeCatalogManager.createFromBackendConfig());
+  public Frontend(AuthorizationFactory authzFactory, boolean isBackendTest)
+      throws ImpalaException {
+    this(authzFactory, FeCatalogManager.createFromBackendConfig(), isBackendTest);
   }
 
   /**
@@ -292,11 +293,12 @@ public class Frontend {
   @VisibleForTesting
   public Frontend(AuthorizationFactory authzFactory, FeCatalog testCatalog)
       throws ImpalaException {
-    this(authzFactory, FeCatalogManager.createForTests(testCatalog));
+    // This signature is only used for frontend tests, so pass false for isBackendTest
+    this(authzFactory, FeCatalogManager.createForTests(testCatalog), false);
   }
 
-  private Frontend(AuthorizationFactory authzFactory, FeCatalogManager catalogManager)
-      throws ImpalaException {
+  private Frontend(AuthorizationFactory authzFactory, FeCatalogManager catalogManager,
+      boolean isBackendTest) throws ImpalaException {
     catalogManager_ = catalogManager;
     authzFactory_ = authzFactory;
 
@@ -323,10 +325,15 @@ public class Frontend {
     impaladTableUsageTracker_ = ImpaladTableUsageTracker.createFromConfig(
         BackendConfig.INSTANCE);
     queryHookManager_ = QueryEventHookManager.createFromConfig(BackendConfig.INSTANCE);
-    metaStoreClientPool_ = new MetaStoreClientPool(1, 0);
-    if (MetastoreShim.getMajorVersion() > 2) {
-      transactionKeepalive_ = new TransactionKeepalive(metaStoreClientPool_);
+    if (!isBackendTest) {
+      metaStoreClientPool_ = new MetaStoreClientPool(1, 0);
+      if (MetastoreShim.getMajorVersion() > 2) {
+        transactionKeepalive_ = new TransactionKeepalive(metaStoreClientPool_);
+      } else {
+        transactionKeepalive_ = null;
+      }
     } else {
+      metaStoreClientPool_ = null;
       transactionKeepalive_ = null;
     }
   }

@@ -25,6 +25,7 @@
 #include "rpc/jni-thrift-util.h"
 #include "util/backend-gflag-util.h"
 #include "util/jni-util.h"
+#include "util/test-info.h"
 #include "util/time.h"
 
 #include "common/names.h"
@@ -81,7 +82,7 @@ DEFINE_string(kudu_master_hosts, "", "Specifies the default Kudu master(s). The 
 
 Frontend::Frontend() {
   JniMethodDescriptor methods[] = {
-    {"<init>", "([B)V", &fe_ctor_},
+    {"<init>", "([BZ)V", &fe_ctor_},
     {"createExecRequest", "([B)[B", &create_exec_request_id_},
     {"getExplainPlan", "([B)Ljava/lang/String;", &get_explain_plan_id_},
     {"getHadoopConfig", "([B)[B", &get_hadoop_config_id_},
@@ -130,7 +131,10 @@ Frontend::Frontend() {
   jbyteArray cfg_bytes;
   ABORT_IF_ERROR(GetThriftBackendGflags(jni_env, &cfg_bytes));
 
-  jobject fe = jni_env->NewObject(fe_class, fe_ctor_, cfg_bytes);
+  // Pass in whether this is a backend test, so that the Frontend can avoid certain
+  // unnecessary initialization that introduces dependencies on a running minicluster.
+  jboolean is_be_test = TestInfo::is_be_test();
+  jobject fe = jni_env->NewObject(fe_class, fe_ctor_, cfg_bytes, is_be_test);
   ABORT_IF_EXC(jni_env);
   ABORT_IF_ERROR(JniUtil::LocalToGlobalRef(jni_env, fe, &fe_));
 }
