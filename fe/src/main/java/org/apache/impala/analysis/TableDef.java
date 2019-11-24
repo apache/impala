@@ -470,6 +470,7 @@ class TableDef {
     }
     Map<String, ColumnDef> colDefsByColName = ColumnDef.mapByColumnNames(columnDefs_);
     int keySeq = 1;
+    String constraintName = null;
     for (String colName: primaryKeyColNames_) {
       colName = colName.toLowerCase();
       ColumnDef colDef = colDefsByColName.remove(colName);
@@ -494,7 +495,11 @@ class TableDef {
         if (primaryKey_.isValidateCstr()) {
           throw new AnalysisException("VALIDATE feature is not supported yet.");
         }
-        String constraintName = generateConstraintName();
+        // All primary keys in a composite key should have the same constraint name. This
+        // is necessary because of HIVE-16603. See IMPALA-9188 for details.
+        if (constraintName == null) {
+          constraintName = generateConstraintName();
+        }
         // Each column of a primary key definition will be an SQLPrimaryKey.
         sqlPrimaryKeys_.add(new SQLPrimaryKey(getTblName().getDb(), getTbl(),
             colDef.getColName(), keySeq++, constraintName, primaryKey_.enableCstr,
