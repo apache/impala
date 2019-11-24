@@ -32,6 +32,15 @@
 # pkill -P $TIMEOUT_PID || true
 # kill $TIMEOUT_PID
 
+function collect_stacktraces() {
+  name=$1
+  pid=$2
+  echo "**** Generating stacktrace of $name with process id: $pid ****"
+  gdb -ex "thread apply all bt"  --batch -p $pid > \
+      "${IMPALA_TIMEOUT_LOGS_DIR}/${name}_${pid}.txt"
+  $JAVA_HOME/bin/jstack -F $pid > "${IMPALA_TIMEOUT_LOGS_DIR}/${name}_${pid}_jstack.txt"
+}
+
 SCRIPT_NAME=""
 SLEEP_TIMEOUT_MIN=""
 
@@ -96,9 +105,15 @@ echo
 # Impala might have a thread stuck. Print the stacktrace to the console output.
 mkdir -p "$IMPALA_TIMEOUT_LOGS_DIR"
 for pid in $(pgrep impalad); do
-  echo "**** Generating stacktrace of impalad with process id: $pid ****"
-  gdb -ex "thread apply all bt"  --batch -p $pid > "${IMPALA_TIMEOUT_LOGS_DIR}/${pid}.txt"
+  collect_stacktraces impalad $pid
 done
+
+# Catalogd's process name may change. Use 'ps' directly to search the binary name.
+CATALOGD_PID=$(ps aux | grep [c]atalogd | awk '{print $2}')
+collect_stacktraces catalogd $CATALOGD_PID
+
+STATESTORED_PID=$(pgrep statestored)
+collect_stacktraces statestored $STATESTORED_PID
 
 # Now kill the caller
 kill $PPID
@@ -107,5 +122,4 @@ kill $PPID
 --error "Script ${SCRIPT_NAME} timed out. This probably happened due to a hung
 thread which can be confirmed by looking at the stacktrace of running impalad
 processes at ${IMPALA_TIMEOUT_LOGS_DIR}"
-
 
