@@ -592,16 +592,23 @@ under the License.
     <title>impala-shell Configuration File</title>
 
     <conbody>
-      <p>You can define a set of default options for your
-          <cmdname>impala-shell</cmdname> environment, stored in the
-          <codeph>impala-shell</codeph> configuration file.</p>
-      <p>The <codeph>impala-shell</codeph> configuration file can be specified
-        at the global level in <codeph>/etc/impalarc</codeph>, and at the user
-        level in <codeph>~/.impalarc</codeph>. Note that the global level file
-        does not include a dot (<filepath>.</filepath>) in the file name.</p>
-      <p>To specify a different file name or path for the configuration file,
-        set the <codeph>--config_file</codeph>
-        <cmdname>impala-shell</cmdname> command line option to the path of the
+      <p>You can store a set of default settings for
+          <cmdname>impala-shell</cmdname> in the <codeph>impala-shell</codeph>
+        configuration file.</p>
+      <p>The global <codeph>impala-shell</codeph> configuration file is located
+        in <codeph>/etc/impalarc</codeph>.</p>
+      <p>The user-level <codeph>impala-shell</codeph> configuration file is
+        located in <codeph>~/.impalarc</codeph>.</p>
+      <p>Note that the global-level file name is different from the user-level
+        file name. The global-level file name does not include a dot
+          (<filepath>.</filepath>) in the file name.</p>
+      <p>The default path of the global configuration file can be changed by
+        setting the <codeph>$IMPALA_SHELL_GLOBAL_CONFIG_FILE</codeph>
+        environment variable.</p>
+      <p>To specify a different file name or path for the user-level
+        configuration file, start <cmdname>impala-shell</cmdname> with the
+          <codeph>--config_file</codeph>
+        <cmdname>impala-shell</cmdname> option set to the path of the
         configuration file. </p>
       <p>Typically, an administrator creates the global configuration file for
         the <cmdname>impala-shell</cmdname>, and if the user-level configuration
@@ -610,16 +617,14 @@ under the License.
       <p>In turn, any options you specify on the <cmdname>impala-shell</cmdname>
         command line override any corresponding options within the configuration
         file. </p>
-      <p>The default path of the global configuration file can be changed by
-        setting the <codeph>$IMPALA_SHELL_GLOBAL_CONFIG_FILE</codeph>
-        environment variable.</p>
+      <p> The <codeph>impala-shell</codeph> configuration file (global or user)
+        configuration file must contain a header label
+        <codeph>[impala]</codeph>, followed by the options specific to
+          <cmdname>impala-shell</cmdname>.</p>
       <p>The <codeph>impala-shell</codeph> configuration file consists of
-        key-value pairs, one option per line. Everything after a
+        key-value pairs, one option per line. Everything after the
           <codeph>#</codeph> character on a line is treated as a comment and
         ignored. </p>
-      <p> The configuration file must contain a header label
-          <codeph>[impala]</codeph>, followed by the options specific to
-          <cmdname>impala-shell</cmdname>.</p>
       <p> The names of the options in the configuration file are similar
         (although not necessarily identical) to the long-form command-line
         arguments to the <cmdname>impala-shell</cmdname> command. For the names
@@ -628,6 +633,9 @@ under the License.
       <p>You can specify key-value pair options using <codeph>keyval</codeph>,
         similar to the <codeph>--var</codeph> command-line option. For example,
           <codeph>keyval=</codeph><varname>variable1</varname>=<varname>value1</varname>.</p>
+      <p>The query options specified in the <codeph>[impala]</codeph> section
+        override the options specified in the
+          <codeph>[impala.query_options]</codeph> section.</p>
       <p> The following example shows a configuration file that you might use
         during benchmarking tests. It sets verbose mode, so that the output from
         each SQL query is followed by timing information.
@@ -651,10 +659,6 @@ output_delimiter=,
 output_file=/home/tester1/benchmark_results.csv
 show_profiles=true
 keyval=msg1=hello,keyval=msg2=world</codeblock>
-      <p>Within an <codeph>impala-shell</codeph> configuration file (global or
-        user), query options specified in the <codeph>[impala]</codeph> section
-        override the options specified in the
-          <codeph>[impala.query_options]</codeph> section.</p>
       <p rev="2.11.0 IMPALA-5736"> The following example shows a configuration
         file that connects to a specific remote Impala node, runs a single query
         within a particular database, then exits. Any query options predefined
