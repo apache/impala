@@ -22,6 +22,7 @@ import java.util.List;
 
 import org.apache.impala.analysis.BinaryPredicate;
 import org.apache.impala.analysis.Expr;
+import org.apache.impala.planner.RuntimeFilterGenerator.RuntimeFilter;
 import org.apache.impala.thrift.TDataSink;
 import org.apache.impala.thrift.TDataSinkType;
 import org.apache.impala.thrift.TExplainLevel;
@@ -43,6 +44,8 @@ public class JoinBuildSink extends DataSink {
 
   private final List<Expr> buildExprs_ = new ArrayList<>();
 
+  private final List<RuntimeFilter> runtimeFilters_ = new ArrayList<>();
+
   /**
    * Creates sink for build side of 'joinNode' (extracts buildExprs_ from joinNode).
    */
@@ -58,23 +61,37 @@ public class JoinBuildSink extends DataSink {
       // by convention the build exprs are the rhs of the join conjuncts
       buildExprs_.add(p.getChild(1).clone());
     }
+    runtimeFilters_.addAll(joinNode.getRuntimeFilters());
   }
 
   public JoinTableId getJoinTableId() { return joinTableId_; }
+  @Override
+  public List<RuntimeFilter> getRuntimeFilters() { return runtimeFilters_; }
 
   @Override
   protected void toThriftImpl(TDataSink tsink) {
     TJoinBuildSink tBuildSink = new TJoinBuildSink();
     tBuildSink.setDest_node_id(joinNode_.getId().asInt());
-    for (Expr buildExpr: buildExprs_) {
-      tBuildSink.addToBuild_exprs(buildExpr.treeToThrift());
+    tBuildSink.setJoin_op(joinNode_.getJoinOp().toThrift());
+    if (joinNode_ instanceof HashJoinNode) {
+      tBuildSink.setEq_join_conjuncts(
+          ((HashJoinNode)joinNode_).getThriftEquiJoinConjuncts());
+      tBuildSink.setHash_seed(joinNode_.getFragment().getHashSeed());
+    }
+    for (RuntimeFilter filter : runtimeFilters_) {
+      tBuildSink.addToRuntime_filters(filter.toThrift());
     }
     tsink.setJoin_build_sink(tBuildSink);
   }
 
   @Override
   protected TDataSinkType getSinkType() {
-    return TDataSinkType.JOIN_BUILD_SINK;
+    if (joinNode_ instanceof HashJoinNode) {
+      return TDataSinkType.HASH_JOIN_BUILDER;
+    } else {
+      Preconditions.checkState(joinNode_ instanceof NestedLoopJoinNode);
+      return TDataSinkType.NESTED_LOOP_JOIN_BUILDER;
+    }
   }
 
   @Override
@@ -90,6 +107,11 @@ public class JoinBuildSink extends DataSink {
         output.append(detailPrefix + "build expressions: ")
             .append(Expr.toSql(buildExprs_, DEFAULT) + "\n");
       }
+      if (!runtimeFilters_.isEmpty()) {
+        output.append(detailPrefix + "runtime filters: ");
+        output.append(PlanNode.getRuntimeFilterExplainString(
+            runtimeFilters_, true, joinNode_.getId(), detailLevel));
+      }
     }
   }
 
@@ -100,8 +122,7 @@ public class JoinBuildSink extends DataSink {
 
   @Override
   public void computeResourceProfile(TQueryOptions queryOptions) {
-    // The memory consumption is counted against the join PlanNode.
-    resourceProfile_ = ResourceProfile.noReservation(0);
+    resourceProfile_ = joinNode_.computeJoinResourceProfile(queryOptions).second;
   }
 
   @Override

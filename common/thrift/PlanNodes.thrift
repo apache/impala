@@ -341,6 +341,7 @@ struct TEqJoinCondition {
   3: required bool is_not_distinct_from;
 }
 
+// Different join operations supported by backend join operations.
 enum TJoinOp {
   INNER_JOIN = 0
   LEFT_OUTER_JOIN = 1
@@ -361,21 +362,38 @@ enum TJoinOp {
 }
 
 struct THashJoinNode {
-  1: required TJoinOp join_op
-
   // equi-join predicates
-  2: required list<TEqJoinCondition> eq_join_conjuncts
+  1: required list<TEqJoinCondition> eq_join_conjuncts
 
   // non equi-join predicates
-  3: optional list<Exprs.TExpr> other_join_conjuncts
+  2: optional list<Exprs.TExpr> other_join_conjuncts
+
+  // Hash seed to use. Must be the same as the join builder's hash seed, if there is
+  // a separate join build. Must be positive.
+  3: optional i32 hash_seed
 }
 
 struct TNestedLoopJoinNode {
-  1: required TJoinOp join_op
-
   // Join conjuncts (both equi-join and non equi-join). All other conjuncts that are
   // evaluated at the join node are stored in TPlanNode.conjuncts.
-  2: optional list<Exprs.TExpr> join_conjuncts
+  1: optional list<Exprs.TExpr> join_conjuncts
+}
+
+// Top-level struct for a join node. Elements that are shared between the different
+// join implementations are top-level variables and elements that are specific to a
+// join implementation live in a specialized struct.
+struct TJoinNode {
+  1: required TJoinOp join_op
+
+  // Tuples in build row.
+  2: optional list<Types.TTupleId> build_tuples
+
+  // Nullable tuples in build row.
+  3: optional list<bool> nullable_build_tuples
+
+  // One of these must be set.
+  4: optional THashJoinNode hash_join_node
+  5: optional TNestedLoopJoinNode nested_loop_join_node
 }
 
 struct TAggregator {
@@ -599,8 +617,7 @@ struct TPlanNode {
   10: optional THBaseScanNode hbase_scan_node
   11: optional TKuduScanNode kudu_scan_node
   12: optional TDataSourceScanNode data_source_node
-  13: optional THashJoinNode hash_join_node
-  14: optional TNestedLoopJoinNode nested_loop_join_node
+  13: optional TJoinNode join_node
   15: optional TAggregationNode agg_node
   16: optional TSortNode sort_node
   17: optional TUnionNode union_node

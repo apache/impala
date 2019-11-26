@@ -57,8 +57,19 @@ class TestSpillingDebugActionDimensions(ImpalaTestSuite):
       debug_action_dims = CORE_DEBUG_ACTION_DIMS + EXHAUSTIVE_DEBUG_ACTION_DIMS
     # Tests are calibrated so that they can execute and spill with this page size.
     cls.ImpalaTestMatrix.add_dimension(
-        create_exec_option_dimension_from_dict({'default_spillable_buffer_size' : ['256k'],
-          'debug_action' : debug_action_dims}))
+        create_exec_option_dimension_from_dict({'default_spillable_buffer_size': ['256k'],
+          'debug_action': debug_action_dims, 'mt_dop': [0, 1]}))
+    # Pare down the combinations of mt_dop and debug_action that run to reduce test time.
+    # The MT code path for joins is more complex, so focus testing there.
+    if cls.exploration_strategy() == 'exhaustive':
+      debug_action_dims = CORE_DEBUG_ACTION_DIMS + EXHAUSTIVE_DEBUG_ACTION_DIMS
+      cls.ImpalaTestMatrix.add_constraint(lambda v:
+          v.get_value('exec_option')['mt_dop'] == 1 or
+          v.get_value('exec_option')['debug_action'] in CORE_DEBUG_ACTION_DIMS)
+    elif cls.exploration_strategy() == 'core':
+      cls.ImpalaTestMatrix.add_constraint(lambda v:
+          v.get_value('exec_option')['mt_dop'] == 1 or
+          v.get_value('exec_option')['debug_action'] is None)
 
   def test_spilling(self, vector):
     self.run_test_case('QueryTest/spilling', vector)
@@ -102,7 +113,8 @@ class TestSpillingNoDebugActionDimensions(ImpalaTestSuite):
     cls.ImpalaTestMatrix.add_dimension(create_parquet_dimension('tpch'))
     # Tests are calibrated so that they can execute and spill with this page size.
     cls.ImpalaTestMatrix.add_dimension(
-        create_exec_option_dimension_from_dict({'default_spillable_buffer_size' : ['256k']}))
+        create_exec_option_dimension_from_dict({'default_spillable_buffer_size': ['256k'],
+            'mt_dop': [0, 4]}))
 
   def test_spilling_naaj_no_deny_reservation(self, vector):
     """

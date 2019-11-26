@@ -49,34 +49,36 @@ static const string PREPARE_FOR_READ_FAILED_ERROR_MSG =
 using namespace impala;
 using strings::Substitute;
 
-Status PhjBuilderConfig::Init(
-    const TDataSink& tsink, const RowDescriptor* input_row_desc, RuntimeState* state) {
-  return Status("Not Implemented.");
+static string ConstructBuilderName(int join_node_id) {
+  return Substitute("Hash Join Builder (join_node_id=$0)", join_node_id);
 }
 
 DataSink* PhjBuilderConfig::CreateSink(const TPlanFragmentCtx& fragment_ctx,
     const TPlanFragmentInstanceCtx& fragment_instance_ctx, RuntimeState* state) const {
-  DCHECK(false) << "Not Implemented";
-  return nullptr;
+  // We have one fragment per sink, so we can use the fragment index as the sink ID.
+  TDataSinkId sink_id = fragment_ctx.fragment.idx;
+  ObjectPool* pool = state->obj_pool();
+  return pool->Add(new PhjBuilder(sink_id, *this, state));
 }
 
 PhjBuilder* PhjBuilderConfig::CreateSink(BufferPool::ClientHandle* buffer_pool_client,
-    const std::string& join_node_label, int64_t spillable_buffer_size,
-    int64_t max_row_buffer_size, RuntimeState* state) const {
+    int64_t spillable_buffer_size, int64_t max_row_buffer_size,
+    RuntimeState* state) const {
   ObjectPool* pool = state->obj_pool();
-  return pool->Add(new PhjBuilder(*this, buffer_pool_client, join_node_label,
-      spillable_buffer_size, max_row_buffer_size, state));
+  return pool->Add(new PhjBuilder(*this, buffer_pool_client, spillable_buffer_size,
+        max_row_buffer_size, state));
 }
 
 Status PhjBuilderConfig::CreateConfig(RuntimeState* state, int join_node_id,
     TJoinOp::type join_op, const RowDescriptor* build_row_desc,
     const std::vector<TEqJoinCondition>& eq_join_conjuncts,
-    const std::vector<TRuntimeFilterDesc>& filters, const PhjBuilderConfig** sink) {
+    const std::vector<TRuntimeFilterDesc>& filters, uint32_t hash_seed,
+    const PhjBuilderConfig** sink) {
   ObjectPool* pool = state->obj_pool();
-  TDataSink* tsink = pool->Add(new TDataSink()); // just a dummy object.
+  TDataSink* tsink = pool->Add(new TDataSink());
   PhjBuilderConfig* data_sink = pool->Add(new PhjBuilderConfig());
-  RETURN_IF_ERROR(data_sink->Init(
-      state, *tsink, join_node_id, join_op, build_row_desc, eq_join_conjuncts, filters));
+  RETURN_IF_ERROR(data_sink->Init(state, join_node_id, join_op, build_row_desc,
+      eq_join_conjuncts, filters, hash_seed, tsink));
   *sink = data_sink;
   return Status::OK();
 }
@@ -115,46 +117,94 @@ Status PhjBuilderConfig::InitExprsAndFilters(RuntimeState* state,
   return Status::OK();
 }
 
-Status PhjBuilderConfig::Init(RuntimeState* state, const TDataSink& tsink,
-    int join_node_id, TJoinOp::type join_op, const RowDescriptor* build_row_desc,
+Status PhjBuilderConfig::Init(RuntimeState* state, int join_node_id,
+    TJoinOp::type join_op, const RowDescriptor* build_row_desc,
     const std::vector<TEqJoinCondition>& eq_join_conjuncts,
-    const std::vector<TRuntimeFilterDesc>& filters) {
-  RETURN_IF_ERROR(DataSinkConfig::Init(tsink, build_row_desc, state));
-  join_node_id_ = join_node_id;
-  join_op_ = join_op;
+    const std::vector<TRuntimeFilterDesc>& filters, uint32_t hash_seed,
+    TDataSink* tsink) {
+  tsink->__isset.join_build_sink = true;
+  tsink->join_build_sink.__set_dest_node_id(join_node_id);
+  tsink->join_build_sink.__set_join_op(join_op);
+  RETURN_IF_ERROR(JoinBuilderConfig::Init(*tsink, build_row_desc, state));
+  hash_seed_ = hash_seed;
   return InitExprsAndFilters(state, eq_join_conjuncts, filters);
+}
+
+Status PhjBuilderConfig::Init(
+    const TDataSink& tsink, const RowDescriptor* input_row_desc, RuntimeState* state) {
+  RETURN_IF_ERROR(JoinBuilderConfig::Init(tsink, input_row_desc, state));
+  const TJoinBuildSink& build_sink = tsink.join_build_sink;
+  hash_seed_ = build_sink.hash_seed;
+  resource_profile_ = &tsink.resource_profile;
+  return InitExprsAndFilters(
+      state, tsink.join_build_sink.eq_join_conjuncts, build_sink.runtime_filters);
 }
 
 const char* PhjBuilder::LLVM_CLASS_NAME = "class.impala::PhjBuilder";
 
-PhjBuilder::PhjBuilder(const PhjBuilderConfig& sink_config,
-    BufferPool::ClientHandle* buffer_pool_client, const std::string& join_node_label,
-    int64_t spillable_buffer_size, int64_t max_row_buffer_size, RuntimeState* state)
-  : DataSink(-1, sink_config,
-        Substitute("Hash Join Builder (join_node_id=$0)", sink_config.join_node_id_),
-        state),
+PhjBuilder::PhjBuilder(
+    TDataSinkId sink_id, const PhjBuilderConfig& sink_config, RuntimeState* state)
+  : JoinBuilder(
+        sink_id, sink_config, ConstructBuilderName(sink_config.join_node_id_), state),
     runtime_state_(state),
-    join_node_id_(sink_config.join_node_id_),
-    join_node_label_(join_node_label),
-    join_op_(sink_config.join_op_),
-    buffer_pool_client_(buffer_pool_client),
-    spillable_buffer_size_(spillable_buffer_size),
-    max_row_buffer_size_(max_row_buffer_size),
+    hash_seed_(sink_config.hash_seed_),
+    resource_profile_(sink_config.resource_profile_),
+    reservation_manager_(),
+    buffer_pool_client_(reservation_manager_.buffer_pool_client()),
+    spillable_buffer_size_(resource_profile_->spillable_buffer_size),
+    max_row_buffer_size_(resource_profile_->max_row_buffer_size),
     build_exprs_(sink_config.build_exprs_),
     is_not_distinct_from_(sink_config.is_not_distinct_from_),
     filter_exprs_(sink_config.filter_exprs_) {
+  DCHECK_GT(sink_config.hash_seed_, 0);
   for (const TRuntimeFilterDesc& filter_desc : sink_config.filter_descs_) {
     filter_ctxs_.emplace_back();
     filter_ctxs_.back().filter = state->filter_bank()->RegisterFilter(filter_desc, true);
   }
 }
 
+PhjBuilder::PhjBuilder(const PhjBuilderConfig& sink_config,
+    BufferPool::ClientHandle* buffer_pool_client, int64_t spillable_buffer_size,
+    int64_t max_row_buffer_size, RuntimeState* state)
+  : JoinBuilder(
+        -1, sink_config, ConstructBuilderName(sink_config.join_node_id_), state),
+    runtime_state_(state),
+    hash_seed_(sink_config.hash_seed_),
+    resource_profile_(nullptr),
+    reservation_manager_(),
+    buffer_pool_client_(buffer_pool_client),
+    spillable_buffer_size_(spillable_buffer_size),
+    max_row_buffer_size_(max_row_buffer_size),
+    build_exprs_(sink_config.build_exprs_),
+    is_not_distinct_from_(sink_config.is_not_distinct_from_),
+    filter_exprs_(sink_config.filter_exprs_) {
+  DCHECK_GT(sink_config.hash_seed_, 0);
+  for (const TRuntimeFilterDesc& filter_desc : sink_config.filter_descs_) {
+    filter_ctxs_.emplace_back();
+    filter_ctxs_.back().filter = state->filter_bank()->RegisterFilter(filter_desc, true);
+  }
+}
+
+PhjBuilder::~PhjBuilder() {}
+
 Status PhjBuilder::Prepare(RuntimeState* state, MemTracker* parent_mem_tracker) {
   RETURN_IF_ERROR(DataSink::Prepare(state, parent_mem_tracker));
+  if (is_separate_build_) {
+    const TDebugOptions& instance_debug_options = state->instance_ctx().debug_options;
+    bool debug_option_enabled = instance_debug_options.node_id == -1
+        || instance_debug_options.node_id == join_node_id_;
+    // SET_DENY_RESERVATION_PROBABILITY should behave the same as if it were applied to
+    // the join node.
+    reservation_manager_.Init(Substitute("$0 ptr=$1", name_, this), profile(),
+        state->instance_buffer_reservation(), mem_tracker_.get(), *resource_profile_,
+        debug_option_enabled ? instance_debug_options : TDebugOptions());
+  }
+
   RETURN_IF_ERROR(HashTableCtx::Create(&obj_pool_, state, build_exprs_, build_exprs_,
-      HashTableStoresNulls(), is_not_distinct_from_, state->fragment_hash_seed(),
-      MAX_PARTITION_DEPTH, row_desc_->tuple_descriptors().size(), expr_perm_pool_.get(),
-      expr_results_pool_.get(), expr_results_pool_.get(), &ht_ctx_));
+      HashTableStoresNulls(join_op_, is_not_distinct_from_), is_not_distinct_from_,
+      hash_seed_, MAX_PARTITION_DEPTH, row_desc_->tuple_descriptors().size(),
+      expr_perm_pool_.get(), expr_results_pool_.get(), expr_results_pool_.get(),
+      &ht_ctx_));
 
   DCHECK_EQ(filter_exprs_.size(), filter_ctxs_.size());
   for (int i = 0; i < filter_exprs_.size(); ++i) {
@@ -182,6 +232,12 @@ Status PhjBuilder::Prepare(RuntimeState* state, MemTracker* parent_mem_tracker) 
 }
 
 Status PhjBuilder::Open(RuntimeState* state) {
+  SCOPED_TIMER(profile()->total_time_counter());
+  if (!buffer_pool_client_->is_registered()) {
+    DCHECK(is_separate_build_) << "Client is registered by PhjNode if not separate";
+    DCHECK_GE(resource_profile_->min_reservation, MinReservation().second);
+    RETURN_IF_ERROR(reservation_manager_.ClaimBufferReservation(state));
+  }
   // Need to init here instead of constructor so that buffer_pool_client_ is registered.
   if (probe_stream_reservation_.is_closed()) {
     probe_stream_reservation_.Init(buffer_pool_client_);
@@ -207,6 +263,7 @@ Status PhjBuilder::Open(RuntimeState* state) {
 }
 
 Status PhjBuilder::Send(RuntimeState* state, RowBatch* batch) {
+  SCOPED_TIMER(profile()->total_time_counter());
   SCOPED_TIMER(partition_build_rows_timer_);
   bool build_filters = ht_ctx_->level() == 0 && filter_ctxs_.size() > 0;
   if (process_build_batch_fn_ == nullptr) {
@@ -232,6 +289,7 @@ Status PhjBuilder::Send(RuntimeState* state, RowBatch* batch) {
 }
 
 Status PhjBuilder::FlushFinal(RuntimeState* state) {
+  SCOPED_TIMER(profile()->total_time_counter());
   int64_t num_build_rows = 0;
   for (const unique_ptr<Partition>& partition : hash_partitions_) {
     num_build_rows += partition->build_rows()->num_rows();
@@ -275,12 +333,17 @@ Status PhjBuilder::FlushFinal(RuntimeState* state) {
     RETURN_IF_ERROR(null_aware_partition_->Spill(BufferedTupleStream::UNPIN_ALL));
   }
 
-  RETURN_IF_ERROR(BuildHashTablesAndReserveProbeBuffers());
+  HashJoinState next_state;
   if (state_ == HashJoinState::PARTITIONING_BUILD) {
-    UpdateState(HashJoinState::PARTITIONING_PROBE);
+    next_state = HashJoinState::PARTITIONING_PROBE;
   } else {
     DCHECK_ENUM_EQ(state_, HashJoinState::REPARTITIONING_BUILD);
-    UpdateState(HashJoinState::REPARTITIONING_PROBE);
+    next_state = HashJoinState::REPARTITIONING_PROBE;
+  }
+  RETURN_IF_ERROR(BuildHashTablesAndReserveProbeBuffers(next_state));
+  UpdateState(next_state);
+  if (state_ == HashJoinState::PARTITIONING_PROBE && is_separate_build_) {
+    HandoffToProbesAndWait(state);
   }
   return Status::OK();
 }
@@ -300,11 +363,13 @@ void PhjBuilder::Close(RuntimeState* state) {
   ScalarExpr::Close(build_exprs_);
   obj_pool_.Clear();
   probe_stream_reservation_.Close();
+  if (is_separate_build_) reservation_manager_.Close(state);
   DataSink::Close(state);
   closed_ = true;
 }
 
 void PhjBuilder::Reset(RowBatch* row_batch) {
+  DCHECK(!is_separate_build_);
   DCHECK_EQ(0, probe_stream_reservation_.GetReservation());
   state_ = HashJoinState::PARTITIONING_BUILD;
   expr_results_pool_->Clear();
@@ -356,7 +421,7 @@ string PhjBuilder::PrintState() const {
 Status PhjBuilder::CreateAndPreparePartition(
     int level, unique_ptr<Partition>* partition) {
   *partition = make_unique<Partition>(runtime_state_, this, level);
-  Status status = (*partition)->build_rows()->Init(join_node_label_, true);
+  Status status = (*partition)->build_rows()->Init(name_, true);
   if (!status.ok()) goto error;
   bool got_buffer;
   status = (*partition)->build_rows()->PrepareForWrite(&got_buffer);
@@ -452,7 +517,7 @@ Status PhjBuilder::SpillPartition(BufferedTupleStream::UnpinMode mode,
 // For now, we go with a greedy solution.
 //
 // TODO: implement the knapsack solution.
-Status PhjBuilder::BuildHashTablesAndReserveProbeBuffers() {
+Status PhjBuilder::BuildHashTablesAndReserveProbeBuffers(HashJoinState next_state) {
   DCHECK_EQ(PARTITION_FANOUT, hash_partitions_.size());
 
   for (int i = 0; i < PARTITION_FANOUT; ++i) {
@@ -476,8 +541,7 @@ Status PhjBuilder::BuildHashTablesAndReserveProbeBuffers() {
   // building hash tables because allocating probe buffers may cause some more partitions
   // to be spilled. This avoids wasted work on building hash tables for partitions that
   // won't fit in memory alongside the required probe buffers.
-  bool input_is_spilled = ht_ctx_->level() > 0;
-  RETURN_IF_ERROR(ReserveProbeBuffers(input_is_spilled));
+  RETURN_IF_ERROR(ReserveProbeBuffers(next_state));
 
   for (int i = 0; i < PARTITION_FANOUT; ++i) {
     Partition* partition = hash_partitions_[i].get();
@@ -492,19 +556,18 @@ Status PhjBuilder::BuildHashTablesAndReserveProbeBuffers() {
   }
   // We may have spilled additional partitions while building hash tables, we need to
   // reserve memory for the probe buffers for those additional spilled partitions.
-  RETURN_IF_ERROR(ReserveProbeBuffers(input_is_spilled));
+  RETURN_IF_ERROR(ReserveProbeBuffers(next_state));
+  if (is_separate_build_) {
+    // The builder may have some surplus reservation. Release it so that it can be
+    // used by the probe side or by other operators.
+    RETURN_IF_ERROR(reservation_manager_.ReleaseUnusedReservation());
+  }
   return Status::OK();
 }
 
-Status PhjBuilder::ReserveProbeBuffers(bool input_is_spilled) {
+Status PhjBuilder::ReserveProbeBuffers(HashJoinState next_state) {
   DCHECK_EQ(PARTITION_FANOUT, hash_partitions_.size());
-
-  // We need a write buffer for probe rows for each spilled partition, and a read buffer
-  // if the input is a spilled partition (i.e. that we are repartitioning the input).
-  int num_probe_streams =
-      GetNumSpilledPartitions(hash_partitions_) + (input_is_spilled ? 1 : 0);
-  int64_t per_stream_reservation = spillable_buffer_size_;
-  int64_t addtl_reservation = num_probe_streams * per_stream_reservation
+  int64_t addtl_reservation = CalcProbeStreamReservation(next_state)
       - probe_stream_reservation_.GetReservation();
 
   // Loop until either we get enough reservation or all partitions are spilled (in which
@@ -515,32 +578,67 @@ Status PhjBuilder::ReserveProbeBuffers(bool input_is_spilled) {
           BufferedTupleStream::UNPIN_ALL, &spilled_partition));
     // Don't need to create a probe stream for the null-aware partition.
     if (spilled_partition != null_aware_partition_.get()) {
-      addtl_reservation += per_stream_reservation;
+      addtl_reservation += spillable_buffer_size_;
     }
   }
+  VLOG(3) << "PHJ(node_id=" << join_node_id_ << ") saved reservation "
+          << addtl_reservation;
   buffer_pool_client_->SaveReservation(&probe_stream_reservation_, addtl_reservation);
   return Status::OK();
 }
 
-PhjBuilder::HashPartitions PhjBuilder::BeginInitialProbe(
-    BufferPool::ClientHandle* probe_client) {
+Status PhjBuilder::BeginInitialProbe(
+    BufferPool::ClientHandle* probe_client, HashPartitions* partitions) {
+  DCHECK_EQ(is_separate_build_, probe_client != buffer_pool_client_);
   DCHECK_ENUM_EQ(state_, HashJoinState::PARTITIONING_PROBE);
   DCHECK_EQ(PARTITION_FANOUT, hash_partitions_.size());
-  TransferProbeStreamReservation(probe_client);
-  return HashPartitions(ht_ctx_->level(), &hash_partitions_, non_empty_build_);
+  RETURN_IF_ERROR(TransferProbeStreamReservation(probe_client));
+  *partitions = HashPartitions(ht_ctx_->level(), &hash_partitions_, non_empty_build_);
+  return Status::OK();
 }
 
-void PhjBuilder::TransferProbeStreamReservation(BufferPool::ClientHandle* probe_client) {
-  // An extra buffer is needed for reading spilled input stream, unless we're doing the
-  // initial partitioning of rows from the left child.
-  int num_buffers = GetNumSpilledPartitions(hash_partitions_)
-      + (state_ == HashJoinState::PARTITIONING_PROBE ? 0 : 1);
+Status PhjBuilder::TransferProbeStreamReservation(
+    BufferPool::ClientHandle* probe_client) {
+  DCHECK_EQ(is_separate_build_, probe_client != buffer_pool_client_);
+  int64_t probe_reservation = CalcProbeStreamReservation(state_);
+  VLOG(3) << "PHJ(node_id=" << join_node_id_ << ") transfer " << probe_reservation
+          << " to probe client.";
+  if (probe_reservation == 0) return Status::OK();
   int64_t saved_reservation = probe_stream_reservation_.GetReservation();
-  DCHECK_GE(saved_reservation, spillable_buffer_size_ * num_buffers);
+  DCHECK_GE(saved_reservation, probe_reservation);
 
-  // TODO: in future we may need to support different clients for the probe.
-  DCHECK_EQ(probe_client, buffer_pool_client_);
-  probe_client->RestoreReservation(&probe_stream_reservation_, saved_reservation);
+  buffer_pool_client_->RestoreReservation(&probe_stream_reservation_, probe_reservation);
+  if (is_separate_build_) {
+    bool success;
+    RETURN_IF_ERROR(buffer_pool_client_->TransferReservationTo(
+          probe_client, probe_reservation, &success));
+    DCHECK(success) << "Transferring within query shouldn't violate reservation limits.";
+  }
+  return Status::OK();
+}
+
+int64_t PhjBuilder::CalcProbeStreamReservation(HashJoinState next_state) const {
+  // We need a read buffer if the input is a spilled partition (i.e. we are repartitioning
+  // the input).
+  bool need_probe_buffer;
+  if (next_state == HashJoinState::PARTITIONING_PROBE) {
+    need_probe_buffer = false;
+  } else {
+    DCHECK(next_state == HashJoinState::PROBING_SPILLED_PARTITION
+        || next_state == HashJoinState::REPARTITIONING_PROBE)
+      << static_cast<int>(next_state);
+    DCHECK_GT(spilled_partitions_.size(), 0);
+    need_probe_buffer = spilled_partitions_.back()->num_spilled_probe_rows() > 0;
+  }
+  DCHECK(next_state == HashJoinState::PROBING_SPILLED_PARTITION
+      || hash_partitions_.size() > 0);
+  int num_spilled_partitions = GetNumSpilledPartitions(hash_partitions_);
+  int num_buffers = num_spilled_partitions + (need_probe_buffer ? 1 : 0);
+  int num_max_sized_buffers =
+      (num_spilled_partitions > 0 ? 1 : 0) + (need_probe_buffer ? 1 : 0);
+  DCHECK_LE(num_max_sized_buffers, num_buffers);
+  return num_max_sized_buffers * max_row_buffer_size_ +
+         (num_buffers - num_max_sized_buffers) * spillable_buffer_size_;
 }
 
 int PhjBuilder::GetNumSpilledPartitions(const vector<unique_ptr<Partition>>& partitions) {
@@ -553,10 +651,17 @@ int PhjBuilder::GetNumSpilledPartitions(const vector<unique_ptr<Partition>>& par
   return num_spilled;
 }
 
-void PhjBuilder::DoneProbingHashPartitions(
+Status PhjBuilder::DoneProbingHashPartitions(
     const int64_t num_spilled_probe_rows[PARTITION_FANOUT],
+    BufferPool::ClientHandle* probe_client,
     deque<unique_ptr<Partition>>* output_partitions, RowBatch* batch) {
+  DCHECK_EQ(is_separate_build_, probe_client != buffer_pool_client_);
   DCHECK(output_partitions->empty());
+  VLOG(3) << "PHJ(node_id=" << join_node_id_ << ") done probing hash partitions.";
+  // Calculate the reservation before cleaning up 'hash_partitions_' and
+  // 'spilled_partitions_', which the calculation depends on.
+  int64_t probe_reservation = CalcProbeStreamReservation(state_);
+  DCHECK_GE(probe_client->GetUnusedReservation(), probe_reservation);
   if (state_ == HashJoinState::REPARTITIONING_PROBE) {
     // Finished repartitioning this partition. Discard before pushing more spilled
     // partitions onto 'spilled_partitions_'.
@@ -586,11 +691,22 @@ void PhjBuilder::DoneProbingHashPartitions(
       partition->Close(batch);
     }
   }
+  if (is_separate_build_) {
+    bool success;
+    RETURN_IF_ERROR(probe_client->TransferReservationTo(
+          buffer_pool_client_, probe_reservation, &success));
+    DCHECK(success) << "Transferring within query shouldn't violate reservation limits.";
+  }
   hash_partitions_.clear();
+  return Status::OK();
 }
 
-void PhjBuilder::DoneProbingSinglePartition(
-      deque<unique_ptr<Partition>>* output_partitions, RowBatch* batch) {
+Status PhjBuilder::DoneProbingSinglePartition(BufferPool::ClientHandle* probe_client,
+    deque<unique_ptr<Partition>>* output_partitions, RowBatch* batch) {
+  VLOG(3) << "PHJ(node_id=" << join_node_id_ << ") done probing single partition.";
+  DCHECK_EQ(is_separate_build_, probe_client != buffer_pool_client_);
+  // Calculate before popping off the last 'spilled_partition_'.
+  int64_t probe_reservation = CalcProbeStreamReservation(state_);
   if (NeedToProcessUnmatchedBuildRows(join_op_)) {
     // If the build partition was in memory, we are done probing this partition.
     // In case of right-outer, right-anti and full-outer joins, we move this partition
@@ -601,6 +717,14 @@ void PhjBuilder::DoneProbingSinglePartition(
     spilled_partitions_.back()->Close(IsLeftSemiJoin(join_op_) ? nullptr : batch);
   }
   spilled_partitions_.pop_back();
+  DCHECK_GE(probe_client->GetUnusedReservation(), probe_reservation);
+  if (is_separate_build_) {
+    bool success;
+    RETURN_IF_ERROR(probe_client->TransferReservationTo(
+          buffer_pool_client_, probe_reservation, &success));
+    DCHECK(success) << "Transferring within query shouldn't violate reservation limits.";
+  }
+  return Status::OK();
 }
 
 void PhjBuilder::CloseAndDeletePartitions(RowBatch* row_batch) {
@@ -639,6 +763,8 @@ void PhjBuilder::InsertRuntimeFilters(TupleRow* build_row) noexcept {
 }
 
 void PhjBuilder::PublishRuntimeFilters(int64_t num_build_rows) {
+  VLOG(3) << "Join builder (join_node_id_=" << join_node_id_ << ") publishing "
+          << filter_ctxs_.size() << " filters.";
   int32_t num_enabled_filters = 0;
   // Use 'num_build_rows' to estimate FP-rate of each Bloom filter, and publish
   // 'always-true' filters if it's too high. Doing so saves CPU at the coordinator,
@@ -685,6 +811,7 @@ void PhjBuilder::PublishRuntimeFilters(int64_t num_build_rows) {
 Status PhjBuilder::BeginSpilledProbe(
     BufferPool::ClientHandle* probe_client, bool* repartitioned,
      Partition** input_partition, HashPartitions* new_partitions) {
+  DCHECK_EQ(is_separate_build_, probe_client != buffer_pool_client_);
   DCHECK(!spilled_partitions_.empty());
   DCHECK_EQ(0, hash_partitions_.size());
   // Pick the next spilled partition to process. The partition will stay in
@@ -697,7 +824,7 @@ Status PhjBuilder::BeginSpilledProbe(
 
   if (partition->num_spilled_probe_rows() == 0) {
     // If there are no probe rows, there's no need to build the hash table, and
-    // only partitions with NeedToProcessUnmatcheBuildRows() will have been added
+    // only partitions with NeedToProcessUnmatchedBuildRows() will have been added
     // to 'spilled_partitions_' in DoneProbingHashPartitions().
     DCHECK(NeedToProcessUnmatchedBuildRows(join_op_));
     bool got_read_buffer = false;
@@ -715,15 +842,15 @@ Status PhjBuilder::BeginSpilledProbe(
   // Set aside memory required for reading the probe stream, so that we don't use
   // it for the hash table.
   buffer_pool_client_->SaveReservation(
-      &probe_stream_reservation_, spillable_buffer_size_);
+      &probe_stream_reservation_, max_row_buffer_size_);
 
   // Try to build a hash table for the spilled build partition.
   bool built;
   RETURN_IF_ERROR(partition->BuildHashTable(&built));
   if (built) {
-    TransferProbeStreamReservation(probe_client);
     UpdateState(HashJoinState::PROBING_SPILLED_PARTITION);
     *repartitioned = false;
+    RETURN_IF_ERROR(TransferProbeStreamReservation(probe_client));
     return Status::OK();
   }
   // This build partition still does not fit in memory, repartition.
@@ -740,7 +867,7 @@ Status PhjBuilder::BeginSpilledProbe(
   // Temporarily free up the probe reservation to use when repartitioning. Repartitioning
   // will reserve as much memory as needed for the probe streams.
   buffer_pool_client_->RestoreReservation(
-      &probe_stream_reservation_, spillable_buffer_size_);
+      &probe_stream_reservation_, max_row_buffer_size_);
   // All reservation should be available for repartitioning.
   DCHECK_EQ(0, probe_stream_reservation_.GetReservation());
   DCHECK_EQ(0, buffer_pool_client_->GetUsedReservation());
@@ -758,7 +885,7 @@ Status PhjBuilder::BeginSpilledProbe(
         next_partition_level, num_input_rows, DebugString(),
         buffer_pool_client_->DebugString());
   }
-  TransferProbeStreamReservation(probe_client);
+  RETURN_IF_ERROR(TransferProbeStreamReservation(probe_client));
   *repartitioned = true;
   *new_partitions = HashPartitions(ht_ctx_->level(), &hash_partitions_, non_empty_build_);
   return Status::OK();
@@ -812,11 +939,23 @@ int64_t PhjBuilder::LargestPartitionRows() const {
   return max_rows;
 }
 
-bool PhjBuilder::HashTableStoresNulls() const {
-  return join_op_ == TJoinOp::RIGHT_OUTER_JOIN || join_op_ == TJoinOp::RIGHT_ANTI_JOIN
-      || join_op_ == TJoinOp::FULL_OUTER_JOIN
-      || std::accumulate(is_not_distinct_from_.begin(), is_not_distinct_from_.end(),
-             false, std::logical_or<bool>());
+bool PhjBuilder::HashTableStoresNulls(
+    TJoinOp::type join_op, const vector<bool>& is_not_distinct_from) {
+  return join_op == TJoinOp::RIGHT_OUTER_JOIN || join_op == TJoinOp::RIGHT_ANTI_JOIN
+      || join_op == TJoinOp::FULL_OUTER_JOIN
+      || std::accumulate(is_not_distinct_from.begin(), is_not_distinct_from.end(), false,
+             std::logical_or<bool>());
+}
+
+void PhjBuilder::ReturnReservation(
+    BufferPool::ClientHandle* probe_client, int64_t bytes) {
+  DCHECK(is_separate_build_);
+  DCHECK(buffer_pool_client_ != probe_client);
+  bool success;
+  Status status =
+      probe_client->TransferReservationTo(buffer_pool_client_, bytes, &success);
+  DCHECK(status.ok()) << status.GetDetail() << " shouldn't have any dirty pages to flush";
+  DCHECK(success) << "Transferring within query shouldn't violate reservation limits.";
 }
 
 PhjBuilder::Partition::Partition(RuntimeState* state, PhjBuilder* parent, int level)
@@ -984,8 +1123,8 @@ void PhjBuilder::Codegen(LlvmCodeGen* codegen) {
   Status codegen_status;
 
   // Context required to generate hash table codegened methods.
-  HashTableConfig hash_table_config(
-      build_exprs_, build_exprs_, HashTableStoresNulls(), is_not_distinct_from_);
+  HashTableConfig hash_table_config(build_exprs_, build_exprs_,
+      HashTableStoresNulls(join_op_, is_not_distinct_from_), is_not_distinct_from_);
   // Codegen for hashing rows with the builder's hash table context.
   llvm::Function* hash_fn;
   codegen_status =

@@ -55,9 +55,10 @@ public class ParallelPlanner {
   public ParallelPlanner(PlannerContext ctx) { ctx_ = ctx; }
 
   /**
-   * Given a distributed plan, return list of plans ready for parallel execution.
-   * The last plan in the sequence materializes the query result, the preceding
-   * plans materialize the build sides of joins.
+   * Given a distributed plan, return list of plans ready for parallel execution. Each
+   * returned fragment has a PlanRootSink or JoinBuildSink as their sink. The first
+   * plan in the list materializes the query result and subsequent plans materialize
+   * the build sides of joins. Each plan appears before its dependencies in the list.
    * Assigns cohortId and planId for all fragments.
    * TODO: create class DistributedPlan with a PlanFragment member, so we don't
    * need to distinguish PlanFragment and Plan through comments?
@@ -163,6 +164,9 @@ public class ParallelPlanner {
     JoinBuildSink buildSink =
         new JoinBuildSink(joinTableIdGenerator_.getNextId(), join);
     join.setJoinTableId(buildSink.getJoinTableId());
+    // Filters will be produced by the build sink. Remove them from the join node since
+    // it now not responsible for producing them.
+    join.getRuntimeFilters().clear();
     // c'tor fixes up PlanNode.fragment_
     PlanFragment buildFragment = new PlanFragment(ctx_.getNextFragmentId(),
         join.getChild(1), join.getFragment().getDataPartition());

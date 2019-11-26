@@ -368,8 +368,8 @@ PLAN-ROOT SINK
    runtime filters: RF000 -> tpch.partsupp.ps_partkey, RF008 -> ps_suppkey
    row-size=24B cardinality=800.00K
 ---- PARALLELPLANS
-Max Per-Host Resource Reservation: Memory=118.81MB Threads=23
-Per-Host Resource Estimates: Memory=709MB
+Max Per-Host Resource Reservation: Memory=122.81MB Threads=39
+Per-Host Resource Estimates: Memory=717MB
 PLAN-ROOT SINK
 |
 30:MERGING-EXCHANGE [UNPARTITIONED]
@@ -382,23 +382,23 @@ PLAN-ROOT SINK
 |
 17:HASH JOIN [RIGHT SEMI JOIN, PARTITIONED]
 |  hash predicates: ps_partkey = p_partkey, min(ps_supplycost) = ps_supplycost
-|  runtime filters: RF000 <- p_partkey
 |  row-size=325B cardinality=1.01K
 |
 |--JOIN BUILD
 |  |  join-table-id=00 plan-id=01 cohort-id=01
 |  |  build expressions: p_partkey, ps_supplycost
+|  |  runtime filters: RF000 <- p_partkey
 |  |
 |  29:EXCHANGE [HASH(p_partkey,ps_supplycost)]
 |  |
 |  16:HASH JOIN [INNER JOIN, BROADCAST]
 |  |  hash predicates: n_regionkey = r_regionkey
-|  |  runtime filters: RF010 <- r_regionkey
 |  |  row-size=325B cardinality=1.01K
 |  |
 |  |--JOIN BUILD
 |  |  |  join-table-id=01 plan-id=02 cohort-id=02
 |  |  |  build expressions: r_regionkey
+|  |  |  runtime filters: RF010 <- r_regionkey
 |  |  |
 |  |  27:EXCHANGE [BROADCAST]
 |  |  |
@@ -409,12 +409,12 @@ PLAN-ROOT SINK
 |  |
 |  15:HASH JOIN [INNER JOIN, BROADCAST]
 |  |  hash predicates: s_nationkey = n_nationkey
-|  |  runtime filters: RF012 <- n_nationkey
 |  |  row-size=304B cardinality=5.05K
 |  |
 |  |--JOIN BUILD
 |  |  |  join-table-id=02 plan-id=03 cohort-id=02
 |  |  |  build expressions: n_nationkey
+|  |  |  runtime filters: RF012 <- n_nationkey
 |  |  |
 |  |  26:EXCHANGE [BROADCAST]
 |  |  |
@@ -425,23 +425,23 @@ PLAN-ROOT SINK
 |  |
 |  14:HASH JOIN [INNER JOIN, BROADCAST]
 |  |  hash predicates: s_suppkey = ps_suppkey
-|  |  runtime filters: RF014 <- ps_suppkey
 |  |  row-size=281B cardinality=5.05K
 |  |
 |  |--JOIN BUILD
 |  |  |  join-table-id=03 plan-id=04 cohort-id=02
 |  |  |  build expressions: ps_suppkey
+|  |  |  runtime filters: RF014 <- ps_suppkey
 |  |  |
 |  |  25:EXCHANGE [BROADCAST]
 |  |  |
 |  |  13:HASH JOIN [INNER JOIN, BROADCAST]
 |  |  |  hash predicates: ps_partkey = p_partkey
-|  |  |  runtime filters: RF016 <- p_partkey
 |  |  |  row-size=95B cardinality=5.05K
 |  |  |
 |  |  |--JOIN BUILD
 |  |  |  |  join-table-id=04 plan-id=05 cohort-id=03
 |  |  |  |  build expressions: p_partkey
+|  |  |  |  runtime filters: RF016 <- p_partkey
 |  |  |  |
 |  |  |  24:EXCHANGE [BROADCAST]
 |  |  |  |
@@ -476,12 +476,12 @@ PLAN-ROOT SINK
 |
 11:HASH JOIN [INNER JOIN, BROADCAST]
 |  hash predicates: n_regionkey = r_regionkey
-|  runtime filters: RF004 <- r_regionkey
 |  row-size=59B cardinality=160.00K
 |
 |--JOIN BUILD
 |  |  join-table-id=05 plan-id=06 cohort-id=01
 |  |  build expressions: r_regionkey
+|  |  runtime filters: RF004 <- r_regionkey
 |  |
 |  21:EXCHANGE [BROADCAST]
 |  |
@@ -492,12 +492,12 @@ PLAN-ROOT SINK
 |
 10:HASH JOIN [INNER JOIN, BROADCAST]
 |  hash predicates: s_nationkey = n_nationkey
-|  runtime filters: RF006 <- n_nationkey
 |  row-size=38B cardinality=800.00K
 |
 |--JOIN BUILD
 |  |  join-table-id=06 plan-id=07 cohort-id=01
 |  |  build expressions: n_nationkey
+|  |  runtime filters: RF006 <- n_nationkey
 |  |
 |  20:EXCHANGE [BROADCAST]
 |  |
@@ -508,12 +508,12 @@ PLAN-ROOT SINK
 |
 09:HASH JOIN [INNER JOIN, BROADCAST]
 |  hash predicates: ps_suppkey = s_suppkey
-|  runtime filters: RF008 <- s_suppkey
 |  row-size=34B cardinality=800.00K
 |
 |--JOIN BUILD
 |  |  join-table-id=07 plan-id=08 cohort-id=01
 |  |  build expressions: s_suppkey
+|  |  runtime filters: RF008 <- s_suppkey
 |  |
 |  19:EXCHANGE [BROADCAST]
 |  |
@@ -648,8 +648,8 @@ PLAN-ROOT SINK
    runtime filters: RF002 -> l_orderkey
    row-size=46B cardinality=600.12K
 ---- PARALLELPLANS
-Max Per-Host Resource Reservation: Memory=71.50MB Threads=13
-Per-Host Resource Estimates: Memory=495MB
+Max Per-Host Resource Reservation: Memory=71.50MB Threads=17
+Per-Host Resource Estimates: Memory=503MB
 PLAN-ROOT SINK
 |
 13:MERGING-EXCHANGE [UNPARTITIONED]
@@ -674,12 +674,12 @@ PLAN-ROOT SINK
 |
 04:HASH JOIN [INNER JOIN, PARTITIONED]
 |  hash predicates: o_custkey = c_custkey
-|  runtime filters: RF000 <- c_custkey
 |  row-size=117B cardinality=17.56K
 |
 |--JOIN BUILD
 |  |  join-table-id=00 plan-id=01 cohort-id=01
 |  |  build expressions: c_custkey
+|  |  runtime filters: RF000 <- c_custkey
 |  |
 |  10:EXCHANGE [HASH(c_custkey)]
 |  |
@@ -692,12 +692,12 @@ PLAN-ROOT SINK
 |
 03:HASH JOIN [INNER JOIN, PARTITIONED]
 |  hash predicates: l_orderkey = o_orderkey
-|  runtime filters: RF002 <- o_orderkey
 |  row-size=88B cardinality=57.58K
 |
 |--JOIN BUILD
 |  |  join-table-id=01 plan-id=02 cohort-id=01
 |  |  build expressions: o_orderkey
+|  |  runtime filters: RF002 <- o_orderkey
 |  |
 |  08:EXCHANGE [HASH(o_orderkey)]
 |  |
@@ -811,8 +811,8 @@ PLAN-ROOT SINK
    runtime filters: RF000 -> l_orderkey
    row-size=52B cardinality=600.12K
 ---- PARALLELPLANS
-Max Per-Host Resource Reservation: Memory=72.62MB Threads=9
-Per-Host Resource Estimates: Memory=445MB
+Max Per-Host Resource Reservation: Memory=72.62MB Threads=11
+Per-Host Resource Estimates: Memory=453MB
 PLAN-ROOT SINK
 |
 09:MERGING-EXCHANGE [UNPARTITIONED]
@@ -836,12 +836,12 @@ PLAN-ROOT SINK
 |
 02:HASH JOIN [RIGHT SEMI JOIN, PARTITIONED]
 |  hash predicates: l_orderkey = o_orderkey
-|  runtime filters: RF000 <- o_orderkey
 |  row-size=50B cardinality=150.00K
 |
 |--JOIN BUILD
 |  |  join-table-id=00 plan-id=01 cohort-id=01
 |  |  build expressions: o_orderkey
+|  |  runtime filters: RF000 <- o_orderkey
 |  |
 |  06:EXCHANGE [HASH(o_orderkey)]
 |  |
@@ -1043,8 +1043,8 @@ PLAN-ROOT SINK
    runtime filters: RF005 -> l_suppkey, RF010 -> l_orderkey
    row-size=32B cardinality=6.00M
 ---- PARALLELPLANS
-Max Per-Host Resource Reservation: Memory=135.28MB Threads=15
-Per-Host Resource Estimates: Memory=627MB
+Max Per-Host Resource Reservation: Memory=137.28MB Threads=25
+Per-Host Resource Estimates: Memory=644MB
 PLAN-ROOT SINK
 |
 20:MERGING-EXCHANGE [UNPARTITIONED]
@@ -1068,12 +1068,12 @@ PLAN-ROOT SINK
 |
 10:HASH JOIN [INNER JOIN, BROADCAST]
 |  hash predicates: n_regionkey = r_regionkey
-|  runtime filters: RF000 <- r_regionkey
 |  row-size=134B cardinality=115.16K
 |
 |--JOIN BUILD
 |  |  join-table-id=00 plan-id=01 cohort-id=01
 |  |  build expressions: r_regionkey
+|  |  runtime filters: RF000 <- r_regionkey
 |  |
 |  17:EXCHANGE [BROADCAST]
 |  |
@@ -1084,12 +1084,12 @@ PLAN-ROOT SINK
 |
 09:HASH JOIN [INNER JOIN, BROADCAST]
 |  hash predicates: s_nationkey = n_nationkey
-|  runtime filters: RF002 <- n_nationkey
 |  row-size=113B cardinality=575.77K
 |
 |--JOIN BUILD
 |  |  join-table-id=01 plan-id=02 cohort-id=01
 |  |  build expressions: n_nationkey
+|  |  runtime filters: RF002 <- n_nationkey
 |  |
 |  16:EXCHANGE [BROADCAST]
 |  |
@@ -1100,12 +1100,12 @@ PLAN-ROOT SINK
 |
 08:HASH JOIN [INNER JOIN, BROADCAST]
 |  hash predicates: c_nationkey = s_nationkey, l_suppkey = s_suppkey
-|  runtime filters: RF004 <- s_nationkey, RF005 <- s_suppkey
 |  row-size=90B cardinality=575.77K
 |
 |--JOIN BUILD
 |  |  join-table-id=02 plan-id=03 cohort-id=01
 |  |  build expressions: s_nationkey, s_suppkey
+|  |  runtime filters: RF004 <- s_nationkey, RF005 <- s_suppkey
 |  |
 |  15:EXCHANGE [BROADCAST]
 |  |
@@ -1116,12 +1116,12 @@ PLAN-ROOT SINK
 |
 07:HASH JOIN [INNER JOIN, BROADCAST]
 |  hash predicates: o_custkey = c_custkey
-|  runtime filters: RF008 <- c_custkey
 |  row-size=80B cardinality=575.77K
 |
 |--JOIN BUILD
 |  |  join-table-id=03 plan-id=04 cohort-id=01
 |  |  build expressions: c_custkey
+|  |  runtime filters: RF008 <- c_custkey
 |  |
 |  14:EXCHANGE [BROADCAST]
 |  |
@@ -1132,12 +1132,12 @@ PLAN-ROOT SINK
 |
 06:HASH JOIN [INNER JOIN, BROADCAST]
 |  hash predicates: l_orderkey = o_orderkey
-|  runtime filters: RF010 <- o_orderkey
 |  row-size=70B cardinality=575.77K
 |
 |--JOIN BUILD
 |  |  join-table-id=04 plan-id=05 cohort-id=01
 |  |  build expressions: o_orderkey
+|  |  runtime filters: RF010 <- o_orderkey
 |  |
 |  13:EXCHANGE [BROADCAST]
 |  |
@@ -1414,8 +1414,8 @@ PLAN-ROOT SINK
    runtime filters: RF006 -> l_suppkey, RF008 -> l_orderkey
    row-size=54B cardinality=600.12K
 ---- PARALLELPLANS
-Max Per-Host Resource Reservation: Memory=139.78MB Threads=17
-Per-Host Resource Estimates: Memory=650MB
+Max Per-Host Resource Reservation: Memory=139.78MB Threads=27
+Per-Host Resource Estimates: Memory=673MB
 PLAN-ROOT SINK
 |
 21:MERGING-EXCHANGE [UNPARTITIONED]
@@ -1440,12 +1440,12 @@ PLAN-ROOT SINK
 10:HASH JOIN [INNER JOIN, BROADCAST]
 |  hash predicates: c_nationkey = n2.n_nationkey
 |  other predicates: ((n1.n_name = 'FRANCE' AND n2.n_name = 'GERMANY') OR (n1.n_name = 'GERMANY' AND n2.n_name = 'FRANCE'))
-|  runtime filters: RF000 <- n2.n_nationkey
 |  row-size=132B cardinality=575.77K
 |
 |--JOIN BUILD
 |  |  join-table-id=00 plan-id=01 cohort-id=01
 |  |  build expressions: n2.n_nationkey
+|  |  runtime filters: RF000 <- n2.n_nationkey
 |  |
 |  18:EXCHANGE [BROADCAST]
 |  |
@@ -1455,12 +1455,12 @@ PLAN-ROOT SINK
 |
 09:HASH JOIN [INNER JOIN, BROADCAST]
 |  hash predicates: s_nationkey = n1.n_nationkey
-|  runtime filters: RF002 <- n1.n_nationkey
 |  row-size=111B cardinality=575.77K
 |
 |--JOIN BUILD
 |  |  join-table-id=01 plan-id=02 cohort-id=01
 |  |  build expressions: n1.n_nationkey
+|  |  runtime filters: RF002 <- n1.n_nationkey
 |  |
 |  17:EXCHANGE [BROADCAST]
 |  |
@@ -1470,12 +1470,12 @@ PLAN-ROOT SINK
 |
 08:HASH JOIN [INNER JOIN, BROADCAST]
 |  hash predicates: o_custkey = c_custkey
-|  runtime filters: RF004 <- c_custkey
 |  row-size=90B cardinality=575.77K
 |
 |--JOIN BUILD
 |  |  join-table-id=02 plan-id=03 cohort-id=01
 |  |  build expressions: c_custkey
+|  |  runtime filters: RF004 <- c_custkey
 |  |
 |  16:EXCHANGE [BROADCAST]
 |  |
@@ -1486,12 +1486,12 @@ PLAN-ROOT SINK
 |
 07:HASH JOIN [INNER JOIN, BROADCAST]
 |  hash predicates: l_suppkey = s_suppkey
-|  runtime filters: RF006 <- s_suppkey
 |  row-size=80B cardinality=575.77K
 |
 |--JOIN BUILD
 |  |  join-table-id=03 plan-id=04 cohort-id=01
 |  |  build expressions: s_suppkey
+|  |  runtime filters: RF006 <- s_suppkey
 |  |
 |  15:EXCHANGE [BROADCAST]
 |  |
@@ -1502,12 +1502,12 @@ PLAN-ROOT SINK
 |
 06:HASH JOIN [INNER JOIN, PARTITIONED]
 |  hash predicates: l_orderkey = o_orderkey
-|  runtime filters: RF008 <- o_orderkey
 |  row-size=70B cardinality=575.77K
 |
 |--JOIN BUILD
 |  |  join-table-id=04 plan-id=05 cohort-id=01
 |  |  build expressions: o_orderkey
+|  |  runtime filters: RF008 <- o_orderkey
 |  |
 |  14:EXCHANGE [HASH(o_orderkey)]
 |  |
@@ -1770,8 +1770,8 @@ PLAN-ROOT SINK
    runtime filters: RF008 -> l_suppkey, RF010 -> l_orderkey, RF012 -> l_partkey
    row-size=40B cardinality=6.00M
 ---- PARALLELPLANS
-Max Per-Host Resource Reservation: Memory=135.05MB Threads=25
-Per-Host Resource Estimates: Memory=718MB
+Max Per-Host Resource Reservation: Memory=136.05MB Threads=39
+Per-Host Resource Estimates: Memory=724MB
 PLAN-ROOT SINK
 |
 29:MERGING-EXCHANGE [UNPARTITIONED]
@@ -1795,12 +1795,12 @@ PLAN-ROOT SINK
 |
 14:HASH JOIN [INNER JOIN, BROADCAST]
 |  hash predicates: s_nationkey = n2.n_nationkey
-|  runtime filters: RF000 <- n2.n_nationkey
 |  row-size=184B cardinality=761
 |
 |--JOIN BUILD
 |  |  join-table-id=00 plan-id=01 cohort-id=01
 |  |  build expressions: n2.n_nationkey
+|  |  runtime filters: RF000 <- n2.n_nationkey
 |  |
 |  26:EXCHANGE [BROADCAST]
 |  |
@@ -1810,12 +1810,12 @@ PLAN-ROOT SINK
 |
 13:HASH JOIN [INNER JOIN, BROADCAST]
 |  hash predicates: n1.n_regionkey = r_regionkey
-|  runtime filters: RF002 <- r_regionkey
 |  row-size=163B cardinality=761
 |
 |--JOIN BUILD
 |  |  join-table-id=01 plan-id=02 cohort-id=01
 |  |  build expressions: r_regionkey
+|  |  runtime filters: RF002 <- r_regionkey
 |  |
 |  25:EXCHANGE [BROADCAST]
 |  |
@@ -1826,12 +1826,12 @@ PLAN-ROOT SINK
 |
 12:HASH JOIN [INNER JOIN, BROADCAST]
 |  hash predicates: c_nationkey = n1.n_nationkey
-|  runtime filters: RF004 <- n1.n_nationkey
 |  row-size=143B cardinality=3.81K
 |
 |--JOIN BUILD
 |  |  join-table-id=02 plan-id=03 cohort-id=01
 |  |  build expressions: n1.n_nationkey
+|  |  runtime filters: RF004 <- n1.n_nationkey
 |  |
 |  24:EXCHANGE [BROADCAST]
 |  |
@@ -1842,12 +1842,12 @@ PLAN-ROOT SINK
 |
 11:HASH JOIN [INNER JOIN, PARTITIONED]
 |  hash predicates: o_custkey = c_custkey
-|  runtime filters: RF006 <- c_custkey
 |  row-size=139B cardinality=3.81K
 |
 |--JOIN BUILD
 |  |  join-table-id=03 plan-id=04 cohort-id=01
 |  |  build expressions: c_custkey
+|  |  runtime filters: RF006 <- c_custkey
 |  |
 |  23:EXCHANGE [HASH(c_custkey)]
 |  |
@@ -1860,12 +1860,12 @@ PLAN-ROOT SINK
 |
 10:HASH JOIN [INNER JOIN, PARTITIONED]
 |  hash predicates: l_suppkey = s_suppkey
-|  runtime filters: RF008 <- s_suppkey
 |  row-size=129B cardinality=3.81K
 |
 |--JOIN BUILD
 |  |  join-table-id=04 plan-id=05 cohort-id=01
 |  |  build expressions: s_suppkey
+|  |  runtime filters: RF008 <- s_suppkey
 |  |
 |  21:EXCHANGE [HASH(s_suppkey)]
 |  |
@@ -1878,12 +1878,12 @@ PLAN-ROOT SINK
 |
 09:HASH JOIN [INNER JOIN, PARTITIONED]
 |  hash predicates: l_orderkey = o_orderkey
-|  runtime filters: RF010 <- o_orderkey
 |  row-size=119B cardinality=3.81K
 |
 |--JOIN BUILD
 |  |  join-table-id=05 plan-id=06 cohort-id=01
 |  |  build expressions: o_orderkey
+|  |  runtime filters: RF010 <- o_orderkey
 |  |
 |  19:EXCHANGE [HASH(o_orderkey)]
 |  |
@@ -1897,12 +1897,12 @@ PLAN-ROOT SINK
 |
 08:HASH JOIN [INNER JOIN, BROADCAST]
 |  hash predicates: l_partkey = p_partkey
-|  runtime filters: RF012 <- p_partkey
 |  row-size=81B cardinality=39.66K
 |
 |--JOIN BUILD
 |  |  join-table-id=06 plan-id=07 cohort-id=01
 |  |  build expressions: p_partkey
+|  |  runtime filters: RF012 <- p_partkey
 |  |
 |  17:EXCHANGE [BROADCAST]
 |  |
@@ -2104,8 +2104,8 @@ PLAN-ROOT SINK
    runtime filters: RF002 -> l_partkey, RF003 -> l_suppkey, RF006 -> l_suppkey, RF008 -> l_orderkey, RF010 -> l_partkey
    row-size=48B cardinality=6.00M
 ---- PARALLELPLANS
-Max Per-Host Resource Reservation: Memory=164.89MB Threads=19
-Per-Host Resource Estimates: Memory=823MB
+Max Per-Host Resource Reservation: Memory=165.89MB Threads=29
+Per-Host Resource Estimates: Memory=867MB
 PLAN-ROOT SINK
 |
 22:MERGING-EXCHANGE [UNPARTITIONED]
@@ -2129,12 +2129,12 @@ PLAN-ROOT SINK
 |
 10:HASH JOIN [INNER JOIN, BROADCAST]
 |  hash predicates: s_nationkey = n_nationkey
-|  runtime filters: RF000 <- n_nationkey
 |  row-size=186B cardinality=574.29K
 |
 |--JOIN BUILD
 |  |  join-table-id=00 plan-id=01 cohort-id=01
 |  |  build expressions: n_nationkey
+|  |  runtime filters: RF000 <- n_nationkey
 |  |
 |  19:EXCHANGE [BROADCAST]
 |  |
@@ -2144,12 +2144,12 @@ PLAN-ROOT SINK
 |
 09:HASH JOIN [INNER JOIN, PARTITIONED]
 |  hash predicates: l_partkey = ps_partkey, l_suppkey = ps_suppkey
-|  runtime filters: RF002 <- ps_partkey, RF003 <- ps_suppkey
 |  row-size=165B cardinality=574.29K
 |
 |--JOIN BUILD
 |  |  join-table-id=01 plan-id=02 cohort-id=01
 |  |  build expressions: ps_partkey, ps_suppkey
+|  |  runtime filters: RF002 <- ps_partkey, RF003 <- ps_suppkey
 |  |
 |  18:EXCHANGE [HASH(ps_partkey,ps_suppkey)]
 |  |
@@ -2161,12 +2161,12 @@ PLAN-ROOT SINK
 |
 08:HASH JOIN [INNER JOIN, BROADCAST]
 |  hash predicates: l_suppkey = s_suppkey
-|  runtime filters: RF006 <- s_suppkey
 |  row-size=141B cardinality=574.29K
 |
 |--JOIN BUILD
 |  |  join-table-id=02 plan-id=03 cohort-id=01
 |  |  build expressions: s_suppkey
+|  |  runtime filters: RF006 <- s_suppkey
 |  |
 |  16:EXCHANGE [BROADCAST]
 |  |
@@ -2177,12 +2177,12 @@ PLAN-ROOT SINK
 |
 07:HASH JOIN [INNER JOIN, PARTITIONED]
 |  hash predicates: l_orderkey = o_orderkey
-|  runtime filters: RF008 <- o_orderkey
 |  row-size=131B cardinality=574.29K
 |
 |--JOIN BUILD
 |  |  join-table-id=03 plan-id=04 cohort-id=01
 |  |  build expressions: o_orderkey
+|  |  runtime filters: RF008 <- o_orderkey
 |  |
 |  15:EXCHANGE [HASH(o_orderkey)]
 |  |
@@ -2194,12 +2194,12 @@ PLAN-ROOT SINK
 |
 06:HASH JOIN [INNER JOIN, BROADCAST]
 |  hash predicates: l_partkey = p_partkey
-|  runtime filters: RF010 <- p_partkey
 |  row-size=101B cardinality=598.58K
 |
 |--JOIN BUILD
 |  |  join-table-id=04 plan-id=05 cohort-id=01
 |  |  build expressions: p_partkey
+|  |  runtime filters: RF010 <- p_partkey
 |  |
 |  13:EXCHANGE [BROADCAST]
 |  |
@@ -2366,8 +2366,8 @@ PLAN-ROOT SINK
    runtime filters: RF004 -> l_orderkey
    row-size=37B cardinality=2.00M
 ---- PARALLELPLANS
-Max Per-Host Resource Reservation: Memory=161.89MB Threads=13
-Per-Host Resource Estimates: Memory=605MB
+Max Per-Host Resource Reservation: Memory=162.89MB Threads=19
+Per-Host Resource Estimates: Memory=628MB
 PLAN-ROOT SINK
 |
 15:MERGING-EXCHANGE [UNPARTITIONED]
@@ -2392,12 +2392,12 @@ PLAN-ROOT SINK
 |
 06:HASH JOIN [INNER JOIN, BROADCAST]
 |  hash predicates: c_nationkey = n_nationkey
-|  runtime filters: RF000 <- n_nationkey
 |  row-size=293B cardinality=191.92K
 |
 |--JOIN BUILD
 |  |  join-table-id=00 plan-id=01 cohort-id=01
 |  |  build expressions: n_nationkey
+|  |  runtime filters: RF000 <- n_nationkey
 |  |
 |  12:EXCHANGE [BROADCAST]
 |  |
@@ -2407,12 +2407,12 @@ PLAN-ROOT SINK
 |
 05:HASH JOIN [INNER JOIN, PARTITIONED]
 |  hash predicates: o_custkey = c_custkey
-|  runtime filters: RF002 <- c_custkey
 |  row-size=272B cardinality=191.92K
 |
 |--JOIN BUILD
 |  |  join-table-id=01 plan-id=02 cohort-id=01
 |  |  build expressions: c_custkey
+|  |  runtime filters: RF002 <- c_custkey
 |  |
 |  11:EXCHANGE [HASH(c_custkey)]
 |  |
@@ -2425,12 +2425,12 @@ PLAN-ROOT SINK
 |
 04:HASH JOIN [INNER JOIN, BROADCAST]
 |  hash predicates: l_orderkey = o_orderkey
-|  runtime filters: RF004 <- o_orderkey
 |  row-size=75B cardinality=191.92K
 |
 |--JOIN BUILD
 |  |  join-table-id=02 plan-id=03 cohort-id=01
 |  |  build expressions: o_orderkey
+|  |  runtime filters: RF004 <- o_orderkey
 |  |
 |  09:EXCHANGE [BROADCAST]
 |  |
@@ -2650,8 +2650,8 @@ PLAN-ROOT SINK
    runtime filters: RF002 -> ps_suppkey
    row-size=28B cardinality=800.00K
 ---- PARALLELPLANS
-Max Per-Host Resource Reservation: Memory=85.41MB Threads=16
-Per-Host Resource Estimates: Memory=588MB
+Max Per-Host Resource Reservation: Memory=87.41MB Threads=26
+Per-Host Resource Estimates: Memory=591MB
 PLAN-ROOT SINK
 |
 23:MERGING-EXCHANGE [UNPARTITIONED]
@@ -2683,12 +2683,12 @@ PLAN-ROOT SINK
 |  |
 |  10:HASH JOIN [INNER JOIN, BROADCAST]
 |  |  hash predicates: s_nationkey = n_nationkey
-|  |  runtime filters: RF004 <- n_nationkey
 |  |  row-size=51B cardinality=32.00K
 |  |
 |  |--JOIN BUILD
 |  |  |  join-table-id=01 plan-id=02 cohort-id=02
 |  |  |  build expressions: n_nationkey
+|  |  |  runtime filters: RF004 <- n_nationkey
 |  |  |
 |  |  19:EXCHANGE [BROADCAST]
 |  |  |
@@ -2699,12 +2699,12 @@ PLAN-ROOT SINK
 |  |
 |  09:HASH JOIN [INNER JOIN, BROADCAST]
 |  |  hash predicates: ps_suppkey = s_suppkey
-|  |  runtime filters: RF006 <- s_suppkey
 |  |  row-size=30B cardinality=800.00K
 |  |
 |  |--JOIN BUILD
 |  |  |  join-table-id=02 plan-id=03 cohort-id=02
 |  |  |  build expressions: s_suppkey
+|  |  |  runtime filters: RF006 <- s_suppkey
 |  |  |
 |  |  18:EXCHANGE [BROADCAST]
 |  |  |
@@ -2732,12 +2732,12 @@ PLAN-ROOT SINK
 |
 04:HASH JOIN [INNER JOIN, BROADCAST]
 |  hash predicates: s_nationkey = n_nationkey
-|  runtime filters: RF000 <- n_nationkey
 |  row-size=59B cardinality=32.00K
 |
 |--JOIN BUILD
 |  |  join-table-id=03 plan-id=04 cohort-id=01
 |  |  build expressions: n_nationkey
+|  |  runtime filters: RF000 <- n_nationkey
 |  |
 |  15:EXCHANGE [BROADCAST]
 |  |
@@ -2748,12 +2748,12 @@ PLAN-ROOT SINK
 |
 03:HASH JOIN [INNER JOIN, BROADCAST]
 |  hash predicates: ps_suppkey = s_suppkey
-|  runtime filters: RF002 <- s_suppkey
 |  row-size=38B cardinality=800.00K
 |
 |--JOIN BUILD
 |  |  join-table-id=04 plan-id=05 cohort-id=01
 |  |  build expressions: s_suppkey
+|  |  runtime filters: RF002 <- s_suppkey
 |  |
 |  14:EXCHANGE [BROADCAST]
 |  |
@@ -2868,8 +2868,8 @@ PLAN-ROOT SINK
    runtime filters: RF000 -> l_orderkey
    row-size=90B cardinality=320.78K
 ---- PARALLELPLANS
-Max Per-Host Resource Reservation: Memory=100.88MB Threads=9
-Per-Host Resource Estimates: Memory=473MB
+Max Per-Host Resource Reservation: Memory=100.88MB Threads=11
+Per-Host Resource Estimates: Memory=493MB
 PLAN-ROOT SINK
 |
 09:MERGING-EXCHANGE [UNPARTITIONED]
@@ -2893,12 +2893,12 @@ PLAN-ROOT SINK
 |
 02:HASH JOIN [INNER JOIN, PARTITIONED]
 |  hash predicates: l_orderkey = o_orderkey
-|  runtime filters: RF000 <- o_orderkey
 |  row-size=119B cardinality=320.78K
 |
 |--JOIN BUILD
 |  |  join-table-id=00 plan-id=01 cohort-id=01
 |  |  build expressions: o_orderkey
+|  |  runtime filters: RF000 <- o_orderkey
 |  |
 |  06:EXCHANGE [HASH(o_orderkey)]
 |  |
@@ -3017,8 +3017,8 @@ PLAN-ROOT SINK
    runtime filters: RF000 -> o_custkey
    row-size=77B cardinality=150.00K
 ---- PARALLELPLANS
-Max Per-Host Resource Reservation: Memory=68.38MB Threads=9
-Per-Host Resource Estimates: Memory=333MB
+Max Per-Host Resource Reservation: Memory=68.38MB Threads=11
+Per-Host Resource Estimates: Memory=335MB
 PLAN-ROOT SINK
 |
 10:MERGING-EXCHANGE [UNPARTITIONED]
@@ -3047,12 +3047,12 @@ PLAN-ROOT SINK
 |
 02:HASH JOIN [RIGHT OUTER JOIN, PARTITIONED]
 |  hash predicates: o_custkey = c_custkey
-|  runtime filters: RF000 <- c_custkey
 |  row-size=85B cardinality=150.00K
 |
 |--JOIN BUILD
 |  |  join-table-id=00 plan-id=01 cohort-id=01
 |  |  build expressions: c_custkey
+|  |  runtime filters: RF000 <- c_custkey
 |  |
 |  07:EXCHANGE [HASH(c_custkey)]
 |  |
@@ -3140,8 +3140,8 @@ PLAN-ROOT SINK
    runtime filters: RF000 -> l_partkey
    row-size=46B cardinality=600.12K
 ---- PARALLELPLANS
-Max Per-Host Resource Reservation: Memory=40.75MB Threads=7
-Per-Host Resource Estimates: Memory=297MB
+Max Per-Host Resource Reservation: Memory=40.75MB Threads=9
+Per-Host Resource Estimates: Memory=313MB
 PLAN-ROOT SINK
 |
 07:AGGREGATE [FINALIZE]
@@ -3156,12 +3156,12 @@ PLAN-ROOT SINK
 |
 02:HASH JOIN [INNER JOIN, PARTITIONED]
 |  hash predicates: l_partkey = p_partkey
-|  runtime filters: RF000 <- p_partkey
 |  row-size=87B cardinality=598.58K
 |
 |--JOIN BUILD
 |  |  join-table-id=00 plan-id=01 cohort-id=01
 |  |  build expressions: p_partkey
+|  |  runtime filters: RF000 <- p_partkey
 |  |
 |  05:EXCHANGE [HASH(p_partkey)]
 |  |
@@ -3329,8 +3329,8 @@ PLAN-ROOT SINK
    runtime filters: RF000 -> tpch.lineitem.l_suppkey
    row-size=46B cardinality=600.12K
 ---- PARALLELPLANS
-Max Per-Host Resource Reservation: Memory=86.50MB Threads=12
-Per-Host Resource Estimates: Memory=529MB
+Max Per-Host Resource Reservation: Memory=86.50MB Threads=16
+Per-Host Resource Estimates: Memory=531MB
 PLAN-ROOT SINK
 |
 17:MERGING-EXCHANGE [UNPARTITIONED]
@@ -3379,12 +3379,12 @@ PLAN-ROOT SINK
 |
 06:HASH JOIN [INNER JOIN, PARTITIONED]
 |  hash predicates: l_suppkey = s_suppkey
-|  runtime filters: RF000 <- s_suppkey
 |  row-size=126B cardinality=10.00K
 |
 |--JOIN BUILD
 |  |  join-table-id=01 plan-id=02 cohort-id=01
 |  |  build expressions: s_suppkey
+|  |  runtime filters: RF000 <- s_suppkey
 |  |
 |  11:EXCHANGE [HASH(s_suppkey)]
 |  |
@@ -3545,8 +3545,8 @@ PLAN-ROOT SINK
    runtime filters: RF000 -> ps_partkey
    row-size=16B cardinality=800.00K
 ---- PARALLELPLANS
-Max Per-Host Resource Reservation: Memory=93.62MB Threads=11
-Per-Host Resource Estimates: Memory=392MB
+Max Per-Host Resource Reservation: Memory=95.50MB Threads=15
+Per-Host Resource Estimates: Memory=396MB
 PLAN-ROOT SINK
 |
 14:MERGING-EXCHANGE [UNPARTITIONED]
@@ -3595,12 +3595,12 @@ PLAN-ROOT SINK
 |
 03:HASH JOIN [INNER JOIN, BROADCAST]
 |  hash predicates: ps_partkey = p_partkey
-|  runtime filters: RF000 <- p_partkey
 |  row-size=81B cardinality=31.92K
 |
 |--JOIN BUILD
 |  |  join-table-id=01 plan-id=02 cohort-id=01
 |  |  build expressions: p_partkey
+|  |  runtime filters: RF000 <- p_partkey
 |  |
 |  08:EXCHANGE [BROADCAST]
 |  |
@@ -3729,8 +3729,8 @@ PLAN-ROOT SINK
    runtime filters: RF000 -> tpch.lineitem.l_partkey
    row-size=16B cardinality=6.00M
 ---- PARALLELPLANS
-Max Per-Host Resource Reservation: Memory=74.62MB Threads=9
-Per-Host Resource Estimates: Memory=499MB
+Max Per-Host Resource Reservation: Memory=75.62MB Threads=13
+Per-Host Resource Estimates: Memory=502MB
 PLAN-ROOT SINK
 |
 12:AGGREGATE [FINALIZE]
@@ -3746,23 +3746,23 @@ PLAN-ROOT SINK
 05:HASH JOIN [RIGHT SEMI JOIN, PARTITIONED]
 |  hash predicates: l_partkey = p_partkey
 |  other join predicates: l_quantity < 0.2 * avg(l_quantity)
-|  runtime filters: RF000 <- p_partkey
 |  row-size=72B cardinality=29.93K
 |
 |--JOIN BUILD
 |  |  join-table-id=00 plan-id=01 cohort-id=01
 |  |  build expressions: p_partkey
+|  |  runtime filters: RF000 <- p_partkey
 |  |
 |  10:EXCHANGE [HASH(p_partkey)]
 |  |
 |  04:HASH JOIN [INNER JOIN, BROADCAST]
 |  |  hash predicates: l_partkey = p_partkey
-|  |  runtime filters: RF002 <- p_partkey
 |  |  row-size=72B cardinality=29.93K
 |  |
 |  |--JOIN BUILD
 |  |  |  join-table-id=01 plan-id=02 cohort-id=02
 |  |  |  build expressions: p_partkey
+|  |  |  runtime filters: RF002 <- p_partkey
 |  |  |
 |  |  09:EXCHANGE [BROADCAST]
 |  |  |
@@ -3958,8 +3958,8 @@ PLAN-ROOT SINK
    runtime filters: RF000 -> tpch.lineitem.l_orderkey, RF004 -> l_orderkey
    row-size=16B cardinality=6.00M
 ---- PARALLELPLANS
-Max Per-Host Resource Reservation: Memory=264.88MB Threads=13
-Per-Host Resource Estimates: Memory=842MB
+Max Per-Host Resource Reservation: Memory=298.88MB Threads=19
+Per-Host Resource Estimates: Memory=924MB
 PLAN-ROOT SINK
 |
 17:MERGING-EXCHANGE [UNPARTITIONED]
@@ -3984,12 +3984,12 @@ PLAN-ROOT SINK
 |
 07:HASH JOIN [LEFT SEMI JOIN, PARTITIONED]
 |  hash predicates: o_orderkey = l_orderkey
-|  runtime filters: RF000 <- l_orderkey
 |  row-size=100B cardinality=600.12K
 |
 |--JOIN BUILD
 |  |  join-table-id=00 plan-id=01 cohort-id=01
 |  |  build expressions: l_orderkey
+|  |  runtime filters: RF000 <- l_orderkey
 |  |
 |  14:AGGREGATE [FINALIZE]
 |  |  output: sum:merge(l_quantity)
@@ -4010,12 +4010,12 @@ PLAN-ROOT SINK
 |
 06:HASH JOIN [INNER JOIN, BROADCAST]
 |  hash predicates: o_custkey = c_custkey
-|  runtime filters: RF002 <- c_custkey
 |  row-size=100B cardinality=5.76M
 |
 |--JOIN BUILD
 |  |  join-table-id=01 plan-id=02 cohort-id=01
 |  |  build expressions: c_custkey
+|  |  runtime filters: RF002 <- c_custkey
 |  |
 |  12:EXCHANGE [BROADCAST]
 |  |
@@ -4025,12 +4025,12 @@ PLAN-ROOT SINK
 |
 05:HASH JOIN [INNER JOIN, PARTITIONED]
 |  hash predicates: l_orderkey = o_orderkey
-|  runtime filters: RF004 <- o_orderkey
 |  row-size=62B cardinality=5.76M
 |
 |--JOIN BUILD
 |  |  join-table-id=02 plan-id=03 cohort-id=01
 |  |  build expressions: o_orderkey
+|  |  runtime filters: RF004 <- o_orderkey
 |  |
 |  11:EXCHANGE [HASH(o_orderkey)]
 |  |
@@ -4142,8 +4142,8 @@ PLAN-ROOT SINK
    runtime filters: RF000 -> l_partkey
    row-size=72B cardinality=801.95K
 ---- PARALLELPLANS
-Max Per-Host Resource Reservation: Memory=37.88MB Threads=5
-Per-Host Resource Estimates: Memory=276MB
+Max Per-Host Resource Reservation: Memory=38.88MB Threads=7
+Per-Host Resource Estimates: Memory=279MB
 PLAN-ROOT SINK
 |
 06:AGGREGATE [FINALIZE]
@@ -4159,12 +4159,12 @@ PLAN-ROOT SINK
 02:HASH JOIN [INNER JOIN, BROADCAST]
 |  hash predicates: l_partkey = p_partkey
 |  other predicates: ((p_brand = 'Brand#12' AND p_container IN ('SM CASE', 'SM BOX', 'SM PACK', 'SM PKG') AND l_quantity >= 1 AND l_quantity <= 11 AND p_size <= 5) OR (p_brand = 'Brand#23' AND p_container IN ('MED BAG', 'MED BOX', 'MED PKG', 'MED PACK') AND l_quantity >= 10 AND l_quantity <= 20 AND p_size <= 10) OR (p_brand = 'Brand#34' AND p_container IN ('LG CASE', 'LG BOX', 'LG PACK', 'LG PKG') AND l_quantity >= 20 AND l_quantity <= 30 AND p_size <= 15))
-|  runtime filters: RF000 <- p_partkey
 |  row-size=124B cardinality=79.99K
 |
 |--JOIN BUILD
 |  |  join-table-id=00 plan-id=01 cohort-id=01
 |  |  build expressions: p_partkey
+|  |  runtime filters: RF000 <- p_partkey
 |  |
 |  04:EXCHANGE [BROADCAST]
 |  |
@@ -4359,8 +4359,8 @@ PLAN-ROOT SINK
    runtime filters: RF000 -> tpch.lineitem.l_suppkey, RF002 -> tpch.lineitem.l_partkey, RF003 -> tpch.lineitem.l_suppkey
    row-size=46B cardinality=600.12K
 ---- PARALLELPLANS
-Max Per-Host Resource Reservation: Memory=159.39MB Threads=15
-Per-Host Resource Estimates: Memory=605MB
+Max Per-Host Resource Reservation: Memory=161.39MB Threads=23
+Per-Host Resource Estimates: Memory=613MB
 PLAN-ROOT SINK
 |
 18:MERGING-EXCHANGE [UNPARTITIONED]
@@ -4372,23 +4372,23 @@ PLAN-ROOT SINK
 |
 09:HASH JOIN [RIGHT SEMI JOIN, PARTITIONED]
 |  hash predicates: ps_suppkey = s_suppkey
-|  runtime filters: RF000 <- s_suppkey
 |  row-size=98B cardinality=400
 |
 |--JOIN BUILD
 |  |  join-table-id=00 plan-id=01 cohort-id=01
 |  |  build expressions: s_suppkey
+|  |  runtime filters: RF000 <- s_suppkey
 |  |
 |  17:EXCHANGE [HASH(s_suppkey)]
 |  |
 |  08:HASH JOIN [INNER JOIN, BROADCAST]
 |  |  hash predicates: s_nationkey = n_nationkey
-|  |  runtime filters: RF008 <- n_nationkey
 |  |  row-size=98B cardinality=400
 |  |
 |  |--JOIN BUILD
 |  |  |  join-table-id=01 plan-id=02 cohort-id=02
 |  |  |  build expressions: n_nationkey
+|  |  |  runtime filters: RF008 <- n_nationkey
 |  |  |
 |  |  15:EXCHANGE [BROADCAST]
 |  |  |
@@ -4407,23 +4407,23 @@ PLAN-ROOT SINK
 07:HASH JOIN [RIGHT SEMI JOIN, PARTITIONED]
 |  hash predicates: l_partkey = ps_partkey, l_suppkey = ps_suppkey
 |  other join predicates: ps_availqty > 0.5 * sum(l_quantity)
-|  runtime filters: RF002 <- ps_partkey, RF003 <- ps_suppkey
 |  row-size=20B cardinality=79.79K
 |
 |--JOIN BUILD
 |  |  join-table-id=02 plan-id=03 cohort-id=01
 |  |  build expressions: ps_partkey, ps_suppkey
+|  |  runtime filters: RF002 <- ps_partkey, RF003 <- ps_suppkey
 |  |
 |  14:EXCHANGE [HASH(ps_partkey,ps_suppkey)]
 |  |
 |  06:HASH JOIN [LEFT SEMI JOIN, BROADCAST]
 |  |  hash predicates: ps_partkey = p_partkey
-|  |  runtime filters: RF006 <- p_partkey
 |  |  row-size=20B cardinality=79.79K
 |  |
 |  |--JOIN BUILD
 |  |  |  join-table-id=03 plan-id=04 cohort-id=03
 |  |  |  build expressions: p_partkey
+|  |  |  runtime filters: RF006 <- p_partkey
 |  |  |
 |  |  13:EXCHANGE [BROADCAST]
 |  |  |
@@ -4661,8 +4661,8 @@ PLAN-ROOT SINK
    predicates: l3.l_receiptdate > l3.l_commitdate
    row-size=60B cardinality=600.12K
 ---- PARALLELPLANS
-Max Per-Host Resource Reservation: Memory=105.27MB Threads=17
-Per-Host Resource Estimates: Memory=859MB
+Max Per-Host Resource Reservation: Memory=109.14MB Threads=27
+Per-Host Resource Estimates: Memory=915MB
 PLAN-ROOT SINK
 |
 21:MERGING-EXCHANGE [UNPARTITIONED]
@@ -4697,21 +4697,21 @@ PLAN-ROOT SINK
 |  09:HASH JOIN [RIGHT SEMI JOIN, PARTITIONED]
 |  |  hash predicates: l2.l_orderkey = l1.l_orderkey
 |  |  other join predicates: l2.l_suppkey != l1.l_suppkey
-|  |  runtime filters: RF000 <- l1.l_orderkey
 |  |  row-size=142B cardinality=7.68K
 |  |
 |  |--JOIN BUILD
 |  |  |  join-table-id=01 plan-id=02 cohort-id=02
 |  |  |  build expressions: l1.l_orderkey
+|  |  |  runtime filters: RF000 <- l1.l_orderkey
 |  |  |
 |  |  08:HASH JOIN [INNER JOIN, BROADCAST]
 |  |  |  hash predicates: s_nationkey = n_nationkey
-|  |  |  runtime filters: RF002 <- n_nationkey
 |  |  |  row-size=142B cardinality=7.68K
 |  |  |
 |  |  |--JOIN BUILD
 |  |  |  |  join-table-id=02 plan-id=03 cohort-id=03
 |  |  |  |  build expressions: n_nationkey
+|  |  |  |  runtime filters: RF002 <- n_nationkey
 |  |  |  |
 |  |  |  16:EXCHANGE [BROADCAST]
 |  |  |  |
@@ -4722,12 +4722,12 @@ PLAN-ROOT SINK
 |  |  |
 |  |  07:HASH JOIN [INNER JOIN, BROADCAST]
 |  |  |  hash predicates: l1.l_suppkey = s_suppkey
-|  |  |  runtime filters: RF004 <- s_suppkey
 |  |  |  row-size=121B cardinality=191.92K
 |  |  |
 |  |  |--JOIN BUILD
 |  |  |  |  join-table-id=03 plan-id=04 cohort-id=03
 |  |  |  |  build expressions: s_suppkey
+|  |  |  |  runtime filters: RF004 <- s_suppkey
 |  |  |  |
 |  |  |  15:EXCHANGE [BROADCAST]
 |  |  |  |
@@ -4738,12 +4738,12 @@ PLAN-ROOT SINK
 |  |  |
 |  |  06:HASH JOIN [INNER JOIN, PARTITIONED]
 |  |  |  hash predicates: l1.l_orderkey = o_orderkey
-|  |  |  runtime filters: RF006 <- o_orderkey
 |  |  |  row-size=81B cardinality=191.92K
 |  |  |
 |  |  |--JOIN BUILD
 |  |  |  |  join-table-id=04 plan-id=05 cohort-id=03
 |  |  |  |  build expressions: o_orderkey
+|  |  |  |  runtime filters: RF006 <- o_orderkey
 |  |  |  |
 |  |  |  14:EXCHANGE [HASH(o_orderkey)]
 |  |  |  |
@@ -4911,8 +4911,8 @@ PLAN-ROOT SINK
    HDFS partitions=1/1 files=1 size=162.56MB
    row-size=8B cardinality=1.50M
 ---- PARALLELPLANS
-Max Per-Host Resource Reservation: Memory=83.75MB Threads=12
-Per-Host Resource Estimates: Memory=414MB
+Max Per-Host Resource Reservation: Memory=83.75MB Threads=16
+Per-Host Resource Estimates: Memory=416MB
 PLAN-ROOT SINK
 |
 15:MERGING-EXCHANGE [UNPARTITIONED]

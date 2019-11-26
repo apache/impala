@@ -381,8 +381,13 @@ class BufferPool::ClientHandle {
   bool TransferReservationFrom(ReservationTracker* src, int64_t bytes);
 
   /// Transfer 'bytes' of reservation from this client to 'dst' using
-  /// ReservationTracker::TransferReservationTo().
-  bool TransferReservationTo(ReservationTracker* dst, int64_t bytes);
+  /// ReservationTracker::TransferReservationTo(). The client must have at least 'bytes'
+  /// of unused reservation. May fail if transferring the reservation requires flushing
+  /// unpinned pages to disk and a write to disk fails, in which case it returns an error
+  /// status. May also fail if a reservation limit on 'dst' would be exceeded as a result
+  /// of the transfer, in which case *transferred is false but Status::OK is returned.
+  Status TransferReservationTo(ReservationTracker* dst, int64_t bytes, bool* transferred);
+  Status TransferReservationTo(ClientHandle* dst, int64_t bytes, bool* transferred);
 
   /// Call SetDebugDenyIncreaseReservation() on this client's ReservationTracker.
   void SetDebugDenyIncreaseReservation(double probability);

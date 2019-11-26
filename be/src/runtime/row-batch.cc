@@ -488,7 +488,8 @@ int64_t RowBatch::GetSerializedSize(const OutboundRowBatch& batch) {
 }
 
 void RowBatch::AcquireState(RowBatch* src) {
-  DCHECK(row_desc_->LayoutEquals(*src->row_desc_));
+  DCHECK(row_desc_->LayoutEquals(*src->row_desc_)) << row_desc_->DebugString() << "\n"
+    << src->row_desc_->DebugString();
   DCHECK_EQ(num_tuples_per_row_, src->num_tuples_per_row_);
   DCHECK_EQ(tuple_ptrs_size_, src->tuple_ptrs_size_);
 

@@ -112,7 +112,7 @@ public class Planner {
    *    that such an expr substitution during plan generation never fails. If it does,
    *    that typically means there is a bug in analysis, or a broken/missing smap.
    */
-  public List<PlanFragment> createPlan() throws ImpalaException {
+  private List<PlanFragment> createPlanFragments() throws ImpalaException {
     SingleNodePlanner singleNodePlanner = new SingleNodePlanner(ctx_);
     DistributedPlanner distributedPlanner = new DistributedPlanner(ctx_);
     PlanNode singleNodePlan = singleNodePlanner.createSingleNodePlan();
@@ -125,11 +125,9 @@ public class Planner {
     invertJoins(singleNodePlan, ctx_.isSingleNodeExec());
     singleNodePlan = useNljForSingularRowBuilds(singleNodePlan, ctx_.getRootAnalyzer());
 
-    // MT_DOP > 0 is not supported by default for plans with base table joins or table
-    // sinks: we only allow MT_DOP > 0 with such plans if --unlock_mt_dop=true is
-    // specified. We allow single node plans with mt_dop since there is no actual
-    // parallelism.
-    if (!ctx_.isSingleNodeExec() && ctx_.getQueryOptions().mt_dop > 0
+    // Parallel plans are not supported by default for plans with base table joins or
+    // table sinks: we only allow such plans if --unlock_mt_dop=true is specified.
+    if (useParallelPlan()
         && (!RuntimeEnv.INSTANCE.isTestEnv()
                || RuntimeEnv.INSTANCE.isMtDopValidationEnabled())
         && !BackendConfig.INSTANCE.isMtDopUnlocked()
@@ -258,23 +256,29 @@ public class Planner {
   }
 
   /**
-   * Return a list of plans, each represented by the root of their fragment trees.
-   * TODO: roll into createPlan()
+   * Return a list of plans, each represented by the root of their fragment trees. May
+   * return a single-node, distributed, or parallel plan depending on the query and
+   * configuration.
    */
-  public List<PlanFragment> createParallelPlans() throws ImpalaException {
-    Preconditions.checkState(ctx_.getQueryOptions().mt_dop > 0);
-    List<PlanFragment> distrPlan = createPlan();
+  public List<PlanFragment> createPlans() throws ImpalaException {
+    List<PlanFragment> distrPlan = createPlanFragments();
     Preconditions.checkNotNull(distrPlan);
-    List<PlanFragment> parallelPlans;
-    // TODO: IMPALA-4224: Parallel plans are not executable
-    if (RuntimeEnv.INSTANCE.isTestEnv()) {
-      ParallelPlanner planner = new ParallelPlanner(ctx_);
-      parallelPlans = planner.createPlans(distrPlan.get(0));
-    } else {
-      parallelPlans = Collections.singletonList(distrPlan.get(0));
+    if (!useParallelPlan()) {
+      return Collections.singletonList(distrPlan.get(0));
     }
+    ParallelPlanner planner = new ParallelPlanner(ctx_);
+    List<PlanFragment> parallelPlans = planner.createPlans(distrPlan.get(0));
     ctx_.getTimeline().markEvent("Parallel plans created");
     return parallelPlans;
+  }
+
+  /**
+   * Return true if we should generate a parallel plan for this query, based on the
+   * current mt_dop value and whether a single-node plan was chosen.
+   */
+  private boolean useParallelPlan() {
+    Preconditions.checkState(ctx_.getQueryOptions().isSetMt_dop());
+    return ctx_.getQueryOptions().mt_dop > 0 && !ctx_.isSingleNodeExec();
   }
 
   /**
@@ -436,6 +440,7 @@ public class Planner {
       // instances run on all backends with max DOP, and can consume their peak resources
       // at the same time, i.e. that the query-wide peak resources is the sum of the
       // per-fragment-instance peak resources.
+      // TODO: IMPALA-9255: take into account parallel plan dependencies.
       maxPerHostPeakResources =
           maxPerHostPeakResources.sum(fragment.getTotalPerBackendResourceProfile(mtDop));
       // Coordinator has to have a copy of each of the runtime filters to perform filter

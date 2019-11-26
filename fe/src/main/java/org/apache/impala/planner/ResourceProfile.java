@@ -125,18 +125,21 @@ public class ResourceProfile {
     return output.toString();
   }
 
-  // Returns a profile with the max of each value in 'this' and 'other'.
+  // Returns a profile with the max of each aggregate value in 'this' and 'other'.
+  // Values which don't aggregate (like buffer sizes) are invalid in the result.
   public ResourceProfile max(ResourceProfile other) {
     if (!isValid()) return other;
     if (!other.isValid()) return this;
     return new ResourceProfile(true,
         Math.max(getMemEstimateBytes(), other.getMemEstimateBytes()),
         Math.max(getMinMemReservationBytes(), other.getMinMemReservationBytes()),
-        Math.max(getMaxMemReservationBytes(), other.getMaxMemReservationBytes()), -1, -1,
+        Math.max(getMaxMemReservationBytes(), other.getMaxMemReservationBytes()),
+        -1, -1,
         Math.max(getThreadReservation(), other.getThreadReservation()));
   }
 
-  // Returns a profile with the sum of each value in 'this' and 'other'.
+  // Returns a profile with the sum of each aggregate value in 'this' and 'other'.
+  // Values which don't aggregate (like buffer sizes) are invalid in the result.
   public ResourceProfile sum(ResourceProfile other) {
     if (!isValid()) return other;
     if (!other.isValid()) return this;
@@ -145,12 +148,29 @@ public class ResourceProfile {
         MathUtil.saturatingAdd(
             getMinMemReservationBytes(),other.getMinMemReservationBytes()),
         MathUtil.saturatingAdd(
-            getMaxMemReservationBytes(), other.getMaxMemReservationBytes()),
-        -1, -1,
+            getMaxMemReservationBytes(), other.getMaxMemReservationBytes()), -1, -1,
         MathUtil.saturatingAdd(getThreadReservation(), other.getThreadReservation()));
   }
 
-  // Returns a profile with all values multiplied by 'factor'.
+  // Returns a profile with the sum of each aggregate value in 'this' and 'other'.
+  // For buffer sizes, where summing the values doesn't make sense, returns the max.
+  public ResourceProfile combine(ResourceProfile other) {
+    if (!isValid()) return other;
+    if (!other.isValid()) return this;
+    return new ResourceProfile(true,
+        MathUtil.saturatingAdd(getMemEstimateBytes(), other.getMemEstimateBytes()),
+        MathUtil.saturatingAdd(
+            getMinMemReservationBytes(),other.getMinMemReservationBytes()),
+        MathUtil.saturatingAdd(
+            getMaxMemReservationBytes(), other.getMaxMemReservationBytes()),
+        Math.max(getSpillableBufferBytes(), other.getSpillableBufferBytes()),
+        Math.max(getMaxRowBufferBytes(), other.getMaxRowBufferBytes()),
+        MathUtil.saturatingAdd(getThreadReservation(), other.getThreadReservation()));
+  }
+
+  // Returns a profile with each aggregate value multiplied by 'factor'.
+  // For buffer sizes, where multiplying the values doesn't make sense, invalid values
+  // are present in the returned profile.
   public ResourceProfile multiply(int factor) {
     if (!isValid()) return this;
     return new ResourceProfile(true,

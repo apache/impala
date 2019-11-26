@@ -16,19 +16,11 @@ PLAN-ROOT SINK
 |  in pipelines: 03(GETNEXT), 00(OPEN)
 |
 02:NESTED LOOP JOIN [CROSS JOIN]
-|  join table id: 00
 |  mem-estimate=2.00GB mem-reservation=0B thread-reservation=0
 |  tuple-ids=0,1 row-size=0B cardinality=unavailable
 |  in pipelines: 00(GETNEXT), 01(OPEN)
 |
-|--F01:PLAN FRAGMENT [UNPARTITIONED] hosts=1 instances=1
-|  |  Per-Host Shared Resources: included in parent fragment
-|  |  Per-Instance Resources: included in parent fragment
-|  JOIN BUILD
-|  |  join-table-id=00 plan-id=01 cohort-id=01
-|  |  mem-estimate=0B mem-reservation=0B thread-reservation=0
-|  |
-|  01:SCAN HDFS [functional_parquet.alltypestiny b]
+|--01:SCAN HDFS [functional_parquet.alltypestiny b]
 |     HDFS partitions=4/4 files=4 size=11.67KB
 |     stored statistics:
 |       table: rows=unavailable size=unavailable
@@ -59,7 +51,7 @@ functional_parquet.alltypestiny b
 where a.id = b.id
 ---- PLAN
 F00:PLAN FRAGMENT [UNPARTITIONED] hosts=1 instances=1
-|  Per-Instance Resources: mem-estimate=2.03GB mem-reservation=35.01MB thread-reservation=1 runtime-filters-memory=1.00MB
+|  Per-Instance Resources: mem-estimate=2.03GB mem-reservation=35.02MB thread-reservation=1 runtime-filters-memory=1.00MB
 PLAN-ROOT SINK
 |  output exprs: count(*)
 |  mem-estimate=0B mem-reservation=0B thread-reservation=0
@@ -71,7 +63,6 @@ PLAN-ROOT SINK
 |  in pipelines: 03(GETNEXT), 00(OPEN)
 |
 02:HASH JOIN [INNER JOIN]
-|  hash-table-id=00
 |  hash predicates: a.id = b.id
 |  fk/pk conjuncts: assumed fk/pk
 |  runtime filters: RF000[bloom] <- b.id
@@ -79,15 +70,7 @@ PLAN-ROOT SINK
 |  tuple-ids=0,1 row-size=8B cardinality=unavailable
 |  in pipelines: 00(GETNEXT), 01(OPEN)
 |
-|--F01:PLAN FRAGMENT [UNPARTITIONED] hosts=1 instances=1
-|  |  Per-Host Shared Resources: included in parent fragment
-|  |  Per-Instance Resources: included in parent fragment
-|  JOIN BUILD
-|  |  join-table-id=00 plan-id=01 cohort-id=01
-|  |  build expressions: b.id
-|  |  mem-estimate=0B mem-reservation=0B thread-reservation=0
-|  |
-|  01:SCAN HDFS [functional_parquet.alltypestiny b]
+|--01:SCAN HDFS [functional_parquet.alltypestiny b]
 |     HDFS partitions=4/4 files=4 size=11.67KB
 |     stored statistics:
 |       table: rows=unavailable size=unavailable

@@ -167,7 +167,6 @@ Status Coordinator::Exec() {
   exec_summary_.Init(schedule_);
 
   if (filter_mode_ != TRuntimeFilterMode::OFF) {
-    DCHECK_EQ(request.plan_exec_info.size(), 1);
     // Populate the runtime filter routing table. This should happen before starting the
     // fragment instances. This code anticipates the indices of the instance states
     // created later on in ExecRemoteFragment()
@@ -320,15 +319,23 @@ void Coordinator::ExecSummary::Init(const QuerySchedule& schedule) {
         node_summary.exec_stats.resize(num_instances);
       }
 
-      if (fragment.__isset.output_sink
-          && fragment.output_sink.type == TDataSinkType::DATA_STREAM_SINK) {
-        const TDataStreamSink& sink = fragment.output_sink.stream_sink;
-        int exch_idx = node_id_to_idx_map[sink.dest_node_id];
-        if (sink.output_partition.type == TPartitionType::UNPARTITIONED) {
-          thrift_exec_summary.nodes[exch_idx].__set_is_broadcast(true);
+      if (fragment.__isset.output_sink &&
+          (fragment.output_sink.type == TDataSinkType::DATA_STREAM_SINK
+           || IsJoinBuildSink(fragment.output_sink.type))) {
+        int dst_node_idx;
+        if (fragment.output_sink.type == TDataSinkType::DATA_STREAM_SINK) {
+          const TDataStreamSink& sink = fragment.output_sink.stream_sink;
+          dst_node_idx = node_id_to_idx_map[sink.dest_node_id];
+          if (sink.output_partition.type == TPartitionType::UNPARTITIONED) {
+            thrift_exec_summary.nodes[dst_node_idx].__set_is_broadcast(true);
+          }
+        } else {
+          DCHECK(IsJoinBuildSink(fragment.output_sink.type));
+          const TJoinBuildSink& sink = fragment.output_sink.join_build_sink;
+          dst_node_idx = node_id_to_idx_map[sink.dest_node_id];
         }
         thrift_exec_summary.__isset.exch_to_sender_map = true;
-        thrift_exec_summary.exch_to_sender_map[exch_idx] = root_node_idx;
+        thrift_exec_summary.exch_to_sender_map[dst_node_idx] = root_node_idx;
       }
     }
   }
@@ -347,14 +354,26 @@ void Coordinator::InitFilterRoutingTable() {
     int num_backends = fragment_params.GetNumBackends();
     DCHECK_GT(num_backends, 0);
 
-    // TODO: IMPALA-4224: also call AddFilterSource for build sinks that produce filters.
+    // Hash join build sinks can produce filters in mt_dop > 0 plans.
+    if (fragment_params.fragment.output_sink.__isset.join_build_sink) {
+      const TJoinBuildSink& join_sink =
+          fragment_params.fragment.output_sink.join_build_sink;
+      for (const TRuntimeFilterDesc& filter: join_sink.runtime_filters) {
+        // The join node ID is used to identify the join that produces the filter, even
+        // though the builder is separate from the actual node.
+        DCHECK_EQ(filter.src_node_id, join_sink.dest_node_id);
+        AddFilterSource(
+            fragment_params, num_instances, num_backends, filter, filter.src_node_id);
+      }
+    }
     for (const TPlanNode& plan_node: fragment_params.fragment.plan.nodes) {
       if (!plan_node.__isset.runtime_filters) continue;
       for (const TRuntimeFilterDesc& filter: plan_node.runtime_filters) {
         DCHECK(filter_mode_ == TRuntimeFilterMode::GLOBAL || filter.has_local_targets);
         // Currently hash joins are the only filter sources. Otherwise it must be
         // a filter consumer.
-        if (plan_node.__isset.hash_join_node) {
+        if (plan_node.__isset.join_node &&
+            plan_node.join_node.__isset.hash_join_node) {
           AddFilterSource(
               fragment_params, num_instances, num_backends, filter, plan_node.node_id);
         } else if (plan_node.__isset.hdfs_scan_node || plan_node.__isset.kudu_scan_node) {

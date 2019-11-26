@@ -589,9 +589,12 @@ class ImpalaClient(object):
     output.append(row)
     try:
       sender_idx = summary.exch_to_sender_map[idx]
-      # This is an exchange node, so the sender is a fragment root, and should be printed
-      # next.
-      self.build_summary_table(summary, sender_idx, True, indent_level, False, output)
+      # This is an exchange node or a join node with a separate builder, so the source
+      # is a fragment root, and should be printed next.
+      sender_indent_level = indent_level + node.num_children
+      sender_new_indent_level = node.num_children > 0
+      self.build_summary_table(
+          summary, sender_idx, True, sender_indent_level, sender_new_indent_level, output)
     except (KeyError, TypeError):
       # Fall through if idx not in map, or if exch_to_sender_map itself is not set
       pass

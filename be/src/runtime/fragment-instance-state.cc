@@ -29,6 +29,9 @@
 #include "exec/exchange-node.h"
 #include "exec/exec-node.h"
 #include "exec/hdfs-scan-node-base.h"
+#include "exec/join-builder.h"
+#include "exec/nested-loop-join-builder.h"
+#include "exec/partitioned-hash-join-builder.h"
 #include "exec/plan-root-sink.h"
 #include "exec/scan-node.h"
 #include "gen-cpp/ImpalaInternalService_types.h"
@@ -191,7 +194,7 @@ Status FragmentInstanceState::Prepare() {
     DCHECK_EQ(exch_node->type(), TPlanNodeType::EXCHANGE_NODE);
     int num_senders =
         FindWithDefault(instance_ctx_.per_exch_num_senders, exch_node->id(), 0);
-    DCHECK_GT(num_senders, 0);
+    DCHECK_GT(num_senders, 0) << exch_node->id();
     static_cast<ExchangeNode*>(exch_node)->set_num_senders(num_senders);
   }
 
@@ -389,8 +392,16 @@ Status FragmentInstanceState::ExecInternal() {
     RETURN_IF_ERROR(sink_->Send(runtime_state_, row_batch_.get()));
     UpdateState(StateEvent::BATCH_SENT);
   } while (!exec_tree_complete);
+  // Release resources from final row batch.
+  row_batch_->Reset();
 
   UpdateState(StateEvent::LAST_BATCH_SENT);
+
+  // Close the tree before the sink is flushed to release 'exec_tree_' resources.
+  // This can significantly reduce resource consumption if 'sink_' is a join
+  // build, where FlushFinal() blocks until the consuming fragment is finished.
+  exec_tree_->Close(runtime_state_);
+
   // Flush the sink as a final step.
   RETURN_IF_ERROR(sink_->FlushFinal(runtime_state()));
   return Status::OK();
@@ -417,11 +428,7 @@ void FragmentInstanceState::Close() {
   // Stop updating profile counters in background.
   profile()->StopPeriodicCounters();
 
-  // We need to delete row_batch_ here otherwise we can't delete the instance_mem_tracker_
-  // in runtime_state_->ReleaseResources().
-  // TODO: do not delete mem trackers in Close()/ReleaseResources(), they are part of
-  // the control structures we need to preserve until the underlying QueryState
-  // disappears.
+  // Delete row_batch_ to free resources associated with it.
   row_batch_.reset();
   if (exec_tree_ != nullptr) exec_tree_->Close(runtime_state_);
   runtime_state_->ReleaseResources();
@@ -554,6 +561,14 @@ PlanRootSink* FragmentInstanceState::GetRootSink() const {
   return fragment_ctx_.fragment.output_sink.type == TDataSinkType::PLAN_ROOT_SINK ?
       static_cast<PlanRootSink*>(sink_) :
       nullptr;
+}
+
+bool FragmentInstanceState::HasJoinBuildSink() const {
+  return IsJoinBuildSink(fragment_ctx_.fragment.output_sink.type);
+}
+
+JoinBuilder* FragmentInstanceState::GetJoinBuildSink() const {
+  return HasJoinBuildSink() ? static_cast<JoinBuilder*>(sink_) : nullptr;
 }
 
 const TQueryCtx& FragmentInstanceState::query_ctx() const {

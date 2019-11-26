@@ -78,9 +78,12 @@ void InitialReservations::Claim(BufferPool::ClientHandle* dst, int64_t bytes) {
 
 void InitialReservations::Return(BufferPool::ClientHandle* src, int64_t bytes) {
   lock_guard<SpinLock> l(lock_);
-  bool success = src->TransferReservationTo(&initial_reservations_, bytes);
+  bool success;
+  Status status = src->TransferReservationTo(&initial_reservations_, bytes, &success);
+  DCHECK(status.ok()) << status.GetDetail() << " no dirty pages to flush, can't fail "
+                      << src->DebugString();
   // No limits on our tracker - no way this should fail.
-  DCHECK(success);
+  DCHECK(success) << initial_reservations_.DebugString();
   // Check to see if we can release any reservation.
   int64_t excess_reservation =
     initial_reservations_.GetReservation() - remaining_initial_reservation_claims_;

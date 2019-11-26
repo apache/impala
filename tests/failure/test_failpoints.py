@@ -100,14 +100,7 @@ class TestFailpoints(ImpalaTestSuite):
     location = vector.get_value('location')
     vector.get_value('exec_option')['mt_dop'] = vector.get_value('mt_dop')
 
-    try:
-      plan_node_ids = self.__parse_plan_nodes_from_explain(query, vector)
-    except ImpalaBeeswaxException as e:
-      if "MT_DOP not supported" in str(e):
-        pytest.xfail(reason="MT_DOP not supported.")
-      else:
-        raise e
-
+    plan_node_ids = self.__parse_plan_nodes_from_explain(query, vector)
     for node_id in plan_node_ids:
       debug_action = '%d:%s:%s' % (node_id, location, FAILPOINT_ACTION_MAP[action])
       # IMPALA-7046: add jitter to backend startup to exercise various failure paths.

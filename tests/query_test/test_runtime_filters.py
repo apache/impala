@@ -16,6 +16,7 @@
 # under the License.
 #
 
+from copy import deepcopy
 import pytest
 import re
 import time
@@ -25,6 +26,7 @@ from tests.common.environ import build_flavor_timeout
 from tests.common.impala_cluster import ImpalaCluster
 from tests.common.impala_test_suite import ImpalaTestSuite
 from tests.common.skip import SkipIfLocal, SkipIfIsilon
+from tests.common.test_vector import ImpalaTestDimension
 from tests.verifiers.metric_verifier import MetricVerifier
 
 # slow_build_timeout is set to 200000 to avoid failures like IMPALA-8064 where the
@@ -49,14 +51,26 @@ class TestRuntimeFilters(ImpalaTestSuite):
     # Runtime filters are disabled on HBase
     cls.ImpalaTestMatrix.add_constraint(
         lambda v: v.get_value('table_format').file_format not in ['hbase'])
+    # Exercise both mt and non-mt code paths. Some tests assume 3 finstances, so
+    # tests are not expected to work unmodified with higher mt_dop values.
+    cls.ImpalaTestMatrix.add_dimension(ImpalaTestDimension('mt_dop', 0, 1))
+    # Don't test all combinations of file format and mt_dop, only test a few
+    # representative formats.
+    cls.ImpalaTestMatrix.add_constraint(
+        lambda v: v.get_value('table_format').file_format in ['parquet', 'text', 'kudu']
+        or v.get_value('mt_dop') == 0)
 
   def test_basic_filters(self, vector):
+    new_vector = deepcopy(vector)
+    new_vector.get_value('exec_option')['mt_dop'] = vector.get_value('mt_dop')
     self.run_test_case('QueryTest/runtime_filters', vector,
         test_file_vars={'$RUNTIME_FILTER_WAIT_TIME_MS' : str(WAIT_TIME_MS)})
 
   def test_wait_time(self, vector):
     """Test that a query that has global filters does not wait for them if run in LOCAL
     mode"""
+    new_vector = deepcopy(vector)
+    new_vector.get_value('exec_option')['mt_dop'] = vector.get_value('mt_dop')
     now = time.time()
     self.run_test_case('QueryTest/runtime_filters_wait', vector)
     duration_s = time.time() - now
@@ -68,6 +82,8 @@ class TestRuntimeFilters(ImpalaTestSuite):
   def test_wait_time_cancellation(self, vector):
     """Regression test for IMPALA-9065 to ensure that threads waiting for filters
     get woken up and exit promptly when the query is cancelled."""
+    new_vector = deepcopy(vector)
+    new_vector.get_value('exec_option')['mt_dop'] = vector.get_value('mt_dop')
     # Make sure the cluster is quiesced before we start this test
     self._verify_no_fragments_running()
 
@@ -101,6 +117,8 @@ class TestRuntimeFilters(ImpalaTestSuite):
   def test_file_filtering(self, vector):
     if 'kudu' in str(vector.get_value('table_format')):
       return
+    new_vector = deepcopy(vector)
+    new_vector.get_value('exec_option')['mt_dop'] = vector.get_value('mt_dop')
     self.change_database(self.client, vector.get_value('table_format'))
     self.execute_query("SET RUNTIME_FILTER_MODE=GLOBAL")
     self.execute_query("SET RUNTIME_FILTER_WAIT_TIME_MS=10000")
@@ -216,7 +234,12 @@ class TestRuntimeRowFilters(ImpalaTestSuite):
     super(TestRuntimeRowFilters, cls).add_test_dimensions()
     cls.ImpalaTestMatrix.add_constraint(lambda v:
         v.get_value('table_format').file_format in ['parquet'])
+    # Exercise both mt and non-mt code paths. Some tests assume 3 finstances, so
+    # tests are not expected to work unmodified with higher mt_dop values.
+    cls.ImpalaTestMatrix.add_dimension(ImpalaTestDimension('mt_dop', 0, 4))
 
   def test_row_filters(self, vector):
+    new_vector = deepcopy(vector)
+    new_vector.get_value('exec_option')['mt_dop'] = vector.get_value('mt_dop')
     self.run_test_case('QueryTest/runtime_row_filters', vector,
                        test_file_vars={'$RUNTIME_FILTER_WAIT_TIME_MS' : str(WAIT_TIME_MS)})

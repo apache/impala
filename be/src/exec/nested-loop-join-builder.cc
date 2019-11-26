@@ -22,22 +22,52 @@
 #include "runtime/mem-tracker.h"
 #include "runtime/row-batch.h"
 #include "runtime/runtime-state.h"
+#include "util/runtime-profile-counters.h"
 
 #include "common/names.h"
 
 using namespace impala;
 
-NljBuilder* NljBuilder::CreateSink(const RowDescriptor* row_desc, RuntimeState* state) {
+DataSink* NljBuilderConfig::CreateSink(const TPlanFragmentCtx& fragment_ctx,
+    const TPlanFragmentInstanceCtx& fragment_instance_ctx,
+    RuntimeState* state) const {
+  // We have one fragment per sink, so we can use the fragment index as the sink ID.
+  TDataSinkId sink_id = fragment_ctx.fragment.idx;
+  return NljBuilder::CreateSeparateBuilder(sink_id, *this, state);
+}
+
+Status NljBuilderConfig::Init(
+    const TDataSink& tsink, const RowDescriptor* input_row_desc, RuntimeState* state) {
+  RETURN_IF_ERROR(JoinBuilderConfig::Init(tsink, input_row_desc, state));
+  return Status::OK();
+}
+
+NljBuilder* NljBuilder::CreateEmbeddedBuilder(
+    const RowDescriptor* row_desc, RuntimeState* state, int join_node_id) {
   ObjectPool* pool = state->obj_pool();
-  DataSinkConfig* sink_config = pool->Add(new NljBuilderConfig());
+  NljBuilderConfig* sink_config = pool->Add(new NljBuilderConfig());
+  sink_config->join_node_id_ = join_node_id;
   sink_config->tsink_ = pool->Add(new TDataSink());
   sink_config->input_row_desc_ = row_desc;
   return pool->Add(new NljBuilder(*sink_config, state));
 }
 
-NljBuilder::NljBuilder(const DataSinkConfig& sink_config, RuntimeState* state)
-  : DataSink(-1, sink_config, "Nested Loop Join Builder", state),
+NljBuilder::NljBuilder(
+    TDataSinkId sink_id, const NljBuilderConfig& sink_config, RuntimeState* state)
+  : JoinBuilder(sink_id, sink_config, "Nested Loop Join Builder", state),
     build_batch_cache_(row_desc_, state->batch_size()) {}
+
+
+NljBuilder::NljBuilder(const NljBuilderConfig& sink_config, RuntimeState* state)
+  : JoinBuilder(-1, sink_config, "Nested Loop Join Builder", state),
+    build_batch_cache_(row_desc_, state->batch_size()) {}
+
+NljBuilder* NljBuilder::CreateSeparateBuilder(
+    TDataSinkId sink_id, const NljBuilderConfig& sink_config, RuntimeState* state) {
+  return state->obj_pool()->Add(new NljBuilder(sink_id, sink_config, state));
+}
+
+NljBuilder::~NljBuilder() {}
 
 Status NljBuilder::Prepare(RuntimeState* state, MemTracker* parent_mem_tracker) {
   RETURN_IF_ERROR(DataSink::Prepare(state, parent_mem_tracker));
@@ -49,12 +79,15 @@ Status NljBuilder::Open(RuntimeState* state) {
 }
 
 Status NljBuilder::Send(RuntimeState* state, RowBatch* batch) {
+  SCOPED_TIMER(profile()->total_time_counter());
   // Swap the contents of the batch into a batch owned by the builder.
   RowBatch* build_batch = GetNextEmptyBatch();
   build_batch->AcquireState(batch);
 
   AddBuildBatch(build_batch);
-  if (build_batch->needs_deep_copy() || build_batch->num_buffers() > 0) {
+  if (is_separate_build_
+      || build_batch->flush_mode() == RowBatch::FlushMode::FLUSH_RESOURCES
+      || build_batch->num_buffers() > 0) {
     // This batch and earlier batches may refer to resources passed from the child
     // that aren't owned by the row batch itself. Deep copying ensures that the row
     // batches are backed by memory owned by this node that is safe to hold on to.
@@ -69,6 +102,7 @@ Status NljBuilder::Send(RuntimeState* state, RowBatch* batch) {
 }
 
 Status NljBuilder::FlushFinal(RuntimeState* state) {
+  SCOPED_TIMER(profile()->total_time_counter());
   if (copied_build_batches_.total_num_rows() > 0) {
     // To simplify things, we only want to process one list, so we need to copy
     // the remaining input batches.
@@ -77,10 +111,12 @@ Status NljBuilder::FlushFinal(RuntimeState* state) {
 
   DCHECK(copied_build_batches_.total_num_rows() == 0 ||
       input_build_batches_.total_num_rows() == 0);
+  if (is_separate_build_) HandoffToProbesAndWait(state);
   return Status::OK();
 }
 
 void NljBuilder::Reset() {
+  DCHECK(!is_separate_build_);
   build_batch_cache_.Reset();
   input_build_batches_.Reset();
   copied_build_batches_.Reset();

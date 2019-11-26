@@ -68,6 +68,9 @@ SORT_QUERY = 'select * from lineitem order by l_orderkey'
 SORT_CANCEL_DELAY = range(6, 10)
 SORT_BUFFER_POOL_LIMIT = ['0', '300m'] # Test spilling and non-spilling sorts.
 
+# Test with and without multithreading
+MT_DOP_VALUES = [0, 4]
+
 class TestCancellation(ImpalaTestSuite):
   @classmethod
   def get_workload(self):
@@ -92,6 +95,8 @@ class TestCancellation(ImpalaTestSuite):
         ImpalaTestDimension('buffer_pool_limit', 0))
     cls.ImpalaTestMatrix.add_dimension(
         ImpalaTestDimension('cpu_limit_s', *CPU_LIMIT_S))
+    cls.ImpalaTestMatrix.add_dimension(
+        ImpalaTestDimension('mt_dop', *MT_DOP_VALUES))
 
     cls.ImpalaTestMatrix.add_constraint(
         lambda v: v.get_value('query_type') != 'CTAS' or (\
@@ -145,6 +150,7 @@ class TestCancellation(ImpalaTestSuite):
     vector.get_value('exec_option')['buffer_pool_limit'] =\
         vector.get_value('buffer_pool_limit')
     vector.get_value('exec_option')['cpu_limit_s'] = vector.get_value('cpu_limit_s')
+    vector.get_value('exec_option')['mt_dop'] = vector.get_value('mt_dop')
 
     # Execute the query multiple times, cancelling it each time.
     for i in xrange(NUM_CANCELATION_ITERATIONS):

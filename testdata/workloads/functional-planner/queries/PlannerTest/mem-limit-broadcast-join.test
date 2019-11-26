@@ -58,12 +58,12 @@ PLAN-ROOT SINK
 |
 02:HASH JOIN [INNER JOIN, PARTITIONED]
 |  hash predicates: c_nationkey = n_nationkey
-|  runtime filters: RF000 <- n_nationkey
 |  row-size=327B cardinality=150.00K
 |
 |--JOIN BUILD
 |  |  join-table-id=00 plan-id=01 cohort-id=01
 |  |  build expressions: n_nationkey
+|  |  runtime filters: RF000 <- n_nationkey
 |  |
 |  04:EXCHANGE [HASH(n_nationkey)]
 |  |

@@ -50,12 +50,19 @@ class PartitionedHashJoinPlanNode : public BlockingJoinPlanNode {
   std::vector<ScalarExpr*> build_exprs_;
   std::vector<ScalarExpr*> probe_exprs_;
 
+  /// is_not_distinct_from_[i] is true if and only if the ith equi-join predicate is IS
+  /// NOT DISTINCT FROM, rather than equality.
+  std::vector<bool> is_not_distinct_from_;
+
   /// Non-equi-join conjuncts from the ON clause.
   std::vector<ScalarExpr*> other_join_conjuncts_;
 
   /// Data sink config object for creating a phj builder that will be eventually used by
   /// the exec node.
   const PhjBuilderConfig* phj_builder_config;
+
+  /// Seed used for hashing rows.
+  uint32_t hash_seed_;
 };
 
 /// Operator to perform partitioned hash join, spilling to disk as necessary. This
@@ -83,12 +90,12 @@ class PartitionedHashJoinPlanNode : public BlockingJoinPlanNode {
 ///
 /// The above algorithm is implemented as a state machine with the following phases:
 ///
-///   1. [PARTITIONING_BUILD or REPARTITIONING_BUILD] Read build rows from child(1) OR
-///      from the spilled build rows of a partition and partition them into the builder's
-///      hash partitions. If there is sufficient memory, all build partitions are kept
-///      in memory. Otherwise, build partitions are spilled as needed to free up memory.
-///      Finally, build a hash table for each in-memory partition and create a probe
-///      partition with a write buffer for each spilled partition.
+///   1. [PARTITIONING_BUILD or REPARTITIONING_BUILD] Read build rows from the right
+///      input plan tree OR from the spilled build rows of a partition and partition them
+///      into the builder's hash partitions. If there is sufficient memory, all build
+///      partitions are kept in memory. Otherwise, build partitions are spilled as needed
+///      to free up memory. Finally, build a hash table for each in-memory partition and
+///      create a probe partition with a write buffer for each spilled partition.
 ///
 ///      After the phase, the algorithm advances from PARTITIONING_BUILD to
 ///      PARTITIONING_PROBE or from REPARTITIONING_BUILD to REPARTITIONING_PROBE.
@@ -518,12 +525,16 @@ class PartitionedHashJoinNode : public BlockingJoinNode {
   Status CodegenProcessProbeBatch(
       LlvmCodeGen* codegen, TPrefetchMode::type prefetch_mode) WARN_UNUSED_RESULT;
 
+  uint32_t hash_seed() const {
+    return static_cast<const PartitionedHashJoinPlanNode&>(plan_node_).hash_seed_;
+  }
+
   std::string NodeDebugString() const;
 
   RuntimeState* runtime_state_;
 
   /// Our equi-join predicates "<lhs> = <rhs>" are separated into
-  /// build_exprs_ (over child(1)) and probe_exprs_ (over child(0))
+  /// build_exprs_ (over the build input row) and probe_exprs_ (over child(0))
   std::vector<ScalarExpr*> build_exprs_;
   std::vector<ScalarExpr*> probe_exprs_;
 
@@ -556,8 +567,10 @@ class PartitionedHashJoinNode : public BlockingJoinNode {
   /// State of the probing algorithm. Used to drive the state machine in GetNext().
   ProbeState probe_state_ = ProbeState::PROBE_COMPLETE;
 
-  /// The build-side of the join. Initialized in constructor and owned by runtime state.
-  PhjBuilder* builder_;
+  /// The build-side rows of the join. Initialized in Prepare() if the build is embedded
+  /// in the join, otherwise looked up in Open() if it's a separate build. Owned by an
+  /// object pool with query lifetime in either case.
+  PhjBuilder* builder_ = nullptr;
 
   /// Last set of hash partitions obtained from builder_. Only valid when the
   /// builder's state is PARTITIONING_PROBE or REPARTITIONING_PROBE.

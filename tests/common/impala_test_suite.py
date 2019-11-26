@@ -916,6 +916,7 @@ class ImpalaTestSuite(BaseTestSuite):
     Uses a default list of valid section names if valid_section_names is None.
     """
     test_file_path = os.path.join(WORKLOAD_DIR, workload, 'queries', file_name + '.test')
+    LOG.info("Loading query test file: %s", test_file_path)
     if not os.path.isfile(test_file_path):
       assert False, 'Test file not found: %s' % file_name
     return parse_query_test_file(test_file_path, valid_section_names, encoding=encoding)

@@ -115,7 +115,13 @@ class DataSink {
   /// Call before Send() to open the sink and initialize output expression evaluators.
   virtual Status Open(RuntimeState* state);
 
-  /// Send a row batch into this sink. Send() may modify 'batch' by acquiring its state.
+  /// Send a row batch into this sink. Generally, Send() should not retain any references
+  /// to data in 'batch' after it returns, so that the caller can free 'batch' and all
+  /// associated memory. This is a hard requirement if the sink is being used as the
+  /// output sink of the fragment, but can be relaxed in certain contexts, e.g. an
+  /// embedded NljBuilder.
+  /// TODO: IMPALA-5832: we could allow sinks to acquire resources of 'batch' if we
+  /// make it possible to always acquire referenced memory.
   virtual Status Send(RuntimeState* state, RowBatch* batch) = 0;
 
   /// Flushes any remaining buffered state.
@@ -176,5 +182,11 @@ class DataSink {
   std::vector<ScalarExpr*> output_exprs_;
   std::vector<ScalarExprEvaluator*> output_expr_evals_;
 };
+
+static inline bool IsJoinBuildSink(const TDataSinkType::type& type) {
+  return type == TDataSinkType::HASH_JOIN_BUILDER
+      || type == TDataSinkType::NESTED_LOOP_JOIN_BUILDER;
+}
+
 } // namespace impala
 #endif

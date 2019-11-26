@@ -35,30 +35,6 @@ class TestMtDopFlags(CustomClusterTestSuite):
     super(TestMtDopFlags, cls).add_test_dimensions()
 
   @pytest.mark.execute_serially
-  @CustomClusterTestSuite.with_args(impalad_args="--unlock_mt_dop=true")
-  @SkipIfABFS.file_or_folder_name_ends_with_period
-  def test_mt_dop_all(self, vector, unique_database):
-    """Test joins, inserts and runtime filters with mt_dop > 0"""
-    vector = deepcopy(vector)
-    vector.get_value('exec_option')['mt_dop'] = 4
-    self.run_test_case('QueryTest/joins', vector, use_db="functional_parquet")
-    self.run_test_case('QueryTest/insert', vector)
-
-    # Runtime filter tests assume 3 fragments, which we can get with one instance per
-    # node.
-    vector.get_value('exec_option')['mt_dop'] = 1
-    self.run_test_case('QueryTest/runtime_filters', vector,
-       test_file_vars={'$RUNTIME_FILTER_WAIT_TIME_MS': str(WAIT_TIME_MS)})
-    self.run_test_case('QueryTest/runtime_row_filters', vector,
-        use_db="functional_parquet",
-        test_file_vars={'$RUNTIME_FILTER_WAIT_TIME_MS' : str(WAIT_TIME_MS)})
-
-    # Allow test to override num_nodes.
-    del vector.get_value('exec_option')['num_nodes']
-    self.run_test_case('QueryTest/joins_mt_dop', vector,
-       test_file_vars={'$RUNTIME_FILTER_WAIT_TIME_MS': str(WAIT_TIME_MS)})
-
-  @pytest.mark.execute_serially
   @CustomClusterTestSuite.with_args(impalad_args="--mt_dop_auto_fallback=true")
   @SkipIfNotHdfsMinicluster.tuned_for_minicluster
   def test_mt_dop_fallback(self, vector, unique_database):

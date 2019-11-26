@@ -29,6 +29,7 @@ import org.apache.impala.catalog.Type;
 import org.apache.impala.common.AnalysisException;
 import org.apache.impala.common.ImpalaException;
 import org.apache.impala.common.InternalException;
+import org.apache.impala.common.Pair;
 import org.apache.impala.thrift.TEqJoinCondition;
 import org.apache.impala.thrift.TExplainLevel;
 import org.apache.impala.thrift.THashJoinNode;
@@ -134,19 +135,30 @@ public class HashJoinNode extends JoinNode {
   @Override
   protected void toThrift(TPlanNode msg) {
     msg.node_type = TPlanNodeType.HASH_JOIN_NODE;
-    msg.hash_join_node = new THashJoinNode();
-    msg.hash_join_node.join_op = joinOp_.toThrift();
-    for (Expr entry: eqJoinConjuncts_) {
+    msg.join_node = joinNodeToThrift();
+    msg.join_node.hash_join_node = new THashJoinNode();
+    msg.join_node.hash_join_node.setEq_join_conjuncts(getThriftEquiJoinConjuncts());
+    for (Expr e: otherJoinConjuncts_) {
+      msg.join_node.hash_join_node.addToOther_join_conjuncts(e.treeToThrift());
+    }
+    msg.join_node.hash_join_node.setHash_seed(getFragment().getHashSeed());
+  }
+
+  /**
+   * Helper to get the equi-join conjuncts in a thrift representation.
+   */
+  public List<TEqJoinCondition> getThriftEquiJoinConjuncts() {
+    List<TEqJoinCondition> equiJoinConjuncts = new ArrayList<>(eqJoinConjuncts_.size());
+    for (Expr entry : eqJoinConjuncts_) {
       BinaryPredicate bp = (BinaryPredicate)entry;
       TEqJoinCondition eqJoinCondition =
           new TEqJoinCondition(bp.getChild(0).treeToThrift(),
               bp.getChild(1).treeToThrift(),
               bp.getOp() == BinaryPredicate.Operator.NOT_DISTINCT);
-      msg.hash_join_node.addToEq_join_conjuncts(eqJoinCondition);
+
+      equiJoinConjuncts.add(eqJoinCondition);
     }
-    for (Expr e: otherJoinConjuncts_) {
-      msg.hash_join_node.addToOther_join_conjuncts(e.treeToThrift());
-    }
+    return equiJoinConjuncts;
   }
 
   @Override
@@ -203,7 +215,8 @@ public class HashJoinNode extends JoinNode {
   }
 
   @Override
-  public void computeNodeResourceProfile(TQueryOptions queryOptions) {
+  public Pair<ResourceProfile, ResourceProfile> computeJoinResourceProfile(
+      TQueryOptions queryOptions) {
     long perInstanceMemEstimate;
     long perInstanceDataBytes;
     int numInstances = fragment_.getNumInstances(queryOptions.getMt_dop());
@@ -227,8 +240,8 @@ public class HashJoinNode extends JoinNode {
 
     // Must be kept in sync with PartitionedHashJoinBuilder::MinReservation() in be.
     final int PARTITION_FANOUT = 16;
-    long minBuffers = PARTITION_FANOUT + 1
-        + (joinOp_ == JoinOperator.NULL_AWARE_LEFT_ANTI_JOIN ? 3 : 0);
+    long minBuildBuffers = PARTITION_FANOUT + 1
+        + (joinOp_ == JoinOperator.NULL_AWARE_LEFT_ANTI_JOIN ? 1 : 0);
 
     long bufferSize = queryOptions.getDefault_spillable_buffer_size();
     if (perInstanceDataBytes != -1) {
@@ -244,12 +257,32 @@ public class HashJoinNode extends JoinNode {
     // to serve as input and output buffers while repartitioning.
     long maxRowBufferSize =
         computeMaxSpillableBufferSize(bufferSize, queryOptions.getMax_row_size());
-    long perInstanceMinMemReservation =
-        bufferSize * (minBuffers - 2) + maxRowBufferSize * 2;
-    nodeResourceProfile_ = new ResourceProfileBuilder()
-        .setMemEstimateBytes(perInstanceMemEstimate)
-        .setMinMemReservationBytes(perInstanceMinMemReservation)
+    long perInstanceBuildMinMemReservation =
+        bufferSize * (minBuildBuffers - 2) + maxRowBufferSize * 2;
+    // Most reservation for probe buffers is obtained from the join builder when
+    // spilling. However, for NAAJ, two additional probe streams are needed that
+    // are used exclusively by the probe side.
+    long perInstanceProbeMinMemReservation = 0;
+    if (joinOp_ == JoinOperator.NULL_AWARE_LEFT_ANTI_JOIN) {
+      // Only one of the NAAJ probe streams is written at a time, so it needs a max-sized
+      // buffer. If the build is integrated, we already have a max sized buffer accounted
+      // for in the build reservation.
+      perInstanceProbeMinMemReservation =
+          hasSeparateBuild() ? maxRowBufferSize + bufferSize : bufferSize * 2;
+    }
+
+    // Almost all resource consumption is in the build, or shared between the build and
+    // the probe. These are accounted for in the build profile.
+    ResourceProfile probeProfile = new ResourceProfileBuilder()
+        .setMemEstimateBytes(0)
+        .setMinMemReservationBytes(perInstanceProbeMinMemReservation)
         .setSpillableBufferBytes(bufferSize)
         .setMaxRowBufferBytes(maxRowBufferSize).build();
+    ResourceProfile buildProfile = new ResourceProfileBuilder()
+        .setMemEstimateBytes(perInstanceMemEstimate)
+        .setMinMemReservationBytes(perInstanceBuildMinMemReservation)
+        .setSpillableBufferBytes(bufferSize)
+        .setMaxRowBufferBytes(maxRowBufferSize).build();
+    return Pair.create(probeProfile, buildProfile);
   }
 }

@@ -17,14 +17,18 @@
 
 package org.apache.impala.planner;
 
+import java.util.Collections;
 import java.util.List;
 
 import org.apache.impala.analysis.Expr;
+import org.apache.impala.planner.RuntimeFilterGenerator.RuntimeFilter;
 import org.apache.impala.thrift.TDataSink;
 import org.apache.impala.thrift.TDataSinkType;
 import org.apache.impala.thrift.TExecStats;
 import org.apache.impala.thrift.TExplainLevel;
 import org.apache.impala.thrift.TQueryOptions;
+
+import com.google.common.base.Preconditions;
 
 /**
  * A DataSink describes the destination of a plan fragment's output rows.
@@ -68,6 +72,13 @@ public abstract class DataSink {
    */
   abstract protected String getLabel();
 
+
+  /**
+   * Return runtime filters produced by this sink. Subclasses that use runtime filters
+   * must override.
+   */
+  public List<RuntimeFilter> getRuntimeFilters() { return Collections.emptyList(); }
+
   /**
    * Construct a thrift representation of the sink.
    */
@@ -77,6 +88,8 @@ public abstract class DataSink {
     TExecStats estimatedStats = new TExecStats();
     estimatedStats.setMemory_used(resourceProfile_.getMemEstimateBytes());
     tsink.setEstimated_stats(estimatedStats);
+    Preconditions.checkState(resourceProfile_.isValid());
+    tsink.resource_profile = resourceProfile_.toThrift();
     toThriftImpl(tsink);
     return tsink;
   }

@@ -28,6 +28,8 @@
 #include "exec/kudu-util.h"
 #include "exec/blocking-plan-root-sink.h"
 #include "exec/buffered-plan-root-sink.h"
+#include "exec/nested-loop-join-builder.h"
+#include "exec/partitioned-hash-join-builder.h"
 #include "exec/plan-root-sink.h"
 #include "exprs/scalar-expr.h"
 #include "gen-cpp/ImpalaInternalService_constants.h"
@@ -87,8 +89,14 @@ Status DataSinkConfig::CreateConfig(const TDataSink& thrift_sink,
     case TDataSinkType::PLAN_ROOT_SINK:
       data_sink = pool->Add(new PlanRootSinkConfig());
       break;
-    case TDataSinkType::JOIN_BUILD_SINK:
-    // IMPALA-4224 - join build sink not supported in backend execution.
+    case TDataSinkType::HASH_JOIN_BUILDER: {
+      data_sink = pool->Add(new PhjBuilderConfig());
+      break;
+    }
+    case TDataSinkType::NESTED_LOOP_JOIN_BUILDER: {
+      data_sink = pool->Add(new NljBuilderConfig());
+      break;
+    }
     default:
       stringstream error_msg;
       map<int, const char*>::const_iterator i =

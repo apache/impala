@@ -164,7 +164,7 @@ do
 
   run-step "Starting Impala cluster" start-impala-cluster.log \
       "${IMPALA_HOME}/bin/start-impala-cluster.py" --log_dir="${IMPALA_EE_TEST_LOGS_DIR}" \
-      ${TEST_START_CLUSTER_ARGS}
+      ${TEST_START_CLUSTER_ARGS} --impalad_args=--unlock_mt_dop=true
 
   if [[ "$BE_TEST" == true ]]; then
     if [[ "$TARGET_FILESYSTEM" == "local" ]]; then

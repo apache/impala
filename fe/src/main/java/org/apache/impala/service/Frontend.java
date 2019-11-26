@@ -1355,13 +1355,13 @@ public class Frontend {
   private TPlanExecInfo createPlanExecInfo(PlanFragment planRoot, Planner planner,
       TQueryCtx queryCtx, TQueryExecRequest queryExecRequest) {
     TPlanExecInfo result = new TPlanExecInfo();
-    List<PlanFragment> fragments = planRoot.getNodesPreOrder();
+    List<PlanFragment> fragments = planRoot.getFragmentsInPlanPreorder();
 
     // collect ScanNodes
     List<ScanNode> scanNodes = Lists.newArrayList();
-    for (PlanFragment fragment: fragments) {
-      Preconditions.checkNotNull(fragment.getPlanRoot());
-      fragment.getPlanRoot().collect(Predicates.instanceOf(ScanNode.class), scanNodes);
+    for (PlanFragment fragment : fragments) {
+      fragment.collectPlanNodes(
+        Predicates.instanceOf(ScanNode.class), scanNodes);
     }
 
     // Set scan ranges/locations for scan nodes.
@@ -1410,25 +1410,13 @@ public class Frontend {
   private TQueryExecRequest createExecRequest(
       Planner planner, PlanCtx planCtx) throws ImpalaException {
     TQueryCtx queryCtx = planner.getQueryCtx();
-    AnalysisResult analysisResult = planner.getAnalysisResult();
-    boolean isMtExec = (analysisResult.isQueryStmt() || analysisResult.isDmlStmt())
-        && queryCtx.client_request.query_options.isSetMt_dop()
-        && queryCtx.client_request.query_options.mt_dop > 0;
-
-    List<PlanFragment> planRoots = Lists.newArrayList();
-    TQueryExecRequest result = new TQueryExecRequest();
-    if (isMtExec) {
-      LOG.trace("create mt plan");
-      planRoots.addAll(planner.createParallelPlans());
-    } else {
-      LOG.trace("create plan");
-      planRoots.add(planner.createPlan().get(0));
-    }
+    List<PlanFragment> planRoots = planner.createPlans();
     if (planCtx.planCaptureRequested()) {
       planCtx.plan_ = planRoots;
     }
 
     // Compute resource requirements of the final plans.
+    TQueryExecRequest result = new TQueryExecRequest();
     planner.computeResourceReqs(planRoots, queryCtx, result);
 
     // create per-plan exec info;
@@ -1445,7 +1433,7 @@ public class Frontend {
         queryCtx.client_request.query_options.isDisable_unsafe_spills()
           && queryCtx.isSetTables_missing_stats()
           && !queryCtx.tables_missing_stats.isEmpty()
-          && !analysisResult.getAnalyzer().hasPlanHints();
+          && !planner.getAnalysisResult().getAnalyzer().hasPlanHints();
     queryCtx.setDisable_spilling(disableSpilling);
 
     // assign fragment idx

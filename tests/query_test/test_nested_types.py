@@ -36,6 +36,8 @@ from tests.common.test_vector import ImpalaTestDimension
 from tests.util.filesystem_utils import WAREHOUSE, get_fs_path, IS_HDFS
 
 class TestNestedTypes(ImpalaTestSuite):
+  """Functional tests for nested types, run for all file formats that support nested
+  types."""
   @classmethod
   def get_workload(self):
     return 'functional-query'
@@ -45,40 +47,58 @@ class TestNestedTypes(ImpalaTestSuite):
     super(TestNestedTypes, cls).add_test_dimensions()
     cls.ImpalaTestMatrix.add_constraint(lambda v:
         v.get_value('table_format').file_format in ['parquet', 'orc'])
+    cls.ImpalaTestMatrix.add_dimension(
+        ImpalaTestDimension('mt_dop', 0, 2))
 
   def test_scanner_basic(self, vector):
     """Queries that do not materialize arrays."""
+    vector = deepcopy(vector)
+    vector.get_value('exec_option')['mt_dop'] = vector.get_value('mt_dop')
     self.run_test_case('QueryTest/nested-types-scanner-basic', vector)
 
   def test_scanner_array_materialization(self, vector):
     """Queries that materialize arrays."""
+    vector = deepcopy(vector)
+    vector.get_value('exec_option')['mt_dop'] = vector.get_value('mt_dop')
     self.run_test_case('QueryTest/nested-types-scanner-array-materialization', vector)
 
   def test_scanner_multiple_materialization(self, vector):
     """Queries that materialize the same array multiple times."""
+    vector = deepcopy(vector)
+    vector.get_value('exec_option')['mt_dop'] = vector.get_value('mt_dop')
     self.run_test_case('QueryTest/nested-types-scanner-multiple-materialization', vector)
 
   def test_scanner_position(self, vector):
     """Queries that materialize the artifical position element."""
+    vector = deepcopy(vector)
+    vector.get_value('exec_option')['mt_dop'] = vector.get_value('mt_dop')
     self.run_test_case('QueryTest/nested-types-scanner-position', vector)
 
   def test_scanner_map(self, vector):
     """Queries that materialize maps. (Maps looks like arrays of key/value structs, so
     most map functionality is already tested by the array tests.)"""
+    vector = deepcopy(vector)
+    vector.get_value('exec_option')['mt_dop'] = vector.get_value('mt_dop')
     self.run_test_case('QueryTest/nested-types-scanner-maps', vector)
 
   def test_runtime(self, vector):
     """Queries that send collections through the execution runtime."""
+    vector = deepcopy(vector)
+    vector.get_value('exec_option')['mt_dop'] = vector.get_value('mt_dop')
     self.run_test_case('QueryTest/nested-types-runtime', vector)
 
   def test_subplan(self, vector):
     """Test subplans with various exec nodes inside it."""
+    vector = deepcopy(vector)
+    vector.get_value('exec_option')['mt_dop'] = vector.get_value('mt_dop')
     db_suffix = vector.get_value('table_format').db_suffix()
     self.run_test_case('QueryTest/nested-types-subplan', vector,
                        use_db='tpch_nested' + db_suffix)
 
   def test_subplan_single_node(self, vector):
     """Test subplans with various exec nodes inside it and num_nodes=1."""
+    vector = deepcopy(vector)
+    vector.get_value('exec_option')['mt_dop'] = vector.get_value('mt_dop')
     new_vector = deepcopy(vector)
     new_vector.get_value('exec_option')['num_nodes'] = 1
     self.run_test_case('QueryTest/nested-types-subplan-single-node', new_vector)
@@ -88,6 +108,19 @@ class TestNestedTypes(ImpalaTestSuite):
     db_suffix = vector.get_value('table_format').db_suffix()
     self.run_test_case('QueryTest/nested-types-with-clause', vector,
                        use_db='tpch_nested' + db_suffix)
+
+
+class TestNestedTypesNoMtDop(ImpalaTestSuite):
+  """Functional tests for nested types that do not need to be run with mt_dop > 0."""
+  @classmethod
+  def get_workload(self):
+    return 'functional-query'
+
+  @classmethod
+  def add_test_dimensions(cls):
+    super(TestNestedTypesNoMtDop, cls).add_test_dimensions()
+    cls.ImpalaTestMatrix.add_constraint(lambda v:
+        v.get_value('table_format').file_format in ['parquet', 'orc'])
 
   def test_tpch(self, vector):
     """Queries over the larger nested TPCH dataset."""
@@ -180,6 +213,7 @@ class TestNestedTypes(ImpalaTestSuite):
           self._get_table_location("functional%s.complextypestbl" % db_suffix, vector)))
     self.run_test_case('QueryTest/nested-types-basic-partitioned', vector,
         unique_database)
+
 
 class TestParquetArrayEncodings(ImpalaTestSuite):
   TESTFILE_DIR = os.path.join(os.environ['IMPALA_HOME'],

@@ -26,6 +26,7 @@
 #include "runtime/bufferpool/buffer-allocator.h"
 #include "util/bit-util.h"
 #include "util/cpu-info.h"
+#include "util/debug-util.h"
 #include "util/metrics.h"
 #include "util/runtime-profile-counters.h"
 #include "util/time.h"
@@ -337,9 +338,15 @@ bool BufferPool::ClientHandle::TransferReservationFrom(
   return src->TransferReservationTo(impl_->reservation(), bytes);
 }
 
-bool BufferPool::ClientHandle::TransferReservationTo(
-    ReservationTracker* dst, int64_t bytes) {
-  return impl_->reservation()->TransferReservationTo(dst, bytes);
+Status BufferPool::ClientHandle::TransferReservationTo(
+    ReservationTracker* dst, int64_t bytes, bool* transferred) {
+  return impl_->TransferReservationTo(dst, bytes, transferred);
+}
+
+Status BufferPool::ClientHandle::TransferReservationTo(ClientHandle* dst, int64_t bytes,
+    bool* transferred) {
+  DCHECK(dst->is_registered());
+  return TransferReservationTo(dst->impl_->reservation(), bytes, transferred);
 }
 
 void BufferPool::ClientHandle::SaveReservation(SubReservation* dst, int64_t bytes) {
@@ -625,17 +632,43 @@ Status BufferPool::Client::DecreaseReservationTo(
   return Status::OK();
 }
 
-Status BufferPool::Client::CleanPages(unique_lock<mutex>* client_lock, int64_t len) {
+Status BufferPool::Client::TransferReservationTo(
+    ReservationTracker* dst, int64_t bytes, bool* transferred) {
+  unique_lock<mutex> lock(lock_);
+  // Only flush pages if necessary, to avoid propagating write errors unnecessarily.
+  RETURN_IF_ERROR(CleanPages(&lock, bytes, /*lazy_flush=*/true));
+  *transferred = reservation_.TransferReservationTo(dst, bytes);
+  return Status::OK();
+}
+
+Status BufferPool::Client::CleanPages(
+    unique_lock<mutex>* client_lock, int64_t len, bool lazy_flush) {
+  DCHECK_GE(len, 0);
+  DCHECK_LE(len, reservation_.GetReservation());
   DCheckHoldsLock(*client_lock);
   DCHECK_CONSISTENCY();
+
   // Work out what we need to get bytes of dirty unpinned + in flight pages down to
   // in order to satisfy the eviction policy.
   int64_t target_dirty_bytes = reservation_.GetReservation() - buffers_allocated_bytes_
       - pinned_pages_.bytes() - len;
+  if (VLOG_IS_ON(3)) {
+    VLOG(3)   << "target_dirty_bytes=" << target_dirty_bytes
+              << "reservation=" << reservation_.GetReservation()
+              << "buffers_allocated_bytes_=" << buffers_allocated_bytes_
+              << "pinned_pages_.bytes()=" << pinned_pages_.bytes()
+              << "len=" << len << "\n"
+              << DebugStringLocked();
+  }
   // Start enough writes to ensure that the loop condition below will eventually become
   // false (or a write error will be encountered).
   int64_t min_bytes_to_write =
       max<int64_t>(0, dirty_unpinned_pages_.bytes() - target_dirty_bytes);
+  if (lazy_flush
+      && dirty_unpinned_pages_.bytes() + in_flight_write_pages_.bytes()
+          <= target_dirty_bytes) {
+    return Status::OK();
+  }
   WriteDirtyPagesAsync(min_bytes_to_write);
 
   // One of the writes we initiated, or an earlier in-flight write may have hit an error.
@@ -719,7 +752,7 @@ void BufferPool::Client::WriteCompleteCallback(Page* page, const Status& write_s
     in_flight_write_pages_.Remove(page);
     // Move to clean pages list even if an error was encountered - the buffer can be
     // repurposed by other clients and 'write_status_' must be checked by this client
-    // before reading back the bad data.
+    // before it can be re-pinned.
     pool_->allocator_->AddCleanPage(cl, page);
     WriteDirtyPagesAsync(); // Start another asynchronous write if needed.
 

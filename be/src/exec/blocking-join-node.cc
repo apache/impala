@@ -17,16 +17,19 @@
 
 #include "exec/blocking-join-node.h"
 
+#include <algorithm>
 #include <sstream>
 
-#include "exec/data-sink.h"
+#include "exec/join-builder.h"
 #include "exprs/scalar-expr.h"
+#include "runtime/exec-env.h"
 #include "runtime/fragment-instance-state.h"
 #include "runtime/mem-tracker.h"
+#include "runtime/query-state.h"
 #include "runtime/row-batch.h"
 #include "runtime/runtime-state.h"
-#include "runtime/tuple-row.h"
 #include "runtime/thread-resource-mgr.h"
+#include "runtime/tuple-row.h"
 #include "util/debug-util.h"
 #include "util/runtime-profile-counters.h"
 #include "util/thread.h"
@@ -41,15 +44,12 @@ using namespace impala;
 const char* BlockingJoinNode::LLVM_CLASS_NAME = "class.impala::BlockingJoinNode";
 
 Status BlockingJoinPlanNode::Init(const TPlanNode& tnode, RuntimeState* state) {
+  DCHECK(tnode.__isset.join_node);
   RETURN_IF_ERROR(PlanNode::Init(tnode, state));
-  TJoinOp::type join_op;
-  if (tnode_->node_type == TPlanNodeType::HASH_JOIN_NODE) {
-    join_op = tnode.hash_join_node.join_op;
-  } else {
-    DCHECK(tnode_->node_type == TPlanNodeType::NESTED_LOOP_JOIN_NODE);
-    join_op = tnode.nested_loop_join_node.join_op;
-  }
-  DCHECK(!IsSemiJoin(join_op) || conjuncts_.size() == 0);
+  build_row_desc_ = state->obj_pool()->Add(
+      new RowDescriptor(state->desc_tbl(), tnode.join_node.build_tuples,
+        tnode.join_node.nullable_build_tuples));
+  DCHECK(!IsSemiJoin(tnode.join_node.join_op) || conjuncts_.size() == 0);
   return Status::OK();
 }
 
@@ -71,23 +71,22 @@ BlockingJoinNode::~BlockingJoinNode() {
 }
 
 Status BlockingJoinNode::Prepare(RuntimeState* state) {
+  DCHECK_EQ(UseSeparateBuild(state->query_options()) ? 1 : 2, children_.size());
   SCOPED_TIMER(runtime_profile_->total_time_counter());
   RETURN_IF_ERROR(ExecNode::Prepare(state));
 
-  runtime_profile_->AddLocalTimeCounter(bind<int64_t>(
-      &BlockingJoinNode::LocalTimeCounterFn, runtime_profile_->total_time_counter(),
-      child(0)->runtime_profile()->total_time_counter(),
-      child(1)->runtime_profile()->total_time_counter(),
-      &built_probe_overlap_stop_watch_));
   build_timer_ = ADD_TIMER(runtime_profile(), "BuildTime");
   probe_timer_ = ADD_TIMER(runtime_profile(), "ProbeTime");
   build_row_counter_ = ADD_COUNTER(runtime_profile(), "BuildRows", TUnit::UNIT);
   probe_row_counter_ = ADD_COUNTER(runtime_profile(), "ProbeRows", TUnit::UNIT);
 
+  // The right child (if present) must match the build row layout.
+  DCHECK(children_.size() == 1 || build_row_desc().Equals(*children_[1]->row_desc()))
+      << build_row_desc().DebugString() << " " << children_[1]->row_desc()->DebugString();
   // Validate the row desc layout is what we expect because the current join
   // implementation relies on it to enable some optimizations.
-  int num_left_tuples = child(0)->row_desc()->tuple_descriptors().size();
-  int num_build_tuples = child(1)->row_desc()->tuple_descriptors().size();
+  int num_probe_tuples = probe_row_desc().tuple_descriptors().size();
+  int num_build_tuples = build_row_desc().tuple_descriptors().size();
 
 #ifndef NDEBUG
   switch (join_op_) {
@@ -95,13 +94,13 @@ Status BlockingJoinNode::Prepare(RuntimeState* state) {
     case TJoinOp::LEFT_SEMI_JOIN:
     case TJoinOp::NULL_AWARE_LEFT_ANTI_JOIN: {
       // Only return the surviving probe-side tuples.
-      DCHECK(row_desc()->Equals(*child(0)->row_desc()));
+      DCHECK(row_desc()->Equals(probe_row_desc()));
       break;
     }
     case TJoinOp::RIGHT_ANTI_JOIN:
     case TJoinOp::RIGHT_SEMI_JOIN: {
       // Only return the surviving build-side tuples.
-      DCHECK(row_desc()->Equals(*child(1)->row_desc()));
+      DCHECK(row_desc()->Equals(build_row_desc()));
       break;
     }
     default: {
@@ -111,20 +110,22 @@ Status BlockingJoinNode::Prepare(RuntimeState* state) {
       //   result[0] = left[0]
       //   result[1] = build[0]
       //   result[2] = build[1]
-      for (int i = 0; i < num_left_tuples; ++i) {
-        TupleDescriptor* desc = child(0)->row_desc()->tuple_descriptors()[i];
+      for (int i = 0; i < num_probe_tuples; ++i) {
+        TupleDescriptor* desc = probe_row_desc().tuple_descriptors()[i];
         DCHECK_EQ(i, row_desc()->GetTupleIdx(desc->id()));
       }
       for (int i = 0; i < num_build_tuples; ++i) {
-        TupleDescriptor* desc = child(1)->row_desc()->tuple_descriptors()[i];
-        DCHECK_EQ(num_left_tuples + i, row_desc()->GetTupleIdx(desc->id()));
+        TupleDescriptor* desc = build_row_desc().tuple_descriptors()[i];
+        DCHECK_EQ(num_probe_tuples + i, row_desc()->GetTupleIdx(desc->id()))
+            << row_desc()->DebugString() << "\n" << probe_row_desc().DebugString() << "\n"
+            << build_row_desc().DebugString();
       }
       break;
     }
   }
 #endif
 
-  probe_tuple_row_size_ = num_left_tuples * sizeof(Tuple*);
+  probe_tuple_row_size_ = num_probe_tuples * sizeof(Tuple*);
   build_tuple_row_size_ = num_build_tuples * sizeof(Tuple*);
 
   if (IsSemiJoin(join_op_)) {
@@ -132,10 +133,8 @@ Status BlockingJoinNode::Prepare(RuntimeState* state) {
         new char[probe_tuple_row_size_ + build_tuple_row_size_]);
   }
 
-  build_batch_.reset(
-      new RowBatch(child(1)->row_desc(), state->batch_size(), mem_tracker()));
-  probe_batch_.reset(
-      new RowBatch(child(0)->row_desc(), state->batch_size(), mem_tracker()));
+  build_batch_.reset(new RowBatch(&build_row_desc(), state->batch_size(), mem_tracker()));
+  probe_batch_.reset(new RowBatch(&probe_row_desc(), state->batch_size(), mem_tracker()));
   return Status::OK();
 }
 
@@ -153,7 +152,8 @@ void BlockingJoinNode::Close(RuntimeState* state) {
 }
 
 void BlockingJoinNode::ProcessBuildInputAsync(
-    RuntimeState* state, DataSink* build_sink, Status* status) {
+    RuntimeState* state, JoinBuilder* build_sink, Status* status) {
+  DCHECK(!UseSeparateBuild(state->query_options()));
   DCHECK(status != nullptr);
   SCOPED_THREAD_COUNTER_MEASUREMENT(state->total_thread_statistics());
   {
@@ -181,31 +181,72 @@ void BlockingJoinNode::ProcessBuildInputAsync(
   state->resource_pool()->ReleaseThreadToken(false);
 }
 
-Status BlockingJoinNode::Open(RuntimeState* state) {
+Status BlockingJoinNode::OpenImpl(RuntimeState* state, JoinBuilder** separate_builder) {
   RETURN_IF_ERROR(ExecNode::Open(state));
   eos_ = false;
   probe_side_eos_ = false;
+
+  if (open_called_) return Status::OK();
+  // The below code should only run once.
+  if (UseSeparateBuild(state->query_options())) {
+    // Find the input fragment's build sink. We do this in the Open() phase so we don't
+    // block this finstance's Prepare() phase on the build finstance's Prepare() phase.
+    const vector<TJoinBuildInput>& build_inputs =
+        state->instance_ctx().join_build_inputs;
+    auto it = std::find_if(build_inputs.begin(), build_inputs.end(),
+        [this](const TJoinBuildInput& bi) { return bi.join_node_id == id_; });
+    DCHECK(it != build_inputs.end());
+    FragmentInstanceState* build_finstance;
+    RETURN_IF_ERROR(state->query_state()->GetFInstanceState(
+        it->input_finstance_id, &build_finstance));
+    TDataSinkType::type build_sink_type =
+        build_finstance->fragment_ctx().fragment.output_sink.type;
+    DCHECK(IsJoinBuildSink(build_sink_type));
+    *separate_builder = build_finstance->GetJoinBuildSink();
+    DCHECK(*separate_builder != nullptr);
+  } else {
+    // The integrated join build requires some tricky time accounting because two
+    // threads execute concurrently with the time from the left and right child
+    // overlapping. The separate join build does not have this problem, because
+    // the build is executed in a separate fragment with a separate profile tree.
+    runtime_profile_->AddLocalTimeCounter(bind<int64_t>(
+        &BlockingJoinNode::LocalTimeCounterFn, runtime_profile_->total_time_counter(),
+        child(0)->runtime_profile()->total_time_counter(),
+        child(1)->runtime_profile()->total_time_counter(),
+        &built_probe_overlap_stop_watch_));
+  }
+  open_called_ = true;
   return Status::OK();
 }
 
 Status BlockingJoinNode::ProcessBuildInputAndOpenProbe(
-    RuntimeState* state, DataSink* build_sink) {
-  // If this node is not inside a subplan, we are running with mt_dop=0 (i.e. no
-  // fragment-level multithreading) and can get a thread token, initiate the
-  // construction of the build-side table in a separate thread, so that the left child
-  // can do any initialisation in parallel. Otherwise, do this in the main thread.
-  // Inside a subplan we expect Open() to be called a number of times proportional to the
-  // input data of the SubplanNode, so we prefer doing processing the build input in the
-  // main thread, assuming that thread creation is expensive relative to a single subplan
-  // iteration.
+    RuntimeState* state, JoinBuilder* build_sink) {
+  // This function implements various strategies for executing Open() on the left child
+  // and doing or waiting for the join build. Some allow the two to proceed in parallel,
+  // while others do them serially. Generally parallelism yields better performance
+  // except inside a subplan. There we expect Open() to be called a number of times
+  // proportional to the input data of the SubplanNode, so processing the build input
+  // in the main thread can be more efficient, assuming that thread creation is expensive
+  // relative to a single subplan iteration.
   //
   // In this block, we also compute the 'overlap' time for the left and right child. This
   // is the time (i.e. clock reads) when the right child stops overlapping with the left
   // child. For the single threaded case, the left and right child never overlap. For the
   // build side in a different thread, the overlap stops when the left child Open()
   // returns.
-  if (!IsInSubplan() && state->query_options().mt_dop == 0
-      && state->resource_pool()->TryAcquireThreadToken()) {
+  if (UseSeparateBuild(state->query_options())) {
+    // Open the left child in parallel before waiting for the build fragment to maximise
+    // parallelism. The build execution is done concurrently by the build finstance's
+    // thread.
+    RETURN_IF_ERROR(child(0)->Open(state));
+    // AcquireResourcesForBuild() opens the buffer pool client, so that probe reservation
+    // can be transferred.
+    RETURN_IF_ERROR(AcquireResourcesForBuild(state));
+    RETURN_IF_ERROR(build_sink->WaitForInitialBuild(state));
+    waited_for_build_ = true;
+  } else if (!IsInSubplan() && state->resource_pool()->TryAcquireThreadToken()) {
+    // The build is integrated into the join node and we got a thread token. Do the hash
+    // table build in a separate thread.
     Status build_side_status;
     runtime_profile()->AppendExecOption("Join Build-Side Prepared Asynchronously");
     string thread_name = Substitute("join-build-thread (finst:$0, plan-node-id:$1)",
@@ -283,8 +324,9 @@ Status BlockingJoinNode::GetFirstProbeRow(RuntimeState* state) {
 }
 
 template <bool ASYNC_BUILD>
-Status BlockingJoinNode::SendBuildInputToSink(RuntimeState* state,
-    DataSink* build_sink) {
+Status BlockingJoinNode::SendBuildInputToSink(
+    RuntimeState* state, JoinBuilder* build_sink) {
+  DCHECK(!UseSeparateBuild(state->query_options()));
   {
     SCOPED_TIMER(build_timer_);
     RETURN_IF_ERROR(build_sink->Open(state));

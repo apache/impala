@@ -116,8 +116,8 @@ PLAN-ROOT SINK
    runtime filters: RF000 -> store_sales.ss_sold_date_sk, RF002 -> store_sales.ss_item_sk
    row-size=16B cardinality=2.88M
 ---- PARALLELPLANS
-Max Per-Host Resource Reservation: Memory=68.62MB Threads=11
-Per-Host Resource Estimates: Memory=166MB
+Max Per-Host Resource Reservation: Memory=69.62MB Threads=15
+Per-Host Resource Estimates: Memory=168MB
 PLAN-ROOT SINK
 |
 12:MERGING-EXCHANGE [UNPARTITIONED]
@@ -142,12 +142,12 @@ PLAN-ROOT SINK
 |
 04:HASH JOIN [INNER JOIN, PARTITIONED]
 |  hash predicates: store_sales.ss_sold_date_sk = dt.d_date_sk
-|  runtime filters: RF000 <- dt.d_date_sk
 |  row-size=72B cardinality=3.04K
 |
 |--JOIN BUILD
 |  |  join-table-id=00 plan-id=01 cohort-id=01
 |  |  build expressions: dt.d_date_sk
+|  |  runtime filters: RF000 <- dt.d_date_sk
 |  |
 |  09:EXCHANGE [HASH(dt.d_date_sk)]
 |  |
@@ -160,12 +160,12 @@ PLAN-ROOT SINK
 |
 03:HASH JOIN [INNER JOIN, BROADCAST]
 |  hash predicates: store_sales.ss_item_sk = item.i_item_sk
-|  runtime filters: RF002 <- item.i_item_sk
 |  row-size=60B cardinality=3.04K
 |
 |--JOIN BUILD
 |  |  join-table-id=01 plan-id=02 cohort-id=01
 |  |  build expressions: item.i_item_sk
+|  |  runtime filters: RF002 <- item.i_item_sk
 |  |
 |  07:EXCHANGE [BROADCAST]
 |  |
@@ -342,8 +342,8 @@ PLAN-ROOT SINK
    runtime filters: RF000 -> ss_item_sk, RF002 -> ss_promo_sk, RF004 -> ss_cdemo_sk, RF006 -> ss_sold_date_sk
    row-size=36B cardinality=2.88M
 ---- PARALLELPLANS
-Max Per-Host Resource Reservation: Memory=98.50MB Threads=15
-Per-Host Resource Estimates: Memory=405MB
+Max Per-Host Resource Reservation: Memory=99.50MB Threads=23
+Per-Host Resource Estimates: Memory=417MB
 PLAN-ROOT SINK
 |
 18:MERGING-EXCHANGE [UNPARTITIONED]
@@ -368,12 +368,12 @@ PLAN-ROOT SINK
 |
 08:HASH JOIN [INNER JOIN, BROADCAST]
 |  hash predicates: ss_item_sk = i_item_sk
-|  runtime filters: RF000 <- i_item_sk
 |  row-size=162B cardinality=261.60K
 |
 |--JOIN BUILD
 |  |  join-table-id=00 plan-id=01 cohort-id=01
 |  |  build expressions: i_item_sk
+|  |  runtime filters: RF000 <- i_item_sk
 |  |
 |  15:EXCHANGE [BROADCAST]
 |  |
@@ -383,12 +383,12 @@ PLAN-ROOT SINK
 |
 07:HASH JOIN [INNER JOIN, BROADCAST]
 |  hash predicates: ss_promo_sk = p_promo_sk
-|  runtime filters: RF002 <- p_promo_sk
 |  row-size=126B cardinality=261.60K
 |
 |--JOIN BUILD
 |  |  join-table-id=01 plan-id=02 cohort-id=01
 |  |  build expressions: p_promo_sk
+|  |  runtime filters: RF002 <- p_promo_sk
 |  |
 |  14:EXCHANGE [BROADCAST]
 |  |
@@ -399,12 +399,12 @@ PLAN-ROOT SINK
 |
 06:HASH JOIN [INNER JOIN, PARTITIONED]
 |  hash predicates: ss_cdemo_sk = cd_demo_sk
-|  runtime filters: RF004 <- cd_demo_sk
 |  row-size=96B cardinality=263.34K
 |
 |--JOIN BUILD
 |  |  join-table-id=02 plan-id=03 cohort-id=01
 |  |  build expressions: cd_demo_sk
+|  |  runtime filters: RF004 <- cd_demo_sk
 |  |
 |  13:EXCHANGE [HASH(cd_demo_sk)]
 |  |
@@ -417,12 +417,12 @@ PLAN-ROOT SINK
 |
 05:HASH JOIN [INNER JOIN, BROADCAST]
 |  hash predicates: ss_sold_date_sk = d_date_sk
-|  runtime filters: RF006 <- d_date_sk
 |  row-size=44B cardinality=589.03K
 |
 |--JOIN BUILD
 |  |  join-table-id=03 plan-id=04 cohort-id=01
 |  |  build expressions: d_date_sk
+|  |  runtime filters: RF006 <- d_date_sk
 |  |
 |  11:EXCHANGE [BROADCAST]
 |  |
@@ -664,8 +664,8 @@ PLAN-ROOT SINK
    runtime filters: RF002 -> store_sales.ss_store_sk
    row-size=8B cardinality=84.40K
 ---- PARALLELPLANS
-Max Per-Host Resource Reservation: Memory=91.27MB Threads=17
-Per-Host Resource Estimates: Memory=285MB
+Max Per-Host Resource Reservation: Memory=92.27MB Threads=25
+Per-Host Resource Estimates: Memory=288MB
 PLAN-ROOT SINK
 |
 21:MERGING-EXCHANGE [UNPARTITIONED]
@@ -690,23 +690,23 @@ PLAN-ROOT SINK
 |
 09:HASH JOIN [INNER JOIN, BROADCAST]
 |  hash predicates: substr(store.s_zip, 1, 2) = substr(substr(ca_zip, 1, 5), 1, 2)
-|  runtime filters: RF000 <- substr(substr(ca_zip, 1, 5), 1, 2)
 |  row-size=65B cardinality=84.40K
 |
 |--JOIN BUILD
 |  |  join-table-id=00 plan-id=01 cohort-id=01
 |  |  build expressions: substr(substr(ca_zip, 1, 5), 1, 2)
+|  |  runtime filters: RF000 <- substr(substr(ca_zip, 1, 5), 1, 2)
 |  |
 |  18:EXCHANGE [BROADCAST]
 |  |
 |  07:HASH JOIN [RIGHT SEMI JOIN, PARTITIONED]
 |  |  hash predicates: substr(ca_zip, 1, 5) = substr(ca_zip, 1, 5)
-|  |  runtime filters: RF004 <- substr(ca_zip, 1, 5)
 |  |  row-size=20B cardinality=396
 |  |
 |  |--JOIN BUILD
 |  |  |  join-table-id=01 plan-id=02 cohort-id=02
 |  |  |  build expressions: substr(ca_zip, 1, 5)
+|  |  |  runtime filters: RF004 <- substr(ca_zip, 1, 5)
 |  |  |
 |  |  16:AGGREGATE [FINALIZE]
 |  |  |  output: count:merge(*)
@@ -723,12 +723,12 @@ PLAN-ROOT SINK
 |  |  |
 |  |  04:HASH JOIN [INNER JOIN, PARTITIONED]
 |  |  |  hash predicates: customer_address.ca_address_sk = customer.c_current_addr_sk
-|  |  |  runtime filters: RF006 <- customer.c_current_addr_sk
 |  |  |  row-size=38B cardinality=51.30K
 |  |  |
 |  |  |--JOIN BUILD
 |  |  |  |  join-table-id=02 plan-id=03 cohort-id=03
 |  |  |  |  build expressions: customer.c_current_addr_sk
+|  |  |  |  runtime filters: RF006 <- customer.c_current_addr_sk
 |  |  |  |
 |  |  |  14:EXCHANGE [HASH(customer.c_current_addr_sk)]
 |  |  |  |
@@ -754,12 +754,12 @@ PLAN-ROOT SINK
 |
 08:HASH JOIN [INNER JOIN, BROADCAST]
 |  hash predicates: store_sales.ss_store_sk = store.s_store_sk
-|  runtime filters: RF002 <- store.s_store_sk
 |  row-size=45B cardinality=84.40K
 |
 |--JOIN BUILD
 |  |  join-table-id=03 plan-id=04 cohort-id=01
 |  |  build expressions: store.s_store_sk
+|  |  runtime filters: RF002 <- store.s_store_sk
 |  |
 |  12:EXCHANGE [BROADCAST]
 |  |
@@ -974,8 +974,8 @@ PLAN-ROOT SINK
    runtime filters: RF000 -> ss_store_sk, RF004 -> ss_customer_sk, RF006 -> ss_sold_date_sk, RF008 -> ss_item_sk
    row-size=24B cardinality=86.28K
 ---- PARALLELPLANS
-Max Per-Host Resource Reservation: Memory=105.27MB Threads=19
-Per-Host Resource Estimates: Memory=300MB
+Max Per-Host Resource Reservation: Memory=107.27MB Threads=29
+Per-Host Resource Estimates: Memory=302MB
 PLAN-ROOT SINK
 |
 22:MERGING-EXCHANGE [UNPARTITIONED]
@@ -1001,12 +1001,12 @@ PLAN-ROOT SINK
 10:HASH JOIN [INNER JOIN, BROADCAST]
 |  hash predicates: ss_store_sk = s_store_sk
 |  other predicates: substr(ca_zip, 1, 5) != substr(s_zip, 1, 5)
-|  runtime filters: RF000 <- s_store_sk
 |  row-size=158B cardinality=24
 |
 |--JOIN BUILD
 |  |  join-table-id=00 plan-id=01 cohort-id=01
 |  |  build expressions: s_store_sk
+|  |  runtime filters: RF000 <- s_store_sk
 |  |
 |  19:EXCHANGE [BROADCAST]
 |  |
@@ -1016,12 +1016,12 @@ PLAN-ROOT SINK
 |
 09:HASH JOIN [INNER JOIN, PARTITIONED]
 |  hash predicates: c_current_addr_sk = ca_address_sk
-|  runtime filters: RF002 <- ca_address_sk
 |  row-size=137B cardinality=24
 |
 |--JOIN BUILD
 |  |  join-table-id=01 plan-id=02 cohort-id=01
 |  |  build expressions: ca_address_sk
+|  |  runtime filters: RF002 <- ca_address_sk
 |  |
 |  18:EXCHANGE [HASH(ca_address_sk)]
 |  |
@@ -1033,12 +1033,12 @@ PLAN-ROOT SINK
 |
 08:HASH JOIN [INNER JOIN, PARTITIONED]
 |  hash predicates: ss_customer_sk = c_customer_sk
-|  runtime filters: RF004 <- c_customer_sk
 |  row-size=116B cardinality=24
 |
 |--JOIN BUILD
 |  |  join-table-id=02 plan-id=03 cohort-id=01
 |  |  build expressions: c_customer_sk
+|  |  runtime filters: RF004 <- c_customer_sk
 |  |
 |  16:EXCHANGE [HASH(c_customer_sk)]
 |  |
@@ -1051,12 +1051,12 @@ PLAN-ROOT SINK
 |
 07:HASH JOIN [INNER JOIN, BROADCAST]
 |  hash predicates: ss_sold_date_sk = d_date_sk
-|  runtime filters: RF006 <- d_date_sk
 |  row-size=108B cardinality=24
 |
 |--JOIN BUILD
 |  |  join-table-id=03 plan-id=04 cohort-id=01
 |  |  build expressions: d_date_sk
+|  |  runtime filters: RF006 <- d_date_sk
 |  |
 |  14:EXCHANGE [BROADCAST]
 |  |
@@ -1067,12 +1067,12 @@ PLAN-ROOT SINK
 |
 06:HASH JOIN [INNER JOIN, BROADCAST]
 |  hash predicates: ss_item_sk = i_item_sk
-|  runtime filters: RF008 <- i_item_sk
 |  row-size=96B cardinality=873
 |
 |--JOIN BUILD
 |  |  join-table-id=04 plan-id=05 cohort-id=01
 |  |  build expressions: i_item_sk
+|  |  runtime filters: RF008 <- i_item_sk
 |  |
 |  13:EXCHANGE [BROADCAST]
 |  |
@@ -1252,8 +1252,8 @@ PLAN-ROOT SINK
    runtime filters: RF000 -> ss_item_sk, RF002 -> ss_store_sk, RF004 -> ss_cdemo_sk, RF006 -> ss_sold_date_sk
    row-size=36B cardinality=2.88M
 ---- PARALLELPLANS
-Max Per-Host Resource Reservation: Memory=98.39MB Threads=15
-Per-Host Resource Estimates: Memory=405MB
+Max Per-Host Resource Reservation: Memory=99.39MB Threads=23
+Per-Host Resource Estimates: Memory=417MB
 PLAN-ROOT SINK
 |
 18:MERGING-EXCHANGE [UNPARTITIONED]
@@ -1278,12 +1278,12 @@ PLAN-ROOT SINK
 |
 08:HASH JOIN [INNER JOIN, BROADCAST]
 |  hash predicates: ss_item_sk = i_item_sk
-|  runtime filters: RF000 <- i_item_sk
 |  row-size=150B cardinality=263.34K
 |
 |--JOIN BUILD
 |  |  join-table-id=00 plan-id=01 cohort-id=01
 |  |  build expressions: i_item_sk
+|  |  runtime filters: RF000 <- i_item_sk
 |  |
 |  15:EXCHANGE [BROADCAST]
 |  |
@@ -1293,12 +1293,12 @@ PLAN-ROOT SINK
 |
 07:HASH JOIN [INNER JOIN, BROADCAST]
 |  hash predicates: ss_store_sk = s_store_sk
-|  runtime filters: RF002 <- s_store_sk
 |  row-size=114B cardinality=263.34K
 |
 |--JOIN BUILD
 |  |  join-table-id=01 plan-id=02 cohort-id=01
 |  |  build expressions: s_store_sk
+|  |  runtime filters: RF002 <- s_store_sk
 |  |
 |  14:EXCHANGE [BROADCAST]
 |  |
@@ -1309,12 +1309,12 @@ PLAN-ROOT SINK
 |
 06:HASH JOIN [INNER JOIN, PARTITIONED]
 |  hash predicates: ss_cdemo_sk = cd_demo_sk
-|  runtime filters: RF004 <- cd_demo_sk
 |  row-size=96B cardinality=263.34K
 |
 |--JOIN BUILD
 |  |  join-table-id=02 plan-id=03 cohort-id=01
 |  |  build expressions: cd_demo_sk
+|  |  runtime filters: RF004 <- cd_demo_sk
 |  |
 |  13:EXCHANGE [HASH(cd_demo_sk)]
 |  |
@@ -1327,12 +1327,12 @@ PLAN-ROOT SINK
 |
 05:HASH JOIN [INNER JOIN, BROADCAST]
 |  hash predicates: ss_sold_date_sk = d_date_sk
-|  runtime filters: RF006 <- d_date_sk
 |  row-size=44B cardinality=589.03K
 |
 |--JOIN BUILD
 |  |  join-table-id=03 plan-id=04 cohort-id=01
 |  |  build expressions: d_date_sk
+|  |  runtime filters: RF006 <- d_date_sk
 |  |
 |  11:EXCHANGE [BROADCAST]
 |  |
@@ -1529,8 +1529,8 @@ PLAN-ROOT SINK
    runtime filters: RF000 -> tpcds.store_sales.ss_customer_sk, RF002 -> store_sales.ss_store_sk, RF004 -> store_sales.ss_sold_date_sk, RF006 -> store_sales.ss_hdemo_sk
    row-size=24B cardinality=2.88M
 ---- PARALLELPLANS
-Max Per-Host Resource Reservation: Memory=86.52MB Threads=15
-Per-Host Resource Estimates: Memory=277MB
+Max Per-Host Resource Reservation: Memory=89.52MB Threads=23
+Per-Host Resource Estimates: Memory=280MB
 PLAN-ROOT SINK
 |
 18:MERGING-EXCHANGE [UNPARTITIONED]
@@ -1543,12 +1543,12 @@ PLAN-ROOT SINK
 |
 09:HASH JOIN [INNER JOIN, PARTITIONED]
 |  hash predicates: ss_customer_sk = c_customer_sk
-|  runtime filters: RF000 <- c_customer_sk
 |  row-size=88B cardinality=3.15K
 |
 |--JOIN BUILD
 |  |  join-table-id=00 plan-id=01 cohort-id=01
 |  |  build expressions: c_customer_sk
+|  |  runtime filters: RF000 <- c_customer_sk
 |  |
 |  17:EXCHANGE [HASH(c_customer_sk)]
 |  |
@@ -1573,12 +1573,12 @@ PLAN-ROOT SINK
 |
 06:HASH JOIN [INNER JOIN, BROADCAST]
 |  hash predicates: store_sales.ss_store_sk = store.s_store_sk
-|  runtime filters: RF002 <- store.s_store_sk
 |  row-size=101B cardinality=31.53K
 |
 |--JOIN BUILD
 |  |  join-table-id=01 plan-id=02 cohort-id=01
 |  |  build expressions: store.s_store_sk
+|  |  runtime filters: RF002 <- store.s_store_sk
 |  |
 |  13:EXCHANGE [BROADCAST]
 |  |
@@ -1589,12 +1589,12 @@ PLAN-ROOT SINK
 |
 05:HASH JOIN [INNER JOIN, BROADCAST]
 |  hash predicates: store_sales.ss_sold_date_sk = date_dim.d_date_sk
-|  runtime filters: RF004 <- date_dim.d_date_sk
 |  row-size=68B cardinality=31.53K
 |
 |--JOIN BUILD
 |  |  join-table-id=02 plan-id=03 cohort-id=01
 |  |  build expressions: date_dim.d_date_sk
+|  |  runtime filters: RF004 <- date_dim.d_date_sk
 |  |
 |  12:EXCHANGE [BROADCAST]
 |  |
@@ -1605,12 +1605,12 @@ PLAN-ROOT SINK
 |
 04:HASH JOIN [INNER JOIN, BROADCAST]
 |  hash predicates: store_sales.ss_hdemo_sk = household_demographics.hd_demo_sk
-|  runtime filters: RF006 <- household_demographics.hd_demo_sk
 |  row-size=56B cardinality=162.45K
 |
 |--JOIN BUILD
 |  |  join-table-id=03 plan-id=04 cohort-id=01
 |  |  build expressions: household_demographics.hd_demo_sk
+|  |  runtime filters: RF006 <- household_demographics.hd_demo_sk
 |  |
 |  11:EXCHANGE [BROADCAST]
 |  |
@@ -1742,8 +1742,8 @@ PLAN-ROOT SINK
    runtime filters: RF000 -> store_sales.ss_sold_date_sk, RF002 -> store_sales.ss_item_sk
    row-size=16B cardinality=2.88M
 ---- PARALLELPLANS
-Max Per-Host Resource Reservation: Memory=67.62MB Threads=9
-Per-Host Resource Estimates: Memory=164MB
+Max Per-Host Resource Reservation: Memory=69.62MB Threads=13
+Per-Host Resource Estimates: Memory=166MB
 PLAN-ROOT SINK
 |
 11:MERGING-EXCHANGE [UNPARTITIONED]
@@ -1768,12 +1768,12 @@ PLAN-ROOT SINK
 |
 04:HASH JOIN [INNER JOIN, BROADCAST]
 |  hash predicates: store_sales.ss_sold_date_sk = dt.d_date_sk
-|  runtime filters: RF000 <- dt.d_date_sk
 |  row-size=62B cardinality=1.73K
 |
 |--JOIN BUILD
 |  |  join-table-id=00 plan-id=01 cohort-id=01
 |  |  build expressions: dt.d_date_sk
+|  |  runtime filters: RF000 <- dt.d_date_sk
 |  |
 |  08:EXCHANGE [BROADCAST]
 |  |
@@ -1784,12 +1784,12 @@ PLAN-ROOT SINK
 |
 03:HASH JOIN [INNER JOIN, BROADCAST]
 |  hash predicates: store_sales.ss_item_sk = item.i_item_sk
-|  runtime filters: RF002 <- item.i_item_sk
 |  row-size=50B cardinality=29.12K
 |
 |--JOIN BUILD
 |  |  join-table-id=01 plan-id=02 cohort-id=01
 |  |  build expressions: item.i_item_sk
+|  |  runtime filters: RF002 <- item.i_item_sk
 |  |
 |  07:EXCHANGE [BROADCAST]
 |  |
@@ -1929,8 +1929,8 @@ PLAN-ROOT SINK
    runtime filters: RF000 -> ss_store_sk, RF002 -> ss_sold_date_sk
    row-size=12B cardinality=2.88M
 ---- PARALLELPLANS
-Max Per-Host Resource Reservation: Memory=51.64MB Threads=9
-Per-Host Resource Estimates: Memory=164MB
+Max Per-Host Resource Reservation: Memory=53.64MB Threads=13
+Per-Host Resource Estimates: Memory=166MB
 PLAN-ROOT SINK
 |
 11:MERGING-EXCHANGE [UNPARTITIONED]
@@ -1955,12 +1955,12 @@ PLAN-ROOT SINK
 |
 04:HASH JOIN [INNER JOIN, BROADCAST]
 |  hash predicates: ss_store_sk = s_store_sk
-|  runtime filters: RF000 <- s_store_sk
 |  row-size=91B cardinality=589.03K
 |
 |--JOIN BUILD
 |  |  join-table-id=00 plan-id=01 cohort-id=01
 |  |  build expressions: s_store_sk
+|  |  runtime filters: RF000 <- s_store_sk
 |  |
 |  08:EXCHANGE [BROADCAST]
 |  |
@@ -1971,12 +1971,12 @@ PLAN-ROOT SINK
 |
 03:HASH JOIN [INNER JOIN, BROADCAST]
 |  hash predicates: ss_sold_date_sk = d_date_sk
-|  runtime filters: RF002 <- d_date_sk
 |  row-size=39B cardinality=589.03K
 |
 |--JOIN BUILD
 |  |  join-table-id=01 plan-id=02 cohort-id=01
 |  |  build expressions: d_date_sk
+|  |  runtime filters: RF002 <- d_date_sk
 |  |
 |  07:EXCHANGE [BROADCAST]
 |  |
@@ -2221,8 +2221,8 @@ PLAN-ROOT SINK
    runtime filters: RF002 -> tpcds.store_sales.ss_customer_sk, RF004 -> store_sales.ss_addr_sk, RF006 -> store_sales.ss_store_sk, RF008 -> store_sales.ss_sold_date_sk, RF010 -> store_sales.ss_hdemo_sk
    row-size=36B cardinality=2.88M
 ---- PARALLELPLANS
-Max Per-Host Resource Reservation: Memory=141.02MB Threads=19
-Per-Host Resource Estimates: Memory=359MB
+Max Per-Host Resource Reservation: Memory=145.02MB Threads=31
+Per-Host Resource Estimates: Memory=377MB
 PLAN-ROOT SINK
 |
 24:MERGING-EXCHANGE [UNPARTITIONED]
@@ -2236,12 +2236,12 @@ PLAN-ROOT SINK
 13:HASH JOIN [INNER JOIN, BROADCAST]
 |  hash predicates: customer.c_current_addr_sk = current_addr.ca_address_sk
 |  other predicates: current_addr.ca_city != ca_city
-|  runtime filters: RF000 <- current_addr.ca_address_sk
 |  row-size=138B cardinality=230.45K
 |
 |--JOIN BUILD
 |  |  join-table-id=00 plan-id=01 cohort-id=01
 |  |  build expressions: current_addr.ca_address_sk
+|  |  runtime filters: RF000 <- current_addr.ca_address_sk
 |  |
 |  23:EXCHANGE [BROADCAST]
 |  |
@@ -2251,12 +2251,12 @@ PLAN-ROOT SINK
 |
 12:HASH JOIN [INNER JOIN, PARTITIONED]
 |  hash predicates: ss_customer_sk = c_customer_sk
-|  runtime filters: RF002 <- c_customer_sk
 |  row-size=113B cardinality=230.45K
 |
 |--JOIN BUILD
 |  |  join-table-id=01 plan-id=02 cohort-id=01
 |  |  build expressions: c_customer_sk
+|  |  runtime filters: RF002 <- c_customer_sk
 |  |
 |  22:EXCHANGE [HASH(c_customer_sk)]
 |  |
@@ -2281,12 +2281,12 @@ PLAN-ROOT SINK
 |
 08:HASH JOIN [INNER JOIN, BROADCAST]
 |  hash predicates: store_sales.ss_addr_sk = customer_address.ca_address_sk
-|  runtime filters: RF004 <- customer_address.ca_address_sk
 |  row-size=107B cardinality=230.45K
 |
 |--JOIN BUILD
 |  |  join-table-id=02 plan-id=03 cohort-id=01
 |  |  build expressions: customer_address.ca_address_sk
+|  |  runtime filters: RF004 <- customer_address.ca_address_sk
 |  |
 |  18:EXCHANGE [BROADCAST]
 |  |
@@ -2296,12 +2296,12 @@ PLAN-ROOT SINK
 |
 07:HASH JOIN [INNER JOIN, BROADCAST]
 |  hash predicates: store_sales.ss_store_sk = store.s_store_sk
-|  runtime filters: RF006 <- store.s_store_sk
 |  row-size=83B cardinality=230.45K
 |
 |--JOIN BUILD
 |  |  join-table-id=03 plan-id=04 cohort-id=01
 |  |  build expressions: store.s_store_sk
+|  |  runtime filters: RF006 <- store.s_store_sk
 |  |
 |  17:EXCHANGE [BROADCAST]
 |  |
@@ -2312,12 +2312,12 @@ PLAN-ROOT SINK
 |
 06:HASH JOIN [INNER JOIN, BROADCAST]
 |  hash predicates: store_sales.ss_sold_date_sk = date_dim.d_date_sk
-|  runtime filters: RF008 <- date_dim.d_date_sk
 |  row-size=60B cardinality=230.45K
 |
 |--JOIN BUILD
 |  |  join-table-id=04 plan-id=05 cohort-id=01
 |  |  build expressions: date_dim.d_date_sk
+|  |  runtime filters: RF008 <- date_dim.d_date_sk
 |  |
 |  16:EXCHANGE [BROADCAST]
 |  |
@@ -2328,12 +2328,12 @@ PLAN-ROOT SINK
 |
 05:HASH JOIN [INNER JOIN, BROADCAST]
 |  hash predicates: store_sales.ss_hdemo_sk = household_demographics.hd_demo_sk
-|  runtime filters: RF010 <- household_demographics.hd_demo_sk
 |  row-size=48B cardinality=702.92K
 |
 |--JOIN BUILD
 |  |  join-table-id=05 plan-id=06 cohort-id=01
 |  |  build expressions: household_demographics.hd_demo_sk
+|  |  runtime filters: RF010 <- household_demographics.hd_demo_sk
 |  |
 |  15:EXCHANGE [BROADCAST]
 |  |
@@ -2464,8 +2464,8 @@ PLAN-ROOT SINK
    runtime filters: RF000 -> store_sales.ss_sold_date_sk, RF002 -> store_sales.ss_item_sk
    row-size=16B cardinality=2.88M
 ---- PARALLELPLANS
-Max Per-Host Resource Reservation: Memory=67.62MB Threads=9
-Per-Host Resource Estimates: Memory=164MB
+Max Per-Host Resource Reservation: Memory=69.62MB Threads=13
+Per-Host Resource Estimates: Memory=167MB
 PLAN-ROOT SINK
 |
 11:MERGING-EXCHANGE [UNPARTITIONED]
@@ -2490,12 +2490,12 @@ PLAN-ROOT SINK
 |
 04:HASH JOIN [INNER JOIN, BROADCAST]
 |  hash predicates: store_sales.ss_sold_date_sk = dt.d_date_sk
-|  runtime filters: RF000 <- dt.d_date_sk
 |  row-size=72B cardinality=1.73K
 |
 |--JOIN BUILD
 |  |  join-table-id=00 plan-id=01 cohort-id=01
 |  |  build expressions: dt.d_date_sk
+|  |  runtime filters: RF000 <- dt.d_date_sk
 |  |
 |  08:EXCHANGE [BROADCAST]
 |  |
@@ -2506,12 +2506,12 @@ PLAN-ROOT SINK
 |
 03:HASH JOIN [INNER JOIN, BROADCAST]
 |  hash predicates: store_sales.ss_item_sk = item.i_item_sk
-|  runtime filters: RF002 <- item.i_item_sk
 |  row-size=60B cardinality=29.12K
 |
 |--JOIN BUILD
 |  |  join-table-id=01 plan-id=02 cohort-id=01
 |  |  build expressions: item.i_item_sk
+|  |  runtime filters: RF002 <- item.i_item_sk
 |  |
 |  07:EXCHANGE [BROADCAST]
 |  |
@@ -2668,8 +2668,8 @@ PLAN-ROOT SINK
    runtime filters: RF000 -> ss_store_sk, RF002 -> ss_sold_date_sk, RF004 -> ss_item_sk
    row-size=20B cardinality=2.88M
 ---- PARALLELPLANS
-Max Per-Host Resource Reservation: Memory=75.52MB Threads=13
-Per-Host Resource Estimates: Memory=204MB
+Max Per-Host Resource Reservation: Memory=76.52MB Threads=19
+Per-Host Resource Estimates: Memory=205MB
 PLAN-ROOT SINK
 |
 15:MERGING-EXCHANGE [UNPARTITIONED]
@@ -2694,12 +2694,12 @@ PLAN-ROOT SINK
 |
 06:HASH JOIN [INNER JOIN, BROADCAST]
 |  hash predicates: ss_store_sk = s_store_sk
-|  runtime filters: RF000 <- s_store_sk
 |  row-size=114B cardinality=96
 |
 |--JOIN BUILD
 |  |  join-table-id=00 plan-id=01 cohort-id=01
 |  |  build expressions: s_store_sk
+|  |  runtime filters: RF000 <- s_store_sk
 |  |
 |  12:EXCHANGE [BROADCAST]
 |  |
@@ -2709,12 +2709,12 @@ PLAN-ROOT SINK
 |
 05:HASH JOIN [INNER JOIN, PARTITIONED]
 |  hash predicates: ss_sold_date_sk = d_date_sk
-|  runtime filters: RF002 <- d_date_sk
 |  row-size=110B cardinality=96
 |
 |--JOIN BUILD
 |  |  join-table-id=01 plan-id=02 cohort-id=01
 |  |  build expressions: d_date_sk
+|  |  runtime filters: RF002 <- d_date_sk
 |  |
 |  11:EXCHANGE [HASH(d_date_sk)]
 |  |
@@ -2727,12 +2727,12 @@ PLAN-ROOT SINK
 |
 04:HASH JOIN [INNER JOIN, BROADCAST]
 |  hash predicates: ss_item_sk = i_item_sk
-|  runtime filters: RF004 <- i_item_sk
 |  row-size=98B cardinality=481
 |
 |--JOIN BUILD
 |  |  join-table-id=02 plan-id=03 cohort-id=01
 |  |  build expressions: i_item_sk
+|  |  runtime filters: RF004 <- i_item_sk
 |  |
 |  09:EXCHANGE [BROADCAST]
 |  |
@@ -2860,8 +2860,8 @@ PLAN-ROOT SINK
    runtime filters: RF000 -> ss_sold_date_sk, RF002 -> ss_item_sk
    row-size=16B cardinality=2.88M
 ---- PARALLELPLANS
-Max Per-Host Resource Reservation: Memory=67.62MB Threads=9
-Per-Host Resource Estimates: Memory=164MB
+Max Per-Host Resource Reservation: Memory=69.62MB Threads=13
+Per-Host Resource Estimates: Memory=167MB
 PLAN-ROOT SINK
 |
 11:MERGING-EXCHANGE [UNPARTITIONED]
@@ -2886,12 +2886,12 @@ PLAN-ROOT SINK
 |
 04:HASH JOIN [INNER JOIN, BROADCAST]
 |  hash predicates: ss_sold_date_sk = d_date_sk
-|  runtime filters: RF000 <- d_date_sk
 |  row-size=72B cardinality=1.73K
 |
 |--JOIN BUILD
 |  |  join-table-id=00 plan-id=01 cohort-id=01
 |  |  build expressions: d_date_sk
+|  |  runtime filters: RF000 <- d_date_sk
 |  |
 |  08:EXCHANGE [BROADCAST]
 |  |
@@ -2902,12 +2902,12 @@ PLAN-ROOT SINK
 |
 03:HASH JOIN [INNER JOIN, BROADCAST]
 |  hash predicates: ss_item_sk = i_item_sk
-|  runtime filters: RF002 <- i_item_sk
 |  row-size=60B cardinality=29.12K
 |
 |--JOIN BUILD
 |  |  join-table-id=01 plan-id=02 cohort-id=01
 |  |  build expressions: i_item_sk
+|  |  runtime filters: RF002 <- i_item_sk
 |  |
 |  07:EXCHANGE [BROADCAST]
 |  |
@@ -3224,8 +3224,8 @@ PLAN-ROOT SINK
    runtime filters: RF004 -> tpcds.store_sales.ss_store_sk, RF008 -> ss_sold_date_sk
    row-size=12B cardinality=2.88M
 ---- PARALLELPLANS
-Max Per-Host Resource Reservation: Memory=195.53MB Threads=23
-Per-Host Resource Estimates: Memory=476MB
+Max Per-Host Resource Reservation: Memory=197.53MB Threads=37
+Per-Host Resource Estimates: Memory=494MB
 PLAN-ROOT SINK
 |
 30:MERGING-EXCHANGE [UNPARTITIONED]
@@ -3238,23 +3238,23 @@ PLAN-ROOT SINK
 |
 16:HASH JOIN [INNER JOIN, PARTITIONED]
 |  hash predicates: d_week_seq = d_week_seq - 52, s_store_id = s_store_id
-|  runtime filters: RF000 <- d_week_seq - 52, RF001 <- s_store_id
 |  row-size=336B cardinality=419.05M
 |
 |--JOIN BUILD
 |  |  join-table-id=00 plan-id=01 cohort-id=01
 |  |  build expressions: d_week_seq - 52, s_store_id
+|  |  runtime filters: RF000 <- d_week_seq - 52, RF001 <- s_store_id
 |  |
 |  29:EXCHANGE [HASH(d_week_seq - 52,s_store_id)]
 |  |
 |  15:HASH JOIN [INNER JOIN, BROADCAST]
 |  |  hash predicates: ss_store_sk = s_store_sk
-|  |  runtime filters: RF010 <- s_store_sk
 |  |  row-size=160B cardinality=50.14K
 |  |
 |  |--JOIN BUILD
 |  |  |  join-table-id=01 plan-id=02 cohort-id=02
 |  |  |  build expressions: s_store_sk
+|  |  |  runtime filters: RF010 <- s_store_sk
 |  |  |
 |  |  27:EXCHANGE [BROADCAST]
 |  |  |
@@ -3264,12 +3264,12 @@ PLAN-ROOT SINK
 |  |
 |  14:HASH JOIN [INNER JOIN, BROADCAST]
 |  |  hash predicates: d_week_seq = d.d_week_seq
-|  |  runtime filters: RF012 <- d.d_week_seq
 |  |  row-size=128B cardinality=50.14K
 |  |
 |  |--JOIN BUILD
 |  |  |  join-table-id=02 plan-id=03 cohort-id=02
 |  |  |  build expressions: d.d_week_seq
+|  |  |  runtime filters: RF012 <- d.d_week_seq
 |  |  |
 |  |  26:EXCHANGE [BROADCAST]
 |  |  |
@@ -3292,12 +3292,12 @@ PLAN-ROOT SINK
 |  |
 |  10:HASH JOIN [INNER JOIN, BROADCAST]
 |  |  hash predicates: ss_sold_date_sk = d_date_sk
-|  |  runtime filters: RF014 <- d_date_sk
 |  |  row-size=39B cardinality=2.88M
 |  |
 |  |--JOIN BUILD
 |  |  |  join-table-id=03 plan-id=04 cohort-id=02
 |  |  |  build expressions: d_date_sk
+|  |  |  runtime filters: RF014 <- d_date_sk
 |  |  |
 |  |  23:EXCHANGE [BROADCAST]
 |  |  |
@@ -3315,12 +3315,12 @@ PLAN-ROOT SINK
 |
 07:HASH JOIN [INNER JOIN, BROADCAST]
 |  hash predicates: ss_store_sk = s_store_sk
-|  runtime filters: RF004 <- s_store_sk
 |  row-size=176B cardinality=50.14K
 |
 |--JOIN BUILD
 |  |  join-table-id=04 plan-id=05 cohort-id=01
 |  |  build expressions: s_store_sk
+|  |  runtime filters: RF004 <- s_store_sk
 |  |
 |  22:EXCHANGE [BROADCAST]
 |  |
@@ -3331,12 +3331,12 @@ PLAN-ROOT SINK
 |
 06:HASH JOIN [INNER JOIN, BROADCAST]
 |  hash predicates: d_week_seq = d.d_week_seq
-|  runtime filters: RF006 <- d.d_week_seq
 |  row-size=128B cardinality=50.14K
 |
 |--JOIN BUILD
 |  |  join-table-id=05 plan-id=06 cohort-id=01
 |  |  build expressions: d.d_week_seq
+|  |  runtime filters: RF006 <- d.d_week_seq
 |  |
 |  21:EXCHANGE [BROADCAST]
 |  |
@@ -3360,12 +3360,12 @@ PLAN-ROOT SINK
 |
 02:HASH JOIN [INNER JOIN, BROADCAST]
 |  hash predicates: ss_sold_date_sk = d_date_sk
-|  runtime filters: RF008 <- d_date_sk
 |  row-size=39B cardinality=2.88M
 |
 |--JOIN BUILD
 |  |  join-table-id=06 plan-id=07 cohort-id=01
 |  |  build expressions: d_date_sk
+|  |  runtime filters: RF008 <- d_date_sk
 |  |
 |  18:EXCHANGE [BROADCAST]
 |  |
@@ -3555,8 +3555,8 @@ PLAN-ROOT SINK
    runtime filters: RF000 -> ss_store_sk, RF002 -> ss_sold_date_sk, RF004 -> ss_item_sk
    row-size=20B cardinality=546.31K
 ---- PARALLELPLANS
-Max Per-Host Resource Reservation: Memory=80.52MB Threads=15
-Per-Host Resource Estimates: Memory=224MB
+Max Per-Host Resource Reservation: Memory=81.52MB Threads=21
+Per-Host Resource Estimates: Memory=225MB
 PLAN-ROOT SINK
 |
 19:MERGING-EXCHANGE [UNPARTITIONED]
@@ -3594,12 +3594,12 @@ PLAN-ROOT SINK
 |
 06:HASH JOIN [INNER JOIN, PARTITIONED]
 |  hash predicates: ss_store_sk = s_store_sk
-|  runtime filters: RF000 <- s_store_sk
 |  row-size=114B cardinality=6
 |
 |--JOIN BUILD
 |  |  join-table-id=00 plan-id=01 cohort-id=01
 |  |  build expressions: s_store_sk
+|  |  runtime filters: RF000 <- s_store_sk
 |  |
 |  16:EXCHANGE [HASH(s_store_sk)]
 |  |
@@ -3611,12 +3611,12 @@ PLAN-ROOT SINK
 |
 05:HASH JOIN [INNER JOIN, PARTITIONED]
 |  hash predicates: ss_sold_date_sk = d_date_sk
-|  runtime filters: RF002 <- d_date_sk
 |  row-size=110B cardinality=6
 |
 |--JOIN BUILD
 |  |  join-table-id=01 plan-id=02 cohort-id=01
 |  |  build expressions: d_date_sk
+|  |  runtime filters: RF002 <- d_date_sk
 |  |
 |  14:EXCHANGE [HASH(d_date_sk)]
 |  |
@@ -3629,12 +3629,12 @@ PLAN-ROOT SINK
 |
 04:HASH JOIN [INNER JOIN, BROADCAST]
 |  hash predicates: ss_item_sk = i_item_sk
-|  runtime filters: RF004 <- i_item_sk
 |  row-size=98B cardinality=92
 |
 |--JOIN BUILD
 |  |  join-table-id=02 plan-id=03 cohort-id=01
 |  |  build expressions: i_item_sk
+|  |  runtime filters: RF004 <- i_item_sk
 |  |
 |  12:EXCHANGE [BROADCAST]
 |  |
@@ -3898,8 +3898,8 @@ PLAN-ROOT SINK
    runtime filters: RF000 -> tpcds.store_sales.ss_store_sk, RF002 -> tpcds.store_sales.ss_item_sk, RF004 -> tpcds.store_sales.ss_store_sk, RF006 -> ss_sold_date_sk
    row-size=20B cardinality=2.88M
 ---- PARALLELPLANS
-Max Per-Host Resource Reservation: Memory=149.02MB Threads=21
-Per-Host Resource Estimates: Memory=388MB
+Max Per-Host Resource Reservation: Memory=151.02MB Threads=31
+Per-Host Resource Estimates: Memory=394MB
 PLAN-ROOT SINK
 |
 27:MERGING-EXCHANGE [UNPARTITIONED]
@@ -3913,12 +3913,12 @@ PLAN-ROOT SINK
 13:HASH JOIN [INNER JOIN, BROADCAST]
 |  hash predicates: ss_store_sk = ss_store_sk
 |  other predicates: sum(ss_sales_price) <= 0.1 * avg(revenue)
-|  runtime filters: RF000 <- ss_store_sk
 |  row-size=225B cardinality=647.10K
 |
 |--JOIN BUILD
 |  |  join-table-id=00 plan-id=01 cohort-id=01
 |  |  build expressions: ss_store_sk
+|  |  runtime filters: RF000 <- ss_store_sk
 |  |
 |  26:EXCHANGE [BROADCAST]
 |  |
@@ -3948,12 +3948,12 @@ PLAN-ROOT SINK
 |  |
 |  04:HASH JOIN [INNER JOIN, BROADCAST]
 |  |  hash predicates: ss_sold_date_sk = d_date_sk
-|  |  runtime filters: RF008 <- d_date_sk
 |  |  row-size=28B cardinality=2.88M
 |  |
 |  |--JOIN BUILD
 |  |  |  join-table-id=01 plan-id=02 cohort-id=02
 |  |  |  build expressions: d_date_sk
+|  |  |  runtime filters: RF008 <- d_date_sk
 |  |  |
 |  |  21:EXCHANGE [BROADCAST]
 |  |  |
@@ -3969,12 +3969,12 @@ PLAN-ROOT SINK
 |
 12:HASH JOIN [INNER JOIN, PARTITIONED]
 |  hash predicates: ss_item_sk = i_item_sk
-|  runtime filters: RF002 <- i_item_sk
 |  row-size=205B cardinality=107.85K
 |
 |--JOIN BUILD
 |  |  join-table-id=02 plan-id=03 cohort-id=01
 |  |  build expressions: i_item_sk
+|  |  runtime filters: RF002 <- i_item_sk
 |  |
 |  20:EXCHANGE [HASH(i_item_sk)]
 |  |
@@ -3986,12 +3986,12 @@ PLAN-ROOT SINK
 |
 11:HASH JOIN [INNER JOIN, BROADCAST]
 |  hash predicates: ss_store_sk = s_store_sk
-|  runtime filters: RF004 <- s_store_sk
 |  row-size=48B cardinality=107.85K
 |
 |--JOIN BUILD
 |  |  join-table-id=03 plan-id=04 cohort-id=01
 |  |  build expressions: s_store_sk
+|  |  runtime filters: RF004 <- s_store_sk
 |  |
 |  18:EXCHANGE [BROADCAST]
 |  |
@@ -4014,12 +4014,12 @@ PLAN-ROOT SINK
 |
 09:HASH JOIN [INNER JOIN, BROADCAST]
 |  hash predicates: ss_sold_date_sk = d_date_sk
-|  runtime filters: RF006 <- d_date_sk
 |  row-size=28B cardinality=2.88M
 |
 |--JOIN BUILD
 |  |  join-table-id=04 plan-id=05 cohort-id=01
 |  |  build expressions: d_date_sk
+|  |  runtime filters: RF006 <- d_date_sk
 |  |
 |  15:EXCHANGE [BROADCAST]
 |  |
@@ -4260,8 +4260,8 @@ PLAN-ROOT SINK
    runtime filters: RF002 -> tpcds.store_sales.ss_customer_sk, RF004 -> store_sales.ss_addr_sk, RF006 -> store_sales.ss_store_sk, RF008 -> store_sales.ss_sold_date_sk, RF010 -> store_sales.ss_hdemo_sk
    row-size=40B cardinality=2.88M
 ---- PARALLELPLANS
-Max Per-Host Resource Reservation: Memory=202.64MB Threads=17
-Per-Host Resource Estimates: Memory=399MB
+Max Per-Host Resource Reservation: Memory=206.64MB Threads=29
+Per-Host Resource Estimates: Memory=417MB
 PLAN-ROOT SINK
 |
 23:MERGING-EXCHANGE [UNPARTITIONED]
@@ -4275,12 +4275,12 @@ PLAN-ROOT SINK
 13:HASH JOIN [INNER JOIN, BROADCAST]
 |  hash predicates: customer.c_current_addr_sk = current_addr.ca_address_sk
 |  other predicates: current_addr.ca_city != ca_city
-|  runtime filters: RF000 <- current_addr.ca_address_sk
 |  row-size=154B cardinality=702.92K
 |
 |--JOIN BUILD
 |  |  join-table-id=00 plan-id=01 cohort-id=01
 |  |  build expressions: current_addr.ca_address_sk
+|  |  runtime filters: RF000 <- current_addr.ca_address_sk
 |  |
 |  22:EXCHANGE [BROADCAST]
 |  |
@@ -4290,12 +4290,12 @@ PLAN-ROOT SINK
 |
 12:HASH JOIN [INNER JOIN, BROADCAST]
 |  hash predicates: ss_customer_sk = c_customer_sk
-|  runtime filters: RF002 <- c_customer_sk
 |  row-size=129B cardinality=702.92K
 |
 |--JOIN BUILD
 |  |  join-table-id=01 plan-id=02 cohort-id=01
 |  |  build expressions: c_customer_sk
+|  |  runtime filters: RF002 <- c_customer_sk
 |  |
 |  21:EXCHANGE [BROADCAST]
 |  |
@@ -4318,12 +4318,12 @@ PLAN-ROOT SINK
 |
 08:HASH JOIN [INNER JOIN, BROADCAST]
 |  hash predicates: store_sales.ss_addr_sk = customer_address.ca_address_sk
-|  runtime filters: RF004 <- customer_address.ca_address_sk
 |  row-size=125B cardinality=702.92K
 |
 |--JOIN BUILD
 |  |  join-table-id=02 plan-id=03 cohort-id=01
 |  |  build expressions: customer_address.ca_address_sk
+|  |  runtime filters: RF004 <- customer_address.ca_address_sk
 |  |
 |  18:EXCHANGE [BROADCAST]
 |  |
@@ -4333,12 +4333,12 @@ PLAN-ROOT SINK
 |
 07:HASH JOIN [INNER JOIN, BROADCAST]
 |  hash predicates: store_sales.ss_store_sk = store.s_store_sk
-|  runtime filters: RF006 <- store.s_store_sk
 |  row-size=101B cardinality=702.92K
 |
 |--JOIN BUILD
 |  |  join-table-id=03 plan-id=04 cohort-id=01
 |  |  build expressions: store.s_store_sk
+|  |  runtime filters: RF006 <- store.s_store_sk
 |  |
 |  17:EXCHANGE [BROADCAST]
 |  |
@@ -4349,12 +4349,12 @@ PLAN-ROOT SINK
 |
 06:HASH JOIN [INNER JOIN, BROADCAST]
 |  hash predicates: store_sales.ss_sold_date_sk = date_dim.d_date_sk
-|  runtime filters: RF008 <- date_dim.d_date_sk
 |  row-size=78B cardinality=702.92K
 |
 |--JOIN BUILD
 |  |  join-table-id=04 plan-id=05 cohort-id=01
 |  |  build expressions: date_dim.d_date_sk
+|  |  runtime filters: RF008 <- date_dim.d_date_sk
 |  |
 |  16:EXCHANGE [BROADCAST]
 |  |
@@ -4365,12 +4365,12 @@ PLAN-ROOT SINK
 |
 05:HASH JOIN [INNER JOIN, BROADCAST]
 |  hash predicates: store_sales.ss_hdemo_sk = household_demographics.hd_demo_sk
-|  runtime filters: RF010 <- household_demographics.hd_demo_sk
 |  row-size=52B cardinality=702.92K
 |
 |--JOIN BUILD
 |  |  join-table-id=05 plan-id=06 cohort-id=01
 |  |  build expressions: household_demographics.hd_demo_sk
+|  |  runtime filters: RF010 <- household_demographics.hd_demo_sk
 |  |
 |  15:EXCHANGE [BROADCAST]
 |  |
@@ -4559,8 +4559,8 @@ PLAN-ROOT SINK
    runtime filters: RF000 -> tpcds.store_sales.ss_customer_sk, RF002 -> store_sales.ss_store_sk, RF004 -> store_sales.ss_sold_date_sk, RF006 -> store_sales.ss_hdemo_sk
    row-size=24B cardinality=2.88M
 ---- PARALLELPLANS
-Max Per-Host Resource Reservation: Memory=86.52MB Threads=15
-Per-Host Resource Estimates: Memory=278MB
+Max Per-Host Resource Reservation: Memory=89.52MB Threads=23
+Per-Host Resource Estimates: Memory=282MB
 PLAN-ROOT SINK
 |
 18:MERGING-EXCHANGE [UNPARTITIONED]
@@ -4573,12 +4573,12 @@ PLAN-ROOT SINK
 |
 09:HASH JOIN [INNER JOIN, PARTITIONED]
 |  hash predicates: ss_customer_sk = c_customer_sk
-|  runtime filters: RF000 <- c_customer_sk
 |  row-size=88B cardinality=16.25K
 |
 |--JOIN BUILD
 |  |  join-table-id=00 plan-id=01 cohort-id=01
 |  |  build expressions: c_customer_sk
+|  |  runtime filters: RF000 <- c_customer_sk
 |  |
 |  17:EXCHANGE [HASH(c_customer_sk)]
 |  |
@@ -4603,12 +4603,12 @@ PLAN-ROOT SINK
 |
 06:HASH JOIN [INNER JOIN, BROADCAST]
 |  hash predicates: store_sales.ss_store_sk = store.s_store_sk
-|  runtime filters: RF002 <- store.s_store_sk
 |  row-size=93B cardinality=162.45K
 |
 |--JOIN BUILD
 |  |  join-table-id=01 plan-id=02 cohort-id=01
 |  |  build expressions: store.s_store_sk
+|  |  runtime filters: RF002 <- store.s_store_sk
 |  |
 |  13:EXCHANGE [BROADCAST]
 |  |
@@ -4619,12 +4619,12 @@ PLAN-ROOT SINK
 |
 05:HASH JOIN [INNER JOIN, BROADCAST]
 |  hash predicates: store_sales.ss_sold_date_sk = date_dim.d_date_sk
-|  runtime filters: RF004 <- date_dim.d_date_sk
 |  row-size=60B cardinality=162.45K
 |
 |--JOIN BUILD
 |  |  join-table-id=02 plan-id=03 cohort-id=01
 |  |  build expressions: date_dim.d_date_sk
+|  |  runtime filters: RF004 <- date_dim.d_date_sk
 |  |
 |  12:EXCHANGE [BROADCAST]
 |  |
@@ -4634,12 +4634,12 @@ PLAN-ROOT SINK
 |
 04:HASH JOIN [INNER JOIN, BROADCAST]
 |  hash predicates: store_sales.ss_hdemo_sk = household_demographics.hd_demo_sk
-|  runtime filters: RF006 <- household_demographics.hd_demo_sk
 |  row-size=56B cardinality=162.45K
 |
 |--JOIN BUILD
 |  |  join-table-id=03 plan-id=04 cohort-id=01
 |  |  build expressions: household_demographics.hd_demo_sk
+|  |  runtime filters: RF006 <- household_demographics.hd_demo_sk
 |  |
 |  11:EXCHANGE [BROADCAST]
 |  |
@@ -4833,8 +4833,8 @@ PLAN-ROOT SINK
    runtime filters: RF000 -> tpcds.store_sales.ss_customer_sk, RF002 -> store_sales.ss_sold_date_sk, RF004 -> store_sales.ss_store_sk, RF006 -> store_sales.ss_hdemo_sk
    row-size=36B cardinality=2.88M
 ---- PARALLELPLANS
-Max Per-Host Resource Reservation: Memory=82.77MB Threads=15
-Per-Host Resource Estimates: Memory=269MB
+Max Per-Host Resource Reservation: Memory=85.77MB Threads=23
+Per-Host Resource Estimates: Memory=275MB
 PLAN-ROOT SINK
 |
 18:MERGING-EXCHANGE [UNPARTITIONED]
@@ -4847,12 +4847,12 @@ PLAN-ROOT SINK
 |
 09:HASH JOIN [INNER JOIN, PARTITIONED]
 |  hash predicates: ss_customer_sk = c_customer_sk
-|  runtime filters: RF000 <- c_customer_sk
 |  row-size=106B cardinality=46.86K
 |
 |--JOIN BUILD
 |  |  join-table-id=00 plan-id=01 cohort-id=01
 |  |  build expressions: c_customer_sk
+|  |  runtime filters: RF000 <- c_customer_sk
 |  |
 |  17:EXCHANGE [HASH(c_customer_sk)]
 |  |
@@ -4876,12 +4876,12 @@ PLAN-ROOT SINK
 |
 06:HASH JOIN [INNER JOIN, BROADCAST]
 |  hash predicates: store_sales.ss_sold_date_sk = date_dim.d_date_sk
-|  runtime filters: RF002 <- date_dim.d_date_sk
 |  row-size=101B cardinality=46.86K
 |
 |--JOIN BUILD
 |  |  join-table-id=01 plan-id=02 cohort-id=01
 |  |  build expressions: date_dim.d_date_sk
+|  |  runtime filters: RF002 <- date_dim.d_date_sk
 |  |
 |  13:EXCHANGE [BROADCAST]
 |  |
@@ -4892,12 +4892,12 @@ PLAN-ROOT SINK
 |
 05:HASH JOIN [INNER JOIN, BROADCAST]
 |  hash predicates: store_sales.ss_store_sk = store.s_store_sk
-|  runtime filters: RF004 <- store.s_store_sk
 |  row-size=75B cardinality=46.86K
 |
 |--JOIN BUILD
 |  |  join-table-id=02 plan-id=03 cohort-id=01
 |  |  build expressions: store.s_store_sk
+|  |  runtime filters: RF004 <- store.s_store_sk
 |  |
 |  12:EXCHANGE [BROADCAST]
 |  |
@@ -4908,12 +4908,12 @@ PLAN-ROOT SINK
 |
 04:HASH JOIN [INNER JOIN, BROADCAST]
 |  hash predicates: store_sales.ss_hdemo_sk = household_demographics.hd_demo_sk
-|  runtime filters: RF006 <- household_demographics.hd_demo_sk
 |  row-size=48B cardinality=281.17K
 |
 |--JOIN BUILD
 |  |  join-table-id=03 plan-id=04 cohort-id=01
 |  |  build expressions: household_demographics.hd_demo_sk
+|  |  runtime filters: RF006 <- household_demographics.hd_demo_sk
 |  |
 |  11:EXCHANGE [BROADCAST]
 |  |
@@ -5091,8 +5091,8 @@ PLAN-ROOT SINK
    runtime filters: RF000 -> ss_store_sk, RF002 -> ss_sold_date_sk, RF004 -> ss_item_sk
    row-size=20B cardinality=2.88M
 ---- PARALLELPLANS
-Max Per-Host Resource Reservation: Memory=105.52MB Threads=11
-Per-Host Resource Estimates: Memory=234MB
+Max Per-Host Resource Reservation: Memory=108.52MB Threads=17
+Per-Host Resource Estimates: Memory=237MB
 PLAN-ROOT SINK
 |
 17:MERGING-EXCHANGE [UNPARTITIONED]
@@ -5130,12 +5130,12 @@ PLAN-ROOT SINK
 |
 06:HASH JOIN [INNER JOIN, BROADCAST]
 |  hash predicates: ss_store_sk = s_store_sk
-|  runtime filters: RF000 <- s_store_sk
 |  row-size=145B cardinality=10.67K
 |
 |--JOIN BUILD
 |  |  join-table-id=00 plan-id=01 cohort-id=01
 |  |  build expressions: s_store_sk
+|  |  runtime filters: RF000 <- s_store_sk
 |  |
 |  14:EXCHANGE [BROADCAST]
 |  |
@@ -5145,12 +5145,12 @@ PLAN-ROOT SINK
 |
 05:HASH JOIN [INNER JOIN, BROADCAST]
 |  hash predicates: ss_sold_date_sk = d_date_sk
-|  runtime filters: RF002 <- d_date_sk
 |  row-size=106B cardinality=10.67K
 |
 |--JOIN BUILD
 |  |  join-table-id=01 plan-id=02 cohort-id=01
 |  |  build expressions: d_date_sk
+|  |  runtime filters: RF002 <- d_date_sk
 |  |
 |  13:EXCHANGE [BROADCAST]
 |  |
@@ -5161,12 +5161,12 @@ PLAN-ROOT SINK
 |
 04:HASH JOIN [INNER JOIN, BROADCAST]
 |  hash predicates: ss_item_sk = i_item_sk
-|  runtime filters: RF004 <- i_item_sk
 |  row-size=94B cardinality=52.17K
 |
 |--JOIN BUILD
 |  |  join-table-id=02 plan-id=03 cohort-id=01
 |  |  build expressions: i_item_sk
+|  |  runtime filters: RF004 <- i_item_sk
 |  |
 |  12:EXCHANGE [BROADCAST]
 |  |
@@ -5294,8 +5294,8 @@ PLAN-ROOT SINK
    runtime filters: RF000 -> ss.ss_store_sk, RF002 -> ss.ss_hdemo_sk, RF004 -> ss.ss_sold_time_sk
    row-size=12B cardinality=2.88M
 ---- PARALLELPLANS
-Max Per-Host Resource Reservation: Memory=50.14MB Threads=9
-Per-Host Resource Estimates: Memory=176MB
+Max Per-Host Resource Reservation: Memory=53.14MB Threads=15
+Per-Host Resource Estimates: Memory=179MB
 PLAN-ROOT SINK
 |
 12:AGGREGATE [FINALIZE]
@@ -5310,12 +5310,12 @@ PLAN-ROOT SINK
 |
 06:HASH JOIN [INNER JOIN, BROADCAST]
 |  hash predicates: ss.ss_store_sk = s.s_store_sk
-|  runtime filters: RF000 <- s.s_store_sk
 |  row-size=52B cardinality=2.27K
 |
 |--JOIN BUILD
 |  |  join-table-id=00 plan-id=01 cohort-id=01
 |  |  build expressions: s.s_store_sk
+|  |  runtime filters: RF000 <- s.s_store_sk
 |  |
 |  10:EXCHANGE [BROADCAST]
 |  |
@@ -5326,12 +5326,12 @@ PLAN-ROOT SINK
 |
 05:HASH JOIN [INNER JOIN, BROADCAST]
 |  hash predicates: ss.ss_hdemo_sk = hd.hd_demo_sk
-|  runtime filters: RF002 <- hd.hd_demo_sk
 |  row-size=32B cardinality=6.82K
 |
 |--JOIN BUILD
 |  |  join-table-id=01 plan-id=02 cohort-id=01
 |  |  build expressions: hd.hd_demo_sk
+|  |  runtime filters: RF002 <- hd.hd_demo_sk
 |  |
 |  09:EXCHANGE [BROADCAST]
 |  |
@@ -5342,12 +5342,12 @@ PLAN-ROOT SINK
 |
 04:HASH JOIN [INNER JOIN, BROADCAST]
 |  hash predicates: ss.ss_sold_time_sk = td.t_time_sk
-|  runtime filters: RF004 <- td.t_time_sk
 |  row-size=24B cardinality=69.82K
 |
 |--JOIN BUILD
 |  |  join-table-id=02 plan-id=03 cohort-id=01
 |  |  build expressions: td.t_time_sk
+|  |  runtime filters: RF004 <- td.t_time_sk
 |  |
 |  08:EXCHANGE [BROADCAST]
 |  |
@@ -5507,8 +5507,8 @@ PLAN-ROOT SINK
    runtime filters: RF000 -> ss_sold_date_sk, RF002 -> ss_item_sk
    row-size=16B cardinality=29.76K
 ---- PARALLELPLANS
-Max Per-Host Resource Reservation: Memory=113.75MB Threads=11
-Per-Host Resource Estimates: Memory=201MB
+Max Per-Host Resource Reservation: Memory=113.75MB Threads=15
+Per-Host Resource Estimates: Memory=202MB
 PLAN-ROOT SINK
 |
 14:MERGING-EXCHANGE [UNPARTITIONED]
@@ -5542,12 +5542,12 @@ PLAN-ROOT SINK
 |
 04:HASH JOIN [INNER JOIN, BROADCAST]
 |  hash predicates: ss_sold_date_sk = d_date_sk
-|  runtime filters: RF000 <- d_date_sk
 |  row-size=232B cardinality=29.80K
 |
 |--JOIN BUILD
 |  |  join-table-id=00 plan-id=01 cohort-id=01
 |  |  build expressions: d_date_sk
+|  |  runtime filters: RF000 <- d_date_sk
 |  |
 |  11:EXCHANGE [BROADCAST]
 |  |
@@ -5558,12 +5558,12 @@ PLAN-ROOT SINK
 |
 03:HASH JOIN [INNER JOIN, PARTITIONED]
 |  hash predicates: ss_item_sk = i_item_sk
-|  runtime filters: RF002 <- i_item_sk
 |  row-size=206B cardinality=29.80K
 |
 |--JOIN BUILD
 |  |  join-table-id=01 plan-id=02 cohort-id=01
 |  |  build expressions: i_item_sk
+|  |  runtime filters: RF002 <- i_item_sk
 |  |
 |  10:EXCHANGE [HASH(i_item_sk)]
 |  |
@@ -5822,8 +5822,8 @@ PLAN-ROOT SINK
    runtime filters: RF004 -> s.ss_item_sk, RF006 -> s.ss_sold_date_sk, RF010 -> s.ss_customer_sk
    row-size=16B cardinality=2.88M
 ---- PARALLELPLANS
-Max Per-Host Resource Reservation: Memory=173.88MB Threads=22
-Per-Host Resource Estimates: Memory=430MB
+Max Per-Host Resource Reservation: Memory=176.88MB Threads=34
+Per-Host Resource Estimates: Memory=439MB
 PLAN-ROOT SINK
 |
 30:MERGING-EXCHANGE [UNPARTITIONED]
@@ -5850,12 +5850,12 @@ PLAN-ROOT SINK
 14:HASH JOIN [LEFT SEMI JOIN, BROADCAST]
 |  hash predicates: i.i_category = j.i_category
 |  other join predicates: i.i_current_price > 1.2 * avg(j.i_current_price)
-|  runtime filters: RF000 <- j.i_category
 |  row-size=80B cardinality=1.19K
 |
 |--JOIN BUILD
 |  |  join-table-id=00 plan-id=01 cohort-id=01
 |  |  build expressions: j.i_category
+|  |  runtime filters: RF000 <- j.i_category
 |  |
 |  27:EXCHANGE [BROADCAST]
 |  |
@@ -5877,12 +5877,12 @@ PLAN-ROOT SINK
 |
 13:HASH JOIN [LEFT SEMI JOIN, BROADCAST]
 |  hash predicates: d.d_month_seq = (d_month_seq)
-|  runtime filters: RF002 <- (d_month_seq)
 |  row-size=80B cardinality=1.19K
 |
 |--JOIN BUILD
 |  |  join-table-id=01 plan-id=02 cohort-id=01
 |  |  build expressions: (d_month_seq)
+|  |  runtime filters: RF002 <- (d_month_seq)
 |  |
 |  24:EXCHANGE [BROADCAST]
 |  |
@@ -5907,12 +5907,12 @@ PLAN-ROOT SINK
 |
 12:HASH JOIN [INNER JOIN, BROADCAST]
 |  hash predicates: s.ss_item_sk = i.i_item_sk
-|  runtime filters: RF004 <- i.i_item_sk
 |  row-size=80B cardinality=2.88M
 |
 |--JOIN BUILD
 |  |  join-table-id=02 plan-id=03 cohort-id=01
 |  |  build expressions: i.i_item_sk
+|  |  runtime filters: RF004 <- i.i_item_sk
 |  |
 |  20:EXCHANGE [BROADCAST]
 |  |
@@ -5923,12 +5923,12 @@ PLAN-ROOT SINK
 |
 11:HASH JOIN [INNER JOIN, BROADCAST]
 |  hash predicates: s.ss_sold_date_sk = d.d_date_sk
-|  runtime filters: RF006 <- d.d_date_sk
 |  row-size=50B cardinality=2.88M
 |
 |--JOIN BUILD
 |  |  join-table-id=03 plan-id=04 cohort-id=01
 |  |  build expressions: d.d_date_sk
+|  |  runtime filters: RF006 <- d.d_date_sk
 |  |
 |  19:EXCHANGE [BROADCAST]
 |  |
@@ -5939,12 +5939,12 @@ PLAN-ROOT SINK
 |
 10:HASH JOIN [INNER JOIN, BROADCAST]
 |  hash predicates: c.c_current_addr_sk = a.ca_address_sk
-|  runtime filters: RF008 <- a.ca_address_sk
 |  row-size=42B cardinality=2.88M
 |
 |--JOIN BUILD
 |  |  join-table-id=04 plan-id=05 cohort-id=01
 |  |  build expressions: a.ca_address_sk
+|  |  runtime filters: RF008 <- a.ca_address_sk
 |  |
 |  18:EXCHANGE [BROADCAST]
 |  |
@@ -5954,12 +5954,12 @@ PLAN-ROOT SINK
 |
 09:HASH JOIN [INNER JOIN, BROADCAST]
 |  hash predicates: s.ss_customer_sk = c.c_customer_sk
-|  runtime filters: RF010 <- c.c_customer_sk
 |  row-size=24B cardinality=2.88M
 |
 |--JOIN BUILD
 |  |  join-table-id=05 plan-id=06 cohort-id=01
 |  |  build expressions: c.c_customer_sk
+|  |  runtime filters: RF010 <- c.c_customer_sk
 |  |
 |  17:EXCHANGE [BROADCAST]
 |  |
@@ -6425,8 +6425,8 @@ PLAN-ROOT SINK
    runtime filters: RF000 -> ss_store_sk, RF002 -> ss_item_sk, RF004 -> ss_sold_date_sk
    row-size=20B cardinality=2.88M
 ---- PARALLELPLANS
-Max Per-Host Resource Reservation: Memory=746.80MB Threads=33
-Per-Host Resource Estimates: Memory=1.03GB
+Max Per-Host Resource Reservation: Memory=755.80MB Threads=55
+Per-Host Resource Estimates: Memory=1.07GB
 PLAN-ROOT SINK
 |
 54:MERGING-EXCHANGE [UNPARTITIONED]
@@ -6472,12 +6472,12 @@ PLAN-ROOT SINK
 |  |
 |  29:HASH JOIN [INNER JOIN, BROADCAST]
 |  |  hash predicates: ss_store_sk = s_store_sk
-|  |  runtime filters: RF012 <- s_store_sk
 |  |  row-size=125B cardinality=685.36K
 |  |
 |  |--JOIN BUILD
 |  |  |  join-table-id=01 plan-id=02 cohort-id=02
 |  |  |  build expressions: s_store_sk
+|  |  |  runtime filters: RF012 <- s_store_sk
 |  |  |
 |  |  49:EXCHANGE [BROADCAST]
 |  |  |
@@ -6487,12 +6487,12 @@ PLAN-ROOT SINK
 |  |
 |  28:HASH JOIN [INNER JOIN, BROADCAST]
 |  |  hash predicates: ss_item_sk = i_item_sk
-|  |  runtime filters: RF014 <- i_item_sk
 |  |  row-size=86B cardinality=685.36K
 |  |
 |  |--JOIN BUILD
 |  |  |  join-table-id=02 plan-id=03 cohort-id=02
 |  |  |  build expressions: i_item_sk
+|  |  |  runtime filters: RF014 <- i_item_sk
 |  |  |
 |  |  48:EXCHANGE [BROADCAST]
 |  |  |
@@ -6502,12 +6502,12 @@ PLAN-ROOT SINK
 |  |
 |  27:HASH JOIN [INNER JOIN, BROADCAST]
 |  |  hash predicates: ss_sold_date_sk = d_date_sk
-|  |  runtime filters: RF016 <- d_date_sk
 |  |  row-size=32B cardinality=685.36K
 |  |
 |  |--JOIN BUILD
 |  |  |  join-table-id=03 plan-id=04 cohort-id=02
 |  |  |  build expressions: d_date_sk
+|  |  |  runtime filters: RF016 <- d_date_sk
 |  |  |
 |  |  47:EXCHANGE [BROADCAST]
 |  |  |
@@ -6571,12 +6571,12 @@ PLAN-ROOT SINK
 |  |
 |  06:HASH JOIN [INNER JOIN, BROADCAST]
 |  |  hash predicates: ss_store_sk = s_store_sk
-|  |  runtime filters: RF006 <- s_store_sk
 |  |  row-size=125B cardinality=685.36K
 |  |
 |  |--JOIN BUILD
 |  |  |  join-table-id=05 plan-id=06 cohort-id=03
 |  |  |  build expressions: s_store_sk
+|  |  |  runtime filters: RF006 <- s_store_sk
 |  |  |
 |  |  43:EXCHANGE [BROADCAST]
 |  |  |
@@ -6586,12 +6586,12 @@ PLAN-ROOT SINK
 |  |
 |  05:HASH JOIN [INNER JOIN, BROADCAST]
 |  |  hash predicates: ss_item_sk = i_item_sk
-|  |  runtime filters: RF008 <- i_item_sk
 |  |  row-size=86B cardinality=685.36K
 |  |
 |  |--JOIN BUILD
 |  |  |  join-table-id=06 plan-id=07 cohort-id=03
 |  |  |  build expressions: i_item_sk
+|  |  |  runtime filters: RF008 <- i_item_sk
 |  |  |
 |  |  42:EXCHANGE [BROADCAST]
 |  |  |
@@ -6601,12 +6601,12 @@ PLAN-ROOT SINK
 |  |
 |  04:HASH JOIN [INNER JOIN, BROADCAST]
 |  |  hash predicates: ss_sold_date_sk = d_date_sk
-|  |  runtime filters: RF010 <- d_date_sk
 |  |  row-size=32B cardinality=685.36K
 |  |
 |  |--JOIN BUILD
 |  |  |  join-table-id=07 plan-id=08 cohort-id=03
 |  |  |  build expressions: d_date_sk
+|  |  |  runtime filters: RF010 <- d_date_sk
 |  |  |
 |  |  41:EXCHANGE [BROADCAST]
 |  |  |
@@ -6645,12 +6645,12 @@ PLAN-ROOT SINK
 |
 19:HASH JOIN [INNER JOIN, BROADCAST]
 |  hash predicates: ss_store_sk = s_store_sk
-|  runtime filters: RF000 <- s_store_sk
 |  row-size=125B cardinality=685.36K
 |
 |--JOIN BUILD
 |  |  join-table-id=08 plan-id=09 cohort-id=01
 |  |  build expressions: s_store_sk
+|  |  runtime filters: RF000 <- s_store_sk
 |  |
 |  38:EXCHANGE [BROADCAST]
 |  |
@@ -6660,12 +6660,12 @@ PLAN-ROOT SINK
 |
 18:HASH JOIN [INNER JOIN, BROADCAST]
 |  hash predicates: ss_item_sk = i_item_sk
-|  runtime filters: RF002 <- i_item_sk
 |  row-size=86B cardinality=685.36K
 |
 |--JOIN BUILD
 |  |  join-table-id=09 plan-id=10 cohort-id=01
 |  |  build expressions: i_item_sk
+|  |  runtime filters: RF002 <- i_item_sk
 |  |
 |  37:EXCHANGE [BROADCAST]
 |  |
@@ -6675,12 +6675,12 @@ PLAN-ROOT SINK
 |
 17:HASH JOIN [INNER JOIN, BROADCAST]
 |  hash predicates: ss_sold_date_sk = d_date_sk
-|  runtime filters: RF004 <- d_date_sk
 |  row-size=32B cardinality=685.36K
 |
 |--JOIN BUILD
 |  |  join-table-id=10 plan-id=11 cohort-id=01
 |  |  build expressions: d_date_sk
+|  |  runtime filters: RF004 <- d_date_sk
 |  |
 |  36:EXCHANGE [BROADCAST]
 |  |
@@ -7052,8 +7052,8 @@ PLAN-ROOT SINK
    runtime filters: RF010 -> ss_sold_date_sk, RF008 -> ss_item_sk, RF006 -> ss_promo_sk, RF002 -> ss_customer_sk, RF004 -> ss_store_sk
    row-size=28B cardinality=2.88M
 ---- PARALLELPLANS
-Max Per-Host Resource Reservation: Memory=232.78MB Threads=32
-Per-Host Resource Estimates: Memory=617MB
+Max Per-Host Resource Reservation: Memory=238.78MB Threads=55
+Per-Host Resource Estimates: Memory=627MB
 PLAN-ROOT SINK
 |
 27:SORT
@@ -7081,12 +7081,12 @@ PLAN-ROOT SINK
 |  |
 |  24:HASH JOIN [INNER JOIN, BROADCAST]
 |  |  hash predicates: c_current_addr_sk = ca_address_sk
-|  |  runtime filters: RF012 <- ca_address_sk
 |  |  row-size=86B cardinality=3.30K
 |  |
 |  |--JOIN BUILD
 |  |  |  join-table-id=01 plan-id=02 cohort-id=02
 |  |  |  build expressions: ca_address_sk
+|  |  |  runtime filters: RF012 <- ca_address_sk
 |  |  |
 |  |  42:EXCHANGE [BROADCAST]
 |  |  |
@@ -7097,12 +7097,12 @@ PLAN-ROOT SINK
 |  |
 |  23:HASH JOIN [INNER JOIN, PARTITIONED]
 |  |  hash predicates: ss_customer_sk = c_customer_sk
-|  |  runtime filters: RF014 <- c_customer_sk
 |  |  row-size=78B cardinality=17.06K
 |  |
 |  |--JOIN BUILD
 |  |  |  join-table-id=02 plan-id=03 cohort-id=02
 |  |  |  build expressions: c_customer_sk
+|  |  |  runtime filters: RF014 <- c_customer_sk
 |  |  |
 |  |  41:EXCHANGE [HASH(c_customer_sk)]
 |  |  |
@@ -7130,12 +7130,12 @@ PLAN-ROOT SINK
 |  |
 |  21:HASH JOIN [INNER JOIN, BROADCAST]
 |  |  hash predicates: ss_item_sk = i_item_sk
-|  |  runtime filters: RF018 <- i_item_sk
 |  |  row-size=62B cardinality=17.06K
 |  |
 |  |--JOIN BUILD
 |  |  |  join-table-id=04 plan-id=05 cohort-id=02
 |  |  |  build expressions: i_item_sk
+|  |  |  runtime filters: RF018 <- i_item_sk
 |  |  |
 |  |  38:EXCHANGE [BROADCAST]
 |  |  |
@@ -7146,12 +7146,12 @@ PLAN-ROOT SINK
 |  |
 |  20:HASH JOIN [INNER JOIN, BROADCAST]
 |  |  hash predicates: ss_sold_date_sk = d_date_sk
-|  |  runtime filters: RF020 <- d_date_sk
 |  |  row-size=36B cardinality=170.55K
 |  |
 |  |--JOIN BUILD
 |  |  |  join-table-id=05 plan-id=06 cohort-id=02
 |  |  |  build expressions: d_date_sk
+|  |  |  runtime filters: RF020 <- d_date_sk
 |  |  |
 |  |  37:EXCHANGE [BROADCAST]
 |  |  |
@@ -7177,12 +7177,12 @@ PLAN-ROOT SINK
 |
 12:HASH JOIN [INNER JOIN, BROADCAST]
 |  hash predicates: c_current_addr_sk = ca_address_sk
-|  runtime filters: RF000 <- ca_address_sk
 |  row-size=133B cardinality=3.28K
 |
 |--JOIN BUILD
 |  |  join-table-id=06 plan-id=07 cohort-id=01
 |  |  build expressions: ca_address_sk
+|  |  runtime filters: RF000 <- ca_address_sk
 |  |
 |  34:EXCHANGE [BROADCAST]
 |  |
@@ -7193,12 +7193,12 @@ PLAN-ROOT SINK
 |
 11:HASH JOIN [INNER JOIN, PARTITIONED]
 |  hash predicates: ss_customer_sk = c_customer_sk
-|  runtime filters: RF002 <- c_customer_sk
 |  row-size=125B cardinality=16.94K
 |
 |--JOIN BUILD
 |  |  join-table-id=07 plan-id=08 cohort-id=01
 |  |  build expressions: c_customer_sk
+|  |  runtime filters: RF002 <- c_customer_sk
 |  |
 |  33:EXCHANGE [HASH(c_customer_sk)]
 |  |
@@ -7211,12 +7211,12 @@ PLAN-ROOT SINK
 |
 10:HASH JOIN [INNER JOIN, BROADCAST]
 |  hash predicates: ss_store_sk = s_store_sk
-|  runtime filters: RF004 <- s_store_sk
 |  row-size=117B cardinality=16.94K
 |
 |--JOIN BUILD
 |  |  join-table-id=08 plan-id=09 cohort-id=01
 |  |  build expressions: s_store_sk
+|  |  runtime filters: RF004 <- s_store_sk
 |  |
 |  31:EXCHANGE [BROADCAST]
 |  |
@@ -7227,12 +7227,12 @@ PLAN-ROOT SINK
 |
 09:HASH JOIN [INNER JOIN, BROADCAST]
 |  hash predicates: ss_promo_sk = p_promo_sk
-|  runtime filters: RF006 <- p_promo_sk
 |  row-size=109B cardinality=16.94K
 |
 |--JOIN BUILD
 |  |  join-table-id=09 plan-id=10 cohort-id=01
 |  |  build expressions: p_promo_sk
+|  |  runtime filters: RF006 <- p_promo_sk
 |  |
 |  30:EXCHANGE [BROADCAST]
 |  |
@@ -7243,12 +7243,12 @@ PLAN-ROOT SINK
 |
 08:HASH JOIN [INNER JOIN, BROADCAST]
 |  hash predicates: ss_item_sk = i_item_sk
-|  runtime filters: RF008 <- i_item_sk
 |  row-size=66B cardinality=17.06K
 |
 |--JOIN BUILD
 |  |  join-table-id=10 plan-id=11 cohort-id=01
 |  |  build expressions: i_item_sk
+|  |  runtime filters: RF008 <- i_item_sk
 |  |
 |  29:EXCHANGE [BROADCAST]
 |  |
@@ -7259,12 +7259,12 @@ PLAN-ROOT SINK
 |
 07:HASH JOIN [INNER JOIN, BROADCAST]
 |  hash predicates: ss_sold_date_sk = d_date_sk
-|  runtime filters: RF010 <- d_date_sk
 |  row-size=40B cardinality=170.55K
 |
 |--JOIN BUILD
 |  |  join-table-id=11 plan-id=12 cohort-id=01
 |  |  build expressions: d_date_sk
+|  |  runtime filters: RF010 <- d_date_sk
 |  |
 |  28:EXCHANGE [BROADCAST]
 |  |
@@ -8126,8 +8126,8 @@ PLAN-ROOT SINK
    runtime filters: RF004 -> ss_sold_time_sk, RF002 -> ss_hdemo_sk
    row-size=12B cardinality=2.88M
 ---- PARALLELPLANS
-Max Per-Host Resource Reservation: Memory=373.12MB Threads=72
-Per-Host Resource Estimates: Memory=1.34GB
+Max Per-Host Resource Reservation: Memory=383.12MB Threads=127
+Per-Host Resource Estimates: Memory=1.36GB
 PLAN-ROOT SINK
 |
 70:NESTED LOOP JOIN [CROSS JOIN, BROADCAST]
@@ -8181,12 +8181,12 @@ PLAN-ROOT SINK
 |  |
 |  60:HASH JOIN [INNER JOIN, BROADCAST]
 |  |  hash predicates: ss_sold_time_sk = time_dim.t_time_sk
-|  |  runtime filters: RF046 <- time_dim.t_time_sk
 |  |  row-size=24B cardinality=69.82K
 |  |
 |  |--JOIN BUILD
 |  |  |  join-table-id=03 plan-id=04 cohort-id=02
 |  |  |  build expressions: time_dim.t_time_sk
+|  |  |  runtime filters: RF046 <- time_dim.t_time_sk
 |  |  |
 |  |  112:EXCHANGE [BROADCAST]
 |  |  |
@@ -8251,12 +8251,12 @@ PLAN-ROOT SINK
 |  |
 |  52:HASH JOIN [INNER JOIN, BROADCAST]
 |  |  hash predicates: ss_sold_time_sk = time_dim.t_time_sk
-|  |  runtime filters: RF040 <- time_dim.t_time_sk
 |  |  row-size=24B cardinality=69.82K
 |  |
 |  |--JOIN BUILD
 |  |  |  join-table-id=07 plan-id=08 cohort-id=03
 |  |  |  build expressions: time_dim.t_time_sk
+|  |  |  runtime filters: RF040 <- time_dim.t_time_sk
 |  |  |
 |  |  106:EXCHANGE [BROADCAST]
 |  |  |
@@ -8321,12 +8321,12 @@ PLAN-ROOT SINK
 |  |
 |  44:HASH JOIN [INNER JOIN, BROADCAST]
 |  |  hash predicates: ss_sold_time_sk = time_dim.t_time_sk
-|  |  runtime filters: RF034 <- time_dim.t_time_sk
 |  |  row-size=24B cardinality=69.82K
 |  |
 |  |--JOIN BUILD
 |  |  |  join-table-id=11 plan-id=12 cohort-id=04
 |  |  |  build expressions: time_dim.t_time_sk
+|  |  |  runtime filters: RF034 <- time_dim.t_time_sk
 |  |  |
 |  |  100:EXCHANGE [BROADCAST]
 |  |  |
@@ -8391,12 +8391,12 @@ PLAN-ROOT SINK
 |  |
 |  36:HASH JOIN [INNER JOIN, BROADCAST]
 |  |  hash predicates: ss_sold_time_sk = time_dim.t_time_sk
-|  |  runtime filters: RF028 <- time_dim.t_time_sk
 |  |  row-size=24B cardinality=69.82K
 |  |
 |  |--JOIN BUILD
 |  |  |  join-table-id=15 plan-id=16 cohort-id=05
 |  |  |  build expressions: time_dim.t_time_sk
+|  |  |  runtime filters: RF028 <- time_dim.t_time_sk
 |  |  |
 |  |  94:EXCHANGE [BROADCAST]
 |  |  |
@@ -8461,12 +8461,12 @@ PLAN-ROOT SINK
 |  |
 |  28:HASH JOIN [INNER JOIN, BROADCAST]
 |  |  hash predicates: ss_sold_time_sk = time_dim.t_time_sk
-|  |  runtime filters: RF022 <- time_dim.t_time_sk
 |  |  row-size=24B cardinality=69.82K
 |  |
 |  |--JOIN BUILD
 |  |  |  join-table-id=19 plan-id=20 cohort-id=06
 |  |  |  build expressions: time_dim.t_time_sk
+|  |  |  runtime filters: RF022 <- time_dim.t_time_sk
 |  |  |
 |  |  88:EXCHANGE [BROADCAST]
 |  |  |
@@ -8531,12 +8531,12 @@ PLAN-ROOT SINK
 |  |
 |  20:HASH JOIN [INNER JOIN, BROADCAST]
 |  |  hash predicates: ss_sold_time_sk = time_dim.t_time_sk
-|  |  runtime filters: RF016 <- time_dim.t_time_sk
 |  |  row-size=24B cardinality=69.82K
 |  |
 |  |--JOIN BUILD
 |  |  |  join-table-id=23 plan-id=24 cohort-id=07
 |  |  |  build expressions: time_dim.t_time_sk
+|  |  |  runtime filters: RF016 <- time_dim.t_time_sk
 |  |  |
 |  |  82:EXCHANGE [BROADCAST]
 |  |  |
@@ -8586,12 +8586,12 @@ PLAN-ROOT SINK
 |  |
 |  13:HASH JOIN [INNER JOIN, BROADCAST]
 |  |  hash predicates: ss_hdemo_sk = household_demographics.hd_demo_sk
-|  |  runtime filters: RF008 <- household_demographics.hd_demo_sk
 |  |  row-size=36B cardinality=6.82K
 |  |
 |  |--JOIN BUILD
 |  |  |  join-table-id=26 plan-id=27 cohort-id=08
 |  |  |  build expressions: household_demographics.hd_demo_sk
+|  |  |  runtime filters: RF008 <- household_demographics.hd_demo_sk
 |  |  |
 |  |  77:EXCHANGE [BROADCAST]
 |  |  |
@@ -8602,12 +8602,12 @@ PLAN-ROOT SINK
 |  |
 |  12:HASH JOIN [INNER JOIN, BROADCAST]
 |  |  hash predicates: ss_sold_time_sk = time_dim.t_time_sk
-|  |  runtime filters: RF010 <- time_dim.t_time_sk
 |  |  row-size=24B cardinality=69.82K
 |  |
 |  |--JOIN BUILD
 |  |  |  join-table-id=27 plan-id=28 cohort-id=08
 |  |  |  build expressions: time_dim.t_time_sk
+|  |  |  runtime filters: RF010 <- time_dim.t_time_sk
 |  |  |
 |  |  76:EXCHANGE [BROADCAST]
 |  |  |
@@ -8648,12 +8648,12 @@ PLAN-ROOT SINK
 |
 05:HASH JOIN [INNER JOIN, BROADCAST]
 |  hash predicates: ss_hdemo_sk = household_demographics.hd_demo_sk
-|  runtime filters: RF002 <- household_demographics.hd_demo_sk
 |  row-size=36B cardinality=6.82K
 |
 |--JOIN BUILD
 |  |  join-table-id=29 plan-id=30 cohort-id=01
 |  |  build expressions: household_demographics.hd_demo_sk
+|  |  runtime filters: RF002 <- household_demographics.hd_demo_sk
 |  |
 |  72:EXCHANGE [BROADCAST]
 |  |
@@ -8664,12 +8664,12 @@ PLAN-ROOT SINK
 |
 04:HASH JOIN [INNER JOIN, BROADCAST]
 |  hash predicates: ss_sold_time_sk = time_dim.t_time_sk
-|  runtime filters: RF004 <- time_dim.t_time_sk
 |  row-size=24B cardinality=69.82K
 |
 |--JOIN BUILD
 |  |  join-table-id=30 plan-id=31 cohort-id=01
 |  |  build expressions: time_dim.t_time_sk
+|  |  runtime filters: RF004 <- time_dim.t_time_sk
 |  |
 |  71:EXCHANGE [BROADCAST]
 |  |

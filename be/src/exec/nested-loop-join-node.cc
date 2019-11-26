@@ -38,14 +38,13 @@ using namespace strings;
 
 Status NestedLoopJoinPlanNode::Init(const TPlanNode& tnode, RuntimeState* state) {
   RETURN_IF_ERROR(BlockingJoinPlanNode::Init(tnode, state));
-  DCHECK(tnode.__isset.nested_loop_join_node);
+  DCHECK(tnode.join_node.__isset.nested_loop_join_node);
   // join_conjunct_evals_ are evaluated in the context of rows assembled from
   // all inner and outer tuples.
-  RowDescriptor full_row_desc(
-      *children_[0]->row_descriptor_, *children_[1]->row_descriptor_);
-  RETURN_IF_ERROR(ScalarExpr::Create(tnode.nested_loop_join_node.join_conjuncts,
+  RowDescriptor full_row_desc(probe_row_desc(), build_row_desc());
+  RETURN_IF_ERROR(ScalarExpr::Create(tnode.join_node.nested_loop_join_node.join_conjuncts,
       full_row_desc, state, &join_conjuncts_));
-  DCHECK(tnode.nested_loop_join_node.join_op != TJoinOp::CROSS_JOIN
+  DCHECK(tnode.join_node.join_op != TJoinOp::CROSS_JOIN
       || join_conjuncts_.size() == 0)
       << "Join conjuncts in a cross join";
   return Status::OK();
@@ -60,7 +59,7 @@ Status NestedLoopJoinPlanNode::CreateExecNode(
 
 NestedLoopJoinNode::NestedLoopJoinNode(
     ObjectPool* pool, const NestedLoopJoinPlanNode& pnode, const DescriptorTbl& descs)
-  : BlockingJoinNode("NestedLoopJoinNode", pnode.tnode_->nested_loop_join_node.join_op,
+  : BlockingJoinNode("NestedLoopJoinNode", pnode.tnode_->join_node.join_op,
         pool, pnode, descs),
     build_batches_(NULL),
     current_build_row_idx_(0),
@@ -75,14 +74,21 @@ NestedLoopJoinNode::~NestedLoopJoinNode() {
 Status NestedLoopJoinNode::Open(RuntimeState* state) {
   SCOPED_TIMER(runtime_profile_->total_time_counter());
   ScopedOpenEventAdder ea(this);
-  RETURN_IF_ERROR(BlockingJoinNode::Open(state));
+  JoinBuilder* tmp_builder = nullptr;
+  RETURN_IF_ERROR(BlockingJoinNode::OpenImpl(state, &tmp_builder));
+  if (builder_ == nullptr) {
+    DCHECK(UseSeparateBuild(state->query_options()));
+    builder_ = dynamic_cast<NljBuilder*>(tmp_builder);
+    DCHECK(builder_ != nullptr);
+  }
   RETURN_IF_ERROR(ScalarExprEvaluator::Open(join_conjunct_evals_, state));
 
   // Check for errors and free expr result allocations before opening children.
   RETURN_IF_CANCELLED(state);
   RETURN_IF_ERROR(QueryMaintenance(state));
 
-  if (child(1)->type() == TPlanNodeType::type::SINGULAR_ROW_SRC_NODE) {
+  if (num_children() == 2 &&
+      child(1)->type() == TPlanNodeType::type::SINGULAR_ROW_SRC_NODE) {
     DCHECK(IsInSubplan());
     // When inside a subplan, open the first child before doing the build such that
     // UnnestNodes on the probe side are opened and project their unnested collection
@@ -111,14 +117,18 @@ Status NestedLoopJoinNode::Prepare(RuntimeState* state) {
   RETURN_IF_ERROR(BlockingJoinNode::Prepare(state));
   RETURN_IF_ERROR(ScalarExprEvaluator::Create(join_conjuncts_, state,
       pool_, expr_perm_pool(), expr_results_pool(), &join_conjunct_evals_));
-  builder_ = NljBuilder::CreateSink(child(1)->row_desc(), state);
-  RETURN_IF_ERROR(builder_->Prepare(state, mem_tracker()));
-  runtime_profile()->PrependChild(builder_->profile());
+
+  if (!UseSeparateBuild(state->query_options())) {
+    builder_ = NljBuilder::CreateEmbeddedBuilder(&build_row_desc(), state, id_);
+    RETURN_IF_ERROR(builder_->Prepare(state, mem_tracker()));
+    runtime_profile()->PrependChild(builder_->profile());
+  }
 
   // For some join modes we need to record the build rows with matches in a bitmap.
-  if (join_op_ == TJoinOp::RIGHT_ANTI_JOIN || join_op_ == TJoinOp::RIGHT_SEMI_JOIN ||
-      join_op_ == TJoinOp::RIGHT_OUTER_JOIN || join_op_ == TJoinOp::FULL_OUTER_JOIN) {
-    if (child(1)->type() == TPlanNodeType::type::SINGULAR_ROW_SRC_NODE) {
+  if (join_op_ == TJoinOp::RIGHT_ANTI_JOIN || join_op_ == TJoinOp::RIGHT_SEMI_JOIN
+      || join_op_ == TJoinOp::RIGHT_OUTER_JOIN || join_op_ == TJoinOp::FULL_OUTER_JOIN) {
+    if (num_children() == 2
+        && child(1)->type() == TPlanNodeType::type::SINGULAR_ROW_SRC_NODE) {
       // Allocate a fixed-size bitmap with a single element if we have a singular
       // row source node as our build child.
       int64_t bitmap_mem_usage = Bitmap::MemUsage(1);
@@ -150,9 +160,14 @@ void NestedLoopJoinNode::Close(RuntimeState* state) {
   ScalarExprEvaluator::Close(join_conjunct_evals_, state);
   ScalarExpr::Close(join_conjuncts_);
   if (builder_ != NULL) {
-    // IMPALA-6595: builder must be closed before child.
-    DCHECK(builder_->is_closed() || !children_[1]->is_closed());
-    builder_->Close(state);
+    // IMPALA-6595: builder must be closed before child. The separate build case is
+    // handled in FragmentInstanceState.
+    DCHECK(UseSeparateBuild(state->query_options()) || builder_->is_closed()
+        || !children_[1]->is_closed());
+    if (!UseSeparateBuild(state->query_options()) || waited_for_build_) {
+      builder_->CloseFromProbe(state);
+      waited_for_build_ = false;
+    }
   }
   build_batches_ = NULL;
   if (matching_build_rows_ != NULL) {
@@ -165,8 +180,9 @@ void NestedLoopJoinNode::Close(RuntimeState* state) {
 Status NestedLoopJoinNode::ConstructSingularBuildSide(RuntimeState* state) {
   // Optimized path for a common subplan shape with a singular row src node on the build
   // side that avoids expensive timers, virtual function calls, and other overhead.
-  DCHECK_EQ(child(1)->type(), TPlanNodeType::type::SINGULAR_ROW_SRC_NODE);
   DCHECK(IsInSubplan());
+  DCHECK_EQ(2, num_children());
+  DCHECK_EQ(child(1)->type(), TPlanNodeType::type::SINGULAR_ROW_SRC_NODE);
   RowBatch* batch = builder_->GetNextEmptyBatch();
   bool eos;
   RETURN_IF_ERROR(child(1)->GetNext(state, batch, &eos));

@@ -30,6 +30,7 @@
 
 namespace impala {
 
+class JoinBuilder;
 class RowBatch;
 class TupleRow;
 
@@ -39,11 +40,38 @@ class BlockingJoinPlanNode : public PlanNode {
   /// work, e.g. creating expr trees.
   virtual Status Init(const TPlanNode& tnode, RuntimeState* state) override;
   virtual Status CreateExecNode(RuntimeState* state, ExecNode** node) const override = 0;
+
+  /// Returns true if this join node will use a separate builder that is the root sink
+  /// of a different fragment. Otherwise the builder is owned by this node and consumes
+  /// input from the second child node. This depends on the containing subplan being
+  /// initialized, and isn't accurate until the whole PlanNode tree has been initialized.
+  bool UseSeparateBuild(const TQueryOptions& query_options) const {
+    return !IsInSubplan() && query_options.mt_dop > 0 && query_options.num_nodes != 1;
+  }
+
+  const RowDescriptor& probe_row_desc() const { return *children_[0]->row_descriptor_; }
+  const RowDescriptor& build_row_desc() const {
+    DCHECK(build_row_desc_ != nullptr);
+    return *build_row_desc_;
+  }
+
+ protected:
+  /// This is the same as the RowDescriptor of the build sink, if the join build is
+  /// separate, or the right child, if the join build is integrated into the node.
+  /// Owned by RuntimeState's object pool.
+  RowDescriptor* build_row_desc_ = nullptr;
 };
 
-/// Abstract base class for join nodes that block while consuming all rows from their
-/// right child in Open(). There is no implementation of Reset() because the Open()
-/// sufficiently covers setting members into a 'reset' state.
+/// Abstract base class for join nodes that block in Open() until all rows from the
+/// right input plan tree have been processed.
+///
+/// BlockingJoinNode and JoinBuilder subclasses interact together to implement a blocking
+/// join: the builder. Two modes are supported: an integrated join build, where the
+/// JoinBuilder is owned by the BlockingJoinNode, and a separate join build, where the
+/// JoinBuilder is owned by a separate build fragment co-located in the same Impala
+/// daemon, and the join node synchronizes with the builder to access build-side data
+/// structures.
+///
 /// TODO: Remove the restriction that the tuples in the join's output row have to
 /// correspond to the order of its child exec nodes. See the DCHECKs in Init().
 
@@ -58,8 +86,10 @@ class BlockingJoinNode : public ExecNode {
   /// Prepare() work, e.g. codegen.
   virtual Status Prepare(RuntimeState* state);
 
+  /// Helper called by subclass's Open() implementation.
   /// Calls ExecNode::Open() and initializes 'eos_' and 'probe_side_eos_'.
-  virtual Status Open(RuntimeState* state);
+  /// If the join build is separate, the join builder is returned in *separate_builder.
+  Status OpenImpl(RuntimeState* state, JoinBuilder** separate_builder);
 
   /// Transfers resources from 'probe_batch_' to 'row_batch'.
   virtual Status Reset(RuntimeState* state, RowBatch* row_batch);
@@ -73,6 +103,14 @@ class BlockingJoinNode : public ExecNode {
  protected:
   const std::string node_name_;
   TJoinOp::type join_op_;
+
+  /// True if OpenImpl() was called.
+  bool open_called_ = false;
+
+  /// True if this join node has called WaitForInitialBuild() on the corresponding
+  /// separate join builder. This means that CloseFromProbe() needs to be called
+  /// on the builder.
+  bool waited_for_build_ = false;
 
   /// Store in node to avoid reallocating. Cleared after build completes.
   boost::scoped_ptr<RowBatch> build_batch_;
@@ -106,7 +144,7 @@ class BlockingJoinNode : public ExecNode {
   RuntimeProfile::Counter* probe_row_counter_;   // num probe (left child) rows
 
   /// Stopwatch that measures the build child's Open/GetNext time that overlaps
-  /// with the probe child Open().
+  /// with the probe child Open(). Not used for separate join builds.
   MonotonicStopWatch built_probe_overlap_stop_watch_;
 
   // True for a join node subclass if the build side can be closed before the probe
@@ -118,14 +156,15 @@ class BlockingJoinNode : public ExecNode {
   // TODO: IMPALA-4179: this should always be true once resource transfer has been fixed.
   virtual bool CanCloseBuildEarly() const { return false; }
 
+  /// Acquire resources for this ExecNode required for the build phase.
   /// Called by BlockingJoinNode after opening child(1) succeeds and before
-  /// SendBuildInputToSink is called to allocate resources for this ExecNode.
+  /// this node either waits for the separate build or calls SendBuildInputToSink().
   virtual Status AcquireResourcesForBuild(RuntimeState* state) { return Status::OK(); }
 
   /// Processes the build-side input, which should be already open, by sending it to
   /// 'build_sink', wand opens the probe side. Will do both concurrently if not in a
   /// subplan and an extra thread token is available.
-  Status ProcessBuildInputAndOpenProbe(RuntimeState* state, DataSink* build_sink);
+  Status ProcessBuildInputAndOpenProbe(RuntimeState* state, JoinBuilder* build_sink);
 
   /// Set up 'current_probe_row_' to point to the first input row from the left child
   /// (probe side). Fills 'probe_batch_' with rows from the left child and updates
@@ -195,20 +234,40 @@ class BlockingJoinNode : public ExecNode {
       const RuntimeProfile::Counter* right_child_time,
       const MonotonicStopWatch* child_overlap_timer);
 
+  const BlockingJoinPlanNode& plan_node() const {
+    return static_cast<const BlockingJoinPlanNode&>(plan_node_);
+  }
+
+  /// Returns true if this join node is using a separate builder that is the root sink
+  /// of a different fragment. Otherwise the builder is owned by this node and consumes
+  /// input from the second child node.
+  bool UseSeparateBuild(const TQueryOptions& query_options) const {
+    return plan_node().UseSeparateBuild(query_options);
+  }
+
+  const RowDescriptor& probe_row_desc() const {
+    return plan_node().probe_row_desc();
+  }
+
+  const RowDescriptor& build_row_desc() const {
+    return plan_node().build_row_desc();
+  }
+
  private:
-  /// Helper function to process the build input by sending it to a DataSink. The build
-  /// input must already be open before calling this. ASYNC_BUILD enables timers that
-  /// impose some overhead but are required if the build is processed concurrently with
-  /// the Open() of the left child.
+  /// Helper function to process the build input by sending it to the integrated
+  /// JoinBuilder. The build input must already be open before calling this. ASYNC_BUILD
+  /// enables timers that impose some overhead but are required if the build is processed
+  /// concurrently with the Open() of the left child.
   template <bool ASYNC_BUILD>
-  Status SendBuildInputToSink(RuntimeState* state, DataSink* build_sink);
+  Status SendBuildInputToSink(RuntimeState* state, JoinBuilder* build_sink);
 
   /// The main function for the thread that opens the build side and processes the build
   /// input asynchronously.  Its status is returned in the 'status' promise. If
   /// 'build_sink' is non-NULL, it is used for the build. Otherwise, ProcessBuildInput()
   /// is called on the subclass.
-  void ProcessBuildInputAsync(RuntimeState* state, DataSink* build_sink, Status* status);
+  void ProcessBuildInputAsync(
+      RuntimeState* state, JoinBuilder* build_sink, Status* status);
 };
-}
+} // namespace impala
 
 #endif

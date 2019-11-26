@@ -58,6 +58,7 @@ class Thread;
 class DataSink;
 class DataSinkConfig;
 class RuntimeState;
+class JoinBuilder;
 
 /// FragmentInstanceState handles all aspects of the execution of a single plan fragment
 /// instance, including setup and finalization, both in the success and error case.
@@ -110,9 +111,13 @@ class FragmentInstanceState {
   void ReportSuccessful(const FragmentInstanceExecStatusPB& instance_status);
   void ReportFailed(const FragmentInstanceExecStatusPB& instance_status);
 
-  /// Returns fragment instance's sink if this is the root fragment instance. Valid after
-  /// the Prepare phase. May be nullptr.
+  /// Accessor functions for this fragment instance's sink. Valid after the Prepare
+  /// phase. Returns nullptr if this fragment has a different sink type.
   PlanRootSink* GetRootSink() const;
+  JoinBuilder* GetJoinBuildSink() const;
+
+  /// Return true if this finstance's sink is a join builder.
+  bool HasJoinBuildSink() const;
 
   /// Returns a string description of 'state'.
   static const string& ExecStateToString(FInstanceExecStatePB state);

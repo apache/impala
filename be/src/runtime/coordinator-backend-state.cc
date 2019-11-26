@@ -144,6 +144,7 @@ void Coordinator::BackendState::SetRpcParams(const DebugOptions& debug_options,
     instance_ctx.__set_per_exch_num_senders(
         params.fragment_exec_params.per_exch_num_senders);
     instance_ctx.__set_sender_id(params.sender_id);
+    instance_ctx.__set_join_build_inputs(params.join_build_inputs);
     if (debug_options.enabled()
         && (debug_options.instance_idx() == -1
             || debug_options.instance_idx() == GetInstanceIdx(params.instance_id))) {

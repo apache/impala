@@ -95,9 +95,11 @@ void PrintExecSummary(const TExecSummary& exec_summary, int indent_level,
   map<int, int>::const_iterator child_fragment_idx_it =
       exec_summary.exch_to_sender_map.find(*node_idx);
   if (child_fragment_idx_it != exec_summary.exch_to_sender_map.end()) {
-    DCHECK_EQ(node.num_children, 0);
+    int child_fragment_indent_level = indent_level + node.num_children;
+    bool child_fragment_new_indent_level = node.num_children > 0;
     int child_fragment_id = child_fragment_idx_it->second;
-    PrintExecSummary(exec_summary, indent_level, false, &child_fragment_id, result);
+    PrintExecSummary(exec_summary, child_fragment_indent_level,
+        child_fragment_new_indent_level, &child_fragment_id, result);
   }
   ++*node_idx;
   if (node.num_children == 0) return;

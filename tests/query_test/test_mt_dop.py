@@ -20,11 +20,13 @@
 import pytest
 
 from copy import deepcopy
-from tests.common.environ import ImpalaTestClusterProperties
+from tests.common.environ import ImpalaTestClusterProperties, build_flavor_timeout
 from tests.common.impala_test_suite import ImpalaTestSuite
 from tests.common.kudu_test_suite import KuduTestSuite
-from tests.common.skip import SkipIfEC, SkipIfNotHdfsMinicluster
+from tests.common.skip import SkipIfABFS, SkipIfEC, SkipIfNotHdfsMinicluster
 from tests.common.test_vector import ImpalaTestDimension
+
+WAIT_TIME_MS = build_flavor_timeout(60000, slow_build_timeout=100000)
 
 # COMPUTE STATS on Parquet tables automatically sets MT_DOP=4, so include
 # the value 0 to cover the non-MT path as well.
@@ -109,6 +111,27 @@ class TestMtDopParquet(ImpalaTestSuite):
     # Disable min-max stats to prevent interference with directionary filtering.
     vector.get_value('exec_option')['parquet_read_statistics'] = '0'
     self.run_test_case('QueryTest/parquet-filtering', vector)
+
+  @pytest.mark.execute_serially
+  @SkipIfABFS.file_or_folder_name_ends_with_period
+  def test_mt_dop_insert(self, vector, unique_database):
+    """Basic tests for inserts with mt_dop > 0"""
+    mt_dop = vector.get_value('mt_dop')
+    if mt_dop == 0:
+      pytest.skip("Non-mt inserts tested elsewhere")
+    self.run_test_case('QueryTest/insert', vector)
+
+  def test_mt_dop_only_joins(self, vector, unique_database):
+    """MT_DOP specific tests for joins."""
+    mt_dop = vector.get_value('mt_dop')
+    if mt_dop == 0:
+      pytest.skip("Test requires mt_dop > 0")
+    vector = deepcopy(vector)
+    # Allow test to override num_nodes.
+    del vector.get_value('exec_option')['num_nodes']
+    self.run_test_case('QueryTest/joins_mt_dop', vector,
+       test_file_vars={'$RUNTIME_FILTER_WAIT_TIME_MS': str(WAIT_TIME_MS)})
+
 
 class TestMtDopKudu(KuduTestSuite):
   @classmethod

@@ -68,6 +68,7 @@ add_library(Exec
   hbase-scan-node.cc
   hbase-table-scanner.cc
   incr-stats-util.cc
+  join-builder.cc
   nested-loop-join-builder.cc
   nested-loop-join-node.cc
   non-grouping-aggregator.cc

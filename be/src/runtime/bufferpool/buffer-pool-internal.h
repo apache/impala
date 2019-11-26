@@ -254,6 +254,9 @@ class BufferPool::Client {
   /// Implementation of ClientHandle::DecreaseReservationTo().
   Status DecreaseReservationTo(int64_t max_decrease, int64_t target_bytes) WARN_UNUSED_RESULT;
 
+  /// Implementations of ClientHandle::TransferReservationTo().
+  Status TransferReservationTo(ReservationTracker* dst, int64_t bytes, bool* transferred);
+
   /// Called after a buffer of 'len' is freed via the FreeBuffer() API to update
   /// internal accounting and release the buffer to the client's reservation. No page or
   /// client locks should be held by the caller.
@@ -310,8 +313,10 @@ class BufferPool::Client {
   /// Must be called once before allocating or reclaiming a buffer of 'len'. Ensures that
   /// enough dirty pages are flushed to disk to satisfy the buffer pool's internal
   /// invariants after the allocation. 'lock_' should be held by the caller via
-  /// 'client_lock'
-  Status CleanPages(boost::unique_lock<boost::mutex>* client_lock, int64_t len);
+  /// 'client_lock'. If 'lazy_flush' is true, only write out pages if needed to reclaim
+  /// 'len', and do not return a write error if the error prevents flushing enough pages.
+  Status CleanPages(boost::unique_lock<boost::mutex>* client_lock, int64_t len,
+      bool lazy_flush = false);
 
   /// Initiates asynchronous writes of dirty unpinned pages to disk. Ensures that at
   /// least 'min_bytes_to_write' bytes of writes will be written asynchronously. May

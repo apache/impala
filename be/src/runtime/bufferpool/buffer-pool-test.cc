@@ -1575,6 +1575,12 @@ void BufferPoolTest::TestWriteError(int write_delay_ms) {
   EXPECT_EQ(TErrorCode::SCRATCH_ALLOCATION_FAILED, error.code());
   EXPECT_FALSE(pages[0].is_pinned());
 
+  // Transferring reservation does not result in an error.
+  bool transferred;
+  EXPECT_OK(
+      client.TransferReservationTo(&global_reservations_, TEST_BUFFER_LEN, &transferred));
+  EXPECT_TRUE(transferred);
+
   DestroyAll(&pool, &client, &pages);
   pool.DeregisterClient(&client);
   global_reservations_.Close();

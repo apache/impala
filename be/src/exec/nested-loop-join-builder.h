@@ -18,50 +18,59 @@
 #ifndef IMPALA_EXEC_NESTED_LOOP_JOIN_BUILDER_H
 #define IMPALA_EXEC_NESTED_LOOP_JOIN_BUILDER_H
 
+#include "common/atomic.h"
 #include "exec/blocking-join-node.h"
-#include "exec/data-sink.h"
+#include "exec/join-builder.h"
 #include "exec/row-batch-cache.h"
 #include "exec/row-batch-list.h"
 #include "runtime/descriptors.h"
 
 namespace impala {
 
-/// Dummy class needed to create an instance of the sink.
-class NljBuilderConfig : public DataSinkConfig {
+class NljBuilderConfig : public JoinBuilderConfig {
  public:
   DataSink* CreateSink(const TPlanFragmentCtx& fragment_ctx,
       const TPlanFragmentInstanceCtx& fragment_instance_ctx,
-      RuntimeState* state) const override {
-    DCHECK(false) << "Not Implemented";
-    return nullptr;
-  }
+      RuntimeState* state) const override;
 
   ~NljBuilderConfig() override {}
+
+ protected:
+  Status Init(const TDataSink& tsink, const RowDescriptor* input_row_desc,
+      RuntimeState* state) override;
 };
 
 /// Builder for the NestedLoopJoinNode that accumulates the build-side rows for the join.
-/// Implements the DataSink interface but also exposes some methods for direct use by
-/// NestedLoopJoinNode.
+/// Implements the JoinBuilder and DataSink interfaces but also exposes some methods for
+/// direct use by NestedLoopJoinNode.
 ///
 /// The builder will operate in one of two modes depending on the memory ownership of
 /// row batches pulled from the child node on the build side. If the row batches own all
 /// tuple memory, the non-copying mode is used and row batches are simply accumulated in
 /// the builder. If the batches reference tuple data they do not own, the copying mode
-/// is used and all data is deep copied into memory owned by the builder.
-class NljBuilder : public DataSink {
+/// is used and all data is deep copied into memory owned by the builder. We always
+/// use the copying mode for separate build sinks so that the source fragment plan tree
+/// can be safely torn down.
+class NljBuilder : public JoinBuilder {
  public:
-
   /// To be used by the NestedLoopJoinNode to create an instance of this sink.
-  static NljBuilder* CreateSink(const RowDescriptor* row_desc, RuntimeState* state);
+  static NljBuilder* CreateEmbeddedBuilder(
+      const RowDescriptor* row_desc, RuntimeState* state, int join_node_id);
+  // Factory method for separate builder.
+  static NljBuilder* CreateSeparateBuilder(
+      TDataSinkId sink_id, const NljBuilderConfig& sink_config, RuntimeState* state);
+
+  ~NljBuilder();
 
   /// Implementations of DataSink interface methods.
   virtual Status Prepare(RuntimeState* state, MemTracker* parent_mem_tracker) override;
   virtual Status Open(RuntimeState* state) override;
   virtual Status Send(RuntimeState* state, RowBatch* batch) override;
   virtual Status FlushFinal(RuntimeState* state) override;
-  virtual void Close(RuntimeState* state) override;
+  void Close(RuntimeState* state) override;
 
   /// Reset the builder to the same state as it was in after calling Open().
+  /// Not valid to call on a separate join build.
   void Reset();
 
   /// Returns the next build batch that should be filled and passed to AddBuildBatch().
@@ -77,7 +86,8 @@ class NljBuilder : public DataSink {
   inline void AddBuildBatch(RowBatch* batch) { input_build_batches_.AddRowBatch(batch); }
 
   /// Return a pointer to the final list of build batches.
-  /// Only valid to call after FlushFinal() has been called.
+  /// Only valid to call after FlushFinal() has been called. The returned build batches
+  /// are not mutated and valid to use until Close() is called on the builder.
   RowBatchList* GetFinalBuildBatches() {
     if (copied_build_batches_.total_num_rows() > 0) {
       DCHECK_EQ(input_build_batches_.total_num_rows(), 0);
@@ -91,7 +101,11 @@ class NljBuilder : public DataSink {
   inline RowBatchList* copied_build_batches() { return &copied_build_batches_; }
 
  private:
-  NljBuilder(const DataSinkConfig& sink_config, RuntimeState* state);
+  // Constructor for builder embedded in NestedLoopJoinNode.
+  NljBuilder(const NljBuilderConfig& sink_config, RuntimeState* state);
+  // Constructor for separate builder.
+  NljBuilder(
+      TDataSinkId sink_id, const NljBuilderConfig& sink_config, RuntimeState* state);
 
   /// Deep copy all build batches in 'input_build_batches_' to 'copied_build_batches_'.
   /// Resets all the source batches and clears 'input_build_batches_'.

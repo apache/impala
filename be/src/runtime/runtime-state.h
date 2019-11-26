@@ -55,6 +55,7 @@ class HBaseTableFactory;
 class TPlanFragmentCtx;
 class TPlanFragmentInstanceCtx;
 class QueryState;
+class ConditionVariable;
 
 namespace io {
   class DiskIoMgr;
@@ -238,6 +239,11 @@ class RuntimeState {
 
   bool is_cancelled() const { return is_cancelled_.Load(); }
   void Cancel();
+  /// Add a condition variable to be signalled when this RuntimeState is cancelled.
+  /// Adding a condition variable multiple times is a no-op. Each distinct 'cv' will be
+  /// signalled once with NotifyAll() when is_cancelled() becomes true.
+  /// The condition variable must have query lifetime.
+  void AddCancellationCV(ConditionVariable* cv);
 
   RuntimeProfile::Counter* total_storage_wait_timer() {
     return total_storage_wait_timer_;
@@ -418,6 +424,11 @@ class RuntimeState {
   /// status once it notices is_cancelled_ == true.
   AtomicBool is_cancelled_{false};
 
+  /// Condition variables that will be signalled by Cancel(). Protected by
+  /// 'cancellation_cvs_lock_'.
+  std::vector<ConditionVariable*> cancellation_cvs_;
+  SpinLock cancellation_cvs_lock_;
+
   /// if true, ReleaseResources() was called.
   bool released_resources_ = false;
 
@@ -427,11 +438,9 @@ class RuntimeState {
   SpinLock query_status_lock_;
   Status query_status_;
 
-  /// This is the node id of the root node for this plan fragment. This is used as the
-  /// hash seed and has two useful properties:
-  /// 1) It is the same for all exec nodes in a fragment, so the resulting hash values
-  /// can be shared.
-  /// 2) It is different between different fragments, so we do not run into hash
+  /// This is the node id of the root node for this plan fragment.
+  ///
+  /// This is used as the hash seed within the fragment so we do not run into hash
   /// collisions after data partitioning (across fragments). See IMPALA-219 for more
   /// details.
   PlanNodeId root_node_id_ = -1;

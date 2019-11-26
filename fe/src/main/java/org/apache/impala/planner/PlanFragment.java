@@ -37,6 +37,8 @@ import org.apache.impala.thrift.TPlanFragmentTree;
 import org.apache.impala.thrift.TQueryOptions;
 
 import com.google.common.base.Preconditions;
+import com.google.common.base.Predicate;
+import com.google.common.base.Predicates;
 
 /**
  * PlanFragments form a tree structure via their ExchangeNodes. A tree of fragments
@@ -48,10 +50,15 @@ import com.google.common.base.Preconditions;
  * plans that materialize intermediate results for a particular consumer plan
  * are grouped into a single cohort.
  *
- * A PlanFragment encapsulates the specific tree of execution nodes that
+ * A PlanFragment encapsulates the specific tree of execution nodes (PlanNodes) that
  * are used to produce the output of the plan fragment, as well as output exprs,
  * destination node, etc. If there are no output exprs, the full row that is
  * is produced by the plan root is marked as materialized.
+ *
+ * PlanNode trees are connected across fragments where the parent fragment consumes the
+ * output of the child fragment. In this case the PlanNode and DataSink of the two
+ * fragments must match, e.g. ExchangeNode and DataStreamSink or a JoinNode and a
+ * JoinBuildSink.
  *
  * A plan fragment can have one or many instances, each of which in turn is executed by
  * an individual node and the output sent to a specific instance of the destination
@@ -64,13 +71,10 @@ import com.google.common.base.Preconditions;
  *
  * The sequence of calls is:
  * - c'tor
- * - assemble with getters, etc.
- * - finalize()
+ * - assemble with getters, etc. setSink() must be called so that the fragment has a sink.
+ * - finalizeExchanges()
+ * - computeResourceProfile()
  * - toThrift()
- *
- * TODO: the tree of PlanNodes is connected across fragment boundaries, which makes
- *   it impossible search for things within a fragment (using TreeNode functions);
- *   fix that
  */
 public class PlanFragment extends TreeNode<PlanFragment> {
   private final PlanFragmentId fragmentId_;
@@ -157,15 +161,30 @@ public class PlanFragment extends TreeNode<PlanFragment> {
    */
   public List<PlanNode> collectPlanNodes() {
     List<PlanNode> nodes = new ArrayList<>();
-    collectPlanNodesHelper(planRoot_, nodes);
+    collectPlanNodesHelper(planRoot_, Predicates.alwaysTrue(), nodes);
     return nodes;
   }
 
-  private void collectPlanNodesHelper(PlanNode root, List<PlanNode> nodes) {
+  /**
+   * Collect PlanNodes that belong to the exec tree of this fragment and for which
+   * 'predicate' is true. Collected nodes are added to 'node'. Nodes are cast to
+   * T.
+   */
+  public <T extends PlanNode> void collectPlanNodes(
+      Predicate<? super PlanNode> predicate, List<T> nodes) {
+    collectPlanNodesHelper(planRoot_, predicate, nodes);
+  }
+
+  @SuppressWarnings("unchecked")
+  private  <T extends PlanNode> void collectPlanNodesHelper(
+      PlanNode root, Predicate<? super PlanNode> predicate, List<T> nodes) {
     if (root == null) return;
-    nodes.add(root);
-    if (root instanceof ExchangeNode) return;
-    for (PlanNode child: root.getChildren()) collectPlanNodesHelper(child, nodes);
+    if (predicate.apply(root)) nodes.add((T)root);
+    for (PlanNode child: root.getChildren()) {
+      if (child.getFragment() == this) {
+        collectPlanNodesHelper(child, predicate, nodes);
+      }
+    }
   }
 
   /**
@@ -238,17 +257,19 @@ public class PlanFragment extends TreeNode<PlanFragment> {
    * runtime filters that are stored at the fragment level.
    */
   public void computeResourceProfile(Analyzer analyzer) {
+    Preconditions.checkState(sink_ != null);
     // Compute resource profiles for all plan nodes and sinks in the fragment.
     sink_.computeResourceProfile(analyzer.getQueryOptions());
     computeRuntimeFilterResources(analyzer);
 
-    if (sink_ instanceof JoinBuildSink) {
-      // Resource consumption of fragments with join build sinks is included in the
-      // parent fragment because the join node blocks waiting for the join build to
-      // finish - see JoinNode.computeTreeResourceProfiles().
-      perBackendResourceProfile_ = ResourceProfile.invalid();
-      perInstanceResourceProfile_ = ResourceProfile.invalid();
-      return;
+    perBackendInitialMemReservationTotalClaims_ =
+        consumedGlobalRuntimeFiltersMemReservationBytes_;
+    perInstanceInitialMemReservationTotalClaims_ =
+        sink_.getResourceProfile().getMinMemReservationBytes()
+        + producedRuntimeFiltersMemReservationBytes_;
+    for (PlanNode node: collectPlanNodes()) {
+      perInstanceInitialMemReservationTotalClaims_ +=
+          node.getNodeResourceProfile().getMinMemReservationBytes();
     }
 
     ExecPhaseResourceProfiles planTreeProfile =
@@ -270,15 +291,20 @@ public class PlanFragment extends TreeNode<PlanFragment> {
             .setMinMemReservationBytes(consumedGlobalRuntimeFiltersMemReservationBytes_)
             .setThreadReservation(0)
             .build();
-    perBackendInitialMemReservationTotalClaims_ =
-        consumedGlobalRuntimeFiltersMemReservationBytes_;
-    perInstanceInitialMemReservationTotalClaims_ =
-        sink_.getResourceProfile().getMinMemReservationBytes()
-        + producedRuntimeFiltersMemReservationBytes_;
-    for (PlanNode node : collectPlanNodes()) {
-      perInstanceInitialMemReservationTotalClaims_ +=
-          node.getNodeResourceProfile().getMinMemReservationBytes();
-    }
+    validateResourceProfiles();
+  }
+
+  /**
+   * Validates that the resource profiles for this PlanFragment are complete and valid,
+   * i.e. that computeResourceProfile() was called and that it filled out the profiles
+   * correctly. Raises an exception if an invariant is violated. */
+  private void validateResourceProfiles() {
+    Preconditions.checkState(perInstanceResourceProfile_.isValid());
+    Preconditions.checkState(perBackendResourceProfile_.isValid());
+    Preconditions.checkArgument(perInstanceInitialMemReservationTotalClaims_ > -1);
+    Preconditions.checkArgument(perBackendInitialMemReservationTotalClaims_ > -1);
+    Preconditions.checkArgument(producedRuntimeFiltersMemReservationBytes_ > -1);
+    Preconditions.checkArgument(consumedGlobalRuntimeFiltersMemReservationBytes_ > -1);
   }
 
   /**
@@ -289,6 +315,14 @@ public class PlanFragment extends TreeNode<PlanFragment> {
   private void computeRuntimeFilterResources(Analyzer analyzer) {
     Map<RuntimeFilterId, RuntimeFilter> consumedFilters = new HashMap<>();
     Map<RuntimeFilterId, RuntimeFilter> producedFilters = new HashMap<>();
+    // Visit all sinks and nodes to identify filters produced or consumed by fragment.
+    sink_.computeResourceProfile(analyzer.getQueryOptions());
+    Preconditions.checkState(
+        sink_.getRuntimeFilters().isEmpty() || sink_ instanceof JoinBuildSink);
+    for (RuntimeFilter filter : sink_.getRuntimeFilters()) {
+      // Join build sinks are always runtime filter producers, not consumers.
+      producedFilters.put(filter.getFilterId(), filter);
+    }
     for (PlanNode node : collectPlanNodes()) {
       node.computeNodeResourceProfile(analyzer.getQueryOptions());
       boolean isFilterProducer = node instanceof JoinNode;
@@ -382,36 +416,26 @@ public class PlanFragment extends TreeNode<PlanFragment> {
   }
 
   public TPlanFragment toThrift() {
+    validateResourceProfiles();
     TPlanFragment result = new TPlanFragment();
     result.setDisplay_name(fragmentId_.toString());
     if (planRoot_ != null) result.setPlan(planRoot_.treeToThrift());
     if (sink_ != null) result.setOutput_sink(sink_.toThrift());
     result.setPartition(dataPartition_.toThrift());
-    if (perInstanceResourceProfile_.isValid()) {
-      Preconditions.checkState(perBackendResourceProfile_.isValid());
-      Preconditions.checkArgument(perInstanceInitialMemReservationTotalClaims_ > -1);
-      Preconditions.checkArgument(perBackendInitialMemReservationTotalClaims_ > -1);
-      result.setInstance_min_mem_reservation_bytes(
-          perInstanceResourceProfile_.getMinMemReservationBytes());
-      result.setBackend_min_mem_reservation_bytes(
-          perBackendResourceProfile_.getMinMemReservationBytes());
-      result.setInstance_initial_mem_reservation_total_claims(
-          perInstanceInitialMemReservationTotalClaims_);
-      result.setBackend_initial_mem_reservation_total_claims(
-          perBackendInitialMemReservationTotalClaims_);
-      result.setProduced_runtime_filters_reservation_bytes(
-          producedRuntimeFiltersMemReservationBytes_);
-      result.setConsumed_runtime_filters_reservation_bytes(
-          consumedGlobalRuntimeFiltersMemReservationBytes_);
-      result.setThread_reservation(perInstanceResourceProfile_.getThreadReservation());
-    } else {
-      result.setBackend_min_mem_reservation_bytes(0);
-      result.setInstance_min_mem_reservation_bytes(0);
-      result.setBackend_initial_mem_reservation_total_claims(0);
-      result.setInstance_initial_mem_reservation_total_claims(0);
-      result.setProduced_runtime_filters_reservation_bytes(0);
-      result.setConsumed_runtime_filters_reservation_bytes(0);
-    }
+
+    result.setInstance_initial_mem_reservation_total_claims(
+        perInstanceInitialMemReservationTotalClaims_);
+    result.setBackend_initial_mem_reservation_total_claims(
+        perBackendInitialMemReservationTotalClaims_);
+    result.setProduced_runtime_filters_reservation_bytes(
+        producedRuntimeFiltersMemReservationBytes_);
+    result.setConsumed_runtime_filters_reservation_bytes(
+        consumedGlobalRuntimeFiltersMemReservationBytes_);
+    result.setInstance_min_mem_reservation_bytes(
+        perInstanceResourceProfile_.getMinMemReservationBytes());
+    result.setBackend_min_mem_reservation_bytes(
+        perBackendResourceProfile_.getMinMemReservationBytes());
+    result.setThread_reservation(perInstanceResourceProfile_.getThreadReservation());
     return result;
   }
 
@@ -491,10 +515,7 @@ public class PlanFragment extends TreeNode<PlanFragment> {
         "Per-Host Resources: " : "Per-Host Shared Resources: ";
     String perHostExplainString = null;
     String perInstanceExplainString = null;
-    if (sink_ instanceof JoinBuildSink) {
-      perHostExplainString = "included in parent fragment";
-      perInstanceExplainString = mt_dop == 0 ? null : "included in parent fragment";
-    } else if (mt_dop == 0) {
+    if (mt_dop == 0) {
       // There is no point separating out per-host and per-instance resources when there
       // is only a single instance per host so combine them together.
       ResourceProfile perHostProfile = getTotalPerBackendResourceProfile(mt_dop);
@@ -602,6 +623,29 @@ public class PlanFragment extends TreeNode<PlanFragment> {
   }
 
   /**
+   * Return all fragments in the current plan (i.e. ancestors of this root reachable
+   * via exchanges but not via join builds).
+   * Only valid to call once all fragments have sinks created.
+   */
+  public List<PlanFragment> getFragmentsInPlanPreorder() {
+    List<PlanFragment> result = new ArrayList<>();
+    getFragmentsInPlanPreorderAux(result);
+    return result;
+  }
+
+  /**
+   * Helper for getFragmentsInPlanPreorder().
+   */
+  protected void getFragmentsInPlanPreorderAux(List<PlanFragment> result) {
+    result.add(this);
+    for (PlanFragment child: children_) {
+      if (child.getSink() instanceof DataStreamSink) {
+        child.getFragmentsInPlanPreorderAux(result);
+      }
+    }
+  }
+
+  /**
    * Verify that the tree of PlanFragments and their contained tree of
    * PlanNodes is constructed correctly.
    */
@@ -627,5 +671,13 @@ public class PlanFragment extends TreeNode<PlanFragment> {
     Preconditions.checkState(getChildren().containsAll(childFragments));
 
     for (PlanFragment child: getChildren()) child.verifyTree();
+  }
+
+  /// Returns a seed value to use when hashing tuples for nodes within this fragment.
+  /// Also see RuntimeState::fragment_hash_seed().
+  public int getHashSeed() {
+    // IMPALA-219: we should use different seeds for different fragment.
+    // We add one to prevent having a hash seed of 0.
+    return planRoot_.getId().asInt() + 1;
   }
 }

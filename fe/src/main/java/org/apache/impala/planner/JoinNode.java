@@ -36,6 +36,7 @@ import org.apache.impala.common.ImpalaException;
 import org.apache.impala.common.Pair;
 import org.apache.impala.thrift.TExecNodePhase;
 import org.apache.impala.thrift.TJoinDistributionMode;
+import org.apache.impala.thrift.TJoinNode;
 import org.apache.impala.thrift.TQueryOptions;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -198,6 +199,7 @@ public abstract class JoinNode extends PlanNode {
   public void setDistributionMode(DistributionMode distrMode) { distrMode_ = distrMode; }
   public JoinTableId getJoinTableId() { return joinTableId_; }
   public void setJoinTableId(JoinTableId id) { joinTableId_ = id; }
+  public boolean hasSeparateBuild() { return joinTableId_ != JoinTableId.INVALID; }
   /// True if this consumes all of its right input before outputting any rows.
   abstract public boolean isBlockingJoinNode();
 
@@ -657,38 +659,42 @@ public abstract class JoinNode extends PlanNode {
       TQueryOptions queryOptions) {
     Preconditions.checkState(isBlockingJoinNode(), "Only blocking join nodes supported");
 
-    ExecPhaseResourceProfiles buildSideProfile =
-        getChild(1).computeTreeResourceProfiles(queryOptions);
     ExecPhaseResourceProfiles probeSideProfile =
         getChild(0).computeTreeResourceProfiles(queryOptions);
 
-    // The peak resource consumption of the build phase is either during the Open() of
-    // the build side or while we're doing the join build and calling GetNext() on the
-    // build side.
-    ResourceProfile buildPhaseProfile = buildSideProfile.duringOpenProfile.max(
-        buildSideProfile.postOpenProfile.sum(nodeResourceProfile_));
-
-    ResourceProfile finishedBuildProfile = nodeResourceProfile_;
-    if (this instanceof NestedLoopJoinNode) {
-      // These exec node implementations may hold references into the build side, which
-      // prevents closing of the build side in a timely manner. This means we have to
-      // count the post-open resource consumption of the build side in the same way as
-      // the other in-memory data structures.
-      // TODO: IMPALA-4179: remove this workaround
-      finishedBuildProfile = buildSideProfile.postOpenProfile.sum(nodeResourceProfile_);
-    }
-
-    // Peak resource consumption of this subtree during Open().
-    ResourceProfile duringOpenProfile;
-    if (queryOptions.getMt_dop() == 0) {
-      // The build and probe side can be open and therefore consume resources
-      // simultaneously when mt_dop = 0 because of the async build thread.
-      duringOpenProfile = buildPhaseProfile.sum(probeSideProfile.duringOpenProfile);
+    ResourceProfile buildPhaseProfile;
+    ResourceProfile finishedBuildProfile;
+    if (hasSeparateBuild()) {
+      // Memory consumption is accounted for in the build fragment, except for the probe
+      // buffers accounted for in nodeResourceProfile_.
+      buildPhaseProfile = nodeResourceProfile_;
+      finishedBuildProfile = nodeResourceProfile_;
     } else {
-      // Open() of the probe side happens after the build completes.
-      duringOpenProfile = buildPhaseProfile.max(
-          finishedBuildProfile.sum(probeSideProfile.duringOpenProfile));
+      ExecPhaseResourceProfiles buildSideProfile =
+          getChild(1).computeTreeResourceProfiles(queryOptions);
+      // The peak resource consumption of the build phase is either during the Open() of
+      // the build side or while we're doing the join build and calling GetNext() on the
+      // build side.
+      buildPhaseProfile = buildSideProfile.duringOpenProfile.max(
+          buildSideProfile.postOpenProfile.sum(nodeResourceProfile_));
+
+      finishedBuildProfile = nodeResourceProfile_;
+      if (this instanceof NestedLoopJoinNode) {
+        // These exec node implementations may hold references into the build side, which
+        // prevents closing of the build side in a timely manner. This means we have to
+        // count the post-open resource consumption of the build side in the same way as
+        // the other in-memory data structures.
+        // TODO: IMPALA-4179: remove this workaround
+        finishedBuildProfile =
+            buildSideProfile.postOpenProfile.sum(nodeResourceProfile_);
+      }
     }
+
+    // Compute peak resource consumption of this subtree during Open().
+    // The build and probe side can be open and therefore consume resources
+    // simultaneously when mt_dop = 0 because of the async build thread.
+    ResourceProfile duringOpenProfile =
+        buildPhaseProfile.sum(probeSideProfile.duringOpenProfile);
 
     // After Open(), the probe side remains open and the join build remain in memory.
     ResourceProfile probePhaseProfile =
@@ -714,4 +720,39 @@ public abstract class JoinNode extends PlanNode {
       }
     }
   }
+
+  /** Helper to construct TJoinNode. */
+  protected TJoinNode joinNodeToThrift() {
+    TJoinNode result = new TJoinNode(joinOp_.toThrift());
+    List<TupleId> buildTupleIds = getChild(1).getTupleIds();
+    result.setBuild_tuples(new ArrayList<>(buildTupleIds.size()));
+    result.setNullable_build_tuples(new ArrayList<>(buildTupleIds.size()));
+    for (TupleId tid : buildTupleIds) {
+      result.addToBuild_tuples(tid.asInt());
+      result.addToNullable_build_tuples(getChild(1).getNullableTupleIds().contains(tid));
+    }
+    return result;
+  }
+
+  @Override
+  public void computeNodeResourceProfile(TQueryOptions queryOptions) {
+    Pair<ResourceProfile, ResourceProfile> profiles =
+        computeJoinResourceProfile(queryOptions);
+    if (hasSeparateBuild()) {
+      // All build resource consumption is accounted for in the separate builder.
+      nodeResourceProfile_ = profiles.first;
+    } else {
+      // Both build and profile resources are accounted for in the node.
+      nodeResourceProfile_ = profiles.first.combine(profiles.second);
+    }
+  }
+
+  /**
+   * Helper method to compute the resource requirements for the join that can be
+   * called from the builder or the join node. Returns a pair of the probe
+   * resource requirements and the build resource requirements.
+   * Does not modify the state of this node.
+   */
+  public abstract Pair<ResourceProfile, ResourceProfile> computeJoinResourceProfile(
+      TQueryOptions queryOptions);
 }

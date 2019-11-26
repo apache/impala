@@ -25,6 +25,7 @@ import org.apache.impala.analysis.BinaryPredicate;
 import org.apache.impala.analysis.Expr;
 import org.apache.impala.analysis.JoinOperator;
 import org.apache.impala.common.ImpalaException;
+import org.apache.impala.common.Pair;
 import org.apache.impala.thrift.TExplainLevel;
 import org.apache.impala.thrift.TNestedLoopJoinNode;
 import org.apache.impala.thrift.TPlanNode;
@@ -75,7 +76,8 @@ public class NestedLoopJoinNode extends JoinNode {
   }
 
   @Override
-  public void computeNodeResourceProfile(TQueryOptions queryOptions) {
+  public Pair<ResourceProfile, ResourceProfile> computeJoinResourceProfile(
+      TQueryOptions queryOptions) {
     long perInstanceMemEstimate;
     if (getChild(1).getCardinality() == -1 || getChild(1).getAvgRowSize() == -1
         || numNodes_ == 0) {
@@ -84,7 +86,10 @@ public class NestedLoopJoinNode extends JoinNode {
       perInstanceMemEstimate =
           (long) Math.ceil(getChild(1).cardinality_ * getChild(1).avgRowSize_);
     }
-    nodeResourceProfile_ = ResourceProfile.noReservation(perInstanceMemEstimate);
+    ResourceProfile buildProfile = ResourceProfile.noReservation(perInstanceMemEstimate);
+    // Memory requirements for the probe side are minimal - batches are just streamed
+    // through.
+    return Pair.create(ResourceProfile.noReservation(0), buildProfile);
   }
 
   @Override
@@ -118,10 +123,10 @@ public class NestedLoopJoinNode extends JoinNode {
   @Override
   protected void toThrift(TPlanNode msg) {
     msg.node_type = TPlanNodeType.NESTED_LOOP_JOIN_NODE;
-    msg.nested_loop_join_node = new TNestedLoopJoinNode();
-    msg.nested_loop_join_node.join_op = joinOp_.toThrift();
-    for (Expr e: otherJoinConjuncts_) {
-      msg.nested_loop_join_node.addToJoin_conjuncts(e.treeToThrift());
+    msg.join_node = joinNodeToThrift();
+    msg.join_node.nested_loop_join_node = new TNestedLoopJoinNode();
+    for (Expr e : otherJoinConjuncts_) {
+      msg.join_node.nested_loop_join_node.addToJoin_conjuncts(e.treeToThrift());
     }
   }
 

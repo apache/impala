@@ -435,7 +435,8 @@ abstract public class PlanNode extends TreeNode<PlanNode> {
     return result;
   }
 
-  // Append a flattened version of this plan node, including all children, to 'container'.
+  // Append a flattened version of this plan node, including all children in the same
+  // fragment, to 'container'.
   private void treeToThriftHelper(TPlan container) {
     TPlanNode msg = new TPlanNode();
     msg.node_id = id_.asInt();
@@ -471,16 +472,15 @@ abstract public class PlanNode extends TreeNode<PlanNode> {
     }
     toThrift(msg);
     container.addToNodes(msg);
-    // For the purpose of the BE consider ExchangeNodes to have no children.
-    if (this instanceof ExchangeNode) {
-      msg.num_children = 0;
-      return;
-    } else {
-      msg.num_children = children_.size();
-      for (PlanNode child: children_) {
-        child.treeToThriftHelper(container);
-      }
+    // For the purpose of the BE consider cross-fragment children (i.e.
+    // ExchangeNodes and separated join builds) to have no children.
+    int numChildren = 0;
+    for (PlanNode child: children_) {
+      if (child.getFragment() != getFragment()) continue;
+      child.treeToThriftHelper(container);
+      ++numChildren;
     }
+    msg.num_children = numChildren;
   }
 
   /**
@@ -866,9 +866,14 @@ abstract public class PlanNode extends TreeNode<PlanNode> {
 
   protected String getRuntimeFilterExplainString(
       boolean isBuildNode, TExplainLevel detailLevel) {
-    if (runtimeFilters_.isEmpty()) return "";
+    return getRuntimeFilterExplainString(runtimeFilters_, isBuildNode, id_, detailLevel);
+  }
+
+  public static String getRuntimeFilterExplainString(List<RuntimeFilter> filters,
+      boolean isBuildNode, PlanNodeId nodeId, TExplainLevel detailLevel) {
+    if (filters.isEmpty()) return "";
     List<String> filtersStr = new ArrayList<>();
-    for (RuntimeFilter filter: runtimeFilters_) {
+    for (RuntimeFilter filter: filters) {
       StringBuilder filterStr = new StringBuilder();
       filterStr.append(filter.getFilterId());
       if (detailLevel.ordinal() >= TExplainLevel.EXTENDED.ordinal()) {
@@ -881,7 +886,7 @@ abstract public class PlanNode extends TreeNode<PlanNode> {
         filterStr.append(filter.getSrcExpr().toSql());
       } else {
         filterStr.append(" -> ");
-        filterStr.append(filter.getTargetExpr(getId()).toSql());
+        filterStr.append(filter.getTargetExpr(nodeId).toSql());
       }
       filtersStr.add(filterStr.toString());
     }

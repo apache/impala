@@ -81,6 +81,8 @@ class PlanNode {
 
   virtual ~PlanNode(){}
 
+  bool IsInSubplan() const { return containing_subplan_ != nullptr; }
+
   /// TODO: IMPALA-9216: Add accessor methods for these members instead of making
   /// them public.
   /// Reference to the thrift node that represents this PlanNode.
@@ -99,7 +101,7 @@ class PlanNode {
   std::vector<PlanNode*> children_;
 
   /// Pointer to the containing SubplanPlanNode or NULL if not inside a subplan.
-  /// Set by the containing SubplanPlanNode::Prepare() before Prepare() is called on
+  /// Set by the containing SubplanPlanNode::Init() before Init() is called on
   /// 'this' node. Not owned.
   SubplanPlanNode* containing_subplan_ = nullptr;
 
@@ -320,7 +322,7 @@ class ExecNode {
   bool IsNodeCodegenDisabled() const;
 
   /// Returns true if this node is inside the right-hand side plan tree of a SubplanNode.
-  bool IsInSubplan() const { return plan_node_.containing_subplan_ != nullptr; }
+  bool IsInSubplan() const { return plan_node_.IsInSubplan(); }
 
   /// Names of counters shared by all exec nodes
   static const std::string ROW_THROUGHPUT_COUNTER;
@@ -388,7 +390,7 @@ class ExecNode {
   RowDescriptor& row_descriptor_;
 
   /// Resource information sent from the frontend.
-  const TBackendResourceProfile resource_profile_;
+  const TBackendResourceProfile& resource_profile_;
 
   /// debug-only: if debug_action_ is not INVALID, node will perform action in
   /// debug_phase_

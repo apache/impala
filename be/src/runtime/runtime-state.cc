@@ -231,6 +231,19 @@ Status RuntimeState::LogOrReturnError(const ErrorMsg& message) {
 
 void RuntimeState::Cancel() {
   is_cancelled_.Store(true);
+  {
+    lock_guard<SpinLock> l(cancellation_cvs_lock_);
+    for (ConditionVariable* cv : cancellation_cvs_) cv->NotifyAll();
+  }
+}
+
+void RuntimeState::AddCancellationCV(ConditionVariable* cv) {
+  lock_guard<SpinLock> l(cancellation_cvs_lock_);
+  for (ConditionVariable* cv2 : cancellation_cvs_) {
+    // Don't add if already present.
+    if (cv == cv2) return;
+  }
+  cancellation_cvs_.push_back(cv);
 }
 
 double RuntimeState::ComputeExchangeScanRatio() const {

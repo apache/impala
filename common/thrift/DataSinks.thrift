@@ -23,13 +23,15 @@ include "Exprs.thrift"
 include "Types.thrift"
 include "Descriptors.thrift"
 include "Partitions.thrift"
+include "PlanNodes.thrift"
 include "ResourceProfile.thrift"
 
 enum TDataSinkType {
   DATA_STREAM_SINK = 0
   TABLE_SINK = 1
-  JOIN_BUILD_SINK = 2
+  HASH_JOIN_BUILDER = 2
   PLAN_ROOT_SINK = 3
+  NESTED_LOOP_JOIN_BUILDER = 4
 }
 
 enum TSinkAction {
@@ -103,8 +105,18 @@ struct TJoinBuildSink {
   // destination join node id
   1: required Types.TPlanNodeId dest_node_id
 
-  // only set for hash join build sinks
-  2: required list<Exprs.TExpr> build_exprs
+  // Join operation implemented by the JoinNode
+  2: required PlanNodes.TJoinOp join_op
+
+  // Equi-join conjunctions. Only set for hash join builds.
+  3: optional list<PlanNodes.TEqJoinCondition> eq_join_conjuncts
+
+  // Runtime filters produced by this sink.
+  4: optional list<PlanNodes.TRuntimeFilterDesc> runtime_filters
+
+  // Hash seed to use. Only set for hash join builds. Must be the same as the join node's
+  // hash seed. Must be positive.
+  5: optional i32 hash_seed
 }
 
 struct TPlanRootSink {
@@ -137,4 +149,7 @@ struct TDataSink {
   // Exprs that produce values for slots of output tuple (one expr per slot).
   // Only set by the DataSink implementations that require it.
   8: optional list<Exprs.TExpr> output_exprs
+
+  // Resource profile for this data sink. Always set.
+  9: optional ResourceProfile.TBackendResourceProfile resource_profile
 }
