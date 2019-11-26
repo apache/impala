@@ -346,59 +346,18 @@ void Coordinator::InitFilterRoutingTable() {
     int num_backends = fragment_params.GetNumBackends();
     DCHECK_GT(num_backends, 0);
 
+    // TODO: IMPALA-4224: also call AddFilterSource for build sinks that produce filters.
     for (const TPlanNode& plan_node: fragment_params.fragment.plan.nodes) {
       if (!plan_node.__isset.runtime_filters) continue;
       for (const TRuntimeFilterDesc& filter: plan_node.runtime_filters) {
         DCHECK(filter_mode_ == TRuntimeFilterMode::GLOBAL || filter.has_local_targets);
-        auto i = filter_routing_table_->id_to_filter
-                     .emplace(std::piecewise_construct,
-                         std::forward_as_tuple(filter.filter_id),
-                         std::forward_as_tuple(filter, plan_node.node_id))
-                     .first;
-
-        FilterState* f = &(i->second);
-        // source plan node of filter
+        // Currently hash joins are the only filter sources. Otherwise it must be
+        // a filter consumer.
         if (plan_node.__isset.hash_join_node) {
-          // Set the 'pending_count_' to zero to indicate that for a filter with
-          // local-only targets the coordinator does not expect to receive any filter
-          // updates. We expect to receive a single aggregated filter from each backend
-          // for partitioned joins.
-          int pending_count = filter.is_broadcast_join
-              ? (filter.has_remote_targets ? 1 : 0) : num_backends;
-          f->set_pending_count(pending_count);
-
-          // determine source instances
-          // TODO: IMPALA-9333: having a shared RuntimeFilterBank between all fragments on
-          // a backend allows further optimizations to reduce the number of broadcast join
-          // filters sent over the network, by considering cross-fragment filters on
-          // the same backend as local filters:
-          // 1. Produce a local filter on any backend with a destination fragment.
-          // 2. Only produce one local filter per backend (although, this would be made
-          //    redundant by IMPALA-4224 - sharing broadcast join hash tables).
-          // 3. Don't produce a global filter if all targets can be satisfied with
-          //    local producers.
-          // This work was deferred from the IMPALA-4400 change because it provides only
-          // incremental performance benefits.
-          vector<int> src_idxs = fragment_params.GetInstanceIdxs();
-
-          // If this is a broadcast join with only non-local targets, build and publish it
-          // on MAX_BROADCAST_FILTER_PRODUCERS instances. If this is not a broadcast join
-          // or it is a broadcast join with local targets, it should be generated
-          // everywhere the join is executed.
-          if (filter.is_broadcast_join && !filter.has_local_targets
-              && num_instances > MAX_BROADCAST_FILTER_PRODUCERS) {
-            random_shuffle(src_idxs.begin(), src_idxs.end());
-            src_idxs.resize(MAX_BROADCAST_FILTER_PRODUCERS);
-          }
-          for (int src_idx : src_idxs) {
-            TRuntimeFilterSource filter_src;
-            filter_src.src_node_id = plan_node.node_id;
-            filter_src.filter_id = filter.filter_id;
-            filter_routing_table_->finstance_filters_produced[src_idx].emplace_back(
-                filter_src);
-          }
-          f->set_num_producers(src_idxs.size());
+          AddFilterSource(
+              fragment_params, num_instances, num_backends, filter, plan_node.node_id);
         } else if (plan_node.__isset.hdfs_scan_node || plan_node.__isset.kudu_scan_node) {
+          FilterState* f = filter_routing_table_->GetOrCreateFilterState(filter);
           auto it = filter.planid_to_target_ndx.find(plan_node.node_id);
           DCHECK(it != filter.planid_to_target_ndx.end());
           const TRuntimeFilterTargetDesc& t_target = filter.targets[it->second];
@@ -417,6 +376,51 @@ void Coordinator::InitFilterRoutingTable() {
   query_profile_->AddInfoString("Filter routing table", FilterDebugString());
   if (VLOG_IS_ON(2)) VLOG_QUERY << FilterDebugString();
   filter_routing_table_->is_complete = true;
+}
+
+void Coordinator::AddFilterSource(const FragmentExecParams& src_fragment_params,
+    int num_instances, int num_backends, const TRuntimeFilterDesc& filter,
+    int join_node_id) {
+  FilterState* f = filter_routing_table_->GetOrCreateFilterState(filter);
+  // Set the 'pending_count_' to zero to indicate that for a filter with
+  // local-only targets the coordinator does not expect to receive any filter
+  // updates. We expect to receive a single aggregated filter from each backend
+  // for partitioned joins.
+  int pending_count = filter.is_broadcast_join
+      ? (filter.has_remote_targets ? 1 : 0) : num_backends;
+  f->set_pending_count(pending_count);
+
+  // Determine which instances will produce the filters.
+  // TODO: IMPALA-9333: having a shared RuntimeFilterBank between all fragments on
+  // a backend allows further optimizations to reduce the number of broadcast join
+  // filters sent over the network, by considering cross-fragment filters on
+  // the same backend as local filters:
+  // 1. Produce a local filter on any backend with a destination fragment.
+  // 2. Only produce one local filter per backend (although, this would be made
+  //    redundant by IMPALA-4224 - sharing broadcast join hash tables).
+  // 3. Don't produce a global filter if all targets can be satisfied with
+  //    local producers.
+  // This work was deferred from the IMPALA-4400 change because it provides only
+  // incremental performance benefits.
+  vector<int> src_idxs = src_fragment_params.GetInstanceIdxs();
+
+  // If this is a broadcast join with only non-local targets, build and publish it
+  // on MAX_BROADCAST_FILTER_PRODUCERS instances. If this is not a broadcast join
+  // or it is a broadcast join with local targets, it should be generated
+  // everywhere the join is executed.
+  if (filter.is_broadcast_join && !filter.has_local_targets
+      && num_instances > MAX_BROADCAST_FILTER_PRODUCERS) {
+    random_shuffle(src_idxs.begin(), src_idxs.end());
+    src_idxs.resize(MAX_BROADCAST_FILTER_PRODUCERS);
+  }
+  for (int src_idx : src_idxs) {
+    TRuntimeFilterSource filter_src;
+    filter_src.src_node_id = join_node_id;
+    filter_src.filter_id = filter.filter_id;
+    filter_routing_table_->finstance_filters_produced[src_idx].emplace_back(
+        filter_src);
+  }
+  f->set_num_producers(src_idxs.size());
 }
 
 Status Coordinator::StartBackendExec() {
@@ -526,7 +530,7 @@ string Coordinator::FilterDebugString() {
     vector<string> row;
     const FilterState& state = v.second;
     row.push_back(lexical_cast<string>(v.first));
-    row.push_back(lexical_cast<string>(state.src()));
+    row.push_back(lexical_cast<string>(state.desc().src_node_id));
     vector<string> target_ids;
     vector<string> target_types;
     vector<string> partition_filter;

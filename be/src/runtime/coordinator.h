@@ -61,6 +61,7 @@ class RuntimeState;
 class TPlanExecRequest;
 class TRuntimeProfileTree;
 class TUpdateCatalogRequest;
+struct FragmentExecParams;
 
 /// Query coordinator: handles execution of fragment instances on remote nodes, given a
 /// TQueryExecRequest. As part of that, it handles all interactions with the executing
@@ -509,9 +510,17 @@ class Coordinator { // NOLINT: The member variables could be re-ordered to save 
   /// possible at this point if no fragment instances were assigned to it).
   Status FinishBackendStartup() WARN_UNUSED_RESULT;
 
-  /// Build the filter routing table by iterating over all plan nodes and collecting the
-  /// filters that they either produce or consume.
+  /// Build the filter routing table by iterating over all plan nodes and data sinks and
+  /// collecting the filters that they either produce or consume.
   void InitFilterRoutingTable();
+
+  /// Helper for InitFilterRoutingTable() that adds a source join node or join build sink
+  /// for 'filter' to the routing table. 'src_fragment_params' is the parameters for the
+  /// fragment containing the join node (if build is integrated) or build sink (if the
+  /// build is separate). 'num_instances' and 'num_backends' are the number of instances
+  /// and backends that the fragment runs on.
+  void AddFilterSource(const FragmentExecParams& src_fragment_params,int num_instances,
+      int num_backends, const TRuntimeFilterDesc& filter, int join_node_id);
 
   /// Helper for HandleExecStateTransition(). Releases all resources associated with
   /// query execution. The ExecState state-machine ensures this is called exactly once.

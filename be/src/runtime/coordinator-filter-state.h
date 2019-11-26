@@ -61,8 +61,8 @@ struct Coordinator::FilterTarget {
 /// calling any FilterState functions if thread safety is needed.
 class Coordinator::FilterState {
  public:
-  FilterState(const TRuntimeFilterDesc& desc, const TPlanNodeId& src)
-    : desc_(desc), src_(src) {
+  FilterState(const TRuntimeFilterDesc& desc)
+    : desc_(desc) {
     // bloom_filter_ is a disjunction so the unit value is always_false.
     bloom_filter_.set_always_false(true);
     min_max_filter_.set_always_false(true);
@@ -75,7 +75,6 @@ class Coordinator::FilterState {
   const std::vector<FilterTarget>& targets() const { return targets_; }
   int64_t first_arrival_time() const { return first_arrival_time_; }
   int64_t completion_time() const { return completion_time_; }
-  const TPlanNodeId& src() const { return src_; }
   const TRuntimeFilterDesc& desc() const { return desc_; }
   bool is_bloom_filter() const { return desc_.type == TRuntimeFilterType::BLOOM; }
   bool is_min_max_filter() const { return desc_.type == TRuntimeFilterType::MIN_MAX; }
@@ -120,7 +119,6 @@ class Coordinator::FilterState {
   /// Contains the specification of the runtime filter.
   TRuntimeFilterDesc desc_;
 
-  TPlanNodeId src_;
   std::vector<FilterTarget> targets_;
 
   /// Number of remaining backends to hear from before filter is complete.
@@ -163,6 +161,17 @@ class Coordinator::FilterState {
 /// has access to all the internals of this structure and must protect invariants.
 struct Coordinator::FilterRoutingTable {
   int64_t num_filters() const { return id_to_filter.size(); }
+
+  /// Get the existing FilterState for 'filter' or create it if not present.
+  FilterState* GetOrCreateFilterState(const TRuntimeFilterDesc& filter) {
+    auto i = id_to_filter.find(filter.filter_id);
+    if (i == id_to_filter.end()) {
+      i = id_to_filter.emplace(std::piecewise_construct,
+                           std::forward_as_tuple(filter.filter_id),
+                           std::forward_as_tuple(filter)).first;
+    }
+    return &(i->second);
+  }
 
   /// Maps the filter ID to the state of that filter.
   boost::unordered_map<int32_t, FilterState> id_to_filter;

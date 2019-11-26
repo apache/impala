@@ -282,6 +282,7 @@ public final class RuntimeFilterGenerator {
       TRuntimeFilterDesc tFilter = new TRuntimeFilterDesc();
       tFilter.setFilter_id(id_.asInt());
       tFilter.setSrc_expr(srcExpr_.treeToThrift());
+      tFilter.setSrc_node_id(src_.getId().asInt());
       tFilter.setIs_broadcast_join(isBroadcastJoin_);
       tFilter.setNdv_estimate(ndvEstimate_);
       tFilter.setHas_local_targets(hasLocalTargets_);

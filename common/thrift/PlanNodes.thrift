@@ -157,6 +157,9 @@ struct TRuntimeFilterDesc {
   // The size of the filter based on the ndv estimate and the min/max limit specified in
   // the query options. Should be greater than zero for bloom filters, zero otherwise.
   11: optional i64 filter_size_bytes
+
+  // The ID of the plan node that produces this filter.
+  12: optional Types.TPlanNodeId src_node_id
 }
 
 // The information contained in subclasses of ScanNode captured in two separate
