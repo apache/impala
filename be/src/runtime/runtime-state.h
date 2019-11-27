@@ -302,6 +302,26 @@ class RuntimeState {
   /// Release resources and prepare this object for destruction. Can only be called once.
   void ReleaseResources();
 
+  /// If the fragment instance associated with this RuntimeState failed due to a RPC
+  /// failure, use this method to set the network address of the RPC's target node and
+  /// the posix error code of the failed RPC. The target node address and posix error code
+  /// will be included in the AuxErrorInfo returned by GetAuxErrorInfo. This method is
+  /// idempotent.
+  void SetRPCErrorInfo(TNetworkAddress dest_node, int16_t posix_error_code);
+
+  /// Returns true if this RuntimeState has any auxiliary error information, false
+  /// otherwise. Currently, only SetRPCErrorInfo() sets aux error info.
+  bool HasAuxErrorInfo() {
+    boost::lock_guard<SpinLock> l(aux_error_info_lock_);
+    return aux_error_info_ != nullptr;
+  }
+
+  /// Sets the given AuxErrorInfoPB with all relevant aux error info from the fragment
+  /// instance associated with this RuntimeState. If no aux error info for this
+  /// RuntimeState has been set, this method does nothing. Currently, only
+  /// SetRPCErrorInfo() sets aux error info.
+  void GetAuxErrorInfo(AuxErrorInfoPB* aux_error_info);
+
   static const char* LLVM_CLASS_NAME;
 
  private:
@@ -413,6 +433,13 @@ class RuntimeState {
   /// Manages runtime filters that are either produced or consumed (or both!) by plan
   /// nodes that share this runtime state.
   boost::scoped_ptr<RuntimeFilterBank> filter_bank_;
+
+  /// Lock protecting aux_error_info_.
+  SpinLock aux_error_info_lock_;
+
+  /// Auxiliary error information, only set if the fragment instance failed (e.g.
+  /// query_status_ != Status::OK()). Owned by this RuntimeState.
+  std::unique_ptr<AuxErrorInfoPB> aux_error_info_;
 
   /// prohibit copies
   RuntimeState(const RuntimeState&);

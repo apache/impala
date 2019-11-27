@@ -311,6 +311,25 @@ void RuntimeState::ReleaseResources() {
   released_resources_ = true;
 }
 
+void RuntimeState::SetRPCErrorInfo(TNetworkAddress dest_node, int16_t posix_error_code) {
+  boost::lock_guard<SpinLock> l(aux_error_info_lock_);
+  if (aux_error_info_ == nullptr) {
+    aux_error_info_.reset(new AuxErrorInfoPB());
+    RPCErrorInfoPB* rpc_error_info = aux_error_info_->mutable_rpc_error_info();
+    NetworkAddressPB* network_addr = rpc_error_info->mutable_dest_node();
+    network_addr->set_hostname(dest_node.hostname);
+    network_addr->set_port(dest_node.port);
+    rpc_error_info->set_posix_error_code(posix_error_code);
+  }
+}
+
+void RuntimeState::GetAuxErrorInfo(AuxErrorInfoPB* aux_error_info) {
+  boost::lock_guard<SpinLock> l(aux_error_info_lock_);
+  if (aux_error_info_ != nullptr) {
+    aux_error_info->CopyFrom(*aux_error_info_);
+  }
+}
+
 const std::string& RuntimeState::GetEffectiveUser() const {
   return impala::GetEffectiveUser(query_ctx().session);
 }

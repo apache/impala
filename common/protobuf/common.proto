@@ -21,6 +21,12 @@ syntax="proto2";
 
 package impala;
 
+// Refer to Types.thrift for documentation.
+message NetworkAddressPB {
+  required string hostname = 1;
+  required int32 port = 2;
+}
+
 // Proto-serialized version of Impala's Status object.
 message StatusPB {
   optional int32 status_code = 1;

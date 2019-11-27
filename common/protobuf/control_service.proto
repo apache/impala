@@ -124,6 +124,25 @@ message StatefulStatusPB {
   map<int32, ErrorLogEntryPB> error_log = 2;
 }
 
+// RPC error metadata that can be associated with a AuxErrorInfoPB object. Created if a
+// RPC to another node failed.
+message RPCErrorInfoPB {
+  // The address of the RPC's target node.
+  required NetworkAddressPB dest_node = 1;
+
+  // The posix error code of the failed RPC.
+  required int32 posix_error_code = 2;
+}
+
+// Error metadata that can be associated with a failed fragment instance. Used to store
+// extra info about errors encountered during fragment execution. This information is
+// used by the Coordinator to blacklist potentially unhealthy nodes.
+message AuxErrorInfoPB {
+  // Set if the fragment instance failed because a RPC to another node failed. Only set
+  // if the RPC failed due to a network error.
+  optional RPCErrorInfoPB rpc_error_info = 1;
+}
+
 message FragmentInstanceExecStatusPB {
   // Sequence number prevents out-of-order or duplicated updates from being applied.
   optional int64 report_seq_no = 1;
@@ -144,6 +163,10 @@ message FragmentInstanceExecStatusPB {
   // The non-idempotent parts of the report, and any prior reports that are not known to
   // have been received by the coordinator.
   repeated StatefulStatusPB stateful_report = 6;
+
+  // Metadata associated with a failed fragment instance. Only set for failed fragment
+  // instances.
+  optional AuxErrorInfoPB aux_error_info = 7;
 }
 
 message ReportExecStatusRequestPB {

@@ -167,6 +167,19 @@ string TNetworkAddressToString(const TNetworkAddress& address) {
   return ss.str();
 }
 
+string NetworkAddressPBToString(const NetworkAddressPB& address) {
+  stringstream ss;
+  ss << address.hostname() << ":" << dec << address.port();
+  return ss.str();
+}
+
+TNetworkAddress FromNetworkAddressPB(const NetworkAddressPB& address) {
+  TNetworkAddress t_address;
+  t_address.__set_hostname(address.hostname());
+  t_address.__set_port(address.port());
+  return t_address;
+}
+
 /// Pick a random port in the range of ephemeral ports
 /// https://tools.ietf.org/html/rfc6335
 int FindUnusedEphemeralPort() {

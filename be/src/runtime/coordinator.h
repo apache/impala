@@ -248,6 +248,13 @@ class Coordinator { // NOLINT: The member variables could be re-ordered to save 
   /// are non-nullptr and owned by obj_pool(). Populated by Exec()/InitBackendStates().
   std::vector<BackendState*> backend_states_;
 
+  /// A map from the TNetworkAddress of a backend to the BackendState running on the
+  /// TNetworkAddress. All values are non-nullptr and owned by obj_pool(). The address
+  /// is the kRPC address (Coordinator::BackendState::krpc_impalad_address) of the
+  /// Backend. This map is distinct from QuerySchedule::per_backend_exec_params(),
+  /// which uses the Thrift address as the key rather than the kRPC address.
+  boost::unordered_map<TNetworkAddress, BackendState*> addr_to_backend_state_;
+
   /// Protects the population of backend_states_ vector (not the BackendState objects).
   /// Used when accessing backend_states_ if it's not guaranteed that
   /// InitBackendStates() has completed.
@@ -540,6 +547,16 @@ class Coordinator { // NOLINT: The member variables could be re-ordered to save 
 
   /// Checks the exec_state_ of the query and returns true if the query is executing.
   bool IsExecuting();
+
+  /// Helper function for UpdateBackendExecStatus that iterates through the
+  /// FragmentInstanceExecStatusPB for each fragment and uses AuxErrorInfoPB to check if
+  /// any nodes should be blacklisted. AuxErrorInfoPB contains additional error
+  /// information about why the fragment failed, beyond what is available in the
+  /// ReportExecStatusRequestPB::overall_status field. This method uses information in
+  /// AuxErrorInfoPB to classify specific nodes as "faulty" and then blacklists them. A
+  /// node might be considered "faulty" if, for example, a RPC to that node failed, or a
+  /// fragment on that node failed due to a disk IO error.
+  void UpdateBlacklistWithAuxErrorInfo(const ReportExecStatusRequestPB& request);
 
   /// BackendState and BackendResourceState are private to the Coordinator class, so mark
   /// all tests in CoordinatorBackendStateTest as friends.

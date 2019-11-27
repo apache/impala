@@ -443,6 +443,10 @@ void KrpcDataStreamSender::Channel::HandleFailedRPC(const DoRpcFn& rpc_fn,
         MonoDelta::FromMilliseconds(FLAGS_rpc_retry_interval_ms));
     return;
   }
+  // If the RPC failed due to a network error, set the RPC error info in RuntimeState.
+  if (controller_status.IsNetworkError()) {
+    parent_->state_->SetRPCErrorInfo(address_, controller_status.posix_code());
+  }
   MarkDone(FromKuduStatus(controller_status, prepend));
 }
 

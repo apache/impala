@@ -290,6 +290,10 @@ void FragmentInstanceState::GetStatusReport(FragmentInstanceExecStatusPB* instan
     stateful_report->set_report_seq_no(report_seq_no_);
     runtime_state()->GetUnreportedErrors(stateful_report->mutable_error_log());
   }
+  // If set in the RuntimeState, set the AuxErrorInfoPB field.
+  if (runtime_state()->HasAuxErrorInfo()) {
+    runtime_state()->GetAuxErrorInfo(instance_status->mutable_aux_error_info());
+  }
 }
 
 void FragmentInstanceState::ReportSuccessful(

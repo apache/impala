@@ -16,6 +16,7 @@
 // under the License.
 
 #include "common/status.h"
+#include "gen-cpp/common.pb.h"
 #include "gen-cpp/StatestoreService_types.h"
 #include "gen-cpp/Types_types.h"
 #include <vector>
@@ -63,6 +64,12 @@ bool IsWildcardAddress(const std::string& ipaddress);
 
 /// Utility method to print address as address:port
 std::string TNetworkAddressToString(const TNetworkAddress& address);
+
+/// Utility method to print a NetworkAddressPB as address:port.
+std::string NetworkAddressPBToString(const NetworkAddressPB& address);
+
+/// Utility method to convert a NetworkAddressPB to a TNetworkAddress.
+TNetworkAddress FromNetworkAddressPB(const NetworkAddressPB& address);
 
 /// Utility method to convert TNetworkAddress to Kudu sock addr.
 /// Note that 'address' has to contain a resolved IP address.

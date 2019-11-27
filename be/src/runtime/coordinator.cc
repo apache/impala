@@ -17,6 +17,7 @@
 
 #include "runtime/coordinator.h"
 
+#include <cerrno>
 #include <unordered_set>
 
 #include <thrift/protocol/TDebugProtocol.h>
@@ -236,6 +237,15 @@ void Coordinator::InitBackendStates() {
         schedule_, query_ctx(), backend_idx, filter_mode_, entry.second));
     backend_state->Init(fragment_stats_, host_profiles_, obj_pool());
     backend_states_[backend_idx++] = backend_state;
+    // was_inserted is true if the pair was successfully inserted into the map, false
+    // otherwise.
+    bool was_inserted = addr_to_backend_state_
+                            .emplace(backend_state->krpc_impalad_address(), backend_state)
+                            .second;
+    if (UNLIKELY(!was_inserted)) {
+      DCHECK(false) << "Network address " << backend_state->krpc_impalad_address()
+                    << " associated with multiple BackendStates";
+    }
   }
   backend_resource_state_ =
       obj_pool()->Add(new BackendResourceState(backend_states_, schedule_));
@@ -827,6 +837,11 @@ Status Coordinator::UpdateBackendExecStatus(const ReportExecStatusRequestPB& req
       // We may start receiving status reports before all exec rpcs are complete.
       // Can't apply state transition until no more exec rpcs will be sent.
       exec_rpcs_complete_barrier_.Wait();
+
+      // Iterate through all instance exec statuses, and use each fragment's AuxErrorInfo
+      // to possibly blacklist any "faulty" nodes.
+      UpdateBlacklistWithAuxErrorInfo(request);
+
       // Transition the status if we're not already in a terminal state. This won't block
       // because either this transitions to an ERROR state or the query is already in
       // a terminal state.
@@ -853,6 +868,64 @@ Status Coordinator::UpdateBackendExecStatus(const ReportExecStatusRequestPB& req
   // If query execution has terminated, return a cancelled status to force the fragment
   // instance to stop executing.
   return IsExecuting() ? Status::OK() : Status::CANCELLED;
+}
+
+void Coordinator::UpdateBlacklistWithAuxErrorInfo(
+    const ReportExecStatusRequestPB& request) {
+  // If the Backend failed due to a RPC failure, blacklist the destination node of
+  // the failed RPC. Only blacklist one node per ReportExecStatusRequestPB to avoid
+  // blacklisting nodes too aggressively. Currently, only blacklist the first node
+  // that contains a valid RPCErrorInfoPB object.
+  for (auto instance_exec_status : request.instance_exec_status()) {
+    if (instance_exec_status.has_aux_error_info()
+        && instance_exec_status.aux_error_info().has_rpc_error_info()) {
+      RPCErrorInfoPB rpc_error_info =
+          instance_exec_status.aux_error_info().rpc_error_info();
+      DCHECK(rpc_error_info.has_dest_node());
+      DCHECK(rpc_error_info.has_posix_error_code());
+      const NetworkAddressPB& dest_node = rpc_error_info.dest_node();
+
+      auto dest_node_and_be_state =
+          addr_to_backend_state_.find(FromNetworkAddressPB(dest_node));
+
+      // If the target address of the RPC is not known to the Coordinator, it cannot
+      // be blacklisted.
+      if (dest_node_and_be_state == addr_to_backend_state_.end()) {
+        string err_msg = "Query failed due to a failed RPC to an unknown target address "
+            + NetworkAddressPBToString(dest_node);
+        DCHECK(false) << err_msg;
+        LOG(ERROR) << err_msg;
+        continue;
+      }
+
+      // The execution parameters of the destination node for the failed RPC.
+      const BackendExecParams* dest_node_exec_params =
+          dest_node_and_be_state->second->exec_params();
+
+      // The Coordinator for the query should never be blacklisted.
+      if (dest_node_exec_params->is_coord_backend) {
+        VLOG_QUERY << "Query failed due to a failed RPC to the Coordinator";
+        continue;
+      }
+
+      // A set of RPC related posix error codes that should cause the target node
+      // of the failed RPC to be blacklisted.
+      static const set<int32_t> blacklistable_rpc_error_codes = {
+          ENOTCONN, // 107: Transport endpoint is not connected
+          ESHUTDOWN, // 108: Cannot send after transport endpoint shutdown
+          ECONNREFUSED  // 111: Connection refused
+      };
+
+      if (blacklistable_rpc_error_codes.find(rpc_error_info.posix_error_code())
+          != blacklistable_rpc_error_codes.end()) {
+        LOG(INFO) << "Blacklisting " << NetworkAddressPBToString(dest_node)
+                  << " because a RPC to it failed.";
+        ExecEnv::GetInstance()->cluster_membership_mgr()->BlacklistExecutor(
+            dest_node_exec_params->be_desc);
+        break;
+      }
+    }
+  }
 }
 
 int64_t Coordinator::GetMaxBackendStateLagMs(TNetworkAddress* address) {
