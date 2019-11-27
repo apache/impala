@@ -69,7 +69,7 @@ class TestEventProcessing(CustomClusterTestSuite):
   @pytest.mark.execute_serially
   @CustomClusterTestSuite.with_args(catalogd_args="--hms_event_polling_interval_s=2")
   @SkipIfHive2.acid
-  def test_insert_events_transactional(self):
+  def test_transactional_insert_events(self):
     """Executes 'run_test_insert_events' for transactional tables.
     """
     self.run_test_insert_events(is_transactional=True)

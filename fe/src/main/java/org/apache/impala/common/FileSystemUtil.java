@@ -676,9 +676,20 @@ public class FileSystemUtil {
       // we don't need to do anything (extra calls to hasNext() must not affect
       // state)
       while (curFile_ == null) {
-        if (!baseIterator_.hasNext()) return false;
-        // if the next fileStatus is in ignored directory skip it
-        FileStatus next = baseIterator_.next();
+        FileStatus next;
+        try {
+          if (!baseIterator_.hasNext()) return false;
+          // if the next fileStatus is in ignored directory skip it
+           next = baseIterator_.next();
+        } catch (FileNotFoundException ex) {
+          // in case of concurrent operations by multiple engines it is possible that
+          // some temporary files are deleted while Impala is loading the table. For
+          // instance, hive deletes the temporary files in the .hive-staging directory
+          // after an insert query from Hive completes. If we are loading the table at
+          // the same time, we may get a FileNotFoundException which is safe to ignore.
+          LOG.warn(ex.getMessage());
+          continue;
+        }
         if (!isInIgnoredDirectory(startPath_, next)) {
           curFile_ = next;
           return true;
@@ -702,13 +713,13 @@ public class FileSystemUtil {
    * Iterator which recursively visits directories on a FileSystem, yielding
    * files in an unspecified order.
    */
-  static class RecursingIterator implements RemoteIterator<FileStatus> {
+  private static class RecursingIterator implements RemoteIterator<FileStatus> {
     private final FileSystem fs_;
     private final Stack<RemoteIterator<FileStatus>> iters_ = new Stack<>();
     private RemoteIterator<FileStatus> curIter_;
     private FileStatus curFile_;
 
-    RecursingIterator(FileSystem fs, Path startPath) throws IOException {
+    private RecursingIterator(FileSystem fs, Path startPath) throws IOException {
       this.fs_ = Preconditions.checkNotNull(fs);
       curIter_ = fs.listStatusIterator(Preconditions.checkNotNull(startPath));
     }
