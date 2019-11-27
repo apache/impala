@@ -551,8 +551,9 @@ bool Coordinator::BackendState::Cancel() {
   return true;
 }
 
-void Coordinator::BackendState::PublishFilter(
-    const PublishFilterParamsPB& rpc_params, RpcController& controller) {
+void Coordinator::BackendState::PublishFilter(FilterState* state,
+    MemTracker* mem_tracker, const PublishFilterParamsPB& rpc_params,
+    RpcController& controller, PublishFilterResultPB& res) {
   DCHECK_EQ(ProtoToQueryId(rpc_params.dst_query_id()), query_id_);
   // If the backend is already done, it's not waiting for this filter, so we skip
   // sending it in this case.
@@ -571,15 +572,42 @@ void Coordinator::BackendState::PublishFilter(
     return;
   }
 
-  PublishFilterResultPB res;
-  kudu::Status rpc_status = proxy->PublishFilter(rpc_params, &res, &controller);
-  if (!rpc_status.ok()) {
-    LOG(ERROR) << "PublishFilter() rpc failed: " << rpc_status.ToString();
-    return;
+  state->IncrementNumInflightRpcs(1);
+
+  proxy->PublishFilterAsync(rpc_params, &res, &controller,
+      boost::bind(&Coordinator::BackendState::PublishFilterCompleteCb, this, &controller,
+                                state, mem_tracker));
+}
+
+void Coordinator::BackendState::PublishFilterCompleteCb(
+    const kudu::rpc::RpcController* rpc_controller, FilterState* state,
+    MemTracker* mem_tracker) {
+  const kudu::Status controller_status = rpc_controller->status();
+
+  // In the case of an unsuccessful KRPC call, we only log this event w/o retrying.
+  // Failing to send a filter is not a query-wide error - the remote fragment will
+  // continue regardless.
+  if (!controller_status.ok()) {
+    LOG(ERROR) << "PublishFilter() failed: " << controller_status.message().ToString();
   }
-  if (res.status().status_code() != TErrorCode::OK) {
-    LOG(ERROR) << "PublishFilter() operation failed: "
-               << Status(res.status()).GetDetail();
+
+  {
+    lock_guard<SpinLock> l(state->lock());
+
+    state->IncrementNumInflightRpcs(-1);
+
+    if (state->num_inflight_rpcs() == 0) {
+      // Since we disabled the filter once complete and held FilterState::lock_ while
+      // issuing all PublishFilter() rpcs, at this point there can't be any more
+      // PublishFilter() rpcs issued.
+      DCHECK(state->disabled());
+      if (state->is_bloom_filter() && state->bloom_filter_directory().size() > 0) {
+        mem_tracker->Release(state->bloom_filter_directory().size());
+        state->bloom_filter_directory().clear();
+        state->bloom_filter_directory().shrink_to_fit();
+      }
+      state->get_publish_filter_done_cv().notify_one();
+    }
   }
 }
 

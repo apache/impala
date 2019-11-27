@@ -348,10 +348,13 @@ void Coordinator::InitFilterRoutingTable() {
       if (!plan_node.__isset.runtime_filters) continue;
       for (const TRuntimeFilterDesc& filter: plan_node.runtime_filters) {
         DCHECK(filter_mode_ == TRuntimeFilterMode::GLOBAL || filter.has_local_targets);
-        auto i = filter_routing_table_->id_to_filter.emplace(
-            filter.filter_id, FilterState(filter, plan_node.node_id)).first;
-        FilterState* f = &(i->second);
+        auto i = filter_routing_table_->id_to_filter
+                     .emplace(std::piecewise_construct,
+                         std::forward_as_tuple(filter.filter_id),
+                         std::forward_as_tuple(filter, plan_node.node_id))
+                     .first;
 
+        FilterState* f = &(i->second);
         // source plan node of filter
         if (plan_node.__isset.hash_join_node) {
           // Set the 'pending_count_' to zero to indicate that for a filter with
@@ -1045,9 +1048,11 @@ void Coordinator::ReleaseExecResources() {
   }
 
   for (auto& filter : filter_routing_table_->id_to_filter) {
-    FilterState* state = &filter.second;
-    state->Disable(filter_mem_tracker_);
+    unique_lock<SpinLock> l(filter.second.lock());
+    filter.second.WaitForPublishFilter();
+    filter.second.DisableAndRelease(filter_mem_tracker_);
   }
+
   // This may be NULL while executing UDFs.
   if (filter_mem_tracker_ != nullptr) filter_mem_tracker_->Close();
   // At this point some tracked memory may still be used in the coordinator for result
@@ -1124,21 +1129,22 @@ void Coordinator::UpdateFilter(const UpdateFilterParamsPB& params, RpcContext* c
 
   PublishFilterParamsPB rpc_params;
   unordered_set<int> target_fragment_idxs;
-  string bloom_filter_directory;
+  if (!IsExecuting()) {
+    LOG(INFO) << "Filter update received for non-executing query with id: "
+        << query_id();
+    return;
+  }
+  auto it = filter_routing_table_->id_to_filter.find(params.filter_id());
+  if (it == filter_routing_table_.get()->id_to_filter.end()) {
+    // This should not be possible since 'id_to_filter' is never changed after
+    // InitFilterRoutingTable().
+    DCHECK(false);
+    LOG(INFO) << "Could not find filter with id: " << rpc_params.filter_id();
+    return;
+  }
+  FilterState* state = &it->second;
   {
-    lock_guard<SpinLock> l(filter_routing_table_->update_lock);
-    if (!IsExecuting()) {
-      LOG(INFO) << "Filter update received for non-executing query with id: "
-                << query_id();
-      return;
-    }
-    auto it = filter_routing_table_->id_to_filter.find(params.filter_id());
-    if (it == filter_routing_table_->id_to_filter.end()) {
-      LOG(INFO) << "Could not find filter with id: " << params.filter_id();
-      return;
-    }
-    FilterState* state = &it->second;
-
+    lock_guard<SpinLock> l(state->lock());
     DCHECK(state->desc().has_remote_targets)
         << "Coordinator received filter that has only local targets";
 
@@ -1165,7 +1171,7 @@ void Coordinator::UpdateFilter(const UpdateFilterParamsPB& params, RpcContext* c
 
     // No more updates are pending on this filter ID. Create a distribution payload and
     // offer it to the queue.
-    for (const FilterTarget& target: *state->targets()) {
+    for (const FilterTarget& target : *state->targets()) {
       // Don't publish the filter to targets that are in the same fragment as the join
       // that produced it.
       if (target.is_local) continue;
@@ -1175,43 +1181,46 @@ void Coordinator::UpdateFilter(const UpdateFilterParamsPB& params, RpcContext* c
     if (state->is_bloom_filter()) {
       // Assign an outgoing bloom filter.
       *rpc_params.mutable_bloom_filter() = state->bloom_filter();
-      bloom_filter_directory.swap(state->bloom_filter_directory());
+
       DCHECK(rpc_params.bloom_filter().always_false()
-          || rpc_params.bloom_filter().always_true() || !bloom_filter_directory.empty());
+          || rpc_params.bloom_filter().always_true()
+          || !state->bloom_filter_directory().empty());
+
     } else {
       DCHECK(state->is_min_max_filter());
       MinMaxFilter::Copy(state->min_max_filter(), rpc_params.mutable_min_max_filter());
     }
 
-    // Filter is complete, and can be released.
-    state->Disable(filter_mem_tracker_);
-  }
+    // Filter is complete. We disable it so future UpdateFilter rpcs will be ignored,
+    // e.g., if it was a broadcast join.
+    state->Disable();
 
-  TUniqueIdToUniqueIdPB(query_id(), rpc_params.mutable_dst_query_id());
-  rpc_params.set_filter_id(params.filter_id());
+    TUniqueIdToUniqueIdPB(query_id(), rpc_params.mutable_dst_query_id());
+    rpc_params.set_filter_id(params.filter_id());
 
-  // Waited for exec_rpcs_complete_barrier_ so backend_states_ is valid.
-  for (BackendState* bs: backend_states_) {
-    for (int fragment_idx: target_fragment_idxs) {
-      if (!IsExecuting()) goto cleanup;
-      rpc_params.set_dst_fragment_idx(fragment_idx);
-      RpcController controller;
-      if (rpc_params.has_bloom_filter() && !rpc_params.bloom_filter().always_false()
-          && !rpc_params.bloom_filter().always_true()) {
-        BloomFilter::AddDirectorySidecar(rpc_params.mutable_bloom_filter(), &controller,
-            bloom_filter_directory);
+    // Waited for exec_rpcs_complete_barrier_ so backend_states_ is valid.
+    for (BackendState* bs : backend_states_) {
+      for (int fragment_idx : target_fragment_idxs) {
+        if (!IsExecuting()) {
+          if (rpc_params.has_bloom_filter()) {
+            filter_mem_tracker_->Release(state->bloom_filter_directory().size());
+            state->bloom_filter_directory().clear();
+            state->bloom_filter_directory().shrink_to_fit();
+          }
+          return;
+        }
+
+        rpc_params.set_dst_fragment_idx(fragment_idx);
+        RpcController* controller = obj_pool()->Add(new RpcController);
+        PublishFilterResultPB* res = obj_pool()->Add(new PublishFilterResultPB);
+        if (rpc_params.has_bloom_filter() && !rpc_params.bloom_filter().always_false()
+            && !rpc_params.bloom_filter().always_true()) {
+          BloomFilter::AddDirectorySidecar(rpc_params.mutable_bloom_filter(), controller,
+              state->bloom_filter_directory());
+        }
+        bs->PublishFilter(state, filter_mem_tracker_, rpc_params, *controller, *res);
       }
-      // TODO: make this asynchronous.
-      bs->PublishFilter(rpc_params, controller);
     }
-  }
-
-cleanup:
-  // For bloom filters, the memory used in the filter_routing_table_ is transfered to
-  // rpc_params. Hence the Release() function on the filter_mem_tracker_ is called
-  // here to ensure that the MemTracker is updated after the memory is actually freed.
-  if (rpc_params.has_bloom_filter()) {
-    filter_mem_tracker_->Release(bloom_filter_directory.size());
   }
 }
 
@@ -1228,7 +1237,7 @@ void Coordinator::FilterState::ApplyUpdate(
   if (is_bloom_filter()) {
     DCHECK(params.has_bloom_filter());
     if (params.bloom_filter().always_true()) {
-      Disable(coord->filter_mem_tracker_);
+      DisableAndRelease(coord->filter_mem_tracker_);
     } else if (params.bloom_filter().always_false()) {
       if (!bloom_filter_.has_log_bufferpool_space()) {
         bloom_filter_ = BloomFilterPB(params.bloom_filter());
@@ -1243,7 +1252,7 @@ void Coordinator::FilterState::ApplyUpdate(
           params.bloom_filter().directory_sidecar_idx(), &sidecar_slice);
       if (!status.ok()) {
         LOG(ERROR) << "Cannot get inbound sidecar: " << status.message().ToString();
-        Disable(coord->filter_mem_tracker_);
+        DisableAndRelease(coord->filter_mem_tracker_);
       } else if (bloom_filter_.always_false()) {
         int64_t heap_space = sidecar_slice.size();
         if (!coord->filter_mem_tracker_->TryConsume(heap_space)) {
@@ -1251,7 +1260,7 @@ void Coordinator::FilterState::ApplyUpdate(
                      << PrettyPrinter::Print(heap_space, TUnit::BYTES)
                      << " (query_id=" << PrintId(coord->query_id()) << ")";
           // Disable, as one missing update means a correct filter cannot be produced.
-          Disable(coord->filter_mem_tracker_);
+          DisableAndRelease(coord->filter_mem_tracker_);
         } else {
           bloom_filter_ = params.bloom_filter();
           bloom_filter_directory_ = sidecar_slice.ToString();
@@ -1267,7 +1276,7 @@ void Coordinator::FilterState::ApplyUpdate(
     DCHECK(is_min_max_filter());
     DCHECK(params.has_min_max_filter());
     if (params.min_max_filter().always_true()) {
-      Disable(coord->filter_mem_tracker_);
+      DisableAndRelease(coord->filter_mem_tracker_);
     } else if (min_max_filter_.always_false()) {
       MinMaxFilter::Copy(params.min_max_filter(), &min_max_filter_);
     } else {
@@ -1281,17 +1290,29 @@ void Coordinator::FilterState::ApplyUpdate(
   }
 }
 
-void Coordinator::FilterState::Disable(MemTracker* tracker) {
+void Coordinator::FilterState::DisableAndRelease(MemTracker* tracker) {
+  Disable();
   if (is_bloom_filter()) {
-    bloom_filter_.set_always_true(true);
-    bloom_filter_.set_always_false(false);
     tracker->Release(bloom_filter_directory_.size());
     bloom_filter_directory_.clear();
     bloom_filter_directory_.shrink_to_fit();
+  }
+}
+
+void Coordinator::FilterState::Disable() {
+  if (is_bloom_filter()) {
+    bloom_filter_.set_always_true(true);
+    bloom_filter_.set_always_false(false);
   } else {
     DCHECK(is_min_max_filter());
     min_max_filter_.set_always_true(true);
     min_max_filter_.set_always_false(false);
+  }
+}
+
+void Coordinator::FilterState::WaitForPublishFilter() {
+  while (num_inflight_publish_filter_rpcs_ > 0) {
+    publish_filter_done_cv_.wait(lock_);
   }
 }
 

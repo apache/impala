@@ -15,7 +15,7 @@
 // specific language governing permissions and limitations
 // under the License.
 
-
+#include <condition_variable>
 #include <memory>
 #include <utility>
 #include <vector>
@@ -56,6 +56,9 @@ struct Coordinator::FilterTarget {
 /// A filter is disabled if an always_true filter update is received, an OOM is hit,
 /// filter aggregation is complete or if the query is complete.
 /// Once a filter is disabled, subsequent updates for that filter are ignored.
+///
+/// This class is not thread safe. Callers must always take 'lock()' themselves when
+/// calling any FilterState functions if thread safety is needed.
 class Coordinator::FilterState {
  public:
   FilterState(const TRuntimeFilterDesc& desc, const TPlanNodeId& src)
@@ -88,14 +91,30 @@ class Coordinator::FilterState {
       return min_max_filter_.always_true();
     }
   }
+  int num_inflight_rpcs() const { return num_inflight_publish_filter_rpcs_; }
+  SpinLock& lock() { return lock_; }
+  std::condition_variable_any& get_publish_filter_done_cv() {
+    return publish_filter_done_cv_;
+  }
 
   /// Aggregates partitioned join filters and updates memory consumption.
   /// Disables filter if always_true filter is received or OOM is hit.
   void ApplyUpdate(const UpdateFilterParamsPB& params, Coordinator* coord,
       kudu::rpc::RpcContext* context);
 
-  /// Disables a filter. A disabled filter consumes no memory.
-  void Disable(MemTracker* tracker);
+  /// Disables the filter and releases the consumed memory if the filter is a Bloom
+  /// filter.
+  void DisableAndRelease(MemTracker* tracker);
+  /// Disables the filter but does not release the consumed memory.
+  void Disable();
+
+  void IncrementNumInflightRpcs(int i) {
+    num_inflight_publish_filter_rpcs_ += i;
+    DCHECK_GE(num_inflight_publish_filter_rpcs_, 0);
+  }
+
+  /// Waits until any inflight PublishFilter rpcs have completed.
+  void WaitForPublishFilter();
 
  private:
   /// Contains the specification of the runtime filter.
@@ -129,8 +148,15 @@ class Coordinator::FilterState {
   /// Time at which all local filters arrived.
   int64_t completion_time_ = 0L;
 
-  /// TODO: Add a per-object lock so that we can avoid holding the global routing table
+  /// Per-object lock so that we can avoid holding the global routing table
   /// lock for every filter update.
+  SpinLock lock_;
+
+  /// Keeps track of the number of inflight PublishFilter rpcs.
+  int num_inflight_publish_filter_rpcs_ = 0;
+
+  /// Signaled when 'num_inflight_rpcs' reaches 0.
+  std::condition_variable_any publish_filter_done_cv_;
 };
 
 /// Struct to contain all of the data structures for filter routing. Coordinator
@@ -145,9 +171,6 @@ struct Coordinator::FilterRoutingTable {
   // The key of the map is the instance index returned by GetInstanceIdx().
   // The value is source plan node id and the filter ID.
   boost::unordered_map<int, std::vector<TRuntimeFilterSource>> finstance_filters_produced;
-
-  /// Synchronizes updates to the state of this routing table.
-  SpinLock update_lock;
 
   /// Protects this routing table.
   /// Usage pattern:

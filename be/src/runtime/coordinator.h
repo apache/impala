@@ -100,8 +100,8 @@ class TUpdateCatalogRequest;
 ///
 /// Lock ordering: (lower-numbered acquired before higher-numbered)
 /// 1. wait_lock_
-/// 2. filter_lock_
-/// 3. exec_state_lock_, backend_states_init_lock_, filter_update_lock_, ExecSummary::lock
+/// 2. Coordinator::FilterRoutingTable::lock
+/// 3. exec_state_lock_, backend_states_init_lock_, FilterState::lock_, ExecSummary::lock
 /// 4. Coordinator::BackendState::lock_ (leafs)
 ///
 /// TODO: move into separate subdirectory and move nested classes into separate files
