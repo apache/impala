@@ -24,6 +24,7 @@ import java.util.HashMap;
 import java.util.HashSet;
 import java.util.Iterator;
 import java.util.List;
+import java.util.ListIterator;
 import java.util.Map;
 import java.util.Set;
 
@@ -1242,6 +1243,9 @@ public class SingleNodePlanner {
     List<Expr> viewPredicates =
         Expr.substituteList(preds, inlineViewRef.getSmap(), analyzer, false);
 
+    // perform any post-processing of the predicates before registering
+    removeDisqualifyingInferredPreds(inlineViewRef.getAnalyzer(), viewPredicates);
+
     // Unset the On-clause flag of the migrated conjuncts because the migrated conjuncts
     // apply to the post-join/agg/analytic result of the inline view.
     for (Expr e: viewPredicates) e.setIsOnClauseConjunct(false);
@@ -1252,6 +1256,40 @@ public class SingleNodePlanner {
     List<Expr> substUnassigned = Expr.substituteList(unassignedConjuncts,
         inlineViewRef.getBaseTblSmap(), analyzer, false);
     analyzer.materializeSlots(substUnassigned);
+  }
+
+  /**
+   * Analyze the predicates in the context of the inline view for certain disqualifying
+   * conditions and remove such predicates from the input list. One such condition is
+   * the predicate is an inferred predicate AND either its left or right SlotRef
+   * references the output of an outer join. Note that although such predicates
+   * may have been detected at the time of creating the values transfer graph
+   * (in the Analyzer), we do this check here anyways as a safety in case any such
+   * predicate 'fell through' to this stage.
+   */
+  private void removeDisqualifyingInferredPreds(Analyzer analyzer, List<Expr> preds) {
+    ListIterator<Expr> iter = preds.listIterator();
+    while (iter.hasNext()) {
+      Expr e = iter.next();
+      if (e instanceof BinaryPredicate && ((BinaryPredicate)e).isInferred()) {
+        BinaryPredicate p = (BinaryPredicate)e;
+        Pair<SlotId, SlotId> slots = p.getEqSlots();
+        if (slots == null) continue;
+        TupleId leftParent = analyzer.getTupleId(slots.first);
+        TupleId rightParent = analyzer.getTupleId(slots.second);
+        // check if either the left parent or right parent is an outer joined tuple
+        // Note: strictly, we may be ok to check only for the null producing
+        // side but we are being conservative here to check both sides. With
+        // additional testing we could potentially relax this.
+        if (analyzer.isOuterJoined(leftParent) ||
+                analyzer.isOuterJoined(rightParent)) {
+          iter.remove();
+          LOG.warn("Removed inferred predicate " + p.toSql() + " from the list of " +
+                  "predicates considered for inline view because either the left " +
+                  "or right side is derived from an outer join output.");
+        }
+      }
+    }
   }
 
   /**

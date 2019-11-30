@@ -1410,7 +1410,7 @@ PLAN-ROOT SINK
 |
 04:HASH JOIN [FULL OUTER JOIN]
 |  hash predicates: a.id = c.id
-|  other predicates: a.id < b.id, a.id = b.id
+|  other predicates: a.id < b.id
 |  row-size=12B cardinality=7.40K
 |
 |--02:SCAN HDFS [functional.alltypessmall c]
@@ -2219,4 +2219,95 @@ PLAN-ROOT SINK
 01:SCAN HDFS [functional.alltypestiny t]
    HDFS partitions=4/4 files=4 size=460B
    row-size=4B cardinality=8
+====
+# IMPALA-9162: Should not add extra predicates to the WHERE part of a left outer join
+select x.* from (select v1.c2, v1.max_c2 from functional.alltypessmall t
+  left join (
+   with iv1 AS (SELECT smallint_col c1, bigint_col c2
+                 FROM functional.alltypessmall
+                group by c1, c2),
+        iv2 AS (SELECT smallint_col r_c1, max(bigint_col) max_c2
+                 FROM functional.alltypessmall
+                group by r_c1)
+    select iv1.c2, iv2.max_c2 FROM iv1, iv2 where iv1.c2 = iv2.max_c2) as v1
+  on t.smallint_col=v1.c2) as x;
+---- PLAN
+PLAN-ROOT SINK
+|
+06:HASH JOIN [RIGHT OUTER JOIN]
+|  hash predicates: bigint_col = t.smallint_col
+|  runtime filters: RF000 <- t.smallint_col
+|  row-size=22B cardinality=81
+|
+|--00:SCAN HDFS [functional.alltypessmall t]
+|     HDFS partitions=4/4 files=4 size=6.32KB
+|     row-size=2B cardinality=81
+|
+05:HASH JOIN [INNER JOIN]
+|  hash predicates: bigint_col = max(bigint_col)
+|  runtime filters: RF002 <- max(bigint_col)
+|  row-size=20B cardinality=81
+|
+|--04:AGGREGATE [FINALIZE]
+|  |  output: max(bigint_col)
+|  |  group by: smallint_col
+|  |  row-size=10B cardinality=81
+|  |
+|  03:SCAN HDFS [functional.alltypessmall]
+|     HDFS partitions=4/4 files=4 size=6.32KB
+|     row-size=10B cardinality=81
+|
+02:AGGREGATE [FINALIZE]
+|  group by: smallint_col, bigint_col
+|  row-size=10B cardinality=81
+|
+01:SCAN HDFS [functional.alltypessmall]
+   HDFS partitions=4/4 files=4 size=6.32KB
+   runtime filters: RF000 -> functional.alltypessmall.bigint_col, RF002 -> functional.alltypessmall.bigint_col
+   row-size=10B cardinality=81
+====
+# IMPALA-9162: Should not add extra predicates to the WHERE part of a full outer join
+select x.* from (select v1.c2, v1.max_c2 from functional.alltypessmall t
+   full outer join (
+   with iv1 AS (SELECT smallint_col c1, bigint_col c2
+                 FROM functional.alltypessmall
+                group by c1, c2),
+        iv2 AS (SELECT smallint_col r_c1, max(bigint_col) max_c2
+                 FROM functional.alltypessmall
+                group by r_c1)
+    select iv1.c2, iv2.max_c2 FROM iv1, iv2 where iv1.c2 = iv2.max_c2) as v1
+  on t.smallint_col=v1.c2) as x;
+---- PLAN
+PLAN-ROOT SINK
+|
+06:HASH JOIN [FULL OUTER JOIN]
+|  hash predicates: bigint_col = t.smallint_col
+|  row-size=22B cardinality=81
+|
+|--00:SCAN HDFS [functional.alltypessmall t]
+|     HDFS partitions=4/4 files=4 size=6.32KB
+|     row-size=2B cardinality=81
+|
+05:HASH JOIN [INNER JOIN]
+|  hash predicates: bigint_col = max(bigint_col)
+|  runtime filters: RF000 <- max(bigint_col)
+|  row-size=20B cardinality=81
+|
+|--04:AGGREGATE [FINALIZE]
+|  |  output: max(bigint_col)
+|  |  group by: smallint_col
+|  |  row-size=10B cardinality=81
+|  |
+|  03:SCAN HDFS [functional.alltypessmall]
+|     HDFS partitions=4/4 files=4 size=6.32KB
+|     row-size=10B cardinality=81
+|
+02:AGGREGATE [FINALIZE]
+|  group by: smallint_col, bigint_col
+|  row-size=10B cardinality=81
+|
+01:SCAN HDFS [functional.alltypessmall]
+   HDFS partitions=4/4 files=4 size=6.32KB
+   runtime filters: RF000 -> functional.alltypessmall.bigint_col
+   row-size=10B cardinality=81
 ====
