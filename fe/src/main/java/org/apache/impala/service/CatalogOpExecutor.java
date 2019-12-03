@@ -2245,7 +2245,8 @@ public class CatalogOpExecutor {
           }
         }
         // Add the table to the catalog cache
-        Table newTbl = catalog_.addTable(newTable.getDbName(), newTable.getTableName());
+        Table newTbl = catalog_.addIncompleteTable(newTable.getDbName(),
+            newTable.getTableName());
         addTableToCatalogUpdate(newTbl, response.result);
       }
     } catch (Exception e) {
@@ -2339,7 +2340,8 @@ public class CatalogOpExecutor {
                 "CREATE TABLE CACHED");
         applyAlterTable(newTable);
       }
-      Table newTbl = catalog_.addTable(newTable.getDbName(), newTable.getTableName());
+      Table newTbl = catalog_.addIncompleteTable(newTable.getDbName(),
+          newTable.getTableName());
       addTableToCatalogUpdate(newTbl, response.result);
       if (authzConfig_.isEnabled()) {
         authzManager_.updateTableOwnerPrivilege(serverName, newTable.getDbName(),

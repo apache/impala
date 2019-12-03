@@ -1721,21 +1721,22 @@ public class CatalogServiceCatalog extends Catalog {
   }
 
   /**
-   * Adds a table with the given name to the catalog and returns the new table,
-   * loading the metadata if needed.
+   * Adds a table with the given name to the catalog and returns the new table.
    */
-  public Table addTable(String dbName, String tblName) {
-    Db db = getDb(dbName);
-    if (db == null) return null;
-    Table incompleteTable = IncompleteTable.createUninitializedTable(db, tblName);
+  public Table addIncompleteTable(String dbName, String tblName) {
     versionLock_.writeLock().lock();
     try {
+      // IMPALA-9211: get db object after holding the writeLock in case of getting stale
+      // db object due to concurrent INVALIDATE METADATA
+      Db db = getDb(dbName);
+      if (db == null) return null;
+      Table incompleteTable = IncompleteTable.createUninitializedTable(db, tblName);
       incompleteTable.setCatalogVersion(incrementAndGetCatalogVersion());
       db.addTable(incompleteTable);
+      return db.getTable(tblName);
     } finally {
       versionLock_.writeLock().unlock();
     }
-    return db.getTable(tblName);
   }
 
   /**
@@ -1973,7 +1974,7 @@ public class CatalogServiceCatalog extends Catalog {
           removeTable(oldTableName.getDb_name(), oldTableName.getTable_name());
       if (oldTable == null) return Pair.create(null, null);
       return Pair.create(oldTable,
-          addTable(newTableName.getDb_name(), newTableName.getTable_name()));
+          addIncompleteTable(newTableName.getDb_name(), newTableName.getTable_name()));
     } finally {
       versionLock_.writeLock().unlock();
     }
@@ -2170,7 +2171,7 @@ public class CatalogServiceCatalog extends Catalog {
     // Add a new uninitialized table to the table cache, effectively invalidating
     // any existing entry. The metadata for the table will be loaded lazily, on the
     // on the next access to the table.
-    Table newTable = addTable(dbName, tblName);
+    Table newTable = addIncompleteTable(dbName, tblName);
     Preconditions.checkNotNull(newTable);
     if (loadInBackground_) {
       tableLoadingMgr_.backgroundLoad(new TTableName(dbName.toLowerCase(),
