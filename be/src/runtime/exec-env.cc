@@ -133,10 +133,6 @@ DECLARE_string(webserver_interface);
 DECLARE_int32(webserver_port);
 DECLARE_int64(tcmalloc_max_total_thread_cache_bytes);
 
-// TODO-MT: rename or retire
-DEFINE_int32(coordinator_rpc_threads, 12, "(Advanced) Number of threads available to "
-    "start fragments on remote Impala daemons.");
-
 DECLARE_string(ssl_client_ca_certificate);
 
 DEFINE_int32(backend_client_connection_num_retries, 3, "Retry backend connections.");
@@ -279,8 +275,6 @@ ExecEnv::ExecEnv(int backend_port, int krpc_port,
   if (FLAGS_is_coordinator) {
     hdfs_op_thread_pool_.reset(
         CreateHdfsOpThreadPool("hdfs-worker-pool", FLAGS_num_hdfs_worker_threads, 1024));
-    exec_rpc_thread_pool_.reset(new CallableThreadPool("exec-rpc-pool", "worker",
-        FLAGS_coordinator_rpc_threads, numeric_limits<int32_t>::max()));
     scheduler_.reset(new Scheduler(metrics_.get(), request_pool_service_.get()));
   }
 
@@ -308,7 +302,6 @@ Status ExecEnv::InitForFeTests() {
 Status ExecEnv::Init() {
   // Initialize thread pools
   if (FLAGS_is_coordinator) {
-    RETURN_IF_ERROR(exec_rpc_thread_pool_->Init());
     RETURN_IF_ERROR(hdfs_op_thread_pool_->Init());
   }
   RETURN_IF_ERROR(async_rpc_pool_->Init());

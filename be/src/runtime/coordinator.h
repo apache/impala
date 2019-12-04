@@ -120,7 +120,8 @@ class Coordinator { // NOLINT: The member variables could be re-ordered to save 
   /// Blocks until result rows are ready to be retrieved via GetNext(), or, if the
   /// query doesn't return rows, until the query finishes or is cancelled. A call to
   /// Wait() must precede all calls to GetNext().  Multiple calls to Wait() are
-  /// idempotent and it is okay to issue multiple Wait() calls concurrently.
+  /// idempotent and it is okay to issue multiple Wait() calls concurrently. Only valid to
+  /// call after Exec() returns successfully.
   Status Wait() WARN_UNUSED_RESULT;
 
   /// Fills 'results' with up to 'max_rows' rows. May return fewer than 'max_rows'
@@ -150,8 +151,9 @@ class Coordinator { // NOLINT: The member variables could be re-ordered to save 
 
   /// Returns the time in ms since the latest report was received for the backend which
   /// has gone the longest without a report being received, and sets 'address' to the host
-  /// for that backend. May return 0, for example if the backends are not initialized yet
-  /// or if all of them have already completed, in which case 'address' will not be set.
+  /// for that backend. Only valid to call if Exec() has returned successfully. May return
+  /// 0, for example if all of the backends have already completed, in which case
+  /// 'address' will not be set.
   int64_t GetMaxBackendStateLagMs(TNetworkAddress* address);
 
   /// Get cumulative profile aggregated over all fragments of the query.
@@ -365,8 +367,12 @@ class Coordinator { // NOLINT: The member variables could be re-ordered to save 
   /// sequentially, without synchronization.
   std::vector<FragmentStats*> fragment_stats_;
 
-  /// Barrier that is released when all calls to BackendState::Exec() have returned.
-  CountingBarrier exec_rpcs_complete_barrier_;
+  /// Barrier that is released when all backend Exec() rpcs have completed successfully,
+  /// or when one fails, in which case the returned value is the error from that rpc.
+  TypedCountingBarrier<Status> exec_rpcs_status_barrier_;
+
+  /// True if all Exec() rpcs have completed.
+  AtomicBool exec_rpcs_complete_{false};
 
   /// Barrier that is released when all backends have indicated execution completion,
   /// or when all backends are cancelled due to an execution error or client requested
@@ -478,6 +484,9 @@ class Coordinator { // NOLINT: The member variables could be re-ordered to save 
   /// to cancel the backends has already been sent. It is safe to call this concurrently,
   /// but any calls must be made only after Exec().
   void WaitForBackends();
+
+  /// Returns when all Exec() rpcs have completed. Thread-safe.
+  void WaitOnExecRpcs();
 
   /// Initializes fragment_stats_ and query_profile_. Must be called before
   /// InitBackendStates().

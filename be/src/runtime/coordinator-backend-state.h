@@ -47,7 +47,6 @@ namespace impala {
 class ProgressUpdater;
 class ObjectPool;
 class DebugOptions;
-class CountingBarrier;
 class ReportExecStatusRequestPB;
 class TUniqueId;
 class TQueryCtx;
@@ -57,12 +56,30 @@ struct FInstanceExecParams;
 /// This class manages all aspects of the execution of all fragment instances of a
 /// single query on a particular backend. For the coordinator backend its possible to have
 /// no fragment instances scheduled on it. In that case, no RPCs are issued and the
-/// Backend state transitions to 'done' state right after Exec() is called on it.
-/// Thread-safe unless pointed out otherwise.
+/// Backend state transitions to 'done' state right after ExecAsync() is called on it.
+///
+/// Object Lifecycle/Thread Safety:
+/// - Init() must be called first followed by ExecAsync() and then WaitOnExecRpc().
+/// - Cancel() may be called at any time after Init(). After Cancel() is called, it is no
+///   longer valid to call ExecAsync().
+/// - After WaitOnExecRpc() has completed, all other functions are valid to call and
+//    thread-safe.
+/// - 'lock_' is used to protect all members that may be read and modified concurrently,
+///   subject to the restrictions above on when methods may be called.
 class Coordinator::BackendState {
  public:
   BackendState(const QuerySchedule& schedule, const TQueryCtx& query_ctx, int state_idx,
       TRuntimeFilterMode::type filter_mode, const BackendExecParams& exec_params);
+
+  /// The following are initialized in the constructor and always valid to call.
+  int state_idx() const { return state_idx_; }
+  const BackendExecParams* exec_params() const { return backend_exec_params_; }
+  const TNetworkAddress& impalad_address() const { return host_; }
+  const TNetworkAddress& krpc_impalad_address() const { return krpc_host_; }
+  /// Returns true if there are no fragment instances scheduled on this backend.
+  bool IsEmptyBackend() const { return backend_exec_params_->instance_params.empty(); }
+  /// Return true if execution at this backend is done.
+  bool IsDone();
 
   /// Creates InstanceStats for all instance in backend_exec_params in obj_pool
   /// and installs the instance profiles as children of the corresponding FragmentStats'
@@ -72,16 +89,34 @@ class Coordinator::BackendState {
   void Init(const std::vector<FragmentStats*>& fragment_stats,
       RuntimeProfile* host_profile_parent, ObjectPool* obj_pool);
 
-  /// Starts query execution at this backend by issuing an ExecQueryFInstances rpc and
-  /// notifies on rpc_complete_barrier when the rpc completes. Success/failure is
-  /// communicated through GetStatus(). Uses filter_routing_table to remove filters
-  /// that weren't selected during its construction.
+  /// Starts query execution at this backend by issuing an ExecQueryFInstances rpc
+  /// asynchronously and returns immediately. 'exec_status_barrier' is notified when the
+  /// rpc completes or when an error occurs. Success/failure is communicated through
+  /// GetStatus() after WaitOnExecRpc() returns.
+  /// Uses 'filter_routing_table' to remove filters that weren't selected during its
+  /// construction.
   /// No RPC is issued if there are no fragment instances scheduled on this backend.
-  /// The debug_options are applied to the appropriate TPlanFragmentInstanceCtxs, based
+  /// The 'debug_options' are applied to the appropriate TPlanFragmentInstanceCtxs, based
   /// on their node_id/instance_idx.
-  void Exec(const DebugOptions& debug_options,
+  void ExecAsync(const DebugOptions& debug_options,
       const FilterRoutingTable& filter_routing_table,
-      const kudu::Slice& serialized_query_ctx, CountingBarrier* rpc_complete_barrier);
+      const kudu::Slice& serialized_query_ctx,
+      TypedCountingBarrier<Status>* exec_status_barrier);
+
+  /// Waits until the ExecQueryFInstances() rpc has completed. May be called multiple
+  /// times and from different threads.
+  void WaitOnExecRpc();
+
+  /// Cancel execution at this backend if anything is running. Returns true if
+  /// cancellation was attempted, false otherwise.
+  ///
+  /// May be called at any time after Init(). If the ExecQueryFInstances() rpc is
+  /// inflight, will attempt to cancel the rpc. If ExecQueryFInstances() has already
+  /// completed or cancelling it is unsuccessful, sends the Cancel() rpc.
+  bool Cancel();
+
+  /////////////////////////////////////////
+  /// BEGIN: Functions that should only be called after WaitOnExecRpc() has returned.
 
   /// Update overall execution status, including the instances' exec status/profiles
   /// and the error log, if this backend is not already done. Updates the fragment
@@ -111,10 +146,6 @@ class Coordinator::BackendState {
   void PublishFilterCompleteCb(const kudu::rpc::RpcController* rpc_controller,
       FilterState* state, MemTracker* mem_tracker);
 
-  /// Cancel execution at this backend if anything is running. Returns true
-  /// if cancellation was attempted, false otherwise.
-  bool Cancel();
-
   /// Return the overall execution status. For an error status, the error could come
   /// from the fragment instance level or it can be a general error from the backend
   /// (with no specific fragment responsible). For a caller to distinguish between
@@ -128,10 +159,6 @@ class Coordinator::BackendState {
   /// 'failed_instance_id' must be omitted (using the default value of nullptr).
   Status GetStatus(bool* is_fragment_failure = nullptr,
       TUniqueId* failed_instance_id = nullptr) WARN_UNUSED_RESULT;
-
-  /// Return true if execution at this backend is done. Thread-safe. Caller must not hold
-  /// lock_.
-  bool IsDone();
 
   /// Return peak memory consumption and aggregated resource usage across all fragment
   /// instances for this backend.
@@ -148,25 +175,14 @@ class Coordinator::BackendState {
   /// 'fragment_idxs'
   bool HasFragmentIdx(const std::unordered_set<int>& fragment_idxs) const;
 
-  const TNetworkAddress& impalad_address() const { return host_; }
-  const TNetworkAddress& krpc_impalad_address() const { return krpc_host_; }
-  int state_idx() const { return state_idx_; }
-
-  /// Valid after Init().
-  const BackendExecParams* exec_params() const { return backend_exec_params_; }
-
-  /// Only valid after Exec().
   int64_t rpc_latency() const { return rpc_latency_; }
-  Status exec_rpc_status() const { return exec_rpc_status_; }
+  kudu::Status exec_rpc_status() const { return exec_rpc_status_; }
 
   int64_t last_report_time_ms() {
     std::lock_guard<std::mutex> l(lock_);
+    DCHECK(exec_done_) << "May only be called after WaitOnExecRpc() completes.";
     return last_report_time_ms_;
   }
-
-  /// Print host/port info for the first backend that's still in progress as a
-  /// debugging aid for backend deadlocks.
-  static void LogFirstInProgress(std::vector<BackendState*> backend_states);
 
   /// Serializes backend state to JSON by adding members to 'value', including total
   /// number of instances, peak memory consumption, host and status amongst others.
@@ -176,11 +192,15 @@ class Coordinator::BackendState {
   /// adding members to 'value', including the remote host name.
   void InstanceStatsToJson(rapidjson::Value* value, rapidjson::Document* doc);
 
+  /// END: Functions that should only be called after WaitOnExecRpc() has returned.
+  /////////////////////////////////////////
+
+  /// Print host/port info for the first backend that's still in progress as a
+  /// debugging aid for backend deadlocks.
+  static void LogFirstInProgress(std::vector<BackendState*> backend_states);
+
   /// Returns a timestamp using monotonic time for tracking arrival of status reports.
   static int64_t GenerateReportTimestamp() { return MonotonicMillis(); }
-
-  /// Returns True if there are no fragment instances scheduled on this backend.
-  bool IsEmptyBackend() { return backend_exec_params_->instance_params.empty(); }
 
  private:
   /// Execution stats for a single fragment instance.
@@ -293,22 +313,39 @@ class Coordinator::BackendState {
   /// Krpc address of execution backend.
   TNetworkAddress krpc_host_;
 
-  /// protects fields below
-  /// lock ordering: Coordinator::lock_ must only be obtained *prior* to lock_
+  /// The query context of the Coordinator that owns this BackendState.
+  const TQueryCtx& query_ctx_;
+
+  /// The query id of the Coordinator that owns this BackendState.
+  const TUniqueId& query_id_;
+
+  /// Used to issue the ExecQueryFInstances() rpc.
+  kudu::rpc::RpcController exec_rpc_controller_;
+
+  /// Response from ExecQueryFInstances().
+  ExecQueryFInstancesResponsePB exec_response_;
+
+  /// The status returned by KRPC for the ExecQueryFInstances() rpc. If this is an error,
+  /// we were unable to successfully communicate with the backend, eg. because of a
+  /// network error, or the rpc was cancelled by Cancel().
+  kudu::Status exec_rpc_status_;
+
+  /// Time, in ms, that it took to execute the ExecQueryFInstances() rpc.
+  int64_t rpc_latency_ = 0;
+
+  /////////////////////////////////////////
+  /// BEGIN: Members that are protected by 'lock_'.
+
+  /// Lock ordering: Coordinator::lock_ must only be obtained *prior* to lock_
   std::mutex lock_;
 
-  // number of in-flight instances
+  // Number of in-flight instances
   int num_remaining_instances_ = 0;
 
   /// If the status indicates an error status, execution has either been aborted by the
   /// executing impalad (which then reported the error) or cancellation has been
   /// initiated; either way, execution must not be cancelled.
   Status status_;
-
-  /// The status returned by KRPC for the ExecQueryFInstances() rpc. If this is an error,
-  /// we were unable to successfully communicate with the backend, eg. because of a
-  /// network error.
-  Status exec_rpc_status_;
 
   /// Used to distinguish between errors reported by a specific fragment instance,
   /// which would set failed_instance_id_, rather than an error independent of any
@@ -322,22 +359,23 @@ class Coordinator::BackendState {
   /// Errors reported by this fragment instance.
   ErrorLogMap error_log_;
 
-  /// Time, in ms, that it took to execute the ExecRemoteFragment() RPC.
-  int64_t rpc_latency_ = 0;
+  /// If true, ExecQueryFInstances() rpc has been sent.
+  bool exec_rpc_sent_ = false;
 
-  /// If true, ExecPlanFragment() rpc has been sent - even if it was not determined to be
-  /// successful.
-  bool rpc_sent_ = false;
+  /// If true, any work related to Exec() is done. The usual case is that the
+  /// ExecQueryFInstances() rpc callback has been executed, but it may also be set to true
+  /// if Cancel() is called before Exec() or if no Exec() rpc needs to be sent.
+  bool exec_done_ = false;
 
-  /// Initialized in Init(), then set in each call to ApplyExecStatusReport().
+  /// Notified when the ExecQueryFInstances() rpc is completed.
+  ConditionVariable exec_done_cv_;
+
+  /// Initialized in ExecCompleteCb(), then set in each call to ApplyExecStatusReport().
   /// Uses GenerateReportTimeout().
   int64_t last_report_time_ms_ = 0;
 
-  /// The query context of the Coordinator that owns this BackendState.
-  const TQueryCtx& query_ctx_;
-
-  /// The query id of the Coordinator that owns this BackendState.
-  const TUniqueId& query_id_;
+  /// END: Members that are protected by 'lock_'.
+  /////////////////////////////////////////
 
   /// Fill in 'request' and 'fragment_info' based on state. Uses 'filter_routing_table' to
   /// remove filters that weren't selected during its construction.
@@ -346,14 +384,26 @@ class Coordinator::BackendState {
       ExecQueryFInstancesRequestPB* request, TExecPlanFragmentInfo* fragment_info);
 
   /// Expects that 'status' is an error. Sets 'status_' to a formatted version of its
-  /// message.
-  void SetExecError(const Status& status);
+  /// message and notifies 'exec_status_barrier' with it. Caller must hold 'lock_'.
+  void SetExecError(
+      const Status& status, TypedCountingBarrier<Status>* exec_status_barrier);
+
+  /// Same as WaitOnExecRpc(), except 'l' must own 'lock_'.
+  void WaitOnExecLocked(std::unique_lock<std::mutex>* l);
+
+  /// Called when the ExecQueryFInstances() rpc completes. Notifies 'exec_status_barrier'
+  /// with the status. 'start' is the MonotonicMillis() timestamp when the rpc was sent.
+  void ExecCompleteCb(
+      TypedCountingBarrier<Status>* exec_status_barrier, int64_t start_ms);
 
   /// Version of IsDone() where caller must hold lock_ via lock;
   bool IsDoneLocked(const std::unique_lock<std::mutex>& lock) const;
 
   /// Same as ComputeResourceUtilization() but caller must hold lock.
   ResourceUtilization ComputeResourceUtilizationLocked();
+
+  /// Logs 'msg' at the VLOG_QUERY level, along with 'query_id_' and 'krpc_host_'.
+  void VLogForBackend(const std::string& msg);
 };
 
 /// Per fragment execution statistics.

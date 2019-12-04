@@ -50,6 +50,7 @@
 #include "util/hdfs-bulk-ops.h"
 #include "util/hdfs-util.h"
 #include "util/histogram-metric.h"
+#include "util/kudu-status-util.h"
 #include "util/min-max-filter.h"
 #include "util/pretty-printer.h"
 #include "util/table-printer.h"
@@ -119,7 +120,7 @@ Coordinator::Coordinator(ClientRequestState* parent, const QuerySchedule& schedu
     filter_mode_(schedule.query_options().runtime_filter_mode),
     obj_pool_(new ObjectPool()),
     query_events_(events),
-    exec_rpcs_complete_barrier_(schedule_.per_backend_exec_params().size()),
+    exec_rpcs_status_barrier_(schedule_.per_backend_exec_params().size()),
     backend_released_barrier_(schedule_.per_backend_exec_params().size()),
     filter_routing_table_(new FilterRoutingTable) {}
 
@@ -443,6 +444,14 @@ void Coordinator::AddFilterSource(const FragmentExecParams& src_fragment_params,
   f->set_num_producers(src_idxs.size());
 }
 
+void Coordinator::WaitOnExecRpcs() {
+  if (exec_rpcs_complete_.Load()) return;
+  for (BackendState* backend_state : backend_states_) {
+    backend_state->WaitOnExecRpc();
+  }
+  exec_rpcs_complete_.Store(true);
+}
+
 Status Coordinator::StartBackendExec() {
   int num_backends = backend_states_.size();
   backend_exec_complete_barrier_.reset(new CountingBarrier(num_backends));
@@ -454,7 +463,7 @@ Status Coordinator::StartBackendExec() {
   query_events_->MarkEvent(Substitute("Ready to start on $0 backends", num_backends));
 
   // Serialize the TQueryCtx once and pass it to each backend. The serialized buffer must
-  // stay valid until exec_rpcs_complete_barrier_ has been signalled.
+  // stay valid until WaitOnExecRpcs() has returned.
   ThriftSerializer serializer(true);
   uint8_t* serialized_buf = nullptr;
   uint32_t serialized_len = 0;
@@ -466,21 +475,41 @@ Status Coordinator::StartBackendExec() {
   kudu::Slice query_ctx_slice(serialized_buf, serialized_len);
 
   for (BackendState* backend_state: backend_states_) {
-    ExecEnv::GetInstance()->exec_rpc_thread_pool()->Offer(
-        [backend_state, this, &debug_options, &query_ctx_slice]() {
-          DebugActionNoFail(schedule_.query_options(), "COORD_BEFORE_EXEC_RPC");
-          // Safe for Exec() to read 'filter_routing_table_' because it is complete
-          // at this point and won't be destroyed while this function is executing,
-          // because it won't be torn down until 'exec_rpcs_complete_barrier_' is
-          // signalled.
-          DCHECK(filter_mode_ == TRuntimeFilterMode::OFF
-              || filter_routing_table_->is_complete);
-          backend_state->Exec(debug_options, *filter_routing_table_, query_ctx_slice,
-              &exec_rpcs_complete_barrier_);
-        });
+    if (exec_rpcs_status_barrier_.pending() <= 0) {
+      // One of the backends has already indicated an error with Exec().
+      break;
+    }
+    DebugActionNoFail(schedule_.query_options(), "COORD_BEFORE_EXEC_RPC");
+    // Safe for ExecAsync() to read 'filter_routing_table_' because it is complete
+    // at this point and won't be destroyed while this function is executing,
+    // because it won't be torn down until WaitOnExecRpcs() has returned.
+    DCHECK(filter_mode_ == TRuntimeFilterMode::OFF || filter_routing_table_->is_complete);
+    backend_state->ExecAsync(debug_options, *filter_routing_table_, query_ctx_slice,
+        &exec_rpcs_status_barrier_);
   }
-  exec_rpcs_complete_barrier_.Wait();
+  Status exec_rpc_status = exec_rpcs_status_barrier_.Wait();
+  if (!exec_rpc_status.ok()) {
+    // One of the backends failed to startup, so we cancel the other ones.
+    CancelBackends();
+    WaitOnExecRpcs();
+    for (BackendState* backend_state : backend_states_) {
+      // If Exec() rpc failed for a reason besides being aborted, blacklist the executor.
+      if (!backend_state->exec_rpc_status().ok()
+          && !backend_state->exec_rpc_status().IsAborted()) {
+        LOG(INFO) << "Blacklisting "
+                  << TNetworkAddressToString(backend_state->impalad_address())
+                  << " because an Exec() rpc to it failed.";
+        const TBackendDescriptor& be_desc = backend_state->exec_params()->be_desc;
+        ExecEnv::GetInstance()->cluster_membership_mgr()->BlacklistExecutor(be_desc,
+            FromKuduStatus(backend_state->exec_rpc_status(), "Exec() rpc failed"));
+      }
+    }
+    VLOG_QUERY << "query startup cancelled due to a failed Exec() rpc: "
+               << exec_rpc_status;
+    return UpdateExecState(exec_rpc_status, nullptr, FLAGS_hostname);
+  }
 
+  WaitOnExecRpcs();
   VLOG_QUERY << "started execution on " << num_backends << " backends for query_id="
              << PrintId(query_id());
   query_events_->MarkEvent(
@@ -490,6 +519,7 @@ Status Coordinator::StartBackendExec() {
 }
 
 Status Coordinator::FinishBackendStartup() {
+  DCHECK(exec_rpcs_complete_.Load());
   const TMetricDef& def =
       MakeTMetricDef("backend-startup-latencies", TMetricKind::HISTOGRAM, TUnit::TIME_MS);
   // Capture up to 30 minutes of start-up times, in ms, with 4 s.f. accuracy.
@@ -499,17 +529,13 @@ Status Coordinator::FinishBackendStartup() {
   string max_latency_host;
   int max_latency = 0;
   for (BackendState* backend_state: backend_states_) {
+    // All of the Exec() rpcs must have completed successfully.
+    DCHECK(backend_state->exec_rpc_status().ok());
     // preserve the first non-OK, if there is one
     Status backend_status = backend_state->GetStatus();
     if (!backend_status.ok() && status.ok()) {
       status = backend_status;
       error_hostname = backend_state->impalad_address().hostname;
-    }
-    if (!backend_state->exec_rpc_status().ok()) {
-      // The Exec() rpc failed, so blacklist the executor.
-      const TBackendDescriptor& be_desc = backend_state->exec_params()->be_desc;
-      ExecEnv::GetInstance()->cluster_membership_mgr()->BlacklistExecutor(
-          be_desc, backend_state->exec_rpc_status());
     }
     if (backend_state->rpc_latency() > max_latency) {
       // Find the backend that takes the most time to acknowledge to
@@ -672,7 +698,7 @@ void Coordinator::HandleExecStateTransition(
   // Can't transition until the exec RPCs are no longer in progress. Otherwise, a
   // cancel RPC could be missed, and resources freed before a backend has had a chance
   // to take a resource reference.
-  DCHECK_LE(exec_rpcs_complete_barrier_.pending(), 0) << "exec rpcs not completed";
+  DCHECK(exec_rpcs_complete_.Load()) << "exec rpcs not completed";
 
   query_events_->MarkEvent(exec_state_to_event.at(new_state));
   // This thread won the race to transitioning into a terminal state - terminate
@@ -748,6 +774,7 @@ void Coordinator::WaitForBackends() {
 }
 
 Status Coordinator::Wait() {
+  DCHECK(exec_rpcs_complete_.Load()) << "Exec() must be called first";
   lock_guard<SpinLock> l(wait_lock_);
   SCOPED_TIMER(query_profile_->total_time_counter());
   if (has_called_wait_.Load()) return Status::OK();
@@ -817,7 +844,7 @@ Status Coordinator::GetNext(QueryResultSet* results, int max_rows, bool* eos,
 void Coordinator::Cancel() {
   // Illegal to call Cancel() before Exec() returns, so there's no danger of the cancel
   // RPC passing the exec RPC.
-  DCHECK_LE(exec_rpcs_complete_barrier_.pending(), 0) << "Exec() must be called first";
+  DCHECK(exec_rpcs_complete_.Load()) << "Exec() must be called first";
   discard_result(SetNonErrorTerminalState(ExecState::CANCELLED));
   // CancelBackends() is called for all transitions into a terminal state except
   // for RETURNED_RESULTS. We need to call it now because after Cancel() is called
@@ -879,7 +906,9 @@ Status Coordinator::UpdateBackendExecStatus(const ReportExecStatusRequestPB& req
     if (!status.ok()) {
       // We may start receiving status reports before all exec rpcs are complete.
       // Can't apply state transition until no more exec rpcs will be sent.
-      exec_rpcs_complete_barrier_.Wait();
+      // TODO(IMPALA-6788): we should stop issuing ExecQueryFInstance rpcs and cancel any
+      // inflight when this happens.
+      WaitOnExecRpcs();
 
       // Transition the status if we're not already in a terminal state. This won't block
       // because either this transitions to an ERROR state or the query is already in
@@ -970,11 +999,7 @@ void Coordinator::UpdateBlacklistWithAuxErrorInfo(
 }
 
 int64_t Coordinator::GetMaxBackendStateLagMs(TNetworkAddress* address) {
-  if (exec_rpcs_complete_barrier_.pending() > 0) {
-    // Exec() hadn't completed for all the backends, so we can't rely on
-    // 'last_report_time_ms_' being set yet.
-    return 0;
-  }
+  DCHECK(exec_rpcs_complete_.Load()) << "Exec() must be called first.";
   DCHECK_GT(backend_states_.size(), 0);
   int64_t current_time = BackendState::GenerateReportTimestamp();
   int64_t min_last_report_time_ms = current_time;
@@ -995,6 +1020,7 @@ int64_t Coordinator::GetMaxBackendStateLagMs(TNetworkAddress* address) {
 
 // TODO: add histogram/percentile
 void Coordinator::ComputeQuerySummary() {
+  DCHECK(exec_rpcs_complete_.Load()) << "Exec() must be called first";
   // In this case, the query did not even get to start all fragment instances.
   // Some of the state that is used below might be uninitialized.  In this case,
   // the query has made so little progress, reporting a summary is not very useful.
@@ -1067,6 +1093,7 @@ void Coordinator::ComputeQuerySummary() {
 }
 
 string Coordinator::GetErrorLog() {
+  DCHECK(exec_rpcs_complete_.Load()) << "Exec() must be called first";
   ErrorLogMap merged;
   {
     lock_guard<SpinLock> l(backend_states_init_lock_);
@@ -1094,6 +1121,7 @@ void Coordinator::ReleaseExecResources() {
 }
 
 void Coordinator::ReleaseQueryAdmissionControlResources() {
+  DCHECK(exec_rpcs_complete_.Load()) << "Exec() must be called first";
   vector<BackendState*> unreleased_backends =
       backend_resource_state_->CloseAndGetUnreleasedBackends();
   if (!unreleased_backends.empty()) {
@@ -1128,6 +1156,7 @@ void Coordinator::ReleaseBackendAdmissionControlResources(
 }
 
 Coordinator::ResourceUtilization Coordinator::ComputeQueryResourceUtilization() {
+  DCHECK(exec_rpcs_complete_.Load()) << "Exec() must be called first";
   ResourceUtilization query_resource_utilization;
   for (BackendState* backend_state: backend_states_) {
     query_resource_utilization.Merge(backend_state->ComputeResourceUtilization());
@@ -1158,7 +1187,7 @@ void Coordinator::UpdateFilter(const UpdateFilterParamsPB& params, RpcContext* c
   DCHECK(backend_exec_complete_barrier_.get() != nullptr)
       << "Filters received before fragments started!";
 
-  exec_rpcs_complete_barrier_.Wait();
+  WaitOnExecRpcs();
   DCHECK(filter_routing_table_->is_complete)
       << "Filter received before routing table complete";
 
@@ -1233,7 +1262,7 @@ void Coordinator::UpdateFilter(const UpdateFilterParamsPB& params, RpcContext* c
     TUniqueIdToUniqueIdPB(query_id(), rpc_params.mutable_dst_query_id());
     rpc_params.set_filter_id(params.filter_id());
 
-    // Waited for exec_rpcs_complete_barrier_ so backend_states_ is valid.
+    // Called WaitForExecRpcs() so backend_states_ is valid.
     for (BackendState* bs : backend_states_) {
       if (!IsExecuting()) {
         if (rpc_params.has_bloom_filter()) {
@@ -1361,6 +1390,7 @@ MemTracker* Coordinator::query_mem_tracker() const {
 }
 
 void Coordinator::BackendsToJson(Document* doc) {
+  DCHECK(exec_rpcs_complete_.Load()) << "Exec() must be called first";
   Value states(kArrayType);
   {
     lock_guard<SpinLock> l(backend_states_init_lock_);
@@ -1374,6 +1404,7 @@ void Coordinator::BackendsToJson(Document* doc) {
 }
 
 void Coordinator::FInstanceStatsToJson(Document* doc) {
+  DCHECK(exec_rpcs_complete_.Load()) << "Exec() must be called first";
   Value states(kArrayType);
   {
     lock_guard<SpinLock> l(backend_states_init_lock_);

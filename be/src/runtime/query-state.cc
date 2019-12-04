@@ -145,6 +145,8 @@ Status QueryState::Init(const ExecQueryFInstancesRequestPB* exec_rpc_params,
   // returns a resource refcount to its caller.
   AcquireBackendResourceRefcount();
 
+  RETURN_IF_ERROR(DebugAction(query_options(), "QUERY_STATE_INIT"));
+
   ExecEnv* exec_env = ExecEnv::GetInstance();
 
   // Initialize resource tracking counters.

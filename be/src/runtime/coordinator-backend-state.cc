@@ -66,21 +66,20 @@ const char* Coordinator::BackendState::InstanceStats::LAST_REPORT_TIME_DESC =
     "Last report received time";
 
 Coordinator::BackendState::BackendState(const QuerySchedule& schedule,
-    const TQueryCtx& query_ctx, int state_idx,
-    TRuntimeFilterMode::type filter_mode, const BackendExecParams& exec_params)
+    const TQueryCtx& query_ctx, int state_idx, TRuntimeFilterMode::type filter_mode,
+    const BackendExecParams& exec_params)
   : schedule_(schedule),
     state_idx_(state_idx),
     filter_mode_(filter_mode),
     backend_exec_params_(&exec_params),
+    host_(backend_exec_params_->be_desc.address),
+    krpc_host_(backend_exec_params_->be_desc.krpc_address),
     query_ctx_(query_ctx),
-    query_id_(schedule.query_id()) {}
+    query_id_(schedule.query_id()),
+    num_remaining_instances_(backend_exec_params_->instance_params.size()) {}
 
 void Coordinator::BackendState::Init(const vector<FragmentStats*>& fragment_stats,
     RuntimeProfile* host_profile_parent, ObjectPool* obj_pool) {
-  host_ = backend_exec_params_->be_desc.address;
-  krpc_host_ = backend_exec_params_->be_desc.krpc_address;
-  num_remaining_instances_ = backend_exec_params_->instance_params.size();
-
   host_profile_ = RuntimeProfile::Create(obj_pool, TNetworkAddressToString(host_));
   host_profile_parent->AddChild(host_profile_);
   RuntimeProfile::Counter* admission_slots =
@@ -163,124 +162,156 @@ void Coordinator::BackendState::SetRpcParams(const DebugOptions& debug_options,
   }
 }
 
-void Coordinator::BackendState::SetExecError(const Status& status) {
+void Coordinator::BackendState::SetExecError(
+    const Status& status, TypedCountingBarrier<Status>* exec_status_barrier) {
   const string ERR_TEMPLATE = "ExecQueryFInstances rpc query_id=$0 failed: $1";
   const string& err_msg =
       Substitute(ERR_TEMPLATE, PrintId(query_id_), status.msg().GetFullMessageDetails());
   LOG(ERROR) << err_msg;
   status_ = Status::Expected(err_msg);
+  exec_done_ = true;
+  exec_status_barrier->NotifyRemaining(status);
 }
 
-void Coordinator::BackendState::Exec(const DebugOptions& debug_options,
-    const FilterRoutingTable& filter_routing_table,
-    const kudu::Slice& serialized_query_ctx, CountingBarrier* exec_complete_barrier) {
-  const auto trigger = MakeScopeExitTrigger([&]() {
-    // Ensure that 'last_report_time_ms_' is set prior to the barrier being notified.
-    {
-      // Since last_report_time_ms_ is protected by lock_ it must be acquired before
-      // updating last_report_time_ms_. The lock_ is guaranteed to not be held by this
-      // method when this lambda runs since it has not already been acquired by the
-      // method. The lambda executes in an object destructor and C++ destroys objects in
-      // the reverse order they were created.
-      lock_guard<mutex> lock(lock_);
-      last_report_time_ms_ = GenerateReportTimestamp();
+void Coordinator::BackendState::WaitOnExecRpc() {
+  unique_lock<mutex> l(lock_);
+  WaitOnExecLocked(&l);
+}
+
+void Coordinator::BackendState::WaitOnExecLocked(unique_lock<mutex>* l) {
+  DCHECK(l->owns_lock());
+  while (!exec_done_) {
+    exec_done_cv_.Wait(*l);
+  }
+}
+
+void Coordinator::BackendState::ExecCompleteCb(
+    TypedCountingBarrier<Status>* exec_status_barrier, int64_t start_ms) {
+  {
+    lock_guard<mutex> l(lock_);
+    exec_rpc_status_ = exec_rpc_controller_.status();
+    rpc_latency_ = MonotonicMillis() - start_ms;
+
+    if (!exec_rpc_status_.ok()) {
+      SetExecError(
+          FromKuduStatus(exec_rpc_status_, "Exec() rpc failed"), exec_status_barrier);
+      goto done;
     }
-    exec_complete_barrier->Notify();
-  });
 
-  // Do not issue an ExecQueryFInstances RPC if there are no fragment instances
-  // scheduled to run on this backend.
-  if (IsEmptyBackend()) {
-    DCHECK(backend_exec_params_->is_coord_backend);
+    Status exec_status = Status(exec_response_.status());
+    if (!exec_status.ok()) {
+      SetExecError(exec_status, exec_status_barrier);
+      goto done;
+    }
+
+    for (const auto& entry : instance_stats_map_) entry.second->stopwatch_.Start();
+    VLOG_FILE << "rpc succeeded: ExecQueryFInstances query_id=" << PrintId(query_id_);
+    exec_done_ = true;
+    last_report_time_ms_ = GenerateReportTimestamp();
+    exec_status_barrier->Notify(Status::OK());
+  }
+done:
+  // Notify after releasing 'lock_' so that we don't wake up a thread just to have it
+  // immediately block again.
+  exec_done_cv_.NotifyAll();
+}
+
+void Coordinator::BackendState::ExecAsync(const DebugOptions& debug_options,
+    const FilterRoutingTable& filter_routing_table,
+    const kudu::Slice& serialized_query_ctx,
+    TypedCountingBarrier<Status>* exec_status_barrier) {
+  {
+    lock_guard<mutex> l(lock_);
+    DCHECK(!exec_done_);
+    DCHECK(status_.ok());
+    // Do not issue an ExecQueryFInstances RPC if there are no fragment instances
+    // scheduled to run on this backend.
+    if (IsEmptyBackend()) {
+      DCHECK(backend_exec_params_->is_coord_backend);
+      exec_done_ = true;
+      exec_status_barrier->Notify(Status::OK());
+      goto done;
+    }
+
+    std::unique_ptr<ControlServiceProxy> proxy;
+    Status get_proxy_status =
+        ControlService::GetProxy(krpc_host_, host_.hostname, &proxy);
+    if (!get_proxy_status.ok()) {
+      SetExecError(get_proxy_status, exec_status_barrier);
+      goto done;
+    }
+
+    ExecQueryFInstancesRequestPB request;
+    TExecPlanFragmentInfo fragment_info;
+    SetRpcParams(debug_options, filter_routing_table, &request, &fragment_info);
+
+    exec_rpc_controller_.set_timeout(
+        MonoDelta::FromMilliseconds(FLAGS_backend_client_rpc_timeout_ms));
+
+    // Serialize the sidecar and add it to the rpc controller. The serialized buffer is
+    // owned by 'serializer' and is freed when it is destructed.
+    ThriftSerializer serializer(true);
+    uint8_t* serialized_buf = nullptr;
+    uint32_t serialized_len = 0;
+    Status serialize_status =
+        DebugAction(schedule_.query_options(), "EXEC_SERIALIZE_FRAGMENT_INFO");
+    if (LIKELY(serialize_status.ok())) {
+      serialize_status =
+          serializer.SerializeToBuffer(&fragment_info, &serialized_len, &serialized_buf);
+    }
+    if (UNLIKELY(!serialize_status.ok())) {
+      SetExecError(serialize_status, exec_status_barrier);
+      goto done;
+    } else if (serialized_len > FLAGS_rpc_max_message_size) {
+      SetExecError(
+          Status::Expected("Serialized Exec() request exceeds --rpc_max_message_size."),
+          exec_status_barrier);
+      goto done;
+    }
+
+    // TODO: eliminate the extra copy here by using a Slice
+    unique_ptr<kudu::faststring> sidecar_buf = make_unique<kudu::faststring>();
+    sidecar_buf->assign_copy(serialized_buf, serialized_len);
+    unique_ptr<RpcSidecar> rpc_sidecar = RpcSidecar::FromFaststring(move(sidecar_buf));
+
+    int sidecar_idx;
+    kudu::Status sidecar_status =
+        exec_rpc_controller_.AddOutboundSidecar(move(rpc_sidecar), &sidecar_idx);
+    if (!sidecar_status.ok()) {
+      SetExecError(
+          FromKuduStatus(sidecar_status, "Failed to add sidecar"), exec_status_barrier);
+      goto done;
+    }
+    request.set_plan_fragment_info_sidecar_idx(sidecar_idx);
+
+    // Add the serialized TQueryCtx as a sidecar.
+    unique_ptr<RpcSidecar> query_ctx_sidecar =
+        RpcSidecar::FromSlice(serialized_query_ctx);
+    int query_ctx_sidecar_idx;
+    kudu::Status query_ctx_sidecar_status = exec_rpc_controller_.AddOutboundSidecar(
+        move(query_ctx_sidecar), &query_ctx_sidecar_idx);
+    if (!query_ctx_sidecar_status.ok()) {
+      SetExecError(
+          FromKuduStatus(query_ctx_sidecar_status, "Failed to add TQueryCtx sidecar"),
+          exec_status_barrier);
+      goto done;
+    }
+    request.set_query_ctx_sidecar_idx(query_ctx_sidecar_idx);
+
+    VLOG_FILE << "making rpc: ExecQueryFInstances"
+              << " host=" << TNetworkAddressToString(impalad_address())
+              << " query_id=" << PrintId(query_id_);
+
+    proxy->ExecQueryFInstancesAsync(request, &exec_response_, &exec_rpc_controller_,
+        std::bind(&Coordinator::BackendState::ExecCompleteCb, this, exec_status_barrier,
+            MonotonicMillis()));
+    exec_rpc_sent_ = true;
     return;
   }
-
-  std::unique_ptr<ControlServiceProxy> proxy;
-  Status get_proxy_status = ControlService::GetProxy(krpc_host_, host_.hostname, &proxy);
-  if (!get_proxy_status.ok()) {
-    SetExecError(get_proxy_status);
-    return;
-  }
-
-  ExecQueryFInstancesRequestPB request;
-  TExecPlanFragmentInfo fragment_info;
-  SetRpcParams(debug_options, filter_routing_table, &request, &fragment_info);
-
-  RpcController rpc_controller;
-  rpc_controller.set_timeout(
-      MonoDelta::FromMilliseconds(FLAGS_backend_client_rpc_timeout_ms));
-
-  // Serialize the sidecar and add it to the rpc controller. The serialized buffer is
-  // owned by 'serializer' and is freed when it is destructed.
-  ThriftSerializer serializer(true);
-  uint8_t* serialized_buf = nullptr;
-  uint32_t serialized_len = 0;
-  Status serialize_status =
-      serializer.SerializeToBuffer(&fragment_info, &serialized_len, &serialized_buf);
-  if (UNLIKELY(!serialize_status.ok())) {
-    SetExecError(serialize_status);
-    return;
-  } else if (serialized_len > FLAGS_rpc_max_message_size) {
-    SetExecError(
-        Status::Expected("Serialized Exec() request exceeds --rpc_max_message_size."));
-    return;
-  }
-
-  // TODO: eliminate the extra copy here by using a Slice
-  unique_ptr<kudu::faststring> sidecar_buf = make_unique<kudu::faststring>();
-  sidecar_buf->assign_copy(serialized_buf, serialized_len);
-  unique_ptr<RpcSidecar> rpc_sidecar = RpcSidecar::FromFaststring(move(sidecar_buf));
-
-  int sidecar_idx;
-  kudu::Status sidecar_status =
-      rpc_controller.AddOutboundSidecar(move(rpc_sidecar), &sidecar_idx);
-  if (!sidecar_status.ok()) {
-    SetExecError(FromKuduStatus(sidecar_status, "Failed to add sidecar"));
-    return;
-  }
-  request.set_plan_fragment_info_sidecar_idx(sidecar_idx);
-
-  // Add the serialized TQueryCtx as a sidecar.
-  unique_ptr<RpcSidecar> query_ctx_sidecar = RpcSidecar::FromSlice(serialized_query_ctx);
-  int query_ctx_sidecar_idx;
-  kudu::Status query_ctx_sidecar_status =
-      rpc_controller.AddOutboundSidecar(move(query_ctx_sidecar), &query_ctx_sidecar_idx);
-  if (!query_ctx_sidecar_status.ok()) {
-    SetExecError(
-        FromKuduStatus(query_ctx_sidecar_status, "Failed to add TQueryCtx sidecar"));
-    return;
-  }
-  request.set_query_ctx_sidecar_idx(query_ctx_sidecar_idx);
-
-  VLOG_FILE << "making rpc: ExecQueryFInstances"
-      << " host=" << TNetworkAddressToString(impalad_address()) << " query_id="
-      << PrintId(query_id_);
-
-  // guard against concurrent UpdateBackendExecStatus() that may arrive after RPC returns
-  lock_guard<mutex> l(lock_);
-  int64_t start = MonotonicMillis();
-
-  ExecQueryFInstancesResponsePB response;
-  exec_rpc_status_ =
-      FromKuduStatus(proxy->ExecQueryFInstances(request, &response, &rpc_controller),
-          "Exec() rpc failed");
-
-  rpc_sent_ = true;
-  rpc_latency_ = MonotonicMillis() - start;
-
-  if (!exec_rpc_status_.ok()) {
-    SetExecError(exec_rpc_status_);
-    return;
-  }
-
-  Status exec_status = Status(response.status());
-  if (!exec_status.ok()) {
-    SetExecError(exec_status);
-    return;
-  }
-
-  for (const auto& entry: instance_stats_map_) entry.second->stopwatch_.Start();
-  VLOG_FILE << "rpc succeeded: ExecQueryFInstances query_id=" << PrintId(query_id_);
+done:
+  // Notify after releasing 'lock_' so that we don't wake up a thread just to have it
+  // immediately block again.
+  exec_done_cv_.NotifyAll();
 }
 
 Status Coordinator::BackendState::GetStatus(bool* is_fragment_failure,
@@ -296,6 +327,7 @@ Status Coordinator::BackendState::GetStatus(bool* is_fragment_failure,
 
 Coordinator::ResourceUtilization Coordinator::BackendState::ComputeResourceUtilization() {
   lock_guard<mutex> l(lock_);
+  DCHECK(exec_done_) << "May only be called after WaitOnExecRpc() completes.";
   return ComputeResourceUtilizationLocked();
 }
 
@@ -339,6 +371,7 @@ Coordinator::BackendState::ComputeResourceUtilizationLocked() {
 
 void Coordinator::BackendState::MergeErrorLog(ErrorLogMap* merged) {
   lock_guard<mutex> l(lock_);
+  DCHECK(exec_done_) << "May only be called after WaitOnExecRpc() completes.";
   if (error_log_.size() > 0)  MergeErrorMaps(error_log_, merged);
 }
 
@@ -389,7 +422,12 @@ bool Coordinator::BackendState::ApplyExecStatusReport(
   unique_lock<mutex> lock(lock_);
   last_report_time_ms_ = GenerateReportTimestamp();
 
-  // If this backend completed previously, don't apply the update.
+  // If this backend completed previously, don't apply the update. This ensures that
+  // the profile doesn't change during or after Coordinator::ComputeQuerySummary(), but
+  // can mean that we lose profile information for failed queries, since the Coordinator
+  // will call Cancel() on all BackendStates and we may stop accepting reports before some
+  // backends send their final report.
+  // TODO: revisit ComputeQuerySummary()
   if (IsDoneLocked(lock)) return false;
 
   // Use empty profile in case profile serialization/deserialization failed.
@@ -457,20 +495,6 @@ bool Coordinator::BackendState::ApplyExecStatusReport(
       instance_stats->done_ = true;
       --num_remaining_instances_;
     }
-
-    // TODO: clean up the ReportQuerySummary() mess
-    if (status_.ok()) {
-      // We can't update this backend's profile if ReportQuerySummary() is running,
-      // because it depends on all profiles not changing during its execution (when it
-      // calls SortChildren()). ReportQuerySummary() only gets called after
-      // WaitForBackendCompletion() returns or at the end of CancelFragmentInstances().
-      // WaitForBackendCompletion() only returns after all backends have completed (in
-      // which case we wouldn't be in this function), or when there's an error, in which
-      // case CancelFragmentInstances() is called. CancelFragmentInstances sets all
-      // exec_state's statuses to cancelled.
-      // TODO: We're losing this profile information. Call ReportQuerySummary only after
-      // all backends have completed.
-    }
   }
 
   // status_ has incorporated the status from all fragment instances. If the overall
@@ -491,6 +515,7 @@ bool Coordinator::BackendState::ApplyExecStatusReport(
 
 void Coordinator::BackendState::UpdateHostProfile(
     const TRuntimeProfileTree& thrift_profile) {
+  // We do not take 'lock_' here because RuntimeProfile::Update() is thread-safe.
   DCHECK(!IsEmptyBackend());
   host_profile_->Update(thrift_profile);
 }
@@ -498,6 +523,7 @@ void Coordinator::BackendState::UpdateHostProfile(
 void Coordinator::BackendState::UpdateExecStats(
     const vector<FragmentStats*>& fragment_stats) {
   lock_guard<mutex> l(lock_);
+  DCHECK(exec_done_) << "May only be called after WaitOnExecRpc() completes.";
   for (const auto& entry: instance_stats_map_) {
     const InstanceStats& instance_stats = *entry.second;
     int fragment_idx = instance_stats.exec_params_.fragment().idx;
@@ -516,29 +542,46 @@ void Coordinator::BackendState::UpdateExecStats(
 bool Coordinator::BackendState::Cancel() {
   unique_lock<mutex> l(lock_);
 
-  // Nothing to cancel if the exec rpc was not sent
-  if (!rpc_sent_) return false;
+  // Nothing to cancel if the exec rpc was not sent.
+  if (!exec_rpc_sent_) {
+    if (status_.ok()) status_ = Status::CANCELLED;
+    VLogForBackend("Not sending Cancel() rpc because nothing was started.");
+    exec_done_ = true;
+    // Notify after releasing 'lock_' so that we don't wake up a thread just to have it
+    // immediately block again.
+    l.unlock();
+    exec_done_cv_.NotifyAll();
+    return false;
+  }
 
-  // don't cancel if it already finished (for any reason)
-  if (IsDoneLocked(l)) return false;
+  // If the exec rpc was sent but the callback hasn't been executed, try to cancel the rpc
+  // and then wait for it to be done.
+  if (!exec_done_) {
+    VLogForBackend("Attempting to cancel Exec() rpc");
+    exec_rpc_controller_.Cancel();
+    WaitOnExecLocked(&l);
+  }
 
-  /// If the status is not OK, we still try to cancel - !OK status might mean
-  /// communication failure between backend and coordinator, but fragment
-  /// instances might still be running.
+  // Don't cancel if we're done. Note that its possible the backend is still running, eg.
+  // if the rpc layer reported that the Exec() rpc failed but it actually reached the
+  // backend. In that case, the backend will cancel itself the first time it tries to send
+  // a status report and the coordinator responds with an error.
+  if (IsDoneLocked(l)) {
+    VLogForBackend(Substitute(
+        "Not cancelling because the backend is already done: $0", status_.GetDetail()));
+    return false;
+  }
 
-  // set an error status to make sure we only cancel this once
+  // Set an error status to make sure we only cancel this once.
   if (status_.ok()) status_ = Status::CANCELLED;
 
-  VLOG_QUERY << "Sending CancelQueryFInstances rpc for query_id=" << PrintId(query_id_)
-             << " backend=" << TNetworkAddressToString(krpc_host_);
+  VLogForBackend("Sending CancelQueryFInstances rpc");
 
   std::unique_ptr<ControlServiceProxy> proxy;
   Status get_proxy_status = ControlService::GetProxy(krpc_host_, host_.hostname, &proxy);
   if (!get_proxy_status.ok()) {
     status_.MergeStatus(get_proxy_status);
-    VLOG_QUERY << "Cancel query_id= " << PrintId(query_id_) << " could not get proxy to "
-               << TNetworkAddressToString(krpc_host_)
-               << " failure: " << get_proxy_status.msg().msg();
+    VLogForBackend(Substitute("Could not get proxy: $0", get_proxy_status.msg().msg()));
     return true;
   }
 
@@ -556,17 +599,15 @@ bool Coordinator::BackendState::Cancel() {
 
   if (!rpc_status.ok()) {
     status_.MergeStatus(rpc_status);
-    VLOG_QUERY << "Cancel query_id= " << PrintId(query_id_) << " could not do rpc to "
-               << TNetworkAddressToString(krpc_host_)
-               << " failure: " << rpc_status.msg().msg();
+    VLogForBackend(
+        Substitute("CancelQueryFInstances rpc failed: $0", rpc_status.msg().msg()));
     return true;
   }
   Status cancel_status = Status(response.status());
   if (!cancel_status.ok()) {
     status_.MergeStatus(cancel_status);
-    VLOG_QUERY << "Cancel query_id= " << PrintId(query_id_)
-               << " got failure after rpc to " << TNetworkAddressToString(krpc_host_)
-               << " failure: " << cancel_status.msg().msg();
+    VLogForBackend(
+        Substitute("CancelQueryFInstances failed: $0", cancel_status.msg().msg()));
     return true;
   }
   return true;
@@ -811,6 +852,7 @@ void Coordinator::FragmentStats::AddExecStats() {
 
 void Coordinator::BackendState::ToJson(Value* value, Document* document) {
   unique_lock<mutex> l(lock_);
+  DCHECK(exec_done_) << "May only be called after WaitOnExecRpc() completes.";
   ResourceUtilization resource_utilization = ComputeResourceUtilizationLocked();
   value->AddMember("num_instances", fragments_.size(), document->GetAllocator());
   value->AddMember("done", IsDoneLocked(l), document->GetAllocator());
@@ -843,6 +885,7 @@ void Coordinator::BackendState::InstanceStatsToJson(Value* value, Document* docu
   Value instance_stats(kArrayType);
   {
     lock_guard<mutex> l(lock_);
+    DCHECK(exec_done_) << "May only be called after WaitOnExecRpc() completes.";
     for (const auto& elem : instance_stats_map_) {
       Value val(kObjectType);
       elem.second->ToJson(&val, document);
@@ -855,6 +898,11 @@ void Coordinator::BackendState::InstanceStatsToJson(Value* value, Document* docu
   // protected by Coordinator::lock_.
   Value val(TNetworkAddressToString(impalad_address()).c_str(), document->GetAllocator());
   value->AddMember("host", val, document->GetAllocator());
+}
+
+void Coordinator::BackendState::VLogForBackend(const string& msg) {
+  VLOG_QUERY << "query_id=" << PrintId(query_id_)
+             << " target backend=" << TNetworkAddressToString(krpc_host_) << ": " << msg;
 }
 
 } // namespace impala

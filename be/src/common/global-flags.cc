@@ -346,6 +346,7 @@ REMOVED_FLAG(adls_read_chunk_size);
 REMOVED_FLAG(authorization_policy_file);
 REMOVED_FLAG(be_service_threads);
 REMOVED_FLAG(cgroup_hierarchy_path);
+REMOVED_FLAG(coordinator_rpc_threads);
 REMOVED_FLAG(disable_admission_control);
 REMOVED_FLAG(disable_mem_pools);
 REMOVED_FLAG(enable_accept_queue_server);

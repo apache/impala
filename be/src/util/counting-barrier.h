@@ -37,7 +37,7 @@ class TypedCountingBarrier {
   /// 'promise_value'.
   int32_t Notify(const T& promise_value) {
     int32_t result = count_.Add(-1);
-    if (result == 0) promise_.Set(promise_value);
+    if (result == 0) discard_result(promise_.Set(promise_value));
     return result;
   }
 
@@ -48,7 +48,7 @@ class TypedCountingBarrier {
       int32_t value = count_.Load();
       if (value <= 0) return;  // count_ can legitimately drop below 0
       if (count_.CompareAndSwap(value, 0)) {
-        promise_.Set(promise_value);
+        discard_result(promise_.Set(promise_value));
         return;
       }
     }
