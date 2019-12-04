@@ -1323,6 +1323,17 @@ class TestOrc(ImpalaTestSuite):
 
     self.run_test_case('DataErrorsTest/orc-type-checks', vector, unique_database)
 
+  def test_orc_timestamp_out_of_range(self, vector, unique_database):
+      """Test the validation of out-of-range timestamps."""
+      test_files = ["testdata/data/out_of_range_timestamp.orc"]
+      create_table_and_copy_files(self.client, "create table {db}.{tbl} "
+                                               "(ts timestamp) stored as orc",
+                                  unique_database, "out_of_range_timestamp", test_files)
+      new_vector = deepcopy(vector)
+      del new_vector.get_value('exec_option')['abort_on_error']
+      self.run_test_case('DataErrorsTest/orc-out-of-range-timestamp',
+                         new_vector, unique_database)
+
 class TestScannerReservation(ImpalaTestSuite):
   @classmethod
   def get_workload(self):

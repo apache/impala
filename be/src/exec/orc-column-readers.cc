@@ -191,6 +191,12 @@ Status OrcTimestampReader::ReadValue(int row_idx, Tuple* tuple, MemPool* pool) {
   auto slot = reinterpret_cast<TimestampValue*>(GetSlot(tuple));
   *slot = TimestampValue::FromUnixTimeNanos(secs, nanos,
       scanner_->state_->local_time_zone());
+  if (UNLIKELY(!slot->HasDate())) {
+    SetNullSlot(tuple);
+    TErrorCode::type errorCode = TErrorCode::ORC_TIMESTAMP_OUT_OF_RANGE;
+    ErrorMsg msg(errorCode, scanner_->filename(), orc_column_id_);
+    return scanner_->state_->LogOrReturnError(msg);
+  }
   return Status::OK();
 }
 

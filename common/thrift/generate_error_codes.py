@@ -438,6 +438,10 @@ error_codes = (
 
   ("AVRO_INVALID_DATE", 144, "Avro file '$0' is corrupt: out of range date value $1 "
    "at offset $2. The valid date range is -719162..2932896 (0001-01-01..9999-12-31)."),
+
+  ("ORC_TIMESTAMP_OUT_OF_RANGE", 145,
+   "ORC file '$0' column '$1' contains an out of range timestamp. "
+   "The valid date range is 1400-01-01..9999-12-31."),
 )
 
 import sys

@@ -1,0 +1,16 @@
+====
+---- QUERY
+SET abort_on_error=1;
+SELECT * FROM out_of_range_timestamp;
+---- CATCH
+ORC file '$NAMENODE/test-warehouse/$DATABASE.db/out_of_range_timestamp/out_of_range_timestamp.orc' column '1' contains an out of range timestamp. The valid date range is 1400-01-01..9999-12-31.
+====
+---- QUERY
+SET abort_on_error=0;
+SELECT * FROM out_of_range_timestamp;
+---- TYPES
+TIMESTAMP
+---- RESULTS
+NULL
+---- ERRORS
+ORC file '$NAMENODE/test-warehouse/$DATABASE.db/out_of_range_timestamp/out_of_range_timestamp.orc' column '1' contains an out of range timestamp. The valid date range is 1400-01-01..9999-12-31.

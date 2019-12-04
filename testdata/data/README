@@ -451,3 +451,7 @@ relationships along with parent_table and child_table.
 child_table:
 Created manually. Contains four columns. 'seq' column is the primary key of this table. ('id', 'year') form a foreign key referring to parent_table('id', 'year') and 'a' is a
 foreign key referring to parent_table_2's primary column 'a'.
+
+out_of_range_timestamp.orc:
+Created with Hive. ORC file with a single timestamp column 'ts'.
+Contains one row (1300-01-01 00:00:00) which is outside Impala's valid time range.
