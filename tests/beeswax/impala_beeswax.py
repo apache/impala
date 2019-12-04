@@ -284,7 +284,8 @@ class ImpalaBeeswaxClient(object):
       else:
         avg_time = 0
 
-      row["num_hosts"] = len(node.exec_stats)
+      row["num_instances"] = len(node.exec_stats)
+      row["num_hosts"] = node.num_hosts
       row["avg_time"] = avg_time
 
     is_sink = node.node_id == -1

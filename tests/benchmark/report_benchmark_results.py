@@ -338,7 +338,6 @@ class Report(object):
     the report).
     """
     def __init__(self, results, ref_results):
-
       self.workload_name = '{0}({1})'.format(
           results[RESULT_LIST][0][QUERY][WORKLOAD_NAME].upper(),
           results[RESULT_LIST][0][QUERY][SCALE_FACTOR])
@@ -407,7 +406,6 @@ class Report(object):
       For example:
       Regression: TPCDS-Q52 [parquet/none/none] (1.390s -> 1.982s [+42.59%])
       """
-
       perf_change_type = ("(R) Regression" if zval >= 0 and tval >= 0
                           else "(I) Improvement" if zval <= 0 and tval <= 0
                           else "(?) Anomoly")
@@ -613,6 +611,7 @@ class CombinedExecSummaries(object):
       prefix (str)
       operator (str)
       num_hosts (int)
+      num_instances (int)
       num_rows (int)
       est_num_rows (int)
       detail (str)
@@ -641,7 +640,8 @@ class CombinedExecSummaries(object):
     for row_num, row in enumerate(first_exec_summary):
       combined_row = {}
       # Copy fixed values from the first exec summary
-      for key in [PREFIX, OPERATOR, NUM_HOSTS, NUM_ROWS, EST_NUM_ROWS, DETAIL]:
+      for key in [PREFIX, OPERATOR, NUM_HOSTS, NUM_INSTANCES, NUM_ROWS, EST_NUM_ROWS,
+                  DETAIL]:
         combined_row[key] = row[key]
 
       avg_times = [exec_summary[row_num][AVG_TIME] for exec_summary in exec_summaries]
@@ -769,6 +769,7 @@ class ExecSummaryComparison(object):
       prefix (str)
       operator (str)
       num_hosts (int)
+      num_instances (int)
       avg_time (float)
       stddev_time (float)
       avg_time_change (float): % change in avg time compared to reference
