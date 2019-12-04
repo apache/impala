@@ -48,9 +48,7 @@ under the License.
     </p>
 
     <p>
-      Currently, the Impala statestore mechanism does not include such proxying and
-      load-balancing features. Set up a software package of your choice to perform these
-      functions.
+      Set up a software package of your choice to perform these functions.
     </p>
 
     <note>
@@ -107,9 +105,7 @@ under the License.
         <li>
           Select and download the load-balancing proxy software or other load-balancing hardware
           appliance. It should only need to be installed and configured on a single host,
-          typically on an edge node. Pick a host other than the DataNodes where
-          <cmdname>impalad</cmdname> is running, because the intention is to protect against the
-          possibility of one or more of these DataNodes becoming unavailable.
+          typically on an edge node.
         </li>
 
         <li>
@@ -117,13 +113,15 @@ under the License.
           particular:
           <ul>
             <li>
-              Set up a port that the load balancer will listen on to relay Impala requests back
-              and forth.
+              To relay Impala requests back and forth, set up a port that the load balancer will
+              listen on.
             </li>
 
             <li>
-              See <xref href="#proxy_balancing" format="dita"/> for load balancing algorithm
-              options.
+              Select a load balancing algorithm. See
+              <xref
+                href="#proxy_balancing" format="dita"/> for load balancing
+              algorithm options.
             </li>
 
             <li>
@@ -136,7 +134,7 @@ under the License.
 
         <li>
           If you are using Hue or JDBC-based applications, you typically set up load balancing
-          for both ports 21000 and 21050, because these client applications connect through port
+          for both ports 21000 and 21050 because these client applications connect through port
           21050 while the <cmdname>impala-shell</cmdname> command connects through port 21000.
           See <xref href="impala_ports.xml#ports"/> for when to use port 21000, 21050, or
           another value depending on what type of connections you are load balancing.
@@ -149,8 +147,8 @@ under the License.
 
         <li>
           For any scripts, jobs, or configuration settings for applications that formerly
-          connected to a specific DataNode to run Impala SQL statements, change the connection
-          information (such as the <codeph>-i</codeph> option in
+          connected to a specific <cmdname>impalad</cmdname> to run Impala SQL statements,
+          change the connection information (such as the <codeph>-i</codeph> option in
           <cmdname>impala-shell</cmdname>) to point to the load balancer instead.
         </li>
       </ol>
@@ -231,10 +229,8 @@ under the License.
           </dt>
 
           <dd>
-            <p>
-              Distributes connections to all coordinator nodes. Typically not recommended for
-              Impala.
-            </p>
+            Distributes connections to all coordinator nodes. Typically not recommended for
+            Impala.
           </dd>
 
         </dlentry>
@@ -267,8 +263,7 @@ under the License.
 
       <p>
         In a cluster using Kerberos, applications check host credentials to verify that the host
-        they are connecting to is the same one that is actually processing the request, to
-        prevent man-in-the-middle attacks.
+        they are connecting to is the same one that is actually processing the request.
       </p>
 
       <p>
@@ -278,13 +273,12 @@ under the License.
       </p>
 
       <p>
-        In <keyword keyref="impala212_full">Impala 2.12</keyword> and higher, if you enable a
-        proxy server in a Kerberized cluster, users have an option to connect to Impala daemons
-        directly from <cmdname>impala-shell</cmdname> using the <codeph>-b</codeph> /
-        <codeph>--kerberos_host_fqdn</codeph> option when you start
-        <cmdname>impala-shell</cmdname>. This option can be used for testing or troubleshooting
-        purposes, but not recommended for live production environments as it defeats the purpose
-        of a load balancer/proxy.
+        In <keyword keyref="impala212_full">Impala 2.12</keyword> and higher versions, when you
+        enable a proxy server in a Kerberized cluster, users have an option to connect to Impala
+        daemons directly from <cmdname>impala-shell</cmdname> using the <codeph>-b</codeph> /
+        <codeph>--kerberos_host_fqdn</codeph> <cmdname>impala-shell</cmdname> flag. This option
+        can be used for testing or troubleshooting purposes, but not recommended for live
+        production environments as it defeats the purpose of a load balancer/proxy.
       </p>
 
       <p>
@@ -305,8 +299,7 @@ impala-shell -i impalad-1.mydomain.com -k -b loadbalancer-1.mydomain.com
       </p>
 
       <p>
-        To clarify that the load-balancing proxy server is legitimate, perform these extra
-        Kerberos setup steps:
+        To validate the load-balancing proxy server, perform these extra Kerberos setup steps:
       </p>
 
       <ol>
@@ -321,26 +314,29 @@ impala-shell -i impalad-1.mydomain.com -k -b loadbalancer-1.mydomain.com
           Choose the host you will use for the proxy server. Based on the Kerberos setup
           procedure, it should already have an entry
           <codeph>impala/<varname>proxy_host</varname>@<varname>realm</varname></codeph> in its
-          keytab. If not, go back over the initial Kerberos configuration steps for the keytab
-          on each host running the <cmdname>impalad</cmdname> daemon.
+          <filepath>keytab</filepath>. If not, go back over the initial Kerberos configuration
+          steps for the <filepath>keytab</filepath> on each host running the
+          <cmdname>impalad</cmdname> daemon.
         </li>
 
         <li>
-          Copy the keytab file from the proxy host to all other hosts in the cluster that run
-          the <cmdname>impalad</cmdname> daemon. (For optimal performance,
-          <cmdname>impalad</cmdname> should be running on all DataNodes in the cluster.) Put the
-          keytab file in a secure location on each of these other hosts.
+          Copy the <filepath>keytab</filepath> file from the proxy host to all other hosts in
+          the cluster that run the <cmdname>impalad</cmdname> daemon. Put the
+          <filepath>keytab</filepath> file in a secure location on each of these other hosts.
         </li>
 
         <li>
           Add an entry
           <codeph>impala/<varname>actual_hostname</varname>@<varname>realm</varname></codeph> to
-          the keytab on each host running the <cmdname>impalad</cmdname> daemon.
+          the <filepath>keytab</filepath> on each host running the <cmdname>impalad</cmdname>
+          daemon.
         </li>
 
         <li>
-          For each impalad node, merge the existing keytab with the proxy’s keytab using
-          <cmdname>ktutil</cmdname>, producing a new keytab file. For example:
+          For each <cmdname>impalad</cmdname> node, merge the existing
+          <filepath>keytab</filepath> with the proxy’s <filepath>keytab</filepath> using
+          <cmdname>ktutil</cmdname>, producing a new <filepath>keytab</filepath> file. For
+          example:
 <codeblock>$ ktutil
   ktutil: read_kt proxy.keytab
   ktutil: read_kt impala.keytab
@@ -349,44 +345,39 @@ impala-shell -i impalad-1.mydomain.com -k -b loadbalancer-1.mydomain.com
         </li>
 
         <li>
-          To verify that the keytabs are merged, run the command:
+          To verify that the <filepath>keytabs</filepath> are merged, run the command:
 <codeblock>
 klist -k <varname>keytabfile</varname>
 </codeblock>
-          which lists the credentials for both <codeph>principal</codeph> and
+          The command lists the credentials for both <codeph>principal</codeph> and
           <codeph>be_principal</codeph> on all nodes.
         </li>
 
         <li>
-          Make sure that the <codeph>impala</codeph> user has permission to read this merged
-          keytab file.
+          Make sure that the <codeph>impala</codeph> user has the permission to read this merged
+          <filepath>keytab</filepath> file.
         </li>
 
         <li>
-          Change the following configuration settings for each host in the cluster that
-          participates in the load balancing:
-          <ul>
-            <li>
-              In the <cmdname>impalad</cmdname> option definition, add:
+          For each coordinator <codeph>impalad</codeph> host in the cluster that participates in
+          the load balancing, add the following configuration options to receive client
+          connections coming through the load balancer proxy server:
 <codeblock>
---principal=impala/<i>proxy_host@realm</i>
-  --be_principal=impala/<i>actual_host@realm</i>
-  --keytab_file=<i>path_to_merged_keytab</i>
+--principal=impala/<varname>proxy_host@realm</varname>
+  --be_principal=impala/<varname>actual_host@realm</varname>
+  --keytab_file=<varname>path_to_merged_keytab</varname>
 </codeblock>
-              <note>
-                Every host has different <codeph>--be_principal</codeph> because the actual
-                hostname is different on each host. Specify the fully qualified domain name
-                (FQDN) for the proxy host, not the IP address. Use the exact FQDN as returned by
-                a reverse DNS lookup for the associated IP address.
-              </note>
-            </li>
+          <p>
+            The <codeph>--principal</codeph> setting prevents a client from connecting to a
+            coordinator <codeph>impalad</codeph> using a principal other than one specified.
+          </p>
 
-            <li>
-              Modify the startup options. See
-              <xref href="impala_config_options.xml#config_options"/> for the procedure to
-              modify the startup options.
-            </li>
-          </ul>
+          <note>
+            Every host has different <codeph>--be_principal</codeph> because the actual host
+            name is different on each host. Specify the fully qualified domain name (FQDN) for
+            the proxy host, not the IP address. Use the exact FQDN as returned by a reverse DNS
+            lookup for the associated IP address.
+          </note>
         </li>
 
         <li>
@@ -395,6 +386,40 @@ klist -k <varname>keytabfile</varname>
           <cmdname>catalogd</cmdname> daemons.
         </li>
       </ol>
+
+      <section id="section_fjz_mfn_yjb">
+
+        <title>Client Connection to Proxy Server in Kerberized Clusters</title>
+
+        <p>
+          When a client connect to Impala, the service principal specified by the client must
+          match the <codeph>-principal</codeph> setting of the Impala proxy server. And the
+          client should connect to the proxy server port.
+        </p>
+
+        <p>
+          In <filepath>hue.ini</filepath>, set the following for to configure Hue to
+          automatically connect to the proxy server:
+        </p>
+
+<codeblock>[impala]
+server_host=<varname>proxy_host</varname>
+impala_principal=impala/<varname>proxy_host</varname></codeblock>
+
+        <p>
+          The following are the JDBC connection string formats when connecting through the load
+          balancer with the load balancer's host name in the principal:
+        </p>
+
+<codeblock>jdbc:hive2://<varname>proxy_host</varname>:<varname>load_balancer_port</varname>/;principal=impala/_HOST@<varname>realm</varname>
+jdbc:hive2://<varname>proxy_host</varname>:<varname>load_balancer_port</varname>/;principal=impala/<varname>proxy_host</varname>@<varname>realm</varname></codeblock>
+
+        <p>
+          When starting <cmdname>impala-shell</cmdname>, specify the service principal via the
+          <codeph>-b</codeph> or <codeph>--kerberos_host_fqdn</codeph> flag.
+        </p>
+
+      </section>
 
     </conbody>
 
@@ -512,8 +537,9 @@ klist -k <varname>keytabfile</varname>
       <ul>
         <li>
           <p>
-            Install the load balancer: <codeph>yum install haproxy</codeph>
+            Install the load balancer:
           </p>
+<codeblock>yum install haproxy</codeblock>
         </li>
 
         <li>
@@ -604,7 +630,8 @@ listen stats :25002
     stats enable
     stats auth <varname>username</varname>:<varname>password</varname>
 
-# This is the setup for Impala. Impala client connect to load_balancer_host:25003.
+# Setup for Impala.
+# Impala client connect to load_balancer_host:25003.
 # HAProxy will balance connections among the list of servers listed below.
 # The list of Impalad is listening at port 21000 for beeswax (impala-shell) or original ODBC driver.
 # For JDBC or ODBC version 2.x driver, use port 21050 instead of 21000.
@@ -621,12 +648,13 @@ listen impala :25003
 # Setup for Hue or other JDBC-enabled applications.
 # In particular, Hue requires sticky sessions.
 # The application connects to load_balancer_host:21051, and HAProxy balances
-# connections to the associated hosts, where Impala listens for JDBC
-# requests on port 21050.
+# connections to the associated hosts, where Impala listens for
+# JDBC requests at port 21050.
 listen impalajdbc :21051
     mode tcp
     option tcplog
     balance source
+
     server <varname>symbolic_name_5</varname> impala-host-1.example.com:21050 check
     server <varname>symbolic_name_6</varname> impala-host-2.example.com:21050 check
     server <varname>symbolic_name_7</varname> impala-host-3.example.com:21050 check
@@ -635,8 +663,8 @@ listen impalajdbc :21051
 
       <note type="important">
         Hue requires the <codeph>check</codeph> option at end of each line in the above file to
-        ensure HAProxy can detect any unreachable Impalad server, and failover can be
-        successful. Without the TCP check, you may hit an error when the
+        ensure HAProxy can detect any unreachable <cmdname>Impalad</cmdname> server, and
+        failover can be successful. Without the TCP check, you may hit an error when the
         <cmdname>impalad</cmdname> daemon to which Hue tries to connect is down.
       </note>
 
