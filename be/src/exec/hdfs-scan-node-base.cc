@@ -66,6 +66,80 @@ using namespace impala;
 using namespace impala::io;
 using namespace strings;
 
+PROFILE_DEFINE_TIMER(TotalRawHdfsReadTime, STABLE_LOW, "Aggregate wall clock time"
+    " across all Disk I/O threads in HDFS read operations.");
+PROFILE_DEFINE_TIMER(TotalRawHdfsOpenFileTime, STABLE_LOW, "Aggregate wall clock time"
+    " spent across all Disk I/O threads in HDFS open operations.");
+PROFILE_DEFINE_DERIVED_COUNTER(PerReadThreadRawHdfsThroughput, STABLE_LOW,
+    TUnit::BYTES_PER_SECOND, "The read throughput in bytes/sec for each HDFS read thread"
+    " while it is executing I/O operations on behalf of a scan.");
+PROFILE_DEFINE_COUNTER(ScanRangesComplete, STABLE_LOW, TUnit::UNIT,
+    "Number of scan ranges that have been completed by a scan node.");
+PROFILE_DEFINE_COUNTER(CollectionItemsRead, STABLE_LOW, TUnit::UNIT,
+    "Total number of nested collection items read by the scan. Only created for scans "
+    "(e.g. Parquet) that support nested types.");
+PROFILE_DEFINE_COUNTER(NumDisksAccessed, STABLE_LOW, TUnit::UNIT, "Number of distinct "
+     "disks accessed by HDFS scan. Each local disk is counted as a disk and each type of"
+     " remote filesystem (e.g. HDFS remote reads, S3) is counted as a distinct disk.");
+PROFILE_DEFINE_SAMPLING_COUNTER(AverageHdfsReadThreadConcurrency, STABLE_LOW, "The"
+     " average number of HDFS read threads executing read operations on behalf of this "
+     "scan. Higher values (i.e. close to the aggregate number of I/O threads across "
+     "all disks accessed) show that this scan is using a larger proportion of the I/O "
+     "capacity of the system. Lower values show that either this scan is not I/O bound"
+     " or that it is getting a small share of the I/O capacity of the system.");
+PROFILE_DEFINE_SUMMARY_STATS_COUNTER(InitialRangeIdealReservation, DEBUG, TUnit::BYTES,
+     "Tracks stats about the ideal reservation for initial scan ranges. Use this to "
+     "determine if the scan got all of the reservation it wanted. Does not include "
+     "subsequent reservation increases done by scanner implementation (e.g. for Parquet "
+     "columns).");
+PROFILE_DEFINE_SUMMARY_STATS_COUNTER(InitialRangeActualReservation, DEBUG,
+    TUnit::BYTES, "Tracks stats about the actual reservation for initial scan ranges. "
+    "Use this to determine if the scan got all of the reservation it wanted. Does not "
+    "include subsequent reservation increases done by scanner implementation "
+    "(e.g. for Parquet columns).");
+PROFILE_DEFINE_COUNTER(BytesReadLocal, STABLE_LOW, TUnit::BYTES,
+    "The total number of bytes read locally");
+PROFILE_DEFINE_COUNTER(BytesReadShortCircuit, STABLE_LOW, TUnit::BYTES,
+    "The total number of bytes read via short circuit read");
+PROFILE_DEFINE_COUNTER(BytesReadDataNodeCache, STABLE_HIGH, TUnit::BYTES,
+    "The total number of bytes read from data node cache");
+PROFILE_DEFINE_COUNTER(RemoteScanRanges, STABLE_HIGH, TUnit::UNIT,
+    "The total number of remote scan ranges");
+PROFILE_DEFINE_COUNTER(BytesReadRemoteUnexpected, STABLE_LOW, TUnit::BYTES,
+    "The total number of bytes read remotely that were expected to be local");
+PROFILE_DEFINE_COUNTER(CachedFileHandlesHitCount, STABLE_LOW, TUnit::UNIT,
+    "Total number of file handle opens where the file handle was present in the cache");
+PROFILE_DEFINE_COUNTER(CachedFileHandlesMissCount, STABLE_LOW, TUnit::UNIT,
+    "Total number of file handle opens where the file handle was not in the cache");
+PROFILE_DEFINE_HIGH_WATER_MARK_COUNTER(MaxCompressedTextFileLength, STABLE_LOW,
+    TUnit::BYTES, "The size of the largest compressed text file to be scanned. "
+    "This is used to estimate scanner thread memory usage.");
+PROFILE_DEFINE_TIMER(ScannerIoWaitTime, STABLE_LOW, "Total amount of time scanner "
+    "threads spent waiting for I/O. This value can be compared to the value of "
+    "ScannerThreadsTotalWallClockTime of MT_DOP = 0 scan nodes or otherwise compared "
+    "to the total time reported for MT_DOP > 0 scan nodes. High values show that "
+    "scanner threads are spending significant time waiting for I/O instead of "
+    "processing data. Note that this includes the time when the thread is runnable "
+    "but not scheduled.");
+PROFILE_DEFINE_SUMMARY_STATS_COUNTER(ParquetUncompressedBytesReadPerColumn, STABLE_LOW,
+    TUnit::BYTES, "Stats about the number of uncompressed bytes read per column. "
+    "Each sample in the counter is the size of a single column that is scanned by the "
+    "scan node.");
+PROFILE_DEFINE_SUMMARY_STATS_COUNTER(ParquetCompressedBytesReadPerColumn, STABLE_LOW,
+    TUnit::BYTES, "Stats about the number of compressed bytes read per column. "
+    "Each sample in the counter is the size of a single column that is scanned by the "
+    "scan node.");
+PROFILE_DEFINE_COUNTER(DataCacheHitCount, STABLE_HIGH, TUnit::UNIT,
+    "Total count of data cache hit");
+PROFILE_DEFINE_COUNTER(DataCachePartialHitCount, STABLE_HIGH, TUnit::UNIT,
+    "Total count of data cache partially hit");
+PROFILE_DEFINE_COUNTER(DataCacheMissCount, STABLE_HIGH, TUnit::UNIT,
+    "Total count of data cache miss");
+PROFILE_DEFINE_COUNTER(DataCacheHitBytes, STABLE_HIGH, TUnit::BYTES,
+    "Total bytes of data cache hit");
+PROFILE_DEFINE_COUNTER(DataCacheMissBytes, STABLE_HIGH, TUnit::BYTES,
+    "Total bytes of data cache miss");
+
 const string HdfsScanNodeBase::HDFS_SPLIT_STATS_DESC =
     "Hdfs split stats (<volume id>:<# splits>/<split lengths>)";
 
@@ -356,33 +430,30 @@ Status HdfsScanNodeBase::Open(RuntimeState* state) {
   reader_context_ = ExecEnv::GetInstance()->disk_io_mgr()->RegisterContext();
 
   // Initialize HdfsScanNode specific counters
-  hdfs_read_timer_ = ADD_TIMER(runtime_profile(), TOTAL_HDFS_READ_TIMER);
-  hdfs_open_file_timer_ = ADD_TIMER(runtime_profile(), TOTAL_HDFS_OPEN_FILE_TIMER);
-  per_read_thread_throughput_counter_ = runtime_profile()->AddDerivedCounter(
-      PER_READ_THREAD_THROUGHPUT_COUNTER, TUnit::BYTES_PER_SECOND,
+  hdfs_read_timer_ = PROFILE_TotalRawHdfsReadTime.Instantiate(runtime_profile());
+  hdfs_open_file_timer_ =
+      PROFILE_TotalRawHdfsOpenFileTime.Instantiate(runtime_profile());
+  per_read_thread_throughput_counter_ =
+      PROFILE_PerReadThreadRawHdfsThroughput.Instantiate(runtime_profile(),
       bind<int64_t>(&RuntimeProfile::UnitsPerSecond, bytes_read_counter_,
       hdfs_read_timer_));
   scan_ranges_complete_counter_ =
-      ADD_COUNTER(runtime_profile(), SCAN_RANGES_COMPLETE_COUNTER, TUnit::UNIT);
+      PROFILE_ScanRangesComplete.Instantiate(runtime_profile());
   collection_items_read_counter_ =
-      ADD_COUNTER(runtime_profile(), COLLECTION_ITEMS_READ_COUNTER, TUnit::UNIT);
+      PROFILE_CollectionItemsRead.Instantiate(runtime_profile());
   if (DiskInfo::num_disks() < 64) {
     num_disks_accessed_counter_ =
-        ADD_COUNTER(runtime_profile(), NUM_DISKS_ACCESSED_COUNTER, TUnit::UNIT);
+        PROFILE_NumDisksAccessed.Instantiate(runtime_profile());
   } else {
     num_disks_accessed_counter_ = NULL;
   }
 
-  data_cache_hit_count_ = ADD_COUNTER(runtime_profile(),
-      "DataCacheHitCount", TUnit::UNIT);
-  data_cache_partial_hit_count_ = ADD_COUNTER(runtime_profile(),
-      "DataCachePartialHitCount", TUnit::UNIT);
-  data_cache_miss_count_ = ADD_COUNTER(runtime_profile(),
-      "DataCacheMissCount", TUnit::UNIT);
-  data_cache_hit_bytes_ = ADD_COUNTER(runtime_profile(),
-      "DataCacheHitBytes", TUnit::BYTES);
-  data_cache_miss_bytes_ = ADD_COUNTER(runtime_profile(),
-      "DataCacheMissBytes", TUnit::BYTES);
+  data_cache_hit_count_ = PROFILE_DataCacheHitCount.Instantiate(runtime_profile());
+  data_cache_partial_hit_count_ =
+      PROFILE_DataCachePartialHitCount.Instantiate(runtime_profile());
+  data_cache_miss_count_ = PROFILE_DataCacheMissCount.Instantiate(runtime_profile());
+  data_cache_hit_bytes_ = PROFILE_DataCacheHitBytes.Instantiate(runtime_profile());
+  data_cache_miss_bytes_ = PROFILE_DataCacheMissBytes.Instantiate(runtime_profile());
 
   reader_context_->set_bytes_read_counter(bytes_read_counter());
   reader_context_->set_read_timer(hdfs_read_timer_);
@@ -395,38 +466,36 @@ Status HdfsScanNodeBase::Open(RuntimeState* state) {
   reader_context_->set_data_cache_hit_bytes_counter(data_cache_hit_bytes_);
   reader_context_->set_data_cache_miss_bytes_counter(data_cache_miss_bytes_);
 
-  average_hdfs_read_thread_concurrency_ = runtime_profile()->AddSamplingCounter(
-      AVERAGE_HDFS_READ_THREAD_CONCURRENCY, &active_hdfs_read_thread_counter_);
+  average_hdfs_read_thread_concurrency_ =
+      PROFILE_AverageHdfsReadThreadConcurrency.Instantiate(runtime_profile(),
+      &active_hdfs_read_thread_counter_);
 
-  initial_range_ideal_reservation_stats_ = ADD_SUMMARY_STATS_COUNTER(runtime_profile(),
-      "InitialRangeIdealReservation", TUnit::BYTES);
-  initial_range_actual_reservation_stats_ = ADD_SUMMARY_STATS_COUNTER(runtime_profile(),
-      "InitialRangeActualReservation", TUnit::BYTES);
+  initial_range_ideal_reservation_stats_ =
+      PROFILE_InitialRangeIdealReservation.Instantiate(runtime_profile());
+  initial_range_actual_reservation_stats_ =
+      PROFILE_InitialRangeActualReservation.Instantiate(runtime_profile());
 
-  uncompressed_bytes_read_per_column_counter_ = ADD_SUMMARY_STATS_COUNTER(
-      runtime_profile(), "ParquetUncompressedBytesReadPerColumn", TUnit::BYTES);
-  compressed_bytes_read_per_column_counter_ = ADD_SUMMARY_STATS_COUNTER(
-      runtime_profile(), "ParquetCompressedBytesReadPerColumn", TUnit::BYTES);
+  uncompressed_bytes_read_per_column_counter_ =
+      PROFILE_ParquetUncompressedBytesReadPerColumn.Instantiate(runtime_profile());
+  compressed_bytes_read_per_column_counter_ =
+      PROFILE_ParquetCompressedBytesReadPerColumn.Instantiate(runtime_profile());
 
-  bytes_read_local_ = ADD_COUNTER(runtime_profile(), "BytesReadLocal",
-      TUnit::BYTES);
-  bytes_read_short_circuit_ = ADD_COUNTER(runtime_profile(), "BytesReadShortCircuit",
-      TUnit::BYTES);
-  bytes_read_dn_cache_ = ADD_COUNTER(runtime_profile(), "BytesReadDataNodeCache",
-      TUnit::BYTES);
-  num_remote_ranges_ = ADD_COUNTER(runtime_profile(), "RemoteScanRanges",
-      TUnit::UNIT);
-  unexpected_remote_bytes_ = ADD_COUNTER(runtime_profile(), "BytesReadRemoteUnexpected",
-      TUnit::BYTES);
-  cached_file_handles_hit_count_ = ADD_COUNTER(runtime_profile(),
-      "CachedFileHandlesHitCount", TUnit::UNIT);
-  cached_file_handles_miss_count_ = ADD_COUNTER(runtime_profile(),
-      "CachedFileHandlesMissCount", TUnit::UNIT);
+  bytes_read_local_ = PROFILE_BytesReadLocal.Instantiate(runtime_profile());
+  bytes_read_short_circuit_ =
+      PROFILE_BytesReadShortCircuit.Instantiate(runtime_profile());
+  bytes_read_dn_cache_ = PROFILE_BytesReadDataNodeCache.Instantiate(runtime_profile());
+  num_remote_ranges_ = PROFILE_RemoteScanRanges.Instantiate(runtime_profile());
+  unexpected_remote_bytes_ =
+      PROFILE_BytesReadRemoteUnexpected.Instantiate(runtime_profile());
+  cached_file_handles_hit_count_ =
+      PROFILE_CachedFileHandlesHitCount.Instantiate(runtime_profile());
+  cached_file_handles_miss_count_ =
+      PROFILE_CachedFileHandlesMissCount.Instantiate(runtime_profile());
 
-  max_compressed_text_file_length_ = runtime_profile()->AddHighWaterMarkCounter(
-      "MaxCompressedTextFileLength", TUnit::BYTES);
+  max_compressed_text_file_length_ =
+      PROFILE_MaxCompressedTextFileLength.Instantiate(runtime_profile());
 
-  scanner_io_wait_time_ = ADD_TIMER(runtime_profile(), "ScannerIoWaitTime");
+  scanner_io_wait_time_ = PROFILE_ScannerIoWaitTime.Instantiate(runtime_profile());
   hdfs_read_thread_concurrency_bucket_ = runtime_profile()->AddBucketingCounters(
       &active_hdfs_read_thread_counter_,
       ExecEnv::GetInstance()->disk_io_mgr()->num_total_disks() + 1);

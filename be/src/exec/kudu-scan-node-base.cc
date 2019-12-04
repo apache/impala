@@ -42,6 +42,8 @@
 using kudu::client::KuduClient;
 using kudu::client::KuduTable;
 
+PROFILE_DECLARE_COUNTER(ScanRangesComplete);
+
 namespace impala {
 
 const string KuduScanNodeBase::KUDU_ROUND_TRIPS = "TotalKuduScanRoundTrips";
@@ -68,7 +70,7 @@ Status KuduScanNodeBase::Prepare(RuntimeState* state) {
   RETURN_IF_ERROR(ScanNode::Prepare(state));
 
   scan_ranges_complete_counter_ =
-      ADD_COUNTER(runtime_profile(), SCAN_RANGES_COMPLETE_COUNTER, TUnit::UNIT);
+      PROFILE_ScanRangesComplete.Instantiate(runtime_profile());
   kudu_round_trips_ = ADD_COUNTER(runtime_profile(), KUDU_ROUND_TRIPS, TUnit::UNIT);
   kudu_remote_tokens_ = ADD_COUNTER(runtime_profile(), KUDU_REMOTE_TOKENS, TUnit::UNIT);
   kudu_client_time_ = ADD_TIMER(runtime_profile(), KUDU_CLIENT_TIME);

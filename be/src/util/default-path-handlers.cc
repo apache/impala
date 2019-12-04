@@ -39,6 +39,7 @@
 #include "util/memusage-path-handlers.h"
 #include "util/pprof-path-handlers.h"
 #include "util/process-state-info.h"
+#include "util/runtime-profile-counters.h"
 
 #include "common/names.h"
 
@@ -125,6 +126,49 @@ void FlagsHandler(const Webserver::WebRequest& req, Document* document) {
   Value title("Command-line Flags", document->GetAllocator());
   document->AddMember("title", title, document->GetAllocator());
   document->AddMember("flags", flag_arr, document->GetAllocator());
+}
+
+// Profile documentation handlers.
+// Will have list of all the profile counters and the definition of Significance added
+// in document.
+// Counters have the following properties:
+//   name, significance, description, unit
+void ProfileDocsHandler(const Webserver::WebRequest& req, Document* document) {
+  vector<const ProfileEntryPrototype*> prototypes;
+  ProfileEntryPrototypeRegistry::get()->GetPrototypes(&prototypes);
+
+  Value profile_docs(kArrayType);
+  for (auto p : prototypes) {
+    Value p_val(kObjectType);
+    Value name(p->name(), document->GetAllocator());
+    p_val.AddMember("name", name, document->GetAllocator());
+    Value significance(p->significance(), document->GetAllocator());
+    p_val.AddMember("significance", significance, document->GetAllocator());
+    Value description(p->desc(), document->GetAllocator());
+    p_val.AddMember("description", description, document->GetAllocator());
+    auto unit_it = _TUnit_VALUES_TO_NAMES.find(p->unit());
+    const char* unit_str = unit_it != _TUnit_VALUES_TO_NAMES.end() ? unit_it->second : "";
+    Value unit(unit_str, document->GetAllocator());
+    p_val.AddMember("unit", unit, document->GetAllocator());
+    profile_docs.PushBack(p_val, document->GetAllocator());
+  }
+
+  Value significance_def(kArrayType);
+  for (auto significance : ProfileEntryPrototype::ALLSIGNIFICANCE) {
+    Value significance_obj(kObjectType);
+    Value significance_val(ProfileEntryPrototype::SignificanceString(significance),
+        document->GetAllocator());
+    Value significance_description(
+        ProfileEntryPrototype::SignificanceDescription(significance),
+        document->GetAllocator());
+    significance_obj.AddMember("name", significance_val,document->GetAllocator());
+    significance_obj.AddMember("description",
+        significance_description,document->GetAllocator());
+    significance_def.PushBack(significance_obj, document->GetAllocator());
+  }
+
+  document->AddMember("significance_docs", significance_def, document->GetAllocator());
+  document->AddMember("profile_docs", profile_docs, document->GetAllocator());
 }
 
 void JmxHandler(const Webserver::WebRequest& req, Document* document) {
@@ -234,6 +278,8 @@ void AddDefaultUrlCallbacks(Webserver* webserver, MetricGroup* metric_group,
     MemTracker* process_mem_tracker) {
   webserver->RegisterUrlCallback("/logs", "logs.tmpl", LogsHandler, true);
   webserver->RegisterUrlCallback("/varz", "flags.tmpl", FlagsHandler, true);
+  webserver->RegisterUrlCallback(
+      "/profile_docs", "profile_docs.tmpl", ProfileDocsHandler, true);
   if (JniUtil::is_jvm_inited()) {
     // JmxHandler outputs a plain JSON string and does not require a template to
     // render. However RawUrlCallback only supports PLAIN content type.

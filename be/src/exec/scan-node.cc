@@ -53,30 +53,44 @@ using boost::algorithm::join;
 
 namespace impala {
 
-// Changing these names have compatibility concerns.
-const string ScanNode::BYTES_READ_COUNTER = "BytesRead";
-const string ScanNode::ROWS_READ_COUNTER = "RowsRead";
-const string ScanNode::COLLECTION_ITEMS_READ_COUNTER = "CollectionItemsRead";
-const string ScanNode::TOTAL_HDFS_READ_TIMER = "TotalRawHdfsReadTime(*)";
-const string ScanNode::TOTAL_HDFS_OPEN_FILE_TIMER = "TotalRawHdfsOpenFileTime(*)";
-const string ScanNode::TOTAL_HBASE_READ_TIMER = "TotalRawHBaseReadTime(*)";
-const string ScanNode::TOTAL_THROUGHPUT_COUNTER = "TotalReadThroughput";
-const string ScanNode::MATERIALIZE_TUPLE_TIMER = "MaterializeTupleTime(*)";
-const string ScanNode::PER_READ_THREAD_THROUGHPUT_COUNTER =
-    "PerReadThreadRawHdfsThroughput";
-const string ScanNode::NUM_DISKS_ACCESSED_COUNTER = "NumDisksAccessed";
-const string ScanNode::SCAN_RANGES_COMPLETE_COUNTER = "ScanRangesComplete";
+PROFILE_DEFINE_COUNTER(BytesRead, STABLE_HIGH, TUnit::BYTES, "Total bytes read from "
+    "disk by a scan node.");
+PROFILE_DEFINE_COUNTER(RowsRead, STABLE_HIGH, TUnit::UNIT, "Number of top-level "
+    "rows/tuples read from the storage layer, including those discarded by predicate "
+    "evaluation. Used for all types of scans.");
+PROFILE_DEFINE_RATE_COUNTER(TotalReadThroughput, STABLE_LOW, TUnit::BYTES_PER_SECOND,
+    "BytesRead divided by the total wall clock time that this scan "
+    "was executing (from Open() to Close()). This gives the aggregate data is scanned.");
+PROFILE_DEFINE_TIME_SERIES_COUNTER(BytesReadSeries, UNSTABLE, TUnit::BYTES,
+    "Time series of BytesRead that samples the BytesRead counter.");
+PROFILE_DEFINE_TIMER(MaterializeTupleTime, UNSTABLE, "Wall clock time spent "
+    "materializing tuples and evaluating predicates.");
+PROFILE_DEFINE_COUNTER(NumScannerThreadsStarted, DEBUG, TUnit::UNIT,
+    "NumScannerThreadsStarted - the number of scanner threads started for the duration "
+    "of the ScanNode. A single scanner thread will likely process multiple scan ranges."
+    "Meanwhile, more than one scanner thread can be spun up to process data from a "
+    "single scan range. This is *not* the same as peak scanner thread concurrency "
+    "because the number of scanner threads can fluctuate during execution of the scan.");
+PROFILE_DEFINE_COUNTER(RowBatchesEnqueued, STABLE_LOW, TUnit::UNIT, "Number of row "
+    "batches enqueued in the scan node's output queue.");
+PROFILE_DEFINE_COUNTER(RowBatchBytesEnqueued, STABLE_LOW, TUnit::BYTES,
+    "Number of bytes enqueued in the scan node's output queue.");
+PROFILE_DEFINE_TIMER(RowBatchQueueGetWaitTime, UNSTABLE, "Wall clock time that the "
+    "fragment execution thread spent blocked waiting for row batches to be added to the "
+    "scan node's output queue.");
+PROFILE_DEFINE_TIMER(RowBatchQueuePutWaitTime, UNSTABLE, "Aggregate wall clock time "
+    "across all scanner threads spent blocked waiting for space in the scan node's "
+    "output queue when it is full.");
+PROFILE_DEFINE_COUNTER(RowBatchQueuePeakMemoryUsage, DEBUG, TUnit::BYTES,
+    "Peak memory consumption of row batches enqueued in the scan node's output queue.");
+PROFILE_DEFINE_COUNTER(NumScannerThreadMemUnavailable, STABLE_LOW, TUnit::UNIT,
+    "Number of times scanner threads were not created because of memory not available.");
+PROFILE_DEFINE_SAMPLING_COUNTER(AverageScannerThreadConcurrency, STABLE_LOW,
+    "Average number of executing scanner threads.");
+PROFILE_DEFINE_HIGH_WATER_MARK_COUNTER(PeakScannerThreadConcurrency, STABLE_LOW,
+    TUnit::UNIT, "Peak number of executing scanner threads.");
+
 const string ScanNode::SCANNER_THREAD_COUNTERS_PREFIX = "ScannerThreads";
-const string ScanNode::SCANNER_THREAD_TOTAL_WALLCLOCK_TIME =
-    "ScannerThreadsTotalWallClockTime";
-const string ScanNode::AVERAGE_SCANNER_THREAD_CONCURRENCY =
-    "AverageScannerThreadConcurrency";
-const string ScanNode::PEAK_SCANNER_THREAD_CONCURRENCY =
-    "PeakScannerThreadConcurrency";
-const string ScanNode::AVERAGE_HDFS_READ_THREAD_CONCURRENCY =
-    "AverageHdfsReadThreadConcurrency";
-const string ScanNode::NUM_SCANNER_THREADS_STARTED =
-    "NumScannerThreadsStarted";
 
 bool ScanNode::IsDataCacheDisabled() const {
   return runtime_state()->query_options().disable_data_cache;
@@ -122,9 +136,8 @@ Status ScanNode::Prepare(RuntimeState* state) {
   runtime_state_ = state;
   RETURN_IF_ERROR(ExecNode::Prepare(state));
 
-  rows_read_counter_ =
-      ADD_COUNTER(runtime_profile(), ROWS_READ_COUNTER, TUnit::UNIT);
-  materialize_tuple_timer_ = ADD_TIMER(runtime_profile(), MATERIALIZE_TUPLE_TIMER);
+  rows_read_counter_ = PROFILE_RowsRead.Instantiate(runtime_profile());
+  materialize_tuple_timer_ = PROFILE_MaterializeTupleTime.Instantiate(runtime_profile());
 
   DCHECK_EQ(filter_exprs_.size(), filter_ctxs_.size());
   for (int i = 0; i < filter_exprs_.size(); ++i) {
@@ -135,13 +148,12 @@ Status ScanNode::Prepare(RuntimeState* state) {
 }
 
 void ScanNode::AddBytesReadCounters() {
-  bytes_read_counter_ =
-      ADD_COUNTER(runtime_profile(), BYTES_READ_COUNTER, TUnit::BYTES);
+  bytes_read_counter_ = PROFILE_BytesRead.Instantiate(runtime_profile());
   runtime_state()->AddBytesReadCounter(bytes_read_counter_);
-  bytes_read_timeseries_counter_ = ADD_TIME_SERIES_COUNTER(runtime_profile(),
-      BYTES_READ_COUNTER, bytes_read_counter_);
-  total_throughput_counter_ = runtime_profile()->AddRateCounter(
-      TOTAL_THROUGHPUT_COUNTER, bytes_read_counter_);
+  bytes_read_timeseries_counter_ = PROFILE_BytesReadSeries.Instantiate(runtime_profile(),
+      bytes_read_counter_);
+  total_throughput_counter_ = PROFILE_TotalReadThroughput.Instantiate(runtime_profile(),
+      bytes_read_counter_);
 }
 
 Status ScanNode::Open(RuntimeState* state) {
@@ -214,17 +226,15 @@ void ScanNode::ScannerThreadState::Prepare(
       new MemTracker(-1, "Queued Batches", parent->mem_tracker(), false));
 
   thread_counters_ = ADD_THREAD_COUNTERS(profile, SCANNER_THREAD_COUNTERS_PREFIX);
-  num_threads_started_ = ADD_COUNTER(profile, NUM_SCANNER_THREADS_STARTED, TUnit::UNIT);
-  row_batches_enqueued_ =
-      ADD_COUNTER(profile, "RowBatchesEnqueued", TUnit::UNIT);
-  row_batch_bytes_enqueued_ =
-      ADD_COUNTER(profile, "RowBatchBytesEnqueued", TUnit::BYTES);
-  row_batches_get_timer_ = ADD_TIMER(profile, "RowBatchQueueGetWaitTime");
-  row_batches_put_timer_ = ADD_TIMER(profile, "RowBatchQueuePutWaitTime");
+  num_threads_started_ = PROFILE_NumScannerThreadsStarted.Instantiate(profile);
+  row_batches_enqueued_ = PROFILE_RowBatchesEnqueued.Instantiate(profile);
+  row_batch_bytes_enqueued_ = PROFILE_RowBatchBytesEnqueued.Instantiate(profile);
+  row_batches_get_timer_ = PROFILE_RowBatchQueueGetWaitTime.Instantiate(profile);
+  row_batches_put_timer_ = PROFILE_RowBatchQueuePutWaitTime.Instantiate(profile);
   row_batches_peak_mem_consumption_ =
-      ADD_COUNTER(profile, "RowBatchQueuePeakMemoryUsage", TUnit::BYTES);
+      PROFILE_RowBatchQueuePeakMemoryUsage.Instantiate(profile);
   scanner_thread_mem_unavailable_counter_ =
-      ADD_COUNTER(profile, "NumScannerThreadMemUnavailable", TUnit::UNIT);
+      PROFILE_NumScannerThreadMemUnavailable.Instantiate(profile);
 
   parent->runtime_state()->query_state()->scanner_mem_limiter()->RegisterScan(
       parent, estimated_per_thread_mem);
@@ -267,12 +277,12 @@ void ScanNode::ScannerThreadState::Open(
       FLAGS_max_queued_row_batch_bytes, row_batches_get_timer_, row_batches_put_timer_));
 
   // Start measuring the scanner thread concurrency only once the node is opened.
-  average_concurrency_ = parent->runtime_profile()->AddSamplingCounter(
-      AVERAGE_SCANNER_THREAD_CONCURRENCY, [&num_active=num_active_] () {
+  average_concurrency_ = PROFILE_AverageScannerThreadConcurrency.Instantiate(
+      parent->runtime_profile(), [&num_active=num_active_] () {
         return num_active.Load();
       });
-  peak_concurrency_ = parent->runtime_profile()->AddHighWaterMarkCounter(
-      PEAK_SCANNER_THREAD_CONCURRENCY, TUnit::UNIT);
+  peak_concurrency_ =
+      PROFILE_PeakScannerThreadConcurrency.Instantiate(parent->runtime_profile());
 }
 
 void ScanNode::ScannerThreadState::AddThread(unique_ptr<Thread> thread) {

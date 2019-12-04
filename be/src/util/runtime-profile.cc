@@ -64,6 +64,71 @@ const string RuntimeProfile::TOTAL_TIME_COUNTER_NAME = "TotalTime";
 const string RuntimeProfile::LOCAL_TIME_COUNTER_NAME = "LocalTime";
 const string RuntimeProfile::INACTIVE_TIME_COUNTER_NAME = "InactiveTotalTime";
 
+constexpr ProfileEntryPrototype::Significance ProfileEntryPrototype::ALLSIGNIFICANCE[];
+
+void ProfileEntryPrototypeRegistry::AddPrototype(const ProfileEntryPrototype* prototype) {
+  boost::lock_guard<SpinLock> l(lock_);
+  DCHECK(prototypes_.find(prototype->name()) == prototypes_.end()) <<
+      "Found duplicate prototype name: " << prototype->name();
+  prototypes_.emplace(prototype->name(), prototype);
+}
+
+void ProfileEntryPrototypeRegistry::GetPrototypes(
+    vector<const ProfileEntryPrototype*>* out) {
+  lock_guard<SpinLock> l(lock_);
+  out->reserve(prototypes_.size());
+  for (auto p : prototypes_) out->push_back(p.second);
+}
+
+ProfileEntryPrototype::ProfileEntryPrototype(const char* name, Significance significance,
+    const char* desc, TUnit::type unit) :
+    name_(name), significance_(significance), desc_(desc),
+    unit_(unit) {
+  ProfileEntryPrototypeRegistry::get()->AddPrototype(this);
+}
+
+const char* ProfileEntryPrototype::SignificanceString(
+    ProfileEntryPrototype::Significance significance) {
+  switch (significance) {
+    case Significance::STABLE_HIGH:
+      return "STABLE & HIGH";
+    case Significance::STABLE_LOW:
+      return "STABLE & LOW";
+    case Significance::UNSTABLE:
+      return "UNSTABLE";
+    case Significance::DEBUG:
+      return "DEBUG";
+    default:
+      DCHECK(false);
+      return "";
+  }
+}
+
+const char* ProfileEntryPrototype::SignificanceDescription(
+    ProfileEntryPrototype::Significance significance) {
+  switch (significance) {
+    case Significance::STABLE_HIGH:
+      return "High level and stable counters - always useful for measuring query "
+             "performance and status. Counters that everyone is interested. should "
+             "rarely change and if it does we will make some effort to notify users.";
+    case Significance::STABLE_LOW:
+      return "Low level and stable counters - interesting counters to monitor and "
+             "analyze by machine. It will probably be interesting under some "
+             "circumstances for users.";
+    case Significance::UNSTABLE:
+      return "Unstable but useful - useful to understand query performance, but subject"
+             " to change, particularly if the implementation changes. E.g. "
+             "RowBatchQueuePutWaitTime, MaterializeTupleTimer";
+    case Significance::DEBUG:
+      return "Debugging counters - generally not useful to users of Impala, the main"
+             " use case is low-level debugging. Can be hidden to reduce noise for "
+             "most consumers of profiles.";
+    default:
+      DCHECK(false);
+      return "";
+  }
+}
+
 RuntimeProfile* RuntimeProfile::Create(ObjectPool* pool, const string& name,
     bool is_averaged_profile) {
   return pool->Add(new RuntimeProfile(pool, name, is_averaged_profile));

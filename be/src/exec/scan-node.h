@@ -126,24 +126,7 @@ class ScanNode : public ExecNode {
     return materialize_tuple_timer_;
   }
 
-  /// names of ScanNode common counters
-  static const std::string BYTES_READ_COUNTER;
-  static const std::string ROWS_READ_COUNTER;
-  static const std::string COLLECTION_ITEMS_READ_COUNTER;
-  static const std::string TOTAL_HDFS_READ_TIMER;
-  static const std::string TOTAL_HDFS_OPEN_FILE_TIMER;
-  static const std::string TOTAL_HBASE_READ_TIMER;
-  static const std::string TOTAL_THROUGHPUT_COUNTER;
-  static const std::string PER_READ_THREAD_THROUGHPUT_COUNTER;
-  static const std::string NUM_DISKS_ACCESSED_COUNTER;
-  static const std::string MATERIALIZE_TUPLE_TIMER;
-  static const std::string SCAN_RANGES_COMPLETE_COUNTER;
   static const std::string SCANNER_THREAD_COUNTERS_PREFIX;
-  static const std::string SCANNER_THREAD_TOTAL_WALLCLOCK_TIME;
-  static const std::string AVERAGE_SCANNER_THREAD_CONCURRENCY;
-  static const std::string PEAK_SCANNER_THREAD_CONCURRENCY;
-  static const std::string AVERAGE_HDFS_READ_THREAD_CONCURRENCY;
-  static const std::string NUM_SCANNER_THREADS_STARTED;
 
   const std::vector<ScalarExpr*>& filter_exprs() const { return filter_exprs_; }
 

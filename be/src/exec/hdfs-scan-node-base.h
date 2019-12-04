@@ -522,82 +522,41 @@ class HdfsScanNodeBase : public ScanNode {
   /// profile.
   bool counters_running_ = false;
 
-  /// The size of the largest compressed text file to be scanned. This is used to
-  /// estimate scanner thread memory usage.
-  RuntimeProfile::HighWaterMarkCounter* max_compressed_text_file_length_ = nullptr;
-
   /// Disk accessed bitmap
   RuntimeProfile::Counter disks_accessed_bitmap_;
+  /// The number of active hdfs reading threads reading for this node.
+  RuntimeProfile::Counter active_hdfs_read_thread_counter_;
 
-  /// Total number of bytes read locally
+  /// Definition of following counters can be found in hdfs-scan-node-base.cc
+  RuntimeProfile::HighWaterMarkCounter* max_compressed_text_file_length_ = nullptr;
   RuntimeProfile::Counter* bytes_read_local_ = nullptr;
-
-  /// Total number of bytes read via short circuit read
   RuntimeProfile::Counter* bytes_read_short_circuit_ = nullptr;
-
-  /// Total number of bytes read from data node cache
   RuntimeProfile::Counter* bytes_read_dn_cache_ = nullptr;
-
-  /// Total number of remote scan ranges
   RuntimeProfile::Counter* num_remote_ranges_ = nullptr;
-
-  /// Total number of bytes read remotely that were expected to be local
   RuntimeProfile::Counter* unexpected_remote_bytes_ = nullptr;
-
-  /// Total number of file handle opens where the file handle was present in the cache
   RuntimeProfile::Counter* cached_file_handles_hit_count_ = nullptr;
-
-  /// Total number of file handle opens where the file handle was not in the cache
   RuntimeProfile::Counter* cached_file_handles_miss_count_ = nullptr;
-
-  /// Counters for data cache.
   RuntimeProfile::Counter* data_cache_hit_count_ = nullptr;
   RuntimeProfile::Counter* data_cache_partial_hit_count_ = nullptr;
   RuntimeProfile::Counter* data_cache_miss_count_ = nullptr;
   RuntimeProfile::Counter* data_cache_hit_bytes_ = nullptr;
   RuntimeProfile::Counter* data_cache_miss_bytes_ = nullptr;
-
-  /// The amount of time scanner threads spend waiting for I/O.
   RuntimeProfile::Counter* scanner_io_wait_time_ = nullptr;
-
-  /// The number of active hdfs reading threads reading for this node.
-  RuntimeProfile::Counter active_hdfs_read_thread_counter_;
-
-  /// Average number of active hdfs reading threads
-  /// This should be created in Open() and stopped when all the scanner threads are done.
   RuntimeProfile::Counter* average_hdfs_read_thread_concurrency_ = nullptr;
-
-  /// HDFS read thread concurrency bucket: bucket[i] refers to the number of sample
-  /// taken where there are i concurrent hdfs read thread running. Created in Open().
-  std::vector<RuntimeProfile::Counter*>* hdfs_read_thread_concurrency_bucket_ = nullptr;
-
-  /// HDFS read throughput per Disk I/O thread [bytes/sec],
   RuntimeProfile::Counter* per_read_thread_throughput_counter_ = nullptr;
-
-  /// Total number of disks accessed for this scan node.
   RuntimeProfile::Counter* num_disks_accessed_counter_ = nullptr;
-
-  /// Total file read time in I/O mgr disk thread.
   RuntimeProfile::Counter* hdfs_read_timer_ = nullptr;
-
-  /// Total time spent opening file handles in I/O mgr disk thread.
   RuntimeProfile::Counter* hdfs_open_file_timer_ = nullptr;
-
-  /// Track stats about ideal/actual reservation for initial scan ranges so we can
-  /// determine if the scan got all of the reservation it wanted. Does not include
-  /// subsequent reservation increases done by scanner implementation (e.g. for Parquet
-  /// columns).
   RuntimeProfile::SummaryStatsCounter* initial_range_ideal_reservation_stats_ = nullptr;
   RuntimeProfile::SummaryStatsCounter* initial_range_actual_reservation_stats_ = nullptr;
-
-  /// Track stats about the number of bytes read per column. Each sample in the counter is
-  /// the size of a single column that is scanned by the scan node. The scan node tracks
-  /// the number of bytes read for each column it processes, and when the scan node is
-  /// closed, it updates these counters with the size of each column.
   RuntimeProfile::SummaryStatsCounter* compressed_bytes_read_per_column_counter_ =
       nullptr;
   RuntimeProfile::SummaryStatsCounter* uncompressed_bytes_read_per_column_counter_ =
       nullptr;
+
+  /// HDFS read thread concurrency bucket: bucket[i] refers to the number of sample
+  /// taken where there are i concurrent hdfs read thread running. Created in Open().
+  std::vector<RuntimeProfile::Counter*>* hdfs_read_thread_concurrency_bucket_ = nullptr;
 
   /// Pool for allocating some amounts of memory that is shared between scanners.
   /// e.g. partition key tuple and their string buffers

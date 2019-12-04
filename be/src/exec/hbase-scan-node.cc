@@ -36,6 +36,9 @@
 #include "common/names.h"
 using namespace impala;
 
+PROFILE_DEFINE_TIMER(TotalRawHBaseReadTime, STABLE_HIGH,
+    "Aggregate wall clock time spent reading from HBase.");
+
 HBaseScanNode::HBaseScanNode(ObjectPool* pool, const TPlanNode& tnode,
                              const DescriptorTbl& descs)
     : ScanNode(pool, tnode, descs),
@@ -59,7 +62,7 @@ HBaseScanNode::~HBaseScanNode() {
 
 Status HBaseScanNode::Prepare(RuntimeState* state) {
   RETURN_IF_ERROR(ScanNode::Prepare(state));
-  hbase_read_timer_ = ADD_TIMER(runtime_profile(), TOTAL_HBASE_READ_TIMER);
+  hbase_read_timer_ = PROFILE_TotalRawHBaseReadTime.Instantiate(runtime_profile());
   AddBytesReadCounters();
 
   hbase_scanner_.reset(

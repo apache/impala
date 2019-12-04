@@ -116,7 +116,7 @@ class HBaseScanNode : public ScanNode {
   /// will be 0.
   int suggested_max_caching_;
 
-  /// Total wall clock time spent reading from HBase.
+  /// Definition can be found in hbase_scan_node.cc
   RuntimeProfile::Counter* hbase_read_timer_ = nullptr;
 
   /// Writes a slot in tuple from an HBase value containing text data.

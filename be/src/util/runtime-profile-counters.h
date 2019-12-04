@@ -26,6 +26,7 @@
 
 #include "common/atomic.h"
 #include "common/logging.h"
+#include "gutil/singleton.h"
 #include "util/arithmetic-util.h"
 #include "util/runtime-profile.h"
 #include "util/stopwatch.h"
@@ -92,6 +93,232 @@ namespace impala {
   #define SCOPED_THREAD_COUNTER_MEASUREMENT(c)
   #define SCOPED_CONCURRENT_COUNTER(c)
 #endif
+
+
+#define PROFILE_DEFINE_COUNTER(name, significance, unit, desc) \
+  ::impala::CounterPrototype PROFILE_##name( \
+      #name, ::impala::ProfileEntryPrototype::Significance::significance, desc, unit)
+
+#define PROFILE_DEFINE_RATE_COUNTER(name, significance, unit, desc) \
+  ::impala::RateCounterPrototype PROFILE_##name( \
+      #name, ::impala::ProfileEntryPrototype::Significance::significance, desc, unit)
+
+#define PROFILE_DEFINE_SUMMARY_STATS_COUNTER(name, significance, unit, desc) \
+  ::impala::SummaryStatsCounterPrototype PROFILE_##name( \
+      #name, ::impala::ProfileEntryPrototype::Significance::significance, desc, unit)
+
+#define PROFILE_DEFINE_DERIVED_COUNTER(name, significance, unit, desc) \
+  ::impala::DerivedCounterPrototype PROFILE_##name( \
+      #name, ::impala::ProfileEntryPrototype::Significance::significance, desc, unit)
+
+#define PROFILE_DEFINE_SAMPLING_COUNTER(name, significance, desc) \
+  ::impala::SamplingCounterPrototype PROFILE_##name( \
+      #name, ::impala::ProfileEntryPrototype::Significance::significance, desc)
+
+#define PROFILE_DEFINE_HIGH_WATER_MARK_COUNTER(name, significance, unit, \
+  desc)::impala::HighWaterMarkCounterPrototype PROFILE_##name( \
+      #name, ::impala::ProfileEntryPrototype::Significance::significance, desc, unit)
+
+#define PROFILE_DEFINE_TIME_SERIES_COUNTER(name, significance, unit, desc) \
+  ::impala::TimeSeriesCounterPrototype PROFILE_##name( \
+      #name, ::impala::ProfileEntryPrototype::Significance::significance, desc, unit)
+
+#define PROFILE_DEFINE_TIMER(name, significance, desc) \
+  ::impala::CounterPrototype PROFILE_##name(#name, \
+      ::impala::ProfileEntryPrototype::Significance::significance, desc, TUnit::TIME_NS)
+
+#define PROFILE_DEFINE_SUMMARY_STATS_TIMER(name, significance, desc) \
+  ::impala::SummaryStatsCounterPrototype PROFILE_##name(#name, \
+  ::impala::ProfileEntryPrototype::Significance::significance, desc, TUnit::TIME_NS)
+
+#define PROFILE_DECLARE_COUNTER(name) extern ::impala::CounterPrototype PROFILE_##name
+
+/// Prototype of a profile entry. All prototypes must be defined at compile time and must
+/// have a unique name. Subclasses then must provide a way to create new profile entries
+/// from a prototype, for example by providing an Instantiate() method.
+class ProfileEntryPrototype {
+ public:
+  enum class Significance {
+    // High level and stable counters - always useful for measuring query performance and
+    // status. Counters that everyone is interested. should rarely change and if it does
+    // we will make some effort to notify users.
+    STABLE_HIGH,
+    // Low level and stable counters - interesting counters to monitor and analyze by
+    // machine. It will probably be interesting under some circumstances for users.
+    // Lots of developers are interested.
+    STABLE_LOW,
+    // Unstable but useful - useful to understand query performance, but subject to
+    // change, particularly if the implementation changes. E.g. RowBatchQueuePutWaitTime,
+    // MaterializeTupleTimer
+    UNSTABLE,
+    // Debugging counters - generally not useful to users of Impala, the main use case is
+    // low-level debugging. Can be hidden to reduce noise for most consumers of profiles.
+    DEBUG
+  };
+
+  // Creates a new prototype and registers it with the singleton
+  // ProfileEntryPrototypeRegistry instance.
+  ProfileEntryPrototype(
+      const char* name, Significance significance, const char* desc, TUnit::type unit);
+
+  const char* name() const { return name_; }
+  const char* desc() const { return desc_; }
+  const char* significance() const { return SignificanceString(significance_); }
+  TUnit::type unit() const { return unit_; }
+
+  // Returns a string representation of 'significance'.
+  static const char* SignificanceString(Significance significance);
+
+  constexpr const static Significance ALLSIGNIFICANCE[4] = {Significance::STABLE_HIGH,
+      Significance::STABLE_LOW, Significance::UNSTABLE, Significance::DEBUG};
+
+  // Return the description of this significance. Should be similar with the
+  // comments above but it is a more user interface descriptions
+  static const char* SignificanceDescription(Significance significance);
+
+ protected:
+  // Name of this prototype, needs to have process lifetime.
+  const char* name_;
+
+  // Significance of this prototype. See enum Significance above for descriptions of
+  // possible values.
+  Significance significance_;
+
+  // Description of this prototype, needs to have process lifetime. This is used to
+  // generate documentation automatically.
+  const char* desc_;
+  TUnit::type unit_;
+
+ private:
+  DISALLOW_COPY_AND_ASSIGN(ProfileEntryPrototype);
+};
+
+/// Registry to collect all profile entry prototypes. During process startup, all
+/// prototypes will register with the singleton instance of this class. Then, this class
+/// can be used to retrieve all registered prototypes, for example to display
+/// documentation to users. This class is thread-safe.
+class ProfileEntryPrototypeRegistry {
+ public:
+  // Returns the singleton instance.
+  static ProfileEntryPrototypeRegistry* get() {
+    return Singleton<ProfileEntryPrototypeRegistry>::get();
+  }
+
+  // Adds a prototype to the registry. Prototypes must have unique names.
+  void AddPrototype(const ProfileEntryPrototype* prototype);
+
+  // Copies all prototype pointers to 'out'.
+  void GetPrototypes(std::vector<const ProfileEntryPrototype*>* out);
+
+ private:
+  mutable SpinLock lock_;
+  std::map<const char*, const ProfileEntryPrototype*> prototypes_;
+};
+
+/// TODO: As an alternative to this approach we could just have a single class
+/// ProfileEntryPrototype and pass its objects into the profile->Add.*Counter() methods.
+class CounterPrototype : public ProfileEntryPrototype {
+ public:
+  CounterPrototype(const char* name, Significance significance, const char* desc,
+      TUnit::type unit): ProfileEntryPrototype(name, significance, desc, unit) {}
+
+  RuntimeProfile::Counter* Instantiate(RuntimeProfile* profile,
+      const std::string& parent_counter_name = "") {
+    return profile->AddCounter(name(), unit(), parent_counter_name);
+  }
+
+};
+
+class DerivedCounterPrototype : public ProfileEntryPrototype {
+ public:
+  DerivedCounterPrototype(const char* name, Significance significance, const char* desc,
+      TUnit::type unit): ProfileEntryPrototype(name, significance, desc, unit) {}
+
+  RuntimeProfile::DerivedCounter* Instantiate(RuntimeProfile* profile,
+      const RuntimeProfile::SampleFunction& counter_fn,
+      const std::string& parent_counter_name = "") {
+    return profile->AddDerivedCounter(name(), unit(), counter_fn, parent_counter_name);
+  }
+};
+
+class SamplingCounterPrototype : public ProfileEntryPrototype {
+ public:
+  SamplingCounterPrototype(const char* name, Significance significance, const char* desc):
+      ProfileEntryPrototype(name, significance, desc, TUnit::DOUBLE_VALUE) {}
+
+  RuntimeProfile::Counter* Instantiate(RuntimeProfile* profile,
+      RuntimeProfile::Counter* src_counter) {
+    return profile->AddSamplingCounter(name(), src_counter);
+  }
+
+  RuntimeProfile::Counter* Instantiate(RuntimeProfile* profile,
+      boost::function<int64_t ()> sample_fn) {
+    return profile->AddSamplingCounter(name(), sample_fn);
+  }
+};
+
+class HighWaterMarkCounterPrototype : public ProfileEntryPrototype {
+ public:
+  HighWaterMarkCounterPrototype(
+      const char* name, Significance significance, const char* desc,
+      TUnit::type unit): ProfileEntryPrototype(name, significance, desc, unit) {}
+
+  RuntimeProfile::HighWaterMarkCounter* Instantiate(RuntimeProfile* profile,
+        const std::string& parent_counter_name = "") {
+    return profile->AddHighWaterMarkCounter(name(), unit(), parent_counter_name);
+  }
+};
+
+class TimeSeriesCounterPrototype : public ProfileEntryPrototype {
+ public:
+  TimeSeriesCounterPrototype(const char* name, Significance significance,
+      const char* desc, TUnit::type unit):
+      ProfileEntryPrototype(name, significance, desc, unit) {}
+
+  RuntimeProfile::TimeSeriesCounter* operator()(RuntimeProfile* profile,
+      RuntimeProfile::Counter* src_counter) {
+    DCHECK(src_counter->unit() == unit());
+    return profile->AddSamplingTimeSeriesCounter(name(), src_counter);
+  }
+
+  RuntimeProfile::TimeSeriesCounter* Instantiate(RuntimeProfile* profile,
+      RuntimeProfile::Counter* src_counter) {
+    return (*this)(profile, src_counter);
+  }
+};
+
+class RateCounterPrototype : public ProfileEntryPrototype {
+ public:
+  RateCounterPrototype(const char* name, Significance significance,
+      const char* desc, TUnit::type unit):
+      ProfileEntryPrototype(name, significance, desc, unit) {}
+
+  RuntimeProfile::Counter* operator()(
+      RuntimeProfile* profile, RuntimeProfile::Counter* src_counter) {
+    RuntimeProfile::Counter* new_counter = profile->AddRateCounter(name(), src_counter);
+    DCHECK_EQ(unit(), new_counter->unit());
+    return new_counter;
+  }
+  RuntimeProfile::Counter* Instantiate(
+      RuntimeProfile* profile, RuntimeProfile::Counter* src_counter) {
+    RuntimeProfile::Counter* new_counter = profile->AddRateCounter(name(), src_counter);
+    DCHECK_EQ(unit(), new_counter->unit());
+    return new_counter;
+  }
+};
+
+class SummaryStatsCounterPrototype : public ProfileEntryPrototype {
+ public:
+  SummaryStatsCounterPrototype(const char* name, Significance significance,
+      const char* desc, TUnit::type unit):
+      ProfileEntryPrototype(name, significance, desc, unit) {}
+
+  RuntimeProfile::SummaryStatsCounter* Instantiate(RuntimeProfile* profile,
+      const std::string& parent_counter_name = "") {
+    return profile->AddSummaryStatsCounter(name(), unit(), parent_counter_name);
+  }
+};
+
 
 /// A counter that keeps track of the highest value seen (reporting that
 /// as value()) and the current value.

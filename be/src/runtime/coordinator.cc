@@ -67,6 +67,42 @@ DECLARE_string(hostname);
 
 using namespace impala;
 
+PROFILE_DEFINE_COUNTER(NumBackends, STABLE_HIGH, TUnit::UNIT,
+    "Number of backends running this query.");
+PROFILE_DEFINE_COUNTER(TotalBytesRead, STABLE_HIGH, TUnit::BYTES,
+    "Total number of bytes read by a query.");
+PROFILE_DEFINE_COUNTER(TotalCpuTime, STABLE_HIGH, TUnit::TIME_NS,
+    "Total CPU time (user + system) consumed by a query.");
+PROFILE_DEFINE_COUNTER(FiltersReceived,STABLE_LOW, TUnit::UNIT,
+    "Total number of filter updates received (always 0 if filter mode is not "
+    "GLOBAL). Excludes repeated broadcast filter updates.");
+PROFILE_DEFINE_COUNTER(NumFragments, STABLE_HIGH, TUnit::UNIT,
+    "Number of fragments in the plan of a query.");
+PROFILE_DEFINE_COUNTER(NumFragmentInstances, STABLE_HIGH, TUnit::UNIT,
+     "Number of fragment instances executed by a query.");
+PROFILE_DEFINE_COUNTER(TotalBytesSent, STABLE_LOW, TUnit::BYTES,"The total number"
+    " of bytes sent (across the network) by this query in exchange nodes. Does not "
+    "include remote reads, data written to disk, or data sent to the client.");
+PROFILE_DEFINE_COUNTER(TotalScanBytesSent, STABLE_LOW, TUnit::BYTES,
+    "The total number of bytes sent (across the network) by fragment instances that "
+    "had a scan node in their plan.");
+PROFILE_DEFINE_COUNTER(TotalInnerBytesSent, STABLE_LOW, TUnit::BYTES, "The total "
+    "number of bytes sent (across the network) by fragment instances that did not have a"
+    " scan node in their plan i.e. that received their input data from other instances"
+    " through exchange node.");
+PROFILE_DEFINE_COUNTER(ExchangeScanRatio, STABLE_LOW, TUnit::DOUBLE_VALUE,
+    "The ratio between TotalScanByteSent and TotalBytesRead, i.e. the selectivity over "
+    "all fragment instances that had a scan node in their plan.");
+PROFILE_DEFINE_COUNTER(InnerNodeSelectivityRatio, STABLE_LOW, TUnit::DOUBLE_VALUE,
+    "The ratio between bytes sent by instances with a scan node in their plan and "
+    "instances without a scan node in their plan. This indicates how well the inner "
+    "nodes of the execution plan reduced the data volume.");
+PROFILE_DEFINE_COUNTER(NumCompletedBackends, STABLE_HIGH, TUnit::UNIT,"The number of "
+    "completed backends. Only valid after all backends have started executing. "
+    "Does not count the number of CANCELLED Backends.");
+PROFILE_DEFINE_TIMER(FinalizationTimer, STABLE_LOW,
+    "Total time spent in finalization (typically 0 except for INSERT into hdfs tables).");
+
 // Maximum number of fragment instances that can publish each broadcast filter.
 static const int MAX_BROADCAST_FILTER_PRODUCERS = 3;
 
@@ -101,8 +137,8 @@ Status Coordinator::Exec() {
 
   query_profile_ =
       RuntimeProfile::Create(obj_pool(), "Execution Profile " + PrintId(query_id()));
-  finalization_timer_ = ADD_TIMER(query_profile_, "FinalizationTimer");
-  filter_updates_received_ = ADD_COUNTER(query_profile_, "FiltersReceived", TUnit::UNIT);
+  finalization_timer_ = PROFILE_FinalizationTimer.Instantiate(query_profile_);
+  filter_updates_received_ = PROFILE_FiltersReceived.Instantiate(query_profile_);
 
   host_profiles_ = RuntimeProfile::Create(obj_pool(), "Per Node Profiles");
   query_profile_->AddChild(host_profiles_);
@@ -178,12 +214,10 @@ void Coordinator::InitFragmentStats() {
     query_profile_->AddChild(fragment_stats->avg_profile(), true);
     query_profile_->AddChild(fragment_stats->root_profile());
   }
-  RuntimeProfile::Counter* num_fragments =
-      ADD_COUNTER(query_profile_, "NumFragments", TUnit::UNIT);
-  num_fragments->Set(static_cast<int64_t>(fragments.size()));
-  RuntimeProfile::Counter* num_finstances =
-      ADD_COUNTER(query_profile_, "NumFragmentInstances", TUnit::UNIT);
-  num_finstances->Set(total_num_finstances);
+  COUNTER_SET(PROFILE_NumFragments.Instantiate(query_profile_),
+      static_cast<int64_t>(fragments.size()));
+  COUNTER_SET(PROFILE_NumFragmentInstances.Instantiate(query_profile_),
+      total_num_finstances);
 }
 
 void Coordinator::InitBackendStates() {
@@ -193,9 +227,7 @@ void Coordinator::InitBackendStates() {
   lock_guard<SpinLock> l(backend_states_init_lock_);
   backend_states_.resize(num_backends);
 
-  RuntimeProfile::Counter* num_backends_counter =
-      ADD_COUNTER(query_profile_, "NumBackends", TUnit::UNIT);
-  num_backends_counter->Set(num_backends);
+  COUNTER_SET(PROFILE_NumBackends.Instantiate(query_profile_), num_backends);
 
   // create BackendStates
   int backend_idx = 0;
@@ -207,8 +239,7 @@ void Coordinator::InitBackendStates() {
   }
   backend_resource_state_ =
       obj_pool()->Add(new BackendResourceState(backend_states_, schedule_));
-  num_completed_backends_ =
-      ADD_COUNTER(query_profile_, "NumCompletedBackends", TUnit::UNIT);
+  num_completed_backends_ = PROFILE_NumCompletedBackends.Instantiate(query_profile_);
 }
 
 void Coordinator::ExecSummary::Init(const QuerySchedule& schedule) {
@@ -887,21 +918,16 @@ void Coordinator::ComputeQuerySummary() {
                     << ") ";
   }
 
-  // The total number of bytes read by this query.
-  COUNTER_SET(ADD_COUNTER(query_profile_, "TotalBytesRead", TUnit::BYTES),
+  // The definitions of these counters are in the top of this file.
+  COUNTER_SET(PROFILE_TotalBytesRead.Instantiate(query_profile_),
       total_utilization.bytes_read);
-  // The total number of bytes sent by this query in exchange nodes. Does not include
-  // remote reads, data written to disk, or data sent to the client.
-  COUNTER_SET(ADD_COUNTER(query_profile_, "TotalBytesSent", TUnit::BYTES),
+  COUNTER_SET(PROFILE_TotalCpuTime.Instantiate(query_profile_),
+      total_utilization.cpu_user_ns + total_utilization.cpu_sys_ns);
+  COUNTER_SET(PROFILE_TotalBytesSent.Instantiate(query_profile_),
       total_utilization.scan_bytes_sent + total_utilization.exchange_bytes_sent);
-  // The total number of bytes sent by fragment instances that had a scan node in their
-  // plan.
-  COUNTER_SET(ADD_COUNTER(query_profile_, "TotalScanBytesSent", TUnit::BYTES),
+  COUNTER_SET(PROFILE_TotalScanBytesSent.Instantiate(query_profile_),
       total_utilization.scan_bytes_sent);
-  // The total number of bytes sent by fragment instances that did not have a scan node in
-  // their plan, i.e. that received their input data from other instances through exchange
-  // node.
-  COUNTER_SET(ADD_COUNTER(query_profile_, "TotalInnerBytesSent", TUnit::BYTES),
+  COUNTER_SET(PROFILE_TotalInnerBytesSent.Instantiate(query_profile_),
       total_utilization.exchange_bytes_sent);
 
   double xchg_scan_ratio = 0;
@@ -909,25 +935,15 @@ void Coordinator::ComputeQuerySummary() {
     xchg_scan_ratio =
         (double)total_utilization.scan_bytes_sent / total_utilization.bytes_read;
   }
-  // The ratio between TotalScanBytesSent and TotalBytesRead, i.e. the selectivity over
-  // all fragment instances that had a scan node in their plan.
-  COUNTER_SET(ADD_COUNTER(query_profile_, "ExchangeScanRatio", TUnit::DOUBLE_VALUE),
-      xchg_scan_ratio);
+  COUNTER_SET(PROFILE_ExchangeScanRatio.Instantiate(query_profile_), xchg_scan_ratio);
 
   double inner_node_ratio = 0;
   if (total_utilization.scan_bytes_sent > 0) {
     inner_node_ratio =
         (double)total_utilization.exchange_bytes_sent / total_utilization.scan_bytes_sent;
   }
-  // The ratio between bytes sent by instances with a scan node in their plan and
-  // instances without a scan node in their plan. This indicates how well the inner nodes
-  // of the execution plan reduced the data volume.
-  COUNTER_SET(
-      ADD_COUNTER(query_profile_, "InnerNodeSelectivityRatio", TUnit::DOUBLE_VALUE),
+  COUNTER_SET(PROFILE_InnerNodeSelectivityRatio.Instantiate(query_profile_),
       inner_node_ratio);
-
-  COUNTER_SET(ADD_COUNTER(query_profile_, "TotalCpuTime", TUnit::TIME_NS),
-      total_utilization.cpu_user_ns + total_utilization.cpu_sys_ns);
 
   // TODO(IMPALA-8126): Move to host profiles
   query_profile_->AddInfoString("Per Node Peak Memory Usage", mem_info.str());

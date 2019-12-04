@@ -50,15 +50,18 @@
 using kudu::MonoDelta;
 using kudu::rpc::RpcController;
 using kudu::rpc::RpcSidecar;
-using namespace impala;
 using namespace rapidjson;
 namespace accumulators = boost::accumulators;
 
-const char* Coordinator::BackendState::InstanceStats::LAST_REPORT_TIME_DESC =
-    "Last report received time";
-
 DECLARE_int32(backend_client_rpc_timeout_ms);
 DECLARE_int64(rpc_max_message_size);
+PROFILE_DECLARE_COUNTER(ScanRangesComplete);
+
+namespace impala {
+PROFILE_DECLARE_COUNTER(BytesRead);
+
+const char* Coordinator::BackendState::InstanceStats::LAST_REPORT_TIME_DESC =
+    "Last report received time";
 
 Coordinator::BackendState::BackendState(const QuerySchedule& schedule,
     const TQueryCtx& query_ctx, int state_idx,
@@ -584,10 +587,10 @@ void Coordinator::BackendState::InstanceStats::InitCounters() {
   vector<RuntimeProfile*> children;
   profile_->GetAllChildren(&children);
   for (RuntimeProfile* p : children) {
-    RuntimeProfile::Counter* c = p->GetCounter(ScanNode::SCAN_RANGES_COMPLETE_COUNTER);
+    RuntimeProfile::Counter* c = p->GetCounter(PROFILE_ScanRangesComplete.name());
     if (c != nullptr) scan_ranges_complete_counters_.push_back(c);
 
-    RuntimeProfile::Counter* bytes_read = p->GetCounter(ScanNode::BYTES_READ_COUNTER);
+    RuntimeProfile::Counter* bytes_read = p->GetCounter(PROFILE_BytesRead.name());
     if (bytes_read != nullptr) bytes_read_counters_.push_back(bytes_read);
 
     RuntimeProfile::Counter* bytes_sent =
@@ -782,4 +785,6 @@ void Coordinator::BackendState::InstanceStatsToJson(Value* value, Document* docu
   // protected by Coordinator::lock_.
   Value val(TNetworkAddressToString(impalad_address()).c_str(), document->GetAllocator());
   value->AddMember("host", val, document->GetAllocator());
+}
+
 }
