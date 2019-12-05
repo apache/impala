@@ -547,11 +547,10 @@ bootstrap_dependencies
 # local cache.
 CDH_FILE="${IMPALA_HOME}/.cdh"
 CDP_FILE="${IMPALA_HOME}/.cdp"
-if [[ -f ${CDH_FILE} && -f ${CDP_FILE} ]]; then
-  if [[ $(cat ${CDH_FILE}) != ${CDH_BUILD_NUMBER} || \
-        $(cat ${CDP_FILE}) != ${CDP_BUILD_NUMBER} ]]; then
-    export IMPALA_MAVEN_OPTIONS="${IMPALA_MAVEN_OPTIONS} -U"
-  fi
+if [[ ! -f ${CDH_FILE} || ! -f ${CDP_FILE} || \
+      $(cat ${CDH_FILE}) != ${CDH_BUILD_NUMBER} || \
+      $(cat ${CDP_FILE}) != ${CDP_BUILD_NUMBER} ]]; then
+  export IMPALA_MAVEN_OPTIONS="${IMPALA_MAVEN_OPTIONS} -U"
 fi
 echo "${CDH_BUILD_NUMBER}" > ${CDH_FILE}
 echo "${CDP_BUILD_NUMBER}" > ${CDP_FILE}
