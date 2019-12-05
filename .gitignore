@@ -16,10 +16,10 @@ bin/impala-config-local.sh
 .cache
 .cdh
 .cdp
+.pep8
 
 # distcc options
-.impala_compiler_opts
-.impala_compiler_opts_v2
+.impala_compiler_opts*
 
 pprof.out
 
@@ -37,6 +37,8 @@ CTestTestfile.cmake
 .ninja_log
 build.ninja
 rules.ninja
+CMakeDoxyfile.in
+CMakeDoxygenDefaults.cmake
 
 # Build timestamp files
 .*timestamp
@@ -99,3 +101,9 @@ eclipse-classes/
 # Debugging
 ad-hoc.test
 nohup.out
+
+# Python virtualenvs
+gerrit_critic_venv
+
+# Output of single_node_perf_run.py
+perf_results/
