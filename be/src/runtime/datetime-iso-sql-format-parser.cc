@@ -175,7 +175,7 @@ bool IsoSqlFormatParser::ParseDateTime(const char* input_str, int input_len,
       case TIMEZONE_HOUR: {
         // Deliberately ignore the timezone offsets.
         int dummy_result;
-        if (!ParseAndValidate(current_pos, token_len, -99, 99, &dummy_result)) {
+        if (!ParseAndValidate(current_pos, token_len, -15, 15, &dummy_result)) {
           return false;
         }
         break;
@@ -183,7 +183,7 @@ bool IsoSqlFormatParser::ParseDateTime(const char* input_str, int input_len,
       case TIMEZONE_MIN: {
         // Deliberately ignore the timezone offsets.
         int dummy_result;
-        if (!ParseAndValidate(current_pos, token_len, 0, 99, &dummy_result)) {
+        if (!ParseAndValidate(current_pos, token_len, 0, 59, &dummy_result)) {
           return false;
         }
         break;
