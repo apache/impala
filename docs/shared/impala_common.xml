@@ -1519,8 +1519,7 @@ alter table partitioned_data set tblproperties ('numRows'='1030000', 'STATS_GENE
         or <codeph>-f</codeph> options are used. 
       </p>
 
-      <p id="live_progress_live_summary_asciinema">
-        To see how the <codeph>LIVE_PROGRESS</codeph> and <codeph>LIVE_SUMMARY</codeph> query
+      <p id="live_progress_live_summary_asciinema">To see how the <codeph>LIVE_PROGRESS</codeph> and <codeph>LIVE_SUMMARY</codeph> query
         options work in real time, see
         <xref href="https://asciinema.org/a/1rv7qippo0fe7h5k1b6k4nexk" scope="external" format="html">this
           animated demo</xref>.

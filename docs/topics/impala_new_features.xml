@@ -45,6 +45,185 @@ under the License.
     <p outputclass="toc inpage"/>
 
   </conbody>
+  <concept rev="3.2.0" id="new_features_34">
+    <title>New Features in <keyword keyref="impala34"/></title>
+    <conbody>
+      <p> The following sections describe the noteworthy improvements made in
+          <keyword keyref="impala34"/>. </p>
+      <p> For the full list of issues closed in this release, see the <xref
+          keyref="changelog_34">changelog for <keyword keyref="impala34"
+          /></xref>. </p>
+      <section id="section_cw4_nmw_pjb">
+        <title>Support for Hive Insert-Only Transactional Tables</title>
+        <p>Impala added the support to truncate insert-only transactional
+          tables. </p>
+        <p>By default, Impala creates an insert-only transactional table when
+          you issue the <codeph>CREATE TABLE</codeph> statement.</p>
+        <p>Use the Hive compaction to compact small files to improve the
+          performance and scalability of metadata in transactional tables.</p>
+        <p>See <xref href="impala_transactions.xml#transactions"/> for more
+          information.</p>
+      </section>
+      <section id="impala-8656">
+        <title>Server-side Spooling of Query Results</title>
+        <p>You can use the <codeph>SPOOL_QUERY_RESULTS</codeph> query option to
+          control how query results are returned to the client.</p>
+        <p>By default, when a client fetches a set of query results, the next
+          set of results are fetched in batches until all the result rows are
+          produced. If a client issues a query without fetching all the results,
+          the query fragments continue to hold on to the resources until the
+          query is canceled and unregistered, potentially tying up resources and
+          causing other queries to wait in admission control.</p>
+        <p>When the query result spooling feature is enabled, the result sets of
+          queries are eagerly fetched and buffered until they are read by the
+          client, and resources are freed up for other queries.</p>
+        <p>See <xref href="impala_query_results_spooling.xml#data_sink"/> for
+          the new feature and the query options.</p>
+      </section>
+      <section id="impala-8584">
+        <title>Cookie-based Authentication</title>
+        <p>Starting in this version, Impala supports cookies for authentication
+          when clients connect via HiveServer2 over HTTP. </p>
+        <p>You can use the <codeph>--max_cookie_lifetime_s startup</codeph> flag
+          to:</p>
+        <ul>
+          <li>Disable the use of cookies</li>
+          <li>Control how long generated cookies are valid for</li>
+        </ul>
+        <p>See <xref href="impala_client.xml#intro_client"/> for more
+          information.</p>
+      </section>
+      <section id="section_hw4_nmw_pjb">
+        <title>Object Ownership Support</title>
+        <p>Object ownership for tables, views, and databases is enabled by
+          default in Impala. When you create a database, a table, or a view, as
+          the owner of that object, you implicitly have the privileges on the
+          object. The privileges that owners have are specified in Ranger on the
+          special user, <codeph>{OWNER}</codeph>. </p>
+        <p>The <codeph>{OWNER}</codeph> user must be defined in Ranger for the
+          object ownership privileges work in Impala.</p>
+        <p>See <xref href="impala_authorization.xml#authorization"/> for
+          details.</p>
+      </section>
+      <section id="impala-8752">
+        <title>New Built-in Functions for Fuzzy Matching of Strings</title>
+        <p>Use the new Jaro or Jaro-Winkler functions to perform fuzzy matches
+          on relatively short strings, e.g. to scrub user inputs of names
+          against the records in the database.</p>
+        <ul>
+          <li><codeph>JARO_DISTANCE</codeph>, <codeph>JARO_DST</codeph></li>
+          <li><codeph>JARO_SIMILARITY</codeph>, <codeph>JARO_SIM</codeph></li>
+          <li><codeph>JARO_WINKLER_DISTANCE</codeph>,
+            <codeph>JW_DST</codeph></li>
+          <li><codeph>JARO_WINKLER_SIMILARITY</codeph>,
+            <codeph>JW_SIM</codeph></li>
+        </ul>
+        <p>See <xref href="impala_string_functions.xml#string_functions"/> for
+          details.</p>
+      </section>
+      <section id="impala-8376">
+        <title>Capacity Quota for Scratch Disks</title>
+        <p>When configuring scratch space for intermediate files used in large
+          sorts, joins, aggregations, or analytic function operations, use the
+            <codeph>‑‑scratch_dirs</codeph> startup flag to optionally specify a
+          capacity quota per scratch directory, e.g.,
+            <codeph>‑‑scratch_dirs=/dir1:5MB,/dir2</codeph>.</p>
+        <p>See <xref href="impala_file_formats.xml#file_formats"/> for
+          details.</p>
+      </section>
+      <section id="impala-8913">
+        <title>Query Option for Disabling HBase Row Estimation</title>
+        <p>During query plan generation, Impala samples underlying HBase tables
+          to estimate row count and row size, but the sampling process can
+          negatively impact the planning time. To alleviate the issue, when the
+          HBase table stats do not change much in a short time, disable the
+          sampling with the <codeph>DISABLE_HBASE_NUM_ROWS_ESTIMATE</codeph>
+          query option so that the Impala planner falls back to using Hive
+          Metastore (HMS) table stats instead. </p>
+        <p>See <xref
+            href="impala_disable_hbase_num_rows_estimate.xml#disable_hbase_num_rows_estimate"
+          />.</p>
+      </section>
+      <section id="impala-8942">
+        <title>Query Option for Controlling Size of Parquet Splits on Non-block
+          Stores</title>
+        <p>To optimize query performance, Impala planner uses the value of the
+            <codeph>fs.s3a.block.size</codeph> startup flag when calculating the
+          split size on non-block based stores, e.g. S3, ADLS, etc. Starting in
+          this release, Impala planner uses the
+            <codeph>PARQUET_OBJECT_STORE_SPLIT_SIZE</codeph> query option to get
+          the Parquet file format specific split size. </p>
+        <p>For Parquet files, the <codeph>fs.s3a.block.size</codeph> startup
+          flag is no longer used.</p>
+        <p>The default value of the
+            <codeph>PARQUET_OBJECT_STORE_SPLIT_SIZE</codeph> query option is 256
+          MB.</p>
+        <p>See <xref href="impala_s3.xml#s3"/> for tuning Impala query
+          performance for S3.</p>
+      </section>
+      <section id="impala-5149">
+        <title>Query Profile Exported to JSON</title>
+        <p>On the Query Details page of Impala Daemon Web UI, you have a new
+          option, in addition to the existing Thrift and Text formats, to export
+          the query profile output in the JSON format.</p>
+        <p>See <xref href="impala_webui.xml#webui"/> for generating JSON query
+          profile outputs in Web UI.</p>
+      </section>
+      <section id="section_rnb_ny4_yjb">
+        <title>DATE Data Type Supported in Avro Tables</title>
+        <p>You can now use the <codeph>DATE</codeph> data type to query date
+          values from Avro tables.</p>
+        <p>See <xref href="impala_avro.xml#avro"/> for details.</p>
+      </section>
+      <section>
+        <title>Primary Key and Foreign Key Constraints</title>
+        <p>This release adds support for primary and foreign key constraints,
+          but in this release the constraints are advisory and intended for
+          estimating cardinality during query planning in a future release.
+          There is no attempt to enforce constraints. See <xref 
+            href="impala_create_table.xml"/> for details. </p>
+      </section>
+      <section>
+        <title>Enhanced External Kudu Table</title>
+        <p>By default HMS implicitly translates internal Kudu tables to external
+          Kudu tables with the 'external.table.purge' property set to true. These
+          tables behave similar to internal tables. You can explicitly create such
+          external Kudu tables. See <xref href="impala_create_table.xml"/>
+          for details.</p>
+      </section>
+      <section>
+        <title>Ranger Column Masking</title>
+        <p>This release supports Ranger column masking, which hides sensitive columnar
+          data in Impala query output. For example, you can define a policy that reveals
+          only the first or last four characters of column data. Column masking is enabled
+          by default. See <xref href="impala_authorization.xml#sec_ranger_col_masking"/>
+          for details.</p>
+      </section>
+      <section>
+        <title>BROADCAST_BYTES_LIMIT query option</title>
+        <p>You can set the default limit for the size of the broadcast input. Such a limit
+          can prevent possible performance problems.</p>
+        <!--Add link to details after file is published.-->
+      </section>
+      <section>
+        <title>Experimental Support for Apache Hudi</title>
+        <p>In this release, you can use Read Optimized Queries on Hudi tables. See
+          <xref href="impala_hudi.xml"/> for details. </p>
+      </section>
+      <section>
+        <title>ORC Reads Enabled by Default</title>
+        <p>Impala stability and performance have been improved. Consequently, ORC reads are now
+          enabled in Impala by default. To disable, set <codeph>--enable_orc_scanner</codeph> to
+          <codeph>false</codeph> when starting the cluster. See <xref href="impala_orc.xml"/> for
+          details.</p>
+      </section>
+      <section>
+        <title>Support for ZSTD and DEFLATE</title>
+        <p>This release supports ZSTD and DEFLATE compression codecs for text files. See 
+          <xref href="impala_txtfile.xml#gzip"/> for details.</p>
+      </section>
+    </conbody>
+  </concept>
   <concept rev="3.2.0" id="new_features_33">
     <title>New Features in <keyword keyref="impala33"/></title>
     <conbody>
@@ -231,9 +410,9 @@ under the License.
         <title>Default File Format Changed to Parquet</title>
         <p>When you create a table, the default format for that table data is
           now Parquet.</p>
-        <p>For backward compatibility, you can use the DEFAULT_FILE_FORMAT query
-          option to set the default file format to the previous default, text,
-          or other formats.</p>
+        <p>For backward compatibility, you can use the
+            <codeph>DEFAULT_FILE_FORMAT</codeph> query option to set the default
+          file format to the previous default, text, or other formats.</p>
       </section>
       <section id="section_m1h_mnf_t3b">
         <title>Built-in Function to Process JSON Objects</title>

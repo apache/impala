@@ -259,162 +259,6 @@ under the License.
 
     </concept>
 
-<!--IMPALA-7585 and IMPALA-7298 are fixed. Should be removed from here?-->
-
-    <concept id="IMPALA-7585" audience="hidden">
-
-      <title>Impala user not added to /etc/passwd when LDAP is enabled</title>
-
-      <conbody>
-
-        <p>
-          When using Impala with LDAP enabled, a user may hit the following:
-        </p>
-
-<pre>Not authorized: Client connection negotiation failed: client connection to 127.0.0.1:27000: SASL(-1): generic failure: All-whitespace username.</pre>
-
-        <p>
-          The following sequence can lead to the <codeph>impala</codeph> user not being created
-          in <codeph>/etc/passwd</codeph> on some machines on the cluster.
-          <ul>
-            <li>
-              Time 1: The <codeph>impala</codeph> user is not in LDAP. Impala was installed on
-              machine 1, and the user <codeph>impala</codeph> is created in
-              <codeph>/etc/passwd</codeph>.
-            </li>
-
-            <li>
-              Time 2: The <codeph>impala</codeph> user is added to LDAP.
-            </li>
-
-            <li>
-              Time 3: A new machine is added to the cluster. When adding Impala service to this
-              new machine, adding the <codeph>impala</codeph> user will fail as it already
-              exists in LDAP.
-            </li>
-          </ul>
-        </p>
-
-        <p>
-          The consequence is that the <codeph>impala</codeph> user doesn't exist in
-          <codeph>/etc/passwd</codeph> on the new machine, leading to the error above.
-        </p>
-
-        <p>
-          <b>Workaround</b>: Manually edit <codeph>/etc/passwd</codeph> to add the
-          <codeph>impala</codeph> user
-        </p>
-
-        <p>
-          <b>Apache Issue:</b> <xref keyref="IMPALA-7585">IMPALA-7585</xref>
-        </p>
-
-        <p>
-          <b>Affected Versions:</b> Impala 2.12, Impala 3.0
-        </p>
-
-        <p>
-          <b>Fixed Version:</b> Impala 3.1
-        </p>
-
-      </conbody>
-
-    </concept>
-
-    <concept id="IMPALA-7298" audience="hidden">
-
-      <title>Kerberos authentication fails with the reverse DNS lookup disabled</title>
-
-      <conbody>
-
-        <p>
-          Kerberos authentication does not function correctly if <codeph>rdns = false</codeph>
-          is configured in <codeph>krb5.conf</codeph>. If the flag <codeph>rdns =
-          false</codeph>, when Impala tries to match principals, it will fail because Kerberos
-          receives a SPN (Service Principal Name) with an IP address in it, but Impala expects a
-          principal with a FQDN in it.
-        </p>
-
-        <p>
-          You may hit the following error:
-        </p>
-
-<pre>WARNINGS: TransmitData() to X.X.X.X:27000 failed: Not authorized: Client connection negotiation failed: client connection to X.X.X.X:27000: Server impala/X.X.X.X@VPC.CLOUDERA.COM not found in Kerberos database
-</pre>
-
-        <p>
-          <b>Apache Issue:</b> <xref keyref="IMPALA-7298">IMPALA-7298</xref>
-        </p>
-
-        <p>
-          <b>Affected Versions:</b> Impala 2.12.0 and 3.0
-        </p>
-
-        <p>
-          <b>Workaround:</b> Set the following flags in <codeph>krb5.conf</codeph>:
-          <ul>
-            <li>
-              <codeph>dns_canonicalize_hostname = true</codeph>
-            </li>
-
-            <li>
-              <codeph>rdns = true</codeph>
-            </li>
-          </ul>
-        </p>
-
-        <p>
-          <b>Fixed Versions:</b> Impala 3.1
-        </p>
-
-      </conbody>
-
-    </concept>
-
-<!--kudu2198 is fixed-->
-
-    <concept id="KUDU-2198" audience="hidden">
-
-      <title>System-wide auth-to-local mapping not applied correctly to Kudu service account</title>
-
-      <conbody>
-
-        <p>
-          Due to system the <codeph>auth_to_local</codeph> mapping, the principal may be mapped
-          to some local name.
-        </p>
-
-        <p>
-          When running with Kerberos enabled, you may hit the following error message where
-          <varname>&lt;random-string></varname> is some random string which doesn't match the
-          primary in the Kerberos principal.
-        </p>
-
-<pre>WARNINGS: TransmitData() to X.X.X.X:27000 failed: Remote error: Not authorized: {username='&lt;random-string>', principal='impala/redacted'} is not allowed to access DataStreamService
-</pre>
-
-        <p>
-          <b>Workaround</b>: Start Impala with the
-          <codeph>--use_system_auth_to_local=false</codeph> flag to ignore the system-wide
-          <codeph>auth_to_local</codeph> mappings configured in <codeph>/etc/krb5.conf</codeph>.
-        </p>
-
-        <p>
-          <b>Apache Issue:</b> <xref keyref="IMPALA-8154">IMPALA-8154</xref>
-        </p>
-
-        <p>
-          <b>Affected Versions:</b> Impala 2.12, Impala 3.0 / Kudu 1.6
-        </p>
-
-        <p>
-          <b>Fixed Versions:</b> Impala 3.2
-        </p>
-
-      </conbody>
-
-    </concept>
-
   </concept>
 
   <concept id="known_issues_resources">
@@ -722,25 +566,6 @@ ALTER TABLE table_name SET TBLPROPERTIES('EXTERNAL'='TRUE');
 
     </concept>
 
-    <concept id="IMP-175" audience="hidden">
-
-      <title>Deviation from Hive behavior: Out of range values float/double values are returned as maximum allowed value of type (Hive returns NULL)</title>
-
-      <conbody>
-
-        <p>
-          Impala behavior differs from Hive with respect to out of range float/double values.
-          Out of range values are returned as maximum allowed value of type (Hive returns NULL).
-        </p>
-
-        <p>
-          <b>Workaround:</b> None
-        </p>
-
-      </conbody>
-
-    </concept>
-
     <concept id="flume_writeformat_text">
 
       <title>Configuration needed for Flume to be compatible with Impala</title>
@@ -837,6 +662,24 @@ ALTER TABLE table_name SET TBLPROPERTIES('EXTERNAL'='TRUE');
       </conbody>
 
     </concept>
+    <concept id="IMPALA-8953">
+      <title>Tables and databases sharing same name can cause query
+        failures</title>
+      <conbody>
+        <p>A table and a database that share the same name can cause a query
+          failure if the table is not readable by Impala, for example, the table
+          was created in Hive in the Open CSV Serde format. The following
+          exception will return:</p>
+        <codeblock>CAUSED BY: TableLoadingException: Unrecognized table type for table</codeblock>
+        <p>
+          <b>Apache Issue:</b>
+          <xref keyref="IMPALA-8953">IMPALA-8953</xref>
+        </p>
+        <p>
+          <b>Workaround:</b> Do not create databases and tables with the same
+          names.</p>
+      </conbody>
+    </concept>
 
   </concept>
 
@@ -852,22 +695,6 @@ ALTER TABLE table_name SET TBLPROPERTIES('EXTERNAL'='TRUE');
       </p>
 
     </conbody>
-    <!--IMPALA8376 fixed the issue below.-->
-    <concept id="IMPALA-8829" audience="hidden">
-      <title>Unable to Correctly Parse the Terabyte Unit</title>
-      <conbody>
-        <p>Impala does not support parsing strings that contain "TB" when used
-          as a unit for terabytes. The flags related to memory limits may be
-          affected, such as the flags for scratch space and data cache.</p>
-        <p><b>Workaround:</b> Use other supported units to specify values, e.g.
-          GB or MB.</p>
-        <p><b>Affected Versions:</b> All versions</p>
-        <p>
-          <b>Apache Issue:</b>
-          <xref keyref="IMPALA-8829">IMPALA-8829</xref>
-        </p>
-      </conbody>
-    </concept>
 
     <concept id="IMPALA-4551">
 
@@ -984,33 +811,6 @@ ALTER TABLE table_name SET TBLPROPERTIES('EXTERNAL'='TRUE');
         </p>
 
 <!-- <p><b>Workaround:</b> Doublecheck that <codeph>CAST()</codeph> operations work as expect. The issue applies to expressions involving literals, not values read from table columns.</p> -->
-
-      </conbody>
-
-    </concept>
-
-<!--Fixed in 3.2-->
-
-    <concept id="IMPALA-941" rev="IMPALA-941" audience="hidden">
-
-      <title>Impala Parser issue when using fully qualified table names that start with a number</title>
-
-      <conbody>
-
-        <p>
-          A fully qualified table name starting with a number could cause a parsing error. In a
-          name such as <codeph>db.571_market</codeph>, the decimal point followed by digits is
-          interpreted as a floating-point number.
-        </p>
-
-        <p>
-          <b>Apache Issue:</b> <xref keyref="IMPALA-941">IMPALA-941</xref>
-        </p>
-
-        <p>
-          <b>Workaround:</b> Surround each part of the fully qualified name with backticks
-          (<codeph>``</codeph>).
-        </p>
 
       </conbody>
 
