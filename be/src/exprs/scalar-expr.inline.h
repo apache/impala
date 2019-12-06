@@ -44,8 +44,9 @@ namespace impala {
       ScalarExprEvaluator* eval, const TupleRow* row) const {                          \
     DCHECK(type_validation) << type_.DebugString();                                    \
     DCHECK(eval != nullptr);                                                           \
-    if (codegend_compute_fn_ == nullptr) return Get##val_type##Interpreted(eval, row); \
-    val_type##Wrapper fn = reinterpret_cast<val_type##Wrapper>(codegend_compute_fn_);  \
+    val_type##Wrapper fn                                                               \
+      = reinterpret_cast<val_type##Wrapper>(codegend_compute_fn_.load());              \
+    if (fn == nullptr) return Get##val_type##Interpreted(eval, row);                   \
     return fn(eval, row);                                                              \
   }
 

@@ -384,7 +384,7 @@ Status FragmentInstanceState::Open() {
 
   if (fragment_state_->ShouldCodegen()) {
     UpdateState(StateEvent::CODEGEN_START);
-    RETURN_IF_ERROR(fragment_state_->InvokeCodegen());
+    RETURN_IF_ERROR(fragment_state_->InvokeCodegen(event_sequence_));
   }
 
   {

@@ -51,7 +51,8 @@ class HdfsColumnarScanner : public HdfsScanner {
 
   typedef int (*ProcessScratchBatchFn)(HdfsColumnarScanner*, RowBatch*);
   /// The codegen'd version of ProcessScratchBatch() if available, NULL otherwise.
-  ProcessScratchBatchFn codegend_process_scratch_batch_fn_ = nullptr;
+  /// Function type: ProcessScratchBatchFn
+  const CodegenFnPtrBase* codegend_process_scratch_batch_fn_ = nullptr;
 
   /// Evaluates runtime filters and conjuncts (if any) against the tuples in
   /// 'scratch_batch_', and adds the surviving tuples to the given batch.
@@ -64,6 +65,9 @@ class HdfsColumnarScanner : public HdfsScanner {
   /// until it is exhausted or the output is full. Called for the case when there are
   /// materialized tuples. This is a separate function so it can be codegened.
   int ProcessScratchBatch(RowBatch* dst_batch);
+
+ private:
+  int ProcessScratchBatchCodegenOrInterpret(RowBatch* dst_batch);
 };
 
 }

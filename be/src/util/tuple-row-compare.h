@@ -19,6 +19,7 @@
 #ifndef IMPALA_UTIL_TUPLE_ROW_COMPARE_H_
 #define IMPALA_UTIL_TUPLE_ROW_COMPARE_H_
 
+#include "codegen/codegen-fn-ptr.h"
 #include "common/compiler-util.h"
 #include "exprs/scalar-expr.h"
 #include "runtime/descriptors.h"
@@ -90,7 +91,7 @@ class TupleRowComparatorConfig {
   /// Codegened version of TupleRowComparator::Compare().
   typedef int (*CompareFn)(ScalarExprEvaluator* const*, ScalarExprEvaluator* const*,
       const TupleRow*, const TupleRow*);
-  CompareFn codegend_compare_fn_ = nullptr;
+  CodegenFnPtr<CompareFn> codegend_compare_fn_;
 
  private:
   /// Codegen TupleRowLexicalComparator::Compare(). Returns a non-OK status if codegen is
@@ -124,10 +125,14 @@ class TupleRowComparator {
   /// ordering_exprs_rhs_) must have been prepared and opened before calling this,
   /// i.e. 'sort_key_exprs' in the constructor must have been opened.
   int ALWAYS_INLINE Compare(const TupleRow* lhs, const TupleRow* rhs) const {
-    return codegend_compare_fn_ == nullptr ?
-        CompareInterpreted(lhs, rhs) :
-        (*codegend_compare_fn_)(ordering_expr_evals_lhs_.data(),
-            ordering_expr_evals_rhs_.data(), lhs, rhs);
+    const TupleRowComparatorConfig::CompareFn codegend_compare_fn =
+        codegend_compare_fn_.load();
+    if (codegend_compare_fn != nullptr) {
+      return codegend_compare_fn(ordering_expr_evals_lhs_.data(),
+          ordering_expr_evals_rhs_.data(), lhs, rhs);
+    }
+
+    return CompareInterpreted(lhs, rhs);
   }
 
   /// Returns true if lhs is strictly less than rhs.
@@ -157,7 +162,7 @@ class TupleRowComparator {
 
   /// Reference to the codegened function pointer owned by the TupleRowComparatorConfig
   /// object that was used to create this instance.
-  const TupleRowComparatorConfig::CompareFn& codegend_compare_fn_;
+  const CodegenFnPtr<TupleRowComparatorConfig::CompareFn>& codegend_compare_fn_;
 
  private:
   /// Interpreted implementation of Compare().

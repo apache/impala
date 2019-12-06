@@ -955,8 +955,7 @@ void KrpcDataStreamSenderConfig::Codegen(FragmentState* state) {
       codegen_status =
           Status("Codegen'd HashAndAddRows() failed verification. See log");
     } else {
-      codegen->AddFunctionToJit(hash_and_add_rows_fn,
-          reinterpret_cast<void**>(&hash_and_add_rows_fn_));
+      codegen->AddFunctionToJit(hash_and_add_rows_fn, &hash_and_add_rows_fn_);
     }
   }
   AddCodegenStatus(codegen_status, sender_name);
@@ -1029,8 +1028,10 @@ Status KrpcDataStreamSender::Send(RuntimeState* state, RowBatch* batch) {
     }
   } else {
     DCHECK_EQ(partition_type_, TPartitionType::HASH_PARTITIONED);
-    if (hash_and_add_rows_fn_ != nullptr) {
-      RETURN_IF_ERROR(hash_and_add_rows_fn_(this, batch));
+    const KrpcDataStreamSenderConfig::HashAndAddRowsFn hash_and_add_rows_fn =
+        hash_and_add_rows_fn_.load();
+    if (hash_and_add_rows_fn != nullptr) {
+      RETURN_IF_ERROR(hash_and_add_rows_fn(this, batch));
     } else {
       RETURN_IF_ERROR(HashAndAddRows(batch));
     }

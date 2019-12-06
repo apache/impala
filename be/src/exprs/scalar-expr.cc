@@ -291,10 +291,7 @@ Status ScalarExpr::Init(
   }
   // Add the expression to the list of expressions to codegen in the codegen phase.
   if (ShouldCodegen(state)) {
-    // If the expression is not interpretable, we need an entry point to evaluate
-    // the expression from interpreted code, e.g. GetConstValue().
-    bool is_codegen_entry_point = is_entry_point || !IsInterpretable();
-    state->AddScalarExprToCodegen(this, is_codegen_entry_point);
+    state->AddScalarExprToCodegen(this, is_entry_point, IsInterpretable());
   }
   return Status::OK();
 }

@@ -67,7 +67,7 @@ Status PhjBuilder::ProcessBuildBatch(
     }
     const uint32_t hash = expr_vals_cache->CurExprValuesHash();
     const uint32_t partition_idx = hash >> (32 - NUM_PARTITIONING_BITS);
-    Partition* partition = hash_partitions_[partition_idx].get();
+    PhjBuilderPartition* partition = hash_partitions_[partition_idx].get();
     if (UNLIKELY(!AppendRow(partition->build_rows(), build_row, &status))) {
       return status;
     }
@@ -76,7 +76,7 @@ Status PhjBuilder::ProcessBuildBatch(
   return Status::OK();
 }
 
-bool PhjBuilder::Partition::InsertBatch(TPrefetchMode::type prefetch_mode,
+bool PhjBuilderPartition::InsertBatch(TPrefetchMode::type prefetch_mode,
     HashTableCtx* ht_ctx, RowBatch* batch,
     const vector<BufferedTupleStream::FlatRowPtr>& flat_rows, Status* status) {
   // Compute the hash values and prefetch the hash table buckets.

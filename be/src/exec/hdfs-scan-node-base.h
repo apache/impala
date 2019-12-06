@@ -29,6 +29,7 @@
 #include <boost/thread/shared_mutex.hpp>
 #include <boost/unordered_map.hpp>
 
+#include "codegen/codegen-fn-ptr.h"
 #include "exec/filter-context.h"
 #include "exec/scan-node.h"
 #include "runtime/descriptors.h"
@@ -312,9 +313,6 @@ class HdfsScanPlanNode : public ScanPlanNode {
   /// The root of the table's Avro schema, if we're scanning an Avro table.
   ScopedAvroSchemaElement avro_schema_;
 
-  /// Per scanner type codegen'd fn.
-  boost::unordered_map<THdfsFileFormat::type, void*> codegend_fn_map_;
-
   /// State related to scan ranges shared across all scan node instances.
   ScanRangeSharedState shared_state_;
 
@@ -327,6 +325,11 @@ class HdfsScanPlanNode : public ScanPlanNode {
   /// Processes all the scan range params for this scan node to create all the required
   /// file descriptors, update metrics and fill in all relevant state in 'shared_state_'.
   Status ProcessScanRangesAndInitSharedState(FragmentState* state);
+  /// Per scanner type codegen'd fn.
+  /// The actual types of the functions differ so we use void* as the common type and
+  /// reinterpret cast before calling the functions.
+  typedef boost::unordered_map<THdfsFileFormat::type, CodegenFnPtr<void*>> CodegendFnMap;
+  CodegendFnMap codegend_fn_map_;
 };
 
 /// Base class for all Hdfs scan nodes. Contains common members and functions
@@ -460,9 +463,10 @@ class HdfsScanNodeBase : public ScanNode {
     return reinterpret_cast<const bool*>(is_materialized_col_.data());
   }
 
-  /// Returns the per format codegen'd function.  Scanners call this to get the
-  /// codegen'd function to use.  Returns NULL if codegen should not be used.
-  void* GetCodegenFn(THdfsFileFormat::type);
+  /// Returns a pointer to the atomic wrapper of the per format codegen'd function.
+  /// Scanners call this to get the codegen'd function to use. Returns NULL if codegen
+  /// should not be used.
+  const CodegenFnPtrBase* GetCodegenFn(THdfsFileFormat::type);
 
   inline void IncNumScannersCodegenEnabled() { num_scanners_codegen_enabled_.Add(1); }
   inline void IncNumScannersCodegenDisabled() { num_scanners_codegen_disabled_.Add(1); }
@@ -675,7 +679,8 @@ class HdfsScanNodeBase : public ScanNode {
   AtomicBool initial_ranges_issued_;
 
   /// Per scanner type codegen'd fn.
-  const boost::unordered_map<THdfsFileFormat::type, void*>& codegend_fn_map_;
+  /// Owned by HdfsScanPlanNode.
+  const HdfsScanPlanNode::CodegendFnMap& codegend_fn_map_;
 
   /// is_materialized_col_[i] = <true i-th column should be materialized, false otherwise>
   /// for 0 <= i < total # columns in table

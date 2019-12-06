@@ -125,8 +125,10 @@ Status NonGroupingAggregator::AddBatch(RuntimeState* state, RowBatch* batch) {
   SCOPED_TIMER(build_timer_);
   RETURN_IF_ERROR(QueryMaintenance(state));
 
-  if (add_batch_impl_fn_ != nullptr) {
-    RETURN_IF_ERROR(add_batch_impl_fn_(this, batch));
+  NonGroupingAggregatorConfig::AddBatchImplFn add_batch_impl_fn
+      = add_batch_impl_fn_.load();
+  if (add_batch_impl_fn != nullptr) {
+    RETURN_IF_ERROR(add_batch_impl_fn(this, batch));
   } else {
     RETURN_IF_ERROR(AddBatchImpl(batch));
   }
@@ -181,8 +183,7 @@ Status NonGroupingAggregatorConfig::CodegenAddBatchImpl(
                   "AddBatchImpl() function failed verification, see log");
   }
 
-  void** codegened_fn_ptr = reinterpret_cast<void**>(&add_batch_impl_fn_);
-  codegen->AddFunctionToJit(add_batch_impl_fn, codegened_fn_ptr);
+  codegen->AddFunctionToJit(add_batch_impl_fn, &add_batch_impl_fn_);
   return Status::OK();
 }
 } // namespace impala

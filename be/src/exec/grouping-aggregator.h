@@ -22,6 +22,7 @@
 #include <memory>
 #include <vector>
 
+#include "codegen/codegen-fn-ptr.h"
 #include "exec/aggregator.h"
 #include "exec/hash-table.h"
 #include "runtime/buffered-tuple-stream.h"
@@ -163,12 +164,12 @@ class GroupingAggregatorConfig : public AggregatorConfig {
   typedef Status (*AddBatchImplFn)(
       GroupingAggregator*, RowBatch*, TPrefetchMode::type, HashTableCtx*);
   /// Jitted AddBatchImpl function pointer. Null if codegen is disabled.
-  AddBatchImplFn add_batch_impl_fn_ = nullptr;
+  CodegenFnPtr<AddBatchImplFn> add_batch_impl_fn_;
 
   typedef Status (*AddBatchStreamingImplFn)(GroupingAggregator*, int, bool,
       TPrefetchMode::type, RowBatch*, RowBatch*, HashTableCtx*, int[]);
   /// Jitted AddBatchStreamingImpl function pointer. Null if codegen is disabled.
-  AddBatchStreamingImplFn add_batch_streaming_impl_fn_ = nullptr;
+  CodegenFnPtr<AddBatchStreamingImplFn> add_batch_streaming_impl_fn_;
 
   int GetNumGroupingExprs() const override { return grouping_exprs_.size(); }
 
@@ -306,15 +307,12 @@ class GroupingAggregator : public Aggregator {
   int64_t limit_; // -1: no limit
   bool ReachedLimit() { return limit_ != -1 && num_rows_returned_ >= limit_; }
 
-  typedef Status (*AddBatchImplFn)(
-      GroupingAggregator*, RowBatch*, TPrefetchMode::type, HashTableCtx*);
   /// Jitted AddBatchImpl function pointer. Null if codegen is disabled.
-  const AddBatchImplFn& add_batch_impl_fn_;
+  const CodegenFnPtr<GroupingAggregatorConfig::AddBatchImplFn>& add_batch_impl_fn_;
 
-  typedef Status (*AddBatchStreamingImplFn)(GroupingAggregator*, int, bool,
-      TPrefetchMode::type, RowBatch*, RowBatch*, HashTableCtx*, int[PARTITION_FANOUT]);
-  /// Jitted AddBatchStreamingImpl function pointer.  Null if codegen is disabled.
-  const AddBatchStreamingImplFn& add_batch_streaming_impl_fn_ ;
+  /// Jitted AddBatchStreamingImpl function pointer. Null if codegen is disabled.
+  const CodegenFnPtr<GroupingAggregatorConfig::AddBatchStreamingImplFn>&
+      add_batch_streaming_impl_fn_;
 
   /// Total time spent resizing hash tables.
   RuntimeProfile::Counter* ht_resize_timer_ = nullptr;

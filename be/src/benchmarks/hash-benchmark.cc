@@ -91,7 +91,7 @@ struct TestData {
   int num_cols;
   int num_rows;
   vector<int32_t> results;
-  void* jitted_fn;
+  CodegenHashFn jitted_fn;
 };
 
 void TestFnvIntHash(int batch, void* d) {
@@ -165,7 +165,7 @@ void TestBoostIntHash(int batch, void* d) {
 
 void TestCodegenIntHash(int batch, void* d) {
   TestData* data = reinterpret_cast<TestData*>(d);
-  CodegenHashFn fn = reinterpret_cast<CodegenHashFn>(data->jitted_fn);
+  CodegenHashFn fn = data->jitted_fn;
   int rows = data->num_rows;
   for (int i = 0; i < batch; ++i) {
     char* values = reinterpret_cast<char*>(data->data);
@@ -283,7 +283,7 @@ void TestFastHashMixedHash(int batch, void* d) {
 
 void TestCodegenMixedHash(int batch, void* d) {
   TestData* data = reinterpret_cast<TestData*>(d);
-  CodegenHashFn fn = reinterpret_cast<CodegenHashFn>(data->jitted_fn);
+  CodegenHashFn fn = data->jitted_fn;
   int rows = data->num_rows;
   for (int i = 0; i < batch; ++i) {
     char* values = reinterpret_cast<char*>(data->data);
@@ -507,11 +507,11 @@ int main(int argc, char **argv) {
   codegen->EnableOptimizations(true);
 
   llvm::Function* hash_ints = CodegenCrcHash(codegen.get(), false);
-  void* jitted_hash_ints;
+  CodegenFnPtr<CodegenHashFn> jitted_hash_ints;
   codegen->AddFunctionToJit(hash_ints, &jitted_hash_ints);
 
   llvm::Function* hash_mixed = CodegenCrcHash(codegen.get(), true);
-  void* jitted_hash_mixed;
+  CodegenFnPtr<CodegenHashFn> jitted_hash_mixed;
   codegen->AddFunctionToJit(hash_mixed, &jitted_hash_mixed);
 
   status = codegen->FinalizeModule();
@@ -534,7 +534,7 @@ int main(int argc, char **argv) {
   int_data.data = int_provider.NextBatch(&int_data.num_rows);
   int_data.num_cols = int_cols.size();
   int_data.results.resize(int_data.num_rows);
-  int_data.jitted_fn = jitted_hash_ints;
+  int_data.jitted_fn = jitted_hash_ints.load();
 
   // Some mixed col types.  The test hash function will know the exact
   // layout.  This is reasonable to do since we can use llvm
@@ -555,7 +555,7 @@ int main(int argc, char **argv) {
   mixed_data.data = mixed_provider.NextBatch(&mixed_data.num_rows);
   mixed_data.num_cols = mixed_cols.size();
   mixed_data.results.resize(mixed_data.num_rows);
-  mixed_data.jitted_fn = jitted_hash_mixed;
+  mixed_data.jitted_fn = jitted_hash_mixed.load();
 
   Benchmark int_suite("Int Hash");
   int_suite.AddBenchmark("Fnv", TestFnvIntHash, &int_data);

@@ -24,6 +24,7 @@
 #include <vector>
 #include <boost/scoped_ptr.hpp>
 
+#include "codegen/codegen-fn-ptr.h"
 #include "common/global-types.h"
 #include "common/status.h"
 #include "exprs/expr.h"
@@ -398,7 +399,9 @@ class ScalarExpr : public Expr {
   /// Non-NULL if this expr is codegen'd and the constructor of this Expr requested
   /// that this expr should be an entry point from interpreted to codegen'd code.
   /// (see class comment for explanation of usage patterns and motivation).
-  void* codegend_compute_fn_ = nullptr;
+  /// The actual types of the functions differ so we use void* and reinterpret cast before
+  /// calling the functions.
+  CodegenFnPtr<void*> codegend_compute_fn_;
 
   /// True if 'codegend_compute_fn_' is registered with LlvmCodeGen as an entry point
   /// to codegen to fill in . If this is true, then 'codegend_compute_fn_' will be set

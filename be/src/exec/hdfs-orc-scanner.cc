@@ -158,8 +158,7 @@ Status HdfsOrcScanner::Open(ScannerContext* context) {
   process_footer_timer_stats_ =
       ADD_SUMMARY_STATS_TIMER(scan_node_->runtime_profile(), "OrcFooterProcessingTime");
 
-  codegend_process_scratch_batch_fn_ = reinterpret_cast<ProcessScratchBatchFn>(
-      scan_node_->GetCodegenFn(THdfsFileFormat::ORC));
+  codegend_process_scratch_batch_fn_ = scan_node_->GetCodegenFn(THdfsFileFormat::ORC);
   if (codegend_process_scratch_batch_fn_ == nullptr) {
     scan_node_->IncNumScannersCodegenDisabled();
   } else {

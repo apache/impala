@@ -21,6 +21,7 @@
 
 #include "gen-cpp/ImpalaInternalService_types.h"
 #include "runtime/query-state.h"
+#include "util/runtime-profile.h"
 
 namespace impala {
 
@@ -51,7 +52,7 @@ class FragmentState {
   /// till codegen is complete or simple return immediately if it is already completed. In
   /// case codegen fails, it attempts to set an error status in the query state and
   /// returns that status on every subsequent call. Is thread-safe.
-  Status InvokeCodegen();
+  Status InvokeCodegen(RuntimeProfile::EventSequence* event_sequence);
 
   /// Release resources held by codegen, the plan tree and data sink config.
   void ReleaseResources();
@@ -88,13 +89,18 @@ class FragmentState {
   /// TODO: Now that IMPALA-4233 is fixed, revisit this comment.
   Status CodegenScalarExprs();
 
-  /// Add ScalarExpr expression 'expr' to be codegen'd later if it's not disabled by
-  /// query option. If 'is_codegen_entry_point' is true, 'expr' will be an entry
-  /// point into codegen'd evaluation (i.e. it will have a function pointer populated).
-  /// Adding an expr here ensures that it will be codegen'd (i.e. fragment execution
-  /// will fail with an error if the expr cannot be codegen'd).
-  void AddScalarExprToCodegen(ScalarExpr* expr, bool is_codegen_entry_point) {
-    scalar_exprs_to_codegen_.push_back({expr, is_codegen_entry_point});
+  /// Add ScalarExpr expression 'expr' to be codegen'd later if it's not disabled by query
+  /// option. If 'is_codegen_entry_point' is true or 'interpretable' is false, 'expr' will
+  /// be an entry point into codegen'd evaluation (i.e. it will have a function pointer
+  /// populated) - if the expression is not interpretable, we need an entry point to
+  /// evaluate it from interpreted code, e.g. GetConstValue().
+  ///
+  /// Adding an expr here ensures that it will be codegen'd (i.e. fragment execution will
+  /// fail with an error if the expr cannot be codegen'd).
+  void AddScalarExprToCodegen(ScalarExpr* expr, bool is_codegen_entry_point,
+      bool interpretable) {
+    is_interpretable_ = is_interpretable_ && interpretable;
+    scalar_exprs_to_codegen_.push_back({expr, is_codegen_entry_point || !interpretable});
   }
 
   /// Returns true if there are ScalarExpr expressions in the fragments that we want
@@ -144,6 +150,12 @@ class FragmentState {
     return !CodegenDisabledByQueryOption() && !CodegenDisabledByHint();
   }
 
+  /// Whether all expressions are interpretable or codegen is necessary because an
+  /// expression cannot be interpreted.
+  inline bool is_interpretable() const {
+    return is_interpretable_;
+  }
+
   LlvmCodeGen* codegen() { return codegen_.get(); }
 
   /// Utility methods for generating a messages from Status objects by adding context
@@ -181,6 +193,11 @@ class FragmentState {
   /// is true if we want to generate a codegen entry point for this expr.
   std::vector<std::pair<ScalarExpr*, bool>> scalar_exprs_to_codegen_;
 
+  /// Whether all expressions are interpretable. If at least one expression is
+  /// non-interpretable, codegen is necessary and we should return an error if it is
+  /// disabled.
+  bool is_interpretable_ = true;
+
   RuntimeProfile* runtime_profile_ = nullptr;
 
   /// Serializes access to InvokeCodegen().
@@ -200,7 +217,7 @@ class FragmentState {
   }
 
   /// Helper method used by InvokeCodegen(). Does the actual codegen work.
-  Status CodegenHelper();
+  Status CodegenHelper(RuntimeProfile::EventSequence* event_sequence);
 
   /// Create the plan tree, data sink config.
   Status Init();

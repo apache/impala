@@ -154,7 +154,8 @@ class HdfsAvroScanner : public BaseSequenceScanner {
                                   Tuple*, TupleRow*);
 
   /// The codegen'd version of DecodeAvroData() if available, nullptr otherwise.
-  DecodeAvroDataFn codegend_decode_avro_data_ = nullptr;
+  /// Function type: DecodeAvroDataFn.
+  const CodegenFnPtrBase* codegend_decode_avro_data_ = nullptr;
 
   /// Utility function for decoding and parsing file header metadata
   Status ParseMetadata() WARN_UNUSED_RESULT;
@@ -198,6 +199,10 @@ class HdfsAvroScanner : public BaseSequenceScanner {
   /// - tuple_row: tuple row of written tuples
   int DecodeAvroData(int max_tuples, MemPool* pool, uint8_t** data, uint8_t* data_end,
       Tuple* tuple, TupleRow* tuple_row);
+
+  int DecodeAvroDataCodegenOrInterpret(int max_tuples, MemPool* pool, uint8_t** data,
+      uint8_t* data_end, Tuple* tuple, TupleRow* tuple_row);
+
 
   /// Materializes a single tuple from serialized record data. Will return false and set
   /// error in parse_status_ if memory limit is exceeded when allocating new char buffer.

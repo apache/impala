@@ -324,22 +324,17 @@ Status HdfsSequenceScanner::ProcessDecompressedBlock(RowBatch* row_batch) {
 
   // Need to copy out strings if they may reference the original I/O buffer.
   const bool copy_strings = !header_->is_compressed && !string_slot_offsets_.empty();
-  // Call jitted function if possible
-  int tuples_returned;
+
   if (write_tuples_fn_ != nullptr) {
     // HdfsScanner::InitializeWriteTuplesFn() will skip codegen if there are string slots
     // and escape characters. TextConverter::WriteSlot() will be used instead.
     DCHECK(scan_node_->tuple_desc()->string_slots().empty() ||
         delimited_text_parser_->escape_char() == '\0');
-    // last argument: seq always starts at record_location[0]
-    tuples_returned = write_tuples_fn_(this, row_batch->tuple_data_pool(), tuple_row,
-        field_locations_.data(), num_to_process,
-        max_added_tuples, scan_node_->materialized_slots().size(), 0, copy_strings);
-  } else {
-    tuples_returned = WriteAlignedTuples(row_batch->tuple_data_pool(), tuple_row,
-        field_locations_.data(), num_to_process,
-        max_added_tuples, scan_node_->materialized_slots().size(), 0, copy_strings);
   }
+
+  int tuples_returned = WriteAlignedTuplesCodegenOrInterpret(row_batch->tuple_data_pool(),
+      tuple_row, field_locations_.data(), num_to_process, max_added_tuples,
+      scan_node_->materialized_slots().size(), 0, copy_strings);
 
   if (tuples_returned == -1) return parse_status_;
   COUNTER_ADD(scan_node_->rows_read_counter(), num_to_process);

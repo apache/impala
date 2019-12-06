@@ -120,7 +120,7 @@ ir_functions = [
   ["PHJ_PROCESS_PROBE_BATCH_FULL_OUTER_JOIN",
    "_ZN6impala23PartitionedHashJoinNode17ProcessProbeBatchILi8EEEiNS_13TPrefetchMode4typeEPNS_8RowBatchEPNS_12HashTableCtxEPNS_6StatusE"],
   ["PHJ_INSERT_BATCH",
-   "_ZN6impala10PhjBuilder9Partition11InsertBatchENS_13TPrefetchMode4typeEPNS_12HashTableCtxEPNS_8RowBatchERKSt6vectorIPhSaIS9_EEPNS_6StatusE"],
+   "_ZN6impala19PhjBuilderPartition11InsertBatchENS_13TPrefetchMode4typeEPNS_12HashTableCtxEPNS_8RowBatchERKSt6vectorIPhSaIS8_EEPNS_6StatusE"],
   ["HASH_TABLE_GET_HASH_SEED",
    "_ZNK6impala12HashTableCtx11GetHashSeedEv"],
   ["HASH_TABLE_GET_BUILD_EXPR_EVALUATORS",

@@ -19,6 +19,7 @@
 
 #include <mutex>
 
+#include "codegen/llvm-codegen.h"
 #include "common/thread-debug-info.h"
 #include "exec/kudu-util.h"
 #include "exprs/expr.h"
@@ -396,6 +397,28 @@ Status QueryState::GetFInstanceState(
   return Status::OK();
 }
 
+int64_t QueryState::AsyncCodegenThreadHelper(const std::string& suffix) const {
+  int64_t res = 0;
+  vector<RuntimeProfile::Counter*> counters;
+  host_profile_->GetCounters(
+      LlvmCodeGen::ASYNC_CODEGEN_THREAD_COUNTERS_PREFIX + suffix, &counters);
+
+  for (const RuntimeProfile::Counter* counter : counters) {
+    DCHECK(counter != nullptr);
+    res += counter->value();
+  }
+
+  return res;
+}
+
+int64_t QueryState::AsyncCodegenThreadUserTime() const {
+  return AsyncCodegenThreadHelper("UserTime");
+}
+
+int64_t QueryState::AsyncCodegenThreadSysTime() const {
+  return AsyncCodegenThreadHelper("SysTime");
+}
+
 void QueryState::ConstructReport(bool instances_started,
     ReportExecStatusRequestPB* report, TRuntimeProfileForest* profiles_forest) {
   report->Clear();
@@ -413,13 +436,14 @@ void QueryState::ConstructReport(bool instances_started,
   // Add profile to report
   host_profile_->ToThrift(&profiles_forest->host_profile);
   profiles_forest->__isset.host_profile = true;
+
   // Free resources in chunked counters in the profile
   host_profile_->ClearChunkedTimeSeriesCounters();
 
   if (instances_started) {
     // Stats that we aggregate across the instances.
-    int64_t cpu_user_ns = 0;
-    int64_t cpu_sys_ns = 0;
+    int64_t cpu_user_ns = AsyncCodegenThreadUserTime();
+    int64_t cpu_sys_ns = AsyncCodegenThreadSysTime();
     int64_t bytes_read = 0;
     int64_t scan_ranges_complete = 0;
     int64_t exchange_bytes_sent = 0;

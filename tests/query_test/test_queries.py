@@ -24,17 +24,21 @@ from copy import deepcopy
 from tests.common.impala_test_suite import ImpalaTestSuite
 from tests.common.skip import SkipIfEC, SkipIfCatalogV2, SkipIfNotHdfsMinicluster
 from tests.common.test_dimensions import (
-    create_uncompressed_text_dimension, create_exec_option_dimension_from_dict,
-    create_client_protocol_dimension, hs2_parquet_constraint,
-    extend_exec_option_dimension)
-from tests.common.test_vector import ImpalaTestVector
+   create_uncompressed_text_dimension, create_exec_option_dimension_from_dict,
+   create_client_protocol_dimension, hs2_parquet_constraint,
+   extend_exec_option_dimension)
 
 class TestQueries(ImpalaTestSuite):
+
+  debug_actions = \
+    "BEFORE_CODEGEN_IN_ASYNC_CODEGEN_THREAD:JITTER@1000" \
+    "|AFTER_STARTING_ASYNC_CODEGEN_IN_FRAGMENT_THREAD:JITTER@1000"
+
   @classmethod
   def add_test_dimensions(cls):
     super(TestQueries, cls).add_test_dimensions()
     if cls.exploration_strategy() == 'core':
-      cls.ImpalaTestMatrix.add_constraint(lambda v:\
+      cls.ImpalaTestMatrix.add_constraint(lambda v:
           v.get_value('table_format').file_format == 'parquet')
     # Run these queries through both beeswax and HS2 to get coverage of both protocols.
     # Don't run all combinations of table format and protocol - the dimensions should
@@ -45,6 +49,34 @@ class TestQueries(ImpalaTestSuite):
     # Adding a test dimension here to test the small query opt in exhaustive.
     if cls.exploration_strategy() == 'exhaustive':
       extend_exec_option_dimension(cls, "exec_single_node_rows_threshold", "100")
+      extend_exec_option_dimension(cls, "ASYNC_CODEGEN", 1)
+      extend_exec_option_dimension(cls, "debug_action", cls.debug_actions)
+      cls.ImpalaTestMatrix.add_constraint(cls.debug_action_constraint)
+
+  @classmethod
+  def debug_action_constraint(cls, vector):
+    exec_option = vector.get_value("exec_option")
+
+    is_async = exec_option.get("ASYNC_CODEGEN") == 1
+    using_async_debug_actions = exec_option.get("debug_action") == cls.debug_actions
+    codegen_enabled = exec_option["disable_codegen"] == 0
+
+    # If it is a synchronous codegen test, the async debug actions do not matter as they
+    # are never executed on the synchronous codegen path but we filter out the tests where
+    # they are set, otherwise we would run each test twice (once with and once without
+    # debug actions).
+    if not is_async:
+      return not using_async_debug_actions
+
+    # If it is an asynchronous codegen test, we require that codegen should be enabled and
+    # we always run debug actions. We also filter out other test cases than those using
+    # Parquet without compression and the beeswax protocol to save time.
+    assert is_async
+    return (codegen_enabled and using_async_debug_actions
+        and vector.get_value('table_format').file_format == 'parquet'
+        and vector.get_value('table_format').compression_codec == 'none'
+        and vector.get_value('protocol') == 'hs2'
+        and vector.get_value('exec_option')["exec_single_node_rows_threshold"] == 0)
 
   @classmethod
   def get_workload(cls):
@@ -198,7 +230,7 @@ class TestQueriesParquetTables(ImpalaTestSuite):
   @classmethod
   def add_test_dimensions(cls):
     super(TestQueriesParquetTables, cls).add_test_dimensions()
-    cls.ImpalaTestMatrix.add_constraint(lambda v:\
+    cls.ImpalaTestMatrix.add_constraint(lambda v:
         v.get_value('table_format').file_format == 'parquet')
 
   @classmethod
@@ -226,7 +258,7 @@ class TestHdfsQueries(ImpalaTestSuite):
   def add_test_dimensions(cls):
     super(TestHdfsQueries, cls).add_test_dimensions()
     # Kudu doesn't support AllTypesAggMultiFilesNoPart (KUDU-1271, KUDU-1570).
-    cls.ImpalaTestMatrix.add_constraint(lambda v:\
+    cls.ImpalaTestMatrix.add_constraint(lambda v:
         v.get_value('table_format').file_format != 'kudu')
 
     # Adding a test dimension here to test the small query opt in exhaustive.

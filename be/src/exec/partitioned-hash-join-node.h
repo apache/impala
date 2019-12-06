@@ -77,8 +77,8 @@ class PartitionedHashJoinPlanNode : public BlockingJoinPlanNode {
       PartitionedHashJoinNode*, TPrefetchMode::type, RowBatch*, HashTableCtx*, Status*);
   /// Jitted PartitionedHashJoinNode::ProcessProbeBatch function pointers.  NULL if
   /// codegen is disabled.
-  ProcessProbeBatchFn process_probe_batch_fn_ = nullptr;
-  ProcessProbeBatchFn process_probe_batch_fn_level0_ = nullptr;
+  CodegenFnPtr<ProcessProbeBatchFn> process_probe_batch_fn_;
+  CodegenFnPtr<ProcessProbeBatchFn> process_probe_batch_fn_level0_;
 
  private:
   /// Codegen function to create output row. Assumes that the probe row is non-NULL.
@@ -628,7 +628,7 @@ class PartitionedHashJoinNode : public BlockingJoinNode {
   /// In the case of right-outer and full-outer joins, this is the list of the partitions
   /// for which we need to output their unmatched build rows. This list is populated at
   /// DoneProbing(). If this is non-empty, probe_state_ must be OUTPUTTING_UNMATCHED.
-  std::deque<std::unique_ptr<PhjBuilder::Partition>> output_build_partitions_;
+  std::deque<std::unique_ptr<PhjBuilderPartition>> output_build_partitions_;
 
   /// Partition used if 'null_aware_' is set. During probing, rows from the probe
   /// side that did not have a match in the hash table are appended to this partition.
@@ -680,7 +680,7 @@ class PartitionedHashJoinNode : public BlockingJoinNode {
    public:
     /// Create a new probe partition for the same hash partition as 'build_partition'.
     ProbePartition(RuntimeState* state, PartitionedHashJoinNode* parent,
-        PhjBuilder::Partition* build_partition);
+        PhjBuilderPartition* build_partition);
     ~ProbePartition();
 
     /// Prepare to write the probe rows. Allocates the first write block. This stream
@@ -699,13 +699,13 @@ class PartitionedHashJoinNode : public BlockingJoinNode {
     void Close(RowBatch* batch);
 
     BufferedTupleStream* ALWAYS_INLINE probe_rows() { return probe_rows_.get(); }
-    PhjBuilder::Partition* build_partition() { return build_partition_; }
+    PhjBuilderPartition* build_partition() { return build_partition_; }
 
     inline bool IsClosed() const { return probe_rows_ == NULL; }
 
    private:
     /// The corresponding build partition. Not NULL. Owned by PhjBuilder.
-    PhjBuilder::Partition* build_partition_;
+    PhjBuilderPartition* build_partition_;
 
     /// Stream of probe tuples in this partition. Initially owned by this object but
     /// transferred to the parent exec node (via the row batch) when the partition
@@ -714,8 +714,10 @@ class PartitionedHashJoinNode : public BlockingJoinNode {
   };
 
   /// See PartitionedHashJoinPlanNode::ProcessProbeBatchFn for more details.
-  const PartitionedHashJoinPlanNode::ProcessProbeBatchFn& process_probe_batch_fn_;
-  const PartitionedHashJoinPlanNode::ProcessProbeBatchFn& process_probe_batch_fn_level0_;
+  const CodegenFnPtr<PartitionedHashJoinPlanNode::ProcessProbeBatchFn>&
+      process_probe_batch_fn_;
+  const CodegenFnPtr<PartitionedHashJoinPlanNode::ProcessProbeBatchFn>&
+      process_probe_batch_fn_level0_;
 };
 
 }

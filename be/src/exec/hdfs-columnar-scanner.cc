@@ -63,12 +63,7 @@ int HdfsColumnarScanner::TransferScratchTuples(RowBatch* dst_batch) {
     return num_tuples;
   }
 
-  int num_rows_to_commit;
-  if (codegend_process_scratch_batch_fn_ != nullptr) {
-    num_rows_to_commit = codegend_process_scratch_batch_fn_(this, dst_batch);
-  } else {
-    num_rows_to_commit = ProcessScratchBatch(dst_batch);
-  }
+  const int num_rows_to_commit = ProcessScratchBatchCodegenOrInterpret(dst_batch);
   scratch_batch_->FinalizeTupleTransfer(dst_batch, num_rows_to_commit);
   return num_rows_to_commit;
 }
@@ -105,6 +100,12 @@ Status HdfsColumnarScanner::Codegen(HdfsScanPlanNode* node, FragmentState* state
     return Status("Failed to finalize process_scratch_batch_fn.");
   }
   return Status::OK();
+}
+
+int HdfsColumnarScanner::ProcessScratchBatchCodegenOrInterpret(RowBatch* dst_batch) {
+  return CallCodegendOrInterpreted<ProcessScratchBatchFn>::invoke(this,
+      codegend_process_scratch_batch_fn_, &HdfsColumnarScanner::ProcessScratchBatch,
+      dst_batch);
 }
 
 }

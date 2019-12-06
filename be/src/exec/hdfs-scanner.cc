@@ -186,7 +186,7 @@ Status HdfsScanner::InitializeWriteTuplesFn(HdfsPartitionDescriptor* partition,
     return Status::OK();
   }
 
-  write_tuples_fn_ = reinterpret_cast<WriteTuplesFn>(scan_node_->GetCodegenFn(type));
+  write_tuples_fn_ = scan_node_->GetCodegenFn(type);
   if (write_tuples_fn_ == NULL) {
     scan_node_->IncNumScannersCodegenDisabled();
     return Status::OK();
@@ -220,6 +220,15 @@ Status HdfsScanner::CommitRows(int num_rows, RowBatch* row_batch) {
   // memory from evaluating the scanner conjuncts.
   context_->expr_results_pool()->Clear();
   return Status::OK();
+}
+
+int HdfsScanner::WriteAlignedTuplesCodegenOrInterpret(MemPool* pool,
+    TupleRow* tuple_row_mem, FieldLocation* fields, int num_tuples,
+    int max_added_tuples, int slots_per_tuple, int row_idx_start, bool copy_strings) {
+  return CallCodegendOrInterpreted<WriteTuplesFn>::invoke(this, write_tuples_fn_,
+      &HdfsScanner::WriteAlignedTuples, pool, tuple_row_mem, fields, num_tuples,
+      max_added_tuples, scan_node_->materialized_slots().size(), row_idx_start,
+      copy_strings);
 }
 
 int HdfsScanner::WriteTemplateTuples(TupleRow* row, int num_tuples) {

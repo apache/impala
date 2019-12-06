@@ -628,6 +628,47 @@ def verify_runtime_profile(expected, actual, update_section=False):
   return updated_aggregations
 
 
+def extract_event_sequence(runtime_profile):
+  """ Returns a list containing the names of the events on the event sequence in the
+  provided runtime profile"""
+  # The lines corresponding to the events in the event sequence.
+  events = []
+
+  # The number of leading whitespace in the lines containing the events, used to
+  # detect the line after the last event.
+  indent_len = None
+
+  # Set to true when encountering the header before the first event. This means the
+  # following lines contain the events.
+  found_events_start = False
+
+  for line in runtime_profile.splitlines():
+    if found_events_start:
+      leading_whitespace = len(line) - len(line.lstrip())
+      if indent_len is None:
+        # This was the first event. We store the indentation of the events.
+        indent_len = leading_whitespace
+      elif leading_whitespace < indent_len:
+        # We've reached the line after the events, stop the iteration.
+        break
+
+      # If we reach here we are processing a line containing an event.
+      events.append(__extract_event_name(line))
+
+    elif 'Fragment Instance Lifecycle Event Timeline' in line:
+      found_events_start = True
+
+  return events
+
+
+def __extract_event_name(line):
+  # A typical event sequence line from which we extract the name is:
+  # "- Prepare Finished: 1.778ms (1.778ms)"
+  start = line.index('-') + 2  # There is a space after the dash.
+  end = line.index(':')
+  return line[start:end]
+
+
 def verify_lineage(expected, actual, lineage_skip_json_keys=DEFAULT_LINEAGE_SKIP_KEYS):
   """Compares the lineage JSON objects expected and actual."""
   def recursive_sort(obj):

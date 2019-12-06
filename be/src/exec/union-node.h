@@ -21,6 +21,7 @@
 
 #include <boost/scoped_ptr.hpp>
 
+#include "codegen/codegen-fn-ptr.h"
 #include "codegen/impala-ir.h"
 #include "exec/exec-node.h"
 #include "runtime/row-batch.h"
@@ -66,7 +67,8 @@ class UnionPlanNode : public PlanNode {
   /// function for each child. The size of the vector should be equal to the number of
   /// children. If a child is passthrough, there should be a NULL for that child. If
   /// Codegen is disabled, there should be a NULL for every child.
-  std::vector<UnionMaterializeBatchFn> codegend_union_materialize_batch_fns_;
+  std::vector<CodegenFnPtr<UnionMaterializeBatchFn>>
+      codegend_union_materialize_batch_fns_;
 
  private:
   /// Returns true if the child at 'child_idx' can be passed through.
@@ -114,7 +116,7 @@ class UnionNode : public ExecNode {
 
   /// Reference to the codegened vector containing codegened function pointer owned by the
   /// UnionPlanNode object that was used to create this instance.
-  const std::vector<UnionPlanNode::UnionMaterializeBatchFn>&
+  const std::vector<CodegenFnPtr<UnionPlanNode::UnionMaterializeBatchFn>>&
       codegend_union_materialize_batch_fns_;
 
   /////////////////////////////////////////

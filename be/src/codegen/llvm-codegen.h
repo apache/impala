@@ -84,10 +84,12 @@ namespace llvm {
 namespace impala {
 
 class CodegenCallGraph;
+class CodegenFnPtrBase;
 class CodegenSymbolEmitter;
 class FragmentState;
 class ImpalaMCJITMemoryManager;
 class SubExprElimination;
+class Thread;
 class TupleDescriptor;
 
 /// Define builder subclass in case we want to change the template arguments later
@@ -181,6 +183,7 @@ class LlvmCodeGen {
 
   RuntimeProfile* runtime_profile() { return profile_; }
   RuntimeProfile::Counter* ir_generation_timer() { return ir_generation_timer_; }
+  RuntimeProfile::Counter* main_thread_timer() { return main_thread_timer_; }
   RuntimeProfile::ThreadCounters* llvm_thread_counters() { return llvm_thread_counters_; }
 
   /// Turns on/off optimization passes
@@ -340,6 +343,21 @@ class LlvmCodeGen {
   /// functions.
   Status FinalizeModule();
 
+  /// Start executing 'FinalizeModule' in a separate thread and return.
+  /// 'async_compile_thread_' is set to point to the new 'Thread' object.
+  ///
+  /// Execution of the query starts in interpreted mode in the calling thread while
+  /// compilation is done in 'async_compile_thread_'. When compilation has finished
+  /// function pointers that have been added via 'AddFunctionToJit' will be set to the
+  /// compiled functions and the query will automatically use the codegen'd version the
+  /// next time the corresponding function is called (we always check the codegen'd
+  /// function pointer and fall back to interpreted mode if it is nullptr).
+  ///
+  /// The function pointers are atomic so no locking is needed.
+  ///
+  /// 'Close' calls 'Join' on '*async_compile_thread_' if it is not a nullptr.
+  Status FinalizeModuleAsync(RuntimeProfile::EventSequence* event_sequence);
+
   /// Loads a native or IR function 'fn' with symbol 'symbol' from the builtins or
   /// an external library and puts the result in *llvm_fn. *llvm_fn can be safely
   /// modified in place, because it is either newly generated or cloned. The caller must
@@ -411,7 +429,7 @@ class LlvmCodeGen {
   llvm::Function* FinalizeFunction(llvm::Function* function);
 
   /// Adds the function to be automatically jit compiled when the codegen object is
-  /// finalized. FinalizeModule() will set fn_ptr to point to the jitted function.
+  /// finalized. FinalizeModule() will set *fn_ptr to point to the jitted function.
   ///
   /// Pre-condition: FinalizeFunction() must have been called on the function passed to
   /// this method.
@@ -423,7 +441,7 @@ class LlvmCodeGen {
   /// This will also wrap functions returning DecimalVals in an ABI-compliant wrapper (see
   /// the comment in the .cc file for details). This is so we don't accidentally try to
   /// call non-compliant code from native code.
-  void AddFunctionToJit(llvm::Function* fn, void** fn_ptr);
+  void AddFunctionToJit(llvm::Function* fn, CodegenFnPtrBase* fn_ptr);
 
   /// This will generate a printf call instruction to output 'message' at the builder's
   /// insert point. If 'v1' is non-NULL, it will also be passed to the printf call. Only
@@ -603,6 +621,9 @@ class LlvmCodeGen {
   /// into the calling function.
   static const int CODEGEN_INLINE_EXPR_BATCH_THRESHOLD = 25;
 
+  /// Name prefix of the thread counters that track async codegen time.
+  static const std::string ASYNC_CODEGEN_THREAD_COUNTERS_PREFIX;
+
  private:
   friend class ExprCodegenTest;
   friend class LlvmCodeGenTest;
@@ -674,7 +695,7 @@ class LlvmCodeGen {
   Status LoadIntrinsics();
 
   /// Internal function for unit tests: skips Impala-specific wrapper generation logic.
-  void AddFunctionToJitInternal(llvm::Function* fn, void** fn_ptr);
+  void AddFunctionToJitInternal(llvm::Function* fn, CodegenFnPtrBase* fn_ptr);
 
   /// Verifies the function, e.g., checks that the IR is well-formed.  Returns false if
   /// function is invalid.
@@ -685,6 +706,9 @@ class LlvmCodeGen {
 
   /// Optimizes the module. This includes pruning the module of any unused functions.
   Status OptimizeModule();
+
+  /// Points the function pointers in 'fns_to_jit_compile_' to the compiled functions.
+  void SetFunctionPointers();
 
   /// Clears generated hash fns.  This is only used for testing.
   void ClearHashFns();
@@ -787,6 +811,12 @@ class LlvmCodeGen {
   /// Time spent compiling the module.
   RuntimeProfile::Counter* compile_timer_;
 
+  /// Total codegen time spent in the main thread.
+  RuntimeProfile::Counter* main_thread_timer_;
+
+  /// Total codegen time spent in the compiler (helper) thread.
+  RuntimeProfile::ThreadCounters* compile_thread_counters_;
+
   /// Total size of bitcode modules loaded in bytes.
   RuntimeProfile::Counter* module_bitcode_size_;
 
@@ -798,6 +828,8 @@ class LlvmCodeGen {
   /// Aggregated llvm thread counters. Also includes the phase represented by
   /// 'ir_generation_timer_' and hence is also updated by FragmentInstanceState.
   RuntimeProfile::ThreadCounters* llvm_thread_counters_;
+
+  std::unique_ptr<Thread> async_compile_thread_;
 
   /// whether or not optimizations are enabled
   bool optimizations_enabled_;
@@ -859,7 +891,7 @@ class LlvmCodeGen {
   std::set<std::string> linked_modules_;
 
   /// The vector of functions to automatically JIT compile after FinalizeModule().
-  std::vector<std::pair<llvm::Function*, void**>> fns_to_jit_compile_;
+  std::vector<std::pair<llvm::Function*, CodegenFnPtrBase*>> fns_to_jit_compile_;
 
   /// Debug strings that will be outputted by jitted code.  This is a copy of all
   /// strings passed to CodegenDebugTrace.
