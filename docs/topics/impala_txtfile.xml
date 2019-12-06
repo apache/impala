@@ -120,7 +120,8 @@ under the License.
         details.
       </p>
 
-      <p rev="2.0.0">You can also use text data compressed in the bzip2, deflate, gzip, Snappy, or
+      <p rev="2.0.0">
+        You can also use text data compressed in the bzip2, deflate, gzip, Snappy, or
         zstd formats. Because these compressed formats are not <q>splittable</q> in the way that LZO
         is, there is less opportunity for Impala to parallelize queries on them. Therefore, use
         these types of compressed data only for convenience if that is the format in which you

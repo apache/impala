@@ -50,6 +50,26 @@ under the License.
     </p>
     <p outputclass="toc inpage"/>
   </conbody>
+  <concept id="incompatible_changes_340x">
+    <title>Incompatible Changes Introduced in Impala 3.4.x</title>
+    <conbody>
+      <p> For the full list of issues closed in this release, including any that
+        introduce behavior changes or incompatibilities, see the <xref
+          keyref="changelog_34">changelog for <keyword keyref="impala34"
+          /></xref>. <ul>
+          <li>To optimize query performance, Impala planner uses the value of
+            the <codeph>fs.s3a.block.size</codeph> startup flag when calculating
+            the split size on non-block based stores, e.g. S3, ADLS, etc.
+            Starting in this release, Impala planner uses the
+              <codeph>PARQUET_OBJECT_STORE_SPLIT_SIZE</codeph> query option to
+            get the Parquet file format specific split size.<p>For Parquet
+              files, the <codeph>fs.s3a.block.size</codeph> startup flag is no
+              longer used.</p><p>The default value of the
+                <codeph>PARQUET_OBJECT_STORE_SPLIT_SIZE</codeph> query option is
+              256 MB.</p></li>
+        </ul></p>
+    </conbody>
+  </concept>
   <concept id="incompatible_changes_330x">
     <title>Incompatible Changes Introduced in Impala 3.3.x</title>
     <conbody>
