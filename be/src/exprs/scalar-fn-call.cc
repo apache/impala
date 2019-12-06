@@ -53,8 +53,8 @@ using std::pair;
 ScalarFnCall::ScalarFnCall(const TExprNode& node)
   : ScalarExpr(node),
     vararg_start_idx_(node.__isset.vararg_start_idx ? node.vararg_start_idx : -1),
-    prepare_fn_(NULL),
-    close_fn_(NULL),
+    prepare_fn_(),
+    close_fn_(),
     scalar_fn_(NULL) {
   DCHECK_NE(fn_.binary_type, TFunctionBinaryType::JAVA);
 }
@@ -62,11 +62,11 @@ ScalarFnCall::ScalarFnCall(const TExprNode& node)
 Status ScalarFnCall::LoadPrepareAndCloseFn(LlvmCodeGen* codegen) {
   if (fn_.scalar_fn.__isset.prepare_fn_symbol) {
     RETURN_IF_ERROR(GetFunction(codegen, fn_.scalar_fn.prepare_fn_symbol,
-        reinterpret_cast<void**>(&prepare_fn_)));
+        &prepare_fn_));
   }
   if (fn_.scalar_fn.__isset.close_fn_symbol) {
     RETURN_IF_ERROR(GetFunction(codegen, fn_.scalar_fn.close_fn_symbol,
-        reinterpret_cast<void**>(&close_fn_)));
+        &close_fn_));
   }
   return Status::OK();
 }
@@ -214,12 +214,13 @@ Status ScalarFnCall::OpenEvaluator(FunctionContext::FunctionStateScope scope,
   }
   fn_ctx->impl()->SetNonConstantArgs(move(non_constant_args));
 
-  if (prepare_fn_ != nullptr) {
+  const impala_udf::UdfPrepare prepare_fn = prepare_fn_.load();
+  if (prepare_fn != nullptr) {
     if (scope == FunctionContext::FRAGMENT_LOCAL) {
-      prepare_fn_(fn_ctx, FunctionContext::FRAGMENT_LOCAL);
+      prepare_fn(fn_ctx, FunctionContext::FRAGMENT_LOCAL);
       if (fn_ctx->has_error()) return Status(fn_ctx->error_msg());
     }
-    prepare_fn_(fn_ctx, FunctionContext::THREAD_LOCAL);
+    prepare_fn(fn_ctx, FunctionContext::THREAD_LOCAL);
     if (fn_ctx->has_error()) return Status(fn_ctx->error_msg());
   }
 
@@ -229,11 +230,12 @@ Status ScalarFnCall::OpenEvaluator(FunctionContext::FunctionStateScope scope,
 void ScalarFnCall::CloseEvaluator(FunctionContext::FunctionStateScope scope,
     RuntimeState* state, ScalarExprEvaluator* eval) const {
   DCHECK_GE(fn_ctx_idx_, 0);
-  if (close_fn_ != NULL) {
+  const impala_udf::UdfClose close_fn = close_fn_.load();
+  if (close_fn != NULL) {
     FunctionContext* fn_ctx = eval->fn_context(fn_ctx_idx_);
-    close_fn_(fn_ctx, FunctionContext::THREAD_LOCAL);
+    close_fn(fn_ctx, FunctionContext::THREAD_LOCAL);
     if (scope == FunctionContext::FRAGMENT_LOCAL) {
-      close_fn_(fn_ctx, FunctionContext::FRAGMENT_LOCAL);
+      close_fn(fn_ctx, FunctionContext::FRAGMENT_LOCAL);
     }
   }
   ScalarExpr::CloseEvaluator(scope, state, eval);
@@ -389,11 +391,15 @@ Status ScalarFnCall::GetCodegendComputeFnImpl(LlvmCodeGen* codegen, llvm::Functi
   return Status::OK();
 }
 
-Status ScalarFnCall::GetFunction(LlvmCodeGen* codegen, const string& symbol, void** fn) {
+Status ScalarFnCall::GetFunction(LlvmCodeGen* codegen, const string& symbol,
+    CodegenFnPtrBase* fn) {
   if (fn_.binary_type == TFunctionBinaryType::NATIVE
       || fn_.binary_type == TFunctionBinaryType::BUILTIN) {
-    return LibCache::instance()->GetSoFunctionPtr(
-        fn_.hdfs_location, symbol, fn_.last_modified_time, fn, &cache_entry_);
+    void* raw_fn;
+    const Status status = LibCache::instance()->GetSoFunctionPtr(
+        fn_.hdfs_location, symbol, fn_.last_modified_time, &raw_fn, &cache_entry_);
+    fn->store(raw_fn);
+    return status;
   } else {
     DCHECK_EQ(fn_.binary_type, TFunctionBinaryType::IR);
     DCHECK(codegen != NULL);

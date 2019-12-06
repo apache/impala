@@ -57,6 +57,7 @@
 
 #include "codegen/codegen-anyval.h"
 #include "codegen/codegen-callgraph.h"
+#include "codegen/codegen-fn-ptr.h"
 #include "codegen/codegen-symbol-emitter.h"
 #include "codegen/impala-ir-data.h"
 #include "codegen/instruction-counter.h"
@@ -81,6 +82,7 @@
 #include "util/runtime-profile-counters.h"
 #include "util/symbols-util.h"
 #include "util/test-info.h"
+#include "util/thread.h"
 
 #include "common/names.h"
 
@@ -119,6 +121,7 @@ DEFINE_string_hidden(llvm_cpu_attr_whitelist, "adx,aes,avx,avx2,bmi,bmi2,cmov,cx
 
 namespace impala {
 
+const string LlvmCodeGen::ASYNC_CODEGEN_THREAD_COUNTERS_PREFIX = "CodegenCompileThread";
 bool LlvmCodeGen::llvm_initialized_ = false;
 string LlvmCodeGen::cpu_name_;
 std::unordered_set<string> LlvmCodeGen::cpu_attrs_;
@@ -217,6 +220,9 @@ LlvmCodeGen::LlvmCodeGen(FragmentState* state, ObjectPool* pool,
   ir_generation_timer_ = ADD_TIMER(profile_, "IrGenerationTime");
   optimization_timer_ = ADD_TIMER(profile_, "OptimizationTime");
   compile_timer_ = ADD_TIMER(profile_, "CompileTime");
+  main_thread_timer_ = ADD_TIMER(profile_, "MainThreadCodegenTime");
+  compile_thread_counters_ = ADD_THREAD_COUNTERS(profile_,
+      ASYNC_CODEGEN_THREAD_COUNTERS_PREFIX);
   num_functions_ = ADD_COUNTER(profile_, "NumFunctions", TUnit::UNIT);
   num_instructions_ = ADD_COUNTER(profile_, "NumInstructions", TUnit::UNIT);
   llvm_thread_counters_ = ADD_THREAD_COUNTERS(profile_, "Codegen");
@@ -471,6 +477,8 @@ LlvmCodeGen::~LlvmCodeGen() {
 }
 
 void LlvmCodeGen::Close() {
+  if (async_compile_thread_ != nullptr) async_compile_thread_->Join();
+
   if (memory_manager_ != nullptr) {
     mem_tracker_->Release(memory_manager_->bytes_tracked());
     memory_manager_ = nullptr;
@@ -1144,14 +1152,7 @@ Status LlvmCodeGen::FinalizeModule() {
     execution_engine_->finalizeObject();
   }
 
-  // Get pointers to all codegen'd functions
-  for (int i = 0; i < fns_to_jit_compile_.size(); ++i) {
-    llvm::Function* function = fns_to_jit_compile_[i].first;
-    void* jitted_function = execution_engine_->getPointerToFunction(function);
-    DCHECK(jitted_function != NULL) << "Failed to jit " << function->getName().data();
-    *fns_to_jit_compile_[i].second = jitted_function;
-  }
-
+  SetFunctionPointers();
   DestroyModule();
 
   // Track the memory consumed by the compiled code.
@@ -1165,6 +1166,33 @@ Status LlvmCodeGen::FinalizeModule() {
   return Status::OK();
 }
 
+Status LlvmCodeGen::FinalizeModuleAsync(RuntimeProfile::EventSequence* event_sequence) {
+  DCHECK(event_sequence != nullptr);
+  Status thread_start_status = Thread::Create("async-codegen", "async-codegen",
+      [this, event_sequence]() {
+        SCOPED_THREAD_COUNTER_MEASUREMENT(compile_thread_counters_);
+        VLOG(2) << "Starting async code generation.";
+
+        Status status = DebugAction(state_->query_options(),
+            "BEFORE_CODEGEN_IN_ASYNC_CODEGEN_THREAD");
+        if (status.ok()) {
+          status = this->FinalizeModule();
+        }
+
+        const std::string status_msg = status.ok() ? "OK." : status.msg().msg();
+        auto log_level = status.ok() ? 2 : 1;
+        event_sequence->MarkEvent("AsyncCodegenFinished");
+        VLOG(log_level) << "Finished async code generation with result: " << status;
+      }, &async_compile_thread_);
+
+  event_sequence->MarkEvent("AsyncCodegenStarted");
+
+  RETURN_IF_ERROR(DebugAction(state_->query_options(),
+        "AFTER_STARTING_ASYNC_CODEGEN_IN_FRAGMENT_THREAD"));
+  return thread_start_status;
+}
+
+/// TODO: In asynchronous mode, return early if the query is cancelled or finished.
 Status LlvmCodeGen::OptimizeModule() {
   SCOPED_TIMER(optimization_timer_);
 
@@ -1253,6 +1281,17 @@ Status LlvmCodeGen::OptimizeModule() {
   return Status::OK();
 }
 
+void LlvmCodeGen::SetFunctionPointers() {
+  // Get pointers to all codegen'd functions.
+  for (const std::pair<llvm::Function*, CodegenFnPtrBase*>& fn_pair
+      : fns_to_jit_compile_) {
+    llvm::Function* function = fn_pair.first;
+    void* jitted_function = execution_engine_->getPointerToFunction(function);
+    DCHECK(jitted_function != nullptr) << "Failed to jit " << function->getName().data();
+    fn_pair.second->store(jitted_function);
+  }
+}
+
 void LlvmCodeGen::DestroyModule() {
   // Clear all references to LLVM objects owned by the module.
   cross_compiled_functions_.clear();
@@ -1266,7 +1305,7 @@ void LlvmCodeGen::DestroyModule() {
   module_ = NULL;
 }
 
-void LlvmCodeGen::AddFunctionToJit(llvm::Function* fn, void** fn_ptr) {
+void LlvmCodeGen::AddFunctionToJit(llvm::Function* fn, CodegenFnPtrBase* fn_ptr) {
   DCHECK(finalized_functions_.find(fn) != finalized_functions_.end())
       << "Attempted to add a non-finalized function to Jit: " << fn->getName().str();
   llvm::Type* decimal_val_type = GetNamedType(CodegenAnyVal::LLVM_DECIMALVAL_NAME);
@@ -1304,7 +1343,7 @@ void LlvmCodeGen::AddFunctionToJit(llvm::Function* fn, void** fn_ptr) {
   AddFunctionToJitInternal(fn, fn_ptr);
 }
 
-void LlvmCodeGen::AddFunctionToJitInternal(llvm::Function* fn, void** fn_ptr) {
+void LlvmCodeGen::AddFunctionToJitInternal(llvm::Function* fn, CodegenFnPtrBase* fn_ptr) {
   DCHECK(!is_compiled_);
   fns_to_jit_compile_.push_back(make_pair(fn, fn_ptr));
 }

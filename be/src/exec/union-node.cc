@@ -59,7 +59,8 @@ Status UnionPlanNode::Init(const TPlanNode& tnode, FragmentState* state) {
     child_exprs_lists_.push_back(child_exprs);
     DCHECK_EQ(child_exprs.size(), tuple_desc_->slots().size());
   }
-  codegend_union_materialize_batch_fns_.resize(child_exprs_lists_.size(), nullptr);
+  codegend_union_materialize_batch_fns_ =
+      std::vector<CodegenFnPtr<UnionMaterializeBatchFn>>(child_exprs_lists_.size());
   return Status::OK();
 }
 
@@ -154,7 +155,7 @@ void UnionPlanNode::Codegen(FragmentState* state){
 
     // Add the function to Jit and to the vector of codegened functions.
     codegen->AddFunctionToJit(union_materialize_batch_fn,
-        reinterpret_cast<void**>(&(codegend_union_materialize_batch_fns_.data()[i])));
+        &(codegend_union_materialize_batch_fns_.data()[i]));
   }
   AddCodegenStatus(codegen_status, codegen_message.str());
 }
@@ -245,10 +246,12 @@ Status UnionNode::GetNextMaterialized(RuntimeState* state, RowBatch* row_batch) 
         if (child_batch_->num_rows() == 0) continue;
       }
       DCHECK_EQ(codegend_union_materialize_batch_fns_.size(), children_.size());
-      if (codegend_union_materialize_batch_fns_[child_idx_] == nullptr) {
+      UnionPlanNode::UnionMaterializeBatchFn fn =
+          codegend_union_materialize_batch_fns_[child_idx_].load();
+      if (fn == nullptr) {
         MaterializeBatch(row_batch, &tuple_buf);
       } else {
-        codegend_union_materialize_batch_fns_[child_idx_](this, row_batch, &tuple_buf);
+        fn(this, row_batch, &tuple_buf);
       }
     }
     // It shouldn't be the case that we reached the limit because we shouldn't have

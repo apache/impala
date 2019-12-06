@@ -824,10 +824,10 @@ ScanRange* HdfsScanNodeBase::AllocateScanRange(hdfsFS fs, const char* file, int6
       buffer_opts);
 }
 
-void* HdfsScanNodeBase::GetCodegenFn(THdfsFileFormat::type type) {
-  auto it = codegend_fn_map_.find(type);
-  if (it == codegend_fn_map_.end()) return NULL;
-  return it->second;
+const CodegenFnPtrBase* HdfsScanNodeBase::GetCodegenFn(THdfsFileFormat::type type) {
+  HdfsScanPlanNode::CodegendFnMap::const_iterator it = codegend_fn_map_.find(type);
+  if (it == codegend_fn_map_.end()) return nullptr;
+  return &it->second;
 }
 
 Status HdfsScanNodeBase::CreateAndOpenScannerHelper(HdfsPartitionDescriptor* partition,

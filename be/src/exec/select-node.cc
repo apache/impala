@@ -75,8 +75,7 @@ Status SelectPlanNode::CodegenCopyRows(FragmentState* state) {
   DCHECK_REPLACE_COUNT(replaced, 1);
   copy_rows_fn = codegen->FinalizeFunction(copy_rows_fn);
   if (copy_rows_fn == nullptr) return Status("Failed to finalize CopyRows().");
-  codegen->AddFunctionToJit(copy_rows_fn,
-      reinterpret_cast<void**>(&codegend_copy_rows_fn_));
+  codegen->AddFunctionToJit(copy_rows_fn, &codegend_copy_rows_fn_);
   return Status::OK();
 }
 
@@ -103,8 +102,10 @@ Status SelectNode::GetNext(RuntimeState* state, RowBatch* row_batch, bool* eos) 
       // consumed completely or it is empty.
       RETURN_IF_ERROR(child(0)->GetNext(state, child_row_batch_.get(), &child_eos_));
     }
-    if (codegend_copy_rows_fn_ != nullptr) {
-      codegend_copy_rows_fn_(this, row_batch);
+
+    SelectPlanNode::CopyRowsFn copy_rows_fn = codegend_copy_rows_fn_.load();
+    if (copy_rows_fn != nullptr) {
+      copy_rows_fn(this, row_batch);
     } else {
       CopyRows(row_batch);
     }

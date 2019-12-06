@@ -275,7 +275,7 @@ void PartitionedHashJoinNode::CloseAndDeletePartitions(RowBatch* row_batch) {
     null_aware_probe_partition_->Close(row_batch);
     null_aware_probe_partition_.reset();
   }
-  for (unique_ptr<PhjBuilder::Partition>& partition : output_build_partitions_) {
+  for (unique_ptr<PhjBuilderPartition>& partition : output_build_partitions_) {
     partition->Close(row_batch);
   }
   output_build_partitions_.clear();
@@ -318,7 +318,7 @@ void PartitionedHashJoinNode::Close(RuntimeState* state) {
 }
 
 PartitionedHashJoinNode::ProbePartition::ProbePartition(RuntimeState* state,
-    PartitionedHashJoinNode* parent, PhjBuilder::Partition* build_partition)
+    PartitionedHashJoinNode* parent, PhjBuilderPartition* build_partition)
   : build_partition_(build_partition),
     probe_rows_(make_unique<BufferedTupleStream>(state, &parent->probe_row_desc(),
         parent->buffer_pool_client(), parent->resource_profile_.spillable_buffer_size,
@@ -439,7 +439,7 @@ Status PartitionedHashJoinNode::BeginSpilledProbe() {
   DCHECK(probe_hash_partitions_.empty());
   DCHECK(!spilled_partitions_.empty());
 
-  PhjBuilder::Partition* build_input_partition;
+  PhjBuilderPartition* build_input_partition;
   bool repartitioned;
   RETURN_IF_ERROR(builder_->BeginSpilledProbe(buffer_pool_client(), runtime_profile(),
       &repartitioned, &build_input_partition, &build_hash_partitions_));
@@ -478,19 +478,22 @@ Status PartitionedHashJoinNode::ProcessProbeBatch(RowBatch* out_batch) {
   Status status;
   TPrefetchMode::type prefetch_mode = runtime_state_->query_options().prefetch_mode;
   SCOPED_TIMER(probe_timer_);
-  if (process_probe_batch_fn_ == nullptr) {
+
+  PartitionedHashJoinPlanNode::ProcessProbeBatchFn process_probe_batch_fn;
+  if (ht_ctx_->level() == 0) {
+    process_probe_batch_fn = process_probe_batch_fn_level0_.load();
+  } else {
+    process_probe_batch_fn = process_probe_batch_fn_.load();
+  }
+
+  if (process_probe_batch_fn != nullptr) {
+      rows_added = process_probe_batch_fn(
+          this, prefetch_mode, out_batch, ht_ctx_.get(), &status);
+  } else {
     rows_added = ProcessProbeBatch(
         join_op_, prefetch_mode, out_batch, ht_ctx_.get(), &status);
-  } else {
-    DCHECK(process_probe_batch_fn_level0_ != nullptr);
-    if (ht_ctx_->level() == 0) {
-      rows_added = process_probe_batch_fn_level0_(
-          this, prefetch_mode, out_batch, ht_ctx_.get(), &status);
-    } else {
-      rows_added = process_probe_batch_fn_(
-          this, prefetch_mode, out_batch, ht_ctx_.get(), &status);
-    }
   }
+
   if (UNLIKELY(rows_added < 0)) {
     DCHECK(!status.ok());
     return status;
@@ -1007,7 +1010,7 @@ Status PartitionedHashJoinNode::PrepareForPartitionedProbe() {
 
   // Validate the state of the partitions.
   for (int i = 0; i < PARTITION_FANOUT; ++i) {
-    PhjBuilder::Partition* build_partition =
+    PhjBuilderPartition* build_partition =
         (*build_hash_partitions_.hash_partitions)[i].get();
     ProbePartition* probe_partition = probe_hash_partitions_[i].get();
     if (build_partition->IsClosed()) {
@@ -1030,7 +1033,7 @@ Status PartitionedHashJoinNode::CreateProbeHashPartitions(
   *have_spilled_hash_partitions = false;
   probe_hash_partitions_.resize(PARTITION_FANOUT);
   for (int i = 0; i < PARTITION_FANOUT; ++i) {
-    PhjBuilder::Partition* build_partition =
+    PhjBuilderPartition* build_partition =
         (*build_hash_partitions_.hash_partitions)[i].get();
     if (build_partition->IsClosed() || !build_partition->is_spilled()) continue;
     *have_spilled_hash_partitions = true;
@@ -1150,7 +1153,7 @@ Status PartitionedHashJoinNode::DoneProbing(RuntimeState* state, RowBatch* batch
     int64_t num_spilled_probe_rows[PARTITION_FANOUT] = {0};
     for (int i = 0; i < PARTITION_FANOUT; ++i) {
       ProbePartition* probe_partition = probe_hash_partitions_[i].get();
-      PhjBuilder::Partition* build_partition =
+      PhjBuilderPartition* build_partition =
           (*build_hash_partitions_.hash_partitions)[i].get();
       if (probe_partition == nullptr) {
         // Partition was not spilled.
@@ -1189,7 +1192,7 @@ Status PartitionedHashJoinNode::DoneProbing(RuntimeState* state, RowBatch* batch
   }
   if (!output_build_partitions_.empty()) {
     DCHECK(output_unmatched_batch_iter_.get() == nullptr);
-    PhjBuilder::Partition* output_partition = output_build_partitions_.front().get();
+    PhjBuilderPartition* output_partition = output_build_partitions_.front().get();
     if (output_partition->hash_tbl() != nullptr) {
       hash_tbl_iterator_ = output_partition->hash_tbl()->FirstUnmatched(ht_ctx_.get());
     } else {
@@ -1240,7 +1243,7 @@ string PartitionedHashJoinNode::NodeDebugString() const {
     ss << "SpilledPartitions" << endl;
     for (const auto& entry : spilled_partitions_) {
       ProbePartition* probe_partition = entry.second.get();
-      PhjBuilder::Partition* build_partition = probe_partition->build_partition();
+      PhjBuilderPartition* build_partition = probe_partition->build_partition();
       DCHECK(build_partition->is_spilled());
       DCHECK(build_partition->hash_tbl() == nullptr);
       int build_rows = build_partition->build_rows() == nullptr ?  -1 :
@@ -1255,7 +1258,7 @@ string PartitionedHashJoinNode::NodeDebugString() const {
   if (input_partition_ != nullptr) {
     DCHECK(input_partition_->probe_rows() != nullptr);
     ss << "InputPartition: " << input_partition_.get() << endl;
-    PhjBuilder::Partition* build_partition = input_partition_->build_partition();
+    PhjBuilderPartition* build_partition = input_partition_->build_partition();
     if (build_partition->IsClosed()) {
       ss << "   Build Partition Closed" << endl;
     } else {
@@ -1555,9 +1558,8 @@ Status PartitionedHashJoinPlanNode::CodegenProcessProbeBatch(
   }
 
   // Register native function pointers
-  codegen->AddFunctionToJit(process_probe_batch_fn,
-                            reinterpret_cast<void**>(&process_probe_batch_fn_));
+  codegen->AddFunctionToJit(process_probe_batch_fn, &process_probe_batch_fn_);
   codegen->AddFunctionToJit(process_probe_batch_fn_level0,
-                            reinterpret_cast<void**>(&process_probe_batch_fn_level0_));
+                            &process_probe_batch_fn_level0_);
   return Status::OK();
 }

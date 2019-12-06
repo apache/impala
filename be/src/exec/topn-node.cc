@@ -136,8 +136,7 @@ void TopNPlanNode::Codegen(FragmentState* state) {
 
         insert_batch_fn = codegen->FinalizeFunction(insert_batch_fn);
         DCHECK(insert_batch_fn != NULL);
-        codegen->AddFunctionToJit(insert_batch_fn,
-            reinterpret_cast<void**>(&codegend_insert_batch_fn_));
+        codegen->AddFunctionToJit(insert_batch_fn, &codegend_insert_batch_fn_);
       }
     }
   }
@@ -169,8 +168,10 @@ Status TopNNode::Open(RuntimeState* state) {
       RETURN_IF_ERROR(child(0)->GetNext(state, &batch, &eos));
       {
         SCOPED_TIMER(insert_batch_timer_);
-        if (codegend_insert_batch_fn_ != nullptr) {
-          codegend_insert_batch_fn_(this, &batch);
+        const TopNPlanNode::InsertBatchFn insert_batch_fn
+            = codegend_insert_batch_fn_.load();
+        if (insert_batch_fn != nullptr) {
+          insert_batch_fn(this, &batch);
         } else {
           InsertBatch(&batch);
         }

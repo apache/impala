@@ -426,6 +426,9 @@ struct TQueryOptions {
   // See comment in ImpalaService.thrift
   104: optional PlanNodes.TEnabledRuntimeFilterTypes enabled_runtime_filter_types =
       PlanNodes.TEnabledRuntimeFilterTypes.MIN_MAX;
+
+  // See comment in ImpalaService.thrift
+  105: optional bool async_codegen = false;
 }
 
 // Impala currently has two types of sessions: Beeswax and HiveServer2

@@ -137,8 +137,7 @@ Status HdfsParquetScanner::Open(ScannerContext* context) {
   row_group_actual_reservation_counter_ = ADD_SUMMARY_STATS_COUNTER(
       scan_node_->runtime_profile(), ACTUAL_RESERVATION_COUNTER_NAME, TUnit::BYTES);
 
-  codegend_process_scratch_batch_fn_ = reinterpret_cast<ProcessScratchBatchFn>(
-      scan_node_->GetCodegenFn(THdfsFileFormat::PARQUET));
+  codegend_process_scratch_batch_fn_ = scan_node_->GetCodegenFn(THdfsFileFormat::PARQUET);
   if (codegend_process_scratch_batch_fn_ == nullptr) {
     scan_node_->IncNumScannersCodegenDisabled();
   } else {

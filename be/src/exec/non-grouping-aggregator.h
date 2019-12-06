@@ -21,6 +21,7 @@
 #include <memory>
 #include <vector>
 
+#include "codegen/codegen-fn-ptr.h"
 #include "exec/aggregator.h"
 #include "runtime/mem-pool.h"
 
@@ -48,7 +49,7 @@ class NonGroupingAggregatorConfig : public AggregatorConfig {
 
   typedef Status (*AddBatchImplFn)(NonGroupingAggregator*, RowBatch*);
   /// Jitted AddBatchImpl function pointer. Null if codegen is disabled.
-  AddBatchImplFn add_batch_impl_fn_ = nullptr;
+  CodegenFnPtr<AddBatchImplFn> add_batch_impl_fn_;
 
   int GetNumGroupingExprs() const override { return 0; }
 
@@ -103,9 +104,8 @@ class NonGroupingAggregator : public Aggregator {
   /// Reset()/Open()/GetNext()* calls.
   std::unique_ptr<MemPool> singleton_tuple_pool_;
 
-  typedef Status (*AddBatchImplFn)(NonGroupingAggregator*, RowBatch*);
   /// Jitted AddBatchImpl function pointer. Null if codegen is disabled.
-  const AddBatchImplFn& add_batch_impl_fn_;
+  const CodegenFnPtr<NonGroupingAggregatorConfig::AddBatchImplFn>& add_batch_impl_fn_;
 
   /////////////////////////////////////////
   /// BEGIN: Members that must be Reset()

@@ -82,11 +82,11 @@ Status FragmentState::Init() {
   return Status::OK();
 }
 
-Status FragmentState::InvokeCodegen() {
+Status FragmentState::InvokeCodegen(RuntimeProfile::EventSequence* event_sequence) {
   unique_lock<mutex> l(codegen_lock_);
   if (!codegen_invoked_) {
     codegen_invoked_ = true;
-    codegen_status_ = CodegenHelper();
+    codegen_status_ = CodegenHelper(event_sequence);
     if (!codegen_status_.ok()) {
       string error_ctx = Substitute(
           "Fragment failed during codegen, fragment index: $0", fragment_.display_name);
@@ -97,11 +97,13 @@ Status FragmentState::InvokeCodegen() {
   return codegen_status_;
 }
 
-Status FragmentState::CodegenHelper() {
+Status FragmentState::CodegenHelper(RuntimeProfile::EventSequence* event_sequence) {
   DCHECK(plan_tree_ != nullptr);
   DCHECK(sink_config_ != nullptr);
   DCHECK(ShouldCodegen());
   RETURN_IF_ERROR(CreateCodegen());
+
+  SCOPED_TIMER(codegen()->main_thread_timer());
   {
     SCOPED_TIMER2(codegen()->ir_generation_timer(),
         codegen()->runtime_profile()->total_time_counter());
@@ -116,7 +118,16 @@ Status FragmentState::CodegenHelper() {
 
   LlvmCodeGen* llvm_codegen = codegen();
   DCHECK(llvm_codegen != nullptr);
-  RETURN_IF_ERROR(llvm_codegen->FinalizeModule());
+
+  // In case we need codegen, we cannot use asynchronous codegen because we cannot
+  // interpret the query until codegen has run.
+  const bool async_enabled = query_options().async_codegen;
+  if (async_enabled && is_interpretable()) {
+    RETURN_IF_ERROR(llvm_codegen->FinalizeModuleAsync(event_sequence));
+  } else {
+    RETURN_IF_ERROR(llvm_codegen->FinalizeModule());
+  }
+
   return Status::OK();
 }
 

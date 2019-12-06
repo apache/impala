@@ -535,6 +535,9 @@ enum TImpalaQueryOptions {
   //     MIN_MAX - apply min-max filter only (default).
   //     ALL     - apply both bloom filter and min-max filter.
   ENABLED_RUNTIME_FILTER_TYPES = 103
+
+  // Enable asynchronous codegen.
+  ASYNC_CODEGEN = 104
 }
 
 // The summary of a DML statement.

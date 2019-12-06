@@ -342,7 +342,8 @@ TEST_F(ExprCodegenTest, TestInlineConstFnAttrs) {
   // Compile module
   fn = codegen->FinalizeFunction(fn);
   ASSERT_TRUE(fn != NULL);
-  void* fn_ptr;
+  typedef DecimalVal (*TestGetFnAttrs)(FunctionContext*, const DecimalVal&);
+  CodegenFnPtr<TestGetFnAttrs> fn_ptr;
   codegen->AddFunctionToJit(fn, &fn_ptr);
   EXPECT_TRUE(codegen->FinalizeModule().ok()) << LlvmCodeGen::Print(fn);
 
@@ -351,8 +352,7 @@ TEST_F(ExprCodegenTest, TestInlineConstFnAttrs) {
   // and return types are encoded above (ARG0_*, RET_*);
   int64_t v = 1000025;
   DecimalVal arg0_val(v);
-  typedef DecimalVal (*TestGetFnAttrs)(FunctionContext*, const DecimalVal&);
-  DecimalVal result = reinterpret_cast<TestGetFnAttrs>(fn_ptr)(fn_ctx_, arg0_val);
+  DecimalVal result = fn_ptr.load()(fn_ctx_, arg0_val);
   // sanity check result
   EXPECT_EQ(result.is_null, false);
   EXPECT_EQ(result.val8, 100003);

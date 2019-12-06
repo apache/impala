@@ -19,9 +19,11 @@
 #ifndef IMPALA_EXEC_HDFS_SCANNER_H_
 #define IMPALA_EXEC_HDFS_SCANNER_H_
 
-#include <vector>
 #include <memory>
 #include <stdint.h>
+#include <type_traits>
+#include <utility>
+#include <vector>
 #include <boost/scoped_ptr.hpp>
 
 #include "codegen/impala-ir.h"
@@ -303,12 +305,13 @@ class HdfsScanner {
   /// Time spent decompressing bytes.
   RuntimeProfile::Counter* decompress_timer_ = nullptr;
 
-  /// Matching typedef for WriteAlignedTuples for codegen.  Refer to comments for
-  /// that function.
+  /// Matching typedef for WriteAlignedTuples for codegen. Refer to comments for that
+  /// function.
   typedef int (*WriteTuplesFn)(HdfsScanner*, MemPool*, TupleRow*, FieldLocation*,
       int, int, int, int, bool);
-  /// Jitted write tuples function pointer.  Null if codegen is disabled.
-  WriteTuplesFn write_tuples_fn_ = nullptr;
+  /// Jitted write tuples function pointer. Null if codegen is disabled.
+  /// Function type: WriteTuplesFn.
+  const CodegenFnPtrBase* write_tuples_fn_ = nullptr;
 
   struct LocalFilterStats {
     /// Total number of rows to which each filter was applied
@@ -441,6 +444,51 @@ class HdfsScanner {
   int WriteAlignedTuples(MemPool* pool, TupleRow* tuple_row_mem, FieldLocation* fields,
       int num_tuples, int max_added_tuples, int slots_per_tuple, int row_idx_start,
       bool copy_strings);
+
+  /// Convenience struct for pointers to codegen'd function pointers (CodegenFnPtrBase*).
+  /// Calls the codegen'd function if neither the outer nor the inner pointer is nullptr,
+  /// otherwise calls the provided interpreted function.
+  ///
+  /// The signatures of the condegen'd and the interpreted functions must be the same
+  /// except that the interpreted function is a member function and the codegen'd function
+  /// is a non-member function that takes the 'this' pointer explicitly as its first
+  /// argument.
+  ///
+  /// CodegendFnT: Function pointer type of the codegen'd version. This template parameter
+  /// is separated from the other template parameters because the compiler can infer the
+  /// others but this needs to be written explicitly.
+  ///
+  /// Example:
+  ///   SomeType var = CallCodegendOrInterpreted<SomeCodegendFnType>(this,
+  ///     codegend_fn_ptr_ptr, interpreted_member_fn, arg1, arg2, arg3);
+  template <class CodegendFnT>
+  struct CallCodegendOrInterpreted {
+    /// InterpretedFnT: Member function pointer type of the interpreted version.
+    /// ThisT: type of the 'this' pointer of the caller: needed because of polymorphism.
+    /// Args: argument pack for all other arguments.
+    template <class ThisT, class InterpretedFnT, class ...Args>
+    static decltype(auto) invoke(ThisT This, const CodegenFnPtrBase* atomic_codegend_fn,
+        InterpretedFnT interpreted_fn, Args&& ...args) {
+      if (atomic_codegend_fn != nullptr) {
+        // Codegen is enabled but may not be ready (if asynchronous).
+        CodegendFnT codegend_fn
+            = reinterpret_cast<CodegendFnT>(atomic_codegend_fn->load());
+        if (codegend_fn != nullptr) {
+          // Codegen is ready.
+          return codegend_fn(This, std::forward<Args>(args)...);
+        }
+      }
+
+      // Codegen is either disabled or not ready yet.
+      return (This->*interpreted_fn)(std::forward<Args>(args)...);
+    }
+  };
+
+  /// Calls the codegen'd version of WriteAlignedTuples if codegen is enabled and ready
+  /// (in case of asynchronous codegen) or the interpreted version otherwise.
+  int WriteAlignedTuplesCodegenOrInterpret(MemPool* pool, TupleRow* tuple_row_mem,
+      FieldLocation* fields, int num_tuples, int max_added_tuples, int slots_per_tuple,
+      int row_idx_start, bool copy_strings);
 
   /// Update the decompressor_ object given a compression type or codec name. Depending on
   /// the old compression type and the new one, it may close the old decompressor and/or

@@ -22,6 +22,7 @@
 #include <queue>
 #include <boost/scoped_ptr.hpp>
 
+#include "codegen/codegen-fn-ptr.h"
 #include "codegen/impala-ir.h"
 #include "exec/exec-node.h"
 #include "runtime/descriptors.h"  // for TupleId
@@ -57,7 +58,7 @@ class TopNPlanNode : public PlanNode {
 
   /// Codegened version of TopNNode::InsertBatch().
   typedef void (*InsertBatchFn)(TopNNode*, RowBatch*);
-  InsertBatchFn codegend_insert_batch_fn_ = nullptr;
+  CodegenFnPtr<InsertBatchFn> codegend_insert_batch_fn_;
 };
 
 /// Node for in-memory TopN (ORDER BY ... LIMIT)
@@ -140,7 +141,7 @@ class TopNNode : public ExecNode {
 
   /// Reference to the codegened function pointer owned by the TopNPlanNode object that
   /// was used to create this instance.
-  const TopNPlanNode::InsertBatchFn& codegend_insert_batch_fn_;
+  const CodegenFnPtr<TopNPlanNode::InsertBatchFn>& codegend_insert_batch_fn_;
 
   /// Timer for time spent in InsertBatch() function (or codegen'd version)
   RuntimeProfile::Counter* insert_batch_timer_;

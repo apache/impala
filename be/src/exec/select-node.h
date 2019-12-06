@@ -21,9 +21,9 @@
 
 #include <boost/scoped_ptr.hpp>
 
+#include "codegen/codegen-fn-ptr.h"
 #include "exec/exec-node.h"
 #include "runtime/mem-pool.h"
-#include <boost/scoped_ptr.hpp>
 
 namespace impala {
 
@@ -40,7 +40,7 @@ class SelectPlanNode : public PlanNode {
 
   /// Codegened version of SelectNode::CopyRows().
   typedef void (*CopyRowsFn)(SelectNode*, RowBatch*);
-  CopyRowsFn codegend_copy_rows_fn_ = nullptr;
+  CodegenFnPtr<CopyRowsFn> codegend_copy_rows_fn_;
 
  private:
   /// Codegen SelectNode::CopyRows().
@@ -78,7 +78,7 @@ class SelectNode : public ExecNode {
 
   /// Reference to the codegened function pointer owned by the SelectPlanNode object that
   /// was used to create this instance.
-  const SelectPlanNode::CopyRowsFn& codegend_copy_rows_fn_;
+  const CodegenFnPtr<SelectPlanNode::CopyRowsFn>& codegend_copy_rows_fn_;
 
   /// Copy rows from child_row_batch_ for which conjuncts_ evaluate to true to
   /// output_batch, up to limit_ or till the output row batch reaches capacity.

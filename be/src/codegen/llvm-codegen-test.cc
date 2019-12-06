@@ -96,7 +96,8 @@ class LlvmCodeGenTest : public testing:: Test {
     codegen->ClearHashFns();
   }
 
-  static void AddFunctionToJit(LlvmCodeGen* codegen, llvm::Function* fn, void** fn_ptr) {
+  static void AddFunctionToJit(LlvmCodeGen* codegen, llvm::Function* fn,
+      CodegenFnPtrBase* fn_ptr) {
     // Bypass Impala-specific logic in AddFunctionToJit() that assumes Impala's struct
     // types are available in the module.
     return codegen->AddFunctionToJitInternal(fn, fn_ptr);
@@ -268,31 +269,31 @@ TEST_F(LlvmCodeGenTest, ReplaceFnCall) {
   EXPECT_EQ(1, num_replaced);
   EXPECT_TRUE(VerifyFunction(codegen.get(), jitted_loop2));
 
-  void* original_loop = NULL;
+  CodegenFnPtr<TestLoopFn> original_loop;
   AddFunctionToJit(codegen.get(), loop, &original_loop);
-  void* new_loop = NULL;
+  CodegenFnPtr<TestLoopFn> new_loop;
   AddFunctionToJit(codegen.get(), jitted_loop, &new_loop);
-  void* new_loop2 = NULL;
+  CodegenFnPtr<TestLoopFn> new_loop2;
   AddFunctionToJit(codegen.get(), jitted_loop2, &new_loop2);
 
   // Part 5: compile all the functions (we can't add more functions after jitting with
   // MCJIT) then run them.
   ASSERT_OK(LlvmCodeGenTest::FinalizeModule(codegen.get()));
-  ASSERT_TRUE(original_loop != NULL);
-  ASSERT_TRUE(new_loop != NULL);
-  ASSERT_TRUE(new_loop2 != NULL);
+  ASSERT_TRUE(original_loop.load() != nullptr);
+  ASSERT_TRUE(new_loop.load() != nullptr);
+  ASSERT_TRUE(new_loop2.load() != nullptr);
 
-  TestLoopFn original_loop_fn = reinterpret_cast<TestLoopFn>(original_loop);
+  TestLoopFn original_loop_fn = original_loop.load();
   original_loop_fn(5);
   EXPECT_EQ(0, jitted_counter);
 
-  TestLoopFn new_loop_fn = reinterpret_cast<TestLoopFn>(new_loop);
+  TestLoopFn new_loop_fn = new_loop.load();
   new_loop_fn(5);
   EXPECT_EQ(5, jitted_counter);
   new_loop_fn(5);
   EXPECT_EQ(10, jitted_counter);
 
-  TestLoopFn new_loop_fn2 = reinterpret_cast<TestLoopFn>(new_loop2);
+  TestLoopFn new_loop_fn2 = new_loop2.load();
   new_loop_fn2(5);
   EXPECT_EQ(0, jitted_counter);
   codegen->Close();
@@ -366,14 +367,14 @@ TEST_F(LlvmCodeGenTest, StringValue) {
   EXPECT_TRUE(string_test_fn != NULL);
 
   // Jit compile function
-  void* jitted_fn = NULL;
+  typedef int (*TestStringInteropFn)(StringValue*);
+  CodegenFnPtr<TestStringInteropFn> jitted_fn;
   AddFunctionToJit(codegen.get(), string_test_fn, &jitted_fn);
   ASSERT_OK(LlvmCodeGenTest::FinalizeModule(codegen.get()));
-  ASSERT_TRUE(jitted_fn != NULL);
+  ASSERT_TRUE(jitted_fn.load() != nullptr);
 
   // Call IR function
-  typedef int (*TestStringInteropFn)(StringValue*);
-  TestStringInteropFn fn = reinterpret_cast<TestStringInteropFn>(jitted_fn);
+  TestStringInteropFn fn = jitted_fn.load();
   int result = fn(&str_val);
 
   // Validate
@@ -413,13 +414,13 @@ TEST_F(LlvmCodeGenTest, MemcpyTest) {
   fn = codegen->FinalizeFunction(fn);
   ASSERT_TRUE(fn != NULL);
 
-  void* jitted_fn = NULL;
+  typedef void (*TestMemcpyFn)(char*, char*, int64_t);
+  CodegenFnPtr<TestMemcpyFn> jitted_fn;
   LlvmCodeGenTest::AddFunctionToJit(codegen.get(), fn, &jitted_fn);
   ASSERT_OK(LlvmCodeGenTest::FinalizeModule(codegen.get()));
-  ASSERT_TRUE(jitted_fn != NULL);
+  ASSERT_TRUE(jitted_fn.load() != nullptr);
 
-  typedef void (*TestMemcpyFn)(char*, char*, int64_t);
-  TestMemcpyFn test_fn = reinterpret_cast<TestMemcpyFn>(jitted_fn);
+  TestMemcpyFn test_fn = jitted_fn.load();
 
   test_fn(dst, src, 4);
 
@@ -483,13 +484,13 @@ TEST_F(LlvmCodeGenTest, HashTest) {
     fn_fixed = codegen->FinalizeFunction(fn_fixed);
     ASSERT_TRUE(fn_fixed != NULL);
 
-    void* jitted_fn = NULL;
+    typedef uint32_t (*TestHashFn)();
+    CodegenFnPtr<TestHashFn> jitted_fn;
     LlvmCodeGenTest::AddFunctionToJit(codegen.get(), fn_fixed, &jitted_fn);
     ASSERT_OK(LlvmCodeGenTest::FinalizeModule(codegen.get()));
-    ASSERT_TRUE(jitted_fn != NULL);
+    ASSERT_TRUE(jitted_fn.load() != nullptr);
 
-    typedef uint32_t (*TestHashFn)();
-    TestHashFn test_fn = reinterpret_cast<TestHashFn>(jitted_fn);
+    TestHashFn test_fn = jitted_fn.load();
 
     uint32_t result = test_fn();
 

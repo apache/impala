@@ -66,7 +66,7 @@ class KrpcDataStreamSenderConfig : public DataSinkConfig {
   /// Type and pointer for the codegen'd KrpcDataStreamSender::HashAndAddRows()
   /// function. NULL if codegen is disabled or failed.
   typedef Status (*HashAndAddRowsFn)(KrpcDataStreamSender*, RowBatch* row);
-  HashAndAddRowsFn hash_and_add_rows_fn_ = nullptr;
+  CodegenFnPtr<HashAndAddRowsFn> hash_and_add_rows_fn_;
 
   ~KrpcDataStreamSenderConfig() override {}
 
@@ -270,7 +270,7 @@ class KrpcDataStreamSender : public DataSink {
 
   /// Pointer for the codegen'd HashAndAddRows() function.
   /// NULL if codegen is disabled or failed.
-  const KrpcDataStreamSenderConfig::HashAndAddRowsFn& hash_and_add_rows_fn_;
+  const CodegenFnPtr<KrpcDataStreamSenderConfig::HashAndAddRowsFn>& hash_and_add_rows_fn_;
 };
 
 } // namespace impala

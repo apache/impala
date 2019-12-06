@@ -36,8 +36,7 @@ TupleRowComparatorConfig::TupleRowComparatorConfig(
     const TSortInfo& tsort_info, const std::vector<ScalarExpr*>& ordering_exprs)
   : sorting_order_(tsort_info.sorting_order),
     ordering_exprs_(ordering_exprs),
-    is_asc_(tsort_info.is_asc_order),
-    codegend_compare_fn_(nullptr) {
+    is_asc_(tsort_info.is_asc_order) {
   if (sorting_order_ == TSortingOrder::ZORDER) return;
   for (bool null_first : tsort_info.nulls_first) {
     nulls_first_.push_back(null_first ? -1 : 1);
@@ -71,9 +70,9 @@ Status TupleRowComparatorConfig::Codegen(FragmentState* state) {
   }
   llvm::Function* fn;
   LlvmCodeGen* codegen = state->codegen();
-  DCHECK(codegen != NULL);
+  DCHECK(codegen != nullptr);
   RETURN_IF_ERROR(CodegenLexicalCompare(codegen, &fn));
-  codegen->AddFunctionToJit(fn, reinterpret_cast<void**>(&codegend_compare_fn_));
+  codegen->AddFunctionToJit(fn, &codegend_compare_fn_);
   return Status::OK();
 }
 

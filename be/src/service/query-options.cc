@@ -906,6 +906,10 @@ Status impala::SetQueryOption(const string& key, const string& value,
         query_options->__set_enabled_runtime_filter_types(enum_type);
         break;
       }
+      case TImpalaQueryOptions::ASYNC_CODEGEN: {
+        query_options->__set_async_codegen(IsTrue(value));
+        break;
+      }
       default:
         if (IsRemovedQueryOption(key)) {
           LOG(WARNING) << "Ignoring attempt to set removed query option '" << key << "'";

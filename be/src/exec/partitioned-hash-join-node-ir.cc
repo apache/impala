@@ -305,7 +305,7 @@ bool IR_ALWAYS_INLINE PartitionedHashJoinNode::NextProbeRow(
         hash_tbl_iterator_ = hash_tbl->FindProbeRow(ht_ctx);
       } else {
         // The build partition is either empty or spilled.
-        PhjBuilder::Partition* build_partition =
+        PhjBuilderPartition* build_partition =
             (*build_hash_partitions_.hash_partitions)[partition_idx].get();
         ProbePartition* probe_partition = probe_hash_partitions_[partition_idx].get();
         DCHECK((build_partition->IsClosed() && probe_partition == NULL)

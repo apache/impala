@@ -481,8 +481,7 @@ Status HdfsAvroScanner::InitNewRange() {
   }
 
   if (avro_header_->use_codegend_decode_avro_data) {
-    codegend_decode_avro_data_ = reinterpret_cast<DecodeAvroDataFn>(
-        scan_node_->GetCodegenFn(THdfsFileFormat::AVRO));
+    codegend_decode_avro_data_ = scan_node_->GetCodegenFn(THdfsFileFormat::AVRO);
   }
   if (codegend_decode_avro_data_ == nullptr) {
     scan_node_->IncNumScannersCodegenDisabled();
@@ -552,13 +551,12 @@ Status HdfsAvroScanner::ProcessRange(RowBatch* row_batch) {
       if (scan_node_->materialized_slots().empty()) {
         // No slots to materialize (e.g. count(*)), no need to decode data
         num_to_commit = WriteTemplateTuples(tuple_row, max_tuples);
-      } else if (codegend_decode_avro_data_ != nullptr) {
-        num_to_commit = codegend_decode_avro_data_(this, max_tuples,
-            row_batch->tuple_data_pool(), &data_block_, data_block_end_, tuple, tuple_row);
       } else {
-        num_to_commit = DecodeAvroData(max_tuples, row_batch->tuple_data_pool(),
-            &data_block_, data_block_end_, tuple, tuple_row);
+        num_to_commit = DecodeAvroDataCodegenOrInterpret(max_tuples,
+            row_batch->tuple_data_pool(), &data_block_,
+            data_block_end_, tuple, tuple_row);
       }
+
       RETURN_IF_ERROR(parse_status_);
       RETURN_IF_ERROR(CommitRows(num_to_commit, row_batch));
       record_pos_ += max_tuples;
@@ -1140,4 +1138,11 @@ Status HdfsAvroScanner::CodegenDecodeAvroData(const HdfsScanPlanNode* node,
     return Status("Failed to finalize decode_avro_data_fn.");
   }
   return Status::OK();
+}
+
+int HdfsAvroScanner::DecodeAvroDataCodegenOrInterpret(int max_tuples, MemPool* pool,
+    uint8_t** data, uint8_t* data_end, Tuple* tuple, TupleRow* tuple_row) {
+  return CallCodegendOrInterpreted<DecodeAvroDataFn>::invoke(this,
+      codegend_decode_avro_data_, &HdfsAvroScanner::DecodeAvroData, max_tuples, pool,
+      &data_block_, data_block_end_, tuple, tuple_row);
 }

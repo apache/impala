@@ -887,21 +887,18 @@ int HdfsTextScanner::WriteFields(int num_fields, int num_tuples, MemPool* pool,
     int max_added_tuples = (scan_node_->limit() == -1) ?
         num_tuples :
         scan_node_->limit() - scan_node_->rows_returned_shared();
-    int tuples_returned = 0;
-    // Call jitted function if possible
+
     if (write_tuples_fn_ != nullptr) {
       // HdfsScanner::InitializeWriteTuplesFn() will skip codegen if there are string
       // slots and escape characters. TextConverter::WriteSlot() will be used instead.
       DCHECK(scan_node_->tuple_desc()->string_slots().empty() ||
           delimited_text_parser_->escape_char() == '\0');
-      tuples_returned = write_tuples_fn_(this, pool, row, fields, num_tuples,
-          max_added_tuples, scan_node_->materialized_slots().size(),
-          num_tuples_processed, copy_strings);
-    } else {
-      tuples_returned = WriteAlignedTuples(pool, row, fields, num_tuples,
-          max_added_tuples, scan_node_->materialized_slots().size(),
-          num_tuples_processed, copy_strings);
     }
+
+    int tuples_returned = WriteAlignedTuplesCodegenOrInterpret(pool, row, fields,
+        num_tuples, max_added_tuples, scan_node_->materialized_slots().size(),
+        num_tuples_processed, copy_strings);
+
     if (tuples_returned == -1) return 0;
     DCHECK_EQ(slot_idx_, 0);
 

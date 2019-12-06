@@ -442,6 +442,11 @@ class QueryState {
   /// thread-safe.
   void ReleaseBackendResources();
 
+  /// Functions for calculating user or system time spent on async codegen threads.
+  int64_t AsyncCodegenThreadHelper(const std::string& suffix) const;
+  int64_t AsyncCodegenThreadUserTime() const;
+  int64_t AsyncCodegenThreadSysTime() const;
+
   /// Helper for ReportExecStatus() to construct a status report to be sent to the
   /// coordinator. The execution statuses (e.g. 'done' indicator) of all fragment
   /// instances belonging to this query state are stored in 'report'. The Thrift

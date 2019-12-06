@@ -432,8 +432,9 @@ Status GroupingAggregator::AddBatch(RuntimeState* state, RowBatch* batch) {
   num_input_rows_ += batch->num_rows();
 
   TPrefetchMode::type prefetch_mode = state->query_options().prefetch_mode;
-  if (add_batch_impl_fn_ != nullptr) {
-    RETURN_IF_ERROR(add_batch_impl_fn_(this, batch, prefetch_mode, ht_ctx_.get()));
+  GroupingAggregatorConfig::AddBatchImplFn add_batch_impl_fn = add_batch_impl_fn_.load();
+  if (add_batch_impl_fn != nullptr) {
+    RETURN_IF_ERROR(add_batch_impl_fn(this, batch, prefetch_mode, ht_ctx_.get()));
   } else {
     RETURN_IF_ERROR(AddBatchImpl<false>(batch, prefetch_mode, ht_ctx_.get()));
   }
@@ -477,8 +478,10 @@ Status GroupingAggregator::AddBatchStreaming(
   }
 
   TPrefetchMode::type prefetch_mode = state->query_options().prefetch_mode;
-  if (add_batch_streaming_impl_fn_ != nullptr) {
-    RETURN_IF_ERROR(add_batch_streaming_impl_fn_(this, agg_idx_, needs_serialize_,
+  GroupingAggregatorConfig::AddBatchStreamingImplFn fn
+      = add_batch_streaming_impl_fn_.load();
+  if (fn != nullptr) {
+    RETURN_IF_ERROR(fn(this, agg_idx_, needs_serialize_,
         prefetch_mode, child_batch, out_batch, ht_ctx_.get(), remaining_capacity));
   } else {
     RETURN_IF_ERROR(AddBatchStreamingImpl(agg_idx_, needs_serialize_, prefetch_mode,
@@ -1058,8 +1061,7 @@ Status GroupingAggregatorConfig::CodegenAddBatchImpl(
                   "AddBatchImpl() function failed verification, see log");
   }
 
-  void** codegened_fn_ptr = reinterpret_cast<void**>(&add_batch_impl_fn_);
-  codegen->AddFunctionToJit(add_batch_impl_fn, codegened_fn_ptr);
+  codegen->AddFunctionToJit(add_batch_impl_fn, &add_batch_impl_fn_);
   return Status::OK();
 }
 
@@ -1134,8 +1136,7 @@ Status GroupingAggregatorConfig::CodegenAddBatchStreamingImpl(
                   "AddBatchStreamingImpl() function failed verification, see log");
   }
 
-  codegen->AddFunctionToJit(add_batch_streaming_impl_fn,
-      reinterpret_cast<void**>(&add_batch_streaming_impl_fn_));
+  codegen->AddFunctionToJit(add_batch_streaming_impl_fn, &add_batch_streaming_impl_fn_);
   return Status::OK();
 }
 
