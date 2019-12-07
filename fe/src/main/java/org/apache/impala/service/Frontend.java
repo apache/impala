@@ -868,7 +868,11 @@ public class Frontend {
       User user) throws ImpalaException {
     FeCatalog catalog = getCatalog();
     List<String> tblNames = catalog.getTableNames(dbName, matcher);
-    if (authzFactory_.getAuthorizationConfig().isEnabled()) {
+
+    boolean needsAuthChecks = authzFactory_.getAuthorizationConfig().isEnabled()
+                              && !userHasAccessForWholeDb(user, dbName);
+
+    if (needsAuthChecks) {
       List<Future<Boolean>> pendingCheckTasks = Lists.newArrayList();
       Iterator<String> iter = tblNames.iterator();
       while (iter.hasNext()) {
@@ -1010,9 +1014,12 @@ public class Frontend {
   public List<? extends FeDb> getDbs(PatternMatcher matcher, User user)
       throws InternalException {
     List<? extends FeDb> dbs = getCatalog().getDbs(matcher);
-    // If authorization is enabled, filter out the databases the user does not
-    // have permissions on.
-    if (authzFactory_.getAuthorizationConfig().isEnabled()) {
+
+    boolean needsAuthChecks = authzFactory_.getAuthorizationConfig().isEnabled()
+                              && !userHasAccessForWholeServer(user);
+
+    // Filter out the databases the user does not have permissions on.
+    if (needsAuthChecks) {
       Iterator<? extends FeDb> iter = dbs.iterator();
       List<Future<Boolean>> pendingCheckTasks = Lists.newArrayList();
       while (iter.hasNext()) {
@@ -1040,8 +1047,8 @@ public class Frontend {
     }
 
     PrivilegeRequestBuilder builder = new PrivilegeRequestBuilder(
-      authzFactory_.getAuthorizableFactory())
-      .anyOf(minPrivilegeSetForShowStmts_);
+        authzFactory_.getAuthorizableFactory())
+        .anyOf(minPrivilegeSetForShowStmts_);
     if (tblName == null) {
       // Check database
       builder = builder.onAnyColumn(dbName, owner);
@@ -1051,6 +1058,46 @@ public class Frontend {
     }
 
     return authzChecker_.get().hasAnyAccess(user, builder.buildSet());
+  }
+
+  /**
+   * Check whether the whole server is accessible to given user.
+   */
+  private boolean userHasAccessForWholeServer(User user)
+      throws InternalException {
+    if (authEngineSupportsDenyRules()) return false;
+    PrivilegeRequestBuilder builder = new PrivilegeRequestBuilder(
+        authzFactory_.getAuthorizableFactory()).anyOf(minPrivilegeSetForShowStmts_)
+        .onServer(authzFactory_.getAuthorizationConfig().getServerName());
+    return authzChecker_.get().hasAnyAccess(user, builder.buildSet());
+  }
+
+  /**
+   * Check whether the whole database is accessible to given user.
+   */
+  private boolean userHasAccessForWholeDb(User user, String dbName)
+      throws InternalException, DatabaseNotFoundException {
+    if (authEngineSupportsDenyRules()) return false;
+    // FeDb is needed to respect ownership in Ranger, dbName would be enough for
+    // the privilege request otherwise.
+    FeDb db = getCatalog().getDb(dbName);
+    if (db == null) {
+      throw new DatabaseNotFoundException("Database '" + dbName + "' not found");
+    }
+    PrivilegeRequestBuilder builder = new PrivilegeRequestBuilder(
+        authzFactory_.getAuthorizableFactory()).anyOf(minPrivilegeSetForShowStmts_)
+        .onDb(db);
+    return authzChecker_.get().hasAnyAccess(user, builder.buildSet());
+  }
+
+  /**
+   * Returns whether the authorization engine supports deny rules. If it does,
+   * then a privilege on a higher level object does not imply privilege on lower
+   * level objects in the hierarchy.
+   */
+  private boolean authEngineSupportsDenyRules() {
+    // TODO: could check config for Ranger and return true if deny rules are disabled
+    return !authzFactory_.getAuthorizationConfig().getProviderName().equals("sentry");
   }
 
   /**
