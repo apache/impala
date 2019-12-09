@@ -58,8 +58,8 @@ class TestRPCException(CustomClusterTestSuite):
 
   # Execute TEST_QUERY repeatedly until the FAIL debug action has been hit. If
   # 'exception_string' is None, it's expected to always complete sucessfully with result
-  # matching EXPECTED_RESULT. Otherwise, it's expected to fail with 'exception_string' if
-  # the debug action has been hit.
+  # matching EXPECTED_RESULT. Otherwise, it's expected to either succeed or fail with
+  # the error 'exception_string'.
   def execute_test_query(self, exception_string):
     impalad = self.cluster.impalads[2]
     assert impalad.service.krpc_port == self.KRPC_PORT
@@ -71,13 +71,12 @@ class TestRPCException(CustomClusterTestSuite):
       i += 1
       try:
         result = self.client.execute(self.TEST_QUERY)
-        assert result.data == self.EXPECTED_RESULT
-        assert not exception_string or self._get_num_fails(impalad) == 0
+        assert result.data == self.EXPECTED_RESULT, "Query returned unexpected results."
       except ImpalaBeeswaxException as e:
         if exception_string is None:
           raise e
-        assert exception_string in str(e)
-    assert self._get_num_fails(impalad) > 0
+        assert exception_string in str(e), "Query failed with unexpected exception."
+    assert self._get_num_fails(impalad) > 0, "Debug action wasn't hit after 10 iters."
 
   def _get_fail_action(rpc, error=None, port=KRPC_PORT, p=0.1):
     """Returns a debug action that causes rpcs with the name 'rpc' that are sent to the
