@@ -397,10 +397,8 @@ under the License.
                       Month number
                     </entry>
                     <entry>
-                      <p>
-                        In date/time to string conversions, a 1-digit month is prefixed with a
-                        zero.
-                      </p>
+                      <p> In date/time to string conversions, 1-digit months are
+                        prefixed with a zero. </p>
                     </entry>
                   </row>
                   <row>
@@ -424,9 +422,8 @@ under the License.
                       In string to date/time conversions:
 
                       <ul>
-                        <li>
-                          Converts textual month names to 2-digit month numbers.
-                        </li>
+                        <li> Converts a textual month name to a 2-digit month
+                          number. </li>
 
                         <li>
                           The input strings are expected without trailing spaces, e.g.
@@ -504,15 +501,12 @@ under the License.
                       Week of year (1-53)
                     </entry>
                     <entry>
-                      <p>
-                        Not supported in a string to date/time conversions.
-                      </p>
+                      <p> Not supported in string to date/time conversions. </p>
 
 
 
-                      <p>
-                        1st week begins on January 1st and ends on January 7th.
-                      </p>
+                      <p> The 1st week begins on January 1st and ends on January
+                        7th. </p>
                     </entry>
                   </row>
                   <row>
@@ -558,10 +552,8 @@ under the License.
                       Day of month (1-31)
                     </entry>
                     <entry>
-                      <p>
-                        In date/time to string conversions, one digit day is prefixed with a
-                        zero.
-                      </p>
+                      <p> In date/time to string conversions, 1-digit days are
+                        prefixed with a zero. </p>
                     </entry>
                   </row>
                   <row>
