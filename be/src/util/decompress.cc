@@ -614,7 +614,13 @@ Status Lz4Decompressor::ProcessBlock(bool output_preallocated, int64_t input_len
 }
 
 ZstandardDecompressor::ZstandardDecompressor(MemPool* mem_pool, bool reuse_buffer)
-  : Codec(mem_pool, reuse_buffer) {}
+  : Codec(mem_pool, reuse_buffer, true) {}
+
+ZstandardDecompressor::~ZstandardDecompressor() {
+  if (stream_ != NULL) {
+    static_cast<void>(ZSTD_freeDCtx(stream_));
+  }
+}
 
 int64_t ZstandardDecompressor::MaxOutputLen(int64_t input_len, const uint8_t* input) {
   return -1;
@@ -631,6 +637,48 @@ Status ZstandardDecompressor::ProcessBlock(bool output_preallocated, int64_t inp
         ZSTD_getErrorString(ZSTD_getErrorCode(ret)));
   }
   *output_length = ret;
+  return Status::OK();
+}
+
+Status ZstandardDecompressor::ProcessBlockStreaming(int64_t input_length,
+    const uint8_t* input, int64_t* input_bytes_read, int64_t* output_length,
+    uint8_t** output, bool* stream_end) {
+  if (!reuse_buffer_ || out_buffer_ == nullptr) {
+    buffer_length_ = STREAM_OUT_BUF_SIZE;
+    out_buffer_ = memory_pool_->TryAllocate(buffer_length_);
+    if (UNLIKELY(out_buffer_ == nullptr)) {
+      string details =
+          Substitute(DECOMPRESSOR_MEM_LIMIT_EXCEEDED, "Zstd", buffer_length_);
+      return memory_pool_->mem_tracker()->MemLimitExceeded(
+          nullptr, details, buffer_length_);
+    }
+  }
+  if (stream_ == NULL) {
+    stream_ = ZSTD_createDCtx();
+    if (stream_ == NULL) {
+      return Status(
+          TErrorCode::COMPRESSED_FILE_DECOMPRESSOR_ERROR, "Zstd", "ZSTD_createDCtx()");
+    }
+  }
+  *input_bytes_read = 0;
+  *output = out_buffer_;
+  *output_length = 0;
+
+  *stream_end = false;
+
+  ZSTD_inBuffer input_buffer{input, static_cast<size_t>(input_length), 0};
+  ZSTD_outBuffer output_buffer{*output, static_cast<size_t>(buffer_length_), 0};
+  while (input_buffer.pos < input_buffer.size && output_buffer.pos < output_buffer.size) {
+    size_t ret = ZSTD_decompressStream(stream_, &output_buffer, &input_buffer);
+    if (ZSTD_isError(ret)) {
+      *output_length = 0;
+      return Status(TErrorCode::ZSTD_ERROR, "ZSTD_decompressStream",
+          ZSTD_getErrorString(ZSTD_getErrorCode(ret)));
+    }
+    if (input_buffer.pos == input_buffer.size) *stream_end = true;
+  }
+  *input_bytes_read = input_buffer.pos;
+  *output_length = output_buffer.pos;
   return Status::OK();
 }
 

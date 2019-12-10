@@ -146,7 +146,7 @@ class ZstandardCompressor : public Codec {
   virtual Status ProcessBlock(bool output_preallocated, int64_t input_length,
       const uint8_t* input, int64_t* output_length,
       uint8_t** output) override WARN_UNUSED_RESULT;
-  virtual std::string file_extension() const override { return "zstd"; }
+  virtual std::string file_extension() const override { return "zst"; }
 
  private:
   int clevel_;

@@ -102,10 +102,10 @@ class DecompressorTest : public ::testing::Test {
     decompressor->Close();
   }
 
-  void RunTestStreaming(THdfsCompression::type format) {
+  void RunTestStreaming(THdfsCompression::type format, int compression_level = 0) {
     scoped_ptr<Codec> compressor;
     scoped_ptr<Codec> decompressor;
-    Codec::CodecInfo codec_info(format);
+    Codec::CodecInfo codec_info(format, compression_level);
 
     EXPECT_OK(Codec::CreateCompressor(&mem_pool_, true, codec_info, &compressor));
     EXPECT_OK(Codec::CreateDecompressor(&mem_pool_, true, format, &decompressor));
@@ -251,7 +251,17 @@ class DecompressorTest : public ::testing::Test {
       int64_t input_len, uint8_t* input) {
     uint8_t* compressed = NULL;
     int64_t compressed_length = 0;
-    Compress(compressor, input_len, input, &compressed_length, &compressed, false);
+    if (compressor->file_extension() == "zst") {
+      // Zstd compressor requires allocating memory first
+      if (input_len == 0)
+        compressed_length = 0;
+      else
+        compressed_length = compressor->MaxOutputLen(input_len, input);
+      compressed = mem_pool_.Allocate(compressed_length);
+      Compress(compressor, input_len, input, &compressed_length, &compressed, true);
+    } else {
+      Compress(compressor, input_len, input, &compressed_length, &compressed, false);
+    }
     // If compressed_len is 0, there is nothing to decompress so should not expect
     // "stream_end == true" either.
     // Note the gzip compressor will generate some compressed data even if input == NULL
@@ -489,6 +499,27 @@ TEST_F(DecompressorTest, ZSTD) {
   // zstd supports compression levels from 1 up to ZSTD_maxCLevel()
   const int clevel = uniform_int_distribution<int>(1, ZSTD_maxCLevel())(rng);
   RunTest(THdfsCompression::ZSTD, clevel);
+  RunTestStreaming(THdfsCompression::ZSTD, clevel);
+}
+
+TEST_F(DecompressorTest, ZSTDHuge) {
+  // As output buffer size is about 8M, we want to use an input buffer larger than that
+  // to test continuous stream reading
+  // Generate a big random payload, 100M length.
+  int payload_len = 100 * 1000 * 1000;
+  unique_ptr<uint8_t[]> payload(new uint8_t[payload_len]);
+  for (int i = 0; i < payload_len; ++i) payload[i] = rand();
+  scoped_ptr<Codec> compressor;
+  scoped_ptr<Codec> decompressor;
+
+  THdfsCompression::type format = THdfsCompression::ZSTD;
+  Codec::CodecInfo codec_info(format, ZSTD_CLEVEL_DEFAULT);
+  EXPECT_OK(Codec::CreateCompressor(&mem_pool_, true, codec_info, &compressor));
+  EXPECT_OK(Codec::CreateDecompressor(&mem_pool_, true, format, &decompressor));
+  CompressAndDecompressNoOutputAllocated(
+      compressor.get(), decompressor.get(), payload_len, payload.get());
+  CompressAndStreamingDecompress(
+      compressor.get(), decompressor.get(), payload_len, payload.get());
 }
 
 TEST_F(DecompressorTest, LZ4HadoopCompat) {

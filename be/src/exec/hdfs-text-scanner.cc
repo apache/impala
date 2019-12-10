@@ -89,6 +89,7 @@ Status HdfsTextScanner::IssueInitialRanges(HdfsScanNodeBase* scan_node,
       case THdfsCompression::GZIP:
       case THdfsCompression::SNAPPY:
       case THdfsCompression::SNAPPY_BLOCKED:
+      case THdfsCompression::ZSTD:
       case THdfsCompression::BZIP2:
       case THdfsCompression::DEFLATE:
         for (int j = 0; j < files[i]->splits.size(); ++j) {

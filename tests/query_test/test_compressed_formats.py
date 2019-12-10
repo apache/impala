@@ -16,18 +16,20 @@
 # under the License.
 
 import math
+import os
 import pytest
 import struct
 import subprocess
 from os.path import join
-from subprocess import call
 
 from tests.common.environ import MANAGED_WAREHOUSE_DIR
 from tests.common.impala_test_suite import ImpalaTestSuite
 from tests.common.skip import SkipIfS3, SkipIfABFS, SkipIfADLS, SkipIfIsilon, SkipIfLocal
 from tests.common.test_dimensions import create_single_exec_option_dimension
+from tests.common.test_result_verifier import verify_query_result_is_equal
 from tests.common.test_vector import ImpalaTestDimension
 from tests.util.filesystem_utils import get_fs_path
+
 
 # (file extension, table suffix) pairs
 compression_formats = [
@@ -264,3 +266,70 @@ class TestBzip2Streaming(ImpalaTestSuite):
 
   def test_bzip2_streaming(self, vector):
     self.run_test_case('QueryTest/text-bzip-scan', vector)
+
+
+class TestReadZtsdLibCompressedFile(ImpalaTestSuite):
+  """
+  Test that file compressed by zstd standard library can be read by Impala
+  """
+  COMPRESSED_TABLE_NAME = "zstdlib_compressed_table"
+  UNCOMPRESSED_TABLE_NAME = "uncompressed_table"
+  COMPRESSED_TABLE_LOCATION = get_fs_path("/test-warehouse/zstdlib_compressed_file")
+  UNCOMPRESSED_TABLE_LOCATION = get_fs_path("/test-warehouse/uncompressed_file")
+  COMPRESSED_LOCAL_FILE_PATH = "testdata/data/text_large_zstd.zst"
+  UNCOMPRESSED_LOCAL_FILE_PATH = "testdata/data/text_large_zstd.txt"
+
+  IMPALA_HOME = os.environ['IMPALA_HOME']
+
+  @classmethod
+  def get_workload(self):
+    return 'functional-query'
+
+  @classmethod
+  def add_test_dimensions(cls):
+    super(TestReadZtsdLibCompressedFile, cls).add_test_dimensions()
+
+    if cls.exploration_strategy() != 'exhaustive':
+      pytest.skip('runs only in exhaustive')
+    cls.ImpalaTestMatrix.add_constraint(lambda v:
+        (v.get_value('table_format').file_format == 'text' and
+        v.get_value('table_format').compression_codec == 'zstd'))
+
+  def __generate_file(self, local_file_location, table_location):
+    """
+    Make directory in HDFS and copy zstd standard library compressed file to HDFS
+    Lib compressed file extension has to be zst to be readable.
+    Copy original uncompressed file to HDFS as well for row comparison.
+    """
+    source_local_file = os.path.join(self.IMPALA_HOME, local_file_location)
+    subprocess.check_call(["hadoop", "fs", "-put", source_local_file, table_location])
+
+  def __create_test_table(self, table_name, location):
+    self.client.execute("DROP TABLE IF EXISTS %s" % table_name)
+    self.client.execute("CREATE TABLE %s (col string) LOCATION '%s'"
+        % (table_name, location))
+
+  def test_query_large_file(self):
+    self.__create_test_table(self.COMPRESSED_TABLE_NAME,
+        self.COMPRESSED_TABLE_LOCATION)
+    self.__create_test_table(self.UNCOMPRESSED_TABLE_NAME,
+         self.UNCOMPRESSED_TABLE_LOCATION)
+    self.__generate_file(self.COMPRESSED_LOCAL_FILE_PATH,
+        self.COMPRESSED_TABLE_LOCATION)
+    self.__generate_file(self.UNCOMPRESSED_LOCAL_FILE_PATH,
+        self.UNCOMPRESSED_TABLE_LOCATION)
+    self.client.execute("refresh %s" % self.COMPRESSED_TABLE_NAME)
+    self.client.execute("refresh %s" % self.UNCOMPRESSED_TABLE_NAME)
+
+    # Read from compressed table
+    result = self.client.execute("select count(*) from %s" % self.COMPRESSED_TABLE_NAME)
+    result_uncompressed = self.client.execute("select count(*) from %s" %
+        self.UNCOMPRESSED_TABLE_NAME)
+    assert int(result.get_data()) == int(result_uncompressed.get_data())
+
+    # Read top 10k rows from compressed table and uncompressed table, compare results
+    base_result = self.execute_query_expect_success(self.client,
+        "select * from {0} order by col limit 10000".format(self.UNCOMPRESSED_TABLE_NAME))
+    test_result = self.execute_query_expect_success(self.client,
+        "select * from {0} order by col limit 10000".format(self.COMPRESSED_TABLE_NAME))
+    verify_query_result_is_equal(test_result.data, base_result.data)
