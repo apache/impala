@@ -4652,6 +4652,7 @@ TEST_P(ExprTest, StringFunctions) {
   TestIsNull("concat(NULL)", TYPE_STRING);
   TestIsNull("concat('a', NULL, 'b')", TYPE_STRING);
   TestIsNull("concat('a', 'b', NULL)", TYPE_STRING);
+  TestStringValue("concat('', '', '')", "");
 
   TestStringValue("concat_ws(',', 'a')", "a");
   TestStringValue("concat_ws(',', 'a', 'b')", "a,b");
@@ -4661,8 +4662,17 @@ TEST_P(ExprTest, StringFunctions) {
   TestStringValue("concat_ws('|','a', 'b', 'cde', '', 'fg', '')", "a|b|cde||fg|");
   TestStringValue("concat_ws('', '', '', '')", "");
   TestIsNull("concat_ws(NULL, NULL)", TYPE_STRING);
-  TestIsNull("concat_ws(',', NULL, 'b')", TYPE_STRING);
-  TestIsNull("concat_ws(',', 'b', NULL)", TYPE_STRING);
+  TestStringValue("concat_ws(',', NULL, 'b')", "b");
+  TestStringValue("concat_ws(',', 'b', NULL)", "b");
+  TestStringValue("concat_ws(',', NULL, 'b', 'a')", "b,a");
+  TestStringValue("concat_ws(',', 'b', NULL, 'a')", "b,a");
+  TestStringValue("concat_ws(',', 'b', 'a', NULL)", "b,a");
+  TestStringValue("concat_ws('', NULL, 'b', 'a')", "ba");
+  TestStringValue("concat_ws('', 'b', NULL, 'a')", "ba");
+  TestStringValue("concat_ws('', 'b', 'a', NULL)", "ba");
+  TestStringValue("concat_ws(',', NULL, NULL)", "");
+  TestStringValue("concat_ws(',', '', '')", ",");
+  TestStringValue("concat_ws(',', '')", "");
 
   TestValue("find_in_set('ab', 'ab,ab,ab,ade,cde')", TYPE_INT, 1);
   TestValue("find_in_set('ab', 'abc,xyz,abc,ade,ab')", TYPE_INT, 5);

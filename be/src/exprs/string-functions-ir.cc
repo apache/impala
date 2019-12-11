@@ -854,36 +854,82 @@ IntVal StringFunctions::RegexpMatchCount4Args(FunctionContext* context,
   return IntVal(count);
 }
 
-StringVal StringFunctions::Concat(FunctionContext* context, int num_children,
-    const StringVal* strs) {
-  return ConcatWs(context, StringVal(), num_children, strs);
-}
-
-StringVal StringFunctions::ConcatWs(FunctionContext* context, const StringVal& sep,
-    int num_children, const StringVal* strs) {
+// NULL handling of function Concat and ConcatWs are different.
+// Function concat was reimplemented to keep the original
+// NULL handling.
+StringVal StringFunctions::Concat(
+    FunctionContext* context, int num_children, const StringVal* strs) {
   DCHECK_GE(num_children, 1);
-  DCHECK(strs != NULL);
-  if (sep.is_null) return StringVal::null();
-
-  // Pass through if there's only one argument
+  DCHECK(strs != nullptr);
+  // Pass through if there's only one argument.
   if (num_children == 1) return strs[0];
 
-  if (strs[0].is_null) return StringVal::null();
-  int32_t total_size = strs[0].len;
-
   // Loop once to compute the final size and reserve space.
-  for (int32_t i = 1; i < num_children; ++i) {
+  int32_t total_size = 0;
+  for (int32_t i = 0; i < num_children; ++i) {
     if (strs[i].is_null) return StringVal::null();
-    total_size += sep.len + strs[i].len;
+    total_size += strs[i].len;
   }
+  // If total_size is zero, directly returns empty string
+  if (total_size <= 0) return StringVal();
+
   StringVal result(context, total_size);
   if (UNLIKELY(result.is_null)) return StringVal::null();
 
   // Loop again to append the data.
   uint8_t* ptr = result.ptr;
-  Ubsan::MemCpy(ptr, strs[0].ptr, strs[0].len);
-  ptr += strs[0].len;
-  for (int32_t i = 1; i < num_children; ++i) {
+  for (int32_t i = 0; i < num_children; ++i) {
+    Ubsan::MemCpy(ptr, strs[i].ptr, strs[i].len);
+    ptr += strs[i].len;
+  }
+  return result;
+}
+
+StringVal StringFunctions::ConcatWs(FunctionContext* context, const StringVal& sep,
+    int num_children, const StringVal* strs) {
+  DCHECK_GE(num_children, 1);
+  DCHECK(strs != nullptr);
+  if (sep.is_null) return StringVal::null();
+
+  // Loop once to compute valid start index, final string size and valid string object
+  // count.
+  int32_t valid_num_children = 0;
+  int32_t valid_start_index = -1;
+  int32_t total_size = 0;
+  for (int32_t i = 0; i < num_children; ++i) {
+    if (strs[i].is_null) continue;
+
+    if (valid_start_index == -1) {
+      valid_start_index = i;
+      // Calculate the space required by first valid string object.
+      total_size += strs[i].len;
+    } else {
+      // Calculate the space required by subsequent valid string object.
+      total_size += sep.len + strs[i].len;
+    }
+    // Record the count of valid string object.
+    valid_num_children++;
+  }
+
+  // If all data are invalid, or data size is zero, return empty string.
+  if (valid_start_index < 0 || total_size <= 0) {
+    return StringVal();
+  }
+  DCHECK_GT(valid_num_children, 0);
+
+  // Pass through if there's only one argument.
+  if (valid_num_children == 1) return strs[valid_start_index];
+
+  // Reserve space needed by final result.
+  StringVal result(context, total_size);
+  if (UNLIKELY(result.is_null)) return StringVal::null();
+
+  // Loop to append the data.
+  uint8_t* ptr = result.ptr;
+  Ubsan::MemCpy(ptr, strs[valid_start_index].ptr, strs[valid_start_index].len);
+  ptr += strs[valid_start_index].len;
+  for (int32_t i = valid_start_index + 1; i < num_children; ++i) {
+    if (strs[i].is_null) continue;
     Ubsan::MemCpy(ptr, sep.ptr, sep.len);
     ptr += sep.len;
     Ubsan::MemCpy(ptr, strs[i].ptr, strs[i].len);
