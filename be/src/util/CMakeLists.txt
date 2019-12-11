@@ -58,6 +58,7 @@ add_library(Util
   histogram-metric.cc
   impalad-metrics.cc
   jni-util.cc
+  json-util.cc
   logging-support.cc
   mem-info.cc
   memory-metrics.cc

@@ -17,6 +17,10 @@
 
 #include "rpc/rpc-mgr.h"
 
+#include <google/protobuf/descriptor.h>
+#include <google/protobuf/descriptor.pb.h>
+#include <google/protobuf/message.h>
+
 #include "exec/kudu-util.h"
 #include "kudu/rpc/acceptor_pool.h"
 #include "kudu/rpc/remote_user.h"
@@ -30,6 +34,7 @@
 #include "runtime/mem-tracker.h"
 #include "util/auth-util.h"
 #include "util/cpu-info.h"
+#include "util/json-util.h"
 #include "util/network-util.h"
 #include "util/openssl-util.h"
 
@@ -41,12 +46,13 @@ using kudu::HostPort;
 using kudu::MetricEntity;
 using kudu::MonoDelta;
 using kudu::rpc::AcceptorPool;
-using kudu::rpc::DumpRunningRpcsRequestPB;
-using kudu::rpc::DumpRunningRpcsResponsePB;
+using kudu::rpc::DumpConnectionsRequestPB;
+using kudu::rpc::DumpConnectionsResponsePB;
 using kudu::rpc::GeneratedServiceIf;
 using kudu::rpc::MessengerBuilder;
 using kudu::rpc::Messenger;
 using kudu::rpc::RemoteUser;
+using kudu::rpc::RpcCallInProgressPB;
 using kudu::rpc::RpcConnectionPB;
 using kudu::rpc::RpcContext;
 using kudu::rpc::RpcController;
@@ -227,8 +233,8 @@ void RpcMgr::Shutdown() {
 bool RpcMgr::IsServerTooBusy(const RpcController& rpc_controller) {
   const kudu::Status status = rpc_controller.status();
   const kudu::rpc::ErrorStatusPB* err = rpc_controller.error_response();
-  return status.IsRemoteError() && err != nullptr && err->has_code() &&
-      err->code() == kudu::rpc::ErrorStatusPB::ERROR_SERVER_TOO_BUSY;
+  return status.IsRemoteError() && err != nullptr && err->has_code()
+      && err->code() == kudu::rpc::ErrorStatusPB::ERROR_SERVER_TOO_BUSY;
 }
 
 void RpcMgr::ToJson(Document* document) {
@@ -241,18 +247,42 @@ void RpcMgr::ToJson(Document* document) {
   document->AddMember("rpc_connections_accepted", num_accepted, document->GetAllocator());
 
   // Add messenger metrics.
-  DumpRunningRpcsResponsePB response;
-  messenger_->DumpRunningRpcs(DumpRunningRpcsRequestPB(), &response);
+  DumpConnectionsResponsePB response;
+  messenger_->DumpConnections(DumpConnectionsRequestPB(), &response);
 
   int64_t num_inbound_calls_in_flight = 0;
+  // Add per connection metrics for inbound connections.
+  Value inbound_per_conn_metrics(kArrayType);
   for (const RpcConnectionPB& conn : response.inbound_connections()) {
+    Value per_conn_metrics_entry(kObjectType);
+    Value remote_ip_str(conn.remote_ip().c_str(), document->GetAllocator());
+    per_conn_metrics_entry.AddMember(
+        "remote_ip", remote_ip_str, document->GetAllocator());
+    per_conn_metrics_entry.AddMember(
+        "num_calls_in_flight", conn.calls_in_flight().size(), document->GetAllocator());
     num_inbound_calls_in_flight += conn.calls_in_flight().size();
+    Value socket_stats_entry(kObjectType);
+    ProtobufToJson(conn.socket_stats(), document, &socket_stats_entry);
+    per_conn_metrics_entry.AddMember(
+        "socket_stats", socket_stats_entry, document->GetAllocator());
+
+    Value calls_in_flight(kArrayType);
+    for (const RpcCallInProgressPB& call : conn.calls_in_flight()) {
+      Value call_in_flight(kObjectType);
+      ProtobufToJson(call, document, &call_in_flight);
+      calls_in_flight.PushBack(call_in_flight, document->GetAllocator());
+    }
+    per_conn_metrics_entry.AddMember(
+      "calls_in_flight", calls_in_flight, document->GetAllocator());
+    inbound_per_conn_metrics.PushBack(per_conn_metrics_entry, document->GetAllocator());
   }
+  document->AddMember(
+      "inbound_per_conn_metrics", inbound_per_conn_metrics, document->GetAllocator());
   document->AddMember("num_inbound_calls_in_flight", num_inbound_calls_in_flight,
       document->GetAllocator());
 
-  // Add per connection metrics.
-  Value per_conn_metrics(kArrayType);
+  // Add per connection metrics for outbound connections.
+  Value outbound_per_conn_metrics(kArrayType);
   int64_t num_outbound_calls_in_flight = 0;
   for (const RpcConnectionPB& conn : response.outbound_connections()) {
     num_outbound_calls_in_flight += conn.calls_in_flight().size();
@@ -263,10 +293,27 @@ void RpcMgr::ToJson(Document* document) {
     per_conn_metrics_entry.AddMember(
         "remote_ip", remote_ip_str, document->GetAllocator());
     per_conn_metrics_entry.AddMember(
+        "num_calls_in_flight", conn.calls_in_flight().size(), document->GetAllocator());
+    per_conn_metrics_entry.AddMember(
         "outbound_queue_size", conn.outbound_queue_size(), document->GetAllocator());
-    per_conn_metrics.PushBack(per_conn_metrics_entry, document->GetAllocator());
+
+    Value socket_stats_entry(kObjectType);
+    ProtobufToJson(conn.socket_stats(), document, &socket_stats_entry);
+    per_conn_metrics_entry.AddMember(
+        "socket_stats", socket_stats_entry, document->GetAllocator());
+
+    Value calls_in_flight(kArrayType);
+    for (const RpcCallInProgressPB& call : conn.calls_in_flight()) {
+      Value call_in_flight(kObjectType);
+      ProtobufToJson(call, document, &call_in_flight);
+      calls_in_flight.PushBack(call_in_flight, document->GetAllocator());
+    }
+    per_conn_metrics_entry.AddMember(
+        "calls_in_flight", calls_in_flight, document->GetAllocator());
+    outbound_per_conn_metrics.PushBack(per_conn_metrics_entry, document->GetAllocator());
   }
-  document->AddMember("per_conn_metrics", per_conn_metrics, document->GetAllocator());
+  document->AddMember(
+      "per_conn_metrics", outbound_per_conn_metrics, document->GetAllocator());
   document->AddMember("num_outbound_calls_in_flight", num_outbound_calls_in_flight,
       document->GetAllocator());
 

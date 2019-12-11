@@ -18,11 +18,17 @@
 #ifndef IMPALA_UTIL_JSON_UTIL_H
 #define IMPALA_UTIL_JSON_UTIL_H
 
-#include <rapidjson/rapidjson.h>
 #include <rapidjson/document.h>
+#include <rapidjson/rapidjson.h>
 
-#include "util/template-util.h"
 #include "util/pretty-printer.h"
+#include "util/template-util.h"
+
+namespace google {
+namespace protobuf {
+class Message;
+}
+} // namespace google
 
 namespace impala {
 
@@ -58,6 +64,14 @@ ToJsonValue(const T& value, const TUnit::type unit, rapidjson::Document* documen
   }
 }
 
-}
+/// Uses reflection to append the fields from the protobuf 'pb' to the JSON object 'obj'.
+/// Recursively adds nested arrays and objects, i.e. makes a verbatim copy of 'pb'.
+/// 'document' must be the document containing 'obj'.
+/// Care must be taken when converting protobufs that may contain sensitive data, e.g.
+/// strings, so as to not leak it. Strings are automatically redacted if redaction
+/// is enabled.
+void ProtobufToJson(const google::protobuf::Message& pb, rapidjson::Document* document,
+    rapidjson::Value* obj);
+} // namespace impala
 
 #endif

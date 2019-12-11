@@ -86,21 +86,89 @@ under the License.
 </table>
 {{/services}}
 
-<h3>Per connection metrics for KRPC</h3>
+<h3>Per connection metrics for KRPC outbound connections</h3>
 <table class="table table-bordered table-hover" id="per_conn_metrics">
   <thead>
     <tr>
       <th>Remote IP</th>
+      <th># Calls in Flight</th>
       <th>Outbound Queue Size (count)</th>
+      <th>Socket RTT (us)</th>
+      <th>Socket RTT Variance (us)</th>
+      <th>Sender Congestion Window</th>
+      <th># Retransmitted Packets</th>
+      <th>Pacing Rate</th>
+      <th>Max Pacing Rate</th>
+      <th>Bytes Acked</th>
+      <th>Bytes Received</th>
+      <th>Segments Sent</th>
+      <th>Segments Received</th>
+      <th>Send Queue Size (bytes)</th>
+      <th>Receive Queue Size (bytes)</th>
     </tr>
   </thead>
   <tbody>
     {{#per_conn_metrics}}
     <tr>
       <td>{{remote_ip}}</td>
+      <td>{{num_calls_in_flight}}</td>
       <td>{{outbound_queue_size}}</td>
+      <td>{{socket_stats.rtt}}</td>
+      <td>{{socket_stats.rttvar}}</td>
+      <td>{{socket_stats.snd_cwnd}}</td>
+      <td>{{socket_stats.total_retrans}}</td>
+      <td>{{socket_stats.pacing_rate}}</td>
+      <td>{{socket_stats.max_pacing_rate}}</td>
+      <td>{{socket_stats.bytes_acked}}</td>
+      <td>{{socket_stats.bytes_received}}</td>
+      <td>{{socket_stats.segs_out}}</td>
+      <td>{{socket_stats.segs_in}}</td>
+      <td>{{socket_stats.send_queue_bytes}}</td>
+      <td>{{socket_stats.receive_queue_bytes}}</td>
     </tr>
     {{/per_conn_metrics}}
+  </tbody>
+</table>
+
+<h3>Per connection metrics for KRPC inbound connections</h3>
+<table class="table table-bordered table-hover" id="inbound_per_conn_metrics">
+  <thead>
+    <tr>
+      <th>Remote IP</th>
+      <th># Calls in Flight</th>
+      <th>Socket RTT (us)</th>
+      <th>Socket RTT Variance (us)</th>
+      <th>Sender Congestion Window</th>
+      <th># Retransmitted Packets</th>
+      <th>Pacing Rate</th>
+      <th>Max Pacing Rate</th>
+      <th>Bytes Acked</th>
+      <th>Bytes Received</th>
+      <th>Segments Sent</th>
+      <th>Segments Received</th>
+      <th>Send Queue Size (bytes)</th>
+      <th>Receive Queue Size (bytes)</th>
+    </tr>
+  </thead>
+  <tbody>
+    {{#inbound_per_conn_metrics}}
+    <tr>
+      <td>{{remote_ip}}</td>
+      <td>{{num_calls_in_flight}}</td>
+      <td>{{socket_stats.rtt}}</td>
+      <td>{{socket_stats.rttvar}}</td>
+      <td>{{socket_stats.snd_cwnd}}</td>
+      <td>{{socket_stats.total_retrans}}</td>
+      <td>{{socket_stats.pacing_rate}}</td>
+      <td>{{socket_stats.max_pacing_rate}}</td>
+      <td>{{socket_stats.bytes_acked}}</td>
+      <td>{{socket_stats.bytes_received}}</td>
+      <td>{{socket_stats.segs_out}}</td>
+      <td>{{socket_stats.segs_in}}</td>
+      <td>{{socket_stats.send_queue_bytes}}</td>
+      <td>{{socket_stats.receive_queue_bytes}}</td>
+    </tr>
+    {{/inbound_per_conn_metrics}}
   </tbody>
 </table>
 
@@ -229,7 +297,40 @@ function update_krpc_services(json) {
 function update_krpc_conn_metrics_datatable(json) {
   var table = $('#per_conn_metrics').DataTable();
   var rows = $.map(json["per_conn_metrics"], function(row) {
-    return [[row["remote_ip"], row["outbound_queue_size"]]];
+    return [[row["remote_ip"], row["num_calls_in_flight"], row["outbound_queue_size"],
+             row["socket_stats"]["rtt"]],
+             row["socket_stats"]["rttvar"]],
+             row["socket_stats"]["cnd_cwnd"]],
+             row["socket_stats"]["total_retrans"]],
+             row["socket_stats"]["pacing_rate"]],
+             row["socket_stats"]["max_pacing_rate"]],
+             row["socket_stats"]["bytes_acked"]],
+             row["socket_stats"]["bytes_received"]],
+             row["socket_stats"]["segs_out"]],
+             row["socket_stats"]["segs_in"]],
+             row["socket_stats"]["send_queue_bytes"]],
+             row["socket_stats"]["receive_queue_bytes"]]];
+  });
+
+  table.clear().rows.add(rows).draw();
+}
+
+function update_krpc_inbound_conn_metrics_datatable(json) {
+  var table = $('#inbound_per_conn_metrics').DataTable();
+  var rows = $.map(json["inbounad_per_conn_metrics"], function(row) {
+    return [[row["remote_ip"], row["num_calls_in_flight"],
+             row["socket_stats"]["rtt"]],
+             row["socket_stats"]["rttvar"]],
+             row["socket_stats"]["cnd_cwnd"]],
+             row["socket_stats"]["total_retrans"]],
+             row["socket_stats"]["pacing_rate"]],
+             row["socket_stats"]["max_pacing_rate"]],
+             row["socket_stats"]["bytes_acked"]],
+             row["socket_stats"]["bytes_received"]],
+             row["socket_stats"]["segs_out"]],
+             row["socket_stats"]["segs_in"]],
+             row["socket_stats"]["send_queue_bytes"]],
+             row["socket_stats"]["receive_queue_bytes"]]];
   });
 
   table.clear().rows.add(rows).draw();
@@ -253,6 +354,7 @@ function refresh() {
     update_impala_services(json);
     update_krpc_services(json);
     update_krpc_conn_metrics_datatable(json);
+    update_krpc_inbound_conn_metrics_datatable(json);
     document.getElementById("last-updated").textContent = new Date();
   }
 

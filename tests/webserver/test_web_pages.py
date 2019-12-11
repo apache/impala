@@ -20,6 +20,7 @@ from tests.common.file_utils import grep_dir
 from tests.common.skip import SkipIfBuildType
 from tests.common.impala_cluster import ImpalaCluster
 from tests.common.impala_test_suite import ImpalaTestSuite
+import itertools
 import json
 import os
 import pytest
@@ -529,6 +530,16 @@ class TestWebPage(ImpalaTestSuite):
         functional.alltypestiny join functional.alltypessmall c2"
     SVC_NAME = 'impala.DataStreamService'
 
+    def get_per_conn_metrics(inbound):
+      """Get inbound or outbound per-connection metrics"""
+      rpcz = self.get_debug_page(self.RPCZ_URL)
+      if inbound:
+        key = "inbound_per_conn_metrics"
+      else:
+        key = "per_conn_metrics"
+      conns = rpcz[key]
+      return conns
+
     def get_svc_metrics(svc_name):
       rpcz = self.get_debug_page(self.RPCZ_URL)
       assert len(rpcz['services']) > 0
@@ -538,11 +549,28 @@ class TestWebPage(ImpalaTestSuite):
           return sorted(s['rpc_method_metrics'], key=lambda m: m['method_name'])
       assert False, 'Could not find metrics for %s' % svc_name
 
-    before = get_svc_metrics(SVC_NAME)
+    svc_before = get_svc_metrics(SVC_NAME)
+    inbound_before = get_per_conn_metrics(True)
+    outbound_before = get_per_conn_metrics(False)
     self.client.execute(TEST_QUERY)
-    after = get_svc_metrics(SVC_NAME)
+    svc_after = get_svc_metrics(SVC_NAME)
+    inbound_after = get_per_conn_metrics(True)
+    outbound_after = get_per_conn_metrics(False)
 
-    assert before != after
+    assert svc_before != svc_after
+    assert inbound_before != inbound_after
+    assert outbound_before != outbound_after
+
+    # Some connections should have metrics after executing query
+    assert len(inbound_after) > 0
+    assert len(outbound_after) > 0
+    # Spot-check some fields, including socket stats.
+    for conn in itertools.chain(inbound_after, outbound_after):
+      assert conn["remote_ip"] != ""
+      assert conn["num_calls_in_flight"] >= 0
+      assert conn["num_calls_in_flight"] == len(conn["calls_in_flight"])
+      assert conn["socket_stats"]["bytes_acked"] > 0, conn
+      assert conn["socket_stats"]["send_queue_bytes"] >= 0, conn
 
   @pytest.mark.execute_serially
   def test_admission_page(self):
