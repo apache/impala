@@ -110,12 +110,12 @@ under the License.
           the new table.)
         </li>
 
-        <li>
-          You issue queries against the Impala tables. For efficient queries, use <codeph>WHERE</codeph> clauses to
-          find a single key value or a range of key values wherever practical, by testing the Impala column
-          corresponding to the HBase row key. Avoid queries that do full-table scans, which are efficient for
-          regular Impala tables but inefficient in HBase.
-        </li>
+        <li> You issue queries against the Impala tables. For efficient queries,
+          use the <codeph>WHERE</codeph> clause to find a single key value or a
+          range of key values wherever practical, by testing the Impala column
+          corresponding to the HBase row key. Avoid queries that do full-table
+          scans, which are efficient for regular Impala tables but inefficient
+          in HBase. </li>
       </ul>
 
       <p>
@@ -180,15 +180,16 @@ under the License.
         key or value fields. All the type enforcement is done on the Impala side.
       </p>
 
-      <p>
-        For best performance of Impala queries against HBase tables, most queries will perform comparisons in the
-        <codeph>WHERE</codeph> against the column that corresponds to the HBase row key. When creating the table
-        through the Hive shell, use the <codeph>STRING</codeph> data type for the column that corresponds to the
-        HBase row key. Impala can translate conditional tests (through operators such as <codeph>=</codeph>,
-        <codeph>&lt;</codeph>, <codeph>BETWEEN</codeph>, and <codeph>IN</codeph>) against this column into fast
-        lookups in HBase, but this optimization (<q>predicate pushdown</q>) only works when that column is
-        defined as <codeph>STRING</codeph>.
-      </p>
+      <p> For best performance of Impala queries against HBase tables, most
+        queries will perform comparisons in the <codeph>WHERE</codeph> clause
+        against the column that corresponds to the HBase row key. When creating
+        the table through the Hive shell, use the <codeph>STRING</codeph> data
+        type for the column that corresponds to the HBase row key. Impala can
+        translate predicates (through operators such as <codeph>=</codeph>,
+          <codeph>&lt;</codeph>, and <codeph>BETWEEN</codeph>) against this
+        column into fast lookups in HBase, but this optimization (<q>predicate
+          pushdown</q>) only works when that column is defined as
+          <codeph>STRING</codeph>. </p>
 
       <p>
         Starting in Impala 1.1, Impala also supports reading and writing to columns that are defined in the Hive
