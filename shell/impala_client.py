@@ -129,6 +129,17 @@ class MissingThriftMethodException(Exception):
       return self.value
 
 
+class CodeCheckingHttpClient(THttpClient):
+  """Add HTTP response code handling to THttpClient."""
+  def flush(self):
+    THttpClient.flush(self)
+    # At this point the http call has completed.
+    if self.code >= 300:
+      # Report any http response code that is not 1XX (informational response) or
+      # 2XX (successful).
+      raise RPCException("HTTP code {}: {}".format(self.code, self.message))
+
+
 def print_to_stderr(message):
   print >> sys.stderr, message
 
@@ -394,10 +405,11 @@ class ImpalaClient(object):
       else:
         ssl_ctx.check_hostname = False  # Mandated by the SSL lib for CERT_NONE mode.
         ssl_ctx.verify_mode = ssl.CERT_NONE
-      transport = THttpClient(
+      transport = CodeCheckingHttpClient(
           "https://{0}/{1}".format(host_and_port, self.http_path), ssl_context=ssl_ctx)
     else:
-      transport = THttpClient("http://{0}/{1}".format(host_and_port, self.http_path))
+      transport = CodeCheckingHttpClient("http://{0}/{1}".
+          format(host_and_port, self.http_path))
 
     if self.use_ldap:
       # Set the BASIC auth header
