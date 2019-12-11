@@ -29,10 +29,10 @@ const int BufferedPlanRootSink::MAX_FETCH_SIZE;
 const int FETCH_NUM_BATCHES = 10;
 
 BufferedPlanRootSink::BufferedPlanRootSink(TDataSinkId sink_id,
-    const RowDescriptor* row_desc, RuntimeState* state,
-    const TBackendResourceProfile& resource_profile, const TDebugOptions& debug_options)
-  : PlanRootSink(sink_id, row_desc, state),
-    resource_profile_(resource_profile),
+    const DataSinkConfig& sink_config, RuntimeState* state,
+    const TDebugOptions& debug_options)
+  : PlanRootSink(sink_id, sink_config, state),
+    resource_profile_(sink_config.tsink_->plan_root_sink.resource_profile),
     debug_options_(debug_options) {}
 
 Status BufferedPlanRootSink::Prepare(

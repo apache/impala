@@ -66,8 +66,8 @@ class NestedLoopJoinNode : public BlockingJoinNode {
   /////////////////////////////////////////
   /// BEGIN: Members that must be Reset()
 
-  /// The build side rows of the join.
-  boost::scoped_ptr<NljBuilder> builder_;
+  /// The build side rows of the join. Created in Prepare() and owned by runtime state.
+  NljBuilder* builder_;
 
   /// Pointer to the RowBatchList (owned by 'builder_') that contains the batches to
   /// use during the probe phase.

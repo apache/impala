@@ -30,6 +30,15 @@
 
 namespace impala {
 
+class KuduTableSinkConfig : public DataSinkConfig {
+ public:
+  DataSink* CreateSink(const TPlanFragmentCtx& fragment_ctx,
+      const TPlanFragmentInstanceCtx& fragment_instance_ctx,
+      RuntimeState* state) const override;
+
+  ~KuduTableSinkConfig() override {}
+};
+
 /// Sink that takes RowBatches and writes them into a Kudu table.
 ///
 /// The data is added to Kudu in Send(). The Kudu client is configured to automatically
@@ -53,8 +62,8 @@ namespace impala {
 /// status. All reported errors (ignored or not) will be logged via the RuntimeState.
 class KuduTableSink : public DataSink {
  public:
-  KuduTableSink(TDataSinkId sink_id, const RowDescriptor* row_desc,
-      const TDataSink& tsink, RuntimeState* state);
+  KuduTableSink(TDataSinkId sink_id, const DataSinkConfig& sink_config,
+      const TTableSink& table_sink, RuntimeState* state);
 
   /// Prepares the expressions to be applied and creates a KuduSchema based on the
   /// expressions and KuduTableDescriptor.

@@ -49,29 +49,45 @@ static const string PREPARE_FOR_READ_FAILED_ERROR_MSG =
 using namespace impala;
 using strings::Substitute;
 
-const char* PhjBuilder::LLVM_CLASS_NAME = "class.impala::PhjBuilder";
+Status PhjBuilderConfig::Init(
+    const TDataSink& tsink, const RowDescriptor* input_row_desc, RuntimeState* state) {
+  return Status("Not Implemented.");
+}
 
-PhjBuilder::PhjBuilder(int join_node_id, const string& join_node_label,
-    TJoinOp::type join_op, const RowDescriptor* build_row_desc, RuntimeState* state,
-    BufferPool::ClientHandle* buffer_pool_client, int64_t spillable_buffer_size,
-    int64_t max_row_buffer_size)
-  : DataSink(-1, build_row_desc,
-        Substitute("Hash Join Builder (join_node_id=$0)", join_node_id), state),
-    runtime_state_(state),
-    join_node_id_(join_node_id),
-    join_node_label_(join_node_label),
-    join_op_(join_op),
-    buffer_pool_client_(buffer_pool_client),
-    spillable_buffer_size_(spillable_buffer_size),
-    max_row_buffer_size_(max_row_buffer_size) {}
+DataSink* PhjBuilderConfig::CreateSink(const TPlanFragmentCtx& fragment_ctx,
+    const TPlanFragmentInstanceCtx& fragment_instance_ctx, RuntimeState* state) const {
+  DCHECK(false) << "Not Implemented";
+  return nullptr;
+}
 
-Status PhjBuilder::InitExprsAndFilters(RuntimeState* state,
+PhjBuilder* PhjBuilderConfig::CreateSink(BufferPool::ClientHandle* buffer_pool_client,
+    const std::string& join_node_label, int64_t spillable_buffer_size,
+    int64_t max_row_buffer_size, RuntimeState* state) const {
+  ObjectPool* pool = state->obj_pool();
+  return pool->Add(new PhjBuilder(*this, buffer_pool_client, join_node_label,
+      spillable_buffer_size, max_row_buffer_size, state));
+}
+
+Status PhjBuilderConfig::CreateConfig(RuntimeState* state, int join_node_id,
+    TJoinOp::type join_op, const RowDescriptor* build_row_desc,
+    const std::vector<TEqJoinCondition>& eq_join_conjuncts,
+    const std::vector<TRuntimeFilterDesc>& filters, const PhjBuilderConfig** sink) {
+  ObjectPool* pool = state->obj_pool();
+  TDataSink* tsink = pool->Add(new TDataSink()); // just a dummy object.
+  PhjBuilderConfig* data_sink = pool->Add(new PhjBuilderConfig());
+  RETURN_IF_ERROR(data_sink->Init(
+      state, *tsink, join_node_id, join_op, build_row_desc, eq_join_conjuncts, filters));
+  *sink = data_sink;
+  return Status::OK();
+}
+
+Status PhjBuilderConfig::InitExprsAndFilters(RuntimeState* state,
     const vector<TEqJoinCondition>& eq_join_conjuncts,
     const vector<TRuntimeFilterDesc>& filter_descs) {
   for (const TEqJoinCondition& eq_join_conjunct : eq_join_conjuncts) {
     ScalarExpr* build_expr;
     RETURN_IF_ERROR(
-        ScalarExpr::Create(eq_join_conjunct.right, *row_desc_, state, &build_expr));
+        ScalarExpr::Create(eq_join_conjunct.right, *input_row_desc_, state, &build_expr));
     build_exprs_.push_back(build_expr);
     is_not_distinct_from_.push_back(eq_join_conjunct.is_not_distinct_from);
   }
@@ -92,15 +108,45 @@ Status PhjBuilder::InitExprsAndFilters(RuntimeState* state,
     if (it == filters_produced.end()) continue;
     ScalarExpr* filter_expr;
     RETURN_IF_ERROR(
-        ScalarExpr::Create(filter_desc.src_expr, *row_desc_, state, &filter_expr));
+        ScalarExpr::Create(filter_desc.src_expr, *input_row_desc_, state, &filter_expr));
     filter_exprs_.push_back(filter_expr);
-
-    // TODO: Move to Prepare().
-    filter_ctxs_.emplace_back();
-    // TODO: IMPALA-4400 - implement local aggregation of runtime filters.
-    filter_ctxs_.back().filter = state->filter_bank()->RegisterFilter(filter_desc, true);
+    filter_descs_.push_back(filter_desc);
   }
   return Status::OK();
+}
+
+Status PhjBuilderConfig::Init(RuntimeState* state, const TDataSink& tsink,
+    int join_node_id, TJoinOp::type join_op, const RowDescriptor* build_row_desc,
+    const std::vector<TEqJoinCondition>& eq_join_conjuncts,
+    const std::vector<TRuntimeFilterDesc>& filters) {
+  RETURN_IF_ERROR(DataSinkConfig::Init(tsink, build_row_desc, state));
+  join_node_id_ = join_node_id;
+  join_op_ = join_op;
+  return InitExprsAndFilters(state, eq_join_conjuncts, filters);
+}
+
+const char* PhjBuilder::LLVM_CLASS_NAME = "class.impala::PhjBuilder";
+
+PhjBuilder::PhjBuilder(const PhjBuilderConfig& sink_config,
+    BufferPool::ClientHandle* buffer_pool_client, const std::string& join_node_label,
+    int64_t spillable_buffer_size, int64_t max_row_buffer_size, RuntimeState* state)
+  : DataSink(-1, sink_config,
+        Substitute("Hash Join Builder (join_node_id=$0)", sink_config.join_node_id_),
+        state),
+    runtime_state_(state),
+    join_node_id_(sink_config.join_node_id_),
+    join_node_label_(join_node_label),
+    join_op_(sink_config.join_op_),
+    buffer_pool_client_(buffer_pool_client),
+    spillable_buffer_size_(spillable_buffer_size),
+    max_row_buffer_size_(max_row_buffer_size),
+    build_exprs_(sink_config.build_exprs_),
+    is_not_distinct_from_(sink_config.is_not_distinct_from_),
+    filter_exprs_(sink_config.filter_exprs_) {
+  for (const TRuntimeFilterDesc& filter_desc : sink_config.filter_descs_) {
+    filter_ctxs_.emplace_back();
+    filter_ctxs_.back().filter = state->filter_bank()->RegisterFilter(filter_desc, true);
+  }
 }
 
 Status PhjBuilder::Prepare(RuntimeState* state, MemTracker* parent_mem_tracker) {

@@ -66,14 +66,20 @@ namespace impala {
 // Send 7MB buffers to Kudu, matching a hard-coded size in Kudu (KUDU-1693).
 const static int INDIVIDUAL_BUFFER_SIZE = 7 * 1024 * 1024;
 
-KuduTableSink::KuduTableSink(TDataSinkId sink_id, const RowDescriptor* row_desc,
-    const TDataSink& tsink, RuntimeState* state)
-  : DataSink(sink_id, row_desc, "KuduTableSink", state),
-    table_id_(tsink.table_sink.target_table_id),
-    sink_action_(tsink.table_sink.action),
-    kudu_table_sink_(tsink.table_sink.kudu_table_sink),
+DataSink* KuduTableSinkConfig::CreateSink(const TPlanFragmentCtx& fragment_ctx,
+    const TPlanFragmentInstanceCtx& fragment_instance_ctx, RuntimeState* state) const {
+  TDataSinkId sink_id = fragment_ctx.fragment.idx;
+  return state->obj_pool()->Add(
+      new KuduTableSink(sink_id, *this, tsink_->table_sink, state));
+}
+
+KuduTableSink::KuduTableSink(TDataSinkId sink_id, const DataSinkConfig& sink_config,
+      const TTableSink& table_sink, RuntimeState* state)
+  : DataSink(sink_id, sink_config, "KuduTableSink", state),
+    table_id_(table_sink.target_table_id),
+    sink_action_(table_sink.action),
+    kudu_table_sink_(table_sink.kudu_table_sink),
     client_tracked_bytes_(0) {
-  DCHECK(tsink.__isset.table_sink);
   DCHECK(KuduIsAvailable());
 }
 

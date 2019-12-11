@@ -52,6 +52,10 @@ class PartitionedHashJoinPlanNode : public BlockingJoinPlanNode {
 
   /// Non-equi-join conjuncts from the ON clause.
   std::vector<ScalarExpr*> other_join_conjuncts_;
+
+  /// Data sink config object for creating a phj builder that will be eventually used by
+  /// the exec node.
+  const PhjBuilderConfig* phj_builder_config;
 };
 
 /// Operator to perform partitioned hash join, spilling to disk as necessary. This
@@ -128,7 +132,7 @@ class PartitionedHashJoinPlanNode : public BlockingJoinPlanNode {
 
 class PartitionedHashJoinNode : public BlockingJoinNode {
  public:
-  PartitionedHashJoinNode(ObjectPool* pool, const PartitionedHashJoinPlanNode& pnode,
+  PartitionedHashJoinNode(RuntimeState* state, const PartitionedHashJoinPlanNode& pnode,
       const DescriptorTbl& descs);
   virtual ~PartitionedHashJoinNode();
 
@@ -552,8 +556,8 @@ class PartitionedHashJoinNode : public BlockingJoinNode {
   /// State of the probing algorithm. Used to drive the state machine in GetNext().
   ProbeState probe_state_ = ProbeState::PROBE_COMPLETE;
 
-  /// The build-side of the join. Initialized in Prepare().
-  boost::scoped_ptr<PhjBuilder> builder_;
+  /// The build-side of the join. Initialized in constructor and owned by runtime state.
+  PhjBuilder* builder_;
 
   /// Last set of hash partitions obtained from builder_. Only valid when the
   /// builder's state is PARTITIONING_PROBE or REPARTITIONING_PROBE.

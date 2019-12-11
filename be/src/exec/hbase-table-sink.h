@@ -31,12 +31,21 @@
 
 namespace impala {
 
+class HBaseTableSinkConfig : public DataSinkConfig {
+ public:
+  DataSink* CreateSink(const TPlanFragmentCtx& fragment_ctx,
+      const TPlanFragmentInstanceCtx& fragment_instance_ctx,
+      RuntimeState* state) const override;
+
+  ~HBaseTableSinkConfig() override {}
+};
+
 /// Class to take row batches and send them to the HBaseTableWriter to
 /// eventually be written into an HBase table.
 class HBaseTableSink : public DataSink {
  public:
-  HBaseTableSink(TDataSinkId sink_id, const RowDescriptor* row_desc,
-      const TDataSink& tsink, RuntimeState* state);
+  HBaseTableSink(
+      TDataSinkId sink_id, const DataSinkConfig& sink_config, RuntimeState* state);
   virtual Status Prepare(RuntimeState* state, MemTracker* parent_mem_tracker);
   virtual Status Send(RuntimeState* state, RowBatch* batch);
   virtual Status FlushFinal(RuntimeState* state);

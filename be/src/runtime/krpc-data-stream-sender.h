@@ -39,6 +39,23 @@ class TDataStreamSink;
 class TNetworkAddress;
 class TPlanFragmentDestination;
 
+class KrpcDataStreamSenderConfig : public DataSinkConfig {
+ public:
+  DataSink* CreateSink(const TPlanFragmentCtx& fragment_ctx,
+      const TPlanFragmentInstanceCtx& fragment_instance_ctx,
+      RuntimeState* state) const override;
+
+  /// Expressions of partition keys. It's used to compute the
+  /// per-row partition values for shuffling exchange;
+  std::vector<ScalarExpr*> partition_exprs_;
+
+  ~KrpcDataStreamSenderConfig() override {}
+
+ protected:
+  Status Init(const TDataSink& tsink, const RowDescriptor* input_row_desc,
+      RuntimeState* state) override;
+};
+
 /// Single sender of an m:n data stream.
 ///
 /// Row batch data is routed to destinations based on the provided partitioning
@@ -47,21 +64,19 @@ class TPlanFragmentDestination;
 ///
 /// TODO: capture stats that describe distribution of rows/data volume
 /// across channels.
-/// TODO: create a PlanNode equivalent class for DataSink.
 class KrpcDataStreamSender : public DataSink {
  public:
-  /// Constructs a sender according to the output specification (tsink), sending to the
+  /// Constructs a sender according to the config (sink_config), sending to the
   /// given destinations:
   /// 'sender_id' identifies this sender instance, and is unique within a fragment.
-  /// 'row_desc' is the descriptor of the tuple row. It must out-live the sink.
   /// 'destinations' are the receivers' network addresses. There is one channel for each
   /// destination.
   /// 'per_channel_buffer_size' is the soft limit in bytes of the buffering into the
   /// per-channel's accumulating row batch before it will be sent.
   /// NOTE: supported partition types are UNPARTITIONED (broadcast), HASH_PARTITIONED,
   /// and RANDOM.
-  KrpcDataStreamSender(TDataSinkId sink_id, int sender_id, const RowDescriptor* row_desc,
-      const TDataStreamSink& tsink,
+  KrpcDataStreamSender(TDataSinkId sink_id, int sender_id,
+      const KrpcDataStreamSenderConfig& sink_config, const TDataStreamSink& sink,
       const std::vector<TPlanFragmentDestination>& destinations,
       int per_channel_buffer_size, RuntimeState* state);
 
@@ -101,11 +116,6 @@ class KrpcDataStreamSender : public DataSink {
 
  protected:
   friend class DataStreamTest;
-
-  /// Initializes any partitioning expressions based on 'thrift_output_exprs' and stores
-  /// them in 'partition_exprs_'. Returns error status if the initialization failed.
-  virtual Status Init(const std::vector<TExpr>& thrift_output_exprs,
-      const TDataSink& tsink, RuntimeState* state) override;
 
   /// Returns total number of bytes sent. If batches are broadcast to multiple receivers,
   /// they are counted once per receiver.

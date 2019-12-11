@@ -33,8 +33,8 @@ using boost::mutex;
 namespace impala {
 
 BlockingPlanRootSink::BlockingPlanRootSink(
-    TDataSinkId sink_id, const RowDescriptor* row_desc, RuntimeState* state)
-  : PlanRootSink(sink_id, row_desc, state) {}
+    TDataSinkId sink_id, const DataSinkConfig& sink_config, RuntimeState* state)
+  : PlanRootSink(sink_id, sink_config, state) {}
 
 Status BlockingPlanRootSink::Prepare(
     RuntimeState* state, MemTracker* parent_mem_tracker) {

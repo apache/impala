@@ -526,20 +526,16 @@ class DataStreamTest : public testing::Test {
     RuntimeState state(TQueryCtx(), exec_env_.get(), desc_tbl_);
     VLOG_QUERY << "create sender " << sender_num;
     const TDataSink& sink = GetSink(partition_type);
+    const DataSinkConfig* data_sink = nullptr;
+    EXPECT_OK(DataSinkConfig::CreateConfig(sink, row_desc_, &state, &data_sink));
 
     // We create an object of the base class DataSink and cast to the appropriate sender
     // according to the 'is_thrift' option.
     scoped_ptr<DataSink> sender;
 
-    TExprNode expr_node;
-    expr_node.node_type = TExprNodeType::SLOT_REF;
-    TExpr output_exprs;
-    output_exprs.nodes.push_back(expr_node);
-
-    sender.reset(new KrpcDataStreamSender(-1,
-        sender_num, row_desc_, sink.stream_sink, dest_, channel_buffer_size, &state));
-    EXPECT_OK(static_cast<KrpcDataStreamSender*>(
-        sender.get())->Init(vector<TExpr>({output_exprs}), sink, &state));
+    sender.reset(new KrpcDataStreamSender(-1, sender_num,
+        *(static_cast<const KrpcDataStreamSenderConfig*>(data_sink)),
+        data_sink->tsink_->stream_sink, dest_, channel_buffer_size, &state));
     EXPECT_OK(sender->Prepare(&state, &tracker_));
     EXPECT_OK(sender->Open(&state));
     scoped_ptr<RowBatch> batch(CreateRowBatch());

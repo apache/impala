@@ -53,23 +53,39 @@ using namespace strings;
 
 namespace impala {
 
-HdfsTableSink::HdfsTableSink(TDataSinkId sink_id, const RowDescriptor* row_desc,
-    const TDataSink& tsink, RuntimeState* state)
-  : DataSink(sink_id, row_desc, "HdfsTableSink", state),
+Status HdfsTableSinkConfig::Init(
+    const TDataSink& tsink, const RowDescriptor* input_row_desc, RuntimeState* state) {
+  RETURN_IF_ERROR(DataSinkConfig::Init(tsink, input_row_desc, state));
+  DCHECK(tsink_->__isset.table_sink);
+  DCHECK(tsink_->table_sink.__isset.hdfs_table_sink);
+  RETURN_IF_ERROR(
+      ScalarExpr::Create(tsink_->table_sink.hdfs_table_sink.partition_key_exprs,
+          *input_row_desc_, state, &partition_key_exprs_));
+  return Status::OK();
+}
+
+DataSink* HdfsTableSinkConfig::CreateSink(const TPlanFragmentCtx& fragment_ctx,
+    const TPlanFragmentInstanceCtx& fragment_instance_ctx, RuntimeState* state) const {
+  TDataSinkId sink_id = fragment_ctx.fragment.idx;
+  return state->obj_pool()->Add(
+      new HdfsTableSink(sink_id, *this, this->tsink_->table_sink.hdfs_table_sink, state));
+}
+
+HdfsTableSink::HdfsTableSink(TDataSinkId sink_id, const HdfsTableSinkConfig& sink_config,
+    const THdfsTableSink& hdfs_sink, RuntimeState* state)
+  : DataSink(sink_id, sink_config, "HdfsTableSink", state),
     table_desc_(nullptr),
     prototype_partition_(nullptr),
-    table_id_(tsink.table_sink.target_table_id),
+    table_id_(sink_config.tsink_->table_sink.target_table_id),
     skip_header_line_count_(
-        tsink.table_sink.hdfs_table_sink.__isset.skip_header_line_count ?
-            tsink.table_sink.hdfs_table_sink.skip_header_line_count :
-            0),
-    overwrite_(tsink.table_sink.hdfs_table_sink.overwrite),
-    input_is_clustered_(tsink.table_sink.hdfs_table_sink.input_is_clustered),
-    sort_columns_(tsink.table_sink.hdfs_table_sink.sort_columns),
-    current_clustered_partition_(nullptr) {
-  DCHECK(tsink.__isset.table_sink);
-  if (tsink.table_sink.hdfs_table_sink.__isset.write_id) {
-    write_id_ = tsink.table_sink.hdfs_table_sink.write_id;
+        hdfs_sink.__isset.skip_header_line_count ? hdfs_sink.skip_header_line_count : 0),
+    overwrite_(hdfs_sink.overwrite),
+    input_is_clustered_(hdfs_sink.input_is_clustered),
+    sort_columns_(hdfs_sink.sort_columns),
+    current_clustered_partition_(nullptr),
+    partition_key_exprs_(sink_config.partition_key_exprs_) {
+  if (hdfs_sink.__isset.write_id) {
+    write_id_ = hdfs_sink.write_id;
     DCHECK_GT(write_id_, 0);
   }
 }
@@ -81,15 +97,6 @@ OutputPartition::OutputPartition()
     num_files(0),
     partition_descriptor(nullptr),
     block_size(0) {}
-
-Status HdfsTableSink::Init(const vector<TExpr>& thrift_output_exprs,
-    const TDataSink& tsink, RuntimeState* state) {
-  RETURN_IF_ERROR(DataSink::Init(thrift_output_exprs, tsink, state));
-  DCHECK(tsink.__isset.table_sink);
-  RETURN_IF_ERROR(ScalarExpr::Create(tsink.table_sink.hdfs_table_sink.partition_key_exprs,
-      *row_desc_, state, &partition_key_exprs_));
-  return Status::OK();
-}
 
 Status HdfsTableSink::Prepare(RuntimeState* state, MemTracker* parent_mem_tracker) {
   RETURN_IF_ERROR(DataSink::Prepare(state, parent_mem_tracker));

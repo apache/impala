@@ -26,6 +26,19 @@
 
 namespace impala {
 
+/// Dummy class needed to create an instance of the sink.
+class NljBuilderConfig : public DataSinkConfig {
+ public:
+  DataSink* CreateSink(const TPlanFragmentCtx& fragment_ctx,
+      const TPlanFragmentInstanceCtx& fragment_instance_ctx,
+      RuntimeState* state) const override {
+    DCHECK(false) << "Not Implemented";
+    return nullptr;
+  }
+
+  ~NljBuilderConfig() override {}
+};
+
 /// Builder for the NestedLoopJoinNode that accumulates the build-side rows for the join.
 /// Implements the DataSink interface but also exposes some methods for direct use by
 /// NestedLoopJoinNode.
@@ -37,7 +50,9 @@ namespace impala {
 /// is used and all data is deep copied into memory owned by the builder.
 class NljBuilder : public DataSink {
  public:
-  NljBuilder(const RowDescriptor* row_desc, RuntimeState* state);
+
+  /// To be used by the NestedLoopJoinNode to create an instance of this sink.
+  static NljBuilder* CreateSink(const RowDescriptor* row_desc, RuntimeState* state);
 
   /// Implementations of DataSink interface methods.
   virtual Status Prepare(RuntimeState* state, MemTracker* parent_mem_tracker) override;
@@ -76,6 +91,8 @@ class NljBuilder : public DataSink {
   inline RowBatchList* copied_build_batches() { return &copied_build_batches_; }
 
  private:
+  NljBuilder(const DataSinkConfig& sink_config, RuntimeState* state);
+
   /// Deep copy all build batches in 'input_build_batches_' to 'copied_build_batches_'.
   /// Resets all the source batches and clears 'input_build_batches_'.
   /// If the memory limit is exceeded while copying batches, returns a

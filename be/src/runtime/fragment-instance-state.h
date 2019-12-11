@@ -51,6 +51,7 @@ class PlanNode;
 class PlanRootSink;
 class Thread;
 class DataSink;
+class DataSinkConfig;
 class RuntimeState;
 
 /// FragmentInstanceState handles all aspects of the execution of a single plan fragment
@@ -154,6 +155,7 @@ class FragmentInstanceState {
   RuntimeState* runtime_state_ = nullptr;  // lives in obj_pool()
   /// Lives in obj_pool(). Not mutated after being initialized.
   const PlanNode* plan_tree_ = nullptr;
+  const DataSinkConfig* sink_config_ = nullptr;
 
   /// A 'fake mutex' to detect any race condition in accessing 'report_seq_no_' below.
   /// There should be only one thread doing status report at the same time.

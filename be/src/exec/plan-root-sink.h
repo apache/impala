@@ -27,6 +27,15 @@ class RowBatch;
 class QueryResultSet;
 class ScalarExprEvaluator;
 
+class PlanRootSinkConfig : public DataSinkConfig {
+ public:
+  DataSink* CreateSink(const TPlanFragmentCtx& fragment_ctx,
+      const TPlanFragmentInstanceCtx& fragment_instance_ctx,
+      RuntimeState* state) const override;
+
+  ~PlanRootSinkConfig() override {}
+};
+
 /// Sink which manages the handoff between a 'sender' (a fragment instance) that produces
 /// batches by calling Send(), and a 'consumer' (e.g. the coordinator) which consumes rows
 /// formed by computing a set of output expressions over the input batches, by calling
@@ -54,7 +63,8 @@ class ScalarExprEvaluator;
 /// ensures that this outlives any calls to Send() and GetNext(), respectively.
 class PlanRootSink : public DataSink {
  public:
-  PlanRootSink(TDataSinkId sink_id, const RowDescriptor* row_desc, RuntimeState* state);
+  PlanRootSink(
+    TDataSinkId sink_id, const DataSinkConfig& sink_config, RuntimeState* state);
   virtual ~PlanRootSink();
 
   /// Called before Send(), Open(), or Close(). Performs any additional setup necessary,

@@ -55,6 +55,10 @@
 
 #include "common/names.h"
 
+DEFINE_int64(data_stream_sender_buffer_size, 16 * 1024,
+    "(Advanced) Max size in bytes which a row batch in a data stream sender's channel "
+    "can accumulate before the row batch is sent over the wire.");
+
 using std::condition_variable_any;
 using namespace apache::thrift;
 using kudu::rpc::RpcController;
@@ -70,6 +74,29 @@ const char* KrpcDataStreamSender::HASH_ROW_SYMBOL =
     "KrpcDataStreamSender7HashRowEPNS_8TupleRowE";
 const char* KrpcDataStreamSender::LLVM_CLASS_NAME = "class.impala::KrpcDataStreamSender";
 const char* KrpcDataStreamSender::TOTAL_BYTES_SENT_COUNTER = "TotalBytesSent";
+
+Status KrpcDataStreamSenderConfig::Init(
+    const TDataSink& tsink, const RowDescriptor* input_row_desc, RuntimeState* state) {
+  RETURN_IF_ERROR(DataSinkConfig::Init(tsink, input_row_desc, state));
+  DCHECK(tsink_->__isset.stream_sink);
+  auto& partition_type = tsink_->stream_sink.output_partition.type;
+  if (partition_type == TPartitionType::HASH_PARTITIONED
+      || partition_type == TPartitionType::KUDU) {
+    RETURN_IF_ERROR(
+        ScalarExpr::Create(tsink_->stream_sink.output_partition.partition_exprs,
+            *input_row_desc_, state, &partition_exprs_));
+  }
+  return Status::OK();
+}
+
+DataSink* KrpcDataStreamSenderConfig::CreateSink(const TPlanFragmentCtx& fragment_ctx,
+    const TPlanFragmentInstanceCtx& fragment_instance_ctx, RuntimeState* state) const {
+  // We have one fragment per sink, so we can use the fragment index as the sink ID.
+  TDataSinkId sink_id = fragment_ctx.fragment.idx;
+  return state->obj_pool()->Add(new KrpcDataStreamSender(sink_id,
+      fragment_instance_ctx.sender_id, *this, tsink_->stream_sink,
+      fragment_ctx.destinations, FLAGS_data_stream_sender_buffer_size, state));
+}
 
 // A datastream sender may send row batches to multiple destinations. There is one
 // channel for each destination.
@@ -669,14 +696,15 @@ void KrpcDataStreamSender::Channel::Teardown(RuntimeState* state) {
 }
 
 KrpcDataStreamSender::KrpcDataStreamSender(TDataSinkId sink_id, int sender_id,
-    const RowDescriptor* row_desc, const TDataStreamSink& sink,
-    const vector<TPlanFragmentDestination>& destinations, int per_channel_buffer_size,
-    RuntimeState* state)
-  : DataSink(sink_id, row_desc,
+    const KrpcDataStreamSenderConfig& sink_config, const TDataStreamSink& sink,
+    const std::vector<TPlanFragmentDestination>& destinations,
+    int per_channel_buffer_size, RuntimeState* state)
+  : DataSink(sink_id, sink_config,
         Substitute("KrpcDataStreamSender (dst_id=$0)", sink.dest_node_id), state),
     sender_id_(sender_id),
     partition_type_(sink.output_partition.type),
     per_channel_buffer_size_(per_channel_buffer_size),
+    partition_exprs_(sink_config.partition_exprs_),
     dest_node_id_(sink.dest_node_id),
     next_unknown_partition_(0) {
   DCHECK_GT(destinations.size(), 0);
@@ -687,16 +715,17 @@ KrpcDataStreamSender::KrpcDataStreamSender(TDataSinkId sink_id, int sender_id,
 
   for (int i = 0; i < destinations.size(); ++i) {
     channels_.push_back(
-        new Channel(this, row_desc, destinations[i].thrift_backend.hostname,
+        new Channel(this, row_desc_, destinations[i].thrift_backend.hostname,
             destinations[i].krpc_backend, destinations[i].fragment_instance_id,
             sink.dest_node_id, per_channel_buffer_size));
   }
 
-  if (partition_type_ == TPartitionType::UNPARTITIONED ||
-      partition_type_ == TPartitionType::RANDOM) {
+  if (partition_type_ == TPartitionType::UNPARTITIONED
+      || partition_type_ == TPartitionType::RANDOM) {
     // Randomize the order we open/transmit to channels to avoid thundering herd problems.
     random_shuffle(channels_.begin(), channels_.end());
   }
+
 }
 
 KrpcDataStreamSender::~KrpcDataStreamSender() {
@@ -705,18 +734,6 @@ KrpcDataStreamSender::~KrpcDataStreamSender() {
   for (int i = 0; i < channels_.size(); ++i) {
     delete channels_[i];
   }
-}
-
-Status KrpcDataStreamSender::Init(const vector<TExpr>& thrift_output_exprs,
-    const TDataSink& tsink, RuntimeState* state) {
-  SCOPED_TIMER(profile_->total_time_counter());
-  DCHECK(tsink.__isset.stream_sink);
-  if (partition_type_ == TPartitionType::HASH_PARTITIONED ||
-      partition_type_ == TPartitionType::KUDU) {
-    RETURN_IF_ERROR(ScalarExpr::Create(tsink.stream_sink.output_partition.partition_exprs,
-        *row_desc_, state, &partition_exprs_));
-  }
-  return Status::OK();
 }
 
 Status KrpcDataStreamSender::Prepare(

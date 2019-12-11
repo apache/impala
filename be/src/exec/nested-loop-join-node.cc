@@ -95,8 +95,7 @@ Status NestedLoopJoinNode::Open(RuntimeState* state) {
     DCHECK_EQ(builder_->copied_build_batches()->total_num_rows(), 0);
     build_batches_ = builder_->input_build_batches();
   } else {
-    RETURN_IF_ERROR(
-        BlockingJoinNode::ProcessBuildInputAndOpenProbe(state, builder_.get()));
+    RETURN_IF_ERROR(BlockingJoinNode::ProcessBuildInputAndOpenProbe(state, builder_));
     build_batches_ = builder_->GetFinalBuildBatches();
     if (matching_build_rows_ != NULL) {
       RETURN_IF_ERROR(ResetMatchingBuildRows(state, build_batches_->total_num_rows()));
@@ -112,7 +111,7 @@ Status NestedLoopJoinNode::Prepare(RuntimeState* state) {
   RETURN_IF_ERROR(BlockingJoinNode::Prepare(state));
   RETURN_IF_ERROR(ScalarExprEvaluator::Create(join_conjuncts_, state,
       pool_, expr_perm_pool(), expr_results_pool(), &join_conjunct_evals_));
-  builder_.reset(new NljBuilder(child(1)->row_desc(), state));
+  builder_ = NljBuilder::CreateSink(child(1)->row_desc(), state);
   RETURN_IF_ERROR(builder_->Prepare(state, mem_tracker()));
   runtime_profile()->PrependChild(builder_->profile());
 

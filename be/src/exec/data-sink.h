@@ -29,6 +29,7 @@
 
 namespace impala {
 
+class DataSink;
 class MemPool;
 class ObjectPool;
 class RowBatch;
@@ -42,6 +43,46 @@ class TPlanExecRequest;
 class TPlanExecParams;
 class TPlanFragmentInstanceCtx;
 class TInsertStats;
+
+/// Configuration class for creating DataSink objects. It contains a subset of the static
+/// state of their corresponding DataSink, of which there is one instance per fragment.
+/// DataSink contains the runtime state and there can be up to MT_DOP instances of it per
+/// fragment.
+class DataSinkConfig {
+ public:
+  DataSinkConfig() = default;
+  virtual ~DataSinkConfig() {}
+
+  /// Create its corresponding DataSink. Place the sink in state->obj_pool().
+  virtual DataSink* CreateSink(const TPlanFragmentCtx& fragment_ctx,
+    const TPlanFragmentInstanceCtx& fragment_instance_ctx, RuntimeState* state) const = 0;
+
+  /// Pointer to the thrift data sink struct associated with this sink. Set in Init() and
+  /// owned by QueryState.
+  const TDataSink* tsink_ = nullptr;
+
+  /// The row descriptor for the rows consumed by the sink. Owned by root plan node of
+  /// plan tree, which feeds into this sink. Set in Init().
+  const RowDescriptor* input_row_desc_ = nullptr;
+
+  /// Output expressions to convert row batches onto output values.
+  /// Not used in some sub-classes.
+  std::vector<ScalarExpr*> output_exprs_;
+
+  /// Creates a new data sink config, allocated in state->obj_pool() and returned through
+  /// *sink, from the thrift sink object in fragment_ctx.
+  static Status CreateConfig(const TDataSink& thrift_sink, const RowDescriptor* row_desc,
+      RuntimeState* state, const DataSinkConfig** sink);
+
+ protected:
+  /// Sets reference to TDataSink and initializes the expressions. Returns error status on
+  /// failure. If overridden in subclass, must first call superclass's Init().
+  virtual Status Init(
+      const TDataSink& tsink, const RowDescriptor* input_row_desc, RuntimeState* state);
+
+ private:
+  DISALLOW_COPY_AND_ASSIGN(DataSinkConfig);
+};
 
 /// A data sink is an abstract interface for data sinks that consume RowBatches. E.g.
 /// a sink may write a HDFS table, send data across the network, or build hash tables
@@ -57,7 +98,7 @@ class DataSink {
   /// If this is the sink at the root of a fragment, 'sink_id' must be a unique ID for
   /// the sink for use in runtime profiles and other purposes. Otherwise this is a join
   /// build sink owned by an ExecNode and 'sink_id' must be -1.
-  DataSink(TDataSinkId sink_id, const RowDescriptor* row_desc, const string& name,
+  DataSink(TDataSinkId sink_id, const DataSinkConfig& sink_config, const string& name,
       RuntimeState* state);
   virtual ~DataSink();
 
@@ -87,12 +128,6 @@ class DataSink {
   /// Must be idempotent.
   virtual void Close(RuntimeState* state);
 
-  /// Creates a new data sink, allocated in pool and returned through *sink, from
-  /// thrift_sink.
-  static Status Create(const TPlanFragmentCtx& fragment_ctx,
-      const TPlanFragmentInstanceCtx& fragment_instance_ctx,
-      const RowDescriptor* row_desc, RuntimeState* state, DataSink** sink);
-
   MemTracker* mem_tracker() const { return mem_tracker_.get(); }
   RuntimeProfile* profile() const { return profile_; }
   const std::vector<ScalarExprEvaluator*>& output_expr_evals() const {
@@ -104,6 +139,9 @@ class DataSink {
   static const char* const ROOT_PARTITION_KEY;
 
  protected:
+  /// Reference to the sink configuration shared across fragment instances.
+  const DataSinkConfig& sink_config_;
+
   /// Set to true after Close() has been called. Subclasses should check and set this in
   /// Close().
   bool closed_;
@@ -137,10 +175,6 @@ class DataSink {
   /// Not used in some sub-classes.
   std::vector<ScalarExpr*> output_exprs_;
   std::vector<ScalarExprEvaluator*> output_expr_evals_;
-
-  /// Initialize the expressions in the data sink and return error status on failure.
-  virtual Status Init(const std::vector<TExpr>& thrift_output_exprs,
-      const TDataSink& tsink, RuntimeState* state);
 };
 } // namespace impala
 #endif

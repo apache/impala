@@ -27,9 +27,17 @@
 
 using namespace impala;
 
-NljBuilder::NljBuilder(const RowDescriptor* row_desc, RuntimeState* state)
-  : DataSink(-1, row_desc, "Nested Loop Join Builder", state),
-    build_batch_cache_(row_desc, state->batch_size()) {}
+NljBuilder* NljBuilder::CreateSink(const RowDescriptor* row_desc, RuntimeState* state) {
+  ObjectPool* pool = state->obj_pool();
+  DataSinkConfig* sink_config = pool->Add(new NljBuilderConfig());
+  sink_config->tsink_ = pool->Add(new TDataSink());
+  sink_config->input_row_desc_ = row_desc;
+  return pool->Add(new NljBuilder(*sink_config, state));
+}
+
+NljBuilder::NljBuilder(const DataSinkConfig& sink_config, RuntimeState* state)
+  : DataSink(-1, sink_config, "Nested Loop Join Builder", state),
+    build_batch_cache_(row_desc_, state->batch_size()) {}
 
 Status NljBuilder::Prepare(RuntimeState* state, MemTracker* parent_mem_tracker) {
   RETURN_IF_ERROR(DataSink::Prepare(state, parent_mem_tracker));

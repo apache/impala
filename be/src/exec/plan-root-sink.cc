@@ -17,6 +17,8 @@
 
 #include "exec/plan-root-sink.h"
 
+#include "exec/buffered-plan-root-sink.h"
+#include "exec/blocking-plan-root-sink.h"
 #include "exprs/scalar-expr-evaluator.h"
 #include "exprs/scalar-expr.h"
 #include "runtime/row-batch.h"
@@ -33,9 +35,21 @@ using boost::mutex;
 
 namespace impala {
 
+DataSink* PlanRootSinkConfig::CreateSink(const TPlanFragmentCtx& fragment_ctx,
+    const TPlanFragmentInstanceCtx& fragment_instance_ctx, RuntimeState* state) const {
+  TDataSinkId sink_id = fragment_ctx.fragment.idx;
+  ObjectPool* pool = state->obj_pool();
+  if (state->query_options().spool_query_results) {
+    return pool->Add(new BufferedPlanRootSink(
+        sink_id, *this, state, fragment_instance_ctx.debug_options));
+  } else {
+    return pool->Add(new BlockingPlanRootSink(sink_id, *this, state));
+  }
+}
+
 PlanRootSink::PlanRootSink(
-    TDataSinkId sink_id, const RowDescriptor* row_desc, RuntimeState* state)
-  : DataSink(sink_id, row_desc, "PLAN_ROOT_SINK", state),
+    TDataSinkId sink_id, const DataSinkConfig& sink_config, RuntimeState* state)
+  : DataSink(sink_id, sink_config, "PLAN_ROOT_SINK", state),
     num_rows_produced_limit_(state->query_options().num_rows_produced_limit) {}
 
 PlanRootSink::~PlanRootSink() {}

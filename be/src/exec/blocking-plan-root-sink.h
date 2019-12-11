@@ -48,7 +48,7 @@ class ScalarExprEvaluator;
 class BlockingPlanRootSink : public PlanRootSink {
  public:
   BlockingPlanRootSink(
-      TDataSinkId sink_id, const RowDescriptor* row_desc, RuntimeState* state);
+    TDataSinkId sink_id, const DataSinkConfig& sink_config, RuntimeState* state);
 
   /// TODO: Currently, this does nothing, it just calls DataSink::Prepare. However, adding
   /// it is necessary because BufferedPlanRootSink needs to use PlanRootSink::Prepare.

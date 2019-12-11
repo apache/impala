@@ -43,9 +43,8 @@ class DequeRowBatchQueue;
 /// synchronize access to the queue.
 class BufferedPlanRootSink : public PlanRootSink {
  public:
-  BufferedPlanRootSink(TDataSinkId sink_id, const RowDescriptor* row_desc,
-      RuntimeState* state, const TBackendResourceProfile& resource_profile,
-      const TDebugOptions& debug_options);
+  BufferedPlanRootSink(TDataSinkId sink_id, const DataSinkConfig& sink_config,
+      RuntimeState* state, const TDebugOptions& debug_options);
 
   /// Initializes the row_batches_get_wait_timer_ and row_batches_send_wait_timer_
   /// counters.

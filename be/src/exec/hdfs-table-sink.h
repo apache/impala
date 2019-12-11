@@ -94,6 +94,22 @@ struct OutputPartition {
   OutputPartition();
 };
 
+class HdfsTableSinkConfig : public DataSinkConfig {
+ public:
+  DataSink* CreateSink(const TPlanFragmentCtx& fragment_ctx,
+      const TPlanFragmentInstanceCtx& fragment_instance_ctx,
+      RuntimeState* state) const override;
+
+  /// Expressions for computing the target partitions to which a row is written.
+  std::vector<ScalarExpr*> partition_key_exprs_;
+
+  ~HdfsTableSinkConfig() override {}
+
+ protected:
+  Status Init(const TDataSink& tsink, const RowDescriptor* input_row_desc,
+      RuntimeState* state) override;
+};
+
 /// The sink consumes all row batches of its child execution tree, and writes the
 /// evaluated output_exprs into temporary Hdfs files. The query coordinator moves the
 /// temporary files into their final locations after the sinks have finished executing.
@@ -134,8 +150,8 @@ struct OutputPartition {
 /// <table base dir>/<partition dirs>/<ACID base or delta directory>
 class HdfsTableSink : public DataSink {
  public:
-  HdfsTableSink(TDataSinkId sink_id, const RowDescriptor* row_desc,
-      const TDataSink& tsink, RuntimeState* state);
+  HdfsTableSink(TDataSinkId sink_id, const HdfsTableSinkConfig& sink_config,
+    const THdfsTableSink& hdfs_sink, RuntimeState* state);
 
   /// Prepares output_exprs and partition_key_exprs, and connects to HDFS.
   virtual Status Prepare(RuntimeState* state, MemTracker* parent_mem_tracker);
@@ -166,10 +182,6 @@ class HdfsTableSink : public DataSink {
   RuntimeProfile::Counter* compress_timer() { return compress_timer_; }
 
   std::string DebugString() const;
-
- protected:
-  virtual Status Init(const std::vector<TExpr>& thrift_output_exprs,
-      const TDataSink& tsink, RuntimeState* state) WARN_UNUSED_RESULT;
 
  private:
   /// Initialises the filenames of a given output partition, and opens the temporary file.
