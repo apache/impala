@@ -17,6 +17,7 @@
 
 package org.apache.impala.authorization.ranger;
 
+import com.google.common.base.Preconditions;
 import org.apache.impala.authorization.AuthorizationChecker;
 import org.apache.impala.authorization.AuthorizationConfig;
 import org.apache.impala.authorization.AuthorizationContext;
@@ -39,7 +40,7 @@ import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.assertTrue;
 
 public class RangerAuditLogTest extends AuthorizationTestBase {
-  private RangerAuthorizationCheckerSpy authzChecker_;
+  private static RangerAuthorizationCheckerSpy authzChecker_ = null;
 
   private static class RangerAuthorizationCheckerSpy extends RangerAuthorizationChecker {
     private AuthorizationContext authzCtx_;
@@ -205,6 +206,8 @@ public class RangerAuditLogTest extends AuthorizationTestBase {
     authorize(stmt).ok(privileges);
     RangerAuthorizationContext rangerCtx =
         (RangerAuthorizationContext) authzChecker_.authzCtx_;
+    Preconditions.checkNotNull(rangerCtx);
+    Preconditions.checkNotNull(rangerCtx.getAuditHandler());
     resultChecker.accept(rangerCtx.getAuditHandler().getAuthzEvents());
   }
 
@@ -213,6 +216,8 @@ public class RangerAuditLogTest extends AuthorizationTestBase {
     authorize(stmt).error("", privileges);
     RangerAuthorizationContext rangerCtx =
         (RangerAuthorizationContext) authzChecker_.authzCtx_;
+    Preconditions.checkNotNull(rangerCtx);
+    Preconditions.checkNotNull(rangerCtx.getAuditHandler());
     resultChecker.accept(rangerCtx.getAuditHandler().getAuthzEvents());
   }
 
@@ -238,7 +243,11 @@ public class RangerAuditLogTest extends AuthorizationTestBase {
       @Override
       public AuthorizationChecker newAuthorizationChecker(
           AuthorizationPolicy authzPolicy) {
-        authzChecker_ = new RangerAuthorizationCheckerSpy(authzConfig_);
+        // Do not create a new instance if we already have one. This is consistent with
+        // RangerAuthorizationFactory#newAuthorizationChecker().
+        if (authzChecker_ == null) {
+          authzChecker_ = new RangerAuthorizationCheckerSpy(authzConfig_);
+        }
         return authzChecker_;
       }
     };

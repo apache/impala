@@ -1,0 +1,400 @@
+====
+---- QUERY
+select id, bool_col, string_col from functional.alltypestiny
+---- RESULTS
+0,NULL,'0aaa'
+100,NULL,'1aaa'
+200,NULL,'0aaa'
+300,NULL,'1aaa'
+400,NULL,'0aaa'
+500,NULL,'1aaa'
+600,NULL,'0aaa'
+700,NULL,'1aaa'
+---- TYPES
+INT,BOOLEAN,STRING
+====
+---- QUERY
+# Test on table alias
+select t.id, bool_col, string_col from functional.alltypestiny t
+---- RESULTS
+0,NULL,'0aaa'
+100,NULL,'1aaa'
+200,NULL,'0aaa'
+300,NULL,'1aaa'
+400,NULL,'0aaa'
+500,NULL,'1aaa'
+600,NULL,'0aaa'
+700,NULL,'1aaa'
+---- TYPES
+INT,BOOLEAN,STRING
+====
+---- QUERY
+# Test on slot path resolution
+select functional.alltypestiny.id, alltypestiny.bool_col, string_col
+from functional.alltypestiny
+---- RESULTS
+0,NULL,'0aaa'
+100,NULL,'1aaa'
+200,NULL,'0aaa'
+300,NULL,'1aaa'
+400,NULL,'0aaa'
+500,NULL,'1aaa'
+600,NULL,'0aaa'
+700,NULL,'1aaa'
+---- TYPES
+INT,BOOLEAN,STRING
+====
+---- QUERY
+# Test on star select item
+select * from functional.alltypestiny
+---- RESULTS
+0,NULL,0,0,0,0,0,0,'01/01/09','0aaa',2009-01-01 00:00:00,2009,1
+100,NULL,1,1,1,10,1.100000023841858,10.1,'01/01/09','1aaa',2009-01-01 00:01:00,2009,1
+200,NULL,0,0,0,0,0,0,'02/01/09','0aaa',2009-02-01 00:00:00,2009,2
+300,NULL,1,1,1,10,1.100000023841858,10.1,'02/01/09','1aaa',2009-02-01 00:01:00,2009,2
+400,NULL,0,0,0,0,0,0,'03/01/09','0aaa',2009-03-01 00:00:00,2009,3
+500,NULL,1,1,1,10,1.100000023841858,10.1,'03/01/09','1aaa',2009-03-01 00:01:00,2009,3
+600,NULL,0,0,0,0,0,0,'04/01/09','0aaa',2009-04-01 00:00:00,2009,4
+700,NULL,1,1,1,10,1.100000023841858,10.1,'04/01/09','1aaa',2009-04-01 00:01:00,2009,4
+---- TYPES
+INT,BOOLEAN,TINYINT,SMALLINT,INT,BIGINT,FLOAT,DOUBLE,STRING,STRING,TIMESTAMP,INT,INT
+====
+---- QUERY
+# Test on star select item with table alias
+select * from functional.alltypestiny t
+---- RESULTS
+0,NULL,0,0,0,0,0,0,'01/01/09','0aaa',2009-01-01 00:00:00,2009,1
+100,NULL,1,1,1,10,1.100000023841858,10.1,'01/01/09','1aaa',2009-01-01 00:01:00,2009,1
+200,NULL,0,0,0,0,0,0,'02/01/09','0aaa',2009-02-01 00:00:00,2009,2
+300,NULL,1,1,1,10,1.100000023841858,10.1,'02/01/09','1aaa',2009-02-01 00:01:00,2009,2
+400,NULL,0,0,0,0,0,0,'03/01/09','0aaa',2009-03-01 00:00:00,2009,3
+500,NULL,1,1,1,10,1.100000023841858,10.1,'03/01/09','1aaa',2009-03-01 00:01:00,2009,3
+600,NULL,0,0,0,0,0,0,'04/01/09','0aaa',2009-04-01 00:00:00,2009,4
+700,NULL,1,1,1,10,1.100000023841858,10.1,'04/01/09','1aaa',2009-04-01 00:01:00,2009,4
+---- TYPES
+INT,BOOLEAN,TINYINT,SMALLINT,INT,BIGINT,FLOAT,DOUBLE,STRING,STRING,TIMESTAMP,INT,INT
+====
+---- QUERY
+# Test on predicate. Should evaluate on masked values.
+select * from functional.alltypestiny where id = 1
+---- RESULTS
+====
+---- QUERY
+# Test on predicate. Should evaluate on masked values.
+select * from functional.alltypestiny where id = 100
+---- RESULTS
+100,NULL,1,1,1,10,1.100000023841858,10.1,'01/01/09','1aaa',2009-01-01 00:01:00,2009,1
+---- TYPES
+INT,BOOLEAN,TINYINT,SMALLINT,INT,BIGINT,FLOAT,DOUBLE,STRING,STRING,TIMESTAMP,INT,INT
+====
+---- QUERY
+# Test on predicate. Should evaluate on masked values.
+select concat(string_col, date_string_col) from (
+  select string_col, date_string_col from functional.alltypestiny where string_col = "1"
+) t
+---- RESULTS
+====
+---- QUERY
+# Test on predicate. Should evaluate on masked values.
+select concat(string_col, date_string_col) from (
+  select string_col, date_string_col from functional.alltypestiny where string_col = "1aaa"
+) t
+---- RESULTS
+'1aaa01/01/09'
+'1aaa02/01/09'
+'1aaa03/01/09'
+'1aaa04/01/09'
+---- TYPES
+STRING
+====
+---- QUERY
+# Test on slot path resolution for multiple tables
+select t.id, s.bool_col, t.bool_col, s.string_col, t.string_col
+from functional.alltypessmall s join functional.alltypestiny t
+on s.id = t.id
+---- RESULTS
+0,true,NULL,'0','0aaa'
+---- TYPES
+INT,BOOLEAN,BOOLEAN,STRING,STRING
+====
+---- QUERY
+# Test on slot path resolution for multiple tables
+select t.id, s.bool_col, t.bool_col, s.string_col, t.string_col
+from functional.alltypessmall s join functional.alltypestiny t using (id)
+---- RESULTS
+0,true,NULL,'0','0aaa'
+---- TYPES
+INT,BOOLEAN,BOOLEAN,STRING,STRING
+====
+---- QUERY
+# Test on slot path resolution for multiple tables
+select a.id, s.bool_col, t.bool_col, s.string_col, t.string_col
+from functional.alltypes a
+  join functional.alltypestiny t using (id)
+  join functional.alltypessmall s on t.id = s.id
+---- RESULTS
+0,true,NULL,'0','0aaa'
+---- TYPES
+INT,BOOLEAN,BOOLEAN,STRING,STRING
+====
+---- QUERY
+select t.* from functional.alltypessmall s join functional.alltypestiny t on s.id = t.id
+---- RESULTS
+0,NULL,0,0,0,0,0,0,'01/01/09','0aaa',2009-01-01 00:00:00,2009,1
+---- TYPES
+INT,BOOLEAN,TINYINT,SMALLINT,INT,BIGINT,FLOAT,DOUBLE,STRING,STRING,TIMESTAMP,INT,INT
+====
+---- QUERY
+select
+  alltypessmall.id, alltypestiny.id + 1,
+  alltypessmall.bool_col, functional.alltypestiny.bool_col is null,
+  alltypessmall.string_col, concat('xxx', alltypestiny.string_col)
+from functional.alltypessmall join functional.alltypestiny
+on alltypessmall.id = functional.alltypestiny.id
+where alltypestiny.id % 200 = 0
+---- RESULTS
+0,1,true,true,'0','xxx0aaa'
+---- TYPES
+INT,BIGINT,BOOLEAN,BOOLEAN,STRING,STRING
+====
+---- QUERY
+# Test on subqueries
+select id, bool_col, int_col, string_col from (
+  select id, bool_col, int_col, string_col from (
+    select id, bool_col, int_col, upper(string_col) as string_col
+    from functional.alltypestiny
+  ) t1 where id % 200 = 0
+) t0 where id = 400
+---- RESULTS
+400,NULL,0,'0AAA'
+---- TYPES
+INT,BOOLEAN,INT,STRING
+====
+---- QUERY
+# Test on union
+select id, bool_col, string_col from functional.alltypestiny
+union all
+select id, bool_col, string_col from functional.alltypestiny
+---- RESULTS
+0,NULL,'0aaa'
+100,NULL,'1aaa'
+200,NULL,'0aaa'
+300,NULL,'1aaa'
+400,NULL,'0aaa'
+500,NULL,'1aaa'
+600,NULL,'0aaa'
+700,NULL,'1aaa'
+0,NULL,'0aaa'
+100,NULL,'1aaa'
+200,NULL,'0aaa'
+300,NULL,'1aaa'
+400,NULL,'0aaa'
+500,NULL,'1aaa'
+600,NULL,'0aaa'
+700,NULL,'1aaa'
+---- TYPES
+INT,BOOLEAN,STRING
+====
+---- QUERY
+# Test on view and it's underlying table. alltypes_view is a view on table alltypes.
+# They both have column masking policies and are applied.
+select id, bool_col, int_col, string_col from functional.alltypes_view
+order by id limit 10
+---- RESULTS
+0,true,0,'vvv0ttt'
+100,false,1,'vvv1ttt'
+200,true,2,'vvv2ttt'
+300,false,3,'vvv3ttt'
+400,true,4,'vvv4ttt'
+500,false,5,'vvv5ttt'
+600,true,6,'vvv6ttt'
+700,false,7,'vvv7ttt'
+800,true,8,'vvv8ttt'
+900,false,9,'vvv9ttt'
+---- TYPES
+INT,BOOLEAN,INT,STRING
+====
+---- QUERY
+# Test on local view (CTE). Correctly ignore masking on local view names so the result
+# won't be 100 (affected by policy id => id * 100).
+use functional;
+with alltypestiny as (select 1 as id)
+select * from alltypestiny
+---- RESULTS
+1
+====
+---- QUERY
+# Test on local view (CTE). Correctly ignore masking on local view names so the value
+# of local view 'alltypes' won't be 10000 (affected by policy id => id * 100).
+use functional;
+with alltypes as (select 100 as id)
+select alltypes.id from alltypestiny join alltypes using (id)
+---- RESULTS
+100
+====
+---- QUERY
+# Test on local view (CTE). Correctly mask table used in local view.
+use functional;
+with iv as (select id, bool_col, string_col from alltypestiny)
+select * from iv
+---- RESULTS
+0,NULL,'0aaa'
+100,NULL,'1aaa'
+200,NULL,'0aaa'
+300,NULL,'1aaa'
+400,NULL,'0aaa'
+500,NULL,'1aaa'
+600,NULL,'0aaa'
+700,NULL,'1aaa'
+---- TYPES
+INT,BOOLEAN,STRING
+====
+---- QUERY
+# Test on local view (CTE). Correctly mask view used in local view.
+use functional;
+with iv as (select id, bool_col, string_col from alltypes_view order by id limit 10)
+select * from iv
+---- RESULTS
+0,true,'vvv0ttt'
+100,false,'vvv1ttt'
+200,true,'vvv2ttt'
+300,false,'vvv3ttt'
+400,true,'vvv4ttt'
+500,false,'vvv5ttt'
+600,true,'vvv6ttt'
+700,false,'vvv7ttt'
+800,true,'vvv8ttt'
+900,false,'vvv9ttt'
+---- TYPES
+INT,BOOLEAN,STRING
+====
+---- QUERY
+# Test on local view (CTE).
+use functional;
+with iv1 as (select id, bool_col, string_col from alltypestiny),
+     iv2 as (select int_col, count(int_col) as cnt from alltypestiny group by int_col)
+select iv1.*, iv2.*, v.string_col from iv1, iv2, alltypes_view v
+where iv1.id = iv2.int_col and iv1.id = v.id
+---- RESULTS
+0,NULL,'0aaa',0,4,'vvv0ttt'
+---- TYPES
+INT,BOOLEAN,STRING,INT,BIGINT,STRING
+====
+---- QUERY
+# Test on local view (CTE). The join properties are associated at TableRef of
+# alltypes_view. Test those properties are migrated correctly in masking and
+# unmasking. See more in FromClause#reset().
+with iv as (select v.string_col
+  from functional.alltypestiny t
+  join functional.alltypes_view v
+  on t.id = v.id)
+select * from iv;
+---- RESULTS
+'vvv0ttt'
+'vvv1ttt'
+'vvv2ttt'
+'vvv3ttt'
+'vvv4ttt'
+'vvv5ttt'
+'vvv6ttt'
+'vvv7ttt'
+---- TYPES
+STRING
+====
+---- QUERY
+# Test on local view (CTE). The join properties are associated at TableRef of
+# alltypestiny. Test those properties are migrated correctly in masking and
+# unmasking. See more in FromClause#reset().
+with iv as (select v.string_col
+  from functional.alltypes_view v
+  join functional.alltypestiny t
+  on t.id = v.id)
+select * from iv;
+---- RESULTS
+'vvv0ttt'
+'vvv1ttt'
+'vvv2ttt'
+'vvv3ttt'
+'vvv4ttt'
+'vvv5ttt'
+'vvv6ttt'
+'vvv7ttt'
+---- TYPES
+STRING
+====
+---- QUERY
+# Test on masking table inside correlated subquery.
+use functional;
+select id, string_col from alltypes a
+where exists (select id from alltypestiny where id = a.id)
+order by id
+---- RESULTS
+0,'0ttt'
+100,'1ttt'
+200,'2ttt'
+300,'3ttt'
+400,'4ttt'
+500,'5ttt'
+600,'6ttt'
+700,'7ttt'
+---- TYPES
+INT,STRING
+====
+---- QUERY
+# Test on masking table inside correlated subquery.
+use functional;
+select id from alltypessmall
+where id * 10 in (select id from alltypestiny)
+order by id
+---- RESULTS
+0
+10
+20
+30
+40
+50
+60
+70
+---- TYPES
+INT
+====
+---- QUERY
+# Test on masking table inside uncorrelated subquery.
+use functional;
+select id from alltypessmall
+where id = (select count(1) from alltypestiny where id < 500)
+---- RESULTS
+5
+---- TYPES
+INT
+====
+---- QUERY
+# Test on CTAS
+create table $UNIQUE_DB.masked_tbl as select * from alltypestiny;
+select * from $UNIQUE_DB.masked_tbl;
+---- RESULTS
+0,NULL,0,0,0,0,0,0,'01/01/09','0aaa',2009-01-01 00:00:00,2009,1
+100,NULL,1,1,1,10,1.100000023841858,10.1,'01/01/09','1aaa',2009-01-01 00:01:00,2009,1
+200,NULL,0,0,0,0,0,0,'02/01/09','0aaa',2009-02-01 00:00:00,2009,2
+300,NULL,1,1,1,10,1.100000023841858,10.1,'02/01/09','1aaa',2009-02-01 00:01:00,2009,2
+400,NULL,0,0,0,0,0,0,'03/01/09','0aaa',2009-03-01 00:00:00,2009,3
+500,NULL,1,1,1,10,1.100000023841858,10.1,'03/01/09','1aaa',2009-03-01 00:01:00,2009,3
+600,NULL,0,0,0,0,0,0,'04/01/09','0aaa',2009-04-01 00:00:00,2009,4
+700,NULL,1,1,1,10,1.100000023841858,10.1,'04/01/09','1aaa',2009-04-01 00:01:00,2009,4
+---- TYPES
+INT,BOOLEAN,TINYINT,SMALLINT,INT,BIGINT,FLOAT,DOUBLE,STRING,STRING,TIMESTAMP,INT,INT
+====
+---- QUERY
+# Test on CreateView. Should not mask the columns when used in sql generations.
+create view $UNIQUE_DB.masked_view as select * from alltypestiny;
+show create view $UNIQUE_DB.masked_view;
+---- RESULTS
+'CREATE VIEW $UNIQUE_DB.masked_view AS\nSELECT * FROM functional.alltypestiny'
+====
+---- QUERY
+# Test on AlterView. Should not mask the columns when used in sql generations.
+alter view $UNIQUE_DB.masked_view as select id from alltypestiny;
+show create view $UNIQUE_DB.masked_view;
+---- RESULTS
+'CREATE VIEW $UNIQUE_DB.masked_view AS\nSELECT id FROM functional.alltypestiny'
+====

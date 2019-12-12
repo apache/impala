@@ -39,6 +39,12 @@ public class FromClause extends StmtNode implements Iterable<TableRef> {
 
   private boolean analyzed_ = false;
 
+  // Whether we should perform table masking. It will replace each table/view with a
+  // masked subquery if there're column masking policies for the user on this table/view.
+  // Turned off for CreateView and AlterView statements since they're not actually
+  // reading data.
+  private boolean doTableMasking_ = true;
+
   public FromClause(List<TableRef> tableRefs) {
     tableRefs_ = Lists.newArrayList(tableRefs);
     // Set left table refs to ensure correct toSql() before analysis.
@@ -50,6 +56,15 @@ public class FromClause extends StmtNode implements Iterable<TableRef> {
   public FromClause() { tableRefs_ = new ArrayList<>(); }
   public List<TableRef> getTableRefs() { return tableRefs_; }
 
+  public void setDoTableMasking(boolean doTableMasking) {
+    doTableMasking_ = doTableMasking;
+    for (TableRef tableRef : tableRefs_) {
+      if (!(tableRef instanceof InlineViewRef)) continue;
+      InlineViewRef viewRef = (InlineViewRef) tableRef;
+      viewRef.getViewStmt().setDoTableMasking(doTableMasking);
+    }
+  }
+
   @Override
   public void analyze(Analyzer analyzer) throws AnalysisException {
     if (analyzed_) return;
@@ -58,7 +73,7 @@ public class FromClause extends StmtNode implements Iterable<TableRef> {
     for (int i = 0; i < tableRefs_.size(); ++i) {
       TableRef tblRef = tableRefs_.get(i);
       // Replace non-InlineViewRef table refs with a BaseTableRef or ViewRef.
-      tblRef = analyzer.resolveTableRef(tblRef);
+      tblRef = analyzer.resolveTableRef(tblRef, doTableMasking_);
       tableRefs_.set(i, Preconditions.checkNotNull(tblRef));
       tblRef.setLeftTblRef(leftTblRef);
       tblRef.analyze(analyzer);
@@ -93,24 +108,60 @@ public class FromClause extends StmtNode implements Iterable<TableRef> {
     return new FromClause(clone);
   }
 
+  /**
+   * Unmask, un-resolve and reset all the tableRefs.
+   * TableMasking views are created by analysis so we should unwrap them to restore the
+   * unmasked TableRef.
+   * 'un-resolve' here means replacing resolved tableRefs with unresolved ones. To make
+   * sure we get the same results in later resolution, the unresolved tableRefs should
+   * use fully qualified paths. Otherwise, non-fully qualified paths might incorrectly
+   * match a local view.
+   * However, we don't un-resolve views because local views don't have fully qualified
+   * paths. Due to this we don't unmask a TableMasking view if the underlying TableRef is
+   * a view. TODO(IMPALA-9286): These may make this FromClause still dirty after reset()
+   * since it doesn't come back to the state before analyze(). We should introduce fully
+   * qualified paths for local views to fix this.
+   */
   public void reset() {
     for (int i = 0; i < size(); ++i) {
-      TableRef origTblRef = get(i);
-      if (origTblRef.isResolved() && !(origTblRef instanceof InlineViewRef)) {
-        // Replace resolved table refs with unresolved ones.
-        TableRef newTblRef = new TableRef(origTblRef);
-        // Use the fully qualified raw path to preserve the original resolution.
-        // Otherwise, non-fully qualified paths might incorrectly match a local view.
-        // TODO for 2.3: This full qualification preserves analysis state which is
-        // contrary to the intended semantics of reset(). We could address this issue by
-        // changing the WITH-clause analysis to register local views that have
-        // fully-qualified table refs, and then remove the full qualification here.
-        newTblRef.rawPath_ = origTblRef.getResolvedPath().getFullyQualifiedRawPath();
-        set(i, newTblRef);
-      }
-      get(i).reset();
+      unmaskAndUnresolveTableRef(i);
+      get(i).reset();   // Reset() recursion happens here for views
     }
     this.analyzed_ = false;
+  }
+
+  /**
+   * Replace the i-th tableRef with an unmasked and unresolved one if the result is not a
+   * view. See more in comments of reset().
+   */
+  private void unmaskAndUnresolveTableRef(int i) {
+    TableRef origTblRef = get(i);
+    if (!origTblRef.isResolved()
+        || (origTblRef instanceof InlineViewRef && !origTblRef.isTableMaskingView())) {
+      return;
+    }
+    // Unmasked the TableRef if it's an inline view for table masking.
+    if (origTblRef.isTableMaskingView()) {
+      Preconditions.checkState(origTblRef instanceof InlineViewRef);
+      TableRef unMaskedTableRef = ((InlineViewRef) origTblRef).getUnMaskedTableRef();
+      if (unMaskedTableRef instanceof InlineViewRef) return;
+      // Migrate back the properties (e.g. join ops, hints) since we are going to
+      // replace it with an unresolved one.
+      origTblRef.migratePropertiesTo(unMaskedTableRef);
+      origTblRef = unMaskedTableRef;
+    }
+    // Replace the resolved TableRef with an unresolved one if it's not a view.
+    if (!(origTblRef instanceof InlineViewRef)) {
+      TableRef newTblRef = new TableRef(origTblRef);
+      // Use the fully qualified raw path to preserve the original resolution.
+      // Otherwise, non-fully qualified paths might incorrectly match a local view.
+      // TODO(IMPALA-9286): This full qualification preserves analysis state which is
+      // contrary to the intended semantics of reset(). We could address this issue by
+      // changing the WITH-clause analysis to register local views that have
+      // fully-qualified table refs, and then remove the full qualification here.
+      newTblRef.rawPath_ = origTblRef.getResolvedPath().getFullyQualifiedRawPath();
+      set(i, newTblRef);
+    }
   }
 
   @Override

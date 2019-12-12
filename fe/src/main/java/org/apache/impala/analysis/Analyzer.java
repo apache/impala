@@ -34,11 +34,13 @@ import java.util.function.Function;
 
 import org.apache.impala.analysis.Path.PathType;
 import org.apache.impala.analysis.StmtMetadataLoader.StmtTableCache;
+import org.apache.impala.authorization.AuthorizationChecker;
 import org.apache.impala.authorization.AuthorizationConfig;
 import org.apache.impala.authorization.AuthorizationFactory;
 import org.apache.impala.authorization.Privilege;
 import org.apache.impala.authorization.PrivilegeRequest;
 import org.apache.impala.authorization.PrivilegeRequestBuilder;
+import org.apache.impala.authorization.TableMask;
 import org.apache.impala.authorization.User;
 import org.apache.impala.catalog.Column;
 import org.apache.impala.catalog.DatabaseNotFoundException;
@@ -684,6 +686,10 @@ public class Analyzer {
     return result;
   }
 
+  public TableRef resolveTableRef(TableRef tableRef) throws AnalysisException {
+    return resolveTableRef(tableRef, false);
+  }
+
   /**
    * Resolves the given TableRef into a concrete BaseTableRef, ViewRef or
    * CollectionTableRef. Returns the new resolved table ref or the given table
@@ -693,8 +699,10 @@ public class Analyzer {
    * an AuthorizationException is preferred over an AnalysisException so as not to
    * accidentally reveal the non-existence of tables/databases.
    */
-  public TableRef resolveTableRef(TableRef tableRef) throws AnalysisException {
-    // Return the table if it is already resolved.
+  public TableRef resolveTableRef(TableRef tableRef, boolean doTableMasking)
+      throws AnalysisException {
+    // Return the table if it is already resolved. This also avoids the table being
+    // masked again.
     if (tableRef.isResolved()) return tableRef;
     // Try to find a matching local view.
     if (tableRef.getPath().size() == 1) {
@@ -747,13 +755,33 @@ public class Analyzer {
     Preconditions.checkNotNull(resolvedPath);
     if (resolvedPath.destTable() != null) {
       FeTable table = resolvedPath.destTable();
-      if (table instanceof FeView) return new InlineViewRef((FeView) table, tableRef);
-      // The table must be a base table.
-      Preconditions.checkState(table instanceof FeFsTable ||
-          table instanceof FeKuduTable ||
-          table instanceof FeHBaseTable ||
-          table instanceof FeDataSourceTable);
-      return new BaseTableRef(tableRef, resolvedPath);
+      TableRef resolvedTableRef;
+      if (table instanceof FeView) {
+        resolvedTableRef = new InlineViewRef((FeView) table, tableRef);
+      } else {
+        // The table must be a base table.
+        Preconditions.checkState(table instanceof FeFsTable ||
+            table instanceof FeKuduTable ||
+            table instanceof FeHBaseTable ||
+            table instanceof FeDataSourceTable);
+        resolvedTableRef = new BaseTableRef(tableRef, resolvedPath);
+      }
+      if (!doTableMasking || !getAuthzFactory().getAuthorizationConfig().isEnabled()
+          || !getAuthzFactory().supportsColumnMasking()) {
+        return resolvedTableRef;
+      }
+
+      AuthorizationChecker authChecker = getAuthzFactory().newAuthorizationChecker(
+          getCatalog().getAuthPolicy());
+      TableMask tableMask = new TableMask(authChecker, table, user_);
+      try {
+        if (!tableMask.needsMaskingOrFiltering()) return resolvedTableRef;
+        return InlineViewRef.createTableMaskView(resolvedPath, resolvedTableRef,
+            tableMask);
+      } catch (InternalException e) {
+        LOG.error("Error performing table masking", e);
+        throw new AnalysisException("Error performing table masking", e);
+      }
     } else {
       return new CollectionTableRef(tableRef, resolvedPath);
     }

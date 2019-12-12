@@ -168,6 +168,13 @@ public abstract class QueryStmt extends StatementBase {
   }
 
   /**
+   * Disable table masking when analyzing the FromClauses. Used in CreateView and
+   * AlterView statements since they don't actually read the data.
+   * @param doTableMasking
+   */
+  public void setDoTableMasking(boolean doTableMasking) {}
+
+  /**
    * Returns a list containing all the materialized tuple ids that this stmt is
    * correlated with (i.e., those tuple ids from outer query blocks that TableRefs
    * inside this stmt are rooted at).

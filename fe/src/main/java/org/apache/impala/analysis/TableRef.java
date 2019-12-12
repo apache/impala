@@ -24,6 +24,7 @@ import java.util.Collections;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Set;
+import java.util.UUID;
 
 import org.apache.impala.authorization.Privilege;
 import org.apache.impala.catalog.FeFsTable;
@@ -633,5 +634,23 @@ public class TableRef extends StmtNode {
     allMaterializedTupleIds_.clear();
     correlatedTupleIds_.clear();
     desc_ = null;
+  }
+
+  public boolean isTableMaskingView() { return false; }
+
+  void migratePropertiesTo(TableRef other) {
+    other.aliases_ = aliases_;
+    other.onClause_ = onClause_;
+    other.usingColNames_ = usingColNames_;
+    other.joinOp_ = joinOp_;
+    other.joinHints_ = joinHints_;
+    other.tableHints_ = tableHints_;
+    // Clear properties. Don't clear aliases_ since it's still used in resolving slots
+    // in the query block of 'other'.
+    onClause_ = null;
+    usingColNames_ = null;
+    joinOp_ = null;
+    joinHints_ = new ArrayList<>();
+    tableHints_ = new ArrayList<>();
   }
 }

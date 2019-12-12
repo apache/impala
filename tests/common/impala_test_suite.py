@@ -682,6 +682,8 @@ class ImpalaTestSuite(BaseTestSuite):
         # ERRORS, TYPES, LABELS, etc. which doesn't make sense if there are two
         # different result sets to consider (IMPALA-4471).
         assert 'DML_RESULTS' not in test_section
+        test_section['RESULTS'] = self.__do_replacements(
+            test_section['RESULTS'], use_db=use_db, extra=test_file_vars)
         self.__verify_results_and_errors(vector, test_section, result, use_db)
       else:
         # TODO: Can't validate errors without expected results for now.

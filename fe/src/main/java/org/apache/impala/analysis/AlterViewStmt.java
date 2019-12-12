@@ -45,6 +45,8 @@ public class AlterViewStmt extends CreateOrAlterViewStmtBase {
   public void analyze(Analyzer analyzer) throws AnalysisException {
     // Enforce Hive column labels for view compatibility.
     analyzer.setUseHiveColLabels(true);
+    // Disable table masking since we don't actually read the data
+    viewDefStmt_.setDoTableMasking(false);
     viewDefStmt_.analyze(analyzer);
 
     Preconditions.checkState(tableName_ != null && !tableName_.isEmpty());

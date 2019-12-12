@@ -475,6 +475,7 @@ public class AnalysisContext {
     if (analysisResult_.requiresSubqueryRewrite()) {
       new StmtRewriter.SubqueryRewriter().rewrite(analysisResult_);
       reAnalyze = true;
+      LOG.info("Re-analyze the rewritten query.");
     }
     if (!reAnalyze) return;
 

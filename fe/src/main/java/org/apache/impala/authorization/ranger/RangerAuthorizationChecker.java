@@ -19,6 +19,7 @@ package org.apache.impala.authorization.ranger;
 
 import com.google.common.annotations.VisibleForTesting;
 import com.google.common.base.Preconditions;
+import org.apache.commons.lang.StringUtils;
 import org.apache.hadoop.security.UserGroupInformation;
 import org.apache.impala.analysis.AnalysisContext.AnalysisResult;
 import org.apache.impala.authorization.Authorizable;
@@ -38,6 +39,8 @@ import org.apache.impala.common.RuntimeEnv;
 import org.apache.impala.thrift.TSessionState;
 import org.apache.impala.util.EventSequence;
 import org.apache.ranger.audit.model.AuthzAuditEvent;
+import org.apache.ranger.plugin.model.RangerPolicy;
+import org.apache.ranger.plugin.model.RangerServiceDef;
 import org.apache.ranger.plugin.policyengine.RangerAccessRequest;
 import org.apache.ranger.plugin.policyengine.RangerAccessRequestImpl;
 import org.apache.ranger.plugin.policyengine.RangerAccessResourceImpl;
@@ -47,7 +50,6 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import java.util.ArrayList;
-import java.util.EnumSet;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Optional;
@@ -185,17 +187,10 @@ public class RangerAuthorizationChecker extends BaseAuthorizationChecker {
       List<PrivilegeRequest> privilegeRequests)
       throws AuthorizationException, InternalException {
     for (PrivilegeRequest request : privilegeRequests) {
-      if (request.getAuthorizable().getType() == Type.COLUMN) {
-        authorizeColumnMask(user,
+      if (request.getAuthorizable().getType() == Type.TABLE) {
+        authorizeRowFilter(user,
             request.getAuthorizable().getDbName(),
-            request.getAuthorizable().getTableName(),
-            request.getAuthorizable().getColumnName());
-      } else if (request.getAuthorizable().getType() == Type.TABLE) {
-        if (request.getAuthorizable().getType() == Type.TABLE) {
-          authorizeRowFilter(user,
-              request.getAuthorizable().getDbName(),
-              request.getAuthorizable().getTableName());
-        }
+            request.getAuthorizable().getTableName());
       }
     }
   }
@@ -267,13 +262,64 @@ public class RangerAuthorizationChecker extends BaseAuthorizationChecker {
     }
   }
 
+  @Override
+  public boolean needsMaskingOrFiltering(User user, String dbName, String tableName,
+      List<String> requiredColumns) throws InternalException {
+    for (String column: requiredColumns) {
+      if (evalColumnMask(user, dbName, tableName, column).isMaskEnabled()) {
+        return true;
+      }
+    }
+    return false;
+  }
+
+  @Override
+  public String createColumnMask(User user, String dbName, String tableName,
+      String columnName) throws InternalException {
+    RangerAccessResult accessResult = evalColumnMask(user, dbName, tableName,
+        columnName);
+    // No column masking policies, return the original column.
+    if (!accessResult.isMaskEnabled()) return columnName;
+    String maskType = accessResult.getMaskType();
+    RangerServiceDef.RangerDataMaskTypeDef maskTypeDef = accessResult.getMaskTypeDef();
+    Preconditions.checkNotNull(maskType);
+    // The expression used to replace the original column.
+    String maskedColumn = columnName;
+    // The expression of the mask type. Column names are referenced by "{col}".
+    // Transformer examples for the builtin mask types:
+    //   mask type           transformer
+    //   MASK                mask({col})
+    //   MASK_SHOW_LAST_4    mask_show_last_n({col}, 4, 'x', 'x', 'x', -1, '1')
+    //   MASK_SHOW_FIRST_4   mask_show_first_n({col}, 4, 'x', 'x', 'x', -1, '1')
+    //   MASK_HASH           mask_hash({col})
+    //   MASK_DATE_SHOW_YEAR mask({col}, 'x', 'x', 'x', -1, '1', 1, 0, -1)
+    String transformer = null;
+    if (maskTypeDef != null) {
+      transformer = maskTypeDef.getTransformer();
+    }
+    if (StringUtils.equalsIgnoreCase(maskType, RangerPolicy.MASK_TYPE_NULL)) {
+      maskedColumn = "NULL";
+    } else if (StringUtils.equalsIgnoreCase(maskType, RangerPolicy.MASK_TYPE_CUSTOM)) {
+      String maskedValue = accessResult.getMaskedValue();
+      if (maskedValue == null) {
+        maskedColumn = "NULL";
+      } else {
+        maskedColumn = maskedValue.replace("{col}", columnName);
+      }
+    } else if (StringUtils.isNotEmpty(transformer)) {
+      maskedColumn = transformer.replace("{col}", columnName);
+    }
+    LOG.info("dbName: {}, tableName: {}, column: {}, maskType: {}, columnTransformer: {}",
+        dbName, tableName, columnName, maskType, maskedColumn);
+    return maskedColumn;
+  }
+
   /**
-   * This method checks if column mask is enabled on the given columns and deny access
-   * when column mask is enabled by throwing an {@link AuthorizationException}. This is
-   * to prevent data leak when Hive has column mask enabled but not in Impala.
+   * Evaluate column masking policies on the given column and returns the result.
+   * A RangerAccessResult contains the matched policy details and the masked column.
    */
-  private void authorizeColumnMask(User user, String dbName, String tableName,
-      String columnName) throws InternalException, AuthorizationException {
+  private RangerAccessResult evalColumnMask(User user, String dbName,
+      String tableName, String columnName) throws InternalException {
     RangerAccessResourceImpl resource = new RangerImpalaResourceBuilder()
         .database(dbName)
         .table(tableName)
@@ -281,11 +327,7 @@ public class RangerAuthorizationChecker extends BaseAuthorizationChecker {
         .build();
     RangerAccessRequest req = new RangerAccessRequestImpl(resource,
         SELECT_ACCESS_TYPE, user.getShortName(), getUserGroups(user));
-    if (plugin_.evalDataMaskPolicies(req, null).isMaskEnabled()) {
-      throw new AuthorizationException(String.format(
-          "Impala does not support column masking yet. Column masking is enabled on " +
-              "column: %s.%s.%s", dbName, tableName, columnName));
-    }
+    return plugin_.evalDataMaskPolicies(req, null);
   }
 
   /**

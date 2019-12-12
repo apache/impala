@@ -39,13 +39,12 @@ public interface AuthorizationFactory {
   /**
    * Creates a new instance of {@link AuthorizationChecker}.
    */
-  AuthorizationChecker newAuthorizationChecker(AuthorizationPolicy authzPolicy)
-      throws ImpalaException;
+  AuthorizationChecker newAuthorizationChecker(AuthorizationPolicy authzPolicy);
 
   /**
    * Creates a new instance of {@link AuthorizationChecker}.
    */
-  default AuthorizationChecker newAuthorizationChecker() throws ImpalaException {
+  default AuthorizationChecker newAuthorizationChecker() {
     return newAuthorizationChecker(null);
   }
 
@@ -70,4 +69,10 @@ public interface AuthorizationFactory {
    */
   AuthorizationManager newAuthorizationManager(CatalogServiceCatalog catalog)
       throws ImpalaException;
+
+  /**
+   * Returns whether the authorization implementation supports column masking and row
+   * filtering. Currently, only Ranger implementation supports these.
+   */
+  boolean supportsColumnMasking();
 }

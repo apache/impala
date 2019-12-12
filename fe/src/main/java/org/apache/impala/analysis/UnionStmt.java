@@ -215,6 +215,13 @@ public class UnionStmt extends QueryStmt {
   }
 
   @Override
+  public void setDoTableMasking(boolean doTableMasking) {
+    for (UnionOperand op : operands_) {
+      op.getQueryStmt().setDoTableMasking(doTableMasking);
+    }
+  }
+
+  @Override
   public void analyze(Analyzer analyzer) throws AnalysisException {
     if (isAnalyzed()) return;
     super.analyze(analyzer);

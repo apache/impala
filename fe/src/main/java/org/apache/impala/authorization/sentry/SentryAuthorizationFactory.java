@@ -101,4 +101,9 @@ public class SentryAuthorizationFactory implements AuthorizationFactory {
     return new SentryCatalogdAuthorizationManager(
         (SentryAuthorizationConfig) getAuthorizationConfig(), catalog);
   }
+
+  @Override
+  public boolean supportsColumnMasking() {
+    return false;
+  }
 }

@@ -23,6 +23,7 @@ import org.apache.impala.common.InternalException;
 import org.apache.impala.thrift.TSessionState;
 import org.apache.impala.util.EventSequence;
 
+import java.util.List;
 import java.util.Optional;
 import java.util.Set;
 
@@ -82,4 +83,17 @@ public interface AuthorizationChecker {
    * Invalidates an authorization cache.
    */
   void invalidateAuthorizationCache();
+
+  /**
+   * Returns whether the given table needs column masking or row filtering when read by
+   * the given user.
+   */
+  boolean needsMaskingOrFiltering(User user, String dbName, String tableName,
+      List<String> requiredColumns) throws InternalException;
+
+  /**
+   * Returns the column mask string for the given column.
+   */
+  String createColumnMask(User user, String dbName, String tableName, String columnName)
+      throws InternalException;
 }

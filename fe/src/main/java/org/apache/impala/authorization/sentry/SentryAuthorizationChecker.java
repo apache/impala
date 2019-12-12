@@ -90,6 +90,18 @@ public class SentryAuthorizationChecker extends BaseAuthorizationChecker {
   }
 
   @Override
+  public boolean needsMaskingOrFiltering(User user, String dbName, String tableName,
+      List<String> requiredColumns) {
+    return false;
+  }
+
+  @Override
+  public String createColumnMask(User user, String dbName, String tableName,
+      String columnName) {
+    return columnName;
+  }
+
+  @Override
   public AuthorizationContext createAuthorizationContext(boolean doAudits,
       String sqlStmt, TSessionState sessionState, Optional<EventSequence> timeline) {
     return new AuthorizationContext(timeline);

@@ -99,4 +99,9 @@ public class RangerAuthorizationFactory implements AuthorizationFactory {
     plugin.init();
     return new RangerCatalogdAuthorizationManager(() -> plugin, catalog);
   }
+
+  @Override
+  public boolean supportsColumnMasking() {
+    return true;
+  }
 }

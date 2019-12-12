@@ -30,6 +30,7 @@ from tests.util.calculation_util import get_random_id
 ADMIN = "admin"
 RANGER_AUTH = ("admin", "admin")
 RANGER_HOST = "http://localhost:6080"
+REST_HEADERS = {"Content-Type": "application/json", "Accept": "application/json"}
 IMPALAD_ARGS = "--server-name=server1 --ranger_service_type=hive " \
                "--ranger_app_id=impala --authorization_provider=ranger"
 CATALOGD_ARGS = "--server-name=server1 --ranger_service_type=hive " \
@@ -44,6 +45,10 @@ class TestRanger(CustomClusterTestSuite):
   """
   Tests for Apache Ranger integration with Apache Impala.
   """
+
+  @classmethod
+  def get_workload(cls):
+    return 'functional-query'
 
   @pytest.mark.execute_serially
   @CustomClusterTestSuite.with_args(
@@ -488,11 +493,9 @@ class TestRanger(CustomClusterTestSuite):
       "isRecursive": "false",
       "clusterName": "server1"
     }
-
-    headers = {"Content-Type": "application/json", "Accept": "application/json"}
     r = requests.post("{0}/service/plugins/services/grant/test_impala?pluginId=impala"
                       .format(RANGER_HOST),
-                      auth=RANGER_AUTH, json=data, headers=headers)
+                      auth=RANGER_AUTH, json=data, headers=REST_HEADERS)
     assert 200 <= r.status_code < 300
 
   @staticmethod
@@ -510,11 +513,9 @@ class TestRanger(CustomClusterTestSuite):
       "isRecursive": "false",
       "clusterName": "server1"
     }
-
-    headers = {"Content-Type": "application/json", "Accept": "application/json"}
     r = requests.post("{0}/service/plugins/services/revoke/test_impala?pluginId=impala"
                       .format(RANGER_HOST),
-                      auth=RANGER_AUTH, json=data, headers=headers)
+                      auth=RANGER_AUTH, json=data, headers=REST_HEADERS)
     assert 200 <= r.status_code < 300
 
   @staticmethod
@@ -534,25 +535,77 @@ class TestRanger(CustomClusterTestSuite):
 
   @staticmethod
   def _get_ranger_privileges(user):
-    headers = {"Content-Type": "application/json", "Accept": "application/json"}
     r = requests.get("{0}/service/plugins/policies"
                      .format(RANGER_HOST),
-                     auth=RANGER_AUTH, headers=headers)
+                     auth=RANGER_AUTH, headers=REST_HEADERS)
     return json.loads(r.content)["policies"]
 
   def _add_ranger_user(self, user):
     data = {"name": user, "password": "password123", "userRoleList": ["ROLE_USER"]}
-    headers = {"Content-Type": "application/json", "Accept": "application/json"}
-
     r = requests.post("{0}/service/xusers/secure/users".format(RANGER_HOST),
                       auth=RANGER_AUTH,
-                      json=data, headers=headers)
+                      json=data, headers=REST_HEADERS)
     return json.loads(r.content)["id"]
 
   def _remove_ranger_user(self, id):
     r = requests.delete("{0}/service/xusers/users/{1}?forceDelete=true"
                         .format(RANGER_HOST, id), auth=RANGER_AUTH)
     assert 300 > r.status_code >= 200
+
+  @staticmethod
+  def _add_column_masking_policy(
+      policy_name, user, db, table, column, mask_type, value_expr=None):
+    """ Adds a column masking policy and returns the policy id"""
+    data = {
+      "name": policy_name,
+      "policyType": 1,
+      "serviceType": "hive",
+      "service": "test_impala",
+      "resources": {
+        "database": {
+          "values": [db],
+          "isExcludes": False,
+          "isRecursive": False
+        },
+        "table": {
+          "values": [table],
+          "isExcludes": False,
+          "isRecursive": False
+        },
+        "column": {
+          "values": [column],
+          "isExcludes": False,
+          "isRecursive": False
+        }
+      },
+      "dataMaskPolicyItems": [
+        {
+          "accesses": [
+            {
+              "type": "select",
+              "isAllowed": True
+            }
+          ],
+          "users": [user],
+          "dataMaskInfo": {
+            "dataMaskType": mask_type,
+            "valueExpr": value_expr
+          }
+        }
+      ]
+    }
+    r = requests.post("{0}/service/public/v2/api/policy".format(RANGER_HOST),
+                      auth=RANGER_AUTH, json=data, headers=REST_HEADERS)
+    assert 300 > r.status_code >= 200, r.content
+    return json.loads(r.content)["id"]
+
+  @staticmethod
+  def _remove_column_masking_policy(policy_name):
+    r = requests.delete(
+        "{0}/service/public/v2/api/policy?servicename=test_impala&policyname={1}".format(
+            RANGER_HOST, policy_name),
+        auth=RANGER_AUTH, headers=REST_HEADERS)
+    assert 300 > r.status_code >= 200, r.content
 
   @staticmethod
   def _check_privileges(result, expected):
@@ -735,3 +788,56 @@ class TestRanger(CustomClusterTestSuite):
         TestRanger._revoke_ranger_privilege("{OWNER}", resource, access)
     finally:
       self._run_query_as_user("drop database {0} cascade".format(test_db), ADMIN, True)
+
+  @CustomClusterTestSuite.with_args(
+    impalad_args=IMPALAD_ARGS, catalogd_args=CATALOGD_ARGS)
+  def test_column_masking(self, vector, unique_name):
+    user = getuser()
+    unique_database = unique_name + '_db'
+    # Create another client for admin user since current user doesn't have privileges to
+    # create/drop databases or refresh authorization.
+    admin_client = self.create_impala_client()
+    admin_client.execute("drop database if exists %s cascade" % unique_database,
+                         user=ADMIN)
+    admin_client.execute("create database %s" % unique_database, user=ADMIN)
+    # Grant CREATE on database to current user for tests on CTAS, CreateView etc.
+    admin_client.execute("grant create on database %s to user %s"
+                         % (unique_database, user))
+    policy_cnt = 0
+    try:
+      TestRanger._add_column_masking_policy(
+        unique_name + str(policy_cnt), user, "functional", "alltypestiny", "id",
+        "CUSTOM", "id * 100")   # use column name 'id' directly
+      policy_cnt += 1
+      TestRanger._add_column_masking_policy(
+        unique_name + str(policy_cnt), user, "functional", "alltypestiny", "bool_col",
+        "MASK_NULL")
+      policy_cnt += 1
+      TestRanger._add_column_masking_policy(
+        unique_name + str(policy_cnt), user, "functional", "alltypestiny", "string_col",
+        "CUSTOM", "concat({col}, 'aaa')")   # use column reference '{col}'
+      policy_cnt += 1
+      # Add policy to a view
+      TestRanger._add_column_masking_policy(
+        unique_name + str(policy_cnt), user, "functional", "alltypes_view", "string_col",
+        "CUSTOM", "concat('vvv', {col})")
+      policy_cnt += 1
+      # Add policy to the table used in the view
+      TestRanger._add_column_masking_policy(
+        unique_name + str(policy_cnt), user, "functional", "alltypes", "id",
+        "CUSTOM", "{col} * 100")
+      policy_cnt += 1
+      TestRanger._add_column_masking_policy(
+        unique_name + str(policy_cnt), user, "functional", "alltypes", "string_col",
+        "CUSTOM", "concat({col}, 'ttt')")
+      policy_cnt += 1
+      self.execute_query_expect_success(admin_client, "refresh authorization",
+                                        user=ADMIN)
+      self.run_test_case("QueryTest/ranger_column_masking", vector,
+                         test_file_vars={'$UNIQUE_DB': unique_database})
+    finally:
+      admin_client.execute("revoke create on database %s from user %s"
+                           % (unique_database, user))
+      admin_client.execute("drop database %s cascade" % unique_database)
+      for i in range(policy_cnt):
+        TestRanger._remove_column_masking_policy(unique_name + str(i))

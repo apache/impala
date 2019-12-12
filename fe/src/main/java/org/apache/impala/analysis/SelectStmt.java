@@ -177,6 +177,11 @@ public class SelectStmt extends QueryStmt {
     return tableAliasGenerator_;
   }
 
+  @Override
+  public void setDoTableMasking(boolean doTableMasking) {
+    fromClause_.setDoTableMasking(doTableMasking);
+  }
+
   /**
    * Creates resultExprs and baseTblResultExprs.
    */

@@ -212,6 +212,18 @@ public class NoopAuthorizationFactory implements AuthorizationFactory {
           String sqlStmt, TSessionState sessionState, Optional<EventSequence> timeline) {
         return new AuthorizationContext(timeline);
       }
+
+      @Override
+      public boolean needsMaskingOrFiltering(User user, String dbName,
+          String tableName, List<String> requiredColumns) {
+        return false;
+      }
+
+      @Override
+      public String createColumnMask(User user, String dbName, String tableName,
+          String columnName) {
+        return null;
+      }
     };
   }
 
@@ -224,5 +236,10 @@ public class NoopAuthorizationFactory implements AuthorizationFactory {
   @Override
   public AuthorizationManager newAuthorizationManager(CatalogServiceCatalog catalog) {
     return new NoopAuthorizationManager();
+  }
+
+  @Override
+  public boolean supportsColumnMasking() {
+    return false;
   }
 }

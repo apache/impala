@@ -385,6 +385,18 @@ public class FrontendTestBase extends AbstractFrontendTest {
           public void invalidateAuthorizationCache() {}
 
           @Override
+          public boolean needsMaskingOrFiltering(User user, String dbName,
+              String tableName, List<String> requiredColumns) {
+            return false;
+          }
+
+          @Override
+          public String createColumnMask(User user, String dbName, String tableName,
+              String columnName) {
+            return null;
+          }
+
+          @Override
           public AuthorizationContext createAuthorizationContext(boolean doAudits,
               String sqlStmt, TSessionState sessionState,
               Optional<EventSequence> timeline) {
@@ -402,6 +414,11 @@ public class FrontendTestBase extends AbstractFrontendTest {
       @Override
       public AuthorizationManager newAuthorizationManager(CatalogServiceCatalog catalog) {
         return new NoopAuthorizationManager();
+      }
+
+      @Override
+      public boolean supportsColumnMasking() {
+        return false;
       }
     };
   }

@@ -21,11 +21,14 @@ import java.util.ArrayList;
 import java.util.List;
 import java.util.Set;
 
+import org.apache.impala.authorization.TableMask;
+import org.apache.impala.catalog.Column;
 import org.apache.impala.catalog.ColumnStats;
 import org.apache.impala.catalog.FeView;
 import org.apache.impala.catalog.StructField;
 import org.apache.impala.catalog.StructType;
 import org.apache.impala.common.AnalysisException;
+import org.apache.impala.common.InternalException;
 import org.apache.impala.rewrite.ExprRewriter;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -68,6 +71,9 @@ public class InlineViewRef extends TableRef {
 
   // Map inline view's output slots to the corresponding baseTblResultExpr of queryStmt.
   protected final ExprSubstitutionMap baseTblSmap_;
+
+  // Whether this is an inline view generated for table masking.
+  private boolean isTableMaskingView_ = false;
 
   // END: Members that need to be reset()
   /////////////////////////////////////////
@@ -127,6 +133,45 @@ public class InlineViewRef extends TableRef {
     materializedTupleIds_.addAll(other.materializedTupleIds_);
     smap_ = other.smap_.clone();
     baseTblSmap_ = other.baseTblSmap_.clone();
+    isTableMaskingView_ = other.isTableMaskingView_;
+  }
+
+  /**
+   * Creates an inline-view doing table masking for column masking and row filtering
+   * policies. Callers should replace 'tableRef' with the returned view.
+   *
+   * @param resolvedPath resolved path for the original table/view
+   * @param tableRef original resolved table/view
+   * @param tableMask TableMask providing column masking and row filtering policies
+   */
+  static InlineViewRef createTableMaskView(Path resolvedPath, TableRef tableRef,
+      TableMask tableMask) throws AnalysisException, InternalException {
+    Preconditions.checkNotNull(resolvedPath);
+    Preconditions.checkNotNull(resolvedPath.getRootTable());
+    Preconditions.checkNotNull(tableRef);
+    Preconditions.checkState(tableRef instanceof InlineViewRef
+        || tableRef instanceof BaseTableRef);
+    List<Column> columns = resolvedPath.getRootTable().getColumnsInHiveOrder();
+    List<SelectListItem> items = Lists.newArrayListWithCapacity(columns.size());
+    for (Column col: columns) {
+      // TODO: only add materialized columns to avoid introducing new privilege
+      //  requirements (IMPALA-9223)
+      items.add(new SelectListItem(
+          tableMask.createColumnMask(col.getName(), col.getType()), col.getName()));
+    }
+    SelectList selectList = new SelectList(items);
+    FromClause fromClause = new FromClause(Lists.newArrayList(tableRef));
+    SelectStmt tableMaskStmt = new SelectStmt(selectList, fromClause,
+        null, null, null, null, null);
+    InlineViewRef viewRef = new InlineViewRef(/*alias*/ null, tableMaskStmt,
+        (TableSampleClause) null);
+    tableRef.migratePropertiesTo(viewRef);
+    viewRef.isTableMaskingView_ = true;
+    if (LOG.isTraceEnabled()) {
+      LOG.trace("Replacing '{}' with subquery: {}", tableRef.toSql(),
+          tableMaskStmt.toSql());
+    }
+    return viewRef;
   }
 
   /**
@@ -309,6 +354,20 @@ public class InlineViewRef extends TableRef {
   }
 
   public FeView getView() { return view_; }
+
+  public boolean isTableMaskingView() { return isTableMaskingView_; }
+
+  /**
+   * Return the unmasked TableRef if this is an inline view for table masking.
+   */
+  public TableRef getUnMaskedTableRef() {
+    Preconditions.checkState(isTableMaskingView_);
+    Preconditions.checkState(queryStmt_ instanceof SelectStmt);
+    SelectStmt selectStmt = (SelectStmt) queryStmt_;
+    Preconditions.checkNotNull(selectStmt.fromClause_);
+    Preconditions.checkState(selectStmt.fromClause_.size() == 1);
+    return selectStmt.fromClause_.get(0);
+  }
 
   @Override
   protected TableRef clone() { return new InlineViewRef(this); }
