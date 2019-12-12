@@ -40,6 +40,7 @@ import org.apache.impala.rewrite.FoldConstantsRule;
 import org.apache.impala.rewrite.NormalizeBinaryPredicatesRule;
 import org.apache.impala.rewrite.NormalizeCountStarRule;
 import org.apache.impala.rewrite.NormalizeExprsRule;
+import org.apache.impala.rewrite.SimplifyCastStringToTimestamp;
 import org.apache.impala.rewrite.SimplifyConditionalsRule;
 import org.apache.impala.rewrite.SimplifyDistinctFromRule;
 import org.junit.BeforeClass;
@@ -768,6 +769,21 @@ public class ExprRewriteRulesTest extends FrontendTestBase {
     RewritesOk("if(bool_col is not distinct from bool_col, 1, 2)", rules, "1");
     RewritesOk("if(bool_col <=> bool_col, 1, 2)", rules, "1");
     RewritesOk("if(bool_col <=> NULL, 1, 2)", rules, null);
+  }
+
+  @Test
+  public void testSimplifyCastStringToTimestamp() throws ImpalaException {
+    ExprRewriteRule rule = SimplifyCastStringToTimestamp.INSTANCE;
+
+    // Can be simplified
+    RewritesOk("cast(unix_timestamp(date_string_col) as timestamp)", rule,
+        "CAST(date_string_col AS TIMESTAMP)");
+    RewritesOk("cast(unix_timestamp(date_string_col, 'yyyy-MM-dd') as timestamp)", rule,
+        "to_timestamp(date_string_col, 'yyyy-MM-dd')");
+
+    // Verify nothing happens
+    RewritesOk("cast(unix_timestamp(timestamp_col) as timestamp)", rule, null);
+    RewritesOk("cast(unix_timestamp() as timestamp)", rule, null);
   }
 
   /**
