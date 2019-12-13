@@ -47,7 +47,7 @@ public abstract class BaseAuthorizationChecker implements AuthorizationChecker {
 
   protected final AuthorizationConfig config_;
 
-  /*
+  /**
    * Creates a new AuthorizationChecker based on the config values.
    */
   protected BaseAuthorizationChecker(AuthorizationConfig config) {
@@ -55,7 +55,7 @@ public abstract class BaseAuthorizationChecker implements AuthorizationChecker {
     config_ = config;
   }
 
-  /*
+  /**
    * Returns true if the given user has permission to execute the given
    * request, false otherwise. Always returns true if authorization is disabled or the
    * given user is an admin user.
@@ -81,6 +81,20 @@ public abstract class BaseAuthorizationChecker implements AuthorizationChecker {
       return true;
     }
     return authorizeResource(authzCtx, user, request);
+  }
+
+  @Override
+  public boolean hasAnyAccess(User user, Set<PrivilegeRequest> requests)
+      throws InternalException {
+    Preconditions.checkNotNull(user);
+    Preconditions.checkNotNull(requests);
+
+    for (PrivilegeRequest request : requests) {
+      if (hasAccess(user, request)) {
+        return true;
+      }
+    }
+    return false;
   }
 
   /**

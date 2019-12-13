@@ -30,12 +30,20 @@ import java.util.Set;
  * An interface used to check whether a user has access to a given resource.
  */
 public interface AuthorizationChecker {
-  /*
+  /**
    * Returns true if the given user has permission to execute the given
    * request, false otherwise. Always returns true if authorization is disabled or the
    * given user is an admin user.
    */
   boolean hasAccess(User user, PrivilegeRequest request) throws InternalException;
+
+  /**
+   * Returns true if the given user has permission to execute any of the given
+   * requests, false otherwise. Always returns true if authorization is disabled or the
+   * given user is an admin user.
+   */
+  boolean hasAnyAccess(User user, Set<PrivilegeRequest> requests)
+      throws InternalException;
 
   /**
    * Creates a a new {@link AuthorizationContext}. {@link AuthorizationContext} gets

@@ -279,12 +279,18 @@ DEFINE_bool_hidden(recursively_list_partitions, true,
 DEFINE_bool(unlock_zorder_sort, false,
     "(Experimental) If true, enables using ZORDER option for SORT BY.");
 
-DEFINE_bool(simplify_check_on_show_tables, false,
-    "If true, only check SELECT privilege on SHOW TABLES or GET_TABLES when enabling "
-    "authorization. If false, all privileges will be checked for visibility of a table. "
-    "A table will show up if the user has any privileges on it. This flag is used to "
-    "improve SHOW TABLES performance when using Sentry and have thousands of candidate "
-    "tables to be checked. No performance gain is found in using Ranger");
+DEFINE_string(min_privilege_set_for_show_stmts, "any",
+    "Comma separated list of privileges. Any one of them is required to show a database "
+    "or table. Defaults to \"any\" which means if the user has any privilege (CREATE, "
+    "SELECT, INSERT, etc) on a database or table, the database/table is visible in the "
+    "results of SHOW DATABASES/TABLES. If set to \"select\", only dbs/tables on which "
+    "the user has SELECT privilege will be shown. If set to \"select,insert\", only "
+    "dbs/tables on which the user has SELECT or INSERT privilege will be shown. In "
+    "practice, this flag can be set to \"select\" or \"select,insert\" to improve "
+    "performance of SHOW DATABASES/TABLES and GET_SCHEMAS/GET_TABLES, especially when "
+    "using Sentry and having thousands of candidate dbs/tables to be checked with a "
+    "user with large scale of privileges. No significant performance gain when using "
+    "Ranger");
 
 // Set the slow RPC threshold to 2 minutes to avoid false positives (since TransmitData
 // RPCs can take some time to process).

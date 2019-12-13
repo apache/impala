@@ -23,6 +23,7 @@ import java.util.Arrays;
 import java.util.Collection;
 import java.util.Collections;
 import java.util.Comparator;
+import java.util.EnumSet;
 import java.util.HashSet;
 import java.util.Iterator;
 import java.util.List;
@@ -168,6 +169,7 @@ import org.slf4j.LoggerFactory;
 import com.google.common.annotations.VisibleForTesting;
 import com.google.common.base.Preconditions;
 import com.google.common.base.Predicates;
+import com.google.common.base.Strings;
 import com.google.common.collect.Lists;
 import com.google.common.collect.Sets;
 import com.google.common.util.concurrent.Uninterruptibles;
@@ -249,6 +251,8 @@ public class Frontend {
   private final FeCatalogManager catalogManager_;
   private final AuthorizationFactory authzFactory_;
   private final AuthorizationManager authzManager_;
+  // Privileges in which the user should have any of them to see a database or table,
+  private final EnumSet<Privilege> minPrivilegeSetForShowStmts_;
   /**
    * Authorization checker. Initialized and periodically loaded by a task
    * running on the {@link #policyReader_} thread.
@@ -296,6 +300,7 @@ public class Frontend {
     catalogManager_.setAuthzChecker(authzChecker_);
     authzManager_ = authzFactory.newAuthorizationManager(catalogManager_,
         authzChecker_::get);
+    minPrivilegeSetForShowStmts_ = getMinPrivilegeSetForShowStmts();
     impaladTableUsageTracker_ = ImpaladTableUsageTracker.createFromConfig(
         BackendConfig.INSTANCE);
     queryHookManager_ = QueryEventHookManager.createFromConfig(BackendConfig.INSTANCE);
@@ -305,6 +310,24 @@ public class Frontend {
     } else {
       transactionKeepalive_ = null;
     }
+  }
+
+  /**
+   * Returns the required privilege set for showing a database or table.
+   */
+  private EnumSet<Privilege> getMinPrivilegeSetForShowStmts() throws InternalException {
+    String configStr = BackendConfig.INSTANCE.getMinPrivilegeSetForShowStmts();
+    if (Strings.isNullOrEmpty(configStr)) return EnumSet.of(Privilege.ANY);
+    EnumSet<Privilege> privileges = EnumSet.noneOf(Privilege.class);
+    for (String pStr : configStr.toUpperCase().split(",")) {
+      try {
+        privileges.add(Privilege.valueOf(pStr.trim()));
+      } catch (IllegalArgumentException e) {
+        LOG.error("Illegal privilege name '{}'", pStr, e);
+        throw new InternalException("Failed to parse privileges: " + configStr, e);
+      }
+    }
+    return privileges.isEmpty() ? EnumSet.of(Privilege.ANY) : privileges;
   }
 
   public FeCatalog getCatalog() { return catalogManager_.getOrCreateCatalog(); }
@@ -774,10 +797,6 @@ public class Frontend {
     FeCatalog catalog = getCatalog();
     List<String> tblNames = catalog.getTableNames(dbName, matcher);
     if (authzFactory_.getAuthorizationConfig().isEnabled()) {
-      Privilege requiredPrivilege = Privilege.ANY;
-      if (BackendConfig.INSTANCE.simplifyCheckOnShowTables()) {
-        requiredPrivilege = Privilege.SELECT;
-      }
       Iterator<String> iter = tblNames.iterator();
       while (iter.hasNext()) {
         String tblName = iter.next();
@@ -794,10 +813,12 @@ public class Frontend {
           LOG.info("Table {} not yet loaded, ignoring it in table listing.",
               dbName + "." + tblName);
         }
-        PrivilegeRequest privilegeRequest = new PrivilegeRequestBuilder(
+        Set<PrivilegeRequest> requests = new PrivilegeRequestBuilder(
             authzFactory_.getAuthorizableFactory())
-            .allOf(requiredPrivilege).onAnyColumn(dbName, tblName, tableOwner).build();
-        if (!authzChecker_.get().hasAccess(user, privilegeRequest)) {
+            .anyOf(minPrivilegeSetForShowStmts_)
+            .onAnyColumn(dbName, tblName, tableOwner)
+            .buildSet();
+        if (!authzChecker_.get().hasAnyAccess(user, requests)) {
           iter.remove();
         }
       }
@@ -940,10 +961,12 @@ public class Frontend {
       // Default DB should always be shown.
       return true;
     }
-    PrivilegeRequest request = new PrivilegeRequestBuilder(
-        authzFactory_.getAuthorizableFactory()).any().onAnyColumn(
-            db.getName(), db.getOwnerUser()).build();
-    return authzChecker_.get().hasAccess(user, request);
+    Set<PrivilegeRequest> requests = new PrivilegeRequestBuilder(
+        authzFactory_.getAuthorizableFactory())
+        .anyOf(minPrivilegeSetForShowStmts_)
+        .onAnyColumn(db.getName(), db.getOwnerUser())
+        .buildSet();
+    return authzChecker_.get().hasAnyAccess(user, requests);
   }
 
   /**

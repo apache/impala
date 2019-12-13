@@ -17,7 +17,11 @@
 
 package org.apache.impala.authorization;
 
+import java.util.EnumSet;
+import java.util.Set;
+
 import com.google.common.base.Preconditions;
+import com.google.common.collect.Sets;
 import org.apache.impala.catalog.FeDb;
 import org.apache.impala.catalog.FeTable;
 
@@ -33,6 +37,7 @@ public class PrivilegeRequestBuilder {
   private final AuthorizableFactory authzFactory_;
   private Authorizable authorizable_;
   private Privilege privilege_;
+  private EnumSet<Privilege> privilegeSet_;
   private boolean grantOption_ = false;
 
   public PrivilegeRequestBuilder(AuthorizableFactory authzFactory) {
@@ -152,6 +157,14 @@ public class PrivilegeRequestBuilder {
   }
 
   /**
+   * Specifies any of the privileges the user needs to have.
+   */
+  public PrivilegeRequestBuilder anyOf(EnumSet<Privilege> privileges) {
+    privilegeSet_ = privileges;
+    return this;
+  }
+
+  /**
    * Specifies the user needs "ALL" privileges
    */
   public PrivilegeRequestBuilder all() {
@@ -183,5 +196,15 @@ public class PrivilegeRequestBuilder {
     Preconditions.checkNotNull(authorizable_);
     Preconditions.checkNotNull(privilege_);
     return new PrivilegeRequest(authorizable_, privilege_, grantOption_);
+  }
+
+  public Set<PrivilegeRequest> buildSet() {
+    Preconditions.checkNotNull(authorizable_);
+    Preconditions.checkNotNull(privilegeSet_);
+    Set<PrivilegeRequest> privileges = Sets.newHashSet();
+    for (Privilege p : privilegeSet_) {
+      privileges.add(new PrivilegeRequest(authorizable_, p, grantOption_));
+    }
+    return privileges;
   }
 }

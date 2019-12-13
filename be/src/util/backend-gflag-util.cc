@@ -81,7 +81,7 @@ DECLARE_bool(use_dedicated_coordinator_estimates);
 DECLARE_string(blacklisted_dbs);
 DECLARE_bool(unlock_zorder_sort);
 DECLARE_string(blacklisted_tables);
-DECLARE_bool(simplify_check_on_show_tables);
+DECLARE_string(min_privilege_set_for_show_stmts);
 DECLARE_int32(num_expected_executors);
 
 namespace impala {
@@ -167,7 +167,7 @@ Status GetThriftBackendGflags(JNIEnv* jni_env, jbyteArray* cfg_bytes) {
   cfg.__set_blacklisted_dbs(FLAGS_blacklisted_dbs);
   cfg.__set_unlock_zorder_sort(FLAGS_unlock_zorder_sort);
   cfg.__set_blacklisted_tables(FLAGS_blacklisted_tables);
-  cfg.__set_simplify_check_on_show_tables(FLAGS_simplify_check_on_show_tables);
+  cfg.__set_min_privilege_set_for_show_stmts(FLAGS_min_privilege_set_for_show_stmts);
   cfg.__set_num_expected_executors(FLAGS_num_expected_executors);
   RETURN_IF_ERROR(SerializeThriftMsg(jni_env, &cfg, cfg_bytes));
   return Status::OK();

@@ -193,8 +193,8 @@ public class BackendConfig {
     backendCfg_.setUnlock_zorder_sort(zOrdering);
   }
 
-  public boolean simplifyCheckOnShowTables() {
-    return backendCfg_.simplify_check_on_show_tables;
+  public String getMinPrivilegeSetForShowStmts() {
+    return backendCfg_.min_privilege_set_for_show_stmts;
   }
 
   // Inits the auth_to_local configuration in the static KerberosName class.

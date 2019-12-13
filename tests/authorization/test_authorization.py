@@ -486,16 +486,21 @@ class TestAuthorization(CustomClusterTestSuite):
       self.execute_query_expect_success(client,
                                         "select * from functional.alltypes limit 1")
 
-  @pytest.mark.execute_serially
-  @CustomClusterTestSuite.with_args(
-    impalad_args="--server_name=server1 --sentry_config=%s "
-                 "--authorized_proxy_user_config=%s=* "
-                 "--simplify_check_on_show_tables=true" %
-                 (SENTRY_CONFIG_FILE, getuser()),
-    catalogd_args="--sentry_config={0}".format(SENTRY_CONFIG_FILE),
-    sentry_config=SENTRY_CONFIG_FILE_OO,  # Enable Sentry Object Ownership
-    sentry_log_dir="{0}/test_fast_show_tables_with_sentry".format(SENTRY_BASE_LOG_DIR))
-  def test_fast_show_tables_with_sentry(self, unique_role, unique_name):
+  @staticmethod
+  def _verify_show_dbs(result, unique_name, visibility_privileges=PRIVILEGES):
+    """ Helper function for verifying the results of SHOW DATABASES below.
+    Only show databases with privileges implying any of the visibility_privileges.
+    """
+    for priv in PRIVILEGES:
+      # Result lines are in the format of "db_name\tdb_comment"
+      db_name = 'db_%s_%s\t' % (unique_name, priv)
+      if priv != 'all' and priv not in visibility_privileges:
+        assert db_name not in result.data
+      else:
+        assert db_name in result.data
+
+  def _test_sentry_show_stmts_helper(self, unique_role, unique_name,
+                                     visibility_privileges):
     unique_db = unique_name + "_db"
     # TODO: can we create and use a temp username instead of using root?
     another_user = 'root'
@@ -511,52 +516,138 @@ class TestAuthorization(CustomClusterTestSuite):
       self.client.execute("drop database if exists %s cascade" % unique_db)
       self.client.execute("create database %s" % unique_db)
       for priv in PRIVILEGES:
+        self.client.execute("create database db_%s_%s" % (unique_name, priv))
+        self.client.execute("grant {0} on database db_{1}_{2} to role {3}"
+                            .format(priv, unique_name, priv, unique_role))
         self.client.execute("create table %s.tbl_%s (i int)" % (unique_db, priv))
         self.client.execute("grant {0} on table {1}.tbl_{2} to role {3}"
                             .format(priv, unique_db, priv, unique_role))
       self.client.execute("grant role %s to group %s" %
                           (unique_role, another_user_grp))
 
-      # Owner (current user) can still see all the tables
+      # Owner (current user) can still see all the owned databases and tables
+      result = self.client.execute("show databases")
+      TestAuthorization._verify_show_dbs(result, unique_name)
       result = self.client.execute("show tables in %s" % unique_db)
       assert result.data == ["tbl_%s" % p for p in PRIVILEGES]
 
-      # Check SHOW TABLES using another username
+      # Check SHOW DATABASES and SHOW TABLES using another username
       # Create another client so we can user another username
       root_impalad_client = self.create_impala_client()
       result = self.execute_query_expect_success(
-        root_impalad_client, "show tables in %s" % unique_db, user=another_user)
-      # Only show tables with privileges implying SELECT privilege
-      assert result.data == ['tbl_all', 'tbl_select']
+          root_impalad_client, "show databases", user=another_user)
+      TestAuthorization._verify_show_dbs(result, unique_name, visibility_privileges)
+      result = self.execute_query_expect_success(
+          root_impalad_client, "show tables in %s" % unique_db, user=another_user)
+      # Only show tables with privileges implying any of the visibility privileges
+      assert 'tbl_all' in result.data   # ALL can imply to any privilege
+      for p in visibility_privileges:
+        assert 'tbl_%s' % p in result.data
     finally:
-      self.role_cleanup(unique_role)
       self.client.execute("drop database if exists %s cascade" % unique_db)
+      for priv in PRIVILEGES:
+        self.client.execute(
+            "drop database if exists db_%s_%s cascade" % (unique_name, priv))
+      self.role_cleanup(unique_role)
 
   @pytest.mark.execute_serially
   @CustomClusterTestSuite.with_args(
-    impalad_args="--server-name=server1 --ranger_service_type=hive "
-                 "--ranger_app_id=impala --authorization_provider=ranger "
-                 "--simplify_check_on_show_tables=true",
-    catalogd_args="--server-name=server1 --ranger_service_type=hive "
-                  "--ranger_app_id=impala --authorization_provider=ranger")
-  def test_fast_show_tables_with_ranger(self, unique_role, unique_name):
+    impalad_args="--server_name=server1 --sentry_config=%s "
+                 "--authorized_proxy_user_config=%s=* "
+                 "--min_privilege_set_for_show_stmts=select" %
+                 (SENTRY_CONFIG_FILE, getuser()),
+    catalogd_args="--sentry_config={0}".format(SENTRY_CONFIG_FILE),
+    sentry_config=SENTRY_CONFIG_FILE_OO,  # Enable Sentry Object Ownership
+    sentry_log_dir="{0}/test_sentry_show_stmts_with_select".format(SENTRY_BASE_LOG_DIR))
+  def test_sentry_show_stmts_with_select(self, unique_role, unique_name):
+    self._test_sentry_show_stmts_helper(unique_role, unique_name, ['select'])
+
+  @pytest.mark.execute_serially
+  @CustomClusterTestSuite.with_args(
+    impalad_args="--server_name=server1 --sentry_config=%s "
+                 "--authorized_proxy_user_config=%s=* "
+                 "--min_privilege_set_for_show_stmts=select,insert" %
+                 (SENTRY_CONFIG_FILE, getuser()),
+    catalogd_args="--sentry_config={0}".format(SENTRY_CONFIG_FILE),
+    sentry_config=SENTRY_CONFIG_FILE_OO,  # Enable Sentry Object Ownership
+    sentry_log_dir="{0}/test_sentry_show_stmts_with_select_insert"
+                   .format(SENTRY_BASE_LOG_DIR))
+  def test_sentry_show_stmts_with_select_insert(self, unique_role, unique_name):
+    self._test_sentry_show_stmts_helper(unique_role, unique_name,
+                                        ['select', 'insert'])
+
+  @pytest.mark.execute_serially
+  @CustomClusterTestSuite.with_args(
+    impalad_args="--server_name=server1 --sentry_config=%s "
+                 "--authorized_proxy_user_config=%s=* "
+                 "--min_privilege_set_for_show_stmts=any" %
+                 (SENTRY_CONFIG_FILE, getuser()),
+    catalogd_args="--sentry_config={0}".format(SENTRY_CONFIG_FILE),
+    sentry_config=SENTRY_CONFIG_FILE_OO,  # Enable Sentry Object Ownership
+    sentry_log_dir="{0}/test_sentry_show_stmts_with_any".format(SENTRY_BASE_LOG_DIR))
+  def test_sentry_show_stmts_with_any(self, unique_role, unique_name):
+    self._test_sentry_show_stmts_helper(unique_role, unique_name, PRIVILEGES)
+
+  def _test_ranger_show_stmts_helper(self, unique_name, visibility_privileges):
     unique_db = unique_name + "_db"
     admin_client = self.create_impala_client()
     try:
       admin_client.execute("drop database if exists %s cascade" % unique_db, user=ADMIN)
       admin_client.execute("create database %s" % unique_db, user=ADMIN)
       for priv in PRIVILEGES:
+        admin_client.execute("create database db_%s_%s" % (unique_name, priv))
+        admin_client.execute("grant {0} on database db_{1}_{2} to user {3}"
+                             .format(priv, unique_name, priv, getuser()))
         admin_client.execute("create table %s.tbl_%s (i int)" % (unique_db, priv))
         admin_client.execute("grant {0} on table {1}.tbl_{2} to user {3}"
-                            .format(priv, unique_db, priv, getuser()))
+                             .format(priv, unique_db, priv, getuser()))
 
-      # Admin can still see all the tables
+      # Admin can still see all the databases and tables
+      result = admin_client.execute("show databases")
+      TestAuthorization._verify_show_dbs(result, unique_name)
       result = admin_client.execute("show tables in %s" % unique_db)
       assert result.data == ["tbl_%s" % p for p in PRIVILEGES]
 
-      # Check SHOW TABLES using another username
+      # Check SHOW DATABASES and SHOW TABLES using another username
+      result = self.client.execute("show databases")
+      TestAuthorization._verify_show_dbs(result, unique_name, visibility_privileges)
       result = self.client.execute("show tables in %s" % unique_db)
-      # Only show tables with privileges implying SELECT privilege
-      assert result.data == ['tbl_all', 'tbl_select']
+      # Only show tables with privileges implying any of the visibility privileges
+      assert 'tbl_all' in result.data   # ALL can imply to any privilege
+      for p in visibility_privileges:
+        assert 'tbl_%s' % p in result.data
     finally:
       admin_client.execute("drop database if exists %s cascade" % unique_db)
+      for priv in PRIVILEGES:
+        admin_client.execute(
+            "drop database if exists db_%s_%s cascade" % (unique_name, priv))
+
+  @pytest.mark.execute_serially
+  @CustomClusterTestSuite.with_args(
+    impalad_args="--server-name=server1 --ranger_service_type=hive "
+                 "--ranger_app_id=impala --authorization_provider=ranger "
+                 "--min_privilege_set_for_show_stmts=select",
+    catalogd_args="--server-name=server1 --ranger_service_type=hive "
+                  "--ranger_app_id=impala --authorization_provider=ranger")
+  def test_ranger_show_stmts_with_select(self, unique_name):
+    self._test_ranger_show_stmts_helper(unique_name, ['select'])
+
+  @pytest.mark.execute_serially
+  @CustomClusterTestSuite.with_args(
+    impalad_args="--server-name=server1 --ranger_service_type=hive "
+                 "--ranger_app_id=impala --authorization_provider=ranger "
+                 "--min_privilege_set_for_show_stmts=select,insert",
+    catalogd_args="--server-name=server1 --ranger_service_type=hive "
+                  "--ranger_app_id=impala --authorization_provider=ranger")
+  def test_ranger_show_stmts_with_select_insert(self, unique_name):
+    self._test_ranger_show_stmts_helper(unique_name, ['select', 'insert'])
+
+  @pytest.mark.execute_serially
+  @CustomClusterTestSuite.with_args(
+    impalad_args="--server-name=server1 --ranger_service_type=hive "
+                 "--ranger_app_id=impala --authorization_provider=ranger "
+                 "--min_privilege_set_for_show_stmts=any",
+    catalogd_args="--server-name=server1 --ranger_service_type=hive "
+                  "--ranger_app_id=impala --authorization_provider=ranger")
+  def test_ranger_show_stmts_with_any(self, unique_name):
+    self._test_ranger_show_stmts_helper(unique_name, PRIVILEGES)
