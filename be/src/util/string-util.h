@@ -45,10 +45,10 @@ bool CommaSeparatedContains(const std::string& cs_list, const std::string& item)
 /// 'end' string
 bool EndsWith(const std::string& full_string, const std::string& end);
 
-/// This function returns a pointer past the end of the longest C-style identifier
+/// This function returns a pointer past the end of the longest identifier
 /// that is a prefix of given string or NULL if the given string does not start with
-/// one.  A C-style identifier begins with an ASCII letter or underscore
-/// and continues with ASCII letters, digits, or underscores.  start and end means
+/// one. The identifier must begin with an ASCII letter, underscore, or digit
+/// and continues with ASCII letters, digits, or underscores. start and end means
 /// the given string is located at [start, end)
 const uint8_t* FindEndOfIdentifier(const uint8_t* start, const uint8_t* end);
 

@@ -76,7 +76,8 @@ bool EndsWith(const std::string& full_string, const std::string& end) {
 const uint8_t* FindEndOfIdentifier(const uint8_t* start, const uint8_t* end) {
   if (start == end) return nullptr;
   uint8_t ch = *start++;
-  if (!((ch >= 'a' && ch <= 'z') || (ch >= 'A' && ch <= 'Z') || ch == '_')) {
+  if (!((ch >= 'a' && ch <= 'z') || (ch >= 'A' && ch <= 'Z') ||
+      (ch >= '0' && ch <= '9') || ch == '_')) {
     return nullptr;
   }
   while (start != end) {
