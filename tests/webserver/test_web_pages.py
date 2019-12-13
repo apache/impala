@@ -569,7 +569,11 @@ class TestWebPage(ImpalaTestSuite):
       assert conn["remote_ip"] != ""
       assert conn["num_calls_in_flight"] >= 0
       assert conn["num_calls_in_flight"] == len(conn["calls_in_flight"])
-      assert conn["socket_stats"]["bytes_acked"] > 0, conn
+      # Check rtt, which should be present in 'struct tcp_info' even in old kernels
+      # like 2.6.32.
+      assert conn["socket_stats"]["rtt"] > 0, conn
+      # send_queue_bytes uses TIOCOUTQ, which is also present in 2.6.32 and even older
+      # kernels.
       assert conn["socket_stats"]["send_queue_bytes"] >= 0, conn
 
   @pytest.mark.execute_serially
