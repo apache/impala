@@ -9999,6 +9999,7 @@ TEST_P(ExprTest, JsonTest) {
   TestStringValue(
       "get_json_object('{\"a\": {\"aa\": 1}, \"b\": {\"bb\": 2}}', '$.*.*')",
       "[1,2]");
+  TestStringValue("get_json_object('{\"a\":1, \"1\":2, \"c\":3}', '$.1')", "2");
 
   // Tests about NULL
   TestIsNull("get_json_object('{\"a\": 1}', '$.b')", TYPE_STRING);
