@@ -652,15 +652,15 @@ explain SELECT 1 FROM alltypestiny a1
       <title>Queries Stuck on Failed HDFS Calls and not Timing out</title>
 
       <conbody>
-
-        <p>
-          If the following error appears multiple times in a short duration while running a
-          query, it would mean that the connection between the <codeph>impalad</codeph> and the
-          HDFS NameNode is in a bad state and hence the <codeph>impalad</codeph> would have to
-          be restarted:
-        </p>
+        <p> In Impala 3.2 and higher, if the following error appears multiple
+          times in a short duration while running a query, it would mean that
+          the connection between the <codeph>impalad</codeph> and the HDFS
+          NameNode is in a bad state and hence the <codeph>impalad</codeph>
+          would have to be restarted: </p>
 
 <codeblock>"hdfsOpenFile() for &lt;filename> at backend &lt;hostname:port> failed to finish before the &lt;hdfs_operation_timeout_sec> second timeout " </codeblock>
+        <p>In Impala 3.1 and lower, the same issue would cause Impala to wait for
+          a long time or hang without showing the above error message.</p>
 
         <p>
           <b>Apache Issue:</b>
