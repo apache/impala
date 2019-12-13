@@ -44,7 +44,7 @@ under the License.
 
     <p>
       For most clusters that have multiple users and production availability requirements, you
-      might set up a proxy server to relay requests to and from Impala.
+      might want to set up a load-balancing proxy server to relay requests to and from Impala.
     </p>
 
     <p>
@@ -87,13 +87,12 @@ under the License.
           server rather than a specific host running the <cmdname>impalad</cmdname> daemon.
         </li>
 
-        <li>
-          The coordinator node for each Impala query potentially requires more memory and CPU
-          cycles than the other nodes that process the query. The proxy server can issue queries
-          so that each connection uses a different coordinator node. This load-balancing
-          technique lets the Impala nodes share this additional work, rather than concentrating
-          it on a single machine.
-        </li>
+        <li> The coordinator node for each Impala query potentially requires
+          more memory and CPU cycles than the other nodes that process the
+          query. The proxy server can issue queries so that each connection uses
+          a different coordinator node. This load-balancing technique lets the
+            <cmdname>impalad</cmdname> nodes share this additional work, rather
+          than concentrating it on a single machine. </li>
       </ul>
 
       <p>
@@ -398,8 +397,8 @@ klist -k <varname>keytabfile</varname>
         </p>
 
         <p>
-          In <filepath>hue.ini</filepath>, set the following for to configure Hue to
-          automatically connect to the proxy server:
+          In <filepath>hue.ini</filepath>, set the following to configure Hue to automatically
+          connect to the proxy server:
         </p>
 
 <codeblock>[impala]
@@ -457,17 +456,13 @@ jdbc:hive2://<varname>proxy_host</varname>:<varname>load_balancer_port</varname>
 
       <dl>
         <dlentry>
-
-          <dt>
-            Client/Server SSL
-          </dt>
-
-          <dd>
-            In this configuration, the proxy server presents an SSL certificate to the client,
-            decrypts the client request, then re-encrypts the request before sending it to the
-            backend <codeph>impalad</codeph>. The client and server certificates can be managed
-            separately. The request or resulting payload is encrypted in transit at all times.
-          </dd>
+          <dt> TLS/SSL Bridging</dt>
+          <dd> In this configuration, the proxy server presents a TLS/SSL
+            certificate to the client, decrypts the client request, then
+            re-encrypts the request before sending it to the backend
+              <codeph>impalad</codeph>. The client and server certificates can
+            be managed separately. The request or resulting payload is encrypted
+            in transit at all times. </dd>
 
         </dlentry>
 
