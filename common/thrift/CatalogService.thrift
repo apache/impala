@@ -324,6 +324,10 @@ struct TTableInfoSelector {
   // ... each partition should include the partition stats serialized as a byte[]
   // and that is deflate-compressed.
   7: bool want_partition_stats
+
+  // The response should contain table constraints like primary keys
+  // and foreign keys
+  8: bool want_table_constraints
 }
 
 // Returned information about a particular partition.
@@ -375,6 +379,14 @@ struct TPartialTableInfo {
   // than duplicate the list of network address, which helps reduce memory usage.
   // Only used when partition files are fetched.
   7: optional list<Types.TNetworkAddress> network_addresses
+
+  // List of primary key constraints, small enough that we can
+  // return them wholesale.
+  8: optional list<hive_metastore.SQLPrimaryKey> primary_keys
+
+  // List of foreign key constraints, small enough that we can
+  // return them wholesale.
+  9: optional list<hive_metastore.SQLForeignKey> foreign_keys
 }
 
 // Selector for partial information about a Database.

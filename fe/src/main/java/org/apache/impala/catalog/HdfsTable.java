@@ -245,7 +245,8 @@ public class HdfsTable extends Table implements FeFsTable {
   // for setAvroSchema().
   private boolean isSchemaLoaded_ = false;
 
-  // Primary Key and Foreign Key information. Set in load() method.
+  // Primary Key and Foreign Key information. Set in load() method. An empty list could
+  // mean either the table does not have any keys or the table is not loaded.
   private final List<SQLPrimaryKey> primaryKeys_ = new ArrayList<>();
   private final List<SQLForeignKey> foreignKeys_ = new ArrayList<>();
 
@@ -992,7 +993,7 @@ public class HdfsTable extends Table implements FeFsTable {
             MetaStoreUtil.getNullPartitionKeyValue(client).intern();
           loadSchema(msTbl);
           loadAllColumnStats(client);
-          loadPkFkInfo(client, msTbl);
+          loadConstraintsInfo(client, msTbl);
         }
         loadValidWriteIdList(client);
         // Load partition and file metadata
@@ -1047,7 +1048,7 @@ public class HdfsTable extends Table implements FeFsTable {
    * Load Primary Key and Foreign Key information for table. Throws TableLoadingException
    * if the load fails.
    */
-  private void loadPkFkInfo(IMetaStoreClient client,
+  private void loadConstraintsInfo(IMetaStoreClient client,
       org.apache.hadoop.hive.metastore.api.Table msTbl) throws TableLoadingException{
     try {
       // Reset and add primary keys info and foreign keys info.
@@ -1551,6 +1552,13 @@ public class HdfsTable extends Table implements FeFsTable {
       // of cloning of file descriptors which might increase memory pressure.
       resp.table_info.setNetwork_addresses(hostIndex_.getList());
     }
+
+    if (req.table_info_selector.want_table_constraints) {
+      List<SQLPrimaryKey> primaryKeys = new ArrayList<>(primaryKeys_);
+      List<SQLForeignKey> foreignKeys = new ArrayList<>(foreignKeys_);
+      resp.table_info.setPrimary_keys(primaryKeys);
+      resp.table_info.setForeign_keys(foreignKeys);
+    }
     return resp;
   }
 
@@ -1649,55 +1657,6 @@ public class HdfsTable extends Table implements FeFsTable {
   public List<SQLForeignKey> getForeignKeys() {
     return ImmutableList.copyOf(foreignKeys_);
   }
-
-  /**
-   * Get primary keys column names, useful for toSqlUtils.
-   */
-  public List<String> getPrimaryKeysSql() {
-    List<String> primaryKeyColNames = new ArrayList<>();
-    if (getPrimaryKeys() != null && !getPrimaryKeys().isEmpty()) {
-      getPrimaryKeys().stream().forEach(p -> primaryKeyColNames.add(p.getColumn_name()));
-    }
-    return primaryKeyColNames;
-  }
-
-  /**
-   * Get foreign keys information as strings. Useful for toSqlUtils.
-   * @return List of strings of the form "(col1, col2,..) REFERENCES [pk_db].pk_table
-   * (colA, colB,..)".
-   */
-  public List<String> getForeignKeysSql() {
-    List<String> foreignKeysSql = new ArrayList<>();
-    // Iterate through foreign keys list. This list may contain multiple foreign keys
-    // and each foreign key may contain multiple columns. The outer loop collects
-    // information common to a foreign key (pk table information). The inner
-    // loop collects column information.
-    List<SQLForeignKey> foreignKeys = getForeignKeys();
-    for (int i = 0; i < foreignKeys.size(); i++) {
-      String pkTableDb = foreignKeys.get(i).getPktable_db();
-      String pkTableName = foreignKeys.get(i).getPktable_name();
-      List<String> pkList = new ArrayList<>();
-      List<String> fkList = new ArrayList<>();
-      StringBuilder sb = new StringBuilder();
-      sb.append("(");
-      for (; i<foreignKeys.size(); i++) {
-        fkList.add(foreignKeys.get(i).getFkcolumn_name());
-        pkList.add(foreignKeys.get(i).getPkcolumn_name());
-        // Bail out of inner loop if the key_seq of the next ForeignKey is 1.
-        if (i + 1 < foreignKeys.size() && foreignKeys.get(i + 1).getKey_seq() == 1) {
-          break;
-        }
-      }
-      Joiner.on(", ").appendTo(sb, fkList).append(") ");
-      sb.append("REFERENCES ");
-      if (pkTableDb != null) sb.append(pkTableDb + ".");
-      sb.append(pkTableName + "(");
-      Joiner.on(", ").appendTo(sb, pkList).append(")");
-      foreignKeysSql.add(sb.toString());
-    }
-    return foreignKeysSql;
-  }
-
 
   /**
    * Returns the set of file formats that the partitions are stored in.

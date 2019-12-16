@@ -29,6 +29,7 @@ import static org.junit.Assert.fail;
 import java.io.IOException;
 import java.nio.ByteBuffer;
 import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.Base64;
 import java.util.Collection;
 import java.util.Collections;
@@ -47,6 +48,8 @@ import org.apache.hadoop.hdfs.DFSOpsCountStatistics;
 import org.apache.hadoop.hdfs.DFSOpsCountStatistics.OpType;
 import org.apache.hadoop.hive.metastore.TableType;
 import org.apache.hadoop.hive.metastore.api.ColumnStatisticsData;
+import org.apache.hadoop.hive.metastore.api.SQLForeignKey;
+import org.apache.hadoop.hive.metastore.api.SQLPrimaryKey;
 import org.apache.impala.analysis.FunctionName;
 import org.apache.impala.analysis.LiteralExpr;
 import org.apache.impala.analysis.NumericLiteral;
@@ -431,6 +434,53 @@ public class CatalogTest {
     HdfsTable table =
         (HdfsTable) catalog_.getOrLoadTable("functional", "AllTypes", "test");
     checkAllTypesPartitioning(table, true);
+  }
+
+  /**
+   * Test SQL constraints such as primary keys and foreign keys
+   */
+  @Test
+  public void testGetSqlConstraints() throws Exception {
+    FeFsTable t = (FeFsTable) catalog_.getOrLoadTable("functional", "parent_table",
+        "test");
+    assertNotNull(t);
+    assertTrue(t instanceof FeFsTable);
+    List<SQLPrimaryKey> primaryKeys = t.getPrimaryKeys();
+    List<SQLForeignKey> foreignKeys = t.getForeignKeys();
+    assertEquals(2, primaryKeys.size());
+    assertEquals(0, foreignKeys.size());
+    for (SQLPrimaryKey pk: primaryKeys) {
+      assertEquals("functional", pk.getTable_db());
+      assertEquals("parent_table", pk.getTable_name());
+    }
+    // HMS returns the columns in the reverse order of PK columns specified in the DDL.
+    // "parent_table" in our test data has primary key(id, year) specified.
+    assertEquals("year", primaryKeys.get(0).getColumn_name());
+    assertEquals("id", primaryKeys.get(1).getColumn_name());
+
+    // Force load parent_table_2. Required for fetching foreign keys from child_table.
+    catalog_.getOrLoadTable("functional", "parent_table_2", "test");
+
+    t = (FeFsTable) catalog_.getOrLoadTable("functional", "child_table", "test");
+    assertNotNull(t);
+    assertTrue(t instanceof FeFsTable);
+    primaryKeys = t.getPrimaryKeys();
+    foreignKeys = t.getForeignKeys();
+    assertEquals(1, primaryKeys.size());
+    assertEquals(3, foreignKeys.size());
+    assertEquals("functional", primaryKeys.get(0).getTable_db());
+    assertEquals("child_table",primaryKeys.get(0).getTable_name());
+    for (SQLForeignKey fk : foreignKeys) {
+      assertEquals("functional", fk.getFktable_db());
+      assertEquals("child_table", fk.getFktable_name());
+      assertEquals("functional", fk.getPktable_db());
+    }
+    assertEquals("parent_table", foreignKeys.get(0).getPktable_name());
+    assertEquals("parent_table", foreignKeys.get(1).getPktable_name());
+    assertEquals("parent_table_2", foreignKeys.get(2).getPktable_name());
+    assertEquals("id", foreignKeys.get(0).getPkcolumn_name());
+    assertEquals("year", foreignKeys.get(1).getPkcolumn_name());
+    assertEquals("a", foreignKeys.get(2).getPkcolumn_name());
   }
 
   public static void checkAllTypesPartitioning(FeFsTable table,

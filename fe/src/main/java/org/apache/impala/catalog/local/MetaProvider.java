@@ -25,6 +25,8 @@ import org.apache.hadoop.hive.metastore.api.Database;
 import org.apache.hadoop.hive.metastore.api.MetaException;
 import org.apache.hadoop.hive.metastore.api.NoSuchObjectException;
 import org.apache.hadoop.hive.metastore.api.Partition;
+import org.apache.hadoop.hive.metastore.api.SQLForeignKey;
+import org.apache.hadoop.hive.metastore.api.SQLPrimaryKey;
 import org.apache.hadoop.hive.metastore.api.Table;
 import org.apache.hadoop.hive.metastore.api.UnknownDBException;
 import org.apache.impala.authorization.AuthorizationPolicy;
@@ -77,6 +79,9 @@ public interface MetaProvider {
    */
   List<PartitionRef> loadPartitionList(TableMetaRef table)
       throws MetaException, TException;
+
+  Pair<List<SQLPrimaryKey>, List<SQLForeignKey>> loadConstraints(TableMetaRef table,
+      Table msTbl) throws MetaException, TException;
 
   /**
    * Retrieve the list of functions in the given database.

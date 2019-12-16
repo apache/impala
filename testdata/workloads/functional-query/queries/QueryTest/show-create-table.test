@@ -538,3 +538,33 @@ WITH SERDEPROPERTIES ('hbase.columns.mapping'=':key,d:bool_col,d:tinyint_col,d:s
 TBLPROPERTIES ('hbase.table.name'='functional_hbase.alltypes',
                'storage_handler'='org.apache.hadoop.hive.hbase.HBaseStorageHandler')
 ====
+---- QUERY
+SHOW CREATE TABLE functional.parent_table
+---- RESULTS-HIVE
+CREATE EXTERNAL TABLE functional.parent_table (
+  id INT,
+  year STRING,
+  PRIMARY KEY (year, id)
+ )
+ROW FORMAT DELIMITED FIELDS TERMINATED BY ','
+WITH SERDEPROPERTIES ('field.delim'=',', 'serialization.format'=',')
+STORED AS TEXTFILE
+LOCATION '$$location_uri$$'
+====
+---- QUERY
+SHOW CREATE TABLE functional.child_table
+---- RESULTS-HIVE
+CREATE EXTERNAL TABLE functional.child_table (
+  seq INT,
+  id INT,
+  year STRING,
+  a INT,
+  PRIMARY KEY (seq),
+  FOREIGN KEY(id, year) REFERENCES functional.parent_table(id, year),
+  FOREIGN KEY(a) REFERENCES functional.parent_table_2(a)
+)
+ROW FORMAT DELIMITED FIELDS TERMINATED BY ','
+WITH SERDEPROPERTIES ('field.delim'=',', 'serialization.format'=',')
+STORED AS TEXTFILE
+LOCATION '$$location_uri$$'
+====

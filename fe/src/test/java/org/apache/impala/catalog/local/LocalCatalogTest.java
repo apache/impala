@@ -22,6 +22,8 @@ import static org.junit.Assert.*;
 import java.util.List;
 import java.util.Set;
 
+import org.apache.hadoop.hive.metastore.api.SQLForeignKey;
+import org.apache.hadoop.hive.metastore.api.SQLPrimaryKey;
 import org.apache.hive.service.rpc.thrift.TGetColumnsReq;
 import org.apache.hive.service.rpc.thrift.TGetSchemasReq;
 import org.apache.hive.service.rpc.thrift.TGetTablesReq;
@@ -160,6 +162,49 @@ public class LocalCatalogTest {
     // TODO(todd): once we support file descriptors in LocalCatalog,
     // run the full test.
     CatalogTest.checkAllTypesPartitioning(t, /*checkFileDescriptors=*/false);
+  }
+
+  /**
+   * Test SQL constraints such as primary keys and foreign keys
+   */
+  @Test
+  public void testGetSqlConstraints() throws Exception {
+    FeFsTable t = (FeFsTable) catalog_.getTable("functional", "parent_table");
+    assertNotNull(t);
+    assertTrue(t instanceof LocalFsTable);
+    List<SQLPrimaryKey> primaryKeys = t.getPrimaryKeys();
+    List<SQLForeignKey> foreignKeys = t.getForeignKeys();
+    assertEquals(2, primaryKeys.size());
+    assertEquals(0, foreignKeys.size());
+    for (SQLPrimaryKey pk: primaryKeys) {
+      assertEquals("functional", pk.getTable_db());
+      assertEquals("parent_table", pk.getTable_name());
+    }
+    // HMS returns the columns in the reverse order of PK columns specified in the DDL.
+    // "parent_table" in our test data has primary key(id, year) specified.
+    assertEquals("year", primaryKeys.get(0).getColumn_name());
+    assertEquals("id", primaryKeys.get(1).getColumn_name());
+
+    t = (FeFsTable) catalog_.getTable("functional", "child_table");
+    assertNotNull(t);
+    assertTrue(t instanceof LocalFsTable);
+    primaryKeys = t.getPrimaryKeys();
+    foreignKeys = t.getForeignKeys();
+    assertEquals(1, primaryKeys.size());
+    assertEquals(3, foreignKeys.size());
+    assertEquals("functional", primaryKeys.get(0).getTable_db());
+    assertEquals("child_table",primaryKeys.get(0).getTable_name());
+    for (SQLForeignKey fk : foreignKeys) {
+      assertEquals("functional", fk.getFktable_db());
+      assertEquals("child_table", fk.getFktable_name());
+      assertEquals("functional", fk.getPktable_db());
+    }
+    assertEquals("parent_table", foreignKeys.get(0).getPktable_name());
+    assertEquals("parent_table", foreignKeys.get(1).getPktable_name());
+    assertEquals("parent_table_2", foreignKeys.get(2).getPktable_name());
+    assertEquals("id", foreignKeys.get(0).getPkcolumn_name());
+    assertEquals("year", foreignKeys.get(1).getPkcolumn_name());
+    assertEquals("a", foreignKeys.get(2).getPkcolumn_name());
   }
 
   /**

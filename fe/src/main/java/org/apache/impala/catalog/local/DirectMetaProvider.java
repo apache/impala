@@ -19,6 +19,7 @@ package org.apache.impala.catalog.local;
 
 import java.io.FileNotFoundException;
 import java.io.IOException;
+import java.util.ArrayList;
 import java.util.Collections;
 import java.util.List;
 import java.util.Map;
@@ -27,9 +28,13 @@ import java.util.Set;
 import org.apache.hadoop.fs.Path;
 import org.apache.hadoop.hive.metastore.api.ColumnStatisticsObj;
 import org.apache.hadoop.hive.metastore.api.Database;
+import org.apache.hadoop.hive.metastore.api.ForeignKeysRequest;
 import org.apache.hadoop.hive.metastore.api.MetaException;
 import org.apache.hadoop.hive.metastore.api.NoSuchObjectException;
 import org.apache.hadoop.hive.metastore.api.Partition;
+import org.apache.hadoop.hive.metastore.api.PrimaryKeysRequest;
+import org.apache.hadoop.hive.metastore.api.SQLForeignKey;
+import org.apache.hadoop.hive.metastore.api.SQLPrimaryKey;
 import org.apache.hadoop.hive.metastore.api.Table;
 import org.apache.hadoop.hive.metastore.api.UnknownDBException;
 import org.apache.impala.authorization.AuthorizationPolicy;
@@ -156,6 +161,21 @@ class DirectMetaProvider implements MetaProvider {
       partRefs.add(new PartitionRefImpl(name));
     }
     return partRefs;
+  }
+
+  @Override
+  public Pair<List<SQLPrimaryKey>, List<SQLForeignKey>> loadConstraints(
+      TableMetaRef table, Table msTbl) throws TException {
+    List<SQLPrimaryKey> primaryKeys = new ArrayList<>();
+    List<SQLForeignKey> foreignKeys = new ArrayList<>();
+
+    try (MetaStoreClient c = msClientPool_.getClient()) {
+      primaryKeys.addAll(c.getHiveClient().getPrimaryKeys(
+          new PrimaryKeysRequest(msTbl.getDbName(), msTbl.getTableName())));
+      foreignKeys.addAll(c.getHiveClient().getForeignKeys(new ForeignKeysRequest(null,
+          null, msTbl.getDbName(), msTbl.getTableName())));
+    }
+    return new Pair<>(primaryKeys, foreignKeys);
   }
 
   @Override

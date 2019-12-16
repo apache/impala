@@ -39,6 +39,8 @@ import org.apache.hadoop.hive.metastore.api.Database;
 import org.apache.hadoop.hive.metastore.api.MetaException;
 import org.apache.hadoop.hive.metastore.api.NoSuchObjectException;
 import org.apache.hadoop.hive.metastore.api.Partition;
+import org.apache.hadoop.hive.metastore.api.SQLForeignKey;
+import org.apache.hadoop.hive.metastore.api.SQLPrimaryKey;
 import org.apache.hadoop.hive.metastore.api.Table;
 import org.apache.hadoop.hive.metastore.api.UnknownDBException;
 import org.apache.impala.authorization.AuthorizationChecker;
@@ -686,13 +688,17 @@ public class CatalogdMetaProvider implements MetaProvider {
           public TableMetaRefImpl call() throws Exception {
             TGetPartialCatalogObjectRequest req = newReqForTable(dbName, tableName);
             req.table_info_selector.want_hms_table = true;
+            // To be consistent with implementation in legacy catalog mode, we eagerly
+            // load constraint information whenever a table is loaded.
+            req.table_info_selector.want_table_constraints = true;
             TGetPartialCatalogObjectResponse resp = sendRequest(req);
             checkResponse(resp.table_info != null && resp.table_info.hms_table != null,
                 req, "missing expected HMS table");
             addTableMetadatStorageLoadTimeToProfile(
                 resp.table_info.storage_metadata_load_time_ns);
             return new TableMetaRefImpl(
-                dbName, tableName, resp.table_info.hms_table, resp.object_version_number);
+                dbName, tableName, resp.table_info.hms_table, resp.object_version_number,
+                resp.table_info.primary_keys, resp.table_info.foreign_keys);
            }
       });
     return Pair.create(ref.msTable_, (TableMetaRef)ref);
@@ -788,6 +794,15 @@ public class CatalogdMetaProvider implements MetaProvider {
             return partitionRefs;
           }
         });
+  }
+
+  @Override
+  public Pair<List<SQLPrimaryKey>, List<SQLForeignKey>> loadConstraints(
+      final TableMetaRef table, Table msTbl) {
+     Pair<List<SQLPrimaryKey>, List<SQLForeignKey>> pair =
+         new Pair<>(((TableMetaRefImpl) table).primaryKeys_,
+         ((TableMetaRefImpl) table).foreignKeys_);
+     return pair;
   }
 
   @Override
@@ -1378,6 +1393,9 @@ public class CatalogdMetaProvider implements MetaProvider {
   private static class TableMetaRefImpl implements TableMetaRef {
     private final String dbName_;
     private final String tableName_;
+    // SQL constraints for the table, populated during loadTable().
+    private final List<SQLPrimaryKey> primaryKeys_;
+    private final List<SQLForeignKey> foreignKeys_;
 
     /**
      * Stash the HMS Table object since we need this in order to handle some strange
@@ -1393,11 +1411,14 @@ public class CatalogdMetaProvider implements MetaProvider {
     private final long catalogVersion_;
 
     public TableMetaRefImpl(String dbName, String tableName,
-        Table msTable, long catalogVersion) {
+        Table msTable, long catalogVersion, List<SQLPrimaryKey> primaryKeys,
+        List<SQLForeignKey> foreignKeys) {
       this.dbName_ = dbName;
       this.tableName_ = tableName;
       this.msTable_ = msTable;
       this.catalogVersion_ = catalogVersion;
+      this.primaryKeys_ = primaryKeys;
+      this.foreignKeys_ = foreignKeys;
     }
 
     @Override

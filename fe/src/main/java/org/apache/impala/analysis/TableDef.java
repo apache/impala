@@ -36,7 +36,6 @@ import org.apache.impala.catalog.Column;
 import org.apache.impala.catalog.FeFsTable;
 import org.apache.impala.catalog.FeTable;
 import org.apache.impala.catalog.HdfsStorageDescriptor;
-import org.apache.impala.catalog.HdfsTable;
 import org.apache.impala.catalog.RowFormat;
 import org.apache.impala.catalog.Type;
 import org.apache.impala.common.AnalysisException;
@@ -49,6 +48,7 @@ import org.apache.impala.thrift.TQueryOptions;
 import org.apache.impala.thrift.TSortingOrder;
 import org.apache.impala.util.AcidUtils;
 import org.apache.impala.util.MetaStoreUtil;
+import org.apache.thrift.TException;
 
 import com.google.common.base.Preconditions;
 import com.google.common.collect.ImmutableList;
@@ -547,14 +547,17 @@ class TableDef {
         // Hive has a bug that prevents foreign keys from being added when pk column is
         // not part of primary key. This can be confusing. Till this bug is fixed, we
         // will not allow foreign keys definition on such columns.
-        if (parentTable instanceof HdfsTable) {
-          // TODO (IMPALA-9158): Modify this check to call FeFsTable.getPrimaryKeysSql()
-          // instead of HdfsTable.getPrimaryKeysSql() when we implement PK/FK feature
-          // for LocalCatalog.
-          if (!((HdfsTable) parentTable).getPrimaryKeysSql().contains(pkCol)) {
+        try {
+          if (!((FeFsTable) parentTable).getPrimaryKeyColumnNames().contains(pkCol)) {
             throw new AnalysisException(String.format("Parent column %s is not part of "
                 + "primary key.", pkCol));
           }
+        } catch (TException e) {
+          // In local catalog mode, we do not aggressively load PK/FK information, a
+          // call to getPrimaryKeyColumnNames() will try to selectively load PK/FK
+          // information. Hence, TException is thrown only in local catalog mode.
+          throw new AnalysisException("Failed to get primary key columns for "
+              + fk.pkTableName);
         }
       }
 

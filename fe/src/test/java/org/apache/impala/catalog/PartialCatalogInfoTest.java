@@ -32,6 +32,8 @@ import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicBoolean;
 
 import org.apache.hadoop.hive.metastore.api.ColumnStatisticsObj;
+import org.apache.hadoop.hive.metastore.api.SQLForeignKey;
+import org.apache.hadoop.hive.metastore.api.SQLPrimaryKey;
 import org.apache.impala.common.InternalException;
 import org.apache.impala.service.BackendConfig;
 import org.apache.impala.testutil.CatalogServiceTestCatalog;
@@ -238,6 +240,62 @@ public class PartialCatalogInfoTest {
       assertEquals("Failed to load metadata for table: functional.bad_serde",
           tle.getMessage());
     }
+  }
+
+  @Test
+  public void testGetSqlConstraints() throws Exception {
+    // Test constraints of parent table.
+    TGetPartialCatalogObjectRequest req = new TGetPartialCatalogObjectRequest();
+    req.object_desc = new TCatalogObject();
+    req.object_desc.setType(TCatalogObjectType.TABLE);
+    req.object_desc.table = new TTable("functional", "parent_table");
+    req.table_info_selector = new TTableInfoSelector();
+    req.table_info_selector.want_hms_table = true;
+    req.table_info_selector.want_table_constraints = true;
+
+    TGetPartialCatalogObjectResponse resp = sendRequest(req);
+    List<SQLPrimaryKey> primaryKeys = resp.table_info.primary_keys;
+    List<SQLForeignKey> foreignKeys = resp.table_info.foreign_keys;
+
+    assertEquals(2, primaryKeys.size());
+    assertEquals(0, foreignKeys.size());
+    for (SQLPrimaryKey pk: primaryKeys) {
+      assertEquals("functional", pk.getTable_db());
+      assertEquals("parent_table", pk.getTable_name());
+    }
+    // HMS returns the columns in the reverse order of PK columns specified in the DDL.
+    // "parent_table" in our test data has primary key(id, year) specified.
+    assertEquals("year", primaryKeys.get(0).getColumn_name());
+    assertEquals("id", primaryKeys.get(1).getColumn_name());
+
+    // Test constraints of child_table.
+    req = new TGetPartialCatalogObjectRequest();
+    req.object_desc = new TCatalogObject();
+    req.object_desc.setType(TCatalogObjectType.TABLE);
+    req.object_desc.table = new TTable("functional", "child_table");
+    req.table_info_selector = new TTableInfoSelector();
+    req.table_info_selector.want_hms_table = true;
+    req.table_info_selector.want_table_constraints = true;
+
+    resp = sendRequest(req);
+    primaryKeys = resp.table_info.primary_keys;
+    foreignKeys = resp.table_info.foreign_keys;
+
+    assertEquals(1, primaryKeys.size());
+    assertEquals(3, foreignKeys.size());
+    assertEquals("functional", primaryKeys.get(0).getTable_db());
+    assertEquals("child_table",primaryKeys.get(0).getTable_name());
+    for (SQLForeignKey fk : foreignKeys) {
+      assertEquals("functional", fk.getFktable_db());
+      assertEquals("child_table", fk.getFktable_name());
+      assertEquals("functional", fk.getPktable_db());
+    }
+    assertEquals("parent_table", foreignKeys.get(0).getPktable_name());
+    assertEquals("parent_table", foreignKeys.get(1).getPktable_name());
+    assertEquals("parent_table_2", foreignKeys.get(2).getPktable_name());
+    assertEquals("id", foreignKeys.get(0).getPkcolumn_name());
+    assertEquals("year", foreignKeys.get(1).getPkcolumn_name());
+    assertEquals("a", foreignKeys.get(2).getPkcolumn_name());
   }
 
   @Test

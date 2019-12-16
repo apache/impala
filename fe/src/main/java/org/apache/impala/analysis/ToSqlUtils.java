@@ -30,7 +30,6 @@ import org.apache.commons.collections.CollectionUtils;
 import org.apache.commons.lang.ObjectUtils;
 import org.apache.commons.lang.StringEscapeUtils;
 import org.apache.hadoop.hive.common.StatsSetupConst;
-import org.apache.hadoop.hive.metastore.TableType;
 import org.apache.hadoop.hive.ql.parse.HiveLexer;
 import org.apache.impala.catalog.CatalogException;
 import org.apache.impala.catalog.Column;
@@ -42,7 +41,6 @@ import org.apache.impala.catalog.FeView;
 import org.apache.impala.catalog.Function;
 import org.apache.impala.catalog.HdfsCompression;
 import org.apache.impala.catalog.HdfsFileFormat;
-import org.apache.impala.catalog.HdfsTable;
 import org.apache.impala.catalog.KuduColumn;
 import org.apache.impala.catalog.KuduTable;
 import org.apache.impala.catalog.RowFormat;
@@ -374,9 +372,11 @@ public class ToSqlUtils {
       String inputFormat = msTable.getSd().getInputFormat();
       format = HdfsFileFormat.fromHdfsInputFormatClass(inputFormat);
       compression = HdfsCompression.fromHdfsInputFormatClass(inputFormat);
-      if (table instanceof HdfsTable) {
-        primaryKeySql = ((HdfsTable) table).getPrimaryKeysSql();
-        foreignKeySql = ((HdfsTable) table).getForeignKeysSql();
+      try {
+        primaryKeySql = ((FeFsTable) table).getPrimaryKeyColumnNames();
+        foreignKeySql = ((FeFsTable) table).getForeignKeysSql();
+      } catch (Exception e) {
+        throw new CatalogException("Could not get primary key/foreign keys sql.", e);
       }
     }
     HdfsUri tableLocation = location == null ? null : new HdfsUri(location);
