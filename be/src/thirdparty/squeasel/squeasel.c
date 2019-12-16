@@ -693,20 +693,32 @@ static int match_prefix(const char *pattern, int pattern_len, const char *str) {
   return j;
 }
 
-// HTTP 1.1 assumes keep alive if "Connection:" header is not set
-// This function must tolerate situations when connection info is not
-// set up, for example if request parsing failed.
 static int should_keep_alive(const struct sq_connection *conn) {
   const char *http_version = conn->request_info.http_version;
   const char *header = sq_get_header(conn, "Connection");
+
+  // Start by checking our own internal request state and configuration.
   if (conn->must_close ||
-      conn->status_code == 401 ||
-      sq_strcasecmp(conn->ctx->config[ENABLE_KEEP_ALIVE], "yes") != 0 ||
-      (header != NULL && sq_strcasecmp(header, "keep-alive") != 0) ||
-      (header == NULL && http_version && strcmp(http_version, "1.1"))) {
+      sq_strcasecmp(conn->ctx->config[ENABLE_KEEP_ALIVE], "yes") != 0) {
     return 0;
   }
-  return 1;
+
+  // Now consider the HTTP version and "Connection:" header.
+
+  // If we couldn't parse an HTTP version, assume 1.0.
+  //
+  // We must tolerate situations when connection info is not set up, for
+  // example if HTTP request parsing failed.
+  int http_1_0 = !http_version || sq_strcasecmp(http_version, "1.0") == 0;
+  if (!header) {
+    // HTTP 1.1 assumes keep alive if the "Connection:" header is not set.
+    return !http_1_0;
+  }
+
+  // With HTTP 1.0, keep alive only if the "Connection: keep-alive" header
+  // exists. Otherwise, keep alive unless the "Connection: close" header exists.
+  return (http_1_0 && sq_strcasecmp(header, "keep-alive") == 0) ||
+         (!http_1_0 && sq_strcasecmp(header, "close") != 0);
 }
 
 static const char *suggest_connection_header(const struct sq_connection *conn) {
@@ -3236,8 +3248,7 @@ static void handle_ssi_file_request(struct sq_connection *conn,
     conn->must_close = 1;
     fclose_on_exec(&file);
     sq_printf(conn, "HTTP/1.1 200 OK\r\n"
-              "Content-Type: text/html\r\nConnection: %s\r\n\r\n",
-              suggest_connection_header(conn));
+              "Content-Type: text/html\r\nConnection: close\r\n\r\n");
     send_ssi_file(conn, path, &file, 0);
     sq_fclose(&file);
   }
