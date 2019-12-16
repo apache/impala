@@ -52,6 +52,7 @@ class TestEventProcessing(CustomClusterTestSuite):
     event processor does not error out
     """
     try:
+      event_id_before = EventProcessorUtils.get_last_synced_event_id()
       self.run_stmt_in_hive("create database testBlackListedDb")
       self.run_stmt_in_hive("create table testBlackListedDb.testtbl (id int)")
       self.run_stmt_in_hive(
@@ -62,6 +63,7 @@ class TestEventProcessing(CustomClusterTestSuite):
       # wait until all the events generated above are processed
       EventProcessorUtils.wait_for_event_processing(self.hive_client)
       assert EventProcessorUtils.get_event_processor_status() == "ACTIVE"
+      assert EventProcessorUtils.get_last_synced_event_id() > event_id_before
     finally:
       self.run_stmt_in_hive("drop database testBlackListedDb cascade")
       self.run_stmt_in_hive("drop table functional_parquet.testBlackListedTbl")

@@ -584,19 +584,23 @@ public class MetastoreEventsProcessor implements ExternalEventsProcessor {
   /**
    * Process the given list of notification events. Useful for tests which provide a list
    * of events
-   *
-   * @return the last Notification event which was processed.
    */
   @VisibleForTesting
   protected void processEvents(List<NotificationEvent> events)
       throws MetastoreNotificationException {
     NotificationEvent lastProcessedEvent = null;
+    // update the events received metric before returning
+    metrics_.getMeter(EVENTS_RECEIVED_METRIC).mark(events.size());
+    if (events.isEmpty()) return;
     final Timer.Context context =
         metrics_.getTimer(EVENTS_PROCESS_DURATION_METRIC).time();
-    metrics_.getMeter(EVENTS_RECEIVED_METRIC).mark(events.size());
     try {
       List<MetastoreEvent> filteredEvents =
           metastoreEventFactory_.getFilteredEvents(events);
+      if (filteredEvents.isEmpty()) {
+        lastSyncedEventId_.set(events.get(events.size() - 1).getEventId());
+        return;
+      }
       for (MetastoreEvent event : filteredEvents) {
         // synchronizing each event processing reduces the scope of the lock so the a
         // potential reset() during event processing is not blocked for longer than
