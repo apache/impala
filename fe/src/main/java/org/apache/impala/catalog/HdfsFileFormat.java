@@ -34,6 +34,7 @@ import com.google.common.collect.ImmutableMap;
  * 4) whether scanning complex types from it is supported
  * 5) whether the file format can skip complex columns in scans and just materialize
  *    scalar typed columns
+ * 6) Indicates if the given file format supports Date type.
  *
  * Important note: Always keep consistent with the classes used in Hive.
  * TODO: Kudu doesn't belong in this list. Either rename this enum or create a separate
@@ -66,7 +67,7 @@ public enum HdfsFileFormat {
   ORC("org.apache.hadoop.hive.ql.io.orc.OrcInputFormat",
       "org.apache.hadoop.hive.ql.io.orc.OrcOutputFormat",
       "org.apache.hadoop.hive.ql.io.orc.OrcSerde",
-      true, true, false),
+      true, true, true),
   KUDU("org.apache.hadoop.hive.kudu.KuduInputFormat",
        "org.apache.hadoop.hive.kudu.KuduOutputFormat",
        "org.apache.hadoop.hive.kudu.KuduSerDe",

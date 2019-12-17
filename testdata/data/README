@@ -321,10 +321,24 @@ and should be read as NULL by Impala:
    9999-12-31
   10000-01-01 (invalid - date too large)
 
+out_of_range_date.orc:
+Created using a pre-3.1. Hive version (2.1.1.) to contain an out-of-range date value.
+Took advantage of the incompatibility between Hive and Impala when Hive (before 3.1)
+writes a date before 1582-10-15 is interpreted incorrectly by Impala. The values I wrote
+with Hive:
+2019-10-04, 1582-10-15, 0001-01-01, 9999-12-31
+This is interpreted by Impala as:
+2019-10-04, 1582-10-15, 0000-12-30 (invalid - date too small), 9999-12-31
+
+
+
 hive2_pre_gregorian.parquet:
 Small parquet table with one DATE column, created by Hive 2.1.1.
 Used to demonstrate parquet interoperability issues between Hive and Impala for dates
 before the introduction of Gregorian calendar in 1582-10-15.
+
+hive2_pre_gregorian.orc:
+Same as the above but in ORC format instead of Parquet.
 
 decimals_1_10.parquet:
 Contains two decimal columns, one with precision 1, the other with precision 10.

@@ -1,0 +1,20 @@
+====
+---- QUERY
+SELECT * FROM $DATABASE.out_of_range_date_orc;
+---- TYPES
+DATE
+---- RESULTS
+2019-10-04
+1582-10-15
+NULL
+9999-12-31
+---- ERRORS
+ORC file '$NAMENODE/test-warehouse/$DATABASE.db/out_of_range_date_orc/out_of_range_date.orc' column '1' contains an out of range date. The valid date range is 0001-01-01..9999-12-31.
+====
+---- QUERY
+set abort_on_error=1;
+SELECT * FROM $DATABASE.out_of_range_date_orc;
+---- CATCH
+ORC file '$NAMENODE/test-warehouse/$DATABASE.db/out_of_range_date_orc/out_of_range_date.orc' column '1' contains an out of range date. The valid date range is 0001-01-01..9999-12-31.
+====
+

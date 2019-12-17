@@ -54,7 +54,7 @@ class OrcColumnReader {
   /// Create a column reader for the given 'slot_desc' based on the ORC 'node'. We say
   /// the 'slot_desc' and ORC 'node' match iff
   ///     scanner->col_id_path_map_[node->getColumnId()] == slot_desc->col_path
-  /// Caller should guaranteed that 'slot_desc' matches to ORC 'node' or one of its
+  /// Caller should guarantee that 'slot_desc' matches to ORC 'node' or one of its
   /// descendants. If 'node' is a primitive type, 'slot_desc' should match it since
   /// primitive types don't have descendants.
   /// If 'node' is in complex types (struct/array/map) and does not match 'slot_desc',
@@ -218,6 +218,22 @@ class OrcTimestampReader : public OrcColumnReader {
   Status ReadValue(int row_idx, Tuple* tuple, MemPool* pool) override WARN_UNUSED_RESULT;
  private:
   orc::TimestampVectorBatch* batch_ = nullptr;
+};
+
+class OrcDateColumnReader : public OrcColumnReader {
+ public:
+  OrcDateColumnReader(const orc::Type* node, const SlotDescriptor* slot_desc,
+      HdfsOrcScanner* scanner)
+      : OrcColumnReader(node, slot_desc, scanner) { }
+
+  void UpdateInputBatch(orc::ColumnVectorBatch* orc_batch) override {
+    batch_ = static_cast<orc::LongVectorBatch*>(orc_batch);
+    DCHECK(batch_ == dynamic_cast<orc::LongVectorBatch*>(orc_batch));
+  }
+
+  Status ReadValue(int row_idx, Tuple* tuple, MemPool* pool) override WARN_UNUSED_RESULT;
+ private:
+  orc::LongVectorBatch* batch_ = nullptr;
 };
 
 template<typename DECIMAL_TYPE>

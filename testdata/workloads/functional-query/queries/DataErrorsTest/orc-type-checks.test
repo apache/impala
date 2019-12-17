@@ -55,6 +55,16 @@ select c11 from illtypes
 Type mismatch: table column BIGINT is map to column timestamp in ORC file
 ====
 ---- QUERY
+select c11 from illtypes_ts_to_date
+---- CATCH
+Type mismatch: table column DATE is map to column timestamp in ORC file
+====
+---- QUERY
+select c2 from illtypes_date_tbl
+---- CATCH
+Type mismatch: table column TIMESTAMP is map to column date in ORC file
+====
+---- QUERY
 select * from safetypes order by c1
 ---- TYPES
 bigint,boolean,smallint,int,bigint,bigint,double,double,char,string,timestamp,int,int

@@ -182,6 +182,9 @@ Status OrcSchemaResolver::ValidateType(const ColumnType& type,
           "Column $0 in ORC file '$1' can't be truncated to table column $2",
           orc_type.toString(), filename_, type.DebugString()));
     }
+    case orc::TypeKind::DATE:
+      if (type.type == TYPE_DATE) return Status::OK();
+      break;
     default: break;
   }
   return Status(Substitute(

@@ -230,9 +230,11 @@ table_name:table_with_header_insert, constraint:restrict_to, table_format:text/g
 table_name:table_with_header_insert, constraint:restrict_to, table_format:parquet/none/none
 
 # IMPALA-7368/IMPALA-7370/IMPALA-8198 adds DATE support for text, hbase, parquet and avro.
+# IMPALA-8801 adds DATE support for ORC.
 # Other file-formats will be introduced later.
 table_name:date_tbl, constraint:restrict_to, table_format:parquet/none/none
 table_name:date_tbl, constraint:restrict_to, table_format:avro/snap/block
+table_name:date_tbl, constraint:restrict_to, table_format:orc/def/block
 table_name:date_tbl, constraint:restrict_to, table_format:hbase/none/none
 table_name:date_tbl, constraint:restrict_to, table_format:text/none/none
 table_name:date_tbl, constraint:restrict_to, table_format:text/lzo/block

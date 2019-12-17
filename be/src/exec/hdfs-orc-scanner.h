@@ -136,6 +136,7 @@ class HdfsOrcScanner : public HdfsScanner {
 
  private:
   friend class OrcColumnReader;
+  friend class OrcDateColumnReader;
   friend class OrcStringColumnReader;
   friend class OrcTimestampReader;
   friend class OrcComplexColumnReader;

@@ -442,6 +442,10 @@ error_codes = (
   ("ORC_TIMESTAMP_OUT_OF_RANGE", 145,
    "ORC file '$0' column '$1' contains an out of range timestamp. "
    "The valid date range is 1400-01-01..9999-12-31."),
+
+  ("ORC_DATE_OUT_OF_RANGE", 146,
+   "ORC file '$0' column '$1' contains an out of range date. "
+   "The valid date range is 0001-01-01..9999-12-31."),
 )
 
 import sys

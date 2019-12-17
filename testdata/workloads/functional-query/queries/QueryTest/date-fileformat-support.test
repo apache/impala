@@ -31,10 +31,15 @@ select * from $DATABASE.avro_date_tbl;
 DATE
 ====
 ---- QUERY
-# Querying orc table is not supported.
+# Querying ORC table is supported.
 select * from $DATABASE.orc_date_tbl;
----- CATCH
-NotImplementedException: Scanning DATE values in table '$DATABASE.orc_date_tbl' is not supported for fileformat ORC
+---- TYPES
+DATE
+---- RESULTS
+1970-06-12
+2008-11-21
+9999-12-31
+NULL
 ====
 ---- QUERY
 # Inserting text partitions to $DATABASE.date_tbl is OK.
@@ -54,20 +59,12 @@ select date_col from functional_parquet.date_tbl where date_part = '1399-06-27';
 date_part=1899-12-31/: 3
 ====
 ---- QUERY
-# Adding orc partition works even though Impala cannot scan/write DATE values in orc.
-# Querying all the partitions fails because of the one orc partition.
+# Adding ORC partition works even though Impala cannot write ORC format.
+# Querying all the partitions also works.
 alter table $DATABASE.date_tbl add partition (date_part='2099-12-31')
 location '$NAMENODE/test-warehouse/$DATABASE.db/orc_date_tbl';
 alter table $DATABASE.date_tbl partition (date_part='2099-12-31') set fileformat orc;
-select * from $DATABASE.date_tbl;
----- CATCH
-NotImplementedException: Scanning DATE values in table '$DATABASE.date_tbl' is not supported for fileformat ORC
-====
----- QUERY
-# Querying text, parquet and avro partitions is OK.
-select date_part, date_col
-from $DATABASE.date_tbl
-where date_part != '2099-12-31';
+select date_part, date_col from $DATABASE.date_tbl;
 ---- RESULTS
 0001-01-01,0001-01-01
 0001-01-01,0001-12-31
@@ -104,12 +101,10 @@ where date_part != '2099-12-31';
 1999-12-31,1970-01-02
 1999-12-31,1224-05-19
 1999-12-31,8543-11-21
+2099-12-31,1970-06-12
+2099-12-31,2008-11-21
+2099-12-31,9999-12-31
+2099-12-31,NULL
 ---- TYPES
 DATE,DATE
-====
----- QUERY
-# Querying the orc partition separately fails.
-select date_part, date_col from $DATABASE.date_tbl where date_part='2099-12-31';
----- CATCH
-NotImplementedException: Scanning DATE values in table '$DATABASE.date_tbl' is not supported for fileformat ORC
 ====

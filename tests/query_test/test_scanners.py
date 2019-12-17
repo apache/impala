@@ -31,6 +31,7 @@ from parquet.ttypes import ConvertedType
 from subprocess import check_call
 
 from testdata.common import widetable
+from tests.common.file_utils import create_table_and_copy_files
 from tests.common.impala_test_suite import ImpalaTestSuite, LOG
 from tests.common.skip import (
     SkipIf,
@@ -344,7 +345,7 @@ class TestParquet(ImpalaTestSuite):
     self.run_test_case('QueryTest/out-of-range-timestamp-abort-on-error',
         vector, unique_database)
 
-  def test_date_out_of_range(self, vector, unique_database):
+  def test_date_out_of_range_parquet(self, vector, unique_database):
     """Test scanning parquet files with an out of range date."""
     create_table_from_parquet(self.client, unique_database, "out_of_range_date")
 
@@ -352,7 +353,7 @@ class TestParquet(ImpalaTestSuite):
     del new_vector.get_value('exec_option')['abort_on_error']
     self.run_test_case('QueryTest/out-of-range-date', new_vector, unique_database)
 
-  def test_pre_gregorian_date(self, vector, unique_database):
+  def test_pre_gregorian_date_parquet(self, vector, unique_database):
     """Test date interoperability issues between Impala and Hive 2.1.1 when scanning
        a parquet table that contains dates that precede the introduction of Gregorian
        calendar in 1582-10-15.
@@ -1297,20 +1298,31 @@ class TestOrc(ImpalaTestSuite):
     assert total == num_scanners_with_no_reads
 
   def test_type_conversions(self, vector, unique_database):
-    # Create an "illtypes" table whose columns can't match the underlining ORC file's.
+    # Create "illtypes" tables whose columns can't match the underlining ORC file's.
     # Create an "safetypes" table likes above but ORC columns can still fit into it.
-    # Reuse the data files of functional_orc_def.alltypestiny
+    # Reuse the data files of alltypestiny and date_tbl in funtional_orc_def.
     tbl_loc = get_fs_path("/test-warehouse/alltypestiny_orc_def")
     self.client.execute("""create external table %s.illtypes (c1 boolean, c2 float,
         c3 boolean, c4 tinyint, c5 smallint, c6 int, c7 boolean, c8 string, c9 int,
         c10 float, c11 bigint) partitioned by (year int, month int) stored as ORC
         location '%s';""" % (unique_database, tbl_loc))
+    self.client.execute("""create external table %s.illtypes_ts_to_date (c1 boolean,
+        c2 float, c3 boolean, c4 tinyint, c5 smallint, c6 int, c7 boolean, c8 string,
+        c9 int, c10 float, c11 date) partitioned by (year int, month int) stored as ORC
+        location '%s';""" % (unique_database, tbl_loc))
     self.client.execute("""create external table %s.safetypes (c1 bigint, c2 boolean,
         c3 smallint, c4 int, c5 bigint, c6 bigint, c7 double, c8 double, c9 char(3),
         c10 varchar(3), c11 timestamp) partitioned by (year int, month int) stored as ORC
         location '%s';""" % (unique_database, tbl_loc))
+    self.client.execute("""create external table %s.illtypes_date_tbl (c1 boolean,
+        c2 timestamp) partitioned by (date_part date) stored as ORC location '%s';"""
+        % (unique_database, "/test-warehouse/date_tbl_orc_def"))
     self.client.execute("alter table %s.illtypes recover partitions" % unique_database)
+    self.client.execute("alter table %s.illtypes_ts_to_date recover partitions"
+        % unique_database)
     self.client.execute("alter table %s.safetypes recover partitions" % unique_database)
+    self.client.execute("alter table %s.illtypes_date_tbl recover partitions"
+        % unique_database)
 
     # Create a decimal table whose precisions don't match the underlining orc files.
     # Reuse the data files of functional_orc_def.decimal_tbl.
@@ -1319,7 +1331,8 @@ class TestOrc(ImpalaTestSuite):
         d2 decimal(8,0), d3 decimal(19,10), d4 decimal(20,20), d5 decimal(2,0))
         partitioned by (d6 decimal(9,0)) stored as orc location '%s'"""
         % (unique_database, decimal_loc))
-    self.client.execute("alter table %s.mismatch_decimals recover partitions" % unique_database)
+    self.client.execute("alter table %s.mismatch_decimals recover partitions"
+        % unique_database)
 
     self.run_test_case('DataErrorsTest/orc-type-checks', vector, unique_database)
 
@@ -1353,6 +1366,32 @@ class TestOrc(ImpalaTestSuite):
         "Encountered parse error during schema selection")
     self._run_invalid_schema_test(unique_database, "corrupt_root_type",
         "root type is boolean (should be struct)")
+
+
+  def test_date_out_of_range_orc(self, vector, unique_database):
+    """Test scanning orc files with an out of range date."""
+    orc_tbl_name = "out_of_range_date_orc"
+    create_sql = "create table %s.%s (d date) stored as orc" % (unique_database,
+        orc_tbl_name)
+    create_table_and_copy_files(self.client, create_sql, unique_database, orc_tbl_name,
+        ["/testdata/data/out_of_range_date.orc"])
+
+    new_vector = deepcopy(vector)
+    del new_vector.get_value('exec_option')['abort_on_error']
+    self.run_test_case('QueryTest/out-of-range-date-orc', new_vector, unique_database)
+
+  def test_pre_gregorian_date_orc(self, vector, unique_database):
+    """Test date interoperability issues between Impala and Hive 2.1.1 when scanning
+       an orc table that contains dates that precede the introduction of Gregorian
+       calendar in 1582-10-15.
+    """
+    orc_tbl_name = "hive2_pre_gregorian_orc"
+    create_sql = "create table %s.%s (d date) stored as orc" % (unique_database,
+        orc_tbl_name)
+    create_table_and_copy_files(self.client, create_sql, unique_database, orc_tbl_name,
+        ["/testdata/data/hive2_pre_gregorian.orc"])
+
+    self.run_test_case('QueryTest/hive2-pre-gregorian-date-orc', vector, unique_database)
 
 
 class TestScannerReservation(ImpalaTestSuite):

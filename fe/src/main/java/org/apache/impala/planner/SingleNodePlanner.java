@@ -1389,8 +1389,8 @@ public class SingleNodePlanner {
 
   /**
    * Looks for a filesystem-based partition in 'partitions' with no DATE support and
-   * returns the first one it finds. Right now, scanning DATE values is only supported for
-   * TEXT, PARQUET and AVRO fileformats.
+   * returns the first one it finds. Right now, scanning DATE values is supported for
+   * TEXT, PARQUET, AVRO and ORC fileformats.
    *
    * Returns null otherwise.
    */

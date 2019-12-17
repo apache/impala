@@ -98,6 +98,9 @@ OrcColumnReader* OrcColumnReader::Create(const orc::Type* node,
           }
         }
         break;
+      case TYPE_DATE:
+        reader = new OrcDateColumnReader(node, slot_desc, scanner);
+        break;
       default:
         DCHECK(false) << slot_desc->type().DebugString();
     } // end of switch
@@ -197,6 +200,22 @@ Status OrcTimestampReader::ReadValue(int row_idx, Tuple* tuple, MemPool* pool) {
     ErrorMsg msg(errorCode, scanner_->filename(), orc_column_id_);
     return scanner_->state_->LogOrReturnError(msg);
   }
+  return Status::OK();
+}
+
+Status OrcDateColumnReader::ReadValue(int row_idx, Tuple* tuple, MemPool* pool) {
+  if (IsNull(DCHECK_NOTNULL(batch_), row_idx)) {
+    SetNullSlot(tuple);
+    return Status::OK();
+  }
+  DateValue dv(batch_->data.data()[row_idx]);
+  if (UNLIKELY(!dv.IsValid())) {
+    SetNullSlot(tuple);
+    ErrorMsg msg(TErrorCode::ORC_DATE_OUT_OF_RANGE, scanner_->filename(), orc_column_id_);
+    return scanner_->state_->LogOrReturnError(msg);
+  }
+  DateValue* slot = reinterpret_cast<DateValue*>(GetSlot(tuple));
+  *slot = dv;
   return Status::OK();
 }
 
