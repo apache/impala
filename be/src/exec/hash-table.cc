@@ -152,11 +152,27 @@ Status HashTableCtx::Open(RuntimeState* state) {
 }
 
 void HashTableCtx::Close(RuntimeState* state) {
+  if (VLOG_IS_ON(3)) VLOG(3) << PrintStats();
   free(scratch_row_);
   scratch_row_ = NULL;
   expr_values_cache_.Close(expr_perm_pool_->mem_tracker());
   ScalarExprEvaluator::Close(build_expr_evals_, state);
   ScalarExprEvaluator::Close(probe_expr_evals_, state);
+}
+
+string HashTableCtx::PrintStats() const {
+  double avg_travel = num_probes_ == 0 ? 0 : (double)travel_length_ / (double)num_probes_;
+  stringstream ss;
+  ss << "Probes: " << num_probes_ << endl;
+  ss << "Travel: " << travel_length_ << " " << avg_travel << endl;
+  ss << "HashCollisions: " << num_hash_collisions_ << endl;
+  return ss.str();
+}
+
+void HashTableCtx::StatsCountersAdd(HashTableStatsProfile* profile) {
+  COUNTER_ADD(profile->num_hash_collisions_, num_hash_collisions_);
+  COUNTER_ADD(profile->num_hash_probes_, num_probes_);
+  COUNTER_ADD(profile->num_hash_travels_, travel_length_);
 }
 
 uint32_t HashTableCtx::Hash(const void* input, int len, uint32_t hash) const {
@@ -433,26 +449,21 @@ unique_ptr<HashTableStatsProfile> HashTable::AddHashTableCounters(
 }
 
 void HashTable::Close() {
-  // Print statistics only for the large or heavily used hash tables.
-  // TODO: Tweak these numbers/conditions, or print them always?
+  // Print statistics only for the large hash tables or extremely verbose logging is
+  // enabled.
   const int64_t LARGE_HT = 128 * 1024;
-  const int64_t HEAVILY_USED = 1024 * 1024;
-  // TODO: These statistics should go to the runtime profile as well.
-  if ((num_buckets_ > LARGE_HT) || (num_probes_ > HEAVILY_USED)) VLOG(2) << PrintStats();
+  if (num_buckets_ > LARGE_HT || VLOG_IS_ON(3)) VLOG(2) << PrintStats();
   for (auto& data_page : data_pages_) allocator_->Free(move(data_page));
   data_pages_.clear();
   if (bucket_allocation_ != nullptr) allocator_->Free(move(bucket_allocation_));
 }
 
 void HashTable::StatsCountersAdd(HashTableStatsProfile* profile) {
-  COUNTER_ADD(profile->num_hash_collisions_, num_hash_collisions_);
-  COUNTER_ADD(profile->num_hash_probes_, num_probes_);
-  COUNTER_ADD(profile->num_hash_travels_, travel_length_);
-  COUNTER_ADD(profile->num_hash_resizes_, this->num_resizes_);
+  COUNTER_ADD(profile->num_hash_resizes_, num_resizes_);
 }
 
 Status HashTable::CheckAndResize(
-    uint64_t buckets_to_fill, const HashTableCtx* ht_ctx, bool* got_memory) {
+    uint64_t buckets_to_fill, HashTableCtx* __restrict__ ht_ctx, bool* got_memory) {
   uint64_t shift = 0;
   while (num_filled_buckets_ + buckets_to_fill >
          (num_buckets_ << shift) * MAX_FILL_FACTOR) {
@@ -464,7 +475,7 @@ Status HashTable::CheckAndResize(
 }
 
 Status HashTable::ResizeBuckets(
-    int64_t num_buckets, const HashTableCtx* ht_ctx, bool* got_memory) {
+    int64_t num_buckets, HashTableCtx* __restrict__ ht_ctx, bool* got_memory) {
   DCHECK_EQ((num_buckets & (num_buckets - 1)), 0)
       << "num_buckets=" << num_buckets << " must be a power of 2";
   DCHECK_GT(num_buckets, num_filled_buckets_)
@@ -502,8 +513,8 @@ Status HashTable::ResizeBuckets(
        NextFilledBucket(&iter.bucket_idx_, &iter.node_)) {
     Bucket* bucket_to_copy = &buckets_[iter.bucket_idx_];
     bool found = false;
-    int64_t bucket_idx =
-        Probe<true>(new_buckets, num_buckets, NULL, bucket_to_copy->hash, &found);
+    int64_t bucket_idx = Probe<true, false>(
+        new_buckets, num_buckets, ht_ctx, bucket_to_copy->hash, &found);
     DCHECK(!found);
     DCHECK_NE(bucket_idx, Iterator::BUCKET_NOT_FOUND) << " Probe failed even though "
         " there are free buckets. " << num_buckets << " " << num_filled_buckets_;
@@ -581,17 +592,13 @@ string HashTable::DebugString(bool skip_empty, bool show_match,
 }
 
 string HashTable::PrintStats() const {
-  double curr_fill_factor = (double)num_filled_buckets_/(double)num_buckets_;
-  double avg_travel = (double)travel_length_/(double)num_probes_;
-  double avg_collisions = (double)num_hash_collisions_/(double)num_filled_buckets_;
+  double curr_fill_factor =
+      num_buckets_ == 0 ? 0 : (double)num_filled_buckets_ / (double)num_buckets_;
   stringstream ss;
   ss << "Buckets: " << num_buckets_ << " " << num_filled_buckets_ << " "
      << curr_fill_factor << endl;
   ss << "Duplicates: " << num_buckets_with_duplicates_ << " buckets "
      << num_duplicate_nodes_ << " nodes" << endl;
-  ss << "Probes: " << num_probes_ << endl;
-  ss << "Travel: " << travel_length_ << " " << avg_travel << endl;
-  ss << "HashCollisions: " << num_hash_collisions_ << " " << avg_collisions << endl;
   ss << "Resizes: " << num_resizes_ << endl;
   return ss.str();
 }

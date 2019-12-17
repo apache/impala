@@ -316,6 +316,10 @@ class PhjBuilder : public DataSink {
   /// TODO: IMPALA-9176: improve the encapsulation of the null-aware partition.
   inline Partition* null_aware_partition() const { return null_aware_partition_.get(); }
 
+  /// TODO: IMPALA-9156: document thread safety for accessing this from
+  /// multiple PartitionedHashJoinNodes.
+  HashTableStatsProfile* ht_stats_profile() const { return ht_stats_profile_.get(); }
+
   std::string DebugString() const;
 
   /// A partition containing a subset of build rows.

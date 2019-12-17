@@ -288,8 +288,11 @@ Status PhjBuilder::FlushFinal(RuntimeState* state) {
 void PhjBuilder::Close(RuntimeState* state) {
   if (closed_) return;
   CloseAndDeletePartitions(nullptr);
-  if (ht_ctx_ != nullptr) ht_ctx_->Close(state);
-  ht_ctx_.reset();
+  if (ht_ctx_ != nullptr) {
+    ht_ctx_->StatsCountersAdd(ht_stats_profile_.get());
+    ht_ctx_->Close(state);
+    ht_ctx_.reset();
+  }
   for (const FilterContext& ctx : filter_ctxs_) {
     if (ctx.expr_eval != nullptr) ctx.expr_eval->Close(state);
   }

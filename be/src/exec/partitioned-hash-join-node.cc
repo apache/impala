@@ -253,8 +253,11 @@ void PartitionedHashJoinNode::CloseAndDeletePartitions(RowBatch* row_batch) {
 
 void PartitionedHashJoinNode::Close(RuntimeState* state) {
   if (is_closed()) return;
-  if (ht_ctx_ != nullptr) ht_ctx_->Close(state);
-  ht_ctx_.reset();
+  if (ht_ctx_ != nullptr) {
+    ht_ctx_->StatsCountersAdd(builder_->ht_stats_profile());
+    ht_ctx_->Close(state);
+    ht_ctx_.reset();
+  }
   output_unmatched_batch_.reset();
   output_unmatched_batch_iter_.reset();
   CloseAndDeletePartitions(nullptr);

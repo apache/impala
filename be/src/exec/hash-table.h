@@ -51,6 +51,7 @@ class ScalarExprEvaluator;
 class Tuple;
 class TupleRow;
 class HashTable;
+struct HashTableStatsProfile;
 
 /// Linear or quadratic probing hash table implementation tailored to the usage pattern
 /// for partitioned hash aggregation and hash joins. The hash table stores TupleRows and
@@ -63,11 +64,16 @@ class HashTable;
 /// expr results for the current row being processed when possible into a contiguous
 /// memory buffer. This allows for efficient hash computation.
 //
-/// The hash table does not support removes. The hash table is not thread safe.
-/// The table is optimized for the partition hash aggregation and hash joins and is not
-/// intended to be a generic hash table implementation. The API loosely mimics the
-/// std::hashset API.
-//
+/// The hash table does not support removes. The table is optimized for the partition hash
+/// aggregation and hash joins and is not intended to be a generic hash table
+/// implementation.
+///
+/// Operations that mutate the hash table are not thread-safe. Read-only access to the
+/// hash table, is, however, thread safe: multiple threads, each with their own
+/// HashTableCtx, can safely look up rows in the hash table with FindProbeRow(), etc so
+/// long as no thread is mutating the hash table. Thread-safe methods are explicitly
+/// documented.
+///
 /// The data (rows) are stored in a BufferedTupleStream. The basic data structure of this
 /// hash table is a vector of buckets. The buckets (indexed by the mod of the hash)
 /// contain a pointer to either the slot in the tuple-stream or in case of duplicate
@@ -128,6 +134,15 @@ class HashTableCtx {
 
   /// Call to cleanup any resources allocated by the expression evaluators.
   void Close(RuntimeState* state);
+
+  /// Update and print some statistics that can be used for performance debugging.
+  std::string PrintStats() const;
+
+  /// Add operations stats of this hash table context to the counters in profile.
+  /// This method should only be called once for each context and be called during
+  /// closing the owner object of the context. Not all the counters are added with the
+  /// method, only counters for Probes, travels and collisions are affected.
+  void StatsCountersAdd(HashTableStatsProfile* profile);
 
   void set_level(int level);
 
@@ -527,6 +542,19 @@ class HashTableCtx {
   /// clearing them when results from the respective expr evaluators are no longer needed.
   MemPool* build_expr_results_pool_;
   MemPool* probe_expr_results_pool_;
+
+  /// The stats below can be used for debugging perf.
+  /// Number of Probe() calls that probe the hash table.
+  int64_t num_probes_ = 0;
+
+  /// Total distance traveled for each probe. That is the sum of the diff between the end
+  /// position of a probe (find/insert) and its start position
+  /// (hash & (num_buckets_ - 1)).
+  int64_t travel_length_ = 0;
+
+  /// The number of cases where we had to compare buckets with the same hash value, but
+  /// the row equality failed.
+  int64_t num_hash_collisions_ = 0;
 };
 
 /// HashTableStatsProfile encapsulates hash tables stats. It tracks the stats of all the
@@ -655,7 +683,7 @@ class HashTable {
   /// Add operations stats of this hash table to the counters in profile.
   /// This method should only be called once for each HashTable and be called during
   /// closing the owner object of the HashTable. Not all the counters are added with the
-  /// method, only counters for Probes, travels, collisions and resizes are affected.
+  /// method, only counters for resizes are affected.
   void StatsCountersAdd(HashTableStatsProfile* profile);
 
   /// Inserts the row to the hash table. The caller is responsible for ensuring that the
@@ -669,11 +697,12 @@ class HashTable {
   /// only one tuple, a pointer to that tuple is stored. Otherwise the 'flat_row' pointer
   /// is stored. The 'row' is not copied by the hash table and the caller must guarantee
   /// it stays in memory. This will not grow the hash table.
-  bool IR_ALWAYS_INLINE Insert(HashTableCtx* ht_ctx,
+  bool IR_ALWAYS_INLINE Insert(HashTableCtx* __restrict__ ht_ctx,
       BufferedTupleStream::FlatRowPtr flat_row, TupleRow* row,
       Status* status) WARN_UNUSED_RESULT;
 
   /// Prefetch the hash table bucket which the given hash value 'hash' maps to.
+  /// Thread-safe for read-only hash tables.
   template <const bool READ>
   void IR_ALWAYS_INLINE PrefetchBucket(uint32_t hash);
 
@@ -685,26 +714,33 @@ class HashTable {
   /// row. The matching rows do not need to be evaluated since all the nodes of a bucket
   /// are duplicates. One scan can be in progress for each 'ht_ctx'. Used in the probe
   /// phase of hash joins.
-  Iterator IR_ALWAYS_INLINE FindProbeRow(HashTableCtx* ht_ctx);
+  /// Thread-safe for read-only hash tables.
+  Iterator IR_ALWAYS_INLINE FindProbeRow(HashTableCtx* __restrict__ ht_ctx);
 
   /// If a match is found in the table, return an iterator as in FindProbeRow(). If a
   /// match was not present, return an iterator pointing to the empty bucket where the key
   /// should be inserted. Returns End() if the table is full. The caller can set the data
   /// in the bucket using a Set*() method on the iterator.
-  Iterator IR_ALWAYS_INLINE FindBuildRowBucket(HashTableCtx* ht_ctx, bool* found);
+  /// Thread-safe for read-only hash tables.
+  Iterator IR_ALWAYS_INLINE FindBuildRowBucket(
+      HashTableCtx* __restrict__ ht_ctx, bool* found);
 
   /// Returns number of elements inserted in the hash table
+  /// Thread-safe for read-only hash tables.
   int64_t size() const {
     return num_filled_buckets_ - num_buckets_with_duplicates_ + num_duplicate_nodes_;
   }
 
   /// Returns the number of empty buckets.
+  /// Thread-safe for read-only hash tables.
   int64_t EmptyBuckets() const { return num_buckets_ - num_filled_buckets_; }
 
   /// Returns the number of buckets
+  /// Thread-safe for read-only hash tables.
   int64_t num_buckets() const { return num_buckets_; }
 
   /// Returns the load factor (the number of non-empty buckets)
+  /// Thread-safe for read-only hash tables.
   double load_factor() const {
     return static_cast<double>(num_filled_buckets_) / num_buckets_;
   }
@@ -726,6 +762,7 @@ class HashTable {
 
   /// Returns the memory occupied by the hash table, takes into account the number of
   /// duplicates.
+  /// Thread-safe for read-only hash tables.
   int64_t CurrentMemSize() const;
 
   /// Returns the number of inserts that can be performed before resizing the table.
@@ -738,7 +775,7 @@ class HashTable {
   /// inserted without need to resize. If there is not enough memory available to
   /// resize the hash table, Status::OK() is returned and 'got_memory' is false. If a
   /// another error occurs, an error status may be returned.
-  Status CheckAndResize(uint64_t buckets_to_fill, const HashTableCtx* ht_ctx,
+  Status CheckAndResize(uint64_t buckets_to_fill, HashTableCtx* __restrict__ ht_ctx,
       bool* got_memory) WARN_UNUSED_RESULT;
 
   /// Returns the number of bytes allocated to the hash table from the block manager.
@@ -748,23 +785,28 @@ class HashTable {
 
   /// Returns an iterator at the beginning of the hash table.  Advancing this iterator
   /// will traverse all elements.
+  /// Thread-safe for read-only hash tables.
   Iterator Begin(const HashTableCtx* ht_ctx);
 
   /// Return an iterator pointing to the first element (Bucket or DuplicateNode, if the
   /// bucket has duplicates) in the hash table that does not have its matched flag set.
   /// Used in right joins and full-outer joins.
+  /// Thread-safe for read-only hash tables.
   Iterator FirstUnmatched(HashTableCtx* ctx);
 
   /// Return true if there was a least one match.
+  /// Thread-safe for read-only hash tables.
   bool HasMatches() const { return has_matches_; }
 
   /// Return end marker.
+  /// Thread-safe for read-only hash tables.
   Iterator End() { return Iterator(); }
 
   /// Dump out the entire hash table to string.  If 'skip_empty', empty buckets are
   /// skipped.  If 'show_match', it also prints the matched flag of each node. If
   /// 'build_desc' is non-null, the build rows will be printed. Otherwise, only the
   /// the addresses of the build rows will be printed.
+  /// Thread-safe for read-only hash tables.
   std::string DebugString(bool skip_empty, bool show_match,
       const RowDescriptor* build_desc);
 
@@ -772,6 +814,7 @@ class HashTable {
   void DebugStringTuple(std::stringstream& ss, HtData& htdata, const RowDescriptor* desc);
 
   /// Update and print some statistics that can be used for performance debugging.
+  /// Thread-safe for read-only hash tables.
   std::string PrintStats() const;
 
   /// stl-like iterator interface.
@@ -788,6 +831,7 @@ class HashTable {
         node_(NULL) { }
 
     /// Iterates to the next element. It should be called only if !AtEnd().
+    /// Thread-safe for read-only hash tables.
     void IR_ALWAYS_INLINE Next();
 
     /// Iterates to the next duplicate node. If the bucket does not have duplicates or
@@ -795,39 +839,48 @@ class HashTable {
     /// Used when we want to iterate over all the duplicate nodes bypassing the Next()
     /// interface (e.g. in semi/outer joins without other_join_conjuncts, in order to
     /// iterate over all nodes of an unmatched bucket).
+    /// Thread-safe for read-only hash tables.
     void IR_ALWAYS_INLINE NextDuplicate();
 
     /// Iterates to the next element that does not have its matched flag set. Used in
     /// right-outer and full-outer joins.
+    /// Thread-safe for read-only hash tables.
     void IR_ALWAYS_INLINE NextUnmatched();
 
     /// Return the current row or tuple. Callers must check the iterator is not AtEnd()
     /// before calling them.  The returned row is owned by the iterator and valid until
     /// the next call to GetRow(). It is safe to advance the iterator.
+    /// Thread-safe for read-only hash tables.
     TupleRow* IR_ALWAYS_INLINE GetRow() const;
     Tuple* IR_ALWAYS_INLINE GetTuple() const;
 
     /// Set the current tuple for an empty bucket. Designed to be used with the iterator
     /// returned from FindBuildRowBucket() in the case when the value is not found.  It is
     /// not valid to call this function if the bucket already has an entry.
+    /// Not thread-safe.
     void SetTuple(Tuple* tuple, uint32_t hash);
 
     /// Sets as matched the Bucket or DuplicateNode currently pointed by the iterator,
     /// depending on whether the bucket has duplicates or not. The iterator cannot be
     /// AtEnd().
+    /// Not thread-safe.
     void SetMatched();
 
     /// Returns the 'matched' flag of the current Bucket or DuplicateNode, depending on
     /// whether the bucket has duplicates or not. It should be called only if !AtEnd().
+    /// Thread-safe for read-only hash tables.
     bool IsMatched() const;
 
     /// Resets everything but the pointer to the hash table.
+    /// Not thread-safe.
     void SetAtEnd();
 
     /// Returns true if this iterator is at the end, i.e. GetRow() cannot be called.
+    /// Thread-safe for read-only hash tables.
     bool ALWAYS_INLINE AtEnd() const { return bucket_idx_ == BUCKET_NOT_FOUND; }
 
     /// Prefetch the hash table bucket which the iterator is pointing to now.
+    /// Thread-safe for read-only hash tables.
     template<const bool READ>
     void IR_ALWAYS_INLINE PrefetchBucket();
 
@@ -868,9 +921,10 @@ class HashTable {
 
   /// Performs the probing operation according to the probing algorithm (linear or
   /// quadratic. Returns one of the following:
-  /// (a) the index of the bucket that contains the entry that matches with the last row
-  ///     evaluated in 'ht_ctx'. If 'ht_ctx' is NULL then it does not check for row
-  ///     equality and returns the index of the first empty bucket.
+  /// (a) the index of the bucket that contains the entry matching 'hash' and, if
+  ///     COMPARE_ROW is true, also equals the last row evaluated in 'ht_ctx'.
+  ///     If COMPARE_ROW is false, returns the index of the first bucket with
+  ///     matching hash.
   /// (b) the index of the first empty bucket according to the probing algorithm (linear
   ///     or quadratic), if the entry is not in the hash table or 'ht_ctx' is NULL.
   /// (c) Iterator::BUCKET_NOT_FOUND if the probe was not successful, i.e. the maximum
@@ -889,15 +943,16 @@ class HashTable {
   /// 'found' indicates that a bucket that contains an equal row is found.
   ///
   /// There are wrappers of this function that perform the Find and Insert logic.
-  template <bool INCLUSIVE_EQUALITY>
+  template <bool INCLUSIVE_EQUALITY, bool COMPARE_ROW>
   int64_t IR_ALWAYS_INLINE Probe(Bucket* buckets, int64_t num_buckets,
-      HashTableCtx* ht_ctx, uint32_t hash, bool* found);
+      HashTableCtx* __restrict__ ht_ctx, uint32_t hash, bool* found);
 
   /// Performs the insert logic. Returns the HtData* of the bucket or duplicate node
   /// where the data should be inserted. Returns NULL if the insert was not successful
   /// and either sets 'status' to OK if it failed because not enough reservation was
   /// available or the error if an error was encountered.
-  HtData* IR_ALWAYS_INLINE InsertInternal(HashTableCtx* ht_ctx, Status* status);
+  HtData* IR_ALWAYS_INLINE InsertInternal(
+      HashTableCtx* __restrict__ ht_ctx, Status* status);
 
   /// Updates 'bucket_idx' to the index of the next non-empty bucket. If the bucket has
   /// duplicates, 'node' will be pointing to the head of the linked list of duplicates.
@@ -906,7 +961,8 @@ class HashTable {
   void NextFilledBucket(int64_t* bucket_idx, DuplicateNode** node);
 
   /// Resize the hash table to 'num_buckets'. 'got_memory' is false on OOM.
-  Status ResizeBuckets(int64_t num_buckets, const HashTableCtx* ht_ctx, bool* got_memory);
+  Status ResizeBuckets(
+      int64_t num_buckets, HashTableCtx* __restrict__ ht_ctx, bool* got_memory);
 
   /// Appends the DuplicateNode pointed by next_node_ to 'bucket' and moves the next_node_
   /// pointer to the next DuplicateNode in the page, updating the remaining node counter.
@@ -1015,19 +1071,6 @@ class HashTable {
   /// Flag used to check that we don't lose stored matches when spilling hash tables
   /// (IMPALA-1488).
   bool has_matches_ = false;
-
-  /// The stats below can be used for debugging perf.
-  /// Number of Probe() calls that probe the hash table.
-  int64_t num_probes_ = 0;
-
-  /// Total distance traveled for each probe. That is the sum of the diff between the end
-  /// position of a probe (find/insert) and its start position
-  /// (hash & (num_buckets_ - 1)).
-  int64_t travel_length_ = 0;
-
-  /// The number of cases where we had to compare buckets with the same hash value, but
-  /// the row equality failed.
-  int64_t num_hash_collisions_ = 0;
 
   /// How many times this table has resized so far.
   int64_t num_resizes_ = 0;

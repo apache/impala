@@ -399,7 +399,10 @@ void GroupingAggregator::Close(RuntimeState* state) {
   ClosePartitions();
 
   if (tuple_pool_.get() != nullptr) tuple_pool_->FreeAll();
-  if (ht_ctx_.get() != nullptr) ht_ctx_->Close(state);
+  if (ht_ctx_.get() != nullptr) {
+    ht_ctx_->StatsCountersAdd(ht_stats_profile_.get());
+    ht_ctx_->Close(state);
+  }
   ht_ctx_.reset();
   if (serialize_stream_.get() != nullptr) {
     serialize_stream_->Close(nullptr, RowBatch::FlushMode::NO_FLUSH_RESOURCES);
@@ -669,7 +672,7 @@ Status GroupingAggregator::CreateHashPartitions(int level, int single_partition_
 }
 
 Status GroupingAggregator::CheckAndResizeHashPartitions(
-    bool partitioning_aggregated_rows, int num_rows, const HashTableCtx* ht_ctx) {
+    bool partitioning_aggregated_rows, int num_rows, HashTableCtx* ht_ctx) {
   DCHECK(!is_streaming_preagg_);
   for (int i = 0; i < PARTITION_FANOUT; ++i) {
     Partition* partition = hash_partitions_[i];

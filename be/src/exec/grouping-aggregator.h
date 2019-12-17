@@ -583,7 +583,7 @@ class GroupingAggregator : public Aggregator {
   /// resize the hash tables, may spill partitions. 'aggregated_rows' is true if
   /// we're currently partitioning aggregated rows.
   Status CheckAndResizeHashPartitions(
-      bool aggregated_rows, int num_rows, const HashTableCtx* ht_ctx) WARN_UNUSED_RESULT;
+      bool aggregated_rows, int num_rows, HashTableCtx* ht_ctx) WARN_UNUSED_RESULT;
 
   /// Prepares the next partition to return results from. On return, this function
   /// initializes output_iterator_ and output_partition_. This either removes
