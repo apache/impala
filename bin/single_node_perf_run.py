@@ -116,9 +116,10 @@ def start_minicluster():
   configured_call(["{0}/testdata/bin/run-all.sh".format(IMPALA_HOME)])
 
 
-def start_impala(num_impalads):
+def start_impala(num_impalads, options):
   configured_call(["{0}/bin/start-impala-cluster.py".format(IMPALA_HOME), "-s",
-                   str(num_impalads), "-c", str(num_impalads)])
+                   str(num_impalads), "-c", str(num_impalads)] +
+                  ["--impalad_args={0}".format(arg) for arg in options.impalad_args])
 
 
 def run_workload(base_dir, workloads, options):
@@ -231,7 +232,7 @@ def perf_ab_test(options, args):
 
   if options.start_minicluster:
     start_minicluster()
-  start_impala(options.num_impalads)
+  start_impala(options.num_impalads, options)
 
   workloads = set(options.workloads.split(","))
 
@@ -254,7 +255,7 @@ def perf_ab_test(options, args):
     sh.git.checkout("--", "testdata/workloads")
     build(hash_b, options)
     restore_workloads(workload_dir)
-    start_impala(options.num_impalads)
+    start_impala(options.num_impalads, options)
     run_workload(temp_dir, workloads, options)
     compare(temp_dir, hash_a, hash_b)
 
@@ -280,6 +281,9 @@ def parse_options():
                     help="start a new Hadoop minicluster")
   parser.add_option("--ninja", action="store_true",
                     help = "use ninja, rather than Make, as the build tool")
+  parser.add_option("--impalad_args", dest="impalad_args", action="append", type="string",
+                    default=[],
+                    help="Additional arguments to pass to each Impalad during startup")
 
   parser.set_usage(textwrap.dedent("""
     single_node_perf_run.py [options] git_hash_A [git_hash_B]
