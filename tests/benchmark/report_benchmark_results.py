@@ -688,7 +688,7 @@ class CombinedExecSummaries(object):
     table = prettytable.PrettyTable(
         ["Operator",
           "#Hosts",
-          "#Inst"
+          "#Inst",
           "Avg Time",
           "Std Dev",
           "Max Time",
