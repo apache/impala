@@ -227,7 +227,8 @@ class SkipIfHive2:
   create_external_kudu_table = pytest.mark.skipif(HIVE_MAJOR_VERSION == 2,
       reason="Hive 2 does not support creating external.table.purge Kudu tables."
              " See IMPALA-9092 for details.")
-
+  orc = pytest.mark.skipif(HIVE_MAJOR_VERSION <= 2,
+      reason="CREATE TABLE LIKE ORC is only supported with Hive version >= 3")
 
 class SkipIfCatalogV2:
   """Expose decorators as methods so that is_catalog_v2_cluster() can be evaluated lazily

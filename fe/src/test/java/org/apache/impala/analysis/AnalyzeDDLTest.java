@@ -54,9 +54,8 @@ import org.apache.impala.thrift.TBackendGflags;
 import org.apache.impala.thrift.TDescribeTableParams;
 import org.apache.impala.thrift.TQueryOptions;
 import org.apache.impala.util.MetaStoreUtil;
-import org.junit.AfterClass;
 import org.junit.Assert;
-import org.junit.BeforeClass;
+import org.junit.Assume;
 import org.junit.Test;
 
 import com.google.common.base.Joiner;
@@ -1994,27 +1993,27 @@ public class AnalyzeDDLTest extends FrontendTestBase {
         "Database does not exist: database_DNE");
 
     // check invalid paths
-    AnalysisError("create table if not exists functional.zipcode_incomes like parquet "
-        + "'/test-warehouse'",
+    AnalysisError("create table if not exists functional.zipcode_incomes like parquet " +
+        "'/test-warehouse'",
         "Cannot infer schema, path is not a file: hdfs://localhost:20500/test-warehouse");
     AnalysisError("create table newtbl_DNE like parquet 'foobar'",
         "URI path must be absolute: foobar");
     AnalysisError("create table newtbl_DNE like parquet '/not/a/file/path'",
-        "Cannot infer schema, path is not a file: "
-        + "hdfs://localhost:20500/not/a/file/path");
-    AnalysisError("create table if not exists functional.zipcode_incomes like parquet "
-        + "'file:///tmp/foobar'",
-        "Cannot infer schema, path is not a file: file:/tmp/foobar");
+        "Cannot infer schema, path does not exist: " +
+        "hdfs://localhost:20500/not/a/file/path");
+    AnalysisError("create table if not exists functional.zipcode_incomes like parquet " +
+        "'file:///tmp/foobar'",
+        "Cannot infer schema, path does not exist: file:/tmp/foobar");
 
     // check valid paths with bad file contents
-    AnalysisError("create table database_DNE.newtbl_DNE like parquet "
-        + "'/test-warehouse/zipcode_incomes_rc/000000_0'",
-        "File is not a parquet file: "
-        + "hdfs://localhost:20500/test-warehouse/zipcode_incomes_rc/000000_0");
+    AnalysisError("create table database_DNE.newtbl_DNE like parquet " +
+        "'/test-warehouse/zipcode_incomes_rc/000000_0'",
+        "File is not a parquet file: " +
+        "hdfs://localhost:20500/test-warehouse/zipcode_incomes_rc/000000_0");
 
     // this is a decimal file without annotations
-    AnalysisError("create table if not exists functional.zipcode_incomes like parquet "
-        + "'/test-warehouse/schemas/malformed_decimal_tiny.parquet'",
+    AnalysisError("create table if not exists functional.zipcode_incomes like parquet " +
+        "'/test-warehouse/schemas/malformed_decimal_tiny.parquet'",
         "Unsupported parquet type FIXED_LEN_BYTE_ARRAY for field c1");
 
     // Invalid file format
@@ -2024,6 +2023,51 @@ public class AnalyzeDDLTest extends FrontendTestBase {
 
 
     BackendConfig.INSTANCE.setZOrderSortUnlocked(false);
+
+  }
+
+  @Test
+  public void TestCreateTableLikeFileOrc() throws AnalysisException {
+    Assume.assumeTrue(
+        "Skipping this test; CREATE TABLE LIKE ORC is only supported when running " +
+            "against Hive-3 or greater", TestUtils.getHiveMajorVersion() >= 3);
+
+    AnalysisError("create table database_DNE.newtbl_DNE like ORC " +
+        "'/test-warehouse/schemas/alltypestiny.parquet'",
+        "Failed to open file as an ORC file: org.apache.orc.FileFormatException: " +
+        "Malformed ORC file " +
+        "hdfs://localhost:20500/test-warehouse/schemas/alltypestiny.parquet" +
+        ". Invalid postscript.");
+
+    // Inferring primitive and complex types
+    AnalyzesOk("create table if not exists newtbl_DNE like orc " +
+        "'/test-warehouse/alltypestiny_orc_def/year=2009/month=1/000000_0'");
+    AnalyzesOk("create table if not exists newtbl_DNE like orc " +
+        "'/test-warehouse/functional_orc_def.db/complextypes_fileformat/000000_0'");
+
+    // check invalid paths
+    AnalysisError("create table if not exists functional.zipcode_incomes like ORC " +
+        "'/test-warehouse'",
+        "Cannot infer schema, path is not a file: hdfs://localhost:20500/test-warehouse");
+    AnalysisError("create table newtbl_DNE like ORC 'foobar'",
+        "URI path must be absolute: foobar");
+    AnalysisError("create table newtbl_DNE like ORC '/not/a/file/path'",
+        "Cannot infer schema, path does not exist: " +
+        "hdfs://localhost:20500/not/a/file/path");
+    AnalysisError("create table if not exists functional.zipcode_incomes like ORC " +
+        "'file:///tmp/foobar'",
+        "Cannot infer schema, path does not exist: file:/tmp/foobar");
+  }
+
+  @Test
+  public void TestCreateTableLikeFileOrcWithHive2() throws AnalysisException {
+    // Testing if error is thrown when trying to create table like orc file with Hive-2.
+    Assume.assumeTrue(TestUtils.getHiveMajorVersion() < 3);
+
+    // Inferring primitive and complex types
+    AnalysisError("create table if not exists newtbl_DNE like orc " +
+        "'/test-warehouse/alltypestiny_orc_def/year=2009/month=1/000000_0'",
+        "Creating table like ORC file is unsupported for Hive with version < 3");
   }
 
   @Test

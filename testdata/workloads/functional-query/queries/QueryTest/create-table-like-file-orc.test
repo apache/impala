@@ -1,0 +1,89 @@
+====
+---- QUERY
+create table $DATABASE.temp_decimal_table_orc like ORC
+'$FILESYSTEM_PREFIX/test-warehouse/decimal_tiny_orc_def/000000_0'
+---- RESULTS
+'Table has been created.'
+====
+---- QUERY
+describe $DATABASE.temp_decimal_table_orc
+---- RESULTS
+'c1','decimal(10,4)','Inferred from ORC file.'
+'c2','decimal(15,5)','Inferred from ORC file.'
+'c3','decimal(1,1)','Inferred from ORC file.'
+---- TYPES
+STRING, STRING, STRING
+====
+---- QUERY
+create table $DATABASE.temp_chars_table like ORC
+'$FILESYSTEM_PREFIX/test-warehouse/chars_tiny_orc_def/000000_0'
+---- RESULTS
+'Table has been created.'
+====
+---- QUERY
+describe $DATABASE.temp_chars_table
+---- RESULTS
+'cs','char(5)','Inferred from ORC file.'
+'cl','char(140)','Inferred from ORC file.'
+'vc','varchar(32)','Inferred from ORC file.'
+---- TYPES
+STRING, STRING, STRING
+====
+---- QUERY
+create table $DATABASE.like_zipcodes_file_orc like ORC
+'$FILESYSTEM_PREFIX/test-warehouse/zipcode_incomes_orc_def/000000_0'
+---- RESULTS
+'Table has been created.'
+====
+---- QUERY
+describe $DATABASE.like_zipcodes_file_orc
+---- RESULTS
+'id','string','Inferred from ORC file.'
+'zip','string','Inferred from ORC file.'
+'description1','string','Inferred from ORC file.'
+'description2','string','Inferred from ORC file.'
+'income','int','Inferred from ORC file.'
+---- TYPES
+STRING, STRING, STRING
+====
+---- QUERY
+create table $DATABASE.like_alltypestiny_file_orc like ORC
+'$FILESYSTEM_PREFIX/test-warehouse/alltypestiny_orc_def/year=2009/month=1/000000_0'
+---- RESULTS
+'Table has been created.'
+====
+---- QUERY
+describe $DATABASE.like_alltypestiny_file_orc
+---- RESULTS
+'id','int','Inferred from ORC file.'
+'bool_col','boolean','Inferred from ORC file.'
+'tinyint_col','tinyint','Inferred from ORC file.'
+'smallint_col','smallint','Inferred from ORC file.'
+'int_col','int','Inferred from ORC file.'
+'bigint_col','bigint','Inferred from ORC file.'
+'float_col','float','Inferred from ORC file.'
+'double_col','double','Inferred from ORC file.'
+'date_string_col','string','Inferred from ORC file.'
+'string_col','string','Inferred from ORC file.'
+'timestamp_col','timestamp','Inferred from ORC file.'
+---- TYPES
+STRING, STRING, STRING
+====
+---- QUERY
+create table allcomplextypes_clone_orc like ORC
+'$FILESYSTEM_PREFIX/test-warehouse/complextypestbl_orc_def/nullable.orc'
+---- RESULTS
+'Table has been created.'
+====
+---- QUERY
+describe allcomplextypes_clone_orc
+---- RESULTS
+'id','bigint','Inferred from ORC file.'
+'int_array','array<int>','Inferred from ORC file.'
+'int_array_array','array<array<int>>','Inferred from ORC file.'
+'int_map','map<string,int>','Inferred from ORC file.'
+'int_map_array','array<map<string,int>>','Inferred from ORC file.'
+'nested_struct','struct<\n  a:int,\n  b:array<int>,\n  c:struct<\n    d:array<array<struct<\n      e:int,\n      f:string\n    >>>\n  >,\n  g:map<string,struct<\n    h:struct<\n      i:array<double>\n    >\n  >>\n>','Inferred from ORC file.'
+---- TYPES
+STRING, STRING, STRING
+====

@@ -599,6 +599,14 @@ public class FileSystemUtil {
   }
 
   /**
+   * Returns true if the path 'p' is a file, false if not. Throws if path does not exist.
+   */
+  public static boolean isFile(Path p) throws IOException, FileNotFoundException {
+    FileSystem fs = getFileSystemForPath(p);
+    return fs.getFileStatus(p).isFile();
+  }
+
+  /**
    * Return the path of 'path' relative to the startPath. This may
    * differ from simply the file name in the case of recursive listings.
    */

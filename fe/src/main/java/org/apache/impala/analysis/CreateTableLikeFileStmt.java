@@ -26,6 +26,7 @@ import org.apache.impala.catalog.HdfsCompression;
 import org.apache.impala.catalog.HdfsFileFormat;
 import org.apache.impala.common.AnalysisException;
 import org.apache.impala.common.Pair;
+import org.apache.impala.compat.MetastoreShim;
 import org.apache.impala.thrift.THdfsFileFormat;
 
 
@@ -71,11 +72,18 @@ public class CreateTableLikeFileStmt extends CreateTableStmt {
     schemaLocation_.analyze(analyzer, Privilege.ALL, FsAction.READ);
     switch (schemaFileFormat_) {
       case PARQUET:
-        getColumnDefs().addAll(ParquetHelper.extractParquetSchema(schemaLocation_));
+        getColumnDefs().addAll(ParquetSchemaExtractor.extract(schemaLocation_));
+        break;
+      case ORC:
+        if (MetastoreShim.getMajorVersion() < 3) {
+          throw new AnalysisException("Creating table like ORC file is unsupported for " +
+              "Hive with version < 3");
+        }
+        getColumnDefs().addAll(OrcSchemaExtractor.extract(schemaLocation_));
         break;
       default:
-        throw new AnalysisException("Unsupported file type for schema inference: "
-            + schemaFileFormat_);
+        throw new AnalysisException("Unsupported file type for schema inference: " +
+            schemaFileFormat_);
     }
     super.analyze(analyzer);
   }

@@ -94,6 +94,7 @@ the same dependencies
                 <include>org/apache/hadoop/hive/serde2/**</include>
                 <include>org/apache/hive/service/rpc/thrift/**</include>
                 <include>org/apache/hive/common/HiveVersionAnnotation.class</include>
+                <include>org/apache/orc/**</include>
                 <include>com/google/**</include>
               </includes>
             </filter>

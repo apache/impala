@@ -306,6 +306,22 @@ under the License.
     </dependency>
 
     <dependency>
+      <groupId>org.apache.orc</groupId>
+      <artifactId>orc-core</artifactId>
+      <version>${orc.version}</version>
+      <exclusions>
+        <exclusion>
+          <groupId>org.apache.hadoop</groupId>
+          <artifactId>hadoop-common</artifactId>
+        </exclusion>
+       <exclusion>
+          <groupId>org.apache.hive</groupId>
+          <artifactId>*</artifactId>
+        </exclusion>
+      </exclusions>
+    </dependency>
+
+    <dependency>
       <groupId>org.apache.hbase</groupId>
       <artifactId>hbase-client</artifactId>
       <version>${hbase.version}</version>
@@ -713,6 +729,7 @@ under the License.
                     <exclude>org.apache.kudu:*</exclude>
                     <exclude>org.apache.sentry:*</exclude>
                     <exclude>org.apache.parquet:*</exclude>
+                    <exclude>org.apache.orc:*</exclude>
                   </excludes>
                   <includes>
                     <!-- hadoop-yarn-common depends on some Jetty utilities. -->
@@ -725,6 +742,7 @@ under the License.
                     <include>org.apache.kudu:*:${kudu.version}</include>
                     <include>org.apache.sentry:*:${sentry.version}</include>
                     <include>org.apache.parquet:*:${parquet.version}</include>
+                    <include>org.apache.orc:*:${orc.version}</include>
                   </includes>
                 </bannedDependencies>
               </rules>
@@ -944,6 +962,14 @@ under the License.
             </exclusion>
             <exclusion>
               <groupId>org.apache.ant</groupId>
+              <artifactId>*</artifactId>
+            </exclusion>
+            <exclusion>
+              <groupId>orc</groupId>
+              <artifactId>*</artifactId>
+            </exclusion>
+            <exclusion>
+              <groupId>org.apache.orc</groupId>
               <artifactId>*</artifactId>
             </exclusion>
           </exclusions>

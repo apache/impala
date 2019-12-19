@@ -294,6 +294,13 @@ class TestDdlStatements(TestDdlBase):
     self.run_test_case('QueryTest/create-table-like-file', vector,
         use_db=unique_database, multiple_impalad=self._use_multiple_impalad(vector))
 
+  @SkipIfHive2.orc
+  @UniqueDatabase.parametrize(sync_ddl=True)
+  def test_create_table_like_file_orc(self, vector, unique_database):
+    vector.get_value('exec_option')['abort_on_error'] = False
+    self.run_test_case('QueryTest/create-table-like-file-orc', vector,
+        use_db=unique_database, multiple_impalad=self._use_multiple_impalad(vector))
+
   @UniqueDatabase.parametrize(sync_ddl=True)
   def test_create_table_as_select(self, vector, unique_database):
     vector.get_value('exec_option')['abort_on_error'] = False
