@@ -19,10 +19,19 @@
 # under the License.
 from __future__ import print_function, unicode_literals
 
-
 """
 A module where we can aggregate python2 -> 3 code contortions.
 """
+
+import os
+import sys
+
+
+if sys.version_info.major == 2:
+  # default is typically ASCII, but unicode_literals dictates UTF-8
+  # See also https://stackoverflow.com/questions/492483/setting-the-correct-encoding-when-piping-stdout-in-python  # noqa
+  os.environ['PYTHONIOENCODING'] = 'utf-8'
+
 
 try:
   _xrange = xrange

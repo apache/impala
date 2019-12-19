@@ -148,6 +148,16 @@ def pytest_addoption(parser):
                    help="If set to N/M (e.g., 3/5), will split the tests into "
                    "M partitions and run the Nth partition. 1-indexed.")
 
+  parser.addoption("--shell_executable", default=None,
+                   help="Full path to the impala-shell executable. Useful for running"
+                   "shell/ e2e tests against a version of the impala-shell that has been "
+                   "installed as a python package in a separate virtualenv. The python "
+                   "version in the target virtualenv does not need to the match the "
+                   "version used to execute the tests, but if the tested environment is "
+                   "using python 3, also be sure to also set the environment variable "
+                   "USE_THRIFT11_GEN_PY=true in the test env. "
+                   "(See $IMPALA_HOME/bin/set-pythonpath.sh.)")
+
 
 def pytest_assertrepr_compare(op, left, right):
   """

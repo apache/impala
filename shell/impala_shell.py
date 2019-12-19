@@ -1,4 +1,5 @@
 #!/usr/bin/env python
+# -*- coding: utf-8 -*-
 #
 # Licensed to the Apache Software Foundation (ASF) under one
 # or more contributor license agreements.  See the NOTICE file
@@ -18,7 +19,7 @@
 # under the License.
 #
 # Impala's shell
-from __future__ import print_function
+from __future__ import print_function, unicode_literals
 from compatibility import _xrange as xrange
 
 import cmd
@@ -41,8 +42,8 @@ import traceback
 from impala_client import ImpalaHS2Client, ImpalaBeeswaxClient, QueryOptionLevels
 from impala_shell_config_defaults import impala_shell_defaults
 from option_parser import get_option_parser, get_config_from_file
-from shell_output import DelimitedOutputFormatter, OutputStream, PrettyOutputFormatter
-from shell_output import OverwritingStdErrOutputStream
+from shell_output import (DelimitedOutputFormatter, OutputStream, PrettyOutputFormatter,
+                          OverwritingStdErrOutputStream)
 from subprocess import call
 from shell_exceptions import (RPCException, DisconnectedException, QueryStateException,
     QueryCancelledByShellException, MissingThriftMethodException)
@@ -66,6 +67,7 @@ DEFAULT_BEESWAX_PORT = 21000
 DEFAULT_HS2_PORT = 21050
 DEFAULT_HS2_HTTP_PORT = 28000
 
+
 def strip_comments(sql):
   """sqlparse default implementation of strip comments has a bad performance when parsing
   very large SQL due to the grouping. This is because the default implementation tries to
@@ -77,6 +79,7 @@ def strip_comments(sql):
   stack.stmtprocess.append(sqlparse.filters.StripCommentsFilter())
   stack.postprocess.append(sqlparse.filters.SerializerUnicode())
   return ''.join(stack.run(sql, 'utf-8')).strip()
+
 
 class CmdStatus:
   """Values indicate the execution status of a command to the cmd shell driver module
@@ -94,23 +97,14 @@ class FatalShellException(Exception):
   error should be logged to stderr before raising this exception."""
   pass
 
-class ImpalaPrettyTable(prettytable.PrettyTable):
-  """Patched version of PrettyTable with different unicode handling - instead of throwing
-  exceptions when a character can't be converted to unicode, it is replaced with a
-  placeholder character."""
-  def _unicode(self, value):
-    if not isinstance(value, basestring):
-      value = str(value)
-    if not isinstance(value, unicode):
-      # If a value cannot be encoded, replace it with a placeholder.
-      value = unicode(value, self.encoding, "replace")
-    return value
 
 class QueryOptionDisplayModes:
   REGULAR_OPTIONS_ONLY = 1
   ALL_OPTIONS = 2
 
-class ImpalaShell(object, cmd.Cmd):
+
+# Py3 method resolution order requires 'object' to be last w/ multiple inheritance
+class ImpalaShell(cmd.Cmd, object):
   """ Simple Impala Shell.
 
   Implements the context manager interface to ensure client connections and sessions
@@ -437,7 +431,7 @@ class ImpalaShell(object, cmd.Cmd):
     # Strip any comments to make a statement such as the following be considered as
     # ending with a delimiter:
     # select 1 + 1; -- this is a comment
-    line = strip_comments(line).encode('utf-8').rstrip()
+    line = strip_comments(line).rstrip()
     if line.endswith(ImpalaShell.CMD_DELIM):
       try:
         # Look for an open quotation in the entire command, and not just the
@@ -502,10 +496,10 @@ class ImpalaShell(object, cmd.Cmd):
 
       # partial_cmd is already populated, add the current input after a newline.
       if self.partial_cmd and cmd:
-        self.partial_cmd = "%s\n%s" % (self.partial_cmd, cmd)
+        self.partial_cmd = "{0}\n{1}".format(self.partial_cmd, cmd)
       else:
         # If the input string is empty or partial_cmd is empty.
-        self.partial_cmd = "%s%s" % (self.partial_cmd, cmd)
+        self.partial_cmd = "{0}{1}".format(self.partial_cmd, cmd)
       # Remove the most recent item from history if:
       #   -- The current state of user input in incomplete.
       #   -- The most recent user input is not an empty string
@@ -515,16 +509,17 @@ class ImpalaShell(object, cmd.Cmd):
       return str()
     elif self.partial_cmd:  # input ends with a delimiter and partial_cmd is not empty
       if cmd != ImpalaShell.CMD_DELIM:
-        completed_cmd = "%s\n%s" % (self.partial_cmd, cmd)
+        completed_cmd = "{0}\n{1}".format(self.partial_cmd, cmd)
       else:
-        completed_cmd = "%s%s" % (self.partial_cmd, cmd)
+        completed_cmd = "{0}{1}".format(self.partial_cmd, cmd)
       # Reset partial_cmd to an empty string
       self.partial_cmd = str()
       # Replace the most recent history item with the completed command.
       completed_cmd = sqlparse.format(completed_cmd)
       if self.readline and current_history_len > 0:
-        self.readline.replace_history_item(current_history_len - 1,
-            completed_cmd.encode('utf-8'))
+        if sys.version_info.major == 2:
+          completed_cmd = completed_cmd.encode('utf-8')
+        self.readline.replace_history_item(current_history_len - 1, completed_cmd)
       # Revert the prompt to its earlier state
       self.prompt = self.cached_prompt
     else:  # Input has a delimiter and partial_cmd is empty
@@ -603,7 +598,10 @@ class ImpalaShell(object, cmd.Cmd):
         host=self.impalad[0], port=self.impalad[1], db=db)
 
   def precmd(self, args):
-    args = self.sanitise_input(args)
+    if sys.version_info.major == 2:
+      args = self.sanitise_input(args.decode('utf-8'))  # python2
+    else:
+      args = self.sanitise_input(args)  # python3
     if not args: return args
     # Split args using sqlparse. If there are multiple queries present in user input,
     # the length of the returned query list will be greater than one.
@@ -620,7 +618,7 @@ class ImpalaShell(object, cmd.Cmd):
       print("Connection lost, reconnecting...", file=sys.stderr)
       self._connect()
       self._validate_database(immediately=True)
-    return args.encode('utf-8')
+    return args
 
   def onecmd(self, line):
     """Overridden to ensure the variable replacement is processed in interactive
@@ -1033,6 +1031,7 @@ class ImpalaShell(object, cmd.Cmd):
     Impala shell cannot get child query handle so it cannot
     query live progress for COMPUTE STATS query. Disable live
     progress/summary callback for COMPUTE STATS query."""
+
     query = self._build_query_string(self.last_leading_comment, self.orig_cmd, args)
     (prev_live_progress, prev_live_summary) = self.live_progress, self.live_summary
     (self.live_progress, self.live_summary) = False, False
@@ -1234,10 +1233,9 @@ class ImpalaShell(object, cmd.Cmd):
     Should be called after the query has finished and before data is fetched.
     All data is left aligned.
     """
-    table = ImpalaPrettyTable()
+    table = prettytable.PrettyTable()
     for column in column_names:
-      # Column names may be encoded as utf-8
-      table.add_column(column.decode('utf-8', 'ignore'), [])
+      table.add_column(column, [])
     table.align = "l"
     return table
 
@@ -1251,15 +1249,15 @@ class ImpalaShell(object, cmd.Cmd):
     query = self._build_query_string(self.last_leading_comment, self.orig_cmd, args)
     # Use shlex to deal with escape quotes in string literals.
     # Set posix=False to preserve the quotes.
-    tokens = shlex.split(strip_comments(query.lstrip()).encode('utf-8'),
-                         posix=False)
+    tokens = shlex.split(strip_comments(query.lstrip()), posix=False)
     try:
       # Because the WITH clause may precede DML or SELECT queries,
       # just checking the first token is insufficient.
       is_dml = False
-      if filter(self.DML_REGEX.match, tokens): is_dml = True
+      if any(self.DML_REGEX.match(t) for t in tokens):
+        is_dml = True
       return self._execute_stmt(query, is_dml=is_dml, print_web_link=True)
-    except ValueError as e:
+    except ValueError:
       return self._execute_stmt(query, print_web_link=True)
 
   def do_use(self, args):
@@ -1436,11 +1434,9 @@ class ImpalaShell(object, cmd.Cmd):
     """
     if ImpalaShell._has_leading_comment(line):
       leading_comment, line = ImpalaShell.strip_leading_comment(line.strip())
-      line = line.encode('utf-8')
-      if leading_comment:
-        leading_comment = leading_comment.encode('utf-8')
     else:
       leading_comment, line = None, line.strip()
+
     if line and line[0] == '@':
       line = 'rerun ' + line[1:]
     return super(ImpalaShell, self).parseline(line) + (leading_comment,)
@@ -1517,6 +1513,9 @@ class ImpalaShell(object, cmd.Cmd):
     history_len = self.readline.get_current_history_length()
     # load the history and replace the shell's delimiter with EOL
     history_items = map(self.readline.get_history_item, xrange(1, history_len + 1))
+    if sys.version_info.major == 2:
+      src_delim = src_delim.encode('utf-8')
+      tgt_delim = tgt_delim.encode('utf-8')
     history_items = [item.replace(src_delim, tgt_delim) for item in history_items]
     # Clear the original history and replace it with the mutated history.
     self.readline.clear_history()
@@ -1560,7 +1559,7 @@ class ImpalaShell(object, cmd.Cmd):
     return True
 
 
-TIPS=[
+TIPS = [
   "Press TAB twice to see a list of available commands.",
   "After running a query, type SUMMARY to see a summary of where time was spent.",
   "The SET command shows the current value of all shell and query options.",
@@ -1586,15 +1585,17 @@ command."
 EXPLAIN command. You can change the level of detail in the EXPLAIN output by setting the \
 EXPLAIN_LEVEL query option.",
   "When you set a query option it lasts for the duration of the Impala shell session."
-  ]
+]
 
 HEADER_DIVIDER =\
   "***********************************************************************************"
+
 
 def _format_tip(tip):
   """Takes a tip string and splits it on word boundaries so that it fits neatly inside the
   shell header."""
   return '\n'.join([l for l in textwrap.wrap(tip, len(HEADER_DIVIDER))])
+
 
 WELCOME_STRING = """\
 ***********************************************************************************
@@ -1607,9 +1608,9 @@ Welcome to the Impala shell.
   % (VERSION_STRING, _format_tip(random.choice(TIPS)))
 
 
-def parse_query_text(query_text, utf8_encode_policy='strict'):
-  """Parse query file text to extract queries and encode into utf-8"""
-  query_list = [q.encode('utf-8', utf8_encode_policy) for q in sqlparse.split(query_text)]
+def parse_query_text(query_text):
+  """Parse query file text to extract queries"""
+  query_list = sqlparse.split(query_text)
   # Remove trailing comments in the input, if any. We do this because sqlparse splits the
   # input at query boundaries and associates the query only with preceding comments
   # (following comments are associated with the next query). This is a problem with
@@ -1626,6 +1627,7 @@ def parse_query_text(query_text, utf8_encode_policy='strict'):
   if query_list and not strip_comments(query_list[-1]).strip("\n"):
     query_list.pop()
   return query_list
+
 
 def parse_variables(keyvals):
   """Parse variable assignments passed as arguments in the command line"""
@@ -1645,9 +1647,17 @@ def parse_variables(keyvals):
 
 
 def replace_variables(set_variables, input_string):
-  """Replaces variable within the string with their corresponding values using the
-     given set_variables."""
+  """
+  Replaces variable within the input_string with their corresponding values
+  from the given set_variables.
+  """
   errors = False
+
+  # In the case of a byte sequence, re.findall() will choke under python 3
+  if sys.version_info.major > 2:
+    if not isinstance(input_string, str):
+      input_string = input_string.decode('utf-8')
+
   matches = set([v.upper() for v in re.findall(r'(?<!\\)\${([^}]+)}', input_string)])
   for name in matches:
     value = None
@@ -1687,21 +1697,21 @@ def get_var_name(name):
       return var_name
   return None
 
+
 def execute_queries_non_interactive_mode(options, query_options):
   """Run queries in non-interactive mode. Return True on success. Logs the
   error and returns False otherwise."""
   if options.query_file:
-    try:
-      # "-" here signifies input from STDIN
-      if options.query_file == "-":
-        query_file_handle = sys.stdin
-      else:
-        query_file_handle = open(options.query_file, 'r')
-    except Exception, e:
-      print("Could not open file '%s': %s" % (options.query_file, e), file=sys.stderr)
-      return False
-
-    query_text = query_file_handle.read()
+    # "-" here signifies input from STDIN
+    if options.query_file == "-":
+      query_text = sys.stdin.read()
+    else:
+      try:
+        with open(options.query_file, 'r') as query_file_handle:
+          query_text = query_file_handle.read()
+      except Exception as e:
+        print("Could not open file '%s': %s" % (options.query_file, e), file=sys.stderr)
+        return False
   elif options.query:
     query_text = options.query
   else:
@@ -1711,6 +1721,7 @@ def execute_queries_non_interactive_mode(options, query_options):
   with ImpalaShell(options, query_options) as shell:
     return (shell.execute_query_list(shell.cmdqueue) and
             shell.execute_query_list(queries))
+
 
 def get_intro(options):
   """Get introduction message for start-up. The last character should not be a return."""
@@ -1801,7 +1812,11 @@ def impala_shell_main():
     return
 
   if options.write_delimited:
-    delim = options.output_delimiter.decode('string-escape')
+    if isinstance(options.output_delimiter, str):
+      delim_sequence = bytearray(options.output_delimiter, 'utf-8')
+    else:
+      delim_sequence = options.output_delimiter
+    delim = delim_sequence.decode('unicode_escape')
     if len(delim) != 1:
       print("Illegal delimiter %s, the delimiter "
             "must be a 1-character string." % delim, file=sys.stderr)
@@ -1823,9 +1838,15 @@ def impala_shell_main():
           "mechanism (-l)", file=sys.stderr)
     raise FatalShellException()
 
+  start_msg = "Starting Impala"
+
+  py_version_msg = "using Python {0}.{1}.{2}".format(
+    sys.version_info.major, sys.version_info.minor, sys.version_info.micro)
+
   if options.use_kerberos:
     if options.verbose:
-      print("Starting Impala Shell using Kerberos authentication", file=sys.stderr)
+      kerb_msg = "with Kerberos authentication"
+      print("{0} {1} {2}".format(start_msg, kerb_msg, py_version_msg), file=sys.stderr)
       print("Using service name '%s'" % options.kerberos_service_name, file=sys.stderr)
     # Check if the user has a ticket in the credentials cache
     try:
@@ -1838,10 +1859,12 @@ def impala_shell_main():
       raise FatalShellException()
   elif options.use_ldap:
     if options.verbose:
-      print("Starting Impala Shell using LDAP-based authentication", file=sys.stderr)
+      ldap_msg = "with LDAP-based authentication"
+      print("{0} {1} {2}".format(start_msg, ldap_msg, py_version_msg), file=sys.stderr)
   else:
     if options.verbose:
-      print("Starting Impala Shell without Kerberos authentication", file=sys.stderr)
+      no_auth_msg = "with no authentication"
+      print("{0} {1} {2}".format(start_msg, no_auth_msg, py_version_msg), file=sys.stderr)
 
   options.ldap_password = None
   if options.use_ldap and options.ldap_password_cmd:

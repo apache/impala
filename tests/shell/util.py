@@ -1,5 +1,5 @@
 #!/usr/bin/env impala-python
-# encoding=utf-8
+# -*- coding: utf-8 -*-
 #
 # Licensed to the Apache Software Foundation (ASF) under one
 # or more contributor license agreements.  See the NOTICE file
@@ -18,10 +18,12 @@
 # specific language governing permissions and limitations
 # under the License.
 
+import logging
 import os
 import pytest
 import re
 import shlex
+import sys
 import time
 from subprocess import Popen, PIPE
 
@@ -30,18 +32,75 @@ from tests.common.environ import (IMPALA_LOCAL_BUILD_VERSION,
 from tests.common.impala_test_suite import (IMPALAD_BEESWAX_HOST_PORT,
     IMPALAD_HS2_HOST_PORT, IMPALAD_HS2_HTTP_HOST_PORT)
 
+logging.basicConfig()
+LOG = logging.getLogger('tests/shell/util.py')
+LOG.addHandler(logging.StreamHandler())
 
 SHELL_HISTORY_FILE = os.path.expanduser("~/.impalahistory")
 IMPALA_HOME = os.environ['IMPALA_HOME']
 
-if ImpalaTestClusterProperties.get_instance().is_remote_cluster():
-  # With remote cluster testing, we cannot assume that the shell was built locally.
-  IMPALA_SHELL_EXECUTABLE = os.path.join(IMPALA_HOME, "bin/impala-shell.sh")
-else:
-  # Test the locally built shell distribution.
-  IMPALA_SHELL_EXECUTABLE = os.path.join(
-      IMPALA_HOME, "shell/build", "impala-shell-" + IMPALA_LOCAL_BUILD_VERSION,
-      "impala-shell")
+# Note that pytest.config.getoption is deprecated usage. We use this
+# in a couple of other places. Ultimately, it needs to be addressed if
+# we ever want to get off of pytest 2.9.2.
+IMPALA_SHELL_EXECUTABLE = pytest.config.getoption('shell_executable')
+
+if IMPALA_SHELL_EXECUTABLE is None:
+  if ImpalaTestClusterProperties.get_instance().is_remote_cluster():
+    # With remote cluster testing, we cannot assume that the shell was built locally.
+    IMPALA_SHELL_EXECUTABLE = os.path.join(IMPALA_HOME, "bin/impala-shell.sh")
+  else:
+    # Test the locally built shell distribution.
+    IMPALA_SHELL_EXECUTABLE = os.path.join(
+        IMPALA_HOME, "shell/build", "impala-shell-" + IMPALA_LOCAL_BUILD_VERSION,
+        "impala-shell")
+
+
+def get_python_version_for_shell_env():
+  """
+  Return the version of python belonging to the tested IMPALA_SHELL_EXECUTABLE.
+
+  We need this because some tests behave differently based on the version of
+  python being used to execute the impala-shell. However, since the test
+  framework itself is still being run with python2.7.x, sys.version_info
+  alone can't help us to determine the python version for the environment of
+  the shell executable. Instead, we have to invoke the shell, and then parse
+  the python version from the output. This information is present even in the
+  case of a fatal shell exception, e.g., not being unable to establish a
+  connection to an impalad.
+
+  Moreover, if the python version for the shell being executed is 3 or higher,
+  and USE_THRIFT11_GEN_PY is not True, the test run should exit. Using older
+  versions of thrift with python 3 will cause hard-to-triage failures because
+  older thrift gen-py files are not py3 compatible.
+  """
+  version_check = Popen([IMPALA_SHELL_EXECUTABLE, '-q', 'version()'],
+                        stdout=PIPE, stderr=PIPE)
+  stdout, stderr = version_check.communicate()
+
+  if "No module named \'ttypes\'" in stderr:
+    # If USE_THRIFT11_GEN_PY is not true, and the shell executable is from a
+    # python 3 (or higher) environment, this is the specific error message that
+    # we'll encounter, related to python3 not allowing implicit relative imports.
+    if os.getenv("USE_THRIFT11_GEN_PY") != "true":
+      sys.exit("If tested shell environment has python 3 or higher, "
+               "the USE_THRIFT11_GEN_PY env variable must be 'true'")
+
+  # e.g. Starting Impala with Kerberos authentication using Python 3.7.6
+  start_msg_line = stderr.split('\n')[0]
+  py_version = start_msg_line.split()[-1]   # e.g. 3.7.6
+  try:
+    major_version, minor_version, micro_version = py_version.split('.')
+    ret_val = int(major_version)
+  except (ValueError, UnboundLocalError) as e:
+    LOG.error(stderr)
+    sys.exit("Could not determine python version in shell env: {}".format(str(e)))
+
+  return ret_val
+
+
+# Since both test_shell_commandline and test_shell_interactive import from
+# this file, this check will be forced before any tests are run.
+SHELL_IS_PYTHON_2 = True if (get_python_version_for_shell_env() == 2) else False
 
 
 def assert_var_substitution(result):

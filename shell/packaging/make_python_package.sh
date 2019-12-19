@@ -42,11 +42,14 @@ PACKAGE_DIR="${STAGING_DIR}"/impala_shell_package
 MODULE_LIB_DIR="${PACKAGE_DIR}"/impala_shell
 NO_CLEAN_DIST="${NO_CLEAN_DIST:-}"
 
+THRIFT_GEN_PY_DIR=${SHELL_HOME}/build/thrift-11-gen/gen-py
+THRIFT_PY_ROOT="${IMPALA_TOOLCHAIN}/thrift-${IMPALA_THRIFT11_VERSION}"
+
 assemble_package_files() {
   mkdir -p "${MODULE_LIB_DIR}"
 
-  cp -r "${SHELL_HOME}/gen-py"/* "${MODULE_LIB_DIR}"
-  cp -r "${THRIFT_HOME}/python/lib/python2.7/site-packages/thrift" "${MODULE_LIB_DIR}"
+  cp -r "${THRIFT_GEN_PY_DIR}"/* "${MODULE_LIB_DIR}"
+  cp -r "${THRIFT_PY_ROOT}/python/lib/python2.7/site-packages/thrift" "${MODULE_LIB_DIR}"
 
   cp "${WORKING_DIR}/__init__.py" "${MODULE_LIB_DIR}"
   cp "${SHELL_HOME}/compatibility.py" "${MODULE_LIB_DIR}"

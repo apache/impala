@@ -49,6 +49,9 @@ SHELL_HOME=${IMPALA_HOME}/shell
 BUILD_DIR=${SHELL_HOME}/build
 TARBALL_ROOT=${BUILD_DIR}/impala-shell-${VERSION}
 
+IMPALA_THRIFT_PY_VERSION="${IMPALA_THRIFT11_VERSION}"
+THRIFT_GEN_PY_DIR="${SHELL_HOME}/build/thrift-11-gen/gen-py"
+
 echo "Deleting all files in ${TARBALL_ROOT}/{gen-py,lib,ext-py}"
 rm -rf ${TARBALL_ROOT}/lib/* 2>&1 > /dev/null
 rm -rf ${TARBALL_ROOT}/gen-py/* 2>&1 > /dev/null
@@ -56,8 +59,8 @@ rm -rf ${TARBALL_ROOT}/ext-py/* 2>&1 > /dev/null
 mkdir -p ${TARBALL_ROOT}/lib
 mkdir -p ${TARBALL_ROOT}/ext-py
 
-rm -f ${SHELL_HOME}/gen-py/impala_build_version.py
-cat > ${SHELL_HOME}/gen-py/impala_build_version.py <<EOF
+rm -f ${THRIFT_GEN_PY_DIR}/impala_build_version.py
+cat > ${THRIFT_GEN_PY_DIR}/impala_build_version.py <<EOF
 #
 # Licensed to the Apache Software Foundation (ASF) under one
 # or more contributor license agreements.  See the NOTICE file
@@ -106,14 +109,18 @@ done
 
 # Copy all the shell files into the build dir
 # The location of python libs for thrift is different in rhel/centos/sles
-if [ -d ${THRIFT_HOME}/python/lib/python*/site-packages/thrift ]; then
-  cp -r ${THRIFT_HOME}/python/lib/python*/site-packages/thrift\
+
+THRIFT_PY_ROOT="${IMPALA_TOOLCHAIN}/thrift-${IMPALA_THRIFT_PY_VERSION}"
+
+if [ -d ${THRIFT_PY_ROOT}/python/lib/python*/site-packages/thrift ]; then
+  cp -r ${THRIFT_PY_ROOT}/python/lib/python*/site-packages/thrift\
         ${TARBALL_ROOT}/lib
 else
-  cp -r ${THRIFT_HOME}/python/lib64/python*/site-packages/thrift\
+  cp -r ${THRIFT_PY_ROOT}/python/lib64/python*/site-packages/thrift\
         ${TARBALL_ROOT}/lib
 fi
-cp -r ${SHELL_HOME}/gen-py ${TARBALL_ROOT}
+
+cp -r ${THRIFT_GEN_PY_DIR} ${TARBALL_ROOT}
 cp ${SHELL_HOME}/option_parser.py ${TARBALL_ROOT}/lib
 cp ${SHELL_HOME}/impala_shell_config_defaults.py ${TARBALL_ROOT}/lib
 cp ${SHELL_HOME}/impala_client.py ${TARBALL_ROOT}/lib

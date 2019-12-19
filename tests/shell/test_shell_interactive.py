@@ -1,5 +1,5 @@
 #!/usr/bin/env impala-python
-# encoding=utf-8
+# -*- coding: utf-8 -*-
 #
 # Licensed to the Apache Software Foundation (ASF) under one
 # or more contributor license agreements.  See the NOTICE file
@@ -54,6 +54,7 @@ QUERY_FILE_PATH = os.path.join(os.environ['IMPALA_HOME'], 'tests', 'shell')
 PROMPT_REGEX = r'\[[^:]+:2(1|8)0[0-9][0-9]\]'
 
 LOG = logging.getLogger('test_shell_interactive')
+
 
 @pytest.fixture
 def tmp_history_file(request):
@@ -116,7 +117,7 @@ class TestImpalaShellInteractive(ImpalaTestSuite):
     try:
       actual = impala_service.wait_for_metric_value(metric_name, expected)
     except AssertionError:
-      LOG.exception("Error: " % err)
+      LOG.exception("Error: %s" % err)
       raise
     assert actual == expected, err
 
@@ -553,9 +554,9 @@ class TestImpalaShellInteractive(ImpalaTestSuite):
     # Positive tests
     # set live_summary and live_progress as True with config file
     rcfile_path = os.path.join(QUERY_FILE_PATH, 'good_impalarc3')
-    args = ['--config_file=%s' % rcfile_path]
+    cmd_line_args = ['--config_file=%s' % rcfile_path]
     cmds = "set all;"
-    result = run_impala_shell_interactive(vector, cmds, shell_args=args)
+    result = run_impala_shell_interactive(vector, cmds, shell_args=cmd_line_args)
     assert 'WARNING:' not in result.stderr, \
       "A valid config file should not trigger any warning: {0}".format(result.stderr)
     assert "\tLIVE_SUMMARY: True" in result.stdout
@@ -697,6 +698,7 @@ class TestImpalaShellInteractive(ImpalaTestSuite):
       result = run_impala_shell_interactive(vector,
         "sOuRcE shell_case_sensitive.cmds; SeLeCt 'second command'")
       print result.stderr
+
       assert "Query: uSe FUNCTIONAL" in result.stderr
       assert "Query: ShOw TABLES" in result.stderr
       assert "alltypes" in result.stdout
@@ -726,32 +728,25 @@ class TestImpalaShellInteractive(ImpalaTestSuite):
     result = run_impala_shell_interactive(vector, '/* comment */\n'
                                           'select * from {0};'.format(table))
     assert 'Fetched 1 row(s)' in result.stderr
-
     result = run_impala_shell_interactive(vector, '/* comment1 */\n'
                                           '-- comment2\n'
                                           'select * from {0};'.format(table))
     assert 'Fetched 1 row(s)' in result.stderr
-
     result = run_impala_shell_interactive(vector, '/* comment1\n'
                                           'comment2 */ select * from {0};'.format(table))
     assert 'Fetched 1 row(s)' in result.stderr
-
     result = run_impala_shell_interactive(vector, '/* select * from {0} */ '
                                           'select * from {0};'.format(table))
     assert 'Fetched 1 row(s)' in result.stderr
-
     result = run_impala_shell_interactive(vector, '/* comment */ help use')
     assert 'Executes a USE... query' in result.stdout
-
     result = run_impala_shell_interactive(vector, '-- comment\n'
                                           ' help use;')
     assert 'Executes a USE... query' in result.stdout
-
     result = run_impala_shell_interactive(vector, '/* comment1 */\n'
                                           '-- comment2\n'
                                           'desc {0};'.format(table))
     assert 'Fetched 1 row(s)' in result.stderr
-
     result = run_impala_shell_interactive(vector, '/* comment1 */\n'
                                           '-- comment2\n'
                                           'help use;')
@@ -797,6 +792,31 @@ class TestImpalaShellInteractive(ImpalaTestSuite):
 
   def test_fix_infinite_loop(self, vector):
     # IMPALA-6337: Fix infinite loop.
+
+    # In case of TL;DR:
+    # - see IMPALA-9362 for details
+    # - see tests/shell/util.py for explanation of IMPALA_SHELL_EXECUTABLE
+    if os.getenv("IMPALA_HOME") not in IMPALA_SHELL_EXECUTABLE:
+      # The fix for IMPALA-6337 involved patching our internal verison of
+      # sqlparse 0.1.19 in ${IMPALA_HOME}/shell/ext-py. However, when we
+      # create the the stand-alone python package of the impala-shell for PyPI,
+      # we don't include the bundled 3rd party libs -- we expect users to
+      # install 3rd upstream libraries from PyPI.
+      #
+      # We could try to bundle sqlparse with the PyPI package, but there we
+      # run into the issue that the our bundled version is not python 3
+      # compatible. The real fix for this would be to upgrade to sqlparse 0.3.0,
+      # but that's not without complications. See IMPALA-9362 for details.
+      #
+      # For the time being, what this means is that IMPALA-6337 is fixed for
+      # people who are running the shell locally from any host/node that's part
+      # of a cluster where Impala is installed, but if they are running a
+      # standalone version of the shell on a client outside of a cluster, then
+      # they will still be relying on the upstream version of sqlparse 0.1.19,
+      # and so they may still be affected by the IMPALA-6337.
+      #
+      pytest.skip("Test will fail if shell is not part of dev environment.")
+
     result = run_impala_shell_interactive(vector, "select 1 + 1; \"\n;\";")
     assert '| 2     |' in result.stdout
     result = run_impala_shell_interactive(vector, "select '1234'\";\n;\n\";")
@@ -933,9 +953,10 @@ class TestImpalaShellInteractive(ImpalaTestSuite):
     for keyword in ["insert", "upsert", "update", "delete", "\\'insert\\'",
                     "\\'upsert\\'", "\\'update\\'", "\\'delete\\'"]:
       p = ImpalaShell(vector)
-      p.send_cmd("with foo as "
-                 "(select * from functional.alltypestiny where string_col='%s') "
-                 "select * from foo limit 1" % keyword)
+      cmd = ("with foo as "
+             "(select * from functional.alltypestiny where string_col='%s') "
+             "select * from foo limit 1" % keyword)
+      p.send_cmd(cmd)
       result = p.get_result()
       assert "Fetched 0 row" in result.stderr
 
