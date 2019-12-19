@@ -1,4 +1,5 @@
 #!/usr/bin/env python
+# -*- coding: utf-8 -*-
 #
 # Licensed to the Apache Software Foundation (ASF) under one
 # or more contributor license agreements.  See the NOTICE file
@@ -26,7 +27,7 @@
 # [impala.query_options]
 # EXPLAIN_LEVEL=2
 # MT_DOP=2
-from __future__ import print_function
+from __future__ import print_function, unicode_literals
 
 import sys
 

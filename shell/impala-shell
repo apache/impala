@@ -18,7 +18,7 @@
 # under the License.
 
 
-# This script runs the Impala shell. Python is required. 
+# This script runs the Impala shell. Python is required.
 #
 # This script assumes that the supporting library files for the Impala shell are
 # rooted in either the same directory that this script is in, or in a directory
@@ -51,4 +51,4 @@ for EGG in $(ls ${SHELL_HOME}/ext-py/*.egg); do
 done
 
 PYTHONPATH="${EGG_PATH}${SHELL_HOME}/gen-py:${SHELL_HOME}/lib:${PYTHONPATH}" \
-  exec python ${SHELL_HOME}/impala_shell.py "$@"
+  PYTHONIOENCODING='utf-8' exec python ${SHELL_HOME}/impala_shell.py "$@"

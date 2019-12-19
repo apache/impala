@@ -1,4 +1,5 @@
-# encoding=utf-8
+#!/usr/bin/env impala-python
+# -*- coding: utf-8 -*-
 #
 # Licensed to the Apache Software Foundation (ASF) under one
 # or more contributor license agreements.  See the NOTICE file
@@ -35,7 +36,7 @@ from tests.common.skip import SkipIf
 from tests.common.test_dimensions import create_client_protocol_dimension
 from time import sleep, time
 from util import (get_impalad_host_port, assert_var_substitution, run_impala_shell_cmd,
-                  ImpalaShell, IMPALA_SHELL_EXECUTABLE)
+                  ImpalaShell, IMPALA_SHELL_EXECUTABLE, SHELL_IS_PYTHON_2)
 from contextlib import closing
 
 
@@ -155,7 +156,7 @@ class TestImpalaShell(ImpalaTestSuite):
 
   def test_unsecure_message(self, vector):
     results = run_impala_shell_cmd(vector, [], wait_until_connected=False)
-    assert "Starting Impala Shell without Kerberos authentication" in results.stderr
+    assert "with no authentication" in results.stderr
 
   def test_print_header(self, vector, populated_table):
     args = ['--print_header', '-B', '--output_delim=,', '-q',
@@ -184,7 +185,7 @@ class TestImpalaShell(ImpalaTestSuite):
     results = run_impala_shell_cmd(vector, args, expect_success=False)
     # Check that impala is using the right service name.
     assert "Using service name 'impala'" in results.stderr
-    assert "Starting Impala Shell using Kerberos authentication" in results.stderr
+    assert "with Kerberos authentication" in results.stderr
     # Check that Impala warns the user if klist does not exist on the system, or if
     # no kerberos tickets are initialized.
     try:
@@ -253,7 +254,7 @@ class TestImpalaShell(ImpalaTestSuite):
   def test_removed_query_option(self, vector):
     """Test that removed query options produce warning."""
     result = run_impala_shell_cmd(vector, ['-q', 'set disable_cached_reads=true'],
-        expect_success=True)
+                                  expect_success=True)
     assert "Ignoring removed query option: 'disable_cached_reads'" in result.stderr,\
         result.stderr
 
@@ -393,6 +394,7 @@ class TestImpalaShell(ImpalaTestSuite):
   def test_query_cancellation_during_wait_to_finish(self, vector):
     """IMPALA-1144: Test cancellation (CTRL+C) while the query is in the
     wait_to_finish state"""
+
     # A select where wait_to_finish takes several seconds
     stmt = "select * from tpch.customer c1, tpch.customer c2, " + \
            "tpch.customer c3 order by c1.c_name"
@@ -472,7 +474,9 @@ class TestImpalaShell(ImpalaTestSuite):
   def test_international_characters_prettyprint_tabs(self, vector):
     """IMPALA-2717: ensure we can handle international characters in pretty-printed
     output when pretty-printing falls back to delimited output."""
+
     args = ['-q', "select '{0}\\t'".format(RUSSIAN_CHARS.encode('utf-8'))]
+
     result = run_impala_shell_cmd(vector, args)
     protocol = vector.get_value('protocol')
     if protocol == 'beeswax':
@@ -528,6 +532,7 @@ class TestImpalaShell(ImpalaTestSuite):
     assert 'WARNING:' not in result.stderr, \
       "A valid config file should not trigger any warning: {0}".format(result.stderr)
     assert 'Query: select 1' in result.stderr
+
     # override option in config file through command line
     args = ['--config_file={0}/good_impalarc'.format(QUERY_FILE_PATH), '--query=select 2']
     result = run_impala_shell_cmd(vector, args)
@@ -555,6 +560,7 @@ class TestImpalaShell(ImpalaTestSuite):
     # specified config file does not exist
     args = ['--config_file=%s/does_not_exist' % QUERY_FILE_PATH]
     run_impala_shell_cmd(vector, args, expect_success=False)
+
     # bad formatting of config file
     args = ['--config_file=%s/bad_impalarc' % QUERY_FILE_PATH]
     run_impala_shell_cmd(vector, args, expect_success=False)
@@ -631,14 +637,21 @@ class TestImpalaShell(ImpalaTestSuite):
 
   def test_ldap_password_from_shell(self, vector):
     args = ['-l', '--auth_creds_ok_in_clear']
-    result = run_impala_shell_cmd(vector, args + ['--ldap_password_cmd=cmddoesntexist'],
-                                  expect_success=False)
-    assert ("Error retrieving LDAP password (command was: 'cmddoesntexist', exception "
-            "was: '[Errno 2] No such file or directory')") in result.stderr
-    result = run_impala_shell_cmd(
-        vector, args + ['--ldap_password_cmd=cat filedoesntexist'], expect_success=False)
-    assert ("Error retrieving LDAP password (command was 'cat filedoesntexist', error "
-            "was: 'cat: filedoesntexist: No such file or directory')") in result.stderr
+
+    result_1 = run_impala_shell_cmd(vector, args + ['--ldap_password_cmd=cmddoesntexist'],
+                                    expect_success=False)
+
+    assert "Error retrieving LDAP password" in result_1.stderr
+    assert "command was: 'cmddoesntexist'" in result_1.stderr
+    assert "No such file or directory" in result_1.stderr
+
+    result_2 = run_impala_shell_cmd(vector,
+                                    args + ['--ldap_password_cmd=cat filedoesntexist'],
+                                    expect_success=False)
+
+    assert "Error retrieving LDAP password" in result_2.stderr
+    assert "command was 'cat filedoesntexist'" in result_2.stderr
+    assert "No such file or directory" in result_2.stderr
 
     # TODO: Without an Impala daemon with LDAP authentication enabled, we can't test the
     # positive case where the password is correct.
@@ -989,5 +1002,16 @@ class TestImpalaShell(ImpalaTestSuite):
     assert "0\tNULL\tNULL" in result.stdout, result.stdout
     assert "1\t1\t10.1" in result.stdout, result.stdout
     assert "2\t2\t20.2" in result.stdout, result.stdout
-    assert "3\t3\t30.3" in result.stdout, result.stdout
+
+    if (vector.get_value("protocol") in ('hs2', 'hs2-http')) and not SHELL_IS_PYTHON_2:
+      # The HS2 client returns binary values for float/double types, and these must
+      # be converted to strings for display. However, due to differences between the
+      # way that python2 and python3 represent floating point values, the output
+      # from the shell will differ with regard to which version of python the
+      # shell is running under.
+      assert "3\t3\t30.299999999999997" in result.stdout, result.stdout
+    else:
+      # python 2, or python 3 with beeswax protocol
+      assert "3\t3\t30.3" in result.stdout, result.stdout
+
     assert "4\t4\t40.4" in result.stdout, result.stdout

@@ -135,7 +135,7 @@ def get_version():
 
 setup(
   name='impala_shell',
-  python_requires='>2.6, <3.0.0',
+  python_requires='>2.6',
   version=get_version(),
   description='Impala Shell',
   long_description_content_type='text/markdown',

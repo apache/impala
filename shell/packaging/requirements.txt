@@ -1,8 +1,9 @@
 bitarray==1.0.1
-prettytable==0.7.1
+configparser==4.0.2
+prettytable==0.7.2
 sasl==0.2.1
 setuptools>=36.8.0
 six==1.14.0
 sqlparse==0.3.1
-thrift==0.9.3
+thrift==0.11.0
 thrift_sasl==0.4.2

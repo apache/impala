@@ -1,4 +1,5 @@
 #!/usr/bin/env python
+# -*- coding: utf-8 -*-
 #
 # Licensed to the Apache Software Foundation (ASF) under one
 # or more contributor license agreements.  See the NOTICE file
@@ -16,7 +17,7 @@
 # KIND, either express or implied.  See the License for the
 # specific language governing permissions and limitations
 # under the License.
-from __future__ import print_function
+from __future__ import print_function, unicode_literals
 
 import csv
 import re
@@ -33,16 +34,13 @@ class PrettyOutputFormatter(object):
     self.prettytable = prettytable
 
   def format(self, rows):
-    """Returns string containing UTF-8-encoded representation of the table data."""
+    """Returns string containing representation of the table data."""
     # Clear rows that already exist in the table.
     self.prettytable.clear_rows()
     try:
-      map(self.prettytable.add_row, rows)
-      # PrettyTable.get_string() converts UTF-8-encoded strs added via add_row() into
-      # Python unicode strings. We need to convert it back to a UTF-8-encoded str for
-      # output, since Python won't do the encoding automatically when outputting to a
-      # non-terminal (see IMPALA-2717).
-      return self.prettytable.get_string().encode('utf-8')
+      for row in rows:
+        self.prettytable.add_row(row)
+      return self.prettytable.get_string()
     except Exception as e:
       # beeswax returns each row as a tab separated string. If a string column
       # value in a row has tabs, it will break the row split. Default to displaying
@@ -57,19 +55,31 @@ class PrettyOutputFormatter(object):
 class DelimitedOutputFormatter(object):
   def __init__(self, field_delim="\t"):
     if field_delim:
-      self.field_delim = field_delim.decode('string-escape')
+      if sys.version_info.major > 2:
+        # strings do not have a 'decode' method in python 3
+        field_delim_bytes = bytearray(field_delim, 'utf-8')
+        self.field_delim = field_delim_bytes.decode('unicode_escape')
+      else:
+        self.field_delim = field_delim.decode('unicode_escape')
       # IMPALA-8652, the delimiter should be a 1-character string and verified already
       assert len(self.field_delim) == 1
 
   def format(self, rows):
     """Returns string containing UTF-8-encoded representation of the table data."""
     # csv.writer expects a file handle to the input.
-    # cStringIO is used as the temporary buffer.
     temp_buffer = StringIO()
-    writer = csv.writer(temp_buffer, delimiter=self.field_delim,
+    if sys.version_info.major == 2:
+      # csv.writer in python2 requires an ascii string delimiter
+      delim = self.field_delim.encode('ascii', 'ignore')
+    else:
+      delim = self.field_delim
+    writer = csv.writer(temp_buffer, delimiter=delim,
                         lineterminator='\n', quoting=csv.QUOTE_MINIMAL)
-    writer.writerows(rows)
-    rows = temp_buffer.getvalue().rstrip('\n')
+    for row in rows:
+      if sys.version_info.major == 2:
+        row = [val.encode('utf-8') for val in row]
+      writer.writerow(row)
+    rows = temp_buffer.getvalue().rstrip()
     temp_buffer.close()
     return rows
 
@@ -82,25 +92,23 @@ class OutputStream(object):
     `data` is a list of lists.
     """
     self.formatter = formatter
-    self.handle = sys.stdout
     self.filename = filename
-    if self.filename:
-      try:
-        self.handle = open(self.filename, 'ab')
-      except IOError as err:
-        print("Error opening file %s: %s" % (self.filename, str(err)),
-              file=self.handle)
-        print(sys.stderr, "Writing to stdout", file=self.handle)
 
   def write(self, data):
-    print(self.formatter.format(data), file=self.handle)
-    self.handle.flush()
-
-  def __del__(self):
-    # If the output file cannot be opened, OutputStream defaults to sys.stdout.
-    # Don't close the file handle if it points to sys.stdout.
-    if self.filename and self.handle != sys.stdout:
-      self.handle.close()
+    formatted_data = self.formatter.format(data)
+    if self.filename is not None:
+      try:
+        with open(self.filename, 'ab') as out_file:
+          # Note that instances of this class do not persist, so it's fine to
+          # close the we close the file handle after each write.
+          out_file.write(formatted_data.encode('utf-8'))  # file opened in binary mode
+      except IOError as err:
+        file_err_msg = "Error opening file %s: %s" % (self.filename, str(err))
+        print('{0} (falling back to stderr)'.format(file_err_msg), file=sys.stderr)
+        print(formatted_data, file=sys.stderr)
+    else:
+      # If filename is None, then just print to stdout
+      print(formatted_data)
 
 
 class OverwritingStdErrOutputStream(object):
