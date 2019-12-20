@@ -33,6 +33,9 @@ import java.util.concurrent.Future;
 import java.util.concurrent.ScheduledExecutorService;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicReference;
+import java.util.concurrent.Callable;
+import java.util.concurrent.ExecutorService;
+import java.util.concurrent.ExecutionException;
 
 import org.apache.hadoop.fs.FileSystem;
 import org.apache.hadoop.fs.Path;
@@ -172,6 +175,7 @@ import com.google.common.base.Predicates;
 import com.google.common.base.Strings;
 import com.google.common.collect.Lists;
 import com.google.common.collect.Sets;
+import com.google.common.util.concurrent.MoreExecutors;
 import com.google.common.util.concurrent.Uninterruptibles;
 
 /**
@@ -192,6 +196,10 @@ public class Frontend {
   // Maximum number of times to retry a query if it fails due to inconsistent metadata.
   private static final int INCONSISTENT_METADATA_NUM_RETRIES =
       BackendConfig.INSTANCE.getLocalCatalogMaxFetchRetries();
+
+  // Maximum number of threads used to check authorization for the user when executing
+  // show tables/databases.
+  private static final int MAX_CHECK_AUTHORIZATION_POOL_SIZE = 128;
 
   /**
    * Plan-time context that allows capturing various artifacts created
@@ -271,6 +279,8 @@ public class Frontend {
 
   private final TransactionKeepalive transactionKeepalive_;
 
+  private static ExecutorService checkAuthorizationPool_;
+
   public Frontend(AuthorizationFactory authzFactory) throws ImpalaException {
     this(authzFactory, FeCatalogManager.createFromBackendConfig());
   }
@@ -294,6 +304,15 @@ public class Frontend {
     if (authzConfig.isEnabled()) {
       authzChecker_.set(authzFactory.newAuthorizationChecker(
           getCatalog().getAuthPolicy()));
+      int numThreads = BackendConfig.INSTANCE.getNumCheckAuthorizationThreads();
+      Preconditions.checkState(numThreads > 0
+        && numThreads <= MAX_CHECK_AUTHORIZATION_POOL_SIZE);
+      if (numThreads == 1) {
+        checkAuthorizationPool_ = MoreExecutors.sameThreadExecutor();
+      } else {
+        LOG.info("Using a thread pool of size {} for authorization", numThreads);
+        checkAuthorizationPool_ = Executors.newFixedThreadPool(numThreads);
+      }
     } else {
       authzChecker_.set(authzFactory.newAuthorizationChecker());
     }
@@ -776,6 +795,31 @@ public class Frontend {
   }
 
   /**
+   * A Callable wrapper used for checking authorization to tables/databases.
+   */
+  private class CheckAuthorization implements Callable<Boolean> {
+    private final String dbName_;
+    private final String tblName_;
+    private final String owner_;
+    private final User user_;
+
+    public CheckAuthorization(String dbName, String tblName, String owner, User user) {
+      // dbName and user cannot be null, tblName and owner can be null.
+      Preconditions.checkNotNull(dbName);
+      Preconditions.checkNotNull(user);
+      dbName_ = dbName;
+      tblName_ = tblName;
+      owner_ = owner;
+      user_ = user;
+    }
+
+    @Override
+    public Boolean call() throws Exception {
+      return new Boolean(isAccessibleToUser(dbName_, tblName_, owner_, user_));
+    }
+  }
+
+  /**
    * Returns all tables in database 'dbName' that match the pattern of 'matcher' and are
    * accessible to 'user'.
    */
@@ -792,11 +836,40 @@ public class Frontend {
     }
   }
 
+  /**
+   * This method filters out elements from the given list based on the the results
+   * of the pendingCheckTasks.
+   */
+  private void filterUnaccessibleElements(List<Future<Boolean>> pendingCheckTasks,
+    List<?> checkList) throws InternalException {
+    int failedCheckTasks = 0;
+    int index = 0;
+    Iterator<?> iter = checkList.iterator();
+
+    Preconditions.checkState(checkList.size() == pendingCheckTasks.size());
+    while (iter.hasNext()) {
+      iter.next();
+      try {
+        if (!pendingCheckTasks.get(index).get()) iter.remove();
+        index++;
+      } catch (ExecutionException | InterruptedException e) {
+        failedCheckTasks++;
+        LOG.error("Encountered an error checking access", e);
+        break;
+      }
+    }
+
+    if (failedCheckTasks > 0)
+      throw new InternalException("Failed to check access." +
+          "Check the server log for more details.");
+  }
+
   private List<String> doGetTableNames(String dbName, PatternMatcher matcher,
       User user) throws ImpalaException {
     FeCatalog catalog = getCatalog();
     List<String> tblNames = catalog.getTableNames(dbName, matcher);
     if (authzFactory_.getAuthorizationConfig().isEnabled()) {
+      List<Future<Boolean>> pendingCheckTasks = Lists.newArrayList();
       Iterator<String> iter = tblNames.iterator();
       while (iter.hasNext()) {
         String tblName = iter.next();
@@ -811,18 +884,15 @@ public class Frontend {
         String tableOwner = table.getOwnerUser();
         if (tableOwner == null) {
           LOG.info("Table {} not yet loaded, ignoring it in table listing.",
-              dbName + "." + tblName);
+            dbName + "." + tblName);
         }
-        Set<PrivilegeRequest> requests = new PrivilegeRequestBuilder(
-            authzFactory_.getAuthorizableFactory())
-            .anyOf(minPrivilegeSetForShowStmts_)
-            .onAnyColumn(dbName, tblName, tableOwner)
-            .buildSet();
-        if (!authzChecker_.get().hasAnyAccess(user, requests)) {
-          iter.remove();
-        }
+        pendingCheckTasks.add(checkAuthorizationPool_.submit(
+            new CheckAuthorization(dbName, tblName, tableOwner, user)));
       }
+
+      filterUnaccessibleElements(pendingCheckTasks, tblNames);
     }
+
     return tblNames;
   }
 
@@ -944,29 +1014,43 @@ public class Frontend {
     // have permissions on.
     if (authzFactory_.getAuthorizationConfig().isEnabled()) {
       Iterator<? extends FeDb> iter = dbs.iterator();
+      List<Future<Boolean>> pendingCheckTasks = Lists.newArrayList();
       while (iter.hasNext()) {
         FeDb db = iter.next();
-        if (!isAccessibleToUser(db, user)) iter.remove();
+        pendingCheckTasks.add(checkAuthorizationPool_.submit(
+            new CheckAuthorization(db.getName(), null, db.getOwnerUser(), user)));
       }
+
+      filterUnaccessibleElements(pendingCheckTasks, dbs);
     }
+
     return dbs;
   }
 
   /**
-   * Check whether database is accessible to given user.
+   * Check whether table/database is accessible to given user.
    */
-  private boolean isAccessibleToUser(FeDb db, User user)
-      throws InternalException {
-    if (db.getName().toLowerCase().equals(Catalog.DEFAULT_DB.toLowerCase())) {
+  private boolean isAccessibleToUser(String dbName, String tblName,
+      String owner, User user) throws InternalException {
+    Preconditions.checkNotNull(dbName);
+    if (tblName == null &&
+        dbName.toLowerCase().equals(Catalog.DEFAULT_DB.toLowerCase())) {
       // Default DB should always be shown.
       return true;
     }
-    Set<PrivilegeRequest> requests = new PrivilegeRequestBuilder(
-        authzFactory_.getAuthorizableFactory())
-        .anyOf(minPrivilegeSetForShowStmts_)
-        .onAnyColumn(db.getName(), db.getOwnerUser())
-        .buildSet();
-    return authzChecker_.get().hasAnyAccess(user, requests);
+
+    PrivilegeRequestBuilder builder = new PrivilegeRequestBuilder(
+      authzFactory_.getAuthorizableFactory())
+      .anyOf(minPrivilegeSetForShowStmts_);
+    if (tblName == null) {
+      // Check database
+      builder = builder.onAnyColumn(dbName, owner);
+    } else {
+      // Check table
+      builder = builder.onAnyColumn(dbName, tblName, owner);
+    }
+
+    return authzChecker_.get().hasAnyAccess(user, builder.buildSet());
   }
 
   /**

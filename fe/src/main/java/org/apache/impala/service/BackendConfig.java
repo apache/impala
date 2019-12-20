@@ -197,6 +197,10 @@ public class BackendConfig {
     return backendCfg_.min_privilege_set_for_show_stmts;
   }
 
+  public int getNumCheckAuthorizationThreads() {
+    return backendCfg_.num_check_authorization_threads;
+  }
+
   // Inits the auth_to_local configuration in the static KerberosName class.
   private static void initAuthToLocal() {
     // If auth_to_local is enabled, we read the configuration hadoop.security.auth_to_local

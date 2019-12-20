@@ -300,6 +300,14 @@ DEFINE_int64(impala_slow_rpc_threshold_ms, 2 * 60 * 1000,
     "may result in false positives"
     "This overrides KRPC's --rpc_duration_too_long_ms setting.");
 
+DEFINE_int32(num_check_authorization_threads, 1,
+    "The number of threads used to check authorization for the user when executing show "
+    "tables/databases. This configuration is applicable only when authorization is "
+    "enabled. A value of 1 disables multi-threaded execution for checking authorization."
+    "However, a small value of larger than 1 may limit the parallism of FE requests when "
+    "checking authorization with a high concurrency. The value must be in the range of "
+    "1 to 128.");
+
 // ++========================++
 // || Startup flag graveyard ||
 // ++========================++

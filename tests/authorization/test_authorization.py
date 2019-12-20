@@ -22,6 +22,7 @@ import pytest
 import tempfile
 import grp
 import re
+import random
 import sys
 import subprocess
 import urllib
@@ -651,3 +652,26 @@ class TestAuthorization(CustomClusterTestSuite):
                   "--ranger_app_id=impala --authorization_provider=ranger")
   def test_ranger_show_stmts_with_any(self, unique_name):
     self._test_ranger_show_stmts_helper(unique_name, PRIVILEGES)
+
+  @pytest.mark.execute_serially
+  @CustomClusterTestSuite.with_args(
+    impalad_args="--server-name=server1 --ranger_service_type=hive "
+                 "--ranger_app_id=impala --authorization_provider=ranger "
+                 "--num_check_authorization_threads=%d" % (random.randint(2, 128)),
+    catalogd_args="--server-name=server1 --ranger_service_type=hive "
+                  "--ranger_app_id=impala --authorization_provider=ranger")
+  def test_num_check_authorization_threads_with_ranger(self, unique_name):
+    self._test_ranger_show_stmts_helper(unique_name, PRIVILEGES)
+
+  @pytest.mark.execute_serially
+  @CustomClusterTestSuite.with_args(
+    impalad_args="--server_name=server1 --sentry_config=%s "
+                 "--authorized_proxy_user_config=%s=* "
+                 "--num_check_authorization_threads=%d" %
+                 (SENTRY_CONFIG_FILE, getuser(), random.randint(2, 128)),
+    catalogd_args="--sentry_config={0}".format(SENTRY_CONFIG_FILE),
+    sentry_config=SENTRY_CONFIG_FILE_OO,  # Enable Sentry Object Ownership
+    sentry_log_dir="{0}/test_num_check_authorization_threads_with_sentry"
+                   .format(SENTRY_BASE_LOG_DIR))
+  def test_num_check_authorization_threads_with_sentry(self, unique_role, unique_name):
+    self._test_sentry_show_stmts_helper(unique_role, unique_name, PRIVILEGES)
