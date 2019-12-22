@@ -202,7 +202,10 @@ void Scheduler::ComputeFragmentExecParams(
     const ExecutorConfig& executor_config, QuerySchedule* schedule) {
   const TQueryExecRequest& exec_request = schedule->request();
 
-  // for each plan, compute the FInstanceExecParams for the tree of fragments
+  // for each plan, compute the FInstanceExecParams for the tree of fragments.
+  // The plans are in dependency order, so we compute parameters for each plan
+  // *before* its input join build plans. This allows the join build plans to
+  // be easily co-located with the plans consuming their output.
   for (const TPlanExecInfo& plan_exec_info : exec_request.plan_exec_info) {
     // set instance_id, host, per_node_scan_ranges
     ComputeFragmentExecParams(executor_config, plan_exec_info,
@@ -210,13 +213,11 @@ void Scheduler::ComputeFragmentExecParams(
 
     // Set destinations, per_exch_num_senders, sender_id.
     for (const TPlanFragment& src_fragment : plan_exec_info.fragments) {
+      VLOG(3) << "Computing exec params for fragment " << src_fragment.display_name;
       if (!src_fragment.output_sink.__isset.stream_sink) continue;
       FragmentIdx dest_idx =
           schedule->GetFragmentIdx(src_fragment.output_sink.stream_sink.dest_node_id);
-      DCHECK_LT(dest_idx, plan_exec_info.fragments.size());
-      const TPlanFragment& dest_fragment = plan_exec_info.fragments[dest_idx];
-      FragmentExecParams* dest_params =
-          schedule->GetFragmentExecParams(dest_fragment.idx);
+      FragmentExecParams* dest_params = schedule->GetFragmentExecParams(dest_idx);
       FragmentExecParams* src_params = schedule->GetFragmentExecParams(src_fragment.idx);
 
       // populate src_params->destinations
@@ -254,15 +255,24 @@ void Scheduler::ComputeFragmentExecParams(
 void Scheduler::ComputeFragmentExecParams(const ExecutorConfig& executor_config,
     const TPlanExecInfo& plan_exec_info, FragmentExecParams* fragment_params,
     QuerySchedule* schedule) {
-  // traverse input fragments
-  for (FragmentIdx input_fragment_idx : fragment_params->input_fragments) {
+  // Create exec params for child fragments connected by an exchange. Instance creation
+  // for this fragment depends on where the input fragment instances are scheduled.
+  for (FragmentIdx input_fragment_idx : fragment_params->exchange_input_fragments) {
     ComputeFragmentExecParams(executor_config, plan_exec_info,
         schedule->GetFragmentExecParams(input_fragment_idx), schedule);
   }
 
   const TPlanFragment& fragment = fragment_params->fragment;
-  // case 1: single instance executed at coordinator
-  if (fragment.partition.type == TPartitionType::UNPARTITIONED) {
+  if (fragment.output_sink.__isset.join_build_sink) {
+    // case 0: join build fragment, co-located with its parent fragment. Join build
+    // fragments may be unpartitioned if they are co-located with the root fragment.
+    VLOG(3) << "Computing exec params for collocated join build fragment "
+            << fragment_params->fragment.display_name;
+    CreateCollocatedJoinBuildInstances(fragment_params, schedule);
+  } else if (fragment.partition.type == TPartitionType::UNPARTITIONED) {
+    // case 1: root fragment instance executed at coordinator
+    VLOG(3) << "Computing exec params for coordinator fragment "
+            << fragment_params->fragment.display_name;
     const TBackendDescriptor& local_be_desc = executor_config.local_be_desc;
     const TNetworkAddress& coord = local_be_desc.address;
     DCHECK(local_be_desc.__isset.krpc_address);
@@ -282,20 +292,18 @@ void Scheduler::ComputeFragmentExecParams(const ExecutorConfig& executor_config,
       auto first_entry = fragment_params->scan_range_assignment.begin();
       instance_params.per_node_scan_ranges = first_entry->second;
     }
-
-    return;
-  }
-
-  if (ContainsNode(fragment.plan, TPlanNodeType::UNION_NODE)
+  } else if (ContainsNode(fragment.plan, TPlanNodeType::UNION_NODE)
       || ContainsScanNode(fragment.plan)) {
+    VLOG(3) << "Computing exec params for scan and/or union fragment.";
     // case 2: leaf fragment (i.e. no input fragments) with a single scan node.
     // case 3: union fragment, which may have scan nodes and may have input fragments.
     CreateCollocatedAndScanInstances(executor_config, fragment_params, schedule);
   } else {
+    VLOG(3) << "Computing exec params for interior fragment.";
     // case 4: interior (non-leaf) fragment without a scan or union.
     // We assign the same hosts as those of our leftmost input fragment (so that a
     // merge aggregation fragment runs on the hosts that provide the input data).
-    CreateCollocatedInstances(fragment_params, schedule);
+    CreateInputCollocatedInstances(fragment_params, schedule);
   }
 }
 
@@ -367,7 +375,7 @@ void Scheduler::CreateCollocatedAndScanInstances(const ExecutorConfig& executor_
   // the input scan, for consistency with the previous behaviour of only using
   // the parallelism of the scan.
   if (has_union) {
-    for (FragmentIdx idx : fragment_params->input_fragments) {
+    for (FragmentIdx idx : fragment_params->exchange_input_fragments) {
       std::unordered_map<TNetworkAddress, int> input_fragment_instances_per_host;
       const FragmentExecParams& input_params = *schedule->GetFragmentExecParams(idx);
       for (const FInstanceExecParams& instance_params :
@@ -503,17 +511,44 @@ vector<vector<TScanRangeParams>> Scheduler::AssignRangesToInstances(
   return per_instance_ranges;
 }
 
-void Scheduler::CreateCollocatedInstances(
+void Scheduler::CreateInputCollocatedInstances(
     FragmentExecParams* fragment_params, QuerySchedule* schedule) {
-  DCHECK_GE(fragment_params->input_fragments.size(), 1);
-  const FragmentExecParams* input_fragment_params =
-      schedule->GetFragmentExecParams(fragment_params->input_fragments[0]);
+  DCHECK_GE(fragment_params->exchange_input_fragments.size(), 1);
+  const FragmentExecParams& input_fragment_params =
+      *schedule->GetFragmentExecParams(fragment_params->exchange_input_fragments[0]);
   int per_fragment_instance_idx = 0;
   for (const FInstanceExecParams& input_instance_params :
-      input_fragment_params->instance_exec_params) {
+      input_fragment_params.instance_exec_params) {
     fragment_params->instance_exec_params.emplace_back(schedule->GetNextInstanceId(),
         input_instance_params.host, input_instance_params.krpc_host,
         per_fragment_instance_idx++, *fragment_params);
+  }
+}
+
+void Scheduler::CreateCollocatedJoinBuildInstances(
+    FragmentExecParams* fragment_params, QuerySchedule* schedule) {
+  const TPlanFragment& fragment = fragment_params->fragment;
+  DCHECK(fragment.output_sink.__isset.join_build_sink);
+  const TJoinBuildSink& sink = fragment.output_sink.join_build_sink;
+  int join_fragment_idx = schedule->GetFragmentIdx(sink.dest_node_id);
+  FragmentExecParams* join_fragment_params =
+      schedule->GetFragmentExecParams(join_fragment_idx);
+  DCHECK(!join_fragment_params->instance_exec_params.empty())
+      << "Parent fragment instances must already be created.";
+  int per_fragment_instance_idx = 0;
+  for (FInstanceExecParams& parent_exec_params :
+      join_fragment_params->instance_exec_params) {
+    TUniqueId instance_id = schedule->GetNextInstanceId();
+    fragment_params->instance_exec_params.emplace_back(instance_id,
+        parent_exec_params.host, parent_exec_params.krpc_host,
+        per_fragment_instance_idx++, *fragment_params);
+    TJoinBuildInput build_input;
+    build_input.__set_join_node_id(sink.dest_node_id);
+    build_input.__set_input_finstance_id(instance_id);
+    parent_exec_params.join_build_inputs.emplace_back(build_input);
+    VLOG(3) << "Linked join build for node id=" << sink.dest_node_id
+            << " build finstance=" << PrintId(instance_id)
+            << " dst finstance=" << PrintId(parent_exec_params.instance_id);
   }
 }
 

@@ -106,6 +106,9 @@ struct FInstanceExecParams {
   /// uniquely identify it to a receiver. -1 = invalid.
   int sender_id;
 
+  // List of input join build finstances for joins in this finstance.
+  std::vector<TJoinBuildInput> join_build_inputs;
+
   /// The parent FragmentExecParams
   const FragmentExecParams& fragment_exec_params;
   const TPlanFragment& fragment() const;
@@ -136,7 +139,9 @@ struct FragmentExecParams {
 
   bool is_coord_fragment;
   const TPlanFragment& fragment;
-  std::vector<FragmentIdx> input_fragments;
+
+  // Fragments that are inputs to an ExchangeNode of this fragment.
+  std::vector<FragmentIdx> exchange_input_fragments;
   std::vector<FInstanceExecParams> instance_exec_params;
 
   FragmentExecParams(const TPlanFragment& fragment)
@@ -372,7 +377,7 @@ class QuerySchedule {
   string executor_group_;
 
   /// Populate fragment_exec_params_ from request_.plan_exec_info.
-  /// Sets is_coord_fragment and input_fragments.
+  /// Sets is_coord_fragment and exchange_input_fragments.
   /// Also populates plan_node_to_fragment_idx_ and plan_node_to_plan_node_idx_.
   void Init();
 

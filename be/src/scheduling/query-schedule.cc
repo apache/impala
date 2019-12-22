@@ -124,7 +124,7 @@ void QuerySchedule::Init() {
       PlanNodeId dest_node_id = fragment.output_sink.stream_sink.dest_node_id;
       FragmentIdx dest_idx = plan_node_to_fragment_idx_[dest_node_id];
       FragmentExecParams& dest_params = fragment_exec_params_[dest_idx];
-      dest_params.input_fragments.push_back(fragment.idx);
+      dest_params.exchange_input_fragments.push_back(fragment.idx);
     }
   }
 }
@@ -179,6 +179,11 @@ void QuerySchedule::Validate() const {
         DCHECK_EQ(node_map[node_id], node_assignment.second.size());
       }
     }
+  }
+
+  // Check that all fragments have instances.
+  for (const FragmentExecParams& fp: fragment_exec_params_) {
+    DCHECK_GT(fp.instance_exec_params.size(), 0) << fp.fragment;
   }
 
   for (const auto& elem: per_backend_exec_params_) {

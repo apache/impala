@@ -38,6 +38,9 @@ public class JoinBuildSink extends DataSink {
   // id of join's build-side table assigned during planning
   private final JoinTableId joinTableId_;
 
+  // Reference to the join node that consumes the build side.
+  private final JoinNode joinNode_;
+
   private final List<Expr> buildExprs_ = new ArrayList<>();
 
   /**
@@ -46,6 +49,7 @@ public class JoinBuildSink extends DataSink {
   public JoinBuildSink(JoinTableId joinTableId, JoinNode joinNode) {
     Preconditions.checkState(joinTableId.isValid());
     joinTableId_ = joinTableId;
+    joinNode_ = joinNode;
     Preconditions.checkNotNull(joinNode);
     Preconditions.checkState(joinNode instanceof JoinNode);
     if (!(joinNode instanceof HashJoinNode)) return;
@@ -61,7 +65,7 @@ public class JoinBuildSink extends DataSink {
   @Override
   protected void toThriftImpl(TDataSink tsink) {
     TJoinBuildSink tBuildSink = new TJoinBuildSink();
-    tBuildSink.setJoin_table_id(joinTableId_.asInt());
+    tBuildSink.setDest_node_id(joinNode_.getId().asInt());
     for (Expr buildExpr: buildExprs_) {
       tBuildSink.addToBuild_exprs(buildExpr.treeToThrift());
     }

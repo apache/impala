@@ -406,7 +406,8 @@ struct TPlanExecInfo {
 
 // Result of call to ImpalaPlanService/JniFrontend.CreateQueryRequest()
 struct TQueryExecRequest {
-  // exec info for all plans; the first one materializes the query result
+  // exec info for all plans; the first one materializes the query result and subsequent
+  // ones materialize join builds that are input for preceding plans in the list.
   1: optional list<TPlanExecInfo> plan_exec_info
 
   // Metadata of the query result set (only for select)

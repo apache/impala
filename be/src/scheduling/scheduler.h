@@ -395,7 +395,14 @@ class Scheduler {
   /// For each instance of fragment_params's input fragment, create a collocated
   /// instance for fragment_params's fragment.
   /// Expects that fragment_params only has a single input fragment.
-  void CreateCollocatedInstances(
+  void CreateInputCollocatedInstances(
+      FragmentExecParams* fragment_params, QuerySchedule* schedule);
+
+  /// Create instances for a fragment that has a join build sink as its root.
+  /// These instances will be collocated with the fragment instances that consume
+  /// the join build. Therefore, those instances must have already been created
+  /// by the scheduler.
+  void CreateCollocatedJoinBuildInstances(
       FragmentExecParams* fragment_params, QuerySchedule* schedule);
 
   /// Add all hosts that the scans identified by 'scan_ids' are executed on to

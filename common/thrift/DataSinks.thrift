@@ -100,7 +100,8 @@ struct TKuduTableSink {
 
 // Sink to create the build side of a JoinNode.
 struct TJoinBuildSink {
-  1: required Types.TJoinTableId join_table_id
+  // destination join node id
+  1: required Types.TPlanNodeId dest_node_id
 
   // only set for hash join build sinks
   2: required list<Exprs.TExpr> build_exprs

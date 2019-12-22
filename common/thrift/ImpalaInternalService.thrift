@@ -613,6 +613,15 @@ struct TRuntimeFilterSource {
   2: required i32 filter_id
 }
 
+// Information about the input fragment instance of a join node.
+struct TJoinBuildInput {
+  // The join node id that will consume this join build.
+  1: required Types.TPlanNodeId join_node_id
+
+  // Fragment instance id of the input fragment instance.
+  2: required Types.TUniqueId input_finstance_id
+}
+
 // Execution parameters of a single fragment instance.
 struct TPlanFragmentInstanceCtx {
   // TPlanFragment.idx
@@ -647,6 +656,9 @@ struct TPlanFragmentInstanceCtx {
 
   // List of runtime filters produced by nodes in the finstance.
   8: optional list<TRuntimeFilterSource> filters_produced
+
+  // List of input join build finstances for joins in this finstance.
+  9: optional list<TJoinBuildInput> join_build_inputs
 }
 
 
