@@ -80,6 +80,8 @@ function stop {
   local DEADLINE=$(($(date +%s) + $TIMEOUT_SECS))
   while [[ $(date +%s) -lt $DEADLINE ]]; do
     if ! pid_exists $PID; then
+      # Remove the pid file so that there is no confusion if the pids wrap
+      rm -f $PID_FILE
       return
     fi
     sleep 0.1
