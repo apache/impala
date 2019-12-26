@@ -49,6 +49,7 @@
 #include "exprs/in-predicate-ir.cc"
 #include "exprs/is-null-predicate-ir.cc"
 #include "exprs/like-predicate-ir.cc"
+#include "exprs/mask-functions-ir.cc"
 #include "exprs/math-functions-ir.cc"
 #include "exprs/operators-ir.cc"
 #include "exprs/scalar-expr-ir.cc"

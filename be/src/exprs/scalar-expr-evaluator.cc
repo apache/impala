@@ -37,6 +37,7 @@
 #include "exprs/is-null-predicate.h"
 #include "exprs/like-predicate.h"
 #include "exprs/literal.h"
+#include "exprs/mask-functions.h"
 #include "exprs/math-functions.h"
 #include "exprs/null-literal.h"
 #include "exprs/operators.h"
@@ -436,6 +437,7 @@ void ScalarExprEvaluator::InitBuiltinsDummy() {
   IsNullPredicate::IsNull(nullptr, BooleanVal::null());
   LikePredicate::Like(nullptr, StringVal::null(), StringVal::null());
   Operators::Add_IntVal_IntVal(nullptr, IntVal::null(), IntVal::null());
+  MaskFunctions::MaskShowFirstN(nullptr, StringVal::null());
   MathFunctions::Pi(nullptr);
   StringFunctions::Length(nullptr, StringVal::null());
   TimestampFunctions::Year(nullptr, TimestampVal::null());

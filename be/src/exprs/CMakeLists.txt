@@ -48,6 +48,7 @@ add_library(Exprs
   like-predicate.cc
   like-predicate-ir.cc
   literal.cc
+  mask-functions-ir.cc
   math-functions-ir.cc
   null-literal.cc
   operators-ir.cc

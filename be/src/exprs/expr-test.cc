@@ -10076,6 +10076,407 @@ TEST_P(ExprTest, JsonTest) {
   TestErrorString("get_json_object('[1,2,3]', '   ')",
       "Failed to parse json path '   ': Should start with '$'\n");
 }
+
+TEST_P(ExprTest, MaskShowFirstNTest) {
+  // Test overrides for string value.
+  // Replace upper case with 'X', lower case with 'x', digit chars with '0', other chars
+  // with ':'.
+  TestStringValue("mask_show_first_n('TestString-123', 4, 'X', 'x', '0', ':')",
+      "TestXxxxxx:000");
+  TestStringValue(
+      "mask_show_first_n(cast('TestString-123' as varchar(24)), 4, 'X', 'x', '0', ':')",
+      "TestXxxxxx:000");
+  TestStringValue(
+      "mask_show_first_n(cast('TestString-123' as char(24)), 4, 'X', 'x', '0', ':')",
+      "TestXxxxxx:000::::::::::");
+  TestStringValue("mask_show_first_n('')", "");
+  TestStringValue("mask_show_first_n('abcdeABCDE12345-#')", "abcdxXXXXXnnnnn-#");
+  TestStringValue("mask_show_first_n('abcdeABCDE12345-#', 0)", "xxxxxXXXXXnnnnn-#");
+  TestStringValue("mask_show_first_n('abcdeABCDE12345-#', -1)", "xxxxxXXXXXnnnnn-#");
+  TestStringValue("mask_show_first_n('abcdeABCDE12345-#', 2)", "abxxxXXXXXnnnnn-#");
+  TestStringValue("mask_show_first_n('abcdeABCDE12345-#', 100)", "abcdeABCDE12345-#");
+  TestStringValue("mask_show_first_n('abcdeABCDE12345-#', 3, '*', '*', '*', '*', 1)",
+      "abc**************");  // The last argument 1 is unused since the value is string.
+  // Most importantly, test the override used by Ranger transformer.
+  TestStringValue("mask_show_first_n('abcdeABCDE12345-#', 4, 'x', 'x', 'x', -1, '1')",
+      "abcdxxxxxxxxxxx-#");
+  TestStringValue("mask_show_first_n('abcdeABCDE12345-#', 0, '*', '*', '*', -1, '9')",
+      "***************-#");
+  // Test all int arguments. 65 = 'A', 97 = 'a', 48 = '0'.
+  TestStringValue("mask_show_first_n('abcdeABCDE12345-#', 0, 65, 97, 48, -1, 9)",
+      "aaaaaAAAAA00000-#");
+  TestStringValue("mask_show_first_n('abcdeABCDE12345-#', 4, -1, -1, -1, -1, 9)",
+      "abcdeABCDE12345-#");
+
+  // Test overrides for numeric value.
+  TestValue("mask_show_first_n(0)", TYPE_BIGINT, 0);
+  TestValue("mask_show_first_n(0, 0)", TYPE_BIGINT, 1);
+  TestValue("mask_show_first_n(0, 0, -1, -1, -1, -1, 5)", TYPE_BIGINT, 5);
+  TestValue("mask_show_first_n(cast(123 as tinyint), 2, 'x', 'x', 'x', -1, '5')",
+      TYPE_BIGINT, 125);
+  TestValue("mask_show_first_n(cast(12345 as smallint), 3, 'x', 'x', 'x', -1, '5')",
+      TYPE_BIGINT, 12355);
+  TestValue("mask_show_first_n(cast(12345 as int), 0, 'x', 'x', 'x', 'x', 5)",
+      TYPE_BIGINT, 55555);
+  TestValue("mask_show_first_n(cast(12345 as bigint), 4, -1, -1, -1, -1, -1)",
+      TYPE_BIGINT, 12341);
+  TestValue("mask_show_first_n(123456789)", TYPE_BIGINT, 123411111);
+  TestValue("mask_show_first_n(123456789, 0)", TYPE_BIGINT, 111111111);
+  TestValue("mask_show_first_n(123456789, -1)", TYPE_BIGINT, 111111111);
+  TestValue("mask_show_first_n(123456789, 2)", TYPE_BIGINT, 121111111);
+  TestValue("mask_show_first_n(123456789, 100)", TYPE_BIGINT, 123456789);
+  TestValue("mask_show_first_n(123456789, 3, '*', '*', '*', '*', 2)", TYPE_BIGINT,
+      123222222);  // Only the last mask argument 2 is unused since the value is numeric.
+  // Most importantly, test the override used by Ranger transformer.
+  TestValue("mask_show_first_n(12345678900, 4, 'x', 'x', 'x', -1, '1')", TYPE_BIGINT,
+      12341111111);
+  TestValue("mask_show_first_n(12345678900, 0, '*', '*', '*', -1, '9')", TYPE_BIGINT,
+      99999999999);
+  TestValue("mask_show_first_n(-12345678900, 0, '*', '*', '*', -1, '9')", TYPE_BIGINT,
+      -99999999999);
+  // Test all int arguments. 65 = 'A', 97 = 'a', 48 = '0'.
+  TestValue("mask_show_first_n(12345678, 0, 65, 97, 48, -1, 9)", TYPE_BIGINT, 99999999);
+  // Illegal masked_number (not in [0, 9]) is converted to default value 1.
+  TestValue("mask_show_first_n(12345678, 4, -1, -1, -1, -1, 10)", TYPE_BIGINT, 12341111);
+  TestValue("mask_show_first_n(12345678, 4, -1, -1, -1, -1, -1)", TYPE_BIGINT, 12341111);
+
+  // Error handling
+  // Empty chars are converted to default values. Pick the first char for long strings.
+  TestStringValue("mask_show_first_n('TestString-123', 4, '', 'bBBBB', '', 'dDDD')",
+      "TestXbbbbbdnnn");
+  TestIsNull("mask_show_first_n(cast(NULL as STRING))", TYPE_STRING);
+  TestIsNull("mask_show_first_n(cast(NULL as BIGINT))", TYPE_BIGINT);
+  TestErrorString("mask_show_first_n(123456789, 4, 'aa', 'bb', 'cc', -1, 'a')",
+      "Can't convert 'a' to a valid masked_number. Valid values: 0-9.\n");
+  TestErrorString("mask_show_first_n(123456789, 4, 'aa', 'bb', 'cc', -1, '10')",
+      "Can't convert '10' to a valid masked_number. Valid values: 0-9.\n");
+}
+
+TEST_P(ExprTest, MaskShowLastNTest) {
+  // Test overrides for string value.
+  // Replace upper case with 'X', lower case with 'x', digit chars with '0', other chars
+  // with ':'.
+  TestStringValue("mask_show_last_n('TestString-123', 4, 'X', 'x', '0', ':')",
+      "XxxxXxxxxx-123");
+  TestStringValue(
+      "mask_show_last_n(cast('TestString-123' as varchar(24)), 4, 'X', 'x', '0', ':')",
+      "XxxxXxxxxx-123");
+  TestStringValue(
+      "mask_show_last_n(cast('TestString-123' as char(24)), 4, 'X', 'x', '0', ':')",
+      "XxxxXxxxxx:000::::::    "); // Remain the last 4 whitespaces
+  TestStringValue("mask_show_last_n('')", "");
+  TestStringValue("mask_show_last_n('abcdeABCDE12345-#')", "xxxxxXXXXXnnn45-#");
+  TestStringValue("mask_show_last_n('abcdeABCDE12345-#', 0)", "xxxxxXXXXXnnnnn-#");
+  TestStringValue("mask_show_last_n('abcdeABCDE12345-#', -1)", "xxxxxXXXXXnnnnn-#");
+  TestStringValue("mask_show_last_n('abcdeABCDE12345-#', 2)", "xxxxxXXXXXnnnnn-#");
+  TestStringValue("mask_show_last_n('abcdeABCDE12345-#', 100)", "abcdeABCDE12345-#");
+  TestStringValue("mask_show_last_n('abcdeABCDE12345-#', 3, '*', '*', '*', '*', 1)",
+      "**************5-#");  // The last argument 1 is unused since the value is string.
+  // Most importantly, test the override used by Ranger transformer.
+  TestStringValue("mask_show_last_n('abcdeABCDE12345-#', 4, 'x', 'x', 'x', -1, '1')",
+      "xxxxxxxxxxxxx45-#");
+  TestStringValue("mask_show_last_n('abcdeABCDE12345-#', 0, '*', '*', '*', -1, '9')",
+      "***************-#");
+  // Test all int arguments. 65 = 'A', 97 = 'a', 48 = '0'.
+  TestStringValue("mask_show_last_n('abcdeABCDE12345-#', 0, 65, 97, 48, -1, 9)",
+      "aaaaaAAAAA00000-#");
+  TestStringValue("mask_show_last_n('abcdeABCDE12345-#', 4, -1, -1, -1, -1, 9)",
+      "abcdeABCDE12345-#");
+
+  // Test overrides for numeric value.
+  TestValue("mask_show_last_n(0)", TYPE_BIGINT, 0);
+  TestValue("mask_show_last_n(0, 0)", TYPE_BIGINT, 1);
+  TestValue("mask_show_last_n(0, 0, -1, -1, -1, -1, 5)", TYPE_BIGINT, 5);
+  TestValue("mask_show_last_n(cast(123 as tinyint), 2, 'x', 'x', 'x', -1, '5')",
+      TYPE_BIGINT, 523);
+  TestValue("mask_show_last_n(cast(12345 as smallint), 3, 'x', 'x', 'x', -1, '5')",
+      TYPE_BIGINT, 55345);
+  TestValue("mask_show_last_n(cast(12345 as int), 0, 'x', 'x', 'x', 'x', 5)",
+      TYPE_BIGINT, 55555);
+  TestValue("mask_show_last_n(cast(12345 as bigint), 4, -1, -1, -1, -1, -1)",
+      TYPE_BIGINT, 12345);
+  TestValue("mask_show_last_n(123456789)", TYPE_BIGINT, 111116789);
+  TestValue("mask_show_last_n(123456789, 0)", TYPE_BIGINT, 111111111);
+  TestValue("mask_show_last_n(123456789, -1)", TYPE_BIGINT, 111111111);
+  TestValue("mask_show_last_n(123456789, 2)", TYPE_BIGINT, 111111189);
+  TestValue("mask_show_last_n(123456789, 100)", TYPE_BIGINT, 123456789);
+  TestValue("mask_show_last_n(123456789, 3, '*', '*', '*', '*', 2)", TYPE_BIGINT,
+      222222789);  // Only the last mask argument 2 is unused since the value is numeric.
+  // Most importantly, test the override used by Ranger transformer.
+  TestValue("mask_show_last_n(12345678900, 4, 'x', 'x', 'x', -1, '1')", TYPE_BIGINT,
+      11111118900);
+  TestValue("mask_show_last_n(12345678900, 0, '*', '*', '*', -1, '9')", TYPE_BIGINT,
+      99999999999);
+  TestValue("mask_show_last_n(-12345678900, 0, '*', '*', '*', -1, '9')", TYPE_BIGINT,
+      -99999999999);
+  // Test all int arguments. 65 = 'A', 97 = 'a', 48 = '0'.
+  TestValue("mask_show_last_n(12345678, 0, 65, 97, 48, -1, 9)", TYPE_BIGINT, 99999999);
+  // Illegal masked_number (not in [0, 9]) is converted to default value 1.
+  TestValue("mask_show_last_n(12345678, 4, -1, -1, -1, -1, 10)", TYPE_BIGINT, 11115678);
+  TestValue("mask_show_last_n(12345678, 4, -1, -1, -1, -1, -1)", TYPE_BIGINT, 11115678);
+
+  // Error handling
+  // Empty chars are converted to default values. Pick the first char for long strings.
+  TestStringValue("mask_show_last_n('TestString-123', 4, '', 'bBBBB', '', 'dDDD')",
+      "XbbbXbbbbb-123");
+  TestIsNull("mask_show_last_n(cast(NULL as STRING))", TYPE_STRING);
+  TestIsNull("mask_show_last_n(cast(NULL as BIGINT))", TYPE_BIGINT);
+  TestErrorString("mask_show_last_n(123456789, 4, 'aa', 'bb', 'cc', -1, 'a')",
+      "Can't convert 'a' to a valid masked_number. Valid values: 0-9.\n");
+  TestErrorString("mask_show_last_n(123456789, 4, 'aa', 'bb', 'cc', -1, '10')",
+      "Can't convert '10' to a valid masked_number. Valid values: 0-9.\n");
+}
+
+TEST_P(ExprTest, MaskFirstNTest) {
+  // Test overrides for string value.
+  // Replace upper case with 'X', lower case with 'x', digit chars with '0', other chars
+  // with ':'.
+  TestStringValue("mask_first_n('TestString-123', 4, 'X', 'x', '0', ':')",
+      "XxxxString-123");
+  TestStringValue(
+      "mask_first_n(cast('TestString-123' as varchar(24)), 4, 'X', 'x', '0', ':')",
+      "XxxxString-123");
+  TestStringValue(
+      "mask_first_n(cast('TestString-123' as char(24)), 4, 'X', 'x', '0', ':')",
+      "XxxxString-123          ");
+  TestStringValue("mask_first_n('')", "");
+  TestStringValue("mask_first_n('abcdeABCDE12345-#')", "xxxxeABCDE12345-#");
+  TestStringValue("mask_first_n('abcdeABCDE12345-#', 0)", "abcdeABCDE12345-#");
+  TestStringValue("mask_first_n('abcdeABCDE12345-#', -1)", "abcdeABCDE12345-#");
+  TestStringValue("mask_first_n('abcdeABCDE12345-#', 2)", "xxcdeABCDE12345-#");
+  TestStringValue("mask_first_n('abcdeABCDE12345-#', 100)", "xxxxxXXXXXnnnnn-#");
+  TestStringValue("mask_first_n('abcdeABCDE12345-#', 3, '*', '*', '*', '*', 1)",
+      "***deABCDE12345-#");  // The last argument 1 is unused since the value is string.
+  // Most importantly, test the override used by Ranger transformer.
+  TestStringValue("mask_first_n('abcdeABCDE12345-#', 4, 'x', 'x', 'x', -1, '1')",
+      "xxxxeABCDE12345-#");
+  TestStringValue("mask_first_n('abcdeABCDE12345-#', 0, '*', '*', '*', -1, '9')",
+      "abcdeABCDE12345-#");
+  // Test all int arguments. 65 = 'A', 97 = 'a', 48 = '0'.
+  TestStringValue("mask_first_n('abcdeABCDE12345-#', 100, 65, 97, 48, -1, 9)",
+      "aaaaaAAAAA00000-#");
+  TestStringValue("mask_first_n('abcdeABCDE12345-#', 100, -1, -1, -1, -1, 9)",
+      "abcdeABCDE12345-#");
+
+  // Test overrides for numeric value.
+  TestValue("mask_first_n(0)", TYPE_BIGINT, 1);
+  TestValue("mask_first_n(0, 0)", TYPE_BIGINT, 0);
+  TestValue("mask_first_n(0, 4, -1, -1, -1, -1, 5)", TYPE_BIGINT, 5);
+  TestValue("mask_first_n(cast(123 as tinyint), 2, 'x', 'x', 'x', -1, '5')",
+      TYPE_BIGINT, 553);
+  TestValue("mask_first_n(cast(12345 as smallint), 3, 'x', 'x', 'x', -1, '5')",
+      TYPE_BIGINT, 55545);
+  TestValue("mask_first_n(cast(12345 as int), 0, 'x', 'x', 'x', 'x', 5)",
+      TYPE_BIGINT, 12345);
+  TestValue("mask_first_n(cast(12345 as bigint), 4, -1, -1, -1, -1, -1)",
+      TYPE_BIGINT, 11115);
+  TestValue("mask_first_n(123456789)", TYPE_BIGINT, 111156789);
+  TestValue("mask_first_n(123456789, 0)", TYPE_BIGINT, 123456789);
+  TestValue("mask_first_n(123456789, -1)", TYPE_BIGINT, 123456789);
+  TestValue("mask_first_n(123456789, 2)", TYPE_BIGINT, 113456789);
+  TestValue("mask_first_n(123456789, 100)", TYPE_BIGINT, 111111111);
+  TestValue("mask_first_n(123456789, 3, '*', '*', '*', '*', 2)", TYPE_BIGINT,
+      222456789);  // Only the last mask argument 2 is unused since the value is numeric.
+  // Most importantly, test the override used by Ranger transformer.
+  TestValue("mask_first_n(12345678900, 4, 'x', 'x', 'x', -1, '1')", TYPE_BIGINT,
+      11115678900);
+  TestValue("mask_first_n(12345678900, 20, '*', '*', '*', -1, '9')", TYPE_BIGINT,
+      99999999999);
+  TestValue("mask_first_n(-12345678900, 20, '*', '*', '*', -1, '9')", TYPE_BIGINT,
+      -99999999999);
+  // Test all int arguments. 65 = 'A', 97 = 'a', 48 = '0'.
+  TestValue("mask_first_n(12345678, 10, 65, 97, 48, -1, 9)", TYPE_BIGINT, 99999999);
+  // Illegal masked_number (not in [0, 9]) is converted to default value 1.
+  TestValue("mask_first_n(12345678, 4, -1, -1, -1, -1, 10)", TYPE_BIGINT, 11115678);
+  TestValue("mask_first_n(12345678, 4, -1, -1, -1, -1, -1)", TYPE_BIGINT, 11115678);
+
+  // Error handling
+  // Empty chars are converted to default values. Pick the first char for long strings.
+  TestStringValue("mask_first_n('TestString-123', 4, '', 'bBBBB', '', 'dDDD')",
+      "XbbbString-123");
+  TestIsNull("mask_first_n(cast(NULL as STRING))", TYPE_STRING);
+  TestIsNull("mask_first_n(cast(NULL as BIGINT))", TYPE_BIGINT);
+  TestErrorString("mask_first_n(123456789, 4, 'aa', 'bb', 'cc', -1, 'a')",
+      "Can't convert 'a' to a valid masked_number. Valid values: 0-9.\n");
+  TestErrorString("mask_first_n(123456789, 4, 'aa', 'bb', 'cc', -1, '10')",
+      "Can't convert '10' to a valid masked_number. Valid values: 0-9.\n");
+}
+
+TEST_P(ExprTest, MaskLastNTest) {
+  // Test overrides for string value.
+  // Replace upper case with 'X', lower case with 'x', digit chars with '0', other chars
+  // with ':'.
+  TestStringValue("mask_last_n('TestString-123', 4, 'X', 'x', '0', ':')",
+      "TestString:000");
+  TestStringValue(
+      "mask_last_n(cast('TestString-123' as varchar(24)), 4, 'X', 'x', '0', ':')",
+      "TestString:000");
+  TestStringValue(
+      "mask_last_n(cast('TestString-123' as char(24)), 4, 'X', 'x', '0', ':')",
+      "TestString-123      ::::");
+  TestStringValue("mask_last_n('')", "");
+  TestStringValue("mask_last_n('abcdeABCDE12345-#')", "abcdeABCDE123nn-#");
+  TestStringValue("mask_last_n('abcdeABCDE12345-#', 0)", "abcdeABCDE12345-#");
+  TestStringValue("mask_last_n('abcdeABCDE12345-#', -1)", "abcdeABCDE12345-#");
+  TestStringValue("mask_last_n('abcdeABCDE12345-#', 2)", "abcdeABCDE12345-#");
+  TestStringValue("mask_last_n('abcdeABCDE12345-#', 100)", "xxxxxXXXXXnnnnn-#");
+  TestStringValue("mask_last_n('abcdeABCDE12345-#', 3, '*', '*', '*', '*', 1)",
+      "abcdeABCDE1234***");  // The last argument 1 is unused since the value is string.
+  // Most importantly, test the override used by Ranger transformer.
+  TestStringValue("mask_last_n('abcdeABCDE12345-#', 4, 'x', 'x', 'x', -1, '1')",
+      "abcdeABCDE123xx-#");
+  TestStringValue("mask_last_n('abcdeABCDE12345-#', 100, '*', '*', '*', -1, '9')",
+      "***************-#");
+  // Test all int arguments. 65 = 'A', 97 = 'a', 48 = '0'.
+  TestStringValue("mask_last_n('abcdeABCDE12345-#', 100, 65, 97, 48, -1, 9)",
+      "aaaaaAAAAA00000-#");
+  TestStringValue("mask_last_n('abcdeABCDE12345-#', 100, -1, -1, -1, -1, 9)",
+      "abcdeABCDE12345-#");
+
+  // Test overrides for numeric value.
+  TestValue("mask_last_n(0)", TYPE_BIGINT, 1);
+  TestValue("mask_last_n(0, 0)", TYPE_BIGINT, 0);
+  TestValue("mask_last_n(0, 4, -1, -1, -1, -1, 5)", TYPE_BIGINT, 5);
+  TestValue("mask_last_n(cast(123 as tinyint), 2, 'x', 'x', 'x', -1, '5')",
+      TYPE_BIGINT, 155);
+  TestValue("mask_last_n(cast(12345 as smallint), 3, 'x', 'x', 'x', -1, '5')",
+      TYPE_BIGINT, 12555);
+  TestValue("mask_last_n(cast(12345 as int), 10, 'x', 'x', 'x', 'x', 5)",
+      TYPE_BIGINT, 55555);
+  TestValue("mask_last_n(cast(12345 as bigint), 4, -1, -1, -1, -1, -1)",
+      TYPE_BIGINT, 11111);
+  TestValue("mask_last_n(123456789)", TYPE_BIGINT, 123451111);
+  TestValue("mask_last_n(123456789, 0)", TYPE_BIGINT, 123456789);
+  TestValue("mask_last_n(123456789, -1)", TYPE_BIGINT, 123456789);
+  TestValue("mask_last_n(123456789, 2)", TYPE_BIGINT, 123456711);
+  TestValue("mask_last_n(123456789, 100)", TYPE_BIGINT, 111111111);
+  TestValue("mask_last_n(123456789, 3, '*', '*', '*', '*', 2)", TYPE_BIGINT,
+      123456222);  // Only the last mask argument 2 is unused since the value is numeric.
+  // Most importantly, test the override used by Ranger transformer.
+  TestValue("mask_last_n(12345678900, 4, 'x', 'x', 'x', -1, '1')", TYPE_BIGINT,
+      12345671111);
+  TestValue("mask_last_n(12345678900, 20, '*', '*', '*', -1, '9')", TYPE_BIGINT,
+      99999999999);
+  TestValue("mask_last_n(-12345678900, 20, '*', '*', '*', -1, '9')", TYPE_BIGINT,
+      -99999999999);
+  // Test all int arguments. 65 = 'A', 97 = 'a', 48 = '0'.
+  TestValue("mask_last_n(12345678, 10, 65, 97, 48, -1, 9)", TYPE_BIGINT, 99999999);
+  // Illegal masked_number (not in [0, 9]) is converted to default value 1.
+  TestValue("mask_last_n(12345678, 4, -1, -1, -1, -1, 10)", TYPE_BIGINT, 12341111);
+  TestValue("mask_last_n(12345678, 4, -1, -1, -1, -1, -1)", TYPE_BIGINT, 12341111);
+
+  // Error handling
+  // Empty chars are converted to default values. Pick the first char for long strings.
+  TestStringValue("mask_last_n('TestString-123', 4, '', 'bBBBB', '', 'dDDD')",
+      "TestStringdnnn");
+  TestIsNull("mask_last_n(cast(NULL as STRING))", TYPE_STRING);
+  TestIsNull("mask_last_n(cast(NULL as BIGINT))", TYPE_BIGINT);
+  TestErrorString("mask_last_n(123456789, 4, 'aa', 'bb', 'cc', -1, 'a')",
+      "Can't convert 'a' to a valid masked_number. Valid values: 0-9.\n");
+  TestErrorString("mask_last_n(123456789, 4, 'aa', 'bb', 'cc', -1, '10')",
+      "Can't convert '10' to a valid masked_number. Valid values: 0-9.\n");
+}
+
+TEST_P(ExprTest, MaskTest) {
+  // Test overrides for string value.
+  // Replace upper case with 'X', lower case with 'x', digit chars with '0', other chars
+  // with ':'.
+  TestStringValue("mask('TestString-123', 'X', 'x', '0', ':')", "XxxxXxxxxx:000");
+  TestStringValue("mask(cast('TestString-123' as varchar(24)), 'X', 'x', '0', ':')",
+      "XxxxXxxxxx:000");
+  TestStringValue("mask(cast('TestString-123' as char(24)), 'X', 'x', '0', ':')",
+      "XxxxXxxxxx:000::::::::::");
+  TestStringValue("mask('')", "");
+  TestStringValue("mask('abcdeABCDE12345-#')", "xxxxxXXXXXnnnnn-#");
+  TestStringValue("mask('abcdeABCDE12345-#', '*', '*', '*', '*', 1)",
+      "*****************");  // The last argument 1 is unused since the value is string.
+  // Most importantly, test the override used by Ranger transformer.
+  TestStringValue("mask('abcdeABCDE12345-#', 'x', 'x', 'x', -1, '1')",
+      "xxxxxxxxxxxxxxx-#");
+  TestStringValue("mask('abcdeABCDE12345-#', '*', '*', '*', -1, '9')",
+      "***************-#");
+  // Test all int arguments. 65 = 'A', 97 = 'a', 48 = '0'.
+  TestStringValue("mask('abcdeABCDE12345-#', 65, 97, 48, -1, 9)", "aaaaaAAAAA00000-#");
+  TestStringValue("mask('abcdeABCDE12345-#', -1, -1, -1, -1, 9)", "abcdeABCDE12345-#");
+
+  // Test overrides for numeric value.
+  TestValue("mask(0)", TYPE_BIGINT, 1);
+  TestValue("mask(0, -1, -1, -1, -1, 5)", TYPE_BIGINT, 5);
+  TestValue("mask(cast(123 as tinyint), 'x', 'x', 'x', -1, '5')", TYPE_BIGINT, 555);
+  TestValue("mask(cast(12345 as smallint), 'x', 'x', 'x', -1, '5')", TYPE_BIGINT, 55555);
+  TestValue("mask(cast(12345 as int), 'x', 'x', 'x', 'x', 5)", TYPE_BIGINT, 55555);
+  TestValue("mask(cast(12345 as bigint), -1, -1, -1, -1, -1)", TYPE_BIGINT, 11111);
+  TestValue("mask(12345678900)", TYPE_BIGINT, 11111111111);
+  TestValue("mask(12345678900, '*', '*', '*', '*', 2)", TYPE_BIGINT, 22222222222);
+  // Most importantly, test the override used by Ranger transformer.
+  TestValue("mask(12345678900, 'x', 'x', 'x', -1, '1')", TYPE_BIGINT, 11111111111);
+  TestValue("mask(12345678900, '*', '*', '*', -1, '9')", TYPE_BIGINT, 99999999999);
+  TestValue("mask(-12345678900, '*', '*', '*', -1, '9')", TYPE_BIGINT, -99999999999);
+  // Test all int arguments. 65 = 'A', 97 = 'a', 48 = '0'.
+  TestValue("mask(12345678, 65, 97, 48, -1, 9)", TYPE_BIGINT, 99999999);
+  // Illegal masked_number (not in [0, 9]) is converted to default value 1.
+  TestValue("mask(12345678, -1, -1, -1, -1, 10)", TYPE_BIGINT, 11111111);
+  TestValue("mask(12345678, -1, -1, -1, -1, -1)", TYPE_BIGINT, 11111111);
+
+  // Test overrides for Date value.
+  TestDateValue("mask(cast('2019-12-31' as date), -1, -1, -1, -1, -1, 11, 2, 2020)",
+      DateValue(2020, 3, 11));
+  TestDateValue("mask(cast('2019-12-31' as date), -1, -1, -1, -1, -1, 32, 12, 2020)",
+      DateValue(2020, 1, 1));
+  TestDateValue("mask(cast('2019-12-31' as date), -1, -1, -1, -1, -1, -1, -1, -1)",
+      DateValue(2019, 12, 31));
+  TestDateValue("mask(cast('2019-12-31' as date), -1, -1, -1, -1, -1, 10, -1, -1)",
+      DateValue(2019, 12, 10));
+  TestDateValue("mask(cast('2019-12-31' as date), -1, -1, -1, -1, -1, -1, 0, -1)",
+      DateValue(2019, 1, 31));
+  TestDateValue("mask(cast('2019-12-31' as date), -1, -1, -1, -1, -1, -1, -1, 10)",
+      DateValue(10, 12, 31));
+  TestDateValue("mask(cast('2019-12-31' as date), -1, -1, -1, -1, -1, 10, 0, -1)",
+      DateValue(2019, 1, 10));
+  TestDateValue("mask(cast('2019-12-31' as date), -1, -1, -1, -1, -1, 10, -1, 10)",
+      DateValue(10, 12, 10));
+  TestDateValue("mask(cast('2019-12-31' as date), -1, -1, -1, -1, -1, -1, 0, 10)",
+      DateValue(10, 1, 31));
+  TestDateValue("mask(cast('2019-12-31' as date), -1, -1, -1, -1, -1, 10, 0, 10)",
+      DateValue(10, 1, 10));
+
+  // Error handling
+  // Empty chars are converted to default values. Pick the first char for long strings.
+  TestStringValue("mask('TestString-123', '', 'bBBBB', '', 'dDDD')", "XbbbXbbbbbdnnn");
+  TestIsNull("mask(cast(NULL as STRING))", TYPE_STRING);
+  TestIsNull("mask(cast(NULL as BIGINT))", TYPE_BIGINT);
+  TestIsNull("mask(cast(NULL as DATE))", TYPE_DATE);
+  TestErrorString("mask(123456789, 'aa', 'bb', 'cc', -1, 'a')",
+      "Can't convert 'a' to a valid masked_number. Valid values: 0-9.\n");
+  TestErrorString("mask(123456789, 'aa', 'bb', 'cc', -1, '10')",
+      "Can't convert '10' to a valid masked_number. Valid values: 0-9.\n");
+  TestDateValue("mask(cast('2019-12-31' as date), -1, -1, -1, -1, -1, 10, 0, 0)",
+      DateValue(1, 1, 10));
+  TestDateValue("mask(cast('2019-12-31' as date), -1, -1, -1, -1, -1, 10, 0, 10000)",
+      DateValue(1, 1, 10));
+  // This is a different behavior than Hive's. Hive will convert '2019-02-30' to
+  // '2019-03-02', while Impala converts it to NULL.
+  TestIsNull("mask(cast('2019-02-03' as date), -1, -1, -1, -1, -1, 30, -1, -1)",
+      TYPE_DATE);
+}
+
+TEST_P(ExprTest, MaskHashTest) {
+  TestStringValue("mask_hash('TestString-123')",
+      "8b44d559dc5d60e4453c9b4edf2a455fbce054bb8504cd3eb9b5f391bd239c90");
+  TestStringValue("mask_hash(cast('TestString-123' as varchar(24)))",
+      "8b44d559dc5d60e4453c9b4edf2a455fbce054bb8504cd3eb9b5f391bd239c90");
+  TestStringValue("mask_hash(cast('TestString-123' as char(24)))",
+      "30a88603135d3a6f7a66b4f9193da1ab4423aed45fb8fe736c2f2a08977f2bdd");
+  TestIsNull("mask_hash(cast(123 as tinyint))", TYPE_BIGINT);
+  TestIsNull("mask_hash(cast(12345 as smallint))", TYPE_BIGINT);
+  TestIsNull("mask_hash(cast(12345 as int))", TYPE_BIGINT);
+  TestIsNull("mask_hash(cast(12345 as bigint))", TYPE_BIGINT);
+  TestIsNull("mask_hash(cast(1 as boolean))", TYPE_BOOLEAN);
+  TestIsNull("mask_hash(cast(12345 as double))", TYPE_DOUBLE);
+  TestIsNull("mask_hash(cast('2016-04-20' as date))", TYPE_DATE);
+  TestIsNull("mask_hash(cast('2016-04-20' as timestamp))", TYPE_TIMESTAMP);
+}
+
 } // namespace impala
 
 INSTANTIATE_TEST_CASE_P(Instantiations, ExprTest, ::testing::Values(
