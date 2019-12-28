@@ -82,10 +82,10 @@ public class CreateKuduTableWithoutHMSTest {
    */
   private static void restartImpalaCluster(boolean useHiveMetastore)
       throws IOException, InterruptedException {
-    String args = "";
+    StringBuilder args = new StringBuilder(" --log_dir=${IMPALA_EE_TEST_LOGS_DIR}");
     String kuduVariant = "";
     if (!useHiveMetastore) {
-      args = " --env_vars=CUSTOM_CLASSPATH=" + TMP_HIVE_SITE;
+      args.append(" --env_vars=CUSTOM_CLASSPATH=" + TMP_HIVE_SITE);
       kuduVariant = "KUDU_VARIANT=without_hms_config";
     }
 
@@ -95,7 +95,7 @@ public class CreateKuduTableWithoutHMSTest {
 
     String generateCmd = String.format("bash %s/bin/create-test-configuration.sh",
                                        IMPALA_HOME);
-    String restartCmd = IMPALA_HOME + "/bin/start-impala-cluster.py" + args;
+    String restartCmd = IMPALA_HOME + "/bin/start-impala-cluster.py" + args.toString();
     String cmdStr = generateCmd + " && " + restartCmd;
     Process p = Runtime.getRuntime().exec(getCmdsArray(cmdStr), envpArray);
     p.waitFor();
