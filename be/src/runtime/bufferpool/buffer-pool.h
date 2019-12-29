@@ -366,6 +366,9 @@ class BufferPool::ClientHandle {
 
   /// Move some of src's reservation to this client. 'bytes' of unused reservation must be
   /// available in 'src'.
+  ///
+  /// This is safe to call concurrently from multiple threads, as long as those threads
+  /// coordinate to ensure there is sufficient unused reservation.
   void RestoreReservation(SubReservation* src, int64_t bytes);
 
   /// Accessors for this client's reservation corresponding to the identically-named
@@ -385,6 +388,9 @@ class BufferPool::ClientHandle {
   /// unpinned pages to disk and a write to disk fails, in which case it returns an error
   /// status. May also fail if a reservation limit on 'dst' would be exceeded as a result
   /// of the transfer, in which case *transferred is false but Status::OK is returned.
+  ///
+  /// This is safe to call concurrently from multiple threads, as long as those threads
+  /// coordinate to ensure there is sufficient unused reservation.
   Status TransferReservationTo(ReservationTracker* dst, int64_t bytes, bool* transferred);
   Status TransferReservationTo(ClientHandle* dst, int64_t bytes, bool* transferred);
 

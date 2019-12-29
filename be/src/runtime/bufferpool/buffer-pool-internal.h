@@ -364,6 +364,10 @@ class BufferPool::Client {
   /// Condition variable signalled when a write for this client completes.
   ConditionVariable write_complete_cv_;
 
+  /// Used to ensure that only one thread at a time is active in CleanPages().
+  bool cleaning_pages_ = false;
+  ConditionVariable clean_pages_done_cv_;
+
   /// All non-OK statuses returned by write operations are merged into this status.
   /// All operations that depend on pages being written to disk successfully (e.g.
   /// reading pages back from disk) must check 'write_status_' before proceeding, so

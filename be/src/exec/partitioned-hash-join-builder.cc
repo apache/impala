@@ -23,8 +23,8 @@
 
 #include "codegen/llvm-codegen.h"
 #include "exec/hash-table.inline.h"
-#include "exprs/scalar-expr.h"
 #include "exprs/scalar-expr-evaluator.h"
+#include "exprs/scalar-expr.h"
 #include "runtime/buffered-tuple-stream.h"
 #include "runtime/exec-env.h"
 #include "runtime/mem-tracker.h"
@@ -34,6 +34,7 @@
 #include "runtime/runtime-filter.h"
 #include "runtime/runtime-state.h"
 #include "util/bloom-filter.h"
+#include "util/cyclic-barrier.h"
 #include "util/min-max-filter.h"
 #include "util/runtime-profile-counters.h"
 
@@ -167,6 +168,9 @@ PhjBuilder::PhjBuilder(
     is_not_distinct_from_(sink_config.is_not_distinct_from_),
     filter_exprs_(sink_config.filter_exprs_),
     hash_table_config_(*sink_config.hash_table_config_),
+    probe_barrier_(num_probe_threads_ <= 1 ?
+            nullptr :
+            make_unique<CyclicBarrier>(state->instance_ctx().num_join_build_outputs)),
     process_build_batch_fn_(sink_config.process_build_batch_fn_),
     process_build_batch_fn_level0_(sink_config.process_build_batch_fn_level0_),
     insert_batch_fn_(
@@ -174,10 +178,18 @@ PhjBuilder::PhjBuilder(
     insert_batch_fn_level0_(reinterpret_cast<const Partition::InsertBatchFn&>(
         sink_config.insert_batch_fn_level0_)) {
   DCHECK_GT(sink_config.hash_seed_, 0);
+  DCHECK(num_probe_threads_ <= 1 || !NeedToProcessUnmatchedBuildRows(join_op_))
+      << "Returning rows with build partitions is not supported with shared builds";
   for (const TRuntimeFilterDesc& filter_desc : sink_config.filter_descs_) {
     filter_ctxs_.emplace_back();
     filter_ctxs_.back().filter = state->filter_bank()->RegisterFilter(filter_desc, true);
   }
+  // Ensure threads get unblocked from probe_barrier_ when the query is cancelled. Using
+  // the AddBarrierToCancel() mechanism ensures that cancellation happens after the
+  // overall error for this backend has already been set in QueryState. Otherwise this
+  // status and the original status could race with each other to become this backend's
+  // status.
+  if (probe_barrier_ != nullptr) state->AddBarrierToCancel(probe_barrier_.get());
 }
 
 PhjBuilder::PhjBuilder(const PhjBuilderConfig& sink_config,
@@ -195,6 +207,7 @@ PhjBuilder::PhjBuilder(const PhjBuilderConfig& sink_config,
     is_not_distinct_from_(sink_config.is_not_distinct_from_),
     filter_exprs_(sink_config.filter_exprs_),
     hash_table_config_(*sink_config.hash_table_config_),
+    probe_barrier_(nullptr),
     process_build_batch_fn_(sink_config.process_build_batch_fn_),
     process_build_batch_fn_level0_(sink_config.process_build_batch_fn_level0_),
     insert_batch_fn_(
@@ -202,6 +215,7 @@ PhjBuilder::PhjBuilder(const PhjBuilderConfig& sink_config,
     insert_batch_fn_level0_(reinterpret_cast<const Partition::InsertBatchFn&>(
         sink_config.insert_batch_fn_level0_)) {
   DCHECK_GT(sink_config.hash_seed_, 0);
+  DCHECK_EQ(1, num_probe_threads_) << "Embedded builders cannot be shared";
   for (const TRuntimeFilterDesc& filter_desc : sink_config.filter_descs_) {
     filter_ctxs_.emplace_back();
     filter_ctxs_.back().filter = state->filter_bank()->RegisterFilter(filter_desc, true);
@@ -419,8 +433,8 @@ void PhjBuilder::UpdateState(HashJoinState next_state) {
   VLOG(2) << "Transitioned State:" << endl << DebugString();
 }
 
-string PhjBuilder::PrintState() const {
-  switch (state_) {
+string PhjBuilder::PrintState(HashJoinState state) {
+  switch (state) {
     case HashJoinState::PARTITIONING_BUILD:
       return "PartitioningBuild";
     case HashJoinState::PARTITIONING_PROBE:
@@ -586,8 +600,9 @@ Status PhjBuilder::BuildHashTablesAndReserveProbeBuffers(HashJoinState next_stat
 
 Status PhjBuilder::ReserveProbeBuffers(HashJoinState next_state) {
   DCHECK_EQ(PARTITION_FANOUT, hash_partitions_.size());
-  int64_t addtl_reservation = CalcProbeStreamReservation(next_state)
-      - probe_stream_reservation_.GetReservation();
+  int64_t curr_reservation = probe_stream_reservation_.GetReservation();
+  int64_t addtl_reservation =
+      CalcProbeStreamReservation(next_state) * num_probe_threads_ - curr_reservation;
 
   // Loop until either we get enough reservation or all partitions are spilled (in which
   // case SpillPartition() returns an error).
@@ -595,9 +610,10 @@ Status PhjBuilder::ReserveProbeBuffers(HashJoinState next_state) {
     Partition* spilled_partition;
     RETURN_IF_ERROR(SpillPartition(
           BufferedTupleStream::UNPIN_ALL, &spilled_partition));
+    // Increase reservation to reflect the additional spilled partition.
     // Don't need to create a probe stream for the null-aware partition.
     if (spilled_partition != null_aware_partition_.get()) {
-      addtl_reservation += spillable_buffer_size_;
+      addtl_reservation += spillable_buffer_size_ * num_probe_threads_;
     }
   }
   VLOG(3) << "PHJ(node_id=" << join_node_id_ << ") saved reservation "
@@ -620,11 +636,10 @@ Status PhjBuilder::TransferProbeStreamReservation(
     BufferPool::ClientHandle* probe_client) {
   DCHECK_EQ(is_separate_build_, probe_client != buffer_pool_client_);
   int64_t probe_reservation = CalcProbeStreamReservation(state_);
-  VLOG(3) << "PHJ(node_id=" << join_node_id_ << ") transfer " << probe_reservation
+  VLOG(3) << "PHJ(node_id=" << join_node_id_ << ") will transfer " << probe_reservation
           << " to probe client.";
   if (probe_reservation == 0) return Status::OK();
-  int64_t saved_reservation = probe_stream_reservation_.GetReservation();
-  DCHECK_GE(saved_reservation, probe_reservation);
+  DCHECK_GE(probe_stream_reservation_.GetReservation(), probe_reservation);
 
   buffer_pool_client_->RestoreReservation(&probe_stream_reservation_, probe_reservation);
   if (is_separate_build_) {
@@ -681,6 +696,37 @@ Status PhjBuilder::DoneProbingHashPartitions(
   // 'spilled_partitions_', which the calculation depends on.
   int64_t probe_reservation = CalcProbeStreamReservation(state_);
   DCHECK_GE(probe_client->GetUnusedReservation(), probe_reservation);
+
+  // Merge together num_spilled_probe_rows to include info from all threads.
+  for (int i = 0; i < PARTITION_FANOUT; ++i) {
+    PhjBuilder::Partition* partition = hash_partitions_[i].get();
+    if (partition->IsClosed()) continue;
+    partition->IncrementNumSpilledProbeRows(num_spilled_probe_rows[i]);
+  }
+
+  if (num_probe_threads_ > 1) {
+    // TODO: IMPALA-9411: consider reworking to attach buffers to all output batches.
+    RETURN_IF_ERROR(probe_barrier_->Wait([&]() {
+      CleanUpHashPartitions(output_partitions, nullptr);
+      DCHECK_EQ(0, output_partitions->size())
+          << "Cannot share build for join modes that return rows from build partitions";
+      return Status::OK();
+    }));
+  } else {
+    CleanUpHashPartitions(output_partitions, batch);
+  }
+
+  if (is_separate_build_) {
+    bool success;
+    RETURN_IF_ERROR(probe_client->TransferReservationTo(
+        buffer_pool_client_, probe_reservation, &success));
+    DCHECK(success) << "Transferring within query shouldn't violate reservation limits.";
+  }
+  return Status::OK();
+}
+
+void PhjBuilder::CleanUpHashPartitions(
+    deque<unique_ptr<Partition>>* output_partitions, RowBatch* batch) {
   if (state_ == HashJoinState::REPARTITIONING_PROBE) {
     // Finished repartitioning this partition. Discard before pushing more spilled
     // partitions onto 'spilled_partitions_'.
@@ -691,16 +737,18 @@ Status PhjBuilder::DoneProbingHashPartitions(
   for (int i = 0; i < PARTITION_FANOUT; ++i) {
     unique_ptr<PhjBuilder::Partition> partition = std::move(hash_partitions_[i]);
     if (partition->IsClosed()) continue;
-    partition->IncrementNumSpilledProbeRows(num_spilled_probe_rows[i]);
     if (partition->is_spilled()) {
       DCHECK(partition->hash_tbl() == nullptr) << DebugString();
       DCHECK_EQ(partition->build_rows()->BytesPinned(false), 0)
           << "Build was fully unpinned in BuildHashTablesAndPrepareProbeStreams()";
       if (partition->num_spilled_probe_rows() == 0
-          && !NeedToProcessUnmatchedBuildRows(join_op_)) {
+          && !NeedToProcessUnmatchedBuildRows(join_op_)
+          && num_probe_threads_ == 1) {
         COUNTER_ADD(num_hash_table_builds_skipped_, 1);
         partition->Close(nullptr);
       } else {
+        // For shared builds, always add the partition to keep the spilled partitions
+        // in sync across all the builders and join nodes.
         spilled_partitions_.push_back(std::move(partition));
       }
     } else if (NeedToProcessUnmatchedBuildRows(join_op_)) {
@@ -710,14 +758,7 @@ Status PhjBuilder::DoneProbingHashPartitions(
       partition->Close(batch);
     }
   }
-  if (is_separate_build_) {
-    bool success;
-    RETURN_IF_ERROR(probe_client->TransferReservationTo(
-          buffer_pool_client_, probe_reservation, &success));
-    DCHECK(success) << "Transferring within query shouldn't violate reservation limits.";
-  }
   hash_partitions_.clear();
-  return Status::OK();
 }
 
 Status PhjBuilder::DoneProbingSinglePartition(BufferPool::ClientHandle* probe_client,
@@ -726,7 +767,32 @@ Status PhjBuilder::DoneProbingSinglePartition(BufferPool::ClientHandle* probe_cl
   DCHECK_EQ(is_separate_build_, probe_client != buffer_pool_client_);
   // Calculate before popping off the last 'spilled_partition_'.
   int64_t probe_reservation = CalcProbeStreamReservation(state_);
+  DCHECK_GE(probe_client->GetUnusedReservation(), probe_reservation);
+  if (num_probe_threads_ > 1) {
+    // TODO: IMPALA-9411: consider reworking to attach buffers to all output batches.
+    RETURN_IF_ERROR(probe_barrier_->Wait([&]() {
+      CleanUpSinglePartition(output_partitions, nullptr);
+      DCHECK_EQ(0, output_partitions->size())
+          << "Cannot share build for join modes that return rows from build partitions";
+      return Status::OK();
+    }));
+  } else {
+    CleanUpSinglePartition(output_partitions, batch);
+  }
+  if (is_separate_build_) {
+    bool success;
+    RETURN_IF_ERROR(probe_client->TransferReservationTo(
+          buffer_pool_client_, probe_reservation, &success));
+    DCHECK(success) << "Transferring within query shouldn't violate reservation limits.";
+  }
+  return Status::OK();
+}
+
+void PhjBuilder::CleanUpSinglePartition(
+    deque<unique_ptr<Partition>>* output_partitions, RowBatch* batch) {
   if (NeedToProcessUnmatchedBuildRows(join_op_)) {
+    DCHECK_LE(num_probe_threads_, 1)
+        << "Don't support returning build partitions with shared build";
     // If the build partition was in memory, we are done probing this partition.
     // In case of right-outer, right-anti and full-outer joins, we move this partition
     // to the list of partitions that we need to output their unmatched build rows.
@@ -736,14 +802,6 @@ Status PhjBuilder::DoneProbingSinglePartition(BufferPool::ClientHandle* probe_cl
     spilled_partitions_.back()->Close(IsLeftSemiJoin(join_op_) ? nullptr : batch);
   }
   spilled_partitions_.pop_back();
-  DCHECK_GE(probe_client->GetUnusedReservation(), probe_reservation);
-  if (is_separate_build_) {
-    bool success;
-    RETURN_IF_ERROR(probe_client->TransferReservationTo(
-          buffer_pool_client_, probe_reservation, &success));
-    DCHECK(success) << "Transferring within query shouldn't violate reservation limits.";
-  }
-  return Status::OK();
 }
 
 void PhjBuilder::CloseAndDeletePartitions(RowBatch* row_batch) {
@@ -836,15 +894,42 @@ Status PhjBuilder::BeginSpilledProbe(
   DCHECK_EQ(is_separate_build_, probe_client != buffer_pool_client_);
   DCHECK(!spilled_partitions_.empty());
   DCHECK_EQ(0, hash_partitions_.size());
+  if (num_probe_threads_ > 1) {
+    RETURN_IF_ERROR(probe_barrier_->Wait([&]() { return BeginSpilledProbeSerial(); }));
+  } else {
+    RETURN_IF_ERROR(BeginSpilledProbeSerial());
+  }
+
+  RETURN_IF_ERROR(TransferProbeStreamReservation(probe_client));
+  *input_partition = spilled_partitions_.back().get();
+  if (state_ == HashJoinState::PROBING_SPILLED_PARTITION) {
+    *repartitioned = false;
+  } else {
+    DCHECK_ENUM_EQ(HashJoinState::REPARTITIONING_PROBE, state_);
+    *repartitioned = true;
+    *new_partitions =
+        HashPartitions(ht_ctx_->level(), &hash_partitions_, non_empty_build_);
+  }
+  return Status::OK();
+}
+
+Status PhjBuilder::BeginSpilledProbeSerial() {
+  DCHECK_EQ(0, probe_stream_reservation_.GetReservation());
+  if (is_separate_build_ || join_op_ != TJoinOp::NULL_AWARE_LEFT_ANTI_JOIN) {
+    DCHECK_EQ(0, buffer_pool_client_->GetUsedReservation())
+        << "All memory should be available to bring the spilled partition into memory: "
+        << "all build and probe data shuld be spilled to disk. THe only exception is "
+        << "NAAJ probe streams, which are accounted for in the PHJ node separately.";
+  }
+
   // Pick the next spilled partition to process. The partition will stay in
   // 'spilled_partitions_' until we are done probing it or repartitioning its probe.
   // Thus it will remain valid as long as it's needed and always get cleaned up in
   // Close(), even if an error occurs.
   Partition* partition = spilled_partitions_.back().get();
-  *input_partition = partition;
   DCHECK(partition->is_spilled()) << partition->DebugString();
 
-  if (partition->num_spilled_probe_rows() == 0) {
+  if (partition->num_spilled_probe_rows() == 0 && num_probe_threads_ == 1) {
     // If there are no probe rows, there's no need to build the hash table, and
     // only partitions with NeedToProcessUnmatchedBuildRows() will have been added
     // to 'spilled_partitions_' in DoneProbingHashPartitions().
@@ -857,22 +942,24 @@ Status PhjBuilder::BeginSpilledProbe(
     }
     COUNTER_ADD(num_hash_table_builds_skipped_, 1);
     UpdateState(HashJoinState::PROBING_SPILLED_PARTITION);
-    *repartitioned = false;
     return Status::OK();
   }
 
   // Set aside memory required for reading the probe stream, so that we don't use
   // it for the hash table.
+  bool need_probe_buffer = partition->num_spilled_probe_rows() > 0;
+  int64_t saved_probe_reservation =
+      need_probe_buffer ? max_row_buffer_size_ * num_probe_threads_ : 0;
   buffer_pool_client_->SaveReservation(
-      &probe_stream_reservation_, max_row_buffer_size_);
+      &probe_stream_reservation_, saved_probe_reservation);
+  VLOG(3) << "PHJ(node_id=" << join_node_id_ << ") saved " << saved_probe_reservation
+          << " for probe clients.";
 
   // Try to build a hash table for the spilled build partition.
   bool built;
   RETURN_IF_ERROR(partition->BuildHashTable(&built));
   if (built) {
     UpdateState(HashJoinState::PROBING_SPILLED_PARTITION);
-    *repartitioned = false;
-    RETURN_IF_ERROR(TransferProbeStreamReservation(probe_client));
     return Status::OK();
   }
   // This build partition still does not fit in memory, repartition.
@@ -889,7 +976,9 @@ Status PhjBuilder::BeginSpilledProbe(
   // Temporarily free up the probe reservation to use when repartitioning. Repartitioning
   // will reserve as much memory as needed for the probe streams.
   buffer_pool_client_->RestoreReservation(
-      &probe_stream_reservation_, max_row_buffer_size_);
+      &probe_stream_reservation_, saved_probe_reservation);
+  VLOG(3) << "PHJ(node_id=" << join_node_id_ << ") unsave " << saved_probe_reservation
+          << " for probe clients.";
   // All reservation should be available for repartitioning.
   DCHECK_EQ(0, probe_stream_reservation_.GetReservation());
   DCHECK_EQ(0, buffer_pool_client_->GetUsedReservation());
@@ -907,9 +996,6 @@ Status PhjBuilder::BeginSpilledProbe(
         next_partition_level, num_input_rows, DebugString(),
         buffer_pool_client_->DebugString());
   }
-  RETURN_IF_ERROR(TransferProbeStreamReservation(probe_client));
-  *repartitioned = true;
-  *new_partitions = HashPartitions(ht_ctx_->level(), &hash_partitions_, non_empty_build_);
   return Status::OK();
 }
 
@@ -1135,7 +1221,7 @@ std::string PhjBuilder::Partition::DebugString() {
   if (hash_tbl_ != nullptr) {
     ss << "    Hash Table Rows: " << hash_tbl_->size();
   }
-  ss << "    Spilled Probe Rows: " << num_spilled_probe_rows_ << endl;
+  ss << "    Spilled Probe Rows: " << num_spilled_probe_rows_.Load() << endl;
   return ss.str();
 }
 
@@ -1186,7 +1272,7 @@ void PhjBuilderConfig::Codegen(RuntimeState* state, RuntimeProfile* profile) {
 
 string PhjBuilder::DebugString() const {
   stringstream ss;
-  ss << " PhjBuilder state=" << PrintState()
+  ss << " PhjBuilder state=" << PrintState(state_)
      << " Hash partitions: " << hash_partitions_.size() << ":" << endl;
   for (int i = 0; i < hash_partitions_.size(); ++i) {
     ss << " Hash partition " << i << " " << hash_partitions_[i]->DebugString() << endl;

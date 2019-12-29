@@ -152,11 +152,11 @@ class PartitionedHashJoinPlanNode : public BlockingJoinPlanNode {
 ///      progress.
 ///
 ///
-/// TODO: when IMPALA-9156 is implemented, HashJoinState of the builder will drive the
-/// hash join algorithm across all the PartitionedHashJoinNode implementations sharing
-/// the builder. Each PartitionedHashJoinNode implementation will independently execute
-/// its ProbeState state machine, synchronizing via the builder for transitions of the
-/// HashJoinState state machine.
+/// When the PhjBuilder is shared by multiple PartitionedHashJoinNodes, HashJoinState of
+/// the builder will drive the hash join algorithm across all the PartitionedHashJoinNode
+/// implementations sharing the builder. Each PartitionedHashJoinNode implementation will
+/// independently execute its ProbeState state machine, synchronizing via the builder for
+/// transitions of the HashJoinState state machine.
 ///
 /// Null aware anti-join (NAAJ) extends the above algorithm by accumulating rows with
 /// NULLs into several different streams, which are processed in a separate step to
@@ -589,6 +589,11 @@ class PartitionedHashJoinNode : public BlockingJoinNode {
   /// State of the probing algorithm. Used to drive the state machine in GetNext().
   ProbeState probe_state_ = ProbeState::PROBE_COMPLETE;
 
+  /// Additional state for flushing build-side data. Needed for
+  /// separate build.
+  /// TODO: IMPALA-9411: this could be removed if we attached the buffers.
+  bool flushed_unattachable_build_buffers_ = false;
+
   /// The build-side rows of the join. Initialized in Prepare() if the build is embedded
   /// in the join, otherwise looked up in Open() if it's a separate build. Owned by an
   /// object pool with query lifetime in either case.
@@ -614,6 +619,8 @@ class PartitionedHashJoinNode : public BlockingJoinNode {
 
   /// Probe partitions that have been spilled and still need more processing. Each of
   /// these has a corresponding build partition in 'builder_' with the same PartitionId.
+  /// For shared broadcast join builds, the set of keys in this map will be the same
+  /// across all of the instances of the join builder.
   /// This list is populated at DoneProbing().
   std::unordered_map<PhjBuilder::PartitionId, std::unique_ptr<ProbePartition>>
       spilled_partitions_;

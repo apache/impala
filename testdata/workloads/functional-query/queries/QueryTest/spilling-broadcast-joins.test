@@ -1,0 +1,127 @@
+====
+---- QUERY
+# Spilling broadcast join between lineitem and orders.
+# Simplified from TPC-Q21.
+set buffer_pool_limit=50m;
+select straight_join s_name, count(*)
+from lineitem join /*+broadcast*/ orders on o_orderkey = l_orderkey
+    join supplier on s_suppkey = l_suppkey
+where o_orderstatus = 'F'
+group by s_name
+order by count(*) desc, s_name
+limit 20
+---- RESULTS
+'Supplier#000002293',350
+'Supplier#000006337',349
+'Supplier#000008446',349
+'Supplier#000009636',349
+'Supplier#000006566',347
+'Supplier#000000219',346
+'Supplier#000000870',346
+'Supplier#000001689',346
+'Supplier#000002493',345
+'Supplier#000000208',344
+'Supplier#000008565',343
+'Supplier#000001941',342
+'Supplier#000006467',341
+'Supplier#000007489',341
+'Supplier#000007079',340
+'Supplier#000000326',339
+'Supplier#000003041',339
+'Supplier#000002196',338
+'Supplier#000005229',338
+'Supplier#000006159',338
+---- TYPES
+STRING,BIGINT
+---- RUNTIME_PROFILE
+# Verify that at least one of the joins was spilled.
+row_regex: .*SpilledPartitions: .* \([1-9][0-9]*\)
+====
+---- QUERY
+# Spilling broadcast join that will repartition.
+# Force a bushy plan where join of customer and orders feeds into the broadcast join.
+set buffer_pool_limit=58m;
+select straight_join o_orderkey, o_custkey, o_orderstatus, o_totalprice, o_orderdate,
+    o_orderpriority, o_clerk, o_shippriority, c_name, c_nationkey, c_address, c_comment
+from lineitem join /*+broadcast*/
+  (select *
+   from orders
+      join customer on o_custkey = c_custkey) v on o_orderkey = l_orderkey
+group by 1,2,3,4,5,6,7,8,9,10,11,12
+order by count(*) desc, o_orderkey
+limit 10
+---- RESULTS
+7,39136,'O',252004.18,'1996-01-10','2-HIGH','Clerk#000000470',0,'Customer#000039136',5,'afZJC1mWpwvsfKT0211ZD6NQXVGETfl','y? express theodolites haggle against the bold instructions. slyly regular accoun'
+68,28547,'O',330793.52,'1998-04-18','3-MEDIUM','Clerk#000000440',0,'Customer#000028547',1,'AeWmD3BLrsSkmRY7O,wbB75i6Ll','y regular foxes nag quickly after the express, regular deposits. regular, bold requests nod furi'
+129,71134,'F',261013.14,'1992-11-19','5-LOW','Clerk#000000859',0,'Customer#000071134',8,'QrIUhKsAaaU8pLxHNHpG mN1F n0eWQxE2',' ideas. furiously pending packages dazzle blithely. special platelets nod f'
+164,779,'F',301925.76,'1992-10-21','5-LOW','Clerk#000000209',0,'Customer#000000779',5,'2cTZiS4ulZ74edT,RmDnh4ZaCrphMMh Ff2','old dependencies. pains haggle fluffily carefull'
+194,61724,'F',176707.84,'1992-04-05','3-MEDIUM','Clerk#000000352',0,'Customer#000061724',8,'konflahJ4RK4riiSPR3 duNNLr5n Es7gF','regular accounts. carefully ironic requests '
+225,33031,'P',220441.09,'1995-05-25','1-URGENT','Clerk#000000177',0,'Customer#000033031',8,'YFlDbKd1jeGbXz WgshqgAslqv,T4Rfe','e quickly. slyly special pinto beans nag quickly? carefully ironic de'
+226,127466,'F',313134.62,'1993-03-10','2-HIGH','Clerk#000000756',0,'Customer#000127466',17,'0,cSa,GNNBHU','tes haggle furiously during the unusual, even'
+322,133546,'F',205623.50,'1992-03-19','1-URGENT','Clerk#000000158',0,'Customer#000133546',5,'J0vOJt9OkiZ0R3kE,RtYvv','. final gifts are slyly pending packages. even instructio'
+326,75986,'O',327413.14,'1995-06-04','2-HIGH','Clerk#000000466',0,'Customer#000075986',21,'h3vC,A ibqYy2VagkCNfRiQ','y after the carefully bold instructions. special, regular instructions cajo'
+354,138268,'O',217160.72,'1996-03-14','2-HIGH','Clerk#000000511',0,'Customer#000138268',9,'HCMHttdHqpeDYf','inal, express deposits against the slowly'
+---- TYPES
+BIGINT, BIGINT, STRING, DECIMAL, STRING, STRING, STRING, INT, STRING, SMALLINT, STRING, STRING
+---- RUNTIME_PROFILE
+# Verify that at least one of the joins was spilled and repartitioned.
+row_regex: .*SpilledPartitions: .* \([1-9][0-9]*\)
+row_regex: .*NumRepartitions: .* \([1-9][0-9]*\)
+====
+---- QUERY
+# Spilling broadcast join with empty probe-side partitions.
+set buffer_pool_limit=50m;
+select straight_join count(*)
+from
+lineitem a join /*+broadcast*/ lineitem b on a.l_orderkey = b.l_orderkey
+where
+a.l_partkey = 1 and b.l_orderkey < 1000000;
+---- RESULTS
+19
+---- TYPES
+BIGINT
+---- RUNTIME_PROFILE
+# Verify that at least one of the joins was spilled and that same hash table builds
+# were *not* skipped - that optimization is disabled for shared broadcast joins.
+row_regex: .*SpilledPartitions: .* \([1-9][0-9]*\)
+row_regex: .*NumHashTableBuildsSkipped: 0 
+====
+---- QUERY
+# Spilling broadcast join that has some empty build partitions.
+# This needs to be calibrated so that the join has enough memory to
+# fit all of the duplicate values for a given key in memory.
+set buffer_pool_limit=60m;
+select straight_join s_name, o_clerk, count(*)
+from lineitem
+  join /*+broadcast*/ orders on (o_orderkey % 8) = l_orderkey
+  join supplier on s_suppkey = l_suppkey
+where o_orderstatus = 'F'
+group by s_name, o_clerk
+order by count(*) desc, s_name, o_clerk limit 20;
+---- RESULTS
+'Supplier#000000035','Clerk#000000337',126
+'Supplier#000001759','Clerk#000000225',126
+'Supplier#000002269','Clerk#000000225',126
+'Supplier#000003074','Clerk#000000225',126
+'Supplier#000003928','Clerk#000000337',126
+'Supplier#000007758','Clerk#000000225',126
+'Supplier#000008571','Clerk#000000337',126
+'Supplier#000009440','Clerk#000000225',126
+'Supplier#000009607','Clerk#000000225',126
+'Supplier#000009799','Clerk#000000225',126
+'Supplier#000000638','Clerk#000000461',125
+'Supplier#000000650','Clerk#000000718',125
+'Supplier#000001534','Clerk#000000461',125
+'Supplier#000001798','Clerk#000000718',125
+'Supplier#000001883','Clerk#000000718',125
+'Supplier#000003474','Clerk#000000718',125
+'Supplier#000003701','Clerk#000000461',125
+'Supplier#000004633','Clerk#000000461',125
+'Supplier#000006540','Clerk#000000718',125
+'Supplier#000007311','Clerk#000000461',125
+---- TYPES
+STRING, STRING, BIGINT
+---- RUNTIME_PROFILE
+# Verify that at least one of the joins was spilled.
+row_regex: .*SpilledPartitions: .* \([1-9][0-9]*\)
+====

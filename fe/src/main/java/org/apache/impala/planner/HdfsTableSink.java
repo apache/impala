@@ -92,7 +92,7 @@ public class HdfsTableSink extends TableSink {
   @Override
   public void computeResourceProfile(TQueryOptions queryOptions) {
     PlanNode inputNode = fragment_.getPlanRoot();
-    int numInstances = fragment_.getNumInstances(queryOptions.getMt_dop());
+    int numInstances = fragment_.getNumInstances();
     // Compute the number of partitions buffered in memory at the same time, taking into
     // account the number of nodes and the data partition of the fragment executing this
     // sink.

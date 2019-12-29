@@ -34,11 +34,19 @@ LINEITEM_PK = 'l_orderkey, l_partkey, l_suppkey, l_linenumber'
 # Queries to execute, mapped to a unique PRIMARY KEY for use in CTAS with Kudu. If None
 # is specified for the PRIMARY KEY, it will not be used in a CTAS statement on Kudu.
 # Use the TPC-H dataset because tables are large so queries take some time to execute.
-QUERIES = {'select l_returnflag from lineitem' : None,
-           'select count(l_returnflag) pk from lineitem' : 'pk',
-           'select * from lineitem limit 50' : LINEITEM_PK,
-           'compute stats lineitem' : None,
-           'select * from lineitem order by l_orderkey' : LINEITEM_PK}
+QUERIES = {'select l_returnflag from lineitem': None,
+           'select count(l_returnflag) pk from lineitem': 'pk',
+           'select * from lineitem limit 50': LINEITEM_PK,
+           'compute stats lineitem': None,
+           'select * from lineitem order by l_orderkey': LINEITEM_PK,
+           '''SELECT STRAIGHT_JOIN *
+           FROM lineitem
+                  JOIN /*+broadcast*/ orders ON o_orderkey = l_orderkey
+                  JOIN supplier ON s_suppkey = l_suppkey
+           WHERE o_orderstatus = 'F'
+           ORDER BY l_orderkey
+           LIMIT 10000''': LINEITEM_PK
+           }
 
 QUERY_TYPE = ["SELECT", "CTAS"]
 

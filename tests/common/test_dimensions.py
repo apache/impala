@@ -115,6 +115,12 @@ def create_avro_snappy_dimension(workload):
       TableFormatInfo.create_from_string(dataset, 'avro/snap/block'))
 
 
+def create_kudu_dimension(workload):
+  dataset = get_dataset_from_workload(workload)
+  return ImpalaTestDimension('table_format',
+      TableFormatInfo.create_from_string(dataset, 'kudu/none'))
+
+
 def create_client_protocol_dimension():
   # IMPALA-8864: Older python versions do not support SSLContext object that the thrift
   # http client implementation depends on. Falls back to a dimension without http

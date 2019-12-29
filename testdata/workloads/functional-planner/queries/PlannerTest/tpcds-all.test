@@ -116,8 +116,8 @@ PLAN-ROOT SINK
    runtime filters: RF000 -> store_sales.ss_sold_date_sk, RF002 -> store_sales.ss_item_sk
    row-size=16B cardinality=2.88M
 ---- PARALLELPLANS
-Max Per-Host Resource Reservation: Memory=69.62MB Threads=15
-Per-Host Resource Estimates: Memory=168MB
+Max Per-Host Resource Reservation: Memory=52.62MB Threads=12
+Per-Host Resource Estimates: Memory=127MB
 PLAN-ROOT SINK
 |
 12:MERGING-EXCHANGE [UNPARTITIONED]
@@ -342,11 +342,11 @@ PLAN-ROOT SINK
    runtime filters: RF000 -> ss_item_sk, RF002 -> ss_promo_sk, RF004 -> ss_cdemo_sk, RF006 -> ss_sold_date_sk
    row-size=36B cardinality=2.88M
 ---- PARALLELPLANS
-Max Per-Host Resource Reservation: Memory=99.50MB Threads=23
-Per-Host Resource Estimates: Memory=417MB
+Max Per-Host Resource Reservation: Memory=84.56MB Threads=13
+Per-Host Resource Estimates: Memory=259MB
 PLAN-ROOT SINK
 |
-18:MERGING-EXCHANGE [UNPARTITIONED]
+17:MERGING-EXCHANGE [UNPARTITIONED]
 |  order by: i_item_id ASC
 |  limit: 100
 |
@@ -354,12 +354,12 @@ PLAN-ROOT SINK
 |  order by: i_item_id ASC
 |  row-size=60B cardinality=100
 |
-17:AGGREGATE [FINALIZE]
+16:AGGREGATE [FINALIZE]
 |  output: avg:merge(ss_quantity), avg:merge(ss_list_price), avg:merge(ss_coupon_amt), avg:merge(ss_sales_price)
 |  group by: i_item_id
 |  row-size=60B cardinality=8.85K
 |
-16:EXCHANGE [HASH(i_item_id)]
+15:EXCHANGE [HASH(i_item_id)]
 |
 09:AGGREGATE [STREAMING]
 |  output: avg(ss_quantity), avg(ss_list_price), avg(ss_coupon_amt), avg(ss_sales_price)
@@ -375,7 +375,7 @@ PLAN-ROOT SINK
 |  |  build expressions: i_item_sk
 |  |  runtime filters: RF000 <- i_item_sk
 |  |
-|  15:EXCHANGE [BROADCAST]
+|  14:EXCHANGE [BROADCAST]
 |  |
 |  03:SCAN HDFS [tpcds.item]
 |     HDFS partitions=1/1 files=1 size=4.82MB
@@ -390,14 +390,14 @@ PLAN-ROOT SINK
 |  |  build expressions: p_promo_sk
 |  |  runtime filters: RF002 <- p_promo_sk
 |  |
-|  14:EXCHANGE [BROADCAST]
+|  13:EXCHANGE [BROADCAST]
 |  |
 |  04:SCAN HDFS [tpcds.promotion]
 |     HDFS partitions=1/1 files=1 size=36.36KB
 |     predicates: (p_channel_email = 'N' OR p_channel_event = 'N')
 |     row-size=30B cardinality=300
 |
-06:HASH JOIN [INNER JOIN, PARTITIONED]
+06:HASH JOIN [INNER JOIN, BROADCAST]
 |  hash predicates: ss_cdemo_sk = cd_demo_sk
 |  row-size=96B cardinality=263.34K
 |
@@ -406,14 +406,12 @@ PLAN-ROOT SINK
 |  |  build expressions: cd_demo_sk
 |  |  runtime filters: RF004 <- cd_demo_sk
 |  |
-|  13:EXCHANGE [HASH(cd_demo_sk)]
+|  12:EXCHANGE [BROADCAST]
 |  |
 |  01:SCAN HDFS [tpcds.customer_demographics]
 |     HDFS partitions=1/1 files=1 size=76.92MB
 |     predicates: cd_marital_status = 'W', cd_gender = 'F', cd_education_status = 'Primary'
 |     row-size=52B cardinality=97.40K
-|
-12:EXCHANGE [HASH(ss_cdemo_sk)]
 |
 05:HASH JOIN [INNER JOIN, BROADCAST]
 |  hash predicates: ss_sold_date_sk = d_date_sk
@@ -664,11 +662,11 @@ PLAN-ROOT SINK
    runtime filters: RF002 -> store_sales.ss_store_sk
    row-size=8B cardinality=84.40K
 ---- PARALLELPLANS
-Max Per-Host Resource Reservation: Memory=92.27MB Threads=25
-Per-Host Resource Estimates: Memory=288MB
+Max Per-Host Resource Reservation: Memory=58.38MB Threads=14
+Per-Host Resource Estimates: Memory=187MB
 PLAN-ROOT SINK
 |
-21:MERGING-EXCHANGE [UNPARTITIONED]
+20:MERGING-EXCHANGE [UNPARTITIONED]
 |  order by: s_store_name ASC
 |  limit: 100
 |
@@ -676,12 +674,12 @@ PLAN-ROOT SINK
 |  order by: s_store_name ASC
 |  row-size=32B cardinality=8
 |
-20:AGGREGATE [FINALIZE]
+19:AGGREGATE [FINALIZE]
 |  output: sum:merge(ss_net_profit)
 |  group by: s_store_name
 |  row-size=32B cardinality=8
 |
-19:EXCHANGE [HASH(s_store_name)]
+18:EXCHANGE [HASH(s_store_name)]
 |
 10:AGGREGATE [STREAMING]
 |  output: sum(ss_net_profit)
@@ -697,7 +695,7 @@ PLAN-ROOT SINK
 |  |  build expressions: substr(substr(ca_zip, 1, 5), 1, 2)
 |  |  runtime filters: RF000 <- substr(substr(ca_zip, 1, 5), 1, 2)
 |  |
-|  18:EXCHANGE [BROADCAST]
+|  17:EXCHANGE [BROADCAST]
 |  |
 |  07:HASH JOIN [RIGHT SEMI JOIN, PARTITIONED]
 |  |  hash predicates: substr(ca_zip, 1, 5) = substr(ca_zip, 1, 5)
@@ -708,20 +706,20 @@ PLAN-ROOT SINK
 |  |  |  build expressions: substr(ca_zip, 1, 5)
 |  |  |  runtime filters: RF004 <- substr(ca_zip, 1, 5)
 |  |  |
-|  |  16:AGGREGATE [FINALIZE]
+|  |  15:AGGREGATE [FINALIZE]
 |  |  |  output: count:merge(*)
 |  |  |  group by: substr(ca_zip, 1, 5)
 |  |  |  having: count(*) > 10
 |  |  |  row-size=20B cardinality=396
 |  |  |
-|  |  15:EXCHANGE [HASH(substr(ca_zip, 1, 5))]
+|  |  14:EXCHANGE [HASH(substr(ca_zip, 1, 5))]
 |  |  |
 |  |  05:AGGREGATE [STREAMING]
 |  |  |  output: count(*)
 |  |  |  group by: substr(ca_zip, 1, 5)
 |  |  |  row-size=20B cardinality=3.96K
 |  |  |
-|  |  04:HASH JOIN [INNER JOIN, PARTITIONED]
+|  |  04:HASH JOIN [INNER JOIN, BROADCAST]
 |  |  |  hash predicates: customer_address.ca_address_sk = customer.c_current_addr_sk
 |  |  |  row-size=38B cardinality=51.30K
 |  |  |
@@ -730,21 +728,19 @@ PLAN-ROOT SINK
 |  |  |  |  build expressions: customer.c_current_addr_sk
 |  |  |  |  runtime filters: RF006 <- customer.c_current_addr_sk
 |  |  |  |
-|  |  |  14:EXCHANGE [HASH(customer.c_current_addr_sk)]
+|  |  |  13:EXCHANGE [BROADCAST]
 |  |  |  |
 |  |  |  03:SCAN HDFS [tpcds.customer]
 |  |  |     HDFS partitions=1/1 files=1 size=12.60MB
 |  |  |     predicates: c_preferred_cust_flag = 'Y'
 |  |  |     row-size=17B cardinality=50.00K
 |  |  |
-|  |  13:EXCHANGE [HASH(customer_address.ca_address_sk)]
-|  |  |
 |  |  02:SCAN HDFS [tpcds.customer_address]
 |  |     HDFS partitions=1/1 files=1 size=5.25MB
 |  |     runtime filters: RF006 -> customer_address.ca_address_sk
 |  |     row-size=21B cardinality=50.00K
 |  |
-|  17:EXCHANGE [HASH(substr(ca_zip, 1, 5))]
+|  16:EXCHANGE [HASH(substr(ca_zip, 1, 5))]
 |  |
 |  06:SCAN HDFS [tpcds.customer_address]
 |     HDFS partitions=1/1 files=1 size=5.25MB
@@ -974,8 +970,8 @@ PLAN-ROOT SINK
    runtime filters: RF000 -> ss_store_sk, RF004 -> ss_customer_sk, RF006 -> ss_sold_date_sk, RF008 -> ss_item_sk
    row-size=24B cardinality=86.28K
 ---- PARALLELPLANS
-Max Per-Host Resource Reservation: Memory=107.27MB Threads=29
-Per-Host Resource Estimates: Memory=302MB
+Max Per-Host Resource Reservation: Memory=72.26MB Threads=21
+Per-Host Resource Estimates: Memory=203MB
 PLAN-ROOT SINK
 |
 22:MERGING-EXCHANGE [UNPARTITIONED]
@@ -1252,11 +1248,11 @@ PLAN-ROOT SINK
    runtime filters: RF000 -> ss_item_sk, RF002 -> ss_store_sk, RF004 -> ss_cdemo_sk, RF006 -> ss_sold_date_sk
    row-size=36B cardinality=2.88M
 ---- PARALLELPLANS
-Max Per-Host Resource Reservation: Memory=99.39MB Threads=23
-Per-Host Resource Estimates: Memory=417MB
+Max Per-Host Resource Reservation: Memory=84.51MB Threads=13
+Per-Host Resource Estimates: Memory=260MB
 PLAN-ROOT SINK
 |
-18:MERGING-EXCHANGE [UNPARTITIONED]
+17:MERGING-EXCHANGE [UNPARTITIONED]
 |  order by: i_item_id ASC, s_state ASC
 |  limit: 100
 |
@@ -1264,12 +1260,12 @@ PLAN-ROOT SINK
 |  order by: i_item_id ASC, s_state ASC
 |  row-size=74B cardinality=100
 |
-17:AGGREGATE [FINALIZE]
+16:AGGREGATE [FINALIZE]
 |  output: avg:merge(ss_quantity), avg:merge(ss_list_price), avg:merge(ss_coupon_amt), avg:merge(ss_sales_price)
 |  group by: i_item_id, s_state
 |  row-size=74B cardinality=8.85K
 |
-16:EXCHANGE [HASH(i_item_id,s_state)]
+15:EXCHANGE [HASH(i_item_id,s_state)]
 |
 09:AGGREGATE [STREAMING]
 |  output: avg(ss_quantity), avg(ss_list_price), avg(ss_coupon_amt), avg(ss_sales_price)
@@ -1285,7 +1281,7 @@ PLAN-ROOT SINK
 |  |  build expressions: i_item_sk
 |  |  runtime filters: RF000 <- i_item_sk
 |  |
-|  15:EXCHANGE [BROADCAST]
+|  14:EXCHANGE [BROADCAST]
 |  |
 |  04:SCAN HDFS [tpcds.item]
 |     HDFS partitions=1/1 files=1 size=4.82MB
@@ -1300,14 +1296,14 @@ PLAN-ROOT SINK
 |  |  build expressions: s_store_sk
 |  |  runtime filters: RF002 <- s_store_sk
 |  |
-|  14:EXCHANGE [BROADCAST]
+|  13:EXCHANGE [BROADCAST]
 |  |
 |  03:SCAN HDFS [tpcds.store]
 |     HDFS partitions=1/1 files=1 size=3.08KB
 |     predicates: s_state IN ('WI', 'CA', 'TX', 'FL', 'WA', 'TN')
 |     row-size=18B cardinality=12
 |
-06:HASH JOIN [INNER JOIN, PARTITIONED]
+06:HASH JOIN [INNER JOIN, BROADCAST]
 |  hash predicates: ss_cdemo_sk = cd_demo_sk
 |  row-size=96B cardinality=263.34K
 |
@@ -1316,14 +1312,12 @@ PLAN-ROOT SINK
 |  |  build expressions: cd_demo_sk
 |  |  runtime filters: RF004 <- cd_demo_sk
 |  |
-|  13:EXCHANGE [HASH(cd_demo_sk)]
+|  12:EXCHANGE [BROADCAST]
 |  |
 |  01:SCAN HDFS [tpcds.customer_demographics]
 |     HDFS partitions=1/1 files=1 size=76.92MB
 |     predicates: cd_marital_status = 'W', cd_gender = 'F', cd_education_status = 'Primary'
 |     row-size=52B cardinality=97.40K
-|
-12:EXCHANGE [HASH(ss_cdemo_sk)]
 |
 05:HASH JOIN [INNER JOIN, BROADCAST]
 |  hash predicates: ss_sold_date_sk = d_date_sk
@@ -1529,8 +1523,8 @@ PLAN-ROOT SINK
    runtime filters: RF000 -> tpcds.store_sales.ss_customer_sk, RF002 -> store_sales.ss_store_sk, RF004 -> store_sales.ss_sold_date_sk, RF006 -> store_sales.ss_hdemo_sk
    row-size=24B cardinality=2.88M
 ---- PARALLELPLANS
-Max Per-Host Resource Reservation: Memory=89.52MB Threads=23
-Per-Host Resource Estimates: Memory=280MB
+Max Per-Host Resource Reservation: Memory=68.26MB Threads=14
+Per-Host Resource Estimates: Memory=188MB
 PLAN-ROOT SINK
 |
 18:MERGING-EXCHANGE [UNPARTITIONED]
@@ -1742,8 +1736,8 @@ PLAN-ROOT SINK
    runtime filters: RF000 -> store_sales.ss_sold_date_sk, RF002 -> store_sales.ss_item_sk
    row-size=16B cardinality=2.88M
 ---- PARALLELPLANS
-Max Per-Host Resource Reservation: Memory=69.62MB Threads=13
-Per-Host Resource Estimates: Memory=166MB
+Max Per-Host Resource Reservation: Memory=51.62MB Threads=9
+Per-Host Resource Estimates: Memory=124MB
 PLAN-ROOT SINK
 |
 11:MERGING-EXCHANGE [UNPARTITIONED]
@@ -1929,8 +1923,8 @@ PLAN-ROOT SINK
    runtime filters: RF000 -> ss_store_sk, RF002 -> ss_sold_date_sk
    row-size=12B cardinality=2.88M
 ---- PARALLELPLANS
-Max Per-Host Resource Reservation: Memory=53.64MB Threads=13
-Per-Host Resource Estimates: Memory=166MB
+Max Per-Host Resource Reservation: Memory=43.63MB Threads=9
+Per-Host Resource Estimates: Memory=124MB
 PLAN-ROOT SINK
 |
 11:MERGING-EXCHANGE [UNPARTITIONED]
@@ -2221,8 +2215,8 @@ PLAN-ROOT SINK
    runtime filters: RF002 -> tpcds.store_sales.ss_customer_sk, RF004 -> store_sales.ss_addr_sk, RF006 -> store_sales.ss_store_sk, RF008 -> store_sales.ss_sold_date_sk, RF010 -> store_sales.ss_hdemo_sk
    row-size=36B cardinality=2.88M
 ---- PARALLELPLANS
-Max Per-Host Resource Reservation: Memory=145.02MB Threads=31
-Per-Host Resource Estimates: Memory=377MB
+Max Per-Host Resource Reservation: Memory=107.76MB Threads=20
+Per-Host Resource Estimates: Memory=257MB
 PLAN-ROOT SINK
 |
 24:MERGING-EXCHANGE [UNPARTITIONED]
@@ -2464,8 +2458,8 @@ PLAN-ROOT SINK
    runtime filters: RF000 -> store_sales.ss_sold_date_sk, RF002 -> store_sales.ss_item_sk
    row-size=16B cardinality=2.88M
 ---- PARALLELPLANS
-Max Per-Host Resource Reservation: Memory=69.62MB Threads=13
-Per-Host Resource Estimates: Memory=167MB
+Max Per-Host Resource Reservation: Memory=51.62MB Threads=9
+Per-Host Resource Estimates: Memory=125MB
 PLAN-ROOT SINK
 |
 11:MERGING-EXCHANGE [UNPARTITIONED]
@@ -2668,11 +2662,11 @@ PLAN-ROOT SINK
    runtime filters: RF000 -> ss_store_sk, RF002 -> ss_sold_date_sk, RF004 -> ss_item_sk
    row-size=20B cardinality=2.88M
 ---- PARALLELPLANS
-Max Per-Host Resource Reservation: Memory=76.52MB Threads=19
-Per-Host Resource Estimates: Memory=205MB
+Max Per-Host Resource Reservation: Memory=57.51MB Threads=11
+Per-Host Resource Estimates: Memory=146MB
 PLAN-ROOT SINK
 |
-15:MERGING-EXCHANGE [UNPARTITIONED]
+14:MERGING-EXCHANGE [UNPARTITIONED]
 |  order by: sum_sales ASC, i_manufact_id ASC
 |  limit: 100
 |
@@ -2680,12 +2674,12 @@ PLAN-ROOT SINK
 |  order by: sum_sales ASC, i_manufact_id ASC
 |  row-size=20B cardinality=96
 |
-14:AGGREGATE [FINALIZE]
+13:AGGREGATE [FINALIZE]
 |  output: sum:merge(ss_sales_price)
 |  group by: i_manufact_id, d_qoy
 |  row-size=24B cardinality=96
 |
-13:EXCHANGE [HASH(i_manufact_id,d_qoy)]
+12:EXCHANGE [HASH(i_manufact_id,d_qoy)]
 |
 07:AGGREGATE [STREAMING]
 |  output: sum(ss_sales_price)
@@ -2701,13 +2695,13 @@ PLAN-ROOT SINK
 |  |  build expressions: s_store_sk
 |  |  runtime filters: RF000 <- s_store_sk
 |  |
-|  12:EXCHANGE [BROADCAST]
+|  11:EXCHANGE [BROADCAST]
 |  |
 |  03:SCAN HDFS [tpcds.store]
 |     HDFS partitions=1/1 files=1 size=3.08KB
 |     row-size=4B cardinality=12
 |
-05:HASH JOIN [INNER JOIN, PARTITIONED]
+05:HASH JOIN [INNER JOIN, BROADCAST]
 |  hash predicates: ss_sold_date_sk = d_date_sk
 |  row-size=110B cardinality=96
 |
@@ -2716,14 +2710,12 @@ PLAN-ROOT SINK
 |  |  build expressions: d_date_sk
 |  |  runtime filters: RF002 <- d_date_sk
 |  |
-|  11:EXCHANGE [HASH(d_date_sk)]
+|  10:EXCHANGE [BROADCAST]
 |  |
 |  02:SCAN HDFS [tpcds.date_dim]
 |     HDFS partitions=1/1 files=1 size=9.84MB
 |     predicates: d_month_seq IN (1212, 1213, 1214, 1215, 1216, 1217, 1218, 1219, 1220, 1221, 1222, 1223)
 |     row-size=12B cardinality=362
-|
-10:EXCHANGE [HASH(ss_sold_date_sk)]
 |
 04:HASH JOIN [INNER JOIN, BROADCAST]
 |  hash predicates: ss_item_sk = i_item_sk
@@ -2860,8 +2852,8 @@ PLAN-ROOT SINK
    runtime filters: RF000 -> ss_sold_date_sk, RF002 -> ss_item_sk
    row-size=16B cardinality=2.88M
 ---- PARALLELPLANS
-Max Per-Host Resource Reservation: Memory=69.62MB Threads=13
-Per-Host Resource Estimates: Memory=167MB
+Max Per-Host Resource Reservation: Memory=51.62MB Threads=9
+Per-Host Resource Estimates: Memory=124MB
 PLAN-ROOT SINK
 |
 11:MERGING-EXCHANGE [UNPARTITIONED]
@@ -3224,8 +3216,8 @@ PLAN-ROOT SINK
    runtime filters: RF004 -> tpcds.store_sales.ss_store_sk, RF008 -> ss_sold_date_sk
    row-size=12B cardinality=2.88M
 ---- PARALLELPLANS
-Max Per-Host Resource Reservation: Memory=197.53MB Threads=37
-Per-Host Resource Estimates: Memory=494MB
+Max Per-Host Resource Reservation: Memory=159.52MB Threads=25
+Per-Host Resource Estimates: Memory=356MB
 PLAN-ROOT SINK
 |
 30:MERGING-EXCHANGE [UNPARTITIONED]
@@ -3555,11 +3547,11 @@ PLAN-ROOT SINK
    runtime filters: RF000 -> ss_store_sk, RF002 -> ss_sold_date_sk, RF004 -> ss_item_sk
    row-size=20B cardinality=546.31K
 ---- PARALLELPLANS
-Max Per-Host Resource Reservation: Memory=81.52MB Threads=21
-Per-Host Resource Estimates: Memory=225MB
+Max Per-Host Resource Reservation: Memory=62.51MB Threads=11
+Per-Host Resource Estimates: Memory=166MB
 PLAN-ROOT SINK
 |
-19:MERGING-EXCHANGE [UNPARTITIONED]
+17:MERGING-EXCHANGE [UNPARTITIONED]
 |  order by: i_manager_id ASC, avg_monthly_sales ASC, sum_sales ASC
 |  limit: 100
 |
@@ -3580,19 +3572,19 @@ PLAN-ROOT SINK
 |  order by: i_manager_id ASC NULLS FIRST
 |  row-size=24B cardinality=6
 |
-18:AGGREGATE [FINALIZE]
+16:AGGREGATE [FINALIZE]
 |  output: sum:merge(ss_sales_price)
 |  group by: i_manager_id, d_moy
 |  row-size=24B cardinality=6
 |
-17:EXCHANGE [HASH(i_manager_id)]
+15:EXCHANGE [HASH(i_manager_id)]
 |
 07:AGGREGATE [STREAMING]
 |  output: sum(ss_sales_price)
 |  group by: i_manager_id, d_moy
 |  row-size=24B cardinality=6
 |
-06:HASH JOIN [INNER JOIN, PARTITIONED]
+06:HASH JOIN [INNER JOIN, BROADCAST]
 |  hash predicates: ss_store_sk = s_store_sk
 |  row-size=114B cardinality=6
 |
@@ -3601,15 +3593,13 @@ PLAN-ROOT SINK
 |  |  build expressions: s_store_sk
 |  |  runtime filters: RF000 <- s_store_sk
 |  |
-|  16:EXCHANGE [HASH(s_store_sk)]
+|  14:EXCHANGE [BROADCAST]
 |  |
 |  03:SCAN HDFS [tpcds.store]
 |     HDFS partitions=1/1 files=1 size=3.08KB
 |     row-size=4B cardinality=12
 |
-15:EXCHANGE [HASH(ss_store_sk)]
-|
-05:HASH JOIN [INNER JOIN, PARTITIONED]
+05:HASH JOIN [INNER JOIN, BROADCAST]
 |  hash predicates: ss_sold_date_sk = d_date_sk
 |  row-size=110B cardinality=6
 |
@@ -3618,14 +3608,12 @@ PLAN-ROOT SINK
 |  |  build expressions: d_date_sk
 |  |  runtime filters: RF002 <- d_date_sk
 |  |
-|  14:EXCHANGE [HASH(d_date_sk)]
+|  13:EXCHANGE [BROADCAST]
 |  |
 |  02:SCAN HDFS [tpcds.date_dim]
 |     HDFS partitions=1/1 files=1 size=9.84MB
 |     predicates: tpcds.date_dim.d_date_sk <= 2452275, tpcds.date_dim.d_date_sk >= 2451911, d_month_seq IN (1212, 1213, 1214, 1215, 1216, 1217, 1218, 1219, 1220, 1221, 1222, 1223)
 |     row-size=12B cardinality=114
-|
-13:EXCHANGE [HASH(ss_sold_date_sk)]
 |
 04:HASH JOIN [INNER JOIN, BROADCAST]
 |  hash predicates: ss_item_sk = i_item_sk
@@ -3898,8 +3886,8 @@ PLAN-ROOT SINK
    runtime filters: RF000 -> tpcds.store_sales.ss_store_sk, RF002 -> tpcds.store_sales.ss_item_sk, RF004 -> tpcds.store_sales.ss_store_sk, RF006 -> ss_sold_date_sk
    row-size=20B cardinality=2.88M
 ---- PARALLELPLANS
-Max Per-Host Resource Reservation: Memory=151.02MB Threads=31
-Per-Host Resource Estimates: Memory=394MB
+Max Per-Host Resource Reservation: Memory=123.01MB Threads=23
+Per-Host Resource Estimates: Memory=310MB
 PLAN-ROOT SINK
 |
 27:MERGING-EXCHANGE [UNPARTITIONED]
@@ -4260,8 +4248,8 @@ PLAN-ROOT SINK
    runtime filters: RF002 -> tpcds.store_sales.ss_customer_sk, RF004 -> store_sales.ss_addr_sk, RF006 -> store_sales.ss_store_sk, RF008 -> store_sales.ss_sold_date_sk, RF010 -> store_sales.ss_hdemo_sk
    row-size=40B cardinality=2.88M
 ---- PARALLELPLANS
-Max Per-Host Resource Reservation: Memory=206.64MB Threads=29
-Per-Host Resource Estimates: Memory=417MB
+Max Per-Host Resource Reservation: Memory=168.38MB Threads=17
+Per-Host Resource Estimates: Memory=292MB
 PLAN-ROOT SINK
 |
 23:MERGING-EXCHANGE [UNPARTITIONED]
@@ -4559,8 +4547,8 @@ PLAN-ROOT SINK
    runtime filters: RF000 -> tpcds.store_sales.ss_customer_sk, RF002 -> store_sales.ss_store_sk, RF004 -> store_sales.ss_sold_date_sk, RF006 -> store_sales.ss_hdemo_sk
    row-size=24B cardinality=2.88M
 ---- PARALLELPLANS
-Max Per-Host Resource Reservation: Memory=89.52MB Threads=23
-Per-Host Resource Estimates: Memory=282MB
+Max Per-Host Resource Reservation: Memory=68.26MB Threads=14
+Per-Host Resource Estimates: Memory=190MB
 PLAN-ROOT SINK
 |
 18:MERGING-EXCHANGE [UNPARTITIONED]
@@ -4833,8 +4821,8 @@ PLAN-ROOT SINK
    runtime filters: RF000 -> tpcds.store_sales.ss_customer_sk, RF002 -> store_sales.ss_sold_date_sk, RF004 -> store_sales.ss_store_sk, RF006 -> store_sales.ss_hdemo_sk
    row-size=36B cardinality=2.88M
 ---- PARALLELPLANS
-Max Per-Host Resource Reservation: Memory=85.77MB Threads=23
-Per-Host Resource Estimates: Memory=275MB
+Max Per-Host Resource Reservation: Memory=64.51MB Threads=14
+Per-Host Resource Estimates: Memory=185MB
 PLAN-ROOT SINK
 |
 18:MERGING-EXCHANGE [UNPARTITIONED]
@@ -5091,8 +5079,8 @@ PLAN-ROOT SINK
    runtime filters: RF000 -> ss_store_sk, RF002 -> ss_sold_date_sk, RF004 -> ss_item_sk
    row-size=20B cardinality=2.88M
 ---- PARALLELPLANS
-Max Per-Host Resource Reservation: Memory=108.52MB Threads=17
-Per-Host Resource Estimates: Memory=237MB
+Max Per-Host Resource Reservation: Memory=89.51MB Threads=11
+Per-Host Resource Estimates: Memory=178MB
 PLAN-ROOT SINK
 |
 17:MERGING-EXCHANGE [UNPARTITIONED]
@@ -5294,8 +5282,8 @@ PLAN-ROOT SINK
    runtime filters: RF000 -> ss.ss_store_sk, RF002 -> ss.ss_hdemo_sk, RF004 -> ss.ss_sold_time_sk
    row-size=12B cardinality=2.88M
 ---- PARALLELPLANS
-Max Per-Host Resource Reservation: Memory=53.14MB Threads=15
-Per-Host Resource Estimates: Memory=179MB
+Max Per-Host Resource Reservation: Memory=41.88MB Threads=9
+Per-Host Resource Estimates: Memory=128MB
 PLAN-ROOT SINK
 |
 12:AGGREGATE [FINALIZE]
@@ -5507,8 +5495,8 @@ PLAN-ROOT SINK
    runtime filters: RF000 -> ss_sold_date_sk, RF002 -> ss_item_sk
    row-size=16B cardinality=29.76K
 ---- PARALLELPLANS
-Max Per-Host Resource Reservation: Memory=113.75MB Threads=15
-Per-Host Resource Estimates: Memory=202MB
+Max Per-Host Resource Reservation: Memory=60.31MB Threads=9
+Per-Host Resource Estimates: Memory=120MB
 PLAN-ROOT SINK
 |
 14:MERGING-EXCHANGE [UNPARTITIONED]
@@ -5822,8 +5810,8 @@ PLAN-ROOT SINK
    runtime filters: RF004 -> s.ss_item_sk, RF006 -> s.ss_sold_date_sk, RF010 -> s.ss_customer_sk
    row-size=16B cardinality=2.88M
 ---- PARALLELPLANS
-Max Per-Host Resource Reservation: Memory=176.88MB Threads=34
-Per-Host Resource Estimates: Memory=439MB
+Max Per-Host Resource Reservation: Memory=115.00MB Threads=20
+Per-Host Resource Estimates: Memory=270MB
 PLAN-ROOT SINK
 |
 30:MERGING-EXCHANGE [UNPARTITIONED]
@@ -6425,8 +6413,8 @@ PLAN-ROOT SINK
    runtime filters: RF000 -> ss_store_sk, RF002 -> ss_item_sk, RF004 -> ss_sold_date_sk
    row-size=20B cardinality=2.88M
 ---- PARALLELPLANS
-Max Per-Host Resource Reservation: Memory=755.80MB Threads=55
-Per-Host Resource Estimates: Memory=1.07GB
+Max Per-Host Resource Reservation: Memory=698.77MB Threads=36
+Per-Host Resource Estimates: Memory=915MB
 PLAN-ROOT SINK
 |
 54:MERGING-EXCHANGE [UNPARTITIONED]
@@ -7052,8 +7040,8 @@ PLAN-ROOT SINK
    runtime filters: RF010 -> ss_sold_date_sk, RF008 -> ss_item_sk, RF006 -> ss_promo_sk, RF002 -> ss_customer_sk, RF004 -> ss_store_sk
    row-size=28B cardinality=2.88M
 ---- PARALLELPLANS
-Max Per-Host Resource Reservation: Memory=238.78MB Threads=55
-Per-Host Resource Estimates: Memory=627MB
+Max Per-Host Resource Reservation: Memory=166.70MB Threads=35
+Per-Host Resource Estimates: Memory=411MB
 PLAN-ROOT SINK
 |
 27:SORT
@@ -8126,8 +8114,8 @@ PLAN-ROOT SINK
    runtime filters: RF004 -> ss_sold_time_sk, RF002 -> ss_hdemo_sk
    row-size=12B cardinality=2.88M
 ---- PARALLELPLANS
-Max Per-Host Resource Reservation: Memory=383.12MB Threads=127
-Per-Host Resource Estimates: Memory=1.36GB
+Max Per-Host Resource Reservation: Memory=307.06MB Threads=79
+Per-Host Resource Estimates: Memory=994MB
 PLAN-ROOT SINK
 |
 70:NESTED LOOP JOIN [CROSS JOIN, BROADCAST]

@@ -122,9 +122,15 @@ abstract public class PlanNode extends TreeNode<PlanNode> {
   // invalid: -1
   protected long cardinality_;
 
-  // number of nodes on which the plan tree rooted at this node would execute;
+  // Estimated number of nodes on which the plan tree rooted at this node would be
+  // scheduled;
   // set in computeStats(); invalid: -1
   protected int numNodes_;
+
+  // Estimated number of instances across all nodes that the scheduler would generate for
+  // a fragment with the plan tree rooted at this node;
+  // set in computeStats(); invalid: -1
+  protected int numInstances_;
 
   // resource requirements and estimates for this plan node.
   // Initialized with a dummy value. Gets set correctly in
@@ -163,6 +169,7 @@ abstract public class PlanNode extends TreeNode<PlanNode> {
     tblRefIds_ = new ArrayList<>();
     cardinality_ = -1;
     numNodes_ = -1;
+    numInstances_ = -1;
     displayName_ = displayName;
     disableCodegen_ = false;
   }
@@ -179,6 +186,7 @@ abstract public class PlanNode extends TreeNode<PlanNode> {
     conjuncts_ = Expr.cloneList(node.conjuncts_);
     cardinality_ = -1;
     numNodes_ = -1;
+    numInstances_ = -1;
     displayName_ = displayName;
     disableCodegen_ = node.disableCodegen_;
   }
@@ -210,6 +218,7 @@ abstract public class PlanNode extends TreeNode<PlanNode> {
   public boolean hasLimit() { return limit_ > -1; }
   public long getCardinality() { return cardinality_; }
   public int getNumNodes() { return numNodes_; }
+  public int getNumInstances() { return numInstances_; }
   public ResourceProfile getNodeResourceProfile() { return nodeResourceProfile_; }
   public float getAvgRowSize() { return avgRowSize_; }
   public void setFragment(PlanFragment fragment) { fragment_ = fragment; }
@@ -547,7 +556,10 @@ abstract public class PlanNode extends TreeNode<PlanNode> {
       TupleDescriptor desc = analyzer.getTupleDesc(tid);
       avgRowSize_ += desc.getAvgSerializedSize();
     }
-    if (!children_.isEmpty()) numNodes_ = getChild(0).numNodes_;
+    if (!children_.isEmpty()) {
+      numNodes_ = getChild(0).numNodes_;
+      numInstances_ = getChild(0).numInstances_;
+    }
   }
 
   protected long capCardinalityAtLimit(long cardinality) {
@@ -686,6 +698,7 @@ abstract public class PlanNode extends TreeNode<PlanNode> {
    */
   protected boolean hasValidStats() {
     return (numNodes_ == -1 || numNodes_ >= 0) &&
+           (numInstances_ == -1 || numInstances_ >= 0) &&
            (cardinality_ == -1 || cardinality_ >= 0);
   }
 
@@ -858,6 +871,14 @@ abstract public class PlanNode extends TreeNode<PlanNode> {
       sum = checkedAdd(sum, tmp);
     }
     return sum;
+  }
+
+  /**
+   * Returns the max number of instances of a fragment that can be scheduled on a single
+   * node - the mt_dop value if mt_dop > 0, or 1 otherwise.
+   */
+  protected int getMaxInstancesPerNode(Analyzer analyzer) {
+    return Math.max(1, analyzer.getQueryOptions().getMt_dop());
   }
 
   protected void addRuntimeFilter(RuntimeFilter filter) { runtimeFilters_.add(filter); }

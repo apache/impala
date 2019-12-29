@@ -517,7 +517,7 @@ public class AggregationNode extends PlanNode {
       long inputCardinality = getChild(0).getCardinality();
       if (inputCardinality != -1) {
         // Calculate the input cardinality distributed across fragment instances.
-        long numInstances = fragment_.getNumInstances(queryOptions.getMt_dop());
+        long numInstances = fragment_.getNumInstances();
         long perInstanceInputCardinality;
         if (numInstances > 1) {
           perInstanceInputCardinality =

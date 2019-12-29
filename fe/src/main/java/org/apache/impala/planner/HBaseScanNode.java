@@ -303,6 +303,7 @@ public class HBaseScanNode extends ScanNode {
       // We have run computeStats successfully. Don't need to estimate cardinality again
       // (IMPALA-8912). Check some invariants if computeStats has been called.
       Preconditions.checkState(numNodes_ > 0);
+      Preconditions.checkState(numInstances_ > 0);
       Preconditions.checkState(cardinality_ >= 0);
       cardinality_ = inputCardinality_;
       if (LOG.isTraceEnabled()) {
@@ -358,12 +359,17 @@ public class HBaseScanNode extends ScanNode {
       LOG.trace("computeStats HbaseScan: cardinality=" + cardinality_);
     }
 
-    // Assume that each executor in the cluster gets a scan range, unless there are fewer
-    // scan ranges than nodes.
-    numNodes_ = Math.max(1, Math.min(scanRangeSpecs_.getConcrete_rangesSize(),
-                                ExecutorMembershipSnapshot.getCluster().numExecutors()));
+    // Assume that each node/instance in the cluster gets a scan range, unless there are
+    // fewer scan ranges than nodes/instances.
+    int numExecutors = ExecutorMembershipSnapshot.getCluster().numExecutors();
+    numNodes_ =
+        Math.max(1, Math.min(scanRangeSpecs_.getConcrete_rangesSize(), numExecutors));
+    int maxInstances = numNodes_ * getMaxInstancesPerNode(analyzer);
+    numInstances_ =
+        Math.max(1, Math.min(scanRangeSpecs_.getConcrete_rangesSize(), maxInstances));
     if (LOG.isTraceEnabled()) {
-      LOG.trace("computeStats HbaseScan: #nodes=" + numNodes_);
+      LOG.trace(
+          "computeStats HbaseScan: #nodes=" + numNodes_ + " #instances=" + numInstances_);
     }
   }
 

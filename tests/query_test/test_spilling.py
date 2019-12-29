@@ -22,7 +22,7 @@ from tests.common.environ import ImpalaTestClusterProperties
 from tests.common.impala_test_suite import ImpalaTestSuite
 from tests.common.skip import SkipIfNotHdfsMinicluster
 from tests.common.test_dimensions import (create_exec_option_dimension_from_dict,
-    create_parquet_dimension)
+    create_kudu_dimension, create_parquet_dimension)
 
 IMPALA_TEST_CLUSTER_PROPERTIES = ImpalaTestClusterProperties.get_instance()
 
@@ -133,3 +133,29 @@ class TestSpillingNoDebugActionDimensions(ImpalaTestSuite):
        These tests either run with no debug action set or set their own debug action."""
     self.run_test_case('QueryTest/spilling-no-debug-action', vector)
 
+
+@pytest.mark.xfail(IMPALA_TEST_CLUSTER_PROPERTIES.is_remote_cluster(),
+                   reason='Queries may not spill on larger clusters')
+class TestSpillingBroadcastJoins(ImpalaTestSuite):
+  """Tests specifically targeted at shared broadcast joins for mt_dop."""
+  @classmethod
+  def get_workload(self):
+    return 'functional-query'
+
+  @classmethod
+  def add_test_dimensions(cls):
+    super(TestSpillingBroadcastJoins, cls).add_test_dimensions()
+    cls.ImpalaTestMatrix.clear_constraints()
+    # Use parquet because it has 9 input splits for lineitem, hence can have a
+    # higher effective dop than parquet, which only has 3 splits.
+    cls.ImpalaTestMatrix.add_dimension(create_kudu_dimension('tpch'))
+    debug_action_dims = CORE_DEBUG_ACTION_DIMS
+    if cls.exploration_strategy() == 'exhaustive':
+      debug_action_dims = CORE_DEBUG_ACTION_DIMS + EXHAUSTIVE_DEBUG_ACTION_DIMS
+    # Tests are calibrated so that they can execute and spill with this page size.
+    cls.ImpalaTestMatrix.add_dimension(
+        create_exec_option_dimension_from_dict({'default_spillable_buffer_size': ['256k'],
+          'debug_action': debug_action_dims, 'mt_dop': [3]}))
+
+  def test_spilling_broadcast_joins(self, vector):
+    self.run_test_case('QueryTest/spilling-broadcast-joins', vector)

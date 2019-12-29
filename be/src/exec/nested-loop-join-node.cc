@@ -22,6 +22,7 @@
 
 #include "common/names.h"
 #include "exec/exec-node-util.h"
+#include "exec/join-op.h"
 #include "exprs/scalar-expr-evaluator.h"
 #include "exprs/scalar-expr.h"
 #include "gen-cpp/PlanNodes_types.h"
@@ -283,7 +284,15 @@ end:
   if (eos_) {
     *eos = true;
     probe_batch_->TransferResourceOwnership(output_batch);
-    build_batches_->TransferResourceOwnership(output_batch);
+    if (ReturnsBuildData(join_op_)) {
+      if (builder_->num_probe_threads() == 1) {
+        build_batches_->TransferResourceOwnership(output_batch);
+      } else {
+        // Resources can't be transferred to all NestedLoopJoinNodes sharing the builder,
+        // each finstance must copy out data it needs to hold onto.
+        output_batch->MarkNeedsDeepCopy();
+      }
+    }
   }
   COUNTER_SET(rows_returned_counter_, rows_returned());
   return Status::OK();

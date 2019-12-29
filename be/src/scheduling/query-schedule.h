@@ -104,10 +104,14 @@ struct FInstanceExecParams {
 
   /// In its role as a data sender, a fragment instance is assigned a "sender id" to
   /// uniquely identify it to a receiver. -1 = invalid.
-  int sender_id;
+  int sender_id = -1;
 
   // List of input join build finstances for joins in this finstance.
   std::vector<TJoinBuildInput> join_build_inputs;
+
+  // If this is a join build fragment, the number of fragment instances that consume the
+  // join build. -1 = invalid.
+  int num_join_build_outputs = -1;
 
   /// The parent FragmentExecParams
   const FragmentExecParams& fragment_exec_params;
@@ -120,7 +124,6 @@ struct FInstanceExecParams {
       host(host),
       krpc_host(krpc_host),
       per_fragment_instance_idx(per_fragment_instance_idx),
-      sender_id(-1),
       fragment_exec_params(fragment_exec_params) {}
 };
 

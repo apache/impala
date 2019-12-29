@@ -207,7 +207,8 @@ Status BlockingJoinNode::OpenImpl(RuntimeState* state, JoinBuilder** separate_bu
   } else {
     // The integrated join build requires some tricky time accounting because two
     // threads execute concurrently with the time from the left and right child
-    // overlapping. The separate join build does not have this problem, because
+    // overlapping. We also want to count the builder profile as local time.
+    // The separate join build does not have this problem, because
     // the build is executed in a separate fragment with a separate profile tree.
     runtime_profile_->AddLocalTimeCounter(bind<int64_t>(
         &BlockingJoinNode::LocalTimeCounterFn, runtime_profile_->total_time_counter(),
@@ -242,7 +243,12 @@ Status BlockingJoinNode::ProcessBuildInputAndOpenProbe(
     // AcquireResourcesForBuild() opens the buffer pool client, so that probe reservation
     // can be transferred.
     RETURN_IF_ERROR(AcquireResourcesForBuild(state));
-    RETURN_IF_ERROR(build_sink->WaitForInitialBuild(state));
+    {
+      SCOPED_TIMER(runtime_profile_->inactive_timer());
+      events_->MarkEvent("Waiting for builder");
+      RETURN_IF_ERROR(build_sink->WaitForInitialBuild(state));
+      events_->MarkEvent("Initial build available");
+    }
     waited_for_build_ = true;
   } else if (!IsInSubplan() && state->resource_pool()->TryAcquireThreadToken()) {
     // The build is integrated into the join node and we got a thread token. Do the hash

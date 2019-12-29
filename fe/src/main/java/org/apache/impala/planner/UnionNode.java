@@ -124,6 +124,7 @@ public class UnionNode extends PlanNode {
       // correct iff the child fragments run on sets of nodes that are supersets or
       // subsets of each other, i.e. not just partly overlapping.
       numNodes_ = Math.max(child.getNumNodes(), numNodes_);
+      numInstances_ = Math.max(child.getNumInstances(), numInstances_);
     }
     // Consider estimate valid if we have at least one child with known cardinality, or
     // only constant values.
@@ -135,7 +136,10 @@ public class UnionNode extends PlanNode {
     // The number of nodes of a union node is -1 (invalid) if all the referenced tables
     // are inline views (e.g. select 1 FROM (VALUES(1 x, 1 y)) a FULL OUTER JOIN
     // (VALUES(1 x, 1 y)) b ON (a.x = b.y)). We need to set the correct value.
-    if (numNodes_ == -1) numNodes_ = 1;
+    if (numNodes_ == -1) {
+      numNodes_ = 1;
+      numInstances_ = 1;
+    }
     cardinality_ = capCardinalityAtLimit(cardinality_);
     if (LOG.isTraceEnabled()) {
       LOG.trace("stats Union: cardinality=" + Long.toString(cardinality_));

@@ -84,8 +84,8 @@ public class PlanFragment extends TreeNode<PlanFragment> {
   // root of plan tree executed by this fragment
   private PlanNode planRoot_;
 
-  // exchange node to which this fragment sends its output
-  private ExchangeNode destNode_;
+  // exchange node or join node to which this fragment sends its output
+  private PlanNode destNode_;
 
   // created in finalize() or set in setSink()
   private DataSink sink_;
@@ -195,10 +195,11 @@ public class PlanFragment extends TreeNode<PlanFragment> {
    * among senders if the partition-expr types are not identical.
    */
   public void finalizeExchanges(Analyzer analyzer) throws InternalException {
-    if (destNode_ != null) {
+    if (destNode_ != null && destNode_ instanceof ExchangeNode) {
       Preconditions.checkState(sink_ == null);
       // we're streaming to an exchange node
-      DataStreamSink streamSink = new DataStreamSink(destNode_, outputPartition_);
+      DataStreamSink streamSink =
+          new DataStreamSink((ExchangeNode)destNode_, outputPartition_);
       streamSink.setFragment(this);
       sink_ = streamSink;
     }
@@ -364,32 +365,49 @@ public class PlanFragment extends TreeNode<PlanFragment> {
    * invalid: -1
    */
   public int getNumNodes() {
-    return dataPartition_ == DataPartition.UNPARTITIONED ? 1 : planRoot_.getNumNodes();
+    if (dataPartition_ == DataPartition.UNPARTITIONED) {
+      return 1;
+    } else if (sink_ instanceof JoinBuildSink) {
+      // One instance is scheduled per node, for all instances of the fragment containing
+      // the destination join node. ParallelPlanner sets the destination fragment when
+      // adding the JoinBuildSink.
+      return ((JoinBuildSink)sink_).getNumNodes();
+    } else {
+      return planRoot_.getNumNodes();
+    }
   }
 
   /**
-   * Return the number of instances of this fragment per host that it executes on.
-   * invalid: -1
+   * Return an estimate of the number of instances of this fragment per host that it
+   * executes on.
    */
   public int getNumInstancesPerHost(int mt_dop) {
-    Preconditions.checkState(mt_dop >= 0);
-    if (dataPartition_ == DataPartition.UNPARTITIONED) return 1;
-    return mt_dop == 0 ? 1 : mt_dop;
+    // Assume that instances are evenly divided across hosts.
+    int numNodes = getNumNodes();
+    int numInstances = getNumInstances();
+    // Fall back to assuming that all mt_dop instances will be generated.
+    if (numNodes == -1 || numInstances == -1) return Math.max(1, mt_dop);
+    return (int) Math.ceil((double)numInstances / (double)numNodes);
   }
 
   /**
    * Return the total number of instances of this fragment across all hosts.
    * invalid: -1
    */
-  public int getNumInstances(int mt_dop) {
-    if (dataPartition_ == DataPartition.UNPARTITIONED) return 1;
-    int numNodes = planRoot_.getNumNodes();
-    if (numNodes == -1) return -1;
-    return getNumInstancesPerHost(mt_dop) * numNodes;
+  public int getNumInstances() {
+    if (dataPartition_ == DataPartition.UNPARTITIONED) {
+      return 1;
+    } else if (sink_ instanceof JoinBuildSink) {
+      // One instance is scheduled per instance of the fragment containing the destination
+      // join. ParallelPlanner sets the destination fragment when adding the
+      // JoinBuildSink.
+      return ((JoinBuildSink)sink_).getNumInstances();
+    } else {
+      return planRoot_.getNumInstances();
+    }
   }
 
   /**
-    * Estimates the number of distinct values of exprs per fragment instance based on the
     * data partition of this fragment, the number of nodes, and the degree of parallelism.
     * Returns -1 for an invalid estimate, e.g., because getNumDistinctValues() failed on
     * one of the exprs.
@@ -397,7 +415,7 @@ public class PlanFragment extends TreeNode<PlanFragment> {
   public long getPerInstanceNdv(int mt_dop, List<Expr> exprs) {
     Preconditions.checkNotNull(dataPartition_);
     long result = 1;
-    int numInstances = getNumInstances(mt_dop);
+    int numInstances = getNumInstances();
     Preconditions.checkState(numInstances >= 0);
     // The number of nodes is zero for empty tables.
     if (numInstances == 0) return 0;
@@ -509,7 +527,7 @@ public class PlanFragment extends TreeNode<PlanFragment> {
     builder.append(String.format("%s%s:PLAN FRAGMENT [%s]", firstLinePrefix,
         fragmentId_.toString(), dataPartition_.getExplainString()));
     builder.append(PrintUtils.printNumHosts(" ", getNumNodes()));
-    builder.append(PrintUtils.printNumInstances(" ", getNumInstances(mt_dop)));
+    builder.append(PrintUtils.printNumInstances(" ", getNumInstances()));
     builder.append("\n");
     String perHostPrefix = mt_dop == 0 ?
         "Per-Host Resources: " : "Per-Host Shared Resources: ";
@@ -580,7 +598,7 @@ public class PlanFragment extends TreeNode<PlanFragment> {
     if (destNode_ == null) return null;
     return destNode_.getFragment();
   }
-  public ExchangeNode getDestNode() { return destNode_; }
+  public PlanNode getDestNode() { return destNode_; }
   public DataPartition getDataPartition() { return dataPartition_; }
   public void setDataPartition(DataPartition dataPartition) {
     this.dataPartition_ = dataPartition;
@@ -595,7 +613,10 @@ public class PlanFragment extends TreeNode<PlanFragment> {
     setFragmentInPlanTree(planRoot_);
   }
 
-  public void setDestination(ExchangeNode destNode) {
+  /**
+   * Set the destination node of this fragment's sink, i.e. an ExchangeNode or a JoinNode.
+   */
+  public void setDestination(PlanNode destNode) {
     destNode_ = destNode;
     PlanFragment dest = getDestFragment();
     Preconditions.checkNotNull(dest);

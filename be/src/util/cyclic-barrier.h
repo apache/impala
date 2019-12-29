@@ -38,9 +38,14 @@ class CyclicBarrier {
   /// Waits until all threads have joined the barrier. Then the last thread executes 'fn'
   /// and once that is completed, all threads return. Note that 'fn' executes serially,
   /// so can be used to implement a serial phase of a parallel algorithm.
+  ///
+  /// 'fn' must return a Status object and have no arguments. If the call to 'fn' returns
+  /// an error status, the barrier will be cancelled with that status.
+  ///
   /// Returns OK if all threads joined the barrier or an error status if cancelled.
   template <typename F>
   Status Wait(const F& fn) {
+    Status fn_status;
     {
       std::unique_lock<std::mutex> l(lock_);
       RETURN_IF_ERROR(cancel_status_);
@@ -56,12 +61,16 @@ class CyclicBarrier {
       }
       // This is the last thread and barrier isn't cancelled. We can proceed by
       // resetting state for the next cycle.
-      fn();
-      num_waiting_threads_ = 0;
-      ++cycle_num_;
+      fn_status = fn();
+      if (fn_status.ok()) {
+        num_waiting_threads_ = 0;
+        ++cycle_num_;
+      } else {
+        cancel_status_ = fn_status;
+      }
     }
     barrier_cv_.NotifyAll();
-    return Status::OK();
+    return fn_status;
   }
 
   // Cancels the barrier. All blocked and future calls to cancel will return immediately

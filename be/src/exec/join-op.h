@@ -45,4 +45,12 @@ inline bool NeedToProcessUnmatchedBuildRows(TJoinOp::type join_op) {
   return join_op == TJoinOp::RIGHT_ANTI_JOIN || join_op == TJoinOp::RIGHT_OUTER_JOIN
       || join_op == TJoinOp::FULL_OUTER_JOIN;
 }
+
+/// Returns true if the join returns references to the build-side data.
+inline bool ReturnsBuildData(TJoinOp::type join_op) {
+  return join_op == TJoinOp::INNER_JOIN || join_op == TJoinOp::LEFT_OUTER_JOIN
+      || join_op == TJoinOp::RIGHT_OUTER_JOIN || join_op == TJoinOp::RIGHT_ANTI_JOIN
+      || join_op == TJoinOp::RIGHT_SEMI_JOIN || join_op == TJoinOp::FULL_OUTER_JOIN
+      || join_op == TJoinOp::CROSS_JOIN;
+}
 } // namespace impala

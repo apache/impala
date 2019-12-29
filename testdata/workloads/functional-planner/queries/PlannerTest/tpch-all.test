@@ -368,8 +368,8 @@ PLAN-ROOT SINK
    runtime filters: RF000 -> tpch.partsupp.ps_partkey, RF008 -> ps_suppkey
    row-size=24B cardinality=800.00K
 ---- PARALLELPLANS
-Max Per-Host Resource Reservation: Memory=122.81MB Threads=39
-Per-Host Resource Estimates: Memory=717MB
+Max Per-Host Resource Reservation: Memory=82.84MB Threads=20
+Per-Host Resource Estimates: Memory=376MB
 PLAN-ROOT SINK
 |
 30:MERGING-EXCHANGE [UNPARTITIONED]
@@ -648,11 +648,11 @@ PLAN-ROOT SINK
    runtime filters: RF002 -> l_orderkey
    row-size=46B cardinality=600.12K
 ---- PARALLELPLANS
-Max Per-Host Resource Reservation: Memory=71.50MB Threads=17
-Per-Host Resource Estimates: Memory=503MB
+Max Per-Host Resource Reservation: Memory=64.75MB Threads=9
+Per-Host Resource Estimates: Memory=369MB
 PLAN-ROOT SINK
 |
-13:MERGING-EXCHANGE [UNPARTITIONED]
+11:MERGING-EXCHANGE [UNPARTITIONED]
 |  order by: sum(l_extendedprice * (1 - l_discount)) DESC, o_orderdate ASC
 |  limit: 10
 |
@@ -660,19 +660,19 @@ PLAN-ROOT SINK
 |  order by: sum(l_extendedprice * (1 - l_discount)) DESC, o_orderdate ASC
 |  row-size=50B cardinality=10
 |
-12:AGGREGATE [FINALIZE]
+10:AGGREGATE [FINALIZE]
 |  output: sum:merge(l_extendedprice * (1 - l_discount))
 |  group by: l_orderkey, o_orderdate, o_shippriority
 |  row-size=50B cardinality=17.56K
 |
-11:EXCHANGE [HASH(l_orderkey,o_orderdate,o_shippriority)]
+09:EXCHANGE [HASH(l_orderkey,o_orderdate,o_shippriority)]
 |
 05:AGGREGATE [STREAMING]
 |  output: sum(l_extendedprice * (1 - l_discount))
 |  group by: l_orderkey, o_orderdate, o_shippriority
 |  row-size=50B cardinality=17.56K
 |
-04:HASH JOIN [INNER JOIN, PARTITIONED]
+04:HASH JOIN [INNER JOIN, BROADCAST]
 |  hash predicates: o_custkey = c_custkey
 |  row-size=117B cardinality=17.56K
 |
@@ -681,16 +681,14 @@ PLAN-ROOT SINK
 |  |  build expressions: c_custkey
 |  |  runtime filters: RF000 <- c_custkey
 |  |
-|  10:EXCHANGE [HASH(c_custkey)]
+|  08:EXCHANGE [BROADCAST]
 |  |
 |  00:SCAN HDFS [tpch.customer]
 |     HDFS partitions=1/1 files=1 size=23.08MB
 |     predicates: c_mktsegment = 'BUILDING'
 |     row-size=29B cardinality=30.00K
 |
-09:EXCHANGE [HASH(o_custkey)]
-|
-03:HASH JOIN [INNER JOIN, PARTITIONED]
+03:HASH JOIN [INNER JOIN, BROADCAST]
 |  hash predicates: l_orderkey = o_orderkey
 |  row-size=88B cardinality=57.58K
 |
@@ -699,15 +697,13 @@ PLAN-ROOT SINK
 |  |  build expressions: o_orderkey
 |  |  runtime filters: RF002 <- o_orderkey
 |  |
-|  08:EXCHANGE [HASH(o_orderkey)]
+|  07:EXCHANGE [BROADCAST]
 |  |
 |  01:SCAN HDFS [tpch.orders]
 |     HDFS partitions=1/1 files=1 size=162.56MB
 |     predicates: o_orderdate < '1995-03-15'
 |     runtime filters: RF000 -> o_custkey
 |     row-size=42B cardinality=150.00K
-|
-07:EXCHANGE [HASH(l_orderkey)]
 |
 02:SCAN HDFS [tpch.lineitem]
    HDFS partitions=1/1 files=1 size=718.94MB
@@ -811,8 +807,8 @@ PLAN-ROOT SINK
    runtime filters: RF000 -> l_orderkey
    row-size=52B cardinality=600.12K
 ---- PARALLELPLANS
-Max Per-Host Resource Reservation: Memory=72.62MB Threads=11
-Per-Host Resource Estimates: Memory=453MB
+Max Per-Host Resource Reservation: Memory=46.69MB Threads=7
+Per-Host Resource Estimates: Memory=317MB
 PLAN-ROOT SINK
 |
 09:MERGING-EXCHANGE [UNPARTITIONED]
@@ -1043,8 +1039,8 @@ PLAN-ROOT SINK
    runtime filters: RF005 -> l_suppkey, RF010 -> l_orderkey
    row-size=32B cardinality=6.00M
 ---- PARALLELPLANS
-Max Per-Host Resource Reservation: Memory=137.28MB Threads=25
-Per-Host Resource Estimates: Memory=644MB
+Max Per-Host Resource Reservation: Memory=113.27MB Threads=15
+Per-Host Resource Estimates: Memory=462MB
 PLAN-ROOT SINK
 |
 20:MERGING-EXCHANGE [UNPARTITIONED]
@@ -1414,8 +1410,8 @@ PLAN-ROOT SINK
    runtime filters: RF006 -> l_suppkey, RF008 -> l_orderkey
    row-size=54B cardinality=600.12K
 ---- PARALLELPLANS
-Max Per-Host Resource Reservation: Memory=139.78MB Threads=27
-Per-Host Resource Estimates: Memory=673MB
+Max Per-Host Resource Reservation: Memory=117.77MB Threads=18
+Per-Host Resource Estimates: Memory=499MB
 PLAN-ROOT SINK
 |
 21:MERGING-EXCHANGE [UNPARTITIONED]
@@ -1770,8 +1766,8 @@ PLAN-ROOT SINK
    runtime filters: RF008 -> l_suppkey, RF010 -> l_orderkey, RF012 -> l_partkey
    row-size=40B cardinality=6.00M
 ---- PARALLELPLANS
-Max Per-Host Resource Reservation: Memory=136.05MB Threads=39
-Per-Host Resource Estimates: Memory=724MB
+Max Per-Host Resource Reservation: Memory=106.02MB Threads=28
+Per-Host Resource Estimates: Memory=504MB
 PLAN-ROOT SINK
 |
 29:MERGING-EXCHANGE [UNPARTITIONED]
@@ -2104,23 +2100,23 @@ PLAN-ROOT SINK
    runtime filters: RF002 -> l_partkey, RF003 -> l_suppkey, RF006 -> l_suppkey, RF008 -> l_orderkey, RF010 -> l_partkey
    row-size=48B cardinality=6.00M
 ---- PARALLELPLANS
-Max Per-Host Resource Reservation: Memory=165.89MB Threads=29
-Per-Host Resource Estimates: Memory=867MB
+Max Per-Host Resource Reservation: Memory=193.38MB Threads=18
+Per-Host Resource Estimates: Memory=647MB
 PLAN-ROOT SINK
 |
-22:MERGING-EXCHANGE [UNPARTITIONED]
+21:MERGING-EXCHANGE [UNPARTITIONED]
 |  order by: nation ASC, o_year DESC
 |
 12:SORT
 |  order by: nation ASC, o_year DESC
 |  row-size=39B cardinality=61.70K
 |
-21:AGGREGATE [FINALIZE]
+20:AGGREGATE [FINALIZE]
 |  output: sum:merge(amount)
 |  group by: nation, o_year
 |  row-size=39B cardinality=61.70K
 |
-20:EXCHANGE [HASH(nation,o_year)]
+19:EXCHANGE [HASH(nation,o_year)]
 |
 11:AGGREGATE [STREAMING]
 |  output: sum(l_extendedprice * (1 - l_discount) - ps_supplycost * l_quantity)
@@ -2136,13 +2132,13 @@ PLAN-ROOT SINK
 |  |  build expressions: n_nationkey
 |  |  runtime filters: RF000 <- n_nationkey
 |  |
-|  19:EXCHANGE [BROADCAST]
+|  18:EXCHANGE [BROADCAST]
 |  |
 |  05:SCAN HDFS [tpch.nation]
 |     HDFS partitions=1/1 files=1 size=2.15KB
 |     row-size=21B cardinality=25
 |
-09:HASH JOIN [INNER JOIN, PARTITIONED]
+09:HASH JOIN [INNER JOIN, BROADCAST]
 |  hash predicates: l_partkey = ps_partkey, l_suppkey = ps_suppkey
 |  row-size=165B cardinality=574.29K
 |
@@ -2151,13 +2147,11 @@ PLAN-ROOT SINK
 |  |  build expressions: ps_partkey, ps_suppkey
 |  |  runtime filters: RF002 <- ps_partkey, RF003 <- ps_suppkey
 |  |
-|  18:EXCHANGE [HASH(ps_partkey,ps_suppkey)]
+|  17:EXCHANGE [BROADCAST]
 |  |
 |  03:SCAN HDFS [tpch.partsupp]
 |     HDFS partitions=1/1 files=1 size=112.71MB
 |     row-size=24B cardinality=800.00K
-|
-17:EXCHANGE [HASH(l_partkey,l_suppkey)]
 |
 08:HASH JOIN [INNER JOIN, BROADCAST]
 |  hash predicates: l_suppkey = s_suppkey
@@ -2366,8 +2360,8 @@ PLAN-ROOT SINK
    runtime filters: RF004 -> l_orderkey
    row-size=37B cardinality=2.00M
 ---- PARALLELPLANS
-Max Per-Host Resource Reservation: Memory=162.89MB Threads=19
-Per-Host Resource Estimates: Memory=628MB
+Max Per-Host Resource Reservation: Memory=144.88MB Threads=14
+Per-Host Resource Estimates: Memory=484MB
 PLAN-ROOT SINK
 |
 15:MERGING-EXCHANGE [UNPARTITIONED]
@@ -2650,8 +2644,8 @@ PLAN-ROOT SINK
    runtime filters: RF002 -> ps_suppkey
    row-size=28B cardinality=800.00K
 ---- PARALLELPLANS
-Max Per-Host Resource Reservation: Memory=87.41MB Threads=26
-Per-Host Resource Estimates: Memory=591MB
+Max Per-Host Resource Reservation: Memory=53.45MB Threads=14
+Per-Host Resource Estimates: Memory=311MB
 PLAN-ROOT SINK
 |
 23:MERGING-EXCHANGE [UNPARTITIONED]
@@ -2868,8 +2862,8 @@ PLAN-ROOT SINK
    runtime filters: RF000 -> l_orderkey
    row-size=90B cardinality=320.78K
 ---- PARALLELPLANS
-Max Per-Host Resource Reservation: Memory=100.88MB Threads=11
-Per-Host Resource Estimates: Memory=493MB
+Max Per-Host Resource Reservation: Memory=75.94MB Threads=7
+Per-Host Resource Estimates: Memory=352MB
 PLAN-ROOT SINK
 |
 09:MERGING-EXCHANGE [UNPARTITIONED]
@@ -3017,8 +3011,8 @@ PLAN-ROOT SINK
    runtime filters: RF000 -> o_custkey
    row-size=77B cardinality=150.00K
 ---- PARALLELPLANS
-Max Per-Host Resource Reservation: Memory=68.38MB Threads=11
-Per-Host Resource Estimates: Memory=335MB
+Max Per-Host Resource Reservation: Memory=41.38MB Threads=6
+Per-Host Resource Estimates: Memory=170MB
 PLAN-ROOT SINK
 |
 10:MERGING-EXCHANGE [UNPARTITIONED]
@@ -3140,8 +3134,8 @@ PLAN-ROOT SINK
    runtime filters: RF000 -> l_partkey
    row-size=46B cardinality=600.12K
 ---- PARALLELPLANS
-Max Per-Host Resource Reservation: Memory=40.75MB Threads=9
-Per-Host Resource Estimates: Memory=313MB
+Max Per-Host Resource Reservation: Memory=32.75MB Threads=8
+Per-Host Resource Estimates: Memory=280MB
 PLAN-ROOT SINK
 |
 07:AGGREGATE [FINALIZE]
@@ -3329,8 +3323,8 @@ PLAN-ROOT SINK
    runtime filters: RF000 -> tpch.lineitem.l_suppkey
    row-size=46B cardinality=600.12K
 ---- PARALLELPLANS
-Max Per-Host Resource Reservation: Memory=86.50MB Threads=16
-Per-Host Resource Estimates: Memory=531MB
+Max Per-Host Resource Reservation: Memory=67.62MB Threads=12
+Per-Host Resource Estimates: Memory=489MB
 PLAN-ROOT SINK
 |
 17:MERGING-EXCHANGE [UNPARTITIONED]
@@ -3545,8 +3539,8 @@ PLAN-ROOT SINK
    runtime filters: RF000 -> ps_partkey
    row-size=16B cardinality=800.00K
 ---- PARALLELPLANS
-Max Per-Host Resource Reservation: Memory=95.50MB Threads=15
-Per-Host Resource Estimates: Memory=396MB
+Max Per-Host Resource Reservation: Memory=50.19MB Threads=8
+Per-Host Resource Estimates: Memory=201MB
 PLAN-ROOT SINK
 |
 14:MERGING-EXCHANGE [UNPARTITIONED]
@@ -3729,8 +3723,8 @@ PLAN-ROOT SINK
    runtime filters: RF000 -> tpch.lineitem.l_partkey
    row-size=16B cardinality=6.00M
 ---- PARALLELPLANS
-Max Per-Host Resource Reservation: Memory=75.62MB Threads=13
-Per-Host Resource Estimates: Memory=502MB
+Max Per-Host Resource Reservation: Memory=66.62MB Threads=11
+Per-Host Resource Estimates: Memory=469MB
 PLAN-ROOT SINK
 |
 12:AGGREGATE [FINALIZE]
@@ -3958,8 +3952,8 @@ PLAN-ROOT SINK
    runtime filters: RF000 -> tpch.lineitem.l_orderkey, RF004 -> l_orderkey
    row-size=16B cardinality=6.00M
 ---- PARALLELPLANS
-Max Per-Host Resource Reservation: Memory=298.88MB Threads=19
-Per-Host Resource Estimates: Memory=924MB
+Max Per-Host Resource Reservation: Memory=281.88MB Threads=16
+Per-Host Resource Estimates: Memory=797MB
 PLAN-ROOT SINK
 |
 17:MERGING-EXCHANGE [UNPARTITIONED]
@@ -4142,8 +4136,8 @@ PLAN-ROOT SINK
    runtime filters: RF000 -> l_partkey
    row-size=72B cardinality=801.95K
 ---- PARALLELPLANS
-Max Per-Host Resource Reservation: Memory=38.88MB Threads=7
-Per-Host Resource Estimates: Memory=279MB
+Max Per-Host Resource Reservation: Memory=29.88MB Threads=5
+Per-Host Resource Estimates: Memory=245MB
 PLAN-ROOT SINK
 |
 06:AGGREGATE [FINALIZE]
@@ -4359,8 +4353,8 @@ PLAN-ROOT SINK
    runtime filters: RF000 -> tpch.lineitem.l_suppkey, RF002 -> tpch.lineitem.l_partkey, RF003 -> tpch.lineitem.l_suppkey
    row-size=46B cardinality=600.12K
 ---- PARALLELPLANS
-Max Per-Host Resource Reservation: Memory=161.39MB Threads=23
-Per-Host Resource Estimates: Memory=613MB
+Max Per-Host Resource Reservation: Memory=123.45MB Threads=13
+Per-Host Resource Estimates: Memory=430MB
 PLAN-ROOT SINK
 |
 18:MERGING-EXCHANGE [UNPARTITIONED]
@@ -4661,8 +4655,8 @@ PLAN-ROOT SINK
    predicates: l3.l_receiptdate > l3.l_commitdate
    row-size=60B cardinality=600.12K
 ---- PARALLELPLANS
-Max Per-Host Resource Reservation: Memory=109.14MB Threads=27
-Per-Host Resource Estimates: Memory=915MB
+Max Per-Host Resource Reservation: Memory=97.13MB Threads=22
+Per-Host Resource Estimates: Memory=792MB
 PLAN-ROOT SINK
 |
 21:MERGING-EXCHANGE [UNPARTITIONED]
@@ -4911,8 +4905,8 @@ PLAN-ROOT SINK
    HDFS partitions=1/1 files=1 size=162.56MB
    row-size=8B cardinality=1.50M
 ---- PARALLELPLANS
-Max Per-Host Resource Reservation: Memory=83.75MB Threads=16
-Per-Host Resource Estimates: Memory=416MB
+Max Per-Host Resource Reservation: Memory=41.88MB Threads=9
+Per-Host Resource Estimates: Memory=213MB
 PLAN-ROOT SINK
 |
 15:MERGING-EXCHANGE [UNPARTITIONED]

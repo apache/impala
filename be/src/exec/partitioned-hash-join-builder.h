@@ -24,6 +24,7 @@
 #include <vector>
 #include <boost/scoped_ptr.hpp>
 
+#include "common/atomic.h"
 #include "common/object-pool.h"
 #include "common/status.h"
 #include "exec/filter-context.h"
@@ -37,6 +38,7 @@
 
 namespace impala {
 
+class CyclicBarrier;
 class PhjBuilder;
 class RowDescriptor;
 class RuntimeState;
@@ -207,6 +209,28 @@ enum class HashJoinState {
 /// be a different client.
 ///
 /// The full hash join algorithm is documented in PartitionedHashJoinNode.
+///
+/// Shared Build
+/// ------------
+/// A separate builder can be shared between multiple PartitionedHashJoinNodes. The
+/// spilling hash join algorithm mutates the state of the builder between phases, so
+/// requires synchronization between the probe threads executing PartitionedHashJoinNode
+/// that are reading that state.
+///
+/// The algorithm (specifically the HashJoinState state machine) is executed in lockstep
+/// across all probe threads with each probe thread working on the same set of partitions
+/// at the same time. A CyclicBarrier, 'probe_barrier_', is used for synchronization.
+/// At each state transition where the builder state needs to be mutated, all probe
+/// threads must arrive at the barrier before proceeding. The state transition is executed
+/// serially by a single thread before all threads proceed. All probe threads go through
+/// the same state transitions in lockstep, even if they have no work to do. E.g. if a
+/// probe thread has zero rows remaining in its spilled partitions, it still needs to
+/// wait for the other probe threads.
+///
+/// Not all join ops can be used with a shared build. For example, RIGHT_OUTER_JOIN is
+/// not supported currently, in part because it mutates the hash table during probing to
+/// track matches, but also because hash table matches would need to be broadcast across
+/// all instances within the query, not just the backend.
 class PhjBuilder : public JoinBuilder {
  public:
   /// Number of initial partitions to create. Must be a power of two.
@@ -312,7 +336,9 @@ class PhjBuilder : public JoinBuilder {
   /// PARTITION_FANOUT new partitions with level input_partition->level() + 1. The
   /// previous hash partitions must have been cleared with DoneProbingHashPartitions().
   /// The new hash partitions are returned in 'new_partitions'.
-  /// TODO: IMPALA-9156: this will be a synchronization point for shared join build.
+  ///
+  /// This is a synchronization point for shared join build. All probe threads must
+  /// call this function before continuing the next phase of the hash join algorithm.
   Status BeginSpilledProbe(BufferPool::ClientHandle* probe_client, bool* repartitioned,
       Partition** input_partition, HashPartitions* new_partitions);
 
@@ -330,7 +356,9 @@ class PhjBuilder : public JoinBuilder {
   /// transferred back to the builder.
   ///
   /// Returns an error if an error was encountered or if the query was cancelled.
-  /// TODO: IMPALA-9156: this will be a synchronization point for shared join build.
+  ///
+  /// This is a synchronization point for shared join build. All probe threads must
+  /// call this function before continuing the next phase of the hash join algorithm.
   Status DoneProbingHashPartitions(const int64_t num_spilled_probe_rows[PARTITION_FANOUT],
       BufferPool::ClientHandle* probe_client,
       std::deque<std::unique_ptr<Partition>>* output_partitions, RowBatch* batch);
@@ -351,7 +379,9 @@ class PhjBuilder : public JoinBuilder {
   /// transferred back to the builder.
   ///
   /// Returns an error if an error was encountered or if the query was cancelled.
-  /// TODO: IMPALA-9156: this will be a synchronization point for shared join build.
+  ///
+  /// This is a synchronization point for shared join build. All probe threads must
+  /// call this function before continuing the next phase of the hash join algorithm.
   Status DoneProbingSinglePartition(BufferPool::ClientHandle* probe_client,
       std::deque<std::unique_ptr<Partition>>* output_partitions, RowBatch* batch);
 
@@ -373,10 +403,6 @@ class PhjBuilder : public JoinBuilder {
   static bool HashTableStoresNulls(
       TJoinOp::type join_op, const std::vector<bool>& is_not_distinct_from);
 
-  /// TODO: IMPALA-9156: document thread safety for accessing this from
-  /// multiple PartitionedHashJoinNodes.
-  void AddHashTableStatsToProfile(RuntimeProfile* profile);
-
   /// Returns 'bytes' of reservation to the builder from 'probe_client'.
   /// Called by the probe side to return surplus reservation. This is usually handled by
   /// the above methods, but if an error occured during execution, the probe may still
@@ -384,16 +410,14 @@ class PhjBuilder : public JoinBuilder {
   /// Must only be called if this is a separate build.
   void ReturnReservation(BufferPool::ClientHandle* probe_client, int64_t bytes);
 
-  /// TODO: IMPALA-9156: document thread safety for accessing this from
-  /// multiple PartitionedHashJoinNodes.
+  /// Safe to call from PartitionedHashJoinNode threads during the probe phase.
   HashJoinState state() const { return state_; }
 
   /// Accessor to allow PartitionedHashJoinNode to access null_aware_partition_.
   /// TODO: IMPALA-9176: improve the encapsulation of the null-aware partition.
   inline Partition* null_aware_partition() const { return null_aware_partition_.get(); }
 
-  /// TODO: IMPALA-9156: document thread safety for accessing this from
-  /// multiple PartitionedHashJoinNodes.
+  /// Thread-safe.
   HashTableStatsProfile* ht_stats_profile() const { return ht_stats_profile_.get(); }
 
   std::string DebugString() const;
@@ -453,8 +477,12 @@ class PhjBuilder : public JoinBuilder {
     int ALWAYS_INLINE level() const { return level_; }
     /// Return true if the partition can be spilled - is not closed and is not spilled.
     bool CanSpill() const { return !IsClosed() && !is_spilled(); }
-    int64_t num_spilled_probe_rows() const { return num_spilled_probe_rows_; }
-    void IncrementNumSpilledProbeRows(int64_t count) { num_spilled_probe_rows_ += count; }
+    int64_t num_spilled_probe_rows() const { return num_spilled_probe_rows_.Load(); }
+
+    /// Increment the number of spilled probe rows. Thread-safe.
+    void IncrementNumSpilledProbeRows(int64_t count) {
+      num_spilled_probe_rows_.Add(count);
+    }
 
     /// Method signature of the codegened version of InsertBatch().
     typedef bool (*InsertBatchFn)(Partition*, TPrefetchMode::type, HashTableCtx*,
@@ -497,7 +525,7 @@ class PhjBuilder : public JoinBuilder {
 
     /// The number of spilled probe rows associated with this partition. Updated in
     /// DoneProbingHashPartitions().
-    int64_t num_spilled_probe_rows_ = 0;
+    AtomicInt64 num_spilled_probe_rows_{0};
   };
 
   /// Computes the minimum reservation required to execute the spilling partitioned
@@ -536,8 +564,8 @@ class PhjBuilder : public JoinBuilder {
   /// Updates 'state_' to 'next_state', logging the transition.
   void UpdateState(HashJoinState next_state);
 
-  /// Returns the current 'state_' as a string.
-  std::string PrintState() const;
+  /// Returns the string represenvation of 'state'.
+  static std::string PrintState(HashJoinState state);
 
   /// Create and initialize a set of hash partitions for partitioning level 'level'.
   /// The previous hash partitions must have been cleared with DoneProbing().
@@ -601,7 +629,8 @@ class PhjBuilder : public JoinBuilder {
   /// Ensures that 'probe_stream_reservation_' has enough reservation for a stream per
   /// spilled partition in 'hash_partitions_', plus for the input stream if the input
   /// is a spilled partition (determined by 'next_state' - either PARTITIONING_PROBE or
-  /// REPARTITIONING_PROBE). May spill additional partitions until it can free enough
+  /// REPARTITIONING_PROBE). If num_probe_threads_ is > 1, reserves this amount for each
+  /// probe thread. May spill additional partitions until it can free enough
   /// reservation. Returns an error if an error is encountered or if it runs out of
   /// partitions to spill.
   Status ReserveProbeBuffers(HashJoinState next_state);
@@ -613,11 +642,16 @@ class PhjBuilder : public JoinBuilder {
   /// Transfer reservation for probe streams to 'probe_client'. Memory for one stream was
   /// reserved per spilled partition in FlushFinal(), plus the input stream if the input
   /// partition was spilled.
+  /// This is safe to call from multiple probe threads concurrently.
   Status TransferProbeStreamReservation(BufferPool::ClientHandle* probe_client);
 
-  /// Calculates the amount of memory to be transferred for probe streams when probing
-  /// in the given 'state'. Depends on 'hash_partitions_' and 'spillable_buffer_size_'.
+  /// Calculates the amount of memory per probe thread/join node instance to be
+  /// transferred for probe streams when probing in the given 'state'. Depends on
+  /// 'hash_partitions_', 'spilled_partitions_' and 'spillable_buffer_size_'.
   int64_t CalcProbeStreamReservation(HashJoinState state) const;
+
+  /// The serial part of BeginSpilledProbe() that is executed by a single thread.
+  Status BeginSpilledProbeSerial();
 
   /// Creates new hash partitions and repartitions 'input_partition' into PARTITION_FANOUT
   /// new partitions with level input_partition->level() + 1. The previous hash partitions
@@ -628,6 +662,16 @@ class PhjBuilder : public JoinBuilder {
 
   /// Returns the largest build row count out of the current hash partitions.
   int64_t LargestPartitionRows() const;
+
+  /// Helper for DoneProbingHashPartitions() that processes and cleans up the hash
+  /// partitions.
+  void CleanUpHashPartitions(
+      std::deque<std::unique_ptr<Partition>>* output_partitions, RowBatch* batch);
+
+  /// Helper for DoneProbingSinglePartition() that processes and cleans up the current
+  /// spilled partition.
+  void CleanUpSinglePartition(
+      std::deque<std::unique_ptr<Partition>>* output_partitions, RowBatch* batch);
 
   /// Calls Close() on every Partition, deletes them, and cleans up any pointers that
   /// may reference them. If 'row_batch' if not NULL, transfers the ownership of all
@@ -741,6 +785,10 @@ class PhjBuilder : public JoinBuilder {
   /// Time spent repartitioning and building hash tables of any resulting partitions
   /// that were not spilled.
   RuntimeProfile::Counter* repartition_timer_ = nullptr;
+
+  // Barrier used to synchronize the probe-side threads at synchronization points in the
+  // partitioned hash join algorithm. Used only when 'num_probe_threads_' > 1.
+  std::unique_ptr<CyclicBarrier> probe_barrier_;
 
   /////////////////////////////////////////
   /// BEGIN: Members that must be Reset()

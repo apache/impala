@@ -190,6 +190,14 @@ public abstract class JoinNode extends PlanNode {
     return true;
   }
 
+  // Returns true if we can share a join build between multiple consuming fragment
+  // instances.
+  public boolean canShareBuild() {
+    // TODO: IMPALA-9176: null-aware anti-join doesn't support join build sharing.
+    if (joinOp_ == JoinOperator.NULL_AWARE_LEFT_ANTI_JOIN) return false;
+    return distrMode_ == JoinNode.DistributionMode.BROADCAST;
+  }
+
   public JoinOperator getJoinOp() { return joinOp_; }
   public List<BinaryPredicate> getEqJoinConjuncts() { return eqJoinConjuncts_; }
   public List<Expr> getOtherJoinConjuncts() { return otherJoinConjuncts_; }

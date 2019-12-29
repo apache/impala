@@ -136,9 +136,9 @@ class JoinBuilder : public DataSink {
   /// a separate join build, each BlockingJoinNode that called WaitForInitialBuild() needs
   /// to call CloseFromProbe(). The builder is closed when the last BlockingJoinNode using
   /// this builder calls CloseFromProbe(). BlockingJoinNode never calls Close() directly.
-  /// TODO: IMPALA-9156: for now, we only have a 1:1 relationship between builders and
-  /// nodes. This will change for broadcast joins.
   void CloseFromProbe(RuntimeState* join_node_state);
+
+  int num_probe_threads() const { return num_probe_threads_; }
 
  protected:
   /// ID of the join node that this builder is associated with.
@@ -172,6 +172,10 @@ class JoinBuilder : public DataSink {
   // FlushFinal().
   // Protected by 'separate_build_lock_'.
   bool ready_to_probe_ = false;
+
+  // Total number of probe-side fragment instances, i.e. threads.
+  // Always 1 if 'is_separate_build_' is false.
+  const int num_probe_threads_;
 
   // Number of probe-side threads that are expected to call WaitForInitialBuild()
   // but have not yet called it.

@@ -17,8 +17,6 @@
 
 package org.apache.impala.planner;
 
-import java.util.List;
-
 import org.apache.impala.analysis.Analyzer;
 import org.apache.impala.analysis.Expr;
 import org.apache.impala.analysis.SortInfo;
@@ -194,7 +192,7 @@ public class ExchangeNode extends PlanNode {
     // lean towards the soft limits.
     Preconditions.checkState(!children_.isEmpty());
     Preconditions.checkNotNull(children_.get(0).getFragment());
-    int numSenders = children_.get(0).getFragment().getNumInstances(queryOptions.mt_dop);
+    int numSenders = children_.get(0).getFragment().getNumInstances();
     long estimatedTotalQueueByteSize = estimateTotalQueueByteSize(numSenders);
     long estimatedDeferredRPCQueueSize = estimateDeferredRPCQueueSize(queryOptions,
         numSenders);

@@ -30,9 +30,6 @@ import org.apache.impala.analysis.BinaryPredicate;
 import org.apache.impala.analysis.BoolLiteral;
 import org.apache.impala.analysis.Expr;
 import org.apache.impala.analysis.ExprSubstitutionMap;
-import org.apache.impala.analysis.FunctionCallExpr;
-import org.apache.impala.analysis.FunctionName;
-import org.apache.impala.analysis.FunctionParams;
 import org.apache.impala.analysis.InPredicate;
 import org.apache.impala.analysis.IsNullPredicate;
 import org.apache.impala.analysis.LiteralExpr;
@@ -42,7 +39,6 @@ import org.apache.impala.analysis.SlotRef;
 import org.apache.impala.analysis.StringLiteral;
 import org.apache.impala.analysis.TupleDescriptor;
 import org.apache.impala.catalog.FeKuduTable;
-import org.apache.impala.catalog.HdfsFileFormat;
 import org.apache.impala.catalog.KuduColumn;
 import org.apache.impala.catalog.Type;
 import org.apache.impala.common.ImpalaRuntimeException;
@@ -283,6 +279,11 @@ public class KuduScanNode extends ScanNode {
     super.computeStats(analyzer);
     // Update the number of nodes to reflect the hosts that have relevant data.
     numNodes_ = Math.max(1, hostIndexSet_.size());
+    // Estimate the total number of instances, based on two upper bounds:
+    // * The number of scan ranges to process.
+    // * The maximum parallelism allowed across all the hosts.
+    numInstances_ = Math.min(scanRangeSpecs_.getConcrete_rangesSize(),
+        numNodes_ * getMaxInstancesPerNode(analyzer));
 
     // Update the cardinality
     inputCardinality_ = cardinality_ = kuduTable_.getNumRows();

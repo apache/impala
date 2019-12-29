@@ -40,7 +40,10 @@ void BasicTest(int num_threads, int num_iters) {
         // Add some randomness to test so that threads don't always join in predictable
         // order.
         SleepForMs(rand() % 5);
-        EXPECT_OK(barrier.Wait([&counter]() { ++counter; }));
+        EXPECT_OK(barrier.Wait([&counter]() {
+          ++counter;
+          return Status::OK();
+        }));
       }));
     }
     threads.join_all();
@@ -82,7 +85,10 @@ void OverlapTest(int num_threads, int num_iters) {
   for (int i = 0; i < num_threads; ++i) {
     threads.add_thread(new thread([&]() {
       for (int j = 0; j < num_iters; ++j) {
-        EXPECT_OK(barrier.Wait([&counter]() { ++counter; }));
+        EXPECT_OK(barrier.Wait([&counter]() {
+          ++counter;
+          return Status::OK();
+        }));
       }
     }));
   }
@@ -110,7 +116,10 @@ TEST(CyclicBarrierTest, Cancellation) {
     threads.add_thread(new thread([&barrier, &waits_complete, &counter, i]() {
       // Add some jitter so that not all threads will be waiting when cancelled.
       if (i % 2 == 0) SleepForMs(rand() % 5);
-      Status status = barrier.Wait([&counter]() { ++counter; });
+      Status status = barrier.Wait([&counter]() {
+        ++counter;
+        return Status::OK();
+      });
       EXPECT_FALSE(status.ok());
       EXPECT_EQ(status.code(), TErrorCode::CANCELLED);
       waits_complete.Add(1);
@@ -124,7 +133,10 @@ TEST(CyclicBarrierTest, Cancellation) {
 
   // Subsequent calls to Wait() return immediately.
   for (int i = 0; i < NUM_THREADS; ++i) {
-    Status status = barrier.Wait([&counter]() { ++counter; });
+    Status status = barrier.Wait([&counter]() {
+      ++counter;
+      return Status::OK();
+    });
     EXPECT_FALSE(status.ok());
     EXPECT_EQ(status.code(), TErrorCode::CANCELLED);
     EXPECT_EQ(0, counter) << "The callback should not have run.";
@@ -132,7 +144,10 @@ TEST(CyclicBarrierTest, Cancellation) {
 
   // First status is not overwritten by later Cancel() calls.
   barrier.Cancel(Status("Different status"));
-  Status status = barrier.Wait([&counter]() { ++counter; });
+  Status status = barrier.Wait([&counter]() {
+    ++counter;
+    return Status::OK();
+  });
   EXPECT_FALSE(status.ok());
   EXPECT_EQ(status.code(), TErrorCode::CANCELLED);
 
@@ -143,7 +158,7 @@ TEST(CyclicBarrierTest, Cancellation) {
 // Passing an empty/null function to Wait() is not supported.
 TEST(CyclicBarrierTest, NullFunction) {
   CyclicBarrier barrier(1);
-  typedef void (*fn_ptr_t)();
+  typedef Status (*fn_ptr_t)();
   IMPALA_ASSERT_DEBUG_DEATH(barrier.Wait(static_cast<fn_ptr_t>(nullptr)), "");
 }
 } // namespace impala

@@ -46,6 +46,7 @@
 #include "util/auth-util.h" // for GetEffectiveUser()
 #include "util/bitmap.h"
 #include "util/cpu-info.h"
+#include "util/cyclic-barrier.h"
 #include "util/debug-util.h"
 #include "util/disk-info.h"
 #include "util/error-util.h"
@@ -247,6 +248,9 @@ void RuntimeState::Cancel() {
   {
     lock_guard<SpinLock> l(cancellation_cvs_lock_);
     for (ConditionVariable* cv : cancellation_cvs_) cv->NotifyAll();
+    for (CyclicBarrier* cb : cancellation_cbs_) {
+      cb->Cancel(Status::CancelledInternal("RuntimeState::Cancel()"));
+    }
   }
 }
 
@@ -257,6 +261,15 @@ void RuntimeState::AddCancellationCV(ConditionVariable* cv) {
     if (cv == cv2) return;
   }
   cancellation_cvs_.push_back(cv);
+}
+
+void RuntimeState::AddBarrierToCancel(CyclicBarrier* cb) {
+  lock_guard<SpinLock> l(cancellation_cvs_lock_);
+  for (CyclicBarrier* cb2 : cancellation_cbs_) {
+    // Don't add if already present.
+    if (cb == cb2) return;
+  }
+  cancellation_cbs_.push_back(cb);
 }
 
 double RuntimeState::ComputeExchangeScanRatio() const {

@@ -29,6 +29,7 @@
 #include "util/debug-util.h"
 #include "util/metrics.h"
 #include "util/runtime-profile-counters.h"
+#include "util/scope-exit-trigger.h"
 #include "util/time.h"
 
 DEFINE_int32(concurrent_scratch_ios_per_device, 2,
@@ -646,18 +647,22 @@ Status BufferPool::Client::CleanPages(
   DCHECK_GE(len, 0);
   DCHECK_LE(len, reservation_.GetReservation());
   DCheckHoldsLock(*client_lock);
-  DCHECK_CONSISTENCY();
+  // If another thread is in CleanPages() for this client (and has dropped the lock while
+  // waiting on 'write_complete_cv_', wait for it to flush its pages before proceeding so
+  // that we don't overcommit memory.
+  while (cleaning_pages_) clean_pages_done_cv_.Wait(*client_lock);
 
+  DCHECK_CONSISTENCY();
   // Work out what we need to get bytes of dirty unpinned + in flight pages down to
   // in order to satisfy the eviction policy.
   int64_t target_dirty_bytes = reservation_.GetReservation() - buffers_allocated_bytes_
       - pinned_pages_.bytes() - len;
   if (VLOG_IS_ON(3)) {
     VLOG(3)   << "target_dirty_bytes=" << target_dirty_bytes
-              << "reservation=" << reservation_.GetReservation()
-              << "buffers_allocated_bytes_=" << buffers_allocated_bytes_
-              << "pinned_pages_.bytes()=" << pinned_pages_.bytes()
-              << "len=" << len << "\n"
+              << " reservation=" << reservation_.GetReservation()
+              << " buffers_allocated_bytes_=" << buffers_allocated_bytes_
+              << " pinned_pages_.bytes()=" << pinned_pages_.bytes()
+              << " len=" << len << "\n"
               << DebugStringLocked();
   }
   // Start enough writes to ensure that the loop condition below will eventually become
@@ -669,6 +674,12 @@ Status BufferPool::Client::CleanPages(
           <= target_dirty_bytes) {
     return Status::OK();
   }
+  cleaning_pages_ = true;
+  auto exit_trigger = MakeScopeExitTrigger([this, client_lock]() {
+    DCheckHoldsLock(*client_lock);
+    cleaning_pages_ = false;
+    clean_pages_done_cv_.NotifyAll();
+  });
   WriteDirtyPagesAsync(min_bytes_to_write);
 
   // One of the writes we initiated, or an earlier in-flight write may have hit an error.

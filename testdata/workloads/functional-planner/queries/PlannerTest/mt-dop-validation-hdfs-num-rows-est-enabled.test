@@ -22,29 +22,29 @@ PLAN-ROOT SINK
 |
 02:NESTED LOOP JOIN [CROSS JOIN]
 |  mem-estimate=0B mem-reservation=0B thread-reservation=0
-|  tuple-ids=0,1 row-size=0B cardinality=550.56K
+|  tuple-ids=0,1 row-size=0B cardinality=574.56K
 |  in pipelines: 00(GETNEXT), 01(OPEN)
 |
 |--01:SCAN HDFS [functional_parquet.alltypestiny b]
-|     HDFS partitions=4/4 files=4 size=11.67KB
+|     HDFS partitions=4/4 files=4 size=11.92KB
 |     stored statistics:
 |       table: rows=unavailable size=unavailable
 |       partitions: 0/4 rows=unavailable
 |       columns: all
 |     extrapolated-rows=disabled max-scan-range-rows=unavailable
 |     mem-estimate=16.00MB mem-reservation=8.00KB thread-reservation=0
-|     tuple-ids=1 row-size=0B cardinality=742
+|     tuple-ids=1 row-size=0B cardinality=758
 |     in pipelines: 01(GETNEXT)
 |
 00:SCAN HDFS [functional_parquet.alltypestiny a]
-   HDFS partitions=4/4 files=4 size=11.67KB
+   HDFS partitions=4/4 files=4 size=11.92KB
    stored statistics:
      table: rows=unavailable size=unavailable
      partitions: 0/4 rows=unavailable
      columns: all
    extrapolated-rows=disabled max-scan-range-rows=unavailable
    mem-estimate=16.00MB mem-reservation=8.00KB thread-reservation=0
-   tuple-ids=0 row-size=0B cardinality=742
+   tuple-ids=0 row-size=0B cardinality=758
    in pipelines: 00(GETNEXT)
 ---- PARALLELPLANS
 NotImplementedException: MT_DOP not supported for plans with base table joins or table sinks.
@@ -72,22 +72,22 @@ PLAN-ROOT SINK
 |  fk/pk conjuncts: assumed fk/pk
 |  runtime filters: RF000[bloom] <- b.id
 |  mem-estimate=1.94MB mem-reservation=1.94MB spill-buffer=64.00KB thread-reservation=0
-|  tuple-ids=0,1 row-size=8B cardinality=742
+|  tuple-ids=0,1 row-size=8B cardinality=758
 |  in pipelines: 00(GETNEXT), 01(OPEN)
 |
 |--01:SCAN HDFS [functional_parquet.alltypestiny b]
-|     HDFS partitions=4/4 files=4 size=11.67KB
+|     HDFS partitions=4/4 files=4 size=11.92KB
 |     stored statistics:
 |       table: rows=unavailable size=unavailable
 |       partitions: 0/4 rows=unavailable
 |       columns: unavailable
 |     extrapolated-rows=disabled max-scan-range-rows=unavailable
 |     mem-estimate=16.00MB mem-reservation=8.00KB thread-reservation=0
-|     tuple-ids=1 row-size=4B cardinality=742
+|     tuple-ids=1 row-size=4B cardinality=758
 |     in pipelines: 01(GETNEXT)
 |
 00:SCAN HDFS [functional_parquet.alltypestiny a]
-   HDFS partitions=4/4 files=4 size=11.67KB
+   HDFS partitions=4/4 files=4 size=11.92KB
    runtime filters: RF000[bloom] -> a.id
    stored statistics:
      table: rows=unavailable size=unavailable
@@ -95,7 +95,7 @@ PLAN-ROOT SINK
      columns: unavailable
    extrapolated-rows=disabled max-scan-range-rows=unavailable
    mem-estimate=16.00MB mem-reservation=8.00KB thread-reservation=0
-   tuple-ids=0 row-size=4B cardinality=742
+   tuple-ids=0 row-size=4B cardinality=758
    in pipelines: 00(GETNEXT)
 ---- PARALLELPLANS
 NotImplementedException: MT_DOP not supported for plans with base table joins or table sinks.
@@ -127,7 +127,7 @@ PLAN-ROOT SINK
 |  in pipelines: 01(GETNEXT), 00(OPEN)
 |
 00:SCAN HDFS [functional_parquet.alltypes]
-   HDFS partitions=24/24 files=24 size=201.80KB
+   HDFS partitions=24/24 files=24 size=201.71KB
    predicates: id < CAST(10 AS INT)
    stored statistics:
      table: rows=unavailable size=unavailable
@@ -169,7 +169,7 @@ Per-Instance Resources: mem-estimate=128.18MB mem-reservation=34.00MB thread-res
 |  in pipelines: 04(GETNEXT), 00(OPEN)
 |
 03:EXCHANGE [HASH(bigint_col)]
-|  mem-estimate=186.69KB mem-reservation=0B thread-reservation=0
+|  mem-estimate=186.68KB mem-reservation=0B thread-reservation=0
 |  tuple-ids=1 row-size=16B cardinality=1.28K
 |  in pipelines: 00(GETNEXT)
 |
@@ -183,7 +183,7 @@ Per-Instance Resources: mem-estimate=144.00MB mem-reservation=34.02MB thread-res
 |  in pipelines: 00(GETNEXT)
 |
 00:SCAN HDFS [functional_parquet.alltypes, RANDOM]
-   HDFS partitions=24/24 files=24 size=201.80KB
+   HDFS partitions=24/24 files=24 size=201.71KB
    predicates: id < CAST(10 AS INT)
    stored statistics:
      table: rows=unavailable size=unavailable
@@ -223,7 +223,7 @@ PLAN-ROOT SINK
 |  in pipelines: 01(GETNEXT), 00(OPEN)
 |
 00:SCAN HDFS [functional_parquet.alltypes]
-   HDFS partitions=24/24 files=24 size=201.80KB
+   HDFS partitions=24/24 files=24 size=201.71KB
    predicates: id < CAST(10 AS INT)
    stored statistics:
      table: rows=unavailable size=unavailable
@@ -237,13 +237,13 @@ PLAN-ROOT SINK
    in pipelines: 00(GETNEXT)
 ---- PARALLELPLANS
 F02:PLAN FRAGMENT [UNPARTITIONED] hosts=1 instances=1
-|  Per-Instance Resources: mem-estimate=222.69KB mem-reservation=0B thread-reservation=1
+|  Per-Instance Resources: mem-estimate=222.68KB mem-reservation=0B thread-reservation=1
 PLAN-ROOT SINK
 |  output exprs: row_number()
 |  mem-estimate=0B mem-reservation=0B thread-reservation=0
 |
 04:EXCHANGE [UNPARTITIONED]
-|  mem-estimate=222.69KB mem-reservation=0B thread-reservation=0
+|  mem-estimate=222.68KB mem-reservation=0B thread-reservation=0
 |  tuple-ids=4,3 row-size=16B cardinality=1.28K
 |  in pipelines: 01(GETNEXT)
 |
@@ -272,7 +272,7 @@ Per-Instance Resources: mem-estimate=10.11MB mem-reservation=10.00MB thread-rese
 F00:PLAN FRAGMENT [RANDOM] hosts=3 instances=9
 Per-Instance Resources: mem-estimate=16.00MB mem-reservation=16.00KB thread-reservation=1
 00:SCAN HDFS [functional_parquet.alltypes, RANDOM]
-   HDFS partitions=24/24 files=24 size=201.80KB
+   HDFS partitions=24/24 files=24 size=201.71KB
    predicates: id < CAST(10 AS INT)
    stored statistics:
      table: rows=unavailable size=unavailable

@@ -34,7 +34,9 @@ JoinBuilder::JoinBuilder(TDataSinkId sink_id, const JoinBuilderConfig& sink_conf
   : DataSink(sink_id, sink_config, name, state),
     join_node_id_(sink_config.join_node_id_),
     join_op_(sink_config.join_op_),
-    is_separate_build_(sink_id != -1) {}
+    is_separate_build_(sink_id != -1),
+    num_probe_threads_(
+        is_separate_build_ ? state->instance_ctx().num_join_build_outputs : 1) {}
 
 JoinBuilder::~JoinBuilder() {
   DCHECK_EQ(0, probe_refcount_);
@@ -93,20 +95,30 @@ void JoinBuilder::HandoffToProbesAndWait(RuntimeState* build_side_state) {
   DCHECK(is_separate_build_) << "Doesn't make sense for embedded builder.";
   VLOG(2) << "Initial build ready JoinBuilder (id=" << join_node_id_ << ")";
   build_side_state->AddCancellationCV(&build_wakeup_cv_);
-  unique_lock<mutex> l(separate_build_lock_);
-  ready_to_probe_ = true;
-  outstanding_probes_ = 1; // TODO: IMPALA-9156: this will be the number of join nodes.
-  probe_wakeup_cv_.NotifyAll();
-  while (probe_refcount_ > 0
-      || (outstanding_probes_ > 0 && !build_side_state->is_cancelled())) {
-    SCOPED_TIMER(profile_->inactive_timer());
-    build_wakeup_cv_.Wait(l);
+  {
+    unique_lock<mutex> l(separate_build_lock_);
+    ready_to_probe_ = true;
+    outstanding_probes_ = num_probe_threads_;
+    DCHECK_GE(outstanding_probes_, 1);
+    VLOG(3) << "JoinBuilder (id=" << join_node_id_ << ")"
+            << " waiting for " << outstanding_probes_ << " probes.";
+    probe_wakeup_cv_.NotifyAll();
+    while (probe_refcount_ > 0
+        || (outstanding_probes_ > 0 && !build_side_state->is_cancelled())) {
+      SCOPED_TIMER(profile_->inactive_timer());
+      VLOG(3) << "JoinBuilder (id=" << join_node_id_ << ") waiting"
+              << " probe_refcount_=" << probe_refcount_
+              << " outstanding_probes_=" << outstanding_probes_
+              << " cancelled=" << build_side_state->is_cancelled();
+      build_wakeup_cv_.Wait(l);
+    }
+    // Don't let probe side pick up the builder when we're going to clean it up.
+    // Query cancellation will propagate to the probe finstance.
+    ready_to_probe_ = !build_side_state->is_cancelled();
+    VLOG(2) << "JoinBuilder (id=" << join_node_id_ << ") all probes complete. "
+            << " probe_refcount_=" << probe_refcount_
+            << " outstanding_probes_=" << outstanding_probes_
+            << " cancelled=" << build_side_state->is_cancelled();
   }
-  // Don't let probe side pick up the builder when we're going to clean it up.
-  // Query cancellation will propagate to the probe finstance.
-  ready_to_probe_ = !build_side_state->is_cancelled();
-  VLOG(2) << "JoinBuilder (id=" << join_node_id_ << ")"
-          << " all probes complete. cancelled=" << build_side_state->is_cancelled()
-          << " outstanding_probes_=" << outstanding_probes_;
 }
 } // namespace impala

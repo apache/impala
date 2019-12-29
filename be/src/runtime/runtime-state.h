@@ -56,6 +56,7 @@ class TPlanFragmentCtx;
 class TPlanFragmentInstanceCtx;
 class QueryState;
 class ConditionVariable;
+class CyclicBarrier;
 
 namespace io {
   class DiskIoMgr;
@@ -249,6 +250,12 @@ class RuntimeState {
   /// The condition variable must have query lifetime.
   void AddCancellationCV(ConditionVariable* cv);
 
+  /// Add a barrier to be cancelled when this RuntimeState is cancelled. Adding a barrier
+  /// multiple times is a no-op. Each distinct 'cb' will be cancelled with status code
+  /// CANCELLED_INTERNALLY when is_cancelled() becomes true. 'cb' must have query
+  /// lifetime.
+  void AddBarrierToCancel(CyclicBarrier* cb);
+
   RuntimeProfile::Counter* total_storage_wait_timer() {
     return total_storage_wait_timer_;
   }
@@ -436,6 +443,13 @@ class RuntimeState {
   /// Condition variables that will be signalled by Cancel(). Protected by
   /// 'cancellation_cvs_lock_'.
   std::vector<ConditionVariable*> cancellation_cvs_;
+
+  /// Cyclic barriers that will be signalled by Cancel(). Protected by
+  /// 'cancellation_cvs_lock_'.
+  std::vector<CyclicBarrier*> cancellation_cbs_;
+
+  /// Condition variables that will be signalled by Cancel(). Protected by
+  /// 'cancellation_cvs_lock_'.
   SpinLock cancellation_cvs_lock_;
 
   /// if true, ReleaseResources() was called.

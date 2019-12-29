@@ -178,7 +178,7 @@ public class ParallelPlanner {
       join.getFragment().removeChild(inputFragments.get(i));
       buildFragment.getChildren().add(inputFragments.get(i));
     }
-    join.getFragment().addChild(buildFragment);
+    buildFragment.setDestination(join);
 
     // assign plan and cohort id
     buildFragment.setPlanId(planIdGenerator_.getNextId());

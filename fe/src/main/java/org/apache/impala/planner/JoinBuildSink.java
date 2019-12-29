@@ -28,6 +28,9 @@ import org.apache.impala.thrift.TDataSinkType;
 import org.apache.impala.thrift.TExplainLevel;
 import org.apache.impala.thrift.TJoinBuildSink;
 import org.apache.impala.thrift.TQueryOptions;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
+
 import com.google.common.base.Preconditions;
 
 import static org.apache.impala.analysis.ToSqlOptions.DEFAULT;
@@ -36,6 +39,8 @@ import static org.apache.impala.analysis.ToSqlOptions.DEFAULT;
  * Sink to materialize the build side of a join.
  */
 public class JoinBuildSink extends DataSink {
+  private final static Logger LOG = LoggerFactory.getLogger(JoinBuildSink.class);
+
   // id of join's build-side table assigned during planning
   private final JoinTableId joinTableId_;
 
@@ -81,6 +86,7 @@ public class JoinBuildSink extends DataSink {
     for (RuntimeFilter filter : runtimeFilters_) {
       tBuildSink.addToRuntime_filters(filter.toThrift());
     }
+    tBuildSink.setShare_build(joinNode_.canShareBuild());
     tsink.setJoin_build_sink(tBuildSink);
   }
 
@@ -113,6 +119,25 @@ public class JoinBuildSink extends DataSink {
             runtimeFilters_, true, joinNode_.getId(), detailLevel));
       }
     }
+  }
+
+  /**
+   * Return an estimate of the number of nodes the fragment with this sink will run
+   * on. This is based on the number of nodes of the join node, since they are
+   * co-located.
+   */
+  public int getNumNodes() {
+    return joinNode_.getFragment().getNumNodes();
+  }
+
+  /**
+   * Return an estimate of the number of instances the fragment with this sink will run
+   * on. This is based on the number of instances or nodes of the join node, since they
+   * are co-located, but the build may be shared.
+   */
+  public int getNumInstances() {
+    return joinNode_.canShareBuild() ? joinNode_.getFragment().getNumNodes() :
+                                       joinNode_.getFragment().getNumInstances();
   }
 
   @Override

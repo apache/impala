@@ -659,6 +659,10 @@ struct TPlanFragmentInstanceCtx {
 
   // List of input join build finstances for joins in this finstance.
   9: optional list<TJoinBuildInput> join_build_inputs
+
+  // If this is a join build fragment, the number of fragment instances that consume the
+  // join build. -1 = invalid.
+  10: optional i32 num_join_build_outputs
 }
 
 

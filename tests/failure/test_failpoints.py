@@ -52,7 +52,11 @@ QUERIES = [
   "select 1 from alltypessmall order by id limit 100",
   "select * from alltypessmall union all select * from alltypessmall",
   "select row_number() over (partition by int_col order by id) from alltypessmall",
-  "select c from (select id c from alltypessmall order by id limit 10) v where c = 1"
+  "select c from (select id c from alltypessmall order by id limit 10) v where c = 1",
+  """SELECT STRAIGHT_JOIN *
+           FROM alltypes t1
+                  JOIN /*+broadcast*/ alltypesagg t2 ON t1.id = t2.id
+           WHERE t2.int_col < 1000"""
 ]
 
 @SkipIf.skip_hbase # -skip_hbase argument specified

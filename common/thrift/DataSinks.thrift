@@ -117,6 +117,10 @@ struct TJoinBuildSink {
   // Hash seed to use. Only set for hash join builds. Must be the same as the join node's
   // hash seed. Must be positive.
   5: optional i32 hash_seed
+
+  // If true, join build sharing is enabled and, if multiple instances of a join node are
+  // scheduled on the same backend, they will share the join build on that backend.
+  6: optional bool share_build
 }
 
 struct TPlanRootSink {

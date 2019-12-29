@@ -63,6 +63,7 @@ public class SingularRowSrcNode extends PlanNode {
     // The containing SubplanNode has not yet been initialized, so get the number
     // of nodes from the SubplanNode's input.
     numNodes_ = containingSubplanNode_.getChild(0).getNumNodes();
+    numInstances_ = containingSubplanNode_.getChild(0).getNumInstances();
   }
 
   @Override

@@ -20,6 +20,7 @@ package org.apache.impala.planner;
 import java.io.IOException;
 import java.util.ArrayList;
 import java.util.Collections;
+import java.util.HashMap;
 import java.util.HashSet;
 import java.util.LinkedHashMap;
 import java.util.List;
@@ -1237,10 +1238,16 @@ public class HdfsScanNode extends ScanNode {
   protected void computeNumNodes(Analyzer analyzer, long cardinality) {
     Preconditions.checkNotNull(scanRangeSpecs_);
     ExecutorMembershipSnapshot cluster = ExecutorMembershipSnapshot.getCluster();
-    Set<TNetworkAddress> localHostSet = new HashSet<>();
+    final int maxInstancesPerNode = getMaxInstancesPerNode(analyzer);
+    final int maxPossibleInstances = cluster.numExecutors() * maxInstancesPerNode;
     int totalNodes = 0;
+    int totalInstances = 0;
     int numLocalRanges = 0;
     int numRemoteRanges = 0;
+    // Counts the number of local ranges, capped at maxInstancesPerNode.
+    Map<TNetworkAddress, Integer> localRangeCounts = new HashMap<>();
+    // Sum of the counter values in localRangeCounts.
+    int totalLocalParallelism = 0;
     if (scanRangeSpecs_.isSetConcrete_ranges()) {
       if (analyzer.getQueryOptions().planner_testcase_mode) {
         // TODO: Have a separate scan node implementation that mocks an HDFS scan
@@ -1255,11 +1262,13 @@ public class HdfsScanNode extends ScanNode {
             ++numLocalRanges;
           }
         }
-        totalNodes = Math.min(
-            scanRangeSpecs_.concrete_ranges.size(), dummyHostIndex.size());
-        LOG.info(String.format("Planner running in DEBUG mode. ScanNode: %s, " +
-            "TotalNodes %d, Local Ranges %d", tbl_.getFullName(), totalNodes,
-            numLocalRanges));
+        totalNodes =
+            Math.min(scanRangeSpecs_.concrete_ranges.size(), dummyHostIndex.size());
+        totalInstances = Math.min(scanRangeSpecs_.concrete_ranges.size(),
+            totalNodes * maxInstancesPerNode);
+        LOG.info(String.format("Planner running in DEBUG mode. ScanNode: %s, "
+                + "TotalNodes %d, TotalInstances %d Local Ranges %d",
+            tbl_.getFullName(), totalNodes, totalInstances, numLocalRanges));
       } else {
         for (TScanRangeLocationList range : scanRangeSpecs_.concrete_ranges) {
           boolean anyLocal = false;
@@ -1274,7 +1283,11 @@ public class HdfsScanNode extends ScanNode {
                 // host.  This assumes that when an impalad is colocated with a datanode,
                 // there are the same number of impalads as datanodes on this host in this
                 // cluster.
-                localHostSet.add(dataNode);
+                int count = localRangeCounts.getOrDefault(dataNode, 0);
+                if (count < maxInstancesPerNode) {
+                  ++totalLocalParallelism;
+                  localRangeCounts.put(dataNode, count + 1);
+                }
               }
             }
           }
@@ -1288,35 +1301,61 @@ public class HdfsScanNode extends ScanNode {
           // Approximate the number of nodes that will execute locally assigned ranges to
           // be the smaller of the number of locally assigned ranges and the number of
           // hosts that hold block replica for those ranges.
-          int numLocalNodes = Math.min(numLocalRanges, localHostSet.size());
+          int numLocalNodes = Math.min(numLocalRanges, localRangeCounts.size());
           // The remote ranges are round-robined across all the impalads.
           int numRemoteNodes = Math.min(numRemoteRanges, cluster.numExecutors());
           // The local and remote assignments may overlap, but we don't know by how much
           // so conservatively assume no overlap.
           totalNodes = Math.min(numLocalNodes + numRemoteNodes, cluster.numExecutors());
-          // Exit early if all hosts have a scan range assignment, to avoid extraneous
-          // work in case the number of scan ranges dominates the number of nodes.
-          if (totalNodes == cluster.numExecutors()) break;
+          totalInstances = computeNumInstances(numLocalRanges, numRemoteRanges,
+              totalNodes, maxInstancesPerNode, totalLocalParallelism);
+          // Exit early if we have maxed out our estimate of hosts/instances, to avoid
+          // extraneous work in case the number of scan ranges dominates the number of
+          // nodes.
+          if (totalInstances == maxPossibleInstances) break;
         }
       }
     }
-    // Handle the generated range specifications.
-    if (totalNodes < cluster.numExecutors() && scanRangeSpecs_.isSetSplit_specs()) {
+    // Handle the generated range specifications, which may increase our estimates of
+    // number of nodes.
+    if (totalInstances < maxPossibleInstances && scanRangeSpecs_.isSetSplit_specs()) {
       Preconditions.checkState(
           generatedScanRangeCount_ >= scanRangeSpecs_.getSplit_specsSize());
       numRemoteRanges += generatedScanRangeCount_;
-      totalNodes = Math.min(numRemoteRanges, cluster.numExecutors());
+      int numLocalNodes = Math.min(numLocalRanges, localRangeCounts.size());
+      totalNodes = Math.min(numLocalNodes + numRemoteRanges, cluster.numExecutors());
+      totalInstances = computeNumInstances(numLocalRanges, numRemoteRanges,
+          totalNodes, maxInstancesPerNode, totalLocalParallelism);
     }
     // Tables can reside on 0 nodes (empty table), but a plan node must always be
     // executed on at least one node.
     numNodes_ = (cardinality == 0 || totalNodes == 0) ? 1 : totalNodes;
+    numInstances_ = (cardinality == 0 || totalInstances == 0) ? 1 : totalInstances;
     if (LOG.isTraceEnabled()) {
       LOG.trace("computeNumNodes totalRanges="
           + (scanRangeSpecs_.getConcrete_rangesSize() + generatedScanRangeCount_)
           + " localRanges=" + numLocalRanges + " remoteRanges=" + numRemoteRanges
-          + " localHostSet.size=" + localHostSet.size()
-          + " executorNodes=" + cluster.numExecutors());
+          + " localRangeCounts.size=" + localRangeCounts.size()
+          + " totalLocalParallelism=" + totalLocalParallelism
+          + " executorNodes=" + cluster.numExecutors() + " "
+          + " numNodes=" + numNodes_ + " numInstances=" + numInstances_);
     }
+  }
+
+  /**
+   * Compute an estimate of the number of instances based on the total number of local
+   * and remote ranges, the estimated number of nodes, the maximum possible number
+   * of instances we can schedule on a node, and the total number of local instances
+   * across nodes.
+   */
+  private int computeNumInstances(int numLocalRanges, int numRemoteRanges, int numNodes,
+      int maxInstancesPerNode, int totalLocalParallelism) {
+    // Estimate the total number of instances, based on two upper bounds:
+    // * The number of scan ranges to process, excluding local ranges in excess of
+    //   maxInstancesPerNode.
+    // * The maximum parallelism allowed across all the nodes that will participate.
+    int numLocalInstances = Math.min(numLocalRanges, totalLocalParallelism);
+    return Math.min(numLocalInstances + numRemoteRanges, numNodes * maxInstancesPerNode);
   }
 
   @Override

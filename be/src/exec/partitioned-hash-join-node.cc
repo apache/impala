@@ -267,6 +267,7 @@ Status PartitionedHashJoinNode::Reset(RuntimeState* state, RowBatch* row_batch) 
   }
   output_unmatched_batch_.reset();
   output_unmatched_batch_iter_.reset();
+  flushed_unattachable_build_buffers_ = false;
   return BlockingJoinNode::Reset(state, row_batch);
 }
 
@@ -588,12 +589,23 @@ Status PartitionedHashJoinNode::GetNext(
           probe_state_ = ProbeState::PROBING_IN_BATCH;
         } else if (probe_eos) {
           DCHECK_EQ(probe_batch_pos_, -1);
-          // Finished processing all the probe rows for the current hash partitions.
-          // There may be some partitions that need to outpt their unmatched build rows.
-          RETURN_IF_ERROR(DoneProbing(state, out_batch));
-          probe_state_ = output_build_partitions_.empty() ?
-              ProbeState::PROBE_COMPLETE :
-              ProbeState::OUTPUTTING_UNMATCHED;
+          if (UseSeparateBuild(state->query_options())
+              && !flushed_unattachable_build_buffers_ && ReturnsBuildData(join_op_)) {
+            // Can't attach build-side data because it may be referenced by multiple
+            // finstances. Note that this makes the batch AtCapacity(), so we will exit
+            // the loop below.
+            // TODO: IMPALA-9411: implement shared ownership of buffers to avoid this.
+            flushed_unattachable_build_buffers_ = true;
+            out_batch->MarkNeedsDeepCopy();
+          } else {
+            // Finished processing all the probe rows for the current hash partitions.
+            // There may be some partitions that need to outpt their unmatched build rows.
+            RETURN_IF_ERROR(DoneProbing(state, out_batch));
+            probe_state_ = output_build_partitions_.empty() ?
+                ProbeState::PROBE_COMPLETE :
+                ProbeState::OUTPUTTING_UNMATCHED;
+            flushed_unattachable_build_buffers_ = false;
+          }
         } else {
           // Got an empty batch with resources that we need to flush before getting the
           // next batch.
@@ -1187,7 +1199,8 @@ Status PartitionedHashJoinNode::DoneProbing(RuntimeState* state, RowBatch* batch
           }
         }
       } else if (probe_partition->probe_rows()->num_rows() != 0
-          || NeedToProcessUnmatchedBuildRows(join_op_)) {
+          || NeedToProcessUnmatchedBuildRows(join_op_)
+          || builder_->num_probe_threads() > 1) {
         num_spilled_probe_rows[i] = probe_partition->probe_rows()->num_rows();
         // Unpin the probe stream to free up more memory. We need to free all memory so we
         // can recurse the algorithm and create new hash partitions from spilled
@@ -1200,6 +1213,8 @@ Status PartitionedHashJoinNode::DoneProbing(RuntimeState* state, RowBatch* batch
         // There's no more processing to do for this partition, and since there were no
         // probe rows we didn't return any rows that reference memory from these
         // partitions, so just free the resources.
+        // Avoid doing this for shared builds so that all probe threads have the same
+        // number of partitions, which simplifies logic.
         probe_partition->Close(nullptr);
       }
     }
@@ -1265,12 +1280,13 @@ string PartitionedHashJoinNode::NodeDebugString() const {
       PhjBuilder::Partition* build_partition = probe_partition->build_partition();
       DCHECK(build_partition->is_spilled());
       DCHECK(build_partition->hash_tbl() == NULL);
-      DCHECK(build_partition->build_rows() != NULL);
-      DCHECK(probe_partition->probe_rows() != NULL);
+      int build_rows = build_partition->build_rows() == nullptr ?  -1 :
+          build_partition->build_rows()->num_rows();
+      int probe_rows = probe_partition->probe_rows() == nullptr ?  -1 :
+          probe_partition->probe_rows()->num_rows();
       ss << "  ProbePartition (id=" << entry.first << "):" << probe_partition << endl
-         << "   Spilled Build Rows: " << build_partition->build_rows()->num_rows() << endl
-         << "   Spilled Probe Rows: " << probe_partition->probe_rows()->num_rows()
-         << endl;
+         << "   Spilled Build Rows: " << build_rows << endl
+         << "   Spilled Probe Rows: " << probe_rows << endl;
     }
   }
   if (input_partition_ != NULL) {

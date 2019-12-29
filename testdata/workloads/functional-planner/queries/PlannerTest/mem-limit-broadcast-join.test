@@ -54,9 +54,9 @@ PLAN-ROOT SINK
 ---- PARALLELPLANS
 PLAN-ROOT SINK
 |
-05:EXCHANGE [UNPARTITIONED]
+04:EXCHANGE [UNPARTITIONED]
 |
-02:HASH JOIN [INNER JOIN, PARTITIONED]
+02:HASH JOIN [INNER JOIN, BROADCAST]
 |  hash predicates: c_nationkey = n_nationkey
 |  row-size=327B cardinality=150.00K
 |
@@ -65,13 +65,11 @@ PLAN-ROOT SINK
 |  |  build expressions: n_nationkey
 |  |  runtime filters: RF000 <- n_nationkey
 |  |
-|  04:EXCHANGE [HASH(n_nationkey)]
+|  03:EXCHANGE [BROADCAST]
 |  |
 |  01:SCAN HDFS [tpch.nation]
 |     HDFS partitions=1/1 files=1 size=2.15KB
 |     row-size=109B cardinality=25
-|
-03:EXCHANGE [HASH(c_nationkey)]
 |
 00:SCAN HDFS [tpch.customer]
    HDFS partitions=1/1 files=1 size=23.08MB

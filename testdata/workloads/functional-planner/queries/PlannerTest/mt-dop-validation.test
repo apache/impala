@@ -21,7 +21,7 @@ PLAN-ROOT SINK
 |  in pipelines: 00(GETNEXT), 01(OPEN)
 |
 |--01:SCAN HDFS [functional_parquet.alltypestiny b]
-|     HDFS partitions=4/4 files=4 size=11.67KB
+|     HDFS partitions=4/4 files=4 size=11.92KB
 |     stored statistics:
 |       table: rows=unavailable size=unavailable
 |       partitions: 0/4 rows=unavailable
@@ -32,7 +32,7 @@ PLAN-ROOT SINK
 |     in pipelines: 01(GETNEXT)
 |
 00:SCAN HDFS [functional_parquet.alltypestiny a]
-   HDFS partitions=4/4 files=4 size=11.67KB
+   HDFS partitions=4/4 files=4 size=11.92KB
    stored statistics:
      table: rows=unavailable size=unavailable
      partitions: 0/4 rows=unavailable
@@ -71,7 +71,7 @@ PLAN-ROOT SINK
 |  in pipelines: 00(GETNEXT), 01(OPEN)
 |
 |--01:SCAN HDFS [functional_parquet.alltypestiny b]
-|     HDFS partitions=4/4 files=4 size=11.67KB
+|     HDFS partitions=4/4 files=4 size=11.92KB
 |     stored statistics:
 |       table: rows=unavailable size=unavailable
 |       partitions: 0/4 rows=unavailable
@@ -82,7 +82,7 @@ PLAN-ROOT SINK
 |     in pipelines: 01(GETNEXT)
 |
 00:SCAN HDFS [functional_parquet.alltypestiny a]
-   HDFS partitions=4/4 files=4 size=11.67KB
+   HDFS partitions=4/4 files=4 size=11.92KB
    runtime filters: RF000[bloom] -> a.id
    stored statistics:
      table: rows=unavailable size=unavailable
@@ -137,7 +137,7 @@ WRITE TO HDFS [default.ctas_mt_dop_test, OVERWRITE=false]
 |  mem-estimate=100.00KB mem-reservation=0B thread-reservation=0
 |
 00:SCAN HDFS [functional_parquet.alltypes]
-   HDFS partitions=24/24 files=24 size=201.80KB
+   HDFS partitions=24/24 files=24 size=201.71KB
    stored statistics:
      table: rows=unavailable size=unavailable
      partitions: 0/24 rows=unavailable
@@ -176,7 +176,7 @@ PLAN-ROOT SINK
 |  in pipelines: 01(GETNEXT), 00(OPEN)
 |
 00:SCAN HDFS [functional_parquet.alltypes]
-   HDFS partitions=24/24 files=24 size=201.80KB
+   HDFS partitions=24/24 files=24 size=201.71KB
    predicates: id < CAST(10 AS INT)
    stored statistics:
      table: rows=unavailable size=unavailable
@@ -232,7 +232,7 @@ Per-Instance Resources: mem-estimate=144.00MB mem-reservation=34.02MB thread-res
 |  in pipelines: 00(GETNEXT)
 |
 00:SCAN HDFS [functional_parquet.alltypes, RANDOM]
-   HDFS partitions=24/24 files=24 size=201.80KB
+   HDFS partitions=24/24 files=24 size=201.71KB
    predicates: id < CAST(10 AS INT)
    stored statistics:
      table: rows=unavailable size=unavailable
@@ -272,7 +272,7 @@ PLAN-ROOT SINK
 |  in pipelines: 01(GETNEXT), 00(OPEN)
 |
 00:SCAN HDFS [functional_parquet.alltypes]
-   HDFS partitions=24/24 files=24 size=201.80KB
+   HDFS partitions=24/24 files=24 size=201.71KB
    predicates: id < CAST(10 AS INT)
    stored statistics:
      table: rows=unavailable size=unavailable
@@ -321,7 +321,7 @@ Per-Instance Resources: mem-estimate=10.11MB mem-reservation=10.00MB thread-rese
 F00:PLAN FRAGMENT [RANDOM] hosts=3 instances=9
 Per-Instance Resources: mem-estimate=16.00MB mem-reservation=16.00KB thread-reservation=1
 00:SCAN HDFS [functional_parquet.alltypes, RANDOM]
-   HDFS partitions=24/24 files=24 size=201.80KB
+   HDFS partitions=24/24 files=24 size=201.71KB
    predicates: id < CAST(10 AS INT)
    stored statistics:
      table: rows=unavailable size=unavailable
@@ -390,14 +390,14 @@ PLAN-ROOT SINK
 |     in pipelines: 00(GETNEXT)
 |
 00:SCAN HDFS [tpch_nested_parquet.customer c]
-   HDFS partitions=1/1 files=4 size=288.99MB
+   HDFS partitions=1/1 files=4 size=289.17MB
    predicates: c_custkey < CAST(10 AS BIGINT), !empty(c.c_orders)
    predicates on o: !empty(o.o_lineitems), o_orderkey < CAST(5 AS BIGINT)
    predicates on o_lineitems: l_linenumber < CAST(3 AS INT)
    stored statistics:
-     table: rows=150.00K size=288.99MB
+     table: rows=150.00K size=289.17MB
      columns missing stats: c_orders
-   extrapolated-rows=disabled max-scan-range-rows=50.12K
+   extrapolated-rows=disabled max-scan-range-rows=50.11K
    parquet statistics predicates: c_custkey < CAST(10 AS BIGINT)
    parquet statistics predicates on o: o_orderkey < CAST(5 AS BIGINT)
    parquet statistics predicates on o_lineitems: l_linenumber < CAST(3 AS INT)
@@ -409,17 +409,17 @@ PLAN-ROOT SINK
    in pipelines: 00(GETNEXT)
 ---- PARALLELPLANS
 F01:PLAN FRAGMENT [UNPARTITIONED] hosts=1 instances=1
-|  Per-Instance Resources: mem-estimate=14.34MB mem-reservation=0B thread-reservation=1
+|  Per-Instance Resources: mem-estimate=11.93MB mem-reservation=0B thread-reservation=1
 PLAN-ROOT SINK
 |  output exprs: c.c_custkey, c.c_name, c.c_address, c.c_nationkey, c.c_phone, c.c_acctbal, c.c_mktsegment, c.c_comment, o.item.o_orderkey, o.item.o_orderstatus, o.item.o_totalprice, o.item.o_orderdate, o.item.o_orderpriority, o.item.o_clerk, o.item.o_shippriority, o.item.o_comment, o_lineitems.item.l_partkey, o_lineitems.item.l_suppkey, o_lineitems.item.l_linenumber, o_lineitems.item.l_quantity, o_lineitems.item.l_extendedprice, o_lineitems.item.l_discount, o_lineitems.item.l_tax, o_lineitems.item.l_returnflag, o_lineitems.item.l_linestatus, o_lineitems.item.l_shipdate, o_lineitems.item.l_commitdate, o_lineitems.item.l_receiptdate, o_lineitems.item.l_shipinstruct, o_lineitems.item.l_shipmode, o_lineitems.item.l_comment
 |  mem-estimate=0B mem-reservation=0B thread-reservation=0
 |
 09:EXCHANGE [UNPARTITIONED]
-|  mem-estimate=14.34MB mem-reservation=0B thread-reservation=0
+|  mem-estimate=11.93MB mem-reservation=0B thread-reservation=0
 |  tuple-ids=2,1,0 row-size=482B cardinality=1.50M
 |  in pipelines: 00(GETNEXT)
 |
-F00:PLAN FRAGMENT [RANDOM] hosts=3 instances=9
+F00:PLAN FRAGMENT [RANDOM] hosts=3 instances=4
 Per-Instance Resources: mem-estimate=104.00MB mem-reservation=104.00MB thread-reservation=1
 01:SUBPLAN
 |  mem-estimate=0B mem-reservation=0B thread-reservation=0
@@ -466,14 +466,14 @@ Per-Instance Resources: mem-estimate=104.00MB mem-reservation=104.00MB thread-re
 |     in pipelines: 00(GETNEXT)
 |
 00:SCAN HDFS [tpch_nested_parquet.customer c, RANDOM]
-   HDFS partitions=1/1 files=4 size=288.99MB
+   HDFS partitions=1/1 files=4 size=289.17MB
    predicates: c_custkey < CAST(10 AS BIGINT), !empty(c.c_orders)
    predicates on o: !empty(o.o_lineitems), o_orderkey < CAST(5 AS BIGINT)
    predicates on o_lineitems: l_linenumber < CAST(3 AS INT)
    stored statistics:
-     table: rows=150.00K size=288.99MB
+     table: rows=150.00K size=289.17MB
      columns missing stats: c_orders
-   extrapolated-rows=disabled max-scan-range-rows=50.12K
+   extrapolated-rows=disabled max-scan-range-rows=50.11K
    parquet statistics predicates: c_custkey < CAST(10 AS BIGINT)
    parquet statistics predicates on o: o_orderkey < CAST(5 AS BIGINT)
    parquet statistics predicates on o_lineitems: l_linenumber < CAST(3 AS INT)
@@ -531,13 +531,13 @@ PLAN-ROOT SINK
 |     in pipelines: 00(GETNEXT)
 |
 00:SCAN HDFS [tpch_nested_parquet.customer c]
-   HDFS partitions=1/1 files=4 size=288.99MB
+   HDFS partitions=1/1 files=4 size=289.17MB
    predicates: !empty(c.c_orders), !empty(c.c_orders)
    predicates on o1: o1.o_orderkey < CAST(5 AS BIGINT)
    stored statistics:
-     table: rows=150.00K size=288.99MB
+     table: rows=150.00K size=289.17MB
      columns missing stats: c_orders, c_orders
-   extrapolated-rows=disabled max-scan-range-rows=50.12K
+   extrapolated-rows=disabled max-scan-range-rows=50.11K
    parquet statistics predicates on o1: o1.o_orderkey < CAST(5 AS BIGINT)
    parquet dictionary predicates on o1: o1.o_orderkey < CAST(5 AS BIGINT)
    mem-estimate=88.00MB mem-reservation=16.00MB thread-reservation=0
@@ -545,17 +545,17 @@ PLAN-ROOT SINK
    in pipelines: 00(GETNEXT)
 ---- PARALLELPLANS
 F01:PLAN FRAGMENT [UNPARTITIONED] hosts=1 instances=1
-|  Per-Instance Resources: mem-estimate=12.37MB mem-reservation=0B thread-reservation=1
+|  Per-Instance Resources: mem-estimate=11.05MB mem-reservation=0B thread-reservation=1
 PLAN-ROOT SINK
 |  output exprs: c.c_custkey, c.c_name, c.c_address, c.c_nationkey, c.c_phone, c.c_acctbal, c.c_mktsegment, c.c_comment
 |  mem-estimate=0B mem-reservation=0B thread-reservation=0
 |
 07:EXCHANGE [UNPARTITIONED]
-|  mem-estimate=12.37MB mem-reservation=0B thread-reservation=0
+|  mem-estimate=11.05MB mem-reservation=0B thread-reservation=0
 |  tuple-ids=1,0,2 row-size=258B cardinality=1.50M
 |  in pipelines: 00(GETNEXT)
 |
-F00:PLAN FRAGMENT [RANDOM] hosts=3 instances=9
+F00:PLAN FRAGMENT [RANDOM] hosts=3 instances=4
 Per-Instance Resources: mem-estimate=89.94MB mem-reservation=17.94MB thread-reservation=1
 01:SUBPLAN
 |  mem-estimate=0B mem-reservation=0B thread-reservation=0
@@ -593,13 +593,13 @@ Per-Instance Resources: mem-estimate=89.94MB mem-reservation=17.94MB thread-rese
 |     in pipelines: 00(GETNEXT)
 |
 00:SCAN HDFS [tpch_nested_parquet.customer c, RANDOM]
-   HDFS partitions=1/1 files=4 size=288.99MB
+   HDFS partitions=1/1 files=4 size=289.17MB
    predicates: !empty(c.c_orders), !empty(c.c_orders)
    predicates on o1: o1.o_orderkey < CAST(5 AS BIGINT)
    stored statistics:
-     table: rows=150.00K size=288.99MB
+     table: rows=150.00K size=289.17MB
      columns missing stats: c_orders, c_orders
-   extrapolated-rows=disabled max-scan-range-rows=50.12K
+   extrapolated-rows=disabled max-scan-range-rows=50.11K
    parquet statistics predicates on o1: o1.o_orderkey < CAST(5 AS BIGINT)
    parquet dictionary predicates on o1: o1.o_orderkey < CAST(5 AS BIGINT)
    mem-estimate=88.00MB mem-reservation=16.00MB thread-reservation=0

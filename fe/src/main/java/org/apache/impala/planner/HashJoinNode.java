@@ -217,25 +217,22 @@ public class HashJoinNode extends JoinNode {
   @Override
   public Pair<ResourceProfile, ResourceProfile> computeJoinResourceProfile(
       TQueryOptions queryOptions) {
-    long perInstanceMemEstimate;
-    long perInstanceDataBytes;
-    int numInstances = fragment_.getNumInstances(queryOptions.getMt_dop());
+    long perBuildInstanceMemEstimate;
+    long perBuildInstanceDataBytes;
+    int numInstances = fragment_.getNumInstances();
     if (getChild(1).getCardinality() == -1 || getChild(1).getAvgRowSize() == -1
         || numInstances <= 0) {
-      perInstanceMemEstimate = DEFAULT_PER_INSTANCE_MEM;
-      perInstanceDataBytes = -1;
+      perBuildInstanceMemEstimate = DEFAULT_PER_INSTANCE_MEM;
+      perBuildInstanceDataBytes = -1;
     } else {
-      // TODO: IMPALA-4224: update this once we can share the broadcast join data between
-      // finstances. Currently this implicitly assumes that each instance has a copy of
-      // the hash tables.
-      perInstanceDataBytes = (long) Math.ceil(getChild(1).cardinality_
+      perBuildInstanceDataBytes = (long) Math.ceil(getChild(1).cardinality_
           * getChild(1).avgRowSize_);
       // Assume the rows are evenly divided among instances.
       if (distrMode_ == DistributionMode.PARTITIONED) {
-        perInstanceDataBytes /= numInstances;
+        perBuildInstanceDataBytes /= numInstances;
       }
-      perInstanceMemEstimate = (long) Math.ceil(
-          perInstanceDataBytes * PlannerContext.HASH_TBL_SPACE_OVERHEAD);
+      perBuildInstanceMemEstimate = (long) Math.ceil(
+          perBuildInstanceDataBytes * PlannerContext.HASH_TBL_SPACE_OVERHEAD);
     }
 
     // Must be kept in sync with PartitionedHashJoinBuilder::MinReservation() in be.
@@ -244,8 +241,8 @@ public class HashJoinNode extends JoinNode {
         + (joinOp_ == JoinOperator.NULL_AWARE_LEFT_ANTI_JOIN ? 1 : 0);
 
     long bufferSize = queryOptions.getDefault_spillable_buffer_size();
-    if (perInstanceDataBytes != -1) {
-      long bytesPerBuffer = perInstanceDataBytes / PARTITION_FANOUT;
+    if (perBuildInstanceDataBytes != -1) {
+      long bytesPerBuffer = perBuildInstanceDataBytes / PARTITION_FANOUT;
       // Scale down the buffer size if we think there will be excess free space with the
       // default buffer size, e.g. if the right side is a small dimension table.
       bufferSize = Math.min(bufferSize, Math.max(
@@ -259,6 +256,14 @@ public class HashJoinNode extends JoinNode {
         computeMaxSpillableBufferSize(bufferSize, queryOptions.getMax_row_size());
     long perInstanceBuildMinMemReservation =
         bufferSize * (minBuildBuffers - 2) + maxRowBufferSize * 2;
+    if (queryOptions.mt_dop > 0 && canShareBuild()) {
+      // Ensure we reserve enough memory to hand off to the PartitionedHashJoinNodes for
+      // probe streams when spilling. mt_dop is an upper bound on the number of
+      // PartitionedHashJoinNodes per builder.
+      // TODO: IMPALA-9416: be less conservative here
+      // TODO: how did we not detect the reservation bug here with spilling?
+      perInstanceBuildMinMemReservation *= queryOptions.mt_dop;
+    }
     // Most reservation for probe buffers is obtained from the join builder when
     // spilling. However, for NAAJ, two additional probe streams are needed that
     // are used exclusively by the probe side.
@@ -279,7 +284,7 @@ public class HashJoinNode extends JoinNode {
         .setSpillableBufferBytes(bufferSize)
         .setMaxRowBufferBytes(maxRowBufferSize).build();
     ResourceProfile buildProfile = new ResourceProfileBuilder()
-        .setMemEstimateBytes(perInstanceMemEstimate)
+        .setMemEstimateBytes(perBuildInstanceMemEstimate)
         .setMinMemReservationBytes(perInstanceBuildMinMemReservation)
         .setSpillableBufferBytes(bufferSize)
         .setMaxRowBufferBytes(maxRowBufferSize).build();

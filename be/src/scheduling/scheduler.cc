@@ -535,20 +535,29 @@ void Scheduler::CreateCollocatedJoinBuildInstances(
       schedule->GetFragmentExecParams(join_fragment_idx);
   DCHECK(!join_fragment_params->instance_exec_params.empty())
       << "Parent fragment instances must already be created.";
+  vector<FInstanceExecParams>* instance_exec_params =
+      &fragment_params->instance_exec_params;
+  bool share_build = fragment.output_sink.join_build_sink.share_build;
   int per_fragment_instance_idx = 0;
   for (FInstanceExecParams& parent_exec_params :
       join_fragment_params->instance_exec_params) {
-    TUniqueId instance_id = schedule->GetNextInstanceId();
-    fragment_params->instance_exec_params.emplace_back(instance_id,
-        parent_exec_params.host, parent_exec_params.krpc_host,
-        per_fragment_instance_idx++, *fragment_params);
+    // Share the build if join build sharing is enabled for this fragment and the previous
+    // instance was on the same host (instances for a backend are clustered together).
+    if (!share_build || instance_exec_params->empty()
+        || instance_exec_params->back().krpc_host != parent_exec_params.krpc_host) {
+      TUniqueId instance_id = schedule->GetNextInstanceId();
+      instance_exec_params->emplace_back(instance_id, parent_exec_params.host,
+          parent_exec_params.krpc_host, per_fragment_instance_idx++, *fragment_params);
+      instance_exec_params->back().num_join_build_outputs = 0;
+    }
     TJoinBuildInput build_input;
     build_input.__set_join_node_id(sink.dest_node_id);
-    build_input.__set_input_finstance_id(instance_id);
+    build_input.__set_input_finstance_id(instance_exec_params->back().instance_id);
     parent_exec_params.join_build_inputs.emplace_back(build_input);
     VLOG(3) << "Linked join build for node id=" << sink.dest_node_id
-            << " build finstance=" << PrintId(instance_id)
+            << " build finstance=" << PrintId(instance_exec_params->back().instance_id)
             << " dst finstance=" << PrintId(parent_exec_params.instance_id);
+    ++instance_exec_params->back().num_join_build_outputs;
   }
 }
 
