@@ -146,6 +146,12 @@ mkdir -p hive-site-ext
 rm -f hive-site-ext/hive-site.xml
 ln -s "${CONFIG_DIR}/hive-site_ext.xml" hive-site-ext/hive-site.xml
 
+export HIVE_VARIANT=without_hms_config
+$IMPALA_HOME/bin/generate_xml_config.py hive-site.xml.py hive-site_without_hms.xml
+mkdir -p hive-site-without-hms
+rm -f hive-site-without-hms/hive-site.xml
+ln -s "${CONFIG_DIR}/hive-site_without_hms.xml" hive-site-without-hms/hive-site.xml
+
 generate_config hive-log4j2.properties.template hive-log4j2.properties
 
 if [ $CREATE_METASTORE -eq 1 ]; then

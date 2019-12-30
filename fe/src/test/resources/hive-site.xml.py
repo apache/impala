@@ -22,7 +22,6 @@ import os
 hive_major_version = int(os.environ['IMPALA_HIVE_VERSION'][0])
 kerberize = os.environ.get('IMPALA_KERBERIZE') == '1'
 variant = os.environ.get('HIVE_VARIANT')
-kudu_variant = os.environ.get('KUDU_VARIANT')
 
 CONFIG = {
   'dfs.replication': '3'
@@ -143,7 +142,7 @@ CONFIG.update({
  'hive.metastore.dml.events': 'true',
 })
 
-if kudu_variant == 'without_hms_config':
+if variant == 'without_hms_config':
   CONFIG.clear()
 
 # Database and JDO-related configs:
