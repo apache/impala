@@ -1028,4 +1028,14 @@ public class PlannerTest extends PlannerTestBase {
     options.setExplain_level(TExplainLevel.EXTENDED);
     runPlannerTestFile("preagg-bytes-limit", "tpch_parquet", options);
   }
+
+  /**
+   * Check conversion of predicates to conjunctive normal form.
+   */
+  @Test
+  public void testConvertToCNF() {
+    TQueryOptions options = new TQueryOptions();
+    options.setEnable_cnf_rewrites(true);
+    runPlannerTestFile("convert-to-cnf", "tpch_parquet", options);
+  }
 }

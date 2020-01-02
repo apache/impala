@@ -410,6 +410,12 @@ struct TQueryOptions {
 
   // See comment in ImpalaService.thrift
   99: optional i64 preagg_bytes_limit = -1;
+
+  // See comment in ImpalaService.thrift
+  100: optional bool enable_cnf_rewrites = false;
+
+  // See comment in ImpalaService.thrift
+  101: optional i32 max_cnf_exprs = 0;
 }
 
 // Impala currently has two types of sessions: Beeswax and HiveServer2

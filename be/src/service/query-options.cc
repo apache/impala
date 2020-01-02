@@ -531,6 +531,10 @@ Status impala::SetQueryOption(const string& key, const string& value,
         query_options->__set_enable_expr_rewrites(IsTrue(value));
         break;
       }
+      case TImpalaQueryOptions::ENABLE_CNF_REWRITES: {
+        query_options->__set_enable_cnf_rewrites(IsTrue(value));
+        break;
+      }
       case TImpalaQueryOptions::DECIMAL_V2: {
         query_options->__set_decimal_v2(IsTrue(value));
         break;
@@ -922,6 +926,18 @@ Status impala::SetQueryOption(const string& key, const string& value,
         RETURN_IF_ERROR(
             ParseMemValue(value, "preaggregation bytes limit", &preagg_bytes_limit));
         query_options->__set_preagg_bytes_limit(preagg_bytes_limit);
+        break;
+      }
+      case TImpalaQueryOptions::MAX_CNF_EXPRS: {
+        StringParser::ParseResult result;
+        const int32_t requested_max_cnf_exprs =
+            StringParser::StringToInt<int32_t>(value.c_str(), value.length(), &result);
+        if (result != StringParser::PARSE_SUCCESS || requested_max_cnf_exprs < -1) {
+          return Status(
+              Substitute("Invalid max cnf exprs : '$0'. "
+                         "Only -1 and non-negative numbers are allowed.", value));
+        }
+        query_options->__set_max_cnf_exprs(requested_max_cnf_exprs);
         break;
       }
       default:

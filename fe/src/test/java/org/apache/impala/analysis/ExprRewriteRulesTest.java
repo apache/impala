@@ -32,6 +32,7 @@ import org.apache.impala.common.ImpalaException;
 import org.apache.impala.common.QueryFixture;
 import org.apache.impala.common.SqlCastException;
 import org.apache.impala.rewrite.BetweenToCompoundRule;
+import org.apache.impala.rewrite.ConvertToCNFRule;
 import org.apache.impala.rewrite.EqualityDisjunctsToInRule;
 import org.apache.impala.rewrite.ExprRewriteRule;
 import org.apache.impala.rewrite.ExprRewriter;
@@ -804,4 +805,23 @@ public class ExprRewriteRulesTest extends FrontendTestBase {
     // are not simplified
     RewritesOk("nullif(1 + int_col, 1 + int_col)", rules, "NULL");
   }
+
+  @Test
+  public void testConvertToCNFRule() throws ImpalaException {
+    ExprRewriteRule rule = new ConvertToCNFRule(-1, false);
+
+    RewritesOk("(int_col > 10 AND int_col < 20) OR float_col < 5.0", rule,
+            "int_col < 20 OR float_col < 5.0 AND int_col > 10 OR float_col < 5.0");
+    RewritesOk("float_col < 5.0 OR (int_col > 10 AND int_col < 20)", rule,
+            "float_col < 5.0 OR int_col < 20 AND float_col < 5.0 OR int_col > 10");
+    RewritesOk("(int_col > 10 AND float_col < 5.0) OR " +
+            "(int_col < 20 AND float_col > 15.0)", rule,
+            "float_col < 5.0 OR float_col > 15.0 AND " +
+                    "float_col < 5.0 OR int_col < 20 " +
+                    "AND int_col > 10 OR float_col > 15.0 AND int_col > 10 " +
+                    "OR int_col < 20");
+    RewritesOk("NOT(int_col > 10 OR int_col < 20)", rule,
+            "NOT int_col < 20 AND NOT int_col > 10");
+  }
+
 }

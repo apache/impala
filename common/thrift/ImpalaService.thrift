@@ -507,6 +507,15 @@ enum TImpalaQueryOptions {
   // The max reservation that each grouping class in a preaggregation will use.
   // 0 or -1 means this has no effect.
   PREAGG_BYTES_LIMIT = 98
+
+  // Indicates whether the FE should rewrite disjunctive predicates to conjunctive
+  // normal form (CNF) for optimization purposes. Default is False.
+  ENABLE_CNF_REWRITES = 99
+
+  // The max number of conjunctive normal form (CNF) exprs to create when converting
+  // a disjunctive expression to CNF. Each AND counts as 1 expression. A value of
+  // -1 or 0 means no limit. Default is 0 (unlimited).
+  MAX_CNF_EXPRS = 100
 }
 
 // The summary of a DML statement.

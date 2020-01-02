@@ -1,0 +1,289 @@
+# test conversion of disjunctive predicate to conjunctive normal form
+# inner join
+select count(*) from lineitem, orders
+ where l_orderkey = o_orderkey
+ and ((l_suppkey > 10 and o_custkey > 20)
+      or (l_suppkey > 30 and o_custkey > 40))
+ and l_partkey > 0;
+---- PLAN
+PLAN-ROOT SINK
+|
+03:AGGREGATE [FINALIZE]
+|  output: count(*)
+|  row-size=8B cardinality=1
+|
+02:HASH JOIN [INNER JOIN]
+|  hash predicates: l_orderkey = o_orderkey
+|  other predicates: l_suppkey > 10 OR o_custkey > 40, o_custkey > 20 OR l_suppkey > 30
+|  runtime filters: RF000 <- o_orderkey
+|  row-size=40B cardinality=57.58K
+|
+|--01:SCAN HDFS [tpch_parquet.orders]
+|     HDFS partitions=1/1 files=2 size=54.21MB
+|     predicates: o_custkey > 20 OR o_custkey > 40
+|     row-size=16B cardinality=150.00K
+|
+00:SCAN HDFS [tpch_parquet.lineitem]
+   HDFS partitions=1/1 files=3 size=193.99MB
+   predicates: l_partkey > 0, l_suppkey > 10 OR l_suppkey > 30
+   runtime filters: RF000 -> l_orderkey
+   row-size=24B cardinality=600.12K
+====
+
+# outer join
+select count(*) from lineitem left outer join orders
+ on l_orderkey = o_orderkey
+ where ((l_suppkey > 10 and o_custkey > 20)
+      or (l_suppkey > 30 and o_custkey > 40))
+ and l_partkey > 0;
+---- PLAN
+PLAN-ROOT SINK
+|
+03:AGGREGATE [FINALIZE]
+|  output: count(*)
+|  row-size=8B cardinality=1
+|
+02:HASH JOIN [LEFT OUTER JOIN]
+|  hash predicates: l_orderkey = o_orderkey
+|  other predicates: l_suppkey > 10 OR o_custkey > 40, o_custkey > 20 OR l_suppkey > 30, o_custkey > 20 OR o_custkey > 40
+|  row-size=40B cardinality=600.12K
+|
+|--01:SCAN HDFS [tpch_parquet.orders]
+|     HDFS partitions=1/1 files=2 size=54.21MB
+|     predicates: o_custkey > 20 OR o_custkey > 40
+|     row-size=16B cardinality=150.00K
+|
+00:SCAN HDFS [tpch_parquet.lineitem]
+   HDFS partitions=1/1 files=3 size=193.99MB
+   predicates: l_partkey > 0, l_suppkey > 10 OR l_suppkey > 30
+   row-size=24B cardinality=600.12K
+====
+
+# BETWEEN predicate within each side of the OR
+select count(*) from lineitem, orders
+ where l_orderkey = o_orderkey
+ and ((l_suppkey between 10 and 30 and o_custkey > 20)
+      or (l_suppkey between 30 and 50 and o_custkey > 40))
+ and l_partkey > 0;
+---- PLAN
+PLAN-ROOT SINK
+|
+03:AGGREGATE [FINALIZE]
+|  output: count(*)
+|  row-size=8B cardinality=1
+|
+02:HASH JOIN [INNER JOIN]
+|  hash predicates: l_orderkey = o_orderkey
+|  other predicates: l_suppkey <= 30 OR o_custkey > 40, l_suppkey >= 10 OR o_custkey > 40, o_custkey > 20 OR l_suppkey <= 50, o_custkey > 20 OR l_suppkey >= 30
+|  runtime filters: RF000 <- o_orderkey
+|  row-size=40B cardinality=57.58K
+|
+|--01:SCAN HDFS [tpch_parquet.orders]
+|     HDFS partitions=1/1 files=2 size=54.21MB
+|     predicates: o_custkey > 20 OR o_custkey > 40
+|     row-size=16B cardinality=150.00K
+|
+00:SCAN HDFS [tpch_parquet.lineitem]
+   HDFS partitions=1/1 files=3 size=193.99MB
+   predicates: l_partkey > 0, l_suppkey <= 30 OR l_suppkey >= 30 AND l_suppkey <= 50, l_suppkey >= 10 OR l_suppkey >= 30 AND l_suppkey <= 50
+   runtime filters: RF000 -> l_orderkey
+   row-size=24B cardinality=600.12K
+====
+
+# equality predicates on l_suppkey should eventually be converted to IN
+# after CNF rewrite enables another rule to be applied
+# IN predicates on o_custkey should be preserved
+select count(*) from lineitem, orders
+ where l_orderkey = o_orderkey
+ and ((l_suppkey = 10 and o_custkey in (20, 21))
+      or (l_suppkey = 30 and o_custkey in (40, 41))
+      or (l_suppkey = 50 and o_custkey in (60, 61)))
+ and l_partkey > 0;
+---- PLAN
+PLAN-ROOT SINK
+|
+03:AGGREGATE [FINALIZE]
+|  output: count(*)
+|  row-size=8B cardinality=1
+|
+02:HASH JOIN [INNER JOIN]
+|  hash predicates: l_orderkey = o_orderkey
+|  other predicates: l_suppkey IN (10, 30) OR o_custkey IN (60, 61), o_custkey IN (20, 21, 40, 41) OR l_suppkey = 50, l_suppkey = 10 OR o_custkey IN (40, 41) OR l_suppkey = 50, o_custkey IN (20, 21) OR l_suppkey = 30 OR l_suppkey = 50, l_suppkey = 10 OR o_custkey IN (40, 41) OR o_custkey IN (60, 61), o_custkey IN (20, 21) OR l_suppkey = 30 OR o_custkey IN (60, 61)
+|  runtime filters: RF000 <- o_orderkey
+|  row-size=40B cardinality=1
+|
+|--01:SCAN HDFS [tpch_parquet.orders]
+|     HDFS partitions=1/1 files=2 size=54.21MB
+|     predicates: o_custkey IN (20, 21, 40, 41, 60, 61)
+|     row-size=16B cardinality=91
+|
+00:SCAN HDFS [tpch_parquet.lineitem]
+   HDFS partitions=1/1 files=3 size=193.99MB
+   predicates: l_partkey > 0, l_suppkey IN (10, 30, 50)
+   runtime filters: RF000 -> l_orderkey
+   row-size=24B cardinality=586
+====
+
+# NOT predicate
+select count(*) from lineitem, orders
+ where l_orderkey = o_orderkey
+ and not ((l_suppkey > 10 and o_custkey > 20)
+      or (l_suppkey > 30 and o_custkey > 40))
+ and l_partkey > 0;
+---- PLAN
+PLAN-ROOT SINK
+|
+03:AGGREGATE [FINALIZE]
+|  output: count(*)
+|  row-size=8B cardinality=1
+|
+02:HASH JOIN [INNER JOIN]
+|  hash predicates: o_orderkey = l_orderkey
+|  other predicates: NOT o_custkey > 20 OR o_custkey > 40 AND o_custkey > 20 OR l_suppkey > 30 AND l_suppkey > 10 OR o_custkey > 40 AND l_suppkey > 10 OR l_suppkey > 30
+|  runtime filters: RF000 <- l_orderkey
+|  row-size=40B cardinality=600.12K
+|
+|--00:SCAN HDFS [tpch_parquet.lineitem]
+|     HDFS partitions=1/1 files=3 size=193.99MB
+|     predicates: l_partkey > 0
+|     row-size=24B cardinality=600.12K
+|
+01:SCAN HDFS [tpch_parquet.orders]
+   HDFS partitions=1/1 files=2 size=54.21MB
+   runtime filters: RF000 -> o_orderkey
+   row-size=16B cardinality=1.50M
+====
+
+# set the max_cnf_exprs limit
+# in this case partial conversion is expected
+select count(*) from lineitem, orders
+ where l_orderkey = o_orderkey
+ and ((l_suppkey between 10 and 50 and o_custkey between 20 and 40)
+      or (l_suppkey between 30 and 90  and o_custkey between 60 and 100))
+ and l_partkey > 0;
+---- QUERYOPTIONS
+MAX_CNF_EXPRS=4
+---- PLAN
+PLAN-ROOT SINK
+|
+03:AGGREGATE [FINALIZE]
+|  output: count(*)
+|  row-size=8B cardinality=1
+|
+02:HASH JOIN [INNER JOIN]
+|  hash predicates: l_orderkey = o_orderkey
+|  other predicates: o_custkey <= 40 OR l_suppkey >= 30 AND l_suppkey <= 90, l_suppkey <= 50 OR (l_suppkey >= 30 AND l_suppkey <= 90 AND o_custkey >= 60 AND o_custkey <= 100), l_suppkey >= 10 OR (l_suppkey >= 30 AND l_suppkey <= 90 AND o_custkey >= 60 AND o_custkey <= 100), o_custkey >= 20 OR (l_suppkey >= 30 AND l_suppkey <= 90 AND o_custkey >= 60 AND o_custkey <= 100)
+|  runtime filters: RF000 <- o_orderkey
+|  row-size=40B cardinality=57.58K
+|
+|--01:SCAN HDFS [tpch_parquet.orders]
+|     HDFS partitions=1/1 files=2 size=54.21MB
+|     predicates: o_custkey <= 40 OR o_custkey >= 60 AND o_custkey <= 100
+|     row-size=16B cardinality=150.00K
+|
+00:SCAN HDFS [tpch_parquet.lineitem]
+   HDFS partitions=1/1 files=3 size=193.99MB
+   predicates: l_partkey > 0
+   runtime filters: RF000 -> l_orderkey
+   row-size=24B cardinality=600.12K
+====
+
+# reset the max_cnf_exprs limit to unlimited (-1)
+# in this case full conversion is expected
+select count(*) from lineitem, orders
+ where l_orderkey = o_orderkey
+ and ((l_suppkey between 10 and 50 and o_custkey between 20 and 40)
+      or (l_suppkey between 30 and 90  and o_custkey between 60 and 100))
+ and l_partkey > 0;
+---- QUERYOPTIONS
+MAX_CNF_EXPRS=-1
+---- PLAN
+PLAN-ROOT SINK
+|
+03:AGGREGATE [FINALIZE]
+|  output: count(*)
+|  row-size=8B cardinality=1
+|
+02:HASH JOIN [INNER JOIN]
+|  hash predicates: l_orderkey = o_orderkey
+|  other predicates: l_suppkey <= 50 OR o_custkey <= 100, l_suppkey <= 50 OR o_custkey >= 60, l_suppkey >= 10 OR o_custkey <= 100, l_suppkey >= 10 OR o_custkey >= 60, o_custkey <= 40 OR l_suppkey <= 90, o_custkey <= 40 OR l_suppkey >= 30, o_custkey >= 20 OR l_suppkey <= 90, o_custkey >= 20 OR l_suppkey >= 30
+|  runtime filters: RF000 <- o_orderkey
+|  row-size=40B cardinality=57.58K
+|
+|--01:SCAN HDFS [tpch_parquet.orders]
+|     HDFS partitions=1/1 files=2 size=54.21MB
+|     predicates: o_custkey <= 40 OR o_custkey >= 60 AND o_custkey <= 100, o_custkey >= 20 OR o_custkey >= 60 AND o_custkey <= 100
+|     row-size=16B cardinality=150.00K
+|
+00:SCAN HDFS [tpch_parquet.lineitem]
+   HDFS partitions=1/1 files=3 size=193.99MB
+   predicates: l_partkey > 0, l_suppkey <= 50 OR l_suppkey >= 30 AND l_suppkey <= 90, l_suppkey >= 10 OR l_suppkey >= 30 AND l_suppkey <= 90
+   runtime filters: RF000 -> l_orderkey
+   row-size=24B cardinality=600.12K
+====
+
+# same as above, but set max_cnf_exprs to 0 (also implies unlimited)
+# in this case full conversion is expected
+select count(*) from lineitem, orders
+ where l_orderkey = o_orderkey
+ and ((l_suppkey between 10 and 50 and o_custkey between 20 and 40)
+      or (l_suppkey between 30 and 90  and o_custkey between 60 and 100))
+ and l_partkey > 0;
+---- QUERYOPTIONS
+MAX_CNF_EXPRS=0
+---- PLAN
+PLAN-ROOT SINK
+|
+03:AGGREGATE [FINALIZE]
+|  output: count(*)
+|  row-size=8B cardinality=1
+|
+02:HASH JOIN [INNER JOIN]
+|  hash predicates: l_orderkey = o_orderkey
+|  other predicates: l_suppkey <= 50 OR o_custkey <= 100, l_suppkey <= 50 OR o_custkey >= 60, l_suppkey >= 10 OR o_custkey <= 100, l_suppkey >= 10 OR o_custkey >= 60, o_custkey <= 40 OR l_suppkey <= 90, o_custkey <= 40 OR l_suppkey >= 30, o_custkey >= 20 OR l_suppkey <= 90, o_custkey >= 20 OR l_suppkey >= 30
+|  runtime filters: RF000 <- o_orderkey
+|  row-size=40B cardinality=57.58K
+|
+|--01:SCAN HDFS [tpch_parquet.orders]
+|     HDFS partitions=1/1 files=2 size=54.21MB
+|     predicates: o_custkey <= 40 OR o_custkey >= 60 AND o_custkey <= 100, o_custkey >= 20 OR o_custkey >= 60 AND o_custkey <= 100
+|     row-size=16B cardinality=150.00K
+|
+00:SCAN HDFS [tpch_parquet.lineitem]
+   HDFS partitions=1/1 files=3 size=193.99MB
+   predicates: l_partkey > 0, l_suppkey <= 50 OR l_suppkey >= 30 AND l_suppkey <= 90, l_suppkey >= 10 OR l_suppkey >= 30 AND l_suppkey <= 90
+   runtime filters: RF000 -> l_orderkey
+   row-size=24B cardinality=600.12K
+====
+
+# disable the rewrite, so no conversion is expected
+select count(*) from lineitem, orders
+ where l_orderkey = o_orderkey
+ and ((l_suppkey between 10 and 50 and o_custkey between 20 and 40)
+      or (l_suppkey between 30 and 90  and o_custkey between 60 and 100))
+ and l_partkey > 0;
+---- QUERYOPTIONS
+ENABLE_CNF_REWRITES=false
+---- PLAN
+PLAN-ROOT SINK
+|
+03:AGGREGATE [FINALIZE]
+|  output: count(*)
+|  row-size=8B cardinality=1
+|
+02:HASH JOIN [INNER JOIN]
+|  hash predicates: o_orderkey = l_orderkey
+|  other predicates: ((l_suppkey >= 10 AND l_suppkey <= 50 AND o_custkey >= 20 AND o_custkey <= 40) OR (l_suppkey >= 30 AND l_suppkey <= 90 AND o_custkey >= 60 AND o_custkey <= 100))
+|  runtime filters: RF000 <- l_orderkey
+|  row-size=40B cardinality=600.12K
+|
+|--00:SCAN HDFS [tpch_parquet.lineitem]
+|     HDFS partitions=1/1 files=3 size=193.99MB
+|     predicates: l_partkey > 0
+|     row-size=24B cardinality=600.12K
+|
+01:SCAN HDFS [tpch_parquet.orders]
+   HDFS partitions=1/1 files=2 size=54.21MB
+   runtime filters: RF000 -> o_orderkey
+   row-size=16B cardinality=1.50M
+====

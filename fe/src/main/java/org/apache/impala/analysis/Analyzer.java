@@ -65,6 +65,7 @@ import org.apache.impala.common.Pair;
 import org.apache.impala.common.RuntimeEnv;
 import org.apache.impala.planner.PlanNode;
 import org.apache.impala.rewrite.BetweenToCompoundRule;
+import org.apache.impala.rewrite.ConvertToCNFRule;
 import org.apache.impala.rewrite.EqualityDisjunctsToInRule;
 import org.apache.impala.rewrite.ExprRewriteRule;
 import org.apache.impala.rewrite.ExprRewriter;
@@ -481,6 +482,10 @@ public class Analyzer {
         rules.add(FoldConstantsRule.INSTANCE);
         rules.add(NormalizeExprsRule.INSTANCE);
         rules.add(ExtractCommonConjunctRule.INSTANCE);
+        if (queryCtx.getClient_request().getQuery_options().isEnable_cnf_rewrites()) {
+          rules.add(new ConvertToCNFRule(queryCtx.getClient_request().getQuery_options()
+                  .getMax_cnf_exprs(),true));
+        }
         // Relies on FoldConstantsRule and NormalizeExprsRule.
         rules.add(SimplifyConditionalsRule.INSTANCE);
         rules.add(EqualityDisjunctsToInRule.INSTANCE);
