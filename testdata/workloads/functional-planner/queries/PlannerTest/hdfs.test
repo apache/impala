@@ -1189,7 +1189,7 @@ PLAN-ROOT SINK
 ====
 # Partition pruning when a binary predicate contains a constant expression (IMPALA-1636)
 select * from functional.alltypesagg t1
-where t1.day = instr("this is a test", "this") or t1.year = year(now()) + 100
+where t1.day = instr("this is a test", "this") or t1.year = cast(pi() as int) + 2116
 ---- PLAN
 PLAN-ROOT SINK
 |
@@ -1201,7 +1201,7 @@ PLAN-ROOT SINK
 # Partition pruning when there is a constant expression in the IN predicate values
 # (IMPALA-1636)
 select * from functional.alltypesagg t1
-where t1.day in (1, cast(2.0 as INT), year(now()) + 100)
+where t1.day in (1, cast(2.0 as INT), cast(pi() as int) + 2116)
 ---- PLAN
 PLAN-ROOT SINK
 |
