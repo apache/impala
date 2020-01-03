@@ -42,6 +42,7 @@ add_library(Util
   common-metrics.cc
   compress.cc
   cpu-info.cc
+  cyclic-barrier.cc
   decimal-util.cc
   dynamic-util.cc
   debug-util.cc
@@ -109,6 +110,7 @@ add_library(UtilTests STATIC
   blocking-queue-test.cc
   bloom-filter-test.cc
   coding-util-test.cc
+  cyclic-barrier-test.cc
   debug-util-test.cc
   dict-test.cc
   error-util-test.cc
@@ -167,6 +169,7 @@ ADD_UNIFIED_BE_LSAN_TEST(bit-util-test "BitUtil.*")
 ADD_UNIFIED_BE_LSAN_TEST(blocking-queue-test "BlockingQueueTest.*")
 ADD_UNIFIED_BE_LSAN_TEST(bloom-filter-test "BloomFilter.*:BloomFilterTest.*")
 ADD_UNIFIED_BE_LSAN_TEST(coding-util-test "UrlCodingTest.*:Base64Test.*:HtmlEscapingTest.*")
+ADD_UNIFIED_BE_LSAN_TEST(cyclic-barrier-test "CyclicBarrierTest.*")
 ADD_UNIFIED_BE_LSAN_TEST(debug-util-test "DebugUtil.*")
 # Decompress-test fails in unified mode (possibly due to missing libs)
 ADD_BE_LSAN_TEST(decompress-test)
