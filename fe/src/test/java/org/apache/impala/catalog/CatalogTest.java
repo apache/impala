@@ -395,7 +395,7 @@ public class CatalogTest {
     List<TPartitionKeyValue> partitionSpec = ImmutableList.of(
         new TPartitionKeyValue("year", "2010"),
         new TPartitionKeyValue("month", "10"));
-    catalog_.reloadPartition(table, partitionSpec, "test");
+    catalog_.reloadPartition(table, partitionSpec, new Reference<>(false), "test");
     assertEquals(0L, (long)opsCounts.getLong(GET_FILE_BLOCK_LOCS));
 
     // Loading or reloading an unpartitioned table with some files in it should not make
@@ -416,7 +416,7 @@ public class CatalogTest {
         .getPartitionFromThriftPartitionSpec(partitionSpec);
     hdfsPartition.setFileDescriptors(new ArrayList<>());
     stats.reset();
-    catalog_.reloadPartition(table, partitionSpec, "test");
+    catalog_.reloadPartition(table, partitionSpec, new Reference<>(false), "test");
 
     // Should not scan the directory file-by-file, should use a single
     // listLocatedStatus() to get the whole directory (partition)

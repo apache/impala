@@ -20,7 +20,6 @@ package org.apache.impala.catalog;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.HashMap;
-import java.util.LinkedList;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
@@ -37,6 +36,7 @@ import org.apache.hadoop.hive.metastore.api.FieldSchema;
 import org.apache.hadoop.hive.metastore.api.SQLForeignKey;
 import org.apache.hadoop.hive.metastore.api.SQLPrimaryKey;
 import org.apache.impala.analysis.TableName;
+import org.apache.impala.catalog.events.InFlightEvents;
 import org.apache.impala.common.ImpalaRuntimeException;
 import org.apache.impala.common.Metrics;
 import org.apache.impala.common.Pair;
@@ -141,13 +141,9 @@ public abstract class Table extends CatalogObjectImpl implements FeTable {
   // TODO(todd) this should probably be a ValidWriteIdList in memory instead of a String.
   protected String validWriteIds_ = null;
 
-  // maximum number of catalog versions to store for in-flight events for this table
-  private static final int MAX_NUMBER_OF_INFLIGHT_EVENTS = 10;
-
-  // FIFO list of versions for all the in-flight metastore events in this table
-  // This queue can only grow up to MAX_NUMBER_OF_INFLIGHT_EVENTS size. Anything which
-  // is attempted to be added to this list when its at maximum capacity is ignored
-  private final LinkedList<Long> versionsForInflightEvents_ = new LinkedList<>();
+  // tracks the in-flight metastore events for this table. Used by Events processor to
+  // avoid unnecessary refresh when the event is received
+  private final InFlightEvents inFlightEvents = new InFlightEvents();
 
   // Table metrics. These metrics are applicable to all table types. Each subclass of
   // Table can define additional metrics specific to that table type.
@@ -810,7 +806,7 @@ public abstract class Table extends CatalogObjectImpl implements FeTable {
    * Gets the current list of versions for in-flight events for this table
    */
   public List<Long> getVersionsForInflightEvents() {
-    return Collections.unmodifiableList(versionsForInflightEvents_);
+    return inFlightEvents.getAll();
   }
 
   /**
@@ -819,7 +815,7 @@ public abstract class Table extends CatalogObjectImpl implements FeTable {
    * @return true if version was successfully removed, false if didn't exist
    */
   public boolean removeFromVersionsForInflightEvents(long versionNumber) {
-    return versionsForInflightEvents_.remove(versionNumber);
+    return inFlightEvents.remove(versionNumber);
   }
 
   /**
@@ -831,16 +827,12 @@ public abstract class Table extends CatalogObjectImpl implements FeTable {
    * @return True if version number was added, false if the collection is at its max
    * capacity
    */
-  public boolean addToVersionsForInflightEvents(long versionNumber) {
-    if (versionsForInflightEvents_.size() == MAX_NUMBER_OF_INFLIGHT_EVENTS) {
-      LOG.warn(String.format("Number of versions to be stored for table %s is at "
-              + " its max capacity %d. Ignoring add request for version number %d. This "
-              + "could cause unnecessary table invalidation when the event is processed",
-          getFullName(), MAX_NUMBER_OF_INFLIGHT_EVENTS, versionNumber));
-      return false;
+  public void addToVersionsForInflightEvents(long versionNumber) {
+    if (!inFlightEvents.add(versionNumber)) {
+      LOG.warn(String.format("Could not add %s version to the table %s. This could "
+          + "cause unnecessary refresh of the table when the event is received by the "
+              + "Events processor.", versionNumber, getFullName()));
     }
-    versionsForInflightEvents_.add(versionNumber);
-    return true;
   }
 
   @Override

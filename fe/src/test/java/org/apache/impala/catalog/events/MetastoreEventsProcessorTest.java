@@ -82,7 +82,6 @@ import org.apache.impala.catalog.events.MetastoreEvents.AlterTableEvent;
 import org.apache.impala.catalog.events.MetastoreEvents.MetastoreEvent;
 import org.apache.impala.catalog.events.MetastoreEvents.MetastoreEventPropertyKey;
 import org.apache.impala.catalog.events.MetastoreEvents.MetastoreEventType;
-import org.apache.impala.catalog.events.MetastoreEvents.TableInvalidatingEvent;
 import org.apache.impala.catalog.events.MetastoreEventsProcessor.EventProcessorStatus;
 import org.apache.impala.common.FileSystemUtil;
 import org.apache.impala.common.ImpalaException;
@@ -107,6 +106,7 @@ import org.apache.impala.thrift.TAlterTableSetLocationParams;
 import org.apache.impala.thrift.TAlterTableSetRowFormatParams;
 import org.apache.impala.thrift.TAlterTableSetTblPropertiesParams;
 import org.apache.impala.thrift.TAlterTableType;
+import org.apache.impala.thrift.TAlterTableUpdateStatsParams;
 import org.apache.impala.thrift.TColumn;
 import org.apache.impala.thrift.TColumnType;
 import org.apache.impala.thrift.TCreateDbParams;
@@ -124,11 +124,13 @@ import org.apache.impala.thrift.THdfsFileFormat;
 import org.apache.impala.thrift.TOwnerType;
 import org.apache.impala.thrift.TPartitionDef;
 import org.apache.impala.thrift.TPartitionKeyValue;
+import org.apache.impala.thrift.TPartitionStats;
 import org.apache.impala.thrift.TPrimitiveType;
 import org.apache.impala.thrift.TScalarType;
 import org.apache.impala.thrift.TTableName;
 import org.apache.impala.thrift.TTablePropertyType;
 import org.apache.impala.thrift.TTableRowFormat;
+import org.apache.impala.thrift.TTableStats;
 import org.apache.impala.thrift.TTypeNode;
 import org.apache.impala.thrift.TTypeNodeType;
 import org.apache.impala.thrift.TUniqueId;
@@ -683,7 +685,7 @@ public class MetastoreEventsProcessorTest {
             catalog_.getTable(TEST_DB_NAME, testTblName));
     FeFsPartition singlePartitionAfterTrivialAlter =
         Iterables.getOnlyElement(partsAfterTrivialAlter);
-    for (String parameter : TableInvalidatingEvent.parametersToIgnore) {
+    for (String parameter : MetastoreEvents.parametersToIgnore) {
       assertEquals("Unexpected parameter value after trivial alter partition "
           + "event", singlePartition.getParameters().get(parameter),
           singlePartitionAfterTrivialAlter.getParameters().get(parameter));
@@ -736,11 +738,6 @@ public class MetastoreEventsProcessorTest {
 
   /**
    * Util method to create empty files in a given path
-   * @param parentPath
-   * @param fileNamePrefix
-   * @param totalNumberOfFilesToAdd
-   * @return
-   * @throws IOException
    */
   private List<String> addFilesToDirectory(Path parentPath, String fileNamePrefix,
       int totalNumberOfFilesToAdd, boolean isOverwrite) throws IOException {
@@ -858,8 +855,8 @@ public class MetastoreEventsProcessorTest {
     eventsProcessor_.processEvents();
     // simulate the table being loaded by explicitly calling load table
     loadTable("old_name");
-    long numberOfInvalidatesBefore = eventsProcessor_.getMetrics()
-        .getCounter(MetastoreEventsProcessor.NUMBER_OF_TABLE_INVALIDATES).getCount();
+    long numOfRefreshesBefore = eventsProcessor_.getMetrics()
+        .getCounter(MetastoreEventsProcessor.NUMBER_OF_TABLE_REFRESHES).getCount();
 
     // test renaming a table from outside aka metastore client
     alterTableRename("old_name", testTblName, null);
@@ -895,43 +892,43 @@ public class MetastoreEventsProcessorTest {
     loadTable(testTblName);
     alterTableAddParameter(testTblName, "somekey", "someval");
     eventsProcessor_.processEvents();
-    assertTrue("Table should be incomplete after alter table add parameter",
+    assertFalse("Table should have been refreshed after alter table add parameter",
         catalog_.getTable(TEST_DB_NAME, testTblName)
                 instanceof IncompleteTable);
     // check invalidate after alter table add col
     loadTable(testTblName);
     alterTableAddCol(testTblName, "newCol", "int", "null");
     eventsProcessor_.processEvents();
-    assertTrue("Table should have been invalidated after alter table add column",
+    assertFalse("Table should have been refreshed after alter table add column",
         catalog_.getTable(TEST_DB_NAME, testTblName)
                 instanceof IncompleteTable);
     // check invalidate after alter table change column type
     loadTable(testTblName);
     altertableChangeCol(testTblName, "newCol", "string", null);
     eventsProcessor_.processEvents();
-    assertTrue("Table should have been invalidated after changing column type",
+    assertFalse("Table should have been refreshed after changing column type",
         catalog_.getTable(TEST_DB_NAME, testTblName)
                 instanceof IncompleteTable);
     // check invalidate after alter table remove column
     loadTable(testTblName);
     alterTableRemoveCol(testTblName, "newCol");
     eventsProcessor_.processEvents();
-    assertTrue("Table should have been invalidated after removing a column",
+    assertFalse("Table should have been refreshed after removing a column",
         catalog_.getTable(TEST_DB_NAME, testTblName)
                 instanceof IncompleteTable);
     // 5 alters above. Each one of them except rename should increment the counter by 1
     long numberOfInvalidatesAfter = eventsProcessor_.getMetrics()
-        .getCounter(MetastoreEventsProcessor.NUMBER_OF_TABLE_INVALIDATES).getCount();
-    assertEquals("Unexpected number of table invalidates",
-        numberOfInvalidatesBefore + 4, numberOfInvalidatesAfter);
+        .getCounter(MetastoreEventsProcessor.NUMBER_OF_TABLE_REFRESHES).getCount();
+    assertEquals("Unexpected number of table refreshes",
+        numOfRefreshesBefore + 4, numberOfInvalidatesAfter);
     // Check if trivial alters are ignored.
     loadTable(testTblName);
     alterTableChangeTrivialProperties(testTblName);
-    // The above alter should not cause an invalidate.
+    // The above alter should not cause a refresh.
     long numberOfInvalidatesAfterTrivialAlter = eventsProcessor_.getMetrics()
-        .getCounter(MetastoreEventsProcessor.NUMBER_OF_TABLE_INVALIDATES).getCount();
-    assertEquals("Unexpected number of table invalidates after trivial alter",
-        numberOfInvalidatesBefore + 4, numberOfInvalidatesAfterTrivialAlter);
+        .getCounter(MetastoreEventsProcessor.NUMBER_OF_TABLE_REFRESHES).getCount();
+    assertEquals("Unexpected number of table refreshes after trivial alters",
+        numOfRefreshesBefore + 4, numberOfInvalidatesAfterTrivialAlter);
 
     // Simulate rename and drop sequence for table/db.
     String tblName = "alter_drop_test";
@@ -2042,6 +2039,11 @@ public class MetastoreEventsProcessorTest {
 
   private abstract class AlterTableExecutor {
     protected abstract void execute() throws Exception;
+
+    protected long getNumTblsRefreshed() {
+      return eventsProcessor_.getMetrics()
+          .getCounter(MetastoreEventsProcessor.NUMBER_OF_TABLE_REFRESHES).getCount();
+    }
   }
 
   private class HiveAlterTableExecutor extends AlterTableExecutor {
@@ -2055,21 +2057,33 @@ public class MetastoreEventsProcessorTest {
     }
 
     public void execute() throws Exception {
+      Table tblBefore = Preconditions.checkNotNull(catalog_.getTable(TEST_DB_NAME,
+          tblName_));
+      boolean incompleteBefore = tblBefore instanceof IncompleteTable;
       if (toggle_.get()) {
         alterTableAddCol(tblName_, colName_, colType_, "");
-        verify();
       } else {
         alterTableRemoveCol(tblName_, colName_);
-        verify();
       }
+      verify(incompleteBefore);
       toggle_.compareAndSet(toggle_.get(), !toggle_.get());
     }
 
-    private void verify() throws Exception {
+    private void verify(boolean wasTblIncompleteBefore) throws Exception {
+      long numTblsRefreshedBefore = getNumTblsRefreshed();
       eventsProcessor_.processEvents();
       Table catTable = catalog_.getTable(TEST_DB_NAME, tblName_);
       assertNotNull(catTable);
-      assertTrue(catTable instanceof IncompleteTable);
+      if (wasTblIncompleteBefore) {
+        assertTrue("Table should not reloaded if its already incomplete",
+            catTable instanceof IncompleteTable);
+        assertTrue(numTblsRefreshedBefore == getNumTblsRefreshed());
+      } else {
+        assertFalse("Table should have been reloaded if its loaded before",
+            catTable instanceof IncompleteTable);
+        assertTrue(numTblsRefreshedBefore < getNumTblsRefreshed());
+      }
+
     }
   }
 
@@ -2087,19 +2101,21 @@ public class MetastoreEventsProcessorTest {
     public void execute() throws Exception {
       if (toggle_.get()) {
         alterTableAddColsFromImpala(TEST_DB_NAME, tblName_, colName_, colType_);
-        verify();
       } else {
         alterTableRemoveColFromImpala(TEST_DB_NAME, tblName_, colName_);
-        verify();
       }
+      verify();
       toggle_.compareAndSet(toggle_.get(), !toggle_.get());
     }
 
     public void verify() throws Exception {
+      long numTblsRefreshedBefore = getNumTblsRefreshed();
       eventsProcessor_.processEvents();
       Table catTable = catalog_.getTable(TEST_DB_NAME, tblName_);
       assertNotNull(catTable);
       assertFalse(catTable instanceof IncompleteTable);
+      // this is a self-event, table should not be refreshed
+      assertTrue(numTblsRefreshedBefore == getNumTblsRefreshed());
     }
   }
 
@@ -2182,13 +2198,41 @@ public class MetastoreEventsProcessorTest {
 
     eventsProcessor_.processEvents();
     Table catalogTbl = catalog_.getTable(TEST_DB_NAME, testTblName);
-    assertFalse(
-        "Table should not be invalidated after process events as it is a self-event.",
-        catalogTbl instanceof IncompleteTable);
-    hdfsPartition =
-        catalog_.getHdfsPartition(TEST_DB_NAME, testTblName, partKeyVals);
-    assertNotNull(hdfsPartition.getParameters());
-    assertEquals("dummyValue1", hdfsPartition.getParameters().get("dummyKey1"));
+    confirmTableIsLoaded(TEST_DB_NAME, testTblName);
+    // we check for the object hash of the HDFSPartition to make sure that it was not
+    // refresh
+    assertEquals("Partition should not have been refreshed after receiving "
+            + "self-event", hdfsPartition,
+        catalog_.getHdfsPartition(TEST_DB_NAME, testTblName, partKeyVals));
+
+    // compute stats on the table and make sure that the table and its partittions are
+    // not refreshed due to the events
+    alterTableComputeStats(testTblName, Arrays.asList(Arrays.asList("1"),
+        Arrays.asList("2")));
+    // currently there is no good way to find out if a partition was refreshed or not.
+    // When a partition is refreshed, we replace the HDFSPartition objects in the
+    // HDFSTable with the new ones which are reloaded from updated information in HMS.
+    // In order to detect whether the partitions were refreshed, we
+    // compare the HDFSPartition object before and after the events are
+    // processed to make sure that they are the same instance of HDFSPartition
+    HdfsPartition part1Before = catalog_.getHdfsPartition(TEST_DB_NAME, testTblName,
+        partKeyVals);
+    List<TPartitionKeyValue> partKeyVals2 = new ArrayList<>();
+    partKeyVals2.add(new TPartitionKeyValue("p1", "2"));
+    HdfsPartition part2Before = catalog_.getHdfsPartition(TEST_DB_NAME, testTblName,
+        partKeyVals2);
+    // we updated the stats on 2 partitions, we should see atleast 2 alter partition
+    // events
+    assertTrue(eventsProcessor_.getNextMetastoreEvents().size() >= 2);
+    eventsProcessor_.processEvents();
+    confirmTableIsLoaded(TEST_DB_NAME, testTblName);
+    // make sure that the partitions are the same instance
+    assertEquals("Partition should not have been refreshed after receiving the "
+            + "self-event", part1Before,
+        catalog_.getHdfsPartition(TEST_DB_NAME, testTblName, partKeyVals));
+    assertEquals("Partition should not have been refreshed after receiving the "
+            + "self-event", part2Before,
+        catalog_.getHdfsPartition(TEST_DB_NAME, testTblName, partKeyVals2));
   }
 
   private void createDatabase(String dbName, Map<String, String> params)
@@ -2611,6 +2655,34 @@ public class MetastoreEventsProcessorTest {
         "dummyValue1", catalogTbl.getMetaStoreTable().getParameters().get("dummyKey1"));
   }
 
+  private void alterTableComputeStats(String tblName, List<List<String>> partValsList)
+      throws ImpalaException {
+    TDdlExecRequest req = new TDdlExecRequest();
+    req.setDdl_type(TDdlType.ALTER_TABLE);
+
+    TAlterTableParams alterTableParams = new TAlterTableParams();
+    alterTableParams.setAlter_type(TAlterTableType.UPDATE_STATS);
+    alterTableParams.setTable_name(new TTableName(TEST_DB_NAME, tblName));
+    req.setAlter_table_params(alterTableParams);
+
+    TAlterTableUpdateStatsParams updateStatsParams = new TAlterTableUpdateStatsParams();
+    TTableStats tTableStats = new TTableStats();
+    tTableStats.num_rows = 10;
+    tTableStats.total_file_bytes = 1000;
+    updateStatsParams.setTable_stats(tTableStats);
+    Map<List<String>, TPartitionStats> partitionStats = new HashMap<>();
+    for (List<String> partVals : partValsList) {
+      TPartitionStats partStats = new TPartitionStats();
+      partStats.stats = new TTableStats();
+      partStats.stats.num_rows = 6;
+      partitionStats.put(partVals, partStats);
+    }
+
+    updateStatsParams.setPartition_stats(partitionStats);
+
+    alterTableParams.setUpdate_stats_params(updateStatsParams);
+    catalogOpExecutor_.execDdlRequest(req);
+  }
   /**
    * Set partition properties from Impala
    */
@@ -2703,7 +2775,7 @@ public class MetastoreEventsProcessorTest {
     try (MetaStoreClient msClient = catalog_.getMetaStoreClient()) {
       org.apache.hadoop.hive.metastore.api.Table msTable =
           msClient.getHiveClient().getTable(TEST_DB_NAME, tblName);
-      for (String parameter : TableInvalidatingEvent.parametersToIgnore) {
+      for (String parameter : MetastoreEvents.parametersToIgnore) {
         msTable.getParameters().put(parameter, "1234567");
       }
       msClient.getHiveClient().alter_table_with_environmentContext(
@@ -2802,7 +2874,7 @@ public class MetastoreEventsProcessorTest {
     try (MetaStoreClient metaStoreClient = catalog_.getMetaStoreClient()) {
       Partition partition = metaStoreClient.getHiveClient().getPartition(TEST_DB_NAME,
           tblName, partVal);
-      for (String parameter : TableInvalidatingEvent.parametersToIgnore) {
+      for (String parameter : MetastoreEvents.parametersToIgnore) {
         partition.getParameters().put(parameter, "12334567");
         partitions.add(partition);
       }

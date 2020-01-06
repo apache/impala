@@ -37,6 +37,8 @@ import org.apache.hadoop.fs.Path;
 import org.apache.impala.analysis.Expr;
 import org.apache.impala.analysis.LiteralExpr;
 import org.apache.impala.analysis.PartitionKeyValue;
+import org.apache.impala.catalog.events.InFlightEvents;
+import org.apache.impala.catalog.events.MetastoreEvents.MetastoreEventPropertyKey;
 import org.apache.impala.common.FileSystemUtil;
 import org.apache.impala.common.ImpalaException;
 import org.apache.impala.common.Pair;
@@ -618,6 +620,8 @@ public class HdfsPartition implements FeFsPartition, PrunablePartition {
   // -1 means writeId_ is irrelevant(not supported).
   private long writeId_ = -1L;
 
+  private final InFlightEvents inFlightEvents_ = new InFlightEvents(20);
+
   private HdfsPartition(HdfsTable table,
       org.apache.hadoop.hive.metastore.api.Partition msPartition,
       List<LiteralExpr> partitionKeyValues,
@@ -643,6 +647,7 @@ public class HdfsPartition implements FeFsPartition, PrunablePartition {
     } else {
       hmsParameters_ = new HashMap<>();
     }
+    addInflightVersionsFromParameters();
     extractAndCompressPartStats();
     // Intern parameters after removing the incremental stats
     hmsParameters_ = CatalogInterners.internParameters(hmsParameters_);
@@ -845,6 +850,48 @@ public class HdfsPartition implements FeFsPartition, PrunablePartition {
     putToParameters(kv.first, kv.second);
   }
 
+  /**
+   * Gets the current list of versions for in-flight events for this partition
+   */
+  public List<Long> getVersionsForInflightEvents() {
+    return inFlightEvents_.getAll();
+  }
+
+  /**
+   * Removes a given version from the in-flight events
+   * @param versionNumber version number to remove
+   * @return true if the versionNumber was removed, false if it didn't exist
+   */
+  public boolean removeFromVersionsForInflightEvents(long versionNumber) {
+    return inFlightEvents_.remove(versionNumber);
+  }
+
+  /**
+   * Adds a version number to the in-flight events of this partition
+   * @param versionNumber version number to add
+   */
+  public void addToVersionsForInflightEvents(long versionNumber) {
+    if (!inFlightEvents_.add(versionNumber)) {
+      LOG.warn(String.format("Could not add %s version to the partition %s of table %s. "
+          + "This could cause unnecessary refresh of the partition when the event is"
+          + "received by the Events processor.", versionNumber, getPartitionName(),
+          getTable().getFullName()));
+    }
+  }
+
+  /**
+   * Adds the version from the given Partition parameters. No-op if the parameters does
+   * not contain the <code>MetastoreEventPropertyKey.CATALOG_VERSION</code>
+   */
+  private void addInflightVersionsFromParameters() {
+    Preconditions.checkNotNull(hmsParameters_);
+    Preconditions.checkState(inFlightEvents_.size() == 0);
+    if (!hmsParameters_.containsKey(MetastoreEventPropertyKey.CATALOG_VERSION.getKey())) {
+      return;
+    }
+    inFlightEvents_.add(Long.parseLong(
+            hmsParameters_.get(MetastoreEventPropertyKey.CATALOG_VERSION.getKey())));
+  }
   /**
    * Marks this partition's metadata as "dirty" indicating that changes have been
    * made and this partition's metadata should not be reused during the next

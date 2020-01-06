@@ -19,37 +19,45 @@
 # modifies the metadata via Hive and checks that the modification
 # succeeded by querying Impala, or vice versa.
 
+import logging
 import requests
 import time
 import json
-from tests.common.environ import build_flavor_timeout
 
-
+LOG = logging.getLogger('event_processor_utils')
+LOG.setLevel(level=logging.DEBUG)
 class EventProcessorUtils(object):
 
   DEFAULT_CATALOG_URL = "http://localhost:25020"
 
   @staticmethod
-  def wait_for_event_processing(hive_client, timeout=10):
+  def wait_for_event_processing(test_suite, timeout=10):
       """Waits till the event processor has synced to the latest event id from metastore
          or the timeout value in seconds whichever is earlier"""
       success = False
       assert timeout > 0
-      assert hive_client is not None
-      current_event_id = EventProcessorUtils.get_current_notification_id(hive_client)
+      assert test_suite.hive_client is not None
+      current_event_id = EventProcessorUtils.get_current_notification_id(
+        test_suite.hive_client)
+      LOG.info("Waiting until events processor syncs to event id:" + str(current_event_id))
       end_time = time.time() + timeout
       while time.time() < end_time:
-        new_event_id = EventProcessorUtils.get_last_synced_event_id()
-        if new_event_id >= current_event_id:
+        last_synced_id = EventProcessorUtils.get_last_synced_event_id()
+        if last_synced_id >= current_event_id:
+          LOG.debug(
+            "Metric last-synced-event-id has reached the desired value:" + str(
+              last_synced_id))
           success = True
           break
         time.sleep(0.1)
       if not success:
         raise Exception(
-          "Event processor did not sync till last known event id{0} \
+          "Event processor did not sync till last known event id {0} \
           within {1} seconds".format(current_event_id, timeout))
-      # Wait for catalog update to be propagated.
-      time.sleep(build_flavor_timeout(6, slow_build_timeout=10))
+      # Wait until the impalad catalog versions agree with the catalogd's version.
+      catalogd_version = test_suite.cluster.catalogd.service.get_catalog_version()
+      for impalad in test_suite.cluster.impalads:
+        impalad.service.wait_for_metric_value("catalog.curr-version", catalogd_version)
       return success
 
   @staticmethod
@@ -67,6 +75,14 @@ class EventProcessorUtils(object):
 
      pairs = [strip_pair(kv.split(':')) for kv in metrics if kv]
      return dict(pairs)
+
+  @staticmethod
+  def get_event_processor_metric(metric_key, default_val=None):
+    """Returns the event processor metric from the /events catalog debug page"""
+    metrics = EventProcessorUtils.get_event_processor_metrics()
+    if metric_key not in metrics:
+      return default_val
+    return metrics[metric_key]
 
   @staticmethod
   def get_last_synced_event_id():
@@ -88,4 +104,4 @@ class EventProcessorUtils(object):
   def get_current_notification_id(hive_client):
     """Returns the current notification from metastore"""
     assert hive_client is not None
-    return hive_client.get_current_notificationEventId()
+    return int(hive_client.get_current_notificationEventId().eventId)

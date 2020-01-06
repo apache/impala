@@ -204,8 +204,10 @@ public class MetastoreEventsProcessor implements ExternalEventsProcessor {
   public static final String LAST_SYNCED_ID_METRIC = "last-synced-event-id";
   // metric name which counts the number of self-events which are skipped
   public static final String NUMBER_OF_SELF_EVENTS = "self-events-skipped";
-  // metric name for number of tables which are invalidated by event processor so far
-  public static final String NUMBER_OF_TABLE_INVALIDATES = "tables-invalidated";
+  // metric name for number of tables which are refreshed by event processor so far
+  public static final String NUMBER_OF_TABLE_REFRESHES = "tables-refreshed";
+  // number of times events processor refreshed a partition
+  public static final String NUMBER_OF_PARTITION_REFRESHES = "partitions-refreshed";
 
   // possible status of event processor
   public enum EventProcessorStatus {
@@ -311,7 +313,8 @@ public class MetastoreEventsProcessor implements ExternalEventsProcessor {
     metrics_.addGauge(LAST_SYNCED_ID_METRIC,
         (Gauge<Long>) () -> lastSyncedEventId_.get());
     metrics_.addCounter(NUMBER_OF_SELF_EVENTS);
-    metrics_.addCounter(NUMBER_OF_TABLE_INVALIDATES);
+    metrics_.addCounter(NUMBER_OF_TABLE_REFRESHES);
+    metrics_.addCounter(NUMBER_OF_PARTITION_REFRESHES);
   }
 
   /**
@@ -334,8 +337,7 @@ public class MetastoreEventsProcessor implements ExternalEventsProcessor {
   /**
    * Gets the current event processor status
    */
-  @VisibleForTesting
-  EventProcessorStatus getStatus() {
+  public EventProcessorStatus getStatus() {
     return eventProcessorStatus_;
   }
 

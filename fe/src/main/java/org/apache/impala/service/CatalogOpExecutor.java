@@ -583,7 +583,7 @@ public class CatalogOpExecutor {
         try {
           alterTableOrViewRename(tbl,
               TableName.fromThrift(params.getRename_params().getNew_table_name()),
-              response);
+              newCatalogVersion, response);
           return;
         } finally {
           // release the version taken in the tryLock call above
@@ -624,6 +624,12 @@ public class CatalogOpExecutor {
           refreshedTable = alterTableAddPartitions(tbl, params.getAdd_partition_params());
           if (refreshedTable != null) {
             refreshedTable.setCatalogVersion(newCatalogVersion);
+            // the alter table event is only generated when we add the partition. For
+            // instance if not exists clause is provided and the partition is
+            // pre-existing there is no alter table event generated. Hence we should
+            // only add the versions for in-flight events when we are sure that the
+            // partition was really added.
+            catalog_.addVersionsForInflightEvents(tbl, newCatalogVersion);
             addTableToCatalogUpdate(refreshedTable, response.result);
           }
           reloadMetadata = false;
@@ -655,6 +661,10 @@ public class CatalogOpExecutor {
               dropPartParams.isPurge(), numUpdatedPartitions);
           if (refreshedTable != null) {
             refreshedTable.setCatalogVersion(newCatalogVersion);
+            // we don't need to add catalog versions in partition's InflightEvents here
+            // since by the time the event is received, the partition is already
+            // removed from catalog and there is nothing to compare against during
+            // self-event evaluation
             addTableToCatalogUpdate(refreshedTable, response.result);
           }
           addSummary(response,
@@ -757,11 +767,11 @@ public class CatalogOpExecutor {
       if (reloadMetadata) {
         loadTableMetadata(tbl, newCatalogVersion, reloadFileMetadata,
             reloadTableSchema, null, "ALTER TABLE " + params.getAlter_type().name());
+        // now that HMS alter operation has succeeded, add this version to list of
+        // inflight events in catalog table if event processing is enabled
+        catalog_.addVersionsForInflightEvents(tbl, newCatalogVersion);
         addTableToCatalogUpdate(tbl, response.result);
       }
-      // now that HMS alter operation has succeeded, add this version to list of inflight
-      // events in catalog table if event processing is enabled
-      catalog_.addVersionsForInflightEvents(tbl, newCatalogVersion);
     } finally {
       context.stop();
       UnlockWriteLockIfErronouslyLocked();
@@ -874,7 +884,7 @@ public class CatalogOpExecutor {
     try (MetaStoreClient msClient = catalog_.getMetaStoreClient()) {
       List<HdfsPartition> hdfsPartitions = hdfsTable.createAndLoadPartitions(
           msClient.getHiveClient(), partitions);
-      for (HdfsPartition hdfsPartition: hdfsPartitions) {
+      for (HdfsPartition hdfsPartition : hdfsPartitions) {
         catalog_.addPartition(hdfsPartition);
       }
     }
@@ -938,7 +948,7 @@ public class CatalogOpExecutor {
    */
   private void addCatalogServiceIdentifiers(Table tbl, String catalogServiceId,
       long newCatalogVersion) {
-    if (!catalog_.isExternalEventProcessingEnabled()) return;
+    if (!catalog_.isEventProcessingActive()) return;
     org.apache.hadoop.hive.metastore.api.Table msTbl = tbl.getMetaStoreTable();
     msTbl.putToParameters(
         MetastoreEventPropertyKey.CATALOG_SERVICE_ID.getKey(),
@@ -2938,7 +2948,7 @@ public class CatalogOpExecutor {
    * reloaded on the next access.
    */
   private void alterTableOrViewRename(Table oldTbl, TableName newTableName,
-      TDdlExecResponse response) throws ImpalaException {
+      long newCatalogVersion, TDdlExecResponse response) throws ImpalaException {
     Preconditions.checkState(oldTbl.getLock().isHeldByCurrentThread()
         && catalog_.getLock().isWriteLockedByCurrentThread());
     TableName tableName = oldTbl.getTableName();
@@ -2985,7 +2995,7 @@ public class CatalogOpExecutor {
           "'%s' and the new table name '%s' may fix the problem." , tableName.toString(),
           newTableName.toString()));
     }
-
+    catalog_.addVersionsForInflightEvents(result.second, newCatalogVersion);
     // TODO(todd): if client is a 'v2' impalad, only send back invalidation
     response.result.addToRemoved_catalog_objects(result.first.toMinimalTCatalogObject());
     response.result.addToUpdated_catalog_objects(result.second.toTCatalogObject());
@@ -3515,14 +3525,14 @@ public class CatalogOpExecutor {
   }
 
   /**
-   * Adds this catalog service id and the given catalog version to the partition
-   * parameters from table parameters. No-op if event processing is disabled
+   * No-op if event processing is disabled. Adds this catalog service id and the given
+   * catalog version to the partition parameters from table parameters.
    */
   private void addCatalogServiceIdentifiers(
       org.apache.hadoop.hive.metastore.api.Table msTbl, Partition partition) {
-    if (!catalog_.isExternalEventProcessingEnabled())
-      return;
+    if (!catalog_.isEventProcessingActive()) return;
     Preconditions.checkState(msTbl.isSetParameters());
+    Preconditions.checkNotNull(partition, "Partition is null");
     Map<String, String> tblParams = msTbl.getParameters();
     Preconditions
         .checkState(tblParams.containsKey(
@@ -3534,12 +3544,39 @@ public class CatalogOpExecutor {
             MetastoreEventPropertyKey.CATALOG_VERSION.getKey()),
             "Table parameters must contain catalog version before adding "
                 + "it to partition parameters");
-    partition.putToParameters(
-        MetastoreEventPropertyKey.CATALOG_SERVICE_ID.getKey(),
-        tblParams.get(MetastoreEventPropertyKey.CATALOG_SERVICE_ID.getKey()));
-    partition.putToParameters(
-        MetastoreEventPropertyKey.CATALOG_VERSION.getKey(),
-        tblParams.get(MetastoreEventPropertyKey.CATALOG_VERSION.getKey()));
+    // make sure that the service id from the table matches with our own service id to
+    // avoid issues where the msTbl has an older (other catalogs' service identifiers)
+    String serviceIdFromTbl =
+        tblParams.get(MetastoreEventPropertyKey.CATALOG_SERVICE_ID.getKey());
+    String version = tblParams.get(MetastoreEventPropertyKey.CATALOG_VERSION.getKey());
+    if (catalog_.getCatalogServiceId().equals(serviceIdFromTbl)) {
+      partition.putToParameters(
+          MetastoreEventPropertyKey.CATALOG_SERVICE_ID.getKey(), serviceIdFromTbl);
+      partition.putToParameters(
+          MetastoreEventPropertyKey.CATALOG_VERSION.getKey(), version);
+    }
+  }
+
+  /**
+   * This method extracts the catalog version from the tbl parameters and adds it to
+   * the HdfsPartition's inflight events. This information is used by event
+   * processor to skip the event generated on the partition.
+   */
+  private void addToInflightVersionsOfPartition(
+      Map<String, String> partitionParams, HdfsPartition hdfsPartition) {
+    if (!catalog_.isEventProcessingActive()) return;
+    Preconditions.checkState(partitionParams != null);
+    String version = partitionParams
+        .get(MetastoreEventPropertyKey.CATALOG_VERSION.getKey());
+    String serviceId = partitionParams
+        .get(MetastoreEventPropertyKey.CATALOG_SERVICE_ID.getKey());
+
+    // make sure that we are adding the catalog version from our own instance of
+    // catalog service identifiers
+    if (catalog_.getCatalogServiceId().equals(serviceId)) {
+      Preconditions.checkNotNull(version);
+      hdfsPartition.addToVersionsForInflightEvents(Long.parseLong(version));
+    }
   }
 
   /**
@@ -3660,6 +3697,7 @@ public class CatalogOpExecutor {
       addCatalogServiceIdentifiers(tbl.getMetaStoreTable(), hmsPartition);
       applyAlterHmsPartitions(tbl.getMetaStoreTable().deepCopy(), msClient,
           tbl.getTableName(), Arrays.asList(hmsPartition));
+      addToInflightVersionsOfPartition(hmsPartition.getParameters(), partition);
     }
   }
 
@@ -3829,7 +3867,13 @@ public class CatalogOpExecutor {
           for (org.apache.hadoop.hive.metastore.api.Partition msPartition:
               hmsPartitionsSubList) {
             try {
-              catalog_.getHdfsPartition(dbName, tableName, msPartition).markDirty();
+              HdfsPartition hdfsPartition = catalog_.getHdfsPartition(dbName, tableName,
+                  msPartition);
+              hdfsPartition.markDirty();
+              // if event processing is turned on add the version number from partition
+              // paramters to the HdfsPartition's list of in-flight events
+              addToInflightVersionsOfPartition(msPartition.getParameters(),
+                  hdfsPartition);
             } catch (PartitionNotFoundException e) {
               LOG.error(String.format("Partition of table %s could not be found: %s",
                   tableName, e.getMessage()));
@@ -3963,8 +4007,11 @@ public class CatalogOpExecutor {
                 boolean isTransactional = AcidUtils.isTransactionalTable(
                     tbl.getMetaStoreTable().getParameters());
                 Preconditions.checkArgument(!isTransactional);
+                Reference<Boolean> wasPartitionRefreshed = new Reference<>(false);
+                // TODO if the partition was not really refreshed because the partSpec
+                // was wrong, do we still need to send back the table?
                 updatedThriftTable = catalog_.reloadPartition(tbl,
-                    req.getPartition_spec(), cmdString);
+                    req.getPartition_spec(), wasPartitionRefreshed, cmdString);
               } else {
                 // TODO IMPALA-8809: Optimisation for partitioned tables:
                 //   1: Reload the whole table if schema change happened. Identify
@@ -4097,6 +4144,8 @@ public class CatalogOpExecutor {
       List<FeFsPartition> affectedExistingPartitions = new ArrayList<>();
       List<org.apache.hadoop.hive.metastore.api.Partition> hmsPartitionsStatsUnset =
           Lists.newArrayList();
+      addCatalogServiceIdentifiers(table, catalog_.getCatalogServiceId(),
+          newCatalogVersion);
       if (table.getNumClusteringCols() > 0) {
         // Set of all partition names targeted by the insert that need to be created
         // in the Metastore (partitions that do not currently exist in the catalog).
@@ -4157,6 +4206,7 @@ public class CatalogOpExecutor {
               partition.getSd().setSerdeInfo(msTbl.getSd().getSerdeInfo().deepCopy());
               partition.getSd().setLocation(msTbl.getSd().getLocation() + "/" +
                   partName.substring(0, partName.length() - 1));
+              addCatalogServiceIdentifiers(msTbl, partition);
               MetastoreShim.updatePartitionStatsFast(partition, msTbl, warehouse);
             }
 
@@ -4287,7 +4337,7 @@ public class CatalogOpExecutor {
    */
   private void createInsertEvents(Table table,
       List<FeFsPartition> affectedExistingPartitions, boolean isInsertOverwrite) {
-    if (!catalog_.isExternalEventProcessingEnabled() ||
+    if (!catalog_.isEventProcessingActive() ||
         affectedExistingPartitions.size() == 0) return;
 
     // Map of partition names to file names of all existing partitions touched by the
@@ -4429,6 +4479,9 @@ public class CatalogOpExecutor {
       throw new CatalogException("Database: " + dbName + " does not exist.");
     }
     synchronized (metastoreDdlLock_) {
+      // Get a new catalog version to assign to the database being altered.
+      long newCatalogVersion = catalog_.incrementAndGetCatalogVersion();
+      addCatalogServiceIdentifiers(db, catalog_.getCatalogServiceId(), newCatalogVersion);
       Database msDb = db.getMetaStoreDb().deepCopy();
       msDb.setDescription(comment);
       try {
@@ -4438,6 +4491,9 @@ public class CatalogOpExecutor {
       }
       Db updatedDb = catalog_.updateDb(msDb);
       addDbToCatalogUpdate(updatedDb, response.result);
+      // now that HMS alter operation has succeeded, add this version to list of inflight
+      // events in catalog database if event processing is enabled
+      catalog_.addVersionsForInflightEvents(db, newCatalogVersion);
     }
     addSummary(response, "Updated database.");
   }
@@ -4498,7 +4554,7 @@ public class CatalogOpExecutor {
    */
   private void addCatalogServiceIdentifiers(
       Db db, String catalogServiceId, long newCatalogVersion) {
-    if (!catalog_.isExternalEventProcessingEnabled()) return;
+    if (!catalog_.isEventProcessingActive()) return;
     org.apache.hadoop.hive.metastore.api.Database msDb = db.getMetaStoreDb();
     msDb.putToParameters(MetastoreEventPropertyKey.CATALOG_SERVICE_ID.getKey(),
         catalogServiceId);

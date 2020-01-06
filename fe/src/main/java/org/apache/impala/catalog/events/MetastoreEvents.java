@@ -23,8 +23,9 @@ import com.google.common.collect.ImmutableList;
 import com.google.common.collect.Lists;
 
 import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.Collections;
-import java.util.Iterator;
+import java.util.HashMap;
 import java.util.List;
 import java.util.Objects;
 import java.util.Map;
@@ -48,19 +49,19 @@ import org.apache.impala.catalog.CatalogException;
 import org.apache.impala.catalog.CatalogServiceCatalog;
 import org.apache.impala.catalog.DatabaseNotFoundException;
 import org.apache.impala.catalog.Db;
+import org.apache.impala.catalog.HdfsTable;
 import org.apache.impala.catalog.Table;
-import org.apache.impala.catalog.TableNotFoundException;
 import org.apache.impala.catalog.TableLoadingException;
+import org.apache.impala.catalog.TableNotFoundException;
+import org.apache.impala.catalog.TableNotLoadedException;
 import org.apache.impala.common.Metrics;
 import org.apache.impala.common.Pair;
 import org.apache.impala.common.Reference;
 import org.apache.impala.thrift.TPartitionKeyValue;
 import org.apache.impala.thrift.TTableName;
 import org.apache.impala.util.AcidUtils;
-import org.apache.impala.util.ClassUtil;
 import org.slf4j.LoggerFactory;
 import org.slf4j.Logger;
-import org.apache.hadoop.hive.common.FileUtils;
 
 /**
  * Main class which provides Metastore event objects for various event types. Also
@@ -167,18 +168,10 @@ public class MetastoreEvents {
         case CREATE_DATABASE: return new CreateDatabaseEvent(catalog_, metrics_, event);
         case DROP_DATABASE: return new DropDatabaseEvent(catalog_, metrics_, event);
         case ALTER_DATABASE: return new AlterDatabaseEvent(catalog_, metrics_, event);
-        case ADD_PARTITION:
-          // add partition events triggers invalidate table currently
-          return new AddPartitionEvent(catalog_, metrics_, event);
-        case DROP_PARTITION:
-          // drop partition events triggers invalidate table currently
-          return new DropPartitionEvent(catalog_, metrics_, event);
-        case ALTER_PARTITION:
-          // alter partition events triggers invalidate table currently
-          return new AlterPartitionEvent(catalog_, metrics_, event);
-        case INSERT:
-          // Insert events trigger refresh on a table/partition currently
-          return new InsertEvent(catalog_, metrics_, event);
+        case ADD_PARTITION: return new AddPartitionEvent(catalog_, metrics_, event);
+        case DROP_PARTITION: return new DropPartitionEvent(catalog_, metrics_, event);
+        case ALTER_PARTITION: return new AlterPartitionEvent(catalog_, metrics_, event);
+        case INSERT: return new InsertEvent(catalog_, metrics_, event);
         default:
           // ignore all the unknown events by creating a IgnoredEvent
           return new IgnoredEvent(catalog_, metrics_, event);
@@ -287,15 +280,6 @@ public class MetastoreEvents {
     // metrics registry so that events can add metrics
     protected final Metrics metrics_;
 
-    // version number from the event object parameters used for self-event detection
-    protected long versionNumberFromEvent_ = -1;
-    // service id from the event object parameters used for self-event detection
-    protected String serviceIdFromEvent_ = null;
-    // the list of versions which this catalog expects to be see in the
-    // self-generated events in order. Anything which is seen out of order of this list
-    // will be used to determine that this is not a self-event and table will be
-    // invalidated. See <code>isSelfEvent</code> for more details.
-    protected List<Long> pendingVersionNumbersFromCatalog_ = Collections.EMPTY_LIST;
 
     MetastoreEvent(CatalogServiceCatalog catalogServiceCatalog, Metrics metrics,
         NotificationEvent event) {
@@ -414,6 +398,8 @@ public class MetastoreEvents {
      */
     protected abstract boolean isEventProcessingDisabled();
 
+    protected abstract SelfEventContext getSelfEventContext();
+
     /**
      * This method detects if this event is self-generated or not (see class
      * documentation of <code>MetastoreEventProcessor</code> to understand what a
@@ -436,56 +422,24 @@ public class MetastoreEvents {
      * @return True if this event is a self-generated event. If the returned value is
      * true, this method also clears the version number from the catalog database/table.
      * Returns false if the version numbers or service id don't match
-     * @throws CatalogException in case of exceptions while removing the version number
-     * from the database/table or when reading the values of version list from catalog
-     * database/table
      */
-    protected boolean isSelfEvent() throws CatalogException {
-      initSelfEventIdentifiersFromEvent();
-      if (versionNumberFromEvent_ == -1 || pendingVersionNumbersFromCatalog_.isEmpty()) {
-        return false;
-      }
-
-      // first check if service id is a match, then check if the event version is what we
-      // expect in the list
-      if (catalog_.getCatalogServiceId().equals(serviceIdFromEvent_)
-          && pendingVersionNumbersFromCatalog_.get(0).equals(versionNumberFromEvent_)) {
-        // we see this version for the first time. This is a self-event
-        // remove this version number from the catalog so that next time we see this
-        // version we don't determine it wrongly as self-event
-        // TODO we should improve by atomically doing this check and invalidating the
-        // table to avoid any races. Currently, it is possible the some other thread
-        // in CatalogService changes the pendingVersionNumbersFromCatalog after do
-        // the check here. However, there are only two possible operations that can
-        // happen from outside with respect to this version list. Either some thread
-        // adds a new version to the list after we looked at it, or the table is
-        // invalidated. In both the cases, it is OK since the new version added is
-        // guaranteed to be greater than versionNumberFromEvent and if the table is
-        // invalidated, this operation (this whole event) becomes a no-op
-        catalog_.removeFromInFlightVersionsForEvents(
-            dbName_, tblName_, versionNumberFromEvent_);
-        metrics_.getCounter(MetastoreEventsProcessor.NUMBER_OF_SELF_EVENTS).inc();
-        return true;
+    protected boolean isSelfEvent() {
+      try {
+        if (catalog_.evaluateSelfEvent(getSelfEventContext())) {
+          metrics_.getCounter(MetastoreEventsProcessor.NUMBER_OF_SELF_EVENTS).inc();
+          return true;
+        }
+      } catch (CatalogException e) {
+        debugLog("Received exception {}. Ignoring self-event evaluation", e.getMessage());
       }
       return false;
     }
+  }
 
-    /**
-     * This method should be implemented by subclasses to initialize the values of
-     * self-event identifiers by parsing the event data. These identifiers are later
-     * used to determine if this event needs to be processed or not. See
-     * <code>isSelfEvent</code> method for details.
-     */
-    protected void initSelfEventIdentifiersFromEvent() {
-      throw new UnsupportedOperationException(
-          String.format("%s is not supported", ClassUtil.getMethodName()));
-    }
-
-    protected static String getStringProperty(
-        Map<String, String> params, String key, String defaultVal) {
-      if (params == null) return defaultVal;
-      return params.getOrDefault(key, defaultVal);
-    }
+  public static String getStringProperty(
+      Map<String, String> params, String key, String defaultVal) {
+    if (params == null) return defaultVal;
+    return params.getOrDefault(key, defaultVal);
   }
 
   /**
@@ -504,8 +458,13 @@ public class MetastoreEvents {
       super(catalogServiceCatalog, metrics, event);
       Preconditions.checkNotNull(dbName_, debugString("Database name cannot be null"));
       tblName_ = Preconditions.checkNotNull(event.getTableName());
-      debugLog("Creating event {} of type {} on table {}", eventId_, eventType_,
-          getFullyQualifiedTblName());
+      if (MetastoreEventType.OTHER.equals(eventType_)) {
+        debugLog("Creating event {} of type {} ({}) on table {}", eventId_, eventType_,
+            event.getEventType(), getFullyQualifiedTblName());
+      } else {
+        debugLog("Creating event {} of type {} on table {}", eventId_, eventType_,
+            getFullyQualifiedTblName());
+      }
     }
 
 
@@ -515,20 +474,6 @@ public class MetastoreEvents {
      */
     protected String getFullyQualifiedTblName() {
       return new TableName(dbName_, tblName_).toString();
-    }
-
-    /**
-     * Util method to issue invalidate on a given table on the catalog. This method
-     * atomically invalidates the table if it exists in the catalog. No-op if the table
-     * does not exist
-     */
-    protected boolean invalidateCatalogTable() {
-      boolean tableInvalidated =
-          catalog_.invalidateTableIfExists(dbName_, tblName_) != null;
-      if (tableInvalidated) {
-        metrics_.getCounter(MetastoreEventsProcessor.NUMBER_OF_TABLE_INVALIDATES).inc();
-      }
-      return tableInvalidated;
     }
 
     /**
@@ -604,34 +549,65 @@ public class MetastoreEvents {
       return tPartSpec;
     }
 
-    /**
-     * Util method to create a partition spec string out of a TPartitionKeyValue objects.
-     */
-    protected static String constructPartitionStringFromTPartitionSpec(
-        List<TPartitionKeyValue> tPartSpec) {
-      List<String> partitionCols = new ArrayList<>();
-      List<String> partitionVals = new ArrayList<>();
-      for (TPartitionKeyValue kv: tPartSpec) {
-        partitionCols.add(kv.getName());
-        partitionVals.add(kv.getValue());
-      }
-      String partString = FileUtils.makePartName(partitionCols, partitionVals);
-      return partString;
-    }
-
     /*
      * Helper function to initiate a table reload on Catalog. Re-throws the exception if
      * the catalog operation throws.
      */
-    protected void reloadTableFromCatalog(String operation) throws CatalogException {
-      if (!catalog_.reloadTableIfExists(dbName_, tblName_,
-              "Processing " + operation + " event from HMS")) {
-        debugLog("Automatic refresh on table {} failed as the table is not "
-            + "present either in catalog or metastore.", getFullyQualifiedTblName());
-      } else {
-        infoLog("Table {} has been refreshed after " + operation +".",
+    protected boolean reloadTableFromCatalog(String operation, boolean isTransactional)
+        throws CatalogException {
+      try {
+        if (!catalog_.reloadTableIfExists(dbName_, tblName_,
+            "Processing " + operation + " event from HMS")) {
+          debugLog("Automatic refresh on table {} failed as the table "
+              + "either does not exist anymore or is not in loaded state.",
+              getFullyQualifiedTblName());
+          return false;
+        }
+      } catch (DatabaseNotFoundException e) {
+        debugLog("Refresh table {} failed as "
+                + "the database was not present in the catalog.",
             getFullyQualifiedTblName());
+        return false;
       }
+      String tblStr = isTransactional ? "transactional table" : "table";
+      infoLog("Refreshed {} {}", tblStr, getFullyQualifiedTblName());
+      metrics_.getCounter(MetastoreEventsProcessor.NUMBER_OF_TABLE_REFRESHES).inc();
+      return true;
+    }
+
+    /**
+     * Refreshes a partition provided by given spec only if the table is loaded
+     * @param tPartSpec
+     * @param reason Event type which caused the refresh, used for logging by catalog
+     * @return false if the table or database did not exist or was not loaded, else
+     * returns true.
+     * @throws CatalogException
+     */
+    protected boolean reloadPartition(List<TPartitionKeyValue> tPartSpec, String reason)
+        throws CatalogException {
+      try {
+        boolean result = catalog_.reloadPartitionIfExists(dbName_,
+            tblName_, tPartSpec, reason);
+        if (!result) {
+          debugLog("partition {} on table {} was not refreshed since it does not exist "
+                  + "in catalog anymore", HdfsTable.constructPartitionName(tPartSpec),
+              getFullyQualifiedTblName());
+        } else {
+          metrics_.getCounter(MetastoreEventsProcessor.NUMBER_OF_PARTITION_REFRESHES)
+              .inc();
+          infoLog("Table {} partition {} has been refreshed", getFullyQualifiedTblName(),
+              HdfsTable.constructPartitionName(tPartSpec));
+        }
+        return true;
+      } catch (TableNotLoadedException e) {
+          debugLog("Partition {} on table {} was not refreshed since it is not loaded",
+              HdfsTable.constructPartitionName(tPartSpec), getFullyQualifiedTblName());
+      } catch (DatabaseNotFoundException | TableNotFoundException e) {
+        debugLog("Refresh of table {} partition {} "
+                + "event failed as the database or table is not present in the catalog.",
+            getFullyQualifiedTblName(), HdfsTable.constructPartitionName(tPartSpec));
+      }
+      return false;
     }
   }
 
@@ -684,6 +660,12 @@ public class MetastoreEvents {
         throw new MetastoreNotificationException(
             debugString("Unable to deserialize the event message"), e);
       }
+    }
+
+    @Override
+    public SelfEventContext getSelfEventContext() {
+      throw new UnsupportedOperationException("Self-event evaluation is unnecessary for"
+          + " this event type");
     }
 
     /**
@@ -782,6 +764,12 @@ public class MetastoreEvents {
       }
     }
 
+    @Override
+    public SelfEventContext getSelfEventContext() {
+      throw new UnsupportedOperationException("Self-event evaluation is not implemented"
+          + " for insert event type");
+    }
+
     /**
      * Currently we do not check for self-events in Inserts. Existing self-events logic
      * cannot be used for insert events since firing insert event does not allow us to
@@ -815,27 +803,13 @@ public class MetastoreEvents {
         // Ignore event if table or database is not in catalog. Throw exception if
         // refresh fails. If the partition does not exist in metastore the reload
         // method below removes it from the catalog
-        if (!catalog_.reloadPartitionIfExists(dbName_, tblName_, tPartSpec,
-            "processing partition-level INSERT event from HMS")) {
-          debugLog("Refresh of table {} partition {} after insert "
-                  + "event failed as the table is not present in the catalog.",
-              getFullyQualifiedTblName(), (tPartSpec));
-        } else {
-          infoLog("Table {} partition {} has been refreshed after insert.",
-              getFullyQualifiedTblName(),
-              constructPartitionStringFromTPartitionSpec(tPartSpec));
-        }
-      } catch (DatabaseNotFoundException e) {
-        debugLog("Refresh of table {} partition {} for insert "
-                + "event failed as the database is not present in the catalog.",
-            getFullyQualifiedTblName(),
-            constructPartitionStringFromTPartitionSpec(tPartSpec));
+        reloadPartition(tPartSpec, "INSERT");
       } catch (CatalogException e) {
         throw new MetastoreNotificationNeedsInvalidateException(debugString("Refresh "
                 + "partition on table {} partition {} failed. Event processing cannot "
-                + "continue. Issue and invalidate command to reset the event processor "
-                + "state.", getFullyQualifiedTblName(),
-            constructPartitionStringFromTPartitionSpec(tPartSpec)), e);
+                + "continue. Issue an invalidate metadata command to reset the event "
+                + "processor state.", getFullyQualifiedTblName(),
+            HdfsTable.constructPartitionName(tPartSpec)), e);
       }
     }
 
@@ -848,10 +822,7 @@ public class MetastoreEvents {
       try {
         // Ignore event if table or database is not in the catalog. Throw exception if
         // refresh fails.
-        reloadTableFromCatalog("table-level INSERT");
-      } catch (DatabaseNotFoundException e) {
-        debugLog("Automatic refresh of table {} insert failed as the "
-            + "database is not present in the catalog.", getFullyQualifiedTblName());
+        reloadTableFromCatalog("INSERT", false);
       } catch (CatalogException e) {
         if (e instanceof TableLoadingException &&
             e.getCause() instanceof NoSuchObjectException) {
@@ -871,7 +842,7 @@ public class MetastoreEvents {
   /**
    * MetastoreEvent for ALTER_TABLE event type
    */
-  public static class AlterTableEvent extends TableInvalidatingEvent {
+  public static class AlterTableEvent extends MetastoreTableEvent {
     protected org.apache.hadoop.hive.metastore.api.Table tableBefore_;
     // the table object after alter operation, as parsed from the NotificationEvent
     protected org.apache.hadoop.hive.metastore.api.Table tableAfter_;
@@ -915,32 +886,14 @@ public class MetastoreEvents {
     }
 
     @Override
-    protected void initSelfEventIdentifiersFromEvent() {
-      versionNumberFromEvent_ = Long.parseLong(
-          getStringProperty(tableAfter_.getParameters(),
-              MetastoreEventPropertyKey.CATALOG_VERSION.getKey(), "-1"));
-      serviceIdFromEvent_ =
-          getStringProperty(tableAfter_.getParameters(),
-              MetastoreEventPropertyKey.CATALOG_SERVICE_ID.getKey(), "");
-      try {
-        if (isRename_) {
-          //if this is rename event then identifiers will be in tableAfter
-          pendingVersionNumbersFromCatalog_ = catalog_
-              .getInFlightVersionsForEvents(tableAfter_.getDbName(),
-                  tableAfter_.getTableName());
-        } else {
-          pendingVersionNumbersFromCatalog_ = catalog_
-              .getInFlightVersionsForEvents(msTbl_.getDbName(), msTbl_.getTableName());
-        }
-      } catch (TableNotFoundException | DatabaseNotFoundException e) {
-        debugLog("Received exception {}. Ignoring self-event evaluation",
-            e.getMessage());
-      }
+    protected SelfEventContext getSelfEventContext() {
+      return new SelfEventContext(tableAfter_.getDbName(), tableAfter_.getTableName(),
+          tableAfter_.getParameters());
     }
 
     /**
      * If the ALTER_TABLE event is due a table rename, this method removes the old table
-     * and creates a new table with the new name. Else, this just issues a invalidate
+     * and creates a new table with the new name. Else, this just issues a refresh
      * table on the tblName from the event
      */
     @Override
@@ -948,8 +901,7 @@ public class MetastoreEvents {
       // Determine whether this is an event which we have already seen or if it is a new
       // event
       if (isSelfEvent()) {
-        infoLog("Not processing the event as it is a self-event or "
-            + "update is already present in catalog.");
+        infoLog("Not processing the event as it is a self-event");
         return;
       }
       // Ignore the event if this is a trivial event. See javadoc for
@@ -960,12 +912,12 @@ public class MetastoreEvents {
         return;
       }
       // in case of table level alters from external systems it is better to do a full
-      // invalidate  eg. this could be due to as simple as adding a new parameter or a
-      // full blown adding  or changing column type
-      // detect the special where a table is renamed
+      // refresh  eg. this could be due to as simple as adding a new parameter or a
+      // full blown adding or changing column type
+      // detect the special case where a table is renamed
       if (!isRename_) {
-        // table is not renamed, need to invalidate
-        if (!invalidateCatalogTable()) {
+        // table is not renamed, need to refresh the table if its loaded
+        if (!reloadTableFromCatalog("ALTER_TABLE", false)) {
           if (wasEventSyncTurnedOn()) {
             // we received this alter table event on a non-existing table. We also
             // detect that event sync was turned on in this event. This may mean that
@@ -980,11 +932,6 @@ public class MetastoreEvents {
                     + "continued further. Issue a invalidate metadata command to reset "
                     + "the event processing state", getFullyQualifiedTblName()));
           }
-          debugLog("Table {} does not need to be "
-                  + "invalidated since it does not exist anymore",
-              getFullyQualifiedTblName());
-        } else {
-          infoLog("Table {} is invalidated", getFullyQualifiedTblName());
         }
         return;
       }
@@ -1025,8 +972,7 @@ public class MetastoreEvents {
       return false;
     }
 
-    @Override
-    protected boolean canBeSkipped() {
+    private boolean canBeSkipped() {
       // Certain alter events just modify some parameters such as
       // "transient_lastDdlTime" in Hive. For eg: the alter table event generated
       // along with insert events. Check if the alter table event is such a trivial
@@ -1049,7 +995,7 @@ public class MetastoreEvents {
      * <code>MetastoreEventPropertyKey.DISABLE_EVENT_HMS_SYNC</code>. If the
      * parameter is unchanged, it doesn't
      * matter if you use the before or after table object here since the eventual action
-     * is going be invalidate or rename. If however, the parameter is changed, couple of
+     * is going be refresh or rename. If however, the parameter is changed, couple of
      * things could happen. The flag changes from unset/false to true or it changes from
      * true to false/unset. In the first case, we want to process the event (and ignore
      * subsequent events on this table). In the second case, we should process the event
@@ -1097,6 +1043,12 @@ public class MetastoreEvents {
       }
     }
 
+    @Override
+    public SelfEventContext getSelfEventContext() {
+      throw new UnsupportedOperationException("self-event evaluation is not needed for "
+          + "this event type");
+    }
+
     /**
      * Process the drop table event type. If the table from the event doesn't exist in the
      * catalog, ignore the event. If the table exists in the catalog, compares the
@@ -1121,7 +1073,7 @@ public class MetastoreEvents {
       if (removedTable != null) {
         infoLog("Removed table {} ", getFullyQualifiedTblName());
       } else if (!tblWasFound.getRef()) {
-        debugLog("Table {} was not removed since it did not exist in catalog.",
+        debugLog("Table {} was not removed since it does not exist in catalog anymore.",
             tblName_);
       } else if (!tblMatched.getRef()) {
         infoLog(debugString("Table %s was not removed from "
@@ -1159,6 +1111,12 @@ public class MetastoreEvents {
                 + "Check if %s is set to true in metastore configuration",
             MetastoreEventsProcessor.HMS_ADD_THRIFT_OBJECTS_IN_EVENTS_CONFIG_KEY), e);
       }
+    }
+
+    @Override
+    public SelfEventContext getSelfEventContext() {
+      throw new UnsupportedOperationException("Self-event evaluation is unnecessary for"
+          + " this event type");
     }
 
     /**
@@ -1245,21 +1203,8 @@ public class MetastoreEvents {
     }
 
     @Override
-    protected void initSelfEventIdentifiersFromEvent() {
-      versionNumberFromEvent_ = Long.parseLong(getStringProperty(
-          alteredDatabase_.getParameters(),
-          MetastoreEventPropertyKey.CATALOG_VERSION.getKey(), "-1"));
-      serviceIdFromEvent_ = getStringProperty(
-          alteredDatabase_.getParameters(),
-          MetastoreEventPropertyKey.CATALOG_SERVICE_ID.getKey(), "");
-      try {
-        pendingVersionNumbersFromCatalog_ =
-            catalog_.getInFlightVersionsForEvents(dbName_, tblName_);
-      } catch (DatabaseNotFoundException | TableNotFoundException e) {
-        // ok to ignore this exception, since if the db doesn't exit, this event needs
-        // to be ignored anyways
-        debugLog("Received exception {}. Ignoring self-event evaluation", e.getMessage());
-      }
+    protected SelfEventContext getSelfEventContext() {
+      return new SelfEventContext(dbName_, null, alteredDatabase_.getParameters());
     }
   }
 
@@ -1292,6 +1237,12 @@ public class MetastoreEvents {
                 + "Check if %s is set to true in metastore configuration",
             MetastoreEventsProcessor.HMS_ADD_THRIFT_OBJECTS_IN_EVENTS_CONFIG_KEY), e);
       }
+    }
+
+    @Override
+    public SelfEventContext getSelfEventContext() {
+      throw new UnsupportedOperationException("Self-event evaluation is not needed for "
+          + "this event");
     }
 
     /**
@@ -1332,91 +1283,36 @@ public class MetastoreEvents {
   }
 
   /**
-   * MetastoreEvent for which issues invalidate on a table from the event
+   * Returns a list of parameters that are set by Hive for tables/partitions that can be
+   * ignored to determine if the alter table/partition event is a trivial one.
    */
-  public static abstract class TableInvalidatingEvent extends MetastoreTableEvent {
-    /**
-     * Prevent instantiation from outside should use MetastoreEventFactory instead
-     */
-    private TableInvalidatingEvent(
-        CatalogServiceCatalog catalog, Metrics metrics, NotificationEvent event) {
-      super(catalog, metrics, event);
-    }
+  @VisibleForTesting
+  static final List<String> parametersToIgnore =
+      new ImmutableList.Builder<String>()
+      .add("transient_lastDdlTime")
+      .add("totalSize")
+      .add("numFilesErasureCoded")
+      .add("numFiles")
+      .build();
 
-    /**
-     * Issues a invalidate table on the catalog on the table from the event. This
-     * invalidate does not fetch information from metastore unlike the invalidate metadata
-     * command since event is triggered post-metastore activity. This handler invalidates
-     * by atomically removing existing loaded table and replacing it with a
-     * IncompleteTable. If the table doesn't exist in catalog this operation is a no-op
-     */
-    @Override
-    public void process() throws MetastoreNotificationException, CatalogException {
-      // skip event processing in case its a self-event
-      if (isSelfEvent()) {
-        infoLog("Not processing the event as it is a self-event");
-        return;
-      }
-
-      // Skip if it's only a change in parameters by Hive, which can be ignored.
-      if (canBeSkipped()) {
-        infoLog("Not processing this event as it only modifies some "
-            + "parameters which can be ignored.");
-        return;
-      }
-
-      if (invalidateCatalogTable()) {
-        infoLog("Table {} is invalidated", getFullyQualifiedTblName());
+  /**
+   * Util method that sets the parameters that can be ignored equal before and after
+   * event.
+   */
+  private static void setTrivialParameters(Map<String, String> parametersBefore,
+      Map<String, String> parametersAfter) {
+    for (String parameter: parametersToIgnore) {
+      String val = parametersBefore.get(parameter);
+      if (val == null) {
+        parametersAfter.remove(parameter);
       } else {
-        debugLog("Table {} does not need to be invalidated since "
-            + "it does not exist anymore", getFullyQualifiedTblName());
+        parametersAfter.put(parameter, val);
       }
     }
-
-    protected static String getStringProperty(
-        Map<String, String> params, String key, String defaultVal) {
-      if (params == null) return defaultVal;
-      return params.getOrDefault(key, defaultVal);
-    }
-
-    /**
-     * Returns a list of parameters that are set by Hive for tables/partitions that can be
-     * ignored to determine if the alter table/partition event is a trivial one.
-     */
-    static final List<String> parametersToIgnore = new ImmutableList.Builder<String>()
-        .add("transient_lastDdlTime")
-        .add("totalSize")
-        .add("numFilesErasureCoded")
-        .add("numFiles")
-        .build();
-
-    /**
-     * Util method that sets the parameters that can be ignored equal before and after
-     * event.
-     */
-     static void setTrivialParameters(Map<String, String> parametersBefore,
-        Map<String, String> parametersAfter) {
-      for (String parameter: parametersToIgnore) {
-        String val = parametersBefore.get(parameter);
-        if (val == null) {
-          parametersAfter.remove(parameter);
-        } else {
-          parametersAfter.put(parameter, val);
-        }
-      }
-    }
-
-    /**
-     * Hive generates certain trivial alter events for eg: change only
-     * "transient_lastDdlTime". This method returns true if the alter partition event is
-     * such a trivial event.
-     */
-    protected abstract boolean canBeSkipped();
   }
-
-  public static class AddPartitionEvent extends TableInvalidatingEvent {
-    private Partition lastAddedPartition_;
+  public static class AddPartitionEvent extends MetastoreTableEvent {
     private final List<Partition> addedPartitions_;
+    private final List<List<TPartitionKeyValue>> partitionKeyVals_;
 
     /**
      * Prevent instantiation from outside should use MetastoreEventFactory instead
@@ -1436,18 +1332,27 @@ public class MetastoreEvents {
             Lists.newArrayList(addPartitionMessage_.getPartitionObjs());
         // it is possible that the added partitions is empty in certain cases. See
         // IMPALA-8847 for example
-        if (!addedPartitions_.isEmpty()) {
-          // when multiple partitions are added in HMS they are all added as one
-          // transaction Hence all the partitions which are present in the message must
-          // have the same serviceId and version if it is set. hence it is fine to just
-          // look at the last added partition in the list and use it for the self-event
-          // ids
-          lastAddedPartition_ = addedPartitions_.get(addedPartitions_.size() - 1);
-        }
         msTbl_ = addPartitionMessage_.getTableObj();
+        partitionKeyVals_ = new ArrayList<>(addedPartitions_.size());
+        for (Partition part : addedPartitions_) {
+          partitionKeyVals_.add(getTPartitionSpecFromHmsPartition(msTbl_, part));
+        }
       } catch (Exception ex) {
         throw new MetastoreNotificationException(ex);
       }
+    }
+
+    @Override
+    public SelfEventContext getSelfEventContext() {
+      Map<String, String> params = new HashMap<>();
+      // all the partitions are added as one transaction and hence we expect all the
+      // added partitions to have the same catalog service identifiers. Using the first
+      // one for the params is enough for the purpose of self-event evaluation
+      if (!addedPartitions_.isEmpty()) {
+        params.putAll(addedPartitions_.get(0).getParameters());
+      }
+      return new SelfEventContext(dbName_, tblName_, partitionKeyVals_,
+          params);
     }
 
     @Override
@@ -1464,9 +1369,8 @@ public class MetastoreEvents {
       try {
         // Reload the whole table if it's a transactional table.
         if (AcidUtils.isTransactionalTable(msTbl_.getParameters())) {
-          reloadTableFromCatalog("ADD_PARTITION");
+          reloadTableFromCatalog("ADD_PARTITION", true);
         } else {
-          boolean success = true;
           // HMS adds partitions in a transactional way. This means there may be multiple
           // HMS partition objects in an add_partition event. We try to do the same here
           // by refreshing all those partitions in a loop. If any partition refresh fails,
@@ -1474,58 +1378,23 @@ public class MetastoreEvents {
           // refresh of the partitions if the table is not present in the catalog.
           infoLog("Trying to refresh {} partitions added to table {} in the event",
               addedPartitions_.size(), getFullyQualifiedTblName());
+          //TODO refresh all the partition together instead of looping one by one
           for (Partition partition : addedPartitions_) {
             List<TPartitionKeyValue> tPartSpec =
                 getTPartitionSpecFromHmsPartition(msTbl_, partition);
-            if (!catalog_.reloadPartitionIfExists(dbName_, tblName_, tPartSpec,
-                "processing ADD_PARTITION event from HMS")) {
-              debugLog("Refresh partitions on table {} failed as table was not present " +
-                  "in the catalog.", getFullyQualifiedTblName());
-              success = false;
-              break;
-            }
-          }
-          if (success) {
-            infoLog("Refreshed {} partitions of table {}", addedPartitions_.size(),
-                getFullyQualifiedTblName());
+            if (!reloadPartition(tPartSpec, "ADD_PARTITION")) break;
           }
         }
-      } catch (DatabaseNotFoundException e) {
-        debugLog("Refresh partitions on table {} after add_partitions event failed as "
-                + "the database was not present in the catalog.",
-            getFullyQualifiedTblName());
       } catch (CatalogException e) {
         throw new MetastoreNotificationNeedsInvalidateException(debugString("Failed to "
                 + "refresh newly added partitions of table {}. Event processing cannot "
-                + "continue. Issue an invalidate command to reset event processor.",
-            getFullyQualifiedTblName()), e);
+                + "continue. Issue an invalidate metadata command to reset event "
+                + "processor.", getFullyQualifiedTblName()), e);
       }
     }
-
-    @Override
-    protected void initSelfEventIdentifiersFromEvent() {
-      versionNumberFromEvent_ = Long.parseLong(getStringProperty(
-          lastAddedPartition_.getParameters(),
-          MetastoreEventPropertyKey.CATALOG_VERSION.getKey(), "-1"));
-      serviceIdFromEvent_ = getStringProperty(
-          lastAddedPartition_.getParameters(),
-          MetastoreEventPropertyKey.CATALOG_SERVICE_ID.getKey(), "");
-      try {
-        pendingVersionNumbersFromCatalog_ =
-            catalog_.getInFlightVersionsForEvents(dbName_, tblName_);
-      } catch (DatabaseNotFoundException | TableNotFoundException e) {
-        // ok to ignore this exception, since if the db doesn't exit, this event needs
-        // to be ignored anyways
-        debugLog("Received exception {}. Ignoring self-event evaluation",
-            e.getMessage());
-      }
-    }
-
-    @Override
-    protected boolean canBeSkipped() { return false; }
   }
 
-  public static class AlterPartitionEvent extends TableInvalidatingEvent {
+  public static class AlterPartitionEvent extends MetastoreTableEvent {
     // the Partition object before alter operation, as parsed from the NotificationEvent
     private final org.apache.hadoop.hive.metastore.api.Partition partitionBefore_;
     // the Partition object after alter operation, as parsed from the NotificationEvent
@@ -1572,42 +1441,25 @@ public class MetastoreEvents {
 
       // Reload the whole table if it's a transactional table.
       if (AcidUtils.isTransactionalTable(msTbl_.getParameters())) {
-        reloadTableFromCatalog("ALTER_PARTITION");
+        reloadTableFromCatalog("ALTER_PARTITION", true);
       } else {
         // Refresh the partition that was altered.
         Preconditions.checkNotNull(partitionAfter_);
         List<TPartitionKeyValue> tPartSpec = getTPartitionSpecFromHmsPartition(msTbl_,
             partitionAfter_);
         try {
-          // Ignore event if table or database is not in catalog. Throw exception if
-          // refresh fails.
-          if (!catalog_.reloadPartitionIfExists(dbName_, tblName_, tPartSpec,
-              "processing ALTER_PARTITION event from HMS")) {
-            debugLog("Refresh of table {} partition {} failed as the table "
-                    + "is not present in the catalog.", getFullyQualifiedTblName(),
-                constructPartitionStringFromTPartitionSpec(tPartSpec));
-          } else {
-            infoLog("Table {} partition {} has been refreshed",
-                getFullyQualifiedTblName(),
-                constructPartitionStringFromTPartitionSpec(tPartSpec));
-          }
-        } catch (DatabaseNotFoundException e) {
-          debugLog("Refresh of table {} partition {} "
-                  + "event failed as the database is not present in the catalog.",
-              getFullyQualifiedTblName(),
-              constructPartitionStringFromTPartitionSpec(tPartSpec));
+          reloadPartition(tPartSpec, "ALTER_PARTITION");
         } catch (CatalogException e) {
           throw new MetastoreNotificationNeedsInvalidateException(debugString("Refresh "
                   + "partition on table {} partition {} failed. Event processing cannot "
-                  + "continue. Issue and invalidate command to reset the event processor "
+                  + "continue. Issue an invalidate command to reset the event processor "
                   + "state.", getFullyQualifiedTblName(),
-              constructPartitionStringFromTPartitionSpec(tPartSpec)), e);
+              HdfsTable.constructPartitionName(tPartSpec)), e);
         }
       }
     }
 
-    @Override
-    protected boolean canBeSkipped() {
+    private boolean canBeSkipped() {
       // Certain alter events just modify some parameters such as
       // "transient_lastDdlTime" in Hive. For eg: the alter table event generated
       // along with insert events. Check if the alter table event is such a trivial
@@ -1622,26 +1474,14 @@ public class MetastoreEvents {
     }
 
     @Override
-    protected void initSelfEventIdentifiersFromEvent() {
-      versionNumberFromEvent_ = Long.parseLong(getStringProperty(
-          partitionAfter_.getParameters(),
-          MetastoreEventPropertyKey.CATALOG_VERSION.getKey(), "-1"));
-      serviceIdFromEvent_ = getStringProperty(
-          partitionAfter_.getParameters(),
-          MetastoreEventPropertyKey.CATALOG_SERVICE_ID.getKey(), "");
-      try {
-        pendingVersionNumbersFromCatalog_ =
-            catalog_.getInFlightVersionsForEvents(dbName_, tblName_);
-      } catch (DatabaseNotFoundException | TableNotFoundException e) {
-        // ok to ignore since if the db or table doesn't exist the event is ignored
-        // anyways
-        debugLog("Received exception {}. Ignoring self-event evaluation",
-            e.getMessage());
-      }
+    public SelfEventContext getSelfEventContext() {
+      return new SelfEventContext(dbName_, tblName_,
+          Arrays.asList(getTPartitionSpecFromHmsPartition(msTbl_, partitionAfter_)),
+          partitionAfter_.getParameters());
     }
   }
 
-  public static class DropPartitionEvent extends TableInvalidatingEvent {
+  public static class DropPartitionEvent extends MetastoreTableEvent {
     private final List<Map<String, String>> droppedPartitions_;
 
     /**
@@ -1669,62 +1509,44 @@ public class MetastoreEvents {
     }
 
     @Override
-    public void process() throws MetastoreNotificationException {
+    public void process() throws MetastoreNotificationException, CatalogException {
       // we have seen cases where a add_partition event is generated with empty
       // partition list (see IMPALA-8547 for details. Make sure that droppedPartitions
       // list is not empty
       if (droppedPartitions_.isEmpty()) {
         infoLog("Partition list is empty. Ignoring this event.");
       }
-      // We do not need self event as dropPartition() call is a no-op if the directory
-      // doesn't exist.
       try {
         // Reload the whole table if it's a transactional table.
         if (AcidUtils.isTransactionalTable(msTbl_.getParameters())) {
-          reloadTableFromCatalog("DROP_PARTITION");
+          reloadTableFromCatalog("DROP_PARTITION", true);
         } else {
-          boolean success = true;
           // We refresh all the partitions that were dropped from HMS. If a refresh
           // fails, we throw a MetastoreNotificationNeedsInvalidateException
-          infoLog("{} partitions dropped from table {}. Trying "
-              + "to refresh.", droppedPartitions_.size(), getFullyQualifiedTblName());
+          infoLog("{} partitions dropped from table {}. Refreshing the partitions "
+                  + "to remove them from catalog.", droppedPartitions_.size(),
+              getFullyQualifiedTblName());
           for (Map<String, String> partSpec : droppedPartitions_) {
             List<TPartitionKeyValue> tPartSpec = new ArrayList<>(partSpec.size());
             for (Map.Entry<String, String> entry : partSpec.entrySet()) {
               tPartSpec.add(new TPartitionKeyValue(entry.getKey(), entry.getValue()));
             }
-            if (!catalog_.reloadPartitionIfExists(dbName_, tblName_, tPartSpec,
-                "processing DROP_PARTITION event from HMS")) {
-              debugLog("Could not refresh partition {} of table {} as table "
-                      + "was not present in the catalog.",
-                      getFullyQualifiedTblName());
-              success = false;
-              break;
-            }
-          }
-          if (success) {
-            infoLog("Refreshed {} partitions of table {}", droppedPartitions_.size(),
-                getFullyQualifiedTblName());
+            if (!reloadPartition(tPartSpec, "DROP_PARTITION")) break;
           }
         }
-      } catch (DatabaseNotFoundException e) {
-        debugLog("Could not refresh partitions of table {}"
-            + "as database was not present in the catalog.", getFullyQualifiedTblName());
       } catch (CatalogException e) {
         throw new MetastoreNotificationNeedsInvalidateException(debugString("Failed to "
             + "drop some partitions from table {} after a drop partitions event. Event "
-                + "processing cannot continue. Issue an invalidate command to reset "
-            + "event processor state.", getFullyQualifiedTblName()), e);
+            + "processing cannot continue. Issue an invalidate metadata command to "
+            + "reset event processor state.", getFullyQualifiedTblName()), e);
       }
     }
 
     @Override
-    protected void initSelfEventIdentifiersFromEvent() {
-      // no-op
+    protected SelfEventContext getSelfEventContext() {
+      throw new UnsupportedOperationException("self-event evaluation is not needed for "
+          + "this event type");
     }
-
-    @Override
-    protected boolean canBeSkipped() { return false; }
   }
 
   /**
@@ -1742,12 +1564,19 @@ public class MetastoreEvents {
 
     @Override
     public void process() {
-      debugLog("Ignored");
+      debugLog(
+          "Ignoring unknown event type " + metastoreNotificationEvent_.getEventType());
     }
 
     @Override
     protected boolean isEventProcessingDisabled() {
       return false;
+    }
+
+    @Override
+    protected SelfEventContext getSelfEventContext() {
+      throw new UnsupportedOperationException("Self-event evaluation is not needed for "
+          + "this event type");
     }
   }
 }

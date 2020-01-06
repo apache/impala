@@ -51,7 +51,9 @@ import org.apache.impala.authorization.AuthorizationPolicy;
 import org.apache.impala.catalog.MetaStoreClientPool.MetaStoreClient;
 import org.apache.impala.catalog.events.ExternalEventsProcessor;
 import org.apache.impala.catalog.events.MetastoreEventsProcessor;
+import org.apache.impala.catalog.events.MetastoreEventsProcessor.EventProcessorStatus;
 import org.apache.impala.catalog.events.NoOpEventProcessor;
+import org.apache.impala.catalog.events.SelfEventContext;
 import org.apache.impala.common.FileSystemUtil;
 import org.apache.impala.common.ImpalaException;
 import org.apache.impala.common.Pair;
@@ -390,8 +392,10 @@ public class CatalogServiceCatalog extends Catalog {
     return metastoreEventProcessor_;
   }
 
-  public boolean isExternalEventProcessingEnabled() {
-    return !(metastoreEventProcessor_ instanceof NoOpEventProcessor);
+  public boolean isEventProcessingActive() {
+    return metastoreEventProcessor_ instanceof MetastoreEventsProcessor
+        && EventProcessorStatus.ACTIVE
+        .equals(((MetastoreEventsProcessor) metastoreEventProcessor_).getStatus());
   }
 
   /**
@@ -785,7 +789,7 @@ public class CatalogServiceCatalog extends Catalog {
    */
   public List<Long> getInFlightVersionsForEvents(String dbName, String tblName)
       throws DatabaseNotFoundException, TableNotFoundException {
-    Preconditions.checkState(isExternalEventProcessingEnabled(),
+    Preconditions.checkState(isEventProcessingActive(),
         "Event processing should be enabled before calling this method");
     List<Long> result = Collections.EMPTY_LIST;
     versionLock_.readLock().lock();
@@ -811,36 +815,73 @@ public class CatalogServiceCatalog extends Catalog {
   }
 
   /**
-   * Removes a given version number from the catalog database/table's list of versions
-   * for in-flight events.
-   * If tblName is null, removes version number from database.
-   * If tblName not null and table is not incomplete, removes version number from table
-   * Applicable only when external event processing is enabled.
-   * @param dbName database name
-   * @param tblName table name
+   * Evaluates if the information from an event (serviceId and versionNumber) matches to
+   * the catalog object. If there is match, the in-flight version for that object is
+   * removed and method returns true. If it does not match, returns false
+   * @param ctx self context which provides all the information needed to
+   * evaluate if this is a self-event or not
+   * @return true if given event information evaluates to a self-event, false otherwise
    */
-  public void removeFromInFlightVersionsForEvents(String dbName, String tblName,
-      long versionNumber) throws DatabaseNotFoundException, TableNotFoundException {
-    Preconditions.checkState(isExternalEventProcessingEnabled(),
+  public boolean evaluateSelfEvent(SelfEventContext ctx)
+      throws CatalogException {
+    Preconditions.checkState(isEventProcessingActive(),
         "Event processing should be enabled when calling this method");
-    versionLock_.writeLock().lock();
-    try {
-      Db db = getDb(dbName);
-      if (db == null) return;
-      if (tblName == null) {
-        db.removeFromVersionsForInflightEvents(versionNumber);
-        return;
-      }
-      Table tbl = getTable(dbName, tblName);
-      if (tbl == null) {
-        throw new TableNotFoundException(
-            String.format("Table %s not found", new TableName(dbName, tblName)));
-      }
-      if (tbl instanceof IncompleteTable) return;
-      tbl.removeFromVersionsForInflightEvents(versionNumber);
-    } finally {
-      versionLock_.writeLock().unlock();
+    long versionNumber = ctx.getVersionNumberFromEvent();
+    String serviceIdFromEvent = ctx.getServiceIdFromEvent();
+    // no version info or service id in the event
+    if (versionNumber == -1 || serviceIdFromEvent.isEmpty()) return false;
+    // if the service id from event doesn't match with our service id this is not a
+    // self-event
+    if (!getCatalogServiceId().equals(serviceIdFromEvent)) return false;
+    Db db = getDb(ctx.getDbName());
+    if (db == null) {
+      throw new DatabaseNotFoundException("Database " + ctx.getDbName() + " not found");
     }
+    // if the given tblName is null we look db's in-flight events
+    if (ctx.getTblName() == null) {
+      return db.removeFromVersionsForInflightEvents(versionNumber);
+    }
+    Table tbl = getTable(ctx.getDbName(), ctx.getTblName());
+    if (tbl == null) {
+      throw new TableNotFoundException(
+          String.format("Table %s.%s not found", ctx.getDbName(), ctx.getTblName()));
+    }
+    // we should acquire the table lock so that we wait for any other updates
+    // happening to this table at the same time
+    if (!tryLockTable(tbl)) {
+      throw new CatalogException(String.format("Error during self-event evaluation "
+          + "for table %s due to lock contention", tbl.getFullName()));
+    }
+    versionLock_.writeLock().unlock();
+    try {
+      List<List<TPartitionKeyValue>> partitionKeyValues = ctx.getPartitionKeyValues();
+      // if the partitionKeyValues is null, we look for tbl's in-flight events
+      if (partitionKeyValues == null) {
+        return tbl.removeFromVersionsForInflightEvents(versionNumber);
+      }
+      if (tbl instanceof HdfsTable) {
+        List<String> failingPartitions = new ArrayList<>();
+        for (List<TPartitionKeyValue> partitionKeyValue : partitionKeyValues) {
+          HdfsPartition hdfsPartition =
+              ((HdfsTable) tbl).getPartitionFromThriftPartitionSpec(partitionKeyValue);
+          if (hdfsPartition == null || !hdfsPartition
+              .removeFromVersionsForInflightEvents(versionNumber)) {
+            // even if this is an error condition we should not bail out early since we
+            // should clean up the self-event state on the rest of the partitions
+            String partName = HdfsTable.constructPartitionName(partitionKeyValue);
+            if (hdfsPartition == null) {
+              LOG.warn(String.format("Partition %s not found during self-event "
+                + "evaluation for the table %s", partName, tbl.getFullName()));
+            }
+            failingPartitions.add(partName);
+          }
+        }
+        return failingPartitions.isEmpty();
+      }
+    } finally {
+      tbl.getLock().unlock();
+    }
+    return false;
   }
 
   /**
@@ -851,14 +892,12 @@ public class CatalogServiceCatalog extends Catalog {
    * @param versionNumber version number to be added
    */
   public void addVersionsForInflightEvents(Table tbl, long versionNumber) {
-    if (!isExternalEventProcessingEnabled()) return;
-    versionLock_.writeLock().lock();
-    try {
-      if (tbl instanceof IncompleteTable) return;
-      tbl.addToVersionsForInflightEvents(versionNumber);
-    } finally {
-      versionLock_.writeLock().unlock();
-    }
+    if (!isEventProcessingActive()) return;
+    // we generally don't take locks on Incomplete tables since they are atomically
+    // replaced during load
+    Preconditions.checkState(
+        tbl instanceof IncompleteTable || tbl.getLock().isHeldByCurrentThread());
+    tbl.addToVersionsForInflightEvents(versionNumber);
   }
 
   /**
@@ -869,13 +908,8 @@ public class CatalogServiceCatalog extends Catalog {
    * @param versionNumber version number to be added
    */
   public void addVersionsForInflightEvents(Db db, long versionNumber) {
-    if (!isExternalEventProcessingEnabled()) return;
-    versionLock_.writeLock().lock();
-    try {
-      db.addToVersionsForInflightEvents(versionNumber);
-    } finally {
-      versionLock_.writeLock().unlock();
-    }
+    if (!isEventProcessingActive()) return;
+    db.addToVersionsForInflightEvents(versionNumber);
   }
 
   /**
@@ -2214,17 +2248,26 @@ public class CatalogServiceCatalog extends Catalog {
   }
 
   /**
-   * Refresh partition if it exists. Returns true if reload of the partition succeeds,
-   * false otherwise.
-   * @throws CatalogException if partition reload is unsuccessful.
+   * Refresh partition if it exists.
+   *
+   * @return true if partition was reloaded, else false.
+   * @throws CatalogException if partition reload threw an error.
    * @throws DatabaseNotFoundException if Db doesn't exist.
+   * @throws TableNotFoundException if table doesn't exist.
+   * @throws TableNotLoadedException if table is not loaded in Catalog.
    */
   public boolean reloadPartitionIfExists(String dbName, String tblName,
       List<TPartitionKeyValue> tPartSpec, String reason) throws CatalogException {
     Table table = getTable(dbName, tblName);
-    if (table == null || table instanceof IncompleteTable) return false;
-    reloadPartition(table, tPartSpec, reason);
-    return true;
+    if (table == null) {
+      throw new TableNotFoundException(dbName + "." + tblName + " not found");
+    }
+    if (table instanceof IncompleteTable) {
+      throw new TableNotLoadedException(dbName + "." + tblName + " is not loaded");
+    }
+    Reference<Boolean> wasPartitionRefreshed = new Reference<>(false);
+    reloadPartition(table, tPartSpec, wasPartitionRefreshed, reason);
+    return wasPartitionRefreshed.getRef();
   }
 
   /**
@@ -2555,7 +2598,8 @@ public class CatalogServiceCatalog extends Catalog {
    * the partition metadata was reloaded.
    */
   public TCatalogObject reloadPartition(Table tbl,
-      List<TPartitionKeyValue> partitionSpec, String reason) throws CatalogException {
+      List<TPartitionKeyValue> partitionSpec,
+      Reference<Boolean> wasPartitionReloaded, String reason) throws CatalogException {
     if (!tryLockTable(tbl)) {
       throw new CatalogException(String.format("Error reloading partition of table %s " +
           "due to lock contention", tbl.getFullName()));
@@ -2564,6 +2608,7 @@ public class CatalogServiceCatalog extends Catalog {
       long newCatalogVersion = incrementAndGetCatalogVersion();
       versionLock_.writeLock().unlock();
       HdfsTable hdfsTable = (HdfsTable) tbl;
+      wasPartitionReloaded.setRef(false);
       HdfsPartition hdfsPartition = hdfsTable
           .getPartitionFromThriftPartitionSpec(partitionSpec);
       // Retrieve partition name from existing partition or construct it from
@@ -2584,6 +2629,12 @@ public class CatalogServiceCatalog extends Catalog {
           if (hdfsPartition != null) {
             hdfsTable.dropPartition(partitionSpec);
             hdfsTable.setCatalogVersion(newCatalogVersion);
+            // non-existing partition was dropped from catalog, so we mark it as refreshed
+            wasPartitionReloaded.setRef(true);
+          } else {
+            LOG.info(String.format("Partition metadata for %s was not refreshed since "
+                    + "it does not exist in metastore anymore",
+                hdfsTable.getFullName() + " " + partitionName));
           }
           return hdfsTable.toTCatalogObject();
         } catch (Exception e) {
@@ -2593,6 +2644,7 @@ public class CatalogServiceCatalog extends Catalog {
         hdfsTable.reloadPartition(msClient.getHiveClient(), hdfsPartition, hmsPartition);
       }
       hdfsTable.setCatalogVersion(newCatalogVersion);
+      wasPartitionReloaded.setRef(true);
       LOG.info(String.format("Refreshed partition metadata: %s %s",
           hdfsTable.getFullName(), partitionName));
       return hdfsTable.toTCatalogObject();
