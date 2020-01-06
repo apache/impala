@@ -410,7 +410,7 @@ inline Atomic64 NoBarrier_AtomicIncrement(volatile Atomic64* ptr,
 
   do {
     old_val = *ptr;
-    new_val = return impala::ArithmeticUtil::AsUnsigned<std::plus>(old_val, increment);
+    new_val = impala::ArithmeticUtil::AsUnsigned<std::plus>(old_val, increment);
   } while (__sync_val_compare_and_swap(ptr, old_val, new_val) != old_val);
 
   return impala::ArithmeticUtil::AsUnsigned<std::plus>(old_val, increment);
