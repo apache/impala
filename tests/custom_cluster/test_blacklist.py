@@ -121,11 +121,12 @@ class TestBlacklist(CustomClusterTestSuite):
     """Verifies that when an Impala executor is killed while running a query, that the
     Coordinator blacklists the killed executor."""
 
-    # Run a query asynchronously. Normally, this query should take a few seconds to
-    # complete.
+    # Run a query asynchronously. With the debug actions, this query should take a few
+    # minutes to complete.
     query = "select count(*) from tpch_parquet.lineitem t1, tpch_parquet.lineitem t2 \
         where t1.l_orderkey = t2.l_orderkey"
-    handle = self.execute_query_async(query)
+    handle = self.execute_query_async(query, query_options={
+        'debug_action': '0:GETNEXT:DELAY|1:GETNEXT:DELAY'})
 
     # Wait for the query to start running
     self.wait_for_any_state(handle, [QueryState.RUNNING, QueryState.FINISHED], 10)
@@ -145,6 +146,7 @@ class TestBlacklist(CustomClusterTestSuite):
       assert "TransmitData() to " in str(e) or "EndDataStream() to " in str(e)
 
     # Run another query which should succeed and verify the impalad was blacklisted.
+    self.client.clear_configuration()  # remove the debug actions
     result = self.execute_query("select count(*) from tpch.lineitem")
     match = re.search("Blacklisted Executors: (.*)", result.runtime_profile)
     assert match is not None and match.group(1) == "%s:%s" % \
