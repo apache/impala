@@ -149,7 +149,8 @@ class ClientRequestState {
   /// Update operation state if the requested state isn't already obsolete. This is
   /// only for non-error states (PENDING, RUNNING and FINISHED) - if the query encounters
   /// an error the query status needs to be set with information about the error so
-  /// UpdateQueryStatus() must be used instead. Takes lock_.
+  /// UpdateQueryStatus() must be used instead. If an invalid state transition is
+  /// attempted, this method either DCHECKs or skips the state update. Takes lock_.
   void UpdateNonErrorExecState(ExecState exec_state);
 
   /// Update the query status and the "Query Status" summary profile string.

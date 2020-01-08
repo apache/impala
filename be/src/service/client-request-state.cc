@@ -830,6 +830,9 @@ void ClientRequestState::Wait() {
     if (stmt_type() == TStmtType::DDL) {
       DCHECK(catalog_op_type() != TCatalogOpType::DDL || request_result_set_ != nullptr);
     }
+    // It is possible the query already failed at this point and ExecState is ERROR. In
+    // this case, the call to UpdateNonErrorExecState(FINISHED) does not change the
+    // ExecState.
     UpdateNonErrorExecState(ExecState::FINISHED);
   }
   // UpdateQueryStatus() or UpdateNonErrorExecState() have updated exec_state_.
@@ -925,11 +928,12 @@ Status ClientRequestState::RestartFetch() {
 void ClientRequestState::UpdateNonErrorExecState(ExecState new_state) {
   lock_guard<mutex> l(lock_);
   ExecState old_state = exec_state_.Load();
-  static string error_msg = "Illegal state transition: $0 -> $1";
+  static string error_msg = "Illegal state transition: $0 -> $1, query_id=$3";
   switch (new_state) {
     case ExecState::PENDING:
-      DCHECK(old_state == ExecState::INITIALIZED) << Substitute(
-          error_msg, ExecStateToString(old_state), ExecStateToString(new_state));
+      DCHECK(old_state == ExecState::INITIALIZED)
+          << Substitute(error_msg, ExecStateToString(old_state),
+              ExecStateToString(new_state), PrintId(query_id()));
       UpdateExecState(new_state);
       break;
     case ExecState::RUNNING:
@@ -940,18 +944,22 @@ void ClientRequestState::UpdateNonErrorExecState(ExecState new_state) {
         // DDL statements and metadata ops don't use the PENDING state, so a query can
         // transition directly from the INITIALIZED to RUNNING state.
         DCHECK(old_state == ExecState::INITIALIZED || old_state == ExecState::PENDING)
-            << Substitute(
-                error_msg, ExecStateToString(old_state), ExecStateToString(new_state));
+            << Substitute(error_msg, ExecStateToString(old_state),
+                ExecStateToString(new_state), PrintId(query_id()));
         UpdateExecState(new_state);
       }
       break;
     case ExecState::FINISHED:
-      // A query can transition from PENDING to FINISHED if it is cancelled by the
-      // client.
-      DCHECK(old_state == ExecState::PENDING || old_state == ExecState::RUNNING)
-          << Substitute(
-              error_msg, ExecStateToString(old_state), ExecStateToString(new_state));
-      UpdateExecState(new_state);
+      // Only transition to the FINISHED state if the query has not failed. It is not
+      // valid to transition from ERROR to FINISHED, so skip any attempt to do so.
+      if (old_state != ExecState::ERROR) {
+        // A query can transition from PENDING to FINISHED if it is cancelled by the
+        // client.
+        DCHECK(old_state == ExecState::PENDING || old_state == ExecState::RUNNING)
+            << Substitute(error_msg, ExecStateToString(old_state),
+                ExecStateToString(new_state), PrintId(query_id()));
+        UpdateExecState(new_state);
+      }
       break;
     default:
       DCHECK(false) << "A non-error state expected but got: "
