@@ -194,12 +194,19 @@ Status HdfsOrcScanner::Open(ScannerContext* context) {
   // ancestors and children will be selected too.
   // Here we haven't read stripe data yet so no orc::RowReaders are created. To get the
   // selected types we create a temp orc::RowReader (but won't read rows from it).
-  unique_ptr<orc::RowReader> tmp_row_reader =
-      reader_->createRowReader(row_reader_options_);
-  const orc::Type* root_type = &tmp_row_reader->getSelectedType();
-  DCHECK_EQ(root_type->getKind(), orc::TypeKind::STRUCT);
-  orc_root_reader_ = this->obj_pool_.Add(
-      new OrcStructReader(root_type, scan_node_->tuple_desc(), this));
+  try {
+    unique_ptr<orc::RowReader> tmp_row_reader =
+        reader_->createRowReader(row_reader_options_);
+    const orc::Type* root_type = &tmp_row_reader->getSelectedType();
+    DCHECK_EQ(root_type->getKind(), orc::TypeKind::STRUCT);
+    orc_root_reader_ = this->obj_pool_.Add(
+        new OrcStructReader(root_type, scan_node_->tuple_desc(), this));
+  } catch (std::exception& e) {
+    string msg = Substitute("Encountered parse error during schema selection in "
+        "ORC file $0: $1", filename(), e.what());
+    parse_status_ = Status(msg);
+    return parse_status_;
+  }
 
   // Set top-level template tuple.
   template_tuple_ = template_tuple_map_[scan_node_->tuple_desc()];

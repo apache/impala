@@ -1334,6 +1334,16 @@ class TestOrc(ImpalaTestSuite):
       self.run_test_case('DataErrorsTest/orc-out-of-range-timestamp',
                          new_vector, unique_database)
 
+  def test_invalid_schema(self, vector, unique_database):
+    """Test scanning of ORC file with malformed schema."""
+    test_files = ["testdata/data/corrupt_schema.orc"]
+    create_table_and_copy_files(self.client,
+        "CREATE TABLE {db}.{tbl} (id BIGINT) STORED AS ORC",
+        unique_database, "corrupt_schema", test_files)
+    err = self.execute_query_expect_failure(self.client,
+        "select count(*) from {0}.{1}".format(unique_database, "corrupt_schema"))
+    assert "Encountered parse error during schema selection" in str(err)
+
 class TestScannerReservation(ImpalaTestSuite):
   @classmethod
   def get_workload(self):
