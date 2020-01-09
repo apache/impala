@@ -220,7 +220,7 @@ TEST(QueryOptions, SetEnumOptions) {
   TestEnumCase(options, CASE(parquet_array_resolution, TParquetArrayResolution,
       (THREE_LEVEL, TWO_LEVEL, TWO_LEVEL_THEN_THREE_LEVEL)), true);
   TestEnumCase(options, CASE(default_file_format, THdfsFileFormat,
-      (TEXT, RC_FILE, SEQUENCE_FILE, AVRO, PARQUET, KUDU, ORC)), true);
+      (TEXT, RC_FILE, SEQUENCE_FILE, AVRO, PARQUET, KUDU, ORC, HUDI_PARQUET)), true);
   TestEnumCase(options, CASE(runtime_filter_mode, TRuntimeFilterMode,
       (OFF, LOCAL, GLOBAL)), true);
   TestEnumCase(options, CASE(kudu_read_mode, TKuduReadMode,

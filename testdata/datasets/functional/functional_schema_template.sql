@@ -2750,3 +2750,38 @@ date_part DATE
 id_col INT
 date_col DATE
 ====
+---- DATASET
+functional
+---- BASE_TABLE_NAME
+hudi_partitioned
+---- CREATE
+CREATE TABLE IF NOT EXISTS {db_name}{db_suffix}.{table_name}
+LIKE PARQUET '/test-warehouse/hudi_parquet/year=2015/month=03/day=16/5f541af5-ca07-4329-ad8c-40fa9b353f35-0_2-103-391_20200210090618.parquet'
+PARTITIONED BY (year int, month int, day int)
+STORED AS HUDIPARQUET
+LOCATION '/test-warehouse/hudi_parquet';
+ALTER TABLE {db_name}{db_suffix}.{table_name} RECOVER PARTITIONS;
+---- DEPENDENT_LOAD
+`hadoop fs -mkdir /test-warehouse/hudi_parquet && \
+hadoop fs -put -f ${IMPALA_HOME}/testdata/data/hudi_parquet /test-warehouse/
+====
+---- DATASET
+functional
+---- BASE_TABLE_NAME
+hudi_non_partitioned
+---- CREATE
+CREATE TABLE IF NOT EXISTS {db_name}{db_suffix}.{table_name}
+LIKE PARQUET '/test-warehouse/hudi_parquet/year=2015/month=03/day=16/5f541af5-ca07-4329-ad8c-40fa9b353f35-0_2-103-391_20200210090618.parquet'
+STORED AS HUDIPARQUET
+LOCATION '/test-warehouse/hudi_parquet';
+====
+---- DATASET
+functional
+---- BASE_TABLE_NAME
+hudi_as_parquet
+---- CREATE
+CREATE TABLE IF NOT EXISTS {db_name}{db_suffix}.{table_name}
+LIKE PARQUET '/test-warehouse/hudi_parquet/year=2015/month=03/day=16/5f541af5-ca07-4329-ad8c-40fa9b353f35-0_2-103-391_20200210090618.parquet'
+STORED AS PARQUET
+LOCATION '/test-warehouse/hudi_parquet';
+====

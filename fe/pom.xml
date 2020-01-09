@@ -137,6 +137,26 @@ under the License.
     </dependency>
 
     <dependency>
+      <groupId>org.apache.hudi</groupId>
+      <artifactId>hudi-hadoop-mr</artifactId>
+      <version>${hudi.version}</version>
+        <exclusions>
+          <exclusion>
+            <groupId>org.apache.parquet</groupId>
+            <artifactId>parquet-avro</artifactId>
+          </exclusion>
+          <exclusion>
+            <groupId>org.apache.hadoop</groupId>
+            <artifactId>*</artifactId>
+          </exclusion>
+          <exclusion>
+            <groupId>org.apache.hive</groupId>
+            <artifactId>*</artifactId>
+          </exclusion>
+        </exclusions>
+    </dependency>
+
+    <dependency>
       <groupId>org.apache.ranger</groupId>
       <artifactId>ranger-plugins-common</artifactId>
       <version>${ranger.version}</version>

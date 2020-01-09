@@ -36,9 +36,6 @@ import org.apache.impala.analysis.BinaryPredicate;
 import org.apache.impala.analysis.DescriptorTable;
 import org.apache.impala.analysis.Expr;
 import org.apache.impala.analysis.ExprSubstitutionMap;
-import org.apache.impala.analysis.FunctionCallExpr;
-import org.apache.impala.analysis.FunctionName;
-import org.apache.impala.analysis.FunctionParams;
 import org.apache.impala.analysis.InPredicate;
 import org.apache.impala.analysis.IsNotEmptyPredicate;
 import org.apache.impala.analysis.LiteralExpr;
@@ -182,9 +179,10 @@ public class HdfsScanNode extends ScanNode {
 
   private static Set<HdfsFileFormat> VALID_COLUMNAR_FORMATS =
       ImmutableSet.<HdfsFileFormat>builder()
-      .add(HdfsFileFormat.PARQUET)
-      .add(HdfsFileFormat.ORC)
-      .build();
+          .add(HdfsFileFormat.PARQUET)
+          .add(HdfsFileFormat.HUDI_PARQUET)
+          .add(HdfsFileFormat.ORC)
+          .build();
 
   //An estimate of the width of a row when the information is not available.
   private double DEFAULT_ROW_WIDTH_ESTIMATE = 1.0;
@@ -343,13 +341,29 @@ public class HdfsScanNode extends ScanNode {
   }
 
   /**
+   * Returns true if this scan node contains PARQUET or HUDI_PARQUET
+   */
+  private boolean hasParquet(Set<HdfsFileFormat> fileFormats) {
+    return fileFormats.contains(HdfsFileFormat.PARQUET)
+        || fileFormats.contains(HdfsFileFormat.HUDI_PARQUET);
+  }
+
+  /**
+   * Returns true if this HdfsFileFormat is PARQUET or HUDI_PARQUET
+   */
+  private boolean isParquetBased(HdfsFileFormat fileFormat) {
+    return fileFormat == HdfsFileFormat.PARQUET
+        || fileFormat == HdfsFileFormat.HUDI_PARQUET;
+  }
+
+  /**
    * Returns true if the Parquet count(*) optimization can be applied to the query block
    * of this scan node.
    */
   private boolean canApplyCountStarOptimization(Analyzer analyzer,
       Set<HdfsFileFormat> fileFormats) {
     if (fileFormats.size() != 1) return false;
-    if (!fileFormats.contains(HdfsFileFormat.PARQUET)) return false;
+    if (!hasParquet(fileFormats)) return false;
     return canApplyCountStarOptimization(analyzer);
   }
 
@@ -366,7 +380,7 @@ public class HdfsScanNode extends ScanNode {
     // compute scan range locations with optional sampling
     computeScanRangeLocations(analyzer);
 
-    if (fileFormats_.contains(HdfsFileFormat.PARQUET)) {
+    if (hasParquet(fileFormats_)) {
       // Compute min-max conjuncts only if the PARQUET_READ_STATISTICS query option is
       // set to true.
       if (analyzer.getQueryOptions().parquet_read_statistics) {
@@ -838,7 +852,7 @@ public class HdfsScanNode extends ScanNode {
       boolean fsHasBlocks = FileSystemUtil.supportsStorageIds(partitionFs);
       if (!fsHasBlocks) {
         // Limit the scan range length if generating scan ranges.
-        long defaultBlockSize = partition.getFileFormat() == HdfsFileFormat.PARQUET ?
+        long defaultBlockSize = isParquetBased(partition.getFileFormat()) ?
             analyzer.getQueryOptions().parquet_object_store_split_size :
             partitionFs.getDefaultBlockSize(partition.getLocationPath());
         long maxBlockSize =
@@ -1537,19 +1551,20 @@ public class HdfsScanNode extends ScanNode {
     Preconditions.checkNotNull(desc_);
     Preconditions.checkState(desc_.getTable() instanceof FeFsTable);
     List<Long> columnReservations = null;
-    if (fileFormats_.contains(HdfsFileFormat.PARQUET)
-        || fileFormats_.contains(HdfsFileFormat.ORC)) {
+    if (hasParquet(fileFormats_) || fileFormats_.contains(HdfsFileFormat.ORC)) {
       columnReservations = computeMinColumnMemReservations();
     }
 
     int perHostScanRanges = 0;
     for (HdfsFileFormat format : fileFormats_) {
       int partitionScanRange = 0;
-      if ((format == HdfsFileFormat.PARQUET) || (format == HdfsFileFormat.ORC)) {
+      if (isParquetBased(format) || format == HdfsFileFormat.ORC) {
         Preconditions.checkNotNull(columnReservations);
         // For the purpose of this estimation, the number of per-host scan ranges for
-        // Parquet/ORC files are equal to the number of columns read from the file. I.e.
-        // excluding partition columns and columns that are populated from file metadata.
+        // Parquet/HUDI_PARQUET/ORC files are equal to the number of columns read from the
+        // file.
+        // I.e. excluding partition columns and columns that are populated from file
+        // metadata.
         partitionScanRange = columnReservations.size();
       } else {
         partitionScanRange = estimatePerHostScanRanges(scanRangeSize);
@@ -1619,7 +1634,7 @@ public class HdfsScanNode extends ScanNode {
       // TODO: IMPALA-6875 - ORC should compute total reservation across columns once the
       // ORC scanner supports reservations. For now it is treated the same as a
       // row-oriented format because there is no per-column reservation.
-      if (format == HdfsFileFormat.PARQUET) {
+      if (isParquetBased(format)) {
         // With Parquet, we first read the footer then all of the materialized columns in
         // parallel.
         for (long columnReservation : columnReservations) {

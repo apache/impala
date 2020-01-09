@@ -36,6 +36,7 @@ import org.apache.impala.common.Reference;
 import org.apache.impala.compat.HdfsShim;
 import org.apache.impala.thrift.TNetworkAddress;
 import org.apache.impala.util.AcidUtils;
+import org.apache.impala.util.HudiUtil;
 import org.apache.impala.util.ListMap;
 import org.apache.impala.util.ThreadNameAnnotator;
 import org.slf4j.Logger;
@@ -62,6 +63,8 @@ public class FileMetadataLoader {
   private final ValidWriteIdList writeIds_;
   @Nullable
   private final ValidTxnList validTxnList_;
+  @Nullable
+  private final HdfsFileFormat fileFormat_;
 
   private boolean forceRefreshLocations = false;
 
@@ -79,23 +82,32 @@ public class FileMetadataLoader {
    *   compactions.
    * @param writeIds if non-null, a write-id list which will filter the returned
    *   file descriptors to only include those indicated to be valid.
+   * @param HdfsFileFormat if non-null and equal to HdfsFileFormat.HUDI_PARQUET,
+   *   this loader will filter files based on Hudi's HoodieROTablePathFilter method
    */
   public FileMetadataLoader(Path partDir, boolean recursive, List<FileDescriptor> oldFds,
       ListMap<TNetworkAddress> hostIndex, @Nullable ValidTxnList validTxnList,
-      @Nullable ValidWriteIdList writeIds) {
+      @Nullable ValidWriteIdList writeIds, @Nullable HdfsFileFormat fileFormat) {
     // Either both validTxnList and writeIds are null, or none of them.
-    Preconditions.checkState((validTxnList == null && writeIds == null) ||
-                             (validTxnList != null && writeIds != null));
+    Preconditions.checkState((validTxnList == null && writeIds == null)
+        || (validTxnList != null && writeIds != null));
     partDir_ = Preconditions.checkNotNull(partDir);
     recursive_ = recursive;
     hostIndex_ = Preconditions.checkNotNull(hostIndex);
     oldFdsByRelPath_ = Maps.uniqueIndex(oldFds, FileDescriptor::getRelativePath);
     writeIds_ = writeIds;
     validTxnList_ = validTxnList;
+    fileFormat_ = fileFormat;
 
     if (writeIds_ != null) {
       Preconditions.checkArgument(recursive_, "ACID tables must be listed recursively");
     }
+  }
+
+  public FileMetadataLoader(Path partDir, boolean recursive, List<FileDescriptor> oldFds,
+      ListMap<TNetworkAddress> hostIndex, @Nullable ValidTxnList validTxnList,
+      @Nullable ValidWriteIdList writeIds) {
+    this(partDir, recursive, oldFds, hostIndex, validTxnList, writeIds, null);
   }
 
   /**
@@ -180,6 +192,10 @@ public class FileMetadataLoader {
       if (writeIds_ != null) {
         stats = AcidUtils.filterFilesForAcidState(stats, partDir_, validTxnList_,
             writeIds_, loadStats_);
+      }
+
+      if (fileFormat_ == HdfsFileFormat.HUDI_PARQUET) {
+        stats = HudiUtil.filterFilesForHudiROPath(stats);
       }
 
       for (FileStatus fileStatus : stats) {

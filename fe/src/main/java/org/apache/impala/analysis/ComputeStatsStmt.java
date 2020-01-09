@@ -888,8 +888,8 @@ public class ComputeStatsStmt extends StatementBase {
   public Set<Column> getValidatedColumnWhitelist() { return validatedColumnWhitelist_; }
 
   /**
-   * Returns true if this statement computes stats on Parquet/ORC partitions only,
-   * false otherwise.
+   * Returns true if this statement computes stats on Parquet/HUDI_PARQUET/ORC partitions
+   * only, false otherwise.
    */
   public boolean isColumnar() {
     if (!(table_ instanceof FeFsTable)) return false;
@@ -902,6 +902,7 @@ public class ComputeStatsStmt extends StatementBase {
     }
     for (FeFsPartition partition: affectedPartitions) {
       if (partition.getFileFormat() != HdfsFileFormat.PARQUET
+          && partition.getFileFormat() != HdfsFileFormat.HUDI_PARQUET
           && partition.getFileFormat() != HdfsFileFormat.ORC)
         return false;
     }

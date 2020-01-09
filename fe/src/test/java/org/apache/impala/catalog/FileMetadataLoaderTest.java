@@ -75,6 +75,37 @@ public class FileMetadataLoaderTest {
   }
 
   @Test
+  public void testHudiParquetLoading() throws IOException {
+    ListMap<TNetworkAddress> hostIndex = new ListMap<>();
+    Path tablePath = new Path("hdfs://localhost:20500/test-warehouse/hudi_parquet/");
+    FileMetadataLoader fml = new FileMetadataLoader(tablePath, /* recursive=*/true,
+        /* oldFds = */ Collections.emptyList(), hostIndex, null, null,
+        HdfsFileFormat.HUDI_PARQUET);
+    fml.load();
+    // 6 files in total, 3 files with 2 versions and we should only load the latest
+    // version of each
+    assertEquals(3, fml.getStats().loadedFiles);
+    assertEquals(3, fml.getLoadedFds().size());
+
+    // Test the latest version was loaded.
+    ArrayList<String> relPaths = new ArrayList<>(
+        Collections2.transform(fml.getLoadedFds(), FileDescriptor::getRelativePath));
+    Collections.sort(relPaths);
+    assertEquals(
+        "year=2015/month=03/day=16/5f541af5-ca07-4329-ad8c-40fa9b353f35-0_2-103-391"
+            + "_20200210090618.parquet",
+        relPaths.get(0));
+    assertEquals(
+        "year=2015/month=03/day=17/675e035d-c146-4658-9404-fe590e296d80-0_0-103-389"
+            + "_20200210090618.parquet",
+        relPaths.get(1));
+    assertEquals(
+        "year=2016/month=03/day=15/940359ee-cc79-4974-8a2a-5d133a81a3fd-0_1-103-390"
+            + "_20200210090618.parquet",
+        relPaths.get(2));
+  }
+
+  @Test
   public void testLoadMissingDirectory() throws IOException {
     for (boolean recursive : ImmutableList.of(false, true)) {
       ListMap<TNetworkAddress> hostIndex = new ListMap<>();

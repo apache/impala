@@ -303,6 +303,23 @@ class TestWideTable(ImpalaTestSuite):
     assert expected == actual
 
 
+class TestHudiParquet(ImpalaTestSuite):
+  @classmethod
+  def get_workload(cls):
+    return 'functional-query'
+
+  @classmethod
+  def add_test_dimensions(cls):
+    super(TestHudiParquet, cls).add_test_dimensions()
+    cls.ImpalaTestMatrix.add_dimension(
+        create_exec_option_dimension(debug_action_options=DEBUG_ACTION_DIMS))
+    cls.ImpalaTestMatrix.add_constraint(
+      lambda v: v.get_value('table_format').file_format == 'parquet')
+
+  def test_hudiparquet(self, vector):
+    self.run_test_case('QueryTest/hudi-parquet', vector)
+
+
 class TestParquet(ImpalaTestSuite):
   @classmethod
   def get_workload(cls):

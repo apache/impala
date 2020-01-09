@@ -184,6 +184,7 @@ FILE_FORMAT_MAP = {
   'rc': 'RCFILE',
   'orc': 'ORC',
   'parquet': 'PARQUET',
+  'hudiparquet': 'HUDIPARQUET',
   'text_lzo':
     "\nINPUTFORMAT 'com.hadoop.mapred.DeprecatedLzoTextInputFormat'" +
     "\nOUTPUTFORMAT 'org.apache.hadoop.hive.ql.io.HiveIgnoreKeyTextOutputFormat'",

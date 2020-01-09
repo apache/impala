@@ -146,6 +146,7 @@ import org.apache.impala.thrift.TReservedWordsVersion;
     keywordMap.put("group", SqlParserSymbols.KW_GROUP);
     keywordMap.put("hash", SqlParserSymbols.KW_HASH);
     keywordMap.put("having", SqlParserSymbols.KW_HAVING);
+    keywordMap.put("hudiparquet", SqlParserSymbols.KW_HUDIPARQUET);
     keywordMap.put("if", SqlParserSymbols.KW_IF);
     keywordMap.put("ilike", SqlParserSymbols.KW_ILIKE);
     keywordMap.put("ignore", SqlParserSymbols.KW_IGNORE);

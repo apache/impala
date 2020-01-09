@@ -1,0 +1,79 @@
+====
+---- QUERY
+# IMPALA-8778: Support read Apache Hudi parquet table
+USE functional_parquet;
+SELECT count(*) from hudi_partitioned
+---- TYPES
+bigint
+---- RESULTS
+100
+====
+---- QUERY
+# Non partitioned data should produce same result
+SELECT count(*) from hudi_non_partitioned
+---- TYPES
+bigint
+---- RESULTS
+100
+====
+---- QUERY
+# Test single partition count
+SELECT count(*) from hudi_partitioned
+where(year = 2015 and month = 03 and day = 16)
+---- TYPES
+bigint
+---- RESULTS
+38
+====
+---- QUERY
+# Test single partition count
+SELECT count(*) from hudi_partitioned
+where(year = 2015 and month = 03 and day = 17)
+---- TYPES
+bigint
+---- RESULTS
+28
+====
+---- QUERY
+# Test partitions combine 33 + 38 = 71
+SELECT count(*) from hudi_partitioned
+where(year = 2015 and month = 03)
+---- TYPES
+bigint
+---- RESULTS
+66
+====
+---- QUERY
+# Read hudiparquet as regular parquet should produce duplicate records
+SELECT count(*) from hudi_as_parquet
+---- TYPES
+bigint
+---- RESULTS
+200
+====
+---- QUERY
+# Read hudiparquet as regular parquet should produce duplicate records
+SELECT count(distinct _hoodie_record_key) from hudi_as_parquet
+---- TYPES
+bigint
+---- RESULTS
+100
+====
+---- QUERY
+# Read hudiparquet as regular parquet should produce duplicate records
+SELECT count(distinct _hoodie_record_key) from hudi_as_parquet
+---- TYPES
+bigint
+---- RESULTS
+100
+====
+---- QUERY
+# Read hudiparquet as regular parquet should produce duplicate records
+SELECT count(*) from hudi_partitioned
+LEFT JOIN hudi_as_parquet
+ON hudi_as_parquet._hoodie_record_key = hudi_partitioned._hoodie_record_key
+---- TYPES
+bigint
+---- RESULTS
+200
+====

@@ -56,6 +56,9 @@ table_name:lineitem_multiblock, constraint:restrict_to, table_format:parquet/non
 table_name:lineitem_sixblocks, constraint:restrict_to, table_format:parquet/none/none
 table_name:lineitem_multiblock_one_row_group, constraint:restrict_to, table_format:parquet/none/none
 table_name:customer_multiblock, constraint:restrict_to, table_format:parquet/none/none
+table_name:hudi_partitioned, constraint:restrict_to, table_format:parquet/none/none
+table_name:hudi_non_partitioned, constraint:restrict_to, table_format:parquet/none/none
+table_name:hudi_as_parquet, constraint:restrict_to, table_format:parquet/none/none
 
 # TODO: Support Avro. Data loading currently fails for Avro because complex types
 # cannot be converted to the corresponding Avro types yet.

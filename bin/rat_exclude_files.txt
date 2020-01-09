@@ -136,6 +136,7 @@ testdata/data/text-comma-backslash-newline.txt
 testdata/data/text-dollar-hash-pipe.txt
 testdata/data/widerow.txt
 testdata/data/local_tbl/00000.txt
+testdata/data/hudi_parquet/*
 testdata/datasets/functional/functional_schema_template.sql
 testdata/hive_benchmark/grepTiny/part-00000
 testdata/tzdb/2017c.zip

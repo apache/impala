@@ -62,6 +62,7 @@ enum THdfsFileFormat {
   PARQUET = 4
   KUDU = 5
   ORC = 6
+  HUDI_PARQUET = 7
 }
 
 // TODO: Since compression is also enabled for Kudu columns, we should

@@ -1,0 +1,15 @@
+{
+  "partitionToWriteStats" : { },
+  "compacted" : false,
+  "extraMetadataMap" : { },
+  "extraMetadata" : { },
+  "fileIdAndRelativePaths" : { },
+  "totalRecordsDeleted" : 0,
+  "totalLogRecordsCompacted" : 0,
+  "totalScanTime" : 0,
+  "totalCreateTime" : 0,
+  "totalUpsertTime" : 0,
+  "totalCompactedRecordsUpdated" : 0,
+  "totalLogFilesCompacted" : 0,
+  "totalLogFilesSize" : 0
+}

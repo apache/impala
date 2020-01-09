@@ -623,8 +623,8 @@ public class HdfsTable extends Table implements FeFsTable {
     for (Map.Entry<Path, List<HdfsPartition>> e : partsByPath.entrySet()) {
       List<FileDescriptor> oldFds = e.getValue().get(0).getFileDescriptors();
       FileMetadataLoader loader = new FileMetadataLoader(e.getKey(),
-          Utils.shouldRecursivelyListPartitions(this),
-          oldFds, hostIndex_, validTxnList, writeIds);
+          Utils.shouldRecursivelyListPartitions(this), oldFds, hostIndex_, validTxnList,
+          writeIds, e.getValue().get(0).getFileFormat());
       // If there is a cached partition mapped to this path, we recompute the block
       // locations even if the underlying files have not changed.
       // This is done to keep the cached block metadata up to date.

@@ -142,7 +142,7 @@ Invalid Kudu read mode: 'bar'. Valid values are DEFAULT(0), READ_LATEST(1), READ
 ---- QUERY
 set default_file_format=bar
 ---- CATCH
-Invalid default file format: 'bar'. Valid values are TEXT(0), RC_FILE(1), SEQUENCE_FILE(2), AVRO(3), PARQUET(4), KUDU(5), ORC(6).
+Invalid default file format: 'bar'. Valid values are TEXT(0), RC_FILE(1), SEQUENCE_FILE(2), AVRO(3), PARQUET(4), KUDU(5), ORC(6), HUDI_PARQUET(7).
 ====
 ---- QUERY
 set default_transactional_type=bar

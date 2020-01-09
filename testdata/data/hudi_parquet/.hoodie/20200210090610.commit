@@ -1,0 +1,89 @@
+{
+  "partitionToWriteStats" : {
+    "year=2015/month=03/day=17" : [ {
+      "fileId" : "675e035d-c146-4658-9404-fe590e296d80-0",
+      "path" : "year=2015/month=03/day=17/675e035d-c146-4658-9404-fe590e296d80-0_0-70-117_20200210090610.parquet",
+      "prevCommit" : "null",
+      "numWrites" : 28,
+      "numDeletes" : 0,
+      "numUpdateWrites" : 0,
+      "numInserts" : 28,
+      "totalWriteBytes" : 9621,
+      "totalWriteErrors" : 0,
+      "tempPath" : null,
+      "partitionPath" : "year=2015/month=03/day=17",
+      "totalLogRecords" : 0,
+      "totalLogFilesCompacted" : 0,
+      "totalLogSizeCompacted" : 0,
+      "totalUpdatedRecordsCompacted" : 0,
+      "totalLogBlocks" : 0,
+      "totalCorruptLogBlock" : 0,
+      "totalRollbackBlocks" : 0,
+      "fileSizeInBytes" : 9621
+    } ],
+    "year=2015/month=03/day=16" : [ {
+      "fileId" : "5f541af5-ca07-4329-ad8c-40fa9b353f35-0",
+      "path" : "year=2015/month=03/day=16/5f541af5-ca07-4329-ad8c-40fa9b353f35-0_1-70-118_20200210090610.parquet",
+      "prevCommit" : "null",
+      "numWrites" : 38,
+      "numDeletes" : 0,
+      "numUpdateWrites" : 0,
+      "numInserts" : 38,
+      "totalWriteBytes" : 10486,
+      "totalWriteErrors" : 0,
+      "tempPath" : null,
+      "partitionPath" : "year=2015/month=03/day=16",
+      "totalLogRecords" : 0,
+      "totalLogFilesCompacted" : 0,
+      "totalLogSizeCompacted" : 0,
+      "totalUpdatedRecordsCompacted" : 0,
+      "totalLogBlocks" : 0,
+      "totalCorruptLogBlock" : 0,
+      "totalRollbackBlocks" : 0,
+      "fileSizeInBytes" : 10486
+    } ],
+    "year=2016/month=03/day=15" : [ {
+      "fileId" : "940359ee-cc79-4974-8a2a-5d133a81a3fd-0",
+      "path" : "year=2016/month=03/day=15/940359ee-cc79-4974-8a2a-5d133a81a3fd-0_2-70-119_20200210090610.parquet",
+      "prevCommit" : "null",
+      "numWrites" : 34,
+      "numDeletes" : 0,
+      "numUpdateWrites" : 0,
+      "numInserts" : 34,
+      "totalWriteBytes" : 10144,
+      "totalWriteErrors" : 0,
+      "tempPath" : null,
+      "partitionPath" : "year=2016/month=03/day=15",
+      "totalLogRecords" : 0,
+      "totalLogFilesCompacted" : 0,
+      "totalLogSizeCompacted" : 0,
+      "totalUpdatedRecordsCompacted" : 0,
+      "totalLogBlocks" : 0,
+      "totalCorruptLogBlock" : 0,
+      "totalRollbackBlocks" : 0,
+      "fileSizeInBytes" : 10144
+    } ]
+  },
+  "compacted" : false,
+  "extraMetadataMap" : {
+    "ROLLING_STAT" : "{\n  \"partitionToRollingStats\" : {\n    \"year=2015/month=03/day=17\" : {\n      \"675e035d-c146-4658-9404-fe590e296d80-0\" : {\n        \"fileId\" : \"675e035d-c146-4658-9404-fe590e296d80-0\",\n        \"inserts\" : 28,\n        \"upserts\" : 0,\n        \"deletes\" : 0,\n        \"totalInputWriteBytesToDisk\" : 0,\n        \"totalInputWriteBytesOnDisk\" : 9621\n      }\n    },\n    \"year=2015/month=03/day=16\" : {\n      \"5f541af5-ca07-4329-ad8c-40fa9b353f35-0\" : {\n        \"fileId\" : \"5f541af5-ca07-4329-ad8c-40fa9b353f35-0\",\n        \"inserts\" : 38,\n        \"upserts\" : 0,\n        \"deletes\" : 0,\n        \"totalInputWriteBytesToDisk\" : 0,\n        \"totalInputWriteBytesOnDisk\" : 10486\n      }\n    },\n    \"year=2016/month=03/day=15\" : {\n      \"940359ee-cc79-4974-8a2a-5d133a81a3fd-0\" : {\n        \"fileId\" : \"940359ee-cc79-4974-8a2a-5d133a81a3fd-0\",\n        \"inserts\" : 34,\n        \"upserts\" : 0,\n        \"deletes\" : 0,\n        \"totalInputWriteBytesToDisk\" : 0,\n        \"totalInputWriteBytesOnDisk\" : 10144\n      }\n    }\n  },\n  \"actionType\" : \"commit\"\n}",
+    "schema" : "{\"type\":\"record\",\"name\":\"hoodie_test_record\",\"namespace\":\"hoodie.hoodie_test\",\"fields\":[{\"name\":\"_hoodie_is_deleted\",\"type\":[\"boolean\",\"null\"]},{\"name\":\"_row_key\",\"type\":[\"string\",\"null\"]},{\"name\":\"begin_lat\",\"type\":[\"double\",\"null\"]},{\"name\":\"begin_lon\",\"type\":[\"double\",\"null\"]},{\"name\":\"driver\",\"type\":[\"string\",\"null\"]},{\"name\":\"end_lat\",\"type\":[\"double\",\"null\"]},{\"name\":\"end_lon\",\"type\":[\"double\",\"null\"]},{\"name\":\"fare\",\"type\":[{\"type\":\"record\",\"name\":\"fare\",\"namespace\":\"hoodie.hoodie_test.hoodie_test_record\",\"fields\":[{\"name\":\"amount\",\"type\":[\"double\",\"null\"]},{\"name\":\"currency\",\"type\":[\"string\",\"null\"]}]},\"null\"]},{\"name\":\"partition\",\"type\":[\"string\",\"null\"]},{\"name\":\"rider\",\"type\":[\"string\",\"null\"]},{\"name\":\"timestamp\",\"type\":[\"double\",\"null\"]}]}"
+  },
+  "extraMetadata" : {
+    "ROLLING_STAT" : "{\n  \"partitionToRollingStats\" : {\n    \"year=2015/month=03/day=17\" : {\n      \"675e035d-c146-4658-9404-fe590e296d80-0\" : {\n        \"fileId\" : \"675e035d-c146-4658-9404-fe590e296d80-0\",\n        \"inserts\" : 28,\n        \"upserts\" : 0,\n        \"deletes\" : 0,\n        \"totalInputWriteBytesToDisk\" : 0,\n        \"totalInputWriteBytesOnDisk\" : 9621\n      }\n    },\n    \"year=2015/month=03/day=16\" : {\n      \"5f541af5-ca07-4329-ad8c-40fa9b353f35-0\" : {\n        \"fileId\" : \"5f541af5-ca07-4329-ad8c-40fa9b353f35-0\",\n        \"inserts\" : 38,\n        \"upserts\" : 0,\n        \"deletes\" : 0,\n        \"totalInputWriteBytesToDisk\" : 0,\n        \"totalInputWriteBytesOnDisk\" : 10486\n      }\n    },\n    \"year=2016/month=03/day=15\" : {\n      \"940359ee-cc79-4974-8a2a-5d133a81a3fd-0\" : {\n        \"fileId\" : \"940359ee-cc79-4974-8a2a-5d133a81a3fd-0\",\n        \"inserts\" : 34,\n        \"upserts\" : 0,\n        \"deletes\" : 0,\n        \"totalInputWriteBytesToDisk\" : 0,\n        \"totalInputWriteBytesOnDisk\" : 10144\n      }\n    }\n  },\n  \"actionType\" : \"commit\"\n}",
+    "schema" : "{\"type\":\"record\",\"name\":\"hoodie_test_record\",\"namespace\":\"hoodie.hoodie_test\",\"fields\":[{\"name\":\"_hoodie_is_deleted\",\"type\":[\"boolean\",\"null\"]},{\"name\":\"_row_key\",\"type\":[\"string\",\"null\"]},{\"name\":\"begin_lat\",\"type\":[\"double\",\"null\"]},{\"name\":\"begin_lon\",\"type\":[\"double\",\"null\"]},{\"name\":\"driver\",\"type\":[\"string\",\"null\"]},{\"name\":\"end_lat\",\"type\":[\"double\",\"null\"]},{\"name\":\"end_lon\",\"type\":[\"double\",\"null\"]},{\"name\":\"fare\",\"type\":[{\"type\":\"record\",\"name\":\"fare\",\"namespace\":\"hoodie.hoodie_test.hoodie_test_record\",\"fields\":[{\"name\":\"amount\",\"type\":[\"double\",\"null\"]},{\"name\":\"currency\",\"type\":[\"string\",\"null\"]}]},\"null\"]},{\"name\":\"partition\",\"type\":[\"string\",\"null\"]},{\"name\":\"rider\",\"type\":[\"string\",\"null\"]},{\"name\":\"timestamp\",\"type\":[\"double\",\"null\"]}]}"
+  },
+  "fileIdAndRelativePaths" : {
+    "675e035d-c146-4658-9404-fe590e296d80-0" : "year=2015/month=03/day=17/675e035d-c146-4658-9404-fe590e296d80-0_0-70-117_20200210090610.parquet",
+    "5f541af5-ca07-4329-ad8c-40fa9b353f35-0" : "year=2015/month=03/day=16/5f541af5-ca07-4329-ad8c-40fa9b353f35-0_1-70-118_20200210090610.parquet",
+    "940359ee-cc79-4974-8a2a-5d133a81a3fd-0" : "year=2016/month=03/day=15/940359ee-cc79-4974-8a2a-5d133a81a3fd-0_2-70-119_20200210090610.parquet"
+  },
+  "totalRecordsDeleted" : 0,
+  "totalLogRecordsCompacted" : 0,
+  "totalScanTime" : 0,
+  "totalCreateTime" : 222,
+  "totalUpsertTime" : 0,
+  "totalCompactedRecordsUpdated" : 0,
+  "totalLogFilesCompacted" : 0,
+  "totalLogFilesSize" : 0
+}
