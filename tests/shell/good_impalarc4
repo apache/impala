@@ -1,0 +1,9 @@
+[impala]
+keyval=msg3=test
+verbose=true
+Q=DEFAULT_FILE_FORMAT=avro
+live_progress=False
+live_summary=0
+
+[impala.query_options]
+DEFAULT_FILE_FORMAT=text

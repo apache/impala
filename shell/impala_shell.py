@@ -151,8 +151,8 @@ class ImpalaShell(object, cmd.Cmd):
   QUIT_COMMANDS = ("quit", "exit")
 
   VALID_SHELL_OPTIONS = {
-    'LIVE_PROGRESS' : (lambda x: x in ImpalaShell.TRUE_STRINGS, "print_progress"),
-    'LIVE_SUMMARY' : (lambda x: x in ImpalaShell.TRUE_STRINGS, "print_summary"),
+    'LIVE_PROGRESS': (lambda x: x in ImpalaShell.TRUE_STRINGS, "live_progress"),
+    'LIVE_SUMMARY': (lambda x: x in ImpalaShell.TRUE_STRINGS, "live_summary"),
     'WRITE_DELIMITED' : (lambda x: x in ImpalaShell.TRUE_STRINGS, "write_delimited"),
     'VERBOSE' : (lambda x: x in ImpalaShell.TRUE_STRINGS, "verbose"),
     'DELIMITER' : (lambda x: " " if x == '\\s' else x, "output_delimiter"),
@@ -215,8 +215,8 @@ class ImpalaShell(object, cmd.Cmd):
     # Tracks query handle of the last query executed. Used by the 'profile' command.
     self.last_query_handle = None;
 
-    self.print_summary = options.print_summary
-    self.print_progress = options.print_progress
+    self.live_summary = options.live_summary
+    self.live_progress = options.live_progress
 
     self.ignore_query_failure = options.ignore_query_failure
 
@@ -1011,12 +1011,12 @@ class ImpalaShell(object, cmd.Cmd):
     query live progress for COMPUTE STATS query. Disable live
     progress/summary callback for COMPUTE STATS query."""
     query = self._build_query_string(self.last_leading_comment, self.orig_cmd, args)
-    (prev_print_progress, prev_print_summary) = self.print_progress, self.print_summary
-    (self.print_progress, self.print_summary) = False, False;
+    (prev_live_progress, prev_live_summary) = self.live_progress, self.live_summary
+    (self.live_progress, self.live_summary) = False, False
     try:
       ret = self._execute_stmt(query)
     finally:
-      (self.print_progress, self.print_summary) = prev_print_progress, prev_print_summary
+      (self.live_progress, self.live_summary) = prev_live_progress, prev_live_summary
     return ret
 
   def _format_outputstream(self):
@@ -1037,7 +1037,7 @@ class ImpalaShell(object, cmd.Cmd):
     execute the RPC to get the query exec summary and depending on the set options
     print either the progress or the summary or both to stderr.
     """
-    if not self.print_progress and not self.print_summary: return
+    if not self.live_progress and not self.live_summary: return
 
     checkpoint = time.time()
     if checkpoint - self.last_summary > self.PROGRESS_UPDATE_INTERVAL:
@@ -1060,13 +1060,13 @@ class ImpalaShell(object, cmd.Cmd):
           return
 
         data = ""
-        if self.print_progress and progress.total_scan_ranges > 0:
+        if self.live_progress and progress.total_scan_ranges > 0:
           val = ((summary.progress.num_completed_scan_ranges * 100) /
                  summary.progress.total_scan_ranges)
           fragment_text = "[%s%s] %s%%\n" % ("#" * val, " " * (100 - val), val)
           data += fragment_text
 
-        if self.print_summary:
+        if self.live_summary:
           table = self._default_summary_table()
           output = []
           self.imp_client.build_summary_table(summary, 0, False, 0, False, output)
@@ -1835,7 +1835,7 @@ def impala_shell_main():
      [(k.upper(), v) for k, v in parse_variables(options.query_options).items()])
 
   if options.query or options.query_file:
-    if options.print_progress or options.print_summary:
+    if options.live_progress or options.live_summary:
       print_to_stderr("Error: Live reporting is available for interactive mode only.")
       raise FatalShellException()
 

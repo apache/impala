@@ -141,7 +141,10 @@ tests/pytest.ini
 tests/shell/bad_impalarc
 tests/shell/good_impalarc
 tests/shell/good_impalarc2
+tests/shell/good_impalarc3
+tests/shell/good_impalarc4
 tests/shell/impalarc_with_error
+tests/shell/impalarc_with_error2
 tests/shell/impalarc_with_query_options
 tests/shell/impalarc_with_warnings
 tests/shell/shell.cmds

@@ -1,0 +1,10 @@
+[impala]
+keyval=msg3=test
+verbose=true
+Q=DEFAULT_FILE_FORMAT=avro
+Q=MEM_LIMIT=1GB
+live_progress=true
+live_summary=1
+
+[impala.query_options]
+DEFAULT_FILE_FORMAT=text

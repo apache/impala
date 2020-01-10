@@ -575,6 +575,26 @@ class TestImpalaShell(ImpalaTestSuite):
                "'maybe' is not a valid value for a boolean option.")
     assert  err_msg in result.stderr
 
+    # Test the optional configuration file with live_progress and live_summary
+    # Positive test
+    args = ['--config_file=%s/good_impalarc3' % QUERY_FILE_PATH]
+    result = run_impala_shell_cmd(vector, args)
+    assert 'WARNING:' not in result.stderr, \
+      "A valid config file should not trigger any warning: {0}".format(result.stderr)
+    # Negative Tests
+    # specified config file with live_progress enabled for non interactive mode
+    args = ['--config_file=%s/good_impalarc3' % QUERY_FILE_PATH, '--query=select 3']
+    result = run_impala_shell_cmd(vector, args, expect_success=False)
+    assert 'Live reporting is available for interactive mode only' in result.stderr
+    # bad formatting of config file
+    args = ['--config_file={0}/impalarc_with_error2'.format(QUERY_FILE_PATH)]
+    result = run_impala_shell_cmd(vector, args, expect_success=False)
+    err_msg = "Ignoring unrecognized config option"
+    assert err_msg in result.stderr
+    err_msg = ("Unexpected value in configuration file. "
+               "'maybe' is not a valid value for a boolean option.")
+    assert err_msg in result.stderr
+
   def test_execute_queries_from_stdin(self, vector):
     """Test that queries get executed correctly when STDIN is given as the sql file."""
     args = ['-f', '-', '--quiet', '-B']

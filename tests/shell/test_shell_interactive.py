@@ -497,6 +497,33 @@ class TestImpalaShellInteractive(ImpalaTestSuite):
     # Verify that query options under [impala] override those under [impala.query_options]
     assert "\tDEFAULT_FILE_FORMAT: avro" in result.stdout
 
+  def test_live_option_configuration(self, vector):
+    """Test the optional configuration file with live_progress and live_summary."""
+    # Positive tests
+    # set live_summary and live_progress as True with config file
+    rcfile_path = os.path.join(QUERY_FILE_PATH, 'good_impalarc3')
+    args = ['--config_file=%s' % rcfile_path]
+    cmds = "set all;"
+    result = run_impala_shell_interactive(vector, cmds, shell_args=args)
+    assert 'WARNING:' not in result.stderr, \
+      "A valid config file should not trigger any warning: {0}".format(result.stderr)
+    assert "\tLIVE_SUMMARY: True" in result.stdout
+    assert "\tLIVE_PROGRESS: True" in result.stdout
+
+    # set live_summary and live_progress as False with config file
+    rcfile_path = os.path.join(QUERY_FILE_PATH, 'good_impalarc4')
+    args = ['--config_file=%s' % rcfile_path]
+    result = run_impala_shell_interactive(vector, cmds, shell_args=args)
+    assert 'WARNING:' not in result.stderr, \
+      "A valid config file should not trigger any warning: {0}".format(result.stderr)
+    assert "\tLIVE_SUMMARY: False" in result.stdout
+    assert "\tLIVE_PROGRESS: False" in result.stdout
+    # override options in config file through command line arguments
+    args = ['--live_progress', '--live_summary', '--config_file=%s' % rcfile_path]
+    result = run_impala_shell_interactive(vector, cmds, shell_args=args)
+    assert "\tLIVE_SUMMARY: True" in result.stdout
+    assert "\tLIVE_PROGRESS: True" in result.stdout
+
   def test_source_file(self, vector):
     cwd = os.getcwd()
     try:

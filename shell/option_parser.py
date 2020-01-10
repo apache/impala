@@ -230,9 +230,9 @@ def get_option_parser(defaults):
   parser.add_option("--history_file", dest="history_file",
                     help=("The file in which to store shell history. This may also be "
                           "configured using the IMPALA_HISTFILE environment variable."))
-  parser.add_option("--live_summary", dest="print_summary", action="store_true",
+  parser.add_option("--live_summary", dest="live_summary", action="store_true",
                     help="Print a query summary every 1s while the query is running.")
-  parser.add_option("--live_progress", dest="print_progress", action="store_true",
+  parser.add_option("--live_progress", dest="live_progress", action="store_true",
                     help="Print a query progress every 1s while the query is running.")
   parser.add_option("--auth_creds_ok_in_clear", dest="creds_ok_in_clear",
                     action="store_true", help="If set, LDAP authentication " +
