@@ -67,8 +67,6 @@ static string CURRENT_EXECUTABLE_PATH;
 
 namespace impala {
 
-static int32_t SERVICE_PORT = FindUnusedEphemeralPort();
-
 const static string IMPALA_HOME(getenv("IMPALA_HOME"));
 const string& SERVER_CERT =
     Substitute("$0/be/src/testutil/server-cert.pem", IMPALA_HOME);
@@ -137,7 +135,7 @@ class RpcMgrTest : public testing::Test {
   virtual void SetUp() {
     IpAddr ip;
     ASSERT_OK(HostnameToIpAddr(FLAGS_hostname, &ip));
-    krpc_address_ = MakeNetworkAddress(ip, SERVICE_PORT);
+    krpc_address_ = MakeNetworkAddress(ip, FindUnusedEphemeralPort());
     exec_env_.reset(new ExecEnv());
     ASSERT_OK(rpc_mgr_.Init(krpc_address_));
   }
