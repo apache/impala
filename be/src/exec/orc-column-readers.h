@@ -85,7 +85,8 @@ class OrcColumnReader {
   virtual bool IsCollectionReader() const { return false; }
 
   /// Update the orc batch we tracked. We'll read values from it.
-  virtual void UpdateInputBatch(orc::ColumnVectorBatch* orc_batch) = 0;
+  virtual Status UpdateInputBatch(orc::ColumnVectorBatch* orc_batch)
+      WARN_UNUSED_RESULT = 0;
 
   /// Read value at 'row_idx' of the ColumnVectorBatch into a slot of the given 'tuple'.
   /// Use 'pool' to allocate memory in need. Depends on the UpdateInputBatch being called
@@ -125,10 +126,11 @@ class OrcBoolColumnReader : public OrcColumnReader {
       HdfsOrcScanner* scanner)
       : OrcColumnReader(node, slot_desc, scanner) { }
 
-  void UpdateInputBatch(orc::ColumnVectorBatch* orc_batch) override {
+  Status UpdateInputBatch(orc::ColumnVectorBatch* orc_batch) override WARN_UNUSED_RESULT {
     batch_ = static_cast<orc::LongVectorBatch*>(orc_batch);
     // In debug mode, we use dynamic_cast<> to double-check the downcast is legal
     DCHECK(batch_ == dynamic_cast<orc::LongVectorBatch*>(orc_batch));
+    return Status::OK();
   }
 
   Status ReadValue(int row_idx, Tuple* tuple, MemPool* pool) override WARN_UNUSED_RESULT;
@@ -143,9 +145,10 @@ class OrcIntColumnReader : public OrcColumnReader {
       HdfsOrcScanner* scanner)
       : OrcColumnReader(node, slot_desc, scanner) { }
 
-  void UpdateInputBatch(orc::ColumnVectorBatch* orc_batch) override {
+  Status UpdateInputBatch(orc::ColumnVectorBatch* orc_batch) override WARN_UNUSED_RESULT {
     batch_ = static_cast<orc::LongVectorBatch*>(orc_batch);
     DCHECK(batch_ == static_cast<orc::LongVectorBatch*>(orc_batch));
+    return Status::OK();
   }
 
   Status ReadValue(int row_idx, Tuple* tuple, MemPool* pool)
@@ -169,9 +172,10 @@ class OrcDoubleColumnReader : public OrcColumnReader {
       HdfsOrcScanner* scanner)
       : OrcColumnReader(node, slot_desc, scanner) { }
 
-  void UpdateInputBatch(orc::ColumnVectorBatch* orc_batch) override {
+  Status UpdateInputBatch(orc::ColumnVectorBatch* orc_batch) override WARN_UNUSED_RESULT {
     batch_ = static_cast<orc::DoubleVectorBatch*>(orc_batch);
     DCHECK(batch_ == dynamic_cast<orc::DoubleVectorBatch*>(orc_batch));
+    return Status::OK();
   }
 
   Status ReadValue(int row_idx, Tuple* tuple, MemPool* pool)
@@ -194,14 +198,43 @@ class OrcStringColumnReader : public OrcColumnReader {
       HdfsOrcScanner* scanner)
       : OrcColumnReader(node, slot_desc, scanner) { }
 
-  void UpdateInputBatch(orc::ColumnVectorBatch* orc_batch) override {
+  Status UpdateInputBatch(orc::ColumnVectorBatch* orc_batch) override WARN_UNUSED_RESULT {
     batch_ = static_cast<orc::StringVectorBatch*>(orc_batch);
-    DCHECK(batch_ == dynamic_cast<orc::StringVectorBatch*>(orc_batch));
+    if (orc_batch == nullptr) return Status::OK();
+    // We update the blob of a non-encoded batch every time, but since the dictionary blob
+    // is the same for the stripe, we only reset it for every new stripe.
+    // Note that this is possible since the encoding should be the same for every batch
+    // through the whole stripe.
+    if(!orc_batch->isEncoded) {
+      DCHECK(batch_ == dynamic_cast<orc::StringVectorBatch*>(orc_batch));
+      return InitBlob(&batch_->blob, scanner_->data_batch_pool_.get());
+    }
+    DCHECK(static_cast<orc::EncodedStringVectorBatch*>(batch_) ==
+        dynamic_cast<orc::EncodedStringVectorBatch*>(orc_batch));
+    if (last_stripe_idx_ != scanner_->stripe_idx_) {
+      last_stripe_idx_ = scanner_->stripe_idx_;
+      auto current_batch = static_cast<orc::EncodedStringVectorBatch*>(batch_);
+      return InitBlob(&current_batch->dictionary->dictionaryBlob,
+          scanner_->dictionary_pool_.get());
+    }
+    return Status::OK();
   }
 
   Status ReadValue(int row_idx, Tuple* tuple, MemPool* pool) override WARN_UNUSED_RESULT;
  private:
   orc::StringVectorBatch* batch_ = nullptr;
+  // We copy the blob from the batch, so the memory will be handled by Impala, and not
+  // by the ORC lib.
+  char* blob_ = nullptr;
+
+  // We cache the last stripe so we know when we have to update the blob (in case of
+  // dictionary encoding).
+  int last_stripe_idx_ = -1;
+
+  /// Initializes the blob if it has not been already in the current batch.
+  /// Unfortunately, this cannot be done in UpdateInputBatch, since we do not have
+  /// access to the pool there.
+  Status InitBlob(orc::DataBuffer<char>* blob, MemPool* pool);
 };
 
 class OrcTimestampReader : public OrcColumnReader {
@@ -210,9 +243,10 @@ class OrcTimestampReader : public OrcColumnReader {
       HdfsOrcScanner* scanner)
       : OrcColumnReader(node, slot_desc, scanner) { }
 
-  void UpdateInputBatch(orc::ColumnVectorBatch* orc_batch) override {
+  Status UpdateInputBatch(orc::ColumnVectorBatch* orc_batch) override WARN_UNUSED_RESULT {
     batch_ = static_cast<orc::TimestampVectorBatch*>(orc_batch);
     DCHECK(batch_ == dynamic_cast<orc::TimestampVectorBatch*>(orc_batch));
+    return Status::OK();
   }
 
   Status ReadValue(int row_idx, Tuple* tuple, MemPool* pool) override WARN_UNUSED_RESULT;
@@ -226,9 +260,10 @@ class OrcDateColumnReader : public OrcColumnReader {
       HdfsOrcScanner* scanner)
       : OrcColumnReader(node, slot_desc, scanner) { }
 
-  void UpdateInputBatch(orc::ColumnVectorBatch* orc_batch) override {
+  Status UpdateInputBatch(orc::ColumnVectorBatch* orc_batch) override WARN_UNUSED_RESULT {
     batch_ = static_cast<orc::LongVectorBatch*>(orc_batch);
     DCHECK(batch_ == dynamic_cast<orc::LongVectorBatch*>(orc_batch));
+    return Status::OK();
   }
 
   Status ReadValue(int row_idx, Tuple* tuple, MemPool* pool) override WARN_UNUSED_RESULT;
@@ -243,10 +278,11 @@ class OrcDecimalColumnReader : public OrcColumnReader {
       HdfsOrcScanner* scanner)
       : OrcColumnReader(node, slot_desc, scanner) { }
 
-  void UpdateInputBatch(orc::ColumnVectorBatch* orc_batch) override {
+  Status UpdateInputBatch(orc::ColumnVectorBatch* orc_batch) override WARN_UNUSED_RESULT {
     // Reminder: even decimal(1,1) is stored in int64 batch
     batch_ = static_cast<orc::Decimal64VectorBatch*>(orc_batch);
     DCHECK(batch_ == dynamic_cast<orc::Decimal64VectorBatch*>(orc_batch));
+    return Status::OK();
   }
 
   Status ReadValue(int row_idx, Tuple* tuple, MemPool* pool)
@@ -269,9 +305,10 @@ class OrcDecimal16ColumnReader : public OrcColumnReader {
       HdfsOrcScanner* scanner)
       : OrcColumnReader(node, slot_desc, scanner) { }
 
-  void UpdateInputBatch(orc::ColumnVectorBatch* orc_batch) override {
+  Status UpdateInputBatch(orc::ColumnVectorBatch* orc_batch) override WARN_UNUSED_RESULT {
     batch_ = static_cast<orc::Decimal128VectorBatch*>(orc_batch);
     DCHECK(batch_ == dynamic_cast<orc::Decimal128VectorBatch*>(orc_batch));
+    return Status::OK();
   }
 
   Status ReadValue(int row_idx, Tuple* tuple, MemPool* pool) override WARN_UNUSED_RESULT;
@@ -344,8 +381,9 @@ class OrcComplexColumnReader : public OrcColumnReader {
   /// Whether we've finished reading the current orc batch.
   bool EndOfBatch();
 
-  void UpdateInputBatch(orc::ColumnVectorBatch* orc_batch) override {
+  Status UpdateInputBatch(orc::ColumnVectorBatch* orc_batch) override WARN_UNUSED_RESULT {
     vbatch_ = orc_batch;
+    return Status::OK();
   }
 
   /// Assemble current collection value (tracked by 'row_idx_') into a top level 'tuple'.
@@ -385,7 +423,7 @@ class OrcStructReader : public OrcComplexColumnReader {
   OrcStructReader(const orc::Type* node, const SlotDescriptor* slot_desc,
       HdfsOrcScanner* scanner);
 
-  void UpdateInputBatch(orc::ColumnVectorBatch* orc_batch) override;
+  Status UpdateInputBatch(orc::ColumnVectorBatch* orc_batch) override WARN_UNUSED_RESULT;
 
   Status TransferTuple(Tuple* tuple, MemPool* pool) override WARN_UNUSED_RESULT;
 
@@ -442,7 +480,7 @@ class OrcListReader : public OrcCollectionReader {
   OrcListReader(const orc::Type* node, const SlotDescriptor* slot_desc,
       HdfsOrcScanner* scanner);
 
-  void UpdateInputBatch(orc::ColumnVectorBatch* orc_batch) override;
+  Status UpdateInputBatch(orc::ColumnVectorBatch* orc_batch) override WARN_UNUSED_RESULT;
 
   Status TransferTuple(Tuple* tuple, MemPool* pool) override WARN_UNUSED_RESULT;
 
@@ -474,7 +512,7 @@ class OrcMapReader : public OrcCollectionReader {
   OrcMapReader(const orc::Type* node, const SlotDescriptor* slot_desc,
       HdfsOrcScanner* scanner);
 
-  void UpdateInputBatch(orc::ColumnVectorBatch* orc_batch) override;
+  Status UpdateInputBatch(orc::ColumnVectorBatch* orc_batch) override WARN_UNUSED_RESULT;
 
   Status TransferTuple(Tuple* tuple, MemPool* pool) override WARN_UNUSED_RESULT;
 

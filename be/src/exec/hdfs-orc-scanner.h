@@ -170,6 +170,13 @@ class HdfsOrcScanner : public HdfsScanner {
   /// Mem pool used in orc readers.
   boost::scoped_ptr<OrcMemPool> reader_mem_pool_;
 
+  /// Pool to copy dictionary buffer into.
+  /// This pool is shared across all the batches in a stripe.
+  boost::scoped_ptr<MemPool> dictionary_pool_;
+  /// Pool to copy non-dictionary buffer into. This pool is responsible for handling
+  /// vector batches that do not necessarily fit into one row batch.
+  boost::scoped_ptr<MemPool> data_batch_pool_;
+
   std::unique_ptr<OrcSchemaResolver> schema_resolver_ = nullptr;
 
   /// orc::Reader's responsibility is to read the footer and metadata from an ORC file.

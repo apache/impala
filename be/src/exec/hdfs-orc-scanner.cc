@@ -134,6 +134,8 @@ void HdfsOrcScanner::ScanRangeInputStream::read(void* buf, uint64_t length,
 
 HdfsOrcScanner::HdfsOrcScanner(HdfsScanNodeBase* scan_node, RuntimeState* state)
   : HdfsScanner(scan_node, state),
+    dictionary_pool_(new MemPool(scan_node->mem_tracker())),
+    data_batch_pool_(new MemPool(scan_node->mem_tracker())),
     assemble_rows_timer_(scan_node_->materialize_tuple_timer()) {
   assemble_rows_timer_.Stop();
 }
@@ -184,6 +186,10 @@ Status HdfsOrcScanner::Open(ScannerContext* context) {
   // Update 'row_reader_options_' based on the tuple descriptor so the ORC lib can skip
   // columns we don't need.
   RETURN_IF_ERROR(SelectColumns(*scan_node_->tuple_desc()));
+  // By enabling lazy decoding, String stripes with DICTIONARY_ENCODING[_V2] can be
+  // stored in an EncodedStringVectorBatch, where the data is stored in a dictionary
+  // blob more efficiently.
+  row_reader_options_.setEnableLazyDecoding(true);
 
   // Build 'col_id_path_map_' that maps from ORC column ids to their corresponding
   // SchemaPath in the table. The map is used in the constructors of OrcColumnReaders
@@ -226,18 +232,24 @@ void HdfsOrcScanner::Close(RowBatch* row_batch) {
   if (row_batch != nullptr) {
     context_->ReleaseCompletedResources(true);
     row_batch->tuple_data_pool()->AcquireData(template_tuple_pool_.get(), false);
+    row_batch->tuple_data_pool()->AcquireData(dictionary_pool_.get(), false);
+    row_batch->tuple_data_pool()->AcquireData(data_batch_pool_.get(), false);
     if (scan_node_->HasRowBatchQueue()) {
       static_cast<HdfsScanNode*>(scan_node_)->AddMaterializedRowBatch(
           unique_ptr<RowBatch>(row_batch));
     }
   } else {
     template_tuple_pool_->FreeAll();
+    dictionary_pool_->FreeAll();
+    data_batch_pool_->FreeAll();
     context_->ReleaseCompletedResources(true);
   }
   orc_root_batch_.reset(nullptr);
 
   // Verify all resources (if any) have been transferred.
   DCHECK_EQ(template_tuple_pool_->total_allocated_bytes(), 0);
+  DCHECK_EQ(dictionary_pool_->total_allocated_bytes(), 0);
+  DCHECK_EQ(data_batch_pool_->total_allocated_bytes(), 0);
 
   assemble_rows_timer_.Stop();
   assemble_rows_timer_.ReleaseCounter();
@@ -501,8 +513,10 @@ Status HdfsOrcScanner::GetNextInternal(RowBatch* row_batch) {
   // to can be skip. 'end_of_stripe_' marks whether current stripe is drained. It's only
   // set to true in 'AssembleRows'.
   while (advance_stripe_ || end_of_stripe_) {
+    // The next stripe will use a new dictionary blob so transfer the memory to row_batch.
+    row_batch->tuple_data_pool()->AcquireData(dictionary_pool_.get(), false);
     context_->ReleaseCompletedResources(/* done */ true);
-    // Commit the rows to flush the row batch from the previous stripe
+    // Commit the rows to flush the row batch from the previous stripe.
     RETURN_IF_ERROR(CommitRows(0, row_batch));
 
     RETURN_IF_ERROR(NextStripe());
@@ -617,7 +631,7 @@ Status HdfsOrcScanner::AssembleRows(RowBatch* row_batch) {
   if (!continue_execution) return Status::CancelledInternal("ORC scanner");
 
   // We're going to free the previous batch. Clear the reference first.
-  orc_root_reader_->UpdateInputBatch(nullptr);
+  RETURN_IF_ERROR(orc_root_reader_->UpdateInputBatch(nullptr));
 
   orc_root_batch_ = row_reader_->createRowBatch(row_batch->capacity());
   DCHECK_EQ(orc_root_batch_->numElements, 0);
@@ -625,9 +639,10 @@ Status HdfsOrcScanner::AssembleRows(RowBatch* row_batch) {
   int64_t num_rows_read = 0;
   while (continue_execution) {  // one ORC batch (ColumnVectorBatch) in a round
     if (orc_root_reader_->EndOfBatch()) {
+      row_batch->tuple_data_pool()->AcquireData(data_batch_pool_.get(), false);
       try {
         end_of_stripe_ |= !row_reader_->next(*orc_root_batch_);
-        orc_root_reader_->UpdateInputBatch(orc_root_batch_.get());
+        RETURN_IF_ERROR(orc_root_reader_->UpdateInputBatch(orc_root_batch_.get()));
         if (end_of_stripe_) break; // no more data to process
       } catch (ResourceError& e) {
         parse_status_ = e.GetStatus();

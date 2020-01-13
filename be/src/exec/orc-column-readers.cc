@@ -149,13 +149,45 @@ Status OrcBoolColumnReader::ReadValue(int row_idx, Tuple* tuple, MemPool* pool) 
   return Status::OK();
 }
 
+Status OrcStringColumnReader::InitBlob(orc::DataBuffer<char>* blob, MemPool* pool) {
+  // TODO: IMPALA-9310: Possible improvement is moving the buffer out from orc::DataBuffer
+  // instead of copying and let Impala free the memory later.
+  blob_ = reinterpret_cast<char*>(pool->TryAllocateUnaligned(blob->size()));
+  if (UNLIKELY(blob_ == nullptr)) {
+    string details = Substitute("Could not allocate string buffer of $0 bytes "
+        "for ORC file '$1'.", blob->size(), scanner_->filename());
+    return scanner_->scan_node_->mem_tracker()->MemLimitExceeded(
+        scanner_->state_, details, blob->size());
+  }
+  memcpy(blob_, blob->data(), blob->size());
+  return Status::OK();
+}
+
 Status OrcStringColumnReader::ReadValue(int row_idx, Tuple* tuple, MemPool* pool) {
   if (IsNull(DCHECK_NOTNULL(batch_), row_idx)) {
     SetNullSlot(tuple);
     return Status::OK();
   }
-  const char* src_ptr = batch_->data.data()[row_idx];
-  int64_t src_len = batch_->length.data()[row_idx];
+  char* src_ptr;
+  int src_len;
+
+  if (batch_->isEncoded) {
+    orc::EncodedStringVectorBatch* currentBatch =
+        static_cast<orc::EncodedStringVectorBatch*>(batch_);
+
+    orc::DataBuffer<int64_t>& offsets = currentBatch->dictionary->dictionaryOffset;
+    int64_t index = currentBatch->index[row_idx];
+    if (UNLIKELY(index < 0  || static_cast<uint64_t>(index) + 1 >= offsets.size())) {
+      return Status(Substitute("Corrupt ORC file: $0. Index ($1) out of range [0, $2) in "
+          "StringDictionary.", scanner_->filename(), index, offsets.size()));;
+    }
+    src_ptr = blob_ + offsets[index];
+    src_len = offsets[index + 1] - offsets[index];
+  } else {
+    // The pointed data is now in blob_, a buffer handled by Impala.
+    src_ptr = blob_ + (batch_->data[row_idx] - batch_->blob.data());
+    src_len = batch_->length[row_idx];
+  }
   int dst_len = slot_desc_->type().len;
   if (slot_desc_->type().type == TYPE_CHAR) {
     int unpadded_len = min(dst_len, static_cast<int>(src_len));
@@ -170,17 +202,7 @@ Status OrcStringColumnReader::ReadValue(int row_idx, Tuple* tuple, MemPool* pool
   } else {
     dst->len = src_len;
   }
-  // Space in the StringVectorBatch is allocated by scanner_->reader_mem_pool_. It will
-  // be reused at next batch, so we allocate a new space for this string.
-  uint8_t* buffer = pool->TryAllocateUnaligned(dst->len);
-  if (buffer == nullptr) {
-    string details = Substitute("Could not allocate string buffer of $0 bytes "
-        "for ORC file '$1'.", dst->len, scanner_->filename());
-    return scanner_->scan_node_->mem_tracker()->MemLimitExceeded(
-        scanner_->state_, details, dst->len);
-  }
-  dst->ptr = reinterpret_cast<char*>(buffer);
-  memcpy(dst->ptr, src_ptr, dst->len);
+  dst->ptr = src_ptr;
   return Status::OK();
 }
 
@@ -348,21 +370,24 @@ Status OrcStructReader::ReadValue(int row_idx, Tuple* tuple, MemPool* pool) {
   return Status::OK();
 }
 
-void OrcStructReader::UpdateInputBatch(orc::ColumnVectorBatch* orc_batch) {
-  OrcComplexColumnReader::UpdateInputBatch(orc_batch);
+Status OrcStructReader::UpdateInputBatch(orc::ColumnVectorBatch* orc_batch) {
+  RETURN_IF_ERROR(OrcComplexColumnReader::UpdateInputBatch(orc_batch));
   batch_ = static_cast<orc::StructVectorBatch*>(orc_batch);
   // In debug mode, we use dynamic_cast<> to double-check the downcast is legal
   DCHECK(batch_ == dynamic_cast<orc::StructVectorBatch*>(orc_batch));
   if (batch_ == nullptr || batch_->numElements == 0) {
     row_idx_ = 0;
-    for (OrcColumnReader* child : children_) child->UpdateInputBatch(nullptr);
-    return;
+    for (OrcColumnReader* child : children_) {
+      RETURN_IF_ERROR(child->UpdateInputBatch(nullptr));
+    }
+    return Status::OK();
   }
   row_idx_ = 0;
   int size = children_.size();
   for (int c = 0; c < size; ++c) {
-    children_[c]->UpdateInputBatch(batch_->fields[children_fields_[c]]);
+    RETURN_IF_ERROR(children_[c]->UpdateInputBatch(batch_->fields[children_fields_[c]]));
   }
+  return Status::OK();
 }
 
 Status OrcStructReader::TransferTuple(Tuple* tuple, MemPool* pool) {
@@ -447,17 +472,20 @@ OrcListReader::OrcListReader(const orc::Type* node, const SlotDescriptor* slot_d
       << (tuple_desc_ != nullptr ? tuple_desc_->DebugString() : "null");
 }
 
-void OrcListReader::UpdateInputBatch(orc::ColumnVectorBatch* orc_batch) {
-  OrcComplexColumnReader::UpdateInputBatch(orc_batch);
+Status OrcListReader::UpdateInputBatch(orc::ColumnVectorBatch* orc_batch) {
+  RETURN_IF_ERROR(OrcComplexColumnReader::UpdateInputBatch(orc_batch));
   batch_ = static_cast<orc::ListVectorBatch*>(orc_batch);
   // In debug mode, we use dynamic_cast<> to double-check the downcast is legal
   DCHECK(batch_ == dynamic_cast<orc::ListVectorBatch*>(orc_batch));
   orc::ColumnVectorBatch* item_batch = batch_ ? batch_->elements.get() : nullptr;
-  for (OrcColumnReader* child : children_) child->UpdateInputBatch(item_batch);
+  for (OrcColumnReader* child : children_) {
+    RETURN_IF_ERROR(child->UpdateInputBatch(item_batch));
+  }
   if (batch_) {
     row_idx_ = -1;
     NextRow();
   }
+  return Status::OK();
 }
 
 int OrcListReader::GetNumTuples(int row_idx) const {
@@ -581,19 +609,24 @@ OrcMapReader::OrcMapReader(const orc::Type* node, const SlotDescriptor* slot_des
   }
 }
 
-void OrcMapReader::UpdateInputBatch(orc::ColumnVectorBatch* orc_batch) {
-  OrcComplexColumnReader::UpdateInputBatch(orc_batch);
+Status OrcMapReader::UpdateInputBatch(orc::ColumnVectorBatch* orc_batch) {
+  RETURN_IF_ERROR(OrcComplexColumnReader::UpdateInputBatch(orc_batch));
   batch_ = static_cast<orc::MapVectorBatch*>(orc_batch);
   // In debug mode, we use dynamic_cast<> to double-check the downcast is legal
   DCHECK(batch_ == dynamic_cast<orc::MapVectorBatch*>(orc_batch));
   orc::ColumnVectorBatch* key_batch = batch_ ? batch_->keys.get() : nullptr;
   orc::ColumnVectorBatch* value_batch = batch_ ? batch_->elements.get() : nullptr;
-  for (OrcColumnReader* child : key_readers_) child->UpdateInputBatch(key_batch);
-  for (OrcColumnReader* child : value_readers_) child->UpdateInputBatch(value_batch);
+  for (OrcColumnReader* child : key_readers_) {
+    RETURN_IF_ERROR(child->UpdateInputBatch(key_batch));
+  }
+  for (OrcColumnReader* child : value_readers_) {
+    RETURN_IF_ERROR(child->UpdateInputBatch(value_batch));
+  }
   if (batch_) {
     row_idx_ = -1;
     NextRow();
   }
+  return Status::OK();
 }
 
 void OrcMapReader::NextRow() {
