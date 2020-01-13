@@ -8618,21 +8618,19 @@ TEST_P(ExprTest, ConditionalFunctionIsNotFalse) {
   TestError("isnotfalse(-9999999999999999999999999999999999999.9)");
 }
 
-// Validates that Expr::ComputeResultsLayout() for 'exprs' is correct.
+// Validates that the constructor ScalarExprsResultsRowLayout() for 'exprs' is correct.
 //   - expected_byte_size: total byte size to store all results for exprs
 //   - expected_var_begin: byte offset where variable length types begin
 //   - expected_offsets: mapping of byte sizes to a set valid offsets
 //     exprs that have the same byte size can end up in a number of locations
 void ValidateLayout(const vector<ScalarExpr*>& exprs, int expected_byte_size,
     int expected_var_begin, const map<int, set<int>>& expected_offsets) {
-  vector<int> offsets;
   set<int> offsets_found;
 
-  int var_begin;
-  int byte_size = ScalarExpr::ComputeResultsLayout(exprs, &offsets, &var_begin);
+  ScalarExprsResultsRowLayout row_layout(exprs);
 
-  EXPECT_EQ(expected_byte_size, byte_size);
-  EXPECT_EQ(expected_var_begin, var_begin);
+  EXPECT_EQ(expected_byte_size, row_layout.expr_values_bytes_per_row);
+  EXPECT_EQ(expected_var_begin, row_layout.var_results_begin_offset);
 
   // Walk the computed offsets and make sure the resulting sets match expected_offsets
   for (int i = 0; i < exprs.size(); ++i) {
@@ -8641,7 +8639,7 @@ void ValidateLayout(const vector<ScalarExpr*>& exprs, int expected_byte_size,
     EXPECT_TRUE(iter != expected_offsets.end());
 
     const set<int>& possible_offsets = iter->second;
-    int computed_offset = offsets[i];
+    int computed_offset = row_layout.expr_values_offsets[i];
     // The computed offset has to be one of the possible.  Exprs types with the
     // same size are not ordered wrt each other.
     EXPECT_TRUE(possible_offsets.find(computed_offset) != possible_offsets.end());

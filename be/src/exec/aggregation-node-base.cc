@@ -35,9 +35,9 @@ Status AggregationPlanNode::Init(const TPlanNode& tnode, RuntimeState* state) {
     const TAggregator& agg = tnode_->agg_node.aggregators[i];
     AggregatorConfig* node = nullptr;
     if (agg.grouping_exprs.empty()) {
-      node = state->obj_pool()->Add(new AggregatorConfig(agg, state, this));
+      node = state->obj_pool()->Add(new NonGroupingAggregatorConfig(agg, state, this, i));
     } else {
-      node = state->obj_pool()->Add(new GroupingAggregatorConfig(agg, state, this));
+      node = state->obj_pool()->Add(new GroupingAggregatorConfig(agg, state, this, i));
     }
     DCHECK(node != nullptr);
     aggs_.push_back(node);
@@ -67,13 +67,15 @@ AggregationNodeBase::AggregationNodeBase(
     const AggregatorConfig* agg = pnode.aggs_[i];
     unique_ptr<Aggregator> node;
     if (agg->grouping_exprs_.empty()) {
-      node.reset(new NonGroupingAggregator(this, pool_, *agg, i));
+      const NonGroupingAggregatorConfig* non_grouping_config =
+          static_cast<const NonGroupingAggregatorConfig*>(agg);
+      node.reset(new NonGroupingAggregator(this, pool_, *non_grouping_config));
     } else {
       const GroupingAggregatorConfig* grouping_config =
           static_cast<const GroupingAggregatorConfig*>(agg);
       DCHECK(grouping_config != nullptr);
       node.reset(new GroupingAggregator(this, pool_, *grouping_config,
-          pnode.tnode_->agg_node.estimated_input_cardinality, i));
+          pnode.tnode_->agg_node.estimated_input_cardinality));
     }
     aggs_.push_back(std::move(node));
     runtime_profile_->AddChild(aggs_[i]->runtime_profile());

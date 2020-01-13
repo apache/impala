@@ -1359,8 +1359,14 @@ Status PartitionedHashJoinNode::CodegenProcessProbeBatch(
   // Codegen for hashing rows
   llvm::Function* hash_fn;
   llvm::Function* murmur_hash_fn;
-  RETURN_IF_ERROR(ht_ctx_->CodegenHashRow(codegen, false, &hash_fn));
-  RETURN_IF_ERROR(ht_ctx_->CodegenHashRow(codegen, true, &murmur_hash_fn));
+  // Context required to generate hash table codegened methods.
+  HashTableConfig hash_table_config(build_exprs_, probe_exprs_,
+      builder_->HashTableStoresNulls(), builder_->is_not_distinct_from());
+
+  RETURN_IF_ERROR(
+      HashTableCtx::CodegenHashRow(codegen, false, hash_table_config, &hash_fn));
+  RETURN_IF_ERROR(
+      HashTableCtx::CodegenHashRow(codegen, true, hash_table_config, &murmur_hash_fn));
 
   // Get cross compiled function
   IRFunction::Type ir_fn = IRFunction::FN_END;
@@ -1412,11 +1418,13 @@ Status PartitionedHashJoinNode::CodegenProcessProbeBatch(
 
   // Codegen HashTable::Equals
   llvm::Function* probe_equals_fn;
-  RETURN_IF_ERROR(ht_ctx_->CodegenEquals(codegen, false, &probe_equals_fn));
+  RETURN_IF_ERROR(
+      HashTableCtx::CodegenEquals(codegen, false, hash_table_config, &probe_equals_fn));
 
   // Codegen for evaluating probe rows
   llvm::Function* eval_row_fn;
-  RETURN_IF_ERROR(ht_ctx_->CodegenEvalRow(codegen, false, &eval_row_fn));
+  RETURN_IF_ERROR(
+      HashTableCtx::CodegenEvalRow(codegen, false, hash_table_config, &eval_row_fn));
 
   // Codegen CreateOutputRow
   llvm::Function* create_output_row_fn;
@@ -1478,8 +1486,8 @@ Status PartitionedHashJoinNode::CodegenProcessProbeBatch(
   HashTableCtx::HashTableReplacedConstants replaced_constants;
   const bool stores_duplicates = true;
   const int num_build_tuples = child(1)->row_desc()->tuple_descriptors().size();
-  RETURN_IF_ERROR(ht_ctx_->ReplaceHashTableConstants(codegen, stores_duplicates,
-      num_build_tuples, process_probe_batch_fn, &replaced_constants));
+  RETURN_IF_ERROR(HashTableCtx::ReplaceHashTableConstants(codegen, hash_table_config,
+      stores_duplicates, num_build_tuples, process_probe_batch_fn, &replaced_constants));
   DCHECK_GE(replaced_constants.stores_nulls, 1);
   DCHECK_GE(replaced_constants.finds_some_nulls, 1);
   DCHECK_GE(replaced_constants.stores_duplicates, 1);

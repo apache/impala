@@ -33,10 +33,12 @@
 namespace impala {
 
 class AggFnEvaluator;
+class GroupingAggregator;
 class PlanNode;
 class LlvmCodeGen;
 class RowBatch;
 class RuntimeState;
+struct ScalarExprsResultsRowLayout;
 class TAggregator;
 class Tuple;
 
@@ -117,10 +119,11 @@ class Tuple;
 class GroupingAggregatorConfig : public AggregatorConfig {
  public:
   GroupingAggregatorConfig(
-      const TAggregator& taggregator, RuntimeState* state, PlanNode* pnode);
-  virtual Status Init(
+      const TAggregator& taggregator, RuntimeState* state, PlanNode* pnode, int agg_idx);
+  Status Init(
       const TAggregator& taggregator, RuntimeState* state, PlanNode* pnode) override;
-  ~GroupingAggregatorConfig() {}
+  Status Codegen(RuntimeState* state) override;
+  ~GroupingAggregatorConfig() override {}
 
   /// Row with the intermediate tuple as its only tuple.
   /// Construct a new row desc for preparing the build exprs because neither the child's
@@ -147,13 +150,44 @@ class GroupingAggregatorConfig : public AggregatorConfig {
   /// We need to do more work for var-len expressions when allocating and spilling rows.
   /// All var-len grouping exprs have type string.
   std::vector<int> string_grouping_exprs_;
+
+  /// Used for codegening hash table specific methods and to create the corresponding
+  /// instance of HashTableCtx.
+  const HashTableConfig* hash_table_config_;
+
+  typedef Status (*AddBatchImplFn)(
+      GroupingAggregator*, RowBatch*, TPrefetchMode::type, HashTableCtx*);
+  /// Jitted AddBatchImpl function pointer. Null if codegen is disabled.
+  AddBatchImplFn add_batch_impl_fn_ = nullptr;
+
+  typedef Status (*AddBatchStreamingImplFn)(GroupingAggregator*, int, bool,
+      TPrefetchMode::type, RowBatch*, RowBatch*, HashTableCtx*, int[]);
+  /// Jitted AddBatchStreamingImpl function pointer. Null if codegen is disabled.
+  AddBatchStreamingImplFn add_batch_streaming_impl_fn_ = nullptr;
+
+ protected:
+  int GetNumGroupingExprs() override { return grouping_exprs_.size(); }
+
+ private:
+  /// Codegen the non-streaming add row batch loop. The loop has already been compiled to
+  /// IR and loaded into the codegen object. UpdateAggTuple has also been codegen'd to IR.
+  /// This function will modify the loop subsituting the statically compiled functions
+  /// with codegen'd ones. 'add_batch_impl_fn_' will be updated with the codegened
+  /// function.
+  /// Assumes AGGREGATED_ROWS = false.
+  Status CodegenAddBatchImpl(
+      LlvmCodeGen* codegen, TPrefetchMode::type prefetch_mode) WARN_UNUSED_RESULT;
+
+  /// Codegen the materialization loop for streaming preaggregations.
+  /// 'add_batch_streaming_impl_fn_' will be updated with the codegened function.
+  Status CodegenAddBatchStreamingImpl(
+      LlvmCodeGen* codegen, TPrefetchMode::type prefetch_mode) WARN_UNUSED_RESULT;
 };
 
 class GroupingAggregator : public Aggregator {
  public:
   GroupingAggregator(ExecNode* exec_node, ObjectPool* pool,
-      const GroupingAggregatorConfig& config, int64_t estimated_input_cardinality,
-      int agg_idx);
+      const GroupingAggregatorConfig& config, int64_t estimated_input_cardinality);
 
   virtual Status Prepare(RuntimeState* state) override;
   virtual void Codegen(RuntimeState* state) override;
@@ -176,6 +210,15 @@ class GroupingAggregator : public Aggregator {
 
  private:
   struct Partition;
+
+  /// TODO: Remove reference once codegen is performed before FIS creation.
+  /// Reference to the config object and only used to call Codegen().
+  const GroupingAggregatorConfig& agg_config_;
+
+  /// Reference to the hash table config which is a part of the GroupingAggregatorConfig
+  /// that was used to create this object. Its used to create an instance of the
+  /// HashTableCtx in Prepare(). Not Owned.
+  const HashTableConfig& hash_table_config_;
 
   /// Number of initial partitions to create. Must be a power of 2.
   static const int PARTITION_FANOUT = 16;
@@ -267,12 +310,12 @@ class GroupingAggregator : public Aggregator {
   typedef Status (*AddBatchImplFn)(
       GroupingAggregator*, RowBatch*, TPrefetchMode::type, HashTableCtx*);
   /// Jitted AddBatchImpl function pointer. Null if codegen is disabled.
-  AddBatchImplFn add_batch_impl_fn_ = nullptr;
+  const AddBatchImplFn& add_batch_impl_fn_;
 
   typedef Status (*AddBatchStreamingImplFn)(GroupingAggregator*, int, bool,
       TPrefetchMode::type, RowBatch*, RowBatch*, HashTableCtx*, int[PARTITION_FANOUT]);
   /// Jitted AddBatchStreamingImpl function pointer.  Null if codegen is disabled.
-  AddBatchStreamingImplFn add_batch_streaming_impl_fn_ = nullptr;
+  const AddBatchStreamingImplFn& add_batch_streaming_impl_fn_ ;
 
   /// Total time spent resizing hash tables.
   RuntimeProfile::Counter* ht_resize_timer_ = nullptr;
@@ -631,20 +674,6 @@ class GroupingAggregator : public Aggregator {
   /// Calls finalizes on all tuples starting at 'it'.
   void CleanupHashTbl(
       const std::vector<AggFnEvaluator*>& agg_fn_evals, HashTable::Iterator it);
-
-  /// Codegen the non-streaming add row batch loop. The loop has already been compiled to
-  /// IR and loaded into the codegen object. UpdateAggTuple has also been codegen'd to IR.
-  /// This function will modify the loop subsituting the statically compiled functions
-  /// with codegen'd ones. 'add_batch_impl_fn_' will be updated with the codegened
-  // function.
-  /// Assumes AGGREGATED_ROWS = false.
-  Status CodegenAddBatchImpl(
-      LlvmCodeGen* codegen, TPrefetchMode::type prefetch_mode) WARN_UNUSED_RESULT;
-
-  /// Codegen the materialization loop for streaming preaggregations.
-  /// 'add_batch_streaming_impl_fn_' will be updated with the codegened function.
-  Status CodegenAddBatchStreamingImpl(
-      LlvmCodeGen* codegen, TPrefetchMode::type prefetch_mode) WARN_UNUSED_RESULT;
 
   /// Compute minimum buffer reservation for grouping aggregations.
   /// We need one buffer per partition, which is used either as the write buffer for the

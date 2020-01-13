@@ -31,11 +31,36 @@ class AggregationPlanNode;
 class DescriptorTbl;
 class ExecNode;
 class LlvmCodeGen;
+class NonGroupingAggregator;
 class ObjectPool;
 class RowBatch;
 class RuntimeState;
 class TAggregator;
 class Tuple;
+
+class NonGroupingAggregatorConfig : public AggregatorConfig {
+ public:
+  NonGroupingAggregatorConfig(const TAggregator& taggregator, RuntimeState* state,
+      PlanNode* pnode, int agg_idx);
+  Status Codegen(RuntimeState* state) override;
+  ~NonGroupingAggregatorConfig() override {}
+
+  typedef Status (*AddBatchImplFn)(NonGroupingAggregator*, RowBatch*);
+  /// Jitted AddBatchImpl function pointer. Null if codegen is disabled.
+  AddBatchImplFn add_batch_impl_fn_ = nullptr;
+
+ protected:
+  int GetNumGroupingExprs() override { return 0; }
+
+ private:
+  /// Codegen the non-streaming add row batch loop in NonGroupingAggregator::AddBatch()
+  /// (Assuming AGGREGATED_ROWS = false). The loop has already been compiled to IR and
+  /// loaded into the codegen object. UpdateAggTuple has also been codegen'd to IR. This
+  /// function will modify the loop subsituting the statically compiled functions with
+  /// codegen'd ones. 'add_batch_impl_fn_' will be updated with the codegened function.
+  Status CodegenAddBatchImpl(
+      LlvmCodeGen* codegen, TPrefetchMode::type prefetch_mode) WARN_UNUSED_RESULT;
+};
 
 /// Aggregator for doing non-grouping aggregations. Input is passed to the aggregator
 /// through AddBatch(), which generates the single output row. This Aggregator does
@@ -43,7 +68,7 @@ class Tuple;
 class NonGroupingAggregator : public Aggregator {
  public:
   NonGroupingAggregator(
-      ExecNode* exec_node, ObjectPool* pool, const AggregatorConfig& config, int agg_idx);
+      ExecNode* exec_node, ObjectPool* pool, const NonGroupingAggregatorConfig& config);
 
   virtual Status Prepare(RuntimeState* state) override;
   virtual void Codegen(RuntimeState* state) override;
@@ -73,6 +98,10 @@ class NonGroupingAggregator : public Aggregator {
   virtual void DebugString(int indentation_level, std::stringstream* out) const override;
 
  private:
+  /// TODO: Remove reference once codegen is performed before FIS creation.
+  /// Reference to the config object and only used to call Codegen().
+  const NonGroupingAggregatorConfig& agg_config;
+
   /// MemPool used to allocate memory for 'singleton_output_tuple_'. The ownership of the
   /// pool's memory is transferred to the output batch on eos. The pool should not be
   /// Reset() to allow amortizing memory allocation over a series of
@@ -81,7 +110,7 @@ class NonGroupingAggregator : public Aggregator {
 
   typedef Status (*AddBatchImplFn)(NonGroupingAggregator*, RowBatch*);
   /// Jitted AddBatchImpl function pointer. Null if codegen is disabled.
-  AddBatchImplFn add_batch_impl_fn_ = nullptr;
+  const AddBatchImplFn& add_batch_impl_fn_;
 
   /////////////////////////////////////////
   /// BEGIN: Members that must be Reset()
@@ -105,15 +134,6 @@ class NonGroupingAggregator : public Aggregator {
 
   /// Output 'singleton_output_tuple_' and transfer memory to 'row_batch'.
   void GetSingletonOutput(RowBatch* row_batch);
-
-  /// Codegen the non-streaming add row batch loop. The loop has already been compiled to
-  /// IR and loaded into the codegen object. UpdateAggTuple has also been codegen'd to IR.
-  /// This function will modify the loop subsituting the statically compiled functions
-  /// with codegen'd ones. 'add_batch_impl_fn_' will be updated with the codegened
-  /// function.
-  /// Assumes AGGREGATED_ROWS = false.
-  Status CodegenAddBatchImpl(
-      LlvmCodeGen* codegen, TPrefetchMode::type prefetch_mode) WARN_UNUSED_RESULT;
 };
 } // namespace impala
 

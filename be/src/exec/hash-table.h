@@ -27,6 +27,7 @@
 #include "codegen/impala-ir.h"
 #include "common/compiler-util.h"
 #include "common/logging.h"
+#include "exprs/scalar-expr.h"
 #include "runtime/buffered-tuple-stream.h"
 #include "runtime/buffered-tuple-stream.inline.h"
 #include "runtime/bufferpool/buffer-pool.h"
@@ -52,6 +53,7 @@ class Tuple;
 class TupleRow;
 class HashTable;
 struct HashTableStatsProfile;
+struct ScalarExprsResultsRowLayout;
 
 /// Linear or quadratic probing hash table implementation tailored to the usage pattern
 /// for partitioned hash aggregation and hash joins. The hash table stores TupleRows and
@@ -113,6 +115,35 @@ struct HashTableStatsProfile;
 /// TODO: Batched interface for inserts and finds.
 /// TODO: as an optimization, compute variable-length data size for the agg node.
 
+/// Collection of variables required to create instances of HashTableCtx and to codegen
+/// hash table methods.
+struct HashTableConfig {
+  HashTableConfig() = delete;
+  HashTableConfig(const std::vector<ScalarExpr*>& build_exprs,
+      const std::vector<ScalarExpr*>& probe_exprs, const bool stores_nulls,
+      const std::vector<bool>& finds_nulls);
+
+  /// The exprs used to evaluate rows for inserting rows into hash table.
+  /// Also used when matching hash table entries against probe rows. Not Owned.
+  const std::vector<ScalarExpr*>& build_exprs;
+
+  /// The exprs used to evaluate rows for look-up in the hash table. Not Owned.
+  const std::vector<ScalarExpr*>& probe_exprs;
+
+  /// If false, TupleRows with nulls are ignored during Insert
+  const bool stores_nulls;
+
+  /// if finds_nulls[i] is false, FindProbeRow() return BUCKET_NOT_FOUND for TupleRows
+  /// with nulls in position i even if stores_nulls is true.
+  const std::vector<bool> finds_nulls;
+
+  /// finds_some_nulls_ is just the logical OR of finds_nulls_.
+  const bool finds_some_nulls;
+
+  /// The memory efficient layout for storing the results of evaluating build expressions.
+  const ScalarExprsResultsRowLayout build_exprs_results_row_layout;
+};
+
 /// Control block for a hash table. This class contains the logic as well as the variables
 /// needed by a thread to operate on a hash table.
 class HashTableCtx {
@@ -126,6 +157,11 @@ class HashTableCtx {
       const std::vector<ScalarExpr*>& build_exprs,
       const std::vector<ScalarExpr*>& probe_exprs, bool stores_nulls,
       const std::vector<bool>& finds_nulls, int32_t initial_seed, int max_levels,
+      int num_build_tuples, MemPool* expr_perm_pool, MemPool* build_expr_results_pool,
+      MemPool* probe_expr_results_pool, boost::scoped_ptr<HashTableCtx>* ht_ctx);
+
+  static Status Create(ObjectPool* pool, RuntimeState* state,
+      const HashTableConfig& config, int32_t initial_seed, int max_levels,
       int num_build_tuples, MemPool* expr_perm_pool, MemPool* build_expr_results_pool,
       MemPool* probe_expr_results_pool, boost::scoped_ptr<HashTableCtx>* ht_ctx);
 
@@ -179,20 +215,22 @@ class HashTableCtx {
   /// Codegen for evaluating a tuple row. Codegen'd function matches the signature
   /// for EvalBuildRow and EvalTupleRow.
   /// If build_row is true, the codegen uses the build_exprs, otherwise the probe_exprs.
-  Status CodegenEvalRow(LlvmCodeGen* codegen, bool build_row, llvm::Function** fn);
+  static Status CodegenEvalRow(LlvmCodeGen* codegen, bool build_row,
+      const HashTableConfig& config, llvm::Function** fn);
 
   /// Codegen for evaluating a TupleRow and comparing equality. Function signature
   /// matches HashTable::Equals(). 'inclusive_equality' is true if the generated
   /// equality function should treat all NULLs as equal and all NaNs as equal.
   /// See the template parameter to HashTable::Equals().
-  Status CodegenEquals(LlvmCodeGen* codegen, bool inclusive_equality,
-      llvm::Function** fn);
+  static Status CodegenEquals(LlvmCodeGen* codegen, bool inclusive_equality,
+      const HashTableConfig& config, llvm::Function** fn);
 
   /// Codegen for hashing expr values. Function prototype matches HashRow identically.
   /// Unlike HashRow(), the returned function only uses a single hash function, rather
   /// than switching based on level_. If 'use_murmur' is true, murmur hash is used,
   /// otherwise CRC is used if the hardware supports it (see hash-util.h).
-  Status CodegenHashRow(LlvmCodeGen* codegen, bool use_murmur, llvm::Function** fn);
+  static Status CodegenHashRow(LlvmCodeGen* codegen, bool use_murmur,
+      const HashTableConfig& config, llvm::Function** fn);
 
   /// Struct that returns the number of constants replaced by ReplaceConstants().
   struct HashTableReplacedConstants {
@@ -206,9 +244,9 @@ class HashTableCtx {
   /// Replace hash table parameters with constants in 'fn'. Updates 'replacement_counts'
   /// with the number of replacements made. 'num_build_tuples' and 'stores_duplicates'
   /// correspond to HashTable parameters with the same name.
-  Status ReplaceHashTableConstants(LlvmCodeGen* codegen, bool stores_duplicates,
-      int num_build_tuples, llvm::Function* fn,
-      HashTableReplacedConstants* replacement_counts);
+  static Status ReplaceHashTableConstants(LlvmCodeGen* codegen,
+      const HashTableConfig& config, bool stores_duplicates, int num_build_tuples,
+      llvm::Function* fn, HashTableReplacedConstants* replacement_counts);
 
   static const char* LLVM_CLASS_NAME;
 
@@ -251,7 +289,7 @@ class HashTableCtx {
     /// if memory allocation leads to the memory limits of the exec node to be exceeded.
     /// 'tracker' is the memory tracker of the exec node which owns this HashTableCtx.
     Status Init(RuntimeState* state, MemTracker* tracker,
-        const std::vector<ScalarExpr*>& build_exprs);
+        const ScalarExprsResultsRowLayout& exprs_results_row_layout);
 
     /// Frees up various resources and updates memory tracker with proper accounting.
     /// 'tracker' should be the same memory tracker which was passed in for Init().
@@ -404,8 +442,8 @@ class HashTableCtx {
   ///  - build_exprs are the exprs that should be used to evaluate rows during Insert().
   ///  - probe_exprs are used during FindProbeRow()
   ///  - stores_nulls: if false, TupleRows with nulls are ignored during Insert
-  ///  - finds_nulls: if finds_nulls[i] is false, FindProbeRow() returns End() for
-  ///        TupleRows with nulls in position i even if stores_nulls is true.
+  ///  - finds_nulls: if finds_nulls[i] is false, FindProbeRow() returns BUCKET_NOT_FOUND
+  ///        for TupleRows with nulls in position i even if stores_nulls is true.
   ///  - initial_seed: initial seed value to use when computing hashes for rows with
   ///        level 0. Other levels have their seeds derived from this seed.
   ///  - max_levels: the max lhashevels we will hash with.
@@ -426,10 +464,16 @@ class HashTableCtx {
   ///       with '<=>' and others with '=', stores_nulls could distinguish between columns
   ///       in which nulls are stored and columns in which they are not, which could save
   ///       space by not storing some rows we know will never match.
+  /// TODO: remove this constructor once all client classes switch to using
+  ///       HashTableConfig to create instances of this class.
   HashTableCtx(const std::vector<ScalarExpr*>& build_exprs,
       const std::vector<ScalarExpr*>& probe_exprs, bool stores_nulls,
-      const std::vector<bool>& finds_nulls, int32_t initial_seed,
-      int max_levels, MemPool* expr_perm_pool, MemPool* build_expr_results_pool,
+      const std::vector<bool>& finds_nulls, int32_t initial_seed, int max_levels,
+      MemPool* expr_perm_pool, MemPool* build_expr_results_pool,
+      MemPool* probe_expr_results_pool);
+
+  HashTableCtx(const HashTableConfig& config, int32_t initial_seed, int max_levels,
+      MemPool* expr_perm_pool, MemPool* build_expr_results_pool,
       MemPool* probe_expr_results_pool);
 
   /// Allocate various buffers for storing expression evaluation results, hash values,
@@ -505,6 +549,7 @@ class HashTableCtx {
   /// The exprs used to evaluate rows for inserting rows into hash table.
   /// Also used when matching hash table entries against probe rows.
   const std::vector<ScalarExpr*>& build_exprs_;
+  const ScalarExprsResultsRowLayout build_exprs_results_row_layout_;
   std::vector<ScalarExprEvaluator*> build_expr_evals_;
 
   /// The exprs used to evaluate rows for look-up in the hash table.

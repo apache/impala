@@ -245,13 +245,13 @@ struct MemLayoutData {
   }
 };
 
-int ScalarExpr::ComputeResultsLayout(const vector<ScalarExpr*>& exprs,
-    vector<int>* offsets, int* var_result_begin) {
+ScalarExprsResultsRowLayout::ScalarExprsResultsRowLayout(
+    const vector<ScalarExpr*>& exprs) {
   if (exprs.size() == 0) {
-    *var_result_begin = -1;
-    return 0;
+    var_results_begin_offset = -1;
+    expr_values_bytes_per_row = 0;
+    return;
   }
-
 
   vector<MemLayoutData> data;
   data.resize(exprs.size());
@@ -263,26 +263,23 @@ int ScalarExpr::ComputeResultsLayout(const vector<ScalarExpr*>& exprs,
     data[i].byte_size = exprs[i]->type().GetSlotSize();
     DCHECK_GT(data[i].byte_size, 0);
     data[i].variable_length = exprs[i]->type().IsVarLenStringType();
-
   }
 
   sort(data.begin(), data.end());
 
-  int byte_offset = 0;
-  offsets->resize(exprs.size());
-  *var_result_begin = -1;
+  expr_values_bytes_per_row = 0;
+  expr_values_offsets.resize(exprs.size());
+  var_results_begin_offset = -1;
 
   for (int i = 0; i < data.size(); ++i) {
-
-    (*offsets)[data[i].expr_idx] = byte_offset;
-    if (data[i].variable_length && *var_result_begin == -1) {
-      *var_result_begin = byte_offset;
+    expr_values_offsets[data[i].expr_idx] = expr_values_bytes_per_row;
+    if (data[i].variable_length && var_results_begin_offset == -1) {
+      var_results_begin_offset = expr_values_bytes_per_row;
     }
-    DCHECK(!(i == 0 && byte_offset > 0)) << "first value should be at start of layout";
-    byte_offset += data[i].byte_size;
+    DCHECK(!(i == 0 && expr_values_bytes_per_row > 0))
+        << "first value should be at start of layout";
+    expr_values_bytes_per_row += data[i].byte_size;
   }
-
-  return byte_offset;
 }
 
 Status ScalarExpr::Init(

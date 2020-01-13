@@ -35,10 +35,23 @@
 
 namespace impala {
 
+NonGroupingAggregatorConfig::NonGroupingAggregatorConfig(
+    const TAggregator& taggregator, RuntimeState* state, PlanNode* pnode, int agg_idx)
+  : AggregatorConfig(taggregator, state, pnode, agg_idx) {}
+
+Status NonGroupingAggregatorConfig::Codegen(RuntimeState* state) {
+  LlvmCodeGen* codegen = state->codegen();
+  DCHECK(codegen != nullptr);
+  TPrefetchMode::type prefetch_mode = state->query_options().prefetch_mode;
+  return CodegenAddBatchImpl(codegen, prefetch_mode);
+}
+
 NonGroupingAggregator::NonGroupingAggregator(
-    ExecNode* exec_node, ObjectPool* pool, const AggregatorConfig& config, int agg_idx)
-  : Aggregator(exec_node, pool, config, Substitute("NonGroupingAggregator $0", agg_idx),
-        agg_idx) {}
+    ExecNode* exec_node, ObjectPool* pool, const NonGroupingAggregatorConfig& config)
+  : Aggregator(
+        exec_node, pool, config, Substitute("NonGroupingAggregator $0", config.agg_idx_)),
+    agg_config(config),
+    add_batch_impl_fn_(config.add_batch_impl_fn_) {}
 
 Status NonGroupingAggregator::Prepare(RuntimeState* state) {
   RETURN_IF_ERROR(Aggregator::Prepare(state));
@@ -47,10 +60,9 @@ Status NonGroupingAggregator::Prepare(RuntimeState* state) {
 }
 
 void NonGroupingAggregator::Codegen(RuntimeState* state) {
-  LlvmCodeGen* codegen = state->codegen();
-  DCHECK(codegen != nullptr);
-  TPrefetchMode::type prefetch_mode = state->query_options().prefetch_mode;
-  Status codegen_status = CodegenAddBatchImpl(codegen, prefetch_mode);
+  // TODO: This const cast will be removed once codegen call is moved before FIS creation
+  Status codegen_status =
+      const_cast<NonGroupingAggregatorConfig&>(agg_config).Codegen(state);
   runtime_profile()->AddCodegenMsg(codegen_status.ok(), codegen_status);
 }
 
@@ -155,7 +167,7 @@ void NonGroupingAggregator::DebugString(int indentation_level, stringstream* out
   *out << ")";
 }
 
-Status NonGroupingAggregator::CodegenAddBatchImpl(
+Status NonGroupingAggregatorConfig::CodegenAddBatchImpl(
     LlvmCodeGen* codegen, TPrefetchMode::type prefetch_mode) {
   llvm::Function* update_tuple_fn;
   RETURN_IF_ERROR(CodegenUpdateTuple(codegen, &update_tuple_fn));

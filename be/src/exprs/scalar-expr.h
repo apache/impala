@@ -70,6 +70,27 @@ class TExprNode;
 class Tuple;
 class TupleRow;
 
+/// Describes the memory efficient layout for storing the results of evaluating a list
+/// of scalar expressions.
+/// The constructor computes a memory efficient layout for storing the results of
+/// evaluating 'exprs'. The results are assumed to be void* slot types (vs AnyVal types).
+/// Varlen data is not included (e.g. there will be space for a StringValue, but not the
+/// data referenced by it). Variable length types are guaranteed to be at the end.
+struct ScalarExprsResultsRowLayout {
+  ScalarExprsResultsRowLayout() = delete;
+  ScalarExprsResultsRowLayout(const vector<ScalarExpr*>& exprs);
+
+  /// The number of bytes necessary to store all the results.
+  int expr_values_bytes_per_row;
+
+  /// Maps from expression index to the byte offset into the row of expression values.
+  std::vector<int> expr_values_offsets;
+
+  /// Byte offset from where the variable length results for a row begins. If -1, there
+  /// are no variable length slots.
+  int var_results_begin_offset;
+};
+
 /// --- ScalarExpr overview
 ///
 /// ScalarExpr is an expression which returns a value for each input tuple row.
@@ -181,20 +202,6 @@ class ScalarExpr : public Expr {
   virtual std::string DebugString() const;
   static std::string DebugString(const std::vector<ScalarExpr*>& exprs);
   std::string DebugString(const std::string& expr_name) const;
-
-  /// Computes a memory efficient layout for storing the results of evaluating 'exprs'.
-  /// The results are assumed to be void* slot types (vs AnyVal types). Varlen data is
-  /// not included (e.g. there will be space for a StringValue, but not the data
-  /// referenced by it).
-  ///
-  /// Returns the number of bytes necessary to store all the results and offsets
-  /// where the result for each expr should be stored.
-  ///
-  /// Variable length types are guaranteed to be at the end and 'var_result_begin'
-  /// will be set the beginning byte offset where variable length results begin.
-  /// 'var_result_begin' will be set to -1 if there are no variable len types.
-  static int ComputeResultsLayout(const vector<ScalarExpr*>& exprs, vector<int>* offsets,
-      int* var_result_begin);
 
   /// Releases cache entries to libCache for all nodes in the ScalarExpr tree.
   virtual void Close();

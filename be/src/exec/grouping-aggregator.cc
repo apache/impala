@@ -83,8 +83,8 @@ static const StreamingHtMinReductionEntry STREAMING_HT_MIN_REDUCTION[] = {
 };
 
 GroupingAggregatorConfig::GroupingAggregatorConfig(
-    const TAggregator& taggregator, RuntimeState* state, PlanNode* pnode)
-  : AggregatorConfig(taggregator, state, pnode),
+    const TAggregator& taggregator, RuntimeState* state, PlanNode* pnode, int agg_idx)
+  : AggregatorConfig(taggregator, state, pnode, agg_idx),
     intermediate_row_desc_(intermediate_tuple_desc_, false),
     is_streaming_preagg_(taggregator.use_streaming_preaggregation),
     resource_profile_(taggregator.resource_profile){};
@@ -113,6 +113,9 @@ Status GroupingAggregatorConfig::Init(
   for (int i = 0; i < aggregate_functions_.size(); ++i) {
     needs_serialize_ |= aggregate_functions_[i]->SupportsSerialize();
   }
+
+  hash_table_config_ = state->obj_pool()->Add(new HashTableConfig(
+      build_exprs_, grouping_exprs_, true, vector<bool>(build_exprs_.size(), true)));
   return Status::OK();
 }
 
@@ -120,10 +123,11 @@ static const int STREAMING_HT_MIN_REDUCTION_SIZE =
     sizeof(STREAMING_HT_MIN_REDUCTION) / sizeof(STREAMING_HT_MIN_REDUCTION[0]);
 
 GroupingAggregator::GroupingAggregator(ExecNode* exec_node, ObjectPool* pool,
-    const GroupingAggregatorConfig& config, int64_t estimated_input_cardinality,
-    int agg_idx)
+    const GroupingAggregatorConfig& config, int64_t estimated_input_cardinality)
   : Aggregator(
-        exec_node, pool, config, Substitute("GroupingAggregator $0", agg_idx), agg_idx),
+        exec_node, pool, config, Substitute("GroupingAggregator $0", config.agg_idx_)),
+    agg_config_(config),
+    hash_table_config_(*config.hash_table_config_),
     intermediate_row_desc_(config.intermediate_row_desc_),
     is_streaming_preagg_(config.is_streaming_preagg_),
     needs_serialize_(config.needs_serialize_),
@@ -133,6 +137,8 @@ GroupingAggregator::GroupingAggregator(ExecNode* exec_node, ObjectPool* pool,
     resource_profile_(config.resource_profile_),
     is_in_subplan_(exec_node->IsInSubplan()),
     limit_(exec_node->limit()),
+    add_batch_impl_fn_(config.add_batch_impl_fn_),
+    add_batch_streaming_impl_fn_(config.add_batch_streaming_impl_fn_),
     estimated_input_cardinality_(estimated_input_cardinality),
     partition_pool_(new ObjectPool()) {
   DCHECK_EQ(PARTITION_FANOUT, 1 << NUM_PARTITIONING_BITS);
@@ -183,13 +189,18 @@ Status GroupingAggregator::Prepare(RuntimeState* state) {
   return Status::OK();
 }
 
-void GroupingAggregator::Codegen(RuntimeState* state) {
+Status GroupingAggregatorConfig::Codegen(RuntimeState* state) {
   LlvmCodeGen* codegen = state->codegen();
   DCHECK(codegen != nullptr);
   TPrefetchMode::type prefetch_mode = state->query_options().prefetch_mode;
-  Status codegen_status = is_streaming_preagg_ ?
-      CodegenAddBatchStreamingImpl(codegen, prefetch_mode) :
-      CodegenAddBatchImpl(codegen, prefetch_mode);
+  return is_streaming_preagg_ ? CodegenAddBatchStreamingImpl(codegen, prefetch_mode) :
+                                CodegenAddBatchImpl(codegen, prefetch_mode);
+}
+
+void GroupingAggregator::Codegen(RuntimeState* state) {
+  // TODO: This const cast will be removed once codegen call is moved before FIS creation
+  Status codegen_status =
+      const_cast<GroupingAggregatorConfig&>(agg_config_).Codegen(state);
   runtime_profile()->AddCodegenMsg(codegen_status.ok(), codegen_status);
 }
 
@@ -984,7 +995,7 @@ BufferPool::ClientHandle* GroupingAggregator::buffer_pool_client() {
   return reservation_manager_.buffer_pool_client();
 }
 
-Status GroupingAggregator::CodegenAddBatchImpl(
+Status GroupingAggregatorConfig::CodegenAddBatchImpl(
     LlvmCodeGen* codegen, TPrefetchMode::type prefetch_mode) {
   llvm::Function* update_tuple_fn;
   RETURN_IF_ERROR(CodegenUpdateTuple(codegen, &update_tuple_fn));
@@ -1004,15 +1015,18 @@ Status GroupingAggregator::CodegenAddBatchImpl(
   // The codegen'd AddBatchImpl function is only used in Open() with level_ = 0,
   // so don't use murmur hash
   llvm::Function* hash_fn;
-  RETURN_IF_ERROR(ht_ctx_->CodegenHashRow(codegen, /* use murmur */ false, &hash_fn));
+  RETURN_IF_ERROR(
+      HashTableCtx::CodegenHashRow(codegen, false, *hash_table_config_, &hash_fn));
 
   // Codegen HashTable::Equals<true>
   llvm::Function* build_equals_fn;
-  RETURN_IF_ERROR(ht_ctx_->CodegenEquals(codegen, true, &build_equals_fn));
+  RETURN_IF_ERROR(HashTableCtx::CodegenEquals(
+      codegen, true, *hash_table_config_, &build_equals_fn));
 
   // Codegen for evaluating input rows
   llvm::Function* eval_grouping_expr_fn;
-  RETURN_IF_ERROR(ht_ctx_->CodegenEvalRow(codegen, false, &eval_grouping_expr_fn));
+  RETURN_IF_ERROR(HashTableCtx::CodegenEvalRow(
+      codegen, false, *hash_table_config_, &eval_grouping_expr_fn));
 
   // Replace call sites
   replaced =
@@ -1027,8 +1041,9 @@ Status GroupingAggregator::CodegenAddBatchImpl(
 
   HashTableCtx::HashTableReplacedConstants replaced_constants;
   const bool stores_duplicates = false;
-  RETURN_IF_ERROR(ht_ctx_->ReplaceHashTableConstants(
-      codegen, stores_duplicates, 1, add_batch_impl_fn, &replaced_constants));
+  RETURN_IF_ERROR(
+      HashTableCtx::ReplaceHashTableConstants(codegen, *hash_table_config_,
+          stores_duplicates, 1, add_batch_impl_fn, &replaced_constants));
   DCHECK_GE(replaced_constants.stores_nulls, 1);
   DCHECK_GE(replaced_constants.finds_some_nulls, 1);
   DCHECK_GE(replaced_constants.stores_duplicates, 1);
@@ -1048,7 +1063,7 @@ Status GroupingAggregator::CodegenAddBatchImpl(
   return Status::OK();
 }
 
-Status GroupingAggregator::CodegenAddBatchStreamingImpl(
+Status GroupingAggregatorConfig::CodegenAddBatchStreamingImpl(
     LlvmCodeGen* codegen, TPrefetchMode::type prefetch_mode) {
   DCHECK(is_streaming_preagg_);
 
@@ -1073,15 +1088,18 @@ Status GroupingAggregator::CodegenAddBatchStreamingImpl(
 
   // We only use the top-level hash function for streaming aggregations.
   llvm::Function* hash_fn;
-  RETURN_IF_ERROR(ht_ctx_->CodegenHashRow(codegen, false, &hash_fn));
+  RETURN_IF_ERROR(
+      HashTableCtx::CodegenHashRow(codegen, false, *hash_table_config_, &hash_fn));
 
   // Codegen HashTable::Equals
   llvm::Function* equals_fn;
-  RETURN_IF_ERROR(ht_ctx_->CodegenEquals(codegen, true, &equals_fn));
+  RETURN_IF_ERROR(
+      HashTableCtx::CodegenEquals(codegen, true, *hash_table_config_, &equals_fn));
 
   // Codegen for evaluating input rows
   llvm::Function* eval_grouping_expr_fn;
-  RETURN_IF_ERROR(ht_ctx_->CodegenEvalRow(codegen, false, &eval_grouping_expr_fn));
+  RETURN_IF_ERROR(HashTableCtx::CodegenEvalRow(
+      codegen, false, *hash_table_config_, &eval_grouping_expr_fn));
 
   // Replace call sites
   int replaced = codegen->ReplaceCallSites(
@@ -1100,8 +1118,9 @@ Status GroupingAggregator::CodegenAddBatchStreamingImpl(
 
   HashTableCtx::HashTableReplacedConstants replaced_constants;
   const bool stores_duplicates = false;
-  RETURN_IF_ERROR(ht_ctx_->ReplaceHashTableConstants(
-      codegen, stores_duplicates, 1, add_batch_streaming_impl_fn, &replaced_constants));
+  RETURN_IF_ERROR(
+      HashTableCtx::ReplaceHashTableConstants(codegen, *hash_table_config_,
+          stores_duplicates, 1, add_batch_streaming_impl_fn, &replaced_constants));
   DCHECK_GE(replaced_constants.stores_nulls, 1);
   DCHECK_GE(replaced_constants.finds_some_nulls, 1);
   DCHECK_GE(replaced_constants.stores_duplicates, 1);

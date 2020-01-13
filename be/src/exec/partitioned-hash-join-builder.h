@@ -550,15 +550,16 @@ class PhjBuilder : public DataSink {
 
   /// Codegen processing build batches. Identical signature to ProcessBuildBatch().
   /// Returns non-OK status if codegen was not possible.
-  Status CodegenProcessBuildBatch(LlvmCodeGen* codegen, llvm::Function* hash_fn,
+  Status CodegenProcessBuildBatch(LlvmCodeGen* codegen,
+      HashTableConfig& hash_table_config, llvm::Function* hash_fn,
       llvm::Function* murmur_hash_fn, llvm::Function* eval_row_fn,
       llvm::Function* insert_filters_fn) WARN_UNUSED_RESULT;
 
   /// Codegen inserting batches into a partition's hash table. Identical signature to
   /// Partition::InsertBatch(). Returns non-OK if codegen was not possible.
-  Status CodegenInsertBatch(LlvmCodeGen* codegen, llvm::Function* hash_fn,
-      llvm::Function* murmur_hash_fn, llvm::Function* eval_row_fn,
-      TPrefetchMode::type prefetch_mode) WARN_UNUSED_RESULT;
+  Status CodegenInsertBatch(LlvmCodeGen* codegen, HashTableConfig& hash_table_config,
+      llvm::Function* hash_fn, llvm::Function* murmur_hash_fn,
+      llvm::Function* eval_row_fn, TPrefetchMode::type prefetch_mode) WARN_UNUSED_RESULT;
 
   /// Codegen inserting rows into runtime filters. Identical signature to
   /// InsertRuntimeFilters(). Returns non-OK if codegen was not possible.
