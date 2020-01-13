@@ -815,9 +815,10 @@ Status Coordinator::UpdateBackendExecStatus(const ReportExecStatusRequestPB& req
   if (thrift_profiles.__isset.host_profile) {
     backend_state->UpdateHostProfile(thrift_profiles.host_profile);
   }
+  vector<AuxErrorInfoPB> aux_error_info;
 
   if (backend_state->ApplyExecStatusReport(request, thrift_profiles, &exec_summary_,
-          &progress_, &dml_exec_state_)) {
+          &progress_, &dml_exec_state_, &aux_error_info)) {
     // This backend execution has completed.
     if (VLOG_QUERY_IS_ON) {
       // Don't log backend completion if the query has already been cancelled.
@@ -837,10 +838,6 @@ Status Coordinator::UpdateBackendExecStatus(const ReportExecStatusRequestPB& req
       // We may start receiving status reports before all exec rpcs are complete.
       // Can't apply state transition until no more exec rpcs will be sent.
       exec_rpcs_complete_barrier_.Wait();
-
-      // Iterate through all instance exec statuses, and use each fragment's AuxErrorInfo
-      // to possibly blacklist any "faulty" nodes.
-      UpdateBlacklistWithAuxErrorInfo(request);
 
       // Transition the status if we're not already in a terminal state. This won't block
       // because either this transitions to an ERROR state or the query is already in
@@ -865,22 +862,25 @@ Status Coordinator::UpdateBackendExecStatus(const ReportExecStatusRequestPB& req
     }
     num_completed_backends_->Add(1);
   }
+
+  // Iterate through all AuxErrorInfoPB objects, and use each one to possibly blacklist
+  // any "faulty" nodes.
+  UpdateBlacklistWithAuxErrorInfo(&aux_error_info);
+
   // If query execution has terminated, return a cancelled status to force the fragment
   // instance to stop executing.
   return IsExecuting() ? Status::OK() : Status::CANCELLED;
 }
 
 void Coordinator::UpdateBlacklistWithAuxErrorInfo(
-    const ReportExecStatusRequestPB& request) {
+    vector<AuxErrorInfoPB>* aux_error_info) {
   // If the Backend failed due to a RPC failure, blacklist the destination node of
   // the failed RPC. Only blacklist one node per ReportExecStatusRequestPB to avoid
   // blacklisting nodes too aggressively. Currently, only blacklist the first node
   // that contains a valid RPCErrorInfoPB object.
-  for (auto instance_exec_status : request.instance_exec_status()) {
-    if (instance_exec_status.has_aux_error_info()
-        && instance_exec_status.aux_error_info().has_rpc_error_info()) {
-      RPCErrorInfoPB rpc_error_info =
-          instance_exec_status.aux_error_info().rpc_error_info();
+  for (auto aux_error : *aux_error_info) {
+    if (aux_error.has_rpc_error_info()) {
+      RPCErrorInfoPB rpc_error_info = aux_error.rpc_error_info();
       DCHECK(rpc_error_info.has_dest_node());
       DCHECK(rpc_error_info.has_posix_error_code());
       const NetworkAddressPB& dest_node = rpc_error_info.dest_node();

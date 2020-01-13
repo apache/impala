@@ -90,10 +90,13 @@ class Coordinator::BackendState {
   /// progress_update. If any instance reports an error, the overall execution status
   /// becomes the first reported error status. Returns true iff this update changed
   /// IsDone() from false to true, either because it was the last fragment to complete or
-  /// because it was the first error received.
+  /// because it was the first error received. Adds the AuxErrorInfoPB from each
+  /// FragmentInstanceExecStatusPB in backend_exec_status to the vector
+  /// aux_error_info.
   bool ApplyExecStatusReport(const ReportExecStatusRequestPB& backend_exec_status,
       const TRuntimeProfileForest& thrift_profiles, ExecSummary* exec_summary,
-      ProgressUpdater* scan_range_progress, DmlExecState* dml_exec_state);
+      ProgressUpdater* scan_range_progress, DmlExecState* dml_exec_state,
+      std::vector<AuxErrorInfoPB>* aux_error_info);
 
   /// Merges the incoming 'thrift_profile' into this backend state's host profile.
   void UpdateHostProfile(const TRuntimeProfileTree& thrift_profile);

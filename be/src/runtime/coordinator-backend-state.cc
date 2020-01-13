@@ -357,7 +357,8 @@ inline bool Coordinator::BackendState::IsDoneLocked(
 bool Coordinator::BackendState::ApplyExecStatusReport(
     const ReportExecStatusRequestPB& backend_exec_status,
     const TRuntimeProfileForest& thrift_profiles, ExecSummary* exec_summary,
-    ProgressUpdater* scan_range_progress, DmlExecState* dml_exec_state) {
+    ProgressUpdater* scan_range_progress, DmlExecState* dml_exec_state,
+    vector<AuxErrorInfoPB>* aux_error_info) {
   DCHECK(!IsEmptyBackend());
   // Hold the exec_summary's lock to avoid exposing it half-way through
   // the update loop below.
@@ -442,6 +443,10 @@ bool Coordinator::BackendState::ApplyExecStatusReport(
       // exec_state's statuses to cancelled.
       // TODO: We're losing this profile information. Call ReportQuerySummary only after
       // all backends have completed.
+    }
+
+    if (instance_exec_status.has_aux_error_info()) {
+      aux_error_info->push_back(instance_exec_status.aux_error_info());
     }
   }
 

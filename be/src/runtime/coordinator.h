@@ -39,6 +39,7 @@
 
 namespace impala {
 
+class AuxErrorInfoPB;
 class ClientRequestState;
 class FragmentInstanceState;
 class MemTracker;
@@ -548,15 +549,15 @@ class Coordinator { // NOLINT: The member variables could be re-ordered to save 
   /// Checks the exec_state_ of the query and returns true if the query is executing.
   bool IsExecuting();
 
-  /// Helper function for UpdateBackendExecStatus that iterates through the
-  /// FragmentInstanceExecStatusPB for each fragment and uses AuxErrorInfoPB to check if
-  /// any nodes should be blacklisted. AuxErrorInfoPB contains additional error
-  /// information about why the fragment failed, beyond what is available in the
+  /// Helper function for UpdateBackendExecStatus that iterates through the given vector
+  /// of AuxErrorInfoPB objects and uses each one to check if any nodes should be
+  /// blacklisted. AuxErrorInfoPB contains additional error information about why the
+  /// fragment failed, beyond what is available in the
   /// ReportExecStatusRequestPB::overall_status field. This method uses information in
   /// AuxErrorInfoPB to classify specific nodes as "faulty" and then blacklists them. A
   /// node might be considered "faulty" if, for example, a RPC to that node failed, or a
   /// fragment on that node failed due to a disk IO error.
-  void UpdateBlacklistWithAuxErrorInfo(const ReportExecStatusRequestPB& request);
+  void UpdateBlacklistWithAuxErrorInfo(std::vector<AuxErrorInfoPB>* aux_error_info);
 
   /// BackendState and BackendResourceState are private to the Coordinator class, so mark
   /// all tests in CoordinatorBackendStateTest as friends.
