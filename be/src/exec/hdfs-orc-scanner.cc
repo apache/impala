@@ -184,8 +184,8 @@ Status HdfsOrcScanner::Open(ScannerContext* context) {
   // Build 'col_id_path_map_' that maps from ORC column ids to their corresponding
   // SchemaPath in the table. The map is used in the constructors of OrcColumnReaders
   // where we resolve SchemaPaths of the descriptors.
-  OrcMetadataUtils::BuildSchemaPaths(reader_->getType(),
-      scan_node_->num_partition_keys(), &col_id_path_map_);
+  RETURN_IF_ERROR(schema_resolver_->BuildSchemaPaths(scan_node_->num_partition_keys(),
+      &col_id_path_map_));
 
   // To create OrcColumnReaders, we need the selected orc schema. It's a subset of the
   // file schema: a tree of selected orc types and can only be got from an orc::RowReader

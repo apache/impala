@@ -24,17 +24,6 @@
 
 namespace impala {
 
-/// Utils to build a map from each orc::Type id to a SchemaPath. The map will be used in
-/// creating OrcColumnReaders.
-class OrcMetadataUtils {
- public:
-  static void BuildSchemaPaths(const orc::Type& root, int num_partition_keys,
-      std::vector<SchemaPath>* paths);
- private:
-  static void BuildSchemaPath(const orc::Type& node, SchemaPath* path,
-      std::vector<SchemaPath>* paths);
-};
-
 /// Util class to resolve SchemaPaths of TupleDescriptors/SlotDescriptors into orc::Type.
 class OrcSchemaResolver {
  public:
@@ -47,6 +36,11 @@ class OrcSchemaResolver {
   /// 'missing_field' is set to true if the column is missing in the ORC file.
   Status ResolveColumn(const SchemaPath& col_path, const orc::Type** node,
       bool* pos_field, bool* missing_field) const;
+
+  /// Build a map from each orc::Type id to a SchemaPath. The map will be used in
+  /// creating OrcColumnReaders.
+  Status BuildSchemaPaths(int num_partition_keys, std::vector<SchemaPath>* paths);
+
  private:
   const HdfsTableDescriptor& tbl_desc_;
   const orc::Type* const root_;
@@ -55,5 +49,8 @@ class OrcSchemaResolver {
   /// Validate whether the ColumnType is compatible with the orc type
   Status ValidateType(const ColumnType& type, const orc::Type& orc_type) const
       WARN_UNUSED_RESULT;
+
+  static void BuildSchemaPath(const orc::Type& node, SchemaPath* path,
+      std::vector<SchemaPath>* paths);
 };
 }

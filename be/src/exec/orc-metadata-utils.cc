@@ -22,20 +22,24 @@
 
 namespace impala {
 
-void OrcMetadataUtils::BuildSchemaPaths(const orc::Type& root, int num_partition_keys,
+Status OrcSchemaResolver::BuildSchemaPaths(int num_partition_keys,
     vector<SchemaPath>* paths) {
+  if (root_->getKind() != orc::TypeKind::STRUCT) {
+    return Status(Substitute("Corrupt ORC File '$0': root type is $1 (should be struct)",
+        filename_, root_->toString()));
+  }
   SchemaPath path;
   paths->push_back(path);
-  DCHECK_EQ(root.getKind(), orc::TypeKind::STRUCT);
-  int num_columns = root.getSubtypeCount();
+  int num_columns = root_->getSubtypeCount();
   for (int i = 0; i < num_columns; ++i) {
     path.push_back(i + num_partition_keys);
-    BuildSchemaPath(*root.getSubtype(i), &path, paths);
+    BuildSchemaPath(*root_->getSubtype(i), &path, paths);
     path.pop_back();
   }
+  return Status::OK();
 }
 
-void OrcMetadataUtils::BuildSchemaPath(const orc::Type& node, SchemaPath* path,
+void OrcSchemaResolver::BuildSchemaPath(const orc::Type& node, SchemaPath* path,
     vector<SchemaPath>* paths) {
   DCHECK_EQ(paths->size(), node.getColumnId());
   paths->push_back(*path);

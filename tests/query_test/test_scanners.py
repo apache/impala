@@ -1334,15 +1334,26 @@ class TestOrc(ImpalaTestSuite):
       self.run_test_case('DataErrorsTest/orc-out-of-range-timestamp',
                          new_vector, unique_database)
 
-  def test_invalid_schema(self, vector, unique_database):
-    """Test scanning of ORC file with malformed schema."""
-    test_files = ["testdata/data/corrupt_schema.orc"]
+  def _run_invalid_schema_test(self, unique_database, test_name, expected_error):
+    """Copies 'test_name'.orc to a table and runs a simple query. These tests should
+       cause an error during the processing of the ORC schema, so the file's columns do
+       not have to match with the table's columns.
+    """
+    test_files = ["testdata/data/%s.orc" % test_name]
     create_table_and_copy_files(self.client,
         "CREATE TABLE {db}.{tbl} (id BIGINT) STORED AS ORC",
-        unique_database, "corrupt_schema", test_files)
+        unique_database, test_name, test_files)
     err = self.execute_query_expect_failure(self.client,
-        "select count(*) from {0}.{1}".format(unique_database, "corrupt_schema"))
-    assert "Encountered parse error during schema selection" in str(err)
+        "select count(*) from {0}.{1}".format(unique_database, test_name))
+    assert expected_error in str(err)
+
+  def test_invalid_schema(self, vector, unique_database):
+    """Test scanning of ORC file with malformed schema."""
+    self._run_invalid_schema_test(unique_database, "corrupt_schema",
+        "Encountered parse error during schema selection")
+    self._run_invalid_schema_test(unique_database, "corrupt_root_type",
+        "root type is boolean (should be struct)")
+
 
 class TestScannerReservation(ImpalaTestSuite):
   @classmethod
