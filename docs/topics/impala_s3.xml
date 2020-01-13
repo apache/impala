@@ -88,7 +88,7 @@ under the License.
             consistent nature of S3, the files for that table or partition could
             remain for some unbounded time when using <codeph>PURGE</codeph>.
             The default <codeph>DROP TABLE/PARTITION</codeph> is slow because
-            Impala copies the files to the HDFS trash folder, and Impala waits
+            Impala copies the files to the S3A trash folder, and Impala waits
             until all the data is moved. <codeph>DROP TABLE/PARTITION ..
               PURGE</codeph> is a fast delete operation, and the Impala
             statement finishes quickly even though the change might not have
