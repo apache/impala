@@ -319,8 +319,9 @@ class RuntimeState {
   /// Sets the given AuxErrorInfoPB with all relevant aux error info from the fragment
   /// instance associated with this RuntimeState. If no aux error info for this
   /// RuntimeState has been set, this method does nothing. Currently, only
-  /// SetRPCErrorInfo() sets aux error info.
-  void GetAuxErrorInfo(AuxErrorInfoPB* aux_error_info);
+  /// SetRPCErrorInfo() sets aux error info. This method clears aux_error_info_. Calls to
+  /// HasAuxErrorInfo() after this method has been called will return false.
+  void GetUnreportedAuxErrorInfo(AuxErrorInfoPB* aux_error_info);
 
   static const char* LLVM_CLASS_NAME;
 
@@ -440,6 +441,9 @@ class RuntimeState {
   /// Auxiliary error information, only set if the fragment instance failed (e.g.
   /// query_status_ != Status::OK()). Owned by this RuntimeState.
   std::unique_ptr<AuxErrorInfoPB> aux_error_info_;
+
+  /// True if aux_error_info_ has been sent in a status report, false otherwise.
+  bool reported_aux_error_info_ = false;
 
   /// prohibit copies
   RuntimeState(const RuntimeState&);

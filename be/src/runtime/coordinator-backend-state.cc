@@ -420,6 +420,10 @@ bool Coordinator::BackendState::ApplyExecStatusReport(
           MergeErrorMaps(stateful_report.error_log(), &error_log_);
           VLOG_FILE << "host=" << TNetworkAddressToString(host_)
                     << " error log: " << PrintErrorMapToString(error_log_);
+
+          if (stateful_report.has_aux_error_info()) {
+            aux_error_info->push_back(stateful_report.aux_error_info());
+          }
         }
       }
     }
@@ -443,10 +447,6 @@ bool Coordinator::BackendState::ApplyExecStatusReport(
       // exec_state's statuses to cancelled.
       // TODO: We're losing this profile information. Call ReportQuerySummary only after
       // all backends have completed.
-    }
-
-    if (instance_exec_status.has_aux_error_info()) {
-      aux_error_info->push_back(instance_exec_status.aux_error_info());
     }
   }
 

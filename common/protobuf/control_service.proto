@@ -122,6 +122,10 @@ message StatefulStatusPB {
   // Map of TErrorCode to ErrorLogEntryPB; New errors that have not been reported to
   // the coordinator by this fragment instance. Not idempotent.
   map<int32, ErrorLogEntryPB> error_log = 2;
+
+  // Metadata associated with a failed fragment instance. Only set for failed fragment
+  // instances.
+  optional AuxErrorInfoPB aux_error_info = 3;
 }
 
 // RPC error metadata that can be associated with a AuxErrorInfoPB object. Created if a
@@ -163,10 +167,6 @@ message FragmentInstanceExecStatusPB {
   // The non-idempotent parts of the report, and any prior reports that are not known to
   // have been received by the coordinator.
   repeated StatefulStatusPB stateful_report = 6;
-
-  // Metadata associated with a failed fragment instance. Only set for failed fragment
-  // instances.
-  optional AuxErrorInfoPB aux_error_info = 7;
 }
 
 message ReportExecStatusRequestPB {

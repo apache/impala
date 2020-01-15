@@ -286,15 +286,20 @@ void FragmentInstanceState::GetStatusReport(FragmentInstanceExecStatusPB* instan
     *instance_status->mutable_stateful_report() =
         {prev_stateful_reports_.begin(), prev_stateful_reports_.end()};
   }
+  StatefulStatusPB* stateful_report = nullptr;
   if (runtime_state()->HasErrors()) {
     // Add any new errors.
-    StatefulStatusPB* stateful_report = instance_status->add_stateful_report();
+    stateful_report = instance_status->add_stateful_report();
     stateful_report->set_report_seq_no(report_seq_no_);
     runtime_state()->GetUnreportedErrors(stateful_report->mutable_error_log());
   }
   // If set in the RuntimeState, set the AuxErrorInfoPB field.
   if (runtime_state()->HasAuxErrorInfo()) {
-    runtime_state()->GetAuxErrorInfo(instance_status->mutable_aux_error_info());
+    if (stateful_report == nullptr) {
+      stateful_report = instance_status->add_stateful_report();
+      stateful_report->set_report_seq_no(report_seq_no_);
+    }
+    runtime_state()->GetUnreportedAuxErrorInfo(stateful_report->mutable_aux_error_info());
   }
 }
 
