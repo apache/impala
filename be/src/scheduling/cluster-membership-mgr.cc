@@ -193,6 +193,9 @@ void ClusterMembershipMgr::UpdateMembership(
         const TBackendDescriptor& be_desc = (*new_backend_map)[item.key];
         bool blacklisted = new_blacklist->FindAndRemove(be_desc)
             == ExecutorBlacklist::State::BLACKLISTED;
+        if (blacklisted) {
+          VLOG(1) << "Removing backend " << item.key << " from blacklist (deleted)";
+        }
         // If the backend was quiescing or was previously blacklisted, it will already
         // have been removed from 'executor_groups'.
         if (be_desc.is_executor && !be_desc.is_quiescing && !blacklisted) {
@@ -252,6 +255,9 @@ void ClusterMembershipMgr::UpdateMembership(
       TBackendDescriptor& existing = it->second;
       bool blacklisted =
           new_blacklist->FindAndRemove(be_desc) == ExecutorBlacklist::State::BLACKLISTED;
+      if (blacklisted) {
+        VLOG(1) << "Removing backend " << item.key << " from blacklist (updated)";
+      }
       if (be_desc.is_quiescing && !existing.is_quiescing && existing.is_executor
           && !blacklisted) {
         // Executor needs to be removed from its groups
