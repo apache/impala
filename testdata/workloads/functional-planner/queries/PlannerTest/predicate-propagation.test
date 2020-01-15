@@ -998,7 +998,8 @@ PLAN-ROOT SINK
 |
 |--02:AGGREGATE [FINALIZE]
 |  |  group by: id, int_col
-|  |  row-size=8B cardinality=730
+|  |  having: int_col = 17
+|  |  row-size=8B cardinality=73
 |  |
 |  01:SCAN HDFS [functional.alltypes]
 |     partitions=24/24 files=24 size=478.45KB
@@ -1059,26 +1060,25 @@ where a.id is null and isnull(b.id, 0) = 0 and b.int_col = 17
 ---- PLAN
 PLAN-ROOT SINK
 |
-03:HASH JOIN [RIGHT OUTER JOIN]
-|  hash predicates: id = a.id
+03:HASH JOIN [LEFT OUTER JOIN]
+|  hash predicates: a.id = id
 |  other predicates: int_col = 17, isnull(id, 0) = 0
-|  runtime filters: RF000 <- a.id
 |  row-size=12B cardinality=730
 |
-|--02:SCAN HDFS [functional.alltypes a]
-|     partitions=24/24 files=24 size=478.45KB
-|     predicates: a.id IS NULL
-|     row-size=4B cardinality=730
+|--01:AGGREGATE [FINALIZE]
+|  |  group by: id, int_col
+|  |  having: int_col = 17
+|  |  row-size=8B cardinality=73
+|  |
+|  00:SCAN HDFS [functional.alltypes]
+|     HDFS partitions=24/24 files=24 size=478.45KB
+|     predicates: functional.alltypes.int_col = 17
+|     row-size=8B cardinality=730
 |
-01:AGGREGATE [FINALIZE]
-|  group by: id, int_col
-|  row-size=8B cardinality=730
-|
-00:SCAN HDFS [functional.alltypes]
-   partitions=24/24 files=24 size=478.45KB
-   predicates: functional.alltypes.int_col = 17
-   runtime filters: RF000 -> functional.alltypes.id
-   row-size=8B cardinality=730
+02:SCAN HDFS [functional.alltypes a]
+   HDFS partitions=24/24 files=24 size=478.45KB
+   predicates: a.id IS NULL
+   row-size=4B cardinality=730
 ====
 select straight_join a.id, b.id
 from

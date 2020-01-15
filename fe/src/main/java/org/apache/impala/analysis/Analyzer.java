@@ -1656,21 +1656,7 @@ public class Analyzer {
    * Returns true if predicate 'e' can be correctly evaluated by a tree materializing
    * 'tupleIds', otherwise false:
    * - The predicate needs to be bound by tupleIds.
-   * - For On-clause predicates:
-   *   - If the predicate is from an anti-join On-clause it must be evaluated by the
-   *     corresponding anti-join node.
-   *   - Predicates from the On-clause of an inner or semi join are evaluated at the
-   *     node that materializes the required tuple ids, unless they reference outer
-   *     joined tuple ids. In that case, the predicates are evaluated at the join node
-   *     of the corresponding On-clause.
-   *   - Predicates referencing full-outer joined tuples are assigned at the originating
-   *     join if it is a full-outer join, otherwise at the last full-outer join that does
-   *     not materialize the table ref ids of the originating join.
-   *   - Predicates from the On-clause of a left/right outer join are assigned at
-   *     the corresponding outer join node with the exception of simple predicates
-   *     that only reference a single tuple id. Those may be assigned below the
-   *     outer join node if they are from the same On-clause that makes the tuple id
-   *     nullable.
+   * - For On-clause predicates, see canEvalOnClauseConjunct() for more info.
    * - Otherwise, a predicate can only be correctly evaluated if for all outer-joined
    *   referenced tids the last join to outer-join this tid has been materialized.
    */
@@ -1681,38 +1667,18 @@ public class Analyzer {
     if (tids.isEmpty()) return true;
 
     if (e.isOnClauseConjunct()) {
-      if (isAntiJoinedConjunct(e)) return canEvalAntiJoinedConjunct(e, tupleIds);
-
-      if (isIjConjunct(e) || isSjConjunct(e)) {
-        if (!containsOuterJoinedTid(tids)) return true;
-        // If the predicate references an outer-joined tuple, then evaluate it at
-        // the join that the On-clause belongs to.
-        TableRef onClauseTableRef = null;
-        if (isIjConjunct(e)) {
-          onClauseTableRef = globalState_.ijClauseByConjunct.get(e.getId());
-        } else {
-          onClauseTableRef = globalState_.sjClauseByConjunct.get(e.getId());
-        }
-        Preconditions.checkNotNull(onClauseTableRef);
-        return tupleIds.containsAll(onClauseTableRef.getAllTableRefIds());
-      }
-
-      if (isFullOuterJoined(e)) return canEvalFullOuterJoinedConjunct(e, tupleIds);
-      if (isOjConjunct(e)) {
-        // Force this predicate to be evaluated by the corresponding outer join node.
-        // The join node will pick up the predicate later via getUnassignedOjConjuncts().
-        if (tids.size() > 1) return false;
-        // Optimization for single-tid predicates: Legal to assign below the outer join
-        // if the predicate is from the same On-clause that makes tid nullable
-        // (otherwise e needn't be true when that tuple is set).
-        TupleId tid = tids.get(0);
-        return globalState_.ojClauseByConjunct.get(e.getId()) == getLastOjClause(tid);
-      }
-
-      // Should have returned in one of the cases above.
-      Preconditions.checkState(false);
+      return canEvalOnClauseConjunct(tupleIds, e);
     }
+    return isLastOjMaterializedByTupleIds(tupleIds, e);
+  }
 
+  /**
+   * Checks if for all outer-joined referenced tids of the predicate the last join
+   * to outer-join this tid has been materialized by tupleIds.
+   */
+  public boolean isLastOjMaterializedByTupleIds(List<TupleId> tupleIds, Expr e) {
+    List<TupleId> tids = new ArrayList<>();
+    e.getIds(tids, null);
     for (TupleId tid: tids) {
       TableRef rhsRef = getLastOjClause(tid);
       // Ignore 'tid' because it is not outer-joined.
@@ -1721,6 +1687,62 @@ public class Analyzer {
       if (!tupleIds.containsAll(rhsRef.getAllTableRefIds())) return false;
     }
     return true;
+  }
+
+  /**
+   * Checks if a conjunct from the On-clause can be evaluated in a node that materializes
+   * a given list of tuple ids.
+   * - If the predicate is from an anti-join On-clause it must be evaluated by the
+   * corresponding anti-join node.
+   * - Predicates from the On-clause of an inner or semi join are evaluated at the node
+   * that materializes the required tuple ids, unless they reference outer joined tuple
+   * ids. In that case, the predicates are evaluated at the join node of the corresponding
+   * On-clause.
+   * - Predicates referencing full-outer joined tuples are assigned at the originating
+   * join if it is a full-outer join, otherwise at the last full-outer join that does not
+   * materialize the table ref ids of the originating join.
+   * - Predicates from the On-clause of a left/right outer join are assigned at the
+   * corresponding outer join node with the exception of simple predicates that only
+   * reference a single tuple id. Those may be assigned below the outer join node if they
+   * are from the same On-clause that makes the tuple id nullable.
+   */
+  public boolean canEvalOnClauseConjunct(List<TupleId> tupleIds, Expr e) {
+    Preconditions.checkState(e.isOnClauseConjunct());
+    if (isAntiJoinedConjunct(e)) return canEvalAntiJoinedConjunct(e, tupleIds);
+
+    List<TupleId> exprTids = new ArrayList<>();
+    e.getIds(exprTids, null);
+    if (exprTids.isEmpty()) return true;
+
+    if (isIjConjunct(e) || isSjConjunct(e)) {
+      if (!containsOuterJoinedTid(exprTids)) return true;
+      // If the predicate references an outer-joined tuple, then evaluate it at
+      // the join that the On-clause belongs to.
+      TableRef onClauseTableRef = null;
+      if (isIjConjunct(e)) {
+        onClauseTableRef = globalState_.ijClauseByConjunct.get(e.getId());
+      } else {
+        onClauseTableRef = globalState_.sjClauseByConjunct.get(e.getId());
+      }
+      Preconditions.checkNotNull(onClauseTableRef);
+      return tupleIds.containsAll(onClauseTableRef.getAllTableRefIds());
+    }
+
+    if (isFullOuterJoined(e)) return canEvalFullOuterJoinedConjunct(e, tupleIds);
+    if (isOjConjunct(e)) {
+      // Force this predicate to be evaluated by the corresponding outer join node.
+      // The join node will pick up the predicate later via getUnassignedOjConjuncts().
+      if (exprTids.size() > 1) return false;
+      // Optimization for single-tid predicates: Legal to assign below the outer join
+      // if the predicate is from the same On-clause that makes tid nullable
+      // (otherwise e needn't be true when that tuple is set).
+      TupleId tid = exprTids.get(0);
+      return globalState_.ojClauseByConjunct.get(e.getId()) == getLastOjClause(tid);
+    }
+
+    // Should have returned in one of the cases above.
+    Preconditions.checkState(false);
+    return false;
   }
 
   /**

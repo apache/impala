@@ -982,7 +982,8 @@ public class SelectStmt extends QueryStmt {
   @Override
   public void materializeRequiredSlots(Analyzer analyzer) {
     // Mark unassigned join predicates. Some predicates that must be evaluated by a join
-    // can also be safely evaluated below the join (picked up by getBoundPredicates()).
+    // can also be safely evaluated below the join (picked up by getBoundPredicates() and
+    // migrateConjunctsToInlineView()).
     // Such predicates will be marked twice and that is ok.
     List<Expr> unassigned =
         analyzer.getUnassignedConjuncts(getTableRefIds(), true);
