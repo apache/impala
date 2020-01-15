@@ -128,11 +128,9 @@ class MemTracker {
 
   /// Increases consumption of this tracker and its ancestors by 'bytes'.
   void Consume(int64_t bytes) {
+    DCHECK_GE(bytes, 0);
     DCHECK(!closed_) << label_;
-    if (bytes <= 0) {
-      if (bytes < 0) Release(-bytes);
-      return;
-    }
+    if (UNLIKELY(bytes <= 0)) return; // < 0 needed in RELEASE, hits DCHECK in DEBUG
 
     if (consumption_metric_ != nullptr) {
       RefreshConsumptionFromMetric();
@@ -146,25 +144,22 @@ class MemTracker {
     }
   }
 
-  /// Increases/Decreases the consumption of this tracker and the ancestors up to (but
+  /// Increases the consumption of this tracker and the ancestors up to (but
   /// not including) end_tracker. This is useful if we want to move tracking between
   /// trackers that share a common (i.e. end_tracker) ancestor. This happens when we want
   /// to update tracking on a particular mem tracker but the consumption against
   /// the limit recorded in one of its ancestors already happened.
   void ConsumeLocal(int64_t bytes, MemTracker* end_tracker) {
-    DCHECK(!closed_) << label_;
-    DCHECK(consumption_metric_ == nullptr) << "Should not be called on root.";
-    for (MemTracker* tracker : all_trackers_) {
-      if (tracker == end_tracker) return;
-      DCHECK(!tracker->has_limit());
-      DCHECK(!tracker->closed_) << tracker->label_;
-      tracker->consumption_->Add(bytes);
-    }
-    DCHECK(false) << "end_tracker is not an ancestor";
+    DCHECK_GE(bytes, 0);
+    if (UNLIKELY(bytes < 0)) return; // needed in RELEASE, hits DCHECK in DEBUG
+    ChangeConsumption(bytes, end_tracker);
   }
 
+  /// Same as above, but it decreases the consumption.
   void ReleaseLocal(int64_t bytes, MemTracker* end_tracker) {
-    ConsumeLocal(-bytes, end_tracker);
+    DCHECK_GE(bytes, 0);
+    if (UNLIKELY(bytes < 0)) return; // needed in RELEASE, hits DCHECK in DEBUG
+    ChangeConsumption(-bytes, end_tracker);
   }
 
   /// Increases consumption of this tracker and its ancestors by 'bytes' only if
@@ -175,9 +170,11 @@ class MemTracker {
   /// of success. Returns true if the consumption was successfully updated.
   WARN_UNUSED_RESULT
   bool TryConsume(int64_t bytes, MemLimit mode = MemLimit::HARD) {
+    DCHECK_GE(bytes, 0);
     DCHECK(!closed_) << label_;
+    if (UNLIKELY(bytes == 0)) return true;
+    if (UNLIKELY(bytes < 0)) return false; // needed in RELEASE, hits DCHECK in DEBUG
     if (consumption_metric_ != nullptr) RefreshConsumptionFromMetric();
-    if (UNLIKELY(bytes <= 0)) return true;
     int i;
     // Walk the tracker tree top-down.
     for (i = all_trackers_.size() - 1; i >= 0; --i) {
@@ -216,11 +213,9 @@ class MemTracker {
 
   /// Decreases consumption of this tracker and its ancestors by 'bytes'.
   void Release(int64_t bytes) {
+    DCHECK_GE(bytes, 0);
     DCHECK(!closed_) << label_;
-    if (bytes <= 0) {
-      if (bytes < 0) Consume(-bytes);
-      return;
-    }
+    if (UNLIKELY(bytes <= 0)) return; // < 0 needed in RELEASE, hits DCHECK in DEBUG
 
     if (consumption_metric_ != nullptr) {
       RefreshConsumptionFromMetric();
@@ -407,6 +402,20 @@ class MemTracker {
   /// If an ancestor of this tracker is a query MemTracker, return that tracker.
   /// Otherwise return NULL.
   MemTracker* GetQueryMemTracker();
+
+  /// Increases/Decreases the consumption of this tracker and the ancestors up to (but
+  /// not including) end_tracker.
+  void ChangeConsumption(int64_t bytes, MemTracker* end_tracker) {
+    DCHECK(!closed_) << label_;
+    DCHECK(consumption_metric_ == nullptr) << "Should not be called on root.";
+    for (MemTracker* tracker : all_trackers_) {
+      if (tracker == end_tracker) return;
+      DCHECK(!tracker->has_limit());
+      DCHECK(!tracker->closed_) << tracker->label_;
+      tracker->consumption_->Add(bytes);
+    }
+    DCHECK(false) << "end_tracker is not an ancestor";
+  }
 
   /// Lock to protect GcMemory(). This prevents many GCs from occurring at once.
   boost::mutex gc_lock_;

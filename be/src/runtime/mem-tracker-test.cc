@@ -152,7 +152,7 @@ TEST(MemTestTest, ConsumptionMetric) {
   EXPECT_EQ(t.peak_consumption(), 10);
   EXPECT_EQ(neg_t.consumption(), -10);
   metric.Increment(-5);
-  t.Consume(-1);
+  t.Release(1);
   neg_t.Consume(1);
   EXPECT_EQ(t.consumption(), 5);
   EXPECT_EQ(t.peak_consumption(), 10);
@@ -166,7 +166,7 @@ TEST(MemTestTest, ConsumptionMetric) {
   EXPECT_TRUE(t.LimitExceeded(MemLimit::HARD));
   EXPECT_EQ(neg_t.consumption(), -155);
   metric.Increment(-150);
-  t.Consume(-1);
+  t.Release(1);
   neg_t.Consume(1);
   EXPECT_EQ(t.consumption(), 5);
   EXPECT_EQ(t.peak_consumption(), 155);
@@ -175,15 +175,22 @@ TEST(MemTestTest, ConsumptionMetric) {
   // consumption_ is not updated when Consume()/Release() is called with a zero value
   metric.Increment(10);
   t.Consume(0);
-  neg_t.Consume(0);
+  neg_t.Release(0);
+  EXPECT_EQ(t.consumption(), 5);
+  EXPECT_EQ(t.peak_consumption(), 155);
+  EXPECT_FALSE(t.LimitExceeded(MemLimit::HARD));
+  EXPECT_EQ(neg_t.consumption(), -5);
+  // consumption_ is not updated when TryConsume() is called with a zero value
+  EXPECT_TRUE(t.TryConsume(0));
+  EXPECT_TRUE(neg_t.TryConsume(0));
   EXPECT_EQ(t.consumption(), 5);
   EXPECT_EQ(t.peak_consumption(), 155);
   EXPECT_FALSE(t.LimitExceeded(MemLimit::HARD));
   EXPECT_EQ(neg_t.consumption(), -5);
   // Clean up.
   metric.Increment(-15);
-  t.Consume(-1);
-  neg_t.Consume(-1);
+  t.Release(1);
+  neg_t.Release(1);
 }
 
 TEST(MemTestTest, TrackerHierarchy) {
