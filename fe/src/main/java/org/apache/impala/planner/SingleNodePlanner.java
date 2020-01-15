@@ -1165,6 +1165,56 @@ public class SingleNodePlanner {
   }
 
   /**
+   * Get the unassigned conjuncts that can be evaluated in inline view and return them
+   * in 'evalInInlineViewPreds'.
+   * If a conjunct is not an On-clause predicate and is safe to propagate it inside the
+   * inline view, add it to 'evalAfterJoinPreds'.
+   */
+  private void getConjunctsToInlineView(final Analyzer analyzer,
+      final InlineViewRef inlineViewRef, List<Expr> evalInInlineViewPreds,
+      List<Expr> evalAfterJoinPreds) {
+    List<Expr> unassignedConjuncts =
+        analyzer.getUnassignedConjuncts(inlineViewRef.getId().asList(), true);
+    List<TupleId> tupleIds = inlineViewRef.getId().asList();
+    for (Expr e: unassignedConjuncts) {
+      if (!e.isBoundByTupleIds(tupleIds)) continue;
+      List<TupleId> tids = new ArrayList<>();
+      e.getIds(tids, null);
+      if (tids.isEmpty()) {
+        evalInInlineViewPreds.add(e);
+      } else if (e.isOnClauseConjunct()) {
+        if (!analyzer.canEvalOnClauseConjunct(tupleIds, e)) continue;
+        evalInInlineViewPreds.add(e);
+      } else if (analyzer.isLastOjMaterializedByTupleIds(tupleIds, e)) {
+        evalInInlineViewPreds.add(e);
+      } else {
+        // The predicate belong to an outer-joined tuple, it's correct to duplicate(not
+        // migrate) this predicate inside the inline view since it does not evalute to
+        // true with null slots
+        try {
+          if (!analyzer.isTrueWithNullSlots(e)) {
+            evalAfterJoinPreds.add(e);
+            if (LOG.isTraceEnabled()) {
+              LOG.trace(String.format("Can propagate %s to inline view %s",
+                  e.debugString(), inlineViewRef.getExplicitAlias()));
+            }
+          }
+        } catch (InternalException ex) {
+          // Expr evaluation failed in the backend. Skip 'e' since we cannot
+          // determine whether propagation is safe.
+          LOG.warn("Skipping propagation of conjunct because backend evaluation failed: "
+              + e.toSql(), ex);
+        }
+        continue;
+      }
+      if (LOG.isTraceEnabled()) {
+        LOG.trace(String.format("Can evaluate %s in inline view %s", e.debugString(),
+            inlineViewRef.getExplicitAlias()));
+      }
+    }
+  }
+
+  /**
    * Migrates unassigned conjuncts into an inline view. Conjuncts are not
    * migrated into the inline view if the view has a LIMIT/OFFSET clause or if the
    * view's stmt computes analytic functions (see IMPALA-1243/IMPALA-1900).
@@ -1191,20 +1241,16 @@ public class SingleNodePlanner {
     }
 
     List<Expr> preds = new ArrayList<>();
-    for (Expr e: unassignedConjuncts) {
-      if (analyzer.canEvalPredicate(inlineViewRef.getId().asList(), e)) {
-        preds.add(e);
-        if (LOG. isTraceEnabled()) {
-          LOG.trace(String.format("Can evaluate %s in inline view %s", e.debugString(),
-                  inlineViewRef.getExplicitAlias()));
-        }
-      }
-    }
+    List<Expr> evalAfterJoinPreds = new ArrayList<>();
+    getConjunctsToInlineView(analyzer, inlineViewRef, preds, evalAfterJoinPreds);
     unassignedConjuncts.removeAll(preds);
     // Migrate the conjuncts by marking the original ones as assigned. They will either
     // be ignored if they are identity predicates (e.g. a = a), or be substituted into
     // new ones (viewPredicates below). The substituted ones will be re-registered.
     analyzer.markConjunctsAssigned(preds);
+    // Propagate the conjuncts evaluating the nullable side of outer-join.
+    // Don't mark them as assigned so they would be assigned at the JOIN node.
+    preds.addAll(evalAfterJoinPreds);
     // Generate predicates to enforce equivalences among slots of the inline view
     // tuple. These predicates are also migrated into the inline view.
     analyzer.createEquivConjuncts(inlineViewRef.getId(), preds);

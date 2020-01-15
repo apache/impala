@@ -2160,6 +2160,7 @@ PLAN-ROOT SINK
 ====
 # IMPALA-7957: Same thing except with a predicate on a different column (i.e. adding it
 # to the equivalence class)
+# IMPALA-8361: Bound predicates optimization doesn't work for InlineView
 SELECT t.id, t2.id
 FROM functional.alltypestiny t
 LEFT JOIN
@@ -2183,7 +2184,7 @@ PLAN-ROOT SINK
 |
 |--02:SCAN HDFS [functional.alltypestiny]
 |     HDFS partitions=4/4 files=4 size=460B
-|     predicates: int_col = id, id = smallint_col
+|     predicates: int_col = id, int_col = smallint_col
 |     row-size=10B cardinality=1
 |
 01:SCAN HDFS [functional.alltypestiny t]
@@ -2310,4 +2311,176 @@ PLAN-ROOT SINK
    HDFS partitions=4/4 files=4 size=6.32KB
    runtime filters: RF000 -> functional.alltypessmall.bigint_col
    row-size=10B cardinality=81
+====
+# IMPALA-8361: Bound predicates optimization doesn't work for InlineView
+SELECT *
+FROM functional.alltypessmall a
+    LEFT JOIN (
+        SELECT id, upper(string_col) AS upper_val
+        FROM functional.alltypestiny
+    ) b ON a.id = b.id
+WHERE b.upper_val = '1'
+---- PLAN
+PLAN-ROOT SINK
+|
+02:HASH JOIN [LEFT OUTER JOIN]
+|  hash predicates: a.id = id
+|  other predicates: upper(string_col) = '1'
+|  row-size=106B cardinality=100
+|
+|--01:SCAN HDFS [functional.alltypestiny]
+|     HDFS partitions=4/4 files=4 size=460B
+|     predicates: upper(string_col) = '1'
+|     row-size=17B cardinality=4
+|
+00:SCAN HDFS [functional.alltypessmall a]
+   HDFS partitions=4/4 files=4 size=6.32KB
+   row-size=89B cardinality=100
+====
+# IMPALA-8361: Bound predicates optimization doesn't work for InlineView
+# For local view
+WITH b as (SELECT id, upper(string_col) AS upper_val FROM functional.alltypestiny)
+SELECT * FROM functional.alltypessmall a LEFT JOIN b ON a.id = b.id
+WHERE b.upper_val = '1';
+---- PLAN
+PLAN-ROOT SINK
+|
+02:HASH JOIN [LEFT OUTER JOIN]
+|  hash predicates: a.id = id
+|  other predicates: upper(string_col) = '1'
+|  row-size=106B cardinality=100
+|
+|--01:SCAN HDFS [functional.alltypestiny]
+|     HDFS partitions=4/4 files=4 size=460B
+|     predicates: upper(string_col) = '1'
+|     row-size=17B cardinality=4
+|
+00:SCAN HDFS [functional.alltypessmall a]
+   HDFS partitions=4/4 files=4 size=6.32KB
+   row-size=89B cardinality=100
+====
+# IMPALA-8361: Bound predicates optimization doesn't work for InlineView
+# Outer-joined inline view is union statement
+SELECT * FROM functional.alltypestiny a
+LEFT JOIN
+(SELECT upper(a.string_col) upper_val, a.id FROM functional.alltypestiny a
+UNION SELECT b.string_col,b.id FROM functional.alltypestiny b) b
+ON a.id=b.id
+WHERE b.upper_val='123';
+---- PLAN
+PLAN-ROOT SINK
+|
+05:HASH JOIN [LEFT OUTER JOIN]
+|  hash predicates: a.id = id
+|  other predicates: upper_val = '123'
+|  row-size=105B cardinality=8
+|
+|--04:AGGREGATE [FINALIZE]
+|  |  group by: upper_val, id
+|  |  row-size=16B cardinality=6
+|  |
+|  01:UNION
+|  |  pass-through-operands: 03
+|  |  row-size=16B cardinality=6
+|  |
+|  |--02:SCAN HDFS [functional.alltypestiny a]
+|  |     HDFS partitions=4/4 files=4 size=460B
+|  |     predicates: upper(a.string_col) = '123'
+|  |     row-size=17B cardinality=2
+|  |
+|  03:SCAN HDFS [functional.alltypestiny b]
+|     HDFS partitions=4/4 files=4 size=460B
+|     predicates: b.string_col = '123'
+|     row-size=17B cardinality=4
+|
+00:SCAN HDFS [functional.alltypestiny a]
+   HDFS partitions=4/4 files=4 size=460B
+   row-size=89B cardinality=8
+====
+# IMPALA-8361: Bound predicates optimization doesn't work for InlineView
+# Inline view contains outer join
+SELECT * FROM functional.alltypestiny a
+LEFT JOIN
+(SELECT upper(b.string_col) string_col, b.id FROM functional.alltypestiny a
+LEFT JOIN
+functional.alltypestiny b ON a.id=b.id) b ON a.id=b.id
+WHERE b.string_col='1';
+---- PLAN
+PLAN-ROOT SINK
+|
+04:HASH JOIN [LEFT OUTER JOIN]
+|  hash predicates: a.id = b.id
+|  other predicates: upper(b.string_col) = '1'
+|  row-size=110B cardinality=8
+|
+|--03:HASH JOIN [RIGHT OUTER JOIN]
+|  |  hash predicates: b.id = a.id
+|  |  other predicates: upper(b.string_col) = '1'
+|  |  runtime filters: RF000 <- a.id
+|  |  row-size=21B cardinality=8
+|  |
+|  |--01:SCAN HDFS [functional.alltypestiny a]
+|  |     HDFS partitions=4/4 files=4 size=460B
+|  |     row-size=4B cardinality=8
+|  |
+|  02:SCAN HDFS [functional.alltypestiny b]
+|     HDFS partitions=4/4 files=4 size=460B
+|     predicates: upper(b.string_col) = '1'
+|     runtime filters: RF000 -> b.id
+|     row-size=17B cardinality=4
+|
+00:SCAN HDFS [functional.alltypestiny a]
+   HDFS partitions=4/4 files=4 size=460B
+   row-size=89B cardinality=8
+====
+# IMPALA-8361: Bound predicates optimization doesn't work for InlineView
+# More predicates
+SELECT *
+FROM functional.alltypessmall a
+    LEFT JOIN (
+        SELECT id + 1 as id, upper(string_col) AS upper_val, length(string_col) AS len
+        FROM functional.alltypestiny
+    ) b ON a.id = b.id
+WHERE b.upper_val is NULL and b.len = 0 and b.id > 0;
+---- PLAN
+PLAN-ROOT SINK
+|
+02:HASH JOIN [LEFT OUTER JOIN]
+|  hash predicates: a.id = id + 1
+|  other predicates: id + 1 > 0, upper(string_col) IS NULL, length(string_col) = 0
+|  row-size=106B cardinality=100
+|
+|--01:SCAN HDFS [functional.alltypestiny]
+|     HDFS partitions=4/4 files=4 size=460B
+|     predicates: id + 1 > 0, length(string_col) = 0
+|     row-size=17B cardinality=1
+|
+00:SCAN HDFS [functional.alltypessmall a]
+   HDFS partitions=4/4 files=4 size=6.32KB
+   row-size=89B cardinality=100
+====
+# IMPALA-8361: Bound predicates optimization doesn't work for InlineView
+# Where-clause predicate that can't be propagated
+SELECT *
+FROM functional.alltypessmall a
+    LEFT JOIN (
+        SELECT id, upper(string_col) AS upper_val
+        FROM functional.alltypestiny
+    ) b ON a.id = b.id
+WHERE b.upper_val is NULL;
+---- PLAN
+PLAN-ROOT SINK
+|
+02:HASH JOIN [LEFT OUTER JOIN]
+|  hash predicates: a.id = id
+|  other predicates: upper(string_col) IS NULL
+|  row-size=106B cardinality=100
+|
+|--01:SCAN HDFS [functional.alltypestiny]
+|     HDFS partitions=4/4 files=4 size=460B
+|     row-size=17B cardinality=8
+|
+00:SCAN HDFS [functional.alltypessmall a]
+   HDFS partitions=4/4 files=4 size=6.32KB
+   row-size=89B cardinality=100
 ====

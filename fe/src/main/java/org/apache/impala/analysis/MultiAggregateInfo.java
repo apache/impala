@@ -642,6 +642,7 @@ public class MultiAggregateInfo {
     result.addAll(bindingPredicates);
     result.addAll(unassignedConjuncts);
     analyzer.createEquivConjuncts(tid, result, groupBySids);
+    Expr.removeDuplicates(result);
     return result;
   }
 

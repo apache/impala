@@ -2290,6 +2290,7 @@ PLAN-ROOT SINK
 |  |     row-size=16B cardinality=1
 |  |
 |  03:UNNEST [t1.int_array_col t2]
+|     predicates: item = 1
 |     row-size=12B cardinality=10
 |
 00:SCAN HDFS [functional.allcomplextypes t1]
