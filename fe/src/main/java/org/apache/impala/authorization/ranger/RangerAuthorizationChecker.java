@@ -36,6 +36,7 @@ import org.apache.impala.authorization.User;
 import org.apache.impala.catalog.FeCatalog;
 import org.apache.impala.common.InternalException;
 import org.apache.impala.common.RuntimeEnv;
+import org.apache.impala.service.BackendConfig;
 import org.apache.impala.thrift.TSessionState;
 import org.apache.impala.util.EventSequence;
 import org.apache.ranger.audit.model.AuthzAuditEvent;
@@ -353,7 +354,8 @@ public class RangerAuthorizationChecker extends BaseAuthorizationChecker {
   @Override
   public Set<String> getUserGroups(User user) throws InternalException {
     UserGroupInformation ugi;
-    if (RuntimeEnv.INSTANCE.isTestEnv()) {
+    if (RuntimeEnv.INSTANCE.isTestEnv() ||
+        BackendConfig.INSTANCE.useCustomizedUserGroupsMapperForRanger()) {
       ugi = UserGroupInformation.createUserForTesting(user.getShortName(),
           new String[]{user.getShortName()});
     } else {

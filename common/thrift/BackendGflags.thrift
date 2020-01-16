@@ -149,4 +149,6 @@ struct TBackendGflags {
   62: required i32 num_expected_executors
 
   63: required i32 num_check_authorization_threads
+
+  64: required bool use_customized_user_groups_mapper_for_ranger
 }

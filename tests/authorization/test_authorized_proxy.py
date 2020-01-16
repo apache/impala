@@ -111,19 +111,18 @@ class TestAuthorizedProxy(CustomClusterTestSuite):
     catalogd_args=SENTRY_CATALOGD_ARGS)
   def test_authorized_proxy_user_with_sentry(self, unique_role):
     """Tests authorized proxy user with Sentry using HS2."""
-    self._test_authorized_proxy_with_sentry(unique_role, self._test_authorized_proxy)
+    self._test_authorized_proxy_with_sentry(unique_role, self._test_authorized_proxy,
+                                            getuser())
 
   @pytest.mark.execute_serially
   @CustomClusterTestSuite.with_args(
-    impalad_args="{0} --authorized_proxy_user_config=foo=bar;hue={1} "
-                 .format(RANGER_IMPALAD_ARGS, getuser()),
+    impalad_args="{0} --authorized_proxy_user_config=foo=bar;hue=non_owner "
+                 .format(RANGER_IMPALAD_ARGS),
     catalogd_args=RANGER_CATALOGD_ARGS)
   def test_authorized_proxy_user_with_ranger(self):
-    # This test fails due to bumping up the Ranger to a newer version.
-    # TODO(fangyu.rao): Fix in a follow up commit.
-    pytest.xfail("failed due to bumping up the Ranger to a newer version")
     """Tests authorized proxy user with Ranger using HS2."""
-    self._test_authorized_proxy_with_ranger(self._test_authorized_proxy)
+    self._test_authorized_proxy_with_ranger(self._test_authorized_proxy, "non_owner",
+                                            False)
 
   @pytest.mark.execute_serially
   @CustomClusterTestSuite.with_args(
@@ -133,20 +132,20 @@ class TestAuthorizedProxy(CustomClusterTestSuite):
     catalogd_args=SENTRY_CATALOGD_ARGS)
   def test_authorized_proxy_group_with_sentry(self, unique_role):
     """Tests authorized proxy group with Sentry using HS2."""
-    self._test_authorized_proxy_with_sentry(unique_role, self._test_authorized_proxy)
+    self._test_authorized_proxy_with_sentry(unique_role, self._test_authorized_proxy,
+                                            getuser())
 
   @pytest.mark.execute_serially
   @CustomClusterTestSuite.with_args(
-    impalad_args="{0} --authorized_proxy_user_config=hue=bar "
-                 "--authorized_proxy_group_config=foo=bar;hue={1}"
-                 .format(RANGER_IMPALAD_ARGS, grp.getgrgid(os.getgid()).gr_name),
+    impalad_args="{0} --authorized_proxy_user_config=hue=non_owner "
+                 "--authorized_proxy_group_config=foo=bar;hue=non_owner "
+                 "--use_customized_user_groups_mapper_for_ranger"
+                 .format(RANGER_IMPALAD_ARGS),
     catalogd_args=RANGER_CATALOGD_ARGS)
   def test_authorized_proxy_group_with_ranger(self):
-    # This test fails due to bumping up the Ranger to a newer version.
-    # TODO(fangyu.rao): Fix in a follow up commit.
-    pytest.xfail("failed due to bumping up the Ranger to a newer version")
     """Tests authorized proxy group with Ranger using HS2."""
-    self._test_authorized_proxy_with_ranger(self._test_authorized_proxy)
+    self._test_authorized_proxy_with_ranger(self._test_authorized_proxy, "non_owner",
+                                            True)
 
   @pytest.mark.execute_serially
   @CustomClusterTestSuite.with_args(
@@ -172,7 +171,7 @@ class TestAuthorizedProxy(CustomClusterTestSuite):
     resp = self.hs2_client.OpenSession(open_session_req)
     assert "User 'hue' is not authorized to delegate to 'abc'" in str(resp)
 
-  def _test_authorized_proxy_with_sentry(self, role, test_func):
+  def _test_authorized_proxy_with_sentry(self, role, test_func, delegated_user):
     try:
       self.session_handle = self._open_hs2(getuser(), dict()).sessionHandle
       self._execute_hs2_stmt("create role {0}".format(role))
@@ -182,7 +181,7 @@ class TestAuthorizedProxy(CustomClusterTestSuite):
                              .format(role, grp.getgrnam(getuser()).gr_name))
       self._execute_hs2_stmt("grant role {0} to group {1}"
                              .format(role, grp.getgrgid(os.getgid()).gr_name))
-      test_func()
+      test_func(delegated_user)
     finally:
       self.session_handle = self._open_hs2(getuser(), dict()).sessionHandle
       self._execute_hs2_stmt("grant all on server to role {0}".format(role))
@@ -190,18 +189,23 @@ class TestAuthorizedProxy(CustomClusterTestSuite):
                              .format(role, grp.getgrnam(getuser()).gr_name))
       self._execute_hs2_stmt("drop role {0}".format(role))
 
-  def _test_authorized_proxy_with_ranger(self, test_func):
+  def _test_authorized_proxy_with_ranger(self, test_func, delegated_user,
+                                         delegated_to_group):
     try:
       self.session_handle = self._open_hs2(RANGER_ADMIN_USER, dict()).sessionHandle
-      self._execute_hs2_stmt("grant all on table tpch.lineitem to user {0}"
-                             .format(getuser()))
-      test_func()
+      if not delegated_to_group:
+        self._execute_hs2_stmt("grant all on table tpch.lineitem to user non_owner")
+      else:
+        self._execute_hs2_stmt("grant all on table tpch.lineitem to group non_owner")
+      test_func(delegated_user)
     finally:
       self.session_handle = self._open_hs2(RANGER_ADMIN_USER, dict()).sessionHandle
-      self._execute_hs2_stmt("revoke all on table tpch.lineitem from user {0}"
-                             .format(getuser()))
+      if not delegated_to_group:
+        self._execute_hs2_stmt("revoke all on table tpch.lineitem from user non_owner")
+      else:
+        self._execute_hs2_stmt("revoke all on table tpch.lineitem from group non_owner")
 
-  def _test_authorized_proxy(self):
+  def _test_authorized_proxy(self, delegated_user):
     """End-to-end impersonation + authorization test. Expects authorization to be
        configured before running this test"""
     # TODO: To reuse the HS2 utility code from the TestHS2 test suite we need to import
@@ -213,12 +217,13 @@ class TestAuthorizedProxy(CustomClusterTestSuite):
 
     # Try to query a table we are not authorized to access.
     self.session_handle = self._open_hs2("hue",
-                                         {"impala.doas.user": getuser()}).sessionHandle
+                                         {"impala.doas.user": delegated_user})\
+        .sessionHandle
     bad_resp = self._execute_hs2_stmt("describe tpch_seq.lineitem", False)
-    assert "User '%s' does not have privileges to access" % getuser() in \
+    assert "User '%s' does not have privileges to access" % delegated_user in \
            str(bad_resp)
 
-    assert self._wait_for_audit_record(user=getuser(), impersonator="hue"), \
+    assert self._wait_for_audit_record(user=delegated_user, impersonator="hue"), \
            "No matching audit event recorded in time window"
 
     # Now try the same operation on a table we are authorized to access.
@@ -228,8 +233,8 @@ class TestAuthorizedProxy(CustomClusterTestSuite):
     # Verify the correct user information is in the runtime profile.
     query_id = operation_id_to_query_id(good_resp.operationHandle.operationId)
     profile_page = self.cluster.impalads[0].service.read_query_profile_page(query_id)
-    self._verify_profile_user_fields(profile_page, effective_user=getuser(),
-                                     delegated_user=getuser(), connected_user="hue")
+    self._verify_profile_user_fields(profile_page, effective_user=delegated_user,
+                                     delegated_user=delegated_user, connected_user="hue")
 
     # Try to delegate a user we are not authorized to delegate to.
     resp = self._open_hs2("hue", {"impala.doas.user": "some_user"}, False)

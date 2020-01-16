@@ -308,6 +308,10 @@ DEFINE_int32(num_check_authorization_threads, 1,
     "checking authorization with a high concurrency. The value must be in the range of "
     "1 to 128.");
 
+DEFINE_bool_hidden(use_customized_user_groups_mapper_for_ranger, false,
+    "If true, use the customized user-to-groups mapper when performing authorization via"
+    " Ranger.");
+
 // ++========================++
 // || Startup flag graveyard ||
 // ++========================++
