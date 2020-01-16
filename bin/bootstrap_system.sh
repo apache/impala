@@ -312,6 +312,12 @@ redhat sudo sed -ri 's/local +all +all +ident/local all all trust/g' \
 # Accept md5 passwords from localhost
 redhat sudo sed -i -e 's,\(host.*\)ident,\1md5,' /var/lib/pgsql/data/pg_hba.conf
 
+# Modfiy pg max connections to 500 for IMPALA-9287
+ubuntu sudo sed -i 's/\(max_connections = \)\S*/\1500/g' \
+  /etc/postgresql/*/main/postgresql.conf
+redhat sudo sed -i 's/\(max_connections = \)\S*/\1500/g' \
+  /var/lib/pgsql/data/postgresql.conf
+
 ubuntu sudo service postgresql start
 redhat6 sudo service postgresql start
 redhat7 notindocker sudo service postgresql start
