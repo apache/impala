@@ -130,7 +130,12 @@ class HdfsScanner {
   /// Only valid to call if the parent scan node is single-threaded.
   Status GetNext(RowBatch* row_batch) WARN_UNUSED_RESULT {
     DCHECK(!scan_node_->HasRowBatchQueue());
-    return GetNextInternal(row_batch);
+    RETURN_IF_ERROR(GetNextInternal(row_batch));
+    ++getnext_batches_returned_;
+    if ((getnext_batches_returned_ & (BATCHES_PER_FILTER_SELECTIVITY_CHECK - 1)) == 0) {
+      CheckFiltersEffectiveness();
+    }
+    return Status::OK();
   }
 
   /// Process an entire split, reading bytes from the context's streams.  Context is
@@ -325,6 +330,10 @@ class HdfsScanner {
   /// so that expensive aggregation up to the scan node can be performed once, during
   /// Close().
   vector<LocalFilterStats> filter_stats_;
+
+  /// Counter for the number of batches returned from GetNext(). Only updated by the
+  /// GetNext() API (i.e. mt_dop > 0), not the ProcessSplit() API.
+  int64_t getnext_batches_returned_ = 0;
 
   /// Size of the file footer for ORC and Parquet. This is a guess. If this value is too
   /// little, we will need to issue another read.

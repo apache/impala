@@ -49,6 +49,9 @@ class TestMtDopFlags(CustomClusterTestSuite):
     vector.get_value('exec_option')['mt_dop'] = 1
     self.run_test_case('QueryTest/runtime_filters', vector,
        test_file_vars={'$RUNTIME_FILTER_WAIT_TIME_MS': str(WAIT_TIME_MS)})
+    self.run_test_case('QueryTest/runtime_row_filters', vector,
+        use_db="functional_parquet",
+        test_file_vars={'$RUNTIME_FILTER_WAIT_TIME_MS' : str(WAIT_TIME_MS)})
 
     # Allow test to override num_nodes.
     del vector.get_value('exec_option')['num_nodes']
