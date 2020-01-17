@@ -22,6 +22,7 @@ import java.util.HashSet;
 import java.util.List;
 import java.util.Set;
 import java.util.concurrent.atomic.AtomicInteger;
+import java.util.concurrent.locks.ReentrantReadWriteLock;
 
 import org.apache.impala.thrift.TCatalogObject;
 import org.apache.impala.thrift.TCatalogObjectType;
@@ -43,6 +44,17 @@ public abstract class Principal extends CatalogObjectImpl {
   private final CatalogObjectCache<PrincipalPrivilege> principalPrivileges_ =
       new CatalogObjectCache<>(false);
 
+  // An index that allows efficient filtering of Privileges that are relevant to an
+  // access check. Should contain exactly the same privileges as principalPrivileges_.
+  // Does not support catalog version logic / removal of privileges by privilegeName,
+  // so principalPrivileges_ is still needed.
+  private final PrincipalPrivilegeTree privilegeTree_ = new PrincipalPrivilegeTree();
+
+  // Protects privilegeTree_ and its coherence with principalPrivileges_.
+  // Needs to be taken when accessing privilegeTree_ or when writing principalPrivileges_,
+  // but not when reading principalPrivileges_.
+  private final ReentrantReadWriteLock rwLock_ = new ReentrantReadWriteLock(true);
+
   protected Principal(String principalName, TPrincipalType type,
       Set<String> grantGroups) {
     principal_ = new TPrincipal();
@@ -62,7 +74,14 @@ public abstract class Principal extends CatalogObjectImpl {
    * to the principal.
    */
   public boolean addPrivilege(PrincipalPrivilege privilege) {
-    return principalPrivileges_.add(privilege);
+    try {
+      rwLock_.writeLock().lock();
+      if (!principalPrivileges_.add(privilege)) return false;
+      privilegeTree_.add(privilege);
+    } finally {
+      rwLock_.writeLock().unlock();
+    }
+    return true;
   }
 
   /**
@@ -74,11 +93,30 @@ public abstract class Principal extends CatalogObjectImpl {
   }
 
   /**
-   * Returns all privilege names for this principal, or an empty set of no privileges are
+   * Returns all privilege names for this principal, or an empty set if no privileges are
    * granted to the principal.
    */
   public Set<String> getPrivilegeNames() {
     return new HashSet<>(principalPrivileges_.keySet());
+  }
+
+  /**
+   * Returns all privilege names for this principal that match 'filter'.
+   */
+  public Set<String> getFilteredPrivilegeNames(PrincipalPrivilegeTree.Filter filter) {
+    if (filter == null) return getPrivilegeNames();
+
+    List<PrincipalPrivilege> privileges;
+    try {
+      rwLock_.readLock().lock();
+      privileges = privilegeTree_.getFilteredList(filter);
+    } finally {
+      rwLock_.readLock().unlock();
+    }
+
+    Set<String> results = new HashSet<>();
+    for (PrincipalPrivilege priv: privileges) results.add(priv.getName());
+    return results;
   }
 
   /**
@@ -94,7 +132,14 @@ public abstract class Principal extends CatalogObjectImpl {
    * privilege or null if no privilege exists with this name.
    */
   public PrincipalPrivilege removePrivilege(String privilegeName) {
-    return principalPrivileges_.remove(privilegeName);
+    try {
+      rwLock_.writeLock().lock();
+      PrincipalPrivilege privilege = principalPrivileges_.remove(privilegeName);
+      if (privilege != null) privilegeTree_.remove(privilege);
+      return privilege;
+    } finally {
+      rwLock_.writeLock().unlock();
+    }
   }
 
   /**

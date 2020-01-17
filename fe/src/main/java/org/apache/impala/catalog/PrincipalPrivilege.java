@@ -37,9 +37,11 @@ public class PrincipalPrivilege extends CatalogObjectImpl {
   private static final String AUTHORIZABLE_SEPARATOR = "->";
   private static final String KV_SEPARATOR = "=";
   private final TPrivilege privilege_;
+  private final String name_;
 
   private PrincipalPrivilege(TPrivilege privilege) {
     privilege_ = Preconditions.checkNotNull(privilege);
+    name_ =  buildPrivilegeName(privilege_);
   }
 
   public TPrivilege toThrift() { return privilege_; }
@@ -153,7 +155,7 @@ public class PrincipalPrivilege extends CatalogObjectImpl {
     return TCatalogObjectType.PRIVILEGE;
   }
   @Override
-  public String getName() { return buildPrivilegeName(privilege_); }
+  public String getName() { return name_; }
   public int getPrincipalId() { return privilege_.getPrincipal_id(); }
   public TPrincipalType getPrincipalType() { return privilege_.getPrincipal_type(); }
 
