@@ -278,8 +278,26 @@ bool OrcComplexColumnReader::EndOfBatch() {
     DCHECK_EQ(children_.size(), 1);
     return static_cast<OrcComplexColumnReader*>(children_[0])->EndOfBatch();
   }
-  if (vbatch_) DCHECK_LE(row_idx_, vbatch_->numElements);
+  DCHECK(vbatch_ == nullptr || row_idx_ <= vbatch_->numElements);
   return vbatch_ == nullptr || row_idx_ == vbatch_->numElements;
+}
+
+bool OrcComplexColumnReader::HasCollectionChild() const {
+  return HasCollectionChildRecursive(this);
+}
+
+bool OrcComplexColumnReader::HasCollectionChildRecursive(
+    const OrcColumnReader* reader) const {
+  DCHECK(reader != nullptr);
+  if (reader->IsCollectionReader()) return true;
+  if (!reader->IsComplexColumnReader()) return false;
+  const OrcComplexColumnReader* complex_reader =
+      static_cast<const OrcComplexColumnReader*>(reader);
+  DCHECK(complex_reader == dynamic_cast<const OrcComplexColumnReader*>(reader));
+  for (OrcColumnReader* child : complex_reader->children_) {
+    if (HasCollectionChildRecursive(child)) return true;
+  }
+  return false;
 }
 
 inline bool PathContains(const SchemaPath& path, const SchemaPath& sub_path) {
@@ -370,6 +388,37 @@ Status OrcStructReader::ReadValue(int row_idx, Tuple* tuple, MemPool* pool) {
   return Status::OK();
 }
 
+Status OrcStructReader::TopLevelReadValueBatch(ScratchTupleBatch* scratch_batch,
+    MemPool* pool) {
+  // Saving the initial value of num_tuples because each child->ReadValueBatch() will
+  // update it.
+  int scratch_batch_idx = scratch_batch->num_tuples;
+  int item_count = -1;
+  for (OrcColumnReader* child : children_) {
+    RETURN_IF_ERROR(
+        child->ReadValueBatch(row_idx_, scratch_batch, pool, scratch_batch_idx));
+    // Check if each column reader reads the same amount of values.
+    if (item_count == -1) item_count = scratch_batch->num_tuples;
+    if (item_count != scratch_batch->num_tuples) {
+      return Status(Substitute("Corrupt ORC file '$0':  Expected number of items in "
+          "each column: $1 Actual number in col '$2': $3", scanner_->filename(),
+          item_count, orc_column_id_, scratch_batch->num_tuples));
+    }
+  }
+  row_idx_ += scratch_batch->num_tuples - scratch_batch_idx;
+  return Status::OK();
+}
+
+Status OrcStructReader::ReadValueBatch(int row_idx, ScratchTupleBatch* scratch_batch,
+    MemPool* pool, int scratch_batch_idx) {
+  for (OrcColumnReader* child : children_) {
+    DCHECK(!child->IsCollectionReader());
+    RETURN_IF_ERROR(
+        child->ReadValueBatch(row_idx, scratch_batch, pool, scratch_batch_idx));
+  }
+  return Status::OK();
+}
+
 Status OrcStructReader::UpdateInputBatch(orc::ColumnVectorBatch* orc_batch) {
   RETURN_IF_ERROR(OrcComplexColumnReader::UpdateInputBatch(orc_batch));
   batch_ = static_cast<orc::StructVectorBatch*>(orc_batch);
@@ -422,6 +471,18 @@ Status OrcCollectionReader::ReadValue(int row_idx, Tuple* tuple, MemPool* pool) 
   const TupleDescriptor* tuple_desc = slot_desc_->collection_item_descriptor();
   CollectionValueBuilder builder(coll_slot, *tuple_desc, pool, scanner_->state_);
   return scanner_->AssembleCollection(*this, row_idx, &builder);
+}
+
+Status OrcCollectionReader::TopLevelReadValueBatch(ScratchTupleBatch* scratch_batch,
+    MemPool* pool) {
+  DCHECK(false);
+  return Status::OK();
+}
+
+Status OrcCollectionReader::ReadValueBatch(int row_idx,
+    ScratchTupleBatch* scratch_batch, MemPool* pool, int scratch_batch_idx) {
+  DCHECK(false);
+  return Status::OK();
 }
 
 void OrcListReader::CreateChildForSlot(const orc::Type* node,

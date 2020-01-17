@@ -50,6 +50,8 @@ add_library(Exec
   hash-table.cc
   hbase-table-sink.cc
   hbase-table-writer.cc
+  hdfs-columnar-scanner.cc
+  hdfs-columnar-scanner-ir.cc
   hdfs-scan-node.cc
   hdfs-scan-node-base.cc
   hdfs-scan-node-mt.cc

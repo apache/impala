@@ -25,7 +25,6 @@ set(EXECUTABLE_OUTPUT_PATH "${BUILD_OUTPUT_ROOT_DIRECTORY}/exec/parquet")
 
 add_library(Parquet
   hdfs-parquet-scanner.cc
-  hdfs-parquet-scanner-ir.cc
   hdfs-parquet-table-writer.cc
   parquet-bool-decoder.cc
   parquet-collection-column-reader.cc

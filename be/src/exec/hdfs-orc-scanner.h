@@ -26,7 +26,7 @@
 #include "runtime/exec-env.h"
 #include "runtime/io/disk-io-mgr.h"
 #include "runtime/runtime-state.h"
-#include "exec/hdfs-scanner.h"
+#include "exec/hdfs-columnar-scanner.h"
 #include "exec/hdfs-scan-node.h"
 #include "exec/orc-metadata-utils.h"
 #include "util/runtime-profile-counters.h"
@@ -56,7 +56,7 @@ class OrcComplexColumnReader;
 ///     the range of the Stripe boundaries. Then create a orc::RowReader for this Stripe
 ///     (HdfsOrcScanner::NextStripe)
 ///
-class HdfsOrcScanner : public HdfsScanner {
+class HdfsOrcScanner : public HdfsColumnarScanner {
  public:
   /// Exception throws from the orc scanner to stop the orc::RowReader. It's used in
   /// IO errors (e.g. cancellation) or memory errors (e.g. mem_limit exceeded). The
@@ -261,8 +261,11 @@ class HdfsOrcScanner : public HdfsScanner {
   /// filters and conjuncts (if any) against the tuples. Only surviving tuples are added
   /// to the given batch. Returns if either 'orc_root_batch_' is drained or 'dst_batch'
   /// is full.
+  /// 'do_batch_read' indicates if this function should transfer rows in batches or in a
+  /// row-by-row manner. Batch processing is not used if 'column_reader' has a collection
+  /// amongst its children.
   Status TransferTuples(OrcComplexColumnReader* column_reader,
-      RowBatch* dst_batch) WARN_UNUSED_RESULT;
+      RowBatch* dst_batch, bool do_batch_read) WARN_UNUSED_RESULT;
 
   /// Process the file footer and parse file_metadata_.  This should be called with the
   /// last FOOTER_SIZE bytes in context_.

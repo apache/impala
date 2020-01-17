@@ -20,12 +20,11 @@
 #define IMPALA_EXEC_HDFS_PARQUET_SCANNER_H
 
 #include "codegen/impala-ir.h"
-#include "exec/hdfs-scanner.h"
+#include "exec/hdfs-columnar-scanner.h"
 #include "exec/parquet/parquet-column-stats.h"
 #include "exec/parquet/parquet-common.h"
 #include "exec/parquet/parquet-metadata-utils.h"
 #include "exec/parquet/parquet-page-index.h"
-#include "exec/parquet/parquet-scratch-tuple-batch.h"
 #include "runtime/scoped-buffer.h"
 #include "util/runtime-profile-counters.h"
 
@@ -334,7 +333,7 @@ class ParquetPageReader;
 /// conjuncts against the column index and determines the surviving pages with the help of
 /// the offset index. Then it will configure the column readers to only scan the pages
 /// and row ranges that have a chance to store rows that pass the conjuncts.
-class HdfsParquetScanner : public HdfsScanner {
+class HdfsParquetScanner : public HdfsColumnarScanner {
  public:
   HdfsParquetScanner(HdfsScanNodeBase* scan_node, RuntimeState* state);
   virtual ~HdfsParquetScanner() {}
@@ -409,10 +408,6 @@ class HdfsParquetScanner : public HdfsScanner {
 
   /// Column reader for each top-level materialized slot in the output tuple.
   std::vector<ParquetColumnReader*> column_readers_;
-
-  /// Column readers will write slot values into this scratch batch for
-  /// top-level tuples. See AssembleRows().
-  boost::scoped_ptr<ScratchTupleBatch> scratch_batch_;
 
   /// File metadata thrift object
   parquet::FileMetaData file_metadata_;
@@ -509,10 +504,6 @@ class HdfsParquetScanner : public HdfsScanner {
   /// AssembleRows() and then is reset to 0.
   int64_t coll_items_read_counter_;
 
-  typedef int (*ProcessScratchBatchFn)(HdfsParquetScanner*, RowBatch*);
-  /// The codegen'd version of ProcessScratchBatch() if available, NULL otherwise.
-  ProcessScratchBatchFn codegend_process_scratch_batch_fn_;
-
   ParquetPageIndex page_index_;
 
   const char* filename() const { return metadata_range_->file(); }
@@ -571,18 +562,6 @@ class HdfsParquetScanner : public HdfsScanner {
   /// Scanner can call this with 0 rows to flush any pending resources (attached pools
   /// and io buffers) to minimize memory consumption.
   Status CommitRows(RowBatch* dst_batch, int num_rows) WARN_UNUSED_RESULT;
-
-  /// Evaluates runtime filters and conjuncts (if any) against the tuples in
-  /// 'scratch_batch_', and adds the surviving tuples to the given batch.
-  /// Transfers the ownership of tuple memory to the target batch when the
-  /// scratch batch is exhausted.
-  /// Returns the number of rows that should be committed to the given batch.
-  int TransferScratchTuples(RowBatch* dst_batch);
-
-  /// Processes a single row batch for TransferScratchTuples, looping over scratch_batch_
-  /// until it is exhausted or the output is full. Called for the case when there are
-  /// materialized tuples. This is a separate function so it can be codegened.
-  int ProcessScratchBatch(RowBatch* dst_batch);
 
   /// Reads data using 'column_readers' to materialize the tuples of a CollectionValue
   /// allocated from 'coll_value_builder'. Increases 'coll_items_read_counter_' by the

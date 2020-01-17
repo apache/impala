@@ -171,6 +171,12 @@ class HdfsScanner {
     return eos_;
   }
 
+  /// Not inlined in IR so it can be replaced with a constant.
+  int IR_NO_INLINE tuple_byte_size() const { return tuple_byte_size_; }
+  int IR_NO_INLINE tuple_byte_size(const TupleDescriptor& desc) const {
+    return desc.byte_size();
+  }
+
   /// Scanner subclasses must implement these static functions as well.  Unfortunately,
   /// c++ does not allow static virtual functions.
 
@@ -561,12 +567,6 @@ class HdfsScanner {
         tuple_mem += tuple_byte_size;
       }
     }
-  }
-
-  /// Not inlined in IR so it can be replaced with a constant.
-  int IR_NO_INLINE tuple_byte_size() const { return tuple_byte_size_; }
-  int IR_NO_INLINE tuple_byte_size(const TupleDescriptor& desc) const {
-    return desc.byte_size();
   }
 
   /// Returns true iff 'template_tuple' is non-NULL.

@@ -76,13 +76,13 @@ class OrcColumnReader {
 
   /// Default to true for primitive column readers. Only complex column readers can be
   /// not materializing tuples.
-  virtual bool MaterializeTuple() const { return true; }
+  virtual bool MaterializeTuple() const = 0;
 
   /// Whether it's a reader for a STRUCT/ARRAY/MAP column.
-  virtual bool IsComplexColumnReader() const { return false; }
+  virtual bool IsComplexColumnReader() const = 0;
 
   /// Whether it's a reader for a ARRAY/MAP column.
-  virtual bool IsCollectionReader() const { return false; }
+  virtual bool IsCollectionReader() const = 0;
 
   /// Update the orc batch we tracked. We'll read values from it.
   virtual Status UpdateInputBatch(orc::ColumnVectorBatch* orc_batch)
@@ -93,6 +93,13 @@ class OrcColumnReader {
   /// before (thus batch_ is updated)
   virtual Status ReadValue(int row_idx, Tuple* tuple, MemPool* pool)
       WARN_UNUSED_RESULT = 0;
+
+  /// Reads a batch of values from ColumnVectorBatch starting from 'row_idx' into
+  /// 'scratch_batch' starting from 'scratch_batch_idx'. Use 'pool' to allocate memory
+  /// in need.
+  virtual Status ReadValueBatch(int row_idx, ScratchTupleBatch* scratch_batch,
+      MemPool* pool, int scratch_batch_idx) WARN_UNUSED_RESULT = 0;
+
  protected:
   friend class OrcStructReader;
 
@@ -120,11 +127,56 @@ class OrcColumnReader {
   }
 };
 
-class OrcBoolColumnReader : public OrcColumnReader {
+/// The main purpose of this class other than providing implementations relevant only for
+/// primitive type column readers is to implement static polymorphism via the "curiously
+/// recurring template pattern". All the derived classes are expected to provide
+/// themselves as the template parameter of this class. As a result the number of virtual
+/// function calls can be reduced in ReadValueBatch() as we can directly call non-virtual
+/// ReadValue() of the derived class.
+template<class T>
+class OrcPrimitiveColumnReader : public OrcColumnReader {
+ public:
+  OrcPrimitiveColumnReader(const orc::Type* node, const SlotDescriptor* slot_desc,
+      HdfsOrcScanner* scanner)
+      : OrcColumnReader(node, slot_desc, scanner) {}
+
+  virtual ~OrcPrimitiveColumnReader() { }
+
+  bool IsComplexColumnReader() const override { return false; }
+
+  bool IsCollectionReader() const override { return false; }
+
+  bool MaterializeTuple() const override { return true; }
+
+  Status ReadValueBatch(int row_idx, ScratchTupleBatch* scratch_batch, MemPool* pool,
+      int scratch_batch_idx) override WARN_UNUSED_RESULT {
+    T* derived = static_cast<T*>(this);
+    int num_to_read = std::min<int>(scratch_batch->capacity - scratch_batch_idx,
+        derived->batch_->numElements - row_idx);
+    DCHECK_LE(row_idx + num_to_read, derived->batch_->numElements);
+    for (int i = 0; i < num_to_read; ++i) {
+      int scratch_batch_pos = i + scratch_batch_idx;
+      uint8_t* next_tuple = scratch_batch->tuple_mem +
+          scratch_batch_pos * OrcColumnReader::scanner_->tuple_byte_size();
+      Tuple* tuple = reinterpret_cast<Tuple*>(next_tuple);
+
+      // Make sure that each ReadValue() is final in each derived class. This way
+      // devirtualization helps to reduce the number of virtual function calls, and as a
+      // result to improve performance.
+      RETURN_IF_ERROR(derived->ReadValue(row_idx + i, tuple, pool));
+    }
+    scratch_batch->num_tuples = scratch_batch_idx + num_to_read;
+    return Status::OK();
+  }
+};
+
+class OrcBoolColumnReader : public OrcPrimitiveColumnReader<OrcBoolColumnReader> {
  public:
   OrcBoolColumnReader(const orc::Type* node, const SlotDescriptor* slot_desc,
       HdfsOrcScanner* scanner)
-      : OrcColumnReader(node, slot_desc, scanner) { }
+      : OrcPrimitiveColumnReader<OrcBoolColumnReader>(node, slot_desc, scanner) { }
+
+  virtual ~OrcBoolColumnReader() { }
 
   Status UpdateInputBatch(orc::ColumnVectorBatch* orc_batch) override WARN_UNUSED_RESULT {
     batch_ = static_cast<orc::LongVectorBatch*>(orc_batch);
@@ -133,17 +185,21 @@ class OrcBoolColumnReader : public OrcColumnReader {
     return Status::OK();
   }
 
-  Status ReadValue(int row_idx, Tuple* tuple, MemPool* pool) override WARN_UNUSED_RESULT;
+  Status ReadValue(int row_idx, Tuple* tuple, MemPool* pool) final WARN_UNUSED_RESULT;
  private:
+  friend class OrcPrimitiveColumnReader<OrcBoolColumnReader>;
+
   orc::LongVectorBatch* batch_ = nullptr;
 };
 
 template<typename T>
-class OrcIntColumnReader : public OrcColumnReader {
+class OrcIntColumnReader : public OrcPrimitiveColumnReader<OrcIntColumnReader<T>> {
  public:
   OrcIntColumnReader(const orc::Type* node, const SlotDescriptor* slot_desc,
       HdfsOrcScanner* scanner)
-      : OrcColumnReader(node, slot_desc, scanner) { }
+      : OrcPrimitiveColumnReader<OrcIntColumnReader<T>>(node, slot_desc, scanner) { }
+
+  virtual ~OrcIntColumnReader() { }
 
   Status UpdateInputBatch(orc::ColumnVectorBatch* orc_batch) override WARN_UNUSED_RESULT {
     batch_ = static_cast<orc::LongVectorBatch*>(orc_batch);
@@ -151,26 +207,30 @@ class OrcIntColumnReader : public OrcColumnReader {
     return Status::OK();
   }
 
-  Status ReadValue(int row_idx, Tuple* tuple, MemPool* pool)
-      override WARN_UNUSED_RESULT {
-    if (IsNull(DCHECK_NOTNULL(batch_), row_idx)) {
-      SetNullSlot(tuple);
+  Status ReadValue(int row_idx, Tuple* tuple, MemPool* pool) final WARN_UNUSED_RESULT {
+    if (OrcColumnReader::IsNull(DCHECK_NOTNULL(batch_), row_idx)) {
+      OrcColumnReader::SetNullSlot(tuple);
       return Status::OK();
     }
     int64_t val = batch_->data.data()[row_idx];
-    *(reinterpret_cast<T*>(GetSlot(tuple))) = val;
+    *(reinterpret_cast<T*>(OrcColumnReader::GetSlot(tuple))) = val;
     return Status::OK();
   }
+
  private:
+  friend class OrcPrimitiveColumnReader<OrcIntColumnReader<T>>;
+
   orc::LongVectorBatch* batch_ = nullptr;
 };
 
 template<typename T>
-class OrcDoubleColumnReader : public OrcColumnReader {
+class OrcDoubleColumnReader : public OrcPrimitiveColumnReader<OrcDoubleColumnReader<T>> {
  public:
   OrcDoubleColumnReader(const orc::Type* node, const SlotDescriptor* slot_desc,
       HdfsOrcScanner* scanner)
-      : OrcColumnReader(node, slot_desc, scanner) { }
+      : OrcPrimitiveColumnReader<OrcDoubleColumnReader<T>>(node, slot_desc, scanner) { }
+
+  virtual ~OrcDoubleColumnReader() { }
 
   Status UpdateInputBatch(orc::ColumnVectorBatch* orc_batch) override WARN_UNUSED_RESULT {
     batch_ = static_cast<orc::DoubleVectorBatch*>(orc_batch);
@@ -178,25 +238,29 @@ class OrcDoubleColumnReader : public OrcColumnReader {
     return Status::OK();
   }
 
-  Status ReadValue(int row_idx, Tuple* tuple, MemPool* pool)
-      override WARN_UNUSED_RESULT {
-    if (IsNull(DCHECK_NOTNULL(batch_), row_idx)) {
-      SetNullSlot(tuple);
+  Status ReadValue(int row_idx, Tuple* tuple, MemPool* pool) final WARN_UNUSED_RESULT {
+    if (OrcColumnReader::IsNull(DCHECK_NOTNULL(batch_), row_idx)) {
+      OrcColumnReader::SetNullSlot(tuple);
       return Status::OK();
     }
     double val = batch_->data.data()[row_idx];
-    *(reinterpret_cast<T*>(GetSlot(tuple))) = val;
+    *(reinterpret_cast<T*>(OrcColumnReader::GetSlot(tuple))) = val;
     return Status::OK();
   }
+
  private:
+  friend class OrcPrimitiveColumnReader<OrcDoubleColumnReader<T>>;
+
   orc::DoubleVectorBatch* batch_;
 };
 
-class OrcStringColumnReader : public OrcColumnReader {
+class OrcStringColumnReader : public OrcPrimitiveColumnReader<OrcStringColumnReader> {
  public:
   OrcStringColumnReader(const orc::Type* node, const SlotDescriptor* slot_desc,
       HdfsOrcScanner* scanner)
-      : OrcColumnReader(node, slot_desc, scanner) { }
+      : OrcPrimitiveColumnReader<OrcStringColumnReader>(node, slot_desc, scanner) { }
+
+  virtual ~OrcStringColumnReader() { }
 
   Status UpdateInputBatch(orc::ColumnVectorBatch* orc_batch) override WARN_UNUSED_RESULT {
     batch_ = static_cast<orc::StringVectorBatch*>(orc_batch);
@@ -220,8 +284,11 @@ class OrcStringColumnReader : public OrcColumnReader {
     return Status::OK();
   }
 
-  Status ReadValue(int row_idx, Tuple* tuple, MemPool* pool) override WARN_UNUSED_RESULT;
+  Status ReadValue(int row_idx, Tuple* tuple, MemPool* pool) final WARN_UNUSED_RESULT;
+
  private:
+  friend class OrcPrimitiveColumnReader<OrcStringColumnReader>;
+
   orc::StringVectorBatch* batch_ = nullptr;
   // We copy the blob from the batch, so the memory will be handled by Impala, and not
   // by the ORC lib.
@@ -237,11 +304,13 @@ class OrcStringColumnReader : public OrcColumnReader {
   Status InitBlob(orc::DataBuffer<char>* blob, MemPool* pool);
 };
 
-class OrcTimestampReader : public OrcColumnReader {
+class OrcTimestampReader : public OrcPrimitiveColumnReader<OrcTimestampReader> {
  public:
   OrcTimestampReader(const orc::Type* node, const SlotDescriptor* slot_desc,
       HdfsOrcScanner* scanner)
-      : OrcColumnReader(node, slot_desc, scanner) { }
+      : OrcPrimitiveColumnReader<OrcTimestampReader>(node, slot_desc, scanner) { }
+
+  virtual ~OrcTimestampReader() { }
 
   Status UpdateInputBatch(orc::ColumnVectorBatch* orc_batch) override WARN_UNUSED_RESULT {
     batch_ = static_cast<orc::TimestampVectorBatch*>(orc_batch);
@@ -249,16 +318,21 @@ class OrcTimestampReader : public OrcColumnReader {
     return Status::OK();
   }
 
-  Status ReadValue(int row_idx, Tuple* tuple, MemPool* pool) override WARN_UNUSED_RESULT;
+  Status ReadValue(int row_idx, Tuple* tuple, MemPool* pool) final WARN_UNUSED_RESULT;
+
  private:
+  friend class OrcPrimitiveColumnReader<OrcTimestampReader>;
+
   orc::TimestampVectorBatch* batch_ = nullptr;
 };
 
-class OrcDateColumnReader : public OrcColumnReader {
+class OrcDateColumnReader : public OrcPrimitiveColumnReader<OrcDateColumnReader> {
  public:
   OrcDateColumnReader(const orc::Type* node, const SlotDescriptor* slot_desc,
       HdfsOrcScanner* scanner)
-      : OrcColumnReader(node, slot_desc, scanner) { }
+      : OrcPrimitiveColumnReader<OrcDateColumnReader>(node, slot_desc, scanner) { }
+
+  virtual ~OrcDateColumnReader() { }
 
   Status UpdateInputBatch(orc::ColumnVectorBatch* orc_batch) override WARN_UNUSED_RESULT {
     batch_ = static_cast<orc::LongVectorBatch*>(orc_batch);
@@ -266,17 +340,24 @@ class OrcDateColumnReader : public OrcColumnReader {
     return Status::OK();
   }
 
-  Status ReadValue(int row_idx, Tuple* tuple, MemPool* pool) override WARN_UNUSED_RESULT;
+  Status ReadValue(int row_idx, Tuple* tuple, MemPool* pool) final WARN_UNUSED_RESULT;
+
  private:
+  friend class OrcPrimitiveColumnReader<OrcDateColumnReader>;
+
   orc::LongVectorBatch* batch_ = nullptr;
 };
 
 template<typename DECIMAL_TYPE>
-class OrcDecimalColumnReader : public OrcColumnReader {
+class OrcDecimalColumnReader
+    : public OrcPrimitiveColumnReader<OrcDecimalColumnReader<DECIMAL_TYPE>> {
  public:
   OrcDecimalColumnReader(const orc::Type* node, const SlotDescriptor* slot_desc,
       HdfsOrcScanner* scanner)
-      : OrcColumnReader(node, slot_desc, scanner) { }
+      : OrcPrimitiveColumnReader<OrcDecimalColumnReader<DECIMAL_TYPE>>(node, slot_desc,
+          scanner) { }
+
+  virtual ~OrcDecimalColumnReader() { }
 
   Status UpdateInputBatch(orc::ColumnVectorBatch* orc_batch) override WARN_UNUSED_RESULT {
     // Reminder: even decimal(1,1) is stored in int64 batch
@@ -285,25 +366,30 @@ class OrcDecimalColumnReader : public OrcColumnReader {
     return Status::OK();
   }
 
-  Status ReadValue(int row_idx, Tuple* tuple, MemPool* pool)
-      override WARN_UNUSED_RESULT {
-    if (IsNull(DCHECK_NOTNULL(batch_), row_idx)) {
-      SetNullSlot(tuple);
+  Status ReadValue(int row_idx, Tuple* tuple, MemPool* pool) final WARN_UNUSED_RESULT {
+    if (OrcColumnReader::IsNull(DCHECK_NOTNULL(batch_), row_idx)) {
+      OrcColumnReader::SetNullSlot(tuple);
       return Status::OK();
     }
     int64_t val = batch_->values.data()[row_idx];
-    reinterpret_cast<DECIMAL_TYPE*>(GetSlot(tuple))->value() = val;
+    reinterpret_cast<DECIMAL_TYPE*>(OrcColumnReader::GetSlot(tuple))->value() = val;
     return Status::OK();
   }
+
  private:
+  friend class OrcPrimitiveColumnReader<OrcDecimalColumnReader<DECIMAL_TYPE>>;
+
   orc::Decimal64VectorBatch* batch_ = nullptr;
 };
 
-class OrcDecimal16ColumnReader : public OrcColumnReader {
+class OrcDecimal16ColumnReader
+    : public OrcPrimitiveColumnReader<OrcDecimal16ColumnReader> {
  public:
   OrcDecimal16ColumnReader(const orc::Type* node, const SlotDescriptor* slot_desc,
       HdfsOrcScanner* scanner)
-      : OrcColumnReader(node, slot_desc, scanner) { }
+      : OrcPrimitiveColumnReader<OrcDecimal16ColumnReader>(node, slot_desc, scanner) { }
+
+  virtual ~OrcDecimal16ColumnReader() { }
 
   Status UpdateInputBatch(orc::ColumnVectorBatch* orc_batch) override WARN_UNUSED_RESULT {
     batch_ = static_cast<orc::Decimal128VectorBatch*>(orc_batch);
@@ -311,8 +397,11 @@ class OrcDecimal16ColumnReader : public OrcColumnReader {
     return Status::OK();
   }
 
-  Status ReadValue(int row_idx, Tuple* tuple, MemPool* pool) override WARN_UNUSED_RESULT;
+  Status ReadValue(int row_idx, Tuple* tuple, MemPool* pool) final WARN_UNUSED_RESULT;
+
  private:
+  friend class OrcPrimitiveColumnReader<OrcDecimal16ColumnReader>;
+
   orc::Decimal128VectorBatch* batch_ = nullptr;
 };
 
@@ -335,10 +424,10 @@ class OrcDecimal16ColumnReader : public OrcColumnReader {
 ///     reader->UpdateInputBatch(orc_batch);
 ///     while (!reader->EndOfBatch()) {
 ///       tuple = ...  // Init tuple
-///       reader->TransferTuple(tuple, mem_pool);
+///       reader->ReadValueBatch(scratch_batch, mem_pool);
 ///     }
 ///   }
-/// 'TransferTuple' don't require a row index since the top-level reader will keep
+/// 'ReadValueBatch' don't require a row index since the top-level reader will keep
 /// track of the progress by internal fields:
 ///   * STRUCT reader: row_idx_
 ///   * LIST reader: row_idx_, array_start_, array_idx_, array_end_
@@ -374,6 +463,8 @@ class OrcComplexColumnReader : public OrcColumnReader {
   OrcComplexColumnReader(const orc::Type* node, const SlotDescriptor* slot_desc,
       HdfsOrcScanner* scanner) : OrcColumnReader(node, slot_desc, scanner) { }
 
+  virtual ~OrcComplexColumnReader() { }
+
   bool IsComplexColumnReader() const override { return true; }
 
   bool MaterializeTuple() const override { return materialize_tuple_; }
@@ -386,9 +477,15 @@ class OrcComplexColumnReader : public OrcColumnReader {
     return Status::OK();
   }
 
+  /// Checks if this complex column reader has a collection child.
+  bool HasCollectionChild() const;
+
   /// Assemble current collection value (tracked by 'row_idx_') into a top level 'tuple'.
   /// Depends on the UpdateInputBatch being called before (thus batch_ is updated)
   virtual Status TransferTuple(Tuple* tuple, MemPool* pool) WARN_UNUSED_RESULT = 0;
+
+  virtual Status TopLevelReadValueBatch(ScratchTupleBatch* scratch_batch, MemPool* pool)
+      WARN_UNUSED_RESULT = 0;
 
   /// Num of tuples inside the 'row_idx'-th row. LIST/MAP types will have 0 to N tuples.
   /// STRUCT type will always have one tuple.
@@ -412,6 +509,10 @@ class OrcComplexColumnReader : public OrcColumnReader {
 
   /// Convenient reference to 'batch_' of subclass.
   orc::ColumnVectorBatch* vbatch_ = nullptr;
+
+  /// Helper function for HasCollectionChild() to achieve recursion on the children
+  /// tree of 'reader'.
+  bool HasCollectionChildRecursive(const OrcColumnReader* reader) const;
 };
 
 class OrcStructReader : public OrcComplexColumnReader {
@@ -423,11 +524,21 @@ class OrcStructReader : public OrcComplexColumnReader {
   OrcStructReader(const orc::Type* node, const SlotDescriptor* slot_desc,
       HdfsOrcScanner* scanner);
 
+  virtual ~OrcStructReader() { }
+
+  bool IsCollectionReader() const override { return false; }
+
   Status UpdateInputBatch(orc::ColumnVectorBatch* orc_batch) override WARN_UNUSED_RESULT;
 
   Status TransferTuple(Tuple* tuple, MemPool* pool) override WARN_UNUSED_RESULT;
 
-  Status ReadValue(int row_idx, Tuple* tuple, MemPool* pool) override WARN_UNUSED_RESULT;
+  Status ReadValue(int row_idx, Tuple* tuple, MemPool* pool) final WARN_UNUSED_RESULT;
+
+  Status TopLevelReadValueBatch(ScratchTupleBatch* scratch_batch, MemPool* pool) override
+      WARN_UNUSED_RESULT;
+
+  Status ReadValueBatch(int row_idx, ScratchTupleBatch* scratch_batch, MemPool* pool,
+      int scratch_batch_idx) override WARN_UNUSED_RESULT;
 
   int GetNumTuples(int row_idx) const override { return 1; }
 
@@ -460,9 +571,17 @@ class OrcCollectionReader : public OrcComplexColumnReader {
   OrcCollectionReader(const orc::Type* node, const SlotDescriptor* slot_desc,
       HdfsOrcScanner* scanner);
 
+  virtual ~OrcCollectionReader() { }
+
   bool IsCollectionReader() const override { return true; }
 
   Status ReadValue(int row_idx, Tuple* tuple, MemPool* pool) override WARN_UNUSED_RESULT;
+
+  Status TopLevelReadValueBatch(ScratchTupleBatch* scratch_batch, MemPool* pool) override
+      WARN_UNUSED_RESULT;
+
+  Status ReadValueBatch(int row_idx, ScratchTupleBatch* scratch_batch, MemPool* pool,
+      int scratch_batch_idx) override WARN_UNUSED_RESULT;
 
   /// Assemble the given 'tuple' by reading children values into it. The corresponding
   /// children values are in the 'row_idx'-th collection. Each collection (List/Map) may
@@ -479,6 +598,8 @@ class OrcListReader : public OrcCollectionReader {
 
   OrcListReader(const orc::Type* node, const SlotDescriptor* slot_desc,
       HdfsOrcScanner* scanner);
+
+  virtual ~OrcListReader() { }
 
   Status UpdateInputBatch(orc::ColumnVectorBatch* orc_batch) override WARN_UNUSED_RESULT;
 
@@ -511,6 +632,8 @@ class OrcMapReader : public OrcCollectionReader {
 
   OrcMapReader(const orc::Type* node, const SlotDescriptor* slot_desc,
       HdfsOrcScanner* scanner);
+
+  virtual ~OrcMapReader() { }
 
   Status UpdateInputBatch(orc::ColumnVectorBatch* orc_batch) override WARN_UNUSED_RESULT;
 

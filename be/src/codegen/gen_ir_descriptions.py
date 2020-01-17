@@ -33,9 +33,9 @@ options, args = parser.parse_args()
 # This script will generate two headers that describe all of the clang cross compiled
 # functions.
 # The script outputs (run: 'impala/common/function-registry/gen_functions.py')
-#   - be/src/generated-sources/impala-ir/impala-ir-functions.h
+#   - be/generated-sources/impala-ir/impala-ir-functions.h
 #     This file contains enums for all of the cross compiled functions
-#   - be/src/generated-sources/impala-ir/impala-ir-function-names.h
+#   - be/generated-sources/impala-ir/impala-ir-names.h
 #     This file contains a mapping of <string, enum>
 
 # Mapping of enum to compiled function name. The compiled function name has to be
@@ -182,7 +182,7 @@ ir_functions = [
   ["HDFS_SCANNER_WRITE_ALIGNED_TUPLES",
    "_ZN6impala11HdfsScanner18WriteAlignedTuplesEPNS_7MemPoolEPNS_8TupleRowEPNS_13FieldLocationEiiiib"],
   ["PROCESS_SCRATCH_BATCH",
-   "_ZN6impala18HdfsParquetScanner19ProcessScratchBatchEPNS_8RowBatchE"],
+   "_ZN6impala19HdfsColumnarScanner19ProcessScratchBatchEPNS_8RowBatchE"],
   ["HDFS_SCANNER_EVAL_RUNTIME_FILTER",
    "_ZN6impala11HdfsScanner17EvalRuntimeFilterEiPNS_8TupleRowE"],
   ["STRING_TO_BOOL", "IrStringToBool"],

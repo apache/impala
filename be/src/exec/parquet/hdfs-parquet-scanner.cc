@@ -85,14 +85,12 @@ Status HdfsParquetScanner::IssueInitialRanges(HdfsScanNodeBase* scan_node,
 }
 
 HdfsParquetScanner::HdfsParquetScanner(HdfsScanNodeBase* scan_node, RuntimeState* state)
-  : HdfsScanner(scan_node, state),
+  : HdfsColumnarScanner(scan_node, state),
     row_group_idx_(-1),
     row_group_rows_read_(0),
     advance_row_group_(true),
     min_max_tuple_(nullptr),
     row_batches_produced_(0),
-    scratch_batch_(new ScratchTupleBatch(
-        *scan_node->row_desc(), state_->batch_size(), scan_node->mem_tracker())),
     metadata_range_(nullptr),
     dictionary_pool_(new MemPool(scan_node->mem_tracker())),
     assemble_rows_timer_(scan_node_->materialize_tuple_timer()),
@@ -105,7 +103,6 @@ HdfsParquetScanner::HdfsParquetScanner(HdfsScanNodeBase* scan_node, RuntimeState
     parquet_compressed_page_size_counter_(nullptr),
     parquet_uncompressed_page_size_counter_(nullptr),
     coll_items_read_counter_(0),
-    codegend_process_scratch_batch_fn_(nullptr),
     page_index_(this) {
   assemble_rows_timer_.Stop();
 }
@@ -1176,40 +1173,6 @@ Status HdfsParquetScanner::CommitRows(RowBatch* dst_batch, int num_rows) {
   // memory from evaluating the scanner conjuncts.
   context_->expr_results_pool()->Clear();
   return Status::OK();
-}
-
-int HdfsParquetScanner::TransferScratchTuples(RowBatch* dst_batch) {
-  // This function must not be called when the output batch is already full. As long as
-  // we always call CommitRows() after TransferScratchTuples(), the output batch can
-  // never be empty.
-  DCHECK_LT(dst_batch->num_rows(), dst_batch->capacity());
-  DCHECK_EQ(dst_batch->row_desc()->tuple_descriptors().size(), 1);
-  if (scratch_batch_->tuple_byte_size == 0) {
-    Tuple** output_row =
-        reinterpret_cast<Tuple**>(dst_batch->GetRow(dst_batch->num_rows()));
-    // We are materializing a collection with empty tuples. Add a NULL tuple to the
-    // output batch per remaining scratch tuple and return. No need to evaluate
-    // filters/conjuncts.
-    DCHECK(filter_ctxs_.empty());
-    DCHECK(conjunct_evals_->empty());
-    int num_tuples = min(dst_batch->capacity() - dst_batch->num_rows(),
-        scratch_batch_->num_tuples - scratch_batch_->tuple_idx);
-    memset(output_row, 0, num_tuples * sizeof(Tuple*));
-    scratch_batch_->tuple_idx += num_tuples;
-    // No data is required to back the empty tuples, so we should not attach any data to
-    // these batches.
-    DCHECK_EQ(0, scratch_batch_->total_allocated_bytes());
-    return num_tuples;
-  }
-
-  int num_rows_to_commit;
-  if (codegend_process_scratch_batch_fn_ != nullptr) {
-    num_rows_to_commit = codegend_process_scratch_batch_fn_(this, dst_batch);
-  } else {
-    num_rows_to_commit = ProcessScratchBatch(dst_batch);
-  }
-  scratch_batch_->FinalizeTupleTransfer(dst_batch, num_rows_to_commit);
-  return num_rows_to_commit;
 }
 
 Status HdfsParquetScanner::Codegen(HdfsScanPlanNode* node, RuntimeState* state,

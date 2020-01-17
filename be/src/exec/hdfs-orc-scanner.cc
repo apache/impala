@@ -133,7 +133,7 @@ void HdfsOrcScanner::ScanRangeInputStream::read(void* buf, uint64_t length,
 }
 
 HdfsOrcScanner::HdfsOrcScanner(HdfsScanNodeBase* scan_node, RuntimeState* state)
-  : HdfsScanner(scan_node, state),
+  : HdfsColumnarScanner(scan_node, state),
     dictionary_pool_(new MemPool(scan_node->mem_tracker())),
     data_batch_pool_(new MemPool(scan_node->mem_tracker())),
     assemble_rows_timer_(scan_node_->materialize_tuple_timer()) {
@@ -234,6 +234,7 @@ void HdfsOrcScanner::Close(RowBatch* row_batch) {
     row_batch->tuple_data_pool()->AcquireData(template_tuple_pool_.get(), false);
     row_batch->tuple_data_pool()->AcquireData(dictionary_pool_.get(), false);
     row_batch->tuple_data_pool()->AcquireData(data_batch_pool_.get(), false);
+    scratch_batch_->ReleaseResources(row_batch->tuple_data_pool());
     if (scan_node_->HasRowBatchQueue()) {
       static_cast<HdfsScanNode*>(scan_node_)->AddMaterializedRowBatch(
           unique_ptr<RowBatch>(row_batch));
@@ -243,6 +244,7 @@ void HdfsOrcScanner::Close(RowBatch* row_batch) {
     dictionary_pool_->FreeAll();
     data_batch_pool_->FreeAll();
     context_->ReleaseCompletedResources(true);
+    scratch_batch_->ReleaseResources(nullptr);
   }
   orc_root_batch_.reset(nullptr);
 
@@ -250,6 +252,7 @@ void HdfsOrcScanner::Close(RowBatch* row_batch) {
   DCHECK_EQ(template_tuple_pool_->total_allocated_bytes(), 0);
   DCHECK_EQ(dictionary_pool_->total_allocated_bytes(), 0);
   DCHECK_EQ(data_batch_pool_->total_allocated_bytes(), 0);
+  DCHECK_EQ(scratch_batch_->total_allocated_bytes(), 0);
 
   assemble_rows_timer_.Stop();
   assemble_rows_timer_.ReleaseCounter();
@@ -491,6 +494,14 @@ Status HdfsOrcScanner::GetNextInternal(RowBatch* row_batch) {
     return Status::OK();
   }
 
+  if (!scratch_batch_->AtEnd()) {
+    assemble_rows_timer_.Start();
+    int num_row_to_commit = TransferScratchTuples(row_batch);
+    assemble_rows_timer_.Stop();
+    RETURN_IF_ERROR(CommitRows(num_row_to_commit, row_batch));
+    if (row_batch->AtCapacity()) return Status::OK();
+  }
+
   // reset tuple memory. We'll allocate it the first time we use it.
   tuple_mem_ = nullptr;
   tuple_ = nullptr;
@@ -501,7 +512,8 @@ Status HdfsOrcScanner::GetNextInternal(RowBatch* row_batch) {
   // 'TransferTuples' here.
   if (!orc_root_reader_->EndOfBatch()) {
     assemble_rows_timer_.Start();
-    RETURN_IF_ERROR(TransferTuples(orc_root_reader_, row_batch));
+    RETURN_IF_ERROR(TransferTuples(orc_root_reader_, row_batch,
+        !orc_root_reader_->HasCollectionChild()));
     assemble_rows_timer_.Stop();
     if (row_batch->AtCapacity()) return Status::OK();
     DCHECK(orc_root_reader_->EndOfBatch());
@@ -661,7 +673,8 @@ Status HdfsOrcScanner::AssembleRows(RowBatch* row_batch) {
       num_rows_read += orc_root_batch_->numElements;
     }
 
-    RETURN_IF_ERROR(TransferTuples(orc_root_reader_, row_batch));
+    RETURN_IF_ERROR(TransferTuples(orc_root_reader_, row_batch,
+       !orc_root_reader_->HasCollectionChild()));
     if (row_batch->AtCapacity()) break;
     continue_execution &= !scan_node_->ReachedLimitShared() && !context_->cancelled();
   }
@@ -674,7 +687,7 @@ Status HdfsOrcScanner::AssembleRows(RowBatch* row_batch) {
 }
 
 Status HdfsOrcScanner::TransferTuples(OrcComplexColumnReader* coll_reader,
-    RowBatch* dst_batch) {
+    RowBatch* dst_batch, bool do_batch_read) {
   if (!coll_reader->MaterializeTuple()) {
     // Top-level readers that are not materializing tuples will delegate the
     // materialization to its unique child.
@@ -682,7 +695,8 @@ Status HdfsOrcScanner::TransferTuples(OrcComplexColumnReader* coll_reader,
     OrcColumnReader* child = coll_reader->children()[0];
     // Only complex type readers can be top-level readers.
     DCHECK(child->IsComplexColumnReader());
-    return TransferTuples(static_cast<OrcComplexColumnReader*>(child), dst_batch);
+    return TransferTuples(
+        static_cast<OrcComplexColumnReader*>(child), dst_batch, do_batch_read);
   }
   const TupleDescriptor* tuple_desc = scan_node_->tuple_desc();
 
@@ -694,21 +708,35 @@ Status HdfsOrcScanner::TransferTuples(OrcComplexColumnReader* coll_reader,
   int row_id = dst_batch->num_rows();
   int capacity = dst_batch->capacity();
   int num_to_commit = 0;
-  TupleRow* row = dst_batch->GetRow(row_id);
+  TupleRow* dst_row = dst_batch->GetRow(row_id);
   Tuple* tuple = tuple_;  // tuple_ is updated in CommitRows
 
   // TODO(IMPALA-6506): codegen the runtime filter + conjunct evaluation loop
   while (row_id < capacity && !coll_reader->EndOfBatch()) {
-    if (tuple_desc->byte_size() > 0) DCHECK_LT((void*)tuple, (void*)tuple_mem_end_);
-    InitTuple(tuple_desc, template_tuple_, tuple);
-    RETURN_IF_ERROR(coll_reader->TransferTuple(tuple, dst_batch->tuple_data_pool()));
-    row->SetTuple(0, tuple);
-    if (!EvalRuntimeFilters(row)) continue;
-    if (ExecNode::EvalConjuncts(conjunct_evals, num_conjuncts, row)) {
-      row = next_row(row);
-      tuple = next_tuple(tuple_desc->byte_size(), tuple);
-      ++row_id;
-      ++num_to_commit;
+    if (do_batch_read) {
+      DCHECK(scratch_batch_ != nullptr);
+      DCHECK(scratch_batch_->AtEnd());
+      RETURN_IF_ERROR(scratch_batch_->Reset(state_));
+      InitTupleBuffer(template_tuple_, scratch_batch_->tuple_mem,
+          scratch_batch_->capacity);
+
+      RETURN_IF_ERROR(coll_reader->TopLevelReadValueBatch(scratch_batch_.get(),
+          &scratch_batch_->aux_mem_pool));
+      int num_tuples_transferred = TransferScratchTuples(dst_batch);
+      row_id += num_tuples_transferred;
+      num_to_commit += num_tuples_transferred;
+    } else {
+      if (tuple_desc->byte_size() > 0) DCHECK_LT((void*)tuple, (void*)tuple_mem_end_);
+      InitTuple(tuple_desc, template_tuple_, tuple);
+      RETURN_IF_ERROR(coll_reader->TransferTuple(tuple, dst_batch->tuple_data_pool()));
+      dst_row->SetTuple(0, tuple);
+      if (!EvalRuntimeFilters(dst_row)) continue;
+      if (ExecNode::EvalConjuncts(conjunct_evals, num_conjuncts, dst_row)) {
+        dst_row = next_row(dst_row);
+        tuple = next_tuple(tuple_desc->byte_size(), tuple);
+        ++row_id;
+        ++num_to_commit;
+      }
     }
   }
   VLOG_ROW << Substitute("Transfer $0 rows from scratch batch to dst_batch ($1 rows)",

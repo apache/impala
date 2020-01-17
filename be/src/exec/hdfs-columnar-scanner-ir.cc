@@ -15,18 +15,12 @@
 // specific language governing permissions and limitations
 // under the License.
 
-#include "exec/parquet/hdfs-parquet-scanner.h"
+#include "exec/hdfs-columnar-scanner.h"
 
-#include "exec/filter-context.h"
-#include "exec/parquet/parquet-scratch-tuple-batch.h"
-#include "exprs/scalar-expr.h"
-#include "runtime/runtime-filter.h"
-#include "runtime/runtime-filter.inline.h"
-#include "runtime/tuple-row.h"
+namespace impala {
 
-using namespace impala;
-
-int HdfsParquetScanner::ProcessScratchBatch(RowBatch* dst_batch) {
+int HdfsColumnarScanner::ProcessScratchBatch(RowBatch* dst_batch) {
+  DCHECK(scratch_batch_ != nullptr);
   ScalarExprEvaluator* const* conjunct_evals = conjunct_evals_->data();
   const int num_conjuncts = conjunct_evals_->size();
 
@@ -64,4 +58,6 @@ int HdfsParquetScanner::ProcessScratchBatch(RowBatch* dst_batch) {
   }
   scratch_batch_->tuple_idx += (scratch_tuple - scratch_tuple_start) / tuple_size;
   return output_row - output_row_start;
+}
+
 }
