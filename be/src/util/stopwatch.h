@@ -69,6 +69,13 @@ class StopWatch {
     return total_time_ + RunningTime();
   }
 
+#if defined(__aarch64__)
+  static uint64_t Rdtsc() {
+    uint64_t virtual_timer_value;
+    asm volatile("mrs %0, cntvct_el0" : "=r"(virtual_timer_value));
+    return virtual_timer_value;
+  }
+#else
   static uint64_t Rdtsc() {
     uint32_t lo, hi;
     __asm__ __volatile__ (
@@ -77,6 +84,7 @@ class StopWatch {
     __asm__ __volatile__ ("rdtsc" : "=a" (lo), "=d" (hi));
     return (uint64_t)hi << 32 | lo;
   }
+#endif
 
  private:
   /// Returns total time in cpu ticks since Start() was called. If not running, returns 0.
