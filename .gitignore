@@ -98,6 +98,9 @@ gdb.txt
 eclipse-classes/
 .pydevproject
 
+# Visual Studio Code artifacts
+.vscode/
+
 # Debugging
 ad-hoc.test
 nohup.out
