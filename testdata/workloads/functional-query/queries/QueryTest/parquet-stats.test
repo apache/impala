@@ -681,3 +681,85 @@ NaN
 select * from test_multiple_nans where val > 20
 ---- RESULTS
 ====
+---- QUERY
+# Test the cases when column data types are changed from 32 bit integer to 8 bit integer,
+# from 16 bit integer to 8 bit integer, and from 32 bit integer to 16 bit integer.
+# Some existing data values in the table will be overflow and cause the min/max stats
+# values to be invalid.
+set PARQUET_READ_STATISTICS=1;
+create table tnarrow(i32_to_8 int, i16_to_8 smallint, i32_to_16 int) stored as parquet;
+insert into tnarrow values (1, 2, 3), (200, 201, 40000);
+alter table tnarrow change column i32_to_8 i32_to_8 tinyint;
+alter table tnarrow change column i16_to_8 i16_to_8 tinyint;
+alter table tnarrow change column i32_to_16 i32_to_16 smallint;
+insert into tnarrow values (5, 6, 7), (-5, -6, -7);
+select count(*) from tnarrow;
+---- RESULTS
+4
+====
+---- QUERY
+# Test the case when column data type is changed from 32 bit integer to 8 bit integer.
+select count(*) from tnarrow where i32_to_8 < 0;
+---- RESULTS
+2
+====
+---- QUERY
+select count(*) from tnarrow where i32_to_8 > 0;
+---- RESULTS
+2
+====
+---- QUERY
+select count(*) from tnarrow where i32_to_8 = 1;
+---- RESULTS
+1
+====
+---- QUERY
+# When the column data type is changed, 200 is overflown as value -56.
+select count(*) from tnarrow where i32_to_8 = -56;
+---- RESULTS
+1
+====
+---- QUERY
+# Test the case when column data type is changed from 16 bit integer to 8 bit integer.
+select count(*) from tnarrow where i16_to_8 < 0;
+---- RESULTS
+2
+====
+---- QUERY
+select count(*) from tnarrow where i16_to_8 > 0;
+---- RESULTS
+2
+====
+---- QUERY
+select count(*) from tnarrow where i16_to_8 = 2;
+---- RESULTS
+1
+====
+---- QUERY
+# When the column data type is changed, 201 is overflown as value -55.
+select count(*) from tnarrow where i16_to_8 = -55;
+---- RESULTS
+1
+====
+---- QUERY
+# Test the case when column data type is changed from 32 bit integer to 16 bit integer.
+select count(*) from tnarrow where i32_to_16 < 0;
+---- RESULTS
+2
+====
+---- QUERY
+select count(*) from tnarrow where i32_to_16 > 0;
+---- RESULTS
+2
+====
+---- QUERY
+select count(*) from tnarrow where i32_to_16 = 3;
+---- RESULTS
+1
+====
+---- QUERY
+# When the column data type is changed, 40000 is overflown as value -25536.
+select count(*) from tnarrow where i32_to_16 = -25536;
+---- RESULTS
+1
+====

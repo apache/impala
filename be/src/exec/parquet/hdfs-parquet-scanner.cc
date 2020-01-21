@@ -697,10 +697,12 @@ bool HdfsParquetScanner::ReadStatFromIndex(const ColumnStatsReader& stats_reader
   switch (stats_field) {
     case ColumnStatsReader::StatsField::MIN:
       return stats_reader.ReadFromString(
-          stats_field, column_index.min_values[page_idx], slot);
+          stats_field, column_index.min_values[page_idx],
+          &column_index.max_values[page_idx], slot);
     case ColumnStatsReader::StatsField::MAX:
       return stats_reader.ReadFromString(
-          stats_field, column_index.max_values[page_idx], slot);
+          stats_field, column_index.max_values[page_idx],
+          &column_index.min_values[page_idx], slot);
     default:
       DCHECK(false);
   }

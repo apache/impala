@@ -271,7 +271,10 @@ public:
   bool ReadFromThrift(StatsField stats_field, void* slot) const;
 
   /// Read plain encoded value from a string 'encoded_value' into 'slot'.
+  /// Set paired_stats_value as nullptr if there is no corresponding paired stats,
+  /// or paired stats value is not set.
   bool ReadFromString(StatsField stats_field, const std::string& encoded_value,
+      const std::string* paired_stats_value,
       void* slot) const;
 
   // Gets the null_count statistics from the column chunk's metadata and returns

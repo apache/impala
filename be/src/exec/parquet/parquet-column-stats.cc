@@ -48,23 +48,32 @@ bool ColumnStatsReader::ReadFromThrift(StatsField stats_field, void* slot) const
   // Try to read the requested stats field. If it is not set, we may fall back to reading
   // the old stats, based on the column type.
   const string* stat_value = nullptr;
+  const string* paired_stats_value = nullptr;
   switch (stats_field) {
     case StatsField::MIN:
       if (stats.__isset.min_value && CanUseStats()) {
         stat_value = &stats.min_value;
+        if (stats.__isset.max_value)
+          paired_stats_value = &stats.max_value;
         break;
       }
       if (stats.__isset.min && CanUseDeprecatedStats()) {
         stat_value = &stats.min;
+        if (stats.__isset.max)
+          paired_stats_value = &stats.max;
       }
       break;
     case StatsField::MAX:
       if (stats.__isset.max_value && CanUseStats()) {
         stat_value = &stats.max_value;
+        if (stats.__isset.min_value)
+          paired_stats_value = &stats.min_value;
         break;
       }
       if (stats.__isset.max && CanUseDeprecatedStats()) {
         stat_value = &stats.max;
+        if (stats.__isset.min)
+          paired_stats_value = &stats.min;
       }
       break;
     default:
@@ -72,11 +81,11 @@ bool ColumnStatsReader::ReadFromThrift(StatsField stats_field, void* slot) const
   }
   if (stat_value == nullptr) return false;
 
-  return ReadFromString(stats_field, *stat_value, slot);
+  return ReadFromString(stats_field, *stat_value, paired_stats_value, slot);
 }
 
 bool ColumnStatsReader::ReadFromString(StatsField stats_field,
-    const string& encoded_value, void* slot) const {
+    const string& encoded_value, const string* paired_stats_value, void* slot) const {
   switch (col_type_.type) {
     case TYPE_BOOLEAN:
       return ColumnStats<bool>::DecodePlainValue(encoded_value, slot,
@@ -84,10 +93,20 @@ bool ColumnStatsReader::ReadFromString(StatsField stats_field,
     case TYPE_TINYINT: {
       // parquet::Statistics encodes INT_8 values using 4 bytes.
       int32_t col_stats;
+      int32_t paired_stats_val = 0;
       bool ret = ColumnStats<int32_t>::DecodePlainValue(encoded_value, &col_stats,
           parquet::Type::INT32);
-      if (!ret || col_stats < std::numeric_limits<int8_t>::min() ||
-          col_stats > std::numeric_limits<int8_t>::max()) {
+      if (!ret || paired_stats_value == nullptr) return false;
+      ret = ColumnStats<int32_t>::DecodePlainValue(*paired_stats_value,
+          &paired_stats_val, parquet::Type::INT32);
+      // Check if the values of the column stats and paired stats are in valid range.
+      // The column stats values could be invalid if the column data type
+      // has been changed.
+      if (!ret ||
+          col_stats < std::numeric_limits<int8_t>::min() ||
+          col_stats > std::numeric_limits<int8_t>::max() ||
+          paired_stats_val < std::numeric_limits<int8_t>::min() ||
+          paired_stats_val > std::numeric_limits<int8_t>::max()) {
         return false;
       }
       *static_cast<int8_t*>(slot) = col_stats;
@@ -96,10 +115,17 @@ bool ColumnStatsReader::ReadFromString(StatsField stats_field,
     case TYPE_SMALLINT: {
       // parquet::Statistics encodes INT_16 values using 4 bytes.
       int32_t col_stats;
+      int32_t paired_stats_val = 0;
       bool ret = ColumnStats<int32_t>::DecodePlainValue(encoded_value, &col_stats,
           parquet::Type::INT32);
-      if (!ret || col_stats < std::numeric_limits<int16_t>::min() ||
-          col_stats > std::numeric_limits<int16_t>::max()) {
+      if (!ret || paired_stats_value == nullptr) return false;
+      ret = ColumnStats<int32_t>::DecodePlainValue(*paired_stats_value,
+          &paired_stats_val, parquet::Type::INT32);
+      if (!ret ||
+          col_stats < std::numeric_limits<int16_t>::min() ||
+          col_stats > std::numeric_limits<int16_t>::max() ||
+          paired_stats_val < std::numeric_limits<int16_t>::min() ||
+          paired_stats_val > std::numeric_limits<int16_t>::max()) {
         return false;
       }
       *static_cast<int16_t*>(slot) = col_stats;
