@@ -45,14 +45,14 @@ void ReservationTracker::InitRootTracker(
   DCHECK(!initialized_);
   parent_ = nullptr;
   mem_tracker_ = nullptr;
-  reservation_limit_ = reservation_limit;
-  reservation_ = 0;
-  used_reservation_ = 0;
-  child_reservations_ = 0;
+  reservation_limit_.Store(reservation_limit);
+  reservation_.Store(0);
+  used_reservation_.Store(0);
+  child_reservations_.Store(0);
   initialized_ = true;
 
-  InitCounters(profile, reservation_limit_);
-  COUNTER_SET(counters_.peak_reservation, reservation_);
+  InitCounters(profile, reservation_limit);
+  COUNTER_SET(counters_.peak_reservation, 0);
 
   CheckConsistency();
 }
@@ -69,10 +69,10 @@ void ReservationTracker::InitChildTracker(RuntimeProfile* profile,
   mem_tracker_ = mem_tracker;
   mem_limit_mode_ = mem_limit_mode;
 
-  reservation_limit_ = reservation_limit;
-  reservation_ = 0;
-  used_reservation_ = 0;
-  child_reservations_ = 0;
+  reservation_limit_.Store(reservation_limit);
+  reservation_.Store(0);
+  used_reservation_.Store(0);
+  child_reservations_.Store(0);
   initialized_ = true;
 
   if (mem_tracker_ != nullptr) {
@@ -95,7 +95,7 @@ void ReservationTracker::InitChildTracker(RuntimeProfile* profile,
     }
   }
 
-  InitCounters(profile, reservation_limit_);
+  InitCounters(profile, reservation_limit);
 
   CheckConsistency();
 }
@@ -126,10 +126,10 @@ void ReservationTracker::Close() {
   lock_guard<SpinLock> l(lock_);
   if (!initialized_) return;
   CheckConsistency();
-  DCHECK_EQ(used_reservation_, 0);
-  DCHECK_EQ(child_reservations_, 0);
+  DCHECK_EQ(used_reservation_.Load(), 0);
+  DCHECK_EQ(child_reservations_.Load(), 0);
   // Release any reservation to parent.
-  if (parent_ != nullptr) DecreaseReservationLocked(reservation_, false);
+  if (parent_ != nullptr) DecreaseReservationLocked(reservation_.Load(), false);
   mem_tracker_ = nullptr;
   parent_ = nullptr;
   initialized_ = false;
@@ -175,7 +175,7 @@ bool ReservationTracker::IncreaseReservationInternalLocked(int64_t bytes,
           Substitute("Debug random failure mode is turned on: Reservation of $0 denied.",
               PrettyPrinter::Print(bytes, TUnit::BYTES)));
     }
-  } else if (reservation_ + reservation_increase > reservation_limit_) {
+  } else if (reservation_.Load() + reservation_increase > reservation_limit_.Load()) {
     granted = false;
     if (error_status != nullptr) {
       MemTracker* mem_tracker = mem_tracker_;
@@ -190,10 +190,10 @@ bool ReservationTracker::IncreaseReservationInternalLocked(int64_t bytes,
           "reservation=$3 used_reservation=$4 child_reservations=$5",
           PrettyPrinter::Print(bytes, TUnit::BYTES),
           mem_tracker == nullptr ? "Process" : mem_tracker->label(),
-          PrettyPrinter::Print(reservation_limit_, TUnit::BYTES),
-          PrettyPrinter::Print(reservation_, TUnit::BYTES),
-          PrettyPrinter::Print(used_reservation_, TUnit::BYTES),
-          PrettyPrinter::Print(child_reservations_, TUnit::BYTES));
+          PrettyPrinter::Print(reservation_limit_.Load(), TUnit::BYTES),
+          PrettyPrinter::Print(reservation_.Load(), TUnit::BYTES),
+          PrettyPrinter::Print(used_reservation_.Load(), TUnit::BYTES),
+          PrettyPrinter::Print(child_reservations_.Load(), TUnit::BYTES));
       string top_n_queries = mem_tracker->LogTopNQueries(5);
       if (!top_n_queries.empty()) {
         error_msg = Substitute(
@@ -228,7 +228,7 @@ bool ReservationTracker::IncreaseReservationInternalLocked(int64_t bytes,
     // The reservation was granted and state updated in all ancestors: we can modify
     // this tracker's state now.
     UpdateReservation(reservation_increase);
-    if (is_child_reservation) child_reservations_ += bytes;
+    if (is_child_reservation) child_reservations_.Add(bytes);
   }
 
   CheckConsistency();
@@ -270,9 +270,9 @@ void ReservationTracker::DecreaseReservation(int64_t bytes, bool is_child_reserv
 void ReservationTracker::DecreaseReservationLocked(
     int64_t bytes, bool is_child_reservation) {
   DCHECK(initialized_);
-  DCHECK_GE(reservation_, bytes);
+  DCHECK_GE(reservation_.Load(), bytes);
   if (bytes == 0) return;
-  if (is_child_reservation) child_reservations_ -= bytes;
+  if (is_child_reservation) child_reservations_.Add(-bytes);
   UpdateReservation(-bytes);
   ReleaseToMemTracker(bytes);
   // The reservation should be returned up the tree.
@@ -325,7 +325,9 @@ bool ReservationTracker::TransferReservationTo(ReservationTracker* other, int64_
 
   // Check reservation limits will not be violated before applying any updates.
   for (ReservationTracker* tracker : other_path_to_common) {
-    if (tracker->reservation_ + bytes > tracker->reservation_limit_) return false;
+    if (tracker->reservation_.Load() + bytes > tracker->reservation_limit_.Load()) {
+      return false;
+    }
   }
 
   // Do the updates now that we have checked the limits. We're holding all the locks
@@ -337,10 +339,10 @@ bool ReservationTracker::TransferReservationTo(ReservationTracker* other, int64_
     DCHECK(tracker->mem_tracker_ == nullptr || !tracker->mem_tracker_->has_limit());
     bool success = tracker->TryConsumeFromMemTracker(bytes, MemLimit::HARD);
     DCHECK(success);
-    if (tracker != other_path_to_common[0]) tracker->child_reservations_ += bytes;
+    if (tracker != other_path_to_common[0]) tracker->child_reservations_.Add(bytes);
   }
   for (ReservationTracker* tracker : path_to_common) {
-    if (tracker != path_to_common[0]) tracker->child_reservations_ -= bytes;
+    if (tracker != path_to_common[0]) tracker->child_reservations_.Add(-bytes);
     tracker->UpdateReservation(-bytes);
     tracker->ReleaseToMemTracker(bytes);
   }
@@ -348,15 +350,19 @@ bool ReservationTracker::TransferReservationTo(ReservationTracker* other, int64_
   // Update the 'child_reservations_' on the common ancestor if needed.
   // Case 1: reservation was pushed up to 'other'.
   if (common_ancestor == other) {
+    other->child_reservations_.Add(-bytes);
+#ifndef NDEBUG
     lock_guard<SpinLock> l(other->lock_);
-    other->child_reservations_ -= bytes;
     other->CheckConsistency();
+#endif
   }
   // Case 2: reservation was pushed down below 'this'.
   if (common_ancestor == this) {
+    child_reservations_.Add(bytes);
+#ifndef NDEBUG
     lock_guard<SpinLock> l(lock_);
-    child_reservations_ += bytes;
     CheckConsistency();
+#endif
   }
   return true;
 }
@@ -388,7 +394,7 @@ void ReservationTracker::ReleaseTo(int64_t bytes) {
   lock_guard<SpinLock> l(lock_);
   DCHECK(initialized_);
   DCHECK_GE(bytes, 0);
-  DCHECK_LE(bytes, used_reservation_);
+  DCHECK_LE(bytes, used_reservation_.Load());
   UpdateUsedReservation(-bytes);
   CheckConsistency();
 }
@@ -397,14 +403,14 @@ int64_t ReservationTracker::GetReservation() {
   // Don't acquire lock - there is no point in holding it for this function only since
   // the value read can change as soon as we release it.
   DCHECK(initialized_);
-  return base::subtle::Acquire_Load(&reservation_);
+  return reservation_.Load();
 }
 
 int64_t ReservationTracker::GetUsedReservation() {
   // Don't acquire lock - there is no point in holding it for this function only since
   // the value read can change as soon as we release it.
   DCHECK(initialized_);
-  return base::subtle::Acquire_Load(&used_reservation_);
+  return used_reservation_.Load();
 }
 
 int64_t ReservationTracker::GetUnusedReservation() {
@@ -417,35 +423,35 @@ int64_t ReservationTracker::GetChildReservations() {
   // Don't acquire lock - there is no point in holding it for this function only since
   // the value read can change as soon as we release it.
   DCHECK(initialized_);
-  return base::subtle::Acquire_Load(&child_reservations_);
+  return child_reservations_.Load();
 }
 
 void ReservationTracker::CheckConsistency() const {
   // Check internal invariants.
-  DCHECK_GE(reservation_, 0);
-  DCHECK_LE(reservation_, reservation_limit_);
-  DCHECK_GE(child_reservations_, 0);
-  DCHECK_GE(used_reservation_, 0);
-  DCHECK_LE(used_reservation_ + child_reservations_, reservation_);
+  DCHECK_GE(reservation_.Load(), 0);
+  DCHECK_LE(reservation_.Load(), reservation_limit_.Load());
+  DCHECK_GE(child_reservations_.Load(), 0);
+  DCHECK_GE(used_reservation_.Load(), 0);
+  DCHECK_LE(used_reservation_.Load() + child_reservations_.Load(), reservation_.Load());
 
-  DCHECK_EQ(reservation_, counters_.peak_reservation->current_value());
-  DCHECK_LE(reservation_, counters_.peak_reservation->value());
-  DCHECK_EQ(used_reservation_, counters_.peak_used_reservation->current_value());
-  DCHECK_LE(used_reservation_, counters_.peak_used_reservation->value());
+  DCHECK_EQ(reservation_.Load(), counters_.peak_reservation->current_value());
+  DCHECK_LE(reservation_.Load(), counters_.peak_reservation->value());
+  DCHECK_EQ(used_reservation_.Load(), counters_.peak_used_reservation->current_value());
+  DCHECK_LE(used_reservation_.Load(), counters_.peak_used_reservation->value());
   if (counters_.reservation_limit != nullptr) {
-    DCHECK_EQ(reservation_limit_, counters_.reservation_limit->value());
+    DCHECK_EQ(reservation_limit_.Load(), counters_.reservation_limit->value());
   }
 }
 
 void ReservationTracker::UpdateUsedReservation(int64_t delta) {
-  used_reservation_ += delta;
-  COUNTER_SET(counters_.peak_used_reservation, used_reservation_);
+  int64_t used_reservation = used_reservation_.Add(delta);
+  COUNTER_SET(counters_.peak_used_reservation, used_reservation);
   CheckConsistency();
 }
 
 void ReservationTracker::UpdateReservation(int64_t delta) {
-  reservation_ += delta;
-  COUNTER_SET(counters_.peak_reservation, reservation_);
+  int64_t reservation = reservation_.Add(delta);
+  COUNTER_SET(counters_.peak_reservation, reservation);
   CheckConsistency();
 }
 
@@ -457,7 +463,7 @@ string ReservationTracker::DebugString() {
   return Substitute(
       "<ReservationTracker>: reservation_limit $0 reservation $1 used_reservation $2 "
       "child_reservations $3 parent:\n$4",
-      reservation_limit_, reservation_, used_reservation_, child_reservations_,
-      parent_debug_string);
+      reservation_limit_.Load(), reservation_.Load(), used_reservation_.Load(),
+      child_reservations_.Load(), parent_debug_string);
 }
 }

@@ -81,7 +81,7 @@ Status HdfsScanNode::GetNext(RuntimeState* state, RowBatch* row_batch, bool* eos
   SCOPED_TIMER(runtime_profile_->total_time_counter());
   ScopedGetNextEventAdder ea(this, eos);
 
-  if (!initial_ranges_issued_) {
+  if (!initial_ranges_issued_.Load()) {
     // We do this in GetNext() to maximise the amount of work we can do while waiting for
     // runtime filters to show up. The scanner threads have already started (in Open()),
     // so we need to tell them there is work to do.
@@ -181,7 +181,7 @@ void HdfsScanNode::Close(RuntimeState* state) {
   // At this point, the other threads have been joined, and
   // remaining_scan_range_submissions_ should be 0, if the
   // query started and wasn't cancelled or exited early.
-  if (ranges_issued_barrier_.pending() == 0 && initial_ranges_issued_
+  if (ranges_issued_barrier_.pending() == 0 && initial_ranges_issued_.Load()
       && progress_.done()) {
     DCHECK_EQ(remaining_scan_range_submissions_.Load(), 0);
   }
@@ -269,7 +269,7 @@ void HdfsScanNode::ThreadTokenAvailableCb(ThreadResourcePool* pool) {
   // Case 4. We have not issued the initial ranges so don't start a scanner thread.
   // Issuing ranges will call this function and we'll start the scanner threads then.
   // TODO: It would be good to have a test case for that.
-  if (!initial_ranges_issued_) return;
+  if (!initial_ranges_issued_.Load()) return;
 
   ScannerMemLimiter* scanner_mem_limiter =
       runtime_state_->query_state()->scanner_mem_limiter();

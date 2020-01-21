@@ -130,7 +130,8 @@ SET(CXX_FLAGS_UBSAN "${CXX_FLAGS_UBSAN} -O0")
 # Set the flags to the thread sanitizer, also known as "tsan"
 # Turn on sanitizer and debug symbols to get stack traces:
 SET(CXX_FLAGS_TSAN "${CXX_CLANG_FLAGS} -Werror -O1 -ggdb3 -fno-omit-frame-pointer")
-SET(CXX_FLAGS_TSAN "${CXX_FLAGS_TSAN} -fsanitize=thread -DTHREAD_SANITIZER")
+SET(CXX_FLAGS_TSAN "${CXX_FLAGS_TSAN} -fsanitize=thread -DTHREAD_SANITIZER -DDYNAMIC_ANNOTATIONS_ENABLED")
+SET(CXX_FLAGS_TSAN "${CXX_FLAGS_TSAN} -DTHREAD_SANITIZER_SUPPRESSIONS=\\\"$ENV{IMPALA_HOME}/bin/tsan-suppressions.txt\\\"")
 
 SET(CXX_FLAGS_TIDY "${CXX_CLANG_FLAGS}")
 # Catching unused variables requires an optimization level greater than 0
@@ -163,6 +164,9 @@ elseif ("${CMAKE_BUILD_TYPE}" STREQUAL "UBSAN_FULL")
   SET(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -DUNDEFINED_SANITIZER_FULL")
 elseif ("${CMAKE_BUILD_TYPE}" STREQUAL "TSAN")
   SET(CMAKE_CXX_FLAGS "${CXX_FLAGS_TSAN}")
+elseif ("${CMAKE_BUILD_TYPE}" STREQUAL "TSAN_FULL")
+  SET(CMAKE_CXX_FLAGS "${CXX_FLAGS_TSAN}")
+  SET(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -DTHREAD_SANITIZER_FULL")
 else()
   message(FATAL_ERROR "Unknown build type: ${CMAKE_BUILD_TYPE}")
 endif()
@@ -188,7 +192,8 @@ if (CCACHE AND NOT DEFINED ENV{DISABLE_CCACHE})
       OR "${CMAKE_BUILD_TYPE}" STREQUAL "TIDY"
       OR "${CMAKE_BUILD_TYPE}" STREQUAL "UBSAN"
       OR "${CMAKE_BUILD_TYPE}" STREQUAL "UBSAN_FULL"
-      OR "${CMAKE_BUILD_TYPE}" STREQUAL "TSAN")
+      OR "${CMAKE_BUILD_TYPE}" STREQUAL "TSAN"
+      OR "${CMAKE_BUILD_TYPE}" STREQUAL "TSAN_FULL")
     # Need to set CCACHE_CPP so that ccache calls clang with the original source file for
     # both preprocessing and compilation. Otherwise, ccache will use clang to preprocess
     # the file and then call clang with the preprocessed output if not cached. However,
@@ -337,7 +342,8 @@ if ("${CMAKE_BUILD_TYPE}" STREQUAL "DEBUG" OR
     "${CMAKE_BUILD_TYPE}" STREQUAL "ADDRESS_SANITIZER" OR
     "${CMAKE_BUILD_TYPE}" STREQUAL "UBSAN" OR
     "${CMAKE_BUILD_TYPE}" STREQUAL "UBSAN_FULL" OR
-    "${CMAKE_BUILD_TYPE}" STREQUAL "TSAN")
+    "${CMAKE_BUILD_TYPE}" STREQUAL "TSAN" OR
+    "${CMAKE_BUILD_TYPE}" STREQUAL "TSAN_FULL")
   set(BUILD_OUTPUT_ROOT_DIRECTORY "${CMAKE_CURRENT_SOURCE_DIR}/build/debug/")
 else()
   set(BUILD_OUTPUT_ROOT_DIRECTORY "${CMAKE_CURRENT_SOURCE_DIR}/build/release/")
@@ -542,7 +548,8 @@ endif()
 # malloc/free)
 set (IMPALA_LINK_LIBS_NO_TCMALLOC ${IMPALA_LINK_LIBS})
 if (NOT "${CMAKE_BUILD_TYPE}" STREQUAL "ADDRESS_SANITIZER" AND
-    NOT "${CMAKE_BUILD_TYPE}" STREQUAL "TSAN")
+    NOT "${CMAKE_BUILD_TYPE}" STREQUAL "TSAN" AND
+    NOT "${CMAKE_BUILD_TYPE}" STREQUAL "TSAN_FULL")
   set (IMPALA_LINK_LIBS ${IMPALA_LINK_LIBS} tcmallocstatic)
   set (UNIFIED_TEST_LINK_LIBS ${UNIFIED_TEST_LINK_LIBS} tcmallocstatic)
 endif()

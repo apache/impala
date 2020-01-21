@@ -227,13 +227,16 @@ class ConcurrentStopWatch {
     return lap_duration;
   }
 
-  uint64_t TotalRunningTime() const {  return msw_.ElapsedTime(); }
+  uint64_t TotalRunningTime() const {
+    boost::lock_guard<SpinLock> l(thread_counter_lock_);
+    return msw_.ElapsedTime();
+  }
 
  private:
   MonotonicStopWatch msw_;
 
   /// Lock with busy_threads_.
-  SpinLock thread_counter_lock_;
+  mutable SpinLock thread_counter_lock_;
 
   /// Track how many threads are currently busy.
   int busy_threads_;

@@ -113,13 +113,15 @@ class ImpalaBuildFlavors:
   TIDY = 'tidy'
   # ./buildall.sh -tsan
   TSAN = 'tsan'
+  # ./buildall.sh -full_tsan
+  TSAN_FULL = 'tsan_full'
   # ./buildall.sh -ubsan
   UBSAN = 'ubsan'
   # ./buildall.sh -full_ubsan
   UBSAN_FULL = 'ubsan_full'
 
   VALID_BUILD_TYPES = [ADDRESS_SANITIZER, DEBUG, CODE_COVERAGE_DEBUG, RELEASE,
-      CODE_COVERAGE_RELEASE, TIDY, TSAN, UBSAN, UBSAN_FULL]
+      CODE_COVERAGE_RELEASE, TIDY, TSAN, TSAN_FULL, UBSAN, UBSAN_FULL]
 
 
 class LinkTypes:

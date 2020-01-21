@@ -97,7 +97,7 @@ class DiskIoMgrStress {
   bool includes_cancellation_;
 
   /// Flag to signal that client reader threads should exit
-  volatile bool shutdown_;
+  AtomicBool shutdown_;
 
   /// Helper to initialize a new reader client, registering a new reader with the
   /// io mgr and initializing the scan ranges

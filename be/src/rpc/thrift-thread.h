@@ -36,7 +36,7 @@ class ThriftThreadFactory : public apache::thrift::concurrency::ThreadFactory {
   /// Group is the thread group for new threads to be assigned to, and prefix is the
   /// per-thread prefix (threads are named "prefix-<count_>-<tid>").
   ThriftThreadFactory(const std::string& group, const std::string& prefix)
-      : group_(group), prefix_(prefix), count_(0) { }
+      : group_(group), prefix_(prefix), count_(-1) { }
 
   /// (From ThreadFactory) - creates a new ThriftThread to run the supplied Runnable.
   virtual boost::shared_ptr<apache::thrift::concurrency::Thread> newThread(
@@ -55,7 +55,7 @@ class ThriftThreadFactory : public apache::thrift::concurrency::ThreadFactory {
 
   /// Marked mutable because we want to increment it inside newThread, which for some
   /// reason is const.
-  mutable int64_t count_;
+  mutable AtomicInt64 count_;
 };
 
 /// A ThriftThread is a Thrift-compatible wrapper for Impala's Thread class, so that all

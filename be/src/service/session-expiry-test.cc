@@ -51,6 +51,8 @@ DECLARE_int32(beeswax_port);
 // instead of destroying it to avoid destroying the contained objects.
 static ObjectPool* perm_objects;
 
+namespace impala {
+
 TEST(SessionTest, TestExpiry) {
   const int NUM_SESSIONS = 5;
   const int MAX_IDLE_TIMEOUT_MS = 4000;
@@ -120,6 +122,8 @@ TEST(SessionTest, TestExpiry) {
   SleepForMs(1000);
   statestore->ShutdownForTesting();
 }
+
+} // namespace impala
 
 int main(int argc, char** argv) {
   ::testing::InitGoogleTest(&argc, argv);

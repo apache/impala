@@ -38,7 +38,19 @@ cd ${IMPALA_BE_DIR}
 cd ..
 
 export CTEST_OUTPUT_ON_FAILURE=1
+
 # Override default TSAN_OPTIONS so that halt_on_error is set.
-export TSAN_OPTIONS="halt_on_error=1 history_size=7"
+# See be/src/common/init.cc and
+# https://github.com/google/sanitizers/wiki/ThreadSanitizerCppManual#non-instrumented-code
+# for an explanation of what this flag does.
+IGNORE_NONINSTRUMENTED_MODULES="ignore_noninstrumented_modules="
+if [ "${TSAN_FULL+x}" ]; then
+  IGNORE_NONINSTRUMENTED_MODULES+="0"
+else
+  IGNORE_NONINSTRUMENTED_MODULES+="1"
+fi
+export TSAN_OPTIONS="${IGNORE_NONINSTRUMENTED_MODULES} halt_on_error=1 history_size=7
+  allocator_may_return_null=1 suppressions=${IMPALA_HOME}/bin/tsan-suppressions.txt"
+
 export PATH="${IMPALA_TOOLCHAIN}/llvm-${IMPALA_LLVM_VERSION}/bin:${PATH}"
 "${MAKE_CMD:-make}" test ARGS="${BE_TEST_ARGS}"

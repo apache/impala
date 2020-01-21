@@ -70,6 +70,7 @@ BUILD_TIDY=0
 BUILD_UBSAN=0
 BUILD_UBSAN_FULL=0
 BUILD_TSAN=0
+BUILD_TSAN_FULL=0
 BUILD_SHARED_LIBS=0
 # Export MAKE_CMD so it is visible in scripts that invoke make, e.g. copy-udfs-udas.sh
 export MAKE_CMD=make
@@ -141,6 +142,9 @@ do
     -tsan)
       BUILD_TSAN=1
       ;;
+     -full_tsan)
+      BUILD_TSAN_FULL=1
+      ;;
     -testpairwise)
       EXPLORATION_STRATEGY=pairwise
       ;;
@@ -206,10 +210,18 @@ do
       echo "[-codecoverage] : Build with code coverage [Default: False]"
       echo "[-asan] : Address sanitizer build [Default: False]"
       echo "[-tidy] : clang-tidy build [Default: False]"
+      echo "[-tsan] : Thread sanitizer build, runs with"\
+           "ignore_noninstrumented_modules=1. When this flag is true, TSAN ignores"\
+           "memory accesses from non-instrumented libraries. This decreases the number"\
+           "of false positives, but might miss real issues. -full_tsan disables this"\
+           "flag [Default: False]"
+      echo "[-full_tsan] : Thread sanitizer build, runs with"\
+           "ignore_noninstrumented_modules=0 (see the -tsan description for an"\
+           "explanation of what this flag does) [Default: False]"
       echo "[-ubsan] : Undefined behavior sanitizer build [Default: False]"
       echo "[-full_ubsan] : Undefined behavior sanitizer build, including code generated"\
-           " by cross-compilation to LLVM IR. Much slower queries than plain -ubsan "\
-           " [Default: False]"
+           "by cross-compilation to LLVM IR. Much slower queries than plain -ubsan"\
+           "[Default: False]"
       echo "[-skiptests] : Skips execution of all tests"
       echo "[-notests] : Skips building and execution of all tests"
       echo "[-start_minicluster] : Start test cluster including Impala and all"\
@@ -298,6 +310,10 @@ if [[ ${BUILD_UBSAN_FULL} -eq 1 ]]; then
 fi
 if [[ ${BUILD_TSAN} -eq 1 ]]; then
   CMAKE_BUILD_TYPE_LIST+=(TSAN)
+fi
+if [[ ${BUILD_TSAN_FULL} -eq 1 ]]; then
+  CMAKE_BUILD_TYPE_LIST+=(TSAN_FULL)
+  export TSAN_FULL=1
 fi
 if [[ -n "${CMAKE_BUILD_TYPE_LIST:+1}" ]]; then
   if [[ ${#CMAKE_BUILD_TYPE_LIST[@]} -gt 1 ]]; then
@@ -433,7 +449,8 @@ generate_cmake_files() {
             || ("$build_type" == "TIDY") \
             || ("$build_type" == "UBSAN") \
             || ("$build_type" == "UBSAN_FULL") \
-            || ("$build_type" == "TSAN") ]]; then
+            || ("$build_type" == "TSAN") \
+            || ("$build_type" == "TSAN_FULL") ]]; then
     CMAKE_ARGS+=(-DCMAKE_TOOLCHAIN_FILE=$IMPALA_HOME/cmake_modules/clang_toolchain.cmake)
   else
     CMAKE_ARGS+=(-DCMAKE_TOOLCHAIN_FILE=$IMPALA_HOME/cmake_modules/toolchain.cmake)

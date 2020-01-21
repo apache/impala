@@ -53,6 +53,7 @@ TEST(StatestoreTest, SmokeTest) {
   // Port already in use
   Statestore* statestore_wont_start = perm_objects->Add(new Statestore(metrics_2));
   ASSERT_FALSE(statestore_wont_start->Init(statestore->port()).ok());
+  statestore_wont_start->ShutdownForTesting();
 
   StatestoreSubscriber* sub_will_start = perm_objects->Add(
       new StatestoreSubscriber("sub1", MakeNetworkAddress("localhost", 0),

@@ -240,11 +240,14 @@ ReadOutcome ScanRange::DoRead(DiskQueue* queue, int disk_id) {
     return ReadOutcome::CANCELLED;
   }
 
-  bytes_read_ += buffer_desc->len();
-  DCHECK_LE(bytes_read_, bytes_to_read_);
+  {
+    unique_lock<mutex> lock(lock_);
+    bytes_read_ += buffer_desc->len();
+    DCHECK_LE(bytes_read_, bytes_to_read_);
 
-  // It is end of stream if it is end of file, or read all the bytes.
-  buffer_desc->eosr_ = eof || bytes_read_ == bytes_to_read_;
+    // It is end of stream if it is end of file, or read all the bytes.
+    buffer_desc->eosr_ = eof || bytes_read_ == bytes_to_read_;
+  }
 
   // After calling EnqueueReadyBuffer(), it is no longer valid to touch 'buffer_desc'.
   // Store the state we need before calling EnqueueReadyBuffer().

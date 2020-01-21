@@ -290,7 +290,9 @@ class Coordinator { // NOLINT: The member variables could be re-ordered to save 
   /// ensures single-threaded execution of Wait(). See lock ordering class comment.
   SpinLock wait_lock_;
 
-  bool has_called_wait_ = false;  // if true, Wait() was called; protected by wait_lock_
+  /// If true, Wait() was called. When read / written in Wait() the wait_lock_ should
+  /// still be acquired to ensure Wait() is only executed once.
+  AtomicBool has_called_wait_;
 
   BackendResourceState* backend_resource_state_ = nullptr;
 

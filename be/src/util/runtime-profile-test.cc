@@ -826,7 +826,7 @@ class TimerCounterTest {
 
   struct DummyWorker {
     thread* thread_handle;
-    bool done;
+    AtomicBool done;
 
     DummyWorker()
       : thread_handle(NULL), done(false) {}
@@ -835,9 +835,12 @@ class TimerCounterTest {
       Stop();
     }
 
+    DummyWorker(const DummyWorker& dummy_worker)
+      : thread_handle(dummy_worker.thread_handle), done(dummy_worker.done.Load()) {}
+
     void Stop() {
-      if (!done && thread_handle != NULL) {
-        done = true;
+      if (!done.Load() && thread_handle != NULL) {
+        done.Store(true);
         thread_handle->join();
         delete thread_handle;
         thread_handle = NULL;
@@ -848,7 +851,7 @@ class TimerCounterTest {
   void Run(DummyWorker* worker) {
     SCOPED_CONCURRENT_STOP_WATCH(&csw_);
     SCOPED_CONCURRENT_COUNTER(&timercounter_);
-    while (!worker->done) {
+    while (!worker->done.Load()) {
       SleepForMs(10);
       // Each test case should be no more than one second.
       // Consider test failed if timer is more than 3 seconds.
@@ -970,6 +973,9 @@ TEST(TimerCounterTest, CountersTestRandom) {
   ValidateLapTime(&tester, MonotonicStopWatch::Now() - lap_time_start);
 }
 
+// Don't run TestAddClearRace against TSAN builds as it is expected to have race
+// conditions.
+#ifndef THREAD_SANITIZER
 
 TEST(TimeSeriesCounterTest, TestAddClearRace) {
   ObjectPool pool;
@@ -1009,6 +1015,8 @@ TEST(TimeSeriesCounterTest, TestAddClearRace) {
   counter->GetSamplesTest(&num_samples, &period);
   EXPECT_EQ(num_samples, 0);
 }
+
+#endif
 
 /// Stops the periodic counter updater in 'profile' and then clears the samples in
 /// 'counter'.

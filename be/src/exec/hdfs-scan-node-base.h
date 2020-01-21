@@ -490,7 +490,7 @@ class HdfsScanNodeBase : public ScanNode {
   /// Set to true when the initial scan ranges are issued to the IoMgr. This happens on
   /// the first call to GetNext(). The token manager, in a different thread, will read
   /// this variable.
-  bool initial_ranges_issued_ = false;
+  AtomicBool initial_ranges_issued_;
 
   /// When this counter drops to 0, AddDiskIoRanges() will not be called again, and
   /// therefore scanner threads that can't get work should exit. For most

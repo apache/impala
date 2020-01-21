@@ -416,10 +416,23 @@ extern "C" const char *__asan_default_options() {
 #endif
 
 #if defined(THREAD_SANITIZER)
-// Default TSAN_OPTIONS. Override by setting environment variable $TSAN_OPTIONS.
-extern "C" const char *__tsan_default_options() {
-  // Note that backend test should re-configure to halt_on_error=1
-  return "halt_on_error=0 history_size=7";
+extern "C" const char* __tsan_default_options() {
+  // Default TSAN_OPTIONS. Override by setting environment variable $TSAN_OPTIONS.
+  // TSAN and Java don't play nicely together because JVM code is not instrumented with
+  // TSAN. TSAN requires all libs to be compiled with '-fsanitize=thread' (see
+  // https://github.com/google/sanitizers/wiki/ThreadSanitizerCppManual#non-instrumented-code),
+  // which is not currently possible for Java code. See
+  // https://wiki.openjdk.java.net/display/tsan/Main and JDK-8208520 for efforts to get
+  // TSAN to run against Java code. The flag ignore_noninstrumented_modules tells TSAN to
+  // ignore all interceptors called from any non-instrumented libraries (e.g. Java).
+  return "ignore_noninstrumented_modules="
+#if defined(THREAD_SANITIZER_FULL)
+         "0 "
+#else
+         "1 "
+#endif
+         "halt_on_error=0 history_size=7 allocator_may_return_null=1 "
+         "suppressions=" THREAD_SANITIZER_SUPPRESSIONS;
 }
 #endif
 

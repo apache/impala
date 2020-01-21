@@ -267,17 +267,18 @@ class DataCache::CacheFile {
   int64_t Allocate(int64_t len, const std::unique_lock<SpinLock>& partition_lock) {
     DCHECK(partition_lock.owns_lock());
     DCHECK_EQ(len % PAGE_SIZE, 0);
-    DCHECK_EQ(current_offset_ % PAGE_SIZE, 0);
+    int64_t current_offset = current_offset_.Load();
+    DCHECK_EQ(current_offset % PAGE_SIZE, 0);
     // Hold the lock in shared mode to check if 'file_' is not closed already.
     kudu::shared_lock<rw_spinlock> lock(lock_.get_lock());
-    if (!allow_append_ || (current_offset_ + len > FLAGS_data_cache_file_max_size_bytes &&
-            current_offset_ > 0)) {
+    if (!allow_append_ || (current_offset + len > FLAGS_data_cache_file_max_size_bytes &&
+            current_offset > 0)) {
       allow_append_ = false;
       return -1;
     }
     DCHECK(file_);
-    int64_t insertion_offset = current_offset_;
-    current_offset_ += len;
+    int64_t insertion_offset = current_offset;
+    current_offset_.Add(len);
     return insertion_offset;
   }
 
@@ -289,7 +290,7 @@ class DataCache::CacheFile {
     // Hold the lock in shared mode to check if 'file_' is not closed already.
     kudu::shared_lock<rw_spinlock> lock(lock_.get_lock());
     if (UNLIKELY(!file_)) return false;
-    DCHECK_LE(offset + bytes_to_read, current_offset_);
+    DCHECK_LE(offset + bytes_to_read, current_offset_.Load());
     kudu::Status status = file_->Read(offset, Slice(buffer, bytes_to_read));
     if (UNLIKELY(!status.ok())) {
       LOG(ERROR) << Substitute("Failed to read from $0 at offset $1 for $2 bytes: $3",
@@ -304,11 +305,11 @@ class DataCache::CacheFile {
   // already closed.
   bool Write(int64_t offset, const uint8_t* buffer, int64_t buffer_len) {
     DCHECK_EQ(offset % PAGE_SIZE, 0);
-    DCHECK_LE(offset, current_offset_);
+    DCHECK_LE(offset, current_offset_.Load());
     // Hold the lock in shared mode to check if 'file_' is not closed already.
     kudu::shared_lock<rw_spinlock> lock(lock_.get_lock());
     if (UNLIKELY(!file_)) return false;
-    DCHECK_LE(offset + buffer_len, current_offset_);
+    DCHECK_LE(offset + buffer_len, current_offset_.Load());
     kudu::Status status = file_->Write(offset, Slice(buffer, buffer_len));
     if (UNLIKELY(!status.ok())) {
       LOG(ERROR) << Substitute("Failed to write to $0 at offset $1 for $2 bytes: $3",
@@ -324,7 +325,7 @@ class DataCache::CacheFile {
     // Hold the lock in shared mode to check if 'file_' is not closed already.
     kudu::shared_lock<rw_spinlock> lock(lock_.get_lock());
     if (UNLIKELY(!file_)) return;
-    DCHECK_LE(offset + hole_size, current_offset_);
+    DCHECK_LE(offset + hole_size, current_offset_.Load());
     kudu::Status status = file_->PunchHole(offset, hole_size);
     if (UNLIKELY(!status.ok())) {
       LOG(DFATAL) << Substitute("Failed to punch hole in $0 at offset $1 for $2 $3",
@@ -345,7 +346,7 @@ class DataCache::CacheFile {
   bool allow_append_ = true;
 
   /// The current offset in the file to append to on next insert.
-  int64_t current_offset_ = 0;
+  AtomicInt64 current_offset_;
 
   /// This is a reader-writer lock used for synchronization with the deleter thread.
   /// It is taken in write mode in Close() and shared mode everywhere else. It's expected

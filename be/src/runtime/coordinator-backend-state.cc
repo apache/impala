@@ -175,7 +175,15 @@ void Coordinator::BackendState::Exec(const DebugOptions& debug_options,
     const kudu::Slice& serialized_query_ctx, CountingBarrier* exec_complete_barrier) {
   const auto trigger = MakeScopeExitTrigger([&]() {
     // Ensure that 'last_report_time_ms_' is set prior to the barrier being notified.
-    last_report_time_ms_ = GenerateReportTimestamp();
+    {
+      // Since last_report_time_ms_ is protected by lock_ it must be acquired before
+      // updating last_report_time_ms_. The lock_ is guaranteed to not be held by this
+      // method when this lambda runs since it has not already been acquired by the
+      // method. The lambda executes in an object destructor and C++ destroys objects in
+      // the reverse order they were created.
+      lock_guard<mutex> lock(lock_);
+      last_report_time_ms_ = GenerateReportTimestamp();
+    }
     exec_complete_barrier->Notify();
   });
 

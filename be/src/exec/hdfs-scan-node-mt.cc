@@ -51,7 +51,7 @@ Status HdfsScanNodeMt::Prepare(RuntimeState* state) {
 Status HdfsScanNodeMt::Open(RuntimeState* state) {
   SCOPED_TIMER(runtime_profile_->total_time_counter());
   RETURN_IF_ERROR(HdfsScanNodeBase::Open(state));
-  DCHECK(!initial_ranges_issued_);
+  DCHECK(!initial_ranges_issued_.Load());
   RETURN_IF_ERROR(IssueInitialScanRanges(state));
   return Status::OK();
 }

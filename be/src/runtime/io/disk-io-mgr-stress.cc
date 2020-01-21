@@ -111,7 +111,7 @@ void DiskIoMgrStress::ClientThread(int client_id) {
   Status status;
   char read_buffer[MAX_FILE_LEN];
 
-  while (!shutdown_) {
+  while (!shutdown_.Load()) {
     bool eos = false;
     int bytes_read = 0;
 
@@ -193,7 +193,7 @@ void DiskIoMgrStress::CancelRandomReader() {
 }
 
 void DiskIoMgrStress::Run(int sec) {
-  shutdown_ = false;
+  shutdown_.Store(false);
   for (int i = 0; i < num_clients_; ++i) {
     readers_.add_thread(
         new thread(&DiskIoMgrStress::ClientThread, this, i));
@@ -210,7 +210,7 @@ void DiskIoMgrStress::Run(int sec) {
   }
 
   // Signal shutdown for the client threads
-  shutdown_ = true;
+  shutdown_.Store(true);
 
   for (int i = 0; i < num_clients_; ++i) {
     unique_lock<mutex> lock(clients_[i].lock);

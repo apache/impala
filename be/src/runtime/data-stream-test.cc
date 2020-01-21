@@ -517,7 +517,7 @@ class DataStreamTest : public testing::Test {
     sender_info_.emplace_back(make_unique<SenderInfo>());
     sender_info_.back()->thread_handle.reset(
         new thread(&DataStreamTest::Sender, this, num_senders, channel_buffer_size,
-            partition_type));
+            partition_type, sender_info_[num_senders].get()));
   }
 
   void JoinSenders() {
@@ -527,8 +527,8 @@ class DataStreamTest : public testing::Test {
     }
   }
 
-  void Sender(
-      int sender_num, int channel_buffer_size, TPartitionType::type partition_type) {
+  void Sender(int sender_num, int channel_buffer_size,
+      TPartitionType::type partition_type, SenderInfo* info) {
     RuntimeState state(TQueryCtx(), exec_env_.get(), desc_tbl_);
     VLOG_QUERY << "create sender " << sender_num;
     const TDataSink& sink = GetSink(partition_type);
@@ -545,7 +545,6 @@ class DataStreamTest : public testing::Test {
     EXPECT_OK(sender->Prepare(&state, &tracker_));
     EXPECT_OK(sender->Open(&state));
     scoped_ptr<RowBatch> batch(CreateRowBatch());
-    SenderInfo* info = sender_info_[sender_num].get();
     int next_val = 0;
     for (int i = 0; i < NUM_BATCHES; ++i) {
       GetNextBatch(batch.get(), &next_val);

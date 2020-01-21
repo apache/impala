@@ -57,7 +57,7 @@ void ThriftThread::join() {
 boost::shared_ptr<atc::Thread> ThriftThreadFactory::newThread(
     boost::shared_ptr<atc::Runnable> runnable) const {
   stringstream name;
-  name << prefix_ << "-" << count_++;
+  name << prefix_ << "-" << count_.Add(1);
   boost::shared_ptr<ThriftThread> result =
       boost::shared_ptr<ThriftThread>(new ThriftThread(group_, name.str(), runnable));
   runnable->thread(result);

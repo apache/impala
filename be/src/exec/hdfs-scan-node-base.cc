@@ -564,8 +564,8 @@ void HdfsScanNodeBase::Close(RuntimeState* state) {
 }
 
 Status HdfsScanNodeBase::IssueInitialScanRanges(RuntimeState* state) {
-  DCHECK(!initial_ranges_issued_);
-  initial_ranges_issued_ = true;
+  DCHECK(!initial_ranges_issued_.Load());
+  initial_ranges_issued_.Store(true);
   // We want to decrement this remaining_scan_range_submissions in all cases.
   auto remaining_scan_range_submissions_trigger =
     MakeScopeExitTrigger([&](){ UpdateRemainingScanRangeSubmissions(-1); });
