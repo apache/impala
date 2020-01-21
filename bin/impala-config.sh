@@ -68,7 +68,7 @@ fi
 # moving to a different build of the toolchain, e.g. when a version is bumped or a
 # compile option is changed. The build id can be found in the output of the toolchain
 # build jobs, it is constructed from the build number and toolchain git hash prefix.
-export IMPALA_TOOLCHAIN_BUILD_ID=79-55ae433f60
+export IMPALA_TOOLCHAIN_BUILD_ID=122-7f8aa0363e
 # Versions of toolchain dependencies.
 # -----------------------------------
 export IMPALA_AVRO_VERSION=1.7.4-p5
@@ -85,7 +85,7 @@ export IMPALA_CCTZ_VERSION=2.2
 unset IMPALA_CCTZ_URL
 export IMPALA_CMAKE_VERSION=3.14.3
 unset IMPALA_CMAKE_URL
-export IMPALA_CRCUTIL_VERSION=440ba7babeff77ffad992df3a10c767f184e946e-p1
+export IMPALA_CRCUTIL_VERSION=440ba7babeff77ffad992df3a10c767f184e946e-p2
 unset IMPALA_CRCUTIL_URL
 export IMPALA_CYRUS_SASL_VERSION=2.1.23
 unset IMPALA_CYRUS_SASL_URL
@@ -107,9 +107,9 @@ export IMPALA_LIBEV_VERSION=4.20
 unset IMPALA_LIBEV_URL
 export IMPALA_LIBUNWIND_VERSION=1.3-rc1-p3
 unset IMPALA_LIBUNWIND_URL
-export IMPALA_LLVM_VERSION=5.0.1-p1
+export IMPALA_LLVM_VERSION=5.0.1-p2
 unset IMPALA_LLVM_URL
-export IMPALA_LLVM_ASAN_VERSION=5.0.1-p1
+export IMPALA_LLVM_ASAN_VERSION=5.0.1-p2
 unset IMPALA_LLVM_ASAN_URL
 
 # LLVM stores some files in subdirectories that are named after what
@@ -119,7 +119,7 @@ export IMPALA_LLVM_UBSAN_BASE_VERSION=5.0.1
 
 # Debug builds should use the release+asserts build to get additional coverage.
 # Don't use the LLVM debug build because the binaries are too large to distribute.
-export IMPALA_LLVM_DEBUG_VERSION=5.0.1-asserts-p1
+export IMPALA_LLVM_DEBUG_VERSION=5.0.1-asserts-p2
 unset IMPALA_LLVM_DEBUG_URL
 export IMPALA_LZ4_VERSION=1.7.5
 unset IMPALA_LZ4_URL
@@ -129,7 +129,7 @@ export IMPALA_OPENLDAP_VERSION=2.4.47
 unset IMPALA_OPENLDAP_URL
 export IMPALA_OPENSSL_VERSION=1.0.2l
 unset IMPALA_OPENSSL_URL
-export IMPALA_ORC_VERSION=1.5.5-p1
+export IMPALA_ORC_VERSION=1.6.2-p6
 unset IMPALA_ORC_URL
 export IMPALA_PROTOBUF_VERSION=3.5.1
 unset IMPALA_PROTOBUF_URL
