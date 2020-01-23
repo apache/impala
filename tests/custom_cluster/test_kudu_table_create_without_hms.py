@@ -19,6 +19,7 @@ import pytest
 import os
 
 from tests.common.custom_cluster_test_suite import CustomClusterTestSuite
+from tests.common.skip import SkipIfHive3
 
 IMPALA_HOME = os.getenv('IMPALA_HOME')
 HIVE_SITE_WITHOUT_HMS_DIR = IMPALA_HOME + '/fe/src/test/resources/hive-site-without-hms'
@@ -28,6 +29,7 @@ TBL_NAME = "test_kudu_table_create_without_hms"
 class TestCreatingKuduTableWithoutHMS(CustomClusterTestSuite):
   """Test creating kudu managed table without hms"""
 
+  @SkipIfHive3.without_hms_not_supported
   @pytest.mark.execute_serially
   @CustomClusterTestSuite.with_args(hive_conf_dir=HIVE_SITE_WITHOUT_HMS_DIR)
   def test_kudu_table_create_without_hms(self, unique_database):
