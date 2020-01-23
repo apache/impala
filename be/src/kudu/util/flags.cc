@@ -73,9 +73,8 @@ DEFINE_bool(dump_metrics_json, false,
 TAG_FLAG(dump_metrics_json, hidden);
 
 #ifdef TCMALLOC_ENABLED
-DEFINE_bool(enable_process_lifetime_heap_profiling, false, "Enables heap "
-    "profiling for the lifetime of the process. Profile output will be stored in the "
-    "directory specified by -heap_profile_path.");
+// Defined in Impala in common/global-flags.cc
+DECLARE_bool(enable_process_lifetime_heap_profiling);
 TAG_FLAG(enable_process_lifetime_heap_profiling, stable);
 TAG_FLAG(enable_process_lifetime_heap_profiling, advanced);
 

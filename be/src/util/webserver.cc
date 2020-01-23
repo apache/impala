@@ -165,6 +165,8 @@ string HttpStatusCodeToString(HttpStatusCode code) {
       return "200 OK";
     case HttpStatusCode::BadRequest:
       return "400 Bad Request";
+    case HttpStatusCode::AuthenticationRequired:
+      return "401 Authentication Required";
     case HttpStatusCode::NotFound:
       return "404 Not Found";
     case HttpStatusCode::LengthRequired:

@@ -43,11 +43,10 @@
 #include "common/names.h"
 #include "common/status.h"
 
-METRIC_DEFINE_histogram(server, impala_incoming_queue_time,
-    "RPC Queue Time",
+METRIC_DEFINE_histogram(server, impala_incoming_queue_time, "RPC Queue Time",
     kudu::MetricUnit::kMicroseconds,
     "Number of microseconds incoming RPC requests spend in the worker queue",
-    60000000LU, 3);
+    kudu::MetricLevel::kInfo, 60000000LU, 3);
 
 using namespace rapidjson;
 
@@ -149,7 +148,7 @@ kudu::rpc::RpcMethodInfo* ImpalaServicePool::LookupMethod(
 }
 
 kudu::Status ImpalaServicePool::QueueInboundCall(
-    gscoped_ptr<kudu::rpc::InboundCall> call) {
+    std::unique_ptr<kudu::rpc::InboundCall> call) {
   kudu::rpc::InboundCall* c = call.release();
 
   vector<uint32_t> unsupported_features;

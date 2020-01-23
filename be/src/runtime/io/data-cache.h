@@ -324,8 +324,9 @@ class DataCache {
     /// Returns true iff the existing entry already covers the range of 'buffer' so no
     /// work needs to be done. Returns false otherwise. In which case, the existing entry
     /// will be overwritten.
-    bool HandleExistingEntry(const kudu::Slice& key, kudu::Cache::Handle* handle,
-        const uint8_t* buffer, int64_t buffer_len);
+    bool HandleExistingEntry(const kudu::Slice& key,
+        const kudu::Cache::UniqueHandle& handle, const uint8_t* buffer,
+        int64_t buffer_len);
 
     /// Helper function to insert a new entry with key 'key' into the LRU cache.
     /// The content in 'buffer' of length 'buffer_len' in bytes will be written to

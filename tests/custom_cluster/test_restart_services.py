@@ -250,7 +250,7 @@ class TestGracefulShutdown(CustomClusterTestSuite, HS2TestSuite):
         ":shutdown('e6c00ca5cd67b567eb96c6ecfb26f05')")
     assert "Could not find IPv4 address for:" in str(ex)
     ex = self.execute_query_expect_failure(self.client, ":shutdown('localhost:100000')")
-    assert "Invalid port:" in str(ex)
+    assert "invalid port:" in str(ex)
     assert ("This may be because the port specified is wrong.") not in str(ex)
 
     # Test that pointing to the wrong thrift service (the HS2 port) fails gracefully-ish.

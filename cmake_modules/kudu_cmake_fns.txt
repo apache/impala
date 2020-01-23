@@ -131,3 +131,12 @@ function(ADD_THIRDPARTY_LIB LIB_NAME)
       PROPERTIES IMPORTED_LINK_INTERFACE_LIBRARIES "${ARG_DEPS}")
   endif()
 endfunction()
+
+
+# This macro initializes KUDU_MIN_TEST_LIBS to KUDU_MIN_TEST_LIBS and
+# appends the passed list of libraries to the end. This ensures that
+# KUDU_MIN_TEST_LIBS is linked first.
+macro(SET_KUDU_TEST_LINK_LIBS)
+  set(KUDU_TEST_LINK_LIBS ${KUDU_MIN_TEST_LIBS})
+  list(APPEND KUDU_TEST_LINK_LIBS ${ARGN})
+endmacro()

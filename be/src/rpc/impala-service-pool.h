@@ -62,8 +62,8 @@ class ImpalaServicePool : public kudu::rpc::RpcService {
   virtual kudu::rpc::RpcMethodInfo* LookupMethod(const kudu::rpc::RemoteMethod& method)
     override;
 
-  virtual kudu::Status
-      QueueInboundCall(gscoped_ptr<kudu::rpc::InboundCall> call) OVERRIDE;
+  virtual kudu::Status QueueInboundCall(
+      std::unique_ptr<kudu::rpc::InboundCall> call) OVERRIDE;
 
   const std::string service_name() const;
 

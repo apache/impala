@@ -54,6 +54,7 @@ be/src/kudu/util/array_view.h
 be/src/kudu/util/cache-test.cc
 be/src/kudu/util/cache.cc
 be/src/kudu/util/cache.h
+be/src/kudu/util/cloud/instance_detector-test.cc
 be/src/kudu/util/coding.cc
 be/src/kudu/util/coding.h
 be/src/kudu/util/condition_variable.cc
@@ -102,6 +103,7 @@ shell/packaging/README.md
 testdata/*.csv
 testdata/*.sql
 testdata/*.test
+be/src/kudu/util/testdata/*.txt
 be/src/testutil/*.pem
 *.json
 fe/src/test/resources/*.xml

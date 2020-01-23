@@ -151,7 +151,7 @@ set(UTIL_SRCS
   block_bloom_filter.cc
   bloom_filter.cc
   cache.cc
-  char_util.cc
+  #char_util.cc
   coding.cc
   condition_variable.cc
   cow_object.cc
@@ -167,7 +167,7 @@ set(UTIL_SRCS
   errno.cc
   faststring.cc
   fault_injection.cc
-  file_cache.cc
+  #file_cache.cc
   file_cache_metrics.cc
   flags.cc
   flag_tags.cc
@@ -190,7 +190,7 @@ set(UTIL_SRCS
   memory/overwrite.cc
   mem_tracker.cc
   metrics.cc
-  minidump.cc
+  #minidump.cc
   monotime.cc
   mutex.cc
   net/dns_resolver.cc
@@ -229,11 +229,13 @@ set(UTIL_SRCS
   trace_metrics.cc
   user.cc
   url-coding.cc
-  version_info.cc
+  # Remove from compilation, as it depends on generated method calls. Replaced by
+  # kudu_version.cc in Impala's common library.
+  #version_info.cc
   version_util.cc
   web_callback_registry.cc
   website_util.cc
-  yamlreader.cc
+  #yamlreader.cc
   zlib.cc
 )
 
@@ -277,7 +279,7 @@ set(UTIL_LIBS
   pb_util_proto
   protobuf
   version_info_proto
-  yaml
+  #yaml
   zlib)
 
 if(NOT APPLE)
@@ -320,27 +322,29 @@ ADD_EXPORTABLE_LIBRARY(kudu_util_compression
 # Define LZ4_DISABLE_DEPRECATE_WARNINGS to mute warnings like:
 # "'int LZ4_compress(const char*, char*, int)' is deprecated".
 target_compile_definitions(kudu_util_compression PUBLIC LZ4_DISABLE_DEPRECATE_WARNINGS)
-target_compile_definitions(kudu_util_compression_exported PUBLIC LZ4_DISABLE_DEPRECATE_WARNINGS)
+#target_compile_definitions(kudu_util_compression_exported PUBLIC LZ4_DISABLE_DEPRECATE_WARNINGS)
 
 #######################################
 # kudu_curl_util
 #######################################
-add_library(kudu_curl_util
-  curl_util.cc)
-target_link_libraries(kudu_curl_util
-  security
-  ${CURL_LIBRARIES}
-  glog
-  gutil)
+# Impala doesn't have curl in its toolchain. It relies instead on the system curl, which
+# is too old on some OSes we compile on and doesn't include macros Kudu needs.
+#add_library(kudu_curl_util
+#  curl_util.cc)
+#target_link_libraries(kudu_curl_util
+#  security
+#  ${CURL_LIBRARIES}
+#  glog
+#  gutil)
 
 #######################################
 # kudu_cloud_util
 #######################################
-add_library(kudu_cloud_util
-  cloud/instance_detector.cc
-  cloud/instance_metadata.cc)
-target_link_libraries(kudu_cloud_util
-  kudu_curl_util)
+#add_library(kudu_cloud_util
+#  cloud/instance_detector.cc
+#  cloud/instance_metadata.cc)
+#target_link_libraries(kudu_cloud_util
+#  kudu_curl_util)
 
 # See the comment in sanitizer_options.cc for details on this library's usage.
 # The top-level CMakeLists sets a ${SANITIZER_OPTIONS_OVERRIDE} variable which
@@ -375,7 +379,9 @@ add_library(kudu_test_util
 target_link_libraries(kudu_test_util
   gflags
   glog
-  gmock
+  # Impala doesn't have gmock in its toolchain
+  gtest
+  #gmock
   kudu_util)
 
 #######################################
@@ -404,7 +410,7 @@ endif()
 #######################################
 
 add_executable(protoc-gen-insertions protoc-gen-insertions.cc)
-target_link_libraries(protoc-gen-insertions gutil protobuf protoc ${KUDU_BASE_LIBS})
+target_link_libraries(protoc-gen-insertions gutil glog gflags protoc protobuf ${KUDU_BASE_LIBS})
 
 #######################################
 # Unit tests
@@ -565,17 +571,17 @@ endif()
 #######################################
 # curl_util-test
 #######################################
-ADD_KUDU_TEST(curl_util-test)
-if(NOT NO_TESTS)
-  target_link_libraries(curl_util-test
-    kudu_curl_util)
-endif()
+#ADD_KUDU_TEST(curl_util-test)
+#if(NOT NO_TESTS)
+#  target_link_libraries(curl_util-test
+#    kudu_curl_util)
+#endif()
 
 #######################################
 # instance_detector-test
 #######################################
-ADD_KUDU_TEST(cloud/instance_detector-test)
-if(NOT NO_TESTS)
-  target_link_libraries(instance_detector-test
-    kudu_cloud_util)
-endif()
+#ADD_KUDU_TEST(cloud/instance_detector-test)
+#if(NOT NO_TESTS)
+#  target_link_libraries(instance_detector-test
+#    kudu_cloud_util)
+#endif()
