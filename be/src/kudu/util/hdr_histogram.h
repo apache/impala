@@ -48,7 +48,8 @@
 // tracked value (1 hour), it would still maintain a resolution of 3.6 seconds
 // (or better).
 
-#include <stdint.h>
+#include <cstdint>
+#include <iosfwd>
 
 #include "kudu/gutil/atomicops.h"
 #include "kudu/gutil/gscoped_ptr.h"
@@ -159,13 +160,21 @@ class HdrHistogram {
   uint64_t ValueAtPercentile(double percentile) const;
 
   // Get the percentile at a given value
-  // TODO: implement
+  // TODO(mpercy): implement
   // double PercentileAtOrBelowValue(uint64_t value) const;
 
   // Get the count of recorded values within a range of value levels.
   // (inclusive to within the histogram's resolution)
-  // TODO: implement
+  // TODO(mpercy): implement
   //uint64_t CountBetweenValues(uint64_t low_value, uint64_t high_value) const;
+
+  // Dump a formatted, multiline string describing this histogram to 'out'.
+  void DumpHumanReadable(std::ostream* out) const;
+
+  // Merges 'other' into this HdrHistogram. Values in each 'counts_' array
+  // bucket will be added up, and the related 'min_value_', 'max_value_',
+  // 'total_count_' and 'total_sum_' will be updated if needed.
+  void MergeFrom(const HdrHistogram& other);
 
  private:
   friend class AbstractHistogramIterator;
@@ -176,6 +185,7 @@ class HdrHistogram {
 
   void Init();
   int CountsArrayIndex(int bucket_index, int sub_bucket_index) const;
+  void UpdateMinMax(int64_t min, int64_t max);
 
   uint64_t highest_trackable_value_;
   int num_significant_digits_;

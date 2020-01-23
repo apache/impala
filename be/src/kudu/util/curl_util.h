@@ -18,6 +18,7 @@
 #define KUDU_UTIL_CURL_UTIL_H
 
 #include <string>
+#include <utility>
 #include <vector>
 
 #include "kudu/gutil/macros.h"
@@ -67,6 +68,26 @@ class EasyCurl {
     timeout_ = t;
   }
 
+  void set_use_spnego(bool use_spnego) {
+    use_spnego_ = use_spnego;
+  }
+
+  // Enable verbose mode for curl. This dumps debugging output to stderr, so
+  // is only really useful in the context of tests.
+  void set_verbose(bool v) {
+    verbose_ = v;
+  }
+
+  // Overrides curl's HTTP method handling with a custom method string.
+  void set_custom_method(std::string m) {
+    custom_method_ = std::move(m);
+  }
+
+  // Returns the number of new connections created to achieve the previous transfer.
+  int num_connects() const {
+    return num_connects_;
+  }
+
  private:
   // Do a request. If 'post_data' is non-NULL, does a POST.
   // Otherwise, does a GET.
@@ -76,13 +97,21 @@ class EasyCurl {
                    const std::vector<std::string>& headers = {});
   CURL* curl_;
 
+  std::string custom_method_;
+
   // Whether to verify the server certificate.
   bool verify_peer_ = true;
 
   // Whether to return the HTTP headers with the response.
   bool return_headers_ = false;
 
+  bool use_spnego_ = false;
+
+  bool verbose_ = false;
+
   MonoDelta timeout_;
+
+  int num_connects_ = 0;
 
   DISALLOW_COPY_AND_ASSIGN(EasyCurl);
 };

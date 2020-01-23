@@ -17,7 +17,6 @@
 #include "kudu/util/metrics.h"
 
 #include <iostream>
-#include <map>
 #include <utility>
 
 #include <gflags/gflags.h>
@@ -25,6 +24,7 @@
 
 #include "kudu/gutil/map-util.h"
 #include "kudu/gutil/singleton.h"
+#include "kudu/gutil/strings/join.h"
 #include "kudu/gutil/strings/substitute.h"
 #include "kudu/util/flag_tags.h"
 #include "kudu/util/hdr_histogram.h"
@@ -45,8 +45,49 @@ METRIC_DEFINE_entity(server);
 namespace kudu {
 
 using std::string;
+using std::unordered_set;
 using std::vector;
 using strings::Substitute;
+
+template<typename Collection>
+void WriteMetricsToJson(JsonWriter* writer,
+                        const Collection& metrics,
+                        const MetricJsonOptions& opts) {
+  writer->String("metrics");
+  writer->StartArray();
+  for (const auto& val : metrics) {
+    const auto& m = val.second;
+    if (m->ModifiedInOrAfterEpoch(opts.only_modified_in_or_after_epoch)) {
+      if (!opts.include_untouched_metrics && m->IsUntouched()) {
+        continue;
+      }
+      WARN_NOT_OK(m->WriteAsJson(writer, opts),
+                  Substitute("Failed to write $0 as JSON", val.first->name()));
+    }
+  }
+  writer->EndArray();
+}
+
+void WriteToJson(JsonWriter* writer,
+                 const MergedEntityMetrics &merged_entity_metrics,
+                 const MetricJsonOptions &opts) {
+  for (const auto& entity_metrics : merged_entity_metrics) {
+    if (entity_metrics.second.empty()) {
+      continue;
+    }
+    writer->StartObject();
+
+    writer->String("type");
+    writer->String(entity_metrics.first.type_);
+
+    writer->String("id");
+    writer->String(entity_metrics.first.id_);
+
+    WriteMetricsToJson(writer, entity_metrics.second, opts);
+
+    writer->EndObject();
+  }
+}
 
 //
 // MetricUnit
@@ -152,18 +193,17 @@ MetricEntityPrototype::~MetricEntityPrototype() {
 
 scoped_refptr<MetricEntity> MetricEntityPrototype::Instantiate(
     MetricRegistry* registry,
-    const std::string& id,
+    const string& id,
     const MetricEntity::AttributeMap& initial_attrs) const {
   return registry->FindOrCreateEntity(this, id, initial_attrs);
 }
-
 
 //
 // MetricEntity
 //
 
 MetricEntity::MetricEntity(const MetricEntityPrototype* prototype,
-                           std::string id, AttributeMap attributes)
+                           string id, AttributeMap attributes)
     : prototype_(prototype),
       id_(std::move(id)),
       attributes_(std::move(attributes)),
@@ -185,53 +225,145 @@ scoped_refptr<Metric> MetricEntity::FindOrNull(const MetricPrototype& prototype)
 
 namespace {
 
-bool MatchMetricInList(const string& metric_name,
-                       const vector<string>& match_params) {
-  string metric_name_uc;
-  ToUpperCase(metric_name, &metric_name_uc);
+bool MatchName(const string& name, const string& other) {
+  string name_uc;
+  ToUpperCase(name, &name_uc);
 
-  for (const string& param : match_params) {
-    // Handle wildcard.
-    if (param == "*") return true;
-    // The parameter is a case-insensitive substring match of the metric name.
-    string param_uc;
-    ToUpperCase(param, &param_uc);
-    if (metric_name_uc.find(param_uc) != std::string::npos) {
+  string other_uc;
+  ToUpperCase(other, &other_uc);
+
+  // The parameter is a case-insensitive substring match of the metric name.
+  return name_uc.find(other_uc) != string::npos;
+}
+
+bool MatchNameInList(const string& name, const vector<string>& names) {
+  for (const string& other : names) {
+    if (MatchName(name, other)) {
       return true;
     }
   }
   return false;
 }
 
+const char* MetricLevelName(MetricLevel level) {
+  switch (level) {
+    case MetricLevel::kDebug:
+      return "debug";
+    case MetricLevel::kInfo:
+      return "info";
+    case MetricLevel::kWarn:
+      return "warn";
+    default:
+      return "UNKNOWN LEVEL";
+  }
+}
+
+int MetricLevelNumeric(MetricLevel level) {
+  switch (level) {
+    case MetricLevel::kDebug:
+      return 0;
+    case MetricLevel::kInfo:
+      return 1;
+    case MetricLevel::kWarn:
+      return 2;
+    default:
+      LOG(FATAL) << "Unknown metric level";
+  }
+}
+
 } // anonymous namespace
 
+Status MetricEntity::GetMetricsAndAttrs(const MetricFilters& filters,
+                                        MetricMap* metrics,
+                                        AttributeMap* attrs) const {
+  CHECK(metrics);
+  CHECK(attrs);
 
-Status MetricEntity::WriteAsJson(JsonWriter* writer,
-                                 const vector<string>& requested_metrics,
-                                 const MetricJsonOptions& opts) const {
-  bool select_all = MatchMetricInList(id(), requested_metrics);
+  // Filter the 'type'.
+  if (!filters.entity_types.empty() && !MatchNameInList(prototype_->name(), filters.entity_types)) {
+    return Status::NotFound("entity is filtered by entity type");
+  }
 
-  // We want the keys to be in alphabetical order when printing, so we use an ordered map here.
-  typedef std::map<const char*, scoped_refptr<Metric> > OrderedMetricMap;
-  OrderedMetricMap metrics;
-  AttributeMap attrs;
+  // Filter the 'id'.
+  if (!filters.entity_ids.empty() && !MatchNameInList(id_, filters.entity_ids)) {
+    return Status::NotFound("entity is filtered by entity id");
+  }
+
   {
     // Snapshot the metrics in this registry (not guaranteed to be a consistent snapshot)
     std::lock_guard<simple_spinlock> l(lock_);
-    attrs = attributes_;
-    for (const MetricMap::value_type& val : metric_map_) {
-      const MetricPrototype* prototype = val.first;
-      const scoped_refptr<Metric>& metric = val.second;
+    *attrs = attributes_;
+    *metrics = metric_map_;
+  }
 
-      if (select_all || MatchMetricInList(prototype->name(), requested_metrics)) {
-        InsertOrDie(&metrics, prototype->name(), metric);
+  // Filter the 'attributes'.
+  if (!filters.entity_attrs.empty()) {
+    bool match_attrs = false;
+    DCHECK(filters.entity_attrs.size() % 2 == 0);
+    for (int i = 0; i < filters.entity_attrs.size(); i += 2) {
+      // The attr_key can't be found or the attr_val can't be matched.
+      AttributeMap::const_iterator it = attrs->find(filters.entity_attrs[i]);
+      if (it == attrs->end() || !MatchNameInList(it->second, { filters.entity_attrs[i+1] })) {
+        continue;
       }
+      match_attrs = true;
+      break;
+    }
+    // None of them match.
+    if (!match_attrs) {
+      return Status::NotFound("entity is filtered by some attribute");
     }
   }
 
-  // If we had a filter, and we didn't either match this entity or any metrics inside
-  // it, don't print the entity at all.
-  if (!requested_metrics.empty() && !select_all && metrics.empty()) {
+  // Filter the 'metrics'.
+  if (!filters.entity_metrics.empty()) {
+    for (auto metric = metrics->begin(); metric != metrics->end();) {
+      if (!MatchNameInList(metric->first->name(), filters.entity_metrics)) {
+        metric = metrics->erase(metric);
+      } else {
+        ++metric;
+      }
+    }
+    // None of them match.
+    if (metrics->empty()) {
+      return Status::NotFound("entity is filtered by metric types");
+    }
+  }
+
+  // Filter the metrics by 'level'.
+  // Includes all levels above the lowest matched level.
+  int lowest = MetricLevelNumeric(MetricLevel::kDebug); // Default to the lowest level.
+  if (!filters.entity_level.empty()) {
+    if (MatchName(MetricLevelName(MetricLevel::kDebug), filters.entity_level)) {
+      lowest = MetricLevelNumeric(MetricLevel::kDebug);
+    } else if (MatchName(MetricLevelName(MetricLevel::kInfo), filters.entity_level)) {
+      lowest = MetricLevelNumeric(MetricLevel::kInfo);
+    } else if (MatchName(MetricLevelName(MetricLevel::kWarn), filters.entity_level)) {
+      lowest = MetricLevelNumeric(MetricLevel::kWarn);
+    }
+  }
+  for (auto metric = metrics->begin(); metric != metrics->end();) {
+    if (MetricLevelNumeric(metric->first->level()) < lowest) {
+      metric = metrics->erase(metric);
+    } else {
+      ++metric;
+    }
+    // None of them match.
+    if (metrics->empty()) {
+      return Status::NotFound("entity is filtered by metric level");
+    }
+  }
+
+  return Status::OK();
+}
+
+Status MetricEntity::WriteAsJson(JsonWriter* writer, const MetricJsonOptions& opts) const {
+  MetricMap metrics;
+  AttributeMap attrs;
+  Status s = GetMetricsAndAttrs(opts.filters, &metrics, &attrs);
+  if (s.IsNotFound()) {
+    // Status::NotFound is returned when this entity has been filtered, treat it
+    // as OK, and skip printing it.
     return Status::OK();
   }
 
@@ -253,21 +385,52 @@ Status MetricEntity::WriteAsJson(JsonWriter* writer,
     writer->EndObject();
   }
 
-  writer->String("metrics");
-  writer->StartArray();
-  for (OrderedMetricMap::value_type& val : metrics) {
-    const auto& m = val.second;
-    if (m->ModifiedInOrAfterEpoch(opts.only_modified_in_or_after_epoch)) {
-      if (!opts.include_untouched_metrics && m->IsUntouched()) {
-        continue;
-      }
-      WARN_NOT_OK(m->WriteAsJson(writer, opts),
-                  strings::Substitute("Failed to write $0 as JSON", val.first));
-    }
-  }
-  writer->EndArray();
+  WriteMetricsToJson(writer, metrics, opts);
 
   writer->EndObject();
+
+  return Status::OK();
+}
+
+Status MetricEntity::CollectTo(MergedEntityMetrics* collections,
+                               const MetricFilters& filters,
+                               const MetricMergeRules& merge_rules) const {
+  MetricMap metrics;
+  AttributeMap attrs;
+  Status s = GetMetricsAndAttrs(filters, &metrics, &attrs);
+  if (s.IsNotFound()) {
+    // Status::NotFound is returned when this entity has been filtered, treat it
+    // as OK, and skip collecting it.
+    return Status::OK();
+  }
+
+  string entity_type = prototype_->name();
+  string entity_id = id();
+  auto* merge_rule = ::FindOrNull(merge_rules, prototype_->name());
+  if (merge_rule) {
+    entity_type = merge_rule->merge_to;
+    auto entity_id_ptr = ::FindOrNull(attrs, merge_rule->attribute_to_merge_by);
+    if (!entity_id_ptr) {
+      return Status::NotFound(Substitute("attribute $0 not found in entity $1",
+                                         merge_rule->attribute_to_merge_by, entity_id));
+    }
+    entity_id = *entity_id_ptr;
+  }
+
+  MergedEntity e(entity_type, entity_id);
+  auto& entity_collection = collections->emplace(std::make_pair(e, MergedMetrics())).first->second;
+  for (const auto& val : metrics) {
+    const MetricPrototype* prototype = val.first;
+    const scoped_refptr<Metric>& metric = val.second;
+
+    scoped_refptr<Metric> entry = FindPtrOrNull(entity_collection, prototype);
+    if (!entry) {
+      scoped_refptr<Metric> new_metric = metric->snapshot();
+      InsertOrDie(&entity_collection, new_metric->prototype(), new_metric);
+    } else {
+      entry->MergeFrom(metric);
+    }
+  }
 
   return Status::OK();
 }
@@ -311,7 +474,6 @@ void MetricEntity::RetireOldMetrics() {
       continue;
     }
 
-
     VLOG(2) << "Retiring metric " << it->first;
     metric_map_.erase(it++);
   }
@@ -342,9 +504,7 @@ MetricRegistry::MetricRegistry() {
 MetricRegistry::~MetricRegistry() {
 }
 
-Status MetricRegistry::WriteAsJson(JsonWriter* writer,
-                                   const vector<string>& requested_metrics,
-                                   const MetricJsonOptions& opts) const {
+Status MetricRegistry::WriteAsJson(JsonWriter* writer, const MetricJsonOptions& opts) const {
   EntityMap entities;
   {
     std::lock_guard<simple_spinlock> l(lock_);
@@ -352,9 +512,18 @@ Status MetricRegistry::WriteAsJson(JsonWriter* writer,
   }
 
   writer->StartArray();
-  for (const auto& e : entities) {
-    WARN_NOT_OK(e.second->WriteAsJson(writer, requested_metrics, opts),
-                Substitute("Failed to write entity $0 as JSON", e.second->id()));
+  if (opts.merge_rules.empty()) {
+    for (const auto& e : entities) {
+      WARN_NOT_OK(e.second->WriteAsJson(writer, opts),
+                  Substitute("Failed to write entity $0 as JSON", e.second->id()));
+    }
+  } else {
+    MergedEntityMetrics collections;
+    for (const auto& e : entities) {
+      WARN_NOT_OK(e.second->CollectTo(&collections, opts.filters, opts.merge_rules),
+                  Substitute("Failed to collect entity $0", e.second->id()));
+    }
+    WriteToJson(writer, collections, opts);
   }
   writer->EndArray();
 
@@ -467,6 +636,9 @@ void MetricPrototype::WriteFields(JsonWriter* writer,
 
     writer->String("description");
     writer->String(description());
+
+    writer->String("level");
+    writer->String(MetricLevelName(level()));
   }
 }
 
@@ -485,18 +657,18 @@ FunctionGaugeDetacher::~FunctionGaugeDetacher() {
 
 scoped_refptr<MetricEntity> MetricRegistry::FindOrCreateEntity(
     const MetricEntityPrototype* prototype,
-    const std::string& id,
-    const MetricEntity::AttributeMap& initial_attributes) {
+    const string& id,
+    const MetricEntity::AttributeMap& initial_attrs) {
   std::lock_guard<simple_spinlock> l(lock_);
   scoped_refptr<MetricEntity> e = FindPtrOrNull(entities_, id);
   if (!e) {
-    e = new MetricEntity(prototype, id, initial_attributes);
+    e = new MetricEntity(prototype, id, initial_attrs);
     InsertOrDie(&entities_, id, e);
   } else if (!e->published()) {
-    e = new MetricEntity(prototype, id, initial_attributes);
+    e = new MetricEntity(prototype, id, initial_attrs);
     entities_[id] = e;
   } else {
-    e->SetAttributes(initial_attributes);
+    e->SetAttributes(initial_attrs);
   }
   return e;
 }
@@ -552,22 +724,130 @@ Status Gauge::WriteAsJson(JsonWriter* writer,
 //
 
 StringGauge::StringGauge(const GaugePrototype<string>* proto,
-                         string initial_value)
-    : Gauge(proto), value_(std::move(initial_value)) {}
+                         string initial_value,
+                         unordered_set<string> initial_unique_values)
+    : Gauge(proto),
+      value_(std::move(initial_value)),
+      unique_values_(std::move(initial_unique_values)) {}
 
-std::string StringGauge::value() const {
+scoped_refptr<Metric> StringGauge::snapshot() const {
   std::lock_guard<simple_spinlock> l(lock_);
-  return value_;
+  auto p = new StringGauge(down_cast<const GaugePrototype<string>*>(prototype_),
+                           value_,
+                           unique_values_);
+  p->m_epoch_.store(m_epoch_);
+  p->invalid_for_merge_ = invalid_for_merge_;
+  p->retire_time_ = retire_time_;
+  return scoped_refptr<Metric>(p);
 }
 
-void StringGauge::set_value(const std::string& value) {
+string StringGauge::value() const {
+  std::lock_guard<simple_spinlock> l(lock_);
+  if (PREDICT_TRUE(unique_values_.empty())) {
+    return value_;
+  }
+  return JoinStrings(unique_values_, ", ");
+}
+
+void StringGauge::FillUniqueValuesUnlocked() {
+  if (unique_values_.empty()) {
+    unique_values_.insert(value_);
+  }
+}
+
+unordered_set<string> StringGauge::unique_values() {
+  std::lock_guard<simple_spinlock> l(lock_);
+  FillUniqueValuesUnlocked();
+  return unique_values_;
+}
+
+void StringGauge::set_value(const string& value) {
   UpdateModificationEpoch();
   std::lock_guard<simple_spinlock> l(lock_);
   value_ = value;
+  unique_values_.clear();
+}
+
+void StringGauge::MergeFrom(const scoped_refptr<Metric>& other) {
+  if (PREDICT_FALSE(this == other.get())) {
+    return;
+  }
+
+  if (InvalidateIfNeededInMerge(other)) {
+    return;
+  }
+
+  UpdateModificationEpoch();
+  scoped_refptr<StringGauge> other_ptr = down_cast<StringGauge*>(other.get());
+  auto other_values = other_ptr->unique_values();
+
+  std::lock_guard<simple_spinlock> l(lock_);
+  FillUniqueValuesUnlocked();
+  unique_values_.insert(other_values.begin(), other_values.end());
 }
 
 void StringGauge::WriteValue(JsonWriter* writer) const {
   writer->String(value());
+}
+
+//
+// MeanGauge
+//
+
+scoped_refptr<Metric> MeanGauge::snapshot() const {
+  std::lock_guard<simple_spinlock> l(lock_);
+  auto p = new MeanGauge(down_cast<const GaugePrototype<double>*>(prototype_));
+  p->m_epoch_.store(m_epoch_);
+  p->invalid_for_merge_ = invalid_for_merge_;
+  p->retire_time_ = retire_time_;
+  return scoped_refptr<Metric>(p);
+}
+
+double MeanGauge::value() const {
+  std::lock_guard<simple_spinlock> l(lock_);
+  return total_count_ > 0 ? total_sum_ / total_count_
+                          : 0.0;
+}
+
+double MeanGauge::total_sum() const {
+  std::lock_guard<simple_spinlock> l(lock_);
+  return total_sum_;
+}
+
+double MeanGauge::total_count() const {
+  std::lock_guard<simple_spinlock> l(lock_);
+  return total_count_;
+}
+
+void MeanGauge::set_value(double total_sum, double total_count) {
+  std::lock_guard<simple_spinlock> l(lock_);
+  total_sum_ = total_sum;
+  total_count_ = total_count;
+}
+
+void MeanGauge::MergeFrom(const scoped_refptr<Metric>& other) {
+  if (PREDICT_FALSE(this == other.get())) {
+    return;
+  }
+
+  if (InvalidateIfNeededInMerge(other)) {
+    return;
+  }
+
+  UpdateModificationEpoch();
+  scoped_refptr<MeanGauge> other_ptr = down_cast<MeanGauge*>(other.get());
+  std::lock_guard<simple_spinlock> l(lock_);
+  total_sum_ += other_ptr->total_sum();
+  total_count_ += other_ptr->total_count();
+}
+
+void MeanGauge::WriteValue(JsonWriter* writer) const {
+  writer->Double(value());
+
+  writer->String("total_sum");
+  writer->Double(total_sum());
+  writer->String("total_count");
+  writer->Double(total_count());
 }
 
 //
@@ -638,6 +918,11 @@ scoped_refptr<Histogram> HistogramPrototype::Instantiate(
 Histogram::Histogram(const HistogramPrototype* proto)
   : Metric(proto),
     histogram_(new HdrHistogram(proto->max_trackable_value(), proto->num_sig_digits())) {
+}
+
+Histogram::Histogram(const HistogramPrototype* proto, const HdrHistogram& hdr_hist)
+  : Metric(proto),
+    histogram_(new HdrHistogram(hdr_hist)) {
 }
 
 void Histogram::Increment(int64_t value) {

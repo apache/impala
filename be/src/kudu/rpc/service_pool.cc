@@ -21,7 +21,6 @@
 #include <memory>
 #include <ostream>
 #include <string>
-#include <type_traits>
 #include <utility>
 #include <vector>
 
@@ -29,7 +28,6 @@
 #include <glog/logging.h>
 
 #include "kudu/gutil/basictypes.h"
-#include "kudu/gutil/gscoped_ptr.h"
 #include "kudu/gutil/ref_counted.h"
 #include "kudu/gutil/strings/join.h"
 #include "kudu/gutil/strings/substitute.h"
@@ -45,8 +43,8 @@
 #include "kudu/util/thread.h"
 #include "kudu/util/trace.h"
 
-using std::shared_ptr;
 using std::string;
+using std::unique_ptr;
 using std::vector;
 using strings::Substitute;
 
@@ -54,24 +52,26 @@ METRIC_DEFINE_histogram(server, rpc_incoming_queue_time,
                         "RPC Queue Time",
                         kudu::MetricUnit::kMicroseconds,
                         "Number of microseconds incoming RPC requests spend in the worker queue",
+                        kudu::MetricLevel::kInfo,
                         60000000LU, 3);
 
 METRIC_DEFINE_counter(server, rpcs_timed_out_in_queue,
                       "RPC Queue Timeouts",
                       kudu::MetricUnit::kRequests,
                       "Number of RPCs whose timeout elapsed while waiting "
-                      "in the service queue, and thus were not processed.");
+                      "in the service queue, and thus were not processed.",
+                      kudu::MetricLevel::kWarn);
 
 METRIC_DEFINE_counter(server, rpcs_queue_overflow,
                       "RPC Queue Overflows",
                       kudu::MetricUnit::kRequests,
-                      "Number of RPCs dropped because the service queue "
-                      "was full.");
+                      "Number of RPCs dropped because the service queue was full.",
+                      kudu::MetricLevel::kWarn);
 
 namespace kudu {
 namespace rpc {
 
-ServicePool::ServicePool(gscoped_ptr<ServiceIf> service,
+ServicePool::ServicePool(unique_ptr<ServiceIf> service,
                          const scoped_refptr<MetricEntity>& entity,
                          size_t service_queue_length)
   : service_(std::move(service)),
@@ -126,7 +126,7 @@ void ServicePool::RejectTooBusy(InboundCall* c) {
                  c->remote_address().ToString(),
                  service_queue_.max_size());
   rpcs_queue_overflow_->Increment();
-  KLOG_EVERY_N_SECS(WARNING, 1) << err_msg;
+  KLOG_EVERY_N_SECS(WARNING, 1) << err_msg << THROTTLE_MSG;
   c->RespondFailure(ErrorStatusPB::ERROR_SERVER_TOO_BUSY,
                     Status::ServiceUnavailable(err_msg));
   DLOG(INFO) << err_msg << " Contents of service queue:\n"
@@ -141,7 +141,7 @@ RpcMethodInfo* ServicePool::LookupMethod(const RemoteMethod& method) {
   return service_->LookupMethod(method);
 }
 
-Status ServicePool::QueueInboundCall(gscoped_ptr<InboundCall> call) {
+Status ServicePool::QueueInboundCall(unique_ptr<InboundCall> call) {
   InboundCall* c = call.release();
 
   vector<uint32_t> unsupported_features;

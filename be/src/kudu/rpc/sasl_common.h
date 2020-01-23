@@ -14,9 +14,7 @@
 // KIND, either express or implied.  See the License for the
 // specific language governing permissions and limitations
 // under the License.
-
-#ifndef KUDU_RPC_SASL_COMMON_H
-#define KUDU_RPC_SASL_COMMON_H
+#pragma once
 
 #include <cstddef>
 #include <cstdint>
@@ -29,6 +27,13 @@
 #include "kudu/gutil/port.h"
 #include "kudu/util/slice.h"
 #include "kudu/util/status.h"
+
+#if defined(__APPLE__)
+// Almost all functions in the SASL API are marked as deprecated
+// since macOS 10.11.
+#pragma GCC diagnostic push
+#pragma GCC diagnostic ignored "-Wdeprecated-declarations"
+#endif // #if defined(__APPLE__)
 
 namespace kudu {
 
@@ -140,7 +145,7 @@ Status SaslDecode(sasl_conn_t* conn,
                   Slice ciphertext,
                   Slice* plaintext) WARN_UNUSED_RESULT;
 
-// Deleter for sasl_conn_t instances, for use with gscoped_ptr after calling sasl_*_new()
+// Deleter for sasl_conn_t instances, for use with unique_ptr after calling sasl_*_new().
 struct SaslDeleter {
   inline void operator()(sasl_conn_t* conn) {
     sasl_dispose(&conn);
@@ -155,4 +160,6 @@ void SaslSetMutex();
 } // namespace rpc
 } // namespace kudu
 
-#endif
+#if defined(__APPLE__)
+#pragma GCC diagnostic pop
+#endif // #if defined(__APPLE__)

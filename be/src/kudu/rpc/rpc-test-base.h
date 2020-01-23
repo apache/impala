@@ -14,8 +14,7 @@
 // KIND, either express or implied.  See the License for the
 // specific language governing permissions and limitations
 // under the License.
-#ifndef KUDU_RPC_RPC_TEST_BASE_H
-#define KUDU_RPC_RPC_TEST_BASE_H
+#pragma once
 
 #include <algorithm>
 #include <atomic>
@@ -212,7 +211,7 @@ class GenericCalculatorService : public ServiceIf {
 
     LOG(INFO) << "got call: " << pb_util::SecureShortDebugString(req);
     SleepFor(MonoDelta::FromMicroseconds(req.sleep_micros()));
-    MonoDelta duration(MonoTime::Now().GetDeltaSince(incoming->GetTimeReceived()));
+    MonoDelta duration(MonoTime::Now() - incoming->GetTimeReceived());
     CHECK_GE(duration.ToMicroseconds(), req.sleep_micros());
     SleepResponsePB resp;
     incoming->RespondSuccess(resp);
@@ -534,9 +533,10 @@ class RpcTestBase : public KuduTest {
     CHECK_OK(DoTestOutgoingSidecar(p, size1, size2));
   }
 
-  void DoTestExpectTimeout(const Proxy& p,
-                           const MonoDelta& timeout,
-                           bool* is_negotiaton_error = nullptr) {
+  static void DoTestExpectTimeout(const Proxy& p,
+                                  const MonoDelta& timeout,
+                                  bool will_be_cancelled = false,
+                                  bool* is_negotiaton_error = nullptr) {
     SleepRequestPB req;
     SleepResponsePB resp;
     // Sleep for 500ms longer than the call timeout.
@@ -555,13 +555,20 @@ class RpcTestBase : public KuduTest {
     }
 
     int expected_millis = timeout.ToMilliseconds();
-    int elapsed_millis = sw.elapsed().wall_millis();
+    int elapsed_millis = static_cast<int>(sw.elapsed().wall_millis());
 
-    // We shouldn't timeout significantly faster than our configured timeout.
-    EXPECT_GE(elapsed_millis, expected_millis - 10);
+    // We shouldn't timeout significantly faster than our configured timeout, unless the
+    // rpc is cancelled.
+    if (!will_be_cancelled) {
+      EXPECT_GE(elapsed_millis, expected_millis - 10);
+    }
     // And we also shouldn't take the full time that we asked for
     EXPECT_LT(elapsed_millis * 1000, sleep_micros);
-    EXPECT_TRUE(s.IsTimedOut());
+    if (will_be_cancelled) {
+      EXPECT_TRUE(s.IsAborted());
+    } else {
+      EXPECT_TRUE(s.IsTimedOut());
+    }
     LOG(INFO) << "status: " << s.ToString() << ", seconds elapsed: " << sw.elapsed().wall_seconds();
   }
 
@@ -631,7 +638,7 @@ class RpcTestBase : public KuduTest {
     mem_tracker_ = MemTracker::CreateTracker(-1, "result_tracker");
     result_tracker_.reset(new ResultTracker(mem_tracker_));
 
-    gscoped_ptr<ServiceIf> service(new ServiceClass(metric_entity_, result_tracker_));
+    std::unique_ptr<ServiceIf> service(new ServiceClass(metric_entity_, result_tracker_));
     service_name_ = service->service_name();
     scoped_refptr<MetricEntity> metric_entity = server_messenger_->metric_entity();
     service_pool_ = new ServicePool(std::move(service), metric_entity, service_queue_length_);
@@ -658,4 +665,3 @@ class RpcTestBase : public KuduTest {
 
 } // namespace rpc
 } // namespace kudu
-#endif

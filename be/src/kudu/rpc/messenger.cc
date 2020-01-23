@@ -22,12 +22,10 @@
 #include <mutex>
 #include <ostream>
 #include <string>
-#include <type_traits>
 #include <utility>
 
 #include <glog/logging.h>
 
-#include "kudu/gutil/gscoped_ptr.h"
 #include "kudu/gutil/map-util.h"
 #include "kudu/gutil/port.h"
 #include "kudu/gutil/stl_util.h"
@@ -51,7 +49,6 @@
 #include "kudu/util/metrics.h"
 #include "kudu/util/monotime.h"
 #include "kudu/util/net/socket.h"
-#include "kudu/util/scoped_cleanup.h"
 #include "kudu/util/status.h"
 #include "kudu/util/thread_restrictions.h"
 #include "kudu/util/threadpool.h"
@@ -59,6 +56,7 @@
 using std::string;
 using std::shared_ptr;
 using std::make_shared;
+using std::unique_ptr;
 using strings::Substitute;
 
 namespace boost {
@@ -184,15 +182,15 @@ MessengerBuilder& MessengerBuilder::set_reuseport() {
   return *this;
 }
 
-Status MessengerBuilder::Build(shared_ptr<Messenger> *msgr) {
+Status MessengerBuilder::Build(shared_ptr<Messenger>* msgr) {
   // Initialize SASL library before we start making requests
   RETURN_NOT_OK(SaslInit(!keytab_file_.empty()));
 
-  Messenger* new_msgr(new Messenger(*this));
-
-  auto cleanup = MakeScopedCleanup([&] () {
-      new_msgr->AllExternalReferencesDropped();
-  });
+  // See docs on Messenger::retain_self_ for info about this odd hack.
+  //
+  // Note: can't use make_shared() as it doesn't support custom deleters.
+  shared_ptr<Messenger> new_msgr(new Messenger(*this),
+                                 std::mem_fn(&Messenger::AllExternalReferencesDropped));
 
   RETURN_NOT_OK(ParseTriState("--rpc_authentication",
                               rpc_authentication_,
@@ -233,9 +231,7 @@ Status MessengerBuilder::Build(shared_ptr<Messenger> *msgr) {
     }
   }
 
-  // See docs on Messenger::retain_self_ for info about this odd hack.
-  cleanup.cancel();
-  *msgr = shared_ptr<Messenger>(new_msgr, std::mem_fun(&Messenger::AllExternalReferencesDropped));
+  *msgr = std::move(new_msgr);
   return Status::OK();
 }
 
@@ -371,7 +367,13 @@ void Messenger::QueueOutboundCall(const shared_ptr<OutboundCall> &call) {
   reactor->QueueOutboundCall(call);
 }
 
-void Messenger::QueueInboundCall(gscoped_ptr<InboundCall> call) {
+void Messenger::QueueInboundCall(unique_ptr<InboundCall> call) {
+  // This lock acquisition spans the entirety of the function to avoid having to
+  // take a ref on the RpcService. In doing so, we guarantee that the service
+  // isn't shut down here, which would be problematic because shutdown is a
+  // blocking operation and QueueInboundCall is called by the reactor thread.
+  //
+  // See KUDU-2946 for more details.
   shared_lock<rw_spinlock> guard(lock_.get_lock());
   scoped_refptr<RpcService>* service = FindOrNull(rpc_services_,
                                                   call->remote_method().service_name());
@@ -427,7 +429,6 @@ Messenger::Messenger(const MessengerBuilder &bld)
 }
 
 Messenger::~Messenger() {
-  std::lock_guard<percpu_rwlock> guard(lock_);
   CHECK(closing_) << "Should have already shut down";
   STLDeleteElements(&reactors_);
 }
@@ -451,7 +452,6 @@ Status Messenger::Init() {
 
 Status Messenger::DumpConnections(const DumpConnectionsRequestPB& req,
                                   DumpConnectionsResponsePB* resp) {
-  shared_lock<rw_spinlock> guard(lock_.get_lock());
   for (Reactor* reactor : reactors_) {
     RETURN_NOT_OK(reactor->DumpConnections(req, resp));
   }

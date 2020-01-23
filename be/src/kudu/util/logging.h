@@ -25,6 +25,7 @@
 #include "kudu/gutil/atomicops.h"
 #include "kudu/gutil/dynamic_annotations.h"
 #include "kudu/gutil/macros.h"
+#include "kudu/gutil/port.h"
 #include "kudu/gutil/walltime.h"
 #include "kudu/util/logging_callback.h"
 #include "kudu/util/status.h"
@@ -121,7 +122,7 @@ class ScopedDisableRedaction {
 // the given severity.
 //
 // The log message may include the special token 'THROTTLE_MSG' which expands
-// to either an empty string or '[suppressed <n> similar messages]'.
+// to either an empty string or ' [suppressed <n> similar messages]'.
 //
 // Example usage:
 //   KLOG_EVERY_N_SECS(WARNING, 1) << "server is low on memory" << THROTTLE_MSG;
@@ -161,9 +162,16 @@ class ScopedDisableRedaction {
       &google::LogMessage::SendToLog).stream()
 
 #define KLOG_EVERY_N_SECS(severity, n_secs) \
-  static ::kudu::logging::LogThrottler LOG_THROTTLER;  \
+  static logging::LogThrottler LOG_THROTTLER;  \
   KLOG_EVERY_N_SECS_THROTTLER(severity, n_secs, LOG_THROTTLER, "no-tag")
 
+#define WARN_NOT_OK_EVERY_N_SECS(to_call, warning_prefix, n_secs) do {                 \
+    const ::kudu::Status& _s = (to_call);                                              \
+    if (PREDICT_FALSE(!_s.ok())) {                                                     \
+      KLOG_EVERY_N_SECS(WARNING, n_secs) << (warning_prefix) << ": " << _s.ToString()  \
+                                         << THROTTLE_MSG;                              \
+    }                                                                                  \
+  } while (0)
 
 namespace kudu {
 enum PRIVATE_ThrottleMsg {THROTTLE_MSG};
@@ -351,7 +359,7 @@ std::ostream& operator<<(std::ostream &os, const PRIVATE_ThrottleMsg&);
 
 // Convenience macros to prefix log messages with some prefix, these are the unlocked
 // versions and should not obtain a lock (if one is required to obtain the prefix).
-// There must be a LogPrefixUnlocked()/LogPrefixLocked() method available in the current
+// There must be a LogPrefixUnlocked()/LogPrefix() method available in the current
 // scope in order to use these macros.
 #define LOG_WITH_PREFIX_UNLOCKED(severity) LOG(severity) << LogPrefixUnlocked()
 #define VLOG_WITH_PREFIX_UNLOCKED(verboselevel) LOG_IF(INFO, VLOG_IS_ON(verboselevel)) \

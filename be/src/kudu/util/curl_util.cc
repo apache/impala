@@ -19,7 +19,10 @@
 
 #include <cstddef>
 #include <cstdint>
+#include <mutex>
 #include <ostream>
+#include <string>
+#include <vector>
 
 #include <curl/curl.h>
 #include <glog/logging.h>
@@ -29,6 +32,9 @@
 #include "kudu/util/faststring.h"
 #include "kudu/util/scoped_cleanup.h"
 
+using std::string;
+using std::vector;
+
 namespace kudu {
 
 namespace {
@@ -36,6 +42,9 @@ namespace {
 inline Status TranslateError(CURLcode code) {
   if (code == CURLE_OK) {
     return Status::OK();
+  }
+  if (code == CURLE_OPERATION_TIMEDOUT) {
+    return Status::TimedOut("curl timeout", curl_easy_strerror(code));
   }
   return Status::NetworkError("curl error", curl_easy_strerror(code));
 }
@@ -55,7 +64,13 @@ EasyCurl::EasyCurl() {
   // Use our own SSL initialization, and disable curl's.
   // Both of these calls are idempotent.
   security::InitializeOpenSSL();
-  CHECK_EQ(0, curl_global_init(CURL_GLOBAL_DEFAULT & ~CURL_GLOBAL_SSL));
+  // curl_global_init() is not thread safe and multiple calls have the
+  // same effect as one call.
+  // See more details: https://curl.haxx.se/libcurl/c/curl_global_init.html
+  static std::once_flag once;
+  std::call_once(once, []() {
+    CHECK_EQ(0, curl_global_init(CURL_GLOBAL_DEFAULT & ~CURL_GLOBAL_SSL));
+  });
   curl_ = curl_easy_init();
   CHECK(curl_) << "Could not init curl";
 }
@@ -64,21 +79,21 @@ EasyCurl::~EasyCurl() {
   curl_easy_cleanup(curl_);
 }
 
-Status EasyCurl::FetchURL(const std::string& url, faststring* dst,
-                          const std::vector<std::string>& headers) {
+Status EasyCurl::FetchURL(const string& url, faststring* dst,
+                          const vector<string>& headers) {
   return DoRequest(url, nullptr, dst, headers);
 }
 
-Status EasyCurl::PostToURL(const std::string& url,
-                           const std::string& post_data,
+Status EasyCurl::PostToURL(const string& url,
+                           const string& post_data,
                            faststring* dst) {
   return DoRequest(url, &post_data, dst);
 }
 
-Status EasyCurl::DoRequest(const std::string& url,
-                           const std::string* post_data,
+Status EasyCurl::DoRequest(const string& url,
+                           const string* post_data,
                            faststring* dst,
-                           const std::vector<std::string>& headers) {
+                           const vector<string>& headers) {
   CHECK_NOTNULL(dst)->clear();
 
   if (!verify_peer_) {
@@ -86,6 +101,20 @@ Status EasyCurl::DoRequest(const std::string& url,
         curl_, CURLOPT_SSL_VERIFYHOST, 0)));
     RETURN_NOT_OK(TranslateError(curl_easy_setopt(
         curl_, CURLOPT_SSL_VERIFYPEER, 0)));
+  }
+
+  if (use_spnego_) {
+    RETURN_NOT_OK(TranslateError(curl_easy_setopt(
+        curl_, CURLOPT_HTTPAUTH, CURLAUTH_NEGOTIATE)));
+    // It's necessary to pass an empty user/password to trigger the authentication
+    // code paths in curl, even though SPNEGO doesn't use them.
+    RETURN_NOT_OK(TranslateError(curl_easy_setopt(
+        curl_, CURLOPT_USERPWD, ":")));
+  }
+
+  if (verbose_) {
+    RETURN_NOT_OK(TranslateError(curl_easy_setopt(
+        curl_, CURLOPT_VERBOSE, 1)));
   }
 
   // Add headers if specified.
@@ -111,6 +140,15 @@ Status EasyCurl::DoRequest(const std::string& url,
                                                   post_data->c_str())));
   }
 
+  // Done after CURLOPT_POSTFIELDS in case that resets the method (the docs[1]
+  // are unclear on whether that happens).
+  //
+  // 1. https://curl.haxx.se/libcurl/c/CURLOPT_POSTFIELDS.html
+  if (!custom_method_.empty()) {
+    RETURN_NOT_OK(TranslateError(curl_easy_setopt(curl_, CURLOPT_CUSTOMREQUEST,
+                                                  custom_method_.c_str())));
+  }
+
   RETURN_NOT_OK(TranslateError(curl_easy_setopt(curl_, CURLOPT_HTTPAUTH, CURLAUTH_ANY)));
   if (timeout_.Initialized()) {
     RETURN_NOT_OK(TranslateError(curl_easy_setopt(curl_, CURLOPT_NOSIGNAL, 1)));
@@ -118,12 +156,14 @@ Status EasyCurl::DoRequest(const std::string& url,
         timeout_.ToMilliseconds())));
   }
   RETURN_NOT_OK(TranslateError(curl_easy_perform(curl_)));
-  long rc; // NOLINT(*) curl wants a long
-  RETURN_NOT_OK(TranslateError(curl_easy_getinfo(curl_, CURLINFO_RESPONSE_CODE, &rc)));
-  if (rc != 200) {
-    return Status::RemoteError(strings::Substitute("HTTP $0", rc));
-  }
+  long val; // NOLINT(*) curl wants a long
+  RETURN_NOT_OK(TranslateError(curl_easy_getinfo(curl_, CURLINFO_NUM_CONNECTS, &val)));
+  num_connects_ = val;
 
+  RETURN_NOT_OK(TranslateError(curl_easy_getinfo(curl_, CURLINFO_RESPONSE_CODE, &val)));
+  if (val != 200) {
+    return Status::RemoteError(strings::Substitute("HTTP $0", val));
+  }
   return Status::OK();
 }
 

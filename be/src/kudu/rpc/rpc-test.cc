@@ -15,8 +15,6 @@
 // specific language governing permissions and limitations
 // under the License.
 
-#include "kudu/rpc/rpc-test-base.h"
-
 #include <cerrno>
 #include <cstdint>
 #include <cstdlib>
@@ -26,13 +24,11 @@
 #include <ostream>
 #include <set>
 #include <string>
-#include <unistd.h>
 #include <unordered_map>
 #include <vector>
 
 #include <boost/bind.hpp>
 #include <boost/core/ref.hpp>
-#include <boost/function.hpp>
 #include <gflags/gflags_declare.h>
 #include <glog/logging.h>
 #include <gtest/gtest.h>
@@ -49,6 +45,7 @@
 #include "kudu/rpc/outbound_call.h"
 #include "kudu/rpc/proxy.h"
 #include "kudu/rpc/reactor.h"
+#include "kudu/rpc/rpc-test-base.h"
 #include "kudu/rpc/rpc_controller.h"
 #include "kudu/rpc/rpc_introspection.pb.h"
 #include "kudu/rpc/rpc_sidecar.h"
@@ -498,59 +495,77 @@ TEST_P(TestRpc, TestConnectionAlwaysKeepalive) {
 
 // Test that the metrics on a per connection level work accurately.
 TEST_P(TestRpc, TestClientConnectionMetrics) {
-  // Only run one reactor per messenger, so we can grab the metrics from that
-  // one without having to check all.
-  n_server_reactor_threads_ = 1;
-  keepalive_time_ms_ = -1;
-
   // Set up server.
   Sockaddr server_addr;
   bool enable_ssl = GetParam();
   ASSERT_OK(StartTestServer(&server_addr, enable_ssl));
 
-  // Set up client.
+  // Set up client with one reactor so that we can grab the metrics from just
+  // that reactor.
   LOG(INFO) << "Connecting to " << server_addr.ToString();
   shared_ptr<Messenger> client_messenger;
   ASSERT_OK(CreateMessenger("Client", &client_messenger, 1, enable_ssl));
   Proxy p(client_messenger, server_addr, server_addr.host(),
           GenericCalculatorService::static_service_name());
 
-  // Cause the reactor thread to be blocked for 2 seconds.
-  server_messenger_->ScheduleOnReactor(boost::bind(sleep, 2), MonoDelta::FromSeconds(0));
+  // Here we queue a bunch of calls to the server and test that the sender's
+  // OutboundTransfer queue is indeed populated with those calls. Unfortunately,
+  // we have no surefire way of controlling the queue directly; a fast client
+  // reactor thread or a slow main thread could cause all of the outbound calls
+  // to be sent before we test the queue size, even though the server can't yet process them.
+  //
+  // So we repeat the entire exercise until we get a non-zero queue size.
+  ASSERT_EVENTUALLY([&]{
+    // We'll send several calls asynchronously to force RPC queueing on the sender side.
+    constexpr int n_calls = 1000;
+    AddRequestPB add_req;
+    add_req.set_x(rand());
+    add_req.set_y(rand());
+    AddResponsePB add_resp;
 
-  RpcController controller;
-  DumpRunningRpcsRequestPB dump_req;
-  DumpRunningRpcsResponsePB dump_resp;
-  dump_req.set_include_traces(false);
+    // Send the calls.
+    vector<unique_ptr<RpcController>> controllers;
+    CountDownLatch latch(n_calls);
+    for (int i = 0; i < n_calls; i++) {
+      controllers.emplace_back(new RpcController());
+      p.AsyncRequest(GenericCalculatorService::kAddMethodName, add_req, &add_resp,
+                     controllers.back().get(), boost::bind(
+                         &CountDownLatch::CountDown, boost::ref(latch)));
+    }
+    auto cleanup = MakeScopedCleanup([&](){
+      latch.Wait();
+    });
 
-  // We'll send several calls asynchronously to force RPC queueing on the sender side.
-  int n_calls = 1000;
-  AddRequestPB add_req;
-  add_req.set_x(rand());
-  add_req.set_y(rand());
-  AddResponsePB add_resp;
+    // Test the OutboundTransfer queue.
+    DumpConnectionsRequestPB dump_req;
+    DumpConnectionsResponsePB dump_resp;
+    dump_req.set_include_traces(false);
+    ASSERT_OK(client_messenger->DumpConnections(dump_req, &dump_resp));
+    ASSERT_EQ(1, dump_resp.outbound_connections_size());
+    const auto& conn = dump_resp.outbound_connections(0);
+    ASSERT_GT(conn.outbound_queue_size(), 0);
 
-  vector<unique_ptr<RpcController>> controllers;
-  CountDownLatch latch(n_calls);
-  for (int i = 0; i < n_calls; i++) {
-    controllers.emplace_back(new RpcController());
-    p.AsyncRequest(GenericCalculatorService::kAddMethodName, add_req, &add_resp,
-        controllers.back().get(), boost::bind(&CountDownLatch::CountDown, boost::ref(latch)));
-  }
+#ifdef __linux__
+    // Test that the socket statistics are present. We only assert on those that
+    // we know to be present on all kernel versions.
+    ASSERT_TRUE(conn.has_socket_stats());
+    ASSERT_GT(conn.socket_stats().rtt(), 0);
+    ASSERT_GT(conn.socket_stats().rttvar(), 0);
+    ASSERT_GT(conn.socket_stats().snd_cwnd(), 0);
+    ASSERT_GT(conn.socket_stats().send_bytes_per_sec(), 0);
+    ASSERT_TRUE(conn.socket_stats().has_send_queue_bytes());
+    ASSERT_TRUE(conn.socket_stats().has_receive_queue_bytes());
+#endif
 
-  // Since we blocked the only reactor thread for sometime, we should see RPCs queued on the
-  // OutboundTransfer queue, unless the main thread is very slow.
-  ASSERT_OK(client_messenger->DumpRunningRpcs(dump_req, &dump_resp));
-  ASSERT_EQ(1, dump_resp.outbound_connections_size());
-  ASSERT_GT(dump_resp.outbound_connections(0).outbound_queue_size(), 0);
+    // Unblock all of the calls and wait for them to finish.
+    latch.Wait();
+    cleanup.cancel();
 
-  // Wait for the calls to be marked finished.
-  latch.Wait();
-
-  // Verify that all the RPCs have finished.
-  for (const auto& controller : controllers) {
-    ASSERT_TRUE(controller->finished());
-  }
+    // Verify that all the RPCs have finished.
+    for (const auto& controller : controllers) {
+      ASSERT_TRUE(controller->finished());
+    }
+  });
 }
 
 // Test that outbound connections to the same server are reopen upon every RPC
@@ -927,15 +942,15 @@ TEST_P(TestRpc, TestCallTimeout) {
   // Test a very short timeout - we expect this will time out while the
   // call is still trying to connect, or in the send queue. This was triggering ASAN failures
   // before.
-  ASSERT_NO_FATAL_FAILURE(DoTestExpectTimeout(p, MonoDelta::FromNanoseconds(1)));
+  NO_FATALS(DoTestExpectTimeout(p, MonoDelta::FromNanoseconds(1)));
 
   // Test a longer timeout - expect this will time out after we send the request,
   // but shorter than our threshold for two-stage timeout handling.
-  ASSERT_NO_FATAL_FAILURE(DoTestExpectTimeout(p, MonoDelta::FromMilliseconds(200)));
+  NO_FATALS(DoTestExpectTimeout(p, MonoDelta::FromMilliseconds(200)));
 
   // Test a longer timeout - expect this will trigger the "two-stage timeout"
   // code path.
-  ASSERT_NO_FATAL_FAILURE(DoTestExpectTimeout(p, MonoDelta::FromMilliseconds(1500)));
+  NO_FATALS(DoTestExpectTimeout(p, MonoDelta::FromMilliseconds(1500)));
 }
 
 // Inject 500ms delay in negotiation, and send a call with a short timeout, followed by
@@ -955,7 +970,7 @@ TEST_P(TestRpc, TestCallTimeoutDoesntAffectNegotiation) {
           GenericCalculatorService::static_service_name());
 
   FLAGS_rpc_negotiation_inject_delay_ms = 500;
-  ASSERT_NO_FATAL_FAILURE(DoTestExpectTimeout(p, MonoDelta::FromMilliseconds(50)));
+  NO_FATALS(DoTestExpectTimeout(p, MonoDelta::FromMilliseconds(50)));
   ASSERT_OK(DoTestSyncCall(p, GenericCalculatorService::kAddMethodName));
 
   // Only the second call should have been received by the server, because we
@@ -1000,8 +1015,8 @@ TEST_F(TestRpc, TestNegotiationTimeout) {
           GenericCalculatorService::static_service_name());
 
   bool is_negotiation_error = false;
-  ASSERT_NO_FATAL_FAILURE(DoTestExpectTimeout(
-      p, MonoDelta::FromMilliseconds(100), &is_negotiation_error));
+  NO_FATALS(DoTestExpectTimeout(
+      p, MonoDelta::FromMilliseconds(100), false, &is_negotiation_error));
   EXPECT_TRUE(is_negotiation_error);
 
   acceptor_thread->Join();
@@ -1239,7 +1254,7 @@ TEST_P(TestRpc, TestApplicationFeatureFlag) {
 
 TEST_P(TestRpc, TestApplicationFeatureFlagUnsupportedServer) {
   auto savedFlags = kSupportedServerRpcFeatureFlags;
-  auto cleanup = MakeScopedCleanup([&] () { kSupportedServerRpcFeatureFlags = savedFlags; });
+  SCOPED_CLEANUP({ kSupportedServerRpcFeatureFlags = savedFlags; });
   kSupportedServerRpcFeatureFlags = {};
 
   // Set up server.
@@ -1290,6 +1305,7 @@ TEST_P(TestRpc, TestCancellation) {
   Proxy p(client_messenger, server_addr, server_addr.host(),
           GenericCalculatorService::static_service_name());
 
+  int timeout_ms = 10;
   for (int i = OutboundCall::READY; i <= OutboundCall::FINISHED_SUCCESS; ++i) {
     FLAGS_rpc_inject_cancellation_state = i;
     switch (i) {
@@ -1300,6 +1316,7 @@ TEST_P(TestRpc, TestCancellation) {
         ASSERT_TRUE(DoTestOutgoingSidecar(p, 0, 0).IsAborted());
         ASSERT_TRUE(DoTestOutgoingSidecar(p, 123, 456).IsAborted());
         ASSERT_TRUE(DoTestOutgoingSidecar(p, 3000 * 1024, 2000 * 1024).IsAborted());
+        DoTestExpectTimeout(p, MonoDelta::FromMilliseconds(timeout_ms), true);
         break;
       case OutboundCall::NEGOTIATION_TIMED_OUT:
       case OutboundCall::TIMED_OUT:
@@ -1327,6 +1344,8 @@ TEST_P(TestRpc, TestCancellation) {
         break;
     }
   }
+  // Sleep briefly to ensure the timeout tests have a chance for the timeouts to trigger.
+  SleepFor(MonoDelta::FromMilliseconds(timeout_ms * 2));
   client_messenger->Shutdown();
 }
 

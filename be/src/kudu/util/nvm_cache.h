@@ -14,18 +14,32 @@
 // KIND, either express or implied.  See the License for the
 // specific language governing permissions and limitations
 // under the License.
-#ifndef KUDU_UTIL_NVM_CACHE_H_
-#define KUDU_UTIL_NVM_CACHE_H_
+#pragma once
 
 #include <cstddef>
 #include <string>
 
-namespace kudu {
-class Cache;
+#include "kudu/util/cache.h"
 
-// Create a cache in persistent memory with the given capacity.
-Cache* NewLRUNvmCache(size_t capacity, const std::string& id);
+namespace kudu {
+
+// Convenience macro for invoking CanUseNVMCacheForTests.
+#define RETURN_IF_NO_NVM_CACHE(memory_type) do { \
+  if ((memory_type) == Cache::MemoryType::NVM && !CanUseNVMCacheForTests()) { \
+    LOG(WARNING) << "test is skipped; NVM cache cannot be created"; \
+    return; \
+  } \
+} while (0)
+
+// Returns true if an NVM cache can be created on this machine; false otherwise.
+//
+// Only intended for use in unit tests.
+bool CanUseNVMCacheForTests();
+
+// Create a new LRU cache with a fixed size capacity. This implementation
+// of Cache uses the least-recently-used eviction policy and stored in NVM.
+template<>
+Cache* NewCache<Cache::EvictionPolicy::LRU,
+                Cache::MemoryType::NVM>(size_t capacity, const std::string& id);
 
 }  // namespace kudu
-
-#endif

@@ -12,6 +12,7 @@
 #include <cinttypes>
 #include <cstdlib>
 #include <cstring>
+#include <functional>
 #include <list>
 #include <sstream>
 #include <type_traits>
@@ -36,7 +37,6 @@
 #include "kudu/gutil/strings/util.h"
 #include "kudu/gutil/sysinfo.h"
 #include "kudu/gutil/walltime.h"
-
 #include "kudu/util/atomic.h"
 #include "kudu/util/debug/trace_event.h"
 #include "kudu/util/debug/trace_event_synthetic_delay.h"
@@ -565,7 +565,7 @@ void TraceEvent::Initialize(
     unsigned char flags) {
   timestamp_ = timestamp;
   thread_timestamp_ = thread_timestamp;
-  duration_ = -1;;
+  duration_ = -1;
   id_ = id;
   category_group_enabled_ = category_group_enabled;
   name_ = name;
@@ -639,7 +639,7 @@ void TraceEvent::Initialize(
 void TraceEvent::Reset() {
   // Only reset fields that won't be initialized in Initialize(), or that may
   // hold references to other objects.
-  duration_ = -1;;
+  duration_ = -1;
   parameter_copy_storage_ = nullptr;
   for (int i = 0; i < kTraceMaxNumArgs && arg_names_[i]; ++i)
     convertable_values_[i] = nullptr;
@@ -675,6 +675,7 @@ void JsonEscape(StringPiece s, string* out) {
         break;
       case '\n':
         out->append("\\n");
+        break;
       case '\r':
         out->append("\\r");
         break;
@@ -905,6 +906,7 @@ void TraceResultBuffer::Collect(
 //
 ////////////////////////////////////////////////////////////////////////////////
 class TraceBucketData;
+
 typedef Callback<void(TraceBucketData*)> TraceSampleCallback;
 
 class TraceBucketData {
@@ -1356,10 +1358,10 @@ void TraceLog::SetEnabled(const CategoryFilter& category_filter,
           "bucket2",
           Bind(&TraceSamplingThread::DefaultSamplingCallback));
 
-      Status s = Thread::Create("tracing", "sampler",
-                                &TraceSamplingThread::ThreadMain,
-                                sampling_thread_.get(),
-                                &sampling_thread_handle_);
+      Status s = Thread::CreateWithFlags(
+          "tracing", "sampler",
+          std::bind(&TraceSamplingThread::ThreadMain,sampling_thread_.get()),
+          Thread::NO_STACK_WATCHDOG, &sampling_thread_handle_);
       if (!s.ok()) {
         LOG(DFATAL) << "failed to create trace sampling thread: " << s.ToString();
       }
@@ -1930,7 +1932,7 @@ std::string TraceLog::EventToConsoleMessage(unsigned char phase,
   // TRACE_EVENT_PHASE_BEGIN or TRACE_EVENT_END.
   DCHECK(phase != TRACE_EVENT_PHASE_COMPLETE);
 
-  MicrosecondsInt64 duration;
+  MicrosecondsInt64 duration = 0;
   int thread_id = trace_event ?
       trace_event->thread_id() : Thread::UniqueThreadId();
   if (phase == TRACE_EVENT_PHASE_END) {

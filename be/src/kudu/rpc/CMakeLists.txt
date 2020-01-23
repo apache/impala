@@ -62,6 +62,7 @@ set(KRPC_SRCS
     rpc_context.cc
     rpc_controller.cc
     rpc_sidecar.cc
+    rpc_verification_util.cc
     rpcz_store.cc
     sasl_common.cc
     sasl_helper.cc
@@ -89,23 +90,13 @@ ADD_EXPORTABLE_LIBRARY(krpc
   DEPS ${KRPC_LIBS})
 
 ### RPC generator tool
-add_executable(protoc-gen-krpc protoc-gen-krpc.cc
-  # Impala - add stub for kudu::VersionInfo
-  ${CMAKE_CURRENT_SOURCE_DIR}/../../common/kudu_version.cc
-  # Impala - add definition for any flag names shared between Impala / Kudu.
-  # TODO: Consider either removing code that depends on these flags, or namespacing them
-  # somehow.
-  ${CMAKE_CURRENT_SOURCE_DIR}/../../common/global-flags.cc)
-# IMPALA-8642: kudu_version.cc depends on gen-cpp/Status_types.h in target thrift-deps
-add_dependencies(protoc-gen-krpc thrift-deps)
+add_executable(protoc-gen-krpc protoc-gen-krpc.cc)
 target_link_libraries(protoc-gen-krpc
     ${KUDU_BASE_LIBS}
     rpc_header_proto
     protoc
     protobuf
-    gutil
-    libunwind
-    kudu_util)
+    gutil)
 
 #### RPC test
 PROTOBUF_GENERATE_CPP(
@@ -128,13 +119,12 @@ target_link_libraries(rtest_krpc
   rtest_diff_package_proto)
 
 # Tests
-set(KUDU_TEST_LINK_LIBS
+SET_KUDU_TEST_LINK_LIBS(
   krpc
   mini_kdc
   rpc_header_proto
   rtest_krpc
-  security_test_util
-  ${KUDU_MIN_TEST_LIBS})
+  security_test_util)
 ADD_KUDU_TEST(exactly_once_rpc-test PROCESSORS 10)
 ADD_KUDU_TEST(mt-rpc-test RUN_SERIAL true)
 ADD_KUDU_TEST(negotiation-test)

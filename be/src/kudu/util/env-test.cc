@@ -167,7 +167,7 @@ class TestEnv : public KuduTest {
     unique_ptr<uint8_t[]> scratch(new uint8_t[n]);
     Slice s(scratch.get(), n);
     ASSERT_OK(raf->Read(offset, s));
-    ASSERT_NO_FATAL_FAILURE(VerifyTestData(s, offset));
+    NO_FATALS(VerifyTestData(s, offset));
   }
 
   void TestAppendV(size_t num_slices, size_t slice_size, size_t iterations,
@@ -213,8 +213,8 @@ class TestEnv : public KuduTest {
         if (!fast) {
           // Verify as write. Note: this requires that file is pre-allocated, otherwise
           // the Read() fails with EINVAL.
-          ASSERT_NO_FATAL_FAILURE(ReadAndVerifyTestData(raf.get(), num_slices * slice_size * i,
-                                                        num_slices * slice_size));
+          NO_FATALS(ReadAndVerifyTestData(raf.get(), num_slices * slice_size * i,
+                                          num_slices * slice_size));
         }
       }
     }
@@ -226,8 +226,8 @@ class TestEnv : public KuduTest {
       ASSERT_OK(env_util::OpenFileForRandom(env_, kTestPath, &raf));
     }
     for (int i = 0; i < iterations; i++) {
-      ASSERT_NO_FATAL_FAILURE(ReadAndVerifyTestData(raf.get(), num_slices * slice_size * i,
-                                                    num_slices * slice_size));
+      NO_FATALS(ReadAndVerifyTestData(raf.get(), num_slices * slice_size * i,
+                                      num_slices * slice_size));
     }
   }
 
@@ -474,7 +474,7 @@ TEST_F(TestEnv, TestReadFully) {
   Env* env = Env::Default();
 
   WriteTestFile(env, kTestPath, kFileSize);
-  ASSERT_NO_FATAL_FAILURE();
+  NO_FATALS();
 
   // Reopen for read
   shared_ptr<RandomAccessFile> raf;
@@ -571,15 +571,15 @@ TEST_F(TestEnv, TestIOVMax) {
 TEST_F(TestEnv, TestAppendV) {
   WritableFileOptions opts;
   LOG(INFO) << "Testing AppendV() only, NO pre-allocation";
-  ASSERT_NO_FATAL_FAILURE(TestAppendV(2000, 1024, 5, true, false, opts));
+  NO_FATALS(TestAppendV(2000, 1024, 5, true, false, opts));
 
   if (!fallocate_supported_) {
     LOG(INFO) << "fallocate not supported, skipping preallocated runs";
   } else {
     LOG(INFO) << "Testing AppendV() only, WITH pre-allocation";
-    ASSERT_NO_FATAL_FAILURE(TestAppendV(2000, 1024, 5, true, true, opts));
+    NO_FATALS(TestAppendV(2000, 1024, 5, true, true, opts));
     LOG(INFO) << "Testing AppendV() together with Append() and Read(), WITH pre-allocation";
-    ASSERT_NO_FATAL_FAILURE(TestAppendV(128, 4096, 5, false, true, opts));
+    NO_FATALS(TestAppendV(128, 4096, 5, false, true, opts));
   }
 }
 
@@ -592,7 +592,7 @@ TEST_F(TestEnv, TestGetExecutablePath) {
 TEST_F(TestEnv, TestOpenEmptyRandomAccessFile) {
   Env* env = Env::Default();
   string test_file = GetTestPath("test_file");
-  ASSERT_NO_FATAL_FAILURE(WriteTestFile(env, test_file, 0));
+  NO_FATALS(WriteTestFile(env, test_file, 0));
   unique_ptr<RandomAccessFile> readable_file;
   ASSERT_OK(env->NewRandomAccessFile(test_file, &readable_file));
   uint64_t size;
@@ -612,7 +612,7 @@ TEST_F(TestEnv, TestOverwrite) {
 
   // File exists, try to overwrite (and fail).
   WritableFileOptions opts;
-  opts.mode = Env::CREATE_NON_EXISTING;
+  opts.mode = Env::MUST_CREATE;
   Status s = env_util::OpenFileForWrite(opts,
                                         env_, test_path, &writer);
   ASSERT_TRUE(s.IsAlreadyPresent());
@@ -634,7 +634,7 @@ TEST_F(TestEnv, TestReopen) {
 
   // Reopen it and append to it.
   WritableFileOptions reopen_opts;
-  reopen_opts.mode = Env::OPEN_EXISTING;
+  reopen_opts.mode = Env::MUST_EXIST;
   ASSERT_OK(env_util::OpenFileForWrite(reopen_opts,
                                        env_, test_path, &writer));
   ASSERT_EQ(first.length(), writer->Size());
@@ -771,10 +771,15 @@ TEST_F(TestEnv, TestWalkBadPermissions) {
     PCHECK(chmod(kTestPath.c_str(), stat_buf.st_mode) == 0);
   });
 
-  // A walk on a directory without execute permission should fail.
+  // A walk on a directory without execute permission should fail,
+  // unless the calling process has super-user's effective ID.
   Status s = env_->Walk(kTestPath, Env::PRE_ORDER, Bind(&NoopTestWalkCb));
-  ASSERT_TRUE(s.IsIOError());
-  ASSERT_STR_CONTAINS(s.ToString(), "One or more errors occurred");
+  if (geteuid() == 0) {
+    ASSERT_TRUE(s.ok()) << s.ToString();
+  } else {
+    ASSERT_TRUE(s.IsIOError()) << s.ToString();
+    ASSERT_STR_CONTAINS(s.ToString(), "One or more errors occurred");
+  }
 }
 
 static Status TestWalkErrorCb(int* num_calls,
@@ -836,7 +841,11 @@ TEST_F(TestEnv, TestGlobPermissionDenied) {
     });
   vector<string> matches;
   Status s = env_->Glob(JoinPathSegments(dir, "*"), &matches);
-  ASSERT_STR_MATCHES(s.ToString(), "IO error: glob failed for /.*: Permission denied");
+  if (geteuid() == 0) {
+    ASSERT_TRUE(s.ok()) << s.ToString();
+  } else {
+    ASSERT_STR_MATCHES(s.ToString(), "IO error: glob failed for /.*: Permission denied");
+  }
 }
 
 TEST_F(TestEnv, TestGetBlockSize) {
@@ -922,16 +931,31 @@ TEST_F(TestEnv, TestRWFile) {
 
   // Make sure we can't overwrite it.
   RWFileOptions opts;
-  opts.mode = Env::CREATE_NON_EXISTING;
+  opts.mode = Env::MUST_CREATE;
   ASSERT_TRUE(env_->NewRWFile(opts, GetTestPath("foo"), &file).IsAlreadyPresent());
 
   // Reopen it without truncating the existing data.
-  opts.mode = Env::OPEN_EXISTING;
+  opts.mode = Env::MUST_EXIST;
   ASSERT_OK(env_->NewRWFile(opts, GetTestPath("foo"), &file));
   uint8_t scratch4[kNewTestData.length()];
   Slice result4(scratch4, kNewTestData.length());
   ASSERT_OK(file->Read(0, result4));
   ASSERT_EQ(result4, kNewTestData);
+
+  // Test CREATE_OR_OPEN semantics on a new file.
+  const string bar_path = GetTestPath("bar");
+  unique_ptr<RWFile> file_two;
+  opts.mode = Env::CREATE_OR_OPEN;
+  ASSERT_FALSE(env_->FileExists(bar_path));
+  ASSERT_OK(env_->NewRWFile(opts, bar_path, &file_two));
+  ASSERT_TRUE(env_->FileExists(bar_path));
+  ASSERT_OK(file_two->Write(0, kTestData));
+  ASSERT_OK(file_two->Size(&sz));
+  ASSERT_EQ(kTestData.length(), sz);
+
+  ASSERT_OK(env_->NewRWFile(opts, bar_path, &file_two));
+  ASSERT_OK(file_two->Size(&sz));
+  ASSERT_EQ(kTestData.length(), sz);
 }
 
 TEST_F(TestEnv, TestCanonicalize) {

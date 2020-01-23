@@ -56,13 +56,29 @@ class JsonReader {
                       const char* field,
                       int32_t* result) const;
 
+  Status ExtractUint32(const rapidjson::Value* object,
+                       const char* field,
+                       uint32_t* result) const;
+
   Status ExtractInt64(const rapidjson::Value* object,
                       const char* field,
                       int64_t* result) const;
 
+  Status ExtractUint64(const rapidjson::Value* object,
+                       const char* field,
+                       uint64_t* result) const;
+
   Status ExtractString(const rapidjson::Value* object,
                        const char* field,
                        std::string* result) const;
+
+  Status ExtractDouble(const rapidjson::Value* object,
+                       const char* field,
+                       double* result) const;
+
+  Status ExtractFloat(const rapidjson::Value* object,
+                      const char* field,
+                      float* result) const;
 
   // 'result' is only valid for as long as JsonReader is alive.
   Status ExtractObject(const rapidjson::Value* object,
@@ -80,6 +96,8 @@ class JsonReader {
   Status ExtractField(const rapidjson::Value* object,
                       const char* field,
                       const rapidjson::Value** result) const;
+
+  bool IsLosslessFloatValue(const rapidjson::Value* value) const;
 
   std::string text_;
   rapidjson::Document document_;

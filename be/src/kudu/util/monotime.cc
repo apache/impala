@@ -192,8 +192,8 @@ const MonoTime& MonoTime::Earliest(const MonoTime& a, const MonoTime& b) {
   return a;
 }
 
-MonoTime::MonoTime()
-  : nanos_(0) {
+MonoTime::MonoTime() KUDU_MONOTIME_NOEXCEPT
+    : nanos_(0) {
 }
 
 bool MonoTime::Initialized() const {
@@ -201,11 +201,7 @@ bool MonoTime::Initialized() const {
 }
 
 MonoDelta MonoTime::GetDeltaSince(const MonoTime &rhs) const {
-  DCHECK(Initialized());
-  DCHECK(rhs.Initialized());
-  int64_t delta(nanos_);
-  delta -= rhs.nanos_;
-  return MonoDelta(delta);
+  return rhs - *this;
 }
 
 void MonoTime::AddDelta(const MonoDelta &delta) {
@@ -242,7 +238,7 @@ MonoTime& MonoTime::operator-=(const MonoDelta& delta) {
   return *this;
 }
 
-MonoTime::MonoTime(const struct timespec &ts) {
+MonoTime::MonoTime(const struct timespec &ts) KUDU_MONOTIME_NOEXCEPT {
   // Monotonic time resets when the machine reboots.  The 64-bit limitation
   // means that we can't represent times larger than 292 years, which should be
   // adequate.
@@ -252,8 +248,8 @@ MonoTime::MonoTime(const struct timespec &ts) {
   nanos_ += ts.tv_nsec;
 }
 
-MonoTime::MonoTime(int64_t nanos)
-  : nanos_(nanos) {
+MonoTime::MonoTime(int64_t nanos) KUDU_MONOTIME_NOEXCEPT
+    : nanos_(nanos) {
 }
 
 double MonoTime::ToSeconds() const {
@@ -328,7 +324,11 @@ MonoTime operator-(const MonoTime& t, const MonoDelta& delta) {
 }
 
 MonoDelta operator-(const MonoTime& t_end, const MonoTime& t_beg) {
-  return t_end.GetDeltaSince(t_beg);
+  DCHECK(t_beg.Initialized());
+  DCHECK(t_end.Initialized());
+  int64_t delta(t_end.nanos_);
+  delta -= t_beg.nanos_;
+  return MonoDelta(delta);
 }
 
 } // namespace kudu

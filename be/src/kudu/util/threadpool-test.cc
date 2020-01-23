@@ -38,7 +38,6 @@
 #include "kudu/gutil/atomicops.h"
 #include "kudu/gutil/bind.h"
 #include "kudu/gutil/bind_helpers.h"
-#include "kudu/gutil/gscoped_ptr.h"
 #include "kudu/gutil/port.h"
 #include "kudu/gutil/ref_counted.h"
 #include "kudu/gutil/strings/substitute.h"
@@ -92,7 +91,7 @@ class ThreadPoolTest : public KuduTest {
   }
 
  protected:
-  gscoped_ptr<ThreadPool> pool_;
+  unique_ptr<ThreadPool> pool_;
 };
 
 TEST_F(ThreadPoolTest, TestNoTaskOpenClose) {
@@ -346,7 +345,7 @@ TEST_F(ThreadPoolTest, TestZeroQueueSize) {
 // other tasks on the same pool.
 TEST_F(ThreadPoolTest, TestSlowThreadStart) {
   // Start a pool of threads from which we'll submit tasks.
-  gscoped_ptr<ThreadPool> submitter_pool;
+  unique_ptr<ThreadPool> submitter_pool;
   ASSERT_OK(ThreadPoolBuilder("submitter")
             .set_min_threads(5)
             .set_max_threads(5)
@@ -413,13 +412,19 @@ TEST_F(ThreadPoolTest, TestPromises) {
 
 METRIC_DEFINE_entity(test_entity);
 METRIC_DEFINE_histogram(test_entity, queue_length, "queue length",
-                        MetricUnit::kTasks, "queue length", 1000, 1);
+                        MetricUnit::kTasks, "queue length",
+                        kudu::MetricLevel::kInfo,
+                        1000, 1);
 
 METRIC_DEFINE_histogram(test_entity, queue_time, "queue time",
-                        MetricUnit::kMicroseconds, "queue time", 1000000, 1);
+                        MetricUnit::kMicroseconds, "queue time",
+                        kudu::MetricLevel::kInfo,
+                        1000000, 1);
 
 METRIC_DEFINE_histogram(test_entity, run_time, "run time",
-                        MetricUnit::kMicroseconds, "run time", 1000, 1);
+                        MetricUnit::kMicroseconds, "run time",
+                        kudu::MetricLevel::kInfo,
+                        1000, 1);
 
 TEST_F(ThreadPoolTest, TestMetrics) {
   MetricRegistry registry;

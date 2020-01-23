@@ -15,6 +15,7 @@
 // specific language governing permissions and limitations
 // under the License.
 
+#include <arpa/inet.h>
 #include <sys/socket.h>
 #include <ifaddrs.h>
 #include <limits.h>
@@ -53,6 +54,7 @@
 #include "kudu/util/scoped_cleanup.h"
 #include "kudu/util/stopwatch.h"
 #include "kudu/util/subprocess.h"
+#include "kudu/util/thread_restrictions.h"
 #include "kudu/util/trace.h"
 
 // Mac OS 10.9 does not appear to define HOST_NAME_MAX in unistd.h
@@ -72,16 +74,25 @@ using strings::Substitute;
 
 namespace kudu {
 
+// Allow 18-bit PIDs, max PID up to 262143, for binding in UNIQUE_LOOPBACK mode.
+static const int kPidBits = 18;
+// The PID and server indices share the same 24-bit space. The 24-bit space
+// corresponds to the 127.0.0.0/8 subnet.
+static const int kServerIdxBits = 24 - kPidBits;
+// The maximum allowed number of 'indexed servers' for binding in UNIQUE_LOOPBACK mode.
+const int kServersMaxNum = (1 << kServerIdxBits) - 2;
+
 namespace {
 
 using AddrInfo = unique_ptr<addrinfo, function<void(addrinfo*)>>;
 
-// An utility wrapper around getaddrinfo() call to convert the return code
+// A utility wrapper around getaddrinfo() call to convert the return code
 // of the libc library function into Status.
 Status GetAddrInfo(const string& hostname,
                    const addrinfo& hints,
                    const string& op_description,
                    AddrInfo* info) {
+  ThreadRestrictions::AssertWaitAllowed();
   addrinfo* res = nullptr;
   const int rc = getaddrinfo(hostname.c_str(), nullptr, &hints, &res);
   const int err = errno; // preserving the errno from the getaddrinfo() call
@@ -138,12 +149,37 @@ Status HostPort::ParseString(const string& str, uint16_t default_port) {
     port = default_port;
   } else if (!SimpleAtoi(p.second, &port) ||
              port > 65535) {
-    return Status::InvalidArgument("Invalid port", str);
+    return Status::InvalidArgument("invalid port", str);
   }
 
   host_.swap(p.first);
   port_ = port;
   return Status::OK();
+}
+
+Status HostPort::ParseStringWithScheme(const string& str, uint16_t default_port) {
+  string str_copy(str);
+  const string kSchemeSeparator = "://";
+  const string kPathSeparator = "/";
+
+  auto scheme_idx = str_copy.find(kSchemeSeparator);
+
+  if (scheme_idx == 0) {
+    return Status::InvalidArgument("invalid scheme format", str_copy);
+  }
+
+  if (scheme_idx != string::npos) {
+    str_copy.erase(0, scheme_idx + kSchemeSeparator.size());
+    auto path_idx = str_copy.find(kPathSeparator);
+    if (path_idx == 0) {
+      return Status::InvalidArgument("invalid address format", str_copy);
+    }
+    if (path_idx != string::npos) {
+      str_copy.erase(path_idx, str_copy.size());
+    }
+  }
+
+  return ParseString(str_copy, default_port);
 }
 
 Status HostPort::ResolveAddresses(vector<Sockaddr>* addresses) const {
@@ -159,19 +195,21 @@ Status HostPort::ResolveAddresses(vector<Sockaddr>* addresses) const {
   LOG_SLOW_EXECUTION(WARNING, 200, op_description) {
     RETURN_NOT_OK(GetAddrInfo(host_, hints, op_description, &result));
   }
+  vector<Sockaddr> result_addresses;
   for (const addrinfo* ai = result.get(); ai != nullptr; ai = ai->ai_next) {
-    CHECK_EQ(ai->ai_family, AF_INET);
-    struct sockaddr_in* addr = reinterpret_cast<struct sockaddr_in*>(ai->ai_addr);
+    CHECK_EQ(AF_INET, ai->ai_family);
+    sockaddr_in* addr = reinterpret_cast<sockaddr_in*>(ai->ai_addr);
     addr->sin_port = htons(port_);
     Sockaddr sockaddr(*addr);
-    if (addresses) {
-      addresses->push_back(sockaddr);
-    }
-    VLOG(2) << "Resolved address " << sockaddr.ToString()
-            << " for host/port " << ToString();
+    VLOG(2) << Substitute("resolved address $0 for host/port $1",
+                          sockaddr.ToString(), ToString());
+    result_addresses.emplace_back(sockaddr);
   }
   if (PREDICT_FALSE(FLAGS_fail_dns_resolution)) {
     return Status::NetworkError("injected DNS resolution failure");
+  }
+  if (addresses) {
+    *addresses = std::move(result_addresses);
   }
   return Status::OK();
 }
@@ -179,11 +217,29 @@ Status HostPort::ResolveAddresses(vector<Sockaddr>* addresses) const {
 Status HostPort::ParseStrings(const string& comma_sep_addrs,
                               uint16_t default_port,
                               vector<HostPort>* res) {
+  res->clear();
+
   vector<string> addr_strings = strings::Split(comma_sep_addrs, ",", strings::SkipEmpty());
+  res->reserve(addr_strings.size());
   for (const string& addr_string : addr_strings) {
     HostPort host_port;
     RETURN_NOT_OK(host_port.ParseString(addr_string, default_port));
-    res->push_back(host_port);
+    res->emplace_back(host_port);
+  }
+  return Status::OK();
+}
+
+Status HostPort::ParseStringsWithScheme(const string& comma_sep_addrs,
+                                        uint16_t default_port,
+                                        vector<HostPort>* res) {
+  res->clear();
+
+  vector<string> addr_strings = strings::Split(comma_sep_addrs, ",", strings::SkipEmpty());
+  res->reserve(addr_strings.size());
+  for (const string& addr_string : addr_strings) {
+    HostPort host_port;
+    RETURN_NOT_OK(host_port.ParseStringWithScheme(addr_string, default_port));
+    res->emplace_back(host_port);
   }
   return Status::OK();
 }
@@ -198,6 +254,16 @@ string HostPort::ToCommaSeparatedString(const vector<HostPort>& hostports) {
     hostport_strs.push_back(hostport.ToString());
   }
   return JoinStrings(hostport_strs, ",");
+}
+
+bool HostPort::IsLoopback(uint32_t addr) {
+    return (NetworkByteOrder::FromHost32(addr) >> 24) == 127;
+}
+
+string HostPort::AddrToString(uint32_t addr) {
+  char str[INET_ADDRSTRLEN];
+  ::inet_ntop(AF_INET, &addr, str, INET_ADDRSTRLEN);
+  return str;
 }
 
 Network::Network()
@@ -242,6 +308,14 @@ Status Network::ParseCIDRStrings(const string& comma_sep_addrs,
     res->push_back(network);
   }
   return Status::OK();
+}
+
+bool Network::IsLoopback() const {
+  return HostPort::IsLoopback(addr_);
+}
+
+string Network::GetAddrAsString() const {
+  return HostPort::AddrToString(addr_);
 }
 
 bool IsPrivilegedPort(uint16_t port) {
@@ -397,6 +471,37 @@ void TryRunLsof(const Sockaddr& addr, vector<string>* log) {
     LOG_STRING(WARNING, log) << s.ToString();
   }
   LOG_STRING(WARNING, log) << results;
+}
+
+string GetBindIpForDaemon(int index, BindMode bind_mode) {
+  // The server index should range from (0, max_servers] since
+  // the range for last octet for a valid unicast IP address ranges is (0, 255).
+  CHECK(0 < index && index <= kServersMaxNum) << Substitute(
+      "server index $0 is not in range ($1, $2]", index, 0, kServersMaxNum);
+
+  switch (bind_mode) {
+    case BindMode::UNIQUE_LOOPBACK: {
+      uint32_t pid = getpid();
+      CHECK_LT(pid, 1 << kPidBits) << Substitute(
+          "PID $0 is more than $1 bits wide", pid, kPidBits);
+      uint32_t ip = (pid << kServerIdxBits) | static_cast<uint32_t>(index);
+      uint8_t octets[] = {
+          static_cast<uint8_t>((ip >> 16) & 0xff),
+          static_cast<uint8_t>((ip >>  8) & 0xff),
+          static_cast<uint8_t>((ip >>  0) & 0xff),
+      };
+      // Range for the last octet of a valid unicast IP address is (0, 255).
+      CHECK(0 < octets[2] && octets[2] < UINT8_MAX) << Substitute(
+          "last IP octet $0 is not in range ($1, $2)", octets[2], 0, UINT8_MAX);
+      return Substitute("127.$0.$1.$2", octets[0], octets[1], octets[2]);
+    }
+    case BindMode::WILDCARD:
+      return kWildcardIpAddr;
+    case BindMode::LOOPBACK:
+      return kLoopbackIpAddr;
+    default:
+      LOG(FATAL) << "unknown bind mode";
+  }
 }
 
 } // namespace kudu

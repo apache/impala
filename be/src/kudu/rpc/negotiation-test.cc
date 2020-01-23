@@ -80,6 +80,13 @@
 #define KRB5_VERSION_LE_1_10
 #endif
 
+#if defined(__APPLE__)
+// Almost all functions in the SASL API are marked as deprecated
+// since macOS 10.11.
+#pragma GCC diagnostic push
+#pragma GCC diagnostic ignored "-Wdeprecated-declarations"
+#endif // #if defined(__APPLE__)
+
 DEFINE_bool(is_test_child, false,
             "Used by tests which require clean processes. "
             "See TestDisableInit.");
@@ -199,7 +206,9 @@ TEST_P(TestNegotiation, TestNegotiation) {
   FLAGS_rpc_encrypt_loopback_connections = desc.rpc_encrypt_loopback;
 
   // Generate an optional client token and server token verifier.
-  TokenSigner token_signer(60, 20, std::make_shared<TokenVerifier>());
+  // Note: the authz token validity period doesn't matter because we're only
+  // concerned with authenticating the connection.
+  TokenSigner token_signer(60, 0, 20, std::make_shared<TokenVerifier>());
   {
     unique_ptr<TokenSigningPrivateKey> key;
     ASSERT_OK(token_signer.CheckNeedKey(&key));
@@ -1157,10 +1166,15 @@ TEST_F(TestNegotiation, TestPreflight) {
   // Try with an inaccessible keytab.
   CHECK_ERR(chmod(kt_path.c_str(), 0000));
   s = ServerNegotiation::PreflightCheckGSSAPI("kudu");
-  ASSERT_FALSE(s.ok());
+  if (geteuid() == 0) {
+    // The super-user can acess the 'inaccessible' keytab file anyway.
+    ASSERT_TRUE(s.ok()) << s.ToString();
+  } else {
+    ASSERT_FALSE(s.ok()) << s.ToString();
 #ifndef KRB5_VERSION_LE_1_10
-  ASSERT_STR_MATCHES(s.ToString(), "error accessing keytab: Permission denied");
+    ASSERT_STR_MATCHES(s.ToString(), "error accessing keytab: Permission denied");
 #endif
+  }
   CHECK_ERR(unlink(kt_path.c_str()));
 
   // Try with a keytab that has the wrong credentials.
@@ -1344,3 +1358,7 @@ TEST_F(TestDisableInit, TestMultipleSaslInit_NoMutexImpl) {
 
 } // namespace rpc
 } // namespace kudu
+
+#if defined(__APPLE__)
+#pragma GCC diagnostic pop
+#endif // #if defined(__APPLE__)

@@ -316,7 +316,7 @@ Status ReadPBStartingAt(ReadableFileType* reader, int version,
     // filesize metadata is updated but the new data is not persisted.
     // See https://plus.google.com/+KentonVarda/posts/JDwHfAiLGNQ.
     if (IsAllZeros(length_and_cksum_buf)) {
-      bool all_zeros;
+      bool all_zeros = false;
       RETURN_NOT_OK(RestOfFileIsAllZeros(reader, file_size, tmp_offset, &all_zeros));
       if (all_zeros) {
         return Status::Incomplete("incomplete write of PB: rest of file is NULL bytes");
@@ -648,7 +648,6 @@ string SecureShortDebugString(const Message& msg) {
 
   return debug_string;
 }
-
 
 WritablePBContainerFile::WritablePBContainerFile(shared_ptr<RWFile> writer)
   : state_(FileState::NOT_INITIALIZED),

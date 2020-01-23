@@ -66,7 +66,7 @@ InboundCall::InboundCall(Connection* conn)
 
 InboundCall::~InboundCall() {}
 
-Status InboundCall::ParseFrom(gscoped_ptr<InboundTransfer> transfer) {
+Status InboundCall::ParseFrom(unique_ptr<InboundTransfer> transfer) {
   TRACE_EVENT_FLOW_BEGIN0("rpc", "InboundCall", this);
   TRACE_EVENT0("rpc", "InboundCall::ParseFrom");
   RETURN_NOT_OK(serialization::ParseMessage(transfer->data(), &header_, &serialized_request_));
@@ -162,7 +162,7 @@ void InboundCall::Respond(const MessageLite& response,
   TRACE_TO(trace_, "Queueing $0 response", is_success ? "success" : "failure");
   RecordHandlingCompleted();
   conn_->rpcz_store()->AddCall(this);
-  conn_->QueueResponseForCall(gscoped_ptr<InboundCall>(this));
+  conn_->QueueResponseForCall(unique_ptr<InboundCall>(this));
 }
 
 void InboundCall::SerializeResponseBuffer(const MessageLite& response,
@@ -302,7 +302,7 @@ void InboundCall::RecordHandlingCompleted() {
 
   if (method_info_) {
     method_info_->handler_latency_histogram->Increment(
-        (timing_.time_completed - timing_.time_handled).ToMicroseconds());
+        (timing_.ProcessingDuration()).ToMicroseconds());
   }
 }
 
@@ -311,7 +311,13 @@ bool InboundCall::ClientTimedOut() const {
 }
 
 MonoTime InboundCall::GetTimeReceived() const {
+  DCHECK(timing_.time_received.Initialized());
   return timing_.time_received;
+}
+
+MonoTime InboundCall::GetTimeHandled() const {
+  DCHECK(timing_.time_handled.Initialized());
+  return timing_.time_handled;
 }
 
 vector<uint32_t> InboundCall::GetRequiredFeatures() const {

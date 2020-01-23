@@ -14,6 +14,7 @@
 // KIND, either express or implied.  See the License for the
 // specific language governing permissions and limitations
 // under the License.
+
 #include "kudu/util/logging.h"
 
 #include <unistd.h>
@@ -23,14 +24,17 @@
 #include <cstdlib>
 #include <ctime>
 #include <fstream>
+#include <initializer_list>
 #include <mutex>
 #include <utility>
 
 #include <boost/uuid/random_generator.hpp>
+#include <boost/uuid/uuid.hpp>
 #include <boost/uuid/uuid_io.hpp>
 #include <gflags/gflags.h>
 #include <glog/logging.h>
 
+#include "kudu/gutil/basictypes.h"
 #include "kudu/gutil/callback.h"  // IWYU pragma: keep
 #include "kudu/gutil/port.h"
 #include "kudu/gutil/spinlock.h"
@@ -46,7 +50,9 @@
 #include "kudu/util/signal.h"
 #include "kudu/util/status.h"
 
-DECLARE_string(log_filename);
+DEFINE_string(log_filename, "",
+    "Prefix of log filename - "
+    "full path is <log_dir>/<log_filename>.[INFO|WARN|ERROR|FATAL]");
 TAG_FLAG(log_filename, stable);
 
 DEFINE_bool(log_async, true,
@@ -59,7 +65,9 @@ DEFINE_int32(log_async_buffer_bytes_per_level, 2 * 1024 * 1024,
              "level. Only relevant when --log_async is enabled.");
 TAG_FLAG(log_async_buffer_bytes_per_level, hidden);
 
-DECLARE_int32(max_log_files);
+DEFINE_int32(max_log_files, 10,
+    "Maximum number of log files to retain per severity level. The most recent "
+    "log files are retained. If set to 0, all log files are retained.");
 TAG_FLAG(max_log_files, runtime);
 TAG_FLAG(max_log_files, experimental);
 
@@ -170,7 +178,7 @@ void FlushCoverageOnExit() {
   static std::once_flag once;
   std::call_once(once, [] {
       static const char msg[] = "Flushing coverage data before crash...\n";
-      write(STDERR_FILENO, msg, arraysize(msg));
+      ignore_result(write(STDERR_FILENO, msg, arraysize(msg)));
       TryFlushCoverage();
     });
   in_call = false;
@@ -212,13 +220,12 @@ void InitGoogleLoggingSafe(const char* arg) {
     }
   }
 
-  // This forces our logging to use /tmp rather than looking for a
+  // This forces our logging to default to /tmp rather than looking for a
   // temporary directory if none is specified. This is done so that we
   // can reliably construct the log file name without duplicating the
   // complex logic that glog uses to guess at a temporary dir.
-  if (FLAGS_log_dir.empty()) {
-    FLAGS_log_dir = "/tmp";
-  }
+  CHECK_NE("", google::SetCommandLineOptionWithMode("log_dir",
+     "/tmp", google::FlagSettingMode::SET_FLAGS_DEFAULT));
 
   if (!FLAGS_logtostderr) {
     // Verify that a log file can be created in log_dir by creating a tmp file.
@@ -268,8 +275,7 @@ void InitGoogleLoggingSafe(const char* arg) {
   IgnoreSigPipe();
 
   // For minidump support. Must be called before logging threads started.
-  // Disabled by Impala, which does not link Kudu's minidump library.
-  // CHECK_OK(BlockSigUSR1());
+  CHECK_OK(BlockSigUSR1());
 
   if (FLAGS_log_async) {
     EnableAsyncLogging();

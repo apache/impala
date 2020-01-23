@@ -17,22 +17,22 @@
 
 #include "kudu/util/version_util.h"
 
-#include <iostream>
+#include <regex.h>
+
+#include <mutex>
 #include <string>
 #include <utility>
-#include <vector>
 
 #include <glog/logging.h>
 
+#include "kudu/gutil/macros.h"
 #include "kudu/gutil/strings/numbers.h"
-#include "kudu/gutil/strings/split.h"
+#include "kudu/gutil/strings/strip.h"
 #include "kudu/gutil/strings/substitute.h"
 #include "kudu/util/status.h"
 
 using std::ostream;
 using std::string;
-using std::vector;
-using strings::Split;
 using strings::Substitute;
 
 namespace kudu {
@@ -41,11 +41,14 @@ bool Version::operator==(const Version& other) const {
   return this->major == other.major &&
          this->minor == other.minor &&
          this->maintenance == other.maintenance &&
+         this->extra_delimiter == other.extra_delimiter &&
          this->extra == other.extra;
 }
 
 string Version::ToString() const {
-  return raw_version;
+  return extra.empty()
+      ? Substitute("$0.$1.$2", major, minor, maintenance)
+      : Substitute("$0.$1.$2$3$4", major, minor, maintenance, *extra_delimiter, extra);
 }
 
 ostream& operator<<(ostream& os, const Version& v) {
@@ -54,29 +57,53 @@ ostream& operator<<(ostream& os, const Version& v) {
 
 Status ParseVersion(const string& version_str,
                     Version* v) {
-  CHECK(v);
+  static regex_t re;
+  static std::once_flag once;
+  static const char* kVersionPattern =
+      "^([[:digit:]]+)\\." // <major>.
+      "([[:digit:]]+)\\."  // <minor>.
+      "([[:digit:]]+)"     // <maintenance>
+      "([.-].*)?$";        // [<delimiter><extra>]
+  std::call_once(once, []{
+      CHECK_EQ(0, regcomp(&re, kVersionPattern, REG_EXTENDED));
+    });
+
+  DCHECK(v);
   const Status invalid_ver_err =
       Status::InvalidArgument("invalid version string", version_str);
+  auto v_str = version_str;
+  StripWhiteSpace(&v_str);
+
+  regmatch_t matches[5];
+  if (regexec(&re, v_str.c_str(), arraysize(matches), matches, 0) != 0) {
+    return invalid_ver_err;
+  }
+#define PARSE_REQUIRED_COMPONENT(idx, lhs)                              \
+  {                                                                     \
+    int i = (idx);                                                      \
+    if (matches[i].rm_so == -1 ||                                       \
+        !SimpleAtoi(v_str.substr(matches[i].rm_so,                      \
+                                 matches[i].rm_eo - matches[i].rm_so),  \
+                    (lhs))) {                                           \
+      return invalid_ver_err;                                           \
+    }                                                                   \
+  }
   Version temp_v;
-  const vector<string> main_and_extra = Split(version_str, "-");
-  if (main_and_extra.empty() || main_and_extra.size() > 2) {
-    return invalid_ver_err;
-  }
-  if (main_and_extra.size() == 2) {
-    temp_v.extra = main_and_extra[1];
-  }
-  const auto& main_ver_str = main_and_extra[0];
-  const vector<string> maj_min_maint = Split(main_ver_str, ".");
-  if (maj_min_maint.size() != 3) {
-    return invalid_ver_err;
-  }
-  if (!SimpleAtoi(maj_min_maint[0], &temp_v.major) ||
-      !SimpleAtoi(maj_min_maint[1], &temp_v.minor) ||
-      !SimpleAtoi(maj_min_maint[2], &temp_v.maintenance)) {
-    return invalid_ver_err;
+  PARSE_REQUIRED_COMPONENT(1, &temp_v.major);
+  PARSE_REQUIRED_COMPONENT(2, &temp_v.minor);
+  PARSE_REQUIRED_COMPONENT(3, &temp_v.maintenance);
+#undef PARSE_REQUIRED_COMPONENT
+  if (matches[4].rm_so != -1) {
+    int extra_comp_off = matches[4].rm_so + 1; // skip the delimiter
+    int extra_comp_len = matches[4].rm_eo - extra_comp_off;
+    if (extra_comp_len > 0) {
+      temp_v.extra_delimiter = v_str[extra_comp_off - 1];
+      temp_v.extra = v_str.substr(extra_comp_off, extra_comp_len);
+    }
   }
   temp_v.raw_version = version_str;
   *v = std::move(temp_v);
+
   return Status::OK();
 }
 

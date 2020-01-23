@@ -32,15 +32,12 @@
 #include <boost/core/ref.hpp>
 #include <boost/function.hpp>
 #include <gflags/gflags.h>
-#include <gflags/gflags_declare.h>
 #include <glog/logging.h>
 #include <glog/stl_logging.h>
 #include <gtest/gtest.h>
 
 #include "kudu/gutil/atomicops.h"
-#include "kudu/gutil/gscoped_ptr.h"
 #include "kudu/gutil/ref_counted.h"
-#include "kudu/gutil/stl_util.h"
 #include "kudu/rpc/messenger.h"
 #include "kudu/rpc/proxy.h"
 #include "kudu/rpc/rpc-test-base.h"
@@ -209,13 +206,35 @@ TEST_F(RpcStubTest, TestAuthorization) {
     p.set_user_credentials(creds);
 
     // Alice is disallowed by all RPCs.
-    RpcController controller;
-    WhoAmIRequestPB req;
-    WhoAmIResponsePB resp;
-    Status s = p.WhoAmI(req, &resp, &controller);
-    ASSERT_FALSE(s.ok());
-    ASSERT_EQ(s.ToString(),
-              "Remote error: Not authorized: alice is not allowed to call this method");
+    {
+      RpcController controller;
+      WhoAmIRequestPB req;
+      WhoAmIResponsePB resp;
+      Status s = p.WhoAmI(req, &resp, &controller);
+      ASSERT_FALSE(s.ok());
+      ASSERT_EQ(s.ToString(),
+                "Remote error: Not authorized: alice is not allowed to call this method");
+    }
+
+    // KUDU-2540: Authorization failures on exactly-once RPCs cause FATAL
+    {
+      RpcController controller;
+
+      unique_ptr<RequestIdPB> request_id(new RequestIdPB);
+      request_id->set_client_id("client-id");
+      request_id->set_attempt_no(0);
+      request_id->set_seq_no(0);
+      request_id->set_first_incomplete_seq_no(-1);
+      controller.SetRequestIdPB(std::move(request_id));
+
+      ExactlyOnceRequestPB req;
+      req.set_value_to_add(1);
+      ExactlyOnceResponsePB resp;
+      Status s = p.AddExactlyOnce(req, &resp, &controller);
+      ASSERT_FALSE(s.ok());
+      ASSERT_EQ(s.ToString(),
+                "Remote error: Not authorized: alice is not allowed to call this method");
+    }
   }
 
   // Try some calls as "bob".
@@ -429,17 +448,16 @@ struct AsyncSleep {
 
 TEST_F(RpcStubTest, TestDontHandleTimedOutCalls) {
   CalculatorServiceProxy p(client_messenger_, server_addr_, server_addr_.host());
-  vector<AsyncSleep*> sleeps;
-  ElementDeleter d(&sleeps);
+  vector<unique_ptr<AsyncSleep>> sleeps;
 
   // Send enough sleep calls to occupy the worker threads.
   for (int i = 0; i < n_worker_threads_; i++) {
-    gscoped_ptr<AsyncSleep> sleep(new AsyncSleep);
+    unique_ptr<AsyncSleep> sleep(new AsyncSleep);
     sleep->rpc.set_timeout(MonoDelta::FromSeconds(1));
     sleep->req.set_sleep_micros(1000*1000); // 1sec
     p.SleepAsync(sleep->req, &sleep->resp, &sleep->rpc,
                  boost::bind(&CountDownLatch::CountDown, &sleep->latch));
-    sleeps.push_back(sleep.release());
+    sleeps.push_back(std::move(sleep));
   }
 
   // We asynchronously sent the RPCs above, but the RPCs might still
@@ -471,7 +489,7 @@ TEST_F(RpcStubTest, TestDontHandleTimedOutCalls) {
     ASSERT_STR_CONTAINS(s.ToString(), "SENT");
   });
 
-  for (AsyncSleep* s : sleeps) {
+  for (const auto& s : sleeps) {
     s->latch.Wait();
   }
 

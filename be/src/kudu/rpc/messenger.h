@@ -14,23 +14,23 @@
 // KIND, either express or implied.  See the License for the
 // specific language governing permissions and limitations
 // under the License.
-#ifndef KUDU_RPC_MESSENGER_H
-#define KUDU_RPC_MESSENGER_H
+#pragma once
 
 #include <cstdint>
 #include <memory>
 #include <mutex>
 #include <string>
 #include <unordered_map>
+#include <utility>
 #include <vector>
 
 #include <boost/optional/optional.hpp>
 #include <gtest/gtest_prod.h>
 
 #include "kudu/gutil/macros.h"
-#include "kudu/gutil/gscoped_ptr.h"
 #include "kudu/gutil/ref_counted.h"
 #include "kudu/rpc/connection.h"
+#include "kudu/rpc/rpc_service.h"
 #include "kudu/security/security_flags.h"
 #include "kudu/security/token.pb.h"
 #include "kudu/util/locks.h"
@@ -66,7 +66,6 @@ class InboundCall;
 class Messenger;
 class OutboundCall;
 class Reactor;
-class RpcService;
 class RpczStore;
 
 struct AcceptorPoolInfo {
@@ -166,7 +165,7 @@ class MessengerBuilder {
   // Configure the messenger to set the SO_REUSEPORT socket option.
   MessengerBuilder& set_reuseport();
 
-  Status Build(std::shared_ptr<Messenger> *msgr);
+  Status Build(std::shared_ptr<Messenger>* msgr);
 
  private:
   const std::string name_;
@@ -257,7 +256,7 @@ class Messenger {
   void QueueOutboundCall(const std::shared_ptr<OutboundCall> &call);
 
   // Enqueue a call for processing on the server.
-  void QueueInboundCall(gscoped_ptr<InboundCall> call);
+  void QueueInboundCall(std::unique_ptr<InboundCall> call);
 
   // Queue a cancellation for the given outbound call.
   void QueueCancellation(const std::shared_ptr<OutboundCall> &call);
@@ -379,8 +378,8 @@ class Messenger {
 
   // Separate client and server negotiation pools to avoid possibility of distributed
   // deadlock. See KUDU-2041.
-  gscoped_ptr<ThreadPool> client_negotiation_pool_;
-  gscoped_ptr<ThreadPool> server_negotiation_pool_;
+  std::unique_ptr<ThreadPool> client_negotiation_pool_;
+  std::unique_ptr<ThreadPool> server_negotiation_pool_;
 
   std::unique_ptr<security::TlsContext> tls_context_;
 
@@ -458,4 +457,3 @@ class Messenger {
 } // namespace rpc
 } // namespace kudu
 
-#endif

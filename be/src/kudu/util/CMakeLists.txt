@@ -30,6 +30,20 @@ ADD_EXPORTABLE_LIBRARY(util_compression_proto
   NONLINK_DEPS ${UTIL_COMPRESSION_PROTO_TGTS})
 
 #######################################
+# hash_proto
+#######################################
+
+PROTOBUF_GENERATE_CPP(
+  HASH_PROTO_SRCS HASH_PROTO_HDRS HASH_PROTO_TGTS
+  SOURCE_ROOT ${CMAKE_CURRENT_SOURCE_DIR}/../..
+  BINARY_ROOT ${CMAKE_CURRENT_BINARY_DIR}/../..
+  PROTO_FILES hash.proto)
+ADD_EXPORTABLE_LIBRARY(hash_proto
+  SRCS ${HASH_PROTO_SRCS}
+  DEPS protobuf
+  NONLINK_DEPS ${HASH_PROTO_TGTS})
+
+#######################################
 # histogram_proto
 #######################################
 
@@ -48,14 +62,28 @@ ADD_EXPORTABLE_LIBRARY(histogram_proto
 #######################################
 
 PROTOBUF_GENERATE_CPP(
-    MAINTENANCE_MANAGER_PROTO_SRCS MAINTENANCE_MANAGER_PROTO_HDRS MAINTENANCE_MANAGER_PROTO_TGTS
-    SOURCE_ROOT ${CMAKE_CURRENT_SOURCE_DIR}/../..
-    BINARY_ROOT ${CMAKE_CURRENT_BINARY_DIR}/../..
-    PROTO_FILES maintenance_manager.proto)
+  MAINTENANCE_MANAGER_PROTO_SRCS MAINTENANCE_MANAGER_PROTO_HDRS MAINTENANCE_MANAGER_PROTO_TGTS
+  SOURCE_ROOT ${CMAKE_CURRENT_SOURCE_DIR}/../..
+  BINARY_ROOT ${CMAKE_CURRENT_BINARY_DIR}/../..
+  PROTO_FILES maintenance_manager.proto)
 ADD_EXPORTABLE_LIBRARY(maintenance_manager_proto
-    SRCS ${MAINTENANCE_MANAGER_PROTO_SRCS}
-    DEPS protobuf
-    NONLINK_DEPS ${MAINTENANCE_MANAGER_PROTO_TGTS})
+  SRCS ${MAINTENANCE_MANAGER_PROTO_SRCS}
+  DEPS protobuf
+  NONLINK_DEPS ${MAINTENANCE_MANAGER_PROTO_TGTS})
+
+#######################################
+# mem_tracker_proto
+#######################################
+
+PROTOBUF_GENERATE_CPP(
+  MEM_TRACKER_PROTO_SRCS MEM_TRACKER_PROTO_HDRS MEM_TRACKER_PROTO_TGTS
+  SOURCE_ROOT ${CMAKE_CURRENT_SOURCE_DIR}/../..
+  BINARY_ROOT ${CMAKE_CURRENT_BINARY_DIR}/../..
+  PROTO_FILES mem_tracker.proto)
+ADD_EXPORTABLE_LIBRARY(mem_tracker_proto
+  SRCS ${MEM_TRACKER_PROTO_SRCS}
+  DEPS protobuf
+  NONLINK_DEPS ${MEM_TRACKER_PROTO_TGTS})
 
 #######################################
 # pb_util_proto
@@ -119,10 +147,11 @@ set(UTIL_SRCS
   async_logger.cc
   atomic.cc
   bitmap.cc
+  block_cache_metrics.cc
+  block_bloom_filter.cc
   bloom_filter.cc
-  bitmap.cc
   cache.cc
-  cache_metrics.cc
+  char_util.cc
   coding.cc
   condition_variable.cc
   cow_object.cc
@@ -139,6 +168,7 @@ set(UTIL_SRCS
   faststring.cc
   fault_injection.cc
   file_cache.cc
+  file_cache_metrics.cc
   flags.cc
   flag_tags.cc
   flag_validators.cc
@@ -160,13 +190,14 @@ set(UTIL_SRCS
   memory/overwrite.cc
   mem_tracker.cc
   metrics.cc
-  # minidump.cc
+  minidump.cc
   monotime.cc
   mutex.cc
   net/dns_resolver.cc
   net/net_util.cc
   net/sockaddr.cc
   net/socket.cc
+  nvm_cache.cc
   oid_generator.cc
   once.cc
   os-util.cc
@@ -198,11 +229,11 @@ set(UTIL_SRCS
   trace_metrics.cc
   user.cc
   url-coding.cc
-  # Remove from compilation, as it depends on generated method calls. Replaced by
-  # kudu_version.cc in Impala's common library.
-  # version_info.cc
+  version_info.cc
   version_util.cc
+  web_callback_registry.cc
   website_util.cc
+  yamlreader.cc
   zlib.cc
 )
 
@@ -211,10 +242,26 @@ set(UTIL_SRCS
 # optimized regardless of the default optimization options.
 set_source_files_properties(memory/overwrite.cc PROPERTIES COMPILE_FLAGS "-O3")
 
-if(HAVE_LIB_VMEM)
-  set(UTIL_SRCS
-    ${UTIL_SRCS}
-    nvm_cache.cc)
+# Detect AVX2 support
+set(AVX2_CMD "echo | ${CMAKE_CXX_COMPILER} -mavx2 -dM -E - | awk '$2 == \"__AVX2__\" { print $3 }'")
+execute_process(
+  COMMAND bash -c ${AVX2_CMD}
+  OUTPUT_VARIABLE AVX2_SUPPORT
+  OUTPUT_STRIP_TRAILING_WHITESPACE
+)
+
+# block_bloom_filter_avx2.cc uses AVX2 operations.
+if (AVX2_SUPPORT)
+  list(APPEND UTIL_SRCS block_bloom_filter_avx2.cc)
+  set_source_files_properties(block_bloom_filter_avx2.cc PROPERTIES COMPILE_FLAGS "-mavx2")
+  # block_bloom_filter.cc is not compiled explicitly with AVX2 instructions(-mavx2) but it needs
+  # to know at compile time whether AVX2 support is available, hence the custom definition
+  # instead of relying on __AVX2__ defined by compiler with -mavx2.
+  set_source_files_properties(block_bloom_filter_avx2.cc block_bloom_filter.cc
+                              PROPERTIES COMPILE_DEFINITIONS "USE_AVX2=1")
+  message("Compiler supports AVX2")
+else()
+  message("Compiler does not support AVX2")
 endif()
 
 set(UTIL_LIBS
@@ -222,12 +269,15 @@ set(UTIL_LIBS
   gflags
   glog
   gutil
+  hash_proto
   histogram_proto
   libev
   maintenance_manager_proto
+  mem_tracker_proto
   pb_util_proto
   protobuf
   version_info_proto
+  yaml
   zlib)
 
 if(NOT APPLE)
@@ -236,12 +286,6 @@ if(NOT APPLE)
     breakpad_client
     dl
     rt)
-endif()
-
-if(HAVE_LIB_VMEM)
-  set(UTIL_LIBS
-    ${UTIL_LIBS}
-    vmem)
 endif()
 
 # We use MallocExtension, but not in the exported version of the library.
@@ -264,15 +308,62 @@ set(UTIL_COMPRESSION_SRCS
 set(UTIL_COMPRESSION_LIBS
   kudu_util
   util_compression_proto
-
   glog
   gutil
   lz4
   snappy
   zlib)
+
 ADD_EXPORTABLE_LIBRARY(kudu_util_compression
   SRCS ${UTIL_COMPRESSION_SRCS}
   DEPS ${UTIL_COMPRESSION_LIBS})
+# Define LZ4_DISABLE_DEPRECATE_WARNINGS to mute warnings like:
+# "'int LZ4_compress(const char*, char*, int)' is deprecated".
+target_compile_definitions(kudu_util_compression PUBLIC LZ4_DISABLE_DEPRECATE_WARNINGS)
+target_compile_definitions(kudu_util_compression_exported PUBLIC LZ4_DISABLE_DEPRECATE_WARNINGS)
+
+#######################################
+# kudu_curl_util
+#######################################
+add_library(kudu_curl_util
+  curl_util.cc)
+target_link_libraries(kudu_curl_util
+  security
+  ${CURL_LIBRARIES}
+  glog
+  gutil)
+
+#######################################
+# kudu_cloud_util
+#######################################
+add_library(kudu_cloud_util
+  cloud/instance_detector.cc
+  cloud/instance_metadata.cc)
+target_link_libraries(kudu_cloud_util
+  kudu_curl_util)
+
+# See the comment in sanitizer_options.cc for details on this library's usage.
+# The top-level CMakeLists sets a ${SANITIZER_OPTIONS_OVERRIDE} variable which
+# should be linked first into all Kudu binaries.
+
+#######################################
+# sanitizer_options
+#######################################
+add_library(sanitizer_options STATIC sanitizer_options.cc)
+target_link_libraries(sanitizer_options gutil)
+if ("${KUDU_USE_ASAN}" OR "${KUDU_USE_TSAN}" OR "${KUDU_USE_UBSAN}")
+  # By default the sanitizers use addr2line utility to symbolize reports.
+  # llvm-symbolizer is faster, consumes less memory and produces much better reports.
+  # We set KUDU_EXTERNAL_SYMBOLIZER_PATH which is used in sanitizer_options.cc
+  # to set the default external_symbolizer_path.
+  SET(KUDU_LLVM_SYMBOLIZER_PATH ${THIRDPARTY_INSTALL_UNINSTRUMENTED_DIR}/bin/llvm-symbolizer)
+  if (EXISTS ${KUDU_LLVM_SYMBOLIZER_PATH})
+    target_compile_definitions(sanitizer_options PRIVATE KUDU_EXTERNAL_SYMBOLIZER_PATH=${KUDU_LLVM_SYMBOLIZER_PATH})
+  else()
+    message(SEND_ERROR
+      "Could not find llvm-symbolizer required for sanitizer builds at ${KUDU_LLVM_SYMBOLIZER_PATH}")
+  endif()
+endif()
 
 #######################################
 # kudu_test_util
@@ -284,28 +375,8 @@ add_library(kudu_test_util
 target_link_libraries(kudu_test_util
   gflags
   glog
-  # Impala doesn't have gmock in its toolchain
-  gtest
-  #gmock
+  gmock
   kudu_util)
-
-if(HAVE_LIB_VMEM)
-  target_link_libraries(kudu_test_util
-    vmem)
-endif()
-
-#######################################
-# kudu_curl_util
-#######################################
-if(NOT NO_TESTS)
-  add_library(kudu_curl_util
-    curl_util.cc)
-  target_link_libraries(kudu_curl_util
-    security
-    ${CURL_LIBRARIES}
-    glog
-    gutil)
-endif()
 
 #######################################
 # kudu_test_main
@@ -333,22 +404,26 @@ endif()
 #######################################
 
 add_executable(protoc-gen-insertions protoc-gen-insertions.cc)
-target_link_libraries(protoc-gen-insertions gutil glog gflags protoc protobuf ${KUDU_BASE_LIBS})
+target_link_libraries(protoc-gen-insertions gutil protobuf protoc ${KUDU_BASE_LIBS})
 
 #######################################
 # Unit tests
 #######################################
 
-set(KUDU_TEST_LINK_LIBS kudu_util gutil ${KUDU_MIN_TEST_LIBS})
+SET_KUDU_TEST_LINK_LIBS(kudu_util gutil)
 ADD_KUDU_TEST(async_util-test)
 ADD_KUDU_TEST(atomic-test)
 ADD_KUDU_TEST(bit-util-test)
 ADD_KUDU_TEST(bitmap-test)
+ADD_KUDU_TEST(bitset-test)
 ADD_KUDU_TEST(blocking_queue-test)
+ADD_KUDU_TEST(block_bloom_filter-test)
 ADD_KUDU_TEST(bloom_filter-test)
 ADD_KUDU_TEST(cache-bench RUN_SERIAL true)
 ADD_KUDU_TEST(cache-test)
 ADD_KUDU_TEST(callback_bind-test)
+ADD_KUDU_TEST(char_util-test
+  DATA_FILES testdata/char_truncate_utf8.txt testdata/char_truncate_ascii.txt)
 ADD_KUDU_TEST(countdown_latch-test)
 ADD_KUDU_TEST(crc-test RUN_SERIAL true) # has a benchmark
 ADD_KUDU_TEST(debug-util-test)
@@ -412,9 +487,11 @@ ADD_KUDU_TEST(thread-test)
 ADD_KUDU_TEST(threadpool-test)
 ADD_KUDU_TEST(throttler-test)
 ADD_KUDU_TEST(trace-test PROCESSORS 4)
+ADD_KUDU_TEST(ttl_cache-test)
 ADD_KUDU_TEST(url-coding-test)
 ADD_KUDU_TEST(user-test)
 ADD_KUDU_TEST(version_util-test)
+ADD_KUDU_TEST(yamlreader-test)
 
 if (NOT APPLE)
   ADD_KUDU_TEST(minidump-test)
@@ -483,4 +560,22 @@ if(NOT NO_TESTS)
   target_link_libraries(compression-test
     cfile
     kudu_util_compression)
+endif()
+
+#######################################
+# curl_util-test
+#######################################
+ADD_KUDU_TEST(curl_util-test)
+if(NOT NO_TESTS)
+  target_link_libraries(curl_util-test
+    kudu_curl_util)
+endif()
+
+#######################################
+# instance_detector-test
+#######################################
+ADD_KUDU_TEST(cloud/instance_detector-test)
+if(NOT NO_TESTS)
+  target_link_libraries(instance_detector-test
+    kudu_cloud_util)
 endif()

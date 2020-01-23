@@ -25,14 +25,15 @@
 #include <cstring>
 #include <string>
 
-#include "kudu/gutil/endian.h"
 #include "kudu/gutil/hash/builtin_type_hash.h"
 #include "kudu/gutil/port.h"
+#include "kudu/gutil/strings/join.h"
 #include "kudu/gutil/strings/substitute.h"
 #include "kudu/util/net/net_util.h"
 #include "kudu/util/stopwatch.h"
 
 using std::string;
+using std::vector;
 using strings::Substitute;
 
 namespace kudu {
@@ -89,9 +90,7 @@ int Sockaddr::port() const {
 }
 
 std::string Sockaddr::host() const {
-  char str[INET_ADDRSTRLEN];
-  ::inet_ntop(AF_INET, &addr_.sin_addr, str, INET_ADDRSTRLEN);
-  return str;
+  return HostPort::AddrToString(addr_.sin_addr.s_addr);
 }
 
 const struct sockaddr_in& Sockaddr::addr() const {
@@ -107,14 +106,14 @@ bool Sockaddr::IsWildcard() const {
 }
 
 bool Sockaddr::IsAnyLocalAddress() const {
-  return (NetworkByteOrder::FromHost32(addr_.sin_addr.s_addr) >> 24) == 127;
+  return HostPort::IsLoopback(addr_.sin_addr.s_addr);
 }
 
 Status Sockaddr::LookupHostname(string* hostname) const {
   char host[NI_MAXHOST];
   int flags = 0;
 
-  int rc;
+  int rc = 0;
   LOG_SLOW_EXECUTION(WARNING, 200,
                      Substitute("DNS reverse-lookup for $0", ToString())) {
     rc = getnameinfo((struct sockaddr *) &addr_, sizeof(sockaddr_in),
@@ -131,6 +130,15 @@ Status Sockaddr::LookupHostname(string* hostname) const {
   }
   *hostname = host;
   return Status::OK();
+}
+
+string Sockaddr::ToCommaSeparatedString(const std::vector<Sockaddr>& addrs) {
+  vector<string> addrs_str;
+  addrs_str.reserve(addrs.size());
+  for (const Sockaddr& addr : addrs) {
+    addrs_str.push_back(addr.ToString());
+  }
+  return JoinStrings(addrs_str, ",");
 }
 
 } // namespace kudu

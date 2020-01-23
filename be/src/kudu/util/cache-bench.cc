@@ -15,10 +15,9 @@
 // specific language governing permissions and limitations
 // under the License.
 
-#include <string.h>
-
 #include <atomic>
 #include <cstdint>
+#include <cstring>
 #include <memory>
 #include <ostream>
 #include <string>
@@ -96,8 +95,7 @@ class CacheBench : public KuduTest,
  public:
   void SetUp() override {
     KuduTest::SetUp();
-
-    cache_.reset(NewLRUCache(DRAM_CACHE, kCacheCapacity, "test-cache"));
+    cache_.reset(NewCache(kCacheCapacity, "test-cache"));
   }
 
   // Run queries against the cache until '*done' becomes true.
@@ -117,17 +115,15 @@ class CacheBench : public KuduTest,
       char key_buf[sizeof(int_key)];
       memcpy(key_buf, &int_key, sizeof(int_key));
       Slice key_slice(key_buf, arraysize(key_buf));
-      Cache::Handle* h = cache_->Lookup(key_slice, Cache::EXPECT_IN_CACHE);
+      auto h(cache_->Lookup(key_slice, Cache::EXPECT_IN_CACHE));
       if (h) {
-        hits++;
+        ++hits;
       } else {
-        Cache::PendingHandle* ph = cache_->Allocate(
-            key_slice, /* val_len=*/kEntrySize, /* charge=*/kEntrySize);
-        h = cache_->Insert(ph, nullptr);
+        auto ph(cache_->Allocate(
+            key_slice, /* val_len=*/kEntrySize, /* charge=*/kEntrySize));
+        cache_->Insert(std::move(ph), nullptr);
       }
-
-      cache_->Release(h);
-      lookups++;
+      ++lookups;
     }
     return {hits, lookups};
   }

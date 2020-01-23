@@ -42,6 +42,7 @@ using base::subtle::NoBarrier_Store;
 using base::subtle::NoBarrier_Load;
 using base::subtle::NoBarrier_CompareAndSwap;
 using strings::Substitute;
+using std::endl;
 
 namespace kudu {
 
@@ -154,6 +155,26 @@ void HdrHistogram::Increment(int64_t value) {
   IncrementBy(value, 1);
 }
 
+void HdrHistogram::UpdateMinMax(int64_t min, int64_t max) {
+  // Update min, if needed.
+  {
+    Atomic64 min_val;
+    while (PREDICT_FALSE(min < (min_val = MinValue()))) {
+      Atomic64 old_val = NoBarrier_CompareAndSwap(&min_value_, min_val, min);
+      if (PREDICT_TRUE(old_val == min_val)) break; // CAS success.
+    }
+  }
+
+  // Update max, if needed.
+  {
+    Atomic64 max_val;
+    while (PREDICT_FALSE(max > (max_val = MaxValue()))) {
+      Atomic64 old_val = NoBarrier_CompareAndSwap(&max_value_, max_val, max);
+      if (PREDICT_TRUE(old_val == max_val)) break; // CAS success.
+    }
+  }
+}
+
 void HdrHistogram::IncrementBy(int64_t value, int64_t count) {
   DCHECK_GE(value, 0);
   DCHECK_GE(count, 0);
@@ -169,23 +190,7 @@ void HdrHistogram::IncrementBy(int64_t value, int64_t count) {
   NoBarrier_AtomicIncrement(&total_count_, count);
   NoBarrier_AtomicIncrement(&total_sum_, value * count);
 
-  // Update min, if needed.
-  {
-    Atomic64 min_val;
-    while (PREDICT_FALSE(value < (min_val = MinValue()))) {
-      Atomic64 old_val = NoBarrier_CompareAndSwap(&min_value_, min_val, value);
-      if (PREDICT_TRUE(old_val == min_val)) break; // CAS success.
-    }
-  }
-
-  // Update max, if needed.
-  {
-    Atomic64 max_val;
-    while (PREDICT_FALSE(value > (max_val = MaxValue()))) {
-      Atomic64 old_val = NoBarrier_CompareAndSwap(&max_value_, max_val, value);
-      if (PREDICT_TRUE(old_val == max_val)) break; // CAS success.
-    }
-  }
+  UpdateMinMax(value, value);
 }
 
 void HdrHistogram::IncrementWithExpectedInterval(int64_t value,
@@ -322,6 +327,47 @@ uint64_t HdrHistogram::ValueAtPercentile(double percentile) const {
 
   LOG(DFATAL) << "Fell through while iterating, likely concurrent modification of histogram";
   return 0;
+}
+
+void HdrHistogram::DumpHumanReadable(std::ostream* out) const {
+  *out << "Count: " << TotalCount() << endl;
+  *out << "Mean: " << MeanValue() << endl;
+  *out << "Percentiles:" << endl;
+  *out << "   0%  (min) = " << MinValue() << endl;
+  *out << "  25%        = " << ValueAtPercentile(25) << endl;
+  *out << "  50%  (med) = " << ValueAtPercentile(50) << endl;
+  *out << "  75%        = " << ValueAtPercentile(75) << endl;
+  *out << "  95%        = " << ValueAtPercentile(95) << endl;
+  *out << "  99%        = " << ValueAtPercentile(99) << endl;
+  *out << "  99.9%      = " << ValueAtPercentile(99.9) << endl;
+  *out << "  99.99%     = " << ValueAtPercentile(99.99) << endl;
+  *out << "  100% (max) = " << MaxValue() << endl;
+  if (MaxValue() >= highest_trackable_value()) {
+    *out << "*NOTE: some values were greater than highest trackable value" << endl;
+  }
+}
+
+void HdrHistogram::MergeFrom(const HdrHistogram& other) {
+  DCHECK_EQ(highest_trackable_value_, other.highest_trackable_value());
+  DCHECK_EQ(num_significant_digits_, other.num_significant_digits());
+  DCHECK_EQ(counts_array_length_, other.counts_array_length_);
+  DCHECK_EQ(bucket_count_, other.bucket_count_);
+  DCHECK_EQ(sub_bucket_count_, other.sub_bucket_count_);
+  DCHECK_EQ(sub_bucket_half_count_magnitude_, other.sub_bucket_half_count_magnitude_);
+  DCHECK_EQ(sub_bucket_half_count_, other.sub_bucket_half_count_);
+  DCHECK_EQ(sub_bucket_mask_, other.sub_bucket_mask_);
+
+  NoBarrier_AtomicIncrement(&total_count_, other.total_count_);
+  NoBarrier_AtomicIncrement(&total_sum_, other.total_sum_);
+
+  UpdateMinMax(other.min_value_, other.max_value_);
+
+  for (int i = 0; i < counts_array_length_; i++) {
+    Atomic64 count = NoBarrier_Load(&other.counts_[i]);
+    if (count > 0) {
+      NoBarrier_AtomicIncrement(&counts_[i], count);
+    }
+  }
 }
 
 ///////////////////////////////////////////////////////////////////////

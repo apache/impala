@@ -65,6 +65,8 @@ DEFINE_string(test_leave_files, "on_failure",
 
 DEFINE_int32(test_random_seed, 0, "Random seed to use for randomized tests");
 
+DECLARE_string(time_source);
+
 using boost::optional;
 using std::string;
 using std::vector;
@@ -73,7 +75,7 @@ using strings::Substitute;
 namespace kudu {
 
 const char* kInvalidPath = "/dev/invalid-path-for-kudu-tests";
-static const char* const kSlowTestsEnvVariable = "KUDU_ALLOW_SLOW_TESTS";
+static const char* const kSlowTestsEnvVar = "KUDU_ALLOW_SLOW_TESTS";
 
 static const uint64_t kTestBeganAtMicros = Env::Default()->NowMicros();
 
@@ -89,9 +91,9 @@ bool g_is_gtest = true;
 ///////////////////////////////////////////////////
 
 KuduTest::KuduTest()
-  : env_(Env::Default()),
-    flag_saver_(new google::FlagSaver()),
-    test_dir_(GetTestDataDirectory()) {
+    : env_(Env::Default()),
+      flag_saver_(new google::FlagSaver()),
+      test_dir_(GetTestDataDirectory()) {
   std::map<const char*, const char*> flags_for_tests = {
     // Disabling fsync() speeds up tests dramatically, and it's safe to do as no
     // tests rely on cutting power to a machine or equivalent.
@@ -108,10 +110,16 @@ KuduTest::KuduTest()
     {"ipki_server_key_size", "1024"},
     {"ipki_ca_key_size", "1024"},
     {"tsk_num_rsa_bits", "512"},
+    // For a generic Kudu test, the local wall-clock time is good enough even
+    // if it's not synchronized by NTP. All test components are run at the same
+    // node, so there aren't multiple time sources to synchronize.
+    {"time_source", "system_unsync"},
   };
   for (const auto& e : flags_for_tests) {
     // We don't check for errors here, because we have some default flags that
-    // only apply to certain tests.
+    // only apply to certain tests. If a flag is defined in a library which
+    // the test binary isn't linked with, then SetCommandLineOptionWithMode()
+    // reports an error since the flag is unknown to the gflags runtime.
     google::SetCommandLineOptionWithMode(e.first, e.second, google::SET_FLAGS_DEFAULT);
   }
   // If the TEST_TMPDIR variable has been set, then glog will automatically use that
@@ -169,8 +177,10 @@ void KuduTest::OverrideKrb5Environment() {
 // Test utility functions
 ///////////////////////////////////////////////////
 
-bool AllowSlowTests() {
-  char *e = getenv(kSlowTestsEnvVariable);
+namespace {
+// Get the value of an environment variable that has boolean semantics.
+bool GetBooleanEnvironmentVariable(const char* env_var_name) {
+  const char* const e = getenv(env_var_name);
   if ((e == nullptr) ||
       (strlen(e) == 0) ||
       (strcasecmp(e, "false") == 0) ||
@@ -183,8 +193,14 @@ bool AllowSlowTests() {
       (strcasecmp(e, "yes") == 0)) {
     return true;
   }
-  LOG(FATAL) << "Unrecognized value for " << kSlowTestsEnvVariable << ": " << e;
-  return false;
+  LOG(FATAL) << Substitute("$0: invalid value for environment variable $0",
+                           e, env_var_name);
+  return false;  // unreachable
+}
+} // anonymous namespace
+
+bool AllowSlowTests() {
+  return GetBooleanEnvironmentVariable(kSlowTestsEnvVar);
 }
 
 void OverrideFlagForSlowTests(const std::string& flag_name,
@@ -273,14 +289,17 @@ void AssertEventually(const std::function<void(void)>& f,
                       AssertBackoff backoff) {
   const MonoTime deadline = MonoTime::Now() + timeout;
   {
-    // Disable --gtest_break_on_failure, or else the assertion failures
-    // inside our attempts will cause the test to SEGV even though we
-    // would like to retry.
+    // Disable gtest's "on failure" behavior, or else the assertion failures
+    // inside our attempts will cause the test to end even though we would
+    // like to retry.
     bool old_break_on_failure = testing::FLAGS_gtest_break_on_failure;
-    auto c = MakeScopedCleanup([old_break_on_failure]() {
+    bool old_throw_on_failure = testing::FLAGS_gtest_throw_on_failure;
+    auto c = MakeScopedCleanup([old_break_on_failure, old_throw_on_failure]() {
       testing::FLAGS_gtest_break_on_failure = old_break_on_failure;
+      testing::FLAGS_gtest_throw_on_failure = old_throw_on_failure;
     });
     testing::FLAGS_gtest_break_on_failure = false;
+    testing::FLAGS_gtest_throw_on_failure = false;
 
     for (int attempts = 0; MonoTime::Now() < deadline; attempts++) {
       // Capture any assertion failures within this scope (i.e. from their function)

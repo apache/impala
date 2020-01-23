@@ -17,6 +17,7 @@
 
 #pragma once
 
+#include <cstddef>
 #include <memory>
 #include <string>
 #include <unordered_map>
@@ -27,18 +28,16 @@
 #include "kudu/gutil/ref_counted.h"
 #include "kudu/util/cache.h"
 #include "kudu/util/countdown_latch.h"
+#include "kudu/util/env.h"
 #include "kudu/util/locks.h"
 #include "kudu/util/status.h"
 
 namespace kudu {
 
-class Env;
-
 namespace internal {
 
 template <class FileType>
 class BaseDescriptor;
-
 template <class FileType>
 class Descriptor;
 
@@ -61,19 +60,19 @@ class Thread;
 // The core of the client-facing API is the cache descriptor. A descriptor
 // uniquely identifies an opened file. To a client, a descriptor is just an
 // open file interface of the variety defined in util/env.h. Clients open
-// descriptors via the OpenExistingFile() cache method.
+// descriptors via the OpenFile() cache methods.
 //
 // Descriptors are shared objects; an existing descriptor is handed back to a
 // client if a file with the same name is already opened. To facilitate
-// descriptor sharing, the file cache maintains a by-file-name descriptor map.
-// The values are weak references to the descriptors so that map entries don't
-// affect the descriptor lifecycle.
+// descriptor sharing, the file cache maintains by-file-name descriptor maps
+// (one per file type). The values are weak references to the descriptors so
+// that map entries don't affect the descriptor lifecycle.
 //
 // LRU cache
 // ---------
 // The lower half of the file cache is a standard LRU cache whose keys are file
 // names and whose values are pointers to opened file objects allocated on the
-// heap. Unlike the descriptor map, this cache has an upper bound on capacity,
+// heap. Unlike the descriptor maps, this cache has an upper bound on capacity,
 // and handles are evicted (and closed) according to an LRU algorithm.
 //
 // Whenever a descriptor is used by a client in file I/O, its file name is used
@@ -92,7 +91,6 @@ class Thread;
 // descriptor, the file is deleted immediately.
 //
 // Every public method in the file cache is thread safe.
-template <class FileType>
 class FileCache {
  public:
   // Creates a new file cache.
@@ -117,16 +115,32 @@ class FileCache {
   // to a file-like interface but interfaces with the cache under the hood to
   // reopen a file as needed during file operations.
   //
-  // The descriptor is opened immediately to verify that the on-disk file can
-  // be opened, but may be closed later if the cache reaches its upper bound on
-  // the number of open files.
-  Status OpenExistingFile(const std::string& file_name,
-                          std::shared_ptr<FileType>* file);
+  // The underlying file is opened immediately to respect 'Mode', but may be
+  // closed later if the cache reaches its upper bound on the number of open
+  // files. It is also closed when the descriptor's last reference is dropped.
+  //
+  // All file types honor a 'Mode' of MUST_EXIST. Some may honor other modes as
+  // well, although transparently reopening evicted files will always use
+  // MUST_EXIST. Different combinations of modes and file types are expressed as
+  // template specializations; if a file type doesn't support a particular mode,
+  // there will be a linker error.
+  //
+  // TODO(adar): The file cache tries to behave as if users were accessing the
+  // underlying POSIX filesystem directly, but its semantics aren't 100% correct
+  // when using modes other than MUST_EXIST. For example, the behavior of
+  // MUST_CREATE and CREATE_OR_OPEN isn't quite right for open files marked for
+  // deletion. In theory we should "unmark" such a file to indicate that it was
+  // recreated, and truncate it so it's empty for the second client, but the
+  // truncation would corrupt the file for the first client. In short, take
+  // great care when using any mode apart from MUST_EXIST.
+  template <Env::OpenMode Mode, class FileType>
+  Status OpenFile(const std::string& file_name,
+                  std::shared_ptr<FileType>* file);
 
   // Deletes a file by name through the cache.
   //
   // If there is an outstanding descriptor for the file, the deletion will be
-  // deferred until the last referent is dropped. Otherwise, the file is
+  // deferred until the last reference is dropped. Otherwise, the file is
   // deleted immediately.
   Status DeleteFile(const std::string& file_name);
 
@@ -153,29 +167,66 @@ class FileCache {
   // from multiple threads.
   void Invalidate(const std::string& file_name);
 
-  // Returns the number of entries in the descriptor map.
+  // Returns the number of entries in the descriptor maps.
   //
   // Only intended for unit tests.
-  int NumDescriptorsForTests() const;
+  size_t NumDescriptorsForTests() const;
 
   // Dumps the contents of the file cache. Intended for debugging.
   std::string ToDebugString() const;
 
  private:
-  friend class internal::BaseDescriptor<FileType>;
+  friend class internal::BaseDescriptor<RWFile>;
+  friend class internal::BaseDescriptor<RandomAccessFile>;
 
-  template<class FileType2>
+  template <class FileType>
+  using DescriptorMap = std::unordered_map<std::string,
+                                           std::weak_ptr<internal::Descriptor<FileType>>>;
+
+  template <class FileType>
   FRIEND_TEST(FileCacheTest, TestBasicOperations);
 
-  // Looks up a descriptor by file name.
+  // Dumps a descriptor map in 'descriptors'. All output will be prefixed by 'prefix'.
+  template <class FileType>
+  static std::string MapToDebugString(const DescriptorMap<FileType>& descs,
+                                      const std::string& prefix);
+
+  // Removes all expired descriptors from 'descs'.
+  template <class FileType>
+  static void ExpireDescriptorsFromMap(DescriptorMap<FileType>* descs);
+
+  // Looks up a descriptor by file name or creates a new one (if requested).
+  //
+  // The value of 'created_desc' will be set in accordance with whether a new
+  // descriptor was created.
   //
   // Must be called with 'lock_' held.
-  Status FindDescriptorUnlocked(
-      const std::string& file_name,
-      std::shared_ptr<internal::Descriptor<FileType>>* file);
+  enum class FindMode {
+    // Only return an existing descriptor from the map; don't create a new one.
+    DONT_CREATE,
 
-  // Periodically removes expired descriptors from 'descriptors_'.
+    // Create a new descriptor if one did not exist in the map.
+    CREATE_IF_NOT_EXIST,
+  };
+  template <class FileType>
+  std::shared_ptr<internal::Descriptor<FileType>> FindDescriptorUnlocked(
+      const std::string& file_name,
+      FindMode mode,
+      DescriptorMap<FileType>* descs,
+      bool* created_desc);
+
+  // Periodically removes expired descriptors from the descriptor maps.
   void RunDescriptorExpiry();
+
+  // Actually opens the file as per OpenFile. Used to encapsulate the bulk of
+  // OpenFile because C++ prohibits partial specialization of template functions.
+  template <class FileType>
+  Status DoOpenFile(const std::string& file_name,
+                    std::shared_ptr<FileType>* file,
+                    bool* created_desc);
+
+  // Status message prefix for files that have already been marked as deleted.
+  static const char* const kAlreadyDeleted;
 
   // Interface to the underlying filesystem.
   Env* env_;
@@ -194,8 +245,8 @@ class FileCache {
   mutable simple_spinlock lock_;
 
   // Maps filenames to descriptors.
-  std::unordered_map<std::string,
-                     std::weak_ptr<internal::Descriptor<FileType>>> descriptors_;
+  DescriptorMap<RWFile> rwf_descs_;
+  DescriptorMap<RandomAccessFile> raf_descs_;
 
   // Calls RunDescriptorExpiry() in a loop until 'running_' isn't set.
   scoped_refptr<Thread> descriptor_expiry_thread_;

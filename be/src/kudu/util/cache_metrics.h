@@ -14,8 +14,8 @@
 // KIND, either express or implied.  See the License for the
 // specific language governing permissions and limitations
 // under the License.
-#ifndef KUDU_UTIL_CACHE_METRICS_H
-#define KUDU_UTIL_CACHE_METRICS_H
+
+#pragma once
 
 #include <cstdint>
 
@@ -25,8 +25,8 @@
 namespace kudu {
 
 struct CacheMetrics {
-  explicit CacheMetrics(const scoped_refptr<MetricEntity>& metric_entity);
-
+  virtual ~CacheMetrics() {
+  }
   scoped_refptr<Counter> inserts;
   scoped_refptr<Counter> lookups;
   scoped_refptr<Counter> evictions;
@@ -35,8 +35,7 @@ struct CacheMetrics {
   scoped_refptr<Counter> cache_misses;
   scoped_refptr<Counter> cache_misses_caching;
 
-  scoped_refptr<AtomicGauge<uint64_t> > cache_usage;
+  scoped_refptr<AtomicGauge<uint64_t>> cache_usage;
 };
 
 } // namespace kudu
-#endif /* KUDU_UTIL_CACHE_METRICS_H */
