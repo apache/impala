@@ -453,10 +453,8 @@ public class CatalogTest {
       assertEquals("functional", pk.getTable_db());
       assertEquals("parent_table", pk.getTable_name());
     }
-    // HMS returns the columns in the reverse order of PK columns specified in the DDL.
-    // "parent_table" in our test data has primary key(id, year) specified.
-    assertEquals("year", primaryKeys.get(0).getColumn_name());
-    assertEquals("id", primaryKeys.get(1).getColumn_name());
+    assertEquals("id", primaryKeys.get(0).getColumn_name());
+    assertEquals("year", primaryKeys.get(1).getColumn_name());
 
     // Force load parent_table_2. Required for fetching foreign keys from child_table.
     catalog_.getOrLoadTable("functional", "parent_table_2", "test");

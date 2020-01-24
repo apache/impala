@@ -180,10 +180,8 @@ public class LocalCatalogTest {
       assertEquals("functional", pk.getTable_db());
       assertEquals("parent_table", pk.getTable_name());
     }
-    // HMS returns the columns in the reverse order of PK columns specified in the DDL.
-    // "parent_table" in our test data has primary key(id, year) specified.
-    assertEquals("year", primaryKeys.get(0).getColumn_name());
-    assertEquals("id", primaryKeys.get(1).getColumn_name());
+    assertEquals("id", primaryKeys.get(0).getColumn_name());
+    assertEquals("year", primaryKeys.get(1).getColumn_name());
 
     t = (FeFsTable) catalog_.getTable("functional", "child_table");
     assertNotNull(t);

@@ -18,6 +18,7 @@
 package org.apache.impala.util;
 
 import java.util.ArrayList;
+import java.util.Comparator;
 import java.util.HashSet;
 import java.util.LinkedHashMap;
 import java.util.List;
@@ -34,6 +35,7 @@ import org.apache.hadoop.hive.metastore.api.FireEventRequestData;
 import org.apache.hadoop.hive.metastore.api.InsertEventRequestData;
 import org.apache.hadoop.hive.metastore.api.MetaException;
 import org.apache.hadoop.hive.metastore.api.Partition;
+import org.apache.hadoop.hive.metastore.api.SQLPrimaryKey;
 import org.apache.hadoop.hive.metastore.api.StorageDescriptor;
 import org.apache.hadoop.hive.metastore.api.Table;
 import org.apache.impala.catalog.CatalogException;
@@ -354,5 +356,21 @@ public class MetaStoreUtil {
   public static boolean isBucketedTable(Table msTbl) {
     Preconditions.checkNotNull(msTbl);
     return msTbl.getSd().getNumBuckets() > 0;
+  }
+
+  /**
+   * A custom comparator class to sort SQLPrimaryKeys in alphabetical order of the
+   * primary key name. If the primary key names are same(composite primary key), we
+   * will sort in increasing order of key_seq.
+   */
+  public static class SqlPrimaryKeyComparator implements Comparator<SQLPrimaryKey> {
+    @Override
+    public int compare(SQLPrimaryKey pk1, SQLPrimaryKey pk2) {
+      int keyNameComp = pk1.getPk_name().compareTo(pk2.getPk_name());
+      if (keyNameComp == 0) {
+        return Integer.compare(pk1.getKey_seq(), pk2.getKey_seq());
+      }
+      return keyNameComp;
+    }
   }
 }

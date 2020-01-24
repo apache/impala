@@ -544,7 +544,7 @@ SHOW CREATE TABLE functional.parent_table
 CREATE EXTERNAL TABLE functional.parent_table (
   id INT,
   year STRING,
-  PRIMARY KEY (year, id)
+  PRIMARY KEY (id, year)
  )
 ROW FORMAT DELIMITED FIELDS TERMINATED BY ','
 WITH SERDEPROPERTIES ('field.delim'=',', 'serialization.format'=',')

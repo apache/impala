@@ -1058,6 +1058,9 @@ public class HdfsTable extends Table implements FeFsTable {
           new PrimaryKeysRequest(msTbl.getDbName(), msTbl.getTableName())));
       foreignKeys_.addAll(client.getForeignKeys(new ForeignKeysRequest(null, null,
           msTbl.getDbName(), msTbl.getTableName())));
+
+      // Store primary keys in a canonical order.
+      primaryKeys_.sort(new MetaStoreUtil.SqlPrimaryKeyComparator());
     } catch (Exception e) {
       throw new TableLoadingException("Failed to load primary keys/foreign keys for "
           + "table: " + getFullName(), e);
