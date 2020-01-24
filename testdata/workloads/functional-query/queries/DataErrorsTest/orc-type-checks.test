@@ -135,3 +135,78 @@ decimal
 1
 1
 ====
+---- HIVE_QUERY
+# Create a table with UNION, ARRAY, MAP types by Hive and insert values into it.
+create external table $DATABASE.union_complextypes(
+  id int,
+  u uniontype<int, boolean>,
+  int_array array<int>,
+  int_map map<string, int>)
+stored as orc;
+insert into $DATABASE.union_complextypes
+  select 0, create_union(1, 50, false), array(0), map('key0', 0);
+# Create an external table on the ORC files with different schema.
+create external table $DATABASE.ill_complextypes(
+  id int,
+  u map<int, double>,
+  int_map map<string, int>,
+  int_array array<int>)
+stored as orc
+location '$NAMENODE/test-warehouse/$DATABASE.db/union_complextypes';
+====
+---- QUERY
+invalidate metadata ill_complextypes;
+# Should be able to read the first column that match the file schema.
+select id from ill_complextypes
+---- TYPES
+INT
+---- RESULTS
+0
+====
+---- QUERY
+select u.key, u.value from ill_complextypes.u
+---- CATCH
+File '$NAMENODE/test-warehouse/$DATABASE.db/union_complextypes/000000_0'
+ has an incompatible ORC schema for column '$DATABASE.ill_complextypes.u',
+ Column type: map, ORC schema: uniontype<int,boolean>
+====
+---- QUERY
+select m.key, m.value from ill_complextypes.int_map m
+---- CATCH
+File '$NAMENODE/test-warehouse/$DATABASE.db/union_complextypes/000000_0'
+ has an incompatible ORC schema for column '$DATABASE.ill_complextypes.int_map',
+ Column type: map, ORC schema: array<int>
+====
+---- QUERY
+select a.item from ill_complextypes.int_array a
+---- CATCH
+File '$NAMENODE/test-warehouse/$DATABASE.db/union_complextypes/000000_0'
+ has an incompatible ORC schema for column '$DATABASE.ill_complextypes.int_array',
+ Column type: array, ORC schema: map<string,int>
+====
+---- QUERY
+# Create a table whose nested types don't match the underlying ORC files.
+# Reuse the data files of functional_orc_def.complextypestbl.
+create external table ill_complextypes2 (id bigint,
+  int_array map<string, int>,
+  int_array_array array<struct<x:int>>,
+  int_map array<struct<k:string,v:int>>,
+  int_map_array array<array<struct<k:string,v:int>>>
+) stored as orc location '$NAMENODE/test-warehouse/complextypestbl_orc_def';
+select a.item.x from ill_complextypes2.int_array_array a
+---- CATCH
+has an incompatible ORC schema for column '$DATABASE.ill_complextypes2.int_array_array.item',
+ Column type: struct, ORC schema: array<int>
+====
+---- QUERY
+select a.item.k, a.item.v from ill_complextypes2.int_map a
+---- CATCH
+has an incompatible ORC schema for column '$DATABASE.ill_complextypes2.int_map',
+ Column type: array, ORC schema: map<string,int>
+====
+---- QUERY
+select inner_arr.item.k, inner_arr.item.v from ill_complextypes2.int_map_array a, a.item inner_arr
+---- CATCH
+has an incompatible ORC schema for column '$DATABASE.ill_complextypes2.int_map_array.item',
+ Column type: array, ORC schema: map<string,int>
+====

@@ -446,6 +446,14 @@ error_codes = (
   ("ORC_DATE_OUT_OF_RANGE", 146,
    "ORC file '$0' column '$1' contains an out of range date. "
    "The valid date range is 0001-01-01..9999-12-31."),
+
+  ("ORC_NESTED_TYPE_MISMATCH", 147,
+   "File '$0' has an incompatible ORC schema for column '$1', "
+   "Column type: $2, ORC schema: $3"),
+
+  ("ORC_TYPE_NOT_ROOT_AT_STRUCT", 148,
+   "Root of the $0 type returned by the ORC lib is not STRUCT: $1. "
+   "Either there are bugs in the ORC lib or ORC file '$2' is corrupt."),
 )
 
 import sys

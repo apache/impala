@@ -23,48 +23,57 @@
 namespace impala {
 
 Status OrcSchemaResolver::BuildSchemaPaths(int num_partition_keys,
-    vector<SchemaPath>* paths) {
+    vector<SchemaPath>* col_id_path_map) const {
   if (root_->getKind() != orc::TypeKind::STRUCT) {
-    return Status(Substitute("Corrupt ORC File '$0': root type is $1 (should be struct)",
-        filename_, root_->toString()));
+    return Status(TErrorCode::ORC_TYPE_NOT_ROOT_AT_STRUCT, "file", root_->toString(),
+        filename_);
   }
   SchemaPath path;
-  paths->push_back(path);
+  col_id_path_map->push_back(path);
   int num_columns = root_->getSubtypeCount();
   for (int i = 0; i < num_columns; ++i) {
     path.push_back(i + num_partition_keys);
-    BuildSchemaPath(*root_->getSubtype(i), &path, paths);
+    BuildSchemaPathHelper(*root_->getSubtype(i), &path, col_id_path_map);
     path.pop_back();
   }
   return Status::OK();
 }
 
-void OrcSchemaResolver::BuildSchemaPath(const orc::Type& node, SchemaPath* path,
-    vector<SchemaPath>* paths) {
-  DCHECK_EQ(paths->size(), node.getColumnId());
-  paths->push_back(*path);
-  if (node.getKind() == orc::TypeKind::STRUCT) {
+void OrcSchemaResolver::BuildSchemaPathHelper(const orc::Type& node, SchemaPath* path,
+    vector<SchemaPath>* col_id_path_map) {
+  DCHECK_EQ(col_id_path_map->size(), node.getColumnId()) << Substitute(
+      "Failed building map from ORC type ids to SchemaPaths. $0 are built but current "
+      "ORC type id is $1, missing ORC type with id=$0.",
+      col_id_path_map->size(), node.getColumnId());
+  // Map ORC type with id=size() to 'path'.
+  col_id_path_map->push_back(*path);
+  // Deal with subtypes recursively.
+  if (node.getKind() == orc::TypeKind::STRUCT
+      || node.getKind() == orc::TypeKind::UNION) {
+    // It's possible the file schema contains more columns than the table schema.
+    // We should deal with UNION type here in case it's not in the table schema and the
+    // query is not reading them. Otherwise the map will miss some ORC types.
     int size = node.getSubtypeCount();
     for (int i = 0; i < size; ++i) {
       path->push_back(i);
       const orc::Type* child = node.getSubtype(i);
-      BuildSchemaPath(*child, path, paths);
+      BuildSchemaPathHelper(*child, path, col_id_path_map);
       path->pop_back();
     }
   } else if (node.getKind() == orc::TypeKind::LIST) {
     DCHECK_EQ(node.getSubtypeCount(), 1);
     const orc::Type* child = node.getSubtype(0);
     path->push_back(SchemaPathConstants::ARRAY_ITEM);
-    BuildSchemaPath(*child, path, paths);
+    BuildSchemaPathHelper(*child, path, col_id_path_map);
     path->pop_back();
   } else if (node.getKind() == orc::TypeKind::MAP) {
     DCHECK_EQ(node.getSubtypeCount(), 2);
     const orc::Type* key_child = node.getSubtype(0);
     const orc::Type* value_child = node.getSubtype(1);
     path->push_back(SchemaPathConstants::MAP_KEY);
-    BuildSchemaPath(*key_child, path, paths);
+    BuildSchemaPathHelper(*key_child, path, col_id_path_map);
     (*path)[path->size() - 1] = SchemaPathConstants::MAP_VALUE;
-    BuildSchemaPath(*value_child, path, paths);
+    BuildSchemaPathHelper(*value_child, path, col_id_path_map);
     path->pop_back();
   }
 }
@@ -101,19 +110,21 @@ Status OrcSchemaResolver::ResolveColumn(const SchemaPath& col_path,
     if (table_col_type->type == TYPE_ARRAY) {
       DCHECK_EQ(table_col_type->children.size(), 1);
       if ((*node)->getKind() != orc::TypeKind::LIST) {
-        return Status(Substitute("File '$0' has an incompatible ORC schema for column "
-            "'$1', Column type: $2, ORC schema:\\n$3", filename_,
-            PrintSubPath(tbl_desc_, col_path, i), "array", (*node)->toString()));
+        return Status(TErrorCode::ORC_NESTED_TYPE_MISMATCH, filename_,
+            PrintSubPath(tbl_desc_, col_path, i), "array", (*node)->toString());
       }
     } else if (table_col_type->type == TYPE_MAP) {
       DCHECK_EQ(table_col_type->children.size(), 2);
       if ((*node)->getKind() != orc::TypeKind::MAP) {
-        return Status(Substitute("File '$0' has an incompatible ORC schema for column "
-            "'$1', Column type: $2, ORC schema:\\n$3", filename_,
-            PrintSubPath(tbl_desc_, col_path, i), "map", (*node)->toString()));
+        return Status(TErrorCode::ORC_NESTED_TYPE_MISMATCH, filename_,
+            PrintSubPath(tbl_desc_, col_path, i), "map", (*node)->toString());
       }
     } else if (table_col_type->type == TYPE_STRUCT) {
       DCHECK_GT(table_col_type->children.size(), 0);
+      if ((*node)->getKind() != orc::TypeKind::STRUCT) {
+        return Status(TErrorCode::ORC_NESTED_TYPE_MISMATCH, filename_,
+            PrintSubPath(tbl_desc_, col_path, i), "struct", (*node)->toString());
+      }
     } else {
       DCHECK(!table_col_type->IsComplexType());
       DCHECK_EQ(i, col_path.size() - 1);

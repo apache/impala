@@ -1365,7 +1365,7 @@ class TestOrc(ImpalaTestSuite):
     self._run_invalid_schema_test(unique_database, "corrupt_schema",
         "Encountered parse error during schema selection")
     self._run_invalid_schema_test(unique_database, "corrupt_root_type",
-        "root type is boolean (should be struct)")
+        "Root of the file type returned by the ORC lib is not STRUCT: boolean.")
 
 
   def test_date_out_of_range_orc(self, vector, unique_database):

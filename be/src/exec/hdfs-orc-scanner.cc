@@ -198,7 +198,11 @@ Status HdfsOrcScanner::Open(ScannerContext* context) {
     unique_ptr<orc::RowReader> tmp_row_reader =
         reader_->createRowReader(row_reader_options_);
     const orc::Type* root_type = &tmp_row_reader->getSelectedType();
-    DCHECK_EQ(root_type->getKind(), orc::TypeKind::STRUCT);
+    if (root_type->getKind() != orc::TypeKind::STRUCT) {
+      parse_status_ = Status(TErrorCode::ORC_TYPE_NOT_ROOT_AT_STRUCT, "selected",
+          root_type->toString(), filename());
+      return parse_status_;
+    }
     orc_root_reader_ = this->obj_pool_.Add(
         new OrcStructReader(root_type, scan_node_->tuple_desc(), this));
   } catch (std::exception& e) {
@@ -303,6 +307,7 @@ Status HdfsOrcScanner::ResolveColumns(const TupleDescriptor& tuple_desc,
   const orc::Type* node = nullptr;
   bool pos_field = false;
   bool missing_field = false;
+  // 1. Deal with the tuple descriptor. It should map to an ORC type.
   RETURN_IF_ERROR(schema_resolver_->ResolveColumn(tuple_desc.tuple_path(), &node,
       &pos_field, &missing_field));
   if (missing_field) {
@@ -316,7 +321,7 @@ Status HdfsOrcScanner::ResolveColumns(const TupleDescriptor& tuple_desc,
     // reading its items (or subcolumn of its items). So we select the most inner
     // subcolumn of the collection (get by orc::Type::getMaximumColumnId()). E.g.
     // if 'node' is array<struct<c1:int,c2:int,c3:int>> and we just need the array
-    // lengths. We still need to read at least one subcolumn otherwise the ORC lib
+    // lengths, we still need to read at least one subcolumn otherwise the ORC lib
     // will skip the whole array column. So we select 'c3' for this case.
     selected_type_ids_.push_back(node->getMaximumColumnId());
     VLOG(3) << "Add ORC column " << node->getMaximumColumnId() << " for empty tuple "
@@ -324,7 +329,9 @@ Status HdfsOrcScanner::ResolveColumns(const TupleDescriptor& tuple_desc,
     return Status::OK();
   }
 
-  // Each tuple can have at most one position slot.
+  // 2. Deal with slots of the tuple descriptor. Each slot should map to an ORC type,
+  // otherwise it should be the position slot. Each tuple can have at most one position
+  // slot.
   SlotDescriptor* pos_slot_desc = nullptr;
   for (SlotDescriptor* slot_desc : tuple_desc.slots()) {
     // Skip partition columns
