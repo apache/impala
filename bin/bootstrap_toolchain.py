@@ -647,14 +647,12 @@ def get_kudu_downloads(use_kudu_stub):
                       "USE_CDH_KUDU=false to use the toolchain Kudu.")
         sys.exit(1)
       kudu_downloads += [CdhKudu(get_platform_release_label().cdh)]
+      # There is also a Kudu Java package.
+      kudu_downloads += [CdhKuduJava()]
     else:
+      # Toolchain Kudu includes Java artifacts.
       kudu_downloads += [ToolchainKudu()]
 
-  # Independent of the regular Kudu package, there is also a Kudu Java package. This
-  # always needs to be downloaded from the CDH components, because the toolchain
-  # does not produce the Java artifacts.
-  # TODO: Does this make any sense with the Kudu stub?
-  kudu_downloads += [CdhKuduJava()]
   return kudu_downloads
 
 

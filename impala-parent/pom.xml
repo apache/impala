@@ -181,6 +181,17 @@ under the License.
       </snapshots>
     </repository>
     <repository>
+      <id>impala.toolchain.kudu.repo</id>
+      <url>${env.IMPALA_TOOLCHAIN_KUDU_MAVEN_REPOSITORY}</url>
+      <name>Impala Toolchain Kudu Repository</name>
+      <releases>
+        <enabled>${env.IMPALA_TOOLCHAIN_KUDU_MAVEN_REPOSITORY_ENABLED}</enabled>
+      </releases>
+      <snapshots>
+        <enabled>${env.IMPALA_TOOLCHAIN_KUDU_MAVEN_REPOSITORY_ENABLED}</enabled>
+      </snapshots>
+    </repository>
+    <repository>
       <id>cloudera.thirdparty.repo</id>
       <url>https://repository.cloudera.com/content/repositories/third-party</url>
       <name>Cloudera Third Party Repository</name>

@@ -68,7 +68,7 @@ fi
 # moving to a different build of the toolchain, e.g. when a version is bumped or a
 # compile option is changed. The build id can be found in the output of the toolchain
 # build jobs, it is constructed from the build number and toolchain git hash prefix.
-export IMPALA_TOOLCHAIN_BUILD_ID=122-7f8aa0363e
+export IMPALA_TOOLCHAIN_BUILD_ID=137-30bf4d6e3c
 # Versions of toolchain dependencies.
 # -----------------------------------
 export IMPALA_AVRO_VERSION=1.7.4-p5
@@ -188,7 +188,6 @@ export IMPALA_PARQUET_VERSION=1.10.99-cdh6.x-SNAPSHOT
 export IMPALA_AVRO_JAVA_VERSION=1.8.2-cdh6.x-SNAPSHOT
 export IMPALA_HUDI_VERSION=0.5.0-incubating
 export IMPALA_KITE_VERSION=1.0.0-cdh6.x-SNAPSHOT
-export IMPALA_KUDU_JAVA_VERSION=1.11.0-cdh6.x-SNAPSHOT
 export IMPALA_ORC_JAVA_VERSION=1.6.2
 
 # When IMPALA_(CDH_COMPONENT)_URL are overridden, they may contain '$(platform_label)'
@@ -198,9 +197,13 @@ unset IMPALA_HBASE_URL
 unset IMPALA_HIVE_URL
 unset IMPALA_KUDU_URL
 unset IMPALA_KUDU_VERSION
+unset IMPALA_KUDU_JAVA_VERSION
 unset IMPALA_SENTRY_URL
 
 export IMPALA_KERBERIZE=false
+
+unset IMPALA_TOOLCHAIN_KUDU_MAVEN_REPOSITORY
+unset IMPALA_TOOLCHAIN_KUDU_MAVEN_REPOSITORY_ENABLED
 
 # Source the branch and local config override files here to override any
 # variables above or any variables below that allow overriding via environment
@@ -674,18 +677,18 @@ fi
 export USE_KUDU_DEBUG_BUILD=${USE_KUDU_DEBUG_BUILD-false}
 
 # Kudu doesn't compile on some old Linux distros. KUDU_IS_SUPPORTED enables building Kudu
-# into the backend. We prefer to pull Kudu in from CDH, but will fall back to using the
-# toolchain Kudu for distros where the CDH tarballs are not provided by setting
-# USE_CDH_KUDU to false.
-# The frontend build is OS independent since it is Java.
-export USE_CDH_KUDU=${USE_CDH_KUDU-true}
+# into the backend. We prefer to pull Kudu in from the toolchain, but will fall back to
+# using the CDH Kudu by setting USE_CDH_KUDU to true.
+export USE_CDH_KUDU=${USE_CDH_KUDU-false}
 if [[ -z "${KUDU_IS_SUPPORTED-}" ]]; then
   if [[ -n "$KUDU_BUILD_DIR" ]]; then
     KUDU_IS_SUPPORTED=true
-  else
-    KUDU_IS_SUPPORTED=false
+  elif $IS_OSX; then
     USE_CDH_KUDU=false
-    if ! $IS_OSX; then
+    KUDU_IS_SUPPORTED=false
+  else
+    KUDU_IS_SUPPORTED=true
+    if $USE_CDH_KUDU; then
       if ! which lsb_release &>/dev/null; then
         echo Unable to find the 'lsb_release' command. \
             Please ensure it is available in your PATH. 1>&2
@@ -698,14 +701,9 @@ if [[ -z "${KUDU_IS_SUPPORTED-}" ]]; then
       fi
       # Remove spaces, trim minor versions, and convert to lowercase.
       DISTRO_VERSION="$(tr -d ' \n' <<< "$DISTRO_VERSION" | cut -d. -f1 | tr "A-Z" "a-z")"
-      case "$DISTRO_VERSION" in
-        centos6 | centos7 | debian8 | suselinux12 | suse12 | ubuntu16 | ubuntu18)
-          USE_CDH_KUDU=true
-          KUDU_IS_SUPPORTED=true;;
-        ubuntu14 )
-          USE_CDH_KUDU=false
-          KUDU_IS_SUPPORTED=true;;
-      esac
+      if [[ "$DISTRO_VERSION" == "ubuntu14" ]]; then
+        USE_CDH_KUDU=false
+      fi
     fi
   fi
 fi
@@ -713,12 +711,22 @@ export KUDU_IS_SUPPORTED
 
 if $USE_CDH_KUDU; then
   export IMPALA_KUDU_VERSION=${IMPALA_KUDU_VERSION-"1.11.0-cdh6.x-SNAPSHOT"}
+  export IMPALA_KUDU_JAVA_VERSION=${IMPALA_KUDU_JAVA_VERSION-"1.11.0-cdh6.x-SNAPSHOT"}
   export IMPALA_KUDU_HOME=${CDH_COMPONENTS_HOME}/kudu-$IMPALA_KUDU_VERSION
+  export IMPALA_KUDU_JAVA_HOME=${CDH_COMPONENTS_HOME}/kudu-$IMPALA_KUDU_VERSION
+  # If USE_CDH_KUDU is true, Toolchain Kudu maven repository should be disabled.
+  # We get Kudu Java artifacts from CDH.
+  export IMPALA_TOOLCHAIN_KUDU_MAVEN_REPOSITORY="file:///non/existing/repo"
+  export IMPALA_TOOLCHAIN_KUDU_MAVEN_REPOSITORY_ENABLED=false
 else
-  export IMPALA_KUDU_VERSION=${IMPALA_KUDU_VERSION-"988296d"}
+  export IMPALA_KUDU_VERSION=${IMPALA_KUDU_VERSION-"5c610bf40"}
+  export IMPALA_KUDU_JAVA_VERSION=${IMPALA_KUDU_JAVA_VERSION-"1.12.0-SNAPSHOT"}
   export IMPALA_KUDU_HOME=${IMPALA_TOOLCHAIN}/kudu-$IMPALA_KUDU_VERSION
+  export IMPALA_KUDU_JAVA_HOME=${IMPALA_TOOLCHAIN}/kudu-${IMPALA_KUDU_VERSION}/java
+  export IMPALA_TOOLCHAIN_KUDU_MAVEN_REPOSITORY=\
+"file://${IMPALA_KUDU_JAVA_HOME}/repository"
+  export IMPALA_TOOLCHAIN_KUDU_MAVEN_REPOSITORY_ENABLED=true
 fi
-export IMPALA_KUDU_JAVA_HOME=${CDH_COMPONENTS_HOME}/kudu-$IMPALA_KUDU_VERSION
 
 # Set $THRIFT_HOME to the Thrift directory in toolchain.
 export THRIFT_HOME="${IMPALA_TOOLCHAIN}/thrift-${IMPALA_THRIFT_VERSION}"
