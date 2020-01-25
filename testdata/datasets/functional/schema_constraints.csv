@@ -276,3 +276,8 @@ table_name:bucketed_ext_table, constraint:exclude, table_format:kudu/none/none
 table_name:bucketed_table, constraint:exclude, table_format:hbase/none/none
 table_name:bucketed_table, constraint:exclude, table_format:kudu/none/none
 table_name:bucketed_table, constraint:exclude, table_format:text/lzo/block
+
+# The uncompressed ORC tables are mainly used in test_scanners_fuzz.py to avoid creating
+# them each time when running the test. Developers may run this test many times locally.
+table_name:uncomp_src_alltypes, constraint:restrict_to, table_format:orc/def/block
+table_name:uncomp_src_decimal_tbl, constraint:restrict_to, table_format:orc/def/block

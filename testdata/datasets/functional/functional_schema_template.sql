@@ -2280,6 +2280,29 @@ SELECT * from functional.{table_name};
 ---- DATASET
 functional
 ---- BASE_TABLE_NAME
+uncomp_src_alltypes
+---- CREATE_HIVE
+CREATE TABLE {db_name}{db_suffix}.{table_name} LIKE functional.alltypes STORED AS ORC;
+---- DEPENDENT_LOAD_HIVE
+SET orc.compress=NONE;
+INSERT OVERWRITE TABLE {db_name}{db_suffix}.{table_name} PARTITION (year, month)
+SELECT id, bool_col, tinyint_col, smallint_col, int_col, bigint_col, float_col, double_col, date_string_col, string_col, timestamp_col, year, month
+FROM functional.alltypes;
+====
+---- DATASET
+functional
+---- BASE_TABLE_NAME
+uncomp_src_decimal_tbl
+---- CREATE_HIVE
+CREATE TABLE {db_name}{db_suffix}.{table_name} LIKE functional.decimal_tbl STORED AS ORC;
+---- DEPENDENT_LOAD_HIVE
+SET orc.compress=NONE;
+INSERT OVERWRITE TABLE {db_name}{db_suffix}.{table_name} PARTITION (d6)
+SELECT d1, d2, d3, d4, d5, d6 FROM functional.decimal_tbl;
+====
+---- DATASET
+functional
+---- BASE_TABLE_NAME
 testescape_16_lf
 ---- CREATE
 CREATE EXTERNAL TABLE IF NOT EXISTS {db_name}{db_suffix}.{table_name} (
