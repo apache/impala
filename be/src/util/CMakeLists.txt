@@ -119,7 +119,6 @@ add_library(UtilTests STATIC
   hdfs-util-test.cc
   hdr-histogram-test.cc
   logging-support-test.cc
-  lru-cache-test.cc
   metrics-test.cc
   min-max-filter-test.cc
   openssl-util-test.cc
@@ -183,7 +182,6 @@ ADD_UNIFIED_BE_LSAN_TEST(hdr-histogram-test HdrHistogramTest.*)
 # to use a unified executable
 ADD_BE_LSAN_TEST(internal-queue-test)
 ADD_UNIFIED_BE_LSAN_TEST(logging-support-test "LoggingSupport.*")
-ADD_UNIFIED_BE_LSAN_TEST(lru-cache-test "FifoMultimap.*")
 ADD_UNIFIED_BE_LSAN_TEST(metrics-test "MetricsTest.*")
 ADD_UNIFIED_BE_LSAN_TEST(min-max-filter-test "MinMaxFilterTest.*")
 ADD_UNIFIED_BE_LSAN_TEST(openssl-util-test "OpenSSLUtilTest.*")
