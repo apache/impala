@@ -594,6 +594,24 @@ public class AuthorizationStmtTest extends AuthorizationTestBase {
     authorize("select 1 from functional.notbl")
         .error(selectError("functional.notbl"));
 
+    // Select from non-existent database in CTE without required privileges
+    authorize("with t as (select id from nodb.alltypes) select * from t")
+        .error(selectError("nodb.alltypes"));
+
+    // Select from non-existent table in CTE without required privileges
+    authorize("with t as (select id from functional.notbl) select * from t")
+        .error(selectError("functional.notbl"));
+
+    // Select from non-existent column in CTE without required privileges
+    authorize("with t as (select nocol from functional.alltypes) select * from t")
+        .error(selectError("functional.alltypes"))
+        .error(selectError("functional.alltypes"), onColumn("functional", "alltypes",
+            ALLTYPES_COLUMNS, TPrivilegeLevel.SELECT));
+
+    // With clause column labels exceeding the number of columns in the query
+    authorize("with t(c1, c2) as (select id from functional.alltypes) select * from t")
+        .error(selectError("functional.alltypes"));
+
     // Select with inline view.
     authorize("select a.* from (select * from functional.alltypes) a")
         .ok(onServer(TPrivilegeLevel.ALL))

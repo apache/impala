@@ -77,23 +77,30 @@ public class WithClause extends StmtNode {
     Analyzer withClauseAnalyzer = Analyzer.createWithNewGlobalState(analyzer);
     withClauseAnalyzer.setHasWithClause();
     if (analyzer.isExplain()) withClauseAnalyzer.setIsExplain();
-    for (View view: views_) {
-      Analyzer viewAnalyzer = new Analyzer(withClauseAnalyzer);
-      view.getQueryStmt().analyze(viewAnalyzer);
-      // Register this view so that the next view can reference it.
-      withClauseAnalyzer.registerLocalView(view);
+    try {
+      for (View view: views_) {
+        Analyzer viewAnalyzer = new Analyzer(withClauseAnalyzer);
+        view.getQueryStmt().analyze(viewAnalyzer);
+        // Register this view so that the next view can reference it.
+        withClauseAnalyzer.registerLocalView(view);
+      }
+      // Register all local views with the analyzer.
+      for (FeView localView: withClauseAnalyzer.getLocalViews().values()) {
+        analyzer.registerLocalView(localView);
+      }
+      // Record audit events because the resolved table references won't generate any
+      // when a view is referenced.
+      analyzer.getAccessEvents().addAll(withClauseAnalyzer.getAccessEvents());
     }
-    // Register all local views with the analyzer.
-    for (FeView localView: withClauseAnalyzer.getLocalViews().values()) {
-      analyzer.registerLocalView(localView);
-    }
-    // Record audit events because the resolved table references won't generate any
-    // when a view is referenced.
-    analyzer.getAccessEvents().addAll(withClauseAnalyzer.getAccessEvents());
-
-    // Register all privilege requests made from the root analyzer.
-    for (PrivilegeRequest req: withClauseAnalyzer.getPrivilegeReqs()) {
-      analyzer.registerPrivReq(req);
+    finally {
+      // Register all privilege requests made from the root analyzer to the input
+      // analyzer so that caller could do authorization for all the requests collected
+      // during analysis and report an authorization error over an analysis error.
+      // We should not accidentally reveal the non-existence of a database/table if
+      // the user is not authorized.
+      for (PrivilegeRequest req : withClauseAnalyzer.getPrivilegeReqs()) {
+        analyzer.registerPrivReq(req);
+      }
     }
   }
 
