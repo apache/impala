@@ -200,6 +200,12 @@ class ClusterMembershipMgr {
   /// listeners.
   void UpdateMetrics(const SnapshotPtr& new_state);
 
+  /// Returns true if the 'be_desc' is in any of the 'executor_groups', false otherwise.
+  /// Used to check the consistency of the ClusterMembershipMgr state. Currently, only
+  /// used in DCHECKs.
+  bool IsBackendInExecutorGroups(
+      const TBackendDescriptor& be_desc, const ExecutorGroups& executor_groups);
+
   /// Ensures that only one thread is processing a membership update at a time, either
   /// from a statestore update or a blacklisting decision. Must be taken before any other
   /// locks in this class.

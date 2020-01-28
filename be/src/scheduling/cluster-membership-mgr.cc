@@ -195,6 +195,7 @@ void ClusterMembershipMgr::UpdateMembership(
             == ExecutorBlacklist::State::BLACKLISTED;
         if (blacklisted) {
           VLOG(1) << "Removing backend " << item.key << " from blacklist (deleted)";
+          DCHECK(!IsBackendInExecutorGroups(be_desc, *new_executor_groups));
         }
         // If the backend was quiescing or was previously blacklisted, it will already
         // have been removed from 'executor_groups'.
@@ -253,18 +254,30 @@ void ClusterMembershipMgr::UpdateMembership(
     if (it != new_backend_map->end()) {
       // Update
       TBackendDescriptor& existing = it->second;
-      bool blacklisted =
-          new_blacklist->FindAndRemove(be_desc) == ExecutorBlacklist::State::BLACKLISTED;
-      if (blacklisted) {
-        VLOG(1) << "Removing backend " << item.key << " from blacklist (updated)";
-      }
-      if (be_desc.is_quiescing && !existing.is_quiescing && existing.is_executor
-          && !blacklisted) {
-        // Executor needs to be removed from its groups
-        for (const auto& group : be_desc.executor_groups) {
-          VLOG(1) << "Removing backend " << item.key << " from group " << group
-                  << " (quiescing)";
-          FindOrInsertExecutorGroup(group, new_executor_groups)->RemoveExecutor(be_desc);
+
+      // Once a backend starts quiescing, it must stay in the quiescing state until it
+      // has been deleted from the cluster membership. Once a node starts quiescing, it
+      // can never transfer back to a running state.
+      if (existing.is_quiescing) DCHECK(be_desc.is_quiescing);
+
+      // If the node starts quiescing
+      if (be_desc.is_quiescing && !existing.is_quiescing && existing.is_executor) {
+        // If the backend starts quiescing and it is present in the blacklist, remove it
+        // from the blacklist. If the backend is present in the blacklist, there is no
+        // need to remove it from the executor group because it has already been removed
+        bool blacklisted = new_blacklist->FindAndRemove(be_desc)
+            == ExecutorBlacklist::State::BLACKLISTED;
+        if (blacklisted) {
+          VLOG(1) << "Removing backend " << item.key << " from blacklist (quiescing)";
+          DCHECK(!IsBackendInExecutorGroups(be_desc, *new_executor_groups));
+        } else {
+          // Executor needs to be removed from its groups
+          for (const auto& group : be_desc.executor_groups) {
+            VLOG(1) << "Removing backend " << item.key << " from group " << group
+                    << " (quiescing)";
+            FindOrInsertExecutorGroup(group, new_executor_groups)
+                ->RemoveExecutor(be_desc);
+          }
         }
       }
       existing = be_desc;
@@ -530,6 +543,16 @@ void ClusterMembershipMgr::UpdateMetrics(const SnapshotPtr& new_state){
   total_live_executor_groups_->SetValue(total_live_executor_groups);
   total_healthy_executor_groups_->SetValue(healthy_executor_groups);
   total_backends_->SetValue(new_state->current_backends.size());
+}
+
+bool ClusterMembershipMgr::IsBackendInExecutorGroups(
+    const TBackendDescriptor& be_desc, const ExecutorGroups& executor_groups) {
+  for (const auto& executor_group : executor_groups) {
+    if (executor_group.second.LookUpBackendDesc(be_desc.address) != nullptr) {
+      return true;
+    }
+  }
+  return false;
 }
 
 } // end namespace impala
