@@ -20,6 +20,7 @@ package org.apache.impala.catalog;
 import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.assertNull;
 import static org.junit.Assert.assertTrue;
+import static org.junit.Assert.assertNotNull;
 import static org.junit.Assert.fail;
 
 import java.util.ArrayList;
@@ -254,8 +255,8 @@ public class PartialCatalogInfoTest {
     req.table_info_selector.want_table_constraints = true;
 
     TGetPartialCatalogObjectResponse resp = sendRequest(req);
-    List<SQLPrimaryKey> primaryKeys = resp.table_info.primary_keys;
-    List<SQLForeignKey> foreignKeys = resp.table_info.foreign_keys;
+    List<SQLPrimaryKey> primaryKeys = resp.table_info.sql_constraints.primary_keys;
+    List<SQLForeignKey> foreignKeys = resp.table_info.sql_constraints.foreign_keys;
 
     assertEquals(2, primaryKeys.size());
     assertEquals(0, foreignKeys.size());
@@ -276,8 +277,8 @@ public class PartialCatalogInfoTest {
     req.table_info_selector.want_table_constraints = true;
 
     resp = sendRequest(req);
-    primaryKeys = resp.table_info.primary_keys;
-    foreignKeys = resp.table_info.foreign_keys;
+    primaryKeys = resp.table_info.sql_constraints.primary_keys;
+    foreignKeys = resp.table_info.sql_constraints.foreign_keys;
 
     assertEquals(1, primaryKeys.size());
     assertEquals(3, foreignKeys.size());
@@ -294,6 +295,25 @@ public class PartialCatalogInfoTest {
     assertEquals("id", foreignKeys.get(0).getPkcolumn_name());
     assertEquals("year", foreignKeys.get(1).getPkcolumn_name());
     assertEquals("a", foreignKeys.get(2).getPkcolumn_name());
+    // FK name for the composite primary key (id, year) should be equal.
+    assertEquals(foreignKeys.get(0).getFk_name(), foreignKeys.get(1).getFk_name());
+
+    // Check tables without constraints.
+    req = new TGetPartialCatalogObjectRequest();
+    req.object_desc = new TCatalogObject();
+    req.object_desc.setType(TCatalogObjectType.TABLE);
+    req.object_desc.table = new TTable("functional", "alltypes");
+    req.table_info_selector = new TTableInfoSelector();
+    req.table_info_selector.want_hms_table = true;
+    req.table_info_selector.want_table_constraints = true;
+
+    resp = sendRequest(req);
+    primaryKeys = resp.table_info.sql_constraints.primary_keys;
+    foreignKeys = resp.table_info.sql_constraints.foreign_keys;
+    assertNotNull(primaryKeys);
+    assertNotNull(foreignKeys);
+    assertEquals(0, primaryKeys.size());
+    assertEquals(0, foreignKeys.size());
   }
 
   @Test

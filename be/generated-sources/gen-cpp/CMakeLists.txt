@@ -89,6 +89,8 @@ set(SRC_FILES
   ResourceProfile_types.cpp
   RuntimeProfile_constants.cpp
   RuntimeProfile_types.cpp
+  SqlConstraints_constants.cpp
+  SqlConstraints_types.cpp
   StatestoreService.cpp
   StatestoreService_constants.cpp
   StatestoreService_types.cpp

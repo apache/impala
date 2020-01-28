@@ -55,6 +55,7 @@ import org.apache.impala.catalog.HdfsPartition.FileDescriptor;
 import org.apache.impala.catalog.ImpaladCatalog.ObjectUpdateSequencer;
 import org.apache.impala.catalog.Principal;
 import org.apache.impala.catalog.PrincipalPrivilege;
+import org.apache.impala.catalog.SqlConstraints;
 import org.apache.impala.common.InternalException;
 import org.apache.impala.common.Pair;
 import org.apache.impala.service.FeSupport;
@@ -696,9 +697,13 @@ public class CatalogdMetaProvider implements MetaProvider {
                 req, "missing expected HMS table");
             addTableMetadatStorageLoadTimeToProfile(
                 resp.table_info.storage_metadata_load_time_ns);
+            List<SQLPrimaryKey> primaryKeys = resp.table_info.sql_constraints == null ?
+                new ArrayList<>() : resp.table_info.sql_constraints.getPrimary_keys();
+            List<SQLForeignKey> foreignKeys = resp.table_info.sql_constraints == null ?
+                new ArrayList<>() : resp.table_info.sql_constraints.getForeign_keys();
             return new TableMetaRefImpl(
                 dbName, tableName, resp.table_info.hms_table, resp.object_version_number,
-                resp.table_info.primary_keys, resp.table_info.foreign_keys);
+                new SqlConstraints(primaryKeys, foreignKeys));
            }
       });
     return Pair.create(ref.msTable_, (TableMetaRef)ref);
@@ -797,12 +802,9 @@ public class CatalogdMetaProvider implements MetaProvider {
   }
 
   @Override
-  public Pair<List<SQLPrimaryKey>, List<SQLForeignKey>> loadConstraints(
+  public SqlConstraints loadConstraints(
       final TableMetaRef table, Table msTbl) {
-     Pair<List<SQLPrimaryKey>, List<SQLForeignKey>> pair =
-         new Pair<>(((TableMetaRefImpl) table).primaryKeys_,
-         ((TableMetaRefImpl) table).foreignKeys_);
-     return pair;
+    return ((TableMetaRefImpl) table).sqlConstraints_;
   }
 
   @Override
@@ -1394,8 +1396,7 @@ public class CatalogdMetaProvider implements MetaProvider {
     private final String dbName_;
     private final String tableName_;
     // SQL constraints for the table, populated during loadTable().
-    private final List<SQLPrimaryKey> primaryKeys_;
-    private final List<SQLForeignKey> foreignKeys_;
+    private final SqlConstraints sqlConstraints_;
 
     /**
      * Stash the HMS Table object since we need this in order to handle some strange
@@ -1411,14 +1412,12 @@ public class CatalogdMetaProvider implements MetaProvider {
     private final long catalogVersion_;
 
     public TableMetaRefImpl(String dbName, String tableName,
-        Table msTable, long catalogVersion, List<SQLPrimaryKey> primaryKeys,
-        List<SQLForeignKey> foreignKeys) {
+        Table msTable, long catalogVersion, SqlConstraints sqlConstraints) {
       this.dbName_ = dbName;
       this.tableName_ = tableName;
       this.msTable_ = msTable;
       this.catalogVersion_ = catalogVersion;
-      this.primaryKeys_ = primaryKeys;
-      this.foreignKeys_ = foreignKeys;
+      this.sqlConstraints_ = sqlConstraints;
     }
 
     @Override

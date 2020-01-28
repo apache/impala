@@ -24,6 +24,7 @@ include "Types.thrift"
 include "Status.thrift"
 include "Results.thrift"
 include "hive_metastore.thrift"
+include "SqlConstraints.thrift"
 
 // CatalogServer service API and related structs.
 
@@ -380,13 +381,9 @@ struct TPartialTableInfo {
   // Only used when partition files are fetched.
   7: optional list<Types.TNetworkAddress> network_addresses
 
-  // List of primary key constraints, small enough that we can
+  // SqlConstraints for the table, small enough that we can
   // return them wholesale.
-  8: optional list<hive_metastore.SQLPrimaryKey> primary_keys
-
-  // List of foreign key constraints, small enough that we can
-  // return them wholesale.
-  9: optional list<hive_metastore.SQLForeignKey> foreign_keys
+  8: optional SqlConstraints.TSqlConstraints sql_constraints
 }
 
 // Selector for partial information about a Database.

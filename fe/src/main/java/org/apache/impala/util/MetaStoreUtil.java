@@ -357,20 +357,4 @@ public class MetaStoreUtil {
     Preconditions.checkNotNull(msTbl);
     return msTbl.getSd().getNumBuckets() > 0;
   }
-
-  /**
-   * A custom comparator class to sort SQLPrimaryKeys in alphabetical order of the
-   * primary key name. If the primary key names are same(composite primary key), we
-   * will sort in increasing order of key_seq.
-   */
-  public static class SqlPrimaryKeyComparator implements Comparator<SQLPrimaryKey> {
-    @Override
-    public int compare(SQLPrimaryKey pk1, SQLPrimaryKey pk2) {
-      int keyNameComp = pk1.getPk_name().compareTo(pk2.getPk_name());
-      if (keyNameComp == 0) {
-        return Integer.compare(pk1.getKey_seq(), pk2.getKey_seq());
-      }
-      return keyNameComp;
-    }
-  }
 }

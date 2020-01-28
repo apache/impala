@@ -22,6 +22,7 @@ include "Exprs.thrift"
 include "Status.thrift"
 include "Types.thrift"
 include "hive_metastore.thrift"
+include "SqlConstraints.thrift"
 
 // Types used to represent catalog objects.
 
@@ -368,10 +369,7 @@ struct THdfsTable {
   7: optional list<Types.TNetworkAddress> network_addresses,
 
   // Primary Keys information for HDFS Tables
-  11: optional list<hive_metastore.SQLPrimaryKey> primary_keys,
-
-  // Foreign Keys information for HDFS Tables
-  12: optional list<hive_metastore.SQLForeignKey> foreign_keys
+  11: optional SqlConstraints.TSqlConstraints sql_constraints
 }
 
 struct THBaseTable {

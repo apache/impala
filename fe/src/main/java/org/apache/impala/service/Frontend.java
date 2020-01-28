@@ -933,7 +933,8 @@ public class Frontend {
       throws InternalException {
     Preconditions.checkNotNull(table);
     List<SQLPrimaryKey> pkList;
-    pkList = table.getPrimaryKeys();
+    pkList = table.getSqlConstraints().getPrimaryKeys();
+    Preconditions.checkNotNull(pkList);
     for (SQLPrimaryKey pk : pkList) {
       if (authzFactory_.getAuthorizationConfig().isEnabled()) {
         PrivilegeRequest privilegeRequest = new PrivilegeRequestBuilder(
@@ -974,7 +975,9 @@ public class Frontend {
     // but we return the "SQLFOreignKey" for col3.
     Set<String> omitList = new HashSet<>();
     List<SQLForeignKey> fkList = new ArrayList<>();
-    for (SQLForeignKey fk : table.getForeignKeys()) {
+    List<SQLForeignKey> foreignKeys = table.getSqlConstraints().getForeignKeys();
+    Preconditions.checkNotNull(foreignKeys);
+    for (SQLForeignKey fk : foreignKeys) {
       String fkName = fk.getFk_name();
       if (!omitList.contains(fkName)) {
         if (authzFactory_.getAuthorizationConfig().isEnabled()) {
@@ -999,7 +1002,7 @@ public class Frontend {
         }
       }
     }
-    for (SQLForeignKey fk : table.getForeignKeys()) {
+    for (SQLForeignKey fk : foreignKeys) {
       if (!omitList.contains(fk.getFk_name())) {
         fkList.add(fk);
       }

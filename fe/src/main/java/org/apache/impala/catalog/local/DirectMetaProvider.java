@@ -19,7 +19,6 @@ package org.apache.impala.catalog.local;
 
 import java.io.FileNotFoundException;
 import java.io.IOException;
-import java.util.ArrayList;
 import java.util.Collections;
 import java.util.List;
 import java.util.Map;
@@ -33,8 +32,6 @@ import org.apache.hadoop.hive.metastore.api.MetaException;
 import org.apache.hadoop.hive.metastore.api.NoSuchObjectException;
 import org.apache.hadoop.hive.metastore.api.Partition;
 import org.apache.hadoop.hive.metastore.api.PrimaryKeysRequest;
-import org.apache.hadoop.hive.metastore.api.SQLForeignKey;
-import org.apache.hadoop.hive.metastore.api.SQLPrimaryKey;
 import org.apache.hadoop.hive.metastore.api.Table;
 import org.apache.hadoop.hive.metastore.api.UnknownDBException;
 import org.apache.impala.authorization.AuthorizationPolicy;
@@ -43,6 +40,7 @@ import org.apache.impala.catalog.Function;
 import org.apache.impala.catalog.HdfsPartition.FileDescriptor;
 import org.apache.impala.catalog.MetaStoreClientPool;
 import org.apache.impala.catalog.MetaStoreClientPool.MetaStoreClient;
+import org.apache.impala.catalog.SqlConstraints;
 import org.apache.impala.common.Pair;
 import org.apache.impala.compat.MetastoreShim;
 import org.apache.impala.service.BackendConfig;
@@ -164,21 +162,16 @@ class DirectMetaProvider implements MetaProvider {
   }
 
   @Override
-  public Pair<List<SQLPrimaryKey>, List<SQLForeignKey>> loadConstraints(
+  public SqlConstraints loadConstraints(
       TableMetaRef table, Table msTbl) throws TException {
-    List<SQLPrimaryKey> primaryKeys = new ArrayList<>();
-    List<SQLForeignKey> foreignKeys = new ArrayList<>();
-
+    SqlConstraints sqlConstraints;
     try (MetaStoreClient c = msClientPool_.getClient()) {
-      primaryKeys.addAll(c.getHiveClient().getPrimaryKeys(
-          new PrimaryKeysRequest(msTbl.getDbName(), msTbl.getTableName())));
-      foreignKeys.addAll(c.getHiveClient().getForeignKeys(new ForeignKeysRequest(null,
+      sqlConstraints = new SqlConstraints(c.getHiveClient().getPrimaryKeys(
+          new PrimaryKeysRequest(msTbl.getDbName(), msTbl.getTableName())),
+          c.getHiveClient().getForeignKeys(new ForeignKeysRequest(null,
           null, msTbl.getDbName(), msTbl.getTableName())));
-
-      // Store primary keys in a canonical order.
-      primaryKeys.sort(new MetaStoreUtil.SqlPrimaryKeyComparator());
     }
-    return new Pair<>(primaryKeys, foreignKeys);
+    return sqlConstraints;
   }
 
   @Override

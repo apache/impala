@@ -491,139 +491,115 @@ class TestHS2(HS2TestSuite):
     finally:
       self.execute_query("drop table {0}".format(table))
 
-  @needs_session_cluster_properties()
-  def test_get_primary_keys(self, cluster_properties, unique_database):
-    table = "pk"
-    self.execute_query("use {0}".format(unique_database))
-    self.execute_query("drop table if exists {0}".format(table))
-    self.execute_query("""
-        create table {0} (id int, year string, primary key(id, year))""".format(
-        table))
-    pks = ["id", "year"]
-    try:
-      req = TCLIService.TGetPrimaryKeysReq()
-      req.sessionHandle = self.session_handle
-      req.schemaName = unique_database
-      req.tableName = table
+  @needs_session()
+  def test_get_primary_keys(self):
+    req = TCLIService.TGetPrimaryKeysReq()
+    req.sessionHandle = self.session_handle
+    req.schemaName = 'functional'
+    req.tableName = 'parent_table'
 
-      get_primary_keys_resp = self.hs2_client.GetPrimaryKeys(req)
-      TestHS2.check_response(get_primary_keys_resp)
+    get_primary_keys_resp = self.hs2_client.GetPrimaryKeys(req)
+    TestHS2.check_response(get_primary_keys_resp)
 
-      fetch_results_resp = self._fetch_results(
-          get_primary_keys_resp.operationHandle, 100)
+    fetch_results_resp = self._fetch_results(
+        get_primary_keys_resp.operationHandle, 100)
 
-      if not cluster_properties.is_catalog_v2_cluster():
-        for i in range(len(pks)):
-          results = fetch_results_resp.results
-          table_cat = results.columns[0].stringVal.values[i]
-          table_schema = results.columns[1].stringVal.values[i]
-          table_name = results.columns[2].stringVal.values[i]
-          pk_col_name = results.columns[3].stringVal.values[i]
-          pk_name = results.columns[5].stringVal.values[i]
-          assert table_cat == ''
-          assert table_schema == unique_database
-          assert table_name == table
-          assert pk_col_name in pks
-          assert len(pk_name) > 0
+    results = fetch_results_resp.results
+    for i in range(2):
+      table_cat = results.columns[0].stringVal.values[i]
+      table_schema = results.columns[1].stringVal.values[i]
+      table_name = results.columns[2].stringVal.values[i]
+      pk_name = results.columns[5].stringVal.values[i]
+      assert table_cat == ''
+      assert table_schema == 'functional'
+      assert table_name == 'parent_table'
+      assert len(pk_name) > 0
 
-    finally:
-      self.execute_query("drop table {0}".format(table))
+    # Assert PK column names.
+    assert results.columns[3].stringVal.values[0] == 'id'
+    assert results.columns[3].stringVal.values[1] == 'year'
 
-  @needs_session_cluster_properties()
-  def test_get_cross_reference(self, cluster_properties, unique_database):
-    parent_table_1 = "pk_1"
-    parent_table_2 = "pk_2"
-    fk_table = "fk"
-    self.execute_query("use {0}".format(unique_database))
-    self.execute_query("drop table if exists {0}".format(parent_table_1))
-    self.execute_query("""
-        create table {0} (id int, year string, primary key(id, year))""".format(
-        parent_table_1))
-    self.execute_query("drop table if exists {0}".format(parent_table_2))
-    self.execute_query("""
-        create table {0} (a int, b string, primary key(a))""".format(
-        parent_table_2))
-    self.execute_query("drop table if exists {0}".format(fk_table))
-    self.execute_query("""
-        create table {0} (seq int, id int, year string, a int, primary key(seq)
-        , foreign key(id, year) references {1}(id, year), foreign key(a)
-        references {2}(a))
-        """.format(fk_table, parent_table_1, parent_table_2))
-    pk_column_names = ["id", "year", "a"]
-    try:
-      req = TCLIService.TGetCrossReferenceReq()
-      req.sessionHandle = self.session_handle
-      req.parentSchemaName = unique_database
-      req.foreignSchemaName = unique_database
-      req.parentTableName = parent_table_1
-      req.foreignTableName = fk_table
+  @needs_session()
+  def test_get_cross_reference(self):
+    req = TCLIService.TGetCrossReferenceReq()
+    req.sessionHandle = self.session_handle
+    req.parentSchemaName = "functional"
+    req.foreignSchemaName = "functional"
+    req.parentTableName = "parent_table"
+    req.foreignTableName = "child_table"
 
-      get_foreign_keys_resp = self.hs2_client.GetCrossReference(req)
-      TestHS2.check_response(get_foreign_keys_resp)
+    get_foreign_keys_resp = self.hs2_client.GetCrossReference(req)
+    TestHS2.check_response(get_foreign_keys_resp)
 
-      fetch_results_resp = self._fetch_results(
-          get_foreign_keys_resp.operationHandle, 100)
+    fetch_results_resp = self._fetch_results(
+        get_foreign_keys_resp.operationHandle, 100)
 
-      results = fetch_results_resp.results
+    results = fetch_results_resp.results
 
-      if not cluster_properties.is_catalog_v2_cluster():
-        for i in range(2):
-          parent_table_cat = results.columns[0].stringVal.values[i]
-          parent_table_schema = results.columns[1].stringVal.values[i]
-          parent_table_name = results.columns[2].stringVal.values[i]
-          parent_col_name = results.columns[3].stringVal.values[i]
-          foreign_table_cat = results.columns[4].stringVal.values[i]
-          foreign_table_schema = results.columns[5].stringVal.values[i]
-          foreign_table_name = results.columns[6].stringVal.values[i]
-          foreign_col_name = results.columns[7].stringVal.values[i]
+    for i in range(2):
+      parent_table_cat = results.columns[0].stringVal.values[i]
+      parent_table_schema = results.columns[1].stringVal.values[i]
+      parent_table_name = results.columns[2].stringVal.values[i]
+      foreign_table_cat = results.columns[4].stringVal.values[i]
+      foreign_table_schema = results.columns[5].stringVal.values[i]
+      foreign_table_name = results.columns[6].stringVal.values[i]
+      assert parent_table_cat == ''
+      assert parent_table_schema == 'functional'
+      assert parent_table_name == 'parent_table'
+      assert foreign_table_cat == ''
+      assert foreign_table_schema == 'functional'
+      assert foreign_table_name == 'child_table'
 
-          assert parent_table_cat == ''
-          assert parent_table_schema == unique_database
-          assert parent_table_name == parent_table_1
-          assert parent_col_name in pk_column_names
-          assert foreign_table_cat == ''
-          assert foreign_table_schema == unique_database
-          assert foreign_table_name == fk_table
-          assert foreign_col_name in pk_column_names
+    # Assert PK column names.
+    assert results.columns[3].stringVal.values[0] == 'id'
+    assert results.columns[3].stringVal.values[1] == 'year'
 
-        # Get all foreign keys from the FK side by not setting pkTableSchema
-        # and pkTable name in the request.
-        req = TCLIService.TGetCrossReferenceReq()
-        req.sessionHandle = self.session_handle
-        req.foreignSchemaName = unique_database
-        req.foreignTableName = fk_table
+    # Assert FK column names.
+    assert results.columns[7].stringVal.values[0] == 'id'
+    assert results.columns[7].stringVal.values[1] == 'year'
 
-        get_foreign_keys_resp = self.hs2_client.GetCrossReference(req)
-        TestHS2.check_response(get_foreign_keys_resp)
+    # Get all foreign keys from the FK side by not setting pkTableSchema
+    # and pkTable name in the request.
+    req = TCLIService.TGetCrossReferenceReq()
+    req.sessionHandle = self.session_handle
+    req.foreignSchemaName = 'functional'
+    req.foreignTableName = 'child_table'
 
-        fetch_results_resp = self._fetch_results(
-            get_foreign_keys_resp.operationHandle, 100)
+    get_foreign_keys_resp = self.hs2_client.GetCrossReference(req)
+    TestHS2.check_response(get_foreign_keys_resp)
 
-        results = fetch_results_resp.results
+    fetch_results_resp = self._fetch_results(
+        get_foreign_keys_resp.operationHandle, 100)
 
-        pk_table_names = [parent_table_1, parent_table_2]
-        for i in range(len(pk_column_names)):
-          parent_table_cat = results.columns[0].stringVal.values[i]
-          parent_table_schema = results.columns[1].stringVal.values[i]
-          parent_table_name = results.columns[2].stringVal.values[i]
-          parent_col_name = results.columns[3].stringVal.values[i]
-          foreign_table_cat = results.columns[4].stringVal.values[i]
-          foreign_table_schema = results.columns[5].stringVal.values[i]
-          foreign_table_name = results.columns[6].stringVal.values[i]
-          foreign_col_name = results.columns[7].stringVal.values[i]
-          assert parent_table_cat == ''
-          assert parent_table_schema == unique_database
-          assert parent_table_name in pk_table_names
-          assert parent_col_name in pk_column_names
-          assert foreign_table_cat == ''
-          assert foreign_table_schema == unique_database
-          assert foreign_table_name == fk_table
-          assert foreign_col_name in pk_column_names
+    results = fetch_results_resp.results
 
-    finally:
-      self.execute_query("drop table {0}".format(parent_table_1))
-      self.execute_query("drop table {0}".format(parent_table_2))
-      self.execute_query("drop table {0}".format(fk_table))
+    for i in range(3):
+      parent_table_cat = results.columns[0].stringVal.values[i]
+      parent_table_schema = results.columns[1].stringVal.values[i]
+      foreign_table_cat = results.columns[4].stringVal.values[i]
+      foreign_table_schema = results.columns[5].stringVal.values[i]
+      foreign_table_name = results.columns[6].stringVal.values[i]
+      assert parent_table_cat == ''
+      assert parent_table_schema == 'functional'
+      assert foreign_table_cat == ''
+      assert foreign_table_schema == 'functional'
+      assert foreign_table_name == 'child_table'
+
+    # First two FKs have 'parent_table' as PK table.
+    pk_table_names = ['parent_table', 'parent_table', 'parent_table_2']
+    for i in range(len(pk_table_names)):
+      parent_table_name = results.columns[2].stringVal.values[i]
+      parent_table_name == pk_table_names[i]
+
+      # Assert PK column names.
+    assert results.columns[3].stringVal.values[0] == 'id'
+    assert results.columns[3].stringVal.values[1] == 'year'
+    assert results.columns[3].stringVal.values[2] == 'a'
+
+    # Assert FK column names.
+    assert results.columns[7].stringVal.values[0] == 'id'
+    assert results.columns[7].stringVal.values[1] == 'year'
+    assert results.columns[7].stringVal.values[2] == 'a'
 
   @needs_session(conf_overlay={"idle_session_timeout": "5"})
   def test_get_operation_status_session_timeout(self):

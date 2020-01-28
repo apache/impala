@@ -184,14 +184,9 @@ public interface FeFsTable extends FeTable {
   List<? extends FeFsPartition> loadPartitions(Collection<Long> ids);
 
   /**
-   * @return: Primary keys information.
+   * @return: SQL Constraints Information.
    */
-  List<SQLPrimaryKey> getPrimaryKeys();
-
-  /**
-   * @return Foreign keys information.
-   */
-  List<SQLForeignKey> getForeignKeys();
+  SqlConstraints getSqlConstraints();
 
   /**
    * @return  List of primary keys column names, useful for toSqlUtils. In local
@@ -199,7 +194,7 @@ public interface FeFsTable extends FeTable {
    */
   default List<String> getPrimaryKeyColumnNames() throws TException {
     List<String> primaryKeyColNames = new ArrayList<>();
-    List<SQLPrimaryKey> primaryKeys = getPrimaryKeys();
+    List<SQLPrimaryKey> primaryKeys = getSqlConstraints().getPrimaryKeys();
     if (!primaryKeys.isEmpty()) {
       primaryKeys.stream().forEach(p -> primaryKeyColNames.add(p.getColumn_name()));
     }
@@ -217,7 +212,7 @@ public interface FeFsTable extends FeTable {
     // and each foreign key may contain multiple columns. The outerloop collects
     // information common to a foreign key (pk table information). The inner
     // loop collects column information.
-    List<SQLForeignKey> foreignKeys = getForeignKeys();
+    List<SQLForeignKey> foreignKeys = getSqlConstraints().getForeignKeys();
     for (int i = 0; i < foreignKeys.size(); i++) {
       String pkTableDb = foreignKeys.get(i).getPktable_db();
       String pkTableName = foreignKeys.get(i).getPktable_name();

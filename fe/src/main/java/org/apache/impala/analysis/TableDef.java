@@ -255,7 +255,7 @@ class TableDef {
     final List<String> foreignKeyColNames;
 
     // Name of fk
-    final String fkConstraintName;
+    String fkConstraintName;
 
     // Fully qualified pk name. Set during analysis.
     TableName fullyQualifiedPkTableName;
@@ -291,6 +291,10 @@ class TableDef {
 
     public String getFkConstraintName() {
       return fkConstraintName;
+    }
+
+    public void setConstraintName(String constraintName) {
+      fkConstraintName = constraintName;
     }
 
     public TableName getFullyQualifiedPkTableName() {
@@ -570,22 +574,18 @@ class TableDef {
         throw new AnalysisException("VALIDATE feature is not supported yet.");
       }
 
-      String constraintName = null;
+      if (fk.getFkConstraintName() == null) {
+        fk.setConstraintName(generateConstraintName());
+      }
+
       for (int i = 0; i < fk.getForeignKeyColNames().size(); i++) {
-        if (fk.getFkConstraintName() == null) {
-          if (i == 0){
-            constraintName = generateConstraintName();
-          }
-        } else {
-          constraintName = fk.getFkConstraintName();
-        }
         SQLForeignKey sqlForeignKey = new SQLForeignKey();
         sqlForeignKey.setPktable_db(parentDb);
         sqlForeignKey.setPktable_name(fk.getPkTableName().getTbl());
         sqlForeignKey.setFktable_db(getTblName().getDb());
         sqlForeignKey.setFktable_name(getTbl());
         sqlForeignKey.setPkcolumn_name(fk.getPrimaryKeyColNames().get(i).toLowerCase());
-        sqlForeignKey.setFk_name(constraintName);
+        sqlForeignKey.setFk_name(fk.getFkConstraintName());
         sqlForeignKey.setKey_seq(i+1);
         sqlForeignKey.setFkcolumn_name(fk.getForeignKeyColNames().get(i).toLowerCase());
         sqlForeignKey.setRely_cstr(fk.isRelyCstr());

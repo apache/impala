@@ -25,13 +25,12 @@ import org.apache.hadoop.hive.metastore.api.Database;
 import org.apache.hadoop.hive.metastore.api.MetaException;
 import org.apache.hadoop.hive.metastore.api.NoSuchObjectException;
 import org.apache.hadoop.hive.metastore.api.Partition;
-import org.apache.hadoop.hive.metastore.api.SQLForeignKey;
-import org.apache.hadoop.hive.metastore.api.SQLPrimaryKey;
 import org.apache.hadoop.hive.metastore.api.Table;
 import org.apache.hadoop.hive.metastore.api.UnknownDBException;
 import org.apache.impala.authorization.AuthorizationPolicy;
 import org.apache.impala.catalog.Function;
 import org.apache.impala.catalog.HdfsPartition.FileDescriptor;
+import org.apache.impala.catalog.SqlConstraints;
 import org.apache.impala.common.Pair;
 import org.apache.impala.thrift.TNetworkAddress;
 import org.apache.impala.util.ListMap;
@@ -80,7 +79,10 @@ public interface MetaProvider {
   List<PartitionRef> loadPartitionList(TableMetaRef table)
       throws MetaException, TException;
 
-  Pair<List<SQLPrimaryKey>, List<SQLForeignKey>> loadConstraints(TableMetaRef table,
+  /**
+   * Load the list of SQL constraints for the given table.
+   */
+  SqlConstraints loadConstraints(TableMetaRef table,
       Table msTbl) throws MetaException, TException;
 
   /**

@@ -231,6 +231,7 @@ set (SRC_FILES
   ResourceProfile.thrift
   Results.thrift
   RuntimeProfile.thrift
+  SqlConstraints.thrift
   StatestoreService.thrift
   Zip.thrift
   ${TCLI_SERVICE_THRIFT}

@@ -47,8 +47,6 @@ import org.apache.hadoop.hive.metastore.api.FieldSchema;
 import org.apache.hadoop.hive.metastore.api.ForeignKeysRequest;
 import org.apache.hadoop.hive.metastore.api.Partition;
 import org.apache.hadoop.hive.metastore.api.PrimaryKeysRequest;
-import org.apache.hadoop.hive.metastore.api.SQLForeignKey;
-import org.apache.hadoop.hive.metastore.api.SQLPrimaryKey;
 import org.apache.hadoop.hive.metastore.api.StorageDescriptor;
 import org.apache.hadoop.hive.serde.serdeConstants;
 import org.apache.impala.analysis.Expr;
@@ -78,6 +76,7 @@ import org.apache.impala.thrift.TPartialPartitionInfo;
 import org.apache.impala.thrift.TPartitionKeyValue;
 import org.apache.impala.thrift.TResultSet;
 import org.apache.impala.thrift.TResultSetMetadata;
+import org.apache.impala.thrift.TSqlConstraints;
 import org.apache.impala.thrift.TTable;
 import org.apache.impala.thrift.TTableDescriptor;
 import org.apache.impala.thrift.TTableType;
@@ -245,10 +244,9 @@ public class HdfsTable extends Table implements FeFsTable {
   // for setAvroSchema().
   private boolean isSchemaLoaded_ = false;
 
-  // Primary Key and Foreign Key information. Set in load() method. An empty list could
-  // mean either the table does not have any keys or the table is not loaded.
-  private final List<SQLPrimaryKey> primaryKeys_ = new ArrayList<>();
-  private final List<SQLForeignKey> foreignKeys_ = new ArrayList<>();
+  // SQL constraints information for the table. Set in load() method.
+  private SqlConstraints sqlConstraints_ = new SqlConstraints(new ArrayList<>(),
+      new ArrayList<>());
 
   // Represents a set of storage-related statistics aggregated at the table or partition
   // level.
@@ -1051,16 +1049,10 @@ public class HdfsTable extends Table implements FeFsTable {
   private void loadConstraintsInfo(IMetaStoreClient client,
       org.apache.hadoop.hive.metastore.api.Table msTbl) throws TableLoadingException{
     try {
-      // Reset and add primary keys info and foreign keys info.
-      primaryKeys_.clear();
-      foreignKeys_.clear();
-      primaryKeys_.addAll(client.getPrimaryKeys(
-          new PrimaryKeysRequest(msTbl.getDbName(), msTbl.getTableName())));
-      foreignKeys_.addAll(client.getForeignKeys(new ForeignKeysRequest(null, null,
+      sqlConstraints_ = new SqlConstraints(client.getPrimaryKeys(
+          new PrimaryKeysRequest(msTbl.getDbName(), msTbl.getTableName())),
+          client.getForeignKeys(new ForeignKeysRequest(null, null,
           msTbl.getDbName(), msTbl.getTableName())));
-
-      // Store primary keys in a canonical order.
-      primaryKeys_.sort(new MetaStoreUtil.SqlPrimaryKeyComparator());
     } catch (Exception e) {
       throw new TableLoadingException("Failed to load primary keys/foreign keys for "
           + "table: " + getFullName(), e);
@@ -1452,10 +1444,7 @@ public class HdfsTable extends Table implements FeFsTable {
     nullColumnValue_ = hdfsTable.nullColumnValue;
     nullPartitionKeyValue_ = hdfsTable.nullPartitionKeyValue;
     hostIndex_.populate(hdfsTable.getNetwork_addresses());
-    primaryKeys_.clear();
-    primaryKeys_.addAll(hdfsTable.getPrimary_keys());
-    foreignKeys_.clear();
-    foreignKeys_.addAll(hdfsTable.getForeign_keys());
+    sqlConstraints_ =  SqlConstraints.fromThrift(hdfsTable.getSql_constraints());
     resetPartitions();
     try {
       for (Map.Entry<Long, THdfsPartition> part: hdfsTable.getPartitions().entrySet()) {
@@ -1557,10 +1546,10 @@ public class HdfsTable extends Table implements FeFsTable {
     }
 
     if (req.table_info_selector.want_table_constraints) {
-      List<SQLPrimaryKey> primaryKeys = new ArrayList<>(primaryKeys_);
-      List<SQLForeignKey> foreignKeys = new ArrayList<>(foreignKeys_);
-      resp.table_info.setPrimary_keys(primaryKeys);
-      resp.table_info.setForeign_keys(foreignKeys);
+      TSqlConstraints sqlConstraints =
+          new TSqlConstraints(sqlConstraints_.getPrimaryKeys(),
+          sqlConstraints_.getForeignKeys());
+      resp.table_info.setSql_constraints(sqlConstraints);
     }
     return resp;
   }
@@ -1623,8 +1612,7 @@ public class HdfsTable extends Table implements FeFsTable {
     THdfsTable hdfsTable = new THdfsTable(hdfsBaseDir_, getColumnNames(),
         nullPartitionKeyValue_, nullColumnValue_, idToPartition, prototypePartition);
     hdfsTable.setAvroSchema(avroSchema_);
-    hdfsTable.setPrimary_keys(primaryKeys_);
-    hdfsTable.setForeign_keys(foreignKeys_);
+    hdfsTable.setSql_constraints(sqlConstraints_.toThrift());
     if (type == ThriftObjectType.FULL) {
       // Network addresses are used only by THdfsFileBlocks which are inside
       // THdfsFileDesc, so include network addreses only when including THdfsFileDesc.
@@ -1652,13 +1640,8 @@ public class HdfsTable extends Table implements FeFsTable {
   public ListMap<TNetworkAddress> getHostIndex() { return hostIndex_; }
 
   @Override
-  public List<SQLPrimaryKey> getPrimaryKeys() {
-    return ImmutableList.copyOf(primaryKeys_);
-  }
-
-  @Override
-  public List<SQLForeignKey> getForeignKeys() {
-    return ImmutableList.copyOf(foreignKeys_);
+  public SqlConstraints getSqlConstraints() {
+    return sqlConstraints_;
   }
 
   /**

@@ -644,8 +644,8 @@ public class MetadataOp {
 
     for (int i = 0; i < dbsMetadata.dbs.size(); ++i) {
       for (int j = 0; j < dbsMetadata.tableNames.get(i).size(); ++j) {
-        TResultRow row = new TResultRow();
         for (SQLPrimaryKey pk : dbsMetadata.primaryKeys.get(i).get(j)) {
+          TResultRow row = new TResultRow();
           row.colVals = Lists.newArrayList();
           row.colVals.add(EMPTY_COL_VAL);
           row.colVals.add(createTColumnValue(pk.getTable_db()));
@@ -710,9 +710,8 @@ public class MetadataOp {
         List<SQLForeignKey> filteredForeignKeys =
             filterForeignKeys(dbsMetadata.foreignKeys.get(i).get(j), parentSchemaName,
                 parentTableName);
-
-        TResultRow row = new TResultRow();
         for (SQLForeignKey fk : filteredForeignKeys) {
+          TResultRow row = new TResultRow();
           row.colVals = Lists.newArrayList();
           row.colVals.add(EMPTY_COL_VAL); // PKTABLE_CAT
           row.colVals.add(createTColumnValue(fk.getPktable_db()));

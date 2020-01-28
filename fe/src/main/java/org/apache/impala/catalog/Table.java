@@ -33,8 +33,6 @@ import org.apache.hadoop.hive.metastore.TableType;
 import org.apache.hadoop.hive.metastore.api.ColumnStatisticsData;
 import org.apache.hadoop.hive.metastore.api.ColumnStatisticsObj;
 import org.apache.hadoop.hive.metastore.api.FieldSchema;
-import org.apache.hadoop.hive.metastore.api.SQLForeignKey;
-import org.apache.hadoop.hive.metastore.api.SQLPrimaryKey;
 import org.apache.impala.analysis.TableName;
 import org.apache.impala.catalog.events.InFlightEvents;
 import org.apache.impala.common.ImpalaRuntimeException;
@@ -116,11 +114,9 @@ public abstract class Table extends CatalogObjectImpl implements FeTable {
   // map from lowercase column name to Column object.
   private final Map<String, Column> colsByName_ = new HashMap<>();
 
-  // List of primary keys associated with the table.
-  protected final List<SQLPrimaryKey> primaryKeys_ = new ArrayList<>();
-
-  // List of foreign keys associated with the table.
-  protected final List<SQLForeignKey> foreignKeys_ = new ArrayList<>();
+  // List of SQL constraints associated with the table.
+  private final SqlConstraints sqlConstraints_ = new SqlConstraints(new ArrayList<>(),
+      new ArrayList<>());
 
   // Type of this table (array of struct) that mirrors the columns. Useful for analysis.
   protected final ArrayType type_ = new ArrayType(new StructType());
@@ -661,16 +657,7 @@ public abstract class Table extends CatalogObjectImpl implements FeTable {
   public List<Column> getColumns() { return colsByPos_; }
 
   @Override // FeTable
-  public List<SQLPrimaryKey> getPrimaryKeys() {
-    // Prevent clients from modifying the primary keys list.
-    return ImmutableList.copyOf(primaryKeys_);
-  }
-
-  @Override // FeTable
-  public List<SQLForeignKey> getForeignKeys() {
-    // Prevent clients from modifying the foreign keys list.
-    return ImmutableList.copyOf(foreignKeys_);
-  }
+  public SqlConstraints getSqlConstraints()  { return sqlConstraints_; }
 
   @Override // FeTable
   public List<String> getColumnNames() { return Column.toColumnNames(colsByPos_); }

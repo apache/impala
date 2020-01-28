@@ -445,8 +445,8 @@ public class CatalogTest {
         "test");
     assertNotNull(t);
     assertTrue(t instanceof FeFsTable);
-    List<SQLPrimaryKey> primaryKeys = t.getPrimaryKeys();
-    List<SQLForeignKey> foreignKeys = t.getForeignKeys();
+    List<SQLPrimaryKey> primaryKeys = t.getSqlConstraints().getPrimaryKeys();
+    List<SQLForeignKey> foreignKeys = t.getSqlConstraints().getForeignKeys();
     assertEquals(2, primaryKeys.size());
     assertEquals(0, foreignKeys.size());
     for (SQLPrimaryKey pk: primaryKeys) {
@@ -462,8 +462,8 @@ public class CatalogTest {
     t = (FeFsTable) catalog_.getOrLoadTable("functional", "child_table", "test");
     assertNotNull(t);
     assertTrue(t instanceof FeFsTable);
-    primaryKeys = t.getPrimaryKeys();
-    foreignKeys = t.getForeignKeys();
+    primaryKeys = t.getSqlConstraints().getPrimaryKeys();
+    foreignKeys = t.getSqlConstraints().getForeignKeys();
     assertEquals(1, primaryKeys.size());
     assertEquals(3, foreignKeys.size());
     assertEquals("functional", primaryKeys.get(0).getTable_db());
@@ -479,6 +479,20 @@ public class CatalogTest {
     assertEquals("id", foreignKeys.get(0).getPkcolumn_name());
     assertEquals("year", foreignKeys.get(1).getPkcolumn_name());
     assertEquals("a", foreignKeys.get(2).getPkcolumn_name());
+    // FK name for the composite primary key (id, year) should be equal.
+    assertEquals(foreignKeys.get(0).getFk_name(), foreignKeys.get(1).getFk_name());
+
+    // Check tables without constraints.
+    t = (FeFsTable) catalog_.getOrLoadTable("functional", "alltypes",
+        "test");
+    assertNotNull(t);
+    assertTrue(t instanceof FeFsTable);
+    primaryKeys = t.getSqlConstraints().getPrimaryKeys();
+    foreignKeys = t.getSqlConstraints().getForeignKeys();
+    assertNotNull(primaryKeys);
+    assertNotNull(foreignKeys);
+    assertEquals(0, primaryKeys.size());
+    assertEquals(0, foreignKeys.size());
   }
 
   public static void checkAllTypesPartitioning(FeFsTable table,
