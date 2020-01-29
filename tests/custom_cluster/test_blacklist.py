@@ -116,7 +116,8 @@ class TestBlacklist(CustomClusterTestSuite):
     assert re.search("NumBackends: 3", result.runtime_profile), result.runtime_profile
 
   @pytest.mark.execute_serially
-  @CustomClusterTestSuite.with_args(num_exclusive_coordinators=1)
+  @CustomClusterTestSuite.with_args(num_exclusive_coordinators=1,
+      statestored_args="-statestore_heartbeat_frequency_ms=1000")
   def test_kill_impalad_with_running_queries(self, cursor):
     """Verifies that when an Impala executor is killed while running a query, that the
     Coordinator blacklists the killed executor."""
