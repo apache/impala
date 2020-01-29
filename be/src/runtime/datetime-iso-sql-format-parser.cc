@@ -293,6 +293,7 @@ bool IsoSqlFormatParser::ProcessSeparatorSequence(const char** current_pos,
   DCHECK(current_tok_idx != nullptr && *current_tok_idx < dt_ctx.toks.size());
   DCHECK(dt_ctx.toks[*current_tok_idx].type == SEPARATOR);
   if (!IsoSqlFormatTokenizer::IsSeparator(current_pos, end_pos, false)) return false;
+  const char* begin_pos = *current_pos;
   // Advance to the end of the separator sequence.
   ++(*current_pos);
   while (*current_pos < end_pos &&
@@ -320,7 +321,11 @@ bool IsoSqlFormatParser::ProcessSeparatorSequence(const char** current_pos,
   }
 
   // The last '-' of a separator sequence might be taken as a sign for timezone hour.
-  if (*(*current_pos - 1) == '-' && dt_ctx.toks[*current_tok_idx].type == TIMEZONE_HOUR) {
+  // If the TZH token itself doesn't start with a '+' sign and the separator sequence
+  // contains more than one separators then the last '-' of the separator sequence is
+  // taken as the sign of TZH.
+  if (*(*current_pos - 1) == '-' && dt_ctx.toks[*current_tok_idx].type == TIMEZONE_HOUR
+      && *(*current_pos) != '+' && begin_pos != (*current_pos - 1)) {
     --(*current_pos);
   }
   return true;

@@ -1160,6 +1160,10 @@ class TestCastWithFormat(ImpalaTestSuite):
         "timestamp FORMAT 'YYYY-MM-DD HH12:MI A.M.TZH:TZM')")
     assert result.data == ["2018-12-31 08:00:00"]
 
+    result = self.client.execute("select cast('2018-12-31 08:00 AM-+1:10' as "
+        "timestamp FORMAT 'YYYY-MM-DD HH12:MI A.M. TZH:TZM')")
+    assert result.data == ["2018-12-31 08:00:00"]
+
     # Invalid TZH and TZM
     result = self.client.execute("select cast('2016-01-01 10:00 AM +16:00' as "
         "timestamp FORMAT 'YYYY-MM-DD HH12:MI A.M. TZH:TZM')")
