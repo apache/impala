@@ -72,6 +72,7 @@ public class RangerAuthorizationChecker extends BaseAuthorizationChecker {
   public static final String SELECT_ACCESS_TYPE = "select";
 
   private final RangerImpalaPlugin plugin_;
+  private boolean isColumnMaskingEnabled_;
 
   public RangerAuthorizationChecker(AuthorizationConfig authzConfig) {
     super(authzConfig);
@@ -80,6 +81,7 @@ public class RangerAuthorizationChecker extends BaseAuthorizationChecker {
     plugin_ = new RangerImpalaPlugin(
         rangerConfig.getServiceType(), rangerConfig.getAppId());
     plugin_.init();
+    isColumnMaskingEnabled_ = BackendConfig.INSTANCE.isColumnMaskingEnabled();
   }
 
   @Override
@@ -188,7 +190,13 @@ public class RangerAuthorizationChecker extends BaseAuthorizationChecker {
       List<PrivilegeRequest> privilegeRequests)
       throws AuthorizationException, InternalException {
     for (PrivilegeRequest request : privilegeRequests) {
-      if (request.getAuthorizable().getType() == Type.TABLE) {
+      if (!isColumnMaskingEnabled_
+          && request.getAuthorizable().getType() == Type.COLUMN) {
+        authorizeColumnMask(user,
+            request.getAuthorizable().getDbName(),
+            request.getAuthorizable().getTableName(),
+            request.getAuthorizable().getColumnName());
+      } else if (request.getAuthorizable().getType() == Type.TABLE) {
         authorizeRowFilter(user,
             request.getAuthorizable().getDbName(),
             request.getAuthorizable().getTableName());
@@ -260,6 +268,22 @@ public class RangerAuthorizationChecker extends BaseAuthorizationChecker {
           .filter(evt -> evt.getAccessResult() != 0)
           .collect(Collectors.toList());
       originalCtx.getAuditHandler().getAuthzEvents().addAll(events);
+    }
+  }
+
+  /**
+   * This method checks if column mask is enabled on the given columns and deny access
+   * when column mask is enabled by throwing an {@link AuthorizationException}. This is
+   * to prevent data leak when Hive has column mask enabled but not in Impala.
+   */
+  private void authorizeColumnMask(User user, String dbName, String tableName,
+      String columnName) throws InternalException, AuthorizationException {
+    if (!isColumnMaskingEnabled_
+        && evalColumnMask(user, dbName, tableName, columnName).isMaskEnabled()) {
+      throw new AuthorizationException(String.format(
+          "Column masking is disabled by --enable_column_masking flag. Can't access " +
+              "column %s.%s.%s that has column masking policy.",
+          dbName, tableName, columnName));
     }
   }
 

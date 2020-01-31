@@ -225,7 +225,8 @@ public abstract class BaseAuthorizationChecker implements AuthorizationChecker {
     Preconditions.checkArgument(!requests.isEmpty());
     Analyzer analyzer = analysisResult.getAnalyzer();
     // We need to temporarily deny access when row filtering feature is enabled until
-    // Impala has full implementation of row filtering.
+    // Impala has full implementation of row filtering. Also deny access of columns
+    // containing column masking policies when column masking feature is disabled.
     // This is to prevent data leak since we do not want Impala to show any information
     // when Hive has row filtering enabled.
     authorizeRowFilterAndColumnMask(analysisResult.getAnalyzer().getUser(), requests);

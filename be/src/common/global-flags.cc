@@ -312,6 +312,8 @@ DEFINE_bool_hidden(use_customized_user_groups_mapper_for_ranger, false,
     "If true, use the customized user-to-groups mapper when performing authorization via"
     " Ranger.");
 
+DEFINE_bool(enable_column_masking, false, "If true, enable the column masking feature.");
+
 // ++========================++
 // || Startup flag graveyard ||
 // ++========================++

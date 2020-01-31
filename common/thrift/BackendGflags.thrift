@@ -151,4 +151,6 @@ struct TBackendGflags {
   63: required i32 num_check_authorization_threads
 
   64: required bool use_customized_user_groups_mapper_for_ranger
+
+  65: required bool enable_column_masking
 }

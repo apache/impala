@@ -748,8 +748,8 @@ public abstract class AuthorizationTestBase extends FrontendTestBase {
   }
 
   protected static String columnMaskError(String object) {
-    return "Impala does not support column masking yet. Column masking is enabled on " +
-        "column: " + object;
+    return "Column masking is disabled by --enable_column_masking flag. Can't access " +
+        "column " + object + " that has column masking policy.";
   }
 
   protected static String rowFilterError(String object) {

@@ -757,7 +757,8 @@ class TestRanger(CustomClusterTestSuite):
       self._run_query_as_user("drop database {0} cascade".format(test_db), ADMIN, True)
 
   @CustomClusterTestSuite.with_args(
-    impalad_args=IMPALAD_ARGS, catalogd_args=CATALOGD_ARGS)
+    impalad_args="{0} {1}".format(IMPALAD_ARGS, "--enable_column_masking"),
+    catalogd_args=CATALOGD_ARGS)
   def test_column_masking(self, vector, unique_name):
     user = getuser()
     unique_database = unique_name + '_db'

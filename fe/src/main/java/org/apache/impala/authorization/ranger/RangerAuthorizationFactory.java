@@ -102,6 +102,6 @@ public class RangerAuthorizationFactory implements AuthorizationFactory {
 
   @Override
   public boolean supportsColumnMasking() {
-    return true;
+    return BackendConfig.INSTANCE.isColumnMaskingEnabled();
   }
 }
