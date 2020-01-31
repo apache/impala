@@ -695,6 +695,8 @@ Status PartitionedHashJoinNode::OutputAllBuild(RowBatch* out_batch) {
     output_build_partitions_.pop_front();
     DCHECK(output_build_partitions_.empty());
     output_unmatched_batch_iter_.reset();
+    output_unmatched_batch_->TransferResourceOwnership(out_batch);
+    output_unmatched_batch_->Reset();
   }
   return Status::OK();
 }

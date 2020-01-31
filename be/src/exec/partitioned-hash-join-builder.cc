@@ -741,6 +741,9 @@ Status PhjBuilder::BeginSpilledProbe(
   // will reserve as much memory as needed for the probe streams.
   buffer_pool_client_->RestoreReservation(
       &probe_stream_reservation_, spillable_buffer_size_);
+  // All reservation should be available for repartitioning.
+  DCHECK_EQ(0, probe_stream_reservation_.GetReservation());
+  DCHECK_EQ(0, buffer_pool_client_->GetUsedReservation());
 
   DCHECK_EQ(partition->build_rows()->BytesPinned(false), 0) << DebugString();
   int64_t num_input_rows = partition->build_rows()->num_rows();
