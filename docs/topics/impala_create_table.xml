@@ -85,6 +85,7 @@ under the License.
 
 <codeblock>CREATE [EXTERNAL] TABLE [IF NOT EXISTS] [<varname>db_name</varname>.]<varname>table_name</varname>
   (<varname>col_name</varname> <varname>data_type</varname>
+    [<varname>constraint_specification</varname>]
     [COMMENT '<varname>col_comment</varname>']
     [, ...]
   )
@@ -141,6 +142,13 @@ array_type: ARRAY &lt; <varname>primitive_or_complex_type</varname> &gt;
 
 map_type: MAP &lt; <varname>primitive_type</varname>, <varname>primitive_or_complex_type</varname> &gt;
 </ph>
+
+constraint_specification:
+  PRIMARY KEY (<varname>col_name</varname>, ...) [DISABLE] [NOVALIDATE] [RELY], [<varname>foreign_key_specification</varname>, ...]
+
+foreign_key_specification:
+  FOREIGN KEY (<varname>col_name</varname>, ...) REFERENCES table_name(<varname>col_name</varname>, ...) [DISABLE] [NOVALIDATE] [RELY]
+
 row_format:
   DELIMITED [FIELDS TERMINATED BY '<varname>char</varname>' [ESCAPED BY '<varname>char</varname>']]
   [LINES TERMINATED BY '<varname>char</varname>']
@@ -275,12 +283,31 @@ AS
       the source table, query, or data file.
     </p>
 
-    <p>
-      With the basic <codeph>CREATE TABLE</codeph> syntax, you must list one or more columns,
-      its name, type, and optionally a comment, in addition to any columns used as partitioning
-      keys. There is one exception where the column list is not required: when creating an Avro
-      table with the <codeph>STORED AS AVRO</codeph> clause, you can omit the list of columns
-      and specify the same metadata as part of the <codeph>TBLPROPERTIES</codeph> clause.
+    <p> With the basic <codeph>CREATE TABLE</codeph> syntax, you must list one or more columns, its
+      name, type, optionally constraints, and optionally a comment, in addition to any columns used
+      as partitioning keys. There is one exception where the column list is not required: when
+      creating an Avro table with the <codeph>STORED AS AVRO</codeph> clause, you can omit the list
+      of columns and specify the same metadata as part of the <codeph>TBLPROPERTIES</codeph> clause. </p>
+
+    <p rev="3.4.0">
+      <b>Constraints:</b>
+    </p>
+    <p>Constraints are advisory and intended for estimating cardinality during query planning in a
+      future release; there is no attempt to enforce constraints. Add primary and foreign key
+      information after column definitions. Do not include a constraint name; the constraint name is
+      generated internally as a UUID. The following constraint states are supported: <ul
+        id="ul_gbz_3kl_4kb">
+        <li>DISABLE</li>
+        <li>NOVALIDATE</li>
+        <li>RELY</li>
+      </ul>The ENABLE, VALIDATE, and NORELY options are not supported. The foreign key must be
+      defined as the primary key in the referenced table. </p>
+    <p> Constraint examples: <codeblock>CREATE TABLE pk(col1 INT, col2 STRING, PRIMARY KEY(col1, col2));</codeblock>
+      <codeblock>CREATE TABLE fk(id INT, col1 INT, col2 STRING, PRIMARY KEY(id),
+  FOREIGN KEY(col1, col2) REFERENCES pk(col1, col2));</codeblock>
+      <codeblock>CREATE TABLE pk(id INT, PRIMARY KEY(id) DISABLE, NOVALIDATE, RELY);</codeblock>
+      <codeblock>CREATE TABLE fk(id INT, col1 INT, col2 STRING, PRIMARY KEY(id),
+  FOREIGN KEY(col1, col2) REFERENCES pk(col1, col2));</codeblock>
     </p>
 
     <p conref="../shared/impala_common.xml#common/complex_types_blurb"/>
