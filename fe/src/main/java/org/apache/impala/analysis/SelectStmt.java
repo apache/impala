@@ -441,7 +441,7 @@ public class SelectStmt extends QueryStmt {
         throws AnalysisException {
       Path resolvedPath = null;
       try {
-        resolvedPath = analyzer.resolvePath(rawPath, PathType.STAR);
+        resolvedPath = analyzer.resolvePathWithMasking(rawPath, PathType.STAR);
       } catch (TableLoadingException e) {
         // Should never happen because we only check registered table aliases.
         Preconditions.checkState(false);

@@ -84,7 +84,6 @@ public class BaseTableRef extends TableRef {
     return getTable().getTableName().toSql() + aliasSql + tableSampleSql + tableHintsSql;
   }
 
-  public String debugString() { return tableRefToSql(); }
   @Override
   protected TableRef clone() { return new BaseTableRef(this); }
 

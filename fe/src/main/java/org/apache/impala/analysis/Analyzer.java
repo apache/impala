@@ -682,6 +682,9 @@ public class Analyzer {
     for (String alias: aliases) {
       aliasMap_.put(alias, result);
     }
+    if (LOG.isTraceEnabled()) {
+      LOG.trace("Register aliases {} to tuple {}", aliases, result.debugString());
+    }
     tableRefMap_.put(result.getId(), ref);
     return result;
   }
@@ -704,6 +707,9 @@ public class Analyzer {
     // Return the table if it is already resolved. This also avoids the table being
     // masked again.
     if (tableRef.isResolved()) return tableRef;
+    if (LOG.isTraceEnabled()) {
+      LOG.trace("Resolving TableRef {}", ToSqlUtils.getPathSql(tableRef.getPath()));
+    }
     // Try to find a matching local view.
     if (tableRef.getPath().size() == 1) {
       // Searches the hierarchy of analyzers bottom-up for a registered local view with
@@ -722,7 +728,7 @@ public class Analyzer {
     List<String> rawPath = tableRef.getPath();
     Path resolvedPath = null;
     try {
-      resolvedPath = resolvePath(tableRef.getPath(), PathType.TABLE_REF);
+      resolvedPath = resolvePathWithMasking(rawPath, PathType.TABLE_REF);
     } catch (AnalysisException e) {
       // Register privilege requests to prefer reporting an authorization error over
       // an analysis error. We should not accidentally reveal the non-existence of a
@@ -766,11 +772,14 @@ public class Analyzer {
             table instanceof FeDataSourceTable);
         resolvedTableRef = new BaseTableRef(tableRef, resolvedPath);
       }
+      // Only do table masking when authorization is enabled and the authorization
+      // factory supports column masking. If both of these are false, return the unmasked
+      // table ref.
       if (!doTableMasking || !getAuthzFactory().getAuthorizationConfig().isEnabled()
           || !getAuthzFactory().supportsColumnMasking()) {
         return resolvedTableRef;
       }
-
+      // Performing table masking.
       AuthorizationChecker authChecker = getAuthzFactory().newAuthorizationChecker(
           getCatalog().getAuthPolicy());
       TableMask tableMask = new TableMask(authChecker, table, user_);
@@ -900,6 +909,55 @@ public class Analyzer {
   public boolean hasEmptySpjResultSet() { return hasEmptySpjResultSet_; }
 
   /**
+   * Resolves 'rawPath' according to the given path type. Deal with paths that got
+   * resolved to nested columns of table masking views.
+   */
+  public Path resolvePathWithMasking(List<String> rawPath, PathType pathType)
+      throws AnalysisException, TableLoadingException {
+    Path resolvedPath = resolvePath(rawPath, pathType);
+    // Skip normal resolution cases that don't relate to nested types.
+    if (pathType == PathType.TABLE_REF) {
+      if (resolvedPath.destTable() != null || !resolvedPath.isRootedAtTuple()) {
+        return resolvedPath;
+      }
+    } else if (pathType == PathType.SLOT_REF) {
+      if (!resolvedPath.getMatchedTypes().get(0).isStructType()) {
+        return resolvedPath;
+      }
+    } else if (pathType == PathType.STAR) {
+      if (!resolvedPath.destType().isStructType() || !resolvedPath.isRootedAtTuple()) {
+        return resolvedPath;
+      }
+    }
+    // In this case, resolvedPath is resolved on a nested column. Check if it's resolved
+    // on a table masking view. The root TableRef(table/view) could be at a parent query
+    // block (correlated case, e.g. "t.int_array" in query
+    // "SELECT ... FROM tbl t, (SELECT * FROM t.int_array) a" roots at "tbl t" which is
+    // in the parent block), so we should find the parent block first then we can find
+    // the root TableRef.
+    TupleId rootTupleId = resolvedPath.getRootDesc().getId();
+    Analyzer parentAnalyzer = findAnalyzer(rootTupleId);
+    TableRef rootTblRef = parentAnalyzer.getTableRef(rootTupleId);
+    Preconditions.checkNotNull(rootTblRef);
+    if (!rootTblRef.isTableMaskingView()) return resolvedPath;
+    // resolvedPath is resolved on a nested column of a table masking view. The view
+    // won't produce results of nested columns. It just exposes the nested columns of the
+    // underlying BaseTableRef in the fields of its output type. (See more in
+    // InlineViewRef#createTupleDescriptor()). We need to resolve 'rawPath' inside the
+    // view as if the underlying table is not masked. So the resolved path can point to
+    // the real table and be used to create materialized slot in the TupleDescriptor of
+    // the real table.
+    InlineViewRef tableMaskingView = (InlineViewRef) rootTblRef;
+    Preconditions.checkState(
+        tableMaskingView.getUnMaskedTableRef() instanceof BaseTableRef);
+    // Resolve rawPath inside the table masking view to point to the real table.
+    Path maskedPath = tableMaskingView.inlineViewAnalyzer_.resolvePath(
+        rawPath, pathType);
+    maskedPath.setPathBeforeMasking(resolvedPath);
+    return maskedPath;
+  }
+
+  /**
    * Resolves the given raw path according to the given path type, as follows:
    * SLOT_REF and STAR: Resolves the path in the context of all registered tuple
    * descriptors, considering qualified as well as unqualified matches.
@@ -942,7 +1000,10 @@ public class Analyzer {
     // List of all candidate paths with different roots. Paths in this list are initially
     // unresolved and may be illegal with respect to the pathType.
     List<Path> candidates = getTupleDescPaths(rawPath);
-
+    if (LOG.isTraceEnabled()) {
+      LOG.trace("Candidates for {} {}: {}", pathType, ToSqlUtils.getPathSql(rawPath),
+          candidates);
+    }
     LinkedList<String> errors = Lists.newLinkedList();
     if (pathType == PathType.SLOT_REF || pathType == PathType.STAR) {
       // Paths rooted at all of the unique registered tuple descriptors.
@@ -971,15 +1032,21 @@ public class Analyzer {
           candidates.add(new Path(tbl, rawPath.subList(tblNameIdx + 1, rawPath.size())));
         }
       }
+      LOG.trace("Replace candidates with {}", candidates);
     }
 
     Path result = resolvePaths(rawPath, candidates, pathType, errors);
     if (result == null && resolveInAncestors && hasAncestors()) {
+      LOG.trace("Resolve in ancestors");
       result = getParentAnalyzer().resolvePath(rawPath, pathType, true);
     }
     if (result == null) {
       Preconditions.checkState(!errors.isEmpty());
       throw new AnalysisException(errors.getFirst());
+    }
+    if (LOG.isTraceEnabled()) {
+      LOG.trace("Resolved {} {} to {}", pathType, ToSqlUtils.getPathSql(rawPath),
+          result.debugString());
     }
     return result;
   }
@@ -1033,7 +1100,10 @@ public class Analyzer {
 
     List<Path> legalPaths = new ArrayList<>();
     for (Path p: paths) {
-      if (!p.resolve()) continue;
+      if (!p.resolve()) {
+        LOG.trace("Can't resolve path {}", p);
+        continue;
+      }
 
       // Check legality of the resolved path.
       if (p.isRootedAtTuple() && !isVisible(p.getRootDesc().getId())) {
@@ -1111,6 +1181,7 @@ public class Analyzer {
       }
       return null;
     }
+    if (LOG.isTraceEnabled()) LOG.trace("Legal candidate: {}", legalPaths.get(0));
     return legalPaths.get(0);
   }
 

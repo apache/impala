@@ -72,7 +72,6 @@ public class RangerAuthorizationChecker extends BaseAuthorizationChecker {
   public static final String SELECT_ACCESS_TYPE = "select";
 
   private final RangerImpalaPlugin plugin_;
-  private boolean isColumnMaskingEnabled_;
 
   public RangerAuthorizationChecker(AuthorizationConfig authzConfig) {
     super(authzConfig);
@@ -81,7 +80,6 @@ public class RangerAuthorizationChecker extends BaseAuthorizationChecker {
     plugin_ = new RangerImpalaPlugin(
         rangerConfig.getServiceType(), rangerConfig.getAppId());
     plugin_.init();
-    isColumnMaskingEnabled_ = BackendConfig.INSTANCE.isColumnMaskingEnabled();
   }
 
   @Override
@@ -189,8 +187,9 @@ public class RangerAuthorizationChecker extends BaseAuthorizationChecker {
   protected void authorizeRowFilterAndColumnMask(User user,
       List<PrivilegeRequest> privilegeRequests)
       throws AuthorizationException, InternalException {
+    boolean isColumnMaskingEnabled = BackendConfig.INSTANCE.isColumnMaskingEnabled();
     for (PrivilegeRequest request : privilegeRequests) {
-      if (!isColumnMaskingEnabled_
+      if (!isColumnMaskingEnabled
           && request.getAuthorizable().getType() == Type.COLUMN) {
         authorizeColumnMask(user,
             request.getAuthorizable().getDbName(),
@@ -278,8 +277,7 @@ public class RangerAuthorizationChecker extends BaseAuthorizationChecker {
    */
   private void authorizeColumnMask(User user, String dbName, String tableName,
       String columnName) throws InternalException, AuthorizationException {
-    if (!isColumnMaskingEnabled_
-        && evalColumnMask(user, dbName, tableName, columnName).isMaskEnabled()) {
+    if (evalColumnMask(user, dbName, tableName, columnName).isMaskEnabled()) {
       throw new AuthorizationException(String.format(
           "Column masking is disabled by --enable_column_masking flag. Can't access " +
               "column %s.%s.%s that has column masking policy.",

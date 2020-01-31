@@ -20,6 +20,7 @@ package org.apache.impala.analysis;
 import java.util.ArrayList;
 import java.util.List;
 
+import com.google.common.base.Objects;
 import org.apache.impala.catalog.ArrayType;
 import org.apache.impala.catalog.Column;
 import org.apache.impala.catalog.FeTable;
@@ -31,6 +32,8 @@ import org.apache.impala.catalog.Type;
 import com.google.common.base.Joiner;
 import com.google.common.base.Preconditions;
 import com.google.common.collect.Lists;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 /**
  * Represents a resolved or unresolved dot-separated path that is rooted at a registered
@@ -105,6 +108,8 @@ import com.google.common.collect.Lists;
  * of the query block that it is used in.
  */
 public class Path {
+  private final static Logger LOG = LoggerFactory.getLogger(Path.class);
+
   // Implicit field names of collections.
   public static final String ARRAY_ITEM_FIELD_NAME = "item";
   public static final String ARRAY_POS_FIELD_NAME = "pos";
@@ -149,6 +154,9 @@ public class Path {
 
   // Caches the result of getAbsolutePath() to avoid re-computing it.
   private List<Integer> absolutePath_ = null;
+
+  // Resolved path before we resolved it again inside the table masking view.
+  private Path pathBeforeMasking_ = null;
 
   /**
    * Constructs a Path rooted at the given rootDesc.
@@ -220,8 +228,12 @@ public class Path {
     while (rawPathIdx < rawPath_.size()) {
       if (!currentType.isComplexType()) return false;
       StructType structType = getTypeAsStruct(currentType);
+      if (LOG.isTraceEnabled()) LOG.trace("structType: {}", structType.toSql());
       // Resolve explicit path.
       StructField field = structType.getField(rawPath_.get(rawPathIdx));
+      if (LOG.isTraceEnabled()) {
+        LOG.trace("field: {}", field == null ? null : field.toSql(0));
+      }
       if (field == null) {
         // Resolve implicit path.
         if (structType instanceof CollectionStructType) {
@@ -299,6 +311,12 @@ public class Path {
   public boolean isRootedAtTuple() { return rootDesc_ != null; }
   public List<String> getRawPath() { return rawPath_; }
   public boolean isResolved() { return isResolved_; }
+  public boolean isMaskedPath() { return pathBeforeMasking_ != null; }
+  public Path getPathBeforeMasking() { return pathBeforeMasking_; }
+  public void setPathBeforeMasking(Path p) {
+    Preconditions.checkState(p.isResolved());
+    pathBeforeMasking_ = p;
+  }
 
   public List<Type> getMatchedTypes() {
     Preconditions.checkState(isResolved_);
@@ -447,6 +465,14 @@ public class Path {
     }
     if (rawPath_.isEmpty()) return pathRoot;
     return pathRoot + "." + Joiner.on(".").join(rawPath_);
+  }
+
+  public String debugString() {
+    return Objects.toStringHelper(this)
+        .add("rootTable", rootTable_)
+        .add("rootDesc", rootDesc_)
+        .add("rawPath", rawPath_)
+        .toString();
   }
 
   /**

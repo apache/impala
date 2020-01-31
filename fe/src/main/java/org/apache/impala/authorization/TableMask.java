@@ -17,6 +17,8 @@
 
 package org.apache.impala.authorization;
 
+import com.google.common.base.Preconditions;
+import com.google.common.collect.Lists;
 import org.apache.impala.analysis.Expr;
 import org.apache.impala.analysis.Parser;
 import org.apache.impala.analysis.SelectStmt;
@@ -66,13 +68,16 @@ public class TableMask {
    */
   public Expr createColumnMask(String colName, Type colType)
       throws InternalException, AnalysisException {
+    Preconditions.checkState(!colType.isComplexType());
     String maskedValue = authChecker_.createColumnMask(user_, dbName_, tableName_,
         colName);
     if (LOG.isTraceEnabled()) {
       LOG.trace("Performing column masking on table {}.{}: {} => {}",
           dbName_, tableName_, colName, maskedValue);
     }
-    if (maskedValue == null) return new SlotRef(colName);
+    if (maskedValue == null || maskedValue.equals(colName)) {  // Don't need masking.
+      return new SlotRef(Lists.newArrayList(colName));
+    }
     SelectStmt maskStmt = (SelectStmt) Parser.parse(
         String.format("SELECT CAST(%s AS %s)", maskedValue, colType));
     if (maskStmt.getSelectList().getItems().size() != 1 || maskStmt.hasGroupByClause()

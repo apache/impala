@@ -86,16 +86,24 @@ public class CollectionTableRef extends TableRef {
       collectionExpr_ = new SlotRef(parentSlotDesc);
       // Must always be materialized to ensure the correct cardinality after unnesting.
       analyzer.materializeSlots(collectionExpr_);
-      Analyzer parentAnalyzer =
-          analyzer.findAnalyzer(resolvedPath_.getRootDesc().getId());
+      TupleId rootTupleId = resolvedPath_.getRootDesc().getId();
+      if (resolvedPath_.isMaskedPath()) {
+        // Use tuple id of the table masking view so we can find it in current block or
+        // parent blocks. See how such kind of Paths are resolved in
+        // Analyzer#resolvePathWithMasking().
+        Preconditions.checkState(resolvedPath_.getPathBeforeMasking().isRootedAtTuple());
+        rootTupleId = resolvedPath_.getPathBeforeMasking().getRootDesc().getId();
+      }
+      Analyzer parentAnalyzer = analyzer.findAnalyzer(rootTupleId);
       Preconditions.checkNotNull(parentAnalyzer);
-      if (parentAnalyzer != analyzer) {
-        TableRef parentRef =
-            parentAnalyzer.getTableRef(resolvedPath_.getRootDesc().getId());
+      if (parentAnalyzer != analyzer) {  // Correlated to a TableRef in a parent block.
+        TableRef parentRef = parentAnalyzer.getTableRef(rootTupleId);
         Preconditions.checkNotNull(parentRef);
-        // InlineViews are currently not supported as a parent ref.
-        Preconditions.checkState(!(parentRef instanceof InlineViewRef));
-        correlatedTupleIds_.add(parentRef.getId());
+        // InlineViews are currently not supported as a parent ref expects
+        // TableMaskingViews.
+        Preconditions.checkState(!(parentRef instanceof InlineViewRef)
+            || parentRef.isTableMaskingView());
+        correlatedTupleIds_.add(resolvedPath_.getRootDesc().getId());
       }
     }
     if (!isRelative()) {

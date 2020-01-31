@@ -823,6 +823,12 @@ public class SingleNodePlanner {
       parentRefs.get(i).setLeftTblRef(parentRefs.get(i - 1));
     }
     for (SubplanRef subplanRef: subplanRefs) subplanRef.tblRef.setLeftTblRef(null);
+    if (LOG.isTraceEnabled()) {
+      LOG.trace("parentRefs: {}",
+          parentRefs.stream().map(TableRef::debugString).reduce(", ", String::concat));
+      LOG.trace("subplanRefs: {}", subplanRefs.stream().map(r -> r.tblRef.debugString())
+          .reduce(", ", String::concat));
+    }
   }
 
   /**

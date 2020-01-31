@@ -576,6 +576,8 @@ public class TableRef extends StmtNode {
     if (onClause_ != null) onClause_ = rewriter.rewrite(onClause_, analyzer);
   }
 
+  public String debugString() { return tableRefToSql(); }
+
   protected String tableRefToSql() { return tableRefToSql(DEFAULT); }
 
   protected String tableRefToSql(ToSqlOptions options) {

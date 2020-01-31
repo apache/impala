@@ -94,7 +94,7 @@ public class SlotRef extends Expr {
     Preconditions.checkState(rawPath_ != null);
     Path resolvedPath = null;
     try {
-      resolvedPath = analyzer.resolvePath(rawPath_, PathType.SLOT_REF);
+      resolvedPath = analyzer.resolvePathWithMasking(rawPath_, PathType.SLOT_REF);
     } catch (TableLoadingException e) {
       // Should never happen because we only check registered table aliases.
       Preconditions.checkState(false);

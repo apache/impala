@@ -24,6 +24,7 @@ import java.util.Set;
 import org.apache.impala.authorization.TableMask;
 import org.apache.impala.catalog.Column;
 import org.apache.impala.catalog.ColumnStats;
+import org.apache.impala.catalog.FeTable;
 import org.apache.impala.catalog.FeView;
 import org.apache.impala.catalog.StructField;
 import org.apache.impala.catalog.StructType;
@@ -42,7 +43,7 @@ import com.google.common.collect.Sets;
  * from a query string or represent a reference to a local or catalog view.
  */
 public class InlineViewRef extends TableRef {
-  private final static Logger LOG = LoggerFactory.getLogger(SelectStmt.class);
+  private final static Logger LOG = LoggerFactory.getLogger(InlineViewRef.class);
 
   // Catalog or local view that is referenced.
   // Null for inline views parsed directly from a query string.
@@ -154,10 +155,12 @@ public class InlineViewRef extends TableRef {
     List<Column> columns = resolvedPath.getRootTable().getColumnsInHiveOrder();
     List<SelectListItem> items = Lists.newArrayListWithCapacity(columns.size());
     for (Column col: columns) {
+      if (col.getType().isComplexType()) continue;
       // TODO: only add materialized columns to avoid introducing new privilege
       //  requirements (IMPALA-9223)
       items.add(new SelectListItem(
-          tableMask.createColumnMask(col.getName(), col.getType()), col.getName()));
+          tableMask.createColumnMask(col.getName(), col.getType()),
+          /*alias*/ col.getName()));
     }
     SelectList selectList = new SelectList(items);
     FromClause fromClause = new FromClause(Lists.newArrayList(tableRef));
@@ -305,6 +308,28 @@ public class InlineViewRef extends TableRef {
             colAlias + "'" + " in inline view " + "'" + getUniqueAlias() + "'");
       }
       fields.add(new StructField(colAlias, selectItemExpr.getType(), null));
+    }
+    // If this is a table masking view, the underlying table is wrapped by this so its
+    // nested columns are not visible to the original query block, because we can't
+    // expose nested columns in the SelectList. However, we can expose nested columns
+    // in this view's output type which is a StructType containing fields of all result
+    // columns. The output type is used to resolve Paths (see Path#resolve()).
+    // By exposing nested columns in the output type, Paths in the original query block
+    // can still be recognized and resolved.
+    if (isTableMaskingView_) {
+      TableRef tblRef = getUnMaskedTableRef();
+      if (tblRef instanceof BaseTableRef) {
+        BaseTableRef baseTbl = (BaseTableRef) tblRef;
+        FeTable tbl = baseTbl.resolvedPath_.getRootTable();
+        for (Column col : tbl.getColumnsInHiveOrder()) {
+          if (!col.getType().isComplexType()) continue;
+          if (LOG.isTraceEnabled()) {
+            LOG.trace("Add {} (type={}) to output type of table mask view",
+                col.getName(), col.getType().toSql());
+          }
+          fields.add(new StructField(col.getName(), col.getType(), null));
+        }
+      }
     }
 
     // Create the non-materialized tuple and set its type.

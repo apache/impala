@@ -2865,6 +2865,7 @@ public class AuthorizationStmtTest extends AuthorizationTestBase {
 
     String policyName = "col_mask";
     for (String tableName: new String[]{"alltypes", "alltypes_view"}) {
+      BackendConfig.INSTANCE.setColumnMaskingEnabled(false);
       String json = String.format("{\n" +
               "  \"name\": \"%s\",\n" +
               "  \"policyType\": 1,\n" +
@@ -2978,6 +2979,7 @@ public class AuthorizationStmtTest extends AuthorizationTestBase {
                 onServer(TPrivilegeLevel.ALL));
       } finally {
         deleteRangerPolicy(policyName);
+        BackendConfig.INSTANCE.setColumnMaskingEnabled(true);
       }
     }
   }

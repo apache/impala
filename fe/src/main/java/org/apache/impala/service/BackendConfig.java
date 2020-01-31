@@ -205,6 +205,10 @@ public class BackendConfig {
     return backendCfg_.use_customized_user_groups_mapper_for_ranger;
   }
 
+  public void setColumnMaskingEnabled(boolean columnMaskingEnabled) {
+    backendCfg_.setEnable_column_masking(columnMaskingEnabled);
+  }
+
   public boolean isColumnMaskingEnabled() { return backendCfg_.enable_column_masking; }
 
   // Inits the auth_to_local configuration in the static KerberosName class.
