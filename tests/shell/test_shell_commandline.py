@@ -586,11 +586,16 @@ class TestImpalaShell(ImpalaTestSuite):
     args = ['--config_file=%s/good_impalarc3' % QUERY_FILE_PATH, '--query=select 3']
     result = run_impala_shell_cmd(vector, args, expect_success=False)
     assert 'Live reporting is available for interactive mode only' in result.stderr
-    # bad formatting of config file
+    # testing config file related warning messages
+    args = ['--config_file=%s/impalarc_with_warnings2' % QUERY_FILE_PATH]
+    result = run_impala_shell_cmd(
+      vector, args, expect_success=True, wait_until_connected=False)
+    err_msg = ("WARNING: Unable to read configuration file correctly. "
+               "Ignoring unrecognized config option: 'Live_Progress'\n")
+    assert err_msg in result.stderr
+    # bad formatting of config file with invalid value
     args = ['--config_file={0}/impalarc_with_error2'.format(QUERY_FILE_PATH)]
     result = run_impala_shell_cmd(vector, args, expect_success=False)
-    err_msg = "Ignoring unrecognized config option"
-    assert err_msg in result.stderr
     err_msg = ("Unexpected value in configuration file. "
                "'maybe' is not a valid value for a boolean option.")
     assert err_msg in result.stderr

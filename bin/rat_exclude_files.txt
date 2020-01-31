@@ -148,6 +148,7 @@ tests/shell/impalarc_with_error
 tests/shell/impalarc_with_error2
 tests/shell/impalarc_with_query_options
 tests/shell/impalarc_with_warnings
+tests/shell/impalarc_with_warnings2
 tests/shell/shell.cmds
 tests/shell/shell2.cmds
 tests/shell/shell_case_sensitive.cmds
