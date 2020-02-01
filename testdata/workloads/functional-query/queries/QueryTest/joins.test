@@ -842,3 +842,10 @@ where v1.c1 = v2.c2;
 ---- TYPES
 FLOAT,FLOAT
 ====
+---- QUERY
+# IMPALA-9309: this query caused a crash in the NLJ.
+set debug_action="2:PREPARE:FAIL|COORD_BEFORE_EXEC_RPC:JITTER@100@0.3";
+select 1 from alltypestiny a join alltypestiny b on a.id != b.id;
+---- CATCH
+Debug Action: FAIL
+====

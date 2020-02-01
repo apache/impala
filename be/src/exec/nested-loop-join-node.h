@@ -67,7 +67,7 @@ class NestedLoopJoinNode : public BlockingJoinNode {
   /// BEGIN: Members that must be Reset()
 
   /// The build side rows of the join. Created in Prepare() and owned by runtime state.
-  NljBuilder* builder_;
+  NljBuilder* builder_ = nullptr;
 
   /// Pointer to the RowBatchList (owned by 'builder_') that contains the batches to
   /// use during the probe phase.
