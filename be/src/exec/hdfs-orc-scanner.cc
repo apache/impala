@@ -62,6 +62,10 @@ HdfsOrcScanner::OrcMemPool::~OrcMemPool() {
 }
 
 void HdfsOrcScanner::OrcMemPool::FreeAll() {
+  if (!chunk_sizes_.empty()) {
+    scanner_->state_->LogError(ErrorMsg(TErrorCode::INTERNAL_ERROR,
+        "Impala had to free memory leaked by ORC library."));
+  }
   int64_t total_bytes_released = 0;
   for (auto it = chunk_sizes_.begin(); it != chunk_sizes_.end(); ++it) {
     std::free(it->first);
