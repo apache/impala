@@ -188,7 +188,7 @@ data_type:
 </codeblock>
 
     <p>
-      <b>Kudu tables:</b>
+      <b>Internal Kudu tables:</b>
     </p>
 
 <codeblock rev="kudu">CREATE TABLE [IF NOT EXISTS] [<varname>db_name</varname>.]<varname>table_name</varname>
@@ -243,11 +243,45 @@ range_comparison_operator ::= { &lt; | &lt;= }
       <b>External Kudu tables:</b>
     </p>
 
+    <p>In Impala 3.4 and earlier, you can create an external Kudu table based on a pre-existing Kudu
+      schema using the table property <codeph>'kudu.table_name'='internal_kudu_name'</codeph>. </p>
+
+<codeblock>CREATE EXTERNAL TABLE [IF NOT EXISTS] [<varname>db_name</varname>.]<varname>table_name</varname>
+  [COMMENT '<varname>col_comment</varname>']
+  STORED AS KUDU
+  [TBLPROPERTIES ('<varname>kudu.table.name</varname>'='<varname>internal_kudu_name</varname>', '<varname>key1</varname>'='<varname>value1</varname>',...)]
+</codeblock>
+
+    <p>Alternatively, in Impala 3.4 and higher, you can also create an external Kudu table as follows:</p>
+
 <codeblock rev="kudu">CREATE EXTERNAL TABLE [IF NOT EXISTS] [<varname>db_name</varname>.]<varname>table_name</varname>
+  (<varname>col_name</varname> <varname>data_type</varname>
+  [<varname>kudu_column_attribute</varname> ...]
+  [COMMENT '<varname>col_comment</varname>']
+  [, ...]
+  [PRIMARY KEY (<varname>col_name</varname>[, ...])]
+  )
+  [PARTITION BY <varname>kudu_partition_clause</varname>]
   [COMMENT '<varname>table_comment</varname>']
   STORED AS KUDU
-  [TBLPROPERTIES ('kudu.table_name'='<varname>internal_kudu_name</varname>')]
+  [TBLPROPERTIES ('external.table.purge'='true', '<varname>key1</varname>'='<varname>value1</varname>',...)]
 </codeblock>
+
+    <ul>
+      <li>Use a Hive metastore (HMS) 3 or later.</li>
+      <li>Provide column specifications to define the schema when you create the table, similar to
+        creating an internal table. </li>
+      <li>Omit the <codeph>kudu.table_name</codeph> table property as there is no pre-existing
+        schema. </li>
+      <li>Include the required <codeph>external.table.purge</codeph> property.</li>
+    </ul>
+
+    <p> Only the schema metadata is stored in HMS when you create an external table; however, using
+      this create table syntax, drop table on the Kudu external table deletes the data stored
+      outside HMS in Kudu as well as the metadata (schema) inside HMS. Likewise, renaming the table
+      changes the name of the table in HMS and in Kudu. Kudu synchronizes changes to the actual data
+      and metadata; consequently, operations such as dropping a table or altering a table name
+      simulate internal table operations. </p>
 
     <p>
       <b>CREATE TABLE AS SELECT for Kudu tables:</b>
@@ -341,16 +375,12 @@ AS
       <b>Internal and external tables (EXTERNAL and LOCATION clauses):</b>
     </p>
 
-    <p>
-      By default, Impala creates an <q>internal</q> table, where Impala manages the underlying
-      data files for the table, and physically deletes the data files when you drop the table.
-      If you specify the <codeph>EXTERNAL</codeph> clause, Impala treats the table as an
-      <q>external</q> table, where the data files are typically produced outside Impala and
-      queried from their original locations in HDFS, and Impala leaves the data files in place
-      when you drop the table. For details about internal and external tables, see
-      <xref
-        href="impala_tables.xml#tables"/>.
-    </p>
+    <p> By default, Impala creates an internal table, where Impala manages the underlying data files
+      for the table, and physically deletes the data files when you drop the table. If you specify
+      the <codeph>EXTERNAL</codeph> clause, Impala treats the table as an <q>external</q> table,
+      where the data files are typically produced outside Impala and queried from their original
+      locations in HDFS, and Impala leaves the data files in place when you drop the table. For
+      details about internal and external tables, see <xref href="impala_tables.xml#tables"/>. </p>
 
     <p>
       Typically, for an external table you include a <codeph>LOCATION</codeph> clause to specify
@@ -565,8 +595,8 @@ CREATE TABLE kudu_t3 (id BIGINT, year INT, s STRING,
 </codeblock>
 
     <p>
-      Here is an example of creating an external Kudu table:
-    </p>
+      Here is an example of creating an external Kudu table based on an pre-existing table
+      identified by the table property: </p>
 
 <codeblock><![CDATA[
 -- Inherits column definitions from original table.
@@ -575,6 +605,36 @@ CREATE TABLE kudu_t3 (id BIGINT, year INT, s STRING,
 CREATE EXTERNAL TABLE external_t1 STORED AS KUDU
   TBLPROPERTIES ('kudu.table_name'='kudu_tbl_created_via_api');
 ]]>
+</codeblock>
+
+    <p>
+      In Impala 3.4 and higher, by default HMS implicitly translates internal Kudu tables to
+      external Kudu tables with the 'external.table.purge' property set to true. You can explicitly
+      create such external Kudu tables similar to the way you create internal Kudu tables. You must
+      set the table property <codeph>'external.table.purge'</codeph> to true. Here is an example of
+      creating an external Kudu table:
+    </p>
+
+<codeblock>CREATE EXTERNAL TABLE myextkudutbl (
+  id int PRIMARY KEY,
+  name string)
+  PARTITION BY HASH PARTITIONS 8
+  STORED AS KUDU
+  TBLPROPERTIES ('external.table.purge'='true');
+</codeblock>
+    <p>
+      Operations on the resulting external table in Impala, HMS, and Kudu table metadata is 
+      synchronized. HMS-Kudu integration does not need to be enabled for external table 
+      synchronization. Such synchronized tables behave similar to internal tables. For example, 
+      dropping a table removes the underlying Kudu table data as well as the table metadata in HMS. 
+    </p>
+    <p>
+      If you want to drop only the HMS metadata and not drop the Kudu table, you
+      can set <codeph>external.table.purge</codeph> to false, as shown in the following example:
+    </p>
+
+<codeblock>
+  ALTER TABLE myextkudutbl set tblproperties('external.table.purge'='false');
 </codeblock>
 
     <p>
