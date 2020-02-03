@@ -20,7 +20,7 @@
 import os
 
 hive_major_version = int(os.environ['IMPALA_HIVE_VERSION'][0])
-kerberize = os.environ.get('IMPALA_KERBERIZE') == '1'
+kerberize = os.environ.get('IMPALA_KERBERIZE') == 'true'
 variant = os.environ.get('HIVE_VARIANT')
 
 CONFIG = {

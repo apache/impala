@@ -78,7 +78,7 @@ if ${CLUSTER_DIR}/admin is_kerberized; then
 
   # These ultimately become args to java when it starts up hbase
   K1="-Djava.security.krb5.conf=${KRB5_CONFIG}"
-  K2="${JAVA_KRB5_DEBUG}"
+  K2="${JAVA_KRB5_DEBUG:-}"
   K3="-Djava.security.auth.login.config=${HBASE_JAAS_CLIENT}"
   K4="-Djava.security.auth.login.config=${HBASE_JAAS_SERVER}"
 

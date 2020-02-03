@@ -31,7 +31,6 @@ set -euo pipefail
 . $IMPALA_HOME/bin/report_build_error.sh
 setup_report_build_error
 
-: ${IMPALA_KERBERIZE=}
 : ${INCLUDE_YARN=}
 
 # For Hive 3, we require Yarn for Tez support.
@@ -39,10 +38,9 @@ if "$USE_CDP_HIVE"; then
   INCLUDE_YARN=1
 fi
 
-while getopts vky OPT; do
+while getopts vy OPT; do
   case $OPT in
     v) set -x;;
-    k) export IMPALA_KERBERIZE=1;;
     y) export INCLUDE_YARN=1;;
     ?) echo "Usage: $0 [-v (verbose) -k (kerberize) -y (yarn)] ACTION (see source...)"; exit 1;;
   esac
@@ -109,7 +107,6 @@ EMPTY_NODE_DIRS=$(echo data/dfs/{dn,nn} var/{run,lib/hadoop-hdfs,log} \
     var/{log,run}/kudu/{master,ts} var/lib/kudu/{master,ts}/{wal,data})
 
 EASY_ACCESS_LOG_DIR="$IMPALA_CLUSTER_LOGS_DIR"
-MINIKDC_INIT=${IMPALA_HOME}/testdata/bin/minikdc.sh
 
 FIND_EXECUTABLE_FILTER="-executable"
 if ! find /dev/null "${FIND_EXECUTABLE_FILTER}" 2> /dev/null; then
@@ -127,12 +124,8 @@ fi
 # ourselves a fresh TGT (Ticket-Granting-Ticket).
 #
 function kerberize_setup {
-  if is_kerberized; then
-    export IMPALA_KERBERIZE=1
-  fi
-
   # No kerberos?  We're done.
-  if [ -z "${IMPALA_KERBERIZE}" ]; then
+  if [[ "${IMPALA_KERBERIZE}" != "true" ]]; then
     return
   fi
 
@@ -170,9 +163,6 @@ function kerberize_setup {
     exit 1
   fi
 
-  # Starting it has no effect if it's already started...
-  ${MINIKDC_INIT} start
-
   # Source the appropriate minikdc environment variables
   . ${MINIKDC_ENV}
 
@@ -190,7 +180,7 @@ function kerberize_setup {
 function is_kerberized {
   HCONFSC="`get_hadoop_client_conf_dir`/core-site.xml"
   if [ -f "${HCONFSC}" ]; then
-    if grep -qi "Kerberos settings" "${HCONFSC}"; then
+    if grep -qi "kerberos" "${HCONFSC}"; then
       # If the config exists and has kerberos things in it, treat as kerberized
       return 0
     fi
@@ -216,13 +206,9 @@ function create_cluster {
   # Blow away existing config files (so we don't pick up kerberos settings)
   rm -f `get_hadoop_client_conf_dir`/*
 
-  if [ ! -z "${IMPALA_KERBERIZE}" ]; then
+  if [[ "${IMPALA_KERBERIZE}" = "true" ]]; then
     kerberize_setup
     echo "Creating Kerberized cluster."
-  else
-    # Stop the minikdc in case it was running
-    . ${MINIKDC_ENV}
-    ${MINIKDC_INIT} stop
   fi
 
   echo "Hostname for internal communication: ${INTERNAL_LISTEN_HOST}" \
@@ -295,7 +281,7 @@ function create_cluster {
 
       # Chop out everything between the BEGIN/END Kerberos comments if
       # not kerberized
-      if [ -z "${IMPALA_KERBERIZE}" ]; then
+      if [[ "${IMPALA_KERBERIZE}" != "true" ]]; then
         sed '/<!-- BEGIN Kerberos/,/END Kerberos settings -->/d' \
             "$ACTUAL_PATH.1" > "$ACTUAL_PATH"
       else
@@ -329,11 +315,10 @@ function start_cluster {
     return 1
   fi
 
-  if [ ! -z "${IMPALA_KERBERIZE}" ] && ! is_kerberized; then
+  if [[ "${IMPALA_KERBERIZE}" = "true" ]] && ! is_kerberized; then
     echo "Kerberized start requested, but the config files aren't set up"
-    echo "for kerberos.  Destroy the cluster and rebuild it:"
-    echo "  --> $ ./testdata/cluster/admin delete_cluster"
-    echo "  --> $ IMPALA_KERBERIZE=1 ./testdata/cluster/admin create_cluster"
+    echo "for kerberos. You must regenerate configurations with "
+    echo  "  ./bin/create-test-configuration.sh"
     exit 1
   fi
 

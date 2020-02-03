@@ -186,7 +186,6 @@ export CDP_KNOX_VERSION=1.3.0.7.0.2.0-212
 
 export IMPALA_PARQUET_VERSION=1.10.99-cdh6.x-SNAPSHOT
 export IMPALA_AVRO_JAVA_VERSION=1.8.2-cdh6.x-SNAPSHOT
-export IMPALA_LLAMA_MINIKDC_VERSION=1.0.0
 export IMPALA_KITE_VERSION=1.0.0-cdh6.x-SNAPSHOT
 export IMPALA_KUDU_JAVA_VERSION=1.11.0-cdh6.x-SNAPSHOT
 export IMPALA_ORC_JAVA_VERSION=1.6.2
@@ -199,7 +198,8 @@ unset IMPALA_HIVE_URL
 unset IMPALA_KUDU_URL
 unset IMPALA_KUDU_VERSION
 unset IMPALA_SENTRY_URL
-unset IMPALA_LLAMA_MINIKDC_URL
+
+export IMPALA_KERBERIZE=false
 
 # Source the branch and local config override files here to override any
 # variables above or any variables below that allow overriding via environment
@@ -603,7 +603,6 @@ HADOOP_CLASSPATH="${HADOOP_CLASSPATH}:${HADOOP_HOME}/share/hadoop/tools/lib/*"
 export MINI_DFS_BASE_DATA_DIR="$IMPALA_HOME/cdh-${CDH_MAJOR_VERSION}-hdfs-data"
 export PATH="$HADOOP_HOME/bin:$PATH"
 
-export MINIKDC_HOME="$CDH_COMPONENTS_HOME/llama-minikdc-${IMPALA_LLAMA_MINIKDC_VERSION}"
 export SENTRY_HOME="$CDH_COMPONENTS_HOME/sentry-${IMPALA_SENTRY_VERSION}"
 export SENTRY_CONF_DIR="$IMPALA_HOME/fe/src/test/resources"
 
@@ -796,7 +795,6 @@ echo "SENTRY_HOME             = $SENTRY_HOME"
 echo "SENTRY_CONF_DIR         = $SENTRY_CONF_DIR"
 echo "RANGER_HOME             = $RANGER_HOME"
 echo "RANGER_CONF_DIR         = $RANGER_CONF_DIR "
-echo "MINIKDC_HOME            = $MINIKDC_HOME"
 echo "THRIFT_HOME             = $THRIFT_HOME"
 echo "HADOOP_LZO              = $HADOOP_LZO"
 echo "IMPALA_LZO              = $IMPALA_LZO"
@@ -834,7 +832,7 @@ if "${CLUSTER_DIR}/admin" is_kerberized; then
   echo " *** This cluster is kerberized ***"
   echo "KRB5_KTNAME            = $KRB5_KTNAME"
   echo "KRB5_CONFIG            = $KRB5_CONFIG"
-  echo "KRB5_TRACE             = $KRB5_TRACE"
+  echo "KRB5_TRACE             = ${KRB5_TRACE:-}"
   echo "HADOOP_OPTS            = $HADOOP_OPTS"
   echo " *** This cluster is kerberized ***"
 else

@@ -400,6 +400,7 @@ def build_kerberos_args(daemon):
     args.append("-principal={0}".format(os.getenv("MINIKDC_PRINC_IMPALA_BE")))
   if os.getenv("MINIKDC_DEBUG", "") == "true":
     args.append("-krb5_debug_file=/tmp/{0}.krb5_debug".format(daemon))
+  return args
 
 
 def compute_impalad_mem_limit(cluster_size):

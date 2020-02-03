@@ -46,7 +46,7 @@ function generate_config {
   perl -wpl -e 's/\$\{([^}]+)\}/defined $ENV{$1} ? $ENV{$1} : $&/eg' \
       "${GCIN}" > "${GCOUT}.tmp"
 
-  if [ "${IMPALA_KERBERIZE}" = "" ]; then
+  if [[ "${IMPALA_KERBERIZE}" != "true" ]]; then
     sed '/<!-- BEGIN Kerberos/,/END Kerberos settings -->/d' \
         "${GCOUT}.tmp" > "${GCOUT}"
   else
@@ -67,7 +67,6 @@ function generate_config {
 CREATE_METASTORE=0
 CREATE_SENTRY_POLICY_DB=0
 CREATE_RANGER_POLICY_DB=0
-: ${IMPALA_KERBERIZE=}
 
 # parse command line options
 for ARG in $*
@@ -82,15 +81,10 @@ do
     -create_ranger_policy_db)
       CREATE_RANGER_POLICY_DB=1
       ;;
-    -k|-kerberize|-kerberos|-kerb)
-      # This could also come in through the environment...
-      export IMPALA_KERBERIZE=1
-      ;;
     -help|*)
       echo "[-create_metastore] : If true, creates a new metastore."
       echo "[-create_sentry_policy_db] : If true, creates a new sentry policy db."
       echo "[-create_ranger_policy_db] : If true, creates a new Ranger policy db."
-      echo "[-kerberize] : Enable kerberos on the cluster"
       exit 1
       ;;
   esac
@@ -104,7 +98,7 @@ fi
 
 ${CLUSTER_DIR}/admin create_cluster
 
-if [ ! -z "${IMPALA_KERBERIZE}" ]; then
+if [[ "${IMPALA_KERBERIZE}" = "true" ]]; then
   # Sanity check...
   if ! ${CLUSTER_DIR}/admin is_kerberized; then
     echo "Kerberized cluster not created, even though told to."
@@ -192,7 +186,7 @@ for file in core-site.xml hdfs-site.xml yarn-site.xml ; do
   ln -s ${CLUSTER_HADOOP_CONF_DIR}/$file
 done
 
-if ${CLUSTER_DIR}/admin is_kerberized; then
+if [[ "${IMPALA_KERBERIZE}" = "true" ]]; then
   # KERBEROS TODO: Without this, the yarn daemons can see these
   # files, but mapreduce jobs *cannot* see these files.  This seems
   # strange, but making these symlinks also results in data loading
@@ -214,7 +208,7 @@ for SENTRY_VARIANT in oo oo_nogrant no_oo ; do
       sentry-site_${SENTRY_VARIANT}.xml
 done
 
-if [ ! -z "${IMPALA_KERBERIZE}" ]; then
+if [[ "${IMPALA_KERBERIZE}" = "true" ]]; then
   generate_config hbase-jaas-server.conf.template hbase-jaas-server.conf
   generate_config hbase-jaas-client.conf.template hbase-jaas-client.conf
 fi

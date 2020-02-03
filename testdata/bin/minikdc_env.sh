@@ -15,14 +15,18 @@
 # specific language governing permissions and limitations
 # under the License.
 #
-# This file should be sourced by the minikdc and by impala-config.sh
-# when operating a kerberized development environment.
+# This file should be sourced by impala-config.sh when operating in a
+# kerberized development environment.
 #
+# The minikdc name comes from an old KDC implementation that was used as a standalone
+# KDC for Impa. minicluster environments. That minikdc support bitrotted so now this
+# only supports a manually configured KDC (e.g. set up by
+# bin/experimental-kerberos-setup.sh).
 
 # Twiddle this to turn on/off kerberos debug EVERYWHERE.  Then restart
-# all deamons and the minikdc to enable lots of kerberos debug messages.
+# all daemons to enable lots of kerberos debug messages.
 # Valid values are true | false
-export MINIKDC_DEBUG=false
+export MINIKDC_DEBUG=true
 
 # MiniKdc realm configuration.  Unfortunately, it breaks if realm isn't
 # EXAMPLE.COM.
@@ -51,17 +55,17 @@ export MINIKDC_PRINC_ZOOK=zookeeper/localhost@${MINIKDC_REALM}
 export MINIKDC_PRINC_IMPALA=impala/localhost@${MINIKDC_REALM}
 export MINIKDC_PRINC_IMPALA_BE=impala-be/localhost@${MINIKDC_REALM}
 export MINIKDC_PRINC_USER=${USER}/localhost@${MINIKDC_REALM}
-export MINIKDC_PRINC_LLAM=llama/localhost@${MINIKDC_REALM}
 
 # Basic directory setup:
 MINIKDC_SCRATCH_ROOT=${MINIKDC_SCRATCH_ROOT-${IMPALA_CLUSTER_LOGS_DIR}}
 export MINIKDC_WD=${MINIKDC_SCRATCH_ROOT}/minikdc-workdir
 
-# The one big keytab created by the minikdc
-export MINIKDC_KEYTAB=${MINIKDC_WD}/keytab
+# The one big keytab that should contain all the service users
+export MINIKDC_KEYTAB=$IMPALA_HOME/impala.keytab
 
-# The krb5.conf file everyone needs to point at
-export MINIKDC_KRB5CONF=${MINIKDC_WD}/krb5.conf
+# The krb5.conf file that all the services should be using. We just point
+# to the system config file for now.
+export MINIKDC_KRB5CONF=/etc/krb5.conf
 
 # These options tell kerberos related code to emit lots of debug messages
 if [ ${MINIKDC_DEBUG} = "true" ]; then
@@ -72,7 +76,8 @@ else
     export JAVA_KERBEROS_MAGIC=""
 fi
 
-# Kerberos environment variables to talk to our MiniKdc
+# Kerberos environment variables so other kerberos clients will use our
+# kerberos setup.
 export KRB5_KTNAME="${MINIKDC_KEYTAB}"
 export KRB5_CONFIG="${MINIKDC_KRB5CONF}"
 

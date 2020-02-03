@@ -629,15 +629,6 @@ def get_hadoop_downloads():
   # Ranger is always CDP
   cluster_components.append(CdpComponent("ranger",
                                          archive_basename_tmpl="ranger-${version}-admin"))
-
-  # llama-minikdc is used for testing and not something that Impala needs to be built
-  # against. It does not get updated very frequently unlike the other CDH components.
-  # It is stored in a special location compared to other components.
-  toolchain_host = os.environ["IMPALA_TOOLCHAIN_HOST"]
-  download_path_prefix = "https://{0}/build/cdh_components/".format(toolchain_host)
-  destination_basedir = os.environ["CDH_COMPONENTS_HOME"]
-  cluster_components += [EnvVersionedPackage("llama-minikdc", download_path_prefix,
-      destination_basedir)]
   return cluster_components
 
 
@@ -686,7 +677,6 @@ def main():
   If false, most components get the CDH versions based on the $CDH_BUILD_NUMBER.
   The exceptions are:
   - sentry (always downloaded from $IMPALA_TOOLCHAIN_HOST for a given $CDH_BUILD_NUMBER)
-  - llama-minikdc (always downloaded from $TOOLCHAIN_HOST)
   - ranger (always downloaded from $IMPALA_TOOLCHAIN_HOST for a given $CDP_BUILD_NUMBER)
   - kudu (currently always downloaded from $IMPALA_TOOLCHAIN_HOST for a given
     $CDH_BUILD_NUMBER)

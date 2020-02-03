@@ -59,12 +59,19 @@ $IMPALA_HOME/testdata/bin/run-mini-dfs.sh ${HDFS_FORMAT_CLUSTER-} 2>&1 | \
 # - One Yarn ResourceManager
 # - Multiple Yarn NodeManagers, exactly one per HDFS DN
 if [[ ${DEFAULT_FS} == "hdfs://${INTERNAL_LISTEN_HOST}:20500" ]]; then
-  echo " --> Starting HBase"
-  $IMPALA_HOME/testdata/bin/run-hbase.sh 2>&1 | \
-      tee ${IMPALA_CLUSTER_LOGS_DIR}/run-hbase.log
+  # HBase does not work with kerberos yet.
+  if [[ "$IMPALA_KERBERIZE" != true ]]; then
+    echo " --> Starting HBase"
+    $IMPALA_HOME/testdata/bin/run-hbase.sh 2>&1 | \
+        tee ${IMPALA_CLUSTER_LOGS_DIR}/run-hbase.log
+  fi
 
   echo " --> Starting Hive Server and Metastore Service"
-  $IMPALA_HOME/testdata/bin/run-hive-server.sh 2>&1 | \
+  HIVE_FLAGS=
+  if [[ "$IMPALA_KERBERIZE" = true ]]; then
+    HIVE_FLAGS=" -only_metastore"
+  fi
+  $IMPALA_HOME/testdata/bin/run-hive-server.sh $HIVE_FLAGS 2>&1 | \
       tee ${IMPALA_CLUSTER_LOGS_DIR}/run-hive-server.log
 
   echo " --> Starting the Sentry Policy Server"

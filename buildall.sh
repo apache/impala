@@ -58,7 +58,6 @@ FORMAT_SENTRY_POLICY_DB=0
 FORMAT_RANGER_POLICY_DB=0
 NEED_MINICLUSTER=0
 START_IMPALA_CLUSTER=0
-IMPALA_KERBERIZE=0
 SNAPSHOT_FILE=
 METASTORE_SNAPSHOT_FILE=
 CODE_COVERAGE=0
@@ -178,13 +177,6 @@ do
     -start_impala_cluster)
       START_IMPALA_CLUSTER=1
       ;;
-    -k|-kerberize|-kerberos|-kerb)
-      # Export to the environment for all child process tools
-      export IMPALA_KERBERIZE=1
-      set +u
-      . ${MINIKDC_ENV}
-      set -u
-      ;;
     -v|-debug)
       echo "Running in Debug mode"
       set -x
@@ -236,7 +228,6 @@ do
       echo "[-snapshot_file <file name>] : Load test data from a snapshot file"
       echo "[-metastore_snapshot_file <file_name>]: Load the hive metastore snapshot"
       echo "[-so|-build_shared_libs] : Dynamically link executables (default is static)"
-      echo "[-kerberize] : Enable kerberos on the cluster"
       echo "[-fe_only] : Build just the frontend"
       echo "[-ninja] : Use ninja instead of make"
       echo "[-cmake_only] : Generate makefiles only, instead of doing a full build"
@@ -318,11 +309,13 @@ fi
 
 # If we aren't kerberized then we certainly don't need to talk about
 # re-sourcing impala-config.
-if [[ ${IMPALA_KERBERIZE} -eq 0 ]]; then
+if [[ ${IMPALA_KERBERIZE} = "true" ]]; then
+  . ${MINIKDC_ENV}
+else
   NEEDS_RE_SOURCE_NOTE=0
 fi
 
-if [[ ${IMPALA_KERBERIZE} -eq 1 &&
+if [[ ${IMPALA_KERBERIZE} = "true" &&
   (${TESTDATA_ACTION} -eq 1 || ${TESTS_ACTION} -eq 1) ]]; then
   echo "Running tests or loading test data is not supported for kerberized clusters."
   echo "Please remove the -testdata flag and/or add the -skiptests flag."
@@ -462,11 +455,6 @@ reconfigure_test_cluster() {
     # Kill any processes that may be accessing postgres metastore. To be safe, this is
     # done before we make any changes to the config files.
     "${IMPALA_HOME}/testdata/bin/kill-all.sh" || true
-  fi
-
-  # Stop the minikdc if needed.
-  if "${CLUSTER_DIR}/admin" is_kerberized; then
-      "${IMPALA_HOME}/testdata/bin/minikdc.sh" stop
   fi
 
   local CREATE_TEST_CONFIG_ARGS=""
