@@ -44,14 +44,13 @@ class TestConcurrentKuduCreate(CustomClusterTestSuite):
       self.execute_query_expect_success(
         tls.client, "create table if not exists %s "
                     "(id int, primary key(id)) stored as kudu" % table_name)
-      tls.client.close()
 
     # Drop table before run test if exists
     self.execute_query("drop table if exists %s" % table_name)
     NUM_ITERS = 20
+    pool = ThreadPool(processes=3)
     for i in xrange(NUM_ITERS):
       # Run several commands by specific time interval to reproduce this bug
-      pool = ThreadPool(processes=3)
       r1 = pool.apply_async(run_create_table_if_not_exists)
       r2 = pool.apply_async(run_create_table_if_not_exists)
       # Sleep to make race conflict happens in different places
@@ -60,7 +59,7 @@ class TestConcurrentKuduCreate(CustomClusterTestSuite):
       r1.get()
       r2.get()
       r3.get()
-      pool.terminate()
       # If hit IMPALA-8984, this query would be failed due to table been deleted in kudu
       self.execute_query_expect_success(tls.client, "select * from %s" % table_name)
       self.execute_query("drop table if exists %s" % table_name)
+    pool.terminate()

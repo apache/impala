@@ -170,12 +170,11 @@ class TestConcurrentDdls(CustomClusterTestSuite):
     def run_invalidate_metadata():
       # TODO(IMPALA-9123): Detect hangs here instead of using pytest.mark.timeout
       self.execute_query_expect_success(tls.client, "invalidate metadata")
-      tls.client.close()
 
     NUM_ITERS = 20
+    pool = ThreadPool(processes=2)
     for i in xrange(NUM_ITERS):
       # Run two INVALIDATE METADATA commands in parallel
-      pool = ThreadPool(processes=2)
       r1 = pool.apply_async(run_invalidate_metadata)
       r2 = pool.apply_async(run_invalidate_metadata)
       try:
@@ -183,4 +182,4 @@ class TestConcurrentDdls(CustomClusterTestSuite):
         r2.get(timeout=60)
       except TimeoutError:
         assert False, "INVALIDATE METADATA timeout in 60s!"
-      pool.terminate()
+    pool.terminate()
