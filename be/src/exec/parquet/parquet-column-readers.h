@@ -20,6 +20,7 @@
 
 #include <boost/scoped_ptr.hpp>
 
+#include "common/atomic.h"
 #include "exec/parquet/hdfs-parquet-scanner.h"
 #include "exec/parquet/parquet-level-decoder.h"
 #include "exec/parquet/parquet-column-chunk-reader.h"
@@ -579,9 +580,9 @@ inline bool ParquetColumnReader::ColReaderDebugAction(int* val_count) {
 // when materializing multiple columns. Failing on non-empty row batch tests proper
 // resources freeing by the Parquet scanner.
 #ifndef NDEBUG
-extern int parquet_column_reader_debug_count;
+extern AtomicInt32 parquet_column_reader_debug_count;
 #define SHOULD_TRIGGER_COL_READER_DEBUG_ACTION(num_tuples) \
-    ((parquet_column_reader_debug_count++ % 2) == 1 && num_tuples >= 128)
+    ((parquet_column_reader_debug_count.Add(1) % 2) == 0 && num_tuples >= 128)
 #else
 #define SHOULD_TRIGGER_COL_READER_DEBUG_ACTION(x) (false)
 #endif

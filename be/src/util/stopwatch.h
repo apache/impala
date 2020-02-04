@@ -39,6 +39,10 @@ namespace impala {
   ScopedStopWatch<ConcurrentStopWatch> \
   MACRO_CONCAT(CONCURRENT_STOP_WATCH, __COUNTER__)(c)
 
+#define CONDITIONAL_SCOPED_CONCURRENT_STOP_WATCH(c, enabled) \
+  ScopedStopWatch<ConcurrentStopWatch> \
+  MACRO_CONCAT(CONCURRENT_STOP_WATCH, __COUNTER__)(c, enabled)
+
 /// Utility class to measure time.  This is measured using the cpu tick counter which
 /// is very low overhead but can be inaccurate if the thread is switched away.  This
 /// is useful for measuring cpu time at the row batch level (too much overhead at the
@@ -229,6 +233,13 @@ class ConcurrentStopWatch {
   uint64_t TotalRunningTime() const {
     std::lock_guard<SpinLock> l(thread_counter_lock_);
     return msw_.ElapsedTime();
+  }
+
+  /// Set the time ceiling of the stop watch to Now(). The stop watch won't run past the
+  /// ceiling.
+  void SetTimeCeiling() {
+    std::lock_guard<SpinLock> l(thread_counter_lock_);
+    msw_.SetTimeCeiling();
   }
 
  private:

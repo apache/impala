@@ -882,7 +882,7 @@ Status ClientRequestState::WaitInternal() {
   if (!returns_result_set()) {
     // Queries that do not return a result are finished at this point. This includes
     // DML operations.
-    eos_ = true;
+    eos_.Store(true);
   } else if (catalog_op_type() == TCatalogOpType::DDL &&
       ddl_type() == TDdlType::CREATE_TABLE_AS_SELECT) {
     SetCreateTableAsSelectResultSet();
@@ -921,7 +921,7 @@ Status ClientRequestState::RestartFetch() {
     return Status(ErrorMsg(TErrorCode::RECOVERABLE_ERROR, ss.str()));
   }
   // Reset fetch state to start over.
-  eos_ = false;
+  eos_.Store(false);
   num_rows_fetched_ = 0;
   return Status::OK();
 }
@@ -985,7 +985,7 @@ Status ClientRequestState::FetchRowsInternal(const int32_t max_rows,
   // state beyond that should have a non-OK query_status_ set).
   DCHECK(exec_state_.Load() == ExecState::FINISHED);
 
-  if (eos_) return Status::OK();
+  if (eos_.Load()) return Status::OK();
 
   if (request_result_set_ != NULL) {
     int num_rows = 0;
@@ -997,7 +997,7 @@ Status ClientRequestState::FetchRowsInternal(const int32_t max_rows,
       ++num_rows_fetched_;
       ++num_rows;
     }
-    eos_ = (num_rows_fetched_ == all_rows.size());
+    eos_.Store(num_rows_fetched_ == all_rows.size());
     return Status::OK();
   }
 
@@ -1026,14 +1026,19 @@ Status ClientRequestState::FetchRowsInternal(const int32_t max_rows,
   {
     SCOPED_TIMER(row_materialization_timer_);
     size_t before = fetched_rows->size();
+    bool eos = false;
+
     // Temporarily release lock so calls to Cancel() are not blocked. fetch_rows_lock_
     // (already held) ensures that we do not call coord_->GetNext() multiple times
     // concurrently.
     // TODO: Simplify this.
     lock_.unlock();
     Status status =
-        coordinator->GetNext(fetched_rows, max_coord_rows, &eos_, block_on_wait_time_us);
+        coordinator->GetNext(fetched_rows, max_coord_rows, &eos, block_on_wait_time_us);
     lock_.lock();
+
+    if (eos) eos_.Store(true);
+
     int num_fetched = fetched_rows->size() - before;
     DCHECK(max_coord_rows <= 0 || num_fetched <= max_coord_rows) << Substitute(
         "Fetched more rows ($0) than asked for ($1)", num_fetched, max_coord_rows);
@@ -1043,7 +1048,7 @@ Status ClientRequestState::FetchRowsInternal(const int32_t max_rows,
     RETURN_IF_ERROR(status);
     // Check if query status has changed during GetNext() call
     if (!query_status_.ok()) {
-      eos_ = true;
+      eos_.Store(true);
       return query_status_;
     }
   }
@@ -1119,7 +1124,7 @@ Status ClientRequestState::Cancel(bool check_inflight, const Status* cause) {
   {
     lock_guard<mutex> lock(lock_);
     // If the query has reached a terminal state, no need to update the state.
-    bool already_done = eos_ || exec_state_.Load() == ExecState::ERROR;
+    bool already_done = eos_.Load() || exec_state_.Load() == ExecState::ERROR;
     if (!already_done && cause != NULL) {
       DCHECK(!cause->ok());
       discard_result(UpdateQueryStatus(*cause));

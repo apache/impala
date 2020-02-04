@@ -57,7 +57,6 @@ namespace impala {
 KuduScanNode::KuduScanNode(ObjectPool* pool, const ScanPlanNode& pnode,
     const DescriptorTbl& descs)
     : KuduScanNodeBase(pool, pnode, descs),
-      done_(false),
       thread_avail_cb_id_(-1) {
   DCHECK(KuduIsAvailable());
 }
@@ -138,7 +137,7 @@ void KuduScanNode::ThreadAvailableCb(ThreadResourcePool* pool) {
   while (true) {
     unique_lock<mutex> lock(lock_);
     // All done or all tokens are assigned.
-    if (done_ || !HasScanToken()) break;
+    if (done_.Load() || !HasScanToken()) break;
     bool first_thread = thread_state_.GetNumActive() == 0;
 
     // * Don't start up a ScannerThread if the row batch queue is full since
@@ -204,11 +203,11 @@ Status KuduScanNode::ProcessScanToken(KuduScanner* scanner, const string& scan_t
   bool eos;
   RETURN_IF_ERROR(scanner->OpenNextScanToken(scan_token, &eos));
   if (eos) return Status::OK();
-  while (!eos && !done_) {
+  while (!eos && !done_.Load()) {
     unique_ptr<RowBatch> row_batch = std::make_unique<RowBatch>(row_desc(),
         runtime_state_->batch_size(), mem_tracker());
     RETURN_IF_ERROR(scanner->GetNext(row_batch.get(), &eos));
-    while (!done_) {
+    while (!done_.Load()) {
       scanner->KeepKuduScannerAlive();
       if (thread_state_.EnqueueBatchWithTimeout(&row_batch, 1000000)) {
         break;
@@ -231,9 +230,7 @@ void KuduScanNode::RunScannerThread(
   const string* scan_token = initial_token;
   Status status = scanner.Open();
   if (status.ok()) {
-    // Here, even though a read of 'done_' may conflict with a write to it,
-    // ProcessScanToken() will return early, as will GetNextScanToken().
-    while (!done_ && scan_token != nullptr) {
+    while (!done_.Load() && scan_token != nullptr) {
       status = ProcessScanToken(&scanner, *scan_token);
       if (!status.ok()) break;
 
@@ -243,8 +240,8 @@ void KuduScanNode::RunScannerThread(
       // tokens, ThreadAvailableCb() will be invoked again.
       if (!first_thread && runtime_state_->resource_pool()->optional_exceeded()) break;
 
-      unique_lock<mutex> l(lock_);
-      if (!done_) {
+      if (!done_.Load()) {
+        unique_lock<mutex> l(lock_);
         scan_token = GetNextScanToken();
       } else {
         scan_token = nullptr;
@@ -274,8 +271,8 @@ void KuduScanNode::RunScannerThread(
 }
 
 void KuduScanNode::SetDoneInternal() {
-  if (done_) return;
-  done_ = true;
+  if (done_.Load()) return;
+  done_.Store(true);
   thread_state_.Shutdown();
 }
 

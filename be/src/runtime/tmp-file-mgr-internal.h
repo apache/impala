@@ -56,6 +56,8 @@ class TmpFileMgr::File {
   int AssignDiskQueue() const;
 
   const std::string& path() const { return path_; }
+
+  /// Caller must hold TmpFileMgr::FileGroup::lock_.
   bool is_blacklisted() const { return blacklisted_; }
 
   std::string DebugString();
@@ -86,6 +88,7 @@ class TmpFileMgr::File {
   int64_t bytes_allocated_;
 
   /// Set to true to indicate that we shouldn't allocate any more space in this file.
+  /// Protected by TmpFileMgr::FileGroup::lock_.
   bool blacklisted_;
 
   /// Helper to get the TmpDir that this file is associated with.

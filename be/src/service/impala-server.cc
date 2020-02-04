@@ -790,9 +790,9 @@ Status ImpalaServer::GetExecSummary(const TUniqueId& query_id, const string& use
   }
 }
 
-void ImpalaServer::ArchiveQuery(const ClientRequestState& query) {
+void ImpalaServer::ArchiveQuery(ClientRequestState* query) {
   vector<uint8_t> compressed_profile;
-  Status status = query.profile()->Compress(&compressed_profile);
+  Status status = query->profile()->Compress(&compressed_profile);
   if (!status.ok()) {
     // Didn't serialize the string. Continue with empty string.
     LOG_EVERY_N(WARNING, 1000) << "Could not serialize profile to archive string "
@@ -804,7 +804,7 @@ void ImpalaServer::ArchiveQuery(const ClientRequestState& query) {
   // FLAGS_log_query_to_file will have been set to false
   if (FLAGS_log_query_to_file) {
     stringstream ss;
-    ss << UnixMillis() << " " << PrintId(query.query_id()) << " ";
+    ss << UnixMillis() << " " << PrintId(query->query_id()) << " ";
     Base64Encode(compressed_profile, &ss);
     status = profile_logger_->AppendEntry(ss.str());
     if (!status.ok()) {
@@ -817,14 +817,20 @@ void ImpalaServer::ArchiveQuery(const ClientRequestState& query) {
   }
 
   if (FLAGS_query_log_size == 0) return;
-  unique_ptr<QueryStateRecord> record =
-      make_unique<QueryStateRecord>(query, move(compressed_profile));
-  if (query.GetCoordinator() != nullptr)
-    query.GetCoordinator()->GetTExecSummary(&record->exec_summary);
+  // 'fetch_rows_lock()' protects several fields in ClientReqestState that are read
+  // during QueryStateRecord creation. There should be no contention on this lock because
+  // the query has already been closed (e.g. no more results can be fetched).
+  unique_ptr<QueryStateRecord> record = nullptr;
+  {
+    lock_guard<mutex> l(*query->fetch_rows_lock());
+    record = make_unique<QueryStateRecord>(*query, move(compressed_profile));
+  }
+  if (query->GetCoordinator() != nullptr)
+    query->GetCoordinator()->GetTExecSummary(&record->exec_summary);
   {
     lock_guard<mutex> l(query_log_lock_);
     // Add record to the beginning of the log, and to the lookup index.
-    query_log_index_[query.query_id()] = record.get();
+    query_log_index_[query->query_id()] = record.get();
     query_log_.insert(query_log_.begin(), move(record));
 
     if (FLAGS_query_log_size > -1 && FLAGS_query_log_size < query_log_.size()) {
@@ -1181,7 +1187,7 @@ Status ImpalaServer::CloseClientRequestState(
       }
     }
   }
-  ArchiveQuery(*request_state);
+  ArchiveQuery(request_state.get());
   ImpaladMetrics::NUM_QUERIES_REGISTERED->Increment(-1L);
   return Status::OK();
 }

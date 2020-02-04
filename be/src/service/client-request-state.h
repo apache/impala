@@ -214,7 +214,7 @@ class ClientRequestState {
   TSessionType::type session_type() const { return query_ctx_.session.session_type; }
   const TUniqueId& session_id() const { return query_ctx_.session.session_id; }
   const std::string& default_db() const { return query_ctx_.session.database; }
-  bool eos() const { return eos_; }
+  bool eos() const { return eos_.Load(); }
   const QuerySchedule* schedule() const { return schedule_.get(); }
 
   /// Returns the Coordinator for 'QUERY' and 'DML' requests once Coordinator::Exec()
@@ -467,7 +467,7 @@ protected:
   RuntimeProfile::EventSequence* query_events_;
 
   bool is_cancelled_ = false; // if true, Cancel() was called.
-  bool eos_ = false;  // if true, there are no more rows to return
+  AtomicBool eos_;  // if true, there are no more rows to return
 
   /// We enforce the invariant that query_status_ is not OK iff exec_state_ is ERROR,
   /// given that lock_ is held. exec_state_ should only be updated using

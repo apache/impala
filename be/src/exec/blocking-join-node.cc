@@ -157,7 +157,7 @@ void BlockingJoinNode::ProcessBuildInputAsync(
   DCHECK(status != nullptr);
   SCOPED_THREAD_COUNTER_MEASUREMENT(state->total_thread_statistics());
   {
-    SCOPED_STOP_WATCH(&built_probe_overlap_stop_watch_);
+    SCOPED_CONCURRENT_STOP_WATCH(&built_probe_overlap_stop_watch_);
     *status = child(1)->Open(state);
   }
   if (status->ok()) *status = AcquireResourcesForBuild(state);
@@ -339,7 +339,8 @@ Status BlockingJoinNode::SendBuildInputToSink(
     RETURN_IF_ERROR(QueryMaintenance(state));
 
     {
-      CONDITIONAL_SCOPED_STOP_WATCH(&built_probe_overlap_stop_watch_, ASYNC_BUILD);
+      CONDITIONAL_SCOPED_CONCURRENT_STOP_WATCH(
+          &built_probe_overlap_stop_watch_, ASYNC_BUILD);
       RETURN_IF_ERROR(child(1)->GetNext(state, build_batch_.get(), &eos));
     }
     COUNTER_ADD(build_row_counter_, build_batch_->num_rows());
@@ -388,9 +389,9 @@ string BlockingJoinNode::GetLeftChildRowString(TupleRow* row) {
 int64_t BlockingJoinNode::LocalTimeCounterFn(const RuntimeProfile::Counter* total_time,
     const RuntimeProfile::Counter* left_child_time,
     const RuntimeProfile::Counter* right_child_time,
-    const MonotonicStopWatch* child_overlap_timer) {
+    const ConcurrentStopWatch* child_overlap_timer) {
   int64_t local_time = total_time->value() - left_child_time->value() -
-      (right_child_time->value() - child_overlap_timer->ElapsedTime());
+      (right_child_time->value() - child_overlap_timer->TotalRunningTime());
   // While the calculation is correct at the end of the execution, counter value
   // and the stop watch reading is not accurate during execution.
   // If the child time counter is updated before the parent time counter, then the child

@@ -21,6 +21,7 @@
 #include <gtest/gtest.h>
 #include <kudu/client/client.h>
 
+#include "common/atomic.h"
 #include "exec/kudu-scan-node-base.h"
 #include "gutil/gscoped_ptr.h"
 
@@ -53,9 +54,7 @@ class KuduScanNode : public KuduScanNodeBase {
 
   ScannerThreadState thread_state_;
 
-  /// Protects access to state accessed by scanner threads, such as 'status_' and 'done_'.
-  /// Writers to 'done_' must hold lock to prevent races when updating, but readers can
-  /// read without holding lock, provided they can tolerate stale reads.
+  /// Protects access to state accessed by scanner threads, such as 'status_'.
   std::mutex lock_;
 
   /// The current status of the scan, set to non-OK if any problems occur, e.g. if an
@@ -65,11 +64,7 @@ class KuduScanNode : public KuduScanNodeBase {
 
   /// Set to true when the scan is complete (either because all scan tokens have been
   /// processed, the limit was reached or some error occurred).
-  /// Protected by lock_. It is safe to do optimistic reads without taking lock_ in
-  /// certain places, based on the decisions taken after that.
-  /// The tradeoff is occasionally doing some extra work versus increasing lock
-  /// contention.
-  volatile bool done_;
+  AtomicBool done_;
 
   /// The id of the callback added to the thread resource manager when a thread
   /// is available. Used to remove the callback before this scan node is destroyed.

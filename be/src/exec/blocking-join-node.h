@@ -144,7 +144,7 @@ class BlockingJoinNode : public ExecNode {
 
   /// Stopwatch that measures the build child's Open/GetNext time that overlaps
   /// with the probe child Open(). Not used for separate join builds.
-  MonotonicStopWatch built_probe_overlap_stop_watch_;
+  ConcurrentStopWatch built_probe_overlap_stop_watch_;
 
   // True for a join node subclass if the build side can be closed before the probe
   // side is opened. Should be true wherever possible to reduce resource consumption.
@@ -161,7 +161,7 @@ class BlockingJoinNode : public ExecNode {
   virtual Status AcquireResourcesForBuild(RuntimeState* state) { return Status::OK(); }
 
   /// Processes the build-side input, which should be already open, by sending it to
-  /// 'build_sink', wand opens the probe side. Will do both concurrently if not in a
+  /// 'build_sink', and opens the probe side. Will do both concurrently if not in a
   /// subplan and an extra thread token is available.
   Status ProcessBuildInputAndOpenProbe(RuntimeState* state, JoinBuilder* build_sink);
 
@@ -231,7 +231,7 @@ class BlockingJoinNode : public ExecNode {
   static int64_t LocalTimeCounterFn(const RuntimeProfile::Counter* total_time,
       const RuntimeProfile::Counter* left_child_time,
       const RuntimeProfile::Counter* right_child_time,
-      const MonotonicStopWatch* child_overlap_timer);
+      const ConcurrentStopWatch* child_overlap_timer);
 
   const BlockingJoinPlanNode& plan_node() const {
     return static_cast<const BlockingJoinPlanNode&>(plan_node_);

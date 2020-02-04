@@ -539,8 +539,8 @@ Status TmpFileMgr::FileGroup::RecoverWriteError(
   {
     lock_guard<SpinLock> lock(lock_);
     scratch_errors_.push_back(write_status);
+    handle->file_->Blacklist(write_status.msg());
   }
-  handle->file_->Blacklist(write_status.msg());
 
   // Do not retry cancelled writes or propagate the error, simply return CANCELLED.
   if (handle->is_cancelled_) return Status::CancelledInternal("TmpFileMgr write");

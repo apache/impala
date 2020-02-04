@@ -801,7 +801,7 @@ class ImpalaServer : public ImpalaServiceIf,
   /// Copies a query's state into the query log. Called immediately prior to a
   /// ClientRequestState's deletion. Also writes the query profile to the profile log
   /// on disk.
-  void ArchiveQuery(const ClientRequestState& query);
+  void ArchiveQuery(ClientRequestState* query);
 
   /// Checks whether the given user is allowed to delegate as the specified do_as_user.
   /// Returns OK if the authorization suceeds, otherwise returns an status with details

@@ -46,7 +46,7 @@ namespace impala {
 
 // Definition of variable declared in header for use of the
 // SHOULD_TRIGGER_COL_READER_DEBUG_ACTION macro.
-int parquet_column_reader_debug_count = 0;
+AtomicInt32 parquet_column_reader_debug_count;
 
 /// Per column type reader. InternalType is the datatype that Impala uses internally to
 /// store tuple data and PARQUET_TYPE is the corresponding primitive datatype (as defined

@@ -578,7 +578,10 @@ Status KrpcDataStreamSender::Channel::TransmitData(
 
 Status KrpcDataStreamSender::Channel::SerializeAndSendBatch(RowBatch* batch) {
   OutboundRowBatch* outbound_batch = &outbound_batches_[next_batch_idx_];
+  // Reads 'rpc_in_flight_batch_' without acquiring 'lock_', so reads can be racey.
+  ANNOTATE_IGNORE_READS_BEGIN();
   DCHECK(outbound_batch != rpc_in_flight_batch_);
+  ANNOTATE_IGNORE_READS_END();
   RETURN_IF_ERROR(parent_->SerializeBatch(batch, outbound_batch));
   RETURN_IF_ERROR(TransmitData(outbound_batch));
   next_batch_idx_ = (next_batch_idx_ + 1) % NUM_OUTBOUND_BATCHES;
