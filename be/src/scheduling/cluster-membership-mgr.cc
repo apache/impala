@@ -346,7 +346,9 @@ void ClusterMembershipMgr::UpdateMembership(
   recovering_membership_.reset();
 }
 
-void ClusterMembershipMgr::BlacklistExecutor(const TBackendDescriptor& be_desc) {
+void ClusterMembershipMgr::BlacklistExecutor(
+    const TBackendDescriptor& be_desc, const Status& cause) {
+  DCHECK(!cause.ok());
   if (!ExecutorBlacklist::BlacklistingEnabled()) return;
   lock_guard<mutex> l(update_membership_lock_);
   // Don't blacklist the local executor. Some queries may have root fragments that must be
@@ -382,6 +384,9 @@ void ClusterMembershipMgr::BlacklistExecutor(const TBackendDescriptor& be_desc) 
     return;
   }
 
+  LOG(INFO) << "Blacklisting " << TNetworkAddressToString(be_desc.address) << ": "
+            << cause;
+
   std::shared_ptr<Snapshot> new_state;
   if (recovering) {
     // If the statestore is currently recovering, we can apply the blacklisting to
@@ -399,7 +404,7 @@ void ClusterMembershipMgr::BlacklistExecutor(const TBackendDescriptor& be_desc) 
   }
 
   ExecutorBlacklist* new_blacklist = &(new_state->executor_blacklist);
-  new_blacklist->Blacklist(be_desc);
+  new_blacklist->Blacklist(be_desc, cause);
 
   // We'll call SetState() with 'recovering_membership_' once the statestore is no longer
   // in recovery.

@@ -651,6 +651,9 @@ class TestWebPage(ImpalaTestSuite):
     assert 'backends' in response_json
     # When this test runs, all impalads would have already started.
     assert len(response_json['backends']) == 3
+    assert response_json['num_active_backends'] == 3
+    assert 'num_quiescing_backends' not in response_json
+    assert 'num_blacklisted_backends' not in response_json
 
     # Look at results for a single backend - they are not sorted.
     backend_row = response_json['backends'][0]
@@ -672,6 +675,7 @@ class TestWebPage(ImpalaTestSuite):
     assert backend_row['is_coordinator']
     assert backend_row['is_executor']
     assert not backend_row['is_quiescing']
+    assert not backend_row['is_blacklisted']
     assert len(backend_row['admit_mem_limit']) > 0
 
   def test_download_profile(self):

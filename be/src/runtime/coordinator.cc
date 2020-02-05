@@ -487,11 +487,9 @@ Status Coordinator::FinishBackendStartup() {
     }
     if (!backend_state->exec_rpc_status().ok()) {
       // The Exec() rpc failed, so blacklist the executor.
-      LOG(INFO) << "Blacklisting "
-                << TNetworkAddressToString(backend_state->impalad_address())
-                << " because an Exec() rpc to it failed.";
       const TBackendDescriptor& be_desc = backend_state->exec_params()->be_desc;
-      ExecEnv::GetInstance()->cluster_membership_mgr()->BlacklistExecutor(be_desc);
+      ExecEnv::GetInstance()->cluster_membership_mgr()->BlacklistExecutor(
+          be_desc, backend_state->exec_rpc_status());
     }
     if (backend_state->rpc_latency() > max_latency) {
       // Find the backend that takes the most time to acknowledge to
@@ -942,10 +940,9 @@ void Coordinator::UpdateBlacklistWithAuxErrorInfo(
 
       if (blacklistable_rpc_error_codes.find(rpc_error_info.posix_error_code())
           != blacklistable_rpc_error_codes.end()) {
-        LOG(INFO) << "Blacklisting " << NetworkAddressPBToString(dest_node)
-                  << " because a RPC to it failed.";
         ExecEnv::GetInstance()->cluster_membership_mgr()->BlacklistExecutor(
-            dest_node_exec_params->be_desc);
+            dest_node_exec_params->be_desc,
+            Status(Substitute("RPC to $0 failed", NetworkAddressPBToString(dest_node))));
         break;
       }
     }

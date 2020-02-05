@@ -164,7 +164,8 @@ class ClusterMembershipMgr {
 
   /// Adds the given backend to the local blacklist. Updates 'current_membership_' to
   /// remove the backend from 'executor_groups' so that it will not be scheduled on.
-  void BlacklistExecutor(const TBackendDescriptor& be_desc);
+  /// 'cause' is an error status representing the reason the node was blacklisted.
+  void BlacklistExecutor(const TBackendDescriptor& be_desc, const Status& cause);
 
  private:
   /// Serializes and adds the local backend descriptor to 'subscriber_topic_updates'.

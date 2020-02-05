@@ -1,0 +1,1 @@
+Backends are temporarily blacklisted by a coordinator when it sees an error that may indicate the backend is non-functioning. Blacklisted backends are not considered by that coordinator when scheduling new queries.

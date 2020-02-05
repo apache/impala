@@ -1,0 +1,1 @@
+Quiescing backends are in the process of gracefully shutting down. No more queries will be scheduled on them, and they will shut down once the grace period has passed and either all running queries have completed or the shutdown deadline is reached.

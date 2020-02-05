@@ -36,7 +36,8 @@ bool ExecutorBlacklist::BlacklistingEnabled() {
   return FLAGS_blacklisting_enabled;
 }
 
-void ExecutorBlacklist::Blacklist(const TBackendDescriptor& be_desc) {
+void ExecutorBlacklist::Blacklist(
+    const TBackendDescriptor& be_desc, const Status& cause) {
   DCHECK(BlacklistingEnabled());
   DCHECK(!be_desc.ip_address.empty());
   vector<Entry>& be_descs = executor_list_[be_desc.ip_address];
@@ -49,6 +50,7 @@ void ExecutorBlacklist::Blacklist(const TBackendDescriptor& be_desc) {
       // This executor was on probation, so re-blacklist it.
       it->state = State::BLACKLISTED;
       it->blacklist_time_ms = MonotonicMillis();
+      it->cause = cause;
 
       int64_t probation_timeout = GetBlacklistTimeoutMs() * PROBATION_TIMEOUT_MULTIPLIER;
       int64_t elapsed = MonotonicMillis() - it->blacklist_time_ms;
@@ -64,7 +66,7 @@ void ExecutorBlacklist::Blacklist(const TBackendDescriptor& be_desc) {
     }
   } else {
     // This executor was not already on the list, create a new Entry for it.
-    be_descs.emplace_back(be_desc, MonotonicMillis());
+    be_descs.emplace_back(be_desc, MonotonicMillis(), cause);
   }
   VLOG(2) << "Blacklisted " << TNetworkAddressToString(be_desc.address)
           << ", current blacklist: " << DebugString();
@@ -145,12 +147,18 @@ void ExecutorBlacklist::Maintenance(std::list<TBackendDescriptor>* probation_lis
   VLOG(2) << "Completed blacklist maintenance. Current blacklist: " << DebugString();
 }
 
-bool ExecutorBlacklist::IsBlacklisted(const TBackendDescriptor& be_desc) const {
+bool ExecutorBlacklist::IsBlacklisted(
+    const TBackendDescriptor& be_desc, Status* cause, int64_t* time_remaining_ms) const {
   for (auto executor_it : executor_list_) {
     if (executor_it.first == be_desc.ip_address) {
       for (auto entry_it : executor_it.second) {
         if (entry_it.be_desc.address.port == be_desc.address.port
             && entry_it.state == State::BLACKLISTED) {
+          if (cause != nullptr) *cause = entry_it.cause;
+          int64_t elapsed_ms = MonotonicMillis() - entry_it.blacklist_time_ms;
+          int64_t total_timeout_ms =
+              GetBlacklistTimeoutMs() * entry_it.num_consecutive_blacklistings;
+          *time_remaining_ms = total_timeout_ms - elapsed_ms;
           return true;
         }
       }

@@ -64,8 +64,9 @@ class ExecutorBlacklist {
 
   /// Adds an executor to the blacklist, if it is not already blacklisted. If the executor
   /// was on probation, updates its entry in 'executor_list_' accordingly. Should only be
-  /// called if BlacklistingEnabled() is true.
-  void Blacklist(const TBackendDescriptor& be_desc);
+  /// called if BlacklistingEnabled() is true. 'cause' is an error status indicating why
+  /// the executor is being blacklisted.
+  void Blacklist(const TBackendDescriptor& be_desc, const Status& cause);
 
   /// Removes an executor from the blacklist or probation, if it is in 'executor_list_'.
   /// Does not put blacklisted executors on probation. Returns the executor's state prior
@@ -87,8 +88,11 @@ class ExecutorBlacklist {
   /// probation.
   void Maintenance(std::list<TBackendDescriptor>* probation_list);
 
-  /// Returns true if 'be_desc' is blacklisted.
-  bool IsBlacklisted(const TBackendDescriptor& be_desc) const;
+  /// If 'be_desc' is blacklisted, sets 'cause' to the error Status that caused this
+  /// executor to be blacklisted, sets 'time_remaining_ms' to the amount of time the
+  /// executor has left on the blacklist, and returns true.
+  bool IsBlacklisted(const TBackendDescriptor& be_desc, Status* cause = nullptr,
+      int64_t* time_remaining_ms = nullptr) const;
 
   /// Returns a space-separated string of the addresses of executors that are currently
   /// blacklisted.
@@ -100,11 +104,13 @@ class ExecutorBlacklist {
  private:
   /// Info about an executor that is either blacklisted or on probabtion.
   struct Entry {
-    Entry(const TBackendDescriptor& be_desc, int64_t blacklist_time_ms)
+    Entry(
+        const TBackendDescriptor& be_desc, int64_t blacklist_time_ms, const Status& cause)
       : be_desc(be_desc),
         blacklist_time_ms(blacklist_time_ms),
         state(State::BLACKLISTED),
-        num_consecutive_blacklistings(1) {}
+        num_consecutive_blacklistings(1),
+        cause(cause) {}
 
     TBackendDescriptor be_desc;
 
@@ -117,6 +123,9 @@ class ExecutorBlacklist {
     /// Number of times that this executor has been blacklisted since the last time it was
     /// off probation.
     int32_t num_consecutive_blacklistings;
+
+    /// Error status representing the reason the executor was blacklisted.
+    Status cause;
   };
 
   /// Returns the base blacklist timeout in ms. This should be multiplied by

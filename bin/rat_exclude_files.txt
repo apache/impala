@@ -187,8 +187,10 @@ be/src/thirdparty/pcg-cpp-0.98/LICENSE.txt
 # http://www.apache.org/legal/src-headers.html: 'Snippet' files that are combined as form
 # a larger file where the larger file would have duplicate licensing headers.
 www/all_child_groups.tmpl
+www/blacklisted_tooltip.txt
 www/common-footer.tmpl
 www/form-hidden-inputs.tmpl
+www/quiescing_tooltip.txt
 
 # GNU tar artifact
 pax_global_header

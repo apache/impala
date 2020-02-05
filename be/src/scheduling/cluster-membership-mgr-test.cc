@@ -376,17 +376,17 @@ TEST_F(ClusterMembershipMgrTest, ExecutorBlacklist) {
   }
 
   // Tell a BE to blacklist itself, should have no effect.
-  backends_[0]->cmm->BlacklistExecutor(*backends_[0]->desc);
+  backends_[0]->cmm->BlacklistExecutor(*backends_[0]->desc, Status("error"));
   EXPECT_EQ(NUM_BACKENDS, backends_[0]->cmm->GetSnapshot()->current_backends.size());
   EXPECT_EQ(NUM_BACKENDS, GetDefaultGroupSize(*backends_[0]->cmm));
 
   // Tell a BE to blacklist another BE, should remove it from executor_groups but not
   // current_backends.
-  backends_[0]->cmm->BlacklistExecutor(*backends_[1]->desc);
+  backends_[0]->cmm->BlacklistExecutor(*backends_[1]->desc, Status("error"));
   EXPECT_EQ(NUM_BACKENDS, backends_[0]->cmm->GetSnapshot()->current_backends.size());
   EXPECT_EQ(NUM_BACKENDS - 1, GetDefaultGroupSize(*backends_[0]->cmm));
   // Blacklist a BE that is already blacklisted. Should have no effect.
-  backends_[0]->cmm->BlacklistExecutor(*backends_[1]->desc);
+  backends_[0]->cmm->BlacklistExecutor(*backends_[1]->desc, Status("error"));
   EXPECT_EQ(NUM_BACKENDS, backends_[0]->cmm->GetSnapshot()->current_backends.size());
   EXPECT_EQ(NUM_BACKENDS - 1, GetDefaultGroupSize(*backends_[0]->cmm));
 
@@ -397,7 +397,7 @@ TEST_F(ClusterMembershipMgrTest, ExecutorBlacklist) {
   EXPECT_EQ(NUM_BACKENDS, GetDefaultGroupSize(*backends_[0]->cmm));
 
   // Blacklist the BE and sleep again.
-  backends_[0]->cmm->BlacklistExecutor(*backends_[1]->desc);
+  backends_[0]->cmm->BlacklistExecutor(*backends_[1]->desc, Status("error"));
   EXPECT_EQ(NUM_BACKENDS, backends_[0]->cmm->GetSnapshot()->current_backends.size());
   EXPECT_EQ(NUM_BACKENDS - 1, GetDefaultGroupSize(*backends_[0]->cmm));
   usleep(BLACKLIST_TIMEOUT_SLEEP_US);
@@ -407,12 +407,12 @@ TEST_F(ClusterMembershipMgrTest, ExecutorBlacklist) {
   EXPECT_EQ(NUM_BACKENDS, backends_[0]->cmm->GetSnapshot()->current_backends.size());
   EXPECT_EQ(NUM_BACKENDS - 1, GetDefaultGroupSize(*backends_[0]->cmm));
   // Try blacklisting the quiesced BE, should have no effect.
-  backends_[0]->cmm->BlacklistExecutor(*backends_[1]->desc);
+  backends_[0]->cmm->BlacklistExecutor(*backends_[1]->desc, Status("error"));
   EXPECT_EQ(NUM_BACKENDS, backends_[0]->cmm->GetSnapshot()->current_backends.size());
   EXPECT_EQ(NUM_BACKENDS - 1, GetDefaultGroupSize(*backends_[0]->cmm));
 
   // Blacklist another BE and sleep.
-  backends_[0]->cmm->BlacklistExecutor(*backends_[2]->desc);
+  backends_[0]->cmm->BlacklistExecutor(*backends_[2]->desc, Status("error"));
   EXPECT_EQ(NUM_BACKENDS, backends_[0]->cmm->GetSnapshot()->current_backends.size());
   EXPECT_EQ(NUM_BACKENDS - 2, GetDefaultGroupSize(*backends_[0]->cmm));
   usleep(BLACKLIST_TIMEOUT_SLEEP_US);

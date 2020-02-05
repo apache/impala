@@ -39,6 +39,8 @@ class TestBlacklist(CustomClusterTestSuite):
     super(TestBlacklist, cls).setup_class()
 
   @pytest.mark.execute_serially
+  @CustomClusterTestSuite.with_args(
+      statestored_args="-statestore_heartbeat_frequency_ms=1000")
   def test_kill_impalad(self, cursor):
     """Test that verifies that when an impalad is killed, it is properly blacklisted."""
     # Run a query and verify that no impalads are blacklisted yet.
@@ -59,9 +61,21 @@ class TestBlacklist(CustomClusterTestSuite):
 
     # Run another query which should succeed and verify the impalad was blacklisted.
     result = self.execute_query("select count(*) from tpch.lineitem")
+    backends_json = self.cluster.impalads[0].service.get_debug_webpage_json("/backends")
     match = re.search("Blacklisted Executors: (.*)", result.runtime_profile)
     assert match.group(1) == "%s:%s" % \
         (killed_impalad.hostname, killed_impalad.service.be_port), result.runtime_profile
+    assert backends_json["num_blacklisted_backends"] == 1, backends_json
+    assert backends_json["num_active_backends"] == 2, backends_json
+    assert len(backends_json["backends"]) == 3, backends_json
+    num_blacklisted = 0
+    for backend_json in backends_json["backends"]:
+      if str(killed_impalad.service.krpc_port) in backend_json["krpc_address"]:
+        assert backend_json["is_blacklisted"], backend_json
+        num_blacklisted += 1
+      else:
+        assert not backend_json["is_blacklisted"], backend_json
+    assert num_blacklisted == 1, backends_json
 
     # Sleep for long enough for the statestore to remove the impalad from the cluster
     # membership, i.e. Statestore::FailedExecutorDetectionTime() + some padding

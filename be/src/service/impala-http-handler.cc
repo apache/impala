@@ -919,6 +919,9 @@ void ImpalaHttpHandler::BackendsHandler(const Webserver::WebRequest& req,
   ExecEnv::GetInstance()->admission_controller()->PopulatePerHostMemReservedAndAdmitted(
       &host_stats);
   Value backends_list(kArrayType);
+  int num_active_backends = 0;
+  int num_quiescing_backends = 0;
+  int num_blacklisted_backends = 0;
   ClusterMembershipMgr* cluster_membership_mgr =
       ExecEnv::GetInstance()->cluster_membership_mgr();
   DCHECK(cluster_membership_mgr != nullptr);
@@ -943,6 +946,31 @@ void ImpalaHttpHandler::BackendsHandler(const Webserver::WebRequest& req,
         document->GetAllocator());
     backend_obj.AddMember("is_executor", backend.is_executor, document->GetAllocator());
     backend_obj.AddMember("is_quiescing", backend.is_quiescing, document->GetAllocator());
+    Status blacklist_cause;
+    int64_t blacklist_time_remaining_ms;
+    bool is_blacklisted = membership_snapshot->executor_blacklist.IsBlacklisted(
+        backend, &blacklist_cause, &blacklist_time_remaining_ms);
+    backend_obj.AddMember("is_blacklisted", is_blacklisted, document->GetAllocator());
+    backend_obj.AddMember(
+        "is_active", !is_blacklisted && !backend.is_quiescing, document->GetAllocator());
+    if (backend.is_quiescing) {
+      // Backends cannot be both blacklisted and quiescing.
+      DCHECK(!is_blacklisted);
+      ++num_quiescing_backends;
+    } else if (is_blacklisted) {
+      Value blacklist_cause_value(
+          blacklist_cause.GetDetail().c_str(), document->GetAllocator());
+      backend_obj.AddMember(
+          "blacklist_cause", blacklist_cause_value, document->GetAllocator());
+      Value blacklist_time_remaining_str(
+          Substitute("$0 s", (blacklist_time_remaining_ms / 1000)).c_str(),
+          document->GetAllocator());
+      backend_obj.AddMember("blacklist_time_remaining", blacklist_time_remaining_str,
+          document->GetAllocator());
+      ++num_blacklisted_backends;
+    } else {
+      ++num_active_backends;
+    }
     Value admit_mem_limit(PrettyPrinter::PrintBytes(backend.admit_mem_limit).c_str(),
         document->GetAllocator());
     backend_obj.AddMember("admit_mem_limit", admit_mem_limit, document->GetAllocator());
@@ -968,6 +996,18 @@ void ImpalaHttpHandler::BackendsHandler(const Webserver::WebRequest& req,
     backends_list.PushBack(backend_obj, document->GetAllocator());
   }
   document->AddMember("backends", backends_list, document->GetAllocator());
+  document->AddMember(
+      "num_active_backends", num_active_backends, document->GetAllocator());
+  // Don't add the following fields if they're 0 so that we won't display the
+  // corresponding tables if they would be empty.
+  if (num_quiescing_backends > 0) {
+    document->AddMember(
+        "num_quiescing_backends", num_quiescing_backends, document->GetAllocator());
+  }
+  if (num_blacklisted_backends > 0) {
+    document->AddMember(
+        "num_blacklisted_backends", num_blacklisted_backends, document->GetAllocator());
+  }
 }
 
 void ImpalaHttpHandler::AdmissionStateHandler(
