@@ -606,5 +606,86 @@ GRANT SELECT ON TABLE training1.course1 TO ROLE student;</codeblock>
     </conbody>
 
   </concept>
+  <concept id="sec_ranger_col_masking">
+    <title>Ranger Column Masking</title>
+    <conbody>
+    <p> Ranger column masking hides sensitive columnar data in Impala query output. For example, you
+        can define a policy that reveals only the first or last four characters of column data.
+        Column masking is enabled by default. The Impala behavior mimics Hive behavior with respect
+        to column masking. For more information, see the <xref
+          href="https://cwiki.apache.org/confluence/display/RANGER/Row-level+filtering+and+column-masking+using+Apache+Ranger+policies+in+Apache+Hive"
+          format="html" scope="external">Apache Ranger documentation</xref>.</p>
+
+      <p>
+        The following table lists all supported, built-in mask types for defining column masking in
+        a policy using the Ranger REST API. <table rowsep="1" colsep="1" id="table_mask_types">
+          <tgroup cols="4">
+            <colspec colname="c1" colnum="1"/>
+            <colspec colname="c2" colnum="2"/>
+            <colspec colname="c3" colnum="3"/>
+            <colspec colname="c4" colnum="4"/>
+            <thead>
+              <row>
+                <entry>Type</entry>
+                <entry>Name</entry>
+                <entry>Description</entry>
+                <entry>Transformer</entry>
+              </row>
+            </thead>
+            <tbody>
+              <row>
+                <entry>MASK</entry>
+                <entry>Redact</entry>
+                <entry>Replace lowercase with 'x', uppercase with 'X', digits with '0'</entry>
+                <entry>mask({col})</entry>
+              </row>
+              <row>
+                <entry>MASK_SHOW_LAST_4</entry>
+                <entry>Partial mask: show last 4</entry>
+                <entry>Show last 4 characters; replace rest with 'x'</entry>
+                <entry>mask_show_last_n({col}, 4, 'x', 'x', 'x', -1, '1')</entry>
+              </row>
+              <row>
+                <entry>MASK_SHOW_FIRST_4</entry>
+                <entry>Partial mask: show first 4</entry>
+                <entry>Show first 4 characters; replace rest with 'x'</entry>
+                <entry>mask_show_first_n({col}, 4, 'x', 'x', 'x', -1, '1')</entry>
+              </row>
+              <row>
+                <entry>MASK_HASH</entry>
+                <entry>Hash</entry>
+                <entry>Hash the value</entry>
+                <entry>mask_hash({col})</entry>
+              </row>
+              <row>
+                <entry>MASK_NULL</entry>
+                <entry>Nullify</entry>
+                <entry>Replace with NULL</entry>
+                <entry> N/A</entry>
+              </row>
+              <row>
+                <entry>MASK_NONE</entry>
+                <entry>Unmasked (retain original value)</entry>
+                <entry>No masking</entry>
+                <entry> N/A</entry>
+              </row>
+              <row>
+                <entry>MASK_DATE_SHOW_YEAR</entry>
+                <entry>Date: show only year</entry>
+                <entry>Date: show only year</entry>
+                <entry>mask({col}, 'x', 'x', 'x', -1, '1', 1, 0, -1)</entry>
+              </row>
+              <row>
+                <entry>CUSTOM</entry>
+                <entry>Custom</entry>
+                <entry>Custom</entry>
+                <entry>N/A</entry>
+              </row>
+            </tbody>
+          </tgroup>
+        </table>
+      </p>
+    </conbody>
+  </concept>
 
 </concept>
