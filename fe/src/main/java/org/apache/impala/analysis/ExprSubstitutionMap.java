@@ -71,6 +71,20 @@ public final class ExprSubstitutionMap {
   }
 
   /**
+   * Same as get() but start at index 'hint'
+   */
+  public Expr getWithHint(Expr lhsExpr, int hint) {
+    for (int i = hint; i < lhs_.size(); ++i) {
+      if (lhsExpr.equals(lhs_.get(i))) return rhs_.get(i);
+    }
+    if (lhs_.size() < hint) hint = lhs_.size();
+    for (int i = 0; i < hint; ++i) {
+      if (lhsExpr.equals(lhs_.get(i))) return rhs_.get(i);
+    }
+    return null;
+  }
+
+  /**
    * Returns true if the smap contains a mapping for lhsExpr.
    */
   public boolean containsMappingFor(Expr lhsExpr) {
@@ -186,8 +200,8 @@ public final class ExprSubstitutionMap {
       for (int j = i + 1; j < other.lhs_.size(); ++j) {
         Expr a = other.lhs_.get(i);
         Expr b = other.lhs_.get(j);
-        Expr finalA = get(a);
-        Expr finalB = get(b);
+        Expr finalA = getWithHint(a, i);
+        Expr finalB = getWithHint(b, j);
         if (finalA == null || finalB == null) {
           if (LOG.isTraceEnabled()) {
             if (finalA == null) {
