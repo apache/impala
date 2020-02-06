@@ -1482,24 +1482,24 @@ uint64_t AggregateFunctions::HllFinalEstimate(const uint8_t* buckets) {
   DCHECK(buckets != NULL);
 
   // Empirical constants for the algorithm.
-  float alpha = 0;
+  double alpha = 0;
   if (HLL_LEN == 16) {
-    alpha = 0.673f;
+    alpha = 0.673;
   } else if (HLL_LEN == 32) {
-    alpha = 0.697f;
+    alpha = 0.697;
   } else if (HLL_LEN == 64) {
-    alpha = 0.709f;
+    alpha = 0.709;
   } else {
-    alpha = 0.7213f / (1 + 1.079f / HLL_LEN);
+    alpha = 0.7213 / (1 + 1.079 / HLL_LEN);
   }
 
-  float harmonic_mean = 0;
+  double harmonic_mean = 0;
   int num_zero_registers = 0;
   for (int i = 0; i < HLL_LEN; ++i) {
-    harmonic_mean += ldexp(1.0f, -buckets[i]);
+    harmonic_mean += ldexp(1.0, -buckets[i]);
     if (buckets[i] == 0) ++num_zero_registers;
   }
-  harmonic_mean = 1.0f / harmonic_mean;
+  harmonic_mean = 1.0 / harmonic_mean;
   int64_t estimate = alpha * HLL_LEN * HLL_LEN * harmonic_mean;
   // Adjust for Hll bias based on Hll++ algorithm
   if (estimate <= 5 * HLL_LEN) {
@@ -1510,7 +1510,7 @@ uint64_t AggregateFunctions::HllFinalEstimate(const uint8_t* buckets) {
 
   // Estimated cardinality is too low. Hll is too inaccurate here, instead use
   // linear counting.
-  int64_t h = HLL_LEN * log(static_cast<float>(HLL_LEN) / num_zero_registers);
+  int64_t h = HLL_LEN * log(static_cast<double>(HLL_LEN) / num_zero_registers);
 
   return (h <= HllThreshold(HLL_PRECISION)) ? h : estimate;
 }
