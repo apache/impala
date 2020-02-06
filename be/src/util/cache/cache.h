@@ -28,16 +28,15 @@
 #include "kudu/gutil/macros.h"
 #include "kudu/util/slice.h"
 
-namespace kudu {
+using kudu::Slice;
 
-struct CacheMetrics;
+namespace impala {
 
 class Cache {
  public:
   // Type of memory backing the cache's storage.
   enum class MemoryType {
-    DRAM,
-    NVM,
+    DRAM
   };
 
   // Supported eviction policies for the cache. Eviction policy determines what
@@ -64,9 +63,6 @@ class Cache {
   // Destroys all existing entries by calling the "deleter"
   // function that was passed to the constructor.
   virtual ~Cache();
-
-  // Set the cache metrics to update corresponding counters accordingly.
-  virtual void SetMetrics(std::unique_ptr<CacheMetrics> metrics) = 0;
 
   // Opaque handle to an entry stored in the cache.
   struct Handle { };
@@ -360,4 +356,4 @@ Cache* NewCache<Cache::EvictionPolicy::LRU,
 // A helper method to output cache memory type into ostream.
 std::ostream& operator<<(std::ostream& os, Cache::MemoryType mem_type);
 
-} // namespace kudu
+} // namespace impala

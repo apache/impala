@@ -23,9 +23,15 @@ set(EXECUTABLE_OUTPUT_PATH "${BUILD_OUTPUT_ROOT_DIRECTORY}/util/cache")
 
 add_library(UtilCache
   cache.cc
-  nvm_cache.cc
 )
 add_dependencies(UtilCache gen-deps gen_ir_descriptions)
 
-# Currently does not build cache-test or cache-bench, because they depend on Kudu
-# build infrastructure.
+add_library(UtilCacheTests STATIC
+  cache-test.cc
+)
+add_dependencies(UtilCacheTests gen-deps gen_ir_descriptions)
+
+add_executable(cache-bench cache-bench.cc)
+target_link_libraries(cache-bench ${IMPALA_TEST_LINK_LIBS})
+
+ADD_UNIFIED_BE_LSAN_TEST(cache-test "CacheTypes/CacheTest.*:CacheTypes/LRUCacheTest.*:FIFOCacheTest.*")

@@ -416,6 +416,7 @@ set (IMPALA_LIBS
   token_proto
   Udf
   Util
+  UtilCache
 )
 
 set (IMPALA_LINK_LIBS
@@ -454,6 +455,7 @@ set (UNIFIED_TEST_LIBS
   SchedulingTests
   ServiceTests
   UtilTests
+  UtilCacheTests
 )
 set (UNIFIED_TEST_LINK_LIBS
   ${WL_START_GROUP}

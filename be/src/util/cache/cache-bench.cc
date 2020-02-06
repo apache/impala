@@ -33,12 +33,12 @@
 #include "kudu/gutil/macros.h"
 #include "kudu/gutil/stringprintf.h"
 #include "kudu/gutil/strings/human_readable.h"
-#include "kudu/util/cache.h"
 #include "kudu/util/monotime.h"
 #include "kudu/util/random.h"
 #include "kudu/util/random_util.h"
 #include "kudu/util/slice.h"
-#include "kudu/util/test_util.h"
+#include "util/cache/cache.h"
+#include "testutil/gtest-util.h"
 
 DEFINE_int32(num_threads, 16, "The number of threads to access the cache concurrently.");
 DEFINE_int32(run_seconds, 1, "The number of seconds to run the benchmark");
@@ -50,7 +50,7 @@ using std::thread;
 using std::unique_ptr;
 using std::vector;
 
-namespace kudu {
+namespace impala {
 
 // Benchmark a 1GB cache.
 static constexpr int kCacheCapacity = 1024 * 1024 * 1024;
@@ -90,11 +90,10 @@ struct BenchSetup {
   }
 };
 
-class CacheBench : public KuduTest,
+class CacheBench : public testing::Test,
                    public testing::WithParamInterface<BenchSetup>{
  public:
   void SetUp() override {
-    KuduTest::SetUp();
     cache_.reset(NewCache(kCacheCapacity, "test-cache"));
   }
 
@@ -102,15 +101,18 @@ class CacheBench : public KuduTest,
   // Returns a pair of the number of cache hits and lookups.
   pair<int64_t, int64_t> DoQueries(const atomic<bool>* done) {
     const BenchSetup& setup = GetParam();
-    Random r(GetRandomSeed32());
+    kudu::Random r(kudu::GetRandomSeed32());
     int64_t lookups = 0;
     int64_t hits = 0;
+    // Add max_key variable and test to avoid division by zero warning from clang-tidy
+    uint32_t max_key = setup.max_key();
+    if (max_key == 0) return {0, 0};
     while (!*done) {
       uint32_t int_key;
       if (setup.pattern == BenchSetup::Pattern::ZIPFIAN) {
-        int_key = r.Skewed(Bits::Log2Floor(setup.max_key()));
+        int_key = r.Skewed(Bits::Log2Floor(max_key));
       } else {
-        int_key = r.Uniform(setup.max_key());
+        int_key = r.Uniform(max_key);
       }
       char key_buf[sizeof(int_key)];
       memcpy(key_buf, &int_key, sizeof(int_key));
@@ -142,7 +144,7 @@ class CacheBench : public KuduTest,
           total_lookups += hits_lookups.second;
         });
     }
-    SleepFor(MonoDelta::FromSeconds(n_seconds));
+    kudu::SleepFor(kudu::MonoDelta::FromSeconds(n_seconds));
     done = true;
     for (auto& t : threads) {
       t.join();
@@ -184,4 +186,6 @@ TEST_P(CacheBench, RunBench) {
   LOG(INFO) << test_case << ": " << StringPrintf("%.1f", hit_rate * 100.0) << "% hit rate";
 }
 
-} // namespace kudu
+} // namespace impala
+
+IMPALA_TEST_MAIN();

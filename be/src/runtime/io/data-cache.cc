@@ -29,7 +29,6 @@
 
 #include "exec/kudu-util.h"
 #include "kudu/util/async_logger.h"
-#include "kudu/util/cache.h"
 #include "kudu/util/env.h"
 #include "kudu/util/jsonwriter.h"
 #include "kudu/util/locks.h"
@@ -40,6 +39,7 @@
 #include "gutil/strings/split.h"
 #include "gutil/walltime.h"
 #include "util/bit-util.h"
+#include "util/cache/cache.h"
 #include "util/error-util.h"
 #include "util/filesystem-util.h"
 #include "util/hash-util.h"
@@ -446,7 +446,7 @@ DataCache::Partition::Partition(
     capacity_(max<int64_t>(capacity, PAGE_SIZE)),
     max_opened_files_(max_opened_files),
     meta_cache_(
-        kudu::NewCache<kudu::Cache::EvictionPolicy::LRU, kudu::Cache::MemoryType::DRAM>(
+        NewCache<Cache::EvictionPolicy::LRU, Cache::MemoryType::DRAM>(
             capacity_, path_)) {}
 
 DataCache::Partition::~Partition() {
@@ -553,8 +553,7 @@ int64_t DataCache::Partition::Lookup(const CacheKey& cache_key, int64_t bytes_to
     uint8_t* buffer) {
   DCHECK(!closed_);
   Slice key = cache_key.ToSlice();
-  kudu::Cache::UniqueHandle handle(
-      meta_cache_->Lookup(key, kudu::Cache::EXPECT_IN_CACHE));
+  Cache::UniqueHandle handle(meta_cache_->Lookup(key, Cache::EXPECT_IN_CACHE));
 
   if (handle.get() == nullptr) {
     if (tracer_ != nullptr) {
@@ -589,7 +588,7 @@ int64_t DataCache::Partition::Lookup(const CacheKey& cache_key, int64_t bytes_to
 }
 
 bool DataCache::Partition::HandleExistingEntry(const Slice& key,
-    const kudu::Cache::UniqueHandle& handle, const uint8_t* buffer, int64_t buffer_len) {
+    const Cache::UniqueHandle& handle, const uint8_t* buffer, int64_t buffer_len) {
   // Unpack the cache entry.
   CacheEntry entry(meta_cache_->Value(handle));
 
@@ -612,7 +611,7 @@ bool DataCache::Partition::InsertIntoCache(const Slice& key, CacheFile* cache_fi
   const int64_t charge_len = BitUtil::RoundUp(buffer_len, PAGE_SIZE);
 
   // Allocate a cache handle
-  kudu::Cache::UniquePendingHandle pending_handle(
+  Cache::UniquePendingHandle pending_handle(
       meta_cache_->Allocate(key, sizeof(CacheEntry), charge_len));
   if (UNLIKELY(pending_handle.get() == nullptr)) return false;
 
@@ -629,7 +628,7 @@ bool DataCache::Partition::InsertIntoCache(const Slice& key, CacheFile* cache_fi
   // Insert the new entry into the cache.
   CacheEntry entry(cache_file, insertion_offset, buffer_len, checksum);
   memcpy(meta_cache_->MutableValue(&pending_handle), &entry, sizeof(CacheEntry));
-  kudu::Cache::UniqueHandle handle(meta_cache_->Insert(std::move(pending_handle), this));
+  Cache::UniqueHandle handle(meta_cache_->Insert(std::move(pending_handle), this));
   pending_handle = nullptr;
   ImpaladMetrics::IO_MGR_REMOTE_DATA_CACHE_TOTAL_BYTES->Increment(charge_len);
   return true;
@@ -645,8 +644,7 @@ bool DataCache::Partition::Store(const CacheKey& cache_key, const uint8_t* buffe
 
   // Check for existing entry.
   {
-    kudu::Cache::UniqueHandle handle(
-        meta_cache_->Lookup(key, kudu::Cache::EXPECT_IN_CACHE));
+    Cache::UniqueHandle handle(meta_cache_->Lookup(key, Cache::EXPECT_IN_CACHE));
     if (handle.get() != nullptr) {
       if (HandleExistingEntry(key, handle, buffer, buffer_len)) return false;
     }

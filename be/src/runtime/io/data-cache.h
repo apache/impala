@@ -25,15 +25,11 @@
 #include <gtest/gtest_prod.h>
 
 #include "common/status.h"
+#include "util/cache/cache.h"
 #include "util/spinlock.h"
 #include "util/thread-pool.h"
-#include "kudu/util/cache.h"
 #include "kudu/util/faststring.h"
 #include "kudu/util/slice.h"
-
-namespace kudu {
-class Cache;
-} // kudu
 
 /// This class is an implementation of an IO data cache which is backed by local storage.
 /// It implicitly relies on the OS page cache management to shuffle data between memory
@@ -192,7 +188,7 @@ class DataCache {
 
   /// An implementation of a cache partition. Each partition maintains its own set of
   /// cache keys in a LRU cache.
-  class Partition : public kudu::Cache::EvictionCallback {
+  class Partition : public Cache::EvictionCallback {
    public:
     /// Creates a partition at the given directory 'path' with quota 'capacity' in bytes.
     /// 'max_opened_files' is the maximum number of opened files allowed per partition.
@@ -298,7 +294,7 @@ class DataCache {
     ///
     /// A cache entry has type CacheEntry and it contains the metadata of the cached
     /// content. Please see comments at CachedEntry for details.
-    std::unique_ptr<kudu::Cache> meta_cache_;
+    std::unique_ptr<Cache> meta_cache_;
 
     std::unique_ptr<Tracer> tracer_;
 
@@ -325,7 +321,7 @@ class DataCache {
     /// work needs to be done. Returns false otherwise. In which case, the existing entry
     /// will be overwritten.
     bool HandleExistingEntry(const kudu::Slice& key,
-        const kudu::Cache::UniqueHandle& handle, const uint8_t* buffer,
+        const Cache::UniqueHandle& handle, const uint8_t* buffer,
         int64_t buffer_len);
 
     /// Helper function to insert a new entry with key 'key' into the LRU cache.

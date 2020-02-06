@@ -2,7 +2,7 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-#include "kudu/util/cache.h"
+#include "util/cache/cache.h"
 
 #include <atomic>
 #include <cstdint>
@@ -26,24 +26,16 @@
 #include "kudu/gutil/strings/substitute.h"
 #include "kudu/gutil/sysinfo.h"
 #include "kudu/util/alignment.h"
-#include "kudu/util/cache_metrics.h"
 #include "kudu/util/flag_tags.h"
 #include "kudu/util/locks.h"
 #include "kudu/util/malloc.h"
 #include "kudu/util/mem_tracker.h"
-#include "kudu/util/metrics.h"
 #include "kudu/util/slice.h"
-#include "kudu/util/test_util_prod.h"
 
 // Useful in tests that require accurate cache capacity accounting.
-DEFINE_bool(cache_force_single_shard, false,
-            "Override all cache implementations to use just one shard");
-TAG_FLAG(cache_force_single_shard, hidden);
+DECLARE_bool(cache_force_single_shard);
 
-DEFINE_double(cache_memtracker_approximation_ratio, 0.01,
-              "The MemTracker associated with a cache can accumulate error up to "
-              "this ratio to improve performance. For tests.");
-TAG_FLAG(cache_memtracker_approximation_ratio, hidden);
+DECLARE_double(cache_memtracker_approximation_ratio);
 
 using std::atomic;
 using std::shared_ptr;
@@ -51,7 +43,7 @@ using std::string;
 using std::unique_ptr;
 using std::vector;
 
-namespace kudu {
+namespace impala {
 
 Cache::~Cache() {
 }
@@ -200,7 +192,6 @@ string ToString(Cache::EvictionPolicy p) {
       return "lru";
     default:
       LOG(FATAL) << "unexpected cache eviction policy: " << static_cast<int>(p);
-      break;
   }
   return "unknown";
 }
@@ -209,7 +200,7 @@ string ToString(Cache::EvictionPolicy p) {
 template<Cache::EvictionPolicy policy>
 class CacheShard {
  public:
-  explicit CacheShard(MemTracker* tracker);
+  explicit CacheShard(kudu::MemTracker* tracker);
   ~CacheShard();
 
   // Separate from constructor so caller can easily make an array of CacheShard
@@ -217,8 +208,6 @@ class CacheShard {
     capacity_ = capacity;
     max_deferred_consumption_ = capacity * FLAGS_cache_memtracker_approximation_ratio;
   }
-
-  void SetMetrics(CacheMetrics* metrics) { metrics_ = metrics; }
 
   Cache::Handle* Insert(RLHandle* handle, Cache::EvictionCallback* eviction_callback);
   // Like Cache::Lookup, but with an extra "hash" parameter.
@@ -259,14 +248,11 @@ class CacheShard {
   // Positive delta indicates an increased memory consumption.
   void UpdateMemTracker(int64_t delta);
 
-  // Update the metrics for a lookup operation in the cache.
-  void UpdateMetricsLookup(bool was_hit, bool caching);
-
   // Initialized before use.
   size_t capacity_;
 
   // mutex_ protects the following state.
-  simple_spinlock mutex_;
+  kudu::simple_spinlock mutex_;
   size_t usage_;
 
   // Dummy head of recency list.
@@ -275,21 +261,18 @@ class CacheShard {
 
   HandleTable table_;
 
-  MemTracker* mem_tracker_;
+  kudu::MemTracker* mem_tracker_;
   atomic<int64_t> deferred_consumption_ { 0 };
 
   // Initialized based on capacity_ to ensure an upper bound on the error on the
   // MemTracker consumption.
   int64_t max_deferred_consumption_;
-
-  CacheMetrics* metrics_;
 };
 
 template<Cache::EvictionPolicy policy>
-CacheShard<policy>::CacheShard(MemTracker* tracker)
+CacheShard<policy>::CacheShard(kudu::MemTracker* tracker)
     : usage_(0),
-      mem_tracker_(tracker),
-      metrics_(nullptr) {
+      mem_tracker_(tracker) {
   // Make empty circular linked list.
   rl_.next = &rl_;
   rl_.prev = &rl_;
@@ -322,10 +305,6 @@ void CacheShard<policy>::FreeEntry(RLHandle* e) {
     e->eviction_callback->EvictedEntry(e->key(), e->value());
   }
   UpdateMemTracker(-static_cast<int64_t>(e->charge));
-  if (PREDICT_TRUE(metrics_)) {
-    metrics_->cache_usage->DecrementBy(e->charge);
-    metrics_->evictions->Increment();
-  }
   delete [] e;
 }
 
@@ -338,26 +317,6 @@ void CacheShard<policy>::UpdateMemTracker(int64_t delta) {
       new_deferred < -max_deferred_consumption_) {
     int64_t to_propagate = deferred_consumption_.exchange(0, std::memory_order_relaxed);
     mem_tracker_->Consume(to_propagate);
-  }
-}
-
-template<Cache::EvictionPolicy policy>
-void CacheShard<policy>::UpdateMetricsLookup(bool was_hit, bool caching) {
-  if (PREDICT_TRUE(metrics_)) {
-    metrics_->lookups->Increment();
-    if (was_hit) {
-      if (caching) {
-        metrics_->cache_hits_caching->Increment();
-      } else {
-        metrics_->cache_hits->Increment();
-      }
-    } else {
-      if (caching) {
-        metrics_->cache_misses_caching->Increment();
-      } else {
-        metrics_->cache_misses->Increment();
-      }
-    }
   }
 }
 
@@ -403,9 +362,6 @@ Cache::Handle* CacheShard<policy>::Lookup(const Slice& key,
     }
   }
 
-  // Do the metrics outside of the lock.
-  UpdateMetricsLookup(e != nullptr, caching);
-
   return reinterpret_cast<Cache::Handle*>(e);
 }
 
@@ -428,10 +384,6 @@ Cache::Handle* CacheShard<policy>::Insert(
   // Two refs for the handle: one from CacheShard, one for the returned handle.
   handle->refs.store(2, std::memory_order_relaxed);
   UpdateMemTracker(handle->charge);
-  if (PREDICT_TRUE(metrics_)) {
-    metrics_->cache_usage->IncrementBy(handle->charge);
-    metrics_->inserts->Increment();
-  }
 
   RLHandle* to_remove_head = nullptr;
   {
@@ -550,7 +502,7 @@ class ShardedCache : public Cache {
     // A cache is often a singleton, so:
     // 1. We reuse its MemTracker if one already exists, and
     // 2. It is directly parented to the root MemTracker.
-    mem_tracker_ = MemTracker::FindOrCreateGlobalTracker(
+    mem_tracker_ = kudu::MemTracker::FindOrCreateGlobalTracker(
         -1, strings::Substitute("$0-sharded_$1_cache", id, ToString(policy)));
 
     int num_shards = 1 << shard_bits_;
@@ -565,22 +517,6 @@ class ShardedCache : public Cache {
 
   virtual ~ShardedCache() {
     STLDeleteElements(&shards_);
-  }
-
-  void SetMetrics(std::unique_ptr<CacheMetrics> metrics) override {
-    // TODO(KUDU-2165): reuse of the Cache singleton across multiple MiniCluster servers
-    // causes TSAN errors. So, we'll ensure that metrics only get attached once, from
-    // whichever server starts first. This has the downside that, in test builds, we won't
-    // get accurate cache metrics, but that's probably better than spurious failures.
-    std::lock_guard<decltype(metrics_lock_)> l(metrics_lock_);
-    if (metrics_) {
-      CHECK(IsGTest()) << "Metrics should only be set once per Cache singleton";
-      return;
-    }
-    metrics_ = std::move(metrics);
-    for (auto* cache : shards_) {
-      cache->SetMetrics(metrics_.get());
-    }
   }
 
   UniqueHandle Lookup(const Slice& key, CacheBehavior caching) override {
@@ -624,7 +560,7 @@ class ShardedCache : public Cache {
     // TODO(KUDU-1091): account for the footprint of structures used by Cache's
     //                  internal housekeeping (RL handles, etc.) in case of
     //                  non-automatic charge.
-    handle->charge = (charge == kAutomaticCharge) ? kudu_malloc_usable_size(h.get())
+    handle->charge = (charge == kAutomaticCharge) ? kudu::kudu_malloc_usable_size(h.get())
                                                   : charge;
     handle->hash = HashSlice(key);
     memcpy(handle->kv_data, key.data(), key_len);
@@ -667,16 +603,11 @@ class ShardedCache : public Cache {
     return static_cast<uint64_t>(hash) >> (32 - shard_bits_);
   }
 
-  shared_ptr<MemTracker> mem_tracker_;
-  unique_ptr<CacheMetrics> metrics_;
+  shared_ptr<kudu::MemTracker> mem_tracker_;
   vector<CacheShard<policy>*> shards_;
 
   // Number of bits of hash used to determine the shard.
   const int shard_bits_;
-
-  // Protects 'metrics_'. Used only when metrics are set, to ensure
-  // that they are set only once in test environments.
-  simple_spinlock metrics_lock_;
 };
 
 }  // end anonymous namespace
@@ -698,9 +629,6 @@ std::ostream& operator<<(std::ostream& os, Cache::MemoryType mem_type) {
     case Cache::MemoryType::DRAM:
       os << "DRAM";
       break;
-    case Cache::MemoryType::NVM:
-      os << "NVM";
-      break;
     default:
       os << "unknown (" << static_cast<int>(mem_type) << ")";
       break;
@@ -708,4 +636,4 @@ std::ostream& operator<<(std::ostream& os, Cache::MemoryType mem_type) {
   return os;
 }
 
-}  // namespace kudu
+}  // namespace impala
