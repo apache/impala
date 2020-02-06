@@ -1297,6 +1297,15 @@ class TestOrc(ImpalaTestSuite):
       total += int(n)
     assert total == num_scanners_with_no_reads
 
+  # Skip this test on non-HDFS filesystems, because orc-type-check.test contains Hive
+  # queries that hang in some cases (IMPALA-9345). It would be possible to separate
+  # the tests that use Hive and run most tests on S3, but I think that running these on
+  # S3 doesn't add too much coverage.
+  @SkipIfABFS.hive
+  @SkipIfADLS.hive
+  @SkipIfIsilon.hive
+  @SkipIfLocal.hive
+  @SkipIfS3.hive
   def test_type_conversions(self, vector, unique_database):
     # Create "illtypes" tables whose columns can't match the underlining ORC file's.
     # Create an "safetypes" table likes above but ORC columns can still fit into it.
