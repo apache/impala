@@ -77,6 +77,7 @@ DECLARE_bool(recursively_list_partitions);
 DECLARE_string(query_event_hook_classes);
 DECLARE_int32(query_event_hook_nthreads);
 DECLARE_bool(is_executor);
+DECLARE_bool(is_coordinator);
 DECLARE_bool(use_dedicated_coordinator_estimates);
 DECLARE_string(blacklisted_dbs);
 DECLARE_bool(unlock_zorder_sort);
@@ -165,6 +166,7 @@ Status GetThriftBackendGflags(JNIEnv* jni_env, jbyteArray* cfg_bytes) {
   cfg.__set_query_event_hook_classes(FLAGS_query_event_hook_classes);
   cfg.__set_query_event_hook_nthreads(FLAGS_query_event_hook_nthreads);
   cfg.__set_is_executor(FLAGS_is_executor);
+  cfg.__set_is_coordinator(FLAGS_is_coordinator);
   cfg.__set_use_dedicated_coordinator_estimates(
       FLAGS_use_dedicated_coordinator_estimates);
   cfg.__set_blacklisted_dbs(FLAGS_blacklisted_dbs);

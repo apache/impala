@@ -230,4 +230,8 @@ public class BackendConfig {
       KerberosName.setRules(defaultRule);
     }
   }
+
+  public boolean isDedicatedCoordinator() {
+    return (backendCfg_.is_executor == false) && (backendCfg_.is_coordinator == true);
+  }
 }

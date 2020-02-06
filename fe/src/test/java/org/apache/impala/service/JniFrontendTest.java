@@ -17,19 +17,45 @@
 
 package org.apache.impala.service;
 
+import static org.junit.Assert.assertEquals;
+import static org.junit.Assert.assertTrue;
+import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.when;
+
+import java.io.File;
+import java.util.Random;
+
 import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.fs.CommonConfigurationKeys;
+import org.apache.hadoop.hdfs.DFSConfigKeys;
 import org.apache.hadoop.security.JniBasedUnixGroupsMappingWithFallback;
 import org.apache.hadoop.security.JniBasedUnixGroupsNetgroupMappingWithFallback;
 import org.apache.hadoop.security.ShellBasedUnixGroupsMapping;
 import org.apache.hadoop.security.ShellBasedUnixGroupsNetgroupMapping;
 import org.apache.impala.common.ImpalaException;
+import org.apache.impala.thrift.TBackendGflags;
+import org.junit.AfterClass;
+import org.junit.BeforeClass;
 import org.junit.Test;
 
-import static org.junit.Assert.assertEquals;
-import static org.junit.Assert.assertTrue;
-
 public class JniFrontendTest {
+  private static TBackendGflags origFlags;
+
+  @BeforeClass
+  public static void setup() {
+    // The original BackendConfig need to be mocked, we are saving the values here, so
+    // they can be restored and not break other tests
+    if (BackendConfig.INSTANCE == null) {
+      BackendConfig.create(new TBackendGflags());
+    }
+    origFlags = BackendConfig.INSTANCE.getBackendCfg();
+  }
+
+  @AfterClass
+  public static void teardown() {
+    BackendConfig.create(origFlags);
+  }
+
   @Test
   public void testCheckGroupsMappingProvider() throws ImpalaException {
     Configuration conf = new Configuration();
@@ -54,5 +80,46 @@ public class JniFrontendTest {
             "Consider using: %s instead.",
             ShellBasedUnixGroupsNetgroupMapping.class.getName(),
             JniBasedUnixGroupsNetgroupMappingWithFallback.class.getName()));
+  }
+
+  /**
+   * This test verifies whether short-circuit socket path parent directory configurations
+   * are skipped for coordinator-only mode instances and checked for executors. A socket
+   * directory is created in order to mock the file access.
+   */
+  @Test
+  public void testCheckShortCircuitConfigs() {
+    String tmpDir = System.getProperty("java.io.tmpdir", "/tmp");
+    File socketDir = new File(tmpDir + "/socketTest",
+        "socks." + (System.currentTimeMillis() + "." + (new Random().nextInt())));
+    socketDir.mkdirs();
+    socketDir.getParentFile().setExecutable(false);
+
+    Configuration conf = mock(Configuration.class);
+    when(conf.getBoolean(DFSConfigKeys.DFS_CLIENT_READ_SHORTCIRCUIT_KEY,
+        DFSConfigKeys.DFS_CLIENT_READ_SHORTCIRCUIT_DEFAULT)).thenReturn(true);
+    when(conf.getTrimmed(DFSConfigKeys.DFS_DOMAIN_SOCKET_PATH_KEY,
+        DFSConfigKeys.DFS_DOMAIN_SOCKET_PATH_DEFAULT))
+        .thenReturn(socketDir.getAbsolutePath());
+    when(conf.getBoolean(DFSConfigKeys.DFS_CLIENT_USE_LEGACY_BLOCKREADERLOCAL,
+        DFSConfigKeys.DFS_CLIENT_USE_LEGACY_BLOCKREADERLOCAL_DEFAULT)).thenReturn(false);
+    BackendConfig.INSTANCE = mock(BackendConfig.class);
+
+    when(BackendConfig.INSTANCE.isDedicatedCoordinator()).thenReturn(true);
+    String actualErrorMessage = JniFrontend.checkShortCircuitRead(conf);
+    assertEquals("", actualErrorMessage);
+
+    when(BackendConfig.INSTANCE.isDedicatedCoordinator()).thenReturn(false);
+    actualErrorMessage = JniFrontend.checkShortCircuitRead(conf);
+    assertEquals("Invalid short-circuit reads configuration:\n"
+        + "  - Impala cannot read or execute the parent directory of "
+        + DFSConfigKeys.DFS_DOMAIN_SOCKET_PATH_KEY + "\n",
+        actualErrorMessage);
+
+    if (socketDir != null) {
+      socketDir.getParentFile().setExecutable(true);
+      socketDir.delete();
+      socketDir.getParentFile().delete();
+    }
   }
 }

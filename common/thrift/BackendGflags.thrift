@@ -134,23 +134,25 @@ struct TBackendGflags {
 
   55: required bool is_executor
 
-  56: required bool use_dedicated_coordinator_estimates
+  56: required bool is_coordinator
 
-  57: required string blacklisted_dbs
+  57: required bool use_dedicated_coordinator_estimates
 
-  58: required string blacklisted_tables
+  58: required string blacklisted_dbs
 
-  59: required bool unlock_zorder_sort
+  59: required string blacklisted_tables
 
-  60: required string min_privilege_set_for_show_stmts
+  60: required bool unlock_zorder_sort
 
-  61: required bool mt_dop_auto_fallback
+  61: required string min_privilege_set_for_show_stmts
 
-  62: required i32 num_expected_executors
+  62: required bool mt_dop_auto_fallback
 
-  63: required i32 num_check_authorization_threads
+  63: required i32 num_expected_executors
 
-  64: required bool use_customized_user_groups_mapper_for_ranger
+  64: required i32 num_check_authorization_threads
 
-  65: required bool enable_column_masking
+  65: required bool use_customized_user_groups_mapper_for_ranger
+
+  66: required bool enable_column_masking
 }

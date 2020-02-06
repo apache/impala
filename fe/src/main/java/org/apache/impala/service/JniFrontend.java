@@ -718,7 +718,8 @@ public class JniFrontend {
    * Returns an error message if short circuit reads are enabled but misconfigured.
    * Otherwise, returns an empty string,
    */
-  private String checkShortCircuitRead(Configuration conf) {
+  @VisibleForTesting
+  protected static String checkShortCircuitRead(Configuration conf) {
     if (!conf.getBoolean(DFSConfigKeys.DFS_CLIENT_READ_SHORTCIRCUIT_KEY,
         DFSConfigKeys.DFS_CLIENT_READ_SHORTCIRCUIT_DEFAULT)) {
       LOG.info("Short-circuit reads are not enabled.");
@@ -741,7 +742,10 @@ public class JniFrontend {
       // The socket path parent directory must be readable and executable.
       File socketFile = new File(domainSocketPath);
       File socketDir = socketFile.getParentFile();
-      if (socketDir == null || !socketDir.canRead() || !socketDir.canExecute()) {
+      if (BackendConfig.INSTANCE.isDedicatedCoordinator()) {
+        LOG.warn("Dedicated coordinator instance will not read local data via "
+            + "short-circuit reads, socket path directory checks are skipped.");
+      } else if (socketDir == null || !socketDir.canRead() || !socketDir.canExecute()) {
         errorCause.append(prefix);
         errorCause.append("Impala cannot read or execute the parent directory of ");
         errorCause.append(DFSConfigKeys.DFS_DOMAIN_SOCKET_PATH_KEY);
