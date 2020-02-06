@@ -31,6 +31,7 @@
 #include "kudu/util/malloc.h"
 #include "kudu/util/mem_tracker.h"
 #include "kudu/util/slice.h"
+#include "util/cache/cache-internal.h"
 
 // Useful in tests that require accurate cache capacity accounting.
 DECLARE_bool(cache_force_single_shard);
@@ -65,156 +66,45 @@ namespace {
 // Recency list handle. An entry is a variable length heap-allocated structure.
 // Entries are kept in a circular doubly linked list ordered by some recency
 // criterion (e.g., access time for LRU policy, insertion time for FIFO policy).
-struct RLHandle {
+class RLHandle : public HandleBase {
+public:
+  RLHandle(uint8_t* kv_ptr, const Slice& key, int32_t hash, int val_len, int charge)
+    : HandleBase(kv_ptr, key, hash, val_len, charge) {}
+
+  RLHandle()
+    : HandleBase(nullptr, Slice(), 0, 0, 0) {}
+
   Cache::EvictionCallback* eviction_callback;
-  RLHandle* next_hash;
   RLHandle* next;
   RLHandle* prev;
-  size_t charge;      // TODO(opt): Only allow uint32_t?
-  uint32_t key_length;
-  uint32_t val_length;
   std::atomic<int32_t> refs;
-  uint32_t hash;      // Hash of key(); used for fast sharding and comparisons
-
-  // The storage for the key/value pair itself. The data is stored as:
-  //   [key bytes ...] [padding up to 8-byte boundary] [value bytes ...]
-  uint8_t kv_data[1];   // Beginning of key/value pair
-
-  Slice key() const {
-    return Slice(kv_data, key_length);
-  }
-
-  uint8_t* mutable_val_ptr() {
-    int val_offset = KUDU_ALIGN_UP(key_length, sizeof(void*));
-    return &kv_data[val_offset];
-  }
-
-  const uint8_t* val_ptr() const {
-    return const_cast<RLHandle*>(this)->mutable_val_ptr();
-  }
-
-  Slice value() const {
-    return Slice(val_ptr(), val_length);
-  }
 };
 
-// We provide our own simple hash table since it removes a whole bunch
-// of porting hacks and is also faster than some of the built-in hash
-// table implementations in some of the compiler/runtime combinations
-// we have tested.  E.g., readrandom speeds up by ~5% over the g++
-// 4.4.3's builtin hashtable.
-class HandleTable {
- public:
-  HandleTable() : length_(0), elems_(0), list_(nullptr) { Resize(); }
-  ~HandleTable() { delete[] list_; }
-
-  RLHandle* Lookup(const Slice& key, uint32_t hash) {
-    return *FindPointer(key, hash);
-  }
-
-  RLHandle* Insert(RLHandle* h) {
-    RLHandle** ptr = FindPointer(h->key(), h->hash);
-    RLHandle* old = *ptr;
-    h->next_hash = (old == nullptr ? nullptr : old->next_hash);
-    *ptr = h;
-    if (old == nullptr) {
-      ++elems_;
-      if (elems_ > length_) {
-        // Since each cache entry is fairly large, we aim for a small
-        // average linked list length (<= 1).
-        Resize();
-      }
-    }
-    return old;
-  }
-
-  RLHandle* Remove(const Slice& key, uint32_t hash) {
-    RLHandle** ptr = FindPointer(key, hash);
-    RLHandle* result = *ptr;
-    if (result != nullptr) {
-      *ptr = result->next_hash;
-      --elems_;
-    }
-    return result;
-  }
-
- private:
-  // The table consists of an array of buckets where each bucket is
-  // a linked list of cache entries that hash into the bucket.
-  uint32_t length_;
-  uint32_t elems_;
-  RLHandle** list_;
-
-  // Return a pointer to slot that points to a cache entry that
-  // matches key/hash.  If there is no such cache entry, return a
-  // pointer to the trailing slot in the corresponding linked list.
-  RLHandle** FindPointer(const Slice& key, uint32_t hash) {
-    RLHandle** ptr = &list_[hash & (length_ - 1)];
-    while (*ptr != nullptr &&
-           ((*ptr)->hash != hash || key != (*ptr)->key())) {
-      ptr = &(*ptr)->next_hash;
-    }
-    return ptr;
-  }
-
-  void Resize() {
-    uint32_t new_length = 16;
-    while (new_length < elems_ * 1.5) {
-      new_length *= 2;
-    }
-    auto new_list = new RLHandle*[new_length];
-    memset(new_list, 0, sizeof(new_list[0]) * new_length);
-    uint32_t count = 0;
-    for (uint32_t i = 0; i < length_; i++) {
-      RLHandle* h = list_[i];
-      while (h != nullptr) {
-        RLHandle* next = h->next_hash;
-        uint32_t hash = h->hash;
-        RLHandle** ptr = &new_list[hash & (new_length - 1)];
-        h->next_hash = *ptr;
-        *ptr = h;
-        h = next;
-        count++;
-      }
-    }
-    DCHECK_EQ(elems_, count);
-    delete[] list_;
-    list_ = new_list;
-    length_ = new_length;
-  }
-};
-
-string ToString(Cache::EvictionPolicy p) {
-  switch (p) {
-    case Cache::EvictionPolicy::FIFO:
-      return "fifo";
-    case Cache::EvictionPolicy::LRU:
-      return "lru";
-    default:
-      LOG(FATAL) << "unexpected cache eviction policy: " << static_cast<int>(p);
-  }
-  return "unknown";
-}
-
-// A single shard of sharded cache.
+// A single shard of a cache that uses a recency list based eviction policy
 template<Cache::EvictionPolicy policy>
-class CacheShard {
+class RLCacheShard : public CacheShard {
+  static_assert(
+      policy == Cache::EvictionPolicy::LRU || policy == Cache::EvictionPolicy::FIFO,
+      "RLCacheShard only supports LRU or FIFO");
+
  public:
-  explicit CacheShard(kudu::MemTracker* tracker);
-  ~CacheShard();
+  explicit RLCacheShard(kudu::MemTracker* tracker);
+  ~RLCacheShard();
 
   // Separate from constructor so caller can easily make an array of CacheShard
-  void SetCapacity(size_t capacity) {
+  void SetCapacity(size_t capacity) override {
     capacity_ = capacity;
     max_deferred_consumption_ = capacity * FLAGS_cache_memtracker_approximation_ratio;
   }
 
-  Cache::Handle* Insert(RLHandle* handle, Cache::EvictionCallback* eviction_callback);
-  // Like Cache::Lookup, but with an extra "hash" parameter.
-  Cache::Handle* Lookup(const Slice& key, uint32_t hash, bool caching);
-  void Release(Cache::Handle* handle);
-  void Erase(const Slice& key, uint32_t hash);
-  size_t Invalidate(const Cache::InvalidationControl& ctl);
+  HandleBase* Allocate(Slice key, uint32_t hash, int val_len, int charge) override;
+  void Free(HandleBase* handle) override;
+  HandleBase* Insert(HandleBase* handle,
+      Cache::EvictionCallback* eviction_callback) override;
+  HandleBase* Lookup(const Slice& key, uint32_t hash, bool caching) override;
+  void Release(HandleBase* handle) override;
+  void Erase(const Slice& key, uint32_t hash) override;
+  size_t Invalidate(const Cache::InvalidationControl& ctl) override;
 
  private:
   void RL_Remove(RLHandle* e);
@@ -270,16 +160,16 @@ class CacheShard {
 };
 
 template<Cache::EvictionPolicy policy>
-CacheShard<policy>::CacheShard(kudu::MemTracker* tracker)
-    : usage_(0),
-      mem_tracker_(tracker) {
+RLCacheShard<policy>::RLCacheShard(kudu::MemTracker* tracker)
+  : usage_(0),
+    mem_tracker_(tracker) {
   // Make empty circular linked list.
   rl_.next = &rl_;
   rl_.prev = &rl_;
 }
 
 template<Cache::EvictionPolicy policy>
-CacheShard<policy>::~CacheShard() {
+RLCacheShard<policy>::~RLCacheShard() {
   for (RLHandle* e = rl_.next; e != &rl_; ) {
     RLHandle* next = e->next;
     DCHECK_EQ(e->refs.load(std::memory_order_relaxed), 1)
@@ -293,23 +183,23 @@ CacheShard<policy>::~CacheShard() {
 }
 
 template<Cache::EvictionPolicy policy>
-bool CacheShard<policy>::Unref(RLHandle* e) {
+bool RLCacheShard<policy>::Unref(RLHandle* e) {
   DCHECK_GT(e->refs.load(std::memory_order_relaxed), 0);
   return e->refs.fetch_sub(1) == 1;
 }
 
 template<Cache::EvictionPolicy policy>
-void CacheShard<policy>::FreeEntry(RLHandle* e) {
+void RLCacheShard<policy>::FreeEntry(RLHandle* e) {
   DCHECK_EQ(e->refs.load(std::memory_order_relaxed), 0);
   if (e->eviction_callback) {
     e->eviction_callback->EvictedEntry(e->key(), e->value());
   }
-  UpdateMemTracker(-static_cast<int64_t>(e->charge));
-  delete [] e;
+  UpdateMemTracker(-static_cast<int64_t>(e->charge()));
+  Free(e);
 }
 
 template<Cache::EvictionPolicy policy>
-void CacheShard<policy>::UpdateMemTracker(int64_t delta) {
+void RLCacheShard<policy>::UpdateMemTracker(int64_t delta) {
   int64_t old_deferred = deferred_consumption_.fetch_add(delta);
   int64_t new_deferred = old_deferred + delta;
 
@@ -321,53 +211,84 @@ void CacheShard<policy>::UpdateMemTracker(int64_t delta) {
 }
 
 template<Cache::EvictionPolicy policy>
-void CacheShard<policy>::RL_Remove(RLHandle* e) {
+void RLCacheShard<policy>::RL_Remove(RLHandle* e) {
   e->next->prev = e->prev;
   e->prev->next = e->next;
-  DCHECK_GE(usage_, e->charge);
-  usage_ -= e->charge;
+  DCHECK_GE(usage_, e->charge());
+  usage_ -= e->charge();
 }
 
 template<Cache::EvictionPolicy policy>
-void CacheShard<policy>::RL_Append(RLHandle* e) {
+void RLCacheShard<policy>::RL_Append(RLHandle* e) {
   // Make "e" newest entry by inserting just before rl_.
   e->next = &rl_;
   e->prev = rl_.prev;
   e->prev->next = e;
   e->next->prev = e;
-  usage_ += e->charge;
+  usage_ += e->charge();
 }
 
 template<>
-void CacheShard<Cache::EvictionPolicy::FIFO>::RL_UpdateAfterLookup(RLHandle* /* e */) {
+void RLCacheShard<Cache::EvictionPolicy::FIFO>::RL_UpdateAfterLookup(RLHandle* /* e */) {
 }
 
 template<>
-void CacheShard<Cache::EvictionPolicy::LRU>::RL_UpdateAfterLookup(RLHandle* e) {
+void RLCacheShard<Cache::EvictionPolicy::LRU>::RL_UpdateAfterLookup(RLHandle* e) {
   RL_Remove(e);
   RL_Append(e);
 }
 
 template<Cache::EvictionPolicy policy>
-Cache::Handle* CacheShard<policy>::Lookup(const Slice& key,
-                                          uint32_t hash,
-                                          bool caching) {
+HandleBase* RLCacheShard<policy>::Allocate(Slice key, uint32_t hash, int val_len,
+    int charge) {
+  int key_len = key.size();
+  DCHECK_GE(key_len, 0);
+  DCHECK_GE(val_len, 0);
+  int key_len_padded = KUDU_ALIGN_UP(key_len, sizeof(void*));
+  uint8_t* buf = new uint8_t[sizeof(RLHandle)
+                             + key_len_padded + val_len]; // the kv_data VLA data
+  // TODO(KUDU-1091): account for the footprint of structures used by Cache's
+  //                  internal housekeeping (RL handles, etc.) in case of
+  //                  non-automatic charge.
+  int calc_charge =
+    (charge == Cache::kAutomaticCharge) ? kudu::kudu_malloc_usable_size(buf) : charge;
+  uint8_t* kv_ptr = buf + sizeof(RLHandle);
+  RLHandle* handle = new (buf) RLHandle(kv_ptr, key, hash, val_len,
+      calc_charge);
+  return handle;
+}
+
+template<Cache::EvictionPolicy policy>
+void RLCacheShard<policy>::Free(HandleBase* handle) {
+  // We allocate the handle as a uint8_t array, then we call a placement new,
+  // which calls the constructor. For symmetry, we call the destructor and then
+  // delete on the uint8_t array.
+  RLHandle* h = static_cast<RLHandle*>(handle);
+  h->~RLHandle();
+  uint8_t* data = reinterpret_cast<uint8_t*>(handle);
+  delete [] data;
+}
+
+template<Cache::EvictionPolicy policy>
+HandleBase* RLCacheShard<policy>::Lookup(const Slice& key,
+                                         uint32_t hash,
+                                         bool caching) {
   RLHandle* e;
   {
     std::lock_guard<decltype(mutex_)> l(mutex_);
-    e = table_.Lookup(key, hash);
+    e = static_cast<RLHandle*>(table_.Lookup(key, hash));
     if (e != nullptr) {
       e->refs.fetch_add(1, std::memory_order_relaxed);
       RL_UpdateAfterLookup(e);
     }
   }
 
-  return reinterpret_cast<Cache::Handle*>(e);
+  return e;
 }
 
 template<Cache::EvictionPolicy policy>
-void CacheShard<policy>::Release(Cache::Handle* handle) {
-  RLHandle* e = reinterpret_cast<RLHandle*>(handle);
+void RLCacheShard<policy>::Release(HandleBase* handle) {
+  RLHandle* e = static_cast<RLHandle*>(handle);
   bool last_reference = Unref(e);
   if (last_reference) {
     FreeEntry(e);
@@ -375,15 +296,16 @@ void CacheShard<policy>::Release(Cache::Handle* handle) {
 }
 
 template<Cache::EvictionPolicy policy>
-Cache::Handle* CacheShard<policy>::Insert(
-    RLHandle* handle,
+HandleBase* RLCacheShard<policy>::Insert(
+    HandleBase* handle_in,
     Cache::EvictionCallback* eviction_callback) {
+  RLHandle* handle = static_cast<RLHandle*>(handle_in);
   // Set the remaining RLHandle members which were not already allocated during
   // Allocate().
   handle->eviction_callback = eviction_callback;
-  // Two refs for the handle: one from CacheShard, one for the returned handle.
+  // Two refs for the handle: one from RLCacheShard, one for the returned handle.
   handle->refs.store(2, std::memory_order_relaxed);
-  UpdateMemTracker(handle->charge);
+  UpdateMemTracker(handle->charge());
 
   RLHandle* to_remove_head = nullptr;
   {
@@ -391,7 +313,7 @@ Cache::Handle* CacheShard<policy>::Insert(
 
     RL_Append(handle);
 
-    RLHandle* old = table_.Insert(handle);
+    RLHandle* old = static_cast<RLHandle*>(table_.Insert(handle));
     if (old != nullptr) {
       RL_Remove(old);
       if (Unref(old)) {
@@ -403,7 +325,7 @@ Cache::Handle* CacheShard<policy>::Insert(
     while (usage_ > capacity_ && rl_.next != &rl_) {
       RLHandle* old = rl_.next;
       RL_Remove(old);
-      table_.Remove(old->key(), old->hash);
+      table_.Remove(old->key(), old->hash());
       if (Unref(old)) {
         old->next = to_remove_head;
         to_remove_head = old;
@@ -419,16 +341,16 @@ Cache::Handle* CacheShard<policy>::Insert(
     to_remove_head = next;
   }
 
-  return reinterpret_cast<Cache::Handle*>(handle);
+  return handle;
 }
 
 template<Cache::EvictionPolicy policy>
-void CacheShard<policy>::Erase(const Slice& key, uint32_t hash) {
+void RLCacheShard<policy>::Erase(const Slice& key, uint32_t hash) {
   RLHandle* e;
   bool last_reference = false;
   {
     std::lock_guard<decltype(mutex_)> l(mutex_);
-    e = table_.Remove(key, hash);
+    e = static_cast<RLHandle*>(table_.Remove(key, hash));
     if (e != nullptr) {
       RL_Remove(e);
       last_reference = Unref(e);
@@ -442,7 +364,7 @@ void CacheShard<policy>::Erase(const Slice& key, uint32_t hash) {
 }
 
 template<Cache::EvictionPolicy policy>
-size_t CacheShard<policy>::Invalidate(const Cache::InvalidationControl& ctl) {
+size_t RLCacheShard<policy>::Invalidate(const Cache::InvalidationControl& ctl) {
   size_t invalid_entry_count = 0;
   size_t valid_entry_count = 0;
   RLHandle* to_remove_head = nullptr;
@@ -466,7 +388,7 @@ size_t CacheShard<policy>::Invalidate(const Cache::InvalidationControl& ctl) {
       h = h->next;
 
       RL_Remove(h_to_remove);
-      table_.Remove(h_to_remove->key(), h_to_remove->hash);
+      table_.Remove(h_to_remove->key(), h_to_remove->hash());
       if (Unref(h_to_remove)) {
         h_to_remove->next = to_remove_head;
         to_remove_head = h_to_remove;
@@ -485,6 +407,8 @@ size_t CacheShard<policy>::Invalidate(const Cache::InvalidationControl& ctl) {
   return invalid_entry_count;
 }
 
+}  // end anonymous namespace
+
 // Determine the number of bits of the hash that should be used to determine
 // the cache shard. This, in turn, determines the number of shards.
 int DetermineShardBits() {
@@ -494,123 +418,17 @@ int DetermineShardBits() {
   return bits;
 }
 
-template<Cache::EvictionPolicy policy>
-class ShardedCache : public Cache {
- public:
-  explicit ShardedCache(size_t capacity, const string& id)
-        : shard_bits_(DetermineShardBits()) {
-    // A cache is often a singleton, so:
-    // 1. We reuse its MemTracker if one already exists, and
-    // 2. It is directly parented to the root MemTracker.
-    mem_tracker_ = kudu::MemTracker::FindOrCreateGlobalTracker(
-        -1, strings::Substitute("$0-sharded_$1_cache", id, ToString(policy)));
-
-    int num_shards = 1 << shard_bits_;
-    const size_t per_shard = (capacity + (num_shards - 1)) / num_shards;
-    for (int s = 0; s < num_shards; s++) {
-      unique_ptr<CacheShard<policy>> shard(
-          new CacheShard<policy>(mem_tracker_.get()));
-      shard->SetCapacity(per_shard);
-      shards_.push_back(shard.release());
-    }
+string ToString(Cache::EvictionPolicy p) {
+  switch (p) {
+    case Cache::EvictionPolicy::FIFO:
+      return "fifo";
+    case Cache::EvictionPolicy::LRU:
+      return "lru";
+    default:
+      LOG(FATAL) << "unexpected cache eviction policy: " << static_cast<int>(p);
   }
-
-  virtual ~ShardedCache() {
-    STLDeleteElements(&shards_);
-  }
-
-  UniqueHandle Lookup(const Slice& key, CacheBehavior caching) override {
-    const uint32_t hash = HashSlice(key);
-    return UniqueHandle(
-        shards_[Shard(hash)]->Lookup(key, hash, caching == EXPECT_IN_CACHE),
-        Cache::HandleDeleter(this));
-  }
-
-  void Erase(const Slice& key) override {
-    const uint32_t hash = HashSlice(key);
-    shards_[Shard(hash)]->Erase(key, hash);
-  }
-
-  Slice Value(const UniqueHandle& handle) const override {
-    return reinterpret_cast<const RLHandle*>(handle.get())->value();
-  }
-
-  UniqueHandle Insert(UniquePendingHandle handle,
-                      Cache::EvictionCallback* eviction_callback) override {
-    RLHandle* h = reinterpret_cast<RLHandle*>(DCHECK_NOTNULL(handle.release()));
-    return UniqueHandle(
-        shards_[Shard(h->hash)]->Insert(h, eviction_callback),
-        Cache::HandleDeleter(this));
-  }
-
-  UniquePendingHandle Allocate(Slice key, int val_len, int charge) override {
-    int key_len = key.size();
-    DCHECK_GE(key_len, 0);
-    DCHECK_GE(val_len, 0);
-    int key_len_padded = KUDU_ALIGN_UP(key_len, sizeof(void*));
-    UniquePendingHandle h(reinterpret_cast<PendingHandle*>(
-        new uint8_t[sizeof(RLHandle)
-                    + key_len_padded + val_len // the kv_data VLA data
-                    - 1 // (the VLA has a 1-byte placeholder)
-                   ]),
-        PendingHandleDeleter(this));
-    RLHandle* handle = reinterpret_cast<RLHandle*>(h.get());
-    handle->key_length = key_len;
-    handle->val_length = val_len;
-    // TODO(KUDU-1091): account for the footprint of structures used by Cache's
-    //                  internal housekeeping (RL handles, etc.) in case of
-    //                  non-automatic charge.
-    handle->charge = (charge == kAutomaticCharge) ? kudu::kudu_malloc_usable_size(h.get())
-                                                  : charge;
-    handle->hash = HashSlice(key);
-    memcpy(handle->kv_data, key.data(), key_len);
-
-    return h;
-  }
-
-  uint8_t* MutableValue(UniquePendingHandle* handle) override {
-    return reinterpret_cast<RLHandle*>(handle->get())->mutable_val_ptr();
-  }
-
-  size_t Invalidate(const InvalidationControl& ctl) override {
-    size_t invalidated_count = 0;
-    for (auto& shard: shards_) {
-      invalidated_count += shard->Invalidate(ctl);
-    }
-    return invalidated_count;
-  }
-
- protected:
-  void Release(Handle* handle) override {
-    RLHandle* h = reinterpret_cast<RLHandle*>(handle);
-    shards_[Shard(h->hash)]->Release(handle);
-  }
-
-  void Free(PendingHandle* h) override {
-    uint8_t* data = reinterpret_cast<uint8_t*>(h);
-    delete [] data;
-  }
-
- private:
-  static inline uint32_t HashSlice(const Slice& s) {
-    return util_hash::CityHash64(
-      reinterpret_cast<const char *>(s.data()), s.size());
-  }
-
-  uint32_t Shard(uint32_t hash) {
-    // Widen to uint64 before shifting, or else on a single CPU,
-    // we would try to shift a uint32_t by 32 bits, which is undefined.
-    return static_cast<uint64_t>(hash) >> (32 - shard_bits_);
-  }
-
-  shared_ptr<kudu::MemTracker> mem_tracker_;
-  vector<CacheShard<policy>*> shards_;
-
-  // Number of bits of hash used to determine the shard.
-  const int shard_bits_;
-};
-
-}  // end anonymous namespace
+  return "unknown";
+}
 
 template<>
 Cache* NewCache<Cache::EvictionPolicy::FIFO,
@@ -622,6 +440,11 @@ template<>
 Cache* NewCache<Cache::EvictionPolicy::LRU,
                 Cache::MemoryType::DRAM>(size_t capacity, const std::string& id) {
   return new ShardedCache<Cache::EvictionPolicy::LRU>(capacity, id);
+}
+
+template<Cache::EvictionPolicy policy>
+CacheShard* NewCacheShard(kudu::MemTracker* mem_tracker) {
+  return new RLCacheShard<policy>(mem_tracker);
 }
 
 std::ostream& operator<<(std::ostream& os, Cache::MemoryType mem_type) {
