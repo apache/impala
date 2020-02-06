@@ -18,16 +18,13 @@
 import random
 import string
 import pytest
-import json
-import time
-import requests
 
-from tests.common.skip import SkipIfS3, SkipIfABFS, SkipIfADLS, SkipIfIsilon, \
-    SkipIfLocal, SkipIfHive2
+from tests.common.skip import SkipIfHive2
 from tests.common.custom_cluster_test_suite import CustomClusterTestSuite
 from tests.common.skip import SkipIfS3, SkipIfABFS, SkipIfADLS, SkipIfIsilon, SkipIfLocal
 from tests.util.hive_utils import HiveDbWrapper
 from tests.util.event_processor_utils import EventProcessorUtils
+from tests.util.filesystem_utils import WAREHOUSE
 
 
 @SkipIfS3.hive
@@ -242,8 +239,12 @@ class TestEventProcessing(CustomClusterTestSuite):
     self_event_test_queries = {
       # Queries which will increment the self-events-skipped counter
       True: [
+          # ALTER_DATABASE case
           "comment on database {0} is 'self-event test database'".format(db_name),
           "alter database {0} set owner user `test-user`".format(db_name),
+          "create function {0}.f() returns int location '{1}/libTestUdfs.so' "
+          "symbol='NoArgs'".format(db_name, WAREHOUSE),
+          "drop function {0}.f()".format(db_name),
           # ALTER_TABLE case
           "alter table {0}.{1} set TBLPROPERTIES ('k'='v')".format(db_name, tbl_name),
           "alter table {0}.{1} ADD COLUMN c1 int".format(db_name, tbl_name),

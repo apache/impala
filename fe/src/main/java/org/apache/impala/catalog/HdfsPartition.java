@@ -851,18 +851,14 @@ public class HdfsPartition implements FeFsPartition, PrunablePartition {
   }
 
   /**
-   * Gets the current list of versions for in-flight events for this partition
-   */
-  public List<Long> getVersionsForInflightEvents() {
-    return inFlightEvents_.getAll();
-  }
-
-  /**
    * Removes a given version from the in-flight events
    * @param versionNumber version number to remove
    * @return true if the versionNumber was removed, false if it didn't exist
    */
   public boolean removeFromVersionsForInflightEvents(long versionNumber) {
+    Preconditions.checkState(table_.getLock().isHeldByCurrentThread(),
+        "removeFromVersionsForInflightEvents called without holding the table lock on "
+            + "partition " + getPartitionName() + " of table " + table_.getFullName());
     return inFlightEvents_.remove(versionNumber);
   }
 
@@ -871,6 +867,9 @@ public class HdfsPartition implements FeFsPartition, PrunablePartition {
    * @param versionNumber version number to add
    */
   public void addToVersionsForInflightEvents(long versionNumber) {
+    Preconditions.checkState(table_.getLock().isHeldByCurrentThread(),
+        "addToVersionsForInflightEvents called without holding the table lock on "
+            + "partition " + getPartitionName() + " of table " + table_.getFullName());
     if (!inFlightEvents_.add(versionNumber)) {
       LOG.warn(String.format("Could not add %s version to the partition %s of table %s. "
           + "This could cause unnecessary refresh of the partition when the event is"
@@ -881,17 +880,22 @@ public class HdfsPartition implements FeFsPartition, PrunablePartition {
 
   /**
    * Adds the version from the given Partition parameters. No-op if the parameters does
-   * not contain the <code>MetastoreEventPropertyKey.CATALOG_VERSION</code>
+   * not contain the <code>MetastoreEventPropertyKey.CATALOG_VERSION</code>. This is
+   * done to detect add partition events from this catalog which are generated when
+   * partitions are added or recovered.
    */
   private void addInflightVersionsFromParameters() {
     Preconditions.checkNotNull(hmsParameters_);
     Preconditions.checkState(inFlightEvents_.size() == 0);
+    // we should not check for table lock being held here since there are certain code
+    // paths which call this method without holding the table lock (eg. getOrLoadTable())
     if (!hmsParameters_.containsKey(MetastoreEventPropertyKey.CATALOG_VERSION.getKey())) {
       return;
     }
     inFlightEvents_.add(Long.parseLong(
             hmsParameters_.get(MetastoreEventPropertyKey.CATALOG_VERSION.getKey())));
   }
+
   /**
    * Marks this partition's metadata as "dirty" indicating that changes have been
    * made and this partition's metadata should not be reused during the next

@@ -21,10 +21,10 @@ import java.util.ArrayList;
 import java.util.Base64;
 import java.util.Collections;
 import java.util.HashMap;
-import java.util.LinkedList;
 import java.util.List;
 import java.util.Map;
 import java.util.concurrent.atomic.AtomicReference;
+import java.util.concurrent.locks.ReentrantLock;
 
 import org.apache.hadoop.hive.metastore.api.Database;
 import org.apache.impala.analysis.ColumnDef;
@@ -100,6 +100,10 @@ public class Db extends CatalogObjectImpl implements FeDb {
   // tracks the in-flight metastore events for this db
   private final InFlightEvents inFlightEvents_ = new InFlightEvents();
 
+  // lock to make sure modifications to the Db object are atomically done along with
+  // its associated HMS operation (eg. alterDbOwner or commentOnDb)
+  private final ReentrantLock dbLock_ = new ReentrantLock();
+
   public Db(String name, org.apache.hadoop.hive.metastore.api.Database msDb) {
     setMetastoreDb(name, msDb);
     tableCache_ = new CatalogObjectCache<>();
@@ -138,6 +142,8 @@ public class Db extends CatalogObjectImpl implements FeDb {
     if (msDb.getParameters() == null) return false;
     return msDb.getParameters().remove(k) != null;
   }
+
+  public ReentrantLock getLock() { return dbLock_; }
 
   @Override // FeDb
   public boolean isSystemDb() { return isSystemDb_; }
@@ -497,18 +503,14 @@ public class Db extends CatalogObjectImpl implements FeDb {
   }
 
   /**
-   * Gets the current list of versions for in-flight events for this database
-   */
-  public List<Long> getVersionsForInflightEvents() {
-    return inFlightEvents_.getAll();
-  }
-
-  /**
    * Removes a given version from the collection of version numbers for in-flight events
    * @param versionNumber version number to remove from the collection
    * @return true if version was successfully removed, false if didn't exist
    */
   public boolean removeFromVersionsForInflightEvents(long versionNumber) {
+    Preconditions.checkState(dbLock_.isHeldByCurrentThread(),
+        "removeFromVersionsForInflightEvents called without getting the db lock for "
+            + getName() + " database.");
     return inFlightEvents_.remove(versionNumber);
   }
 
@@ -520,6 +522,9 @@ public class Db extends CatalogObjectImpl implements FeDb {
    * @param versionNumber version number to add
    */
   public void addToVersionsForInflightEvents(long versionNumber) {
+    Preconditions.checkState(dbLock_.isHeldByCurrentThread(),
+        "addToVersionsForInFlightEvents called without getting the db lock for "
+            + getName() + " database.");
     if (!inFlightEvents_.add(versionNumber)) {
       LOG.warn(String.format("Could not add version %s to the list of in-flight "
           + "events. This could cause unnecessary database %s invalidation when the "
