@@ -21,7 +21,6 @@ import java.io.IOException;
 import java.nio.ByteBuffer;
 import java.util.ArrayList;
 import java.util.Collection;
-import java.util.Collections;
 import java.util.HashMap;
 import java.util.HashSet;
 import java.util.List;
@@ -192,9 +191,9 @@ public class CatalogServiceCatalog extends Catalog {
   private static final int MAX_NUM_SKIPPED_TOPIC_UPDATES = 2;
   // Timeout for acquiring a table lock
   // TODO: Make this configurable
-  private static final long TBL_LOCK_TIMEOUT_MS = 7200000;
+  private static final long LOCK_RETRY_TIMEOUT_MS = 7200000;
   // Time to sleep before retrying to acquire a table lock
-  private static final int TBL_LOCK_RETRY_MS = 10;
+  private static final int LOCK_RETRY_DELAY_MS = 10;
 
   private final TUniqueId catalogServiceId_;
 
@@ -402,8 +401,9 @@ public class CatalogServiceCatalog extends Catalog {
 
   /**
    * Tries to acquire versionLock_ and the lock of 'tbl' in that order. Returns true if it
-   * successfully acquires both within TBL_LOCK_TIMEOUT_MS millisecs; both locks are held
-   * when the function returns. Returns false otherwise and no lock is held in this case.
+   * successfully acquires both within LOCK_RETRY_TIMEOUT_MS millisecs; both locks are
+   * held when the function returns. Returns false otherwise and no lock is held in
+   * this case.
    */
   public boolean tryLockTable(Table tbl) {
     try (ThreadNameAnnotator tna = new ThreadNameAnnotator(
@@ -423,12 +423,45 @@ public class CatalogServiceCatalog extends Catalog {
         versionLock_.writeLock().unlock();
         try {
           // Sleep to avoid spinning and allow other operations to make progress.
-          Thread.sleep(TBL_LOCK_RETRY_MS);
+          Thread.sleep(LOCK_RETRY_DELAY_MS);
         } catch (InterruptedException e) {
           // ignore
         }
         end = System.currentTimeMillis();
-      } while (end - begin < TBL_LOCK_TIMEOUT_MS);
+      } while (end - begin < LOCK_RETRY_TIMEOUT_MS);
+      return false;
+    }
+  }
+
+  /**
+   * Similar to tryLock on a table, but works on a database object instead of Table.
+   * TODO: Refactor the code so that both table and db can be "lockable" using a single
+   * method.
+   */
+  public boolean tryLockDb(Db db) {
+    try (ThreadNameAnnotator tna = new ThreadNameAnnotator(
+        "Attempting to lock database " + db.getName())) {
+      long begin = System.currentTimeMillis();
+      long end;
+      do {
+        versionLock_.writeLock().lock();
+        if (db.getLock().tryLock()) {
+          if (LOG.isTraceEnabled()) {
+            end = System.currentTimeMillis();
+            LOG.trace(String.format("Lock for db %s was acquired in %d msec",
+                db.getName(), end - begin));
+          }
+          return true;
+        }
+        versionLock_.writeLock().unlock();
+        try {
+          // Sleep to avoid spinning and allow other operations to make progress.
+          Thread.sleep(LOCK_RETRY_DELAY_MS);
+        } catch (InterruptedException e) {
+          // ignore
+        }
+        end = System.currentTimeMillis();
+      } while (end - begin < LOCK_RETRY_TIMEOUT_MS);
       return false;
     }
   }
@@ -781,42 +814,6 @@ public class CatalogServiceCatalog extends Catalog {
   }
 
   /**
-   * Gets the list of versions for in-flight events for the given table. Applicable
-   * only when external event processing is enabled.
-   * @param dbName database name
-   * @param tblName table name
-   * @return List of previous version numbers for in-flight events on this table.
-   * If table is not laoded returns a empty list. If event processing is disabled,
-   * returns a empty list
-   */
-  public List<Long> getInFlightVersionsForEvents(String dbName, String tblName)
-      throws DatabaseNotFoundException, TableNotFoundException {
-    Preconditions.checkState(isEventProcessingActive(),
-        "Event processing should be enabled before calling this method");
-    List<Long> result = Collections.EMPTY_LIST;
-    versionLock_.readLock().lock();
-    try {
-      Db db = getDb(dbName);
-      if (db == null) {
-        throw new DatabaseNotFoundException(
-            String.format("Database %s not found", dbName));
-      }
-      if (tblName == null) {
-        return db.getVersionsForInflightEvents();
-      }
-      Table tbl = getTable(dbName, tblName);
-      if (tbl == null) {
-        throw new TableNotFoundException(
-            String.format("Table %s not found", new TableName(dbName, tblName)));
-      }
-      if (tbl instanceof IncompleteTable) return result;
-      return tbl.getVersionsForInflightEvents();
-    } finally {
-      versionLock_.readLock().unlock();
-    }
-  }
-
-  /**
    * Evaluates if the information from an event (serviceId and versionNumber) matches to
    * the catalog object. If there is match, the in-flight version for that object is
    * removed and method returns true. If it does not match, returns false
@@ -830,20 +827,45 @@ public class CatalogServiceCatalog extends Catalog {
         "Event processing should be enabled when calling this method");
     long versionNumber = ctx.getVersionNumberFromEvent();
     String serviceIdFromEvent = ctx.getServiceIdFromEvent();
+    LOG.debug("Input arguments for self-event evaluation: {} {}",versionNumber,
+        serviceIdFromEvent);
     // no version info or service id in the event
-    if (versionNumber == -1 || serviceIdFromEvent.isEmpty()) return false;
+    if (versionNumber == -1 || serviceIdFromEvent.isEmpty()) {
+      LOG.info("Not a self-event since the given version is {} and service id is {}",
+          versionNumber, serviceIdFromEvent);
+      return false;
+    }
     // if the service id from event doesn't match with our service id this is not a
     // self-event
-    if (!getCatalogServiceId().equals(serviceIdFromEvent)) return false;
+    if (!getCatalogServiceId().equals(serviceIdFromEvent)) {
+      LOG.info("Not a self-event because service id of this catalog {} does not match "
+          + "with one in event {}.", getCatalogServiceId(), serviceIdFromEvent);
+      return false;
+    }
     Db db = getDb(ctx.getDbName());
     if (db == null) {
       throw new DatabaseNotFoundException("Database " + ctx.getDbName() + " not found");
     }
     // if the given tblName is null we look db's in-flight events
     if (ctx.getTblName() == null) {
-      return db.removeFromVersionsForInflightEvents(versionNumber);
+      //TODO use read/write locks for both table and db
+      if (!tryLockDb(db)) {
+        throw new CatalogException("Could not acquire lock on database object " +
+            db.getName());
+      }
+      versionLock_.writeLock().unlock();
+      try {
+        boolean removed = db.removeFromVersionsForInflightEvents(versionNumber);
+        if (!removed) {
+          LOG.info("Could not find version {} in the in-flight event list of database "
+              + "{}", versionNumber, db.getName());
+        }
+        return removed;
+      } finally {
+        db.getLock().unlock();
+      }
     }
-    Table tbl = getTable(ctx.getDbName(), ctx.getTblName());
+    Table tbl = db.getTable(ctx.getTblName());
     if (tbl == null) {
       throw new TableNotFoundException(
           String.format("Table %s.%s not found", ctx.getDbName(), ctx.getTblName()));
@@ -859,7 +881,12 @@ public class CatalogServiceCatalog extends Catalog {
       List<List<TPartitionKeyValue>> partitionKeyValues = ctx.getPartitionKeyValues();
       // if the partitionKeyValues is null, we look for tbl's in-flight events
       if (partitionKeyValues == null) {
-        return tbl.removeFromVersionsForInflightEvents(versionNumber);
+        boolean removed = tbl.removeFromVersionsForInflightEvents(versionNumber);
+        if (!removed) {
+          LOG.info("Could not find version {} in in-flight event list of table {}",
+              versionNumber, tbl.getFullName());
+        }
+        return removed;
       }
       if (tbl instanceof HdfsTable) {
         List<String> failingPartitions = new ArrayList<>();
@@ -872,8 +899,11 @@ public class CatalogServiceCatalog extends Catalog {
             // should clean up the self-event state on the rest of the partitions
             String partName = HdfsTable.constructPartitionName(partitionKeyValue);
             if (hdfsPartition == null) {
-              LOG.warn(String.format("Partition %s not found during self-event "
-                + "evaluation for the table %s", partName, tbl.getFullName()));
+              LOG.info("Partition {} not found during self-event "
+                + "evaluation for the table {}", partName, tbl.getFullName());
+            } else {
+              LOG.info("Could not find {} in in-flight event list of the partition {} "
+                  + "of table {}", versionNumber, partName, tbl.getFullName());
             }
             failingPartitions.add(partName);
           }
@@ -895,11 +925,9 @@ public class CatalogServiceCatalog extends Catalog {
    */
   public void addVersionsForInflightEvents(Table tbl, long versionNumber) {
     if (!isEventProcessingActive()) return;
-    // we generally don't take locks on Incomplete tables since they are atomically
-    // replaced during load
-    Preconditions.checkState(
-        tbl instanceof IncompleteTable || tbl.getLock().isHeldByCurrentThread());
     tbl.addToVersionsForInflightEvents(versionNumber);
+    LOG.info("Added catalog version {} in table's {} in-flight events",
+        versionNumber, tbl.getFullName());
   }
 
   /**
@@ -911,6 +939,8 @@ public class CatalogServiceCatalog extends Catalog {
    */
   public void addVersionsForInflightEvents(Db db, long versionNumber) {
     if (!isEventProcessingActive()) return;
+    LOG.info("Added catalog version {} in database's {} in-flight events",
+        versionNumber, db.getName());
     db.addToVersionsForInflightEvents(versionNumber);
   }
 

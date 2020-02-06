@@ -97,22 +97,32 @@ class TestConcurrentDdls(CustomClusterTestSuite):
 
     def run_ddls(i):
       tbl_name = db + ".test_" + str(i)
-      for query_tmpl in [
+      # func_name = "f_" + str(i)
+      for query in [
+        # alter database operations
+        # TODO (IMPALA-9532): Uncomment the alter database operations
+        # "comment on database %s is 'test-concurrent-ddls'" % db,
+        # "alter database %s set owner user `test-user`" % db,
+        # "create function %s.%s() returns int location '%s/libTestUdfs.so' \
+        #    symbol='NoArgs'" % (db, func_name, WAREHOUSE),
+        # "drop function if exists %s.%s()" % (db, func_name),
         # Create a partitioned and unpartitioned table
-        "create table %s (i int)",
-        "create table %s_part (i int) partitioned by (j int)",
+        "create table %s (i int)" % tbl_name,
+        "create table %s_part (i int) partitioned by (j int)" % tbl_name,
         # Below queries could fail if running with invalidate metadata concurrently
-        "alter table %s_part add partition (j=1)",
-        "alter table %s_part add partition (j=2)",
-        "invalidate metadata %s_part",
-        "refresh %s",
-        "refresh %s_part",
-        "insert overwrite table %s select int_col from functional.alltypestiny",
-        "insert overwrite table %s_part partition(j=1) values (1), (2), (3), (4), (5)",
-        "insert overwrite table %s_part partition(j=2) values (1), (2), (3), (4), (5)"
+        "alter table %s_part add partition (j=1)" % tbl_name,
+        "alter table %s_part add partition (j=2)" % tbl_name,
+        "invalidate metadata %s_part" % tbl_name,
+        "refresh %s" % tbl_name,
+        "refresh %s_part" % tbl_name,
+        "insert overwrite table %s select int_col from "
+        "functional.alltypestiny" % tbl_name,
+        "insert overwrite table %s_part partition(j=1) "
+        "values (1), (2), (3), (4), (5)" % tbl_name,
+        "insert overwrite table %s_part partition(j=2) "
+        "values (1), (2), (3), (4), (5)" % tbl_name
       ]:
         try:
-          query = query_tmpl % tbl_name
           # TODO(IMPALA-9123): Timeout logic here does not work for DDLs since they are
           #  usually stuck in CREATED state and execute_async() won't return. We finally
           #  use timeout in pytest.mark.timeout() but it's not precise. We should find a

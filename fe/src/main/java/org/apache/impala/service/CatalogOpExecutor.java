@@ -216,21 +216,27 @@ import org.slf4j.LoggerFactory;
  * updates, DDL operations should not directly modify the HMS objects of the catalog
  * objects but should operate on copies instead.
  *
- * The CatalogOpExecutor uses table-level locking to protect table metadata during
- * concurrent modifications and is responsible for assigning a new catalog version when
- * a table is modified (e.g. alterTable()).
+ * The CatalogOpExecutor uses table-level or Db object level locking to protect table
+ * metadata or database metadata respectively during concurrent modifications and is
+ * responsible for assigning a new catalog version when a table/Db is modified
+ * (e.g. alterTable() or alterDb()).
  *
  * The following locking protocol is employed to ensure that modifying
- * the table metadata and assigning a new catalog version is performed atomically and
+ * the table/Db metadata and assigning a new catalog version is performed atomically and
  * consistently in the presence of concurrent DDL operations. The following pattern
  * ensures that the catalog lock is never held for a long period of time, preventing
- * other DDL operations from making progress. This pattern only applies to single-table
+ * other DDL operations from making progress. This pattern only applies to single-table/Db
  * update operations and requires the use of fair table locks to prevent starvation.
+ * Additionally, this locking protocol is also followed in case of CREATE/DROP
+ * FUNCTION. In case of CREATE/DROP FUNCTION, we take the Db object lock since
+ * certain FUNCTION are stored in the HMS database parameters. Using this approach
+ * also makes sure that adding or removing functions from different databases do not
+ * block each other.
  *
  *   DO {
  *     Acquire the catalog lock (see CatalogServiceCatalog.versionLock_)
- *     Try to acquire a table lock
- *     IF the table lock acquisition fails {
+ *     Try to acquire a table/Db lock
+ *     IF the table/Db lock acquisition fails {
  *       Release the catalog lock
  *       YIELD()
  *     ELSE
@@ -241,21 +247,22 @@ import org.slf4j.LoggerFactory;
  *
  *   Increment and get a new catalog version
  *   Release the catalog lock
- *   Modify table metadata
- *   Release table lock
+ *   Modify table/Db metadata
+ *   Release table/Db lock
  *
  * Note: The getCatalogObjects() function is the only case where this locking pattern is
  * not used since it accesses multiple catalog entities in order to compute a snapshot
  * of catalog metadata.
  *
- * Operations that CREATE/DROP catalog objects such as tables and databases employ the
- * following locking protocol:
+ * Operations that CREATE/DROP catalog objects such as tables and databases
+ * (except for functions, see above) employ the following locking protocol:
  * 1. Acquire the metastoreDdlLock_
  * 2. Update the Hive Metastore
  * 3. Increment and get a new catalog version
  * 4. Update the catalog
  * 5. Grant/revoke owner privilege if authorization with ownership is enabled.
  * 6. Release the metastoreDdlLock_
+ *
  *
  * It is imperative that other operations that need to hold both the catalog lock and
  * table locks at the same time follow the same locking protocol and acquire these
@@ -1356,21 +1363,23 @@ public class CatalogOpExecutor {
     }
     boolean isPersistentJavaFn =
         (fn.getBinaryType() == TFunctionBinaryType.JAVA) && fn.isPersistent();
-    synchronized (metastoreDdlLock_) {
-      Db db = catalog_.getDb(fn.dbName());
-      if (db == null) {
-        throw new CatalogException("Database: " + fn.dbName() + " does not exist.");
-      }
-      // Get a new catalog version to assign to the database being altered. This is
-      // needed for events processor as this method creates alter database events.
-      long newCatalogVersion = catalog_.incrementAndGetCatalogVersion();
-      addCatalogServiceIdentifiers(db, catalog_.getCatalogServiceId(), newCatalogVersion);
+    Db db = catalog_.getDb(fn.dbName());
+    if (db == null) {
+      throw new CatalogException("Database: " + fn.dbName() + " does not exist.");
+    }
+
+    tryLock(db, "creating function " + fn.getClass().getSimpleName());
+    // Get a new catalog version to assign to the database being altered. This is
+    // needed for events processor as this method creates alter database events.
+    long newCatalogVersion = catalog_.incrementAndGetCatalogVersion();
+    catalog_.getLock().writeLock().unlock();
+    try {
       // Search for existing functions with the same name or signature that would
       // conflict with the function being added.
-      for (Function function: db.getFunctions(fn.functionName())) {
+      for (Function function : db.getFunctions(fn.functionName())) {
         if (isPersistentJavaFn || (function.isPersistent() &&
             (function.getBinaryType() == TFunctionBinaryType.JAVA)) ||
-                function.compare(fn, Function.CompareMode.IS_INDISTINGUISHABLE)) {
+            function.compare(fn, Function.CompareMode.IS_INDISTINGUISHABLE)) {
           if (!params.if_not_exists) {
             throw new CatalogException("Function " + fn.functionName() +
                 " already exists.");
@@ -1386,15 +1395,16 @@ public class CatalogOpExecutor {
         // the corresponding Jar and add each signature to the catalog.
         Preconditions.checkState(fn instanceof ScalarFunction);
         org.apache.hadoop.hive.metastore.api.Function hiveFn =
-            ((ScalarFunction)fn).toHiveFunction();
+            ((ScalarFunction) fn).toHiveFunction();
         List<Function> funcs = FunctionUtils.extractFunctions(fn.dbName(), hiveFn,
             BackendConfig.INSTANCE.getBackendCfg().local_library_path);
         if (funcs.isEmpty()) {
           throw new CatalogException(
-            "No compatible function signatures found in class: " + hiveFn.getClassName());
+              "No compatible function signatures found in class: " + hiveFn
+                  .getClassName());
         }
         if (addJavaFunctionToHms(fn.dbName(), hiveFn, params.if_not_exists)) {
-          for (Function addedFn: funcs) {
+          for (Function addedFn : funcs) {
             if (LOG.isTraceEnabled()) {
               LOG.trace(String.format("Adding function: %s.%s", addedFn.dbName(),
                   addedFn.signatureString()));
@@ -1404,7 +1414,14 @@ public class CatalogOpExecutor {
           }
         }
       } else {
+        //TODO(Vihang): addFunction method below directly updates the database
+        // parameters. If the applyAlterDatabase method below throws an exception,
+        // catalog might end up in a inconsistent state. Ideally, we should make a copy
+        // of hms Database object and then update the Db once the HMS operation succeeds
+        // similar to what happens in alterDatabaseSetOwner method.
         if (catalog_.addFunction(fn)) {
+          addCatalogServiceIdentifiers(db.getMetaStoreDb(),
+              catalog_.getCatalogServiceId(), newCatalogVersion);
           // Flush DB changes to metastore
           applyAlterDatabase(db.getMetaStoreDb());
           addedFunctions.add(fn.toTCatalogObject());
@@ -1421,6 +1438,8 @@ public class CatalogOpExecutor {
       } else {
         addSummary(resp, "Function already exists.");
       }
+    } finally {
+      db.getLock().unlock();
     }
   }
 
@@ -2098,24 +2117,26 @@ public class CatalogOpExecutor {
   private void dropFunction(TDropFunctionParams params, TDdlExecResponse resp)
       throws ImpalaException {
     FunctionName fName = FunctionName.fromThrift(params.fn_name);
-    synchronized (metastoreDdlLock_) {
-      Db db = catalog_.getDb(fName.getDb());
-      if (db == null) {
-        if (!params.if_exists) {
-            throw new CatalogException("Database: " + fName.getDb()
-                + " does not exist.");
-        }
-        addSummary(resp, "Database does not exist.");
-        return;
+    Db db = catalog_.getDb(fName.getDb());
+    if (db == null) {
+      if (!params.if_exists) {
+        throw new CatalogException("Database: " + fName.getDb()
+            + " does not exist.");
       }
-      // Get a new catalog version to assign to the database being altered. This is
-      // needed for events processor as this method creates alter database events.
-      long newCatalogVersion = catalog_.incrementAndGetCatalogVersion();
-      addCatalogServiceIdentifiers(db, catalog_.getCatalogServiceId(), newCatalogVersion);
+      addSummary(resp, "Database does not exist.");
+      return;
+    }
+
+    tryLock(db, "dropping function " + fName);
+    // Get a new catalog version to assign to the database being altered. This is
+    // needed for events processor as this method creates alter database events.
+    long newCatalogVersion = catalog_.incrementAndGetCatalogVersion();
+    catalog_.getLock().writeLock().unlock();
+    try {
       List<TCatalogObject> removedFunctions = Lists.newArrayList();
       if (!params.isSetSignature()) {
         dropJavaFunctionFromHms(fName.getDb(), fName.getFunction(), params.if_exists);
-        for (Function fn: db.getFunctions(fName.getFunction())) {
+        for (Function fn : db.getFunctions(fName.getFunction())) {
           if (fn.getBinaryType() != TFunctionBinaryType.JAVA
               || !fn.isPersistent()) {
             continue;
@@ -2125,7 +2146,7 @@ public class CatalogOpExecutor {
         }
       } else {
         ArrayList<Type> argTypes = Lists.newArrayList();
-        for (TColumnType t: params.arg_types) {
+        for (TColumnType t : params.arg_types) {
           argTypes.add(Type.fromThrift(t));
         }
         Function desc = new Function(fName, argTypes, Type.INVALID, false);
@@ -2136,6 +2157,8 @@ public class CatalogOpExecutor {
                 "Function: " + desc.signatureString() + " does not exist.");
           }
         } else {
+          addCatalogServiceIdentifiers(db.getMetaStoreDb(),
+              catalog_.getCatalogServiceId(), newCatalogVersion);
           // Flush DB changes to metastore
           applyAlterDatabase(db.getMetaStoreDb());
           removedFunctions.add(fn.toTCatalogObject());
@@ -2152,6 +2175,8 @@ public class CatalogOpExecutor {
         addSummary(resp, "Function does not exist.");
       }
       resp.result.setVersion(catalog_.getCatalogVersion());
+    } finally {
+      db.getLock().unlock();
     }
   }
 
@@ -4576,16 +4601,19 @@ public class CatalogOpExecutor {
   }
 
   private void alterCommentOnDb(String dbName, String comment, TDdlExecResponse response)
-      throws ImpalaRuntimeException, CatalogException {
+      throws ImpalaRuntimeException, CatalogException, InternalException {
     Db db = catalog_.getDb(dbName);
     if (db == null) {
       throw new CatalogException("Database: " + dbName + " does not exist.");
     }
-    synchronized (metastoreDdlLock_) {
-      // Get a new catalog version to assign to the database being altered.
-      long newCatalogVersion = catalog_.incrementAndGetCatalogVersion();
-      addCatalogServiceIdentifiers(db, catalog_.getCatalogServiceId(), newCatalogVersion);
+    tryLock(db, "altering the comment");
+    // Get a new catalog version to assign to the database being altered.
+    long newCatalogVersion = catalog_.incrementAndGetCatalogVersion();
+    catalog_.getLock().writeLock().unlock();
+    try {
       Database msDb = db.getMetaStoreDb().deepCopy();
+      addCatalogServiceIdentifiers(msDb, catalog_.getCatalogServiceId(),
+          newCatalogVersion);
       msDb.setDescription(comment);
       try {
         applyAlterDatabase(msDb);
@@ -4597,6 +4625,8 @@ public class CatalogOpExecutor {
       // now that HMS alter operation has succeeded, add this version to list of inflight
       // events in catalog database if event processing is enabled
       catalog_.addVersionsForInflightEvents(db, newCatalogVersion);
+    } finally {
+      db.getLock().unlock();
     }
     addSummary(response, "Updated database.");
   }
@@ -4623,11 +4653,14 @@ public class CatalogOpExecutor {
       TDdlExecResponse response) throws ImpalaException {
     Preconditions.checkNotNull(params.owner_name);
     Preconditions.checkNotNull(params.owner_type);
-    synchronized (metastoreDdlLock_) {
-      // Get a new catalog version to assign to the database being altered.
-      long newCatalogVersion = catalog_.incrementAndGetCatalogVersion();
-      addCatalogServiceIdentifiers(db, catalog_.getCatalogServiceId(), newCatalogVersion);
+    tryLock(db, "altering the owner");
+    // Get a new catalog version to assign to the database being altered.
+    long newCatalogVersion = catalog_.incrementAndGetCatalogVersion();
+    catalog_.getLock().writeLock().unlock();
+    try {
       Database msDb = db.getMetaStoreDb().deepCopy();
+      addCatalogServiceIdentifiers(msDb, catalog_.getCatalogServiceId(),
+          newCatalogVersion);
       String originalOwnerName = msDb.getOwnerName();
       PrincipalType originalOwnerType = msDb.getOwnerType();
       msDb.setOwnerName(params.owner_name);
@@ -4647,6 +4680,8 @@ public class CatalogOpExecutor {
       // now that HMS alter operation has succeeded, add this version to list of inflight
       // events in catalog database if event processing is enabled
       catalog_.addVersionsForInflightEvents(db, newCatalogVersion);
+    } finally {
+      db.getLock().unlock();
     }
     addSummary(response, "Updated database.");
   }
@@ -4656,9 +4691,9 @@ public class CatalogOpExecutor {
    * No-op if event processing is disabled
    */
   private void addCatalogServiceIdentifiers(
-      Db db, String catalogServiceId, long newCatalogVersion) {
+      Database msDb, String catalogServiceId, long newCatalogVersion) {
     if (!catalog_.isEventProcessingActive()) return;
-    org.apache.hadoop.hive.metastore.api.Database msDb = db.getMetaStoreDb();
+    Preconditions.checkNotNull(msDb);
     msDb.putToParameters(MetastoreEventPropertyKey.CATALOG_SERVICE_ID.getKey(),
         catalogServiceId);
     msDb.putToParameters(MetastoreEventPropertyKey.CATALOG_VERSION.getKey(),
@@ -4771,6 +4806,17 @@ public class CatalogOpExecutor {
     if (!catalog_.tryLockTable(tbl)) {
       throw new InternalException(String.format("Error %s (for) %s %s due to " +
           "lock contention.", operation, type, tbl.getFullName()));
+    }
+  }
+
+  /**
+   * Try to lock the given Db in the catalog for the given operation. Throws
+   * InternalException if catalog is unable to lock the database.
+   */
+  private void tryLock(Db db, String operation) throws InternalException {
+    if (!catalog_.tryLockDb(db)) {
+      throw new InternalException(String.format("Error %s of database %s due to lock "
+          + "contention.", operation, db.getName()));
     }
   }
 

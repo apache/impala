@@ -794,18 +794,14 @@ public abstract class Table extends CatalogObjectImpl implements FeTable {
   }
 
   /**
-   * Gets the current list of versions for in-flight events for this table
-   */
-  public List<Long> getVersionsForInflightEvents() {
-    return inFlightEvents.getAll();
-  }
-
-  /**
    * Removes a given version from the collection of version numbers for in-flight events
    * @param versionNumber version number to remove from the collection
    * @return true if version was successfully removed, false if didn't exist
    */
   public boolean removeFromVersionsForInflightEvents(long versionNumber) {
+    Preconditions.checkState(tableLock_.isHeldByCurrentThread(),
+        "removeFromVersionsForInFlightEvents called without taking the table lock on "
+            + getFullName());
     return inFlightEvents.remove(versionNumber);
   }
 
@@ -819,6 +815,10 @@ public abstract class Table extends CatalogObjectImpl implements FeTable {
    * capacity
    */
   public void addToVersionsForInflightEvents(long versionNumber) {
+    // we generally don't take locks on Incomplete tables since they are atomically
+    // replaced during load
+    Preconditions.checkState(
+        this instanceof IncompleteTable || tableLock_.isHeldByCurrentThread());
     if (!inFlightEvents.add(versionNumber)) {
       LOG.warn(String.format("Could not add %s version to the table %s. This could "
           + "cause unnecessary refresh of the table when the event is received by the "
