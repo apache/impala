@@ -758,7 +758,10 @@ void PhjBuilder::AllocateRuntimeFilters() {
   }
 }
 
-void PhjBuilder::InsertRuntimeFilters(TupleRow* build_row) noexcept {
+void PhjBuilder::InsertRuntimeFilters(
+    FilterContext filter_ctxs[], TupleRow* build_row) noexcept {
+  // For the interpreted path we can directly use the filter_ctxs_ member variable.
+  DCHECK_EQ(filter_ctxs_.data(), filter_ctxs);
   for (const FilterContext& ctx : filter_ctxs_) ctx.Insert(build_row);
 }
 
@@ -1323,18 +1326,21 @@ Status PhjBuilder::CodegenInsertBatch(LlvmCodeGen* codegen,
 
 // An example of the generated code for a query with two filters built by this node.
 //
-// ; Function Attrs: noinline
-// define void @InsertRuntimeFilters(%"class.impala::PhjBuilder"* %this,
-//     %"class.impala::TupleRow"* %row) #46 {
-// entry:
-//   call void @FilterContextInsert(%"struct.impala::FilterContext"* inttoptr (
-//       i64 197870464 to %"struct.impala::FilterContext"*),
-//       %"class.impala::TupleRow"* %row)
-//   call void @FilterContextInsert.14(%"struct.impala::FilterContext"* inttoptr (
-//       i64 197870496 to %"struct.impala::FilterContext"*),
-//       %"class.impala::TupleRow"* %row)
-//   ret void
-// }
+//  ; Function Attrs: noinline
+//  define void @InsertRuntimeFilters(%"class.impala::PhjBuilder"* %this,
+//      %"struct.impala::FilterContext"* %filter_ctxs,
+//      %"class.impala::TupleRow"* %row) #49 {
+//  entry:
+//    %0 = getelementptr %"struct.impala::FilterContext",
+//        %"struct.impala::FilterContext"* %filter_ctxs, i32 0
+//    call void @FilterContextInsert(%"struct.impala::FilterContext"* %0,
+//        %"class.impala::TupleRow"* %row)
+//    %1 = getelementptr %"struct.impala::FilterContext",
+//        %"struct.impala::FilterContext"* %filter_ctxs, i32 1
+//    call void @FilterContextInsert.3(%"struct.impala::FilterContext"* %1,
+//        %"class.impala::TupleRow"* %row)
+//    ret void
+//  }
 Status PhjBuilder::CodegenInsertRuntimeFilters(
     LlvmCodeGen* codegen, const vector<ScalarExpr*>& filter_exprs, llvm::Function** fn) {
   llvm::LLVMContext& context = codegen->context();
@@ -1342,25 +1348,25 @@ Status PhjBuilder::CodegenInsertRuntimeFilters(
 
   *fn = nullptr;
   llvm::Type* this_type = codegen->GetStructPtrType<PhjBuilder>();
+  llvm::PointerType* filters_ctx_arr_type = codegen->GetStructPtrType<FilterContext>();
   llvm::PointerType* tuple_row_ptr_type = codegen->GetStructPtrType<TupleRow>();
   LlvmCodeGen::FnPrototype prototype(
       codegen, "InsertRuntimeFilters", codegen->void_type());
   prototype.AddArgument(LlvmCodeGen::NamedVariable("this", this_type));
+  prototype.AddArgument(LlvmCodeGen::NamedVariable("filter_ctxs", filters_ctx_arr_type));
   prototype.AddArgument(LlvmCodeGen::NamedVariable("row", tuple_row_ptr_type));
 
-  llvm::Value* args[2];
+  llvm::Value* args[3];
   llvm::Function* insert_runtime_filters_fn = prototype.GeneratePrototype(&builder, args);
-  llvm::Value* row_arg = args[1];
+  llvm::Value* filter_ctxs = args[1];
+  llvm::Value* row_arg = args[2];
 
   int num_filters = filter_exprs.size();
   for (int i = 0; i < num_filters; ++i) {
     llvm::Function* insert_fn;
     RETURN_IF_ERROR(FilterContext::CodegenInsert(
-        codegen, filter_exprs_[i], &filter_ctxs_[i], &insert_fn));
-    llvm::PointerType* filter_context_type = codegen->GetStructPtrType<FilterContext>();
-    llvm::Value* filter_context_ptr =
-        codegen->CastPtrToLlvmPtr(filter_context_type, &filter_ctxs_[i]);
-
+        codegen, filter_exprs[i], &filter_ctxs_[i], &insert_fn));
+    llvm::Value* filter_context_ptr = builder.CreateConstGEP1_32(filter_ctxs, i);
     llvm::Value* insert_args[] = {filter_context_ptr, row_arg};
     builder.CreateCall(insert_fn, insert_args);
   }

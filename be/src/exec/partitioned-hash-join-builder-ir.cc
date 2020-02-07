@@ -57,7 +57,7 @@ Status PhjBuilder::ProcessBuildBatch(
     if (build_filters) {
       DCHECK_EQ(ctx->level(), 0)
           << "Runtime filters should not be built during repartitioning.";
-      InsertRuntimeFilters(build_row);
+      InsertRuntimeFilters(filter_ctxs_.data(), build_row);
     }
     const uint32_t hash = expr_vals_cache->CurExprValuesHash();
     const uint32_t partition_idx = hash >> (32 - NUM_PARTITIONING_BITS);
