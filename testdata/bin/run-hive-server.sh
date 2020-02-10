@@ -28,6 +28,7 @@ LOGDIR=${IMPALA_CLUSTER_LOGS_DIR}/hive
 HIVES2_TRANSPORT="plain_sasl"
 METASTORE_TRANSPORT="buffered"
 ONLY_METASTORE=0
+ENABLE_RANGER_AUTH=0
 
 CLUSTER_BIN=${IMPALA_HOME}/testdata/bin
 
@@ -48,9 +49,18 @@ do
     -only_metastore)
       ONLY_METASTORE=1
       ;;
+    -with_ranger)
+      if [[ "$USE_CDP_HIVE" = "false" ]]; then
+        echo "Ranger authorization is not supported in Hive 2."
+        exit 1
+      fi
+      ENABLE_RANGER_AUTH=1
+      echo "Starting Hive with Ranger authorization."
+      ;;
     -help|-h|*)
       echo "run-hive-server.sh : Starts the hive server and the metastore."
       echo "[-only_metastore] : Only starts the hive metastore."
+      echo "[-with_ranger] : Starts with Ranger authorization (only for Hive 3)."
       exit 1;
       ;;
     esac
@@ -74,6 +84,21 @@ if [[ "$USE_CDP_HIVE" = "true" && -n "$SENTRY_HOME" ]]; then
     # exclude all the hive jars from being included in the classpath since Sentry
     # depends on Hive 2.1.1
     if [[ ! $FILE_NAME == hive* ]]; then
+      export HADOOP_CLASSPATH=${HADOOP_CLASSPATH}:${f}
+    fi
+  done
+fi
+
+# Add Ranger dependencies if we are starting with Ranger authorization enabled.
+if [[ $ENABLE_RANGER_AUTH -eq 1 ]]; then
+  export HIVE_CONF_DIR="$HADOOP_CONF_DIR/hive-site-ranger-auth/"
+  for f in "$RANGER_HOME"/ews/webapp/WEB-INF/classes/ranger-plugins/hive/ranger-*.jar \
+      "$RANGER_HOME"/ews/webapp/WEB-INF/lib/*.jar \
+      "$RANGER_HOME"/ews/lib/ranger-*.jar; do
+    FILE_NAME=$(basename $f)
+    # Exclude unneccessary jars.
+    if [[ ! $FILE_NAME == hive* && ! $FILE_NAME == hadoop* && ! $FILE_NAME == hbase* \
+        && ! $FILE_NAME == zookeeper* ]]; then
       export HADOOP_CLASSPATH=${HADOOP_CLASSPATH}:${f}
     fi
   done

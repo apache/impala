@@ -146,6 +146,18 @@ mkdir -p hive-site-without-hms
 rm -f hive-site-without-hms/hive-site.xml
 ln -s "${CONFIG_DIR}/hive-site_without_hms.xml" hive-site-without-hms/hive-site.xml
 
+export HIVE_VARIANT=ranger_auth
+HIVE_RANGER_CONF_DIR=hive-site-ranger-auth
+$IMPALA_HOME/bin/generate_xml_config.py hive-site.xml.py hive-site_ranger_auth.xml
+rm -rf $HIVE_RANGER_CONF_DIR
+mkdir -p $HIVE_RANGER_CONF_DIR
+ln -s "${CONFIG_DIR}/hive-site_ranger_auth.xml" $HIVE_RANGER_CONF_DIR/hive-site.xml
+# Link some neccessary config files for Hive.
+for f in ranger-hive-security.xml ranger-hive-audit.xml log4j.properties \
+    hive-log4j2.properties; do
+  ln -s "${CONFIG_DIR}/$f" "$HIVE_RANGER_CONF_DIR/$f"
+done
+
 generate_config hive-log4j2.properties.template hive-log4j2.properties
 
 if [ $CREATE_METASTORE -eq 1 ]; then

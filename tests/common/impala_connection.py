@@ -285,7 +285,7 @@ class ImpylaHS2Connection(ImpalaConnection):
 
   def clear_configuration(self):
     self.__query_options.clear()
-    if hasattr(tests.common, "current_node"):
+    if hasattr(tests.common, "current_node") and not self._is_hive:
       self.set_configuration_option("client_identifier", tests.common.current_node)
 
   def connect(self):
@@ -496,8 +496,9 @@ def create_connection(host_port, use_kerberos=False, protocol='beeswax',
     c = ImpylaHS2Connection(host_port=host_port, use_kerberos=use_kerberos,
         is_hive=is_hive, use_http_transport=True, http_path='cliservice')
 
-  # A hook in conftest sets tests.common.current_node.
-  if hasattr(tests.common, "current_node"):
+  # A hook in conftest sets tests.common.current_node. Skip for Hive connections since
+  # Hive cannot modify client_identifier at runtime.
+  if hasattr(tests.common, "current_node") and not is_hive:
     c.set_configuration_option("client_identifier", tests.common.current_node)
   return c
 

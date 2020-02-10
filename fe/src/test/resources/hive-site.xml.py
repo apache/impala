@@ -63,6 +63,13 @@ if variant == 'changed_external_dir':
   CONFIG.update({
     'hive.metastore.warehouse.external.dir': '${WAREHOUSE_LOCATION_PREFIX}/test-warehouse-external',
   })
+elif variant == 'ranger_auth':
+  CONFIG.update({
+    'hive.security.authorization.manager':
+        'org.apache.ranger.authorization.hive.authorizer.RangerHiveAuthorizerFactory',
+    'hive.metastore.pre.event.listeners':
+        'org.apache.hadoop.hive.ql.security.authorization.plugin.metastore.HiveMetaStoreAuthorizer',
+  })
 
 # HBase-related configs.
 # Impala processes need to connect to zookeeper on INTERNAL_LISTEN_HOST for HBase.

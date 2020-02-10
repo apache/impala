@@ -17,13 +17,17 @@
 #
 # Client tests for SQL statement authorization
 
+import os
 import grp
 import json
 import pytest
 import requests
+from subprocess import check_call
 
 from getpass import getuser
 from tests.common.custom_cluster_test_suite import CustomClusterTestSuite
+from tests.common.skip import (SkipIfS3, SkipIfABFS, SkipIfADLS, SkipIfIsilon,
+                               SkipIfLocal, SkipIfHive2)
 from tests.util.hdfs_util import NAMENODE
 from tests.util.calculation_util import get_random_id
 
@@ -866,8 +870,7 @@ class TestRanger(CustomClusterTestSuite):
       self._run_query_as_user("drop database {0} cascade".format(test_db), ADMIN, True)
 
   @CustomClusterTestSuite.with_args(
-    impalad_args="{0} {1}".format(IMPALAD_ARGS, "--enable_column_masking"),
-    catalogd_args=CATALOGD_ARGS)
+    impalad_args=IMPALAD_ARGS, catalogd_args=CATALOGD_ARGS)
   def test_column_masking(self, vector, unique_name):
     user = getuser()
     unique_database = unique_name + '_db'
@@ -932,3 +935,26 @@ class TestRanger(CustomClusterTestSuite):
       admin_client.execute("drop database %s cascade" % unique_database)
       for i in range(policy_cnt):
         TestRanger._remove_column_masking_policy(unique_name + str(i))
+
+  @SkipIfABFS.hive
+  @SkipIfADLS.hive
+  @SkipIfIsilon.hive
+  @SkipIfLocal.hive
+  @SkipIfS3.hive
+  @SkipIfHive2.ranger_auth
+  @CustomClusterTestSuite.with_args()
+  def test_hive_with_ranger_setup(self, vector):
+    """Test for setup of Hive-Ranger integration. Make sure future upgrades on
+    Hive/Ranger won't break the tool."""
+    script = os.path.join(os.environ['IMPALA_HOME'], 'testdata/bin/run-hive-server.sh')
+    try:
+      # Add the policy before restarting Hive. So it can take effect immediately after
+      # HiveServer2 starts.
+      TestRanger._add_column_masking_policy(
+          "col_mask_for_hive", getuser(), "functional", "alltypestiny", "id", "CUSTOM",
+          "{col} * 100")
+      check_call([script, '-with_ranger'])
+      self.run_test_case("QueryTest/hive_ranger_integration", vector)
+    finally:
+      check_call([script])
+      TestRanger._remove_column_masking_policy("col_mask_for_hive")
