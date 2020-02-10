@@ -580,6 +580,7 @@ sq_callback_result_t Webserver::BeginRequestCallback(struct sq_connection* conne
   }
 
   WebRequest req;
+  req.source_socket = GetRemoteAddress(request_info).ToString();
   if (request_info->query_string != nullptr) {
     req.query_string = request_info->query_string;
     BuildArgumentMap(request_info->query_string, &req.parsed_args);

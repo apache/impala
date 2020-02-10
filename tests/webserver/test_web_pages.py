@@ -17,7 +17,7 @@
 
 from tests.common.environ import ImpalaTestClusterFlagsDetector
 from tests.common.file_utils import grep_dir
-from tests.common.skip import SkipIfBuildType
+from tests.common.skip import SkipIfBuildType, SkipIfDockerizedCluster
 from tests.common.impala_cluster import ImpalaCluster
 from tests.common.impala_test_suite import ImpalaTestSuite
 import itertools
@@ -762,3 +762,29 @@ class TestWebPage(ImpalaTestSuite):
     self.get_and_check_status(self.ROOT_URL,
         "href='http://.*:%s/'" % self.IMPALAD_TEST_PORT[0], self.IMPALAD_TEST_PORT,
         regex=True, headers={'X-Forwarded-Context': '/gateway'})
+
+  @SkipIfDockerizedCluster.daemon_logs_not_exposed
+  def test_display_src_socket_in_query_cause(self):
+    # Execute a long running query then cancel it from the WebUI.
+    # Check the runtime profile and the INFO logs for the cause message.
+    query = "select sleep(10000)"
+    query_id = self.execute_query_async(query).get_handle().id
+    cancel_query_url = "{0}cancel_query?query_id={1}".format(self.ROOT_URL.format
+      ("25000"), query_id)
+    text_profile_url = "{0}query_profile_plain_text?query_id={1}".format(self.ROOT_URL
+      .format("25000"), query_id)
+    requests.get(cancel_query_url)
+    response = requests.get(text_profile_url)
+    cancel_status = "Cancelled from Impala&apos;s debug web interface by client at"
+    assert cancel_status in response.text
+    self.assert_impalad_log_contains("INFO", "Cancelled from Impala\'s debug web "
+      "interface by client at", expected_count=-1)
+    # Session closing from the WebUI does not produce the cause message in the profile,
+    # so we will skip checking the runtime profile.
+    results = self.execute_query("select current_session()")
+    session_id = results.data[0]
+    close_session_url = "{0}close_session?session_id={1}".format(self.ROOT_URL.format
+      ("25000"), session_id)
+    requests.get(close_session_url)
+    self.assert_impalad_log_contains("INFO", "Session closed from Impala\'s debug "
+      "web interface by client at", expected_count=-1)

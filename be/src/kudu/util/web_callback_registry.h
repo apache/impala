@@ -65,6 +65,9 @@ class WebCallbackRegistry {
 
     // In the case of a POST, the posted data.
     std::string post_data;
+
+    // The socket address of the requester, <host>:<port>.
+    std::string source_socket;
   };
 
   // A response to an HTTP request whose body is rendered by template.
