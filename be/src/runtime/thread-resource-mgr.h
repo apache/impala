@@ -15,13 +15,12 @@
 // specific language governing permissions and limitations
 // under the License.
 
-#ifndef IMPALA_RUNTIME_THREAD_RESOURCE_MGR_H
-#define IMPALA_RUNTIME_THREAD_RESOURCE_MGR_H
+#pragma once
 
 #include <stdlib.h>
 
 #include <boost/function.hpp>
-#include <boost/thread/mutex.hpp>
+#include <boost/thread/pthread/mutex.hpp>
 
 #include <list>
 
@@ -236,5 +235,3 @@ class ThreadResourcePool {
   int next_callback_idx_ = 0;
 };
 } // namespace impala
-
-#endif

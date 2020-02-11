@@ -15,12 +15,11 @@
 // specific language governing permissions and limitations
 // under the License.
 
-#ifndef IMPALA_UTIL_PROCESS_STATE_INFO_H
-#define IMPALA_UTIL_PROCESS_STATE_INFO_H
+#pragma once
 
+#include <cstdint>
 #include <map>
 #include <string>
-#include <boost/cstdint.hpp>
 
 #include "common/logging.h"
 
@@ -111,7 +110,4 @@ class ProcessStateInfo {
   /// Read the number of currently open file descriptors from /proc/self/fd.
   void ReadProcFileDescriptorCount();
 };
-
 }
-
-#endif

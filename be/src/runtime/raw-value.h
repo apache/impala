@@ -15,11 +15,9 @@
 // specific language governing permissions and limitations
 // under the License.
 
+#pragma once
 
-#ifndef IMPALA_RUNTIME_RAW_VALUE_H
-#define IMPALA_RUNTIME_RAW_VALUE_H
-
-#include <sstream>
+#include <iosfwd>
 #include <string>
 
 #include "codegen/impala-ir.h"
@@ -124,7 +122,4 @@ class RawValue {
   // Returns positive zero for floating point types.
   static inline const void* PositiveFloatingZero(const ColumnType& type);
 };
-
 }
-
-#endif

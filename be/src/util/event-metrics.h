@@ -15,9 +15,16 @@
 // specific language governing permissions and limitations
 // under the License.
 
-#include "util/metrics.h"
+#pragma once
+
+#include <string>
+
+#include "gutil/strings/substitute.h"
+#include "util/metrics-fwd.h"
 
 namespace impala {
+
+class TEventProcessorMetrics;
 
 /// class which is used to refresh the metastore event related metrics from catalog
 class MetastoreEventMetrics {
@@ -62,31 +69,31 @@ class MetastoreEventMetrics {
   /// Following metric names must match with the key in metrics.json
 
   /// metric name for events received counter.
-  static string NUMBER_EVENTS_RECEIVED_METRIC_NAME;
+  static std::string NUMBER_EVENTS_RECEIVED_METRIC_NAME;
 
   /// metric name for events skipped counter
-  static string NUMBER_EVENTS_SKIPPED_METRIC_NAME;
+  static std::string NUMBER_EVENTS_SKIPPED_METRIC_NAME;
 
   /// metric name for event processor status
-  static string EVENT_PROCESSOR_STATUS_METRIC_NAME;
+  static std::string EVENT_PROCESSOR_STATUS_METRIC_NAME;
 
   /// metric name for the mean time taken for events fetch metric
-  static string EVENTS_FETCH_DURATION_MEAN_METRIC_NAME;
+  static std::string EVENTS_FETCH_DURATION_MEAN_METRIC_NAME;
 
   /// metric name for the mean time taken for events processing metric
-  static string EVENTS_PROCESS_DURATION_MEAN_METRIC_NAME;
+  static std::string EVENTS_PROCESS_DURATION_MEAN_METRIC_NAME;
 
   /// metric name for EWMA of number of events in last 1 min
-  static string EVENTS_RECEIVED_1MIN_METRIC_NAME;
+  static std::string EVENTS_RECEIVED_1MIN_METRIC_NAME;
 
   /// metric name for EWMA of number of events in last 5 min
-  static string EVENTS_RECEIVED_5MIN_METRIC_NAME;
+  static std::string EVENTS_RECEIVED_5MIN_METRIC_NAME;
 
   /// metric name for EWMA of number of events in last 15 min
-  static string EVENTS_RECEIVED_15MIN_METRIC_NAME;
+  static std::string EVENTS_RECEIVED_15MIN_METRIC_NAME;
 
   /// Metric name for last metastore event id that the catalog server synced to.
-  static string LAST_SYNCED_EVENT_ID_METRIC_NAME;
+  static std::string LAST_SYNCED_EVENT_ID_METRIC_NAME;
 };
 
 } // namespace impala

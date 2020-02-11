@@ -15,13 +15,12 @@
 // specific language governing permissions and limitations
 // under the License.
 
-#ifndef IMPALA_UTIL_THREAD_POOL_H
-#define IMPALA_UTIL_THREAD_POOL_H
+#pragma once
 
 #include "util/blocking-queue.h"
 
-#include <boost/thread/mutex.hpp>
 #include <boost/bind/mem_fn.hpp>
+#include <boost/thread/pthread/mutex.hpp>
 
 #include "util/aligned-new.h"
 #include "util/condition-variable.h"
@@ -347,7 +346,4 @@ class SynchronousThreadPool : public ThreadPool<std::shared_ptr<SynchronousWorkI
     work->WorkerExecute();
   }
 };
-
 }
-
-#endif

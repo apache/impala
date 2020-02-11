@@ -17,10 +17,21 @@
 
 #include "util/bloom-filter.h"
 
+#include <emmintrin.h>
+#include <math.h>
+#include <string.h>
+
+#include <cmath>
+#include <cstdint>
+#include <memory>
+#include <ostream>
+
+#include "gen-cpp/data_stream_service.pb.h"
 #include "kudu/rpc/rpc_controller.h"
 #include "kudu/rpc/rpc_sidecar.h"
+#include "kudu/util/slice.h"
+#include "kudu/util/status.h"
 #include "runtime/exec-env.h"
-#include "runtime/runtime-state.h"
 
 using namespace std;
 

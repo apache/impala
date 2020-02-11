@@ -15,39 +15,13 @@
 // specific language governing permissions and limitations
 // under the License.
 
+#pragma once
 
-#ifndef IMPALA_UTIL_UID_UTIL_H
-#define IMPALA_UTIL_UID_UTIL_H
-
-#include <boost/functional/hash.hpp>
 #include <boost/uuid/uuid.hpp>
-#include <boost/uuid/uuid_generators.hpp>
 
 #include "gen-cpp/Types_types.h"  // for TUniqueId
 #include "gen-cpp/control_service.pb.h"
 #include "util/debug-util.h"
-
-namespace impala {
-
-inline std::size_t hash_value(const TUniqueId& id) {
-  std::size_t seed = 0;
-  boost::hash_combine(seed, id.lo);
-  boost::hash_combine(seed, id.hi);
-  return seed;
-}
-
-}
-
-/// Hash function for std:: containers
-namespace std {
-
-template<> struct hash<impala::TUniqueId> {
-  std::size_t operator()(const impala::TUniqueId& id) const {
-    return impala::hash_value(id);
-  }
-};
-
-}
 
 namespace impala {
 
@@ -119,12 +93,7 @@ inline T CastTUniqueId(const F& from) {
 }
 
 /// generates a 16 byte UUID
-inline string GenerateUUIDString() {
-  boost::uuids::basic_random_generator<boost::mt19937> gen;
-  boost::uuids::uuid u = gen();
-  string uuid(u.begin(), u.end());
-  return uuid;
-}
+std::string GenerateUUIDString();
 
 /// generates a 16 byte UUID
 inline TUniqueId GenerateUUID() {
@@ -134,6 +103,4 @@ inline TUniqueId GenerateUUID() {
   memcpy(&uid.lo, u.data() + sizeof(int64_t), sizeof(int64_t));
   return uid;
 }
-
 } // namespace impala
-#endif

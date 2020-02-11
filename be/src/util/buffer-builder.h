@@ -15,12 +15,10 @@
 // specific language governing permissions and limitations
 // under the License.
 
-
-#ifndef IMPALA_UTIL_BUFFER_BUILDER_H
-#define IMPALA_UTIL_BUFFER_BUILDER_H
+#pragma once
 
 #include <stdlib.h>
-#include <boost/cstdint.hpp>
+#include <cstdint>
 
 namespace impala {
 
@@ -53,5 +51,3 @@ class BufferBuilder {
   int size_;
 };
 }
-
-#endif

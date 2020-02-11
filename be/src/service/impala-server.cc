@@ -86,6 +86,7 @@
 #include "util/redactor.h"
 #include "util/runtime-profile-counters.h"
 #include "util/runtime-profile.h"
+#include "util/simple-logger.h"
 #include "util/string-parser.h"
 #include "util/summary-util.h"
 #include "util/test-info.h"

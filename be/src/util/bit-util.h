@@ -15,9 +15,7 @@
 // specific language governing permissions and limitations
 // under the License.
 
-
-#ifndef IMPALA_BIT_UTIL_H
-#define IMPALA_BIT_UTIL_H
+#pragma once
 
 #if defined(__APPLE__)
 #include <machine/endian.h>
@@ -26,13 +24,15 @@
 #endif
 
 #include <climits>
+#include <cstdint>
 #include <limits>
-#include <typeinfo>
 #include <type_traits>
 
 #include "common/compiler-util.h"
+#include "common/logging.h"
 #include "gutil/bits.h"
 #include "runtime/multi-precision.h"
+#include "util/arithmetic-util.h"
 #include "util/cpu-info.h"
 #include "util/sse-util.h"
 
@@ -427,5 +427,3 @@ class SimdByteSwap {
   static void ByteSwapSimd(const void* src, const int len, void* dst);
 };
 }
-
-#endif

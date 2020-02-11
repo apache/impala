@@ -15,14 +15,13 @@
 // specific language governing permissions and limitations
 // under the License.
 
-#ifndef SCHEDULING_SCHEDULER_H
-#define SCHEDULING_SCHEDULER_H
+#pragma once
 
 #include <list>
 #include <string>
 #include <vector>
 #include <boost/heap/binomial_heap.hpp>
-#include <boost/thread/mutex.hpp>
+#include <boost/thread/pthread/mutex.hpp>
 #include <boost/unordered_map.hpp>
 #include <gtest/gtest_prod.h> // for FRIEND_TEST
 
@@ -436,5 +435,3 @@ class Scheduler {
 };
 
 }
-
-#endif

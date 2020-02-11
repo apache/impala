@@ -15,12 +15,10 @@
 // specific language governing permissions and limitations
 // under the License.
 
-
-#ifndef IMPALA_RUNTIME_SORTED_RUN_MERGER_H_
-#define IMPALA_RUNTIME_SORTED_RUN_MERGER_H_
+#pragma once
 
 #include <boost/scoped_ptr.hpp>
-#include <boost/thread/mutex.hpp>
+#include <boost/thread/pthread/mutex.hpp>
 
 #include "common/object-pool.h"
 #include "util/tuple-row-compare.h"
@@ -111,7 +109,4 @@ class SortedRunMerger {
   /// Times calls to get the next batch of rows from the input run.
   RuntimeProfile::Counter* get_next_batch_timer_;
 };
-
 }
-
-#endif

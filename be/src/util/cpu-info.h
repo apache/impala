@@ -15,14 +15,12 @@
 // specific language governing permissions and limitations
 // under the License.
 
+#pragma once
 
-#ifndef IMPALA_UTIL_CPU_INFO_H
-#define IMPALA_UTIL_CPU_INFO_H
-
+#include <cstdint>
 #include <memory>
 #include <string>
 #include <vector>
-#include <boost/cstdint.hpp>
 
 #include "common/logging.h"
 
@@ -223,4 +221,3 @@ class CpuInfo {
   static std::vector<int> numa_node_core_idx_;
 };
 }
-#endif

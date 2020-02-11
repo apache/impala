@@ -21,9 +21,13 @@
 #include <fstream>
 #include <iostream>
 #include <utility>
+#include <vector>
 
-#include <boost/algorithm/string.hpp>
+#include <boost/algorithm/string/classification.hpp>
+#include <boost/algorithm/string/constants.hpp>
+#include <boost/algorithm/string/split.hpp>
 
+#include "common/logging.h"
 #include "gutil/strings/escaping.h"
 #include "gutil/strings/substitute.h"
 #include "util/error-util.h"

@@ -93,6 +93,7 @@ add_library(Util
   thread.cc
   time.cc
   tuple-row-compare.cc
+  uid-util.cc
   url-parser.cc
   ${SQUEASEL_SRC_DIR}/squeasel.c
   webserver.cc

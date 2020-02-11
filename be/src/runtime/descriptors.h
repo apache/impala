@@ -15,14 +15,12 @@
 // specific language governing permissions and limitations
 // under the License.
 
+#pragma once
 
-#ifndef IMPALA_RUNTIME_DESCRIPTORS_H
-#define IMPALA_RUNTIME_DESCRIPTORS_H
-
+#include <iosfwd>
 #include <unordered_map>
 #include <vector>
 #include <boost/scoped_ptr.hpp>
-#include <ostream>
 
 #include "codegen/impala-ir.h"
 #include "common/global-types.h"
@@ -631,7 +629,4 @@ class RowDescriptor {
   /// Provide quick way to check if there are variable length slots.
   bool has_varlen_slots_;
 };
-
 }
-
-#endif

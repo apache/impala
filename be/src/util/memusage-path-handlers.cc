@@ -22,6 +22,7 @@
 #include "runtime/mem-tracker.h"
 #include "util/common-metrics.h"
 #include "util/mem-info.h"
+#include "util/metrics.h"
 #include "util/pretty-printer.h"
 
 #include "common/names.h"

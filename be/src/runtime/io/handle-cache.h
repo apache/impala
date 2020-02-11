@@ -15,15 +15,14 @@
 // specific language governing permissions and limitations
 // under the License.
 
-#ifndef IMPALA_RUNTIME_DISK_IO_MGR_HANDLE_CACHE_H
-#define IMPALA_RUNTIME_DISK_IO_MGR_HANDLE_CACHE_H
+#pragma once
 
 #include <array>
 #include <list>
 #include <map>
 #include <memory>
 
-#include <boost/thread/mutex.hpp>
+#include <boost/thread/pthread/mutex.hpp>
 
 #include "common/hdfs.h"
 #include "common/status.h"
@@ -223,5 +222,3 @@ class FileHandleCache {
 };
 }
 }
-
-#endif

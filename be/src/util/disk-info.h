@@ -15,14 +15,13 @@
 // specific language governing permissions and limitations
 // under the License.
 
+#pragma once
 
-#ifndef IMPALA_UTIL_DISK_INFO_H
-#define IMPALA_UTIL_DISK_INFO_H
-
+#include <cstdint>
 #include <map>
 #include <string>
+#include <vector>
 
-#include <boost/cstdint.hpp>
 #include "common/logging.h"
 
 namespace impala {
@@ -108,4 +107,3 @@ class DiskInfo {
   static bool TryNVMETrim(const std::string& name_in, std::string* basename_out);
 };
 }
-#endif

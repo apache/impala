@@ -48,19 +48,19 @@ class MiniKdcWrapper {
   Status TearDownMiniKDC();
 
   /// Kinit a user to the mini KDC.
-  Status Kinit(const string& username);
+  Status Kinit(const std::string& username);
 
   /// Creates a new user with the given username.
   /// The password is the same as the username.
-  Status CreateUserPrincipal(const string& username);
+  Status CreateUserPrincipal(const std::string& username);
 
   /// Creates a keytab file under the 'unique_test_dir_' path which is configured to
   /// authenticate the service principal 'spn'. The path to the file is returned as a
   /// string in 'kt_path'.
-  Status CreateServiceKeytab(const string& spn, string* kt_path);
+  Status CreateServiceKeytab(const std::string& spn, std::string* kt_path);
 
   /// Returns the environment variable ""KRB5CCNAME" configured in the setup of mini-kdc.
-  const string GetKrb5CCname() const {
+  const std::string GetKrb5CCname() const {
     return kdc_->GetEnvVars()["KRB5CCNAME"];
   }
 

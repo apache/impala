@@ -15,13 +15,11 @@
 // specific language governing permissions and limitations
 // under the License.
 
-
-#ifndef IMPALA_UTIL_RUNTIME_PROFILE_H
-#define IMPALA_UTIL_RUNTIME_PROFILE_H
+#pragma once
 
 #include <boost/function.hpp>
 #include <boost/thread/lock_guard.hpp>
-#include <iostream>
+#include <iosfwd>
 #include <rapidjson/document.h>
 #include "common/atomic.h"
 #include "common/status.h"
@@ -625,7 +623,4 @@ class RuntimeProfile { // NOLINT: This struct is not packed, but there are not s
       const string& counter_name, const CounterMap& counter_map,
       const ChildCounterMap& child_counter_map) const;
 };
-
 }
-
-#endif

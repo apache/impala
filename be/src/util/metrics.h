@@ -17,8 +17,8 @@
 
 #pragma once
 
+#include <iosfwd>
 #include <map>
-#include <sstream>
 #include <string>
 #include <vector>
 #include <boost/function.hpp>

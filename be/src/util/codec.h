@@ -15,14 +15,17 @@
 // specific language governing permissions and limitations
 // under the License.
 
+#pragma once
 
-#ifndef IMPALA_UTIL_CODEC_H
-#define IMPALA_UTIL_CODEC_H
-
-#include "common/status.h"
+#include <cstdint>
+#include <map>
+#include <string>
 
 #include <boost/scoped_ptr.hpp>
 
+#include "common/status.h"
+#include "gen-cpp/CatalogObjects_types.h"
+#include "gutil/strings/substitute.h"
 #include "runtime/mem-pool.h"
 
 namespace impala {
@@ -203,6 +206,4 @@ class Codec {
   /// This is set to true for codecs that implement ProcessBlockStreaming().
   bool supports_streaming_;
 };
-
 }
-#endif

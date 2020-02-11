@@ -15,15 +15,13 @@
 // specific language governing permissions and limitations
 // under the License.
 
-
-#ifndef IMPALA_RUNTIME_LIB_CACHE_H
-#define IMPALA_RUNTIME_LIB_CACHE_H
+#pragma once
 
 #include <string>
 #include <boost/scoped_ptr.hpp>
+#include <boost/thread/pthread/mutex.hpp>
 #include <boost/unordered_map.hpp>
 #include <boost/unordered_set.hpp>
-#include <boost/thread/mutex.hpp>
 #include "common/atomic.h"
 #include "common/object-pool.h"
 #include "common/status.h"
@@ -236,5 +234,3 @@ class LibCacheEntryHandle {
 };
 
 }
-
-#endif

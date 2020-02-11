@@ -15,23 +15,27 @@
 // specific language governing permissions and limitations
 // under the License.
 
-#ifndef IMPALA_RUNTIME_QUERY_STATE_H
-#define IMPALA_RUNTIME_QUERY_STATE_H
+#pragma once
 
+#include <cstdint>
 #include <memory>
-#include <mutex>
+#include <string>
 #include <unordered_map>
 
 #include "common/atomic.h"
+#include "common/compiler-util.h"
+#include "common/logging.h"
 #include "common/object-pool.h"
+#include "common/status.h"
 #include "gen-cpp/ImpalaInternalService_types.h"
 #include "gen-cpp/Types_types.h"
-#include "gen-cpp/data_stream_service.pb.h"
+#include "gen-cpp/control_service.pb.h"
+#include "gutil/macros.h"
 #include "gutil/threading/thread_collision_warner.h" // for DFAKE_*
 #include "runtime/tmp-file-mgr.h"
-#include "util/container-util.h"
 #include "util/counting-barrier.h"
-#include "util/uid-util.h"
+#include "util/spinlock.h"
+#include "util/unique-id-hash.h"
 
 namespace kudu {
 namespace rpc {
@@ -42,15 +46,17 @@ class RpcContext;
 namespace impala {
 
 class ControlServiceProxy;
-class RuntimeFilterBank;
+class DescriptorTbl;
 class FragmentInstanceState;
 class InitialReservations;
 class MemTracker;
-class ReportExecStatusRequestPB;
+class PublishFilterParamsPB;
 class ReservationTracker;
+class RuntimeFilterBank;
+class RuntimeProfile;
 class RuntimeState;
 class ScannerMemLimiter;
-class ThriftSerializer;
+class TRuntimeProfileForest;
 
 /// Central class for all backend execution state (example: the FragmentInstanceStates
 /// of the individual fragment instances) created for a particular query.
@@ -466,5 +472,3 @@ class QueryState {
   const char* BackendExecStateToString(const BackendExecState& state);
 };
 }
-
-#endif

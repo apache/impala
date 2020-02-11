@@ -15,11 +15,10 @@
 // specific language governing permissions and limitations
 // under the License.
 
-#ifndef IMPALA_RPC_AUTH_PROVIDER_H
-#define IMPALA_RPC_AUTH_PROVIDER_H
+#pragma once
 
 #include <string>
-#include <boost/thread/mutex.hpp>
+#include <boost/thread/pthread/mutex.hpp>
 #include <sasl/sasl.h>
 
 #include "common/status.h"
@@ -214,5 +213,3 @@ class NoAuthProvider : public AuthProvider {
 Status InitAuth(const std::string& appname);
 
 }
-
-#endif

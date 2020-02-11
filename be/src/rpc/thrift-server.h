@@ -15,12 +15,11 @@
 // specific language governing permissions and limitations
 // under the License.
 
-#ifndef IMPALA_RPC_THRIFT_SERVER_H
-#define IMPALA_RPC_THRIFT_SERVER_H
+#pragma once
 
 #include <boost/scoped_ptr.hpp>
 #include <boost/shared_ptr.hpp>
-#include <boost/thread/mutex.hpp>
+#include <boost/thread/pthread/mutex.hpp>
 #include <boost/unordered_map.hpp>
 #include <boost/uuid/uuid_generators.hpp>
 #include <thrift/TProcessor.h>
@@ -488,5 +487,3 @@ struct SSLProtoVersions {
 };
 
 }
-
-#endif

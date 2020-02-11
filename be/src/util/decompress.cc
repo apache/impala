@@ -17,6 +17,10 @@
 
 #include "util/decompress.h"
 
+#include <strings.h>
+
+#include <sstream>
+
 // Codec libraries
 #include <zlib.h>
 #include <bzlib.h>
@@ -30,6 +34,9 @@
 #include "exec/read-write-util.h"
 #include "runtime/mem-pool.h"
 #include "runtime/mem-tracker.h"
+
+#include "common/compiler-util.h"
+#include "gen-cpp/ErrorCodes_types.h"
 
 #include "common/names.h"
 

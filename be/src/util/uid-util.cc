@@ -15,19 +15,16 @@
 // specific language governing permissions and limitations
 // under the License.
 
-#include "util/bloom-filter.h"
-#include "util/hash-util.h"
+#include "util/uid-util.h"
 
-using namespace impala;
+#include <boost/uuid/uuid_generators.hpp>
 
-void BloomFilter::InsertNoAvx2(const uint32_t hash) noexcept {
-  always_false_ = false;
-  const uint32_t bucket_idx = HashUtil::Rehash32to32(hash) & directory_mask_;
-  BucketInsert(bucket_idx, hash);
+namespace impala {
+
+string GenerateUUIDString() {
+  boost::uuids::basic_random_generator<boost::mt19937> gen;
+  boost::uuids::uuid u = gen();
+  string uuid(u.begin(), u.end());
+  return uuid;
 }
-
-void BloomFilter::InsertAvx2(const uint32_t hash) noexcept {
-  always_false_ = false;
-  const uint32_t bucket_idx = HashUtil::Rehash32to32(hash) & directory_mask_;
-  BucketInsertAVX2(bucket_idx, hash);
-}
+} // namespace impala

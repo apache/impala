@@ -15,12 +15,10 @@
 // specific language governing permissions and limitations
 // under the License.
 
+#pragma once
 
-#ifndef IMPALA_EXEC_EXEC_NODE_H
-#define IMPALA_EXEC_EXEC_NODE_H
-
+#include <iosfwd>
 #include <memory>
-#include <sstream>
 #include <vector>
 
 #include "common/status.h"
@@ -518,6 +516,4 @@ inline bool ExecNode::EvalPredicate(ScalarExprEvaluator* eval, TupleRow* row) {
   if (v.is_null || !v.val) return false;
   return true;
 }
-
-}
-#endif
+} // namespace impala

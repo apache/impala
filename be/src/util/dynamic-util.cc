@@ -19,7 +19,6 @@
 
 #include <dlfcn.h>
 #include <sstream>
-#include "runtime/exec-env.h"
 #include "util/test-info.h"
 
 #include "common/names.h"

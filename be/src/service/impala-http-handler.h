@@ -15,10 +15,9 @@
 // specific language governing permissions and limitations
 // under the License.
 
-#ifndef IMPALA_SERVICE_IMPALA_HTTP_HANDLER_H
-#define IMPALA_SERVICE_IMPALA_HTTP_HANDLER_H
+#pragma once
 
-#include <sstream>
+#include <iosfwd>
 #include <rapidjson/document.h>
 #include "kudu/util/web_callback_registry.h"
 #include "util/webserver.h"
@@ -249,7 +248,4 @@ class ImpalaHttpHandler {
   void ResetResourcePoolStatsHandler(
       const Webserver::WebRequest& req, rapidjson::Document* document);
 };
-
 }
-
-#endif

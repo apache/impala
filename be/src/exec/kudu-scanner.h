@@ -94,7 +94,7 @@ class KuduScanner {
   }
 
   /// Builds the error string by adding the PlanNode id and KuduTable to the message.
-  string BuildErrorString(const char* msg);
+  std::string BuildErrorString(const char* msg);
 
   KuduScanNodeBase* scan_node_;
   RuntimeState* state_;

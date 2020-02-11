@@ -15,22 +15,37 @@
 // specific language governing permissions and limitations
 // under the License.
 
+#include <dirent.h>
+#include <errno.h>
 #include <fcntl.h>
+#include <limits.h>
+#include <stdlib.h>
 #include <string.h>
+#include <unistd.h>
 #include <sys/resource.h>
 #include <sys/stat.h>
-#include <boost/filesystem.hpp>
-#include <gutil/strings/numbers.h>
-#include <gutil/strings/substitute.h>
-#include <gutil/strings/util.h>
 
-#include "exec/kudu-util.h"
+#include <memory>
+#include <string>
+#include <vector>
+
+#include <boost/filesystem.hpp>
+
+#include "common/logging.h"
+#include "common/status.h"
+#include "gen-cpp/ErrorCodes_types.h"
 #include "gutil/macros.h"
-#include "runtime/io/error-converter.h"
+#include "gutil/strings/numbers.h"
+#include "gutil/strings/substitute.h"
+#include "gutil/strings/util.h"
 #include "kudu/util/env.h"
 #include "kudu/util/path_util.h"
-#include "util/filesystem-util.h"
+#include "kudu/util/slice.h"
+#include "runtime/io/error-converter.h"
+#include "util/debug-util.h"
 #include "util/error-util.h"
+#include "util/filesystem-util.h"
+#include "util/kudu-status-util.h"
 #include "util/scope-exit-trigger.h"
 #include "util/uid-util.h"
 

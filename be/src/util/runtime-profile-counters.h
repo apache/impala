@@ -350,7 +350,7 @@ class RuntimeProfile::HighWaterMarkCounter : public RuntimeProfile::Counter {
     UpdateMax(v);
   }
 
-  string CounterType() const override {
+  std::string CounterType() const override {
     return "HighWaterMarkCounter";
   }
 
@@ -385,7 +385,7 @@ class RuntimeProfile::DerivedCounter : public RuntimeProfile::Counter {
     return counter_fn_();
   }
 
-  string CounterType() const override {
+  std::string CounterType() const override {
     return "DerivedCounter";
   }
 
@@ -433,7 +433,7 @@ class RuntimeProfile::AveragedCounter : public RuntimeProfile::Counter {
     }
   }
 
-  string CounterType() const override {
+  std::string CounterType() const override {
     return "AveragedCounter";
   }
 
@@ -506,7 +506,7 @@ class RuntimeProfile::SummaryStatsCounter : public RuntimeProfile::Counter {
     val->AddMember("num_of_samples", total_num_values_, document.GetAllocator());
   }
 
-  string CounterType() const override {
+  std::string CounterType() const override {
     return "SummaryStatsCounter";
   }
 
@@ -812,7 +812,7 @@ class RuntimeProfile::ConcurrentTimerCounter : public Counter {
     DCHECK(false);
   }
 
-  string CounterType() const override {
+  std::string CounterType() const override {
     return "ConcurrentTimerCounter";
   }
 

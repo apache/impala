@@ -15,15 +15,13 @@
 // specific language governing permissions and limitations
 // under the License.
 
+#pragma once
 
-#ifndef IMPALA_UTIL_BLOCKING_QUEUE_H
-#define IMPALA_UTIL_BLOCKING_QUEUE_H
-
-#include <boost/thread/mutex.hpp>
-#include <boost/scoped_ptr.hpp>
+#include <unistd.h>
 #include <deque>
 #include <memory>
-#include <unistd.h>
+#include <boost/scoped_ptr.hpp>
+#include <boost/thread/pthread/mutex.hpp>
 
 #include "common/atomic.h"
 #include "common/compiler-util.h"
@@ -306,7 +304,4 @@ class BlockingQueue : public CacheLineAligned {
   /// Soft limit on total bytes in queue. -1 if no limit.
   const int64_t max_bytes_;
 };
-
 }
-
-#endif

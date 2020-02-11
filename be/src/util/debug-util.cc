@@ -17,25 +17,34 @@
 
 #include "util/debug-util.h"
 
+#include <cstdint>
+#include <cstdlib>
+#include <cstring>
 #include <iomanip>
-#include <random>
 #include <sstream>
-#include <boost/algorithm/string.hpp>
+#include <utility>
+
+#include <boost/algorithm/string/classification.hpp>
+#include <boost/algorithm/string/constants.hpp>
+#include <boost/algorithm/string/predicate.hpp>
+#include <boost/algorithm/string/split.hpp>
 #include <boost/tokenizer.hpp>
+#include <gflags/gflags.h>
 
 #include "common/version.h"
 #include "runtime/collection-value.h"
 #include "runtime/descriptors.h"
-#include "runtime/exec-env.h"
-#include "runtime/raw-value.inline.h"
-#include "runtime/tuple-row.h"
+#include "runtime/raw-value.h"
 #include "runtime/row-batch.h"
-#include "util/cpu-info.h"
+#include "runtime/tuple-row.h"
+#include "runtime/tuple.h"
+#include "runtime/types.h"
 #include "util/impalad-metrics.h"
 #include "util/metrics.h"
 #include "util/string-parser.h"
-#include "util/uid-util.h"
 #include "util/time.h"
+
+#include "common/names.h"
 
 // / WARNING this uses a private API of GLog: DumpStackTraceToString().
 namespace google {
@@ -300,7 +309,7 @@ string GetBackendString() {
 
 DebugActionTokens TokenizeDebugActions(const string& debug_actions) {
   DebugActionTokens results;
-  list<string> actions;
+  vector<string> actions;
   split(actions, debug_actions, is_any_of("|"), token_compress_on);
   for (const string& a : actions) {
     vector<string> components;

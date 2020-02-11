@@ -37,6 +37,7 @@
 #include "util/jni-util.h"
 #include "util/mem-info.h"
 #include "util/memusage-path-handlers.h"
+#include "util/metrics.h"
 #include "util/pprof-path-handlers.h"
 #include "util/process-state-info.h"
 #include "util/runtime-profile-counters.h"

@@ -25,6 +25,7 @@
 #include "scheduling/hash-ring.h"
 #include "util/container-util.h"
 #include "util/network-util.h"
+#include "util/unique-id-hash.h"
 
 namespace impala {
 

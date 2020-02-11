@@ -15,12 +15,11 @@
 // specific language governing permissions and limitations
 // under the License.
 
-
+#include <unistd.h>
 #include <boost/thread.hpp>
-#include <boost/thread/mutex.hpp>
+#include <boost/thread/pthread/mutex.hpp>
 #include <glog/logging.h>
 #include <gtest/gtest.h>
-#include <unistd.h>
 
 #include "common/init.h"
 #include "common/atomic.h"

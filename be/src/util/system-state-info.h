@@ -20,7 +20,6 @@
 #include <array>
 #include <cstdint>
 #include <string>
-#include <sstream>
 
 #include <gtest/gtest_prod.h> // for FRIEND_TEST
 

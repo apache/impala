@@ -19,7 +19,7 @@
 
 #include <limits>
 
-#include <boost/thread/mutex.hpp>
+#include <boost/thread/pthread/mutex.hpp>
 #include <gflags/gflags.h>
 
 #include "common/logging.h"

@@ -15,15 +15,12 @@
 // specific language governing permissions and limitations
 // under the License.
 
-
-#ifndef IMPALA_UDA_TEST_HARNESS_H
-#define IMPALA_UDA_TEST_HARNESS_H
+#pragma once
 
 // THIS FILE IS USED BY THE STANDALONE IMPALA UDF DEVELOPMENT KIT.
 // IT MUST BE BUILDABLE WITH C++98 AND WITHOUT ANY INTERNAL IMPALA HEADERS.
 
 #include <string>
-#include <sstream>
 #include <vector>
 
 #include <boost/scoped_ptr.hpp>
@@ -290,9 +287,5 @@ class UdaTestHarness4 : public UdaTestHarnessBase<RESULT, INTERMEDIATE> {
   const std::vector<INPUT3>* input3_;
   const std::vector<INPUT4>* input4_;
 };
-
 }
-
 #include "udf/uda-test-harness-impl.h"
-
-#endif

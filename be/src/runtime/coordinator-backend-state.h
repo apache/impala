@@ -15,8 +15,7 @@
 // specific language governing permissions and limitations
 // under the License.
 
-#ifndef IMPALA_RUNTIME_COORDINATOR_BACKEND_STATE_H
-#define IMPALA_RUNTIME_COORDINATOR_BACKEND_STATE_H
+#pragma once
 
 #include <vector>
 #include <unordered_set>
@@ -28,7 +27,7 @@
 #include <boost/accumulators/statistics/min.hpp>
 #include <boost/accumulators/statistics/stats.hpp>
 #include <boost/accumulators/statistics/variance.hpp>
-#include <boost/thread/mutex.hpp>
+#include <boost/thread/pthread/mutex.hpp>
 
 #include "gen-cpp/control_service.proxy.h"
 #include "kudu/rpc/rpc_controller.h"
@@ -548,5 +547,3 @@ class Coordinator::BackendResourceState {
   FRIEND_TEST(CoordinatorBackendStateTest, StateMachine);
 };
 }
-
-#endif

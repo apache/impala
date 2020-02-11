@@ -17,6 +17,15 @@
 
 #include "util/event-metrics.h"
 
+#include <ostream>
+#include <unordered_map>
+
+#include <gflags/gflags_declare.h>
+
+#include "common/logging.h"
+#include "gen-cpp/JniCatalog_types.h"
+#include "util/metrics.h"
+
 DECLARE_int32(hms_event_polling_interval_s);
 
 namespace impala {

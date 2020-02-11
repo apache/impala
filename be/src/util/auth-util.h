@@ -15,11 +15,13 @@
 // specific language governing permissions and limitations
 // under the License.
 
-
-#ifndef IMPALA_UTIL_AUTH_UTIL_H
-#define IMPALA_UTIL_AUTH_UTIL_H
+#pragma once
 
 #include <string>
+#include <gflags/gflags_declare.h>
+
+#include "common/status.h"
+#include "gutil/strings/substitute.h"
 #include "service/impala-server.h"
 
 DECLARE_string(principal);
@@ -68,6 +70,4 @@ Status ParseKerberosPrincipal(const std::string& principal, std::string* service
 inline bool IsKerberosEnabled() {
   return !FLAGS_principal.empty();
 }
-
 } // namespace impala
-#endif

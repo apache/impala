@@ -42,6 +42,7 @@
 #include "util/bloom-filter.h"
 #include "util/min-max-filter.h"
 #include "util/pretty-printer.h"
+#include "util/uid-util.h"
 
 #include "common/names.h"
 

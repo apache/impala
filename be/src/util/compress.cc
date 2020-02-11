@@ -17,17 +17,24 @@
 
 #include "util/compress.h"
 
+#include <strings.h>
+
+#include <ostream>
+#include <vector>
+
 #include <bzlib.h>
 #include <zlib.h>
 #include <boost/crc.hpp>
-#include <gutil/strings/substitute.h>
 #undef DISALLOW_COPY_AND_ASSIGN // Snappy redefines this.
 #include <lz4.h>
 #include <snappy.h>
+#include <zconf.h>
 #include <zstd.h>
 #include <zstd_errors.h>
 
+#include "common/logging.h"
 #include "exec/read-write-util.h"
+#include "gutil/strings/substitute.h"
 #include "runtime/mem-pool.h"
 
 #include "common/names.h"

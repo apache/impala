@@ -15,14 +15,13 @@
 // specific language governing permissions and limitations
 // under the License.
 
-#ifndef IMPALA_UTIL_CONDITION_VARIABLE_H
-#define IMPALA_UTIL_CONDITION_VARIABLE_H
+#pragma once
 
-#include <boost/thread/pthread/timespec.hpp>
-#include <boost/thread/mutex.hpp>
-#include <boost/thread/thread_time.hpp>
 #include <pthread.h>
 #include <unistd.h>
+#include <boost/thread/pthread/mutex.hpp>
+#include <boost/thread/pthread/timespec.hpp>
+#include <boost/thread/thread_time.hpp>
 
 #include "util/time.h"
 
@@ -79,6 +78,4 @@ class ConditionVariable {
   pthread_cond_t cv_;
 
 };
-
 }
-#endif

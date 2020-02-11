@@ -15,26 +15,26 @@
 // specific language governing permissions and limitations
 // under the License.
 
-#ifndef IMPALA_RUNTIME_KRPC_DATA_STREAM_MGR_H
-#define IMPALA_RUNTIME_KRPC_DATA_STREAM_MGR_H
+#pragma once
 
 #include <list>
 #include <queue>
 #include <set>
-#include <boost/thread/mutex.hpp>
 #include <boost/thread/condition_variable.hpp>
+#include <boost/thread/pthread/mutex.hpp>
 #include <boost/unordered_map.hpp>
 #include <boost/unordered_set.hpp>
 
-#include "common/status.h"
 #include "common/object-pool.h"
-#include "runtime/descriptors.h"  // for PlanNodeId
+#include "common/status.h"
+#include "gen-cpp/Types_types.h" // for TUniqueId
+#include "runtime/descriptors.h" // for PlanNodeId
 #include "runtime/row-batch.h"
 #include "util/metrics-fwd.h"
 #include "util/promise.h"
 #include "util/runtime-profile.h"
 #include "util/thread-pool.h"
-#include "gen-cpp/Types_types.h"  // for TUniqueId
+#include "util/unique-id-hash.h"
 
 #include "gutil/macros.h"
 
@@ -486,4 +486,3 @@ class KrpcDataStreamMgr : public CacheLineAligned {
 };
 
 } // namespace impala
-#endif // IMPALA_RUNTIME_KRPC_DATA_STREAM_MGR_H

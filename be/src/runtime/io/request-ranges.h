@@ -15,14 +15,13 @@
 // specific language governing permissions and limitations
 // under the License.
 
-#ifndef IMPALA_RUNTIME_IO_REQUEST_RANGES_H
-#define IMPALA_RUNTIME_IO_REQUEST_RANGES_H
+#pragma once
 
 #include <cstdint>
 #include <deque>
 #include <functional>
 
-#include <boost/thread/mutex.hpp>
+#include <boost/thread/pthread/mutex.hpp>
 #include <gtest/gtest_prod.h> // for FRIEND_TEST
 
 #include "common/atomic.h"
@@ -629,5 +628,3 @@ inline bool BufferDescriptor::is_client_buffer() const {
 }
 }
 }
-
-#endif

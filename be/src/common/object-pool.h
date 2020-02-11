@@ -15,13 +15,11 @@
 // specific language governing permissions and limitations
 // under the License.
 
-
-#ifndef IMPALA_COMMON_OBJECT_POOL_H
-#define IMPALA_COMMON_OBJECT_POOL_H
+#pragma once
 
 #include <vector>
 #include <boost/thread/locks.hpp>
-#include <boost/thread/mutex.hpp>
+#include <boost/thread/pthread/mutex.hpp>
 
 #include "gutil/macros.h"
 #include "util/spinlock.h"
@@ -67,5 +65,3 @@ class ObjectPool {
 };
 
 }
-
-#endif

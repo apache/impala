@@ -38,6 +38,7 @@
 #include "util/stopwatch.h"
 #include "util/thread.h"
 #include "util/uid-util.h"
+#include "util/unique-id-hash.h"
 
 #include "common/init.h"
 #include "common/names.h"

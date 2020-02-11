@@ -15,14 +15,17 @@
 // specific language governing permissions and limitations
 // under the License.
 
+#pragma once
 
-#ifndef IMPALA_UTIL_DECOMPRESS_H
-#define IMPALA_UTIL_DECOMPRESS_H
+#include <cstdint>
+#include <string>
 
 // We need zlib.h here to declare stream_ below.
 #include <zlib.h>
 #include <bzlib.h>
 
+#include "common/status.h"
+#include "gutil/strings/substitute.h"
 #include "util/codec.h"
 
 namespace impala {
@@ -159,4 +162,3 @@ class Lz4BlockDecompressor : public Codec {
   virtual std::string file_extension() const override { return "lz4"; }
 };
 }
-#endif

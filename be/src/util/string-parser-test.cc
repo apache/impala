@@ -15,14 +15,14 @@
 // specific language governing permissions and limitations
 // under the License.
 
-#include <stdlib.h>
+#include "util/string-parser.h"
 #include <stdio.h>
+#include <stdlib.h>
+#include <cstdint>
 #include <iostream>
 #include <limits>
-#include <boost/cstdint.hpp>
 #include <boost/lexical_cast.hpp>
 #include "testutil/gtest-util.h"
-#include "util/string-parser.h"
 
 #include "common/names.h"
 

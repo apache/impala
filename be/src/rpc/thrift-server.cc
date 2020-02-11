@@ -18,7 +18,7 @@
 #include <boost/algorithm/string.hpp>
 #include <boost/filesystem.hpp>
 #include <boost/thread.hpp>
-#include <boost/thread/mutex.hpp>
+#include <boost/thread/pthread/mutex.hpp>
 #include <boost/uuid/uuid_io.hpp>
 
 #include <openssl/err.h>

@@ -23,7 +23,7 @@
 #include <boost/algorithm/string/join.hpp>
 #include <boost/date_time/posix_time/posix_time.hpp>
 #include <boost/thread/lock_options.hpp>
-#include <boost/thread/shared_mutex.hpp>
+#include <boost/thread/pthread/shared_mutex.hpp>
 #include <gutil/strings/substitute.h>
 
 #include "common/logging.h"

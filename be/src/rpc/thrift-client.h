@@ -15,12 +15,8 @@
 // specific language governing permissions and limitations
 // under the License.
 
+#pragma once
 
-#ifndef IMPALA_RPC_THRIFT_CLIENT_H
-#define IMPALA_RPC_THRIFT_CLIENT_H
-
-#include <ostream>
-#include <sstream>
 #include <boost/shared_ptr.hpp>
 #include <common/status.h>
 #include <thrift/Thrift.h>
@@ -28,7 +24,6 @@
 #include <thrift/transport/TSSLSocket.h>
 #include <thrift/transport/TBufferTransports.h>
 #include <thrift/protocol/TBinaryProtocol.h>
-#include <sstream>
 #include <gflags/gflags.h>
 
 #include "transport/TSaslClientTransport.h"
@@ -161,6 +156,4 @@ ThriftClient<InterfaceType>::ThriftClient(const std::string& ipaddress, int port
   protocol_.reset(new apache::thrift::protocol::TBinaryProtocol(transport_));
   iface_.reset(new InterfaceType(protocol_));
 }
-
 }
-#endif

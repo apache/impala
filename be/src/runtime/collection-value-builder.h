@@ -67,7 +67,7 @@ class CollectionValueBuilder {
         if (UNLIKELY(new_buf == NULL)) {
           *tuple_mem = NULL;
           *num_tuples = 0;
-          string path = tuple_desc_.table_desc() == NULL ? "" :
+          std::string path = tuple_desc_.table_desc() == NULL ? "" :
               PrintPath(*tuple_desc_.table_desc(), tuple_desc_.tuple_path());
           return pool_->mem_tracker()->MemLimitExceeded(state_,
               ErrorMsg(TErrorCode::COLLECTION_ALLOC_FAILED, new_buffer_size,

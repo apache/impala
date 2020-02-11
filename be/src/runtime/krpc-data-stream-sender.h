@@ -157,7 +157,7 @@ class KrpcDataStreamSender : public DataSink {
   Status CodegenHashRow(LlvmCodeGen* codegen, llvm::Function** fn);
 
   /// Returns the name of the partitioning type of this data stream sender.
-  string PartitionTypeName() const;
+  std::string PartitionTypeName() const;
 
   /// Sender instance id, unique within a fragment.
   const int sender_id_;

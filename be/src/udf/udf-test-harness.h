@@ -15,9 +15,7 @@
 // specific language governing permissions and limitations
 // under the License.
 
-
-#ifndef IMPALA_UDF_TEST_HARNESS_H
-#define IMPALA_UDF_TEST_HARNESS_H
+#pragma once
 
 // THIS FILE IS USED BY THE STANDALONE IMPALA UDF DEVELOPMENT KIT.
 // IT MUST BE BUILDABLE WITH C++98 AND WITHOUT ANY INTERNAL IMPALA HEADERS.
@@ -327,7 +325,4 @@ class UdfTestHarness {
     }
   }
 };
-
 }
-
-#endif

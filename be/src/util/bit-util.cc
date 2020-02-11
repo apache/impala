@@ -16,7 +16,10 @@
 // under the License.
 
 #include "util/bit-util.h"
+
+#include <emmintrin.h>
 #include <immintrin.h>
+#include <ostream>
 
 namespace {
 // ByteSwapScalarLoop is only used in bit-util.cc, so put it in this anonymous

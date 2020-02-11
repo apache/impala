@@ -15,20 +15,18 @@
 // specific language governing permissions and limitations
 // under the License.
 
-#ifndef IMPALA_EXPERIMENT_DATAPROVIDER_H
-#define IMPALA_EXPERIMENT_DATAPROVIDER_H
+#pragma once
 
 #include <math.h>
-#include <iostream>
+#include <cstdint>
+#include <iosfwd>
 #include <limits>
-#include <boost/cstdint.hpp>
-#include <boost/scoped_ptr.hpp>
-#include <boost/random/uniform_int.hpp>
+#include <boost/generator_iterator.hpp>
 #include <boost/random/linear_congruential.hpp>
 #include <boost/random/uniform_int.hpp>
 #include <boost/random/uniform_real.hpp>
 #include <boost/random/variate_generator.hpp>
-#include <boost/generator_iterator.hpp>
+#include <boost/scoped_ptr.hpp>
 
 #include "runtime/mem-pool.h"
 #include "runtime/types.h"
@@ -247,5 +245,3 @@ template<> inline float DataProvider::ColDesc::Generate<float>(double d, int i) 
 template<> inline double DataProvider::ColDesc::Generate<double>(double d, int i) const {
   return Generate<double>(d, i, min.d, max.d);
 }
-
-#endif

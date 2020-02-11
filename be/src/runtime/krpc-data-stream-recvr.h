@@ -15,11 +15,10 @@
 // specific language governing permissions and limitations
 // under the License.
 
-#ifndef IMPALA_RUNTIME_KRPC_DATA_STREAM_RECVR_H
-#define IMPALA_RUNTIME_KRPC_DATA_STREAM_RECVR_H
+#pragma once
 
 #include <boost/scoped_ptr.hpp>
-#include <boost/thread/mutex.hpp>
+#include <boost/thread/pthread/mutex.hpp>
 
 #include "common/object-pool.h"
 #include "common/status.h"
@@ -301,5 +300,3 @@ class KrpcDataStreamRecvr {
 };
 
 } // namespace impala
-
-#endif // IMPALA_RUNTIME_KRPC_DATA_STREAM_RECVR_H

@@ -17,9 +17,13 @@
 
 #include "util/coding-util.h"
 
-#include <exception>
+#include <cctype>
+#include <limits>
 #include <sstream>
-#include <boost/algorithm/string.hpp>
+
+#include <boost/algorithm/string/classification.hpp>
+#include <boost/function.hpp>
+#include <sasl/sasl.h>
 
 #include "common/compiler-util.h"
 #include "common/logging.h"

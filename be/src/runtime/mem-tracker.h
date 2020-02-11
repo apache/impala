@@ -15,16 +15,14 @@
 // specific language governing permissions and limitations
 // under the License.
 
-
-#ifndef IMPALA_RUNTIME_MEM_TRACKER_H
-#define IMPALA_RUNTIME_MEM_TRACKER_H
+#pragma once
 
 #include <stdint.h>
 #include <map>
 #include <memory>
 #include <queue>
 #include <vector>
-#include <boost/thread/mutex.hpp>
+#include <boost/thread/pthread/mutex.hpp>
 #include <boost/unordered_map.hpp>
 
 #include "common/logging.h"
@@ -527,5 +525,3 @@ class PoolMemTrackerRegistry {
   SpinLock pool_to_mem_trackers_lock_;
 };
 }
-
-#endif

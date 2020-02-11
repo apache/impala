@@ -20,7 +20,7 @@
 #include <algorithm>
 #include <sstream>
 #include <boost/lexical_cast.hpp>
-#include <boost/thread/mutex.hpp>
+#include <boost/thread/pthread/mutex.hpp>
 #include <rapidjson/prettywriter.h>
 #include <rapidjson/stringbuffer.h>
 

@@ -62,7 +62,7 @@ class DateParser {
   /// Format the date values using the given format context.
   /// dt_ctx -- date format context
   /// date -- the date value
-  static string Format(const datetime_parse_util::DateTimeFormatContext& dt_ctx,
+  static std::string Format(const datetime_parse_util::DateTimeFormatContext& dt_ctx,
       const DateValue& date);
 
  private:

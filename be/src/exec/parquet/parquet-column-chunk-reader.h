@@ -64,8 +64,8 @@ class ParquetColumnChunkReader {
   }
 
   /// Moved to implementation to be able to forward declare class in scoped_ptr.
-  ParquetColumnChunkReader(HdfsParquetScanner* parent, string schema_name, int slot_id,
-      ValueMemoryType value_mem_type);
+  ParquetColumnChunkReader(HdfsParquetScanner* parent, std::string schema_name,
+      int slot_id, ValueMemoryType value_mem_type);
   ~ParquetColumnChunkReader();
 
   /// Resets the reader for each row group in the file and creates the scan
@@ -127,7 +127,7 @@ class ParquetColumnChunkReader {
 
  private:
   HdfsParquetScanner* parent_;
-  string schema_name_;
+  std::string schema_name_;
 
   ParquetPageReader page_reader_;
 

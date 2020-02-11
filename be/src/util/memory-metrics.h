@@ -15,13 +15,12 @@
 // specific language governing permissions and limitations
 // under the License.
 
-#ifndef IMPALA_UTIL_MEM_METRICS_H
-#define IMPALA_UTIL_MEM_METRICS_H
+#pragma once
 
 #include "util/metrics.h"
 
 #include <boost/bind.hpp>
-#include <boost/thread/mutex.hpp>
+#include <boost/thread/pthread/mutex.hpp>
 #include <gperftools/malloc_extension.h>
 #if defined(ADDRESS_SANITIZER) || defined(THREAD_SANITIZER)
 #include <sanitizer/allocator_interface.h>
@@ -338,5 +337,3 @@ class MemTrackerMetric : public IntGauge {
 Status RegisterMemoryMetrics(MetricGroup* metrics, bool register_jvm_metrics,
     ReservationTracker* global_reservations, BufferPool* buffer_pool);
 }
-
-#endif

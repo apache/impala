@@ -15,13 +15,12 @@
 // specific language governing permissions and limitations
 // under the License.
 
-#ifndef IMPALA_CATALOG_CATALOG_SERVER_H
-#define IMPALA_CATALOG_CATALOG_SERVER_H
+#pragma once
 
 #include <string>
 #include <vector>
 #include <boost/shared_ptr.hpp>
-#include <boost/thread/mutex.hpp>
+#include <boost/thread/pthread/mutex.hpp>
 #include <boost/unordered_set.hpp>
 
 #include "gen-cpp/CatalogService.h"
@@ -236,5 +235,3 @@ class CatalogServer {
 };
 
 }
-
-#endif

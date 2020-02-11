@@ -20,7 +20,7 @@
 #include <map>
 #include <string>
 #include <boost/function.hpp>
-#include <boost/thread/shared_mutex.hpp>
+#include <boost/thread/pthread/shared_mutex.hpp>
 #include <rapidjson/fwd.h>
 
 #include "common/status.h"
@@ -119,8 +119,8 @@ class Webserver {
   bool IsSecure() const;
 
   /// Returns the URL to the webserver as a string.
-  string url() { return url_; }
-  string hostname() { return hostname_; }
+  std::string url() { return url_; }
+  std::string hostname() { return hostname_; }
   int port() { return http_address_.port; }
 
   /// Returns the appropriate MIME type for a given ContentType.

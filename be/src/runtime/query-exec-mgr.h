@@ -15,25 +15,19 @@
 // specific language governing permissions and limitations
 // under the License.
 
-
-#ifndef IMPALA_RUNTIME_QUERY_EXEC_MGR_H
-#define IMPALA_RUNTIME_QUERY_EXEC_MGR_H
-
-#include <boost/thread/mutex.hpp>
-#include <unordered_map>
+#pragma once
 
 #include "common/status.h"
-#include "gen-cpp/Types_types.h"
+#include "util/aligned-new.h"
 #include "util/sharded-query-map-util.h"
 
 namespace impala {
 
+class ExecQueryFInstancesRequestPB;
 class QueryState;
-class Thread;
-class TExecPlanFragmentParams;
+class TExecPlanFragmentInfo;
 class TQueryCtx;
 class TUniqueId;
-class FragmentInstanceState;
 
 /// A daemon-wide registry and manager of QueryStates. This is the central
 /// entry point for gaining refcounted access to a QueryState. It also initiates
@@ -81,5 +75,3 @@ class QueryExecMgr : public CacheLineAligned {
   void ExecuteQueryHelper(QueryState* qs);
 };
 }
-
-#endif

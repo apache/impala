@@ -17,19 +17,19 @@
 
 #include "common/logging.h"
 
-#include <boost/thread/locks.hpp>
-#include <boost/thread/mutex.hpp>
-#include <boost/uuid/uuid.hpp>
-#include <boost/uuid/uuid_generators.hpp>
-#include <boost/uuid/uuid_io.hpp>
+#include <stdio.h>
 #include <cerrno>
 #include <ctime>
 #include <fstream>
-#include <gutil/strings/substitute.h>
 #include <iostream>
 #include <map>
 #include <sstream>
-#include <stdio.h>
+#include <boost/thread/locks.hpp>
+#include <boost/thread/pthread/mutex.hpp>
+#include <boost/uuid/uuid.hpp>
+#include <boost/uuid/uuid_generators.hpp>
+#include <boost/uuid/uuid_io.hpp>
+#include <gutil/strings/substitute.h>
 
 #include "common/logging.h"
 #include "service/impala-server.h"

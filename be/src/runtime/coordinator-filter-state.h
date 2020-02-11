@@ -69,7 +69,7 @@ class Coordinator::FilterState {
   }
 
   BloomFilterPB& bloom_filter() { return bloom_filter_; }
-  string& bloom_filter_directory() { return bloom_filter_directory_; }
+  std::string& bloom_filter_directory() { return bloom_filter_directory_; }
   MinMaxFilterPB& min_max_filter() { return min_max_filter_; }
   std::vector<FilterTarget>* targets() { return &targets_; }
   const std::vector<FilterTarget>& targets() const { return targets_; }
@@ -137,7 +137,7 @@ class Coordinator::FilterState {
   BloomFilterPB bloom_filter_;
   /// When the filter is a Bloom filter, we use this string to store the contents of the
   /// aggregated Bloom filter.
-  string bloom_filter_directory_;
+  std::string bloom_filter_directory_;
   MinMaxFilterPB min_max_filter_;
 
   /// Time at which first local filter arrived.

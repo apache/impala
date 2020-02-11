@@ -15,7 +15,11 @@
 // specific language governing permissions and limitations
 // under the License.
 
-#include "util/metrics.h"
+#pragma once
+
+#include <string>
+
+#include "util/metrics-fwd.h"
 
 namespace impala {
 
@@ -31,8 +35,8 @@ public:
   static void InitCommonMetrics(MetricGroup* metric_group);
 
 private:
-  static string PROCESS_START_TIME_METRIC_NAME;
-  static string KUDU_CLIENT_VERSION_METRIC_NAME;
+ static std::string PROCESS_START_TIME_METRIC_NAME;
+ static std::string KUDU_CLIENT_VERSION_METRIC_NAME;
 };
 
 }

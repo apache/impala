@@ -15,14 +15,12 @@
 // specific language governing permissions and limitations
 // under the License.
 
-
-#ifndef IMPALA_RUNTIME_HDFS_FS_CACHE_H
-#define IMPALA_RUNTIME_HDFS_FS_CACHE_H
+#pragma once
 
 #include <string>
 #include <boost/scoped_ptr.hpp>
+#include <boost/thread/pthread/mutex.hpp>
 #include <boost/unordered_map.hpp>
-#include <boost/thread/mutex.hpp>
 #include "common/hdfs.h"
 
 #include "common/status.h"
@@ -60,7 +58,7 @@ class HdfsFsCache {
 
   /// Get NameNode info from path, set error message if path is not valid.
   /// Exposed as a static method for testing purpose.
-  static string GetNameNodeFromPath(const string& path, string* err);
+  static std::string GetNameNodeFromPath(const std::string& path, std::string* err);
 
   /// S3A access key retrieved by running command in Init().
   /// If either s3a_secret_key_ or this are empty, the default value is taken from the
@@ -85,5 +83,3 @@ class HdfsFsCache {
 };
 
 }
-
-#endif

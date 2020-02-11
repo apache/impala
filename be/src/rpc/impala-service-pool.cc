@@ -17,11 +17,11 @@
 
 #include "rpc/impala-service-pool.h"
 
-#include <boost/thread/mutex.hpp>
-#include <glog/logging.h>
 #include <memory>
 #include <string>
 #include <vector>
+#include <boost/thread/pthread/mutex.hpp>
+#include <glog/logging.h>
 
 #include "exec/kudu-util.h"
 #include "gutil/strings/numbers.h"

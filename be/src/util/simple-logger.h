@@ -15,11 +15,10 @@
 // specific language governing permissions and limitations
 // under the License.
 
-#ifndef IMPALA_SERVICE_SIMPLE_LOGGER_H
-#define IMPALA_SERVICE_SIMPLE_LOGGER_H
+#pragma once
 
 #include <fstream>
-#include <boost/thread/mutex.hpp>
+#include <boost/thread/pthread/mutex.hpp>
 
 #include "common/status.h"
 
@@ -87,4 +86,3 @@ class SimpleLogger {
   void RotateLogFiles();
 };
 }
-#endif

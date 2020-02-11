@@ -37,7 +37,7 @@ class ParquetMetadataUtils {
 
   /// Validate column offsets by checking if the dictionary page comes before the data
   /// pages and checking if the column offsets lie within the file.
-  static Status ValidateColumnOffsets(const string& filename, int64_t file_length,
+  static Status ValidateColumnOffsets(const std::string& filename, int64_t file_length,
       const parquet::RowGroup& row_group);
 
   /// Check that a file offset is in the file. Return an error status with a detailed
@@ -215,7 +215,7 @@ class ParquetSchemaResolver {
   /// found. The name comparison is case-insensitive because that's how Impala treats
   /// db/table/column/field names. If there are several matches with different casing,
   /// then the index of the first match is returned.
-  int FindChildWithName(SchemaNode* node, const string& name) const;
+  int FindChildWithName(SchemaNode* node, const std::string& name) const;
 
   /// The ResolvePathHelper() logic for arrays.
   Status ResolveArray(ArrayEncoding array_encoding, const SchemaPath& path, int idx,

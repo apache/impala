@@ -17,8 +17,15 @@
 
 #include "util/codec.h"
 
-#include <gutil/strings/substitute.h>
+#include <ostream>
+#include <utility>
 
+#include <zstd.h>
+
+#include "common/compiler-util.h"
+#include "common/logging.h"
+#include "gutil/strings/substitute.h"
+#include "util/bit-util.h"
 #include "util/compress.h"
 #include "util/decompress.h"
 

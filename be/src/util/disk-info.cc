@@ -17,24 +17,20 @@
 
 #include "util/disk-info.h"
 
+#include <stdlib.h>
 #include <regex>
-#ifdef __APPLE__
-#include <sys/mount.h>
-#else
-#include <sys/vfs.h>
-#endif
-#include <sys/types.h>
-#include <sys/sysmacros.h>
 #include <sys/stat.h>
-#include <unistd.h>
+#include <sys/sysmacros.h>
+#include <sys/types.h>
 
-#include <boost/algorithm/string.hpp>
-#include <boost/algorithm/string/join.hpp>
-#include <iostream>
 #include <fstream>
-#include <sstream>
+#include <utility>
+#include <boost/algorithm/string/classification.hpp>
+#include <boost/algorithm/string/constants.hpp>
+#include <boost/algorithm/string/split.hpp>
+#include <boost/algorithm/string/trim.hpp>
 
-#include "util/debug-util.h"
+#include "gutil/strings/substitute.h"
 
 #include "common/names.h"
 

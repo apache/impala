@@ -15,12 +15,11 @@
 // specific language governing permissions and limitations
 // under the License.
 
-#ifndef IMPALA_EXEC_HASH_TABLE_H
-#define IMPALA_EXEC_HASH_TABLE_H
+#pragma once
 
+#include <cstdint>
 #include <memory>
 #include <vector>
-#include <boost/cstdint.hpp>
 #include <boost/scoped_array.hpp>
 #include <boost/scoped_ptr.hpp>
 
@@ -1122,5 +1121,3 @@ class HashTable {
 };
 
 }
-
-#endif

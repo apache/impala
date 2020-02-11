@@ -15,8 +15,7 @@
 // specific language governing permissions and limitations
 // under the License.
 
-#ifndef IMPALA_RUNTIME_DECIMAL_VALUE_INLINE_H
-#define IMPALA_RUNTIME_DECIMAL_VALUE_INLINE_H
+#pragma once
 
 #include "runtime/decimal-value.h"
 
@@ -24,8 +23,6 @@
 #include <functional>
 #include <iomanip>
 #include <limits>
-#include <ostream>
-#include <sstream>
 
 #include "common/logging.h"
 #include "util/arithmetic-util.h"
@@ -792,7 +789,4 @@ inline Decimal8Value ToDecimal8(const Decimal16Value& v, bool* overflow) {
 inline Decimal16Value ToDecimal16(const Decimal16Value& v, bool* overflow) {
   return v;
 }
-
 }
-
-#endif

@@ -90,7 +90,7 @@ inline int WriteStream::WriteBoolean(bool b) {
   return WriteBytes(1, &val);
 }
 
-inline string WriteStream::String() {
+inline std::string WriteStream::String() {
   return buffer_.str();
 }
 

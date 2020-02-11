@@ -24,8 +24,8 @@
 #include <string>
 #include <vector>
 
-#include <boost/thread/shared_mutex.hpp>
 #include <boost/scoped_ptr.hpp>
+#include <boost/thread/pthread/shared_mutex.hpp>
 #include <boost/unordered_map.hpp>
 #include <boost/uuid/uuid_generators.hpp>
 

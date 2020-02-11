@@ -20,11 +20,12 @@
 #include <sstream>
 #include <string.h>
 
+#include "common/logging.h"
+#include "kudu/util/path_util.h"
+#include "runtime/exec-env.h"
 #include "util/error-util.h"
 
 #include "common/names.h"
-#include "runtime/exec-env.h"
-#include "kudu/util/path_util.h"
 
 namespace impala {
 

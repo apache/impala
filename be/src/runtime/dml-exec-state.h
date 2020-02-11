@@ -15,14 +15,12 @@
 // specific language governing permissions and limitations
 // under the License.
 
+#pragma once
 
-#ifndef IMPALA_RUNTIME_DML_EXEC_STATE_H
-#define IMPALA_RUNTIME_DML_EXEC_STATE_H
-
-#include <string>
 #include <map>
+#include <string>
+#include <boost/thread/pthread/mutex.hpp>
 #include <boost/unordered_map.hpp>
-#include <boost/thread/mutex.hpp>
 
 #include "common/hdfs.h"
 #include "common/status.h"
@@ -145,5 +143,3 @@ class DmlExecState {
 };
 
 }
-
-#endif

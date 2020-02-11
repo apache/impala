@@ -15,16 +15,14 @@
 // specific language governing permissions and limitations
 // under the License.
 
-
-#ifndef STATESTORE_STATESTORE_SUBSCRIBER_H
-#define STATESTORE_STATESTORE_SUBSCRIBER_H
+#pragma once
 
 #include <string>
 
 #include <boost/scoped_ptr.hpp>
 #include <boost/shared_ptr.hpp>
-#include <boost/thread/mutex.hpp>
-#include <boost/thread/shared_mutex.hpp>
+#include <boost/thread/pthread/mutex.hpp>
+#include <boost/thread/pthread/shared_mutex.hpp>
 
 #include "gen-cpp/StatestoreService.h"
 #include "gen-cpp/StatestoreSubscriber.h"
@@ -235,7 +233,7 @@ class StatestoreSubscriber {
     bool populate_min_subscriber_topic_version = false;
 
     /// Only subscribe to keys with the provided prefix.
-    string filter_prefix;
+    std::string filter_prefix;
 
     /// The last version of the topic this subscriber processed.
     /// -1 if no updates have been processed yet.
@@ -315,7 +313,4 @@ class StatestoreSubscriber {
     return MonotonicMillis() - last_registration_ms_.Load();
   }
 };
-
 }
-
-#endif

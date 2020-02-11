@@ -15,15 +15,14 @@
 // specific language governing permissions and limitations
 // under the License.
 
-#ifndef IMPALA_RUNTIME_CLIENT_CACHE_H
-#define IMPALA_RUNTIME_CLIENT_CACHE_H
+#pragma once
 
-#include <vector>
 #include <list>
 #include <string>
-#include <boost/unordered_map.hpp>
-#include <boost/thread/mutex.hpp>
+#include <vector>
 #include <boost/bind.hpp>
+#include <boost/thread/pthread/mutex.hpp>
+#include <boost/unordered_map.hpp>
 #include <gutil/strings/substitute.h>
 
 #include "catalog/catalog-service-client-wrapper.h"
@@ -492,5 +491,3 @@ class ClientCache {
 };
 
 }
-
-#endif

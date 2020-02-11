@@ -16,7 +16,6 @@
 // under the License.
 
 #include "util/decimal-util.h"
-#include "runtime/types.h"
 
 namespace impala {
 

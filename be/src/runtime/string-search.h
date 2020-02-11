@@ -15,14 +15,12 @@
 // specific language governing permissions and limitations
 // under the License.
 
-#ifndef IMPALA_RUNTIME_STRING_SEARCH_H
-#define IMPALA_RUNTIME_STRING_SEARCH_H
+#pragma once
 
 #include <algorithm>
+#include <cstdint>
 #include <cstring>
 #include <vector>
-
-#include <boost/cstdint.hpp>
 
 #include "common/logging.h"
 #include "runtime/string-value.h"
@@ -192,7 +190,4 @@ class StringSearch {
   int skip_;
   int rskip_;
 };
-
 }
-
-#endif

@@ -17,8 +17,12 @@
 
 #pragma once
 
-#include <boost/thread.hpp>
+#include <cstdint>
 
+#include <boost/thread/lock_types.hpp>
+#include <boost/thread/pthread/mutex.hpp>
+
+#include "common/logging.h"
 #include "common/status.h"
 #include "util/condition-variable.h"
 

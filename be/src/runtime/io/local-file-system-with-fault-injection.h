@@ -31,7 +31,7 @@ namespace io {
 class LocalFileSystemWithFaultInjection : public LocalFileSystem {
 public:
   // Public interface to set the fault injection
-  void SetWriteFaultInjection(const string& function_name, int err_no);
+  void SetWriteFaultInjection(const std::string& function_name, int err_no);
 
   virtual ~LocalFileSystemWithFaultInjection() {}
 
@@ -50,9 +50,9 @@ private:
   // Used for defining fault injection. This structure represents a function name meant
   // to fail alongside with the desired error code that will be used to populate errno.
   struct WriteFaultInjectionItem {
-    WriteFaultInjectionItem(const string& function_name, int e)
+    WriteFaultInjectionItem(const std::string& function_name, int e)
         : function(function_name), err_no(e) {}
-    string function;
+    std::string function;
     int err_no;
   };
 
@@ -64,7 +64,7 @@ private:
   // Compares 'function_name' to fault_injection_to_write_->first. If they match
   // then sets errno to fault_injection_to_write_->second and returns true. Returns false
   // otherwise.
-  bool DebugFaultInjection(const string& function_name);
+  bool DebugFaultInjection(const std::string& function_name);
 };
 
 }

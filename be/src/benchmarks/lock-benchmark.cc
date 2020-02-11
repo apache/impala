@@ -15,13 +15,13 @@
 // specific language governing permissions and limitations
 // under the License.
 
-#include <stdlib.h>
 #include <stdio.h>
+#include <stdlib.h>
 #include <iostream>
-#include <vector>
 #include <sstream>
+#include <vector>
 #include <boost/thread.hpp>
-#include <boost/thread/mutex.hpp>
+#include <boost/thread/pthread/mutex.hpp>
 #include "util/benchmark.h"
 #include "util/cpu-info.h"
 #include "util/spinlock.h"

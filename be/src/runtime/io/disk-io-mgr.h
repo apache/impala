@@ -15,12 +15,15 @@
 // specific language governing permissions and limitations
 // under the License.
 
-#ifndef IMPALA_RUNTIME_IO_DISK_IO_MGR_H
+#pragma once
+
+// This macro is used by some plugin text scanners to detect the version of Impala
+// they are built against.
 #define IMPALA_RUNTIME_IO_DISK_IO_MGR_H
 
 #include <vector>
 
-#include <boost/thread/mutex.hpp>
+#include <boost/thread/pthread/mutex.hpp>
 
 #include "common/atomic.h"
 #include "common/hdfs.h"
@@ -447,5 +450,3 @@ class DiskIoMgr : public CacheLineAligned {
 };
 }
 }
-
-#endif

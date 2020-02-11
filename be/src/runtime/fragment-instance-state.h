@@ -15,13 +15,11 @@
 // specific language governing permissions and limitations
 // under the License.
 
-
-#ifndef IMPALA_RUNTIME_FRAGMENT_INSTANCE_STATE_H
-#define IMPALA_RUNTIME_FRAGMENT_INSTANCE_STATE_H
+#pragma once
 
 #include <string>
 #include <boost/scoped_ptr.hpp>
-#include <boost/thread/mutex.hpp>
+#include <boost/thread/pthread/mutex.hpp>
 
 #include "common/atomic.h"
 #include "common/status.h"
@@ -302,5 +300,3 @@ class FragmentInstanceState {
 };
 
 }
-
-#endif

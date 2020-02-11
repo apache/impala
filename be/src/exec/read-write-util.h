@@ -15,11 +15,9 @@
 // specific language governing permissions and limitations
 // under the License.
 
+#pragma once
 
-#ifndef IMPALA_EXEC_READ_WRITE_UTIL_H
-#define IMPALA_EXEC_READ_WRITE_UTIL_H
-
-#include <boost/cstdint.hpp>
+#include <cstdint>
 #include <sstream>
 #include "common/logging.h"
 #include "common/status.h"
@@ -327,4 +325,3 @@ inline int ReadWriteUtil::DecodeVIntSize(int8_t byte) {
 }
 
 }
-#endif

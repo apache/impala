@@ -15,17 +15,18 @@
 // specific language governing permissions and limitations
 // under the License.
 
+#pragma once
 
-#ifndef IMPALA_UTIL_DECIMAL_UTIL_H
-#define IMPALA_UTIL_DECIMAL_UTIL_H
+#include <endian.h>
 
+#include <cstdint>
 #include <functional>
-#include <ostream>
-#include <string>
-#include <boost/cstdint.hpp>
 
+#include "common/compiler-util.h"
+#include "common/logging.h"
 #include "runtime/multi-precision.h"
 #include "runtime/types.h"
+#include "util/arithmetic-util.h"
 #include "util/bit-util.h"
 
 namespace impala {
@@ -260,5 +261,3 @@ inline int128_t DecimalUtil::GetScaleMultiplier<int128_t>(int scale) {
   return -1;  // Overflow
 }
 }
-
-#endif

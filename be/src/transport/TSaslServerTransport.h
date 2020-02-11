@@ -18,14 +18,13 @@
  * under the License.
  */
 
-#ifndef IMPALA_TRANSPORT_TSASLSERVERTRANSPORT_H
-#define IMPALA_TRANSPORT_TSASLSERVERTRANSPORT_H
+#pragma once
 
 #include <string>
 #include <pthread.h>
 
 #include <boost/shared_ptr.hpp>
-#include <boost/thread/mutex.hpp>
+#include <boost/thread/pthread/mutex.hpp>
 #include <thrift/transport/TTransport.h>
 #include "transport/TSasl.h"
 #include "transport/TSaslTransport.h"
@@ -199,5 +198,3 @@ class TSaslServerTransport : public TSaslTransport {
 };
 
 }}} // apache::thrift::transport
-
-#endif // #ifndef IMPALA_TRANSPORT_TSSLSERVERTRANSPORT_H

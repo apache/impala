@@ -15,25 +15,25 @@
 // specific language governing permissions and limitations
 // under the License.
 
-#ifndef IMPALA_SERVICE_IMPALA_SERVER_H
-#define IMPALA_SERVICE_IMPALA_SERVER_H
+#pragma once
 
 #include <atomic>
+#include <unordered_map>
 #include <boost/random/random_device.hpp>
-#include <boost/thread/mutex.hpp>
-#include <boost/shared_ptr.hpp>
 #include <boost/scoped_ptr.hpp>
+#include <boost/shared_ptr.hpp>
+#include <boost/thread/pthread/mutex.hpp>
 #include <boost/unordered_set.hpp>
 #include <boost/uuid/uuid.hpp>
 #include <boost/uuid/uuid_generators.hpp>
 #include <boost/uuid/uuid_io.hpp>
-#include <unordered_map>
 
 #include "common/status.h"
 #include "gen-cpp/Frontend_types.h"
 #include "gen-cpp/ImpalaHiveServer2Service.h"
 #include "gen-cpp/ImpalaInternalService.h"
 #include "gen-cpp/ImpalaService.h"
+#include "gen-cpp/control_service.pb.h"
 #include "kudu/util/random.h"
 #include "rpc/thrift-server.h"
 #include "runtime/timestamp-value.h"
@@ -73,6 +73,7 @@ class TGetExecSummaryResp;
 class TGetExecSummaryReq;
 class ClientRequestState;
 class QuerySchedule;
+class SimpleLogger;
 
 /// An ImpalaServer contains both frontend and backend functionality;
 /// it implements ImpalaService (Beeswax), ImpalaHiveServer2Service (HiveServer2)
@@ -499,11 +500,11 @@ class ImpalaServer : public ImpalaServiceIf,
   QueryOptionLevels query_option_levels_;
 
   /// The prefix of audit event log filename.
-  static const string AUDIT_EVENT_LOG_FILE_PREFIX;
+  static const std::string AUDIT_EVENT_LOG_FILE_PREFIX;
 
   /// The default executor group name for executors that do not explicitly belong to a
   /// specific executor group.
-  static const string DEFAULT_EXECUTOR_GROUP_NAME;
+  static const std::string DEFAULT_EXECUTOR_GROUP_NAME;
 
   /// Per-session state.  This object is reference counted using shared_ptrs.  There
   /// is one ref count in the SessionStateMap for as long as the session is active.
@@ -1422,5 +1423,3 @@ class ImpalaServer : public ImpalaServiceIf,
   AtomicInt64 shutdown_deadline_{0};
 };
 }
-
-#endif

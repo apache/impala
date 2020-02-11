@@ -15,11 +15,9 @@
 // specific language governing permissions and limitations
 // under the License.
 
-#ifndef IMPALA_UTIL_STREAMING_SAMPLER_H
-#define IMPALA_UTIL_STREAMING_SAMPLER_H
+#pragma once
 
 #include <string.h>
-#include <iostream>
 
 #include "util/ubsan.h"
 
@@ -105,7 +103,4 @@ class StreamingSampler {
   /// The total time that current_sample_sum_ represents
   int current_sample_total_time_;
 };
-
 }
-
-#endif

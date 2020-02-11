@@ -15,12 +15,11 @@
 // specific language governing permissions and limitations
 // under the License.
 
+#pragma once
 
-#ifndef IMPALA_UTIL_BIT_STREAM_UTILS_H
-#define IMPALA_UTIL_BIT_STREAM_UTILS_H
-
-#include <boost/cstdint.hpp>
 #include <string.h>
+#include <cstdint>
+
 #include "common/compiler-util.h"
 #include "common/logging.h"
 #include "util/bit-packing.h"
@@ -201,5 +200,3 @@ class BatchedBitReader {
   const uint8_t* buffer_end_ = nullptr;
 };
 }
-
-#endif

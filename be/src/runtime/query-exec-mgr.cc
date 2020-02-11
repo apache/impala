@@ -18,20 +18,27 @@
 
 #include "runtime/query-exec-mgr.h"
 
+#include <memory>
+#include <ostream>
+#include <string>
+#include <unordered_map>
+#include <utility>
+
+#include <gflags/gflags.h>
 #include <gperftools/malloc_extension.h>
 #include <gutil/strings/substitute.h>
-#include <boost/thread/locks.hpp>
-#include <boost/thread/lock_guard.hpp>
 
+#include "common/compiler-util.h"
 #include "common/logging.h"
-#include "runtime/query-state.h"
-#include "runtime/fragment-instance-state.h"
+#include "gen-cpp/Types_types.h"
+#include "gen-cpp/control_service.pb.h"
 #include "runtime/exec-env.h"
-#include "runtime/mem-tracker.h"
+#include "runtime/query-state.h"
+#include "util/container-util.h"
 #include "util/debug-util.h"
 #include "util/impalad-metrics.h"
 #include "util/metrics.h"
-#include "util/uid-util.h"
+#include "util/network-util.h"
 #include "util/thread.h"
 
 #include "common/names.h"

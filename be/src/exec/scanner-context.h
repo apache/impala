@@ -15,13 +15,11 @@
 // specific language governing permissions and limitations
 // under the License.
 
+#pragma once
 
-#ifndef IMPALA_EXEC_SCANNER_CONTEXT_H
-#define IMPALA_EXEC_SCANNER_CONTEXT_H
-
+#include <cstdint>
 #include <deque>
 
-#include <boost/cstdint.hpp>
 #include <boost/scoped_ptr.hpp>
 
 #include "common/compiler-util.h"
@@ -439,5 +437,3 @@ class ScannerContext {
 };
 
 }
-
-#endif

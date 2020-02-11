@@ -72,13 +72,12 @@
 /// invariant can be increased. Operations block waiting for enough writes to complete
 /// to satisfy the invariant.
 
-#ifndef IMPALA_RUNTIME_BUFFER_POOL_INTERNAL_H
-#define IMPALA_RUNTIME_BUFFER_POOL_INTERNAL_H
+#pragma once
 
+#include <iosfwd>
 #include <memory>
-#include <sstream>
 
-#include <boost/thread/mutex.hpp>
+#include <boost/thread/pthread/mutex.hpp>
 
 #include "runtime/bufferpool/buffer-pool-counters.h"
 #include "runtime/bufferpool/buffer-pool.h"
@@ -391,5 +390,3 @@ class BufferPool::Client {
   PageList in_flight_write_pages_;
 };
 }
-
-#endif

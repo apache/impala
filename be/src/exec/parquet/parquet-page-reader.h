@@ -31,7 +31,7 @@ class ParquetPageReader {
   ScannerContext::Stream* stream() const { return stream_; }
   uint64_t PageHeadersRead() const { return page_headers_read_; }
 
-  ParquetPageReader(HdfsParquetScanner* parent, string schema_name)
+  ParquetPageReader(HdfsParquetScanner* parent, std::string schema_name)
       : parent_(parent),
         schema_name_(schema_name)
   {
@@ -72,7 +72,7 @@ class ParquetPageReader {
   Status AdvanceStream(int64_t bytes);
 
   HdfsParquetScanner* parent_;
-  string schema_name_;
+  std::string schema_name_;
 
   /// Header for current data page.
   parquet::PageHeader current_page_header_;

@@ -17,18 +17,26 @@
 
 #pragma once
 
-#include "util/metrics.h"
-
+#include <cstdint>
+#include <iosfwd>
+#include <set>
 #include <string>
 #include <vector>
-#include <set>
-#include <boost/algorithm/string/join.hpp>
+
 #include <boost/accumulators/accumulators.hpp>
+#include <boost/accumulators/framework/accumulator_set.hpp>
+#include <boost/accumulators/framework/features.hpp>
 #include <boost/accumulators/statistics/count.hpp>
+#include <boost/accumulators/statistics/max.hpp>
 #include <boost/accumulators/statistics/mean.hpp>
 #include <boost/accumulators/statistics/min.hpp>
-#include <boost/accumulators/statistics/max.hpp>
 #include <boost/accumulators/statistics/variance.hpp>
+#include <boost/thread/lock_guard.hpp>
+#include <boost/thread/pthread/mutex.hpp>
+
+#include "common/logging.h"
+#include "util/metrics-fwd.h"
+#include "util/metrics.h"
 
 namespace impala {
 

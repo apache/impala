@@ -15,20 +15,21 @@
 // specific language governing permissions and limitations
 // under the License.
 
-#ifndef IMPALA_UTIL_BLOOM_H
-#define IMPALA_UTIL_BLOOM_H
+#pragma once
 
-#include <math.h>
 #include <stdint.h>
 
+#include <algorithm>
+#include <cstring>
 #include <limits>
 
 #include <immintrin.h>
 
 #include "common/compiler-util.h"
-#include "gen-cpp/ImpalaInternalService_types.h"
-#include "gen-cpp/data_stream_service.pb.h"
+#include "common/logging.h"
+#include "common/status.h"
 #include "gutil/macros.h"
+#include "gutil/strings/substitute.h"
 #include "runtime/bufferpool/buffer-pool.h"
 #include "util/cpu-info.h"
 #include "util/hash-util.h"
@@ -41,6 +42,7 @@ class RpcController;
 
 namespace impala {
 class BloomFilter;
+class BloomFilterPB;
 } // namespace impala
 
 // Need this forward declaration since we make bloom_filter_test_util::BfUnion() a friend
@@ -293,7 +295,4 @@ inline bool ALWAYS_INLINE BloomFilter::Find(const uint32_t hash) const noexcept 
     return BucketFind(bucket_idx, hash);
   }
 }
-
 } // namespace impala
-
-#endif // IMPALA_UTIL_BLOOM_H

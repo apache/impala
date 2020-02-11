@@ -98,8 +98,8 @@ class DataSink {
   /// If this is the sink at the root of a fragment, 'sink_id' must be a unique ID for
   /// the sink for use in runtime profiles and other purposes. Otherwise this is a join
   /// build sink owned by an ExecNode and 'sink_id' must be -1.
-  DataSink(TDataSinkId sink_id, const DataSinkConfig& sink_config, const string& name,
-      RuntimeState* state);
+  DataSink(TDataSinkId sink_id, const DataSinkConfig& sink_config,
+      const std::string& name, RuntimeState* state);
   virtual ~DataSink();
 
   /// Setup. Call before Send(), Open(), or Close() during the prepare phase of the query
@@ -151,7 +151,7 @@ class DataSink {
   const RowDescriptor* row_desc_;
 
   /// The name to be used in profiles etc. Passed by derived classes in the ctor.
-  const string name_;
+  const std::string name_;
 
   /// The runtime profile for this DataSink. Initialized in ctor. Not owned.
   RuntimeProfile* profile_ = nullptr;

@@ -29,7 +29,6 @@
 #include "util/metrics.h"
 #include "util/runtime-profile-counters.h"
 #include "util/time.h"
-#include "util/uid-util.h"
 
 DEFINE_int32(concurrent_scratch_ios_per_device, 2,
     "Set this to influence the number of concurrent write I/Os issues to write data to "

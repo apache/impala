@@ -27,7 +27,7 @@
 #include "util/pretty-printer.h"
 
 #include <memory>
-#include <boost/thread/mutex.hpp>
+#include <boost/thread/pthread/mutex.hpp>
 
 using namespace std;
 using boost::unique_lock;

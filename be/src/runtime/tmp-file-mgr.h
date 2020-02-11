@@ -15,15 +15,14 @@
 // specific language governing permissions and limitations
 // under the License.
 
-#ifndef IMPALA_RUNTIME_TMP_FILE_MGR_H
-#define IMPALA_RUNTIME_TMP_FILE_MGR_H
+#pragma once
 
 #include <functional>
 #include <memory>
 #include <utility>
 
 #include <boost/scoped_ptr.hpp>
-#include <boost/thread/mutex.hpp>
+#include <boost/thread/pthread/mutex.hpp>
 
 #include "common/object-pool.h"
 #include "common/status.h"
@@ -451,7 +450,4 @@ class TmpFileMgr {
   /// Metrics to track the scratch space HWM.
   AtomicHighWaterMarkGauge* scratch_bytes_used_metric_;
 };
-
 }
-
-#endif

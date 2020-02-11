@@ -15,11 +15,10 @@
 // specific language governing permissions and limitations
 // under the License.
 
-#ifndef IMPALA_UTIL_PARSE_UTIL_H
-#define IMPALA_UTIL_PARSE_UTIL_H
+#pragma once
 
+#include <cstdint>
 #include <string>
-#include <boost/cstdint.hpp>
 
 namespace impala {
 
@@ -42,7 +41,4 @@ class ParseUtil {
   static int64_t ParseMemSpec(const std::string& mem_spec_str,
       bool* is_percent, int64_t relative_reference);
 };
-
 }
-
-#endif

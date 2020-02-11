@@ -15,13 +15,12 @@
 // specific language governing permissions and limitations
 // under the License.
 
-#ifndef IMPALA_UTIL_FLAT_BUFFER_H
-#define IMPALA_UTIL_FLAT_BUFFER_H
+#pragma once
 
 #include "common/status.h"
 
 #include "gen-cpp/CatalogObjects_generated.h"
-#include "gen-cpp/ImpalaInternalService_constants.h"
+#include "gen-cpp/CatalogObjects_types.h"
 
 namespace impala {
 
@@ -30,4 +29,3 @@ namespace impala {
 Status FromFbCompression(org::apache::impala::fb::FbCompression fb_compression,
     THdfsCompression::type* thrift_compression);
 } // namespace impala
-#endif // IMPALA_UTIL_FLAT_BUFFER_H

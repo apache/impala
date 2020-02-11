@@ -15,10 +15,9 @@
 // specific language governing permissions and limitations
 // under the License.
 
-#ifndef IMPALA_EXEC_HDFS_PLUGIN_TEXT_SCANNER_H
-#define IMPALA_EXEC_HDFS_PLUGIN_TEXT_SCANNER_H
+#pragma once
 
-#include <boost/thread/shared_mutex.hpp>
+#include <boost/thread/pthread/shared_mutex.hpp>
 
 #include "common/status.h"
 #include "exec/scan-node.h"
@@ -90,4 +89,3 @@ class HdfsPluginTextScanner {
   static Status LoadPluginLibrary(const std::string& plugin_name, LoadedPlugin* plugin);
 };
 }
-#endif

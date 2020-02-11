@@ -15,15 +15,14 @@
 // specific language governing permissions and limitations
 // under the License.
 
-#ifndef IMPALA_UDF_UDF_INTERNAL_H
-#define IMPALA_UDF_UDF_INTERNAL_H
+#pragma once
 
 #include <string.h>
+#include <cstdint>
 #include <map>
 #include <string>
 #include <utility>
 #include <vector>
-#include <boost/cstdint.hpp>
 
 /// Be very careful when adding Impala includes in this file. We don't want to pull
 /// in unnecessary dependencies for the development libs.
@@ -320,5 +319,3 @@ static_assert(
     offsetof(CollectionVal, num_tuples) == offsetof(StringVal, len), "Wrong offset.");
 static_assert(offsetof(CollectionVal, ptr) == offsetof(StringVal, ptr), "Wrong offset.");
 } // namespace impala_udf
-
-#endif

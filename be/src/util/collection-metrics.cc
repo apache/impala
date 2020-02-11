@@ -17,6 +17,14 @@
 
 #include "util/collection-metrics.h"
 
+#include <ostream>
+
+#include <boost/accumulators/statistics/count.hpp>
+#include <boost/accumulators/statistics/max.hpp>
+#include <boost/accumulators/statistics/mean.hpp>
+#include <boost/accumulators/statistics/min.hpp>
+#include <boost/accumulators/statistics/variance.hpp>
+
 #include "util/json-util.h"
 #include "util/pretty-printer.h"
 

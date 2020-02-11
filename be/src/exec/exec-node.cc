@@ -65,6 +65,7 @@
 #include "runtime/runtime-state.h"
 #include "util/debug-util.h"
 #include "util/runtime-profile-counters.h"
+#include "util/uid-util.h"
 
 #include "common/names.h"
 

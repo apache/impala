@@ -42,6 +42,7 @@
 #include "service/impala-server.h"
 #include "service/query-options.h"
 #include "service/query-result-set.h"
+#include "util/auth-util.h"
 #include "util/debug-util.h"
 #include "util/impalad-metrics.h"
 #include "util/lineage-util.h"
@@ -1432,6 +1433,10 @@ bool ClientRequestState::GetDmlStats(TDmlResult* dml_result, Status* query_statu
 Status ClientRequestState::InitExecRequest(const TQueryCtx& query_ctx) {
   return UpdateQueryStatus(
       exec_env_->frontend()->GetExecRequest(query_ctx, &exec_request_));
+}
+
+const string& ClientRequestState::effective_user() const {
+  return GetEffectiveUser(query_ctx_.session);
 }
 
 void ClientRequestState::UpdateEndTime() {

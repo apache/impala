@@ -28,6 +28,7 @@ set_source_files_properties(${DATA_STREAM_SERVICE_PROTO_SRCS} PROPERTIES GENERAT
 add_library(Service
   child-query.cc
   client-request-state.cc
+  client-request-state-map.cc
   ${CONTROL_SERVICE_PROTO_SRCS}
   control-service.cc
   ${DATA_STREAM_SERVICE_PROTO_SRCS}

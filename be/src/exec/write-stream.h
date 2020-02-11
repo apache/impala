@@ -15,11 +15,9 @@
 // specific language governing permissions and limitations
 // under the License.
 
+#pragma once
 
-#ifndef IMPALA_EXEC_WRITE_STREAM_H
-#define IMPALA_EXEC_WRITE_STREAM_H
-
-#include <boost/cstdint.hpp>
+#include <cstdint>
 
 #include "common/status.h"
 
@@ -65,4 +63,3 @@ class WriteStream {
 };
 
 } // namespace impala
-#endif

@@ -10,8 +10,10 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
+#pragma once
+
 #include "rapidjson/document.h"
-#include <sstream>
+#include <iosfwd>
 
 // Routines for rendering Mustache (http://mustache.github.io) templates with RapidJson
 // (https://code.google.com/p/rapidjson/) documents.

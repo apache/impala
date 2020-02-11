@@ -147,7 +147,7 @@ namespace {
 /// any validation.
 /// Used as a helper function for decoding values that need additional custom validation.
 template <typename T, parquet::Type::type ParquetType>
-inline bool DecodePlainValueNoValidation(const string& buffer, T* result) {
+inline bool DecodePlainValueNoValidation(const std::string& buffer, T* result) {
   int size = buffer.size();
   const uint8_t* data = reinterpret_cast<const uint8_t*>(buffer.data());
   return ParquetPlainEncoder::Decode<T, ParquetType>(
@@ -192,7 +192,7 @@ inline bool ColumnStats<DateValue>::DecodePlainValue(
 /// parquet::Statistics stores string values directly and does not use plain encoding.
 template <>
 inline void ColumnStats<StringValue>::EncodePlainValue(
-    const StringValue& v, int64_t bytes_needed, string* out) {
+    const StringValue& v, int64_t bytes_needed, std::string* out) {
   out->assign(v.ptr, v.len);
 }
 

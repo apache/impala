@@ -16,8 +16,11 @@
 // under the License.
 
 #include "util/common-metrics.h"
-#include "util/time.h"
+
 #include <kudu/client/client.h>
+
+#include "util/metrics.h"
+#include "util/time.h"
 
 namespace impala {
 

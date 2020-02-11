@@ -15,13 +15,12 @@
 // specific language governing permissions and limitations
 // under the License.
 
-#ifndef IMPALA_RUNTIME_COORDINATOR_H
-#define IMPALA_RUNTIME_COORDINATOR_H
+#pragma once
 
 #include <memory>
 #include <string>
 #include <vector>
-#include <boost/thread/shared_mutex.hpp>
+#include <boost/thread/pthread/shared_mutex.hpp>
 #include <boost/unordered_map.hpp>
 #include <rapidjson/document.h>
 
@@ -587,5 +586,3 @@ class Coordinator { // NOLINT: The member variables could be re-ordered to save 
 };
 
 }
-
-#endif

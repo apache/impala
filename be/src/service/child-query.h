@@ -15,11 +15,10 @@
 // specific language governing permissions and limitations
 // under the License.
 
-#ifndef IMPALA_SERVICE_CHILD_QUERY_H
-#define IMPALA_SERVICE_CHILD_QUERY_H
+#pragma once
 
 #include <string>
-#include <boost/thread/mutex.hpp>
+#include <boost/thread/pthread/mutex.hpp>
 
 #include "common/status.h"
 #include "impala-server.h"
@@ -217,5 +216,3 @@ class ChildQueryExecutor {
   Status child_queries_status_;
 };
 }
-
-#endif

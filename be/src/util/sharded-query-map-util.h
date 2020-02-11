@@ -15,8 +15,7 @@
 // specific language governing permissions and limitations
 // under the License.
 
-#ifndef SHARDED_QUERY_MAP_UTIL_H
-#define SHARDED_QUERY_MAP_UTIL_H
+#pragma once
 
 #include <boost/thread/lock_guard.hpp>
 #include <unordered_map>
@@ -24,7 +23,7 @@
 #include "gen-cpp/Types_types.h"
 #include "util/aligned-new.h"
 #include "util/spinlock.h"
-#include "util/uid-util.h"
+#include "util/unique-id-hash.h"
 
 namespace impala {
 
@@ -131,5 +130,3 @@ class ScopedShardedMapRef {
 };
 
 } // namespace impala
-
-#endif /* SHARDED_QUERY_MAP_UTIL_H */

@@ -15,13 +15,11 @@
 // specific language governing permissions and limitations
 // under the License.
 
-
-#ifndef IMPALA_UTIL_PERIODIC_COUNTER_UPDATER_H
-#define IMPALA_UTIL_PERIODIC_COUNTER_UPDATER_H
+#pragma once
 
 #include <boost/function.hpp>
 #include <boost/scoped_ptr.hpp>
-#include <boost/thread/mutex.hpp>
+#include <boost/thread/pthread/mutex.hpp>
 #include <boost/thread/thread.hpp>
 #include <boost/unordered_map.hpp>
 #include <boost/unordered_set.hpp>
@@ -155,7 +153,4 @@ class PeriodicCounterUpdater {
   /// for updating them.
   static PeriodicCounterUpdater* instance_;
 };
-
 }
-
-#endif

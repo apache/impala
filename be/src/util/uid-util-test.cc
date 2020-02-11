@@ -19,6 +19,8 @@
 #include <stdio.h>
 #include <iostream>
 
+#include <boost/uuid/uuid_generators.hpp>
+
 #include "testutil/gtest-util.h"
 #include "util/container-util.h"
 #include "util/uid-util.h"

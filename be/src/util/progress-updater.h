@@ -15,12 +15,10 @@
 // specific language governing permissions and limitations
 // under the License.
 
+#pragma once
 
-#ifndef IMPALA_UTIL_PROGRESS_UPDATER_H
-#define IMPALA_UTIL_PROGRESS_UPDATER_H
-
+#include <cstdint>
 #include <string>
-#include <boost/cstdint.hpp>
 
 #include "common/atomic.h"
 
@@ -83,7 +81,4 @@ class ProgressUpdater {
   /// Percentage when the last output was generated.
   AtomicInt32 last_output_percentage_;
 };
-
 }
-
-#endif

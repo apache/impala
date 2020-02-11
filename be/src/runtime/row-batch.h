@@ -87,7 +87,7 @@ class OutboundRowBatch {
   vector<int32_t> tuple_offsets_;
 
   /// Contains the actual data of all the tuples. The data could be compressed.
-  string tuple_data_;
+  std::string tuple_data_;
 };
 
 /// A RowBatch encapsulates a batch of rows, each composed of a number of tuples.

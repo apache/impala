@@ -26,7 +26,6 @@
 #include "service/child-query.h"
 #include "service/impala-server.h"
 #include "service/query-result-set.h"
-#include "util/auth-util.h"
 #include "util/condition-variable.h"
 #include "util/runtime-profile.h"
 #include "gen-cpp/Frontend_types.h"
@@ -208,9 +207,7 @@ class ClientRequestState {
   ImpalaServer::SessionState* session() const { return session_.get(); }
 
   /// Queries are run and authorized on behalf of the effective_user.
-  const std::string& effective_user() const {
-      return GetEffectiveUser(query_ctx_.session);
-  }
+  const std::string& effective_user() const;
   const std::string& connected_user() const { return query_ctx_.session.connected_user; }
   bool user_has_profile_access() const { return user_has_profile_access_; }
   const std::string& do_as_user() const { return query_ctx_.session.delegated_user; }

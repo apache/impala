@@ -15,10 +15,10 @@
 // specific language governing permissions and limitations
 // under the License.
 
-#include <boost/thread.hpp>
-#include <boost/thread/mutex.hpp>
-#include <glog/logging.h>
 #include <unistd.h>
+#include <boost/thread.hpp>
+#include <boost/thread/pthread/mutex.hpp>
+#include <glog/logging.h>
 
 #include "common/logging.h"
 #include "testutil/gtest-util.h"

@@ -21,7 +21,7 @@
 #include <unordered_map>
 #include <vector>
 
-#include <boost/thread/shared_mutex.hpp>
+#include <boost/thread/pthread/shared_mutex.hpp>
 
 namespace impala {
 class MemTracker;

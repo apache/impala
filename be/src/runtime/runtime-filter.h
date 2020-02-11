@@ -15,11 +15,9 @@
 // specific language governing permissions and limitations
 // under the License.
 
+#pragma once
 
-#ifndef IMPALA_RUNTIME_RUNTIME_FILTER_H
-#define IMPALA_RUNTIME_RUNTIME_FILTER_H
-
-#include <boost/thread/mutex.hpp>
+#include <boost/thread/pthread/mutex.hpp>
 
 #include "runtime/raw-value.h"
 #include "runtime/runtime-filter-bank.h"
@@ -151,7 +149,4 @@ class RuntimeFilter {
   /// 'arrival_mutex_'
   mutable ConditionVariable arrival_cv_;
 };
-
 }
-
-#endif

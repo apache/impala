@@ -15,12 +15,11 @@
 // specific language governing permissions and limitations
 // under the License.
 
-
-#ifndef IMPALA_UTIL_HDFS_UTIL_H
-#define IMPALA_UTIL_HDFS_UTIL_H
+#pragma once
 
 #include <string>
 #include <hdfs.h>
+
 #include "common/status.h"
 
 namespace impala {
@@ -62,6 +61,5 @@ bool FilesystemsMatch(const char* pathA, const char* pathB);
 /// Returns the terminal component of 'path'.
 /// E.g. if 'path' is "hdfs://localhost:8020/a/b/c", "c" is returned.
 /// If the terminal component is empty string or "/", the function returns ".".
-string GetBaseName(const char* path);
+std::string GetBaseName(const char* path);
 }
-#endif // IMPALA_UTIL_HDFS_UTIL_H

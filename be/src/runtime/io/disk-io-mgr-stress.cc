@@ -15,7 +15,7 @@
 // specific language governing permissions and limitations
 // under the License.
 
-#include <boost/thread/mutex.hpp>
+#include <boost/thread/pthread/mutex.hpp>
 
 #include "runtime/io/disk-io-mgr-stress.h"
 

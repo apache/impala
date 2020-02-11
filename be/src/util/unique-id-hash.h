@@ -15,19 +15,33 @@
 // specific language governing permissions and limitations
 // under the License.
 
-#include "util/bloom-filter.h"
-#include "util/hash-util.h"
+// Defines hash functions for TUniqueId.
 
-using namespace impala;
+#pragma once
 
-void BloomFilter::InsertNoAvx2(const uint32_t hash) noexcept {
-  always_false_ = false;
-  const uint32_t bucket_idx = HashUtil::Rehash32to32(hash) & directory_mask_;
-  BucketInsert(bucket_idx, hash);
+#include <boost/functional/hash.hpp>
+
+#include "gen-cpp/Types_types.h" // for TUniqueId
+
+namespace impala {
+
+inline std::size_t hash_value(const TUniqueId& id) {
+  std::size_t seed = 0;
+  boost::hash_combine(seed, id.lo);
+  boost::hash_combine(seed, id.hi);
+  return seed;
 }
 
-void BloomFilter::InsertAvx2(const uint32_t hash) noexcept {
-  always_false_ = false;
-  const uint32_t bucket_idx = HashUtil::Rehash32to32(hash) & directory_mask_;
-  BucketInsertAVX2(bucket_idx, hash);
-}
+} // namespace impala
+
+/// Hash function for std:: containers
+namespace std {
+
+template <>
+struct hash<impala::TUniqueId> {
+  std::size_t operator()(const impala::TUniqueId& id) const {
+    return impala::hash_value(id);
+  }
+};
+
+} // namespace std

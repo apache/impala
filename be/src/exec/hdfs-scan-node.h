@@ -23,7 +23,7 @@
 #include <vector>
 
 #include <boost/scoped_ptr.hpp>
-#include <boost/thread/mutex.hpp>
+#include <boost/thread/pthread/mutex.hpp>
 
 #include "common/atomic.h"
 #include "exec/filter-context.h"

@@ -21,23 +21,21 @@
 #include <sys/sysctl.h>
 #endif
 
-#include <mmintrin.h>
 #include <sched.h>
 #include <stdlib.h>
-#include <string.h>
 #include <unistd.h>
 #include <algorithm>
 #include <fstream>
-#include <iostream>
-#include <sstream>
-#include <boost/algorithm/string.hpp>
+#include <boost/algorithm/string/predicate.hpp>
+#include <boost/algorithm/string/trim.hpp>
 #include <boost/filesystem.hpp>
 #include <sys/sysinfo.h>
 
+#include "common/compiler-util.h"
 #include "common/config.h"
+#include "gen-cpp/Metrics_types.h"
 #include "gutil/strings/substitute.h"
 #include "util/pretty-printer.h"
-#include "util/string-parser.h"
 
 #include "common/names.h"
 

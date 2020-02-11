@@ -43,11 +43,13 @@
 #include "runtime/scanner-mem-limiter.h"
 #include "service/control-service.h"
 #include "service/data-stream-service.h"
+#include "util/container-util.h"
 #include "util/debug-util.h"
 #include "util/impalad-metrics.h"
 #include "util/metrics.h"
 #include "util/system-state-info.h"
 #include "util/thread.h"
+#include "util/uid-util.h"
 
 #include "gen-cpp/control_service.pb.h"
 #include "gen-cpp/control_service.proxy.h"

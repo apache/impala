@@ -15,16 +15,15 @@
 // specific language governing permissions and limitations
 // under the License.
 
-#ifndef IMPALA_EXEC_HBASE_TABLE_SCANNER_H
-#define IMPALA_EXEC_HBASE_TABLE_SCANNER_H
+#pragma once
 
-#include <boost/scoped_ptr.hpp>
 #include <jni.h>
+#include <iosfwd>
 #include <string>
-#include <sstream>
 #include <vector>
-#include "gen-cpp/PlanNodes_types.h"
+#include <boost/scoped_ptr.hpp>
 #include "exec/scan-node.h"
+#include "gen-cpp/PlanNodes_types.h"
 #include "runtime/hbase-table-factory.h"
 #include "runtime/hbase-table.h"
 
@@ -318,7 +317,4 @@ class HBaseTableScanner {
   /// formatted data.
   inline void WriteTupleSlot(const SlotDescriptor* slot_desc, Tuple* tuple, void* data);
 };
-
 }  // namespace impala
-
-#endif

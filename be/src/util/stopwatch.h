@@ -15,11 +15,10 @@
 // specific language governing permissions and limitations
 // under the License.
 
+#pragma once
 
-#ifndef IMPALA_UTIL_STOPWATCH_H
-#define IMPALA_UTIL_STOPWATCH_H
+#include <cstdint>
 
-#include <boost/cstdint.hpp>
 #include <boost/thread/lock_guard.hpp>
 #include <util/os-info.h>
 #include <util/spinlock.h>
@@ -266,7 +265,4 @@ class ScopedStopWatch {
   T* sw_;
   bool enabled_;
 };
-
 }
-
-#endif

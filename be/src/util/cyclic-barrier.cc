@@ -17,6 +17,9 @@
 
 #include "util/cyclic-barrier.h"
 
+#include <boost/thread/lock_guard.hpp>
+#include <boost/thread/pthread/mutex.hpp>
+
 #include "common/names.h"
 
 namespace impala {

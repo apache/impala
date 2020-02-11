@@ -15,12 +15,12 @@
 // specific language governing permissions and limitations
 // under the License.
 
-#include <stdlib.h>
 #include <stdio.h>
+#include <stdlib.h>
+#include <cstdint>
 #include <iostream>
 #include <limits>
 #include <sstream>
-#include <boost/cstdint.hpp>
 #include <boost/lexical_cast.hpp>
 #include "runtime/decimal-value.inline.h"
 #include "runtime/raw-value.h"

@@ -17,9 +17,8 @@
 
 #include "exprs/operators.h"
 
+#include <cstdint>
 #include <functional>
-
-#include <boost/cstdint.hpp>
 
 #include "exprs/anyval-util.h"
 #include "gutil/strings/substitute.h"

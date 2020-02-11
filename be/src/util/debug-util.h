@@ -15,25 +15,27 @@
 // specific language governing permissions and limitations
 // under the License.
 
-#ifndef IMPALA_UTIL_DEBUG_UTIL_H
-#define IMPALA_UTIL_DEBUG_UTIL_H
+#pragma once
 
-#include <ostream>
 #include <string>
-#include <sstream>
+#include <vector>
 
 #include <thrift/protocol/TDebugProtocol.h>
 
+#include "common/compiler-util.h"
 #include "common/config.h"
-#include "gen-cpp/JniCatalog_types.h"
-#include "gen-cpp/Descriptors_types.h"
-#include "gen-cpp/Exprs_types.h"
+#include "common/status.h"
+#include "gen-cpp/CatalogObjects_types.h"
 #include "gen-cpp/Frontend_types.h"
-#include "gen-cpp/PlanNodes_types.h"
-#include "gen-cpp/RuntimeProfile_types.h"
+#include "gen-cpp/ImpalaInternalService_types.h"
 #include "gen-cpp/ImpalaService_types.h"
+#include "gen-cpp/JniCatalog_types.h"
+#include "gen-cpp/Metrics_types.h"
+#include "gen-cpp/PlanNodes_types.h"
+#include "gen-cpp/Types_types.h"
+#include "gen-cpp/beeswax_types.h"
 #include "gen-cpp/parquet_types.h"
-
+#include "gutil/macros.h"
 #include "runtime/descriptors.h" // for SchemaPath
 
 namespace impala {
@@ -134,7 +136,7 @@ std::string GetBackendString();
 /// Tokenize 'debug_actions' into a list of tokenized rows, where columns are separated
 /// by ':' and rows by '|'. i.e. if debug_actions="a:b:c|x:y", then the returned
 /// structure is {{"a", "b", "c"}, {"x", "y"}}
-typedef std::list<std::vector<string>> DebugActionTokens;
+typedef std::vector<std::vector<string>> DebugActionTokens;
 DebugActionTokens TokenizeDebugActions(const string& debug_actions);
 
 /// Tokenize 'action' which has an optional parameter separated by '@'. i.e. "x@y"
@@ -189,7 +191,4 @@ static inline void DebugActionNoFail(
 #define FILE_CHECK_LT(a, b) DCHECK_LT(a, b)
 #define FILE_CHECK_GE(a, b) DCHECK_GE(a, b)
 #define FILE_CHECK_LE(a, b) DCHECK_LE(a, b)
-
 }
-
-#endif

@@ -25,30 +25,31 @@
 #include <boost/thread/lock_guard.hpp>
 #include <boost/date_time/posix_time/posix_time_types.hpp>
 
-#include "common/names.h"
 #include "codegen/llvm-codegen.h"
-#include "exec/plan-root-sink.h"
+#include "exec/exchange-node.h"
 #include "exec/exec-node.h"
 #include "exec/hdfs-scan-node-base.h"
-#include "exec/exchange-node.h"
+#include "exec/plan-root-sink.h"
 #include "exec/scan-node.h"
+#include "gen-cpp/ImpalaInternalService_types.h"
 #include "kudu/rpc/rpc_context.h"
-#include "runtime/exec-env.h"
 #include "runtime/backend-client.h"
 #include "runtime/client-cache.h"
+#include "runtime/exec-env.h"
 #include "runtime/krpc-data-stream-mgr.h"
-#include "runtime/query-state.h"
-#include "runtime/query-state.h"
 #include "runtime/mem-tracker.h"
+#include "runtime/query-state.h"
 #include "runtime/row-batch.h"
 #include "runtime/runtime-filter-bank.h"
 #include "runtime/runtime-state.h"
 #include "runtime/thread-resource-mgr.h"
 #include "scheduling/query-schedule.h"
-#include "util/debug-util.h"
 #include "util/container-util.h"
+#include "util/debug-util.h"
 #include "util/periodic-counter-updater.h"
-#include "gen-cpp/ImpalaInternalService_types.h"
+#include "util/uid-util.h"
+
+#include "common/names.h"
 
 using kudu::rpc::RpcContext;
 using namespace impala;

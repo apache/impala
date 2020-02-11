@@ -15,11 +15,10 @@
 // specific language governing permissions and limitations
 // under the License.
 
-#ifndef IMPALA_UTIL_MEM_INFO_H
-#define IMPALA_UTIL_MEM_INFO_H
+#pragma once
 
+#include <cstdint>
 #include <string>
-#include <boost/cstdint.hpp>
 
 #include "common/logging.h"
 
@@ -121,6 +120,4 @@ class MemInfo {
   /// If overcommit is turned off the maximum allocatable memory
   static int64_t commit_limit_;
 };
-
 }
-#endif
