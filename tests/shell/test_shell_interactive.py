@@ -239,6 +239,40 @@ class TestImpalaShellInteractive(ImpalaTestSuite):
     result = p.get_result()
     assert "^C" in result.stderr
 
+  @pytest.mark.execute_serially
+  def test_cancellation_mid_command(self, vector):
+    """The test starts with sending in a multi-line input without a command delimiter.
+       When the impala-shell is waiting for more input, the test sends a SIGINT signal (to
+       simulate pressing Ctrl-C) followed by a final query terminated with semicolon.
+       The expected behavior for the impala shell is to discard everything before the
+       SIGINT signal was sent and execute the final query only."""
+    shell_cmd = get_shell_cmd(vector)
+    queries = [
+        "line 1\n", "line 2\n", "line 3\n\n", "line 4 and", " 5\n",
+        "line 6\n", "line 7\n", "line 8\n", "line 9\n", "line 10"]
+    # Check when the last line before Ctrl-C doesn't end with newline.
+    child_proc = pexpect.spawn(shell_cmd[0], shell_cmd[1:])
+    for query in queries:
+      child_proc.send(query)
+    child_proc.sendintr()
+    child_proc.send('select "test without newline";\n')
+    child_proc.expect("test without newline")
+    child_proc.sendline('quit;')
+    child_proc.wait()
+    # Check when the last line before Ctrl-C ends with newline.
+    child_proc = pexpect.spawn(shell_cmd[0], shell_cmd[1:])
+    for query in queries:
+      child_proc.send(query)
+    # Sending in a newline so it will end with one
+    child_proc.send("\n")
+    # checking if it realy is a new line
+    child_proc.expect(" > ")
+    child_proc.sendintr()
+    child_proc.send('select "test with newline";\n')
+    child_proc.expect("test with newline")
+    child_proc.sendline('quit;')
+    child_proc.wait()
+
   def test_unicode_input(self, vector):
     "Test queries containing non-ascii input"
     # test a unicode query spanning multiple lines

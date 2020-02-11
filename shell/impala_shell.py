@@ -557,6 +557,11 @@ class ImpalaShell(object, cmd.Cmd):
   def _signal_handler(self, signal, frame):
     """Handles query cancellation on a Ctrl+C event"""
     if self.last_query_handle is None or self.last_query_handle.is_closed:
+      if self.partial_cmd:
+        # Revert the prompt to its earlier state
+        self.prompt = self.cached_prompt
+        # Reset the already given commands
+        self.partial_cmd = str()
       raise KeyboardInterrupt()
     # Create a new connection to the impalad and cancel the query.
     # TODO: this isn't thread-safe with respect to the main thread executing the
