@@ -105,9 +105,9 @@ FailureDetector::PeerState MissedHeartbeatFailureDetector::GetPeerState(
 
 FailureDetector::PeerState MissedHeartbeatFailureDetector::ComputePeerState(
     int32_t missed_heatbeat_count) {
-  if (missed_heatbeat_count > max_missed_heartbeats_) {
+  if (missed_heatbeat_count >= max_missed_heartbeats_) {
     return FAILED;
-  } else if (missed_heatbeat_count > suspect_missed_heartbeats_) {
+  } else if (missed_heatbeat_count >= suspect_missed_heartbeats_) {
     return SUSPECTED;
   }
   return OK;
