@@ -26,7 +26,7 @@ import org.apache.impala.analysis.ExprSubstitutionMap;
 import org.apache.impala.thrift.TDataPartition;
 import org.apache.impala.thrift.TPartitionType;
 import com.google.common.base.Joiner;
-import com.google.common.base.Objects;
+import com.google.common.base.MoreObjects;
 import com.google.common.base.Preconditions;
 import com.google.common.collect.Lists;
 
@@ -102,7 +102,7 @@ public class DataPartition {
   }
 
   public String debugString() {
-    return Objects.toStringHelper(this)
+    return MoreObjects.toStringHelper(this)
         .add("type_", type_)
         .addValue(Expr.debugString(partitionExprs_))
         .toString();

@@ -59,7 +59,7 @@ under the License.
     <eclipse.output.directory>eclipse-classes</eclipse.output.directory>
     <!-- hive-exec seems to leak this version of guava onto our classpath,
          so it's important to depend on the same one -->
-    <guava.version>14.0.1</guava.version>
+    <guava.version>28.1-jre</guava.version>
     <derby.version>10.14.2.0</derby.version>
     <jackson-databind.version>2.10.0</jackson-databind.version>
     <project.build.sourceEncoding>UTF-8</project.build.sourceEncoding>

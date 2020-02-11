@@ -414,8 +414,8 @@ public class AllocationFileLoaderService extends AbstractService {
       Map<FSQueueType, Set<String>> configuredQueues,
       Set<String> nonPreemptableQueues)
       throws AllocationConfigurationException {
-    String queueName = CharMatcher.WHITESPACE.trimFrom(
-        element.getAttribute("name"));
+
+    String queueName = CharMatcher.whitespace().trimFrom(element.getAttribute("name"));
 
     if (queueName.contains(".")) {
       throw new AllocationConfigurationException("Bad fair scheduler config "

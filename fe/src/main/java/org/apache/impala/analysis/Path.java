@@ -20,7 +20,7 @@ package org.apache.impala.analysis;
 import java.util.ArrayList;
 import java.util.List;
 
-import com.google.common.base.Objects;
+import com.google.common.base.MoreObjects;
 import org.apache.impala.catalog.ArrayType;
 import org.apache.impala.catalog.Column;
 import org.apache.impala.catalog.FeTable;
@@ -468,7 +468,7 @@ public class Path {
   }
 
   public String debugString() {
-    return Objects.toStringHelper(this)
+    return MoreObjects.toStringHelper(this)
         .add("rootTable", rootTable_)
         .add("rootDesc", rootDesc_)
         .add("rawPath", rawPath_)

@@ -30,7 +30,7 @@ import org.apache.impala.thrift.TExprNodeType;
 import org.apache.impala.thrift.TFloatLiteral;
 import org.apache.impala.thrift.TIntLiteral;
 
-import com.google.common.base.Objects;
+import com.google.common.base.MoreObjects;
 import com.google.common.base.Preconditions;
 
 /**
@@ -205,7 +205,7 @@ public class NumericLiteral extends LiteralExpr {
 
   @Override
   public String debugString() {
-    return Objects.toStringHelper(this)
+    return MoreObjects.toStringHelper(this)
         .add("value", value_)
         .add("type", type_)
         .toString();

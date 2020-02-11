@@ -32,7 +32,7 @@ import org.apache.impala.extdatasource.thrift.TComparisonOp;
 import org.apache.impala.thrift.TExprNode;
 import org.apache.impala.thrift.TExprNodeType;
 
-import com.google.common.base.Objects;
+import com.google.common.base.MoreObjects;
 import com.google.common.base.Preconditions;
 import com.google.common.base.Predicates;
 import com.google.common.collect.Lists;
@@ -162,7 +162,7 @@ public class BinaryPredicate extends Predicate {
 
   @Override
   public String debugString() {
-    Objects.ToStringHelper toStrHelper = Objects.toStringHelper(this);
+    MoreObjects.ToStringHelper toStrHelper = MoreObjects.toStringHelper(this);
     toStrHelper.add("op", op_).addValue(super.debugString());
     if (isAuxExpr()) toStrHelper.add("isAux", true);
     if (isInferred_) toStrHelper.add("isInferred", true);

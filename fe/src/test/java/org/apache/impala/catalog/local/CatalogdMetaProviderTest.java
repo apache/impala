@@ -285,7 +285,7 @@ public class CatalogdMetaProviderTest {
     ExecutorService exec = Executors.newFixedThreadPool(kNumThreads);
     try {
       // Run for at least 60 seconds to try to provoke the desired behavior.
-      Stopwatch sw = new Stopwatch().start();
+      Stopwatch sw = Stopwatch.createStarted();
       while (sw.elapsed(TimeUnit.SECONDS) < 60) {
         // Submit a wave of parallel tasks which all fetch the same table, concurently.
         // One of these should win whereas the others are likely to piggy-back on the

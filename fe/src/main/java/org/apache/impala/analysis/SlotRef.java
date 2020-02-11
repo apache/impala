@@ -32,6 +32,7 @@ import org.apache.impala.thrift.TSlotRef;
 
 import com.google.common.base.Joiner;
 import com.google.common.base.Objects;
+import com.google.common.base.MoreObjects;
 import com.google.common.base.Preconditions;
 
 public class SlotRef extends Expr {
@@ -168,7 +169,7 @@ public class SlotRef extends Expr {
 
   @Override
   public String debugString() {
-    Objects.ToStringHelper toStrHelper = Objects.toStringHelper(this);
+    MoreObjects.ToStringHelper toStrHelper = MoreObjects.toStringHelper(this);
     if (label_ != null) toStrHelper.add("label", label_);
     if (rawPath_ != null) toStrHelper.add("path", Joiner.on('.').join(rawPath_));
     toStrHelper.add("type", type_.toSql());

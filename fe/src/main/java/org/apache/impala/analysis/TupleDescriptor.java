@@ -33,7 +33,7 @@ import org.apache.impala.catalog.StructType;
 import org.apache.impala.thrift.TTupleDescriptor;
 
 import com.google.common.base.Joiner;
-import com.google.common.base.Objects;
+import com.google.common.base.MoreObjects;
 import com.google.common.base.Preconditions;
 
 /**
@@ -196,7 +196,7 @@ public class TupleDescriptor {
     for (SlotDescriptor slot : slots_) {
       slotStrings.add(slot.debugString());
     }
-    return Objects.toStringHelper(this)
+    return MoreObjects.toStringHelper(this)
         .add("id", id_.asInt())
         .add("name", debugName_)
         .add("tbl", tblStr)

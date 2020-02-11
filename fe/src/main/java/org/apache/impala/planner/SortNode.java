@@ -39,7 +39,7 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import com.google.common.base.Joiner;
-import com.google.common.base.Objects;
+import com.google.common.base.MoreObjects;
 import com.google.common.base.Preconditions;
 
 /**
@@ -181,7 +181,7 @@ public class SortNode extends PlanNode {
     for (Boolean isAsc : info_.getIsAscOrder()) {
       strings.add(isAsc ? "a" : "d");
     }
-    return Objects.toStringHelper(this)
+    return MoreObjects.toStringHelper(this)
         .add("type_", type_)
         .add("ordering_exprs", Expr.debugString(info_.getSortExprs()))
         .add("is_asc", "[" + Joiner.on(" ").join(strings) + "]")

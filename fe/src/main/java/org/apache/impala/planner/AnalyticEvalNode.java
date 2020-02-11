@@ -43,7 +43,7 @@ import org.apache.impala.thrift.TPlanNode;
 import org.apache.impala.thrift.TPlanNodeType;
 import org.apache.impala.thrift.TQueryOptions;
 import com.google.common.base.Joiner;
-import com.google.common.base.Objects;
+import com.google.common.base.MoreObjects;
 import com.google.common.base.Preconditions;
 
 /**
@@ -244,7 +244,7 @@ public class AnalyticEvalNode extends PlanNode {
     for (OrderByElement element: orderByElements_) {
       orderByElementStrs.add(element.toSql());
     }
-    return Objects.toStringHelper(this)
+    return MoreObjects.toStringHelper(this)
         .add("analyticFnCalls", Expr.debugString(analyticFnCalls_))
         .add("partitionExprs", Expr.debugString(partitionExprs_))
         .add("subtitutedPartitionExprs", Expr.debugString(substitutedPartitionExprs_))

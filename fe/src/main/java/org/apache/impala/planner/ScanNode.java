@@ -42,7 +42,7 @@ import org.apache.impala.thrift.TScanRangeSpec;
 import org.apache.impala.thrift.TTableStats;
 
 import com.google.common.base.Joiner;
-import com.google.common.base.Objects;
+import com.google.common.base.MoreObjects;
 import com.google.common.base.Preconditions;
 
 /**
@@ -163,7 +163,7 @@ abstract public class ScanNode extends PlanNode {
 
   @Override
   protected String debugString() {
-    return Objects.toStringHelper(this)
+    return MoreObjects.toStringHelper(this)
         .add("tid", desc_.getId().asInt())
         .add("tblName", desc_.getTable().getFullName())
         .add("keyRanges", "")

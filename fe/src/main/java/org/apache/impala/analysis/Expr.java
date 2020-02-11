@@ -50,7 +50,7 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import com.google.common.base.Joiner;
-import com.google.common.base.Objects;
+import com.google.common.base.MoreObjects;
 import com.google.common.base.Preconditions;
 import com.google.common.base.Predicates;
 import com.google.common.collect.Iterables;
@@ -1449,7 +1449,7 @@ abstract public class Expr extends TreeNode<Expr> implements ParseNode, Cloneabl
 
   @Override
   public String toString() {
-    return Objects.toStringHelper(this.getClass())
+    return MoreObjects.toStringHelper(this.getClass())
         .add("id", id_)
         .add("type", type_)
         .add("toSql", toSql(ToSqlOptions.SHOW_IMPLICIT_CASTS))

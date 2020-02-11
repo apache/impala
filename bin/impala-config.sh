@@ -229,6 +229,7 @@ export CDP_RANGER_URL=${CDP_RANGER_URL-}
 export CDH_COMPONENTS_HOME="$IMPALA_TOOLCHAIN/cdh_components-$CDH_BUILD_NUMBER"
 export CDP_COMPONENTS_HOME="$IMPALA_TOOLCHAIN/cdp_components-$CDP_BUILD_NUMBER"
 export USE_CDP_HIVE=${USE_CDP_HIVE-false}
+export DISABLE_SENTRY=${DISABLE_SENTRY_OVERRIDE:-"true"}
 if $USE_CDP_HIVE; then
   # When USE_CDP_HIVE is set we use the CDP hive version to build as well as deploy in
   # the minicluster
@@ -244,7 +245,6 @@ if $USE_CDP_HIVE; then
   export IMPALA_TEZ_URL=${CDP_TEZ_URL-}
   export IMPALA_KNOX_VERSION=${CDP_KNOX_VERSION}
   export HADOOP_HOME="$CDP_COMPONENTS_HOME/hadoop-${IMPALA_HADOOP_VERSION}/"
-  export DISABLE_SENTRY=${DISABLE_SENTRY_OVERRIDE:-"true"}
 else
   # CDH hive version is used to build and deploy in minicluster when USE_CDP_HIVE is
   # false
@@ -256,7 +256,6 @@ else
   export IMPALA_HBASE_VERSION=${CDH_HBASE_VERSION}
   export IMPALA_HBASE_URL=${CDH_HBASE_URL-}
   export HADOOP_HOME="$CDH_COMPONENTS_HOME/hadoop-${IMPALA_HADOOP_VERSION}/"
-  export DISABLE_SENTRY="false"
 fi
 
 # Ozone always uses the CDP version

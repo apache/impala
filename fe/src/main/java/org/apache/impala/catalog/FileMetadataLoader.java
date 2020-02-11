@@ -16,7 +16,7 @@
 // under the License.
 package org.apache.impala.catalog;
 
-import com.google.common.base.Objects;
+import com.google.common.base.MoreObjects;
 import com.google.common.base.Preconditions;
 import com.google.common.collect.ImmutableMap;
 import com.google.common.collect.Maps;
@@ -285,7 +285,7 @@ public class FileMetadataLoader {
     public int unknownDiskIds = 0;
 
     public String debugString() {
-      return Objects.toStringHelper("")
+      return MoreObjects.toStringHelper("")
         .add("path", partDir_)
         .add("loaded files", loadedFiles)
         .add("hidden files", nullIfZero(hiddenFiles))

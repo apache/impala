@@ -54,7 +54,7 @@ public class TableLoader {
    * an IncompleteTable will be returned that contains details on the error.
    */
   public Table load(Db db, String tblName, String reason) {
-    Stopwatch sw = new Stopwatch().start();
+    Stopwatch sw = Stopwatch.createStarted();
     String fullTblName = db.getName() + "." + tblName;
     String annotation = "Loading metadata for: " + fullTblName + " (" + reason + ")";
     LOG.info(annotation);
@@ -64,7 +64,7 @@ public class TableLoader {
          MetaStoreClient msClient = catalog_.getMetaStoreClient()) {
       org.apache.hadoop.hive.metastore.api.Table msTbl = null;
       // All calls to getTable() need to be serialized due to HIVE-5457.
-      Stopwatch hmsLoadSW = new Stopwatch().start();
+      Stopwatch hmsLoadSW = Stopwatch.createStarted();
       synchronized (metastoreAccessLock_) {
         msTbl = msClient.getHiveClient().getTable(db.getName(), tblName);
       }
@@ -101,7 +101,7 @@ public class TableLoader {
           "'invalidate metadata " + fullTblName + "' may resolve this problem.", e));
     }
     LOG.info("Loaded metadata for: " + fullTblName + " (" +
-        sw.elapsedTime(TimeUnit.MILLISECONDS) + "ms)");
+        sw.elapsed(TimeUnit.MILLISECONDS) + "ms)");
     return table;
   }
 }

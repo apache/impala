@@ -17,6 +17,7 @@
 
 package org.apache.impala.analysis;
 
+import java.nio.charset.Charset;
 import java.util.ArrayList;
 import java.util.Collection;
 import java.util.HashMap;
@@ -761,7 +762,7 @@ public class ColumnLineageGraph {
 
   private String getQueryHash(String queryStr) {
     Hasher hasher = Hashing.md5().newHasher();
-    hasher.putString(queryStr);
+    hasher.putUnencodedChars(queryStr);
     return hasher.hash().toString();
   }
 

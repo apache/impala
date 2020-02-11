@@ -28,7 +28,7 @@ import org.apache.impala.common.InternalException;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
-import com.google.common.base.Objects;
+import com.google.common.base.MoreObjects;
 import com.google.common.base.Preconditions;
 import com.google.common.collect.Lists;
 
@@ -697,7 +697,7 @@ public class AggregateInfo extends AggregateInfoBase {
   @Override
   public String debugString() {
     StringBuilder out = new StringBuilder(super.debugString());
-    out.append(Objects.toStringHelper(this)
+    out.append(MoreObjects.toStringHelper(this)
         .add("phase", aggPhase_)
         .add("intermediate_smap", intermediateTupleSmap_.debugString())
         .add("output_smap", outputTupleSmap_.debugString())

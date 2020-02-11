@@ -139,7 +139,7 @@ public class ParallelFileMetadataLoader {
     poolSize = Math.min(numLoaders, poolSize);
 
     if (poolSize == 1) {
-      return MoreExecutors.sameThreadExecutor();
+      return MoreExecutors.newDirectExecutorService();
     } else {
       LOG.info(logPrefix_ + " using a thread pool of size {}", poolSize);
       return Executors.newFixedThreadPool(poolSize);

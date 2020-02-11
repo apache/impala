@@ -24,7 +24,7 @@ import org.apache.impala.catalog.Type;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
-import com.google.common.base.Objects;
+import com.google.common.base.MoreObjects;
 import com.google.common.base.Preconditions;
 
 /**
@@ -172,7 +172,7 @@ public class AnalyticInfo extends AggregateInfoBase {
   @Override
   public String debugString() {
     StringBuilder out = new StringBuilder(super.debugString());
-    out.append(Objects.toStringHelper(this)
+    out.append(MoreObjects.toStringHelper(this)
         .add("analytic_exprs", Expr.debugString(analyticExprs_))
         .add("smap", analyticTupleSmap_.debugString())
         .toString());

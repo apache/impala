@@ -31,7 +31,7 @@ import org.apache.impala.analysis.Expr;
 import org.apache.impala.analysis.SlotRef;
 import org.apache.impala.thrift.TColumnStats;
 
-import com.google.common.base.Objects;
+import com.google.common.base.MoreObjects;
 import com.google.common.base.Preconditions;
 import com.google.common.collect.Sets;
 import com.google.common.math.LongMath;
@@ -461,7 +461,7 @@ public class ColumnStats {
 
   @Override
   public String toString() {
-    return Objects.toStringHelper(this.getClass())
+    return MoreObjects.toStringHelper(this.getClass())
         .add("avgSize_", avgSize_)
         .add("avgSerializedSize_", avgSerializedSize_)
         .add("maxSize_", maxSize_)

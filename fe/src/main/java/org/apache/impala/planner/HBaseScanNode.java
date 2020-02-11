@@ -62,7 +62,7 @@ import org.apache.impala.util.ExecutorMembershipSnapshot;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
-import com.google.common.base.Objects;
+import com.google.common.base.MoreObjects;
 import com.google.common.base.Preconditions;
 import com.google.common.collect.Lists;
 
@@ -376,7 +376,7 @@ public class HBaseScanNode extends ScanNode {
   @Override
   protected String debugString() {
     FeHBaseTable tbl = (FeHBaseTable) desc_.getTable();
-    return Objects.toStringHelper(this)
+    return MoreObjects.toStringHelper(this)
         .add("tid", desc_.getId().asInt())
         .add("hiveTblName", tbl.getFullName())
         .add("hbaseTblName", tbl.getHBaseTableName())

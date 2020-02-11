@@ -21,7 +21,7 @@ import org.apache.impala.catalog.Type;
 import org.apache.impala.thrift.TExprNode;
 import org.apache.impala.thrift.TExprNodeType;
 
-import com.google.common.base.Objects;
+import com.google.common.base.MoreObjects;
 import com.google.common.base.Preconditions;
 
 public class NullLiteral extends LiteralExpr {
@@ -57,7 +57,7 @@ public class NullLiteral extends LiteralExpr {
 
   @Override
   public String debugString() {
-    return Objects.toStringHelper(this).addValue(super.debugString()).toString();
+    return MoreObjects.toStringHelper(this).addValue(super.debugString()).toString();
   }
 
   @Override

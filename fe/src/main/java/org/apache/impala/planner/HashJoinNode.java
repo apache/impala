@@ -39,7 +39,7 @@ import org.apache.impala.thrift.TQueryOptions;
 import org.apache.impala.util.BitUtil;
 
 import com.google.common.base.Joiner;
-import com.google.common.base.Objects;
+import com.google.common.base.MoreObjects;
 import com.google.common.base.Preconditions;
 
 /**
@@ -118,14 +118,14 @@ public class HashJoinNode extends JoinNode {
 
   @Override
   protected String debugString() {
-    return Objects.toStringHelper(this)
+    return MoreObjects.toStringHelper(this)
         .add("eqJoinConjuncts_", eqJoinConjunctsDebugString())
         .addValue(super.debugString())
         .toString();
   }
 
   private String eqJoinConjunctsDebugString() {
-    Objects.ToStringHelper helper = Objects.toStringHelper(this);
+    MoreObjects.ToStringHelper helper = MoreObjects.toStringHelper(this);
     for (Expr entry: eqJoinConjuncts_) {
       helper.add("lhs" , entry.getChild(0)).add("rhs", entry.getChild(1));
     }

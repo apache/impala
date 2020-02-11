@@ -28,7 +28,7 @@ import org.apache.impala.common.AnalysisException;
 import org.apache.impala.common.Reference;
 import org.apache.impala.thrift.TExprNode;
 import org.apache.impala.thrift.TExprNodeType;
-import com.google.common.base.Objects;
+import com.google.common.base.MoreObjects;
 import com.google.common.base.Preconditions;
 import com.google.common.collect.Lists;
 
@@ -89,7 +89,7 @@ public class IsNullPredicate extends Predicate {
 
   @Override
   public String debugString() {
-    return Objects.toStringHelper(this)
+    return MoreObjects.toStringHelper(this)
         .add("notNull", isNotNull_)
         .addValue(super.debugString())
         .toString();

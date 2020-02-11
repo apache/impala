@@ -1839,7 +1839,7 @@ public class CatalogOpExecutor {
       org.apache.hadoop.hive.metastore.api.Table msTbl = existingTbl.getMetaStoreTable();
       if (msTbl == null) {
         Preconditions.checkState(existingTbl instanceof IncompleteTable);
-        Stopwatch hmsLoadSW = new Stopwatch().start();
+        Stopwatch hmsLoadSW = Stopwatch.createStarted();
         long hmsLoadTime;
         try (MetaStoreClient msClient = catalog_.getMetaStoreClient()) {
           msTbl = msClient.getHiveClient().getTable(tableName.getDb(),
@@ -3996,7 +3996,7 @@ public class CatalogOpExecutor {
     Preconditions.checkNotNull(msClient);
     Db db = tbl.getDb();
     org.apache.hadoop.hive.metastore.api.Table msTbl = null;
-    Stopwatch hmsLoadSW = new Stopwatch().start();
+    Stopwatch hmsLoadSW = Stopwatch.createStarted();
     long hmsLoadTime;
     try {
       msTbl = msClient.getHiveClient().getTable(db.getName(), tbl.getName());

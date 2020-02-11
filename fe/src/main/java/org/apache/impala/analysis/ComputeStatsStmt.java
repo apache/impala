@@ -26,6 +26,7 @@ import java.util.Iterator;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
+import java.util.concurrent.TimeUnit;
 
 import org.apache.hadoop.hive.metastore.api.FieldSchema;
 import org.apache.impala.authorization.Privilege;
@@ -648,7 +649,7 @@ public class ComputeStatsStmt extends StatementBase {
     Preconditions.checkNotNull(partitions);
     Preconditions.checkState(!RuntimeEnv.INSTANCE.isTestEnv());
     if (partitions.isEmpty()) return Collections.emptyMap();
-    Stopwatch sw = new Stopwatch().start();
+    Stopwatch sw = Stopwatch.createStarted();
     int numCompressedBytes = 0;
     int totalPartitions = 0;
     int numPartitionsWithStats = 0;
@@ -708,7 +709,8 @@ public class ComputeStatsStmt extends StatementBase {
     profile.addToCounter(STATS_FETCH_TOTAL_PARTITIONS, TUnit.NONE, totalPartitions);
     profile.addToCounter(STATS_FETCH_NUM_PARTITIONS_WITH_STATS, TUnit.NONE,
         numPartitionsWithStats);
-    profile.addToCounter(STATS_FETCH_TIME, TUnit.TIME_MS, stopwatch.elapsedMillis());
+    profile.addToCounter(STATS_FETCH_TIME, TUnit.TIME_MS,
+        stopwatch.elapsed(TimeUnit.MILLISECONDS));
   }
 
   /**

@@ -409,7 +409,7 @@ public abstract class Table extends CatalogObjectImpl implements FeTable {
    */
   protected void loadValidWriteIdList(IMetaStoreClient client)
       throws TableLoadingException {
-    Stopwatch sw = new Stopwatch().start();
+    Stopwatch sw = Stopwatch.createStarted();
     Preconditions.checkState(msTable_ != null && msTable_.getParameters() != null);
     if (MetastoreShim.getMajorVersion() > 2 &&
         AcidUtils.isTransactionalTable(msTable_.getParameters())) {
