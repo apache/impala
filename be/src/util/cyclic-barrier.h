@@ -18,9 +18,7 @@
 #pragma once
 
 #include <cstdint>
-
-#include <boost/thread/lock_types.hpp>
-#include <boost/thread/pthread/mutex.hpp>
+#include <mutex>
 
 #include "common/logging.h"
 #include "common/status.h"
@@ -44,7 +42,7 @@ class CyclicBarrier {
   template <typename F>
   Status Wait(const F& fn) {
     {
-      boost::unique_lock<boost::mutex> l(lock_);
+      std::unique_lock<std::mutex> l(lock_);
       RETURN_IF_ERROR(cancel_status_);
       ++num_waiting_threads_;
       DCHECK_LE(num_waiting_threads_, num_threads_);
@@ -77,7 +75,7 @@ class CyclicBarrier {
   const int num_threads_;
 
   // Protects below members.
-  boost::mutex lock_;
+  std::mutex lock_;
 
   // Condition variable that is signalled (with NotifyAll) when all threads join the
   // barrier, or the barrier is cancelled.

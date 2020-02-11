@@ -15,7 +15,7 @@
 // specific language governing permissions and limitations
 // under the License.
 
-#include <boost/thread.hpp>
+#include <boost/thread/thread.hpp>
 
 #include "common/atomic.h"
 #include "testutil/death-test-util.h"

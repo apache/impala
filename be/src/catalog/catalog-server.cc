@@ -306,7 +306,7 @@ void CatalogServer::UpdateCatalogTopicCallback(
       incoming_topic_deltas.find(CatalogServer::IMPALA_CATALOG_TOPIC);
   if (topic == incoming_topic_deltas.end()) return;
 
-  try_mutex::scoped_try_lock l(catalog_lock_);
+  unique_lock<mutex> l(catalog_lock_, std::try_to_lock);
   // Return if unable to acquire the catalog_lock_ or if the topic update data is
   // not yet ready for processing. This indicates the catalog_update_gathering_thread_
   // is still building a topic update.

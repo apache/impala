@@ -18,8 +18,8 @@
 #pragma once
 
 #include <map>
+#include <mutex>
 #include <string>
-#include <boost/thread/pthread/mutex.hpp>
 #include <boost/unordered_map.hpp>
 
 #include "common/hdfs.h"
@@ -109,7 +109,7 @@ class DmlExecState {
 
  private:
   /// protects all fields below
-  boost::mutex lock_;
+  std::mutex lock_;
 
   /// Counts how many rows an DML query has added to a particular partition (partitions
   /// are identified by their partition keys: k1=v1/k2=v2 etc. Unpartitioned tables

@@ -17,7 +17,7 @@
 
 #pragma once
 
-#include <boost/thread/locks.hpp>
+#include <mutex>
 
 #include "exec/data-sink.h"
 #include "util/condition-variable.h"
@@ -156,7 +156,7 @@ class JoinBuilder : public DataSink {
 
   // Lock used for synchronization between threads from the build and probe side (i.e.
   // the build fragment thread and the probe-side thread executing the join node).
-  boost::mutex separate_build_lock_;
+  std::mutex separate_build_lock_;
 
   // Probe-side threads block on this while waiting for initial_build_complete_ = true
   // (or for probe finstance cancellation).

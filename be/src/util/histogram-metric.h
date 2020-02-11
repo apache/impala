@@ -42,7 +42,7 @@ class HistogramMetric : public Metric {
       std::stringstream* metric_kind) override;
 
   void Update(int64_t val) {
-    boost::lock_guard<SpinLock> l(lock_);
+    std::lock_guard<SpinLock> l(lock_);
     histogram_->Increment(val);
   }
 

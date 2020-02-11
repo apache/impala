@@ -21,9 +21,8 @@
 // they are built against.
 #define IMPALA_RUNTIME_IO_DISK_IO_MGR_H
 
+#include <mutex>
 #include <vector>
-
-#include <boost/thread/pthread/mutex.hpp>
 
 #include "common/atomic.h"
 #include "common/hdfs.h"

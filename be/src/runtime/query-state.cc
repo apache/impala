@@ -17,8 +17,7 @@
 
 #include "runtime/query-state.h"
 
-#include <boost/thread/lock_guard.hpp>
-#include <boost/thread/locks.hpp>
+#include <mutex>
 
 #include "common/thread-debug-info.h"
 #include "exec/kudu-util.h"
@@ -355,7 +354,7 @@ void QueryState::ConstructReport(bool instances_started,
   DCHECK(exec_rpc_params_.has_coord_state_idx());
   report->set_coord_state_idx(exec_rpc_params_.coord_state_idx());
   {
-    std::unique_lock<SpinLock> l(status_lock_);
+    unique_lock<SpinLock> l(status_lock_);
     overall_status_.ToProto(report->mutable_overall_status());
     if (IsValidFInstanceId(failed_finstance_id_)) {
       TUniqueIdToUniqueIdPB(failed_finstance_id_, report->mutable_fragment_instance_id());
@@ -516,7 +515,7 @@ int64_t QueryState::GetReportWaitTimeMs() const {
 
 void QueryState::ErrorDuringPrepare(const Status& status, const TUniqueId& finst_id) {
   {
-    std::unique_lock<SpinLock> l(status_lock_);
+    unique_lock<SpinLock> l(status_lock_);
     if (!HasErrorStatus()) {
       overall_status_ = status;
       failed_finstance_id_ = finst_id;
@@ -527,7 +526,7 @@ void QueryState::ErrorDuringPrepare(const Status& status, const TUniqueId& finst
 
 void QueryState::ErrorDuringExecute(const Status& status, const TUniqueId& finst_id) {
   {
-    std::unique_lock<SpinLock> l(status_lock_);
+    unique_lock<SpinLock> l(status_lock_);
     if (!HasErrorStatus()) {
       overall_status_ = status;
       failed_finstance_id_ = finst_id;

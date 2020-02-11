@@ -17,9 +17,9 @@
 
 #pragma once
 
-#include <boost/function.hpp>
-#include <boost/thread/lock_guard.hpp>
 #include <iosfwd>
+
+#include <boost/function.hpp>
 #include <rapidjson/document.h>
 #include "common/atomic.h"
 #include "common/status.h"

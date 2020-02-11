@@ -15,10 +15,9 @@
 // specific language governing permissions and limitations
 // under the License.
 
+#include <mutex>
 #include <boost/algorithm/string.hpp>
 #include <boost/filesystem.hpp>
-#include <boost/thread.hpp>
-#include <boost/thread/pthread/mutex.hpp>
 #include <boost/uuid/uuid_io.hpp>
 
 #include <openssl/err.h>
@@ -46,6 +45,7 @@
 #include "util/network-util.h"
 #include "util/openssl-util.h"
 #include "util/os-util.h"
+#include "util/thread.h"
 #include "util/uid-util.h"
 
 #include "common/names.h"

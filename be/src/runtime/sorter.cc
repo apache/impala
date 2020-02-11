@@ -17,6 +17,7 @@
 
 #include "runtime/sorter-internal.h"
 
+#include <boost/bind.hpp>
 #include <boost/random/mersenne_twister.hpp>
 #include <boost/random/uniform_int.hpp>
 #include <gutil/strings/substitute.h>

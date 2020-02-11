@@ -21,12 +21,13 @@
 
 #include <stdint.h>
 #include <memory>
+#include <tuple>
 #include <unordered_set>
 #include <vector>
-#include <tuple>
 
-#include <boost/unordered_map.hpp>
 #include <boost/scoped_ptr.hpp>
+#include <boost/thread/shared_mutex.hpp>
+#include <boost/unordered_map.hpp>
 
 #include "exec/filter-context.h"
 #include "exec/scan-node.h"
@@ -474,7 +475,7 @@ class HdfsScanNodeBase : public ScanNode {
   /// Scanner specific per file metadata (e.g. header information) and associated lock.
   /// Key of the map is partition_id, filename pair
   /// TODO: Remove this lock when removing the legacy scanners and scan nodes.
-  boost::mutex metadata_lock_;
+  std::mutex metadata_lock_;
   std::unordered_map<PartitionFileKey, void*, pair_hash> per_file_metadata_;
 
   /// Conjuncts for each materialized tuple (top-level row batch tuples and collection

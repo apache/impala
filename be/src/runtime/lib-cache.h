@@ -17,9 +17,9 @@
 
 #pragma once
 
+#include <mutex>
 #include <string>
 #include <boost/scoped_ptr.hpp>
-#include <boost/thread/pthread/mutex.hpp>
 #include <boost/unordered_map.hpp>
 #include <boost/unordered_set.hpp>
 #include "common/atomic.h"
@@ -145,7 +145,7 @@ class LibCache {
 
   /// Protects lib_cache_. For lock ordering, this lock must always be taken before
   /// the per entry lock.
-  boost::mutex lock_;
+  std::mutex lock_;
 
   /// Maps HDFS library path => cache entry.
   /// Entries in the cache need to be explicitly deleted.
@@ -168,13 +168,12 @@ class LibCache {
   /// taken and returned in *entry_lock.
   /// If an error is returned, there will be no entry in lib_cache_ and *entry is NULL.
   Status GetCacheEntry(const std::string& hdfs_lib_file, LibType type, time_t exp_mtime,
-      boost::unique_lock<boost::mutex>* entry_lock, LibCacheEntry** entry);
+      std::unique_lock<std::mutex>* entry_lock, LibCacheEntry** entry);
 
   /// Implementation to get the cache entry for 'hdfs_lib_file'. Errors are returned
   /// without evicting the cache entry if the status is not OK and *entry is not NULL.
   Status GetCacheEntryInternal(const std::string& hdfs_lib_file, LibType type,
-      time_t exp_mtime, boost::unique_lock<boost::mutex>* entry_lock,
-      LibCacheEntry** entry);
+      time_t exp_mtime, std::unique_lock<std::mutex>* entry_lock, LibCacheEntry** entry);
 
   /// Returns iter's cache entry in 'entry' with 'entry_lock' held if entry does not
   /// need to be refreshed.
@@ -190,7 +189,7 @@ class LibCache {
   /// TODO: cleanup this method's interface and how the outputs are used.
   Status RefreshCacheEntry(const std::string& hdfs_lib_file, LibType type,
       time_t exp_mtime, const LibMap::iterator& iter,
-      boost::unique_lock<boost::mutex>* entry_lock, LibCacheEntry** entry);
+      std::unique_lock<std::mutex>* entry_lock, LibCacheEntry** entry);
 
   /// 'hdfs_lib_file' is copied locally and 'entry' is initialized with its contents.
   /// An error is returned if exp_mtime differs from the mtime on the file system.

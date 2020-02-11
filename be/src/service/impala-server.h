@@ -18,11 +18,11 @@
 #pragma once
 
 #include <atomic>
+#include <mutex>
 #include <unordered_map>
 #include <boost/random/random_device.hpp>
 #include <boost/scoped_ptr.hpp>
 #include <boost/shared_ptr.hpp>
-#include <boost/thread/pthread/mutex.hpp>
 #include <boost/unordered_set.hpp>
 #include <boost/uuid/uuid.hpp>
 #include <boost/uuid/uuid_generators.hpp>
@@ -549,7 +549,7 @@ class ImpalaServer : public ImpalaServiceIf,
 
     /// Protects all fields below. See "Locking" in the class comment for lock
     /// acquisition order.
-    boost::mutex lock;
+    std::mutex lock;
 
     /// If true, the session has been closed.
     bool closed;
@@ -1034,7 +1034,7 @@ class ImpalaServer : public ImpalaServiceIf,
   static ThreadSafeRandom rng_;
 
   /// Guards query_log_ and query_log_index_
-  boost::mutex query_log_lock_;
+  std::mutex query_log_lock_;
 
   /// FIFO list of query records, which are written after the query finishes executing
   typedef std::list<QueryStateRecord> QueryLog;
@@ -1080,7 +1080,7 @@ class ImpalaServer : public ImpalaServiceIf,
   std::multiset<int32_t> session_timeout_set_;
 
   /// The lock for protecting the session_timeout_set_.
-  boost::mutex session_timeout_lock_;
+  std::mutex session_timeout_lock_;
 
   /// session_timeout_thread_ relies on the following conditional variable to wake up
   /// when there are sessions that have a timeout.
@@ -1229,7 +1229,7 @@ class ImpalaServer : public ImpalaServiceIf,
 
   /// Protects session_state_map_. See "Locking" in the class comment for lock
   /// acquisition order.
-  boost::mutex session_state_map_lock_;
+  std::mutex session_state_map_lock_;
 
   /// A map from session identifier to a structure containing per-session information
   typedef boost::unordered_map<TUniqueId, std::shared_ptr<SessionState>> SessionStateMap;
@@ -1237,7 +1237,7 @@ class ImpalaServer : public ImpalaServiceIf,
 
   /// Protects connection_to_sessions_map_. See "Locking" in the class comment for lock
   /// acquisition order.
-  boost::mutex connection_to_sessions_map_lock_;
+  std::mutex connection_to_sessions_map_lock_;
 
   /// Map from a connection ID to the associated list of sessions so that all can be
   /// closed when the connection ends. HS2 allows for multiplexing several sessions across
@@ -1258,7 +1258,7 @@ class ImpalaServer : public ImpalaServiceIf,
   /// Decrement the session's reference counter and mark last_accessed_ms so that state
   /// expiration can proceed.
   inline void MarkSessionInactive(std::shared_ptr<SessionState> session) {
-    boost::lock_guard<boost::mutex> l(session->lock);
+    std::lock_guard<std::mutex> l(session->lock);
     DCHECK_GT(session->ref_count, 0);
     --session->ref_count;
     session->last_accessed_ms = UnixMillis();
@@ -1269,7 +1269,7 @@ class ImpalaServer : public ImpalaServiceIf,
   void AddSessionToConnection(const TUniqueId& session_id, SessionState* session);
 
   /// Protects query_locations_. Not held in conjunction with other locks.
-  boost::mutex query_locations_lock_;
+  std::mutex query_locations_lock_;
 
   /// A map from backend to the list of queries currently running or expected to run
   /// there.
@@ -1280,18 +1280,18 @@ class ImpalaServer : public ImpalaServiceIf,
   /// The local backend descriptor. Updated in GetLocalBackendDescriptor() and protected
   /// by 'local_backend_descriptor_lock_';
   std::shared_ptr<const TBackendDescriptor> local_backend_descriptor_;
-  boost::mutex local_backend_descriptor_lock_;
+  std::mutex local_backend_descriptor_lock_;
 
   /// UUID generator for session IDs and secrets. Uses system random device to get
   /// cryptographically secure random numbers.
   boost::uuids::basic_random_generator<boost::random_device> crypto_uuid_generator_;
 
   /// Lock to protect uuid_generator
-  boost::mutex uuid_lock_;
+  std::mutex uuid_lock_;
 
   /// Lock for catalog_update_version_, min_subscriber_catalog_topic_version_,
   /// and catalog_version_update_cv_
-  boost::mutex catalog_version_lock_;
+  std::mutex catalog_version_lock_;
 
   /// Variable to signal when the catalog version has been modified
   ConditionVariable catalog_version_update_cv_;
@@ -1335,7 +1335,7 @@ class ImpalaServer : public ImpalaServiceIf,
 
   /// Guards queries_by_timestamp_. See "Locking" in the class comment for lock
   /// acquisition order.
-  boost::mutex query_expiration_lock_;
+  std::mutex query_expiration_lock_;
 
   enum class ExpirationKind {
     // The query is cancelled if the query has been inactive this long. The event may

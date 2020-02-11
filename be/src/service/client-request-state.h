@@ -31,7 +31,6 @@
 #include "gen-cpp/Frontend_types.h"
 #include "gen-cpp/ImpalaHiveServer2Service.h"
 
-#include <boost/thread.hpp>
 #include <boost/unordered_set.hpp>
 #include <vector>
 
@@ -45,6 +44,7 @@ class Frontend;
 class ReportExecStatusRequestPB;
 class RowBatch;
 class RuntimeState;
+class Thread;
 class TRuntimeProfileTree;
 class TupleRow;
 enum class AdmissionOutcome;
@@ -250,8 +250,8 @@ class ClientRequestState {
   TDdlType::type ddl_type() const {
     return exec_request_.catalog_op_request.ddl_params.ddl_type;
   }
-  boost::mutex* lock() { return &lock_; }
-  boost::mutex* fetch_rows_lock() { return &fetch_rows_lock_; }
+  std::mutex* lock() { return &lock_; }
+  std::mutex* fetch_rows_lock() { return &fetch_rows_lock_; }
   /// ExecState is stored using an AtomicEnum, so reads do not require holding lock_.
   ExecState exec_state() const { return exec_state_.Load(); }
   /// Translate exec_state_ to a TOperationState.
@@ -279,23 +279,23 @@ class ClientRequestState {
   }
 
   inline int64_t last_active_ms() const {
-    boost::lock_guard<boost::mutex> l(expiration_data_lock_);
+    std::lock_guard<std::mutex> l(expiration_data_lock_);
     return last_active_time_ms_;
   }
 
   /// Returns true if Impala is actively processing this query.
   inline bool is_active() const {
-    boost::lock_guard<boost::mutex> l(expiration_data_lock_);
+    std::lock_guard<std::mutex> l(expiration_data_lock_);
     return ref_count_ > 0;
   }
 
   bool is_expired() const {
-    boost::lock_guard<boost::mutex> l(expiration_data_lock_);
+    std::lock_guard<std::mutex> l(expiration_data_lock_);
     return is_expired_;
   }
 
   void set_expired() {
-    boost::lock_guard<boost::mutex> l(expiration_data_lock_);
+    std::lock_guard<std::mutex> l(expiration_data_lock_);
     is_expired_ = true;
   }
 
@@ -328,11 +328,11 @@ protected:
   /// while acquiring this lock (since FetchRows() will release and re-acquire lock_ during
   /// its execution).
   /// See "Locking" in the class comment for lock acquisition order.
-  boost::mutex fetch_rows_lock_;
+  std::mutex fetch_rows_lock_;
 
   /// Protects last_active_time_ms_, ref_count_ and is_expired_. Only held during short
   /// function calls - no other locks should be acquired while holding this lock.
-  mutable boost::mutex expiration_data_lock_;
+  mutable std::mutex expiration_data_lock_;
 
   /// Stores the last time that the query was actively doing work, in Unix milliseconds.
   int64_t last_active_time_ms_;
@@ -363,7 +363,7 @@ protected:
   /// requests for this query, e.g. query status and cancellation. Furthermore, until
   /// IMPALA-3882 is fixed, it can indirectly block progress on all other queries.
   /// See "Locking" in the class comment for lock acquisition order.
-  boost::mutex lock_;
+  std::mutex lock_;
 
   /// TODO: remove and use ExecEnv::GetInstance() instead
   ExecEnv* exec_env_;

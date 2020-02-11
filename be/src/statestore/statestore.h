@@ -479,7 +479,7 @@ class Statestore : public CacheLineAligned {
 
     /// Lock held when adding or deleting transient entries. See class comment for lock
     /// acquisition order.
-    boost::mutex transient_entry_lock_;
+    std::mutex transient_entry_lock_;
 
     /// True once DeleteAllTransientEntries() has been called during subscriber
     /// unregisteration. Protected by 'transient_entry_lock_'
@@ -488,7 +488,7 @@ class Statestore : public CacheLineAligned {
 
   /// Protects access to subscribers_ and subscriber_uuid_generator_. See the class
   /// comment for the lock acquisition order.
-  boost::mutex subscribers_lock_;
+  std::mutex subscribers_lock_;
 
   /// Map of subscribers currently connected; upon failure their entry is removed from this
   /// map. Subscribers must only be removed by UnregisterSubscriber() which ensures that

@@ -16,7 +16,7 @@
 // under the License.
 
 #include <string>
-#include <boost/thread.hpp>
+#include <boost/thread/thread.hpp>
 
 #include "common/atomic.h"
 #include "testutil/gtest-util.h"

@@ -18,9 +18,9 @@
 #include "service/impala-http-handler.h"
 
 #include <algorithm>
+#include <mutex>
 #include <sstream>
 #include <boost/lexical_cast.hpp>
-#include <boost/thread/pthread/mutex.hpp>
 #include <rapidjson/prettywriter.h>
 #include <rapidjson/stringbuffer.h>
 

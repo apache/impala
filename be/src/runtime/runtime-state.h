@@ -199,7 +199,7 @@ class RuntimeState {
   inline Status GetQueryStatus() {
     // Do a racy check for query_status_ to avoid unnecessary spinlock acquisition.
     if (UNLIKELY(!query_status_.ok())) {
-      boost::lock_guard<SpinLock> l(query_status_lock_);
+      std::lock_guard<SpinLock> l(query_status_lock_);
       return query_status_;
     }
     return Status::OK();
@@ -213,13 +213,13 @@ class RuntimeState {
 
   /// Returns true if the error log has not reached max_errors_.
   bool LogHasSpace() {
-    boost::lock_guard<SpinLock> l(error_log_lock_);
+    std::lock_guard<SpinLock> l(error_log_lock_);
     return error_log_.size() < query_options().max_errors;
   }
 
   /// Returns true if there are entries in the error log.
   bool HasErrors() {
-    boost::lock_guard<SpinLock> l(error_log_lock_);
+    std::lock_guard<SpinLock> l(error_log_lock_);
     return !error_log_.empty();
   }
 
@@ -275,7 +275,7 @@ class RuntimeState {
 
   /// Sets query_status_ with err_msg if no error has been set yet.
   void SetQueryStatus(const std::string& err_msg) {
-    boost::lock_guard<SpinLock> l(query_status_lock_);
+    std::lock_guard<SpinLock> l(query_status_lock_);
     if (!query_status_.ok()) return;
     query_status_ = Status(err_msg);
   }
@@ -323,7 +323,7 @@ class RuntimeState {
   /// Returns true if this RuntimeState has any auxiliary error information, false
   /// otherwise. Currently, only SetRPCErrorInfo() sets aux error info.
   bool HasAuxErrorInfo() {
-    boost::lock_guard<SpinLock> l(aux_error_info_lock_);
+    std::lock_guard<SpinLock> l(aux_error_info_lock_);
     return aux_error_info_ != nullptr;
   }
 

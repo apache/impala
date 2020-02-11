@@ -17,7 +17,7 @@
 
 #include "runtime/hbase-table-factory.h"
 
-#include <boost/thread/locks.hpp>
+#include <mutex>
 
 #include "common/status.h"
 #include "common/logging.h"

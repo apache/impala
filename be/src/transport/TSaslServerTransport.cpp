@@ -21,11 +21,10 @@
 #include "config.h"
 #ifdef HAVE_SASL_SASL_H
 #include <stdint.h>
+#include <mutex>
 #include <sstream>
-#include <boost/shared_ptr.hpp>
 #include <boost/scoped_ptr.hpp>
-#include <boost/thread/locks.hpp>
-#include <boost/thread/thread.hpp>
+#include <boost/shared_ptr.hpp>
 
 #include <thrift/transport/TBufferTransports.h>
 #include <thrift/transport/TSocket.h>

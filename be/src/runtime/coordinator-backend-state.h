@@ -17,8 +17,9 @@
 
 #pragma once
 
-#include <vector>
+#include <mutex>
 #include <unordered_set>
+#include <vector>
 
 #include <boost/accumulators/accumulators.hpp>
 #include <boost/accumulators/statistics/max.hpp>
@@ -27,7 +28,6 @@
 #include <boost/accumulators/statistics/min.hpp>
 #include <boost/accumulators/statistics/stats.hpp>
 #include <boost/accumulators/statistics/variance.hpp>
-#include <boost/thread/pthread/mutex.hpp>
 
 #include "gen-cpp/control_service.proxy.h"
 #include "kudu/rpc/rpc_controller.h"
@@ -160,7 +160,7 @@ class Coordinator::BackendState {
   Status exec_rpc_status() const { return exec_rpc_status_; }
 
   int64_t last_report_time_ms() {
-    boost::lock_guard<boost::mutex> l(lock_);
+    std::lock_guard<std::mutex> l(lock_);
     return last_report_time_ms_;
   }
 
@@ -295,7 +295,7 @@ class Coordinator::BackendState {
 
   /// protects fields below
   /// lock ordering: Coordinator::lock_ must only be obtained *prior* to lock_
-  boost::mutex lock_;
+  std::mutex lock_;
 
   // number of in-flight instances
   int num_remaining_instances_ = 0;
@@ -350,7 +350,7 @@ class Coordinator::BackendState {
   void SetExecError(const Status& status);
 
   /// Version of IsDone() where caller must hold lock_ via lock;
-  bool IsDoneLocked(const boost::unique_lock<boost::mutex>& lock) const;
+  bool IsDoneLocked(const std::unique_lock<std::mutex>& lock) const;
 
   /// Same as ComputeResourceUtilization() but caller must hold lock.
   ResourceUtilization ComputeResourceUtilizationLocked();

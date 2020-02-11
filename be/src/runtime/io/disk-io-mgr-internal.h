@@ -19,8 +19,8 @@
 #define IMPALA_RUNTIME_DISK_IO_MGR_INTERNAL_H
 
 #include <unistd.h>
+#include <mutex>
 #include <queue>
-#include <boost/thread/locks.hpp>
 
 #include "common/logging.h"
 #include "runtime/io/request-context.h"
@@ -77,7 +77,7 @@ class DiskQueue {
   /// Enqueue the request context to the disk queue.
   void EnqueueContext(RequestContext* worker) {
     {
-      boost::unique_lock<boost::mutex> disk_lock(lock_);
+      std::unique_lock<std::mutex> disk_lock(lock_);
       // Check that the reader is not already on the queue
       DCHECK(find(request_contexts_.begin(), request_contexts_.end(), worker) ==
           request_contexts_.end());
@@ -122,7 +122,7 @@ class DiskQueue {
   HistogramMetric* read_size_ = nullptr;
 
   /// Lock that protects below members.
-  boost::mutex lock_;
+  std::mutex lock_;
 
   /// Condition variable to signal the disk threads that there is work to do or the
   /// thread should shut down.  A disk thread will be woken up when there is a reader

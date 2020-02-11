@@ -18,11 +18,11 @@
 #include <cstdio>
 #include <cstdlib>
 #include <limits>
+#include <mutex>
 #include <numeric>
 
 #include <boost/filesystem.hpp>
 #include <boost/scoped_ptr.hpp>
-#include <boost/thread/locks.hpp>
 #include <gtest/gtest.h>
 
 #include "common/init.h"

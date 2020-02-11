@@ -77,7 +77,7 @@ class BlockingPlanRootSink : public PlanRootSink {
 
  private:
   /// Protects all members, including the condition variables.
-  boost::mutex lock_;
+  std::mutex lock_;
 
   /// Waited on by the sender only. Signalled when the consumer has written results_ and
   /// num_rows_requested_, and so the sender may begin satisfying that request for rows

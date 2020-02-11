@@ -303,8 +303,7 @@ void ScanRange::SetBlockedOnBuffer() {
   blocked_on_buffer_ = true;
 }
 
-void ScanRange::CleanUpBuffer(
-    const boost::unique_lock<boost::mutex>& scan_range_lock,
+void ScanRange::CleanUpBuffer(const unique_lock<mutex>& scan_range_lock,
     unique_ptr<BufferDescriptor> buffer_desc) {
   DCHECK(scan_range_lock.mutex() == &lock_ && scan_range_lock.owns_lock());
   DCHECK(buffer_desc != nullptr);

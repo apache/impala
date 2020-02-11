@@ -36,6 +36,7 @@
 #include "util/metrics.h"
 #include "util/pretty-printer.h"
 #include "util/runtime-profile-counters.h"
+#include "util/thread.h"
 #include "util/time.h"
 
 #include "common/names.h"

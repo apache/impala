@@ -19,6 +19,7 @@
 
 #include <algorithm>
 #include <cstdlib>
+#include <mutex>
 
 #include "common/object-pool.h"
 #include "gutil/atomicops.h"

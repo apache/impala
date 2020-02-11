@@ -23,7 +23,7 @@
 #include <utility>
 #include <vector>
 
-#include <boost/thread.hpp>
+#include <boost/thread/thread.hpp>
 
 #include "common/object-pool.h"
 #include "gutil/strings/substitute.h"

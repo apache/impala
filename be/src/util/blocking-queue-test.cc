@@ -16,8 +16,9 @@
 // under the License.
 
 #include <unistd.h>
-#include <boost/thread.hpp>
-#include <boost/thread/pthread/mutex.hpp>
+#include <mutex>
+
+#include <boost/thread/thread.hpp>
 #include <glog/logging.h>
 
 #include "testutil/gtest-util.h"

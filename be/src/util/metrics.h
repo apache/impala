@@ -19,11 +19,11 @@
 
 #include <iosfwd>
 #include <map>
+#include <mutex>
 #include <string>
 #include <vector>
 #include <boost/function.hpp>
 #include <boost/scoped_ptr.hpp>
-#include <boost/thread/locks.hpp>
 #include <gtest/gtest_prod.h> // for FRIEND_TEST
 #include <rapidjson/fwd.h>
 
@@ -186,13 +186,13 @@ class LockedMetric : public ScalarMetric<T, metric_kind_t> {
 
   /// Atomically reads the current value.
   virtual T GetValue() override {
-    boost::lock_guard<SpinLock> l(lock_);
+    std::lock_guard<SpinLock> l(lock_);
     return value_;
   }
 
   /// Atomically sets the value.
   void SetValue(const T& value) {
-    boost::lock_guard<SpinLock> l(lock_);
+    std::lock_guard<SpinLock> l(lock_);
     value_ = value;
   }
 
@@ -359,7 +359,7 @@ class MetricGroup {
   template <typename M>
   M* RegisterMetric(M* metric) {
     DCHECK(!metric->key_.empty());
-    boost::lock_guard<SpinLock> l(lock_);
+    std::lock_guard<SpinLock> l(lock_);
     DCHECK(metric_map_.find(metric->key_) == metric_map_.end()) << metric->key_;
     std::shared_ptr<M> metric_ptr(metric);
     metric_map_[metric->key_] = metric_ptr;
@@ -372,7 +372,7 @@ class MetricGroup {
   void RemoveMetric(const std::string& key, const std::string& metric_def_arg = "") {
     TMetricDef metric_def = MetricDefs::Get(key, metric_def_arg);
     DCHECK(!metric_def.key.empty());
-    boost::lock_guard<SpinLock> l(lock_);
+    std::lock_guard<SpinLock> l(lock_);
     DCHECK(metric_map_.find(metric_def.key) != metric_map_.end()) << metric_def.key;
     metric_map_.erase(metric_def.key);
     }

@@ -19,7 +19,6 @@
 #define IMPALA_EXEC_HBASE_TABLE_WRITER_H
 
 #include <jni.h>
-#include <boost/thread.hpp>
 #include <boost/scoped_ptr.hpp>
 #include <vector>
 #include <string>

@@ -17,8 +17,7 @@
 
 #include "util/cyclic-barrier.h"
 
-#include <boost/thread/lock_guard.hpp>
-#include <boost/thread/pthread/mutex.hpp>
+#include <mutex>
 
 #include "common/names.h"
 

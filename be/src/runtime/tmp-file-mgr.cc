@@ -18,11 +18,11 @@
 #include "runtime/tmp-file-mgr.h"
 
 #include <limits>
+#include <mutex>
 
 #include <boost/algorithm/string.hpp>
 #include <boost/filesystem.hpp>
 #include <boost/lexical_cast.hpp>
-#include <boost/thread/locks.hpp>
 #include <boost/uuid/random_generator.hpp>
 #include <boost/uuid/uuid_io.hpp>
 #include <gutil/strings/join.h>

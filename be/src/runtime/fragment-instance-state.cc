@@ -19,11 +19,10 @@
 #include "runtime/fragment-instance-state.h"
 
 #include <sstream>
-#include <thrift/protocol/TDebugProtocol.h>
-#include <boost/thread/locks.hpp>
-#include <boost/thread/thread_time.hpp>
-#include <boost/thread/lock_guard.hpp>
+#include <boost/bind.hpp>
 #include <boost/date_time/posix_time/posix_time_types.hpp>
+#include <boost/thread/thread_time.hpp>
+#include <thrift/protocol/TDebugProtocol.h>
 
 #include "codegen/llvm-codegen.h"
 #include "exec/exchange-node.h"

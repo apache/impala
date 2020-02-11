@@ -20,8 +20,8 @@
 #include <cstdint>
 #include <deque>
 #include <functional>
+#include <mutex>
 
-#include <boost/thread/pthread/mutex.hpp>
 #include <gtest/gtest_prod.h> // for FRIEND_TEST
 
 #include "common/atomic.h"
@@ -339,7 +339,7 @@ class ScanRange : public RequestRange {
   /// If the data is not cached, returns ok() and *read_succeeded is set to false.
   /// Returns a non-ok status if it ran into a non-continuable error.
   /// The reader lock must be held by the caller.
-  Status ReadFromCache(const boost::unique_lock<boost::mutex>& reader_lock,
+  Status ReadFromCache(const std::unique_lock<std::mutex>& reader_lock,
       bool* read_succeeded) WARN_UNUSED_RESULT;
 
   /// Add buffers for the range to read data into and schedule the range if blocked.
@@ -358,7 +358,7 @@ class ScanRange : public RequestRange {
   /// Either ReturnBuffer() or CleanUpBuffer() is called for every BufferDescriptor.
   /// The caller must hold 'lock_' via 'scan_range_lock'.
   /// This function may acquire 'file_reader_->lock()'
-  void CleanUpBuffer(const boost::unique_lock<boost::mutex>& scan_range_lock,
+  void CleanUpBuffer(const std::unique_lock<std::mutex>& scan_range_lock,
       std::unique_ptr<BufferDescriptor> buffer);
 
   /// Same as CleanUpBuffer() except cleans up multiple buffers and caller must not
@@ -414,11 +414,11 @@ class ScanRange : public RequestRange {
   /// 'unused_iomgr_buffer_bytes_'. If 'unused_iomgr_buffers_' is empty, return NULL.
   /// 'lock_' must be held by the caller via 'scan_range_lock'.
   std::unique_ptr<BufferDescriptor> GetUnusedBuffer(
-      const boost::unique_lock<boost::mutex>& scan_range_lock);
+      const std::unique_lock<std::mutex>& scan_range_lock);
 
   /// Clean up all buffers in 'unused_iomgr_buffers_'. Only valid to call when the scan
   /// range is cancelled or at eos. The caller must hold 'lock_' via 'scan_range_lock'.
-  void CleanUpUnusedBuffers(const boost::unique_lock<boost::mutex>& scan_range_lock);
+  void CleanUpUnusedBuffers(const std::unique_lock<std::mutex>& scan_range_lock);
 
   /// Waits for any in-flight read to complete. Called after CancelInternal() to ensure
   /// no more reads will occur for the scan range.
@@ -426,7 +426,7 @@ class ScanRange : public RequestRange {
 
   /// Returns true if no more buffers will be returned to clients in the future,
   /// either because of hitting eosr or cancellation.
-  bool all_buffers_returned(const boost::unique_lock<boost::mutex>& lock) const {
+  bool all_buffers_returned(const std::unique_lock<std::mutex>& lock) const {
     DCHECK(lock.mutex() == &lock_ && lock.owns_lock());
     return !cancel_status_.ok() || (eosr_queued_ && ready_buffers_.empty());
   }
@@ -508,7 +508,7 @@ class ScanRange : public RequestRange {
   /// This lock should not be taken during FileReader::Open()/Read()/Close().
   /// If RequestContext::lock_ and this lock need to be held simultaneously,
   /// RequestContext::lock_ must be taken first.
-  boost::mutex lock_;
+  std::mutex lock_;
 
   /// Buffers to read into, used if the 'external_buffer_tag_' is NO_BUFFER. These are
   /// initially populated when the client calls AllocateBuffersForRange() and

@@ -19,6 +19,7 @@
 #include <memory>
 #include <utility>
 #include <vector>
+#include <boost/thread/shared_mutex.hpp>
 #include <boost/unordered_set.hpp>
 
 #include "runtime/coordinator.h"

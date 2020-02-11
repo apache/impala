@@ -98,7 +98,7 @@ Status FileHandleCache::GetFileHandle(
   // If this requires a new handle, skip to the creation codepath. Otherwise,
   // find an unused entry with the same mtime
   if (!require_new_handle) {
-    boost::lock_guard<SpinLock> g(p.lock);
+    std::lock_guard<SpinLock> g(p.lock);
     pair<typename MapType::iterator, typename MapType::iterator> range =
       p.cache.equal_range(*fname);
 
@@ -141,7 +141,7 @@ Status FileHandleCache::GetFileHandle(
   // for this file in the multimap. The ordering is largely unimportant if all the
   // existing entries are in use. However, if require_new_handle is true, there may be
   // unused entries, so it would make more sense to insert the new entry at the front.
-  boost::lock_guard<SpinLock> g(p.lock);
+  std::lock_guard<SpinLock> g(p.lock);
   pair<typename MapType::iterator, typename MapType::iterator> range =
       p.cache.equal_range(*fname);
   FileHandleEntry entry(std::move(new_fh), p.lru_list);
@@ -162,7 +162,7 @@ void FileHandleCache::ReleaseFileHandle(std::string* fname,
   // Hash the key and get appropriate partition
   int index = HashUtil::Hash(fname->data(), fname->size(), 0) % cache_partitions_.size();
   FileHandleCachePartition& p = cache_partitions_[index];
-  boost::lock_guard<SpinLock> g(p.lock);
+  std::lock_guard<SpinLock> g(p.lock);
   pair<typename MapType::iterator, typename MapType::iterator> range =
     p.cache.equal_range(*fname);
 
@@ -211,7 +211,7 @@ void FileHandleCache::ReleaseFileHandle(std::string* fname,
 void FileHandleCache::EvictHandlesLoop() {
   while (true) {
     for (FileHandleCachePartition& p : cache_partitions_) {
-      boost::lock_guard<SpinLock> g(p.lock);
+      std::lock_guard<SpinLock> g(p.lock);
       EvictHandles(p);
     }
     // This Get() will time out until shutdown, when the promise is set.

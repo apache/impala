@@ -18,10 +18,8 @@
 #include "runtime/krpc-data-stream-recvr.h"
 
 #include <condition_variable>
+#include <mutex>
 #include <queue>
-
-#include <boost/thread/locks.hpp>
-#include <boost/thread/pthread/mutex.hpp>
 
 #include "exec/kudu-util.h"
 #include "kudu/rpc/rpc_context.h"

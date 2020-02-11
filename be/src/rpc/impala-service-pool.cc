@@ -18,9 +18,9 @@
 #include "rpc/impala-service-pool.h"
 
 #include <memory>
+#include <mutex>
 #include <string>
 #include <vector>
-#include <boost/thread/pthread/mutex.hpp>
 #include <glog/logging.h>
 
 #include "exec/kudu-util.h"
@@ -39,6 +39,7 @@
 #include "runtime/exec-env.h"
 #include "runtime/mem-tracker.h"
 #include "util/pretty-printer.h"
+#include "util/thread.h"
 
 #include "common/names.h"
 #include "common/status.h"

@@ -438,7 +438,7 @@ BufferPool::Page* BufferPool::Client::CreatePinnedPage(BufferHandle&& buffer) {
   page->buffer = move(buffer);
   page->pin_count = 1;
 
-  boost::lock_guard<boost::mutex> lock(lock_);
+  std::lock_guard<std::mutex> lock(lock_);
   // The buffer is transferred to the page so will be accounted for in
   // pinned_pages_.bytes() instead of buffers_allocated_bytes_.
   buffers_allocated_bytes_ -= page->len;

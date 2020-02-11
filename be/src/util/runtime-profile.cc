@@ -20,11 +20,10 @@
 #include <algorithm>
 #include <iomanip>
 #include <iostream>
+#include <mutex>
 #include <utility>
 
 #include <boost/bind.hpp>
-#include <boost/thread/locks.hpp>
-#include <boost/thread/thread.hpp>
 
 #include "common/object-pool.h"
 #include "gutil/strings/strip.h"
@@ -67,7 +66,7 @@ const string RuntimeProfile::INACTIVE_TIME_COUNTER_NAME = "InactiveTotalTime";
 constexpr ProfileEntryPrototype::Significance ProfileEntryPrototype::ALLSIGNIFICANCE[];
 
 void ProfileEntryPrototypeRegistry::AddPrototype(const ProfileEntryPrototype* prototype) {
-  boost::lock_guard<SpinLock> l(lock_);
+  lock_guard<SpinLock> l(lock_);
   DCHECK(prototypes_.find(prototype->name()) == prototypes_.end()) <<
       "Found duplicate prototype name: " << prototype->name();
   prototypes_.emplace(prototype->name(), prototype);
@@ -1700,7 +1699,7 @@ void RuntimeProfile::TimeSeriesCounter::ToJson(Document& document, Value* val) {
 }
 
 void RuntimeProfile::EventSequence::ToJson(Document& document, Value* value) {
-  boost::lock_guard<SpinLock> event_lock(lock_);
+  lock_guard<SpinLock> event_lock(lock_);
   SortEvents();
 
   Value event_sequence_json(kObjectType);

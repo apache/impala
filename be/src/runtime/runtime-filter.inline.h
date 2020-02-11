@@ -21,8 +21,6 @@
 
 #include "runtime/runtime-filter.h"
 
-#include <boost/thread.hpp>
-
 #include "runtime/raw-value.inline.h"
 #include "util/bloom-filter.h"
 #include "util/min-max-filter.h"

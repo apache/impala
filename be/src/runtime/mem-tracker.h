@@ -20,9 +20,9 @@
 #include <stdint.h>
 #include <map>
 #include <memory>
+#include <mutex>
 #include <queue>
 #include <vector>
-#include <boost/thread/pthread/mutex.hpp>
 #include <boost/unordered_map.hpp>
 
 #include "common/logging.h"
@@ -416,7 +416,7 @@ class MemTracker {
   }
 
   /// Lock to protect GcMemory(). This prevents many GCs from occurring at once.
-  boost::mutex gc_lock_;
+  std::mutex gc_lock_;
 
   /// True if this is a Query MemTracker returned from CreateQueryMemTracker().
   bool is_query_mem_tracker_ = false;
@@ -520,7 +520,7 @@ class PoolMemTrackerRegistry {
   /// from this map. Protected by 'pool_to_mem_trackers_lock_'
   typedef boost::unordered_map<std::string, std::unique_ptr<MemTracker>> PoolTrackersMap;
   PoolTrackersMap pool_to_mem_trackers_;
-  /// IMPALA-3068: Use SpinLock instead of boost::mutex so that the lock won't
+  /// IMPALA-3068: Use SpinLock instead of std::mutex so that the lock won't
   /// automatically destroy itself as part of process teardown, which could cause races.
   SpinLock pool_to_mem_trackers_lock_;
 };

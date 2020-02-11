@@ -17,8 +17,8 @@
 
 #pragma once
 
+#include <mutex>
 #include <boost/scoped_ptr.hpp>
-#include <boost/thread/pthread/mutex.hpp>
 
 #include "common/object-pool.h"
 #include "common/status.h"

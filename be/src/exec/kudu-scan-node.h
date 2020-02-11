@@ -56,7 +56,7 @@ class KuduScanNode : public KuduScanNodeBase {
   /// Protects access to state accessed by scanner threads, such as 'status_' and 'done_'.
   /// Writers to 'done_' must hold lock to prevent races when updating, but readers can
   /// read without holding lock, provided they can tolerate stale reads.
-  boost::mutex lock_;
+  std::mutex lock_;
 
   /// The current status of the scan, set to non-OK if any problems occur, e.g. if an
   /// error occurs in a scanner.

@@ -17,7 +17,7 @@
 
 #pragma once
 
-#include <boost/thread/pthread/mutex.hpp>
+#include <mutex>
 
 #include "runtime/raw-value.h"
 #include "runtime/runtime-filter-bank.h"
@@ -143,7 +143,7 @@ class RuntimeFilter {
   const int64_t filter_size_;
 
   /// Lock to protect 'arrival_cv_'
-  mutable boost::mutex arrival_mutex_;
+  mutable std::mutex arrival_mutex_;
 
   /// Signalled when a filter arrives or the filter is cancelled. Paired with
   /// 'arrival_mutex_'

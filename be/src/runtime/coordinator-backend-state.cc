@@ -372,7 +372,7 @@ bool Coordinator::BackendState::IsDone() {
 }
 
 inline bool Coordinator::BackendState::IsDoneLocked(
-    const unique_lock<boost::mutex>& lock) const {
+    const unique_lock<std::mutex>& lock) const {
   DCHECK(lock.owns_lock() && lock.mutex() == &lock_);
   return num_remaining_instances_ == 0 || !status_.ok();
 }

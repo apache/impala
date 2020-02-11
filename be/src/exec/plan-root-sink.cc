@@ -27,11 +27,11 @@
 #include "util/pretty-printer.h"
 
 #include <memory>
-#include <boost/thread/pthread/mutex.hpp>
+#include <mutex>
 
 using namespace std;
-using boost::unique_lock;
-using boost::mutex;
+using std::mutex;
+using std::unique_lock;
 
 namespace impala {
 

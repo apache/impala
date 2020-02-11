@@ -17,12 +17,14 @@
 
 #include "codegen/codegen-symbol-emitter.h"
 
-#include <boost/scoped_ptr.hpp>
-#include <boost/thread/locks.hpp>
+#include <unistd.h>
 #include <cstdio>
 #include <fstream>
 #include <iostream>
 #include <memory>
+#include <mutex>
+#include <boost/scoped_ptr.hpp>
+#include <llvm-c/Disassembler.h>
 #include <llvm/CodeGen/MachineFunction.h>
 #include <llvm/DebugInfo/DIContext.h>
 #include <llvm/DebugInfo/DWARF/DWARFContext.h>
@@ -31,8 +33,6 @@
 #include <llvm/Object/SymbolSize.h>
 #include <llvm/Support/Debug.h>
 #include "llvm/Support/raw_ostream.h"
-#include <llvm-c/Disassembler.h>
-#include <unistd.h>
 
 #include "common/logging.h"
 #include "gutil/strings/substitute.h"

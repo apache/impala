@@ -19,7 +19,6 @@
 #ifndef IMPALA_CODEGEN_JIT_SYMBOL_EMITTER_H
 #define IMPALA_CODEGEN_JIT_SYMBOL_EMITTER_H
 
-#include <boost/thread/locks.hpp>
 #include <boost/unordered_map.hpp>
 #include <iosfwd>
 #include <llvm/ExecutionEngine/JITEventListener.h>

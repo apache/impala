@@ -29,10 +29,10 @@
 #include "kudu/util/status.h"
 #include "util/histogram-metric.h"
 #include "util/spinlock.h"
-#include "util/thread.h"
 
 namespace impala {
 class MemTracker;
+class Thread;
 
 /// A pool of threads that handle new incoming RPC calls.
 /// Also includes a queue that calls get pushed onto for handling by the pool.
@@ -110,7 +110,7 @@ class ImpalaServicePool : public kudu::rpc::RpcService {
   /// Protects against concurrent Shutdown() operations.
   /// TODO: This seems implausible given our current usage pattern.
   /// Consider removing lock.
-  boost::mutex shutdown_lock_;
+  std::mutex shutdown_lock_;
   bool closing_ = false;
 
   /// The address this service is running on.

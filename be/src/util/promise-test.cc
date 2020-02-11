@@ -15,7 +15,7 @@
 // specific language governing permissions and limitations
 // under the License.
 
-#include <boost/thread.hpp>
+#include <boost/thread/thread.hpp>
 
 #include "runtime/timestamp-value.h"
 #include "testutil/gtest-util.h"

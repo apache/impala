@@ -35,11 +35,11 @@
 #include "util/condition-variable.h"
 #include "util/internal-queue.h"
 #include "util/runtime-profile.h"
-#include "util/thread.h"
 
 namespace impala {
 
 class ExecEnv;
+class Thread;
 
 /// Represents the admission outcome of a query. It is stored in the 'admit_outcome'
 /// input variable passed to AdmissionController::AdmitQuery() if an admission decision
@@ -440,7 +440,7 @@ class AdmissionController {
   ThriftSerializer thrift_serializer_;
 
   /// Protects all access to all variables below.
-  boost::mutex admission_ctrl_lock_;
+  std::mutex admission_ctrl_lock_;
 
   /// The last time a topic update was processed. Time is obtained from
   /// MonotonicMillis(), or is 0 if an update was never received.

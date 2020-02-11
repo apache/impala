@@ -779,8 +779,7 @@ void RequestContext::IncrementDiskThreadAfterDequeue(int disk_id) {
   disk_states_[disk_id].IncrementDiskThreadAfterDequeue();
 }
 
-void RequestContext::DecrementDiskRefCount(
-    const boost::unique_lock<boost::mutex>& lock) {
+void RequestContext::DecrementDiskRefCount(const std::unique_lock<std::mutex>& lock) {
   DCHECK(lock.mutex() == &lock_ && lock.owns_lock());
   DCHECK_GT(num_disks_with_ranges_, 0);
   if (--num_disks_with_ranges_ == 0) {
@@ -790,7 +789,7 @@ void RequestContext::DecrementDiskRefCount(
 }
 
 void RequestContext::ScheduleScanRange(
-    const boost::unique_lock<boost::mutex>& lock, ScanRange* range) {
+    const std::unique_lock<std::mutex>& lock, ScanRange* range) {
   DCHECK(lock.mutex() == &lock_ && lock.owns_lock());
   DCHECK_EQ(state_, Active);
   DCHECK(range != nullptr);

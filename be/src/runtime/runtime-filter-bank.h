@@ -18,6 +18,9 @@
 #ifndef IMPALA_RUNTIME_RUNTIME_FILTER_BANK_H
 #define IMPALA_RUNTIME_RUNTIME_FILTER_BANK_H
 
+#include <condition_variable>
+#include <mutex>
+
 #include "codegen/impala-ir.h"
 #include "common/object-pool.h"
 #include "gen-cpp/data_stream_service.pb.h"
@@ -30,9 +33,6 @@
 
 #include <boost/unordered_map.hpp>
 #include <boost/scoped_ptr.hpp>
-#include <boost/thread/lock_guard.hpp>
-
-#include <condition_variable>
 
 namespace kudu {
 namespace rpc {
@@ -155,7 +155,7 @@ class RuntimeFilterBank {
       const boost::unordered_map<int32_t, int>& produced_filter_counts);
 
   /// Acquire locks for all filters, returning them to the caller.
-  std::vector<boost::unique_lock<SpinLock>> LockAllFilters();
+  std::vector<std::unique_lock<SpinLock>> LockAllFilters();
 
   /// Implementation of Cancel(). All filter locks must be held by caller.
   void CancelLocked();

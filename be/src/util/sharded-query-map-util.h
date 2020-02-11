@@ -17,7 +17,7 @@
 
 #pragma once
 
-#include <boost/thread/lock_guard.hpp>
+#include <mutex>
 #include <unordered_map>
 
 #include "gen-cpp/Types_types.h"
@@ -47,7 +47,7 @@ class ShardedQueryMap {
   // TODO: If necessary, refactor the lambda signature to allow returning Status objects.
   void DoFuncForAllEntries(const std::function<void(const T&)>& call) {
     for (int i = 0; i < NUM_QUERY_BUCKETS; ++i) {
-      boost::lock_guard<SpinLock> l(shards_[i].map_lock_);
+      std::lock_guard<SpinLock> l(shards_[i].map_lock_);
       for (const auto& map_value_ref: shards_[i].map_) {
         call(map_value_ref.second);
       }

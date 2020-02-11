@@ -18,8 +18,8 @@
 #include "runtime/initial-reservations.h"
 
 #include <limits>
+#include <mutex>
 
-#include <boost/thread/pthread/mutex.hpp>
 #include <gflags/gflags.h>
 
 #include "common/logging.h"

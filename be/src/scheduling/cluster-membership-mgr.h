@@ -210,7 +210,7 @@ class ClusterMembershipMgr {
   /// Ensures that only one thread is processing a membership update at a time, either
   /// from a statestore update or a blacklisting decision. Must be taken before any other
   /// locks in this class.
-  boost::mutex update_membership_lock_;
+  std::mutex update_membership_lock_;
 
   /// Membership metrics
   IntCounter* total_live_executor_groups_ = nullptr;
@@ -225,7 +225,7 @@ class ClusterMembershipMgr {
 
   /// Protects current_membership_. Cannot be held at the same time as
   /// 'callback_fn_lock_'.
-  mutable boost::mutex current_membership_lock_;
+  mutable std::mutex current_membership_lock_;
 
   /// A temporary membership snapshot to hold updates while the statestore is in its
   /// post-recovery grace period. Not exposed to clients. Protected by
@@ -252,7 +252,7 @@ class ClusterMembershipMgr {
 
   /// Protects the callbacks. Cannot be held at the same time as
   /// 'current_membership_lock_'.
-  mutable boost::mutex callback_fn_lock_;
+  mutable std::mutex callback_fn_lock_;
 
   friend class impala::test::SchedulerWrapper;
 };

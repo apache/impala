@@ -17,12 +17,12 @@
 
 #pragma once
 
+#include <mutex>
 #include <string>
 
 #include <boost/scoped_ptr.hpp>
 #include <boost/shared_ptr.hpp>
-#include <boost/thread/pthread/mutex.hpp>
-#include <boost/thread/pthread/shared_mutex.hpp>
+#include <boost/thread/shared_mutex.hpp>
 
 #include "gen-cpp/StatestoreService.h"
 #include "gen-cpp/StatestoreSubscriber.h"
@@ -206,7 +206,7 @@ class StatestoreSubscriber {
 
   /// Protects registration_id_. Must be taken after lock_ if both are to be taken
   /// together.
-  boost::mutex registration_id_lock_;
+  std::mutex registration_id_lock_;
 
   /// Set during Register(), this is the unique ID of the current registration with the
   /// statestore. If this subscriber must recover, or disconnects and then reconnects, the
@@ -222,7 +222,7 @@ class StatestoreSubscriber {
     /// Held when processing a topic update. 'StatestoreSubscriber::lock_' must be held in
     /// shared mode before acquiring this lock. If taking multiple update locks, they must
     /// be acquired in ascending order of topic name.
-    boost::mutex update_lock;
+    std::mutex update_lock;
 
     /// Whether the subscriber considers this topic to be "transient", that is any updates
     /// it makes will be deleted upon failure or disconnection.

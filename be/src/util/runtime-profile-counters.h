@@ -577,7 +577,7 @@ class RuntimeProfile::EventSequence {
   /// (relative to the first time Start() was called) as the timestamp.
   void MarkEvent(std::string label) {
     Event event = make_pair(move(label), sw_.ElapsedTime() + offset_);
-    boost::lock_guard<SpinLock> event_lock(lock_);
+    std::lock_guard<SpinLock> event_lock(lock_);
     events_.emplace_back(move(event));
   }
 
@@ -593,7 +593,7 @@ class RuntimeProfile::EventSequence {
   /// timestamps. The supplied vector 'events' is cleared before this.
   void GetEvents(std::vector<Event>* events) {
     events->clear();
-    boost::lock_guard<SpinLock> event_lock(lock_);
+    std::lock_guard<SpinLock> event_lock(lock_);
     /// It's possible that MarkEvent() logs concurrent events out of sequence so we sort
     /// the events each time we are here.
     SortEvents();
@@ -607,7 +607,7 @@ class RuntimeProfile::EventSequence {
       const std::vector<int64_t>& timestamps, const std::vector<std::string>& labels) {
     DCHECK_EQ(timestamps.size(), labels.size());
     DCHECK(std::is_sorted(timestamps.begin(), timestamps.end()));
-    boost::lock_guard<SpinLock> event_lock(lock_);
+    std::lock_guard<SpinLock> event_lock(lock_);
     int64_t last_timestamp = events_.empty() ? 0 : events_.back().second;
     for (int64_t i = 0; i < timestamps.size(); ++i) {
       if (timestamps[i] <= last_timestamp) continue;

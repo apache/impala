@@ -17,7 +17,7 @@
 
 #include "runtime/scanner-mem-limiter.h"
 
-#include <boost/thread/locks.hpp>
+#include <mutex>
 
 #include "exec/scan-node.h"
 #include "runtime/mem-tracker.h"

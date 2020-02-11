@@ -79,8 +79,7 @@ class BufferPool::FreeBufferArena : public CacheLineAligned {
   /// number of bytes freed and the actual number of bytes claimed.
   ///
   /// Caller should not hold 'lock_'. If 'arena_lock' is non-null, ownership of the
-  /// arena lock is transferred to the caller. Uses std::unique_lock instead of
-  /// boost::unique_lock because it is movable.
+  /// arena lock is transferred to the caller.
   pair<int64_t, int64_t> FreeSystemMemory(int64_t target_bytes_to_free,
       int64_t target_bytes_to_claim, std::unique_lock<SpinLock>* arena_lock);
 

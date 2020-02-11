@@ -18,10 +18,9 @@
 #pragma once
 
 #include <list>
+#include <mutex>
 #include <queue>
 #include <set>
-#include <boost/thread/condition_variable.hpp>
-#include <boost/thread/pthread/mutex.hpp>
 #include <boost/unordered_map.hpp>
 #include <boost/unordered_set.hpp>
 
@@ -340,7 +339,7 @@ class KrpcDataStreamMgr : public CacheLineAligned {
   IntCounter* num_senders_timedout_;
 
   /// protects all fields below
-  boost::mutex lock_;
+  std::mutex lock_;
 
   /// Map from hash value of fragment instance id/node id pair to stream receivers;
   /// Ownership of the stream revcr is shared between this instance and the caller of

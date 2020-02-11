@@ -17,10 +17,10 @@
 
 #pragma once
 
+#include <mutex>
 #include <string>
 #include <vector>
 #include <boost/shared_ptr.hpp>
-#include <boost/thread/pthread/mutex.hpp>
 #include <boost/unordered_set.hpp>
 
 #include "gen-cpp/CatalogService.h"
@@ -100,7 +100,7 @@ class CatalogServer {
 
   /// Protects catalog_update_cv_, pending_topic_updates_,
   /// catalog_objects_to/from_version_, and last_sent_catalog_version.
-  boost::mutex catalog_lock_;
+  std::mutex catalog_lock_;
 
   /// Condition variable used to signal when the catalog_update_gathering_thread_ should
   /// fetch its next set of updates from the JniCatalog. At the end of each statestore

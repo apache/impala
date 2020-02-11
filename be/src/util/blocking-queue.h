@@ -20,8 +20,8 @@
 #include <unistd.h>
 #include <deque>
 #include <memory>
+#include <mutex>
 #include <boost/scoped_ptr.hpp>
-#include <boost/thread/pthread/mutex.hpp>
 
 #include "common/atomic.h"
 #include "common/compiler-util.h"
@@ -86,12 +86,12 @@ class BlockingQueue : public CacheLineAligned {
   /// Returns false if we were shut down prior to getting the element, and there
   /// are no more elements available.
   bool BlockingGet(T* out) {
-    boost::unique_lock<boost::mutex> read_lock(get_lock_);
+    std::unique_lock<std::mutex> read_lock(get_lock_);
 
     if (UNLIKELY(get_list_.empty())) {
       MonotonicStopWatch timer;
       // Block off writers while swapping 'get_list_' with 'put_list_'.
-      boost::unique_lock<boost::mutex> write_lock(put_lock_);
+      std::unique_lock<std::mutex> write_lock(put_lock_);
       while (put_list_.empty()) {
         DCHECK(get_list_.empty());
         if (UNLIKELY(shutdown_)) return false;
@@ -146,7 +146,7 @@ class BlockingQueue : public CacheLineAligned {
     MonotonicStopWatch timer;
     int64_t val_bytes = ElemBytesFn()(val);
     DCHECK_GE(val_bytes, 0);
-    boost::unique_lock<boost::mutex> write_lock(put_lock_);
+    std::unique_lock<std::mutex> write_lock(put_lock_);
     while (!HasCapacityInternal(write_lock, val_bytes) && !shutdown_) {
       if (put_wait_timer_ != nullptr) timer.Start();
       put_cv_.Wait(write_lock);
@@ -173,7 +173,7 @@ class BlockingQueue : public CacheLineAligned {
     MonotonicStopWatch timer;
     int64_t val_bytes = ElemBytesFn()(val);
     DCHECK_GE(val_bytes, 0);
-    boost::unique_lock<boost::mutex> write_lock(put_lock_);
+    std::unique_lock<std::mutex> write_lock(put_lock_);
     timespec abs_time;
     TimeFromNowMicros(timeout_micros, &abs_time);
     bool notified = true;
@@ -202,7 +202,7 @@ class BlockingQueue : public CacheLineAligned {
     {
       // No need to hold 'get_lock_' here. BlockingGet() may sleep with 'get_lock_' so
       // it may delay the caller here if the lock is acquired.
-      boost::lock_guard<boost::mutex> write_lock(put_lock_);
+      std::lock_guard<std::mutex> write_lock(put_lock_);
       shutdown_ = true;
     }
 
@@ -211,18 +211,17 @@ class BlockingQueue : public CacheLineAligned {
   }
 
   uint32_t Size() const {
-    boost::unique_lock<boost::mutex> write_lock(put_lock_);
+    std::unique_lock<std::mutex> write_lock(put_lock_);
     return SizeLocked(write_lock);
   }
 
   bool AtCapacity() const {
-    boost::unique_lock<boost::mutex> write_lock(put_lock_);
+    std::unique_lock<std::mutex> write_lock(put_lock_);
     return SizeLocked(write_lock) >= max_elements_;
   }
 
  private:
-
-  uint32_t ALWAYS_INLINE SizeLocked(const boost::unique_lock<boost::mutex>& lock) const {
+  uint32_t ALWAYS_INLINE SizeLocked(const std::unique_lock<std::mutex>& lock) const {
     // The size of 'get_list_' is read racily to avoid getting 'get_lock_' in write path.
     DCHECK(lock.mutex() == &put_lock_ && lock.owns_lock());
     return get_list_size_.Load() + put_list_.size();
@@ -230,8 +229,7 @@ class BlockingQueue : public CacheLineAligned {
 
   /// Return true if the queue has capacity to add one more element with size 'val_bytes'.
   /// Caller must hold 'put_lock_' via 'lock'.
-  bool HasCapacityInternal(
-      const boost::unique_lock<boost::mutex>& lock, int64_t val_bytes) {
+  bool HasCapacityInternal(const std::unique_lock<std::mutex>& lock, int64_t val_bytes) {
     DCHECK(lock.mutex() == &put_lock_ && lock.owns_lock());
     uint32_t size = SizeLocked(lock);
     if (size >= max_elements_) return false;
@@ -261,7 +259,7 @@ class BlockingQueue : public CacheLineAligned {
 
   /// Guards against concurrent access to 'put_list_'.
   /// Please see comments at the beginning of the file for lock ordering.
-  mutable boost::mutex put_lock_;
+  mutable std::mutex put_lock_;
 
   /// The queue for items enqueued by BlockingPut(). Guarded by 'put_lock_'.
   std::deque<T> put_list_;
@@ -278,7 +276,7 @@ class BlockingQueue : public CacheLineAligned {
   int64_t put_bytes_enqueued_ = 0;
 
   /// Guards against concurrent access to 'get_list_'.
-  mutable boost::mutex get_lock_;
+  mutable std::mutex get_lock_;
 
   /// The queue of items to be consumed by BlockingGet(). Guarded by 'get_lock_'.
   std::deque<T> get_list_;

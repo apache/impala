@@ -22,8 +22,6 @@
 #include <cstdint>
 #include <vector>
 
-#include <boost/thread/locks.hpp>
-
 #include "common/logging.h"
 #include "gutil/macros.h"
 #include "runtime/bufferpool/buffer-pool.h"

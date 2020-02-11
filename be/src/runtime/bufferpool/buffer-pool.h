@@ -22,7 +22,6 @@
 #include <string>
 #include <vector>
 #include <boost/scoped_ptr.hpp>
-#include <boost/thread/locks.hpp>
 
 #include "common/atomic.h"
 #include "common/compiler-util.h"

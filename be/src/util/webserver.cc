@@ -27,7 +27,7 @@
 #include <boost/filesystem.hpp>
 #include <boost/lexical_cast.hpp>
 #include <boost/mem_fn.hpp>
-#include <boost/thread/locks.hpp>
+#include <boost/thread/shared_mutex.hpp>
 #include <rapidjson/document.h>
 #include <rapidjson/prettywriter.h>
 #include <rapidjson/stringbuffer.h>

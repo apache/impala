@@ -19,8 +19,8 @@
 
 #include <stdlib.h>
 
+#include <mutex>
 #include <boost/function.hpp>
-#include <boost/thread/pthread/mutex.hpp>
 
 #include <list>
 
@@ -85,7 +85,7 @@ class ThreadResourceMgr {
 
   /// Lock for the entire object. Protects all fields below. Must be acquired before
   /// ThreadResourcePool::lock_ if both are held at the same time.
-  boost::mutex lock_;
+  std::mutex lock_;
 
   /// Pools currently being managed
   typedef std::set<ThreadResourcePool*> Pools;
@@ -218,7 +218,7 @@ class ThreadResourcePool {
 
   /// Lock for the fields below. This lock is taken when the callback function is called.
   /// Must be acquired after ThreadResourceMgr::lock_ if both are held at the same time.
-  boost::mutex lock_;
+  std::mutex lock_;
 
   /// A vector of registered callback functions. Entries will be set to "empty" function
   /// objects, which can be constructed with the default ThreadAvailableCb() constructor,

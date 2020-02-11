@@ -17,8 +17,8 @@
 
 #include "runtime/dml-exec-state.h"
 
-#include <boost/thread/locks.hpp>
-#include <boost/thread/lock_guard.hpp>
+#include <mutex>
+
 #include <boost/algorithm/string.hpp>
 #include <boost/algorithm/string/join.hpp>
 #include <boost/filesystem.hpp>

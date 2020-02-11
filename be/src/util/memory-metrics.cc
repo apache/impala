@@ -29,7 +29,7 @@
 #include "util/time.h"
 
 using boost::algorithm::to_lower;
-using boost::lock_guard;
+using std::lock_guard;
 using namespace impala;
 using namespace strings;
 
@@ -264,14 +264,14 @@ void JvmMetricCache::GrabMetricsIfNecessary() {
 
 int64_t JvmMetricCache::GetCounterMetric(
     int64_t(*accessor)(const TGetJvmMemoryMetricsResponse&)) {
-  lock_guard<boost::mutex> lock_guard(lock_);
+  lock_guard<std::mutex> lock_guard(lock_);
   GrabMetricsIfNecessary();
   return accessor(last_response_);
 }
 
 int64_t JvmMetricCache::GetPoolMetric(const std::string& mempool_name,
     JvmMemoryMetricType type) {
-  lock_guard<boost::mutex> lock_guard(lock_);
+  lock_guard<std::mutex> lock_guard(lock_);
   GrabMetricsIfNecessary();
 
   for (const TJvmMemoryPool& pool : last_response_.memory_pools) {
@@ -303,7 +303,7 @@ int64_t JvmMetricCache::GetPoolMetric(const std::string& mempool_name,
 }
 
 vector<string> JvmMetricCache::GetPoolNames() {
-  lock_guard<boost::mutex> lock_guard(lock_);
+  lock_guard<std::mutex> lock_guard(lock_);
   GrabMetricsIfNecessary();
   vector<string> names;
   for (const TJvmMemoryPool& usage: last_response_.memory_pools) {

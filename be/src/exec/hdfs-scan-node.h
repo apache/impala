@@ -17,13 +17,13 @@
 
 #pragma once
 
+#include <stdint.h>
 #include <map>
 #include <memory>
-#include <stdint.h>
+#include <mutex>
 #include <vector>
 
 #include <boost/scoped_ptr.hpp>
-#include <boost/thread/pthread/mutex.hpp>
 
 #include "common/atomic.h"
 #include "exec/filter-context.h"
@@ -122,7 +122,7 @@ class HdfsScanNode : public HdfsScanNodeBase {
   /// together, this lock must be taken first. This is a "timed_mutex" to allow specifying
   /// a timeout when acquiring the mutex. Almost all code locations acquire the mutex
   /// without a timeout; see ThreadTokenAvailableCb for a location using a timeout.
-  boost::timed_mutex lock_;
+  std::timed_mutex lock_;
 
   /// Protects file_type_counts_. Cannot be taken together with any other lock
   /// except lock_, and if so, lock_ must be taken first.
@@ -186,7 +186,7 @@ class HdfsScanNode : public HdfsScanNodeBase {
   /// needed. Always holds onto at least the minimum reservation to avoid violating the
   /// invariants of ExecNode::buffer_pool_client_. 'lock_' must be held via 'lock'.
   void ReturnReservationFromScannerThread(
-      const boost::unique_lock<boost::timed_mutex>& lock, int64_t bytes);
+      const std::unique_lock<std::timed_mutex>& lock, int64_t bytes);
 
   /// Checks for eos conditions and returns batches from the row batch queue.
   Status GetNextInternal(RuntimeState* state, RowBatch* row_batch, bool* eos)

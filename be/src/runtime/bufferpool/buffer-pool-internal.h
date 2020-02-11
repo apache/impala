@@ -76,8 +76,7 @@
 
 #include <iosfwd>
 #include <memory>
-
-#include <boost/thread/pthread/mutex.hpp>
+#include <mutex>
 
 #include "runtime/bufferpool/buffer-pool-counters.h"
 #include "runtime/bufferpool/buffer-pool.h"
@@ -261,7 +260,7 @@ class BufferPool::Client {
   /// internal accounting and release the buffer to the client's reservation. No page or
   /// client locks should be held by the caller.
   void FreedBuffer(int64_t len) {
-    boost::lock_guard<boost::mutex> cl(lock_);
+    std::lock_guard<std::mutex> cl(lock_);
     reservation_.ReleaseTo(len);
     buffers_allocated_bytes_ -= len;
     DCHECK_CONSISTENCY();
@@ -270,14 +269,14 @@ class BufferPool::Client {
   /// Wait for the in-flight write for 'page' to complete.
   /// 'lock_' must be held by the caller via 'client_lock'. page->buffer_lock should
   /// not be held.
-  void WaitForWrite(boost::unique_lock<boost::mutex>* client_lock, Page* page);
+  void WaitForWrite(std::unique_lock<std::mutex>* client_lock, Page* page);
 
   /// Test helper: wait for all in-flight writes to complete.
   /// 'lock_' must not be held by the caller.
   void WaitForAllWrites();
 
   /// Asserts that 'client_lock' is holding 'lock_'.
-  void DCheckHoldsLock(const boost::unique_lock<boost::mutex>& client_lock) {
+  void DCheckHoldsLock(const std::unique_lock<std::mutex>& client_lock) {
     DCHECK(client_lock.mutex() == &lock_ && client_lock.owns_lock());
   }
 
@@ -315,7 +314,7 @@ class BufferPool::Client {
   /// invariants after the allocation. 'lock_' should be held by the caller via
   /// 'client_lock'. If 'lazy_flush' is true, only write out pages if needed to reclaim
   /// 'len', and do not return a write error if the error prevents flushing enough pages.
-  Status CleanPages(boost::unique_lock<boost::mutex>* client_lock, int64_t len,
+  Status CleanPages(std::unique_lock<std::mutex>* client_lock, int64_t len,
       bool lazy_flush = false);
 
   /// Initiates asynchronous writes of dirty unpinned pages to disk. Ensures that at
@@ -333,7 +332,7 @@ class BufferPool::Client {
   /// locked by the caller via 'client_lock' and handle->page must be unlocked.
   /// 'client_lock' is released then reacquired.
   Status StartMoveEvictedToPinned(
-      boost::unique_lock<boost::mutex>* client_lock, ClientHandle* client, Page* page);
+      std::unique_lock<std::mutex>* client_lock, ClientHandle* client, Page* page);
 
   /// Same as DebugString() except the caller must already hold 'lock_'.
   std::string DebugStringLocked();
@@ -360,7 +359,7 @@ class BufferPool::Client {
   int debug_write_delay_ms_;
 
   /// Lock to protect the below member variables;
-  boost::mutex lock_;
+  std::mutex lock_;
 
   /// Condition variable signalled when a write for this client completes.
   ConditionVariable write_complete_cv_;

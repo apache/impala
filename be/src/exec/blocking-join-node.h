@@ -20,7 +20,6 @@
 #define IMPALA_EXEC_BLOCKING_JOIN_NODE_H
 
 #include <boost/scoped_ptr.hpp>
-#include <boost/thread.hpp>
 #include <string>
 
 #include "exec/exec-node.h"

@@ -21,8 +21,8 @@
 #include <memory>
 #include <utility>
 
+#include <mutex>
 #include <boost/scoped_ptr.hpp>
-#include <boost/thread/pthread/mutex.hpp>
 
 #include "common/object-pool.h"
 #include "common/status.h"
@@ -387,7 +387,7 @@ class TmpFileMgr {
     /// invalid to call WriteRange/FileGroup methods concurrently from multiple threads,
     /// so no locking is required. This is a terminal lock and should not be held while
     /// acquiring other locks or invoking 'cb_'.
-    boost::mutex write_state_lock_;
+    std::mutex write_state_lock_;
 
     /// True if the the write has been cancelled (but is not necessarily complete).
     bool is_cancelled_;

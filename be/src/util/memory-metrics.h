@@ -19,8 +19,8 @@
 
 #include "util/metrics.h"
 
+#include <mutex>
 #include <boost/bind.hpp>
-#include <boost/thread/pthread/mutex.hpp>
 #include <gperftools/malloc_extension.h>
 #if defined(ADDRESS_SANITIZER) || defined(THREAD_SANITIZER)
 #include <sanitizer/allocator_interface.h>
@@ -184,7 +184,7 @@ class JvmMetricCache {
     /// Updates metrics if over CACHE_PERIOD_MILLIS has elapsed.
     void GrabMetricsIfNecessary();
 
-    boost::mutex lock_;
+    std::mutex lock_;
     /// Time when metrics were last fetched, using MonotonicMillis().
     /// Protected by lock_.
     int64_t last_fetch_ = 0;

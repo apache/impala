@@ -316,7 +316,7 @@ void RuntimeState::ReleaseResources() {
 }
 
 void RuntimeState::SetRPCErrorInfo(TNetworkAddress dest_node, int16_t posix_error_code) {
-  boost::lock_guard<SpinLock> l(aux_error_info_lock_);
+  std::lock_guard<SpinLock> l(aux_error_info_lock_);
   if (aux_error_info_ == nullptr && !reported_aux_error_info_) {
     aux_error_info_.reset(new AuxErrorInfoPB());
     RPCErrorInfoPB* rpc_error_info = aux_error_info_->mutable_rpc_error_info();
@@ -328,7 +328,7 @@ void RuntimeState::SetRPCErrorInfo(TNetworkAddress dest_node, int16_t posix_erro
 }
 
 void RuntimeState::GetUnreportedAuxErrorInfo(AuxErrorInfoPB* aux_error_info) {
-  boost::lock_guard<SpinLock> l(aux_error_info_lock_);
+  std::lock_guard<SpinLock> l(aux_error_info_lock_);
   if (aux_error_info_ != nullptr) {
     aux_error_info->CopyFrom(*aux_error_info_);
   }

@@ -23,9 +23,8 @@
 #include <fstream>
 #include <iostream>
 #include <map>
+#include <mutex>
 #include <sstream>
-#include <boost/thread/locks.hpp>
-#include <boost/thread/pthread/mutex.hpp>
 #include <boost/uuid/uuid.hpp>
 #include <boost/uuid/uuid_generators.hpp>
 #include <boost/uuid/uuid_io.hpp>
@@ -83,7 +82,7 @@ void MessageListener(string* s, bool* changed) {
 mutex logging_mutex;
 
 void impala::InitGoogleLoggingSafe(const char* arg) {
-  mutex::scoped_lock logging_lock(logging_mutex);
+  lock_guard<mutex> logging_lock(logging_mutex);
   if (logging_initialized) return;
   if (!FLAGS_log_filename.empty()) {
     for (int severity = google::INFO; severity <= google::FATAL; ++severity) {
@@ -174,7 +173,7 @@ void impala::ShutdownLogging() {
   // This method may only correctly be called once (which this lock does not
   // enforce), but this lock protects against concurrent calls with
   // InitGoogleLoggingSafe
-  mutex::scoped_lock logging_lock(logging_mutex);
+  lock_guard<mutex> logging_lock(logging_mutex);
   google::ShutdownGoogleLogging();
 }
 

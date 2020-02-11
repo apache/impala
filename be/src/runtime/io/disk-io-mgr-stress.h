@@ -22,7 +22,6 @@
 #include <memory>
 #include <vector>
 #include <boost/scoped_ptr.hpp>
-#include <boost/thread/condition_variable.hpp>
 #include <boost/thread/thread.hpp>
 
 #include "common/object-pool.h"

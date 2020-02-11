@@ -17,6 +17,7 @@
 
 #include "exec/hdfs-scan-node.h"
 
+#include <chrono>
 #include <memory>
 #include <sstream>
 
@@ -288,7 +289,7 @@ void HdfsScanNode::ThreadTokenAvailableCb(ThreadResourcePool* pool) {
     // TODO: This still leans heavily on starvation-free locks, come up with a more
     // correct way to communicate between this method and ScannerThread().
     if (done()) break;
-    unique_lock<timed_mutex> lock(lock_, boost::chrono::milliseconds(10));
+    unique_lock<timed_mutex> lock(lock_, std::chrono::milliseconds(10));
     if (!lock.owns_lock()) {
       continue;
     }

@@ -147,7 +147,7 @@ class RequestContext {
   void Cancel();
 
   bool IsCancelled() {
-    boost::unique_lock<boost::mutex> lock(lock_);
+    std::unique_lock<std::mutex> lock(lock_);
     return state_ == Cancelled;
   }
 
@@ -253,7 +253,7 @@ class RequestContext {
   /// Decrements the number of active disks for this reader.  If the disk count
   /// goes to 0, the disk complete condition variable is signaled.
   /// 'lock_' must be held via 'lock'.
-  void DecrementDiskRefCount(const boost::unique_lock<boost::mutex>& lock);
+  void DecrementDiskRefCount(const std::unique_lock<std::mutex>& lock);
 
   /// Reader & Disk Scheduling: Readers that currently can't do work are not on
   /// the disk's queue. These readers are ones that don't have any ranges in the
@@ -265,7 +265,7 @@ class RequestContext {
   /// Adds range to in_flight_ranges, scheduling this reader on the disk threads
   /// if necessary.
   /// 'lock_' must be held via 'lock'. Only valid to call if this context is active.
-  void ScheduleScanRange(const boost::unique_lock<boost::mutex>& lock, ScanRange* range);
+  void ScheduleScanRange(const std::unique_lock<std::mutex>& lock, ScanRange* range);
 
   // Called from the disk thread for 'disk_id' to get the next request range to process
   // for this context for the disk. Returns nullptr if there are no ranges currently
@@ -304,26 +304,26 @@ class RequestContext {
   /// client by GetNextUnstartedRange(). If BY_CALLER, the scan range is not added to
   /// any queues. The range will be scheduled later as a separate step, e.g. when it is
   /// unblocked by adding buffers to it. Caller must hold 'lock_' via 'lock'.
-  void AddRangeToDisk(const boost::unique_lock<boost::mutex>& lock, RequestRange* range,
+  void AddRangeToDisk(const std::unique_lock<std::mutex>& lock, RequestRange* range,
       ScheduleMode schedule_mode);
 
   /// Adds an active range to 'active_scan_ranges_'
   void AddActiveScanRangeLocked(
-      const boost::unique_lock<boost::mutex>& lock, ScanRange* range);
+      const std::unique_lock<std::mutex>& lock, ScanRange* range);
 
   /// Removes the range from 'active_scan_ranges_'. Called by ScanRange after eos or
   /// cancellation. If calling the Locked version, the caller must hold
   /// 'lock_'. Otherwise the function will acquire 'lock_'.
   void RemoveActiveScanRange(ScanRange* range);
   void RemoveActiveScanRangeLocked(
-      const boost::unique_lock<boost::mutex>& lock, ScanRange* range);
+      const std::unique_lock<std::mutex>& lock, ScanRange* range);
 
   /// Try to read the scan range from the cache. '*read_succeeded' is set to true if the
   /// scan range can be found in the cache, otherwise false.
   /// If '*needs_buffers' is returned as true, the caller must call
   /// AllocateBuffersForRange() to add buffers for the data to be read into before the
   /// range can be scheduled.
-  Status TryReadFromCache(const boost::unique_lock<boost::mutex>& lock, ScanRange* range,
+  Status TryReadFromCache(const std::unique_lock<std::mutex>& lock, ScanRange* range,
       bool* read_succeeded, bool* needs_buffers);
 
   // Counters are updated by other classes - expose to other io:: classes for convenience.
@@ -392,7 +392,7 @@ class RequestContext {
   /// All fields below are accessed by multiple threads and the lock needs to be
   /// taken before accessing them. Must be acquired before ScanRange::lock_ if both
   /// are held simultaneously.
-  boost::mutex lock_;
+  std::mutex lock_;
 
   /// Current state of the reader
   State state_ = Active;

@@ -15,7 +15,7 @@
 // specific language governing permissions and limitations
 // under the License.
 
-#include <boost/thread/pthread/mutex.hpp>
+#include <mutex>
 
 #include "runtime/io/disk-io-mgr-stress.h"
 
@@ -62,7 +62,7 @@ string DiskIoMgrStress::GenerateRandomData() {
 }
 
 struct DiskIoMgrStress::Client {
-  boost::mutex lock;
+  std::mutex lock;
   /// Pool for objects that is cleared when the client is (re-)initialized in NewClient().
   ObjectPool obj_pool;
   unique_ptr<RequestContext> reader;

@@ -50,7 +50,6 @@ using kudu::rpc::RpcContext;
 using kudu::rpc::RpcController;
 using kudu::rpc::RpcSidecar;
 using namespace impala;
-using namespace boost;
 using namespace strings;
 
 DEFINE_double(max_filter_error_rate, 0.75, "(Advanced) The maximum probability of false "

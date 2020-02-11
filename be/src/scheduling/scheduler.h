@@ -18,10 +18,10 @@
 #pragma once
 
 #include <list>
+#include <mutex>
 #include <string>
 #include <vector>
 #include <boost/heap/binomial_heap.hpp>
-#include <boost/thread/pthread/mutex.hpp>
 #include <boost/unordered_map.hpp>
 #include <gtest/gtest_prod.h> // for FRIEND_TEST
 

@@ -17,9 +17,9 @@
 
 #pragma once
 
+#include <mutex>
 #include <boost/scoped_ptr.hpp>
 #include <boost/shared_ptr.hpp>
-#include <boost/thread/pthread/mutex.hpp>
 #include <boost/unordered_map.hpp>
 #include <boost/uuid/uuid_generators.hpp>
 #include <thrift/TProcessor.h>
@@ -28,6 +28,7 @@
 #include <thrift/transport/TSSLSocket.h>
 
 #include "common/status.h"
+#include "util/condition-variable.h"
 #include "util/metrics-fwd.h"
 #include "util/thread.h"
 
@@ -215,7 +216,7 @@ class ThriftServer {
     /// Lock used to ensure that there are no missed notifications between starting the
     /// supervision thread and calling signal_cond_.WaitUntil. Also used to ensure
     /// thread-safe access to members of thrift_server_
-    boost::mutex signal_lock_;
+    std::mutex signal_lock_;
 
     /// Condition variable that is notified by the supervision thread once either
     /// a) all is well or b) an error occurred.
@@ -331,7 +332,7 @@ class ThriftServer {
   ConnectionHandlerIf* connection_handler_;
 
   /// Protects connection_contexts_
-  boost::mutex connection_contexts_lock_;
+  std::mutex connection_contexts_lock_;
 
   /// Map of active connection context to a shared_ptr containing that context; when an
   /// item is removed from the map, it is automatically freed.

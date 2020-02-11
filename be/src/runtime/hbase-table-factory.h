@@ -18,9 +18,11 @@
 #ifndef IMPALA_RUNTIME_HBASE_TABLE_FACTORY_H
 #define IMPALA_RUNTIME_HBASE_TABLE_FACTORY_H
 
-#include <boost/scoped_ptr.hpp>
 #include <jni.h>
+#include <mutex>
 #include <string>
+
+#include <boost/scoped_ptr.hpp>
 
 #include "common/status.h"
 #include "runtime/hbase-table.h"
@@ -49,7 +51,7 @@ class HBaseTableFactory {
   /// Connection jobject. Initialized in GetConnection(). The connection_ pointer value
   /// is protected by connection_lock_: the Connection object can be shared between
   /// threads.
-  boost::mutex connection_lock_;
+  std::mutex connection_lock_;
   jobject connection_;
 
   /// Connection class and methods.

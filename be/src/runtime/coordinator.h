@@ -20,7 +20,6 @@
 #include <memory>
 #include <string>
 #include <vector>
-#include <boost/thread/pthread/shared_mutex.hpp>
 #include <boost/unordered_map.hpp>
 #include <rapidjson/document.h>
 

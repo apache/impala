@@ -18,8 +18,8 @@
 #pragma once
 
 #include <cstdint>
+#include <mutex>
 
-#include <boost/thread/lock_guard.hpp>
 #include <util/os-info.h>
 #include <util/spinlock.h>
 #include <util/time.h>
@@ -201,7 +201,7 @@ class ConcurrentStopWatch {
   ConcurrentStopWatch() : busy_threads_(0), last_lap_start_(0) {}
 
   void Start() {
-    boost::lock_guard<SpinLock> l(thread_counter_lock_);
+    std::lock_guard<SpinLock> l(thread_counter_lock_);
     if (busy_threads_ == 0) {
       msw_.Start();
     }
@@ -209,7 +209,7 @@ class ConcurrentStopWatch {
   }
 
   void Stop() {
-    boost::lock_guard<SpinLock> l(thread_counter_lock_);
+    std::lock_guard<SpinLock> l(thread_counter_lock_);
     DCHECK_GT(busy_threads_, 0);
     --busy_threads_;
     if (busy_threads_ == 0) {
@@ -219,7 +219,7 @@ class ConcurrentStopWatch {
 
   /// Returns delta wall time since last time LapTime() is called.
   uint64_t LapTime() {
-    boost::lock_guard<SpinLock> l(thread_counter_lock_);
+    std::lock_guard<SpinLock> l(thread_counter_lock_);
     uint64_t now = msw_.ElapsedTime();
     uint64_t lap_duration = now - last_lap_start_;
     last_lap_start_ = now;
@@ -227,7 +227,7 @@ class ConcurrentStopWatch {
   }
 
   uint64_t TotalRunningTime() const {
-    boost::lock_guard<SpinLock> l(thread_counter_lock_);
+    std::lock_guard<SpinLock> l(thread_counter_lock_);
     return msw_.ElapsedTime();
   }
 

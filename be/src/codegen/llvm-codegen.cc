@@ -22,8 +22,8 @@
 #include <sstream>
 #include <unordered_set>
 
+#include <mutex>
 #include <boost/algorithm/string.hpp>
-#include <boost/thread/pthread/mutex.hpp>
 #include <gutil/strings/substitute.h>
 
 #include <llvm/ADT/Triple.h>

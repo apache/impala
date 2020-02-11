@@ -85,7 +85,7 @@ class BufferedPlanRootSink : public PlanRootSink {
   static const int MAX_FETCH_SIZE = QueryState::DEFAULT_BATCH_SIZE * 100;
 
   /// Protects the RowBatchQueue and all ConditionVariables.
-  boost::mutex lock_;
+  std::mutex lock_;
 
   /// Waited on by the consumer inside GetNext() until rows are available for consumption.
   /// Signaled when the producer adds a RowBatch to the queue. Also signaled by

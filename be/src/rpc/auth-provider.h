@@ -17,8 +17,8 @@
 
 #pragma once
 
+#include <mutex>
 #include <string>
-#include <boost/thread/pthread/mutex.hpp>
 #include <sasl/sasl.h>
 
 #include "common/status.h"

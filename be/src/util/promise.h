@@ -19,7 +19,7 @@
 #define IMPALA_UTIL_PROMISE_H
 
 #include <algorithm>
-#include <boost/thread.hpp>
+#include <mutex>
 
 #include "util/condition-variable.h"
 #include "util/time.h"
@@ -56,7 +56,7 @@ class Promise {
   /// set before this call.
   /// It is invalid to call Set() twice if the PromiseMode is SINGLE_PRODUCER.
   T Set(const T& val) {
-    boost::unique_lock<boost::mutex> l(val_lock_);
+    std::unique_lock<std::mutex> l(val_lock_);
     if (val_is_set_) {
       DCHECK_ENUM_EQ(mode, PromiseMode::MULTIPLE_PRODUCER)
           << "Called Set(..) twice on the same Promise in SINGLE_PRODUCER mode";
@@ -82,7 +82,7 @@ class Promise {
   /// Blocks until a value is set, and then returns a reference to that value. Once Get()
   /// returns, the returned value will not change, since Set(..) may not be called twice.
   const T& Get() {
-    boost::unique_lock<boost::mutex> l(val_lock_);
+    std::unique_lock<std::mutex> l(val_lock_);
     while (!val_is_set_) {
       val_set_cond_.Wait(l);
     }
@@ -99,7 +99,7 @@ class Promise {
     DCHECK_GT(timeout_millis, 0);
     int64_t timeout_micros = timeout_millis * MICROS_PER_MILLI;
     DCHECK(timed_out != NULL);
-    boost::unique_lock<boost::mutex> l(val_lock_);
+    std::unique_lock<std::mutex> l(val_lock_);
     int64_t start;
     int64_t now;
     now = start = MonotonicMicros();
@@ -114,7 +114,7 @@ class Promise {
 
   /// Returns whether the value is set.
   bool IsSet() {
-    boost::lock_guard<boost::mutex> l(val_lock_);
+    std::lock_guard<std::mutex> l(val_lock_);
     return val_is_set_;
   }
 
@@ -123,7 +123,7 @@ class Promise {
   /// access to val_;
   ConditionVariable val_set_cond_;
   bool val_is_set_;
-  boost::mutex val_lock_;
+  std::mutex val_lock_;
 
   /// The actual value transferred from producer to consumer
   T val_;

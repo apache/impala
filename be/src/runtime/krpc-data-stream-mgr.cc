@@ -18,9 +18,8 @@
 #include "runtime/krpc-data-stream-mgr.h"
 
 #include <iostream>
+#include <mutex>
 #include <boost/functional/hash.hpp>
-#include <boost/thread/locks.hpp>
-#include <boost/thread/thread.hpp>
 
 #include "kudu/rpc/rpc_context.h"
 #include "kudu/util/net/sockaddr.h"
@@ -64,7 +63,7 @@ DEFINE_int32(datastream_service_num_deserialization_threads, 16,
 DEFINE_int32(datastream_service_deserialization_queue_size, 10000,
     "Number of deferred RPC requests that can be enqueued before being processed by a "
     "deserialization thread.");
-using boost::mutex;
+using std::mutex;
 
 namespace impala {
 

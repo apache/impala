@@ -17,6 +17,7 @@
 
 #include "statestore/statestore-subscriber.h"
 
+#include <mutex>
 #include <sstream>
 #include <utility>
 
@@ -46,7 +47,6 @@
 using boost::posix_time::seconds;
 using boost::shared_lock;
 using boost::shared_mutex;
-using boost::try_to_lock;
 using std::string;
 
 using namespace apache::thrift;
@@ -397,7 +397,7 @@ Status StatestoreSubscriber::UpdateState(const TopicDeltaMap& incoming_topic_del
   //
   // TODO: Consider returning an error in this case so that the statestore will eventually
   // stop sending updates even if re-registration fails.
-  shared_lock<shared_mutex> l(lock_, try_to_lock);
+  shared_lock<shared_mutex> l(lock_, boost::try_to_lock);
   if (!l.owns_lock()) {
     *skipped = true;
     return Status::OK();
@@ -416,7 +416,7 @@ Status StatestoreSubscriber::UpdateState(const TopicDeltaMap& incoming_topic_del
       continue;
     }
     TopicRegistration& registration = it->second;
-    unique_lock<mutex> ul(registration.update_lock, try_to_lock);
+    unique_lock<mutex> ul(registration.update_lock, std::try_to_lock);
     if (!ul.owns_lock()) {
       // Statestore sent out concurrent topic updates. Avoid blocking the RPC by skipping
       // the topic.

@@ -18,10 +18,10 @@
 #pragma once
 
 #include <list>
+#include <mutex>
 #include <string>
 #include <vector>
 #include <boost/bind.hpp>
-#include <boost/thread/pthread/mutex.hpp>
 #include <boost/unordered_map.hpp>
 #include <gutil/strings/substitute.h>
 
@@ -143,14 +143,14 @@ class ClientCacheHelper {
   /// until they are released for the first time.
   struct PerHostCache {
     /// Protects clients.
-    boost::mutex lock;
+    std::mutex lock;
 
     /// List of client keys for this entry's host.
     std::list<ClientKey> clients;
   };
 
   /// Protects per_host_caches_
-  boost::mutex cache_lock_;
+  std::mutex cache_lock_;
 
   /// Map from an address to a PerHostCache containing a list of keys that have entries in
   /// client_map_ for that host. The value type is wrapped in a shared_ptr so that the
@@ -160,7 +160,7 @@ class ClientCacheHelper {
   PerHostCacheMap per_host_caches_;
 
   /// Protects client_map_.
-  boost::mutex client_map_lock_;
+  std::mutex client_map_lock_;
 
   /// Map from client key back to its associated ThriftClientImpl transport. This is where
   /// all the clients are actually stored, and client instances are owned by this class

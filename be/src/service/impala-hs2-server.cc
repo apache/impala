@@ -1069,11 +1069,11 @@ void ImpalaServer::AddSessionToConnection(
     const TUniqueId& session_id, SessionState* session) {
   const TUniqueId& connection_id = ThriftServer::GetThreadConnectionId();
   {
-    boost::lock_guard<boost::mutex> l(connection_to_sessions_map_lock_);
+    lock_guard<mutex> l(connection_to_sessions_map_lock_);
     connection_to_sessions_map_[connection_id].insert(session_id);
   }
 
-  boost::lock_guard<boost::mutex> session_lock(session->lock);
+  std::lock_guard<std::mutex> session_lock(session->lock);
   if (session->connections.empty()) {
     // This session was previously disconnected but now has an associated
     // connection. It should no longer be considered for the disconnected timeout.

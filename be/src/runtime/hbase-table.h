@@ -18,7 +18,6 @@
 #ifndef IMPALA_RUNTIME_HBASE_HTABLE_H_
 #define IMPALA_RUNTIME_HBASE_HTABLE_H_
 
-#include <boost/thread.hpp>
 #include <jni.h>
 #include <string>
 

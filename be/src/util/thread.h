@@ -24,7 +24,7 @@
 #include <boost/bind.hpp>
 #include <boost/function.hpp>
 #include <boost/scoped_ptr.hpp>
-#include <boost/thread.hpp>
+#include <boost/thread/thread_only.hpp>
 
 #include "common/status.h"
 #include "util/promise.h"

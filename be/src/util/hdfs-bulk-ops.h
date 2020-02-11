@@ -18,8 +18,8 @@
 #ifndef IMPALA_UTIL_HDFS_BULK_OPS_H
 #define IMPALA_UTIL_HDFS_BULK_OPS_H
 
+#include <mutex>
 #include <string>
-#include <boost/thread.hpp>
 
 #include "common/hdfs.h"
 #include "common/atomic.h"
@@ -132,7 +132,7 @@ class HdfsOperationSet {
   HdfsFsCache::HdfsFsMap* connection_cache_;
 
   /// Protects errors_ and abort_on_error_ during Execute
-  boost::mutex errors_lock_;
+  std::mutex errors_lock_;
 
   /// All errors produced during Execute
   Errors errors_;

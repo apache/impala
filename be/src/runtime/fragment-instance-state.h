@@ -17,9 +17,9 @@
 
 #pragma once
 
+#include <mutex>
 #include <string>
 #include <boost/scoped_ptr.hpp>
-#include <boost/thread/pthread/mutex.hpp>
 
 #include "common/atomic.h"
 #include "common/status.h"

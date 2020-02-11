@@ -21,8 +21,7 @@
 #include <list>
 #include <map>
 #include <memory>
-
-#include <boost/thread/pthread/mutex.hpp>
+#include <mutex>
 
 #include "common/hdfs.h"
 #include "common/status.h"

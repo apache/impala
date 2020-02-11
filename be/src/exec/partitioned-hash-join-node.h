@@ -22,7 +22,6 @@
 #include <memory>
 #include <string>
 #include <boost/scoped_ptr.hpp>
-#include <boost/thread.hpp>
 
 #include "exec/blocking-join-node.h"
 #include "exec/exec-node.h"
