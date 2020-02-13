@@ -320,6 +320,19 @@ NumRowErrors: 0
 row_regex: .*EXEC_SINGLE_NODE_ROWS_THRESHOLD=0.*
 ====
 ---- QUERY
+create table timestampkey (t timestamp primary key)
+  partition by hash(t) PARTITIONS 2 stored as kudu;
+====
+---- QUERY
+# Regression test for IMPALA-8909 (used to hit a DCHECK in debug builds).
+insert into timestampkey select concat(string_col, " ") from functional.alltypessmall;
+---- RESULTS
+: 0
+---- RUNTIME_PROFILE
+NumModifiedRows: 0
+NumRowErrors: 100
+====
+---- QUERY
 # Table with default values
 create table tbl_with_defaults (a int primary key, b int null default 10,
   c int not null default 100, d int default 1000, e int null, f int not null,
