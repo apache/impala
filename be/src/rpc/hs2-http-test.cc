@@ -17,18 +17,27 @@
 
 #include "testutil/gtest-util.h"
 
+#include <boost/filesystem.hpp>
+
 #include "gen-cpp/ImpalaHiveServer2Service.h"
 #include "rpc/authentication.h"
 #include "util/kudu-status-util.h"
+#include "util/network-util.h"
+#include "util/os-util.h"
 
 #include "kudu/security/test/mini_kdc.h"
 
 DECLARE_string(principal);
 DECLARE_string(keytab_file);
 
+static string IMPALA_HOME(getenv("IMPALA_HOME"));
+
+namespace filesystem = boost::filesystem;
+
 using namespace impala;
 using namespace apache::hive::service::cli::thrift;
 using namespace apache::thrift;
+using strings::Substitute;
 
 class TestHS2Service : public ImpalaHiveServer2ServiceIf {
  public:
@@ -75,8 +84,47 @@ class TestHS2Service : public ImpalaHiveServer2ServiceIf {
       TCloseImpalaOperationResp& _return, const TCloseImpalaOperationReq& req) {}
 };
 
+// Test that the HTTP server can successfuly read chunked requests.
+// None of our usual clients are capable of generating chunked requests directly, but we
+// may still have to process chunked requests, eg. if the requests are being proxied
+// through something like Apache Knox, so we use curl to test it. Unfortunately, its
+// difficult to craft a request that Thrift will actually recognize as an rpc, so mostly
+// what we're really testing here is just that the server doesn't hang or crash.
+TEST(ThriftHttpTest, TestChunkedRequests) {
+  boost::shared_ptr<TestHS2Service> service(new TestHS2Service());
+  boost::shared_ptr<TProcessor> hs2_http_processor(
+      new ImpalaHiveServer2ServiceProcessor(service));
+  int port = FindUnusedEphemeralPort();
+  ThriftServer* http_server;
+  ThriftServerBuilder http_builder("test-http-server", hs2_http_processor, port);
+  ASSERT_OK(
+      http_builder.transport_type(ThriftServer::TransportType::HTTP).Build(&http_server));
+  ASSERT_OK(http_server->Start());
+
+  string curl_output;
+  // Only run this if curl is available.
+  if (RunShellProcess("curl --version", &curl_output)) {
+    string host = Substitute("http://127.0.0.1:$0", port);
+    // Send a plain, non-chunked request.
+    system(Substitute("curl -X POST -v '$0'", host).c_str());
+    // Send a chunked request with a small amount of data.
+    system(Substitute("curl -d somedata -H 'Transfer-Encoding: chunked' -v '$0'", host)
+               .c_str());
+    string filename = Substitute("$0/testdata/data/decimal_rtf_tbl.txt", IMPALA_HOME);
+    EXPECT_TRUE(filesystem::exists(filename));
+    // Send a chunked request with a large amount of data.
+    system(
+        Substitute("curl -d @$0 -H 'Transfer-Encoding: chunked' -v '$1'", filename, host)
+            .c_str());
+  } else {
+    LOG(INFO) << "Skipping test, curl was not present: " << curl_output;
+  }
+
+  http_server->StopForTesting();
+}
+
 // Test that the HTTP server can be connected to successfully with Kerberos.
-TEST(ThriftKerberosTest, TestSpnego) {
+TEST(Hs2HttpTest, TestSpnego) {
   // Initialize the mini kdc.
   kudu::MiniKdc kdc(kudu::MiniKdcOptions{});
   KUDU_ASSERT_OK(kdc.Start());
@@ -96,7 +144,7 @@ TEST(ThriftKerberosTest, TestSpnego) {
   boost::shared_ptr<TestHS2Service> service(new TestHS2Service());
   boost::shared_ptr<TProcessor> hs2_http_processor(
       new ImpalaHiveServer2ServiceProcessor(service));
-  int port = 28005;
+  int port = FindUnusedEphemeralPort();
   ThriftServer* http_server;
   ThriftServerBuilder http_builder("test-http-server", hs2_http_processor, port);
   ASSERT_OK(http_builder.auth_provider(auth_manager.GetExternalAuthProvider())
@@ -104,8 +152,19 @@ TEST(ThriftKerberosTest, TestSpnego) {
                 .Build(&http_server));
   ASSERT_OK(http_server->Start());
 
-  // TODO: enable this when curl is available in the toolchain
-  //system("curl -X POST -v --negotiate -u : 'http://127.0.0.1:28005'");
+  string curl_output;
+  // Only run this if a version of curl with the necessary features is available.
+  if (RunShellProcess("curl --version", &curl_output)
+      && curl_output.find("GSS-API") != string::npos
+      && curl_output.find("SPNEGO") != string::npos) {
+    system(Substitute("curl -X POST -v --negotiate -u : 'http://127.0.0.1:$0'", port)
+               .c_str());
+  } else {
+    LOG(INFO) << "Skipping test, curl was not present or did not have the required "
+              << "features: " << curl_output;
+  }
+
+  http_server->StopForTesting();
 }
 
 int main(int argc, char** argv) {

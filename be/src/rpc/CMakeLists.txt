@@ -54,8 +54,8 @@ ADD_BE_TEST(thrift-server-test) # TODO: this test leaks servers
 # The thrift-server-test uses some utilities from the Kudu security test code.
 target_link_libraries(thrift-server-test security-test-for-impala)
 
-ADD_BE_TEST(kerberos-test)
-target_link_libraries(kerberos-test security-test-for-impala)
+ADD_BE_TEST(hs2-http-test)
+target_link_libraries(hs2-http-test security-test-for-impala)
 
 ADD_BE_LSAN_TEST(authentication-test)
 
