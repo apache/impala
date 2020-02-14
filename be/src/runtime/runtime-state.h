@@ -108,7 +108,10 @@ class RuntimeState {
   const TimestampValue* now() const { return now_.get(); }
   const TimestampValue* utc_timestamp() const { return utc_timestamp_.get(); }
   void set_now(const TimestampValue* now);
-  const Timezone& local_time_zone() const { return *local_time_zone_; }
+  const Timezone* local_time_zone() const { return local_time_zone_; }
+  const Timezone* time_zone_for_unix_time_conversions() const {
+    return time_zone_for_unix_time_conversions_;
+  }
   const TUniqueId& query_id() const { return query_ctx().query_id; }
   const TUniqueId& fragment_instance_id() const {
     return instance_ctx_ != nullptr
@@ -368,8 +371,13 @@ class RuntimeState {
   boost::scoped_ptr<TimestampValue> utc_timestamp_;
 
   /// Query-global timezone used as local timezone when executing the query.
-  /// Owned by a static storage member of TimezoneDatabase class. It cannot be nullptr.
+  /// Owned by a static storage member of TimezoneDatabase class.
   const Timezone* local_time_zone_;
+
+  /// Query-global timezone used during int<->timestamp conversions. UTC by default, but
+  /// if use_local_tz_for_unix_timestamp_conversions=1, then the local_time_zone_ is used
+  /// instead.
+  const Timezone* time_zone_for_unix_time_conversions_;
 
   boost::scoped_ptr<LlvmCodeGen> codegen_;
 

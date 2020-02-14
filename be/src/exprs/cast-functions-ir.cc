@@ -245,7 +245,8 @@ StringVal CastFunctions::CastToChar(FunctionContext* ctx, const StringVal& val) 
     if (val.is_null) return to_type::null(); \
     TimestampValue tv = TimestampValue::FromTimestampVal(val); \
     time_t result; \
-    if (!tv.ToUnixTime(ctx->impl()->state()->local_time_zone(), &result)) { \
+    const Timezone* tz = ctx->impl()->state()->time_zone_for_unix_time_conversions(); \
+    if (!tv.ToUnixTime(tz, &result)) { \
       return to_type::null(); \
     } \
     return to_type(result); \
@@ -263,7 +264,8 @@ CAST_FROM_TIMESTAMP(BigIntVal);
     if (val.is_null) return to_type::null(); \
     TimestampValue tv = TimestampValue::FromTimestampVal(val); \
     double result; \
-    if (!tv.ToSubsecondUnixTime(ctx->impl()->state()->local_time_zone(), &result)) { \
+    const Timezone* tz = ctx->impl()->state()->time_zone_for_unix_time_conversions(); \
+    if (!tv.ToSubsecondUnixTime(tz, &result)) { \
       return to_type::null(); \
     } \
     return to_type(result);\
@@ -276,8 +278,9 @@ CAST_FROM_SUBSECOND_TIMESTAMP(DoubleVal);
   TimestampVal CastFunctions::CastToTimestampVal(FunctionContext* ctx, \
                                                  const from_type& val) { \
     if (val.is_null) return TimestampVal::null(); \
+    const Timezone* tz = ctx->impl()->state()->time_zone_for_unix_time_conversions(); \
     TimestampValue timestamp_value = TimestampValue::FromSubsecondUnixTime(val.val, \
-        ctx->impl()->state()->local_time_zone()); \
+        tz); \
     TimestampVal result; \
     timestamp_value.ToTimestampVal(&result); \
     return result; \
@@ -290,8 +293,8 @@ CAST_TO_SUBSECOND_TIMESTAMP(DoubleVal);
   TimestampVal CastFunctions::CastToTimestampVal(FunctionContext* ctx, \
                                                  const from_type& val) { \
     if (val.is_null) return TimestampVal::null(); \
-    TimestampValue timestamp_value = TimestampValue::FromUnixTime(val.val, \
-        ctx->impl()->state()->local_time_zone()); \
+    const Timezone* tz = ctx->impl()->state()->time_zone_for_unix_time_conversions(); \
+    TimestampValue timestamp_value = TimestampValue::FromUnixTime(val.val, tz); \
     TimestampVal result; \
     timestamp_value.ToTimestampVal(&result); \
     return result; \

@@ -740,8 +740,8 @@ public:
       Precision& precision, bool& needs_conversion);
 
 private:
-  /// Timezone used for UTC->Local conversions. If nullptr, no conversion is needed.
-  const Timezone* timezone_ = nullptr;
+  /// Timezone used for UTC->Local conversions. If it is UTCPTR, no conversion is needed.
+  const Timezone* timezone_ = UTCPTR;
 
   /// Unit of the encoded timestamp. Used to decide between milli and microseconds during
   /// INT64 decoding. INT64 with nanosecond precision (and reduced range) is also planned

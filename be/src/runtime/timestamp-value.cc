@@ -37,11 +37,6 @@ using boost::posix_time::ptime_from_tm;
 using boost::posix_time::time_duration;
 using boost::posix_time::to_tm;
 
-DEFINE_bool(use_local_tz_for_unix_timestamp_conversions, false,
-    "When true, TIMESTAMPs are interpreted in the local time zone when converting to "
-    "and from Unix times. When false, TIMESTAMPs are interpreted in the UTC time zone. "
-    "Set to true for Hive compatibility.");
-
 // Boost stores dates as an uint32_t. Since subtraction is needed, convert to signed.
 const int64_t EPOCH_DAY_NUMBER =
     static_cast<int64_t>(date(1970, boost::gregorian::Jan, 1).day_number());
@@ -199,9 +194,9 @@ TimestampValue TimestampValue::UnixTimeToLocal(
   }
 }
 
-TimestampValue TimestampValue::FromUnixTime(time_t unix_time, const Timezone& local_tz) {
-  if (FLAGS_use_local_tz_for_unix_timestamp_conversions) {
-    return UnixTimeToLocal(unix_time, local_tz);
+TimestampValue TimestampValue::FromUnixTime(time_t unix_time, const Timezone* local_tz) {
+  if (local_tz != UTCPTR) {
+    return UnixTimeToLocal(unix_time, *local_tz);
   } else {
     return UtcFromUnixTimeTicks<1>(unix_time);
   }

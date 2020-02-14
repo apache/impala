@@ -73,6 +73,10 @@ class TimezoneDatabase {
     return (it == tz_name_map_.end()) ? nullptr : it->second.get();
   }
 
+  // Return the Timezone object for UTC.
+  // Note that in performance critical parts of the code it is recommended
+  // to use UTCPTR instead (which is just a nullptr) to represent UTC, as many
+  // TimestampValue functions have optimized path for it.
   static const Timezone& GetUtcTimezone() { return UTC_TIMEZONE_; }
 
   /// Public proxy for LoadZoneInfo. Should be only used in BE tests.

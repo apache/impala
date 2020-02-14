@@ -169,7 +169,7 @@ class DecimalOperators {
   /// true.
   template <typename T>
   static TimestampVal ConvertToTimestampVal(
-      const T& decimal_value, int scale, bool round, const Timezone& local_tz);
+      const T& decimal_value, int scale, bool round, const Timezone* local_tz);
 
   /// Converts fractional 'val' with the given 'scale' to nanoseconds. Rounds
   /// instead of truncating if 'round' is true.

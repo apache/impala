@@ -100,7 +100,7 @@ class DataSourceScanNode : public ScanNode {
 
   /// Materializes the next row (next_row_idx_) into tuple. 'local_tz' is used as the
   /// local time-zone for materializing 'TYPE_TIMESTAMP' slots.
-  Status MaterializeNextRow(const Timezone& local_tz, MemPool* mem_pool, Tuple* tuple);
+  Status MaterializeNextRow(const Timezone* local_tz, MemPool* mem_pool, Tuple* tuple);
 
   /// Gets the next batch from the data source, stored in input_batch_.
   Status GetNextInputBatch();

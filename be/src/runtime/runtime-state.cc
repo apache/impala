@@ -23,6 +23,7 @@
 #include <string>
 
 #include <boost/algorithm/string/join.hpp>
+#include <gflags/gflags.h>
 #include <gutil/strings/substitute.h>
 #include "common/logging.h"
 
@@ -59,6 +60,11 @@ using strings::Substitute;
 
 DECLARE_int32(max_errors);
 
+DEFINE_bool(use_local_tz_for_unix_timestamp_conversions, false,
+    "When true, TIMESTAMPs are interpreted in the local time zone when converting to "
+    "and from Unix times. When false, TIMESTAMPs are interpreted in the UTC time zone. "
+    "Set to true for Hive compatibility.");
+
 namespace impala {
 
 const char* RuntimeState::LLVM_CLASS_NAME = "class.impala::RuntimeState";
@@ -72,7 +78,8 @@ RuntimeState::RuntimeState(QueryState* query_state, const TPlanFragmentCtx& frag
         query_state->query_ctx().now_string))),
     utc_timestamp_(new TimestampValue(TimestampValue::ParseSimpleDateFormat(
         query_state->query_ctx().utc_timestamp_string))),
-    local_time_zone_(&TimezoneDatabase::GetUtcTimezone()),
+    local_time_zone_(UTCPTR),
+    time_zone_for_unix_time_conversions_(UTCPTR),
     profile_(RuntimeProfile::Create(
         obj_pool(), "Fragment " + PrintId(instance_ctx.fragment_instance_id))),
     instance_buffer_reservation_(obj_pool()->Add(new ReservationTracker)) {
@@ -95,7 +102,8 @@ RuntimeState::RuntimeState(
     now_(new TimestampValue(TimestampValue::ParseSimpleDateFormat(qctx.now_string))),
     utc_timestamp_(new TimestampValue(TimestampValue::ParseSimpleDateFormat(
         qctx.utc_timestamp_string))),
-    local_time_zone_(&TimezoneDatabase::GetUtcTimezone()),
+    local_time_zone_(UTCPTR),
+    time_zone_for_unix_time_conversions_(UTCPTR),
     profile_(RuntimeProfile::Create(obj_pool(), "<unnamed>")),
     instance_buffer_reservation_(nullptr) {
   // We may use execution resources while evaluating exprs, etc. Decremented in
@@ -147,14 +155,19 @@ void RuntimeState::Init() {
   if (!TestInfo::is_fe_test()) {
     const Timezone* tz = TimezoneDatabase::FindTimezone(query_ctx().local_time_zone);
     if (tz != nullptr) {
-      local_time_zone_ = tz;
+      // Use UTCPTR (actually a nullptr) if the timezone is UTC. This makes it easy to
+      // optimize many code paths for the UTC case.
+      local_time_zone_ = tz == &TimezoneDatabase::GetUtcTimezone() ? UTCPTR : tz;
     } else {
       const string msg = Substitute(
           "Failed to find local timezone '$0'.Falling back to UTC.",
           query_ctx().local_time_zone);
       LOG(WARNING) << msg;
       LogError(ErrorMsg(TErrorCode::GENERAL, msg));
-      local_time_zone_ = &TimezoneDatabase::GetUtcTimezone();
+      local_time_zone_ = UTCPTR;
+    }
+    if (FLAGS_use_local_tz_for_unix_timestamp_conversions) {
+      time_zone_for_unix_time_conversions_ = local_time_zone_;
     }
   }
 }

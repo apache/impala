@@ -207,7 +207,7 @@ inline Status SetDecimalVal(const ColumnType& type, char* bytes, int len,
   return Status::OK();
 }
 
-Status DataSourceScanNode::MaterializeNextRow(const Timezone& local_tz,
+Status DataSourceScanNode::MaterializeNextRow(const Timezone* local_tz,
     MemPool* tuple_pool, Tuple* tuple) {
   const vector<TColumnData>& cols = input_batch_->rows.cols;
   tuple->Init(tuple_desc_->byte_size());
@@ -349,7 +349,10 @@ Status DataSourceScanNode::GetNext(RuntimeState* state, RowBatch* row_batch, boo
       SCOPED_TIMER(materialize_tuple_timer());
       // copy rows until we hit the limit/capacity or until we exhaust input_batch_
       while (!ReachedLimit() && !row_batch->AtCapacity() && InputBatchHasNext()) {
-        RETURN_IF_ERROR(MaterializeNextRow(state->local_time_zone(), tuple_pool, tuple));
+        // TODO The timezone depends on flag use_local_tz_for_unix_timestamp_conversions.
+        //      Check if this is the intended behaviour.
+        RETURN_IF_ERROR(MaterializeNextRow(
+            state->time_zone_for_unix_time_conversions(), tuple_pool, tuple));
         ++rows_read;
         int row_idx = row_batch->AddRow();
         TupleRow* tuple_row = row_batch->GetRow(row_idx);

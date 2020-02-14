@@ -602,7 +602,7 @@ TimestampValue new_split_utc_from_unix_time_nanos(const SplitNanoAndSecond& unix
   // The TimestampValue version is used as it is hard to reproduce the same logic without
   // accessing private members.
   return TimestampValue::FromUnixTimeNanos(unix_time.seconds, unix_time.nanos,
-      TimezoneDatabase::GetUtcTimezone());
+      &TimezoneDatabase::GetUtcTimezone());
 }
 
 TimestampValue from_subsecond_unix_time_old(const double& unix_time) {
@@ -619,7 +619,7 @@ TimestampValue from_subsecond_unix_time_new(const double& unix_time) {
   int64_t unix_time_whole = unix_time;
   int64_t nanos = (unix_time - unix_time_whole) / ONE_BILLIONTH;
   return TimestampValue::FromUnixTimeNanos(
-      unix_time_whole, nanos, TimezoneDatabase::GetUtcTimezone());
+      unix_time_whole, nanos, &TimezoneDatabase::GetUtcTimezone());
 }
 
 //
@@ -792,7 +792,7 @@ int main(int argc, char* argv[]) {
   vector<time_t> time_data;
   for (const TimestampValue& tsvalue: tsvalue_data) {
     time_t unix_time;
-    tsvalue.ToUnixTime(TimezoneDatabase::GetUtcTimezone(), &unix_time);
+    tsvalue.ToUnixTime(&TimezoneDatabase::GetUtcTimezone(), &unix_time);
     time_data.push_back(unix_time);
   }
 
@@ -856,7 +856,7 @@ int main(int argc, char* argv[]) {
   for (int i = 0; i < tsvalue_data.size(); ++i) {
     const TimestampValue& tsvalue = tsvalue_data[i];
     time_t unix_time;
-    tsvalue.ToUnixTime(TimezoneDatabase::GetUtcTimezone(), &unix_time);
+    tsvalue.ToUnixTime(&TimezoneDatabase::GetUtcTimezone(), &unix_time);
     int micros = (i * 1001) % MICROS_PER_SEC; // add some sub-second part
     microsec_data.push_back(unix_time * MICROS_PER_SEC + micros);
   }
@@ -882,7 +882,7 @@ int main(int argc, char* argv[]) {
   for (int i = 0; i < tsvalue_data.size(); ++i) {
     const TimestampValue& tsvalue = tsvalue_data[i];
     time_t unix_time;
-    tsvalue.ToUnixTime(TimezoneDatabase::GetUtcTimezone(), &unix_time);
+    tsvalue.ToUnixTime(&TimezoneDatabase::GetUtcTimezone(), &unix_time);
     int nanos = (i * 1001) % NANOS_PER_SEC; // add some sub-second part
     nanosec_data.push_back(SplitNanoAndSecond {unix_time, nanos} );
   }
@@ -908,7 +908,7 @@ int main(int argc, char* argv[]) {
   for (int i = 0; i < tsvalue_data.size(); ++i) {
     const TimestampValue& tsvalue = tsvalue_data[i];
     time_t unix_time;
-    tsvalue.ToUnixTime(TimezoneDatabase::GetUtcTimezone(), &unix_time);
+    tsvalue.ToUnixTime(&TimezoneDatabase::GetUtcTimezone(), &unix_time);
     double nanos = (i * 1001) % NANOS_PER_SEC; // add some sub-second part
     double_data.push_back((double)unix_time + nanos / NANOS_PER_SEC);
   }

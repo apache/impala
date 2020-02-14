@@ -75,6 +75,7 @@
 
 DECLARE_bool(abort_on_config_error);
 DECLARE_bool(disable_optimization_passes);
+DECLARE_bool(use_local_tz_for_unix_timestamp_conversions);
 DECLARE_bool(use_utc_for_unix_timestamp_conversions);
 DECLARE_string(hdfs_zone_info_zip);
 
@@ -310,8 +311,7 @@ class ExprTest : public testing::TestWithParam<std::tuple<bool, bool>> {
     default_date_str_ = "cast('2011-01-01' as date)";
     default_bool_val_ = false;
     default_string_val_ = "abc";
-    default_timestamp_val_ = TimestampValue::FromUnixTime(1293872461,
-        TimezoneDatabase::GetUtcTimezone());
+    default_timestamp_val_ = TimestampValue::FromUnixTime(1293872461, UTCPTR);
     default_date_val_ = DateValue(2011, 1, 1);
     default_type_strs_[TYPE_TINYINT] =
         lexical_cast<string>(min_int_values_[TYPE_TINYINT]);
@@ -1195,22 +1195,22 @@ TimestampValue ExprTest::CreateTestTimestamp(const string& val) {
 
 template<>
 TimestampValue ExprTest::CreateTestTimestamp(float val) {
-  return TimestampValue::FromSubsecondUnixTime(val, TimezoneDatabase::GetUtcTimezone());
+  return TimestampValue::FromSubsecondUnixTime(val, UTCPTR);
 }
 
 template<>
 TimestampValue ExprTest::CreateTestTimestamp(double val) {
-  return TimestampValue::FromSubsecondUnixTime(val, TimezoneDatabase::GetUtcTimezone());
+  return TimestampValue::FromSubsecondUnixTime(val, UTCPTR);
 }
 
 template<>
 TimestampValue ExprTest::CreateTestTimestamp(int val) {
-  return TimestampValue::FromUnixTime(val, TimezoneDatabase::GetUtcTimezone());
+  return TimestampValue::FromUnixTime(val, UTCPTR);
 }
 
 template<>
 TimestampValue ExprTest::CreateTestTimestamp(int64_t val) {
-  return TimestampValue::FromUnixTime(val, TimezoneDatabase::GetUtcTimezone());
+  return TimestampValue::FromUnixTime(val, UTCPTR);
 }
 
 // Test casting 'stmt' to each of the native types.  The result should be 'val'
@@ -7014,15 +7014,15 @@ TEST_P(ExprTest, TimestampFunctions) {
     const Timezone& local_tz = time_zone.GetTimezone();
 
     const TimestampValue start_time =
-        TimestampValue::FromUnixTimeMicros(UnixMicros(), local_tz);
+        TimestampValue::FromUnixTimeMicros(UnixMicros(), &local_tz);
     TimestampValue timestamp_result =
         ConvertValue<TimestampValue>(GetValue("now()", TYPE_TIMESTAMP));
     EXPECT_BETWEEN(start_time, timestamp_result,
-        TimestampValue::FromUnixTimeMicros(UnixMicros(), local_tz));
+        TimestampValue::FromUnixTimeMicros(UnixMicros(), &local_tz));
     timestamp_result = ConvertValue<TimestampValue>(GetValue("current_timestamp()",
         TYPE_TIMESTAMP));
     EXPECT_BETWEEN(start_time, timestamp_result,
-        TimestampValue::FromUnixTimeMicros(UnixMicros(), local_tz));
+        TimestampValue::FromUnixTimeMicros(UnixMicros(), &local_tz));
   }
 
   // Test that utc_timestamp() is reasonable.
@@ -7045,9 +7045,9 @@ TEST_P(ExprTest, TimestampFunctions) {
         (posix_time::microsec_clock::local_time() - from_time_t(0)).total_seconds();
     TimestampValue timestamp_result = ConvertValue<TimestampValue>(GetValue(
         "cast(unix_timestamp() as timestamp)", TYPE_TIMESTAMP));
-    EXPECT_BETWEEN(TimestampValue::FromUnixTime(unix_start_time - 1, local_tz),
+    EXPECT_BETWEEN(TimestampValue::FromUnixTime(unix_start_time - 1, &local_tz),
         timestamp_result,
-        TimestampValue::FromUnixTimeMicros(UnixMicros(), local_tz));
+        TimestampValue::FromUnixTimeMicros(UnixMicros(), &local_tz));
   }
 
   // Test that UTC and local time represent the same point in time
@@ -8198,10 +8198,10 @@ TEST_P(ExprTest, DateFunctions) {
     const Timezone& local_tz = time_zone.GetTimezone();
 
     const boost::gregorian::date start_date =
-        TimestampValue::FromUnixTimeMicros(UnixMicros(), local_tz).date();
+        TimestampValue::FromUnixTimeMicros(UnixMicros(), &local_tz).date();
     DateValue current_dv = ConvertValue<DateValue>(GetValue("current_date()", TYPE_DATE));
     const boost::gregorian::date end_date =
-        TimestampValue::FromUnixTimeMicros(UnixMicros(), local_tz).date();
+        TimestampValue::FromUnixTimeMicros(UnixMicros(), &local_tz).date();
 
     int year, month, day;
     EXPECT_TRUE(current_dv.ToYearMonthDay(&year, &month, &day));
@@ -8221,10 +8221,8 @@ TEST_P(ExprTest, ConditionalFunctions) {
   TestValue("if(FALSE, cast(5.5 as double), cast(8.8 as double))", TYPE_DOUBLE, 8.8);
   TestStringValue("if(TRUE, 'abc', 'defgh')", "abc");
   TestStringValue("if(FALSE, 'abc', 'defgh')", "defgh");
-  TimestampValue then_val = TimestampValue::FromUnixTime(1293872461,
-      TimezoneDatabase::GetUtcTimezone());
-  TimestampValue else_val = TimestampValue::FromUnixTime(929387245,
-      TimezoneDatabase::GetUtcTimezone());
+  TimestampValue then_val = TimestampValue::FromUnixTime(1293872461, UTCPTR);
+  TimestampValue else_val = TimestampValue::FromUnixTime(929387245, UTCPTR);
   TestTimestampValue("if(TRUE, cast('2011-01-01 09:01:01' as timestamp), "
       "cast('1999-06-14 19:07:25' as timestamp))", then_val);
   TestTimestampValue("if(FALSE, cast('2011-01-01 09:01:01' as timestamp), "
@@ -8245,10 +8243,8 @@ TEST_P(ExprTest, ConditionalFunctions) {
   TestValue("nvl2(NULL, cast(5.5 as double), cast(8.8 as double))", TYPE_DOUBLE, 8.8);
   TestStringValue("nvl2('some string', 'abc', 'defgh')", "abc");
   TestStringValue("nvl2(NULL, 'abc', 'defgh')", "defgh");
-  TimestampValue first_val = TimestampValue::FromUnixTime(1293872461,
-      TimezoneDatabase::GetUtcTimezone());
-  TimestampValue second_val = TimestampValue::FromUnixTime(929387245,
-      TimezoneDatabase::GetUtcTimezone());
+  TimestampValue first_val = TimestampValue::FromUnixTime(1293872461, UTCPTR);
+  TimestampValue second_val = TimestampValue::FromUnixTime(929387245, UTCPTR);
   TestTimestampValue("nvl2(FALSE, cast('2011-01-01 09:01:01' as timestamp), "
       "cast('1999-06-14 19:07:25' as timestamp))", first_val);
   TestTimestampValue("nvl2(NULL, cast('2011-01-01 09:01:01' as timestamp), "
@@ -8278,8 +8274,7 @@ TEST_P(ExprTest, ConditionalFunctions) {
   TestStringValue("nullif('abc', NULL)", "abc");
   TestIsNull("nullif(cast('2011-01-01 09:01:01' as timestamp), "
       "cast('2011-01-01 09:01:01' as timestamp))", TYPE_TIMESTAMP);
-  TimestampValue testlhs = TimestampValue::FromUnixTime(1293872461,
-      TimezoneDatabase::GetUtcTimezone());
+  TimestampValue testlhs = TimestampValue::FromUnixTime(1293872461, UTCPTR);
   TestTimestampValue("nullif(cast('2011-01-01 09:01:01' as timestamp), "
       "cast('1999-06-14 19:07:25' as timestamp))", testlhs);
   TestIsNull("nullif(NULL, "
@@ -8346,10 +8341,8 @@ TEST_P(ExprTest, ConditionalFunctions) {
   TestStringValue("coalesce(NULL, 'abc', NULL)", "abc");
   TestStringValue("coalesce('defgh', NULL, 'abc', NULL)", "defgh");
   TestStringValue("coalesce(NULL, NULL, NULL, 'abc', NULL, NULL)", "abc");
-  TimestampValue ats = TimestampValue::FromUnixTime(1293872461,
-      TimezoneDatabase::GetUtcTimezone());
-  TimestampValue bts = TimestampValue::FromUnixTime(929387245,
-      TimezoneDatabase::GetUtcTimezone());
+  TimestampValue ats = TimestampValue::FromUnixTime(1293872461, UTCPTR);
+  TimestampValue bts = TimestampValue::FromUnixTime(929387245, UTCPTR);
   TestTimestampValue("coalesce(cast('2011-01-01 09:01:01' as timestamp))", ats);
   TestTimestampValue("coalesce(NULL, cast('2011-01-01 09:01:01' as timestamp),"
       "NULL)", ats);

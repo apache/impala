@@ -636,7 +636,7 @@ IR_ALWAYS_INLINE int32_t DecimalOperators::ConvertToNanoseconds(
 
 template <typename T>
 TimestampVal DecimalOperators::ConvertToTimestampVal(
-    const T& decimal_value, int scale, bool round, const Timezone& local_tz) {
+    const T& decimal_value, int scale, bool round, const Timezone* local_tz) {
   typename T::StorageType seconds = decimal_value.whole_part(scale);
   if (seconds < numeric_limits<int64_t>::min() ||
       seconds > numeric_limits<int64_t>::max()) {
@@ -656,10 +656,11 @@ TimestampVal DecimalOperators::ConvertToTimestampVal(
 TimestampVal DecimalOperators::CastToTimestampVal(
     FunctionContext* ctx, const DecimalVal& val) {
   if (val.is_null) return TimestampVal::null();
-  int precision = ctx->impl()->GetConstFnAttr(FunctionContextImpl::ARG_TYPE_PRECISION, 0);
+  int precision =
+      ctx->impl()->GetConstFnAttr(FunctionContextImpl::ARG_TYPE_PRECISION, 0);
   int scale = ctx->impl()->GetConstFnAttr(FunctionContextImpl::ARG_TYPE_SCALE, 0);
   bool is_decimal_v2 = ctx->impl()->GetConstFnAttr(FunctionContextImpl::DECIMAL_V2);
-  const Timezone& local_tz = ctx->impl()->state()->local_time_zone();
+  const Timezone* local_tz = ctx->impl()->state()->time_zone_for_unix_time_conversions();
   TimestampVal result;
   switch (ColumnType::GetDecimalByteSize(precision)) {
     case 4:

@@ -1,5 +1,8 @@
 ====
 ---- QUERY
+# This test is called with convert_legacy_hive_parquet_utc_timestamps=true.
+# The timezone should be non-UTC for that flag to actually have an effect.
+set timezone="PST8PDT";
 set abort_on_error=0;
 # Spot check some values to make sure the correct results are returned.
 SELECT id, timestamp_col FROM out_of_range_timestamp_hive_211 where id < 5;
@@ -16,12 +19,14 @@ INT, TIMESTAMP
 Parquet file '$NAMENODE/test-warehouse/$DATABASE.db/out_of_range_timestamp_hive_211/out_of_range_timestamp_hive_211.parquet' column 'timestamp_col' contains an out of range timestamp. The valid date range is 1400-01-01..9999-12-31.
 ====
 ---- QUERY
+set timezone="PST8PDT";
 set abort_on_error=1;
 SELECT id, timestamp_col FROM out_of_range_timestamp_hive_211 where id < 5;
 ---- CATCH
 Parquet file '$NAMENODE/test-warehouse/$DATABASE.db/out_of_range_timestamp_hive_211/out_of_range_timestamp_hive_211.parquet' column 'timestamp_col' contains an out of range timestamp. The valid date range is 1400-01-01..9999-12-31.
 ====
 ---- QUERY
+set timezone="PST8PDT";
 set abort_on_error=0;
 # Spot check some values to make sure the correct results are returned.
 SELECT id, timestamp_col FROM out_of_range_timestamp2_hive_211 where id in (-1, 5, 2000, 2345, 2346, 2347, 4100, 4101, 4102)
@@ -40,6 +45,7 @@ INT, TIMESTAMP
 Parquet file '$NAMENODE/test-warehouse/$DATABASE.db/out_of_range_timestamp2_hive_211/out_of_range_timestamp2_hive_211.parquet' column 'timestamp_col' contains an out of range timestamp. The valid date range is 1400-01-01..9999-12-31. (1 of 2433 similar)
 ====
 ---- QUERY
+set timezone="PST8PDT";
 set abort_on_error=1;
 SELECT id, timestamp_col FROM out_of_range_timestamp2_hive_211 where id in (-1, 5, 2000, 2345, 2346, 2347, 4100, 4101, 4102)
 ---- CATCH

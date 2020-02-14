@@ -22,7 +22,6 @@
 #include <boost/date_time/compiler_config.hpp>
 #include <boost/date_time/gregorian/gregorian.hpp>
 #include <boost/date_time/local_time/local_time.hpp>
-#include <gflags/gflags.h>
 #include <string>
 
 #include "common/global-types.h"
@@ -30,11 +29,6 @@
 #include "gen-cpp/data_stream_service.pb.h"
 #include "udf/udf.h"
 #include "util/hash-util.h"
-
-/// Users who want a fix for IMPALA-97 (to be Hive compatible) can enable this flag.
-/// The flag is disabled by default but should be flipped with the next release that
-/// accepts breaking-changes.
-DECLARE_bool(use_local_tz_for_unix_timestamp_conversions);
 
 namespace impala {
 
@@ -105,20 +99,19 @@ class TimestampValue {
   int64_t DaysSinceUnixEpoch() const;
 
   /// Unix time (seconds since 1970-01-01 UTC by definition) constructors.
-  /// Return the corresponding timestamp in the 'local_tz' time zone if
-  /// FLAGS_use_local_tz_for_unix_timestamp_conversions is true. Otherwise, return the
-  /// corresponding timestamp in UTC.
-  static TimestampValue FromUnixTime(time_t unix_time, const Timezone& local_tz);
+  /// If 'local_tz' is set and non-UTC, 'unix_time' is assumed to be UTC and
+  /// UTC->local_tz conversion takes place.
+  static TimestampValue FromUnixTime(time_t unix_time, const Timezone* local_tz);
 
   /// Same as FromUnixTime() above, but adds the specified number of nanoseconds to the
   /// resulting TimestampValue. Handles negative nanoseconds and the case where
   /// abs(nanos) >= 1e9.
   static TimestampValue FromUnixTimeNanos(time_t unix_time, int64_t nanos,
-      const Timezone& local_tz);
+      const Timezone* local_tz);
 
   /// Same as FromUnixTime(), but expects the time in microseconds.
   static TimestampValue FromUnixTimeMicros(int64_t unix_time_micros,
-      const Timezone& local_tz);
+      const Timezone* local_tz);
 
   /// Return the corresponding timestamp in UTC for the Unix time specified in
   /// nanoseconds. The range is smaller than in other conversion function, as the
@@ -138,7 +131,7 @@ class TimestampValue {
   /// specified 'unix_time' specifies the number of seconds (see above), and the
   /// fractional part is converted to nanoseconds and added to the resulting
   /// TimestampValue.
-  static TimestampValue FromSubsecondUnixTime(double unix_time, const Timezone& local_tz);
+  static TimestampValue FromSubsecondUnixTime(double unix_time, const Timezone* local_tz);
 
   /// Returns a TimestampValue converted from a TimestampVal. The caller must ensure
   /// the TimestampVal does not represent a NULL.
@@ -245,19 +238,18 @@ class TimestampValue {
   /// otherwise true.
   bool UtcToUnixTimeLimitedRangeNanos(int64_t* unix_time_nanos) const;
 
-  /// Converts to Unix time (seconds since the Unix epoch) representation. The time zone
-  /// interpretation of the TimestampValue instance is determined by
-  /// FLAGS_use_local_tz_for_unix_timestamp_conversions. If the flag is true, the instance
-  /// is interpreted as a value in the 'local_tz' time zone. If the flag is false, UTC is
-  /// assumed. Returns false if the conversion failed (unix_time will be undefined),
+  /// Converts to Unix time (seconds since the Unix epoch) representation.
+  /// If 'local_tz' is set and non-UTC, then this TimestampValue is assumed to be in
+  /// local_tz and local_tz->UTC conversion takes place to return it as UTC Unix time.
+  /// Returns false if the conversion failed (unix_time will be undefined),
   /// otherwise true.
-  bool ToUnixTime(const Timezone& local_tz, time_t* unix_time) const;
+  bool ToUnixTime(const Timezone* local_tz, time_t* unix_time) const;
 
   /// Converts to Unix time with fractional seconds. The time zone interpretation of the
-  /// TimestampValue instance is determined a above.
+  /// TimestampValue instance is determined as above.
   /// Returns false if the conversion failed (unix_time will be undefined), otherwise
   /// true.
-  bool ToSubsecondUnixTime(const Timezone& local_tz, double* unix_time) const;
+  bool ToSubsecondUnixTime(const Timezone* local_tz, double* unix_time) const;
 
   /// Converts from UTC to 'local_tz' time zone in-place. The caller must ensure the
   /// TimestampValue this function is called upon has both a valid date and time.

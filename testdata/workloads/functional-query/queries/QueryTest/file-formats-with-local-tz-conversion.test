@@ -1,0 +1,68 @@
+====
+---- QUERY
+# Check that scanning different file formats is not affected by
+# flag use_local_tz_for_unix_timestamp_conversion.
+SET timezone=CET;
+select min(timestamp_col) from functional.alltypestiny;
+---- TYPES
+TIMESTAMP
+---- RESULTS
+2009-01-01 00:00:00
+====
+---- QUERY
+SET timezone=CET;
+select min(timestamp_col) from functional_seq.alltypestiny;
+---- TYPES
+TIMESTAMP
+---- RESULTS
+2009-01-01 00:00:00
+====
+---- QUERY
+SET timezone=CET;
+select min(timestamp_col) from functional_rc.alltypestiny;
+---- TYPES
+TIMESTAMP
+---- RESULTS
+2009-01-01 00:00:00
+====
+---- QUERY
+SET timezone=CET;
+select min(timestamp_col) from functional_avro.alltypestiny;
+---- TYPES
+STRING
+---- RESULTS
+'2009-01-01 00:00:00'
+====
+---- QUERY
+SET timezone=CET;
+select min(timestamp_col) from functional_parquet.alltypestiny;
+---- TYPES
+TIMESTAMP
+---- RESULTS
+2009-01-01 00:00:00
+====
+---- QUERY
+# Regression test for IMPALA-9385.
+SET timezone=CET;
+select min(timestamp_col) from functional_orc_def.alltypestiny;
+---- TYPES
+TIMESTAMP
+---- RESULTS
+2009-01-01 00:00:00
+====
+---- QUERY
+SET timezone=CET;
+select min(timestamp_col) from functional_kudu.alltypestiny;
+---- TYPES
+TIMESTAMP
+---- RESULTS
+2009-01-01 00:00:00
+====
+---- QUERY
+SET timezone=CET;
+select min(timestamp_col) from functional_hbase.alltypestiny;
+---- TYPES
+TIMESTAMP
+---- RESULTS
+2009-01-01 00:00:00
+====

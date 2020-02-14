@@ -179,8 +179,7 @@ TEST_F(RawValueTest, TemplatizedHash) {
     RawValue::GetHashValue(&string_value,ColumnType::CreateVarcharType(
     ColumnType::MAX_VARCHAR_LENGTH), seed));
 
-  Timezone utc_tz = cctz::utc_time_zone();
-  TimestampValue timestamp_value = TimestampValue::FromUnixTime(253433923200, utc_tz);
+  TimestampValue timestamp_value = TimestampValue::FromUnixTime(253433923200, UTCPTR);
   EXPECT_EQ(RawValue::GetHashValue<impala::TimestampValue>(
     &timestamp_value, TYPE_TIMESTAMP, seed),RawValue::GetHashValue(
     &timestamp_value, TYPE_TIMESTAMP, seed));

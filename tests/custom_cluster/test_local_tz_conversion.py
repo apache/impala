@@ -64,3 +64,7 @@ class TestLocalTzConversion(CustomClusterTestSuite):
     # Tests for local timestamp functions, i.e. functions that depend on the
     # behavior of the flag --use_local_tz_for_unix_timestamp_conversions.
     self.run_test_case('QueryTest/local-timestamp-functions', vector)
+
+    # Test that scanning of different file formats is not affected by flag
+    # use_local_tz_for_unix_timestamp_conversions.
+    self.run_test_case('QueryTest/file-formats-with-local-tz-conversion', vector)
