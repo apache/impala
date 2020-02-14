@@ -687,7 +687,7 @@ Status HdfsOrcScanner::TransferTuples(OrcComplexColumnReader* coll_reader,
     if (tuple_desc->byte_size() > 0) DCHECK_LT((void*)tuple, (void*)tuple_mem_end_);
     InitTuple(tuple_desc, template_tuple_, tuple);
     RETURN_IF_ERROR(coll_reader->TransferTuple(tuple, dst_batch->tuple_data_pool()));
-    row->SetTuple(scan_node_->tuple_idx(), tuple);
+    row->SetTuple(0, tuple);
     if (!EvalRuntimeFilters(row)) continue;
     if (ExecNode::EvalConjuncts(conjunct_evals, num_conjuncts, row)) {
       row = next_row(row);

@@ -351,10 +351,8 @@ class HdfsParquetScanner : public HdfsScanner {
 
   /// Codegen ProcessScratchBatch(). Stores the resulting function in
   /// 'process_scratch_batch_fn' if codegen was successful or NULL otherwise.
-  static Status Codegen(HdfsScanNodeBase* node,
-      const std::vector<ScalarExpr*>& conjuncts,
-      llvm::Function** process_scratch_batch_fn)
-      WARN_UNUSED_RESULT;
+  static Status Codegen(HdfsScanPlanNode* node, RuntimeState* state,
+      llvm::Function** process_scratch_batch_fn);
 
   /// Helper function to create ColumnStatsReader object. 'col_order' might be NULL.
   ColumnStatsReader CreateColumnStatsReader(

@@ -78,13 +78,12 @@ Status HdfsAvroScanner::Open(ScannerContext* context) {
   return Status::OK();
 }
 
-Status HdfsAvroScanner::Codegen(HdfsScanNodeBase* node,
-    const vector<ScalarExpr*>& conjuncts, llvm::Function** decode_avro_data_fn) {
+Status HdfsAvroScanner::Codegen(HdfsScanPlanNode* node,
+   RuntimeState* state, llvm::Function** decode_avro_data_fn) {
   *decode_avro_data_fn = nullptr;
-  DCHECK(node->runtime_state()->ShouldCodegen());
-  LlvmCodeGen* codegen = node->runtime_state()->codegen();
-  DCHECK(codegen != nullptr);
-  RETURN_IF_ERROR(CodegenDecodeAvroData(node, codegen, conjuncts, decode_avro_data_fn));
+  DCHECK(state->ShouldCodegen());
+  DCHECK(state->codegen() != nullptr);
+  RETURN_IF_ERROR(CodegenDecodeAvroData(node, state, decode_avro_data_fn));
   DCHECK(*decode_avro_data_fn != nullptr);
   return Status::OK();
 }
@@ -783,14 +782,14 @@ void HdfsAvroScanner::SetStatusValueOverflow(TErrorCode::type error_code, int64_
 // bail_out:                                         ; preds = %entry
 //   ret i1 false
 // }
-Status HdfsAvroScanner::CodegenMaterializeTuple(const HdfsScanNodeBase* node,
+Status HdfsAvroScanner::CodegenMaterializeTuple(const HdfsScanPlanNode* node,
     LlvmCodeGen* codegen, llvm::Function** materialize_tuple_fn) {
   llvm::LLVMContext& context = codegen->context();
   LlvmBuilder builder(context);
 
   llvm::PointerType* this_ptr_type = codegen->GetStructPtrType<HdfsAvroScanner>();
 
-  TupleDescriptor* tuple_desc = const_cast<TupleDescriptor*>(node->tuple_desc());
+  TupleDescriptor* tuple_desc = const_cast<TupleDescriptor*>(node->tuple_desc_);
   llvm::StructType* tuple_type = tuple_desc->GetLlvmStruct(codegen);
   if (tuple_type == nullptr) return Status("Could not generate tuple struct.");
   llvm::Type* tuple_ptr_type = llvm::PointerType::get(tuple_type, 0);
@@ -803,8 +802,8 @@ Status HdfsAvroScanner::CodegenMaterializeTuple(const HdfsScanNodeBase* node,
 
   // Schema can be null if metadata is stale. See test in
   // queries/QueryTest/avro-schema-changes.test.
-  RETURN_IF_ERROR(CheckSchema(node->avro_schema()));
-  int num_children = node->avro_schema().children.size();
+  RETURN_IF_ERROR(CheckSchema(*node->avro_schema_.get()));
+  int num_children = node->avro_schema_->children.size();
   if (num_children == 0) {
     return Status("Invalid Avro record schema: contains no children.");
   }
@@ -845,7 +844,7 @@ Status HdfsAvroScanner::CodegenMaterializeTuple(const HdfsScanNodeBase* node,
         llvm::BasicBlock::Create(context, "bail_out", helper_fn, nullptr);
 
     Status status = CodegenReadRecord(
-        SchemaPath(), node->avro_schema(), i, std::min(num_children, i + step_size),
+        SchemaPath(), *node->avro_schema_.get(), i, std::min(num_children, i + step_size),
         node, codegen, &builder, helper_fn, bail_out_block,
         bail_out_block, this_val, pool_val, tuple_val, data_val, data_end_val);
     if (!status.ok()) {
@@ -912,7 +911,7 @@ Status HdfsAvroScanner::CodegenMaterializeTuple(const HdfsScanNodeBase* node,
 
 Status HdfsAvroScanner::CodegenReadRecord(const SchemaPath& path,
     const AvroSchemaElement& record, int child_start, int child_end,
-    const HdfsScanNodeBase* node, LlvmCodeGen* codegen, void* void_builder,
+    const HdfsScanPlanNode* node, LlvmCodeGen* codegen, void* void_builder,
     llvm::Function* fn, llvm::BasicBlock* insert_before, llvm::BasicBlock* bail_out,
     llvm::Value* this_val, llvm::Value* pool_val, llvm::Value* tuple_val,
     llvm::Value* data_val, llvm::Value* data_end_val) {
@@ -927,16 +926,16 @@ Status HdfsAvroScanner::CodegenReadRecord(const SchemaPath& path,
   // Used to store result of ReadUnionType() call
   llvm::Value* is_null_ptr = nullptr;
   for (int i = child_start; i < child_end; ++i) {
-    const AvroSchemaElement* field = &record.children[i];
+    const AvroSchemaElement& field = record.children[i];
     int col_idx = i;
     // If we're about to process the table-level columns, account for the partition keys
     // when constructing 'path'
-    if (path.empty()) col_idx += node->num_partition_keys();
+    if (path.empty()) col_idx += node->hdfs_table_->num_clustering_cols();
     SchemaPath new_path = path;
     new_path.push_back(col_idx);
     int slot_idx = node->GetMaterializedSlotIdx(new_path);
     SlotDescriptor* slot_desc = (slot_idx == HdfsScanNodeBase::SKIP_COLUMN) ?
-                                nullptr : node->materialized_slots()[slot_idx];
+                                nullptr : node->materialized_slots_[slot_idx];
 
     // Block that calls appropriate Read<Type> function
     llvm::BasicBlock* read_field_block =
@@ -951,12 +950,12 @@ Status HdfsAvroScanner::CodegenReadRecord(const SchemaPath& path,
     llvm::BasicBlock* end_field_block =
         llvm::BasicBlock::Create(context, "end_field", fn, insert_before);
 
-    if (field->nullable()) {
+    if (field.nullable()) {
       // Field could be null. Create conditional branch based on ReadUnionType result.
       llvm::Function* read_union_fn =
           codegen->GetFunction(IRFunction::READ_UNION_TYPE, false);
       llvm::Value* null_union_pos_val =
-          codegen->GetI32Constant(field->null_union_position);
+          codegen->GetI32Constant(field.null_union_position);
       if (is_null_ptr == nullptr) {
         is_null_ptr = codegen->CreateEntryBlockAlloca(*builder, codegen->bool_type(),
             "is_null_ptr");
@@ -992,15 +991,15 @@ Status HdfsAvroScanner::CodegenReadRecord(const SchemaPath& path,
     // Write read_field_block IR
     builder->SetInsertPoint(read_field_block);
     llvm::Value* ret_val = nullptr;
-    if (field->schema->type == AVRO_RECORD) {
+    if (field.schema->type == AVRO_RECORD) {
       llvm::BasicBlock* insert_before_block =
           (null_block != nullptr) ? null_block : end_field_block;
-      RETURN_IF_ERROR(CodegenReadRecord(new_path, *field, 0, field->children.size(),
+      RETURN_IF_ERROR(CodegenReadRecord(new_path, field, 0, field.children.size(),
           node, codegen, builder, fn,
           insert_before_block, bail_out, this_val, pool_val, tuple_val, data_val,
           data_end_val));
     } else {
-      RETURN_IF_ERROR(CodegenReadScalar(*field, slot_desc, codegen, builder,
+      RETURN_IF_ERROR(CodegenReadScalar(field, slot_desc, codegen, builder,
           this_val, pool_val, tuple_val, data_val, data_end_val, &ret_val));
     }
     builder->CreateCondBr(ret_val, end_field_block, bail_out);
@@ -1098,9 +1097,11 @@ Status HdfsAvroScanner::CodegenReadScalar(const AvroSchemaElement& element,
   return Status::OK();
 }
 
-Status HdfsAvroScanner::CodegenDecodeAvroData(const HdfsScanNodeBase* node,
-    LlvmCodeGen* codegen, const vector<ScalarExpr*>& conjuncts,
-    llvm::Function** decode_avro_data_fn) {
+Status HdfsAvroScanner::CodegenDecodeAvroData(const HdfsScanPlanNode* node,
+    RuntimeState* state, llvm::Function** decode_avro_data_fn) {
+  const vector<ScalarExpr*>& conjuncts = node->conjuncts_;
+  LlvmCodeGen* codegen = state->codegen();
+
   llvm::Function* materialize_tuple_fn;
   RETURN_IF_ERROR(CodegenMaterializeTuple(node, codegen, &materialize_tuple_fn));
   DCHECK(materialize_tuple_fn != nullptr);
@@ -1123,11 +1124,11 @@ Status HdfsAvroScanner::CodegenDecodeAvroData(const HdfsScanNodeBase* node,
 
   llvm::Function* copy_strings_fn;
   RETURN_IF_ERROR(Tuple::CodegenCopyStrings(
-      codegen, *node->tuple_desc(), &copy_strings_fn));
+      codegen, *node->tuple_desc_, &copy_strings_fn));
   replaced = codegen->ReplaceCallSites(fn, copy_strings_fn, "CopyStrings");
   DCHECK_REPLACE_COUNT(replaced, 1);
 
-  int tuple_byte_size = node->tuple_desc()->byte_size();
+  int tuple_byte_size = node->tuple_desc_->byte_size();
   replaced = codegen->ReplaceCallSitesWithValue(fn,
       codegen->GetI32Constant(tuple_byte_size), "tuple_byte_size");
   DCHECK_REPLACE_COUNT(replaced, 1);

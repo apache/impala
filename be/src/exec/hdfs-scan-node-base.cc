@@ -43,6 +43,7 @@
 #include "runtime/hdfs-fs-cache.h"
 #include "runtime/io/disk-io-mgr.h"
 #include "runtime/io/request-context.h"
+#include "runtime/query-state.h"
 #include "runtime/runtime-filter.inline.h"
 #include "runtime/runtime-state.h"
 #include "util/disk-info.h"
@@ -151,99 +152,10 @@ const int UNEXPECTED_REMOTE_BYTES_WARN_THRESHOLD = 64 * 1024 * 1024;
 Status HdfsScanPlanNode::Init(const TPlanNode& tnode, RuntimeState* state) {
   RETURN_IF_ERROR(ScanPlanNode::Init(tnode, state));
 
-  // Add collection item conjuncts
-  for (const auto& entry: tnode.hdfs_scan_node.collection_conjuncts) {
-    TupleDescriptor* tuple_desc = state->desc_tbl().GetTupleDescriptor(entry.first);
-    RowDescriptor* collection_row_desc = state->obj_pool()->Add(
-        new RowDescriptor(tuple_desc, /* is_nullable */ false));
-    DCHECK(conjuncts_map_.find(entry.first) == conjuncts_map_.end());
-    RETURN_IF_ERROR(ScalarExpr::Create(entry.second, *collection_row_desc, state,
-        &conjuncts_map_[entry.first]));
-  }
-  const TTupleId& tuple_id = tnode.hdfs_scan_node.tuple_id;
-  DCHECK(conjuncts_map_[tuple_id].empty());
-  conjuncts_map_[tuple_id] = conjuncts_;
-
-  // Add min max conjuncts
-  if (tnode.hdfs_scan_node.__isset.min_max_tuple_id) {
-    TupleDescriptor* min_max_tuple_desc =
-        state->desc_tbl().GetTupleDescriptor(tnode.hdfs_scan_node.min_max_tuple_id);
-    DCHECK(min_max_tuple_desc != nullptr);
-    RowDescriptor* min_max_row_desc = state->obj_pool()->Add(
-        new RowDescriptor(min_max_tuple_desc, /* is_nullable */ false));
-    RETURN_IF_ERROR(ScalarExpr::Create(tnode.hdfs_scan_node.min_max_conjuncts,
-        *min_max_row_desc, state, &min_max_conjuncts_));
-  }
-  return Status::OK();
-}
-
-Status HdfsScanPlanNode::CreateExecNode(RuntimeState* state, ExecNode** node) const {
-  ObjectPool* pool = state->obj_pool();
-  *node = pool->Add(tnode_->hdfs_scan_node.use_mt_scan_node ?
-          static_cast<HdfsScanNodeBase*>(
-              new HdfsScanNodeMt(pool, *this, state->desc_tbl())) :
-          static_cast<HdfsScanNodeBase*>(
-              new HdfsScanNode(pool, *this, state->desc_tbl())));
-  return Status::OK();
-}
-
-HdfsScanNodeBase::HdfsScanNodeBase(ObjectPool* pool, const HdfsScanPlanNode& pnode,
-    const THdfsScanNode& hdfs_scan_node, const DescriptorTbl& descs)
-  : ScanNode(pool, pnode, descs),
-    min_max_tuple_id_(
-        hdfs_scan_node.__isset.min_max_tuple_id ? hdfs_scan_node.min_max_tuple_id : -1),
-    min_max_tuple_desc_(
-        min_max_tuple_id_ == -1 ? nullptr : descs.GetTupleDescriptor(min_max_tuple_id_)),
-    skip_header_line_count_(hdfs_scan_node.__isset.skip_header_line_count ?
-            hdfs_scan_node.skip_header_line_count :
-            0),
-    tuple_id_(hdfs_scan_node.tuple_id),
-    parquet_count_star_slot_offset_(
-        hdfs_scan_node.__isset.parquet_count_star_slot_offset ?
-            hdfs_scan_node.parquet_count_star_slot_offset :
-            -1),
-    tuple_desc_(descs.GetTupleDescriptor(tuple_id_)),
-    thrift_dict_filter_conjuncts_map_(hdfs_scan_node.__isset.dictionary_filter_conjuncts ?
-            &hdfs_scan_node.dictionary_filter_conjuncts :
-            nullptr),
-    disks_accessed_bitmap_(TUnit::UNIT, 0),
-    active_hdfs_read_thread_counter_(TUnit::UNIT, 0) {
-  conjuncts_map_ = pnode.conjuncts_map_;
-  min_max_conjuncts_ = pnode.min_max_conjuncts_;
-}
-
-HdfsScanNodeBase::~HdfsScanNodeBase() {
-}
-
-/// TODO: Break up this very long function.
-Status HdfsScanNodeBase::Prepare(RuntimeState* state) {
-  SCOPED_TIMER(runtime_profile_->total_time_counter());
-  RETURN_IF_ERROR(ScanNode::Prepare(state));
-  AddBytesReadCounters();
-
-  // Prepare collection conjuncts
-  for (const auto& entry: conjuncts_map_) {
-    TupleDescriptor* tuple_desc = state->desc_tbl().GetTupleDescriptor(entry.first);
-    // conjuncts_ are already prepared in ExecNode::Prepare(), don't try to prepare again
-    if (tuple_desc == tuple_desc_) {
-      conjunct_evals_map_[entry.first] = conjunct_evals();
-    } else {
-      DCHECK(conjunct_evals_map_[entry.first].empty());
-      RETURN_IF_ERROR(ScalarExprEvaluator::Create(entry.second, state, pool_,
-          expr_perm_pool(), expr_results_pool(), &conjunct_evals_map_[entry.first]));
-    }
-  }
-
-  // Prepare min max statistics conjuncts.
-  if (min_max_tuple_id_ != -1) {
-    RETURN_IF_ERROR(ScalarExprEvaluator::Create(min_max_conjuncts_, state, pool_,
-        expr_perm_pool(), expr_results_pool(), &min_max_conjunct_evals_));
-  }
-
-  // One-time initialization of state that is constant across scan ranges
+  tuple_id_ = tnode.hdfs_scan_node.tuple_id;
+  tuple_desc_ = state->desc_tbl().GetTupleDescriptor(tuple_id_);
   DCHECK(tuple_desc_->table_desc() != NULL);
   hdfs_table_ = static_cast<const HdfsTableDescriptor*>(tuple_desc_->table_desc());
-  scan_node_pool_.reset(new MemPool(mem_tracker()));
 
   // Parse Avro table schema if applicable
   const string& avro_schema_str = hdfs_table_->avro_schema();
@@ -281,8 +193,124 @@ Status HdfsScanNodeBase::Prepare(RuntimeState* state) {
   // Initialize is_materialized_col_
   is_materialized_col_.resize(hdfs_table_->num_cols());
   for (int i = 0; i < hdfs_table_->num_cols(); ++i) {
-    is_materialized_col_[i] = GetMaterializedSlotIdx(vector<int>(1, i)) != SKIP_COLUMN;
+    is_materialized_col_[i] =
+        GetMaterializedSlotIdx(vector<int>(1, i)) != HdfsScanNodeBase::SKIP_COLUMN;
   }
+
+  // Add collection item conjuncts
+  for (const auto& entry : tnode.hdfs_scan_node.collection_conjuncts) {
+    TupleDescriptor* tuple_desc = state->desc_tbl().GetTupleDescriptor(entry.first);
+    RowDescriptor* collection_row_desc =
+        state->obj_pool()->Add(new RowDescriptor(tuple_desc, /* is_nullable */ false));
+    DCHECK(conjuncts_map_.find(entry.first) == conjuncts_map_.end());
+    RETURN_IF_ERROR(ScalarExpr::Create(
+        entry.second, *collection_row_desc, state, &conjuncts_map_[entry.first]));
+  }
+  const TTupleId& tuple_id = tnode.hdfs_scan_node.tuple_id;
+  DCHECK(conjuncts_map_[tuple_id].empty());
+  conjuncts_map_[tuple_id] = conjuncts_;
+
+  // Add min max conjuncts
+  if (tnode.hdfs_scan_node.__isset.min_max_tuple_id) {
+    TupleDescriptor* min_max_tuple_desc =
+        state->desc_tbl().GetTupleDescriptor(tnode.hdfs_scan_node.min_max_tuple_id);
+    DCHECK(min_max_tuple_desc != nullptr);
+    RowDescriptor* min_max_row_desc = state->obj_pool()->Add(
+        new RowDescriptor(min_max_tuple_desc, /* is_nullable */ false));
+    RETURN_IF_ERROR(ScalarExpr::Create(tnode.hdfs_scan_node.min_max_conjuncts,
+        *min_max_row_desc, state, &min_max_conjuncts_));
+  }
+
+  // TODO: Find formats to be read across all instances once codegen done per fragment.
+  const TPlanFragmentInstanceCtx& instance_ctx = state->instance_ctx();
+  auto ranges = instance_ctx.per_node_scan_ranges.find(tnode.node_id);
+  if (ranges != instance_ctx.per_node_scan_ranges.end()) {
+    for (const TScanRangeParams& scan_range_param : ranges->second) {
+      const THdfsFileSplit& split = scan_range_param.scan_range.hdfs_file_split;
+      HdfsPartitionDescriptor* partition_desc =
+          hdfs_table_->GetPartition(split.partition_id);
+      scanned_file_formats_.insert(partition_desc->file_format());
+    }
+  }
+  return Status::OK();
+}
+
+int HdfsScanPlanNode::GetMaterializedSlotIdx(const std::vector<int>& path) const {
+  auto result = path_to_materialized_slot_idx_.find(path);
+  if (result == path_to_materialized_slot_idx_.end()) {
+    return HdfsScanNodeBase::SKIP_COLUMN;
+  }
+  return result->second;
+}
+
+Status HdfsScanPlanNode::CreateExecNode(RuntimeState* state, ExecNode** node) const {
+  ObjectPool* pool = state->obj_pool();
+  *node = pool->Add(tnode_->hdfs_scan_node.use_mt_scan_node ?
+          static_cast<HdfsScanNodeBase*>(
+              new HdfsScanNodeMt(pool, *this, state->desc_tbl())) :
+          static_cast<HdfsScanNodeBase*>(
+              new HdfsScanNode(pool, *this, state->desc_tbl())));
+  return Status::OK();
+}
+
+HdfsScanNodeBase::HdfsScanNodeBase(ObjectPool* pool, const HdfsScanPlanNode& pnode,
+    const THdfsScanNode& hdfs_scan_node, const DescriptorTbl& descs)
+  : ScanNode(pool, pnode, descs),
+    min_max_tuple_id_(
+        hdfs_scan_node.__isset.min_max_tuple_id ? hdfs_scan_node.min_max_tuple_id : -1),
+    min_max_conjuncts_(pnode.min_max_conjuncts_),
+    min_max_tuple_desc_(
+        min_max_tuple_id_ == -1 ? nullptr : descs.GetTupleDescriptor(min_max_tuple_id_)),
+    skip_header_line_count_(hdfs_scan_node.__isset.skip_header_line_count ?
+            hdfs_scan_node.skip_header_line_count :
+            0),
+    tuple_id_(pnode.tuple_id_),
+    parquet_count_star_slot_offset_(
+        hdfs_scan_node.__isset.parquet_count_star_slot_offset ?
+            hdfs_scan_node.parquet_count_star_slot_offset :
+            -1),
+    tuple_desc_(pnode.tuple_desc_),
+    hdfs_table_(pnode.hdfs_table_),
+    avro_schema_(*pnode.avro_schema_.get()),
+    conjuncts_map_(pnode.conjuncts_map_),
+    thrift_dict_filter_conjuncts_map_(hdfs_scan_node.__isset.dictionary_filter_conjuncts ?
+            &hdfs_scan_node.dictionary_filter_conjuncts :
+            nullptr),
+    codegend_fn_map_(pnode.codegend_fn_map_),
+    is_materialized_col_(pnode.is_materialized_col_),
+    materialized_slots_(pnode.materialized_slots_),
+    partition_key_slots_(pnode.partition_key_slots_),
+    disks_accessed_bitmap_(TUnit::UNIT, 0),
+    active_hdfs_read_thread_counter_(TUnit::UNIT, 0) {}
+
+HdfsScanNodeBase::~HdfsScanNodeBase() {}
+
+Status HdfsScanNodeBase::Prepare(RuntimeState* state) {
+  SCOPED_TIMER(runtime_profile_->total_time_counter());
+  RETURN_IF_ERROR(ScanNode::Prepare(state));
+  AddBytesReadCounters();
+
+  // Prepare collection conjuncts
+  for (const auto& entry: conjuncts_map_) {
+    TupleDescriptor* tuple_desc = state->desc_tbl().GetTupleDescriptor(entry.first);
+    // conjuncts_ are already prepared in ExecNode::Prepare(), don't try to prepare again
+    if (tuple_desc == tuple_desc_) {
+      conjunct_evals_map_[entry.first] = conjunct_evals();
+    } else {
+      DCHECK(conjunct_evals_map_[entry.first].empty());
+      RETURN_IF_ERROR(ScalarExprEvaluator::Create(entry.second, state, pool_,
+          expr_perm_pool(), expr_results_pool(), &conjunct_evals_map_[entry.first]));
+    }
+  }
+
+  // Prepare min max statistics conjuncts.
+  if (min_max_tuple_id_ != -1) {
+    RETURN_IF_ERROR(ScalarExprEvaluator::Create(min_max_conjuncts_, state, pool_,
+        expr_perm_pool(), expr_results_pool(), &min_max_conjunct_evals_));
+  }
+
+  // One-time initialization of state that is constant across scan ranges
+  scan_node_pool_.reset(new MemPool(mem_tracker()));
 
   HdfsFsCache::HdfsFsMap fs_cache;
   // Convert the TScanRangeParams into per-file DiskIO::ScanRange objects and populate
@@ -374,37 +402,28 @@ void HdfsScanNodeBase::Codegen(RuntimeState* state) {
   DCHECK(state->ShouldCodegen());
   ExecNode::Codegen(state);
   if (IsNodeCodegenDisabled()) return;
+  const HdfsScanPlanNode& const_plan_node =
+      static_cast<const HdfsScanPlanNode&>(plan_node_);
+  HdfsScanPlanNode& hdfs_plan_node = const_cast<HdfsScanPlanNode&>(const_plan_node);
+  hdfs_plan_node.Codegen(state, state->runtime_profile());
+}
 
-  // Create codegen'd functions
-  for (int format = THdfsFileFormat::TEXT; format <= THdfsFileFormat::PARQUET; ++format) {
-    vector<HdfsFileDesc*>& file_descs =
-        per_type_files_[static_cast<THdfsFileFormat::type>(format)];
-
-    if (file_descs.empty()) continue;
-
-    // Randomize the order this node processes the files. We want to do this to avoid
-    // issuing remote reads to the same DN from different impalads. In file formats such
-    // as avro/seq/rc (i.e. splittable with a header), every node first reads the header.
-    // If every node goes through the files in the same order, all the remote reads are
-    // for the same file meaning a few DN serves a lot of remote reads at the same time.
-    random_shuffle(file_descs.begin(), file_descs.end());
-
-    // Create reusable codegen'd functions for each file type type needed
-    // TODO: do this for conjuncts_map_
+void HdfsScanPlanNode::Codegen(RuntimeState* state, RuntimeProfile* profile) {
+  for (THdfsFileFormat::type format: scanned_file_formats_) {
     llvm::Function* fn;
     Status status;
     switch (format) {
       case THdfsFileFormat::TEXT:
-        status = HdfsTextScanner::Codegen(this, conjuncts_, &fn);
+        status = HdfsTextScanner::Codegen(this, state, &fn);
         break;
       case THdfsFileFormat::SEQUENCE_FILE:
-        status = HdfsSequenceScanner::Codegen(this, conjuncts_, &fn);
+        status = HdfsSequenceScanner::Codegen(this, state, &fn);
         break;
       case THdfsFileFormat::AVRO:
-        status = HdfsAvroScanner::Codegen(this, conjuncts_, &fn);
+        status = HdfsAvroScanner::Codegen(this, state, &fn);
         break;
       case THdfsFileFormat::PARQUET:
-        status = HdfsParquetScanner::Codegen(this, conjuncts_, &fn);
+        status = HdfsParquetScanner::Codegen(this, state, &fn);
         break;
       default:
         // No codegen for this format
@@ -416,10 +435,10 @@ void HdfsScanNodeBase::Codegen(RuntimeState* state) {
     if (status.ok()) {
       LlvmCodeGen* codegen = state->codegen();
       DCHECK(codegen != NULL);
-      codegen->AddFunctionToJit(fn,
-          &codegend_fn_map_[static_cast<THdfsFileFormat::type>(format)]);
+      codegen->AddFunctionToJit(
+          fn, &codegend_fn_map_[static_cast<THdfsFileFormat::type>(format)]);
     }
-    runtime_profile()->AddCodegenMsg(status.ok(), status, format_name);
+    profile->AddCodegenMsg(status.ok(), status, format_name);
   }
 }
 
@@ -588,6 +607,12 @@ Status HdfsScanNodeBase::IssueInitialScanRanges(RuntimeState* state) {
         SkipFile(v.first, file);
       }
     }
+    // Randomize the order this node processes the files. We want to do this to avoid
+    // issuing remote reads to the same DN from different impalads. In file formats such
+    // as avro/seq/rc (i.e. splittable with a header), every node first reads the header.
+    // If every node goes through the files in the same order, all the remote reads are
+    // for the same file meaning a few DN serves a lot of remote reads at the same time.
+    random_shuffle(matching_files->begin(), matching_files->end());
   }
 
   // Issue initial ranges for all file types. Only call functions for file types that
@@ -770,7 +795,7 @@ void* HdfsScanNodeBase::GetFileMetadata(
 }
 
 void* HdfsScanNodeBase::GetCodegenFn(THdfsFileFormat::type type) {
-  CodegendFnMap::iterator it = codegend_fn_map_.find(type);
+  auto it = codegend_fn_map_.find(type);
   if (it == codegend_fn_map_.end()) return NULL;
   return it->second;
 }
@@ -857,10 +882,10 @@ void HdfsScanNodeBase::InitNullCollectionValues(const TupleDescriptor* tuple_des
 void HdfsScanNodeBase::InitNullCollectionValues(RowBatch* row_batch) const {
   DCHECK_EQ(row_batch->row_desc()->tuple_descriptors().size(), 1);
   const TupleDescriptor& tuple_desc =
-      *row_batch->row_desc()->tuple_descriptors()[tuple_idx()];
+      *row_batch->row_desc()->tuple_descriptors()[0];
   if (tuple_desc.collection_slots().empty()) return;
   for (int i = 0; i < row_batch->num_rows(); ++i) {
-    Tuple* tuple = row_batch->GetRow(i)->GetTuple(tuple_idx());
+    Tuple* tuple = row_batch->GetRow(i)->GetTuple(0);
     DCHECK(tuple != NULL);
     InitNullCollectionValues(&tuple_desc, tuple);
   }
@@ -916,12 +941,11 @@ void HdfsScanNodeBase::SkipFile(const THdfsFileFormat::type& file_type,
   }
 }
 
-void HdfsScanNodeBase::ComputeSlotMaterializationOrder(vector<int>* order) const {
-  const vector<ScalarExpr*>& conjuncts = ExecNode::conjuncts();
+void HdfsScanPlanNode::ComputeSlotMaterializationOrder(
+    const DescriptorTbl& desc_tbl, vector<int>* order) const {
+  const vector<ScalarExpr*>& conjuncts = conjuncts_;
   // Initialize all order to be conjuncts.size() (after the last conjunct)
-  order->insert(order->begin(), materialized_slots().size(), conjuncts.size());
-
-  const DescriptorTbl& desc_tbl = runtime_state_->desc_tbl();
+  order->insert(order->begin(), materialized_slots_.size(), conjuncts.size());
 
   vector<SlotId> slot_ids;
   for (int conjunct_idx = 0; conjunct_idx < conjuncts.size(); ++conjunct_idx) {

@@ -95,10 +95,8 @@ class HdfsAvroScanner : public BaseSequenceScanner {
 
   /// Codegen DecodeAvroData(). Stores the resulting function in 'decode_avro_data_fn' if
   /// codegen was successful or nullptr otherwise.
-  static Status Codegen(HdfsScanNodeBase* node,
-      const std::vector<ScalarExpr*>& conjuncts,
-      llvm::Function** decode_avro_data_fn)
-      WARN_UNUSED_RESULT;
+  static Status Codegen(
+      HdfsScanPlanNode* node, RuntimeState* state, llvm::Function** decode_avro_data_fn);
 
   static const char* LLVM_CLASS_NAME;
 
@@ -210,15 +208,14 @@ class HdfsAvroScanner : public BaseSequenceScanner {
   /// Produces a version of DecodeAvroData that uses codegen'd instead of interpreted
   /// functions. Stores the resulting function in 'decode_avro_data_fn' if codegen was
   /// successful or returns an error.
-  static Status CodegenDecodeAvroData(const HdfsScanNodeBase* node, LlvmCodeGen* codegen,
-      const std::vector<ScalarExpr*>& conjuncts,
-      llvm::Function** decode_avro_data_fn) WARN_UNUSED_RESULT;
+  static Status CodegenDecodeAvroData(const HdfsScanPlanNode* node, RuntimeState* state,
+      llvm::Function** decode_avro_data_fn);
 
   /// Codegens a version of MaterializeTuple() that reads records based on the table
   /// schema. Stores the resulting function in 'materialize_tuple_fn' if codegen was
   /// successful or returns an error.
   /// TODO: Codegen a function for each unique file schema.
-  static Status CodegenMaterializeTuple(const HdfsScanNodeBase* node,
+  static Status CodegenMaterializeTuple(const HdfsScanPlanNode* node,
       LlvmCodeGen* codegen, llvm::Function** materialize_tuple_fn) WARN_UNUSED_RESULT;
 
   /// Used by CodegenMaterializeTuple to recursively create the IR for reading an Avro
@@ -238,7 +235,7 @@ class HdfsAvroScanner : public BaseSequenceScanner {
   /// - child_start / child_end: specifies to only generate a subset of the record
   ///     schema's children
   static Status CodegenReadRecord(const SchemaPath& path, const AvroSchemaElement& record,
-      int child_start, int child_end, const HdfsScanNodeBase* node, LlvmCodeGen* codegen,
+      int child_start, int child_end, const HdfsScanPlanNode* node, LlvmCodeGen* codegen,
       void* builder, llvm::Function* fn, llvm::BasicBlock* insert_before,
       llvm::BasicBlock* bail_out, llvm::Value* this_val, llvm::Value* pool_val,
       llvm::Value* tuple_val, llvm::Value* data_val,

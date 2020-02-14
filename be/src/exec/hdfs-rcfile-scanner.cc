@@ -602,7 +602,7 @@ Status HdfsRCFileScanner::ProcessRange(RowBatch* row_batch) {
         RETURN_IF_ERROR(state_->LogOrReturnError(msg));
       }
 
-      current_row->SetTuple(scan_node_->tuple_idx(), tuple);
+      current_row->SetTuple(0, tuple);
       // Evaluate the conjuncts and add the row to the batch
       if (EvalConjuncts(current_row)) {
         ++num_to_commit;
@@ -637,14 +637,4 @@ Status HdfsRCFileScanner::ProcessRange(RowBatch* row_batch) {
     }
   }
   return Status::OK();
-}
-
-void HdfsRCFileScanner::DebugString(int indentation_level, stringstream* out) const {
-  // TODO: Add more details of internal state.
-  *out << string(indentation_level * 2, ' ')
-       << "HdfsRCFileScanner(tupleid=" << scan_node_->tuple_idx()
-       << " file=" << stream_->filename();
-  // TODO: Scanner::DebugString
-  //  ExecNode::DebugString(indentation_level, out);
-  *out << "])" << endl;
 }

@@ -48,18 +48,16 @@ HdfsSequenceScanner::~HdfsSequenceScanner() {
 }
 
 // Codegen for materialized parsed data into tuples.
-Status HdfsSequenceScanner::Codegen(HdfsScanNodeBase* node,
-    const vector<ScalarExpr*>& conjuncts, llvm::Function** write_aligned_tuples_fn) {
+Status HdfsSequenceScanner::Codegen(HdfsScanPlanNode* node, RuntimeState* state,
+    llvm::Function** write_aligned_tuples_fn) {
   *write_aligned_tuples_fn = nullptr;
-  DCHECK(node->runtime_state()->ShouldCodegen());
-  LlvmCodeGen* codegen = node->runtime_state()->codegen();
-  DCHECK(codegen != nullptr);
+  DCHECK(state->ShouldCodegen());
+  DCHECK(state->codegen() != nullptr);
   llvm::Function* write_complete_tuple_fn;
-  RETURN_IF_ERROR(CodegenWriteCompleteTuple(node, codegen, conjuncts,
-      &write_complete_tuple_fn));
+  RETURN_IF_ERROR(CodegenWriteCompleteTuple(node, state, &write_complete_tuple_fn));
   DCHECK(write_complete_tuple_fn != nullptr);
-  RETURN_IF_ERROR(CodegenWriteAlignedTuples(node, codegen, write_complete_tuple_fn,
-      write_aligned_tuples_fn));
+  RETURN_IF_ERROR(CodegenWriteAlignedTuples(
+      node, state, write_complete_tuple_fn, write_aligned_tuples_fn));
   DCHECK(*write_aligned_tuples_fn != nullptr);
   return Status::OK();
 }

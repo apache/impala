@@ -103,6 +103,20 @@ class HdfsScanPlanNode : public ScanPlanNode {
  public:
   virtual Status Init(const TPlanNode& tnode, RuntimeState* state) override;
   virtual Status CreateExecNode(RuntimeState* state, ExecNode** node) const override;
+  void Codegen(RuntimeState* state, RuntimeProfile* profile);
+
+  /// Returns index into materialized_slots with 'path'.  Returns SKIP_COLUMN if
+  /// that path is not materialized. Only valid to call after Init().
+  int GetMaterializedSlotIdx(const std::vector<int>& path) const;
+
+  /// Utility function to compute the order in which to materialize slots to allow for
+  /// computing conjuncts as slots get materialized (on partial tuples).
+  /// 'order' will contain for each slot, the first conjunct it is associated with.
+  /// e.g. order[2] = 1 indicates materialized_slots[2] must be materialized before
+  /// evaluating conjuncts[1].  Slots that are not referenced by any conjuncts will have
+  /// order set to conjuncts.size(). Only valid to call after Init().
+  void ComputeSlotMaterializationOrder(
+      const DescriptorTbl& desc_tbl, std::vector<int>* order) const;
 
   /// Conjuncts for each materialized tuple (top-level row batch tuples and collection
   /// item tuples). Includes a copy of PlanNode.conjuncts_.
@@ -111,6 +125,42 @@ class HdfsScanPlanNode : public ScanPlanNode {
 
   /// Conjuncts to evaluate on parquet::Statistics.
   std::vector<ScalarExpr*> min_max_conjuncts_;
+
+  /// Tuple id resolved in Init() to set tuple_desc_ .
+  int tuple_id_ = -1;
+
+  /// Descriptor for tuples this scan node constructs
+  const TupleDescriptor* tuple_desc_ = nullptr;
+
+  /// Maps from a slot's path to its index into materialized_slots_.
+  boost::unordered_map<std::vector<int>, int> path_to_materialized_slot_idx_;
+
+  /// is_materialized_col_[i] = <true i-th column should be materialized, false otherwise>
+  /// for 0 <= i < total # columns in table
+  //
+  /// This should be a vector<bool>, but bool vectors are special-cased and not stored
+  /// internally as arrays, so instead we store as chars and cast to bools as needed
+  std::vector<char> is_materialized_col_;
+
+  /// Vector containing slot descriptors for all non-partition key slots.  These
+  /// descriptors are sorted in order of increasing col_pos.
+  std::vector<SlotDescriptor*> materialized_slots_;
+
+  /// Vector containing slot descriptors for all partition key slots.
+  std::vector<SlotDescriptor*> partition_key_slots_;
+
+  /// Descriptor for the hdfs table, including partition and format metadata.
+  /// Set in Init, owned by QueryState
+  const HdfsTableDescriptor* hdfs_table_ = nullptr;
+
+  /// The root of the table's Avro schema, if we're scanning an Avro table.
+  ScopedAvroSchemaElement avro_schema_;
+
+  /// File formats that instances of this node will read.
+  boost::unordered_set<THdfsFileFormat::type> scanned_file_formats_;
+
+  /// Per scanner type codegen'd fn.
+  boost::unordered_map<THdfsFileFormat::type, void*> codegend_fn_map_;
 };
 
 /// Base class for all Hdfs scan nodes. Contains common members and functions
@@ -190,10 +240,6 @@ class HdfsScanNodeBase : public ScanNode {
   const std::vector<SlotDescriptor*>& materialized_slots()
       const { return materialized_slots_; }
 
-  /// Returns the tuple idx into the row for this scan node to output to.
-  /// Currently this is always 0.
-  int tuple_idx() const { return 0; }
-
   /// Returns number of partition keys in the table.
   int num_partition_keys() const { return hdfs_table_->num_clustering_cols(); }
 
@@ -209,7 +255,7 @@ class HdfsScanNodeBase : public ScanNode {
   const TupleDescriptor* min_max_tuple_desc() const { return min_max_tuple_desc_; }
   const TupleDescriptor* tuple_desc() const { return tuple_desc_; }
   const HdfsTableDescriptor* hdfs_table() const { return hdfs_table_; }
-  const AvroSchemaElement& avro_schema() const { return *avro_schema_.get(); }
+  const AvroSchemaElement& avro_schema() const { return avro_schema_; }
   int skip_header_line_count() const { return skip_header_line_count_; }
   io::RequestContext* reader_context() const { return reader_context_.get(); }
   bool optimize_parquet_count_star() const {
@@ -239,9 +285,7 @@ class HdfsScanNodeBase : public ScanNode {
   /// Returns index into materialized_slots with 'path'.  Returns SKIP_COLUMN if
   /// that path is not materialized.
   int GetMaterializedSlotIdx(const std::vector<int>& path) const {
-    PathToSlotIdxMap::const_iterator result = path_to_materialized_slot_idx_.find(path);
-    if (result == path_to_materialized_slot_idx_.end()) return SKIP_COLUMN;
-    return result->second;
+    return static_cast<const HdfsScanPlanNode&>(plan_node_).GetMaterializedSlotIdx(path);
   }
 
   /// The result array is of length hdfs_table_->num_cols(). The i-th element is true iff
@@ -356,14 +400,6 @@ class HdfsScanNodeBase : public ScanNode {
   /// Calls RangeComplete() with skipped=true for all the splits of the file
   void SkipFile(const THdfsFileFormat::type& file_type, HdfsFileDesc* file);
 
-  /// Utility function to compute the order in which to materialize slots to allow for
-  /// computing conjuncts as slots get materialized (on partial tuples).
-  /// 'order' will contain for each slot, the first conjunct it is associated with.
-  /// e.g. order[2] = 1 indicates materialized_slots[2] must be materialized before
-  /// evaluating conjuncts[1].  Slots that are not referenced by any conjuncts will have
-  /// order set to conjuncts.size()
-  void ComputeSlotMaterializationOrder(std::vector<int>* order) const;
-
   /// Returns true if there are no materialized slots, such as a count(*) over the table.
   inline bool IsZeroSlotTableScan() const {
     return materialized_slots().empty() && tuple_desc()->tuple_path().empty();
@@ -430,7 +466,7 @@ class HdfsScanNodeBase : public ScanNode {
   // to values > 0 for hdfs text files.
   const int skip_header_line_count_;
 
-  /// Tuple id resolved in Prepare() to set tuple_desc_
+  /// Tuple id of the tuple descriptor to be used.
   const int tuple_id_;
 
   /// The byte offset of the slot for Parquet metadata if Parquet count star optimization
@@ -455,7 +491,7 @@ class HdfsScanNodeBase : public ScanNode {
   const HdfsTableDescriptor* hdfs_table_ = nullptr;
 
   /// The root of the table's Avro schema, if we're scanning an Avro table.
-  ScopedAvroSchemaElement avro_schema_;
+  const AvroSchemaElement& avro_schema_;
 
   /// Partitions scanned by this scan node.
   std::unordered_set<int64_t> partition_ids_;
@@ -503,26 +539,21 @@ class HdfsScanNodeBase : public ScanNode {
   AtomicInt32 remaining_scan_range_submissions_ = { 1 };
 
   /// Per scanner type codegen'd fn.
-  typedef boost::unordered_map<THdfsFileFormat::type, void*> CodegendFnMap;
-  CodegendFnMap codegend_fn_map_;
-
-  /// Maps from a slot's path to its index into materialized_slots_.
-  typedef boost::unordered_map<std::vector<int>, int> PathToSlotIdxMap;
-  PathToSlotIdxMap path_to_materialized_slot_idx_;
+  const boost::unordered_map<THdfsFileFormat::type, void*>& codegend_fn_map_;
 
   /// is_materialized_col_[i] = <true i-th column should be materialized, false otherwise>
   /// for 0 <= i < total # columns in table
   //
   /// This should be a vector<bool>, but bool vectors are special-cased and not stored
   /// internally as arrays, so instead we store as chars and cast to bools as needed
-  std::vector<char> is_materialized_col_;
+  const std::vector<char>& is_materialized_col_;
 
   /// Vector containing slot descriptors for all non-partition key slots.  These
   /// descriptors are sorted in order of increasing col_pos.
-  std::vector<SlotDescriptor*> materialized_slots_;
+  const std::vector<SlotDescriptor*>& materialized_slots_;
 
   /// Vector containing slot descriptors for all partition key slots.
-  std::vector<SlotDescriptor*> partition_key_slots_;
+  const std::vector<SlotDescriptor*>& partition_key_slots_;
 
   /// Keeps track of total splits and the number finished.
   ProgressUpdater progress_;

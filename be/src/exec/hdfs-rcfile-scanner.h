@@ -238,8 +238,6 @@ class HdfsRCFileScanner : public BaseSequenceScanner {
 
   virtual Status Open(ScannerContext* context) WARN_UNUSED_RESULT;
 
-  void DebugString(int indentation_level, std::stringstream* out) const;
-
  private:
   /// The key class name located in the RCFile Header.
   /// This is always "org.apache.hadoop.hive.ql.io.RCFile$KeyBuffer"

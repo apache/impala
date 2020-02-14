@@ -482,23 +482,21 @@ class HdfsScanner {
   /// Codegen function to replace WriteCompleteTuple. Should behave identically
   /// to WriteCompleteTuple. Stores the resulting function in 'write_complete_tuple_fn'
   /// if codegen was successful or NULL otherwise.
-  static Status CodegenWriteCompleteTuple(const HdfsScanNodeBase* node,
-      LlvmCodeGen* codegen, const std::vector<ScalarExpr*>& conjuncts,
-      llvm::Function** write_complete_tuple_fn) WARN_UNUSED_RESULT;
+  static Status CodegenWriteCompleteTuple(const HdfsScanPlanNode* node,
+      RuntimeState* state, llvm::Function** write_complete_tuple_fn);
 
   /// Codegen function to replace WriteAlignedTuples.  WriteAlignedTuples is cross
   /// compiled to IR.  This function loads the precompiled IR function, modifies it,
   /// and stores the resulting function in 'write_aligned_tuples_fn' if codegen was
   /// successful or NULL otherwise.
-  static Status CodegenWriteAlignedTuples(const HdfsScanNodeBase*, LlvmCodeGen*,
-      llvm::Function* write_tuple_fn,
-      llvm::Function** write_aligned_tuples_fn) WARN_UNUSED_RESULT;
+  static Status CodegenWriteAlignedTuples(const HdfsScanPlanNode*, RuntimeState*,
+      llvm::Function* write_tuple_fn, llvm::Function** write_aligned_tuples_fn);
 
   /// Codegen function to replace InitTuple() removing runtime constants like the tuple
   /// size and branches like the template tuple existence check. The codegen'd version
   /// of InitTuple() is stored in 'init_tuple_fn' if codegen was successful.
   static Status CodegenInitTuple(
-      const HdfsScanNodeBase* node, LlvmCodeGen* codegen, llvm::Function** init_tuple_fn);
+      const HdfsScanPlanNode* node, LlvmCodeGen* codegen, llvm::Function** init_tuple_fn);
 
   /// Codegen EvalRuntimeFilters() by unrolling the loop in the interpreted version
   /// and emitting a customized version of EvalRuntimeFilter() for each filter in

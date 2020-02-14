@@ -47,7 +47,7 @@ int HdfsAvroScanner::DecodeAvroData(int max_tuples, MemPool* pool, uint8_t** dat
         tuple))) {
       return 0;
     }
-    tuple_row->SetTuple(scan_node_->tuple_idx(), tuple);
+    tuple_row->SetTuple(0, tuple);
     if (EvalConjuncts(tuple_row)) {
       if (copy_strings) {
         if (UNLIKELY(!tuple->CopyStrings("HdfsAvroScanner::DecodeAvroData()",

@@ -1183,7 +1183,6 @@ int HdfsParquetScanner::TransferScratchTuples(RowBatch* dst_batch) {
   // we always call CommitRows() after TransferScratchTuples(), the output batch can
   // never be empty.
   DCHECK_LT(dst_batch->num_rows(), dst_batch->capacity());
-  DCHECK_EQ(scan_node_->tuple_idx(), 0);
   DCHECK_EQ(dst_batch->row_desc()->tuple_descriptors().size(), 1);
   if (scratch_batch_->tuple_byte_size == 0) {
     Tuple** output_row =
@@ -1213,17 +1212,18 @@ int HdfsParquetScanner::TransferScratchTuples(RowBatch* dst_batch) {
   return num_rows_to_commit;
 }
 
-Status HdfsParquetScanner::Codegen(HdfsScanNodeBase* node,
-    const vector<ScalarExpr*>& conjuncts, llvm::Function** process_scratch_batch_fn) {
-  DCHECK(node->runtime_state()->ShouldCodegen());
+Status HdfsParquetScanner::Codegen(HdfsScanPlanNode* node, RuntimeState* state,
+      llvm::Function** process_scratch_batch_fn) {
+  DCHECK(state->ShouldCodegen());
   *process_scratch_batch_fn = nullptr;
-  LlvmCodeGen* codegen = node->runtime_state()->codegen();
+  LlvmCodeGen* codegen = state->codegen();
   DCHECK(codegen != nullptr);
 
   llvm::Function* fn = codegen->GetFunction(IRFunction::PROCESS_SCRATCH_BATCH, true);
   DCHECK(fn != nullptr);
 
   llvm::Function* eval_conjuncts_fn;
+  const vector<ScalarExpr*>& conjuncts = node->conjuncts_;
   RETURN_IF_ERROR(ExecNode::CodegenEvalConjuncts(codegen, conjuncts, &eval_conjuncts_fn));
   DCHECK(eval_conjuncts_fn != nullptr);
 
@@ -1232,7 +1232,7 @@ Status HdfsParquetScanner::Codegen(HdfsScanNodeBase* node,
 
   llvm::Function* eval_runtime_filters_fn;
   RETURN_IF_ERROR(CodegenEvalRuntimeFilters(
-      codegen, node->filter_exprs(), &eval_runtime_filters_fn));
+      codegen, node->runtime_filter_exprs_, &eval_runtime_filters_fn));
   DCHECK(eval_runtime_filters_fn != nullptr);
 
   replaced = codegen->ReplaceCallSites(fn, eval_runtime_filters_fn, "EvalRuntimeFilters");
