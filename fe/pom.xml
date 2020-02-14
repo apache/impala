@@ -1226,12 +1226,13 @@ under the License.
             </exclusion>
           </exclusions>
         </dependency>
-        <!-- IMPALA-9287: Needed when catalogd used embedded HMS-->
+        <!-- Needed by tests like TestCaseLoader instantiate HMS in embedded mode which
+        needs datanucleus as test dependency-->
         <dependency>
           <groupId>org.datanucleus</groupId>
           <artifactId>javax.jdo</artifactId>
           <version>3.2.0-m3</version>
-          <scope>runtime</scope>
+          <scope>test</scope>
         </dependency>
         <!-- IMPALA-8766: Include Knox jars on the classpath -->
         <dependency>
@@ -1243,30 +1244,6 @@ under the License.
             <exclusion>
               <groupId>com.google.cloud.bigdataoss</groupId>
               <artifactId>*</artifactId>
-            </exclusion>
-          </exclusions>
-        </dependency>
-
-        <!-- IMPALA-9287: Needed when catalogd used embedded HMS-->
-        <dependency>
-          <groupId>org.apache.hive</groupId>
-          <artifactId>hive-metastore</artifactId>
-          <version>${hive.version}</version>
-          <scope>runtime</scope>
-          <exclusions>
-            <!-- Impala uses log4j v1; avoid pulling in slf4j handling for log4j2 -->
-            <exclusion>
-              <groupId>org.apache.logging.log4j</groupId>
-              <artifactId>log4j-slf4j-impl</artifactId>
-            </exclusion>
-            <!-- https://issues.apache.org/jira/browse/HADOOP-14903 -->
-            <exclusion>
-              <groupId>net.minidev</groupId>
-              <artifactId>json-smart</artifactId>
-            </exclusion>
-            <exclusion>
-              <groupId>org.apache.hadoop</groupId>
-              <artifactId>hadoop-yarn-server-resourcemanager</artifactId>
             </exclusion>
           </exclusions>
         </dependency>
