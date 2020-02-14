@@ -477,32 +477,6 @@ function load-custom-data {
 
   hadoop fs -mv /bad_text_lzo_text_lzo/ /test-warehouse/
 
-  # Load specialized parquet files into functional_parquet.bad_parquet
-  # bad_parquet_data.parquet   - IMPALA-694: data file produced by
-  #                              parquet-mr version 1.2.5-cdh4.5.0
-  # repeated_values.parquet    - Data file produced by parquet-mr with repeated values
-  #                              (produces 0 bit width dictionary)
-  # multiple_rowgroups.parquet - IMPALA-720: data file produced by parquet-mr
-  #                              with multiple row groups
-  # long_page_header.parquet   - IMPALA-1401: data file produced by Hive 13 containing
-  #                              page statistics with long min/max string values
-  hadoop fs -put -f \
-    ${IMPALA_HOME}/testdata/data/bad_parquet_data.parquet \
-    ${IMPALA_HOME}/testdata/data/repeated_values.parquet \
-    ${IMPALA_HOME}/testdata/data/multiple_rowgroups.parquet \
-    ${IMPALA_HOME}/testdata/data/long_page_header.parquet \
-    /test-warehouse/bad_parquet_parquet
-
-  # IMPALA-3732: parquet files with corrupt strings
-  hadoop fs -put -f \
-    ${IMPALA_HOME}/testdata/bad_parquet_data/dict-encoded-negative-len.parq \
-    ${IMPALA_HOME}/testdata/bad_parquet_data/plain-encoded-negative-len.parq \
-    /test-warehouse/bad_parquet_strings_negative_len_parquet
-  hadoop fs -put -f \
-    ${IMPALA_HOME}/testdata/bad_parquet_data/dict-encoded-out-of-bounds.parq \
-    ${IMPALA_HOME}/testdata/bad_parquet_data/plain-encoded-out-of-bounds.parq \
-    /test-warehouse/bad_parquet_strings_out_of_bounds_parquet
-
   # Remove all index files in this partition.
   hadoop fs -rm -f /test-warehouse/alltypes_text_lzo/year=2009/month=1/*.lzo.index
 

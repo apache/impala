@@ -18,7 +18,9 @@
 # under the License.
 
 # Functions for generating test files with specific length, and ended with all
-# permutation (with replacement) of items in suffix_list.
+# permutation (with replacement) of items in suffix_list. When run from the
+# command line, will generate data files in the specified directory and a
+# print a SQL load statement to incorporate into dataload SQL script generation.
 
 from shutil import rmtree
 from optparse import OptionParser
@@ -55,4 +57,9 @@ if __name__ == "__main__":
   if not options.table_dir:
     parser.error("--table_dir option must be specified")
 
+  # Generate data locally, and output the SQL load command for use in dataload
   generate_testescape_files(options.table_dir, options.only_newline, options.file_len)
+
+  print ("LOAD DATA LOCAL INPATH '%s' "
+         "OVERWRITE INTO TABLE {db_name}{db_suffix}.{table_name};"
+         % options.table_dir)

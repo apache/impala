@@ -1636,28 +1636,55 @@ OVERWRITE INTO TABLE {db_name}{db_suffix}.{table_name};
 ====
 ---- DATASET
 -- IMPALA-694: uses data file produced by parquet-mr version 1.2.5-cdh4.5.0
--- (can't use LOAD DATA LOCAL with Impala so copied in create-load-data.sh)
 functional
 ---- BASE_TABLE_NAME
 bad_parquet
 ---- COLUMNS
 field STRING
+---- DEPENDENT_LOAD_HIVE
+-- IMPALA-694: data file produced by parquet-mr version 1.2.5-cdh4.5.0
+LOAD DATA LOCAL INPATH '{impala_home}/testdata/data/bad_parquet_data.parquet'
+OVERWRITE INTO TABLE {db_name}{db_suffix}.{table_name};
+-- Data file produced by parquet-mr with repeated values (produces 0 bit width dictionary)
+LOAD DATA LOCAL INPATH '{impala_home}/testdata/data/repeated_values.parquet'
+INTO TABLE {db_name}{db_suffix}.{table_name};
+-- IMPALA-720: data file produced by parquet-mr with multiple row groups
+LOAD DATA LOCAL INPATH '{impala_home}/testdata/data/multiple_rowgroups.parquet'
+INTO TABLE {db_name}{db_suffix}.{table_name};
+-- IMPALA-1401: data file produced by Hive 13 containing page statistics with long min/max
+-- string values
+LOAD DATA LOCAL INPATH '{impala_home}/testdata/data/long_page_header.parquet'
+INTO TABLE {db_name}{db_suffix}.{table_name};
 ====
 ---- DATASET
--- Can't use LOAD DATA LOCAL with Impala so copied in create-load-data.sh.
 functional
 ---- BASE_TABLE_NAME
 bad_parquet_strings_negative_len
 ---- COLUMNS
 s STRING
+---- DEPENDENT_LOAD_HIVE
+-- IMPALA-3732: parquet files with corrupt strings
+LOAD DATA LOCAL INPATH
+'{impala_home}/testdata/bad_parquet_data/dict-encoded-negative-len.parq'
+OVERWRITE INTO TABLE {db_name}{db_suffix}.{table_name};
+LOAD DATA LOCAL INPATH
+'{impala_home}/testdata/bad_parquet_data/plain-encoded-negative-len.parq'
+INTO TABLE {db_name}{db_suffix}.{table_name};
 ====
 ---- DATASET
--- Can't use LOAD DATA LOCAL with Impala so copied in create-load-data.sh.
 functional
 ---- BASE_TABLE_NAME
 bad_parquet_strings_out_of_bounds
 ---- COLUMNS
 s STRING
+---- DEPENDENT_LOAD_HIVE
+-- IMPALA-3732: parquet files with corrupt strings
+LOAD DATA LOCAL INPATH
+'{impala_home}/testdata/bad_parquet_data/dict-encoded-out-of-bounds.parq'
+OVERWRITE INTO TABLE {db_name}{db_suffix}.{table_name};
+LOAD DATA LOCAL INPATH
+'{impala_home}/testdata/bad_parquet_data/plain-encoded-out-of-bounds.parq'
+INTO TABLE {db_name}{db_suffix}.{table_name};
 ====
 ---- DATASET
 -- IMPALA-2130: Wrong verification of parquet file version
@@ -1666,10 +1693,9 @@ functional
 bad_magic_number
 ---- COLUMNS
 field STRING
----- LOAD
-`hadoop fs -mkdir -p /test-warehouse/bad_magic_number_parquet && \
-hadoop fs -put -f ${IMPALA_HOME}/testdata/data/bad_magic_number.parquet \
-/test-warehouse/bad_magic_number_parquet/
+---- DEPENDENT_LOAD_HIVE
+LOAD DATA LOCAL INPATH '{impala_home}/testdata/data/bad_magic_number.parquet'
+OVERWRITE INTO TABLE {db_name}{db_suffix}.{table_name};
 ====
 ---- DATASET
 -- IMPALA-1658: Timestamps written by Hive are local-to-UTC adjusted.
@@ -1691,10 +1717,9 @@ timestamp_col timestamp
 year int
 month int
 day int
----- LOAD
-`hadoop fs -mkdir -p /test-warehouse/alltypesagg_hive_13_1_parquet && \
-hadoop fs -put -f ${IMPALA_HOME}/testdata/data/alltypesagg_hive_13_1.parquet \
-/test-warehouse/alltypesagg_hive_13_1_parquet/
+---- DEPENDENT_LOAD_HIVE
+LOAD DATA LOCAL INPATH '{impala_home}/testdata/data/alltypesagg_hive_13_1.parquet'
+OVERWRITE INTO TABLE {db_name}{db_suffix}.{table_name};
 ====
 ---- DATASET
 -- Parquet file with invalid metadata size in the file footer.
@@ -1703,10 +1728,9 @@ functional
 bad_metadata_len
 ---- COLUMNS
 field TINYINT
----- LOAD
-`hadoop fs -mkdir -p /test-warehouse/bad_metadata_len_parquet && hadoop fs -put -f \
-${IMPALA_HOME}/testdata/data/bad_metadata_len.parquet \
-/test-warehouse/bad_metadata_len_parquet/
+---- DEPENDENT_LOAD_HIVE
+LOAD DATA LOCAL INPATH '{impala_home}/testdata/data/bad_metadata_len.parquet'
+OVERWRITE INTO TABLE {db_name}{db_suffix}.{table_name};
 ====
 ---- DATASET
 -- Parquet file with invalid column dict_page_offset.
@@ -1715,10 +1739,9 @@ functional
 bad_dict_page_offset
 ---- COLUMNS
 field TINYINT
----- LOAD
-`hadoop fs -mkdir -p /test-warehouse/bad_dict_page_offset_parquet && hadoop fs -put -f \
-${IMPALA_HOME}/testdata/data/bad_dict_page_offset.parquet \
-/test-warehouse/bad_dict_page_offset_parquet/
+---- DEPENDENT_LOAD_HIVE
+LOAD DATA LOCAL INPATH '{impala_home}/testdata/data/bad_dict_page_offset.parquet'
+OVERWRITE INTO TABLE {db_name}{db_suffix}.{table_name};
 ====
 ---- DATASET
 -- Parquet file with invalid column total_compressed_size.
@@ -1727,10 +1750,9 @@ functional
 bad_compressed_size
 ---- COLUMNS
 field TINYINT
----- LOAD
-`hadoop fs -mkdir -p /test-warehouse/bad_compressed_size_parquet && hadoop fs -put -f \
-${IMPALA_HOME}/testdata/data/bad_compressed_size.parquet \
-/test-warehouse/bad_compressed_size_parquet/
+---- DEPENDENT_LOAD_HIVE
+LOAD DATA LOCAL INPATH '{impala_home}/testdata/data/bad_compressed_size.parquet'
+OVERWRITE INTO TABLE {db_name}{db_suffix}.{table_name};
 ====
 ---- DATASET
 -- Parquet file with required columns written by Kite. Hive and Impala always write files
@@ -1749,10 +1771,9 @@ opt_int_2 bigint
 opt_int_3 bigint
 req_int_2 bigint
 req_int_3 bigint
----- LOAD
-`hadoop fs -mkdir -p /test-warehouse/kite_required_fields_parquet && \
-hadoop fs -put -f ${IMPALA_HOME}/testdata/data/kite_required_fields.parquet \
-/test-warehouse/kite_required_fields_parquet/
+---- DEPENDENT_LOAD_HIVE
+LOAD DATA LOCAL INPATH '{impala_home}/testdata/data/kite_required_fields.parquet'
+OVERWRITE INTO TABLE {db_name}{db_suffix}.{table_name};
 ====
 ---- DATASET
 -- Parquet file with incorrect column metadata in multiple row groups
@@ -1762,10 +1783,9 @@ bad_column_metadata
 ---- COLUMNS
 id bigint
 int_array array<int>
----- LOAD
-`hadoop fs -mkdir -p /test-warehouse/bad_column_metadata_parquet && \
-hadoop fs -put -f ${IMPALA_HOME}/testdata/data/bad_column_metadata.parquet \
-/test-warehouse/bad_column_metadata_parquet
+---- DEPENDENT_LOAD_HIVE
+LOAD DATA LOCAL INPATH '{impala_home}/testdata/data/bad_column_metadata.parquet'
+OVERWRITE INTO TABLE {db_name}{db_suffix}.{table_name};
 ====
 ---- DATASET
 functional
@@ -2031,8 +2051,8 @@ LOCATION '/test-warehouse/{table_name}';
 ---- ROW_FORMAT
 delimited fields terminated by '',''
 ---- LOAD
-`hadoop fs -mkdir -p /test-warehouse/parent_table && hadoop fs -put -f \
-${IMPALA_HOME}/testdata/data/parent_table.txt /test-warehouse/parent_table/
+LOAD DATA LOCAL INPATH '{impala_home}/testdata/data/parent_table.txt'
+OVERWRITE INTO TABLE {db_name}{db_suffix}.{table_name};
 ====
 ---- DATASET
 functional
@@ -2046,8 +2066,8 @@ LOCATION '/test-warehouse/{table_name}';
 ---- ROW_FORMAT
 delimited fields terminated by ','
 ---- LOAD
-`hadoop fs -mkdir -p /test-warehouse/parent_table_2 && hadoop fs -put -f \
-${IMPALA_HOME}/testdata/data/parent_table_2.txt /test-warehouse/parent_table_2/
+LOAD DATA LOCAL INPATH '{impala_home}/testdata/data/parent_table_2.txt'
+OVERWRITE INTO TABLE {db_name}{db_suffix}.{table_name};
 ====
 ---- DATASET
 functional
@@ -2064,8 +2084,8 @@ LOCATION '/test-warehouse/{table_name}';
 ---- ROW_FORMAT
 delimited fields terminated by ','
 ---- LOAD
-`hadoop fs -mkdir -p /test-warehouse/child_table && hadoop fs -put -f \
-${IMPALA_HOME}/testdata/data/child_table.txt /test-warehouse/child_table/
+LOAD DATA LOCAL INPATH '{impala_home}/testdata/data/child_table.txt'
+OVERWRITE INTO TABLE {db_name}{db_suffix}.{table_name};
 ====
 ---- DATASET
 functional
@@ -2078,8 +2098,8 @@ vc VARCHAR(32)
 ---- ROW_FORMAT
 delimited fields terminated by ','
 ---- LOAD
-`hadoop fs -mkdir -p /test-warehouse/chars_tiny && hadoop fs -put -f \
-${IMPALA_HOME}/testdata/data/chars-tiny.txt /test-warehouse/chars_tiny/
+LOAD DATA LOCAL INPATH '{impala_home}/testdata/data/chars-tiny.txt'
+OVERWRITE INTO TABLE {db_name}{db_suffix}.{table_name};
 ---- DEPENDENT_LOAD
 INSERT OVERWRITE TABLE {db_name}{db_suffix}.{table_name}
 select * from functional.{table_name};
@@ -2175,8 +2195,8 @@ id INT, col_1 BOOLEAN, col_2 DOUBLE, col_3 TIMESTAMP)
 row format delimited fields terminated by ','
 LOCATION '/test-warehouse/{table_name}';
 ---- LOAD
-`hadoop fs -mkdir -p /test-warehouse/table_no_newline && \
-hadoop fs -put -f ${IMPALA_HOME}/testdata/data/table_no_newline.csv /test-warehouse/table_no_newline
+LOAD DATA LOCAL INPATH '{impala_home}/testdata/data/table_no_newline.csv'
+OVERWRITE INTO TABLE {db_name}{db_suffix}.{table_name};
 ====
 ---- DATASET
 functional
@@ -2191,11 +2211,10 @@ LOCATION '/test-warehouse/{table_name}';
 ALTER TABLE {db_name}{db_suffix}.{table_name} ADD IF NOT EXISTS PARTITION (year=2015, month=3);
 ALTER TABLE {db_name}{db_suffix}.{table_name} ADD IF NOT EXISTS PARTITION (year=2010, month=3);
 ---- LOAD
-`hadoop fs -mkdir -p /test-warehouse/table_no_newline_part && \
-hadoop fs -mkdir -p /test-warehouse/table_no_newline_part/year=2010/month=3 && \
-hadoop fs -mkdir -p /test-warehouse/table_no_newline_part/year=2015/month=3 && \
-hadoop fs -put -f ${IMPALA_HOME}/testdata/data/table_no_newline.csv /test-warehouse/table_no_newline_part/year=2010/month=3 && \
-hadoop fs -put -f ${IMPALA_HOME}/testdata/data/table_missing_columns.csv /test-warehouse/table_no_newline_part/year=2015/month=3
+LOAD DATA LOCAL INPATH '{impala_home}/testdata/data/table_no_newline.csv'
+OVERWRITE INTO TABLE {db_name}{db_suffix}.{table_name} PARTITION(year=2010, month=3);
+LOAD DATA LOCAL INPATH '{impala_home}/testdata/data/table_missing_columns.csv'
+OVERWRITE INTO TABLE {db_name}{db_suffix}.{table_name} PARTITION(year=2015, month=3);
 ====
 ---- DATASET
 functional
@@ -2310,9 +2329,7 @@ CREATE EXTERNAL TABLE IF NOT EXISTS {db_name}{db_suffix}.{table_name} (
 row format delimited fields terminated by ','  escaped by '\\'
 LOCATION '/test-warehouse/{table_name}';
 ---- LOAD
-`${IMPALA_HOME}/testdata/common/text_delims_table.py --table_dir '/tmp/testescape_16_lf' --file_len 16 --only_newline && \
-hadoop fs -mkdir -p /test-warehouse/testescape_16_lf && \
-hadoop fs -put -f /tmp/testescape_16_lf/* /test-warehouse/testescape_16_lf/
+`${IMPALA_HOME}/testdata/common/text_delims_table.py --table_dir '/tmp/testescape_16_lf' --file_len 16 --only_newline
 ====
 ---- DATASET
 functional
@@ -2324,9 +2341,7 @@ CREATE EXTERNAL TABLE IF NOT EXISTS {db_name}{db_suffix}.{table_name} (
 row format delimited fields terminated by ','  escaped by '\\'
 LOCATION '/test-warehouse/{table_name}';
 ---- LOAD
-`${IMPALA_HOME}/testdata/common/text_delims_table.py --table_dir '/tmp/testescape_16_crlf' --file_len 16 && \
-hadoop fs -mkdir -p /test-warehouse/testescape_16_crlf && \
-hadoop fs -put -f /tmp/testescape_16_crlf/* /test-warehouse/testescape_16_crlf/
+`${IMPALA_HOME}/testdata/common/text_delims_table.py --table_dir '/tmp/testescape_16_crlf' --file_len 16
 ====
 ---- DATASET
 functional
@@ -2338,9 +2353,7 @@ CREATE EXTERNAL TABLE IF NOT EXISTS {db_name}{db_suffix}.{table_name} (
 row format delimited fields terminated by ','  escaped by '\\'
 LOCATION '/test-warehouse/{table_name}';
 ---- LOAD
-`${IMPALA_HOME}/testdata/common/text_delims_table.py --table_dir '/tmp/testescape_17_lf' --file_len 17 --only_newline && \
-hadoop fs -mkdir -p /test-warehouse/testescape_17_lf && \
-hadoop fs -put -f /tmp/testescape_17_lf/* /test-warehouse/testescape_17_lf/
+`${IMPALA_HOME}/testdata/common/text_delims_table.py --table_dir '/tmp/testescape_17_lf' --file_len 17 --only_newline
 ====
 ---- DATASET
 functional
@@ -2352,9 +2365,7 @@ CREATE EXTERNAL TABLE IF NOT EXISTS {db_name}{db_suffix}.{table_name} (
 row format delimited fields terminated by ','  escaped by '\\'
 LOCATION '/test-warehouse/{table_name}';
 ---- LOAD
-`${IMPALA_HOME}/testdata/common/text_delims_table.py --table_dir '/tmp/testescape_17_crlf' --file_len 17 && \
-hadoop fs -mkdir -p /test-warehouse/testescape_17_crlf && \
-hadoop fs -put -f /tmp/testescape_17_crlf/* /test-warehouse/testescape_17_crlf/
+`${IMPALA_HOME}/testdata/common/text_delims_table.py --table_dir '/tmp/testescape_17_crlf' --file_len 17
 ====
 ---- DATASET
 functional
@@ -2366,9 +2377,7 @@ CREATE EXTERNAL TABLE IF NOT EXISTS {db_name}{db_suffix}.{table_name} (
 row format delimited fields terminated by ','  escaped by '\\'
 LOCATION '/test-warehouse/{table_name}';
 ---- LOAD
-`${IMPALA_HOME}/testdata/common/text_delims_table.py --table_dir '/tmp/testescape_32_lf' --file_len 32 --only_newline && \
-hadoop fs -mkdir -p /test-warehouse/testescape_32_lf && \
-hadoop fs -put -f /tmp/testescape_32_lf/* /test-warehouse/testescape_32_lf/
+`${IMPALA_HOME}/testdata/common/text_delims_table.py --table_dir '/tmp/testescape_32_lf' --file_len 32 --only_newline
 ====
 ---- DATASET
 functional
@@ -2380,9 +2389,7 @@ CREATE EXTERNAL TABLE IF NOT EXISTS {db_name}{db_suffix}.{table_name} (
 row format delimited fields terminated by ','  escaped by '\\'
 LOCATION '/test-warehouse/{table_name}';
 ---- LOAD
-`${IMPALA_HOME}/testdata/common/text_delims_table.py --table_dir '/tmp/testescape_32_crlf' --file_len 32 && \
-hadoop fs -mkdir -p /test-warehouse/testescape_32_crlf && \
-hadoop fs -put -f /tmp/testescape_32_crlf/* /test-warehouse/testescape_32_crlf/
+`${IMPALA_HOME}/testdata/common/text_delims_table.py --table_dir '/tmp/testescape_32_crlf' --file_len 32
 ====
 ---- DATASET
 functional
@@ -2394,18 +2401,18 @@ timezone STRING, utctime TIMESTAMP, localtime TIMESTAMP)
 row format delimited fields terminated by ','
 LOCATION '/test-warehouse/{table_name}';
 ---- LOAD
-`hadoop fs -mkdir -p /test-warehouse/alltimezones && \
-hadoop fs -put -f ${IMPALA_HOME}/testdata/data/timezoneverification.csv /test-warehouse/alltimezones
+LOAD DATA LOCAL INPATH '{impala_home}/testdata/data/timezoneverification.csv'
+OVERWRITE INTO TABLE {db_name}{db_suffix}.{table_name};
 ====
 ---- DATASET
 functional
 ---- BASE_TABLE_NAME
 avro_unicode_nulls
 ---- CREATE_HIVE
-create external table if not exists {db_name}{db_suffix}.{table_name} like {db_name}{db_suffix}.liketbl stored as avro LOCATION '/test-warehouse/avro_null_char';
----- LOAD
-`hdfs dfs -mkdir -p /test-warehouse/avro_null_char && \
-hdfs dfs -put -f ${IMPALA_HOME}/testdata/avro_null_char/000000_0 /test-warehouse/avro_null_char/
+create external table if not exists {db_name}{db_suffix}.{table_name} like {db_name}{db_suffix}.liketbl stored as avro LOCATION '{hdfs_location}';
+---- DEPENDENT_LOAD_HIVE
+LOAD DATA LOCAL INPATH '{impala_home}/testdata/avro_null_char/000000_0'
+OVERWRITE INTO TABLE {db_name}{db_suffix}.{table_name};
 ====
 ---- DATASET
 -- IMPALA-1881: Maximize data locality when scanning Parquet files with multiple row groups.
@@ -2490,10 +2497,9 @@ C_ACCTBAL DECIMAL(12, 2)
 C_MKTSEGMENT STRING
 C_COMMENT STRING
 C_ORDERS ARRAY<STRUCT<O_ORDERKEY: BIGINT, O_ORDERSTATUS: STRING, O_TOTALPRICE: DECIMAL(12, 2), O_ORDERDATE: STRING, O_ORDERPRIORITY: STRING, O_CLERK: STRING, O_SHIPPRIORITY: INT, O_COMMENT: STRING, O_LINEITEMS: ARRAY<STRUCT<L_PARTKEY: BIGINT, L_SUPPKEY: BIGINT, L_LINENUMBER: INT, L_QUANTITY: DECIMAL(12, 2), L_EXTENDEDPRICE: DECIMAL(12, 2), L_DISCOUNT: DECIMAL(12, 2), L_TAX: DECIMAL(12, 2), L_RETURNFLAG: STRING, L_LINESTATUS: STRING, L_SHIPDATE: STRING, L_COMMITDATE: STRING, L_RECEIPTDATE: STRING, L_SHIPINSTRUCT: STRING, L_SHIPMODE: STRING, L_COMMENT: STRING>>>>
----- DEPENDENT_LOAD
-`hadoop fs -mkdir -p /test-warehouse/customer_multiblock_parquet && \
-hadoop fs -put -f ${IMPALA_HOME}/testdata/CustomerMultiBlock/customer_multiblock.parquet \
-/test-warehouse/customer_multiblock_parquet/
+---- DEPENDENT_LOAD_HIVE
+LOAD DATA LOCAL INPATH '{impala_home}/testdata/CustomerMultiBlock/customer_multiblock.parquet'
+OVERWRITE INTO TABLE {db_name}{db_suffix}.{table_name};
 ====
 ---- DATASET
 functional
@@ -2501,9 +2507,9 @@ functional
 bzip2_tbl
 ---- COLUMNS
 col string
----- DEPENDENT_LOAD
-`hadoop fs -mkdir -p /test-warehouse/bzip2_tbl_text_bzip/ && \
-hadoop fs -put -f ${IMPALA_HOME}/testdata/data/data-bzip2.bz2 /test-warehouse/bzip2_tbl_text_bzip/
+---- DEPENDENT_LOAD_HIVE
+LOAD DATA LOCAL INPATH '{impala_home}/testdata/data/data-bzip2.bz2'
+OVERWRITE INTO TABLE {db_name}{db_suffix}.{table_name};
 ====
 ---- DATASET
 functional
@@ -2511,9 +2517,9 @@ functional
 large_bzip2_tbl
 ---- COLUMNS
 col string
----- DEPENDENT_LOAD
-`hadoop fs -mkdir -p /test-warehouse/large_bzip2_tbl_text_bzip/ && \
-hadoop fs -put -f ${IMPALA_HOME}/testdata/data/large_bzip2.bz2 /test-warehouse/large_bzip2_tbl_text_bzip/
+---- DEPENDENT_LOAD_HIVE
+LOAD DATA LOCAL INPATH '{impala_home}/testdata/data/large_bzip2.bz2'
+OVERWRITE INTO TABLE {db_name}{db_suffix}.{table_name};
 ====
 ---- DATASET
 functional
@@ -2521,9 +2527,9 @@ functional
 multistream_bzip2_tbl
 ---- COLUMNS
 col string
----- DEPENDENT_LOAD
-`hadoop fs -mkdir -p /test-warehouse/multistream_bzip2_tbl_text_bzip/ && \
-hadoop fs -put -f ${IMPALA_HOME}/testdata/data/data-pbzip2.bz2 /test-warehouse/multistream_bzip2_tbl_text_bzip/
+---- DEPENDENT_LOAD_HIVE
+LOAD DATA LOCAL INPATH '{impala_home}/testdata/data/data-pbzip2.bz2'
+OVERWRITE INTO TABLE {db_name}{db_suffix}.{table_name};
 ====
 ---- DATASET
 functional
@@ -2531,9 +2537,9 @@ functional
 large_multistream_bzip2_tbl
 ---- COLUMNS
 col string
----- DEPENDENT_LOAD
-`hdfs dfs -mkdir -p /test-warehouse/large_multistream_bzip2_tbl_text_bzip/ && \
-hdfs dfs -put -f ${IMPALA_HOME}/testdata/data/large_pbzip2.bz2 /test-warehouse/large_multistream_bzip2_tbl_text_bzip/
+---- DEPENDENT_LOAD_HIVE
+LOAD DATA LOCAL INPATH '{impala_home}/testdata/data/large_pbzip2.bz2'
+OVERWRITE INTO TABLE {db_name}{db_suffix}.{table_name};
 ====
 ---- DATASET
 functional
@@ -2762,7 +2768,7 @@ STORED AS HUDIPARQUET
 LOCATION '/test-warehouse/hudi_parquet';
 ALTER TABLE {db_name}{db_suffix}.{table_name} RECOVER PARTITIONS;
 ---- DEPENDENT_LOAD
-`hadoop fs -mkdir /test-warehouse/hudi_parquet && \
+`hadoop fs -mkdir -p /test-warehouse/hudi_parquet && \
 hadoop fs -put -f ${IMPALA_HOME}/testdata/data/hudi_parquet /test-warehouse/
 ====
 ---- DATASET

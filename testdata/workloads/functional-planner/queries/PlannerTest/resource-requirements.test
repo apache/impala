@@ -484,7 +484,7 @@ PLAN-ROOT SINK
 00:SCAN HDFS [functional_parquet.customer_multiblock]
    HDFS partitions=1/1 files=1 size=482.93KB
    stored statistics:
-     table: rows=unavailable size=unavailable
+     table: rows=unavailable size=482.93KB
      columns: unavailable
    extrapolated-rows=disabled max-scan-range-rows=unavailable
    mem-estimate=16.00MB mem-reservation=512.00KB thread-reservation=1
