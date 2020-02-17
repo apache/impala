@@ -303,7 +303,8 @@ void ImpalaServer::OpenSession(TOpenSessionResp& return_val,
   // create a session state: initialize start time, session type, database and default
   // query options.
   // TODO: Fix duplication of code between here and ConnectionStart().
-  shared_ptr<SessionState> state = make_shared<SessionState>(this, session_id, secret);
+  shared_ptr<SessionState> state =
+      std::make_shared<SessionState>(this, session_id, secret);
   state->closed = false;
   state->start_time_ms = UnixMillis();
   state->session_type = TSessionType::HIVESERVER2;

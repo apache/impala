@@ -1900,7 +1900,7 @@ void ImpalaServer::ConnectionStart(
     TUniqueId secret;
     UUIDToTUniqueId(secret_uuid, &secret);
     shared_ptr<SessionState> session_state =
-        make_shared<SessionState>(this, session_id, secret);
+        std::make_shared<SessionState>(this, session_id, secret);
     session_state->closed = false;
     session_state->start_time_ms = UnixMillis();
     session_state->last_accessed_ms = UnixMillis();
