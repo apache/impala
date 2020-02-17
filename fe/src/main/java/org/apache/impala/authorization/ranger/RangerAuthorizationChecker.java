@@ -77,9 +77,8 @@ public class RangerAuthorizationChecker extends BaseAuthorizationChecker {
     super(authzConfig);
     Preconditions.checkArgument(authzConfig instanceof RangerAuthorizationConfig);
     RangerAuthorizationConfig rangerConfig = (RangerAuthorizationConfig) authzConfig;
-    plugin_ = new RangerImpalaPlugin(
-        rangerConfig.getServiceType(), rangerConfig.getAppId());
-    plugin_.init();
+    plugin_ = RangerImpalaPlugin.getInstance(rangerConfig.getServiceType(),
+        rangerConfig.getAppId());
   }
 
   @Override

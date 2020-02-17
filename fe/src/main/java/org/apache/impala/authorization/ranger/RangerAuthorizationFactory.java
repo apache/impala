@@ -94,9 +94,8 @@ public class RangerAuthorizationFactory implements AuthorizationFactory {
   @Override
   public AuthorizationManager newAuthorizationManager(CatalogServiceCatalog catalog) {
     RangerAuthorizationConfig config = (RangerAuthorizationConfig) authzConfig_;
-    RangerImpalaPlugin plugin = new RangerImpalaPlugin(config.getServiceType(),
+    RangerImpalaPlugin plugin = RangerImpalaPlugin.getInstance(config.getServiceType(),
         config.getAppId());
-    plugin.init();
     return new RangerCatalogdAuthorizationManager(() -> plugin, catalog);
   }
 

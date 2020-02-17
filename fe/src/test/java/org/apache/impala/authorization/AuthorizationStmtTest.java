@@ -29,7 +29,6 @@ import org.apache.impala.common.AnalysisException;
 import org.apache.impala.common.ImpalaException;
 import org.apache.impala.common.RuntimeEnv;
 import org.apache.impala.service.BackendConfig;
-import org.apache.impala.testutil.TestUtils;
 import org.apache.impala.thrift.TDescribeOutputStyle;
 import org.apache.impala.thrift.TPrivilegeLevel;
 import org.apache.impala.thrift.TQueryOptions;
@@ -2922,9 +2921,6 @@ public class AuthorizationStmtTest extends AuthorizationTestBase {
           user_.getShortName());
 
       try {
-        // Clear existing row filter policies, otherwise they will cause different
-        // error message since we check them before any column masking policies.
-        clearRangerRowFilterPolicies("functional", tableName);
         createRangerPolicy(policyName, json);
         rangerImpalaPlugin_.refreshPoliciesAndTags();
 

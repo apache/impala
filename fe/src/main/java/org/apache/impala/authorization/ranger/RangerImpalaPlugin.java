@@ -17,13 +17,40 @@
 
 package org.apache.impala.authorization.ranger;
 
+import com.google.common.base.Preconditions;
+import org.apache.commons.lang3.StringUtils;
 import org.apache.ranger.plugin.service.RangerBasePlugin;
 
 /**
- * An implementation of Ranger Impala plugin.
+ * An implementation of Ranger Impala plugin. Make this a singleton since each process
+ * should have only one ranger plugin instance. Impalad and Catalogd already satisfy this
+ * requirement. The main purpose is to avoid test classes that has embedded catalogd and
+ * frontend create multiple ranger plugins.
  */
 public class RangerImpalaPlugin extends RangerBasePlugin {
-  public RangerImpalaPlugin(String serviceType, String appId) {
+  private static volatile RangerImpalaPlugin INSTANCE = null;
+  private static String SERVICE_TYPE = null;
+  private static String APP_ID = null;
+
+  private RangerImpalaPlugin(String serviceType, String appId) {
     super(serviceType, appId);
+  }
+
+  public static RangerImpalaPlugin getInstance(String serviceType, String appId) {
+    if (INSTANCE == null) {
+      synchronized(RangerImpalaPlugin.class) {
+        if (INSTANCE == null) {
+          SERVICE_TYPE = serviceType;
+          APP_ID = appId;
+          INSTANCE = new RangerImpalaPlugin(serviceType, appId);
+          INSTANCE.init();
+        }
+      }
+    }
+    Preconditions.checkState(StringUtils.equals(SERVICE_TYPE, serviceType),
+        String.format("%s != %s", SERVICE_TYPE, serviceType));
+    Preconditions.checkState(StringUtils.equals(APP_ID, appId),
+        String.format("%s != %s", APP_ID, appId));
+    return INSTANCE;
   }
 }

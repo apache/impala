@@ -53,6 +53,8 @@ import org.apache.ranger.plugin.util.RangerRESTUtils;
 import org.json.simple.JSONArray;
 import org.json.simple.JSONObject;
 import org.json.simple.parser.JSONParser;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 import javax.ws.rs.core.Response;
 import javax.ws.rs.core.Response.Status.Family;
@@ -73,6 +75,7 @@ import static org.junit.Assert.fail;
  * Base class for authorization tests.
  */
 public abstract class AuthorizationTestBase extends FrontendTestBase {
+  public static final Logger LOG = LoggerFactory.getLogger(AuthorizationTestBase.class);
   protected static final String RANGER_ADMIN_URL = "http://localhost:6080";
   protected static final String RANGER_USER = "admin";
   protected static final String RANGER_PASSWORD = "admin";
@@ -574,6 +577,7 @@ public abstract class AuthorizationTestBase extends FrontendTestBase {
   private void authzOk(AnalysisContext context, String stmt, WithPrincipal withPrincipal)
       throws ImpalaException {
     try {
+      LOG.info("Testing authzOk for {}", stmt);
       parseAndAnalyze(stmt, context, authzFrontend_);
     } catch (AuthorizationException e) {
       // Because the same test can be called from multiple statements
@@ -616,6 +620,7 @@ public abstract class AuthorizationTestBase extends FrontendTestBase {
       throws ImpalaException {
     Preconditions.checkNotNull(expectedErrorString);
     try {
+      LOG.info("Testing authzError for {}", stmt);
       parseAndAnalyze(stmt, ctx, authzFrontend_);
     } catch (AuthorizationException e) {
       // Insert the username into the error.
@@ -641,6 +646,7 @@ public abstract class AuthorizationTestBase extends FrontendTestBase {
           "Unable to create a Ranger policy: %s Response: %s",
           policyName, response.getEntity(String.class)));
     }
+    LOG.info("Created ranger policy {}: {}", policyName, json);
   }
 
   protected void deleteRangerPolicy(String policyName) {
@@ -653,32 +659,7 @@ public abstract class AuthorizationTestBase extends FrontendTestBase {
       throw new RuntimeException(
           String.format("Unable to delete Ranger policy: %s.", policyName));
     }
-  }
-
-  protected void clearRangerRowFilterPolicies(String dbName, String tableName) {
-    ClientResponse response = rangerRestClient_
-        .getResource("/service/public/v2/api/policy")
-        .queryParam("servicename", RANGER_SERVICE_NAME)
-        .queryParam("policyType", "2")  // Row filter policy type: "2"
-        .queryParam("databases", dbName)
-        .queryParam("tables", tableName)
-        .get(ClientResponse.class);
-    if (response.getStatusInfo().getFamily() != Response.Status.Family.SUCCESSFUL) {
-      throw new RuntimeException(String.format(
-          "Unable to search Ranger policies on %s.%s", dbName, tableName));
-    }
-    JSONParser parser = new JSONParser();
-    JSONArray policies;
-    try {
-      policies = (JSONArray) parser.parse(
-          new InputStreamReader(response.getEntityInputStream()));
-    } catch (Exception e) {
-      throw new RuntimeException("Error parsing ranger response", e);
-    }
-    for (Object obj: policies) {
-      JSONObject policy = (JSONObject) obj;
-      deleteRangerPolicy(policy.get("name").toString());
-    }
+    LOG.info("Deleted ranger policy {}", policyName);
   }
 
   // Convert TDescribeResult to list of strings.
