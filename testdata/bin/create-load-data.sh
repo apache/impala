@@ -719,6 +719,9 @@ if [ "${TARGET_FILESYSTEM}" = "hdfs" ]; then
       create-internal-hbase-table
 
   run-step "Checking HDFS health" check-hdfs-health.log check-hdfs-health
+
+  # Saving the list of created files can help in debugging missing files.
+  run-step "Logging created files" created-files.log hdfs dfs -ls -R /test-warehouse
 fi
 
 # TODO: Investigate why all stats are not preserved. Theoretically, we only need to
