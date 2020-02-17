@@ -480,9 +480,10 @@ void ImpalaHttpHandler::QueryStateHandler(const Webserver::WebRequest& req,
   Value completed_queries(kArrayType);
   {
     lock_guard<mutex> l(server_->query_log_lock_);
-    for (const ImpalaServer::QueryStateRecord& log_entry: server_->query_log_) {
+    for (const unique_ptr<ImpalaServer::QueryStateRecord>& log_entry :
+        server_->query_log_) {
       Value record_json(kObjectType);
-      QueryStateToJson(log_entry, &record_json, document);
+      QueryStateToJson(*log_entry, &record_json, document);
       completed_queries.PushBack(record_json, document->GetAllocator());
     }
   }

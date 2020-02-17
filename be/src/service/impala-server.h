@@ -812,16 +812,13 @@ class ImpalaServer : public ImpalaServiceIf,
   /// Initializes the backend descriptor in 'be_desc' with the local backend information.
   void BuildLocalBackendDescriptorInternal(TBackendDescriptor* be_desc);
 
-  /// Snapshot of a query's state, archived in the query log.
+  /// Snapshot of a query's state, archived in the query log. Not mutated after
+  /// construction.
   struct QueryStateRecord {
-    /// Pretty-printed runtime profile. TODO: Copy actual profile object
-    std::string profile_str;
-
-    /// Base64 encoded runtime profile
-    std::string encoded_profile_str;
-
-    /// JSON based runtime profile
-    std::string json_profile_str;
+    /// Compressed representation of profile returned by RuntimeProfile::Compress().
+    /// Must be initialised to a valid value if this is a completed query.
+    /// Empty if this was initialised from a running query.
+    const std::vector<uint8_t> compressed_profile;
 
     /// Query id
     TUniqueId id;
@@ -890,16 +887,20 @@ class ImpalaServer : public ImpalaServiceIf,
     /// string if this request doesn't go through admission control.
     std::string resource_pool;
 
-    /// Initialise from an exec_state. If copy_profile is true, print the query
-    /// profile to a string and copy that into this.profile (which is expensive),
-    /// otherwise leave this.profile empty.
-    /// If encoded_str is non-empty, it is the base64 encoded string for
-    /// exec_state->profile.
-    QueryStateRecord(const ClientRequestState& exec_state, bool copy_profile = false,
-        const std::string& encoded_str = "");
+    /// Initialise from 'exec_state' of a completed query. 'compressed_profile' must be
+    /// a runtime profile decompressed with RuntimeProfile::Compress().
+    QueryStateRecord(
+        const ClientRequestState& exec_state, std::vector<uint8_t>&& compressed_profile);
+
+    /// Initialize from 'exec_state' of a running query
+    QueryStateRecord(const ClientRequestState& exec_state);
 
     /// Default constructor used only when participating in collections
     QueryStateRecord() { }
+
+   private:
+    // Common initialization for constructors.
+    void Init(const ClientRequestState& exec_state);
   };
 
   struct QueryStateRecordLessThan {
@@ -1037,11 +1038,13 @@ class ImpalaServer : public ImpalaServiceIf,
   std::mutex query_log_lock_;
 
   /// FIFO list of query records, which are written after the query finishes executing
-  typedef std::list<QueryStateRecord> QueryLog;
+  typedef std::list<std::unique_ptr<QueryStateRecord>> QueryLog;
   QueryLog query_log_;
 
-  /// Index that allows lookup via TUniqueId into the query log
-  typedef boost::unordered_map<TUniqueId, QueryLog::iterator> QueryLogIndex;
+  /// Index that allows lookup via TUniqueId into the query log. The QueryStateRecord
+  /// value is owned by 'query_log_' so the entry in this index must be removed when
+  /// it is removed from 'query_log_'.
+  typedef boost::unordered_map<TUniqueId, QueryStateRecord*> QueryLogIndex;
   QueryLogIndex query_log_index_;
 
   /// Logger for writing encoded query profiles, one per line with the following format:

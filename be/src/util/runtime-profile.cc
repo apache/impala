@@ -229,7 +229,8 @@ RuntimeProfile* RuntimeProfile::CreateFromThrift(ObjectPool* pool,
 
   ++*idx;
   for (int i = 0; i < node.num_children; ++i) {
-    profile->AddChild(RuntimeProfile::CreateFromThrift(pool, nodes, idx));
+    bool indent = nodes[*idx].indent;
+    profile->AddChild(RuntimeProfile::CreateFromThrift(pool, nodes, idx), indent);
   }
   return profile;
 }
@@ -782,7 +783,8 @@ void RuntimeProfile::ToJsonCounters(Value* parent, Document* d,
 
       Value counter(kObjectType);
       iter->second->ToJson(*d, &counter);
-      counter.AddMember("counter_name", StringRef(child_counter.c_str()), allocator);
+      Value child_counter_json(child_counter.c_str(), child_counter.size(), allocator);
+      counter.AddMember("counter_name", child_counter_json, allocator);
 
       Value child_counters_json(kArrayType);
       RuntimeProfile::ToJsonCounters(&child_counters_json, d,
@@ -883,11 +885,9 @@ void RuntimeProfile::ToJsonHelper(Value* parent, Document* d) const{
       Value summary_stats_counters_json(kArrayType);
       for (const SummaryStatsCounterMap::value_type& v : summary_stats_map_) {
         Value summary_stats_counter(kObjectType);
-        Value summary_name(v.first.c_str(), allocator);
+        Value summary_name_json(v.first.c_str(), v.first.size(), allocator);
         v.second->ToJson(*d, &summary_stats_counter);
-        // Remove Kind here because it would be redundant information for users
-        summary_stats_counter.RemoveMember("kind");
-        summary_stats_counter.AddMember("counter_name", summary_name, allocator);
+        summary_stats_counter.AddMember("counter_name", summary_name_json, allocator);
         summary_stats_counters_json.PushBack(summary_stats_counter, allocator);
       }
       parent->AddMember(
@@ -1078,14 +1078,7 @@ void RuntimeProfile::PrettyPrint(ostream* s, const string& prefix) const {
   }
 }
 
-Status RuntimeProfile::SerializeToArchiveString(string* out) const {
-  stringstream ss;
-  RETURN_IF_ERROR(SerializeToArchiveString(&ss));
-  *out = ss.str();
-  return Status::OK();
-}
-
-Status RuntimeProfile::SerializeToArchiveString(stringstream* out) const {
+Status RuntimeProfile::Compress(vector<uint8_t>* out) const {
   Status status;
   TRuntimeProfileTree thrift_object;
   const_cast<RuntimeProfile*>(this)->ToThrift(&thrift_object);
@@ -1101,18 +1094,63 @@ Status RuntimeProfile::SerializeToArchiveString(stringstream* out) const {
   const auto close_compressor =
       MakeScopeExitTrigger([&compressor]() { compressor->Close(); });
 
-  vector<uint8_t> compressed_buffer;
   int64_t max_compressed_size = compressor->MaxOutputLen(serialized_buffer.size());
   DCHECK_GT(max_compressed_size, 0);
-  compressed_buffer.resize(max_compressed_size);
-  int64_t result_len = compressed_buffer.size();
-  uint8_t* compressed_buffer_ptr = compressed_buffer.data();
+  out->resize(max_compressed_size);
+  int64_t result_len = out->size();
+  uint8_t* compressed_buffer_ptr = out->data();
   RETURN_IF_ERROR(compressor->ProcessBlock(true, serialized_buffer.size(),
       serialized_buffer.data(), &result_len, &compressed_buffer_ptr));
-  compressed_buffer.resize(result_len);
+  out->resize(result_len);
+  return Status::OK();
+}
 
+Status RuntimeProfile::DecompressToThrift(
+    const vector<uint8_t>& compressed_profile, TRuntimeProfileTree* out) {
+  scoped_ptr<Codec> decompressor;
+  MemTracker mem_tracker;
+  MemPool mem_pool(&mem_tracker);
+  const auto close_mem_tracker = MakeScopeExitTrigger([&mem_pool, &mem_tracker]() {
+    mem_pool.FreeAll();
+    mem_tracker.Close();
+  });
+  RETURN_IF_ERROR(Codec::CreateDecompressor(
+      &mem_pool, false, THdfsCompression::DEFAULT, &decompressor));
+  const auto close_decompressor =
+      MakeScopeExitTrigger([&decompressor]() { decompressor->Close(); });
+
+  int64_t result_len;
+  uint8_t* decompressed_buffer;
+  RETURN_IF_ERROR(decompressor->ProcessBlock(false, compressed_profile.size(),
+      compressed_profile.data(), &result_len, &decompressed_buffer));
+
+  uint32_t deserialized_len = static_cast<uint32_t>(result_len);
+  RETURN_IF_ERROR(
+      DeserializeThriftMsg(decompressed_buffer, &deserialized_len, true, out));
+  return Status::OK();
+}
+
+Status RuntimeProfile::DecompressToProfile(
+    const vector<uint8_t>& compressed_profile, ObjectPool* pool, RuntimeProfile** out) {
+  TRuntimeProfileTree thrift_profile;
+  RETURN_IF_ERROR(
+      RuntimeProfile::DecompressToThrift(compressed_profile, &thrift_profile));
+  *out = RuntimeProfile::CreateFromThrift(pool, thrift_profile);
+  return Status::OK();
+}
+
+Status RuntimeProfile::SerializeToArchiveString(string* out) const {
+  stringstream ss;
+  RETURN_IF_ERROR(SerializeToArchiveString(&ss));
+  *out = ss.str();
+  return Status::OK();
+}
+
+Status RuntimeProfile::SerializeToArchiveString(stringstream* out) const {
+  vector<uint8_t> compressed_buffer;
+  RETURN_IF_ERROR(Compress(&compressed_buffer));
   Base64Encode(compressed_buffer, out);
-  return Status::OK();;
+  return Status::OK();
 }
 
 Status RuntimeProfile::DeserializeFromArchiveString(
@@ -1130,28 +1168,7 @@ Status RuntimeProfile::DeserializeFromArchiveString(
     return Status("Error in DeserializeFromArchiveString: Base64Decode failed.");
   }
   decoded_buffer.resize(decoded_len);
-
-  scoped_ptr<Codec> decompressor;
-  MemTracker mem_tracker;
-  MemPool mem_pool(&mem_tracker);
-  const auto close_mem_tracker = MakeScopeExitTrigger([&mem_pool, &mem_tracker]() {
-    mem_pool.FreeAll();
-    mem_tracker.Close();
-  });
-  RETURN_IF_ERROR(Codec::CreateDecompressor(
-      &mem_pool, false, THdfsCompression::DEFAULT, &decompressor));
-  const auto close_decompressor =
-      MakeScopeExitTrigger([&decompressor]() { decompressor->Close(); });
-
-  int64_t result_len;
-  uint8_t* decompressed_buffer;
-  RETURN_IF_ERROR(decompressor->ProcessBlock(
-      false, decoded_len, decoded_buffer.data(), &result_len, &decompressed_buffer));
-
-  uint32_t deserialized_len = static_cast<uint32_t>(result_len);
-  RETURN_IF_ERROR(
-      DeserializeThriftMsg(decompressed_buffer, &deserialized_len, true, out));
-  return Status::OK();
+  return DecompressToThrift(decoded_buffer, out);
 }
 
 void RuntimeProfile::SetTExecSummary(const TExecSummary& summary) {
@@ -1662,16 +1679,15 @@ void RuntimeProfile::Counter::ToJson(Document& document, Value* val) const {
   DCHECK(unit_itr != _TUnit_VALUES_TO_NAMES.end());
   Value unit_json(unit_itr->second, document.GetAllocator());
   counter_json.AddMember("unit", unit_json, document.GetAllocator());
-  Value kind_json(CounterType().c_str(), document.GetAllocator());
-  counter_json.AddMember("kind", kind_json, document.GetAllocator());
   *val = counter_json;
 }
 
 void RuntimeProfile::TimeSeriesCounter::ToJson(Document& document, Value* val) {
   lock_guard<SpinLock> lock(lock_);
   Value counter_json(kObjectType);
-  counter_json.AddMember("counter_name",
-      StringRef(name_.c_str()), document.GetAllocator());
+
+  Value counter_name_json(name_.c_str(), name_.size(), document.GetAllocator());
+  counter_json.AddMember("counter_name", counter_name_json, document.GetAllocator());
   auto unit_itr = _TUnit_VALUES_TO_NAMES.find(unit_);
   DCHECK(unit_itr != _TUnit_VALUES_TO_NAMES.end());
   Value unit_json(unit_itr->second, document.GetAllocator());
@@ -1709,7 +1725,8 @@ void RuntimeProfile::EventSequence::ToJson(Document& document, Value* value) {
 
   for (const Event& ev: events_) {
     Value event_json(kObjectType);
-    event_json.AddMember("label", StringRef(ev.first.c_str()), document.GetAllocator());
+    Value label_json(ev.first.c_str(), ev.first.size(), document.GetAllocator());
+    event_json.AddMember("label", label_json, document.GetAllocator());
     event_json.AddMember("timestamp", ev.second, document.GetAllocator());
     events_json.PushBack(event_json, document.GetAllocator());
   }

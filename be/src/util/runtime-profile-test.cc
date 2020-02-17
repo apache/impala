@@ -98,6 +98,18 @@ TEST(CountersTest, Basic) {
   deserialized_profile->GetExecSummary(&exec_summary_result);
   EXPECT_EQ(exec_summary_result.status, status);
 
+  // Serialize/deserialize to compressed binary
+  vector<uint8_t> compressed;
+  EXPECT_OK(profile_a->Compress(&compressed));
+  RuntimeProfile* deserialized_profile2;
+  EXPECT_OK(
+      RuntimeProfile::DecompressToProfile(compressed, &pool, &deserialized_profile2));
+  counter_merged = deserialized_profile2->GetCounter("A");
+  EXPECT_EQ(counter_merged->value(), 1);
+  EXPECT_TRUE(deserialized_profile2->GetCounter("Not there") == nullptr);
+  deserialized_profile2->GetExecSummary(&exec_summary_result);
+  EXPECT_EQ(exec_summary_result.status, status);
+
   // Averaged
   RuntimeProfile* averaged_profile = RuntimeProfile::Create(&pool, "Merged", true);
   averaged_profile->UpdateAverage(from_thrift);
@@ -1214,14 +1226,12 @@ TEST(ToJson, RuntimeProfileToJsonTest) {
     if (itr["counter_name"] == "A") {
       EXPECT_EQ(1, itr["value"].GetInt());
       EXPECT_EQ("UNIT", itr["unit"]);
-      EXPECT_EQ("Counter", itr["kind"]);
     }// check HighWaterMarkCounter
     else if (itr["counter_name"] == "high_water_counter") {
       EXPECT_EQ(20, itr["value"].GetInt());
       EXPECT_EQ("BYTES", itr["unit"]);
-      EXPECT_EQ("HighWaterMarkCounter", itr["kind"]);
     } else {
-      DCHECK(false);
+      EXPECT_TRUE(false) << itr["counter_name"].GetString();
     }
   }
 
@@ -1234,7 +1244,6 @@ TEST(ToJson, RuntimeProfileToJsonTest) {
       EXPECT_EQ(15, itr["avg"].GetInt());
       EXPECT_EQ(2, itr["num_of_samples"].GetInt());
       EXPECT_EQ("TIME_NS", itr["unit"]);
-      EXPECT_TRUE(!itr.HasMember("kind"));
     }
   }
 }

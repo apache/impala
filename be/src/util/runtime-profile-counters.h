@@ -350,10 +350,6 @@ class RuntimeProfile::HighWaterMarkCounter : public RuntimeProfile::Counter {
     UpdateMax(v);
   }
 
-  std::string CounterType() const override {
-    return "HighWaterMarkCounter";
-  }
-
   int64_t current_value() const { return current_value_.Load(); }
 
  private:
@@ -383,10 +379,6 @@ class RuntimeProfile::DerivedCounter : public RuntimeProfile::Counter {
 
   int64_t value() const override {
     return counter_fn_();
-  }
-
-  std::string CounterType() const override {
-    return "DerivedCounter";
   }
 
  private:
@@ -431,10 +423,6 @@ class RuntimeProfile::AveragedCounter : public RuntimeProfile::Counter {
           current_int_sum_, (new_counter->value() - old_val));
       value_.Store(current_int_sum_ / counter_value_map_.size());
     }
-  }
-
-  std::string CounterType() const override {
-    return "AveragedCounter";
   }
 
   /// The value for this counter should be updated through UpdateCounter().
@@ -504,10 +492,6 @@ class RuntimeProfile::SummaryStatsCounter : public RuntimeProfile::Counter {
     val->AddMember("max", max_, document.GetAllocator());
     val->AddMember("avg", value(), document.GetAllocator());
     val->AddMember("num_of_samples", total_num_values_, document.GetAllocator());
-  }
-
-  std::string CounterType() const override {
-    return "SummaryStatsCounter";
   }
 
  private:
@@ -810,10 +794,6 @@ class RuntimeProfile::ConcurrentTimerCounter : public Counter {
 
   void Add(int64_t delta) override {
     DCHECK(false);
-  }
-
-  std::string CounterType() const override {
-    return "ConcurrentTimerCounter";
   }
 
  private:

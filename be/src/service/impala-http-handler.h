@@ -79,8 +79,10 @@ class ImpalaHttpHandler {
   void QueryStateHandler(const Webserver::WebRequest& req,
       rapidjson::Document* document);
 
-  /// Json callback for /query_profile. Expects query_id as an argument, produces Json
-  /// with 'profile' set to the profile string, and 'query_id' set to the query ID.
+  /// Json callback for /query_profile. Expects query_id as an argument. If a json
+  /// profile is requested, the JSON profile is returned in 'document' under
+  /// "contents". Otherwise 'document' has 'profile' set to the profile string,
+  /// and 'query_id' set to the query ID.
   void QueryProfileHandler(const Webserver::WebRequest& req,
       rapidjson::Document* document);
 

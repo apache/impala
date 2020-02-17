@@ -121,11 +121,6 @@ class RuntimeProfile { // NOLINT: This struct is not packed, but there are not s
     /// counter_name, value, kind, unit
     virtual void ToJson(rapidjson::Document& document, rapidjson::Value* val) const;
 
-    ///  Return the name of the counter type
-    virtual string CounterType() const {
-      return "Counter";
-    }
-
     TUnit::type unit() const { return unit_; }
 
    protected:
@@ -325,6 +320,21 @@ class RuntimeProfile { // NOLINT: This struct is not packed, but there are not s
   /// Store profile into JSON format into a document
   void ToJsonHelper(rapidjson::Value* parent, rapidjson::Document* d) const;
   void ToJson(rapidjson::Document* d) const;
+
+  /// Serializes the runtime profile to a buffer.  This first serializes the
+  /// object using thrift compact binary format and then gzip compresses it.
+  /// This is not a lightweight operation and should not be in the hot path.
+  Status Compress(std::vector<uint8_t>* out) const;
+
+  /// Deserializes a compressed profile into a TRuntimeProfileTree. 'compressed_profile'
+  /// is expected to have been serialized by Compress().
+  static Status DecompressToThrift(
+      const std::vector<uint8_t>& compressed_profile, TRuntimeProfileTree* out);
+
+  /// Deserializes a compressed profile into a RuntimeProfile tree owned by 'pool'.
+  /// 'compressed_profile' is expected to have been serialized by Compress().
+  static Status DecompressToProfile(const std::vector<uint8_t>& compressed_profile,
+      ObjectPool* pool, RuntimeProfile** out);
 
   /// Serializes the runtime profile to a string.  This first serializes the
   /// object using thrift compact binary format, then gzip compresses it and

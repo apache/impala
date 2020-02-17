@@ -48,6 +48,7 @@
 #include "catalog/catalog-util.h"
 #include "common/compiler-util.h"
 #include "common/logging.h"
+#include "common/object-pool.h"
 #include "common/thread-debug-info.h"
 #include "common/version.h"
 #include "exec/external-data-source-executor.h"
@@ -68,12 +69,13 @@
 #include "runtime/tmp-file-mgr.h"
 #include "scheduling/admission-controller.h"
 #include "service/cancellation-work.h"
-#include "service/impala-http-handler.h"
-#include "service/impala-internal-service.h"
 #include "service/client-request-state.h"
 #include "service/frontend.h"
+#include "service/impala-http-handler.h"
+#include "service/impala-internal-service.h"
 #include "util/auth-util.h"
 #include "util/bit-util.h"
+#include "util/coding-util.h"
 #include "util/debug-util.h"
 #include "util/error-util.h"
 #include "util/histogram-metric.h"
@@ -90,8 +92,8 @@
 #include "util/string-parser.h"
 #include "util/summary-util.h"
 #include "util/test-info.h"
-#include "util/uid-util.h"
 #include "util/time.h"
+#include "util/uid-util.h"
 
 #include "gen-cpp/Types_types.h"
 #include "gen-cpp/ImpalaService.h"
@@ -661,24 +663,23 @@ Status ImpalaServer::GetRuntimeProfileOutput(const TUniqueId& query_id,
     RETURN_IF_ERROR(CheckProfileAccess(user, query_record->second->effective_user,
         query_record->second->user_has_profile_access));
     if (format == TRuntimeProfileFormat::BASE64) {
-      (*output) << query_record->second->encoded_profile_str;
+      Base64Encode(query_record->second->compressed_profile, output);
     } else if (format == TRuntimeProfileFormat::THRIFT) {
-      RETURN_IF_ERROR(RuntimeProfile::DeserializeFromArchiveString(
-          query_record->second->encoded_profile_str, thrift_output));
+      RETURN_IF_ERROR(RuntimeProfile::DecompressToThrift(
+          query_record->second->compressed_profile, thrift_output));
     } else if (format == TRuntimeProfileFormat::JSON) {
-      ParseResult parse_ok = json_output->Parse(
-          query_record->second->json_profile_str.c_str());
-      // When there is an error, the json_output will stay unchanged
-      // based on rapidjson parse API
-      if (!parse_ok){
-        string err = strings::Substitute("JSON parse error: $0 (Offset: $1)",
-            GetParseError_En(parse_ok.Code()), parse_ok.Offset());
-        VLOG(1) << err;
-        return Status::Expected(err);
-      }
+      ObjectPool tmp_pool;
+      RuntimeProfile* tmp_profile;
+      RETURN_IF_ERROR(RuntimeProfile::DecompressToProfile(
+          query_record->second->compressed_profile, &tmp_pool, &tmp_profile));
+      tmp_profile->ToJson(json_output);
     } else {
       DCHECK_EQ(format, TRuntimeProfileFormat::STRING);
-      (*output) << query_record->second->profile_str;
+      ObjectPool tmp_pool;
+      RuntimeProfile* tmp_profile;
+      RETURN_IF_ERROR(RuntimeProfile::DecompressToProfile(
+          query_record->second->compressed_profile, &tmp_pool, &tmp_profile));
+      tmp_profile->PrettyPrint(output);
     }
   }
   return Status::OK();
@@ -790,8 +791,8 @@ Status ImpalaServer::GetExecSummary(const TUniqueId& query_id, const string& use
 }
 
 void ImpalaServer::ArchiveQuery(const ClientRequestState& query) {
-  string encoded_profile_str;
-  Status status = query.profile()->SerializeToArchiveString(&encoded_profile_str);
+  vector<uint8_t> compressed_profile;
+  Status status = query.profile()->Compress(&compressed_profile);
   if (!status.ok()) {
     // Didn't serialize the string. Continue with empty string.
     LOG_EVERY_N(WARNING, 1000) << "Could not serialize profile to archive string "
@@ -803,7 +804,8 @@ void ImpalaServer::ArchiveQuery(const ClientRequestState& query) {
   // FLAGS_log_query_to_file will have been set to false
   if (FLAGS_log_query_to_file) {
     stringstream ss;
-    ss << UnixMillis() << " " << PrintId(query.query_id()) << " " << encoded_profile_str;
+    ss << UnixMillis() << " " << PrintId(query.query_id()) << " ";
+    Base64Encode(compressed_profile, &ss);
     status = profile_logger_->AppendEntry(ss.str());
     if (!status.ok()) {
       LOG_EVERY_N(WARNING, 1000) << "Could not write to profile log file file ("
@@ -815,17 +817,19 @@ void ImpalaServer::ArchiveQuery(const ClientRequestState& query) {
   }
 
   if (FLAGS_query_log_size == 0) return;
-  QueryStateRecord record(query, true, encoded_profile_str);
+  unique_ptr<QueryStateRecord> record =
+      make_unique<QueryStateRecord>(query, move(compressed_profile));
   if (query.GetCoordinator() != nullptr)
-    query.GetCoordinator()->GetTExecSummary(&record.exec_summary);
+    query.GetCoordinator()->GetTExecSummary(&record->exec_summary);
   {
     lock_guard<mutex> l(query_log_lock_);
     // Add record to the beginning of the log, and to the lookup index.
-    query_log_index_[query.query_id()] = query_log_.insert(query_log_.begin(), record);
+    query_log_index_[query.query_id()] = record.get();
+    query_log_.insert(query_log_.begin(), move(record));
 
     if (FLAGS_query_log_size > -1 && FLAGS_query_log_size < query_log_.size()) {
       DCHECK_EQ(query_log_.size() - FLAGS_query_log_size, 1);
-      query_log_index_.erase(query_log_.back().id);
+      query_log_index_.erase(query_log_.back()->id);
       query_log_.pop_back();
     }
   }
@@ -1810,8 +1814,18 @@ void ImpalaServer::BuildLocalBackendDescriptorInternal(TBackendDescriptor* be_de
   be_desc->executor_groups = GetExecutorGroups(FLAGS_executor_groups);
 }
 
-ImpalaServer::QueryStateRecord::QueryStateRecord(const ClientRequestState& request_state,
-    bool copy_profile, const string& encoded_profile) {
+ImpalaServer::QueryStateRecord::QueryStateRecord(
+    const ClientRequestState& request_state, vector<uint8_t>&& compressed_profile)
+  : compressed_profile(compressed_profile) {
+  Init(request_state);
+}
+
+ImpalaServer::QueryStateRecord::QueryStateRecord(const ClientRequestState& request_state)
+  : compressed_profile() {
+  Init(request_state);
+}
+
+void ImpalaServer::QueryStateRecord::Init(const ClientRequestState& request_state) {
   id = request_state.query_id();
   const TExecRequest& request = request_state.exec_request();
 
@@ -1836,31 +1850,6 @@ ImpalaServer::QueryStateRecord::QueryStateRecord(const ClientRequestState& reque
   query_status = request_state.query_status();
 
   request_state.query_events()->ToThrift(&event_sequence);
-
-  if (copy_profile) {
-    stringstream ss;
-    request_state.profile()->PrettyPrint(&ss);
-    profile_str = ss.str();
-
-    Document json_profile(rapidjson::kObjectType);
-    request_state.profile()->ToJson(&json_profile);
-
-    StringBuffer buffer;
-    Writer<StringBuffer> writer(buffer);
-    json_profile.Accept(writer);
-    json_profile_str = buffer.GetString();
-
-    if (encoded_profile.empty()) {
-      Status status =
-          request_state.profile()->SerializeToArchiveString(&encoded_profile_str);
-      if (!status.ok()) {
-        LOG_EVERY_N(WARNING, 1000) << "Could not serialize profile to archive string "
-                                   << status.GetDetail();
-      }
-    } else {
-      encoded_profile_str = encoded_profile;
-    }
-  }
 
   // Save the query fragments so that the plan can be visualised.
   for (const TPlanExecInfo& plan_exec_info:
