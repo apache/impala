@@ -355,6 +355,20 @@ void RuntimeProfile::Update(const vector<TRuntimeProfileNode>& nodes, int* idx) 
       child_counters->insert(child_counter_src_itr->second.begin(),
           child_counter_src_itr->second.end());
     }
+
+    for (int i = 0; i < node.time_series_counters.size(); ++i) {
+      const TTimeSeriesCounter& c = node.time_series_counters[i];
+      TimeSeriesCounterMap::iterator it = time_series_counter_map_.find(c.name);
+      if (it == time_series_counter_map_.end()) {
+        // Capture all incoming time series counters with the same type since re-sampling
+        // will have happened on the sender side.
+        time_series_counter_map_[c.name] = pool_->Add(
+            new ChunkedTimeSeriesCounter(c.name, c.unit, c.period_ms, c.values));
+      } else {
+        int64_t start_idx = c.__isset.start_index ? c.start_index : 0;
+        it->second->SetSamples(c.period_ms, c.values, start_idx);
+      }
+    }
   }
 
   {
@@ -373,23 +387,6 @@ void RuntimeProfile::Update(const vector<TRuntimeProfileNode>& nodes, int* idx) 
         info_strings_display_order_.push_back(key);
       } else {
         info_strings_[key] = it->second;
-      }
-    }
-  }
-
-  {
-    lock_guard<SpinLock> l(counter_map_lock_);
-    for (int i = 0; i < node.time_series_counters.size(); ++i) {
-      const TTimeSeriesCounter& c = node.time_series_counters[i];
-      TimeSeriesCounterMap::iterator it = time_series_counter_map_.find(c.name);
-      if (it == time_series_counter_map_.end()) {
-        // Capture all incoming time series counters with the same type since re-sampling
-        // will have happened on the sender side.
-        time_series_counter_map_[c.name] = pool_->Add(
-            new ChunkedTimeSeriesCounter(c.name, c.unit, c.period_ms, c.values));
-      } else {
-        int64_t start_idx = c.__isset.start_index ? c.start_index : 0;
-        it->second->SetSamples(c.period_ms, c.values, start_idx);
       }
     }
   }
@@ -1170,9 +1167,26 @@ void RuntimeProfile::ToThrift(TRuntimeProfileTree* tree) const {
 }
 
 void RuntimeProfile::ToThrift(vector<TRuntimeProfileNode>* nodes) const {
-  int index = nodes->size();
-  nodes->push_back(TRuntimeProfileNode());
-  TRuntimeProfileNode& node = (*nodes)[index];
+  // Use a two-pass approach where we first collect nodes with a pre-order traversal and
+  // then serialize them. This is done to allow reserving the full vector of
+  // TRuntimeProfileNodes upfront - copying the constructed nodes when resizing the vector
+  // can be very expensive - see IMPALA-9378.
+  vector<CollectedNode> preorder_nodes;
+  CollectNodes(false, &preorder_nodes);
+
+  nodes->reserve(preorder_nodes.size());
+  for (CollectedNode& preorder_node : preorder_nodes) {
+    nodes->emplace_back();
+    TRuntimeProfileNode& node = nodes->back();
+    preorder_node.node->ToThrift(&node);
+    node.indent = preorder_node.indent;
+    node.num_children = preorder_node.num_children;
+  }
+}
+
+void RuntimeProfile::ToThrift(TRuntimeProfileNode* out_node) const {
+  // Use a reference to reduce code churn. TODO: clean this up to use a pointer later.
+  TRuntimeProfileNode& node = *out_node;
   node.name = name_;
   // Set the required metadata field to the plan node ID for compatibility with any tools
   // that rely on the plan node id being set there.
@@ -1182,21 +1196,35 @@ void RuntimeProfile::ToThrift(vector<TRuntimeProfileNode>* nodes) const {
   if (metadata_.__isset.plan_node_id || metadata_.__isset.data_sink_id) {
     node.__set_node_metadata(metadata_);
   }
-  node.indent = true;
 
-  CounterMap counter_map;
+  // Copy of the entries. We need to do this because calling value() on entries in
+  // 'counter_map_' might invoke an arbitrary function. Use vector instead of map
+  // for efficiency of creation and iteration. Only copy references to string keys.
+  // std::map entries are stable.
+  vector<pair<const string&, const Counter*>> counter_map_entries;
   {
     lock_guard<SpinLock> l(counter_map_lock_);
-    counter_map = counter_map_;
+    counter_map_entries.reserve(counter_map_.size());
+    std::copy(counter_map_.begin(), counter_map_.end(),
+        std::back_inserter(counter_map_entries));
     node.child_counters_map = child_counter_map_;
+
+    if (time_series_counter_map_.size() != 0) {
+      node.__isset.time_series_counters = true;
+      node.time_series_counters.reserve(time_series_counter_map_.size());
+      for (const auto& val : time_series_counter_map_) {
+        node.time_series_counters.emplace_back();
+        val.second->ToThrift(&node.time_series_counters.back());
+      }
+    }
   }
-  for (map<string, Counter*>::const_iterator iter = counter_map.begin();
-       iter != counter_map.end(); ++iter) {
-    TCounter counter;
-    counter.name = iter->first;
-    counter.value = iter->second->value();
-    counter.unit = iter->second->unit();
-    node.counters.push_back(counter);
+  node.counters.reserve(counter_map_entries.size());
+  for (const auto& entry : counter_map_entries) {
+    node.counters.emplace_back();
+    TCounter& counter = node.counters.back();
+    counter.name = entry.first;
+    counter.value = entry.second->value();
+    counter.unit = entry.second->unit();
   }
 
   {
@@ -1209,29 +1237,19 @@ void RuntimeProfile::ToThrift(vector<TRuntimeProfileNode>* nodes) const {
     vector<EventSequence::Event> events;
     lock_guard<SpinLock> l(event_sequence_lock_);
     if (event_sequence_map_.size() != 0) {
-      node.__set_event_sequences(vector<TEventSequence>());
-      node.event_sequences.resize(event_sequence_map_.size());
-      int idx = 0;
-      for (const EventSequenceMap::value_type& val: event_sequence_map_) {
-        TEventSequence* seq = &node.event_sequences[idx++];
-        seq->name = val.first;
+      node.__isset.event_sequences = true;
+      node.event_sequences.reserve(event_sequence_map_.size());
+      for (const auto& val : event_sequence_map_) {
+        node.event_sequences.emplace_back();
+        TEventSequence& seq = node.event_sequences.back();
+        seq.name = val.first;
         val.second->GetEvents(&events);
+        seq.labels.reserve(events.size());
+        seq.timestamps.reserve(events.size());
         for (const EventSequence::Event& ev: events) {
-          seq->labels.push_back(ev.first);
-          seq->timestamps.push_back(ev.second);
+          seq.labels.push_back(move(ev.first));
+          seq.timestamps.push_back(ev.second);
         }
-      }
-    }
-  }
-
-  {
-    lock_guard<SpinLock> l(counter_map_lock_);
-    if (time_series_counter_map_.size() != 0) {
-      node.__set_time_series_counters(
-          vector<TTimeSeriesCounter>(time_series_counter_map_.size()));
-      int idx = 0;
-      for (const TimeSeriesCounterMap::value_type& val: time_series_counter_map_) {
-        val.second->ToThrift(&node.time_series_counters[idx++]);
       }
     }
   }
@@ -1239,26 +1257,21 @@ void RuntimeProfile::ToThrift(vector<TRuntimeProfileNode>* nodes) const {
   {
     lock_guard<SpinLock> l(summary_stats_map_lock_);
     if (summary_stats_map_.size() != 0) {
-      node.__set_summary_stats_counters(
-          vector<TSummaryStatsCounter>(summary_stats_map_.size()));
+      node.__isset.summary_stats_counters = true;
+      node.summary_stats_counters.resize(summary_stats_map_.size());
       int idx = 0;
       for (const SummaryStatsCounterMap::value_type& val: summary_stats_map_) {
         val.second->ToThrift(&node.summary_stats_counters[idx++], val.first);
       }
     }
   }
+}
 
-  ChildVector children;
-  {
-    lock_guard<SpinLock> l(children_lock_);
-    children = children_;
-    node.num_children = children_.size();
-  }
-  for (int i = 0; i < children.size(); ++i) {
-    int child_idx = nodes->size();
-    children[i].first->ToThrift(nodes);
-    // fix up indentation flag
-    (*nodes)[child_idx].indent = children[i].second;
+void RuntimeProfile::CollectNodes(bool indent, vector<CollectedNode>* nodes) const {
+  lock_guard<SpinLock> l(children_lock_);
+  nodes->emplace_back(this, indent, children_.size());
+  for (const auto& child : children_) {
+    child.first->CollectNodes(child.second, nodes);
   }
 }
 

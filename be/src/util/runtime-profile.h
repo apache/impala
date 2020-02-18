@@ -321,7 +321,6 @@ class RuntimeProfile { // NOLINT: This struct is not packed, but there are not s
   /// Serializes profile to thrift.
   /// Does not hold locks when it makes any function calls.
   void ToThrift(TRuntimeProfileTree* tree) const;
-  void ToThrift(std::vector<TRuntimeProfileNode>* nodes) const;
 
   /// Store profile into JSON format into a document
   void ToJsonHelper(rapidjson::Value* parent, rapidjson::Document* d) const;
@@ -578,6 +577,22 @@ class RuntimeProfile { // NOLINT: This struct is not packed, but there are not s
   /// Trailing whitspace is removed.
   void AddInfoStringInternal(
       const std::string& key, std::string value, bool append, bool redact = false);
+
+  /// Helper to serialize the individual plan nodes to thrift.
+  void ToThrift(std::vector<TRuntimeProfileNode>* nodes) const;
+  void ToThrift(TRuntimeProfileNode* out_node) const;
+
+  struct CollectedNode {
+    CollectedNode(const RuntimeProfile* node, bool indent, int num_children) :
+      node(node), indent(indent), num_children(num_children) {}
+    const RuntimeProfile* const node;
+    const bool indent;
+    const int num_children;
+  };
+
+  /// Collect this node and descendants into 'nodes'. The order is a pre-order traversal
+  /// 'indent' is true if this node should be indented.
+  void CollectNodes(bool indent, std::vector<CollectedNode>* nodes) const;
 
   /// Send exec_summary to thrift
   void ExecSummaryToThrift(TRuntimeProfileTree* tree) const;
