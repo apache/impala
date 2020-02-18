@@ -217,8 +217,12 @@ fi
 
 # Ubuntu 18.04 installs OpenJDK 11 and configures it as the default Java version.
 # Impala is currently tested with OpenJDK 8, so configure that version as the default.
-ubuntu18 sudo update-java-alternatives -s java-1.8.0-openjdk-amd64
-
+ARCH_NAME=$(uname -p)
+if [[ $ARCH_NAME == 'aarch64' ]]; then
+  ubuntu18 sudo update-java-alternatives -s java-1.8.0-openjdk-arm64
+else
+  ubuntu18 sudo update-java-alternatives -s java-1.8.0-openjdk-amd64
+fi
 
 redhat sudo yum install -y curl gcc gcc-c++ git krb5-devel krb5-server krb5-workstation \
         libevent-devel libffi-devel make ntp ntpdate ntp-perl openssl-devel cyrus-sasl \
@@ -290,7 +294,7 @@ notindocker redhat7 sudo service ntpd start
 # IMPALA-3932, IMPALA-3926
 if [[ $UBUNTU = true && ( $DISTRIB_RELEASE = 16.04 || $DISTRIB_RELEASE = 18.04 ) ]]
 then
-  SET_LD_LIBRARY_PATH='export LD_LIBRARY_PATH=/usr/lib/x86_64-linux-gnu/${LD_LIBRARY_PATH:+:$LD_LIBRARY_PATH}'
+  SET_LD_LIBRARY_PATH="export LD_LIBRARY_PATH=/usr/lib/${ARCH_NAME}-linux-gnu/${LD_LIBRARY_PATH:+:$LD_LIBRARY_PATH}"
   echo -e "\n$SET_LD_LIBRARY_PATH" >> "${IMPALA_HOME}/bin/impala-config-local.sh"
   eval "$SET_LD_LIBRARY_PATH"
 fi
@@ -395,7 +399,9 @@ eval "$SET_IMPALA_HOME"
 
 # Ubuntu and RH install JDK's in slightly different paths.
 if [[ $UBUNTU == true ]]; then
-  SET_JAVA_HOME="export JAVA_HOME=/usr/lib/jvm/java-8-openjdk-amd64"
+  # Assert that there's only one glob match.
+  [ 1 == $(compgen -G "/usr/lib/jvm/java-8-openjdk-*" | wc -l) ]
+  SET_JAVA_HOME="export JAVA_HOME=$(compgen -G '/usr/lib/jvm/java-8-openjdk-*')"
 else
   # Assert that there's only one glob match.
   [ 1 == $(compgen -G "/usr/lib/jvm/java-1.8.0-openjdk-*" | wc -l) ]
