@@ -78,6 +78,7 @@ static const string num_io_threads_per_rotational_disk_help_msg = Substitute("Nu
     " is set, defaults to $0 thread(s) per rotational disk", THREADS_PER_ROTATIONAL_DISK);
 DEFINE_int32(num_io_threads_per_rotational_disk, 0,
     num_io_threads_per_rotational_disk_help_msg.c_str());
+
 // The maximum number of the threads per solid state disk is also the max queue depth per
 // solid state disk.
 static const string num_io_threads_per_solid_state_disk_help_msg = Substitute("Number of"
@@ -86,25 +87,30 @@ static const string num_io_threads_per_solid_state_disk_help_msg = Substitute("N
     THREADS_PER_SOLID_STATE_DISK);
 DEFINE_int32(num_io_threads_per_solid_state_disk, 0,
     num_io_threads_per_solid_state_disk_help_msg.c_str());
+
 // The maximum number of remote HDFS I/O threads.  HDFS access that are expected to be
 // remote are placed on a separate remote disk queue.  This is the queue depth for that
 // queue.  If 0, then the remote queue is not used and instead ranges are round-robined
 // across the local disk queues.
 DEFINE_int32(num_remote_hdfs_io_threads, 8, "Number of remote HDFS I/O threads");
+
 // The maximum number of S3 I/O threads. The default value of 16 was chosen emperically
 // to maximize S3 throughput. Maximum throughput is achieved with multiple connections
 // open to S3 and use of multiple CPU cores since S3 reads are relatively compute
 // expensive (SSL and JNI buffer overheads).
 DEFINE_int32(num_s3_io_threads, 16, "Number of S3 I/O threads");
+
 // The maximum number of ABFS I/O threads. TODO: choose the default empirically.
 DEFINE_int32(num_abfs_io_threads, 16, "Number of ABFS I/O threads");
+
 // The maximum number of ADLS I/O threads. This number is a good default to have for
 // clusters that may vary widely in size, due to an undocumented concurrency limit
 // enforced by ADLS for a cluster, which spans between 500-700. For smaller clusters
 // (~10 nodes), 64 threads would be more ideal.
 DEFINE_int32(num_adls_io_threads, 16, "Number of ADLS I/O threads");
 
-DECLARE_int64(min_buffer_size);
+// The maximum number of Ozone I/O threads. TODO: choose the default empirically.
+DEFINE_int32(num_ozone_io_threads, 16, "Number of Ozone I/O threads");
 
 // The number of cached file handles defines how much memory can be used per backend for
 // caching frequently used file handles. Measurements indicate that a single file handle
@@ -147,6 +153,8 @@ DEFINE_bool(cache_remote_file_handles, true, "Enable the file handle cache for "
 // This parameter controls whether S3 file handles are cached.
 DEFINE_bool(cache_s3_file_handles, true, "Enable the file handle cache for "
     "S3 files.");
+
+DECLARE_int64(min_buffer_size);
 
 static const char* DEVICE_NAME_METRIC_KEY_TEMPLATE =
     "impala-server.io-mgr.queue-$0.device-name";
@@ -271,6 +279,9 @@ Status DiskIoMgr::Init() {
     } else if (i == RemoteAdlsDiskId()) {
       num_threads_per_disk = FLAGS_num_adls_io_threads;
       device_name = "ADLS remote";
+    } else if (i == RemoteOzoneDiskId()) {
+      num_threads_per_disk = FLAGS_num_ozone_io_threads;
+      device_name = "Ozone remote";
     } else if (DiskInfo::is_rotational(i)) {
       num_threads_per_disk = num_io_threads_per_rotational_disk_;
       // During tests, i may not point to an existing disk.
@@ -541,11 +552,13 @@ int DiskIoMgr::AssignQueue(const char* file, int disk_id, bool expected_local) {
     if (IsS3APath(file)) return RemoteS3DiskId();
     if (IsABFSPath(file)) return RemoteAbfsDiskId();
     if (IsADLSPath(file)) return RemoteAdlsDiskId();
+    if (IsOzonePath(file)) return RemoteOzoneDiskId();
   }
   // Assign to a local disk queue.
   DCHECK(!IsS3APath(file)); // S3 is always remote.
   DCHECK(!IsABFSPath(file)); // ABFS is always remote.
   DCHECK(!IsADLSPath(file)); // ADLS is always remote.
+  DCHECK(!IsOzonePath(file)); // Ozone is always remote.
   if (disk_id == -1) {
     // disk id is unknown, assign it an arbitrary one.
     disk_id = next_disk_id_.Add(1);

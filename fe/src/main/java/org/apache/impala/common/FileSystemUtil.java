@@ -391,6 +391,23 @@ public class FileSystemUtil {
   }
 
   /**
+   * Returns true iff the filesystem is a OzoneFileSystem.
+   */
+  public static boolean isOzoneFileSystem(FileSystem fs) {
+    // TODO once CDP becomes the default build version, this check can directly use
+    // org.apache.hadoop.fs.ozone.OzoneFileSystem, similar to the rest of the
+    // is*FileSystem() methods.
+    return fs.getUri().getScheme().equals("o3fs");
+  }
+
+  /**
+   * Returns true iff the path is on OzoneFileSystem.
+   */
+  public static boolean isOzoneFileSystem(Path path) throws IOException {
+    return isOzoneFileSystem(path.getFileSystem(CONF));
+  }
+
+  /**
    * Represents the type of filesystem being used. Typically associated with a
    * {@link org.apache.hadoop.fs.FileSystem} instance that is used to read data.
    *
@@ -406,7 +423,8 @@ public class FileSystemUtil {
     ADLS,
     HDFS,
     LOCAL,
-    S3;
+    S3,
+    OZONE;
 
     private static final Map<String, FsType> SCHEME_TO_FS_MAPPING =
         ImmutableMap.<String, FsType>builder()
@@ -416,6 +434,7 @@ public class FileSystemUtil {
             .put("file", LOCAL)
             .put("hdfs", HDFS)
             .put("s3a", S3)
+            .put("o3fs", OZONE)
             .build();
 
     /**
@@ -531,7 +550,8 @@ public class FileSystemUtil {
         FileSystemUtil.isLocalFileSystem(path) ||
         FileSystemUtil.isS3AFileSystem(path) ||
         FileSystemUtil.isABFSFileSystem(path) ||
-        FileSystemUtil.isADLFileSystem(path));
+        FileSystemUtil.isADLFileSystem(path) ||
+        FileSystemUtil.isOzoneFileSystem(path));
   }
 
   /**

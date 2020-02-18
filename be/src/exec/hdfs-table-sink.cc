@@ -405,11 +405,14 @@ Status HdfsTableSink::CreateNewTmpFile(RuntimeState* state,
 
   if (IsS3APath(output_partition->current_file_name.c_str()) ||
       IsABFSPath(output_partition->current_file_name.c_str()) ||
-      IsADLSPath(output_partition->current_file_name.c_str())) {
+      IsADLSPath(output_partition->current_file_name.c_str()) ||
+      IsOzonePath(output_partition->current_file_name.c_str())) {
     // On S3A, the file cannot be stat'ed until after it's closed, and even so, the block
     // size reported will be just the filesystem default. Similarly, the block size
     // reported for ADLS will be the filesystem default. So, remember the requested block
     // size.
+    // TODO: IMPALA-9437: Ozone does not support stat'ing a file until after it's closed,
+    // so for now skip the call to hdfsGetPathInfo.
     output_partition->block_size = block_size;
   } else {
     // HDFS may choose to override the block size that we've recommended, so for non-S3
