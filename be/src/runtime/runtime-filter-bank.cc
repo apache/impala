@@ -230,19 +230,21 @@ void RuntimeFilterBank::UpdateFilterFromLocal(
       lock_guard<SpinLock> l(fs->lock);
       if (fs->consumed_filter == nullptr) return;
       consumed_filter = fs->consumed_filter;
-    }
-    if (consumed_filter->HasFilter()) {
-      // Multiple instances may produce the same filter for broadcast joins.
-      // TODO: we would ideally update the coordinator logic to avoid creating duplicates
-      // on the same node, but sending out a few duplicate filters is relatively
-      // inconsequential for performance.
-      DCHECK(consumed_filter->filter_desc().is_broadcast_join)
-          << consumed_filter->filter_desc();
-    } else {
-      consumed_filter->SetFilter(complete_filter);
-      query_state_->host_profile()->AddInfoString(
-          Substitute("Filter $0 arrival", filter_id),
-          PrettyPrinter::Print(consumed_filter->arrival_delay_ms(), TUnit::TIME_MS));
+      // Update the filter while still holding the lock to avoid racing with the
+      // SetFilter() call in PublishGlobalFilter().
+      if (consumed_filter->HasFilter()) {
+        // Multiple instances may produce the same filter for broadcast joins.
+        // TODO: we would ideally update the coordinator logic to avoid creating duplicates
+        // on the same node, but sending out a few duplicate filters is relatively
+        // inconsequential for performance.
+        DCHECK(consumed_filter->filter_desc().is_broadcast_join)
+            << consumed_filter->filter_desc();
+      } else {
+        consumed_filter->SetFilter(complete_filter);
+        query_state_->host_profile()->AddInfoString(
+            Substitute("Filter $0 arrival", filter_id),
+            PrettyPrinter::Print(consumed_filter->arrival_delay_ms(), TUnit::TIME_MS));
+      }
     }
   }
 

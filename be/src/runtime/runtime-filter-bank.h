@@ -194,6 +194,10 @@ class RuntimeFilterBank {
 
     /// The filter that is returned to consumers that call RegisterFilter(producer=false).
     /// Initialised when RegisterFilter(producer=false) is called for this filter id.
+    ///
+    /// For broadcast joins, SetFilter() must be called while holding 'lock' and after
+    /// checking HasFilter() to avoid SetFilter() being called multiple times for
+    /// broadcast join filters.
     RuntimeFilter* consumed_filter = nullptr;
 
     /// Contains references to all the bloom filters generated. Used in Close() to safely
