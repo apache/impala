@@ -311,7 +311,7 @@ ubuntu sudo service postgresql stop
 # widely.
 ubuntu sudo sed -ri 's/local +all +all +peer/local all all trust/g' \
   /etc/postgresql/*/main/pg_hba.conf
-redhat sudo sed -ri 's/local +all +all +ident/local all all trust/g' \
+redhat sudo sed -ri 's/local +all +all +(ident|peer)/local all all trust/g' \
   /var/lib/pgsql/data/pg_hba.conf
 # Accept md5 passwords from localhost
 redhat sudo sed -i -e 's,\(host.*\)ident,\1md5,' /var/lib/pgsql/data/pg_hba.conf
