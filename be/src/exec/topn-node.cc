@@ -43,17 +43,18 @@ using namespace impala;
 Status TopNPlanNode::Init(const TPlanNode& tnode, RuntimeState* state) {
   const TSortInfo& tsort_info = tnode.sort_node.sort_info;
   RETURN_IF_ERROR(PlanNode::Init(tnode, state));
-  RETURN_IF_ERROR(ScalarExpr::Create(tsort_info.ordering_exprs, *row_descriptor_,
-      state, &ordering_exprs_));
+  RETURN_IF_ERROR(ScalarExpr::Create(
+      tsort_info.ordering_exprs, *row_descriptor_, state, &ordering_exprs_));
   DCHECK(tsort_info.__isset.sort_tuple_slot_exprs);
+  output_tuple_desc_ = row_descriptor_->tuple_descriptors()[0];
   RETURN_IF_ERROR(ScalarExpr::Create(tsort_info.sort_tuple_slot_exprs,
       *children_[0]->row_descriptor_, state, &output_tuple_exprs_));
-  is_asc_order_ = tnode.sort_node.sort_info.is_asc_order;
-  nulls_first_ = tnode.sort_node.sort_info.nulls_first;
-  DCHECK_EQ(conjuncts_.size(), 0)
-      << "TopNNode should never have predicates to evaluate.";
+  row_comparator_config_ =
+      state->obj_pool()->Add(new TupleRowComparatorConfig(tsort_info, ordering_exprs_));
+  DCHECK_EQ(conjuncts_.size(), 0) << "TopNNode should never have predicates to evaluate.";
   return Status::OK();
 }
+
 void TopNPlanNode::Close() {
   ScalarExpr::Close(ordering_exprs_);
   ScalarExpr::Close(output_tuple_exprs_);
@@ -70,17 +71,12 @@ TopNNode::TopNNode(
     ObjectPool* pool, const TopNPlanNode& pnode, const DescriptorTbl& descs)
   : ExecNode(pool, pnode, descs),
     offset_(pnode.tnode_->sort_node.__isset.offset ? pnode.tnode_->sort_node.offset : 0),
-    ordering_exprs_(pnode.ordering_exprs_),
     output_tuple_exprs_(pnode.output_tuple_exprs_),
-    is_asc_order_(pnode.is_asc_order_),
-    nulls_first_(pnode.nulls_first_),
-    output_tuple_desc_(row_descriptor_.tuple_descriptors()[0]),
-    tuple_row_less_than_(NULL),
-    tmp_tuple_(NULL),
-    tuple_pool_(NULL),
-    codegend_insert_batch_fn_(NULL),
+    output_tuple_desc_(pnode.output_tuple_desc_),
+    tuple_row_less_than_(new TupleRowLexicalComparator(*pnode.row_comparator_config_)),
+    tuple_pool_(nullptr),
+    codegend_insert_batch_fn_(pnode.codegend_insert_batch_fn_),
     rows_to_reclaim_(0),
-    tuple_pool_reclaim_counter_(NULL),
     num_rows_skipped_(0) {
   runtime_profile()->AddInfoString("SortType", "TopN");
 }
@@ -92,9 +88,6 @@ Status TopNNode::Prepare(RuntimeState* state) {
   tuple_pool_.reset(new MemPool(mem_tracker()));
   RETURN_IF_ERROR(ScalarExprEvaluator::Create(output_tuple_exprs_, state, pool_,
       expr_perm_pool(), expr_results_pool(), &output_tuple_expr_evals_));
-  tuple_row_less_than_.reset(
-      new TupleRowLexicalComparator(ordering_exprs_, is_asc_order_, nulls_first_));
-  output_tuple_desc_ = row_descriptor_.tuple_descriptors()[0];
   insert_batch_timer_ = ADD_TIMER(runtime_profile(), "InsertBatchTime");
   state->CheckAndAddCodegenDisabledMessage(runtime_profile());
   tuple_pool_reclaim_counter_ = ADD_COUNTER(runtime_profile(), "TuplePoolReclamations",
@@ -106,12 +99,16 @@ void TopNNode::Codegen(RuntimeState* state) {
   DCHECK(state->ShouldCodegen());
   ExecNode::Codegen(state);
   if (IsNodeCodegenDisabled()) return;
+  const TopNPlanNode& topn_pnode = static_cast<const TopNPlanNode&>(plan_node_);
+  TopNPlanNode& non_const_pnode = const_cast<TopNPlanNode&>(topn_pnode);
+  non_const_pnode.Codegen(state, runtime_profile());
+}
 
+void TopNPlanNode::Codegen(RuntimeState* state, RuntimeProfile* runtime_profile) {
   LlvmCodeGen* codegen = state->codegen();
   DCHECK(codegen != NULL);
 
-  // TODO: inline tuple_row_less_than_->Compare()
-  Status codegen_status = tuple_row_less_than_->Codegen(state);
+  Status codegen_status = row_comparator_config_->Codegen(state);
   if (codegen_status.ok()) {
     llvm::Function* insert_batch_fn =
         codegen->GetFunction(IRFunction::TOPN_NODE_INSERT_BATCH, true);
@@ -148,7 +145,7 @@ void TopNNode::Codegen(RuntimeState* state) {
       }
     }
   }
-  runtime_profile()->AddCodegenMsg(codegen_status.ok(), codegen_status);
+  runtime_profile->AddCodegenMsg(codegen_status.ok(), codegen_status);
 }
 
 Status TopNNode::Open(RuntimeState* state) {
@@ -176,7 +173,7 @@ Status TopNNode::Open(RuntimeState* state) {
       RETURN_IF_ERROR(child(0)->GetNext(state, &batch, &eos));
       {
         SCOPED_TIMER(insert_batch_timer_);
-        if (codegend_insert_batch_fn_ != NULL) {
+        if (codegend_insert_batch_fn_ != nullptr) {
           codegend_insert_batch_fn_(this, &batch);
         } else {
           InsertBatch(&batch);
@@ -295,13 +292,14 @@ Status TopNNode::ReclaimTuplePool(RuntimeState* state) {
 
 void TopNNode::DebugString(int indentation_level, stringstream* out) const {
   *out << string(indentation_level * 2, ' ');
-  *out << "TopNNode("
-       << ScalarExpr::DebugString(ordering_exprs_);
-  for (int i = 0; i < is_asc_order_.size(); ++i) {
-    *out << (i > 0 ? " " : "")
-         << (is_asc_order_[i] ? "asc" : "desc")
-         << " nulls " << (nulls_first_[i] ? "first" : "last");
- }
+  const TopNPlanNode& pnode = static_cast<const TopNPlanNode&>(plan_node_);
+  const TSortInfo& tsort_info = pnode.tnode_->sort_node.sort_info;
+
+  *out << "TopNNode(" << ScalarExpr::DebugString(pnode.ordering_exprs_);
+  for (int i = 0; i < tsort_info.is_asc_order.size(); ++i) {
+    *out << (i > 0 ? " " : "") << (tsort_info.is_asc_order[i] ? "asc" : "desc")
+         << " nulls " << (tsort_info.nulls_first[i] ? "first" : "last");
+  }
 
   ExecNode::DebugString(indentation_level, out);
   *out << ")";

@@ -93,8 +93,8 @@ class RowBatch;
 class Sorter {
  public:
   /// 'sort_tuple_exprs' are the slot exprs used to materialize the tuples to be
-  /// sorted. 'ordering_exprs', 'is_asc_order' and 'nulls_first' are parameters
-  /// for the comparator for the sort tuples.
+  /// sorted.
+  /// 'tuple_row_comparator_config' is used to create the comparator for the sort tuples.
   /// 'node_label' is the label of the exec node using the sorter for error reporting.
   /// 'enable_spilling' should be set to false to reduce the number of requested buffers
   /// if the caller will use AddBatchNoSpill().
@@ -103,21 +103,16 @@ class Sorter {
   /// reservations for sorting, and may increase the size of the client's reservation.
   /// The caller is responsible for ensuring that the minimum reservation (returned from
   /// ComputeMinReservation()) is available.
-  Sorter(const std::vector<ScalarExpr*>& ordering_exprs,
-      const std::vector<bool>& is_asc_order, const std::vector<bool>& nulls_first,
+  Sorter(const TupleRowComparatorConfig& tuple_row_comparator_config,
       const std::vector<ScalarExpr*>& sort_tuple_exprs, RowDescriptor* output_row_desc,
       MemTracker* mem_tracker, BufferPool::ClientHandle* client, int64_t page_len,
       RuntimeProfile* profile, RuntimeState* state, const std::string& node_label,
-      bool enable_spilling, TSortingOrder::type sorting_order);
+      bool enable_spilling);
   ~Sorter();
 
   /// Initial set-up of the sorter for execution.
   /// The evaluators for 'sort_tuple_exprs_' will be created and stored in 'obj_pool'.
   Status Prepare(ObjectPool* obj_pool) WARN_UNUSED_RESULT;
-
-  /// Do codegen for the Sorter. Called after Prepare() if codegen is desired. Returns OK
-  /// if successful or a Status describing the reason why Codegen failed otherwise.
-  Status Codegen(RuntimeState* state);
 
   /// Opens the sorter for adding rows and initializes the evaluators for materializing
   /// the tuples. Must be called after Prepare() or Reset() and before calling AddBatch().

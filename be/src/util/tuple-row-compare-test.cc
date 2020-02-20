@@ -68,7 +68,11 @@ class TupleRowCompareTest : public testing::Test {
   }
 
   void LoadComperator(int offset) {
-    comperator_.reset(new TupleRowZOrderComparator(ordering_exprs_));
+    TSortInfo* tsort_info = pool_.Add(new TSortInfo);
+    tsort_info->sorting_order = TSortingOrder::ZORDER;
+    TupleRowComparatorConfig* config =
+        pool_.Add(new TupleRowComparatorConfig(*tsort_info, ordering_exprs_));
+    comperator_.reset(new TupleRowZOrderComparator(*config));
     ASSERT_OK(comperator_->Open(&pool_, runtime_state_, &expr_perm_pool_,
         &expr_results_pool_));
   }

@@ -28,19 +28,19 @@ class PartialSortPlanNode : public PlanNode {
   virtual Status Init(const TPlanNode& tnode, RuntimeState* state) override;
   virtual void Close() override;
   virtual Status CreateExecNode(RuntimeState* state, ExecNode** node) const override;
+  void Codegen(RuntimeState* state, RuntimeProfile* runtime_profile);
 
   ~PartialSortPlanNode(){}
 
-    /// Expressions and parameters used for tuple comparison.
+  /// Expressions used for tuple comparison.
   std::vector<ScalarExpr*> ordering_exprs_;
 
   /// Expressions used to materialize slots in the tuples to be sorted.
   /// One expr per slot in the materialized tuple.
   std::vector<ScalarExpr*> sort_tuple_slot_exprs_;
 
-  std::vector<bool> is_asc_order_;
-  std::vector<bool> nulls_first_;
-  TSortingOrder::type sorting_order_;
+  /// Config used to create a TupleRowComparator instance.
+  TupleRowComparatorConfig* row_comparator_config_ = nullptr;
 };
 
 /// Node that implements a partial sort, where its input is divided up into runs, each
@@ -78,16 +78,11 @@ class PartialSortNode : public ExecNode {
   virtual void DebugString(int indentation_level, std::stringstream* out) const;
 
  private:
-  /// Expressions and parameters used for tuple comparison.
-  const std::vector<ScalarExpr*>& ordering_exprs_;
-
   /// Expressions used to materialize slots in the tuples to be sorted.
   /// One expr per slot in the materialized tuple.
   const std::vector<ScalarExpr*>& sort_tuple_exprs_;
 
-  std::vector<bool> is_asc_order_;
-  std::vector<bool> nulls_first_;
-  TSortingOrder::type sorting_order_;
+  const TupleRowComparatorConfig& tuple_row_comparator_config_;
 
   /////////////////////////////////////////
   /// BEGIN: Members that must be Reset()

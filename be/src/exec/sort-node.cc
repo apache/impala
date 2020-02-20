@@ -35,10 +35,8 @@ Status SortPlanNode::Init(const TPlanNode& tnode, RuntimeState* state) {
   DCHECK(tsort_info.__isset.sort_tuple_slot_exprs);
   RETURN_IF_ERROR(ScalarExpr::Create(tsort_info.sort_tuple_slot_exprs,
       *children_[0]->row_descriptor_, state, &sort_tuple_slot_exprs_));
-  is_asc_order_ = tnode.sort_node.sort_info.is_asc_order;
-  nulls_first_ = tnode.sort_node.sort_info.nulls_first;
-  sorting_order_ = static_cast<TSortingOrder::type>(
-      tnode.sort_node.sort_info.sorting_order);
+  row_comparator_config_ =
+      state->obj_pool()->Add(new TupleRowComparatorConfig(tsort_info, ordering_exprs_));
   return Status::OK();
 }
 
@@ -58,11 +56,8 @@ SortNode::SortNode(
     ObjectPool* pool, const SortPlanNode& pnode, const DescriptorTbl& descs)
   : ExecNode(pool, pnode, descs),
     offset_(pnode.tnode_->sort_node.__isset.offset ? pnode.tnode_->sort_node.offset : 0),
-    ordering_exprs_(pnode.ordering_exprs_),
     sort_tuple_exprs_(pnode.sort_tuple_slot_exprs_),
-    is_asc_order_(pnode.is_asc_order_),
-    nulls_first_(pnode.nulls_first_),
-    sorting_order_(pnode.sorting_order_),
+    tuple_row_comparator_config_(*pnode.row_comparator_config_),
     sorter_(NULL),
     num_rows_skipped_(0) {
   runtime_profile()->AddInfoString("SortType", "Total");
@@ -74,10 +69,9 @@ SortNode::~SortNode() {
 Status SortNode::Prepare(RuntimeState* state) {
   SCOPED_TIMER(runtime_profile_->total_time_counter());
   RETURN_IF_ERROR(ExecNode::Prepare(state));
-  sorter_.reset(new Sorter(ordering_exprs_, is_asc_order_, nulls_first_,
-      sort_tuple_exprs_, &row_descriptor_, mem_tracker(), buffer_pool_client(),
-      resource_profile_.spillable_buffer_size, runtime_profile(), state, label(), true,
-      sorting_order_));
+  sorter_.reset(new Sorter(tuple_row_comparator_config_, sort_tuple_exprs_,
+      &row_descriptor_, mem_tracker(), buffer_pool_client(),
+      resource_profile_.spillable_buffer_size, runtime_profile(), state, label(), true));
   RETURN_IF_ERROR(sorter_->Prepare(pool_));
   DCHECK_GE(resource_profile_.min_reservation, sorter_->ComputeMinReservation());
   state->CheckAndAddCodegenDisabledMessage(runtime_profile());
@@ -88,8 +82,14 @@ void SortNode::Codegen(RuntimeState* state) {
   DCHECK(state->ShouldCodegen());
   ExecNode::Codegen(state);
   if (IsNodeCodegenDisabled()) return;
-  Status codegen_status = sorter_->Codegen(state);
-  runtime_profile()->AddCodegenMsg(codegen_status.ok(), codegen_status);
+  const SortPlanNode& sort_pnode = static_cast<const SortPlanNode&>(plan_node_);
+  SortPlanNode& non_const_pnode = const_cast<SortPlanNode&>(sort_pnode);
+  non_const_pnode.Codegen(state, runtime_profile());
+}
+
+void SortPlanNode::Codegen(RuntimeState* state, RuntimeProfile* runtime_profile) {
+  Status codegen_status = row_comparator_config_->Codegen(state);
+  runtime_profile->AddCodegenMsg(codegen_status.ok(), codegen_status);
 }
 
 Status SortNode::Open(RuntimeState* state) {
@@ -178,11 +178,12 @@ void SortNode::Close(RuntimeState* state) {
 
 void SortNode::DebugString(int indentation_level, stringstream* out) const {
   *out << string(indentation_level * 2, ' ');
-  *out << "SortNode(" << ScalarExpr::DebugString(ordering_exprs_);
-  for (int i = 0; i < is_asc_order_.size(); ++i) {
-    *out << (i > 0 ? " " : "")
-         << (is_asc_order_[i] ? "asc" : "desc")
-         << " nulls " << (nulls_first_[i] ? "first" : "last");
+  const SortPlanNode& pnode = static_cast<const SortPlanNode&>(plan_node_);
+  const TSortInfo& tsort_info = pnode.tnode_->sort_node.sort_info;
+  *out << "SortNode(" << ScalarExpr::DebugString(pnode.ordering_exprs_);
+  for (int i = 0; i < tsort_info.is_asc_order.size(); ++i) {
+    *out << (i > 0 ? " " : "") << (tsort_info.is_asc_order[i] ? "asc" : "desc")
+         << " nulls " << (tsort_info.nulls_first[i] ? "first" : "last");
   }
   ExecNode::DebugString(indentation_level, out);
   *out << ")";

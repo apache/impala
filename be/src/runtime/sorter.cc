@@ -758,13 +758,11 @@ Status Sorter::TupleSorter::Sort(Run* run) {
   return Status::OK();
 }
 
-Sorter::Sorter(const std::vector<ScalarExpr*>& ordering_exprs,
-      const std::vector<bool>& is_asc_order, const std::vector<bool>& nulls_first,
+Sorter::Sorter(const TupleRowComparatorConfig& tuple_row_comparator_config,
     const vector<ScalarExpr*>& sort_tuple_exprs, RowDescriptor* output_row_desc,
     MemTracker* mem_tracker, BufferPool::ClientHandle* buffer_pool_client,
     int64_t page_len, RuntimeProfile* profile, RuntimeState* state,
-    const string& node_label, bool enable_spilling,
-    TSortingOrder::type sorting_order)
+    const string& node_label, bool enable_spilling)
   : node_label_(node_label),
     state_(state),
     expr_perm_pool_(mem_tracker),
@@ -786,13 +784,13 @@ Sorter::Sorter(const std::vector<ScalarExpr*>& ordering_exprs,
     in_mem_sort_timer_(nullptr),
     sorted_data_size_(nullptr),
     run_sizes_(nullptr) {
-  switch (sorting_order) {
+  switch (tuple_row_comparator_config.sorting_order_) {
     case TSortingOrder::LEXICAL:
-      compare_less_than_.reset(new TupleRowLexicalComparator(ordering_exprs, is_asc_order,
-          nulls_first));
+      compare_less_than_.reset(
+          new TupleRowLexicalComparator(tuple_row_comparator_config));
       break;
     case TSortingOrder::ZORDER:
-      compare_less_than_.reset(new TupleRowZOrderComparator(ordering_exprs));
+      compare_less_than_.reset(new TupleRowZOrderComparator(tuple_row_comparator_config));
       break;
     default:
       DCHECK(false);
@@ -841,10 +839,6 @@ Status Sorter::Prepare(ObjectPool* obj_pool) {
   RETURN_IF_ERROR(ScalarExprEvaluator::Create(sort_tuple_exprs_, state_, obj_pool,
       &expr_perm_pool_, &expr_results_pool_, &sort_tuple_expr_evals_));
   return Status::OK();
-}
-
-Status Sorter::Codegen(RuntimeState* state) {
-  return compare_less_than_->Codegen(state);
 }
 
 Status Sorter::Open() {

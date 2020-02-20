@@ -31,6 +31,18 @@
 using namespace impala;
 using namespace strings;
 
+TupleRowComparatorConfig::TupleRowComparatorConfig(
+    const TSortInfo& tsort_info, const std::vector<ScalarExpr*>& ordering_exprs)
+  : sorting_order_(tsort_info.sorting_order),
+    ordering_exprs_(ordering_exprs),
+    is_asc_(tsort_info.is_asc_order),
+    codegend_compare_fn_(nullptr) {
+  if (sorting_order_ == TSortingOrder::ZORDER) return;
+  for (bool null_first : tsort_info.nulls_first) {
+    nulls_first_.push_back(null_first ? -1 : 1);
+  }
+}
+
 Status TupleRowComparator::Open(ObjectPool* pool, RuntimeState* state,
     MemPool* expr_perm_pool, MemPool* expr_results_pool) {
   if (ordering_expr_evals_lhs_.empty()) {
@@ -52,13 +64,15 @@ void TupleRowComparator::Close(RuntimeState* state) {
   ScalarExprEvaluator::Close(ordering_expr_evals_lhs_, state);
 }
 
-Status TupleRowComparator::Codegen(RuntimeState* state) {
+Status TupleRowComparatorConfig::Codegen(RuntimeState* state) {
+  if (sorting_order_ == TSortingOrder::ZORDER) {
+    return Status("Codegen not yet implemented for sorting order: ZORDER");
+  }
   llvm::Function* fn;
   LlvmCodeGen* codegen = state->codegen();
   DCHECK(codegen != NULL);
-  RETURN_IF_ERROR(CodegenCompare(codegen, &fn));
-  codegend_compare_fn_ = state->obj_pool()->Add(new CompareFn);
-  codegen->AddFunctionToJit(fn, reinterpret_cast<void**>(codegend_compare_fn_));
+  RETURN_IF_ERROR(CodegenLexicalCompare(codegen, &fn));
+  codegen->AddFunctionToJit(fn, reinterpret_cast<void**>(&codegend_compare_fn_));
   return Status::OK();
 }
 
@@ -83,8 +97,8 @@ int TupleRowLexicalComparator::CompareInterpreted(
   return 0; // fully equivalent key
 }
 
-// Codegens an unrolled version of Compare(). Uses codegen'd key exprs and injects
-// nulls_first_ and is_asc_ values.
+// Codegens an unrolled version of TupleRowLexicalComparator::Compare(). Uses codegen'd
+// key exprs and injects nulls_first_ and is_asc_ values.
 //
 // Example IR for comparing an int column then a float column:
 //
@@ -204,8 +218,8 @@ int TupleRowLexicalComparator::CompareInterpreted(
 // next_key2:                                        ; preds = %rhs_non_null12, %next_key
 //   ret i32 0
 // }
-Status TupleRowLexicalComparator::CodegenCompare(LlvmCodeGen* codegen,
-    llvm::Function** fn) {
+Status TupleRowComparatorConfig::CodegenLexicalCompare(
+    LlvmCodeGen* codegen, llvm::Function** fn) {
   llvm::LLVMContext& context = codegen->context();
   const vector<ScalarExpr*>& ordering_exprs = ordering_exprs_;
   llvm::Function* key_fns[ordering_exprs.size()];
@@ -453,11 +467,5 @@ U inline TupleRowZOrderComparator::GetSharedStringRepresentation(const char* cha
   // We copy the bytes from the string but swap the bytes because of integer endianness.
   BitUtil::ByteSwap(&dst, char_ptr, len);
   return dst << ((sizeof(U) - len) * 8);
-}
-
-Status TupleRowZOrderComparator::CodegenCompare(LlvmCodeGen* codegen,
-    llvm::Function** fn) {
-  LOG(WARNING) << "TupleRowZOrderComparator::CodegenCompare is not yet implemented.";
-  return Status("TupleRowZOrderComparator has no Codegen'd comperator.");
 }
 

@@ -36,10 +36,8 @@ Status PartialSortPlanNode::Init(const TPlanNode& tnode, RuntimeState* state) {
   DCHECK(tsort_info.__isset.sort_tuple_slot_exprs);
   RETURN_IF_ERROR(ScalarExpr::Create(tsort_info.sort_tuple_slot_exprs,
       *children_[0]->row_descriptor_, state, &sort_tuple_slot_exprs_));
-  is_asc_order_ = tnode.sort_node.sort_info.is_asc_order;
-  nulls_first_ = tnode.sort_node.sort_info.nulls_first;
-  sorting_order_ = static_cast<TSortingOrder::type>(
-      tnode.sort_node.sort_info.sorting_order);
+  row_comparator_config_ =
+      state->obj_pool()->Add(new TupleRowComparatorConfig(tsort_info, ordering_exprs_));
   return Status::OK();
 }
 
@@ -58,11 +56,8 @@ Status PartialSortPlanNode::CreateExecNode(RuntimeState* state, ExecNode** node)
 PartialSortNode::PartialSortNode(
     ObjectPool* pool, const PartialSortPlanNode& pnode, const DescriptorTbl& descs)
   : ExecNode(pool, pnode, descs),
-    ordering_exprs_(pnode.ordering_exprs_),
     sort_tuple_exprs_(pnode.sort_tuple_slot_exprs_),
-    is_asc_order_(pnode.is_asc_order_),
-    nulls_first_(pnode.nulls_first_),
-    sorting_order_(pnode.sorting_order_),
+    tuple_row_comparator_config_(*pnode.row_comparator_config_),
     sorter_(nullptr),
     input_batch_index_(0),
     input_eos_(false),
@@ -77,10 +72,10 @@ PartialSortNode::~PartialSortNode() {
 Status PartialSortNode::Prepare(RuntimeState* state) {
   SCOPED_TIMER(runtime_profile_->total_time_counter());
   RETURN_IF_ERROR(ExecNode::Prepare(state));
-  sorter_.reset(new Sorter(ordering_exprs_, is_asc_order_, nulls_first_,
-      sort_tuple_exprs_, &row_descriptor_, mem_tracker(), buffer_pool_client(),
-      resource_profile_.spillable_buffer_size, runtime_profile(), state, label(), false,
-      sorting_order_));
+  sorter_.reset(
+      new Sorter(tuple_row_comparator_config_, sort_tuple_exprs_, &row_descriptor_,
+          mem_tracker(), buffer_pool_client(), resource_profile_.spillable_buffer_size,
+          runtime_profile(), state, label(), false));
   RETURN_IF_ERROR(sorter_->Prepare(pool_));
   DCHECK_GE(resource_profile_.min_reservation, sorter_->ComputeMinReservation());
   state->CheckAndAddCodegenDisabledMessage(runtime_profile());
@@ -93,8 +88,16 @@ void PartialSortNode::Codegen(RuntimeState* state) {
   DCHECK(state->ShouldCodegen());
   ExecNode::Codegen(state);
   if (IsNodeCodegenDisabled()) return;
-  Status codegen_status = sorter_->Codegen(state);
-  runtime_profile()->AddCodegenMsg(codegen_status.ok(), codegen_status);
+  const PartialSortPlanNode& partial_sort_pnode =
+      static_cast<const PartialSortPlanNode&>(plan_node_);
+  PartialSortPlanNode& non_const_pnode =
+      const_cast<PartialSortPlanNode&>(partial_sort_pnode);
+  non_const_pnode.Codegen(state, runtime_profile());
+}
+
+void PartialSortPlanNode::Codegen(RuntimeState* state, RuntimeProfile* runtime_profile) {
+  Status codegen_status = row_comparator_config_->Codegen(state);
+  runtime_profile->AddCodegenMsg(codegen_status.ok(), codegen_status);
 }
 
 Status PartialSortNode::Open(RuntimeState* state) {
@@ -180,10 +183,12 @@ void PartialSortNode::Close(RuntimeState* state) {
 
 void PartialSortNode::DebugString(int indentation_level, stringstream* out) const {
   *out << string(indentation_level * 2, ' ');
-  *out << "PartialSortNode(" << ScalarExpr::DebugString(ordering_exprs_);
-  for (int i = 0; i < is_asc_order_.size(); ++i) {
-    *out << (i > 0 ? " " : "") << (is_asc_order_[i] ? "asc" : "desc") << " nulls "
-         << (nulls_first_[i] ? "first" : "last");
+  const PartialSortPlanNode& pnode = static_cast<const PartialSortPlanNode&>(plan_node_);
+  const TSortInfo& tsort_info = pnode.tnode_->sort_node.sort_info;
+  *out << "PartialSortNode(" << ScalarExpr::DebugString(pnode.ordering_exprs_);
+  for (int i = 0; i < tsort_info.is_asc_order.size(); ++i) {
+    *out << (i > 0 ? " " : "") << (tsort_info.is_asc_order[i] ? "asc" : "desc")
+         << " nulls " << (tsort_info.nulls_first[i] ? "first" : "last");
   }
   ExecNode::DebugString(indentation_level, out);
   *out << ")";

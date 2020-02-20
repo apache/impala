@@ -57,13 +57,56 @@ class ComparatorWrapper {
   }
 };
 
+/// TupleRowComparatorConfig contains the static state initialized from its corresponding
+/// thrift structure. It serves as an input for creating instances of the
+/// TupleRowComparator class.
+class TupleRowComparatorConfig {
+ public:
+  /// 'tsort_info' : the thrift struct contains all relevant input params.
+  /// 'ordering_exprs': the ordering expressions for tuple comparison created from the
+  /// params in 'tsort_info'.
+  TupleRowComparatorConfig(
+      const TSortInfo& tsort_info, const std::vector<ScalarExpr*>& ordering_exprs);
+
+  /// Codegens a Compare() function for this comparator that is used in Compare().
+  Status Codegen(RuntimeState* state);
+
+  /// Indicates the sorting ordering used. Specified using the SORT BY clause.
+  TSortingOrder::type sorting_order_;
+
+  /// References to ordering expressions owned by the plan node which owns this
+  /// TupleRowComparatorConfig.
+  const std::vector<ScalarExpr*>& ordering_exprs_;
+
+  /// Indicates, for each ordering expr, whether it enforces an ascending order or not.
+  /// Not Owned.
+  const std::vector<bool>& is_asc_;
+
+  /// Indicates, for each ordering expr, if nulls should be listed first or last. As a
+  /// optimization for the TupleRowComparator::Compare() implementation, true/false is
+  /// stored as +/- 1 respectively. This is independent of is_asc_.
+  std::vector<int8_t> nulls_first_;
+
+  /// Codegened version of TupleRowComparator::Compare().
+  typedef int (*CompareFn)(ScalarExprEvaluator* const*, ScalarExprEvaluator* const*,
+      const TupleRow*, const TupleRow*);
+  CompareFn codegend_compare_fn_ = nullptr;
+
+ private:
+  /// Codegen TupleRowLexicalComparator::Compare(). Returns a non-OK status if codegen is
+  /// unsuccessful. TODO: inline this at codegen'd callsites instead of indirectly calling
+  /// via function pointer.
+  Status CodegenLexicalCompare(LlvmCodeGen* codegen, llvm::Function** fn);
+};
+
 /// Interface for comparing two TupleRows based on a set of exprs.
 class TupleRowComparator {
  public:
-  /// 'ordering_exprs': the ordering expressions for tuple comparison.
-  TupleRowComparator(const std::vector<ScalarExpr*>& ordering_exprs)
-    : ordering_exprs_(ordering_exprs),
-      codegend_compare_fn_(nullptr) { }
+  TupleRowComparator(const TupleRowComparatorConfig& config)
+    : ordering_exprs_(config.ordering_exprs_),
+      codegend_compare_fn_(config.codegend_compare_fn_) {
+  }
+
   virtual ~TupleRowComparator() {}
 
   /// Create the evaluators for the ordering expressions and store them in 'pool'. The
@@ -76,15 +119,12 @@ class TupleRowComparator {
   /// Release resources held by the ordering expressions' evaluators.
   void Close(RuntimeState* state);
 
-  /// Codegens a Compare() function for this comparator that is used in Compare().
-  Status Codegen(RuntimeState* state);
-
   /// Returns a negative value if lhs is less than rhs, a positive value if lhs is
   /// greater than rhs, or 0 if they are equal. All exprs (ordering_exprs_lhs_ and
   /// ordering_exprs_rhs_) must have been prepared and opened before calling this,
   /// i.e. 'sort_key_exprs' in the constructor must have been opened.
   int ALWAYS_INLINE Compare(const TupleRow* lhs, const TupleRow* rhs) const {
-    return codegend_compare_fn_ == NULL ?
+    return codegend_compare_fn_ == nullptr ?
         CompareInterpreted(lhs, rhs) :
         (*codegend_compare_fn_)(ordering_expr_evals_lhs_.data(),
             ordering_expr_evals_rhs_.data(), lhs, rhs);
@@ -106,8 +146,8 @@ class TupleRowComparator {
   }
 
  protected:
-  /// References to ordering expressions owned by the Exec node which owns this
-  /// TupleRowComparator.
+  /// References to ordering expressions owned by the plan node which owns the
+  /// TupleRowComparatorConfig used to create this instance.
   const std::vector<ScalarExpr*>& ordering_exprs_;
 
   /// The evaluators for the LHS and RHS ordering expressions. The RHS evaluator is
@@ -115,24 +155,13 @@ class TupleRowComparator {
   std::vector<ScalarExprEvaluator*> ordering_expr_evals_lhs_;
   std::vector<ScalarExprEvaluator*> ordering_expr_evals_rhs_;
 
-  /// We store a pointer to the codegen'd function pointer (adding an extra level of
-  /// indirection) so that copies of this TupleRowComparator will have the same pointer to
-  /// the codegen'd function. This is necessary because the codegen'd function pointer is
-  /// only set after the IR module is compiled. Without the indirection, if this
-  /// TupleRowComparator is copied before the module is compiled, the copy will still have
-  /// its function pointer set to NULL. The function pointer is allocated from the runtime
-  /// state's object pool so that its lifetime will be >= that of any copies.
-  typedef int (*CompareFn)(ScalarExprEvaluator* const*, ScalarExprEvaluator* const*,
-      const TupleRow*, const TupleRow*);
-  CompareFn* codegend_compare_fn_;
+  /// Reference to the codegened function pointer owned by the TupleRowComparatorConfig
+  /// object that was used to create this instance.
+  const TupleRowComparatorConfig::CompareFn& codegend_compare_fn_;
+
  private:
   /// Interpreted implementation of Compare().
   virtual int CompareInterpreted(const TupleRow* lhs, const TupleRow* rhs) const = 0;
-
-  /// Codegen Compare(). Returns a non-OK status if codegen is unsuccessful.
-  /// TODO: inline this at codegen'd callsites instead of indirectly calling via function
-  /// pointer.
-  virtual Status CodegenCompare(LlvmCodeGen* codegen, llvm::Function** fn) = 0;
 };
 
 /// Compares two TupleRows based on a set of exprs, in lexicographical order.
@@ -143,36 +172,35 @@ class TupleRowLexicalComparator : public TupleRowComparator {
   /// order.
   /// 'nulls_first' determines, for each expr, if nulls should come before or after all
   /// other values.
-  TupleRowLexicalComparator(const std::vector<ScalarExpr*>& ordering_exprs,
-      const std::vector<bool>& is_asc, const std::vector<bool>& nulls_first)
-    : TupleRowComparator(ordering_exprs),
-      is_asc_(is_asc) {
-    DCHECK_EQ(is_asc_.size(), ordering_exprs.size());
-    for (bool null_first : nulls_first) nulls_first_.push_back(null_first ? -1 : 1);
+  TupleRowLexicalComparator(const TupleRowComparatorConfig& config)
+    : TupleRowComparator(config),
+      is_asc_(config.is_asc_),
+      nulls_first_(config.nulls_first_) {
+    DCHECK(config.sorting_order_ == TSortingOrder::LEXICAL);
+    DCHECK_EQ(nulls_first_.size(), ordering_exprs_.size());
+    DCHECK_EQ(is_asc_.size(), ordering_exprs_.size());
   }
 
  private:
   const std::vector<bool>& is_asc_;
-  std::vector<int8_t> nulls_first_;
+  const std::vector<int8_t>& nulls_first_;
 
   int CompareInterpreted(const TupleRow* lhs, const TupleRow* rhs) const override;
-
-  /// TODO: implement it.
-  Status CodegenCompare(LlvmCodeGen* codegen, llvm::Function** fn) override;
 };
 
 /// Compares two TupleRows based on a set of exprs, in Z-order.
 class TupleRowZOrderComparator : public TupleRowComparator {
  public:
   /// 'ordering_exprs': the ordering expressions for tuple comparison.
-  TupleRowZOrderComparator(const std::vector<ScalarExpr*>& ordering_exprs)
-    : TupleRowComparator(ordering_exprs) { }
+  TupleRowZOrderComparator(const TupleRowComparatorConfig& config)
+    : TupleRowComparator(config) {
+    DCHECK(config.sorting_order_ == TSortingOrder::ZORDER);
+  }
 
  private:
   typedef __uint128_t uint128_t;
 
   int CompareInterpreted(const TupleRow* lhs, const TupleRow* rhs) const override;
-  Status CodegenCompare(LlvmCodeGen* codegen, llvm::Function** fn) override;
 
   /// Compares the rows using Z-ordering. The function does not calculate the actual
   /// Z-value, only looks for the column with the most significant dimension, and compares

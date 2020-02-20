@@ -159,8 +159,9 @@ class DataStreamTest : public testing::Test {
 
     CreateRowDesc();
 
-    is_asc_.push_back(true);
-    nulls_first_.push_back(true);
+    tsort_info_.sorting_order = TSortingOrder::LEXICAL;
+    tsort_info_.is_asc_order.push_back(true);
+    tsort_info_.nulls_first.push_back(true);
     CreateTupleComparator();
 
     next_instance_id_.lo = 0;
@@ -234,8 +235,7 @@ class DataStreamTest : public testing::Test {
   scoped_ptr<MemPool> mem_pool_;
   DescriptorTbl* desc_tbl_;
   const RowDescriptor* row_desc_;
-  vector<bool> is_asc_;
-  vector<bool> nulls_first_;
+  TSortInfo tsort_info_;
   TupleRowComparator* less_than_;
   boost::scoped_ptr<ExecEnv> exec_env_;
   scoped_ptr<RuntimeState> runtime_state_;
@@ -346,8 +346,9 @@ class DataStreamTest : public testing::Test {
     SlotRef* lhs_slot = obj_pool_.Add(new SlotRef(TYPE_BIGINT, 0));
     ASSERT_OK(lhs_slot->Init(RowDescriptor(), true, runtime_state_.get()));
     ordering_exprs_.push_back(lhs_slot);
-    less_than_ = obj_pool_.Add(new TupleRowLexicalComparator(ordering_exprs_,
-        is_asc_, nulls_first_));
+    TupleRowComparatorConfig* comparator_config =
+        obj_pool_.Add(new TupleRowComparatorConfig(tsort_info_, ordering_exprs_));
+    less_than_ = obj_pool_.Add(new TupleRowLexicalComparator(*comparator_config));
     ASSERT_OK(less_than_->Open(
         &obj_pool_, runtime_state_.get(), mem_pool_.get(), mem_pool_.get()));
   }

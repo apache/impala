@@ -30,19 +30,22 @@ class KrpcDataStreamRecvr;
 class RowBatch;
 class ScalarExpr;
 class TupleRowComparator;
+class TupleRowComparatorConfig;
 
 class ExchangePlanNode : public PlanNode {
  public:
   virtual Status Init(const TPlanNode& tnode, RuntimeState* state) override;
   virtual void Close() override;
   virtual Status CreateExecNode(RuntimeState* state, ExecNode** node) const override;
+  void Codegen(RuntimeState* state, RuntimeProfile* runtime_profile);
 
   ~ExchangePlanNode(){}
 
-  /// Sort expressions and parameters passed to the merging receiver.
+  /// Sort expressions passed to the merging receiver.
   std::vector<ScalarExpr*> ordering_exprs_;
-  std::vector<bool> is_asc_order_;
-  std::vector<bool> nulls_first_;
+
+  /// Config used to create a TupleRowComparator instance. Non null for merging exchange.
+  TupleRowComparatorConfig* row_comparator_config_ = nullptr;
 };
 
 /// Receiver node for data streams. The data stream receiver is created in Prepare()
@@ -127,11 +130,6 @@ class ExchangeNode : public ExecNode {
 
   /// The TupleRowComparator based on 'sort_exec_exprs_' for merging exchange.
   boost::scoped_ptr<TupleRowComparator> less_than_;
-
-  /// Sort expressions and parameters passed to the merging receiver..
-  const std::vector<ScalarExpr*>& ordering_exprs_;
-  std::vector<bool> is_asc_order_;
-  std::vector<bool> nulls_first_;
 
   /// Offset specifying number of rows to skip.
   int64_t offset_;

@@ -44,12 +44,14 @@ DEFINE_int64(exchg_node_buffer_size_bytes, 1024 * 1024 * 10,
 
 Status ExchangePlanNode::Init(const TPlanNode& tnode, RuntimeState* state) {
   RETURN_IF_ERROR(PlanNode::Init(tnode, state));
-  if (!tnode.exchange_node.__isset.sort_info) return Status::OK();
+  bool is_merging = tnode_->exchange_node.__isset.sort_info;
+  if (!is_merging) return Status::OK();
 
-  RETURN_IF_ERROR(ScalarExpr::Create(tnode.exchange_node.sort_info.ordering_exprs,
-      *row_descriptor_, state, &ordering_exprs_));
-  is_asc_order_ = tnode.exchange_node.sort_info.is_asc_order;
-  nulls_first_ = tnode.exchange_node.sort_info.nulls_first;
+  const TSortInfo& sort_info = tnode.exchange_node.sort_info;
+  RETURN_IF_ERROR(ScalarExpr::Create(
+      sort_info.ordering_exprs, *row_descriptor_, state, &ordering_exprs_));
+  row_comparator_config_ =
+      state->obj_pool()->Add(new TupleRowComparatorConfig(sort_info, ordering_exprs_));
   return Status::OK();
 }
 
@@ -75,7 +77,6 @@ ExchangeNode::ExchangeNode(
                             + pnode.tnode_->exchange_node.input_row_tuples.size())),
     next_row_idx_(0),
     is_merging_(pnode.tnode_->exchange_node.__isset.sort_info),
-    ordering_exprs_(pnode.ordering_exprs_),
     offset_(pnode.tnode_->exchange_node.__isset.offset ?
             pnode.tnode_->exchange_node.offset :
             0),
@@ -83,8 +84,7 @@ ExchangeNode::ExchangeNode(
   DCHECK_GE(offset_, 0);
   DCHECK(is_merging_ || (offset_ == 0));
   if (!is_merging_) return;
-  is_asc_order_ = pnode.is_asc_order_;
-  nulls_first_ = pnode.nulls_first_;
+  less_than_.reset(new TupleRowLexicalComparator(*pnode.row_comparator_config_));
 }
 
 Status ExchangeNode::Prepare(RuntimeState* state) {
@@ -110,11 +110,7 @@ Status ExchangeNode::Prepare(RuntimeState* state) {
       FLAGS_exchg_node_buffer_size_bytes, is_merging_, runtime_profile(), mem_tracker(),
       &recvr_buffer_pool_client_);
 
-  if (is_merging_) {
-    less_than_.reset(
-        new TupleRowLexicalComparator(ordering_exprs_, is_asc_order_, nulls_first_));
-    state->CheckAndAddCodegenDisabledMessage(runtime_profile());
-  }
+  if (is_merging_) state->CheckAndAddCodegenDisabledMessage(runtime_profile());
   return Status::OK();
 }
 
@@ -124,9 +120,16 @@ void ExchangeNode::Codegen(RuntimeState* state) {
   if (IsNodeCodegenDisabled()) return;
 
   if (is_merging_) {
-    Status codegen_status = less_than_->Codegen(state);
-    runtime_profile()->AddCodegenMsg(codegen_status.ok(), codegen_status);
+    const ExchangePlanNode& exch_pnode = static_cast<const ExchangePlanNode&>(plan_node_);
+    ExchangePlanNode& non_const_pnode = const_cast<ExchangePlanNode&>(exch_pnode);
+    non_const_pnode.Codegen(state, runtime_profile());
   }
+}
+
+void ExchangePlanNode::Codegen(RuntimeState* state, RuntimeProfile* runtime_profile) {
+  DCHECK(row_comparator_config_ != nullptr);
+  Status codegen_status = row_comparator_config_->Codegen(state);
+  runtime_profile->AddCodegenMsg(codegen_status.ok(), codegen_status);
 }
 
 Status ExchangeNode::Open(RuntimeState* state) {

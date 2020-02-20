@@ -31,6 +31,7 @@ namespace impala {
 
 class MemPool;
 class RuntimeState;
+class TopNNode;
 class Tuple;
 
 class TopNPlanNode : public PlanNode {
@@ -38,17 +39,25 @@ class TopNPlanNode : public PlanNode {
   virtual Status Init(const TPlanNode& tnode, RuntimeState* state) override;
   virtual void Close() override;
   virtual Status CreateExecNode(RuntimeState* state, ExecNode** node) const override;
+  void Codegen(RuntimeState* state, RuntimeProfile* runtime_profile);
 
   ~TopNPlanNode(){}
 
   /// Ordering expressions used for tuple comparison.
   std::vector<ScalarExpr*> ordering_exprs_;
 
+  /// Cached descriptor for the materialized tuple.
+  TupleDescriptor* output_tuple_desc_ = nullptr;
+
   /// Materialization exprs for the output tuple and their evaluators.
   std::vector<ScalarExpr*> output_tuple_exprs_;
 
-  std::vector<bool> is_asc_order_;
-  std::vector<bool> nulls_first_;
+  /// Config used to create a TupleRowComparator instance.
+  TupleRowComparatorConfig* row_comparator_config_ = nullptr;
+
+  /// Codegened version of TopNNode::InsertBatch().
+  typedef void (*InsertBatchFn)(TopNNode*, RowBatch*);
+  InsertBatchFn codegend_insert_batch_fn_ = nullptr;
 };
 
 /// Node for in-memory TopN (ORDER BY ... LIMIT)
@@ -106,18 +115,12 @@ class TopNNode : public ExecNode {
   /// Number of rows to skip.
   int64_t offset_;
 
-  /// Ordering expressions used for tuple comparison.
-  const std::vector<ScalarExpr*>& ordering_exprs_;
-
   /// Materialization exprs for the output tuple and their evaluators.
   const std::vector<ScalarExpr*>& output_tuple_exprs_;
   std::vector<ScalarExprEvaluator*> output_tuple_expr_evals_;
 
-  std::vector<bool> is_asc_order_;
-  std::vector<bool> nulls_first_;
-
-  /// Cached descriptor for the materialized tuple. Assigned in Prepare().
-  TupleDescriptor* output_tuple_desc_;
+  /// Cached descriptor for the materialized tuple.
+  TupleDescriptor* const output_tuple_desc_;
 
   /// Comparator for priority_queue_.
   boost::scoped_ptr<TupleRowComparator> tuple_row_less_than_;
@@ -128,7 +131,7 @@ class TopNNode : public ExecNode {
   /// Tuple allocated once from tuple_pool_ and reused in InsertTupleRow to
   /// materialize input tuples if necessary. After materialization, tmp_tuple_ may be
   /// copied into the tuple pool and inserted into the priority queue.
-  Tuple* tmp_tuple_;
+  Tuple* tmp_tuple_ = nullptr;
 
   /// Stores everything referenced in priority_queue_.
   boost::scoped_ptr<MemPool> tuple_pool_;
@@ -136,8 +139,9 @@ class TopNNode : public ExecNode {
   /// Iterator over elements in sorted_top_n_.
   std::vector<Tuple*>::iterator get_next_iter_;
 
-  typedef void (*InsertBatchFn)(TopNNode*, RowBatch*);
-  InsertBatchFn codegend_insert_batch_fn_;
+  /// Reference to the codegened function pointer owned by the TopNPlanNode object that
+  /// was used to create this instance.
+  const TopNPlanNode::InsertBatchFn& codegend_insert_batch_fn_;
 
   /// Timer for time spent in InsertBatch() function (or codegen'd version)
   RuntimeProfile::Counter* insert_batch_timer_;
@@ -146,7 +150,7 @@ class TopNNode : public ExecNode {
   int64_t rows_to_reclaim_;
 
   /// Number of times tuple pool memory was reclaimed
-  RuntimeProfile::Counter* tuple_pool_reclaim_counter_;
+  RuntimeProfile::Counter* tuple_pool_reclaim_counter_= nullptr;
 
   /////////////////////////////////////////
   /// BEGIN: Members that must be Reset()
