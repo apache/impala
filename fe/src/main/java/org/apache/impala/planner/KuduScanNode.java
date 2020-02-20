@@ -114,6 +114,14 @@ public class KuduScanNode extends ScanNode {
   // this scan node has the count(*) optimization enabled.
   private SlotDescriptor countStarSlot_ = null;
 
+  // It is used to indicate if the input query returns not more than one row
+  // from Kudu. It is set as TRUE in extractKuduConjuncts() if the number of
+  // primary key columns in equivalence predicates pushed down to Kudu equals
+  // the total number of primary key columns of the Kudu table.
+  // It is used to adjust the cardinality estimation to speed up point lookup
+  // for Kudu primary keys by enabling small query optimization.
+  boolean isPointLookupQuery_ = false;
+
   public KuduScanNode(PlanNodeId id, TupleDescriptor desc, List<Expr> conjuncts,
       AggregateInfo aggInfo) {
     super(id, desc, "SCAN KUDU");
@@ -278,8 +286,17 @@ public class KuduScanNode extends ScanNode {
 
     // Update the cardinality
     inputCardinality_ = cardinality_ = kuduTable_.getNumRows();
-    cardinality_ = applyConjunctsSelectivity(cardinality_);
-    cardinality_ = capCardinalityAtLimit(cardinality_);
+    if (isPointLookupQuery_) {
+      // Adjust input and output cardinality for point lookup.
+      // Planner don't create KuduScanNode for query with closure "limit 0" so
+      // we can assume "limit" is not less than 1 here and don't need to call
+      // capCardinalityAtLimit().
+      if (cardinality_ != 0) cardinality_ = 1;
+      inputCardinality_ = cardinality_;
+    } else {
+      cardinality_ = applyConjunctsSelectivity(cardinality_);
+      cardinality_ = capCardinalityAtLimit(cardinality_);
+    }
     if (LOG.isTraceEnabled()) {
       LOG.trace("computeStats KuduScan: cardinality=" + Long.toString(cardinality_));
     }
@@ -366,14 +383,23 @@ public class KuduScanNode extends ScanNode {
    */
   private void extractKuduConjuncts(Analyzer analyzer,
       KuduClient client, org.apache.kudu.client.KuduTable rpcTable) {
+    // The set of primary key column index which are in equality predicates where
+    // it's compared to a constant, and will be pushed down to Kudu.
+    Set<Integer> primaryKeyColsInEqualPred = new HashSet<>();
     ListIterator<Expr> it = conjuncts_.listIterator();
     while (it.hasNext()) {
       Expr predicate = it.next();
-      if (tryConvertBinaryKuduPredicate(analyzer, rpcTable, predicate) ||
+      if (tryConvertBinaryKuduPredicate(analyzer, rpcTable, predicate,
+              primaryKeyColsInEqualPred) ||
           tryConvertInListKuduPredicate(analyzer, rpcTable, predicate) ||
           tryConvertIsNullKuduPredicate(analyzer, rpcTable, predicate)) {
         it.remove();
       }
+    }
+    if (primaryKeyColsInEqualPred.size() >= 1 &&
+        primaryKeyColsInEqualPred.size() ==
+            rpcTable.getSchema().getPrimaryKeyColumnCount()) {
+      isPointLookupQuery_ = true;
     }
   }
 
@@ -382,7 +408,8 @@ public class KuduScanNode extends ScanNode {
    * kuduPredicates_ and kuduConjuncts_.
    */
   private boolean tryConvertBinaryKuduPredicate(Analyzer analyzer,
-      org.apache.kudu.client.KuduTable table, Expr expr) {
+      org.apache.kudu.client.KuduTable table, Expr expr,
+      Set<Integer> primaryKeyColsInEqualPred) {
     if (!(expr instanceof BinaryPredicate)) return false;
     BinaryPredicate predicate = (BinaryPredicate) expr;
 
@@ -460,6 +487,12 @@ public class KuduScanNode extends ScanNode {
 
     kuduConjuncts_.add(predicate);
     kuduPredicates_.add(kuduPredicate);
+
+    if (predicate.getOp().isEquivalence() && column.isKey()) {
+      Integer colIndex = table.getSchema().getColumnIndex(colName);
+      primaryKeyColsInEqualPred.add(colIndex);
+    }
+
     return true;
   }
 

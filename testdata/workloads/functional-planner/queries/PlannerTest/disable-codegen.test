@@ -264,3 +264,36 @@ PLAN-ROOT SINK
    limit: 1000
    row-size=16B cardinality=1.00K
 ====
+# Test query on large Kudu table with all Kudu primary key columns in equivalence
+# predicates: not more than 1 row could be returned from Kudu,
+# Codegen should be disabled.
+select * from tpch_kudu.partsupp where ps_partkey=2 and ps_suppkey=5003
+---- DISTRIBUTEDPLAN
+Max Per-Host Resource Reservation: Memory=0B Threads=3
+Per-Host Resource Estimates: Memory=10MB
+Codegen disabled by planner
+
+PLAN-ROOT SINK
+|
+01:EXCHANGE [UNPARTITIONED]
+|
+00:SCAN KUDU [tpch_kudu.partsupp]
+   kudu predicates: ps_partkey = 2, ps_suppkey = 5003
+   row-size=172B cardinality=1
+====
+# Test query on large Kudu table with partial Kudu primary key columns in equivalence
+# predicates: any number of rows could be returned from Kudu,
+# Codegen should be enabled
+select * from tpch_kudu.partsupp where ps_partkey=2
+---- DISTRIBUTEDPLAN
+Max Per-Host Resource Reservation: Memory=0B Threads=3
+Per-Host Resource Estimates: Memory=10MB
+
+PLAN-ROOT SINK
+|
+01:EXCHANGE [UNPARTITIONED]
+|
+00:SCAN KUDU [tpch_kudu.partsupp]
+   kudu predicates: ps_partkey = 2
+   row-size=172B cardinality=4
+====

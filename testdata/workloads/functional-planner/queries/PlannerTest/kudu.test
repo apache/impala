@@ -626,3 +626,89 @@ PLAN-ROOT SINK
    kudu predicates: d4 = 0.123456789
    row-size=56B cardinality=5
 ====
+# Multiple conflicting equality predicates on the Kudu table.
+# EmptySetNode should be created.
+select * from functional_kudu.testtbl where id = 1 and id = 10
+---- PLAN
+PLAN-ROOT SINK
+|
+00:EMPTYSET
+---- SCANRANGELOCATIONS
+
+---- DISTRIBUTEDPLAN
+PLAN-ROOT SINK
+|
+00:EMPTYSET
+====
+# Query with "limit 0" on the Kudu table
+# EmptySetNode should be created.
+select * from functional_kudu.testtbl limit 0
+---- PLAN
+PLAN-ROOT SINK
+|
+00:EMPTYSET
+---- SCANRANGELOCATIONS
+
+---- DISTRIBUTEDPLAN
+PLAN-ROOT SINK
+|
+00:EMPTYSET
+====
+# Multiple redundant equality predicates on the Kudu table.
+# They should be deduplicated.
+select * from functional_kudu.testtbl where name = 'Smith' and name = 'Smith'
+---- PLAN
+PLAN-ROOT SINK
+|
+00:SCAN KUDU [functional_kudu.testtbl]
+   kudu predicates: name = 'Smith'
+   row-size=28B cardinality=0
+---- SCANRANGELOCATIONS
+NODE 0:
+  ScanToken{table-name=impala::functional_kudu.testtbl, range-partition: [(int64 id=1004), (int64 id=1008))}
+  ScanToken{table-name=impala::functional_kudu.testtbl, range-partition: [(int64 id=1008), <end>)}
+  ScanToken{table-name=impala::functional_kudu.testtbl, range-partition: [<start>, (int64 id=1004))}
+---- DISTRIBUTEDPLAN
+PLAN-ROOT SINK
+|
+01:EXCHANGE [UNPARTITIONED]
+|
+00:SCAN KUDU [functional_kudu.testtbl]
+   kudu predicates: name = 'Smith'
+   row-size=28B cardinality=0
+====
+# Redundant = and "is not distinct from" predicates.
+# They are same and should be deduplicated.
+select count(*) from tpch_kudu.lineitem
+where l_orderkey = 1 and l_orderkey is not distinct from 1 and
+l_partkey = 1 and l_suppkey = 1;
+---- PLAN
+PLAN-ROOT SINK
+|
+01:AGGREGATE [FINALIZE]
+|  output: count(*)
+|  row-size=8B cardinality=1
+|
+00:SCAN KUDU [tpch_kudu.lineitem]
+   kudu predicates: l_orderkey = 1, l_partkey = 1, l_suppkey = 1
+   row-size=0B cardinality=1
+---- SCANRANGELOCATIONS
+NODE 0:
+  ScanToken{table-name=impala::tpch_kudu.lineitem, hash-partition-buckets: [3]}
+---- DISTRIBUTEDPLAN
+PLAN-ROOT SINK
+|
+03:AGGREGATE [FINALIZE]
+|  output: count:merge(*)
+|  row-size=8B cardinality=1
+|
+02:EXCHANGE [UNPARTITIONED]
+|
+01:AGGREGATE
+|  output: count(*)
+|  row-size=8B cardinality=1
+|
+00:SCAN KUDU [tpch_kudu.lineitem]
+   kudu predicates: l_orderkey = 1, l_partkey = 1, l_suppkey = 1
+   row-size=0B cardinality=1
+====

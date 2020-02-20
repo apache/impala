@@ -359,3 +359,27 @@ PLAN-ROOT SINK
    limit: 5
    row-size=12B cardinality=0
 ====
+# Test query on large Kudu table with all Kudu primary key columns in equivalence
+# predicates: not more than 1 row could be returned from Kudu,
+# small query optimization should be enabled.
+select * from tpch_kudu.partsupp where ps_partkey=2 and ps_suppkey=5003
+---- DISTRIBUTEDPLAN
+PLAN-ROOT SINK
+|
+00:SCAN KUDU [tpch_kudu.partsupp]
+   kudu predicates: ps_partkey = 2, ps_suppkey = 5003
+   row-size=172B cardinality=1
+====
+# Test query on large Kudu table with partial Kudu primary key columns in equivalence
+# predicates: any number of rows could be returned from Kudu,
+# small query optimization should be disabled
+select * from tpch_kudu.partsupp where ps_partkey=2
+---- DISTRIBUTEDPLAN
+PLAN-ROOT SINK
+|
+01:EXCHANGE [UNPARTITIONED]
+|
+00:SCAN KUDU [tpch_kudu.partsupp]
+   kudu predicates: ps_partkey = 2
+   row-size=172B cardinality=4
+====
