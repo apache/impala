@@ -28,17 +28,29 @@ from six.moves import urllib
 from six.moves import http_client
 
 from thrift.transport.TTransport import TTransportBase
+from shell_exceptions import RPCException
 import six
 
 
-class THttpClient(TTransportBase):
+# This was taken from THttpClient.py in Thrift to allow making changes Impala needs.
+# The current changes that have been applied:
+# - Added logic for the 'Expect: 100-continue' header on large requests
+# - If an error code is received back in flush(), an exception is thrown.
+class ImpalaHttpClient(TTransportBase):
   """Http implementation of TTransport base."""
 
-  def __init__(self, uri_or_host, port=None, path=None, cafile=None, cert_file=None, key_file=None, ssl_context=None):
-    """THttpClient supports two different types of construction:
+  # When sending requests larger than this size, include the 'Expect: 100-continue' header
+  # to indicate to the server to validate the request before reading the contents. This
+  # value was chosen to match curl's behavior. See Section 8.2.3 of RFC2616.
+  MIN_REQUEST_SIZE_FOR_EXPECT = 1024
 
-    THttpClient(host, port, path) - deprecated
-    THttpClient(uri, [port=<n>, path=<s>, cafile=<filename>, cert_file=<filename>, key_file=<filename>, ssl_context=<context>])
+  def __init__(self, uri_or_host, port=None, path=None, cafile=None, cert_file=None,
+      key_file=None, ssl_context=None):
+    """ImpalaHttpClient supports two different types of construction:
+
+    ImpalaHttpClient(host, port, path) - deprecated
+    ImpalaHttpClient(uri, [port=<n>, path=<s>, cafile=<filename>, cert_file=<filename>,
+        key_file=<filename>, ssl_context=<context>])
 
     Only the second supports https.  To properly authenticate against the server,
     provide the client's identity by specifying cert_file and key_file.  To properly
@@ -47,7 +59,7 @@ class THttpClient(TTransportBase):
     """
     if port is not None:
       warnings.warn(
-          "Please use the THttpClient('http{s}://host:port/path') constructor",
+          "Please use the ImpalaHttpClient('http{s}://host:port/path') constructor",
           DeprecationWarning,
           stacklevel=2)
       self.host = uri_or_host
@@ -65,7 +77,8 @@ class THttpClient(TTransportBase):
         self.port = parsed.port or http_client.HTTPS_PORT
         self.certfile = cert_file
         self.keyfile = key_file
-        self.context = ssl.create_default_context(cafile=cafile) if (cafile and not ssl_context) else ssl_context
+        self.context = ssl.create_default_context(cafile=cafile) \
+            if (cafile and not ssl_context) else ssl_context
       self.host = parsed.hostname
       self.path = parsed.path
       if parsed.query:
@@ -160,12 +173,18 @@ class THttpClient(TTransportBase):
 
     # Write headers
     self.__http.putheader('Content-Type', 'application/x-thrift')
-    self.__http.putheader('Content-Length', str(len(data)))
+    data_len = len(data)
+    self.__http.putheader('Content-Length', str(data_len))
+    if data_len > ImpalaHttpClient.MIN_REQUEST_SIZE_FOR_EXPECT:
+      # Add the 'Expect' header to large requests. Note that we do not explicitly wait for
+      # the '100 continue' response before sending the data - HTTPConnection simply
+      # ignores these types of responses, but we'll get the right behavior anyways.
+      self.__http.putheader("Expect", "100-continue")
     if self.using_proxy() and self.scheme == "http" and self.proxy_auth is not None:
       self.__http.putheader("Proxy-Authorization", self.proxy_auth)
 
     if not self.__custom_headers or 'User-Agent' not in self.__custom_headers:
-      user_agent = 'Python/THttpClient'
+      user_agent = 'Python/ImpalaHttpClient'
       script = os.path.basename(sys.argv[0])
       if script:
         user_agent = '%s (%s)' % (user_agent, urllib.parse.quote(script))
@@ -185,3 +204,8 @@ class THttpClient(TTransportBase):
     self.code = self.__http_response.status
     self.message = self.__http_response.reason
     self.headers = self.__http_response.msg
+
+    if self.code >= 300:
+      # Report any http response code that is not 1XX (informational response) or
+      # 2XX (successful).
+      raise RPCException("HTTP code {}: {}".format(self.code, self.message))

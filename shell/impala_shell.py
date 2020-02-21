@@ -35,15 +35,14 @@ import sys
 import textwrap
 import time
 
-from impala_client import (ImpalaHS2Client, ImpalaBeeswaxClient, DisconnectedException,
-                           QueryStateException, RPCException,
-                           QueryCancelledByShellException, QueryOptionLevels,
-                           MissingThriftMethodException)
+from impala_client import ImpalaHS2Client, ImpalaBeeswaxClient, QueryOptionLevels
 from impala_shell_config_defaults import impala_shell_defaults
 from option_parser import get_option_parser, get_config_from_file
 from shell_output import DelimitedOutputFormatter, OutputStream, PrettyOutputFormatter
 from shell_output import OverwritingStdErrOutputStream
 from subprocess import call
+from shell_exceptions import (RPCException, DisconnectedException, QueryStateException,
+    QueryCancelledByShellException, MissingThriftMethodException)
 
 
 VERSION_FORMAT = "Impala Shell v%(version)s (%(git_hash)s) built on %(build_date)s"

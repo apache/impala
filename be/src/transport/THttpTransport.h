@@ -78,6 +78,11 @@ protected:
   uint32_t httpBufLen_;
   uint32_t httpBufSize_;
 
+  // Set to 'true' for a request if the "Expect: 100-continue" header was present.
+  // Indicates that we should return a "100 Continue" response if the headers are
+  // successfully validated before reading the contents of the request.
+  bool continue_ = false;
+
   void init();
 
   uint32_t readMoreData();

@@ -837,7 +837,8 @@ class TestImpalaShell(ImpalaTestSuite):
     # the performance of Impala in general. So, this test will execute a large query
     # from a non-existent table since this will make the query execution time negligible.
     sql_file, sql_path = tempfile.mkstemp()
-    num_cols = 10000
+    # This generates a sql file size of ~50K.
+    num_cols = 1000
     os.write(sql_file, "select \n")
     for i in xrange(num_cols):
       if i < num_cols:
@@ -849,11 +850,13 @@ class TestImpalaShell(ImpalaTestSuite):
     os.close(sql_file)
 
     try:
-      args = ['-q', '-f', sql_path, '-d', unique_database]
+      args = ['-f', sql_path, '-d', unique_database]
       start_time = time()
-      run_impala_shell_cmd(vector, args, expect_success=False)
+      result = run_impala_shell_cmd(vector, args, expect_success=False)
+      assert "Could not resolve table reference: 'non_existence_large_table'" \
+          in result.stderr
       end_time = time()
-      time_limit_s = 10
+      time_limit_s = 20
       actual_time_s = end_time - start_time
       assert actual_time_s <= time_limit_s, (
           "It took {0} seconds to execute the query. Time limit is {1} seconds.".format(

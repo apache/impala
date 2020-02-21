@@ -38,12 +38,14 @@ from TCLIService.TCLIService import (TExecuteStatementReq, TOpenSessionReq,
     TCloseSessionReq, TProtocolVersion, TStatusCode, TGetOperationStatusReq,
     TOperationState, TFetchResultsReq, TFetchOrientation, TGetLogReq,
     TGetResultSetMetadataReq, TTypeId, TCancelOperationReq)
-from THttpClient import THttpClient
+from ImpalaHttpClient import ImpalaHttpClient
 from thrift.protocol import TBinaryProtocol
 from thrift_sasl import TSaslClientTransport
 from thrift.transport.TSocket import TSocket
 from thrift.transport.TTransport import TBufferedTransport, TTransportException
 from thrift.Thrift import TApplicationException, TException
+from shell_exceptions import (RPCException, QueryStateException, DisconnectedException,
+    QueryCancelledByShellException, MissingThriftMethodException)
 
 
 # Helpers to extract and convert HS2's representation of values to the display version.
@@ -98,47 +100,6 @@ class QueryOptionLevels:
   def from_string(cls, string):
     """Return the integral value based on the string. Defaults to DEVELOPMENT."""
     return cls.NAME_TO_VALUES.get(string.upper(), cls.DEVELOPMENT)
-
-class RPCException(Exception):
-    def __init__(self, value=""):
-      self.value = value
-    def __str__(self):
-      return self.value
-
-class QueryStateException(Exception):
-    def __init__(self, value=""):
-      self.value = value
-    def __str__(self):
-      return self.value
-
-class DisconnectedException(Exception):
-  def __init__(self, value=""):
-      self.value = value
-  def __str__(self):
-      return self.value
-
-class QueryCancelledByShellException(Exception): pass
-
-
-class MissingThriftMethodException(Exception):
-  """Thrown if a Thrift method that the client tried to call is missing."""
-  def __init__(self, value=""):
-      self.value = value
-
-  def __str__(self):
-      return self.value
-
-
-class CodeCheckingHttpClient(THttpClient):
-  """Add HTTP response code handling to THttpClient."""
-  def flush(self):
-    THttpClient.flush(self)
-    # At this point the http call has completed.
-    if self.code >= 300:
-      # Report any http response code that is not 1XX (informational response) or
-      # 2XX (successful).
-      raise RPCException("HTTP code {}: {}".format(self.code, self.message))
-
 
 def print_to_stderr(message):
   print >> sys.stderr, message
@@ -371,17 +332,17 @@ class ImpalaClient(object):
 
   def _get_http_transport(self, connect_timeout_ms):
     """Creates a transport with HTTP as the base."""
-    # Older python versions do not support SSLContext needed by THttpClient. More
+    # Older python versions do not support SSLContext needed by ImpalaHttpClient. More
     # context in IMPALA-8864. CentOs 6 ships such an incompatible python version
     # out of the box.
     if not hasattr(ssl, "create_default_context"):
       print_to_stderr("Python version too old. SSLContext not supported.")
       raise NotImplementedError()
-    # Current implementation of THttpClient does a close() and open() of the underlying
-    # http connection on every flush() (THRIFT-4600). Due to this, setting a connect
-    # timeout does not achieve the desirable result as the subsequent open() could block
-    # similary in case of problematic remote end points.
-    # TODO: Investigate connection reuse in THttpClient and revisit this.
+    # Current implementation of ImpalaHttpClient does a close() and open() of the
+    # underlying http connection on every flush() (THRIFT-4600). Due to this, setting a
+    # connect timeout does not achieve the desirable result as the subsequent open() could
+    # block similary in case of problematic remote end points.
+    # TODO: Investigate connection reuse in ImpalaHttpClient and revisit this.
     if connect_timeout_ms > 0:
       print_to_stderr("Warning: --connect_timeout_ms is currently ignored with" +
           " HTTP transport.")
@@ -396,7 +357,7 @@ class ImpalaClient(object):
 
     host_and_port = "{0}:{1}".format(self.impalad_host, self.impalad_port)
     assert self.http_path
-    # THttpClient relies on the URI scheme (http vs https) to open an appropriate
+    # ImpalaHttpClient relies on the URI scheme (http vs https) to open an appropriate
     # connection to the server.
     if self.use_ssl:
       ssl_ctx = ssl.create_default_context(cafile=self.ca_cert)
@@ -405,11 +366,10 @@ class ImpalaClient(object):
       else:
         ssl_ctx.check_hostname = False  # Mandated by the SSL lib for CERT_NONE mode.
         ssl_ctx.verify_mode = ssl.CERT_NONE
-      transport = CodeCheckingHttpClient(
+      transport = ImpalaHttpClient(
           "https://{0}/{1}".format(host_and_port, self.http_path), ssl_context=ssl_ctx)
     else:
-      transport = CodeCheckingHttpClient("http://{0}/{1}".
-          format(host_and_port, self.http_path))
+      transport = ImpalaHttpClient("http://{0}/{1}".format(host_and_port, self.http_path))
 
     if self.use_ldap:
       # Set the BASIC auth header

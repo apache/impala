@@ -222,6 +222,7 @@ void THttpTransport::readHeaders() {
   chunked_ = false;
   chunkedDone_ = false;
   chunkSize_ = 0;
+  continue_ = false;
 
   // Control state flow
   bool statusLine = true;
@@ -249,7 +250,20 @@ void THttpTransport::readHeaders() {
     }
   }
 
+  // Perform any validation of the headers needed.
   headersDone();
+
+  // The headers have been validated, so if the client included the 'Expect: 100-continue"
+  // header, we respond that it can continue with sending the request. See Section 8.2.3
+  // of RFC2616 for more details: https://www.w3.org/Protocols/rfc2616/rfc2616-sec8.html
+  if (continue_) {
+    std::ostringstream h;
+    h << "HTTP/1.1 100 Continue" << CRLF << CRLF;
+    string header = h.str();
+    transport_->write(
+        (const uint8_t*)header.c_str(), static_cast<uint32_t>(header.size()));
+    transport_->flush();
+  }
 }
 
 void THttpTransport::write(const uint8_t* buf, uint32_t len) {

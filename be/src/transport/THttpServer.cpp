@@ -110,6 +110,10 @@ void THttpServer::parseHeader(char* header) {
     auth_value_ = string(value);
   } else if (use_cookies_ && THRIFT_strncasecmp(header, "Cookie", sz) == 0) {
     cookie_value_ = string(value);
+  } else if (THRIFT_strncasecmp(header, "Expect", sz) == 0) {
+    if (THRIFT_strcasestr(value, "100-continue")){
+      continue_ = true;
+    }
   }
 }
 
