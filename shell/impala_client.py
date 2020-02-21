@@ -38,9 +38,9 @@ from TCLIService.TCLIService import (TExecuteStatementReq, TOpenSessionReq,
     TCloseSessionReq, TProtocolVersion, TStatusCode, TGetOperationStatusReq,
     TOperationState, TFetchResultsReq, TFetchOrientation, TGetLogReq,
     TGetResultSetMetadataReq, TTypeId, TCancelOperationReq)
+from THttpClient import THttpClient
 from thrift.protocol import TBinaryProtocol
 from thrift_sasl import TSaslClientTransport
-from thrift.transport.THttpClient import THttpClient
 from thrift.transport.TSocket import TSocket
 from thrift.transport.TTransport import TBufferedTransport, TTransportException
 from thrift.Thrift import TApplicationException, TException
