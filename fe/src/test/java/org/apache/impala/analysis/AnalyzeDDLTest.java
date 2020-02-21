@@ -2043,7 +2043,7 @@ public class AnalyzeDDLTest extends FrontendTestBase {
     AnalyzesOk("create table if not exists newtbl_DNE like orc " +
         "'/test-warehouse/alltypestiny_orc_def/year=2009/month=1/000000_0'");
     AnalyzesOk("create table if not exists newtbl_DNE like orc " +
-        "'/test-warehouse/functional_orc_def.db/complextypes_fileformat/000000_0'");
+        "'/test-warehouse/complextypestbl_orc_def/nullable.orc'");
 
     // check invalid paths
     AnalysisError("create table if not exists functional.zipcode_incomes like ORC " +
