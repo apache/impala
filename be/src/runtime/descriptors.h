@@ -124,8 +124,12 @@ class SlotDescriptor {
   /// convenient for table formats for which we only support flat data.
   int col_pos() const { return col_path_[0]; }
   const SchemaPath& col_path() const { return col_path_; }
-  /// Returns the field index in the generated llvm struct for this slot's tuple
-  int llvm_field_idx() const { return llvm_field_idx_; }
+
+  /// Returns the field index in the generated llvm struct for this slot's tuple.
+  /// The 'llvm_field_idx' is the index of the slot in the llvm codegen'd tuple struct.
+  /// This takes into account any padding bytes.
+  int llvm_field_idx() const { return slot_idx_; }
+
   int tuple_offset() const { return tuple_offset_; }
   const NullIndicatorOffset& null_indicator_offset() const {
     return null_indicator_offset_;
@@ -184,11 +188,6 @@ class SlotDescriptor {
 
   /// the byte size of this slot.
   const int slot_size_;
-
-  /// The idx of the slot in the llvm codegen'd tuple struct
-  /// This is set by TupleDescriptor during codegen and takes into account
-  /// any padding bytes.
-  int llvm_field_idx_ = -1;
 
   /// collection_item_descriptor should be non-NULL iff this is a collection slot
   SlotDescriptor(const TSlotDescriptor& tdesc, const TupleDescriptor* parent,

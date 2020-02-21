@@ -30,3 +30,14 @@ race:impala::StatestoreTest_SmokeTest_Test
 thread:impala::StatestoreTest_SmokeTest_Test
 race:impala::SessionTest_TestExpiry_Test
 race:impala::StatestoreSslTest_ValidCertSmokeTest_Test
+
+# TODO: IMPALA-9314: The ThriftServer used by the tests in hs2-http-test.cc has various
+# race conditions during the shutdown process
+race:impala::ThriftHttpTest_TestChunkedRequests_Test
+race:impala::Hs2HttpTest_TestSpnego_Test
+
+# TODO: IMPALA-9455 / IMPALA-6085: 'RpcMgrKerberizedTest' calls 'InitAuth'
+# (auth-provider.h) multiple times per process. This causes a race condition on
+# 'g_kinit_ctx' (init.cc). On a production cluster, Impala daemons should only call
+# 'InitAuth' once.
+race:impala::RpcMgrKerberizedTest

@@ -159,10 +159,13 @@ class DataStreamTest : public testing::Test {
 
     CreateRowDesc();
 
+    SlotRef* lhs_slot = obj_pool_.Add(new SlotRef(TYPE_BIGINT, 0));
+    ASSERT_OK(lhs_slot->Init(RowDescriptor(), true, runtime_state_.get()));
+    ordering_exprs_.push_back(lhs_slot);
+
     tsort_info_.sorting_order = TSortingOrder::LEXICAL;
     tsort_info_.is_asc_order.push_back(true);
     tsort_info_.nulls_first.push_back(true);
-    CreateTupleComparator();
 
     next_instance_id_.lo = 0;
     next_instance_id_.hi = 0;
@@ -217,7 +220,9 @@ class DataStreamTest : public testing::Test {
 
   virtual void TearDown() {
     desc_tbl_->ReleaseResources();
-    less_than_->Close(runtime_state_.get());
+    for (auto less_than_comparator : less_than_comparators_) {
+      less_than_comparator->Close(runtime_state_.get());
+    }
     ScalarExpr::Close(ordering_exprs_);
     mem_pool_->FreeAll();
     StopKrpcBackend();
@@ -236,7 +241,7 @@ class DataStreamTest : public testing::Test {
   DescriptorTbl* desc_tbl_;
   const RowDescriptor* row_desc_;
   TSortInfo tsort_info_;
-  TupleRowComparator* less_than_;
+  vector<TupleRowComparator*> less_than_comparators_;
   boost::scoped_ptr<ExecEnv> exec_env_;
   scoped_ptr<RuntimeState> runtime_state_;
   TUniqueId next_instance_id_;
@@ -342,14 +347,12 @@ class DataStreamTest : public testing::Test {
   }
 
   // Create a tuple comparator to sort in ascending order on the single bigint column.
-  void CreateTupleComparator() {
-    SlotRef* lhs_slot = obj_pool_.Add(new SlotRef(TYPE_BIGINT, 0));
-    ASSERT_OK(lhs_slot->Init(RowDescriptor(), true, runtime_state_.get()));
-    ordering_exprs_.push_back(lhs_slot);
+  void CreateTupleComparator(TupleRowComparator** less_than_comparator) {
     TupleRowComparatorConfig* comparator_config =
         obj_pool_.Add(new TupleRowComparatorConfig(tsort_info_, ordering_exprs_));
-    less_than_ = obj_pool_.Add(new TupleRowLexicalComparator(*comparator_config));
-    ASSERT_OK(less_than_->Open(
+    *less_than_comparator =
+        obj_pool_.Add(new TupleRowLexicalComparator(*comparator_config));
+    ASSERT_OK((*less_than_comparator)->Open(
         &obj_pool_, runtime_state_.get(), mem_pool_.get(), mem_pool_.get()));
   }
 
@@ -389,11 +392,15 @@ class DataStreamTest : public testing::Test {
     info->stream_recvr = stream_mgr_->CreateRecvr(row_desc_, *runtime_state_.get(),
         instance_id, DEST_NODE_ID, num_senders, buffer_size, is_merging, profile,
         &tracker_, &buffer_pool_client_);
-    if (!is_merging) {
+   if (!is_merging) {
       info->thread_handle.reset(new thread(&DataStreamTest::ReadStream, this, info));
     } else {
+      TupleRowComparator* less_than_comparator = nullptr;
+      CreateTupleComparator(&less_than_comparator);
+      DCHECK(less_than_comparator != nullptr);
+      less_than_comparators_.push_back(less_than_comparator);
       info->thread_handle.reset(new thread(&DataStreamTest::ReadStreamMerging, this, info,
-          profile));
+          profile, less_than_comparator));
     }
     if (out_id != nullptr) *out_id = instance_id;
   }
@@ -423,8 +430,9 @@ class DataStreamTest : public testing::Test {
     VLOG_QUERY << "done reading";
   }
 
-  void ReadStreamMerging(ReceiverInfo* info, RuntimeProfile* profile) {
-    info->status = info->stream_recvr->CreateMerger(*less_than_);
+  void ReadStreamMerging(ReceiverInfo* info, RuntimeProfile* profile,
+      TupleRowComparator* less_than_comparator) {
+    info->status = info->stream_recvr->CreateMerger(*less_than_comparator);
     if (info->status.IsCancelled()) return;
     RowBatch batch(row_desc_, 1024, &tracker_);
     VLOG_QUERY << "start reading merging";

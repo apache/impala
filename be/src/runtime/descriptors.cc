@@ -142,7 +142,7 @@ string SlotDescriptor::DebugString() const {
     out << " collection_item_tuple_id=" << collection_item_descriptor_->id();
   }
   out << " offset=" << tuple_offset_ << " null=" << null_indicator_offset_.DebugString()
-      << " slot_idx=" << slot_idx_ << " field_idx=" << llvm_field_idx_
+      << " slot_idx=" << slot_idx_ << " field_idx=" << slot_idx_
       << ")";
   return out.str();
 }
@@ -724,6 +724,10 @@ llvm::Value* SlotDescriptor::CodegenGetNullByte(
 vector<SlotDescriptor*> TupleDescriptor::SlotsOrderedByIdx() const {
   vector<SlotDescriptor*> sorted_slots(slots().size());
   for (SlotDescriptor* slot: slots()) sorted_slots[slot->slot_idx_] = slot;
+  // Check that the size of sorted_slots has not changed. This ensures that the series
+  // of slot indexes starts at 0 and increases by 1 for each slot. This also ensures that
+  // the returned vector has no nullptr elements.
+  DCHECK_EQ(slots().size(), sorted_slots.size());
   return sorted_slots;
 }
 
@@ -736,7 +740,6 @@ llvm::StructType* TupleDescriptor::GetLlvmStruct(LlvmCodeGen* codegen) const {
   int curr_struct_offset = 0;
   for (SlotDescriptor* slot: sorted_slots) {
     DCHECK_EQ(curr_struct_offset, slot->tuple_offset());
-    slot->llvm_field_idx_ = struct_fields.size();
     struct_fields.push_back(codegen->GetSlotType(slot->type()));
     curr_struct_offset = slot->tuple_offset() + slot->slot_size();
   }

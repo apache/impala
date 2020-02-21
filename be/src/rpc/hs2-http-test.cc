@@ -34,10 +34,11 @@ static string IMPALA_HOME(getenv("IMPALA_HOME"));
 
 namespace filesystem = boost::filesystem;
 
-using namespace impala;
 using namespace apache::hive::service::cli::thrift;
 using namespace apache::thrift;
 using strings::Substitute;
+
+namespace impala {
 
 class TestHS2Service : public ImpalaHiveServer2ServiceIf {
  public:
@@ -166,9 +167,10 @@ TEST(Hs2HttpTest, TestSpnego) {
 
   http_server->StopForTesting();
 }
+}
 
 int main(int argc, char** argv) {
   ::testing::InitGoogleTest(&argc, argv);
-  InitCommonRuntime(argc, argv, false, TestInfo::BE_TEST);
+  impala::InitCommonRuntime(argc, argv, false, impala::TestInfo::BE_TEST);
   return RUN_ALL_TESTS();
 }
