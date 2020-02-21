@@ -711,7 +711,7 @@ public class CatalogOpExecutor {
             // pre-existing there is no alter table event generated. Hence we should
             // only add the versions for in-flight events when we are sure that the
             // partition was really added.
-            catalog_.addVersionsForInflightEvents(tbl, newCatalogVersion);
+            catalog_.addVersionsForInflightEvents(false, tbl, newCatalogVersion);
             addTableToCatalogUpdate(refreshedTable, response.result);
           }
           reloadMetadata = false;
@@ -851,7 +851,7 @@ public class CatalogOpExecutor {
             reloadTableSchema, null, "ALTER TABLE " + params.getAlter_type().name());
         // now that HMS alter operation has succeeded, add this version to list of
         // inflight events in catalog table if event processing is enabled
-        catalog_.addVersionsForInflightEvents(tbl, newCatalogVersion);
+        catalog_.addVersionsForInflightEvents(false, tbl, newCatalogVersion);
         addTableToCatalogUpdate(tbl, response.result);
       }
     } finally {
@@ -3098,7 +3098,7 @@ public class CatalogOpExecutor {
           "'%s' and the new table name '%s' may fix the problem." , tableName.toString(),
           newTableName.toString()));
     }
-    catalog_.addVersionsForInflightEvents(result.second, newCatalogVersion);
+    catalog_.addVersionsForInflightEvents(false, result.second, newCatalogVersion);
     // TODO(todd): if client is a 'v2' impalad, only send back invalidation
     response.result.addToRemoved_catalog_objects(result.first.toMinimalTCatalogObject());
     response.result.addToUpdated_catalog_objects(result.second.toTCatalogObject());
@@ -3678,7 +3678,7 @@ public class CatalogOpExecutor {
     // catalog service identifiers
     if (catalog_.getCatalogServiceId().equals(serviceId)) {
       Preconditions.checkNotNull(version);
-      hdfsPartition.addToVersionsForInflightEvents(Long.parseLong(version));
+      hdfsPartition.addToVersionsForInflightEvents(false, Long.parseLong(version));
     }
   }
 
@@ -4430,7 +4430,7 @@ public class CatalogOpExecutor {
   }
 
   /**
-   * Populates insert event data and calls fireInsertEventAysnc() if external event
+   * Populates insert event data and calls fireInsertEvents() if external event
    * processing is enabled. This is no-op if event processing is disabled or there are
    * no existing partitions affected by this insert.
    *
@@ -4440,11 +4440,16 @@ public class CatalogOpExecutor {
    */
   private void createInsertEvents(Table table,
       List<FeFsPartition> affectedExistingPartitions, boolean isInsertOverwrite) {
-    if (!catalog_.isEventProcessingActive() ||
-        affectedExistingPartitions.size() == 0) return;
+    boolean isInsertEventsEnabled = BackendConfig.INSTANCE.isInsertEventsEnabled();
+    if (!catalog_.isEventProcessingActive() || !isInsertEventsEnabled
+        || affectedExistingPartitions.size() == 0) {
+      return;
+    }
 
     // List of all insert events that we call HMS fireInsertEvent() on.
     List<InsertEventInfo> insertEventInfos = new ArrayList<>();
+    // List of all partitions that we insert into
+    List<HdfsPartition> partitions = new ArrayList<>();
 
     // Map of partition names to file names of all existing partitions touched by the
     // insert.
@@ -4471,58 +4476,54 @@ public class CatalogOpExecutor {
       // Find the delta of the files added by the insert if it is not an overwrite
       // operation. HMS fireListenerEvent() expects an empty list if no new files are
       // added or if the operation is an insert overwrite.
+      HdfsPartition hdfsPartition = (HdfsPartition) part;
       Set<String> deltaFiles = new HashSet<>();
       List<String> partVals = null;
       if (!isInsertOverwrite) {
-        String partitionName = part.getPartitionName() + "/";
+        String partitionName = hdfsPartition.getPartitionName() + "/";
         Set<String> filesPostInsert =
             partitionFilesMapPostInsert.get(partitionName);
         if (table.getNumClusteringCols() > 0) {
           Set<String> filesBeforeInsert =
               partitionFilesMapBeforeInsert.get(partitionName);
           deltaFiles = Sets.difference(filesBeforeInsert, filesPostInsert);
-          partVals = part.getPartitionValuesAsStrings(true);
+          partVals = hdfsPartition.getPartitionValuesAsStrings(true);
         } else {
           Map.Entry<String, Set<String>> entry =
               partitionFilesMapBeforeInsert.entrySet().iterator().next();
           deltaFiles = Sets.difference(entry.getValue(), filesPostInsert);
         }
         LOG.info("{} new files detected for table {} partition {}.",
-            filesPostInsert.size(), table.getTableName(), part.getPartitionName());
+            filesPostInsert.size(), table.getTableName(),
+            hdfsPartition.getPartitionName());
       }
       if (deltaFiles != null || isInsertOverwrite) {
         // Collect all the insert events.
-        insertEventInfos.add(new InsertEventInfo(table.getDb().getName(),
-            table.getName(), partVals, deltaFiles, isInsertOverwrite));
+        insertEventInfos.add(
+            new InsertEventInfo(partVals, deltaFiles, isInsertOverwrite));
+        if (partVals != null) {
+          // insert into partition
+          partitions.add(hdfsPartition);
+        }
       } else {
         LOG.info("No new files were created, and is not a replace. Skipping "
             + "generating INSERT event.");
       }
     }
 
-    // Firing insert events by making calls to HMS APIs can be slow for tables with
-    // large number of partitions. Hence, we fire the insert events asynchronously.
-    fireInsertEventsAsync(insertEventInfos);
-  }
-
-  /**
-   * Helper method to fire insert events asynchronously. This creates a single thread
-   * to execute the fireInsertEvent method and shuts down the thread after it has
-   * finished. In case of any exception, we just log the failure of firing insert events.
-   */
-  private void fireInsertEventsAsync(List<InsertEventInfo> insertEventInfos) {
-    ExecutorService fireInsertEventThread = Executors.newSingleThreadExecutor();
-    CompletableFuture.runAsync(() -> {
-      for (InsertEventInfo info : insertEventInfos) {
-        try (MetaStoreClient metaStoreClient = catalog_.getMetaStoreClient()) {
-          MetaStoreUtil.fireInsertEvent(metaStoreClient.getHiveClient(), info);
-        } catch (Exception e) {
-          LOG.error("Failed to fire insert event. Some tables might not be"
-              + " refreshed on other impala clusters.", e);
+    MetaStoreClient metaStoreClient = catalog_.getMetaStoreClient();
+    List<Long> eventIds = MetastoreShim.fireInsertEvents(metaStoreClient,
+        insertEventInfos, table.getDb().getName(), table.getName());
+    if (!eventIds.isEmpty()) {
+      if (partitions.size() == 0) { // insert into table
+        catalog_.addVersionsForInflightEvents(true, table, eventIds.get(0));
+      } else { // insert into partition
+        for (int par_idx = 0; par_idx < partitions.size(); par_idx++) {
+          partitions.get(par_idx).addToVersionsForInflightEvents(
+              true, eventIds.get(par_idx));
         }
       }
-    }, Executors.newSingleThreadExecutor()).thenRun(() ->
-        fireInsertEventThread.shutdown());
+    }
   }
 
   /**

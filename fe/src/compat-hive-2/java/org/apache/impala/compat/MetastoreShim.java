@@ -23,8 +23,14 @@ import static org.apache.impala.service.MetadataOp.TABLE_TYPE_VIEW;
 import com.google.common.annotations.VisibleForTesting;
 import com.google.common.base.Preconditions;
 import com.google.common.collect.ImmutableMap;
+
+import java.util.ArrayList;
+import java.util.Collections;
 import java.util.EnumSet;
 import java.util.List;
+import java.util.concurrent.CompletableFuture;
+import java.util.concurrent.ExecutorService;
+import java.util.concurrent.Executors;
 
 import org.apache.hadoop.fs.Path;
 import org.apache.hadoop.hive.common.FileUtils;
@@ -51,6 +57,9 @@ import org.apache.hadoop.hive.metastore.api.NoSuchObjectException;
 import org.apache.hadoop.hive.metastore.api.Partition;
 import org.apache.hadoop.hive.metastore.api.Table;
 import org.apache.hadoop.hive.metastore.api.FieldSchema;
+import org.apache.hadoop.hive.metastore.api.FireEventRequest;
+import org.apache.hadoop.hive.metastore.api.FireEventRequestData;
+import org.apache.hadoop.hive.metastore.api.InsertEventRequestData;
 import org.apache.hadoop.hive.ql.parse.BaseSemanticAnalyzer;
 import org.apache.hadoop.hive.metastore.messaging.AlterTableMessage;
 import org.apache.hadoop.hive.metastore.messaging.EventMessage;
@@ -62,6 +71,9 @@ import org.apache.hive.service.rpc.thrift.TGetFunctionsReq;
 import org.apache.hive.service.rpc.thrift.TGetSchemasReq;
 import org.apache.hive.service.rpc.thrift.TGetTablesReq;
 import org.apache.impala.authorization.User;
+import org.apache.impala.catalog.CatalogServiceCatalog;
+import org.apache.impala.catalog.HdfsPartition;
+import org.apache.impala.catalog.MetaStoreClientPool.MetaStoreClient;
 import org.apache.impala.common.ImpalaException;
 import org.apache.impala.common.ImpalaRuntimeException;
 import org.apache.impala.common.Pair;
@@ -71,6 +83,8 @@ import org.apache.impala.service.MetadataOp;
 import org.apache.impala.thrift.TMetadataOpRequest;
 import org.apache.impala.thrift.TResultSet;
 import org.apache.impala.util.AcidUtils.TblTransaction;
+import org.apache.impala.util.MetaStoreUtil.InsertEventInfo;
+import org.apache.log4j.Logger;
 import org.apache.thrift.TException;
 
 /**
@@ -78,6 +92,7 @@ import org.apache.thrift.TException;
  * between major versions of Hive. This implements the shimmed methods for Hive 2.
  */
 public class MetastoreShim {
+  private static final Logger LOG = Logger.getLogger(MetastoreShim.class);
 
   public static TblTransaction createTblTransaction(
      IMetaStoreClient client, Table tbl, long txnId) {
@@ -483,5 +498,59 @@ public class MetastoreShim {
   public static String getPathForNewTable(Database db, Table tbl)
       throws MetaException {
     return new Path(db.getLocationUri(), tbl.getTableName().toLowerCase()).toString();
+  }
+
+  /**
+   * Fire insert events asynchronously. This creates a single thread to execute the
+   * fireInsertEvent method and shuts down the thread after it has finished.
+   * In case of any exception, we just log the failure of firing insert events.
+   */
+  public static List<Long> fireInsertEvents(MetaStoreClient msClient,
+      List<InsertEventInfo> insertEventInfos, String dbName, String tableName) {
+    ExecutorService fireInsertEventThread = Executors.newSingleThreadExecutor();
+    CompletableFuture.runAsync(() -> {
+      try {
+        fireInsertEventHelper(msClient.getHiveClient(), insertEventInfos, dbName, tableName);
+      } catch (Exception e) {
+        LOG.error("Failed to fire insert event. Some tables might not be"
+                + " refreshed on other impala clusters.", e);
+      } finally {
+        msClient.close();
+      }
+    }, Executors.newSingleThreadExecutor()).thenRun(() ->
+        fireInsertEventThread.shutdown());
+    return Collections.emptyList();
+  }
+
+  /**
+   *  Fires an insert event to HMS notification log. In Hive-2 for partitioned table,
+   *  each existing partition touched by the insert will fire a separate insert event.
+   * @param msClient Metastore client,
+   * @param insertEventInfos A list of insert event encapsulating the information needed
+   * to fire insert
+   * @param dbName
+   * @param tableName
+   */
+  @VisibleForTesting
+  public static void fireInsertEventHelper(IMetaStoreClient msClient,
+      List<InsertEventInfo> insertEventInfos, String dbName, String tableName)
+      throws TException {
+    Preconditions.checkNotNull(msClient);
+    Preconditions.checkNotNull(dbName);
+    Preconditions.checkNotNull(tableName);
+    for (InsertEventInfo info : insertEventInfos) {
+      Preconditions.checkNotNull(info.getNewFiles());
+      LOG.debug("Firing an insert event for " + tableName);
+      FireEventRequestData data = new FireEventRequestData();
+      InsertEventRequestData insertData = new InsertEventRequestData();
+      data.setInsertData(insertData);
+      FireEventRequest rqst = new FireEventRequest(true, data);
+      rqst.setDbName(dbName);
+      rqst.setTableName(tableName);
+      insertData.setFilesAdded(new ArrayList<>(info.getNewFiles()));
+      insertData.setReplace(info.isOverwrite());
+      if (info.getPartVals() != null) rqst.setPartitionVals(info.getPartVals());
+      msClient.fireListenerEvent(rqst);
+    }
   }
 }

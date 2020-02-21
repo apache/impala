@@ -67,6 +67,7 @@ DECLARE_int64(exchg_node_buffer_size_bytes);
 DECLARE_int32(kudu_mutation_buffer_size);
 DECLARE_int32(kudu_error_buffer_size);
 DECLARE_int32(hms_event_polling_interval_s);
+DECLARE_bool(enable_insert_events);
 DECLARE_string(authorization_factory_class);
 DECLARE_bool(unlock_mt_dop);
 DECLARE_bool(mt_dop_auto_fallback);
@@ -155,6 +156,7 @@ Status GetThriftBackendGflags(JNIEnv* jni_env, jbyteArray* cfg_bytes) {
   cfg.__set_kudu_mutation_buffer_size(FLAGS_kudu_mutation_buffer_size);
   cfg.__set_kudu_error_buffer_size(FLAGS_kudu_error_buffer_size);
   cfg.__set_hms_event_polling_interval_s(FLAGS_hms_event_polling_interval_s);
+  cfg.__set_enable_insert_events(FLAGS_enable_insert_events);
   cfg.__set_impala_build_version(::GetDaemonBuildVersion());
   cfg.__set_authorization_factory_class(FLAGS_authorization_factory_class);
   cfg.__set_unlock_mt_dop(FLAGS_unlock_mt_dop);

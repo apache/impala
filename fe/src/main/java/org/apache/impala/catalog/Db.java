@@ -511,7 +511,7 @@ public class Db extends CatalogObjectImpl implements FeDb {
     Preconditions.checkState(dbLock_.isHeldByCurrentThread(),
         "removeFromVersionsForInflightEvents called without getting the db lock for "
             + getName() + " database.");
-    return inFlightEvents_.remove(versionNumber);
+    return inFlightEvents_.remove(false, versionNumber);
   }
 
   /**
@@ -525,7 +525,7 @@ public class Db extends CatalogObjectImpl implements FeDb {
     Preconditions.checkState(dbLock_.isHeldByCurrentThread(),
         "addToVersionsForInFlightEvents called without getting the db lock for "
             + getName() + " database.");
-    if (!inFlightEvents_.add(versionNumber)) {
+    if (!inFlightEvents_.add(false, versionNumber)) {
       LOG.warn(String.format("Could not add version %s to the list of in-flight "
           + "events. This could cause unnecessary database %s invalidation when the "
           + "event is processed", versionNumber, getName()));

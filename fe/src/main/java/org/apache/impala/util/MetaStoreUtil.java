@@ -30,9 +30,6 @@ import org.apache.hadoop.hive.metastore.IMetaStoreClient;
 import org.apache.hadoop.hive.metastore.Warehouse;
 import org.apache.hadoop.hive.metastore.api.ConfigValSecurityException;
 import org.apache.hadoop.hive.metastore.api.FieldSchema;
-import org.apache.hadoop.hive.metastore.api.FireEventRequest;
-import org.apache.hadoop.hive.metastore.api.FireEventRequestData;
-import org.apache.hadoop.hive.metastore.api.InsertEventRequestData;
 import org.apache.hadoop.hive.metastore.api.MetaException;
 import org.apache.hadoop.hive.metastore.api.Partition;
 import org.apache.hadoop.hive.metastore.api.SQLPrimaryKey;
@@ -317,13 +314,18 @@ public class MetaStoreUtil {
   }
 
   /**
+   * Check if the hms table is a bucketed table or not
+   */
+  public static boolean isBucketedTable(Table msTbl) {
+    Preconditions.checkNotNull(msTbl);
+    return msTbl.getSd().getNumBuckets() > 0;
+  }
+
+  /**
    * A helper class that encapsulates all the information needed to fire and insert event
    * with HMS.
    */
   public static class InsertEventInfo {
-    private String dbName;
-    private String tableName;
-
     // List of partition values corresponding to the partition keys in
     // a partitioned table. This is null for non-partitioned table.
     private List<String> partVals;
@@ -337,48 +339,15 @@ public class MetaStoreUtil {
     // false otherwise.
     private boolean isOverwrite;
 
-    public InsertEventInfo(String dbName, String tableName, List<String> partVals,
-        Collection<String> newFiles, boolean isOverwrite) {
-      this.dbName = dbName;
-      this.tableName = tableName;
+    public InsertEventInfo(
+        List<String> partVals, Collection<String> newFiles, boolean isOverwrite) {
       this.partVals = partVals;
       this.newFiles = newFiles;
       this.isOverwrite = isOverwrite;
     }
-  }
 
-  /**
-   *  Fires an insert event to HMS notification log. For partitioned table, each
-   *  existing partition touched by the insert will fire a separate insert event.
-   *
-   * @param msClient Metastore client,
-   * @param info A singe insert event encapsulating the information needed to fire insert
-   * event with HMS.
-   */
-  public static void fireInsertEvent(IMetaStoreClient msClient,
-      InsertEventInfo info) throws TException {
-    Preconditions.checkNotNull(msClient);
-    Preconditions.checkNotNull(info.dbName);
-    Preconditions.checkNotNull(info.tableName);
-    Preconditions.checkNotNull(info.newFiles);
-    LOG.debug("Firing an insert event for {}", info.tableName);
-    FireEventRequestData data = new FireEventRequestData();
-    InsertEventRequestData insertData = new InsertEventRequestData();
-    data.setInsertData(insertData);
-    FireEventRequest rqst = new FireEventRequest(true, data);
-    rqst.setDbName(info.dbName);
-    rqst.setTableName(info.tableName);
-    insertData.setFilesAdded(new ArrayList<>(info.newFiles));
-    insertData.setReplace(info.isOverwrite);
-    if (info.partVals != null) rqst.setPartitionVals(info.partVals);
-    msClient.fireListenerEvent(rqst);
-  }
-
-  /**
-   * Check if the hms table is a bucketed table or not
-   */
-  public static boolean isBucketedTable(Table msTbl) {
-    Preconditions.checkNotNull(msTbl);
-    return msTbl.getSd().getNumBuckets() > 0;
+    public List<String> getPartVals() { return this.partVals; }
+    public Collection<String> getNewFiles() { return this.newFiles; }
+    public boolean isOverwrite() { return this.isOverwrite; }
   }
 }

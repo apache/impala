@@ -852,25 +852,33 @@ public class HdfsPartition implements FeFsPartition, PrunablePartition {
 
   /**
    * Removes a given version from the in-flight events
-   * @param versionNumber version number to remove
+   * @param isInsertEvent If true, remove eventId from list of eventIds for in-flight
+   * Insert events. If false, remove version number from list of versions for in-flight
+   * DDL events.
+   * @param versionNumber when isInsertEvent is true, it's eventId to remove
+   *                      when isInsertEvent is false, it's version number to remove
    * @return true if the versionNumber was removed, false if it didn't exist
    */
-  public boolean removeFromVersionsForInflightEvents(long versionNumber) {
+  public boolean removeFromVersionsForInflightEvents(
+      boolean isInsertEvent, long versionNumber) {
     Preconditions.checkState(table_.getLock().isHeldByCurrentThread(),
         "removeFromVersionsForInflightEvents called without holding the table lock on "
             + "partition " + getPartitionName() + " of table " + table_.getFullName());
-    return inFlightEvents_.remove(versionNumber);
+    return inFlightEvents_.remove(isInsertEvent, versionNumber);
   }
 
   /**
    * Adds a version number to the in-flight events of this partition
-   * @param versionNumber version number to add
+   * @param isInsertEvent if true, add eventId to list of eventIds for in-flight Insert
+   * events if false, add version number to list of versions for in-flight DDL events
+   * @param versionNumber when isInsertEvent is true, it's eventId to add
+   *                      when isInsertEvent is false, it's version number to add
    */
-  public void addToVersionsForInflightEvents(long versionNumber) {
+  public void addToVersionsForInflightEvents(boolean isInsertEvent, long versionNumber) {
     Preconditions.checkState(table_.getLock().isHeldByCurrentThread(),
         "addToVersionsForInflightEvents called without holding the table lock on "
             + "partition " + getPartitionName() + " of table " + table_.getFullName());
-    if (!inFlightEvents_.add(versionNumber)) {
+    if (!inFlightEvents_.add(isInsertEvent, versionNumber)) {
       LOG.warn(String.format("Could not add %s version to the partition %s of table %s. "
           + "This could cause unnecessary refresh of the partition when the event is"
           + "received by the Events processor.", versionNumber, getPartitionName(),
@@ -886,13 +894,14 @@ public class HdfsPartition implements FeFsPartition, PrunablePartition {
    */
   private void addInflightVersionsFromParameters() {
     Preconditions.checkNotNull(hmsParameters_);
-    Preconditions.checkState(inFlightEvents_.size() == 0);
+    Preconditions.checkState(inFlightEvents_.size(false) == 0);
     // we should not check for table lock being held here since there are certain code
     // paths which call this method without holding the table lock (eg. getOrLoadTable())
     if (!hmsParameters_.containsKey(MetastoreEventPropertyKey.CATALOG_VERSION.getKey())) {
       return;
     }
-    inFlightEvents_.add(Long.parseLong(
+    inFlightEvents_.add(false,
+        Long.parseLong(
             hmsParameters_.get(MetastoreEventPropertyKey.CATALOG_VERSION.getKey())));
   }
 

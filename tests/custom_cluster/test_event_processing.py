@@ -21,6 +21,7 @@ import pytest
 
 from tests.common.skip import SkipIfHive2
 from tests.common.custom_cluster_test_suite import CustomClusterTestSuite
+from tests.common.environ import HIVE_MAJOR_VERSION
 from tests.common.skip import SkipIfS3, SkipIfABFS, SkipIfADLS, SkipIfIsilon, SkipIfLocal
 from tests.util.hive_utils import HiveDbWrapper
 from tests.util.event_processor_utils import EventProcessorUtils
@@ -268,11 +269,6 @@ class TestEventProcessing(CustomClusterTestSuite):
           # add partition
           "alter table {0}.{1} add if not exists partition (year=1111, month=1)".format(
             db_name, tbl2),
-          # insert into a existing partition; generates ALTER_PARTITION
-          # TODO add support for insert_events (IMPALA-8632)
-          # "insert into table {0}.{1} partition (year, month) "
-          # "select * from functional.alltypessmall where year=2009 and month=1".format(
-          #  db_name, tbl2),
           # compute stats will generates ALTER_PARTITION
           "compute stats {0}.{1}".format(db_name, tbl2),
           "alter table {0}.{1} recover partitions".format(db_name, recover_tbl_name)],
@@ -295,6 +291,11 @@ class TestEventProcessing(CustomClusterTestSuite):
           "alter table {0}.{1} drop if exists partition (year=2100, month=1)".format(
             db_name, tbl_name)]
     }
+    if HIVE_MAJOR_VERSION >= 3:
+      # insert into a existing partition; generates INSERT events
+      self_event_test_queries[True].append("insert into table {0}.{1} partition "
+          "(year, month) select * from functional.alltypessmall where year=2009 "
+          "and month=1".format(db_name, tbl2))
     return self_event_test_queries
 
   def __get_hive_test_queries(self, db_name, recover_tbl_name):

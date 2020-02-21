@@ -34,41 +34,66 @@ public class InFlightEvents {
   // maximum number of catalog versions to store for in-flight events for this table
   private static final int DEFAULT_MAX_NUMBER_OF_INFLIGHT_EVENTS = 10;
 
+  // maximum number of eventIds to store for in-flight events for this table
+  private static final int DEFAULT_MAX_NUMBER_OF_INFLIGHT_INSERT_EVENTS = 100;
+
   private static final Logger LOG = LoggerFactory.getLogger(InFlightEvents.class);
-  // FIFO list of versions for all the in-flight metastore events in this table
+  // FIFO list of versions for all the in-flight metastore DDL events in this table
   // This queue can only grow up to MAX_NUMBER_OF_INFLIGHT_EVENTS size. Anything which
   // is attempted to be added to this list when its at maximum capacity is ignored
   private final LinkedList<Long> versionsForInflightEvents_ = new LinkedList<>();
 
+  // FIFO list of eventIds for all the in-flight metastore Insert events in this table
+  // This queue can only grow up to MAX_NUMBER_OF_INFLIGHT_INSERT_EVENTS size. Anything
+  // which is attempted to be added to this list when its at maximum capacity is ignored
+  private final LinkedList<Long> idsForInflightDmlEvents_ = new LinkedList<>();
+
   // maximum number of versions to store
-  private final int capacity_;
+  private final int capacity_for_versions_;
+
+  // maximum number of eventIds to store
+  private final int capacity_for_eventIds_;
 
   public InFlightEvents() {
-    this.capacity_ = DEFAULT_MAX_NUMBER_OF_INFLIGHT_EVENTS;
+    this.capacity_for_versions_ = DEFAULT_MAX_NUMBER_OF_INFLIGHT_EVENTS;
+    this.capacity_for_eventIds_ = DEFAULT_MAX_NUMBER_OF_INFLIGHT_INSERT_EVENTS;
   }
 
   public InFlightEvents(int capacity) {
     Preconditions.checkState(capacity > 0);
-    this.capacity_ = capacity;
+    this.capacity_for_versions_ = capacity;
+    this.capacity_for_eventIds_ = DEFAULT_MAX_NUMBER_OF_INFLIGHT_INSERT_EVENTS;
   }
-
   /**
    * Gets the current list of versions for in-flight events for this table
+   * @param isInsertEvent if true, return list of eventIds for in-flight Insert events
+   * if false, return list of versions for in-flight DDL events
    */
-  public List<Long> getAll() {
-    return ImmutableList.copyOf(versionsForInflightEvents_);
+  public List<Long> getAll(boolean isInsertEvent) {
+    if (isInsertEvent) {
+      return ImmutableList.copyOf(idsForInflightDmlEvents_);
+    } else {
+      return ImmutableList.copyOf(versionsForInflightEvents_);
+    }
   }
 
   /**
    * Removes a given version from the collection of version numbers for in-flight
    * events.
-   *
-   * @param versionNumber version number to remove from the collection
+   * @param isInsertEvent If true, remove eventId from list of eventIds for in-flight
+   * Insert events. If false, remove version number from list of versions for in-flight
+   * DDL events.
+   * @param versionNumber when isInsertEvent is true, it's eventId to remove
+   * when isInsertEvent is false, it's version number to remove
    * @return true if the version was found and successfully removed, false
    * otherwise
    */
-  public boolean remove(long versionNumber) {
-    return versionsForInflightEvents_.remove(versionNumber);
+  public boolean remove(boolean isInsertEvent, long versionNumber) {
+    if (isInsertEvent) {
+      return idsForInflightDmlEvents_.remove(versionNumber);
+    } else {
+      return versionsForInflightEvents_.remove(versionNumber);
+    }
   }
 
   /**
@@ -76,23 +101,45 @@ public class InFlightEvents {
    * collection is already at the max size defined by
    * <code>MAX_NUMBER_OF_INFLIGHT_EVENTS</code>, then it ignores the given version and
    * does not add it
-   *
-   * @param versionNumber version number to add
+   * @param isInsertEvent If true, add eventId to list of eventIds for in-flight Insert
+   * events. If false, add versionNumber to list of versions for in-flight DDL events.
+   * @param versionNumber when isInsertEvent is true, it's eventId to add
+   * when isInsertEvent is false, it's version number to add
    * @return True if version number was added, false if the collection is at its max
    * capacity
    */
-  public boolean add(long versionNumber) {
-    if (versionsForInflightEvents_.size() == capacity_) {
-      LOG.warn(String.format("Number of versions to be stored is at "
-              + " its max capacity %d. Ignoring add request for version number %d.",
-          DEFAULT_MAX_NUMBER_OF_INFLIGHT_EVENTS, versionNumber));
-      return false;
+  public boolean add(boolean isInsertEvent, long versionNumber) {
+    if (isInsertEvent) {
+      if (idsForInflightDmlEvents_.size() == capacity_for_eventIds_) {
+        LOG.warn(String.format("Number of Insert events to be stored is at "
+                + " its max capacity %d. Ignoring add request for eventId %d.",
+            DEFAULT_MAX_NUMBER_OF_INFLIGHT_EVENTS, versionNumber));
+        return false;
+      }
+      idsForInflightDmlEvents_.add(versionNumber);
+    } else {
+      if (versionsForInflightEvents_.size() == capacity_for_versions_) {
+        LOG.warn(String.format("Number of DDL events to be stored is at "
+                + "its max capacity %d. Ignoring add request for version %d.",
+            DEFAULT_MAX_NUMBER_OF_INFLIGHT_EVENTS, versionNumber));
+        return false;
+      }
+      versionsForInflightEvents_.add(versionNumber);
     }
-    versionsForInflightEvents_.add(versionNumber);
     return true;
   }
 
-  public int size() {
-    return versionsForInflightEvents_.size();
+  /**
+   * Get the size of in-flight DDL or DML events list
+   * @param isInsertEvent if true, return size of Insert events list
+   *              if false, return size of DDL events list
+   * @return size of events list
+   */
+  public int size(boolean isInsertEvent) {
+    if (isInsertEvent) {
+      return idsForInflightDmlEvents_.size();
+    } else {
+      return versionsForInflightEvents_.size();
+    }
   }
 }

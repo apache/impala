@@ -269,7 +269,7 @@ public class MetastoreEvents {
     protected final String tblName_;
 
     // eventId of the event. Used instead of calling getter on event_ everytime
-    protected final long eventId_;
+    protected long eventId_;
 
     // eventType from the NotificationEvent
     protected final MetastoreEventType eventType_;
@@ -419,13 +419,15 @@ public class MetastoreEvents {
      * serviceId and version. More details on complete flow of self-event handling
      * logic can be read in <code>MetastoreEventsProcessor</code> documentation.
      *
+     * @param isInsertEvent if true, check in flight events list of Insert event
+     * if false, check events list of DDL
      * @return True if this event is a self-generated event. If the returned value is
      * true, this method also clears the version number from the catalog database/table.
      * Returns false if the version numbers or service id don't match
      */
-    protected boolean isSelfEvent() {
+    protected boolean isSelfEvent(boolean isInsertEvent) {
       try {
-        if (catalog_.evaluateSelfEvent(getSelfEventContext())) {
+        if (catalog_.evaluateSelfEvent(isInsertEvent, getSelfEventContext())) {
           metrics_.getCounter(MetastoreEventsProcessor.NUMBER_OF_SELF_EVENTS).inc();
           return true;
         }
@@ -434,6 +436,8 @@ public class MetastoreEvents {
       }
       return false;
     }
+
+    protected boolean isSelfEvent() { return isSelfEvent(false); }
   }
 
   public static String getStringProperty(
@@ -766,19 +770,25 @@ public class MetastoreEvents {
 
     @Override
     public SelfEventContext getSelfEventContext() {
-      throw new UnsupportedOperationException("Self-event evaluation is not implemented"
-          + " for insert event type");
+      if (insertPartition_ != null) {
+        // create selfEventContext for insert partition event
+        List<TPartitionKeyValue> tPartSpec =
+            getTPartitionSpecFromHmsPartition(msTbl_, insertPartition_);
+        return new SelfEventContext(dbName_, tblName_, Arrays.asList(tPartSpec),
+            insertPartition_.getParameters(), eventId_);
+      } else {
+        // create selfEventContext for insert table event
+        return new SelfEventContext(
+            dbName_, tblName_, null, msTbl_.getParameters(), eventId_);
+      }
     }
 
-    /**
-     * Currently we do not check for self-events in Inserts. Existing self-events logic
-     * cannot be used for insert events since firing insert event does not allow us to
-     * modify table parameters in HMS. Hence, we cannot get CatalogServiceIdentifiers in
-     * Insert Events.
-     * TODO: Handle self-events for insert case.
-     */
     @Override
     public void process() throws MetastoreNotificationException {
+      if (isSelfEvent(true)) {
+        infoLog("Not processing the event as it is a self-event");
+        return;
+      }
       // Reload the whole table if it's a transactional table.
       if (AcidUtils.isTransactionalTable(msTbl_.getParameters())) {
         insertPartition_ = null;

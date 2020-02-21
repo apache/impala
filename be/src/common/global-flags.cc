@@ -266,6 +266,12 @@ DEFINE_int32(hms_event_polling_interval_s, 0,
     "feature and not recommended to be deployed on production systems until it is "
     "made generally available.");
 
+DEFINE_bool(enable_insert_events, true,
+    "Enables insert events in the events processor. When this configuration is set to "
+    "true Impala will generate INSERT event types which when received by other Impala "
+    "clusters can be used to automatically refresh the tables or partitions. Event "
+    "processing must be turned on for this flag to have any effect.");
+
 DEFINE_string(blacklisted_dbs, "sys,information_schema",
     "Comma separated list for blacklisted databases. Configure which databases to be "
     "skipped for loading (in startup and global INVALIDATE METADATA). Users can't access,"

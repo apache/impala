@@ -155,4 +155,6 @@ struct TBackendGflags {
   65: required bool use_customized_user_groups_mapper_for_ranger
 
   66: required bool enable_column_masking
+
+  67: required bool enable_insert_events
 }

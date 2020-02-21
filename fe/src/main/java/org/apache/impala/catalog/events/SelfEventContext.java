@@ -32,15 +32,21 @@ import org.apache.impala.thrift.TPartitionKeyValue;
 public class SelfEventContext {
   private final String dbName_;
   private final String tblName_;
+  private final long insertEventId_;
   // version number from the event object parameters used for self-event detection
   private final long versionNumberFromEvent_;
   // service id from the event object parameters used for self-event detection
-  private final String serviceIdFromEvent_;
+  private final String serviceidFromEvent_;
   private final List<List<TPartitionKeyValue>> partitionKeyValues_;
 
   SelfEventContext(String dbName, String tblName,
       Map<String, String> parameters) {
-    this(dbName, tblName, null, parameters);
+    this(dbName, tblName, null, parameters, -1);
+  }
+
+  SelfEventContext(String dbName, String tblName,
+      List<List<TPartitionKeyValue>> partitionKeyValues, Map<String, String> parameters) {
+    this(dbName, tblName, partitionKeyValues, parameters, -1);
   }
 
   /**
@@ -55,17 +61,17 @@ public class SelfEventContext {
    */
   SelfEventContext(String dbName, @Nullable String tblName,
       @Nullable List<List<TPartitionKeyValue>> partitionKeyValues,
-      Map<String, String> parameters) {
+      Map<String, String> parameters, long eventId) {
     Preconditions.checkNotNull(parameters);
     this.dbName_ = Preconditions.checkNotNull(dbName);
     this.tblName_ = tblName;
     this.partitionKeyValues_ = partitionKeyValues;
+    insertEventId_ = eventId;
     versionNumberFromEvent_ = Long.parseLong(
         MetastoreEvents.getStringProperty(parameters,
             MetastoreEventPropertyKey.CATALOG_VERSION.getKey(), "-1"));
-    serviceIdFromEvent_ =
-        MetastoreEvents.getStringProperty(parameters,
-            MetastoreEventPropertyKey.CATALOG_SERVICE_ID.getKey(), "");
+    serviceidFromEvent_ = MetastoreEvents.getStringProperty(
+        parameters, MetastoreEventPropertyKey.CATALOG_SERVICE_ID.getKey(), "");
   }
 
   public String getDbName() {
@@ -76,13 +82,13 @@ public class SelfEventContext {
     return tblName_;
   }
 
+  public long getIdFromEvent() { return insertEventId_; }
+
   public long getVersionNumberFromEvent() {
     return versionNumberFromEvent_;
   }
 
-  public String getServiceIdFromEvent() {
-    return serviceIdFromEvent_;
-  }
+  public String getServiceIdFromEvent() { return serviceidFromEvent_; }
 
   public List<List<TPartitionKeyValue>> getPartitionKeyValues() {
     return partitionKeyValues_ == null ?

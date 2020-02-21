@@ -63,7 +63,6 @@ import org.apache.log4j.Logger;
 import com.codahale.metrics.Timer;
 import com.google.common.base.Preconditions;
 import com.google.common.base.Stopwatch;
-import com.google.common.collect.ImmutableList;
 import com.google.common.collect.Lists;
 
 /**
@@ -801,14 +800,19 @@ public abstract class Table extends CatalogObjectImpl implements FeTable {
 
   /**
    * Removes a given version from the collection of version numbers for in-flight events
-   * @param versionNumber version number to remove from the collection
+   * @param isInsertEvent If true, remove eventId from list of eventIds for in-flight
+   * Insert events. If false, remove versionNumber from list of versions for in-flight DDL
+   * events
+   * @param versionNumber when isInsertEvent is true, it's eventId to remove
+   * when isInsertEvent is false, it's version number to remove
    * @return true if version was successfully removed, false if didn't exist
    */
-  public boolean removeFromVersionsForInflightEvents(long versionNumber) {
+  public boolean removeFromVersionsForInflightEvents(
+      boolean isInsertEvent, long versionNumber) {
     Preconditions.checkState(tableLock_.isHeldByCurrentThread(),
         "removeFromVersionsForInFlightEvents called without taking the table lock on "
             + getFullName());
-    return inFlightEvents.remove(versionNumber);
+    return inFlightEvents.remove(isInsertEvent, versionNumber);
   }
 
   /**
@@ -816,16 +820,19 @@ public abstract class Table extends CatalogObjectImpl implements FeTable {
    * collection is already at the max size defined by
    * <code>MAX_NUMBER_OF_INFLIGHT_EVENTS</code>, then it ignores the given version and
    * does not add it
-   * @param versionNumber version number to add
+   * @param isInsertEvent if true, add eventId to list of eventIds for in-flight Insert
+   * events. If false, add versionNumber to list of versions for in-flight DDL events
+   * @param versionNumber when isInsertEvent is true, it's eventId to add
+   * when isInsertEvent is false, it's version number to add
    * @return True if version number was added, false if the collection is at its max
    * capacity
    */
-  public void addToVersionsForInflightEvents(long versionNumber) {
+  public void addToVersionsForInflightEvents(boolean isInsertEvent, long versionNumber) {
     // we generally don't take locks on Incomplete tables since they are atomically
     // replaced during load
     Preconditions.checkState(
         this instanceof IncompleteTable || tableLock_.isHeldByCurrentThread());
-    if (!inFlightEvents.add(versionNumber)) {
+    if (!inFlightEvents.add(isInsertEvent, versionNumber)) {
       LOG.warn(String.format("Could not add %s version to the table %s. This could "
           + "cause unnecessary refresh of the table when the event is received by the "
               + "Events processor.", versionNumber, getFullName()));

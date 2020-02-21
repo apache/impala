@@ -817,29 +817,36 @@ public class CatalogServiceCatalog extends Catalog {
    * Evaluates if the information from an event (serviceId and versionNumber) matches to
    * the catalog object. If there is match, the in-flight version for that object is
    * removed and method returns true. If it does not match, returns false
+
    * @param ctx self context which provides all the information needed to
    * evaluate if this is a self-event or not
    * @return true if given event information evaluates to a self-event, false otherwise
    */
-  public boolean evaluateSelfEvent(SelfEventContext ctx)
+  public boolean evaluateSelfEvent(boolean isInsertEvent, SelfEventContext ctx)
       throws CatalogException {
     Preconditions.checkState(isEventProcessingActive(),
         "Event processing should be enabled when calling this method");
-    long versionNumber = ctx.getVersionNumberFromEvent();
+    long versionNumber =
+        isInsertEvent ? ctx.getIdFromEvent() : ctx.getVersionNumberFromEvent();
     String serviceIdFromEvent = ctx.getServiceIdFromEvent();
-    LOG.debug("Input arguments for self-event evaluation: {} {}",versionNumber,
-        serviceIdFromEvent);
-    // no version info or service id in the event
-    if (versionNumber == -1 || serviceIdFromEvent.isEmpty()) {
-      LOG.info("Not a self-event since the given version is {} and service id is {}",
-          versionNumber, serviceIdFromEvent);
-      return false;
-    }
-    // if the service id from event doesn't match with our service id this is not a
-    // self-event
-    if (!getCatalogServiceId().equals(serviceIdFromEvent)) {
-      LOG.info("Not a self-event because service id of this catalog {} does not match "
-          + "with one in event {}.", getCatalogServiceId(), serviceIdFromEvent);
+
+    if (!isInsertEvent) {
+      // no version info or service id in the event
+      if (versionNumber == -1 || serviceIdFromEvent.isEmpty()) {
+        LOG.info("Not a self-event since the given version is {} and service id is {}",
+            versionNumber, serviceIdFromEvent);
+        return false;
+      }
+      // if the service id from event doesn't match with our service id this is not a
+      // self-event
+      if (!getCatalogServiceId().equals(serviceIdFromEvent)) {
+        LOG.info("Not a self-event because service id of this catalog {} does not match "
+                + "with one in event {}.",
+            getCatalogServiceId(), serviceIdFromEvent);
+      }
+    } else if (versionNumber == -1) {
+      // if insert event, we only compare eventId
+      LOG.info("Not a self-event because eventId is {}", versionNumber);
       return false;
     }
     Db db = getDb(ctx.getDbName());
@@ -881,10 +888,11 @@ public class CatalogServiceCatalog extends Catalog {
       List<List<TPartitionKeyValue>> partitionKeyValues = ctx.getPartitionKeyValues();
       // if the partitionKeyValues is null, we look for tbl's in-flight events
       if (partitionKeyValues == null) {
-        boolean removed = tbl.removeFromVersionsForInflightEvents(versionNumber);
+        boolean removed =
+            tbl.removeFromVersionsForInflightEvents(isInsertEvent, versionNumber);
         if (!removed) {
-          LOG.info("Could not find version {} in in-flight event list of table {}",
-              versionNumber, tbl.getFullName());
+          LOG.info("Could not find {} {} in in-flight event list of table {}",
+              isInsertEvent ? "eventId" : "version", versionNumber, tbl.getFullName());
         }
         return removed;
       }
@@ -893,8 +901,9 @@ public class CatalogServiceCatalog extends Catalog {
         for (List<TPartitionKeyValue> partitionKeyValue : partitionKeyValues) {
           HdfsPartition hdfsPartition =
               ((HdfsTable) tbl).getPartitionFromThriftPartitionSpec(partitionKeyValue);
-          if (hdfsPartition == null || !hdfsPartition
-              .removeFromVersionsForInflightEvents(versionNumber)) {
+          if (hdfsPartition == null
+              || !hdfsPartition.removeFromVersionsForInflightEvents(
+                     isInsertEvent, versionNumber)) {
             // even if this is an error condition we should not bail out early since we
             // should clean up the self-event state on the rest of the partitions
             String partName = HdfsTable.constructPartitionName(partitionKeyValue);
@@ -919,15 +928,18 @@ public class CatalogServiceCatalog extends Catalog {
   /**
    * Adds a given version number from the catalog table's list of versions for in-flight
    * events. Applicable only when external event processing is enabled.
-   *
+   * @param isInsertEvent if false add versionNumber for DDL Event, otherwise add eventId
+   * for Insert Event.
    * @param tbl Catalog table
-   * @param versionNumber version number to be added
+   * @param versionNumber when isInsertEvent is true, it is eventId to add
+   * when isInsertEvent is false, it is version number to add
    */
-  public void addVersionsForInflightEvents(Table tbl, long versionNumber) {
+  public void addVersionsForInflightEvents(
+      boolean isInsertEvent, Table tbl, long versionNumber) {
     if (!isEventProcessingActive()) return;
-    tbl.addToVersionsForInflightEvents(versionNumber);
-    LOG.info("Added catalog version {} in table's {} in-flight events",
-        versionNumber, tbl.getFullName());
+    tbl.addToVersionsForInflightEvents(isInsertEvent, versionNumber);
+    LOG.info("Added {} {} in table's {} in-flight events",
+        isInsertEvent ? "eventId" : "catalog version", versionNumber, tbl.getFullName());
   }
 
   /**

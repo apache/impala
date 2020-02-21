@@ -32,6 +32,7 @@ import java.net.UnknownHostException;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.BitSet;
+import java.util.Collections;
 import java.util.EnumSet;
 import java.util.List;
 
@@ -52,6 +53,10 @@ import org.apache.hadoop.hive.metastore.api.ColumnStatistics;
 import org.apache.hadoop.hive.metastore.api.ColumnStatisticsObj;
 import org.apache.hadoop.hive.metastore.api.Database;
 import org.apache.hadoop.hive.metastore.api.FieldSchema;
+import org.apache.hadoop.hive.metastore.api.FireEventRequest;
+import org.apache.hadoop.hive.metastore.api.FireEventRequestData;
+import org.apache.hadoop.hive.metastore.api.FireEventResponse;
+import org.apache.hadoop.hive.metastore.api.InsertEventRequestData;
 import org.apache.hadoop.hive.metastore.api.InvalidInputException;
 import org.apache.hadoop.hive.metastore.api.InvalidObjectException;
 import org.apache.hadoop.hive.metastore.api.InvalidOperationException;
@@ -83,6 +88,9 @@ import org.apache.hive.service.rpc.thrift.TGetFunctionsReq;
 import org.apache.hive.service.rpc.thrift.TGetSchemasReq;
 import org.apache.hive.service.rpc.thrift.TGetTablesReq;
 import org.apache.impala.authorization.User;
+import org.apache.impala.catalog.CatalogServiceCatalog;
+import org.apache.impala.catalog.HdfsPartition;
+import org.apache.impala.catalog.MetaStoreClientPool.MetaStoreClient;
 import org.apache.impala.common.ImpalaException;
 import org.apache.impala.common.ImpalaRuntimeException;
 import org.apache.impala.common.Pair;
@@ -94,6 +102,7 @@ import org.apache.impala.thrift.TMetadataOpRequest;
 import org.apache.impala.thrift.TResultSet;
 import org.apache.impala.util.AcidUtils;
 import org.apache.impala.util.AcidUtils.TblTransaction;
+import org.apache.impala.util.MetaStoreUtil.InsertEventInfo;
 import org.apache.log4j.Logger;
 import org.apache.thrift.TException;
 
@@ -983,5 +992,68 @@ public class MetastoreShim {
     // TODO(IMPALA-9088): deal with customized transformer in HMS.
     return wh.getDefaultTablePath(db, tbl.getTableName().toLowerCase(), isExternal)
         .toString();
+  }
+
+  /**
+   * Fire insert events for table and partition.
+   * In case of any exception, we just log the failure of firing insert events.
+   */
+  public static List<Long> fireInsertEvents(MetaStoreClient msClient,
+      List<InsertEventInfo> insertEventInfos, String dbName, String tableName) {
+    try {
+      return fireInsertEventHelper(msClient.getHiveClient(), insertEventInfos, dbName, tableName);
+    } catch (Exception e) {
+      LOG.error("Failed to fire insert event. Some tables might not be"
+              + " refreshed on other impala clusters.", e);
+    } finally {
+      msClient.close();
+    }
+    return Collections.emptyList();
+  }
+
+  /**
+   *  Fires an insert event to HMS notification log. In Hive-3 for partitioned table,
+   *  all partition insert events will be fired by a bulk API.
+   *
+   * @param msClient Metastore client,
+   * @param insertEventInfos A list of insert event encapsulating the information needed
+   * to fire insert
+   * @param dbName
+   * @param tableName
+   * @return a list of eventIds for the insert events
+   */
+  @VisibleForTesting
+  public static List<Long> fireInsertEventHelper(IMetaStoreClient msClient,
+      List<InsertEventInfo> insertEventInfos, String dbName, String tableName)
+      throws TException {
+    Preconditions.checkNotNull(msClient);
+    Preconditions.checkNotNull(dbName);
+    Preconditions.checkNotNull(tableName);
+    LOG.debug(String.format(
+        "Firing %s insert event for %s", insertEventInfos.size(), tableName));
+    FireEventRequestData data = new FireEventRequestData();
+    FireEventRequest rqst = new FireEventRequest(true, data);
+    rqst.setDbName(dbName);
+    rqst.setTableName(tableName);
+    List<InsertEventRequestData> insertDatas = new ArrayList<>();
+    for (InsertEventInfo info : insertEventInfos) {
+      InsertEventRequestData insertData = new InsertEventRequestData();
+      Preconditions.checkNotNull(info.getNewFiles());
+      insertData.setFilesAdded(new ArrayList<>(info.getNewFiles()));
+      insertData.setReplace(info.isOverwrite());
+      if (info.getPartVals() != null) insertData.setPartitionVal(info.getPartVals());
+      insertDatas.add(insertData);
+    }
+    if (insertDatas.size() == 1) {
+      if (insertEventInfos.get(0).getPartVals() != null) {
+        rqst.setPartitionVals(insertEventInfos.get(0).getPartVals());
+      }
+      data.setInsertData(insertDatas.get(0));
+    } else {
+      data.setInsertDatas(insertDatas);
+    }
+    FireEventResponse response = msClient.fireListenerEvent(rqst);
+
+    return response.getEventIds();
   }
 }

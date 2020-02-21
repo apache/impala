@@ -37,6 +37,7 @@ import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collection;
 import java.util.HashMap;
+import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Random;
@@ -90,6 +91,7 @@ import org.apache.impala.compat.MetastoreShim;
 import org.apache.impala.service.CatalogOpExecutor;
 import org.apache.impala.service.FeSupport;
 import org.apache.impala.testutil.CatalogServiceTestCatalog;
+import org.apache.impala.testutil.TestUtils;
 import org.apache.impala.thrift.TAlterDbParams;
 import org.apache.impala.thrift.TAlterDbSetOwnerParams;
 import org.apache.impala.thrift.TAlterDbType;
@@ -107,6 +109,7 @@ import org.apache.impala.thrift.TAlterTableSetRowFormatParams;
 import org.apache.impala.thrift.TAlterTableSetTblPropertiesParams;
 import org.apache.impala.thrift.TAlterTableType;
 import org.apache.impala.thrift.TAlterTableUpdateStatsParams;
+import org.apache.impala.thrift.TCatalogServiceRequestHeader;
 import org.apache.impala.thrift.TColumn;
 import org.apache.impala.thrift.TColumnType;
 import org.apache.impala.thrift.TCreateDbParams;
@@ -134,12 +137,14 @@ import org.apache.impala.thrift.TTableStats;
 import org.apache.impala.thrift.TTypeNode;
 import org.apache.impala.thrift.TTypeNodeType;
 import org.apache.impala.thrift.TUniqueId;
+import org.apache.impala.thrift.TUpdateCatalogRequest;
 import org.apache.impala.util.MetaStoreUtil;
 import org.apache.impala.util.MetaStoreUtil.InsertEventInfo;
 import org.apache.thrift.TException;
 import org.junit.After;
 import org.junit.AfterClass;
 import org.junit.Assert;
+import org.junit.Assume;
 import org.junit.Before;
 import org.junit.BeforeClass;
 import org.junit.Test;
@@ -712,6 +717,67 @@ public class MetastoreEventsProcessorTest {
   }
 
   /**
+   * Test insert from impala. Insert into table and partition from impala
+   * should be treated as self-event.
+   */
+  @Test
+  public void testInsertFromImpala() throws ImpalaException {
+    Assume.assumeTrue("Skipping this test because it only works with Hive-3 or greater",
+        TestUtils.getHiveMajorVersion() >= 3);
+    // Test insert into multiple partitions
+    createDatabaseFromImpala(TEST_DB_NAME, null);
+    String tableToInsertPart = "tbl_with_mul_part";
+    createTableFromImpala(TEST_DB_NAME, tableToInsertPart, true);
+    String tableToInsertMulPart = "tbl_to_insert_mul_part";
+    createTableFromImpala(TEST_DB_NAME, tableToInsertMulPart, true);
+    // add first partition
+    TPartitionDef partitionDef = new TPartitionDef();
+    partitionDef.addToPartition_spec(new TPartitionKeyValue("p1", "1"));
+    partitionDef.addToPartition_spec(new TPartitionKeyValue("p2", "100"));
+    alterTableAddPartition(TEST_DB_NAME, tableToInsertPart, partitionDef);
+    alterTableAddPartition(TEST_DB_NAME, tableToInsertMulPart, partitionDef);
+    // add second partition
+    partitionDef = new TPartitionDef();
+    partitionDef.addToPartition_spec(new TPartitionKeyValue("p1", "1"));
+    partitionDef.addToPartition_spec(new TPartitionKeyValue("p2", "200"));
+    alterTableAddPartition(TEST_DB_NAME, tableToInsertPart, partitionDef);
+    alterTableAddPartition(TEST_DB_NAME, tableToInsertMulPart, partitionDef);
+    eventsProcessor_.processEvents();
+    // count self event from here, numberOfSelfEventsBefore=4 as we have 4 ADD PARTITION
+    // events
+    long numberOfSelfEventsBefore =
+        eventsProcessor_.getMetrics()
+            .getCounter(MetastoreEventsProcessor.NUMBER_OF_SELF_EVENTS)
+            .getCount();
+    // insert into partition
+    insertFromImpala(tableToInsertPart, true, "1", "100");
+    insertFromImpala(tableToInsertPart, true, "1", "200");
+    // insert into multiple partition
+    Set<String> created_partitions = new HashSet<String>();
+    String partition1 = "p1=1/p2=100/";
+    String partition2 = "p1=1/p2=200/";
+    created_partitions.add(partition1);
+    created_partitions.add(partition2);
+    insertMulPartFromImpala(tableToInsertMulPart, tableToInsertPart, created_partitions);
+    eventsProcessor_.processEvents();
+
+    // Test insert into table
+    String tableToInsert = "tbl_to_insert";
+    createTableFromImpala(TEST_DB_NAME, tableToInsert, false);
+    insertFromImpala(tableToInsert, false, "", "");
+    eventsProcessor_.processEvents();
+
+    long selfEventsCountAfter =
+        eventsProcessor_.getMetrics()
+            .getCounter(MetastoreEventsProcessor.NUMBER_OF_SELF_EVENTS)
+            .getCount();
+    // 2 single insert partition events, 1 multi insert partitions which includes 2 single
+    // insert events 1 single insert table event
+    assertEquals("Unexpected number of self-events generated",
+        numberOfSelfEventsBefore + 5, selfEventsCountAfter);
+  }
+
+  /**
    * Test generates a sequence of create_table, insert and drop_table in the event stream
    * to make sure when the insert event is processed on a removed table, it doesn't cause
    * any issues with the event processing.
@@ -835,9 +901,10 @@ public class MetastoreEventsProcessorTest {
     List <String> newFiles = addFilesToDirectory(parentPath, "testFile.",
         totalNumberOfFilesToAdd, isOverwrite);
     try (MetaStoreClient metaStoreClient = catalog_.getMetaStoreClient()) {
-      MetaStoreUtil.fireInsertEvent(metaStoreClient.getHiveClient(),
-          new InsertEventInfo(msTbl.getDbName(), msTbl.getTableName(), null,
-          newFiles, isOverwrite));
+      List<InsertEventInfo> insertEventInfos = new ArrayList<>();
+      insertEventInfos.add(new InsertEventInfo(null, newFiles, isOverwrite));
+      MetastoreShim.fireInsertEventHelper(metaStoreClient.getHiveClient(),
+          insertEventInfos, msTbl.getDbName(), msTbl.getTableName());
     }
   }
 
@@ -2709,6 +2776,57 @@ public class MetastoreEventsProcessorTest {
     alterTableParams.setAlter_type(TAlterTableType.SET_TBL_PROPERTIES);
     req.setAlter_table_params(alterTableParams);
     catalogOpExecutor_.execDdlRequest(req);
+  }
+
+  /**
+   * Insert multiple partitions into table from Impala
+   */
+  private void insertMulPartFromImpala(String tblName1, String tblName2,
+      Set<String> created_partitions) throws ImpalaException {
+    String insert_mul_part = String.format(
+        "insert into table %s partition(p1, p2) select * from %s", tblName1, tblName2);
+    TUpdateCatalogRequest testInsertRequest = createTestTUpdateCatalogRequest(
+        TEST_DB_NAME, tblName1, insert_mul_part, created_partitions);
+    catalogOpExecutor_.updateCatalog(testInsertRequest);
+  }
+
+  /**
+   * Insert into table or partition from Impala
+   * @param tblName
+   * @param isPartitioned
+   * @return
+   */
+  private void insertFromImpala(String tblName, boolean isPartitioned, String p1val,
+      String p2val) throws ImpalaException {
+    String partition = String.format("partition (p1=%s, p2='%s')", p1val, p2val);
+    String test_insert_tbl = String.format("insert into table %s %s values ('a','aa') ",
+        tblName, isPartitioned ? partition : "");
+    Set<String> created_partitions = new HashSet<String>();
+    String created_part_str =
+        isPartitioned ? String.format("p1=%s/p2=%s/", p1val, p2val) : "";
+    created_partitions.add(created_part_str);
+    TUpdateCatalogRequest testInsertRequest = createTestTUpdateCatalogRequest(
+        TEST_DB_NAME, tblName, test_insert_tbl, created_partitions);
+    catalogOpExecutor_.updateCatalog(testInsertRequest);
+  }
+
+  /**
+   * Create DML request to Catalog
+   * @param dBName
+   * @param tableName
+   * @param redacted_sql_stmt
+   * @param created_partitions
+   * @return
+   */
+  private TUpdateCatalogRequest createTestTUpdateCatalogRequest(String dBName,
+      String tableName, String redacted_sql_stmt, Set<String> created_partitions) {
+    TUpdateCatalogRequest tUpdateCatalogRequest = new TUpdateCatalogRequest();
+    tUpdateCatalogRequest.setDb_name(dBName);
+    tUpdateCatalogRequest.setTarget_table(tableName);
+    tUpdateCatalogRequest.setCreated_partitions((created_partitions));
+    tUpdateCatalogRequest.setHeader(new TCatalogServiceRequestHeader());
+    tUpdateCatalogRequest.getHeader().setRedacted_sql_stmt(redacted_sql_stmt);
+    return tUpdateCatalogRequest;
   }
 
   private TColumn getScalarColumn(String colName, TPrimitiveType type) {
