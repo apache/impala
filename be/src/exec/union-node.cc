@@ -34,29 +34,31 @@ using namespace impala;
 
 Status UnionPlanNode::Init(const TPlanNode& tnode, RuntimeState* state) {
   RETURN_IF_ERROR(PlanNode::Init(tnode, state));
-  DCHECK(tnode.__isset.union_node);
+  DCHECK(tnode_->__isset.union_node);
   DCHECK_EQ(conjuncts_.size(), 0);
-  const TupleDescriptor* tuple_desc =
-      state->desc_tbl().GetTupleDescriptor(tnode.union_node.tuple_id);
-  DCHECK(tuple_desc != nullptr);
+  tuple_desc_ = state->desc_tbl().GetTupleDescriptor(tnode_->union_node.tuple_id);
+  DCHECK(tuple_desc_ != nullptr);
+  first_materialized_child_idx_ = tnode_->union_node.first_materialized_child_idx;
+  DCHECK_GT(first_materialized_child_idx_, -1);
   // Create const_exprs_lists_ from thrift exprs.
-  const vector<vector<TExpr>>& const_texpr_lists = tnode.union_node.const_expr_lists;
+  const vector<vector<TExpr>>& const_texpr_lists = tnode_->union_node.const_expr_lists;
   for (const vector<TExpr>& texprs : const_texpr_lists) {
     vector<ScalarExpr*> const_exprs;
     RETURN_IF_ERROR(ScalarExpr::Create(texprs, *row_descriptor_, state, &const_exprs));
-    DCHECK_EQ(const_exprs.size(), tuple_desc->slots().size());
+    DCHECK_EQ(const_exprs.size(), tuple_desc_->slots().size());
     const_exprs_lists_.push_back(const_exprs);
   }
   // Create child_exprs_lists_ from thrift exprs.
-  const vector<vector<TExpr>>& thrift_result_exprs = tnode.union_node.result_expr_lists;
+  const vector<vector<TExpr>>& thrift_result_exprs = tnode_->union_node.result_expr_lists;
   for (int i = 0; i < thrift_result_exprs.size(); ++i) {
     const vector<TExpr>& texprs = thrift_result_exprs[i];
     vector<ScalarExpr*> child_exprs;
     RETURN_IF_ERROR(
         ScalarExpr::Create(texprs, *children_[i]->row_descriptor_, state, &child_exprs));
     child_exprs_lists_.push_back(child_exprs);
-    DCHECK_EQ(child_exprs.size(), tuple_desc->slots().size());
+    DCHECK_EQ(child_exprs.size(), tuple_desc_->slots().size());
   }
+  codegend_union_materialize_batch_fns_.resize(child_exprs_lists_.size(), nullptr);
   return Status::OK();
 }
 
@@ -69,24 +71,22 @@ Status UnionPlanNode::CreateExecNode(RuntimeState* state, ExecNode** node) const
 UnionNode::UnionNode(
     ObjectPool* pool, const UnionPlanNode& pnode, const DescriptorTbl& descs)
   : ExecNode(pool, pnode, descs),
-    tuple_id_(pnode.tnode_->union_node.tuple_id),
-    tuple_desc_(descs.GetTupleDescriptor(tuple_id_)),
-    first_materialized_child_idx_(pnode.tnode_->union_node.first_materialized_child_idx),
+    tuple_desc_(pnode.tuple_desc_),
+    first_materialized_child_idx_(pnode.first_materialized_child_idx_),
+    const_exprs_lists_(pnode.const_exprs_lists_),
+    child_exprs_lists_(pnode.child_exprs_lists_),
+    codegend_union_materialize_batch_fns_(pnode.codegend_union_materialize_batch_fns_),
     child_idx_(0),
     child_batch_(nullptr),
     child_row_idx_(0),
     child_eos_(false),
     const_exprs_lists_idx_(0),
-    to_close_child_idx_(-1) {
-  const_exprs_lists_ = pnode.const_exprs_lists_;
-  child_exprs_lists_ = pnode.child_exprs_lists_;
-}
+    to_close_child_idx_(-1) {}
 
 Status UnionNode::Prepare(RuntimeState* state) {
   SCOPED_TIMER(runtime_profile_->total_time_counter());
   RETURN_IF_ERROR(ExecNode::Prepare(state));
   DCHECK(tuple_desc_ != nullptr);
-  codegend_union_materialize_batch_fns_.resize(child_exprs_lists_.size());
 
   // Prepare const expr lists.
   for (const vector<ScalarExpr*>& const_exprs : const_exprs_lists_) {
@@ -110,7 +110,12 @@ void UnionNode::Codegen(RuntimeState* state) {
   DCHECK(state->ShouldCodegen());
   ExecNode::Codegen(state);
   if (IsNodeCodegenDisabled()) return;
+  const UnionPlanNode& union_pnode = static_cast<const UnionPlanNode&>(plan_node_);
+  UnionPlanNode& non_const_pnode = const_cast<UnionPlanNode&>(union_pnode);
+  non_const_pnode.Codegen(state, runtime_profile());
+}
 
+void UnionPlanNode::Codegen(RuntimeState* state, RuntimeProfile* runtime_profile){
   LlvmCodeGen* codegen = state->codegen();
   DCHECK(codegen != nullptr);
   std::stringstream codegen_message;
@@ -124,7 +129,7 @@ void UnionNode::Codegen(RuntimeState* state) {
     if (!codegen_status.ok()) {
       // Codegen may fail in some corner cases. If this happens, abort codegen for this
       // and the remaining children.
-      codegen_message << "Codegen failed for child: " << children_[i]->id();
+      codegen_message << "Codegen failed for child: " << children_[i]->tnode_->node_id;
       break;
     }
 
@@ -146,7 +151,7 @@ void UnionNode::Codegen(RuntimeState* state) {
     codegen->AddFunctionToJit(union_materialize_batch_fn,
         reinterpret_cast<void**>(&(codegend_union_materialize_batch_fns_.data()[i])));
   }
-  runtime_profile()->AddCodegenMsg(
+  runtime_profile->AddCodegenMsg(
       codegen_status.ok(), codegen_status, codegen_message.str());
 }
 

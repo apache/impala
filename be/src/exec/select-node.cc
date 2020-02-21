@@ -43,7 +43,7 @@ SelectNode::SelectNode(
     child_row_batch_(NULL),
     child_row_idx_(0),
     child_eos_(false),
-    codegend_copy_rows_fn_(nullptr) {}
+    codegend_copy_rows_fn_(pnode.codegend_copy_rows_fn_) {}
 
 Status SelectNode::Prepare(RuntimeState* state) {
   SCOPED_TIMER(runtime_profile_->total_time_counter());
@@ -55,11 +55,17 @@ void SelectNode::Codegen(RuntimeState* state) {
   DCHECK(state->ShouldCodegen());
   ExecNode::Codegen(state);
   if (IsNodeCodegenDisabled()) return;
-  Status codegen_status = CodegenCopyRows(state);
-  runtime_profile()->AddCodegenMsg(codegen_status.ok(), codegen_status);
+  const SelectPlanNode& select_pnode = static_cast<const SelectPlanNode&>(plan_node_);
+  SelectPlanNode& non_const_pnode = const_cast<SelectPlanNode&>(select_pnode);
+  non_const_pnode.Codegen(state, runtime_profile());
 }
 
-Status SelectNode::CodegenCopyRows(RuntimeState* state) {
+void SelectPlanNode::Codegen(RuntimeState* state, RuntimeProfile* runtime_profile) {
+  Status codegen_status = CodegenCopyRows(state);
+  runtime_profile->AddCodegenMsg(codegen_status.ok(), codegen_status);
+}
+
+Status SelectPlanNode::CodegenCopyRows(RuntimeState* state) {
   LlvmCodeGen* codegen = state->codegen();
   DCHECK(codegen != nullptr);
   llvm::Function* copy_rows_fn =

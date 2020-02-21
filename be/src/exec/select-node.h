@@ -27,13 +27,24 @@
 
 namespace impala {
 
+class SelectNode;
 class Tuple;
 class TupleRow;
 
 class SelectPlanNode : public PlanNode {
  public:
   virtual Status CreateExecNode(RuntimeState* state, ExecNode** node) const override;
+  void Codegen(RuntimeState* state, RuntimeProfile* runtime_profile);
+
   ~SelectPlanNode(){}
+
+  /// Codegened version of SelectNode::CopyRows().
+  typedef void (*CopyRowsFn)(SelectNode*, RowBatch*);
+  CopyRowsFn codegend_copy_rows_fn_ = nullptr;
+
+ private:
+  /// Codegen SelectNode::CopyRows().
+  Status CodegenCopyRows(RuntimeState* state);
 };
 
 /// Node that evaluates conjuncts and enforces a limit but otherwise passes along
@@ -66,15 +77,13 @@ class SelectNode : public ExecNode {
   /// END: Members that must be Reset()
   /////////////////////////////////////////
 
-  typedef void (*CopyRowsFn)(SelectNode*, RowBatch*);
-  CopyRowsFn codegend_copy_rows_fn_;
+  /// Reference to the codegened function pointer owned by the SelectPlanNode object that
+  /// was used to create this instance.
+  const SelectPlanNode::CopyRowsFn& codegend_copy_rows_fn_;
 
   /// Copy rows from child_row_batch_ for which conjuncts_ evaluate to true to
   /// output_batch, up to limit_ or till the output row batch reaches capacity.
   void CopyRows(RowBatch* output_batch);
-
-  /// Codegen CopyRows(). Used for mostly codegen'ing the conjuncts evaluation logic.
-  Status CodegenCopyRows(RuntimeState* state);
 };
 
 }
