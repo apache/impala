@@ -19,6 +19,12 @@ add_custom_target(validate_java_pom_versions ALL
   COMMAND $ENV{IMPALA_HOME}/bin/validate-java-pom-versions.sh
 )
 
+SET(JAMM_MAVEN_FLAGS --show-version --batch-mode)
+# Discover and download dependencies in parallel, using 10 threads
+SET(JAMM_MAVEN_FLAGS ${JAMM_MAVEN_FLAGS} -Daether.dependencyCollector.impl=bf)
+SET(JAMM_MAVEN_FLAGS ${JAMM_MAVEN_FLAGS} -Daether.connector.basic.threads=10)
+SET(JAMM_MAVEN_FLAGS ${JAMM_MAVEN_FLAGS} -Daether.dependencyCollector.bf.threads=10)
+
 include(ExternalProject)
 ExternalProject_Add(jamm
   GIT_REPOSITORY    https://github.com/jbellis/jamm
@@ -27,7 +33,7 @@ ExternalProject_Add(jamm
   PATCH_COMMAND     sed -i.bak s/0.4.0-SNAPSHOT/0.4.0-IMPALA/ pom.xml
   CONFIGURE_COMMAND sed s:JAVA_HOME:$ENV{JAVA_HOME}:g ${CMAKE_CURRENT_SOURCE_DIR}/toolchains.xml.tmpl > toolchains.xml
   BUILD_IN_SOURCE   true
-  BUILD_COMMAND     mvn --batch-mode --toolchains toolchains.xml install -Dmaven.test.skip=true -DskipTests
+  BUILD_COMMAND     mvn install ${JAMM_MAVEN_FLAGS} --toolchains toolchains.xml -Dmaven.test.skip=true -DskipTests
   INSTALL_COMMAND   ""
 )
 

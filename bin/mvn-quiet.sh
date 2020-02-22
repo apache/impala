@@ -37,13 +37,13 @@ LOGGING_OPTIONS="-Dorg.slf4j.simpleLogger.showDateTime \
 # Filter out "Checksum validation failed" messages, as they are mostly harmless and
 # make it harder to search for failed tests in the console output. Limit the filtering
 # to WARNING messages.
-CHECKSUM_VALIDATION_FAILED_REGEX="[WARNING].*Checksum validation failed"
+CHECKSUM_VALIDATION_FAILED_REGEX="[WARNING].*(Checksum validation failed|Could not validate integrity of download)"
 
 # Always use maven's batch mode (-B), as it produces output that is easier to parse.
 if ! mvn -B $IMPALA_MAVEN_OPTIONS $LOGGING_OPTIONS "$@" | \
   tee -a "$LOG_FILE" | \
   grep -E -e WARNING -e ERROR -e SUCCESS -e FAILURE -e Test -e "Found Banned" | \
-  grep -v -i "${CHECKSUM_VALIDATION_FAILED_REGEX}"; then
+  grep -E -v -i "${CHECKSUM_VALIDATION_FAILED_REGEX}"; then
   echo "mvn $IMPALA_MAVEN_OPTIONS $@ exited with code $?"
   exit 1
 fi

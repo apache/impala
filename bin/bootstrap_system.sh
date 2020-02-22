@@ -340,18 +340,17 @@ redhat sudo yum install -y ccache
 # Clean up yum caches
 redhat sudo yum clean all
 
-# Download maven for all OSes, since the OS-packaged version can be
-# pretty old.
-if [ ! -d /usr/local/apache-maven-3.5.4 ]; then
+# Download Maven since the packaged version is pretty old.
+if [ ! -d /usr/local/apache-maven-3.9.2 ]; then
   sudo wget -nv \
-    https://archive.apache.org/dist/maven/maven-3/3.5.4/binaries/apache-maven-3.5.4-bin.tar.gz
-  sudo sha512sum -c - <<< '2a803f578f341e164f6753e410413d16ab60fabe31dc491d1fe35c984a5cce696bc71f57757d4538fe7738be04065a216f3ebad4ef7e0ce1bb4c51bc36d6be86  apache-maven-3.5.4-bin.tar.gz'
-  sudo tar -C /usr/local -x --no-same-owner -zf apache-maven-3.5.4-bin.tar.gz
-  sudo ln -sf /usr/local/apache-maven-3.5.4/bin/mvn /usr/local/bin
+    https://archive.apache.org/dist/maven/maven-3/3.9.2/binaries/apache-maven-3.9.2-bin.tar.gz
+  sha512sum -c - <<< '900bdeeeae550d2d2b3920fe0e00e41b0069f32c019d566465015bdd1b3866395cbe016e22d95d25d51d3a5e614af2c83ec9b282d73309f644859bbad08b63db  apache-maven-3.9.2-bin.tar.gz'
+  sudo tar -C /usr/local -xzf apache-maven-3.9.2-bin.tar.gz
+  sudo ln -s /usr/local/apache-maven-3.9.2/bin/mvn /usr/local/bin
 
   # reset permissions on redhat8
   # TODO: figure out why this is necessary for redhat8
-  MAVEN_DIRECTORY="/usr/local/apache-maven-3.5.4"
+  MAVEN_DIRECTORY="/usr/local/apache-maven-3.9.2"
   redhat8 indocker sudo chmod 0755 ${MAVEN_DIRECTORY}
   redhat8 indocker sudo chmod 0755 ${MAVEN_DIRECTORY}/{bin,boot}
   redhat9 indocker sudo chmod 0755 ${MAVEN_DIRECTORY}
