@@ -78,7 +78,8 @@ public class KuduColumn extends Column {
     if (defaultValue != null) {
       Type defaultValueType = type.isTimestamp() ? Type.BIGINT : type;
       try {
-        defaultValueExpr = LiteralExpr.create(defaultValue.toString(), defaultValueType);
+        defaultValueExpr = LiteralExpr.createFromUnescapedStr(defaultValue.toString(),
+            defaultValueType);
       } catch (AnalysisException e) {
         throw new ImpalaRuntimeException(String.format("Error parsing default value: " +
             "'%s'", defaultValue), e);

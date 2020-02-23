@@ -284,3 +284,5 @@ table_name:bucketed_table, constraint:exclude, table_format:text/lzo/block
 # them each time when running the test. Developers may run this test many times locally.
 table_name:uncomp_src_alltypes, constraint:restrict_to, table_format:orc/def/block
 table_name:uncomp_src_decimal_tbl, constraint:restrict_to, table_format:orc/def/block
+
+table_name:part_strings_with_quotes, constraint:restrict_to, table_format:text/none/none

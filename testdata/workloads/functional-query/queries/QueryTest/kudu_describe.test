@@ -65,3 +65,25 @@ NAME,TYPE,COMMENT,PRIMARY_KEY,NULLABLE,DEFAULT_VALUE,ENCODING,COMPRESSION,BLOCK_
 ---- TYPES
 STRING,STRING,STRING,STRING,STRING,STRING,STRING,STRING,STRING
 ====
+---- QUERY
+# IMPALA-7781: Test unescaped default column values
+CREATE TABLE IF NOT EXISTS unescaped_str_defaults (
+  id int,
+  s1 string default "\"",
+  s2 string default '\'',
+  s3 string default "\\\"",
+  s4 string default '\\\'',
+  primary key(id)
+) STORED AS KUDU;
+DESCRIBE unescaped_str_defaults;
+---- LABELS
+NAME,TYPE,COMMENT,PRIMARY_KEY,NULLABLE,DEFAULT_VALUE,ENCODING,COMPRESSION,BLOCK_SIZE
+---- RESULTS
+'id','int','','true','false','','AUTO_ENCODING','DEFAULT_COMPRESSION','0'
+'s1','string','','false','true','"','AUTO_ENCODING','DEFAULT_COMPRESSION','0'
+'s2','string','','false','true','''','AUTO_ENCODING','DEFAULT_COMPRESSION','0'
+'s3','string','','false','true','\\"','AUTO_ENCODING','DEFAULT_COMPRESSION','0'
+'s4','string','','false','true','\\''','AUTO_ENCODING','DEFAULT_COMPRESSION','0'
+---- TYPES
+STRING,STRING,STRING,STRING,STRING,STRING,STRING,STRING,STRING
+====

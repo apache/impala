@@ -172,3 +172,17 @@ COLUMN, TYPE, #DISTINCT VALUES, #NULLS, MAX SIZE, AVG SIZE
 ---- TYPES
 STRING, STRING, BIGINT, BIGINT, BIGINT, DOUBLE
 ====
+---- QUERY
+# IMPALA-7784: Show unescaped partition string values. Note that in our test framework,
+# two single quotes inside a single-quoted string is escaped to a single quote.
+show partitions functional.part_strings_with_quotes
+---- LABELS
+p, #ROWS, #FILES, SIZE, BYTES CACHED, CACHE REPLICATION, FORMAT, INCREMENTAL STATS, LOCATION
+---- RESULTS
+'"',1,1,regex:.+B,'NOT CACHED','NOT CACHED','TEXT','false','$NAMENODE/test-warehouse/part_strings_with_quotes/p=%22'
+'''',1,1,regex:.+B,'NOT CACHED','NOT CACHED','TEXT','false','$NAMENODE/test-warehouse/part_strings_with_quotes/p=%27'
+'\\"',1,1,regex:.+B,'NOT CACHED','NOT CACHED','TEXT','false','$NAMENODE/test-warehouse/part_strings_with_quotes/p=%5C%22'
+'\\''',1,1,regex:.+B,'NOT CACHED','NOT CACHED','TEXT','false','$NAMENODE/test-warehouse/part_strings_with_quotes/p=%5C%27'
+'Total',4,4,'8B','0B','','','',''
+---- TYPES
+STRING, BIGINT, BIGINT, STRING, STRING, STRING, STRING, STRING, STRING

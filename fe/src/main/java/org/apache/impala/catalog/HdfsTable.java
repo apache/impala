@@ -1770,7 +1770,7 @@ public class HdfsTable extends Table implements FeFsTable {
     String value = URLDecoder.decode(partName[1], StandardCharsets.UTF_8.name());
     if (!value.equals(getNullPartitionKeyValue())) {
       try {
-        expr = LiteralExpr.create(value, type);
+        expr = LiteralExpr.createFromUnescapedStr(value, type);
         // Skip large value which exceeds the MAX VALUE of specified Type.
         if (expr instanceof NumericLiteral) {
           if (NumericLiteral.isOverflow(((NumericLiteral) expr).getValue(), type)) {

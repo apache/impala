@@ -60,10 +60,11 @@ public abstract class LiteralExpr extends Expr implements Comparable<LiteralExpr
   }
 
   /**
-   * Returns an analyzed literal of 'type'. Returns null for types that do not have a
-   * LiteralExpr subclass, e.g. TIMESTAMP.
+   * Creates an analyzed literal of 'type' from an unescaped string value. Returns null
+   * for types that do not have a LiteralExpr subclass, e.g. TIMESTAMP.
    */
-  public static LiteralExpr create(String value, Type type) throws AnalysisException {
+  public static LiteralExpr createFromUnescapedStr(String value, Type type)
+      throws AnalysisException {
     if (!type.isValid()) {
       throw new UnsupportedFeatureException("Invalid literal type: " + type.toSql());
     }
@@ -87,7 +88,7 @@ public abstract class LiteralExpr extends Expr implements Comparable<LiteralExpr
       case STRING:
       case VARCHAR:
       case CHAR:
-        e = new StringLiteral(value);
+        e = new StringLiteral(value, type, false);
         break;
       case DATE:
         e = new DateLiteral(value);
@@ -124,7 +125,7 @@ public abstract class LiteralExpr extends Expr implements Comparable<LiteralExpr
       LiteralExpr result = null;
       switch (exprNode.node_type) {
         case FLOAT_LITERAL:
-          result = LiteralExpr.create(
+          result = LiteralExpr.createFromUnescapedStr(
               Double.toString(exprNode.float_literal.value), colType);
           break;
         case DECIMAL_LITERAL:
@@ -140,14 +141,15 @@ public abstract class LiteralExpr extends Expr implements Comparable<LiteralExpr
               exprNode.date_literal.date_string);
           break;
         case INT_LITERAL:
-          result = LiteralExpr.create(
+          result = LiteralExpr.createFromUnescapedStr(
               Long.toString(exprNode.int_literal.value), colType);
           break;
         case STRING_LITERAL:
-          result = LiteralExpr.create(exprNode.string_literal.value, colType);
+          result = LiteralExpr.createFromUnescapedStr(
+              exprNode.string_literal.value, colType);
           break;
         case BOOL_LITERAL:
-          result =  LiteralExpr.create(
+          result =  LiteralExpr.createFromUnescapedStr(
               Boolean.toString(exprNode.bool_literal.value), colType);
           break;
         case NULL_LITERAL:

@@ -354,6 +354,27 @@ class TestRecoverPartitions(ImpalaTestSuite):
         FQ_TBL_NAME
 
   @SkipIfLocal.hdfs_client
+  def test_unescaped_string_partition(self, vector, unique_database):
+    """IMPALA-7784: Test that RECOVER PARTITIONS correctly parses unescaped string
+       values"""
+    tbl_name = "test_unescaped_string_partition"
+    fq_tbl_name = unique_database + "." + tbl_name
+    tbl_location = self.__get_fs_location(unique_database, tbl_name)
+
+    self.execute_query_expect_success(
+        self.client, "CREATE TABLE %s (i int) PARTITIONED BY (p string)" % fq_tbl_name)
+    self.create_fs_partition(tbl_location, 'p=\"', "file_000", "1")
+    self.create_fs_partition(tbl_location, 'p=\'', "file_000", "2")
+    self.create_fs_partition(tbl_location, 'p=\\\"', "file_000", "3")
+    self.create_fs_partition(tbl_location, 'p=\\\'', "file_000", "4")
+    self.execute_query_expect_success(
+        self.client, "ALTER TABLE %s RECOVER PARTITIONS" % fq_tbl_name)
+    result = self.execute_query_expect_success(
+        self.client, "SHOW PARTITIONS %s" % fq_tbl_name)
+    assert self.count_partition(result.data) == 4
+    self.verify_partitions(['\"', '\'', '\\\"', '\\\''], result.data)
+
+  @SkipIfLocal.hdfs_client
   @SkipIfS3.empty_directory
   def test_empty_directory(self, vector, unique_database):
     """Explicitly test how empty directories are handled when partitions are recovered."""
@@ -433,3 +454,10 @@ class TestRecoverPartitions(ImpalaTestSuite):
   def count_value(self, value, lines):
     """Count the number of lines that contain value."""
     return len(filter(lambda line: line.find(value) != -1, lines))
+
+  def verify_partitions(self, expected_parts, lines):
+    """Check if all partition values are expected"""
+    values = [line.split('\t')[0] for line in lines]
+    assert len(values) == len(expected_parts) + 1
+    for p in expected_parts:
+      assert p in values

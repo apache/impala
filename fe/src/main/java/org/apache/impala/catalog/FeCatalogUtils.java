@@ -235,7 +235,7 @@ public abstract class FeCatalogUtils {
         keyValues.add(NullLiteral.create(type));
       } else {
         try {
-          keyValues.add(LiteralExpr.create(partitionKey, type));
+          keyValues.add(LiteralExpr.createFromUnescapedStr(partitionKey, type));
         } catch (Exception ex) {
           LOG.warn(String.format(
               "Failed to create literal expression: type: %s, value: '%s'",

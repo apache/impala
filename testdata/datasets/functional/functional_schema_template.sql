@@ -2617,6 +2617,20 @@ FROM {db_name}.{table_name};
 ---- DATASET
 functional
 ---- BASE_TABLE_NAME
+part_strings_with_quotes
+---- COLUMNS
+i int
+---- PARTITION_COLUMNS
+p string
+---- LOAD
+INSERT OVERWRITE TABLE {db_name}{db_suffix}.{table_name} PARTITION (p="\"") VALUES (1);
+INSERT OVERWRITE TABLE {db_name}{db_suffix}.{table_name} PARTITION (p='\'') VALUES (2);
+INSERT OVERWRITE TABLE {db_name}{db_suffix}.{table_name} PARTITION (p="\\\"") VALUES (3);
+INSERT OVERWRITE TABLE {db_name}{db_suffix}.{table_name} PARTITION (p='\\\'') VALUES (4);
+====
+---- DATASET
+functional
+---- BASE_TABLE_NAME
 manynulls
 ---- COLUMNS
 id int

@@ -38,7 +38,10 @@ public class StringLiteral extends LiteralExpr {
   private final String value_;
   public static int MAX_STRING_LEN = Integer.MAX_VALUE;
 
-  // Indicates whether this value needs to be unescaped in toThrift().
+  // Indicates whether this value needs to be unescaped in toThrift() or comparison.
+  // TODO: Add enum to distinguish the sources, e.g. double/single quoted SQL, HMS view,
+  //  or the result of an evaluated const expression. So we know whether we need
+  //  unescaping more clearly.
   private final boolean needsUnescaping_;
 
   public StringLiteral(String value) {
@@ -215,7 +218,10 @@ public class StringLiteral extends LiteralExpr {
     int ret = super.compareTo(o);
     if (ret != 0) return ret;
     StringLiteral other = (StringLiteral) o;
-    return value_.compareTo(other.getStringValue());
+    String thisValue = needsUnescaping_? getUnescapedValue() : value_;
+    String otherValue = other.needsUnescaping_?
+        other.getUnescapedValue() : other.getStringValue();
+    return thisValue.compareTo(otherValue);
   }
 
   @Override
