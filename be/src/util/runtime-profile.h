@@ -30,7 +30,10 @@
 namespace impala {
 
 class ObjectPool;
+class RuntimeProfile;
 
+/// RuntimeProfileBase is the common subclass of all runtime profiles.
+///
 /// Runtime profile is a group of profiling counters.  It supports adding named counters
 /// and being able to serialize and deserialize them.
 /// The profiles support a tree structure to form a hierarchy of counters.
@@ -76,8 +79,7 @@ class ObjectPool;
 ///         of previously retrieved values.
 ///
 /// All methods are thread-safe unless otherwise mentioned.
-class RuntimeProfile { // NOLINT: This struct is not packed, but there are not so many
-                       // of them that it makes a performance difference
+class RuntimeProfileBase {
  public:
   class Counter {
    public:
@@ -111,10 +113,15 @@ class RuntimeProfile { // NOLINT: This struct is not packed, but there are not s
 
     virtual int64_t value() const { return value_.Load(); }
 
-    virtual double double_value() const {
-      int64_t v = value_.Load();
+    double double_value() const {
+      int64_t v = value();
       return *reinterpret_cast<const double*>(&v);
     }
+
+    /// Prints the contents of the counter in a name: value format, prefixed on
+    /// each line by 'prefix' and terminated with a newline.
+    virtual void PrettyPrint(
+        const std::string& prefix, const std::string& name, std::ostream* s) const;
 
     /// Builds a new Value into 'val', using (if required) the allocator from
     /// 'document'. Should set the following fields where appropriate:
@@ -131,30 +138,245 @@ class RuntimeProfile { // NOLINT: This struct is not packed, but there are not s
   };
 
   class AveragedCounter;
+  class SummaryStatsCounter;
+
+  typedef boost::function<int64_t()> SampleFunction;
+
+  virtual ~RuntimeProfileBase();
+
+  /// Gets the counter object with 'name'.  Returns NULL if there is no counter with
+  /// that name.
+  Counter* GetCounter(const std::string& name);
+
+  /// Adds all counters with 'name' that are registered either in this or
+  /// in any of the child profiles to 'counters'.
+  void GetCounters(const std::string& name, std::vector<Counter*>* counters);
+
+  /// Recursively compute the fraction of the 'total_time' spent in this profile and
+  /// its children. This function updates local_time_frac_ for each profile.
+  void ComputeTimeInProfile();
+
+  /// Prints the contents of the profile in a name: value format.
+  /// Does not hold locks when it makes any function calls.
+  void PrettyPrint(std::ostream* s, const std::string& prefix = "") const;
+
+  void GetChildren(std::vector<RuntimeProfileBase*>* children);
+
+  /// Gets all profiles in tree, including this one.
+  void GetAllChildren(std::vector<RuntimeProfileBase*>* children);
+
+  /// Adds a string to the runtime profile.  If a value already exists for 'key',
+  /// the value will be updated.
+  /// TODO: IMPALA-9382: this can be moved to RuntimeProfile once we remove callsites for
+  /// this function on AggregatedRuntimeProfile.
+  void AddInfoString(const std::string& key, const std::string& value);
+
+  /// Returns name of this profile
+  const std::string& name() const { return name_; }
+  const TRuntimeProfileNodeMetadata& metadata() const { return metadata_; }
+
+  /// Returns the counter for the total elapsed time.
+  Counter* total_time_counter() const {
+    auto it = counter_map_.find(TOTAL_TIME_COUNTER_NAME);
+    DCHECK(it != counter_map_.end());
+    return it->second;
+  }
+
+  /// Returns the counter for the inactive time.
+  Counter* inactive_timer() const {
+    auto it = counter_map_.find(INACTIVE_TIME_COUNTER_NAME);
+    DCHECK(it != counter_map_.end());
+    return it->second;
+  }
+
+  int64_t local_time() const { return local_time_ns_.Load(); }
+  int64_t total_time() const { return total_time_ns_.Load(); }
+
+  /// Returns the number of counters in this profile. Used for unit tests.
+  int num_counters() const;
+
+  /// Return the number of input instances that contributed to this profile.
+  /// Always 1 for non-aggregated profiles.
+  virtual int GetNumInputProfiles() const = 0;
+
+ protected:
+  /// Name of the counter maintaining the total time.
+  static const std::string TOTAL_TIME_COUNTER_NAME;
+  static const std::string LOCAL_TIME_COUNTER_NAME;
+  static const std::string INACTIVE_TIME_COUNTER_NAME;
+
+  /// Pool for allocated counters. Usually owned by the creator of this
+  /// object, but occasionally allocated in the constructor.
+  ObjectPool* pool_;
+
+  /// Name for this runtime profile.
+  std::string name_;
+
+  /// Detailed metadata that identifies the plan node, sink, etc.
+  TRuntimeProfileNodeMetadata metadata_;
+
+  /// Map from counter names to counters.  The profile owns the memory for the
+  /// counters.
+  typedef std::map<std::string, Counter*> CounterMap;
+  CounterMap counter_map_;
+
+  /// Map from parent counter name to a set of child counter name.
+  /// All top level counters are the child of "" (root).
+  typedef std::map<std::string, std::set<std::string>> ChildCounterMap;
+  ChildCounterMap child_counter_map_;
+
+  /// Protects counter_map_, child_counter_map_, RuntimeProfile::bucketing_counters_,
+  /// RuntimeProfile::rate_counters_, RuntimeProfile::sampling_counters_,
+  /// RuntimeProfile::time_series_counter_map_, and
+  /// RuntimeProfile::has_active_periodic_counters_.
+  mutable SpinLock counter_map_lock_;
+
+  /// TODO: IMPALA-9382: info strings can be moved to RuntimeProfile once we remove
+  /// callsites for this function on AggregatedRuntimeProfile.
+  typedef std::map<std::string, std::string> InfoStrings;
+  InfoStrings info_strings_;
+
+  /// Keeps track of the order in which InfoStrings are displayed when printed.
+  typedef std::vector<std::string> InfoStringsDisplayOrder;
+  InfoStringsDisplayOrder info_strings_display_order_;
+
+  /// Protects info_strings_ and info_strings_display_order_.
+  mutable SpinLock info_strings_lock_;
+
+  /// Child profiles. Does not own memory.
+  /// We record children in both a map (to facilitate updates) and a vector
+  /// (to print things in the order they were registered)
+  typedef std::map<std::string, RuntimeProfileBase*> ChildMap;
+  ChildMap child_map_;
+
+  /// Vector of (profile, indentation flag).
+  typedef std::vector<std::pair<RuntimeProfileBase*, bool>> ChildVector;
+  ChildVector children_;
+
+  /// Protects child_map_ and children_.
+  mutable SpinLock children_lock_;
+
+  /// Time spent in just in this profile (i.e. not the children) as a fraction
+  /// of the total time in the entire profile tree. This is a double's bit pattern
+  /// stored in an integer. Computed in ComputeTimeInProfile().
+  /// Atomic so that it can be read concurrently with the value being calculated.
+  AtomicInt64 local_time_frac_{0};
+
+  /// Time spent in this node (not including the children). Computed in
+  /// ComputeTimeInProfile(). Atomic b/c it can be read concurrently with
+  /// ComputeTimeInProfile() executing.
+  AtomicInt64 local_time_ns_{0};
+
+  /// Total time spent in this node. Computed in ComputeTimeInProfile() and is
+  /// the maximum of the total time spent in children and the value of
+  /// counter_total_time_. Atomic b/c it can be read concurrently with
+  /// ComputeTimeInProfile() executing.
+  AtomicInt64 total_time_ns_{0};
+
+  RuntimeProfileBase(ObjectPool* pool, const std::string& name);
+
+  ///  Inserts 'child' before the iterator 'insert_pos' in 'children_'.
+  /// 'children_lock_' must be held by the caller.
+  void AddChildLocked(
+      RuntimeProfileBase* child, bool indent, ChildVector::iterator insert_pos);
+
+  /// Clear all chunked time series counters in this profile and all children.
+  virtual void ClearChunkedTimeSeriesCounters();
+
+  struct CollectedNode {
+    CollectedNode(const RuntimeProfileBase* node, bool indent, int num_children)
+      : node(node), indent(indent), num_children(num_children) {}
+    const RuntimeProfileBase* const node;
+    const bool indent;
+    const int num_children;
+  };
+
+  /// Collect this node and descendants into 'nodes'. The order is a pre-order traversal
+  /// 'indent' is true if this node should be indented.
+  void CollectNodes(bool indent, std::vector<CollectedNode>* nodes) const;
+
+  /// Helpers to serialize the individual plan nodes to thrift.
+  void ToThriftHelper(std::vector<TRuntimeProfileNode>* nodes) const;
+  void ToThriftHelper(TRuntimeProfileNode* out_node) const;
+
+  /// Adds subclass-specific state to 'out_node'.
+  virtual void ToThriftSubclass(
+      std::vector<std::pair<const std::string&, const Counter*>>& counter_map_entries,
+      TRuntimeProfileNode* out_node) const = 0;
+
+  /// Create a subtree of runtime profiles from nodes, starting at *node_idx.
+  /// On return, *node_idx is the index one past the end of this subtree.
+  static RuntimeProfileBase* CreateFromThriftHelper(
+      ObjectPool* pool, const std::vector<TRuntimeProfileNode>& nodes, int* node_idx);
+
+  /// Init subclass-specific state from 'node'.
+  virtual void InitFromThrift(const TRuntimeProfileNode& node, ObjectPool* pool) = 0;
+
+  /// Helper for ToJson().
+  void ToJsonHelper(rapidjson::Value* parent, rapidjson::Document* d) const;
+
+  /// Adds subclass-specific state to 'parent'.
+  virtual void ToJsonSubclass(rapidjson::Value* parent, rapidjson::Document* d) const = 0;
+
+  /// Print the child counters of the given counter name.
+  static void PrintChildCounters(const std::string& prefix,
+      const std::string& counter_name, const CounterMap& counter_map,
+      const ChildCounterMap& child_counter_map, std::ostream* s);
+
+  /// Print info strings. Implemented by subclass which may store them
+  /// in different ways
+  virtual void PrettyPrintInfoStrings(
+      std::ostream* s, const std::string& prefix) const = 0;
+
+  /// Print any additional counters from the base class.
+  virtual void PrettyPrintSubclassCounters(
+      std::ostream* s, const std::string& prefix) const = 0;
+
+  /// Add all the counters of this instance into the given parent node in JSON format
+  /// Args:
+  ///   parent: the root node to add all the counters
+  ///   d: document of this json, could be used to get Allocator
+  ///   counter_name: this will be used to find its child counters in child_counter_map
+  ///   counter_map: A map of counters name to counter
+  ///   child_counter_map: A map of counter to its child counters
+  void ToJsonCounters(rapidjson::Value* parent, rapidjson::Document* d,
+      const string& counter_name, const CounterMap& counter_map,
+      const ChildCounterMap& child_counter_map) const;
+
+  /// Implementation of AddInfoString() and AppendInfoString(). If 'append' is false,
+  /// implements AddInfoString(), otherwise implements AppendInfoString().
+  /// Redaction rules are applied on the info string if 'redact' is true.
+  /// Trailing whitespace is removed.
+  /// TODO: IMPALA-9382: this can be moved to RuntimeProfile once we remove callsites for
+  /// this function on AggregatedRuntimeProfile.
+  void AddInfoStringInternal(
+      const std::string& key, std::string value, bool append, bool redact = false);
+};
+
+/// A standard runtime profile that can be mutated and updated.
+class RuntimeProfile : public RuntimeProfileBase {
+ public:
+  // Import the nested class names from the base class so we can still refer
+  // to them as RuntimeProfile::Counter, etc in the rest of the codebase.
+  using RuntimeProfileBase::Counter;
+  using RuntimeProfileBase::SummaryStatsCounter;
   class ConcurrentTimerCounter;
   class DerivedCounter;
   class HighWaterMarkCounter;
-  class SummaryStatsCounter;
   class EventSequence;
   class ThreadCounters;
   class TimeSeriesCounter;
   class SamplingTimeSeriesCounter;
   class ChunkedTimeSeriesCounter;
 
-  typedef boost::function<int64_t ()> SampleFunction;
-
   /// Create a runtime profile object with 'name'. The profile, counters and any other
   /// structures owned by the profile are allocated from 'pool'.
-  /// If 'is_averaged_profile' is true, the counters in this profile will be derived
-  /// averages (of unit AveragedCounter) from other profiles, so the counter map will
-  /// be left empty. Otherwise, the counter map is initialized with a single entry for
-  /// TotalTime.
-  static RuntimeProfile* Create(ObjectPool* pool, const std::string& name,
-      bool is_averaged_profile = false);
+  static RuntimeProfile* Create(ObjectPool* pool, const std::string& name);
 
   ~RuntimeProfile();
 
-  /// Deserialize from thrift.  Runtime profiles are allocated from the pool.
+  /// Deserialize a runtime profile tree from thrift. Allocated objects are stored in
+  /// 'pool'.
   static RuntimeProfile* CreateFromThrift(ObjectPool* pool,
       const TRuntimeProfileTree& profiles);
 
@@ -165,12 +387,12 @@ class RuntimeProfile { // NOLINT: This struct is not packed, but there are not s
   /// relative to the parent.
   /// If location is non-null, child will be inserted after location.  Location must
   /// already be added to the profile.
-  void AddChild(RuntimeProfile* child,
-      bool indent = true, RuntimeProfile* location = NULL);
+  void AddChild(
+      RuntimeProfileBase* child, bool indent = true, RuntimeProfile* location = NULL);
 
   /// Adds a child profile, similarly to AddChild(). The child profile is put before any
   /// existing profiles.
-  void PrependChild(RuntimeProfile* child, bool indent = true);
+  void PrependChild(RuntimeProfileBase* child, bool indent = true);
 
   /// Creates a new child profile with the given 'name'. A child profile with that name
   /// must not already exist. If 'prepend' is true, prepended before other child profiles,
@@ -182,19 +404,11 @@ class RuntimeProfile { // NOLINT: This struct is not packed, but there are not s
   /// invalidate pointers to profiles.
   void SortChildrenByTotalTime();
 
-  /// Updates the AveragedCounter counters in this profile with the counters from the
-  /// 'src' profile. If a counter is present in 'src' but missing in this profile, a new
-  /// AveragedCounter is created with the same name. This method should not be invoked
-  /// if is_average_profile_ is false. Obtains locks on the counter maps and child counter
-  /// maps in both this and 'src' profiles.
-  void UpdateAverage(RuntimeProfile* src);
-
   /// Updates this profile w/ the thrift profile.
   /// Counters and child profiles in thrift_profile that already exist in this profile
   /// are updated. Counters that do not already exist are created.
   /// Info strings matched up by key and are updated or added, depending on whether
   /// the key has already been registered.
-  /// TODO: Event sequences are ignored
   void Update(const TRuntimeProfileTree& thrift_profile);
 
   /// Add a counter with 'name'/'unit'.  Returns a counter object that the caller can
@@ -235,22 +449,6 @@ class RuntimeProfile { // NOLINT: This struct is not packed, but there are not s
   // once.
   void AddLocalTimeCounter(const SampleFunction& counter_fn);
 
-  /// Gets the counter object with 'name'.  Returns NULL if there is no counter with
-  /// that name.
-  Counter* GetCounter(const std::string& name);
-
-  /// Gets the summary stats counter with 'name'. Returns NULL if there is no summary
-  /// stats counter with that name.
-  SummaryStatsCounter* GetSummaryStatsCounter(const std::string& name);
-
-  /// Adds all counters with 'name' that are registered either in this or
-  /// in any of the child profiles to 'counters'.
-  void GetCounters(const std::string& name, std::vector<Counter*>* counters);
-
-  /// Adds a string to the runtime profile.  If a value already exists for 'key',
-  /// the value will be updated.
-  void AddInfoString(const std::string& key, const std::string& value);
-
   /// Same as AddInfoString(), except that this method applies the redaction
   /// rules on 'value' before adding it to the runtime profile.
   void AddInfoStringRedacted(const std::string& key, const std::string& value);
@@ -286,8 +484,6 @@ class RuntimeProfile { // NOLINT: This struct is not packed, but there are not s
   /// TODO: EventSequences are not merged by Merge() or Update()
   EventSequence* AddEventSequence(const std::string& key);
   EventSequence* AddEventSequence(const std::string& key, const TEventSequence& from);
-
-  /// Returns event sequence with the provided name if it exists, otherwise NULL.
   EventSequence* GetEventSequence(const std::string& name) const;
 
   /// Updates 'value' of info string with 'key'. No-op if the key doesn't exist.
@@ -297,76 +493,19 @@ class RuntimeProfile { // NOLINT: This struct is not packed, but there are not s
   /// the key does not exist.
   const std::string* GetInfoString(const std::string& key) const;
 
+  /// Gets the summary stats counter with 'name'. Returns NULL if there is no summary
+  /// stats counter with that name.
+  SummaryStatsCounter* GetSummaryStatsCounter(const std::string& name);
+
   /// Stops updating all counters in this profile that are periodically updated by a
   /// background thread (i.e. sampling, rate, bucketing and time series counters).
   /// Must be called before the profile is destroyed if any such counters are active.
   /// Does not stop counters on descendant profiles.
   void StopPeriodicCounters();
 
-  /// Returns the counter for the total elapsed time.
-  Counter* total_time_counter() { return counter_map_[TOTAL_TIME_COUNTER_NAME]; }
-  Counter* inactive_timer() { return counter_map_[INACTIVE_TIME_COUNTER_NAME]; }
-  int64_t local_time() { return local_time_ns_.Load(); }
-  int64_t total_time() { return total_time_ns_.Load(); }
-
-  /// Prints the contents of the profile in a name: value format.
-  /// Does not hold locks when it makes any function calls.
-  void PrettyPrint(std::ostream* s, const std::string& prefix="") const;
-
-  /// Serializes profile to thrift.
-  /// Does not hold locks when it makes any function calls.
-  void ToThrift(TRuntimeProfileTree* tree) const;
-
-  /// Store profile into JSON format into a document
-  void ToJsonHelper(rapidjson::Value* parent, rapidjson::Document* d) const;
-  void ToJson(rapidjson::Document* d) const;
-
-  /// Serializes the runtime profile to a buffer.  This first serializes the
-  /// object using thrift compact binary format and then gzip compresses it.
-  /// This is not a lightweight operation and should not be in the hot path.
-  Status Compress(std::vector<uint8_t>* out) const;
-
-  /// Deserializes a compressed profile into a TRuntimeProfileTree. 'compressed_profile'
-  /// is expected to have been serialized by Compress().
-  static Status DecompressToThrift(
-      const std::vector<uint8_t>& compressed_profile, TRuntimeProfileTree* out);
-
-  /// Deserializes a compressed profile into a RuntimeProfile tree owned by 'pool'.
-  /// 'compressed_profile' is expected to have been serialized by Compress().
-  static Status DecompressToProfile(const std::vector<uint8_t>& compressed_profile,
-      ObjectPool* pool, RuntimeProfile** out);
-
-  /// Serializes the runtime profile to a string.  This first serializes the
-  /// object using thrift compact binary format, then gzip compresses it and
-  /// finally encodes it as base64.  This is not a lightweight operation and
-  /// should not be in the hot path.
-  Status SerializeToArchiveString(std::string* out) const WARN_UNUSED_RESULT;
-  Status SerializeToArchiveString(std::stringstream* out) const WARN_UNUSED_RESULT;
-
-  /// Deserializes a string into a TRuntimeProfileTree. 'archive_str' is expected to have
-  /// been serialized by SerializeToArchiveString().
-  static Status DeserializeFromArchiveString(
-      const std::string& archive_str, TRuntimeProfileTree* out);
-
-  /// Divides all counters by n
-  void Divide(int n);
-
-  void GetChildren(std::vector<RuntimeProfile*>* children);
-
-  /// Gets all profiles in tree, including this one.
-  void GetAllChildren(std::vector<RuntimeProfile*>* children);
-
-  /// Returns the number of counters in this profile
-  int num_counters() const { return counter_map_.size(); }
-
-  /// Returns name of this profile
-  const std::string& name() const { return name_; }
-
   /// *only call this on top-level profiles*
   /// (because it doesn't re-file child profiles)
   void set_name(const std::string& name) { name_ = name; }
-
-  const TRuntimeProfileNodeMetadata& metadata() const { return metadata_; }
 
   /// Called if this corresponds to a plan node. Sets metadata so that later code that
   /// analyzes the profile can identify this as the plan node's profile.
@@ -446,43 +585,73 @@ class RuntimeProfile { // NOLINT: This struct is not packed, but there are not s
       const std::string& name, TUnit::type unit, SampleFunction sample_fn);
 
   /// Clear all chunked time series counters in this profile and all children.
-  void ClearChunkedTimeSeriesCounters();
+  void ClearChunkedTimeSeriesCounters() override;
 
-  /// Recursively compute the fraction of the 'total_time' spent in this profile and
-  /// its children.
-  /// This function updates local_time_frac_ for each profile.
-  void ComputeTimeInProfile();
+  /// Serializes an entire runtime profile tree to thrift.
+  /// This is defined in RuntimeProfile instead of RuntimeProfileBase becase we require
+  /// that a runtime profile root be a RuntimeProfile.
+  /// Does not hold locks when it makes any function calls.
+  void ToThrift(TRuntimeProfileTree* tree) const;
+
+  /// Store an entire runtime profile tree into JSON document 'd'.
+  void ToJson(rapidjson::Document* d) const;
+
+  /// Serializes the runtime profile to a buffer.  This first serializes the
+  /// object using thrift compact binary format and then gzip compresses it.
+  /// This is not a lightweight operation and should not be in the hot path.
+  Status Compress(std::vector<uint8_t>* out) const;
+
+  /// Deserializes a compressed profile into a TRuntimeProfileTree. 'compressed_profile'
+  /// is expected to have been serialized by Compress().
+  static Status DecompressToThrift(
+      const std::vector<uint8_t>& compressed_profile, TRuntimeProfileTree* out);
+
+  /// Deserializes a compressed profile into a RuntimeProfile tree owned by 'pool'.
+  /// 'compressed_profile' is expected to have been serialized by Compress().
+  static Status DecompressToProfile(const std::vector<uint8_t>& compressed_profile,
+      ObjectPool* pool, RuntimeProfile** out);
+
+  /// Serializes the runtime profile to a string.  This first serializes the
+  /// object using thrift compact binary format, then gzip compresses it and
+  /// finally encodes it as base64.  This is not a lightweight operation and
+  /// should not be in the hot path.
+  Status SerializeToArchiveString(std::string* out) const;
+  Status SerializeToArchiveString(std::stringstream* out) const;
+
+  /// Deserializes a string into a TRuntimeProfileTree. 'archive_str' is expected to have
+  /// been serialized by SerializeToArchiveString().
+  static Status DeserializeFromArchiveString(
+      const std::string& archive_str, TRuntimeProfileTree* out);
 
   /// Set ExecSummary
   void SetTExecSummary(const TExecSummary& summary);
 
-  /// Get a copy of exec_summary tp t_exec_summary
+  /// Get a copy of exec_summary to t_exec_summary
   void GetExecSummary(TExecSummary* t_exec_summary) const;
 
+ protected:
+  virtual int GetNumInputProfiles() const override { return 1; }
+
+  /// Adds subclass-specific state to 'out_node'.
+  void ToThriftSubclass(
+      std::vector<std::pair<const std::string&, const Counter*>>& counter_map_entries,
+      TRuntimeProfileNode* out_node) const override;
+
+  /// Init subclass-specific state from 'node'.
+  void InitFromThrift(const TRuntimeProfileNode& node, ObjectPool* pool) override;
+
+  /// Adds subclass-specific state to 'parent'.
+  void ToJsonSubclass(rapidjson::Value* parent, rapidjson::Document* d) const override;
+
+  /// Print info strings from this subclass.
+  void PrettyPrintInfoStrings(std::ostream* s, const std::string& prefix) const override;
+
+  /// Print any additional counters from this subclass.
+  void PrettyPrintSubclassCounters(
+      std::ostream* s, const std::string& prefix) const override;
+
  private:
-  /// Pool for allocated counters. Usually owned by the creator of this
-  /// object, but occasionally allocated in the constructor.
-  ObjectPool* pool_;
-
-  /// Name for this runtime profile.
-  std::string name_;
-
-  /// Detailed metadata that identifies the plan node, sink, etc.
-  TRuntimeProfileNodeMetadata metadata_;
-
-  /// True if this profile is an average derived from other profiles.
-  /// All counters in this profile must be of unit AveragedCounter.
-  bool is_averaged_profile_;
-
-  /// Map from counter names to counters.  The profile owns the memory for the
-  /// counters.
-  typedef std::map<std::string, Counter*> CounterMap;
-  CounterMap counter_map_;
-
-  /// Map from parent counter name to a set of child counter name.
-  /// All top level counters are the child of "" (root).
-  typedef std::map<std::string, std::set<std::string>> ChildCounterMap;
-  ChildCounterMap child_counter_map_;
+  friend class AggregatedRuntimeProfile;
 
   /// A set of bucket counters registered in this runtime profile.
   std::set<std::vector<Counter*>*> bucketing_counters_;
@@ -504,33 +673,6 @@ class RuntimeProfile { // NOLINT: This struct is not packed, but there are not s
   /// sampling and time series counters.
   bool has_active_periodic_counters_ = false;
 
-  /// Protects counter_map_, child_counter_map_, bucketing_counters_, rate_counters_,
-  /// sampling_counters_, time_series_counter_map_, and has_active_periodic_counters_.
-  mutable SpinLock counter_map_lock_;
-
-  /// Child profiles.  Does not own memory.
-  /// We record children in both a map (to facilitate updates) and a vector
-  /// (to print things in the order they were registered)
-  typedef std::map<std::string, RuntimeProfile*> ChildMap;
-  ChildMap child_map_;
-
-  /// Vector of (profile, indentation flag).
-  typedef std::vector<std::pair<RuntimeProfile*, bool>> ChildVector;
-  ChildVector children_;
-
-  /// Protects child_map_ and children_.
-  mutable SpinLock children_lock_;
-
-  typedef std::map<std::string, std::string> InfoStrings;
-  InfoStrings info_strings_;
-
-  /// Keeps track of the order in which InfoStrings are displayed when printed.
-  typedef std::vector<std::string> InfoStringsDisplayOrder;
-  InfoStringsDisplayOrder info_strings_display_order_;
-
-  /// Protects info_strings_ and info_strings_display_order_.
-  mutable SpinLock info_strings_lock_;
-
   typedef std::map<std::string, EventSequence*> EventSequenceMap;
   EventSequenceMap event_sequence_map_;
 
@@ -543,29 +685,12 @@ class RuntimeProfile { // NOLINT: This struct is not packed, but there are not s
   /// Protects summary_stats_map_.
   mutable SpinLock summary_stats_map_lock_;
 
-  Counter counter_total_time_;
+  Counter counter_total_time_{TUnit::TIME_NS};
 
   /// Total time spent waiting (on non-children) that should not be counted when
   /// computing local_time_frac_. This is updated for example in the exchange
   /// node when waiting on the sender from another fragment.
-  Counter inactive_timer_;
-
-  /// Time spent in just in this profile (i.e. not the children) as a fraction
-  /// of the total time in the entire profile tree. This is a double's bit pattern
-  /// stored in an integer. Computed in ComputeTimeInProfile().
-  /// Atomic so that it can be read concurrently with the value being calculated.
-  AtomicInt64 local_time_frac_{0};
-
-  /// Time spent in this node (not including the children). Computed in
-  /// ComputeTimeInProfile(). Atomic b/c it can be read concurrently with
-  /// ComputeTimeInProfile() executing.
-  AtomicInt64 local_time_ns_{0};
-
-  /// Total time spent in this node. Computed in ComputeTimeInProfile() and is
-  /// the maximum of the total time spent in children and the value of
-  /// counter_total_time_. Atomic b/c it can be read concurrently with
-  /// ComputeTimeInProfile() executing.
-  AtomicInt64 total_time_ns_{0};
+  Counter inactive_timer_{TUnit::TIME_NS};
 
   /// The Exec Summary
   TExecSummary t_exec_summary_;
@@ -574,52 +699,14 @@ class RuntimeProfile { // NOLINT: This struct is not packed, but there are not s
   mutable SpinLock t_exec_summary_lock_;
 
   /// Constructor used by Create().
-  RuntimeProfile(ObjectPool* pool, const std::string& name, bool is_averaged_profile);
+  RuntimeProfile(ObjectPool* pool, const std::string& name);
 
   /// Update a subtree of profiles from nodes, rooted at *idx.
   /// On return, *idx points to the node immediately following this subtree.
   void Update(const std::vector<TRuntimeProfileNode>& nodes, int* idx);
 
-  /// Helper function to compute compute the fraction of the total time spent in
-  /// this profile and its children.
-  /// Called recusively.
-  void ComputeTimeInProfile(int64_t total_time);
-
-  /// Implementation of AddInfoString() and AppendInfoString(). If 'append' is false,
-  /// implements AddInfoString(), otherwise implements AppendInfoString().
-  /// Redaction rules are applied on the info string if 'redact' is true.
-  /// Trailing whitspace is removed.
-  void AddInfoStringInternal(
-      const std::string& key, std::string value, bool append, bool redact = false);
-
-  /// Helper to serialize the individual plan nodes to thrift.
-  void ToThrift(std::vector<TRuntimeProfileNode>* nodes) const;
-  void ToThrift(TRuntimeProfileNode* out_node) const;
-
-  struct CollectedNode {
-    CollectedNode(const RuntimeProfile* node, bool indent, int num_children) :
-      node(node), indent(indent), num_children(num_children) {}
-    const RuntimeProfile* const node;
-    const bool indent;
-    const int num_children;
-  };
-
-  /// Collect this node and descendants into 'nodes'. The order is a pre-order traversal
-  /// 'indent' is true if this node should be indented.
-  void CollectNodes(bool indent, std::vector<CollectedNode>* nodes) const;
-
   /// Send exec_summary to thrift
   void ExecSummaryToThrift(TRuntimeProfileTree* tree) const;
-
-  /// Name of the counter maintaining the total time.
-  static const std::string TOTAL_TIME_COUNTER_NAME;
-  static const std::string LOCAL_TIME_COUNTER_NAME;
-  static const std::string INACTIVE_TIME_COUNTER_NAME;
-
-  /// Create a subtree of runtime profiles from nodes, starting at *node_idx.
-  /// On return, *node_idx is the index one past the end of this subtree
-  static RuntimeProfile* CreateFromThrift(
-      ObjectPool* pool, const std::vector<TRuntimeProfileNode>& nodes, int* node_idx);
 
   /// Internal implementations of the Add*Counter() functions for use when the caller
   /// holds counter_map_lock_. Also returns 'created', which is true if a new counter was
@@ -630,26 +717,101 @@ class RuntimeProfile { // NOLINT: This struct is not packed, but there are not s
       TUnit::type unit, const std::string& parent_counter_name, bool* created);
   ConcurrentTimerCounter* AddConcurrentTimerCounterLocked(const std::string& name,
       TUnit::type unit, const std::string& parent_counter_name, bool* created);
+};
 
-  ///  Inserts 'child' before the iterator 'insert_pos' in 'children_'.
-  /// 'children_lock_' must be held by the caller.
-  void AddChildLocked(
-      RuntimeProfile* child, bool indent, ChildVector::iterator insert_pos);
+/// An aggregated profile that results from combining one or more RuntimeProfiles.
+/// Contains averaged and otherwise aggregated versions of the counters from the
+/// input profiles.
+///
+/// An AggregatedRuntimeProfile can only have other AggregatedRuntimeProfiles as
+/// children.
+class AggregatedRuntimeProfile : public RuntimeProfileBase {
+ public:
+  /// Create an aggregated runtime profile with 'name'. The profile, counters and any
+  /// other structures owned by the profile are allocated from 'pool'.
+  /// The counters in this profile will be aggregated AveragedCounters merged
+  /// from other profiles.
+  ///
+  /// 'is_root' must be true if this is the root of the averaged profile tree which
+  /// will have Update() called on it. The descendants of the root are created and
+  /// updated via Update().
+  static AggregatedRuntimeProfile* Create(ObjectPool* pool, const std::string& name,
+      int num_input_profiles, bool is_root = true);
 
-  /// Print the child counters of the given counter name
-  static void PrintChildCounters(const std::string& prefix,
-      const std::string& counter_name, const CounterMap& counter_map,
-      const ChildCounterMap& child_counter_map, std::ostream* s);
+  /// Updates the AveragedCounter counters in this profile with the counters from the
+  /// 'src' profile. If a counter is present in 'src' but missing in this profile, a new
+  /// AveragedCounter is created with the same name. Obtains locks on the counter maps
+  /// and child counter maps in both this and 'src' profiles.
+  /// TODO: IMPALA-9382: update method name and comment.
+  ///
+  /// Note that 'src' must be all instances of RuntimeProfile - no
+  /// AggregatedRuntimeProfiles can be part of the input.
+  void Update(RuntimeProfile* src, int idx);
 
-  /// Add all the counters of this instance into the given parent node in JSON format
-  /// Args:
-  ///   parent: the root node to add all the counters
-  ///   d: document of this json, could be used to get Allocator
-  ///   counter_name: this will be used to find its child counters in child_counter_map
-  ///   counter_map: A map of counters name to counter
-  ///   child_counter_map: A map of counter to its child counters
-  void ToJsonCounters(rapidjson::Value* parent, rapidjson::Document* d,
-      const string& counter_name, const CounterMap& counter_map,
-      const ChildCounterMap& child_counter_map) const;
+ protected:
+  virtual int GetNumInputProfiles() const override { return num_input_profiles_; }
+
+  /// Adds subclass-specific state to 'out_node'. 'counter_map_entries' is a snapshot
+  /// of 'counter_map_'.
+  void ToThriftSubclass(
+      std::vector<std::pair<const std::string&, const Counter*>>& counter_map_entries,
+      TRuntimeProfileNode* out_node) const override;
+
+  /// Init subclass-specific state from 'node'.
+  void InitFromThrift(const TRuntimeProfileNode& node, ObjectPool* pool) override;
+
+  /// Adds subclass-specific state to 'parent'.
+  void ToJsonSubclass(rapidjson::Value* parent, rapidjson::Document* d) const override;
+
+  /// Print info strings from this subclass.
+  void PrettyPrintInfoStrings(std::ostream* s, const std::string& prefix) const override;
+
+  /// Print any additional counters from this subclass.
+  void PrettyPrintSubclassCounters(
+      std::ostream* s, const std::string& prefix) const override;
+
+ private:
+  /// Number of profiles that will contribute to this aggregated profile.
+  const int num_input_profiles_;
+
+  /// Names of the input profiles. Only use on averaged profiles that are the root
+  /// of an averaged profile tree.
+  /// The size is 'num_input_profiles_'. Protected by 'input_profile_name_lock_'
+  std::vector<std::string> input_profile_names_;
+  mutable SpinLock input_profile_name_lock_;
+
+  /// Aggregated info strings from the input profile. The key is the info string name.
+  /// The value vector contains an entry for every input profile.
+  std::map<std::string, std::vector<std::string>> agg_info_strings_;
+
+  /// Protects 'agg_info_strings_'.
+  mutable SpinLock agg_info_strings_lock_;
+
+  /// Per-instance summary stats. Value is the unit and all of the instance of the
+  /// counter. Some of the counters may be null if the input profile did not have
+  /// that counter present.
+  /// Protected by 'summary_stats_map_lock_'.
+  typedef std::map<std::string, std::pair<TUnit::type, std::vector<SummaryStatsCounter*>>>
+      AggSummaryStatsCounterMap;
+  AggSummaryStatsCounterMap summary_stats_map_;
+
+  /// Protects summary_stats_map_.
+  mutable SpinLock summary_stats_map_lock_;
+
+  AggregatedRuntimeProfile(
+      ObjectPool* pool, const std::string& name, int num_input_profiles, bool is_root);
+
+  /// Group the values in 'info_string_values' by value, with a vector of indices where
+  /// that value appears. 'info_string_values' must be a value from 'info_strings_'.
+  std::map<std::string, std::vector<int32_t>> GroupDistinctInfoStrings(
+      const std::vector<std::string>& info_string_values) const;
+
+  /// Helper for Update() that is invoked recursively on 'src'.
+  void UpdateRecursive(RuntimeProfile* src, int idx);
+
+  /// Aggregate summary stats into a single counter. Entries in
+  /// 'counter' may be NULL.
+  static void AggregateSummaryStats(
+      const std::vector<SummaryStatsCounter*> counters, SummaryStatsCounter* result);
 };
 }

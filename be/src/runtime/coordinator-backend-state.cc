@@ -56,10 +56,18 @@ using kudu::rpc::RpcSidecar;
 using namespace rapidjson;
 namespace accumulators = boost::accumulators;
 
+DECLARE_bool(gen_experimental_profile);
 DECLARE_int32(backend_client_rpc_timeout_ms);
 DECLARE_int64(rpc_max_message_size);
 
 namespace impala {
+PROFILE_DEFINE_COUNTER(BytesAssigned, STABLE_HIGH, TUnit::BYTES,
+    "Total number of bytes of filesystem scan ranges assigned to this fragment "
+    "instance.");
+PROFILE_DEFINE_TIMER(
+    CompletionTime, STABLE_HIGH, "Completion time of this fragment instance");
+PROFILE_DEFINE_COUNTER(ExecutionRate, STABLE_LOW, TUnit::BYTES_PER_SECOND,
+    "Rate at which the fragment instance processed its input scan ranges.");
 
 const char* Coordinator::BackendState::InstanceStats::LAST_REPORT_TIME_DESC =
     "Last report received time";
@@ -521,12 +529,20 @@ void Coordinator::BackendState::UpdateExecStats(
     DCHECK_LT(fragment_idx, fragment_stats.size());
     FragmentStats* f = fragment_stats[fragment_idx];
     int64_t completion_time = instance_stats.stopwatch_.ElapsedTime();
-    f->completion_times_(completion_time);
+    RuntimeProfile::Counter* completion_timer =
+        PROFILE_CompletionTime.Instantiate(instance_stats.profile_);
+    completion_timer->Set(completion_time);
+    if (!FLAGS_gen_experimental_profile) f->completion_times_(completion_time);
     if (completion_time > 0) {
-      f->rates_(instance_stats.total_split_size_
-        / (completion_time / 1000.0 / 1000.0 / 1000.0));
+      RuntimeProfile::Counter* execution_rate_counter =
+          PROFILE_ExecutionRate.Instantiate(instance_stats.profile_);
+      double rate =
+          instance_stats.total_split_size_ / (completion_time / 1000.0 / 1000.0 / 1000.0);
+      execution_rate_counter->Set(static_cast<int64_t>(rate));
+      if (!FLAGS_gen_experimental_profile) f->rates_(rate);
     }
-    f->avg_profile_->UpdateAverage(instance_stats.profile_);
+    f->agg_profile_->Update(
+        instance_stats.profile_, instance_stats.per_fragment_instance_idx());
   }
 }
 
@@ -700,14 +716,19 @@ Coordinator::BackendState::InstanceStats::InstanceStats(
   profile_->AddInfoString(LAST_REPORT_TIME_DESC, ToStringFromUnixMillis(UnixMillis()));
   fragment_stats->root_profile()->AddChild(profile_);
 
-  // add total split size to fragment_stats->bytes_assigned()
+  // Compute total split size and add to profile as "BytesAssigned".
   for (const auto& entry : exec_params_.per_node_scan_ranges()) {
     for (const ScanRangeParamsPB& scan_range_params : entry.second.scan_ranges()) {
       if (!scan_range_params.scan_range().has_hdfs_file_split()) continue;
       total_split_size_ += scan_range_params.scan_range().hdfs_file_split().length();
     }
   }
-  (*fragment_stats->bytes_assigned())(total_split_size_);
+  RuntimeProfile::Counter* bytes_assigned_counter =
+      PROFILE_BytesAssigned.Instantiate(profile_);
+  bytes_assigned_counter->Set(total_split_size_);
+  if (!FLAGS_gen_experimental_profile) {
+    (*fragment_stats->bytes_assigned())(total_split_size_);
+  }
 }
 
 void Coordinator::BackendState::InstanceStats::Update(
@@ -783,14 +804,16 @@ void Coordinator::BackendState::InstanceStats::ToJson(Value* value, Document* do
       document->GetAllocator());
 }
 
-Coordinator::FragmentStats::FragmentStats(const string& avg_profile_name,
+Coordinator::FragmentStats::FragmentStats(const string& agg_profile_name,
     const string& root_profile_name, int num_instances, ObjectPool* obj_pool)
-  : avg_profile_(RuntimeProfile::Create(obj_pool, avg_profile_name, true)),
+  : agg_profile_(
+        AggregatedRuntimeProfile::Create(obj_pool, agg_profile_name, num_instances)),
     root_profile_(RuntimeProfile::Create(obj_pool, root_profile_name)),
-    num_instances_(num_instances) {
-}
+    num_instances_(num_instances) {}
 
 void Coordinator::FragmentStats::AddSplitStats() {
+  // These strings are not included in the transposed profile because we have counters.
+  if (FLAGS_gen_experimental_profile) return;
   double min = accumulators::min(bytes_assigned_);
   double max = accumulators::max(bytes_assigned_);
   double mean = accumulators::mean(bytes_assigned_);
@@ -800,11 +823,13 @@ void Coordinator::FragmentStats::AddSplitStats() {
     << ", max: " << PrettyPrinter::Print(max, TUnit::BYTES)
     << ", avg: " << PrettyPrinter::Print(mean, TUnit::BYTES)
     << ", stddev: " << PrettyPrinter::Print(stddev, TUnit::BYTES);
-  avg_profile_->AddInfoString("split sizes", ss.str());
+  agg_profile_->AddInfoString("split sizes", ss.str());
 }
 
 void Coordinator::FragmentStats::AddExecStats() {
   root_profile_->SortChildrenByTotalTime();
+  // These strings are not included in the transposed profile because we have counters.
+  if (FLAGS_gen_experimental_profile) return;
   stringstream times_label;
   times_label
     << "min:" << PrettyPrinter::Print(
@@ -827,11 +852,9 @@ void Coordinator::FragmentStats::AddExecStats() {
     << "  stddev:" << PrettyPrinter::Print(
         sqrt(accumulators::variance(rates_)), TUnit::BYTES_PER_SECOND);
 
-  // why plural?
-  avg_profile_->AddInfoString("completion times", times_label.str());
-  // why plural?
-  avg_profile_->AddInfoString("execution rates", rates_label.str());
-  avg_profile_->AddInfoString("num instances", lexical_cast<string>(num_instances_));
+  agg_profile_->AddInfoString("completion times", times_label.str());
+  agg_profile_->AddInfoString("execution rates", rates_label.str());
+  agg_profile_->AddInfoString("num instances", lexical_cast<string>(num_instances_));
 }
 
 void Coordinator::BackendState::ToJson(Value* value, Document* document) {

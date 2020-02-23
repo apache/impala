@@ -151,7 +151,7 @@ class Coordinator::BackendState {
   /// Merges the incoming 'thrift_profile' into this backend state's host profile.
   void UpdateHostProfile(const TRuntimeProfileTree& thrift_profile);
 
-  /// Update completion_times, rates, and avg_profile for all fragment_stats.
+  /// Update completion_times, rates, and agg_profile for all fragment_stats.
   void UpdateExecStats(const std::vector<FragmentStats*>& fragment_stats);
 
   /// Make a PublishFilter rpc with given params to this backend. The backend
@@ -430,16 +430,15 @@ class Coordinator::FragmentStats {
       boost::accumulators::tag::variance>
   > SummaryStats;
 
-  /// Create avg and root profiles in obj_pool.
-  FragmentStats(const std::string& avg_profile_name,
-      const std::string& root_profile_name,
+  /// Create aggregated and root profiles in obj_pool.
+  FragmentStats(const std::string& agg_profile_name, const std::string& root_profile_name,
       int num_instances, ObjectPool* obj_pool);
 
-  RuntimeProfile* avg_profile() { return avg_profile_; }
+  AggregatedRuntimeProfile* agg_profile() { return agg_profile_; }
   RuntimeProfile* root_profile() { return root_profile_; }
   SummaryStats* bytes_assigned() { return &bytes_assigned_; }
 
-  /// Compute stats for 'bytes_assigned' and add as info string to avg_profile.
+  /// Compute stats for 'bytes_assigned' and add as info string to agg_profile.
   void AddSplitStats();
 
   /// Add summary string with execution stats to avg profile.
@@ -453,7 +452,7 @@ class Coordinator::FragmentStats {
   /// counters in the fragment instance profiles.
   /// Note that the individual fragment instance profiles themselves are stored and
   /// displayed as children of the root_profile below.
-  RuntimeProfile* avg_profile_;
+  AggregatedRuntimeProfile* agg_profile_;
 
   /// root profile for all fragment instances for this fragment; resides in obj_pool
   RuntimeProfile* root_profile_;
@@ -462,12 +461,15 @@ class Coordinator::FragmentStats {
   int num_instances_;
 
   /// Bytes assigned for instances of this fragment
+  /// TODO: IMPALA-9382: can remove when we switch to the transposed profile.
   SummaryStats bytes_assigned_;
 
   /// Completion times for instances of this fragment
+  /// TODO: IMPALA-9382: can remove when we switch to the transposed profile.
   SummaryStats completion_times_;
 
   /// Execution rates for instances of this fragment
+  /// TODO: IMPALA-9382: can remove when we switch to the transposed profile.
   SummaryStats rates_;
 };
 

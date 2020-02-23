@@ -1392,10 +1392,10 @@ void BufferPoolTest::TestEvictionPolicy(int64_t page_size) {
       nullptr, total_mem, profile, &client));
   ASSERT_TRUE(client.IncreaseReservation(total_mem));
 
-  RuntimeProfile* buffer_pool_profile = nullptr;
-  vector<RuntimeProfile*> profile_children;
+  RuntimeProfileBase* buffer_pool_profile = nullptr;
+  vector<RuntimeProfileBase*> profile_children;
   profile->GetChildren(&profile_children);
-  for (RuntimeProfile* child : profile_children) {
+  for (RuntimeProfileBase* child : profile_children) {
     if (child->name() == "Buffer pool") {
       buffer_pool_profile = child;
       break;

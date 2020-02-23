@@ -24,6 +24,8 @@
 #include <sys/resource.h>
 #include <sys/time.h>
 
+#include <gtest/gtest_prod.h> // for FRIEND_TEST
+
 #include "common/atomic.h"
 #include "common/logging.h"
 #include "gutil/singleton.h"
@@ -219,14 +221,14 @@ class ProfileEntryPrototypeRegistry {
 /// ProfileEntryPrototype and pass its objects into the profile->Add.*Counter() methods.
 class CounterPrototype : public ProfileEntryPrototype {
  public:
-  CounterPrototype(const char* name, Significance significance, const char* desc,
-      TUnit::type unit): ProfileEntryPrototype(name, significance, desc, unit) {}
+  CounterPrototype(
+      const char* name, Significance significance, const char* desc, TUnit::type unit)
+    : ProfileEntryPrototype(name, significance, desc, unit) {}
 
-  RuntimeProfile::Counter* Instantiate(RuntimeProfile* profile,
-      const std::string& parent_counter_name = "") {
+  RuntimeProfileBase::Counter* Instantiate(
+      RuntimeProfile* profile, const std::string& parent_counter_name = "") {
     return profile->AddCounter(name(), unit(), parent_counter_name);
   }
-
 };
 
 class DerivedCounterPrototype : public ProfileEntryPrototype {
@@ -243,16 +245,16 @@ class DerivedCounterPrototype : public ProfileEntryPrototype {
 
 class SamplingCounterPrototype : public ProfileEntryPrototype {
  public:
-  SamplingCounterPrototype(const char* name, Significance significance, const char* desc):
-      ProfileEntryPrototype(name, significance, desc, TUnit::DOUBLE_VALUE) {}
+  SamplingCounterPrototype(const char* name, Significance significance, const char* desc)
+    : ProfileEntryPrototype(name, significance, desc, TUnit::DOUBLE_VALUE) {}
 
-  RuntimeProfile::Counter* Instantiate(RuntimeProfile* profile,
-      RuntimeProfile::Counter* src_counter) {
+  RuntimeProfileBase::Counter* Instantiate(
+      RuntimeProfile* profile, RuntimeProfileBase::Counter* src_counter) {
     return profile->AddSamplingCounter(name(), src_counter);
   }
 
-  RuntimeProfile::Counter* Instantiate(RuntimeProfile* profile,
-      boost::function<int64_t ()> sample_fn) {
+  RuntimeProfileBase::Counter* Instantiate(
+      RuntimeProfile* profile, boost::function<int64_t()> sample_fn) {
     return profile->AddSamplingCounter(name(), sample_fn);
   }
 };
@@ -271,37 +273,39 @@ class HighWaterMarkCounterPrototype : public ProfileEntryPrototype {
 
 class TimeSeriesCounterPrototype : public ProfileEntryPrototype {
  public:
-  TimeSeriesCounterPrototype(const char* name, Significance significance,
-      const char* desc, TUnit::type unit):
-      ProfileEntryPrototype(name, significance, desc, unit) {}
+  TimeSeriesCounterPrototype(
+      const char* name, Significance significance, const char* desc, TUnit::type unit)
+    : ProfileEntryPrototype(name, significance, desc, unit) {}
 
-  RuntimeProfile::TimeSeriesCounter* operator()(RuntimeProfile* profile,
-      RuntimeProfile::Counter* src_counter) {
+  RuntimeProfile::TimeSeriesCounter* operator()(
+      RuntimeProfile* profile, RuntimeProfileBase::Counter* src_counter) {
     DCHECK(src_counter->unit() == unit());
     return profile->AddSamplingTimeSeriesCounter(name(), src_counter);
   }
 
-  RuntimeProfile::TimeSeriesCounter* Instantiate(RuntimeProfile* profile,
-      RuntimeProfile::Counter* src_counter) {
+  RuntimeProfile::TimeSeriesCounter* Instantiate(
+      RuntimeProfile* profile, RuntimeProfileBase::Counter* src_counter) {
     return (*this)(profile, src_counter);
   }
 };
 
 class RateCounterPrototype : public ProfileEntryPrototype {
  public:
-  RateCounterPrototype(const char* name, Significance significance,
-      const char* desc, TUnit::type unit):
-      ProfileEntryPrototype(name, significance, desc, unit) {}
+  RateCounterPrototype(
+      const char* name, Significance significance, const char* desc, TUnit::type unit)
+    : ProfileEntryPrototype(name, significance, desc, unit) {}
 
-  RuntimeProfile::Counter* operator()(
-      RuntimeProfile* profile, RuntimeProfile::Counter* src_counter) {
-    RuntimeProfile::Counter* new_counter = profile->AddRateCounter(name(), src_counter);
+  RuntimeProfileBase::Counter* operator()(
+      RuntimeProfile* profile, RuntimeProfileBase::Counter* src_counter) {
+    RuntimeProfileBase::Counter* new_counter =
+        profile->AddRateCounter(name(), src_counter);
     DCHECK_EQ(unit(), new_counter->unit());
     return new_counter;
   }
-  RuntimeProfile::Counter* Instantiate(
-      RuntimeProfile* profile, RuntimeProfile::Counter* src_counter) {
-    RuntimeProfile::Counter* new_counter = profile->AddRateCounter(name(), src_counter);
+  RuntimeProfileBase::Counter* Instantiate(
+      RuntimeProfile* profile, RuntimeProfileBase::Counter* src_counter) {
+    RuntimeProfileBase::Counter* new_counter =
+        profile->AddRateCounter(name(), src_counter);
     DCHECK_EQ(unit(), new_counter->unit());
     return new_counter;
   }
@@ -319,10 +323,9 @@ class SummaryStatsCounterPrototype : public ProfileEntryPrototype {
   }
 };
 
-
 /// A counter that keeps track of the highest value seen (reporting that
 /// as value()) and the current value.
-class RuntimeProfile::HighWaterMarkCounter : public RuntimeProfile::Counter {
+class RuntimeProfile::HighWaterMarkCounter : public RuntimeProfileBase::Counter {
  public:
   HighWaterMarkCounter(TUnit::type unit) : Counter(unit) {}
 
@@ -371,11 +374,10 @@ class RuntimeProfile::HighWaterMarkCounter : public RuntimeProfile::Counter {
 
 /// A DerivedCounter also has a name and unit, but the value is computed.
 /// Do not call Set() and Add().
-class RuntimeProfile::DerivedCounter : public RuntimeProfile::Counter {
+class RuntimeProfile::DerivedCounter : public RuntimeProfileBase::Counter {
  public:
   DerivedCounter(TUnit::type unit, const SampleFunction& counter_fn)
-    : Counter(unit),
-      counter_fn_(counter_fn) {}
+    : Counter(unit), counter_fn_(counter_fn) {}
 
   int64_t value() const override {
     return counter_fn_();
@@ -389,41 +391,23 @@ class RuntimeProfile::DerivedCounter : public RuntimeProfile::Counter {
 /// average of the values in that set. The average is updated through calls
 /// to UpdateCounter(), which may add a new counter or update an existing counter.
 /// Set() and Add() should not be called.
-class RuntimeProfile::AveragedCounter : public RuntimeProfile::Counter {
+/// TODO: IMPALA-9382: rename counter. CounterVector? AggregatedCounter?
+/// TODO: IMPALA-9382: consider adding more descriptive stats, e.g. median.
+class RuntimeProfileBase::AveragedCounter : public RuntimeProfileBase::Counter {
  public:
-  AveragedCounter(TUnit::type unit)
-   : Counter(unit),
-     current_double_sum_(0.0),
-     current_int_sum_(0) {
-  }
+  /// Construct an empty counter with no values added.
+  AveragedCounter(TUnit::type unit, int num_samples);
 
-  /// Update counter_value_map_ with the new counter. This may require the counter
-  /// to be added to the map.
-  /// No locks are obtained within this class because UpdateCounter() is called from
-  /// UpdateAverage(), which obtains locks on the entire counter map in a profile.
-  void UpdateCounter(Counter* new_counter) {
-    DCHECK_EQ(new_counter->unit_, unit_);
-    boost::unordered_map<Counter*, int64_t>::iterator it =
-        counter_value_map_.find(new_counter);
-    int64_t old_val = 0;
-    if (it != counter_value_map_.end()) {
-      old_val = it->second;
-      it->second = new_counter->value();
-    } else {
-      counter_value_map_[new_counter] = new_counter->value();
-    }
+  /// Construct a counter from existing samples.
+  AveragedCounter(TUnit::type unit, const std::vector<bool>& has_value,
+      const std::vector<int64_t>& values);
 
-    if (unit_ == TUnit::DOUBLE_VALUE) {
-      double old_double_val = *reinterpret_cast<double*>(&old_val);
-      current_double_sum_ += (new_counter->double_value() - old_double_val);
-      double result_val = current_double_sum_ / (double) counter_value_map_.size();
-      value_.Store(*reinterpret_cast<int64_t*>(&result_val));
-    } else {
-      current_int_sum_ = ArithmeticUtil::AsUnsigned<std::plus>(
-          current_int_sum_, (new_counter->value() - old_val));
-      value_.Store(current_int_sum_ / counter_value_map_.size());
-    }
-  }
+  /// Update the counter with a new value for the input instance at 'idx'.
+  /// No locks are obtained within this method because UpdateCounter() is called from
+  /// Update(), which obtains locks on the entire counter map in a profile.
+  /// Note that it is not thread-safe to call this from two threads at the same time.
+  /// It is safe for it to be read at the same time as it is updated.
+  void UpdateCounter(Counter* new_counter, int idx);
 
   /// The value for this counter should be updated through UpdateCounter().
   /// Set() and Add() should not be used.
@@ -431,15 +415,56 @@ class RuntimeProfile::AveragedCounter : public RuntimeProfile::Counter {
   void Set(int64_t value) override { DCHECK(false); }
   void Add(int64_t delta) override { DCHECK(false); }
 
- private:
-  /// Map from counters to their existing values. Modified via UpdateCounter().
-  boost::unordered_map<Counter*, int64_t> counter_value_map_;
+  void PrettyPrint(
+      const std::string& prefix, const std::string& name, std::ostream* s) const override;
 
-  /// Current sums of values from counter_value_map_. Only one of these is used,
-  /// depending on the unit of the counter. current_double_sum_ is used for
-  /// DOUBLE_VALUE, current_int_sum_ otherwise.
-  double current_double_sum_;
-  int64_t current_int_sum_;
+  void ToThrift(const std::string& name, TAggCounter* tcounter) const;
+
+  int64_t value() const override;
+
+ private:
+  FRIEND_TEST(CountersTest, AveragedCounterStats);
+
+  /// Number of values in the below arrays.
+  const int num_values_;
+
+  /// Whether we have a valid value for each input counter. Always initialized to have
+  /// 'num_samples' entries.
+  std::unique_ptr<AtomicBool[]> has_value_;
+
+  /// The value of each input counter. Always initialized to have 'num_samples' entries.
+  std::unique_ptr<AtomicInt64[]> values_;
+
+  // Stats computed in GetStats().
+  template <typename T>
+  struct Stats {
+    T min = 0;
+    T mean = 0;
+    T max = 0;
+    // Values at different percentiles.
+    T p50 = 0;
+    T p75 = 0;
+    T p90 = 0;
+    T p95 = 0;
+    int num_vals = 0;
+  };
+
+  /// Implementation of PrettyPrint parameterized by the type that 'values_' is
+  /// interpreted as - either int64_t or double, depending on the T parameter.
+  template <typename T>
+  void PrettyPrintImpl(
+      const std::string& prefix, const std::string& name, std::ostream* s) const;
+
+  /// Compute all of the stats in Stats, interpreting the values in 'vals' as type T,
+  /// which must be double if 'unit_' is DOUBLE_VALUE or int64_t otherwise.
+  template <typename T>
+  Stats<T> GetStats() const;
+
+  /// Helper for value() that compute the mean value, interpreting the values in 'vals'
+  /// as type T, which must be double if 'unit_' is DOUBLE_VALUE or int64_t otherwise.
+  /// Returns the mean value, or the double bit pattern stored in an int64_t.
+  template <typename T>
+  int64_t ComputeMean() const;
 };
 
 /// This counter records multiple values and keeps a track of the minimum, maximum and
@@ -447,15 +472,15 @@ class RuntimeProfile::AveragedCounter : public RuntimeProfile::Counter {
 /// Unlike the AveragedCounter, this only keeps track of statistics of raw values
 /// whereas the AveragedCounter maintains an average of counters.
 /// value() stores the average.
-class RuntimeProfile::SummaryStatsCounter : public RuntimeProfile::Counter {
+class RuntimeProfileBase::SummaryStatsCounter : public RuntimeProfileBase::Counter {
  public:
-  SummaryStatsCounter(TUnit::type unit, int32_t total_num_values,
-      int64_t min_value, int64_t max_value, int64_t sum)
-   : Counter(unit),
-     total_num_values_(total_num_values),
-     min_(min_value),
-     max_(max_value),
-     sum_(sum) {
+  SummaryStatsCounter(TUnit::type unit, int32_t total_num_values, int64_t min_value,
+      int64_t max_value, int64_t sum)
+    : Counter(unit),
+      total_num_values_(total_num_values),
+      min_(min_value),
+      max_(max_value),
+      sum_(sum) {
     value_.Store(total_num_values == 0 ? 0 : sum / total_num_values);
   }
 
@@ -484,7 +509,18 @@ class RuntimeProfile::SummaryStatsCounter : public RuntimeProfile::Counter {
   /// Overwrites the existing counter with 'counter'
   void SetStats(const TSummaryStatsCounter& counter);
 
+  /// Overwrites the existing counter with 'counter'. Acquires lock on both counters.
+  void SetStats(const SummaryStatsCounter& other);
+
+  /// Merge 'other' into this counter. Acquires lock on both counters.
+  void Merge(const SummaryStatsCounter& other);
+
   void ToThrift(TSummaryStatsCounter* counter, const std::string& name);
+
+  /// Convert a vector of summary stats counters to an aggregate representation.
+  static void ToThrift(const std::string& name, TUnit::type unit,
+      const std::vector<SummaryStatsCounter*>& counters,
+      TAggSummaryStatsCounter* tcounter);
 
   void ToJson(rapidjson::Document& document, rapidjson::Value* val) const override {
     Counter::ToJson(document, val);
@@ -493,6 +529,9 @@ class RuntimeProfile::SummaryStatsCounter : public RuntimeProfile::Counter {
     val->AddMember("avg", value(), document.GetAllocator());
     val->AddMember("num_of_samples", total_num_values_, document.GetAllocator());
   }
+
+  void PrettyPrint(
+      const std::string& prefix, const std::string& name, std::ostream* s) const override;
 
  private:
   /// The total number of values seen so far.
@@ -504,7 +543,9 @@ class RuntimeProfile::SummaryStatsCounter : public RuntimeProfile::Counter {
   int64_t sum_;
 
   // Protects min_, max_, sum_, total_num_values_ and value_.
-  SpinLock lock_;
+  // When acquiring locks on two counters, e.g. in Merge(), the source is acquired
+  // before the destination.
+  mutable SpinLock lock_;
 };
 
 /// A set of counters that measure thread info, such as total time, user time, sys time.
@@ -835,9 +876,9 @@ class ScopedEvent {
 template <class T>
 class ScopedTimer {
  public:
-  ScopedTimer(RuntimeProfile::Counter* c1 = nullptr,
-      RuntimeProfile::Counter* c2 = nullptr,
-      RuntimeProfile::Counter* c3 = nullptr, const bool* is_cancelled = nullptr)
+  ScopedTimer(RuntimeProfileBase::Counter* c1 = nullptr,
+      RuntimeProfileBase::Counter* c2 = nullptr,
+      RuntimeProfileBase::Counter* c3 = nullptr, const bool* is_cancelled = nullptr)
     : counter1_(c1), counter2_(c2), counter3_(c3), is_cancelled_(is_cancelled) {
     DCHECK(c1 == nullptr || c1->unit() == TUnit::TIME_NS);
     DCHECK(c2 == nullptr || c2->unit() == TUnit::TIME_NS);
@@ -881,9 +922,9 @@ class ScopedTimer {
   ScopedTimer& operator=(const ScopedTimer& timer);
 
   T sw_;
-  RuntimeProfile::Counter* counter1_;
-  RuntimeProfile::Counter* counter2_;
-  RuntimeProfile::Counter* counter3_;
+  RuntimeProfileBase::Counter* counter1_;
+  RuntimeProfileBase::Counter* counter2_;
+  RuntimeProfileBase::Counter* counter3_;
   const bool* is_cancelled_;
 };
 

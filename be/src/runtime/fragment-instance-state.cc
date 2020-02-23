@@ -291,12 +291,12 @@ void FragmentInstanceState::GetStatusReport(FragmentInstanceExecStatusPB* instan
 
   // Compute local_time for use below.
   profile()->ComputeTimeInProfile();
-  vector<RuntimeProfile*> nodes;
+  vector<RuntimeProfileBase*> nodes;
   profile()->GetAllChildren(&nodes);
   int64_t bytes_read = 0;
   int64_t scan_ranges_complete = 0;
   int64_t total_bytes_sent = 0;
-  for (RuntimeProfile* node : nodes) {
+  for (RuntimeProfileBase* node : nodes) {
     RuntimeProfile::Counter* c = node->GetCounter(PROFILE_BytesRead.name());
     if (c != nullptr) bytes_read += c->value();
     c = node->GetCounter(PROFILE_ScanRangesComplete.name());

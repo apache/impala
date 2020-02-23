@@ -185,7 +185,7 @@ TEST(PrettyPrinterTest, MicroSeconds) {
 }
 
 TEST(PrettyPrinterTest, DoubleValue) {
-  EXPECT_EQ(PrettyPrinter::Print(1.0, TUnit::DOUBLE_VALUE), "1.00 ");
+  EXPECT_EQ(PrettyPrinter::Print(1.0, TUnit::DOUBLE_VALUE), "1.00");
 }
 
 TEST(PrettyPrinterTest, StringList) {

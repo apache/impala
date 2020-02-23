@@ -18,11 +18,13 @@
 #include <stdlib.h>
 #include <algorithm>
 #include <iostream>
+#include <random>
 
 #include <boost/bind.hpp>
 
 #include "common/object-pool.h"
 #include "testutil/gtest-util.h"
+#include "testutil/rand-util.h"
 #include "util/container-util.h"
 #include "util/periodic-counter-updater.h"
 #include "util/runtime-profile-counters.h"
@@ -33,7 +35,16 @@
 DECLARE_int32(status_report_interval_ms);
 DECLARE_int32(periodic_counter_update_period_ms);
 
+using std::mt19937;
+using std::shuffle;
+
 namespace impala {
+
+/// Return true if this is one of the counters automatically added to profiles,
+/// e.g. TotalTime.
+static bool IsDefaultCounter(const string& counter_name) {
+  return counter_name == "TotalTime" || counter_name == "InactiveTotalTime";
+}
 
 TEST(CountersTest, Basic) {
   ObjectPool pool;
@@ -111,18 +122,19 @@ TEST(CountersTest, Basic) {
   EXPECT_EQ(exec_summary_result.status, status);
 
   // Averaged
-  RuntimeProfile* averaged_profile = RuntimeProfile::Create(&pool, "Merged", true);
-  averaged_profile->UpdateAverage(from_thrift);
+  AggregatedRuntimeProfile* averaged_profile =
+      AggregatedRuntimeProfile::Create(&pool, "Merged", 2, true);
+  averaged_profile->Update(from_thrift, 0);
   counter_merged = averaged_profile->GetCounter("A");
   EXPECT_EQ(counter_merged->value(), 1);
 
-  // UpdateAverage again, there should be no change.
-  averaged_profile->UpdateAverage(from_thrift);
+  // Update again, there should be no change.
+  averaged_profile->Update(from_thrift, 0);
   EXPECT_EQ(counter_merged->value(), 1);
 
   counter_a = profile_a2->AddCounter("A", TUnit::UNIT);
   counter_a->Set(3);
-  averaged_profile->UpdateAverage(profile_a2);
+  averaged_profile->Update(profile_a2, 1);
   EXPECT_EQ(counter_merged->value(), 2);
 
   // Update
@@ -137,7 +149,7 @@ TEST(CountersTest, Basic) {
   EXPECT_EQ(counter_updated->value(), 1);
 }
 
-void ValidateCounter(RuntimeProfile* profile, const string& name, int64_t value) {
+void ValidateCounter(RuntimeProfileBase* profile, const string& name, int64_t value) {
   RuntimeProfile::Counter* counter = profile->GetCounter(name);
   EXPECT_TRUE(counter != NULL);
   EXPECT_EQ(counter->value(), value);
@@ -198,20 +210,21 @@ TEST(CountersTest, MergeAndUpdate) {
   // Merge the two and validate
   TRuntimeProfileTree tprofile1;
   profile1->ToThrift(&tprofile1);
-  RuntimeProfile* averaged_profile = RuntimeProfile::Create(&pool, "merged", true);
-  averaged_profile->UpdateAverage(profile1);
-  averaged_profile->UpdateAverage(profile2);
+  AggregatedRuntimeProfile* averaged_profile =
+      AggregatedRuntimeProfile::Create(&pool, "merged", 2, true);
+  averaged_profile->Update(profile1, 0);
+  averaged_profile->Update(profile2, 1);
   EXPECT_EQ(5, averaged_profile->num_counters());
   ValidateCounter(averaged_profile, "Parent Shared", 2);
   ValidateCounter(averaged_profile, "Parent 1 Only", 2);
   ValidateCounter(averaged_profile, "Parent 2 Only", 5);
 
-  vector<RuntimeProfile*> children;
+  vector<RuntimeProfileBase*> children;
   averaged_profile->GetChildren(&children);
   EXPECT_EQ(children.size(), 3);
 
   for (int i = 0; i < 3; ++i) {
-    RuntimeProfile* profile = children[i];
+    RuntimeProfileBase* profile = children[i];
     if (profile->name().compare("Child1") == 0) {
       EXPECT_EQ(5, profile->num_counters());
       ValidateCounter(profile, "Child1 Shared", 15);
@@ -243,7 +256,7 @@ TEST(CountersTest, MergeAndUpdate) {
   EXPECT_EQ(children.size(), 3);
 
   for (int i = 0; i < 3; ++i) {
-    RuntimeProfile* profile = children[i];
+    RuntimeProfileBase* profile = children[i];
     if (profile->name().compare("Child1") == 0) {
       EXPECT_EQ(5, profile->num_counters());
       ValidateCounter(profile, "Child1 Shared", 10);
@@ -276,12 +289,13 @@ TEST(CountersTest, MergeAndUpdateChildOrder) {
   profile1->ToThrift(&tprofile1_v1);
 
   // Update averaged and deserialized profiles from the serialized profile.
-  RuntimeProfile* averaged_profile = RuntimeProfile::Create(&pool, "merged", true);
+  AggregatedRuntimeProfile* averaged_profile =
+      AggregatedRuntimeProfile::Create(&pool, "merged", 2, true);
   RuntimeProfile* deserialized_profile = RuntimeProfile::Create(&pool, "Parent");
-  averaged_profile->UpdateAverage(profile1);
+  averaged_profile->Update(profile1, 0);
   deserialized_profile->Update(tprofile1_v1);
 
-  std::vector<RuntimeProfile*> tmp_children;
+  std::vector<RuntimeProfileBase*> tmp_children;
   averaged_profile->GetChildren(&tmp_children);
   EXPECT_EQ(1, tmp_children.size());
   EXPECT_EQ("Child2", tmp_children[0]->name());
@@ -293,7 +307,7 @@ TEST(CountersTest, MergeAndUpdateChildOrder) {
   RuntimeProfile* p1_child1 = RuntimeProfile::Create(&pool, "Child1");
   profile1->PrependChild(p1_child1);
   profile1->ToThrift(&tprofile1_v2);
-  averaged_profile->UpdateAverage(profile1);
+  averaged_profile->Update(profile1, 0);
   deserialized_profile->Update(tprofile1_v2);
 
   averaged_profile->GetChildren(&tmp_children);
@@ -315,7 +329,7 @@ TEST(CountersTest, MergeAndUpdateChildOrder) {
   EXPECT_EQ("Child2", tmp_children[0]->name());
   EXPECT_EQ("Child1", tmp_children[1]->name());
   profile1->ToThrift(&tprofile1_v3);
-  averaged_profile->UpdateAverage(profile1);
+  averaged_profile->Update(profile1, 0);
   deserialized_profile->Update(tprofile1_v2);
 
   // The previous order of children that were already present is preserved.
@@ -553,20 +567,20 @@ TEST(CountersTest, AverageSetCounters) {
       profile->AddCounter("bytes 2", TUnit::BYTES);
 
   bytes_1_counter->Set(10);
-  RuntimeProfile::AveragedCounter bytes_avg(TUnit::BYTES);
-  bytes_avg.UpdateCounter(bytes_1_counter);
+  RuntimeProfile::AveragedCounter bytes_avg(TUnit::BYTES, 2);
+  bytes_avg.UpdateCounter(bytes_1_counter, 0);
   // Avg of 10L
   EXPECT_EQ(bytes_avg.value(), 10);
   bytes_1_counter->Set(20L);
-  bytes_avg.UpdateCounter(bytes_1_counter);
+  bytes_avg.UpdateCounter(bytes_1_counter, 0);
   // Avg of 20L
   EXPECT_EQ(bytes_avg.value(), 20);
   bytes_2_counter->Set(40L);
-  bytes_avg.UpdateCounter(bytes_2_counter);
+  bytes_avg.UpdateCounter(bytes_2_counter, 1);
   // Avg of 20L and 40L
   EXPECT_EQ(bytes_avg.value(), 30);
   bytes_2_counter->Set(30L);
-  bytes_avg.UpdateCounter(bytes_2_counter);
+  bytes_avg.UpdateCounter(bytes_2_counter, 1);
   // Avg of 20L and 30L
   EXPECT_EQ(bytes_avg.value(), 25);
 
@@ -575,22 +589,68 @@ TEST(CountersTest, AverageSetCounters) {
   RuntimeProfile::Counter* double_2_counter =
       profile->AddCounter("double 2", TUnit::DOUBLE_VALUE);
   double_1_counter->Set(1.0f);
-  RuntimeProfile::AveragedCounter double_avg(TUnit::DOUBLE_VALUE);
-  double_avg.UpdateCounter(double_1_counter);
+  RuntimeProfile::AveragedCounter double_avg(TUnit::DOUBLE_VALUE, 2);
+  double_avg.UpdateCounter(double_1_counter, 0);
   // Avg of 1.0f
   EXPECT_EQ(double_avg.double_value(), 1.0f);
   double_1_counter->Set(2.0f);
-  double_avg.UpdateCounter(double_1_counter);
+  double_avg.UpdateCounter(double_1_counter, 0);
   // Avg of 2.0f
   EXPECT_EQ(double_avg.double_value(), 2.0f);
   double_2_counter->Set(4.0f);
-  double_avg.UpdateCounter(double_2_counter);
+  double_avg.UpdateCounter(double_2_counter, 1);
   // Avg of 2.0f and 4.0f
   EXPECT_EQ(double_avg.double_value(), 3.0f);
   double_2_counter->Set(3.0f);
-  double_avg.UpdateCounter(double_2_counter);
+  double_avg.UpdateCounter(double_2_counter, 1);
   // Avg of 2.0f and 3.0f
   EXPECT_EQ(double_avg.double_value(), 2.5f);
+}
+
+TEST(CountersTest, AveragedCounterStats) {
+  ObjectPool pool;
+  RuntimeProfile* profile = RuntimeProfile::Create(&pool, "Profile");
+  // Average 100 input counters with values 100-199.
+  const int NUM_COUNTERS = 100;
+  vector<RuntimeProfile::Counter*> counters;
+  for (int i = 0; i < NUM_COUNTERS; ++i) {
+    counters.push_back(
+        profile->AddCounter(Substitute("c$0", i), TUnit::BYTES));
+    counters.back()->Set(100 + i);
+  }
+  // Randomize counter order - computed stats shouldn't depend on order.
+  mt19937 rng;
+  RandTestUtil::SeedRng("RUNTIME_PROFILE_TEST_SEED", &rng);
+  shuffle(counters.begin(), counters.end(), rng);
+
+  RuntimeProfile::AveragedCounter bytes_avg(TUnit::BYTES, NUM_COUNTERS);
+  for (int i = 0; i < NUM_COUNTERS; ++i) {
+    bytes_avg.UpdateCounter(counters[i], i);
+  }
+  RuntimeProfile::AveragedCounter::Stats<int64_t> stats = bytes_avg.GetStats<int64_t>();
+  EXPECT_EQ(NUM_COUNTERS, stats.num_vals);
+  EXPECT_EQ(100, stats.min);
+  EXPECT_EQ(199, stats.max);
+  EXPECT_EQ(149, stats.mean);
+  EXPECT_EQ(149, stats.p50);
+  EXPECT_EQ(174, stats.p75);
+  EXPECT_EQ(189, stats.p90);
+  EXPECT_EQ(194, stats.p95);
+
+  // Round-trip via thrift and confirm values are all the same.
+  TAggCounter tcounter;
+  bytes_avg.ToThrift("", &tcounter);
+  RuntimeProfile::AveragedCounter bytes_avg2(
+      TUnit::BYTES, tcounter.has_value, tcounter.values);
+  stats = bytes_avg2.GetStats<int64_t>();
+  EXPECT_EQ(NUM_COUNTERS, stats.num_vals);
+  EXPECT_EQ(100, stats.min);
+  EXPECT_EQ(199, stats.max);
+  EXPECT_EQ(149, stats.mean);
+  EXPECT_EQ(149, stats.p50);
+  EXPECT_EQ(174, stats.p75);
+  EXPECT_EQ(189, stats.p90);
+  EXPECT_EQ(194, stats.p95);
 }
 
 TEST(CountersTest, InfoStringTest) {
@@ -1220,7 +1280,7 @@ TEST(ToJson, RuntimeProfileToJsonTest) {
   EXPECT_EQ("Value", content["info_strings"][0]["value"]);
 
   // Check counter value matches
-  EXPECT_EQ(2, content["counters"].Size());
+  EXPECT_EQ(4, content["counters"].Size());
   for (auto& itr : content["counters"].GetArray()) {
     // check normal Counter
     if (itr["counter_name"] == "A") {
@@ -1231,7 +1291,8 @@ TEST(ToJson, RuntimeProfileToJsonTest) {
       EXPECT_EQ(20, itr["value"].GetInt());
       EXPECT_EQ("BYTES", itr["unit"]);
     } else {
-      EXPECT_TRUE(false) << itr["counter_name"].GetString();
+      EXPECT_TRUE(IsDefaultCounter(itr["counter_name"].GetString()))
+          << itr["counter_name"].GetString();
     }
   }
 
@@ -1264,11 +1325,16 @@ TEST(ToJson, EmptyTest) {
   // Empty profile should not have following members
   EXPECT_TRUE(!content.HasMember("info_strings"));
   EXPECT_TRUE(!content.HasMember("event_sequences"));
-  EXPECT_TRUE(!content.HasMember("counters"));
   EXPECT_TRUE(!content.HasMember("summary_stats_counters"));
   EXPECT_TRUE(!content.HasMember("time_series_counters"));
   EXPECT_TRUE(!content.HasMember("child_profiles"));
 
+  // Only default counters should be present.
+  EXPECT_EQ(2, content["counters"].Size());
+  for (auto& itr : content["counters"].GetArray()) {
+    EXPECT_TRUE(IsDefaultCounter(itr["counter_name"].GetString()))
+        << itr["counter_name"].GetString();
+  }
 }
 
 TEST(ToJson, EventSequenceToJsonTest) {
