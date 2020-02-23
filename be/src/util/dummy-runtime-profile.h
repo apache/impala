@@ -28,7 +28,7 @@ namespace impala {
 /// but not always so that the object can still allocate counters in the same way.
 class DummyProfile {
  public:
-  DummyProfile() : pool_(), profile_(RuntimeProfile::Create(&pool_, "dummy", false)) {}
+  DummyProfile() : pool_(), profile_(RuntimeProfile::Create(&pool_, "dummy")) {}
   RuntimeProfile* profile() { return profile_; }
 
  private:

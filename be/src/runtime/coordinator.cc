@@ -75,6 +75,7 @@ using boost::algorithm::token_compress_on;
 using boost::algorithm::split;
 using boost::filesystem::path;
 
+DECLARE_bool(gen_experimental_profile);
 DECLARE_string(hostname);
 
 using namespace impala;
@@ -209,20 +210,25 @@ void Coordinator::InitFragmentStats() {
   DCHECK_GT(exec_params_.num_fragments(), 0);
   for (const TPlanFragment* fragment : exec_params_.GetFragments()) {
     string root_profile_name =
-        Substitute(fragment == coord_fragment ? "Coordinator Fragment $0" : "Fragment $0",
-            fragment->display_name);
-    string avg_profile_name = Substitute("Averaged Fragment $0", fragment->display_name);
+        Substitute(
+          fragment == coord_fragment ? "Coordinator Fragment $0" : "Fragment $0",
+          fragment->display_name);
+    const string& agg_profile_name = FLAGS_gen_experimental_profile ?
+        root_profile_name :
+        Substitute("Averaged Fragment $0", fragment->display_name);
     int num_instances = exec_params_.query_schedule()
                             .fragment_exec_params(fragment->idx)
                             .instances_size();
     total_num_finstances += num_instances;
     // TODO: special-case the coordinator fragment?
-    FragmentStats* fragment_stats = obj_pool()->Add(
-        new FragmentStats(
-          avg_profile_name, root_profile_name, num_instances, obj_pool()));
+    FragmentStats* fragment_stats = obj_pool()->Add(new FragmentStats(
+        agg_profile_name, root_profile_name, num_instances, obj_pool()));
     fragment_stats_.push_back(fragment_stats);
-    query_profile_->AddChild(fragment_stats->avg_profile(), true);
-    query_profile_->AddChild(fragment_stats->root_profile());
+    query_profile_->AddChild(fragment_stats->agg_profile(), true);
+    if (!FLAGS_gen_experimental_profile) {
+      // Per-instance profiles are not included in the profile tree in profile V2.
+      query_profile_->AddChild(fragment_stats->root_profile());
+    }
   }
   COUNTER_SET(PROFILE_NumFragments.Instantiate(query_profile_),
       static_cast<int64_t>(exec_params_.num_fragments()));

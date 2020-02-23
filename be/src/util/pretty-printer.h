@@ -133,7 +133,7 @@ class PrettyPrinter {
 
       case TUnit::DOUBLE_VALUE: {
         double output = *reinterpret_cast<double*>(&value);
-        ss << std::setprecision(PRECISION) << output << " ";
+        ss << std::setprecision(PRECISION) << output;
         break;
       }
 
