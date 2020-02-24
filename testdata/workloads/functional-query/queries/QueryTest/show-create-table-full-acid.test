@@ -1,0 +1,98 @@
+====
+---- CREATE_TABLE
+# Create simple full ACID table
+CREATE TABLE test1 (
+  id INT
+)
+STORED AS ORC
+TBLPROPERTIES('transactional'='true')
+---- RESULTS-HIVE-3
+CREATE TABLE show_create_table_test_db.test1 (
+  id INT
+)
+STORED AS ORC
+LOCATION '$$location_uri$$'
+TBLPROPERTIES ('transactional'='true', 'transactional_properties'='default')
+====
+---- CREATE_TABLE
+# simple table with all types
+CREATE TABLE test2 (
+  year INT,
+  month INT,
+  id INT COMMENT 'Add a comment',
+  bool_col BOOLEAN,
+  tinyint_col TINYINT,
+  smallint_col SMALLINT,
+  int_col INT,
+  bigint_col BIGINT,
+  float_col FLOAT,
+  double_col DOUBLE,
+  date_string_col STRING,
+  string_col STRING,
+  timestamp_col TIMESTAMP
+)
+STORED AS ORC
+TBLPROPERTIES('transactional'='true', 'transactional_properties'='default')
+---- RESULTS-HIVE-3
+CREATE TABLE show_create_table_test_db.test2 (
+  year INT,
+  month INT,
+  id INT COMMENT 'Add a comment',
+  bool_col BOOLEAN,
+  tinyint_col TINYINT,
+  smallint_col SMALLINT,
+  int_col INT,
+  bigint_col BIGINT,
+  float_col FLOAT,
+  double_col DOUBLE,
+  date_string_col STRING,
+  string_col STRING,
+  timestamp_col TIMESTAMP
+)
+STORED AS ORC
+LOCATION '$$location_uri$$'
+TBLPROPERTIES ('transactional'='true', 'transactional_properties'='default')
+====
+---- CREATE_TABLE
+# partitioned table with all types
+CREATE TABLE test_part (
+  id INT COMMENT 'Add a comment',
+  bool_col BOOLEAN,
+  tinyint_col TINYINT,
+  smallint_col SMALLINT,
+  int_col INT,
+  bigint_col BIGINT,
+  float_col FLOAT,
+  double_col DOUBLE,
+  date_string_col STRING,
+  string_col STRING,
+  timestamp_col TIMESTAMP
+)
+PARTITIONED BY (
+  year INT,
+  month INT
+)
+STORED AS ORC
+TBLPROPERTIES('transactional'='true', 'transactional_properties'='default')
+---- RESULTS-HIVE-3
+CREATE TABLE show_create_table_test_db.test_part (
+  id INT COMMENT 'Add a comment',
+  bool_col BOOLEAN,
+  tinyint_col TINYINT,
+  smallint_col SMALLINT,
+  int_col INT,
+  bigint_col BIGINT,
+  float_col FLOAT,
+  double_col DOUBLE,
+  date_string_col STRING,
+  string_col STRING,
+  timestamp_col TIMESTAMP
+)
+PARTITIONED BY (
+  year INT,
+  month INT
+)
+STORED AS ORC
+LOCATION '$$location_uri$$'
+TBLPROPERTIES ('transactional'='true', 'transactional_properties'='default')
+====

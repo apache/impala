@@ -136,3 +136,54 @@ describe allcomplextypes.int_array_col
 ---- TYPES
 string,string,string
 ====
+---- HIVE_MAJOR_VERSION
+3
+---- QUERY
+# describe full ACID partitioned table 'alltypes'.
+describe functional_orc_def.alltypes
+---- RESULTS
+'id','int','Add a comment'
+'bool_col','boolean',''
+'tinyint_col','tinyint',''
+'smallint_col','smallint',''
+'int_col','int',''
+'bigint_col','bigint',''
+'float_col','float',''
+'double_col','double',''
+'date_string_col','string',''
+'string_col','string',''
+'timestamp_col','timestamp',''
+'year','int',''
+'month','int',''
+---- TYPES
+string, string, string
+====
+---- HIVE_MAJOR_VERSION
+3
+---- QUERY
+# describe synthetic transactional field 'row__id'.
+describe functional_orc_def.alltypes.row__id
+---- RESULTS
+'operation','int',''
+'originaltransaction','bigint',''
+'bucket','int',''
+'rowid','bigint',''
+'currenttransaction','bigint',''
+---- TYPES
+string, string, string
+====
+---- HIVE_MAJOR_VERSION
+3
+---- QUERY
+# describe full ACID table with nested types.
+describe functional_orc_def.complextypestbl
+---- RESULTS
+'id','bigint',''
+'int_array','array<int>',''
+'int_array_array','array<array<int>>',''
+'int_map','map<string,int>',''
+'int_map_array','array<map<string,int>>',''
+'nested_struct','struct<\n  a:int,\n  b:array<int>,\n  c:struct<\n    d:array<array<struct<\n      e:int,\n      f:string\n    >>>\n  >,\n  g:map<string,struct<\n    h:struct<\n      i:array<double>\n    >\n  >>\n>',''
+---- TYPES
+string, string, string
+====

@@ -28,10 +28,12 @@ import org.apache.impala.catalog.MapType;
 import org.apache.impala.catalog.StructField;
 import org.apache.impala.catalog.StructType;
 import org.apache.impala.catalog.Type;
+import org.apache.impala.util.AcidUtils;
 
 import com.google.common.base.Joiner;
 import com.google.common.base.Preconditions;
 import com.google.common.collect.Lists;
+
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -451,7 +453,42 @@ public class Path {
     absolutePath_ = new ArrayList<>();
     if (rootDesc_ != null) absolutePath_.addAll(rootDesc_.getPath().getAbsolutePath());
     absolutePath_.addAll(matchedPositions_);
+    // ACID table schema path differs from file schema path. Let's convert it here.
+    if (!absolutePath_.isEmpty() &&
+        // Only convert if path was already absolute. Otherwise 'matchedPositions_' is
+        // relative to a path that we have already converted.
+        matchedPositions_.size() == absolutePath_.size() &&
+        rootTable_ != null &&
+        AcidUtils.isFullAcidTable(rootTable_.getMetaStoreTable().getParameters())) {
+      convertToFullAcidFilePath();
+    }
     return absolutePath_;
+  }
+
+  /**
+   * Converts table schema path to file schema path. Well, it's actually somewhere between
+   * the two because the first column is offsetted with the number of partitions.
+   */
+  private void convertToFullAcidFilePath() {
+    // For Full ACID tables we need to create a schema path that corresponds to the
+    // ACID file schema.
+    int numPartitions = rootTable_.getNumClusteringCols();
+    if (absolutePath_.get(0) == numPartitions) {
+      // The path refers to the synthetic "row__id" column.
+      Preconditions.checkState(absolutePath_.size() == 2);
+      // "row__id" is not present in the file so remove it.
+      absolutePath_.remove(0);
+      // The member of the synthetic "row__id" field is actually a top-level table col,
+      // so we need to add 'numPartitions' to its index.
+      absolutePath_.set(0, absolutePath_.get(0) + numPartitions);
+    } else if (absolutePath_.get(0) > numPartitions) {
+      // In the file user columns are embedded inside the "row" column which is
+      // the fifth column in a full ACID file.
+      absolutePath_.add(0, numPartitions + 5);
+      // Since the user column is not top-level anymore we need to subtract
+      // 'numPartitions' and 1 (the synthetic "row__id").
+      absolutePath_.set(1, absolutePath_.get(1) - numPartitions - 1);
+    }
   }
 
   @Override

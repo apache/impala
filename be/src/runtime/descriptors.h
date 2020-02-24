@@ -329,6 +329,8 @@ class HdfsTableDescriptor : public TableDescriptor {
     return prototype_partition_descriptor_;
   }
 
+  bool IsTableFullAcid() const { return is_full_acid_; }
+
   virtual std::string DebugString() const;
 
  protected:
@@ -340,6 +342,7 @@ class HdfsTableDescriptor : public TableDescriptor {
   HdfsPartitionDescriptor* prototype_partition_descriptor_;
   /// Set to the table's Avro schema if this is an Avro table, empty string otherwise
   std::string avro_schema_;
+  bool is_full_acid_;
 };
 
 class HBaseTableDescriptor : public TableDescriptor {

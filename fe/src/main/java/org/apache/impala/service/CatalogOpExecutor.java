@@ -299,6 +299,8 @@ public class CatalogOpExecutor {
   // Table default capabilities
   private static final String ACIDINSERTONLY_CAPABILITIES =
       "HIVEMANAGEDINSERTREAD,HIVEMANAGEDINSERTWRITE";
+  private static final String FULLACID_CAPABILITIES =
+      "HIVEFULLACIDREAD";
   private static final String NONACID_CAPABILITIES = "EXTREAD,EXTWRITE";
 
   // The maximum number of partitions to update in one Hive Metastore RPC.
@@ -2634,8 +2636,11 @@ public class CatalogOpExecutor {
       // Set table default capabilities in HMS
       if (tbl.getParameters().containsKey(CAPABILITIES_KEY)) return;
       if (AcidUtils.isTransactionalTable(tbl.getParameters())) {
-        Preconditions.checkState(!AcidUtils.isFullAcidTable(tbl.getParameters()));
-        tbl.getParameters().put(CAPABILITIES_KEY, ACIDINSERTONLY_CAPABILITIES);
+        if (AcidUtils.isFullAcidTable(tbl.getParameters())) {
+          tbl.getParameters().put(CAPABILITIES_KEY, FULLACID_CAPABILITIES);
+        } else {
+          tbl.getParameters().put(CAPABILITIES_KEY, ACIDINSERTONLY_CAPABILITIES);
+        }
       } else {
         // Managed KUDU table has issues with extra table properties:
         // 1. The property is not stored. 2. The table cannot be found after created.

@@ -235,6 +235,7 @@ HdfsTableDescriptor::HdfsTableDescriptor(const TTableDescriptor& tdesc, ObjectPo
   prototype_partition_descriptor_ = pool->Add(new HdfsPartitionDescriptor(
     tdesc.hdfsTable, tdesc.hdfsTable.prototype_partition));
   avro_schema_ = tdesc.hdfsTable.__isset.avroSchema ? tdesc.hdfsTable.avroSchema : "";
+  is_full_acid_ = tdesc.hdfsTable.is_full_acid;
 }
 
 void HdfsTableDescriptor::ReleaseResources() {
@@ -263,6 +264,7 @@ string HdfsTableDescriptor::DebugString() const {
 
   out << " null_partition_key_value='" << null_partition_key_value_ << "'";
   out << " null_column_value='" << null_column_value_ << "'";
+  out << " is_full_acid=" << std::boolalpha << is_full_acid_;
   return out.str();
 }
 

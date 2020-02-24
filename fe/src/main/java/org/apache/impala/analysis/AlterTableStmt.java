@@ -91,12 +91,24 @@ public abstract class AlterTableStmt extends StatementBase {
     Preconditions.checkState(tableRef instanceof BaseTableRef);
     table_ = tableRef.getTable();
     analyzer.checkTableCapability(table_, Analyzer.OperationType.WRITE);
-    analyzer.ensureTableNotTransactional(table_, "ALTER TABLE");
+    // TODO: IMPALA-8831 will enable all ALTER TABLE statements on transactional tables.
+    // Until that we call 'checkTransactionalTable()' here that throws an exception in
+    // case of transactional tables. However, AlterTableAddPartition and AlterTableSortBy
+    // overrides checkTransactionalTable() to enable those operations.
+    // We need to do that because those ALTER TABLE statements are needed for Impala
+    // testing to load the test tables.
+    // We can do that because these operations are "safe", i.e. they don't mess up the
+    // column statistics.
+    checkTransactionalTable();
     if (table_ instanceof FeDataSourceTable
         && !(this instanceof AlterTableSetColumnStats)) {
       throw new AnalysisException(String.format(
           "ALTER TABLE not allowed on a table produced by a data source: %s",
           tableName_));
     }
+  }
+
+  protected void checkTransactionalTable() throws AnalysisException {
+    Analyzer.ensureTableNotTransactional(table_, "ALTER TABLE");
   }
 }

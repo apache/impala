@@ -27,6 +27,7 @@ import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.fs.FileSystem;
 import org.apache.hadoop.fs.FileUtil;
 import org.apache.hadoop.fs.Path;
+import org.apache.hadoop.hive.metastore.api.MetaException;
 import org.apache.impala.catalog.HdfsPartition.FileDescriptor;
 import org.apache.impala.thrift.TNetworkAddress;
 import org.apache.impala.util.ListMap;
@@ -38,7 +39,8 @@ import com.google.common.collect.ImmutableList;
 public class FileMetadataLoaderTest {
 
   @Test
-  public void testRecursiveLoading() throws IOException {
+  public void testRecursiveLoading() throws IOException, MetaException {
+    //TODO(IMPALA-9042): Remove "throws MetaException"
     ListMap<TNetworkAddress> hostIndex = new ListMap<>();
     Path tablePath = new Path("hdfs://localhost:20500/test-warehouse/alltypes/");
     FileMetadataLoader fml = new FileMetadataLoader(tablePath, /* recursive=*/true,
@@ -75,7 +77,8 @@ public class FileMetadataLoaderTest {
   }
 
   @Test
-  public void testHudiParquetLoading() throws IOException {
+  public void testHudiParquetLoading() throws IOException, MetaException {
+    //TODO(IMPALA-9042): Remove "throws MetaException"
     ListMap<TNetworkAddress> hostIndex = new ListMap<>();
     Path tablePath = new Path("hdfs://localhost:20500/test-warehouse/hudi_parquet/");
     FileMetadataLoader fml = new FileMetadataLoader(tablePath, /* recursive=*/true,
@@ -106,7 +109,8 @@ public class FileMetadataLoaderTest {
   }
 
   @Test
-  public void testLoadMissingDirectory() throws IOException {
+  public void testLoadMissingDirectory() throws IOException, MetaException {
+    //TODO(IMPALA-9042): Remove "throws MetaException"
     for (boolean recursive : ImmutableList.of(false, true)) {
       ListMap<TNetworkAddress> hostIndex = new ListMap<>();
       Path tablePath = new Path("hdfs://localhost:20500/test-warehouse/does-not-exist/");
@@ -117,8 +121,9 @@ public class FileMetadataLoaderTest {
     }
   }
 
+  //TODO(IMPALA-9042): Remove 'throws MetaException'
   @Test
-  public void testSkipHiddenDirectories() throws IOException {
+  public void testSkipHiddenDirectories() throws IOException, MetaException {
     Path sourcePath = new Path("hdfs://localhost:20500/test-warehouse/alltypes/");
     Path tmpTestPath = new Path("hdfs://localhost:20500/tmp/test-filemetadata-loader");
     Configuration conf = new Configuration();

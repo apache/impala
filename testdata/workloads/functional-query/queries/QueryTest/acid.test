@@ -93,3 +93,21 @@ show tables;
 ---- RESULTS
 'upgraded_table'
 ====
+---- QUERY
+create table full_acid (i int) stored as orc
+tblproperties('transactional'='true');
+show tables;
+---- RESULTS
+'full_acid'
+'upgraded_table'
+====
+---- QUERY
+drop table full_acid;
+---- RESULTS
+'Table has been dropped.'
+====
+---- QUERY
+show tables;
+---- RESULTS
+'upgraded_table'
+====

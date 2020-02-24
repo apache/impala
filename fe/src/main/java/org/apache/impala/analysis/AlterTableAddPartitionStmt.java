@@ -96,4 +96,8 @@ public class AlterTableAddPartitionStmt extends AlterTableStmt {
       }
     }
   }
+
+  @Override
+  protected void checkTransactionalTable() throws AnalysisException {
+  }
 }

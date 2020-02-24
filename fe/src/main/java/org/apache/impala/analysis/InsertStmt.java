@@ -442,7 +442,8 @@ public class InsertStmt extends StatementBase {
               table_.getFullName()));
     }
 
-    analyzer.checkTableCapability(table_, Analyzer.OperationType.WRITE);
+    Analyzer.ensureTableNotFullAcid(table_, "INSERT");
+    Analyzer.checkTableCapability(table_, Analyzer.OperationType.WRITE);
 
     // We do not support (in|up)serting into tables with unsupported column types.
     for (Column c: table_.getColumns()) {

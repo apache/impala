@@ -84,14 +84,44 @@ Status OrcSchemaResolver::ResolveColumn(const SchemaPath& col_path,
   *node = root_;
   *pos_field = false;
   *missing_field = false;
+  DCHECK(ValidateFullAcidFileSchema().ok()); // Should have already been validated.
+  bool translate_acid_path = is_table_full_acid_ && is_file_full_acid_;
+  int num_part_cols = tbl_desc_.num_clustering_cols();
   for (int i = 0; i < col_path.size(); ++i) {
     int table_idx = col_path[i];
     int file_idx = table_idx;
     if (i == 0) {
-      table_col_type = &tbl_desc_.col_descs()[table_idx].type();
+      if (translate_acid_path) {
+        constexpr int FILE_INDEX_OF_FIELD_ROW = 5;
+        if (table_idx == num_part_cols + FILE_INDEX_OF_FIELD_ROW) {
+          // Refers to "row" column. Table definition doesn't have "row" column
+          // so here we just step into the file's "row" column to get in sync
+          // with the table schema.
+          *node = (*node)->getSubtype(FILE_INDEX_OF_FIELD_ROW);
+          continue;
+        }
+        DCHECK_GE(table_idx, num_part_cols);
+        // 'col_path' refers to the ACID columns. In table schema they are nested
+        // under the synthetic 'row__id' column. 'row__id' is at index 'num_part_cols'.
+        table_col_type = &tbl_desc_.col_descs()[num_part_cols].type();
+        // The ACID column is under 'row__id' at index 'table_idx - num_part_cols'.
+        int acid_col_idx = table_idx - num_part_cols;
+        DCHECK_GE(acid_col_idx, 0);
+        DCHECK_LT(acid_col_idx, table_col_type->children.size());
+        table_col_type = &table_col_type->children[acid_col_idx];
+      } else {
+        table_col_type = &tbl_desc_.col_descs()[table_idx].type();
+      }
       // For top-level columns, the first index in a path includes the table's partition
       // keys.
-      file_idx -= tbl_desc_.num_clustering_cols();
+      file_idx -= num_part_cols;
+    } else if (i == 1 && table_col_type == nullptr && translate_acid_path) {
+      // Here we are referring to a table column from the viewpoint of the user.
+      // Hence, in the table metadata this is a top-level column, i.e. it is offsetted
+      // with 'num_part_cols' in the table schema. We also need to add '1', because in the
+      // FeTable we added a synthetic struct typed column 'row__id'.
+      table_idx += 1 + num_part_cols;
+      table_col_type = &tbl_desc_.col_descs()[table_idx].type();
     } else if (table_col_type->type == TYPE_ARRAY &&
         table_idx == SchemaPathConstants::ARRAY_POS) {
       // To materialize the positions, the ORC lib has to materialize the whole array
@@ -202,4 +232,29 @@ Status OrcSchemaResolver::ValidateType(const ColumnType& type,
       "Type mismatch: table column $0 is map to column $1 in ORC file '$2'",
       type.DebugString(), orc_type.toString(), filename_));
 }
+
+Status OrcSchemaResolver::ValidateFullAcidFileSchema() const {
+  if (!is_file_full_acid_) return Status::OK();
+  string error_msg = Substitute("File %0 should have full ACID schema.", filename_);
+  if (root_->getKind() != orc::TypeKind::STRUCT) return Status(error_msg);
+  if (root_->getSubtypeCount() != 6) return Status(error_msg);
+  if (root_->getSubtype(0)->getKind() != orc::TypeKind::INT ||
+      root_->getSubtype(1)->getKind() != orc::TypeKind::LONG ||
+      root_->getSubtype(2)->getKind() != orc::TypeKind::INT ||
+      root_->getSubtype(3)->getKind() != orc::TypeKind::LONG ||
+      root_->getSubtype(4)->getKind() != orc::TypeKind::LONG ||
+      root_->getSubtype(5)->getKind() != orc::TypeKind::STRUCT) {
+    return Status(error_msg);
+  }
+  if (root_->getFieldName(0) != "operation" ||
+      root_->getFieldName(1) != "originalTransaction" ||
+      root_->getFieldName(2) != "bucket" ||
+      root_->getFieldName(3) != "rowId" ||
+      root_->getFieldName(4) != "currentTransaction" ||
+      root_->getFieldName(5) != "row") {
+    return Status(error_msg);
+  }
+  return Status::OK();
 }
+
+} // namespace impala

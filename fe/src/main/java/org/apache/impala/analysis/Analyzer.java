@@ -145,11 +145,10 @@ public class Analyzer {
       "Data source does not exist: ";
   public final static String DATA_SRC_ALREADY_EXISTS_ERROR_MSG =
       "Data source already exists: ";
-  private static final String INSERT_ONLY_ACID_TABLE_SUPPORTED_ERROR_MSG =
-      "Table %s not supported. Transactional (ACID) tables are " +
-      "only supported when they are configured as insert_only.";
   private static final String TRANSACTIONAL_TABLE_NOT_SUPPORTED =
-      "%s not supported on transactional (ACID) table: %s" ;
+      "%s not supported on transactional (ACID) table: %s";
+  private static final String FULL_TRANSACTIONAL_TABLE_NOT_SUPPORTED =
+      "%s not supported on full transactional (ACID) table: %s";
   private static final String BUCKETED_TABLE_NOT_SUPPORTED =
       "%s is a bucketed table. Only read operations are supported on such tables.";
   private static final String TABLE_NOT_SUPPORTED =
@@ -214,29 +213,17 @@ public class Analyzer {
   public void setHasWithClause() { hasWithClause_ = true; }
   public boolean hasWithClause() { return hasWithClause_; }
 
-
-  /**
-   * @param tblProperties Table properties that are used to check transactional nature
-   * @param tableName Table name to be reported in exception message
-   * @throws AnalysisException If table is full acid table.
-   */
-  public static void ensureTableNotFullAcid(Map<String, String> tblProperties,
-                                            String tableName)
-      throws AnalysisException {
-    if (AcidUtils.isFullAcidTable(tblProperties)) {
-      throw new AnalysisException(String.format(
-          INSERT_ONLY_ACID_TABLE_SUPPORTED_ERROR_MSG, tableName));
-    }
-  }
-
   /**
    * @param table Table whose properties need to be checked.
+   * @param operationStr The unsupported operation.
    * @throws AnalysisException If table is full acid table.
    */
-  public static void ensureTableNotFullAcid(FeTable table)
+  public static void ensureTableNotFullAcid(FeTable table, String operationStr)
       throws AnalysisException {
-    ensureTableNotFullAcid(table.getMetaStoreTable().getParameters(),
-        table.getFullName());
+    if (AcidUtils.isFullAcidTable(table.getMetaStoreTable().getParameters())) {
+      throw new AnalysisException(String.format(FULL_TRANSACTIONAL_TABLE_NOT_SUPPORTED,
+          operationStr, table.getFullName()));
+    }
   }
 
   public static void ensureTableNotTransactional(FeTable table, String operationStr)
@@ -295,7 +282,6 @@ public class Analyzer {
       if (KuduTable.isKuduTable(table.getMetaStoreTable())) return;
       if (!MetastoreShim.hasTableCapability(table.getMetaStoreTable(), writeRequires)) {
         // Error messages with explanations.
-        ensureTableNotFullAcid(table);
         throw new AnalysisException(String.format(TABLE_NOT_SUPPORTED, "Write",
             table.getFullName(),
             MetastoreShim.getTableAccessType(table.getMetaStoreTable())));
@@ -319,7 +305,6 @@ public class Analyzer {
         // TODO: After Hive provides API calls to send back hints on why
         // the operations are not supported, we will generate error messages
         // accordingly.
-        ensureTableNotFullAcid(table);
         throw new AnalysisException(String.format(TABLE_NOT_SUPPORTED, "Operations",
             table.getFullName(),
             MetastoreShim.getTableAccessType(table.getMetaStoreTable())));

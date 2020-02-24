@@ -138,7 +138,6 @@ public class DropTableOrViewStmt extends StatementBase {
       if (dropTable_) {
         // To drop a view needs not write capabilities, only checks for tables.
         analyzer.checkTableCapability(table, Analyzer.OperationType.WRITE);
-        analyzer.ensureTableNotFullAcid(table);
       }
     } catch (TableLoadingException e) {
       // We should still try to DROP tables that failed to load, so that tables that are

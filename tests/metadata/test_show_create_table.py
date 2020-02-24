@@ -20,7 +20,7 @@ import re
 import shlex
 
 from tests.common.impala_test_suite import ImpalaTestSuite
-from tests.common.skip import SkipIf, SkipIfHive3
+from tests.common.skip import SkipIf, SkipIfHive2
 from tests.common.test_dimensions import create_uncompressed_text_dimension
 from tests.util.test_file_parser import QueryTestSectionReader, remove_comments
 from tests.common.environ import HIVE_MAJOR_VERSION
@@ -59,6 +59,12 @@ class TestShowCreateTable(ImpalaTestSuite):
 
   def test_show_create_table(self, vector, unique_database):
     self.__run_show_create_table_test_case('QueryTest/show-create-table', vector,
+                                           unique_database)
+
+  @SkipIfHive2.acid
+  def test_show_create_table_full_acid(self, vector, unique_database):
+    self.__run_show_create_table_test_case('QueryTest/show-create-table-full-acid',
+                                           vector,
                                            unique_database)
 
   def __run_show_create_table_test_case(self, test_file_name, vector, unique_db_name):

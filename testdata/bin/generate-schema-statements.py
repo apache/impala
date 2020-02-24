@@ -108,6 +108,7 @@ import sys
 import tempfile
 from itertools import product
 from optparse import OptionParser
+from tests.common.environ import HIVE_MAJOR_VERSION
 from tests.util.test_file_parser import *
 from tests.common.test_dimensions import *
 
@@ -156,6 +157,8 @@ COMPRESSION_CODEC = "SET mapred.output.compression.codec=%s;"
 AVRO_COMPRESSION_CODEC = "SET avro.output.codec=%s;"
 SET_DYNAMIC_PARTITION_STATEMENT = "SET hive.exec.dynamic.partition=true;"
 SET_PARTITION_MODE_NONSTRICT_STATEMENT = "SET hive.exec.dynamic.partition.mode=nonstrict;"
+SET_MAX_DYNAMIC_PARTITIONS_STATEMENT = "SET hive.exec.max.dynamic.partitions=10000;\n"\
+    "SET hive.exec.max.dynamic.partitions.pernode=10000;"
 SET_HIVE_INPUT_FORMAT = "SET mapred.max.split.size=256000000;\n"\
                         "SET hive.input.format=org.apache.hadoop.hive.ql.io.%s;\n"
 SET_HIVE_HBASE_BULK_LOAD = "SET hive.hbase.bulk = true"
@@ -312,6 +315,12 @@ def build_table_template(file_format, columns, partition_columns, row_format,
     # Kudu's test tables are managed.
     external = ""
 
+  # ORC tables are full ACID by default.
+  if (HIVE_MAJOR_VERSION == 3 and
+      file_format == 'orc' and
+      'transactional' not in tblproperties):
+    external = ""
+    tblproperties['transactional'] = 'true'
 
   all_tblproperties = []
   for key, value in tblproperties.iteritems():
@@ -448,6 +457,7 @@ def build_insert_into_statement(insert, db_name, db_suffix, table_name, file_for
 
   statement = SET_PARTITION_MODE_NONSTRICT_STATEMENT + "\n"
   statement += SET_DYNAMIC_PARTITION_STATEMENT + "\n"
+  statement += SET_MAX_DYNAMIC_PARTITIONS_STATEMENT + "\n"
   statement += "set hive.auto.convert.join=true;\n"
 
   # For some reason (hive bug?) we need to have the CombineHiveInputFormat set
@@ -624,6 +634,10 @@ def generate_statements(output_name, test_vectors, sections,
           insert = eval_section(section['DEPENDENT_LOAD_KUDU'])
       else:
         create_kudu = None
+
+      if file_format == 'orc' and section["DEPENDENT_LOAD_ACID"]:
+        insert = None
+        insert_hive = eval_section(section["DEPENDENT_LOAD_ACID"])
 
       columns = eval_section(section['COLUMNS']).strip()
       partition_columns = section['PARTITION_COLUMNS'].strip()
@@ -807,7 +821,7 @@ def parse_schema_template_file(file_name):
   VALID_SECTION_NAMES = ['DATASET', 'BASE_TABLE_NAME', 'COLUMNS', 'PARTITION_COLUMNS',
                          'ROW_FORMAT', 'CREATE', 'CREATE_HIVE', 'CREATE_KUDU',
                          'DEPENDENT_LOAD', 'DEPENDENT_LOAD_KUDU', 'DEPENDENT_LOAD_HIVE',
-                         'LOAD', 'ALTER', 'HBASE_COLUMN_FAMILIES',
+                         'DEPENDENT_LOAD_ACID', 'LOAD', 'ALTER', 'HBASE_COLUMN_FAMILIES',
                          'TABLE_PROPERTIES', 'HBASE_REGION_SPLITS', 'HIVE_MAJOR_VERSION']
   return parse_test_file(file_name, VALID_SECTION_NAMES, skip_unknown_sections=False)
 

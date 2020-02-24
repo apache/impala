@@ -29,6 +29,7 @@ from tests.common.skip import (
     SkipIfABFS,
     SkipIfADLS,
     SkipIfEC,
+    SkipIfHive2,
     SkipIfLocal,
     SkipIfNotHdfsMinicluster
     )
@@ -207,13 +208,53 @@ class TestNestedTypesNoMtDop(ImpalaTestSuite):
         )
         STORED AS {1}""".format(db_table, file_format))
     # Add multiple partitions pointing to the complextypes_tbl data.
+    if file_format == 'parquet':
+      base_table = "functional%s.complextypestbl" % db_suffix
+    else:
+      assert file_format == 'orc'
+      base_table = "functional%s.complextypestbl_non_transactional" % db_suffix
     for partition in [1, 2]:
       self.client.execute("ALTER TABLE {0} ADD PARTITION(part={1}) LOCATION '{2}'".format(
           db_table, partition,
-          self._get_table_location("functional%s.complextypestbl" % db_suffix, vector)))
+          self._get_table_location(base_table, vector)))
     self.run_test_case('QueryTest/nested-types-basic-partitioned', vector,
         unique_database)
 
+  @SkipIfHive2.acid
+  def test_partitioned_table_acid(self, vector, unique_database):
+    """IMPALA-6370: Test that a partitioned table with nested types can be scanned."""
+    table = "complextypes_partitioned"
+    db_table = "{0}.{1}".format(unique_database, table)
+    table_format_info = vector.get_value('table_format')  # type: TableFormatInfo
+    file_format = table_format_info.file_format
+    if file_format != "orc":
+      pytest.skip('Full ACID tables are only supported in ORC format.')
+
+    self.client.execute("""
+        CREATE TABLE {0} (
+          id BIGINT,
+          int_array ARRAY<INT>,
+          int_array_array ARRAY<ARRAY<INT>>,
+          int_map MAP<STRING,INT>,
+          int_map_array ARRAY<MAP<STRING,INT>>,
+          nested_struct STRUCT<
+              a:INT,
+              b:ARRAY<INT>,
+              c:STRUCT<d:ARRAY<ARRAY<STRUCT<e:INT,f:STRING>>>>,
+              g:MAP<STRING,STRUCT<h:STRUCT<i:ARRAY<DOUBLE>>>>>
+        )
+        PARTITIONED BY (
+          part int
+        )
+        STORED AS ORC
+        TBLPROPERTIES('transactional'='true')""".format(db_table))
+    # Add multiple partitions with the complextypestbl data.
+    base_table = "functional_orc_def.complextypestbl"
+    for partition in [1, 2]:
+      self.run_stmt_in_hive("INSERT INTO TABLE {0} PARTITION(part={1}) "
+          "SELECT * FROM {2}".format(db_table, partition, base_table))
+    self.run_test_case('QueryTest/nested-types-basic-partitioned', vector,
+        unique_database)
 
 class TestParquetArrayEncodings(ImpalaTestSuite):
   TESTFILE_DIR = os.path.join(os.environ['IMPALA_HOME'],

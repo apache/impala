@@ -95,7 +95,7 @@ select d2 from mismatch_decimals where d6 = 1
 decimal
 ---- RESULTS
 ---- CATCH
-Column decimal(10,0) in ORC file '$NAMENODE/test-warehouse/decimal_tbl_orc_def/d6=1/000000_0' can't be truncated to table column DECIMAL(8,0)
+can't be truncated to table column DECIMAL(8,0)
 ====
 ---- QUERY
 select d3 from mismatch_decimals
@@ -142,7 +142,8 @@ create external table $DATABASE.union_complextypes(
   u uniontype<int, boolean>,
   int_array array<int>,
   int_map map<string, int>)
-stored as orc;
+stored as orc
+tblproperties ('external.table.purge'='TRUE');
 insert into $DATABASE.union_complextypes
   select 0, create_union(1, 50, false), array(0), map('key0', 0);
 # Create an external table on the ORC files with different schema.
@@ -184,16 +185,23 @@ File '$NAMENODE/test-warehouse/$DATABASE.db/union_complextypes/000000_0'
  has an incompatible ORC schema for column '$DATABASE.ill_complextypes.int_array',
  Column type: array, ORC schema: map<string,int>
 ====
+---- HIVE_QUERY
+use $DATABASE;
+create external table orc_complextypes like functional_parquet.complextypestbl
+stored as orc
+tblproperties ('external.table.purge'='TRUE');
+insert into orc_complextypes select * from functional_parquet.complextypestbl;
+====
 ---- QUERY
+invalidate metadata orc_complextypes;
 # Create a table whose nested types don't match the underlying ORC files.
-# Reuse the data files of functional_orc_def.complextypestbl.
 create external table ill_complextypes2 (id bigint,
   int_array map<string, int>,
   int_array_array array<struct<x:int>>,
   int_map array<struct<k:string,v:int>>,
   int_map_array array<array<struct<k:string,v:int>>>
-) stored as orc location '$NAMENODE/test-warehouse/complextypestbl_orc_def';
-select a.item.x from ill_complextypes2.int_array_array a
+) stored as orc location '$NAMENODE/test-warehouse/$DATABASE.db/orc_complextypes';
+select a.item.x from ill_complextypes2.int_array_array a;
 ---- CATCH
 has an incompatible ORC schema for column '$DATABASE.ill_complextypes2.int_array_array.item',
  Column type: struct, ORC schema: array<int>

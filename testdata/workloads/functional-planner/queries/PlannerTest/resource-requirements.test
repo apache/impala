@@ -1465,22 +1465,22 @@ select * from tpch_orc_def.lineitem
 3
 ---- PLAN
 Max Per-Host Resource Reservation: Memory=8.00MB Threads=2
-Per-Host Resource Estimates: Memory=88MB
+Per-Host Resource Estimates: Memory=24MB
 Analyzed query: SELECT * FROM tpch_orc_def.lineitem
 
 F00:PLAN FRAGMENT [UNPARTITIONED] hosts=1 instances=1
-|  Per-Host Resources: mem-estimate=88.00MB mem-reservation=8.00MB thread-reservation=2
+|  Per-Host Resources: mem-estimate=24.00MB mem-reservation=8.00MB thread-reservation=2
 PLAN-ROOT SINK
 |  output exprs: tpch_orc_def.lineitem.l_orderkey, tpch_orc_def.lineitem.l_partkey, tpch_orc_def.lineitem.l_suppkey, tpch_orc_def.lineitem.l_linenumber, tpch_orc_def.lineitem.l_quantity, tpch_orc_def.lineitem.l_extendedprice, tpch_orc_def.lineitem.l_discount, tpch_orc_def.lineitem.l_tax, tpch_orc_def.lineitem.l_returnflag, tpch_orc_def.lineitem.l_linestatus, tpch_orc_def.lineitem.l_shipdate, tpch_orc_def.lineitem.l_commitdate, tpch_orc_def.lineitem.l_receiptdate, tpch_orc_def.lineitem.l_shipinstruct, tpch_orc_def.lineitem.l_shipmode, tpch_orc_def.lineitem.l_comment
 |  mem-estimate=0B mem-reservation=0B thread-reservation=0
 |
 00:SCAN HDFS [tpch_orc_def.lineitem]
-   HDFS partitions=1/1 files=1 size=142.84MB
+   HDFS partitions=1/1 files=12 size=142.90MB
    stored statistics:
-     table: rows=6.00M size=142.84MB
+     table: rows=6.00M size=142.90MB
      columns: all
-   extrapolated-rows=disabled max-scan-range-rows=6.00M
-   mem-estimate=88.00MB mem-reservation=8.00MB thread-reservation=1
+   extrapolated-rows=disabled max-scan-range-rows=538.49K
+   mem-estimate=24.00MB mem-reservation=8.00MB thread-reservation=1
    tuple-ids=0 row-size=231B cardinality=6.00M
    in pipelines: 00(GETNEXT)
 ====
@@ -1516,22 +1516,22 @@ select l_comment from tpch_orc_def.lineitem
 3
 ---- PLAN
 Max Per-Host Resource Reservation: Memory=8.00MB Threads=2
-Per-Host Resource Estimates: Memory=88MB
+Per-Host Resource Estimates: Memory=24MB
 Analyzed query: SELECT l_comment FROM tpch_orc_def.lineitem
 
 F00:PLAN FRAGMENT [UNPARTITIONED] hosts=1 instances=1
-|  Per-Host Resources: mem-estimate=88.00MB mem-reservation=8.00MB thread-reservation=2
+|  Per-Host Resources: mem-estimate=24.00MB mem-reservation=8.00MB thread-reservation=2
 PLAN-ROOT SINK
 |  output exprs: l_comment
 |  mem-estimate=0B mem-reservation=0B thread-reservation=0
 |
 00:SCAN HDFS [tpch_orc_def.lineitem]
-   HDFS partitions=1/1 files=1 size=142.84MB
+   HDFS partitions=1/1 files=12 size=142.90MB
    stored statistics:
-     table: rows=6.00M size=142.84MB
+     table: rows=6.00M size=142.90MB
      columns: all
-   extrapolated-rows=disabled max-scan-range-rows=6.00M
-   mem-estimate=88.00MB mem-reservation=8.00MB thread-reservation=1
+   extrapolated-rows=disabled max-scan-range-rows=538.49K
+   mem-estimate=24.00MB mem-reservation=8.00MB thread-reservation=1
    tuple-ids=0 row-size=38B cardinality=6.00M
    in pipelines: 00(GETNEXT)
 ====

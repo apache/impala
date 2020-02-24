@@ -247,7 +247,8 @@ class DirectMetaProvider implements MetaProvider {
    */
   private Map<String, PartitionMetadata> loadUnpartitionedPartition(
       TableMetaRefImpl table, List<PartitionRef> partitionRefs,
-      ListMap<TNetworkAddress> hostIndex) {
+      ListMap<TNetworkAddress> hostIndex) throws MetaException {
+    //TODO(IMPALA-9042): Remove "throws MetaException"
     Preconditions.checkArgument(partitionRefs.size() == 1,
         "Expected exactly one partition to load for unpartitioned table");
     PartitionRef ref = partitionRefs.get(0);
@@ -303,7 +304,9 @@ class DirectMetaProvider implements MetaProvider {
   }
 
   private ImmutableList<FileDescriptor> loadFileMetadata(String fullTableName,
-      String partName, Partition msPartition, ListMap<TNetworkAddress> hostIndex) {
+      String partName, Partition msPartition, ListMap<TNetworkAddress> hostIndex)
+        throws MetaException {
+    //TODO(IMPALA-9042): Remove "throws MetaException"
     Path partDir = new Path(msPartition.getSd().getLocation());
     // TODO(todd): The table property to disable recursive loading is not supported
     // by this code path. However, DirectMetaProvider is not yet a supported feature.

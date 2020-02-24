@@ -80,6 +80,7 @@ import org.apache.impala.thrift.TSqlConstraints;
 import org.apache.impala.thrift.TTable;
 import org.apache.impala.thrift.TTableDescriptor;
 import org.apache.impala.thrift.TTableType;
+import org.apache.impala.util.AcidUtils;
 import org.apache.impala.util.AvroSchemaConverter;
 import org.apache.impala.util.AvroSchemaUtils;
 import org.apache.impala.util.FsPermissionCache;
@@ -488,6 +489,29 @@ public class HdfsTable extends Table implements FeFsTable {
       addColumn(col);
       ++pos;
     }
+  }
+
+  /**
+   * Adds the synthetic "row__id" column to the table schema. Under "row__id" it adds
+   * the ACID hidden columns.
+   * Note that this is the exact opposite of the file schema. In an ACID file, the
+   * hidden columns are top-level while the user columns are embedded inside a struct
+   * typed column called "row". We cheat here because this way we don't need to change
+   * column resolution and everything will work seemlessly. We'll only need to generate
+   * a different schema path for the columns but that's fairly simple.
+   * The hidden columns can be retrieved via 'SELECT row__id.* FROM <table>' which is
+   * similar to Hive's 'SELECT row__id FROM <table>'.
+   */
+  private void addColumnsForFullAcidTable(List<FieldSchema> fieldSchemas)
+      throws TableLoadingException {
+    StructType row__id = new StructType();
+    row__id.addField(new StructField("operation", ScalarType.INT, ""));
+    row__id.addField(new StructField("originaltransaction", ScalarType.BIGINT, ""));
+    row__id.addField(new StructField("bucket", ScalarType.INT, ""));
+    row__id.addField(new StructField("rowid", ScalarType.BIGINT, ""));
+    row__id.addField(new StructField("currenttransaction", ScalarType.BIGINT, ""));
+    addColumn(new Column("row__id", row__id, "", colsByPos_.size()));
+    addColumnsFromFieldSchemas(fieldSchemas);
   }
 
   /**
@@ -1314,7 +1338,11 @@ public class HdfsTable extends Table implements FeFsTable {
     // Add all columns to the table. Ordering is important: partition columns first,
     // then all other columns.
     addColumnsFromFieldSchemas(msTbl.getPartitionKeys());
-    addColumnsFromFieldSchemas(nonPartFieldSchemas_);
+    if (AcidUtils.isFullAcidTable(msTbl.getParameters())) {
+      addColumnsForFullAcidTable(nonPartFieldSchemas_);
+    } else {
+      addColumnsFromFieldSchemas(nonPartFieldSchemas_);
+    }
     isSchemaLoaded_ = true;
   }
 
@@ -1619,6 +1647,9 @@ public class HdfsTable extends Table implements FeFsTable {
       hdfsTable.setNetwork_addresses(hostIndex_.getList());
     }
     hdfsTable.setPartition_prefixes(partitionLocationCompressor_.getPrefixes());
+    if (AcidUtils.isFullAcidTable(getMetaStoreTable().getParameters())) {
+      hdfsTable.setIs_full_acid(true);
+    }
     return hdfsTable;
   }
 

@@ -843,6 +843,8 @@ public class MetastoreShim {
         EXTREAD,  // External table read
         HIVEMANAGEDINSERTREAD, // Insert-only table read
         HIVEMANAGEDINSERTWRITE, // Insert-only table write
+        HIVEFULLACIDREAD,
+        HIVEFULLACIDWRITE,
         HIVESQL,
         HIVEMQT,
         HIVEBUCKET2 // Includes the capability to get the correct bucket number.

@@ -911,24 +911,29 @@ class TestRanger(CustomClusterTestSuite):
         unique_name + str(policy_cnt), user, "functional", "alltypes", "string_col",
         "CUSTOM", "concat({col}, 'ttt')")
       policy_cnt += 1
-      # Add a policy on a primitive column of a table which contains nested columns.
-      TestRanger._add_column_masking_policy(
-        unique_name + str(policy_cnt), user, "functional_parquet", "complextypestbl",
-        "id", "CUSTOM", "100 * {col}")
-      policy_cnt += 1
-      # Add policies on a nested column though they won't be recognized (same as Hive).
-      TestRanger._add_column_masking_policy(
-        unique_name + str(policy_cnt), user, "functional_parquet", "complextypestbl",
-        "nested_struct.a", "CUSTOM", "100 * {col}")
-      policy_cnt += 1
-      TestRanger._add_column_masking_policy(
-        unique_name + str(policy_cnt), user, "functional_parquet", "complextypestbl",
-        "int_array", "MASK_NULL")
-      policy_cnt += 1
       self.execute_query_expect_success(admin_client, "refresh authorization",
                                         user=ADMIN)
       self.run_test_case("QueryTest/ranger_column_masking", vector,
                          test_file_vars={'$UNIQUE_DB': unique_database})
+      # Add a policy on a primitive column of a table which contains nested columns.
+      for db in ['functional_parquet', 'functional_orc_def']:
+        TestRanger._add_column_masking_policy(
+          unique_name + str(policy_cnt), user, db, "complextypestbl",
+          "id", "CUSTOM", "100 * {col}")
+        policy_cnt += 1
+        # Add policies on a nested column though they won't be recognized (same as Hive).
+        TestRanger._add_column_masking_policy(
+          unique_name + str(policy_cnt), user, db, "complextypestbl",
+          "nested_struct.a", "CUSTOM", "100 * {col}")
+        policy_cnt += 1
+        TestRanger._add_column_masking_policy(
+          unique_name + str(policy_cnt), user, db, "complextypestbl",
+          "int_array", "MASK_NULL")
+        policy_cnt += 1
+        self.execute_query_expect_success(admin_client, "refresh authorization",
+                                          user=ADMIN)
+        self.run_test_case("QueryTest/ranger_column_masking_complex_types", vector,
+                           use_db=db)
     finally:
       admin_client.execute("revoke create on database %s from user %s"
                            % (unique_database, user))

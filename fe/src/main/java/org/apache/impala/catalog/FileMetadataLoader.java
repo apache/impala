@@ -30,6 +30,7 @@ import org.apache.hadoop.fs.Path;
 import org.apache.hadoop.fs.RemoteIterator;
 import org.apache.hadoop.hive.common.ValidTxnList;
 import org.apache.hadoop.hive.common.ValidWriteIdList;
+import org.apache.hadoop.hive.metastore.api.MetaException;
 import org.apache.impala.catalog.HdfsPartition.FileDescriptor;
 import org.apache.impala.common.FileSystemUtil;
 import org.apache.impala.common.Reference;
@@ -147,8 +148,9 @@ public class FileMetadataLoader {
    * descriptors.
    *
    * @throws IOException if listing fails.
+   * @throws MetaException on ACID errors. TODO: remove this once IMPALA-9042 is resolved.
    */
-  public void load() throws IOException {
+  public void load() throws MetaException, IOException {
     Preconditions.checkState(loadStats_ == null, "already loaded");
     loadStats_ = new LoadStats();
     FileSystem fs = partDir_.getFileSystem(CONF);

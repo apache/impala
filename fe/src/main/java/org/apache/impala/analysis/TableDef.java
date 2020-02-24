@@ -780,7 +780,5 @@ class TableDef {
 
     AcidUtils.setTransactionalProperties(options_.tblProperties,
           analyzer.getQueryOptions().getDefault_transactional_type());
-    // Disallow creation of full ACID table.
-    analyzer.ensureTableNotFullAcid(options_.tblProperties, fqTableName_.toString());
   }
 }

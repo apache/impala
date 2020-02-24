@@ -18,15 +18,20 @@ package org.apache.impala.util;
 
 import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.assertThat;
+import static org.junit.Assert.assertTrue;
+import static org.junit.Assert.fail;
 
 import java.util.Arrays;
 import java.util.List;
 import java.util.stream.Collectors;
 
+import com.google.common.base.Preconditions;
+
 import org.apache.hadoop.fs.FileStatus;
 import org.apache.hadoop.fs.Path;
 import org.apache.hadoop.hive.common.ValidReadTxnList;
 import org.apache.hadoop.hive.common.ValidWriteIdList;
+import org.apache.hadoop.hive.metastore.api.MetaException;
 import org.apache.impala.compat.MetastoreShim;
 import org.hamcrest.Matchers;
 import org.junit.Assume;
@@ -62,9 +67,33 @@ public class AcidUtilsTest {
     List<FileStatus> stats = createMockStats(relPaths);
     List<FileStatus> expectedStats = createMockStats(expectedRelPaths);
 
-    assertThat(AcidUtils.filterFilesForAcidState(stats, BASE_PATH,
-        new ValidReadTxnList(validTxnListStr), writeIds, null),
-        Matchers.containsInAnyOrder(expectedStats.toArray()));
+    try {
+      assertThat(AcidUtils.filterFilesForAcidState(stats, BASE_PATH,
+          new ValidReadTxnList(validTxnListStr), writeIds, null),
+          Matchers.containsInAnyOrder(expectedStats.toArray()));
+    } catch (MetaException me) {
+      //TODO: Remove try-catch once IMPALA-9042 is resolved.
+      assertTrue(false);
+    }
+  }
+
+  public void filteringError(String[] relPaths, String validTxnListStr,
+      String validWriteIdListStr, String expectedErrorString) {
+    Preconditions.checkNotNull(expectedErrorString, "No expected error message given.");
+    try {
+      ValidWriteIdList writeIds = MetastoreShim.getValidWriteIdListFromString(
+        validWriteIdListStr);
+      List<FileStatus> stats = createMockStats(relPaths);
+      AcidUtils.filterFilesForAcidState(
+          stats, BASE_PATH, new ValidReadTxnList(validTxnListStr), writeIds, null);
+    } catch (Exception e) {
+      String errorString = e.getMessage();
+      Preconditions.checkNotNull(errorString, "Stack trace lost during exception.");
+      String msg = "got error:\n" + errorString + "\nexpected:\n" + expectedErrorString;
+      assertTrue(msg, errorString.startsWith(expectedErrorString));
+      return;
+    }
+    fail("Filtering didn't result in error");
   }
 
   @Test
@@ -305,6 +334,95 @@ public class AcidUtilsTest {
             "base_01.txt", // Post upgrade files are considered valid if there is no base.
             "post_upgrade.txt",
             "delta_000005_000005_0000/lmn.txt",
+            "delta_0000012_0000012_0000/0000_0",
+            "delta_0000012_0000012_0000/0000_1"});
+  }
+
+  @Test
+  public void testMinorCompactionFail() {
+    filteringError(new String[]{
+            "base_0000005/",
+            "base_0000005/abc.txt",
+            "delta_0000006_0000007/",
+            "delta_0000006_0000007/00000"},
+        // all txns are valid
+        "",
+        // <tbl>:<hwm>:<minOpenWriteId>:<openWriteIds>:<abortedWriteIds>
+        "default.test:10:1234:1,2,3",
+        "Table is minor compacted");
+    filteringError(new String[]{
+          "base_0000005/",
+          "base_0000005/abc.txt",
+          "delta_0000006_0000007_00123/",
+          "delta_0000006_0000007_00123/00000"},
+        // all txns are valid
+        "",
+        // <tbl>:<hwm>:<minOpenWriteId>:<openWriteIds>:<abortedWriteIds>
+        "default.test:10:1234:1,2,3",
+        "Table is minor compacted");
+    filteringError(new String[]{
+          "base_0000005/",
+          "base_0000005/abc.txt",
+          "delta_0000006_0000007_v00123/",
+          "delta_0000006_0000007_v00123/00000"},
+        // all txns are valid
+        "",
+        // <tbl>:<hwm>:<minOpenWriteId>:<openWriteIds>:<abortedWriteIds>
+        "default.test:10:1234:1,2,3",
+        "Table is minor compacted");
+  }
+
+  @Test
+  public void testDeleteDeltaFail() {
+    filteringError(new String[]{
+            "base_0000005/",
+            "base_0000005/abc.txt",
+            "delete_delta_0000006_0000006/",
+            "delete_delta_0000006_0000006/00000"},
+        // all txns are valid
+        "",
+        // <tbl>:<hwm>:<minOpenWriteId>:<openWriteIds>:<abortedWriteIds>
+        "default.test:10:1234:1,2,3",
+        "Table has deleted rows"
+        );
+  }
+
+  @Test
+  public void testMinorCompactionBeforeBase() {
+    assertFiltering(new String[]{
+            "delta_000005_000008_0000/",
+            "delta_000005_000008_0000/abc.txt",
+            "base_000010/",
+            "base_000010/0000_0",
+            "delta_0000012_0000012_0000/",
+            "delta_0000012_0000012_0000/0000_0",
+            "delta_0000012_0000012_0000/0000_1"},
+        // <table>:<highWaterMark>:<minOpenWriteId>
+        "default.test:20:15::",
+        new String[]{
+            // No minor compactions after base directory so it should succeed.
+            "base_000010/0000_0",
+            "delta_0000012_0000012_0000/0000_0",
+            "delta_0000012_0000012_0000/0000_1"});
+  }
+
+  @Test
+  public void testDeletesBeforeBase() {
+    assertFiltering(new String[]{
+            "delta_000004_000004_0000/",
+            "delta_000004_000004_0000/0000",
+            "delete_delta_000005_000005_0000/",
+            "delete_delta_000005_000005_0000/0000",
+            "base_000010/",
+            "base_000010/0000_0",
+            "delta_0000012_0000012_0000/",
+            "delta_0000012_0000012_0000/0000_0",
+            "delta_0000012_0000012_0000/0000_1"},
+        // <table>:<highWaterMark>:<minOpenWriteId>
+        "default.test:20:15::",
+        new String[]{
+            // No deletes after base directory so it should succeed.
+            "base_000010/0000_0",
             "delta_0000012_0000012_0000/0000_0",
             "delta_0000012_0000012_0000/0000_1"});
   }

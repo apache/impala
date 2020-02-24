@@ -21,6 +21,7 @@ import pytest
 
 from copy import deepcopy
 from tests.common.environ import ImpalaTestClusterProperties, build_flavor_timeout
+from tests.common.environ import HIVE_MAJOR_VERSION
 from tests.common.impala_test_suite import ImpalaTestSuite
 from tests.common.kudu_test_suite import KuduTestSuite
 from tests.common.skip import SkipIfABFS, SkipIfEC, SkipIfNotHdfsMinicluster
@@ -66,6 +67,14 @@ class TestMtDop(ImpalaTestSuite):
       self.execute_query(
         "create external table %s like functional_hbase.alltypes" % fq_table_name)
       expected_results = "Updated 1 partition(s) and 13 column(s)."
+    elif HIVE_MAJOR_VERSION == 3 and file_format == 'orc':
+      self.run_stmt_in_hive(
+          "create table %s like functional_orc_def.alltypes" % fq_table_name)
+      self.run_stmt_in_hive(
+          "insert into %s select * from functional_orc_def.alltypes" % fq_table_name)
+      self.execute_query_using_client(self.client,
+          "invalidate metadata %s" % fq_table_name, vector)
+      expected_results = "Updated 24 partition(s) and 11 column(s)."
     else:
       # Create a second table in the same format pointing to the same data files.
       # This function switches to the format-specific DB in 'vector'.

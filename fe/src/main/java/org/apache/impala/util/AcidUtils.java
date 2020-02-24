@@ -24,6 +24,7 @@ import org.apache.hadoop.fs.FileStatus;
 import org.apache.hadoop.fs.Path;
 import org.apache.hadoop.hive.common.ValidTxnList;
 import org.apache.hadoop.hive.common.ValidWriteIdList;
+import org.apache.hadoop.hive.metastore.api.MetaException;
 import org.apache.impala.catalog.FileMetadataLoader.LoadStats;
 import org.apache.impala.common.FileSystemUtil;
 import org.apache.impala.thrift.TQueryOptions;
@@ -76,13 +77,20 @@ public class AcidUtils {
   // Regex pattern for files in delta directories. The pattern matches strings like
   // "delta_0000006_0000006/000000_0",
   // "delta_0000009_0000009_0000/0000/def.txt"
-  private static final Pattern DELTA_PATTERN = Pattern.compile(
+  private static final String DELTA_STR =
       "delta_" +
-       "(?<minWriteId>\\d+)_" +
-       "(?<maxWriteId>\\d+)" +
-       "(?:_(?<optionalStatementId>\\d+))?" +
-       // Optional path suffix.
-       "(?:/.*)?");
+      "(?<minWriteId>\\d+)_" +
+      "(?<maxWriteId>\\d+)" +
+      "(?:_(?<optionalStatementId>\\d+)|_v(?<visibilityTxnId>\\d+))?" +
+      // Optional path suffix.
+      "(?:/.*)?";
+
+  private static final Pattern DELTA_PATTERN = Pattern.compile(DELTA_STR);
+
+  // Regex pattern for files in delete delta directories. The pattern is similar to
+  // the 'DELTA_PATTERN', but starts with "delete_".
+  private static final Pattern DELETE_DELTA_PATTERN = Pattern.compile(
+    "delete_" + DELTA_STR);
 
   @VisibleForTesting
   static final long SENTINEL_BASE_WRITE_ID = Long.MIN_VALUE;
@@ -222,8 +230,7 @@ public class AcidUtils {
     }
   }
 
-  private static ParsedDelta parseDelta(String dirPath) {
-    Matcher deltaMatcher = DELTA_PATTERN.matcher(dirPath);
+  private static ParsedDelta matcherToParsedDelta(Matcher deltaMatcher) {
     if (!deltaMatcher.matches()) {
       return null;
     }
@@ -232,6 +239,14 @@ public class AcidUtils {
     String statementIdStr = deltaMatcher.group("optionalStatementId");
     long statementId = statementIdStr != null ? Long.valueOf(statementIdStr) : -1;
     return new ParsedDelta(minWriteId, maxWriteId, statementId);
+  }
+
+  private static ParsedDelta parseDelta(String dirPath) {
+    return matcherToParsedDelta(DELTA_PATTERN.matcher(dirPath));
+  }
+
+  private static ParsedDelta parseDeleteDelta(String dirPath) {
+    return matcherToParsedDelta(DELETE_DELTA_PATTERN.matcher(dirPath));
   }
 
   /**
@@ -243,10 +258,12 @@ public class AcidUtils {
    * @param loadStats stats to add counts of skipped files to. May be null.
    * @return the FileStatuses that is a subset of passed in descriptors that
    *    must be used.
+   * @throws MetaException on ACID error. TODO: Remove throws clause once IMPALA-9042
+   * is resolved.
    */
   public static List<FileStatus> filterFilesForAcidState(List<FileStatus> stats,
       Path baseDir, ValidTxnList validTxnList, ValidWriteIdList writeIds,
-      @Nullable LoadStats loadStats) {
+      @Nullable LoadStats loadStats) throws MetaException {
     List<FileStatus> validStats = new ArrayList<>(stats);
 
     // First filter out any paths that are not considered valid write IDs.
@@ -289,8 +306,22 @@ public class AcidUtils {
         if (parsedDelta.minWriteId <= maxBaseWriteId) {
           it.remove();
           if (loadStats != null) loadStats.filesSupercededByNewerBase++;
+        } else if (parsedDelta.minWriteId != parsedDelta.maxWriteId) {
+          // TODO(IMPALA-9512): Validate rows in minor compacted deltas.
+          // We could read the non-compacted delta directories, but we'd need to check
+          // that all of them still exists. Let's throw an error on minor compacted tables
+          // for now since we want to read minor compacted deltas in the near future.
+          throw new MetaException("Table is minor compacted which is not supported " +
+              "by Impala. Run major compaction to resolve this.");
         }
         continue;
+      }
+      ParsedDelta deleteDelta = parseDeleteDelta(relPath);
+      if (deleteDelta != null) {
+        if (deleteDelta.maxWriteId > maxBaseWriteId) {
+          throw new MetaException("Table has deleted rows. It's currently not " +
+              "supported by Impala. Run major compaction to resolve this.");
+        }
       }
 
       // Not in a base or a delta directory. In that case, it's probably a post-upgrade

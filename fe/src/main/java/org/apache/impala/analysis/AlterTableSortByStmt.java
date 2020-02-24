@@ -84,4 +84,8 @@ public class AlterTableSortByStmt extends AlterTableStmt {
 
     TableDef.analyzeSortColumns(columns_, targetTable, sortingOrder_);
   }
+
+  @Override
+  protected void checkTransactionalTable() throws AnalysisException {
+  }
 }

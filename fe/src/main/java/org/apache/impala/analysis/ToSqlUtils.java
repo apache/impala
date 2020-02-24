@@ -47,6 +47,7 @@ import org.apache.impala.catalog.RowFormat;
 import org.apache.impala.catalog.Table;
 import org.apache.impala.common.Pair;
 import org.apache.impala.thrift.TSortingOrder;
+import org.apache.impala.util.AcidUtils;
 import org.apache.impala.util.KuduUtil;
 
 import com.google.common.annotations.VisibleForTesting;
@@ -318,11 +319,17 @@ public class ToSqlUtils {
     List<String> colsSql = new ArrayList<>();
     List<String> partitionColsSql = new ArrayList<>();
     boolean isHbaseTable = table instanceof FeHBaseTable;
+    boolean isFullAcid = AcidUtils.isFullAcidTable(
+        table.getMetaStoreTable().getParameters());
     for (int i = 0; i < table.getColumns().size(); i++) {
+      Column col = table.getColumns().get(i);
       if (!isHbaseTable && i < table.getNumClusteringCols()) {
-        partitionColsSql.add(columnToSql(table.getColumns().get(i)));
+        partitionColsSql.add(columnToSql(col));
+      } else if (isFullAcid && i == table.getNumClusteringCols()) {
+        Preconditions.checkState(col.getName().equals("row__id"));
+        continue;
       } else {
-        colsSql.add(columnToSql(table.getColumns().get(i)));
+        colsSql.add(columnToSql(col));
       }
     }
     RowFormat rowFormat = RowFormat.fromStorageDescriptor(msTable.getSd());

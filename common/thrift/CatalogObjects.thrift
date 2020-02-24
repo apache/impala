@@ -370,6 +370,9 @@ struct THdfsTable {
 
   // Primary Keys information for HDFS Tables
   11: optional SqlConstraints.TSqlConstraints sql_constraints
+
+  // True if the table is in Hive Full ACID format.
+  12: optional bool is_full_acid = false
 }
 
 struct THBaseTable {

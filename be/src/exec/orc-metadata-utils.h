@@ -28,7 +28,9 @@ namespace impala {
 class OrcSchemaResolver {
  public:
   OrcSchemaResolver(const HdfsTableDescriptor& tbl_desc, const orc::Type* root,
-      const char* filename) : tbl_desc_(tbl_desc), root_(root), filename_(filename) { }
+      const char* filename, bool is_table_acid, bool is_file_acid) : tbl_desc_(tbl_desc),
+      root_(root), filename_(filename), is_table_full_acid_(is_table_acid),
+      is_file_full_acid_(is_file_acid) { }
 
   /// Resolve SchemaPath into orc::Type (ORC column representation)
   /// 'pos_field' is set to true if 'col_path' reference the index field of an array
@@ -42,10 +44,16 @@ class OrcSchemaResolver {
   Status BuildSchemaPaths(int num_partition_keys,
       std::vector<SchemaPath>* col_id_path_map) const;
 
+  /// Returns error if the file should be in ACIDv2 format,
+  /// but the actual file schema doesn't conform to it.
+  Status ValidateFullAcidFileSchema() const;
+
  private:
   const HdfsTableDescriptor& tbl_desc_;
   const orc::Type* const root_;
   const char* const filename_ = nullptr;
+  const bool is_table_full_acid_;
+  const bool is_file_full_acid_;
 
   /// Validate whether the ColumnType is compatible with the orc type
   Status ValidateType(const ColumnType& type, const orc::Type& orc_type) const

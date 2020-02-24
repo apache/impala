@@ -39,6 +39,8 @@ from tests.common.skip import (
     SkipIfABFS,
     SkipIfADLS,
     SkipIfEC,
+    SkipIfHive2,
+    SkipIfHive3,
     SkipIfIsilon,
     SkipIfLocal,
     SkipIfNotHdfsMinicluster)
@@ -199,13 +201,25 @@ class TestUnmatchedSchema(ImpalaTestSuite):
     Cannot be done in a setup method because we need access to the current test vector
     """
     self._drop_test_table(vector)
-    self.execute_query_using_client(self.client,
-        "create external table jointbl_test like jointbl", vector)
+    file_format = vector.get_value('table_format').file_format
+    if file_format == 'orc':
+      db_name = "functional" + vector.get_value('table_format').db_suffix()
+      self.run_stmt_in_hive(
+          "create table %s.jointbl_test like functional.jointbl "
+          "stored as orc" % db_name)
+      self.run_stmt_in_hive(
+          'insert into functional_orc_def.jointbl_test '
+          'select * from functional_orc_def.jointbl')
+      self.execute_query_using_client(self.client, 'invalidate metadata jointbl_test',
+          vector)
+    else:
+      self.execute_query_using_client(self.client,
+          "create external table jointbl_test like jointbl", vector)
 
-    # Update the location of the new table to point the same location as the old table
-    location = self._get_table_location('jointbl', vector)
-    self.execute_query_using_client(self.client,
-        "alter table jointbl_test set location '%s'" % location, vector)
+      # Update the location of the new table to point the same location as the old table
+      location = self._get_table_location('jointbl', vector)
+      self.execute_query_using_client(self.client,
+          "alter table jointbl_test set location '%s'" % location, vector)
 
   def _drop_test_table(self, vector):
     self.execute_query_using_client(self.client,
@@ -1289,6 +1303,7 @@ class TestOrc(ImpalaTestSuite):
     # lineitem_sixblocks.orc occupies 6 blocks.
     check_call(['hdfs', 'dfs', '-Ddfs.block.size=156672', '-copyFromLocal', '-d', '-f',
         os.environ['IMPALA_HOME'] + "/testdata/LineItemMultiBlock/" + file, tbl_loc])
+    self.client.execute("refresh %s.%s" % (db, tbl))
 
   def _misaligned_orc_stripes_helper(
           self, table_name, rows_in_table, num_scanners_with_no_reads=0):
@@ -1323,7 +1338,8 @@ class TestOrc(ImpalaTestSuite):
   @SkipIfIsilon.hive
   @SkipIfLocal.hive
   @SkipIfS3.hive
-  def test_type_conversions(self, vector, unique_database):
+  @SkipIfHive3.non_acid
+  def test_type_conversions_hive2(self, vector, unique_database):
     # Create "illtypes" tables whose columns can't match the underlining ORC file's.
     # Create an "safetypes" table likes above but ORC columns can still fit into it.
     # Reuse the data files of alltypestiny and date_tbl in funtional_orc_def.
@@ -1354,6 +1370,67 @@ class TestOrc(ImpalaTestSuite):
     # Reuse the data files of functional_orc_def.decimal_tbl.
     decimal_loc = get_fs_path("/test-warehouse/decimal_tbl_orc_def")
     self.client.execute("""create external table %s.mismatch_decimals (d1 decimal(8,0),
+        d2 decimal(8,0), d3 decimal(19,10), d4 decimal(20,20), d5 decimal(2,0))
+        partitioned by (d6 decimal(9,0)) stored as orc location '%s'"""
+        % (unique_database, decimal_loc))
+    self.client.execute("alter table %s.mismatch_decimals recover partitions"
+        % unique_database)
+
+    self.run_test_case('DataErrorsTest/orc-type-checks', vector, unique_database)
+
+  # Skip this test on non-HDFS filesystems, because orc-type-check.test contains Hive
+  # queries that hang in some cases (IMPALA-9345). It would be possible to separate
+  # the tests that use Hive and run most tests on S3, but I think that running these on
+  # S3 doesn't add too much coverage.
+  @SkipIfABFS.hive
+  @SkipIfADLS.hive
+  @SkipIfIsilon.hive
+  @SkipIfLocal.hive
+  @SkipIfS3.hive
+  @SkipIfHive2.acid
+  def test_type_conversions_hive3(self, vector, unique_database):
+    # Create "illtypes" tables whose columns can't match the underlining ORC file's.
+    # Create an "safetypes" table likes above but ORC columns can still fit into it.
+    # Reuse the data files of alltypestiny and date_tbl in funtional_orc_def.
+    def create_plain_orc_table(fq_tbl_src, fq_tbl_dest):
+      self.run_stmt_in_hive(
+          "create table %s like %s stored as orc" % (fq_tbl_dest, fq_tbl_src))
+      self.run_stmt_in_hive("insert into %s select * from %s" % (fq_tbl_dest, fq_tbl_src))
+      self.client.execute("invalidate metadata %s" % fq_tbl_dest)
+    tmp_alltypes = unique_database + ".alltypes"
+    create_plain_orc_table("functional.alltypestiny", tmp_alltypes)
+    tbl_loc = self._get_table_location(tmp_alltypes, vector)
+    self.client.execute("""create table %s.illtypes (c1 boolean, c2 float,
+        c3 boolean, c4 tinyint, c5 smallint, c6 int, c7 boolean, c8 string, c9 int,
+        c10 float, c11 bigint) partitioned by (year int, month int) stored as ORC
+        location '%s'""" % (unique_database, tbl_loc))
+    self.client.execute("""create table %s.illtypes_ts_to_date (c1 boolean,
+        c2 float, c3 boolean, c4 tinyint, c5 smallint, c6 int, c7 boolean, c8 string,
+        c9 int, c10 float, c11 date) partitioned by (year int, month int) stored as ORC
+        location '%s'""" % (unique_database, tbl_loc))
+    self.client.execute("""create table %s.safetypes (c1 bigint, c2 boolean,
+        c3 smallint, c4 int, c5 bigint, c6 bigint, c7 double, c8 double, c9 char(3),
+        c10 varchar(3), c11 timestamp) partitioned by (year int, month int) stored as ORC
+        location '%s'""" % (unique_database, tbl_loc))
+    tmp_date_tbl = unique_database + ".date_tbl"
+    create_plain_orc_table("functional.date_tbl", tmp_date_tbl)
+    date_tbl_loc = self._get_table_location(tmp_date_tbl, vector)
+    self.client.execute("""create table %s.illtypes_date_tbl (c1 boolean,
+        c2 timestamp) partitioned by (date_part date) stored as ORC location '%s'"""
+        % (unique_database, date_tbl_loc))
+    self.client.execute("alter table %s.illtypes recover partitions" % unique_database)
+    self.client.execute("alter table %s.illtypes_ts_to_date recover partitions"
+        % unique_database)
+    self.client.execute("alter table %s.safetypes recover partitions" % unique_database)
+    self.client.execute("alter table %s.illtypes_date_tbl recover partitions"
+        % unique_database)
+
+    # Create a decimal table whose precisions don't match the underlining orc files.
+    # Reuse the data files of functional_orc_def.decimal_tbl.
+    tmp_decimal_tbl = unique_database + ".decimal_tbl"
+    create_plain_orc_table("functional.decimal_tbl", tmp_decimal_tbl)
+    decimal_loc = self._get_table_location(tmp_decimal_tbl, vector)
+    self.client.execute("""create table %s.mismatch_decimals (d1 decimal(8,0),
         d2 decimal(8,0), d3 decimal(19,10), d4 decimal(20,20), d5 decimal(2,0))
         partitioned by (d6 decimal(9,0)) stored as orc location '%s'"""
         % (unique_database, decimal_loc))

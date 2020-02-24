@@ -222,6 +222,8 @@ class SkipIfHive3:
   without_hms_not_supported = pytest.mark.skipif(HIVE_MAJOR_VERSION >= 3,
       reason="Instantiating HMS server in embedded mode within Hive client requires more "
              "dependencies of Hive 3, see IMPALA-9287.")
+  non_acid = pytest.mark.skipif(HIVE_MAJOR_VERSION >= 3,
+      reason="This test expects tables in non-AICD format.")
 
 
 class SkipIfHive2:

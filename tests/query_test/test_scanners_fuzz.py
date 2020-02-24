@@ -25,6 +25,7 @@ import shutil
 import tempfile
 import time
 from subprocess import check_call
+from tests.common.environ import HIVE_MAJOR_VERSION
 from tests.common.test_dimensions import create_exec_option_dimension_from_dict
 from tests.common.impala_test_suite import ImpalaTestSuite, LOG
 from tests.util.filesystem_utils import WAREHOUSE, get_fs_path
@@ -173,28 +174,42 @@ class TestScannersFuzzing(ImpalaTestSuite):
     tmp_table_dir = tempfile.mkdtemp(prefix="tmp-scanner-fuzz-%s" % fuzz_table,
         dir=os.path.join(os.environ['IMPALA_HOME'], "testdata"))
 
-    self.execute_query("create table %s.%s like %s.%s" % (fuzz_db, fuzz_table,
-        src_db, src_table))
-    fuzz_table_location = get_fs_path("/test-warehouse/{0}.db/{1}".format(
-        fuzz_db, fuzz_table))
+    table_format = vector.get_value('table_format')
+    if HIVE_MAJOR_VERSION == 3 and table_format.file_format == 'orc':
+      self.run_stmt_in_hive("create table %s.%s like %s.%s" % (fuzz_db, fuzz_table,
+          src_db, src_table))
+      self.run_stmt_in_hive("insert into %s.%s select * from %s.%s" % (fuzz_db,
+          fuzz_table, src_db, src_table))
+      self.execute_query("invalidate metadata %s.%s" % (fuzz_db, fuzz_table))
+      fq_fuzz_table_name = fuzz_db + "." + fuzz_table
+      table_loc = self._get_table_location(fq_fuzz_table_name, vector)
+      check_call(['hdfs', 'dfs', '-copyToLocal', table_loc + "/*", tmp_table_dir])
+      partitions = self.walk_and_corrupt_table_data(tmp_table_dir, num_copies, rng)
+      self.path_aware_copy_files_to_hdfs(tmp_table_dir, table_loc)
+    else:
+      self.execute_query("create table %s.%s like %s.%s" % (fuzz_db, fuzz_table,
+          src_db, src_table))
+      fuzz_table_location = get_fs_path("/test-warehouse/{0}.db/{1}".format(
+          fuzz_db, fuzz_table))
 
-    LOG.info("Generating corrupted version of %s in %s. Local working directory is %s",
-        fuzz_table, fuzz_db, tmp_table_dir)
+      LOG.info("Generating corrupted version of %s in %s. Local working directory is %s",
+          fuzz_table, fuzz_db, tmp_table_dir)
 
-    # Find the location of the existing table and get the full table directory structure.
-    fq_table_name = src_db + "." + src_table
-    table_loc = self._get_table_location(fq_table_name, vector)
-    check_call(['hdfs', 'dfs', '-copyToLocal', table_loc + "/*", tmp_table_dir])
+      # Find the location of the existing table and get the full table directory
+      # structure.
+      fq_table_name = src_db + "." + src_table
+      table_loc = self._get_table_location(fq_table_name, vector)
+      check_call(['hdfs', 'dfs', '-copyToLocal', table_loc + "/*", tmp_table_dir])
 
-    partitions = self.walk_and_corrupt_table_data(tmp_table_dir, num_copies, rng)
-    for partition in partitions:
-      self.execute_query('alter table {0}.{1} add partition ({2})'.format(
-          fuzz_db, fuzz_table, ','.join(partition)))
+      partitions = self.walk_and_corrupt_table_data(tmp_table_dir, num_copies, rng)
+      for partition in partitions:
+        self.execute_query('alter table {0}.{1} add partition ({2})'.format(
+            fuzz_db, fuzz_table, ','.join(partition)))
 
-    # Copy all of the local files and directories to hdfs.
-    to_copy = ["%s/%s" % (tmp_table_dir, file_or_dir)
-               for file_or_dir in os.listdir(tmp_table_dir)]
-    self.filesystem_client.copy_from_local(to_copy, fuzz_table_location)
+      # Copy all of the local files and directories to hdfs.
+      to_copy = ["%s/%s" % (tmp_table_dir, file_or_dir)
+                for file_or_dir in os.listdir(tmp_table_dir)]
+      self.filesystem_client.copy_from_local(to_copy, fuzz_table_location)
 
     if "SCANNER_FUZZ_KEEP_FILES" not in os.environ:
       shutil.rmtree(tmp_table_dir)
@@ -259,6 +274,7 @@ class TestScannersFuzzing(ImpalaTestSuite):
         filepath = os.path.join(subdir, filename)
         copies = [filepath]
         for copy_num in range(1, num_copies):
+          if filename == '_orc_acid_version': break
           copypath = os.path.join(subdir, "copy{0}_{1}".format(copy_num, filename))
           shutil.copyfile(filepath, copypath)
           copies.append(copypath)
@@ -266,13 +282,29 @@ class TestScannersFuzzing(ImpalaTestSuite):
           self.corrupt_file(filepath, rng)
     return partitions
 
+  def path_aware_copy_files_to_hdfs(self, local_dir, hdfs_dir):
+    for subdir, dirs, files in os.walk(local_dir):
+      if '_impala_insert_staging' in subdir: continue
+      if len(dirs) != 0: continue  # Skip non-leaf directories
+
+      rel_subdir = os.path.relpath(subdir, local_dir)
+      hdfs_location = hdfs_dir + '/' + rel_subdir
+
+      for filename in files:
+        self.filesystem_client.copy_from_local(os.path.join(subdir, filename),
+            hdfs_location)
+
   def partitions_from_path(self, relpath):
     """ Return a list of "key=val" parts from partitions inferred from the directory path.
     """
     reversed_partitions = []
     while relpath != '':
       relpath, suffix  = os.path.split(relpath)
-      reversed_partitions.append(suffix)
+      if (relpath == '' or
+          not suffix.startswith('base_') and
+          not suffix.startswith('delta_') and
+          not suffix.startswith('delete_delta_')):
+        reversed_partitions.append(suffix)
     return reversed(reversed_partitions)
 
   def corrupt_file(self, path, rng):

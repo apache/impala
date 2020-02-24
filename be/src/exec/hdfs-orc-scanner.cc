@@ -40,6 +40,8 @@ using namespace impala::io;
 DEFINE_bool(enable_orc_scanner, true,
     "If false, reading from ORC format tables is not supported");
 
+const string HIVE_ACID_VERSION_KEY = "hive.acid.version";
+
 Status HdfsOrcScanner::IssueInitialRanges(HdfsScanNodeBase* scan_node,
     const vector<HdfsFileDesc*>& files) {
   DCHECK(!files.empty());
@@ -189,8 +191,18 @@ Status HdfsOrcScanner::Open(ScannerContext* context) {
   context_->ReleaseCompletedResources(true);
   RETURN_IF_ERROR(footer_status);
 
+  bool is_table_full_acid = scan_node_->hdfs_table()->IsTableFullAcid();
+  bool is_file_full_acid = reader_->hasMetadataValue(HIVE_ACID_VERSION_KEY) &&
+                           reader_->getMetadataValue(HIVE_ACID_VERSION_KEY) == "2";
+  // TODO: Remove the following constraint once IMPALA-9515 is resolved.
+  if (is_table_full_acid && !is_file_full_acid) {
+    return Status(Substitute("Error: Table is in full ACID format, but "
+        "'hive.acid.version' = '2' is missing from file metadata: table=$0, file=$1",
+        scan_node_->hdfs_table()->name(), filename()));
+  }
   schema_resolver_.reset(new OrcSchemaResolver(*scan_node_->hdfs_table(),
-      &reader_->getType(), filename()));
+      &reader_->getType(), filename(), is_table_full_acid, is_file_full_acid));
+  RETURN_IF_ERROR(schema_resolver_->ValidateFullAcidFileSchema());
 
   // Update 'row_reader_options_' based on the tuple descriptor so the ORC lib can skip
   // columns we don't need.

@@ -68,6 +68,22 @@
   DCHECK(a == b) << "[ " #a " = " << static_cast<int>(a) << " , " #b " = " \
                  << static_cast<int>(b) << " ]"
 
+#ifndef KUDU_HEADERS_USE_SHORT_STATUS_MACROS
+/// Define DCHECK_OK that evaluates an expression that has type 'Status' and checks
+/// that the returning status is OK. If not OK, it logs the error and aborts the process.
+/// In release builds the given expression is not evaluated.
+#  ifndef NDEBUG
+#    define DCHECK_OK(status)                \
+       do {                                  \
+         const Status& _s = (status);        \
+         DCHECK(_s.ok()) << _s.GetDetail();  \
+       } while (0)
+#  else
+     // Let's define it to '{}' in case it's used in single line if statements.
+#    define DCHECK_OK(status) {}
+#  endif // NDEBUG
+#endif   // KUDU_HEADERS_USE_SHORT_STATUS_MACROS
+
 /// Define Kudu logging macros to use glog macros.
 #define KUDU_LOG              LOG
 #define KUDU_CHECK            CHECK
