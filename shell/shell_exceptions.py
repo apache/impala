@@ -17,8 +17,9 @@
 
 
 class RPCException(Exception):
-  def __init__(self, value=""):
+  def __init__(self, value="", exception_type=""):
     self.value = value
+    self.exception_type = exception_type
 
   def __str__(self):
     return self.value

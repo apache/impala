@@ -36,6 +36,7 @@ import subprocess
 import sys
 import textwrap
 import time
+import traceback
 
 from impala_client import ImpalaHS2Client, ImpalaBeeswaxClient, QueryOptionLevels
 from impala_shell_config_defaults import impala_shell_defaults
@@ -1220,6 +1221,8 @@ class ImpalaShell(object, cmd.Cmd):
       # if the exception is unknown, there was possibly an issue with the connection
       # set the shell as disconnected
       print('Unknown Exception : %s' % (e,), file=sys.stderr)
+      # Print the stack trace for the exception.
+      traceback.print_exc()
       self.close_connection()
       self.prompt = ImpalaShell.DISCONNECTED_PROMPT
     return CmdStatus.ERROR
