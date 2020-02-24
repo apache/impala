@@ -6,6 +6,7 @@
 
 #include <vector>
 
+#include "common/status.h"
 #include "kudu/gutil/bits.h"
 #include "kudu/gutil/hash/city.h"
 #include "kudu/gutil/stl_util.h"
@@ -48,6 +49,10 @@ class HandleBase {
     if (kv_data_ptr_ != nullptr && key_length_ > 0) {
       memcpy(kv_data_ptr_, key.data(), key_length_);
     }
+  }
+
+  ~HandleBase() {
+    DCHECK(next_handle_ == nullptr);
   }
 
   Slice key() const {
@@ -111,6 +116,8 @@ class HandleTable {
         // average linked list length (<= 1).
         Resize();
       }
+    } else {
+      old->next_handle_ = nullptr;
     }
     return old;
   }
@@ -120,6 +127,7 @@ class HandleTable {
     HandleBase* result = *ptr;
     if (result != nullptr) {
       *ptr = result->next_handle_;
+      result->next_handle_ = nullptr;
       --elems_;
     }
     return result;
@@ -152,7 +160,7 @@ class HandleTable {
     auto new_list = new HandleBase*[new_length];
     memset(new_list, 0, sizeof(new_list[0]) * new_length);
     uint32_t count = 0;
-    for (uint32_t i = 0; i < length_; i++) {
+    for (uint32_t i = 0; i < length_; ++i) {
       HandleBase* h = list_[i];
       while (h != nullptr) {
         HandleBase* next = h->next_handle_;
@@ -161,7 +169,7 @@ class HandleTable {
         h->next_handle_ = *ptr;
         *ptr = h;
         h = next;
-        count++;
+        ++count;
       }
     }
     DCHECK_EQ(elems_, count);
@@ -186,22 +194,30 @@ class CacheShard {
  public:
   virtual ~CacheShard() {}
 
-  // Separate from constructor so caller can easily make an array of CacheShard
-  virtual void SetCapacity(size_t capacity) = 0;
+  // Initialization function. Must be called before any other function.
+  virtual Status Init() = 0;
 
   virtual HandleBase* Allocate(Slice key, uint32_t hash, int val_len, int charge) = 0;
   virtual void Free(HandleBase* handle) = 0;
   virtual HandleBase* Insert(HandleBase* handle,
       Cache::EvictionCallback* eviction_callback) = 0;
-  virtual HandleBase* Lookup(const Slice& key, uint32_t hash, bool caching) = 0;
+  virtual HandleBase* Lookup(const Slice& key, uint32_t hash, bool no_updates) = 0;
   virtual void Release(HandleBase* handle) = 0;
   virtual void Erase(const Slice& key, uint32_t hash) = 0;
   virtual size_t Invalidate(const Cache::InvalidationControl& ctl) = 0;
 };
 
 // Function to build a cache shard using the given eviction algorithm.
+// This untemplatized function allows ShardedCache to avoid templating and
+// keeps the templates internal to the cache.
+CacheShard* NewCacheShard(Cache::EvictionPolicy eviction_policy,
+    kudu::MemTracker* mem_tracker, size_t capacity);
+
+// Internal templatized function to build a cache shard for the given eviction
+// algorithm. The template argument allows the different eviction policy implementations
+// to be defined in different files (e.g. LRU in rl-cache.cc and LIRS in lirs-cache.cc).
 template <Cache::EvictionPolicy eviction_policy>
-CacheShard* NewCacheShard(kudu::MemTracker* mem_tracker);
+CacheShard* NewCacheShardInt(kudu::MemTracker* mem_tracker, size_t capacity);
 
 // Determine the number of bits of the hash that should be used to determine
 // the cache shard. This, in turn, determines the number of shards.
@@ -214,10 +230,9 @@ string ToString(Cache::EvictionPolicy p);
 // through to the underlying CacheShard unless the function can be answered by the
 // HandleBase itself. The number of shards is currently a power of 2 so that it can
 // do a right shift to get the shard index.
-template <Cache::EvictionPolicy policy>
 class ShardedCache : public Cache {
  public:
-  explicit ShardedCache(size_t capacity, const string& id)
+  explicit ShardedCache(Cache::EvictionPolicy policy, size_t capacity, const string& id)
       : shard_bits_(DetermineShardBits()) {
     // A cache is often a singleton, so:
     // 1. We reuse its MemTracker if one already exists, and
@@ -229,10 +244,8 @@ class ShardedCache : public Cache {
 
     int num_shards = 1 << shard_bits_;
     const size_t per_shard = (capacity + (num_shards - 1)) / num_shards;
-    for (int s = 0; s < num_shards; s++) {
-      unique_ptr<CacheShard> shard(NewCacheShard<policy>(mem_tracker_.get()));
-      shard->SetCapacity(per_shard);
-      shards_.push_back(shard.release());
+    for (int s = 0; s < num_shards; ++s) {
+      shards_.push_back(NewCacheShard(policy, mem_tracker_.get(), per_shard));
     }
   }
 
@@ -240,9 +253,16 @@ class ShardedCache : public Cache {
     STLDeleteElements(&shards_);
   }
 
-  UniqueHandle Lookup(const Slice& key, CacheBehavior caching) override {
+  Status Init() override {
+    for (CacheShard* shard : shards_) {
+      RETURN_IF_ERROR(shard->Init());
+    }
+    return Status::OK();
+  }
+
+  UniqueHandle Lookup(const Slice& key, LookupBehavior behavior) override {
     const uint32_t hash = HashSlice(key);
-    HandleBase* h = shards_[Shard(hash)]->Lookup(key, hash, caching == EXPECT_IN_CACHE);
+    HandleBase* h = shards_[Shard(hash)]->Lookup(key, hash, behavior == NO_UPDATE);
     return UniqueHandle(reinterpret_cast<Cache::Handle*>(h), Cache::HandleDeleter(this));
   }
 

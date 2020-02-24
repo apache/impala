@@ -17,7 +17,6 @@
 
 #include "runtime/io/data-cache.h"
 
-#include <boost/algorithm/string.hpp>
 #include <errno.h>
 #include <fcntl.h>
 #include <mutex>
@@ -90,6 +89,10 @@ DEFINE_bool(data_cache_enable_tracing, false,
 DEFINE_bool(data_cache_anonymize_trace, false,
     "(Advanced) Use hashes of filenames rather than file paths in the data "
     "cache access trace.");
+
+DEFINE_string(data_cache_eviction_policy, "LRU",
+    "(Advanced) The cache eviction policy to use for the data cache. "
+    "Either 'LRU' (default) or 'LIRS' (experimental)");
 
 namespace impala {
 namespace io {
@@ -440,14 +443,21 @@ struct DataCache::CacheKey {
   faststring key_;
 };
 
+static Cache::EvictionPolicy GetCacheEvictionPolicy(const std::string& policy_string) {
+  Cache::EvictionPolicy policy = Cache::ParseEvictionPolicy(policy_string);
+  if (policy != Cache::EvictionPolicy::LRU && policy != Cache::EvictionPolicy::LIRS) {
+    LOG(FATAL) << "Unsupported eviction policy: " << policy_string;
+  }
+  return policy;
+}
+
 DataCache::Partition::Partition(
     const string& path, int64_t capacity, int max_opened_files)
   : path_(path),
     capacity_(max<int64_t>(capacity, PAGE_SIZE)),
     max_opened_files_(max_opened_files),
-    meta_cache_(
-        NewCache<Cache::EvictionPolicy::LRU, Cache::MemoryType::DRAM>(
-            capacity_, path_)) {}
+    meta_cache_(NewCache(GetCacheEvictionPolicy(FLAGS_data_cache_eviction_policy),
+        capacity_, path_)) {}
 
 DataCache::Partition::~Partition() {
   if (!closed_) ReleaseResources();
@@ -481,6 +491,8 @@ Status DataCache::Partition::DeleteExistingFiles() const {
 
 Status DataCache::Partition::Init() {
   std::unique_lock<SpinLock> partition_lock(lock_);
+
+  RETURN_IF_ERROR(meta_cache_->Init());
 
   // Verify the validity of the path specified.
   if (!FileSystemUtil::IsCanonicalPath(path_)) {
@@ -553,7 +565,7 @@ int64_t DataCache::Partition::Lookup(const CacheKey& cache_key, int64_t bytes_to
     uint8_t* buffer) {
   DCHECK(!closed_);
   Slice key = cache_key.ToSlice();
-  Cache::UniqueHandle handle(meta_cache_->Lookup(key, Cache::EXPECT_IN_CACHE));
+  Cache::UniqueHandle handle(meta_cache_->Lookup(key));
 
   if (handle.get() == nullptr) {
     if (tracer_ != nullptr) {
@@ -629,7 +641,8 @@ bool DataCache::Partition::InsertIntoCache(const Slice& key, CacheFile* cache_fi
   CacheEntry entry(cache_file, insertion_offset, buffer_len, checksum);
   memcpy(meta_cache_->MutableValue(&pending_handle), &entry, sizeof(CacheEntry));
   Cache::UniqueHandle handle(meta_cache_->Insert(std::move(pending_handle), this));
-  pending_handle = nullptr;
+  // Check for failure of Insert
+  if (UNLIKELY(handle.get() == nullptr)) return false;
   ImpaladMetrics::IO_MGR_REMOTE_DATA_CACHE_TOTAL_BYTES->Increment(charge_len);
   return true;
 }
@@ -644,7 +657,7 @@ bool DataCache::Partition::Store(const CacheKey& cache_key, const uint8_t* buffe
 
   // Check for existing entry.
   {
-    Cache::UniqueHandle handle(meta_cache_->Lookup(key, Cache::EXPECT_IN_CACHE));
+    Cache::UniqueHandle handle(meta_cache_->Lookup(key, Cache::NO_UPDATE));
     if (handle.get() != nullptr) {
       if (HandleExistingEntry(key, handle, buffer, buffer_len)) return false;
     }

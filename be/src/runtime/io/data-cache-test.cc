@@ -37,13 +37,21 @@
 #include "common/names.h"
 
 #define BASE_CACHE_DIR     "/tmp"
-#define DEFAULT_CACHE_SIZE (4 * 1024 * 1024)
 #define FNAME              ("foobar")
 #define NUM_TEST_DIRS      (16)
 #define NUM_THREADS        (18)
 #define MTIME              (12345)
 #define TEMP_BUFFER_SIZE   (4096)
 #define TEST_BUFFER_SIZE   (8192)
+#define NUM_CACHE_ENTRIES  (1024)
+#define DEFAULT_CACHE_SIZE (NUM_CACHE_ENTRIES * TEMP_BUFFER_SIZE)
+
+// The NUM_CACHE_ENTRIES_NO_EVICT says how many entries can be inserted into the cache
+// and queried without any evictions. This is smaller than NUM_CACHE_ENTRIES to
+// provide a bit of flexibility for cache implementations like LIRS that have multiple
+// segments. The segments may not split cleanly along entries of size TEMP_BUFFER_SIZE,
+// so it can evict something when adding NUM_CACHE_ENTRIES.
+#define NUM_CACHE_ENTRIES_NO_EVICT (NUM_CACHE_ENTRIES - 1)
 
 DECLARE_bool(cache_force_single_shard);
 DECLARE_bool(data_cache_anonymize_trace);
@@ -51,11 +59,12 @@ DECLARE_bool(data_cache_enable_tracing);
 DECLARE_int64(data_cache_file_max_size_bytes);
 DECLARE_int32(data_cache_max_opened_files);
 DECLARE_int32(data_cache_write_concurrency);
+DECLARE_string(data_cache_eviction_policy);
 
 namespace impala {
 namespace io {
 
-class DataCacheTest : public testing::Test {
+class DataCacheBaseTest : public testing::Test {
  public:
   const uint8_t* test_buffer() {
     return reinterpret_cast<const uint8_t*>(test_buffer_);
@@ -91,7 +100,7 @@ class DataCacheTest : public testing::Test {
       num_misses[i] = 0;
       string thread_name = Substitute("thread-$0", i);
       ASSERT_OK(Thread::Create("data-cache-test", thread_name,
-          boost::bind(&DataCacheTest::ThreadFn, this,
+          boost::bind(&DataCacheBaseTest::ThreadFn, this,
              use_per_thread_filename ? thread_name : "", cache, max_start_offset,
              &barrier, &num_misses[i]), &thread));
       threads.emplace_back(std::move(thread));
@@ -112,7 +121,7 @@ class DataCacheTest : public testing::Test {
   }
 
  protected:
-  DataCacheTest() {
+  DataCacheBaseTest() {
     // Create a buffer of random characters.
     for (int i = 0; i < TEST_BUFFER_SIZE; ++i) {
       test_buffer_[i] = '!' + (rand() % 93);
@@ -120,7 +129,7 @@ class DataCacheTest : public testing::Test {
   }
 
   // Create a bunch of test directories in which the data cache will reside.
-  virtual void SetUp() {
+  void SetupWithParameters(std::string eviction_policy) {
     test_env_.reset(new TestEnv());
     flag_saver_.reset(new google::FlagSaver());
     ASSERT_OK(test_env_->Init());
@@ -137,6 +146,9 @@ class DataCacheTest : public testing::Test {
 
     // Allows full write concurrency for the multi-threaded tests.
     FLAGS_data_cache_write_concurrency = NUM_THREADS;
+
+    // This is parameterized to allow testing LRU and LIRS
+    FLAGS_data_cache_eviction_policy = eviction_policy;
   }
 
   // Delete all the test directories created.
@@ -207,10 +219,27 @@ class DataCacheTest : public testing::Test {
   }
 };
 
+class DataCacheTest :
+    public DataCacheBaseTest,
+    public ::testing::WithParamInterface<std::string> {
+ public:
+  DataCacheTest()
+      : DataCacheBaseTest() {
+  }
+
+  void SetUp() override {
+    const auto& param = GetParam();
+    SetupWithParameters(param);
+  }
+};
+
+INSTANTIATE_TEST_CASE_P(DataCacheTestTypes, DataCacheTest,
+    ::testing::Values("LRU", "LIRS"));
+
 // This test exercises the basic insertion and lookup paths by inserting a known set of
 // offsets which fit in the cache entirely. Also tries reading entries which are never
 // inserted into the cache.
-TEST_F(DataCacheTest, TestBasics) {
+TEST_P(DataCacheTest, TestBasics) {
   const int64_t cache_size = DEFAULT_CACHE_SIZE;
   DataCache cache(Substitute("$0:$1", data_cache_dirs()[0], std::to_string(cache_size)));
   ASSERT_OK(cache.Init());
@@ -220,7 +249,7 @@ TEST_F(DataCacheTest, TestBasics) {
   // Read and then insert a range of offsets. Expected all misses in the first iteration
   // and all hits in the second iteration.
   for (int i = 0; i < 2; ++i) {
-    for (int64_t offset = 0; offset < 1024; ++offset) {
+    for (int64_t offset = 0; offset < NUM_CACHE_ENTRIES_NO_EVICT; ++offset) {
       int expected_bytes = i * TEMP_BUFFER_SIZE;
       memset(buffer, 0, TEMP_BUFFER_SIZE);
       ASSERT_EQ(expected_bytes,
@@ -235,24 +264,27 @@ TEST_F(DataCacheTest, TestBasics) {
   }
 
   // Read the same range inserted previously but with a different filename.
-  for (int64_t offset = 1024; offset < TEST_BUFFER_SIZE; ++offset) {
+  for (int64_t offset = NUM_CACHE_ENTRIES_NO_EVICT; offset < TEST_BUFFER_SIZE;
+       ++offset) {
     const string& alt_fname = "random";
     ASSERT_EQ(0, cache.Lookup(alt_fname, MTIME, offset, TEMP_BUFFER_SIZE, buffer));
   }
 
   // Read the same range inserted previously but with a different mtime.
-  for (int64_t offset = 1024; offset < TEST_BUFFER_SIZE; ++offset) {
+  for (int64_t offset = NUM_CACHE_ENTRIES_NO_EVICT; offset < TEST_BUFFER_SIZE;
+       ++offset) {
     int64_t alt_mtime = 67890;
     ASSERT_EQ(0, cache.Lookup(FNAME, alt_mtime, offset, TEMP_BUFFER_SIZE, buffer));
   }
 
   // Read a range of offsets which should miss in the cache.
-  for (int64_t offset = 1024; offset < TEST_BUFFER_SIZE; ++offset) {
+  for (int64_t offset = NUM_CACHE_ENTRIES_NO_EVICT; offset < TEST_BUFFER_SIZE;
+       ++offset) {
     ASSERT_EQ(0, cache.Lookup(FNAME, MTIME, offset, TEMP_BUFFER_SIZE, buffer));
   }
 
   // Read the same same range inserted previously. They should still all be in the cache.
-  for (int64_t offset = 0; offset < 1024; ++offset) {
+  for (int64_t offset = 0; offset < NUM_CACHE_ENTRIES_NO_EVICT; ++offset) {
     memset(buffer, 0, TEMP_BUFFER_SIZE);
     ASSERT_EQ(TEMP_BUFFER_SIZE,
         cache.Lookup(FNAME, MTIME, offset, TEMP_BUFFER_SIZE + 10, buffer));
@@ -295,17 +327,17 @@ TEST_F(DataCacheTest, TestBasics) {
 
 // Tests backing file rotation by setting FLAGS_data_cache_file_max_size_bytes to be 1/4
 // of the cache size. This forces rotation of backing files.
-TEST_F(DataCacheTest, RotateFiles) {
+TEST_P(DataCacheTest, RotateFiles) {
   // Set the maximum size of backing files to be 1/4 of the cache size.
-  FLAGS_data_cache_file_max_size_bytes = 1024 * 1024;
-  const int64_t cache_size = 4 * FLAGS_data_cache_file_max_size_bytes ;
+  FLAGS_data_cache_file_max_size_bytes = DEFAULT_CACHE_SIZE / 4;
+  const int64_t cache_size = DEFAULT_CACHE_SIZE;
   DataCache cache(Substitute("$0:$1", data_cache_dirs()[0], std::to_string(cache_size)));
   ASSERT_OK(cache.Init());
 
   // Read and then insert a range of offsets. Expected all misses in the first iteration
   // and all hits in the second iteration.
   for (int i = 0; i < 2; ++i) {
-    for (int64_t offset = 0; offset < 1024; ++offset) {
+    for (int64_t offset = 0; offset < NUM_CACHE_ENTRIES_NO_EVICT; ++offset) {
       int expected_bytes = i * TEMP_BUFFER_SIZE;
       uint8_t buffer[TEMP_BUFFER_SIZE];
       memset(buffer, 0, TEMP_BUFFER_SIZE);
@@ -334,13 +366,13 @@ TEST_F(DataCacheTest, RotateFiles) {
 // of the cache size. This forces rotation of backing files. Also sets
 // --data_cache_max_opened_files to 1 so that only one underlying
 // file is allowed. This exercises the lazy deletion path.
-TEST_F(DataCacheTest, RotateAndDeleteFiles) {
+TEST_P(DataCacheTest, RotateAndDeleteFiles) {
   // Set the maximum size of backing files to be 1/4 of the cache size.
-  FLAGS_data_cache_file_max_size_bytes = 1024 * 1024;
+  FLAGS_data_cache_file_max_size_bytes = DEFAULT_CACHE_SIZE / 4;
   // Force to allow one backing file.
   FLAGS_data_cache_max_opened_files = 1;
 
-  const int64_t cache_size = 4 * FLAGS_data_cache_file_max_size_bytes ;
+  const int64_t cache_size = DEFAULT_CACHE_SIZE;
   DataCache cache(Substitute("$0:$1", data_cache_dirs()[0], std::to_string(cache_size)));
   ASSERT_OK(cache.Init());
 
@@ -360,12 +392,18 @@ TEST_F(DataCacheTest, RotateAndDeleteFiles) {
   // is still in the cache.
   int64_t in_cache_offset =
       1024 - FLAGS_data_cache_file_max_size_bytes / TEMP_BUFFER_SIZE;
+  int64_t num_entries_hit = 0;
   for (int64_t offset = in_cache_offset ; offset < 1024; ++offset) {
     memset(buffer, 0, TEMP_BUFFER_SIZE);
-    ASSERT_EQ(TEMP_BUFFER_SIZE, cache.Lookup(FNAME, MTIME, offset,
-        TEMP_BUFFER_SIZE, buffer));
-    ASSERT_EQ(0, memcmp(buffer, test_buffer() + offset, TEMP_BUFFER_SIZE));
+    int64_t lookup_size = cache.Lookup(FNAME, MTIME, offset,
+        TEMP_BUFFER_SIZE, buffer);
+    if (lookup_size != 0) {
+      ++num_entries_hit;
+      EXPECT_EQ(TEMP_BUFFER_SIZE, lookup_size);
+      EXPECT_EQ(0, memcmp(buffer, test_buffer() + offset, TEMP_BUFFER_SIZE));
+    }
   }
+  EXPECT_GE(num_entries_hit, NUM_CACHE_ENTRIES / 4 - 1);
 
   // Make sure only one backing file exists. Allow for 10 seconds latency for the
   // file deleter thread to run.
@@ -385,7 +423,9 @@ TEST_F(DataCacheTest, RotateAndDeleteFiles) {
 
 // Tests eviction in the cache by inserting a large entry which evicts all existing
 // entries in the cache.
-TEST_F(DataCacheTest, Eviction) {
+TEST_P(DataCacheTest, LRUEviction) {
+  // This test is specific to LRU
+  if (FLAGS_data_cache_eviction_policy != "LRU") return;
   const int64_t cache_size = DEFAULT_CACHE_SIZE;
   DataCache cache(Substitute("$0:$1", data_cache_dirs()[0], std::to_string(cache_size)));
   ASSERT_OK(cache.Init());
@@ -438,12 +478,12 @@ TEST_F(DataCacheTest, Eviction) {
 // Tests insertion and lookup with the cache with multiple threads.
 // Inserts a working set which will fit in the cache. Despite potential
 // collision during insertion, all entries in the working set should be found.
-TEST_F(DataCacheTest, MultiThreadedNoMisses) {
+TEST_P(DataCacheTest, MultiThreadedNoMisses) {
   int64_t cache_size = DEFAULT_CACHE_SIZE;
   DataCache cache(Substitute("$0:$1", data_cache_dirs()[0], std::to_string(cache_size)));
   ASSERT_OK(cache.Init());
 
-  int64_t max_start_offset = 1024;
+  int64_t max_start_offset = NUM_CACHE_ENTRIES_NO_EVICT;
   bool use_per_thread_filename = false;
   bool expect_misses = false;
   MultiThreadedReadWrite(&cache, max_start_offset, use_per_thread_filename,
@@ -452,7 +492,7 @@ TEST_F(DataCacheTest, MultiThreadedNoMisses) {
 
 // Inserts a working set which is known to be larger than the cache's capacity.
 // Expect some cache misses in lookups.
-TEST_F(DataCacheTest, MultiThreadedWithMisses) {
+TEST_P(DataCacheTest, MultiThreadedWithMisses) {
   int64_t cache_size = DEFAULT_CACHE_SIZE;
   DataCache cache(Substitute("$0:$1", data_cache_dirs()[0], std::to_string(cache_size)));
   ASSERT_OK(cache.Init());
@@ -465,7 +505,7 @@ TEST_F(DataCacheTest, MultiThreadedWithMisses) {
 }
 
 // Test insertion and lookup with a cache configured with multiple partitions.
-TEST_F(DataCacheTest, MultiPartitions) {
+TEST_P(DataCacheTest, MultiPartitions) {
   StringPiece delimiter(",");
   string cache_base = JoinStrings(data_cache_dirs(), delimiter);
   const int64_t cache_size = DEFAULT_CACHE_SIZE;
@@ -482,7 +522,7 @@ TEST_F(DataCacheTest, MultiPartitions) {
 // Tests insertion of a working set whose size is 1/8 of the total memory size.
 // This likely exceeds the size of the page cache and forces write back of dirty pages in
 // the page cache to the backing files and also read from the backing files during lookup.
-TEST_F(DataCacheTest, LargeFootprint) {
+TEST_P(DataCacheTest, LargeFootprint) {
   struct sysinfo info;
   ASSERT_EQ(0, sysinfo(&info));
   ASSERT_GT(info.totalram, 0);
@@ -505,7 +545,7 @@ TEST_F(DataCacheTest, LargeFootprint) {
   }
 }
 
-TEST_F(DataCacheTest, TestAccessTrace) {
+TEST_P(DataCacheTest, TestAccessTrace) {
   FLAGS_data_cache_enable_tracing = true;
   for (bool anon : { false, true }) {
     SCOPED_TRACE(anon);

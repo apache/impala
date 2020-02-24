@@ -29,6 +29,7 @@
 #include <glog/logging.h>
 #include <gtest/gtest.h>
 
+#include "common/status.h"
 #include "kudu/gutil/bits.h"
 #include "kudu/gutil/macros.h"
 #include "kudu/gutil/stringprintf.h"
@@ -42,6 +43,7 @@
 
 DEFINE_int32(num_threads, 16, "The number of threads to access the cache concurrently.");
 DEFINE_int32(run_seconds, 1, "The number of seconds to run the benchmark");
+DEFINE_string(eviction_policy, "LRU", "The eviction policy to use for the cache.");
 
 using std::atomic;
 using std::pair;
@@ -94,7 +96,10 @@ class CacheBench : public testing::Test,
                    public testing::WithParamInterface<BenchSetup>{
  public:
   void SetUp() override {
-    cache_.reset(NewCache(kCacheCapacity, "test-cache"));
+    cache_.reset(NewCache(Cache::ParseEvictionPolicy(FLAGS_eviction_policy),
+        kCacheCapacity, "test-cache"));
+    Status status = cache_->Init();
+    ASSERT_OK(status);
   }
 
   // Run queries against the cache until '*done' becomes true.
@@ -117,7 +122,7 @@ class CacheBench : public testing::Test,
       char key_buf[sizeof(int_key)];
       memcpy(key_buf, &int_key, sizeof(int_key));
       Slice key_slice(key_buf, arraysize(key_buf));
-      auto h(cache_->Lookup(key_slice, Cache::EXPECT_IN_CACHE));
+      auto h(cache_->Lookup(key_slice));
       if (h) {
         ++hits;
       } else {

@@ -179,6 +179,7 @@ class DataCache {
   Status CloseFilesAndVerifySizes();
 
  private:
+  friend class DataCacheBaseTest;
   friend class DataCacheTest;
   FRIEND_TEST(DataCacheTest, TestAccessTrace);
 
@@ -245,6 +246,7 @@ class DataCache {
     void DeleteOldFiles();
 
    private:
+    friend class DataCacheBaseTest;
     friend class DataCacheTest;
     FRIEND_TEST(DataCacheTest, TestAccessTrace);
     class Tracer;

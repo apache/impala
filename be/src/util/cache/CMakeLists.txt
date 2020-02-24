@@ -23,15 +23,21 @@ set(EXECUTABLE_OUTPUT_PATH "${BUILD_OUTPUT_ROOT_DIRECTORY}/util/cache")
 
 add_library(UtilCache
   cache.cc
+  lirs-cache.cc
+  rl-cache.cc
 )
 add_dependencies(UtilCache gen-deps gen_ir_descriptions)
 
 add_library(UtilCacheTests STATIC
   cache-test.cc
+  lirs-cache-test.cc
+  rl-cache-test.cc
 )
 add_dependencies(UtilCacheTests gen-deps gen_ir_descriptions)
 
 add_executable(cache-bench cache-bench.cc)
 target_link_libraries(cache-bench ${IMPALA_TEST_LINK_LIBS})
 
-ADD_UNIFIED_BE_LSAN_TEST(cache-test "CacheTypes/CacheTest.*:CacheTypes/LRUCacheTest.*:FIFOCacheTest.*")
+ADD_UNIFIED_BE_LSAN_TEST(cache-test "CacheTypes/CacheTest.*")
+ADD_UNIFIED_BE_LSAN_TEST(lirs-cache-test "LIRSCacheTest.*")
+ADD_UNIFIED_BE_LSAN_TEST(rl-cache-test "CacheTypes/CacheInvalidationTest.*:CacheTypes/LRUCacheTest.*:FIFOCacheTest.*")

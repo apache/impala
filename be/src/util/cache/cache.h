@@ -17,6 +17,7 @@
 
 #pragma once
 
+#include <boost/algorithm/string.hpp>
 #include <cstddef>
 #include <cstdint>
 #include <functional>
@@ -27,6 +28,7 @@
 
 #include "kudu/gutil/macros.h"
 #include "kudu/util/slice.h"
+#include "common/status.h"
 
 using kudu::Slice;
 
@@ -34,11 +36,6 @@ namespace impala {
 
 class Cache {
  public:
-  // Type of memory backing the cache's storage.
-  enum class MemoryType {
-    DRAM
-  };
-
   // Supported eviction policies for the cache. Eviction policy determines what
   // items to evict if the cache is at capacity when trying to accommodate
   // an extra item.
@@ -48,7 +45,23 @@ class Cache {
 
     // The least-recently-used items are evicted.
     LRU,
+
+    // LIRS (Low Inter-reference Recency Set)
+    LIRS,
   };
+
+  static EvictionPolicy ParseEvictionPolicy(const std::string& policy_string) {
+    string upper_policy = boost::to_upper_copy(policy_string);
+    if (upper_policy == "LRU") {
+      return Cache::EvictionPolicy::LRU;
+    } else if (upper_policy == "LIRS") {
+      return Cache::EvictionPolicy::LIRS;
+    } else if (upper_policy == "FIFO") {
+      return Cache::EvictionPolicy::FIFO;
+    }
+    LOG(FATAL) << "Unsupported eviction policy: " << policy_string;
+    return Cache::EvictionPolicy::LRU;
+  }
 
   // Callback interface which is called when an entry is evicted from the
   // cache.
@@ -63,6 +76,11 @@ class Cache {
   // Destroys all existing entries by calling the "deleter"
   // function that was passed to the constructor.
   virtual ~Cache();
+
+  // Initialization function for the cache. This must be called before using
+  // any other methods. It returns error status if there is any issue with
+  // the cache or its parameters.
+  virtual Status Init() = 0;
 
   // Opaque handle to an entry stored in the cache.
   struct Handle { };
@@ -120,19 +138,25 @@ class Cache {
   // to facilitate automatic reference counting newly allocated cache's handles.
   typedef std::unique_ptr<PendingHandle, PendingHandleDeleter> UniquePendingHandle;
 
-  // Passing EXPECT_IN_CACHE will increment the hit/miss metrics that track the number of times
-  // blocks were requested that the users were hoping to get the block from the cache, along with
-  // with the basic metrics.
-  // Passing NO_EXPECT_IN_CACHE will only increment the basic metrics.
-  // This helps in determining if we are effectively caching the blocks that matter the most.
-  enum CacheBehavior {
-    EXPECT_IN_CACHE,
-    NO_EXPECT_IN_CACHE
+  // There are times when callers may want to perform a Lookup() without having it
+  // impact the priorities of the cache elements. For example, if the caller is
+  // doing a Lookup() as an internal part of its implementation that does not
+  // correspond to actual user activity (or duplicates user activity).
+  //
+  // When LookupBehavior is NORMAL (the default), the cache policy will update the
+  // priorities of entries. When LookupBehavior is NO_UPDATE, the cache policy will
+  // not update the priority of any entry.
+  enum LookupBehavior {
+    NORMAL,
+    NO_UPDATE
   };
 
   // If the cache has no mapping for "key", returns NULL.
   //
   // Else return a handle that corresponds to the mapping.
+  //
+  // Handles are not intended to be held for significant periods of time. Also,
+  // threads should avoid getting multiple handles for the same key simultaneously.
   //
   // Sample usage:
   //
@@ -152,7 +176,7 @@ class Cache {
   //     ...
   //   } // 'h' is automatically released here
   //
-  virtual UniqueHandle Lookup(const Slice& key, CacheBehavior caching) = 0;
+  virtual UniqueHandle Lookup(const Slice& key, LookupBehavior behavior = NORMAL) = 0;
 
   // If the cache contains entry for key, erase it.  Note that the
   // underlying entry will be kept around until all existing handles
@@ -221,14 +245,19 @@ class Cache {
 
   // Commit a prepared entry into the cache.
   //
-  // Returns a handle that corresponds to the mapping. This method always
-  // succeeds and returns a non-null entry, since the space was reserved above.
-  //
   // The 'pending' entry passed here should have been allocated using
   // Cache::Allocate() above.
   //
+  // This method is not guaranteed to succeed. If it succeeds, it returns a handle
+  // that corresponds to the mapping. If it fails, it returns a null handle.
+  //
+  // Handles are not intended to be held for significant periods of time. Also,
+  // threads should avoid getting multiple handles for the same key simultaneously.
+  //
   // If 'eviction_callback' is non-NULL, then it will be called when the
-  // entry is later evicted or when the cache shuts down.
+  // entry is later evicted or when the cache shuts down. If the Insert()
+  // fails, the entry is immediately destroyed and the eviction callback is called
+  // before the return of Insert().
   virtual UniqueHandle Insert(UniquePendingHandle pending,
                               EvictionCallback* eviction_callback) = 0;
 
@@ -333,27 +362,8 @@ class Cache {
   DISALLOW_COPY_AND_ASSIGN(Cache);
 };
 
-// A template helper function to instantiate a cache of particular
-// 'eviction_policy' flavor, backed by the given storage 'mem_type',
-// where 'capacity' specifies the capacity of the result cache,
-// and 'id' specifies its identifier.
-template<Cache::EvictionPolicy eviction_policy = Cache::EvictionPolicy::LRU,
-         Cache::MemoryType mem_type = Cache::MemoryType::DRAM>
-Cache* NewCache(size_t capacity, const std::string& id);
-
-// Create a new FIFO cache with a fixed size capacity. This implementation
-// of Cache uses the first-in-first-out eviction policy and stored in DRAM.
-template<>
-Cache* NewCache<Cache::EvictionPolicy::FIFO,
-                Cache::MemoryType::DRAM>(size_t capacity, const std::string& id);
-
-// Create a new LRU cache with a fixed size capacity. This implementation
-// of Cache uses the least-recently-used eviction policy and stored in DRAM.
-template<>
-Cache* NewCache<Cache::EvictionPolicy::LRU,
-                Cache::MemoryType::DRAM>(size_t capacity, const std::string& id);
-
-// A helper method to output cache memory type into ostream.
-std::ostream& operator<<(std::ostream& os, Cache::MemoryType mem_type);
+// Instantiate a cache of a particular 'policy' flavor with the specified 'capacity'
+// and identifier 'id'.
+Cache* NewCache(Cache::EvictionPolicy policy, size_t capacity, const std::string& id);
 
 } // namespace impala

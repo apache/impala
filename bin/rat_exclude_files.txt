@@ -80,8 +80,11 @@ be/src/kudu/security/x509_check_host.h
 be/src/kudu/security/x509_check_host.cc
 be/src/util/cache/cache.h
 be/src/util/cache/cache.cc
-be/src/util/cache/cache-test.cc
 be/src/util/cache/cache-internal.h
+be/src/util/cache/cache-test.h
+be/src/util/cache/cache-test.cc
+be/src/util/cache/rl-cache.cc
+be/src/util/cache/rl-cache-test.cc
 
 # http://www.apache.org/legal/src-headers.html: "Short informational text files; for
 # example README, INSTALL files. The expectation is that these files make it obvious which
