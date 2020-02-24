@@ -73,7 +73,7 @@ class ClusterMembershipMgr {
   /// immutable copy of a backend descriptor.
   typedef std::shared_ptr<const BackendDescriptorPB> BeDescSharedPtr;
 
-  /// Maps statestore subscriber IDs to backend descriptors.
+  /// Maps backend IDs to backend descriptors.
   typedef std::unordered_map<std::string, BackendDescriptorPB> BackendIdMap;
 
   /// Maps executor group names to executor groups. For now, only a default group exists
@@ -162,7 +162,7 @@ class ClusterMembershipMgr {
   /// Adds the given backend to the local blacklist. Updates 'current_membership_' to
   /// remove the backend from 'executor_groups' so that it will not be scheduled on.
   /// 'cause' is an error status representing the reason the node was blacklisted.
-  void BlacklistExecutor(const BackendDescriptorPB& be_desc, const Status& cause);
+  void BlacklistExecutor(const UniqueIdPB& backend_id, const Status& cause);
 
   /// Returns a pointer to the static empty group reserved for scheduling coord only
   /// queries.

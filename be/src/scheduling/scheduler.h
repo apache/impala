@@ -266,12 +266,12 @@ class Scheduler {
   /// backend or the local host itself. The returned descriptor should not be retained
   /// beyond the lifetime of 'executor_config'.
   const BackendDescriptorPB& LookUpBackendDesc(
-      const ExecutorConfig& executor_config, const TNetworkAddress& host);
+      const ExecutorConfig& executor_config, const NetworkAddressPB& host);
 
   /// Returns the KRPC host in 'executor_config' based on the thrift backend address
   /// 'backend_host'. Will DCHECK if the KRPC address is not valid.
-  TNetworkAddress LookUpKrpcHost(
-      const ExecutorConfig& executor_config, const TNetworkAddress& backend_host);
+  NetworkAddressPB LookUpKrpcHost(
+      const ExecutorConfig& executor_config, const NetworkAddressPB& backend_host);
 
   /// Determine the pool for a user and query options via request_pool_service_.
   Status GetRequestPool(const std::string& user, const TQueryOptions& query_options,
@@ -411,7 +411,7 @@ class Scheduler {
   /// 'scan_hosts'.
   void GetScanHosts(const BackendDescriptorPB& local_be_desc,
       const std::vector<TPlanNodeId>& scan_ids, const FragmentExecParams& params,
-      std::vector<TNetworkAddress>* scan_hosts);
+      std::vector<NetworkAddressPB>* scan_hosts);
 
   /// Return true if 'plan' contains a node of the given type.
   bool ContainsNode(const TPlan& plan, TPlanNodeType::type type);

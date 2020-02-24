@@ -37,7 +37,6 @@
 #include "kudu/util/random.h"
 #include "rpc/thrift-server.h"
 #include "runtime/types.h"
-#include "scheduling/query-schedule.h"
 #include "service/query-driver-map.h"
 #include "service/query-options.h"
 #include "statestore/statestore-subscriber.h"
@@ -57,6 +56,8 @@ class RpcContext;
 namespace impala {
 using kudu::ThreadSafeRandom;
 
+class BackendDescriptorPB;
+class BackendExecParamsPB;
 class ExecEnv;
 class DataSink;
 class CancellationWork;
@@ -73,7 +74,6 @@ class TGetExecSummaryReq;
 class ClientRequestState;
 class QueryDriver;
 struct QueryHandle;
-class QuerySchedule;
 class SimpleLogger;
 class UpdateFilterParamsPB;
 class UpdateFilterResultPB;
@@ -465,7 +465,8 @@ class ImpalaServer : public ImpalaServiceIf,
   /// to run there (query_locations_). After calling this function, the server will cancel
   /// a query with an error if one of its backends fail.
   void RegisterQueryLocations(
-      const PerBackendExecParams& per_backend_params, const TUniqueId& query_id);
+      const google::protobuf::RepeatedPtrField<BackendExecParamsPB>& per_backend_params,
+      const TUniqueId& query_id);
 
   /// Takes a set of backend ids of active backends and cancels all the queries running on
   /// failed ones (that is, ids not in the active set).

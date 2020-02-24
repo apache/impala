@@ -60,6 +60,7 @@ add_library(Runtime
   mem-pool.cc
   query-driver.cc
   query-exec-mgr.cc
+  query-exec-params.cc
   query-state.cc
   test-env.cc
   types.cc

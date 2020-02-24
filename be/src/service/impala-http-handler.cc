@@ -1076,7 +1076,7 @@ void ImpalaHttpHandler::AdmissionStateHandler(
               request_state->schedule()->coord_backend_mem_limit(),
               request_state->schedule()->coord_backend_mem_to_admit(),
               static_cast<unsigned long>(
-                  request_state->schedule()->per_backend_exec_params().size())});
+                  request_state->schedule()->backend_exec_params().size())});
   });
 
   // Add the running queries to the resource_pools json.

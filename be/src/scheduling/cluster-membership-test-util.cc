@@ -20,6 +20,7 @@
 #include "common/names.h"
 #include "scheduling/executor-group.h"
 #include "service/impala-server.h"
+#include "util/uid-util.h"
 
 static const int BACKEND_PORT = 1000;
 static const int KRPC_PORT = 2000;
@@ -47,6 +48,7 @@ string HostIdxToIpAddr(int host_idx) {
 BackendDescriptorPB MakeBackendDescriptor(
     int idx, const ExecutorGroupDescPB& group_desc, int port_offset) {
   BackendDescriptorPB be_desc;
+  UUIDToUniqueIdPB(boost::uuids::random_generator()(), be_desc.mutable_backend_id());
   be_desc.mutable_address()->set_hostname(HostIdxToHostname(idx));
   be_desc.mutable_address()->set_port(BACKEND_PORT + port_offset);
   be_desc.set_ip_address(HostIdxToIpAddr(idx));

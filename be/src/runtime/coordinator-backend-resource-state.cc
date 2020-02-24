@@ -35,11 +35,10 @@ DECLARE_uint32(batched_release_decay_factor);
 DECLARE_uint64(release_backend_states_delay_ms);
 
 Coordinator::BackendResourceState::BackendResourceState(
-    const vector<BackendState*>& backend_states, const QuerySchedule& schedule)
+    const vector<BackendState*>& backend_states)
   : num_in_use_(backend_states.size()),
     backend_states_(backend_states),
     num_backends_(backend_states.size()),
-    schedule_(schedule),
     release_backend_states_delay_ns_(FLAGS_release_backend_states_delay_ms * 1000000),
     batched_release_decay_value_(FLAGS_batched_release_decay_factor) {
   DCHECK_GT(batched_release_decay_value_, 0)
@@ -123,7 +122,7 @@ void Coordinator::BackendResourceState::BackendsReleased(
     backend_resource_states_.at(backend_state) = ResourceState::RELEASED;
     // If the Backend running the Coordinator has completed and been released, set
     // released_coordinator_ to true.
-    if (backend_state->exec_params()->is_coord_backend) {
+    if (backend_state->exec_params().is_coord_backend()) {
       released_coordinator_ = true;
     }
   }

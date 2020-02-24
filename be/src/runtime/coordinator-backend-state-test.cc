@@ -36,41 +36,26 @@ class CoordinatorBackendStateTest : public testing::Test {
   // Pool for objects to be destroyed during test teardown.
   ObjectPool pool_;
 
-  RuntimeProfile* profile_ = nullptr;
-
-  virtual void SetUp() { profile_ = RuntimeProfile::Create(&pool_, "pool1"); }
-
-  /// Utility function to create a dummy QuerySchedule.
-  void MakeQuerySchedule(QuerySchedule** query_schedule) {
-    TUniqueId* query_id = pool_.Add(new TUniqueId());
-    TQueryExecRequest* request = pool_.Add(new TQueryExecRequest());
-    TQueryOptions* query_options = pool_.Add(new TQueryOptions());
-
-    *query_schedule =
-        pool_.Add(new QuerySchedule(*query_id, *request, *query_options, profile_));
-  }
-
   /// Utility function to create a specified number of dummy BackendStates and add them
   /// to the supplied vector. 'coordinator_backend' points to the Backend running the
   /// Coordinator. The 'coordinator_backend' is added to the supplied vector as well.
-  void MakeBackendStates(int num_states, QuerySchedule* query_schedule,
-      Coordinator::BackendState** coordinator_backend,
+  void MakeBackendStates(int num_states, Coordinator::BackendState** coordinator_backend,
       std::vector<Coordinator::BackendState*>* backend_states) {
-    TQueryCtx* query_ctx = pool_.Add(new TQueryCtx());
-
-    PerBackendExecParams* per_backend_exec_params = pool_.Add(new PerBackendExecParams());
-    query_schedule->set_per_backend_exec_params(*per_backend_exec_params);
+    UniqueIdPB* query_id = pool_.Add(new UniqueIdPB());
+    TExecRequest* request = pool_.Add(new TExecRequest());
+    QuerySchedulePB* query_schedule = pool_.Add(new QuerySchedulePB());
+    QueryExecParams* exec_params =
+        pool_.Add(new QueryExecParams(*query_id, *request, *query_schedule));
 
     for (int i = 0; i < num_states; ++i) {
-      TNetworkAddress addr = MakeNetworkAddress(strings::Substitute("host-$0", i), 25000);
-      BackendExecParams* backend_exec_params = pool_.Add(new BackendExecParams());
-      per_backend_exec_params->emplace(addr, *backend_exec_params);
+      BackendExecParamsPB* backend_exec_params =
+          query_schedule->add_backend_exec_params();
       Coordinator::BackendState* backend_state = pool_.Add(new Coordinator::BackendState(
-          *query_schedule, *query_ctx, 0, TRuntimeFilterMode::OFF, *backend_exec_params));
+          *exec_params, i, TRuntimeFilterMode::OFF, *backend_exec_params));
       backend_states->push_back(backend_state);
       // Mark the first BackendState as the Coordinator Backend.
       if (i == 0) {
-        backend_exec_params->is_coord_backend = true;
+        backend_exec_params->set_is_coord_backend(true);
         *coordinator_backend = backend_state;
       }
     }
@@ -86,14 +71,11 @@ class CoordinatorBackendStateTest : public testing::Test {
 TEST_F(CoordinatorBackendStateTest, StateMachine) {
   // Initialize a BackendResourceState with three BackendStates.
   int num_backends = 3;
-  QuerySchedule* query_schedule = nullptr;
-  MakeQuerySchedule(&query_schedule);
-
   std::vector<Coordinator::BackendState*> backend_states;
   Coordinator::BackendState* coordinator_backend = nullptr;
-  MakeBackendStates(num_backends, query_schedule, &coordinator_backend, &backend_states);
+  MakeBackendStates(num_backends, &coordinator_backend, &backend_states);
   Coordinator::BackendResourceState* backend_resource_state =
-      pool_.Add(new Coordinator::BackendResourceState(backend_states, *query_schedule));
+      pool_.Add(new Coordinator::BackendResourceState(backend_states));
 
   // Assert that all BackendStates are initially in the IN_USE state.
   ASSERT_EQ(backend_resource_state->backend_resource_states_.size(), num_backends);
@@ -125,19 +107,16 @@ TEST_F(CoordinatorBackendStateTest, StateMachine) {
 TEST_F(CoordinatorBackendStateTest, CoordinatorOnly) {
   // Initialize a BackendResourceState with eight BackendStates.
   int num_backends = 8;
-  QuerySchedule* query_schedule = nullptr;
-  MakeQuerySchedule(&query_schedule);
-
   std::vector<Coordinator::BackendState*> backend_states;
   Coordinator::BackendState* coordinator_backend = nullptr;
-  MakeBackendStates(num_backends, query_schedule, &coordinator_backend, &backend_states);
+  MakeBackendStates(num_backends, &coordinator_backend, &backend_states);
   Coordinator::BackendResourceState* backend_resource_state =
-      pool_.Add(new Coordinator::BackendResourceState(backend_states, *query_schedule));
+      pool_.Add(new Coordinator::BackendResourceState(backend_states));
 
   // Create a vector of non-Coordinator Backends.
   std::vector<Coordinator::BackendState*> non_coord_backend_states;
   for (auto backend_state : backend_states) {
-    if (!backend_state->exec_params()->is_coord_backend) {
+    if (!backend_state->exec_params().is_coord_backend()) {
       non_coord_backend_states.push_back(backend_state);
     }
   }
@@ -175,14 +154,11 @@ TEST_F(CoordinatorBackendStateTest, CoordinatorOnly) {
 TEST_F(CoordinatorBackendStateTest, TimedRelease) {
   // Initialize a BackendResourceState with eight BackendStates.
   int num_backends = 8;
-  QuerySchedule* query_schedule = nullptr;
-  MakeQuerySchedule(&query_schedule);
-
   std::vector<Coordinator::BackendState*> backend_states;
   Coordinator::BackendState* coordinator_backend = nullptr;
-  MakeBackendStates(num_backends, query_schedule, &coordinator_backend, &backend_states);
+  MakeBackendStates(num_backends, &coordinator_backend, &backend_states);
   Coordinator::BackendResourceState* backend_resource_state =
-      pool_.Add(new Coordinator::BackendResourceState(backend_states, *query_schedule));
+      pool_.Add(new Coordinator::BackendResourceState(backend_states));
 
   // Sleep until the 'Timed Release' timeout is hit.
   SleepForMs(timeout_release_ms_);
@@ -226,14 +202,11 @@ TEST_F(CoordinatorBackendStateTest, TimedRelease) {
 TEST_F(CoordinatorBackendStateTest, BatchedRelease) {
   // Initialize a BackendResouceState with 128 BackendStates.
   int num_backends = 128;
-  QuerySchedule* query_schedule = nullptr;
-  MakeQuerySchedule(&query_schedule);
-
   std::vector<Coordinator::BackendState*> backend_states;
   Coordinator::BackendState* coordinator_backend = nullptr;
-  MakeBackendStates(num_backends, query_schedule, &coordinator_backend, &backend_states);
+  MakeBackendStates(num_backends, &coordinator_backend, &backend_states);
   Coordinator::BackendResourceState* backend_resource_state =
-      pool_.Add(new Coordinator::BackendResourceState(backend_states, *query_schedule));
+      pool_.Add(new Coordinator::BackendResourceState(backend_states));
 
   // Sleep until the 'Timed Release' timeout is hit.
   SleepForMs(timeout_release_ms_);

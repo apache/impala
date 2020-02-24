@@ -344,10 +344,20 @@ void ClusterMembershipMgr::UpdateMembership(
 }
 
 void ClusterMembershipMgr::BlacklistExecutor(
-    const BackendDescriptorPB& be_desc, const Status& cause) {
+    const UniqueIdPB& backend_id, const Status& cause) {
   DCHECK(!cause.ok());
   if (!ExecutorBlacklist::BlacklistingEnabled()) return;
   lock_guard<mutex> l(update_membership_lock_);
+
+  // Look up the descriptor in the current snapshot.
+  auto it = current_membership_->current_backends.find(PrintId(backend_id));
+  if (it == current_membership_->current_backends.end()) {
+    LOG(INFO) << "Did not blacklist " << PrintId(backend_id)
+              << " because it was already removed from the cluster membership.";
+    return;
+  }
+  const BackendDescriptorPB& be_desc = it->second;
+
   // Don't blacklist the local executor. Some queries may have root fragments that must be
   // scheduled on the coordinator and will always fail if its blacklisted.
   if (be_desc.ip_address() == current_membership_->local_be_desc->ip_address()

@@ -69,7 +69,7 @@ class ClusterMembershipMgrTest : public testing::Test {
 
   /// A struct to hold information related to a simulated backend during the test.
   struct Backend {
-    string backend_id;
+    UniqueIdPB backend_id;
     std::unique_ptr<MetricGroup> metric_group;
     std::unique_ptr<ClusterMembershipMgr> cmm;
     std::shared_ptr<BackendDescriptorPB> desc;
@@ -167,7 +167,7 @@ class ClusterMembershipMgrTest : public testing::Test {
     backends_.push_back(make_unique<Backend>());
     auto& be = backends_.back();
     be->desc = make_shared<BackendDescriptorPB>(MakeBackendDescriptor(idx));
-    be->backend_id = be->desc->address().hostname();
+    be->backend_id = be->desc->backend_id();
     offline_.push_back(be.get());
     return be.get();
   }
@@ -179,7 +179,7 @@ class ClusterMembershipMgrTest : public testing::Test {
     ASSERT_TRUE(IsInVector(be, offline_));
     be->metric_group = make_unique<MetricGroup>("test");
     be->cmm = make_unique<ClusterMembershipMgr>(
-        be->backend_id, nullptr, be->metric_group.get());
+        PrintId(be->backend_id), nullptr, be->metric_group.get());
     RemoveFromVector(be, &offline_);
     starting_.push_back(be);
   }
@@ -237,7 +237,7 @@ class ClusterMembershipMgrTest : public testing::Test {
 
     // Create topic item before erasing the backend.
     TTopicItem deletion_item;
-    deletion_item.key = be->backend_id;
+    deletion_item.key = PrintId(be->backend_id);
     deletion_item.deleted = true;
 
     // Delete the backend
@@ -376,17 +376,17 @@ TEST_F(ClusterMembershipMgrTest, ExecutorBlacklist) {
   }
 
   // Tell a BE to blacklist itself, should have no effect.
-  backends_[0]->cmm->BlacklistExecutor(*backends_[0]->desc, Status("error"));
+  backends_[0]->cmm->BlacklistExecutor(backends_[0]->desc->backend_id(), Status("error"));
   EXPECT_EQ(NUM_BACKENDS, backends_[0]->cmm->GetSnapshot()->current_backends.size());
   EXPECT_EQ(NUM_BACKENDS, GetDefaultGroupSize(*backends_[0]->cmm));
 
   // Tell a BE to blacklist another BE, should remove it from executor_groups but not
   // current_backends.
-  backends_[0]->cmm->BlacklistExecutor(*backends_[1]->desc, Status("error"));
+  backends_[0]->cmm->BlacklistExecutor(backends_[1]->desc->backend_id(), Status("error"));
   EXPECT_EQ(NUM_BACKENDS, backends_[0]->cmm->GetSnapshot()->current_backends.size());
   EXPECT_EQ(NUM_BACKENDS - 1, GetDefaultGroupSize(*backends_[0]->cmm));
   // Blacklist a BE that is already blacklisted. Should have no effect.
-  backends_[0]->cmm->BlacklistExecutor(*backends_[1]->desc, Status("error"));
+  backends_[0]->cmm->BlacklistExecutor(backends_[1]->desc->backend_id(), Status("error"));
   EXPECT_EQ(NUM_BACKENDS, backends_[0]->cmm->GetSnapshot()->current_backends.size());
   EXPECT_EQ(NUM_BACKENDS - 1, GetDefaultGroupSize(*backends_[0]->cmm));
 
@@ -397,7 +397,7 @@ TEST_F(ClusterMembershipMgrTest, ExecutorBlacklist) {
   EXPECT_EQ(NUM_BACKENDS, GetDefaultGroupSize(*backends_[0]->cmm));
 
   // Blacklist the BE and sleep again.
-  backends_[0]->cmm->BlacklistExecutor(*backends_[1]->desc, Status("error"));
+  backends_[0]->cmm->BlacklistExecutor(backends_[1]->desc->backend_id(), Status("error"));
   EXPECT_EQ(NUM_BACKENDS, backends_[0]->cmm->GetSnapshot()->current_backends.size());
   EXPECT_EQ(NUM_BACKENDS - 1, GetDefaultGroupSize(*backends_[0]->cmm));
   usleep(BLACKLIST_TIMEOUT_SLEEP_US);
@@ -407,12 +407,12 @@ TEST_F(ClusterMembershipMgrTest, ExecutorBlacklist) {
   EXPECT_EQ(NUM_BACKENDS, backends_[0]->cmm->GetSnapshot()->current_backends.size());
   EXPECT_EQ(NUM_BACKENDS - 1, GetDefaultGroupSize(*backends_[0]->cmm));
   // Try blacklisting the quiesced BE, should have no effect.
-  backends_[0]->cmm->BlacklistExecutor(*backends_[1]->desc, Status("error"));
+  backends_[0]->cmm->BlacklistExecutor(backends_[1]->desc->backend_id(), Status("error"));
   EXPECT_EQ(NUM_BACKENDS, backends_[0]->cmm->GetSnapshot()->current_backends.size());
   EXPECT_EQ(NUM_BACKENDS - 1, GetDefaultGroupSize(*backends_[0]->cmm));
 
   // Blacklist another BE and sleep.
-  backends_[0]->cmm->BlacklistExecutor(*backends_[2]->desc, Status("error"));
+  backends_[0]->cmm->BlacklistExecutor(backends_[2]->desc->backend_id(), Status("error"));
   EXPECT_EQ(NUM_BACKENDS, backends_[0]->cmm->GetSnapshot()->current_backends.size());
   EXPECT_EQ(NUM_BACKENDS - 2, GetDefaultGroupSize(*backends_[0]->cmm));
   usleep(BLACKLIST_TIMEOUT_SLEEP_US);

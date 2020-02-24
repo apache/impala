@@ -31,6 +31,7 @@
 #include "gen-cpp/Types_types.h"
 #include "gen-cpp/data_stream_service.pb.h"
 #include "runtime/dml-exec-state.h"
+#include "runtime/query-exec-params.h"
 #include "util/counting-barrier.h"
 #include "util/progress-updater.h"
 #include "util/promise.h"
@@ -47,13 +48,13 @@ namespace impala {
 
 class AuxErrorInfoPB;
 class ClientRequestState;
+class FragmentExecParamsPB;
 class FragmentInstanceState;
 class MemTracker;
 class ObjectPool;
 class PlanRootSink;
 class QueryDriver;
 class QueryResultSet;
-class QuerySchedule;
 class QueryState;
 class ReportExecStatusRequestPB;
 class RuntimeProfile;
@@ -61,7 +62,6 @@ class RuntimeState;
 class TPlanExecRequest;
 class TRuntimeProfileTree;
 class TUpdateCatalogRequest;
-struct FragmentExecParams;
 
 /// Query coordinator: handles execution of fragment instances on remote nodes, given a
 /// TQueryExecRequest. As part of that, it handles all interactions with the executing
@@ -115,8 +115,8 @@ struct FragmentExecParams;
 /// and unnest them
 class Coordinator { // NOLINT: The member variables could be re-ordered to save space
  public:
-  Coordinator(ClientRequestState* parent, const QuerySchedule& schedule,
-      RuntimeProfile::EventSequence* events);
+  Coordinator(ClientRequestState* parent, const TExecRequest& exec_request,
+      const QuerySchedulePB& query_schedule, RuntimeProfile::EventSequence* events);
   ~Coordinator();
 
   /// Initiate asynchronous execution of a query with the given schedule. When it
@@ -263,8 +263,9 @@ class Coordinator { // NOLINT: The member variables could be re-ordered to save 
   /// the constructor. It always outlives the coordinator.
   ClientRequestState* parent_request_state_;
 
-  /// owned by the ClientRequestState that owns this coordinator
-  const QuerySchedule& schedule_;
+  /// Contains references to Thrift and Protobuf structs constituting the execution
+  /// parameters. These structs are owned by the QueryDriver and ClientRequestState.
+  QueryExecParams exec_params_;
 
   /// Copied from TQueryExecRequest, governs when finalization occurs. Set in Exec().
   TStmtType::type stmt_type_;
@@ -276,7 +277,7 @@ class Coordinator { // NOLINT: The member variables could be re-ordered to save 
   /// A map from the NetworkAddressPB of a backend to the BackendState running on the
   /// NetworkAddressPB. All values are non-nullptr and owned by obj_pool(). The address
   /// is the kRPC address (Coordinator::BackendState::krpc_impalad_address) of the
-  /// Backend. This map is distinct from QuerySchedule::per_backend_exec_params(),
+  /// Backend. This map is distinct from QuerySchedulePB::per_backend_exec_params(),
   /// which uses the Thrift address as the key rather than the kRPC address.
   boost::unordered_map<NetworkAddressPB, BackendState*> addr_to_backend_state_;
 
@@ -364,7 +365,7 @@ class Coordinator { // NOLINT: The member variables could be re-ordered to save 
     /// A mapping of fragment data sink ids to index into thrift_exec_summary.nodes
     boost::unordered_map<TPlanNodeId, int> data_sink_id_to_idx_map;
 
-    void Init(const QuerySchedule& query_schedule);
+    void Init(const QueryExecParams& exec_params);
   };
 
   // Initialized by Exec().
@@ -548,7 +549,7 @@ class Coordinator { // NOLINT: The member variables could be re-ordered to save 
   /// fragment containing the join node (if build is integrated) or build sink (if the
   /// build is separate). 'num_instances' and 'num_backends' are the number of instances
   /// and backends that the fragment runs on.
-  void AddFilterSource(const FragmentExecParams& src_fragment_params,int num_instances,
+  void AddFilterSource(const FragmentExecParamsPB& src_fragment_params, int num_instances,
       int num_backends, const TRuntimeFilterDesc& filter, int join_node_id);
 
   /// Helper for HandleExecStateTransition(). Releases all resources associated with
