@@ -94,7 +94,7 @@ class AdmissionControllerTest : public testing::Test {
     request->__set_stmt_type(TStmtType::QUERY);
 
     RuntimeProfile* profile = RuntimeProfile::Create(&pool_, "pool1");
-    TUniqueId* query_id = pool_.Add(new TUniqueId()); // always 0,0
+    UniqueIdPB* query_id = pool_.Add(new UniqueIdPB()); // always 0,0
     TQueryOptions* query_options = pool_.Add(new TQueryOptions());
     query_options->__set_mem_limit(mem_limit);
     QuerySchedule* query_schedule = pool_.Add(new QuerySchedule(
@@ -122,30 +122,29 @@ class AdmissionControllerTest : public testing::Test {
       bool is_dedicated_coord, int64_t min_mem_reservation_bytes = 0,
       int64_t admit_mem_limit = 200L * MEGABYTE, int slots_to_use = 1,
       int slots_available = 8) {
-    PerBackendExecParams* per_backend_exec_params = pool_.Add(new PerBackendExecParams());
+    query_schedule.ClearBackendExecParams();
     for (int i = 0; i < count; ++i) {
       const string host_name = Substitute("host$0", i);
-      TNetworkAddress host_addr = MakeNetworkAddress(host_name, 25000);
-      BackendExecParams* backend_exec_params = pool_.Add(new BackendExecParams());
-      backend_exec_params->min_mem_reservation_bytes = min_mem_reservation_bytes;
-      backend_exec_params->slots_to_use = slots_to_use;
-      backend_exec_params->be_desc.set_admit_mem_limit(admit_mem_limit);
-      backend_exec_params->be_desc.set_admission_slots(slots_available);
-      backend_exec_params->be_desc.set_is_executor(true);
-      *backend_exec_params->be_desc.mutable_address() = FromTNetworkAddress(host_addr);
+      NetworkAddressPB host_addr = MakeNetworkAddressPB(host_name, 25000);
+      BackendExecParams& backend_exec_params =
+          query_schedule.GetOrCreateBackendExecParams(host_addr);
+      backend_exec_params.pb->set_min_mem_reservation_bytes(min_mem_reservation_bytes);
+      backend_exec_params.pb->set_slots_to_use(slots_to_use);
+      backend_exec_params.be_desc.set_admit_mem_limit(admit_mem_limit);
+      backend_exec_params.be_desc.set_admission_slots(slots_available);
+      backend_exec_params.be_desc.set_is_executor(true);
+      *backend_exec_params.be_desc.mutable_address() = host_addr;
       if (i == 0) {
         // Add first element as the coordinator.
-        backend_exec_params->is_coord_backend = true;
-        backend_exec_params->be_desc.set_is_executor(!is_dedicated_coord);
+        backend_exec_params.pb->set_is_coord_backend(true);
+        backend_exec_params.be_desc.set_is_executor(!is_dedicated_coord);
       }
-      per_backend_exec_params->emplace(host_addr, *backend_exec_params);
     }
-    query_schedule.set_per_backend_exec_params(*per_backend_exec_params);
   }
 
   /// Extract the host network addresses from 'schedule'.
-  vector<TNetworkAddress> GetHostAddrs(const QuerySchedule& schedule) {
-    vector<TNetworkAddress> host_addrs;
+  vector<NetworkAddressPB> GetHostAddrs(const QuerySchedule& schedule) {
+    vector<NetworkAddressPB> host_addrs;
     for (auto& backend_state : schedule.per_backend_exec_params()) {
       host_addrs.push_back(backend_state.first);
     }
@@ -154,9 +153,9 @@ class AdmissionControllerTest : public testing::Test {
 
   /// Set the slots in use for all the hosts in 'host_addrs'.
   void SetSlotsInUse(AdmissionController* admission_controller,
-      const vector<TNetworkAddress>& host_addrs, int slots_in_use) {
-    for (TNetworkAddress host_addr : host_addrs) {
-      string host = TNetworkAddressToString(host_addr);
+      const vector<NetworkAddressPB>& host_addrs, int slots_in_use) {
+    for (NetworkAddressPB host_addr : host_addrs) {
+      string host = NetworkAddressPBToString(host_addr);
       admission_controller->host_stats_[host].slots_in_use = slots_in_use;
     }
   }
@@ -446,7 +445,7 @@ TEST_F(AdmissionControllerTest, CanAdmitRequestSlots) {
     SetHostsInQuerySchedule(
         *schedule, 2, false, MEGABYTE, 200L * MEGABYTE, slots_per_query, slots_per_host);
   }
-  vector<TNetworkAddress> host_addrs = GetHostAddrs(*default_group_schedule);
+  vector<NetworkAddressPB> host_addrs = GetHostAddrs(*default_group_schedule);
   string not_admitted_reason;
 
   // Simulate that there are just enough slots free for the query on all hosts.
@@ -796,27 +795,26 @@ TEST_F(AdmissionControllerTest, DedicatedCoordAdmissionChecks) {
   const int64_t COORD_MEM_ESTIMATE = 150 * MEGABYTE;
   QuerySchedule* query_schedule = MakeQuerySchedule(
       "default", 0, pool_config, 2, PER_EXEC_MEM_ESTIMATE, COORD_MEM_ESTIMATE, true);
-  PerBackendExecParams* per_backend_exec_params = pool_.Add(new PerBackendExecParams());
+  query_schedule->ClearBackendExecParams();
   // Add coordinator backend.
-  BackendExecParams* coord_exec_params = pool_.Add(new BackendExecParams());
-  coord_exec_params->is_coord_backend = true;
-  coord_exec_params->thread_reservation = 1;
-  coord_exec_params->be_desc.set_admit_mem_limit(512 * MEGABYTE);
-  coord_exec_params->be_desc.set_is_executor(false);
   const string coord_host_name = Substitute("host$0", 1);
-  TNetworkAddress coord_addr = MakeNetworkAddress(coord_host_name, 25000);
-  const string coord_host = TNetworkAddressToString(coord_addr);
-  per_backend_exec_params->emplace(coord_addr, *coord_exec_params);
+  NetworkAddressPB coord_addr = MakeNetworkAddressPB(coord_host_name, 25000);
+  const string coord_host = NetworkAddressPBToString(coord_addr);
+  BackendExecParams& coord_exec_params =
+      query_schedule->GetOrCreateBackendExecParams(coord_addr);
+  coord_exec_params.pb->set_is_coord_backend(true);
+  coord_exec_params.pb->set_thread_reservation(1);
+  coord_exec_params.be_desc.set_admit_mem_limit(512 * MEGABYTE);
+  coord_exec_params.be_desc.set_is_executor(false);
   // Add executor backend.
-  BackendExecParams* backend_exec_params = pool_.Add(new BackendExecParams());
-  backend_exec_params->thread_reservation = 1;
-  backend_exec_params->be_desc.set_admit_mem_limit(GIGABYTE);
-  backend_exec_params->be_desc.set_is_executor(true);
   const string exec_host_name = Substitute("host$0", 2);
-  TNetworkAddress exec_addr = MakeNetworkAddress(exec_host_name, 25000);
-  const string exec_host = TNetworkAddressToString(exec_addr);
-  per_backend_exec_params->emplace(exec_addr, *backend_exec_params);
-  query_schedule->set_per_backend_exec_params(*per_backend_exec_params);
+  NetworkAddressPB exec_addr = MakeNetworkAddressPB(exec_host_name, 25000);
+  const string exec_host = NetworkAddressPBToString(exec_addr);
+  BackendExecParams& backend_exec_params =
+      query_schedule->GetOrCreateBackendExecParams(exec_addr);
+  backend_exec_params.pb->set_thread_reservation(1);
+  backend_exec_params.be_desc.set_admit_mem_limit(GIGABYTE);
+  backend_exec_params.be_desc.set_is_executor(true);
   string not_admitted_reason;
   // Test 1: coord's admit_mem_limit < executor's admit_mem_limit. Query should not
   // be rejected because query fits on both executor and coordinator. It should be
@@ -855,9 +853,7 @@ TEST_F(AdmissionControllerTest, DedicatedCoordAdmissionChecks) {
   // Test 2: coord's admit_mem_limit < executor's admit_mem_limit. Query rejected because
   // coord's admit_mem_limit is less than mem_to_admit on the coord.
   // Re-using previous QuerySchedule object.
-  coord_exec_params->be_desc.set_admit_mem_limit(100 * MEGABYTE);
-  (*per_backend_exec_params)[coord_addr] = *coord_exec_params;
-  query_schedule->set_per_backend_exec_params(*per_backend_exec_params);
+  coord_exec_params.be_desc.set_admit_mem_limit(100 * MEGABYTE);
   ASSERT_TRUE(admission_controller->RejectForSchedule(
       *query_schedule, pool_config, &not_admitted_reason));
   EXPECT_STR_CONTAINS(not_admitted_reason,

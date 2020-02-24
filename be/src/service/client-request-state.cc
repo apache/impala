@@ -36,9 +36,9 @@
 #include "runtime/coordinator.h"
 #include "runtime/exec-env.h"
 #include "runtime/mem-tracker.h"
+#include "runtime/query-driver.h"
 #include "runtime/row-batch.h"
 #include "runtime/runtime-state.h"
-#include "runtime/query-driver.h"
 #include "scheduling/admission-controller.h"
 #include "scheduling/scheduler.h"
 #include "service/frontend.h"
@@ -55,6 +55,7 @@
 #include "util/redactor.h"
 #include "util/runtime-profile-counters.h"
 #include "util/time.h"
+#include "util/uid-util.h"
 
 #include "gen-cpp/CatalogService.h"
 #include "gen-cpp/CatalogService_types.h"
@@ -528,9 +529,11 @@ void ClientRequestState::FinishExecQueryOrDmlRequest() {
 
   DCHECK(ExecEnv::GetInstance()->admission_controller() != nullptr);
   DCHECK(exec_request_->__isset.query_exec_request);
+  UniqueIdPB query_id_pb;
+  TUniqueIdToUniqueIdPB(query_id(), &query_id_pb);
   Status admit_status =
       ExecEnv::GetInstance()->admission_controller()->SubmitForAdmission(
-          {query_id(), exec_request_->query_exec_request, exec_request_->query_options,
+          {query_id_pb, exec_request_->query_exec_request, exec_request_->query_options,
               summary_profile_, query_events_},
           &admit_outcome_, &schedule_);
   {
@@ -538,21 +541,19 @@ void ClientRequestState::FinishExecQueryOrDmlRequest() {
     if (!UpdateQueryStatus(admit_status).ok()) return;
   }
   DCHECK(schedule_.get() != nullptr);
-  DCHECK_EQ(schedule_->query_id(), query_id());
   // Note that we don't need to check for cancellation between admission and query
   // startup. The query was not cancelled right before being admitted and the window here
   // is small enough to not require special handling. Instead we start the query and then
   // cancel it through the check below if necessary.
-  DebugActionNoFail(schedule_->query_options(), "CRS_BEFORE_COORD_STARTS");
+  DebugActionNoFail(exec_request_->query_options, "CRS_BEFORE_COORD_STARTS");
   // Register the query with the server to support cancellation. This happens after
   // admission because now the set of executors is fixed and an executor failure will
   // cause a query failure.
-  parent_server_->RegisterQueryLocations(
-      schedule_->per_backend_exec_params(), query_id());
-  coord_.reset(new Coordinator(this, *schedule_, query_events_));
+  parent_server_->RegisterQueryLocations(schedule_->backend_exec_params(), query_id());
+  coord_.reset(new Coordinator(this, *exec_request_, *schedule_.get(), query_events_));
   Status exec_status = coord_->Exec();
 
-  DebugActionNoFail(schedule_->query_options(), "CRS_AFTER_COORD_STARTS");
+  DebugActionNoFail(exec_request_->query_options, "CRS_AFTER_COORD_STARTS");
 
   // Make coordinator profile visible, even upon failure.
   if (coord_->query_profile() != nullptr) profile_->AddChild(coord_->query_profile());

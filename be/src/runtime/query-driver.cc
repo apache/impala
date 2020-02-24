@@ -91,7 +91,7 @@ void QueryDriver::TryQueryRetry(
   const TUniqueId& query_id = client_request_state->query_id();
   DCHECK(client_request_state->schedule() != nullptr);
 
-  if (client_request_state->schedule()->query_options().retry_failed_queries) {
+  if (exec_request_->query_options.retry_failed_queries) {
     lock_guard<mutex> l(*client_request_state->lock());
 
     // Queries can only be retried if no rows for the query have been fetched

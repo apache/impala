@@ -22,8 +22,12 @@ set(LIBRARY_OUTPUT_PATH "${BUILD_OUTPUT_ROOT_DIRECTORY}/scheduling")
 # where to put generated binaries
 set(EXECUTABLE_OUTPUT_PATH "${BUILD_OUTPUT_ROOT_DIRECTORY}/scheduling")
 
+# Mark the protobuf file as generated
+set_source_files_properties(${ADMISSION_CONTROL_SERVICE_PROTO_SRCS} PROPERTIES GENERATED TRUE)
+
 # TODO: Move other scheduling-related classes here
 add_library(Scheduling STATIC
+  ${ADMISSION_CONTROL_SERVICE_PROTO_SRCS}
   admission-controller.cc
   executor-blacklist.cc
   cluster-membership-mgr.cc

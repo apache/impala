@@ -64,18 +64,17 @@ namespace impala {
 const char* Coordinator::BackendState::InstanceStats::LAST_REPORT_TIME_DESC =
     "Last report received time";
 
-Coordinator::BackendState::BackendState(const QuerySchedule& schedule,
-    const TQueryCtx& query_ctx, int state_idx, TRuntimeFilterMode::type filter_mode,
-    const BackendExecParams& exec_params)
-  : schedule_(schedule),
+Coordinator::BackendState::BackendState(const QueryExecParams& exec_params, int state_idx,
+    TRuntimeFilterMode::type filter_mode, const BackendExecParamsPB& backend_exec_params)
+  : exec_params_(exec_params),
     state_idx_(state_idx),
     filter_mode_(filter_mode),
-    backend_exec_params_(&exec_params),
-    host_(backend_exec_params_->be_desc.address()),
-    krpc_host_(backend_exec_params_->be_desc.krpc_address()),
-    query_ctx_(query_ctx),
-    query_id_(schedule.query_id()),
-    num_remaining_instances_(backend_exec_params_->instance_params.size()) {}
+    backend_exec_params_(backend_exec_params),
+    host_(backend_exec_params_.address()),
+    krpc_host_(backend_exec_params_.krpc_address()),
+    query_ctx_(exec_params_.query_exec_request().query_ctx),
+    query_id_(exec_params_.query_id()),
+    num_remaining_instances_(backend_exec_params_.instance_params().size()) {}
 
 void Coordinator::BackendState::Init(const vector<FragmentStats*>& fragment_stats,
     RuntimeProfile* host_profile_parent, ObjectPool* obj_pool) {
@@ -83,16 +82,14 @@ void Coordinator::BackendState::Init(const vector<FragmentStats*>& fragment_stat
   host_profile_parent->AddChild(host_profile_);
   RuntimeProfile::Counter* admission_slots =
       ADD_COUNTER(host_profile_, "AdmissionSlots", TUnit::UNIT);
-  admission_slots->Set(backend_exec_params_->slots_to_use);
+  admission_slots->Set(backend_exec_params_.slots_to_use());
 
   // populate instance_stats_map_ and install instance
   // profiles as child profiles in fragment_stats' profile
   int prev_fragment_idx = -1;
-  for (const FInstanceExecParams* instance_params:
-       backend_exec_params_->instance_params) {
-    DCHECK_EQ(
-        FromNetworkAddressPB(host_), instance_params->host); // all hosts must be the same
-    int fragment_idx = instance_params->fragment().idx;
+  for (const FInstanceExecParamsPB& instance_params :
+      backend_exec_params_.instance_params()) {
+    int fragment_idx = instance_params.fragment_idx();
     DCHECK_LT(fragment_idx, fragment_stats.size());
     if (prev_fragment_idx != -1 && fragment_idx != prev_fragment_idx) {
       // all instances of a fragment are contiguous
@@ -101,10 +98,11 @@ void Coordinator::BackendState::Init(const vector<FragmentStats*>& fragment_stat
     }
     fragments_.insert(fragment_idx);
 
+    const TPlanFragment* fragment = exec_params_.GetFragments()[fragment_idx];
+    InstanceStats* instance_stats = obj_pool->Add(new InstanceStats(
+        instance_params, fragment, host_, fragment_stats[fragment_idx], obj_pool));
     instance_stats_map_.emplace(
-        GetInstanceIdx(instance_params->instance_id),
-        obj_pool->Add(
-          new InstanceStats(*instance_params, fragment_stats[fragment_idx], obj_pool)));
+        GetInstanceIdx(instance_params.instance_id()), instance_stats);
   }
 }
 
@@ -112,59 +110,59 @@ void Coordinator::BackendState::SetRpcParams(const DebugOptions& debug_options,
     const FilterRoutingTable& filter_routing_table, ExecQueryFInstancesRequestPB* request,
     TExecPlanFragmentInfo* fragment_info) {
   request->set_coord_state_idx(state_idx_);
-  request->set_min_mem_reservation_bytes(backend_exec_params_->min_mem_reservation_bytes);
+  request->set_min_mem_reservation_bytes(
+      backend_exec_params_.min_mem_reservation_bytes());
   request->set_initial_mem_reservation_total_claims(
-      backend_exec_params_->initial_mem_reservation_total_claims);
-  request->set_per_backend_mem_limit(schedule_.per_backend_mem_limit());
+      backend_exec_params_.initial_mem_reservation_total_claims());
+  request->set_per_backend_mem_limit(
+      exec_params_.query_schedule().per_backend_mem_limit());
 
   // set fragment_ctxs and fragment_instance_ctxs
   fragment_info->__isset.fragments = true;
   fragment_info->__isset.fragment_instance_ctxs = true;
   fragment_info->fragment_instance_ctxs.resize(
-      backend_exec_params_->instance_params.size());
-  for (int i = 0; i < backend_exec_params_->instance_params.size(); ++i) {
+      backend_exec_params_.instance_params().size());
+  for (int i = 0; i < backend_exec_params_.instance_params().size(); ++i) {
     TPlanFragmentInstanceCtx& instance_ctx = fragment_info->fragment_instance_ctxs[i];
     PlanFragmentInstanceCtxPB* instance_ctx_pb = request->add_fragment_instance_ctxs();
-    const FInstanceExecParams& params = *backend_exec_params_->instance_params[i];
-    int fragment_idx = params.fragment_exec_params.fragment.idx;
+    const FInstanceExecParamsPB& params = backend_exec_params_.instance_params(i);
+    int fragment_idx = params.fragment_idx();
+    DCHECK_LT(fragment_idx, exec_params_.query_schedule().fragment_exec_params().size());
+    const FragmentExecParamsPB& fragment_exec_params =
+        exec_params_.query_schedule().fragment_exec_params(fragment_idx);
 
     // add a TPlanFragment, if we don't already have it
     if (fragment_info->fragments.empty()
         || fragment_info->fragments.back().idx != fragment_idx) {
-      fragment_info->fragments.push_back(params.fragment_exec_params.fragment);
+      const TPlanFragment* fragment = exec_params_.GetFragments()[fragment_idx];
+      fragment_info->fragments.push_back(*fragment);
       PlanFragmentCtxPB* fragment_ctx = request->add_fragment_ctxs();
-      fragment_ctx->set_fragment_idx(params.fragment_exec_params.fragment.idx);
-      *fragment_ctx->mutable_destinations() = {
-          params.fragment_exec_params.destinations.begin(),
-          params.fragment_exec_params.destinations.end()};
+      fragment_ctx->set_fragment_idx(fragment_idx);
+      *fragment_ctx->mutable_destinations() = fragment_exec_params.destinations();
     }
 
     instance_ctx.fragment_idx = fragment_idx;
     instance_ctx_pb->set_fragment_idx(fragment_idx);
-    instance_ctx.fragment_instance_id = params.instance_id;
-    instance_ctx.per_fragment_instance_idx = params.per_fragment_instance_idx;
-    for (const auto& entry : params.per_node_scan_ranges) {
-      ScanRangesPB& scan_ranges =
-          (*instance_ctx_pb->mutable_per_node_scan_ranges())[entry.first];
-      *scan_ranges.mutable_scan_ranges() = {entry.second.begin(), entry.second.end()};
+    UniqueIdPBToTUniqueId(params.instance_id(), &instance_ctx.fragment_instance_id);
+    instance_ctx.per_fragment_instance_idx = params.per_fragment_instance_idx();
+    *instance_ctx_pb->mutable_per_node_scan_ranges() = params.per_node_scan_ranges();
+    for (const auto& entry : fragment_exec_params.per_exch_num_senders()) {
+      instance_ctx.per_exch_num_senders[entry.first] = entry.second;
     }
-    instance_ctx.__set_per_exch_num_senders(
-        params.fragment_exec_params.per_exch_num_senders);
-    instance_ctx.__set_sender_id(params.sender_id);
-    *instance_ctx_pb->mutable_join_build_inputs() = {
-        params.join_build_inputs.begin(), params.join_build_inputs.end()};
-    if (params.num_join_build_outputs != -1) {
-      instance_ctx.__set_num_join_build_outputs(params.num_join_build_outputs);
+    instance_ctx.__set_sender_id(params.sender_id());
+    *instance_ctx_pb->mutable_join_build_inputs() = params.join_build_inputs();
+    if (params.num_join_build_outputs() != -1) {
+      instance_ctx.__set_num_join_build_outputs(params.num_join_build_outputs());
     }
     if (debug_options.enabled()
         && (debug_options.instance_idx() == -1
-            || debug_options.instance_idx() == GetInstanceIdx(params.instance_id))) {
+               || debug_options.instance_idx() == GetInstanceIdx(params.instance_id()))) {
       instance_ctx.__set_debug_options(debug_options.ToThrift());
     }
 
     if (filter_mode_ == TRuntimeFilterMode::OFF) continue;
 
-    int instance_idx = GetInstanceIdx(params.instance_id);
+    int instance_idx = GetInstanceIdx(params.instance_id());
     auto& produced_map = filter_routing_table.finstance_filters_produced;
     auto produced_it = produced_map.find(instance_idx);
     if (produced_it == produced_map.end()) continue;
@@ -239,7 +237,7 @@ void Coordinator::BackendState::ExecAsync(const DebugOptions& debug_options,
     // Do not issue an ExecQueryFInstances RPC if there are no fragment instances
     // scheduled to run on this backend.
     if (IsEmptyBackend()) {
-      DCHECK(backend_exec_params_->is_coord_backend);
+      DCHECK(backend_exec_params_.is_coord_backend());
       exec_done_ = true;
       exec_status_barrier->Notify(Status::OK());
       goto done;
@@ -266,7 +264,7 @@ void Coordinator::BackendState::ExecAsync(const DebugOptions& debug_options,
     uint8_t* serialized_buf = nullptr;
     uint32_t serialized_len = 0;
     Status serialize_status =
-        DebugAction(schedule_.query_options(), "EXEC_SERIALIZE_FRAGMENT_INFO");
+        DebugAction(exec_params_.query_options(), "EXEC_SERIALIZE_FRAGMENT_INFO");
     if (LIKELY(serialize_status.ok())) {
       serialize_status =
           serializer.SerializeToBuffer(&fragment_info, &serialized_len, &serialized_buf);
@@ -429,12 +427,13 @@ bool Coordinator::BackendState::ApplyExecStatusReport(
     DCHECK_EQ(instance_stats_map_.count(instance_idx), 1);
     InstanceStats* instance_stats = instance_stats_map_[instance_idx];
     int64_t last_report_seq_no = instance_stats->last_report_seq_no_;
-    DCHECK(instance_stats->exec_params_.instance_id ==
-        ProtoToQueryId(instance_exec_status.fragment_instance_id()));
+    DCHECK_EQ(instance_stats->exec_params_.instance_id(),
+        instance_exec_status.fragment_instance_id());
     // Ignore duplicate or out-of-order messages.
     if (report_seq_no <= last_report_seq_no) {
-      VLOG_QUERY << Substitute("Ignoring stale update for query instance $0 with "
-          "seq no $1", PrintId(instance_stats->exec_params_.instance_id), report_seq_no);
+      VLOG_QUERY << "Ignoring stale update for query instance "
+                 << instance_stats->exec_params_.instance_id() << " with seq no "
+                 << report_seq_no;
       continue;
     }
 
@@ -516,7 +515,7 @@ void Coordinator::BackendState::UpdateExecStats(
   DCHECK(exec_done_) << "May only be called after WaitOnExecRpc() completes.";
   for (const auto& entry: instance_stats_map_) {
     const InstanceStats& instance_stats = *entry.second;
-    int fragment_idx = instance_stats.exec_params_.fragment().idx;
+    int fragment_idx = instance_stats.exec_params_.fragment_idx();
     DCHECK_LT(fragment_idx, fragment_stats.size());
     FragmentStats* f = fragment_stats[fragment_idx];
     int64_t completion_time = instance_stats.stopwatch_.ElapsedTime();
@@ -601,7 +600,7 @@ Coordinator::BackendState::CancelResult Coordinator::BackendState::Cancel(
   }
 
   CancelQueryFInstancesRequestPB request;
-  TUniqueIdToUniqueIdPB(query_id_, request.mutable_query_id());
+  *request.mutable_query_id() = query_id_;
   CancelQueryFInstancesResponsePB response;
 
   const int num_retries = 3;
@@ -633,7 +632,7 @@ Coordinator::BackendState::CancelResult Coordinator::BackendState::Cancel(
 void Coordinator::BackendState::PublishFilter(FilterState* state,
     MemTracker* mem_tracker, const PublishFilterParamsPB& rpc_params,
     RpcController& controller, PublishFilterResultPB& res) {
-  DCHECK_EQ(ProtoToQueryId(rpc_params.dst_query_id()), query_id_);
+  DCHECK_EQ(rpc_params.dst_query_id(), query_id_);
   // If the backend is already done, it's not waiting for this filter, so we skip
   // sending it in this case.
   if (IsDone()) return;
@@ -690,19 +689,18 @@ void Coordinator::BackendState::PublishFilterCompleteCb(
 }
 
 Coordinator::BackendState::InstanceStats::InstanceStats(
-    const FInstanceExecParams& exec_params, FragmentStats* fragment_stats,
-    ObjectPool* obj_pool)
-  : exec_params_(exec_params),
-    profile_(nullptr) {
+    const FInstanceExecParamsPB& exec_params, const TPlanFragment* fragment,
+    const NetworkAddressPB& address, FragmentStats* fragment_stats, ObjectPool* obj_pool)
+  : exec_params_(exec_params), fragment_(fragment), profile_(nullptr) {
   const string& profile_name = Substitute("Instance $0 (host=$1)",
-      PrintId(exec_params.instance_id), TNetworkAddressToString(exec_params.host));
+      PrintId(exec_params.instance_id()), NetworkAddressPBToString(address));
   profile_ = RuntimeProfile::Create(obj_pool, profile_name);
   profile_->AddInfoString(LAST_REPORT_TIME_DESC, ToStringFromUnixMillis(UnixMillis()));
   fragment_stats->root_profile()->AddChild(profile_);
 
   // add total split size to fragment_stats->bytes_assigned()
-  for (const PerNodeScanRanges::value_type& entry: exec_params_.per_node_scan_ranges) {
-    for (const ScanRangeParamsPB& scan_range_params : entry.second) {
+  for (const auto& entry : exec_params_.per_node_scan_ranges()) {
+    for (const ScanRangeParamsPB& scan_range_params : entry.second.scan_ranges()) {
       if (!scan_range_params.scan_range().has_hdfs_file_split()) continue;
       total_split_size_ += scan_range_params.scan_range().hdfs_file_split().length();
     }
@@ -737,11 +735,11 @@ void Coordinator::BackendState::InstanceStats::Update(
           exec_summary->data_sink_id_to_idx_map[exec_summary_entry.data_sink_id()];
     }
     TPlanNodeExecSummary& node_exec_summary = thrift_exec_summary.nodes[exec_summary_idx];
-    DCHECK_EQ(node_exec_summary.fragment_idx, exec_params_.fragment().idx);
-    int per_fragment_instance_idx = exec_params_.per_fragment_instance_idx;
+    DCHECK_EQ(node_exec_summary.fragment_idx, exec_params_.fragment_idx());
+    int per_fragment_instance_idx = exec_params_.per_fragment_instance_idx();
     DCHECK_LT(per_fragment_instance_idx, node_exec_summary.exec_stats.size())
-        << " instance_id=" << PrintId(exec_params_.instance_id)
-        << " fragment_idx=" << exec_params_.fragment().idx;
+        << " instance_id=" << PrintId(exec_params_.instance_id())
+        << " fragment_idx=" << exec_params_.fragment_idx();
     TExecStats& instance_stats = node_exec_summary.exec_stats[per_fragment_instance_idx];
 
     if (exec_summary_entry.has_rows_returned()) {
@@ -760,8 +758,8 @@ void Coordinator::BackendState::InstanceStats::Update(
 }
 
 void Coordinator::BackendState::InstanceStats::ToJson(Value* value, Document* document) {
-  Value instance_id_val(PrintId(exec_params_.instance_id).c_str(),
-      document->GetAllocator());
+  Value instance_id_val(
+      PrintId(exec_params_.instance_id()).c_str(), document->GetAllocator());
   value->AddMember("instance_id", instance_id_val, document->GetAllocator());
 
   // We send 'done' explicitly so we don't have to infer it by comparison with a string
@@ -772,8 +770,7 @@ void Coordinator::BackendState::InstanceStats::ToJson(Value* value, Document* do
       document->GetAllocator());
   value->AddMember("current_state", state_val, document->GetAllocator());
 
-  Value fragment_name_val(exec_params_.fragment().display_name.c_str(),
-      document->GetAllocator());
+  Value fragment_name_val(fragment_->display_name.c_str(), document->GetAllocator());
   value->AddMember("fragment_name", fragment_name_val, document->GetAllocator());
 
   value->AddMember("first_status_update_received", last_report_time_ms_ > 0,

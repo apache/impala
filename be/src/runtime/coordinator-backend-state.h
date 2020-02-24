@@ -29,10 +29,10 @@
 #include <boost/accumulators/statistics/stats.hpp>
 #include <boost/accumulators/statistics/variance.hpp>
 
+#include "gen-cpp/admission_control_service.pb.h"
 #include "gen-cpp/control_service.proxy.h"
 #include "kudu/rpc/rpc_controller.h"
 #include "runtime/coordinator.h"
-#include "scheduling/query-schedule.h"
 #include "util/error-util-internal.h"
 #include "util/progress-updater.h"
 #include "util/runtime-profile.h"
@@ -51,7 +51,6 @@ class ReportExecStatusRequestPB;
 class TUniqueId;
 class TQueryCtx;
 class ExecSummary;
-struct FInstanceExecParams;
 
 /// This class manages all aspects of the execution of all fragment instances of a
 /// single query on a particular backend. For the coordinator backend its possible to have
@@ -68,16 +67,17 @@ struct FInstanceExecParams;
 ///   subject to the restrictions above on when methods may be called.
 class Coordinator::BackendState {
  public:
-  BackendState(const QuerySchedule& schedule, const TQueryCtx& query_ctx, int state_idx,
-      TRuntimeFilterMode::type filter_mode, const BackendExecParams& exec_params);
+  BackendState(const QueryExecParams& exec_params, int state_idx,
+      TRuntimeFilterMode::type filter_mode,
+      const BackendExecParamsPB& backend_exec_params);
 
   /// The following are initialized in the constructor and always valid to call.
   int state_idx() const { return state_idx_; }
-  const BackendExecParams* exec_params() const { return backend_exec_params_; }
+  const BackendExecParamsPB& exec_params() const { return backend_exec_params_; }
   const NetworkAddressPB& impalad_address() const { return host_; }
   const NetworkAddressPB& krpc_impalad_address() const { return krpc_host_; }
   /// Returns true if there are no fragment instances scheduled on this backend.
-  bool IsEmptyBackend() const { return backend_exec_params_->instance_params.empty(); }
+  bool IsEmptyBackend() const { return backend_exec_params_.instance_params().empty(); }
   /// Return true if execution at this backend is done.
   bool IsDone();
 
@@ -223,7 +223,8 @@ class Coordinator::BackendState {
   /// Not thread-safe.
   class InstanceStats {
    public:
-    InstanceStats(const FInstanceExecParams& exec_params, FragmentStats* fragment_stats,
+    InstanceStats(const FInstanceExecParamsPB& exec_params, const TPlanFragment* fragment,
+        const NetworkAddressPB& address, FragmentStats* fragment_stats,
         ObjectPool* obj_pool);
 
     /// Updates 'this' with exec_status and the fragment intance's thrift profile. Also
@@ -233,7 +234,7 @@ class Coordinator::BackendState {
         const TRuntimeProfileTree& thrift_profile, ExecSummary* exec_summary);
 
     int per_fragment_instance_idx() const {
-      return exec_params_.per_fragment_instance_idx;
+      return exec_params_.per_fragment_instance_idx();
     }
 
     /// Serializes instance stats to JSON by adding members to 'value', including its
@@ -244,8 +245,12 @@ class Coordinator::BackendState {
    private:
     friend class BackendState;
 
-    /// query lifetime
-    const FInstanceExecParams& exec_params_;
+    /// The exec params for this fragment instance. Owned by the QuerySchedulePB in
+    /// ClientRequestState.
+    const FInstanceExecParamsPB& exec_params_;
+
+    /// The corresponding fragment. Owned by the TExecRequest in QueryDriver.
+    const TPlanFragment* fragment_;
 
     /// Unix time in milliseconds of the last status report update for this fragment
     /// instance. Set in Update(). Uses UnixMillis() instead of MonotonicMillis() as
@@ -283,14 +288,15 @@ class Coordinator::BackendState {
     FInstanceExecStatePB current_state_ = FInstanceExecStatePB::WAITING_FOR_EXEC;
   };
 
-  /// QuerySchedule associated with the Coordinator that owns this BackendState.
-  const QuerySchedule& schedule_;
+  /// ExecParams associated with the Coordinator that owns this BackendState.
+  const QueryExecParams& exec_params_;
 
   const int state_idx_;  /// index of 'this' in Coordinator::backend_states_
   const TRuntimeFilterMode::type filter_mode_;
 
-  /// Backend exec params, owned by the QuerySchedule and has query lifetime.
-  const BackendExecParams* backend_exec_params_;
+  /// Backend exec params, owned by the QuerySchedulePB in ClientRequestState and has
+  /// query lifetime.
+  const BackendExecParamsPB& backend_exec_params_;
 
   /// map from instance idx to InstanceStats, the latter live in the obj_pool parameter
   /// of Init()
@@ -312,8 +318,9 @@ class Coordinator::BackendState {
   /// The query context of the Coordinator that owns this BackendState.
   const TQueryCtx& query_ctx_;
 
-  /// The query id of the Coordinator that owns this BackendState.
-  const TUniqueId& query_id_;
+  /// The query id of the Coordinator that owns this BackendState. Owned by
+  /// 'exec_params_'.
+  const UniqueIdPB& query_id_;
 
   /// Used to issue the ExecQueryFInstances() rpc.
   kudu::rpc::RpcController exec_rpc_controller_;
@@ -523,8 +530,7 @@ class Coordinator::BackendResourceState {
  public:
   /// Create the BackendResourceState with the given vector of BackendStates. All
   /// BackendStates are initially in the IN_USE state.
-  BackendResourceState(
-      const std::vector<BackendState*>& backend_states, const QuerySchedule& schedule);
+  BackendResourceState(const std::vector<BackendState*>& backend_states);
   ~BackendResourceState();
 
   /// Mark a BackendState as finished and transition it to the PENDING state. Applies
@@ -586,9 +592,6 @@ class Coordinator::BackendResourceState {
 
   // True if the BackendResourceState is closed, false otherwise.
   bool closed_ = false;
-
-  /// QuerySchedule associated with the Coordinator that owns this BackendResourceState.
-  const QuerySchedule& schedule_;
 
   /// Configured value of FLAGS_release_backend_states_delay_ms in nanoseconds.
   const int64_t release_backend_states_delay_ns_;

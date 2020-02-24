@@ -364,7 +364,7 @@ class Result {
 
   /// Parameter type for callbacks, which are used to filter scheduling results.
   struct AssignmentInfo {
-    const TNetworkAddress& addr;
+    const NetworkAddressPB& addr;
     const HdfsFileSplitPB& hdfs_file_split;
     bool is_cached;
     bool is_remote;

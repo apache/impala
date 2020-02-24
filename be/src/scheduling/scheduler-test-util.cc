@@ -503,8 +503,9 @@ int64_t Result::MinNumAssignedBytesPerHost() const {
 
 int Result::NumDistinctBackends() const {
   unordered_set<IpAddr> backends;
-  AssignmentCallback cb = [&backends](
-      const AssignmentInfo& assignment) { backends.insert(assignment.addr.hostname); };
+  AssignmentCallback cb = [&backends](const AssignmentInfo& assignment) {
+    backends.insert(assignment.addr.hostname());
+  };
   ProcessAssignments(cb);
   return backends.size();
 }
@@ -526,8 +527,9 @@ Result::AssignmentFilter Result::Any() const {
 Result::AssignmentFilter Result::IsHost(int host_idx) const {
   TNetworkAddress expected_addr;
   plan_.cluster().GetBackendAddress(host_idx, &expected_addr);
-  return [expected_addr](
-      const AssignmentInfo& assignment) { return assignment.addr == expected_addr; };
+  return [expected_addr](const AssignmentInfo& assignment) {
+    return assignment.addr == FromTNetworkAddress(expected_addr);
+  };
 }
 
 Result::AssignmentFilter Result::IsCached(AssignmentFilter filter) const {
@@ -551,7 +553,7 @@ Result::AssignmentFilter Result::IsRemote(AssignmentFilter filter) const {
 void Result::ProcessAssignments(const AssignmentCallback& cb) const {
   for (const FragmentScanRangeAssignment& assignment : assignments_) {
     for (const auto& assignment_elem : assignment) {
-      const TNetworkAddress& addr = assignment_elem.first;
+      const NetworkAddressPB& addr = assignment_elem.first;
       const PerNodeScanRanges& per_node_ranges = assignment_elem.second;
       for (const auto& per_node_ranges_elem : per_node_ranges) {
         const vector<ScanRangeParamsPB> scan_range_params_vector =
@@ -592,8 +594,8 @@ int64_t Result::CountAssignedBytesIf(const AssignmentFilter& filter) const {
 void Result::CountAssignmentsPerBackend(
     NumAssignmentsPerBackend* num_assignments_per_backend) const {
   AssignmentCallback cb = [&num_assignments_per_backend](
-      const AssignmentInfo& assignment) {
-    ++(*num_assignments_per_backend)[assignment.addr.hostname];
+                              const AssignmentInfo& assignment) {
+    ++(*num_assignments_per_backend)[assignment.addr.hostname()];
   };
   ProcessAssignments(cb);
 }
@@ -601,8 +603,8 @@ void Result::CountAssignmentsPerBackend(
 void Result::CountAssignedBytesPerBackend(
     NumAssignedBytesPerBackend* num_assignments_per_backend) const {
   AssignmentCallback cb = [&num_assignments_per_backend](
-      const AssignmentInfo& assignment) {
-    (*num_assignments_per_backend)[assignment.addr.hostname] +=
+                              const AssignmentInfo& assignment) {
+    (*num_assignments_per_backend)[assignment.addr.hostname()] +=
         assignment.hdfs_file_split.length();
   };
   ProcessAssignments(cb);

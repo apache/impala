@@ -38,6 +38,7 @@
 #include "util/runtime-profile-counters.h"
 #include "util/thread.h"
 #include "util/time.h"
+#include "util/uid-util.h"
 
 #include "common/names.h"
 
@@ -400,44 +401,42 @@ void AdmissionController::PoolStats::Dequeue(bool timed_out) {
   }
 }
 
-void AdmissionController::UpdateStatsOnReleaseForBackends(
-    const QuerySchedule& schedule, const vector<TNetworkAddress>& host_addrs) {
+void AdmissionController::UpdateStatsOnReleaseForBackends(const UniqueIdPB& query_id,
+    const RunningQuery& running_query, const vector<NetworkAddressPB>& host_addrs) {
   int64_t total_mem_to_release = 0;
   for (auto host_addr : host_addrs) {
-    auto backend_exec_params = schedule.per_backend_exec_params().find(host_addr);
-    if (backend_exec_params == schedule.per_backend_exec_params().end()) {
+    auto backend_allocation = running_query.per_backend_resources.find(host_addr);
+    if (backend_allocation == running_query.per_backend_resources.end()) {
       string err_msg =
           strings::Substitute("Error: Cannot find exec params of host $0 for query $1.",
-              PrintThrift(host_addr), PrintId(schedule.query_id()));
+              NetworkAddressPBToString(host_addr), PrintId(query_id));
       DCHECK(false) << err_msg;
       LOG(ERROR) << err_msg;
       continue;
     }
-    int64_t mem_to_release = GetMemToAdmit(schedule, backend_exec_params->second);
-    UpdateHostStats(
-        host_addr, -mem_to_release, -1, -backend_exec_params->second.slots_to_use);
-    total_mem_to_release += mem_to_release;
+    UpdateHostStats(host_addr, -backend_allocation->second.mem_to_admit, -1,
+        -backend_allocation->second.slots_to_use);
+    total_mem_to_release += backend_allocation->second.mem_to_admit;
   }
-  PoolStats* pool_stats = GetPoolStats(schedule);
+  PoolStats* pool_stats = GetPoolStats(running_query.request_pool);
   pool_stats->ReleaseMem(total_mem_to_release);
-  pools_for_updates_.insert(schedule.request_pool());
+  pools_for_updates_.insert(running_query.request_pool);
 }
 
 void AdmissionController::UpdateStatsOnAdmission(const QuerySchedule& schedule) {
   for (const auto& entry : schedule.per_backend_exec_params()) {
-    const TNetworkAddress& host_addr = entry.first;
+    const NetworkAddressPB& host_addr = entry.first;
     int64_t mem_to_admit = GetMemToAdmit(schedule, entry.second);
-    UpdateHostStats(host_addr, mem_to_admit, 1, entry.second.slots_to_use);
+    UpdateHostStats(host_addr, mem_to_admit, 1, entry.second.pb->slots_to_use());
   }
   PoolStats* pool_stats = GetPoolStats(schedule);
   pool_stats->AdmitQueryAndMemory(schedule);
   pools_for_updates_.insert(schedule.request_pool());
 }
 
-void AdmissionController::UpdateHostStats(
-    const TNetworkAddress& host_addr, int64_t mem_to_admit, int num_queries_to_admit,
-    int num_slots_to_admit) {
-  const string host = TNetworkAddressToString(host_addr);
+void AdmissionController::UpdateHostStats(const NetworkAddressPB& host_addr,
+    int64_t mem_to_admit, int num_queries_to_admit, int num_slots_to_admit) {
+  const string host = NetworkAddressPBToString(host_addr);
   VLOG_ROW << "Update admitted mem reserved for host=" << host
            << " prev=" << PrintBytes(host_stats_[host].mem_admitted)
            << " new=" << PrintBytes(host_stats_[host].mem_admitted + mem_to_admit);
@@ -515,8 +514,8 @@ bool AdmissionController::HasAvailableMemResources(const QuerySchedule& schedule
 
   // Case 2:
   for (const auto& entry : schedule.per_backend_exec_params()) {
-    const TNetworkAddress& host = entry.first;
-    const string host_id = TNetworkAddressToString(host);
+    const NetworkAddressPB& host = entry.first;
+    const string host_id = NetworkAddressPBToString(host);
     int64_t admit_mem_limit = entry.second.be_desc.admit_mem_limit();
     const HostStats& host_stats = host_stats_[host_id];
     int64_t mem_reserved = host_stats.mem_reserved;
@@ -550,17 +549,17 @@ bool AdmissionController::HasAvailableMemResources(const QuerySchedule& schedule
 bool AdmissionController::HasAvailableSlots(const QuerySchedule& schedule,
     const TPoolConfig& pool_cfg, string* unavailable_reason) {
   for (const auto& entry : schedule.per_backend_exec_params()) {
-    const TNetworkAddress& host = entry.first;
-    const string host_id = TNetworkAddressToString(host);
+    const NetworkAddressPB& host = entry.first;
+    const string host_id = NetworkAddressPBToString(host);
     int64_t admission_slots = entry.second.be_desc.admission_slots();
     int64_t slots_in_use = host_stats_[host_id].slots_in_use;
     VLOG_ROW << "Checking available slot on host=" << host_id
              << " slots_in_use=" << slots_in_use
-             << " needs=" << slots_in_use + entry.second.slots_to_use
+             << " needs=" << slots_in_use + entry.second.pb->slots_to_use()
              << " executor admission_slots=" << admission_slots;
-    if (slots_in_use + entry.second.slots_to_use > admission_slots) {
+    if (slots_in_use + entry.second.pb->slots_to_use() > admission_slots) {
       *unavailable_reason = Substitute(HOST_SLOT_NOT_AVAILABLE, host_id,
-          entry.second.slots_to_use, slots_in_use, admission_slots);
+          entry.second.pb->slots_to_use(), slots_in_use, admission_slots);
       return false;
     }
   }
@@ -654,32 +653,34 @@ bool AdmissionController::RejectForSchedule(const QuerySchedule& schedule,
   // Compute the max (over all backends), the cluster totals (across all backends) for
   // min_mem_reservation_bytes, thread_reservation, the min admit_mem_limit
   // (over all executors) and the admit_mem_limit of the coordinator.
-  pair<const TNetworkAddress*, int64_t> largest_min_mem_reservation(nullptr, -1);
+  pair<const NetworkAddressPB*, int64_t> largest_min_mem_reservation(nullptr, -1);
   int64_t cluster_min_mem_reservation_bytes = 0;
-  pair<const TNetworkAddress*, int64_t> max_thread_reservation(nullptr, 0);
-  pair<const TNetworkAddress*, int64_t> min_executor_admit_mem_limit(
+  pair<const NetworkAddressPB*, int64_t> max_thread_reservation(nullptr, 0);
+  pair<const NetworkAddressPB*, int64_t> min_executor_admit_mem_limit(
       nullptr, std::numeric_limits<int64_t>::max());
-  pair<const TNetworkAddress*, int64_t> coord_admit_mem_limit(
+  pair<const NetworkAddressPB*, int64_t> coord_admit_mem_limit(
       nullptr, std::numeric_limits<int64_t>::max());
   int64_t cluster_thread_reservation = 0;
   for (const auto& e : schedule.per_backend_exec_params()) {
     const BackendExecParams& bp = e.second;
     // TODO(IMPALA-8757): Extend slot based admission to default executor group
-    if (!default_group && bp.slots_to_use > bp.be_desc.admission_slots()) {
-      *rejection_reason = Substitute(REASON_NOT_ENOUGH_SLOTS_ON_BACKEND, bp.slots_to_use,
-          NetworkAddressPBToString(bp.be_desc.address()), bp.be_desc.admission_slots());
+    if (!default_group && bp.pb->slots_to_use() > bp.be_desc.admission_slots()) {
+      *rejection_reason = Substitute(REASON_NOT_ENOUGH_SLOTS_ON_BACKEND,
+          bp.pb->slots_to_use(), NetworkAddressPBToString(bp.be_desc.address()),
+          bp.be_desc.admission_slots());
       return true;
     }
 
-    cluster_min_mem_reservation_bytes += bp.min_mem_reservation_bytes;
-    if (bp.min_mem_reservation_bytes > largest_min_mem_reservation.second) {
-      largest_min_mem_reservation = make_pair(&e.first, bp.min_mem_reservation_bytes);
+    cluster_min_mem_reservation_bytes += bp.pb->min_mem_reservation_bytes();
+    if (bp.pb->min_mem_reservation_bytes() > largest_min_mem_reservation.second) {
+      largest_min_mem_reservation =
+          make_pair(&e.first, bp.pb->min_mem_reservation_bytes());
     }
-    cluster_thread_reservation += bp.thread_reservation;
-    if (bp.thread_reservation > max_thread_reservation.second) {
-      max_thread_reservation = make_pair(&e.first, bp.thread_reservation);
+    cluster_thread_reservation += bp.pb->thread_reservation();
+    if (bp.pb->thread_reservation() > max_thread_reservation.second) {
+      max_thread_reservation = make_pair(&e.first, bp.pb->thread_reservation());
     }
-    if (bp.is_coord_backend) {
+    if (bp.pb->is_coord_backend()) {
       coord_admit_mem_limit.first = &e.first;
       coord_admit_mem_limit.second = bp.be_desc.admit_mem_limit();
     } else if (bp.be_desc.admit_mem_limit() < min_executor_admit_mem_limit.second) {
@@ -693,7 +694,7 @@ bool AdmissionController::RejectForSchedule(const QuerySchedule& schedule,
   if (query_opts.__isset.buffer_pool_limit && query_opts.buffer_pool_limit > 0) {
     if (largest_min_mem_reservation.second > query_opts.buffer_pool_limit) {
       *rejection_reason = Substitute(REASON_BUFFER_LIMIT_TOO_LOW_FOR_RESERVATION,
-          TNetworkAddressToString(*largest_min_mem_reservation.first),
+          NetworkAddressPBToString(*largest_min_mem_reservation.first),
           PrintBytes(largest_min_mem_reservation.second));
       return true;
     }
@@ -707,7 +708,7 @@ bool AdmissionController::RejectForSchedule(const QuerySchedule& schedule,
       && query_opts.thread_reservation_limit > 0
       && max_thread_reservation.second > query_opts.thread_reservation_limit) {
     *rejection_reason = Substitute(REASON_THREAD_RESERVATION_LIMIT_EXCEEDED,
-        TNetworkAddressToString(*max_thread_reservation.first),
+        NetworkAddressPBToString(*max_thread_reservation.first),
         max_thread_reservation.second, query_opts.thread_reservation_limit);
     return true;
   }
@@ -749,7 +750,7 @@ bool AdmissionController::RejectForSchedule(const QuerySchedule& schedule,
       *rejection_reason =
           Substitute(REASON_REQ_OVER_NODE_MEM, PrintBytes(executor_mem_to_admit),
               PrintBytes(min_executor_admit_mem_limit.second),
-              TNetworkAddressToString(*min_executor_admit_mem_limit.first));
+              NetworkAddressPBToString(*min_executor_admit_mem_limit.first));
       return true;
     }
     int64_t coord_mem_to_admit = schedule.coord_backend_mem_to_admit();
@@ -759,7 +760,7 @@ bool AdmissionController::RejectForSchedule(const QuerySchedule& schedule,
     if (coord_mem_to_admit > coord_admit_mem_limit.second) {
       *rejection_reason = Substitute(REASON_REQ_OVER_NODE_MEM,
           PrintBytes(coord_mem_to_admit), PrintBytes(coord_admit_mem_limit.second),
-          TNetworkAddressToString(*coord_admit_mem_limit.first));
+          NetworkAddressPBToString(*coord_admit_mem_limit.first));
       return true;
     }
   }
@@ -778,7 +779,7 @@ void AdmissionController::PoolStats::UpdateConfigMetrics(const TPoolConfig& pool
 
 Status AdmissionController::SubmitForAdmission(const AdmissionRequest& request,
     Promise<AdmissionOutcome, PromiseMode::MULTIPLE_PRODUCER>* admit_outcome,
-    std::unique_ptr<QuerySchedule>* schedule_result) {
+    unique_ptr<QuerySchedulePB>* schedule_result) {
   DCHECK(schedule_result->get() == nullptr);
 
   ClusterMembershipMgr::SnapshotPtr membership_snapshot =
@@ -834,10 +835,10 @@ Status AdmissionController::SubmitForAdmission(const AdmissionRequest& request,
     }
 
     if (queue_node.admitted_schedule.get() != nullptr) {
+      DCHECK(queue_node.admitted_schedule->query_schedule_pb().get() != nullptr);
       const string& group_name = queue_node.admitted_schedule->executor_group();
       VLOG(3) << "Can admit to group " << group_name << " (or cancelled)";
       DCHECK_EQ(stats->local_stats().num_queued, 0);
-      *schedule_result = std::move(queue_node.admitted_schedule);
       AdmissionOutcome outcome = admit_outcome->Set(AdmissionOutcome::ADMITTED);
       if (outcome != AdmissionOutcome::ADMITTED) {
         DCHECK_ENUM_EQ(outcome, AdmissionOutcome::CANCELLED);
@@ -846,9 +847,10 @@ Status AdmissionController::SubmitForAdmission(const AdmissionRequest& request,
         return Status::CANCELLED;
       }
       VLOG_QUERY << "Admitting query id=" << PrintId(request.query_id);
-      AdmitQuery(schedule_result->get(), false);
+      AdmitQuery(queue_node.admitted_schedule.get(), false);
       stats->UpdateWaitTime(0);
       VLOG_RPC << "Final: " << stats->DebugString();
+      *schedule_result = move(queue_node.admitted_schedule->query_schedule_pb());
       return Status::OK();
     }
 
@@ -925,7 +927,7 @@ Status AdmissionController::SubmitForAdmission(const AdmissionRequest& request,
     // not change them here.
     DCHECK_ENUM_EQ(outcome, AdmissionOutcome::ADMITTED);
     DCHECK(queue_node.admitted_schedule.get() != nullptr);
-    *schedule_result = std::move(queue_node.admitted_schedule);
+    *schedule_result = move(queue_node.admitted_schedule->query_schedule_pb());
     DCHECK(!queue->Contains(&queue_node));
     VLOG_QUERY << "Admitted queued query id=" << PrintId(request.query_id);
     VLOG_RPC << "Final: " << pool_stats->DebugString();
@@ -934,38 +936,53 @@ Status AdmissionController::SubmitForAdmission(const AdmissionRequest& request,
 }
 
 void AdmissionController::ReleaseQuery(
-    const QuerySchedule& schedule, int64_t peak_mem_consumption) {
-  const string& pool_name = schedule.request_pool();
+    const UniqueIdPB& query_id, int64_t peak_mem_consumption) {
   {
     lock_guard<mutex> lock(admission_ctrl_lock_);
-    DCHECK_EQ(num_released_backends_.at(schedule.query_id()), 0);
-    num_released_backends_.erase(num_released_backends_.find(schedule.query_id()));
-    PoolStats* stats = GetPoolStats(schedule);
+    auto it = running_queries_.find(query_id);
+    if (it == running_queries_.end()) {
+      LOG(DFATAL) << "Unable to find resources to release for query "
+                  << PrintId(query_id);
+      return;
+    }
+
+    const RunningQuery& running_query = it->second;
+    DCHECK_EQ(num_released_backends_.at(query_id), 0) << PrintId(query_id);
+    num_released_backends_.erase(num_released_backends_.find(query_id));
+    PoolStats* stats = GetPoolStats(running_query.request_pool);
     stats->ReleaseQuery(peak_mem_consumption);
     // No need to update the Host Stats as they should have been updated in
     // ReleaseQueryBackends.
-    pools_for_updates_.insert(pool_name);
-    UpdateExecGroupMetric(schedule.executor_group(), -1);
-    VLOG_RPC << "Released query id=" << PrintId(schedule.query_id()) << " "
-             << stats->DebugString();
+    pools_for_updates_.insert(running_query.request_pool);
+    UpdateExecGroupMetric(running_query.executor_group, -1);
+    VLOG_RPC << "Released query id=" << PrintId(query_id) << " " << stats->DebugString();
     pending_dequeue_ = true;
+    running_queries_.erase(it);
   }
   dequeue_cv_.NotifyOne();
 }
 
 void AdmissionController::ReleaseQueryBackends(
-    const QuerySchedule& schedule, const vector<TNetworkAddress>& host_addrs) {
+    const UniqueIdPB& query_id, const vector<NetworkAddressPB>& host_addrs) {
   {
     lock_guard<mutex> lock(admission_ctrl_lock_);
-    UpdateStatsOnReleaseForBackends(schedule, host_addrs);
+    auto it = running_queries_.find(query_id);
+    if (it == running_queries_.end()) {
+      LOG(DFATAL) << "Unable to find resources to release for query backends "
+                  << PrintId(query_id);
+      return;
+    }
+
+    const RunningQuery& running_query = it->second;
+    UpdateStatsOnReleaseForBackends(query_id, running_query, host_addrs);
 
     // Update num_released_backends_.
-    auto released_backends = num_released_backends_.find(schedule.query_id());
+    auto released_backends = num_released_backends_.find(query_id);
     if (released_backends != num_released_backends_.end()) {
       released_backends->second -= host_addrs.size();
     } else {
-      string err_msg = Substitute("Unable to find num released backends for query $0",
-          PrintId(schedule.query_id()));
+      string err_msg = Substitute(
+          "Unable to find num released backends for query $0", PrintId(query_id));
       DCHECK(false) << err_msg;
       LOG(ERROR) << err_msg;
     }
@@ -973,9 +990,9 @@ void AdmissionController::ReleaseQueryBackends(
     if (VLOG_IS_ON(2)) {
       stringstream ss;
       ss << "Released query backend(s) ";
-      for (auto host_addr : host_addrs) ss << PrintThrift(host_addr) << " ";
-      ss << "for query id=" << PrintId(schedule.query_id()) << " "
-         << GetPoolStats(schedule)->DebugString();
+      for (auto host_addr : host_addrs) ss << host_addr << " ";
+      ss << "for query id=" << PrintId(query_id) << " "
+         << GetPoolStats(running_query.request_pool)->DebugString();
       VLOG(2) << ss.str();
     }
     pending_dequeue_ = true;
@@ -1390,7 +1407,7 @@ void AdmissionController::DequeueLoop() {
         }
         DCHECK(is_cancelled || queue_node->admitted_schedule != nullptr);
 
-        const TUniqueId& query_id = queue_node->admission_request.query_id;
+        const UniqueIdPB& query_id = queue_node->admission_request.query_id;
         if (!is_cancelled) {
           VLOG_QUERY << "Admitting from queue: query=" << PrintId(query_id);
           AdmissionOutcome outcome =
@@ -1521,6 +1538,17 @@ void AdmissionController::AdmitQuery(QuerySchedule* schedule, bool was_queued) {
       num_released_backends_.find(schedule->query_id()) == num_released_backends_.end());
   num_released_backends_[schedule->query_id()] =
       schedule->per_backend_exec_params().size();
+
+  // Store info about the admitted resources so that we can release them.
+  DCHECK(running_queries_.find(schedule->query_id()) == running_queries_.end());
+  RunningQuery& running_query = running_queries_[schedule->query_id()];
+  running_query.request_pool = schedule->request_pool();
+  running_query.executor_group = schedule->executor_group();
+  for (const auto& entry : schedule->per_backend_exec_params()) {
+    BackendAllocation& allocation = running_query.per_backend_resources[entry.first];
+    allocation.slots_to_use = entry.second.pb->slots_to_use();
+    allocation.mem_to_admit = GetMemToAdmit(*schedule, entry.second);
+  }
 }
 
 string AdmissionController::GetStalenessDetail(const string& prefix,
@@ -1835,8 +1863,9 @@ bool AdmissionController::PoolLimitsRunningQueriesCount(const TPoolConfig& pool_
 
 int64_t AdmissionController::GetMemToAdmit(
     const QuerySchedule& schedule, const BackendExecParams& backend_exec_params) {
-  return backend_exec_params.is_coord_backend ? schedule.coord_backend_mem_to_admit() :
-                                                schedule.per_backend_mem_to_admit();
+  return backend_exec_params.pb->is_coord_backend() ?
+      schedule.coord_backend_mem_to_admit() :
+      schedule.per_backend_mem_to_admit();
 }
 
 void AdmissionController::UpdateExecGroupMetricMap(

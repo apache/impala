@@ -102,6 +102,14 @@ inline TUniqueId CreateInstanceId(
   return result;
 }
 
+inline UniqueIdPB CreateInstanceId(const UniqueIdPB& query_id, int32_t instance_idx) {
+  DCHECK_EQ(GetInstanceIdx(query_id), 0); // well-formed query id
+  DCHECK_GE(instance_idx, 0);
+  UniqueIdPB result = query_id;
+  result.set_lo(result.lo() + instance_idx);
+  return result;
+}
+
 template <typename F, typename T>
 inline T CastTUniqueId(const F& from) {
   T to;

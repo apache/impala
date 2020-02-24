@@ -116,6 +116,7 @@ using boost::get_system_time;
 using boost::system_time;
 using boost::uuids::random_generator;
 using boost::uuids::uuid;
+using google::protobuf::RepeatedPtrField;
 using kudu::GetRandomSeed32;
 using kudu::rpc::RpcContext;
 using namespace apache::hive::service::cli::thrift;
@@ -1245,16 +1246,16 @@ void ImpalaServer::CloseClientRequestState(const QueryHandle& query_handle) {
   }
 
   if (query_handle->schedule() != nullptr) {
-    const PerBackendExecParams& per_backend_params =
-        query_handle->schedule()->per_backend_exec_params();
-    if (!per_backend_params.empty()) {
+    const RepeatedPtrField<BackendExecParamsPB>& backend_exec_params =
+        query_handle->schedule()->backend_exec_params();
+    if (!backend_exec_params.empty()) {
       lock_guard<mutex> l(query_locations_lock_);
-      for (const auto& entry : per_backend_params) {
+      for (const BackendExecParamsPB& param : backend_exec_params) {
         // Query may have been removed already by cancellation path. In particular, if
         // node to fail was last sender to an exchange, the coordinator will realise and
         // fail the query at the same time the failure detection path does the same
         // thing. They will harmlessly race to remove the query from this map.
-        auto it = query_locations_.find(entry.second.be_desc.backend_id());
+        auto it = query_locations_.find(param.backend_id());
         if (it != query_locations_.end()) {
           it->second.query_ids.erase(query_handle->query_id());
         }
@@ -1893,16 +1894,17 @@ Status ImpalaServer::ProcessCatalogUpdateResult(
 }
 
 void ImpalaServer::RegisterQueryLocations(
-    const PerBackendExecParams& per_backend_params, const TUniqueId& query_id) {
+    const RepeatedPtrField<BackendExecParamsPB>& backend_params,
+    const TUniqueId& query_id) {
   VLOG_QUERY << "Registering query locations";
-  if (!per_backend_params.empty()) {
+  if (!backend_params.empty()) {
     lock_guard<mutex> l(query_locations_lock_);
-    for (const auto& entry : per_backend_params) {
-      const BackendIdPB& backend_id = entry.second.be_desc.backend_id();
+    for (const BackendExecParamsPB& param : backend_params) {
+      const BackendIdPB& backend_id = param.backend_id();
       auto it = query_locations_.find(backend_id);
       if (it == query_locations_.end()) {
         query_locations_.emplace(
-            backend_id, QueryLocationInfo(entry.second.be_desc.address(), query_id));
+            backend_id, QueryLocationInfo(param.address(), query_id));
       } else {
         it->second.query_ids.insert(query_id);
       }

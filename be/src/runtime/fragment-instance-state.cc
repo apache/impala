@@ -47,7 +47,6 @@
 #include "runtime/runtime-filter-bank.h"
 #include "runtime/runtime-state.h"
 #include "runtime/thread-resource-mgr.h"
-#include "scheduling/query-schedule.h"
 #include "util/container-util.h"
 #include "util/debug-util.h"
 #include "util/periodic-counter-updater.h"

@@ -21,7 +21,6 @@
 #include "common/object-pool.h"
 #include "common/status.h"
 #include "exec/catalog-op-executor.h"
-#include "scheduling/query-schedule.h"
 #include "service/child-query.h"
 #include "service/impala-server.h"
 #include "service/query-result-set.h"
@@ -46,6 +45,7 @@ class Thread;
 class TRuntimeProfileTree;
 class TupleRow;
 enum class AdmissionOutcome;
+class QuerySchedulePB;
 
 /// Execution state of the client-facing side of a query. This captures everything
 /// necessary to convert row batches received by the coordinator into results
@@ -233,7 +233,7 @@ class ClientRequestState {
   const TUniqueId& session_id() const { return query_ctx_.session.session_id; }
   const std::string& default_db() const { return query_ctx_.session.database; }
   bool eos() const { return eos_.Load(); }
-  const QuerySchedule* schedule() const { return schedule_.get(); }
+  const QuerySchedulePB* schedule() const { return schedule_.get(); }
 
   /// Returns the Coordinator for 'QUERY' and 'DML' requests once Coordinator::Exec()
   /// completes successfully. Otherwise returns null.
@@ -454,8 +454,8 @@ class ClientRequestState {
   /// Session that this query is from
   std::shared_ptr<ImpalaServer::SessionState> session_;
 
-  /// Resource assignment determined by scheduler. Owned by obj_pool_.
-  std::unique_ptr<QuerySchedule> schedule_;
+  /// Resource assignment determined by scheduler.
+  std::unique_ptr<QuerySchedulePB> schedule_;
 
   /// Thread for asynchronously running the admission control code-path and starting
   /// execution in the following cases:
@@ -633,7 +633,7 @@ class ClientRequestState {
   Status ExecAsyncQueryOrDmlRequest(const TQueryExecRequest& query_exec_request)
       WARN_UNUSED_RESULT;
 
-  /// Submits the QuerySchedule to the admission controller and on successful admission,
+  /// Submits the exec request to the admission controller and on successful admission,
   /// starts up the coordinator execution, makes it accessible by setting
   /// 'coord_exec_called_' to true and advances operation_state_ to RUNNING. Handles
   /// async cancellation of queries and cleans up state if needed.

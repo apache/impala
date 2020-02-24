@@ -23,7 +23,6 @@
 #include <random>
 #include <unordered_map>
 #include <vector>
-#include <boost/algorithm/string/join.hpp>
 #include <boost/unordered_set.hpp>
 #include <gutil/strings/substitute.h>
 
@@ -50,7 +49,6 @@
 
 #include "common/names.h"
 
-using boost::algorithm::join;
 using std::pop_heap;
 using std::push_heap;
 using namespace apache::thrift;
@@ -89,25 +87,24 @@ Scheduler::Scheduler(MetricGroup* metrics, RequestPoolService* request_pool_serv
 }
 
 const BackendDescriptorPB& Scheduler::LookUpBackendDesc(
-    const ExecutorConfig& executor_config, const TNetworkAddress& host) {
-  const BackendDescriptorPB* desc =
-      executor_config.group.LookUpBackendDesc(FromTNetworkAddress(host));
+    const ExecutorConfig& executor_config, const NetworkAddressPB& host) {
+  const BackendDescriptorPB* desc = executor_config.group.LookUpBackendDesc(host);
   if (desc == nullptr) {
     // Local host may not be in executor_config's executor group if it's a dedicated
     // coordinator, or if it is configured to be in a different executor group.
     const BackendDescriptorPB& local_be_desc = executor_config.local_be_desc;
-    DCHECK(host == FromNetworkAddressPB(local_be_desc.address()));
+    DCHECK(host == local_be_desc.address());
     desc = &local_be_desc;
   }
   return *desc;
 }
 
-TNetworkAddress Scheduler::LookUpKrpcHost(
-    const ExecutorConfig& executor_config, const TNetworkAddress& backend_host) {
+NetworkAddressPB Scheduler::LookUpKrpcHost(
+    const ExecutorConfig& executor_config, const NetworkAddressPB& backend_host) {
   const BackendDescriptorPB& backend_descriptor =
       LookUpBackendDesc(executor_config, backend_host);
   DCHECK(backend_descriptor.has_krpc_address());
-  TNetworkAddress krpc_host = FromNetworkAddressPB(backend_descriptor.krpc_address());
+  const NetworkAddressPB& krpc_host = backend_descriptor.krpc_address();
   DCHECK(IsResolvedAddress(krpc_host));
   return krpc_host;
 }
@@ -227,17 +224,16 @@ void Scheduler::ComputeFragmentExecParams(
       FragmentExecParams* src_params = schedule->GetFragmentExecParams(src_fragment.idx);
 
       // populate src_params->destinations
-      src_params->destinations.resize(dest_params->instance_exec_params.size());
       for (int i = 0; i < dest_params->instance_exec_params.size(); ++i) {
-        PlanFragmentDestinationPB& dest = src_params->destinations[i];
-        TUniqueIdToUniqueIdPB(dest_params->instance_exec_params[i].instance_id,
-            dest.mutable_fragment_instance_id());
-        const TNetworkAddress& host = dest_params->instance_exec_params[i].host;
-        *dest.mutable_thrift_backend() = FromTNetworkAddress(host);
+        PlanFragmentDestinationPB* dest = src_params->pb->add_destinations();
+        *dest->mutable_fragment_instance_id() =
+            dest_params->instance_exec_params[i].pb.instance_id();
+        const NetworkAddressPB& host = dest_params->instance_exec_params[i].host;
+        *dest->mutable_thrift_backend() = host;
         const BackendDescriptorPB& desc = LookUpBackendDesc(executor_config, host);
         DCHECK(desc.has_krpc_address());
         DCHECK(IsResolvedAddress(desc.krpc_address()));
-        *dest.mutable_krpc_backend() = desc.krpc_address();
+        *dest->mutable_krpc_backend() = desc.krpc_address();
       }
 
       // enumerate senders consecutively;
@@ -248,12 +244,13 @@ void Scheduler::ComputeFragmentExecParams(
           || sink.output_partition.type == TPartitionType::RANDOM
           || sink.output_partition.type == TPartitionType::KUDU);
       PlanNodeId exch_id = sink.dest_node_id;
-      int sender_id_base = dest_params->per_exch_num_senders[exch_id];
-      dest_params->per_exch_num_senders[exch_id] +=
-          src_params->instance_exec_params.size();
+      google::protobuf::Map<int32_t, int32_t>* per_exch_num_senders =
+          dest_params->pb->mutable_per_exch_num_senders();
+      int sender_id_base = (*per_exch_num_senders)[exch_id];
+      (*per_exch_num_senders)[exch_id] += src_params->instance_exec_params.size();
       for (int i = 0; i < src_params->instance_exec_params.size(); ++i) {
         FInstanceExecParams& src_instance_params = src_params->instance_exec_params[i];
-        src_instance_params.sender_id = sender_id_base + i;
+        src_instance_params.pb.set_sender_id(sender_id_base + i);
       }
     }
   }
@@ -286,19 +283,21 @@ void Scheduler::ComputeFragmentExecParams(const ExecutorConfig& executor_config,
     const NetworkAddressPB& krpc_coord = local_be_desc.krpc_address();
     DCHECK(IsResolvedAddress(krpc_coord));
     // make sure that the coordinator instance ends up with instance idx 0
-    TUniqueId instance_id = fragment_params->is_coord_fragment
-        ? schedule->query_id()
-        : schedule->GetNextInstanceId();
-    fragment_params->instance_exec_params.emplace_back(instance_id,
-        FromNetworkAddressPB(coord), FromNetworkAddressPB(krpc_coord), 0,
-        *fragment_params);
+    UniqueIdPB instance_id = fragment_params->is_coord_fragment ?
+        schedule->query_id() :
+        schedule->GetNextInstanceId();
+    fragment_params->instance_exec_params.emplace_back(
+        instance_id, coord, krpc_coord, 0, *fragment_params);
     FInstanceExecParams& instance_params = fragment_params->instance_exec_params.back();
+    *fragment_params->pb->add_instances() = instance_id;
 
     // That instance gets all of the scan ranges, if there are any.
     if (!fragment_params->scan_range_assignment.empty()) {
       DCHECK_EQ(fragment_params->scan_range_assignment.size(), 1);
       auto first_entry = fragment_params->scan_range_assignment.begin();
-      instance_params.per_node_scan_ranges = first_entry->second;
+      for (const PerNodeScanRanges::value_type& entry : first_entry->second) {
+        instance_params.AddScanRanges(entry.first, entry.second);
+      }
     }
   } else if (ContainsNode(fragment.plan, TPlanNodeType::UNION_NODE)
       || ContainsScanNode(fragment.plan)) {
@@ -348,7 +347,7 @@ void Scheduler::CreateCollocatedAndScanInstances(const ExecutorConfig& executor_
   // Build a map of hosts to the num instances this fragment should have, before we take
   // into account scan ranges. If this fragment has input fragments, we always run with
   // at least the same num instances as the input fragment.
-  std::unordered_map<TNetworkAddress, int> instances_per_host;
+  std::unordered_map<NetworkAddressPB, int> instances_per_host;
 
   // Add hosts of input fragments, counting the number of instances of the fragment.
   // Only do this if there's a union - otherwise only consider the parallelism of
@@ -356,7 +355,7 @@ void Scheduler::CreateCollocatedAndScanInstances(const ExecutorConfig& executor_
   // the parallelism of the scan.
   if (has_union) {
     for (FragmentIdx idx : fragment_params->exchange_input_fragments) {
-      std::unordered_map<TNetworkAddress, int> input_fragment_instances_per_host;
+      std::unordered_map<NetworkAddressPB, int> input_fragment_instances_per_host;
       const FragmentExecParams& input_params = *schedule->GetFragmentExecParams(idx);
       for (const FInstanceExecParams& instance_params :
           input_params.instance_exec_params) {
@@ -379,10 +378,10 @@ void Scheduler::CreateCollocatedAndScanInstances(const ExecutorConfig& executor_
   vector<TPlanNodeId> scan_node_ids = FindScanNodes(fragment.plan);
   DCHECK(has_union || scan_node_ids.size() == 1) << "This method may need revisiting "
       << "for plans with no union and multiple scans per fragment";
-  vector<TNetworkAddress> scan_hosts;
+  vector<NetworkAddressPB> scan_hosts;
   GetScanHosts(
       executor_config.local_be_desc, scan_node_ids, *fragment_params, &scan_hosts);
-  for (const TNetworkAddress& host_addr : scan_hosts) {
+  for (const NetworkAddressPB& host_addr : scan_hosts) {
     // Ensure that the num instances is at least as many as input fragments. We don't
     // want to increment if there were already some instances from the input fragment,
     // since that could result in too high a num_instances.
@@ -397,8 +396,8 @@ void Scheduler::CreateCollocatedAndScanInstances(const ExecutorConfig& executor_
   // Track the index of the next instance to be created for this fragment.
   int per_fragment_instance_idx = 0;
   for (const auto& entry : instances_per_host) {
-    const TNetworkAddress& host = entry.first;
-    TNetworkAddress krpc_host = LookUpKrpcHost(executor_config, host);
+    const NetworkAddressPB& host = entry.first;
+    NetworkAddressPB krpc_host = LookUpKrpcHost(executor_config, host);
     FragmentScanRangeAssignment& sra = fragment_params->scan_range_assignment;
     auto assignment_it = sra.find(host);
     // One entry in outer vector per scan node in 'scan_node_ids'.
@@ -431,8 +430,10 @@ void Scheduler::CreateCollocatedAndScanInstances(const ExecutorConfig& executor_
     // because we may have other input fragments.
     int host_finstance_start_idx = fragment_params->instance_exec_params.size();
     for (int i = 0; i < num_instances; ++i) {
-      fragment_params->instance_exec_params.emplace_back(schedule->GetNextInstanceId(),
-          host, krpc_host, per_fragment_instance_idx++, *fragment_params);
+      UniqueIdPB instance_id = schedule->GetNextInstanceId();
+      fragment_params->instance_exec_params.emplace_back(
+          instance_id, host, krpc_host, per_fragment_instance_idx++, *fragment_params);
+      *fragment_params->pb->add_instances() = instance_id;
     }
     // Allocate scan ranges to the finstances if needed. Currently we simply allocate
     // them to fragment instances in order. This may be suboptimal in cases where the
@@ -443,8 +444,8 @@ void Scheduler::CreateCollocatedAndScanInstances(const ExecutorConfig& executor_
       for (int inst_idx = 0; inst_idx < per_instance_ranges.size(); ++inst_idx) {
         FInstanceExecParams& instance_params =
             fragment_params->instance_exec_params[host_finstance_start_idx + inst_idx];
-        instance_params.per_node_scan_ranges[scan_node_ids[scan_idx]] =
-            move(per_instance_ranges[inst_idx]);
+        instance_params.AddScanRanges(
+            scan_node_ids[scan_idx], per_instance_ranges[inst_idx]);
       }
     }
   }
@@ -476,9 +477,11 @@ void Scheduler::CreateInputCollocatedInstances(
   int per_fragment_instance_idx = 0;
   for (const FInstanceExecParams& input_instance_params :
       input_fragment_params.instance_exec_params) {
-    fragment_params->instance_exec_params.emplace_back(schedule->GetNextInstanceId(),
+    UniqueIdPB instance_id = schedule->GetNextInstanceId();
+    fragment_params->instance_exec_params.emplace_back(instance_id,
         input_instance_params.host, input_instance_params.krpc_host,
         per_fragment_instance_idx++, *fragment_params);
+    *fragment_params->pb->add_instances() = instance_id;
   }
 }
 
@@ -502,20 +505,21 @@ void Scheduler::CreateCollocatedJoinBuildInstances(
     // instance was on the same host (instances for a backend are clustered together).
     if (!share_build || instance_exec_params->empty()
         || instance_exec_params->back().krpc_host != parent_exec_params.krpc_host) {
-      TUniqueId instance_id = schedule->GetNextInstanceId();
+      UniqueIdPB instance_id = schedule->GetNextInstanceId();
       instance_exec_params->emplace_back(instance_id, parent_exec_params.host,
           parent_exec_params.krpc_host, per_fragment_instance_idx++, *fragment_params);
-      instance_exec_params->back().num_join_build_outputs = 0;
+      instance_exec_params->back().pb.set_num_join_build_outputs(0);
+      *fragment_params->pb->add_instances() = instance_id;
     }
     JoinBuildInputPB build_input;
     build_input.set_join_node_id(sink.dest_node_id);
-    TUniqueIdToUniqueIdPB(instance_exec_params->back().instance_id,
-        build_input.mutable_input_finstance_id());
-    parent_exec_params.join_build_inputs.emplace_back(build_input);
+    FInstanceExecParamsPB& pb = instance_exec_params->back().pb;
+    *build_input.mutable_input_finstance_id() = pb.instance_id();
+    *parent_exec_params.pb.add_join_build_inputs() = build_input;
     VLOG(3) << "Linked join build for node id=" << sink.dest_node_id
-            << " build finstance=" << PrintId(instance_exec_params->back().instance_id)
-            << " dst finstance=" << PrintId(parent_exec_params.instance_id);
-    ++instance_exec_params->back().num_join_build_outputs;
+            << " build finstance=" << PrintId(pb.instance_id())
+            << " dst finstance=" << PrintId(parent_exec_params.pb.instance_id());
+    pb.set_num_join_build_outputs(pb.num_join_build_outputs() + 1);
   }
 }
 
@@ -717,7 +721,7 @@ std::vector<TPlanNodeId> Scheduler::FindScanNodes(const TPlan& plan) {
 
 void Scheduler::GetScanHosts(const BackendDescriptorPB& local_be_desc,
     const vector<TPlanNodeId>& scan_ids, const FragmentExecParams& params,
-    vector<TNetworkAddress>* scan_hosts) {
+    vector<NetworkAddressPB>* scan_hosts) {
   for (const TPlanNodeId& scan_id : scan_ids) {
     // Get the list of impalad host from scan_range_assignment_
     for (const FragmentScanRangeAssignment::value_type& scan_range_assignment :
@@ -733,7 +737,7 @@ void Scheduler::GetScanHosts(const BackendDescriptorPB& local_be_desc,
       // TODO: we'll need to revisit this strategy once we can partition joins
       // (in which case this fragment might be executing a right outer join
       // with a large build table)
-      scan_hosts->push_back(FromNetworkAddressPB(local_be_desc.address()));
+      scan_hosts->push_back(local_be_desc.address());
     }
   }
 }
@@ -762,87 +766,96 @@ bool Scheduler::IsCoordinatorOnlyQuery(const TQueryExecRequest& exec_request) {
 
 void Scheduler::ComputeBackendExecParams(
     const ExecutorConfig& executor_config, QuerySchedule* schedule) {
-  PerBackendExecParams per_backend_params;
-  for (const FragmentExecParams& f : schedule->fragment_exec_params()) {
-    const TNetworkAddress* prev_host = nullptr;
-    for (const FInstanceExecParams& i : f.instance_exec_params) {
-      BackendExecParams& be_params = per_backend_params[i.host];
-      be_params.instance_params.push_back(&i);
+  for (FragmentExecParams& f : schedule->fragment_exec_params()) {
+    const NetworkAddressPB* prev_host = nullptr;
+    int num_hosts = 0;
+    for (FInstanceExecParams& i : f.instance_exec_params) {
+      BackendExecParams& be_params = schedule->GetOrCreateBackendExecParams(i.host);
+      be_params.pb->add_instance_params()->Swap(&i.pb);
       // Different fragments do not synchronize their Open() and Close(), so the backend
       // does not provide strong guarantees about whether one fragment instance releases
       // resources before another acquires them. Conservatively assume that all fragment
       // instances on this backend can consume their peak resources at the same time,
       // i.e. that this backend's peak resources is the sum of the per-fragment-instance
       // peak resources for the instances executing on this backend.
-      be_params.min_mem_reservation_bytes +=
-          f.fragment.instance_min_mem_reservation_bytes;
-      be_params.initial_mem_reservation_total_claims +=
-          f.fragment.instance_initial_mem_reservation_total_claims;
-      be_params.thread_reservation += f.fragment.thread_reservation;
+      be_params.pb->set_min_mem_reservation_bytes(
+          be_params.pb->min_mem_reservation_bytes()
+          + f.fragment.instance_min_mem_reservation_bytes);
+      be_params.pb->set_initial_mem_reservation_total_claims(
+          be_params.pb->initial_mem_reservation_total_claims()
+          + f.fragment.instance_initial_mem_reservation_total_claims);
+      be_params.pb->set_thread_reservation(
+          be_params.pb->thread_reservation() + f.fragment.thread_reservation);
       // Some memory is shared between fragments on a host. Only add it for the first
       // instance of this fragment on the host.
       if (prev_host == nullptr || *prev_host != i.host) {
-        be_params.min_mem_reservation_bytes +=
-            f.fragment.backend_min_mem_reservation_bytes;
-        be_params.initial_mem_reservation_total_claims +=
-            f.fragment.backend_initial_mem_reservation_total_claims;
+        be_params.pb->set_min_mem_reservation_bytes(
+            be_params.pb->min_mem_reservation_bytes()
+            + f.fragment.backend_min_mem_reservation_bytes);
+        be_params.pb->set_initial_mem_reservation_total_claims(
+            be_params.pb->initial_mem_reservation_total_claims()
+            + f.fragment.backend_initial_mem_reservation_total_claims);
         prev_host = &i.host;
+        ++num_hosts;
       }
     }
+    f.pb->set_num_hosts(num_hosts);
   }
 
   // Compute 'slots_to_use' for each backend based on the max # of instances of
   // any fragment on that backend.
-  for (auto& backend : per_backend_params) {
+  for (auto& backend : schedule->per_backend_exec_params()) {
     int be_max_instances = 0;
     // Instances for a fragment are clustered together because of how the vector is
     // constructed above. So we can compute the max # of instances of any fragment
     // with a single pass over the vector.
-    const FragmentExecParams* curr_fragment = nullptr;
+    int curr_fragment_idx = -1;
     int curr_instance_count = 0; // Number of instances of the current fragment seen.
-    for (auto& finstance : backend.second.instance_params) {
-      if (curr_fragment == nullptr ||
-          curr_fragment != &finstance->fragment_exec_params) {
-        curr_fragment = &finstance->fragment_exec_params;
+    for (auto& finstance : backend.second.pb->instance_params()) {
+      if (curr_fragment_idx == -1 || curr_fragment_idx != finstance.fragment_idx()) {
+        curr_fragment_idx = finstance.fragment_idx();
         curr_instance_count = 0;
       }
       ++curr_instance_count;
       be_max_instances = max(be_max_instances, curr_instance_count);
     }
-    backend.second.slots_to_use = be_max_instances;
+    backend.second.pb->set_slots_to_use(be_max_instances);
   }
 
   // This also ensures an entry always exists for the coordinator backend.
   int64_t coord_min_reservation = 0;
   const NetworkAddressPB& coord_addr = executor_config.local_be_desc.address();
-  BackendExecParams& coord_be_params =
-      per_backend_params[FromNetworkAddressPB(coord_addr)];
-  coord_be_params.is_coord_backend = true;
-  coord_min_reservation = coord_be_params.min_mem_reservation_bytes;
+  BackendExecParams& coord_be_params = schedule->GetOrCreateBackendExecParams(coord_addr);
+  coord_be_params.pb->set_is_coord_backend(true);
+  coord_min_reservation = coord_be_params.pb->min_mem_reservation_bytes();
 
   int64_t largest_min_reservation = 0;
-  for (auto& backend : per_backend_params) {
-    const TNetworkAddress& host = backend.first;
+  for (auto& backend : schedule->per_backend_exec_params()) {
+    const NetworkAddressPB& host = backend.first;
     const BackendDescriptorPB be_desc = LookUpBackendDesc(executor_config, host);
     backend.second.be_desc = be_desc;
-    if (!backend.second.is_coord_backend) {
+    *backend.second.pb->mutable_backend_id() = be_desc.backend_id();
+    *backend.second.pb->mutable_address() = be_desc.address();
+    *backend.second.pb->mutable_krpc_address() = be_desc.krpc_address();
+    if (!backend.second.pb->is_coord_backend()) {
       largest_min_reservation =
-          max(largest_min_reservation, backend.second.min_mem_reservation_bytes);
+          max(largest_min_reservation, backend.second.pb->min_mem_reservation_bytes());
     }
   }
-  schedule->set_per_backend_exec_params(per_backend_params);
   schedule->set_largest_min_reservation(largest_min_reservation);
   schedule->set_coord_min_reservation(coord_min_reservation);
 
   stringstream min_mem_reservation_ss;
   stringstream num_fragment_instances_ss;
-  for (const auto& e: per_backend_params) {
-    min_mem_reservation_ss << TNetworkAddressToString(e.first) << "("
-         << PrettyPrinter::Print(e.second.min_mem_reservation_bytes, TUnit::BYTES)
-         << ") ";
-    num_fragment_instances_ss << TNetworkAddressToString(e.first) << "("
-         << PrettyPrinter::Print(e.second.instance_params.size(), TUnit::UNIT)
-         << ") ";
+  for (const auto& e : schedule->per_backend_exec_params()) {
+    min_mem_reservation_ss << NetworkAddressPBToString(e.first) << "("
+                           << PrettyPrinter::Print(
+                                  e.second.pb->min_mem_reservation_bytes(), TUnit::BYTES)
+                           << ") ";
+    num_fragment_instances_ss << NetworkAddressPBToString(e.first) << "("
+                              << PrettyPrinter::Print(
+                                     e.second.pb->instance_params_size(), TUnit::UNIT)
+                              << ") ";
   }
   schedule->summary_profile()->AddInfoString("Per Host Min Memory Reservation",
       min_mem_reservation_ss.str());
@@ -1098,8 +1111,8 @@ void Scheduler::AssignmentCtx::RecordScanRangeAssignment(
     if (!remote_read) total_local_assignments_->Increment(1);
   }
 
-  PerNodeScanRanges* scan_ranges = FindOrInsert(
-      assignment, FromNetworkAddressPB(executor.address()), PerNodeScanRanges());
+  PerNodeScanRanges* scan_ranges =
+      FindOrInsert(assignment, executor.address(), PerNodeScanRanges());
   vector<ScanRangeParamsPB>* scan_range_params_list =
       FindOrInsert(scan_ranges, node_id, vector<ScanRangeParamsPB>());
   // Add scan range.
@@ -1127,7 +1140,7 @@ void Scheduler::AssignmentCtx::PrintAssignment(
             << PrettyPrinter::Print(assignment_byte_counters_.cached_bytes, TUnit::BYTES);
 
   for (const FragmentScanRangeAssignment::value_type& entry : assignment) {
-    VLOG_FILE << "ScanRangeAssignment: server=" << ThriftDebugString(entry.first);
+    VLOG_FILE << "ScanRangeAssignment: server=" << entry.first.DebugString();
     for (const PerNodeScanRanges::value_type& per_node_scan_ranges : entry.second) {
       stringstream str;
       for (const ScanRangeParamsPB& params : per_node_scan_ranges.second) {

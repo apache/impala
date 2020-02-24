@@ -87,6 +87,10 @@ std::string PrintBatch(RowBatch* batch);
 std::string PrintId(const TUniqueId& id, const std::string& separator = ":");
 std::string PrintId(const UniqueIdPB& id, const std::string& separator = ":");
 
+inline ostream& operator<<(ostream& os, const UniqueIdPB& id) {
+  return os << PrintId(id);
+}
+
 /// Returns the fully qualified path, e.g. "database.table.array_col.item.field"
 std::string PrintPath(const TableDescriptor& tbl_desc, const SchemaPath& path);
 /// Same as PrintPath(), but truncates the path after the given 'end_path_idx'.
