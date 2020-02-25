@@ -227,7 +227,7 @@ public class LdapHS2Test {
         "eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHg=&impala&0&0" // incorrect signature
     };
     for (String cookieStr : badCookies) {
-      headers.put("Cookie", "impala.hs2.auth=" + cookieStr);
+      headers.put("Cookie", "impala.auth=" + cookieStr);
       transport.setCustomHeaders(headers);
       try {
         TOpenSessionReq openReq5 = new TOpenSessionReq();

@@ -36,8 +36,14 @@ using namespace strings;
 namespace impala {
 
 // Used to separate values in cookies. All generated cookies will be of the form:
-// <signature>&<username>&<timestamp>&<random number>
+// <signature>&u=<username>&t=<timestamp>&r=<random number>
+// This format was chosen to imitate the cookie format used by other Hadoop system such as
+// Hive in order to facilitate interoperability with systems like Knox. See for example:
+// service/src/java/org/apache/hive/service/auth/HttpAuthUtils.java in Hive
 static const string COOKIE_SEPARATOR = "&";
+static const string USERNAME_KEY = "u=";
+static const string TIMESTAMP_KEY = "t=";
+static const string RAND_KEY = "r=";
 
 // Cookies generated and processed by the HTTP server will be of the form:
 // COOKIE_NAME=<cookie>
@@ -98,17 +104,23 @@ Status AuthenticateCookie(
     if (cookie_value_split.size() != 3) {
       return Status("The cookie value has an invalid format.");
     }
+    string timestamp;
+    if (!TryStripPrefixString(cookie_value_split[1], TIMESTAMP_KEY, &timestamp)) {
+      return Status("The cookie timestamp value has an invalid format.");
+    }
     StringParser::ParseResult result;
     int64_t create_time = StringParser::StringToInt<int64_t>(
-        cookie_value_split[1].c_str(), cookie_value_split[1].length(), &result);
+        timestamp.c_str(), timestamp.length(), &result);
     if (result != StringParser::PARSE_SUCCESS) {
       return Status("Could not parse cookie timestamp.");
     }
     // Check that the timestamp contained in the cookie is recent enough for the cookie
     // to still be valid.
     if (MonotonicMillis() - create_time <= FLAGS_max_cookie_lifetime_s * 1000) {
+      if (!TryStripPrefixString(cookie_value_split[0], USERNAME_KEY, username)) {
+        return Status("The cookie username value has an invalid format.");
+      }
       // We've successfully authenticated.
-      *username = cookie_value_split[0];
       return Status::OK();
     } else {
       return Status("Cookie is past its max lifetime.");
@@ -122,8 +134,8 @@ string GenerateCookie(const string& username, const AuthenticationHash& hash) {
   // Its okay to use rand() here even though its a weak RNG because being able to guess
   // the random numbers generated won't help an attacker. The important thing is that
   // we're using a strong RNG to create the key and a strong HMAC function.
-  string cookie_value =
-      StrCat(username, COOKIE_SEPARATOR, MonotonicMillis(), COOKIE_SEPARATOR, rand());
+  string cookie_value = StrCat(USERNAME_KEY, username, COOKIE_SEPARATOR, TIMESTAMP_KEY,
+      MonotonicMillis(), COOKIE_SEPARATOR, RAND_KEY, rand());
   uint8_t signature[AuthenticationHash::HashLen()];
   Status compute_status =
       hash.Compute(reinterpret_cast<const uint8_t*>(cookie_value.data()),
