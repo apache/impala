@@ -36,6 +36,7 @@ class Tuple;
 class TopNPlanNode : public PlanNode {
  public:
   virtual Status Init(const TPlanNode& tnode, RuntimeState* state) override;
+  virtual void Close() override;
   virtual Status CreateExecNode(RuntimeState* state, ExecNode** node) const override;
 
   ~TopNPlanNode(){}
@@ -106,10 +107,10 @@ class TopNNode : public ExecNode {
   int64_t offset_;
 
   /// Ordering expressions used for tuple comparison.
-  std::vector<ScalarExpr*> ordering_exprs_;
+  const std::vector<ScalarExpr*>& ordering_exprs_;
 
   /// Materialization exprs for the output tuple and their evaluators.
-  std::vector<ScalarExpr*> output_tuple_exprs_;
+  const std::vector<ScalarExpr*>& output_tuple_exprs_;
   std::vector<ScalarExprEvaluator*> output_tuple_expr_evals_;
 
   std::vector<bool> is_asc_order_;

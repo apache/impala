@@ -54,6 +54,11 @@ Status TopNPlanNode::Init(const TPlanNode& tnode, RuntimeState* state) {
       << "TopNNode should never have predicates to evaluate.";
   return Status::OK();
 }
+void TopNPlanNode::Close() {
+  ScalarExpr::Close(ordering_exprs_);
+  ScalarExpr::Close(output_tuple_exprs_);
+  PlanNode::Close();
+}
 
 Status TopNPlanNode::CreateExecNode(RuntimeState* state, ExecNode** node) const {
   ObjectPool* pool = state->obj_pool();
@@ -65,6 +70,10 @@ TopNNode::TopNNode(
     ObjectPool* pool, const TopNPlanNode& pnode, const DescriptorTbl& descs)
   : ExecNode(pool, pnode, descs),
     offset_(pnode.tnode_->sort_node.__isset.offset ? pnode.tnode_->sort_node.offset : 0),
+    ordering_exprs_(pnode.ordering_exprs_),
+    output_tuple_exprs_(pnode.output_tuple_exprs_),
+    is_asc_order_(pnode.is_asc_order_),
+    nulls_first_(pnode.nulls_first_),
     output_tuple_desc_(row_descriptor_.tuple_descriptors()[0]),
     tuple_row_less_than_(NULL),
     tmp_tuple_(NULL),
@@ -73,10 +82,6 @@ TopNNode::TopNNode(
     rows_to_reclaim_(0),
     tuple_pool_reclaim_counter_(NULL),
     num_rows_skipped_(0) {
-  ordering_exprs_ = pnode.ordering_exprs_;
-  output_tuple_exprs_ = pnode.output_tuple_exprs_;
-  is_asc_order_ = pnode.is_asc_order_;
-  nulls_first_ = pnode.nulls_first_;
   runtime_profile()->AddInfoString("SortType", "TopN");
 }
 
@@ -241,8 +246,6 @@ void TopNNode::Close(RuntimeState* state) {
   if (tuple_pool_.get() != nullptr) tuple_pool_->FreeAll();
   if (tuple_row_less_than_.get() != nullptr) tuple_row_less_than_->Close(state);
   ScalarExprEvaluator::Close(output_tuple_expr_evals_, state);
-  ScalarExpr::Close(ordering_exprs_);
-  ScalarExpr::Close(output_tuple_exprs_);
   ExecNode::Close(state);
 }
 

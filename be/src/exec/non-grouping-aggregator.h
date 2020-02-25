@@ -49,8 +49,7 @@ class NonGroupingAggregatorConfig : public AggregatorConfig {
   /// Jitted AddBatchImpl function pointer. Null if codegen is disabled.
   AddBatchImplFn add_batch_impl_fn_ = nullptr;
 
- protected:
-  int GetNumGroupingExprs() override { return 0; }
+  int GetNumGroupingExprs() const override { return 0; }
 
  private:
   /// Codegen the non-streaming add row batch loop in NonGroupingAggregator::AddBatch()

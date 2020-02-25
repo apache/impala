@@ -53,6 +53,11 @@ Status ExchangePlanNode::Init(const TPlanNode& tnode, RuntimeState* state) {
   return Status::OK();
 }
 
+void ExchangePlanNode::Close() {
+  ScalarExpr::Close(ordering_exprs_);
+  PlanNode::Close();
+}
+
 Status ExchangePlanNode::CreateExecNode(RuntimeState* state, ExecNode** node) const {
   ObjectPool* pool = state->obj_pool();
   *node = pool->Add(new ExchangeNode(pool, *this, state->desc_tbl()));
@@ -70,6 +75,7 @@ ExchangeNode::ExchangeNode(
                             + pnode.tnode_->exchange_node.input_row_tuples.size())),
     next_row_idx_(0),
     is_merging_(pnode.tnode_->exchange_node.__isset.sort_info),
+    ordering_exprs_(pnode.ordering_exprs_),
     offset_(pnode.tnode_->exchange_node.__isset.offset ?
             pnode.tnode_->exchange_node.offset :
             0),
@@ -77,7 +83,6 @@ ExchangeNode::ExchangeNode(
   DCHECK_GE(offset_, 0);
   DCHECK(is_merging_ || (offset_ == 0));
   if (!is_merging_) return;
-  ordering_exprs_ = pnode.ordering_exprs_;
   is_asc_order_ = pnode.is_asc_order_;
   nulls_first_ = pnode.nulls_first_;
 }
@@ -151,7 +156,6 @@ void ExchangeNode::Close(RuntimeState* state) {
   if (less_than_.get() != nullptr) less_than_->Close(state);
   if (stream_recvr_ != nullptr) stream_recvr_->Close();
   ExecEnv::GetInstance()->buffer_pool()->DeregisterClient(&recvr_buffer_pool_client_);
-  ScalarExpr::Close(ordering_exprs_);
   ExecNode::Close(state);
 }
 

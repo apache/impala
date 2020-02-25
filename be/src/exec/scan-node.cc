@@ -201,7 +201,6 @@ void ScanNode::Close(RuntimeState* state) {
   for (auto& filter_ctx : filter_ctxs_) {
     if (filter_ctx.expr_eval != nullptr) filter_ctx.expr_eval->Close(state);
   }
-  ScalarExpr::Close(filter_exprs_);
   // ScanNode::Prepare() started periodic counters including 'total_throughput_counter_'
   // and 'bytes_read_timeseries_counter_'. Subclasses may also have started counters.
   runtime_profile_->StopPeriodicCounters();

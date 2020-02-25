@@ -43,6 +43,12 @@ Status PartialSortPlanNode::Init(const TPlanNode& tnode, RuntimeState* state) {
   return Status::OK();
 }
 
+void PartialSortPlanNode::Close() {
+  ScalarExpr::Close(ordering_exprs_);
+  ScalarExpr::Close(sort_tuple_slot_exprs_);
+  PlanNode::Close();
+}
+
 Status PartialSortPlanNode::CreateExecNode(RuntimeState* state, ExecNode** node) const {
   ObjectPool* pool = state->obj_pool();
   *node = pool->Add(new PartialSortNode(pool, *this, state->desc_tbl()));
@@ -52,15 +58,15 @@ Status PartialSortPlanNode::CreateExecNode(RuntimeState* state, ExecNode** node)
 PartialSortNode::PartialSortNode(
     ObjectPool* pool, const PartialSortPlanNode& pnode, const DescriptorTbl& descs)
   : ExecNode(pool, pnode, descs),
+    ordering_exprs_(pnode.ordering_exprs_),
+    sort_tuple_exprs_(pnode.sort_tuple_slot_exprs_),
+    is_asc_order_(pnode.is_asc_order_),
+    nulls_first_(pnode.nulls_first_),
+    sorting_order_(pnode.sorting_order_),
     sorter_(nullptr),
     input_batch_index_(0),
     input_eos_(false),
     sorter_eos_(true) {
-  ordering_exprs_ = pnode.ordering_exprs_;
-  sort_tuple_exprs_ = pnode.sort_tuple_slot_exprs_;
-  is_asc_order_ = pnode.is_asc_order_;
-  nulls_first_ = pnode.nulls_first_;
-  sorting_order_ = pnode.sorting_order_;
   runtime_profile()->AddInfoString("SortType", "Partial");
 }
 
@@ -169,8 +175,6 @@ void PartialSortNode::Close(RuntimeState* state) {
   child(0)->Close(state);
   if (sorter_ != nullptr) sorter_->Close(state);
   sorter_.reset();
-  ScalarExpr::Close(ordering_exprs_);
-  ScalarExpr::Close(sort_tuple_exprs_);
   ExecNode::Close(state);
 }
 

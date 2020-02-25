@@ -85,6 +85,14 @@ Status PlanNode::Init(const TPlanNode& tnode, RuntimeState* state) {
   return Status::OK();
 }
 
+void PlanNode::Close() {
+  ScalarExpr::Close(conjuncts_);
+  ScalarExpr::Close(runtime_filter_exprs_);
+  for (auto& child : children_) {
+    child->Close();
+  }
+}
+
 Status PlanNode::CreateTree(
       RuntimeState* state, const TPlan& plan, PlanNode** root) {
   if (plan.nodes.size() == 0) {
@@ -297,7 +305,6 @@ void ExecNode::Close(RuntimeState* state) {
   }
 
   ScalarExprEvaluator::Close(conjunct_evals_, state);
-  ScalarExpr::Close(conjuncts_);
   if (expr_perm_pool() != nullptr) expr_perm_pool_->FreeAll();
   if (expr_results_pool() != nullptr) expr_results_pool_->FreeAll();
   reservation_manager_.Close(state);

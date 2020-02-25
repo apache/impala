@@ -63,6 +63,8 @@ class AggregatorConfig {
       const TAggregator& taggregator, RuntimeState* state, PlanNode* pnode, int agg_idx);
   virtual Status Init(
       const TAggregator& taggregator, RuntimeState* state, PlanNode* pnode);
+  /// Closes the expressions created in Init();
+  virtual void Close();
   virtual Status Codegen(RuntimeState* state) = 0;
   virtual ~AggregatorConfig() {}
 
@@ -93,11 +95,10 @@ class AggregatorConfig {
 
   std::vector<ScalarExpr*> conjuncts_;
 
-  /// Exprs used to evaluate input rows
-  std::vector<ScalarExpr*> grouping_exprs_;
-
   /// The list of all aggregate operations for this aggregator.
   std::vector<AggFn*> aggregate_functions_;
+
+  virtual int GetNumGroupingExprs() const = 0;
 
  protected:
   /// Codegen for updating aggregate expressions aggregate_functions_[agg_fn_idx]
@@ -117,8 +118,6 @@ class AggregatorConfig {
 
   /// Codegen Aggregator::UpdateTuple(). Returns non-OK status if codegen is unsuccessful.
   Status CodegenUpdateTuple(LlvmCodeGen* codegen, llvm::Function** fn) WARN_UNUSED_RESULT;
-
-  virtual int GetNumGroupingExprs() = 0;
 };
 
 /// Base class for aggregating rows. Used in the AggregationNode and
@@ -217,7 +216,7 @@ class Aggregator {
   const bool needs_finalize_;
 
   /// The list of all aggregate operations for this aggregator.
-  std::vector<AggFn*> agg_fns_;
+  const std::vector<AggFn*>& agg_fns_;
 
   /// Evaluators for each aggregate function. If this is a grouping aggregation, these
   /// evaluators are only used to create cloned per-partition evaluators. The cloned
@@ -231,7 +230,7 @@ class Aggregator {
   /// Conjuncts and their evaluators in this aggregator. 'conjuncts_' live in the
   /// query-state's object pool while the evaluators live in this aggregator's
   /// object pool.
-  std::vector<ScalarExpr*> conjuncts_;
+  const std::vector<ScalarExpr*>& conjuncts_;
   std::vector<ScalarExprEvaluator*> conjunct_evals_;
 
   /// Runtime profile for this aggregator. Owned by 'pool_'.

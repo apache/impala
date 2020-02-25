@@ -37,6 +37,11 @@ Status UnnestPlanNode::Init(const TPlanNode& tnode, RuntimeState* state) {
   return Status::OK();
 }
 
+void UnnestPlanNode::Close() {
+  if (collection_expr_ != nullptr) collection_expr_->Close();
+  PlanNode::Close();
+}
+
 Status UnnestPlanNode::InitCollExpr(RuntimeState* state) {
   DCHECK(containing_subplan_ != nullptr)
       << "set_containing_subplan() must have been called";
@@ -66,10 +71,10 @@ UnnestNode::UnnestNode(
   : ExecNode(pool, pnode, descs),
     item_byte_size_(0),
     thrift_coll_expr_(pnode.tnode_->unnest_node.collection_expr),
-    coll_expr_(nullptr),
+    coll_expr_(pnode.collection_expr_),
     coll_expr_eval_(nullptr),
-    coll_slot_desc_(nullptr),
-    coll_tuple_idx_(-1),
+    coll_slot_desc_(pnode.coll_slot_desc_),
+    coll_tuple_idx_(pnode.coll_tuple_idx_),
     coll_value_(nullptr),
     item_idx_(0),
     num_collections_(0),
@@ -79,11 +84,7 @@ UnnestNode::UnnestNode(
     avg_collection_size_counter_(nullptr),
     max_collection_size_counter_(nullptr),
     min_collection_size_counter_(nullptr),
-    num_collections_counter_(nullptr) {
-  coll_expr_ = pnode.collection_expr_;
-  coll_slot_desc_ = pnode.coll_slot_desc_;
-  coll_tuple_idx_ = pnode.coll_tuple_idx_;
-}
+    num_collections_counter_(nullptr) {}
 
 Status UnnestNode::Prepare(RuntimeState* state) {
   SCOPED_TIMER(runtime_profile_->total_time_counter());
@@ -191,7 +192,6 @@ Status UnnestNode::Reset(RuntimeState* state, RowBatch* row_batch) {
 void UnnestNode::Close(RuntimeState* state) {
   if (is_closed()) return;
   if (coll_expr_eval_ != nullptr) coll_expr_eval_->Close(state);
-  if (coll_expr_ != nullptr) coll_expr_->Close();
   ExecNode::Close(state);
 }
 

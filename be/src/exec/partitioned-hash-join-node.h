@@ -41,6 +41,7 @@ class TupleRow;
 class PartitionedHashJoinPlanNode : public BlockingJoinPlanNode {
  public:
   virtual Status Init(const TPlanNode& tnode, RuntimeState* state) override;
+  virtual void Close() override;
   virtual Status CreateExecNode(RuntimeState* state, ExecNode** node) const override;
   void Codegen(RuntimeState* state, RuntimeProfile* profile);
 
@@ -60,7 +61,7 @@ class PartitionedHashJoinPlanNode : public BlockingJoinPlanNode {
 
   /// Data sink config object for creating a phj builder that will be eventually used by
   /// the exec node.
-  const PhjBuilderConfig* phj_builder_config;
+  PhjBuilderConfig* phj_builder_config;
 
   /// Seed used for hashing rows.
   uint32_t hash_seed_;
@@ -551,11 +552,11 @@ class PartitionedHashJoinNode : public BlockingJoinNode {
 
   /// Our equi-join predicates "<lhs> = <rhs>" are separated into
   /// build_exprs_ (over the build input row) and probe_exprs_ (over child(0))
-  std::vector<ScalarExpr*> build_exprs_;
-  std::vector<ScalarExpr*> probe_exprs_;
+  const std::vector<ScalarExpr*>& build_exprs_;
+  const std::vector<ScalarExpr*>& probe_exprs_;
 
   /// Non-equi-join conjuncts from the ON clause.
-  std::vector<ScalarExpr*> other_join_conjuncts_;
+  const std::vector<ScalarExpr*>& other_join_conjuncts_;
   std::vector<ScalarExprEvaluator*> other_join_conjunct_evals_;
 
   /// Reference to the hash table config which is a part of the

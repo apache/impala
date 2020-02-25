@@ -34,6 +34,7 @@ class TupleRowComparator;
 class ExchangePlanNode : public PlanNode {
  public:
   virtual Status Init(const TPlanNode& tnode, RuntimeState* state) override;
+  virtual void Close() override;
   virtual Status CreateExecNode(RuntimeState* state, ExecNode** node) const override;
 
   ~ExchangePlanNode(){}
@@ -128,7 +129,7 @@ class ExchangeNode : public ExecNode {
   boost::scoped_ptr<TupleRowComparator> less_than_;
 
   /// Sort expressions and parameters passed to the merging receiver..
-  std::vector<ScalarExpr*> ordering_exprs_;
+  const std::vector<ScalarExpr*>& ordering_exprs_;
   std::vector<bool> is_asc_order_;
   std::vector<bool> nulls_first_;
 

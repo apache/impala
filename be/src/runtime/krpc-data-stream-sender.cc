@@ -98,6 +98,11 @@ DataSink* KrpcDataStreamSenderConfig::CreateSink(const TPlanFragmentCtx& fragmen
       fragment_ctx.destinations, FLAGS_data_stream_sender_buffer_size, state));
 }
 
+void KrpcDataStreamSenderConfig::Close() {
+  ScalarExpr::Close(partition_exprs_);
+  DataSinkConfig::Close();
+}
+
 // A datastream sender may send row batches to multiple destinations. There is one
 // channel for each destination.
 //
@@ -1074,7 +1079,6 @@ void KrpcDataStreamSender::Close(RuntimeState* state) {
     channels_[i]->Teardown(state);
   }
   ScalarExprEvaluator::Close(partition_expr_evals_, state);
-  ScalarExpr::Close(partition_exprs_);
   profile()->StopPeriodicCounters();
   DataSink::Close(state);
 }

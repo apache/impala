@@ -57,6 +57,9 @@ class DataSinkConfig {
   virtual DataSink* CreateSink(const TPlanFragmentCtx& fragment_ctx,
     const TPlanFragmentInstanceCtx& fragment_instance_ctx, RuntimeState* state) const = 0;
 
+  /// Close() releases all resources that were allocated during creation.
+  virtual void Close();
+
   /// Pointer to the thrift data sink struct associated with this sink. Set in Init() and
   /// owned by QueryState.
   const TDataSink* tsink_ = nullptr;
@@ -72,7 +75,7 @@ class DataSinkConfig {
   /// Creates a new data sink config, allocated in state->obj_pool() and returned through
   /// *sink, from the thrift sink object in fragment_ctx.
   static Status CreateConfig(const TDataSink& thrift_sink, const RowDescriptor* row_desc,
-      RuntimeState* state, const DataSinkConfig** sink);
+      RuntimeState* state, DataSinkConfig** sink);
 
  protected:
   /// Sets reference to TDataSink and initializes the expressions. Returns error status on

@@ -70,6 +70,9 @@ class PlanNode {
   /// Should only be called after all children have been set and Init()-ed.
   virtual Status Init(const TPlanNode& tnode, RuntimeState* state);
 
+  /// Close() releases all resources that were allocated in Init().
+  virtual void Close();
+
   /// Create its corresponding exec node. Place exec node in state->obj_pool().
   virtual Status CreateExecNode(RuntimeState* state, ExecNode** node) const = 0;
 

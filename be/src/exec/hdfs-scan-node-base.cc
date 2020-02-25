@@ -243,6 +243,17 @@ int HdfsScanPlanNode::GetMaterializedSlotIdx(const std::vector<int>& path) const
   return result->second;
 }
 
+void HdfsScanPlanNode::Close() {
+  TTupleId tuple_id = tnode_->hdfs_scan_node.tuple_id;
+  for (auto& tid_conjunct : conjuncts_map_) {
+    // PlanNode::conjuncts_ are already closed in PlanNode::Close()
+    if (tid_conjunct.first == tuple_id) continue;
+    ScalarExpr::Close(tid_conjunct.second);
+  }
+  ScalarExpr::Close(min_max_conjuncts_);
+  PlanNode::Close();
+}
+
 Status HdfsScanPlanNode::CreateExecNode(RuntimeState* state, ExecNode** node) const {
   ObjectPool* pool = state->obj_pool();
   *node = pool->Add(tnode_->hdfs_scan_node.use_mt_scan_node ?
@@ -569,16 +580,14 @@ void HdfsScanNodeBase::Close(RuntimeState* state) {
   if (scan_node_pool_.get() != NULL) scan_node_pool_->FreeAll();
 
   // Close collection conjuncts
-  for (auto& tid_conjunct: conjuncts_map_) {
-    // conjuncts_ are already closed in ExecNode::Close()
-    if (tid_conjunct.first == tuple_id_) continue;
-    ScalarExprEvaluator::Close(conjunct_evals_map_[tid_conjunct.first], state);
-    ScalarExpr::Close(tid_conjunct.second);
+  for (auto& tid_conjunct_eval : conjunct_evals_map_) {
+    // ExecNode::conjunct_evals_ are already closed in ExecNode::Close()
+    if (tid_conjunct_eval.first == tuple_id_) continue;
+    ScalarExprEvaluator::Close(tid_conjunct_eval.second, state);
   }
 
   // Close min max conjunct
   ScalarExprEvaluator::Close(min_max_conjunct_evals_, state);
-  ScalarExpr::Close(min_max_conjuncts_);
   ScanNode::Close(state);
 }
 

@@ -42,6 +42,12 @@ Status SortPlanNode::Init(const TPlanNode& tnode, RuntimeState* state) {
   return Status::OK();
 }
 
+void SortPlanNode::Close() {
+  ScalarExpr::Close(ordering_exprs_);
+  ScalarExpr::Close(sort_tuple_slot_exprs_);
+  PlanNode::Close();
+}
+
 Status SortPlanNode::CreateExecNode(RuntimeState* state, ExecNode** node) const {
   ObjectPool* pool = state->obj_pool();
   *node = pool->Add(new SortNode(pool, *this, state->desc_tbl()));
@@ -52,13 +58,13 @@ SortNode::SortNode(
     ObjectPool* pool, const SortPlanNode& pnode, const DescriptorTbl& descs)
   : ExecNode(pool, pnode, descs),
     offset_(pnode.tnode_->sort_node.__isset.offset ? pnode.tnode_->sort_node.offset : 0),
+    ordering_exprs_(pnode.ordering_exprs_),
+    sort_tuple_exprs_(pnode.sort_tuple_slot_exprs_),
+    is_asc_order_(pnode.is_asc_order_),
+    nulls_first_(pnode.nulls_first_),
+    sorting_order_(pnode.sorting_order_),
     sorter_(NULL),
     num_rows_skipped_(0) {
-  ordering_exprs_ = pnode.ordering_exprs_;
-  sort_tuple_exprs_ = pnode.sort_tuple_slot_exprs_;
-  is_asc_order_ = pnode.is_asc_order_;
-  nulls_first_ = pnode.nulls_first_;
-  sorting_order_ = pnode.sorting_order_;
   runtime_profile()->AddInfoString("SortType", "Total");
 }
 
@@ -167,8 +173,6 @@ void SortNode::Close(RuntimeState* state) {
   if (is_closed()) return;
   if (sorter_ != nullptr) sorter_->Close(state);
   sorter_.reset();
-  ScalarExpr::Close(ordering_exprs_);
-  ScalarExpr::Close(sort_tuple_exprs_);
   ExecNode::Close(state);
 }
 

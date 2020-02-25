@@ -174,10 +174,8 @@ Status FragmentInstanceState::Prepare() {
       bind<int64_t>(mem_fn(&ThreadResourcePool::num_threads),
           runtime_state_->resource_pool()));
 
-  PlanNode* plan_tree = nullptr;
   RETURN_IF_ERROR(
-      PlanNode::CreateTree(runtime_state_, fragment_ctx_.fragment.plan, &plan_tree));
-  plan_tree_ = plan_tree;
+      PlanNode::CreateTree(runtime_state_, fragment_ctx_.fragment.plan, &plan_tree_));
   // set up plan
   RETURN_IF_ERROR(ExecNode::CreateTree(
       runtime_state_, *plan_tree_, query_state_->desc_tbl(), &exec_tree_));
@@ -423,6 +421,7 @@ void FragmentInstanceState::Close() {
 
   // guard against partially-finished Prepare()
   if (sink_ != nullptr) sink_->Close(runtime_state_);
+  if (sink_config_ != nullptr) sink_config_->Close();
 
   // Stop updating profile counters in background.
   profile()->StopPeriodicCounters();
@@ -430,6 +429,7 @@ void FragmentInstanceState::Close() {
   // Delete row_batch_ to free resources associated with it.
   row_batch_.reset();
   if (exec_tree_ != nullptr) exec_tree_->Close(runtime_state_);
+  if (plan_tree_ != nullptr) plan_tree_->Close();
   runtime_state_->ReleaseResources();
 
   // Sanity timer checks

@@ -73,7 +73,7 @@ Status PhjBuilderConfig::CreateConfig(RuntimeState* state, int join_node_id,
     TJoinOp::type join_op, const RowDescriptor* build_row_desc,
     const std::vector<TEqJoinCondition>& eq_join_conjuncts,
     const std::vector<TRuntimeFilterDesc>& filters, uint32_t hash_seed,
-    const PhjBuilderConfig** sink) {
+    PhjBuilderConfig** sink) {
   ObjectPool* pool = state->obj_pool();
   TDataSink* tsink = pool->Add(new TDataSink());
   PhjBuilderConfig* data_sink = pool->Add(new PhjBuilderConfig());
@@ -81,6 +81,12 @@ Status PhjBuilderConfig::CreateConfig(RuntimeState* state, int join_node_id,
       eq_join_conjuncts, filters, hash_seed, tsink));
   *sink = data_sink;
   return Status::OK();
+}
+
+void PhjBuilderConfig::Close() {
+  ScalarExpr::Close(build_exprs_);
+  ScalarExpr::Close(filter_exprs_);
+  DataSinkConfig::Close();
 }
 
 Status PhjBuilderConfig::InitExprsAndFilters(RuntimeState* state,
@@ -374,8 +380,6 @@ void PhjBuilder::Close(RuntimeState* state) {
   for (const FilterContext& ctx : filter_ctxs_) {
     if (ctx.expr_eval != nullptr) ctx.expr_eval->Close(state);
   }
-  ScalarExpr::Close(filter_exprs_);
-  ScalarExpr::Close(build_exprs_);
   obj_pool_.Clear();
   probe_stream_reservation_.Close();
   if (is_separate_build_) reservation_manager_.Close(state);

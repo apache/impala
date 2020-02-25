@@ -71,6 +71,11 @@ DataSink* HdfsTableSinkConfig::CreateSink(const TPlanFragmentCtx& fragment_ctx,
       new HdfsTableSink(sink_id, *this, this->tsink_->table_sink.hdfs_table_sink, state));
 }
 
+void HdfsTableSinkConfig::Close() {
+  ScalarExpr::Close(partition_key_exprs_);
+  DataSinkConfig::Close();
+}
+
 HdfsTableSink::HdfsTableSink(TDataSinkId sink_id, const HdfsTableSinkConfig& sink_config,
     const THdfsTableSink& hdfs_sink, RuntimeState* state)
   : DataSink(sink_id, sink_config, "HdfsTableSink", state),
@@ -703,7 +708,6 @@ void HdfsTableSink::Close(RuntimeState* state) {
   }
   partition_keys_to_output_partitions_.clear();
   ScalarExprEvaluator::Close(partition_key_expr_evals_, state);
-  ScalarExpr::Close(partition_key_exprs_);
   DataSink::Close(state);
   closed_ = true;
 }

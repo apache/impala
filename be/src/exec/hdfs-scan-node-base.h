@@ -102,6 +102,7 @@ struct ScanRangeMetadata {
 class HdfsScanPlanNode : public ScanPlanNode {
  public:
   virtual Status Init(const TPlanNode& tnode, RuntimeState* state) override;
+  virtual void Close() override;
   virtual Status CreateExecNode(RuntimeState* state, ExecNode** node) const override;
   void Codegen(RuntimeState* state, RuntimeProfile* profile);
 
@@ -456,7 +457,7 @@ class HdfsScanNodeBase : public ScanNode {
   const int min_max_tuple_id_;
 
   /// Conjuncts to evaluate on parquet::Statistics.
-  vector<ScalarExpr*> min_max_conjuncts_;
+  const vector<ScalarExpr*>& min_max_conjuncts_;
   vector<ScalarExprEvaluator*> min_max_conjunct_evals_;
 
   /// Descriptor for the tuple used to evaluate conjuncts on parquet::Statistics.
@@ -517,7 +518,7 @@ class HdfsScanNodeBase : public ScanNode {
   /// Conjuncts for each materialized tuple (top-level row batch tuples and collection
   /// item tuples). Includes a copy of ExecNode.conjuncts_.
   typedef std::unordered_map<TupleId, std::vector<ScalarExpr*>> ConjunctsMap;
-  ConjunctsMap conjuncts_map_;
+  const ConjunctsMap& conjuncts_map_;
   ConjunctEvaluatorsMap conjunct_evals_map_;
 
   /// Dictionary filtering eligible conjuncts for each slot. Set to nullptr when there

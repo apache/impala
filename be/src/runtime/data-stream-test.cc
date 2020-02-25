@@ -532,7 +532,7 @@ class DataStreamTest : public testing::Test {
     RuntimeState state(TQueryCtx(), exec_env_.get(), desc_tbl_);
     VLOG_QUERY << "create sender " << sender_num;
     const TDataSink& sink = GetSink(partition_type);
-    const DataSinkConfig* data_sink = nullptr;
+    DataSinkConfig* data_sink = nullptr;
     EXPECT_OK(DataSinkConfig::CreateConfig(sink, row_desc_, &state, &data_sink));
 
     // We create an object of the base class DataSink and cast to the appropriate sender

@@ -45,6 +45,10 @@ using strings::Substitute;
 
 namespace impala {
 
+void DataSinkConfig::Close() {
+  ScalarExpr::Close(output_exprs_);
+}
+
 Status DataSinkConfig::Init(
     const TDataSink& tsink, const RowDescriptor* input_row_desc, RuntimeState* state) {
   tsink_ = &tsink;
@@ -53,27 +57,27 @@ Status DataSinkConfig::Init(
 }
 
 Status DataSinkConfig::CreateConfig(const TDataSink& thrift_sink,
-    const RowDescriptor* row_desc, RuntimeState* state, const DataSinkConfig** sink) {
+    const RowDescriptor* row_desc, RuntimeState* state, DataSinkConfig** data_sink) {
   ObjectPool* pool = state->obj_pool();
-  DataSinkConfig* data_sink = nullptr;
+  *data_sink = nullptr;
   switch (thrift_sink.type) {
     case TDataSinkType::DATA_STREAM_SINK:
       if (!thrift_sink.__isset.stream_sink) return Status("Missing data stream sink.");
       // TODO: figure out good buffer size based on size of output row
-      data_sink = pool->Add(new KrpcDataStreamSenderConfig());
+      *data_sink = pool->Add(new KrpcDataStreamSenderConfig());
       break;
     case TDataSinkType::TABLE_SINK:
       if (!thrift_sink.__isset.table_sink) return Status("Missing table sink.");
       switch (thrift_sink.table_sink.type) {
         case TTableSinkType::HDFS:
-          data_sink = pool->Add(new HdfsTableSinkConfig());
+          *data_sink = pool->Add(new HdfsTableSinkConfig());
           break;
         case TTableSinkType::KUDU:
           RETURN_IF_ERROR(CheckKuduAvailability());
-          data_sink = pool->Add(new KuduTableSinkConfig());
+          *data_sink = pool->Add(new KuduTableSinkConfig());
           break;
         case TTableSinkType::HBASE:
-          data_sink = pool->Add(new HBaseTableSinkConfig());
+          *data_sink = pool->Add(new HBaseTableSinkConfig());
           break;
         default:
           stringstream error_msg;
@@ -87,14 +91,14 @@ Status DataSinkConfig::CreateConfig(const TDataSink& thrift_sink,
       }
       break;
     case TDataSinkType::PLAN_ROOT_SINK:
-      data_sink = pool->Add(new PlanRootSinkConfig());
+      *data_sink = pool->Add(new PlanRootSinkConfig());
       break;
     case TDataSinkType::HASH_JOIN_BUILDER: {
-      data_sink = pool->Add(new PhjBuilderConfig());
+      *data_sink = pool->Add(new PhjBuilderConfig());
       break;
     }
     case TDataSinkType::NESTED_LOOP_JOIN_BUILDER: {
-      data_sink = pool->Add(new NljBuilderConfig());
+      *data_sink = pool->Add(new NljBuilderConfig());
       break;
     }
     default:
@@ -107,8 +111,7 @@ Status DataSinkConfig::CreateConfig(const TDataSink& thrift_sink,
       error_msg << str << " not implemented.";
       return Status(error_msg.str());
   }
-  RETURN_IF_ERROR(data_sink->Init(thrift_sink, row_desc, state));
-  *sink = data_sink;
+  RETURN_IF_ERROR((*data_sink)->Init(thrift_sink, row_desc, state));
   return Status::OK();
 }
 
@@ -159,7 +162,6 @@ Status DataSink::Open(RuntimeState* state) {
 void DataSink::Close(RuntimeState* state) {
   if (closed_) return;
   ScalarExprEvaluator::Close(output_expr_evals_, state);
-  ScalarExpr::Close(output_exprs_);
   if (expr_perm_pool_ != nullptr) expr_perm_pool_->FreeAll();
   if (expr_results_pool_.get() != nullptr) expr_results_pool_->FreeAll();
   if (expr_mem_tracker_ != nullptr) expr_mem_tracker_->Close();

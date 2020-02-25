@@ -50,6 +50,11 @@ Status NestedLoopJoinPlanNode::Init(const TPlanNode& tnode, RuntimeState* state)
   return Status::OK();
 }
 
+void NestedLoopJoinPlanNode::Close() {
+  ScalarExpr::Close(join_conjuncts_);
+  PlanNode::Close();
+}
+
 Status NestedLoopJoinPlanNode::CreateExecNode(
     RuntimeState* state, ExecNode** node) const {
   ObjectPool* pool = state->obj_pool();
@@ -62,9 +67,8 @@ NestedLoopJoinNode::NestedLoopJoinNode(
   : BlockingJoinNode("NestedLoopJoinNode", pool, pnode, descs),
     build_batches_(NULL),
     current_build_row_idx_(0),
-    process_unmatched_build_rows_(false) {
-  join_conjuncts_ = pnode.join_conjuncts_;
-}
+    process_unmatched_build_rows_(false),
+    join_conjuncts_(pnode.join_conjuncts_) {}
 
 NestedLoopJoinNode::~NestedLoopJoinNode() {
   DCHECK(is_closed());
@@ -157,7 +161,6 @@ Status NestedLoopJoinNode::Reset(RuntimeState* state, RowBatch* row_batch) {
 void NestedLoopJoinNode::Close(RuntimeState* state) {
   if (is_closed()) return;
   ScalarExprEvaluator::Close(join_conjunct_evals_, state);
-  ScalarExpr::Close(join_conjuncts_);
   if (builder_ != NULL) {
     // IMPALA-6595: builder must be closed before child. The separate build case is
     // handled in FragmentInstanceState.

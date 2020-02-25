@@ -26,6 +26,7 @@ namespace impala {
 class PartialSortPlanNode : public PlanNode {
  public:
   virtual Status Init(const TPlanNode& tnode, RuntimeState* state) override;
+  virtual void Close() override;
   virtual Status CreateExecNode(RuntimeState* state, ExecNode** node) const override;
 
   ~PartialSortPlanNode(){}
@@ -78,11 +79,11 @@ class PartialSortNode : public ExecNode {
 
  private:
   /// Expressions and parameters used for tuple comparison.
-  std::vector<ScalarExpr*> ordering_exprs_;
+  const std::vector<ScalarExpr*>& ordering_exprs_;
 
   /// Expressions used to materialize slots in the tuples to be sorted.
   /// One expr per slot in the materialized tuple.
-  std::vector<ScalarExpr*> sort_tuple_exprs_;
+  const std::vector<ScalarExpr*>& sort_tuple_exprs_;
 
   std::vector<bool> is_asc_order_;
   std::vector<bool> nulls_first_;

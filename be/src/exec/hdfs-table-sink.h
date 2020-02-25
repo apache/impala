@@ -99,6 +99,7 @@ class HdfsTableSinkConfig : public DataSinkConfig {
   DataSink* CreateSink(const TPlanFragmentCtx& fragment_ctx,
       const TPlanFragmentInstanceCtx& fragment_instance_ctx,
       RuntimeState* state) const override;
+  void Close() override;
 
   /// Expressions for computing the target partitions to which a row is written.
   std::vector<ScalarExpr*> partition_key_exprs_;
@@ -319,7 +320,7 @@ class HdfsTableSink : public DataSink {
   PartitionMap partition_keys_to_output_partitions_;
 
   /// Expressions for computing the target partitions to which a row is written.
-  std::vector<ScalarExpr*> partition_key_exprs_;
+  const std::vector<ScalarExpr*>& partition_key_exprs_;
   std::vector<ScalarExprEvaluator*> partition_key_expr_evals_;
 
   /// Subset of partition_key_expr_evals_ which are not constant. Set in Prepare().

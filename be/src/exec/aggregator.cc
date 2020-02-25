@@ -73,6 +73,11 @@ Status AggregatorConfig::Init(
   return Status::OK();
 }
 
+void AggregatorConfig::Close() {
+  ScalarExpr::Close(conjuncts_);
+  AggFn::Close(aggregate_functions_);
+}
+
 const char* Aggregator::LLVM_CLASS_NAME = "class.impala::Aggregator";
 
 Aggregator::Aggregator(ExecNode* exec_node, ObjectPool* pool,
@@ -122,9 +127,7 @@ Status Aggregator::Open(RuntimeState* state) {
 void Aggregator::Close(RuntimeState* state) {
   // Close all the agg-fn-evaluators
   AggFnEvaluator::Close(agg_fn_evals_, state);
-  AggFn::Close(agg_fns_);
   ScalarExprEvaluator::Close(conjunct_evals_, state);
-  ScalarExpr::Close(conjuncts_);
 
   if (expr_perm_pool_.get() != nullptr) expr_perm_pool_->FreeAll();
   if (expr_results_pool_.get() != nullptr) expr_results_pool_->FreeAll();

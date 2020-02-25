@@ -65,7 +65,9 @@ class PhjBuilderConfig : public JoinBuilderConfig {
       const RowDescriptor* build_row_desc,
       const std::vector<TEqJoinCondition>& eq_join_conjuncts,
       const std::vector<TRuntimeFilterDesc>& filters, uint32_t hash_seed,
-      const PhjBuilderConfig** sink);
+      PhjBuilderConfig** sink);
+
+  void Close() override;
 
   void Codegen(RuntimeState* state, RuntimeProfile* profile);
 
@@ -682,7 +684,7 @@ class PhjBuilder : public JoinBuilder {
   boost::scoped_ptr<Suballocator> ht_allocator_;
 
   /// Expressions over input rows for hash table build.
-  std::vector<ScalarExpr*> build_exprs_;
+  const std::vector<ScalarExpr*>& build_exprs_;
 
   /// is_not_distinct_from_[i] is true if and only if the ith equi-join predicate is IS
   /// NOT DISTINCT FROM, rather than equality.
@@ -690,7 +692,7 @@ class PhjBuilder : public JoinBuilder {
 
   /// Expressions for evaluating input rows for insertion into runtime filters.
   /// Only includes exprs for filters produced by this builder.
-  std::vector<ScalarExpr*> filter_exprs_;
+  const std::vector<ScalarExpr*>& filter_exprs_;
 
   /// List of filters to build. One-to-one correspondence with exprs in 'filter_exprs_'.
   std::vector<FilterContext> filter_ctxs_;

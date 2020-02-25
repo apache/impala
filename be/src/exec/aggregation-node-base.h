@@ -28,6 +28,7 @@ namespace impala {
 class AggregationPlanNode : public PlanNode {
  public:
   virtual Status Init(const TPlanNode& tnode, RuntimeState* state) override;
+  virtual void Close() override;
   virtual Status CreateExecNode(RuntimeState* state, ExecNode** node) const override;
   ~AggregationPlanNode() {}
   /// Configuration for generating aggregators that will be eventually used to aggregate

@@ -90,6 +90,14 @@ Status PartitionedHashJoinPlanNode::Init(const TPlanNode& tnode, RuntimeState* s
   return Status::OK();
 }
 
+void PartitionedHashJoinPlanNode::Close() {
+  ScalarExpr::Close(probe_exprs_);
+  ScalarExpr::Close(build_exprs_);
+  ScalarExpr::Close(other_join_conjuncts_);
+  if (phj_builder_config != nullptr) phj_builder_config->Close();
+  PlanNode::Close();
+}
+
 Status PartitionedHashJoinPlanNode::CreateExecNode(
     RuntimeState* state, ExecNode** node) const {
   ObjectPool* pool = state->obj_pool();
@@ -312,9 +320,6 @@ void PartitionedHashJoinNode::Close(RuntimeState* state) {
     }
   }
   ScalarExprEvaluator::Close(other_join_conjunct_evals_, state);
-  ScalarExpr::Close(build_exprs_);
-  ScalarExpr::Close(probe_exprs_);
-  ScalarExpr::Close(other_join_conjuncts_);
   if (probe_expr_results_pool_ != nullptr) probe_expr_results_pool_->FreeAll();
   BlockingJoinNode::Close(state);
 }

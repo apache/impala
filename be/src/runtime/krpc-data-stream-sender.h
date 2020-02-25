@@ -45,6 +45,7 @@ class KrpcDataStreamSenderConfig : public DataSinkConfig {
   DataSink* CreateSink(const TPlanFragmentCtx& fragment_ctx,
       const TPlanFragmentInstanceCtx& fragment_instance_ctx,
       RuntimeState* state) const override;
+  void Close() override;
 
   void Codegen(RuntimeState* state, RuntimeProfile* profile);
 
@@ -213,7 +214,7 @@ class KrpcDataStreamSender : public DataSink {
 
   /// Expressions of partition keys. It's used to compute the
   /// per-row partition values for shuffling exchange;
-  std::vector<ScalarExpr*> partition_exprs_;
+  const std::vector<ScalarExpr*>& partition_exprs_;
   std::vector<ScalarExprEvaluator*> partition_expr_evals_;
 
   /// Time for serializing row batches.

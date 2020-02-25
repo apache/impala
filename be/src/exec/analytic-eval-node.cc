@@ -91,6 +91,13 @@ Status AnalyticEvalPlanNode::Init(const TPlanNode& tnode, RuntimeState* state) {
   return Status::OK();
 }
 
+void AnalyticEvalPlanNode::Close() {
+  AggFn::Close(analytic_fns_);
+  if (partition_by_eq_expr_ != nullptr) partition_by_eq_expr_->Close();
+  if (order_by_eq_expr_ != nullptr) order_by_eq_expr_->Close();
+  PlanNode::Close();
+}
+
 Status AnalyticEvalPlanNode::CreateExecNode(RuntimeState* state, ExecNode** node) const {
   ObjectPool* pool = state->obj_pool();
   *node = pool->Add(
@@ -99,13 +106,16 @@ Status AnalyticEvalPlanNode::CreateExecNode(RuntimeState* state, ExecNode** node
 }
 
 AnalyticEvalNode::AnalyticEvalNode(ObjectPool* pool, const AnalyticEvalPlanNode& pnode,
-      const TAnalyticNode& analytic_node, const DescriptorTbl& descs)
+    const TAnalyticNode& analytic_node, const DescriptorTbl& descs)
   : ExecNode(pool, pnode, descs),
     window_(analytic_node.window),
     intermediate_tuple_desc_(
         descs.GetTupleDescriptor(analytic_node.intermediate_tuple_id)),
-    result_tuple_desc_(
-        descs.GetTupleDescriptor(analytic_node.output_tuple_id)) {
+    result_tuple_desc_(descs.GetTupleDescriptor(analytic_node.output_tuple_id)),
+    partition_by_eq_expr_(pnode.partition_by_eq_expr_),
+    order_by_eq_expr_(pnode.order_by_eq_expr_),
+    analytic_fns_(pnode.analytic_fns_),
+    is_lead_fn_(pnode.is_lead_fn_) {
   if (analytic_node.__isset.buffered_tuple_id) {
     buffered_tuple_desc_ =
         descs.GetTupleDescriptor(analytic_node.buffered_tuple_id);
@@ -144,11 +154,6 @@ AnalyticEvalNode::AnalyticEvalNode(ObjectPool* pool, const AnalyticEvalPlanNode&
     }
   }
   VLOG_FILE << id() << " Window=" << DebugWindowString();
-  // Set the Exprs from the PlanNode
-  partition_by_eq_expr_ = pnode.partition_by_eq_expr_;
-  order_by_eq_expr_ = pnode.order_by_eq_expr_;
-  analytic_fns_ = pnode.analytic_fns_;
-  is_lead_fn_ = pnode.is_lead_fn_;
 }
 
 AnalyticEvalNode::~AnalyticEvalNode() {
@@ -879,18 +884,9 @@ void AnalyticEvalNode::Close(RuntimeState* state) {
     AggFnEvaluator::Finalize(analytic_fn_evals_, curr_tuple_, dummy_result_tuple_);
   }
   AggFnEvaluator::Close(analytic_fn_evals_, state);
-  AggFn::Close(analytic_fns_);
 
-  if (partition_by_eq_expr_ != nullptr) {
-    if (partition_by_eq_expr_eval_ != nullptr) {
-      partition_by_eq_expr_eval_->Close(state);
-    }
-    partition_by_eq_expr_->Close();
-  }
-  if (order_by_eq_expr_ != nullptr) {
-    if (order_by_eq_expr_eval_ != nullptr) order_by_eq_expr_eval_->Close(state);
-    order_by_eq_expr_->Close();
-  }
+  if (partition_by_eq_expr_eval_ != nullptr) partition_by_eq_expr_eval_->Close(state);
+  if (order_by_eq_expr_eval_ != nullptr) order_by_eq_expr_eval_->Close(state);
   if (curr_child_batch_.get() != nullptr) curr_child_batch_.reset();
   if (curr_tuple_pool_.get() != nullptr) curr_tuple_pool_->FreeAll();
   if (prev_tuple_pool_.get() != nullptr) prev_tuple_pool_->FreeAll();

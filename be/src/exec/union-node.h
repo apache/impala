@@ -40,6 +40,7 @@ class UnionNode;
 class UnionPlanNode : public PlanNode {
  public:
   virtual Status Init(const TPlanNode& tnode, RuntimeState* state) override;
+  virtual void Close() override;
   virtual Status CreateExecNode(RuntimeState* state, ExecNode** node) const override;
   void Codegen(RuntimeState* state, RuntimeProfile* runtime_profile);
 
@@ -105,11 +106,11 @@ class UnionNode : public ExecNode {
 
   /// Const exprs materialized by this node. These exprs don't refer to any children.
   /// Only materialized by the first fragment instance to avoid duplication.
-  std::vector<std::vector<ScalarExpr*>> const_exprs_lists_;
+  const std::vector<std::vector<ScalarExpr*>>& const_exprs_lists_;
   std::vector<std::vector<ScalarExprEvaluator*>> const_expr_evals_lists_;
 
   /// Exprs materialized by this node. The i-th result expr list refers to the i-th child.
-  std::vector<std::vector<ScalarExpr*>> child_exprs_lists_;
+  const std::vector<std::vector<ScalarExpr*>>& child_exprs_lists_;
   std::vector<std::vector<ScalarExprEvaluator*>> child_expr_evals_lists_;
 
   /// Reference to the codegened vector containing codegened function pointer owned by the

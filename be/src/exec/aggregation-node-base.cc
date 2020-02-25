@@ -47,6 +47,11 @@ Status AggregationPlanNode::Init(const TPlanNode& tnode, RuntimeState* state) {
   return Status::OK();
 }
 
+void AggregationPlanNode::Close() {
+  for (AggregatorConfig* config : aggs_) config->Close();
+  PlanNode::Close();
+}
+
 Status AggregationPlanNode::CreateExecNode(RuntimeState* state, ExecNode** node) const {
   ObjectPool* pool = state->obj_pool();
   if (tnode_->agg_node.aggregators[0].use_streaming_preaggregation) {
@@ -66,7 +71,7 @@ AggregationNodeBase::AggregationNodeBase(
   for (int i = 0; i < num_aggs; ++i) {
     const AggregatorConfig* agg = pnode.aggs_[i];
     unique_ptr<Aggregator> node;
-    if (agg->grouping_exprs_.empty()) {
+    if (agg->GetNumGroupingExprs() == 0) {
       const NonGroupingAggregatorConfig* non_grouping_config =
           static_cast<const NonGroupingAggregatorConfig*>(agg);
       node.reset(new NonGroupingAggregator(this, pool_, *non_grouping_config));

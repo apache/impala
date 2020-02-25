@@ -39,6 +39,7 @@ class NestedLoopJoinPlanNode : public BlockingJoinPlanNode {
   std::vector<ScalarExpr*> join_conjuncts_;
 
   virtual Status Init(const TPlanNode& tnode, RuntimeState* state) override;
+  virtual void Close() override;
   virtual Status CreateExecNode(RuntimeState* state, ExecNode** node) const override;
 
   ~NestedLoopJoinPlanNode(){}
@@ -78,7 +79,7 @@ class NestedLoopJoinNode : public BlockingJoinNode {
   RowBatchList::TupleRowIterator build_row_iterator_;
 
   /// Ordinal position of current_build_row_ [0, num_build_rows_).
-  int64_t current_build_row_idx_;
+  int64_t current_build_row_idx_ = 0;
 
   /// Bitmap used to identify matching build tuples for the case of OUTER/SEMI/ANTI
   /// joins. Owned exclusively by the nested loop join node.
@@ -87,13 +88,13 @@ class NestedLoopJoinNode : public BlockingJoinNode {
 
   /// If true, we've started processing the unmatched build rows. Only used in
   /// RIGHT OUTER JOIN, RIGHT ANTI JOIN and FULL OUTER JOIN modes.
-  bool process_unmatched_build_rows_;
+  bool process_unmatched_build_rows_ = false;
 
   /// END: Members that must be Reset()
   /////////////////////////////////////////
 
   /// Join conjuncts
-  std::vector<ScalarExpr*> join_conjuncts_;
+  const std::vector<ScalarExpr*>& join_conjuncts_;
   std::vector<ScalarExprEvaluator*> join_conjunct_evals_;
 
   /// Optimized build for the case where the right child is a SingularRowSrcNode.

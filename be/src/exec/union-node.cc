@@ -62,6 +62,16 @@ Status UnionPlanNode::Init(const TPlanNode& tnode, RuntimeState* state) {
   return Status::OK();
 }
 
+void UnionPlanNode::Close() {
+  for (const vector<ScalarExpr*>& const_exprs : const_exprs_lists_) {
+    ScalarExpr::Close(const_exprs);
+  }
+  for (const vector<ScalarExpr*>& child_exprs : child_exprs_lists_) {
+    ScalarExpr::Close(child_exprs);
+  }
+  PlanNode::Close();
+}
+
 Status UnionPlanNode::CreateExecNode(RuntimeState* state, ExecNode** node) const {
   ObjectPool* pool = state->obj_pool();
   *node = pool->Add(new UnionNode(pool, *this, state->desc_tbl()));
@@ -353,12 +363,6 @@ void UnionNode::Close(RuntimeState* state) {
   }
   for (const vector<ScalarExprEvaluator*>& evals : child_expr_evals_lists_) {
     ScalarExprEvaluator::Close(evals, state);
-  }
-  for (const vector<ScalarExpr*>& const_exprs : const_exprs_lists_) {
-    ScalarExpr::Close(const_exprs);
-  }
-  for (const vector<ScalarExpr*>& child_exprs : child_exprs_lists_) {
-    ScalarExpr::Close(child_exprs);
   }
   ExecNode::Close(state);
 }

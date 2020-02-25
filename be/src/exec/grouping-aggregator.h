@@ -122,6 +122,7 @@ class GroupingAggregatorConfig : public AggregatorConfig {
       const TAggregator& taggregator, RuntimeState* state, PlanNode* pnode, int agg_idx);
   Status Init(
       const TAggregator& taggregator, RuntimeState* state, PlanNode* pnode) override;
+  void Close() override;
   Status Codegen(RuntimeState* state) override;
   ~GroupingAggregatorConfig() override {}
 
@@ -146,6 +147,9 @@ class GroupingAggregatorConfig : public AggregatorConfig {
   /// All the exprs are simply SlotRefs for the intermediate tuple.
   std::vector<ScalarExpr*> build_exprs_;
 
+  /// Exprs used to evaluate input rows
+  std::vector<ScalarExpr*> grouping_exprs_;
+
   /// Indices of grouping exprs with var-len string types in grouping_exprs_.
   /// We need to do more work for var-len expressions when allocating and spilling rows.
   /// All var-len grouping exprs have type string.
@@ -165,8 +169,7 @@ class GroupingAggregatorConfig : public AggregatorConfig {
   /// Jitted AddBatchStreamingImpl function pointer. Null if codegen is disabled.
   AddBatchStreamingImplFn add_batch_streaming_impl_fn_ = nullptr;
 
- protected:
-  int GetNumGroupingExprs() override { return grouping_exprs_.size(); }
+  int GetNumGroupingExprs() const override { return grouping_exprs_.size(); }
 
  private:
   /// Codegen the non-streaming add row batch loop. The loop has already been compiled to
@@ -264,11 +267,11 @@ class GroupingAggregator : public Aggregator {
   bool needs_serialize_ = false;
 
   /// Exprs used to evaluate input rows
-  std::vector<ScalarExpr*> grouping_exprs_;
+  const std::vector<ScalarExpr*>& grouping_exprs_;
 
   /// Exprs used to insert constructed aggregation tuple into the hash table.
   /// All the exprs are simply SlotRefs for the intermediate tuple.
-  std::vector<ScalarExpr*> build_exprs_;
+  const std::vector<ScalarExpr*>& build_exprs_;
 
   /// Indices of grouping exprs with var-len string types in grouping_exprs_.
   /// We need to do more work for var-len expressions when allocating and spilling rows.

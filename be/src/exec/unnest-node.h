@@ -29,6 +29,7 @@ class TupleDescriptor;
 class UnnestPlanNode : public PlanNode {
  public:
   virtual Status Init(const TPlanNode& tnode, RuntimeState* state) override;
+  virtual void Close() override;
   virtual Status CreateExecNode(RuntimeState* state, ExecNode** node) const override;
   /// Initializes the expression which produces the collection to be unnested.
   /// Called by the containing subplan plan-node.
@@ -39,7 +40,7 @@ class UnnestPlanNode : public PlanNode {
   /// Expr that produces the collection to be unnested. Currently always a SlotRef into an
   /// collection-typed slot. We do not evaluate this expr for setting coll_value_, but
   /// instead manually retrieve the slot value to support projection (see class comment).
-  ScalarExpr* collection_expr_;
+  ScalarExpr* collection_expr_ = nullptr;
 
   /// Descriptor of the collection-typed slot referenced by coll_expr_eval_. Set in
   /// Prepare().  This slot is always set to NULL in Open() as a simple projection.

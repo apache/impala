@@ -119,6 +119,12 @@ Status GroupingAggregatorConfig::Init(
   return Status::OK();
 }
 
+void GroupingAggregatorConfig::Close() {
+  ScalarExpr::Close(build_exprs_);
+  ScalarExpr::Close(grouping_exprs_);
+  AggregatorConfig::Close();
+}
+
 static const int STREAMING_HT_MIN_REDUCTION_SIZE =
     sizeof(STREAMING_HT_MIN_REDUCTION) / sizeof(STREAMING_HT_MIN_REDUCTION[0]);
 
@@ -417,8 +423,6 @@ void GroupingAggregator::Close(RuntimeState* state) {
   if (serialize_stream_.get() != nullptr) {
     serialize_stream_->Close(nullptr, RowBatch::FlushMode::NO_FLUSH_RESOURCES);
   }
-  ScalarExpr::Close(grouping_exprs_);
-  ScalarExpr::Close(build_exprs_);
   reservation_manager_.Close(state);
   if (reservation_tracker_ != nullptr) reservation_tracker_->Close();
   // Must be called after tuple_pool_ is freed, so that mem_tracker_ can be closed.
