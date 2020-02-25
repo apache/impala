@@ -131,7 +131,7 @@ Frontend::Frontend() {
   };
 
   jbyteArray cfg_bytes;
-  ABORT_IF_ERROR(GetThriftBackendGflags(jni_env, &cfg_bytes));
+  ABORT_IF_ERROR(GetThriftBackendGFlagsForJNI(jni_env, &cfg_bytes));
 
   // Pass in whether this is a backend test, so that the Frontend can avoid certain
   // unnecessary initialization that introduces dependencies on a running minicluster.

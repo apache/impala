@@ -24,9 +24,12 @@
 
 namespace impala {
 
+class TBackendGflags;
+
+Status PopulateThriftBackendGflags(TBackendGflags& cfg);
 /// Builds the TBackendGflags object to pass to JNI. This is used to pass the gflag
 /// configs to the Frontend and the Catalog.
-Status GetThriftBackendGflags(JNIEnv* jni_env, jbyteArray* cfg_bytes);
+Status GetThriftBackendGFlagsForJNI(JNIEnv* jni_env, jbyteArray* cfg_bytes);
 }
 
 #endif

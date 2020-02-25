@@ -50,6 +50,8 @@ class TestHS2Service : public ImpalaHiveServer2ServiceIf {
       TExecuteStatementResp& _return, const TExecuteStatementReq& req) {}
   virtual void ExecutePlannedStatement(
       TExecuteStatementResp& _return, const TExecutePlannedStatementReq& req) {}
+  virtual void GetBackendConfig(TGetBackendConfigResp& _return,
+      const TGetBackendConfigReq& req) {}
   virtual void GetTypeInfo(TGetTypeInfoResp& _return, const TGetTypeInfoReq& req) {}
   virtual void GetCatalogs(TGetCatalogsResp& _return, const TGetCatalogsReq& req) {}
   virtual void GetSchemas(TGetSchemasResp& _return, const TGetSchemasReq& req) {}

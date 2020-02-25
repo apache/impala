@@ -163,8 +163,7 @@ Status GetConfigFromCommand(const string& flag_cmd, string& result) {
   return Status::OK();
 }
 
-Status GetThriftBackendGflags(JNIEnv* jni_env, jbyteArray* cfg_bytes) {
-  TBackendGflags cfg;
+Status PopulateThriftBackendGflags(TBackendGflags& cfg) {
   cfg.__set_load_catalog_in_background(FLAGS_load_catalog_in_background);
   cfg.__set_enable_orc_scanner(FLAGS_enable_orc_scanner);
   cfg.__set_use_local_catalog(FLAGS_use_local_catalog);
@@ -269,6 +268,12 @@ Status GetThriftBackendGflags(JNIEnv* jni_env, jbyteArray* cfg_bytes) {
   cfg.__set_saml2_group_attribute_name(FLAGS_saml2_group_attribute_name);
   cfg.__set_saml2_group_filter(FLAGS_saml2_group_filter);
   cfg.__set_saml2_ee_test_mode(FLAGS_saml2_ee_test_mode);
+  return Status::OK();
+}
+
+Status GetThriftBackendGFlagsForJNI(JNIEnv* jni_env, jbyteArray* cfg_bytes) {
+  TBackendGflags cfg;
+  RETURN_IF_ERROR(PopulateThriftBackendGflags(cfg));
   RETURN_IF_ERROR(SerializeThriftMsg(jni_env, &cfg, cfg_bytes));
   return Status::OK();
 }
