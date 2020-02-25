@@ -42,6 +42,7 @@ tests/comparison/leopard/static/css/bootstrap*
 tests/comparison/leopard/static/fonts/glyphicons-halflings*
 tests/comparison/leopard/static/js/bootstrap*
 shell/ext-py/prettytable-0.7.1/*
+shell/ext-py/six-1.14.0/*
 shell/ext-py/sqlparse-0.1.19/*
 shell/ext-py/sasl-0.1.1/*
 shell/ext-py/bitarray-0.9.0/*
