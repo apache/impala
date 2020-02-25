@@ -150,6 +150,8 @@ DEFINE_string(default_query_options, "", "key=value pair of default query option
     " impalad, separated by ','");
 DEFINE_int32(query_log_size, 25, "Number of queries to retain in the query log. If -1, "
     "the query log has unbounded size.");
+DEFINE_int32(query_stmt_size, 250, "length of the statements in the query log. If <=0, "
+    "the full statement is displayed in the query log without trimming.");
 DEFINE_bool(log_query_to_file, true, "if true, logs completed query profiles to file.");
 
 DEFINE_int64(max_result_cache_size, 100000L, "Maximum number of query results a client "

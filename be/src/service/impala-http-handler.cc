@@ -59,6 +59,7 @@ using namespace rapidjson;
 using namespace strings;
 
 DECLARE_int32(query_log_size);
+DECLARE_int32(query_stmt_size);
 DECLARE_bool(use_local_catalog);
 
 namespace {
@@ -368,7 +369,11 @@ void ImpalaHttpHandler::QueryStateToJson(const ImpalaServer::QueryStateRecord& r
   value->AddMember("default_db", default_db, document->GetAllocator());
 
   // Redact the query string
-  Value stmt(RedactCopy(record.stmt).c_str(), document->GetAllocator());
+  std::string tmp_stmt = RedactCopy(record.stmt);
+  if(FLAGS_query_stmt_size && tmp_stmt.length() > FLAGS_query_stmt_size) {
+    tmp_stmt = tmp_stmt.substr(0, FLAGS_query_stmt_size).append("...");
+  }
+  Value stmt(tmp_stmt.c_str(), document->GetAllocator());
   value->AddMember("stmt", stmt, document->GetAllocator());
 
   Value stmt_type(_TStmtType_VALUES_TO_NAMES.find(record.stmt_type)->second,

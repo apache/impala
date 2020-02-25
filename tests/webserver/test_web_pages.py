@@ -50,6 +50,7 @@ class TestWebPage(ImpalaTestSuite):
   RESET_RESOURCE_POOL_STATS_URL = "http://localhost:{0}/resource_pool_reset"
   BACKENDS_URL = "http://localhost:{0}/backends"
   PROMETHEUS_METRICS_URL = "http://localhost:{0}/metrics_prometheus"
+  QUERIES_URL = "http://localhost:{0}/queries"
 
   # log4j changes do not apply to the statestore since it doesn't
   # have an embedded JVM. So we make two sets of ports to test the
@@ -415,6 +416,23 @@ class TestWebPage(ImpalaTestSuite):
     for tblinfo in high_filecount_tbls:
       if tblinfo["name"] == tbl_fname:
         assert tblinfo["num_files"] == int(numfiles)
+
+  def test_query_stmt(self):
+    """Create a long select query then check if it is truncated in the response json."""
+    # The imput query is a select + 450 "x " long, which is long enough to get truncated.
+    query = "select \"{0}\"".format("x " * 450)
+    # The expected result query should be 253 long and contains the first 250
+    # chars + "..."
+    expected_result = "select \"{0}...".format("x " * 121)
+    check_if_contains = False
+    self.execute_query(query)
+    response_json = self.__run_query_and_get_debug_page(query, self.QUERIES_URL)
+    # Search the json for the expected value.
+    for json_part in response_json['completed_queries']:
+      if expected_result in json_part['stmt']:
+        check_if_contains = True
+        break
+    assert check_if_contains, "No matching statement found in the jsons."
 
   def __run_query_and_get_debug_page(self, query, page_url, query_options=None,
                                      expected_state=None):

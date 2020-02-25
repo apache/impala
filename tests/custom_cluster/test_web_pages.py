@@ -104,3 +104,37 @@ class TestWebPage(CustomClusterTestSuite):
         assert response.status_code == requests.codes.ok, ip
       except requests.exceptions.ConnectionError:
         assert ip != interface
+
+  @pytest.mark.execute_serially
+  @CustomClusterTestSuite.with_args(
+      impalad_args="--query_stmt_size=0"
+  )
+  def test_query_stmt_without_truncate(self):
+    """Check if the full query string is displayed in the query list on the WebUI."""
+    # The input query is a select + 450 'x ' long.
+    query_select = "x " * 450
+    query = 'select "{0}"'.format(query_select)
+    # In the site there is an extra \ before the " so we need that in the expected
+    # response too.
+    expected = 'select \\"{0}\\"'.format(query_select)
+    self.execute_query(query)
+    response = requests.get("http://localhost:25000/queries?json")
+    response_json = response.text
+    assert expected in response_json, "No matching statement found in the queries site."
+
+  @pytest.mark.execute_serially
+  @CustomClusterTestSuite.with_args(
+      impalad_args="--query_stmt_size=10"
+  )
+  def test_query_stmt_with_custom_length(self):
+    """Check if the partial query with the correct length is displayed in the query list
+    on the WebUI."""
+    # The input query is a select + 450 'x ' long.
+    query = 'select "{0}"'.format("x " * 450)
+    # Searching for the custom, 10 chars long response. In the site there is an extra \
+    # before the " so we need that in the expected response too.
+    expected = 'select \\"x ...'
+    self.execute_query(query)
+    response = requests.get("http://localhost:25000/queries?json")
+    response_json = response.text
+    assert expected in response_json, "No matching statement found in the queries site."
