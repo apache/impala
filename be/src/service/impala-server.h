@@ -29,6 +29,7 @@
 #include <boost/uuid/uuid_io.hpp>
 
 #include "common/status.h"
+#include "gen-cpp/BackendGflags_types.h"
 #include "gen-cpp/Frontend_types.h"
 #include "gen-cpp/ImpalaHiveServer2Service.h"
 #include "gen-cpp/ImpalaService.h"
@@ -351,6 +352,10 @@ class ImpalaServer : public ImpalaServiceIf,
   virtual void ExecutePlannedStatement(
       apache::hive::service::cli::thrift::TExecuteStatementResp& return_val,
       const TExecutePlannedStatementReq& req);
+
+  // Retrieves the current BackendConfig
+  virtual void GetBackendConfig(TGetBackendConfigResp& return_val,
+      const TGetBackendConfigReq& request);
 
   /// Closes an Impala operation and returns additional information about the closed
   /// operation.

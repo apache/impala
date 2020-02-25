@@ -81,7 +81,7 @@ Java_org_apache_impala_util_NativeLogger_Log(
 namespace {
 // Defaults to startup flag --v. FLAGS_v can be overriden at runtime for
 // debugging, so we save the original value here in case we need to restore
-// the defaults. Set in GetThriftBackendGflags().
+// the defaults. Set in GetThriftBackendGFlagsForJNI().
 int FLAGS_v_original_value;
 
 static jclass log4j_logger_class_;

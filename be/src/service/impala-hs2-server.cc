@@ -47,6 +47,7 @@
 #include "service/query-options.h"
 #include "service/query-result-set.h"
 #include "util/auth-util.h"
+#include "util/backend-gflag-util.h"
 #include "util/debug-util.h"
 #include "util/impalad-metrics.h"
 #include "util/metrics.h"
@@ -1173,6 +1174,27 @@ void ImpalaServer::GetDelegationToken(TGetDelegationTokenResp& return_val,
     const TGetDelegationTokenReq& req) {
   return_val.status.__set_statusCode(thrift::TStatusCode::ERROR_STATUS);
   return_val.status.__set_errorMessage("Not implemented");
+}
+
+void ImpalaServer::GetBackendConfig(TGetBackendConfigResp& return_val,
+    const TGetBackendConfigReq& req) {
+  VLOG_QUERY << "GetBackendConfig(): req=" << ThriftDebugString(req);
+  const ThriftServer::ConnectionContext* connection_context =
+      ThriftServer::GetThreadConnectionContext();
+  if (connection_context->server_name != EXTERNAL_FRONTEND_SERVER_NAME) {
+    HS2_RETURN_ERROR(return_val, "Unsupported operation",
+        SQLSTATE_OPTIONAL_FEATURE_NOT_IMPLEMENTED);
+  }
+  TUniqueId session_id;
+  TUniqueId secret;
+  HS2_RETURN_IF_ERROR(return_val, THandleIdentifierToTUniqueId(
+      req.sessionHandle.sessionId, &session_id, &secret), SQLSTATE_GENERAL_ERROR);
+  HS2_RETURN_IF_ERROR(return_val,
+      PopulateThriftBackendGflags(return_val.backend_config),
+      SQLSTATE_GENERAL_ERROR);
+
+  return_val.status.__set_statusCode(thrift::TStatusCode::SUCCESS_STATUS);
+  VLOG_RPC << "GetBackendConfig(): return_val=" << ThriftDebugString(return_val);
 }
 
 void ImpalaServer::CancelDelegationToken(TCancelDelegationTokenResp& return_val,

@@ -81,7 +81,7 @@ Catalog::Catalog() {
   }
 
   jbyteArray cfg_bytes;
-  ABORT_IF_ERROR(GetThriftBackendGflags(jni_env, &cfg_bytes));
+  ABORT_IF_ERROR(GetThriftBackendGFlagsForJNI(jni_env, &cfg_bytes));
 
   jobject catalog = jni_env->NewObject(catalog_class_, catalog_ctor_, cfg_bytes);
   CLEAN_EXIT_IF_EXC(jni_env);

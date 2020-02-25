@@ -732,6 +732,14 @@ class TestHS2(HS2TestSuite):
     assert len(exec_summary_resp.summary.nodes) > 0
 
   @needs_session()
+  def test_get_backend_config(self):
+    get_backend_config_req = ImpalaHiveServer2Service.TGetBackendConfigReq()
+    get_backend_config_req.sessionHandle = self.session_handle
+    get_backend_config_resp = self.hs2_client.GetBackendConfig(get_backend_config_req)
+    TestHS2.check_response(get_backend_config_resp,
+        TCLIService.TStatusCode.ERROR_STATUS, "Unsupported operation")
+
+  @needs_session()
   def test_get_profile(self):
     statement = "SELECT COUNT(2) FROM functional.alltypes"
     execute_statement_resp = self.execute_statement(statement)

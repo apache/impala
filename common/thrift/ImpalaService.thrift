@@ -25,6 +25,7 @@ include "beeswax.thrift"
 include "TCLIService.thrift"
 include "RuntimeProfile.thrift"
 include "Frontend.thrift"
+include "BackendGflags.thrift"
 
 // ImpalaService accepts query execution options through beeswax.Query.configuration in
 // key:value form. For example, the list of strings could be:
@@ -823,6 +824,15 @@ struct TExecutePlannedStatementReq {
   2: required Frontend.TExecRequest plan
 }
 
+struct TGetBackendConfigReq {
+  1: required TCLIService.TSessionHandle sessionHandle
+}
+
+struct TGetBackendConfigResp {
+  1: required TCLIService.TStatus status
+
+  2: required BackendGflags.TBackendGflags backend_config
+}
 
 service ImpalaHiveServer2Service extends TCLIService.TCLIService {
   // Returns the exec summary for the given query. The exec summary is only valid for
@@ -843,4 +853,7 @@ service ImpalaHiveServer2Service extends TCLIService.TCLIService {
   // Execute statement with supplied ExecRequest
   TCLIService.TExecuteStatementResp ExecutePlannedStatement(
       1:TExecutePlannedStatementReq req);
+
+  // Returns the current TBackendGflags. Only supported for the "external fe" service.
+  TGetBackendConfigResp GetBackendConfig(1:TGetBackendConfigReq req);
 }
