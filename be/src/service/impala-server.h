@@ -463,10 +463,10 @@ class ImpalaServer : public ImpalaServiceIf,
   void RegisterQueryLocations(
       const PerBackendExecParams& per_backend_params, const TUniqueId& query_id);
 
-  /// Takes a set of network addresses of active backends and cancels all the queries
-  /// running on failed ones (that is, addresses not in the active set).
+  /// Takes a set of backend ids of active backends and cancels all the queries running on
+  /// failed ones (that is, ids not in the active set).
   void CancelQueriesOnFailedBackends(
-      const std::unordered_set<TNetworkAddress>& current_membership);
+      const std::unordered_set<TBackendId>& current_membership);
 
   /// Start the shutdown process. Return an error if it could not be started. Otherwise,
   /// if it was successfully started by this or a previous call, return OK along with
@@ -1274,10 +1274,23 @@ class ImpalaServer : public ImpalaServiceIf,
   /// Protects query_locations_. Not held in conjunction with other locks.
   std::mutex query_locations_lock_;
 
-  /// A map from backend to the list of queries currently running or expected to run
-  /// there.
-  typedef std::unordered_map<TNetworkAddress, std::unordered_set<TUniqueId>>
-      QueryLocations;
+  /// Entries in the 'query_locations' map.
+  struct QueryLocationInfo {
+    QueryLocationInfo(TNetworkAddress address, TUniqueId query_id) : address(address) {
+      query_ids.insert(query_id);
+    }
+
+    /// Used for logging and error messages so that users don't have to translate between
+    /// the TBackendId and a hostname themselves.
+    TNetworkAddress address;
+
+    /// Queries currently running or expected to run at this location.
+    std::unordered_set<TUniqueId> query_ids;
+  };
+
+  /// Contains info about what queries are running on each backend, so that they can be
+  /// cancelled if the backend goes down.
+  typedef std::unordered_map<TBackendId, QueryLocationInfo> QueryLocations;
   QueryLocations query_locations_;
 
   /// The local backend descriptor. Updated in GetLocalBackendDescriptor() and protected

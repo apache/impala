@@ -151,6 +151,9 @@ struct TUniqueId {
   2: required i64 lo
 }
 
+// Used to uniquely identify individual impalads.
+typedef TUniqueId TBackendId;
+
 enum TFunctionCategory {
   SCALAR = 0
   AGGREGATE = 1

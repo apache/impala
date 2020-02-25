@@ -1175,14 +1175,13 @@ Status ImpalaServer::CloseClientRequestState(
     if (!per_backend_params.empty()) {
       lock_guard<mutex> l(query_locations_lock_);
       for (const auto& entry : per_backend_params) {
-        const TNetworkAddress& hostport = entry.first;
         // Query may have been removed already by cancellation path. In particular, if
         // node to fail was last sender to an exchange, the coordinator will realise and
         // fail the query at the same time the failure detection path does the same
         // thing. They will harmlessly race to remove the query from this map.
-        QueryLocations::iterator it = query_locations_.find(hostport);
+        auto it = query_locations_.find(entry.second.be_desc.backend_id);
         if (it != query_locations_.end()) {
-          it->second.erase(request_state->query_id());
+          it->second.query_ids.erase(request_state->query_id());
         }
       }
     }
@@ -1718,28 +1717,36 @@ void ImpalaServer::RegisterQueryLocations(
   if (!per_backend_params.empty()) {
     lock_guard<mutex> l(query_locations_lock_);
     for (const auto& entry : per_backend_params) {
-      const TNetworkAddress& host = entry.first;
-      query_locations_[host].insert(query_id);
+      const TBackendId& backend_id = entry.second.be_desc.backend_id;
+      auto it = query_locations_.find(backend_id);
+      if (it == query_locations_.end()) {
+        query_locations_.emplace(
+            backend_id, QueryLocationInfo(entry.second.be_desc.address, query_id));
+      } else {
+        it->second.query_ids.insert(query_id);
+      }
     }
   }
 }
 
 void ImpalaServer::CancelQueriesOnFailedBackends(
-    const std::unordered_set<TNetworkAddress>& current_membership) {
+    const std::unordered_set<TBackendId>& current_membership) {
   // Maps from query id (to be cancelled) to a list of failed Impalads that are
-  // the cause of the cancellation.
+  // the cause of the cancellation. Note that we don't need to use TBackendIds as a single
+  // query can't be scheduled on two backends with the same TNetworkAddress so there's no
+  // ambiguity, and passing the TNetworkAddresses into the CancellationWork makes them
+  // available for generating a user-friendly error message.
   map<TUniqueId, vector<TNetworkAddress>> queries_to_cancel;
   {
     // Build a list of queries that are running on failed hosts (as evidenced by their
     // absence from the membership list).
-    // TODO: crash-restart failures can give false negatives for failed Impala demons.
     lock_guard<mutex> l(query_locations_lock_);
     QueryLocations::const_iterator loc_entry = query_locations_.begin();
     while (loc_entry != query_locations_.end()) {
       if (current_membership.find(loc_entry->first) == current_membership.end()) {
         // Add failed backend locations to all queries that ran on that backend.
-        for (const auto& query_id : loc_entry->second) {
-          queries_to_cancel[query_id].push_back(loc_entry->first);
+        for (const auto& query_id : loc_entry->second.query_ids) {
+          queries_to_cancel[query_id].push_back(loc_entry->second.address);
         }
         loc_entry = query_locations_.erase(loc_entry);
       } else {
@@ -1798,6 +1805,7 @@ void ImpalaServer::BuildLocalBackendDescriptorInternal(TBackendDescriptor* be_de
   DCHECK(services_started_.load());
   bool is_quiescing = shutting_down_.Load() != 0;
 
+  be_desc->__set_backend_id(exec_env_->backend_id());
   be_desc->__set_address(exec_env_->GetThriftBackendAddress());
   be_desc->__set_ip_address(exec_env_->ip_address());
   be_desc->__set_is_coordinator(FLAGS_is_coordinator);

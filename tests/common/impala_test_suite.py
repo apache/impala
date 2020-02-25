@@ -1077,21 +1077,24 @@ class ImpalaTestSuite(BaseTestSuite):
           return workload_strategy[1]
     return default_strategy
 
-  def wait_for_state(self, handle, expected_state, timeout):
-    """Waits for the given 'query_handle' to reach the 'expected_state'. If it does not
-    reach the given state within 'timeout' seconds, the method throws an AssertionError.
+  def wait_for_state(self, handle, expected_state, timeout, client=None):
+    """Waits for the given 'query_handle' to reach the 'expected_state' using 'client', or
+    with the default connection if 'client' is None. If it does not reach the given state
+    within 'timeout' seconds, the method throws an AssertionError.
     """
-    self.wait_for_any_state(handle, [expected_state], timeout)
+    self.wait_for_any_state(handle, [expected_state], timeout, client)
 
-  def wait_for_any_state(self, handle, expected_states, timeout):
-    """Waits for the given 'query_handle' to reach one of 'expected_states'. If it does
-    not reach one of the given states within 'timeout' seconds, the method throws an
-    AssertionError. Returns the final state.
+  def wait_for_any_state(self, handle, expected_states, timeout, client=None):
+    """Waits for the given 'query_handle' to reach one of 'expected_states' using 'client'
+    or with the default connection if 'client' is None. If it does not reach one of the
+    given states within 'timeout' seconds, the method throws an AssertionError. Returns
+    the final state.
     """
+    if client is None: client = self.client
     start_time = time.time()
-    actual_state = self.client.get_state(handle)
+    actual_state = client.get_state(handle)
     while actual_state not in expected_states and time.time() - start_time < timeout:
-      actual_state = self.client.get_state(handle)
+      actual_state = client.get_state(handle)
       time.sleep(0.5)
     if actual_state not in expected_states:
       raise Timeout("query {0} did not reach one of the expected states {1}, "

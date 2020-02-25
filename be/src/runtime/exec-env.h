@@ -113,6 +113,8 @@ class ExecEnv {
   /// StartServices() was successful.
   TNetworkAddress GetThriftBackendAddress() const;
 
+  const TBackendId& backend_id() const { return backend_id_; }
+
   KrpcDataStreamMgr* stream_mgr() { return stream_mgr_.get(); }
 
   ImpalaBackendClientCache* impalad_client_cache() {
@@ -174,6 +176,9 @@ class ExecEnv {
   int64_t admission_slots() const { return admission_slots_; }
 
  private:
+  // Used to uniquely identify this impalad.
+  TBackendId backend_id_;
+
   boost::scoped_ptr<ObjectPool> obj_pool_;
   boost::scoped_ptr<MetricGroup> metrics_;
   boost::scoped_ptr<KrpcDataStreamMgr> stream_mgr_;

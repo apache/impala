@@ -69,6 +69,7 @@
 #include "util/system-state-info.h"
 #include "util/test-info.h"
 #include "util/thread-pool.h"
+#include "util/uid-util.h"
 #include "util/webserver.h"
 
 #include "common/names.h"
@@ -251,6 +252,7 @@ ExecEnv::ExecEnv(int backend_port, int krpc_port,
     rpc_metrics_(metrics_->GetOrCreateChildGroup("rpc")),
     enable_webserver_(FLAGS_enable_webserver && webserver_port > 0),
     configured_backend_address_(MakeNetworkAddress(FLAGS_hostname, backend_port)) {
+  UUIDToTUniqueId(boost::uuids::random_generator()(), &backend_id_);
 
   // Resolve hostname to IP address.
   ABORT_IF_ERROR(HostnameToIpAddr(FLAGS_hostname, &ip_address_));
@@ -279,7 +281,7 @@ ExecEnv::ExecEnv(int backend_port, int krpc_port,
   }
 
   cluster_membership_mgr_.reset(new ClusterMembershipMgr(
-      statestore_subscriber_->id(), statestore_subscriber_.get(), metrics_.get()));
+      PrintId(backend_id_), statestore_subscriber_.get(), metrics_.get()));
 
   admission_controller_.reset(
       new AdmissionController(cluster_membership_mgr_.get(), statestore_subscriber_.get(),
@@ -300,6 +302,7 @@ Status ExecEnv::InitForFeTests() {
 }
 
 Status ExecEnv::Init() {
+  LOG(INFO) << "Initializing impalad with backend uuid: " << PrintId(backend_id_);
   // Initialize thread pools
   if (FLAGS_is_coordinator) {
     RETURN_IF_ERROR(hdfs_op_thread_pool_->Init());
@@ -544,9 +547,9 @@ void ExecEnv::SetImpalaServer(ImpalaServer* server) {
   });
   cluster_membership_mgr_->RegisterUpdateCallbackFn(
       [server](ClusterMembershipMgr::SnapshotPtr snapshot) {
-        std::unordered_set<TNetworkAddress> current_backend_set;
+        std::unordered_set<TBackendId> current_backend_set;
         for (const auto& it : snapshot->current_backends) {
-          current_backend_set.insert(it.second.address);
+          current_backend_set.insert(it.second.backend_id);
         }
         server->CancelQueriesOnFailedBackends(current_backend_set);
       });

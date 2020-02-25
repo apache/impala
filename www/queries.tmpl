@@ -147,11 +147,13 @@ archived in memory. The size of that archive is controlled with the
 <table class='table table-hover table-bordered'>
   <tr>
     <th>Location</th>
+    <th>Backend Id</th>
     <th>Number of running queries with fragments on this host</th>
   </tr>
 {{#query_locations}}
   <tr>
     <td>{{location}}</td>
+    <td>{{backend_id}}</td>
     <td>{{count}}</td>
   </tr>
 {{/query_locations}}

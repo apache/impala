@@ -93,6 +93,29 @@ class TestRestart(CustomClusterTestSuite):
       client.close()
 
   @pytest.mark.execute_serially
+  @CustomClusterTestSuite.with_args(
+      # Debug action to delay statestore updates to give the restarted impalad time to
+      # register itself before a membership topic update is generated.
+      statestored_args="--debug_actions=DO_SUBSCRIBER_UPDATE:JITTER@10000")
+  def test_statestore_update_after_impalad_restart(self):
+      """Test that checks that coordinators are informed that an impalad went down even if
+      the statestore doesn't send a membership update until after a new impalad has been
+      restarted at the same location."""
+      if self.exploration_strategy() != 'exhaustive':
+        pytest.skip()
+
+      assert len(self.cluster.impalads) == 3
+      client = self.cluster.impalads[0].service.create_beeswax_client()
+      assert client is not None
+
+      handle = client.execute_async(
+          "select count(*) from functional.alltypes where id = sleep(100000)")
+      node_to_restart = self.cluster.impalads[2]
+      node_to_restart.restart()
+      # Verify that the query is cancelled due to the failed impalad quickly.
+      self.wait_for_state(handle, QueryState.EXCEPTION, 20, client=client)
+
+  @pytest.mark.execute_serially
   def test_catalog_connection_retries(self):
     """Test that connections to the catalogd are retried, both new connections and cached
     connections."""

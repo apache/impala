@@ -106,6 +106,7 @@ DEFINE_int32(statestore_update_tcp_timeout_seconds, 300, "(Advanced) The time af
     "badly hung machines that are not able to respond to the update RPC in short "
     "order.");
 
+DECLARE_string(debug_actions);
 DECLARE_string(ssl_server_certificate);
 DECLARE_string(ssl_private_key);
 DECLARE_string(ssl_private_key_password_cmd);
@@ -918,6 +919,8 @@ void Statestore::DoSubscriberUpdate(UpdateKind update_kind, int thread_id,
     // to wait.
     VLOG(3) << "Initial " << update_kind_str << " message for: " << update.subscriber_id;
   }
+
+  DebugActionNoFail(FLAGS_debug_actions, "DO_SUBSCRIBER_UPDATE");
 
   // Send the right message type, and compute the next deadline
   int64_t deadline_ms = 0;

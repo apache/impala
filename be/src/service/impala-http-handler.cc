@@ -494,13 +494,16 @@ void ImpalaHttpHandler::QueryStateHandler(const Webserver::WebRequest& req,
   Value query_locations(kArrayType);
   {
     lock_guard<mutex> l(server_->query_locations_lock_);
-    for (const ImpalaServer::QueryLocations::value_type& location:
-         server_->query_locations_) {
+    for (const ImpalaServer::QueryLocations::value_type& location :
+        server_->query_locations_) {
       Value location_json(kObjectType);
-      Value location_name(TNetworkAddressToString(location.first).c_str(),
+      Value location_name(TNetworkAddressToString(location.second.address).c_str(),
           document->GetAllocator());
       location_json.AddMember("location", location_name, document->GetAllocator());
-      location_json.AddMember("count", static_cast<uint64_t>(location.second.size()),
+      Value backend_id_str(PrintId(location.first).c_str(), document->GetAllocator());
+      location_json.AddMember("backend_id", backend_id_str, document->GetAllocator());
+      location_json.AddMember("count",
+          static_cast<uint64_t>(location.second.query_ids.size()),
           document->GetAllocator());
       query_locations.PushBack(location_json, document->GetAllocator());
     }
@@ -940,6 +943,8 @@ void ImpalaHttpHandler::BackendsHandler(const Webserver::WebRequest& req,
         TNetworkAddressToString(backend.krpc_address).c_str(), document->GetAllocator());
     backend_obj.AddMember("address", str, document->GetAllocator());
     backend_obj.AddMember("krpc_address", krpc_address, document->GetAllocator());
+    Value backend_id_str(PrintId(backend.backend_id).c_str(), document->GetAllocator());
+    backend_obj.AddMember("backend_id", backend_id_str, document->GetAllocator());
     string webserver_url =
         Substitute("$0://$1", backend.secure_webserver ? "https" : "http",
             TNetworkAddressToString(backend.debug_http_address));
