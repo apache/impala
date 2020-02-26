@@ -311,6 +311,9 @@ fi
 # If true, will not call $IMPALA_HOME/bin/bootstrap_toolchain.py.
 export SKIP_TOOLCHAIN_BOOTSTRAP=${SKIP_TOOLCHAIN_BOOTSTRAP-false}
 
+# If true, will not download python dependencies.
+export SKIP_PYTHON_DOWNLOAD=${SKIP_PYTHON_DOWNLOAD-false}
+
 # This flag is used in $IMPALA_HOME/cmake_modules/toolchain.cmake.
 # If it's 0, Impala will be built with the compiler in the toolchain directory.
 export USE_SYSTEM_GCC=${USE_SYSTEM_GCC-0}

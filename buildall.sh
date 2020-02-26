@@ -374,10 +374,8 @@ create_log_dirs() {
 }
 
 bootstrap_dependencies() {
-  # Populate necessary thirdparty components unless it's set to be skipped.
-  if [[ "${SKIP_TOOLCHAIN_BOOTSTRAP}" = true ]]; then
-    echo "SKIP_TOOLCHAIN_BOOTSTRAP is true, skipping download of Python dependencies."
-    echo "SKIP_TOOLCHAIN_BOOTSTRAP is true, skipping toolchain bootstrap."
+  if [[ "${SKIP_PYTHON_DOWNLOAD}" = true ]]; then
+    echo "SKIP_PYTHON_DOWNLOAD is true, skipping python dependencies download."
   else
     echo ">>> Downloading Python dependencies"
     # Download all the Python dependencies we need before doing anything
@@ -388,7 +386,12 @@ bootstrap_dependencies() {
     else
       echo "Finished downloading Python dependencies"
     fi
+  fi
 
+  # Populate necessary thirdparty components unless it's set to be skipped.
+  if [[ "${SKIP_TOOLCHAIN_BOOTSTRAP}" = true ]]; then
+    echo "SKIP_TOOLCHAIN_BOOTSTRAP is true, skipping toolchain bootstrap."
+  else
     echo ">>> Downloading and extracting toolchain dependencies."
     "$IMPALA_HOME/bin/bootstrap_toolchain.py"
     echo "Toolchain bootstrap complete."
