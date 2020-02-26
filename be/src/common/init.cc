@@ -305,7 +305,9 @@ void impala::InitCommonRuntime(int argc, char** argv, bool init_jvm,
   // Breakpad needs flags and logging to initialize.
   ABORT_IF_ERROR(RegisterMinidump(argv[0]));
 #ifndef THREAD_SANITIZER
+#ifndef __aarch64__
   AtomicOps_x86CPUFeaturesInit();
+#endif
 #endif
   impala::InitThreading();
   impala::datetime_parse_util::SimpleDateFormatTokenizer::InitCtx();
