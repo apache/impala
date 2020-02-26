@@ -269,6 +269,9 @@ void CPU::Initialize() {
 #elif defined(ARCH_CPU_ARM_FAMILY) && (defined(OS_ANDROID) || defined(OS_LINUX))
   cpu_brand_.assign(g_lazy_cpuinfo.Get().brand());
   has_broken_neon_ = g_lazy_cpuinfo.Get().has_broken_neon();
+#elif defined(__aarch64__)
+  cpu_brand_.assign("ARM64");
+  has_broken_neon_ = false;
 #else
   #error unknown architecture
 #endif

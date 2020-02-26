@@ -74,6 +74,8 @@
 #include "gutil/atomicops-internals-tsan.h"
 #elif defined(__APPLE__)
 #include "gutil/atomicops-internals-macosx.h"
+#elif defined(__GNUC__) && defined(__aarch64__)
+#include "gutil/atomicops-internals-arm64.h"
 #elif defined(__GNUC__) && defined(ARMV6)
 #include "gutil/atomicops-internals-arm-v6plus.h"
 #elif defined(ARMV3)
