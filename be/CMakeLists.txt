@@ -35,6 +35,8 @@ PROJECT(ASSEMBLER)
 #   -fno-strict-aliasing: disable optimizations that assume strict aliasing. This
 #       is unsafe to do if the code uses casts (which we obviously do).
 #  -Wno-unknown-pragmas: suppress warnings for unknown (compiler specific) pragmas
+#  -fsigned-char: on aarch64 platform, type of char default is unsigned char, here
+#        set it to signed-char to be compatible with x86-64
 #  -Wno-deprecated: gutil contains deprecated headers
 #  -Wno-vla: we use C99-style variable-length arrays
 #  -pthread: enable multithreaded malloc
@@ -42,6 +44,7 @@ PROJECT(ASSEMBLER)
 #  -fno-omit-frame-pointers: Keep frame pointer for functions in register
 SET(CXX_COMMON_FLAGS "${CXX_COMMON_FLAGS} -Wall -Wno-sign-compare -Wno-unknown-pragmas -pthread")
 SET(CXX_COMMON_FLAGS "${CXX_COMMON_FLAGS} -fno-strict-aliasing -fno-omit-frame-pointer")
+SET(CXX_COMMON_FLAGS "${CXX_COMMON_FLAGS} -fsigned-char")
 SET(CXX_COMMON_FLAGS "${CXX_COMMON_FLAGS} -std=c++14")
 SET(CXX_COMMON_FLAGS "${CXX_COMMON_FLAGS} -Wno-deprecated -Wno-vla")
 SET(CXX_COMMON_FLAGS "${CXX_COMMON_FLAGS} -DBOOST_DATE_TIME_POSIX_TIME_STD_CONFIG")
