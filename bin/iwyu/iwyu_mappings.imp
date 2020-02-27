@@ -1,0 +1,43 @@
+# Licensed to the Apache Software Foundation (ASF) under one
+# or more contributor license agreements.  See the NOTICE file
+# distributed with this work for additional information
+# regarding copyright ownership.  The ASF licenses this file
+# to you under the Apache License, Version 2.0 (the
+# "License"); you may not use this file except in compliance
+# with the License.  You may obtain a copy of the License at
+#
+#   http://www.apache.org/licenses/LICENSE-2.0
+#
+# Unless required by applicable law or agreed to in writing,
+# software distributed under the License is distributed on an
+# "AS IS" BASIS, WITHOUT WARRANTIES OR CONDITIONS OF ANY
+# KIND, either express or implied.  See the License for the
+# specific language governing permissions and limitations
+# under the License.
+
+# Custom IWYU rules for the Impala codebase to reflect the codebase's preferred headers
+# and to work around any quirks of IWYU's recommendations.
+[
+    { include: ["<boost/smart_ptr/scoped_ptr.hpp>", private, "<boost/scoped_ptr.hpp>", public ] },
+    { include: ["<boost/smart_ptr/shared_ptr.hpp>", private, "<boost/shared_ptr.hpp>", public ] },
+    { include: ["<boost/unordered/unordered_set.hpp>", private, "<boost/unordered_set.hpp>", public ] },
+    { include: ["<boost/unordered/unordered_map.hpp>", private, "<boost/unordered_map.hpp>", public ] },
+    { include: ["<boost/bind/bind.hpp>", private, "<boost/bind.hpp>", public ] },
+    { include: ["<boost/bind/placeholders.hpp>", private, "<boost/bind.hpp>", public ] },
+    { include: ["<bits/stdint-intn.h>", private, "<cstdint>", public ] },
+    { include: ["<bits/stdint-uintn.h>", private, "<cstdint>", public ] },
+    { include: ["<glog/logging.h>", private, "\"common/logging.h\"", public ] },
+    { include: ["<hdfs.h>", private, "\"common/hdfs.h\"", public ] },
+    { symbol: ["string", private, "<string>", public] },
+    { symbol: ["ostream", private, "<ostream>", public] },
+    { symbol: [ "LOG", private, "\"common/logging.h\"", public ] },
+    { symbol: [ "VLOG", private, "\"common/logging.h\"", public ] },
+    { symbol: [ "CHECK_EQ", private, "\"common/logging.h\"", public ] },
+    { symbol: [ "CHECK_NE", private, "\"common/logging.h\"", public ] },
+    { symbol: [ "CHECK_LT", private, "\"common/logging.h\"", public ] },
+    { symbol: [ "CHECK_GE", private, "\"common/logging.h\"", public ] },
+    { symbol: [ "CHECK_GT", private, "\"common/logging.h\"", public ] },
+    { symbol: [ "ErrnoLogMessage", private, "\"common/logging.h\"", public ] },
+    { symbol: [ "COMPACT_GOOGLE_LOG_0", private, "\"common/logging.h\"", public ] }
+]
+
