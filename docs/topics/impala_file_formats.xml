@@ -106,7 +106,7 @@ under the License.
             <entry>
               Structured
             </entry>
-            <entry> Snappy, gzip, zstd, lz4; currently Snappy by default </entry>
+            <entry>Snappy, gzip, zstd, lz4; currently Snappy by default </entry>
             <entry>
               Yes.
             </entry>
@@ -147,7 +147,7 @@ under the License.
             <entry>
               Unstructured
             </entry>
-            <entry rev="2.0.0"> LZO, gzip, bzip2, Snappy, zstd</entry>
+            <entry rev="2.0.0">bzip2, deflate, gzip, LZO, Snappy, zstd</entry>
             <entry>
               Yes. For <codeph>CREATE TABLE</codeph> with no <codeph>STORED AS</codeph> clause,
               the default file format is uncompressed text, with values separated by ASCII
@@ -274,9 +274,7 @@ under the License.
         </dt>
 
         <dd>
-          <p>
-            Not supported for text files.
-          </p>
+          <p> Supported for AVRO, RC, Sequence, and text files. </p>
         </dd>
 
       </dlentry>
