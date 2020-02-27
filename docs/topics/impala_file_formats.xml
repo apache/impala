@@ -147,9 +147,7 @@ under the License.
             <entry>
               Unstructured
             </entry>
-            <entry rev="2.0.0">
-              LZO, gzip, bzip2, Snappy
-            </entry>
+            <entry rev="2.0.0"> LZO, gzip, bzip2, Snappy, zstd</entry>
             <entry>
               Yes. For <codeph>CREATE TABLE</codeph> with no <codeph>STORED AS</codeph> clause,
               the default file format is uncompressed text, with values separated by ASCII
@@ -314,7 +312,7 @@ under the License.
       </dlentry>
       <dlentry>
         <dt>Zstd</dt>
-        <dd>For Parquet files only.</dd>
+        <dd>For Parquet and text files only.</dd>
       </dlentry>
 
       <dlentry>

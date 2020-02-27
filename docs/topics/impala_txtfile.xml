@@ -120,14 +120,13 @@ under the License.
         details.
       </p>
 
-      <p rev="2.0.0">
-        In Impala 2.0 and later, you can also use text data compressed in the gzip, bzip2, or Snappy formats.
-        Because these compressed formats are not <q>splittable</q> in the way that LZO is, there is less
-        opportunity for Impala to parallelize queries on them. Therefore, use these types of compressed data only
-        for convenience if that is the format in which you receive the data. Prefer to use LZO compression for text
-        data if you have the choice, or convert the data to Parquet using an <codeph>INSERT ... SELECT</codeph>
-        statement to copy the original data into a Parquet table.
-      </p>
+      <p rev="2.0.0">You can also use text data compressed in the bzip2, gzip, Snappy, or zstd
+        formats. Because these compressed formats are not <q>splittable</q> in the way that LZO is,
+        there is less opportunity for Impala to parallelize queries on them. Therefore, use these
+        types of compressed data only for convenience if that is the format in which you receive the
+        data. Prefer to use LZO compression for text data if you have the choice, or convert the
+        data to Parquet using an <codeph>INSERT ... SELECT</codeph> statement to copy the original
+        data into a Parquet table. </p>
 
       <note rev="2.2.0">
         <p>
@@ -135,11 +134,14 @@ under the License.
           multiple streams created by the <codeph>pbzip2</codeph> command. Impala decodes only the data from the
           first part of such files, leading to incomplete results.
         </p>
+      </note>
 
         <p>
           The maximum size that Impala can accommodate for an individual bzip file is 1 GB (after uncompression).
         </p>
-      </note>
+        <p>
+          Impala supports zstd files created by the zstd command line tool.
+        </p>
 
       <p conref="../shared/impala_common.xml#common/s3_block_splitting"/>
 
@@ -630,39 +632,37 @@ hive&gt; INSERT INTO TABLE lzo_t SELECT col1, col2 FROM uncompressed_text_table;
 
   <concept rev="2.0.0" id="gzip">
 
-    <title>Using gzip, bzip2, or Snappy-Compressed Text Files</title>
+    <title>Using bzip2, gzip, Snappy-Compressed, or zstd Text Files</title>
   <prolog>
     <metadata>
       <data name="Category" value="Snappy"/>
       <data name="Category" value="Gzip"/>
+      <data name="Category" value="Zstd"/>
       <data name="Category" value="Compression"/>
     </metadata>
   </prolog>
 
     <conbody>
 
-      <p> In Impala 2.0 and later, Impala supports using text data files that
-        employ gzip, bzip2, or Snappy compression. These compression types are
-        primarily for convenience within an existing ETL pipeline rather than
-        maximum performance. Although it requires less I/O to read compressed
-        text than the equivalent uncompressed text, files compressed by these
-        codecs are not <q>splittable</q> and therefore cannot take full
-        advantage of the Impala parallel query capability. </p>
+      <p> Impala supports using text data files that employ bzip2, gzip, Snappy, or zstd
+        compression. These compression types are primarily for convenience within an existing ETL
+        pipeline rather than maximum performance. Although it requires less I/O to read compressed
+        text than the equivalent uncompressed text, files compressed by these codecs are not
+          <q>splittable</q> and therefore cannot take full advantage of the Impala parallel query
+        capability. Impala can read compressed text files written by Hive.</p>
 
-      <p>
-        As each bzip2- or Snappy-compressed text file is processed, the node doing the work reads the entire file
-        into memory and then decompresses it. Therefore, the node must have enough memory to hold both the
-        compressed and uncompressed data from the text file. The memory required to hold the uncompressed data is
-        difficult to estimate in advance, potentially causing problems on systems with low memory limits or with
-        resource management enabled. <ph rev="2.1.0">In Impala 2.1 and higher, this memory overhead is reduced for
-        gzip-compressed text files. The gzipped data is decompressed as it is read, rather than all at once.</ph>
+      <p> As each Snappy-compressed file is processed, the node doing the work reads the entire file
+        into memory and then decompresses it. Therefore, the node must have enough memory to hold
+        both the compressed and uncompressed data from the text file. The memory required to hold
+        the uncompressed data is difficult to estimate in advance, potentially causing problems on
+        systems with low memory limits or with resource management enabled. <ph rev="2.1.0">This
+          memory overhead is reduced for bzip-, gzip-, and zstd-compressed text files. The
+          compressed data is decompressed as it is read, rather than all at once.</ph>
       </p>
 
-      <p>
-        To create a table to hold gzip, bzip2, or Snappy-compressed text, create a text table with no special
-        compression options. Specify the delimiter and escape character if required, using the <codeph>ROW
-        FORMAT</codeph> clause.
-      </p>
+      <p> To create a table to hold compressed text, create a text table with no special compression
+        options. Specify the delimiter and escape character if required, using the <codeph>ROW
+          FORMAT</codeph> clause. </p>
 
       <p>
         Because Impala can query compressed text files but currently cannot write them, produce the compressed text
@@ -671,11 +671,10 @@ hive&gt; INSERT INTO TABLE lzo_t SELECT col1, col2 FROM uncompressed_text_table;
         the <codeph>LOCATION</codeph> attribute at a directory containing existing compressed text files.)
       </p>
 
-      <p>
-        For Impala to recognize the compressed text files, they must have the appropriate file extension
-        corresponding to the compression codec, either <codeph>.gz</codeph>, <codeph>.bz2</codeph>, or
-        <codeph>.snappy</codeph>. The extensions can be in uppercase or lowercase.
-      </p>
+      <p> For Impala to recognize the compressed text files, they must have the appropriate file
+        extension corresponding to the compression codec, either <codeph>.bz2</codeph>,
+          <codeph>.gz</codeph>, <codeph>.snappy</codeph>, or <codeph>.zst</codeph>. The extensions
+        can be in uppercase or lowercase. </p>
 
       <p>
         The following example shows how you can create a regular text table, put different kinds of compressed and
@@ -689,7 +688,7 @@ hive&gt; INSERT INTO TABLE lzo_t SELECT col1, col2 FROM uncompressed_text_table;
 insert into csv_compressed values
   ('one - uncompressed', 'two - uncompressed', 'three - uncompressed'),
   ('abc - uncompressed', 'xyz - uncompressed', '123 - uncompressed');
-...make equivalent .gz, .bz2, and .snappy files and load them into same table directory...
+...make equivalent .bz2, .gz, .snappy, and .zst files and load them into same table directory...
 
 select * from csv_compressed;
 +--------------------+--------------------+----------------------+
@@ -702,6 +701,8 @@ select * from csv_compressed;
 | abc - bz2          | xyz - bz2          | 123 - bz2            |
 | one - gzip         | two - gzip         | three - gzip         |
 | abc - gzip         | xyz - gzip         | 123 - gzip           |
+| one - zstd         | two - zstd         | three - zstd         |
+| abc - zstd         | xyz - zstd         | 123 - zstd           |
 +--------------------+--------------------+----------------------+
 
 $ hdfs dfs -ls 'hdfs://127.0.0.1:8020/user/hive/warehouse/file_formats.db/csv_compressed/';
@@ -709,6 +710,7 @@ $ hdfs dfs -ls 'hdfs://127.0.0.1:8020/user/hive/warehouse/file_formats.db/csv_co
 75 hdfs://127.0.0.1:8020/user/hive/warehouse/file_formats.db/csv_compressed/csv_compressed.snappy
 79 hdfs://127.0.0.1:8020/user/hive/warehouse/file_formats.db/csv_compressed/csv_compressed_bz2.csv.bz2
 80 hdfs://127.0.0.1:8020/user/hive/warehouse/file_formats.db/csv_compressed/csv_compressed_gzip.csv.gz
+85 hdfs://127.0.0.1:8020/user/hive/warehouse/file_formats.db/csv_compressed/csv_compressed_zstd.csv.zst
 116 hdfs://127.0.0.1:8020/user/hive/warehouse/file_formats.db/csv_compressed/dd414df64d67d49b_data.0.
 </codeblock>
 
