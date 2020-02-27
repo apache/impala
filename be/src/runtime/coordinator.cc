@@ -602,7 +602,10 @@ string Coordinator::FilterDebugString() {
       }
     }
 
-    row.push_back(!state.disabled() ? "true" : "false");
+    // In case of remote filter, we might intentionally disable the filter upon
+    // completion to prevent further update. In such case, we should check if all filter
+    // updates have been successfully received.
+    row.push_back(state.enabled() || state.received_all_updates() ? "true" : "false");
     table_printer.AddRow(row);
   }
   // Add a line break, as in all contexts this is called we need to start a new line to
@@ -1111,7 +1114,8 @@ void Coordinator::ReleaseExecResources() {
   for (auto& filter : filter_routing_table_->id_to_filter) {
     unique_lock<SpinLock> l(filter.second.lock());
     filter.second.WaitForPublishFilter();
-    filter.second.DisableAndRelease(filter_mem_tracker_);
+    filter.second.DisableAndRelease(
+        filter_mem_tracker_, filter.second.received_all_updates());
   }
 
   // This may be NULL while executing UDFs.
@@ -1230,7 +1234,7 @@ void Coordinator::UpdateFilter(const UpdateFilterParamsPB& params, RpcContext* c
 
     state->ApplyUpdate(params, this, context);
 
-    if (state->pending_count() > 0 && !state->disabled()) return;
+    if (state->pending_count() > 0 && state->enabled()) return;
     // At this point, we either disabled this filter or aggregation is complete.
 
     // No more updates are pending on this filter ID. Create a distribution payload and
@@ -1256,8 +1260,9 @@ void Coordinator::UpdateFilter(const UpdateFilterParamsPB& params, RpcContext* c
     }
 
     // Filter is complete. We disable it so future UpdateFilter rpcs will be ignored,
-    // e.g., if it was a broadcast join.
-    state->Disable();
+    // e.g., if it was a broadcast join. If filter is still enabled at this point, it
+    // means all filter updates have been successfully received and applied.
+    state->Disable(state->enabled());
 
     TUniqueIdToUniqueIdPB(query_id(), rpc_params.mutable_dst_query_id());
     rpc_params.set_filter_id(params.filter_id());
@@ -1290,7 +1295,7 @@ void Coordinator::UpdateFilter(const UpdateFilterParamsPB& params, RpcContext* c
 
 void Coordinator::FilterState::ApplyUpdate(
     const UpdateFilterParamsPB& params, Coordinator* coord, RpcContext* context) {
-  DCHECK(!disabled());
+  DCHECK(enabled());
   DCHECK_GT(pending_count_, 0);
   DCHECK_EQ(completion_time_, 0L);
   if (first_arrival_time_ == 0L) {
@@ -1301,7 +1306,9 @@ void Coordinator::FilterState::ApplyUpdate(
   if (is_bloom_filter()) {
     DCHECK(params.has_bloom_filter());
     if (params.bloom_filter().always_true()) {
-      DisableAndRelease(coord->filter_mem_tracker_);
+      // An always_true filter is received. We don't need to wait for other pending
+      // backends.
+      DisableAndRelease(coord->filter_mem_tracker_, true);
     } else if (params.bloom_filter().always_false()) {
       if (!bloom_filter_.has_log_bufferpool_space()) {
         bloom_filter_ = BloomFilterPB(params.bloom_filter());
@@ -1316,7 +1323,7 @@ void Coordinator::FilterState::ApplyUpdate(
           params.bloom_filter().directory_sidecar_idx(), &sidecar_slice);
       if (!status.ok()) {
         LOG(ERROR) << "Cannot get inbound sidecar: " << status.message().ToString();
-        DisableAndRelease(coord->filter_mem_tracker_);
+        DisableAndRelease(coord->filter_mem_tracker_, false);
       } else if (bloom_filter_.always_false()) {
         int64_t heap_space = sidecar_slice.size();
         if (!coord->filter_mem_tracker_->TryConsume(heap_space)) {
@@ -1324,7 +1331,7 @@ void Coordinator::FilterState::ApplyUpdate(
                      << PrettyPrinter::Print(heap_space, TUnit::BYTES)
                      << " (query_id=" << PrintId(coord->query_id()) << ")";
           // Disable, as one missing update means a correct filter cannot be produced.
-          DisableAndRelease(coord->filter_mem_tracker_);
+          DisableAndRelease(coord->filter_mem_tracker_, false);
         } else {
           bloom_filter_ = params.bloom_filter();
           bloom_filter_directory_ = sidecar_slice.ToString();
@@ -1340,7 +1347,9 @@ void Coordinator::FilterState::ApplyUpdate(
     DCHECK(is_min_max_filter());
     DCHECK(params.has_min_max_filter());
     if (params.min_max_filter().always_true()) {
-      DisableAndRelease(coord->filter_mem_tracker_);
+      // An always_true filter is received. We don't need to wait for other pending
+      // backends.
+      DisableAndRelease(coord->filter_mem_tracker_, true);
     } else if (min_max_filter_.always_false()) {
       MinMaxFilter::Copy(params.min_max_filter(), &min_max_filter_);
     } else {
@@ -1354,8 +1363,9 @@ void Coordinator::FilterState::ApplyUpdate(
   }
 }
 
-void Coordinator::FilterState::DisableAndRelease(MemTracker* tracker) {
-  Disable();
+void Coordinator::FilterState::DisableAndRelease(
+    MemTracker* tracker, const bool all_updates_received) {
+  Disable(all_updates_received);
   if (is_bloom_filter()) {
     tracker->Release(bloom_filter_directory_.size());
     bloom_filter_directory_.clear();
@@ -1363,7 +1373,8 @@ void Coordinator::FilterState::DisableAndRelease(MemTracker* tracker) {
   }
 }
 
-void Coordinator::FilterState::Disable() {
+void Coordinator::FilterState::Disable(const bool all_updates_received) {
+  all_updates_received_ = all_updates_received;
   if (is_bloom_filter()) {
     bloom_filter_.set_always_true(true);
     bloom_filter_.set_always_false(false);

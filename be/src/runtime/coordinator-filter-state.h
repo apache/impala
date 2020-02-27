@@ -91,11 +91,13 @@ class Coordinator::FilterState {
       return min_max_filter_.always_true();
     }
   }
+  bool enabled() const { return !disabled(); }
   int num_inflight_rpcs() const { return num_inflight_publish_filter_rpcs_; }
   SpinLock& lock() { return lock_; }
   std::condition_variable_any& get_publish_filter_done_cv() {
     return publish_filter_done_cv_;
   }
+  bool received_all_updates() const { return all_updates_received_; }
 
   /// Aggregates partitioned join filters and updates memory consumption.
   /// Disables filter if always_true filter is received or OOM is hit.
@@ -104,9 +106,9 @@ class Coordinator::FilterState {
 
   /// Disables the filter and releases the consumed memory if the filter is a Bloom
   /// filter.
-  void DisableAndRelease(MemTracker* tracker);
+  void DisableAndRelease(MemTracker* tracker, const bool all_updates_received);
   /// Disables the filter but does not release the consumed memory.
-  void Disable();
+  void Disable(const bool all_updates_received);
 
   void IncrementNumInflightRpcs(int i) {
     num_inflight_publish_filter_rpcs_ += i;
@@ -156,6 +158,9 @@ class Coordinator::FilterState {
 
   /// Signaled when 'num_inflight_rpcs' reaches 0.
   std::condition_variable_any publish_filter_done_cv_;
+
+  /// True value means coordinator has heard back from all pending backends.
+  bool all_updates_received_ = false;
 };
 
 /// Struct to contain all of the data structures for filter routing. Coordinator

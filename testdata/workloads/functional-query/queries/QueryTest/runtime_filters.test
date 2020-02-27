@@ -192,6 +192,7 @@ select STRAIGHT_JOIN count(*) from alltypes a
 0
 ---- RUNTIME_PROFILE
 row_regex: .*FiltersReceived: 3 .*
+row_regex: .*REMOTE.*ms.*ms.*true
 ====
 
 
