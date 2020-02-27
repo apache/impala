@@ -59,8 +59,7 @@ Status NestedLoopJoinPlanNode::CreateExecNode(
 
 NestedLoopJoinNode::NestedLoopJoinNode(
     ObjectPool* pool, const NestedLoopJoinPlanNode& pnode, const DescriptorTbl& descs)
-  : BlockingJoinNode("NestedLoopJoinNode", pnode.tnode_->join_node.join_op,
-        pool, pnode, descs),
+  : BlockingJoinNode("NestedLoopJoinNode", pool, pnode, descs),
     build_batches_(NULL),
     current_build_row_idx_(0),
     process_unmatched_build_rows_(false) {

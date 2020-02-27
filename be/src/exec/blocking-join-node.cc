@@ -46,6 +46,7 @@ const char* BlockingJoinNode::LLVM_CLASS_NAME = "class.impala::BlockingJoinNode"
 Status BlockingJoinPlanNode::Init(const TPlanNode& tnode, RuntimeState* state) {
   DCHECK(tnode.__isset.join_node);
   RETURN_IF_ERROR(PlanNode::Init(tnode, state));
+  join_op_ = tnode_->join_node.join_op;
   build_row_desc_ = state->obj_pool()->Add(
       new RowDescriptor(state->desc_tbl(), tnode.join_node.build_tuples,
         tnode.join_node.nullable_build_tuples));
@@ -53,17 +54,16 @@ Status BlockingJoinPlanNode::Init(const TPlanNode& tnode, RuntimeState* state) {
   return Status::OK();
 }
 
-BlockingJoinNode::BlockingJoinNode(const string& node_name, const TJoinOp::type join_op,
-    ObjectPool* pool, const BlockingJoinPlanNode& pnode, const DescriptorTbl& descs)
+BlockingJoinNode::BlockingJoinNode(const string& node_name, ObjectPool* pool,
+    const BlockingJoinPlanNode& pnode, const DescriptorTbl& descs)
   : ExecNode(pool, pnode, descs),
     node_name_(node_name),
-    join_op_(join_op),
+    join_op_(pnode.join_op()),
     eos_(false),
     probe_side_eos_(false),
     probe_batch_pos_(-1),
     current_probe_row_(NULL),
-    semi_join_staging_row_(NULL) {
-}
+    semi_join_staging_row_(NULL) {}
 
 BlockingJoinNode::~BlockingJoinNode() {
   // probe_batch_ must be cleaned up in Close() to ensure proper resource freeing.

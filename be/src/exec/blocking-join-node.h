@@ -42,11 +42,14 @@ class BlockingJoinPlanNode : public PlanNode {
 
   /// Returns true if this join node will use a separate builder that is the root sink
   /// of a different fragment. Otherwise the builder is owned by this node and consumes
-  /// input from the second child node. This depends on the containing subplan being
-  /// initialized, and isn't accurate until the whole PlanNode tree has been initialized.
+  /// input from the second child node.
+  /// Note: This depends on the containing subplan being initialized, and isn't accurate
+  /// until the whole PlanNode tree has been initialized.
   bool UseSeparateBuild(const TQueryOptions& query_options) const {
     return !IsInSubplan() && query_options.mt_dop > 0 && query_options.num_nodes != 1;
   }
+
+  TJoinOp::type join_op() const { return join_op_; }
 
   const RowDescriptor& probe_row_desc() const { return *children_[0]->row_descriptor_; }
   const RowDescriptor& build_row_desc() const {
@@ -55,6 +58,8 @@ class BlockingJoinPlanNode : public PlanNode {
   }
 
  protected:
+  TJoinOp::type join_op_;
+
   /// This is the same as the RowDescriptor of the build sink, if the join build is
   /// separate, or the right child, if the join build is integrated into the node.
   /// Owned by RuntimeState's object pool.
@@ -76,8 +81,8 @@ class BlockingJoinPlanNode : public PlanNode {
 
 class BlockingJoinNode : public ExecNode {
  public:
-  BlockingJoinNode(const std::string& node_name, const TJoinOp::type join_op,
-      ObjectPool* pool, const BlockingJoinPlanNode& pnode, const DescriptorTbl& descs);
+  BlockingJoinNode(const std::string& node_name, ObjectPool* pool,
+      const BlockingJoinPlanNode& pnode, const DescriptorTbl& descs);
 
   virtual ~BlockingJoinNode();
 

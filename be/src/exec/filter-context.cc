@@ -276,7 +276,7 @@ Status FilterContext::CodegenEval(
 //   ret void
 // }
 Status FilterContext::CodegenInsert(LlvmCodeGen* codegen, ScalarExpr* filter_expr,
-    FilterContext* ctx, llvm::Function** fn) {
+    const TRuntimeFilterDesc& filter_desc, llvm::Function** fn) {
   llvm::LLVMContext& context = codegen->context();
   LlvmBuilder builder(context);
 
@@ -294,14 +294,14 @@ Status FilterContext::CodegenInsert(LlvmCodeGen* codegen, ScalarExpr* filter_exp
   llvm::Value* row_arg = args[1];
 
   llvm::Value* local_filter_arg;
-  if (ctx->filter->is_bloom_filter()) {
+  if (filter_desc.type == TRuntimeFilterType::BLOOM) {
     // Load 'local_bloom_filter' from 'this_arg' FilterContext object.
     llvm::Value* local_bloom_filter_ptr =
         builder.CreateStructGEP(nullptr, this_arg, 3, "local_bloom_filter_ptr");
     local_filter_arg =
         builder.CreateLoad(local_bloom_filter_ptr, "local_bloom_filter_arg");
   } else {
-    DCHECK(ctx->filter->is_min_max_filter());
+    DCHECK(filter_desc.type == TRuntimeFilterType::MIN_MAX);
     // Load 'local_min_max_filter' from 'this_arg' FilterContext object.
     llvm::Value* local_min_max_filter_ptr =
         builder.CreateStructGEP(nullptr, this_arg, 4, "local_min_max_filter_ptr");
@@ -369,7 +369,7 @@ Status FilterContext::CodegenInsert(LlvmCodeGen* codegen, ScalarExpr* filter_exp
   val_ptr_phi->addIncoming(null_ptr, val_is_null_block);
 
   // Insert into the bloom filter.
-  if (ctx->filter->is_bloom_filter()) {
+  if (filter_desc.type == TRuntimeFilterType::BLOOM) {
     // Create a global constant of the filter expression's ColumnType. It needs to be a
     // constant for constant propagation and dead code elimination in 'get_hash_value_fn'.
     llvm::Type* col_type = codegen->GetStructType<ColumnType>();
@@ -400,7 +400,7 @@ Status FilterContext::CodegenInsert(LlvmCodeGen* codegen, ScalarExpr* filter_exp
     llvm::Value* insert_args[] = {local_filter_arg, hash_value};
     builder.CreateCall(insert_bloom_filter_fn, insert_args);
   } else {
-    DCHECK(ctx->filter->is_min_max_filter());
+    DCHECK(filter_desc.type == TRuntimeFilterType::MIN_MAX);
     // The function for inserting into the min-max filter.
     llvm::Function* min_max_insert_fn = codegen->GetFunction(
         MinMaxFilter::GetInsertIRFunctionType(filter_expr->type()), false);

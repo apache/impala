@@ -135,7 +135,7 @@ struct FilterContext {
   /// On success, 'fn' is set to the generated function. On failure, an error status is
   /// returned.
   static Status CodegenInsert(LlvmCodeGen* codegen, ScalarExpr* filter_expr,
-      FilterContext* ctx, llvm::Function** fn) WARN_UNUSED_RESULT;
+      const TRuntimeFilterDesc& filter_desc, llvm::Function** fn) WARN_UNUSED_RESULT;
 
   // Returns if there is any always_false filter in ctxs. If there is, the counter stats
   // is updated.

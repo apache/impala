@@ -33,8 +33,9 @@
 
 namespace impala {
 
-class RowDescriptor;
+class KrpcDataStreamSender;
 class MemTracker;
+class RowDescriptor;
 class TDataStreamSink;
 class TNetworkAddress;
 class TPlanFragmentDestination;
@@ -45,15 +46,35 @@ class KrpcDataStreamSenderConfig : public DataSinkConfig {
       const TPlanFragmentInstanceCtx& fragment_instance_ctx,
       RuntimeState* state) const override;
 
+  void Codegen(RuntimeState* state, RuntimeProfile* profile);
+
+  /// The type of partitioning to perform.
+  TPartitionType::type partition_type_ = TPartitionType::UNPARTITIONED;
+
   /// Expressions of partition keys. It's used to compute the
   /// per-row partition values for shuffling exchange;
   std::vector<ScalarExpr*> partition_exprs_;
+
+  /// Type and pointer for the codegen'd KrpcDataStreamSender::HashAndAddRows()
+  /// function. NULL if codegen is disabled or failed.
+  typedef Status (*HashAndAddRowsFn)(KrpcDataStreamSender*, RowBatch* row);
+  HashAndAddRowsFn hash_and_add_rows_fn_ = nullptr;
 
   ~KrpcDataStreamSenderConfig() override {}
 
  protected:
   Status Init(const TDataSink& tsink, const RowDescriptor* input_row_desc,
       RuntimeState* state) override;
+
+ private:
+  /// Codegen the KrpcDataStreamSender::HashRow() function and returns the codegen'd
+  /// function in 'fn'. This involves unrolling the loop in HashRow(), codegens each of
+  /// the partition expressions and replaces the column type argument to the hash function
+  /// with constants to eliminate some branches. Returns error status on failure.
+  Status CodegenHashRow(LlvmCodeGen* codegen, llvm::Function** fn);
+
+  /// Returns the name of the partitioning type of this data stream sender.
+  std::string PartitionTypeName() const;
 };
 
 /// Single sender of an m:n data stream.
@@ -88,7 +109,7 @@ class KrpcDataStreamSender : public DataSink {
 
   /// Codegen HashAndAddRows() if partitioning type is HASH_PARTITIONED.
   /// Replaces HashRow() and GetNumChannels() based on runtime information.
-  virtual void Codegen(LlvmCodeGen* codegen) override;
+  virtual void Codegen(RuntimeState* state) override;
 
   /// Initializes the evaluator of the partitioning expressions. Return error status
   /// if initialization failed.
@@ -113,6 +134,14 @@ class KrpcDataStreamSender : public DataSink {
 
   /// Counters shared with other parts of the code
   static const char* TOTAL_BYTES_SENT_COUNTER;
+
+  /// KrpcDataStreamSender::HashRow() symbol. Used for call-site replacement.
+  static const char* HASH_ROW_SYMBOL;
+
+  /// An arbitrary hash seed used for exchanges.
+  static constexpr uint64_t EXCHANGE_HASH_SEED = 0x66bd68df22c3ef37;
+
+  static const char* LLVM_CLASS_NAME;
 
  protected:
   friend class DataStreamTest;
@@ -150,15 +179,6 @@ class KrpcDataStreamSender : public DataSink {
   /// Adds the given row to 'channels_[channel_id]'.
   Status AddRowToChannel(const int channel_id, TupleRow* row);
 
-  /// Codegen the HashRow() function and returns the codegen'd function in 'fn'.
-  /// This involves unrolling the loop in HashRow(), codegens each of the partition
-  /// expressions and replaces the column type argument to the hash function with
-  /// constants to eliminate some branches. Returns error status on failure.
-  Status CodegenHashRow(LlvmCodeGen* codegen, llvm::Function** fn);
-
-  /// Returns the name of the partitioning type of this data stream sender.
-  std::string PartitionTypeName() const;
-
   /// Sender instance id, unique within a fragment.
   const int sender_id_;
 
@@ -189,7 +209,7 @@ class KrpcDataStreamSender : public DataSink {
   bool flushed_ = false;
 
   /// List of all channels. One for each destination.
-  std::vector<Channel*> channels_;
+  std::vector<std::unique_ptr<Channel>> channels_;
 
   /// Expressions of partition keys. It's used to compute the
   /// per-row partition values for shuffling exchange;
@@ -241,18 +261,9 @@ class KrpcDataStreamSender : public DataSink {
   /// or when errors are encountered.
   int next_unknown_partition_;
 
-  /// Types and pointers for the codegen'd HashAndAddRows() functions.
+  /// Pointer for the codegen'd HashAndAddRows() function.
   /// NULL if codegen is disabled or failed.
-  typedef Status (*HashAndAddRowsFn)(KrpcDataStreamSender*, RowBatch* row);
-  HashAndAddRowsFn hash_and_add_rows_fn_ = nullptr;
-
-  /// KrpcDataStreamSender::HashRow() symbol. Used for call-site replacement.
-  static const char* HASH_ROW_SYMBOL;
-
-  /// An arbitrary hash seed used for exchanges.
-  static constexpr uint64_t EXCHANGE_HASH_SEED = 0x66bd68df22c3ef37;
-
-  static const char* LLVM_CLASS_NAME;
+  const KrpcDataStreamSenderConfig::HashAndAddRowsFn& hash_and_add_rows_fn_;
 };
 
 } // namespace impala

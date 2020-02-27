@@ -79,9 +79,9 @@ Status KrpcDataStreamSenderConfig::Init(
     const TDataSink& tsink, const RowDescriptor* input_row_desc, RuntimeState* state) {
   RETURN_IF_ERROR(DataSinkConfig::Init(tsink, input_row_desc, state));
   DCHECK(tsink_->__isset.stream_sink);
-  auto& partition_type = tsink_->stream_sink.output_partition.type;
-  if (partition_type == TPartitionType::HASH_PARTITIONED
-      || partition_type == TPartitionType::KUDU) {
+  partition_type_ = tsink_->stream_sink.output_partition.type;
+  if (partition_type_ == TPartitionType::HASH_PARTITIONED
+      || partition_type_ == TPartitionType::KUDU) {
     RETURN_IF_ERROR(
         ScalarExpr::Create(tsink_->stream_sink.output_partition.partition_exprs,
             *input_row_desc_, state, &partition_exprs_));
@@ -705,11 +705,12 @@ KrpcDataStreamSender::KrpcDataStreamSender(TDataSinkId sink_id, int sender_id,
   : DataSink(sink_id, sink_config,
         Substitute("KrpcDataStreamSender (dst_id=$0)", sink.dest_node_id), state),
     sender_id_(sender_id),
-    partition_type_(sink.output_partition.type),
+    partition_type_(sink_config.partition_type_),
     per_channel_buffer_size_(per_channel_buffer_size),
     partition_exprs_(sink_config.partition_exprs_),
     dest_node_id_(sink.dest_node_id),
-    next_unknown_partition_(0) {
+    next_unknown_partition_(0),
+    hash_and_add_rows_fn_(sink_config.hash_and_add_rows_fn_) {
   DCHECK_GT(destinations.size(), 0);
   DCHECK(sink.output_partition.type == TPartitionType::UNPARTITIONED
       || sink.output_partition.type == TPartitionType::HASH_PARTITIONED
@@ -717,7 +718,7 @@ KrpcDataStreamSender::KrpcDataStreamSender(TDataSinkId sink_id, int sender_id,
       || sink.output_partition.type == TPartitionType::KUDU);
 
   for (int i = 0; i < destinations.size(); ++i) {
-    channels_.push_back(
+    channels_.emplace_back(
         new Channel(this, row_desc_, destinations[i].thrift_backend.hostname,
             destinations[i].krpc_backend, destinations[i].fragment_instance_id,
             sink.dest_node_id, per_channel_buffer_size));
@@ -734,9 +735,6 @@ KrpcDataStreamSender::KrpcDataStreamSender(TDataSinkId sink_id, int sender_id,
 KrpcDataStreamSender::~KrpcDataStreamSender() {
   // TODO: check that sender was either already closed() or there was an error
   // on some channel
-  for (int i = 0; i < channels_.size(); ++i) {
-    delete channels_[i];
-  }
 }
 
 Status KrpcDataStreamSender::Prepare(
@@ -809,14 +807,15 @@ Status KrpcDataStreamSender::Open(RuntimeState* state) {
 //               i64 7403188670037225271)
 //   ret i64 %hash_val
 // }
-Status KrpcDataStreamSender::CodegenHashRow(LlvmCodeGen* codegen, llvm::Function** fn) {
+Status KrpcDataStreamSenderConfig::CodegenHashRow(
+    LlvmCodeGen* codegen, llvm::Function** fn) {
   llvm::LLVMContext& context = codegen->context();
   LlvmBuilder builder(context);
 
   LlvmCodeGen::FnPrototype prototype(
       codegen, "KrpcDataStreamSenderHashRow", codegen->i64_type());
-  prototype.AddArgument(
-      LlvmCodeGen::NamedVariable("this", codegen->GetNamedPtrType(LLVM_CLASS_NAME)));
+  prototype.AddArgument(LlvmCodeGen::NamedVariable(
+      "this", codegen->GetNamedPtrType(KrpcDataStreamSender::LLVM_CLASS_NAME)));
   prototype.AddArgument(
       LlvmCodeGen::NamedVariable("row", codegen->GetStructPtrType<TupleRow>()));
 
@@ -826,7 +825,8 @@ Status KrpcDataStreamSender::CodegenHashRow(LlvmCodeGen* codegen, llvm::Function
   llvm::Value* row_arg = args[1];
 
   // Store the initial seed to hash_val
-  llvm::Value* hash_val = codegen->GetI64Constant(EXCHANGE_HASH_SEED);
+  llvm::Value* hash_val =
+      codegen->GetI64Constant(KrpcDataStreamSender::EXCHANGE_HASH_SEED);
 
   // Unroll the loop and codegen each of the partition expressions
   for (int i = 0; i < partition_exprs_.size(); ++i) {
@@ -897,7 +897,7 @@ Status KrpcDataStreamSender::CodegenHashRow(LlvmCodeGen* codegen, llvm::Function
   return Status::OK();
 }
 
-string KrpcDataStreamSender::PartitionTypeName() const {
+string KrpcDataStreamSenderConfig::PartitionTypeName() const {
   switch (partition_type_) {
   case TPartitionType::UNPARTITIONED:
     return "Unpartitioned";
@@ -913,12 +913,22 @@ string KrpcDataStreamSender::PartitionTypeName() const {
   }
 }
 
-void KrpcDataStreamSender::Codegen(LlvmCodeGen* codegen) {
+void KrpcDataStreamSender::Codegen(RuntimeState* state) {
+  const KrpcDataStreamSenderConfig& config =
+      static_cast<const KrpcDataStreamSenderConfig&>(sink_config_);
+  KrpcDataStreamSenderConfig& non_const_config =
+      const_cast<KrpcDataStreamSenderConfig&>(config);
+  non_const_config.Codegen(state, profile());
+}
+
+void KrpcDataStreamSenderConfig::Codegen(RuntimeState* state, RuntimeProfile* profile) {
+  LlvmCodeGen* codegen = state->codegen();
+  DCHECK(codegen != nullptr);
   const string sender_name = PartitionTypeName() + " Sender";
   if (partition_type_ != TPartitionType::HASH_PARTITIONED) {
     const string& msg = Substitute("not $0",
         partition_type_ == TPartitionType::KUDU ? "supported" : "needed");
-    profile()->AddCodegenMsg(false, msg, sender_name);
+    profile->AddCodegenMsg(false, msg, sender_name);
     return;
   }
 
@@ -931,13 +941,14 @@ void KrpcDataStreamSender::Codegen(LlvmCodeGen* codegen) {
 
     int num_replaced;
     // Replace GetNumChannels() with a constant.
+    int num_channels =  state->fragment_ctx().destinations.size();
     num_replaced = codegen->ReplaceCallSitesWithValue(hash_and_add_rows_fn,
-        codegen->GetI32Constant(GetNumChannels()), "GetNumChannels");
+        codegen->GetI32Constant(num_channels), "GetNumChannels");
     DCHECK_EQ(num_replaced, 1);
 
     // Replace HashRow() with the handcrafted IR function.
     num_replaced = codegen->ReplaceCallSites(hash_and_add_rows_fn,
-        hash_row_fn, HASH_ROW_SYMBOL);
+        hash_row_fn, KrpcDataStreamSender::HASH_ROW_SYMBOL);
     DCHECK_EQ(num_replaced, 1);
 
     hash_and_add_rows_fn = codegen->FinalizeFunction(hash_and_add_rows_fn);
@@ -949,7 +960,7 @@ void KrpcDataStreamSender::Codegen(LlvmCodeGen* codegen) {
           reinterpret_cast<void**>(&hash_and_add_rows_fn_));
     }
   }
-  profile()->AddCodegenMsg(codegen_status.ok(), codegen_status, sender_name);
+  profile->AddCodegenMsg(codegen_status.ok(), codegen_status, sender_name);
 }
 
 Status KrpcDataStreamSender::AddRowToChannel(const int channel_id, TupleRow* row) {
@@ -987,7 +998,7 @@ Status KrpcDataStreamSender::Send(RuntimeState* state, RowBatch* batch) {
   } else if (partition_type_ == TPartitionType::RANDOM || channels_.size() == 1) {
     // Round-robin batches among channels. Wait for the current channel to finish its
     // rpc before overwriting its batch.
-    Channel* current_channel = channels_[current_channel_idx_];
+    Channel* current_channel = channels_[current_channel_idx_].get();
     RETURN_IF_ERROR(current_channel->SerializeAndSendBatch(batch));
     current_channel_idx_ = (current_channel_idx_ + 1) % channels_.size();
   } else if (partition_type_ == TPartitionType::KUDU) {
@@ -1041,16 +1052,16 @@ Status KrpcDataStreamSender::FlushFinal(RuntimeState* state) {
   // If we hit an error here, we can return without closing the remaining channels as
   // the error is propagated back to the coordinator, which in turn cancels the query,
   // which will cause the remaining open channels to be closed.
-  for (Channel* channel : channels_) {
+  for (unique_ptr<Channel>& channel : channels_) {
     RETURN_IF_ERROR(channel->FlushBatches());
   }
-  for (Channel* channel : channels_) {
+  for (unique_ptr<Channel>& channel : channels_) {
     RETURN_IF_ERROR(channel->WaitForRpc());
   }
-  for (Channel* channel : channels_) {
+  for (unique_ptr<Channel>& channel : channels_) {
     RETURN_IF_ERROR(channel->SendEosAsync());
   }
-  for (Channel* channel : channels_) {
+  for (unique_ptr<Channel>& channel : channels_) {
     RETURN_IF_ERROR(channel->WaitForRpc());
   }
   return Status::OK();

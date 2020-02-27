@@ -76,6 +76,10 @@ Status PartitionedHashJoinPlanNode::Init(const TPlanNode& tnode, RuntimeState* s
       || eq_join_conjuncts.size() == 1);
   hash_seed_ = tnode.join_node.hash_join_node.hash_seed;
 
+  hash_table_config_ = state->obj_pool()->Add(new HashTableConfig(build_exprs_,
+      probe_exprs_, PhjBuilder::HashTableStoresNulls(join_op_, is_not_distinct_from_),
+      is_not_distinct_from_));
+
   // Create the config always. It is only used if UseSeparateBuild() is true, but in
   // Init(), IsInSubplan() isn't available yet.
   // TODO: simplify this by ensuring that UseSeparateBuild() is accurate in Init().
@@ -95,11 +99,13 @@ Status PartitionedHashJoinPlanNode::CreateExecNode(
 
 PartitionedHashJoinNode::PartitionedHashJoinNode(RuntimeState* state,
     const PartitionedHashJoinPlanNode& pnode, const DescriptorTbl& descs)
-  : BlockingJoinNode("PartitionedHashJoinNode", pnode.tnode_->join_node.join_op,
-        state->obj_pool(), pnode, descs),
+  : BlockingJoinNode("PartitionedHashJoinNode", state->obj_pool(), pnode, descs),
     build_exprs_(pnode.build_exprs_),
     probe_exprs_(pnode.probe_exprs_),
-    other_join_conjuncts_(pnode.other_join_conjuncts_) {
+    other_join_conjuncts_(pnode.other_join_conjuncts_),
+    hash_table_config_(*pnode.hash_table_config_),
+    process_probe_batch_fn_(pnode.process_probe_batch_fn_),
+    process_probe_batch_fn_level0_(pnode.process_probe_batch_fn_level0_) {
   memset(hash_tbls_, 0, sizeof(HashTable*) * PARTITION_FANOUT);
 }
 
@@ -135,13 +141,9 @@ Status PartitionedHashJoinNode::Prepare(RuntimeState* state) {
   // QueryMaintenance(). Values of probe exprs may need to live longer until the
   // cache is reset so are stored in 'probe_expr_results_pool_', which is cleared
   // manually at the appropriate time.
-  const vector<bool>& is_not_distinct_from =
-      static_cast<const PartitionedHashJoinPlanNode&>(plan_node_).is_not_distinct_from_;
-  RETURN_IF_ERROR(HashTableCtx::Create(pool_, state, build_exprs_, probe_exprs_,
-      PhjBuilder::HashTableStoresNulls(join_op_, is_not_distinct_from),
-      is_not_distinct_from, hash_seed(), MAX_PARTITION_DEPTH,
-      build_row_desc().tuple_descriptors().size(), expr_perm_pool(), expr_results_pool(),
-      probe_expr_results_pool_.get(), &ht_ctx_));
+  RETURN_IF_ERROR(HashTableCtx::Create(pool_, state, hash_table_config_, hash_seed(),
+      MAX_PARTITION_DEPTH, build_row_desc().tuple_descriptors().size(), expr_perm_pool(),
+      expr_results_pool(), probe_expr_results_pool_.get(), &ht_ctx_));
   if (join_op_ == TJoinOp::NULL_AWARE_LEFT_ANTI_JOIN) {
     null_aware_eval_timer_ = ADD_TIMER(runtime_profile(), "NullAwareAntiJoinEvalTime");
   }
@@ -159,19 +161,31 @@ void PartitionedHashJoinNode::Codegen(RuntimeState* state) {
   if (IsNodeCodegenDisabled()) return;
 
   LlvmCodeGen* codegen = state->codegen();
-  DCHECK(codegen != NULL);
+  DCHECK(codegen != nullptr);
 
   // Codegen the build side (if integrated into this join node).
   if (!UseSeparateBuild(state->query_options())) {
+    // TODO: invoke codegen on the PhjBuilderConfig obj inside
+    // PartitionedHashJoinPlanNode::Codegen() once codegen invocation is completely moved
+    // to the plan nodes.
     DCHECK(builder_ != nullptr);
-    builder_->Codegen(codegen);
+    builder_->Codegen(state);
   }
 
   // Codegen the probe side.
+  const PartitionedHashJoinPlanNode& phj_pnode =
+      static_cast<const PartitionedHashJoinPlanNode&>(plan_node_);
+  PartitionedHashJoinPlanNode& non_const_pnode =
+      const_cast<PartitionedHashJoinPlanNode&>(phj_pnode);
+  non_const_pnode.Codegen(state, runtime_profile());
+}
+
+void PartitionedHashJoinPlanNode::Codegen(RuntimeState* state, RuntimeProfile* profile) {
+  LlvmCodeGen* codegen = state->codegen();
+  DCHECK(codegen != nullptr);
   TPrefetchMode::type prefetch_mode = state->query_options().prefetch_mode;
   Status probe_codegen_status = CodegenProcessProbeBatch(codegen, prefetch_mode);
-  runtime_profile()->AddCodegenMsg(
-      probe_codegen_status.ok(), probe_codegen_status, "Probe Side");
+  profile->AddCodegenMsg(probe_codegen_status.ok(), probe_codegen_status, "Probe Side");
 }
 
 Status PartitionedHashJoinNode::Open(RuntimeState* state) {
@@ -1313,7 +1327,7 @@ string PartitionedHashJoinNode::NodeDebugString() const {
 //   store i8* null, i8** %dst_tuple_ptr
 //   ret void
 // }
-Status PartitionedHashJoinNode::CodegenCreateOutputRow(
+Status PartitionedHashJoinPlanNode::CodegenCreateOutputRow(
     LlvmCodeGen* codegen, llvm::Function** fn) {
   llvm::PointerType* tuple_row_ptr_type = codegen->GetStructPtrType<TupleRow>();
 
@@ -1343,9 +1357,11 @@ Status PartitionedHashJoinNode::CodegenCreateOutputRow(
 
   int num_probe_tuples = probe_row_desc().tuple_descriptors().size();
   int num_build_tuples = build_row_desc().tuple_descriptors().size();
+  int probe_tuple_row_size = num_probe_tuples * sizeof(Tuple*);
+  int build_tuple_row_size = num_build_tuples * sizeof(Tuple*);
 
   // Copy probe row
-  codegen->CodegenMemcpy(&builder, out_row_arg, probe_row_arg, probe_tuple_row_size_);
+  codegen->CodegenMemcpy(&builder, out_row_arg, probe_row_arg, probe_tuple_row_size);
   llvm::Value* build_row_idx[] = {codegen->GetI32Constant(num_probe_tuples)};
   llvm::Value* build_row_dst =
       builder.CreateInBoundsGEP(out_row_arg, build_row_idx, "build_dst_ptr");
@@ -1382,7 +1398,7 @@ Status PartitionedHashJoinNode::CodegenCreateOutputRow(
 
   // Copy build tuple ptrs
   builder.SetInsertPoint(build_not_null_block);
-  codegen->CodegenMemcpy(&builder, build_row_dst, build_row_arg, build_tuple_row_size_);
+  codegen->CodegenMemcpy(&builder, build_row_dst, build_row_arg, build_tuple_row_size);
   builder.CreateRetVoid();
 
   *fn = codegen->FinalizeFunction(*fn);
@@ -1393,21 +1409,16 @@ Status PartitionedHashJoinNode::CodegenCreateOutputRow(
   return Status::OK();
 }
 
-Status PartitionedHashJoinNode::CodegenProcessProbeBatch(
+Status PartitionedHashJoinPlanNode::CodegenProcessProbeBatch(
     LlvmCodeGen* codegen, TPrefetchMode::type prefetch_mode) {
   // Codegen for hashing rows
   llvm::Function* hash_fn;
   llvm::Function* murmur_hash_fn;
-  // Context required to generate hash table codegened methods.
-  auto& plan_node = static_cast<const PartitionedHashJoinPlanNode&>(plan_node_);
-  HashTableConfig hash_table_config(build_exprs_, probe_exprs_,
-      PhjBuilder::HashTableStoresNulls(join_op_, plan_node.is_not_distinct_from_),
-      plan_node.is_not_distinct_from_);
 
   RETURN_IF_ERROR(
-      HashTableCtx::CodegenHashRow(codegen, false, hash_table_config, &hash_fn));
+      HashTableCtx::CodegenHashRow(codegen, false, *hash_table_config_, &hash_fn));
   RETURN_IF_ERROR(
-      HashTableCtx::CodegenHashRow(codegen, true, hash_table_config, &murmur_hash_fn));
+      HashTableCtx::CodegenHashRow(codegen, true, *hash_table_config_, &murmur_hash_fn));
 
   // Get cross compiled function
   IRFunction::Type ir_fn = IRFunction::FN_END;
@@ -1460,12 +1471,12 @@ Status PartitionedHashJoinNode::CodegenProcessProbeBatch(
   // Codegen HashTable::Equals
   llvm::Function* probe_equals_fn;
   RETURN_IF_ERROR(
-      HashTableCtx::CodegenEquals(codegen, false, hash_table_config, &probe_equals_fn));
+      HashTableCtx::CodegenEquals(codegen, false, *hash_table_config_, &probe_equals_fn));
 
   // Codegen for evaluating probe rows
   llvm::Function* eval_row_fn;
   RETURN_IF_ERROR(
-      HashTableCtx::CodegenEvalRow(codegen, false, hash_table_config, &eval_row_fn));
+      HashTableCtx::CodegenEvalRow(codegen, false, *hash_table_config_, &eval_row_fn));
 
   // Codegen CreateOutputRow
   llvm::Function* create_output_row_fn;
@@ -1527,7 +1538,7 @@ Status PartitionedHashJoinNode::CodegenProcessProbeBatch(
   HashTableCtx::HashTableReplacedConstants replaced_constants;
   const bool stores_duplicates = true;
   const int num_build_tuples = build_row_desc().tuple_descriptors().size();
-  RETURN_IF_ERROR(HashTableCtx::ReplaceHashTableConstants(codegen, hash_table_config,
+  RETURN_IF_ERROR(HashTableCtx::ReplaceHashTableConstants(codegen, *hash_table_config_,
       stores_duplicates, num_build_tuples, process_probe_batch_fn, &replaced_constants));
   DCHECK_GE(replaced_constants.stores_nulls, 1);
   DCHECK_GE(replaced_constants.finds_some_nulls, 1);

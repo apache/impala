@@ -174,10 +174,9 @@ Status GroupingAggregator::Prepare(RuntimeState* state) {
         runtime_profile()->AddHighWaterMarkCounter("MaxPartitionLevel", TUnit::UNIT);
   }
 
-  RETURN_IF_ERROR(HashTableCtx::Create(pool_, state, build_exprs_, grouping_exprs_, true,
-      vector<bool>(build_exprs_.size(), true), state->fragment_hash_seed(),
-      MAX_PARTITION_DEPTH, 1, expr_perm_pool_.get(), expr_results_pool_.get(),
-      expr_results_pool_.get(), &ht_ctx_));
+  RETURN_IF_ERROR(HashTableCtx::Create(pool_, state, hash_table_config_,
+      state->fragment_hash_seed(), MAX_PARTITION_DEPTH, 1, expr_perm_pool_.get(),
+      expr_results_pool_.get(), expr_results_pool_.get(), &ht_ctx_));
 
   reservation_tracker_.reset(new ReservationTracker);
   reservation_tracker_->InitChildTracker(runtime_profile_,

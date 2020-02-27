@@ -343,7 +343,7 @@ Status FragmentInstanceState::Open() {
       SCOPED_THREAD_COUNTER_MEASUREMENT(
           runtime_state_->codegen()->llvm_thread_counters());
       exec_tree_->Codegen(runtime_state_);
-      sink_->Codegen(runtime_state_->codegen());
+      sink_->Codegen(runtime_state_);
 
       // It shouldn't be fatal to fail codegen. However, until IMPALA-4233 is fixed,
       // ScalarFnCall has no fall back to interpretation when codegen fails so propagates

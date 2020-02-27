@@ -147,7 +147,7 @@ Status DataSink::Prepare(RuntimeState* state, MemTracker* parent_mem_tracker) {
   return Status::OK();
 }
 
-void DataSink::Codegen(LlvmCodeGen* codegen) {
+void DataSink::Codegen(RuntimeState* state) {
   return;
 }
 

@@ -33,6 +33,7 @@ namespace impala {
 
 class BloomFilter;
 class MemPool;
+class PartitionedHashJoinNode;
 class RowBatch;
 class RuntimeFilter;
 class TupleRow;
@@ -41,6 +42,7 @@ class PartitionedHashJoinPlanNode : public BlockingJoinPlanNode {
  public:
   virtual Status Init(const TPlanNode& tnode, RuntimeState* state) override;
   virtual Status CreateExecNode(RuntimeState* state, ExecNode** node) const override;
+  void Codegen(RuntimeState* state, RuntimeProfile* profile);
 
   ~PartitionedHashJoinPlanNode(){}
 
@@ -62,6 +64,30 @@ class PartitionedHashJoinPlanNode : public BlockingJoinPlanNode {
 
   /// Seed used for hashing rows.
   uint32_t hash_seed_;
+
+  /// Used for codegening hash table specific methods and to create the corresponding
+  /// instance of HashTableCtx.
+  const HashTableConfig* hash_table_config_;
+
+  /// For the below codegen'd functions, xxx_fn_level0_ uses CRC hashing when available
+  /// and is used when the partition level is 0, otherwise xxx_fn_ uses murmur hash and is
+  /// used for subsequent levels.
+  typedef int (*ProcessProbeBatchFn)(
+      PartitionedHashJoinNode*, TPrefetchMode::type, RowBatch*, HashTableCtx*, Status*);
+  /// Jitted PartitionedHashJoinNode::ProcessProbeBatch function pointers.  NULL if
+  /// codegen is disabled.
+  ProcessProbeBatchFn process_probe_batch_fn_ = nullptr;
+  ProcessProbeBatchFn process_probe_batch_fn_level0_ = nullptr;
+
+ private:
+  /// Codegen function to create output row. Assumes that the probe row is non-NULL.
+  Status CodegenCreateOutputRow(LlvmCodeGen* codegen, llvm::Function** fn);
+
+  /// Codegen processing probe batches.  Identical signature to
+  /// PartitionedHashJoinNode::ProcessProbeBatch(). Returns non-OK if codegen was not
+  /// possible.
+  Status CodegenProcessProbeBatch(
+      LlvmCodeGen* codegen, TPrefetchMode::type prefetch_mode);
 };
 
 /// Operator to perform partitioned hash join, spilling to disk as necessary. This
@@ -515,15 +541,6 @@ class PartitionedHashJoinNode : public BlockingJoinNode {
   /// with rows and entering 'probe_state_' PROBING_IN_BATCH.
   void ResetForProbe();
 
-  /// Codegen function to create output row. Assumes that the probe row is non-NULL.
-  Status CodegenCreateOutputRow(
-      LlvmCodeGen* codegen, llvm::Function** fn) WARN_UNUSED_RESULT;
-
-  /// Codegen processing probe batches.  Identical signature to ProcessProbeBatch.
-  /// Returns non-OK if codegen was not possible.
-  Status CodegenProcessProbeBatch(
-      LlvmCodeGen* codegen, TPrefetchMode::type prefetch_mode) WARN_UNUSED_RESULT;
-
   uint32_t hash_seed() const {
     return static_cast<const PartitionedHashJoinPlanNode&>(plan_node_).hash_seed_;
   }
@@ -540,6 +557,11 @@ class PartitionedHashJoinNode : public BlockingJoinNode {
   /// Non-equi-join conjuncts from the ON clause.
   std::vector<ScalarExpr*> other_join_conjuncts_;
   std::vector<ScalarExprEvaluator*> other_join_conjunct_evals_;
+
+  /// Reference to the hash table config which is a part of the
+  /// PartitionedHashJoinPlanNode that was used to create this object. Its used to create
+  /// an instance of the HashTableCtx in Prepare(). Not Owned.
+  const HashTableConfig& hash_table_config_;
 
   /// Used for hash-related functionality, such as evaluating rows and calculating hashes.
   /// This owns the evaluators for the build and probe expressions used during insertion
@@ -687,15 +709,9 @@ class PartitionedHashJoinNode : public BlockingJoinNode {
     std::unique_ptr<BufferedTupleStream> probe_rows_;
   };
 
-  /// For the below codegen'd functions, xxx_fn_level0_ uses CRC hashing when available
-  /// and is used when the partition level is 0, otherwise xxx_fn_ uses murmur hash and is
-  /// used for subsequent levels.
-
-  typedef int (*ProcessProbeBatchFn)(PartitionedHashJoinNode*,
-      TPrefetchMode::type, RowBatch*, HashTableCtx*, Status*);
-  /// Jitted ProcessProbeBatch function pointers.  NULL if codegen is disabled.
-  ProcessProbeBatchFn process_probe_batch_fn_ = nullptr;
-  ProcessProbeBatchFn process_probe_batch_fn_level0_ = nullptr;
+  /// See PartitionedHashJoinPlanNode::ProcessProbeBatchFn for more details.
+  const PartitionedHashJoinPlanNode::ProcessProbeBatchFn& process_probe_batch_fn_;
+  const PartitionedHashJoinPlanNode::ProcessProbeBatchFn& process_probe_batch_fn_level0_;
 };
 
 }

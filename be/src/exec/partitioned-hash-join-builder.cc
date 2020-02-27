@@ -114,6 +114,10 @@ Status PhjBuilderConfig::InitExprsAndFilters(RuntimeState* state,
     filter_exprs_.push_back(filter_expr);
     filter_descs_.push_back(filter_desc);
   }
+
+  hash_table_config_ = state->obj_pool()->Add(new HashTableConfig(build_exprs_,
+      build_exprs_, PhjBuilder::HashTableStoresNulls(join_op_, is_not_distinct_from_),
+      is_not_distinct_from_));
   return Status::OK();
 }
 
@@ -155,7 +159,14 @@ PhjBuilder::PhjBuilder(
     max_row_buffer_size_(resource_profile_->max_row_buffer_size),
     build_exprs_(sink_config.build_exprs_),
     is_not_distinct_from_(sink_config.is_not_distinct_from_),
-    filter_exprs_(sink_config.filter_exprs_) {
+    filter_exprs_(sink_config.filter_exprs_),
+    hash_table_config_(*sink_config.hash_table_config_),
+    process_build_batch_fn_(sink_config.process_build_batch_fn_),
+    process_build_batch_fn_level0_(sink_config.process_build_batch_fn_level0_),
+    insert_batch_fn_(
+        reinterpret_cast<const Partition::InsertBatchFn&>(sink_config.insert_batch_fn_)),
+    insert_batch_fn_level0_(reinterpret_cast<const Partition::InsertBatchFn&>(
+        sink_config.insert_batch_fn_level0_)) {
   DCHECK_GT(sink_config.hash_seed_, 0);
   for (const TRuntimeFilterDesc& filter_desc : sink_config.filter_descs_) {
     filter_ctxs_.emplace_back();
@@ -166,8 +177,7 @@ PhjBuilder::PhjBuilder(
 PhjBuilder::PhjBuilder(const PhjBuilderConfig& sink_config,
     BufferPool::ClientHandle* buffer_pool_client, int64_t spillable_buffer_size,
     int64_t max_row_buffer_size, RuntimeState* state)
-  : JoinBuilder(
-        -1, sink_config, ConstructBuilderName(sink_config.join_node_id_), state),
+  : JoinBuilder(-1, sink_config, ConstructBuilderName(sink_config.join_node_id_), state),
     runtime_state_(state),
     hash_seed_(sink_config.hash_seed_),
     resource_profile_(nullptr),
@@ -177,7 +187,14 @@ PhjBuilder::PhjBuilder(const PhjBuilderConfig& sink_config,
     max_row_buffer_size_(max_row_buffer_size),
     build_exprs_(sink_config.build_exprs_),
     is_not_distinct_from_(sink_config.is_not_distinct_from_),
-    filter_exprs_(sink_config.filter_exprs_) {
+    filter_exprs_(sink_config.filter_exprs_),
+    hash_table_config_(*sink_config.hash_table_config_),
+    process_build_batch_fn_(sink_config.process_build_batch_fn_),
+    process_build_batch_fn_level0_(sink_config.process_build_batch_fn_level0_),
+    insert_batch_fn_(
+        reinterpret_cast<const Partition::InsertBatchFn&>(sink_config.insert_batch_fn_)),
+    insert_batch_fn_level0_(reinterpret_cast<const Partition::InsertBatchFn&>(
+        sink_config.insert_batch_fn_level0_)) {
   DCHECK_GT(sink_config.hash_seed_, 0);
   for (const TRuntimeFilterDesc& filter_desc : sink_config.filter_descs_) {
     filter_ctxs_.emplace_back();
@@ -200,11 +217,9 @@ Status PhjBuilder::Prepare(RuntimeState* state, MemTracker* parent_mem_tracker) 
         debug_option_enabled ? instance_debug_options : TDebugOptions());
   }
 
-  RETURN_IF_ERROR(HashTableCtx::Create(&obj_pool_, state, build_exprs_, build_exprs_,
-      HashTableStoresNulls(join_op_, is_not_distinct_from_), is_not_distinct_from_,
-      hash_seed_, MAX_PARTITION_DEPTH, row_desc_->tuple_descriptors().size(),
-      expr_perm_pool_.get(), expr_results_pool_.get(), expr_results_pool_.get(),
-      &ht_ctx_));
+  RETURN_IF_ERROR(HashTableCtx::Create(&obj_pool_, state, hash_table_config_, hash_seed_,
+      MAX_PARTITION_DEPTH, row_desc_->tuple_descriptors().size(), expr_perm_pool_.get(),
+      expr_results_pool_.get(), expr_results_pool_.get(), &ht_ctx_));
 
   DCHECK_EQ(filter_exprs_.size(), filter_ctxs_.size());
   for (int i = 0; i < filter_exprs_.size(); ++i) {
@@ -1120,43 +1135,48 @@ std::string PhjBuilder::Partition::DebugString() {
   return ss.str();
 }
 
-void PhjBuilder::Codegen(LlvmCodeGen* codegen) {
+void PhjBuilder::Codegen(RuntimeState* state) {
+  const PhjBuilderConfig& phj_config = static_cast<const PhjBuilderConfig&>(sink_config_);
+  PhjBuilderConfig& non_const_config = const_cast<PhjBuilderConfig&>(phj_config);
+  non_const_config.Codegen(state, profile());
+}
+
+void PhjBuilderConfig::Codegen(RuntimeState* state, RuntimeProfile* profile) {
+  LlvmCodeGen* codegen = state->codegen();
+  DCHECK(codegen != nullptr);
   Status build_codegen_status;
   Status insert_codegen_status;
   Status codegen_status;
 
-  // Context required to generate hash table codegened methods.
-  HashTableConfig hash_table_config(build_exprs_, build_exprs_,
-      HashTableStoresNulls(join_op_, is_not_distinct_from_), is_not_distinct_from_);
   // Codegen for hashing rows with the builder's hash table context.
   llvm::Function* hash_fn;
   codegen_status =
-      HashTableCtx::CodegenHashRow(codegen, false, hash_table_config, &hash_fn);
+      HashTableCtx::CodegenHashRow(codegen, false, *hash_table_config_, &hash_fn);
   llvm::Function* murmur_hash_fn;
   codegen_status.MergeStatus(
-      HashTableCtx::CodegenHashRow(codegen, true, hash_table_config, &murmur_hash_fn));
+      HashTableCtx::CodegenHashRow(codegen, true, *hash_table_config_, &murmur_hash_fn));
 
   // Codegen for evaluating build rows
   llvm::Function* eval_build_row_fn;
-  codegen_status.MergeStatus(
-      HashTableCtx::CodegenEvalRow(codegen, true, hash_table_config, &eval_build_row_fn));
+  codegen_status.MergeStatus(HashTableCtx::CodegenEvalRow(
+      codegen, true, *hash_table_config_, &eval_build_row_fn));
 
   llvm::Function* insert_filters_fn;
   codegen_status.MergeStatus(
       CodegenInsertRuntimeFilters(codegen, filter_exprs_, &insert_filters_fn));
 
   if (codegen_status.ok()) {
-    TPrefetchMode::type prefetch_mode = runtime_state_->query_options().prefetch_mode;
-    build_codegen_status = CodegenProcessBuildBatch(codegen, hash_table_config, hash_fn,
-        murmur_hash_fn, eval_build_row_fn, insert_filters_fn);
-    insert_codegen_status = CodegenInsertBatch(codegen, hash_table_config, hash_fn,
-        murmur_hash_fn, eval_build_row_fn, prefetch_mode);
+    TPrefetchMode::type prefetch_mode = state->query_options().prefetch_mode;
+    build_codegen_status = CodegenProcessBuildBatch(
+        codegen, hash_fn, murmur_hash_fn, eval_build_row_fn, insert_filters_fn);
+    insert_codegen_status = CodegenInsertBatch(
+        codegen, hash_fn, murmur_hash_fn, eval_build_row_fn, prefetch_mode);
   } else {
     build_codegen_status = codegen_status;
     insert_codegen_status = codegen_status;
   }
-  profile()->AddCodegenMsg(build_codegen_status.ok(), build_codegen_status, "Build Side");
-  profile()->AddCodegenMsg(
+  profile->AddCodegenMsg(build_codegen_status.ok(), build_codegen_status, "Build Side");
+  profile->AddCodegenMsg(
       insert_codegen_status.ok(), insert_codegen_status, "Hash Table Construction");
 }
 
@@ -1178,9 +1198,8 @@ string PhjBuilder::DebugString() const {
   return ss.str();
 }
 
-Status PhjBuilder::CodegenProcessBuildBatch(LlvmCodeGen* codegen,
-    HashTableConfig& hash_table_config, llvm::Function* hash_fn,
-    llvm::Function* murmur_hash_fn, llvm::Function* eval_row_fn,
+Status PhjBuilderConfig::CodegenProcessBuildBatch(LlvmCodeGen* codegen,
+    llvm::Function* hash_fn, llvm::Function* murmur_hash_fn, llvm::Function* eval_row_fn,
     llvm::Function* insert_filters_fn) {
   llvm::Function* process_build_batch_fn =
       codegen->GetFunction(IRFunction::PHJ_PROCESS_BUILD_BATCH, true);
@@ -1197,9 +1216,9 @@ Status PhjBuilder::CodegenProcessBuildBatch(LlvmCodeGen* codegen,
 
   HashTableCtx::HashTableReplacedConstants replaced_constants;
   const bool stores_duplicates = true;
-  const int num_build_tuples = row_desc_->tuple_descriptors().size();
+  const int num_build_tuples = input_row_desc_->tuple_descriptors().size();
   // Replace some hash table parameters with constants.
-  RETURN_IF_ERROR(HashTableCtx::ReplaceHashTableConstants(codegen, hash_table_config,
+  RETURN_IF_ERROR(HashTableCtx::ReplaceHashTableConstants(codegen, *hash_table_config_,
       stores_duplicates, num_build_tuples, process_build_batch_fn, &replaced_constants));
   DCHECK_GE(replaced_constants.stores_nulls, 1);
   DCHECK_EQ(replaced_constants.finds_some_nulls, 0);
@@ -1219,7 +1238,7 @@ Status PhjBuilder::CodegenProcessBuildBatch(LlvmCodeGen* codegen,
   llvm::Value* build_filter_l0_arg =
       codegen->GetArgument(process_build_batch_fn_level0, 4);
   build_filter_l0_arg->replaceAllUsesWith(
-      codegen->GetBoolConstant(filter_ctxs_.size() > 0));
+      codegen->GetBoolConstant(filter_descs_.size() > 0));
 
   // process_build_batch_fn_level0 uses CRC hash if available,
   replaced =
@@ -1260,8 +1279,7 @@ Status PhjBuilder::CodegenProcessBuildBatch(LlvmCodeGen* codegen,
   return Status::OK();
 }
 
-Status PhjBuilder::CodegenInsertBatch(LlvmCodeGen* codegen,
-    HashTableConfig& hash_table_config, llvm::Function* hash_fn,
+Status PhjBuilderConfig::CodegenInsertBatch(LlvmCodeGen* codegen, llvm::Function* hash_fn,
     llvm::Function* murmur_hash_fn, llvm::Function* eval_row_fn,
     TPrefetchMode::type prefetch_mode) {
   llvm::Function* insert_batch_fn =
@@ -1269,7 +1287,7 @@ Status PhjBuilder::CodegenInsertBatch(LlvmCodeGen* codegen,
   // Context required to generate hash table codegened methods.
   llvm::Function* build_equals_fn;
   RETURN_IF_ERROR(
-      HashTableCtx::CodegenEquals(codegen, true, hash_table_config, &build_equals_fn));
+      HashTableCtx::CodegenEquals(codegen, true, *hash_table_config_, &build_equals_fn));
 
   // Replace the parameter 'prefetch_mode' with constant.
   llvm::Value* prefetch_mode_arg = codegen->GetArgument(insert_batch_fn, 1);
@@ -1288,8 +1306,8 @@ Status PhjBuilder::CodegenInsertBatch(LlvmCodeGen* codegen,
   // Replace hash-table parameters with constants.
   HashTableCtx::HashTableReplacedConstants replaced_constants;
   const bool stores_duplicates = true;
-  const int num_build_tuples = row_desc_->tuple_descriptors().size();
-  RETURN_IF_ERROR(HashTableCtx::ReplaceHashTableConstants(codegen, hash_table_config,
+  const int num_build_tuples = input_row_desc_->tuple_descriptors().size();
+  RETURN_IF_ERROR(HashTableCtx::ReplaceHashTableConstants(codegen, *hash_table_config_,
       stores_duplicates, num_build_tuples, insert_batch_fn, &replaced_constants));
   DCHECK_GE(replaced_constants.stores_nulls, 1);
   DCHECK_EQ(replaced_constants.finds_some_nulls, 0);
@@ -1318,9 +1336,8 @@ Status PhjBuilder::CodegenInsertBatch(LlvmCodeGen* codegen,
         "InsertBatch() function failed verification, see log");
   }
 
-  codegen->AddFunctionToJit(insert_batch_fn, reinterpret_cast<void**>(&insert_batch_fn_));
-  codegen->AddFunctionToJit(
-      insert_batch_fn_level0, reinterpret_cast<void**>(&insert_batch_fn_level0_));
+  codegen->AddFunctionToJit(insert_batch_fn, &insert_batch_fn_);
+  codegen->AddFunctionToJit(insert_batch_fn_level0, &insert_batch_fn_level0_);
   return Status::OK();
 }
 
@@ -1341,7 +1358,7 @@ Status PhjBuilder::CodegenInsertBatch(LlvmCodeGen* codegen,
 //        %"class.impala::TupleRow"* %row)
 //    ret void
 //  }
-Status PhjBuilder::CodegenInsertRuntimeFilters(
+Status PhjBuilderConfig::CodegenInsertRuntimeFilters(
     LlvmCodeGen* codegen, const vector<ScalarExpr*>& filter_exprs, llvm::Function** fn) {
   llvm::LLVMContext& context = codegen->context();
   LlvmBuilder builder(context);
@@ -1365,7 +1382,7 @@ Status PhjBuilder::CodegenInsertRuntimeFilters(
   for (int i = 0; i < num_filters; ++i) {
     llvm::Function* insert_fn;
     RETURN_IF_ERROR(FilterContext::CodegenInsert(
-        codegen, filter_exprs[i], &filter_ctxs_[i], &insert_fn));
+        codegen, filter_exprs[i], filter_descs_[i], &insert_fn));
     llvm::Value* filter_context_ptr = builder.CreateConstGEP1_32(filter_ctxs, i);
     llvm::Value* insert_args[] = {filter_context_ptr, row_arg};
     builder.CreateCall(insert_fn, insert_args);

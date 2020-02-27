@@ -99,6 +99,7 @@ class RuntimeState {
   bool strict_mode() const { return query_options().strict_mode; }
   bool decimal_v2() const { return query_options().decimal_v2; }
   const TQueryCtx& query_ctx() const;
+  const TPlanFragmentCtx& fragment_ctx() const { return *fragment_ctx_; }
   const TPlanFragmentInstanceCtx& instance_ctx() const { return *instance_ctx_; }
   const TUniqueId& session_id() const { return query_ctx().session.session_id; }
   const std::string& do_as_user() const { return query_ctx().session.delegated_user; }
