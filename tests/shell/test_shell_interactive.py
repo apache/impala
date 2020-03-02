@@ -445,6 +445,39 @@ class TestImpalaShellInteractive(ImpalaTestSuite):
       assert history_entry in result.stderr, "'%s' not in '%s'" % (history_entry,
                                                                    result.stderr)
 
+  def test_history_does_not_duplicate_on_interrupt(self, vector, tmp_history_file):
+    """This test verifies that once the cmdloop is broken the history file will not be
+    re-read. The cmdloop can be broken when the user sends a SIGINT or exceptions
+    occur."""
+    # readline gets its input from tty, so using stdin does not work.
+    shell_cmd = get_shell_cmd(vector)
+    child_proc = pexpect.spawn(shell_cmd[0], shell_cmd[1:])
+    # set up history
+    child_proc.expect(PROMPT_REGEX)
+    child_proc.sendline("select 1;")
+    child_proc.expect("Fetched 1 row\(s\) in [0-9]+\.?[0-9]*s")
+    child_proc.expect(PROMPT_REGEX)
+    child_proc.sendline("quit;")
+    child_proc.wait()
+    child_proc = pexpect.spawn(shell_cmd[0], shell_cmd[1:])
+    child_proc.expect(PROMPT_REGEX)
+
+    # send SIGINT then quit to save history
+    child_proc.sendintr()
+    child_proc.sendline("select 2;")
+    child_proc.expect("Fetched 1 row\(s\) in [0-9]+\.?[0-9]*s")
+    child_proc.sendline("quit;")
+    child_proc.wait()
+
+    # check history in a new instance
+    p = ImpalaShell(vector)
+    p.send_cmd('history')
+    result = p.get_result().stderr.splitlines()
+    assert "[1]: select 1;" == result[1]
+    assert "[2]: quit;" == result[2]
+    assert "[3]: select 2;" == result[3]
+    assert "[4]: quit;" == result[4]
+
   def test_history_file_option(self, vector, tmp_history_file):
     """
     Setting the 'tmp_history_file' fixture above means that the IMPALA_HISTFILE

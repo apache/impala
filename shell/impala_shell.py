@@ -235,11 +235,25 @@ class ImpalaShell(object, cmd.Cmd):
         self.readline = __import__('readline')
         try:
           self.readline.set_history_length(int(options.history_max))
+          # The history file is created when the Impala shell is invoked and commands are
+          # issued. In case it does not exist do not read the history file.
+          if os.path.exists(self.history_file):
+            self.readline.read_history_file(self.history_file)
+            self._replace_history_delimiters(ImpalaShell.HISTORY_FILE_QUERY_DELIM, '\n')
         except ValueError:
           warning = "WARNING: history_max option malformed %s\n" % options.history_max
           print(warning, file=sys.stderr)
           self.readline.set_history_length(1000)
-      except ImportError:
+        except IOError, i:
+          warning = "WARNING: Unable to load command history (disabling impala-shell " \
+              "command history): %s" % i
+          print(warning, file=sys.stderr)
+          # This history file exists but is not readable, disable readline.
+          self._disable_readline()
+      except ImportError, i:
+        warning = "WARNING: Unable to import readline module (disabling impala-shell " \
+            "command history): %s" % i
+        print(warning, file=sys.stderr)
         self._disable_readline()
 
     if options.impalad is not None:
@@ -1370,22 +1384,6 @@ class ImpalaShell(object, cmd.Cmd):
       return CmdStatus.SUCCESS
     else:
       return CmdStatus.ERROR
-
-  def preloop(self):
-    """Load the history file if it exists"""
-    if self.readline:
-      # The history file is created when the Impala shell is invoked and commands are
-      # issued. In the first invocation of the shell, the history file will not exist.
-      # Clearly, this is not an error, return.
-      if not os.path.exists(self.history_file): return
-      try:
-        self.readline.read_history_file(self.history_file)
-        self._replace_history_delimiters(ImpalaShell.HISTORY_FILE_QUERY_DELIM, '\n')
-      except IOError as i:
-        msg = "Unable to load command history (disabling history collection): %s" % i
-        print(msg, file=sys.stderr)
-        # This history file exists but is not readable, disable readline.
-        self._disable_readline()
 
   def postloop(self):
     """Save session commands in history."""
