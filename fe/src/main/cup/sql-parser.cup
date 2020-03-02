@@ -1598,14 +1598,19 @@ partition_column_defs ::=
   {: RESULT = col_defs; :}
   ;
 
-// The PARTITION BY clause contains any number of HASH() clauses followed by exactly zero
-// or one RANGE clauses
+// The PARTITION BY clause contains any number of HASH() clauses followed by or following
+// exactly zero or one RANGE clauses
 partition_param_list ::=
   KW_PARTITION KW_BY hash_partition_param_list:list
   {: RESULT = list; :}
   | KW_PARTITION KW_BY range_partition_param:rng
   {: RESULT = Lists.newArrayList(rng); :}
   | KW_PARTITION KW_BY hash_partition_param_list:list COMMA range_partition_param:rng
+  {:
+    list.add(rng);
+    RESULT = list;
+  :}
+  | KW_PARTITION KW_BY range_partition_param:rng COMMA hash_partition_param_list:list
   {:
     list.add(rng);
     RESULT = list;

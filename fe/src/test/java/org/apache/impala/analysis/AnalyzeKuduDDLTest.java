@@ -120,6 +120,16 @@ public class AnalyzeKuduDDLTest extends FrontendTestBase {
         "(partition values < 'aa', partition 'aa' <= values < 'bb', " +
         "partition 'bb' <= values < 'cc', partition 'cc' <= values) " +
         "stored as kudu", isExternalPurgeTbl);
+    // Swapped RANGE and HASH
+    AnalyzesOk("create table tab (x int, y string, primary key(x, y)) " +
+        "partition by range(y) (partition values < 'aa', partition 'aa' " +
+        "<= values < 'bb', partition 'bb' <= values < 'cc', partition 'cc' <= values), " +
+        "hash(x) partitions 3 stored as kudu", isExternalPurgeTbl);
+    // RANGE followed by multiple HASH
+    AnalyzesOk("create table tab (x int, y string, primary key(x, y)) " +
+        "partition by range(y) (partition values < 'aa', partition 'aa' " +
+        "<= values < 'bb', partition 'bb' <= values < 'cc', partition 'cc' <= values), " +
+        "hash(x) partitions 3, hash(y) partitions 2 stored as kudu", isExternalPurgeTbl);
     // Key column in upper case
     AnalyzesOk("create table tab (x int, y int, primary key (X)) " +
         "partition by hash (x) partitions 8 stored as kudu", isExternalPurgeTbl);

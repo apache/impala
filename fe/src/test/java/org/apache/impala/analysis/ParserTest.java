@@ -2876,6 +2876,8 @@ public class ParserTest extends FrontendTestBase {
         "HASH (a) PARTITIONS 3, RANGE (a, b) (PARTITION VALUE = (1, 'abc'), " +
         "PARTITION VALUE = (2, 'def'))");
     ParsesOk("CREATE TABLE Foo (a int) PARTITION BY RANGE (a) " +
+        "(PARTITION VALUE = 10), HASH (a) PARTITIONS 3");
+    ParsesOk("CREATE TABLE Foo (a int) PARTITION BY RANGE (a) " +
         "(PARTITION VALUE = 1 + 1) STORED AS KUDU");
     ParsesOk("CREATE TABLE Foo (a int) PARTITION BY RANGE (a) " +
         "(PARTITION 1 + 1 < VALUES) STORED AS KUDU");
@@ -2888,8 +2890,6 @@ public class ParserTest extends FrontendTestBase {
     ParserError("CREATE TABLE Foo (a int) PARTITION BY RANGE (a) ()");
     ParserError("CREATE TABLE Foo (a int) PARTITION BY HASH (a) PARTITIONS 4, " +
         "RANGE (a) (PARTITION VALUE = 10), RANGE (a) (PARTITION VALUES < 10)");
-    ParserError("CREATE TABLE Foo (a int) PARTITION BY RANGE (a) " +
-        "(PARTITION VALUE = 10), HASH (a) PARTITIONS 3");
     ParserError("CREATE TABLE Foo (a int) PARTITION BY RANGE (a) " +
         "(PARTITION VALUES = 10) STORED AS KUDU");
     ParserError("CREATE TABLE Foo (a int) PARTITION BY RANGE (a) " +
