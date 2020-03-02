@@ -34,6 +34,13 @@
 # to git_hash_B, the second two refer to git_hash_A. The column "Delta(Avg)"
 # is negative if git_hash_B is faster and is positive if git_hash_A is faster.
 #
+# To run this script against data stored in Kudu, set '--table_formats=kudu/none/none'.
+#
+# For a given workload, the target database used will be:
+# '[workload-name][scale-factor]_[table_format]'. Typically, on the first run of this
+# script the target database will not exist. The --load option will be needed to load
+# the database.
+#
 # WARNING: This script will run git checkout. You should not touch the tree
 # while the script is running. You should start the script from a clean git
 # tree.
@@ -46,7 +53,7 @@
 #   --workloads=WORKLOADS
 #                         comma-separated list of workloads. Choices: tpch,
 #                         targeted-perf, tpcds. Default: targeted-perf
-#   --scale=SCALE         scale factor for the workloads
+#   --scale=SCALE         scale factor for the workloads [required]
 #   --iterations=ITERATIONS
 #                         number of times to run each query
 #   --table_formats=TABLE_FORMATS
@@ -266,7 +273,7 @@ def parse_options():
   parser.add_option("--workloads", default="targeted-perf",
                     help="comma-separated list of workloads. Choices: tpch, "
                     "targeted-perf, tpcds. Default: targeted-perf")
-  parser.add_option("--scale", help="scale factor for the workloads")
+  parser.add_option("--scale", help="scale factor for the workloads [required]")
   parser.add_option("--iterations", default=30, help="number of times to run each query")
   parser.add_option("--table_formats", default="parquet/none", help="comma-separated "
                     "list of table formats. Default: parquet/none")
@@ -314,6 +321,10 @@ def parse_options():
   if not 1 <= len(args) <= 2:
     parser.print_usage(sys.stderr)
     raise Exception("Invalid arguments: either 1 or 2 Git hashes allowed")
+
+  if not options.scale:
+    parser.print_help(sys.stderr)
+    raise Exception("--scale is required")
 
   return options, args
 
