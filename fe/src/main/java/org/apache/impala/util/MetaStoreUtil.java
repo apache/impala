@@ -317,36 +317,60 @@ public class MetaStoreUtil {
   }
 
   /**
+   * A helper class that encapsulates all the information needed to fire and insert event
+   * with HMS.
+   */
+  public static class InsertEventInfo {
+    private String dbName;
+    private String tableName;
+
+    // List of partition values corresponding to the partition keys in
+    // a partitioned table. This is null for non-partitioned table.
+    private List<String> partVals;
+
+    // Set of all the 'new' files added by this insert. This is empty in
+    // case of insert overwrite.
+    private Collection<String> newFiles;
+
+    // If true, sets the 'replace' flag to true indicating that the
+    // operation was an insert overwrite in the notification log. Will set the same to
+    // false otherwise.
+    private boolean isOverwrite;
+
+    public InsertEventInfo(String dbName, String tableName, List<String> partVals,
+        Collection<String> newFiles, boolean isOverwrite) {
+      this.dbName = dbName;
+      this.tableName = tableName;
+      this.partVals = partVals;
+      this.newFiles = newFiles;
+      this.isOverwrite = isOverwrite;
+    }
+  }
+
+  /**
    *  Fires an insert event to HMS notification log. For partitioned table, each
    *  existing partition touched by the insert will fire a separate insert event.
    *
-   * @param msClient Metastore client
-   * @param newFiles Set of all the 'new' files added by this insert. This is empty in
-   * case of insert overwrite.
-   * @param partVals List of partition values corresponding to the partition keys in
-   * a partitioned table. This is null for non-partitioned table.
-   * @param isOverwrite If true, sets the 'replace' flag to true indicating that the
-   * operation was an insert overwrite in the notification log. Will set the same to
-   * false otherwise.
+   * @param msClient Metastore client,
+   * @param info A singe insert event encapsulating the information needed to fire insert
+   * event with HMS.
    */
   public static void fireInsertEvent(IMetaStoreClient msClient,
-      String dbName, String tblName, List<String> partVals,
-      Collection<String> newFiles, boolean isOverwrite) throws TException {
+      InsertEventInfo info) throws TException {
     Preconditions.checkNotNull(msClient);
-    Preconditions.checkNotNull(dbName);
-    Preconditions.checkNotNull(tblName);
-    Preconditions.checkNotNull(newFiles);
-    LOG.debug("Firing an insert event for {}", tblName);
+    Preconditions.checkNotNull(info.dbName);
+    Preconditions.checkNotNull(info.tableName);
+    Preconditions.checkNotNull(info.newFiles);
+    LOG.debug("Firing an insert event for {}", info.tableName);
     FireEventRequestData data = new FireEventRequestData();
     InsertEventRequestData insertData = new InsertEventRequestData();
     data.setInsertData(insertData);
     FireEventRequest rqst = new FireEventRequest(true, data);
-    rqst.setDbName(dbName);
-    rqst.setTableName(tblName);
-    insertData.setFilesAdded(new ArrayList<>(newFiles));
-    insertData.setReplace(isOverwrite);
-    if (partVals != null) rqst.setPartitionVals(partVals);
-
+    rqst.setDbName(info.dbName);
+    rqst.setTableName(info.tableName);
+    insertData.setFilesAdded(new ArrayList<>(info.newFiles));
+    insertData.setReplace(info.isOverwrite);
+    if (info.partVals != null) rqst.setPartitionVals(info.partVals);
     msClient.fireListenerEvent(rqst);
   }
 

@@ -135,6 +135,7 @@ import org.apache.impala.thrift.TTypeNode;
 import org.apache.impala.thrift.TTypeNodeType;
 import org.apache.impala.thrift.TUniqueId;
 import org.apache.impala.util.MetaStoreUtil;
+import org.apache.impala.util.MetaStoreUtil.InsertEventInfo;
 import org.apache.thrift.TException;
 import org.junit.After;
 import org.junit.AfterClass;
@@ -834,8 +835,9 @@ public class MetastoreEventsProcessorTest {
     List <String> newFiles = addFilesToDirectory(parentPath, "testFile.",
         totalNumberOfFilesToAdd, isOverwrite);
     try (MetaStoreClient metaStoreClient = catalog_.getMetaStoreClient()) {
-      MetaStoreUtil.fireInsertEvent(metaStoreClient.getHiveClient(), msTbl.getDbName(),
-          msTbl.getTableName(), null, newFiles, isOverwrite);
+      MetaStoreUtil.fireInsertEvent(metaStoreClient.getHiveClient(),
+          new InsertEventInfo(msTbl.getDbName(), msTbl.getTableName(), null,
+          newFiles, isOverwrite));
     }
   }
 

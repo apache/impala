@@ -34,6 +34,9 @@ import java.util.List;
 import java.util.Map;
 import java.util.Optional;
 import java.util.Set;
+import java.util.concurrent.CompletableFuture;
+import java.util.concurrent.ExecutorService;
+import java.util.concurrent.Executors;
 import java.util.concurrent.TimeUnit;
 import java.util.stream.Collectors;
 
@@ -189,6 +192,7 @@ import org.apache.impala.util.FunctionUtils;
 import org.apache.impala.util.HdfsCachingUtil;
 import org.apache.impala.util.KuduUtil;
 import org.apache.impala.util.MetaStoreUtil;
+import org.apache.impala.util.MetaStoreUtil.InsertEventInfo;
 import org.slf4j.Logger;
 import org.apache.thrift.TException;
 
@@ -4396,9 +4400,9 @@ public class CatalogOpExecutor {
   }
 
   /**
-   * Populates insert event data and calls fireInsertEvent() if external event processing
-   * is enabled. This is no-op if event processing is disabled or there are no existing
-   * partitions affected by this insert.
+   * Populates insert event data and calls fireInsertEventAysnc() if external event
+   * processing is enabled. This is no-op if event processing is disabled or there are
+   * no existing partitions affected by this insert.
    *
    * @param affectedExistingPartitions List of existing partitions touched by the insert.
    * @param isInsertOverwrite indicates if the operation was an insert overwrite. If it
@@ -4408,6 +4412,9 @@ public class CatalogOpExecutor {
       List<FeFsPartition> affectedExistingPartitions, boolean isInsertOverwrite) {
     if (!catalog_.isEventProcessingActive() ||
         affectedExistingPartitions.size() == 0) return;
+
+    // List of all insert events that we call HMS fireInsertEvent() on.
+    List<InsertEventInfo> insertEventInfos = new ArrayList<>();
 
     // Map of partition names to file names of all existing partitions touched by the
     // insert.
@@ -4454,20 +4461,38 @@ public class CatalogOpExecutor {
             filesPostInsert.size(), table.getTableName(), part.getPartitionName());
       }
       if (deltaFiles != null || isInsertOverwrite) {
+        // Collect all the insert events.
+        insertEventInfos.add(new InsertEventInfo(table.getDb().getName(),
+            table.getName(), partVals, deltaFiles, isInsertOverwrite));
+      } else {
+        LOG.info("No new files were created, and is not a replace. Skipping "
+            + "generating INSERT event.");
+      }
+    }
+
+    // Firing insert events by making calls to HMS APIs can be slow for tables with
+    // large number of partitions. Hence, we fire the insert events asynchronously.
+    fireInsertEventsAsync(insertEventInfos);
+  }
+
+  /**
+   * Helper method to fire insert events asynchronously. This creates a single thread
+   * to execute the fireInsertEvent method and shuts down the thread after it has
+   * finished. In case of any exception, we just log the failure of firing insert events.
+   */
+  private void fireInsertEventsAsync(List<InsertEventInfo> insertEventInfos) {
+    ExecutorService fireInsertEventThread = Executors.newSingleThreadExecutor();
+    CompletableFuture.runAsync(() -> {
+      for (InsertEventInfo info : insertEventInfos) {
         try (MetaStoreClient metaStoreClient = catalog_.getMetaStoreClient()) {
-          MetaStoreUtil
-              .fireInsertEvent(metaStoreClient.getHiveClient(), table.getDb().getName(),
-                  table.getName(), partVals, deltaFiles, isInsertOverwrite);
+          MetaStoreUtil.fireInsertEvent(metaStoreClient.getHiveClient(), info);
         } catch (Exception e) {
           LOG.error("Failed to fire insert event. Some tables might not be"
               + " refreshed on other impala clusters.", e);
         }
       }
-      else {
-        LOG.info("No new files were created, and is not a replace. Skipping "
-            + "generating INSERT event.");
-      }
-    }
+    }, Executors.newSingleThreadExecutor()).thenRun(() ->
+        fireInsertEventThread.shutdown());
   }
 
   /**
