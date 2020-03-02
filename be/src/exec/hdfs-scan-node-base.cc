@@ -19,6 +19,7 @@
 
 #include "exec/base-sequence-scanner.h"
 #include "exec/hdfs-avro-scanner.h"
+#include "exec/hdfs-columnar-scanner.h"
 #include "exec/hdfs-orc-scanner.h"
 #include "exec/hdfs-plugin-text-scanner.h"
 #include "exec/hdfs-rcfile-scanner.h"
@@ -434,7 +435,8 @@ void HdfsScanPlanNode::Codegen(RuntimeState* state, RuntimeProfile* profile) {
         status = HdfsAvroScanner::Codegen(this, state, &fn);
         break;
       case THdfsFileFormat::PARQUET:
-        status = HdfsParquetScanner::Codegen(this, state, &fn);
+      case THdfsFileFormat::ORC:
+        status = HdfsColumnarScanner::Codegen(this, state, &fn);
         break;
       default:
         // No codegen for this format

@@ -154,7 +154,14 @@ Status HdfsOrcScanner::Open(ScannerContext* context) {
       ADD_COUNTER(scan_node_->runtime_profile(), "NumScannersWithNoReads", TUnit::UNIT);
   process_footer_timer_stats_ =
       ADD_SUMMARY_STATS_TIMER(scan_node_->runtime_profile(), "OrcFooterProcessingTime");
-  scan_node_->IncNumScannersCodegenDisabled();
+
+  codegend_process_scratch_batch_fn_ = reinterpret_cast<ProcessScratchBatchFn>(
+      scan_node_->GetCodegenFn(THdfsFileFormat::ORC));
+  if (codegend_process_scratch_batch_fn_ == nullptr) {
+    scan_node_->IncNumScannersCodegenDisabled();
+  } else {
+    scan_node_->IncNumScannersCodegenEnabled();
+  }
 
   DCHECK(parse_status_.ok()) << "Invalid parse_status_" << parse_status_.GetDetail();
   for (const FilterContext& ctx : context->filter_ctxs()) {

@@ -55,8 +55,6 @@ using namespace impala::io;
 // THIS RECORDS INFORMATION ABOUT PAST BEHAVIOR. DO NOT CHANGE THIS CONSTANT.
 const int LEGACY_IMPALA_MAX_DICT_ENTRIES = 40000;
 
-const char* HdfsParquetScanner::LLVM_CLASS_NAME = "class.impala::HdfsParquetScanner";
-
 static const string PARQUET_MEM_LIMIT_EXCEEDED =
     "HdfsParquetScanner::$0() failed to allocate $1 bytes for $2.";
 
@@ -1172,40 +1170,6 @@ Status HdfsParquetScanner::CommitRows(RowBatch* dst_batch, int num_rows) {
   // Clear expr result allocations for this thread to avoid accumulating too much
   // memory from evaluating the scanner conjuncts.
   context_->expr_results_pool()->Clear();
-  return Status::OK();
-}
-
-Status HdfsParquetScanner::Codegen(HdfsScanPlanNode* node, RuntimeState* state,
-      llvm::Function** process_scratch_batch_fn) {
-  DCHECK(state->ShouldCodegen());
-  *process_scratch_batch_fn = nullptr;
-  LlvmCodeGen* codegen = state->codegen();
-  DCHECK(codegen != nullptr);
-
-  llvm::Function* fn = codegen->GetFunction(IRFunction::PROCESS_SCRATCH_BATCH, true);
-  DCHECK(fn != nullptr);
-
-  llvm::Function* eval_conjuncts_fn;
-  const vector<ScalarExpr*>& conjuncts = node->conjuncts_;
-  RETURN_IF_ERROR(ExecNode::CodegenEvalConjuncts(codegen, conjuncts, &eval_conjuncts_fn));
-  DCHECK(eval_conjuncts_fn != nullptr);
-
-  int replaced = codegen->ReplaceCallSites(fn, eval_conjuncts_fn, "EvalConjuncts");
-  DCHECK_REPLACE_COUNT(replaced, 1);
-
-  llvm::Function* eval_runtime_filters_fn;
-  RETURN_IF_ERROR(CodegenEvalRuntimeFilters(
-      codegen, node->runtime_filter_exprs_, &eval_runtime_filters_fn));
-  DCHECK(eval_runtime_filters_fn != nullptr);
-
-  replaced = codegen->ReplaceCallSites(fn, eval_runtime_filters_fn, "EvalRuntimeFilters");
-  DCHECK_REPLACE_COUNT(replaced, 1);
-
-  fn->setName("ProcessScratchBatch");
-  *process_scratch_batch_fn = codegen->FinalizeFunction(fn);
-  if (*process_scratch_batch_fn == nullptr) {
-    return Status("Failed to finalize process_scratch_batch_fn.");
-  }
   return Status::OK();
 }
 

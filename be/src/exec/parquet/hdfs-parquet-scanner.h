@@ -19,7 +19,6 @@
 #ifndef IMPALA_EXEC_HDFS_PARQUET_SCANNER_H
 #define IMPALA_EXEC_HDFS_PARQUET_SCANNER_H
 
-#include "codegen/impala-ir.h"
 #include "exec/hdfs-columnar-scanner.h"
 #include "exec/parquet/parquet-column-stats.h"
 #include "exec/parquet/parquet-common.h"
@@ -348,11 +347,6 @@ class HdfsParquetScanner : public HdfsColumnarScanner {
   virtual Status ProcessSplit() WARN_UNUSED_RESULT;
   virtual void Close(RowBatch* row_batch);
 
-  /// Codegen ProcessScratchBatch(). Stores the resulting function in
-  /// 'process_scratch_batch_fn' if codegen was successful or NULL otherwise.
-  static Status Codegen(HdfsScanPlanNode* node, RuntimeState* state,
-      llvm::Function** process_scratch_batch_fn);
-
   /// Helper function to create ColumnStatsReader object. 'col_order' might be NULL.
   ColumnStatsReader CreateColumnStatsReader(
       const parquet::ColumnChunk& col_chunk, const ColumnType& col_type,
@@ -361,9 +355,6 @@ class HdfsParquetScanner : public HdfsColumnarScanner {
   /// Initializes a ParquetTimestampDecoder depending on writer, timezone, and the schema
   /// of the column.
   ParquetTimestampDecoder CreateTimestampDecoder(const parquet::SchemaElement& element);
-
-  /// Class name in LLVM IR.
-  static const char* LLVM_CLASS_NAME;
 
  private:
   friend class ParquetColumnReader;

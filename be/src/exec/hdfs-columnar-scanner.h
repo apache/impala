@@ -21,6 +21,7 @@
 
 #include <boost/scoped_ptr.hpp>
 
+#include "codegen/impala-ir.h"
 #include "exec/hdfs-scan-node-base.h"
 #include "exec/scratch-tuple-batch.h"
 #include "runtime/row-batch.h"
@@ -34,6 +35,14 @@ class HdfsColumnarScanner : public HdfsScanner {
  public:
   HdfsColumnarScanner(HdfsScanNodeBase* scan_node, RuntimeState* state);
   virtual ~HdfsColumnarScanner();
+
+  /// Codegen ProcessScratchBatch(). Stores the resulting function in
+  /// 'process_scratch_batch_fn' if codegen was successful or NULL otherwise.
+  static Status Codegen(HdfsScanPlanNode* node, RuntimeState* state,
+      llvm::Function** process_scratch_batch_fn);
+
+  /// Class name in LLVM IR.
+  static const char* LLVM_CLASS_NAME;
 
  protected:
   /// Column readers will write slot values into this scratch batch for
