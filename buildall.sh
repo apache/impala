@@ -279,7 +279,7 @@ Examples of common tasks:
 done
 
 declare -a CMAKE_BUILD_TYPE_LIST
-# Adjust CMAKE_BUILD_TYPE for ASAN and code coverage, if necessary.
+# Adjust CMAKE_BUILD_TYPE for code coverage, if necessary.
 if [[ ${CODE_COVERAGE} -eq 1 ]]; then
   case ${CMAKE_BUILD_TYPE} in
     Debug)
@@ -290,13 +290,16 @@ if [[ ${CODE_COVERAGE} -eq 1 ]]; then
       ;;
   esac
 fi
+
+# If the -release flag is specified, add RELEASE to the CMAKE_BUILD_TYPE_LIST so that
+# the build exits if both -release and a sanitizer flag are specified. This does not
+# apply when -codecoverage is specified because code coverage is not a distinct build
+# type, it just controls if additional build flags are added.
+if [[ ${CODE_COVERAGE} -ne 1 && ${CMAKE_BUILD_TYPE} = "Release" ]]; then
+  CMAKE_BUILD_TYPE_LIST+=(RELEASE)
+fi
+
 if [[ ${BUILD_ASAN} -eq 1 ]]; then
-  # The next check also catches cases where CODE_COVERAGE=1, which is not supported
-  # together with BUILD_ASAN=1.
-  if [[ "${CMAKE_BUILD_TYPE}" != "Debug" ]]; then
-    echo "Address sanitizer build not supported for build type: ${CMAKE_BUILD_TYPE}"
-    exit 1
-  fi
   CMAKE_BUILD_TYPE_LIST+=(ADDRESS_SANITIZER)
 fi
 if [[ ${BUILD_TIDY} -eq 1 ]]; then
