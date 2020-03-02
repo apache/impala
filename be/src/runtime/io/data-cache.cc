@@ -42,11 +42,13 @@
 #include "util/error-util.h"
 #include "util/filesystem-util.h"
 #include "util/hash-util.h"
+#include "util/histogram-metric.h"
 #include "util/impalad-metrics.h"
 #include "util/metrics.h"
 #include "util/parse-util.h"
 #include "util/pretty-printer.h"
 #include "util/scope-exit-trigger.h"
+#include "util/test-info.h"
 #include "util/uid-util.h"
 
 #ifndef FALLOC_FL_PUNCH_HOLE
@@ -101,6 +103,14 @@ static const int64_t PAGE_SIZE = 1L << 12;
 const char* DataCache::Partition::CACHE_FILE_PREFIX = "impala-cache-file-";
 const char* DataCache::Partition::TRACE_FILE_NAME = "impala-cache-trace.txt";
 const int MAX_FILE_DELETER_QUEUE_SIZE = 500;
+static const char* PARTITION_PATH_METRIC_KEY_TEMPLATE =
+    "impala-server.io-mgr.remote-data-cache-partition-$0.path";
+static const char* PARTITION_READ_LATENCY_METRIC_KEY_TEMPLATE =
+    "impala-server.io-mgr.remote-data-cache-partition-$0.read-latency";
+static const char* PARTITION_WRITE_LATENCY_METRIC_KEY_TEMPLATE =
+    "impala-server.io-mgr.remote-data-cache-partition-$0.write-latency";
+static const char* PARTITION_EVICTION_LATENCY_METRIC_KEY_TEMPLATE =
+    "impala-server.io-mgr.remote-data-cache-partition-$0.eviction-latency";
 
 
 namespace {
@@ -452,8 +462,9 @@ static Cache::EvictionPolicy GetCacheEvictionPolicy(const std::string& policy_st
 }
 
 DataCache::Partition::Partition(
-    const string& path, int64_t capacity, int max_opened_files)
-  : path_(path),
+    int32_t index, const string& path, int64_t capacity, int max_opened_files)
+  : index_(index),
+    path_(path),
     capacity_(max<int64_t>(capacity, PAGE_SIZE)),
     max_opened_files_(max_opened_files),
     meta_cache_(NewCache(GetCacheEvictionPolicy(FLAGS_data_cache_eviction_policy),
@@ -522,10 +533,58 @@ Status DataCache::Partition::Init() {
     RETURN_IF_ERROR(tracer_->Start());
   }
 
+  // Create metrics for this partition
+  InitMetrics();
+
   // Create a backing file for the partition.
   RETURN_IF_ERROR(CreateCacheFile());
   oldest_opened_file_ = 0;
   return Status::OK();
+}
+
+void DataCache::Partition::InitMetrics() {
+  const string& i_string = Substitute("$0", index_);
+  // Backend tests may instantiate the data cache (and its associated partitions)
+  // more than once. If the metrics already exist, then we just need to look up the
+  // metrics to populate the partition's fields.
+  if (TestInfo::is_test() &&
+      ImpaladMetrics::IO_MGR_METRICS->FindMetricForTesting<StringProperty>(
+          Substitute(PARTITION_PATH_METRIC_KEY_TEMPLATE, i_string)) != nullptr) {
+    // If the partition path metric already initialized, then all the other metrics
+    // must be initialized.
+    read_latency_ =
+      ImpaladMetrics::IO_MGR_METRICS->FindMetricForTesting<HistogramMetric>(
+          Substitute(PARTITION_READ_LATENCY_METRIC_KEY_TEMPLATE, i_string));
+    write_latency_ =
+      ImpaladMetrics::IO_MGR_METRICS->FindMetricForTesting<HistogramMetric>(
+          Substitute(PARTITION_WRITE_LATENCY_METRIC_KEY_TEMPLATE, i_string));
+    eviction_latency_ =
+      ImpaladMetrics::IO_MGR_METRICS->FindMetricForTesting<HistogramMetric>(
+          Substitute(PARTITION_EVICTION_LATENCY_METRIC_KEY_TEMPLATE, i_string));
+    DCHECK(read_latency_ != nullptr);
+    DCHECK(write_latency_ != nullptr);
+    DCHECK(eviction_latency_ != nullptr);
+    return;
+  }
+  // Two cases:
+  // - This is not a backend test, so metrics should only be initialized once.
+  // - This is a backend test, but none of the metrics have been initialized before.
+  DCHECK(read_latency_ == nullptr);
+  DCHECK(write_latency_ == nullptr);
+  DCHECK(eviction_latency_ == nullptr);
+  int64_t ONE_HOUR_IN_NS = 60L * 60L * NANOS_PER_SEC;
+  ImpaladMetrics::IO_MGR_METRICS->AddProperty<string>(
+      PARTITION_PATH_METRIC_KEY_TEMPLATE, path_, i_string);
+  read_latency_ = ImpaladMetrics::IO_MGR_METRICS->RegisterMetric(new HistogramMetric(
+      MetricDefs::Get(PARTITION_READ_LATENCY_METRIC_KEY_TEMPLATE, i_string),
+      ONE_HOUR_IN_NS, 3));
+  write_latency_ = ImpaladMetrics::IO_MGR_METRICS->RegisterMetric(new HistogramMetric(
+      MetricDefs::Get(PARTITION_WRITE_LATENCY_METRIC_KEY_TEMPLATE, i_string),
+      ONE_HOUR_IN_NS, 3));
+  eviction_latency_ =
+      ImpaladMetrics::IO_MGR_METRICS->RegisterMetric(new HistogramMetric(
+          MetricDefs::Get(PARTITION_EVICTION_LATENCY_METRIC_KEY_TEMPLATE, i_string),
+          ONE_HOUR_IN_NS, 3));
 }
 
 Status DataCache::Partition::CloseFilesAndVerifySizes() {
@@ -585,7 +644,12 @@ int64_t DataCache::Partition::Lookup(const CacheKey& cache_key, int64_t bytes_to
   bytes_to_read = min(entry.len(), bytes_to_read);
   VLOG(3) << Substitute("Reading file $0 offset $1 len $2 checksum $3 bytes_to_read $4",
       cache_file->path(), entry.offset(), entry.len(), entry.checksum(), bytes_to_read);
-  if (UNLIKELY(!cache_file->Read(entry.offset(), buffer, bytes_to_read))) {
+  bool read_success;
+  {
+    ScopedHistogramTimer read_timer(read_latency_);
+    read_success = cache_file->Read(entry.offset(), buffer, bytes_to_read);
+  }
+  if (UNLIKELY(!read_success)) {
     meta_cache_->Erase(key);
     return 0;
   }
@@ -633,7 +697,12 @@ bool DataCache::Partition::InsertIntoCache(const Slice& key, CacheFile* cache_fi
   // Write to backing file.
   VLOG(3) << Substitute("Storing file $0 offset $1 len $2 checksum $3 ",
       cache_file->path(), insertion_offset, buffer_len, checksum);
-  if (UNLIKELY(!cache_file->Write(insertion_offset, buffer, buffer_len))) {
+  bool write_success;
+  {
+    ScopedHistogramTimer write_timer(write_latency_);
+    write_success = cache_file->Write(insertion_offset, buffer, buffer_len);
+  }
+  if (UNLIKELY(!write_success)) {
     return false;
   }
 
@@ -641,9 +710,14 @@ bool DataCache::Partition::InsertIntoCache(const Slice& key, CacheFile* cache_fi
   CacheEntry entry(cache_file, insertion_offset, buffer_len, checksum);
   memcpy(meta_cache_->MutableValue(&pending_handle), &entry, sizeof(CacheEntry));
   Cache::UniqueHandle handle(meta_cache_->Insert(std::move(pending_handle), this));
-  // Check for failure of Insert
-  if (UNLIKELY(handle.get() == nullptr)) return false;
+  // Check for failure of Insert(), which means the entry was evicted during Insert()
+  if (UNLIKELY(handle.get() == nullptr)){
+    ImpaladMetrics::IO_MGR_REMOTE_DATA_CACHE_INSTANT_EVICTIONS->Increment(1);
+    return false;
+  }
   ImpaladMetrics::IO_MGR_REMOTE_DATA_CACHE_TOTAL_BYTES->Increment(charge_len);
+  ImpaladMetrics::IO_MGR_REMOTE_DATA_CACHE_NUM_ENTRIES->Increment(1);
+  ImpaladMetrics::IO_MGR_REMOTE_DATA_CACHE_NUM_WRITES->Increment(1);
   return true;
 }
 
@@ -679,6 +753,7 @@ bool DataCache::Partition::Store(const CacheKey& cache_key, const uint8_t* buffe
     if (exceed_concurrency ||
         pending_insert_set_.find(key.ToString()) != pending_insert_set_.end()) {
       ImpaladMetrics::IO_MGR_REMOTE_DATA_CACHE_DROPPED_BYTES->Increment(buffer_len);
+      ImpaladMetrics::IO_MGR_REMOTE_DATA_CACHE_DROPPED_ENTRIES->Increment(1);
       if (tracer_ != nullptr) {
         tracer_->Trace(Tracer::STORE_FAILED_BUSY, cache_key, /*lookup_len=*/-1,
             buffer_len);
@@ -730,12 +805,14 @@ void DataCache::Partition::DeleteOldFiles() {
 
 void DataCache::Partition::EvictedEntry(Slice key, Slice value) {
   if (closed_) return;
+  ScopedHistogramTimer eviction_timer(eviction_latency_);
   // Unpack the cache entry.
   CacheEntry entry(value);
   int64_t eviction_len = BitUtil::RoundUp(entry.len(), PAGE_SIZE);
   DCHECK_EQ(entry.offset() % PAGE_SIZE, 0);
   entry.file()->PunchHole(entry.offset(), eviction_len);
   ImpaladMetrics::IO_MGR_REMOTE_DATA_CACHE_TOTAL_BYTES->Increment(-eviction_len);
+  ImpaladMetrics::IO_MGR_REMOTE_DATA_CACHE_NUM_ENTRIES->Increment(-1);
 }
 
 // TODO: Switch to using CRC32 once we fix the TODO in hash-util.h
@@ -796,13 +873,16 @@ Status DataCache::Init() {
     return Status(Substitute("Misconfigured --data_cache_max_opened_files: $0. Must be "
         "at least $1.", FLAGS_data_cache_max_opened_files, cache_dirs.size()));
   }
+  int32_t partition_idx = 0;
   for (const string& dir_path : cache_dirs) {
     LOG(INFO) << "Adding partition " << dir_path << " with capacity "
               << PrettyPrinter::PrintBytes(capacity);
     std::unique_ptr<Partition> partition =
-        make_unique<Partition>(dir_path, capacity, max_opened_files_per_partition);
+        make_unique<Partition>(partition_idx, dir_path, capacity,
+            max_opened_files_per_partition);
     RETURN_IF_ERROR(partition->Init());
     partitions_.emplace_back(move(partition));
+    ++partition_idx;
   }
   CHECK_GT(partitions_.size(), 0);
 

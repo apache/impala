@@ -490,6 +490,16 @@
     "key": "impala-server.io-mgr.remote-data-cache-hit-bytes"
   },
   {
+    "description": "Total number of hits in the remote data cache.",
+    "contexts": [
+      "IMPALAD"
+    ],
+    "label": "Impala Server Io Mgr Remote Data Cache Hit Count",
+    "units": "UNIT",
+    "kind": "COUNTER",
+    "key": "impala-server.io-mgr.remote-data-cache-hit-count"
+  },
+  {
     "description": "Total number of bytes of misses in the remote data cache.",
     "contexts": [
       "IMPALAD"
@@ -498,6 +508,16 @@
     "units": "BYTES",
     "kind": "COUNTER",
     "key": "impala-server.io-mgr.remote-data-cache-miss-bytes"
+  },
+  {
+    "description": "Total number of misses in the remote data cache.",
+    "contexts": [
+      "IMPALAD"
+    ],
+    "label": "Impala Server Io Mgr Remote Data Cache Miss Count",
+    "units": "UNIT",
+    "kind": "COUNTER",
+    "key": "impala-server.io-mgr.remote-data-cache-miss-count"
   },
   {
     "description": "Current byte size of the remote data cache.",
@@ -510,14 +530,94 @@
     "key": "impala-server.io-mgr.remote-data-cache-total-bytes"
   },
   {
+    "description": "Current number of entries in the remote data cache.",
+    "contexts": [
+      "IMPALAD"
+    ],
+    "label": "Impala Server Io Mgr Remote Data Cache Num Entries",
+    "units": "UNIT",
+    "kind": "GAUGE",
+    "key": "impala-server.io-mgr.remote-data-cache-num-entries"
+  },
+  {
+    "description": "Total number of writes into the remote data cache.",
+    "contexts": [
+      "IMPALAD"
+    ],
+    "label": "Impala Server Io Mgr Remote Data Cache Num Writes",
+    "units": "UNIT",
+    "kind": "COUNTER",
+    "key": "impala-server.io-mgr.remote-data-cache-num-writes"
+  },
+  {
     "description": "Total number of bytes not inserted in remote data cache due to concurrency limit.",
     "contexts": [
       "IMPALAD"
     ],
     "label": "Impala Server Io Mgr Remote Data Cache Bytes Not Inserted Due To Concurrency limit",
-    "units": "UNIT",
+    "units": "BYTES",
     "kind": "COUNTER",
     "key": "impala-server.io-mgr.remote-data-cache-dropped-bytes"
+  },
+  {
+    "description": "Total number of entries not inserted in remote data cache due to concurrency limit.",
+    "contexts": [
+      "IMPALAD"
+    ],
+    "label": "Impala Server Io Mgr Remote Data Cache Entries Not Inserted Due To Concurrency Limit",
+    "units": "UNIT",
+    "kind": "COUNTER",
+    "key": "impala-server.io-mgr.remote-data-cache-dropped-entries"
+  },
+  {
+    "description": "Total number of instantaneous evictions from the remote data cache. An instantaneous eviction happens when the eviction policy rejects an entry during insert.",
+    "contexts": [
+      "IMPALAD"
+    ],
+    "label": "Impala Server Io Mgr Remote Data Cache Num Instant Evictions",
+    "units": "UNIT",
+    "kind": "COUNTER",
+    "key": "impala-server.io-mgr.remote-data-cache-instant-evictions"
+  },
+  {
+    "description": "Data Cache Partition Path",
+    "contexts": [
+      "IMPALAD"
+    ],
+    "label": "Impala Server Io Mgr Remote Data Cache Partition Path",
+    "units": "NONE",
+    "kind": "PROPERTY",
+    "key": "impala-server.io-mgr.remote-data-cache-partition-$0.path"
+  },
+  {
+    "description": "Histogram of read operation times for data cache partition",
+    "contexts": [
+      "IMPALAD"
+    ],
+    "label": "Impala Server Io Mgr Remote Data Cache Partition Read Latency",
+    "units": "TIME_NS",
+    "kind": "HISTOGRAM",
+    "key": "impala-server.io-mgr.remote-data-cache-partition-$0.read-latency"
+  },
+  {
+    "description": "Histogram of write operation times for data cache partition",
+    "contexts": [
+      "IMPALAD"
+    ],
+    "label": "Impala Server Io Mgr Remote Data Cache Partition Write Latency",
+    "units": "TIME_NS",
+    "kind": "HISTOGRAM",
+    "key": "impala-server.io-mgr.remote-data-cache-partition-$0.write-latency"
+  },
+  {
+    "description": "Histogram of eviction operation times for data cache partition",
+    "contexts": [
+      "IMPALAD"
+    ],
+    "label": "Impala Server Io Mgr Remote Data Cache Partition Eviction Latency",
+    "units": "TIME_NS",
+    "kind": "HISTOGRAM",
+    "key": "impala-server.io-mgr.remote-data-cache-partition-$0.eviction-latency"
   },
   {
     "description": "The number of allocated IO buffers. IO buffers are shared by all queries.",

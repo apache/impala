@@ -60,9 +60,16 @@ class TestDataCache(CustomClusterTestSuite):
     """
     self.run_test_case('QueryTest/data-cache', vector, unique_database)
     assert self.get_metric('impala-server.io-mgr.remote-data-cache-dropped-bytes') >= 0
+    assert self.get_metric('impala-server.io-mgr.remote-data-cache-dropped-entries') >= 0
+    assert \
+        self.get_metric('impala-server.io-mgr.remote-data-cache-instant-evictions') >= 0
     assert self.get_metric('impala-server.io-mgr.remote-data-cache-hit-bytes') > 0
+    assert self.get_metric('impala-server.io-mgr.remote-data-cache-hit-count') > 0
     assert self.get_metric('impala-server.io-mgr.remote-data-cache-miss-bytes') > 0
+    assert self.get_metric('impala-server.io-mgr.remote-data-cache-miss-count') > 0
     assert self.get_metric('impala-server.io-mgr.remote-data-cache-total-bytes') > 0
+    assert self.get_metric('impala-server.io-mgr.remote-data-cache-num-entries') > 0
+    assert self.get_metric('impala-server.io-mgr.remote-data-cache-num-writes') > 0
 
   @pytest.mark.execute_serially
   @CustomClusterTestSuite.with_args(
@@ -87,12 +94,17 @@ class TestDataCache(CustomClusterTestSuite):
     # Do a first run to warm up the cache. Expect no hits.
     self.execute_query(QUERY)
     assert self.get_metric('impala-server.io-mgr.remote-data-cache-hit-bytes') == 0
+    assert self.get_metric('impala-server.io-mgr.remote-data-cache-hit-count') == 0
     assert self.get_metric('impala-server.io-mgr.remote-data-cache-miss-bytes') > 0
+    assert self.get_metric('impala-server.io-mgr.remote-data-cache-miss-count') > 0
     assert self.get_metric('impala-server.io-mgr.remote-data-cache-total-bytes') > 0
+    assert self.get_metric('impala-server.io-mgr.remote-data-cache-num-entries') > 0
+    assert self.get_metric('impala-server.io-mgr.remote-data-cache-num-writes') > 0
 
     # Do a second run. Expect some hits.
     self.execute_query(QUERY)
     assert self.get_metric('impala-server.io-mgr.remote-data-cache-hit-bytes') > 0
+    assert self.get_metric('impala-server.io-mgr.remote-data-cache-hit-count') > 0
 
   @pytest.mark.execute_serially
   @CustomClusterTestSuite.with_args(
@@ -113,8 +125,12 @@ class TestDataCache(CustomClusterTestSuite):
   def __test_data_cache_disablement(self, vector):
     # Verifies that the cache metrics are all zero.
     assert self.get_metric('impala-server.io-mgr.remote-data-cache-hit-bytes') == 0
+    assert self.get_metric('impala-server.io-mgr.remote-data-cache-hit-count') == 0
     assert self.get_metric('impala-server.io-mgr.remote-data-cache-miss-bytes') == 0
+    assert self.get_metric('impala-server.io-mgr.remote-data-cache-miss-count') == 0
     assert self.get_metric('impala-server.io-mgr.remote-data-cache-total-bytes') == 0
+    assert self.get_metric('impala-server.io-mgr.remote-data-cache-num-entries') == 0
+    assert self.get_metric('impala-server.io-mgr.remote-data-cache-num-writes') == 0
 
     # Runs a query with the cache disabled and then enabled against multiple file formats.
     # Verifies that the metrics stay at zero when the cache is disabled.
@@ -126,7 +142,13 @@ class TestDataCache(CustomClusterTestSuite):
         assert disable_cache ==\
             (self.get_metric('impala-server.io-mgr.remote-data-cache-miss-bytes') == 0)
         assert disable_cache ==\
+            (self.get_metric('impala-server.io-mgr.remote-data-cache-miss-count') == 0)
+        assert disable_cache ==\
             (self.get_metric('impala-server.io-mgr.remote-data-cache-total-bytes') == 0)
+        assert disable_cache ==\
+            (self.get_metric('impala-server.io-mgr.remote-data-cache-num-entries') == 0)
+        assert disable_cache ==\
+            (self.get_metric('impala-server.io-mgr.remote-data-cache-num-writes') == 0)
 
   @pytest.mark.execute_serially
   @CustomClusterTestSuite.with_args(

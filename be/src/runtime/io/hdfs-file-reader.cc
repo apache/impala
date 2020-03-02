@@ -286,6 +286,7 @@ int64_t HdfsFileReader::ReadDataCache(DataCache* remote_data_cache, int64_t file
       scan_range_->reader_->data_cache_partial_hit_counter_->Add(1);
     }
     ImpaladMetrics::IO_MGR_REMOTE_DATA_CACHE_HIT_BYTES->Increment(cached_read);
+    ImpaladMetrics::IO_MGR_REMOTE_DATA_CACHE_HIT_COUNT->Increment(1);
   }
   return cached_read;
 }
@@ -301,6 +302,7 @@ void HdfsFileReader::WriteDataCache(DataCache* remote_data_cache, int64_t file_o
   scan_range_->reader_->data_cache_miss_bytes_counter_->Add(bytes_missed);
   scan_range_->reader_->data_cache_miss_counter_->Add(1);
   ImpaladMetrics::IO_MGR_REMOTE_DATA_CACHE_MISS_BYTES->Increment(bytes_missed);
+  ImpaladMetrics::IO_MGR_REMOTE_DATA_CACHE_MISS_COUNT->Increment(1);
 }
 
 void HdfsFileReader::Close() {

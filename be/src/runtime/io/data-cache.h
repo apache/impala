@@ -26,6 +26,7 @@
 
 #include "common/status.h"
 #include "util/cache/cache.h"
+#include "util/metrics-fwd.h"
 #include "util/spinlock.h"
 #include "util/thread-pool.h"
 #include "kudu/util/faststring.h"
@@ -193,7 +194,8 @@ class DataCache {
    public:
     /// Creates a partition at the given directory 'path' with quota 'capacity' in bytes.
     /// 'max_opened_files' is the maximum number of opened files allowed per partition.
-    Partition(const std::string& path, int64_t capacity, int max_opened_files);
+    Partition(int32_t index, const std::string& path, int64_t capacity,
+        int max_opened_files);
 
     ~Partition();
 
@@ -251,6 +253,10 @@ class DataCache {
     FRIEND_TEST(DataCacheTest, TestAccessTrace);
     class Tracer;
 
+    /// Index of this partition. This is used for naming metrics or other items that
+    /// need separate values for each partition. It does not impact cache behavior.
+    int32_t index_;
+
     /// The directory path which this partition stores cached data in.
     const std::string path_;
 
@@ -299,6 +305,16 @@ class DataCache {
     std::unique_ptr<Cache> meta_cache_;
 
     std::unique_ptr<Tracer> tracer_;
+
+    /// Metrics to track performance of the underlying filesystem for the data cache
+    /// These are all latency histograms for the operations on the data cache files for
+    /// this partition.
+    HistogramMetric* read_latency_ = nullptr;
+    HistogramMetric* write_latency_ = nullptr;
+    HistogramMetric* eviction_latency_ = nullptr;
+
+    /// Initialize the metrics
+    void InitMetrics();
 
     /// Utility function for creating a new backing file in 'path_'. The cache
     /// partition's lock needs to be held when calling this function. Returns
