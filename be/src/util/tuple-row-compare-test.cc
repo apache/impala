@@ -113,12 +113,15 @@ class TupleRowCompareTest : public testing::Test {
 
   template <typename T>
   void FillMem(Tuple* tuple_mem, int idx, T val) {
-    *reinterpret_cast<T*>(tuple_mem->GetSlot(idx)) = val;
+    memcpy(tuple_mem->GetSlot(idx), &val, sizeof(T));
   }
 
   template <typename T, typename... Args>
   void FillMem(Tuple* tuple_mem, int idx, T val, Args... args) {
-    *reinterpret_cast<T*>(tuple_mem->GetSlot(idx)) = val;
+    // Use memcpy to avoid gcc generating unaligned instructions like movaps
+    // for int128_t. They will raise SegmentFault when addresses are not
+    // aligned to 16 bytes.
+    memcpy(tuple_mem->GetSlot(idx), &val, sizeof(T));
     FillMem(tuple_mem, idx + sizeof(T), args...);
   }
 
@@ -233,10 +236,12 @@ class TupleRowCompareTest : public testing::Test {
     ColumnType decimal_column = ColumnType::CreateDecimalType(precision, scale);
     CreateComperator(decimal_column, decimal_column);
     bool overflow = false;
-    TupleRow* lhs = CreateTupleRow(DECIMAL_T::FromInt(precision, scale, lval1, &overflow),
-        DECIMAL_T::FromInt(precision, scale, lval2, &overflow));
-    TupleRow* rhs = CreateTupleRow(DECIMAL_T::FromInt(precision, scale, rval1, &overflow),
-        DECIMAL_T::FromInt(precision, scale, rval2, &overflow));
+    DECIMAL_T l1 = DECIMAL_T::FromInt(precision, scale, lval1, &overflow);
+    DECIMAL_T l2 = DECIMAL_T::FromInt(precision, scale, lval2, &overflow);
+    DECIMAL_T r1 = DECIMAL_T::FromInt(precision, scale, rval1, &overflow);
+    DECIMAL_T r2 = DECIMAL_T::FromInt(precision, scale, rval2, &overflow);
+    TupleRow* lhs = CreateTupleRow(l1, l2);
+    TupleRow* rhs = CreateTupleRow(r1, r2);
     int result = comperator_->Compare(lhs, rhs);
     comperator_->Close(runtime_state_);
     return result;
