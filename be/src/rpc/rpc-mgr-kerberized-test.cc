@@ -27,6 +27,8 @@
 #include "util/filesystem-util.h"
 #include "util/scope-exit-trigger.h"
 
+DECLARE_bool(skip_internal_kerberos_auth);
+DECLARE_bool(skip_external_kerberos_auth);
 DECLARE_string(be_principal);
 DECLARE_string(hostname);
 DECLARE_string(keytab_file);
@@ -213,6 +215,67 @@ TEST_F(RpcMgrKerberizedTest, DisabledKerberosConfigs) {
   EXPECT_STR_CONTAINS(jvm_flags, "-Dsun.security.krb5.debug=true");
   EXPECT_STR_CONTAINS(
       jvm_flags, "-Djava.security.krb5.conf=/tmp/DisabledKerberosConfigsConf");
+}
+
+// Test that we kinit even with --skip_internal_kerberos_auth and
+// --skip_external_kerberos_auth set. We do this indirectly by checking for
+// kinit success/failure.
+TEST_F(RpcMgrKerberizedTest, KinitWhenIncomingAuthDisabled) {
+  auto ia =
+      ScopedFlagSetter<bool>::Make(&FLAGS_skip_internal_kerberos_auth, true);
+  auto ea =
+      ScopedFlagSetter<bool>::Make(&FLAGS_skip_external_kerberos_auth, true);
+  EXPECT_OK(InitAuth(CURRENT_EXECUTABLE_PATH));
+
+  FLAGS_principal = FLAGS_be_principal = "non-existent-principal/host@realm";
+  // Kinit should fail because of principal not in keytab.
+  Status status = InitAuth(CURRENT_EXECUTABLE_PATH);
+  EXPECT_FALSE(status.ok());
+  EXPECT_STR_CONTAINS(status.GetDetail(), "Could not init kerberos: Runtime error: "
+      "unable to kinit: unable to login from keytab: Keytab contains no suitable keys "
+      "for non-existent-principal/host@realm");
+
+  FLAGS_principal = FLAGS_be_principal = "MALFORMEDPRINCIPAL//@";
+  // We should fail before attempting kinit because of malformed principal.
+  status = InitAuth(CURRENT_EXECUTABLE_PATH);
+  EXPECT_FALSE(status.ok());
+  EXPECT_STR_CONTAINS(status.GetDetail(), "Could not init kerberos: Runtime error: "
+      "unable to kinit: unable to login from keytab:");
+}
+
+// This test confirms that auth is bypassed on KRPC services when
+// --skip_external_kerberos_auth=true
+TEST_F(RpcMgrKerberizedTest, InternalAuthorizationSkip) {
+  auto ia =
+      ScopedFlagSetter<bool>::Make(&FLAGS_skip_internal_kerberos_auth, true);
+  GeneratedServiceIf* ping_impl =
+      TakeOverService(make_unique<PingServiceImpl>(&rpc_mgr_));
+  const int num_service_threads = 10;
+  const int queue_size = 10;
+  ASSERT_OK(rpc_mgr_.RegisterService(num_service_threads, queue_size, ping_impl,
+      static_cast<PingServiceImpl*>(ping_impl)->mem_tracker()));
+  FLAGS_num_acceptor_threads = 2;
+  FLAGS_num_reactor_threads = 10;
+  ASSERT_OK(rpc_mgr_.StartServices());
+
+  // Switch over to a credentials cache which only contains the dummy credential.
+  // Kinit done in InitAuth() uses a different credentials cache.
+  DCHECK_NE(FLAGS_krb5_ccname, kdc_ccname);
+  discard_result(setenv("KRB5CCNAME", kdc_ccname.c_str(), 1));
+
+  RpcController controller;
+  Status rpc_status;
+
+  // PingService would expect FLAGS_be_principal as principal name, which
+  // we don't have in our dummy credential cache. So this only succeeds if
+  // auth is disabled.
+  unique_ptr<PingServiceProxy> ping_proxy;
+  ASSERT_OK(static_cast<PingServiceImpl*>(ping_impl)->GetProxy(krpc_address_,
+      FLAGS_hostname, &ping_proxy));
+  PingRequestPB ping_request;
+  PingResponsePB ping_response;
+  controller.Reset();
+  EXPECT_OK(FromKuduStatus(ping_proxy->Ping(ping_request, &ping_response, &controller)));
 }
 
 } // namespace impala

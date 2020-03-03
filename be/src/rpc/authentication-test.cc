@@ -60,7 +60,7 @@ TEST(Auth, PrincipalSubstitution) {
   string principal;
   ASSERT_OK(GetExternalKerberosPrincipal(&principal));
 
-  ASSERT_OK(sa.InitKerberos(principal, "/etc/hosts"));
+  ASSERT_OK(sa.InitKerberos(principal));
   ASSERT_OK(sa.Start());
   ASSERT_EQ(string::npos, sa.principal().find("_HOST"));
   ASSERT_NE(string::npos, sa.principal().find(hostname));
@@ -84,7 +84,7 @@ void AuthFails(const string& name, SecureAuthProvider* sa) {
 
 TEST(Auth, AuthorizeInternalPrincipals) {
   SecureAuthProvider sa(true); // false means it's external
-  ASSERT_OK(sa.InitKerberos("service_name/localhost@some.realm", "/etc/hosts"));
+  ASSERT_OK(sa.InitKerberos("service_name/localhost@some.realm"));
 
   AuthOk("service_name/localhost@some.realm", &sa);
   AuthFails("unknown/localhost@some.realm", &sa);
@@ -177,17 +177,15 @@ TEST(Auth, KerbAndSslEnabled) {
   FLAGS_ssl_private_key = "some_path";
   ASSERT_TRUE(IsInternalTlsConfigured());
   SecureAuthProvider sa_internal(true);
-  ASSERT_OK(
-      sa_internal.InitKerberos("service_name/_HOST@some.realm", "/etc/hosts"));
+  ASSERT_OK(sa_internal.InitKerberos("service_name/_HOST@some.realm"));
   SecureAuthProvider sa_external(false);
-  ASSERT_OK(
-      sa_external.InitKerberos("service_name/_HOST@some.realm", "/etc/hosts"));
+  ASSERT_OK(sa_external.InitKerberos("service_name/_HOST@some.realm"));
 }
 
 // Test principal with slash in hostname
 TEST(Auth, InternalPrincipalWithSlash) {
   SecureAuthProvider sa(false); // false means it's external
-  ASSERT_OK(sa.InitKerberos("service_name/local\\/host@some.realm", "/etc/hosts"));
+  ASSERT_OK(sa.InitKerberos("service_name/local\\/host@some.realm"));
   ASSERT_OK(sa.Start());
   ASSERT_EQ("service_name", sa.service_name());
   ASSERT_EQ("local/host", sa.hostname());
@@ -197,9 +195,9 @@ TEST(Auth, InternalPrincipalWithSlash) {
 // Test bad principal format exception
 TEST(Auth, BadPrincipalFormat) {
   SecureAuthProvider sa(false); // false means it's external
-  EXPECT_ERROR(sa.InitKerberos("", "/etc/hosts"), 2);
-  EXPECT_ERROR(sa.InitKerberos("service_name@some.realm", "/etc/hosts"), 2);
-  EXPECT_ERROR(sa.InitKerberos("service_name/localhost", "/etc/hosts"), 2);
+  EXPECT_ERROR(sa.InitKerberos(""), 2);
+  EXPECT_ERROR(sa.InitKerberos("service_name@some.realm"), 2);
+  EXPECT_ERROR(sa.InitKerberos("service_name/localhost"), 2);
 }
 
 }

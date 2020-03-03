@@ -56,6 +56,16 @@ DEFINE_string(krb5_ccname, "/tmp/krb5cc_impala_internal", "Absolute path to the 
 DEFINE_string(krb5_conf, "", "Absolute path to Kerberos krb5.conf if in a non-standard "
     "location. Does not normally need to be set.");
 DEFINE_string(krb5_debug_file, "", "Turn on Kerberos debugging and output to this file");
+DEFINE_bool(skip_internal_kerberos_auth, false,
+    "(Advanced) skip kerberos authentication for incoming internal connections from "
+    "other daemons within the Impala cluster (i.e. impalads, statestored, catalogd). "
+    "Must be set to the same value across all daemons. Only has an effect if --principal "
+    "is set, i.e. Kerberos is enabled.");
+DEFINE_bool(skip_external_kerberos_auth, false,
+    "(Advanced) skip kerberos authentication for incoming external connections to "
+    "this daemon, e.g. clients connecting to the HS2 interface. Only has an effect "
+    "if --principal is set, i.e. Kerberos is enabled.");
+
 
 static const string mem_limit_help_msg = "Limit on process memory consumption. "
     "Includes the JVM's memory consumption only if --mem_limit_includes_jvm is true. "

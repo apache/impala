@@ -24,6 +24,8 @@
 #include "gutil/strings/substitute.h"
 #include "service/impala-server.h"
 
+DECLARE_bool(skip_external_kerberos_auth);
+DECLARE_bool(skip_internal_kerberos_auth);
 DECLARE_string(principal);
 
 namespace impala {
@@ -69,5 +71,15 @@ Status ParseKerberosPrincipal(const std::string& principal, std::string* service
 /// Returns true if kerberos is enabled.
 inline bool IsKerberosEnabled() {
   return !FLAGS_principal.empty();
+}
+
+/// Returns true if kerberos is enabled for incoming connections on internal services.
+inline bool IsInternalKerberosEnabled() {
+  return IsKerberosEnabled() && !FLAGS_skip_internal_kerberos_auth;
+}
+
+/// Returns true if kerberos is enabled for incoming connections on external services.
+inline bool IsExternalKerberosEnabled() {
+  return IsKerberosEnabled() && !FLAGS_skip_external_kerberos_auth;
 }
 } // namespace impala

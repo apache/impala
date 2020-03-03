@@ -124,7 +124,7 @@ Status RpcMgr::Init(const TNetworkAddress& address) {
   // connections is also racy and leads to query failures.
   bld.set_connection_keepalive_time(MonoDelta::FromMilliseconds(-1));
 
-  if (IsKerberosEnabled()) {
+  if (IsInternalKerberosEnabled()) {
     string internal_principal;
     RETURN_IF_ERROR(GetInternalKerberosPrincipal(&internal_principal));
     string service_name, unused_hostname, unused_realm;
@@ -174,7 +174,7 @@ Status RpcMgr::RegisterService(int32_t num_service_threads, int32_t service_queu
 bool RpcMgr::Authorize(const string& service_name, RpcContext* context,
     MemTracker* mem_tracker) const {
   // Authorization is enforced iff Kerberos is enabled.
-  if (!IsKerberosEnabled()) return true;
+  if (!IsInternalKerberosEnabled()) return true;
 
   // Check if the mapped username matches that of the kinit'ed principal.
   const RemoteUser& remote_user = context->remote_user();

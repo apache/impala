@@ -83,9 +83,9 @@ class AuthProvider {
 class SecureAuthProvider : public AuthProvider {
  public:
   SecureAuthProvider(bool is_internal)
-    : has_ldap_(false), is_internal_(is_internal), needs_kinit_(false) {}
+    : has_ldap_(false), is_internal_(is_internal) {}
 
-  /// Performs initialization of external state. Kinit if configured to use kerberos.
+  /// Performs initialization of external state.
   /// If we're using ldap, set up appropriate certificate usage.
   virtual Status Start();
 
@@ -123,7 +123,7 @@ class SecureAuthProvider : public AuthProvider {
   /// Initializes kerberos items and checks for sanity.  Failures can occur on a
   /// malformed principal or when setting some environment variables.  Called
   /// prior to Start().
-  Status InitKerberos(const std::string& principal, const std::string& keytab_path);
+  Status InitKerberos(const std::string& principal);
 
   /// Initializes ldap - just record that we're going to use it.  Called prior to
   /// Start().
@@ -153,9 +153,6 @@ class SecureAuthProvider : public AuthProvider {
   /// supplied, this is --be_principal.  In all other cases this is --principal.
   std::string principal_;
 
-  /// The full path to the keytab where the above principal can be found.
-  std::string keytab_file_;
-
   /// The service name, deduced from the principal. Used by servers to indicate
   /// what service a principal must have a ticket for in order to be granted
   /// access to this service.
@@ -163,11 +160,6 @@ class SecureAuthProvider : public AuthProvider {
 
   /// Principal's realm, again derived from principal.
   std::string realm_;
-
-  /// True if tickets for this principal should be obtained.  This is true if
-  /// we're an auth provider for an "internal" connection, because we may
-  /// function as a client.
-  bool needs_kinit_;
 
   /// Used to generate and verify signatures for cookies.
   AuthenticationHash hash_;
