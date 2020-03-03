@@ -62,8 +62,9 @@ class AuthManager {
   AuthProvider* GetInternalAuthProvider();
 
  private:
-  /// One-time kerberos-specific environment variable setup. Called by Init() if Kerberos
-  /// is enabled.
+  /// One-time kerberos-specific environment variable setup. Sets variables like
+  /// KRB5CCNAME and friends so that command-line flags take effect in the C++ and
+  /// Java Kerberos implementations. Called by Init() whether or not Kerberos is enabled.
   Status InitKerberosEnv();
 
   static AuthManager* auth_manager_;

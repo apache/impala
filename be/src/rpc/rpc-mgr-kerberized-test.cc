@@ -17,15 +17,22 @@
 
 #include "rpc/rpc-mgr-test.h"
 
+#include <boost/filesystem/operations.hpp>
+
 #include "exec/kudu-util.h"
 #include "rpc/auth-provider.h"
 #include "service/fe-support.h"
 #include "testutil/mini-kdc-wrapper.h"
+#include "testutil/scoped-flag-setter.h"
+#include "util/filesystem-util.h"
+#include "util/scope-exit-trigger.h"
 
 DECLARE_string(be_principal);
 DECLARE_string(hostname);
 DECLARE_string(keytab_file);
 DECLARE_string(krb5_ccname);
+DECLARE_string(krb5_conf);
+DECLARE_string(krb5_debug_file);
 DECLARE_string(principal);
 DECLARE_string(ssl_client_ca_certificate);
 DECLARE_string(ssl_server_certificate);
@@ -146,6 +153,66 @@ TEST_F(RpcMgrKerberizedTest, BadCredentialsCachePath) {
   ASSERT_TRUE(!status.ok());
   EXPECT_EQ(status.GetDetail(),
       "Bad --krb5_ccname value: ~/foo is not an absolute file path\n");
+
+  FLAGS_krb5_ccname = "";
+  status = InitAuth(CURRENT_EXECUTABLE_PATH);
+  ASSERT_TRUE(!status.ok());
+  EXPECT_EQ(
+      status.GetDetail(), "--krb5_ccname must be configured if kerberos is enabled\n");
+}
+
+// Test cases in which bad keytab path is specified.
+TEST_F(RpcMgrKerberizedTest, BadKeytabPath) {
+  FLAGS_keytab_file = "non_existent_file_for_testing";
+  Status status = InitAuth(CURRENT_EXECUTABLE_PATH);
+  ASSERT_TRUE(!status.ok());
+  EXPECT_EQ(status.GetDetail(),
+      "Bad --keytab_file value: The file "
+      "non_existent_file_for_testing is not a regular file\n");
+
+  FLAGS_keytab_file = "";
+  status = InitAuth(CURRENT_EXECUTABLE_PATH);
+  ASSERT_TRUE(!status.ok());
+  EXPECT_EQ(
+      status.GetDetail(), "--keytab_file must be configured if kerberos is enabled\n");
+}
+
+// Test that configurations are passed through via env variables even if kerberos
+// is disabled for internal auth (i.e. --principal is not set).
+TEST_F(RpcMgrKerberizedTest, DisabledKerberosConfigs) {
+  // These flags are reset in Setup, so just overwrite them.
+  FLAGS_principal = FLAGS_be_principal = "";
+  FLAGS_keytab_file = "/tmp/DisabledKerberosConfigsKeytab";
+  FLAGS_krb5_ccname = "/tmp/DisabledKerberosConfigsCC";
+  // These flags are not reset in Setup, so used ScopedFlagSetter.
+  auto k5c = ScopedFlagSetter<string>::Make(
+      &FLAGS_krb5_conf, "/tmp/DisabledKerberosConfigsConf");
+  auto k5dbg = ScopedFlagSetter<string>::Make(
+      &FLAGS_krb5_debug_file, "/tmp/DisabledKerberosConfigsDebug");
+
+  // Unset JAVA_TOOL_OPTIONS before more gets appended to it.
+  EXPECT_EQ(0, setenv("JAVA_TOOL_OPTIONS", "", 1));
+
+  // Create dummy files to satisfy validations.
+  auto file_cleanup = MakeScopeExitTrigger([&]() {
+    boost::filesystem::remove(FLAGS_keytab_file);
+    boost::filesystem::remove(FLAGS_krb5_conf);
+  });
+  EXPECT_OK(FileSystemUtil::CreateFile(FLAGS_keytab_file));
+  EXPECT_OK(FileSystemUtil::CreateFile(FLAGS_krb5_conf));
+
+  EXPECT_OK(InitAuth(CURRENT_EXECUTABLE_PATH));
+
+  // Check that the above changes went into the appropriate env variables where
+  // they can be picked up by libkrb5 and the JVM Kerberos libraries.
+  EXPECT_EQ("/tmp/DisabledKerberosConfigsKeytab", string(getenv("KRB5_KTNAME")));
+  EXPECT_EQ("/tmp/DisabledKerberosConfigsCC", string(getenv("KRB5CCNAME")));
+  EXPECT_EQ("/tmp/DisabledKerberosConfigsConf", string(getenv("KRB5_CONFIG")));
+  EXPECT_EQ("/tmp/DisabledKerberosConfigsDebug", string(getenv("KRB5_TRACE")));
+  string jvm_flags = getenv("JAVA_TOOL_OPTIONS");
+  EXPECT_STR_CONTAINS(jvm_flags, "-Dsun.security.krb5.debug=true");
+  EXPECT_STR_CONTAINS(
+      jvm_flags, "-Djava.security.krb5.conf=/tmp/DisabledKerberosConfigsConf");
 }
 
 } // namespace impala

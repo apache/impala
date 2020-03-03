@@ -42,8 +42,12 @@ DEFINE_int32(krpc_port, 27000,
 
 // Kerberos is enabled if and only if principal is set.
 DEFINE_string(principal, "", "Kerberos principal. If set, both client and backend "
-    "network connections will use Kerberos encryption and authentication. Kerberos will "
-    "not be used for internal or external connections if this is not set.");
+    "network connections will use Kerberos encryption and authentication and the daemon "
+    "will acquire a Kerberos TGT (i.e. do the equivalent of the kinit command) and keep "
+    "it refreshed for the lifetime of the daemon.  If this is not set the TGT ticket "
+    "will not be acquired and incoming connections will not be authenticated or "
+    "encrypted using Kerberos. However, the TGT and other settings may be inherited from "
+    "the environment and used by client libraries in certain cases.");
 DEFINE_string(be_principal, "", "Kerberos principal for backend network connections only,"
     "overriding --principal if set. Must not be set if --principal is not set.");
 DEFINE_string(keytab_file, "", "Absolute path to Kerberos keytab file");

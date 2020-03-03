@@ -793,6 +793,7 @@ Status InitAuth(const string& appname) {
 // to debug.  We do this using direct stat() calls because boost doesn't support the
 // detail we need.
 Status CheckReplayCacheDirPermissions() {
+  DCHECK(IsKerberosEnabled());
   struct stat st;
 
   if (stat("/var/tmp", &st) < 0) {
@@ -864,33 +865,43 @@ static Status EnvAppend(const string& attr, const string& thing, const string& t
 }
 
 Status AuthManager::InitKerberosEnv() {
-  DCHECK(!FLAGS_principal.empty());
-
-  RETURN_IF_ERROR(CheckReplayCacheDirPermissions());
-
-  if (!is_regular(FLAGS_keytab_file)) {
-    return Status(Substitute("Bad --keytab_file value: The file $0 is not a "
-        "regular file", FLAGS_keytab_file));
+  if (IsKerberosEnabled()) {
+    RETURN_IF_ERROR(CheckReplayCacheDirPermissions());
+    if (FLAGS_keytab_file.empty()) {
+      return Status("--keytab_file must be configured if kerberos is enabled");
+    }
+    if (FLAGS_krb5_ccname.empty()) {
+      return Status("--krb5_ccname must be configured if kerberos is enabled");
+    }
   }
 
-  // Set the keytab name in the environment so that Sasl Kerberos and kinit can
-  // find and use it.
-  if (setenv("KRB5_KTNAME", FLAGS_keytab_file.c_str(), 1)) {
-    return Status(Substitute("Kerberos could not set KRB5_KTNAME: $0",
-        GetStrErrMsg()));
+  if (!FLAGS_keytab_file.empty()) {
+    if (!is_regular(FLAGS_keytab_file)) {
+      return Status(Substitute("Bad --keytab_file value: The file $0 is not a "
+          "regular file", FLAGS_keytab_file));
+    }
+
+    // Set the keytab name in the environment so that Sasl Kerberos and kinit can
+    // find and use it.
+    if (setenv("KRB5_KTNAME", FLAGS_keytab_file.c_str(), 1)) {
+      return Status(Substitute("Kerberos could not set KRB5_KTNAME: $0",
+          GetStrErrMsg()));
+    }
   }
 
-  // We want to set a custom location for the impala credential cache.
-  // Usually, it's /tmp/krb5cc_xxx where xxx is the UID of the process.  This
-  // is normally fine, but if you're not running impala daemons as user
-  // 'impala', the kinit we perform is going to blow away credentials for the
-  // current user.  Not setting this isn't technically fatal, so ignore errors.
-  const path krb5_ccname_path(FLAGS_krb5_ccname);
-  if (!krb5_ccname_path.is_absolute()) {
-    return Status(Substitute("Bad --krb5_ccname value: $0 is not an absolute file path",
-        FLAGS_krb5_ccname));
+  if (!FLAGS_krb5_ccname.empty()) {
+    // We want to set a custom location for the impala credential cache.
+    // Usually, it's /tmp/krb5cc_xxx where xxx is the UID of the process.  This
+    // is normally fine, but if you're not running impala daemons as user
+    // 'impala', the kinit we perform is going to blow away credentials for the
+    // current user.  Not setting this isn't technically fatal, so ignore errors.
+    const path krb5_ccname_path(FLAGS_krb5_ccname);
+    if (!krb5_ccname_path.is_absolute()) {
+      return Status(Substitute("Bad --krb5_ccname value: $0 is not an absolute file path",
+          FLAGS_krb5_ccname));
+    }
+    discard_result(setenv("KRB5CCNAME", FLAGS_krb5_ccname.c_str(), 1));
   }
-  discard_result(setenv("KRB5CCNAME", FLAGS_krb5_ccname.c_str(), 1));
 
   // If an alternate krb5_conf location is supplied, set both KRB5_CONFIG and
   // JAVA_TOOL_OPTIONS in the environment.
@@ -918,13 +929,13 @@ Status AuthManager::InitKerberosEnv() {
   if (!FLAGS_krb5_debug_file.empty()) {
     bool krb5_debug_fail = false;
     if (setenv("KRB5_TRACE", FLAGS_krb5_debug_file.c_str(), 1) < 0) {
-      LOG(WARNING) << "Failed to set KRB5_TRACE; --krb5_debuf_file not enabled for "
-          "back-end code";
+      LOG(WARNING) << "Failed to set KRB5_TRACE; --krb5_debug_file not enabled for "
+                      "back-end code";
       krb5_debug_fail = true;
     }
     if (!EnvAppend("JAVA_TOOL_OPTIONS", "sun.security.krb5.debug", "true").ok()) {
-      LOG(WARNING) << "Failed to set JAVA_TOOL_OPTIONS; --krb5_debuf_file not enabled "
-          "for front-end code";
+      LOG(WARNING) << "Failed to set JAVA_TOOL_OPTIONS; --krb5_debug_file not enabled "
+                      "for front-end code";
       krb5_debug_fail = true;
     }
     if (!krb5_debug_fail) {
@@ -1225,20 +1236,7 @@ Status AuthManager::Init() {
         "is used in internal (back-end) communication.");
   }
 
-  // When acting as a client, or as a server on internal connections:
-  string kerberos_internal_principal;
-  // When acting as a server on external connections:
-  string kerberos_external_principal;
-
-  bool use_kerberos = IsKerberosEnabled();
-  if (use_kerberos) {
-    RETURN_IF_ERROR(GetInternalKerberosPrincipal(&kerberos_internal_principal));
-    RETURN_IF_ERROR(GetExternalKerberosPrincipal(&kerberos_external_principal));
-    DCHECK(!kerberos_internal_principal.empty());
-    DCHECK(!kerberos_external_principal.empty());
-
-    RETURN_IF_ERROR(InitKerberosEnv());
-  }
+  RETURN_IF_ERROR(InitKerberosEnv());
 
   // This is written from the perspective of the daemons - thus "internal"
   // means "I am used for communication with other daemons, both as a client
@@ -1256,7 +1254,17 @@ Status AuthManager::Init() {
   // Set up the internal auth provider as per above.  Since there's no LDAP on
   // the client side, this is just a check for the "back end" kerberos
   // principal.
+  bool use_kerberos = IsKerberosEnabled();
+  // When acting as a client, or as a server on internal connections:
+  string kerberos_internal_principal;
+  // When acting as a server on external connections:
+  string kerberos_external_principal;
   if (use_kerberos) {
+    RETURN_IF_ERROR(GetInternalKerberosPrincipal(&kerberos_internal_principal));
+    RETURN_IF_ERROR(GetExternalKerberosPrincipal(&kerberos_external_principal));
+    DCHECK(!kerberos_internal_principal.empty());
+    DCHECK(!kerberos_external_principal.empty());
+
     SecureAuthProvider* sap = NULL;
     internal_auth_provider_.reset(sap = new SecureAuthProvider(true));
     RETURN_IF_ERROR(sap->InitKerberos(kerberos_internal_principal,
