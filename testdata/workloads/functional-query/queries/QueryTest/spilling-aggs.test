@@ -1,6 +1,6 @@
 ====
 ---- QUERY
-set buffer_pool_limit=34m;
+set buffer_pool_limit=30m;
 select l_orderkey, count(*)
 from lineitem
 group by 1
@@ -39,29 +39,6 @@ order by 1,2 limit 3
 STRING, BIGINT, DECIMAL, STRING
 ---- RUNTIME_PROFILE
 row_regex: .*SpilledPartitions: .* \([1-9][0-9]*\)
-====
----- QUERY
-set buffer_pool_limit=34m;
-select l_orderkey, count(*)
-from lineitem
-group by 1
-order by 1 limit 10;
----- RESULTS
-1,6
-2,1
-3,6
-4,1
-5,3
-6,1
-7,7
-32,6
-33,4
-34,3
----- TYPES
-BIGINT, BIGINT
----- RUNTIME_PROFILE
-row_regex: .*SpilledPartitions: .* \([1-9][0-9]*\)
-row_regex: .*RowsPassedThrough: .* \([1-9][0-9]*\)
 ====
 ---- QUERY
 # Test query with string grouping column
