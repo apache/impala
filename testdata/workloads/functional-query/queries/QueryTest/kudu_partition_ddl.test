@@ -8,20 +8,20 @@ create table simple_hash (id int, name string, valf float, vali bigint,
 'Table has been created.'
 ====
 ---- QUERY
-show table stats simple_hash
+show partitions simple_hash
 ---- LABELS
-# Rows,Start Key,Stop Key,Leader Replica,# Replicas
+Start Key,Stop Key,Leader Replica,#Replicas
 ---- RESULTS
--1,'','0000000000000001',regex:.*?:\d+,3
--1,'0000000000000001','00000001',regex:.*?:\d+,3
--1,'00000001','0000000100000001',regex:.*?:\d+,3
--1,'0000000100000001','00000002',regex:.*?:\d+,3
--1,'00000002','0000000200000001',regex:.*?:\d+,3
--1,'0000000200000001','00000003',regex:.*?:\d+,3
--1,'00000003','0000000300000001',regex:.*?:\d+,3
--1,'0000000300000001','',regex:.*?:\d+,3
+'','0000000000000001',regex:.*?:\d+,3
+'0000000000000001','00000001',regex:.*?:\d+,3
+'00000001','0000000100000001',regex:.*?:\d+,3
+'0000000100000001','00000002',regex:.*?:\d+,3
+'00000002','0000000200000001',regex:.*?:\d+,3
+'0000000200000001','00000003',regex:.*?:\d+,3
+'00000003','0000000300000001',regex:.*?:\d+,3
+'0000000300000001','',regex:.*?:\d+,3
 ---- TYPES
-INT,STRING,STRING,STRING,INT
+STRING,STRING,STRING,INT
 ====
 ---- QUERY
 -- Test single column range partitioning with bounded and unbounded partitions
@@ -33,15 +33,15 @@ create table range_part_bounds (id int, name string, valf float, vali bigint,
 'Table has been created.'
 ====
 ---- QUERY
-show table stats range_part_bounds
+show partitions range_part_bounds
 ---- LABELS
-# Rows,Start Key,Stop Key,Leader Replica,# Replicas
+Start Key,Stop Key,Leader Replica,#Replicas
 ---- RESULTS
--1,'','8000000B',regex:.*?:\d+,3
--1,'8000000B','80000015',regex:.*?:\d+,3
--1,'80000015','',regex:.*?:\d+,3
+'','8000000B',regex:.*?:\d+,3
+'8000000B','80000015',regex:.*?:\d+,3
+'80000015','',regex:.*?:\d+,3
 ---- TYPES
-INT,STRING,STRING,STRING,INT
+STRING,STRING,STRING,INT
 ====
 ---- QUERY
 -- Test single column range partitioning with single value partitions
@@ -53,15 +53,15 @@ create table range_part_single (id int, name string, valf float, vali bigint,
 'Table has been created.'
 ====
 ---- QUERY
-show table stats range_part_single
+show partitions range_part_single
 ---- LABELS
-# Rows,Start Key,Stop Key,Leader Replica,# Replicas
+Start Key,Stop Key,Leader Replica,#Replicas
 ---- RESULTS
--1,'80000001','80000002',regex:.*?:\d+,3
--1,'8000000A','8000000B',regex:.*?:\d+,3
--1,'80000064','80000065',regex:.*?:\d+,3
+'80000001','80000002',regex:.*?:\d+,3
+'8000000A','8000000B',regex:.*?:\d+,3
+'80000064','80000065',regex:.*?:\d+,3
 ---- TYPES
-INT,STRING,STRING,STRING,INT
+STRING,STRING,STRING,INT
 ====
 ---- QUERY
 -- Test single column range partitioning with bounded, unbounded and single
@@ -74,17 +74,17 @@ create table range_part_multiple_bounds (id int, name string, valf float,
 'Table has been created.'
 ====
 ---- QUERY
-show table stats range_part_multiple_bounds
+show partitions range_part_multiple_bounds
 ---- LABELS
-# Rows,Start Key,Stop Key,Leader Replica,# Replicas
+Start Key,Stop Key,Leader Replica,#Replicas
 ---- RESULTS
--1,'','8000000B',regex:.*?:\d+,3
--1,'8000000B','80000015',regex:.*?:\d+,3
--1,'80000015','8000001F',regex:.*?:\d+,3
--1,'80000028','80000029',regex:.*?:\d+,3
--1,'80000032','80000033',regex:.*?:\d+,3
+'','8000000B',regex:.*?:\d+,3
+'8000000B','80000015',regex:.*?:\d+,3
+'80000015','8000001F',regex:.*?:\d+,3
+'80000028','80000029',regex:.*?:\d+,3
+'80000032','80000033',regex:.*?:\d+,3
 ---- TYPES
-INT,STRING,STRING,STRING,INT
+STRING,STRING,STRING,INT
 ====
 ---- QUERY
 -- Test multiple column range partitioning
@@ -104,15 +104,15 @@ show range partitions range_part_multiple_cols
 'VALUE = (30, "matthew")'
 ====
 ---- QUERY
-show table stats range_part_multiple_cols
+show partitions range_part_multiple_cols
 ---- LABELS
-# Rows,Start Key,Stop Key,Leader Replica,# Replicas
+Start Key,Stop Key,Leader Replica,#Replicas
 ---- RESULTS
--1,'8000000A6D617274696E','8000000A6D617274696E00',regex:.*?:\d+,3
--1,'8000001464696D6974726973','8000001464696D697472697300',regex:.*?:\d+,3
--1,'8000001E6D617474686577','8000001E6D61747468657700',regex:.*?:\d+,3
+'8000000A6D617274696E','8000000A6D617274696E00',regex:.*?:\d+,3
+'8000001464696D6974726973','8000001464696D697472697300',regex:.*?:\d+,3
+'8000001E6D617474686577','8000001E6D61747468657700',regex:.*?:\d+,3
 ---- TYPES
-INT,STRING,STRING,STRING,INT
+STRING,STRING,STRING,INT
 ====
 ---- QUERY
 -- Test single column range partitioning with string partition column
@@ -124,16 +124,16 @@ create table range_part_single_string_col (id int, name string, valf float,
 'Table has been created.'
 ====
 ---- QUERY
-show table stats range_part_single_string_col
+show partitions range_part_single_string_col
 ---- LABELS
-# Rows,Start Key,Stop Key,Leader Replica,# Replicas
+Start Key,Stop Key,Leader Replica,#Replicas
 ---- RESULTS
--1,'','61616100',regex:.*?:\d+,3
--1,'61616100','62626200',regex:.*?:\d+,3
--1,'62626200','63636300',regex:.*?:\d+,3
--1,'646464','64646400',regex:.*?:\d+,3
+'','61616100',regex:.*?:\d+,3
+'61616100','62626200',regex:.*?:\d+,3
+'62626200','63636300',regex:.*?:\d+,3
+'646464','64646400',regex:.*?:\d+,3
 ---- TYPES
-INT,STRING,STRING,STRING,INT
+STRING,STRING,STRING,INT
 ====
 ---- QUERY
 -- Test hash and range partitioning
@@ -144,20 +144,20 @@ create table simple_hash_range (id int, name string, valf float, vali bigint,
 'Table has been created.'
 ====
 ---- QUERY
-show table stats simple_hash_range
+show partitions simple_hash_range
 ---- LABELS
-# Rows,Start Key,Stop Key,Leader Replica,# Replicas
+Start Key,Stop Key,Leader Replica,#Replicas
 ---- RESULTS
--1,'000000008000000A6D617274696E','000000008000000A6D617274696E00',regex:.*?:\d+,3
--1,'0000000080000014616C6578','0000000080000014616C657800',regex:.*?:\d+,3
--1,'000000018000000A6D617274696E','000000018000000A6D617274696E00',regex:.*?:\d+,3
--1,'0000000180000014616C6578','0000000180000014616C657800',regex:.*?:\d+,3
--1,'000000028000000A6D617274696E','000000028000000A6D617274696E00',regex:.*?:\d+,3
--1,'0000000280000014616C6578','0000000280000014616C657800',regex:.*?:\d+,3
--1,'000000038000000A6D617274696E','000000038000000A6D617274696E00',regex:.*?:\d+,3
--1,'0000000380000014616C6578','0000000380000014616C657800',regex:.*?:\d+,3
+'000000008000000A6D617274696E','000000008000000A6D617274696E00',regex:.*?:\d+,3
+'0000000080000014616C6578','0000000080000014616C657800',regex:.*?:\d+,3
+'000000018000000A6D617274696E','000000018000000A6D617274696E00',regex:.*?:\d+,3
+'0000000180000014616C6578','0000000180000014616C657800',regex:.*?:\d+,3
+'000000028000000A6D617274696E','000000028000000A6D617274696E00',regex:.*?:\d+,3
+'0000000280000014616C6578','0000000280000014616C657800',regex:.*?:\d+,3
+'000000038000000A6D617274696E','000000038000000A6D617274696E00',regex:.*?:\d+,3
+'0000000380000014616C6578','0000000380000014616C657800',regex:.*?:\d+,3
 ---- TYPES
-INT,STRING,STRING,STRING,INT
+STRING,STRING,STRING,INT
 ====
 ---- QUERY
 create table simple_hash_range_ctas
@@ -169,20 +169,20 @@ as select * from simple_hash
 'Inserted 0 row(s)'
 ====
 ---- QUERY
-show table stats simple_hash_range_ctas
+show partitions simple_hash_range_ctas
 ---- LABELS
-# Rows,Start Key,Stop Key,Leader Replica,# Replicas
+Start Key,Stop Key,Leader Replica,#Replicas
 ---- RESULTS
--1,'000000008000000A6361736579','000000008000000A636173657900',regex:.*?:\d+,3
--1,'00000000800000146D617263656C','00000000800000146D617263656C00',regex:.*?:\d+,3
--1,'000000018000000A6361736579','000000018000000A636173657900',regex:.*?:\d+,3
--1,'00000001800000146D617263656C','00000001800000146D617263656C00',regex:.*?:\d+,3
--1,'000000028000000A6361736579','000000028000000A636173657900',regex:.*?:\d+,3
--1,'00000002800000146D617263656C','00000002800000146D617263656C00',regex:.*?:\d+,3
--1,'000000038000000A6361736579','000000038000000A636173657900',regex:.*?:\d+,3
--1,'00000003800000146D617263656C','00000003800000146D617263656C00',regex:.*?:\d+,3
+'000000008000000A6361736579','000000008000000A636173657900',regex:.*?:\d+,3
+'00000000800000146D617263656C','00000000800000146D617263656C00',regex:.*?:\d+,3
+'000000018000000A6361736579','000000018000000A636173657900',regex:.*?:\d+,3
+'00000001800000146D617263656C','00000001800000146D617263656C00',regex:.*?:\d+,3
+'000000028000000A6361736579','000000028000000A636173657900',regex:.*?:\d+,3
+'00000002800000146D617263656C','00000002800000146D617263656C00',regex:.*?:\d+,3
+'000000038000000A6361736579','000000038000000A636173657900',regex:.*?:\d+,3
+'00000003800000146D617263656C','00000003800000146D617263656C00',regex:.*?:\d+,3
 ---- TYPES
-INT,STRING,STRING,STRING,INT
+STRING,STRING,STRING,INT
 ====
 ---- QUERY
 -- Test hash defaults to all columns
@@ -192,16 +192,16 @@ create table simple_hash_all_columns (id int, name string, valf float, vali bigi
 'Table has been created.'
 ====
 ---- QUERY
-show table stats simple_hash_all_columns
+show partitions simple_hash_all_columns
 ---- LABELS
-# Rows,Start Key,Stop Key,Leader Replica,# Replicas
+Start Key,Stop Key,Leader Replica,#Replicas
 ---- RESULTS
--1,'','00000001',regex:.*?:\d+,3
--1,'00000001','00000002',regex:.*?:\d+,3
--1,'00000002','00000003',regex:.*?:\d+,3
--1,'00000003','',regex:.*?:\d+,3
+'','00000001',regex:.*?:\d+,3
+'00000001','00000002',regex:.*?:\d+,3
+'00000002','00000003',regex:.*?:\d+,3
+'00000003','',regex:.*?:\d+,3
 ---- TYPES
-INT,STRING,STRING,STRING,INT
+STRING,STRING,STRING,INT
 ====
 ---- QUERY
 -- Test range defaults to all columns
@@ -213,14 +213,14 @@ create table simple_range_all_columns (id int, name string, valf float, vali big
 'Table has been created.'
 ====
 ---- QUERY
-show table stats simple_range_all_columns
+show partitions simple_range_all_columns
 ---- LABELS
-# Rows,Start Key,Stop Key,Leader Replica,# Replicas
+Start Key,Stop Key,Leader Replica,#Replicas
 ---- RESULTS
--1,'8000000161','800000016100',regex:.*?:\d+,3
--1,'8000000262','800000026200',regex:.*?:\d+,3
+'8000000161','800000016100',regex:.*?:\d+,3
+'8000000262','800000026200',regex:.*?:\d+,3
 ---- TYPES
-INT,STRING,STRING,STRING,INT
+STRING,STRING,STRING,INT
 ====
 ---- QUERY
 -- Test using non-literal constant values in range-partition bounds
@@ -232,16 +232,16 @@ create table range_complex_const_boundary_vals (x int, y int, primary key (x))
 'Table has been created.'
 ====
 ---- QUERY
-show table stats range_complex_const_boundary_vals
+show partitions range_complex_const_boundary_vals
 ---- LABELS
-# Rows,Start Key,Stop Key,Leader Replica,# Replicas
+Start Key,Stop Key,Leader Replica,#Replicas
 ---- RESULTS
--1,'','80000002',regex:.*?:\d+,3
--1,'80000007','8000000A',regex:.*?:\d+,3
--1,'80000019','80000078',regex:.*?:\d+,3
--1,'800002D0','800002D1',regex:.*?:\d+,3
+'','80000002',regex:.*?:\d+,3
+'80000007','8000000A',regex:.*?:\d+,3
+'80000019','80000078',regex:.*?:\d+,3
+'800002D0','800002D1',regex:.*?:\d+,3
 ---- TYPES
-INT,STRING,STRING,STRING,INT
+STRING,STRING,STRING,INT
 ====
 ---- QUERY
 -- Test range partitioning with overlapping partitions

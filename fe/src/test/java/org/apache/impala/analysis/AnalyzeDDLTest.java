@@ -3771,7 +3771,7 @@ public class AnalyzeDDLTest extends FrontendTestBase {
     AnalysisError("show partitions functional.view_view",
         "SHOW PARTITIONS not applicable to a view: functional.view_view");
     AnalysisError("show partitions functional_hbase.alltypes",
-        "SHOW PARTITIONS must target an HDFS table: functional_hbase.alltypes");
+        "SHOW PARTITIONS must target an HDFS or Kudu table: functional_hbase.alltypes");
   }
 
   @Test

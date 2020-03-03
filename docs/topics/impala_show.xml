@@ -969,34 +969,19 @@ show create table show_create_table_demo;
 
       <p rev="kudu IMPALA-2830">
         Because Kudu tables do not have characteristics derived from HDFS, such
-        as number of files, file format, and HDFS cache status, the output of
+        as number of files and HDFS cache status, the output of
         <codeph>SHOW TABLE STATS</codeph> reflects different characteristics
-        that apply to Kudu tables. If the Kudu table is created with the
-        clause <codeph>PARTITIONS 20</codeph>, then the result set of
-        <codeph>SHOW TABLE STATS</codeph> consists of 20 rows, each representing
-        one of the numbered partitions. For example:
+        that apply to Kudu tables.
       </p>
 
 <codeblock rev="kudu IMPALA-2830">
 show table stats kudu_table;
-+--------+-----------+----------+-----------------------+------------+
-| # Rows | Start Key | Stop Key | Leader Replica        | # Replicas |
-+--------+-----------+----------+-----------------------+------------+
-| -1     |           | 00000001 | host.example.com:7050 | 3          |
-| -1     | 00000001  | 00000002 | host.example.com:7050 | 3          |
-| -1     | 00000002  | 00000003 | host.example.com:7050 | 3          |
-| -1     | 00000003  | 00000004 | host.example.com:7050 | 3          |
-| -1     | 00000004  | 00000005 | host.example.com:7050 | 3          |
-...
++-------+-------------+---------+--------+------------------------------+
+| #Rows | #Partitions | Size    | Format | Location                     |
++-------+-------------+---------+--------+------------------------------+
+| 100   | 7           | 56.16MB | KUDU   | kudu-master.example.com:7051 |
++-------+-------------+---------+--------+------------------------------+
 </codeblock>
-
-      <p rev="IMPALA-2830">
-        Impala does not compute the number of rows for each partition for
-        Kudu tables. Therefore, you do not need to re-run <codeph>COMPUTE STATS</codeph>
-        when you see -1 in the <codeph># Rows</codeph> column of the output from
-        <codeph>SHOW TABLE STATS</codeph>. That column always shows -1 for
-        all Kudu tables.
-      </p>
 
       <p conref="../shared/impala_common.xml#common/example_blurb"/>
 
@@ -1337,33 +1322,38 @@ show column stats store_sales;
 </codeblock>
 
       <p rev="kudu IMPALA-4403">
-        The following example shows the output for a Kudu table
-        using the hash partitioning mechanism. The number of
-        rows in the result set corresponds to the values used
-        in the <codeph>PARTITIONS <varname>N</varname></codeph>
-        clause of <codeph>CREATE TABLE</codeph>.
+        The following example shows the output for a Kudu table using the hash
+        partitioning mechanism. The number of rows in the result set corresponds to the
+        values used in the <codeph>PARTITIONS <varname>N</varname></codeph> clause of
+        <codeph>CREATE TABLE</codeph>. If the Kudu table is created with the clause
+        <codeph>PARTITIONS 20</codeph>, then the result set of
+        <codeph>SHOW PARTITIONS</codeph> consists of 20 rows, each representing one of
+        the numbered partitions. For example:
       </p>
 
 <codeblock rev="kudu IMPALA-4403"><![CDATA[
 show partitions million_rows_hash;
-
-+--------+-----------+----------+-----------------------+--
-| # Rows | Start Key | Stop Key | Leader Replica        | # Replicas
-+--------+-----------+----------+-----------------------+--
-| -1     |           | 00000001 | n236.example.com:7050 | 3
-| -1     | 00000001  | 00000002 | n236.example.com:7050 | 3
-| -1     | 00000002  | 00000003 | n336.example.com:7050 | 3
-| -1     | 00000003  | 00000004 | n238.example.com:7050 | 3
-| -1     | 00000004  | 00000005 | n338.example.com:7050 | 3
-....
-| -1     | 0000002E  | 0000002F | n240.example.com:7050 | 3
-| -1     | 0000002F  | 00000030 | n336.example.com:7050 | 3
-| -1     | 00000030  | 00000031 | n240.example.com:7050 | 3
-| -1     | 00000031  |          | n334.example.com:7050 | 3
-+--------+-----------+----------+-----------------------+--
-Fetched 50 row(s) in 0.05s
++-----------+----------+-----------------------+------------+
+| Start Key | Stop Key | Leader Replica        | # Replicas |
++-----------+----------+-----------------------+------------+
+|           | 00000001 | n236.example.com:7050 | 3          |
+| 00000001  | 00000002 | n236.example.com:7050 | 3          |
+| 00000002  | 00000003 | n336.example.com:7050 | 3          |
+| 00000003  | 00000004 | n238.example.com:7050 | 3          |
+| 00000004  | 00000005 | n338.example.com:7050 | 3          |
+...                                                         |
+| 0000002E  | 0000002F | n240.example.com:7050 | 3          |
+| 0000002F  | 00000030 | n336.example.com:7050 | 3          |
+| 00000030  | 00000031 | n240.example.com:7050 | 3          |
+| 00000031  |          | n334.example.com:7050 | 3          |
++-----------+----------+-----------------------+------------+
 ]]>
 </codeblock>
+
+      <p rev="IMPALA-2830">
+        Impala only computes the number of rows for the whole Kudu table, partition level
+        row counts are not available.
+      </p>
 
       <p rev="kudu IMPALA-4403">
         The following example shows the output for a Kudu table

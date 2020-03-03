@@ -1182,7 +1182,10 @@ public class Frontend {
     } else if (table instanceof FeKuduTable) {
       if (op == TShowStatsOp.RANGE_PARTITIONS) {
         return FeKuduTable.Utils.getRangePartitions((FeKuduTable) table);
+      } else if (op == TShowStatsOp.PARTITIONS) {
+        return FeKuduTable.Utils.getPartitions((FeKuduTable) table);
       } else {
+        Preconditions.checkState(op == TShowStatsOp.TABLE_STATS);
         return FeKuduTable.Utils.getTableStats((FeKuduTable) table);
       }
     } else {

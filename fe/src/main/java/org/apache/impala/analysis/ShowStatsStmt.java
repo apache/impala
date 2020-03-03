@@ -99,8 +99,8 @@ public class ShowStatsStmt extends StatementBase {
         throw new AnalysisException(getSqlPrefix() + " must target a Kudu table: " +
             table_.getFullName());
       } else if (op_ == TShowStatsOp.PARTITIONS) {
-        throw new AnalysisException(getSqlPrefix() + " must target an HDFS table: " +
-            table_.getFullName());
+        throw new AnalysisException(getSqlPrefix() +
+            " must target an HDFS or Kudu table: " + table_.getFullName());
       }
     }
   }

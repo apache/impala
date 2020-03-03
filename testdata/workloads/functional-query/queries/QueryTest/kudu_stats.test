@@ -7,15 +7,37 @@ create table simple (id int primary key, name string, valf float, vali bigint)
 'Table has been created.'
 ====
 ---- QUERY
-show table stats simple
+# Tests the SHOW TABLE STATS output without stats computed
+show table stats simple;
 ---- RESULTS
--1,'','8000000A',regex:.*?:\d+,1
--1,'8000000A','8000001E',regex:.*?:\d+,1
--1,'8000001E','',regex:.*?:\d+,1
+-1,3,regex:.*,'KUDU',regex:.*
 ---- TYPES
-INT,STRING,STRING,STRING,INT
+BIGINT,BIGINT,STRING,STRING,STRING
 ---- LABELS
-# Rows,Start Key,Stop Key,Leader Replica,# Replicas
+#Rows,#Partitions,Size,Format,Location
+====
+---- QUERY
+# Tests the SHOW TABLE STATS output after stats computed
+compute stats simple;
+show table stats simple;
+---- RESULTS
+0,3,regex:.*,'KUDU',regex:.*
+---- TYPES
+BIGINT,BIGINT,STRING,STRING,STRING
+---- LABELS
+#Rows,#Partitions,Size,Format,Location
+====
+---- QUERY
+# Tests the SHOW PARTITIONS output
+show partitions simple;
+---- RESULTS
+'','8000000A',regex:.*?:\d+,1
+'8000000A','8000001E',regex:.*?:\d+,1
+'8000001E','',regex:.*?:\d+,1
+---- TYPES
+STRING,STRING,STRING,INT
+---- LABELS
+Start Key,Stop Key,Leader Replica,#Replicas
 ====
 ---- QUERY
 # IMPALA-3373: Computing stats on a Kudu table lead to duplicate columns shown for the

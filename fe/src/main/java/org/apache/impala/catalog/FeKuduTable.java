@@ -132,11 +132,42 @@ public interface FeKuduTable extends FeTable {
       TResultSetMetadata resultSchema = new TResultSetMetadata();
       result.setSchema(resultSchema);
 
-      resultSchema.addToColumns(new TColumn("# Rows", Type.INT.toThrift()));
+      // Build column header
+      resultSchema.addToColumns(new TColumn("#Rows", Type.BIGINT.toThrift()));
+      resultSchema.addToColumns(new TColumn("#Partitions", Type.BIGINT.toThrift()));
+      resultSchema.addToColumns(new TColumn("Size", Type.STRING.toThrift()));
+      resultSchema.addToColumns(new TColumn("Format", Type.STRING.toThrift()));
+      resultSchema.addToColumns(new TColumn("Location", Type.STRING.toThrift()));
+
+      KuduClient client = KuduUtil.getKuduClient(table.getKuduMasterHosts());
+      try {
+        org.apache.kudu.client.KuduTable kuduTable =
+            client.openTable(table.getKuduTableName());
+        List<LocatedTablet> tablets = kuduTable.getTabletsLocations(
+            BackendConfig.INSTANCE.getKuduClientTimeoutMs());
+        TResultRowBuilder tResultRowBuilder = new TResultRowBuilder();
+        tResultRowBuilder.add(table.getNumRows());
+        tResultRowBuilder.add(tablets.size());
+        tResultRowBuilder.addBytes(kuduTable.getTableStatistics().getOnDiskSize());
+        tResultRowBuilder.add("KUDU");
+        tResultRowBuilder.add(table.getKuduMasterHosts());
+        result.addToRows(tResultRowBuilder.get());
+      } catch (Exception e) {
+        throw new ImpalaRuntimeException("Error accessing Kudu for table stats.", e);
+      }
+      return result;
+    }
+
+    public static TResultSet getPartitions(FeKuduTable table)
+        throws ImpalaRuntimeException {
+      TResultSet result = new TResultSet();
+      TResultSetMetadata resultSchema = new TResultSetMetadata();
+      result.setSchema(resultSchema);
+
       resultSchema.addToColumns(new TColumn("Start Key", Type.STRING.toThrift()));
       resultSchema.addToColumns(new TColumn("Stop Key", Type.STRING.toThrift()));
       resultSchema.addToColumns(new TColumn("Leader Replica", Type.STRING.toThrift()));
-      resultSchema.addToColumns(new TColumn("# Replicas", Type.INT.toThrift()));
+      resultSchema.addToColumns(new TColumn("#Replicas", Type.INT.toThrift()));
 
       KuduClient client = KuduUtil.getKuduClient(table.getKuduMasterHosts());
       try {
@@ -147,12 +178,11 @@ public interface FeKuduTable extends FeTable {
         if (tablets.isEmpty()) {
           TResultRowBuilder builder = new TResultRowBuilder();
           result.addToRows(
-              builder.add("-1").add("N/A").add("N/A").add("N/A").add("-1").get());
+              builder.add("N/A").add("N/A").add("N/A").add("-1").get());
           return result;
         }
         for (LocatedTablet tab: tablets) {
           TResultRowBuilder builder = new TResultRowBuilder();
-          builder.add("-1");   // The Kudu client API doesn't expose tablet row counts.
           builder.add(DatatypeConverter.printHexBinary(
               tab.getPartition().getPartitionKeyStart()));
           builder.add(DatatypeConverter.printHexBinary(
@@ -161,16 +191,15 @@ public interface FeKuduTable extends FeTable {
           if (leader == null) {
             // Leader might be null, if it is not yet available (e.g. during
             // leader election in Kudu)
-            builder.add("Leader n/a");
+            builder.add("Leader N/A");
           } else {
             builder.add(leader.getRpcHost() + ":" + leader.getRpcPort().toString());
           }
           builder.add(tab.getReplicas().size());
           result.addToRows(builder.get());
         }
-
       } catch (Exception e) {
-        throw new ImpalaRuntimeException("Error accessing Kudu for table stats.", e);
+        throw new ImpalaRuntimeException("Error accessing Kudu for table partitions.", e);
       }
       return result;
     }
