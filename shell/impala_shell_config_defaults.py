@@ -39,7 +39,7 @@ impala_shell_defaults = {
             'output_delimiter': '\\t',
             'output_file': None,
             'print_header': False,
-            'live_progress': False,
+            'live_progress': True,  # The option only applies to interactive shell session
             'live_summary': False,
             'query': None,
             'query_file': None,

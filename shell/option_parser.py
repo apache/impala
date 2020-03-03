@@ -233,7 +233,13 @@ def get_option_parser(defaults):
   parser.add_option("--live_summary", dest="live_summary", action="store_true",
                     help="Print a query summary every 1s while the query is running.")
   parser.add_option("--live_progress", dest="live_progress", action="store_true",
-                    help="Print a query progress every 1s while the query is running.")
+                    help="Print a query progress every 1s while the query is running."
+                         " The default value of the flag is True in the interactive mode."
+                         " If live_progress is set to False in a config file, this flag"
+                         " will override it")
+  parser.add_option("--disable_live_progress", dest="live_progress", action="store_false",
+                    help="A command line flag allows users to disable live_progress in"
+                         " the interactive mode.")
   parser.add_option("--auth_creds_ok_in_clear", dest="creds_ok_in_clear",
                     action="store_true", help="If set, LDAP authentication " +
                     "may be used with an insecure connection to Impala. " +
@@ -298,9 +304,21 @@ def get_option_parser(defaults):
     # (print quiet is false since verbose is true)
     if option == parser.get_option('--quiet'):
       option.help += " [default: %s]" % (not defaults['verbose'])
+    # print default value of disable_live_progress in the help messages as opposite
+    # value for default value of live_progress
+    # (print disable_live_progress is false since live_progress is true)
+    elif option == parser.get_option('--disable_live_progress'):
+      option.help += " [default: %s]" % (not defaults['live_progress'])
     elif option != parser.get_option('--help') and option.help is not SUPPRESS_HELP:
       # don't want to print default value for help or options without help text
       option.help += " [default: %default]"
+
+  # mutually exclusive flags should not be used in the same time
+  if '--live_progress' in sys.argv and '--disable_live_progress' in sys.argv:
+    parser.error("options --live_progress and --disable_live_progress are mutually "
+                 "exclusive")
+  if '--verbose' in sys.argv and '--quiet' in sys.argv:
+    parser.error("options --verbose and --quiet are mutually exclusive")
 
   parser.set_defaults(**defaults)
 

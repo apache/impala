@@ -582,10 +582,10 @@ class TestImpalaShell(ImpalaTestSuite):
     assert 'WARNING:' not in result.stderr, \
       "A valid config file should not trigger any warning: {0}".format(result.stderr)
     # Negative Tests
-    # specified config file with live_progress enabled for non interactive mode
+    # specified config file with live_summary enabled for non interactive mode
     args = ['--config_file=%s/good_impalarc3' % QUERY_FILE_PATH, '--query=select 3']
     result = run_impala_shell_cmd(vector, args, expect_success=False)
-    assert 'Live reporting is available for interactive mode only' in result.stderr
+    assert 'live_summary is available for interactive mode only' in result.stderr
     # testing config file related warning messages
     args = ['--config_file=%s/impalarc_with_warnings2' % QUERY_FILE_PATH]
     result = run_impala_shell_cmd(

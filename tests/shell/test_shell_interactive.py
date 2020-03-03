@@ -126,7 +126,7 @@ class TestImpalaShellInteractive(ImpalaTestSuite):
     proc = pexpect.spawn(shell_cmd[0], shell_cmd[1:])
     proc.expect(":{0}] default>".format(get_impalad_port(vector)))
     self._expect_with_cmd(proc, "set", vector,
-        ("LIVE_PROGRESS: False", "LIVE_SUMMARY: False"))
+        ("LIVE_PROGRESS: True", "LIVE_SUMMARY: False"))
     self._expect_with_cmd(proc, "set live_progress=true", vector)
     self._expect_with_cmd(proc, "set", vector,
         ("LIVE_PROGRESS: True", "LIVE_SUMMARY: False"))
@@ -530,6 +530,23 @@ class TestImpalaShellInteractive(ImpalaTestSuite):
            "ignoring." in result.stdout
     # Verify that query options under [impala] override those under [impala.query_options]
     assert "\tDEFAULT_FILE_FORMAT: avro" in result.stdout
+
+  def test_commandline_flag_disable_live_progress(self, vector):
+    """Test the command line flag disable_live_progress with live_progress."""
+    # By default, shell option live_progress is set to True in the interactive mode.
+    cmds = "set all;"
+    result = run_impala_shell_interactive(vector, cmds)
+    assert "\tLIVE_PROGRESS: True" in result.stdout
+    # override the default option through command line argument.
+    args = ['--disable_live_progress']
+    result = run_impala_shell_interactive(vector, cmds, shell_args=args)
+    assert "\tLIVE_PROGRESS: False" in result.stdout
+    # set live_progress as True with config file.
+    # override the option in config file through command line argument.
+    rcfile_path = os.path.join(QUERY_FILE_PATH, 'good_impalarc3')
+    args = ['--disable_live_progress', '--config_file=%s' % rcfile_path]
+    result = run_impala_shell_interactive(vector, cmds, shell_args=args)
+    assert "\tLIVE_PROGRESS: False" in result.stdout
 
   def test_live_option_configuration(self, vector):
     """Test the optional configuration file with live_progress and live_summary."""

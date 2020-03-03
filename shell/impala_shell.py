@@ -1839,9 +1839,14 @@ def impala_shell_main():
   query_options.update(
      [(k.upper(), v) for k, v in parse_variables(options.query_options).items()])
 
+  # Non-interactive mode
   if options.query or options.query_file:
-    if options.live_progress or options.live_summary:
-      print_to_stderr("Error: Live reporting is available for interactive mode only.")
+    # Impala shell will disable live_progress if non-interactive mode is detected.
+    options.live_progress = False
+    print_to_stderr("Warning: live_progress only applies to interactive shell sessions, "
+                    "and is being skipped for now.")
+    if options.live_summary:
+      print_to_stderr("Error: live_summary is available for interactive mode only.")
       raise FatalShellException()
 
     if execute_queries_non_interactive_mode(options, query_options):
