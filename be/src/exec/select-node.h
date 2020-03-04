@@ -34,7 +34,7 @@ class TupleRow;
 class SelectPlanNode : public PlanNode {
  public:
   virtual Status CreateExecNode(RuntimeState* state, ExecNode** node) const override;
-  void Codegen(RuntimeState* state, RuntimeProfile* runtime_profile);
+  virtual void Codegen(FragmentState* state) override;
 
   ~SelectPlanNode(){}
 
@@ -44,7 +44,7 @@ class SelectPlanNode : public PlanNode {
 
  private:
   /// Codegen SelectNode::CopyRows().
-  Status CodegenCopyRows(RuntimeState* state);
+  Status CodegenCopyRows(FragmentState* state);
 };
 
 /// Node that evaluates conjuncts and enforces a limit but otherwise passes along
@@ -55,7 +55,6 @@ class SelectNode : public ExecNode {
   SelectNode(ObjectPool* pool, const SelectPlanNode& pnode, const DescriptorTbl& descs);
 
   virtual Status Prepare(RuntimeState* state) override;
-  virtual void Codegen(RuntimeState* state) override;
   virtual Status Open(RuntimeState* state) override;
   virtual Status GetNext(RuntimeState* state, RowBatch* row_batch, bool* eos) override;
   virtual Status Reset(RuntimeState* state, RowBatch* row_batch) override;

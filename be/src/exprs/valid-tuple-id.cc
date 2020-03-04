@@ -32,7 +32,7 @@ const char* ValidTupleIdExpr::LLVM_CLASS_NAME = "class.impala::ValidTupleIdExpr"
 ValidTupleIdExpr::ValidTupleIdExpr(const TExprNode& node) : ScalarExpr(node) {}
 
 Status ValidTupleIdExpr::Init(
-    const RowDescriptor& row_desc, bool is_entry_point, RuntimeState* state) {
+    const RowDescriptor& row_desc, bool is_entry_point, FragmentState* state) {
   RETURN_IF_ERROR(ScalarExpr::Init(row_desc, is_entry_point, state));
   DCHECK_EQ(0, children_.size());
   tuple_ids_.reserve(row_desc.tuple_descriptors().size());

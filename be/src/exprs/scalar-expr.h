@@ -56,6 +56,7 @@ using impala_udf::DecimalVal;
 using impala_udf::DateVal;
 using impala_udf::CollectionVal;
 
+class FragmentState;
 struct LibCacheEntry;
 class LlvmCodeGen;
 class MemTracker;
@@ -146,22 +147,22 @@ class ScalarExpr : public Expr {
   /// tuple row descriptor of the input tuple row. On failure, 'expr' is set to NULL and
   /// the expr tree (if created) will be closed. Error status will be returned too.
   static Status Create(const TExpr& texpr, const RowDescriptor& row_desc,
-      RuntimeState* state, ObjectPool* pool, ScalarExpr** expr) WARN_UNUSED_RESULT;
+      FragmentState* state, ObjectPool* pool, ScalarExpr** expr) WARN_UNUSED_RESULT;
 
   /// Create a new ScalarExpr based on thrift Expr 'texpr'. The newly created ScalarExpr
   /// is stored in ObjectPool 'state->obj_pool()' and returned in 'expr'. 'row_desc' is
   /// the tuple row descriptor of the input tuple row. Returns error status on failure.
   static Status Create(const TExpr& texpr, const RowDescriptor& row_desc,
-      RuntimeState* state, ScalarExpr** expr) WARN_UNUSED_RESULT;
+      FragmentState* state, ScalarExpr** expr) WARN_UNUSED_RESULT;
 
   /// Convenience functions creating multiple ScalarExpr.
   static Status Create(const std::vector<TExpr>& texprs, const RowDescriptor& row_desc,
-      RuntimeState* state, ObjectPool* pool, std::vector<ScalarExpr*>* exprs)
-      WARN_UNUSED_RESULT;
+      FragmentState* state, ObjectPool* pool,
+      std::vector<ScalarExpr*>* exprs) WARN_UNUSED_RESULT;
 
   /// Convenience functions creating multiple ScalarExpr.
   static Status Create(const std::vector<TExpr>& texprs, const RowDescriptor& row_desc,
-      RuntimeState* state, std::vector<ScalarExpr*>* exprs) WARN_UNUSED_RESULT;
+      FragmentState* state, std::vector<ScalarExpr*>* exprs) WARN_UNUSED_RESULT;
 
   /// Returns true if this expression is a SlotRef. Overridden by SlotRef.
   virtual bool IsSlotRef() const { return false; }
@@ -308,7 +309,7 @@ class ScalarExpr : public Expr {
   /// point into the codegen'd code. Currently we assume all roots of ScalarExpr subtrees
   /// exprs are potential entry points.
   virtual Status Init(const RowDescriptor& row_desc, bool is_entry_point,
-      RuntimeState* state) WARN_UNUSED_RESULT;
+      FragmentState* state) WARN_UNUSED_RESULT;
 
   /// Initializes 'eval' for execution. If scope if FRAGMENT_LOCAL, both
   /// fragment-local and thread-local states should be initialized. If scope is
@@ -364,7 +365,7 @@ class ScalarExpr : public Expr {
  protected:
   /// Return true if we should codegen this expression node, based on query options
   /// and the properties of this ScalarExpr node.
-  bool ShouldCodegen(const RuntimeState* state) const;
+  bool ShouldCodegen(const FragmentState* state) const;
 
   /// Return true if it is possible to evaluate this expression node without codegen.
   /// The vast majority of exprs support interpretation, so default to true. Scalars

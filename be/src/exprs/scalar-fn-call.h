@@ -79,7 +79,7 @@ class ScalarFnCall : public ScalarExpr {
 
   ScalarFnCall(const TExprNode& node);
   virtual Status Init(const RowDescriptor& row_desc, bool is_entry_point,
-      RuntimeState* state) override WARN_UNUSED_RESULT;
+      FragmentState* state) override WARN_UNUSED_RESULT;
   virtual Status OpenEvaluator(FunctionContext::FunctionStateScope scope,
       RuntimeState* state, ScalarExprEvaluator* eval) const override WARN_UNUSED_RESULT;
   virtual void CloseEvaluator(FunctionContext::FunctionStateScope scope,

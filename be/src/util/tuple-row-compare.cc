@@ -23,6 +23,7 @@
 #include "codegen/llvm-codegen.h"
 #include "exprs/scalar-expr.h"
 #include "exprs/scalar-expr-evaluator.h"
+#include "runtime/fragment-state.h"
 #include "runtime/runtime-state.h"
 #include "runtime/multi-precision.h"
 #include "util/runtime-profile-counters.h"
@@ -64,7 +65,7 @@ void TupleRowComparator::Close(RuntimeState* state) {
   ScalarExprEvaluator::Close(ordering_expr_evals_lhs_, state);
 }
 
-Status TupleRowComparatorConfig::Codegen(RuntimeState* state) {
+Status TupleRowComparatorConfig::Codegen(FragmentState* state) {
   if (sorting_order_ == TSortingOrder::ZORDER) {
     return Status("Codegen not yet implemented for sorting order: ZORDER");
   }

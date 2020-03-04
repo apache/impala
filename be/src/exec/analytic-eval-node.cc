@@ -26,8 +26,8 @@
 #include "exprs/scalar-expr.h"
 #include "runtime/buffered-tuple-stream.inline.h"
 #include "runtime/descriptors.h"
+#include "runtime/fragment-state.h"
 #include "runtime/mem-tracker.h"
-#include "runtime/query-state.h"
 #include "runtime/row-batch.h"
 #include "runtime/runtime-state.h"
 #include "udf/udf-internal.h"
@@ -42,7 +42,7 @@ using namespace strings;
 
 namespace impala {
 
-Status AnalyticEvalPlanNode::Init(const TPlanNode& tnode, RuntimeState* state) {
+Status AnalyticEvalPlanNode::Init(const TPlanNode& tnode, FragmentState* state) {
   RETURN_IF_ERROR(PlanNode::Init(tnode, state));
 
   const TAnalyticNode& analytic_node = tnode.analytic_node;

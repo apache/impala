@@ -558,13 +558,12 @@ static int GetTypeByteSize(const FunctionContext::TypeDesc& type) {
 }
 
 int FunctionContextImpl::GetConstFnAttr(FunctionContextImpl::ConstFnAttr t, int i) {
-  return GetConstFnAttr(state_, return_type_, arg_types_, t, i);
+  return GetConstFnAttr(state_->decimal_v2(), return_type_, arg_types_, t, i);
 }
 
-int FunctionContextImpl::GetConstFnAttr(const RuntimeState* state,
+int FunctionContextImpl::GetConstFnAttr(bool uses_decimal_v2,
     const FunctionContext::TypeDesc& return_type,
-    const vector<FunctionContext::TypeDesc>& arg_types,
-    ConstFnAttr t, int i) {
+    const vector<FunctionContext::TypeDesc>& arg_types, ConstFnAttr t, int i) {
   switch (t) {
     case RETURN_TYPE_SIZE:
       assert(i == -1);
@@ -592,7 +591,7 @@ int FunctionContextImpl::GetConstFnAttr(const RuntimeState* state,
       assert(arg_types[i].type == FunctionContext::TYPE_DECIMAL);
       return arg_types[i].scale;
     case DECIMAL_V2:
-      return state->decimal_v2();
+      return uses_decimal_v2;
     default:
       assert(false);
       return -1;

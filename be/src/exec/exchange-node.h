@@ -34,10 +34,10 @@ class TupleRowComparatorConfig;
 
 class ExchangePlanNode : public PlanNode {
  public:
-  virtual Status Init(const TPlanNode& tnode, RuntimeState* state) override;
+  virtual Status Init(const TPlanNode& tnode, FragmentState* state) override;
   virtual void Close() override;
   virtual Status CreateExecNode(RuntimeState* state, ExecNode** node) const override;
-  void Codegen(RuntimeState* state, RuntimeProfile* runtime_profile);
+  virtual void Codegen(FragmentState* state) override;
 
   ~ExchangePlanNode(){}
 
@@ -66,7 +66,6 @@ class ExchangeNode : public ExecNode {
       ObjectPool* pool, const ExchangePlanNode& pnode, const DescriptorTbl& descs);
 
   virtual Status Prepare(RuntimeState* state);
-  virtual void Codegen(RuntimeState* state);
   /// Blocks until the first batch is available for consumption via GetNext().
   virtual Status Open(RuntimeState* state);
   virtual Status GetNext(RuntimeState* state, RowBatch* row_batch, bool* eos);

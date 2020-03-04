@@ -36,7 +36,7 @@ class ValidTupleIdExpr : public ScalarExpr {
   explicit ValidTupleIdExpr(const TExprNode& node);
 
   virtual Status Init(
-      const RowDescriptor& row_desc, bool is_entry_point, RuntimeState* state) override;
+      const RowDescriptor& row_desc, bool is_entry_point, FragmentState* state) override;
   virtual Status GetCodegendComputeFnImpl(
       LlvmCodeGen* codegen, llvm::Function** fn) override WARN_UNUSED_RESULT;
   virtual std::string DebugString() const override;

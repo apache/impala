@@ -28,12 +28,12 @@ class TupleDescriptor;
 
 class UnnestPlanNode : public PlanNode {
  public:
-  virtual Status Init(const TPlanNode& tnode, RuntimeState* state) override;
+  virtual Status Init(const TPlanNode& tnode, FragmentState* state) override;
   virtual void Close() override;
   virtual Status CreateExecNode(RuntimeState* state, ExecNode** node) const override;
   /// Initializes the expression which produces the collection to be unnested.
   /// Called by the containing subplan plan-node.
-  Status InitCollExpr(RuntimeState* state);
+  Status InitCollExpr(FragmentState* state);
 
   ~UnnestPlanNode(){}
 

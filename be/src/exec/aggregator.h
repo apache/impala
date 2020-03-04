@@ -38,6 +38,7 @@ class PlanNode;
 class CodegenAnyVal;
 class DescriptorTbl;
 class ExecNode;
+class FragmentState;
 class LlvmBuilder;
 class LlvmCodeGen;
 class MemPool;
@@ -60,12 +61,12 @@ class AggregatorConfig {
  public:
   /// 'agg_idx' is the index of 'TAggregator' in the parent TAggregationNode.
   AggregatorConfig(
-      const TAggregator& taggregator, RuntimeState* state, PlanNode* pnode, int agg_idx);
+      const TAggregator& taggregator, FragmentState* state, PlanNode* pnode, int agg_idx);
   virtual Status Init(
-      const TAggregator& taggregator, RuntimeState* state, PlanNode* pnode);
+      const TAggregator& taggregator, FragmentState* state, PlanNode* pnode);
   /// Closes the expressions created in Init();
   virtual void Close();
-  virtual Status Codegen(RuntimeState* state) = 0;
+  virtual void Codegen(FragmentState* state) = 0;
   virtual ~AggregatorConfig() {}
 
   /// The index of this Aggregator within the AggregationNode which is also equivalent to
@@ -97,6 +98,11 @@ class AggregatorConfig {
 
   /// The list of all aggregate operations for this aggregator.
   std::vector<AggFn*> aggregate_functions_;
+
+  /// A message that will eventually be added to the aggregator's (spawned using this
+  /// config) runtime profile to convey codegen related information. Populated in
+  /// Codegen().
+  std::string codegen_status_msg_;
 
   virtual int GetNumGroupingExprs() const = 0;
 
@@ -134,7 +140,6 @@ class Aggregator {
   /// Aggregators follow the same lifecycle as ExecNodes, except that after Open() and
   /// before GetNext() rows should be added with AddBatch(), followed by InputDone()[
   virtual Status Prepare(RuntimeState* state) WARN_UNUSED_RESULT;
-  virtual void Codegen(RuntimeState* state) = 0;
   virtual Status Open(RuntimeState* state) WARN_UNUSED_RESULT;
   virtual Status GetNext(
       RuntimeState* state, RowBatch* row_batch, bool* eos) WARN_UNUSED_RESULT = 0;
@@ -171,6 +176,9 @@ class Aggregator {
   /// The id of the ExecNode this Aggregator corresponds to.
   const int id_;
   ExecNode* exec_node_;
+
+  /// Reference to the config object used to generate this instance.
+  const AggregatorConfig& config_;
 
   /// The index of this Aggregator within the AggregationNode. When returning output, this
   /// Aggregator should only write tuples at 'agg_idx_' within the row.

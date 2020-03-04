@@ -70,6 +70,7 @@
 #include "runtime/lib-cache.h"
 #include "runtime/mem-pool.h"
 #include "runtime/mem-tracker.h"
+#include "runtime/fragment-state.h"
 #include "runtime/runtime-state.h"
 #include "runtime/string-value.h"
 #include "runtime/timestamp-value.h"
@@ -194,7 +195,7 @@ Status LlvmCodeGen::InitializeLlvm(bool load_backend) {
   return Status::OK();
 }
 
-LlvmCodeGen::LlvmCodeGen(RuntimeState* state, ObjectPool* pool,
+LlvmCodeGen::LlvmCodeGen(FragmentState* state, ObjectPool* pool,
     MemTracker* parent_mem_tracker, const string& id)
   : state_(state),
     id_(id),
@@ -221,7 +222,7 @@ LlvmCodeGen::LlvmCodeGen(RuntimeState* state, ObjectPool* pool,
   llvm_thread_counters_ = ADD_THREAD_COUNTERS(profile_, "Codegen");
 }
 
-Status LlvmCodeGen::CreateFromFile(RuntimeState* state, ObjectPool* pool,
+Status LlvmCodeGen::CreateFromFile(FragmentState* state, ObjectPool* pool,
     MemTracker* parent_mem_tracker, const string& file, const string& id,
     scoped_ptr<LlvmCodeGen>* codegen) {
   codegen->reset(new LlvmCodeGen(state, pool, parent_mem_tracker, id));
@@ -239,7 +240,7 @@ error:
   return status;
 }
 
-Status LlvmCodeGen::CreateFromMemory(RuntimeState* state, ObjectPool* pool,
+Status LlvmCodeGen::CreateFromMemory(FragmentState* state, ObjectPool* pool,
     MemTracker* parent_mem_tracker, const string& id, scoped_ptr<LlvmCodeGen>* codegen) {
   codegen->reset(new LlvmCodeGen(state, pool, parent_mem_tracker, id));
   SCOPED_TIMER((*codegen)->profile_->total_time_counter());
@@ -369,7 +370,7 @@ void LlvmCodeGen::StripGlobalCtorsDtors(llvm::Module* module) {
   if (destructors != NULL) destructors->eraseFromParent();
 }
 
-Status LlvmCodeGen::CreateImpalaCodegen(RuntimeState* state,
+Status LlvmCodeGen::CreateImpalaCodegen(FragmentState* state,
     MemTracker* parent_mem_tracker, const string& id,
     scoped_ptr<LlvmCodeGen>* codegen_ret) {
   DCHECK(state != nullptr);
@@ -993,8 +994,8 @@ int LlvmCodeGen::InlineConstFnAttrs(const FunctionContext::TypeDesc& ret_type,
     int i_val = static_cast<int>(i_arg->getSExtValue());
     DCHECK(state_ != nullptr);
     // All supported constants are currently integers.
-    call_instr->replaceAllUsesWith(GetI32Constant(
-        FunctionContextImpl::GetConstFnAttr(state_, ret_type, arg_types, t_val, i_val)));
+    call_instr->replaceAllUsesWith(GetI32Constant(FunctionContextImpl::GetConstFnAttr(
+        state_->query_options().decimal_v2, ret_type, arg_types, t_val, i_val)));
     call_instr->eraseFromParent();
     ++replaced;
   }

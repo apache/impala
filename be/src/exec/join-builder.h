@@ -37,7 +37,7 @@ class JoinBuilderConfig : public DataSinkConfig {
   friend class PhjBuilder;
 
   Status Init(const TDataSink& tsink, const RowDescriptor* input_row_desc,
-      RuntimeState* state) override;
+      FragmentState* state) override;
 
   /// The ID of the join plan node this is associated with.
   int join_node_id_;

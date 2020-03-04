@@ -54,7 +54,7 @@ using namespace strings;
 namespace impala {
 
 Status HdfsTableSinkConfig::Init(
-    const TDataSink& tsink, const RowDescriptor* input_row_desc, RuntimeState* state) {
+    const TDataSink& tsink, const RowDescriptor* input_row_desc, FragmentState* state) {
   RETURN_IF_ERROR(DataSinkConfig::Init(tsink, input_row_desc, state));
   DCHECK(tsink_->__isset.table_sink);
   DCHECK(tsink_->table_sink.__isset.hdfs_table_sink);

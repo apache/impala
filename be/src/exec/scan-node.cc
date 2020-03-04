@@ -27,8 +27,8 @@
 #include "exprs/scalar-expr.h"
 #include "exprs/scalar-expr-evaluator.h"
 #include "runtime/blocking-row-batch-queue.h"
+#include "runtime/fragment-state.h"
 #include "runtime/io/disk-io-mgr.h"
-#include "runtime/query-state.h"
 #include "runtime/row-batch.h"
 #include "runtime/runtime-filter.inline.h"
 #include "runtime/runtime-state.h"
@@ -98,7 +98,7 @@ PROFILE_DEFINE_HIGH_WATER_MARK_COUNTER(PeakScannerThreadConcurrency, STABLE_LOW,
 
 const string ScanNode::SCANNER_THREAD_COUNTERS_PREFIX = "ScannerThreads";
 
-Status ScanPlanNode::Init(const TPlanNode& tnode, RuntimeState* state) {
+Status ScanPlanNode::Init(const TPlanNode& tnode, FragmentState* state) {
   RETURN_IF_ERROR(PlanNode::Init(tnode, state));
   const TQueryOptions& query_options = state->query_options();
   for (const TRuntimeFilterDesc& filter_desc : tnode.runtime_filters) {

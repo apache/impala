@@ -29,6 +29,7 @@
 
 namespace impala {
 
+class FragmentState;
 class RuntimeState;
 class ScalarExprEvaluator;
 
@@ -68,7 +69,7 @@ class TupleRowComparatorConfig {
       const TSortInfo& tsort_info, const std::vector<ScalarExpr*>& ordering_exprs);
 
   /// Codegens a Compare() function for this comparator that is used in Compare().
-  Status Codegen(RuntimeState* state);
+  Status Codegen(FragmentState* state);
 
   /// Indicates the sorting ordering used. Specified using the SORT BY clause.
   TSortingOrder::type sorting_order_;

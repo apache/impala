@@ -36,6 +36,7 @@
 #include "exec/text-converter.h"
 #include "gen-cpp/ErrorCodes_types.h"
 #include "runtime/descriptors.h"
+#include "runtime/fragment-state.h"
 #include "runtime/mem-pool.h"
 #include "runtime/row-batch.h"
 #include "runtime/runtime-state.h"
@@ -74,7 +75,7 @@ HdfsSequenceScanner::~HdfsSequenceScanner() {
 }
 
 // Codegen for materialized parsed data into tuples.
-Status HdfsSequenceScanner::Codegen(HdfsScanPlanNode* node, RuntimeState* state,
+Status HdfsSequenceScanner::Codegen(HdfsScanPlanNode* node, FragmentState* state,
     llvm::Function** write_aligned_tuples_fn) {
   *write_aligned_tuples_fn = nullptr;
   DCHECK(state->ShouldCodegen());

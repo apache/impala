@@ -36,6 +36,7 @@ class AggFnEvaluator;
 class GroupingAggregator;
 class PlanNode;
 class LlvmCodeGen;
+class QueryState;
 class RowBatch;
 class RuntimeState;
 struct ScalarExprsResultsRowLayout;
@@ -119,11 +120,11 @@ class Tuple;
 class GroupingAggregatorConfig : public AggregatorConfig {
  public:
   GroupingAggregatorConfig(
-      const TAggregator& taggregator, RuntimeState* state, PlanNode* pnode, int agg_idx);
+      const TAggregator& taggregator, FragmentState* state, PlanNode* pnode, int agg_idx);
   Status Init(
-      const TAggregator& taggregator, RuntimeState* state, PlanNode* pnode) override;
+      const TAggregator& taggregator, FragmentState* state, PlanNode* pnode) override;
   void Close() override;
-  Status Codegen(RuntimeState* state) override;
+  void Codegen(FragmentState* state) override;
   ~GroupingAggregatorConfig() override {}
 
   /// Row with the intermediate tuple as its only tuple.
@@ -193,7 +194,6 @@ class GroupingAggregator : public Aggregator {
       const GroupingAggregatorConfig& config, int64_t estimated_input_cardinality);
 
   virtual Status Prepare(RuntimeState* state) override;
-  virtual void Codegen(RuntimeState* state) override;
   virtual Status Open(RuntimeState* state) override;
   virtual Status GetNext(RuntimeState* state, RowBatch* row_batch, bool* eos) override;
   virtual Status Reset(RuntimeState* state, RowBatch* row_batch) override;
@@ -213,10 +213,6 @@ class GroupingAggregator : public Aggregator {
 
  private:
   struct Partition;
-
-  /// TODO: Remove reference once codegen is performed before FIS creation.
-  /// Reference to the config object and only used to call Codegen().
-  const GroupingAggregatorConfig& agg_config_;
 
   /// Reference to the hash table config which is a part of the GroupingAggregatorConfig
   /// that was used to create this object. Its used to create an instance of the

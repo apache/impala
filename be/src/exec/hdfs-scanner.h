@@ -489,13 +489,13 @@ class HdfsScanner {
   /// to WriteCompleteTuple. Stores the resulting function in 'write_complete_tuple_fn'
   /// if codegen was successful or NULL otherwise.
   static Status CodegenWriteCompleteTuple(const HdfsScanPlanNode* node,
-      RuntimeState* state, llvm::Function** write_complete_tuple_fn);
+      FragmentState* state, llvm::Function** write_complete_tuple_fn);
 
   /// Codegen function to replace WriteAlignedTuples.  WriteAlignedTuples is cross
   /// compiled to IR.  This function loads the precompiled IR function, modifies it,
   /// and stores the resulting function in 'write_aligned_tuples_fn' if codegen was
   /// successful or NULL otherwise.
-  static Status CodegenWriteAlignedTuples(const HdfsScanPlanNode*, RuntimeState*,
+  static Status CodegenWriteAlignedTuples(const HdfsScanPlanNode*, FragmentState*,
       llvm::Function* write_tuple_fn, llvm::Function** write_aligned_tuples_fn);
 
   /// Codegen function to replace InitTuple() removing runtime constants like the tuple

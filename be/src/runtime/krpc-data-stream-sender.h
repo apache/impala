@@ -47,7 +47,10 @@ class KrpcDataStreamSenderConfig : public DataSinkConfig {
       RuntimeState* state) const override;
   void Close() override;
 
-  void Codegen(RuntimeState* state, RuntimeProfile* profile);
+  /// Codegen KrpcDataStreamSender::HashAndAddRows() if partitioning type is
+  /// HASH_PARTITIONED. Replaces KrpcDataStreamSender::HashRow() and
+  /// KrpcDataStreamSender::GetNumChannels() based on runtime information.
+  void Codegen(FragmentState* state) override;
 
   /// The type of partitioning to perform.
   TPartitionType::type partition_type_ = TPartitionType::UNPARTITIONED;
@@ -55,6 +58,9 @@ class KrpcDataStreamSenderConfig : public DataSinkConfig {
   /// Expressions of partition keys. It's used to compute the
   /// per-row partition values for shuffling exchange;
   std::vector<ScalarExpr*> partition_exprs_;
+
+  /// The number of channels that this node will create.
+  int  num_channels_;
 
   /// Hash seed used for exchanges. Query id will be used to seed the hash function.
   uint64_t exchange_hash_seed_;
@@ -68,7 +74,7 @@ class KrpcDataStreamSenderConfig : public DataSinkConfig {
 
  protected:
   Status Init(const TDataSink& tsink, const RowDescriptor* input_row_desc,
-      RuntimeState* state) override;
+      FragmentState* state) override;
 
  private:
   /// Codegen the KrpcDataStreamSender::HashRow() function and returns the codegen'd
@@ -110,10 +116,6 @@ class KrpcDataStreamSender : public DataSink {
   /// Initializes the sender by initializing all the channels and allocates all
   /// the stat counters. Return error status if any channels failed to initialize.
   virtual Status Prepare(RuntimeState* state, MemTracker* parent_mem_tracker) override;
-
-  /// Codegen HashAndAddRows() if partitioning type is HASH_PARTITIONED.
-  /// Replaces HashRow() and GetNumChannels() based on runtime information.
-  virtual void Codegen(RuntimeState* state) override;
 
   /// Initializes the evaluator of the partitioning expressions. Return error status
   /// if initialization failed.

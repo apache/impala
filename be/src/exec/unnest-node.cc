@@ -22,6 +22,7 @@
 #include "exec/subplan-node.h"
 #include "exprs/scalar-expr-evaluator.h"
 #include "exprs/slot-ref.h"
+#include "runtime/fragment-state.h"
 #include "runtime/row-batch.h"
 #include "runtime/runtime-state.h"
 #include "runtime/tuple-row.h"
@@ -31,7 +32,7 @@ namespace impala {
 
 const CollectionValue UnnestNode::EMPTY_COLLECTION_VALUE;
 
-Status UnnestPlanNode::Init(const TPlanNode& tnode, RuntimeState* state) {
+Status UnnestPlanNode::Init(const TPlanNode& tnode, FragmentState* state) {
   DCHECK(tnode.__isset.unnest_node);
   RETURN_IF_ERROR(PlanNode::Init(tnode, state));
   return Status::OK();
@@ -42,7 +43,7 @@ void UnnestPlanNode::Close() {
   PlanNode::Close();
 }
 
-Status UnnestPlanNode::InitCollExpr(RuntimeState* state) {
+Status UnnestPlanNode::InitCollExpr(FragmentState* state) {
   DCHECK(containing_subplan_ != nullptr)
       << "set_containing_subplan() must have been called";
   const RowDescriptor& row_desc = *containing_subplan_->children_[0]->row_descriptor_;

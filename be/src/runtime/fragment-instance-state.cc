@@ -38,6 +38,7 @@
 #include "runtime/backend-client.h"
 #include "runtime/client-cache.h"
 #include "runtime/exec-env.h"
+#include "runtime/fragment-state.h"
 #include "runtime/krpc-data-stream-mgr.h"
 #include "runtime/mem-tracker.h"
 #include "runtime/query-state.h"
@@ -65,13 +66,12 @@ static const string OPEN_TIMER_NAME = "OpenTime";
 static const string PREPARE_TIMER_NAME = "PrepareTime";
 static const string EXEC_TIMER_NAME = "ExecTime";
 
-FragmentInstanceState::FragmentInstanceState(
-    QueryState* query_state, const TPlanFragmentCtx& fragment_ctx,
-    const TPlanFragmentInstanceCtx& instance_ctx)
+FragmentInstanceState::FragmentInstanceState(QueryState* query_state,
+    FragmentState* fragment_state, const TPlanFragmentInstanceCtx& instance_ctx)
   : query_state_(query_state),
-    fragment_ctx_(fragment_ctx),
-    instance_ctx_(instance_ctx) {
-}
+    fragment_state_(fragment_state),
+    fragment_ctx_(fragment_state->fragment_ctx()),
+    instance_ctx_(instance_ctx) {}
 
 Status FragmentInstanceState::Exec() {
   bool is_prepared = false;
@@ -174,11 +174,11 @@ Status FragmentInstanceState::Prepare() {
       bind<int64_t>(mem_fn(&ThreadResourcePool::num_threads),
           runtime_state_->resource_pool()));
 
-  RETURN_IF_ERROR(
-      PlanNode::CreateTree(runtime_state_, fragment_ctx_.fragment.plan, &plan_tree_));
-  // set up plan
+  // Create the exec tree.
+  const PlanNode* plan_tree = fragment_state_->plan_tree();
+  DCHECK(plan_tree != nullptr);
   RETURN_IF_ERROR(ExecNode::CreateTree(
-      runtime_state_, *plan_tree_, query_state_->desc_tbl(), &exec_tree_));
+      runtime_state_, *plan_tree, query_state_->desc_tbl(), &exec_tree_));
   runtime_state_->set_fragment_root_id(exec_tree_->id());
   if (instance_ctx_.__isset.debug_options) {
     ExecNode::SetDebugOptions(instance_ctx_.debug_options, exec_tree_);
@@ -214,11 +214,9 @@ Status FragmentInstanceState::Prepare() {
   PrintVolumeIds();
 
   // prepare sink_
-  DCHECK(fragment_ctx_.fragment.__isset.output_sink);
-  const TDataSink& thrift_sink = fragment_ctx_.fragment.output_sink;
-  RETURN_IF_ERROR(DataSinkConfig::CreateConfig(
-      thrift_sink, plan_tree_->row_descriptor_, runtime_state_, &sink_config_));
-  sink_ = sink_config_->CreateSink(fragment_ctx_, instance_ctx_, runtime_state_);
+  const DataSinkConfig* sink_config = fragment_state_->sink_config();
+  DCHECK(sink_config != nullptr);
+  sink_ = sink_config->CreateSink(fragment_ctx_, instance_ctx_, runtime_state_);
   RETURN_IF_ERROR(sink_->Prepare(runtime_state_, runtime_state_->instance_mem_tracker()));
   RuntimeProfile* sink_profile = sink_->profile();
   if (sink_profile != nullptr) profile()->AddChild(sink_profile);
@@ -332,26 +330,9 @@ Status FragmentInstanceState::Open() {
       ADD_TIMER(timings_profile_, OPEN_TIMER_NAME));
   SCOPED_THREAD_COUNTER_MEASUREMENT(runtime_state_->total_thread_statistics());
 
-  if (runtime_state_->ShouldCodegen()) {
+  if (fragment_state_->ShouldCodegen()) {
     UpdateState(StateEvent::CODEGEN_START);
-    RETURN_IF_ERROR(runtime_state_->CreateCodegen());
-    {
-      SCOPED_TIMER2(runtime_state_->codegen()->ir_generation_timer(),
-          runtime_state_->codegen()->runtime_profile()->total_time_counter());
-      SCOPED_THREAD_COUNTER_MEASUREMENT(
-          runtime_state_->codegen()->llvm_thread_counters());
-      exec_tree_->Codegen(runtime_state_);
-      sink_->Codegen(runtime_state_);
-
-      // It shouldn't be fatal to fail codegen. However, until IMPALA-4233 is fixed,
-      // ScalarFnCall has no fall back to interpretation when codegen fails so propagates
-      // the error status for now.
-      RETURN_IF_ERROR(runtime_state_->CodegenScalarExprs());
-    }
-
-    LlvmCodeGen* codegen = runtime_state_->codegen();
-    DCHECK(codegen != nullptr);
-    RETURN_IF_ERROR(codegen->FinalizeModule());
+    RETURN_IF_ERROR(fragment_state_->InvokeCodegen());
   }
 
   {
@@ -421,7 +402,6 @@ void FragmentInstanceState::Close() {
 
   // guard against partially-finished Prepare()
   if (sink_ != nullptr) sink_->Close(runtime_state_);
-  if (sink_config_ != nullptr) sink_config_->Close();
 
   // Stop updating profile counters in background.
   profile()->StopPeriodicCounters();
@@ -429,7 +409,6 @@ void FragmentInstanceState::Close() {
   // Delete row_batch_ to free resources associated with it.
   row_batch_.reset();
   if (exec_tree_ != nullptr) exec_tree_->Close(runtime_state_);
-  if (plan_tree_ != nullptr) plan_tree_->Close();
   runtime_state_->ReleaseResources();
 
   // Sanity timer checks

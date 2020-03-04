@@ -37,7 +37,7 @@ class NljBuilderConfig : public JoinBuilderConfig {
 
  protected:
   Status Init(const TDataSink& tsink, const RowDescriptor* input_row_desc,
-      RuntimeState* state) override;
+      FragmentState* state) override;
 };
 
 /// Builder for the NestedLoopJoinNode that accumulates the build-side rows for the join.

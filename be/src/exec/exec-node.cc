@@ -57,10 +57,10 @@
 #include "gutil/strings/substitute.h"
 #include "runtime/descriptors.h"
 #include "runtime/exec-env.h"
+#include "runtime/fragment-state.h"
 #include "runtime/initial-reservations.h"
 #include "runtime/mem-pool.h"
 #include "runtime/mem-tracker.h"
-#include "runtime/query-state.h"
 #include "runtime/row-batch.h"
 #include "runtime/runtime-state.h"
 #include "util/debug-util.h"
@@ -72,7 +72,7 @@
 using strings::Substitute;
 
 namespace impala {
-Status PlanNode::Init(const TPlanNode& tnode, RuntimeState* state) {
+Status PlanNode::Init(const TPlanNode& tnode, FragmentState* state) {
   tnode_ = &tnode;
   row_descriptor_ = state->obj_pool()->Add(
       new RowDescriptor(state->desc_tbl(), tnode_->row_tuples, tnode_->nullable_tuples));
@@ -93,14 +93,14 @@ void PlanNode::Close() {
   }
 }
 
-Status PlanNode::CreateTree(
-      RuntimeState* state, const TPlan& plan, PlanNode** root) {
+Status PlanNode::CreateTree(FragmentState* state, const TPlan& plan, PlanNode** root) {
   if (plan.nodes.size() == 0) {
     *root = NULL;
     return Status::OK();
   }
   int node_idx = 0;
-  Status status = CreateTreeHelper(state, plan.nodes, NULL, &node_idx, root);
+  Status status =
+      CreateTreeHelper(state, plan.nodes, NULL, &node_idx, root);
   if (status.ok() && node_idx + 1 != plan.nodes.size()) {
     status = Status(
         "Plan tree only partially reconstructed. Not all thrift nodes were used.");
@@ -112,9 +112,9 @@ Status PlanNode::CreateTree(
   return status;
 }
 
-Status PlanNode::CreateTreeHelper(RuntimeState* state,
-      const std::vector<TPlanNode>& tnodes, PlanNode* parent, int* node_idx,
-      PlanNode** root) {
+Status PlanNode::CreateTreeHelper(FragmentState* state,
+    const std::vector<TPlanNode>& tnodes, PlanNode* parent, int* node_idx,
+    PlanNode** root) {
   // propagate error case
   if (*node_idx >= tnodes.size()) {
     return Status("Failed to reconstruct plan tree from thrift.");
@@ -123,7 +123,7 @@ Status PlanNode::CreateTreeHelper(RuntimeState* state,
 
   int num_children = tnode.num_children;
   PlanNode* node = NULL;
-  RETURN_IF_ERROR(CreatePlanNode(state->obj_pool(), tnode, &node, state));
+  RETURN_IF_ERROR(CreatePlanNode(state->obj_pool(), tnode, &node));
   if (parent != NULL) {
     parent->children_.push_back(node);
   } else {
@@ -131,7 +131,8 @@ Status PlanNode::CreateTreeHelper(RuntimeState* state,
   }
   for (int i = 0; i < num_children; ++i) {
     ++*node_idx;
-    RETURN_IF_ERROR(CreateTreeHelper(state, tnodes, node, node_idx, NULL));
+    RETURN_IF_ERROR(
+        CreateTreeHelper(state, tnodes, node, node_idx, nullptr));
     // we are expecting a child, but have used all nodes
     // this means we have been given a bad tree and must fail
     if (*node_idx >= tnodes.size()) {
@@ -144,8 +145,14 @@ Status PlanNode::CreateTreeHelper(RuntimeState* state,
   return Status::OK();
 }
 
-Status PlanNode::CreatePlanNode(ObjectPool* pool, const TPlanNode& tnode, PlanNode** node,
-      RuntimeState* state) {
+void PlanNode::AddCodegenStatus(
+    const Status& codegen_status, const std::string& extra_label) {
+  codegen_status_msgs_.emplace_back(FragmentState::GenerateCodegenMsg(
+      codegen_status.ok(), codegen_status, extra_label));
+}
+
+Status PlanNode::CreatePlanNode(
+    ObjectPool* pool, const TPlanNode& tnode, PlanNode** node) {
   switch (tnode.node_type) {
     case TPlanNodeType::HDFS_SCAN_NODE:
       *node = pool->Add(new HdfsScanPlanNode());
@@ -215,6 +222,14 @@ Status PlanNode::CreatePlanNode(ObjectPool* pool, const TPlanNode& tnode, PlanNo
   return Status::OK();
 }
 
+void PlanNode::Codegen(FragmentState* state) {
+  DCHECK(state->ShouldCodegen());
+  DCHECK(state->codegen() != nullptr);
+  for (PlanNode* child : children_) {
+    child->Codegen(state);
+  }
+}
+
 const string ExecNode::ROW_THROUGHPUT_COUNTER = "RowsReturnedRate";
 
 ExecNode::ExecNode(ObjectPool* pool, const PlanNode& pnode, const DescriptorTbl& descs)
@@ -231,7 +246,6 @@ ExecNode::ExecNode(ObjectPool* pool, const PlanNode& pnode, const DescriptorTbl&
     rows_returned_counter_(nullptr),
     rows_returned_rate_(nullptr),
     containing_subplan_(nullptr),
-    disable_codegen_(pnode.tnode_->disable_codegen),
     num_rows_returned_(0),
     is_closed_(false) {
   runtime_profile_->SetPlanNodeId(id_);
@@ -271,17 +285,12 @@ Status ExecNode::Prepare(RuntimeState* state) {
   return Status::OK();
 }
 
-void ExecNode::Codegen(RuntimeState* state) {
-  DCHECK(state->ShouldCodegen());
-  DCHECK(state->codegen() != NULL);
-  for (int i = 0; i < children_.size(); ++i) {
-    children_[i]->Codegen(state);
-  }
-}
-
 Status ExecNode::Open(RuntimeState* state) {
   RETURN_IF_ERROR(ExecDebugAction(TExecNodePhase::OPEN, state));
   DCHECK_EQ(conjunct_evals_.size(), conjuncts_.size());
+  for (const string& codegen_msg : plan_node_.codegen_status_msgs_) {
+    runtime_profile_->AppendExecOption(codegen_msg);
+  }
   return ScalarExprEvaluator::Open(conjunct_evals_, state);
 }
 
@@ -468,10 +477,6 @@ bool ExecNode::EvalConjuncts(
 Status ExecNode::QueryMaintenance(RuntimeState* state) {
   expr_results_pool_->Clear();
   return state->CheckQueryState();
-}
-
-bool ExecNode::IsNodeCodegenDisabled() const {
-  return disable_codegen_;
 }
 
 // Codegen for EvalConjuncts.  The generated signature is the same as EvalConjuncts().

@@ -46,6 +46,7 @@
 #include "exprs/udf-builtins.h"
 #include "exprs/utility-functions.h"
 #include "exprs/valid-tuple-id.h"
+#include "runtime/fragment-state.h"
 #include "runtime/runtime-state.h"
 #include "runtime/tuple-row.h"
 #include "runtime/tuple.h"
@@ -76,7 +77,7 @@ ScalarExpr::ScalarExpr(const TExprNode& node)
 }
 
 Status ScalarExpr::Create(const TExpr& texpr, const RowDescriptor& row_desc,
-    RuntimeState* state, ObjectPool* pool, ScalarExpr** scalar_expr) {
+    FragmentState* state, ObjectPool* pool, ScalarExpr** scalar_expr) {
   *scalar_expr = nullptr;
   ScalarExpr* root;
   RETURN_IF_ERROR(CreateNode(texpr.nodes[0], pool, &root));
@@ -98,7 +99,7 @@ Status ScalarExpr::Create(const TExpr& texpr, const RowDescriptor& row_desc,
 }
 
 Status ScalarExpr::Create(const vector<TExpr>& texprs, const RowDescriptor& row_desc,
-    RuntimeState* state, ObjectPool* pool, vector<ScalarExpr*>* exprs) {
+    FragmentState* state, ObjectPool* pool, vector<ScalarExpr*>* exprs) {
   exprs->clear();
   for (const TExpr& texpr: texprs) {
     ScalarExpr* expr;
@@ -110,12 +111,12 @@ Status ScalarExpr::Create(const vector<TExpr>& texprs, const RowDescriptor& row_
 }
 
 Status ScalarExpr::Create(const TExpr& texpr, const RowDescriptor& row_desc,
-    RuntimeState* state, ScalarExpr** scalar_expr) {
+    FragmentState* state, ScalarExpr** scalar_expr) {
   return ScalarExpr::Create(texpr, row_desc, state, state->obj_pool(), scalar_expr);
 }
 
 Status ScalarExpr::Create(const vector<TExpr>& texprs, const RowDescriptor& row_desc,
-    RuntimeState* state, vector<ScalarExpr*>* exprs) {
+    FragmentState* state, vector<ScalarExpr*>* exprs) {
   return ScalarExpr::Create(texprs, row_desc, state, state->obj_pool(), exprs);
 }
 
@@ -283,7 +284,7 @@ ScalarExprsResultsRowLayout::ScalarExprsResultsRowLayout(
 }
 
 Status ScalarExpr::Init(
-    const RowDescriptor& row_desc, bool is_entry_point, RuntimeState* state) {
+    const RowDescriptor& row_desc, bool is_entry_point, FragmentState* state) {
   DCHECK(type_.type != INVALID_TYPE);
   for (int i = 0; i < children_.size(); ++i) {
     RETURN_IF_ERROR(children_[i]->Init(row_desc, false, state));
@@ -318,7 +319,7 @@ string ScalarExpr::DebugString(const vector<ScalarExpr*>& exprs) {
   return out.str();
 }
 
-bool ScalarExpr::ShouldCodegen(const RuntimeState* state) const {
+bool ScalarExpr::ShouldCodegen(const FragmentState* state) const {
   // Use the interpreted path and call the builtin without codegen if any of the
   // followings is true:
   // 1. The expression does not have an associated RuntimeState, e.g. is a partition

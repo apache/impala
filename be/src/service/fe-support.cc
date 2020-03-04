@@ -37,6 +37,7 @@
 #include "runtime/client-cache.h"
 #include "runtime/decimal-value.inline.h"
 #include "runtime/exec-env.h"
+#include "runtime/fragment-state.h"
 #include "runtime/hdfs-fs-cache.h"
 #include "runtime/lib-cache.h"
 #include "runtime/mem-pool.h"
@@ -200,9 +201,13 @@ Java_org_apache_impala_service_FeSupport_NativeEvalExprsWithoutRow(
   query_ctx.request_pool = "fe-eval-exprs";
 
   RuntimeState state(query_ctx, ExecEnv::GetInstance());
+  TPlanFragmentCtx fragment_ctx;
+  FragmentState fragment_state(state.query_state(), fragment_ctx);
   // Make sure to close the runtime state no matter how this scope is exited.
-  const auto close_runtime_state =
-      MakeScopeExitTrigger([&state]() { state.ReleaseResources(); });
+  const auto close_runtime_state = MakeScopeExitTrigger([&state, &fragment_state]() {
+    fragment_state.ReleaseResources();
+    state.ReleaseResources();
+  });
 
   THROW_IF_ERROR_RET(
       jni_frame.push(env), env, JniUtil::internal_exc_class(), result_bytes);
@@ -214,7 +219,7 @@ Java_org_apache_impala_service_FeSupport_NativeEvalExprsWithoutRow(
   vector<ScalarExprEvaluator*> evals;
   for (const TExpr& texpr : texprs) {
     ScalarExpr* expr;
-    status = ScalarExpr::Create(texpr, RowDescriptor(), &state, &expr);
+    status = ScalarExpr::Create(texpr, RowDescriptor(), &fragment_state, &expr);
     if (!status.ok()) goto error;
     exprs.push_back(expr);
     ScalarExprEvaluator* eval;
@@ -225,12 +230,12 @@ Java_org_apache_impala_service_FeSupport_NativeEvalExprsWithoutRow(
   }
 
   // UDFs which cannot be interpreted need to be handled by codegen.
-  if (state.ScalarExprNeedsCodegen()) {
-    status = state.CreateCodegen();
+  if (fragment_state.ScalarExprNeedsCodegen()) {
+    status = fragment_state.CreateCodegen();
     if (!status.ok()) goto error;
-    LlvmCodeGen* codegen = state.codegen();
+    LlvmCodeGen* codegen = fragment_state.codegen();
     DCHECK(codegen != NULL);
-    status = state.CodegenScalarExprs();
+    status = fragment_state.CodegenScalarExprs();
     if (!status.ok()) goto error;
     codegen->EnableOptimizations(false);
     status = codegen->FinalizeModule();

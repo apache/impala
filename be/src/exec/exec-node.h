@@ -38,6 +38,7 @@ class Function;
 namespace impala {
 
 class DataSink;
+class FragmentState;
 class MemPool;
 class MemTracker;
 class ObjectPool;
@@ -72,7 +73,7 @@ class PlanNode {
   /// initialized here will be owned by state->obj_pool().
   /// If overridden in subclass, must first call superclass's Init().
   /// Should only be called after all children have been set and Init()-ed.
-  virtual Status Init(const TPlanNode& tnode, RuntimeState* state);
+  virtual Status Init(const TPlanNode& tnode, FragmentState* state);
 
   /// Close() releases all resources that were allocated in Init().
   virtual void Close();
@@ -83,12 +84,23 @@ class PlanNode {
   /// Creates plan node tree from list of nodes contained in plan via depth-first
   /// traversal. All nodes are placed in state->obj_pool() and have Init() called on them.
   /// Returns error if 'plan' is corrupted, otherwise success.
-  static Status CreateTree(
-      RuntimeState* state, const TPlan& plan, PlanNode** root) WARN_UNUSED_RESULT;
+  static Status CreateTree(FragmentState* state, const TPlan& plan, PlanNode** root);
+
+  /// Recursively calls Codegen() on all children.
+  /// Expected to be overriden in subclass to generate LLVM IR functions and register
+  /// them with the LlvmCodeGen object. The function pointers of the compiled IR functions
+  /// will be set up when the LlvmCodeGen object is finalized. If overridden in subclass,
+  /// must also call superclass's Codegen() before or after the code generation for this
+  /// plan node. Will only be called once in the node's lifetime.
+  virtual void Codegen(FragmentState* state);
 
   virtual ~PlanNode(){}
 
   bool IsInSubplan() const { return containing_subplan_ != nullptr; }
+
+  /// Return true if codegen was disabled by the planner for this ExecNode. Does not
+  /// check to see if codegen was enabled for the enclosing fragment.
+  bool IsNodeCodegenDisabled() const { return tnode_->disable_codegen; }
 
   /// TODO: IMPALA-9216: Add accessor methods for these members instead of making
   /// them public.
@@ -112,16 +124,24 @@ class PlanNode {
   /// 'this' node. Not owned.
   SubplanPlanNode* containing_subplan_ = nullptr;
 
+  /// A list of messages that will eventually be added to the exec node's runtime
+  /// profile to convey codegen related information. Populated in Codegen().
+  std::vector<std::string> codegen_status_msgs_;
+
+ protected:
+  /// Helper method to add codegen messages from status objects.
+  void AddCodegenStatus(
+      const Status& codegen_status, const std::string& extra_label = "");
+
  private:
   DISALLOW_COPY_AND_ASSIGN(PlanNode);
 
   /// Create a single exec node derived from thrift node; place exec node in 'pool'.
-  static Status CreatePlanNode(ObjectPool* pool, const TPlanNode& tnode, PlanNode** node,
-      RuntimeState* state) WARN_UNUSED_RESULT;
+  static Status CreatePlanNode(ObjectPool* pool, const TPlanNode& tnode, PlanNode** node);
 
-  static Status CreateTreeHelper(RuntimeState* state,
+  static Status CreateTreeHelper(FragmentState* state,
       const std::vector<TPlanNode>& tnodes, PlanNode* parent, int* node_idx,
-      PlanNode** root) WARN_UNUSED_RESULT;
+      PlanNode** root);
 };
 
 class ExecNode {
@@ -138,14 +158,6 @@ class ExecNode {
   /// node's lifetime.
   /// If overridden in subclass, must first call superclass's Prepare().
   virtual Status Prepare(RuntimeState* state) WARN_UNUSED_RESULT;
-
-  /// Recursively calls Codegen() on all children.
-  /// Expected to be overriden in subclass to generate LLVM IR functions and register
-  /// them with the LlvmCodeGen object. The function pointers of the compiled IR functions
-  /// will be set up in PlanFragmentExecutor::Open(). If overridden in subclass, must also
-  /// call superclass's Codegen() before or after the code generation for this exec node.
-  /// Will only be called once in the node's lifetime.
-  virtual void Codegen(RuntimeState* state);
 
   /// Performs any preparatory work prior to calling GetNext().
   /// If overridden in subclass, must first call superclass's Open().
@@ -321,10 +333,6 @@ class ExecNode {
   const TBackendResourceProfile& resource_profile() { return resource_profile_; }
   bool is_closed() const { return is_closed_; }
 
-  /// Return true if codegen was disabled by the planner for this ExecNode. Does not
-  /// check to see if codegen was enabled for the enclosing fragment.
-  bool IsNodeCodegenDisabled() const;
-
   /// Returns true if this node is inside the right-hand side plan tree of a SubplanNode.
   bool IsInSubplan() const { return plan_node_.IsInSubplan(); }
 
@@ -427,9 +435,6 @@ class ExecNode {
   /// Pointer to the containing SubplanNode or NULL if not inside a subplan.
   /// Set by SubplanNode::Prepare() before Prepare() is called on 'this' node. Not owned.
   SubplanNode* containing_subplan_;
-
-  /// If true, codegen should be disabled for this exec node.
-  const bool disable_codegen_;
 
   virtual bool IsScanNode() const { return false; }
 

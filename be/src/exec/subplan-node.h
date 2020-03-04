@@ -27,7 +27,7 @@ class TupleRow;
 
 class SubplanPlanNode : public PlanNode {
  public:
-  virtual Status Init(const TPlanNode& tnode, RuntimeState* state) override;
+  virtual Status Init(const TPlanNode& tnode, FragmentState* state) override;
   virtual Status CreateExecNode(RuntimeState* state, ExecNode** node) const override;
 
   /// Sets 'ancestor' as the containing Subplan in all plan nodes inside the plan-node
@@ -35,7 +35,7 @@ class SubplanPlanNode : public PlanNode {
   /// setting the subplan. Doesn't traverse the second child of SubplanPlanNodes within
   /// 'node'.
   Status SetContainingSubplan(
-    RuntimeState* state, SubplanPlanNode* ancestor, PlanNode* node);
+      FragmentState* state, SubplanPlanNode* ancestor, PlanNode* node);
 
   ~SubplanPlanNode(){}
 };

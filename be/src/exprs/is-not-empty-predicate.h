@@ -41,7 +41,7 @@ class IsNotEmptyPredicate : public Predicate {
   friend class ScalarExpr;
 
   virtual Status Init(
-      const RowDescriptor& row_desc, bool is_entry_point, RuntimeState* state) override;
+      const RowDescriptor& row_desc, bool is_entry_point, FragmentState* state) override;
   explicit IsNotEmptyPredicate(const TExprNode& node);
 };
 

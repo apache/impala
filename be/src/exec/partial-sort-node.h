@@ -25,10 +25,10 @@ namespace impala {
 
 class PartialSortPlanNode : public PlanNode {
  public:
-  virtual Status Init(const TPlanNode& tnode, RuntimeState* state) override;
+  virtual Status Init(const TPlanNode& tnode, FragmentState* state) override;
   virtual void Close() override;
   virtual Status CreateExecNode(RuntimeState* state, ExecNode** node) const override;
-  void Codegen(RuntimeState* state, RuntimeProfile* runtime_profile);
+  virtual void Codegen(FragmentState* state) override;
 
   ~PartialSortPlanNode(){}
 
@@ -68,7 +68,6 @@ class PartialSortNode : public ExecNode {
   ~PartialSortNode();
 
   virtual Status Prepare(RuntimeState* state);
-  virtual void Codegen(RuntimeState* state);
   virtual Status Open(RuntimeState* state);
   virtual Status GetNext(RuntimeState* state, RowBatch* row_batch, bool* eos);
   virtual Status Reset(RuntimeState* state, RowBatch* row_batch);

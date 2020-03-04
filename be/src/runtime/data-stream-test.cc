@@ -28,6 +28,8 @@
 #include "rpc/auth-provider.h"
 #include "rpc/thrift-server.h"
 #include "rpc/rpc-mgr.h"
+#include "runtime/fragment-state.h"
+#include "runtime/query-state.h"
 #include "runtime/row-batch.h"
 #include "runtime/runtime-state.h"
 #include "runtime/exec-env.h"
@@ -152,6 +154,10 @@ class DataStreamTest : public testing::Test {
     ABORT_IF_ERROR(exec_env_->InitForFeTests());
     exec_env_->InitBufferPool(32 * 1024, 1024 * 1024 * 1024, 32 * 1024);
     runtime_state_.reset(new RuntimeState(TQueryCtx(), exec_env_.get()));
+    TPlanFragmentCtx* fragment_ctx =
+        runtime_state_->obj_pool()->Add(new TPlanFragmentCtx());
+    fragment_state_ = runtime_state_->obj_pool()->Add(
+        new FragmentState(runtime_state_->query_state(), *fragment_ctx));
     mem_pool_.reset(new MemPool(&tracker_));
 
     // Register a BufferPool client for allocating buffers for row batches.
@@ -163,7 +169,7 @@ class DataStreamTest : public testing::Test {
     CreateRowDesc();
 
     SlotRef* lhs_slot = obj_pool_.Add(new SlotRef(TYPE_BIGINT, 0));
-    ASSERT_OK(lhs_slot->Init(RowDescriptor(), true, runtime_state_.get()));
+    ASSERT_OK(lhs_slot->Init(RowDescriptor(), true, fragment_state_));
     ordering_exprs_.push_back(lhs_slot);
 
     tsort_info_.sorting_order = TSortingOrder::LEXICAL;
@@ -227,6 +233,8 @@ class DataStreamTest : public testing::Test {
       less_than_comparator->Close(runtime_state_.get());
     }
     ScalarExpr::Close(ordering_exprs_);
+    fragment_state_->ReleaseResources();
+    fragment_state_ = nullptr;
     mem_pool_->FreeAll();
     StopKrpcBackend();
     exec_env_->buffer_pool()->DeregisterClient(&buffer_pool_client_);
@@ -247,6 +255,7 @@ class DataStreamTest : public testing::Test {
   vector<TupleRowComparator*> less_than_comparators_;
   boost::scoped_ptr<ExecEnv> exec_env_;
   scoped_ptr<RuntimeState> runtime_state_;
+  FragmentState* fragment_state_;
   TUniqueId next_instance_id_;
   string stmt_;
   // The sorting expression for the single BIGINT column.
@@ -582,9 +591,13 @@ class DataStreamTest : public testing::Test {
       TPartitionType::type partition_type, SenderInfo* info, bool reset_hash_seed) {
     RuntimeState state(TQueryCtx(), exec_env_.get(), desc_tbl_);
     VLOG_QUERY << "create sender " << sender_num;
-    const TDataSink& sink = GetSink(partition_type);
+    const TDataSink sink = GetSink(partition_type);
+    TPlanFragmentCtx fragment_ctx;
+    fragment_ctx.fragment.output_sink = sink;
+    fragment_ctx.destinations = dest_;
+    FragmentState fragment_state(state.query_state(), fragment_ctx);
     DataSinkConfig* data_sink = nullptr;
-    EXPECT_OK(DataSinkConfig::CreateConfig(sink, row_desc_, &state, &data_sink));
+    EXPECT_OK(DataSinkConfig::CreateConfig(sink, row_desc_, &fragment_state, &data_sink));
 
     // We create an object of the base class DataSink and cast to the appropriate sender
     // according to the 'is_thrift' option.

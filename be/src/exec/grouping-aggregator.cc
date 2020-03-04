@@ -29,6 +29,7 @@
 #include "runtime/buffered-tuple-stream.inline.h"
 #include "runtime/descriptors.h"
 #include "runtime/exec-env.h"
+#include "runtime/fragment-state.h"
 #include "runtime/mem-pool.h"
 #include "runtime/mem-tracker.h"
 #include "runtime/row-batch.h"
@@ -84,14 +85,14 @@ static const StreamingHtMinReductionEntry STREAMING_HT_MIN_REDUCTION[] = {
 };
 
 GroupingAggregatorConfig::GroupingAggregatorConfig(
-    const TAggregator& taggregator, RuntimeState* state, PlanNode* pnode, int agg_idx)
+    const TAggregator& taggregator, FragmentState* state, PlanNode* pnode, int agg_idx)
   : AggregatorConfig(taggregator, state, pnode, agg_idx),
     intermediate_row_desc_(intermediate_tuple_desc_, false),
     is_streaming_preagg_(taggregator.use_streaming_preaggregation),
     resource_profile_(taggregator.resource_profile){};
 
 Status GroupingAggregatorConfig::Init(
-    const TAggregator& taggregator, RuntimeState* state, PlanNode* pnode) {
+    const TAggregator& taggregator, FragmentState* state, PlanNode* pnode) {
   RETURN_IF_ERROR(ScalarExpr::Create(
       taggregator.grouping_exprs, input_row_desc_, state, &grouping_exprs_));
 
@@ -133,7 +134,6 @@ GroupingAggregator::GroupingAggregator(ExecNode* exec_node, ObjectPool* pool,
     const GroupingAggregatorConfig& config, int64_t estimated_input_cardinality)
   : Aggregator(
         exec_node, pool, config, Substitute("GroupingAggregator $0", config.agg_idx_)),
-    agg_config_(config),
     hash_table_config_(*config.hash_table_config_),
     intermediate_row_desc_(config.intermediate_row_desc_),
     is_streaming_preagg_(config.is_streaming_preagg_),
@@ -195,19 +195,14 @@ Status GroupingAggregator::Prepare(RuntimeState* state) {
   return Status::OK();
 }
 
-Status GroupingAggregatorConfig::Codegen(RuntimeState* state) {
+void GroupingAggregatorConfig::Codegen(FragmentState* state) {
   LlvmCodeGen* codegen = state->codegen();
   DCHECK(codegen != nullptr);
   TPrefetchMode::type prefetch_mode = state->query_options().prefetch_mode;
-  return is_streaming_preagg_ ? CodegenAddBatchStreamingImpl(codegen, prefetch_mode) :
-                                CodegenAddBatchImpl(codegen, prefetch_mode);
-}
-
-void GroupingAggregator::Codegen(RuntimeState* state) {
-  // TODO: This const cast will be removed once codegen call is moved before FIS creation
-  Status codegen_status =
-      const_cast<GroupingAggregatorConfig&>(agg_config_).Codegen(state);
-  runtime_profile()->AddCodegenMsg(codegen_status.ok(), codegen_status);
+  Status status = is_streaming_preagg_ ?
+      CodegenAddBatchStreamingImpl(codegen, prefetch_mode) :
+      CodegenAddBatchImpl(codegen, prefetch_mode);
+  codegen_status_msg_ = FragmentState::GenerateCodegenMsg(status.ok(), status);
 }
 
 Status GroupingAggregator::Open(RuntimeState* state) {

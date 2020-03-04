@@ -37,7 +37,7 @@ class BlockingJoinPlanNode : public PlanNode {
  public:
   /// Subclasses should call BlockingJoinNode::Init() and then perform any other Init()
   /// work, e.g. creating expr trees.
-  virtual Status Init(const TPlanNode& tnode, RuntimeState* state) override;
+  virtual Status Init(const TPlanNode& tnode, FragmentState* state) override;
   virtual Status CreateExecNode(RuntimeState* state, ExecNode** node) const override = 0;
 
   /// Returns true if this join node will use a separate builder that is the root sink

@@ -23,6 +23,7 @@
 #include "gutil/strings/substitute.h"
 #include "rpc/rpc-mgr.h"
 #include "runtime/fragment-instance-state.h"
+#include "runtime/fragment-state.h"
 #include "runtime/mem-tracker.h"
 #include "runtime/query-exec-mgr.h"
 #include "runtime/query-state.h"
@@ -166,8 +167,10 @@ Status TestEnv::CreateQueryState(
   fragment_info.__set_fragment_instance_ctxs(
       vector<TPlanFragmentInstanceCtx>({TPlanFragmentInstanceCtx()}));
   RETURN_IF_ERROR(qs->Init(&rpc_params, fragment_info));
+  FragmentState* frag_state =
+      qs->obj_pool()->Add(new FragmentState(qs, qs->fragment_info_.fragment_ctxs[0]));
   FragmentInstanceState* fis = qs->obj_pool()->Add(new FragmentInstanceState(qs,
-      qs->fragment_info_.fragment_ctxs[0], qs->fragment_info_.fragment_instance_ctxs[0]));
+      frag_state, qs->fragment_info_.fragment_instance_ctxs[0]));
   RuntimeState* rs = qs->obj_pool()->Add(
       new RuntimeState(qs, fis->fragment_ctx(), fis->instance_ctx(), exec_env_.get()));
   runtime_states_.push_back(rs);

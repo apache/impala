@@ -29,12 +29,11 @@
 namespace impala {
 
 class DataSink;
+class FragmentState;
 class MemPool;
 class MemTracker;
 class ObjectPool;
 class RowBatch;
-class RuntimeProfile;
-class RuntimeState;
 class RowDescriptor;
 class ScalarExpr;
 class ScalarExprEvaluator;
@@ -57,11 +56,15 @@ class DataSinkConfig {
   virtual DataSink* CreateSink(const TPlanFragmentCtx& fragment_ctx,
     const TPlanFragmentInstanceCtx& fragment_instance_ctx, RuntimeState* state) const = 0;
 
+  /// Codegen expressions in the sink. Overridden by sink type which supports codegen.
+  /// No-op by default.
+  virtual void Codegen(FragmentState* state);
+
   /// Close() releases all resources that were allocated during creation.
   virtual void Close();
 
   /// Pointer to the thrift data sink struct associated with this sink. Set in Init() and
-  /// owned by QueryState.
+  /// owned by FragmentState.
   const TDataSink* tsink_ = nullptr;
 
   /// The row descriptor for the rows consumed by the sink. Owned by root plan node of
@@ -72,16 +75,24 @@ class DataSinkConfig {
   /// Not used in some sub-classes.
   std::vector<ScalarExpr*> output_exprs_;
 
+  /// A list of messages that will eventually be added to the data sink's runtime
+  /// profile to convey codegen related information. Populated in Codegen().
+  std::vector<std::string> codegen_status_msgs_;
+
   /// Creates a new data sink config, allocated in state->obj_pool() and returned through
   /// *sink, from the thrift sink object in fragment_ctx.
   static Status CreateConfig(const TDataSink& thrift_sink, const RowDescriptor* row_desc,
-      RuntimeState* state, DataSinkConfig** sink);
+      FragmentState* state, DataSinkConfig** data_sink);
 
  protected:
   /// Sets reference to TDataSink and initializes the expressions. Returns error status on
   /// failure. If overridden in subclass, must first call superclass's Init().
-  virtual Status Init(
-      const TDataSink& tsink, const RowDescriptor* input_row_desc, RuntimeState* state);
+  virtual Status Init(const TDataSink& tsink, const RowDescriptor* input_row_desc,
+      FragmentState* state);
+
+  /// Helper method to add codegen messages from status objects.
+  void AddCodegenStatus(
+      const Status& codegen_status, const std::string& extra_label = "");
 
  private:
   DISALLOW_COPY_AND_ASSIGN(DataSinkConfig);
@@ -111,11 +122,8 @@ class DataSink {
   /// initializes their evaluators. Subclasses must call DataSink::Prepare().
   virtual Status Prepare(RuntimeState* state, MemTracker* parent_mem_tracker);
 
-  /// Codegen expressions in the sink. Overridden by sink type which supports codegen.
-  /// No-op by default.
-  virtual void Codegen(RuntimeState* state);
-
   /// Call before Send() to open the sink and initialize output expression evaluators.
+  ///  Subclasses must call DataSink::Open().
   virtual Status Open(RuntimeState* state);
 
   /// Send a row batch into this sink. Generally, Send() should not retain any references

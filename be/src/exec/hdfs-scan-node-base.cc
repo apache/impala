@@ -41,6 +41,7 @@
 #include "exprs/scalar-expr.h"
 #include "runtime/descriptors.h"
 #include "runtime/exec-env.h"
+#include "runtime/fragment-state.h"
 #include "runtime/hdfs-fs-cache.h"
 #include "runtime/io/disk-io-mgr.h"
 #include "runtime/io/request-context.h"
@@ -150,7 +151,7 @@ const string HdfsScanNodeBase::HDFS_SPLIT_STATS_DESC =
 // Determines how many unexpected remote bytes trigger an error in the runtime state
 const int UNEXPECTED_REMOTE_BYTES_WARN_THRESHOLD = 64 * 1024 * 1024;
 
-Status HdfsScanPlanNode::Init(const TPlanNode& tnode, RuntimeState* state) {
+Status HdfsScanPlanNode::Init(const TPlanNode& tnode, FragmentState* state) {
   RETURN_IF_ERROR(ScanPlanNode::Init(tnode, state));
 
   tuple_id_ = tnode.hdfs_scan_node.tuple_id;
@@ -222,10 +223,10 @@ Status HdfsScanPlanNode::Init(const TPlanNode& tnode, RuntimeState* state) {
         *min_max_row_desc, state, &min_max_conjuncts_));
   }
 
-  // TODO: Find formats to be read across all instances once codegen done per fragment.
-  const TPlanFragmentInstanceCtx& instance_ctx = state->instance_ctx();
-  auto ranges = instance_ctx.per_node_scan_ranges.find(tnode.node_id);
-  if (ranges != instance_ctx.per_node_scan_ranges.end()) {
+  const vector<const TPlanFragmentInstanceCtx*>& instance_ctxs = state->instance_ctxs();
+  for (auto ctx : instance_ctxs) {
+    auto ranges = ctx->per_node_scan_ranges.find(tnode.node_id);
+    if (ranges == ctx->per_node_scan_ranges.end()) continue;
     for (const TScanRangeParams& scan_range_param : ranges->second) {
       const THdfsFileSplit& split = scan_range_param.scan_range.hdfs_file_split;
       HdfsPartitionDescriptor* partition_desc =
@@ -233,6 +234,7 @@ Status HdfsScanPlanNode::Init(const TPlanNode& tnode, RuntimeState* state) {
       scanned_file_formats_.insert(partition_desc->file_format());
     }
   }
+  state->CheckAndAddCodegenDisabledMessage(codegen_status_msgs_);
   return Status::OK();
 }
 
@@ -406,21 +408,13 @@ Status HdfsScanNodeBase::Prepare(RuntimeState* state) {
   PrintHdfsSplitStats(per_volume_stats, &str);
   runtime_profile()->AddInfoString("Table Name", hdfs_table_->fully_qualified_name());
   runtime_profile()->AddInfoString(HDFS_SPLIT_STATS_DESC, str.str());
-  state->CheckAndAddCodegenDisabledMessage(runtime_profile());
   return Status::OK();
 }
 
-void HdfsScanNodeBase::Codegen(RuntimeState* state) {
+void HdfsScanPlanNode::Codegen(FragmentState* state) {
   DCHECK(state->ShouldCodegen());
-  ExecNode::Codegen(state);
+  PlanNode::Codegen(state);
   if (IsNodeCodegenDisabled()) return;
-  const HdfsScanPlanNode& const_plan_node =
-      static_cast<const HdfsScanPlanNode&>(plan_node_);
-  HdfsScanPlanNode& hdfs_plan_node = const_cast<HdfsScanPlanNode&>(const_plan_node);
-  hdfs_plan_node.Codegen(state, state->runtime_profile());
-}
-
-void HdfsScanPlanNode::Codegen(RuntimeState* state, RuntimeProfile* profile) {
   for (THdfsFileFormat::type format: scanned_file_formats_) {
     llvm::Function* fn;
     Status status;
@@ -451,7 +445,7 @@ void HdfsScanPlanNode::Codegen(RuntimeState* state, RuntimeProfile* profile) {
       codegen->AddFunctionToJit(
           fn, &codegend_fn_map_[static_cast<THdfsFileFormat::type>(format)]);
     }
-    profile->AddCodegenMsg(status.ok(), status, format_name);
+    AddCodegenStatus(status, format_name);
   }
 }
 

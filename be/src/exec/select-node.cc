@@ -22,6 +22,7 @@
 #include "exprs/scalar-expr-evaluator.h"
 #include "exprs/scalar-expr.h"
 #include "gen-cpp/PlanNodes_types.h"
+#include "runtime/fragment-state.h"
 #include "runtime/raw-value.h"
 #include "runtime/row-batch.h"
 #include "runtime/runtime-state.h"
@@ -51,21 +52,14 @@ Status SelectNode::Prepare(RuntimeState* state) {
   return Status::OK();
 }
 
-void SelectNode::Codegen(RuntimeState* state) {
+void SelectPlanNode::Codegen(FragmentState* state) {
   DCHECK(state->ShouldCodegen());
-  ExecNode::Codegen(state);
+  PlanNode::Codegen(state);
   if (IsNodeCodegenDisabled()) return;
-  const SelectPlanNode& select_pnode = static_cast<const SelectPlanNode&>(plan_node_);
-  SelectPlanNode& non_const_pnode = const_cast<SelectPlanNode&>(select_pnode);
-  non_const_pnode.Codegen(state, runtime_profile());
+  AddCodegenStatus(CodegenCopyRows(state));
 }
 
-void SelectPlanNode::Codegen(RuntimeState* state, RuntimeProfile* runtime_profile) {
-  Status codegen_status = CodegenCopyRows(state);
-  runtime_profile->AddCodegenMsg(codegen_status.ok(), codegen_status);
-}
-
-Status SelectPlanNode::CodegenCopyRows(RuntimeState* state) {
+Status SelectPlanNode::CodegenCopyRows(FragmentState* state) {
   LlvmCodeGen* codegen = state->codegen();
   DCHECK(codegen != nullptr);
   llvm::Function* copy_rows_fn =

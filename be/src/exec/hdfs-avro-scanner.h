@@ -96,7 +96,7 @@ class HdfsAvroScanner : public BaseSequenceScanner {
   /// Codegen DecodeAvroData(). Stores the resulting function in 'decode_avro_data_fn' if
   /// codegen was successful or nullptr otherwise.
   static Status Codegen(
-      HdfsScanPlanNode* node, RuntimeState* state, llvm::Function** decode_avro_data_fn);
+      HdfsScanPlanNode* node, FragmentState* state, llvm::Function** decode_avro_data_fn);
 
   static const char* LLVM_CLASS_NAME;
 
@@ -208,7 +208,7 @@ class HdfsAvroScanner : public BaseSequenceScanner {
   /// Produces a version of DecodeAvroData that uses codegen'd instead of interpreted
   /// functions. Stores the resulting function in 'decode_avro_data_fn' if codegen was
   /// successful or returns an error.
-  static Status CodegenDecodeAvroData(const HdfsScanPlanNode* node, RuntimeState* state,
+  static Status CodegenDecodeAvroData(const HdfsScanPlanNode* node, FragmentState* state,
       llvm::Function** decode_avro_data_fn);
 
   /// Codegens a version of MaterializeTuple() that reads records based on the table

@@ -18,6 +18,7 @@
 #include "exec/sort-node.h"
 
 #include "exec/exec-node-util.h"
+#include "runtime/fragment-state.h"
 #include "runtime/row-batch.h"
 #include "runtime/runtime-state.h"
 #include "runtime/sorted-run-merger.h"
@@ -27,7 +28,7 @@
 
 namespace impala {
 
-Status SortPlanNode::Init(const TPlanNode& tnode, RuntimeState* state) {
+Status SortPlanNode::Init(const TPlanNode& tnode, FragmentState* state) {
   RETURN_IF_ERROR(PlanNode::Init(tnode, state));
   const TSortInfo& tsort_info = tnode.sort_node.sort_info;
   RETURN_IF_ERROR(ScalarExpr::Create(
@@ -37,6 +38,7 @@ Status SortPlanNode::Init(const TPlanNode& tnode, RuntimeState* state) {
       *children_[0]->row_descriptor_, state, &sort_tuple_slot_exprs_));
   row_comparator_config_ =
       state->obj_pool()->Add(new TupleRowComparatorConfig(tsort_info, ordering_exprs_));
+  state->CheckAndAddCodegenDisabledMessage(codegen_status_msgs_);
   return Status::OK();
 }
 
@@ -74,22 +76,14 @@ Status SortNode::Prepare(RuntimeState* state) {
       resource_profile_.spillable_buffer_size, runtime_profile(), state, label(), true));
   RETURN_IF_ERROR(sorter_->Prepare(pool_));
   DCHECK_GE(resource_profile_.min_reservation, sorter_->ComputeMinReservation());
-  state->CheckAndAddCodegenDisabledMessage(runtime_profile());
   return Status::OK();
 }
 
-void SortNode::Codegen(RuntimeState* state) {
+void SortPlanNode::Codegen(FragmentState* state) {
   DCHECK(state->ShouldCodegen());
-  ExecNode::Codegen(state);
+  PlanNode::Codegen(state);
   if (IsNodeCodegenDisabled()) return;
-  const SortPlanNode& sort_pnode = static_cast<const SortPlanNode&>(plan_node_);
-  SortPlanNode& non_const_pnode = const_cast<SortPlanNode&>(sort_pnode);
-  non_const_pnode.Codegen(state, runtime_profile());
-}
-
-void SortPlanNode::Codegen(RuntimeState* state, RuntimeProfile* runtime_profile) {
-  Status codegen_status = row_comparator_config_->Codegen(state);
-  runtime_profile->AddCodegenMsg(codegen_status.ok(), codegen_status);
+  AddCodegenStatus(row_comparator_config_->Codegen(state));
 }
 
 Status SortNode::Open(RuntimeState* state) {

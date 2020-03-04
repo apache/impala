@@ -29,6 +29,7 @@
 #include "exprs/scalar-expr.h"
 #include "exprs/slot-ref.h"
 #include "runtime/buffered-tuple-stream.inline.h"
+#include "runtime/fragment-state.h"
 #include "runtime/mem-tracker.h"
 #include "runtime/row-batch.h"
 #include "runtime/runtime-state.h"
@@ -48,7 +49,8 @@ static const string PREPARE_FOR_READ_FAILED_ERROR_MSG =
 using namespace impala;
 using strings::Substitute;
 
-Status PartitionedHashJoinPlanNode::Init(const TPlanNode& tnode, RuntimeState* state) {
+Status PartitionedHashJoinPlanNode::Init(
+    const TPlanNode& tnode, FragmentState* state) {
   RETURN_IF_ERROR(BlockingJoinPlanNode::Init(tnode, state));
   DCHECK(tnode.__isset.join_node);
   DCHECK(tnode.join_node.__isset.hash_join_node);
@@ -83,10 +85,11 @@ Status PartitionedHashJoinPlanNode::Init(const TPlanNode& tnode, RuntimeState* s
   // Create the config always. It is only used if UseSeparateBuild() is true, but in
   // Init(), IsInSubplan() isn't available yet.
   // TODO: simplify this by ensuring that UseSeparateBuild() is accurate in Init().
-  RETURN_IF_ERROR(PhjBuilderConfig::CreateConfig(state, tnode_->node_id,
-      tnode_->join_node.join_op, &build_row_desc(), eq_join_conjuncts,
-      tnode_->runtime_filters, tnode_->join_node.hash_join_node.hash_seed,
-      &phj_builder_config));
+  RETURN_IF_ERROR(
+      PhjBuilderConfig::CreateConfig(state, tnode_->node_id, tnode_->join_node.join_op,
+          &build_row_desc(), eq_join_conjuncts, tnode_->runtime_filters,
+          tnode_->join_node.hash_join_node.hash_seed, &phj_builder_config_));
+  state->CheckAndAddCodegenDisabledMessage(codegen_status_msgs_);
   return Status::OK();
 }
 
@@ -94,7 +97,7 @@ void PartitionedHashJoinPlanNode::Close() {
   ScalarExpr::Close(probe_exprs_);
   ScalarExpr::Close(build_exprs_);
   ScalarExpr::Close(other_join_conjuncts_);
-  if (phj_builder_config != nullptr) phj_builder_config->Close();
+  if (phj_builder_config_ != nullptr) phj_builder_config_->Close();
   PlanNode::Close();
 }
 
@@ -129,7 +132,7 @@ Status PartitionedHashJoinNode::Prepare(RuntimeState* state) {
   runtime_state_ = state;
   if (!UseSeparateBuild(state->query_options())) {
     const PhjBuilderConfig& builder_config =
-      *static_cast<const PartitionedHashJoinPlanNode&>(plan_node_).phj_builder_config;
+      *static_cast<const PartitionedHashJoinPlanNode&>(plan_node_).phj_builder_config_;
     builder_ = builder_config.CreateSink(buffer_pool_client(),
           resource_profile_.spillable_buffer_size, resource_profile_.max_row_buffer_size,
           state);
@@ -158,14 +161,13 @@ Status PartitionedHashJoinNode::Prepare(RuntimeState* state) {
 
   num_probe_rows_partitioned_ =
       ADD_COUNTER(runtime_profile(), "ProbeRowsPartitioned", TUnit::UNIT);
-  state->CheckAndAddCodegenDisabledMessage(runtime_profile());
   return Status::OK();
 }
 
-void PartitionedHashJoinNode::Codegen(RuntimeState* state) {
+void PartitionedHashJoinPlanNode::Codegen(FragmentState* state) {
   DCHECK(state->ShouldCodegen());
-  // Codegen the children node;
-  ExecNode::Codegen(state);
+  // Codegen the children nodes.
+  PlanNode::Codegen(state);
   if (IsNodeCodegenDisabled()) return;
 
   LlvmCodeGen* codegen = state->codegen();
@@ -173,27 +175,12 @@ void PartitionedHashJoinNode::Codegen(RuntimeState* state) {
 
   // Codegen the build side (if integrated into this join node).
   if (!UseSeparateBuild(state->query_options())) {
-    // TODO: invoke codegen on the PhjBuilderConfig obj inside
-    // PartitionedHashJoinPlanNode::Codegen() once codegen invocation is completely moved
-    // to the plan nodes.
-    DCHECK(builder_ != nullptr);
-    builder_->Codegen(state);
+    DCHECK(phj_builder_config_ != nullptr);
+    phj_builder_config_->Codegen(state);
   }
 
-  // Codegen the probe side.
-  const PartitionedHashJoinPlanNode& phj_pnode =
-      static_cast<const PartitionedHashJoinPlanNode&>(plan_node_);
-  PartitionedHashJoinPlanNode& non_const_pnode =
-      const_cast<PartitionedHashJoinPlanNode&>(phj_pnode);
-  non_const_pnode.Codegen(state, runtime_profile());
-}
-
-void PartitionedHashJoinPlanNode::Codegen(RuntimeState* state, RuntimeProfile* profile) {
-  LlvmCodeGen* codegen = state->codegen();
-  DCHECK(codegen != nullptr);
   TPrefetchMode::type prefetch_mode = state->query_options().prefetch_mode;
-  Status probe_codegen_status = CodegenProcessProbeBatch(codegen, prefetch_mode);
-  profile->AddCodegenMsg(probe_codegen_status.ok(), probe_codegen_status, "Probe Side");
+  AddCodegenStatus(CodegenProcessProbeBatch(codegen, prefetch_mode),  "Probe Side");
 }
 
 Status PartitionedHashJoinNode::Open(RuntimeState* state) {

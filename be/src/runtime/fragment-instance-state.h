@@ -43,6 +43,7 @@ class RpcContext;
 
 namespace impala {
 
+class FragmentState;
 class TPlanFragmentCtx;
 class TPlanFragmentInstanceCtx;
 class TBloomFilter;
@@ -79,7 +80,7 @@ class JoinBuilder;
 /// - absorb RuntimeState?
 class FragmentInstanceState {
  public:
-  FragmentInstanceState(QueryState* query_state, const TPlanFragmentCtx& fragment_ctx,
+  FragmentInstanceState(QueryState* query_state, FragmentState* fragment_state,
       const TPlanFragmentInstanceCtx& instance_ctx);
 
   /// Main loop of fragment instance execution. Blocks until execution finishes and
@@ -156,6 +157,7 @@ class FragmentInstanceState {
 
  private:
   QueryState* query_state_;
+  FragmentState* fragment_state_;
   const TPlanFragmentCtx& fragment_ctx_;
   const TPlanFragmentInstanceCtx& instance_ctx_;
 
@@ -163,9 +165,6 @@ class FragmentInstanceState {
   /// in Prepare().
   ExecNode* exec_tree_ = nullptr; // lives in obj_pool()
   RuntimeState* runtime_state_ = nullptr;  // lives in obj_pool()
-  /// Lives in obj_pool(). Not mutated after being initialized except for being closed.
-  PlanNode* plan_tree_ = nullptr;
-  DataSinkConfig* sink_config_ = nullptr;
 
   /// A 'fake mutex' to detect any race condition in accessing 'report_seq_no_' below.
   /// There should be only one thread doing status report at the same time.
@@ -228,9 +227,6 @@ class FragmentInstanceState {
 
   /// should live in obj_pool(), but managed separately so we can delete it in Close()
   boost::scoped_ptr<RowBatch> row_batch_;
-
-  /// Set when Prepare() returns.
-  Promise<Status> prepared_promise_;
 
   /// Set when OpenInternal() returns.
   Promise<Status> opened_promise_;

@@ -18,6 +18,7 @@
 #include "exec/partial-sort-node.h"
 
 #include "exec/exec-node-util.h"
+#include "runtime/fragment-state.h"
 #include "runtime/row-batch.h"
 #include "runtime/runtime-state.h"
 #include "runtime/sorted-run-merger.h"
@@ -27,7 +28,7 @@
 
 namespace impala {
 
-Status PartialSortPlanNode::Init(const TPlanNode& tnode, RuntimeState* state) {
+Status PartialSortPlanNode::Init(const TPlanNode& tnode, FragmentState* state) {
   DCHECK(!tnode.sort_node.__isset.offset || tnode.sort_node.offset == 0);
   RETURN_IF_ERROR(PlanNode::Init(tnode, state));
   const TSortInfo& tsort_info = tnode.sort_node.sort_info;
@@ -38,6 +39,7 @@ Status PartialSortPlanNode::Init(const TPlanNode& tnode, RuntimeState* state) {
       *children_[0]->row_descriptor_, state, &sort_tuple_slot_exprs_));
   row_comparator_config_ =
       state->obj_pool()->Add(new TupleRowComparatorConfig(tsort_info, ordering_exprs_));
+  state->CheckAndAddCodegenDisabledMessage(codegen_status_msgs_);
   return Status::OK();
 }
 
@@ -78,26 +80,16 @@ Status PartialSortNode::Prepare(RuntimeState* state) {
           runtime_profile(), state, label(), false));
   RETURN_IF_ERROR(sorter_->Prepare(pool_));
   DCHECK_GE(resource_profile_.min_reservation, sorter_->ComputeMinReservation());
-  state->CheckAndAddCodegenDisabledMessage(runtime_profile());
   input_batch_.reset(
       new RowBatch(child(0)->row_desc(), state->batch_size(), mem_tracker()));
   return Status::OK();
 }
 
-void PartialSortNode::Codegen(RuntimeState* state) {
+void PartialSortPlanNode::Codegen(FragmentState* state) {
   DCHECK(state->ShouldCodegen());
-  ExecNode::Codegen(state);
+  PlanNode::Codegen(state);
   if (IsNodeCodegenDisabled()) return;
-  const PartialSortPlanNode& partial_sort_pnode =
-      static_cast<const PartialSortPlanNode&>(plan_node_);
-  PartialSortPlanNode& non_const_pnode =
-      const_cast<PartialSortPlanNode&>(partial_sort_pnode);
-  non_const_pnode.Codegen(state, runtime_profile());
-}
-
-void PartialSortPlanNode::Codegen(RuntimeState* state, RuntimeProfile* runtime_profile) {
-  Status codegen_status = row_comparator_config_->Codegen(state);
-  runtime_profile->AddCodegenMsg(codegen_status.ok(), codegen_status);
+  AddCodegenStatus(row_comparator_config_->Codegen(state));
 }
 
 Status PartialSortNode::Open(RuntimeState* state) {

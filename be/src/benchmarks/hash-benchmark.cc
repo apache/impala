@@ -23,7 +23,9 @@
 #include "codegen/llvm-codegen.h"
 #include "common/init.h"
 #include "experiments/data-provider.h"
+#include "runtime/fragment-state.h"
 #include "runtime/mem-tracker.h"
+#include "runtime/query-state.h"
 #include "runtime/test-env.h"
 #include "service/fe-support.h"
 #include "util/benchmark.h"
@@ -479,6 +481,10 @@ int main(int argc, char **argv) {
     return -1;
   }
   status = test_env.CreateQueryState(0, nullptr, &state);
+  QueryState* qs = state->query_state();
+  TPlanFragmentCtx* fragment_ctx = qs->obj_pool()->Add(new TPlanFragmentCtx());
+  FragmentState* fragment_state =
+      qs->obj_pool()->Add(new FragmentState(qs, *fragment_ctx));
   if (!status.ok()) {
     cout << "Could not create RuntimeState";
     return -1;
@@ -492,7 +498,7 @@ int main(int argc, char **argv) {
   DataProvider mixed_provider(&mem_pool, mixed_profile);
 
   scoped_ptr<LlvmCodeGen> codegen;
-  status = LlvmCodeGen::CreateImpalaCodegen(state, NULL, "test", &codegen);
+  status = LlvmCodeGen::CreateImpalaCodegen(fragment_state, NULL, "test", &codegen);
   if (!status.ok()) {
     cout << "Could not start codegen.";
     return -1;

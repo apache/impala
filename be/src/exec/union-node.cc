@@ -22,6 +22,7 @@
 #include "exprs/scalar-expr-evaluator.h"
 #include "exprs/scalar-expr.h"
 #include "gen-cpp/PlanNodes_types.h"
+#include "runtime/fragment-state.h"
 #include "runtime/row-batch.h"
 #include "runtime/runtime-state.h"
 #include "runtime/tuple-row.h"
@@ -32,7 +33,7 @@
 
 using namespace impala;
 
-Status UnionPlanNode::Init(const TPlanNode& tnode, RuntimeState* state) {
+Status UnionPlanNode::Init(const TPlanNode& tnode, FragmentState* state) {
   RETURN_IF_ERROR(PlanNode::Init(tnode, state));
   DCHECK(tnode_->__isset.union_node);
   DCHECK_EQ(conjuncts_.size(), 0);
@@ -116,16 +117,10 @@ Status UnionNode::Prepare(RuntimeState* state) {
   return Status::OK();
 }
 
-void UnionNode::Codegen(RuntimeState* state) {
+void UnionPlanNode::Codegen(FragmentState* state){
   DCHECK(state->ShouldCodegen());
-  ExecNode::Codegen(state);
+  PlanNode::Codegen(state);
   if (IsNodeCodegenDisabled()) return;
-  const UnionPlanNode& union_pnode = static_cast<const UnionPlanNode&>(plan_node_);
-  UnionPlanNode& non_const_pnode = const_cast<UnionPlanNode&>(union_pnode);
-  non_const_pnode.Codegen(state, runtime_profile());
-}
-
-void UnionPlanNode::Codegen(RuntimeState* state, RuntimeProfile* runtime_profile){
   LlvmCodeGen* codegen = state->codegen();
   DCHECK(codegen != nullptr);
   std::stringstream codegen_message;
@@ -161,8 +156,7 @@ void UnionPlanNode::Codegen(RuntimeState* state, RuntimeProfile* runtime_profile
     codegen->AddFunctionToJit(union_materialize_batch_fn,
         reinterpret_cast<void**>(&(codegend_union_materialize_batch_fns_.data()[i])));
   }
-  runtime_profile->AddCodegenMsg(
-      codegen_status.ok(), codegen_status, codegen_message.str());
+  AddCodegenStatus(codegen_status, codegen_message.str());
 }
 
 Status UnionNode::Open(RuntimeState* state) {

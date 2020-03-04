@@ -22,7 +22,7 @@
 #include "exec/kudu-util.h"
 #include "exprs/scalar-expr-evaluator.h"
 #include "runtime/exec-env.h"
-#include "runtime/query-state.h"
+#include "runtime/fragment-state.h"
 #include "runtime/runtime-state.h"
 #include "runtime/tuple-row.h"
 #include "runtime/tuple.h"
@@ -34,7 +34,7 @@ KuduPartitionExpr::KuduPartitionExpr(const TExprNode& node)
   : ScalarExpr(node), tkudu_partition_expr_(node.kudu_partition_expr) {}
 
 Status KuduPartitionExpr::Init(
-    const RowDescriptor& row_desc, bool is_entry_point, RuntimeState* state) {
+    const RowDescriptor& row_desc, bool is_entry_point, FragmentState* state) {
   RETURN_IF_ERROR(ScalarExpr::Init(row_desc, is_entry_point, state));
   DCHECK_EQ(tkudu_partition_expr_.referenced_columns.size(), children_.size());
 

@@ -25,7 +25,7 @@
 namespace impala {
 
 Status JoinBuilderConfig::Init(
-    const TDataSink& tsink, const RowDescriptor* input_row_desc, RuntimeState* state) {
+    const TDataSink& tsink, const RowDescriptor* input_row_desc, FragmentState* state) {
   RETURN_IF_ERROR(DataSinkConfig::Init(tsink, input_row_desc, state));
   join_node_id_ = tsink.join_build_sink.dest_node_id;
   join_op_ = tsink.join_build_sink.join_op;

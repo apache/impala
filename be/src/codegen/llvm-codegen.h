@@ -85,6 +85,7 @@ namespace impala {
 
 class CodegenCallGraph;
 class CodegenSymbolEmitter;
+class FragmentState;
 class ImpalaMCJITMemoryManager;
 class SubExprElimination;
 class TupleDescriptor;
@@ -169,7 +170,7 @@ class LlvmCodeGen {
   /// 'codegen' will contain the created object on success.
   /// 'parent_mem_tracker' - if non-NULL, the CodeGen MemTracker is created under this.
   /// 'id' is used for outputting the IR module for debugging.
-  static Status CreateImpalaCodegen(RuntimeState* state, MemTracker* parent_mem_tracker,
+  static Status CreateImpalaCodegen(FragmentState* state, MemTracker* parent_mem_tracker,
       const std::string& id, boost::scoped_ptr<LlvmCodeGen>* codegen);
 
   ~LlvmCodeGen();
@@ -610,7 +611,7 @@ class LlvmCodeGen {
   friend class SubExprElimination;
 
   /// Top level codegen object. 'module_id' is used for debugging when outputting the IR.
-  LlvmCodeGen(RuntimeState* state, ObjectPool* pool, MemTracker* parent_mem_tracker,
+  LlvmCodeGen(FragmentState* state, ObjectPool* pool, MemTracker* parent_mem_tracker,
       const std::string& module_id);
 
   /// Initializes the jitter and execution engine with the given module.
@@ -620,7 +621,7 @@ class LlvmCodeGen {
   /// 'codegen' will contain the created object on success. The functions in the module
   /// are materialized lazily. Getting a reference to a function via GetFunction() will
   /// materialize the function and its callees recursively.
-  static Status CreateFromFile(RuntimeState* state, ObjectPool* pool,
+  static Status CreateFromFile(FragmentState* state, ObjectPool* pool,
       MemTracker* parent_mem_tracker, const std::string& file,
       const std::string& id, boost::scoped_ptr<LlvmCodeGen>* codegen);
 
@@ -628,7 +629,7 @@ class LlvmCodeGen {
   /// 'codegen' will contain the created object on success. The functions in the module
   /// are materialized lazily. Getting a reference to a function via GetFunction() will
   /// materialize the function and its callees recursively.
-  static Status CreateFromMemory(RuntimeState* state, ObjectPool* pool,
+  static Status CreateFromMemory(FragmentState* state, ObjectPool* pool,
       MemTracker* parent_mem_tracker, const std::string& id,
       boost::scoped_ptr<LlvmCodeGen>* codegen);
 
@@ -755,9 +756,9 @@ class LlvmCodeGen {
   /// Used for determining dependencies when materializing IR functions.
   static CodegenCallGraph shared_call_graph_;
 
-  /// Pointer to the RuntimeState which owns this codegen object. Needed in
+  /// Pointer to the FragmentState which owns this codegen object. Needed in
   /// InlineConstFnAttr() to access the query options.
-  const RuntimeState* state_;
+  const FragmentState* state_;
 
   /// ID used for debugging (can be e.g. the fragment instance ID)
   std::string id_;

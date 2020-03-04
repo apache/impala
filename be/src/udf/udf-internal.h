@@ -170,10 +170,10 @@ class FunctionContextImpl {
   int GetConstFnAttr(ConstFnAttr t, int i = -1);
 
   /// Return the function attribute 't' defined in ConstFnAttr above.
-  static int GetConstFnAttr(const RuntimeState* state,
+  static int GetConstFnAttr(bool uses_decimal_v2,
       const impala_udf::FunctionContext::TypeDesc& return_type,
-      const std::vector<impala_udf::FunctionContext::TypeDesc>& arg_types,
-      ConstFnAttr t, int i = -1);
+      const std::vector<impala_udf::FunctionContext::TypeDesc>& arg_types, ConstFnAttr t,
+      int i = -1);
 
   /// UDFs may manipulate DecimalVal arguments via SIMD instructions such as 'movaps'
   /// that require 16-byte memory alignment.

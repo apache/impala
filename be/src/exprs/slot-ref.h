@@ -50,7 +50,7 @@ class SlotRef : public ScalarExpr {
 
   /// Exposed as public so AGG node can initialize its build expressions.
   virtual Status Init(const RowDescriptor& row_desc, bool is_entry_point,
-      RuntimeState* state) override WARN_UNUSED_RESULT;
+      FragmentState* state) override WARN_UNUSED_RESULT;
   virtual std::string DebugString() const override;
   virtual Status GetCodegendComputeFnImpl(
       LlvmCodeGen* codegen, llvm::Function** fn) override WARN_UNUSED_RESULT;

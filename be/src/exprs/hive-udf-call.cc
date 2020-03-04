@@ -175,7 +175,7 @@ Status HiveUdfCall::InitEnv() {
 }
 
 Status HiveUdfCall::Init(
-    const RowDescriptor& row_desc, bool is_entry_point, RuntimeState* state) {
+    const RowDescriptor& row_desc, bool is_entry_point, FragmentState* state) {
   // Initialize children first.
   RETURN_IF_ERROR(ScalarExpr::Init(row_desc, is_entry_point, state));
 

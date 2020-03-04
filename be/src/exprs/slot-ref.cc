@@ -26,6 +26,7 @@
 #include "gen-cpp/Exprs_types.h"
 #include "runtime/collection-value.h"
 #include "runtime/decimal-value.h"
+#include "runtime/fragment-state.h"
 #include "runtime/multi-precision.h"
 #include "runtime/runtime-state.h"
 #include "runtime/string-value.inline.h"
@@ -72,7 +73,7 @@ SlotRef::SlotRef(const ColumnType& type, int offset, const bool nullable /* = fa
     slot_id_(-1) {}
 
 Status SlotRef::Init(
-    const RowDescriptor& row_desc, bool is_entry_point, RuntimeState* state) {
+    const RowDescriptor& row_desc, bool is_entry_point, FragmentState* state) {
   DCHECK_EQ(children_.size(), 0);
   RETURN_IF_ERROR(ScalarExpr::Init(row_desc, is_entry_point, state));
   if (slot_id_ != -1) {

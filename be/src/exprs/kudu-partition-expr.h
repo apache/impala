@@ -41,7 +41,7 @@ class KuduPartitionExpr : public ScalarExpr {
   KuduPartitionExpr(const TExprNode& node);
 
   virtual Status Init(const RowDescriptor& row_desc, bool is_entry_point,
-      RuntimeState* state) override WARN_UNUSED_RESULT;
+      FragmentState* state) override WARN_UNUSED_RESULT;
 
   virtual IntVal GetIntValInterpreted(
       ScalarExprEvaluator* eval, const TupleRow* row) const override;

@@ -43,7 +43,7 @@ BooleanVal IsNotEmptyPredicate::GetBooleanValInterpreted(
 }
 
 Status IsNotEmptyPredicate::Init(
-    const RowDescriptor& row_desc, bool is_entry_point, RuntimeState* state) {
+    const RowDescriptor& row_desc, bool is_entry_point, FragmentState* state) {
   RETURN_IF_ERROR(ScalarExpr::Init(row_desc, is_entry_point, state));
   DCHECK_EQ(children_.size(), 1);
   return Status::OK();

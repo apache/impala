@@ -21,6 +21,7 @@
 #include "exec/grouping-aggregator.h"
 #include "exec/non-grouping-aggregator.h"
 #include "exec/streaming-aggregation-node.h"
+#include "runtime/fragment-state.h"
 #include "runtime/runtime-state.h"
 #include "util/runtime-profile-counters.h"
 
@@ -28,7 +29,7 @@
 
 namespace impala {
 
-Status AggregationPlanNode::Init(const TPlanNode& tnode, RuntimeState* state) {
+Status AggregationPlanNode::Init(const TPlanNode& tnode, FragmentState* state) {
   RETURN_IF_ERROR(PlanNode::Init(tnode, state));
   int num_ags = tnode_->agg_node.aggregators.size();
   for (int i = 0; i < num_ags; ++i) {
@@ -44,6 +45,7 @@ Status AggregationPlanNode::Init(const TPlanNode& tnode, RuntimeState* state) {
     RETURN_IF_ERROR(aggs_[i]->Init(agg, state, this));
   }
   DCHECK(aggs_.size() > 0);
+  state->CheckAndAddCodegenDisabledMessage(codegen_status_msgs_);
   return Status::OK();
 }
 
@@ -94,15 +96,16 @@ Status AggregationNodeBase::Prepare(RuntimeState* state) {
     agg->SetDebugOptions(debug_options_);
     RETURN_IF_ERROR(agg->Prepare(state));
   }
-  state->CheckAndAddCodegenDisabledMessage(runtime_profile());
   return Status::OK();
 }
 
-void AggregationNodeBase::Codegen(RuntimeState* state) {
+void AggregationPlanNode::Codegen(FragmentState* state) {
   DCHECK(state->ShouldCodegen());
-  ExecNode::Codegen(state);
+  PlanNode::Codegen(state);
   if (IsNodeCodegenDisabled()) return;
-  for (auto& agg : aggs_) agg->Codegen(state);
+  for (auto& agg : aggs_) {
+    agg->Codegen(state);
+  }
 }
 
 Status AggregationNodeBase::Reset(RuntimeState* state, RowBatch* row_batch) {

@@ -173,24 +173,6 @@ void RuntimeState::Init() {
   }
 }
 
-Status RuntimeState::CreateCodegen() {
-  if (codegen_.get() != NULL) return Status::OK();
-  // TODO: add the fragment ID to the codegen ID as well
-  RETURN_IF_ERROR(LlvmCodeGen::CreateImpalaCodegen(this,
-      instance_mem_tracker_, PrintId(fragment_instance_id()), &codegen_));
-  codegen_->EnableOptimizations(true);
-  profile_->AddChild(codegen_->runtime_profile());
-  return Status::OK();
-}
-
-Status RuntimeState::CodegenScalarExprs() {
-  for (auto& item : scalar_exprs_to_codegen_) {
-    llvm::Function* fn;
-    RETURN_IF_ERROR(item.first->GetCodegendComputeFn(codegen_.get(), item.second, &fn));
-  }
-  return Status::OK();
-}
-
 Status RuntimeState::StartSpilling(MemTracker* mem_tracker) {
   return query_state_->StartSpilling(this, mem_tracker);
 }
@@ -322,9 +304,6 @@ void RuntimeState::ReleaseResources() {
   if (resource_pool_ != nullptr) {
     ExecEnv::GetInstance()->thread_mgr()->DestroyPool(move(resource_pool_));
   }
-  // Release any memory associated with codegen.
-  if (codegen_ != nullptr) codegen_->Close();
-
   // Release the reservation, which should be unused at the point.
   if (instance_buffer_reservation_ != nullptr) instance_buffer_reservation_->Close();
 

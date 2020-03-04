@@ -23,6 +23,8 @@
 #include "codegen/llvm-codegen.h"
 #include "common/init.h"
 #include "common/object-pool.h"
+#include "runtime/fragment-state.h"
+#include "runtime/query-state.h"
 #include "runtime/string-value.h"
 #include "runtime/test-env.h"
 #include "service/fe-support.h"
@@ -42,16 +44,21 @@ namespace impala {
 class LlvmCodeGenTest : public testing:: Test {
  protected:
   scoped_ptr<TestEnv> test_env_;
-  RuntimeState* runtime_state_;
+  FragmentState* fragment_state_;
 
   virtual void SetUp() {
     test_env_.reset(new TestEnv());
     ASSERT_OK(test_env_->Init());
+    RuntimeState* runtime_state_;
     ASSERT_OK(test_env_->CreateQueryState(0, nullptr, &runtime_state_));
+    QueryState* qs = runtime_state_->query_state();
+    TPlanFragmentCtx* fragment_ctx = qs->obj_pool()->Add(new TPlanFragmentCtx());
+    fragment_state_ = qs->obj_pool()->Add(new FragmentState(qs, *fragment_ctx));
   }
 
   virtual void TearDown() {
-    runtime_state_ = NULL;
+    fragment_state_->ReleaseResources();
+    fragment_state_ = nullptr;
     test_env_.reset();
   }
 
@@ -78,8 +85,8 @@ class LlvmCodeGenTest : public testing:: Test {
 
   // Wrapper to call private test-only methods on LlvmCodeGen object
   Status CreateFromFile(const string& filename, scoped_ptr<LlvmCodeGen>* codegen) {
-    RETURN_IF_ERROR(LlvmCodeGen::CreateFromFile(runtime_state_,
-        runtime_state_->obj_pool(), NULL, filename, "test", codegen));
+    RETURN_IF_ERROR(LlvmCodeGen::CreateFromFile(fragment_state_,
+        fragment_state_->obj_pool(), NULL, filename, "test", codegen));
     return (*codegen)->MaterializeModule();
   }
 
@@ -342,7 +349,7 @@ llvm::Function* CodegenStringTest(LlvmCodeGen* codegen) {
 // and modify it.
 TEST_F(LlvmCodeGenTest, StringValue) {
   scoped_ptr<LlvmCodeGen> codegen;
-  ASSERT_OK(LlvmCodeGen::CreateImpalaCodegen(runtime_state_, NULL, "test", &codegen));
+  ASSERT_OK(LlvmCodeGen::CreateImpalaCodegen(fragment_state_, NULL, "test", &codegen));
   EXPECT_TRUE(codegen.get() != NULL);
 
   string str("Test");
@@ -383,7 +390,7 @@ TEST_F(LlvmCodeGenTest, StringValue) {
 // Test calling memcpy intrinsic
 TEST_F(LlvmCodeGenTest, MemcpyTest) {
   scoped_ptr<LlvmCodeGen> codegen;
-  ASSERT_OK(LlvmCodeGen::CreateImpalaCodegen(runtime_state_, NULL, "test", &codegen));
+  ASSERT_OK(LlvmCodeGen::CreateImpalaCodegen(fragment_state_, NULL, "test", &codegen));
   ASSERT_TRUE(codegen.get() != NULL);
 
   LlvmCodeGen::FnPrototype prototype(codegen.get(), "MemcpyTest", codegen->void_type());
@@ -429,7 +436,7 @@ TEST_F(LlvmCodeGenTest, HashTest) {
   // Loop to test both the sse4 on/off paths
   for (int i = 0; i < 2; ++i) {
     scoped_ptr<LlvmCodeGen> codegen;
-    ASSERT_OK(LlvmCodeGen::CreateImpalaCodegen(runtime_state_, NULL, "test", &codegen));
+    ASSERT_OK(LlvmCodeGen::CreateImpalaCodegen(fragment_state_, NULL, "test", &codegen));
     ASSERT_TRUE(codegen.get() != NULL);
     const auto close_codegen =
         MakeScopeExitTrigger([&codegen]() { codegen->Close(); });
@@ -541,7 +548,7 @@ TEST_F(LlvmCodeGenTest, CpuAttrWhitelist) {
 // finalizes the llvm module.
 TEST_F(LlvmCodeGenTest, CleanupNonFinalizedMethodsTest) {
   scoped_ptr<LlvmCodeGen> codegen;
-  ASSERT_OK(LlvmCodeGen::CreateImpalaCodegen(runtime_state_, nullptr, "test", &codegen));
+  ASSERT_OK(LlvmCodeGen::CreateImpalaCodegen(fragment_state_, nullptr, "test", &codegen));
   ASSERT_TRUE(codegen.get() != nullptr);
   const auto close_codegen = MakeScopeExitTrigger([&codegen]() { codegen->Close(); });
   LlvmBuilder builder(codegen->context());

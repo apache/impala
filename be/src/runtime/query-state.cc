@@ -33,6 +33,7 @@
 #include "runtime/bufferpool/reservation-tracker.h"
 #include "runtime/bufferpool/reservation-util.h"
 #include "runtime/exec-env.h"
+#include "runtime/fragment-state.h"
 #include "runtime/fragment-instance-state.h"
 #include "runtime/initial-reservations.h"
 #include "runtime/mem-tracker.h"
@@ -116,6 +117,10 @@ void QueryState::ReleaseBackendResources() {
   if (initial_reservations_ != nullptr) initial_reservations_->ReleaseResources();
   if (buffer_reservation_ != nullptr) buffer_reservation_->Close();
   if (desc_tbl_ != nullptr) desc_tbl_->ReleaseResources();
+  // Release any memory associated with codegen.
+  for (auto& elem : fragment_state_map_) {
+    elem.second->ReleaseResources();
+  }
   // Mark the query as finished on the query MemTracker so that admission control will
   // not consider the whole query memory limit to be "reserved".
   query_mem_tracker_->set_query_exec_finished();
@@ -258,6 +263,26 @@ Status QueryState::InitBufferPoolState() {
   return Status::OK();
 }
 
+// Verifies the filters produced by all instances on the same backend are the same.
+bool VerifyFiltersProduced(const vector<TPlanFragmentInstanceCtx>& instance_ctxs) {
+  int fragment_idx = -1;
+  std::unordered_set<int> first_set;
+  for (const TPlanFragmentInstanceCtx& instance_ctx : instance_ctxs) {
+    bool first_instance_of_fragment =
+        fragment_idx == -1 || fragment_idx != instance_ctx.fragment_idx;
+    if (first_instance_of_fragment) {
+      fragment_idx = instance_ctx.fragment_idx;
+      first_set.clear();
+      for (auto f : instance_ctx.filters_produced) first_set.insert(f.filter_id);
+    }
+    if (first_set.size() != instance_ctx.filters_produced.size()) return false;
+    for (auto f : instance_ctx.filters_produced) {
+      if (first_set.find(f.filter_id) == first_set.end()) return false;
+    }
+  }
+  return true;
+}
+
 Status QueryState::InitFilterBank() {
   int64_t runtime_filters_reservation_bytes = 0;
   int fragment_ctx_idx = -1;
@@ -274,6 +299,8 @@ Status QueryState::InitFilterBank() {
       }
     }
   }
+  DCHECK(VerifyFiltersProduced(instance_ctxs))
+      << "Filters produced by all instances on the same backend should be the same";
   for (const TPlanFragmentInstanceCtx& instance_ctx : instance_ctxs) {
     bool first_instance_of_fragment = fragment_ctx_idx == -1
         || fragment_ctxs[fragment_ctx_idx].fragment.idx != instance_ctx.fragment_idx;
@@ -516,6 +543,14 @@ int64_t QueryState::GetReportWaitTimeMs() const {
   return report_interval * (num_failed_reports_ + 1);
 }
 
+void QueryState::ErrorDuringFragmentCodegen(const Status& status) {
+  unique_lock<SpinLock> l(status_lock_);
+  if (!HasErrorStatus()) {
+    overall_status_ = status;
+    failed_finstance_id_ = TUniqueId();
+  }
+}
+
 void QueryState::ErrorDuringPrepare(const Status& status, const TUniqueId& finst_id) {
   {
     unique_lock<SpinLock> l(status_lock_);
@@ -561,9 +596,8 @@ bool QueryState::StartFInstances() {
   DCHECK_GT(backend_resource_refcnt_.Load(), 0) << "Should have been taken in Init()";
 
   DCHECK_GT(fragment_info_.fragment_ctxs.size(), 0);
-  TPlanFragmentCtx* fragment_ctx = &fragment_info_.fragment_ctxs[0];
+  vector<unique_ptr<Thread>> codegen_threads;
   int num_unstarted_instances = fragment_info_.fragment_instance_ctxs.size();
-  int fragment_ctx_idx = 0;
 
   // set up desc tbl
   DCHECK(query_ctx().__isset.desc_tbl_serialized);
@@ -573,49 +607,49 @@ bool QueryState::StartFInstances() {
   VLOG(2) << "descriptor table for query=" << PrintId(query_id())
           << "\n" << desc_tbl_->DebugString();
 
+  start_finstances_status =
+      FragmentState::CreateFragmentStateMap(fragment_info_, this, fragment_state_map_);
+  if (UNLIKELY(!start_finstances_status.ok())) goto error;
+
   fragment_events_start_time_ = MonotonicStopWatch::Now();
-  for (const TPlanFragmentInstanceCtx& instance_ctx :
-      fragment_info_.fragment_instance_ctxs) {
-    // determine corresponding TPlanFragmentCtx
-    if (fragment_ctx->fragment.idx != instance_ctx.fragment_idx) {
-      ++fragment_ctx_idx;
-      DCHECK_LT(fragment_ctx_idx, fragment_info_.fragment_ctxs.size());
-      fragment_ctx = &fragment_info_.fragment_ctxs[fragment_ctx_idx];
-      // we expect fragment and instance contexts to follow the same order
-      DCHECK_EQ(fragment_ctx->fragment.idx, instance_ctx.fragment_idx);
+  for (auto& fragment : fragment_state_map_) {
+    FragmentState* fragment_state = fragment.second;
+    for (const TPlanFragmentInstanceCtx* instance_ctx : fragment_state->instance_ctxs()) {
+      FragmentInstanceState* fis =
+          obj_pool_.Add(new FragmentInstanceState(this, fragment_state, *instance_ctx));
+
+      // start new thread to execute instance
+      refcnt_.Add(1); // decremented in ExecFInstance()
+      AcquireBackendResourceRefcount(); // decremented in ExecFInstance()
+
+      // Add the fragment instance ID to the 'fis_map_'. Has to happen before the thread
+      // is spawned or we may race with users of 'fis_map_'.
+      fis_map_.emplace(fis->instance_id(), fis);
+
+      string thread_name =
+          Substitute("$0 (finst:$1)", FragmentInstanceState::FINST_THREAD_NAME_PREFIX,
+              PrintId(instance_ctx->fragment_instance_id));
+      unique_ptr<Thread> t;
+
+      // Inject thread creation failures through debug actions if enabled.
+      Status debug_action_status =
+          DebugAction(query_options(), "FIS_FAIL_THREAD_CREATION");
+      start_finstances_status = !debug_action_status.ok() ?
+          debug_action_status :
+          Thread::Create(FragmentInstanceState::FINST_THREAD_GROUP_NAME, thread_name,
+              [this, fis]() { this->ExecFInstance(fis); }, &t, true);
+      if (!start_finstances_status.ok()) {
+        fis_map_.erase(fis->instance_id());
+        // Undo refcnt increments done immediately prior to Thread::Create(). The
+        // reference counts were both greater than zero before the increments, so
+        // neither of these decrements will free any structures.
+        ReleaseBackendResourceRefcount();
+        ExecEnv::GetInstance()->query_exec_mgr()->ReleaseQueryState(this);
+        goto error;
+      }
+      t->Detach();
+      --num_unstarted_instances;
     }
-    FragmentInstanceState* fis = obj_pool_.Add(
-        new FragmentInstanceState(this, *fragment_ctx, instance_ctx));
-
-    // start new thread to execute instance
-    refcnt_.Add(1); // decremented in ExecFInstance()
-    AcquireBackendResourceRefcount(); // decremented in ExecFInstance()
-
-    // Add the fragment instance ID to the 'fis_map_'. Has to happen before the thread is
-    // spawned or we may race with users of 'fis_map_'.
-    fis_map_.emplace(fis->instance_id(), fis);
-
-    string thread_name = Substitute("$0 (finst:$1)",
-        FragmentInstanceState::FINST_THREAD_NAME_PREFIX,
-        PrintId(instance_ctx.fragment_instance_id));
-    unique_ptr<Thread> t;
-
-    // Inject thread creation failures through debug actions if enabled.
-    Status debug_action_status = DebugAction(query_options(), "FIS_FAIL_THREAD_CREATION");
-    start_finstances_status = !debug_action_status.ok() ? debug_action_status :
-        Thread::Create(FragmentInstanceState::FINST_THREAD_GROUP_NAME, thread_name,
-            [this, fis]() { this->ExecFInstance(fis); }, &t, true);
-    if (!start_finstances_status.ok()) {
-      fis_map_.erase(fis->instance_id());
-      // Undo refcnt increments done immediately prior to Thread::Create(). The
-      // reference counts were both greater than zero before the increments, so
-      // neither of these decrements will free any structures.
-      ReleaseBackendResourceRefcount();
-      ExecEnv::GetInstance()->query_exec_mgr()->ReleaseQueryState(this);
-      goto error;
-    }
-    t->Detach();
-    --num_unstarted_instances;
   }
   return true;
 

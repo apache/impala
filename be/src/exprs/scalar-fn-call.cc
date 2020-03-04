@@ -31,6 +31,7 @@
 #include "codegen/llvm-codegen.h"
 #include "exprs/anyval-util.h"
 #include "exprs/scalar-expr-evaluator.h"
+#include "runtime/fragment-state.h"
 #include "runtime/hdfs-fs-cache.h"
 #include "runtime/lib-cache.h"
 #include "runtime/runtime-state.h"
@@ -71,7 +72,7 @@ Status ScalarFnCall::LoadPrepareAndCloseFn(LlvmCodeGen* codegen) {
 }
 
 Status ScalarFnCall::Init(
-    const RowDescriptor& desc, bool is_entry_point, RuntimeState* state) {
+    const RowDescriptor& desc, bool is_entry_point, FragmentState* state) {
   // Initialize children first.
   RETURN_IF_ERROR(ScalarExpr::Init(desc, is_entry_point, state));
 

@@ -41,6 +41,7 @@
 #include "gen-cpp/ErrorCodes_types.h"
 #include "gutil/strings/substitute.h"
 #include "runtime/descriptors.h"
+#include "runtime/fragment-state.h"
 #include "runtime/io/request-context.h"
 #include "runtime/io/request-ranges.h"
 #include "runtime/mem-pool.h"
@@ -790,7 +791,7 @@ Status HdfsTextScanner::CheckForSplitDelimiter(bool* split_delimiter) {
 // Codegen for materializing parsed data into tuples.  The function WriteCompleteTuple is
 // handcrafted using the IRBuilder for the specific tuple description.  This function
 // is then injected into the cross-compiled driving function, WriteAlignedTuples().
-Status HdfsTextScanner::Codegen(HdfsScanPlanNode* node, RuntimeState* state,
+Status HdfsTextScanner::Codegen(HdfsScanPlanNode* node, FragmentState* state,
     llvm::Function** write_aligned_tuples_fn) {
   *write_aligned_tuples_fn = nullptr;
   DCHECK(state->ShouldCodegen());

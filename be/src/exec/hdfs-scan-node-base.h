@@ -101,10 +101,10 @@ struct ScanRangeMetadata {
 
 class HdfsScanPlanNode : public ScanPlanNode {
  public:
-  virtual Status Init(const TPlanNode& tnode, RuntimeState* state) override;
+  virtual Status Init(const TPlanNode& tnode, FragmentState* state) override;
   virtual void Close() override;
   virtual Status CreateExecNode(RuntimeState* state, ExecNode** node) const override;
-  void Codegen(RuntimeState* state, RuntimeProfile* profile);
+  virtual void Codegen(FragmentState* state) override;
 
   /// Returns index into materialized_slots with 'path'.  Returns SKIP_COLUMN if
   /// that path is not materialized. Only valid to call after Init().
@@ -228,7 +228,6 @@ class HdfsScanNodeBase : public ScanNode {
   ~HdfsScanNodeBase();
 
   virtual Status Prepare(RuntimeState* state) override WARN_UNUSED_RESULT;
-  virtual void Codegen(RuntimeState* state) override;
   virtual Status Open(RuntimeState* state) override WARN_UNUSED_RESULT;
   virtual Status Reset(
       RuntimeState* state, RowBatch* row_batch) override WARN_UNUSED_RESULT;

@@ -36,6 +36,7 @@
 #include "gen-cpp/ImpalaInternalService_constants.h"
 #include "gen-cpp/ImpalaInternalService_types.h"
 #include "gutil/strings/substitute.h"
+#include "runtime/fragment-state.h"
 #include "runtime/krpc-data-stream-sender.h"
 #include "runtime/mem-tracker.h"
 #include "util/container-util.h"
@@ -46,19 +47,30 @@ using strings::Substitute;
 
 namespace impala {
 
+void DataSinkConfig::Codegen(FragmentState* state) {
+  return;
+}
+
 void DataSinkConfig::Close() {
   ScalarExpr::Close(output_exprs_);
 }
 
 Status DataSinkConfig::Init(
-    const TDataSink& tsink, const RowDescriptor* input_row_desc, RuntimeState* state) {
+    const TDataSink& tsink, const RowDescriptor* input_row_desc, FragmentState* state) {
   tsink_ = &tsink;
   input_row_desc_ = input_row_desc;
   return ScalarExpr::Create(tsink.output_exprs, *input_row_desc_, state, &output_exprs_);
 }
 
+void DataSinkConfig::AddCodegenStatus(
+    const Status& codegen_status, const std::string& extra_label) {
+  codegen_status_msgs_.emplace_back(FragmentState::GenerateCodegenMsg(
+      codegen_status.ok(), codegen_status, extra_label));
+}
+
 Status DataSinkConfig::CreateConfig(const TDataSink& thrift_sink,
-    const RowDescriptor* row_desc, RuntimeState* state, DataSinkConfig** data_sink) {
+    const RowDescriptor* row_desc, FragmentState* state,
+    DataSinkConfig** data_sink) {
   ObjectPool* pool = state->obj_pool();
   *data_sink = nullptr;
   switch (thrift_sink.type) {
@@ -151,12 +163,11 @@ Status DataSink::Prepare(RuntimeState* state, MemTracker* parent_mem_tracker) {
   return Status::OK();
 }
 
-void DataSink::Codegen(RuntimeState* state) {
-  return;
-}
-
 Status DataSink::Open(RuntimeState* state) {
   DCHECK_EQ(output_exprs_.size(), output_expr_evals_.size());
+  for (const string& codegen_msg : sink_config_.codegen_status_msgs_) {
+    profile_->AppendExecOption(codegen_msg);
+  }
   return ScalarExprEvaluator::Open(output_expr_evals_, state);
 }
 

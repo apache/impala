@@ -26,6 +26,7 @@
 #include "exec/hdfs-scan-node.h"
 #include "exec/read-write-util.h"
 #include "exec/scanner-context.inline.h"
+#include "runtime/fragment-state.h"
 #include "runtime/raw-value.h"
 #include "runtime/runtime-state.h"
 #include "util/codec.h"
@@ -79,7 +80,7 @@ Status HdfsAvroScanner::Open(ScannerContext* context) {
 }
 
 Status HdfsAvroScanner::Codegen(HdfsScanPlanNode* node,
-   RuntimeState* state, llvm::Function** decode_avro_data_fn) {
+   FragmentState* state, llvm::Function** decode_avro_data_fn) {
   *decode_avro_data_fn = nullptr;
   DCHECK(state->ShouldCodegen());
   DCHECK(state->codegen() != nullptr);
@@ -1098,7 +1099,7 @@ Status HdfsAvroScanner::CodegenReadScalar(const AvroSchemaElement& element,
 }
 
 Status HdfsAvroScanner::CodegenDecodeAvroData(const HdfsScanPlanNode* node,
-    RuntimeState* state, llvm::Function** decode_avro_data_fn) {
+    FragmentState* state, llvm::Function** decode_avro_data_fn) {
   const vector<ScalarExpr*>& conjuncts = node->conjuncts_;
   LlvmCodeGen* codegen = state->codegen();
 

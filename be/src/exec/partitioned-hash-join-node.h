@@ -40,10 +40,10 @@ class TupleRow;
 
 class PartitionedHashJoinPlanNode : public BlockingJoinPlanNode {
  public:
-  virtual Status Init(const TPlanNode& tnode, RuntimeState* state) override;
+  virtual Status Init(const TPlanNode& tnode, FragmentState* state) override;
   virtual void Close() override;
   virtual Status CreateExecNode(RuntimeState* state, ExecNode** node) const override;
-  void Codegen(RuntimeState* state, RuntimeProfile* profile);
+  virtual void Codegen(FragmentState* state) override;
 
   ~PartitionedHashJoinPlanNode(){}
 
@@ -61,7 +61,7 @@ class PartitionedHashJoinPlanNode : public BlockingJoinPlanNode {
 
   /// Data sink config object for creating a phj builder that will be eventually used by
   /// the exec node.
-  PhjBuilderConfig* phj_builder_config;
+  PhjBuilderConfig* phj_builder_config_;
 
   /// Seed used for hashing rows.
   uint32_t hash_seed_;
@@ -170,7 +170,6 @@ class PartitionedHashJoinNode : public BlockingJoinNode {
   virtual ~PartitionedHashJoinNode();
 
   virtual Status Prepare(RuntimeState* state) override;
-  virtual void Codegen(RuntimeState* state) override;
   virtual Status Open(RuntimeState* state) override;
   virtual Status GetNext(RuntimeState* state, RowBatch* row_batch, bool* eos) override;
   virtual Status Reset(RuntimeState* state, RowBatch* row_batch) override;

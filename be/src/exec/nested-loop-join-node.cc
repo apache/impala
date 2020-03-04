@@ -37,7 +37,7 @@
 using namespace impala;
 using namespace strings;
 
-Status NestedLoopJoinPlanNode::Init(const TPlanNode& tnode, RuntimeState* state) {
+Status NestedLoopJoinPlanNode::Init(const TPlanNode& tnode, FragmentState* state) {
   RETURN_IF_ERROR(BlockingJoinPlanNode::Init(tnode, state));
   DCHECK(tnode.join_node.__isset.nested_loop_join_node);
   // join_conjunct_evals_ are evaluated in the context of rows assembled from

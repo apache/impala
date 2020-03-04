@@ -26,6 +26,7 @@
 #include "exec/text-converter.inline.h"
 #include "exprs/scalar-expr-evaluator.h"
 #include "runtime/collection-value-builder.h"
+#include "runtime/fragment-state.h"
 #include "runtime/hdfs-fs-cache.h"
 #include "runtime/runtime-filter.inline.h"
 #include "runtime/tuple-row.h"
@@ -326,7 +327,7 @@ bool HdfsScanner::WriteCompleteTuple(MemPool* pool, FieldLocation* fields,
 //   ret i1 false
 // }
 Status HdfsScanner::CodegenWriteCompleteTuple(const HdfsScanPlanNode* node,
-    RuntimeState* state, llvm::Function** write_complete_tuple_fn) {
+    FragmentState* state, llvm::Function** write_complete_tuple_fn) {
   const vector<ScalarExpr*>& conjuncts = node->conjuncts_;
   LlvmCodeGen* codegen = state->codegen();
   *write_complete_tuple_fn = NULL;
@@ -339,7 +340,8 @@ Status HdfsScanner::CodegenWriteCompleteTuple(const HdfsScanPlanNode* node,
     SlotDescriptor* slot_desc = node->materialized_slots_[i];
     RETURN_IF_ERROR(TextConverter::CodegenWriteSlot(codegen, tuple_desc, slot_desc, &fn,
         node->hdfs_table_->null_column_value().data(),
-        node->hdfs_table_->null_column_value().size(), true, state->strict_mode()));
+        node->hdfs_table_->null_column_value().size(), true,
+        state->query_options().strict_mode));
     if (i >= LlvmCodeGen::CODEGEN_INLINE_EXPRS_THRESHOLD) codegen->SetNoInline(fn);
     slot_fns.push_back(fn);
   }
@@ -489,14 +491,8 @@ Status HdfsScanner::CodegenWriteCompleteTuple(const HdfsScanPlanNode* node,
       // tuple against that conjunct and start a new parse_block for the next conjunct
       parse_block = llvm::BasicBlock::Create(context, "parse", fn, eval_fail_block);
       llvm::Function* conjunct_fn;
-      Status status =
-          conjuncts[conjunct_idx]->GetCodegendComputeFn(codegen, false, &conjunct_fn);
-      if (!status.ok()) {
-        stringstream ss;
-        ss << "Failed to codegen conjunct: " << status.GetDetail();
-        state->LogError(ErrorMsg(TErrorCode::GENERAL, ss.str()));
-        return status;
-      }
+      RETURN_IF_ERROR(
+          conjuncts[conjunct_idx]->GetCodegendComputeFn(codegen, false, &conjunct_fn));
       if (node->materialized_slots_.size() + conjunct_idx
           >= LlvmCodeGen::CODEGEN_INLINE_EXPRS_THRESHOLD) {
         codegen->SetNoInline(conjunct_fn);
@@ -532,7 +528,7 @@ Status HdfsScanner::CodegenWriteCompleteTuple(const HdfsScanPlanNode* node,
 }
 
 Status HdfsScanner::CodegenWriteAlignedTuples(const HdfsScanPlanNode* node,
-    RuntimeState* state, llvm::Function* write_complete_tuple_fn,
+    FragmentState* state, llvm::Function* write_complete_tuple_fn,
     llvm::Function** write_aligned_tuples_fn) {
   LlvmCodeGen* codegen = state->codegen();
   *write_aligned_tuples_fn = NULL;

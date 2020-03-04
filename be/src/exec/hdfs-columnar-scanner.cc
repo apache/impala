@@ -22,6 +22,7 @@
 #include "codegen/llvm-codegen.h"
 #include "exec/hdfs-scan-node-base.h"
 #include "exec/scratch-tuple-batch.h"
+#include "runtime/fragment-state.h"
 #include "runtime/row-batch.h"
 #include "runtime/runtime-state.h"
 
@@ -72,7 +73,7 @@ int HdfsColumnarScanner::TransferScratchTuples(RowBatch* dst_batch) {
   return num_rows_to_commit;
 }
 
-Status HdfsColumnarScanner::Codegen(HdfsScanPlanNode* node, RuntimeState* state,
+Status HdfsColumnarScanner::Codegen(HdfsScanPlanNode* node, FragmentState* state,
     llvm::Function** process_scratch_batch_fn) {
   DCHECK(state->ShouldCodegen());
   *process_scratch_batch_fn = nullptr;

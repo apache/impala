@@ -24,6 +24,7 @@
 #include "exprs/scalar-expr.h"
 #include "exprs/scalar-expr-evaluator.h"
 #include "runtime/descriptors.h"
+#include "runtime/fragment-state.h"
 #include "runtime/mem-pool.h"
 #include "runtime/mem-tracker.h"
 #include "runtime/row-batch.h"
@@ -41,7 +42,7 @@
 using std::priority_queue;
 using namespace impala;
 
-Status TopNPlanNode::Init(const TPlanNode& tnode, RuntimeState* state) {
+Status TopNPlanNode::Init(const TPlanNode& tnode, FragmentState* state) {
   const TSortInfo& tsort_info = tnode.sort_node.sort_info;
   RETURN_IF_ERROR(PlanNode::Init(tnode, state));
   RETURN_IF_ERROR(ScalarExpr::Create(
@@ -53,6 +54,7 @@ Status TopNPlanNode::Init(const TPlanNode& tnode, RuntimeState* state) {
   row_comparator_config_ =
       state->obj_pool()->Add(new TupleRowComparatorConfig(tsort_info, ordering_exprs_));
   DCHECK_EQ(conjuncts_.size(), 0) << "TopNNode should never have predicates to evaluate.";
+  state->CheckAndAddCodegenDisabledMessage(codegen_status_msgs_);
   return Status::OK();
 }
 
@@ -90,22 +92,15 @@ Status TopNNode::Prepare(RuntimeState* state) {
   RETURN_IF_ERROR(ScalarExprEvaluator::Create(output_tuple_exprs_, state, pool_,
       expr_perm_pool(), expr_results_pool(), &output_tuple_expr_evals_));
   insert_batch_timer_ = ADD_TIMER(runtime_profile(), "InsertBatchTime");
-  state->CheckAndAddCodegenDisabledMessage(runtime_profile());
   tuple_pool_reclaim_counter_ = ADD_COUNTER(runtime_profile(), "TuplePoolReclamations",
       TUnit::UNIT);
   return Status::OK();
 }
 
-void TopNNode::Codegen(RuntimeState* state) {
+void TopNPlanNode::Codegen(FragmentState* state) {
   DCHECK(state->ShouldCodegen());
-  ExecNode::Codegen(state);
+  PlanNode::Codegen(state);
   if (IsNodeCodegenDisabled()) return;
-  const TopNPlanNode& topn_pnode = static_cast<const TopNPlanNode&>(plan_node_);
-  TopNPlanNode& non_const_pnode = const_cast<TopNPlanNode&>(topn_pnode);
-  non_const_pnode.Codegen(state, runtime_profile());
-}
-
-void TopNPlanNode::Codegen(RuntimeState* state, RuntimeProfile* runtime_profile) {
   LlvmCodeGen* codegen = state->codegen();
   DCHECK(codegen != NULL);
 
@@ -146,7 +141,7 @@ void TopNPlanNode::Codegen(RuntimeState* state, RuntimeProfile* runtime_profile)
       }
     }
   }
-  runtime_profile->AddCodegenMsg(codegen_status.ok(), codegen_status);
+  AddCodegenStatus(codegen_status);
 }
 
 Status TopNNode::Open(RuntimeState* state) {

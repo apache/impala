@@ -108,7 +108,7 @@ class HdfsTableSinkConfig : public DataSinkConfig {
 
  protected:
   Status Init(const TDataSink& tsink, const RowDescriptor* input_row_desc,
-      RuntimeState* state) override;
+      FragmentState* state) override;
 };
 
 /// The sink consumes all row batches of its child execution tree, and writes the

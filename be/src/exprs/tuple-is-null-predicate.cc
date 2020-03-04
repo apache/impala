@@ -44,7 +44,7 @@ TupleIsNullPredicate::TupleIsNullPredicate(const TExprNode& node)
         node.tuple_is_null_pred.tuple_ids.end()) {}
 
 Status TupleIsNullPredicate::Init(
-    const RowDescriptor& row_desc, bool is_entry_point, RuntimeState* state) {
+    const RowDescriptor& row_desc, bool is_entry_point, FragmentState* state) {
   RETURN_IF_ERROR(ScalarExpr::Init(row_desc, is_entry_point, state));
   DCHECK_EQ(0, children_.size());
   // Resolve tuple ids to tuple indexes.

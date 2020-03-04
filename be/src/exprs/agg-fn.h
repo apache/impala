@@ -31,6 +31,7 @@ namespace impala {
 
 using impala_udf::FunctionContext;
 
+class FragmentState;
 class LlvmCodeGen;
 class MemPool;
 class MemTracker;
@@ -103,8 +104,8 @@ class AggFn : public Expr {
   /// of the output value. On failure, returns error status and sets 'agg_fn' to NULL.
   static Status Create(const TExpr& texpr, const RowDescriptor& row_desc,
       const SlotDescriptor& intermediate_slot_desc,
-      const SlotDescriptor& output_slot_desc, RuntimeState* state, AggFn** agg_fn)
-      WARN_UNUSED_RESULT;
+      const SlotDescriptor& output_slot_desc, FragmentState* state,
+      AggFn** agg_fn) WARN_UNUSED_RESULT;
 
   bool is_merge() const { return is_merge_; }
   AggregationOp agg_op() const { return agg_op_; }
@@ -176,7 +177,7 @@ class AggFn : public Expr {
 
   /// Initializes the AggFn and its input expressions. May load the UDAF from LibCache
   /// if necessary.
-  virtual Status Init(const RowDescriptor& desc, RuntimeState* state) WARN_UNUSED_RESULT;
+  virtual Status Init(const RowDescriptor& desc, FragmentState* state) WARN_UNUSED_RESULT;
 };
 
 }

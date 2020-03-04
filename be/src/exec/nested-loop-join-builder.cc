@@ -37,7 +37,7 @@ DataSink* NljBuilderConfig::CreateSink(const TPlanFragmentCtx& fragment_ctx,
 }
 
 Status NljBuilderConfig::Init(
-    const TDataSink& tsink, const RowDescriptor* input_row_desc, RuntimeState* state) {
+    const TDataSink& tsink, const RowDescriptor* input_row_desc, FragmentState* state) {
   RETURN_IF_ERROR(JoinBuilderConfig::Init(tsink, input_row_desc, state));
   return Status::OK();
 }
@@ -75,6 +75,7 @@ Status NljBuilder::Prepare(RuntimeState* state, MemTracker* parent_mem_tracker) 
 }
 
 Status NljBuilder::Open(RuntimeState* state) {
+  RETURN_IF_ERROR(DataSink::Open(state));
   return Status::OK();
 }
 

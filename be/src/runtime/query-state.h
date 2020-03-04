@@ -45,15 +45,20 @@ class RpcContext;
 namespace impala {
 
 class ControlServiceProxy;
+class DataSinkConfig;
 class DescriptorTbl;
+class FragmentState;
 class FragmentInstanceState;
 class InitialReservations;
+class LlvmCodeGen;
 class MemTracker;
+class PlanNode;
 class PublishFilterParamsPB;
 class ReservationTracker;
 class RuntimeFilterBank;
 class RuntimeProfile;
 class RuntimeState;
+class ScalarExpr;
 class ScannerMemLimiter;
 class TmpFileGroup;
 class TRuntimeProfileForest;
@@ -240,6 +245,11 @@ class QueryState {
   /// Called by a FragmentInstanceState thread to notify that it's done executing.
   void DoneExecuting() { discard_result(instances_finished_barrier_->Notify()); }
 
+  /// Called to notify that an error was encountered during codegen. This is called by the
+  /// first fragment instance thread that invoked its corresponding FragmentState's
+  /// Codegen() and encountered the error.
+  void ErrorDuringFragmentCodegen(const Status& status);
+
   /// Called by a fragment instance thread to notify that it hit an error during Prepare()
   /// Updates the query status and the failed instance ID if it's not set already.
   /// Also notifies anyone waiting on WaitForPrepare() if this is called by the last
@@ -370,10 +380,14 @@ class QueryState {
   /// and so is 'failed_instance_id_' if an error is hit.
   std::unique_ptr<CountingBarrier> instances_finished_barrier_;
 
-  /// map from instance id to its state (owned by obj_pool_), populated in
+  /// Map from instance id to its state (owned by obj_pool_), populated in
   /// StartFInstances(); Not valid to read from until 'instances_prepared_barrier_'
   /// is set (i.e. readers should always call WaitForPrepare()).
   std::unordered_map<TUniqueId, FragmentInstanceState*> fis_map_;
+
+  /// Map from fragment index to its fragment state (owned by obj_pool_), populated in
+  /// StartFInstances();
+  std::unordered_map<TFragmentIdx, FragmentState*> fragment_state_map_;
 
   ObjectPool obj_pool_;
   AtomicInt32 refcnt_;

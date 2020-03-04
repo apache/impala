@@ -27,7 +27,8 @@ namespace impala {
 
 class AggregationPlanNode : public PlanNode {
  public:
-  virtual Status Init(const TPlanNode& tnode, RuntimeState* state) override;
+  virtual Status Init(const TPlanNode& tnode, FragmentState* state) override;
+  virtual void Codegen(FragmentState* state) override;
   virtual void Close() override;
   virtual Status CreateExecNode(RuntimeState* state, ExecNode** node) const override;
   ~AggregationPlanNode() {}
@@ -45,7 +46,6 @@ class AggregationNodeBase : public ExecNode {
       ObjectPool* pool, const AggregationPlanNode& pnode, const DescriptorTbl& descs);
 
   virtual Status Prepare(RuntimeState* state) override;
-  virtual void Codegen(RuntimeState* state) override;
   virtual Status Reset(RuntimeState* state, RowBatch* row_batch) override;
 
  protected:

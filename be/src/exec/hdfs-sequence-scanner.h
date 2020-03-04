@@ -171,7 +171,7 @@ class HdfsSequenceScanner : public BaseSequenceScanner {
 
   /// Codegen WriteAlignedTuples(). Stores the resulting function in
   /// 'write_aligned_tuples_fn' if codegen was successful or nullptr otherwise.
-  static Status Codegen(HdfsScanPlanNode* node, RuntimeState* state,
+  static Status Codegen(HdfsScanPlanNode* node, FragmentState* state,
       llvm::Function** write_aligned_tuples_fn);
 
  protected:

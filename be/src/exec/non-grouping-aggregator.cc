@@ -24,6 +24,7 @@
 #include "exprs/agg-fn-evaluator.h"
 #include "gutil/strings/substitute.h"
 #include "runtime/descriptors.h"
+#include "runtime/fragment-state.h"
 #include "runtime/mem-pool.h"
 #include "runtime/row-batch.h"
 #include "runtime/runtime-state.h"
@@ -36,34 +37,27 @@
 namespace impala {
 
 NonGroupingAggregatorConfig::NonGroupingAggregatorConfig(
-    const TAggregator& taggregator, RuntimeState* state, PlanNode* pnode, int agg_idx)
+    const TAggregator& taggregator, FragmentState* state, PlanNode* pnode, int agg_idx)
   : AggregatorConfig(taggregator, state, pnode, agg_idx) {}
 
-Status NonGroupingAggregatorConfig::Codegen(RuntimeState* state) {
+void NonGroupingAggregatorConfig::Codegen(FragmentState* state) {
   LlvmCodeGen* codegen = state->codegen();
   DCHECK(codegen != nullptr);
   TPrefetchMode::type prefetch_mode = state->query_options().prefetch_mode;
-  return CodegenAddBatchImpl(codegen, prefetch_mode);
+  Status status = CodegenAddBatchImpl(codegen, prefetch_mode);
+  codegen_status_msg_ = FragmentState::GenerateCodegenMsg(status.ok(), status);
 }
 
 NonGroupingAggregator::NonGroupingAggregator(
     ExecNode* exec_node, ObjectPool* pool, const NonGroupingAggregatorConfig& config)
   : Aggregator(
         exec_node, pool, config, Substitute("NonGroupingAggregator $0", config.agg_idx_)),
-    agg_config(config),
     add_batch_impl_fn_(config.add_batch_impl_fn_) {}
 
 Status NonGroupingAggregator::Prepare(RuntimeState* state) {
   RETURN_IF_ERROR(Aggregator::Prepare(state));
   singleton_tuple_pool_.reset(new MemPool(mem_tracker_.get()));
   return Status::OK();
-}
-
-void NonGroupingAggregator::Codegen(RuntimeState* state) {
-  // TODO: This const cast will be removed once codegen call is moved before FIS creation
-  Status codegen_status =
-      const_cast<NonGroupingAggregatorConfig&>(agg_config).Codegen(state);
-  runtime_profile()->AddCodegenMsg(codegen_status.ok(), codegen_status);
 }
 
 Status NonGroupingAggregator::Open(RuntimeState* state) {

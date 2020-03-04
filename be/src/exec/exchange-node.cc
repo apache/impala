@@ -22,6 +22,7 @@
 #include "exec/exec-node-util.h"
 #include "exprs/scalar-expr.h"
 #include "runtime/exec-env.h"
+#include "runtime/fragment-state.h"
 #include "runtime/krpc-data-stream-mgr.h"
 #include "runtime/krpc-data-stream-recvr.h"
 #include "runtime/row-batch.h"
@@ -42,7 +43,7 @@ using namespace impala;
 DEFINE_int64(exchg_node_buffer_size_bytes, 1024 * 1024 * 10,
     "(Advanced) Maximum size of per-query receive-side buffer");
 
-Status ExchangePlanNode::Init(const TPlanNode& tnode, RuntimeState* state) {
+Status ExchangePlanNode::Init(const TPlanNode& tnode, FragmentState* state) {
   RETURN_IF_ERROR(PlanNode::Init(tnode, state));
   bool is_merging = tnode_->exchange_node.__isset.sort_info;
   if (!is_merging) return Status::OK();
@@ -52,6 +53,7 @@ Status ExchangePlanNode::Init(const TPlanNode& tnode, RuntimeState* state) {
       sort_info.ordering_exprs, *row_descriptor_, state, &ordering_exprs_));
   row_comparator_config_ =
       state->obj_pool()->Add(new TupleRowComparatorConfig(sort_info, ordering_exprs_));
+  state->CheckAndAddCodegenDisabledMessage(codegen_status_msgs_);
   return Status::OK();
 }
 
@@ -110,26 +112,17 @@ Status ExchangeNode::Prepare(RuntimeState* state) {
       FLAGS_exchg_node_buffer_size_bytes, is_merging_, runtime_profile(), mem_tracker(),
       &recvr_buffer_pool_client_);
 
-  if (is_merging_) state->CheckAndAddCodegenDisabledMessage(runtime_profile());
   return Status::OK();
 }
 
-void ExchangeNode::Codegen(RuntimeState* state) {
+void ExchangePlanNode::Codegen(FragmentState* state) {
   DCHECK(state->ShouldCodegen());
-  ExecNode::Codegen(state);
+  PlanNode::Codegen(state);
   if (IsNodeCodegenDisabled()) return;
 
-  if (is_merging_) {
-    const ExchangePlanNode& exch_pnode = static_cast<const ExchangePlanNode&>(plan_node_);
-    ExchangePlanNode& non_const_pnode = const_cast<ExchangePlanNode&>(exch_pnode);
-    non_const_pnode.Codegen(state, runtime_profile());
+  if (row_comparator_config_ != nullptr) {
+    AddCodegenStatus(row_comparator_config_->Codegen(state));
   }
-}
-
-void ExchangePlanNode::Codegen(RuntimeState* state, RuntimeProfile* runtime_profile) {
-  DCHECK(row_comparator_config_ != nullptr);
-  Status codegen_status = row_comparator_config_->Codegen(state);
-  runtime_profile->AddCodegenMsg(codegen_status.ok(), codegen_status);
 }
 
 Status ExchangeNode::Open(RuntimeState* state) {

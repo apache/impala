@@ -28,6 +28,7 @@
 #include "exprs/scalar-expr-evaluator.h"
 #include "gutil/strings/substitute.h"
 #include "runtime/descriptors.h"
+#include "runtime/fragment-state.h"
 #include "runtime/mem-pool.h"
 #include "runtime/mem-tracker.h"
 #include "runtime/raw-value.h"
@@ -43,7 +44,7 @@
 namespace impala {
 
 AggregatorConfig::AggregatorConfig(
-    const TAggregator& taggregator, RuntimeState* state, PlanNode* pnode, int agg_idx)
+    const TAggregator& taggregator, FragmentState* state, PlanNode* pnode, int agg_idx)
   : agg_idx_(agg_idx),
     intermediate_tuple_id_(taggregator.intermediate_tuple_id),
     intermediate_tuple_desc_(
@@ -55,7 +56,7 @@ AggregatorConfig::AggregatorConfig(
     needs_finalize_(taggregator.need_finalize) {}
 
 Status AggregatorConfig::Init(
-    const TAggregator& taggregator, RuntimeState* state, PlanNode* pnode) {
+    const TAggregator& taggregator, FragmentState* state, PlanNode* pnode) {
   DCHECK(intermediate_tuple_desc_ != nullptr);
   DCHECK(output_tuple_desc_ != nullptr);
   DCHECK_EQ(intermediate_tuple_desc_->slots().size(), output_tuple_desc_->slots().size());
@@ -85,6 +86,7 @@ Aggregator::Aggregator(ExecNode* exec_node, ObjectPool* pool,
     const AggregatorConfig& config, const std::string& name)
   : id_(exec_node->id()),
     exec_node_(exec_node),
+    config_(config),
     agg_idx_(config.agg_idx_),
     pool_(pool),
     intermediate_tuple_id_(config.intermediate_tuple_id_),
@@ -120,6 +122,7 @@ Status Aggregator::Prepare(RuntimeState* state) {
 }
 
 Status Aggregator::Open(RuntimeState* state) {
+  runtime_profile_->AppendExecOption(config_.codegen_status_msg_);
   RETURN_IF_ERROR(AggFnEvaluator::Open(agg_fn_evals_, state));
   RETURN_IF_ERROR(ScalarExprEvaluator::Open(conjunct_evals_, state));
   return Status::OK();

@@ -21,6 +21,7 @@
 #include "exprs/anyval-util.h"
 #include "exprs/scalar-expr.h"
 #include "runtime/descriptors.h"
+#include "runtime/fragment-state.h"
 #include "runtime/lib-cache.h"
 
 #include "common/names.h"
@@ -60,7 +61,7 @@ AggFn::AggFn(const TExprNode& tnode, const SlotDescriptor& intermediate_slot_des
   }
 }
 
-Status AggFn::Init(const RowDescriptor& row_desc, RuntimeState* state) {
+Status AggFn::Init(const RowDescriptor& row_desc, FragmentState* state) {
   // Initialize all children (i.e. input exprs to this aggregate expr).
   for (ScalarExpr* input_expr : children()) {
     RETURN_IF_ERROR(input_expr->Init(row_desc, /*is_entry_point*/ false, state));
@@ -116,7 +117,7 @@ Status AggFn::Init(const RowDescriptor& row_desc, RuntimeState* state) {
 
 Status AggFn::Create(const TExpr& texpr, const RowDescriptor& row_desc,
     const SlotDescriptor& intermediate_slot_desc, const SlotDescriptor& output_slot_desc,
-    RuntimeState* state, AggFn** agg_fn) {
+    FragmentState* state, AggFn** agg_fn) {
   *agg_fn = nullptr;
   ObjectPool* pool = state->obj_pool();
   const TExprNode& texpr_node = texpr.nodes[0];

@@ -23,9 +23,9 @@
 #include "exec/join-builder.h"
 #include "exprs/scalar-expr.h"
 #include "runtime/exec-env.h"
+#include "runtime/fragment-state.h"
 #include "runtime/fragment-instance-state.h"
 #include "runtime/mem-tracker.h"
-#include "runtime/query-state.h"
 #include "runtime/row-batch.h"
 #include "runtime/runtime-state.h"
 #include "runtime/thread-resource-mgr.h"
@@ -43,7 +43,7 @@ using namespace impala;
 
 const char* BlockingJoinNode::LLVM_CLASS_NAME = "class.impala::BlockingJoinNode";
 
-Status BlockingJoinPlanNode::Init(const TPlanNode& tnode, RuntimeState* state) {
+Status BlockingJoinPlanNode::Init(const TPlanNode& tnode, FragmentState* state) {
   DCHECK(tnode.__isset.join_node);
   RETURN_IF_ERROR(PlanNode::Init(tnode, state));
   join_op_ = tnode_->join_node.join_op;

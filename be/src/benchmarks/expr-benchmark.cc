@@ -50,8 +50,10 @@
 #include "common/init.h"
 #include "common/object-pool.h"
 #include "common/status.h"
+#include "runtime/fragment-state.h"
 #include "runtime/mem-pool.h"
 #include "runtime/mem-tracker.h"
+#include "runtime/query-state.h"
 #include "service/fe-support.h"
 #include "service/frontend.h"
 #include "service/impala-server.h"
@@ -70,6 +72,10 @@ class Planner {
     ABORT_IF_ERROR(exec_env_.InitForFeTests());
   }
 
+  ~Planner() {
+    if (fragment_state_ != nullptr) fragment_state_->ReleaseResources();
+  }
+
   Status GeneratePlan(const string& stmt, TExecRequest* result) {
     TQueryCtx query_ctx;
     query_ctx.client_request.stmt = stmt;
@@ -78,18 +84,23 @@ class Planner {
     TNetworkAddress dummy;
     ImpalaServer::PrepareQueryContext(dummy, dummy, &query_ctx);
     runtime_state_.reset(new RuntimeState(query_ctx, &exec_env_));
+    TPlanFragmentCtx* fragment_ctx =
+        runtime_state_->obj_pool()->Add(new TPlanFragmentCtx());
+    fragment_state_ = runtime_state_->obj_pool()->Add(
+        new FragmentState(runtime_state_->query_state(), *fragment_ctx));
 
     return frontend_.GetExecRequest(query_ctx, result);
   }
 
-  RuntimeState* GetRuntimeState() {
-    return runtime_state_.get();
-  }
+  RuntimeState* GetRuntimeState() { return runtime_state_.get(); }
+
+  FragmentState* GetFragmentState() { return fragment_state_; }
 
  private:
   Frontend frontend_;
   ExecEnv exec_env_;
   scoped_ptr<RuntimeState> runtime_state_;
+  FragmentState* fragment_state_;
 
   TQueryOptions query_options_;
   TSessionState session_state_;
@@ -114,7 +125,8 @@ static Status PrepareSelectList(
   DCHECK_EQ(texprs.size(), 1);
   RuntimeState* state = planner->GetRuntimeState();
   ScalarExpr* expr;
-  RETURN_IF_ERROR(ScalarExpr::Create(texprs[0], RowDescriptor(), state, &expr));
+  RETURN_IF_ERROR(
+      ScalarExpr::Create(texprs[0], RowDescriptor(), planner->GetFragmentState(), &expr));
   RETURN_IF_ERROR(
       ScalarExprEvaluator::Create(*expr, state, &pool, &mem_pool, &mem_pool, eval));
   return Status::OK();

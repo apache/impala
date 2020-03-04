@@ -28,6 +28,7 @@
 #include "exprs/scalar-expr.h"
 #include "runtime/buffered-tuple-stream.h"
 #include "runtime/exec-env.h"
+#include "runtime/fragment-state.h"
 #include "runtime/mem-tracker.h"
 #include "runtime/query-state.h"
 #include "runtime/row-batch.h"
@@ -71,7 +72,7 @@ PhjBuilder* PhjBuilderConfig::CreateSink(BufferPool::ClientHandle* buffer_pool_c
         max_row_buffer_size, state));
 }
 
-Status PhjBuilderConfig::CreateConfig(RuntimeState* state, int join_node_id,
+Status PhjBuilderConfig::CreateConfig(FragmentState* state, int join_node_id,
     TJoinOp::type join_op, const RowDescriptor* build_row_desc,
     const std::vector<TEqJoinCondition>& eq_join_conjuncts,
     const std::vector<TRuntimeFilterDesc>& filters, uint32_t hash_seed,
@@ -91,7 +92,7 @@ void PhjBuilderConfig::Close() {
   DataSinkConfig::Close();
 }
 
-Status PhjBuilderConfig::InitExprsAndFilters(RuntimeState* state,
+Status PhjBuilderConfig::InitExprsAndFilters(FragmentState* state,
     const vector<TEqJoinCondition>& eq_join_conjuncts,
     const vector<TRuntimeFilterDesc>& filter_descs) {
   for (const TEqJoinCondition& eq_join_conjunct : eq_join_conjuncts) {
@@ -107,10 +108,13 @@ Status PhjBuilderConfig::InitExprsAndFilters(RuntimeState* state,
         filter_desc.is_broadcast_join || state->query_options().num_nodes == 1);
     DCHECK(!state->query_options().disable_row_runtime_filtering ||
         filter_desc.applied_on_partition_columns);
-    // Skip over filters that are not produced by this instance of the join, i.e.
+    // Skip over filters that are not produced by the instances of the builder, i.e.
     // broadcast filters where this instance was not selected as a filter producer.
-    const vector<TRuntimeFilterSource> filters_produced =
-        state->instance_ctx().filters_produced;
+    const vector<const TPlanFragmentInstanceCtx*>& instance_ctxs = state->instance_ctxs();
+    // We can pick any instance since the filters produced should be the same for all
+    // instances.
+    const vector<TRuntimeFilterSource>& filters_produced =
+        instance_ctxs[0]->filters_produced;
     auto it = std::find_if(filters_produced.begin(), filters_produced.end(),
         [this, &filter_desc](const TRuntimeFilterSource f) {
           return f.src_node_id == join_node_id_ && f.filter_id == filter_desc.filter_id;
@@ -126,14 +130,14 @@ Status PhjBuilderConfig::InitExprsAndFilters(RuntimeState* state,
   hash_table_config_ = state->obj_pool()->Add(new HashTableConfig(build_exprs_,
       build_exprs_, PhjBuilder::HashTableStoresNulls(join_op_, is_not_distinct_from_),
       is_not_distinct_from_));
+  state->CheckAndAddCodegenDisabledMessage(codegen_status_msgs_);
   return Status::OK();
 }
 
-Status PhjBuilderConfig::Init(RuntimeState* state, int join_node_id,
+Status PhjBuilderConfig::Init(FragmentState* state, int join_node_id,
     TJoinOp::type join_op, const RowDescriptor* build_row_desc,
-    const std::vector<TEqJoinCondition>& eq_join_conjuncts,
-    const std::vector<TRuntimeFilterDesc>& filters, uint32_t hash_seed,
-    TDataSink* tsink) {
+    const vector<TEqJoinCondition>& eq_join_conjuncts,
+    const vector<TRuntimeFilterDesc>& filters, uint32_t hash_seed, TDataSink* tsink) {
   tsink->__isset.join_build_sink = true;
   tsink->join_build_sink.__set_dest_node_id(join_node_id);
   tsink->join_build_sink.__set_join_op(join_op);
@@ -142,8 +146,8 @@ Status PhjBuilderConfig::Init(RuntimeState* state, int join_node_id,
   return InitExprsAndFilters(state, eq_join_conjuncts, filters);
 }
 
-Status PhjBuilderConfig::Init(
-    const TDataSink& tsink, const RowDescriptor* input_row_desc, RuntimeState* state) {
+Status PhjBuilderConfig::Init(const TDataSink& tsink, const RowDescriptor* input_row_desc,
+    FragmentState* state) {
   RETURN_IF_ERROR(JoinBuilderConfig::Init(tsink, input_row_desc, state));
   const TJoinBuildSink& build_sink = tsink.join_build_sink;
   hash_seed_ = build_sink.hash_seed;
@@ -263,12 +267,12 @@ Status PhjBuilder::Prepare(RuntimeState* state, MemTracker* parent_mem_tracker) 
   num_hash_table_builds_skipped_ =
       ADD_COUNTER(profile(), "NumHashTableBuildsSkipped", TUnit::UNIT);
   repartition_timer_ = ADD_TIMER(profile(), "RepartitionTime");
-  state->CheckAndAddCodegenDisabledMessage(profile());
   return Status::OK();
 }
 
 Status PhjBuilder::Open(RuntimeState* state) {
   SCOPED_TIMER(profile()->total_time_counter());
+  RETURN_IF_ERROR(DataSink::Open(state));
   if (!buffer_pool_client_->is_registered()) {
     DCHECK(is_separate_build_) << "Client is registered by PhjNode if not separate";
     DCHECK_GE(resource_profile_->min_reservation, MinReservation().second);
@@ -1226,13 +1230,7 @@ std::string PhjBuilder::Partition::DebugString() {
   return ss.str();
 }
 
-void PhjBuilder::Codegen(RuntimeState* state) {
-  const PhjBuilderConfig& phj_config = static_cast<const PhjBuilderConfig&>(sink_config_);
-  PhjBuilderConfig& non_const_config = const_cast<PhjBuilderConfig&>(phj_config);
-  non_const_config.Codegen(state, profile());
-}
-
-void PhjBuilderConfig::Codegen(RuntimeState* state, RuntimeProfile* profile) {
+void PhjBuilderConfig::Codegen(FragmentState* state) {
   LlvmCodeGen* codegen = state->codegen();
   DCHECK(codegen != nullptr);
   Status build_codegen_status;
@@ -1266,9 +1264,8 @@ void PhjBuilderConfig::Codegen(RuntimeState* state, RuntimeProfile* profile) {
     build_codegen_status = codegen_status;
     insert_codegen_status = codegen_status;
   }
-  profile->AddCodegenMsg(build_codegen_status.ok(), build_codegen_status, "Build Side");
-  profile->AddCodegenMsg(
-      insert_codegen_status.ok(), insert_codegen_status, "Hash Table Construction");
+  AddCodegenStatus(build_codegen_status, "Build Side");
+  AddCodegenStatus(insert_codegen_status, "Hash Table Construction");
 }
 
 string PhjBuilder::DebugString() const {

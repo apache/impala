@@ -38,7 +38,7 @@ class HdfsColumnarScanner : public HdfsScanner {
 
   /// Codegen ProcessScratchBatch(). Stores the resulting function in
   /// 'process_scratch_batch_fn' if codegen was successful or NULL otherwise.
-  static Status Codegen(HdfsScanPlanNode* node, RuntimeState* state,
+  static Status Codegen(HdfsScanPlanNode* node, FragmentState* state,
       llvm::Function** process_scratch_batch_fn);
 
   /// Class name in LLVM IR.

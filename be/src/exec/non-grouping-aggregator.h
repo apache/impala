@@ -30,6 +30,7 @@ class AggFnEvaluator;
 class AggregationPlanNode;
 class DescriptorTbl;
 class ExecNode;
+class FragmentState;
 class LlvmCodeGen;
 class NonGroupingAggregator;
 class ObjectPool;
@@ -40,9 +41,9 @@ class Tuple;
 
 class NonGroupingAggregatorConfig : public AggregatorConfig {
  public:
-  NonGroupingAggregatorConfig(const TAggregator& taggregator, RuntimeState* state,
+  NonGroupingAggregatorConfig(const TAggregator& taggregator, FragmentState* state,
       PlanNode* pnode, int agg_idx);
-  Status Codegen(RuntimeState* state) override;
+  void Codegen(FragmentState* state) override;
   ~NonGroupingAggregatorConfig() override {}
 
   typedef Status (*AddBatchImplFn)(NonGroupingAggregator*, RowBatch*);
@@ -70,7 +71,6 @@ class NonGroupingAggregator : public Aggregator {
       ExecNode* exec_node, ObjectPool* pool, const NonGroupingAggregatorConfig& config);
 
   virtual Status Prepare(RuntimeState* state) override;
-  virtual void Codegen(RuntimeState* state) override;
   virtual Status Open(RuntimeState* state) override;
   virtual Status GetNext(RuntimeState* state, RowBatch* row_batch, bool* eos) override;
   virtual Status Reset(RuntimeState* state, RowBatch* row_batch) override {
@@ -97,10 +97,6 @@ class NonGroupingAggregator : public Aggregator {
   virtual void DebugString(int indentation_level, std::stringstream* out) const override;
 
  private:
-  /// TODO: Remove reference once codegen is performed before FIS creation.
-  /// Reference to the config object and only used to call Codegen().
-  const NonGroupingAggregatorConfig& agg_config;
-
   /// MemPool used to allocate memory for 'singleton_output_tuple_'. The ownership of the
   /// pool's memory is transferred to the output batch on eos. The pool should not be
   /// Reset() to allow amortizing memory allocation over a series of

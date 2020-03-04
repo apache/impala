@@ -38,6 +38,7 @@
 #include "rpc/rpc-mgr.h"
 #include "runtime/descriptors.h"
 #include "runtime/exec-env.h"
+#include "runtime/fragment-state.h"
 #include "runtime/mem-tracker.h"
 #include "runtime/raw-value.inline.h"
 #include "runtime/row-batch.h"
@@ -76,7 +77,7 @@ const char* KrpcDataStreamSender::LLVM_CLASS_NAME = "class.impala::KrpcDataStrea
 const char* KrpcDataStreamSender::TOTAL_BYTES_SENT_COUNTER = "TotalBytesSent";
 
 Status KrpcDataStreamSenderConfig::Init(
-    const TDataSink& tsink, const RowDescriptor* input_row_desc, RuntimeState* state) {
+    const TDataSink& tsink, const RowDescriptor* input_row_desc, FragmentState* state) {
   RETURN_IF_ERROR(DataSinkConfig::Init(tsink, input_row_desc, state));
   DCHECK(tsink_->__isset.stream_sink);
   partition_type_ = tsink_->stream_sink.output_partition.type;
@@ -88,6 +89,8 @@ Status KrpcDataStreamSenderConfig::Init(
     exchange_hash_seed_ =
         KrpcDataStreamSender::EXCHANGE_HASH_SEED_CONST ^ state->query_id().hi;
   }
+  num_channels_ = state->fragment_ctx().destinations.size();
+  state->CheckAndAddCodegenDisabledMessage(codegen_status_msgs_);
   return Status::OK();
 }
 
@@ -773,12 +776,12 @@ Status KrpcDataStreamSender::Prepare(
   for (int i = 0; i < channels_.size(); ++i) {
     RETURN_IF_ERROR(channels_[i]->Init(state));
   }
-  state->CheckAndAddCodegenDisabledMessage(profile());
   return Status::OK();
 }
 
 Status KrpcDataStreamSender::Open(RuntimeState* state) {
   SCOPED_TIMER(profile_->total_time_counter());
+  RETURN_IF_ERROR(DataSink::Open(state));
   return ScalarExprEvaluator::Open(partition_expr_evals_, state);
 }
 
@@ -921,22 +924,15 @@ string KrpcDataStreamSenderConfig::PartitionTypeName() const {
   }
 }
 
-void KrpcDataStreamSender::Codegen(RuntimeState* state) {
-  const KrpcDataStreamSenderConfig& config =
-      static_cast<const KrpcDataStreamSenderConfig&>(sink_config_);
-  KrpcDataStreamSenderConfig& non_const_config =
-      const_cast<KrpcDataStreamSenderConfig&>(config);
-  non_const_config.Codegen(state, profile());
-}
-
-void KrpcDataStreamSenderConfig::Codegen(RuntimeState* state, RuntimeProfile* profile) {
+void KrpcDataStreamSenderConfig::Codegen(FragmentState* state) {
   LlvmCodeGen* codegen = state->codegen();
   DCHECK(codegen != nullptr);
   const string sender_name = PartitionTypeName() + " Sender";
   if (partition_type_ != TPartitionType::HASH_PARTITIONED) {
     const string& msg = Substitute("not $0",
         partition_type_ == TPartitionType::KUDU ? "supported" : "needed");
-    profile->AddCodegenMsg(false, msg, sender_name);
+    codegen_status_msgs_.emplace_back(
+        FragmentState::GenerateCodegenMsg(false, msg, sender_name));
     return;
   }
 
@@ -949,9 +945,8 @@ void KrpcDataStreamSenderConfig::Codegen(RuntimeState* state, RuntimeProfile* pr
 
     int num_replaced;
     // Replace GetNumChannels() with a constant.
-    int num_channels =  state->fragment_ctx().destinations.size();
     num_replaced = codegen->ReplaceCallSitesWithValue(hash_and_add_rows_fn,
-        codegen->GetI32Constant(num_channels), "GetNumChannels");
+        codegen->GetI32Constant(num_channels_), "GetNumChannels");
     DCHECK_EQ(num_replaced, 1);
 
     // Replace HashRow() with the handcrafted IR function.
@@ -968,7 +963,7 @@ void KrpcDataStreamSenderConfig::Codegen(RuntimeState* state, RuntimeProfile* pr
           reinterpret_cast<void**>(&hash_and_add_rows_fn_));
     }
   }
-  profile->AddCodegenMsg(codegen_status.ok(), codegen_status, sender_name);
+  AddCodegenStatus(codegen_status, sender_name);
 }
 
 Status KrpcDataStreamSender::AddRowToChannel(const int channel_id, TupleRow* row) {
