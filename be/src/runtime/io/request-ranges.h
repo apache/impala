@@ -331,6 +331,11 @@ class ScanRange : public RequestRange {
   /// Closes underlying reader, if no more data will be read from this scan range.
   void CloseReader(const std::unique_lock<std::mutex>& scan_range_lock);
 
+  /// Determine if [offset,offset+length) is expected to be a local range.
+  inline bool ExpectedLocalRead(int64_t offset, int64_t length) const {
+    return expected_local_ && offset >= offset_ && (offset + length <= offset_ + len_);
+  }
+
   /// return a descriptive string for debug.
   std::string DebugString() const;
 

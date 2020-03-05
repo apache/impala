@@ -380,6 +380,13 @@ public class HdfsScanNode extends ScanNode {
   }
 
   /**
+   * Returns true if this scan node contains ORC.
+   */
+  private boolean hasOrc(Set<HdfsFileFormat> fileFormats) {
+    return fileFormats.contains(HdfsFileFormat.ORC);
+  }
+
+  /**
    * Returns true if the Parquet count(*) optimization can be applied to the query block
    * of this scan node.
    */
@@ -416,7 +423,7 @@ public class HdfsScanNode extends ScanNode {
       }
     }
 
-    if (fileFormats_.contains(HdfsFileFormat.ORC)) {
+    if (hasOrc(fileFormats_)) {
       // Compute min-max conjuncts only if the ORC_READ_STATISTICS query option is
       // set to true.
       if (analyzer.getQueryOptions().orc_read_statistics) {
@@ -558,10 +565,10 @@ public class HdfsScanNode extends ScanNode {
   private boolean isUnsupportedStatsType(Type type) {
     // TODO(IMPALA-10882): Push down Min-Max predicates of CHAR/VARCHAR to ORC reader
     // TODO(IMPALA-10915): Push down Min-Max predicates of TIMESTAMP to ORC reader
-    return fileFormats_.contains(HdfsFileFormat.ORC)
+    return hasOrc(fileFormats_)
         && (type.getPrimitiveType() == PrimitiveType.CHAR
-            || type.getPrimitiveType() == PrimitiveType.VARCHAR
-            || type.getPrimitiveType() == PrimitiveType.TIMESTAMP);
+               || type.getPrimitiveType() == PrimitiveType.VARCHAR
+               || type.getPrimitiveType() == PrimitiveType.TIMESTAMP);
   }
 
   private void tryComputeBinaryStatsPredicate(Analyzer analyzer,
@@ -598,7 +605,7 @@ public class HdfsScanNode extends ScanNode {
         buildBinaryStatsPredicate(analyzer, slotRef, binaryPred,
             BinaryPredicate.Operator.GE);
       }
-      if (fileFormats_.contains(HdfsFileFormat.ORC)) {
+      if (hasOrc(fileFormats_)) {
         // We can push down EQ predicates to the ORC reader directly.
         buildBinaryStatsPredicate(analyzer, slotRef, binaryPred, binaryPred.getOp());
       }
@@ -615,7 +622,7 @@ public class HdfsScanNode extends ScanNode {
     // Skip the slot ref if it refers to an array's "pos" field.
     if (slotDesc.isArrayPosRef()) return;
     if (inPred.isNotIn()) return;
-    if (fileFormats_.contains(HdfsFileFormat.ORC)) {
+    if (hasOrc(fileFormats_)) {
       if (isUnsupportedStatsType(slotDesc.getType())) return;
       addStatsOriginalConjunct(slotDesc.getParent(), inPred);
       buildInListStatsPredicate(analyzer, slotRef, inPred);
@@ -653,7 +660,7 @@ public class HdfsScanNode extends ScanNode {
   private void tryComputeIsNullStatsPredicate(Analyzer analyzer,
       IsNullPredicate isNullPred) {
     // Currently, only ORC table can push down IS-NULL predicates.
-    if (!fileFormats_.contains(HdfsFileFormat.ORC)) return;
+    if (!hasOrc(fileFormats_)) return;
     // Retrieve the left side of the IS-NULL predicate. Skip if it's not a simple slot.
     SlotRef slotRef = isNullPred.getBoundSlot();
     if (slotRef == null) return;
@@ -1907,7 +1914,7 @@ public class HdfsScanNode extends ScanNode {
       TupleDescriptor tupleDesc = entry.getKey();
       List<Expr> exprs = entry.getValue();
       String fileFormatStr;
-      if (hasParquet(fileFormats_) && fileFormats_.contains(HdfsFileFormat.ORC)) {
+      if (hasParquet(fileFormats_) && hasOrc(fileFormats_)) {
         fileFormatStr = "parquet/orc";
       } else {
         fileFormatStr = hasParquet(fileFormats_) ? "parquet" : "orc";
@@ -2002,8 +2009,9 @@ public class HdfsScanNode extends ScanNode {
     Preconditions.checkNotNull(desc_);
     Preconditions.checkState(desc_.getTable() instanceof FeFsTable);
     List<Long> columnReservations = null;
-    if (hasParquet(fileFormats_) || fileFormats_.contains(HdfsFileFormat.ORC)) {
-      columnReservations = computeMinColumnMemReservations();
+    if (hasParquet(fileFormats_) || hasOrc(fileFormats_)) {
+      boolean orcAsyncRead = hasOrc(fileFormats_) && queryOptions.orc_async_read;
+      columnReservations = computeMinColumnMemReservations(orcAsyncRead);
     }
 
     int perHostScanRanges = 0;
@@ -2057,7 +2065,8 @@ public class HdfsScanNode extends ScanNode {
 
     nodeResourceProfile_ = new ResourceProfileBuilder()
         .setMemEstimateBytes(perInstanceMemEstimate)
-        .setMinMemReservationBytes(computeMinMemReservation(columnReservations))
+        .setMinMemReservationBytes(computeMinMemReservation(
+            columnReservations, queryOptions))
         .setThreadReservation(requiredThreads).build();
   }
 
@@ -2075,7 +2084,8 @@ public class HdfsScanNode extends ScanNode {
    * - The hdfs split size, to avoid reserving excessive memory for small files or ranges,
    *   e.g. small dimension tables with very few rows.
    */
-  private long computeMinMemReservation(List<Long> columnReservations) {
+  private long computeMinMemReservation(
+      List<Long> columnReservations, TQueryOptions queryOptions) {
     Preconditions.checkState(largestScanRangeBytes_ >= 0);
     long maxIoBufferSize =
         BitUtil.roundUpToPowerOf2(BackendConfig.INSTANCE.getReadSize());
@@ -2085,9 +2095,10 @@ public class HdfsScanNode extends ScanNode {
       // TODO: IMPALA-6875 - ORC should compute total reservation across columns once the
       // ORC scanner supports reservations. For now it is treated the same as a
       // row-oriented format because there is no per-column reservation.
-      if (format.isParquetBased()) {
-        // With Parquet, we first read the footer then all of the materialized columns in
-        // parallel.
+      if (format.isParquetBased()
+          || (format == HdfsFileFormat.ORC && queryOptions.orc_async_read)) {
+        // With Parquet and ORC, we first read the footer then all of the materialized
+        // columns in parallel.
         for (long columnReservation : columnReservations) {
           formatReservationBytes += columnReservation;
         }
@@ -2119,14 +2130,22 @@ public class HdfsScanNode extends ScanNode {
    * Compute minimum memory reservations in bytes per column per scan range for each of
    * the columns read from disk for a columnar format. Returns the raw estimate for
    * each column, not quantized to a buffer size.
-
+   *
    * If there are nested collections, returns a size for each of the leaf scalar slots
    * per collection. This matches Parquet's "shredded" approach to nested collections,
-   * where each nested field is stored as a separate column. We may need to adjust this
-   * logic for nested types in non-shredded columnar formats (e.g. IMPALA-6503 - ORC)
-   * if/when that is added.
+   * where each nested field is stored as a separate column.
+   *
+   * If table is in ORC format and orcAsyncRead is true, we split per column reservation
+   * evenly for number of stream representing that column. For example, an ORC string
+   * column with dictionary encoding has four streams (PRESENT, DATA, DICTIONARY_DATA, and
+   * LENGTH stream). A computeMinColumnMemReservations over ORC table having one string
+   * column will return list:
+   *   [1048576, 1048576, 1048576, 1048576]
+   * Meanwhile, computeMinColumnMemReservations over Parquet table having one string
+   * column will return list:
+   *   [4194304]
    */
-  private List<Long> computeMinColumnMemReservations() {
+  private List<Long> computeMinColumnMemReservations(boolean orcAsyncRead) {
     List<Long> columnByteSizes = new ArrayList<>();
     FeFsTable table = (FeFsTable) desc_.getTable();
     boolean havePosSlot = false;
@@ -2134,28 +2153,56 @@ public class HdfsScanNode extends ScanNode {
       if (!slot.isMaterialized() || slot == countStarSlot_) continue;
       if (slot.getColumn() == null ||
           slot.getColumn().getPosition() >= table.getNumClusteringCols()) {
+        Type type = slot.getType();
         if (slot.isArrayPosRef()) {
           // Position virtual slots can be materialized by piggybacking on another slot.
           havePosSlot = true;
-        } else if (slot.getType().isScalarType()) {
+        } else if (type.isScalarType()) {
           Column column = slot.getColumn();
+          long estReservation;
           if (column == null) {
             // Not a top-level column, e.g. a value from a nested collection that is
             // being unnested by the scanner. No stats are available for nested
             // collections.
-            columnByteSizes.add(DEFAULT_COLUMN_SCAN_RANGE_RESERVATION);
+            estReservation = DEFAULT_COLUMN_SCAN_RANGE_RESERVATION;
           } else {
-            columnByteSizes.add(computeMinScalarColumnMemReservation(column));
+            estReservation = computeMinScalarColumnMemReservation(column);
+          }
+
+          if (orcAsyncRead) {
+            // estReservation need to be spread for each stream. Estimate how many stream
+            // that will be available for this column based on column type.
+            int estNumStream = 2; // DATA and PRESENT stream.
+            if (type.isTimestamp() || type.isStringType() || type.isDecimal()) {
+              estNumStream++; // SECONDARY/LENGTH stream.
+              if (type.isStringType()) {
+                estNumStream++; // DICTIONARY_DATA stream
+              }
+            }
+            long reservationPerStream = estReservation / estNumStream;
+            for (int i = 0; i < estNumStream; i++) {
+              columnByteSizes.add(reservationPerStream);
+            }
+          } else {
+            columnByteSizes.add(estReservation);
           }
         } else {
-          appendMinColumnMemReservationsForComplexType(slot, columnByteSizes);
+          appendMinColumnMemReservationsForComplexType(
+              slot, columnByteSizes, orcAsyncRead);
         }
       }
     }
-    if (havePosSlot && columnByteSizes.isEmpty()) {
-      // Must scan something to materialize a position slot. We don't know anything about
-      // the column that we're scanning so use the default reservation.
-      columnByteSizes.add(DEFAULT_COLUMN_SCAN_RANGE_RESERVATION);
+
+    if (columnByteSizes.isEmpty()) {
+      if (havePosSlot || (orcAsyncRead && desc_.getSlots().isEmpty())) {
+        // We must scan something to materialize a position slot (hasPosSlot=true).
+        // For the case of orcAsyncRead=true and empty descriptor slot, we probably need
+        // to materialize something too if the query can not be served by file metadata
+        // (ie., select count(*) against subtype of a complex column).
+        // We do not know anything about the column we are scanning in either case, so use
+        // the default reservation.
+        appendDefaultColumnReservation(columnByteSizes, orcAsyncRead);
+      }
     }
     return columnByteSizes;
   }
@@ -2163,10 +2210,11 @@ public class HdfsScanNode extends ScanNode {
   /**
    * Helper for computeMinColumnMemReservations() - compute minimum memory reservations
    * for all of the scalar columns read from disk when materializing complexSlot.
-   * Appends one number per scalar column to columnMemReservations.
+   * Appends one number per scalar column to columnMemReservations for Parquet format.
+   * For Orc, up to 4 number per scalar column can be added to columnMemReservations.
    */
   private void appendMinColumnMemReservationsForComplexType(SlotDescriptor complexSlot,
-      List<Long> columnMemReservations) {
+      List<Long> columnMemReservations, boolean orcAsyncRead) {
     Preconditions.checkState(complexSlot.getType().isComplexType());
     boolean addedColumn = false;
     for (SlotDescriptor nestedSlot: complexSlot.getItemTupleDesc().getSlots()) {
@@ -2175,16 +2223,40 @@ public class HdfsScanNode extends ScanNode {
       if (nestedSlot.getType().isScalarType()) {
         // No column stats are available for nested collections so use the default
         // reservation.
-        columnMemReservations.add(DEFAULT_COLUMN_SCAN_RANGE_RESERVATION);
+        appendDefaultColumnReservation(columnMemReservations, orcAsyncRead);
         addedColumn = true;
       } else if (nestedSlot.getType().isComplexType()) {
-        appendMinColumnMemReservationsForComplexType(nestedSlot, columnMemReservations);
+        appendMinColumnMemReservationsForComplexType(
+            nestedSlot, columnMemReservations, orcAsyncRead);
       }
     }
     // Need to scan at least one column to materialize the pos virtual slot and/or
     // determine the size of the nested array. Assume it is the size of a single I/O
     // buffer.
-    if (!addedColumn) columnMemReservations.add(DEFAULT_COLUMN_SCAN_RANGE_RESERVATION);
+    if (!addedColumn) {
+      appendDefaultColumnReservation(columnMemReservations, orcAsyncRead);
+    }
+  }
+
+  /**
+   * Compute minimum memory reservation for an unknown column.
+   *
+   * If orcAsyncRead is true, we allocate DEFAULT_COLUMN_SCAN_RANGE_RESERVATION and split
+   * it for 4 streams. This is because an ORC column can have 4 streams at most (ie.,
+   * dictionary encoded string/char/varchar column). If orcAsyncRead is false, just append
+   * single default reservation.
+   */
+  private void appendDefaultColumnReservation(
+      List<Long> columnMemReservations, boolean orcAsyncRead) {
+    if (orcAsyncRead) {
+      int estNumStream = 4;
+      Long reservationPerStream = DEFAULT_COLUMN_SCAN_RANGE_RESERVATION / estNumStream;
+      for (int i = 0; i < estNumStream; i++) {
+        columnMemReservations.add(reservationPerStream);
+      }
+    } else {
+      columnMemReservations.add(DEFAULT_COLUMN_SCAN_RANGE_RESERVATION);
+    }
   }
 
   /**

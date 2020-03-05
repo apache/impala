@@ -91,6 +91,39 @@ class HdfsOrcScanner : public HdfsColumnarScanner {
     boost::unordered_map<char*, uint64_t> chunk_sizes_;
   };
 
+  struct ColumnRange {
+    uint64_t offset_;
+    uint64_t length_;
+    uint64_t current_position_;
+    orc::StreamKind kind_;
+    uint64_t type_id_;
+    HdfsOrcScanner* scanner_;
+    ScannerContext::Stream* stream_ = nullptr;
+    int io_reservation = 0;
+
+    ColumnRange(uint64_t length, uint64_t offset, orc::StreamKind kind, uint64_t type_id,
+        HdfsOrcScanner* scanner)
+      : offset_(offset),
+        length_(length),
+        current_position_(offset),
+        kind_(kind),
+        type_id_(type_id),
+        scanner_(scanner) {}
+
+    bool operator<(const ColumnRange& other) const { return offset_ < other.offset_; }
+
+    /// Read 'length' bytes from the stream_ starting at 'offset' into 'buf'.
+    Status read(void* buf, uint64_t length, uint64_t offset);
+
+    std::string debug() {
+      return strings::Substitute(
+          "colrange_offset: $0 colrange_length: $1 colrange_pos: $2 "
+          "typeId: $3 kind: $4 filename: $5",
+          offset_, length_, current_position_, type_id_, orc::streamKindToString(kind_),
+          scanner_->filename());
+    }
+  };
+
   /// A wrapper of DiskIoMgr to be used by the ORC lib.
   class ScanRangeInputStream : public orc::InputStream {
    public:
@@ -101,18 +134,21 @@ class HdfsOrcScanner : public HdfsColumnarScanner {
           scanner->context_->partition_descriptor()->id(), filename_);
     }
 
+    /// Get the total length of the file in bytes.
     uint64_t getLength() const override {
       return file_desc_->file_length;
     }
 
-    uint64_t getNaturalReadSize() const override {
-      return ExecEnv::GetInstance()->disk_io_mgr()->max_buffer_size();
-    }
+    /// Get the natural size for reads.
+    /// Return 0 to let ORC lib decide what is the best buffer size depending on
+    /// compression method that is being used.
+    uint64_t getNaturalReadSize() const override { return 0; }
 
     /// Read 'length' bytes from the file starting at 'offset' into the buffer starting
     /// at 'buf'.
     void read(void* buf, uint64_t length, uint64_t offset) override;
 
+    /// Get the name of the stream for error messages.
     const std::string& getName() const override {
       return filename_;
     }
@@ -121,6 +157,9 @@ class HdfsOrcScanner : public HdfsColumnarScanner {
     HdfsOrcScanner* scanner_;
     const HdfsFileDesc* file_desc_;
     std::string filename_;
+
+    /// Default read implementation for non async IO.
+    Status readRandom(void* buf, uint64_t length, uint64_t offset);
   };
 
   HdfsOrcScanner(HdfsScanNodeBase* scan_node, RuntimeState* state);
@@ -220,9 +259,6 @@ class HdfsOrcScanner : public HdfsColumnarScanner {
   std::unordered_map<const SlotDescriptor*, uint64_t> slot_to_col_id_;
   std::unordered_map<const TupleDescriptor*, uint64_t> tuple_to_col_id_;
 
-  /// Scan range for the metadata (file tail).
-  const io::ScanRange* metadata_range_ = nullptr;
-
   /// With the help of it we can check the validity of ACID write ids.
   ValidWriteIdList valid_write_ids_;
 
@@ -242,21 +278,16 @@ class HdfsOrcScanner : public HdfsColumnarScanner {
   /// For files not written by Streaming Ingestion we can assume that every row is valid.
   bool row_batches_need_validation_ = false;
 
+  /// Scan range for column streams.
+  /// StartColumnReading() guarantees that columnRanges_ is sorted by the element's
+  /// offset, and there are no two overlapping range.
+  vector<ColumnRange> columnRanges_;
+
   /// Timer for materializing rows. This ignores time getting the next buffer.
   ScopedTimer<MonotonicStopWatch> assemble_rows_timer_;
 
-  /// Average and min/max time spent processing the footer by each split.
-  RuntimeProfile::SummaryStatsCounter* process_footer_timer_stats_ = nullptr;
-
-  /// Number of columns that need to be read.
-  RuntimeProfile::Counter* num_cols_counter_ = nullptr;
-
   /// Number of stripes that need to be read.
   RuntimeProfile::Counter* num_stripes_counter_ = nullptr;
-
-  /// Number of scanners that end up doing no reads because their splits don't overlap
-  /// with the midpoint of any stripe in the file.
-  RuntimeProfile::Counter* num_scanners_with_no_reads_counter_ = nullptr;
 
   /// Number of collection items read in current row batch. It is a scanner-local counter
   /// used to reduce the frequency of updating HdfsScanNode counter. It is updated by the
@@ -271,6 +302,19 @@ class HdfsOrcScanner : public HdfsColumnarScanner {
   /// Advances 'stripe_idx_' to the next non-empty stripe and initializes
   /// row_reader_ to scan it.
   Status NextStripe() WARN_UNUSED_RESULT;
+
+  /// Begin reading columns of given stripe.
+  Status StartColumnReading(const orc::StripeInformation& stripe);
+
+  /// Find scan ColumnRange that where range [offset, offset+length) lies in.
+  /// Return nullptr if such range does not exist.
+  inline ColumnRange* FindColumnRange(uint64_t length, uint64_t offset) {
+    auto in_range = [length, offset](ColumnRange c) {
+      return (offset >= c.offset_) && (offset + length <= c.offset_ + c.length_);
+    };
+    auto range = std::find_if(columnRanges_.begin(), columnRanges_.end(), in_range);
+    return range != columnRanges_.end() ? &(*range) : nullptr;
+  }
 
   /// Reads data to materialize instances of 'tuple_desc'.
   /// Returns a non-OK status if a non-recoverable error was encountered and execution
@@ -345,6 +389,15 @@ class HdfsOrcScanner : public HdfsColumnarScanner {
   /// with the assumption that the specifit child is a literal.
   orc::Literal GetSearchArgumentLiteral(ScalarExprEvaluator* eval, int child_idx,
       const ColumnType& dst_type, orc::PredicateDataType* predicate_type);
+
+  /// Return true if [offset, offset+length) is within the remaining part of the footer
+  /// stream (initial scan range issued by IssueInitialRanges).
+  inline bool IsInFooterRange(uint64_t offset, uint64_t length) const {
+    DCHECK(stream_ != nullptr);
+    return offset >= stream_->file_offset() && length <= stream_->bytes_left();
+  }
+
+  Status ReadFooterStream(void* buf, uint64_t length, uint64_t offset);
 };
 
 } // namespace impala

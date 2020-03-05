@@ -147,7 +147,7 @@ class DiskQueue;
 /// In case a), ReturnBuffer() may re-enqueue the buffer for GetNext() to return again if
 /// needed. E.g. if 24MB of buffers were allocated to read a 64MB scan range, each buffer
 /// must be returned multiple times. Callers must be careful to call ReturnBuffer() with
-/// the previous buffer returned from the range before calling before GetNext() so that
+/// the previous buffer returned from the range before calling GetNext() so that
 /// at least one buffer is available for the I/O mgr to read data into. Calling GetNext()
 /// when the scan range has no buffers to read data into causes a resource deadlock.
 /// NB: if the scan range was allocated N buffers, then it's always ok for the caller

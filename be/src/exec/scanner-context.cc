@@ -92,6 +92,20 @@ ScannerContext::Stream* ScannerContext::AddStream(ScanRange* range, int64_t rese
   return streams_.back().get();
 }
 
+Status ScannerContext::AddAndStartStream(
+    ScanRange* range, int64_t reservation, ScannerContext::Stream** stream) {
+  DCHECK(stream != nullptr);
+  DiskIoMgr* io_mgr = ExecEnv::GetInstance()->disk_io_mgr();
+  bool needs_buffers;
+  RETURN_IF_ERROR(scan_node_->reader_context()->StartScanRange(range, &needs_buffers));
+  if (needs_buffers) {
+    RETURN_IF_ERROR(io_mgr->AllocateBuffersForRange(bp_client(), range, reservation));
+  }
+  *stream = AddStream(range, reservation);
+  DCHECK(*stream != nullptr);
+  return Status::OK();
+}
+
 void ScannerContext::Stream::ReleaseCompletedResources(bool done) {
   if (done) {
     // Cancel the underlying scan range to clean up any queued buffers there

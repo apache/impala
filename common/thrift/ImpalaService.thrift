@@ -718,6 +718,9 @@ enum TImpalaQueryOptions {
   // Abort the Java UDF if an exception is thrown. Default is that only a
   // warning will be logged if the Java UDF throws an exception.
   ABORT_JAVA_UDF_ON_EXCEPTION = 140;
+
+  // Indicates whether to use ORC's search argument to push down predicates.
+  ORC_ASYNC_READ = 141
 }
 
 // The summary of a DML statement.

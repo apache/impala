@@ -18,15 +18,52 @@
 #include "exec/hdfs-columnar-scanner.h"
 
 #include <algorithm>
+#include <gutil/strings/substitute.h>
 
 #include "codegen/llvm-codegen.h"
 #include "exec/hdfs-scan-node-base.h"
 #include "exec/scratch-tuple-batch.h"
+#include "runtime/exec-env.h"
 #include "runtime/fragment-state.h"
+#include "runtime/io/disk-io-mgr.h"
 #include "runtime/row-batch.h"
 #include "runtime/runtime-state.h"
+#include "util/runtime-profile-counters.h"
+
+using namespace std;
+using namespace strings;
 
 namespace impala {
+
+PROFILE_DEFINE_COUNTER(
+    NumColumns, STABLE_LOW, TUnit::UNIT, "Number of columns that need to be read.");
+PROFILE_DEFINE_COUNTER(NumScannersWithNoReads, STABLE_LOW, TUnit::UNIT,
+    "Number of scanners that end up doing no reads because their splits don't overlap "
+    "with the midpoint of any row-group/stripe in the file.");
+PROFILE_DEFINE_SUMMARY_STATS_TIMER(FooterProcessingTime, STABLE_LOW,
+    "Average and min/max time spent processing the footer by each split.");
+PROFILE_DEFINE_SUMMARY_STATS_COUNTER(ColumnarScannerIdealReservation, DEBUG, TUnit::BYTES,
+    "Tracks stats about the ideal reservation for a scanning a row group (parquet) or "
+    "stripe (orc). The ideal reservation is calculated based on min and max buffer "
+    "size.");
+PROFILE_DEFINE_SUMMARY_STATS_COUNTER(ColumnarScannerActualReservation, DEBUG,
+    TUnit::BYTES,
+    "Tracks stats about the actual reservation for a scanning a row group "
+    "(parquet) or stripe (orc).");
+PROFILE_DEFINE_COUNTER(IoReadSyncRequest, DEBUG, TUnit::UNIT,
+    "Number of stream read request done in synchronized manner.");
+PROFILE_DEFINE_COUNTER(IoReadAsyncRequest, DEBUG, TUnit::UNIT,
+    "Number of stream read request done in asynchronized manner.");
+PROFILE_DEFINE_COUNTER(
+    IoReadTotalRequest, DEBUG, TUnit::UNIT, "Total number of stream read request.");
+PROFILE_DEFINE_COUNTER(IoReadSyncBytes, DEBUG, TUnit::BYTES,
+    "The total number of bytes read from streams in synchronized manner.");
+PROFILE_DEFINE_COUNTER(IoReadAsyncBytes, DEBUG, TUnit::BYTES,
+    "The total number of bytes read from streams in asynchronized manner.");
+PROFILE_DEFINE_COUNTER(IoReadTotalBytes, DEBUG, TUnit::BYTES,
+    "The total number of bytes read from streams.");
+PROFILE_DEFINE_COUNTER(IoReadSkippedBytes, DEBUG, TUnit::BYTES,
+    "The total number of bytes skipped from streams.");
 
 const char* HdfsColumnarScanner::LLVM_CLASS_NAME = "class.impala::HdfsColumnarScanner";
 
@@ -38,6 +75,28 @@ HdfsColumnarScanner::HdfsColumnarScanner(HdfsScanNodeBase* scan_node,
 }
 
 HdfsColumnarScanner::~HdfsColumnarScanner() {}
+
+Status HdfsColumnarScanner::Open(ScannerContext* context) {
+  RETURN_IF_ERROR(HdfsScanner::Open(context));
+  RuntimeProfile* profile = scan_node_->runtime_profile();
+  num_cols_counter_ = PROFILE_NumColumns.Instantiate(profile);
+  num_scanners_with_no_reads_counter_ =
+      PROFILE_NumScannersWithNoReads.Instantiate(profile);
+  process_footer_timer_stats_ = PROFILE_FooterProcessingTime.Instantiate(profile);
+  columnar_scanner_ideal_reservation_counter_ =
+      PROFILE_ColumnarScannerIdealReservation.Instantiate(profile);
+  columnar_scanner_actual_reservation_counter_ =
+      PROFILE_ColumnarScannerActualReservation.Instantiate(profile);
+
+  io_sync_request_ = PROFILE_IoReadSyncRequest.Instantiate(profile);
+  io_sync_bytes_ = PROFILE_IoReadSyncBytes.Instantiate(profile);
+  io_async_request_ = PROFILE_IoReadAsyncRequest.Instantiate(profile);
+  io_async_bytes_ = PROFILE_IoReadAsyncBytes.Instantiate(profile);
+  io_total_request_ = PROFILE_IoReadTotalRequest.Instantiate(profile);
+  io_total_bytes_ = PROFILE_IoReadTotalBytes.Instantiate(profile);
+  io_skipped_bytes_ = PROFILE_IoReadSkippedBytes.Instantiate(profile);
+  return Status::OK();
+}
 
 int HdfsColumnarScanner::FilterScratchBatch(RowBatch* dst_batch) {
   // This function must not be called when the output batch is already full. As long as
@@ -113,4 +172,139 @@ int HdfsColumnarScanner::ProcessScratchBatchCodegenOrInterpret(RowBatch* dst_bat
       dst_batch);
 }
 
+HdfsColumnarScanner::ColumnReservations
+HdfsColumnarScanner::DivideReservationBetweenColumnsHelper(int64_t min_buffer_size,
+    int64_t max_buffer_size, const ColumnRangeLengths& col_range_lengths,
+    int64_t reservation_to_distribute) {
+  // Pair of (column index, reservation allocated).
+  ColumnReservations tmp_reservations;
+  for (int i = 0; i < col_range_lengths.size(); ++i) tmp_reservations.emplace_back(i, 0);
+
+  // Sort in descending order of length, breaking ties by index so that larger columns
+  // get allocated reservation first. It is common to have dramatically different column
+  // sizes in a single file because of different value sizes and compressibility. E.g.
+  // consider a large STRING "comment" field versus a highly compressible
+  // dictionary-encoded column with only a few distinct values. We want to give max-sized
+  // buffers to large columns first to maximize the size of I/Os that we do while reading
+  // this row group.
+  sort(tmp_reservations.begin(), tmp_reservations.end(),
+      [&col_range_lengths](
+          const pair<int, int64_t>& left, const pair<int, int64_t>& right) {
+        int64_t left_len = col_range_lengths[left.first];
+        int64_t right_len = col_range_lengths[right.first];
+        return (left_len != right_len) ? (left_len > right_len) :
+                                         (left.first < right.first);
+      });
+
+  // Set aside the minimum reservation per column.
+  reservation_to_distribute -= min_buffer_size * col_range_lengths.size();
+
+  // Allocate reservations to columns by repeatedly allocating either a max-sized buffer
+  // or a large enough buffer to fit the remaining data for each column. Do this
+  // round-robin up to the ideal number of I/O buffers.
+  for (int i = 0; i < io::DiskIoMgr::IDEAL_MAX_SIZED_BUFFERS_PER_SCAN_RANGE; ++i) {
+    for (auto& tmp_reservation : tmp_reservations) {
+      // Add back the reservation we set aside above.
+      if (i == 0) reservation_to_distribute += min_buffer_size;
+
+      int64_t bytes_left_in_range =
+          col_range_lengths[tmp_reservation.first] - tmp_reservation.second;
+      int64_t bytes_to_add;
+      if (bytes_left_in_range >= max_buffer_size) {
+        if (reservation_to_distribute >= max_buffer_size) {
+          bytes_to_add = max_buffer_size;
+        } else if (i == 0) {
+          DCHECK_EQ(0, tmp_reservation.second);
+          // Ensure this range gets at least one buffer on the first iteration.
+          bytes_to_add = BitUtil::RoundDownToPowerOfTwo(reservation_to_distribute);
+        } else {
+          DCHECK_GT(tmp_reservation.second, 0);
+          // We need to read more than the max buffer size, but can't allocate a
+          // max-sized buffer. Stop adding buffers to this column: we prefer to use
+          // the existing max-sized buffers without small buffers mixed in so that
+          // we will alway do max-sized I/Os, which make efficient use of I/O devices.
+          bytes_to_add = 0;
+        }
+      } else if (bytes_left_in_range > 0
+          && reservation_to_distribute >= min_buffer_size) {
+        // Choose a buffer size that will fit the rest of the bytes left in the range.
+        bytes_to_add =
+            max(min_buffer_size, BitUtil::RoundUpToPowerOfTwo(bytes_left_in_range));
+        // But don't add more reservation than is available.
+        bytes_to_add =
+            min(bytes_to_add, BitUtil::RoundDownToPowerOfTwo(reservation_to_distribute));
+      } else {
+        bytes_to_add = 0;
+      }
+      DCHECK(bytes_to_add == 0 || bytes_to_add >= min_buffer_size) << bytes_to_add;
+      reservation_to_distribute -= bytes_to_add;
+      tmp_reservation.second += bytes_to_add;
+
+      DCHECK_GE(reservation_to_distribute, 0);
+      DCHECK_GT(tmp_reservation.second, 0);
+    }
+  }
+  return tmp_reservations;
+}
+
+int64_t HdfsColumnarScanner::ComputeIdealReservation(
+    const ColumnRangeLengths& col_range_lengths) {
+  io::DiskIoMgr* io_mgr = ExecEnv::GetInstance()->disk_io_mgr();
+  int64_t ideal_reservation = 0;
+  for (int64_t len : col_range_lengths) {
+    ideal_reservation += io_mgr->ComputeIdealBufferReservation(len);
+  }
+  return ideal_reservation;
+}
+
+Status HdfsColumnarScanner::DivideReservationBetweenColumns(
+    const ColumnRangeLengths& col_range_lengths,
+    ColumnReservations& reservation_per_column) {
+  io::DiskIoMgr* io_mgr = ExecEnv::GetInstance()->disk_io_mgr();
+  const int64_t min_buffer_size = io_mgr->min_buffer_size();
+  const int64_t max_buffer_size = io_mgr->max_buffer_size();
+  // The HdfsScanNode reservation calculation in the planner ensures that we have
+  // reservation for at least one buffer per column.
+  if (context_->total_reservation() < min_buffer_size * col_range_lengths.size()) {
+    return Status(TErrorCode::INTERNAL_ERROR,
+        Substitute("Not enough reservation in columnar scanner for file '$0'. "
+                   "Need at least $1 bytes per column for $2 columns but had $3 bytes",
+            filename(), min_buffer_size, col_range_lengths.size(),
+            context_->total_reservation()));
+  }
+
+  // The scanner-wide stream was used only to read the file footer.  Each column has added
+  // its own stream. We can use the total reservation now that 'stream_''s resources have
+  // been released. We may benefit from increasing reservation further, so let's compute
+  // the ideal reservation to scan all the columns.
+  int64_t ideal_reservation = ComputeIdealReservation(col_range_lengths);
+  if (ideal_reservation > context_->total_reservation()) {
+    context_->TryIncreaseReservation(ideal_reservation);
+  }
+  columnar_scanner_actual_reservation_counter_->UpdateCounter(
+      context_->total_reservation());
+  columnar_scanner_ideal_reservation_counter_->UpdateCounter(ideal_reservation);
+
+  reservation_per_column = DivideReservationBetweenColumnsHelper(
+      min_buffer_size, max_buffer_size, col_range_lengths, context_->total_reservation());
+  return Status::OK();
+}
+
+void HdfsColumnarScanner::AddSyncReadBytesCounter(int64_t total_bytes) {
+  io_sync_request_->Add(1);
+  io_total_request_->Add(1);
+  io_sync_bytes_->Add(total_bytes);
+  io_total_bytes_->Add(total_bytes);
+}
+
+void HdfsColumnarScanner::AddAsyncReadBytesCounter(int64_t total_bytes) {
+  io_async_request_->Add(1);
+  io_total_request_->Add(1);
+  io_async_bytes_->Add(total_bytes);
+  io_total_bytes_->Add(total_bytes);
+}
+
+void HdfsColumnarScanner::AddSkippedReadBytesCounter(int64_t total_bytes) {
+  io_skipped_bytes_->Add(total_bytes);
+}
 }

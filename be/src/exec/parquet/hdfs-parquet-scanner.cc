@@ -68,8 +68,6 @@ const int LEGACY_IMPALA_MAX_DICT_ENTRIES = 40000;
 static const string PARQUET_MEM_LIMIT_EXCEEDED =
     "HdfsParquetScanner::$0() failed to allocate $1 bytes for $2.";
 
-static const string IDEAL_RESERVATION_COUNTER_NAME = "ParquetRowGroupIdealReservation";
-static const string ACTUAL_RESERVATION_COUNTER_NAME = "ParquetRowGroupActualReservation";
 
 Status HdfsParquetScanner::IssueInitialRanges(HdfsScanNodeBase* scan_node,
     const vector<HdfsFileDesc*>& files) {
@@ -91,19 +89,15 @@ HdfsParquetScanner::HdfsParquetScanner(HdfsScanNodeBase* scan_node, RuntimeState
     advance_row_group_(true),
     min_max_tuple_(nullptr),
     row_batches_produced_(0),
-    metadata_range_(nullptr),
     dictionary_pool_(new MemPool(scan_node->mem_tracker())),
     stats_batch_read_pool_(new MemPool(scan_node->mem_tracker())),
     assemble_rows_timer_(scan_node_->materialize_tuple_timer()),
-    process_footer_timer_stats_(nullptr),
-    num_cols_counter_(nullptr),
     num_stats_filtered_row_groups_counter_(nullptr),
     num_minmax_filtered_row_groups_counter_(nullptr),
     num_bloom_filtered_row_groups_counter_(nullptr),
     num_rowgroups_skipped_by_unuseful_filters_counter_(nullptr),
     num_row_groups_counter_(nullptr),
     num_minmax_filtered_pages_counter_(nullptr),
-    num_scanners_with_no_reads_counter_(nullptr),
     num_dict_filtered_row_groups_counter_(nullptr),
     parquet_compressed_page_size_counter_(nullptr),
     parquet_uncompressed_page_size_counter_(nullptr),
@@ -116,10 +110,8 @@ HdfsParquetScanner::HdfsParquetScanner(HdfsScanNodeBase* scan_node, RuntimeState
 }
 
 Status HdfsParquetScanner::Open(ScannerContext* context) {
-  RETURN_IF_ERROR(HdfsScanner::Open(context));
+  RETURN_IF_ERROR(HdfsColumnarScanner::Open(context));
   metadata_range_ = stream_->scan_range();
-  num_cols_counter_ =
-      ADD_COUNTER(scan_node_->runtime_profile(), "NumColumns", TUnit::UNIT);
   num_stats_filtered_row_groups_counter_ =
       ADD_COUNTER(scan_node_->runtime_profile(), "NumStatsFilteredRowGroups",
           TUnit::UNIT);
@@ -145,22 +137,14 @@ Status HdfsParquetScanner::Open(ScannerContext* context) {
   num_pages_skipped_by_late_materialization_counter_ =
       ADD_COUNTER(scan_node_->runtime_profile(), "NumPagesSkippedByLateMaterialization",
           TUnit::UNIT);
-  num_scanners_with_no_reads_counter_ =
-      ADD_COUNTER(scan_node_->runtime_profile(), "NumScannersWithNoReads", TUnit::UNIT);
   num_dict_filtered_row_groups_counter_ =
       ADD_COUNTER(scan_node_->runtime_profile(), "NumDictFilteredRowGroups", TUnit::UNIT);
-  process_footer_timer_stats_ =
-      ADD_SUMMARY_STATS_TIMER(scan_node_->runtime_profile(), "FooterProcessingTime");
   parquet_compressed_page_size_counter_ = ADD_SUMMARY_STATS_COUNTER(
       scan_node_->runtime_profile(), "ParquetCompressedPageSize", TUnit::BYTES);
   parquet_uncompressed_page_size_counter_ = ADD_SUMMARY_STATS_COUNTER(
       scan_node_->runtime_profile(), "ParquetUncompressedPageSize", TUnit::BYTES);
   process_page_index_stats_ =
       ADD_SUMMARY_STATS_TIMER(scan_node_->runtime_profile(), "PageIndexProcessingTime");
-  row_group_ideal_reservation_counter_ = ADD_SUMMARY_STATS_COUNTER(
-      scan_node_->runtime_profile(), IDEAL_RESERVATION_COUNTER_NAME, TUnit::BYTES);
-  row_group_actual_reservation_counter_ = ADD_SUMMARY_STATS_COUNTER(
-      scan_node_->runtime_profile(), ACTUAL_RESERVATION_COUNTER_NAME, TUnit::BYTES);
 
   codegend_process_scratch_batch_fn_ = scan_node_->GetCodegenFn(THdfsFileFormat::PARQUET);
   if (codegend_process_scratch_batch_fn_ == nullptr) {
@@ -1967,6 +1951,7 @@ Status HdfsParquetScanner::ReadToBuffer(uint64_t offset, uint8_t* buffer, uint64
   DCHECK_EQ(io_buffer->buffer(), buffer);
   DCHECK_EQ(io_buffer->len(), size);
   DCHECK(io_buffer->eosr());
+  AddSyncReadBytesCounter(io_buffer->len());
   object_range->ReturnBuffer(move(io_buffer));
   return Status::OK();
 }
@@ -2920,129 +2905,19 @@ Status HdfsParquetScanner::InitScalarColumns() {
     }
     RETURN_IF_ERROR(scalar_reader->Reset(*file_desc, col_chunk, row_group_idx_));
   }
-  RETURN_IF_ERROR(DivideReservationBetweenColumns(scalar_readers_));
-  return Status::OK();
-}
 
-Status HdfsParquetScanner::DivideReservationBetweenColumns(
-    const vector<BaseScalarColumnReader*>& column_readers) {
-  DiskIoMgr* io_mgr = ExecEnv::GetInstance()->disk_io_mgr();
-  const int64_t min_buffer_size = io_mgr->min_buffer_size();
-  const int64_t max_buffer_size = io_mgr->max_buffer_size();
-  // The HdfsScanNode reservation calculation in the planner ensures that we have
-  // reservation for at least one buffer per column.
-  if (context_->total_reservation() < min_buffer_size * column_readers.size()) {
-    return Status(TErrorCode::INTERNAL_ERROR,
-        Substitute("Not enough reservation in Parquet scanner for file '$0'. Need at "
-                   "least $1 bytes per column for $2 columns but had $3 bytes",
-            filename(), min_buffer_size, column_readers.size(),
-            context_->total_reservation()));
+  ColumnRangeLengths col_range_lengths(scalar_readers_.size());
+  for (int i = 0; i < scalar_readers_.size(); ++i) {
+    col_range_lengths[i] = scalar_readers_[i]->scan_range()->bytes_to_read();
   }
 
-  vector<int64_t> col_range_lengths(column_readers.size());
-  for (int i = 0; i < column_readers.size(); ++i) {
-    col_range_lengths[i] = column_readers[i]->scan_range()->bytes_to_read();
-  }
-
-  // The scanner-wide stream was used only to read the file footer.  Each column has added
-  // its own stream. We can use the total reservation now that 'stream_''s resources have
-  // been released. We may benefit from increasing reservation further, so let's compute
-  // the ideal reservation to scan all the columns.
-  int64_t ideal_reservation = ComputeIdealReservation(col_range_lengths);
-  if (ideal_reservation > context_->total_reservation()) {
-    context_->TryIncreaseReservation(ideal_reservation);
-  }
-  row_group_actual_reservation_counter_->UpdateCounter(context_->total_reservation());
-  row_group_ideal_reservation_counter_->UpdateCounter(ideal_reservation);
-
-  vector<pair<int, int64_t>> tmp_reservations = DivideReservationBetweenColumnsHelper(
-      min_buffer_size, max_buffer_size, col_range_lengths, context_->total_reservation());
-  for (auto& tmp_reservation : tmp_reservations) {
-    column_readers[tmp_reservation.first]->set_io_reservation(tmp_reservation.second);
+  ColumnReservations reservation_per_column;
+  RETURN_IF_ERROR(
+      DivideReservationBetweenColumns(col_range_lengths, reservation_per_column));
+  for (auto& col_reservation : reservation_per_column) {
+    scalar_readers_[col_reservation.first]->set_io_reservation(col_reservation.second);
   }
   return Status::OK();
-}
-
-int64_t HdfsParquetScanner::ComputeIdealReservation(
-    const vector<int64_t>& col_range_lengths) {
-  DiskIoMgr* io_mgr = ExecEnv::GetInstance()->disk_io_mgr();
-  int64_t ideal_reservation = 0;
-  for (int64_t len : col_range_lengths) {
-    ideal_reservation += io_mgr->ComputeIdealBufferReservation(len);
-  }
-  return ideal_reservation;
-}
-
-vector<pair<int, int64_t>> HdfsParquetScanner::DivideReservationBetweenColumnsHelper(
-    int64_t min_buffer_size, int64_t max_buffer_size,
-    const vector<int64_t>& col_range_lengths, int64_t reservation_to_distribute) {
-  // Pair of (column index, reservation allocated).
-  vector<pair<int, int64_t>> tmp_reservations;
-  for (int i = 0; i < col_range_lengths.size(); ++i) tmp_reservations.emplace_back(i, 0);
-
-  // Sort in descending order of length, breaking ties by index so that larger columns
-  // get allocated reservation first. It is common to have dramatically different column
-  // sizes in a single file because of different value sizes and compressibility. E.g.
-  // consider a large STRING "comment" field versus a highly compressible
-  // dictionary-encoded column with only a few distinct values. We want to give max-sized
-  // buffers to large columns first to maximize the size of I/Os that we do while reading
-  // this row group.
-  sort(tmp_reservations.begin(), tmp_reservations.end(),
-      [&col_range_lengths](
-          const pair<int, int64_t>& left, const pair<int, int64_t>& right) {
-        int64_t left_len = col_range_lengths[left.first];
-        int64_t right_len = col_range_lengths[right.first];
-        return left_len != right_len ? left_len > right_len : left.first < right.first;
-      });
-
-  // Set aside the minimum reservation per column.
-  reservation_to_distribute -= min_buffer_size * col_range_lengths.size();
-
-  // Allocate reservations to columns by repeatedly allocating either a max-sized buffer
-  // or a large enough buffer to fit the remaining data for each column. Do this
-  // round-robin up to the ideal number of I/O buffers.
-  for (int i = 0; i < DiskIoMgr::IDEAL_MAX_SIZED_BUFFERS_PER_SCAN_RANGE; ++i) {
-    for (auto& tmp_reservation : tmp_reservations) {
-      // Add back the reservation we set aside above.
-      if (i == 0) reservation_to_distribute += min_buffer_size;
-
-      int64_t bytes_left_in_range =
-          col_range_lengths[tmp_reservation.first] - tmp_reservation.second;
-      int64_t bytes_to_add;
-      if (bytes_left_in_range >= max_buffer_size) {
-        if (reservation_to_distribute >= max_buffer_size) {
-          bytes_to_add = max_buffer_size;
-        } else if (i == 0) {
-          DCHECK_EQ(0, tmp_reservation.second);
-          // Ensure this range gets at least one buffer on the first iteration.
-          bytes_to_add = BitUtil::RoundDownToPowerOfTwo(reservation_to_distribute);
-        } else {
-          DCHECK_GT(tmp_reservation.second, 0);
-          // We need to read more than the max buffer size, but can't allocate a
-          // max-sized buffer. Stop adding buffers to this column: we prefer to use
-          // the existing max-sized buffers without small buffers mixed in so that
-          // we will alway do max-sized I/Os, which make efficient use of I/O devices.
-          bytes_to_add = 0;
-        }
-      } else if (bytes_left_in_range > 0 &&
-          reservation_to_distribute >= min_buffer_size) {
-        // Choose a buffer size that will fit the rest of the bytes left in the range.
-        bytes_to_add =
-            max(min_buffer_size, BitUtil::RoundUpToPowerOfTwo(bytes_left_in_range));
-        // But don't add more reservation than is available.
-        bytes_to_add =
-            min(bytes_to_add, BitUtil::RoundDownToPowerOfTwo(reservation_to_distribute));
-      } else {
-        bytes_to_add = 0;
-      }
-      DCHECK(bytes_to_add == 0 || bytes_to_add >= min_buffer_size) << bytes_to_add;
-      reservation_to_distribute -= bytes_to_add;
-      tmp_reservation.second += bytes_to_add;
-      DCHECK_GE(reservation_to_distribute, 0);
-      DCHECK_GT(tmp_reservation.second, 0);
-    }
-  }
-  return tmp_reservations;
 }
 
 Status HdfsParquetScanner::InitDictionaries(

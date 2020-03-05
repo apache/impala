@@ -113,6 +113,7 @@ Status ParquetPageIndex::ReadAll(int row_group_idx) {
   DCHECK_EQ(io_buffer->buffer(), page_index_buffer_.buffer());
   DCHECK_EQ(io_buffer->len(), page_index_buffer_.Size());
   DCHECK(io_buffer->eosr());
+  scanner_->AddSyncReadBytesCounter(io_buffer->len());
   object_range->ReturnBuffer(move(io_buffer));
 
   return Status::OK();

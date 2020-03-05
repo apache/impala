@@ -571,6 +571,9 @@ struct TQueryOptions {
   // Abort the Java UDF if an exception is thrown. Default is that only a
   // warning will be logged if the Java UDF throws an exception.
   141: optional bool abort_java_udf_on_exception = false;
+
+  // Indicates whether to use ORC's async read.
+  142: optional bool orc_async_read = true;
 }
 
 // Impala currently has three types of sessions: Beeswax, HiveServer2 and external

@@ -18,11 +18,11 @@
 #include "exec/hdfs-orc-scanner.h"
 
 #include <queue>
+#include <set>
 
 #include "exec/exec-node.inline.h"
 #include "exec/orc-column-readers.h"
 #include "exec/scanner-context.inline.h"
-#include "exec/scratch-tuple-batch.h"
 #include "exprs/expr.h"
 #include "exprs/scalar-expr.h"
 #include "runtime/collection-value-builder.h"
@@ -39,6 +39,8 @@
 using namespace impala;
 using namespace impala::io;
 
+namespace impala {
+
 Status HdfsOrcScanner::IssueInitialRanges(HdfsScanNodeBase* scan_node,
     const vector<HdfsFileDesc*>& files) {
   DCHECK(!files.empty());
@@ -51,8 +53,6 @@ Status HdfsOrcScanner::IssueInitialRanges(HdfsScanNodeBase* scan_node,
   }
   return IssueFooterRanges(scan_node, THdfsFileFormat::ORC, files);
 }
-
-namespace impala {
 
 HdfsOrcScanner::OrcMemPool::OrcMemPool(HdfsOrcScanner* scanner)
     : scanner_(scanner), mem_tracker_(scanner_->scan_node_->mem_tracker()) {
@@ -101,22 +101,48 @@ void HdfsOrcScanner::OrcMemPool::free(char* p) {
   chunk_sizes_.erase(p);
 }
 
-// TODO: improve this to use async IO (IMPALA-6636).
 void HdfsOrcScanner::ScanRangeInputStream::read(void* buf, uint64_t length,
     uint64_t offset) {
+  Status status;
+  if (scanner_->IsInFooterRange(offset, length)) {
+    status = scanner_->ReadFooterStream(buf, length, offset);
+  } else {
+    ColumnRange* columnRange = scanner_->FindColumnRange(length, offset);
+    if (columnRange == nullptr) {
+      status = readRandom(buf, length, offset);
+    } else if (offset < columnRange->current_position_) {
+      VLOG_QUERY << Substitute(
+          "ORC read request to already read range. Falling back to readRandom. "
+          "offset: $0 length: $1 $2",
+          offset, length, columnRange->debug());
+      status = readRandom(buf, length, offset);
+    } else {
+      status = columnRange->read(buf, length, offset);
+    }
+  }
+  if (!status.ok()) throw ResourceError(status);
+}
+
+Status HdfsOrcScanner::ScanRangeInputStream::readRandom(
+    void* buf, uint64_t length, uint64_t offset) {
+  if (offset + length > getLength()) {
+    string msg = Substitute("Invalid read offset/length on ORC file $0. offset: $1 "
+                            "length: $2 file_length: $3.",
+        filename_, offset, length, getLength());
+    return Status(msg);
+  }
+
   const ScanRange* metadata_range = scanner_->metadata_range_;
   const ScanRange* split_range =
       reinterpret_cast<ScanRangeMetadata*>(metadata_range->meta_data())->original_split;
   int64_t partition_id = scanner_->context_->partition_descriptor()->id();
 
-  // Set expected_local to false to avoid cache on stale data (IMPALA-6830)
-  bool expected_local = false;
+  bool expected_local = split_range->ExpectedLocalRead(offset, length);
   int cache_options = split_range->cache_options() & ~BufferOpts::USE_HDFS_CACHE;
   ScanRange* range = scanner_->scan_node_->AllocateScanRange(
       metadata_range->fs(), scanner_->filename(), length, offset, partition_id,
       split_range->disk_id(), expected_local, split_range->mtime(),
       BufferOpts::ReadInto(reinterpret_cast<uint8_t*>(buf), length, cache_options));
-
   unique_ptr<BufferDescriptor> io_buffer;
   Status status;
   {
@@ -128,8 +154,144 @@ void HdfsOrcScanner::ScanRangeInputStream::read(void* buf, uint64_t length,
     DCHECK(!status.ok() || !needs_buffers) << "Already provided a buffer";
     if (status.ok()) status = range->GetNext(&io_buffer);
   }
-  if (io_buffer != nullptr) range->ReturnBuffer(move(io_buffer));
-  if (!status.ok()) throw ResourceError(status);
+  if (io_buffer != nullptr) {
+    DCHECK_EQ(io_buffer->len(), length);
+    scanner_->AddSyncReadBytesCounter(length);
+    range->ReturnBuffer(move(io_buffer));
+  }
+  return status;
+}
+
+bool useAsyncIoForStream(orc::StreamKind kind) {
+  switch (kind) {
+    case orc::StreamKind_DATA:
+    case orc::StreamKind_LENGTH:
+    case orc::StreamKind_SECONDARY:
+    case orc::StreamKind_DICTIONARY_DATA:
+    case orc::StreamKind_DICTIONARY_COUNT:
+    case orc::StreamKind_PRESENT:
+      return true;
+      // We skip Async IO for the following stream kind. We expect that these streams will
+      // be read in one batch, so async reading does not help much.
+      // They also not too large.
+    case orc::StreamKind_ROW_INDEX:
+    case orc::StreamKind_BLOOM_FILTER:
+    case orc::StreamKind_BLOOM_FILTER_UTF8:
+      return false;
+    default:
+      DCHECK(false);
+  }
+}
+
+Status HdfsOrcScanner::StartColumnReading(const orc::StripeInformation& stripe) {
+  columnRanges_.clear();
+
+  const std::list<uint64_t>& selected_type_ids = selected_type_ids_;
+  // Collect the stream belonging to selected columns.
+  set<uint64_t> column_id_set(selected_type_ids.begin(), selected_type_ids.end());
+  try {
+    uint64_t stream_count = stripe.getNumberOfStreams();
+    for (uint64_t stream_id = 0; stream_id < stream_count; stream_id++) {
+      unique_ptr<orc::StreamInformation> stream = stripe.getStreamInformation(stream_id);
+      if (column_id_set.find(stream->getColumnId()) == column_id_set.end()) continue;
+      if (!useAsyncIoForStream(stream->getKind())) continue;
+      if (stream->getLength() == 0) continue;
+
+      columnRanges_.emplace_back(stream->getLength(), stream->getOffset(),
+          stream->getKind(), stream->getColumnId(), this);
+    }
+  } catch (ResourceError& e) { // errors throw from the orc scanner
+    parse_status_ = e.GetStatus();
+    return parse_status_;
+  } catch (std::exception& e) { // other errors throw from the orc library
+    string msg = Substitute(
+        "Encountered parse error in tail of ORC file $0: $1", filename(), e.what());
+    parse_status_ = Status(msg);
+    return parse_status_;
+  }
+
+  // Sort and check that there is no overlapping range in columnRanges_.
+  sort(columnRanges_.begin(), columnRanges_.end());
+  uint64_t last_end = 0;
+  for (const ColumnRange& range : columnRanges_) {
+    if (last_end > range.offset_) {
+      string msg =
+          Substitute("Overlapping ORC column ranges. Last end: $0 Current offset: $1",
+              last_end, range.offset_);
+      return Status(msg);
+    }
+    last_end = range.offset_ + range.length_;
+  }
+
+  // Divide reservation between columns.
+  ColumnRangeLengths col_range_lengths(columnRanges_.size());
+  for (int i = 0; i < columnRanges_.size(); ++i) {
+    col_range_lengths[i] = columnRanges_[i].length_;
+  }
+  ColumnReservations tmp_reservations;
+  RETURN_IF_ERROR(DivideReservationBetweenColumns(col_range_lengths, tmp_reservations));
+  for (auto& tmp_reservation : tmp_reservations) {
+    columnRanges_[tmp_reservation.first].io_reservation = tmp_reservation.second;
+  }
+
+  int64_t partition_id = context_->partition_descriptor()->id();
+  const ScanRange* split_range =
+      static_cast<ScanRangeMetadata*>(metadata_range_->meta_data())->original_split;
+  for (ColumnRange& range : columnRanges_) {
+    // Determine if the column is completely contained within a local split.
+    bool col_range_local = split_range->ExpectedLocalRead(range.offset_, range.length_);
+
+    int file_length = scan_node_->GetFileDesc(partition_id, filename())->file_length;
+    if (range.offset_ + range.length_ > file_length) {
+      string msg = Substitute("Invalid read len.");
+      return Status(msg);
+    }
+    ScanRange* scan_range = scan_node_->AllocateScanRange(metadata_range_->fs(),
+        filename(), range.length_, range.offset_, partition_id, split_range->disk_id(),
+        col_range_local, split_range->mtime(), BufferOpts(split_range->cache_options()));
+    RETURN_IF_ERROR(
+        context_->AddAndStartStream(scan_range, range.io_reservation, &range.stream_));
+  }
+  return Status::OK();
+}
+
+Status HdfsOrcScanner::ColumnRange::read(void* buf, uint64_t length, uint64_t offset) {
+  if (offset + length > offset_ + length_) {
+    string msg = Substitute("ORC read request out of range. offset: $0 length: $1 $2",
+        offset, length, debug());
+    return Status(msg);
+  }
+
+  DCHECK(offset >= current_position_);
+  Status status;
+  if (offset > current_position_) {
+    // skip the non-requested range
+    uint64_t bytes_to_skip = offset - current_position_;
+    if (!stream_->SkipBytes(bytes_to_skip, &status)) {
+      LOG(ERROR) << Substitute(
+          "HdfsOrcScanner::ColumnRange::read skipping failed. offset: $0 length: $1 $2",
+          offset, length, debug());
+      return status;
+    }
+    scanner_->AddSkippedReadBytesCounter(bytes_to_skip);
+    current_position_ = offset;
+  }
+
+  uint8_t* stream_buf = nullptr;
+  {
+    SCOPED_TIMER2(scanner_->state_->total_storage_wait_timer(),
+        scanner_->scan_node_->scanner_io_wait_time());
+    if (!stream_->ReadBytes(length, &stream_buf, &status, false)) return status;
+    scanner_->AddAsyncReadBytesCounter(length);
+  }
+  CHECK_NOTNULL(stream_buf);
+  memcpy(buf, stream_buf, length); // TODO: ORC-262: extend ORC interface to avoid copy.
+  current_position_ += length;
+  bool done = current_position_ == offset_ + length_;
+  DCHECK_EQ(current_position_, stream_->file_offset());
+  DCHECK_EQ(done, stream_->bytes_left() == 0);
+  stream_->ReleaseCompletedResources(done);
+  return Status::OK();
 }
 
 HdfsOrcScanner::HdfsOrcScanner(HdfsScanNodeBase* scan_node, RuntimeState* state)
@@ -145,16 +307,10 @@ HdfsOrcScanner::~HdfsOrcScanner() {
 }
 
 Status HdfsOrcScanner::Open(ScannerContext* context) {
-  RETURN_IF_ERROR(HdfsScanner::Open(context));
+  RETURN_IF_ERROR(HdfsColumnarScanner::Open(context));
   metadata_range_ = stream_->scan_range();
-  num_cols_counter_ =
-      ADD_COUNTER(scan_node_->runtime_profile(), "NumOrcColumns", TUnit::UNIT);
   num_stripes_counter_ =
       ADD_COUNTER(scan_node_->runtime_profile(), "NumOrcStripes", TUnit::UNIT);
-  num_scanners_with_no_reads_counter_ =
-      ADD_COUNTER(scan_node_->runtime_profile(), "NumScannersWithNoReads", TUnit::UNIT);
-  process_footer_timer_stats_ =
-      ADD_SUMMARY_STATS_TIMER(scan_node_->runtime_profile(), "OrcFooterProcessingTime");
 
   codegend_process_scratch_batch_fn_ = scan_node_->GetCodegenFn(THdfsFileFormat::ORC);
   if (codegend_process_scratch_batch_fn_ == nullptr) {
@@ -270,7 +426,6 @@ Status HdfsOrcScanner::Open(ScannerContext* context) {
     parse_status_ = Status(msg);
     return parse_status_;
   }
-
   // Set top-level template tuple.
   template_tuple_ = template_tuple_map_[scan_node_->tuple_desc()];
   return Status::OK();
@@ -325,10 +480,13 @@ void HdfsOrcScanner::Close(RowBatch* row_batch) {
 }
 
 Status HdfsOrcScanner::ProcessFileTail() {
-  unique_ptr<orc::InputStream> input_stream(new ScanRangeInputStream(this));
-  VLOG_FILE << "Processing FileTail of ORC file: " << input_stream->getName()
-      << ", length: " << input_stream->getLength();
   try {
+    // ScanRangeInputStream keeps a pointer to this HdfsOrcScanner so we can hack
+    // async IO behind the orc::InputStream interface. The ranges of the
+    // selected columns will be updated when starting new stripes.
+    unique_ptr<orc::InputStream> input_stream(new ScanRangeInputStream(this));
+    VLOG_FILE << "Processing FileTail of ORC file: " << input_stream->getName()
+              << ", file_length: " << input_stream->getLength();
     reader_ = orc::createReader(move(input_stream), reader_options_);
   } catch (ResourceError& e) {  // errors throw from the orc scanner
     parse_status_ = e.GetStatus();
@@ -745,6 +903,9 @@ Status HdfsOrcScanner::NextStripe() {
     }
 
     COUNTER_ADD(num_stripes_counter_, 1);
+    if (state_->query_options().orc_async_read) {
+      RETURN_IF_ERROR(StartColumnReading(*stripe.get()));
+    }
     row_reader_options_.range(stripe->getOffset(), stripe_len);
     try {
       row_reader_ = reader_->createRowReader(row_reader_options_);
@@ -752,9 +913,9 @@ Status HdfsOrcScanner::NextStripe() {
       parse_status_ = e.GetStatus();
       return parse_status_;
     } catch (std::exception& e) { // errors throw from the orc library
-      VLOG_QUERY << "Error in creating ORC column readers: " << e.what();
-      parse_status_ = Status(
-          Substitute("Error in creating ORC column readers: $0.", e.what()));
+      parse_status_ = Status(Substitute(
+          "Error in creating column readers for ORC file $0: $1.", filename(), e.what()));
+      VLOG_QUERY << parse_status_.msg().msg();
       return parse_status_;
     }
     end_of_stripe_ = false;
@@ -794,8 +955,9 @@ Status HdfsOrcScanner::AssembleRows(RowBatch* row_batch) {
         parse_status_ = e.GetStatus();
         return parse_status_;
       } catch (std::exception& e) {
-        VLOG_QUERY << "Encounter parse error: " << e.what();
-        parse_status_ = Status(Substitute("Encounter parse error: $0.", e.what()));
+        parse_status_ = Status(Substitute(
+            "Encounter parse error in ORC file $0: $1.", filename(), e.what()));
+        VLOG_QUERY << parse_status_.msg().msg();
         eos_ = true;
         return parse_status_;
       }
@@ -1201,4 +1363,30 @@ Status HdfsOrcScanner::PrepareSearchArguments() {
   return Status::OK();
 }
 
+Status HdfsOrcScanner::ReadFooterStream(void* buf, uint64_t length, uint64_t offset) {
+  Status status;
+  if (offset > stream_->file_offset()) {
+    // skip the non-requested range
+    uint64_t bytes_to_skip = offset - stream_->file_offset();
+    if (!stream_->SkipBytes(bytes_to_skip, &status)) {
+      LOG(ERROR) << Substitute("HdfsOrcScanner::ReadFooterStream skipping failed. "
+                               "offset: $0 length: $1 current_offset: $2",
+          offset, length, stream_->file_offset());
+      return status;
+    }
+    AddSkippedReadBytesCounter(bytes_to_skip);
+  }
+
+  uint8_t* stream_buf = nullptr;
+  {
+    SCOPED_TIMER2(state_->total_storage_wait_timer(), scan_node_->scanner_io_wait_time());
+    if (!stream_->ReadBytes(length, &stream_buf, &status, false)) return status;
+    AddAsyncReadBytesCounter(length);
+  }
+  CHECK_NOTNULL(stream_buf);
+  memcpy(buf, stream_buf, length); // TODO: ORC-262: extend ORC interface to avoid copy.
+  bool done = stream_->bytes_left() == 0;
+  stream_->ReleaseCompletedResources(done);
+  return Status::OK();
+}
 }

@@ -439,9 +439,6 @@ class HdfsParquetScanner : public HdfsColumnarScanner {
   /// Version of the application that wrote this file.
   ParquetFileVersion file_version_;
 
-  /// Scan range for the metadata.
-  const io::ScanRange* metadata_range_;
-
   /// Pool to copy dictionary page buffer into. This pool is shared across all the
   /// pages in a column chunk.
   boost::scoped_ptr<MemPool> dictionary_pool_;
@@ -493,14 +490,8 @@ class HdfsParquetScanner : public HdfsColumnarScanner {
   /// Timer for materializing rows.  This ignores time getting the next buffer.
   ScopedTimer<MonotonicStopWatch> assemble_rows_timer_;
 
-  /// Average and min/max time spent processing the footer by each split.
-  RuntimeProfile::SummaryStatsCounter* process_footer_timer_stats_;
-
   /// Average and min/max time spent processing the page index for each row group.
   RuntimeProfile::SummaryStatsCounter* process_page_index_stats_;
-
-  /// Number of columns that need to be read.
-  RuntimeProfile::Counter* num_cols_counter_;
 
   /// Number of row groups that are skipped because of Parquet statistics, either by
   /// row group level statistics, or page level statistics.
@@ -537,10 +528,6 @@ class HdfsParquetScanner : public HdfsColumnarScanner {
   /// rows that survived filtering.
   RuntimeProfile::Counter* num_pages_skipped_by_late_materialization_counter_;
 
-  /// Number of scanners that end up doing no reads because their splits don't overlap
-  /// with the midpoint of any row-group in the file.
-  RuntimeProfile::Counter* num_scanners_with_no_reads_counter_;
-
   /// Number of row groups skipped due to dictionary filter. This is an aggregated counter
   /// that includes the number of filtered row groups as a result of evaluating conjuncts
   /// and runtime bloom filters on the dictionary entries.
@@ -555,11 +542,6 @@ class HdfsParquetScanner : public HdfsColumnarScanner {
   /// to this counter, (2) when a page that is not compressed is read, its size is added
   /// to this counter
   RuntimeProfile::SummaryStatsCounter* parquet_uncompressed_page_size_counter_;
-
-  /// Average and min/max memory reservation for a scanning a row group, both
-  /// ideal(calculated based on min and max buffer size) and actual.
-  RuntimeProfile::SummaryStatsCounter* row_group_ideal_reservation_counter_;
-  RuntimeProfile::SummaryStatsCounter* row_group_actual_reservation_counter_;
 
   /// Number of collection items read in current row batch. It is a scanner-local counter
   /// used to reduce the frequency of updating HdfsScanNode counter. It is updated by the
@@ -582,8 +564,6 @@ class HdfsParquetScanner : public HdfsColumnarScanner {
   /// survive after filtering and call it micro batch. This represents a micro batch
   /// that spans entire batch of length 'scratch_batch_->capacity'.
   ScratchMicroBatch complete_micro_batch_;
-
-  const char* filename() const { return metadata_range_->file(); }
 
   virtual Status GetNextInternal(RowBatch* row_batch) WARN_UNUSED_RESULT;
 
@@ -831,27 +811,6 @@ class HdfsParquetScanner : public HdfsColumnarScanner {
   /// initializes 'scalar_readers_' and divides reservation between the columns but
   /// does not start any scan ranges.
   Status InitScalarColumns() WARN_UNUSED_RESULT;
-
-  /// Decides how to divide stream_->reservation() between the columns. May increase
-  /// the reservation if more reservation would enable more efficient I/O for the
-  /// current columns being scanned. Sets the reservation on each corresponding reader
-  /// in 'column_readers'.
-  Status DivideReservationBetweenColumns(
-      const std::vector<BaseScalarColumnReader*>& column_readers);
-
-  /// Compute the ideal reservation to scan a file with scan range lengths
-  /// 'col_range_lengths' given the min and max buffer size of the singleton DiskIoMgr
-  /// in ExecEnv.
-  static int64_t ComputeIdealReservation(const std::vector<int64_t>& col_range_lengths);
-
-  /// Helper for DivideReservationBetweenColumns(). Implements the core algorithm for
-  /// dividing a reservation of 'reservation_to_distribute' bytes between columns with
-  /// scan range lengths 'col_range_lengths' given a min and max buffer size. Returns
-  /// a vector with an entry per column with the index into 'col_range_lengths' and the
-  /// amount of reservation in bytes to give to that column.
-  static std::vector<std::pair<int, int64_t>> DivideReservationBetweenColumnsHelper(
-      int64_t min_buffer_size, int64_t max_buffer_size,
-      const std::vector<int64_t>& col_range_lengths, int64_t reservation_to_distribute);
 
   /// Initializes the column readers in collection_readers_.
   void InitCollectionColumns();

@@ -86,9 +86,7 @@ Status ParquetPageReader::InitColumnChunk(const HdfsFileDesc& file_desc,
   const ScanRange* split_range =
       static_cast<ScanRangeMetadata*>(metadata_range->meta_data())->original_split;
   // Determine if the column is completely contained within a local split.
-  bool col_range_local = split_range->expected_local()
-      && col_start >= split_range->offset()
-      && col_end <= split_range->offset() + split_range->len();
+  bool col_range_local = split_range->ExpectedLocalRead(col_start, col_len);
   scan_range_ = parent_->scan_node_->AllocateScanRange(metadata_range->fs(),
       filename(), col_len, col_start, move(sub_ranges),
       partition_id, split_range->disk_id(),
@@ -104,16 +102,8 @@ Status ParquetPageReader::StartScan(int io_reservation) {
   DCHECK_GT(io_reservation, 0);
   DCHECK(scan_range_ != nullptr) << "Must Reset() before starting scan.";
 
-  DiskIoMgr* io_mgr = ExecEnv::GetInstance()->disk_io_mgr();
-  ScannerContext* context = parent_->context_;
-  bool needs_buffers;
-  RETURN_IF_ERROR(parent_->scan_node_->reader_context()->StartScanRange(
-        scan_range_, &needs_buffers));
-  if (needs_buffers) {
-    RETURN_IF_ERROR(io_mgr->AllocateBuffersForRange(
-          context->bp_client(), scan_range_, io_reservation));
-  }
-  stream_ = parent_->context_->AddStream(scan_range_, io_reservation);
+  RETURN_IF_ERROR(
+      parent_->context_->AddAndStartStream(scan_range_, io_reservation, &stream_));
   DCHECK(stream_ != nullptr);
 
   state_ = State::ToReadHeader;
@@ -202,6 +192,7 @@ Status ParquetPageReader::ReadPageHeader(bool* eos) {
     }
   }
   RETURN_IF_ERROR(AdvanceStream(header_size));
+  parent_->AddAsyncReadBytesCounter(header_size);
   current_page_header_ = header;
   header_initialized_ = true;
   page_headers_read_++;
@@ -217,6 +208,7 @@ Status ParquetPageReader::ReadPageData(uint8_t** data) {
     DCHECK(!status.ok());
     return status;
   }
+  parent_->AddAsyncReadBytesCounter(current_page_header_.compressed_page_size);
   state_ = State::ToReadHeader;
   return Status::OK();
 }
@@ -224,6 +216,7 @@ Status ParquetPageReader::ReadPageData(uint8_t** data) {
 Status ParquetPageReader::SkipPageData() {
   DCHECK_EQ(state_, State::ToReadData);
   RETURN_IF_ERROR(AdvanceStream(current_page_header_.compressed_page_size));
+  parent_->AddSkippedReadBytesCounter(current_page_header_.compressed_page_size);
   state_ = State::ToReadHeader;
   return Status::OK();
 }
