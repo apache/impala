@@ -21,6 +21,7 @@ import java.util.ArrayList;
 import java.util.List;
 import java.util.Set;
 
+import org.apache.impala.authorization.AuthorizationContext;
 import org.apache.impala.authorization.TableMask;
 import org.apache.impala.catalog.Column;
 import org.apache.impala.catalog.ColumnStats;
@@ -144,12 +145,15 @@ public class InlineViewRef extends TableRef {
    * @param resolvedPath resolved path for the original table/view
    * @param tableRef original resolved table/view
    * @param tableMask TableMask providing column masking and row filtering policies
+   * @param authzCtx AuthorizationContext containing RangerBufferAuditHandler
    */
   static InlineViewRef createTableMaskView(Path resolvedPath, TableRef tableRef,
-      TableMask tableMask) throws AnalysisException, InternalException {
+      TableMask tableMask, AuthorizationContext authzCtx) throws AnalysisException,
+      InternalException {
     Preconditions.checkNotNull(resolvedPath);
     Preconditions.checkNotNull(resolvedPath.getRootTable());
     Preconditions.checkNotNull(tableRef);
+    Preconditions.checkNotNull(authzCtx);
     Preconditions.checkState(tableRef instanceof InlineViewRef
         || tableRef instanceof BaseTableRef);
     List<Column> columns = resolvedPath.getRootTable().getColumnsInHiveOrder();
@@ -159,7 +163,7 @@ public class InlineViewRef extends TableRef {
       // TODO: only add materialized columns to avoid introducing new privilege
       //  requirements (IMPALA-9223)
       items.add(new SelectListItem(
-          tableMask.createColumnMask(col.getName(), col.getType()),
+          tableMask.createColumnMask(col.getName(), col.getType(), authzCtx),
           /*alias*/ col.getName()));
     }
     SelectList selectList = new SelectList(items);

@@ -72,7 +72,6 @@ public class FromClause extends StmtNode implements Iterable<TableRef> {
     TableRef leftTblRef = null;  // the one to the left of tblRef
     for (int i = 0; i < tableRefs_.size(); ++i) {
       TableRef tblRef = tableRefs_.get(i);
-      // Replace non-InlineViewRef table refs with a BaseTableRef or ViewRef.
       tblRef = analyzer.resolveTableRef(tblRef, doTableMasking_);
       tableRefs_.set(i, Preconditions.checkNotNull(tblRef));
       tblRef.setLeftTblRef(leftTblRef);

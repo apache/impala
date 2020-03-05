@@ -66,11 +66,12 @@ public class TableMask {
   /**
    * Return the masked Expr of the given column
    */
-  public Expr createColumnMask(String colName, Type colType)
-      throws InternalException, AnalysisException {
+  public Expr createColumnMask(String colName, Type colType,
+      AuthorizationContext authzCtx) throws InternalException,
+      AnalysisException {
     Preconditions.checkState(!colType.isComplexType());
     String maskedValue = authChecker_.createColumnMask(user_, dbName_, tableName_,
-        colName);
+        colName, authzCtx);
     if (LOG.isTraceEnabled()) {
       LOG.trace("Performing column masking on table {}.{}: {} => {}",
           dbName_, tableName_, colName, maskedValue);

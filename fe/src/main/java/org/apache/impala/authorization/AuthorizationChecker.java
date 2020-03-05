@@ -94,6 +94,6 @@ public interface AuthorizationChecker {
   /**
    * Returns the column mask string for the given column.
    */
-  String createColumnMask(User user, String dbName, String tableName, String columnName)
-      throws InternalException;
+  String createColumnMask(User user, String dbName, String tableName, String columnName,
+      AuthorizationContext authzCtx) throws InternalException;
 }

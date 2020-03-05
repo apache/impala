@@ -32,6 +32,7 @@ import org.apache.ranger.audit.model.AuthzAuditEvent;
 import org.junit.Ignore;
 import org.junit.Test;
 
+import java.util.ArrayList;
 import java.util.Collections;
 import java.util.List;
 import java.util.function.Consumer;
@@ -199,6 +200,115 @@ public class RangerAuditLogTest extends AuthorizationTestBase {
           events.get(0));
       assertEquals("show partitions functional.alltypes", events.get(0).getRequestData());
     }, "show partitions functional.alltypes");
+  }
+
+  @Test
+  public void testAuditsForColumnMasking() throws ImpalaException {
+    String databaseName = "functional";
+    String tableName = "alltypestiny";
+    String policyNames[] = {"col_mask_custom", "col_mask_null"};
+    String columnNames[] = {"string_col", "date_string_col"};
+    String masks[] = {
+        "  {\n" +
+        "    \"dataMaskType\": \"CUSTOM\",\n" +
+        "    \"valueExpr\": \"concat({col}, 'xyz')\"\n" +
+        "  }\n",
+        "  {\n" +
+        "    \"dataMaskType\": \"MASK_NULL\"\n" +
+        "  }\n"
+    };
+
+    List<String> policies = new ArrayList<>();
+    for (int i = 0; i < masks.length; ++i) {
+      String json = String.format("{\n" +
+          "  \"name\": \"%s\",\n" +
+          "  \"policyType\": 1,\n" +
+          "  \"serviceType\": \"%s\",\n" +
+          "  \"service\": \"%s\",\n" +
+          "  \"resources\": {\n" +
+          "    \"database\": {\n" +
+          "      \"values\": [\"%s\"],\n" +
+          "      \"isExcludes\": false,\n" +
+          "      \"isRecursive\": false\n" +
+          "    },\n" +
+          "    \"table\": {\n" +
+          "      \"values\": [\"%s\"],\n" +
+          "      \"isExcludes\": false,\n" +
+          "      \"isRecursive\": false\n" +
+          "    },\n" +
+          "    \"column\": {\n" +
+          "      \"values\": [\"%s\"],\n" +
+          "      \"isExcludes\": false,\n" +
+          "      \"isRecursive\": false\n" +
+          "    }\n" +
+          "  },\n" +
+          "  \"dataMaskPolicyItems\": [\n" +
+          "    {\n" +
+          "      \"accesses\": [\n" +
+          "        {\n" +
+          "          \"type\": \"select\",\n" +
+          "          \"isAllowed\": true\n" +
+          "        }\n" +
+          "      ],\n" +
+          "      \"users\": [\"%s\"],\n" +
+          "      \"dataMaskInfo\":\n" +
+              "%s" +
+          "    }\n" +
+          "  ]\n" +
+          "}", policyNames[i], RANGER_SERVICE_TYPE, RANGER_SERVICE_NAME, databaseName,
+          tableName, columnNames[i], user_.getShortName(), masks[i]);
+      policies.add(json);
+    }
+
+    try {
+      for (int i = 0; i < masks.length; ++i) {
+        String policyName = policyNames[i];
+        String json = policies.get(i);
+        createRangerPolicy(policyName, json);
+      }
+
+      authzOk(events -> {
+        assertEquals(15, events.size());
+        assertEquals("select * from functional.alltypestiny",
+            events.get(0).getRequestData());
+        assertEventEquals("@column", "mask_null",
+            "functional/alltypestiny/date_string_col", 1, events.get(0));
+        assertEventEquals("@column", "custom", "functional/alltypestiny/string_col", 1,
+            events.get(1));
+        assertEventEquals("@table", "select", "functional/alltypestiny", 1,
+            events.get(2));
+        assertEventEquals("@column", "select", "functional/alltypestiny/id", 1,
+            events.get(3));
+        assertEventEquals("@column", "select", "functional/alltypestiny/bool_col", 1,
+            events.get(4));
+        assertEventEquals("@column", "select", "functional/alltypestiny/tinyint_col", 1,
+            events.get(5));
+        assertEventEquals("@column", "select", "functional/alltypestiny/smallint_col", 1,
+            events.get(6));
+        assertEventEquals("@column", "select", "functional/alltypestiny/int_col", 1,
+            events.get(7));
+        assertEventEquals("@column", "select", "functional/alltypestiny/bigint_col", 1,
+            events.get(8));
+        assertEventEquals("@column", "select", "functional/alltypestiny/float_col", 1,
+            events.get(9));
+        assertEventEquals("@column", "select", "functional/alltypestiny/double_col", 1,
+            events.get(10));
+        assertEventEquals("@column", "select", "functional/alltypestiny/string_col", 1,
+            events.get(11));
+        assertEventEquals("@column", "select", "functional/alltypestiny/timestamp_col", 1,
+            events.get(12));
+        assertEventEquals("@column", "select", "functional/alltypestiny/year", 1,
+            events.get(13));
+        assertEventEquals("@column", "select", "functional/alltypestiny/month", 1,
+            events.get(14));
+      }, "select * from functional.alltypestiny", onTable("functional", "alltypestiny",
+          TPrivilegeLevel.SELECT));
+    } finally {
+      for (int i = 0; i < masks.length; ++i) {
+        String policyName = policyNames[i];
+        deleteRangerPolicy(policyName);
+      }
+    }
   }
 
   private void authzOk(Consumer<List<AuthzAuditEvent>> resultChecker, String stmt,

@@ -36,6 +36,7 @@ import org.apache.impala.analysis.Path.PathType;
 import org.apache.impala.analysis.StmtMetadataLoader.StmtTableCache;
 import org.apache.impala.authorization.AuthorizationChecker;
 import org.apache.impala.authorization.AuthorizationConfig;
+import org.apache.impala.authorization.AuthorizationContext;
 import org.apache.impala.authorization.AuthorizationFactory;
 import org.apache.impala.authorization.Privilege;
 import org.apache.impala.authorization.PrivilegeRequest;
@@ -323,6 +324,7 @@ public class Analyzer {
   private static class GlobalState {
     public final TQueryCtx queryCtx;
     public final AuthorizationFactory authzFactory;
+    public final AuthorizationContext authzCtx;
     public final DescriptorTable descTbl = new DescriptorTable();
     public final IdGenerator<ExprId> conjunctIdGenerator = ExprId.createGenerator();
     public final ColumnLineageGraph lineageGraph;
@@ -450,9 +452,10 @@ public class Analyzer {
     private int numStmtExprs_ = 0;
 
     public GlobalState(StmtTableCache stmtTableCache, TQueryCtx queryCtx,
-        AuthorizationFactory authzFactory) {
+        AuthorizationFactory authzFactory, AuthorizationContext authzCtx) {
       this.stmtTableCache = stmtTableCache;
       this.queryCtx = queryCtx;
+      this.authzCtx = authzCtx;
       this.authzFactory = authzFactory;
       this.lineageGraph = new ColumnLineageGraph();
       List<ExprRewriteRule> rules = new ArrayList<>();
@@ -469,7 +472,7 @@ public class Analyzer {
         rules.add(ExtractCommonConjunctRule.INSTANCE);
         if (queryCtx.getClient_request().getQuery_options().isEnable_cnf_rewrites()) {
           rules.add(new ConvertToCNFRule(queryCtx.getClient_request().getQuery_options()
-                  .getMax_cnf_exprs(),true));
+              .getMax_cnf_exprs(),true));
         }
         // Relies on FoldConstantsRule and NormalizeExprsRule.
         rules.add(SimplifyConditionalsRule.INSTANCE);
@@ -522,9 +525,9 @@ public class Analyzer {
   private boolean hasEmptySpjResultSet_ = false;
 
   public Analyzer(StmtTableCache stmtTableCache, TQueryCtx queryCtx,
-      AuthorizationFactory authzFactory) {
+      AuthorizationFactory authzFactory, AuthorizationContext authzCtx) {
     ancestors_ = new ArrayList<>();
-    globalState_ = new GlobalState(stmtTableCache, queryCtx, authzFactory);
+    globalState_ = new GlobalState(stmtTableCache, queryCtx, authzFactory, authzCtx);
     user_ = new User(TSessionStateUtil.getEffectiveUser(queryCtx.session));
   }
 
@@ -557,7 +560,8 @@ public class Analyzer {
    */
   public static Analyzer createWithNewGlobalState(Analyzer parentAnalyzer) {
     GlobalState globalState = new GlobalState(parentAnalyzer.globalState_.stmtTableCache,
-        parentAnalyzer.getQueryCtx(), parentAnalyzer.getAuthzFactory());
+        parentAnalyzer.getQueryCtx(), parentAnalyzer.getAuthzFactory(),
+        parentAnalyzer.getAuthzCtx());
     return new Analyzer(parentAnalyzer, globalState);
   }
 
@@ -776,7 +780,7 @@ public class Analyzer {
       try {
         if (!tableMask.needsMaskingOrFiltering()) return resolvedTableRef;
         return InlineViewRef.createTableMaskView(resolvedPath, resolvedTableRef,
-            tableMask);
+            tableMask, getAuthzCtx());
       } catch (InternalException e) {
         LOG.error("Error performing table masking", e);
         throw new AnalysisException("Error performing table masking", e);
@@ -2710,6 +2714,7 @@ public class Analyzer {
   public AuthorizationConfig getAuthzConfig() {
     return getAuthzFactory().getAuthorizationConfig();
   }
+  public AuthorizationContext getAuthzCtx() { return globalState_.authzCtx; }
   public boolean isAuthzEnabled() { return getAuthzConfig().isEnabled(); }
   public ListMap<TNetworkAddress> getHostIndex() { return globalState_.hostIndex; }
   public ColumnLineageGraph getColumnLineageGraph() { return globalState_.lineageGraph; }

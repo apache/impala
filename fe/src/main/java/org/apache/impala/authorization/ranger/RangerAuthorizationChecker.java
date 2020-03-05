@@ -276,7 +276,7 @@ public class RangerAuthorizationChecker extends BaseAuthorizationChecker {
    */
   private void authorizeColumnMask(User user, String dbName, String tableName,
       String columnName) throws InternalException, AuthorizationException {
-    if (evalColumnMask(user, dbName, tableName, columnName).isMaskEnabled()) {
+    if (evalColumnMask(user, dbName, tableName, columnName, null).isMaskEnabled()) {
       throw new AuthorizationException(String.format(
           "Column masking is disabled by --enable_column_masking flag. Can't access " +
               "column %s.%s.%s that has column masking policy.",
@@ -288,7 +288,8 @@ public class RangerAuthorizationChecker extends BaseAuthorizationChecker {
   public boolean needsMaskingOrFiltering(User user, String dbName, String tableName,
       List<String> requiredColumns) throws InternalException {
     for (String column: requiredColumns) {
-      if (evalColumnMask(user, dbName, tableName, column).isMaskEnabled()) {
+      if (evalColumnMask(user, dbName, tableName, column, null)
+          .isMaskEnabled()) {
         return true;
       }
     }
@@ -297,14 +298,26 @@ public class RangerAuthorizationChecker extends BaseAuthorizationChecker {
 
   @Override
   public String createColumnMask(User user, String dbName, String tableName,
-      String columnName) throws InternalException {
-    RangerAccessResult accessResult = evalColumnMask(user, dbName, tableName,
-        columnName);
+      String columnName, AuthorizationContext rangerCtx) throws InternalException {
+    RangerBufferAuditHandler auditHandler =
+        ((RangerAuthorizationContext) rangerCtx).getAuditHandler();
+    RangerAccessResult accessResult = evalColumnMask(user, dbName, tableName, columnName,
+        auditHandler);
+
     // No column masking policies, return the original column.
     if (!accessResult.isMaskEnabled()) return columnName;
     String maskType = accessResult.getMaskType();
     RangerServiceDef.RangerDataMaskTypeDef maskTypeDef = accessResult.getMaskTypeDef();
     Preconditions.checkNotNull(maskType);
+    List<AuthzAuditEvent> auditEvents = auditHandler.getAuthzEvents();
+    Preconditions.checkState(!auditEvents.isEmpty());
+    // Recall that the same instance of RangerAuthorizationContext is passed to
+    // createColumnMask() every time this method is called. Thus the same instance of
+    // RangerBufferAuditHandler is provided for evalColumnMask() to log the event.
+    // Since there will be exactly one event added to 'auditEvents' when there is a
+    // corresponding column masking policy, i.e., accessResult.isMaskEnabled() evaluates
+    // to true, we only need to process the last event on 'auditEvents'.
+    auditEvents.get(auditEvents.size() - 1).setAccessType(maskType.toLowerCase());
     // The expression used to replace the original column.
     String maskedColumn = columnName;
     // The expression of the mask type. Column names are referenced by "{col}".
@@ -341,7 +354,8 @@ public class RangerAuthorizationChecker extends BaseAuthorizationChecker {
    * A RangerAccessResult contains the matched policy details and the masked column.
    */
   private RangerAccessResult evalColumnMask(User user, String dbName,
-      String tableName, String columnName) throws InternalException {
+      String tableName, String columnName, RangerBufferAuditHandler auditHandler)
+      throws InternalException {
     RangerAccessResourceImpl resource = new RangerImpalaResourceBuilder()
         .database(dbName)
         .table(tableName)
@@ -349,7 +363,12 @@ public class RangerAuthorizationChecker extends BaseAuthorizationChecker {
         .build();
     RangerAccessRequest req = new RangerAccessRequestImpl(resource,
         SELECT_ACCESS_TYPE, user.getShortName(), getUserGroups(user));
-    return plugin_.evalDataMaskPolicies(req, null);
+    // The method evalDataMaskPolicies() only checks whether there is a corresponding
+    // column masking policy on the Ranger server and thus does not check whether the
+    // requesting user/group is granted the necessary privilege on the specified
+    // resource. No AnalysisException or AuthorizationException will be thrown if the
+    // requesting user/group does not possess the necessary privilege.
+    return plugin_.evalDataMaskPolicies(req, auditHandler);
   }
 
   /**

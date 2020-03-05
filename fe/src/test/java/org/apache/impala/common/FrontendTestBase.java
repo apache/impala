@@ -392,7 +392,7 @@ public class FrontendTestBase extends AbstractFrontendTest {
 
           @Override
           public String createColumnMask(User user, String dbName, String tableName,
-              String columnName) {
+              String columnName, AuthorizationContext authzCtx) {
             return null;
           }
 

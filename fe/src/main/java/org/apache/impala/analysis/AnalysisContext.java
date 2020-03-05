@@ -390,7 +390,12 @@ public class AnalysisContext {
   }
 
   public Analyzer createAnalyzer(StmtTableCache stmtTableCache) {
-    Analyzer result = new Analyzer(stmtTableCache, queryCtx_, authzFactory_);
+    return createAnalyzer(stmtTableCache, null);
+  }
+
+  public Analyzer createAnalyzer(StmtTableCache stmtTableCache,
+      AuthorizationContext authzCtx) {
+    Analyzer result = new Analyzer(stmtTableCache, queryCtx_, authzFactory_, authzCtx);
     result.setUseHiveColLabels(useHiveColLabels_);
     return result;
   }
@@ -411,8 +416,25 @@ public class AnalysisContext {
 
     // Analyze statement and record exception.
     AnalysisException analysisException = null;
+    TClientRequest clientRequest;
+    AuthorizationContext authzCtx = null;
+
     try {
-      analyze(stmtTableCache);
+      clientRequest = queryCtx_.getClient_request();
+      authzCtx = authzChecker.createAuthorizationContext(true,
+          clientRequest.isSetRedacted_stmt() ?
+              clientRequest.getRedacted_stmt() : clientRequest.getStmt(),
+          queryCtx_.getSession(), Optional.of(timeline_));
+      // TODO (IMPALA-9597): Generating column masking audit events in the analysis phase
+      // suffers from the drawback of losing the opportunity to control the final
+      // results. Redundant audits could be generated. For example, we will always
+      // generate audit events for column masking even though the requesting user is not
+      // granted the necessary privilege on the specified resource because
+      // AuthorizationChecker#postAuthorize() is always called whether there is an
+      // AuthorizationException or not. Another example is that if a table occurs several
+      // times in a query, we would have duplicate audits for the same column involved in
+      // a column masking policy.
+      analyze(stmtTableCache, authzCtx);
     } catch (AnalysisException e) {
       analysisException = e;
     }
@@ -421,13 +443,7 @@ public class AnalysisContext {
     // Authorize statement and record exception. Authorization relies on information
     // collected during analysis.
     AuthorizationException authException = null;
-    AuthorizationContext authzCtx = null;
     try {
-      TClientRequest clientRequest = queryCtx_.getClient_request();
-      authzCtx = authzChecker.createAuthorizationContext(true,
-          clientRequest.isSetRedacted_stmt() ?
-              clientRequest.getRedacted_stmt() : clientRequest.getStmt(),
-          queryCtx_.getSession(), Optional.of(timeline_));
       authzChecker.authorize(authzCtx, analysisResult_, catalog_);
     } catch (AuthorizationException e) {
       authException = e;
@@ -449,10 +465,11 @@ public class AnalysisContext {
    * given loaded tables. Performs expr and subquery rewrites which require re-analyzing
    * the transformed statement.
    */
-  private void analyze(StmtTableCache stmtTableCache) throws AnalysisException {
+  private void analyze(StmtTableCache stmtTableCache, AuthorizationContext authzCtx)
+      throws AnalysisException {
     Preconditions.checkNotNull(analysisResult_);
     Preconditions.checkNotNull(analysisResult_.stmt_);
-    analysisResult_.analyzer_ = createAnalyzer(stmtTableCache);
+    analysisResult_.analyzer_ = createAnalyzer(stmtTableCache, authzCtx);
     analysisResult_.stmt_.analyze(analysisResult_.analyzer_);
     // Enforce the statement expression limit at the end of analysis so that there is an
     // accurate count of the total number of expressions. The first analyze() call is not
@@ -498,7 +515,7 @@ public class AnalysisContext {
         analysisResult_.analyzer_.getPrivilegeReqs();
 
     // Re-analyze the stmt with a new analyzer.
-    analysisResult_.analyzer_ = createAnalyzer(stmtTableCache);
+    analysisResult_.analyzer_ = createAnalyzer(stmtTableCache, authzCtx);
     // We restore the privileges collected in the first pass below. So, no point in
     // collecting them again.
     analysisResult_.analyzer_.setEnablePrivChecks(false);
