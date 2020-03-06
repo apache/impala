@@ -294,4 +294,8 @@
     <name>ranger.tomcat.ciphers</name>
     <value/>
   </property>
+  <property>
+    <name>ranger.admin.cookie.name</name>
+    <value>RANGERADMINSESSIONID</value>
+  </property>
 </configuration>
