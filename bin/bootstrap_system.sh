@@ -72,6 +72,7 @@ set -x
 REDHAT=
 REDHAT6=
 REDHAT7=
+REDHAT8=
 UBUNTU=
 UBUNTU16=
 UBUNTU18=
@@ -79,6 +80,10 @@ IN_DOCKER=
 if [[ -f /etc/redhat-release ]]; then
   REDHAT=true
   echo "Identified redhat system."
+  if grep 'release 8\.' /etc/redhat-release; then
+    REDHAT8=true
+    echo "Identified redhat8 system."
+  fi
   if grep 'release 7\.' /etc/redhat-release; then
     REDHAT7=true
     echo "Identified redhat7 system."
@@ -158,6 +163,12 @@ function redhat7 {
     "$@"
   fi
 }
+# Helper function to execute following command only on RedHat8
+function redhat8 {
+  if [[ "$REDHAT8" == true ]]; then
+    "$@"
+  fi
+}
 # Helper function to execute following command only in docker
 function indocker {
   if [[ "$IN_DOCKER" == true ]]; then
@@ -228,10 +239,43 @@ fi
 redhat sudo yum install -y curl gawk gcc gcc-c++ git krb5-devel krb5-server \
         krb5-workstation libevent-devel libffi-devel make openssl-devel cyrus-sasl \
         cyrus-sasl-gssapi cyrus-sasl-devel cyrus-sasl-plain \
-        python-devel python-setuptools postgresql postgresql-server \
-        wget vim-common nscd cmake lzo-devel fuse-devel snappy-devel zlib-devel \
+        postgresql postgresql-server \
+        wget vim-common nscd cmake lzo-devel fuse-devel zlib-devel \
         psmisc lsof openssh-server redhat-lsb java-1.8.0-openjdk-devel \
-        java-1.8.0-openjdk-src python-argparse
+        java-1.8.0-openjdk-src
+
+# Enable the Powertools repo for snappy-devel on RedHat 8
+redhat8 sudo yum install -y dnf-plugins-core
+redhat8 sudo yum install -y --enablerepo="PowerTools*" snappy-devel
+
+# RedHat / CentOS 8 exposes only specific versions of Python.
+# Set up unversioned default Python 2.x for older CentOS versions
+redhat6 sudo yum install -y python-devel python-setuptools python-argparse
+redhat7 sudo yum install -y python-devel python-setuptools python-argparse
+
+# Install Python 2.x explicitly for CentOS 8
+function setup_python2() {
+  if command -v python && [[ $(python --version 2>&1 | cut -d ' ' -f 2) =~ 2\. ]]; then
+    echo "We have Python 2.x";
+  else
+    if ! command -v python2; then
+      # Python2 needs to be installed
+      sudo dnf install -y python2
+    fi
+    # Here Python2 is installed, but is not the default Python.
+    # 1. Link pip's version to Python's version
+    sudo alternatives --add-slave python /usr/bin/python2 /usr/bin/pip pip /usr/bin/pip2
+    sudo alternatives --add-slave python /usr/libexec/no-python  /usr/bin/pip pip \
+        /usr/libexec/no-python
+    # 2. Set Python2 (with pip2) to be the system default.
+    sudo alternatives --set python /usr/bin/python2
+  fi
+  # Here the Python2 runtime is already installed, add the dev package
+  sudo dnf -y install python2-devel
+}
+
+redhat8 setup_python2
+redhat8 pip install --user argparse
 
 # CentOS repos don't contain ccache, so install from EPEL
 redhat sudo yum install -y epel-release
@@ -243,18 +287,24 @@ redhat sudo yum clean all
 # Download ant for centos
 redhat sudo wget -nv \
   https://downloads.apache.org/ant/binaries/apache-ant-1.9.14-bin.tar.gz
-redhat sha512sum -c - <<< '487dbd1d7f678a92924ba884a57e910ccb4fe565c554278795a8fdfc80c4e88d81ebc2ccecb5a8f353f0b2076572bb921499a2cadb064e0f44fc406a3c31da20  apache-ant-1.9.14-bin.tar.gz'
+redhat sudo sha512sum -c - <<< '487dbd1d7f678a92924ba884a57e910ccb4fe565c554278795a8fdfc80c4e88d81ebc2ccecb5a8f353f0b2076572bb921499a2cadb064e0f44fc406a3c31da20  apache-ant-1.9.14-bin.tar.gz'
 redhat sudo tar -C /usr/local -xzf apache-ant-1.9.14-bin.tar.gz
-redhat sudo ln -s /usr/local/apache-ant-1.9.14/bin/ant /usr/local/bin
+redhat sudo ln -sf /usr/local/apache-ant-1.9.14/bin/ant /usr/local/bin
 
 # Download maven for all OSes, since the OS-packaged version can be
 # pretty old.
 if [ ! -d /usr/local/apache-maven-3.5.4 ]; then
   sudo wget -nv \
     https://downloads.apache.org/maven/maven-3/3.5.4/binaries/apache-maven-3.5.4-bin.tar.gz
-  sha512sum -c - <<< '2a803f578f341e164f6753e410413d16ab60fabe31dc491d1fe35c984a5cce696bc71f57757d4538fe7738be04065a216f3ebad4ef7e0ce1bb4c51bc36d6be86  apache-maven-3.5.4-bin.tar.gz'
-  sudo tar -C /usr/local -xzf apache-maven-3.5.4-bin.tar.gz
-  sudo ln -s /usr/local/apache-maven-3.5.4/bin/mvn /usr/local/bin
+  sudo sha512sum -c - <<< '2a803f578f341e164f6753e410413d16ab60fabe31dc491d1fe35c984a5cce696bc71f57757d4538fe7738be04065a216f3ebad4ef7e0ce1bb4c51bc36d6be86  apache-maven-3.5.4-bin.tar.gz'
+  sudo tar -C /usr/local -x --no-same-owner -zf apache-maven-3.5.4-bin.tar.gz
+  sudo ln -sf /usr/local/apache-maven-3.5.4/bin/mvn /usr/local/bin
+
+  # reset permissions on redhat8
+  # TODO: figure out why this is necessary for redhat8
+  MAVEN_DIRECTORY="/usr/local/apache-maven-3.5.4"
+  redhat8 indocker sudo chmod 0755 ${MAVEN_DIRECTORY}
+  redhat8 indocker sudo chmod 0755 ${MAVEN_DIRECTORY}/{bin,boot}
 fi
 
 if ! { service --status-all | grep -E '^ \[ \+ \]  ssh$'; }
@@ -263,8 +313,14 @@ then
   # TODO: CentOS/RH 7 uses systemd, and this doesn't work.
   redhat6 sudo service sshd start
   redhat7 notindocker sudo service sshd start
+  redhat8 notindocker sudo service sshd start
   redhat7 indocker sudo /usr/bin/ssh-keygen -A
   redhat7 indocker sudo /usr/sbin/sshd
+  redhat8 indocker sudo /usr/bin/ssh-keygen -A
+  redhat8 indocker sudo /usr/sbin/sshd
+  # The CentOS 8.1 image includes /var/run/nologin by mistake; this file prevents
+  # SSH logins. See https://github.com/CentOS/sig-cloud-instance-images/issues/60
+  redhat8 indocker sudo rm -f /var/run/nologin
 fi
 
 # TODO: config ccache to give it plenty of space
@@ -286,6 +342,9 @@ redhat6 sudo service postgresql stop
 redhat7 notindocker sudo service postgresql initdb
 redhat7 notindocker sudo service postgresql stop
 redhat7 indocker sudo -u postgres PGDATA=/var/lib/pgsql/data pg_ctl init
+redhat8 notindocker sudo service postgresql initdb
+redhat8 notindocker sudo service postgresql stop
+redhat8 indocker sudo -u postgres PGDATA=/var/lib/pgsql/data pg_ctl init
 ubuntu sudo service postgresql stop
 
 # These configurations expose connectiong to PostgreSQL via md5-hashed
@@ -301,12 +360,15 @@ redhat sudo sed -i -e 's,\(host.*\)ident,\1md5,' /var/lib/pgsql/data/pg_hba.conf
 ubuntu sudo service postgresql start
 redhat6 sudo service postgresql start
 redhat7 notindocker sudo service postgresql start
+redhat8 notindocker sudo service postgresql start
 # Important to redirect pg_ctl to a logfile, lest it keep the stdout
 # file descriptor open, preventing the shell from exiting.
 redhat7 indocker sudo -u postgres PGDATA=/var/lib/pgsql/data bash -c \
   "pg_ctl start -w --timeout=120 >> /var/lib/pgsql/pg.log 2>&1"
+redhat8 indocker sudo -u postgres PGDATA=/var/lib/pgsql/data bash -c \
+  "pg_ctl start -w --timeout=120 >> /var/lib/pgsql/pg.log 2>&1"
 
-# Set up postgress for HMS
+# Set up postgres for HMS
 if ! [[ 1 = $(sudo -u postgres psql -At -c "SELECT count(*) FROM pg_roles WHERE rolname = 'hiveuser';") ]]
 then
   sudo -u postgres psql -c "CREATE ROLE hiveuser LOGIN PASSWORD 'password';"
@@ -364,8 +426,11 @@ echo -e "\n* - nofile 1048576" | sudo tee -a /etc/security/limits.conf
 
 # Default on CentOS limits a user to 1024 or 4096 processes (threads) , which isn't
 # enough for minicluster with all of its friends.
-redhat sudo sed -i 's,\*\s*soft\s*nproc\s*[0-9]*$,* soft nproc unlimited,' \
+redhat6 sudo sed -i 's,\*\s*soft\s*nproc\s*[0-9]*$,* soft nproc unlimited,' \
   /etc/security/limits.d/*-nproc.conf
+redhat7 sudo sed -i 's,\*\s*soft\s*nproc\s*[0-9]*$,* soft nproc unlimited,' \
+  /etc/security/limits.d/*-nproc.conf
+redhat8 echo -e "* soft nproc unlimited" | sudo tee -a /etc/security/limits.conf
 
 echo ">>> Checking out Impala"
 

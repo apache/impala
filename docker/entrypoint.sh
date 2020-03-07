@@ -55,6 +55,32 @@ function _pg_ctl() {
   sudo service postgresql $1
 }
 
+# Install Python2 with pip2 and make them the default Python and pip commands
+# on RedHat / CentOS 8.
+# This has no notion of "default" Python, and can install both Python2 and Python3
+# side by side. Impala currently needs Python2 as the default version.
+# The function is adaptive; it performs only the necessary steps; it shares the installer
+# logic with bin/bootstrap_system.sh
+function install_python2_for_centos8() {
+  if command -v python && [[ $(python --version 2>&1 | cut -d ' ' -f 2) =~ 2\. ]]; then
+    echo "We have Python 2.x";
+  else
+    if ! command -v python2; then
+      # Python2 needs to be installed
+      dnf install -y python2
+    fi
+    # Here Python2 is installed, but is not the default Python.
+    # 1. Link pip's version to Python's version
+    alternatives --add-slave python /usr/bin/python2 /usr/bin/pip pip /usr/bin/pip2
+    alternatives --add-slave python /usr/libexec/no-python  /usr/bin/pip pip \
+        /usr/libexec/no-python
+    # 2. Set Python2 (with pip2) to be the system default.
+    alternatives --set python /usr/bin/python2
+  fi
+  # Here the Python2 runtime is already installed, add the dev package
+  dnf -y install python2-devel
+}
+
 # Boostraps the container by creating a user and adding basic tools like Python and git.
 # Takes a uid as an argument for the user to be created.
 function build() {
@@ -80,11 +106,20 @@ function build() {
     paste <(cut -d : -f3 /etc/passwd) <(cut -d : -f1 /etc/passwd) | sort -n
     exit 1
   fi
-  if which apt-get > /dev/null; then
+  if command -v apt-get > /dev/null; then
     apt-get update
     apt-get install -y sudo git lsb-release python
+  elif grep 'release 8\.' /etc/redhat-release; then
+    # WARNING: Install the following packages one by one!
+    # Installing them in a common transaction breaks something inside yum/dnf,
+    # and the subsequent step installing Python2 will fail with a GPG signature error.
+    dnf -y install sudo
+    dnf -y install which
+    dnf -y install git-core
+
+    install_python2_for_centos8
   else
-    yum -y install sudo git python
+    yum -y install which sudo git python
   fi
 
   if ! id impdev; then
