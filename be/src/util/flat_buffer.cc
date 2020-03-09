@@ -58,6 +58,9 @@ Status FromFbCompression(
     case FbCompression_ZLIB:
       *thrift_compression = THdfsCompression::ZLIB;
       break;
+    case FbCompression_ZSTD:
+      *thrift_compression = THdfsCompression::ZSTD;
+      break;
     default:
       return Status(strings::Substitute(
           "Invalid file descriptor compression code: $0", fb_compression));
