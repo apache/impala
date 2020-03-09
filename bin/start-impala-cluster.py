@@ -124,6 +124,12 @@ parser.add_option("--data_cache_dir", dest="data_cache_dir", default=None,
 parser.add_option("--data_cache_size", dest="data_cache_size", default=0,
                   help="This specifies the maximum storage usage of the IO data cache "
                        "each Impala daemon can use.")
+parser.add_option("--data_cache_eviction_policy", dest="data_cache_eviction_policy",
+                  default="LRU", help="This specifies the cache eviction policy to use "
+                  "for the data cache")
+parser.add_option("--data_cache_enable_tracing", dest="data_cache_enable_tracing",
+                  action="store_true", default=False,
+                  help="If the data cache is enabled, this enables tracing accesses.")
 
 # For testing: list of comma-separated delays, in milliseconds, that delay impalad catalog
 # replica initialization. The ith delay is applied to the ith impalad.
@@ -373,6 +379,26 @@ def build_impalad_arg_lists(cluster_size, num_coordinators, use_exclusive_coordi
 
       args = "-data_cache={dir}:{quota} {args}".format(
           dir=data_cache_path_arg, quota=options.data_cache_size, args=args)
+
+      # Add the eviction policy
+      args = "-data_cache_eviction_policy={policy} {args}".format(
+          policy=options.data_cache_eviction_policy, args=args)
+
+      # Add access tracing arguments if requested
+      if options.data_cache_enable_tracing:
+        tracing_args = ""
+        if options.docker_network is None:
+          # To avoid collisions in log files, use different data_cache_trace_dir values
+          # for different Impalads. The default directory is fine for the docker-based
+          # tests.
+          data_cache_trace_dir = "{log_dir}/data_cache_traces_{impalad_num}".format(
+              log_dir=options.log_dir, impalad_num=i)
+          tracing_args = "-data_cache_trace_dir={trace_dir} {tracing_args}".format(
+              trace_dir=data_cache_trace_dir, tracing_args=tracing_args)
+
+        tracing_args = "-data_cache_enable_tracing=true {tracing_args}".format(
+            tracing_args=tracing_args)
+        args = "{tracing_args} {args}".format(tracing_args=tracing_args, args=args)
 
     # Appended at the end so they can override previous args.
     if i < len(per_impalad_args):

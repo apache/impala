@@ -107,6 +107,11 @@
 namespace impala {
 namespace io {
 
+namespace trace {
+  class Tracer;
+  enum class EventType;
+}
+
 class DataCache {
  public:
 
@@ -114,8 +119,12 @@ class DataCache {
   /// in which <dir1>, <dirN> are part of a list of directories for storing cached data
   /// and each directory corresponds to a cache partition. <quota> is the storage quota
   /// for each directory. Impala daemons running on the same host will not share any
-  /// caching directories.
-  explicit DataCache(const std::string config) : config_(std::move(config)) { }
+  /// caching directories. If 'trace_replay' is set to true, the cache operates in a
+  /// an optimized mode that skips all file operations and only does the metadata
+  /// operations. This is used to replay the access trace and compare different cache
+  /// configurations. See data-cache-trace.h
+  explicit DataCache(const std::string config, bool trace_replay = false)
+    : config_(config), trace_replay_(trace_replay) { }
 
   ~DataCache() { ReleaseResources(); }
 
@@ -135,7 +144,8 @@ class DataCache {
   /// 'mtime'         : the modification time of the requested file
   /// 'offset'        : starting offset of the requested region in the file
   /// 'bytes_to_read' : number of bytes to be read from the cache
-  /// 'buffer'        : output buffer to be written into on cache hit
+  /// 'buffer'        : output buffer to be written into on cache hit or nullptr for
+  ///                   trace replay
   ///
   /// Returns the number of bytes read from the cache on cache hit; Returns 0 otherwise.
   ///
@@ -150,7 +160,8 @@ class DataCache {
   /// 'filename'      : name of the file being inserted
   /// 'mtime'         : the modification time of the file being inserted.
   /// 'offset'        : the starting offset of the region in the file being inserted
-  /// 'buffer'        : buffer holding the data to be inserted
+  /// 'buffer'        : buffer holding the data to be inserted or nullptr for trace
+  ///                   replay
   /// 'buffer_len'    : size of 'buffer'
   ///
   /// The cache key is hashed and the resulting hash determines the partition to use.
@@ -194,8 +205,10 @@ class DataCache {
    public:
     /// Creates a partition at the given directory 'path' with quota 'capacity' in bytes.
     /// 'max_opened_files' is the maximum number of opened files allowed per partition.
+    /// If 'trace_replay' is true, this only performs metadata operations for the
+    /// access trace functionality.
     Partition(int32_t index, const std::string& path, int64_t capacity,
-        int max_opened_files);
+        int max_opened_files, bool trace_replay);
 
     ~Partition();
 
@@ -214,14 +227,15 @@ class DataCache {
     void ReleaseResources();
 
     /// Looks up in the meta-data cache with key 'cache_key'. If found, try copying
-    /// 'bytes_to_read' bytes from the backing file into 'buffer'. Returns number
+    /// 'bytes_to_read' bytes from the backing file into 'buffer'. If trace_replay
+    /// is enabled, the buffer is null and no bytes are copied. Returns number
     /// of bytes read from the cache. Returns 0 if there is a cache miss.
     int64_t Lookup(const CacheKey& cache_key, int64_t bytes_to_read, uint8_t* buffer);
 
     /// Inserts a entry with key 'cache_key' and data in 'buffer' into the cache.
-    /// 'buffer_len' is the length of buffer. 'start_reclaim' is set to true if
-    /// the number of backing files exceeds the per partition limit. Returns true if
-    /// the entry is inserted. Returns false otherwise.
+    /// 'buffer' is nullptr for trace replay. 'buffer_len' is the length of buffer.
+    /// 'start_reclaim' is set to true if the number of backing files exceeds the per
+    /// partition limit. Returns true if the entry is inserted. Returns false otherwise.
     bool Store(const CacheKey& cache_key, const uint8_t* buffer, int64_t buffer_len,
         bool* start_reclaim);
 
@@ -251,7 +265,6 @@ class DataCache {
     friend class DataCacheBaseTest;
     friend class DataCacheTest;
     FRIEND_TEST(DataCacheTest, TestAccessTrace);
-    class Tracer;
 
     /// Index of this partition. This is used for naming metrics or other items that
     /// need separate values for each partition. It does not impact cache behavior.
@@ -266,15 +279,17 @@ class DataCache {
     /// Maximum number of opened files allowed in a partition.
     const int max_opened_files_;
 
+    /// Whether this is only a trace replay. For trace replay, this is only
+    /// performing the metadata operations to determine the hit/miss rate.
+    /// There is no need to perform any filesystem operations.
+    bool trace_replay_;
+
     /// True if this partition has been closed. Expected to be set after all IO
     /// threads have been joined.
     bool closed_ = false;
 
     /// The prefix of the names of the cache backing files.
     static const char* CACHE_FILE_PREFIX;
-
-    /// The file name used for the access trace.
-    static const char* TRACE_FILE_NAME;
 
     /// Protects the following fields.
     SpinLock lock_;
@@ -304,7 +319,7 @@ class DataCache {
     /// content. Please see comments at CachedEntry for details.
     std::unique_ptr<Cache> meta_cache_;
 
-    std::unique_ptr<Tracer> tracer_;
+    std::unique_ptr<trace::Tracer> tracer_;
 
     /// Metrics to track performance of the underlying filesystem for the data cache
     /// These are all latency histograms for the operations on the data cache files for
@@ -360,10 +375,17 @@ class DataCache {
     /// Returns false if the checksum of 'buffer' doesn't match 'entry->checksum'.
     static bool VerifyChecksum(const std::string& ops_name, const CacheEntry& entry,
         const uint8_t* buffer, int64_t buffer_len);
+
+    void Trace(const trace::EventType& status, const DataCache::CacheKey& key,
+        int64_t lookup_len, int64_t entry_len);
   };
 
   /// The configuration string for the data cache.
   const std::string config_;
+
+  /// Set to true if this is only doing trace replay. Trace replay does only metadata
+  /// operations, and no filesystem operations are required.
+  bool trace_replay_;
 
   /// The set of all cache partitions.
   std::vector<std::unique_ptr<Partition>> partitions_;
