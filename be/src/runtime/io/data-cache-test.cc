@@ -17,6 +17,7 @@
 
 #include <algorithm>
 #include <boost/bind.hpp>
+#include <boost/filesystem.hpp>
 #include <fstream>
 #include <gflags/gflags.h>
 #include <rapidjson/document.h>
@@ -25,6 +26,7 @@
 #include "gutil/strings/join.h"
 #include "gutil/strings/util.h"
 #include "runtime/io/data-cache.h"
+#include "runtime/io/data-cache-trace.h"
 #include "runtime/io/request-ranges.h"
 #include "runtime/test-env.h"
 #include "service/fe-support.h"
@@ -32,6 +34,7 @@
 #include "testutil/scoped-flag-setter.h"
 #include "util/counting-barrier.h"
 #include "util/filesystem-util.h"
+#include "util/simple-logger.h"
 #include "util/thread.h"
 
 #include "common/names.h"
@@ -60,9 +63,14 @@ DECLARE_int64(data_cache_file_max_size_bytes);
 DECLARE_int32(data_cache_max_opened_files);
 DECLARE_int32(data_cache_write_concurrency);
 DECLARE_string(data_cache_eviction_policy);
+DECLARE_string(data_cache_trace_dir);
+DECLARE_int32(max_data_cache_trace_file_size);
+DECLARE_int32(data_cache_trace_percentage);
 
 namespace impala {
 namespace io {
+
+using boost::filesystem::path;
 
 class DataCacheBaseTest : public testing::Test {
  public:
@@ -72,6 +80,10 @@ class DataCacheBaseTest : public testing::Test {
 
   const std::vector<string>& data_cache_dirs() {
     return data_cache_dirs_;
+  }
+
+  const string& data_cache_trace_dir() {
+    return data_cache_trace_dir_;
   }
 
   //
@@ -138,6 +150,8 @@ class DataCacheBaseTest : public testing::Test {
       ASSERT_OK(FileSystemUtil::RemoveAndCreateDirectory(path));
       data_cache_dirs_.push_back(path);
     }
+    data_cache_trace_dir_ = ("/tmp" / boost::filesystem::unique_path()).string();
+    ASSERT_OK(FileSystemUtil::RemoveAndCreateDirectory(data_cache_trace_dir_));
 
     // Force a single shard to avoid imbalance between shards in the Kudu LRU cache which
     // may lead to unintended eviction. This allows the capacity of the cache is utilized
@@ -158,13 +172,10 @@ class DataCacheBaseTest : public testing::Test {
     for (const string& dir_path : data_cache_dirs_) {
       vector<string> entries;
       ASSERT_OK(FileSystemUtil::Directory::GetEntryNames(dir_path, &entries));
-      if (entries.size() == 1) {
-        EXPECT_EQ(DataCache::Partition::TRACE_FILE_NAME, entries[0]);
-      } else {
-        ASSERT_EQ(0, entries.size());
-      }
+      ASSERT_EQ(0, entries.size());
     }
     ASSERT_OK(FileSystemUtil::RemovePaths(data_cache_dirs_));
+    boost::filesystem::remove_all(path(data_cache_trace_dir_));
     flag_saver_.reset();
     test_env_.reset();
   }
@@ -173,6 +184,7 @@ class DataCacheBaseTest : public testing::Test {
   std::unique_ptr<TestEnv> test_env_;
   char test_buffer_[TEST_BUFFER_SIZE];
   vector<string> data_cache_dirs_;
+  string data_cache_trace_dir_;
 
   // Saved configuration flags for restoring the values at the end of the test.
   std::unique_ptr<google::FlagSaver> flag_saver_;
@@ -545,55 +557,125 @@ TEST_P(DataCacheTest, LargeFootprint) {
   }
 }
 
-TEST_P(DataCacheTest, TestAccessTrace) {
+TEST_P(DataCacheTest, AccessTraceAnonymization) {
   FLAGS_data_cache_enable_tracing = true;
+  FLAGS_data_cache_trace_dir = data_cache_trace_dir();
+  // Use a small trace file size so that the trace is split over multiple files
+  FLAGS_max_data_cache_trace_file_size = 10000;
+  const int64_t cache_size = DEFAULT_CACHE_SIZE;
+  int64_t max_start_offset = 1024;
+  uint64_t expected_total_events = NUM_THREADS * max_start_offset * 2;
   for (bool anon : { false, true }) {
     SCOPED_TRACE(anon);
     FLAGS_data_cache_anonymize_trace = anon;
+    // Remove files between iterations to avoid crosstalk between the anonymized
+    // iteration and non-anonymized iteration
+    ASSERT_OK(FileSystemUtil::RemoveAndCreateDirectory(FLAGS_data_cache_trace_dir));
     {
-      int64_t cache_size = DEFAULT_CACHE_SIZE;
       DataCache cache(Substitute(
           "$0:$1", data_cache_dirs()[0], std::to_string(cache_size)));
       ASSERT_OK(cache.Init());
 
-      int64_t max_start_offset = 1024;
       bool use_per_thread_filename = true;
       bool expect_misses = true;
       MultiThreadedReadWrite(&cache, max_start_offset, use_per_thread_filename,
                              expect_misses);
     }
 
-    // Read the trace file and ensure that all of the lines are valid JSON with the
-    // expected fields.
-    std::ifstream trace(Substitute("$0/$1", data_cache_dirs()[0],
-                                   DataCache::Partition::TRACE_FILE_NAME));
-    int line_num = 1;
-    while (trace.good()) {
-      SCOPED_TRACE(line_num++);
-      string line;
-      std::getline(trace, line);
-      if (line.empty()) {
-        ASSERT_TRUE(trace.eof());
-        break;
-      }
-      SCOPED_TRACE(line);
-      rapidjson::Document d;
-      d.Parse<0>(line.c_str());
-      ASSERT_TRUE(d.IsObject());
-      ASSERT_TRUE(d["ts"].IsDouble());
-      ASSERT_TRUE(d["s"].IsString());
-      ASSERT_TRUE(d["m"].IsInt64());
-      ASSERT_TRUE(d["f"].IsString());
-      if (anon) {
-        // We expect anonymized filenames to be 22-character fingerprints:
-        // - 128 bit fingerprint = 16 bytes
-        // - 16 * 4/3 (base64 encoding) = 21.3333
-        // - Round up to 22.
-        EXPECT_EQ(22, d["f"].GetStringLength());
-      } else {
-        EXPECT_TRUE(MatchPattern(d["f"].GetString(), "thread-*file"));
+    // Part 1: Read the trace files and ensure that the JSON entries are valid
+    // TraceEvent entries
+    vector<string> trace_files;
+    string trace_dir = Substitute("$0/partition-0/", FLAGS_data_cache_trace_dir);
+    ASSERT_OK(SimpleLogger::GetLogFiles(trace_dir, trace::TRACE_FILE_PREFIX,
+        &trace_files));
+
+    for (string filename : trace_files) {
+      trace::TraceFileIterator trace_file_iter(filename);
+      ASSERT_OK(trace_file_iter.Init());
+      while (true) {
+        trace::TraceEvent trace_event;
+        bool done = false;
+        ASSERT_OK(trace_file_iter.GetNextEvent(&trace_event, &done));
+        if (done) break;
+        if (anon) {
+          // We expect anonymized filenames to be 22-character fingerprints:
+          // - 128 bit fingerprint = 16 bytes
+          // - 16 * 4/3 (base64 encoding) = 21.3333
+          // - Round up to 22.
+          EXPECT_EQ(22, trace_event.filename.size()) << trace_event.filename;
+        } else {
+          EXPECT_TRUE(MatchPattern(trace_event.filename, "thread-*file"));
+        }
       }
     }
+
+    // Part 2: Create a replayer and verify that it can successfully replay from that
+    // directory.
+    trace::TraceReplayer replayer(Substitute("/this_directory_doesnt_matter:$0",
+        std::to_string(cache_size)));
+    EXPECT_OK(replayer.Init());
+    EXPECT_OK(replayer.ReplayDirectory(trace_dir));
+    trace::CacheHitStatistics replay_stats = replayer.GetReplayStatistics();
+    int64_t total_events = replay_stats.hits + replay_stats.partial_hits +
+      replay_stats.misses + replay_stats.stores + replay_stats.failed_stores;
+    EXPECT_EQ(total_events, expected_total_events);
+  }
+}
+
+TEST_P(DataCacheTest, AccessTraceSubsetPercentage) {
+  FLAGS_data_cache_enable_tracing = true;
+  FLAGS_data_cache_trace_dir = data_cache_trace_dir();
+  // Use a small trace file size so that the trace is split over multiple files
+  FLAGS_max_data_cache_trace_file_size = 10000;
+  const int64_t cache_size = DEFAULT_CACHE_SIZE;
+  int64_t max_start_offset = 1024;
+  // Each thread does a store and a lookup for each offset
+  uint64_t expected_total_events = NUM_THREADS * max_start_offset * 2;
+  for (int trace_percentage : {100, 50, 20, 10, 5, 1}) {
+    SCOPED_TRACE(trace_percentage);
+    FLAGS_data_cache_trace_percentage = trace_percentage;
+    // Remove files between iterations to avoid crosstalk between the anonymized
+    // iteration and non-anonymized iteration
+    ASSERT_OK(FileSystemUtil::RemoveAndCreateDirectory(FLAGS_data_cache_trace_dir));
+    {
+      DataCache cache(Substitute(
+          "$0:$1", data_cache_dirs()[0], std::to_string(cache_size)));
+      ASSERT_OK(cache.Init());
+
+      bool use_per_thread_filename = true;
+      bool expect_misses = true;
+      MultiThreadedReadWrite(&cache, max_start_offset, use_per_thread_filename,
+                             expect_misses);
+    }
+
+    // Replay the trace and record the counts
+    string trace_dir = Substitute("$0/partition-0/", FLAGS_data_cache_trace_dir);
+    trace::TraceReplayer replayer(Substitute("/this_directory_doesnt_matter:$0",
+        std::to_string(cache_size)));
+    EXPECT_OK(replayer.Init());
+    EXPECT_OK(replayer.ReplayDirectory(trace_dir));
+
+    // The trace percentage is enforced when generating the trace, so verify that
+    // the number of events in the original trace is within +/-1% of the expected value.
+    // This is deterministic, because the actual cache entries accessed are always
+    // the same (even if the order is not).
+    trace::CacheHitStatistics original_trace_stats =
+        replayer.GetOriginalTraceStatistics();
+    int64_t num_original_trace_events = original_trace_stats.hits +
+      original_trace_stats.partial_hits + original_trace_stats.misses +
+      original_trace_stats.stores + original_trace_stats.failed_stores;
+    EXPECT_LE(100 * num_original_trace_events,
+              (expected_total_events * (trace_percentage + 1)));
+    EXPECT_GE(100 * num_original_trace_events,
+              (expected_total_events * (trace_percentage - 1)));
+    LOG(INFO) << "Trace percentage " << trace_percentage << " num events: "
+              << num_original_trace_events;
+
+    // The replay should have the same number of events.
+    trace::CacheHitStatistics replay_stats = replayer.GetReplayStatistics();
+    int64_t num_replay_trace_events = replay_stats.hits + replay_stats.partial_hits +
+      replay_stats.misses + replay_stats.stores + replay_stats.failed_stores;
+    EXPECT_EQ(num_original_trace_events, num_replay_trace_events);
   }
 }
 

@@ -26,17 +26,15 @@
 
 #include <glog/logging.h>
 
+#include "common/compiler-util.h"
 #include "exec/kudu-util.h"
-#include "kudu/util/async_logger.h"
 #include "kudu/util/env.h"
-#include "kudu/util/jsonwriter.h"
 #include "kudu/util/locks.h"
 #include "kudu/util/path_util.h"
-#include "gutil/hash/city.h"
 #include "gutil/port.h"
-#include "gutil/strings/escaping.h"
 #include "gutil/strings/split.h"
 #include "gutil/walltime.h"
+#include "runtime/io/data-cache-trace.h"
 #include "util/bit-util.h"
 #include "util/cache/cache.h"
 #include "util/error-util.h"
@@ -91,6 +89,19 @@ DEFINE_bool(data_cache_enable_tracing, false,
 DEFINE_bool(data_cache_anonymize_trace, false,
     "(Advanced) Use hashes of filenames rather than file paths in the data "
     "cache access trace.");
+DEFINE_int32(data_cache_trace_percentage, 100, "The percentage of cache lookups that "
+    "should be emitted to the trace file.");
+DECLARE_string(log_dir);
+DEFINE_string(data_cache_trace_dir, "", "The base directory for data cache tracing. "
+    "The data cache trace files for each cache directory are placed in separate "
+    "subdirectories underneath this base directory. If blank, defaults to "
+    "<log_file_dir>/data_cache_trace/");
+DEFINE_int32(max_data_cache_trace_file_size, 100000, "The maximum size (in "
+    "log entries) of the data cache trace file before a new one is created.");
+DEFINE_int32(max_data_cache_trace_files, 10, "Maximum number of data cache trace "
+    "files to retain for each cache directory specified by the data_cache startup "
+    "parameter. The most recent trace files are retained. If set to 0, all trace files "
+    "are retained.");
 
 DEFINE_string(data_cache_eviction_policy, "LRU",
     "(Advanced) The cache eviction policy to use for the data cache. "
@@ -101,7 +112,6 @@ namespace io {
 
 static const int64_t PAGE_SIZE = 1L << 12;
 const char* DataCache::Partition::CACHE_FILE_PREFIX = "impala-cache-file-";
-const char* DataCache::Partition::TRACE_FILE_NAME = "impala-cache-trace.txt";
 const int MAX_FILE_DELETER_QUEUE_SIZE = 500;
 static const char* PARTITION_PATH_METRIC_KEY_TEMPLATE =
     "impala-server.io-mgr.remote-data-cache-partition-$0.path";
@@ -111,100 +121,6 @@ static const char* PARTITION_WRITE_LATENCY_METRIC_KEY_TEMPLATE =
     "impala-server.io-mgr.remote-data-cache-partition-$0.write-latency";
 static const char* PARTITION_EVICTION_LATENCY_METRIC_KEY_TEMPLATE =
     "impala-server.io-mgr.remote-data-cache-partition-$0.eviction-latency";
-
-
-namespace {
-
-class FileLogger;
-
-// Simple implementation of a glog Logger that writes to a file, used for
-// cache access tracing.
-//
-// This doesn't fully implement the Logger interface -- only the bare minimum
-// to be usable with kudu::AsyncLogger.
-class FileLogger : public google::base::Logger {
- public:
-  explicit FileLogger(string path) : path_(std::move(path)) {}
-
-  virtual ~FileLogger() {
-    if (file_) Flush();
-  }
-
-  Status Open() {
-    KUDU_RETURN_IF_ERROR(Env::Default()->NewWritableFile({}, path_, &file_),
-                         "Failed to create trace log file");
-    return Status::OK();
-  }
-
-  void Write(bool force_flush,
-             time_t timestamp,
-             const char* message,
-             int message_len) override {
-    buf_.append(message, message_len);
-    if (force_flush || buf_.size() > kBufSize) {
-      Flush();
-    }
-  }
-
-  // Flush any buffered messages.
-  // NOTE: declared 'final' to allow safe calls from the destructor.
-  void Flush() override final {
-    if (buf_.empty()) return;
-
-    KUDU_WARN_NOT_OK(file_->Append(buf_), "Could not append to trace log");
-    buf_.clear();
-  }
-
-  uint32 LogSize() override {
-    LOG(FATAL) << "Unimplemented";
-    return 0;
-  }
-
- private:
-  const string path_;
-  string buf_;
-  unique_ptr<WritableFile> file_;
-
-  static constexpr int kBufSize = 64*1024;
-};
-
-} // anonymous namespace
-
-class DataCache::Partition::Tracer {
- public:
-  explicit Tracer(string path) : underlying_logger_(new FileLogger(std::move(path))) {}
-
-  ~Tracer() {
-    if (logger_) logger_->Stop();
-  }
-
-  Status Start() {
-    RETURN_IF_ERROR(underlying_logger_->Open());
-    logger_.reset(new kudu::AsyncLogger(underlying_logger_.get(), 8 * 1024 * 1024));
-    logger_->Start();
-    return Status::OK();
-  }
-
-  enum CacheStatus {
-    HIT,
-    MISS,
-    STORE,
-    STORE_FAILED_BUSY
-  };
-
-  void Trace(CacheStatus status, const DataCache::CacheKey& key,
-             int64_t lookup_len, int64_t entry_len);
-
- private:
-  // The underlying logger that we wrap with the AsyncLogger wrapper
-  // 'logger_'. NOTE: AsyncLogger consumes a raw pointer which must
-  // outlive the AsyncLogger instance, so it's important that these
-  // are declared in this order (logger_ must destruct before
-  // underlying_logger_).
-  unique_ptr<FileLogger> underlying_logger_;
-  // The async wrapper around underlying_logger_ (see above).
-  unique_ptr<kudu::AsyncLogger> logger_;
-};
 
 
 /// This class is an implementation of backing files in a cache partition.
@@ -462,11 +378,13 @@ static Cache::EvictionPolicy GetCacheEvictionPolicy(const std::string& policy_st
 }
 
 DataCache::Partition::Partition(
-    int32_t index, const string& path, int64_t capacity, int max_opened_files)
+    int32_t index, const string& path, int64_t capacity, int max_opened_files,
+    bool trace_replay)
   : index_(index),
     path_(path),
     capacity_(max<int64_t>(capacity, PAGE_SIZE)),
     max_opened_files_(max_opened_files),
+    trace_replay_(trace_replay),
     meta_cache_(NewCache(GetCacheEvictionPolicy(FLAGS_data_cache_eviction_policy),
         capacity_, path_)) {}
 
@@ -475,6 +393,7 @@ DataCache::Partition::~Partition() {
 }
 
 Status DataCache::Partition::CreateCacheFile() {
+  DCHECK(!trace_replay_);
   lock_.DCheckLocked();
   const string& path =
       JoinPathSegments(path_, CACHE_FILE_PREFIX + PrintId(GenerateUUID()));
@@ -486,6 +405,7 @@ Status DataCache::Partition::CreateCacheFile() {
 }
 
 Status DataCache::Partition::DeleteExistingFiles() const {
+  DCHECK(!trace_replay_);
   vector<string> entries;
   RETURN_IF_ERROR(FileSystemUtil::Directory::GetEntryNames(path_, &entries, 0,
       FileSystemUtil::Directory::EntryType::DIR_ENTRY_REG));
@@ -504,6 +424,10 @@ Status DataCache::Partition::Init() {
   std::unique_lock<SpinLock> partition_lock(lock_);
 
   RETURN_IF_ERROR(meta_cache_->Init());
+
+  // Trace replay does not require further initialization, as it is only doing
+  // metadata operations and does not do filesystem operations.
+  if (trace_replay_) return Status::OK();
 
   // Verify the validity of the path specified.
   if (!FileSystemUtil::IsCanonicalPath(path_)) {
@@ -529,8 +453,26 @@ Status DataCache::Partition::Init() {
   RETURN_IF_ERROR(FileSystemUtil::CheckHolePunch(path_));
 
   if (FLAGS_data_cache_enable_tracing) {
-    tracer_.reset(new Tracer(path_ + "/" + TRACE_FILE_NAME));
-    RETURN_IF_ERROR(tracer_->Start());
+    if (FLAGS_data_cache_trace_percentage > 100 ||
+        FLAGS_data_cache_trace_percentage < 0) {
+      return Status(Substitute("Misconfigured data_cache_trace_percentage: $0."
+          "Must be between 0 and 100.", FLAGS_data_cache_trace_percentage));
+    }
+
+    // If unspecified, use a directory under the "log_dir".
+    if (FLAGS_data_cache_trace_dir.empty()) {
+      stringstream default_trace_dir;
+      default_trace_dir << FLAGS_log_dir << "/data_cache_traces/";
+      FLAGS_data_cache_trace_dir = default_trace_dir.str();
+    }
+    // To avoid mixing trace files from different partitions, give each partition
+    // its own subdirectory.
+    stringstream trace_dir;
+    trace_dir << FLAGS_data_cache_trace_dir << Substitute("/partition-$0/", index_);
+    tracer_.reset(new trace::Tracer(trace_dir.str(),
+        FLAGS_max_data_cache_trace_file_size, FLAGS_max_data_cache_trace_files,
+        FLAGS_data_cache_anonymize_trace));
+    RETURN_IF_ERROR(tracer_->Init());
   }
 
   // Create metrics for this partition
@@ -588,6 +530,7 @@ void DataCache::Partition::InitMetrics() {
 }
 
 Status DataCache::Partition::CloseFilesAndVerifySizes() {
+  if (trace_replay_) return Status::OK();
   int64_t total_size = 0;
   for (auto& file : cache_files_) {
     uint64_t sz_on_disk;
@@ -623,42 +566,42 @@ void DataCache::Partition::ReleaseResources() {
 int64_t DataCache::Partition::Lookup(const CacheKey& cache_key, int64_t bytes_to_read,
     uint8_t* buffer) {
   DCHECK(!closed_);
+  DCHECK(trace_replay_ ? buffer == nullptr : buffer != nullptr);
   Slice key = cache_key.ToSlice();
   Cache::UniqueHandle handle(meta_cache_->Lookup(key));
 
   if (handle.get() == nullptr) {
-    if (tracer_ != nullptr) {
-      tracer_->Trace(Tracer::MISS, cache_key, bytes_to_read, /*entry_len=*/-1);
-    }
+    Trace(trace::EventType::MISS, cache_key, bytes_to_read, /*entry_len=*/-1);
     return 0;
   }
 
   // Read from the backing file.
   CacheEntry entry(meta_cache_->Value(handle));
 
-  if (tracer_ != nullptr) {
-    tracer_->Trace(Tracer::HIT, cache_key, bytes_to_read, entry.len());
-  }
+  Trace(trace::EventType::HIT, cache_key, bytes_to_read, entry.len());
 
-  CacheFile* cache_file = entry.file();
   bytes_to_read = min(entry.len(), bytes_to_read);
-  VLOG(3) << Substitute("Reading file $0 offset $1 len $2 checksum $3 bytes_to_read $4",
-      cache_file->path(), entry.offset(), entry.len(), entry.checksum(), bytes_to_read);
-  bool read_success;
-  {
-    ScopedHistogramTimer read_timer(read_latency_);
-    read_success = cache_file->Read(entry.offset(), buffer, bytes_to_read);
-  }
-  if (UNLIKELY(!read_success)) {
-    meta_cache_->Erase(key);
-    return 0;
-  }
+  // Skip the actual reads if doing trace replay
+  if (LIKELY(!trace_replay_)) {
+    CacheFile* cache_file = entry.file();
+    VLOG(3) << Substitute("Reading file $0 offset $1 len $2 checksum $3 bytes_to_read $4",
+        cache_file->path(), entry.offset(), entry.len(), entry.checksum(), bytes_to_read);
+    bool read_success;
+    {
+      ScopedHistogramTimer read_timer(read_latency_);
+      read_success = cache_file->Read(entry.offset(), buffer, bytes_to_read);
+    }
+    if (UNLIKELY(!read_success)) {
+      meta_cache_->Erase(key);
+      return 0;
+    }
 
-  // Verify checksum if enabled. Delete entry on checksum mismatch.
-  if (FLAGS_data_cache_checksum && bytes_to_read == entry.len() &&
-      !VerifyChecksum("read", entry, buffer, bytes_to_read)) {
-    meta_cache_->Erase(key);
-    return 0;
+    // Verify checksum if enabled. Delete entry on checksum mismatch.
+    if (FLAGS_data_cache_checksum && bytes_to_read == entry.len() &&
+        !VerifyChecksum("read", entry, buffer, bytes_to_read)) {
+      meta_cache_->Erase(key);
+      return 0;
+    }
   }
   return bytes_to_read;
 }
@@ -668,13 +611,16 @@ bool DataCache::Partition::HandleExistingEntry(const Slice& key,
   // Unpack the cache entry.
   CacheEntry entry(meta_cache_->Value(handle));
 
-  // Try verifying the checksum of the new buffer matches that of the existing entry.
-  // On checksum mismatch, delete the existing entry and don't install the new entry
-  // as it's unclear which one is right.
-  if (FLAGS_data_cache_checksum && buffer_len >= entry.len()) {
-    if (!VerifyChecksum("write", entry, buffer, buffer_len)) {
-      meta_cache_->Erase(key);
-      return true;
+  // Trace replays have no data and cannot do checksums.
+  if (LIKELY(!trace_replay_)) {
+    // Try verifying the checksum of the new buffer matches that of the existing entry.
+    // On checksum mismatch, delete the existing entry and don't install the new entry
+    // as it's unclear which one is right.
+    if (FLAGS_data_cache_checksum && buffer_len >= entry.len()) {
+      if (!VerifyChecksum("write", entry, buffer, buffer_len)) {
+        meta_cache_->Erase(key);
+        return true;
+      }
     }
   }
   // If the new entry is not any longer than the existing entry, no work to do.
@@ -683,6 +629,10 @@ bool DataCache::Partition::HandleExistingEntry(const Slice& key,
 
 bool DataCache::Partition::InsertIntoCache(const Slice& key, CacheFile* cache_file,
     int64_t insertion_offset, const uint8_t* buffer, int64_t buffer_len) {
+  if (UNLIKELY(trace_replay_)) {
+    DCHECK(buffer == nullptr);
+    DCHECK(cache_file == nullptr);
+  }
   DCHECK_EQ(insertion_offset % PAGE_SIZE, 0);
   const int64_t charge_len = BitUtil::RoundUp(buffer_len, PAGE_SIZE);
 
@@ -691,19 +641,23 @@ bool DataCache::Partition::InsertIntoCache(const Slice& key, CacheFile* cache_fi
       meta_cache_->Allocate(key, sizeof(CacheEntry), charge_len));
   if (UNLIKELY(pending_handle.get() == nullptr)) return false;
 
-  // Compute checksum if necessary.
-  int64_t checksum = FLAGS_data_cache_checksum ? Checksum(buffer, buffer_len) : 0;
+  int64_t checksum = 0;
+  // Trace replays have no data and cannot do checksums
+  if (LIKELY(!trace_replay_)) {
+    // Compute checksum if necessary.
+    checksum = FLAGS_data_cache_checksum ? Checksum(buffer, buffer_len) : 0;
 
-  // Write to backing file.
-  VLOG(3) << Substitute("Storing file $0 offset $1 len $2 checksum $3 ",
-      cache_file->path(), insertion_offset, buffer_len, checksum);
-  bool write_success;
-  {
-    ScopedHistogramTimer write_timer(write_latency_);
-    write_success = cache_file->Write(insertion_offset, buffer, buffer_len);
-  }
-  if (UNLIKELY(!write_success)) {
-    return false;
+    // Write to backing file.
+    VLOG(3) << Substitute("Storing file $0 offset $1 len $2 checksum $3 ",
+        cache_file->path(), insertion_offset, buffer_len, checksum);
+    bool write_success;
+    {
+      ScopedHistogramTimer write_timer(write_latency_);
+      write_success = cache_file->Write(insertion_offset, buffer, buffer_len);
+    }
+    if (UNLIKELY(!write_success)) {
+      return false;
+    }
   }
 
   // Insert the new entry into the cache.
@@ -712,12 +666,18 @@ bool DataCache::Partition::InsertIntoCache(const Slice& key, CacheFile* cache_fi
   Cache::UniqueHandle handle(meta_cache_->Insert(std::move(pending_handle), this));
   // Check for failure of Insert(), which means the entry was evicted during Insert()
   if (UNLIKELY(handle.get() == nullptr)){
-    ImpaladMetrics::IO_MGR_REMOTE_DATA_CACHE_INSTANT_EVICTIONS->Increment(1);
+    // Trace replays do not keep metrics
+    if (LIKELY(!trace_replay_)) {
+      ImpaladMetrics::IO_MGR_REMOTE_DATA_CACHE_INSTANT_EVICTIONS->Increment(1);
+    }
     return false;
   }
-  ImpaladMetrics::IO_MGR_REMOTE_DATA_CACHE_TOTAL_BYTES->Increment(charge_len);
-  ImpaladMetrics::IO_MGR_REMOTE_DATA_CACHE_NUM_ENTRIES->Increment(1);
-  ImpaladMetrics::IO_MGR_REMOTE_DATA_CACHE_NUM_WRITES->Increment(1);
+  // Trace replays do not keep metrics
+  if (LIKELY(!trace_replay_)) {
+    ImpaladMetrics::IO_MGR_REMOTE_DATA_CACHE_TOTAL_BYTES->Increment(charge_len);
+    ImpaladMetrics::IO_MGR_REMOTE_DATA_CACHE_NUM_ENTRIES->Increment(1);
+    ImpaladMetrics::IO_MGR_REMOTE_DATA_CACHE_NUM_WRITES->Increment(1);
+  }
   return true;
 }
 
@@ -739,7 +699,7 @@ bool DataCache::Partition::Store(const CacheKey& cache_key, const uint8_t* buffe
 
   CacheFile* cache_file;
   int64_t insertion_offset;
-  {
+  if (LIKELY(!trace_replay_)) {
     std::unique_lock<SpinLock> partition_lock(lock_);
 
     // Limit the write concurrency to avoid blocking the caller (which could be calling
@@ -754,10 +714,8 @@ bool DataCache::Partition::Store(const CacheKey& cache_key, const uint8_t* buffe
         pending_insert_set_.find(key.ToString()) != pending_insert_set_.end()) {
       ImpaladMetrics::IO_MGR_REMOTE_DATA_CACHE_DROPPED_BYTES->Increment(buffer_len);
       ImpaladMetrics::IO_MGR_REMOTE_DATA_CACHE_DROPPED_ENTRIES->Increment(1);
-      if (tracer_ != nullptr) {
-        tracer_->Trace(Tracer::STORE_FAILED_BUSY, cache_key, /*lookup_len=*/-1,
-            buffer_len);
-      }
+      Trace(trace::EventType::STORE_FAILED_BUSY, cache_key, /*lookup_len=*/-1,
+          buffer_len);
       return false;
     }
 
@@ -778,20 +736,29 @@ bool DataCache::Partition::Store(const CacheKey& cache_key, const uint8_t* buffe
 
     // Do this last. At this point, we are committed to inserting 'key' into the cache.
     pending_insert_set_.emplace(key.ToString());
-  }
-
-  if (tracer_ != nullptr) {
-    tracer_->Trace(Tracer::STORE, cache_key, /* lookup_len=*/-1, buffer_len);
+  } else {
+    DCHECK(buffer == nullptr);
+    cache_file = nullptr;
+    insertion_offset = 0;
   }
 
   // Set up a scoped exit to always remove entry from the pending insertion set.
+  // This is not needed for trace replay.
   auto remove_from_pending_set = MakeScopeExitTrigger([this, &key]() {
+    if (UNLIKELY(trace_replay_)) return;
     std::unique_lock<SpinLock> partition_lock(lock_);
     pending_insert_set_.erase(key.ToString());
   });
 
   // Try inserting into the cache.
-  return InsertIntoCache(key, cache_file, insertion_offset, buffer, buffer_len);
+  bool insert_success = InsertIntoCache(key, cache_file, insertion_offset, buffer,
+      buffer_len);
+  if (insert_success) {
+    Trace(trace::EventType::STORE, cache_key, /* lookup_len=*/-1, buffer_len);
+  } else {
+    Trace(trace::EventType::STORE_FAILED, cache_key, /*lookup_len=*/ -1, buffer_len);
+  }
+  return insert_success;
 }
 
 void DataCache::Partition::DeleteOldFiles() {
@@ -805,6 +772,7 @@ void DataCache::Partition::DeleteOldFiles() {
 
 void DataCache::Partition::EvictedEntry(Slice key, Slice value) {
   if (closed_) return;
+  if (UNLIKELY(trace_replay_)) return;
   ScopedHistogramTimer eviction_timer(eviction_latency_);
   // Unpack the cache entry.
   CacheEntry entry(value);
@@ -879,21 +847,23 @@ Status DataCache::Init() {
               << PrettyPrinter::PrintBytes(capacity);
     std::unique_ptr<Partition> partition =
         make_unique<Partition>(partition_idx, dir_path, capacity,
-            max_opened_files_per_partition);
+            max_opened_files_per_partition, trace_replay_);
     RETURN_IF_ERROR(partition->Init());
     partitions_.emplace_back(move(partition));
     ++partition_idx;
   }
   CHECK_GT(partitions_.size(), 0);
 
-  // Starts a thread pool which deletes old files from partitions. DataCache::Store()
-  // will enqueue a request (i.e. a partition index) when it notices the number of files
-  // in a partition exceeds the per-partition limit. The files in a partition will be
-  // closed in the order they are created until it's within the per-partition limit.
-  file_deleter_pool_.reset(new ThreadPool<int>("impala-server",
-      "data-cache-file-deleter", 1, MAX_FILE_DELETER_QUEUE_SIZE,
-      bind<void>(&DataCache::DeleteOldFiles, this, _1, _2)));
-  RETURN_IF_ERROR(file_deleter_pool_->Init());
+  if (LIKELY(!trace_replay_)) {
+    // Starts a thread pool which deletes old files from partitions. DataCache::Store()
+    // will enqueue a request (i.e. a partition index) when it notices the number of files
+    // in a partition exceeds the per-partition limit. The files in a partition will be
+    // closed in the order they are created until it's within the per-partition limit.
+    file_deleter_pool_.reset(new ThreadPool<int>("impala-server",
+        "data-cache-file-deleter", 1, MAX_FILE_DELETER_QUEUE_SIZE,
+        bind<void>(&DataCache::DeleteOldFiles, this, _1, _2)));
+    RETURN_IF_ERROR(file_deleter_pool_->Init());
+  }
 
   return Status::OK();
 }
@@ -964,63 +934,29 @@ void DataCache::DeleteOldFiles(uint32_t thread_id, int partition_idx) {
   partitions_[partition_idx]->DeleteOldFiles();
 }
 
-void DataCache::Partition::Tracer::Trace(
-    CacheStatus status, const DataCache::CacheKey& key,
+void DataCache::Partition::Trace(
+    const trace::EventType& type, const DataCache::CacheKey& key,
     int64_t lookup_len, int64_t entry_len) {
+  if (tracer_ == nullptr) return;
 
-  ostringstream buf;
-  kudu::JsonWriter jw(&buf, kudu::JsonWriter::COMPACT);
-
-  jw.StartObject();
-  jw.String("ts");
-  jw.Double(WallTime_Now());
-  jw.String("s");
-  switch (status) {
-    case HIT: jw.String("H"); break;
-    case MISS: jw.String("M"); break;
-    case STORE: jw.String("S"); break;
-    case STORE_FAILED_BUSY: jw.String("F"); break;
+  // When tracing a percentage of the requests, we want to trace all the accesses for a
+  // consistent subset of the entries rather than a subset of accesses for all entries.
+  // This gives the access trace more useful data.
+  //
+  // This uses the hash to determine a consistent subset to trace. Note that this is
+  // tracing at the partition level. If there are multiple partitions, the entry has
+  // been mapped to a specific partition by taking a modulus of the hash value. This
+  // can impact which bits are still useful. For example, if there are two partitions,
+  // this would have only even hash values or only odd hash values. To minimize the
+  // impact of this, we use 101 rather than 100, because 101 is prime.
+  uint64_t unsigned_key_hash = static_cast<uint64_t>(key.Hash());
+  if (FLAGS_data_cache_trace_percentage < 100 &&
+      unsigned_key_hash % 101 >= FLAGS_data_cache_trace_percentage) {
+    return;
   }
 
-  jw.String("f");
-  if (FLAGS_data_cache_anonymize_trace) {
-    uint128 hash = util_hash::CityHash128(
-        reinterpret_cast<const char*>(key.filename().data()),
-        key.filename().size());
-    // A 128-bit (16-byte) hash results in a 24-byte base64-encoded string, including
-    // two characters of padding.
-    const int BUF_LEN = 24;
-    DCHECK_EQ(BUF_LEN, CalculateBase64EscapedLen(sizeof(hash)));
-    char b64_buf[BUF_LEN];
-    int out_len = Base64Escape(reinterpret_cast<const unsigned char*>(&hash),
-        sizeof(hash), b64_buf, BUF_LEN);
-    DCHECK_EQ(out_len, BUF_LEN);
-    // Chop off the two padding bytes.
-    DCHECK(b64_buf[23] == '=' && b64_buf[22] == '=');
-    out_len = 22;
-    jw.String(b64_buf, out_len);
-  } else {
-    jw.String(reinterpret_cast<const char*>(key.filename().data()),
-              key.filename().size());
-  }
-  jw.String("m");
-  jw.Int64(key.mtime());
-  jw.String("o");
-  jw.Int64(key.offset());
-
-  if (lookup_len != -1) {
-    jw.String("lLen");
-    jw.Int64(lookup_len);
-  }
-  if (entry_len != -1) {
-    jw.String("eLen");
-    jw.Int64(entry_len);
-  }
-  jw.EndObject();
-  buf << "\n";
-
-  string s = buf.str();
-  logger_->Write(/*force_flush=*/false, /*timestamp=*/0, s.data(), s.size());
+  tracer_->Trace(type, WallTime_Now(), key.filename(), key.mtime(), key.offset(),
+      lookup_len, entry_len);
 }
 
 } // namespace io
