@@ -29,6 +29,8 @@
 
 namespace impala {
 
+class TimestampValue;
+
 using impala_udf::FunctionContext;
 using impala_udf::StringVal;
 

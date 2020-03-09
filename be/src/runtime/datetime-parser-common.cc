@@ -21,6 +21,7 @@
 #include <boost/algorithm/string/trim.hpp>
 #include <boost/date_time/gregorian/gregorian.hpp>
 
+#include "exprs/timestamp-functions.h"
 #include "gutil/strings/ascii_ctype.h"
 #include "runtime/datetime-iso-sql-format-tokenizer.h"
 #include "runtime/string-value.h"

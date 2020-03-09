@@ -24,6 +24,7 @@
 #include "exec/hdfs-scan-node-mt.h"
 #include "exec/read-write-util.h"
 #include "exec/text-converter.inline.h"
+#include "exprs/scalar-expr-evaluator.h"
 #include "runtime/collection-value-builder.h"
 #include "runtime/hdfs-fs-cache.h"
 #include "runtime/runtime-filter.inline.h"

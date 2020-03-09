@@ -36,7 +36,6 @@
 #include "gen-cpp/Types_types.h"
 #include "rpc/thrift-client.h"
 #include "runtime/client-cache.h"
-#include "runtime/timestamp-value.h"
 #include "statestore/failure-detector.h"
 #include "statestore/statestore-subscriber-client-wrapper.h"
 #include "util/aligned-new.h"

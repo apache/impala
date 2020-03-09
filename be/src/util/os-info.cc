@@ -20,12 +20,15 @@
 #include <stdlib.h>
 #include <string.h>
 #include <fstream>
-#include <iostream>
 #include <sstream>
 
 #include <unistd.h>
-#include <boost/algorithm/string.hpp>
 #include <sys/stat.h>
+
+#include <boost/algorithm/string/classification.hpp>
+#include <boost/algorithm/string/constants.hpp>
+#include <boost/algorithm/string/detail/classification.hpp>
+#include <boost/algorithm/string/split.hpp>
 
 #include "common/names.h"
 

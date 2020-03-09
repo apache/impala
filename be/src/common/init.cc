@@ -42,7 +42,6 @@
 #include "util/cgroup-util.h"
 #include "util/cpu-info.h"
 #include "util/debug-util.h"
-#include "util/decimal-util.h"
 #include "util/disk-info.h"
 #include "util/jni-util.h"
 #include "util/logging-support.h"

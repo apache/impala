@@ -20,8 +20,6 @@
 #include <boost/thread/thread.hpp>
 #include <sys/stat.h>
 
-#include "codegen/llvm-codegen.h"
-#include "common/init.h"
 #include "runtime/bufferpool/buffer-pool.h"
 #include "runtime/bufferpool/reservation-tracker.h"
 #include "runtime/io/cache-reader-test-stub.h"
@@ -30,14 +28,11 @@
 #include "runtime/io/disk-io-mgr.h"
 #include "runtime/io/request-context.h"
 #include "runtime/test-env.h"
-#include "runtime/thread-resource-mgr.h"
-#include "service/fe-support.h"
 #include "testutil/gtest-util.h"
 #include "testutil/rand-util.h"
 #include "testutil/scoped-flag-setter.h"
 #include "util/condition-variable.h"
-#include "util/cpu-info.h"
-#include "util/disk-info.h"
+#include "util/debug-util.h"
 #include "util/thread.h"
 #include "util/time.h"
 

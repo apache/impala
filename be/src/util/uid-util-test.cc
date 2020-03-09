@@ -15,10 +15,6 @@
 // specific language governing permissions and limitations
 // under the License.
 
-#include <stdlib.h>
-#include <stdio.h>
-#include <iostream>
-
 #include <boost/uuid/uuid_generators.hpp>
 
 #include "testutil/gtest-util.h"

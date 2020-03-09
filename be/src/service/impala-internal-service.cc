@@ -25,6 +25,7 @@
 #include "runtime/query-state.h"
 #include "runtime/fragment-instance-state.h"
 #include "runtime/exec-env.h"
+#include "util/debug-util.h"
 
 #include "common/names.h"
 

@@ -24,17 +24,18 @@
 
 namespace impala {
 
-/// File is a handle to a physical file in a temporary directory. File space
+/// TmpFile is a handle to a physical file in a temporary directory. File space
 /// can be allocated and files removed using AllocateSpace() and Remove(). Used
 /// internally by TmpFileMgr.
 ///
 /// Creation of the physical file in the file system is deferred until the file is
 /// written by DiskIoMgr.
 ///
-/// Methods of File are not thread-safe.
-class TmpFileMgr::File {
+/// Methods of TmpFile are not thread-safe.
+class TmpFile {
  public:
-  File(FileGroup* file_group, DeviceId device_id, const std::string& path);
+  TmpFile(TmpFileGroup* file_group, TmpFileMgr::DeviceId device_id,
+      const std::string& path);
 
   /// Allocates 'num_bytes' bytes in this file for a new block of data if there is
   /// free capacity in this temporary directory. If there is insufficient capacity,
@@ -72,14 +73,14 @@ class TmpFileMgr::File {
   /// directory. A warning is issued if available space is less than this threshold.
   const static uint64_t AVAILABLE_SPACE_THRESHOLD_MB;
 
-  /// The FileGroup this belongs to. Cannot be null.
-  FileGroup* const file_group_;
+  /// The TmpFileGroup this belongs to. Cannot be null.
+  TmpFileGroup* const file_group_;
 
   /// Path of the physical file in the filesystem.
   const std::string path_;
 
   /// The temporary device this file is stored on.
-  const DeviceId device_id_;
+  const TmpFileMgr::DeviceId device_id_;
 
   /// The id of the disk on which the physical file lies.
   const int disk_id_;
@@ -92,7 +93,7 @@ class TmpFileMgr::File {
   bool blacklisted_;
 
   /// Helper to get the TmpDir that this file is associated with.
-  TmpDir* GetDir();
+  TmpFileMgr::TmpDir* GetDir();
 };
 } // namespace impala
 

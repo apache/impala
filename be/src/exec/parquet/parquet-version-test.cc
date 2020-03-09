@@ -18,7 +18,6 @@
 #include <limits.h>
 #include <stdio.h>
 #include <stdlib.h>
-#include <iostream>
 
 #include "exec/parquet/parquet-metadata-utils.h"
 #include "testutil/gtest-util.h"

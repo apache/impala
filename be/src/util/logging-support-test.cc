@@ -15,7 +15,6 @@
 // specific language governing permissions and limitations
 // under the License.
 
-#include <iostream>
 #include <boost/filesystem.hpp>
 #include <ctime>
 

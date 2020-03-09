@@ -32,6 +32,7 @@
 
 #include "common/logging.h"
 #include "exec/read-write-util.h"
+#include "gutil/strings/substitute.h"
 #include "runtime/mem-pool.h"
 #include "runtime/mem-tracker.h"
 

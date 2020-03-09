@@ -19,6 +19,8 @@
 #ifndef IMPALA_EXEC_PARQUET_COMMON_H
 #define IMPALA_EXEC_PARQUET_COMMON_H
 
+#include <boost/preprocessor/repetition/repeat_from_to.hpp>
+
 #include "common/compiler-util.h"
 #include "gen-cpp/Descriptors_types.h"
 #include "gen-cpp/parquet_types.h"

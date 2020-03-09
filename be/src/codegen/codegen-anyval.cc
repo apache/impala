@@ -18,6 +18,7 @@
 #include "codegen/codegen-anyval.h"
 
 #include "codegen/codegen-util.h"
+#include "runtime/multi-precision.h"
 #include "runtime/raw-value.h"
 #include "common/names.h"
 
@@ -408,7 +409,7 @@ void CodegenAnyVal::SetVal(int64_t val) {
   SetVal(builder_->getInt64(val));
 }
 
-void CodegenAnyVal::SetVal(int128_t val) {
+void CodegenAnyVal::SetVal(__int128_t val) {
   DCHECK_EQ(type_.type, TYPE_DECIMAL);
   vector<uint64_t> vals({LowBits(val), HighBits(val)});
   llvm::Value* ir_val =

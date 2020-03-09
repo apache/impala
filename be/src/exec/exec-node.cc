@@ -460,7 +460,7 @@ bool ExecNode::CheckLimitAndTruncateRowBatchIfNeededShared(
 bool ExecNode::EvalConjuncts(
     ScalarExprEvaluator* const* evals, int num_conjuncts, TupleRow* row) {
   for (int i = 0; i < num_conjuncts; ++i) {
-    if (!EvalPredicate(evals[i], row)) return false;
+    if (!evals[i]->EvalPredicate(row)) return false;
   }
   return true;
 }

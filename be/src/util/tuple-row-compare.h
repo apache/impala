@@ -21,7 +21,6 @@
 
 #include "common/compiler-util.h"
 #include "exprs/scalar-expr.h"
-#include "exprs/scalar-expr-evaluator.h"
 #include "runtime/descriptors.h"
 #include "runtime/raw-value.h"
 #include "runtime/raw-value.inline.h"

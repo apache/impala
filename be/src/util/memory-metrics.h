@@ -20,14 +20,12 @@
 #include "util/metrics.h"
 
 #include <mutex>
-#include <boost/bind.hpp>
 #include <gperftools/malloc_extension.h>
 #if defined(ADDRESS_SANITIZER) || defined(THREAD_SANITIZER)
 #include <sanitizer/allocator_interface.h>
 #endif
 
 #include "gen-cpp/Frontend_types.h"
-#include "util/debug-util.h"
 
 namespace impala {
 

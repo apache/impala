@@ -37,6 +37,7 @@
 #include "runtime/exec-env.h"
 #include "runtime/fragment-instance-state.h"
 #include "runtime/krpc-data-stream-sender.h"
+#include "runtime/mem-tracker.h"
 #include "service/control-service.h"
 #include "service/data-stream-service.h"
 #include "util/counting-barrier.h"

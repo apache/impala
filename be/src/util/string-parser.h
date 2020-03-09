@@ -52,6 +52,9 @@ namespace impala {
 ///  - Validate input using _sidd_compare_ranges
 ///  - Since we know the length, we can parallelize this: i.e. result = 100*s[0] +
 ///    10*s[1] + s[2]
+///
+/// TODO: people went crazy with huge inline functions in this file - most should be
+/// moved out-of-line.
 class StringParser {
  public:
   enum ParseResult {

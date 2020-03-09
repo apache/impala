@@ -130,11 +130,11 @@ class TmpFileMgrTest : public ::testing::Test {
   /// Helper to call the private CreateFiles() method and return
   /// the created files.
   static Status CreateFiles(
-      TmpFileMgr::FileGroup* group, vector<TmpFileMgr::File*>* files) {
+      TmpFileGroup* group, vector<TmpFile*>* files) {
     // The method expects the lock to be held.
     lock_guard<SpinLock> lock(group->lock_);
     RETURN_IF_ERROR(group->CreateFiles());
-    for (unique_ptr<TmpFileMgr::File>& file : group->tmp_files_) {
+    for (unique_ptr<TmpFile>& file : group->tmp_files_) {
       files->push_back(file.get());
     }
     return Status::OK();
@@ -146,38 +146,38 @@ class TmpFileMgrTest : public ::testing::Test {
   }
 
   /// Helper to call the private TmpFileMgr::NewFile() method.
-  static void NewFile(TmpFileMgr* mgr, TmpFileMgr::FileGroup* group,
-      TmpFileMgr::DeviceId device_id, unique_ptr<TmpFileMgr::File>* new_file) {
+  static void NewFile(TmpFileMgr* mgr, TmpFileGroup* group,
+      TmpFileMgr::DeviceId device_id, unique_ptr<TmpFile>* new_file) {
     mgr->NewFile(group, device_id, new_file);
   }
 
   /// Helper to call the private File::AllocateSpace() method.
   static void FileAllocateSpace(
-      TmpFileMgr::File* file, int64_t num_bytes, int64_t* offset) {
+      TmpFile* file, int64_t num_bytes, int64_t* offset) {
     file->AllocateSpace(num_bytes, offset);
   }
 
   /// Helper to call the private FileGroup::AllocateSpace() method.
-  static Status GroupAllocateSpace(TmpFileMgr::FileGroup* group, int64_t num_bytes,
-      TmpFileMgr::File** file, int64_t* offset) {
+  static Status GroupAllocateSpace(TmpFileGroup* group, int64_t num_bytes,
+      TmpFile** file, int64_t* offset) {
     return group->AllocateSpace(num_bytes, file, offset);
   }
 
   /// Helper to set FileGroup::next_allocation_index_.
-  static void SetNextAllocationIndex(TmpFileMgr::FileGroup* group, int value) {
+  static void SetNextAllocationIndex(TmpFileGroup* group, int value) {
     group->next_allocation_index_ = value;
   }
 
   /// Helper to cancel the FileGroup RequestContext.
-  static void CancelIoContext(TmpFileMgr::FileGroup* group) {
+  static void CancelIoContext(TmpFileGroup* group) {
     group->io_ctx_->Cancel();
   }
 
   /// Helper to get the # of bytes allocated by the group. Validates that the sum across
   /// all files equals this total.
-  static int64_t BytesAllocated(TmpFileMgr::FileGroup* group) {
+  static int64_t BytesAllocated(TmpFileGroup* group) {
     int64_t bytes_allocated = 0;
-    for (unique_ptr<TmpFileMgr::File>& file : group->tmp_files_) {
+    for (unique_ptr<TmpFile>& file : group->tmp_files_) {
       bytes_allocated += file->bytes_allocated_;
     }
     EXPECT_EQ(bytes_allocated, group->current_bytes_allocated_);
@@ -185,8 +185,8 @@ class TmpFileMgrTest : public ::testing::Test {
   }
 
   /// Helpers to call WriteHandle methods.
-  void Cancel(TmpFileMgr::WriteHandle* handle) { handle->Cancel(); }
-  void WaitForWrite(TmpFileMgr::WriteHandle* handle) {
+  void Cancel(TmpWriteHandle* handle) { handle->Cancel(); }
+  void WaitForWrite(TmpWriteHandle* handle) {
     handle->WaitForWrite();
   }
 
@@ -228,17 +228,17 @@ TEST_F(TmpFileMgrTest, TestFileAllocation) {
   TmpFileMgr tmp_file_mgr;
   ASSERT_OK(tmp_file_mgr.Init(metrics_.get()));
   TUniqueId id;
-  TmpFileMgr::FileGroup file_group(
+  TmpFileGroup file_group(
       &tmp_file_mgr, io_mgr(), profile_, id, 1024 * 1024 * 8);
 
   // Default configuration should give us one temporary device.
   EXPECT_EQ(1, tmp_file_mgr.NumActiveTmpDevices());
   vector<TmpFileMgr::DeviceId> tmp_devices = tmp_file_mgr.ActiveTmpDevices();
   EXPECT_EQ(1, tmp_devices.size());
-  vector<TmpFileMgr::File*> files;
+  vector<TmpFile*> files;
   ASSERT_OK(CreateFiles(&file_group, &files));
   EXPECT_EQ(1, files.size());
-  TmpFileMgr::File* file = files[0];
+  TmpFile* file = files[0];
   // Apply writes of variable sizes and check space was allocated correctly.
   int64_t write_sizes[] = {1, 10, 1024, 4, 1024 * 1024 * 8, 1024 * 1024 * 8, 16, 10};
   int num_write_sizes = sizeof(write_sizes) / sizeof(write_sizes[0]);
@@ -269,16 +269,16 @@ TEST_F(TmpFileMgrTest, TestOneDirPerDevice) {
   TmpFileMgr tmp_file_mgr;
   ASSERT_OK(tmp_file_mgr.InitCustom(tmp_dirs, true, metrics_.get()));
   TUniqueId id;
-  TmpFileMgr::FileGroup file_group(&tmp_file_mgr, io_mgr(), profile_, id);
+  TmpFileGroup file_group(&tmp_file_mgr, io_mgr(), profile_, id);
 
   // Only the first directory should be used.
   EXPECT_EQ(1, tmp_file_mgr.NumActiveTmpDevices());
   vector<TmpFileMgr::DeviceId> devices = tmp_file_mgr.ActiveTmpDevices();
   EXPECT_EQ(1, devices.size());
-  vector<TmpFileMgr::File*> files;
+  vector<TmpFile*> files;
   ASSERT_OK(CreateFiles(&file_group, &files));
   EXPECT_EQ(1, files.size());
-  TmpFileMgr::File* file = files[0];
+  TmpFile* file = files[0];
   // Check the prefix is the expected temporary directory.
   EXPECT_EQ(0, file->path().find(tmp_dirs[0]));
   ASSERT_OK(FileSystemUtil::RemovePaths(tmp_dirs));
@@ -293,14 +293,14 @@ TEST_F(TmpFileMgrTest, TestMultiDirsPerDevice) {
   TmpFileMgr tmp_file_mgr;
   ASSERT_OK(tmp_file_mgr.InitCustom(tmp_dirs, false, metrics_.get()));
   TUniqueId id;
-  TmpFileMgr::FileGroup file_group(&tmp_file_mgr, io_mgr(), profile_, id);
+  TmpFileGroup file_group(&tmp_file_mgr, io_mgr(), profile_, id);
 
   // Both directories should be used.
   EXPECT_EQ(2, tmp_file_mgr.NumActiveTmpDevices());
   vector<TmpFileMgr::DeviceId> devices = tmp_file_mgr.ActiveTmpDevices();
   EXPECT_EQ(2, devices.size());
 
-  vector<TmpFileMgr::File*> files;
+  vector<TmpFile*> files;
   ASSERT_OK(CreateFiles(&file_group, &files));
   EXPECT_EQ(2, files.size());
   for (int i = 0; i < 2; ++i) {
@@ -321,7 +321,7 @@ TEST_F(TmpFileMgrTest, TestReportError) {
   TmpFileMgr tmp_file_mgr;
   ASSERT_OK(tmp_file_mgr.InitCustom(tmp_dirs, false, metrics_.get()));
   TUniqueId id;
-  TmpFileMgr::FileGroup file_group(&tmp_file_mgr, io_mgr(), profile_, id);
+  TmpFileGroup file_group(&tmp_file_mgr, io_mgr(), profile_, id);
 
   // Both directories should be used.
   vector<TmpFileMgr::DeviceId> devices = tmp_file_mgr.ActiveTmpDevices();
@@ -330,11 +330,11 @@ TEST_F(TmpFileMgrTest, TestReportError) {
 
   // Inject an error on one device so that we can validate it is handled correctly.
   int good_device = 0, bad_device = 1;
-  vector<TmpFileMgr::File*> files;
+  vector<TmpFile*> files;
   ASSERT_OK(CreateFiles(&file_group, &files));
   ASSERT_EQ(2, files.size());
-  TmpFileMgr::File* good_file = files[good_device];
-  TmpFileMgr::File* bad_file = files[bad_device];
+  TmpFile* good_file = files[good_device];
+  TmpFile* bad_file = files[bad_device];
   ErrorMsg errmsg(TErrorCode::GENERAL, "A fake error");
   bad_file->Blacklist(errmsg);
 
@@ -352,7 +352,7 @@ TEST_F(TmpFileMgrTest, TestReportError) {
   // The good device should still be usable.
   FileAllocateSpace(good_file, 128, &offset);
   // Attempts to allocate new files on bad device should succeed.
-  unique_ptr<TmpFileMgr::File> bad_file2;
+  unique_ptr<TmpFile> bad_file2;
   NewFile(&tmp_file_mgr, &file_group, bad_device, &bad_file2);
   ASSERT_OK(FileSystemUtil::RemovePaths(tmp_dirs));
   file_group.Close();
@@ -370,9 +370,9 @@ TEST_F(TmpFileMgrTest, TestAllocateNonWritable) {
   TmpFileMgr tmp_file_mgr;
   ASSERT_OK(tmp_file_mgr.InitCustom(tmp_dirs, false, metrics_.get()));
   TUniqueId id;
-  TmpFileMgr::FileGroup file_group(&tmp_file_mgr, io_mgr(), profile_, id);
+  TmpFileGroup file_group(&tmp_file_mgr, io_mgr(), profile_, id);
 
-  vector<TmpFileMgr::File*> allocated_files;
+  vector<TmpFile*> allocated_files;
   ASSERT_OK(CreateFiles(&file_group, &allocated_files));
   int64_t offset;
   FileAllocateSpace(allocated_files[0], 1, &offset);
@@ -400,15 +400,15 @@ TEST_F(TmpFileMgrTest, TestScratchLimit) {
   // A power-of-two so that FileGroup allocates exactly this amount of scratch space.
   const int64_t ALLOC_SIZE = 64;
   TUniqueId id;
-  TmpFileMgr::FileGroup file_group(&tmp_file_mgr, io_mgr(), profile_, id, LIMIT);
+  TmpFileGroup file_group(&tmp_file_mgr, io_mgr(), profile_, id, LIMIT);
 
-  vector<TmpFileMgr::File*> files;
+  vector<TmpFile*> files;
   ASSERT_OK(CreateFiles(&file_group, &files));
 
   // Test individual limit is enforced.
   Status status;
   int64_t offset;
-  TmpFileMgr::File* alloc_file;
+  TmpFile* alloc_file;
 
   // Alloc from file 1 should succeed.
   SetNextAllocationIndex(&file_group, 0);
@@ -441,7 +441,7 @@ TEST_F(TmpFileMgrTest, TestScratchRangeRecycling) {
   ASSERT_OK(tmp_file_mgr.InitCustom(tmp_dirs, false, metrics_.get()));
   TUniqueId id;
 
-  TmpFileMgr::FileGroup file_group(&tmp_file_mgr, io_mgr(), profile_, id);
+  TmpFileGroup file_group(&tmp_file_mgr, io_mgr(), profile_, id);
   int64_t expected_scratch_bytes_allocated = 0;
   // Test some different allocation sizes.
   checkHWMMetrics(0, 0);
@@ -456,7 +456,7 @@ TEST_F(TmpFileMgrTest, TestScratchRangeRecycling) {
 
     WriteRange::WriteDoneCallback callback =
         bind(mem_fn(&TmpFileMgrTest::SignalCallback), this, _1);
-    vector<unique_ptr<TmpFileMgr::WriteHandle>> handles(BLOCKS);
+    vector<unique_ptr<TmpWriteHandle>> handles(BLOCKS);
     // 'file_group' should allocate extra scratch bytes for this 'alloc_size'.
     expected_scratch_bytes_allocated += alloc_size * BLOCKS;
     const int TEST_ITERS = 5;
@@ -493,7 +493,7 @@ TEST_F(TmpFileMgrTest, TestScratchRangeRecycling) {
 // internal invariants of TmpFileMgr to be broken on error path.
 TEST_F(TmpFileMgrTest, TestProcessMemLimitExceeded) {
   TUniqueId id;
-  TmpFileMgr::FileGroup file_group(test_env_->tmp_file_mgr(), io_mgr(), profile_, id);
+  TmpFileGroup file_group(test_env_->tmp_file_mgr(), io_mgr(), profile_, id);
 
   const int DATA_SIZE = 64;
   vector<uint8_t> data(DATA_SIZE);
@@ -504,7 +504,7 @@ TEST_F(TmpFileMgrTest, TestProcessMemLimitExceeded) {
   // After this error, writing via the file group should fail.
   WriteRange::WriteDoneCallback callback =
       bind(mem_fn(&TmpFileMgrTest::SignalCallback), this, _1);
-  unique_ptr<TmpFileMgr::WriteHandle> handle;
+  unique_ptr<TmpWriteHandle> handle;
   Status status = file_group.Write(MemRange(data.data(), DATA_SIZE), callback, &handle);
   EXPECT_EQ(TErrorCode::CANCELLED_INTERNALLY, status.code());
   file_group.Close();
@@ -520,7 +520,7 @@ TEST_F(TmpFileMgrTest, TestEncryptionDuringCancellation) {
   FLAGS_stress_scratch_write_delay_ms = 1000;
 #endif
   TUniqueId id;
-  TmpFileMgr::FileGroup file_group(test_env_->tmp_file_mgr(), io_mgr(), profile_, id);
+  TmpFileGroup file_group(test_env_->tmp_file_mgr(), io_mgr(), profile_, id);
 
   // Make the data fairly large so that we have a better chance of cancelling while the
   // write is in flight
@@ -535,7 +535,7 @@ TEST_F(TmpFileMgrTest, TestEncryptionDuringCancellation) {
   }
 
   // Start a write in flight, which should encrypt the data and write it to disk.
-  unique_ptr<TmpFileMgr::WriteHandle> handle;
+  unique_ptr<TmpWriteHandle> handle;
   WriteRange::WriteDoneCallback callback =
       bind(mem_fn(&TmpFileMgrTest::SignalCallback), this, _1);
   ASSERT_OK(file_group.Write(data_mem_range, callback, &handle));
@@ -572,12 +572,12 @@ TEST_F(TmpFileMgrTest, TestBlockVerificationGcmDisabled) {
 void TmpFileMgrTest::TestBlockVerification() {
   FLAGS_disk_spill_encryption = true;
   TUniqueId id;
-  TmpFileMgr::FileGroup file_group(test_env_->tmp_file_mgr(), io_mgr(), profile_, id);
+  TmpFileGroup file_group(test_env_->tmp_file_mgr(), io_mgr(), profile_, id);
   string data = "the quick brown fox jumped over the lazy dog";
   MemRange data_mem_range(reinterpret_cast<uint8_t*>(&data[0]), data.size());
 
   // Start a write in flight, which should encrypt the data and write it to disk.
-  unique_ptr<TmpFileMgr::WriteHandle> handle;
+  unique_ptr<TmpWriteHandle> handle;
   WriteRange::WriteDoneCallback callback =
       bind(mem_fn(&TmpFileMgrTest::SignalCallback), this, _1);
   ASSERT_OK(file_group.Write(data_mem_range, callback, &handle));
@@ -626,17 +626,17 @@ TEST_F(TmpFileMgrTest, TestHWMMetric) {
   // A power-of-two so that FileGroup allocates exactly this amount of scratch space.
   const int64_t ALLOC_SIZE = 64;
   TUniqueId id_1;
-  TmpFileMgr::FileGroup file_group_1(&tmp_file_mgr, io_mgr(), profile_1, id_1, LIMIT);
+  TmpFileGroup file_group_1(&tmp_file_mgr, io_mgr(), profile_1, id_1, LIMIT);
   TUniqueId id_2;
-  TmpFileMgr::FileGroup file_group_2(&tmp_file_mgr, io_mgr(), profile_2, id_2, LIMIT);
+  TmpFileGroup file_group_2(&tmp_file_mgr, io_mgr(), profile_2, id_2, LIMIT);
 
-  vector<TmpFileMgr::File*> files;
+  vector<TmpFile*> files;
   ASSERT_OK(CreateFiles(&file_group_1, &files));
   ASSERT_OK(CreateFiles(&file_group_2, &files));
 
   Status status;
   int64_t offset;
-  TmpFileMgr::File* alloc_file;
+  TmpFile* alloc_file;
 
   // Alloc from file_group_1 and file_group_2 interleaving allocations.
   SetNextAllocationIndex(&file_group_1, 0);
@@ -680,12 +680,12 @@ TEST_F(TmpFileMgrTest, TestDirectoryLimits) {
   TmpFileMgr tmp_file_mgr;
   ASSERT_OK(tmp_file_mgr.InitCustom(tmp_dir_specs, false, metrics_.get()));
 
-  TmpFileMgr::FileGroup file_group_1(
+  TmpFileGroup file_group_1(
       &tmp_file_mgr, io_mgr(), RuntimeProfile::Create(&obj_pool_, "p1"), TUniqueId());
-  TmpFileMgr::FileGroup file_group_2(
+  TmpFileGroup file_group_2(
       &tmp_file_mgr, io_mgr(), RuntimeProfile::Create(&obj_pool_, "p2"), TUniqueId());
 
-  vector<TmpFileMgr::File*> files;
+  vector<TmpFile*> files;
   ASSERT_OK(CreateFiles(&file_group_1, &files));
   ASSERT_OK(CreateFiles(&file_group_2, &files));
 
@@ -699,7 +699,7 @@ TEST_F(TmpFileMgrTest, TestDirectoryLimits) {
   // A power-of-two so that FileGroup allocates exactly this amount of scratch space.
   const int64_t ALLOC_SIZE = 512;
   int64_t offset;
-  TmpFileMgr::File* alloc_file;
+  TmpFile* alloc_file;
 
   // Allocate three times - once per directory. We expect these allocations to go through
   // so we should have one allocation in each directory.
@@ -757,12 +757,12 @@ TEST_F(TmpFileMgrTest, TestDirectoryLimitsExhausted) {
   TmpFileMgr tmp_file_mgr;
   ASSERT_OK(tmp_file_mgr.InitCustom(tmp_dir_specs, false, metrics_.get()));
 
-  TmpFileMgr::FileGroup file_group_1(
+  TmpFileGroup file_group_1(
       &tmp_file_mgr, io_mgr(), RuntimeProfile::Create(&obj_pool_, "p1"), TUniqueId());
-  TmpFileMgr::FileGroup file_group_2(
+  TmpFileGroup file_group_2(
       &tmp_file_mgr, io_mgr(), RuntimeProfile::Create(&obj_pool_, "p2"), TUniqueId());
 
-  vector<TmpFileMgr::File*> files;
+  vector<TmpFile*> files;
   ASSERT_OK(CreateFiles(&file_group_1, &files));
   ASSERT_OK(CreateFiles(&file_group_2, &files));
 
@@ -775,7 +775,7 @@ TEST_F(TmpFileMgrTest, TestDirectoryLimitsExhausted) {
   const int64_t ALLOC_SIZE = 512;
   const int64_t MAX_ALLOCATIONS = (DIR1_LIMIT + DIR2_LIMIT) / ALLOC_SIZE;
   int64_t offset;
-  TmpFileMgr::File* alloc_file;
+  TmpFile* alloc_file;
 
   // Allocate exactly the maximum total capacity of the directories.
   SetNextAllocationIndex(&file_group_1, 0);

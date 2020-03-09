@@ -18,7 +18,6 @@
 #include "codegen/llvm-codegen.h"
 
 #include <fstream>
-#include <iostream>
 #include <sstream>
 #include <unordered_set>
 
@@ -75,6 +74,7 @@
 #include "runtime/string-value.h"
 #include "runtime/timestamp-value.h"
 #include "util/cpu-info.h"
+#include "util/debug-util.h"
 #include "util/hdfs-util.h"
 #include "util/path-builder.h"
 #include "util/runtime-profile-counters.h"

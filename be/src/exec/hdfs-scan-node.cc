@@ -26,6 +26,7 @@
 #include "exec/exec-node-util.h"
 #include "exec/hdfs-scanner.h"
 #include "exec/scanner-context.h"
+#include "exprs/scalar-expr-evaluator.h"
 #include "runtime/blocking-row-batch-queue.h"
 #include "runtime/descriptors.h"
 #include "runtime/fragment-instance-state.h"

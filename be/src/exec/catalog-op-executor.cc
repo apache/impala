@@ -28,6 +28,7 @@
 #include "service/frontend.h"
 #include "service/impala-server.h"
 #include "service/hs2-util.h"
+#include "util/debug-util.h"
 #include "util/runtime-profile-counters.h"
 #include "util/string-parser.h"
 #include "util/test-info.h"

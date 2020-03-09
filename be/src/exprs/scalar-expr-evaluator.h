@@ -165,6 +165,14 @@ class ScalarExprEvaluator {
   DecimalVal GetDecimalVal(const TupleRow* row);
   DateVal GetDateVal(const TupleRow* row);
 
+  /// Helper to evaluate a boolean expression with predicate semantics, where NULL is
+  /// equivalent to false.
+  bool EvalPredicate(TupleRow* row) {
+    BooleanVal v = GetBooleanVal(row);
+    if (v.is_null || !v.val) return false;
+    return true;
+  }
+
   /// Returns an error status if there was any error in evaluating the expression
   /// or its sub-expressions. 'start_idx' and 'end_idx' correspond to the range
   /// within the vector of FunctionContext for the sub-expressions of interest.

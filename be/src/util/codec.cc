@@ -25,6 +25,7 @@
 #include "common/compiler-util.h"
 #include "common/logging.h"
 #include "gutil/strings/substitute.h"
+#include "runtime/mem-pool.h"
 #include "util/bit-util.h"
 #include "util/compress.h"
 #include "util/decompress.h"
@@ -75,6 +76,8 @@ Status Codec::GetHadoopCodecClassName(THdfsCompression::type type, string* out_n
   return Status(Substitute("Unsupported codec for given file type: $0",
       _THdfsCompression_VALUES_TO_NAMES.find(type)->second));
 }
+
+Codec::~Codec() {}
 
 Status Codec::CreateCompressor(MemPool* mem_pool, bool reuse, const string& codec,
     scoped_ptr<Codec>* compressor) {

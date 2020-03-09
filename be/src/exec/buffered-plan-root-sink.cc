@@ -17,6 +17,8 @@
 
 #include "exec/buffered-plan-root-sink.h"
 #include "service/query-result-set.h"
+#include "util/debug-util.h"
+#include "util/runtime-profile-counters.h"
 
 #include "common/names.h"
 

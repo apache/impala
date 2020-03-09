@@ -15,18 +15,23 @@
 // specific language governing permissions and limitations
 // under the License.
 
+#pragma once
 
-#ifndef IMPALA_RUNTIME_TIMESTAMP_VALUE_H
-#define IMPALA_RUNTIME_TIMESTAMP_VALUE_H
-
-#include <boost/date_time/compiler_config.hpp>
-#include <boost/date_time/gregorian/gregorian.hpp>
-#include <boost/date_time/local_time/local_time.hpp>
+#include <cstdint>
+#include <cstring>
+#include <iosfwd>
 #include <string>
 
+#include <boost/date_time/gregorian/greg_date.hpp>
+#include <boost/date_time/posix_time/posix_time_config.hpp>
+#include <boost/date_time/posix_time/ptime.hpp>
+#include <boost/date_time/special_defs.hpp>
+#include <boost/date_time/time_duration.hpp>
+
+#include "common/compiler-util.h"
 #include "common/global-types.h"
-#include "gen-cpp/Data_types.h"
-#include "gen-cpp/data_stream_service.pb.h"
+#include "common/logging.h"
+#include "gen-cpp/common.pb.h"
 #include "udf/udf.h"
 #include "util/hash-util.h"
 
@@ -379,5 +384,3 @@ inline std::size_t hash_value(const TimestampValue& v) {
 
 std::ostream& operator<<(std::ostream& os, const TimestampValue& timestamp_value);
 }
-
-#endif

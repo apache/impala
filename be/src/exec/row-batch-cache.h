@@ -23,7 +23,6 @@
 #include <vector>
 
 #include "runtime/row-batch.h"
-#include "util/debug-util.h"
 
 namespace impala {
 

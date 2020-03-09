@@ -32,7 +32,6 @@
 #include "gen-cpp/control_service.pb.h"
 #include "gutil/macros.h"
 #include "gutil/threading/thread_collision_warner.h" // for DFAKE_*
-#include "runtime/tmp-file-mgr.h"
 #include "util/counting-barrier.h"
 #include "util/spinlock.h"
 #include "util/unique-id-hash.h"
@@ -56,6 +55,7 @@ class RuntimeFilterBank;
 class RuntimeProfile;
 class RuntimeState;
 class ScannerMemLimiter;
+class TmpFileGroup;
 class TRuntimeProfileForest;
 
 /// Central class for all backend execution state (example: the FragmentInstanceStates
@@ -156,7 +156,7 @@ class QueryState {
     return buffer_reservation_;
   }
   InitialReservations* initial_reservations() const { return initial_reservations_; }
-  TmpFileMgr::FileGroup* file_group() const {
+  TmpFileGroup* file_group() const {
     DCHECK_GT(backend_resource_refcnt_.Load(), 0);
     return file_group_;
   }
@@ -350,7 +350,7 @@ class QueryState {
 
   /// Temporary files for this query (owned by obj_pool_). Non-null if spilling is
   /// enabled. Set in Prepare().
-  TmpFileMgr::FileGroup* file_group_ = nullptr;
+  TmpFileGroup* file_group_ = nullptr;
 
   /// Manages runtime filters that are either produced or consumed (or both!) by plan
   /// nodes on this backend.

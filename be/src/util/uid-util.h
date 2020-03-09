@@ -17,11 +17,15 @@
 
 #pragma once
 
+#include <string.h>
+#include <cstdint>
+#include <string>
+
 #include <boost/uuid/uuid.hpp>
 
-#include "gen-cpp/Types_types.h"  // for TUniqueId
-#include "gen-cpp/control_service.pb.h"
-#include "util/debug-util.h"
+#include "common/logging.h"
+#include "gen-cpp/Types_types.h"
+#include "gen-cpp/common.pb.h"
 
 namespace impala {
 
@@ -97,7 +101,7 @@ std::string GenerateUUIDString();
 
 /// generates a 16 byte UUID
 inline TUniqueId GenerateUUID() {
-  const string& u = GenerateUUIDString();
+  const std::string& u = GenerateUUIDString();
   TUniqueId uid;
   memcpy(&uid.hi, u.data(), sizeof(int64_t));
   memcpy(&uid.lo, u.data() + sizeof(int64_t), sizeof(int64_t));

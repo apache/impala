@@ -17,26 +17,37 @@
 
 #pragma once
 
+#include <cstdint>
 #include <list>
+#include <map>
+#include <memory>
 #include <mutex>
+#include <ostream>
 #include <string>
-#include <vector>
-#include <boost/bind.hpp>
-#include <boost/unordered_map.hpp>
-#include <gutil/strings/substitute.h>
+#include <typeinfo>
 
-#include "catalog/catalog-service-client-wrapper.h"
+#include <boost/bind.hpp>
+#include <boost/function.hpp>
+#include <boost/unordered_map.hpp>
+#include <thrift/Thrift.h>
+#include <thrift/transport/TTransportException.h>
+
+#include "common/logging.h"
+#include "common/status.h"
+#include "gen-cpp/ErrorCodes_types.h"
+#include "gen-cpp/Types_types.h"
+#include "gutil/strings/substitute.h"
 #include "rpc/thrift-client.h"
 #include "rpc/thrift-util.h"
-#include "runtime/client-cache-types.h"
-#include "util/debug-util.h"
+#include "util/container-util.h"
 #include "util/metrics-fwd.h"
 #include "util/network-util.h"
 #include "util/time.h"
 
-#include "common/status.h"
-
 namespace impala {
+
+class MetricGroup;
+template <class T> class ClientCache;
 
 /// Opaque pointer type which allows users of ClientCache to refer to particular client
 /// instances without requiring that we parameterise ClientCacheHelper by type.

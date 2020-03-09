@@ -20,20 +20,15 @@
 
 #include <stdint.h>
 #include <string>
-#include <vector>
 #include <boost/scoped_ptr.hpp>
 
-#include "common/atomic.h"
 #include "common/compiler-util.h"
 #include "common/object-pool.h"
 #include "common/status.h"
 #include "gutil/macros.h"
 #include "runtime/mem-tracker-types.h"
-#include "runtime/tmp-file-mgr.h"
 #include "util/aligned-new.h"
-#include "util/internal-queue.h"
 #include "util/mem-range.h"
-#include "util/spinlock.h"
 
 namespace impala {
 
@@ -41,6 +36,7 @@ class MetricGroup;
 class ReservationTracker;
 class RuntimeProfile;
 class SystemAllocator;
+class TmpFileGroup;
 
 /// A buffer pool that manages memory buffers for all queries in an Impala daemon.
 /// The buffer pool enforces buffer reservations, limits, and implements policies
@@ -177,7 +173,7 @@ class BufferPool : public CacheLineAligned {
   /// 'reservation_limit' and associated with MemTracker 'mem_tracker'. The initial
   /// reservation is 0 bytes. 'mem_limit_mode' determines whether reservation
   /// increases are checked against the soft or hard limit of 'mem_tracker'.
-  Status RegisterClient(const std::string& name, TmpFileMgr::FileGroup* file_group,
+  Status RegisterClient(const std::string& name, TmpFileGroup* file_group,
       ReservationTracker* parent_reservation, MemTracker* mem_tracker,
       int64_t reservation_limit, RuntimeProfile* profile, ClientHandle* client,
       MemLimit mem_limit_mode = MemLimit::SOFT) WARN_UNUSED_RESULT;

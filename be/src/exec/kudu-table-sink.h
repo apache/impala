@@ -25,10 +25,10 @@
 #include "common/status.h"
 #include "exec/kudu-util.h"
 #include "exec/data-sink.h"
-#include "exprs/scalar-expr.h"
-#include "exprs/scalar-expr-evaluator.h"
 
 namespace impala {
+
+class KuduTableDescriptor;
 
 class KuduTableSinkConfig : public DataSinkConfig {
  public:

@@ -21,10 +21,12 @@
 
 #include "exec/orc-column-readers.h"
 #include "exec/scanner-context.inline.h"
+#include "exec/scratch-tuple-batch.h"
 #include "exprs/expr.h"
 #include "runtime/collection-value-builder.h"
 #include "runtime/exec-env.h"
 #include "runtime/io/request-context.h"
+#include "runtime/mem-tracker.h"
 #include "runtime/runtime-filter.inline.h"
 #include "runtime/timestamp-value.inline.h"
 #include "runtime/tuple-row.h"

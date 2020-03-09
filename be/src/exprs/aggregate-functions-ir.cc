@@ -32,6 +32,7 @@
 #include "exprs/hll-bias.h"
 #include "runtime/date-value.h"
 #include "runtime/decimal-value.inline.h"
+#include "runtime/multi-precision.h"
 #include "runtime/runtime-state.h"
 #include "runtime/string-value.inline.h"
 #include "runtime/timestamp-value.h"
@@ -422,20 +423,20 @@ IR_ALWAYS_INLINE void AggregateFunctions::DecimalAvgAddOrRemove(FunctionContext*
     case 4:
       avg->sum_val16 += m * src.val4;
       if (UNLIKELY(decimal_v2 &&
-          abs(avg->sum_val16) > DecimalUtil::MAX_UNSCALED_DECIMAL16)) {
+          abs(avg->sum_val16) > MAX_UNSCALED_DECIMAL16)) {
         ctx->SetError("Avg computation overflowed");
       }
       break;
     case 8:
       avg->sum_val16 += m * src.val8;
       if (UNLIKELY(decimal_v2 &&
-          abs(avg->sum_val16) > DecimalUtil::MAX_UNSCALED_DECIMAL16)) {
+          abs(avg->sum_val16) > MAX_UNSCALED_DECIMAL16)) {
         ctx->SetError("Avg computation overflowed");
       }
       break;
     case 16:
       if (UNLIKELY(decimal_v2 && (avg->sum_val16 >= 0) == (src.val16 >= 0) &&
-          abs(avg->sum_val16) > DecimalUtil::MAX_UNSCALED_DECIMAL16 - abs(src.val16))) {
+          abs(avg->sum_val16) > MAX_UNSCALED_DECIMAL16 - abs(src.val16))) {
         // We can't check for overflow after performing the addition like in the other
         // cases because the result may not fit into int128.
         ctx->SetError("Avg computation overflowed");
@@ -463,7 +464,7 @@ void AggregateFunctions::DecimalAvgMerge(FunctionContext* ctx,
   bool decimal_v2 = ctx->impl()->GetConstFnAttr(FunctionContextImpl::DECIMAL_V2);
   bool overflow = decimal_v2 &&
       abs(dst_struct->sum_val16) >
-      DecimalUtil::MAX_UNSCALED_DECIMAL16 - abs(src_struct->sum_val16);
+      MAX_UNSCALED_DECIMAL16 - abs(src_struct->sum_val16);
   if (UNLIKELY(overflow)) ctx->SetError("Avg computation overflowed");
   dst_struct->sum_val16 =
       ArithmeticUtil::AsUnsigned<std::plus>(dst_struct->sum_val16, src_struct->sum_val16);
@@ -559,18 +560,18 @@ IR_ALWAYS_INLINE void AggregateFunctions::SumDecimalAddOrSubtract(FunctionContex
   if (precision <= 9) {
     dst->val16 += m * src.val4;
     if (UNLIKELY(decimal_v2 &&
-        abs(dst->val16) > DecimalUtil::MAX_UNSCALED_DECIMAL16)) {
+        abs(dst->val16) > MAX_UNSCALED_DECIMAL16)) {
       ctx->SetError("Sum computation overflowed");
     }
   } else if (precision <= 19) {
     dst->val16 += m * src.val8;
     if (UNLIKELY(decimal_v2 &&
-        abs(dst->val16) > DecimalUtil::MAX_UNSCALED_DECIMAL16)) {
+        abs(dst->val16) > MAX_UNSCALED_DECIMAL16)) {
       ctx->SetError("Sum computation overflowed");
     }
   } else {
     if (UNLIKELY(decimal_v2 && (dst->val16 >= 0) == (src.val16 >= 0) &&
-        abs(dst->val16) > DecimalUtil::MAX_UNSCALED_DECIMAL16 - abs(src.val16))) {
+        abs(dst->val16) > MAX_UNSCALED_DECIMAL16 - abs(src.val16))) {
       // We can't check for overflow after performing the addition like in the other
       // cases because the result may not fit into int128.
       ctx->SetError("Sum computation overflowed");
@@ -585,7 +586,7 @@ void AggregateFunctions::SumDecimalMerge(FunctionContext* ctx,
   if (dst->is_null) InitZero<DecimalVal>(ctx, dst);
   bool decimal_v2 = ctx->impl()->GetConstFnAttr(FunctionContextImpl::DECIMAL_V2);
   bool overflow = decimal_v2 &&
-      abs(dst->val16) > DecimalUtil::MAX_UNSCALED_DECIMAL16 - abs(src.val16);
+      abs(dst->val16) > MAX_UNSCALED_DECIMAL16 - abs(src.val16);
   if (UNLIKELY(overflow)) ctx->SetError("Sum computation overflowed");
   dst->val16 = ArithmeticUtil::AsUnsigned<std::plus>(dst->val16, src.val16);
 }

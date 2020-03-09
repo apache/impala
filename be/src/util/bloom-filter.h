@@ -29,7 +29,6 @@
 #include "common/logging.h"
 #include "common/status.h"
 #include "gutil/macros.h"
-#include "gutil/strings/substitute.h"
 #include "runtime/bufferpool/buffer-pool.h"
 #include "util/cpu-info.h"
 #include "util/hash-util.h"

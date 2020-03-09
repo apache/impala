@@ -20,6 +20,10 @@
 #include <algorithm>
 
 #include "codegen/llvm-codegen.h"
+#include "exec/hdfs-scan-node-base.h"
+#include "exec/scratch-tuple-batch.h"
+#include "runtime/row-batch.h"
+#include "runtime/runtime-state.h"
 
 namespace impala {
 

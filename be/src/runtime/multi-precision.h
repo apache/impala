@@ -128,8 +128,40 @@ inline uint64_t LowBits(int128_t x) {
   return x & 0xffffffffffffffff;
 }
 
-/// Prints v in base 10.
-std::ostream& operator<<(std::ostream& os, const int128_t& val);
+// Doubles the width of integer types (e.g. int32_t -> int64_t).
+// Currently only works with a few signed types.
+// Feel free to extend it to other types as well.
+template <typename T>
+struct DoubleWidth {};
+
+template <>
+struct DoubleWidth<int32_t> {
+  using type = int64_t;
+};
+
+template <>
+struct DoubleWidth<int64_t> {
+  using type = int128_t;
+};
+
+template <>
+struct DoubleWidth<int128_t> {
+  using type = int256_t;
+};
+
+/// Return an integer signifying the sign of the value, returning +1 for
+/// positive integers (and zero), -1 for negative integers.
+/// The extra shift is to silence GCC warnings about full width shift on
+/// unsigned types. It compiles out in optimized builds into the expected increment.
+template<typename T>
+constexpr static inline T Sign(T value) {
+  return 1 | ((value >> (ArithmeticUtil::UnsignedWidth<T>() - 1)) >> 1);
+}
+
+template<>
+inline int256_t Sign(int256_t value) {
+  return value < 0 ? -1 : 1;
+}
 
 }
 

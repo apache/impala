@@ -68,10 +68,10 @@
   DCHECK(a == b) << "[ " #a " = " << static_cast<int>(a) << " , " #b " = " \
                  << static_cast<int>(b) << " ]"
 
+namespace impala {
 /// IR modules don't use these methods, and can't see the google namespace used in
 /// GetFullLogFilename()'s prototype.
 #ifndef IR_COMPILE
-namespace impala {
 
 /// glog doesn't allow multiple invocations of InitGoogleLogging(). This method
 /// conditionally calls InitGoogleLogging() only if it hasn't been called before.
@@ -96,8 +96,13 @@ void CheckAndRotateLogFiles(int max_log_files);
 /// directory and removes the oldest ones given an upper bound of number of audit event
 /// logfiles to keep.
 void CheckAndRotateAuditEventLogFiles(int max_log_files);
-}
 
 #endif // IR_COMPILE
 
+/// Prints v in base 10.
+/// Defined here so that __int128_t can be used in log messages (the C++ standard library
+/// does not provide support for __int128_t by default).
+std::ostream& operator<<(std::ostream& os, const __int128_t& val);
+
+} // namespace impala
 #endif

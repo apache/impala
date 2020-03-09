@@ -33,8 +33,10 @@
 #include "runtime/bufferpool/buffer-pool-internal.h"
 #include "runtime/bufferpool/buffer-pool.h"
 #include "runtime/bufferpool/reservation-tracker.h"
+#include "runtime/mem-tracker.h"
 #include "runtime/query-state.h"
 #include "runtime/test-env.h"
+#include "runtime/tmp-file-mgr.h"
 #include "service/fe-support.h"
 #include "testutil/cpu-util.h"
 #include "testutil/death-test-util.h"
@@ -65,7 +67,6 @@ namespace impala {
 
 using BufferHandle = BufferPool::BufferHandle;
 using ClientHandle = BufferPool::ClientHandle;
-using FileGroup = TmpFileMgr::FileGroup;
 using PageHandle = BufferPool::PageHandle;
 
 class BufferPoolTest : public ::testing::Test {
@@ -84,7 +85,7 @@ class BufferPoolTest : public ::testing::Test {
       ReservationTracker* tracker = entry.second;
       tracker->Close();
     }
-    for (TmpFileMgr::FileGroup* file_group : file_groups_) {
+    for (TmpFileGroup* file_group : file_groups_) {
       file_group->Close();
     }
     global_reservations_.Close();
@@ -109,7 +110,7 @@ class BufferPoolTest : public ::testing::Test {
       int64_t initial_query_reservation, int64_t query_reservation_limit, mt19937* rng);
 
   /// Create and destroy a page multiple times.
-  void CreatePageLoop(BufferPool* pool, TmpFileMgr::FileGroup* file_group,
+  void CreatePageLoop(BufferPool* pool, TmpFileGroup* file_group,
       ReservationTracker* parent_tracker, int num_ops);
 
  protected:
@@ -149,9 +150,9 @@ class BufferPoolTest : public ::testing::Test {
   }
 
   /// Create a new file group with the default configs.
-  TmpFileMgr::FileGroup* NewFileGroup() {
-    TmpFileMgr::FileGroup* file_group =
-        obj_pool_.Add(new TmpFileMgr::FileGroup(test_env_->tmp_file_mgr(),
+  TmpFileGroup* NewFileGroup() {
+    TmpFileGroup* file_group =
+        obj_pool_.Add(new TmpFileGroup(test_env_->tmp_file_mgr(),
             test_env_->exec_env()->disk_io_mgr(), NewProfile(), TUniqueId()));
     file_groups_.push_back(file_group);
     return file_group;
@@ -380,7 +381,7 @@ class BufferPoolTest : public ::testing::Test {
   void TestRandomInternalSingle(int64_t buffer_len, bool multiple_pins);
   void TestRandomInternalMulti(int num_threads, int64_t buffer_len, bool multiple_pins);
   static const int SINGLE_THREADED_TID = -1;
-  void TestRandomInternalImpl(BufferPool* pool, FileGroup* file_group,
+  void TestRandomInternalImpl(BufferPool* pool, TmpFileGroup* file_group,
       MemTracker* parent_mem_tracker, mt19937* rng, int tid, bool multiple_pins);
 
   ObjectPool obj_pool_;
@@ -392,7 +393,7 @@ class BufferPoolTest : public ::testing::Test {
   mt19937 rng_;
 
   /// The file groups created - closed at end of each test.
-  vector<TmpFileMgr::FileGroup*> file_groups_;
+  vector<TmpFileGroup*> file_groups_;
 
   /// Paths of temporary directories created during tests - deleted at end of test.
   vector<string> created_tmp_dirs_;
@@ -1067,7 +1068,7 @@ TEST_F(BufferPoolTest, ConcurrentPageCreation) {
 
   BufferPool pool(test_env_->metrics(), TEST_BUFFER_LEN, total_mem, total_mem);
   // Share a file group between the threads.
-  TmpFileMgr::FileGroup* file_group = NewFileGroup();
+  TmpFileGroup* file_group = NewFileGroup();
 
   // Launch threads, each with a different set of query IDs.
   thread_group workers;
@@ -1087,7 +1088,7 @@ TEST_F(BufferPoolTest, ConcurrentPageCreation) {
   global_reservations_.Close();
 }
 
-void BufferPoolTest::CreatePageLoop(BufferPool* pool, TmpFileMgr::FileGroup* file_group,
+void BufferPoolTest::CreatePageLoop(BufferPool* pool, TmpFileGroup* file_group,
     ReservationTracker* parent_tracker, int num_ops) {
   BufferPool::ClientHandle client;
   ASSERT_OK(pool->RegisterClient("test client", file_group, parent_tracker, NULL,
@@ -1119,7 +1120,7 @@ TEST_F(BufferPoolTest, SpillingDisabledDcheck) {
   ASSERT_OK(pool.Pin(&client, &handle));
   // It's ok to Unpin() if the pin count remains positive.
   pool.Unpin(&client, &handle);
-  // We didn't pass in a FileGroup, so spilling is disabled and we can't bring the
+  // We didn't pass in a TmpFileGroup, so spilling is disabled and we can't bring the
   // pin count to 0.
   IMPALA_ASSERT_DEBUG_DEATH(pool.Unpin(&client, &handle), "");
 
@@ -1643,7 +1644,7 @@ TEST_F(BufferPoolTest, WriteErrorBlacklist) {
   const int64_t MEM_PER_QUERY = PAGES_PER_QUERY * TEST_BUFFER_LEN;
   BufferPool pool(test_env_->metrics(), TEST_BUFFER_LEN, TOTAL_MEM, TOTAL_MEM);
   global_reservations_.InitRootTracker(NewProfile(), TOTAL_MEM);
-  vector<FileGroup*> file_groups;
+  vector<TmpFileGroup*> file_groups;
   vector<ClientHandle> clients(TOTAL_QUERIES);
   for (int i = 0; i < INITIAL_QUERIES; ++i) {
     file_groups.push_back(NewFileGroup());
@@ -1964,7 +1965,7 @@ void BufferPoolTest::TestRandomInternalMulti(
   BufferPool pool(&tmp_metrics, min_buffer_len, TOTAL_MEM, TOTAL_MEM);
   global_reservations_.InitRootTracker(NewProfile(), TOTAL_MEM);
   MemTracker global_tracker(TOTAL_MEM);
-  FileGroup* shared_file_group = NewFileGroup();
+  TmpFileGroup* shared_file_group = NewFileGroup();
   thread_group workers;
   vector<mt19937> rngs = RandTestUtil::CreateThreadLocalRngs(num_threads, &rng_);
   for (int i = 0; i < num_threads; ++i) {
@@ -1994,7 +1995,7 @@ void BufferPoolTest::TestRandomInternalMulti(
 /// 'multiple_pins' is true, pages can be pinned multiple times (useful to test this
 /// functionality). Otherwise they are only pinned once (useful to test the case when
 /// memory is more committed).
-void BufferPoolTest::TestRandomInternalImpl(BufferPool* pool, FileGroup* file_group,
+void BufferPoolTest::TestRandomInternalImpl(BufferPool* pool, TmpFileGroup* file_group,
     MemTracker* parent_mem_tracker, mt19937* rng, int tid, bool multiple_pins) {
   // Encrypting and decrypting is expensive - reduce iterations when encryption is on.
   int num_iterations = FLAGS_disk_spill_encryption ? 5000 : 50000;

@@ -20,7 +20,6 @@
 #include <stdlib.h>
 #include <unistd.h>
 
-#include <iostream>
 #include <fstream>
 #include <sstream>
 #include <boost/algorithm/string.hpp>

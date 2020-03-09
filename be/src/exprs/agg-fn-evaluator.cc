@@ -17,31 +17,32 @@
 
 #include "exprs/agg-fn-evaluator.h"
 
+#include <endian.h>
+#include <string.h>
+#include <cstdint>
 #include <sstream>
+#include <utility>
 
-#include "codegen/llvm-codegen.h"
+#include "common/compiler-util.h"
 #include "common/logging.h"
-#include "exprs/aggregate-functions.h"
+#include "common/object-pool.h"
 #include "exprs/anyval-util.h"
-#include "exprs/scalar-expr.h"
 #include "exprs/scalar-expr-evaluator.h"
-#include "exprs/scalar-fn-call.h"
+#include "exprs/scalar-expr.h"
 #include "gutil/strings/substitute.h"
 #include "runtime/date-value.h"
-#include "runtime/lib-cache.h"
+#include "runtime/descriptors.h"
 #include "runtime/raw-value.h"
-#include "runtime/runtime-state.h"
-#include "runtime/string-value.inline.h"
+#include "runtime/string-value.h"
+#include "runtime/timestamp-value.h"
+#include "runtime/tuple.h"
+#include "runtime/types.h"
 #include "udf/udf-internal.h"
-#include "util/debug-util.h"
-
-#include <thrift/protocol/TDebugProtocol.h>
 
 #include "common/names.h"
 
 using namespace impala;
 using namespace impala_udf;
-using std::move;
 
 // typedef for builtin aggregate functions. Unfortunately, these type defs don't
 // really work since the actual builtin is implemented not in terms of the base

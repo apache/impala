@@ -285,7 +285,7 @@ void TestFromSubSecondFunctions(int64_t seconds, int64_t millis, const char* exp
   }
 
   // Test UtcFromUnixTimeLimitedRangeNanos only for timestamps that fit to its range.
-  int128_t total_nanos = int128_t {seconds} * NANOS_PER_SEC + millis * 1000 * 1000;
+  __int128_t total_nanos = __int128_t {seconds} * NANOS_PER_SEC + millis * 1000 * 1000;
   if (std::numeric_limits<int64_t>::min() >= total_nanos &&
       std::numeric_limits<int64_t>::max() <= total_nanos) {
     EXPECT_EQ(from_millis,

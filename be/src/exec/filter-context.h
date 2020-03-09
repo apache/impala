@@ -20,16 +20,21 @@
 #define IMPALA_EXEC_FILTER_CONTEXT_H
 
 #include <boost/unordered_map.hpp>
-#include "exprs/scalar-expr-evaluator.h"
 #include "runtime/runtime-filter.h"
 #include "util/runtime-profile.h"
+
+namespace llvm {
+class Function;
+}
 
 namespace impala {
 
 class BloomFilter;
 class LlvmCodeGen;
 class MinMaxFilter;
+class RuntimeState;
 class ScalarExpr;
+class ScalarExprEvaluator;
 class TupleRow;
 
 /// Container struct for per-filter statistics, with statistics for each granularity of

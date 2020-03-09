@@ -26,77 +26,20 @@
 #include <climits>
 #include <cstdint>
 #include <limits>
-#include <type_traits>
 
 #include "common/compiler-util.h"
 #include "common/logging.h"
 #include "gutil/bits.h"
-#include "runtime/multi-precision.h"
 #include "util/arithmetic-util.h"
 #include "util/cpu-info.h"
 #include "util/sse-util.h"
 
 namespace impala {
 
-// Doubles the width of integer types (e.g. int32_t -> int64_t).
-// Currently only works with a few signed types.
-// Feel free to extend it to other types as well.
-template <typename T>
-struct DoubleWidth {};
-
-template <>
-struct DoubleWidth<int32_t> {
-  using type = int64_t;
-};
-
-template <>
-struct DoubleWidth<int64_t> {
-  using type = int128_t;
-};
-
-template <>
-struct DoubleWidth<int128_t> {
-  using type = int256_t;
-};
-
 /// Utility class to do standard bit tricks
 /// TODO: is this in boost or something else like that?
 class BitUtil {
  public:
-
-  /// Returns the width of the integer portion of the type, not counting the sign bit.
-  /// Not safe for use with unknown or non-native types, so make it undefined
-  template<typename T, typename CVR_REMOVED = typename std::decay<T>::type,
-      typename std::enable_if<std::is_integral<CVR_REMOVED>{} ||
-                              std::is_same<CVR_REMOVED, unsigned __int128>{} ||
-                              std::is_same<CVR_REMOVED, __int128>{}, int>::type = 0>
-  constexpr static inline int UnsignedWidth() {
-    return std::is_integral<CVR_REMOVED>::value ?
-        std::numeric_limits<CVR_REMOVED>::digits :
-        std::is_same<CVR_REMOVED, unsigned __int128>::value ? 128 :
-        std::is_same<CVR_REMOVED, __int128>::value ? 127 : -1;
-  }
-
-  /// Returns the max value that can be represented in T.
-  template<typename T, typename CVR_REMOVED = typename std::decay<T>::type,
-      typename std::enable_if<std::is_integral<CVR_REMOVED> {}||
-                              std::is_same<CVR_REMOVED, __int128> {}, int>::type = 0>
-  constexpr static inline CVR_REMOVED Max() {
-    return std::is_integral<CVR_REMOVED>::value ?
-        std::numeric_limits<CVR_REMOVED>::max() :
-        std::is_same<CVR_REMOVED, __int128>::value ?
-            static_cast<UnsignedType<CVR_REMOVED>>(-1) / 2 : -1;
-  }
-
-  /// Return an integer signifying the sign of the value, returning +1 for
-  /// positive integers (and zero), -1 for negative integers.
-  /// The extra shift is to silence GCC warnings about full width shift on
-  /// unsigned types. It compiles out in optimized builds into the expected increment.
-  template<typename T>
-  constexpr static inline T Sign(T value) {
-    return 1 | ((value >> (UnsignedWidth<T>() - 1)) >> 1);
-  }
-
   /// Returns the ceil of value/divisor
   constexpr static inline int64_t Ceil(int64_t value, int64_t divisor) {
     return value / divisor + (value % divisor != 0);
@@ -393,11 +336,6 @@ class BitUtil {
     }
   }
 };
-
-template<>
-inline int256_t BitUtil::Sign(int256_t value) {
-  return value < 0 ? -1 : 1;
-}
 
 /// An encapsulation class of SIMD byteswap functions
 class SimdByteSwap {

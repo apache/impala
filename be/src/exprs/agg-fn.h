@@ -23,6 +23,10 @@
 #include "runtime/descriptors.h"
 #include "udf/udf.h"
 
+namespace llvm {
+class Function;
+}
+
 namespace impala {
 
 using impala_udf::FunctionContext;

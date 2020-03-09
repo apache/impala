@@ -17,6 +17,7 @@
 
 #include "exec/partitioned-hash-join-builder.h"
 
+#include <iomanip>
 #include <numeric>
 
 #include <gutil/strings/substitute.h>

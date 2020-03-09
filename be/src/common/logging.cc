@@ -21,6 +21,7 @@
 #include <cerrno>
 #include <ctime>
 #include <fstream>
+#include <iomanip>
 #include <iostream>
 #include <map>
 #include <mutex>
@@ -32,6 +33,7 @@
 
 #include "common/logging.h"
 #include "service/impala-server.h"
+#include "util/debug-util.h"
 #include "util/error-util.h"
 #include "util/logging-support.h"
 #include "util/redactor.h"
@@ -220,4 +222,44 @@ void impala::CheckAndRotateAuditEventLogFiles(int max_log_files) {
       "$0/$1*", FLAGS_audit_event_log_dir, ImpalaServer::AUDIT_EVENT_LOG_FILE_PREFIX);
 
   impala::LoggingSupport::DeleteOldLogs(fname, max_log_files);
+}
+
+static const uint32_t ONE_BILLION = 1000000000;
+
+// Print the value in base 10 by converting v into parts that are base
+// 1 billion (large multiple of 10 that's easy to work with).
+ostream& impala::operator<<(ostream& os, const __int128_t& val) {
+  __int128_t v = val;
+  if (v == 0) {
+    os << "0";
+    return os;
+  }
+
+  if (v < 0) {
+    v = -v;
+    os << "-";
+  }
+
+  // 1B^5 covers the range for __int128_t
+  // parts[0] is the least significant place.
+  uint32_t parts[5];
+  int index = 0;
+  while (v > 0) {
+    parts[index++] = v % ONE_BILLION;
+    v /= ONE_BILLION;
+  }
+  --index;
+
+  // Accumulate into a temporary stringstream so format options on 'os' do
+  // not mess up printing val.
+  // TODO: This is likely pretty expensive with the string copies. We don't
+  // do this in paths we care about currently but might need to revisit.
+  stringstream ss;
+  ss << parts[index];
+  for (int i = index - 1; i >= 0; --i) {
+    // The remaining parts need to be padded with leading zeros.
+    ss << setfill('0') << setw(9) << parts[i];
+  }
+  os << ss.str();
+  return os;
 }

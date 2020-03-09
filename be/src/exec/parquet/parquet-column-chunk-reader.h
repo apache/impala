@@ -24,8 +24,9 @@
 
 namespace impala {
 
-class MemPool;
 class Codec;
+class MemPool;
+class ScopedBuffer;
 
 /// A class to read data from Parquet pages. It handles the page headers, decompression
 /// and the possible copying of the data buffers.

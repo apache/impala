@@ -16,6 +16,8 @@
 // under the License.
 
 #include "exec/hdfs-columnar-scanner.h"
+#include "runtime/row-batch.h"
+#include "exec/scratch-tuple-batch.h"
 
 namespace impala {
 

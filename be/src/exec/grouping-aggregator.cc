@@ -33,6 +33,7 @@
 #include "runtime/mem-tracker.h"
 #include "runtime/row-batch.h"
 #include "runtime/runtime-state.h"
+#include "runtime/string-value.h"
 #include "runtime/tuple-row.h"
 #include "runtime/tuple.h"
 #include "util/runtime-profile-counters.h"

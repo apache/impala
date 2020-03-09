@@ -19,6 +19,8 @@
 
 #include <boost/uuid/uuid_generators.hpp>
 
+#include "common/names.h"
+
 namespace impala {
 
 string GenerateUUIDString() {

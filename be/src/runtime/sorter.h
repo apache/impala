@@ -21,12 +21,12 @@
 #include <deque>
 
 #include "runtime/bufferpool/buffer-pool.h"
+#include "util/runtime-profile.h"
 #include "util/tuple-row-compare.h"
 
 namespace impala {
 
 class SortedRunMerger;
-class RuntimeProfile;
 class RowBatch;
 
 /// Sorter contains the external sort implementation. Its purpose is to sort arbitrarily

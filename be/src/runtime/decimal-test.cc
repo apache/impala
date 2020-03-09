@@ -26,6 +26,7 @@
 #include "runtime/raw-value.h"
 #include "runtime/types.h"
 #include "testutil/gtest-util.h"
+#include "util/decimal-util.h"
 #include "util/string-parser.h"
 
 #include "common/names.h"
@@ -437,7 +438,7 @@ TEST(DecimalTest, StringToDecimalLarge) {
   VerifyParse("01000000000000000000", 18, 0,
       Decimal8Value(0), StringParser::PARSE_OVERFLOW);
 
-  int128_t result = DecimalUtil::MAX_UNSCALED_DECIMAL16;
+  int128_t result = MAX_UNSCALED_DECIMAL16;
   VerifyParse("99999999999999999999999999999999999999",
       38, 0, Decimal16Value(result), StringParser::PARSE_SUCCESS);
   VerifyParse("99999999999999999999999999999999999999e1",
@@ -524,7 +525,7 @@ TEST(DecimalTest, Overflow) {
   bool overflow = false;
 
   Decimal16Value result;
-  Decimal16Value d_max(DecimalUtil::MAX_UNSCALED_DECIMAL16);
+  Decimal16Value d_max(MAX_UNSCALED_DECIMAL16);
   Decimal16Value two(2);
   Decimal16Value one(1);
   Decimal16Value zero(0);
@@ -655,16 +656,16 @@ TEST(DecimalTest, Overflow) {
   EXPECT_TRUE(overflow);
 
   // Add 37 9's (with scale 0)
-  Decimal16Value d3(DecimalUtil::MAX_UNSCALED_DECIMAL16 / 10);
+  Decimal16Value d3(MAX_UNSCALED_DECIMAL16 / 10);
   overflow = false;
   result = d3.Add<int128_t>(0, zero, 1, 38, 1, false, &overflow);
   EXPECT_FALSE(overflow);
-  EXPECT_EQ(result.value(), DecimalUtil::MAX_UNSCALED_DECIMAL16 - 9);
+  EXPECT_EQ(result.value(), MAX_UNSCALED_DECIMAL16 - 9);
 
   overflow = false;
   result = d3.Add<int128_t>(0, one, 1, 38, 1, false, &overflow);
   EXPECT_FALSE(overflow);
-  EXPECT_EQ(result.value(), DecimalUtil::MAX_UNSCALED_DECIMAL16 - 8);
+  EXPECT_EQ(result.value(), MAX_UNSCALED_DECIMAL16 - 8);
 
   // Mod
   overflow = false;
@@ -678,7 +679,7 @@ TEST(DecimalTest, Overflow) {
   result = d3.Mod<int128_t>(0, two, 0, 38, 0, false, &is_nan, &overflow);
   EXPECT_FALSE(overflow);
   EXPECT_FALSE(is_nan);
-  EXPECT_EQ(result.value(), DecimalUtil::MAX_UNSCALED_DECIMAL16 % 2);
+  EXPECT_EQ(result.value(), MAX_UNSCALED_DECIMAL16 % 2);
 
   result = d3.Mod<int128_t>(0, zero, 1, 38, 1, false, &is_nan, &overflow);
   EXPECT_TRUE(is_nan);

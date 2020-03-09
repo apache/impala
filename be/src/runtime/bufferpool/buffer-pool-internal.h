@@ -82,6 +82,8 @@
 #include "runtime/bufferpool/buffer-pool.h"
 #include "runtime/bufferpool/reservation-tracker.h"
 #include "util/condition-variable.h"
+#include "util/internal-queue.h"
+#include "util/spinlock.h"
 
 // Ensure that DCheckConsistency() function calls get removed in release builds.
 #ifndef NDEBUG
@@ -92,11 +94,16 @@
 
 namespace impala {
 
+class TmpFileGroup;
+class TmpWriteHandle;
+
 /// The internal representation of a page, which can be pinned or unpinned. See the
 /// class comment for explanation of the different page states.
 struct BufferPool::Page : public InternalList<Page>::Node {
-  Page(Client* client, int64_t len)
-    : client(client), len(len), pin_count(0), pin_in_flight(false) {}
+  // Define constructor and destructor out-of-line to avoid include of TmpWriteHandle
+  // body in header.
+  Page(Client* client, int64_t len);
+  ~Page();
 
   std::string DebugString();
 
@@ -119,7 +126,7 @@ struct BufferPool::Page : public InternalList<Page>::Node {
   bool pin_in_flight;
 
   /// Non-null if there is a write in flight, the page is clean, or the page is evicted.
-  std::unique_ptr<TmpFileMgr::WriteHandle> write_handle;
+  std::unique_ptr<TmpWriteHandle> write_handle;
 
   /// Condition variable signalled when a write for this page completes. Protected by
   /// client->lock_.
@@ -192,7 +199,7 @@ class BufferPool::PageList {
 /// The internal state for the client.
 class BufferPool::Client {
  public:
-  Client(BufferPool* pool, TmpFileMgr::FileGroup* file_group, const string& name,
+  Client(BufferPool* pool, TmpFileGroup* file_group, const string& name,
       ReservationTracker* parent_reservation, MemTracker* mem_tracker,
       MemLimit mem_limit_mode, int64_t reservation_limit, RuntimeProfile* profile);
 
@@ -342,7 +349,7 @@ class BufferPool::Client {
 
   /// The file group that should be used for allocating scratch space. If NULL, spilling
   /// is disabled.
-  TmpFileMgr::FileGroup* const file_group_;
+  TmpFileGroup* const file_group_;
 
   /// A name identifying the client.
   const std::string name_;

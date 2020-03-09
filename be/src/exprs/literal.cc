@@ -28,6 +28,7 @@
 #include "runtime/decimal-value.inline.h"
 #include "runtime/runtime-state.h"
 #include "runtime/timestamp-parse-util.h"
+#include "util/decimal-util.h"
 
 #include "common/names.h"
 

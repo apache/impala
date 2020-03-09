@@ -19,6 +19,7 @@
 #define IMPALA_ARITHMETIC_UTIL_H
 
 #include <cstdint>
+#include <limits>
 #include <type_traits>
 
 namespace impala {
@@ -137,6 +138,32 @@ class ArithmeticUtil {
           Ring::INTEGER :
           (std::is_floating_point<T>::value ? Ring::FLOAT : Ring::NEITHER)>
   struct OperateOn;
+
+ public:
+  /// Returns the width of the integer portion of the type, not counting the sign bit.
+  /// Not safe for use with unknown or non-native types, so make it undefined
+  template<typename T, typename CVR_REMOVED = typename std::decay<T>::type,
+      typename std::enable_if<std::is_integral<CVR_REMOVED>{} ||
+                              std::is_same<CVR_REMOVED, unsigned __int128>{} ||
+                              std::is_same<CVR_REMOVED, __int128>{}, int>::type = 0>
+  constexpr static inline int UnsignedWidth() {
+    return std::is_integral<CVR_REMOVED>::value ?
+        std::numeric_limits<CVR_REMOVED>::digits :
+        std::is_same<CVR_REMOVED, unsigned __int128>::value ? 128 :
+        std::is_same<CVR_REMOVED, __int128>::value ? 127 : -1;
+  }
+
+  /// Returns the max value that can be represented in T.
+  template<typename T, typename CVR_REMOVED = typename std::decay<T>::type,
+      typename std::enable_if<std::is_integral<CVR_REMOVED> {}||
+                              std::is_same<CVR_REMOVED, __int128> {}, int>::type = 0>
+  constexpr static inline CVR_REMOVED Max() {
+    return std::is_integral<CVR_REMOVED>::value ?
+        std::numeric_limits<CVR_REMOVED>::max() :
+        std::is_same<CVR_REMOVED, __int128>::value ?
+            static_cast<UnsignedType<CVR_REMOVED>>(-1) / 2 : -1;
+  }
+
 };
 
 template <typename T>

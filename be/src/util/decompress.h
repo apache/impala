@@ -26,7 +26,6 @@
 #include <zstd.h>
 
 #include "common/status.h"
-#include "gutil/strings/substitute.h"
 #include "util/codec.h"
 
 namespace impala {

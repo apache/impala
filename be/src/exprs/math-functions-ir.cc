@@ -27,6 +27,7 @@
 #include "exprs/math-functions.h"
 #include "util/string-parser.h"
 #include "runtime/decimal-value.inline.h"
+#include "runtime/multi-precision.h"
 #include "runtime/runtime-state.h"
 #include "runtime/string-value.inline.h"
 #include "thirdparty/pcg-cpp-0.98/include/pcg_random.hpp"
@@ -474,7 +475,7 @@ DoubleVal MathFunctions::FmodDouble(FunctionContext* ctx, const DoubleVal& a,
 // dist_from_min * num_buckets
 //
 // For all the above cases we use a bigger integer type provided by the
-// BitUtil::DoubleWidth<> metafunction.
+// DoubleWidth<> metafunction.
 template <class  T1>
 BigIntVal MathFunctions::WidthBucketImpl(FunctionContext* ctx,
     const T1& expr, const T1& min_range,
@@ -508,7 +509,7 @@ BigIntVal MathFunctions::WidthBucketImpl(FunctionContext* ctx,
   if (max_range_val >= 0 && min_range_val < 0) {
     if (static_cast<UnsignedType<ActualType>>(max_range_val) +
         static_cast<UnsignedType<ActualType>>(abs(min_range_val)) >=
-        static_cast<UnsignedType<ActualType>>(BitUtil::Max<ActualType>())) {
+        static_cast<UnsignedType<ActualType>>(ArithmeticUtil::Max<ActualType>())) {
       bigger_type_needed = true;
     }
   }
@@ -517,7 +518,7 @@ BigIntVal MathFunctions::WidthBucketImpl(FunctionContext* ctx,
     DCHECK(lhs > 0 && rhs > 0);
     using ActualType = decltype(lhs);
     return BitUtil::CountLeadingZeros(lhs) + BitUtil::CountLeadingZeros(rhs) <=
-        BitUtil::UnsignedWidth<ActualType>() + 1;
+        ArithmeticUtil::UnsignedWidth<ActualType>() + 1;
   };
 
   // It is likely that this can be evaluated during codegen:

@@ -24,6 +24,8 @@
 #include "runtime/string-value.h"
 #include "util/benchmark.h"
 #include "util/cpu-info.h"
+#include "util/decimal-constants.h"
+#include "util/decimal-util.h"
 #include "util/string-parser.h"
 
 #include "common/names.h"
@@ -101,14 +103,14 @@ static bool AdjustToSameScale(const Decimal16Value& x, int x_scale,
     *y_scaled = y.value();
   } else if (delta_scale > 0) {
     if (sizeof(RESULT_T) == 16 && result_precision == ColumnType::MAX_PRECISION &&
-        DecimalUtil::MAX_UNSCALED_DECIMAL16 / scale_factor < abs(y.value())) {
+        MAX_UNSCALED_DECIMAL16 / scale_factor < abs(y.value())) {
       return true;
     }
     *x_scaled = x.value();
     *y_scaled = y.value() * scale_factor;
   } else {
     if (sizeof(RESULT_T) == 16 && result_precision == ColumnType::MAX_PRECISION &&
-        DecimalUtil::MAX_UNSCALED_DECIMAL16 / scale_factor < abs(x.value())) {
+        MAX_UNSCALED_DECIMAL16 / scale_factor < abs(x.value())) {
       return true;
     }
     *x_scaled = x.value() * scale_factor;
@@ -150,7 +152,7 @@ DecimalValue<RESULT_T> BuiltinAdd(const Decimal16Value& val, int this_scale,
   if (sizeof(RESULT_T) == 16 && result_precision == ColumnType::MAX_PRECISION) {
     RESULT_T result = 0;
     *overflow |= __builtin_add_overflow(x, y, &result);
-    *overflow |= abs(result) > DecimalUtil::MAX_UNSCALED_DECIMAL16;
+    *overflow |= abs(result) > MAX_UNSCALED_DECIMAL16;
     return DecimalValue<RESULT_T>(result);
   } else {
     DCHECK(!*overflow) << "Cannot overflow unless result is Decimal16Value";
@@ -174,7 +176,7 @@ DecimalValue<RESULT_T> AddLookupTbl(const Decimal16Value& val, int this_scale,
         result_precision == ColumnType::MAX_PRECISION) {
       // Can only overflow if the signs are the same and result precision reaches
       // max precision.
-      *overflow |= DecimalUtil::MAX_UNSCALED_DECIMAL16 - abs(x) < abs(y);
+      *overflow |= MAX_UNSCALED_DECIMAL16 - abs(x) < abs(y);
       // TODO: faster to return here? We don't care at all about the perf on
       // the overflow case but what makes the normal path faster?
     }
@@ -199,7 +201,7 @@ DecimalValue<RESULT_T> Add(const Decimal16Value& val, int this_scale,
         result_precision == ColumnType::MAX_PRECISION) {
       // Can only overflow if the signs are the same and result precision reaches
       // max precision.
-      *overflow |= DecimalUtil::MAX_UNSCALED_DECIMAL16 - abs(x) < abs(y);
+      *overflow |= MAX_UNSCALED_DECIMAL16 - abs(x) < abs(y);
       // TODO: faster to return here? We don't care at all about the perf on
       // the overflow case but what makes the normal path faster?
     }
@@ -263,7 +265,7 @@ DecimalValue<RESULT_T> BuiltinMultiply(const Decimal16Value& val, int this_scale
   if (sizeof(RESULT_T) == 16 && result_precision == ColumnType::MAX_PRECISION) {
     // Check overflow
     *overflow |= __builtin_mul_overflow(x, y, &result);
-    *overflow |= abs(result) > DecimalUtil::MAX_UNSCALED_DECIMAL16;
+    *overflow |= abs(result) > MAX_UNSCALED_DECIMAL16;
   } else {
     result = x * y;
   }
@@ -299,7 +301,7 @@ DecimalValue<RESULT_T> MultiplyCheckMSB(const Decimal16Value& val, int this_scal
     // Check overflow
     if (result_precision == ColumnType::MAX_PRECISION &&
         DecimalUtil::Clz(abs(x)) + DecimalUtil::Clz(abs(y)) < 130) {
-      *overflow |= DecimalUtil::MAX_UNSCALED_DECIMAL16 / abs(y) < abs(x);
+      *overflow |= MAX_UNSCALED_DECIMAL16 / abs(y) < abs(x);
     }
   }
   RESULT_T result = x * y;
@@ -332,7 +334,7 @@ DecimalValue<RESULT_T> Multiply(const Decimal16Value& val, int this_scale,
   if (sizeof(RESULT_T) == 16) {
     // Check overflow
     if (result_precision == ColumnType::MAX_PRECISION) {
-      *overflow |= DecimalUtil::MAX_UNSCALED_DECIMAL16 / abs(y) < abs(x);
+      *overflow |= MAX_UNSCALED_DECIMAL16 / abs(y) < abs(x);
     }
   }
   RESULT_T result = x * y;

@@ -19,6 +19,7 @@
 
 #include "gutil/strings/substitute.h"
 #include "util/container-util.h"
+#include "util/debug-util.h"
 #include "util/uid-util.h"
 
 #include "common/names.h"

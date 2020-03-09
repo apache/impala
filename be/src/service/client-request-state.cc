@@ -19,6 +19,7 @@
 
 #include <boost/algorithm/string/join.hpp>
 #include <boost/algorithm/string/predicate.hpp>
+#include <boost/algorithm/string/replace.hpp>
 #include <limits>
 #include <gutil/strings/substitute.h>
 #include <rapidjson/rapidjson.h>
@@ -26,6 +27,7 @@
 #include <rapidjson/writer.h>
 #include <rapidjson/error/en.h>
 
+#include "catalog/catalog-service-client-wrapper.h"
 #include "common/status.h"
 #include "exec/kudu-util.h"
 #include "kudu/rpc/rpc_controller.h"

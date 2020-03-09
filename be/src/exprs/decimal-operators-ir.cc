@@ -437,7 +437,7 @@ IR_ALWAYS_INLINE DecimalVal DecimalOperators::RoundDecimalNegativeScale(
       int128_t delta = d * base - (val16.value() % base);
       // Need to check for overflow. This can't happen in the other cases since the
       // FE should have picked a high enough precision.
-      if (DecimalUtil::MAX_UNSCALED_DECIMAL16 - abs(delta) < abs(val16.value())) {
+      if (MAX_UNSCALED_DECIMAL16 - abs(delta) < abs(val16.value())) {
         ctx->AddWarning("Expression overflowed, returning NULL");
         return DecimalVal::null();
       }

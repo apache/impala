@@ -17,15 +17,16 @@
 
 #include "exprs/timestamp-functions.h"
 
+#include <ctime>
+#include <iomanip>
+
 #include <boost/date_time/compiler_config.hpp>
 #include <boost/date_time/posix_time/posix_time_types.hpp>
 #include <boost/date_time/gregorian/gregorian_types.hpp>
-#include <ctime>
 #include <gutil/strings/substitute.h>
 
 #include "exprs/anyval-util.h"
 #include "runtime/datetime-simple-date-format-parser.h"
-#include "runtime/string-value.inline.h"
 #include "runtime/timestamp-value.inline.h"
 #include "runtime/timestamp-value.h"
 #include "udf/udf.h"

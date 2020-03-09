@@ -23,6 +23,7 @@
 
 #include "common/logging.h"
 #include "gen-cpp/ImpalaInternalService_types.h"
+#include "gutil/strings/substitute.h"
 #include "kudu/security/init.h"
 #include "kudu/util/status.h"
 #include "util/kudu-status-util.h"

@@ -18,6 +18,7 @@
 #include "exec/filter-context.h"
 
 #include "codegen/codegen-anyval.h"
+#include "exprs/scalar-expr-evaluator.h"
 #include "runtime/runtime-filter.inline.h"
 #include "runtime/tuple-row.h"
 #include "util/min-max-filter.h"

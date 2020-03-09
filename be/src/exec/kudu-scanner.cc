@@ -38,6 +38,7 @@
 #include "runtime/tuple-row.h"
 #include "gutil/gscoped_ptr.h"
 #include "gutil/strings/substitute.h"
+#include "util/debug-util.h"
 #include "util/jni-util.h"
 #include "util/min-max-filter.h"
 #include "util/periodic-counter-updater.h"

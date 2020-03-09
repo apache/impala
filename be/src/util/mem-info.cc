@@ -24,8 +24,6 @@
 #include <unistd.h>
 #include <cctype>
 #include <fstream>
-#include <iostream>
-#include <sstream>
 
 #include <boost/algorithm/string.hpp>
 #include <boost/lexical_cast.hpp>

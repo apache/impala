@@ -20,8 +20,6 @@
 
 #include "runtime/io/disk-io-mgr.h"
 #include "runtime/exec-env.h"
-#include "runtime/fragment-instance-state.h"
-#include "runtime/mem-tracker.h"
 #include "runtime/runtime-state.h"
 
 namespace impala {

@@ -17,6 +17,16 @@
 
 #include "runtime/datetime-iso-sql-format-tokenizer.h"
 
+#include <strings.h>
+#include <algorithm>
+#include <cstring>
+#include <utility>
+#include <vector>
+
+#include <boost/algorithm/string/case_conv.hpp>
+
+#include "common/logging.h"
+
 namespace impala {
 
 namespace datetime_parse_util {

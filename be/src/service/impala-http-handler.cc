@@ -41,6 +41,7 @@
 #include "service/impala-server.h"
 #include "thrift/protocol/TDebugProtocol.h"
 #include "util/coding-util.h"
+#include "util/debug-util.h"
 #include "util/logging-support.h"
 #include "util/pretty-printer.h"
 #include "util/redactor.h"

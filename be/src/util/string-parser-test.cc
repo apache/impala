@@ -19,7 +19,6 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <cstdint>
-#include <iostream>
 #include <limits>
 #include <boost/lexical_cast.hpp>
 #include "testutil/gtest-util.h"

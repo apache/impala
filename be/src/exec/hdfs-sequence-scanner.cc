@@ -17,19 +17,45 @@
 
 #include "exec/hdfs-sequence-scanner.h"
 
-#include "codegen/llvm-codegen.h"
+#include <string.h>
+#include <algorithm>
+#include <map>
+#include <memory>
+#include <ostream>
+#include <string>
+#include <utility>
+
+#include "common/compiler-util.h"
+#include "common/logging.h"
+#include "exec/delimited-text-parser.h"
 #include "exec/delimited-text-parser.inline.h"
-#include "exec/hdfs-scan-node.h"
+#include "exec/hdfs-scan-node-base.h"
+#include "exec/read-write-util.h"
+#include "exec/scanner-context.h"
 #include "exec/scanner-context.inline.h"
-#include "exec/text-converter.inline.h"
+#include "exec/text-converter.h"
+#include "gen-cpp/ErrorCodes_types.h"
 #include "runtime/descriptors.h"
+#include "runtime/mem-pool.h"
+#include "runtime/row-batch.h"
 #include "runtime/runtime-state.h"
 #include "runtime/tuple.h"
-#include "runtime/tuple-row.h"
 #include "util/codec.h"
+#include "util/error-util.h"
 #include "util/runtime-profile-counters.h"
+#include "util/stopwatch.h"
 
 #include "common/names.h"
+
+namespace impala {
+class LlvmCodeGen;
+class ScalarExpr;
+class TupleRow;
+}
+
+namespace llvm {
+class Function;
+}
 
 using namespace impala;
 

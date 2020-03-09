@@ -22,6 +22,7 @@
 #include "codegen/llvm-codegen.h"
 #include "exec/exec-node-util.h"
 #include "exprs/scalar-expr.h"
+#include "exprs/scalar-expr-evaluator.h"
 #include "runtime/descriptors.h"
 #include "runtime/mem-pool.h"
 #include "runtime/mem-tracker.h"

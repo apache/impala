@@ -15,8 +15,6 @@
 // specific language governing permissions and limitations
 // under the License.
 
-#include <iostream>
-
 #include "common/logging.h"
 #include "udf/uda-test-harness.h"
 #include "testutil/gtest-util.h"

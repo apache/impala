@@ -21,13 +21,13 @@
 
 #include <boost/scoped_ptr.hpp>
 
-#include "codegen/impala-ir.h"
-#include "exec/hdfs-scan-node-base.h"
-#include "exec/scratch-tuple-batch.h"
-#include "runtime/row-batch.h"
-#include "runtime/runtime-state.h"
-
 namespace impala {
+
+class HdfsScanNodeBase;
+class HdfsScanPlanNode;
+class RowBatch;
+class RuntimeState;
+struct ScratchTupleBatch;
 
 /// Parent class for scanners that read values into a scratch batch before applying
 /// conjuncts and runtime filters.

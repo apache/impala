@@ -25,6 +25,7 @@
 #include "exprs/agg-fn-evaluator.h"
 #include "exprs/expr-value.h"
 #include "exprs/scalar-expr.h"
+#include "exprs/scalar-expr-evaluator.h"
 #include "gutil/strings/substitute.h"
 #include "runtime/descriptors.h"
 #include "runtime/mem-pool.h"

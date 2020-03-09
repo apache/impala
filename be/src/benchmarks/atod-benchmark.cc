@@ -23,6 +23,7 @@
 #include "runtime/string-value.h"
 #include "util/benchmark.h"
 #include "util/cpu-info.h"
+#include "util/decimal-util.h"
 #include "util/string-parser.h"
 
 #include "common/names.h"

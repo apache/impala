@@ -17,7 +17,6 @@
 
 #include <cstdlib>
 #include <cstdio>
-#include <iostream>
 #include <vector>
 #include <boost/scoped_ptr.hpp>
 

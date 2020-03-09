@@ -22,7 +22,6 @@
 #include <vector>
 
 #include "common/status.h"
-#include "exprs/scalar-expr-evaluator.h"
 #include "gen-cpp/PlanNodes_types.h"
 #include "gutil/threading/thread_collision_warner.h"
 #include "runtime/bufferpool/buffer-pool.h"
@@ -31,6 +30,10 @@
 #include "runtime/reservation-manager.h"
 #include "util/runtime-profile-counters.h"
 #include "util/runtime-profile.h"
+
+namespace llvm {
+class Function;
+}
 
 namespace impala {
 
@@ -41,6 +44,7 @@ class ObjectPool;
 class RowBatch;
 class RuntimeState;
 class ScalarExpr;
+class ScalarExprEvaluator;
 class SubplanNode;
 class SubplanPlanNode;
 class TPlan;
@@ -217,9 +221,6 @@ class ExecNode {
 
   /// Collect all scan node types.
   void CollectScanNodes(std::vector<ExecNode*>* nodes);
-
-  /// Evaluates the predicate in 'eval' over 'row' and returns the result.
-  static bool EvalPredicate(ScalarExprEvaluator* eval, TupleRow* row);
 
   /// Evaluate the conjuncts in 'evaluators' over 'row'.
   /// Returns true if all exprs return true.
@@ -515,10 +516,4 @@ class ExecNode {
   /// reservations pool in Close().
   ReservationManager reservation_manager_;
 };
-
-inline bool ExecNode::EvalPredicate(ScalarExprEvaluator* eval, TupleRow* row) {
-  BooleanVal v = eval->GetBooleanVal(row);
-  if (v.is_null || !v.val) return false;
-  return true;
-}
 } // namespace impala

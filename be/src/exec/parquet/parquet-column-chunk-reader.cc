@@ -21,6 +21,7 @@
 
 #include "runtime/mem-pool.h"
 #include "runtime/runtime-state.h"
+#include "runtime/scoped-buffer.h"
 #include "util/codec.h"
 
 #include "common/names.h"

@@ -20,6 +20,17 @@
 
 #include "exprs/udf-builtins.h"
 
+#include <boost/date_time/date.hpp>
+#include <boost/date_time/gregorian/greg_calendar.hpp>
+#include <boost/date_time/gregorian/greg_date.hpp>
+#include <boost/date_time/gregorian/greg_duration.hpp>
+#include <boost/date_time/gregorian_calendar.hpp>
+#include <boost/date_time/posix_time/posix_time_config.hpp>
+#include <boost/date_time/posix_time/posix_time_duration.hpp>
+#include <boost/date_time/posix_time/ptime.hpp>
+#include <boost/date_time/time.hpp>
+#include <boost/date_time/time_duration.hpp>
+
 #include <gutil/walltime.h>
 
 #include "gen-cpp/Exprs_types.h"

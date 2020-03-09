@@ -22,6 +22,7 @@
 #include <queue>
 
 #include "exec/hdfs-orc-scanner.h"
+#include "exec/scratch-tuple-batch.h"
 
 namespace impala {
 

@@ -15,12 +15,24 @@
 // specific language governing permissions and limitations
 // under the License.
 
-#include "util/decimal-util.h"
+// Common constants shared between decimal-related modules.
+
+#pragma once
+
+#include <cstdint>
 
 namespace impala {
 
-const int32_t DecimalUtil::MAX_UNSCALED_DECIMAL4;
-const int64_t DecimalUtil::MAX_UNSCALED_DECIMAL8;
-const int128_t DecimalUtil::MAX_UNSCALED_DECIMAL16;
+/// Maximum absolute value of a valid Decimal4Value. This is 9 digits of 9's.
+constexpr int32_t MAX_UNSCALED_DECIMAL4 = 999999999;
 
-}
+/// Maximum absolute value of a valid Decimal8Value. This is 18 digits of 9's.
+constexpr int64_t MAX_UNSCALED_DECIMAL8 = 999999999999999999;
+
+/// Maximum absolute value a valid Decimal16Value. This is 38 digits of 9's.
+constexpr __int128_t MAX_UNSCALED_DECIMAL16 = 99 + 100 *
+    (MAX_UNSCALED_DECIMAL8 + (1 + MAX_UNSCALED_DECIMAL8) *
+     static_cast<__int128_t>(MAX_UNSCALED_DECIMAL8));
+
+} // namespace impala
+

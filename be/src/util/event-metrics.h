@@ -19,7 +19,6 @@
 
 #include <string>
 
-#include "gutil/strings/substitute.h"
 #include "util/metrics-fwd.h"
 
 namespace impala {

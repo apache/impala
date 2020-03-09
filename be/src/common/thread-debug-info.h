@@ -18,18 +18,16 @@
 #ifndef IMPALA_COMMON_THREAD_DEBUG_INFO_H
 #define IMPALA_COMMON_THREAD_DEBUG_INFO_H
 
+#include <cstdint>
 #include <string>
-#include <sys/syscall.h>
+#include <syscall.h>
 #include <unistd.h>
 
-#include "glog/logging.h"
+#include "gen-cpp/Types_types.h"
 #include "gutil/macros.h"
 #include "gutil/strings/util.h"
-#include "util/debug-util.h"
 
 namespace impala {
-
-class ScopedThreadContext;
 
 /// Stores information about the current thread that can be useful in a debug session.
 /// An object of this class needs to be allocated on the stack in order to include

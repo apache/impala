@@ -21,9 +21,9 @@
 
 #include <ostream>
 
+#include "common/logging.h"
 #include "gen-cpp/Data_types.h"
 #include "gen-cpp/data_stream_service.pb.h"
-#include "runtime/multi-precision.h"
 #include "runtime/types.h"
 
 #ifndef __has_builtin
@@ -219,7 +219,7 @@ typedef DecimalValue<int32_t> Decimal4Value;
 typedef DecimalValue<int64_t> Decimal8Value;
 /// TODO: should we support Decimal12Value? We pad it to 16 bytes in the tuple
 /// anyway.
-typedef DecimalValue<int128_t> Decimal16Value;
+typedef DecimalValue<__int128_t> Decimal16Value;
 
 inline std::ostream& operator<<(std::ostream& os, const Decimal4Value& d) {
   return os << d.value();

@@ -57,7 +57,6 @@ add_library(Runtime
   lib-cache.cc
   mem-tracker.cc
   mem-pool.cc
-  multi-precision.cc
   query-exec-mgr.cc
   query-state.cc
   test-env.cc

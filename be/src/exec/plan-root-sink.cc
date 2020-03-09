@@ -24,7 +24,9 @@
 #include "runtime/row-batch.h"
 #include "runtime/tuple-row.h"
 #include "service/query-result-set.h"
+#include "util/debug-util.h"
 #include "util/pretty-printer.h"
+#include "util/runtime-profile-counters.h"
 
 #include <memory>
 #include <mutex>

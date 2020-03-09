@@ -17,23 +17,23 @@
 
 #pragma once
 
+#include <cstdint>
 #include <iosfwd>
+#include <map>
 #include <unordered_map>
+#include <utility>
 #include <vector>
-#include <boost/scoped_ptr.hpp>
 
 #include "codegen/impala-ir.h"
 #include "common/global-types.h"
 #include "common/status.h"
 #include "runtime/types.h"
 
-#include "gen-cpp/Descriptors_types.h"  // for TTupleId
+#include "gen-cpp/CatalogObjects_types.h"
 #include "gen-cpp/Types_types.h"
 
 namespace llvm {
   class Constant;
-  class Function;
-  class PointerType;
   class StructType;
   class Value;
 };
@@ -43,14 +43,14 @@ namespace impala {
 class LlvmBuilder;
 class LlvmCodeGen;
 class ObjectPool;
-class RuntimeState;
-class ScalarExpr;
 class ScalarExprEvaluator;
+class TColumnDescriptor;
 class TDescriptorTable;
+class TDescriptorTableSerialized;
+class TExpr;
 class TSlotDescriptor;
-class TTable;
-class TTupleDescriptor;
 class TTableDescriptor;
+class TTupleDescriptor;
 
 /// A path into a table schema (e.g. a vector of ColumnTypes) pointing to a particular
 /// column/field. The i-th element of the path is the ordinal position of the column/field

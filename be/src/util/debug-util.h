@@ -36,16 +36,18 @@
 #include "gen-cpp/beeswax_types.h"
 #include "gen-cpp/parquet_types.h"
 #include "gutil/macros.h"
-#include "runtime/descriptors.h" // for SchemaPath
 
 namespace impala {
 
+class RowBatch;
 class RowDescriptor;
 class TableDescriptor;
 class TupleDescriptor;
 class Tuple;
 class TupleRow;
-class RowBatch;
+
+// Forward declaration to avoid including descriptors.h.
+typedef std::vector<int> SchemaPath;
 
 // TODO: remove these functions and use operator << after upgrading to Thrift 0.11.0 or
 // higher.

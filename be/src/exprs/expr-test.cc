@@ -50,6 +50,7 @@
 #include "runtime/date-value.h"
 #include "runtime/mem-pool.h"
 #include "runtime/mem-tracker.h"
+#include "runtime/multi-precision.h"
 #include "runtime/raw-value.inline.h"
 #include "runtime/runtime-state.h"
 #include "runtime/string-value.h"
@@ -65,6 +66,7 @@
 #include "udf/udf-test-harness.h"
 #include "util/asan.h"
 #include "util/debug-util.h"
+#include "util/decimal-util.h"
 #include "util/metrics.h"
 #include "util/string-parser.h"
 #include "util/string-util.h"
@@ -3034,7 +3036,7 @@ void TestScaleBy() {
           // overflows in all cases.
           EXPECT_TRUE((-scaled_up_dividend) / scale_multiplier ==
               ConvertToInt256(-dividend));
-          int256_t max_divisor = ConvertToInt256(DecimalUtil::MAX_UNSCALED_DECIMAL16);
+          int256_t max_divisor = ConvertToInt256(MAX_UNSCALED_DECIMAL16);
           EXPECT_TRUE(scaled_up_dividend / max_divisor > max_divisor);
           EXPECT_TRUE((-scaled_up_dividend) / max_divisor < -max_divisor);
         } else {

@@ -15,9 +15,7 @@
 // specific language governing permissions and limitations
 // under the License.
 
-#include <stdlib.h>
 #include <stdio.h>
-#include <iostream>
 
 #include "testutil/gtest-util.h"
 #include "util/symbols-util.h"

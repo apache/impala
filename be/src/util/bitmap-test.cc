@@ -16,10 +16,7 @@
 // under the License.
 
 #include <stdlib.h>
-#include <stdio.h>
-#include <iostream>
 #include <limits.h>
-#include <boost/utility.hpp>
 
 #include "testutil/gtest-util.h"
 #include "util/bitmap.h"

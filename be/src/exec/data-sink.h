@@ -24,13 +24,13 @@
 
 #include "common/status.h"
 #include "runtime/runtime-state.h"  // for PartitionStatusMap
-#include "runtime/mem-tracker.h"
 #include "gen-cpp/Exprs_types.h"
 
 namespace impala {
 
 class DataSink;
 class MemPool;
+class MemTracker;
 class ObjectPool;
 class RowBatch;
 class RuntimeProfile;

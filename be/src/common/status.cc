@@ -15,15 +15,18 @@
 // specific language governing permissions and limitations
 // under the License.
 
-#include <boost/algorithm/string/join.hpp>
-#include <ostream>
-
 #include "common/status.h"
 
-#include "util/debug-util.h"
-#include "common/names.h"
-#include "gen-cpp/common.pb.h"
+#include <ostream>
+
+#include <boost/algorithm/string/join.hpp>
+
 #include "gen-cpp/ErrorCodes_types.h"
+#include "gen-cpp/common.pb.h"
+#include "util/debug-util.h"
+#include "util/error-util.h"
+
+#include "common/names.h"
 
 using namespace apache::hive::service::cli::thrift;
 

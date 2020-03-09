@@ -19,11 +19,14 @@
 
 #include "codegen/impala-ir.h"
 #include "exprs/anyval-util.h"
+#include "runtime/multi-precision.h"
 
-#include <ctype.h>
-#include <math.h>
+#include <cctype>
+#include <cmath>
 
 #include "common/names.h"
+
+using std::abs;
 
 namespace impala {
 

@@ -20,9 +20,11 @@
 
 #include <boost/scoped_ptr.hpp>
 
+#include "common/atomic.h"
 #include "runtime/bufferpool/buffer-pool-internal.h"
 #include "runtime/bufferpool/free-list.h"
 #include "util/aligned-new.h"
+#include "util/spinlock.h"
 
 namespace impala {
 

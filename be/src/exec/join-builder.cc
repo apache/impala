@@ -17,6 +17,9 @@
 
 #include "exec/join-builder.h"
 
+#include "util/debug-util.h"
+#include "util/runtime-profile-counters.h"
+
 #include "common/names.h"
 
 namespace impala {

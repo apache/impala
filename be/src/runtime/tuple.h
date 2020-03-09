@@ -34,7 +34,10 @@ class Constant;
 namespace impala {
 
 struct CollectionValue;
+class RuntimeState;
 struct StringValue;
+class ScalarExpr;
+class ScalarExprEvaluator;
 class TupleDescriptor;
 class TupleRow;
 

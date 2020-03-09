@@ -17,25 +17,53 @@
 
 #include "exec/hdfs-text-scanner.h"
 
+#include <string.h>
+#include <algorithm>
+#include <map>
 #include <memory>
+#include <ostream>
+#include <utility>
 
-#include "codegen/llvm-codegen.h"
+#include <boost/algorithm/string/case_conv.hpp>
+#include <boost/algorithm/string/predicate.hpp>
+
+#include "common/compiler-util.h"
+#include "common/logging.h"
 #include "exec/delimited-text-parser.h"
 #include "exec/delimited-text-parser.inline.h"
 #include "exec/hdfs-plugin-text-scanner.h"
+#include "exec/hdfs-scan-node-base.h"
 #include "exec/hdfs-scan-node.h"
+#include "exec/scanner-context.h"
 #include "exec/scanner-context.inline.h"
 #include "exec/text-converter.h"
 #include "exec/text-converter.inline.h"
+#include "gen-cpp/ErrorCodes_types.h"
+#include "gutil/strings/substitute.h"
+#include "runtime/descriptors.h"
+#include "runtime/io/request-context.h"
+#include "runtime/io/request-ranges.h"
+#include "runtime/mem-pool.h"
+#include "runtime/mem-tracker.h"
 #include "runtime/row-batch.h"
 #include "runtime/runtime-state.h"
 #include "runtime/tuple-row.h"
+#include "runtime/tuple.h"
 #include "util/codec.h"
-#include "util/decompress.h"
-#include "util/cpu-info.h"
-#include "util/debug-util.h"
+#include "util/error-util.h"
+#include "util/runtime-profile-counters.h"
+#include "util/stopwatch.h"
 
 #include "common/names.h"
+
+namespace impala {
+class LlvmCodeGen;
+class ScalarExpr;
+}
+
+namespace llvm {
+class Function;
+}
 
 using boost::algorithm::ends_with;
 using boost::algorithm::to_lower;

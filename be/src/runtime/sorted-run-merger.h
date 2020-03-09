@@ -21,13 +21,13 @@
 #include <boost/scoped_ptr.hpp>
 
 #include "common/object-pool.h"
-#include "util/tuple-row-compare.h"
+#include "util/runtime-profile.h"
 
 namespace impala {
 
 class RowBatch;
 class RowDescriptor;
-class RuntimeProfile;
+class TupleRowComparator;
 
 /// SortedRunMerger is used to merge multiple sorted runs of tuples. A run is a sorted
 /// sequence of row batches, which are fetched from a RunBatchSupplierFn function object.

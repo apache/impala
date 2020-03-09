@@ -15,6 +15,8 @@
 // specific language governing permissions and limitations
 // under the License.
 
+#include <boost/utility.hpp>
+
 #include "testutil/gtest-util.h"
 #include "util/bit-packing.inline.h"
 #include "util/bit-stream-utils.inline.h"

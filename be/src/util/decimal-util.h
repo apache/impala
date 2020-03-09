@@ -28,22 +28,12 @@
 #include "runtime/types.h"
 #include "util/arithmetic-util.h"
 #include "util/bit-util.h"
+#include "util/decimal-constants.h"
 
 namespace impala {
 
 class DecimalUtil {
  public:
-  /// Maximum absolute value of a valid Decimal4Value. This is 9 digits of 9's.
-  static const int32_t MAX_UNSCALED_DECIMAL4 = 999999999;
-
-  /// Maximum absolute value of a valid Decimal8Value. This is 18 digits of 9's.
-  static const int64_t MAX_UNSCALED_DECIMAL8 = 999999999999999999;
-
-  /// Maximum absolute value a valid Decimal16Value. This is 38 digits of 9's.
-  static const int128_t MAX_UNSCALED_DECIMAL16 = 99 + 100 *
-      (MAX_UNSCALED_DECIMAL8 + (1 + MAX_UNSCALED_DECIMAL8) *
-       static_cast<int128_t>(MAX_UNSCALED_DECIMAL8));
-
   // Helper function that checks for multiplication overflow. We only check for overflow
   // if may_overflow is false.
   template <typename T>
@@ -96,7 +86,7 @@ class DecimalUtil {
         // here that it is a multiple of two.
         if (abs(remainder) >= (divisor >> 1)) {
           // Bias at zero must be corrected by sign of dividend.
-          result += BitUtil::Sign(value);
+          result += Sign(value);
         }
       }
       return result;

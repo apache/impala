@@ -21,7 +21,6 @@
 #include <gflags/gflags_declare.h>
 
 #include "common/status.h"
-#include "gutil/strings/substitute.h"
 #include "service/impala-server.h"
 
 DECLARE_bool(skip_external_kerberos_auth);

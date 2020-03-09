@@ -35,11 +35,12 @@
 #include "util/debug-util.h"
 #include "util/metrics-fwd.h"
 #include "util/spinlock.h"
-#include "util/webserver.h"
 
 using kudu::HttpStatusCode;
 
 namespace impala {
+
+class Webserver;
 
 /// Singleton that provides metric definitions. Metrics are defined in metrics.json
 /// and generate_metrics.py produces MetricDefs.thrift. This singleton wraps an instance
@@ -463,25 +464,26 @@ class MetricGroup {
   typedef std::unordered_map<std::string, MetricGroup*> ChildGroupMap;
   ChildGroupMap children_;
 
+  // Forward declaration for Webserver::WebRequest.
+  using WebRequest = kudu::WebCallbackRegistry::WebRequest;
+
   /// Webserver callback for /metrics. Produces a tree of JSON values, each representing a
   /// metric group, and each including a list of metrics, and a list of immediate
   /// children.  If args contains a paramater 'metric', only the json for that metric is
   /// returned.
-  void TemplateCallback(const Webserver::WebRequest& req,
-      rapidjson::Document* document);
+  void TemplateCallback(const WebRequest& req, rapidjson::Document* document);
 
   /// Webserver callback for /metricsPrometheus. Produces string in prometheus format,
   /// each representing metric group, and each including a list of metrics, and a list
   /// of immediate children.  If args contains a paramater 'metric', only the json for
   /// that metric is returned.
-  void PrometheusCallback(const Webserver::WebRequest& req, std::stringstream* data,
+  void PrometheusCallback(const WebRequest& req, std::stringstream* data,
       HttpStatusCode* response);
 
   /// Legacy webpage callback for CM 5.0 and earlier. Produces a flattened map of (key,
   /// value) pairs for all metrics in this hierarchy.
   /// If args contains a paramater 'metric', only the json for that metric is returned.
-  void CMCompatibleCallback(const Webserver::WebRequest& req,
-      rapidjson::Document* document);
+  void CMCompatibleCallback(const WebRequest& req, rapidjson::Document* document);
 
   /// Non-templated implementation for FindMetricForTesting() that does not cast.
   Metric* FindMetricForTestingInternal(const std::string& key);

@@ -32,6 +32,7 @@
 #include "exec/partitioned-hash-join-builder.h"
 #include "exec/plan-root-sink.h"
 #include "exprs/scalar-expr.h"
+#include "exprs/scalar-expr-evaluator.h"
 #include "gen-cpp/ImpalaInternalService_constants.h"
 #include "gen-cpp/ImpalaInternalService_types.h"
 #include "gutil/strings/substitute.h"

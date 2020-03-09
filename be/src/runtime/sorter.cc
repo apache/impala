@@ -22,6 +22,7 @@
 #include <boost/random/uniform_int.hpp>
 #include <gutil/strings/substitute.h>
 
+#include "exprs/scalar-expr-evaluator.h"
 #include "runtime/bufferpool/reservation-tracker.h"
 #include "runtime/exec-env.h"
 #include "runtime/mem-tracker.h"

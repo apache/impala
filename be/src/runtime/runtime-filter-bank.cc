@@ -40,6 +40,7 @@
 #include "service/impala-server.h"
 #include "util/bit-util.h"
 #include "util/bloom-filter.h"
+#include "util/debug-util.h"
 #include "util/min-max-filter.h"
 #include "util/pretty-printer.h"
 #include "util/uid-util.h"

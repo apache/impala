@@ -24,6 +24,7 @@
 #include "common/names.h"
 #include "gutil/strings/substitute.h"
 #include "runtime/bufferpool/buffer-allocator.h"
+#include "runtime/tmp-file-mgr.h"
 #include "util/bit-util.h"
 #include "util/cpu-info.h"
 #include "util/debug-util.h"
@@ -117,7 +118,7 @@ BufferPool::BufferPool(MetricGroup* metrics, int64_t min_buffer_len,
 
 BufferPool::~BufferPool() {}
 
-Status BufferPool::RegisterClient(const string& name, TmpFileMgr::FileGroup* file_group,
+Status BufferPool::RegisterClient(const string& name, TmpFileGroup* file_group,
     ReservationTracker* parent_reservation, MemTracker* mem_tracker,
     int64_t reservation_limit, RuntimeProfile* profile, ClientHandle* client,
     MemLimit mem_limit_mode) {
@@ -405,7 +406,7 @@ void BufferPool::SubReservation::Close() {
   tracker_.reset();
 }
 
-BufferPool::Client::Client(BufferPool* pool, TmpFileMgr::FileGroup* file_group,
+BufferPool::Client::Client(BufferPool* pool, TmpFileGroup* file_group,
     const string& name, ReservationTracker* parent_reservation, MemTracker* mem_tracker,
     MemLimit mem_limit_mode, int64_t reservation_limit, RuntimeProfile* profile)
   : pool_(pool),
@@ -828,6 +829,11 @@ string BufferPool::PageHandle::DebugString() const {
     return Substitute("<BufferPool::PageHandle> $0 CLOSED", this);
   }
 }
+
+BufferPool::Page::Page(Client* client, int64_t len)
+    : client(client), len(len), pin_count(0), pin_in_flight(false) {}
+
+BufferPool::Page::~Page() {}
 
 string BufferPool::Page::DebugString() {
   return Substitute("<BufferPool::Page> $0 len: $1 pin_count: $2 buf: $3", this, len,

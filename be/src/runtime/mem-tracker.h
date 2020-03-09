@@ -17,19 +17,24 @@
 
 #pragma once
 
-#include <stdint.h>
-#include <map>
+#include <cstdint>
+#include <functional>
+#include <list>
 #include <memory>
 #include <mutex>
+#include <ostream>
 #include <queue>
+#include <string>
+#include <utility>
 #include <vector>
+
 #include <boost/unordered_map.hpp>
 
-#include "common/logging.h"
 #include "common/atomic.h"
+#include "common/compiler-util.h"
+#include "common/logging.h"
+#include "common/status.h"
 #include "runtime/mem-tracker-types.h"
-#include "util/debug-util.h"
-#include "util/internal-queue.h"
 #include "util/metrics-fwd.h"
 #include "util/runtime-profile-counters.h"
 #include "util/spinlock.h"
@@ -38,9 +43,10 @@
 
 namespace impala {
 
+class MetricGroup;
 class ObjectPool;
 struct ReservationTrackerCounters;
-class TQueryOptions;
+class RuntimeState;
 
 /// A MemTracker tracks memory consumption; it contains an optional limit
 /// and can be arranged into a tree structure such that the consumption tracked

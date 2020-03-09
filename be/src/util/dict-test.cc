@@ -15,10 +15,6 @@
 // specific language governing permissions and limitations
 // under the License.
 
-#include <stdlib.h>
-#include <stdio.h>
-
-#include <iostream>
 #include <utility>
 
 #include "runtime/mem-tracker.h"
@@ -26,7 +22,6 @@
 #include "runtime/timestamp-value.h"
 #include "testutil/gtest-util.h"
 #include "testutil/rand-util.h"
-#include "util/bit-packing.inline.h"
 #include "util/dict-encoding.h"
 #include "util/encoding-test-util.h"
 

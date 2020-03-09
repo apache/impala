@@ -21,6 +21,7 @@
 #include <iostream>
 #include <vector>
 
+#include "gen-cpp/data_stream_service.pb.h"
 #include "kudu/rpc/rpc_controller.h"
 #include "runtime/bufferpool/buffer-allocator.h"
 #include "runtime/bufferpool/reservation-tracker.h"

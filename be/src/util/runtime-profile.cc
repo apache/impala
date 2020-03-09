@@ -29,6 +29,7 @@
 #include "gutil/strings/strip.h"
 #include "kudu/util/logging.h"
 #include "rpc/thrift-util.h"
+#include "runtime/mem-pool.h"
 #include "runtime/mem-tracker.h"
 #include "util/coding-util.h"
 #include "util/compress.h"

@@ -25,8 +25,10 @@
 #include <limits>
 
 #include "common/logging.h"
+#include "runtime/multi-precision.h"
 #include "util/arithmetic-util.h"
 #include "util/bit-util.h"
+#include "util/decimal-constants.h"
 #include "util/decimal-util.h"
 #include "util/hash-util.h"
 
@@ -115,7 +117,7 @@ inline typename RESULT_T::underlying_type_t DecimalValue<T>::ToInt(int scale,
     if (abs(remainder) >= divisor >> 1) {
       // Round away from zero.
       // Bias at zero must be corrected by sign of dividend.
-      result += BitUtil::Sign(v);
+      result += Sign(v);
     }
   }
   *overflow |=
@@ -255,14 +257,14 @@ inline int128_t AddLarge(int128_t x, int x_scale, int128_t y, int y_scale,
   // it is not necessary, because doing that is equivalent to doing nothing.
   DCHECK(right <= DecimalUtil::GetScaleMultiplier<int128_t>(result_scale));
 
-  *overflow |= x_left > DecimalUtil::MAX_UNSCALED_DECIMAL16 - y_left - carry_to_left;
+  *overflow |= x_left > MAX_UNSCALED_DECIMAL16 - y_left - carry_to_left;
   left = ArithmeticUtil::AsUnsigned<std::plus>(
       ArithmeticUtil::AsUnsigned<std::plus>(x_left, y_left),
       static_cast<int128_t>(carry_to_left));
 
   int128_t mult = DecimalUtil::GetScaleMultiplier<int128_t>(result_scale);
   if (UNLIKELY(!*overflow &&
-      left > (DecimalUtil::MAX_UNSCALED_DECIMAL16 - right) / mult)) {
+      left > (MAX_UNSCALED_DECIMAL16 - right) / mult)) {
     *overflow = true;
   }
   return ArithmeticUtil::AsUnsigned<std::plus>(
@@ -287,8 +289,8 @@ inline int128_t SubtractLarge(int128_t x, int x_scale, int128_t y, int y_scale,
   right = x_right + y_right;
   // Overflow is not possible because one number is positive and the other one is
   // negative.
-  DCHECK(abs(left) <= DecimalUtil::MAX_UNSCALED_DECIMAL16);
-  DCHECK(abs(right) <= DecimalUtil::MAX_UNSCALED_DECIMAL16);
+  DCHECK(abs(left) <= MAX_UNSCALED_DECIMAL16);
+  DCHECK(abs(right) <= MAX_UNSCALED_DECIMAL16);
   // If the whole and fractional parts have different signs, then we need to make the
   // fractional part have the same sign as the whole part. If either left or right is
   // zero, then nothing needs to be done.
@@ -316,7 +318,7 @@ inline int128_t SubtractLarge(int128_t x, int x_scale, int128_t y, int y_scale,
   DCHECK(abs(right) <= DecimalUtil::GetScaleMultiplier<int128_t>(result_scale));
 
   int128_t mult = DecimalUtil::GetScaleMultiplier<int128_t>(result_scale);
-  if (UNLIKELY(abs(left) > (DecimalUtil::MAX_UNSCALED_DECIMAL16 - abs(right)) / mult)) {
+  if (UNLIKELY(abs(left) > (MAX_UNSCALED_DECIMAL16 - abs(right)) / mult)) {
     *overflow = true;
   }
   return DecimalUtil::SafeMultiply(left, mult, *overflow) + right;
@@ -358,7 +360,7 @@ inline DecimalValue<RESULT_T> DecimalValue<T>::Add(int this_scale,
     RESULT_T x = 0;
     RESULT_T y = 0;
     AdjustToSameScale(*this, this_scale, other, other_scale, result_precision, &x, &y);
-    DCHECK(abs(x) <= DecimalUtil::MAX_UNSCALED_DECIMAL16 - abs(y));
+    DCHECK(abs(x) <= MAX_UNSCALED_DECIMAL16 - abs(y));
     x += y;
     if (result_scale_decrease > 0) {
       // After first adjusting x and y to the same scale and adding them together, we now
@@ -414,7 +416,7 @@ DecimalValue<RESULT_T> DecimalValue<T>::Multiply(int this_scale,
     // converting to 256 bits is necessary, when it's not actually the case.
     needs_int256 = total_leading_zeros <= 128;
     if (UNLIKELY(needs_int256 && delta_scale == 0)) {
-      if (LIKELY(abs(x) > DecimalUtil::MAX_UNSCALED_DECIMAL16 / abs(y))) {
+      if (LIKELY(abs(x) > MAX_UNSCALED_DECIMAL16 / abs(y))) {
         // If the intermediate value does not fit into 128 bits, we indicate overflow
         // because the final value would also not fit into 128 bits since delta_scale is
         // zero.
@@ -433,13 +435,13 @@ DecimalValue<RESULT_T> DecimalValue<T>::Multiply(int this_scale,
       intermediate_result = DecimalUtil::ScaleDownAndRound<int256_t>(
           intermediate_result, delta_scale, round);
       result = ConvertToInt128(
-          intermediate_result, DecimalUtil::MAX_UNSCALED_DECIMAL16, overflow);
+          intermediate_result, MAX_UNSCALED_DECIMAL16, overflow);
     }
   } else {
     if (delta_scale == 0) {
       result = DecimalUtil::SafeMultiply(x, y, false);
       if (UNLIKELY(result_precision == ColumnType::MAX_PRECISION &&
-          abs(result) > DecimalUtil::MAX_UNSCALED_DECIMAL16)) {
+          abs(result) > MAX_UNSCALED_DECIMAL16)) {
         // An overflow is possible here, if, for example, x = (2^64 - 1) and
         // y = (2^63 - 1).
         *overflow = true;
@@ -466,7 +468,7 @@ DecimalValue<RESULT_T> DecimalValue<T>::Multiply(int this_scale,
       result = 0;
     }
   }
-  DCHECK(*overflow || abs(result) <= DecimalUtil::MAX_UNSCALED_DECIMAL16);
+  DCHECK(*overflow || abs(result) <= MAX_UNSCALED_DECIMAL16);
   return DecimalValue<RESULT_T>(result);
 }
 
@@ -497,7 +499,7 @@ inline DecimalValue<RESULT_T> DecimalValue<T>::Divide(int this_scale,
     *overflow |= ovf;
     int128_t y_sp = other.value();
     int256_t y = ConvertToInt256(y_sp);
-    int128_t r = ConvertToInt128(x / y, DecimalUtil::MAX_UNSCALED_DECIMAL16, overflow);
+    int128_t r = ConvertToInt128(x / y, MAX_UNSCALED_DECIMAL16, overflow);
     if (round) {
       int256_t remainder = x % y;
       // The following is frought with apparent difficulty, as there is only 1 bit
@@ -509,12 +511,12 @@ inline DecimalValue<RESULT_T> DecimalValue<T>::Divide(int this_scale,
       // This will need to be fixed if we optimize to get back a 128-bit signed value.
       if (abs(2 * remainder) >= abs(y)) {
         // Bias at zero must be corrected by sign of divisor and dividend.
-        r += (BitUtil::Sign(x_sp) ^ BitUtil::Sign(y_sp)) + 1;
+        r += (Sign(x_sp) ^ Sign(y_sp)) + 1;
       }
     }
     // Check overflow again after rounding since +/-1 could cause decimal overflow
     if (result_precision == ColumnType::MAX_PRECISION) {
-      *overflow |= abs(r) > DecimalUtil::MAX_UNSCALED_DECIMAL16;
+      *overflow |= abs(r) > MAX_UNSCALED_DECIMAL16;
     }
     return DecimalValue<RESULT_T>(r);
   } else {
@@ -533,12 +535,12 @@ inline DecimalValue<RESULT_T> DecimalValue<T>::Divide(int this_scale,
         // In addition, we know the dividend is non-zero, since there was a remainder.
         // The two conditions combined mean that the result must also be non-zero.
         DCHECK(r != 0);
-        r += BitUtil::Sign(r);
+        r += Sign(r);
       }
     }
-    DCHECK(abs(r) <= DecimalUtil::MAX_UNSCALED_DECIMAL16 &&
-        (sizeof(RESULT_T) > 8 || abs(r) <= DecimalUtil::MAX_UNSCALED_DECIMAL8) &&
-        (sizeof(RESULT_T) > 4 || abs(r) <= DecimalUtil::MAX_UNSCALED_DECIMAL4));
+    DCHECK(abs(r) <= MAX_UNSCALED_DECIMAL16 &&
+        (sizeof(RESULT_T) > 8 || abs(r) <= MAX_UNSCALED_DECIMAL8) &&
+        (sizeof(RESULT_T) > 4 || abs(r) <= MAX_UNSCALED_DECIMAL4));
     return DecimalValue<RESULT_T>(static_cast<RESULT_T>(r));
   }
 }
@@ -557,7 +559,7 @@ inline DecimalValue<RESULT_T> DecimalValue<T>::Mod(int this_scale,
     case 4: {
       int64_t x, y;
       AdjustToSameScale(*this, this_scale, other, other_scale, result_precision, &x, &y);
-      DCHECK(abs(x % y) <= DecimalUtil::MAX_UNSCALED_DECIMAL4);
+      DCHECK(abs(x % y) <= MAX_UNSCALED_DECIMAL4);
       result = x % y;
       break;
     }
@@ -567,13 +569,13 @@ inline DecimalValue<RESULT_T> DecimalValue<T>::Mod(int this_scale,
         int64_t x, y;
         AdjustToSameScale(*this, this_scale, other, other_scale,
             result_precision, &x, &y);
-        DCHECK(abs(x % y) <= DecimalUtil::MAX_UNSCALED_DECIMAL8);
+        DCHECK(abs(x % y) <= MAX_UNSCALED_DECIMAL8);
         result = x % y;
       } else {
         int128_t x, y;
         AdjustToSameScale(*this, this_scale, other, other_scale,
             result_precision, &x, &y);
-        DCHECK(abs(x % y) <= DecimalUtil::MAX_UNSCALED_DECIMAL8);
+        DCHECK(abs(x % y) <= MAX_UNSCALED_DECIMAL8);
         result = x % y;
       }
       break;
@@ -584,7 +586,7 @@ inline DecimalValue<RESULT_T> DecimalValue<T>::Mod(int this_scale,
         int128_t x, y;
         AdjustToSameScale(*this, this_scale, other, other_scale,
             result_precision, &x, &y);
-        DCHECK(abs(x % y) <= DecimalUtil::MAX_UNSCALED_DECIMAL16);
+        DCHECK(abs(x % y) <= MAX_UNSCALED_DECIMAL16);
         result = x % y;
       } else {
         int256_t x_256 = ConvertToInt256(value());
@@ -597,7 +599,7 @@ inline DecimalValue<RESULT_T> DecimalValue<T>::Mod(int this_scale,
         int256_t intermediate_result = x_256 % y_256;
         bool ovf = false;
         result = ConvertToInt128(intermediate_result,
-            DecimalUtil::MAX_UNSCALED_DECIMAL16, &ovf);
+            MAX_UNSCALED_DECIMAL16, &ovf);
         DCHECK(!ovf);
       }
       break;

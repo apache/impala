@@ -45,7 +45,6 @@ add_library(Util
   compress.cc
   cpu-info.cc
   cyclic-barrier.cc
-  decimal-util.cc
   dynamic-util.cc
   debug-util.cc
   decompress.cc

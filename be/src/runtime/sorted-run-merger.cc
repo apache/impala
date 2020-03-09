@@ -18,6 +18,7 @@
 #include "runtime/sorter.h"
 #include "runtime/tuple-row.h"
 #include "util/runtime-profile-counters.h"
+#include "util/tuple-row-compare.h"
 
 #include "common/names.h"
 

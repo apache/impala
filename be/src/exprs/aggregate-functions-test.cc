@@ -23,11 +23,10 @@
 #include <boost/accumulators/statistics/variance.hpp>
 
 #include "exprs/aggregate-functions.h"
-#include "runtime/multi-precision.h"
 #include "testutil/gtest-util.h"
 #include "udf/udf.h"
 #include "udf/uda-test-harness.h"
-#include "util/decimal-util.h"
+#include "util/decimal-constants.h"
 
 #include "common/names.h"
 
@@ -124,7 +123,7 @@ TEST(HistogramTest, TestDecimal) {
   // All input values are x, result should be constant.
   {
     vector<DecimalVal> input;
-    int128_t val = DecimalUtil::MAX_UNSCALED_DECIMAL16;
+    __int128_t val = MAX_UNSCALED_DECIMAL16;
     stringstream ss;
     for (int i = 0; i < INPUT_SIZE; ++i) input.push_back(DecimalVal(val));
     for (int i = 0; i < NUM_BUCKETS; ++i) {

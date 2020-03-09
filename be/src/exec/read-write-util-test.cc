@@ -17,7 +17,6 @@
 
 #include <stdlib.h>
 #include <stdio.h>
-#include <iostream>
 #include <limits.h>
 
 #include "exec/read-write-util.h"

@@ -36,7 +36,6 @@
 #include "gen-cpp/control_service.pb.h"
 #include "kudu/util/random.h"
 #include "rpc/thrift-server.h"
-#include "runtime/timestamp-value.h"
 #include "runtime/types.h"
 #include "scheduling/query-schedule.h"
 #include "service/client-request-state-map.h"
@@ -74,6 +73,8 @@ class TGetExecSummaryReq;
 class ClientRequestState;
 class QuerySchedule;
 class SimpleLogger;
+class UpdateFilterParamsPB;
+class UpdateFilterResultPB;
 
 /// An ImpalaServer contains both frontend and backend functionality;
 /// it implements ImpalaService (Beeswax), ImpalaHiveServer2Service (HiveServer2)

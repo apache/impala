@@ -29,6 +29,8 @@
 #include "exec/parquet/parquet-collection-column-reader.h"
 #include "exec/parquet/parquet-column-readers.h"
 #include "exec/scanner-context.inline.h"
+#include "exec/scratch-tuple-batch.h"
+#include "exprs/scalar-expr-evaluator.h"
 #include "rpc/thrift-util.h"
 #include "runtime/collection-value-builder.h"
 #include "runtime/exec-env.h"
@@ -36,6 +38,7 @@
 #include "runtime/io/request-context.h"
 #include "runtime/runtime-filter.inline.h"
 #include "runtime/runtime-state.h"
+#include "runtime/scoped-buffer.h"
 #include "util/dict-encoding.h"
 #include "util/pretty-printer.h"
 #include "util/scope-exit-trigger.h"
@@ -536,7 +539,7 @@ Status HdfsParquetScanner::EvaluateStatsConjuncts(
     if (stats_read) {
       TupleRow row;
       row.SetTuple(0, min_max_tuple_);
-      if (!ExecNode::EvalPredicate(eval, &row)) {
+      if (!eval->EvalPredicate(&row)) {
         *skip_row_group = true;
         break;
       }
@@ -766,7 +769,7 @@ Status HdfsParquetScanner::EvaluatePageIndex(bool* filter_pages) {
       if (!is_null_page && !value_read) continue;
       TupleRow row;
       row.SetTuple(0, min_max_tuple_);
-      if (is_null_page || !ExecNode::EvalPredicate(eval, &row)) {
+      if (is_null_page || !eval->EvalPredicate(&row)) {
         BaseScalarColumnReader* scalar_reader = scalar_reader_map_[col_idx];
         RETURN_IF_ERROR(page_index_.DeserializeOffsetIndex(col_chunk,
             &scalar_reader->offset_index_));

@@ -21,7 +21,6 @@
 #include <sstream>
 #include <string>
 
-#include "codegen/llvm-codegen.h"
 #include "exprs/anyval-util.h"
 #include "exprs/scalar-expr-evaluator.h"
 #include "rpc/jni-thrift-util.h"
@@ -39,6 +38,8 @@ const char* EXECUTOR_EVALUATE_SIGNATURE = "()V";
 const char* EXECUTOR_CLOSE_SIGNATURE = "()V";
 
 namespace impala {
+
+class LlvmCodeGen;
 
 jclass HiveUdfCall::executor_cl_ = NULL;
 jmethodID HiveUdfCall::executor_ctor_id_ = NULL;

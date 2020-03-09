@@ -24,6 +24,7 @@
 #include <gutil/strings/substitute.h>
 #include <kudu/client/client.h>
 
+#include "catalog/catalog-service-client-wrapper.h"
 #include "common/logging.h"
 #include "common/object-pool.h"
 #include "exec/kudu-util.h"

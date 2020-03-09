@@ -25,7 +25,6 @@
 #include "runtime/string-value.inline.h"
 #include "runtime/timestamp-value.h"
 #include "udf/udf-internal.h"
-#include "util/decimal-util.h"
 #include "util/hash-util.h"
 
 namespace impala {

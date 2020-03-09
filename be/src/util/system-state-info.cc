@@ -15,6 +15,7 @@
 // specific language governing permissions and limitations
 // under the License.
 
+#include "gutil/strings/numbers.h"
 #include "gutil/strings/split.h"
 #include "gutil/strings/strip.h"
 #include "gutil/strings/util.h"
@@ -22,14 +23,11 @@
 #include "kudu/util/faststring.h"
 #include "kudu/util/logging.h"
 #include "util/disk-info.h"
-#include "util/error-util.h"
-#include "util/string-parser.h"
 #include "util/system-state-info.h"
 #include "util/time.h"
 
 #include <numeric>
 #include <fstream>
-#include <iostream>
 
 #include "common/names.h"
 

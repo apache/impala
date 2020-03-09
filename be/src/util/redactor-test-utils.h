@@ -21,8 +21,6 @@
 
 #include <gtest/gtest.h>
 
-#include "gutil/strings/substitute.h"
-
 namespace impala {
 
 /// Utility class for creating a redaction config file that will be automatically deleted

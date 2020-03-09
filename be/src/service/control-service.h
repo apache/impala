@@ -22,7 +22,6 @@
 
 #include "kudu/rpc/rpc_context.h"
 #include "kudu/rpc/rpc_controller.h"
-#include "util/debug-util.h"
 
 #include "common/status.h"
 

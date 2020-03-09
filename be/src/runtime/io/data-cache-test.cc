@@ -19,7 +19,6 @@
 #include <boost/bind.hpp>
 #include <fstream>
 #include <gflags/gflags.h>
-#include <iostream>
 #include <rapidjson/document.h>
 #include <sys/sysinfo.h>
 

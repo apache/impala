@@ -24,7 +24,6 @@
 #include "exec/parquet/parquet-common.h"
 #include "exec/parquet/parquet-metadata-utils.h"
 #include "exec/parquet/parquet-page-index.h"
-#include "runtime/scoped-buffer.h"
 #include "util/runtime-profile-counters.h"
 
 namespace impala {

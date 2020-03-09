@@ -40,6 +40,7 @@
 #include "runtime/runtime-filter-bank.h"
 #include "runtime/runtime-state.h"
 #include "runtime/scanner-mem-limiter.h"
+#include "runtime/tmp-file-mgr.h"
 #include "service/control-service.h"
 #include "service/data-stream-service.h"
 #include "util/container-util.h"
@@ -251,7 +252,7 @@ Status QueryState::InitBufferPoolState() {
 
   if (query_options().scratch_limit != 0 && !query_ctx_.disable_spilling) {
     file_group_ = obj_pool_.Add(
-        new TmpFileMgr::FileGroup(exec_env->tmp_file_mgr(), exec_env->disk_io_mgr(),
+        new TmpFileGroup(exec_env->tmp_file_mgr(), exec_env->disk_io_mgr(),
             host_profile_, query_id(), query_options().scratch_limit));
   }
   return Status::OK();

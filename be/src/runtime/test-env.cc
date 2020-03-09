@@ -22,6 +22,8 @@
 
 #include "gutil/strings/substitute.h"
 #include "rpc/rpc-mgr.h"
+#include "runtime/fragment-instance-state.h"
+#include "runtime/mem-tracker.h"
 #include "runtime/query-exec-mgr.h"
 #include "runtime/query-state.h"
 #include "runtime/tmp-file-mgr.h"

@@ -21,7 +21,6 @@
 #include "common/object-pool.h"
 #include "common/status.h"
 #include "exec/catalog-op-executor.h"
-#include "runtime/timestamp-value.h"
 #include "scheduling/query-schedule.h"
 #include "service/child-query.h"
 #include "service/impala-server.h"

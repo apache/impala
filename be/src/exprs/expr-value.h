@@ -23,7 +23,7 @@
 #include "runtime/decimal-value.h"
 #include "runtime/string-value.inline.h"
 #include "runtime/timestamp-value.h"
-#include "util/decimal-util.h"
+#include "util/decimal-constants.h"
 
 namespace impala {
 
@@ -133,13 +133,13 @@ struct ExprValue {
       case TYPE_DECIMAL:
         switch (type.GetByteSize()) {
           case 4:
-            decimal4_val = -DecimalUtil::MAX_UNSCALED_DECIMAL4;
+            decimal4_val = -MAX_UNSCALED_DECIMAL4;
             return &decimal4_val;
           case 8:
-            decimal8_val = -DecimalUtil::MAX_UNSCALED_DECIMAL8;
+            decimal8_val = -MAX_UNSCALED_DECIMAL8;
             return &decimal8_val;
           case 16:
-            decimal16_val = -DecimalUtil::MAX_UNSCALED_DECIMAL16;
+            decimal16_val = -MAX_UNSCALED_DECIMAL16;
             return &decimal16_val;
         }
       case TYPE_FLOAT:
@@ -182,13 +182,13 @@ struct ExprValue {
       case TYPE_DECIMAL:
         switch (type.GetByteSize()) {
           case 4:
-            decimal4_val = DecimalUtil::MAX_UNSCALED_DECIMAL4;
+            decimal4_val = MAX_UNSCALED_DECIMAL4;
             return &decimal4_val;
           case 8:
-            decimal8_val = DecimalUtil::MAX_UNSCALED_DECIMAL8;
+            decimal8_val = MAX_UNSCALED_DECIMAL8;
             return &decimal8_val;
           case 16:
-            decimal16_val = DecimalUtil::MAX_UNSCALED_DECIMAL16;
+            decimal16_val = MAX_UNSCALED_DECIMAL16;
             return &decimal16_val;
         }
       case TYPE_FLOAT:

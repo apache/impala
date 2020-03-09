@@ -20,7 +20,6 @@
 
 #include "codegen/llvm-codegen.h"
 #include "runtime/descriptors.h"
-#include "runtime/multi-precision.h"
 
 namespace llvm {
 class Type;
@@ -166,7 +165,7 @@ class CodegenAnyVal {
   void SetVal(int16_t val);
   void SetVal(int32_t val);
   void SetVal(int64_t val);
-  void SetVal(int128_t val);
+  void SetVal(__int128_t val);
   void SetVal(float val);
   void SetVal(double val);
 

@@ -17,15 +17,21 @@
 
 #include "exec/partitioned-hash-join-builder.h"
 
-#include "codegen/impala-ir.h"
+#include "common/compiler-util.h"
+#include "common/logging.h"
+#include "common/status.h"
+#include "exec/filter-context.h"
+#include "exec/hash-table.h"
 #include "exec/hash-table.inline.h"
-#include "runtime/buffered-tuple-stream.inline.h"
-#include "runtime/raw-value.inline.h"
+#include "gen-cpp/Types_types.h"
+#include "runtime/buffered-tuple-stream.h"
 #include "runtime/row-batch.h"
-#include "runtime/runtime-filter.h"
-#include "util/bloom-filter.h"
 
 #include "common/names.h"
+
+namespace impala {
+class TupleRow;
+}
 
 using namespace impala;
 

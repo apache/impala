@@ -84,6 +84,10 @@ const string TMP_FILE_MGR_SCRATCH_SPACE_BYTES_USED =
 const string SCRATCH_DIR_BYTES_USED_FORMAT =
     "tmp-file-mgr.scratch-space-bytes-used.dir-$0";
 
+using DeviceId = TmpFileMgr::DeviceId;
+using TmpDir = TmpFileMgr::TmpDir;
+using WriteDoneCallback = TmpFileMgr::WriteDoneCallback;
+
 TmpFileMgr::TmpFileMgr()
   : initialized_(false),
     num_active_scratch_dirs_metric_(nullptr),
@@ -209,7 +213,7 @@ Status TmpFileMgr::InitCustom(const vector<string>& tmp_dir_specifiers,
 }
 
 void TmpFileMgr::NewFile(
-    FileGroup* file_group, DeviceId device_id, unique_ptr<File>* new_file) {
+    TmpFileGroup* file_group, DeviceId device_id, unique_ptr<TmpFile>* new_file) {
   DCHECK(initialized_);
   DCHECK_GE(device_id, 0);
   DCHECK_LT(device_id, tmp_dirs_.size());
@@ -221,7 +225,7 @@ void TmpFileMgr::NewFile(
   path new_file_path(tmp_dirs_[device_id].path);
   new_file_path /= file_name.str();
 
-  new_file->reset(new File(file_group, device_id, new_file_path.string()));
+  new_file->reset(new TmpFile(file_group, device_id, new_file_path.string()));
 }
 
 string TmpFileMgr::GetTmpDirPath(DeviceId device_id) const {
@@ -236,15 +240,15 @@ int TmpFileMgr::NumActiveTmpDevices() {
   return tmp_dirs_.size();
 }
 
-vector<TmpFileMgr::DeviceId> TmpFileMgr::ActiveTmpDevices() {
-  vector<TmpFileMgr::DeviceId> devices;
+vector<DeviceId> TmpFileMgr::ActiveTmpDevices() {
+  vector<DeviceId> devices;
   for (DeviceId device_id = 0; device_id < tmp_dirs_.size(); ++device_id) {
     devices.push_back(device_id);
   }
   return devices;
 }
 
-TmpFileMgr::File::File(FileGroup* file_group, DeviceId device_id, const string& path)
+TmpFile::TmpFile(TmpFileGroup* file_group, DeviceId device_id, const string& path)
   : file_group_(file_group),
     path_(path),
     device_id_(device_id),
@@ -254,7 +258,7 @@ TmpFileMgr::File::File(FileGroup* file_group, DeviceId device_id, const string& 
   DCHECK(file_group != nullptr);
 }
 
-bool TmpFileMgr::File::AllocateSpace(int64_t num_bytes, int64_t* offset) {
+bool TmpFile::AllocateSpace(int64_t num_bytes, int64_t* offset) {
   DCHECK_GT(num_bytes, 0);
   TmpDir* dir = GetDir();
   // Increment optimistically and roll back if the limit is exceeded.
@@ -267,33 +271,33 @@ bool TmpFileMgr::File::AllocateSpace(int64_t num_bytes, int64_t* offset) {
   return true;
 }
 
-int TmpFileMgr::File::AssignDiskQueue() const {
+int TmpFile::AssignDiskQueue() const {
   return file_group_->io_mgr_->AssignQueue(path_.c_str(), disk_id_, false);
 }
 
-void TmpFileMgr::File::Blacklist(const ErrorMsg& msg) {
+void TmpFile::Blacklist(const ErrorMsg& msg) {
   LOG(ERROR) << "Error for temporary file '" << path_ << "': " << msg.msg();
   blacklisted_ = true;
 }
 
-Status TmpFileMgr::File::Remove() {
+Status TmpFile::Remove() {
   // Remove the file if present (it may not be present if no writes completed).
   Status status = FileSystemUtil::RemovePaths({path_});
   GetDir()->bytes_used_metric->Increment(-bytes_allocated_);
   return status;
 }
 
-TmpFileMgr::TmpDir* TmpFileMgr::File::GetDir() {
+TmpFileMgr::TmpDir* TmpFile::GetDir() {
   return &file_group_->tmp_file_mgr_->tmp_dirs_[device_id_];
 }
 
-string TmpFileMgr::File::DebugString() {
+string TmpFile::DebugString() {
   return Substitute("File $0 path '$1' device id $2 disk id $3 bytes allocated $4 "
       "blacklisted $5", this, path_, device_id_, disk_id_, bytes_allocated_,
       blacklisted_);
 }
 
-TmpFileMgr::FileGroup::FileGroup(TmpFileMgr* tmp_file_mgr, DiskIoMgr* io_mgr,
+TmpFileGroup::TmpFileGroup(TmpFileMgr* tmp_file_mgr, DiskIoMgr* io_mgr,
     RuntimeProfile* profile, const TUniqueId& unique_id, int64_t bytes_limit)
   : tmp_file_mgr_(tmp_file_mgr),
     io_mgr_(io_mgr),
@@ -315,19 +319,19 @@ TmpFileMgr::FileGroup::FileGroup(TmpFileMgr* tmp_file_mgr, DiskIoMgr* io_mgr,
   io_ctx_ = io_mgr_->RegisterContext();
 }
 
-TmpFileMgr::FileGroup::~FileGroup() {
+TmpFileGroup::~TmpFileGroup() {
   DCHECK_EQ(tmp_files_.size(), 0);
 }
 
-Status TmpFileMgr::FileGroup::CreateFiles() {
+Status TmpFileGroup::CreateFiles() {
   lock_.DCheckLocked();
   DCHECK(tmp_files_.empty());
   vector<DeviceId> tmp_devices = tmp_file_mgr_->ActiveTmpDevices();
   int files_allocated = 0;
   // Initialize the tmp files and the initial file to use.
   for (int i = 0; i < tmp_devices.size(); ++i) {
-    TmpFileMgr::DeviceId device_id = tmp_devices[i];
-    unique_ptr<TmpFileMgr::File> tmp_file;
+    DeviceId device_id = tmp_devices[i];
+    unique_ptr<TmpFile> tmp_file;
     tmp_file_mgr_->NewFile(this, device_id, &tmp_file);
     tmp_files_.emplace_back(std::move(tmp_file));
     ++files_allocated;
@@ -339,11 +343,11 @@ Status TmpFileMgr::FileGroup::CreateFiles() {
   return Status::OK();
 }
 
-void TmpFileMgr::FileGroup::Close() {
+void TmpFileGroup::Close() {
   // Cancel writes before deleting the files, since in-flight writes could re-create
   // deleted files.
   if (io_ctx_ != nullptr) io_mgr_->UnregisterContext(io_ctx_.get());
-  for (std::unique_ptr<TmpFileMgr::File>& file : tmp_files_) {
+  for (std::unique_ptr<TmpFile>& file : tmp_files_) {
     Status status = file->Remove();
     if (!status.ok()) {
       LOG(WARNING) << "Error removing scratch file '" << file->path()
@@ -356,8 +360,8 @@ void TmpFileMgr::FileGroup::Close() {
   tmp_files_.clear();
 }
 
-Status TmpFileMgr::FileGroup::AllocateSpace(
-    int64_t num_bytes, File** tmp_file, int64_t* file_offset) {
+Status TmpFileGroup::AllocateSpace(
+    int64_t num_bytes, TmpFile** tmp_file, int64_t* file_offset) {
   lock_guard<SpinLock> lock(lock_);
   int64_t scratch_range_bytes = max<int64_t>(1L, BitUtil::RoundUpToPowerOfTwo(num_bytes));
   int free_ranges_idx = BitUtil::Log2Ceiling64(scratch_range_bytes);
@@ -399,7 +403,7 @@ Status TmpFileMgr::FileGroup::AllocateSpace(
   return ScratchAllocationFailedStatus(at_capacity_dirs);
 }
 
-void TmpFileMgr::FileGroup::RecycleFileRange(unique_ptr<WriteHandle> handle) {
+void TmpFileGroup::RecycleFileRange(unique_ptr<TmpWriteHandle> handle) {
   int64_t scratch_range_bytes =
       max<int64_t>(1L, BitUtil::RoundUpToPowerOfTwo(handle->len()));
   int free_ranges_idx = BitUtil::Log2Ceiling64(scratch_range_bytes);
@@ -408,16 +412,16 @@ void TmpFileMgr::FileGroup::RecycleFileRange(unique_ptr<WriteHandle> handle) {
       handle->file_, handle->write_range_->offset());
 }
 
-Status TmpFileMgr::FileGroup::Write(
-    MemRange buffer, WriteDoneCallback cb, unique_ptr<TmpFileMgr::WriteHandle>* handle) {
+Status TmpFileGroup::Write(MemRange buffer, WriteDoneCallback cb,
+    unique_ptr<TmpWriteHandle>* handle) {
   DCHECK_GE(buffer.len(), 0);
 
-  File* tmp_file;
+  TmpFile* tmp_file;
   int64_t file_offset;
   RETURN_IF_ERROR(AllocateSpace(buffer.len(), &tmp_file, &file_offset));
 
-  unique_ptr<WriteHandle> tmp_handle(new WriteHandle(encryption_timer_, cb));
-  WriteHandle* tmp_handle_ptr = tmp_handle.get(); // Pass ptr by value into lambda.
+  unique_ptr<TmpWriteHandle> tmp_handle(new TmpWriteHandle(encryption_timer_, cb));
+  TmpWriteHandle* tmp_handle_ptr = tmp_handle.get(); // Pass ptr by value into lambda.
   WriteRange::WriteDoneCallback callback = [this, tmp_handle_ptr](
       const Status& write_status) { WriteComplete(tmp_handle_ptr, write_status); };
   RETURN_IF_ERROR(
@@ -428,12 +432,12 @@ Status TmpFileMgr::FileGroup::Write(
   return Status::OK();
 }
 
-Status TmpFileMgr::FileGroup::Read(WriteHandle* handle, MemRange buffer) {
+Status TmpFileGroup::Read(TmpWriteHandle* handle, MemRange buffer) {
   RETURN_IF_ERROR(ReadAsync(handle, buffer));
   return WaitForAsyncRead(handle, buffer);
 }
 
-Status TmpFileMgr::FileGroup::ReadAsync(WriteHandle* handle, MemRange buffer) {
+Status TmpFileGroup::ReadAsync(TmpWriteHandle* handle, MemRange buffer) {
   DCHECK(handle->write_range_ != nullptr);
   DCHECK(!handle->is_cancelled_);
   DCHECK_EQ(buffer.len(), handle->len());
@@ -460,7 +464,7 @@ Status TmpFileMgr::FileGroup::ReadAsync(WriteHandle* handle, MemRange buffer) {
   return Status::OK();
 }
 
-Status TmpFileMgr::FileGroup::WaitForAsyncRead(WriteHandle* handle, MemRange buffer) {
+Status TmpFileGroup::WaitForAsyncRead(TmpWriteHandle* handle, MemRange buffer) {
   DCHECK(handle->read_range_ != nullptr);
   // Don't grab handle->write_state_lock_, it is safe to touch all of handle's state
   // since the write is not in flight.
@@ -491,8 +495,8 @@ exit:
   return status;
 }
 
-Status TmpFileMgr::FileGroup::RestoreData(
-    unique_ptr<WriteHandle> handle, MemRange buffer) {
+Status TmpFileGroup::RestoreData(
+    unique_ptr<TmpWriteHandle> handle, MemRange buffer) {
   DCHECK_EQ(handle->write_range_->data(), buffer.data());
   DCHECK_EQ(handle->len(), buffer.len());
   DCHECK(!handle->write_in_flight_);
@@ -507,14 +511,14 @@ Status TmpFileMgr::FileGroup::RestoreData(
   return status;
 }
 
-void TmpFileMgr::FileGroup::DestroyWriteHandle(unique_ptr<WriteHandle> handle) {
+void TmpFileGroup::DestroyWriteHandle(unique_ptr<TmpWriteHandle> handle) {
   handle->Cancel();
   handle->WaitForWrite();
   RecycleFileRange(move(handle));
 }
 
-void TmpFileMgr::FileGroup::WriteComplete(
-    WriteHandle* handle, const Status& write_status) {
+void TmpFileGroup::WriteComplete(
+    TmpWriteHandle* handle, const Status& write_status) {
   Status status;
   if (!write_status.ok()) {
     status = RecoverWriteError(handle, write_status);
@@ -525,8 +529,8 @@ void TmpFileMgr::FileGroup::WriteComplete(
   handle->WriteComplete(status);
 }
 
-Status TmpFileMgr::FileGroup::RecoverWriteError(
-    WriteHandle* handle, const Status& write_status) {
+Status TmpFileGroup::RecoverWriteError(
+    TmpWriteHandle* handle, const Status& write_status) {
   DCHECK(!write_status.ok());
   DCHECK(handle->file_ != nullptr);
 
@@ -545,7 +549,7 @@ Status TmpFileMgr::FileGroup::RecoverWriteError(
   // Do not retry cancelled writes or propagate the error, simply return CANCELLED.
   if (handle->is_cancelled_) return Status::CancelledInternal("TmpFileMgr write");
 
-  TmpFileMgr::File* tmp_file;
+  TmpFile* tmp_file;
   int64_t file_offset;
   // Discard the scratch file range - we will not reuse ranges from a bad file.
   // Choose another file to try. Blacklisting ensures we don't retry the same file.
@@ -554,7 +558,7 @@ Status TmpFileMgr::FileGroup::RecoverWriteError(
   return handle->RetryWrite(io_ctx_.get(), tmp_file, file_offset);
 }
 
-Status TmpFileMgr::FileGroup::ScratchAllocationFailedStatus(
+Status TmpFileGroup::ScratchAllocationFailedStatus(
     const vector<int>& at_capacity_dirs) {
   vector<string> tmp_dir_paths;
   for (TmpDir& tmp_dir : tmp_file_mgr_->tmp_dirs_) {
@@ -575,10 +579,10 @@ Status TmpFileMgr::FileGroup::ScratchAllocationFailedStatus(
   return status;
 }
 
-string TmpFileMgr::FileGroup::DebugString() {
+string TmpFileGroup::DebugString() {
   lock_guard<SpinLock> lock(lock_);
   stringstream ss;
-  ss << "FileGroup " << this << " bytes limit " << bytes_limit_
+  ss << "TmpFileGroup " << this << " bytes limit " << bytes_limit_
      << " current bytes allocated " << current_bytes_allocated_
      << " next allocation index " << next_allocation_index_ << " writes "
      << write_counter_->value() << " bytes written " << bytes_written_counter_->value()
@@ -588,13 +592,13 @@ string TmpFileMgr::FileGroup::DebugString() {
      << disk_read_timer_->value() << " encryption timer " << encryption_timer_->value()
      << endl
      << "  " << tmp_files_.size() << " files:" << endl;
-  for (unique_ptr<File>& file : tmp_files_) {
+  for (unique_ptr<TmpFile>& file : tmp_files_) {
     ss << "    " << file->DebugString() << endl;
   }
   return ss.str();
 }
 
-TmpFileMgr::WriteHandle::WriteHandle(
+TmpWriteHandle::TmpWriteHandle(
     RuntimeProfile::Counter* encryption_timer, WriteDoneCallback cb)
   : cb_(cb),
     encryption_timer_(encryption_timer),
@@ -603,22 +607,22 @@ TmpFileMgr::WriteHandle::WriteHandle(
     is_cancelled_(false),
     write_in_flight_(false) {}
 
-TmpFileMgr::WriteHandle::~WriteHandle() {
+TmpWriteHandle::~TmpWriteHandle() {
   DCHECK(!write_in_flight_);
   DCHECK(read_range_ == nullptr);
 }
 
-string TmpFileMgr::WriteHandle::TmpFilePath() const {
+string TmpWriteHandle::TmpFilePath() const {
   if (file_ == nullptr) return "";
   return file_->path();
 }
 
-int64_t TmpFileMgr::WriteHandle::len() const {
+int64_t TmpWriteHandle::len() const {
   return write_range_->len();
 }
 
-Status TmpFileMgr::WriteHandle::Write(RequestContext* io_ctx,
-    File* file, int64_t offset, MemRange buffer,
+Status TmpWriteHandle::Write(RequestContext* io_ctx,
+    TmpFile* file, int64_t offset, MemRange buffer,
     WriteRange::WriteDoneCallback callback) {
   DCHECK(!write_in_flight_);
 
@@ -635,7 +639,7 @@ Status TmpFileMgr::WriteHandle::Write(RequestContext* io_ctx,
   if (!status.ok()) {
     // The write will not be in flight if we returned with an error.
     write_in_flight_ = false;
-    // We won't return this WriteHandle to the client of FileGroup, so it won't be
+    // We won't return this TmpWriteHandle to the client of TmpFileGroup, so it won't be
     // cancelled in the normal way. Mark the handle as cancelled so it can be
     // cleanly destroyed.
     is_cancelled_ = true;
@@ -644,8 +648,8 @@ Status TmpFileMgr::WriteHandle::Write(RequestContext* io_ctx,
   return Status::OK();
 }
 
-Status TmpFileMgr::WriteHandle::RetryWrite(
-    RequestContext* io_ctx, File* file, int64_t offset) {
+Status TmpWriteHandle::RetryWrite(
+    RequestContext* io_ctx, TmpFile* file, int64_t offset) {
   DCHECK(write_in_flight_);
   file_ = file;
   write_range_->SetRange(file->path(), offset, file->AssignDiskQueue());
@@ -658,7 +662,7 @@ Status TmpFileMgr::WriteHandle::RetryWrite(
   return Status::OK();
 }
 
-void TmpFileMgr::WriteHandle::WriteComplete(const Status& write_status) {
+void TmpWriteHandle::WriteComplete(const Status& write_status) {
   WriteDoneCallback cb;
   {
     lock_guard<mutex> lock(write_state_lock_);
@@ -677,7 +681,7 @@ void TmpFileMgr::WriteHandle::WriteComplete(const Status& write_status) {
   cb(write_status);
 }
 
-void TmpFileMgr::WriteHandle::Cancel() {
+void TmpWriteHandle::Cancel() {
   CancelRead();
   {
     unique_lock<mutex> lock(write_state_lock_);
@@ -687,19 +691,19 @@ void TmpFileMgr::WriteHandle::Cancel() {
   }
 }
 
-void TmpFileMgr::WriteHandle::CancelRead() {
+void TmpWriteHandle::CancelRead() {
   if (read_range_ != nullptr) {
     read_range_->Cancel(Status::CancelledInternal("TmpFileMgr read"));
     read_range_ = nullptr;
   }
 }
 
-void TmpFileMgr::WriteHandle::WaitForWrite() {
+void TmpWriteHandle::WaitForWrite() {
   unique_lock<mutex> lock(write_state_lock_);
   while (write_in_flight_) write_complete_cv_.Wait(lock);
 }
 
-Status TmpFileMgr::WriteHandle::EncryptAndHash(MemRange buffer) {
+Status TmpWriteHandle::EncryptAndHash(MemRange buffer) {
   DCHECK(FLAGS_disk_spill_encryption);
   SCOPED_TIMER(encryption_timer_);
   // Since we're using GCM/CTR/CFB mode, we must take care not to reuse a
@@ -713,7 +717,7 @@ Status TmpFileMgr::WriteHandle::EncryptAndHash(MemRange buffer) {
   return Status::OK();
 }
 
-Status TmpFileMgr::WriteHandle::CheckHashAndDecrypt(MemRange buffer) {
+Status TmpWriteHandle::CheckHashAndDecrypt(MemRange buffer) {
   DCHECK(FLAGS_disk_spill_encryption);
   DCHECK(write_range_ != nullptr);
   SCOPED_TIMER(encryption_timer_);
@@ -737,7 +741,7 @@ Status TmpFileMgr::WriteHandle::CheckHashAndDecrypt(MemRange buffer) {
   return Status::OK();
 }
 
-string TmpFileMgr::WriteHandle::DebugString() {
+string TmpWriteHandle::DebugString() {
   unique_lock<mutex> lock(write_state_lock_);
   stringstream ss;
   ss << "Write handle " << this << " file '" << file_->path() << "'"

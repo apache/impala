@@ -15,20 +15,12 @@
 // specific language governing permissions and limitations
 // under the License.
 
-#include <iostream>
-#include <sstream>
-#include <stdio.h>
-#include <stdlib.h>
-
 #include <gtest/gtest.h>
 
-#include "common/init.h"
-#include "service/fe-support.h"
 #include "testutil/gtest-util.h"
 #include "util/cgroup-util.h"
 #include "util/mem-info.h"
 #include "util/process-state-info.h"
-#include "util/test-info.h"
 
 #include "common/names.h"
 

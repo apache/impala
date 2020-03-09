@@ -20,6 +20,9 @@
 #include <queue>
 
 #include "runtime/collection-value-builder.h"
+#include "runtime/date-value.h"
+#include "runtime/decimal-value.h"
+#include "runtime/string-value.inline.h"
 #include "runtime/timestamp-value.inline.h"
 #include "common/names.h"
 
@@ -248,13 +251,13 @@ Status OrcDecimal16ColumnReader::ReadValue(int row_idx, Tuple* tuple, MemPool* p
   orc::Int128 orc_val = batch_->values.data()[row_idx];
 
   DCHECK_EQ(slot_desc_->type().GetByteSize(), 16);
-  int128_t val = orc_val.getHighBits();
+  __int128_t val = orc_val.getHighBits();
   val <<= 64;
   val |= orc_val.getLowBits();
   // Use memcpy to avoid gcc generating unaligned instructions like movaps
   // for int128_t. They will raise SegmentFault when addresses are not
   // aligned to 16 bytes.
-  memcpy(GetSlot(tuple), &val, sizeof(int128_t));
+  memcpy(GetSlot(tuple), &val, sizeof(__int128_t));
   return Status::OK();
 }
 

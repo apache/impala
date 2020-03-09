@@ -33,6 +33,7 @@
 #include "runtime/scanner-mem-limiter.h"
 #include "runtime/thread-resource-mgr.h"
 #include "runtime/tuple-row.h"
+#include "util/debug-util.h"
 #include "util/runtime-profile-counters.h"
 
 #include "common/names.h"
