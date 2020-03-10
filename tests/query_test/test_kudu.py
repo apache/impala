@@ -409,7 +409,7 @@ class TestKuduOperations(KuduTestSuite):
       pytest.skip("Only runs in exhaustive to reduce core time.")
     table_name = "%s.storage_attrs" % unique_database
     types = ['boolean', 'tinyint', 'smallint', 'int', 'bigint', 'float', 'double', \
-        'string', 'timestamp', 'decimal', 'date']
+        'string', 'timestamp', 'decimal', 'date', 'varchar(10)']
     cursor.execute("set kudu_read_mode=READ_AT_SNAPSHOT")
     create_query = "create table %s (id int primary key" % table_name
     for t in types:
@@ -431,7 +431,7 @@ class TestKuduOperations(KuduTestSuite):
             assert "encoding %s not supported for type" % e in str(err)
         cursor.execute("""insert into %s values (%s, true, 0, 0, 0, 0, 0, 0, '0',
             cast('2009-01-01' as timestamp), cast(0 as decimal),
-            cast('2010-01-01' as date))""" % (table_name, i))
+            cast('2010-01-01' as date), cast('' as varchar(10)))""" % (table_name, i))
         cursor.execute("select * from %s where id = %s" % (table_name, i))
         assert cursor.fetchall() == \
             [(i, True, 0, 0, 0, 0, 0.0, 0.0, '0', datetime(2009, 1, 1, 0, 0), 0,

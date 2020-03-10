@@ -79,8 +79,11 @@ KuduScanner::KuduScanner(KuduScanNodeBase* scan_node, RuntimeState* state)
 Status KuduScanner::Open() {
   for (int i = 0; i < scan_node_->tuple_desc()->slots().size(); ++i) {
     const SlotDescriptor* slot = scan_node_->tuple_desc()->slots()[i];
-    if (slot->type().type != TYPE_TIMESTAMP) continue;
-    timestamp_slots_.push_back(slot);
+    if (slot->type().type == TYPE_TIMESTAMP) {
+      timestamp_slots_.push_back(slot);
+    } else if (slot->type().type == TYPE_VARCHAR) {
+      varchar_slots_.push_back(slot);
+    }
   }
   return ScalarExprEvaluator::Clone(&obj_pool_, state_, expr_perm_pool_.get(),
       expr_results_pool_.get(), scan_node_->conjunct_evals(), &conjunct_evals_);
@@ -350,6 +353,25 @@ Status KuduScanner::DecodeRowsIntoRowBatch(RowBatch* row_batch, Tuple** tuple_me
             ErrorMsg::Init(TErrorCode::KUDU_TIMESTAMP_OUT_OF_RANGE,
               scan_node_->table_->name(),
               scan_node_->table_->schema().Column(slot->col_pos()).name())));
+      }
+    }
+
+    // Kudu tuples containing VARCHAR columns use characters instead of bytes to limit
+    // the length. In the case of ASCII values there is no difference. However, if
+    // multi-byte characters are written to Kudu the length could be longer than allowed.
+    // This checks the actual length and truncates the value length if it is too long.
+    // TODO(IMPALA-5675): Remove this when Impala supports UTF-8 character VARCHAR length.
+    for (const SlotDescriptor* slot : varchar_slots_) {
+      DCHECK(slot->type().type == TYPE_VARCHAR);
+      if (slot->is_nullable() && kudu_tuple->IsNull(slot->null_indicator_offset())) {
+        continue;
+      }
+      StringValue* sv = reinterpret_cast<StringValue*>(
+          kudu_tuple->GetSlot(slot->tuple_offset()));
+      int src_len = sv->len;
+      int dst_len = slot->type().len;
+      if (src_len > dst_len) {
+        sv->len = dst_len;
       }
     }
 

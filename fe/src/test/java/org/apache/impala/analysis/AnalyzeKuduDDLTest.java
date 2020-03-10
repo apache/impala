@@ -298,7 +298,7 @@ public class AnalyzeKuduDDLTest extends FrontendTestBase {
 
 
     // Test unsupported Kudu types
-    List<String> unsupportedTypes = Lists.newArrayList("VARCHAR(20)", "CHAR(20)",
+    List<String> unsupportedTypes = Lists.newArrayList("CHAR(20)",
         "STRUCT<f1:INT,f2:STRING>", "ARRAY<INT>", "MAP<STRING,STRING>");
     for (String t: unsupportedTypes) {
       String expectedError = String.format(
@@ -351,7 +351,7 @@ public class AnalyzeKuduDDLTest extends FrontendTestBase {
         "i2 smallint default null, i3 int default null, i4 bigint default null, " +
         "vals string default null, valf float default null, vald double default null, " +
         "valb boolean default null, valdec decimal(10, 5) default null, " +
-        "valdate date default null) " +
+        "valdate date default null, valvc varchar(10) default null) " +
         "partition by hash (x) partitions 3 stored as kudu", isExternalPurgeTbl);
     // Use NULL as a default value on a non-nullable column
     AnalysisError("create table tab (x int primary key, y int not null default null) " +
@@ -387,6 +387,7 @@ public class AnalyzeKuduDDLTest extends FrontendTestBase {
         "cast(3.1452 as double), valb boolean default true, " +
         "valdec decimal(10, 5) default 3.14159, " +
         "valdate date default date '1970-01-01', " +
+        "valvc varchar(10) default cast('test' as varchar(10)), " +
         "primary key (i1, i2, i3, i4, vals)) partition by hash (i1) partitions 3 " +
         "stored as kudu", isExternalPurgeTbl);
     AnalyzesOk("create table tab (i int primary key default 1+1+1) " +

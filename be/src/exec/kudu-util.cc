@@ -142,7 +142,18 @@ Status WriteKuduValue(int col, const ColumnType& col_type, const void* value,
   // TODO: codegen this to eliminate branching on type.
   PrimitiveType type = col_type.type;
   switch (type) {
-    case TYPE_VARCHAR:
+    case TYPE_VARCHAR: {
+      const StringValue* sv = reinterpret_cast<const StringValue*>(value);
+      kudu::Slice slice(reinterpret_cast<uint8_t*>(sv->ptr), sv->len);
+      if (copy_strings) {
+        KUDU_RETURN_IF_ERROR(row->SetVarchar(col, slice),
+            "Could not set Kudu row value.");
+      } else {
+        KUDU_RETURN_IF_ERROR(row->SetVarcharNoCopyUnsafe(col, slice),
+            "Could not set Kudu row value.");
+      }
+      break;
+    }
     case TYPE_STRING: {
       const StringValue* sv = reinterpret_cast<const StringValue*>(value);
       kudu::Slice slice(reinterpret_cast<uint8_t*>(sv->ptr), sv->len);
@@ -244,6 +255,8 @@ ColumnType KuduDataTypeToColumnType(
       return ColumnType::CreateDecimalType(
           type_attributes.precision(), type_attributes.scale());
     case DataType::DATE: return ColumnType(PrimitiveType::TYPE_DATE);
+    case DataType::VARCHAR:
+      return ColumnType::CreateVarcharType(type_attributes.length());
     default: return ColumnType(PrimitiveType::INVALID_TYPE);
   }
 }

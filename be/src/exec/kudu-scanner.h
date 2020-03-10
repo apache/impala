@@ -130,6 +130,10 @@ class KuduScanner {
   /// Timestamp slots in the tuple descriptor of the scan node. Used to convert Kudu
   /// UNIXTIME_MICRO values inline.
   vector<const SlotDescriptor*> timestamp_slots_;
+
+  /// Varchar slots in the tuple descriptor of the scan node. Used to resize Kudu
+  /// VARCHAR values inline.
+  vector<const SlotDescriptor*> varchar_slots_;
 };
 
 } /// namespace impala

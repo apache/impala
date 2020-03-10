@@ -187,6 +187,7 @@ public abstract class Type {
   public boolean isDate() { return isScalarType(PrimitiveType.DATE); }
   public boolean isDecimal() { return isScalarType(PrimitiveType.DECIMAL); }
   public boolean isFullySpecifiedDecimal() { return false; }
+  public boolean isVarchar() { return isScalarType(PrimitiveType.VARCHAR); }
   public boolean isWildcardDecimal() { return false; }
   public boolean isWildcardVarchar() { return false; }
   public boolean isWildcardChar() { return false; }

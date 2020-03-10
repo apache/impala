@@ -49,6 +49,7 @@ import org.apache.kudu.client.KuduClient;
 import org.apache.kudu.client.KuduException;
 import org.apache.kudu.client.PartialRow;
 import org.apache.kudu.client.RangePartitionBound;
+import org.apache.kudu.util.CharUtil;
 import org.apache.kudu.util.DecimalUtil;
 import org.apache.log4j.Logger;
 
@@ -150,6 +151,10 @@ public class KuduCatalogOpExecutor {
     if (type.isDecimal()) {
       csb.typeAttributes(
           DecimalUtil.typeAttributes(type.getPrecision(), type.getDecimalDigits()));
+    }
+    if (kuduType == org.apache.kudu.Type.VARCHAR) {
+      csb.typeAttributes(
+          CharUtil.typeAttributes(type.getColumnSize()));
     }
     if (column.isSetComment() && !column.getComment().isEmpty()) {
       csb.comment(column.getComment());

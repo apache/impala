@@ -3,7 +3,7 @@
 create table tdata
   (id int primary key, name string null, valf float null, vali bigint null,
    valv string null, valb boolean null, valt tinyint null, vals smallint null,
-   vald double null, valdec decimal(9, 0) null, valdate date null)
+   vald double null, valdec decimal(9, 0) null, valdate date null, valvc varchar(10) null)
   PARTITION BY RANGE (PARTITION VALUES < 10, PARTITION 10 <= VALUES < 30,
   PARTITION 30 <= VALUES) STORED AS KUDU
 ---- RESULTS
@@ -11,286 +11,286 @@ create table tdata
 ====
 ---- QUERY
 insert into table tdata values
-(40,'he',0,43,'e',false,35,36,1.2,37,DATE '1970-01-05'),
-(1,'unknown',1,43,'aaaaaaaaaaaaaaaaaaaa',false,-1,-2,0,-3,DATE '1970-01-01'),
-(2,'david',1,43,'b',false,0,0,0,0,DATE '1970-01-02'),
-(3,'todd',1,43,'c',true,3,3,3,3,DATE '1970-01-03')
+(40,'he',0,43,'e',false,35,36,1.2,37,DATE '1970-01-05',cast('he' as varchar(10))),
+(1,'unknown',1,43,'aaaaaaaaaaaaaaaaaaaa',false,-1,-2,0,-3,DATE '1970-01-01',cast('unknown' as varchar(10))),
+(2,'david',1,43,'b',false,0,0,0,0,DATE '1970-01-02',cast('david' as varchar(10))),
+(3,'todd',1,43,'c',true,3,3,3,3,DATE '1970-01-03',cast('todd' as varchar(10)))
 ---- RESULTS
 : 4
 ====
 ---- QUERY
 # VALUES, single row, all cols, results in insert
-upsert into table tdata values (4, 'a', 0, 1, 'b', false, 1, 2, 1.5, 4,DATE '1970-01-04')
+upsert into table tdata values (4, 'a', 0, 1, 'b', false, 1, 2, 1.5, 4,DATE '1970-01-04', cast('a' as varchar(10)))
 ---- RUNTIME_PROFILE
 NumModifiedRows: 1
 NumRowErrors: 0
 ---- LABELS
-ID, NAME, VALF, VALI, VALV, VALB, VALT, VALS, VALD, VALDEC, VALDATE
+ID, NAME, VALF, VALI, VALV, VALB, VALT, VALS, VALD, VALDEC, VALDATE, VALVC
 ---- DML_RESULTS: tdata
-40,'he',0,43,'e',false,35,36,1.2,37,1970-01-05
-1,'unknown',1,43,'aaaaaaaaaaaaaaaaaaaa',false,-1,-2,0,-3,1970-01-01
-2,'david',1,43,'b',false,0,0,0,0,1970-01-02
-3,'todd',1,43,'c',true,3,3,3,3,1970-01-03
-4,'a',0,1,'b',false,1,2,1.5,4,1970-01-04
+40,'he',0,43,'e',false,35,36,1.2,37,1970-01-05,'he'
+1,'unknown',1,43,'aaaaaaaaaaaaaaaaaaaa',false,-1,-2,0,-3,1970-01-01,'unknown'
+2,'david',1,43,'b',false,0,0,0,0,1970-01-02,'david'
+3,'todd',1,43,'c',true,3,3,3,3,1970-01-03,'todd'
+4,'a',0,1,'b',false,1,2,1.5,4,1970-01-04,'a'
 ---- TYPES
-INT,STRING,FLOAT,BIGINT,STRING,BOOLEAN,TINYINT,SMALLINT,DOUBLE,DECIMAL,DATE
+INT,STRING,FLOAT,BIGINT,STRING,BOOLEAN,TINYINT,SMALLINT,DOUBLE,DECIMAL,DATE,STRING
 ====
 ---- QUERY
 # VALUES, single row, all cols, results in update
-upsert into table tdata values (4, 'b', -1, 1, 'a', true, 2, 3, 2.5, 5, DATE '1970-01-04')
+upsert into table tdata values (4, 'b', -1, 1, 'a', true, 2, 3, 2.5, 5, DATE '1970-01-04', cast('b' as varchar(10)))
 ---- RUNTIME_PROFILE
 NumModifiedRows: 1
 NumRowErrors: 0
 ---- LABELS
-ID, NAME, VALF, VALI, VALV, VALB, VALT, VALS, VALD, VALDEC, VALDATE
+ID, NAME, VALF, VALI, VALV, VALB, VALT, VALS, VALD, VALDEC, VALDATE, VALVC
 ---- DML_RESULTS: tdata
-40,'he',0,43,'e',false,35,36,1.2,37,1970-01-05
-1,'unknown',1,43,'aaaaaaaaaaaaaaaaaaaa',false,-1,-2,0,-3,1970-01-01
-2,'david',1,43,'b',false,0,0,0,0,1970-01-02
-3,'todd',1,43,'c',true,3,3,3,3,1970-01-03
-4,'b',-1,1,'a',true,2,3,2.5,5,1970-01-04
+40,'he',0,43,'e',false,35,36,1.2,37,1970-01-05,'he'
+1,'unknown',1,43,'aaaaaaaaaaaaaaaaaaaa',false,-1,-2,0,-3,1970-01-01,'unknown'
+2,'david',1,43,'b',false,0,0,0,0,1970-01-02,'david'
+3,'todd',1,43,'c',true,3,3,3,3,1970-01-03,'todd'
+4,'b',-1,1,'a',true,2,3,2.5,5,1970-01-04,'b'
 ---- TYPES
-INT,STRING,FLOAT,BIGINT,STRING,BOOLEAN,TINYINT,SMALLINT,DOUBLE,DECIMAL,DATE
+INT,STRING,FLOAT,BIGINT,STRING,BOOLEAN,TINYINT,SMALLINT,DOUBLE,DECIMAL,DATE,STRING
 ====
 ---- QUERY
 # VALUES, single row, all cols, insert NULL all types
-upsert into table tdata values (10, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL)
+upsert into table tdata values (10, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL)
 ---- RUNTIME_PROFILE
 NumModifiedRows: 1
 NumRowErrors: 0
 ---- LABELS
-ID, NAME, VALF, VALI, VALV, VALB, VALT, VALS, VALD, VALDEC, VALDATE
+ID, NAME, VALF, VALI, VALV, VALB, VALT, VALS, VALD, VALDEC, VALDATE, VALVC
 ---- DML_RESULTS: tdata
-40,'he',0,43,'e',false,35,36,1.2,37,1970-01-05
-1,'unknown',1,43,'aaaaaaaaaaaaaaaaaaaa',false,-1,-2,0,-3,1970-01-01
-2,'david',1,43,'b',false,0,0,0,0,1970-01-02
-3,'todd',1,43,'c',true,3,3,3,3,1970-01-03
-4,'b',-1,1,'a',true,2,3,2.5,5,1970-01-04
-10,'NULL',NULL,NULL,'NULL',NULL,NULL,NULL,NULL,NULL,NULL
+40,'he',0,43,'e',false,35,36,1.2,37,1970-01-05,'he'
+1,'unknown',1,43,'aaaaaaaaaaaaaaaaaaaa',false,-1,-2,0,-3,1970-01-01,'unknown'
+2,'david',1,43,'b',false,0,0,0,0,1970-01-02,'david'
+3,'todd',1,43,'c',true,3,3,3,3,1970-01-03,'todd'
+4,'b',-1,1,'a',true,2,3,2.5,5,1970-01-04,'b'
+10,'NULL',NULL,NULL,'NULL',NULL,NULL,NULL,NULL,NULL,NULL,'NULL'
 ---- TYPES
-INT,STRING,FLOAT,BIGINT,STRING,BOOLEAN,TINYINT,SMALLINT,DOUBLE,DECIMAL,DATE
+INT,STRING,FLOAT,BIGINT,STRING,BOOLEAN,TINYINT,SMALLINT,DOUBLE,DECIMAL,DATE,STRING
 ====
 ---- QUERY
 # VALUES, single row, all cols, update NULL all types
-upsert into table tdata values (4, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL)
+upsert into table tdata values (4, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL)
 ---- RUNTIME_PROFILE
 NumModifiedRows: 1
 NumRowErrors: 0
 ---- LABELS
-ID, NAME, VALF, VALI, VALV, VALB, VALT, VALS, VALD, VALDEC, VALDATE
+ID, NAME, VALF, VALI, VALV, VALB, VALT, VALS, VALD, VALDEC, VALDATE, VALVC
 ---- DML_RESULTS: tdata
-40,'he',0,43,'e',false,35,36,1.2,37,1970-01-05
-1,'unknown',1,43,'aaaaaaaaaaaaaaaaaaaa',false,-1,-2,0,-3,1970-01-01
-2,'david',1,43,'b',false,0,0,0,0,1970-01-02
-3,'todd',1,43,'c',true,3,3,3,3,1970-01-03
-4,'NULL',NULL,NULL,'NULL',NULL,NULL,NULL,NULL,NULL,NULL
-10,'NULL',NULL,NULL,'NULL',NULL,NULL,NULL,NULL,NULL,NULL
+40,'he',0,43,'e',false,35,36,1.2,37,1970-01-05,'he'
+1,'unknown',1,43,'aaaaaaaaaaaaaaaaaaaa',false,-1,-2,0,-3,1970-01-01,'unknown'
+2,'david',1,43,'b',false,0,0,0,0,1970-01-02,'david'
+3,'todd',1,43,'c',true,3,3,3,3,1970-01-03,'todd'
+4,'NULL',NULL,NULL,'NULL',NULL,NULL,NULL,NULL,NULL,NULL,'NULL'
+10,'NULL',NULL,NULL,'NULL',NULL,NULL,NULL,NULL,NULL,NULL,'NULL'
 ---- TYPES
-INT,STRING,FLOAT,BIGINT,STRING,BOOLEAN,TINYINT,SMALLINT,DOUBLE,DECIMAL,DATE
+INT,STRING,FLOAT,BIGINT,STRING,BOOLEAN,TINYINT,SMALLINT,DOUBLE,DECIMAL,DATE,STRING
 ====
 ---- QUERY
 # VALUES, single row, all cols, update from NULL all types
-upsert into table tdata values (4, 'four', 5, 6, 'f', true, 7, 8, 7.5, 9, DATE '1970-01-04')
+upsert into table tdata values (4, 'four', 5, 6, 'f', true, 7, 8, 7.5, 9, DATE '1970-01-04', cast('four' as varchar(10)))
 ---- RUNTIME_PROFILE
 NumModifiedRows: 1
 NumRowErrors: 0
 ---- LABELS
-ID, NAME, VALF, VALI, VALV, VALB, VALT, VALS, VALD, VALDEC, VALDATE
+ID, NAME, VALF, VALI, VALV, VALB, VALT, VALS, VALD, VALDEC, VALDATE, VALVC
 ---- DML_RESULTS: tdata
-40,'he',0,43,'e',false,35,36,1.2,37,1970-01-05
-1,'unknown',1,43,'aaaaaaaaaaaaaaaaaaaa',false,-1,-2,0,-3,1970-01-01
-2,'david',1,43,'b',false,0,0,0,0,1970-01-02
-3,'todd',1,43,'c',true,3,3,3,3,1970-01-03
-4,'four',5,6,'f',true,7,8,7.5,9,1970-01-04
-10,'NULL',NULL,NULL,'NULL',NULL,NULL,NULL,NULL,NULL,NULL
+40,'he',0,43,'e',false,35,36,1.2,37,1970-01-05,'he'
+1,'unknown',1,43,'aaaaaaaaaaaaaaaaaaaa',false,-1,-2,0,-3,1970-01-01,'unknown'
+2,'david',1,43,'b',false,0,0,0,0,1970-01-02,'david'
+3,'todd',1,43,'c',true,3,3,3,3,1970-01-03,'todd'
+4,'four',5,6,'f',true,7,8,7.5,9,1970-01-04,'four'
+10,'NULL',NULL,NULL,'NULL',NULL,NULL,NULL,NULL,NULL,NULL,'NULL'
 ---- TYPES
-INT,STRING,FLOAT,BIGINT,STRING,BOOLEAN,TINYINT,SMALLINT,DOUBLE,DECIMAL,DATE
+INT,STRING,FLOAT,BIGINT,STRING,BOOLEAN,TINYINT,SMALLINT,DOUBLE,DECIMAL,DATE,STRING
 ====
 ---- QUERY
 # VALUES, single row, all cols, insert boundary values
 upsert into table tdata values
 (max_int(), '', cast('nan' as float), min_bigint(), '', true, max_tinyint(),
-  min_smallint(), cast('inf' as double), cast(999999999 as decimal(9, 0)), DATE '9999-12-31')
+  min_smallint(), cast('inf' as double), cast(999999999 as decimal(9, 0)), DATE '9999-12-31', cast('' as varchar(10)))
 ---- RUNTIME_PROFILE
 NumModifiedRows: 1
 NumRowErrors: 0
 ---- LABELS
-ID, NAME, VALF, VALI, VALV, VALB, VALT, VALS, VALD, VALDEC, VALDATE
+ID, NAME, VALF, VALI, VALV, VALB, VALT, VALS, VALD, VALDEC, VALDATE, VALVC
 ---- DML_RESULTS: tdata
-40,'he',0,43,'e',false,35,36,1.2,37,1970-01-05
-1,'unknown',1,43,'aaaaaaaaaaaaaaaaaaaa',false,-1,-2,0,-3,1970-01-01
-2,'david',1,43,'b',false,0,0,0,0,1970-01-02
-3,'todd',1,43,'c',true,3,3,3,3,1970-01-03
-4,'four',5,6,'f',true,7,8,7.5,9,1970-01-04
-10,'NULL',NULL,NULL,'NULL',NULL,NULL,NULL,NULL,NULL,NULL
-2147483647,'',NaN,-9223372036854775808,'',true,127,-32768,Infinity,999999999,9999-12-31
+40,'he',0,43,'e',false,35,36,1.2,37,1970-01-05,'he'
+1,'unknown',1,43,'aaaaaaaaaaaaaaaaaaaa',false,-1,-2,0,-3,1970-01-01,'unknown'
+2,'david',1,43,'b',false,0,0,0,0,1970-01-02,'david'
+3,'todd',1,43,'c',true,3,3,3,3,1970-01-03,'todd'
+4,'four',5,6,'f',true,7,8,7.5,9,1970-01-04,'four'
+10,'NULL',NULL,NULL,'NULL',NULL,NULL,NULL,NULL,NULL,NULL,'NULL'
+2147483647,'',NaN,-9223372036854775808,'',true,127,-32768,Infinity,999999999,9999-12-31,''
 ---- TYPES
-INT,STRING,FLOAT,BIGINT,STRING,BOOLEAN,TINYINT,SMALLINT,DOUBLE,DECIMAL,DATE
+INT,STRING,FLOAT,BIGINT,STRING,BOOLEAN,TINYINT,SMALLINT,DOUBLE,DECIMAL,DATE,STRING
 ====
 ---- QUERY
 # VALUES, single row, all cols, update boundary values
 upsert into table tdata values
 (max_int(), '', cast('-inf' as float), max_bigint(), '', true, min_tinyint(),
-  max_smallint(), cast('nan' as double), cast(-999999999 as decimal(9, 0)), DATE '0001-01-01')
+  max_smallint(), cast('nan' as double), cast(-999999999 as decimal(9, 0)), DATE '0001-01-01', cast('' as varchar(10)))
 ---- RUNTIME_PROFILE
 NumModifiedRows: 1
 NumRowErrors: 0
 ---- LABELS
-ID, NAME, VALF, VALI, VALV, VALB, VALT, VALS, VALD, VALDEC, VALDATE
+ID, NAME, VALF, VALI, VALV, VALB, VALT, VALS, VALD, VALDEC, VALDATE, VALVC
 ---- DML_RESULTS: tdata
-40,'he',0,43,'e',false,35,36,1.2,37,1970-01-05
-1,'unknown',1,43,'aaaaaaaaaaaaaaaaaaaa',false,-1,-2,0,-3,1970-01-01
-2,'david',1,43,'b',false,0,0,0,0,1970-01-02
-3,'todd',1,43,'c',true,3,3,3,3,1970-01-03
-4,'four',5,6,'f',true,7,8,7.5,9,1970-01-04
-10,'NULL',NULL,NULL,'NULL',NULL,NULL,NULL,NULL,NULL,NULL
-2147483647,'',-Infinity,9223372036854775807,'',true,-128,32767,NaN,-999999999,0001-01-01
+40,'he',0,43,'e',false,35,36,1.2,37,1970-01-05,'he'
+1,'unknown',1,43,'aaaaaaaaaaaaaaaaaaaa',false,-1,-2,0,-3,1970-01-01,'unknown'
+2,'david',1,43,'b',false,0,0,0,0,1970-01-02,'david'
+3,'todd',1,43,'c',true,3,3,3,3,1970-01-03,'todd'
+4,'four',5,6,'f',true,7,8,7.5,9,1970-01-04,'four'
+10,'NULL',NULL,NULL,'NULL',NULL,NULL,NULL,NULL,NULL,NULL,'NULL'
+2147483647,'',-Infinity,9223372036854775807,'',true,-128,32767,NaN,-999999999,0001-01-01,''
 ---- TYPES
-INT,STRING,FLOAT,BIGINT,STRING,BOOLEAN,TINYINT,SMALLINT,DOUBLE,DECIMAL,DATE
+INT,STRING,FLOAT,BIGINT,STRING,BOOLEAN,TINYINT,SMALLINT,DOUBLE,DECIMAL,DATE,STRING
 ====
 ---- QUERY
 # VALUES, single row, subset of cols, results in insert
-upsert into table tdata (id, name, vali, valb, vald) values (5, 'five', -5, NULL, 0.5)
+upsert into table tdata (id, name, vali, valb, vald, valvc) values (5, 'five', -5, NULL, 0.5, cast('five' as varchar(10)))
 ---- RUNTIME_PROFILE
 NumModifiedRows: 1
 NumRowErrors: 0
 ---- LABELS
-ID, NAME, VALF, VALI, VALV, VALB, VALT, VALS, VALD, VALDEC, VALDATE
+ID, NAME, VALF, VALI, VALV, VALB, VALT, VALS, VALD, VALDEC, VALDATE, VALVC
 ---- DML_RESULTS: tdata
-40,'he',0,43,'e',false,35,36,1.2,37,1970-01-05
-1,'unknown',1,43,'aaaaaaaaaaaaaaaaaaaa',false,-1,-2,0,-3,1970-01-01
-2,'david',1,43,'b',false,0,0,0,0,1970-01-02
-3,'todd',1,43,'c',true,3,3,3,3,1970-01-03
-4,'four',5,6,'f',true,7,8,7.5,9,1970-01-04
-10,'NULL',NULL,NULL,'NULL',NULL,NULL,NULL,NULL,NULL,NULL
-2147483647,'',-Infinity,9223372036854775807,'',true,-128,32767,NaN,-999999999,0001-01-01
-5,'five',NULL,-5,'NULL',NULL,NULL,NULL,0.5,NULL,NULL
+40,'he',0,43,'e',false,35,36,1.2,37,1970-01-05,'he'
+1,'unknown',1,43,'aaaaaaaaaaaaaaaaaaaa',false,-1,-2,0,-3,1970-01-01,'unknown'
+2,'david',1,43,'b',false,0,0,0,0,1970-01-02,'david'
+3,'todd',1,43,'c',true,3,3,3,3,1970-01-03,'todd'
+4,'four',5,6,'f',true,7,8,7.5,9,1970-01-04,'four'
+10,'NULL',NULL,NULL,'NULL',NULL,NULL,NULL,NULL,NULL,NULL,'NULL'
+2147483647,'',-Infinity,9223372036854775807,'',true,-128,32767,NaN,-999999999,0001-01-01,''
+5,'five',NULL,-5,'NULL',NULL,NULL,NULL,0.5,NULL,NULL,'five'
 ---- TYPES
-INT,STRING,FLOAT,BIGINT,STRING,BOOLEAN,TINYINT,SMALLINT,DOUBLE,DECIMAL,DATE
+INT,STRING,FLOAT,BIGINT,STRING,BOOLEAN,TINYINT,SMALLINT,DOUBLE,DECIMAL,DATE,STRING
 ====
 ---- QUERY
 # VALUES, single row, subset of cols, results in update
-upsert into table tdata (id, name, valf, valv, valb) values (5, NULL, 0, 'six', false)
+upsert into table tdata (id, name, valf, valv, valb, valvc) values (5, NULL, 0, 'six', false, NULL)
 ---- RUNTIME_PROFILE
 NumModifiedRows: 1
 NumRowErrors: 0
 ---- LABELS
-ID, NAME, VALF, VALI, VALV, VALB, VALT, VALS, VALD, VALDEC, VALDATE
+ID, NAME, VALF, VALI, VALV, VALB, VALT, VALS, VALD, VALDEC, VALDATE, VALVC
 ---- DML_RESULTS: tdata
-40,'he',0,43,'e',false,35,36,1.2,37,1970-01-05
-1,'unknown',1,43,'aaaaaaaaaaaaaaaaaaaa',false,-1,-2,0,-3,1970-01-01
-2,'david',1,43,'b',false,0,0,0,0,1970-01-02
-3,'todd',1,43,'c',true,3,3,3,3,1970-01-03
-4,'four',5,6,'f',true,7,8,7.5,9,1970-01-04
-10,'NULL',NULL,NULL,'NULL',NULL,NULL,NULL,NULL,NULL,NULL
-2147483647,'',-Infinity,9223372036854775807,'',true,-128,32767,NaN,-999999999,0001-01-01
-5,'NULL',0,-5,'six',false,NULL,NULL,0.5,NULL,NULL
+40,'he',0,43,'e',false,35,36,1.2,37,1970-01-05,'he'
+1,'unknown',1,43,'aaaaaaaaaaaaaaaaaaaa',false,-1,-2,0,-3,1970-01-01,'unknown'
+2,'david',1,43,'b',false,0,0,0,0,1970-01-02,'david'
+3,'todd',1,43,'c',true,3,3,3,3,1970-01-03,'todd'
+4,'four',5,6,'f',true,7,8,7.5,9,1970-01-04,'four'
+10,'NULL',NULL,NULL,'NULL',NULL,NULL,NULL,NULL,NULL,NULL,'NULL'
+2147483647,'',-Infinity,9223372036854775807,'',true,-128,32767,NaN,-999999999,0001-01-01,''
+5,'NULL',0,-5,'six',false,NULL,NULL,0.5,NULL,NULL,'NULL'
 ---- TYPES
-INT,STRING,FLOAT,BIGINT,STRING,BOOLEAN,TINYINT,SMALLINT,DOUBLE,DECIMAL,DATE
+INT,STRING,FLOAT,BIGINT,STRING,BOOLEAN,TINYINT,SMALLINT,DOUBLE,DECIMAL,DATE,STRING
 ====
 ---- QUERY
 # VALUES, multiple rows, all cols, no errors
 upsert into table tdata values
-(1, 'one', NULL, 44, 'a', true, -1, -2, 0, 0, DATE '1970-01-01'),
-(6, '', -6, 40, 'b', NULL, 0, 0, 10, 11, DATE '1970-01-06'),
-(7, 'seven', 0, min_bigint(), NULL, true, 7, 1, 2, 3, DATE '1970-01-07'),
-(2, 'you', cast('inf' as float), 0, 't', false, NULL, min_smallint(), 0, 0, DATE '1970-01-02')
+(1, 'one', NULL, 44, 'a', true, -1, -2, 0, 0, DATE '1970-01-01', cast('one' as varchar(10))),
+(6, '', -6, 40, 'b', NULL, 0, 0, 10, 11, DATE '1970-01-06', cast('' as varchar(10))),
+(7, 'seven', 0, min_bigint(), NULL, true, 7, 1, 2, 3, DATE '1970-01-07', cast('seven' as varchar(10))),
+(2, 'you', cast('inf' as float), 0, 't', false, NULL, min_smallint(), 0, 0, DATE '1970-01-02', cast('you' as varchar(10)))
 ---- RUNTIME_PROFILE
 NumModifiedRows: 4
 NumRowErrors: 0
 ---- LABELS
-ID, NAME, VALF, VALI, VALV, VALB, VALT, VALS, VALD, VALDEC, VALDATE
+ID, NAME, VALF, VALI, VALV, VALB, VALT, VALS, VALD, VALDEC, VALDATE, VALVC
 ---- DML_RESULTS: tdata
-40,'he',0,43,'e',false,35,36,1.2,37,1970-01-05
-1,'one',NULL,44,'a',true,-1,-2,0,0,1970-01-01
-2,'you',Infinity,0,'t',false,NULL,-32768,0,0,1970-01-02
-3,'todd',1,43,'c',true,3,3,3,3,1970-01-03
-4,'four',5,6,'f',true,7,8,7.5,9,1970-01-04
-10,'NULL',NULL,NULL,'NULL',NULL,NULL,NULL,NULL,NULL,NULL
-2147483647,'',-Infinity,9223372036854775807,'',true,-128,32767,NaN,-999999999,0001-01-01
-5,'NULL',0,-5,'six',false,NULL,NULL,0.5,NULL,NULL
-6,'',-6,40,'b',NULL,0,0,10,11,1970-01-06
-7,'seven',0,-9223372036854775808,'NULL',true,7,1,2,3,1970-01-07
+40,'he',0,43,'e',false,35,36,1.2,37,1970-01-05,'he'
+1,'one',NULL,44,'a',true,-1,-2,0,0,1970-01-01,'one'
+2,'you',Infinity,0,'t',false,NULL,-32768,0,0,1970-01-02,'you'
+3,'todd',1,43,'c',true,3,3,3,3,1970-01-03,'todd'
+4,'four',5,6,'f',true,7,8,7.5,9,1970-01-04,'four'
+10,'NULL',NULL,NULL,'NULL',NULL,NULL,NULL,NULL,NULL,NULL,'NULL'
+2147483647,'',-Infinity,9223372036854775807,'',true,-128,32767,NaN,-999999999,0001-01-01,''
+5,'NULL',0,-5,'six',false,NULL,NULL,0.5,NULL,NULL,'NULL'
+6,'',-6,40,'b',NULL,0,0,10,11,1970-01-06,''
+7,'seven',0,-9223372036854775808,'NULL',true,7,1,2,3,1970-01-07,'seven'
 ---- TYPES
-INT,STRING,FLOAT,BIGINT,STRING,BOOLEAN,TINYINT,SMALLINT,DOUBLE,DECIMAL,DATE
+INT,STRING,FLOAT,BIGINT,STRING,BOOLEAN,TINYINT,SMALLINT,DOUBLE,DECIMAL,DATE,STRING
 ====
 ---- QUERY
 # VALUES, multiple rows, subset of cols, no errors
-upsert into table tdata (id, valb, name, vali) values
-(1, true, NULL, 1),
-(8, false, 'hello', 2),
-(5, NULL, 'five', 10),
-(9, true, 'nine', 9)
+upsert into table tdata (id, valb, name, vali, valvc) values
+(1, true, NULL, 1, NULL),
+(8, false, 'hello', 2, cast('hello' as varchar(10))),
+(5, NULL, 'five', 10, cast('five' as varchar(10))),
+(9, true, 'nine', 9, cast('nine' as varchar(10)))
 ---- RUNTIME_PROFILE
 NumModifiedRows: 4
 NumRowErrors: 0
 ---- LABELS
-ID, NAME, VALF, VALI, VALV, VALB, VALT, VALS, VALD, VALDEC, VALDATE
+ID, NAME, VALF, VALI, VALV, VALB, VALT, VALS, VALD, VALDEC, VALDATE, VALVC
 ---- DML_RESULTS: tdata
-40,'he',0,43,'e',false,35,36,1.2,37,1970-01-05
-1,'NULL',NULL,1,'a',true,-1,-2,0,0,1970-01-01
-2,'you',Infinity,0,'t',false,NULL,-32768,0,0,1970-01-02
-3,'todd',1,43,'c',true,3,3,3,3,1970-01-03
-4,'four',5,6,'f',true,7,8,7.5,9,1970-01-04
-10,'NULL',NULL,NULL,'NULL',NULL,NULL,NULL,NULL,NULL,NULL
-2147483647,'',-Infinity,9223372036854775807,'',true,-128,32767,NaN,-999999999,0001-01-01
-5,'five',0,10,'six',NULL,NULL,NULL,0.5,NULL,NULL
-6,'',-6,40,'b',NULL,0,0,10,11,1970-01-06
-7,'seven',0,-9223372036854775808,'NULL',true,7,1,2,3,1970-01-07
-8,'hello',NULL,2,'NULL',false,NULL,NULL,NULL,NULL,NULL
-9,'nine',NULL,9,'NULL',true,NULL,NULL,NULL,NULL,NULL
+40,'he',0,43,'e',false,35,36,1.2,37,1970-01-05,'he'
+1,'NULL',NULL,1,'a',true,-1,-2,0,0,1970-01-01,'NULL'
+2,'you',Infinity,0,'t',false,NULL,-32768,0,0,1970-01-02,'you'
+3,'todd',1,43,'c',true,3,3,3,3,1970-01-03,'todd'
+4,'four',5,6,'f',true,7,8,7.5,9,1970-01-04,'four'
+10,'NULL',NULL,NULL,'NULL',NULL,NULL,NULL,NULL,NULL,NULL,'NULL'
+2147483647,'',-Infinity,9223372036854775807,'',true,-128,32767,NaN,-999999999,0001-01-01,''
+5,'five',0,10,'six',NULL,NULL,NULL,0.5,NULL,NULL,'five'
+6,'',-6,40,'b',NULL,0,0,10,11,1970-01-06,''
+7,'seven',0,-9223372036854775808,'NULL',true,7,1,2,3,1970-01-07,'seven'
+8,'hello',NULL,2,'NULL',false,NULL,NULL,NULL,NULL,NULL,'hello'
+9,'nine',NULL,9,'NULL',true,NULL,NULL,NULL,NULL,NULL,'nine'
 ---- TYPES
-INT,STRING,FLOAT,BIGINT,STRING,BOOLEAN,TINYINT,SMALLINT,DOUBLE,DECIMAL,DATE
+INT,STRING,FLOAT,BIGINT,STRING,BOOLEAN,TINYINT,SMALLINT,DOUBLE,DECIMAL,DATE,STRING
 ====
 ---- QUERY
 # SELECT, all cols, single row, no errors
 upsert into table tdata
-select id, 'a', valf, vali, valv, NULL, valt, vals, 3, valdec, valdate from tdata where id = 1
+select id, 'a', valf, vali, valv, NULL, valt, vals, 3, valdec, valdate, cast('a' as varchar(10)) from tdata where id = 1
 ---- RUNTIME_PROFILE
 NumModifiedRows: 1
 NumRowErrors: 0
 ---- LABELS
-ID, NAME, VALF, VALI, VALV, VALB, VALT, VALS, VALD, VALDEC, VALDATE
+ID, NAME, VALF, VALI, VALV, VALB, VALT, VALS, VALD, VALDEC, VALDATE, VALVC
 ---- DML_RESULTS: tdata
-40,'he',0,43,'e',false,35,36,1.2,37,1970-01-05
-1,'a',NULL,1,'a',NULL,-1,-2,3,0,1970-01-01
-2,'you',Infinity,0,'t',false,NULL,-32768,0,0,1970-01-02
-3,'todd',1,43,'c',true,3,3,3,3,1970-01-03
-4,'four',5,6,'f',true,7,8,7.5,9,1970-01-04
-10,'NULL',NULL,NULL,'NULL',NULL,NULL,NULL,NULL,NULL,NULL
-2147483647,'',-Infinity,9223372036854775807,'',true,-128,32767,NaN,-999999999,0001-01-01
-5,'five',0,10,'six',NULL,NULL,NULL,0.5,NULL,NULL
-6,'',-6,40,'b',NULL,0,0,10,11,1970-01-06
-7,'seven',0,-9223372036854775808,'NULL',true,7,1,2,3,1970-01-07
-8,'hello',NULL,2,'NULL',false,NULL,NULL,NULL,NULL,NULL
-9,'nine',NULL,9,'NULL',true,NULL,NULL,NULL,NULL,NULL
+40,'he',0,43,'e',false,35,36,1.2,37,1970-01-05,'he'
+1,'a',NULL,1,'a',NULL,-1,-2,3,0,1970-01-01,'a'
+2,'you',Infinity,0,'t',false,NULL,-32768,0,0,1970-01-02,'you'
+3,'todd',1,43,'c',true,3,3,3,3,1970-01-03,'todd'
+4,'four',5,6,'f',true,7,8,7.5,9,1970-01-04,'four'
+10,'NULL',NULL,NULL,'NULL',NULL,NULL,NULL,NULL,NULL,NULL,'NULL'
+2147483647,'',-Infinity,9223372036854775807,'',true,-128,32767,NaN,-999999999,0001-01-01,''
+5,'five',0,10,'six',NULL,NULL,NULL,0.5,NULL,NULL,'five'
+6,'',-6,40,'b',NULL,0,0,10,11,1970-01-06,''
+7,'seven',0,-9223372036854775808,'NULL',true,7,1,2,3,1970-01-07,'seven'
+8,'hello',NULL,2,'NULL',false,NULL,NULL,NULL,NULL,NULL,'hello'
+9,'nine',NULL,9,'NULL',true,NULL,NULL,NULL,NULL,NULL,'nine'
 ---- TYPES
-INT,STRING,FLOAT,BIGINT,STRING,BOOLEAN,TINYINT,SMALLINT,DOUBLE,DECIMAL,DATE
+INT,STRING,FLOAT,BIGINT,STRING,BOOLEAN,TINYINT,SMALLINT,DOUBLE,DECIMAL,DATE,STRING
 ====
 ---- QUERY
 # SELECT, all cols, multiple rows, no errors
 upsert into table tdata
-select id, valv, valf, vali, name, valb, valt, vals, vald, valdec, valdate from tdata where id % 2 = 0
+select id, valv, valf, vali, name, valb, valt, vals, vald, valdec, valdate, cast(valv as varchar(10)) from tdata where id % 2 = 0
 ---- RUNTIME_PROFILE
 NumModifiedRows: 6
 NumRowErrors: 0
 ---- LABELS
-ID, NAME, VALF, VALI, VALV, VALB, VALT, VALS, VALD, VALDEC, VALDATE
+ID, NAME, VALF, VALI, VALV, VALB, VALT, VALS, VALD, VALDEC, VALDATE, VALVC
 ---- DML_RESULTS: tdata
-40,'e',0,43,'he',false,35,36,1.2,37,1970-01-05
-1,'a',NULL,1,'a',NULL,-1,-2,3,0,1970-01-01
-2,'t',Infinity,0,'you',false,NULL,-32768,0,0,1970-01-02
-3,'todd',1,43,'c',true,3,3,3,3,1970-01-03
-4,'f',5,6,'four',true,7,8,7.5,9,1970-01-04
-10,'NULL',NULL,NULL,'NULL',NULL,NULL,NULL,NULL,NULL,NULL
-2147483647,'',-Infinity,9223372036854775807,'',true,-128,32767,NaN,-999999999,0001-01-01
-5,'five',0,10,'six',NULL,NULL,NULL,0.5,NULL,NULL
-6,'b',-6,40,'',NULL,0,0,10,11,1970-01-06
-7,'seven',0,-9223372036854775808,'NULL',true,7,1,2,3,1970-01-07
-8,'NULL',NULL,2,'hello',false,NULL,NULL,NULL,NULL,NULL
-9,'nine',NULL,9,'NULL',true,NULL,NULL,NULL,NULL,NULL
+40,'e',0,43,'he',false,35,36,1.2,37,1970-01-05,'e'
+1,'a',NULL,1,'a',NULL,-1,-2,3,0,1970-01-01,'a'
+2,'t',Infinity,0,'you',false,NULL,-32768,0,0,1970-01-02,'t'
+3,'todd',1,43,'c',true,3,3,3,3,1970-01-03,'todd'
+4,'f',5,6,'four',true,7,8,7.5,9,1970-01-04,'f'
+10,'NULL',NULL,NULL,'NULL',NULL,NULL,NULL,NULL,NULL,NULL,'NULL'
+2147483647,'',-Infinity,9223372036854775807,'',true,-128,32767,NaN,-999999999,0001-01-01,''
+5,'five',0,10,'six',NULL,NULL,NULL,0.5,NULL,NULL,'five'
+6,'b',-6,40,'',NULL,0,0,10,11,1970-01-06,'b'
+7,'seven',0,-9223372036854775808,'NULL',true,7,1,2,3,1970-01-07,'seven'
+8,'NULL',NULL,2,'hello',false,NULL,NULL,NULL,NULL,NULL,'NULL'
+9,'nine',NULL,9,'NULL',true,NULL,NULL,NULL,NULL,NULL,'nine'
 ---- TYPES
-INT,STRING,FLOAT,BIGINT,STRING,BOOLEAN,TINYINT,SMALLINT,DOUBLE,DECIMAL,DATE
+INT,STRING,FLOAT,BIGINT,STRING,BOOLEAN,TINYINT,SMALLINT,DOUBLE,DECIMAL,DATE,STRING
 ====
 ---- QUERY
 # SELECT, subset of cols, single row, no errors
@@ -300,49 +300,49 @@ select int_col, string_col, bigint_col from functional.alltypes where id = 0
 NumModifiedRows: 1
 NumRowErrors: 0
 ---- LABELS
-ID, NAME, VALF, VALI, VALV, VALB, VALT, VALS, VALD, VALDEC, VALDATE
+ID, NAME, VALF, VALI, VALV, VALB, VALT, VALS, VALD, VALDEC, VALDATE, VALVC
 ---- DML_RESULTS: tdata
-40,'e',0,43,'he',false,35,36,1.2,37,1970-01-05
-1,'a',NULL,1,'a',NULL,-1,-2,3,0,1970-01-01
-2,'t',Infinity,0,'you',false,NULL,-32768,0,0,1970-01-02
-3,'todd',1,43,'c',true,3,3,3,3,1970-01-03
-4,'f',5,6,'four',true,7,8,7.5,9,1970-01-04
-10,'NULL',NULL,NULL,'NULL',NULL,NULL,NULL,NULL,NULL,NULL
-2147483647,'',-Infinity,9223372036854775807,'',true,-128,32767,NaN,-999999999,0001-01-01
-5,'five',0,10,'six',NULL,NULL,NULL,0.5,NULL,NULL
-6,'b',-6,40,'',NULL,0,0,10,11,1970-01-06
-7,'seven',0,-9223372036854775808,'NULL',true,7,1,2,3,1970-01-07
-8,'NULL',NULL,2,'hello',false,NULL,NULL,NULL,NULL,NULL
-9,'nine',NULL,9,'NULL',true,NULL,NULL,NULL,NULL,NULL
-0,'NULL',NULL,0,'0',NULL,NULL,NULL,NULL,NULL,NULL
+40,'e',0,43,'he',false,35,36,1.2,37,1970-01-05,'e'
+1,'a',NULL,1,'a',NULL,-1,-2,3,0,1970-01-01,'a'
+2,'t',Infinity,0,'you',false,NULL,-32768,0,0,1970-01-02,'t'
+3,'todd',1,43,'c',true,3,3,3,3,1970-01-03,'todd'
+4,'f',5,6,'four',true,7,8,7.5,9,1970-01-04,'f'
+10,'NULL',NULL,NULL,'NULL',NULL,NULL,NULL,NULL,NULL,NULL,'NULL'
+2147483647,'',-Infinity,9223372036854775807,'',true,-128,32767,NaN,-999999999,0001-01-01,''
+5,'five',0,10,'six',NULL,NULL,NULL,0.5,NULL,NULL,'five'
+6,'b',-6,40,'',NULL,0,0,10,11,1970-01-06,'b'
+7,'seven',0,-9223372036854775808,'NULL',true,7,1,2,3,1970-01-07,'seven'
+8,'NULL',NULL,2,'hello',false,NULL,NULL,NULL,NULL,NULL,'NULL'
+9,'nine',NULL,9,'NULL',true,NULL,NULL,NULL,NULL,NULL,'nine'
+0,'NULL',NULL,0,'0',NULL,NULL,NULL,NULL,NULL,NULL,'NULL'
 ---- TYPES
-INT,STRING,FLOAT,BIGINT,STRING,BOOLEAN,TINYINT,SMALLINT,DOUBLE,DECIMAL,DATE
+INT,STRING,FLOAT,BIGINT,STRING,BOOLEAN,TINYINT,SMALLINT,DOUBLE,DECIMAL,DATE,STRING
 ====
 ---- QUERY
 # SELECT, subset of cols, multiple rows, no errors
-upsert into table tdata (id, valb, name, valt)
-select int_col, bool_col, string_col, tinyint_col from functional.alltypes where id < 4
+upsert into table tdata (id, valb, name, valt, valvc)
+select int_col, bool_col, string_col, tinyint_col, cast(string_col as varchar(10)) from functional.alltypes where id < 4
 ---- RUNTIME_PROFILE
 NumModifiedRows: 4
 NumRowErrors: 0
 ---- LABELS
-ID, NAME, VALF, VALI, VALV, VALB, VALT, VALS, VALD, VALDEC, VALDATE
+ID, NAME, VALF, VALI, VALV, VALB, VALT, VALS, VALD, VALDEC, VALDATE, VALVC
 ---- DML_RESULTS: tdata
-40,'e',0,43,'he',false,35,36,1.2,37,1970-01-05
-1,'1',NULL,1,'a',false,1,-2,3,0,1970-01-01
-2,'2',Infinity,0,'you',true,2,-32768,0,0,1970-01-02
-3,'3',1,43,'c',false,3,3,3,3,1970-01-03
-4,'f',5,6,'four',true,7,8,7.5,9,1970-01-04
-10,'NULL',NULL,NULL,'NULL',NULL,NULL,NULL,NULL,NULL,NULL
-2147483647,'',-Infinity,9223372036854775807,'',true,-128,32767,NaN,-999999999,0001-01-01
-5,'five',0,10,'six',NULL,NULL,NULL,0.5,NULL,NULL
-6,'b',-6,40,'',NULL,0,0,10,11,1970-01-06
-7,'seven',0,-9223372036854775808,'NULL',true,7,1,2,3,1970-01-07
-8,'NULL',NULL,2,'hello',false,NULL,NULL,NULL,NULL,NULL
-9,'nine',NULL,9,'NULL',true,NULL,NULL,NULL,NULL,NULL
-0,'0',NULL,0,'0',true,0,NULL,NULL,NULL,NULL
+40,'e',0,43,'he',false,35,36,1.2,37,1970-01-05,'e'
+1,'1',NULL,1,'a',false,1,-2,3,0,1970-01-01,'1'
+2,'2',Infinity,0,'you',true,2,-32768,0,0,1970-01-02,'2'
+3,'3',1,43,'c',false,3,3,3,3,1970-01-03,'3'
+4,'f',5,6,'four',true,7,8,7.5,9,1970-01-04,'f'
+10,'NULL',NULL,NULL,'NULL',NULL,NULL,NULL,NULL,NULL,NULL,'NULL'
+2147483647,'',-Infinity,9223372036854775807,'',true,-128,32767,NaN,-999999999,0001-01-01,''
+5,'five',0,10,'six',NULL,NULL,NULL,0.5,NULL,NULL,'five'
+6,'b',-6,40,'',NULL,0,0,10,11,1970-01-06,'b'
+7,'seven',0,-9223372036854775808,'NULL',true,7,1,2,3,1970-01-07,'seven'
+8,'NULL',NULL,2,'hello',false,NULL,NULL,NULL,NULL,NULL,'NULL'
+9,'nine',NULL,9,'NULL',true,NULL,NULL,NULL,NULL,NULL,'nine'
+0,'0',NULL,0,'0',true,0,NULL,NULL,NULL,NULL,'0'
 ---- TYPES
-INT,STRING,FLOAT,BIGINT,STRING,BOOLEAN,TINYINT,SMALLINT,DOUBLE,DECIMAL,DATE
+INT,STRING,FLOAT,BIGINT,STRING,BOOLEAN,TINYINT,SMALLINT,DOUBLE,DECIMAL,DATE,STRING
 ====
 ---- QUERY
 # SELECT, decimal column, multiple rows, no errors
@@ -352,27 +352,27 @@ select id, cast((valdec * 2) as decimal(9,0)) from tdata where valdec > 0
 NumModifiedRows: 5
 NumRowErrors: 0
 ---- LABELS
-ID, NAME, VALF, VALI, VALV, VALB, VALT, VALS, VALD, VALDEC, VALDATE
+ID, NAME, VALF, VALI, VALV, VALB, VALT, VALS, VALD, VALDEC, VALDATE, VALVC
 ---- DML_RESULTS: tdata
-40,'e',0,43,'he',false,35,36,1.2,74,1970-01-05
-1,'1',NULL,1,'a',false,1,-2,3,0,1970-01-01
-2,'2',Infinity,0,'you',true,2,-32768,0,0,1970-01-02
-3,'3',1,43,'c',false,3,3,3,6,1970-01-03
-4,'f',5,6,'four',true,7,8,7.5,18,1970-01-04
-10,'NULL',NULL,NULL,'NULL',NULL,NULL,NULL,NULL,NULL,NULL
-2147483647,'',-Infinity,9223372036854775807,'',true,-128,32767,NaN,-999999999,0001-01-01
-5,'five',0,10,'six',NULL,NULL,NULL,0.5,NULL,NULL
-6,'b',-6,40,'',NULL,0,0,10,22,1970-01-06
-7,'seven',0,-9223372036854775808,'NULL',true,7,1,2,6,1970-01-07
-8,'NULL',NULL,2,'hello',false,NULL,NULL,NULL,NULL,NULL
-9,'nine',NULL,9,'NULL',true,NULL,NULL,NULL,NULL,NULL
-0,'0',NULL,0,'0',true,0,NULL,NULL,NULL,NULL
+40,'e',0,43,'he',false,35,36,1.2,74,1970-01-05,'e'
+1,'1',NULL,1,'a',false,1,-2,3,0,1970-01-01,'1'
+2,'2',Infinity,0,'you',true,2,-32768,0,0,1970-01-02,'2'
+3,'3',1,43,'c',false,3,3,3,6,1970-01-03,'3'
+4,'f',5,6,'four',true,7,8,7.5,18,1970-01-04,'f'
+10,'NULL',NULL,NULL,'NULL',NULL,NULL,NULL,NULL,NULL,NULL,'NULL'
+2147483647,'',-Infinity,9223372036854775807,'',true,-128,32767,NaN,-999999999,0001-01-01,''
+5,'five',0,10,'six',NULL,NULL,NULL,0.5,NULL,NULL,'five'
+6,'b',-6,40,'',NULL,0,0,10,22,1970-01-06,'b'
+7,'seven',0,-9223372036854775808,'NULL',true,7,1,2,6,1970-01-07,'seven'
+8,'NULL',NULL,2,'hello',false,NULL,NULL,NULL,NULL,NULL,'NULL'
+9,'nine',NULL,9,'NULL',true,NULL,NULL,NULL,NULL,NULL,'nine'
+0,'0',NULL,0,'0',true,0,NULL,NULL,NULL,NULL,'0'
 ---- TYPES
-INT,STRING,FLOAT,BIGINT,STRING,BOOLEAN,TINYINT,SMALLINT,DOUBLE,DECIMAL,DATE
+INT,STRING,FLOAT,BIGINT,STRING,BOOLEAN,TINYINT,SMALLINT,DOUBLE,DECIMAL,DATE,STRING
 ====
 ---- QUERY
 # VALUES, single row, all cols, null for non-nullable column
-upsert into table tdata values (null, '', 0, 0, cast('' as VARCHAR(20)), false, 0, 0, 0, null, null)
+upsert into table tdata values (null, '', 0, 0, cast('' as VARCHAR(20)), false, 0, 0, 0, null, null, cast('' as varchar(10)))
 ---- RUNTIME_PROFILE
 NumModifiedRows: 0
 NumRowErrors: 1
@@ -387,10 +387,10 @@ NumRowErrors: 1
 ---- QUERY
 # VALUES, multiple rows, all cols, null for non-nullable column
 upsert into table tdata values
-(3,'todd',1,43,'c',true,3,3,3,null,null),
-(4,'four',5,6,'f',true,7,8,7.5,null,null),
-(6,'',-6,40,'b',NULL,0,0,10,null,null),
-(NULL,'seven',0,0,'NULL',true,7,1,2,null,null)
+(3,'todd',1,43,'c',true,3,3,3,null,null,cast('todd' as varchar(10))),
+(4,'four',5,6,'f',true,7,8,7.5,null,null,cast('four' as varchar(10))),
+(6,'',-6,40,'b',NULL,0,0,10,null,null,cast('' as varchar(10))),
+(NULL,'seven',0,0,'NULL',true,7,1,2,null,null,cast('seven' as varchar(10)))
 ---- RUNTIME_PROFILE
 NumModifiedRows: 3
 NumRowErrors: 1
@@ -407,8 +407,9 @@ NumRowErrors: 1
 ====
 ---- QUERY
 # high cardinality
-upsert into table tdata (id, valb, name, valt)
-select int_col, bool_col, string_col, tinyint_col from functional.alltypes limit 100
+upsert into table tdata (id, valb, name, valt, valvc)
+select int_col, bool_col, string_col, tinyint_col, cast(string_col as varchar(10))
+from functional.alltypes limit 100
 ---- RUNTIME_PROFILE
 NumModifiedRows: 100
 NumRowErrors: 0

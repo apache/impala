@@ -105,3 +105,23 @@ NAME,TYPE,COMMENT,PRIMARY_KEY,NULLABLE,DEFAULT_VALUE,ENCODING,COMPRESSION,BLOCK_
 ---- TYPES
 STRING,STRING,STRING,STRING,STRING,STRING,STRING,STRING,STRING
 ====
+---- QUERY
+# Test varchar columns and primary key
+create table describe_varchar_test
+(
+ varchar_pk varchar(1000) PRIMARY KEY,
+ varchar_val varchar(500) not null,
+ varchar_default varchar(200) not null default cast('foo' as varchar(200)),
+ varchar_null varchar(100) null)
+stored as kudu;
+describe describe_varchar_test;
+---- LABELS
+NAME,TYPE,COMMENT,PRIMARY_KEY,NULLABLE,DEFAULT_VALUE,ENCODING,COMPRESSION,BLOCK_SIZE
+---- RESULTS
+'varchar_pk','varchar(1000)','','true','false','','AUTO_ENCODING','DEFAULT_COMPRESSION','0'
+'varchar_val','varchar(500)','','false','false','','AUTO_ENCODING','DEFAULT_COMPRESSION','0'
+'varchar_default','varchar(200)','','false','false','foo','AUTO_ENCODING','DEFAULT_COMPRESSION','0'
+'varchar_null','varchar(100)','','false','true','','AUTO_ENCODING','DEFAULT_COMPRESSION','0'
+---- TYPES
+STRING,STRING,STRING,STRING,STRING,STRING,STRING,STRING,STRING
+====

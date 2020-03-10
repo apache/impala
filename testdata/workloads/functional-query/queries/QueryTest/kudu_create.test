@@ -152,7 +152,7 @@ create table tbl_with_null_defaults (x int primary key, i1 tinyint default null,
   vals string default null, valf float default null, vald double default null,
   valb boolean default null, valdec4 decimal(9) default null,
   valdec8 decimal(18) default null, valdec16 decimal(38) default null,
-  valdate date default null)
+  valdate date default null, valvc varchar(2000) default null)
   partition by hash (x) partitions 3 stored as kudu
 ---- RESULTS
 'Table has been created.'
@@ -163,11 +163,11 @@ insert into tbl_with_null_defaults (x) values (1);
 NumModifiedRows: 1
 NumRowErrors: 0
 ---- LABELS
-X, I1, I2, I3, I4, VALS, VALF, VALD, VALB, VALDEC4, VALDEC8, VALDEC16, VALDATE
+X, I1, I2, I3, I4, VALS, VALF, VALD, VALB, VALDEC4, VALDEC8, VALDEC16, VALDATE, VALVC
 ---- DML_RESULTS: tbl_with_null_defaults
-1,NULL,NULL,NULL,NULL,'NULL',NULL,NULL,NULL,NULL,NULL,NULL,NULL
+1,NULL,NULL,NULL,NULL,'NULL',NULL,NULL,NULL,NULL,NULL,NULL,NULL,'NULL'
 ---- TYPES
-INT,TINYINT,SMALLINT,INT,BIGINT,STRING,FLOAT,DOUBLE,BOOLEAN,DECIMAL,DECIMAL,DECIMAL,DATE
+INT,TINYINT,SMALLINT,INT,BIGINT,STRING,FLOAT,DOUBLE,BOOLEAN,DECIMAL,DECIMAL,DECIMAL,DATE,STRING
 ====
 ---- QUERY
 # Overlapping ranges are rejected by the Kudu client
@@ -421,4 +421,52 @@ select * from kudu_datepk_range;
 2019-12-12
 ---- TYPES
 DATE
+====
+---- QUERY
+# Creates a Kudu table with varchar columns, primary key,
+# hash partition and range partition.
+create table create_varchar
+(
+ valvc varchar(10),
+ primary key (valvc))
+partition by hash (valvc) partitions 4, range (valvc) (
+ partition values < cast('m' as VARCHAR(10)),
+ partition cast('m' as VARCHAR(10)) <= values)
+stored as kudu;
+---- RESULTS
+'Table has been created.'
+====
+---- QUERY
+insert into create_varchar values
+  (cast('a' as VARCHAR(10))),
+  (cast('m' as VARCHAR(10))),
+  (cast('z' as VARCHAR(10)))
+---- RUNTIME_PROFILE
+NumModifiedRows: 3
+NumRowErrors: 0
+---- LABELS
+VALVC
+---- DML_RESULTS: create_varchar
+'a'
+'m'
+'z'
+---- TYPES
+STRING
+====
+---- QUERY
+# Creates as select table with varchar columns and primary key
+create table ctas_varchar primary key (vc)
+stored as kudu
+as select vc from functional.chars_tiny;
+select * from ctas_varchar;
+---- RESULTS
+'1cccc'
+'2cccccc'
+'3ccc'
+'4cc'
+'5c'
+'6c'
+'c'
+---- TYPES
+STRING
 ====

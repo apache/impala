@@ -2199,6 +2199,10 @@ public class AnalyzeDDLTest extends FrontendTestBase {
     AnalyzesOk("create table t primary key (id) partition by hash partitions 3" +
         " stored as kudu as select c1 as id from functional.decimal_tiny");
 
+    // CTAS into Kudu with varchar type
+    AnalyzesOk("create table t primary key (vc) partition by hash partitions 3" +
+        " stored as kudu as select vc from functional.chars_tiny");
+
     // CTAS in an external Kudu table
     AnalysisError("create external table t stored as kudu " +
         "tblproperties('kudu.table_name'='t') as select id, int_col from " +
@@ -2209,9 +2213,6 @@ public class AnalyzeDDLTest extends FrontendTestBase {
     AnalysisError("create table t primary key (cs) partition by hash partitions 3" +
         " stored as kudu as select cs from functional.chars_tiny",
         "Cannot create table 't': Type CHAR(5) is not supported in Kudu");
-    AnalysisError("create table t primary key (vc) partition by hash partitions 3" +
-        " stored as kudu as select vc from functional.chars_tiny",
-        "Cannot create table 't': Type VARCHAR(32) is not supported in Kudu");
     AnalysisError("create table t primary key (id) partition by hash partitions 3" +
         " stored as kudu as select id, s from functional.complextypes_fileformat",
         "Expr 's' in select list returns a complex type 'STRUCT<f1:STRING,f2:INT>'.\n" +

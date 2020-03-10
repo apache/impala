@@ -141,6 +141,28 @@ order by id;
 INT, TIMESTAMP
 ====
 ---- QUERY
+# Push down VARCHAR predicates
+CREATE TABLE kudu_varchar_pred (key INT PRIMARY KEY, varchar_col VARCHAR(10))
+  PARTITION BY HASH (key) PARTITIONS 4 STORED AS KUDU;
+INSERT INTO kudu_varchar_pred VALUES
+  (1, cast('a' as VARCHAR(10))),
+  (2, cast('b' as VARCHAR(10))),
+  (3, cast('m' as VARCHAR(10))),
+  (4, cast('y' as VARCHAR(10))),
+  (5, cast('z' as VARCHAR(10))),
+  (6, NULL);
+select key, varchar_col from kudu_varchar_pred where
+varchar_col >= cast('b' as VARCHAR(10)) and
+varchar_col <= cast('y' as VARCHAR(10))
+order by key;
+---- RESULTS
+2,'b'
+3,'m'
+4,'y'
+---- TYPES
+INT, STRING
+====
+---- QUERY
 # Regression test for IMPALA-6187. Make sure count(*) queries with partition columns only
 # won't miss conjuncts evaluation. 'id' is the partition column here.
 select count(*) from functional_kudu.alltypes where rand() + id < 0.0;
