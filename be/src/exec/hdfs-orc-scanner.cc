@@ -24,6 +24,7 @@
 #include "exec/scanner-context.inline.h"
 #include "exec/scratch-tuple-batch.h"
 #include "exprs/expr.h"
+#include "exprs/scalar-expr.h"
 #include "runtime/collection-value-builder.h"
 #include "runtime/exec-env.h"
 #include "runtime/io/request-context.h"
@@ -138,6 +139,7 @@ HdfsOrcScanner::HdfsOrcScanner(HdfsScanNodeBase* scan_node, RuntimeState* state)
   : HdfsColumnarScanner(scan_node, state),
     dictionary_pool_(new MemPool(scan_node->mem_tracker())),
     data_batch_pool_(new MemPool(scan_node->mem_tracker())),
+    search_args_pool_(new MemPool(scan_node->mem_tracker())),
     assemble_rows_timer_(scan_node_->materialize_tuple_timer()) {
   assemble_rows_timer_.Stop();
 }
@@ -240,6 +242,8 @@ Status HdfsOrcScanner::Open(ScannerContext* context) {
   // blob more efficiently.
   row_reader_options_.setEnableLazyDecoding(true);
 
+  RETURN_IF_ERROR(PrepareSearchArguments());
+
   // To create OrcColumnReaders, we need the selected orc schema. It's a subset of the
   // file schema: a tree of selected orc types and can only be got from an orc::RowReader
   // (by orc::RowReader::getSelectedType).
@@ -290,6 +294,9 @@ void HdfsOrcScanner::Close(RowBatch* row_batch) {
     scratch_batch_->ReleaseResources(nullptr);
   }
   orc_root_batch_.reset(nullptr);
+  search_args_pool_->FreeAll();
+
+  ScalarExprEvaluator::Close(min_max_conjunct_evals_, state_);
 
   // Verify all resources (if any) have been transferred.
   DCHECK_EQ(template_tuple_pool_->total_allocated_bytes(), 0);
@@ -739,8 +746,7 @@ Status HdfsOrcScanner::NextStripe() {
       continue;
     }
 
-    // TODO: check if this stripe can be skipped by stats. e.g. IMPALA-6505 In that case,
-    // set the file row index in 'orc_root_reader_' accordingly.
+    // Set the file row index in 'orc_root_reader_' accordingly.
     if (first_invocation && acid_synthetic_rowid_ != nullptr) {
       orc_root_reader_->SetFileRowIndex(skipped_rows);
     }
@@ -906,4 +912,239 @@ Status HdfsOrcScanner::AssembleCollection(
   coll_items_read_counter_ += tuple_idx;
   return Status::OK();
 }
+
+/// T is the intended ORC primitive type and U is Impala internal primitive type.
+template<typename T, typename U>
+orc::Literal HdfsOrcScanner::GetOrcPrimitiveLiteral(
+    orc::PredicateDataType predicate_type, void* val) {
+  if (UNLIKELY(!val)) return orc::Literal(predicate_type);
+  T* val_dst = reinterpret_cast<T*>(val);
+  return orc::Literal(static_cast<U>(*val_dst));
+}
+
+orc::PredicateDataType HdfsOrcScanner::GetOrcPredicateDataType(const ColumnType& type) {
+  switch (type.type) {
+    case TYPE_BOOLEAN:
+      return orc::PredicateDataType::BOOLEAN;
+    case TYPE_TINYINT:
+    case TYPE_SMALLINT:
+    case TYPE_INT:
+    case TYPE_BIGINT:
+      return orc::PredicateDataType::LONG;
+    case TYPE_FLOAT:
+    case TYPE_DOUBLE:
+      return orc::PredicateDataType::FLOAT;
+    case TYPE_TIMESTAMP:
+      return orc::PredicateDataType::TIMESTAMP;
+    case TYPE_DATE:
+      return orc::PredicateDataType::DATE;
+    case TYPE_STRING:
+    case TYPE_VARCHAR:
+    case TYPE_CHAR:
+    case TYPE_FIXED_UDA_INTERMEDIATE:
+      return orc::PredicateDataType::STRING;
+    case TYPE_DECIMAL:
+      return orc::PredicateDataType::DECIMAL;
+    default:
+      DCHECK(false) << "Unsupported type: " << type.DebugString();
+      return orc::PredicateDataType::LONG;
+  }
+}
+
+orc::Literal HdfsOrcScanner::GetSearchArgumentLiteral(ScalarExprEvaluator* eval,
+    const ColumnType& dst_type, orc::PredicateDataType* predicate_type) {
+  DCHECK(eval->root().GetNumChildren() == 2);
+  ScalarExpr* literal_expr = eval->root().GetChild(1);
+  const ColumnType& type = literal_expr->type();
+  DCHECK(literal_expr->IsLiteral());
+  *predicate_type = GetOrcPredicateDataType(type);
+  // Since we want to get a literal value, the second parameter below is not used.
+  void* val = eval->GetValue(*literal_expr, nullptr);
+
+  switch (type.type) {
+    case TYPE_BOOLEAN:
+      return GetOrcPrimitiveLiteral<bool, bool>(*predicate_type, val);
+    case TYPE_TINYINT:
+      return GetOrcPrimitiveLiteral<int8_t, int64_t>(*predicate_type, val);
+    case TYPE_SMALLINT:
+      return GetOrcPrimitiveLiteral<int16_t, int64_t>(*predicate_type, val);
+    case TYPE_INT:
+      return GetOrcPrimitiveLiteral<int32_t, int64_t>(*predicate_type, val);
+    case TYPE_BIGINT:
+      return GetOrcPrimitiveLiteral<int64_t, int64_t>(*predicate_type, val);
+    case TYPE_FLOAT:
+      return GetOrcPrimitiveLiteral<float, double>(*predicate_type, val);
+    case TYPE_DOUBLE:
+      return GetOrcPrimitiveLiteral<double, double>(*predicate_type, val);
+    // Predicates on Timestamp are currently skipped in FE. We will focus on them in
+    // IMPALA-10915.
+    case TYPE_TIMESTAMP: {
+      DCHECK(false) << "Timestamp predicate is not supported: IMPALA-10915";
+      return orc::Literal(predicate_type);
+    }
+    case TYPE_DATE: {
+      if (UNLIKELY(!val)) return orc::Literal(predicate_type);
+      const DateValue* dv = reinterpret_cast<const DateValue*>(val);
+      int32_t value = 0;
+      // The date should be valid at this point.
+      DCHECK(dv->ToDaysSinceEpoch(&value));
+      return orc::Literal(*predicate_type, value);
+    }
+    case TYPE_STRING: {
+      if (UNLIKELY(!val)) return orc::Literal(predicate_type);
+      const StringValue* sv = reinterpret_cast<StringValue*>(val);
+      return orc::Literal(sv->ptr, sv->len);
+    }
+    // Predicates on CHAR/VARCHAR are currently skipped in FE. We will focus on them in
+    // IMPALA-10882.
+    case TYPE_VARCHAR: {
+      DCHECK(false) << "Varchar predicate is not supported: IMPALA-10882";
+      return orc::Literal(predicate_type);
+    }
+    case TYPE_CHAR: {
+      DCHECK(false) << "Char predicate is not supported: IMPALA-10882";
+      if (UNLIKELY(!val)) return orc::Literal(predicate_type);
+      const StringValue* sv = reinterpret_cast<StringValue*>(val);
+      char* dst_ptr;
+      if (dst_type.len > sv->len) {
+        dst_ptr = reinterpret_cast<char*>(search_args_pool_->TryAllocate(dst_type.len));
+        if (dst_ptr == nullptr) return orc::Literal(predicate_type);
+        memcpy(dst_ptr, sv->ptr, sv->len);
+        StringValue::PadWithSpaces(dst_ptr, dst_type.len, sv->len);
+      } else {
+        dst_ptr = sv->ptr;
+      }
+      return orc::Literal(dst_ptr, sv->len);
+    }
+    case TYPE_DECIMAL: {
+      if (!val) return orc::Literal(predicate_type);
+      orc::Int128 value;
+      switch (type.GetByteSize()) {
+        case 4: {
+          Decimal4Value* dv4 = reinterpret_cast<Decimal4Value*>(val);
+          value = orc::Int128(dv4->value());
+          break;
+        }
+        case 8: {
+          Decimal8Value* dv8 = reinterpret_cast<Decimal8Value*>(val);
+          value = orc::Int128(dv8->value());
+          break;
+        }
+        case 16: {
+          Decimal16Value* dv16 = reinterpret_cast<Decimal16Value*>(val);
+          value = orc::Int128(static_cast<int64_t>(dv16->value() >> 64), // higher bits
+              static_cast<uint64_t>(dv16->value())); // lower bits
+          break;
+        }
+        default:
+          DCHECK(false) << "Invalid byte size for decimal type: " << type.GetByteSize();
+      }
+      return orc::Literal(value, type.precision, type.scale);
+    }
+    default:
+      DCHECK(false) << "Invalid type";
+      return orc::Literal(orc::PredicateDataType::BOOLEAN);
+  }
+}
+
+Status HdfsOrcScanner::PrepareSearchArguments() {
+  if (!state_->query_options().orc_read_statistics) return Status::OK();
+
+  const TupleDescriptor* min_max_tuple_desc = scan_node_->min_max_tuple_desc();
+  if (!min_max_tuple_desc) return Status::OK();
+  // TODO(IMPALA-10894): pushing down predicates into the ORC reader will mess up the
+  //  synthetic(fake) row id, because the row index in the returned batch might differ
+  //  from the index in file (due to some rows are skipped).
+  if (acid_synthetic_rowid_ != nullptr) {
+    VLOG_FILE << "Skip pushing down predicates on non-ACID ORC files under an ACID "
+                 "table: " << filename();
+    return Status::OK();
+  }
+
+  // Clone the min/max statistics conjuncts.
+  RETURN_IF_ERROR(ScalarExprEvaluator::Clone(&obj_pool_, state_,
+      expr_perm_pool_.get(), context_->expr_results_pool(),
+      scan_node_->min_max_conjunct_evals(), &min_max_conjunct_evals_));
+
+  std::unique_ptr<orc::SearchArgumentBuilder> sarg =
+      orc::SearchArgumentFactory::newBuilder();
+  bool sargs_supported = false;
+
+  DCHECK_EQ(min_max_tuple_desc->slots().size(), min_max_conjunct_evals_.size());
+  for (int i = 0; i < min_max_conjunct_evals_.size(); ++i) {
+    SlotDescriptor* slot_desc = min_max_tuple_desc->slots()[i];
+    ScalarExprEvaluator* eval = min_max_conjunct_evals_[i];
+    ScalarExpr* const_expr = eval->root().GetChild(1);
+    // ORC reader only supports pushing down predicates that constant parts are literal.
+    // We could get non-literal expr if expr rewrites are disabled.
+    if (!const_expr->IsLiteral()) continue;
+    // TODO(IMPALA-10882): push down min-max predicates on CHAR/VARCHAR.
+    if (const_expr->type().type == TYPE_CHAR || const_expr->type().type == TYPE_VARCHAR
+        || slot_desc->type().type == TYPE_CHAR
+        || slot_desc->type().type == TYPE_VARCHAR) {
+      continue;
+    }
+    // TODO(IMPALA-10916): dealing with lhs that is a simple cast expr.
+    if (GetOrcPredicateDataType(slot_desc->type()) !=
+        GetOrcPredicateDataType(const_expr->type())) {
+      continue;
+    }
+
+    //Resolve column path to determine col idx.
+    const orc::Type* node = nullptr;
+    bool pos_field;
+    bool missing_field;
+    RETURN_IF_ERROR(schema_resolver_->ResolveColumn(slot_desc->col_path(),
+       &node, &pos_field, &missing_field));
+
+    if (pos_field || missing_field) continue;
+    // TODO(IMPALA-10882): push down min-max predicates on CHAR/VARCHAR.
+    if (node->getKind() == orc::CHAR || node->getKind() == orc::VARCHAR) continue;
+
+    const string& fn_name = eval->root().function_name();
+    orc::PredicateDataType predicate_type;
+    orc::Literal literal =
+        GetSearchArgumentLiteral(eval, slot_desc->type(), &predicate_type);
+    if (literal.isNull()) {
+      VLOG_QUERY << "Failed to push down predicate " << eval->root().DebugString();
+      continue;
+    }
+
+    if (fn_name == "lt") {
+      sarg->lessThan(node->getColumnId(), predicate_type, literal);
+    } else if (fn_name == "gt") {
+      sarg->startNot()
+          .lessThanEquals(node->getColumnId(), predicate_type, literal)
+          .end();
+    } else if (fn_name == "le") {
+      sarg->lessThanEquals(node->getColumnId(), predicate_type, literal);
+    } else if (fn_name == "ge") {
+      sarg->startNot()
+          .lessThan(node->getColumnId(), predicate_type, literal)
+          .end();
+    } else {
+      DCHECK(false) << "Invalid predicate: " << fn_name;
+      continue;
+    }
+    // If we have reached this far, we have a valid search arg that we can build later.
+    sargs_supported = true;
+  }
+  if (sargs_supported) {
+    try {
+      std::unique_ptr<orc::SearchArgument> final_sarg = sarg->build();
+      VLOG_FILE << "Built search arguments for ORC file: " << filename() << ": "
+          << final_sarg->toString() << ". File schema: " << reader_->getType().toString();
+      row_reader_options_.searchArgument(std::move(final_sarg));
+    } catch (std::exception& e) {
+      string msg = Substitute("Encountered parse error during building search arguments "
+          "in ORC file $0: $1", filename(), e.what());
+      parse_status_ = Status(msg);
+      return parse_status_;
+    }
+  }
+  // Free any expr result allocations accumulated during conjunct evaluation.
+  context_->expr_results_pool()->Clear();
+  return Status::OK();
+}
+
 }

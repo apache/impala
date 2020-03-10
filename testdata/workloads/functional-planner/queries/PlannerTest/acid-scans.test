@@ -296,7 +296,7 @@ PLAN-ROOT SINK
 |  |       columns: all
 |  |     extrapolated-rows=disabled max-scan-range-rows=unavailable
 |  |     mem-estimate=48.00MB mem-reservation=24.00KB thread-reservation=1
-|  |     tuple-ids=5 row-size=28B cardinality=419
+|  |     tuple-ids=7 row-size=28B cardinality=413
 |  |     in pipelines: 04(GETNEXT)
 |  |
 |  03:SCAN HDFS [functional_orc_def.alltypes_deleted_rows]
@@ -395,7 +395,7 @@ Per-Host Resources: mem-estimate=68.94MB mem-reservation=4.98MB thread-reservati
 |  |
 |  |--09:EXCHANGE [BROADCAST]
 |  |  |  mem-estimate=50.74KB mem-reservation=0B thread-reservation=0
-|  |  |  tuple-ids=5 row-size=28B cardinality=419
+|  |  |  tuple-ids=7 row-size=28B cardinality=413
 |  |  |  in pipelines: 04(GETNEXT)
 |  |  |
 |  |  F03:PLAN FRAGMENT [RANDOM] hosts=3 instances=3
@@ -408,7 +408,7 @@ Per-Host Resources: mem-estimate=68.94MB mem-reservation=4.98MB thread-reservati
 |  |       columns: all
 |  |     extrapolated-rows=disabled max-scan-range-rows=unavailable
 |  |     mem-estimate=48.00MB mem-reservation=24.00KB thread-reservation=1
-|  |     tuple-ids=5 row-size=28B cardinality=419
+|  |     tuple-ids=7 row-size=28B cardinality=413
 |  |     in pipelines: 04(GETNEXT)
 |  |
 |  03:SCAN HDFS [functional_orc_def.alltypes_deleted_rows, RANDOM]
@@ -495,7 +495,7 @@ Per-Host Resources: mem-estimate=212.88MB mem-reservation=6.89MB thread-reservat
   |  |     extrapolated-rows=disabled max-scan-range-rows=unavailable
   |  |     file formats: [ORC]
   |  |     mem-estimate=48.00MB mem-reservation=24.00KB thread-reservation=1
-  |  |     tuple-ids=3 row-size=28B cardinality=419
+  |  |     tuple-ids=5 row-size=28B cardinality=413
   |  |     in pipelines: 04(GETNEXT)
   |  |
   |  03:SCAN HDFS [functional_orc_def.alltypes_deleted_rows t2]
@@ -630,7 +630,7 @@ Per-Host Resources: mem-estimate=49.99MB mem-reservation=1.96MB thread-reservati
   |
   |--08:EXCHANGE [BROADCAST]
   |     mem-estimate=50.74KB mem-reservation=0B thread-reservation=0
-  |     tuple-ids=3 row-size=28B cardinality=419
+  |     tuple-ids=5 row-size=28B cardinality=413
   |     in pipelines: 04(GETNEXT)
   |
   03:SCAN HDFS [functional_orc_def.alltypes_deleted_rows t2, RANDOM]
@@ -658,7 +658,7 @@ Per-Host Resources: mem-estimate=48.00MB mem-reservation=24.00KB thread-reservat
      extrapolated-rows=disabled max-scan-range-rows=unavailable
      file formats: [ORC]
      mem-estimate=48.00MB mem-reservation=24.00KB thread-reservation=1
-     tuple-ids=3 row-size=28B cardinality=419
+     tuple-ids=5 row-size=28B cardinality=413
      in pipelines: 04(GETNEXT)
 ====
 # Do a join with itself, but the scanned partitions of 't2' don't have delete delta files.

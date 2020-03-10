@@ -177,6 +177,12 @@ class HdfsOrcScanner : public HdfsColumnarScanner {
   /// Pool to copy non-dictionary buffer into. This pool is responsible for handling
   /// vector batches that do not necessarily fit into one row batch.
   boost::scoped_ptr<MemPool> data_batch_pool_;
+  /// Pool to copy values into when building search arguments. Freed on Close().
+  boost::scoped_ptr<MemPool> search_args_pool_;
+
+  /// Clone of Min/max statistics conjunct evaluators. Has the same lifetime as
+  /// the scanner. Stored in 'obj_pool_'.
+  vector<ScalarExprEvaluator*> min_max_conjunct_evals_;
 
   std::unique_ptr<OrcSchemaResolver> schema_resolver_ = nullptr;
 
@@ -311,6 +317,26 @@ class HdfsOrcScanner : public HdfsColumnarScanner {
 
   void SetSyntheticAcidFieldForOriginalFile(const SlotDescriptor* slot_desc,
       Tuple* template_tuple);
+
+  /// Clones the min/max conjucts into min_max_conjunct_evals_, then builds ORC search
+  /// arguments from the conjuncts. The search arguments will exist for the lifespan of
+  /// the scanner and need not to be updated.
+  Status PrepareSearchArguments() WARN_UNUSED_RESULT;
+
+  /// Helper function for GetLiteralSearchArguments. The template parameter T is the
+  /// type of val, and U is the destination type that the constructor of orc::Literal
+  /// accepts. The conversion is required here, since otherwise multiple implicit
+  /// conversions would be possible.
+  template<typename T, typename U>
+  orc::Literal GetOrcPrimitiveLiteral(orc::PredicateDataType predicate_type, void* val);
+
+  /// Helper function for mapping ColumnType to orc::PredicateDataType.
+  static orc::PredicateDataType GetOrcPredicateDataType(const ColumnType& type);
+
+  /// Returns the literal from the min/max conjucts, with the assumption that the
+  /// evaluator has exactly two children, where the second is a literal.
+  orc::Literal GetSearchArgumentLiteral(ScalarExprEvaluator* eval,
+      const ColumnType& dst_type, orc::PredicateDataType* predicate_type);
 };
 
 } // namespace impala

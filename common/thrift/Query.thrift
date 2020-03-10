@@ -546,6 +546,9 @@ struct TQueryOptions {
   // See comment in ImpalaService.thrift
   135: optional TParquetBloomFilterWrite parquet_bloom_filter_write =
       TParquetBloomFilterWrite.IF_NO_DICT;
+
+  // Indicates whether to use ORC's search argument to push down predicates.
+  136: optional bool orc_read_statistics = true;
 }
 
 // Impala currently has three types of sessions: Beeswax, HiveServer2 and external

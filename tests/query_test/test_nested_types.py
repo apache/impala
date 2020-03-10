@@ -236,8 +236,7 @@ class TestNestedTypesNoMtDop(ImpalaTestSuite):
   def test_parquet_stats(self, vector):
     """Queries that test evaluation of Parquet row group statistics."""
     if vector.get_value('table_format').file_format == 'orc':
-      pytest.skip('Predicate push down on ORC stripe statistics is not supported' +
-                  '(IMPALA-6505)')
+      pytest.skip('This test is specific to Parquet')
     self.run_test_case('QueryTest/nested-types-parquet-stats', vector)
 
   @SkipIfIsilon.hive

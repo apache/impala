@@ -1,0 +1,542 @@
+====
+---- QUERY
+select id, bool_col from functional_orc_def.alltypessmall
+---- RUNTIME_PROFILE
+aggregation(SUM, RowsRead): 100
+====
+---- QUERY
+set explain_level=2;
+explain select count(*) from functional_orc_def.alltypessmall where tinyint_col = 10
+---- RESULTS: VERIFY_IS_SUBSET
+'   orc statistics predicates: tinyint_col = CAST(10 AS TINYINT)'
+====
+---- QUERY
+# Test on predicate x < min_val for tinyint. No rows should be read by the ORC reader.
+select count(*) from functional_orc_def.alltypessmall where tinyint_col < 0
+---- RESULTS
+0
+---- RUNTIME_PROFILE
+aggregation(SUM, RowsRead): 0
+====
+---- QUERY
+# Test on predicate x <= min_val for tinyint.
+select count(*) from functional_orc_def.alltypessmall where tinyint_col <= 0
+---- RESULTS
+12
+---- RUNTIME_PROFILE
+aggregation(SUM, RowsRead): 100
+====
+---- QUERY
+# Test on predicate x >= max_val for tinyint.
+select count(*) from functional_orc_def.alltypessmall where tinyint_col >= 9
+---- RESULTS
+8
+---- RUNTIME_PROFILE
+aggregation(SUM, RowsRead): 100
+====
+---- QUERY
+# Test on predicate x > max_val for tinyint. No rows should be read by the ORC reader.
+select count(*) from functional_orc_def.alltypessmall where tinyint_col > 9
+---- RESULTS
+0
+---- RUNTIME_PROFILE
+aggregation(SUM, RowsRead): 0
+====
+---- QUERY
+# Test EQ predicate with values outside the range.
+select count(*) from functional_orc_def.alltypessmall where tinyint_col = -1
+---- RESULTS
+0
+---- RUNTIME_PROFILE
+aggregation(SUM, RowsRead): 0
+====
+---- QUERY
+# Test EQ predicate with values outside the range.
+select count(*) from functional_orc_def.alltypessmall where tinyint_col = 10
+---- RESULTS
+0
+---- RUNTIME_PROFILE
+aggregation(SUM, RowsRead): 0
+====
+---- QUERY
+# Test on predicate x < min_val for smallint. No rows should be read by the ORC reader.
+select count(*) from functional_orc_def.alltypessmall where smallint_col < 0
+---- RESULTS
+0
+---- RUNTIME_PROFILE
+aggregation(SUM, RowsRead): 0
+====
+---- QUERY
+# Test on predicate x <= min_val for smallint.
+select count(*) from functional_orc_def.alltypessmall where smallint_col <= 0
+---- RESULTS
+12
+---- RUNTIME_PROFILE
+aggregation(SUM, RowsRead): 100
+====
+---- QUERY
+# Test on predicate x >= max_val for smallint.
+select count(*) from functional_orc_def.alltypessmall where smallint_col >= 9
+---- RESULTS
+8
+---- RUNTIME_PROFILE
+aggregation(SUM, RowsRead): 100
+====
+---- QUERY
+# Test on predicate x > max_val for smallint. No rows should be read by the ORC reader.
+select count(*) from functional_orc_def.alltypessmall where smallint_col > 9
+---- RESULTS
+0
+---- RUNTIME_PROFILE
+aggregation(SUM, RowsRead): 0
+====
+---- QUERY
+# Test EQ predicate with values outside the range.
+select count(*) from functional_orc_def.alltypessmall where smallint_col = -1
+---- RESULTS
+0
+---- RUNTIME_PROFILE
+aggregation(SUM, RowsRead): 0
+====
+---- QUERY
+# Test EQ predicate with values outside the range.
+select count(*) from functional_orc_def.alltypessmall where smallint_col = 10
+---- RESULTS
+0
+---- RUNTIME_PROFILE
+aggregation(SUM, RowsRead): 0
+====
+---- QUERY
+# Test on predicate x < min_val for int. No rows should be read by the ORC reader.
+select count(*) from functional_orc_def.alltypessmall where int_col < 0
+---- RESULTS
+0
+---- RUNTIME_PROFILE
+aggregation(SUM, RowsRead): 0
+====
+---- QUERY
+# Test on predicate x <= min_val for int.
+select count(*) from functional_orc_def.alltypessmall where int_col <= 0
+---- RESULTS
+12
+---- RUNTIME_PROFILE
+aggregation(SUM, RowsRead): 100
+====
+---- QUERY
+# Test on predicate x >= max_val for int.
+select count(*) from functional_orc_def.alltypessmall where int_col >= 9
+---- RESULTS
+8
+---- RUNTIME_PROFILE
+aggregation(SUM, RowsRead): 100
+====
+---- QUERY
+# Test on predicate x > max_val for int. No rows should be read by the ORC reader.
+select count(*) from functional_orc_def.alltypessmall where int_col > 9
+---- RESULTS
+0
+---- RUNTIME_PROFILE
+aggregation(SUM, RowsRead): 0
+====
+---- QUERY
+# Test EQ predicate with values outside the range.
+select count(*) from functional_orc_def.alltypessmall where int_col = -1
+---- RESULTS
+0
+---- RUNTIME_PROFILE
+aggregation(SUM, RowsRead): 0
+====
+---- QUERY
+# Test EQ predicate with values outside the range.
+select count(*) from functional_orc_def.alltypessmall where int_col = 10
+---- RESULTS
+0
+---- RUNTIME_PROFILE
+aggregation(SUM, RowsRead): 0
+====
+---- QUERY
+# Test on predicate x < min_val for bigint. No rows should be read by the ORC reader.
+select count(*) from functional_orc_def.alltypessmall where bigint_col < 0
+---- RESULTS
+0
+---- RUNTIME_PROFILE
+aggregation(SUM, RowsRead): 0
+====
+---- QUERY
+# Test on predicate x <= min_val for bigint.
+select count(*) from functional_orc_def.alltypessmall where bigint_col <= 0
+---- RESULTS
+12
+---- RUNTIME_PROFILE
+aggregation(SUM, RowsRead): 100
+====
+---- QUERY
+# Test on predicate x >= max_val for bigint.
+select count(*) from functional_orc_def.alltypessmall where bigint_col >= 90
+---- RESULTS
+8
+---- RUNTIME_PROFILE
+aggregation(SUM, RowsRead): 100
+====
+---- QUERY
+# Test on predicate x > max_val for bigint. No rows should be read by the ORC reader.
+select count(*) from functional_orc_def.alltypessmall where bigint_col > 90
+---- RESULTS
+0
+---- RUNTIME_PROFILE
+aggregation(SUM, RowsRead): 0
+====
+---- QUERY
+# Test EQ predicate with values outside the range.
+select count(*) from functional_orc_def.alltypessmall where bigint_col = -1
+---- RESULTS
+0
+---- RUNTIME_PROFILE
+aggregation(SUM, RowsRead): 0
+====
+---- QUERY
+# Test EQ predicate with values outside the range.
+select count(*) from functional_orc_def.alltypessmall where bigint_col = 100
+---- RESULTS
+0
+---- RUNTIME_PROFILE
+aggregation(SUM, RowsRead): 0
+====
+---- QUERY
+# Test on predicate x < min_val for float. No rows should be read by the ORC reader.
+select count(*) from functional_orc_def.alltypessmall where float_col < 0
+---- RESULTS
+0
+---- RUNTIME_PROFILE
+aggregation(SUM, RowsRead): 0
+====
+---- QUERY
+# Test on predicate x > max_val for float. No rows should be read by the ORC reader.
+select count(*) from functional_orc_def.alltypessmall where float_col > 9.9
+---- RESULTS
+0
+---- RUNTIME_PROFILE
+aggregation(SUM, RowsRead): 0
+====
+---- QUERY
+# Test on predicate x < min_val for double. No rows should be read by the ORC reader.
+select count(*) from functional_orc_def.alltypessmall where double_col < 0
+---- RESULTS
+0
+---- RUNTIME_PROFILE
+aggregation(SUM, RowsRead): 0
+====
+---- QUERY
+# Test on predicate x > max_val for double. No rows should be read by the ORC reader.
+select count(*) from functional_orc_def.alltypessmall where double_col > 99
+---- RESULTS
+0
+---- RUNTIME_PROFILE
+aggregation(SUM, RowsRead): 0
+====
+---- QUERY
+# Test on predicate x < min_val for string. No rows should be read by the ORC reader.
+select count(*) from functional_orc_def.alltypessmall where string_col < "0"
+---- RESULTS
+0
+---- RUNTIME_PROFILE
+aggregation(SUM, RowsRead): 0
+====
+---- QUERY
+# Test on predicate x <= min_val for string.
+select count(*) from functional_orc_def.alltypessmall where string_col <= "0"
+---- RESULTS
+12
+---- RUNTIME_PROFILE
+aggregation(SUM, RowsRead): 100
+====
+---- QUERY
+# Test on predicate x >= max_val for string.
+select count(*) from functional_orc_def.alltypessmall where string_col >= "9"
+---- RESULTS
+8
+---- RUNTIME_PROFILE
+aggregation(SUM, RowsRead): 100
+====
+---- QUERY
+# Test on predicate x > max_val for string. No rows should be read by the ORC reader.
+select count(*) from functional_orc_def.alltypessmall where string_col > "9"
+---- RESULTS
+0
+---- RUNTIME_PROFILE
+aggregation(SUM, RowsRead): 0
+====
+---- QUERY
+# Test on TIMESTAMP predicates. Currently they are not pushed down (IMPALA-10915).
+select count(*) from functional_orc_def.alltypessmall where timestamp_col < "2009-01-01 00:00:00"
+---- RESULTS
+0
+---- RUNTIME_PROFILE
+aggregation(SUM, RowsRead): 100
+====
+---- QUERY
+# Test on TIMESTAMP predicates. Currently they are not pushed down (IMPALA-10915).
+select count(*) from functional_orc_def.alltypessmall where timestamp_col > "2009-04-03 00:24:00.96"
+---- RESULTS
+0
+---- RUNTIME_PROFILE
+aggregation(SUM, RowsRead): 100
+====
+---- QUERY
+# Test on predicate x < min_val for decimal(9,0).
+# Due to ORC-517 not included in the current Hive version (3.1.3000.7.2.12.0-104),
+# the ORC files have wrong statistics on d1 column showing that its minimum is 0.
+# So we still see RowsRead=5 here.
+select count(*) from functional_orc_def.decimal_tbl where d1 < 1234
+---- RESULTS
+0
+---- RUNTIME_PROFILE
+aggregation(SUM, RowsRead): 5
+====
+---- QUERY
+select count(*) from functional_orc_def.decimal_tbl where d1 < 0
+---- RESULTS
+0
+---- RUNTIME_PROFILE
+aggregation(SUM, RowsRead): 0
+====
+---- QUERY
+# Test on predicate x > max_val for decimal(9,0). No rows should be read by the ORC reader.
+# Use 132842.0 instead of 132842 to workaround IMPALA-10916.
+select count(*) from functional_orc_def.decimal_tbl where d1 > 132842.0
+---- RESULTS
+0
+---- RUNTIME_PROFILE
+aggregation(SUM, RowsRead): 0
+====
+---- QUERY
+# Test on predicate x < min_val for decimal(20,10). No rows should be read by the ORC
+# reader.
+select count(*) from functional_orc_def.decimal_tbl where d3 < 1.23456789
+---- RESULTS
+0
+---- RUNTIME_PROFILE
+aggregation(SUM, RowsRead): 0
+====
+---- QUERY
+# Test on predicate x > max_val for decimal(20,10). No rows should be read by the ORC
+# reader.
+select count(*) from functional_orc_def.decimal_tbl where d3 > 12345.6789
+---- RESULTS
+0
+---- RUNTIME_PROFILE
+aggregation(SUM, RowsRead): 0
+====
+---- QUERY
+# Test on EQ predicate with a value out of the range.
+select count(*) from functional_orc_def.decimal_tbl where d3 = 1.23456788
+---- RESULTS
+0
+---- RUNTIME_PROFILE
+aggregation(SUM, RowsRead): 0
+====
+---- QUERY
+# Test on EQ predicate with a value out of the range.
+select count(*) from functional_orc_def.decimal_tbl where d3 = 12345.6799
+---- RESULTS
+0
+---- RUNTIME_PROFILE
+aggregation(SUM, RowsRead): 0
+====
+---- QUERY
+select count(*) from functional_orc_def.decimal_tbl where d4 > 0.123456789
+---- RESULTS
+0
+---- RUNTIME_PROFILE
+aggregation(SUM, RowsRead): 0
+====
+---- QUERY
+select count(*) from functional_orc_def.decimal_tbl where d4 < 0.123456789
+---- RESULTS
+0
+---- RUNTIME_PROFILE
+aggregation(SUM, RowsRead): 0
+====
+---- QUERY
+select count(*) from functional_orc_def.decimal_tbl where d4 >= 0.12345678
+---- RESULTS
+5
+---- RUNTIME_PROFILE
+aggregation(SUM, RowsRead): 5
+====
+---- QUERY
+select count(*) from functional_orc_def.decimal_tbl where d4 >= 0.12345679
+---- RESULTS
+0
+---- RUNTIME_PROFILE
+aggregation(SUM, RowsRead): 0
+====
+---- QUERY
+# Test with inverted predicate
+select id, bool_col from functional_orc_def.alltypessmall where -1 > int_col
+---- RESULTS
+---- RUNTIME_PROFILE
+aggregation(SUM, RowsRead): 0
+====
+---- QUERY
+# Mix with partitioning columns
+select count(*) from functional_orc_def.alltypessmall where int_col < 0 and year < 2012
+---- RESULTS
+0
+---- RUNTIME_PROFILE
+aggregation(SUM, RowsRead): 0
+====
+---- QUERY
+select id, bool_col from functional_orc_def.alltypessmall where int_col < 3 - 3
+---- RESULTS
+---- RUNTIME_PROFILE
+aggregation(SUM, RowsRead): 0
+====
+---- QUERY
+select id, bool_col from functional_orc_def.alltypessmall where int_col < 3 - 3
+---- RESULTS
+---- RUNTIME_PROFILE
+aggregation(SUM, RowsRead): 0
+====
+---- QUERY
+# Without expr rewrite and thus without constant folding, predicates with const exprs
+# won't be pushed down.
+set enable_expr_rewrites=0;
+select id, bool_col from functional_orc_def.alltypessmall where int_col < 3 - 3
+---- RESULTS
+---- RUNTIME_PROFILE
+aggregation(SUM, RowsRead): 100
+====
+---- QUERY
+select id, bool_col from functional_orc_def.alltypessmall where 5 + 5 < int_col
+---- RESULTS
+---- RUNTIME_PROFILE
+aggregation(SUM, RowsRead): 0
+====
+---- QUERY
+# Without expr rewrite and thus without constant folding, predicates with const exprs
+# won't be pushed down.
+set enable_expr_rewrites=0;
+select id, bool_col from functional_orc_def.alltypessmall where 5 + 5 < int_col
+---- RESULTS
+---- RUNTIME_PROFILE
+aggregation(SUM, RowsRead): 100
+====
+---- QUERY
+# Query that has an implicit cast to a larger integer type
+select count(*) from functional_orc_def.alltypessmall where tinyint_col > 1000000000000
+---- RESULTS
+0
+---- RUNTIME_PROFILE
+aggregation(SUM, RowsRead): 0
+====
+---- QUERY
+# Predicates with explicit casts are not supported when evaluating orc statistics.
+select count(*) from functional_orc_def.alltypessmall where '0' > cast(tinyint_col as string)
+---- RESULTS
+0
+---- RUNTIME_PROFILE
+aggregation(SUM, RowsRead): 100
+====
+---- QUERY
+# Explicit casts between numerical types can violate the transitivity of "min()", so they
+# are not supported when evaluating orc statistics.
+select count(*) from functional_orc_def.alltypes where cast(id as tinyint) < 10;
+---- RESULTS
+3878
+---- RUNTIME_PROFILE
+aggregation(SUM, RowsRead): 7300
+====
+---- QUERY
+# Predicates on array position can't be pushed down into the orc reader.
+select count(*) from functional_orc_def.complextypestbl.int_array where pos < 5;
+---- RESULTS
+9
+---- RUNTIME_PROFILE
+aggregation(SUM, RowsRead): 8
+====
+---- QUERY
+# Test the conversion of constant IN lists to min/max predicats
+select count(*) from functional_orc_def.alltypes where int_col in (-1,-2,-3,-4);
+---- RESULTS
+0
+---- RUNTIME_PROFILE
+aggregation(SUM, RowsRead): 0
+====
+---- QUERY
+select count(*) from functional_orc_def.alltypes where id IN (1,25,49);
+---- RESULTS
+3
+---- RUNTIME_PROFILE
+aggregation(SUM, RowsRead): 310
+====
+---- QUERY
+select count(*) from functional_orc_def.date_tbl
+where date_part in ("2017-11-27", "1399-06-27") and date_col < '0001-06-19';
+---- RESULTS
+0
+---- RUNTIME_PROFILE
+aggregation(SUM, RowsRead): 0
+====
+---- QUERY
+select count(*) from functional_orc_def.date_tbl
+where date_part in ("2017-11-27", "1399-06-27") and date_col > '2018-12-31';
+---- RESULTS
+0
+---- RUNTIME_PROFILE
+aggregation(SUM, RowsRead): 0
+====
+---- QUERY
+# Test predicates on CHAR type. They are not pushed down (IMPALA-10882). Just make sure
+# we don't hit DCHECKs.
+select count(*) from functional_orc_def.chars_tiny where cs < cast('1aaaa' as char(5));
+---- RESULTS
+0
+---- RUNTIME_PROFILE
+aggregation(SUM, RowsRead): 9
+====
+---- QUERY
+# Test predicates on CHAR type. They are not pushed down (IMPALA-10882). Just make sure
+# we don't hit DCHECKs.
+select count(*) from functional_orc_def.chars_tiny where cs > cast('a' as char(5));
+---- RESULTS
+0
+---- RUNTIME_PROFILE
+aggregation(SUM, RowsRead): 9
+====
+---- QUERY
+# Test predicates on VARCHAR type. They are not pushed down (IMPALA-10882). Just make sure
+# we don't hit DCHECKs.
+select count(*) from functional_orc_def.chars_tiny where vc < cast('1cccc' as varchar(32));
+---- RESULTS
+0
+---- RUNTIME_PROFILE
+aggregation(SUM, RowsRead): 9
+====
+---- QUERY
+# Test predicates on VARCHAR type. They are not pushed down (IMPALA-10882). Just make sure
+# we don't hit DCHECKs.
+select count(*) from functional_orc_def.chars_tiny where vc > cast('c' as varchar(32));
+---- RESULTS
+0
+---- RUNTIME_PROFILE
+aggregation(SUM, RowsRead): 9
+====
+---- QUERY
+# Test that stats support can be disabled using the orc_read_statistics query option.
+set orc_read_statistics=0;
+select count(*) from functional_orc_def.alltypes where id < 0;
+---- RESULTS
+0
+---- RUNTIME_PROFILE
+aggregation(SUM, RowsRead): 7300
+====
+---- QUERY
+# Test on a larger ORC file that has multiple stripes and each stripe has multiple row
+# groups.
+select count(*) from tpch_orc_def.lineitem where l_orderkey = 1609411;
+---- RESULTS
+7
+---- RUNTIME_PROFILE
+aggregation(SUM, RowsRead): 13501
+====

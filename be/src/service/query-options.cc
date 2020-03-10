@@ -525,6 +525,10 @@ Status impala::SetQueryOption(const string& key, const string& value,
         query_options->__set_parquet_read_statistics(IsTrue(value));
         break;
       }
+      case TImpalaQueryOptions::ORC_READ_STATISTICS: {
+        query_options->__set_orc_read_statistics(IsTrue(value));
+        break;
+      }
       case TImpalaQueryOptions::DEFAULT_JOIN_DISTRIBUTION_MODE: {
         TJoinDistributionMode::type enum_type;
         RETURN_IF_ERROR(GetThriftEnum(value, "default join distribution mode",

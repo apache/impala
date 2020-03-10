@@ -235,6 +235,9 @@ class ScalarExpr : public Expr {
   friend class ScalarFnCall;
   friend class SlotRef;
 
+  // The ORC scanner builds search arguments based on the values it gets from Literal.
+  friend class HdfsOrcScanner;
+
   /// For BE tests
   friend class ExprTest;
   friend class ExprCodegenTest;

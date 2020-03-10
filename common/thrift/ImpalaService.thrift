@@ -693,6 +693,9 @@ enum TImpalaQueryOptions {
   //     ALWAYS     - always write Parquet Bloom filters, even if the row group is fully
   //                  dictionary encoded
   PARQUET_BLOOM_FILTER_WRITE = 134
+
+  // Indicates whether to use ORC's search argument to push down predicates.
+  ORC_READ_STATISTICS = 135
 }
 
 // The summary of a DML statement.
