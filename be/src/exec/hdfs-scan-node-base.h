@@ -434,6 +434,11 @@ class HdfsScanNodeBase : public ScanNode {
   bool PartitionPassesFilters(int32_t partition_id, const std::string& stats_name,
       const std::vector<FilterContext>& filter_ctxs);
 
+  /// Update book-keeping to skip the scan range if it has been issued but will not be
+  /// processed by a scanner. E.g. used to cancel ranges that are filtered out by
+  /// late-arriving filters that could not be applied in IssueInitialScanRanges()
+  void SkipScanRange(io::ScanRange* scan_range);
+
   /// Helper to increase reservation from 'curr_reservation' up to 'ideal_reservation'
   /// that may succeed in getting a partial increase if the full increase is not
   /// possible. First increases to an I/O buffer multiple then increases in I/O buffer
@@ -643,11 +648,15 @@ class HdfsScanNodeBase : public ScanNode {
   /// be increased by this function up to a computed "ideal" reservation, in which case
   /// *reservation is increased to reflect the new reservation.
   ///
+  /// Scan ranges are checked against 'filter_ctxs' and scan ranges belonging to
+  /// partitions that do not pass partition filters are filtered out.
+  ///
   /// Returns Status::OK() and sets 'scan_range' if it gets a range to process. Returns
   /// Status::OK() and sets 'scan_range' to NULL when no more ranges are left to process.
   /// Returns an error status if there was an error getting the range or allocating
   /// buffers.
-  Status StartNextScanRange(int64_t* reservation, io::ScanRange** scan_range);
+  Status StartNextScanRange(const std::vector<FilterContext>& filter_ctxs,
+      int64_t* reservation, io::ScanRange** scan_range);
 
   /// Helper for the CreateAndOpenScanner() implementations in the subclass. Creates and
   /// opens a new scanner for this partition type. Depending on the outcome, the

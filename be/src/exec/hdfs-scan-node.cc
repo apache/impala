@@ -400,7 +400,8 @@ void HdfsScanNode::ScannerThread(bool first_thread, int64_t scanner_thread_reser
     // StartNextScanRange() and the check for when all ranges are complete.
     int remaining_scan_range_submissions = remaining_scan_range_submissions_.Load();
     ScanRange* scan_range;
-    Status status = StartNextScanRange(&scanner_thread_reservation, &scan_range);
+    Status status =
+        StartNextScanRange(filter_ctxs, &scanner_thread_reservation, &scan_range);
     if (!status.ok()) {
       unique_lock<timed_mutex> l(lock_);
       // If there was already an error, the main thread will do the cleanup
@@ -471,23 +472,6 @@ void HdfsScanNode::ProcessSplit(const vector<FilterContext>& filter_ctxs,
   DCHECK(partition != nullptr) << "table_id=" << hdfs_table_->id()
                                << " partition_id=" << partition_id
                                << "\n" << PrintThrift(runtime_state_->instance_ctx());
-
-  if (!PartitionPassesFilters(partition_id, FilterStats::SPLITS_KEY, filter_ctxs)) {
-    // Avoid leaking unread buffers in scan_range.
-    scan_range->Cancel(Status::CancelledInternal("HDFS partition pruning"));
-    HdfsFileDesc* desc = GetFileDesc(partition_id, *scan_range->file_string());
-    if (metadata->is_sequence_header) {
-      // File ranges haven't been issued yet, skip entire file.
-      UpdateRemainingScanRangeSubmissions(-1);
-      SkipFile(partition->file_format(), desc);
-    } else {
-      // Mark this scan range as done.
-      HdfsScanNodeBase::RangeComplete(partition->file_format(), desc->file_compression,
-          true);
-    }
-    return;
-  }
-
   ScannerContext context(runtime_state_, this, buffer_pool_client(),
       *scanner_thread_reservation, partition, filter_ctxs, expr_results_pool);
   context.AddStream(scan_range, *scanner_thread_reservation);

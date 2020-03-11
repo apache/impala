@@ -94,12 +94,16 @@ class TestRuntimeFilters(ImpalaTestSuite):
     QUERY = """select straight_join *
                from alltypes t1
                     join /*+shuffle*/ alltypestiny t2 on t1.id = t2.id"""
+    self.client.set_configuration(new_vector.get_value('exec_option'))
     self.client.set_configuration_option("DEBUG_ACTION", "1:OPEN:WAIT")
     self.client.set_configuration_option("RUNTIME_FILTER_WAIT_TIME_MS", "10000000")
     # Run same query with different delays to better exercise call paths.
     for delay_s in [0, 1, 2]:
       handle = self.client.execute_async(QUERY)
-      self.wait_for_state(handle, QueryState.RUNNING, 10)
+      # Wait until all the fragments have started up.
+      BE_START_REGEX = 'All [0-9]* execution backends .* started'
+      while re.search(BE_START_REGEX, self.client.get_runtime_profile(handle)) is None:
+        time.sleep(0.2)
       time.sleep(delay_s)  # Give the query time to get blocked waiting for the filter.
       self.client.close_query(handle)
 
@@ -124,9 +128,35 @@ class TestRuntimeFilters(ImpalaTestSuite):
     self.execute_query("SET RUNTIME_FILTER_WAIT_TIME_MS=10000")
     result = self.execute_query("""select STRAIGHT_JOIN * from alltypes inner join
                                 (select * from alltypessmall where smallint_col=-1) v
-                                on v.year = alltypes.year""")
+                                on v.year = alltypes.year""",
+                                new_vector.get_value('exec_option'))
     assert re.search("Files rejected: 8 \(8\)", result.runtime_profile) is not None
     assert re.search("Splits rejected: [^0] \([^0]\)", result.runtime_profile) is None
+
+  def test_file_filtering_late_arriving_filter(self, vector):
+    """Test that late-arriving filters are applied to files when the scanner starts processing
+    each scan range."""
+    if 'kudu' in str(vector.get_value('table_format')):
+      return
+    new_vector = deepcopy(vector)
+    new_vector.get_value('exec_option')['mt_dop'] = vector.get_value('mt_dop')
+    self.change_database(self.client, vector.get_value('table_format'))
+    self.execute_query("SET RUNTIME_FILTER_MODE=GLOBAL")
+    self.execute_query("SET RUNTIME_FILTER_WAIT_TIME_MS=1")
+    self.execute_query("SET NUM_SCANNER_THREADS=1")
+    # This query is crafted so that both scans execute slowly, but the filter should
+    # arrive before the destination scan finishes processing all of its files (there are 8
+    # files per executor). When I tested this, the filter reliably arrived after a single
+    # input file was processed, but the test will still pass as long as it arrives before
+    # the last file starts being processed.
+    result = self.execute_query("""select STRAIGHT_JOIN count(*) from alltypes inner join /*+shuffle*/
+                                     (select distinct * from alltypessmall
+                                      where smallint_col > sleep(100)) v
+                                     on v.id = alltypes.id
+                                   where alltypes.id < sleep(10);""",
+                                   new_vector.get_value('exec_option'))
+    assert re.search("Splits rejected: [^0] \([^0]\)", result.runtime_profile) is not None
+
 
 @SkipIfLocal.multiple_impalad
 class TestBloomFilters(ImpalaTestSuite):

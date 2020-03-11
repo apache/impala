@@ -672,12 +672,44 @@ bool HdfsScanNodeBase::FilePassesFilterPredicates(
   return true;
 }
 
-Status HdfsScanNodeBase::StartNextScanRange(int64_t* reservation,
-    ScanRange** scan_range) {
+void HdfsScanNodeBase::SkipScanRange(io::ScanRange* scan_range) {
+  // Avoid leaking unread buffers in scan_range.
+  scan_range->Cancel(Status::CancelledInternal("HDFS partition pruning"));
+  ScanRangeMetadata* metadata = static_cast<ScanRangeMetadata*>(scan_range->meta_data());
+  int64_t partition_id = metadata->partition_id;
+  HdfsPartitionDescriptor* partition = hdfs_table_->GetPartition(partition_id);
+  DCHECK(partition != nullptr) << "table_id=" << hdfs_table_->id()
+                               << " partition_id=" << partition_id << "\n"
+                               << PrintThrift(runtime_state_->instance_ctx());
+  HdfsFileDesc* desc = GetFileDesc(partition_id, *scan_range->file_string());
+  if (metadata->is_sequence_header) {
+    // File ranges haven't been issued yet, skip entire file.
+    UpdateRemainingScanRangeSubmissions(-1);
+    SkipFile(partition->file_format(), desc);
+  } else {
+    // Mark this scan range as done.
+    HdfsScanNodeBase::RangeComplete(
+        partition->file_format(), desc->file_compression, true);
+  }
+}
+
+Status HdfsScanNodeBase::StartNextScanRange(const std::vector<FilterContext>& filter_ctxs,
+    int64_t* reservation, ScanRange** scan_range) {
   DiskIoMgr* io_mgr = ExecEnv::GetInstance()->disk_io_mgr();
   bool needs_buffers;
-  RETURN_IF_ERROR(reader_context_->GetNextUnstartedRange(scan_range, &needs_buffers));
-  if (*scan_range == nullptr) return Status::OK();
+  // Loop until we've got a scan range or run out of ranges.
+  do {
+    RETURN_IF_ERROR(reader_context_->GetNextUnstartedRange(scan_range, &needs_buffers));
+    if (*scan_range == nullptr) return Status::OK();
+    if (filter_ctxs.size() > 0) {
+      int64_t partition_id =
+          static_cast<ScanRangeMetadata*>((*scan_range)->meta_data())->partition_id;
+      if (!PartitionPassesFilters(partition_id, FilterStats::SPLITS_KEY, filter_ctxs)) {
+        SkipScanRange(*scan_range);
+        *scan_range = nullptr;
+      }
+    }
+  } while (*scan_range == nullptr);
   if (needs_buffers) {
     // Check if we should increase our reservation to read this range more efficiently.
     // E.g. if we are scanning a large text file, we might want extra I/O buffers to
