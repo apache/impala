@@ -1,0 +1,81 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!--
+Licensed to the Apache Software Foundation (ASF) under one
+or more contributor license agreements.  See the NOTICE file
+distributed with this work for additional information
+regarding copyright ownership.  The ASF licenses this file
+to you under the Apache License, Version 2.0 (the
+"License"); you may not use this file except in compliance
+with the License.  You may obtain a copy of the License at
+
+  http://www.apache.org/licenses/LICENSE-2.0
+
+Unless required by applicable law or agreed to in writing,
+software distributed under the License is distributed on an
+"AS IS" BASIS, WITHOUT WARRANTIES OR CONDITIONS OF ANY
+KIND, either express or implied.  See the License for the
+specific language governing permissions and limitations
+under the License.
+-->
+<!DOCTYPE concept PUBLIC "-//OASIS//DTD DITA Concept//EN" "concept.dtd">
+<concept id="hudi">
+  
+  <title>Using the Hudi File Format</title>
+  <titlealts audience="PDF"><navtitle>Hudi Data Files</navtitle></titlealts>
+  <prolog>
+    <metadata>
+      <data name="Category" value="Impala"/>
+      <!-- <data name="Category" value="ORC"/> -->
+      <data name="Category" value="File Formats"/>
+      <data name="Category" value="Tables"/>
+      <data name="Category" value="Developers"/>
+      <data name="Category" value="Data Analysts"/>
+    </metadata>
+  </prolog>
+  
+  <conbody>
+    
+    <p>
+      <indexterm audience="hidden">Hudi support in Impala</indexterm> Impala supports Read Optimized
+      Queries on Hudi tables as an experimental feature. Read Optimized Queries treat the latest
+      table snapshot as the commit or compaction action, expose only base/columnar files in latest
+      file slices, and guarantee the same columnar query performance as a non-Hudi columnar
+      table.</p>
+    <p/>
+    
+    <table>
+      <title>Hudi Format Support in Impala</title>
+      <tgroup cols="5">
+        <colspec colname="1" colwidth="10*"/>
+        <colspec colname="2" colwidth="10*"/>
+        <colspec colname="3" colwidth="20*"/>
+        <colspec colname="4" colwidth="30*"/>
+        <colspec colname="5" colwidth="30*"/>
+        <thead>
+          <row>
+            <entry>
+              File Type
+            </entry>
+            <entry>
+              Format
+            </entry>
+            <entry>
+              Compression Codecs
+            </entry>
+            <entry>
+              Impala Can CREATE?
+            </entry>
+            <entry>
+              Impala Can INSERT?
+            </entry>
+          </row>
+        </thead>
+        <tbody>
+          <row conref="impala_file_formats.xml#file_formats/hudi_support">
+            <entry/>
+          </row>
+        </tbody>
+      </tgroup>
+    </table>
+  </conbody>
+</concept>

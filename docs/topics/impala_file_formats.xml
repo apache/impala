@@ -179,6 +179,16 @@ under the License.
             </entry>
 <!-- <entry rev="2.0.0">Yes, in Impala 2.0 and higher. For earlier Impala releases, load data through <codeph>LOAD DATA</codeph> on data files already in the right format, or use <codeph>INSERT</codeph> in Hive.</entry> -->
           </row>
+          <row id="hudi_support">
+            <entry>
+              <xref href="impala_hudi.xml#hudi">Hudi</xref>
+            </entry>
+            <entry>Structured</entry>
+            <entry>Snappy, gzip, zstd, lz4; currently Snappy by default </entry>
+            <entry>Yes, support for Read Optimized Queries is experimental.</entry>
+            <entry>No. Create an external table in Impala. Set the table location to the Hudi table
+              directory. Alternatively, create the Hudi table in Hive. </entry>
+          </row>
           <row id="rcfile_support">
             <entry>
               <xref href="impala_rcfile.xml#rcfile">RCFile</xref>

@@ -316,6 +316,7 @@ under the License.
     <topicref href="topics/impala_parquet.xml"/>
     <topicref href="topics/impala_orc.xml"/>
     <topicref href="topics/impala_avro.xml"/>
+    <topicref href="topics/impala_hudi.xml"/>
     <topicref href="topics/impala_rcfile.xml"/>
     <topicref href="topics/impala_seqfile.xml"/>
   </topicref>
