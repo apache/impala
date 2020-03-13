@@ -36,10 +36,9 @@ under the License.
   <conbody>
 
     <p>
-      <indexterm audience="hidden">ORC support in Impala</indexterm>
-      Impala supports using ORC data files as an experimental feature since 2.12.
-      To disable it, set --enable_orc_scanner to false when starting the cluster.
-    </p>
+      <indexterm audience="hidden">ORC support in Impala</indexterm> Impala supports using ORC data
+      files. By default, ORC reads are enabled in Impala 3.4.0. To disable, set --enable_orc_scanner
+      to false when starting the cluster. </p>
 
     <table>
       <title>ORC Format Support in Impala</title>

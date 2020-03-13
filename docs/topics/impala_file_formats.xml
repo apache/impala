@@ -125,14 +125,9 @@ under the License.
             <entry>
               gzip, Snappy, LZO, LZ4; currently gzip by default
             </entry>
-            <entry>
-              Yes, in Impala 2.12.0 and higher.
-
-              <p>
-                The ORC support is an experimental feature since Impala-2.12. To disable it, set
-                <codeph>--enable_orc_scanner</codeph> to <codeph>false</codeph> when starting
-                the cluster.
-              </p>
+            <entry> Yes, in Impala 2.12.0 and higher. <p>By default, ORC reads are enabled in Impala
+              3.4.0 and higher. To disable, set <codeph>--enable_orc_scanner</codeph> to 
+              <codeph>false</codeph> when starting the cluster. </p>
             </entry>
             <entry>
               No. Import data by using <codeph>LOAD DATA</codeph> on data files already in the
