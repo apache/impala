@@ -37,33 +37,29 @@ under the License.
 
   <conbody>
 
-    <p rev="2.3.0"> When the <codeph>LIVE_PROGRESS</codeph> query option is set
-      to <codeph>TRUE</codeph>, Impala displays an interactive progress bar
-      showing roughly what percentage of processing has been completed for
-      queries submitted through the <cmdname>impala-shell</cmdname> command.
-      When the query finishes, the progress bar is erased from the
-        <cmdname>impala-shell</cmdname> console output. </p>
+    <p> In Impala 3.4.0 and higher when you start the Impala shell in interactive mode, the
+        <codeph>LIVE_PROGRESS</codeph> query option is set to <codeph>TRUE</codeph> by default. When
+      you run a query, the live progress bar appears in the output of a query. The bar shows roughly
+      the percentage of completed processing. When the query finishes, the live progress bar
+      disappears from the console output. </p>
     <p>Starting in <keyword keyref="impala31"/>, the summary output also
       includes the queuing status consisting of whether the query was queued and
       what was the latest queuing reason.</p>
     <p><b>Type:</b>
       <codeph>Boolean</codeph></p>
     <p><b>Default:</b>
-      <codeph>FALSE (0)</codeph></p>
+      <codeph>TRUE (0)</codeph></p>
 
     <p conref="../shared/impala_common.xml#common/command_line_blurb"/>
-    <p>
-      You can enable this query option within <cmdname>impala-shell</cmdname>
-      by starting the shell with the <codeph>--live_progress</codeph>
-      command-line option.
-      You can still turn this setting off and on again within the shell through the
-      <codeph>SET</codeph> command.
-    </p>
+    <p> You can turn off <codeph>LIVE_PROGRESS</codeph> within the shell 
+      using the <codeph>SET</codeph> command. You can also turn off
+      LIVE_PROGRESS by starting the shell with the <codeph>--disable_live_progress</codeph>
+      command-line option.</p>
 
     <p conref="../shared/impala_common.xml#common/usage_notes_blurb"/>
     <p conref="../shared/impala_common.xml#common/live_reporting_details"/>
     <p>
-      For a more detailed way of tracking the progress of an interactive query through
+      For tracking the progress of an interactive query through
       all phases of processing, see <xref href="impala_live_summary.xml#live_summary"/>.
     </p>
 
@@ -74,18 +70,17 @@ under the License.
       data, the progress bar might reach 100% before the query is entirely finished.
       For example, the query might do work to perform aggregations after all the
       table data has been read. If many of your queries fall into this category,
-      consider using the <codeph>LIVE_SUMMARY</codeph> option instead for
-      more granular progress reporting.
+      consider using the <codeph>LIVE_SUMMARY</codeph> option for more granular progress
+      reporting.
     </p>
-    <p conref="../shared/impala_common.xml#common/impala_shell_progress_reports_compute_stats_caveat"/>
+    <p
+      conref="../shared/impala_common.xml#common/impala_shell_progress_reports_compute_stats_caveat"/>
     <p conref="../shared/impala_common.xml#common/impala_shell_progress_reports_shell_only_caveat"/>
 
     <p conref="../shared/impala_common.xml#common/added_in_230"/>
 
     <p conref="../shared/impala_common.xml#common/example_blurb"/>
-<codeblock><![CDATA[[localhost:21000] > set live_progress=true;
-LIVE_PROGRESS set to true
-[localhost:21000] > select count(*) from customer;
+<codeblock><![CDATA[[localhost:21000] > select count(*) from customer;
 +----------+
 | count(*) |
 +----------+

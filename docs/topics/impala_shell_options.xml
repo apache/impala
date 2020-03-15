@@ -530,10 +530,15 @@ under the License.
             </row>
             <row rev="2.3.0">
               <entry>--live_progress</entry>
-              <entry>N/A</entry>
+              <entry>live_progress=true</entry>
               <entry>Prints a progress bar showing roughly the percentage complete for each query.
-              The information is updated interactively as the query progresses.
-              See <xref href="impala_live_progress.xml#live_progress"/>.</entry>
+                The information is updated interactively as the query progresses.
+                See <xref href="impala_live_progress.xml#live_progress"/>.</entry>
+            </row>
+            <row>
+              <entry>--disable_live_progress</entry>
+              <entry>live_progress=false</entry>
+              <entry>A command line flag allows users to disable live_progress in the interactive mode.</entry>
             </row>
             <row rev="2.3.0">
               <entry>--live_summary</entry>
