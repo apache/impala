@@ -1514,22 +1514,23 @@ alter table partitioned_data set tblproperties ('numRows'='1030000', 'STATS_GENE
       </p>
 
       <p id="live_reporting_details">
-        The output from this query option is printed to standard error. The output is only
-        displayed in interactive mode, that is, not when the <codeph>-q</codeph> or
-        <codeph>-f</codeph> options are used.
+        The output from this query option is printed to standard
+        error. The output is  displayed only in interactive mode, not when the <codeph>-q</codeph>
+        or <codeph>-f</codeph> options are used. 
       </p>
 
       <p id="live_progress_live_summary_asciinema">
         To see how the <codeph>LIVE_PROGRESS</codeph> and <codeph>LIVE_SUMMARY</codeph> query
         options work in real time, see
         <xref href="https://asciinema.org/a/1rv7qippo0fe7h5k1b6k4nexk" scope="external" format="html">this
-        animated demo</xref>.
+          animated demo</xref>.
       </p>
-
+      
       <p rev="2.5.0" id="runtime_filter_mode_blurb">
-        Because the runtime filtering feature is enabled by default only for local processing,
-        the other filtering-related query options have the greatest effect when used in
-        combination with the setting <codeph>RUNTIME_FILTER_MODE=GLOBAL</codeph>.
+        Because the runtime filtering feature is
+        enabled by default only for local processing, the other filtering-related query options have
+        the greatest effect when used in combination with the setting
+          <codeph>RUNTIME_FILTER_MODE=GLOBAL</codeph>. 
       </p>
 
       <note id="square_bracket_hint_caveat" rev="IMPALA-2522">
