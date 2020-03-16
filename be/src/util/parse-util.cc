@@ -16,10 +16,23 @@
 // under the License.
 
 #include "util/parse-util.h"
+
+#include <sstream>
+
+#include <zstd.h>
+#include <boost/algorithm/string/classification.hpp>
+#include <boost/algorithm/string/split.hpp>
+#include <boost/algorithm/string/trim.hpp>
+
 #include "util/mem-info.h"
 #include "util/string-parser.h"
 
 #include "common/names.h"
+
+using boost::algorithm::is_any_of;
+using boost::algorithm::split;
+using boost::algorithm::token_compress_on;
+using boost::algorithm::trim;
 
 namespace impala {
 
@@ -101,4 +114,55 @@ int64_t ParseUtil::ParseMemSpec(const string& mem_spec_str, bool* is_percent,
   return bytes;
 }
 
+Status ParseUtil::ParseCompressionCodec(
+    const string& compression_codec, THdfsCompression::type* type, int* level) {
+  // Acceptable values are:
+  // - zstd:compression_level
+  // - codec
+  vector<string> tokens;
+  split(tokens, compression_codec, is_any_of(":"), token_compress_on);
+  if (tokens.size() > 2) return Status("Invalid compression codec value");
+
+  string& codec_name = tokens[0];
+  trim(codec_name);
+  int compression_level = ZSTD_CLEVEL_DEFAULT;
+  THdfsCompression::type enum_type;
+  RETURN_IF_ERROR(GetThriftEnum(
+      codec_name, "compression codec", _THdfsCompression_VALUES_TO_NAMES, &enum_type));
+
+  if (tokens.size() == 2) {
+    if (enum_type != THdfsCompression::ZSTD) {
+      return Status("Compression level only supported for ZSTD");
+    }
+    StringParser::ParseResult status;
+    string& clevel = tokens[1];
+    trim(clevel);
+    compression_level = StringParser::StringToInt<int>(
+        clevel.c_str(), static_cast<int>(clevel.size()), &status);
+    if (status != StringParser::PARSE_SUCCESS || compression_level < 1
+        || compression_level > ZSTD_maxCLevel()) {
+      return Status(Substitute("Invalid ZSTD compression level '$0'."
+                               " Valid values are in [1,$1]",
+          clevel, ZSTD_maxCLevel()));
+    }
+  }
+  *type = enum_type;
+  *level = compression_level;
+  return Status::OK();
+}
+
+// Return all enum values in a string format, e.g. FOO(1), BAR(2), BAZ(3).
+string GetThriftEnumValues(const map<int, const char*>& enum_values_to_names) {
+  bool first = true;
+  stringstream ss;
+  for (const auto& e : enum_values_to_names) {
+    if (!first) {
+      ss << ", ";
+    } else {
+      first = false;
+    }
+    ss << e.second << "(" << e.first << ")";
+  }
+  return ss.str();
+}
 }

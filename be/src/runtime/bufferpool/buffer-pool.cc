@@ -421,6 +421,8 @@ BufferPool::Client::Client(BufferPool* pool, TmpFileGroup* file_group,
       child_profile, parent_reservation, mem_tracker, reservation_limit, mem_limit_mode);
   counters_.alloc_time = ADD_TIMER(child_profile, "AllocTime");
   counters_.sys_alloc_time = ADD_TIMER(child_profile, "SystemAllocTime");
+  counters_.compression_time = ADD_TIMER(child_profile, "CompressionTime");
+  counters_.encryption_time = ADD_TIMER(child_profile, "EncryptionTime");
   counters_.cumulative_allocations =
       ADD_COUNTER(child_profile, "CumulativeAllocations", TUnit::UNIT);
   counters_.cumulative_bytes_alloced =
@@ -528,7 +530,8 @@ Status BufferPool::Client::StartMoveToPinned(ClientHandle* client, Page* page) {
     DCHECK(page->write_handle != NULL);
     // Don't need on-disk data.
     cl.unlock(); // Don't block progress for other threads operating on other pages.
-    return file_group_->RestoreData(move(page->write_handle), page->buffer.mem_range());
+    return file_group_->RestoreData(
+        move(page->write_handle), page->buffer.mem_range(), &counters_);
   }
   // If the page wasn't in the clean pages list, it must have been evicted.
   return StartMoveEvictedToPinned(&cl, client, page);
@@ -576,8 +579,8 @@ Status BufferPool::Client::FinishMoveEvictedToPinned(Page* page) {
   // Don't hold any locks while reading back the data. It is safe to modify the page's
   // buffer handle without holding any locks because no concurrent operations can modify
   // evicted pages.
-  RETURN_IF_ERROR(
-      file_group_->WaitForAsyncRead(page->write_handle.get(), page->buffer.mem_range()));
+  RETURN_IF_ERROR(file_group_->WaitForAsyncRead(
+      page->write_handle.get(), page->buffer.mem_range(), &counters_));
   file_group_->DestroyWriteHandle(move(page->write_handle));
   page->pin_in_flight = false;
   return Status::OK();
@@ -729,19 +732,18 @@ void BufferPool::Client::WriteDirtyPagesAsync(int64_t min_bytes_to_write) {
       lock_guard<SpinLock> pl(page->buffer_lock);
       DCHECK(file_group_ != NULL);
       DCHECK(page->buffer.is_open());
-      COUNTER_ADD(counters().bytes_written, page->len);
-      COUNTER_ADD(counters().write_io_ops, 1);
       Status status = file_group_->Write(page->buffer.mem_range(),
-          [this, page](const Status& write_status) {
-            WriteCompleteCallback(page, write_status);
-          },
-          &page->write_handle);
+          [this, page](
+              const Status& write_status) { WriteCompleteCallback(page, write_status); },
+          &page->write_handle, &counters_);
       // Exit early on error: there is no point in starting more writes because future
       /// operations for this client will fail regardless.
       if (!status.ok()) {
         write_status_.MergeStatus(status);
         return;
       }
+      COUNTER_ADD(counters().bytes_written, page->write_handle->on_disk_len());
+      COUNTER_ADD(counters().write_io_ops, 1);
     }
     // Now that the write is in flight, update all the state
     Page* tmp = dirty_unpinned_pages_.PopBack();

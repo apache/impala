@@ -18,7 +18,14 @@
 #pragma once
 
 #include <cstdint>
+#include <map>
 #include <string>
+
+#include <boost/algorithm/string/predicate.hpp>
+
+#include "common/status.h"
+#include "gen-cpp/CatalogObjects_types.h" // for THdfsCompression
+#include "gutil/strings/substitute.h"
 
 namespace impala {
 
@@ -40,5 +47,27 @@ class ParseUtil {
   /// Returns -1 if parsing failed.
   static int64_t ParseMemSpec(const std::string& mem_spec_str,
       bool* is_percent, int64_t relative_reference);
+
+  static Status ParseCompressionCodec(
+      const std::string& compression_codec, THdfsCompression::type* type, int* level);
 };
+
+std::string GetThriftEnumValues(const std::map<int, const char*>& enum_values_to_names);
+
+/// Parses a string into a value of 'ENUM_TYPE' - if the string matches the enum name
+/// (case-insensitive), that value is returned.
+/// Return an error for an invalid Thrift enum value.
+template <typename ENUM_TYPE>
+static inline Status GetThriftEnum(const std::string& value, const std::string& desc,
+    const std::map<int, const char*>& enum_values_to_names, ENUM_TYPE* enum_value) {
+  for (const auto& e : enum_values_to_names) {
+    if (boost::algorithm::iequals(value, std::to_string(e.first))
+        || boost::algorithm::iequals(value, e.second)) {
+      *enum_value = static_cast<ENUM_TYPE>(e.first);
+      return Status::OK();
+    }
+  }
+  return Status(strings::Substitute("Invalid $0: '$1'. Valid values are $2.", desc, value,
+      GetThriftEnumValues(enum_values_to_names)));
+}
 }

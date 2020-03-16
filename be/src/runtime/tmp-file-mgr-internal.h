@@ -20,6 +20,7 @@
 
 #include <string>
 
+#include "common/atomic.h"
 #include "runtime/tmp-file-mgr.h"
 
 namespace impala {
@@ -56,6 +57,9 @@ class TmpFile {
   /// Get the disk ID that should be used for IO mgr queueing.
   int AssignDiskQueue() const;
 
+  /// Try to punch a hole in the file of size 'len' at 'offset'.
+  Status PunchHole(int64_t offset, int64_t len);
+
   const std::string& path() const { return path_; }
 
   /// Caller must hold TmpFileMgr::FileGroup::lock_.
@@ -85,8 +89,13 @@ class TmpFile {
   /// The id of the disk on which the physical file lies.
   const int disk_id_;
 
-  /// Current bytes allocated in the file. Modified by AllocateSpace().
-  int64_t bytes_allocated_;
+  /// Total bytes of the file that have been given out by AllocateSpace(). Note that
+  /// these bytes may not be actually using space on the filesystem, either because the
+  /// data hasn't been written or a hole has been punched. Modified by AllocateSpace().
+  int64_t allocation_offset_ = 0;
+
+  /// Bytes reclaimed through hole punching.
+  AtomicInt64 bytes_reclaimed_{0};
 
   /// Set to true to indicate that we shouldn't allocate any more space in this file.
   /// Protected by TmpFileMgr::FileGroup::lock_.

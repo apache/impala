@@ -80,6 +80,8 @@ FAIR_SCHED_CONF=/opt/impala/conf/minicluster-fair-scheduler.xml
 LLAMA_CONF=/opt/impala/conf/minicluster-llama-site.xml
 export TEST_START_CLUSTER_ARGS="--docker_network=${DOCKER_NETWORK}"
 TEST_START_CLUSTER_ARGS+=" --data_cache_dir=/tmp --data_cache_size=500m"
+TEST_START_CLUSTER_ARGS+=" --impalad_args=--disk_spill_compression_codec=lz4"
+TEST_START_CLUSTER_ARGS+=" --impalad_args=--disk_spill_punch_holes=true"
 TEST_START_CLUSTER_ARGS+=" --impalad_args=-fair_scheduler_allocation_path=${FAIR_SCHED_CONF}"
 TEST_START_CLUSTER_ARGS+=" --impalad_args=-llama_site_path=${LLAMA_CONF}"
 export MAX_PYTEST_FAILURES=0

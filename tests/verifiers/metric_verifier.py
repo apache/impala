@@ -35,7 +35,9 @@ METRIC_LIST = [
                "buffer-pool.clean-pages",
                "buffer-pool.clean-page-bytes",
                "impala-server.num-open-beeswax-sessions",
-               "impala-server.num-open-hiveserver2-sessions"]
+               "impala-server.num-open-hiveserver2-sessions",
+               "tmp-file-mgr.scratch-space-bytes-used",
+               "tmp-file-mgr.scratch-space-bytes-used.dir-0"]
 
 class MetricVerifier(object):
   """Reuseable class that can verify common metrics"""

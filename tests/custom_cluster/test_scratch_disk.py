@@ -92,7 +92,9 @@ class TestScratchDir(CustomClusterTestSuite):
     normal_dirs = self.generate_dirs(5)
     self._start_impala_cluster([
       '--impalad_args=-logbuflevel=-1 -scratch_dirs={0}'.format(','.join(normal_dirs)),
-      '--impalad_args=--allow_multiple_scratch_dirs_per_device=false'])
+      '--impalad_args=--allow_multiple_scratch_dirs_per_device=false',
+      '--impalad_args=--disk_spill_compression_codec=zstd',
+      '--impalad_args=--disk_spill_punch_holes=true'])
     self.assert_impalad_log_contains("INFO", "Using scratch directory ",
                                     expected_count=1)
     exec_option = vector.get_value('exec_option')
@@ -169,7 +171,9 @@ class TestScratchDir(CustomClusterTestSuite):
     dirs = self.generate_dirs(3);
     self._start_impala_cluster([
       '--impalad_args=-logbuflevel=-1 -scratch_dirs={0}'.format(','.join(dirs)),
-      '--impalad_args=--allow_multiple_scratch_dirs_per_device=true'])
+      '--impalad_args=--allow_multiple_scratch_dirs_per_device=true',
+      '--impalad_args=--disk_spill_compression_codec=zstd',
+      '--impalad_args=--disk_spill_punch_holes=true'])
     self.assert_impalad_log_contains("INFO", "Using scratch directory ",
                                     expected_count=len(dirs))
     exec_option = vector.get_value('exec_option')

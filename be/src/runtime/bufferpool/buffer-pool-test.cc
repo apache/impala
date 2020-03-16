@@ -55,10 +55,8 @@ using std::uniform_int_distribution;
 using std::uniform_real_distribution;
 
 DECLARE_bool(disk_spill_encryption);
-
-// Note: This is the default scratch dir created by impala.
-// FLAGS_scratch_dirs + TmpFileMgr::TMP_SUB_DIR_NAME.
-const string SCRATCH_DIR = "/tmp/impala-scratch";
+DECLARE_string(disk_spill_compression_codec);
+DECLARE_bool(disk_spill_punch_holes);
 
 // This suffix is appended to a tmp dir
 const string SCRATCH_SUFFIX = "/impala-scratch";
@@ -116,6 +114,13 @@ class BufferPoolTest : public ::testing::Test {
  protected:
   /// Reinitialize test_env_ to have multiple temporary directories.
   vector<string> InitMultipleTmpDirs(int num_dirs) {
+    return InitTmpFileMgr(
+        num_dirs, FLAGS_disk_spill_compression_codec, FLAGS_disk_spill_punch_holes);
+  }
+
+  /// Init a new tmp file manager with additional options.
+  vector<string> InitTmpFileMgr(
+      int num_dirs, const string& compression, bool punch_holes) {
     vector<string> tmp_dirs;
     for (int i = 0; i < num_dirs; ++i) {
       const string& dir = Substitute("/tmp/buffer-pool-test.$0", i);
@@ -127,7 +132,7 @@ class BufferPoolTest : public ::testing::Test {
     }
     test_env_.reset(new TestEnv);
     test_env_->DisableBufferPool();
-    test_env_->SetTmpFileMgrArgs(tmp_dirs, false);
+    test_env_->SetTmpFileMgrArgs(tmp_dirs, false, compression, punch_holes);
     EXPECT_OK(test_env_->Init());
     EXPECT_EQ(num_dirs, test_env_->tmp_file_mgr()->NumActiveTmpDevices());
     return tmp_dirs;
@@ -311,9 +316,9 @@ class BufferPoolTest : public ::testing::Test {
   void WaitForAllWrites(ClientHandle* client) { client->impl_->WaitForAllWrites(); }
 
   // Remove write permissions on scratch files. Return # of scratch files.
-  static int RemoveScratchPerms() {
+  static int RemoveScratchPerms(const string& scratch_dir) {
     int num_files = 0;
-    directory_iterator dir_it(SCRATCH_DIR);
+    directory_iterator dir_it(scratch_dir);
     for (; dir_it != directory_iterator(); ++dir_it) {
       ++num_files;
       EXPECT_EQ(0, chmod(dir_it->path().c_str(), 0));
@@ -377,7 +382,9 @@ class BufferPoolTest : public ::testing::Test {
   void TestEvictionPolicy(int64_t page_size);
   void TestCleanPageLimit(int max_clean_pages, bool randomize_core);
   void TestQueryTeardown(bool write_error);
-  void TestWriteError(int write_delay_ms);
+  void TestWriteError(int write_delay_ms, const string& compression, bool punch_holes);
+  void TestTmpFileAllocateError(const string& compression, bool punch_holes);
+  void TestWriteErrorBlacklist(const string& compression, bool punch_holes);
   void TestRandomInternalSingle(int64_t buffer_len, bool multiple_pins);
   void TestRandomInternalMulti(int num_threads, int64_t buffer_len, bool multiple_pins);
   static const int SINGLE_THREADED_TID = -1;
@@ -1536,7 +1543,9 @@ TEST_F(BufferPoolTest, QueryTeardownWriteError) {
 // Test that the buffer pool handles a write error correctly.  Delete the scratch
 // directory before an operation that would cause a write and test that subsequent API
 // calls return errors as expected.
-void BufferPoolTest::TestWriteError(int write_delay_ms) {
+void BufferPoolTest::TestWriteError(
+    int write_delay_ms, const string& compression, bool punch_holes) {
+  InitTmpFileMgr(1, compression, punch_holes);
   int MAX_NUM_BUFFERS = 2;
   int64_t TOTAL_MEM = MAX_NUM_BUFFERS * TEST_BUFFER_LEN;
   BufferPool pool(test_env_->metrics(), TEST_BUFFER_LEN, TOTAL_MEM, TOTAL_MEM);
@@ -1555,7 +1564,7 @@ void BufferPoolTest::TestWriteError(int write_delay_ms) {
   // Repin the pages
   ASSERT_OK(PinAll(&pool, &client, &pages));
   // Remove permissions to the backing storage so that future writes will fail
-  ASSERT_GT(RemoveScratchPerms(), 0);
+  ASSERT_GT(RemoveScratchPerms(test_env_->tmp_file_mgr()->GetTmpDirPath(0)), 0);
   // Give the first write a chance to fail before the second write starts.
   const int INTERVAL_MS = 10;
   UnpinAll(&pool, &client, &pages, INTERVAL_MS);
@@ -1588,18 +1597,35 @@ void BufferPoolTest::TestWriteError(int write_delay_ms) {
 }
 
 TEST_F(BufferPoolTest, WriteError) {
-  TestWriteError(0);
+  TestWriteError(0, "", false);
+}
+
+TEST_F(BufferPoolTest, WriteErrorCompression) {
+  TestWriteError(0, "snappy", true);
 }
 
 // Regression test for IMPALA-4842 - inject a delay in the write to
 // reproduce the issue.
 TEST_F(BufferPoolTest, WriteErrorWriteDelay) {
-  TestWriteError(100);
+  TestWriteError(100, "", false);
+}
+
+TEST_F(BufferPoolTest, WriteErrorDelayCompression) {
+  TestWriteError(100, "gzip", true);
 }
 
 // Test error handling when temporary file space cannot be allocated to back an unpinned
 // page.
 TEST_F(BufferPoolTest, TmpFileAllocateError) {
+  TestTmpFileAllocateError("", false);
+}
+
+TEST_F(BufferPoolTest, TmpFileAllocateErrorCompression) {
+  TestTmpFileAllocateError("lz4", true);
+}
+
+void BufferPoolTest::TestTmpFileAllocateError(
+    const string& compression, bool punch_holes) {
   const int MAX_NUM_BUFFERS = 2;
   const int64_t TOTAL_MEM = TEST_BUFFER_LEN * MAX_NUM_BUFFERS;
   BufferPool pool(test_env_->metrics(), TEST_BUFFER_LEN, TOTAL_MEM, TOTAL_MEM);
@@ -1615,7 +1641,7 @@ TEST_F(BufferPoolTest, TmpFileAllocateError) {
   pool.Unpin(&client, pages.data());
   WaitForAllWrites(&client);
   // Remove permissions to the temporary files - subsequent operations will fail.
-  ASSERT_GT(RemoveScratchPerms(), 0);
+  ASSERT_GT(RemoveScratchPerms(test_env_->tmp_file_mgr()->GetTmpDirPath(0)), 0);
   // The write error will happen asynchronously.
   pool.Unpin(&client, &pages[1]);
 
@@ -1629,12 +1655,25 @@ TEST_F(BufferPoolTest, TmpFileAllocateError) {
   pool.DeregisterClient(&client);
 }
 
+TEST_F(BufferPoolTest, WriteErrorBlacklist) {
+  TestWriteErrorBlacklist("", false);
+}
+
+TEST_F(BufferPoolTest, WriteErrorBlacklistHolepunch) {
+  TestWriteErrorBlacklist("", true);
+}
+
+TEST_F(BufferPoolTest, WriteErrorBlacklistCompression) {
+  TestWriteErrorBlacklist("lz4", true);
+}
+
 // Test that scratch devices are blacklisted after a write error. The query that
 // encountered the write error should not allocate more pages on that device, but
 // existing pages on the device will remain in use and future queries will use the device.
-TEST_F(BufferPoolTest, WriteErrorBlacklist) {
+void BufferPoolTest::TestWriteErrorBlacklist(
+    const string& compression, bool punch_holes) {
   // Set up two file groups with two temporary dirs.
-  vector<string> tmp_dirs = InitMultipleTmpDirs(2);
+  vector<string> tmp_dirs = InitTmpFileMgr(2, compression, punch_holes);
   // Simulate two concurrent queries.
   const int TOTAL_QUERIES = 3;
   const int INITIAL_QUERIES = 2;
@@ -1940,6 +1979,24 @@ TEST_F(BufferPoolTest, Multi4Random) {
 TEST_F(BufferPoolTest, Multi8Random) {
   TestRandomInternalMulti(8, 8 * 1024, true);
   TestRandomInternalMulti(8, 8 * 1024, false);
+}
+
+// Sanity test with hole punching and no compression.
+// This will be run with and without encryption because those flags are toggled for the
+// entire test suite.
+TEST_F(BufferPoolTest, RandomHolePunch) {
+  InitTmpFileMgr(2, "", false);
+  TestRandomInternalSingle(8 * 1024, true);
+  TestRandomInternalMulti(4, 8 * 1024, true);
+}
+
+// Sanity test with compression and hole punching.
+// This will be run with and without encryption because those flags are toggled for the
+// entire test suite.
+TEST_F(BufferPoolTest, RandomCompressionHolePunch) {
+  InitTmpFileMgr(2, "lz4", true);
+  TestRandomInternalSingle(8 * 1024, true);
+  TestRandomInternalMulti(4, 8 * 1024, true);
 }
 
 // Single-threaded execution of the TestRandomInternalImpl.

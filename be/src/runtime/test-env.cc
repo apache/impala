@@ -62,8 +62,8 @@ Status TestEnv::Init() {
   RETURN_IF_ERROR(exec_env_->disk_io_mgr()->Init());
   exec_env_->tmp_file_mgr_.reset(new TmpFileMgr);
   if (have_tmp_file_mgr_args_) {
-    RETURN_IF_ERROR(
-        tmp_file_mgr()->InitCustom(tmp_dirs_, one_tmp_dir_per_device_, metrics()));
+    RETURN_IF_ERROR(tmp_file_mgr()->InitCustom(tmp_dirs_, one_tmp_dir_per_device_,
+        tmp_file_mgr_compression_, tmp_file_mgr_punch_holes_, metrics()));
   } else {
     RETURN_IF_ERROR(tmp_file_mgr()->Init(metrics()));
   }
@@ -88,11 +88,13 @@ Status TestEnv::Init() {
   return Status::OK();
 }
 
-void TestEnv::SetTmpFileMgrArgs(
-    const std::vector<std::string>& tmp_dirs, bool one_dir_per_device) {
+void TestEnv::SetTmpFileMgrArgs(const vector<string>& tmp_dirs, bool one_dir_per_device,
+    const string& compression, bool punch_holes) {
   have_tmp_file_mgr_args_ = true;
   tmp_dirs_ = tmp_dirs;
   one_tmp_dir_per_device_ = one_dir_per_device;
+  tmp_file_mgr_compression_ = compression;
+  tmp_file_mgr_punch_holes_ = punch_holes;
 }
 
 void TestEnv::SetBufferPoolArgs(int64_t min_buffer_len, int64_t capacity) {

@@ -36,8 +36,8 @@ class TestEnv {
 
   /// Set custom configuration for TmpFileMgr. Only has effect if called before Init().
   /// If not called, the default configuration is used.
-  void SetTmpFileMgrArgs(
-      const std::vector<std::string>& tmp_dirs, bool one_dir_per_device);
+  void SetTmpFileMgrArgs(const std::vector<std::string>& tmp_dirs,
+      bool one_dir_per_device, const std::string& compression, bool punch_holes);
 
   /// Disables creation of a BufferPool instance as part of this TestEnv in Init().
   void DisableBufferPool() { enable_buffer_pool_ = false; }
@@ -85,6 +85,8 @@ class TestEnv {
   bool have_tmp_file_mgr_args_;
   std::vector<std::string> tmp_dirs_;
   bool one_tmp_dir_per_device_;
+  std::string tmp_file_mgr_compression_;
+  bool tmp_file_mgr_punch_holes_;
 
   /// Whether a buffer pool should be created in Init().
   bool enable_buffer_pool_ = true;

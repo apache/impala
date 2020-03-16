@@ -23,10 +23,13 @@
 
 #include <mutex>
 #include <boost/scoped_ptr.hpp>
+#include <gtest/gtest_prod.h>
 
 #include "common/object-pool.h"
 #include "common/status.h"
+#include "gen-cpp/CatalogObjects_types.h" // for THdfsCompression
 #include "gen-cpp/Types_types.h" // for TUniqueId
+#include "runtime/scoped-buffer.h"
 #include "util/condition-variable.h"
 #include "util/mem-range.h"
 #include "util/metrics-fwd.h"
@@ -41,6 +44,8 @@ namespace io {
   class ScanRange;
   class WriteRange;
 }
+struct BufferPoolClientCounters;
+class MemTracker;
 class TmpFile;
 class TmpFileGroup;
 class TmpWriteHandle;
@@ -109,6 +114,8 @@ class TmpFileMgr {
 
   TmpFileMgr();
 
+  ~TmpFileMgr();
+
   /// Creates the configured tmp directories. If multiple directories are specified per
   /// disk, only one is created and used. Must be called after DiskInfo::Init().
   Status Init(MetricGroup* metrics) WARN_UNUSED_RESULT;
@@ -119,9 +126,11 @@ class TmpFileMgr {
   /// use the command-line syntax, i.e. <path>[:<limit>]. The first variant takes
   /// a comma-separated list, the second takes a vector.
   Status InitCustom(const std::string& tmp_dirs_spec, bool one_dir_per_device,
+      const std::string& compression_codec, bool punch_holes,
       MetricGroup* metrics) WARN_UNUSED_RESULT;
   Status InitCustom(const std::vector<std::string>& tmp_dir_specifiers,
-      bool one_dir_per_device, MetricGroup* metrics) WARN_UNUSED_RESULT;
+      bool one_dir_per_device, const std::string& compression_codec, bool punch_holes,
+      MetricGroup* metrics) WARN_UNUSED_RESULT;
 
   /// Return the scratch directory path for the device.
   std::string GetTmpDirPath(DeviceId device_id) const;
@@ -133,6 +142,24 @@ class TmpFileMgr {
   /// Return vector with device ids of all tmp devices being actively used.
   /// I.e. those that haven't been blacklisted.
   std::vector<DeviceId> ActiveTmpDevices();
+
+  MemTracker* compressed_buffer_tracker() const {
+    return compressed_buffer_tracker_.get();
+  }
+
+  /// The type of spill-to-disk compression in use for spilling.
+  THdfsCompression::type compression_codec() const { return compression_codec_; }
+  bool compression_enabled() const {
+    return compression_codec_ != THdfsCompression::NONE;
+  }
+  int compression_level() const { return compression_level_; }
+  bool punch_holes() const { return punch_holes_; }
+
+  /// The minimum size of hole that we will try to punch in a scratch file.
+  /// This avoids ineffective hole-punching where we only punch a hole in
+  /// part of a block and can't reclaim space. 4kb is chosen based on Linux
+  /// filesystem typically using 4kb or smaller blocks
+  static constexpr int64_t HOLE_PUNCH_BLOCK_SIZE_BYTES = 4096;
 
  private:
   friend class TmpFileMgrTest;
@@ -147,17 +174,32 @@ class TmpFileMgr {
   void NewFile(TmpFileGroup* file_group, DeviceId device_id,
     std::unique_ptr<TmpFile>* new_file);
 
-  bool initialized_;
+  bool initialized_ = false;
+
+  /// The type of spill-to-disk compression in use for spilling. NONE means no
+  /// compression is used.
+  THdfsCompression::type compression_codec_ = THdfsCompression::NONE;
+
+  /// The compression level, which is used for certain compression codecs like ZSTD
+  /// and ignored otherwise. -1 means not set/invalid.
+  int compression_level_ = -1;
+
+  /// Whether hole punching is enabled.
+  bool punch_holes_ = false;
 
   /// The paths of the created tmp directories.
   std::vector<TmpDir> tmp_dirs_;
 
+  /// Memory tracker to track compressed buffers. Set up in InitCustom() if disk spill
+  /// compression is enabled
+  std::unique_ptr<MemTracker> compressed_buffer_tracker_;
+
   /// Metrics to track active scratch directories.
-  IntGauge* num_active_scratch_dirs_metric_;
-  SetMetric<std::string>* active_scratch_dirs_metric_;
+  IntGauge* num_active_scratch_dirs_metric_ = nullptr;
+  SetMetric<std::string>* active_scratch_dirs_metric_ = nullptr;
 
   /// Metrics to track the scratch space HWM.
-  AtomicHighWaterMarkGauge* scratch_bytes_used_metric_;
+  AtomicHighWaterMarkGauge* scratch_bytes_used_metric_ = nullptr;
 };
 
 /// Represents a group of temporary files - one per disk with a scratch directory. The
@@ -190,11 +232,13 @@ class TmpFileGroup {
   /// Returns an error if the scratch space cannot be allocated or the write cannot
   /// be started. Otherwise 'handle' is set and 'cb' will be called asynchronously from
   /// a different thread when the write completes successfully or unsuccessfully or is
-  /// cancelled.
+  /// cancelled. If non-null, the counters in 'counters' are updated with information
+  /// about the write.
   ///
   /// 'handle' must be destroyed by passing the DestroyWriteHandle() or RestoreData().
   Status Write(MemRange buffer, TmpFileMgr::WriteDoneCallback cb,
-      std::unique_ptr<TmpWriteHandle>* handle) WARN_UNUSED_RESULT;
+      std::unique_ptr<TmpWriteHandle>* handle,
+      const BufferPoolClientCounters* counters = nullptr);
 
   /// Synchronously read the data referenced by 'handle' from the temporary file into
   /// 'buffer'. buffer.len() must be the same as handle->len(). Can only be called
@@ -212,14 +256,16 @@ class TmpFileGroup {
   /// Wait until the read started for 'handle' by ReadAsync() completes. 'buffer'
   /// should be the same buffer passed into ReadAsync(). Returns an error if the
   /// read fails. Retrying a failed read by calling ReadAsync() again is allowed.
-  Status WaitForAsyncRead(TmpWriteHandle* handle, MemRange buffer) WARN_UNUSED_RESULT;
+  /// If non-null, the counters in 'counters' are updated with information about the read.
+  Status WaitForAsyncRead(TmpWriteHandle* handle, MemRange buffer,
+      const BufferPoolClientCounters* counters = nullptr) WARN_UNUSED_RESULT;
 
-  /// Restore the original data in the 'buffer' passed to Write(), decrypting or
-  /// decompressing as necessary. Returns an error if restoring the data fails.
-  /// The write must not be in-flight - the caller is responsible for waiting for
-  /// the write to complete.
-  Status RestoreData(
-      std::unique_ptr<TmpWriteHandle> handle, MemRange buffer) WARN_UNUSED_RESULT;
+  /// Restore the original data in the 'buffer' passed to Write(), decrypting as
+  /// necessary. Returns an error if restoring the data fails. The write must not be
+  /// in-flight - the caller is responsible for waiting for the write to complete.
+  /// If non-null, the counters in 'counters' are updated with information about the read.
+  Status RestoreData(std::unique_ptr<TmpWriteHandle> handle, MemRange buffer,
+      const BufferPoolClientCounters* counters = nullptr) WARN_UNUSED_RESULT;
 
   /// Wait for the in-flight I/Os to complete and destroy resources associated with
   /// 'handle'.
@@ -237,6 +283,7 @@ class TmpFileGroup {
  private:
   friend class TmpFile;
   friend class TmpFileMgrTest;
+  friend class TmpWriteHandle;
 
   /// Initializes the file group with one temporary file per disk with a scratch
   /// directory. Returns OK if at least one temporary file could be created.
@@ -250,8 +297,10 @@ class TmpFileGroup {
   Status AllocateSpace(
       int64_t num_bytes, TmpFile** tmp_file, int64_t* file_offset) WARN_UNUSED_RESULT;
 
-  /// Add the scratch range from 'handle' to 'free_ranges_' and destroy handle. Must be
-  /// called without 'lock_' held.
+  /// Recycle the range of bytes in a scratch file and destroy 'handle'. Called when the
+  /// range is no longer in use for 'handle'. The disk space associated with the file can
+  /// be reclaimed once this function, either by adding it to 'free_ranges_' for
+  /// recycling, or punching a hole in the file. Must be called without 'lock_' held.
   void RecycleFileRange(std::unique_ptr<TmpWriteHandle> handle);
 
   /// Called when the DiskIoMgr write completes for 'handle'. On error, will attempt
@@ -302,6 +351,10 @@ class TmpFileGroup {
   /// Number of bytes written to disk (includes writes started but not yet complete).
   RuntimeProfile::Counter* const bytes_written_counter_;
 
+  /// Number of bytes written to disk before compression (includes writes started but
+  /// not yet complete).
+  RuntimeProfile::Counter* const uncompressed_bytes_written_counter_;
+
   /// Number of read operations (includes reads started but not yet complete).
   RuntimeProfile::Counter* const read_counter_;
 
@@ -316,6 +369,10 @@ class TmpFileGroup {
 
   /// Time spent in disk spill encryption, decryption, and integrity checking.
   RuntimeProfile::Counter* encryption_timer_;
+
+  /// Time spent in disk spill compression and decompression. nullptr if compression
+  /// is not enabled.
+  RuntimeProfile::Counter* compression_timer_;
 
   /// Protects below members.
   SpinLock lock_;
@@ -334,6 +391,7 @@ class TmpFileGroup {
   /// Each vector in free_ranges_[i] is a vector of File/offset pairs for free scratch
   /// ranges of length 2^i bytes. Has 64 entries so that every int64_t length has a
   /// valid list associated with it.
+  /// Only used if --disk_spill_punch_holes is false.
   std::vector<std::vector<std::pair<TmpFile*, int64_t>>> free_ranges_;
 
   /// Errors encountered when creating/writing scratch files. We store the history so
@@ -368,8 +426,14 @@ class TmpWriteHandle {
   /// Returns empty string if no backing file allocated.
   std::string TmpFilePath() const;
 
-  /// The length of the write range in bytes.
-  int64_t len() const;
+  /// The length of the in-memory data written to disk in bytes, before any compression.
+  int64_t data_len() const { return data_len_; }
+
+  /// The size of the data on disk (after compression) in bytes. Only valid to call if
+  /// Write() succeeds.
+  int64_t on_disk_len() const;
+
+  bool is_compressed() const { return compressed_len_ >= 0; }
 
   std::string DebugString();
 
@@ -377,15 +441,26 @@ class TmpWriteHandle {
   friend class TmpFileGroup;
   friend class TmpFileMgrTest;
 
-  TmpWriteHandle(
-      RuntimeProfile::Counter* encryption_timer, TmpFileMgr::WriteDoneCallback cb);
+  TmpWriteHandle(TmpFileGroup* const parent, TmpFileMgr::WriteDoneCallback cb);
 
-  /// Starts a write of 'buffer' to 'offset' of 'file'. 'write_in_flight_' must be false
-  /// before calling. After returning, 'write_in_flight_' is true on success or false on
-  /// failure and 'is_cancelled_' is set to true on failure.
-  Status Write(io::RequestContext* io_ctx, TmpFile* file,
-      int64_t offset, MemRange buffer,
-      TmpFileMgr::WriteDoneCallback callback) WARN_UNUSED_RESULT;
+  /// Starts a write. This method allocates space in the file, compresses (if needed) and
+  /// encrypts (if needed). 'write_in_flight_' must be false before calling. After
+  /// returning, 'write_in_flight_' is true on success or false on failure and
+  /// 'is_cancelled_' is set to true on failure. If the data was compressed,
+  /// 'compressed_len_' will be non-negative and 'compressed_' will be the temporary
+  /// buffer used to hold the compressed data.
+  /// If non-null, the counters in 'counters' are updated with information about the read.
+  Status Write(io::RequestContext* io_ctx, MemRange buffer,
+      TmpFileMgr::WriteDoneCallback callback,
+      const BufferPoolClientCounters* counters = nullptr);
+
+  /// Try to compress 'buffer'. On success, returns true and 'compressed_' and
+  /// 'compressed_len_' contain the buffer used (with the length reflecting the
+  /// allocated size) and the length of the compressed data, respectively. On failure,
+  /// returns false and 'compressed_' will be an empty buffer and 'compressed_len_'
+  /// will be -1. The reason for the failure to compress may be logged.
+  /// If non-null, the counters in 'counters' are updated with compression time.
+  bool TryCompress(MemRange buffer, const BufferPoolClientCounters* counters);
 
   /// Retry the write after the initial write failed with an error, instead writing to
   /// 'offset' of 'file'. 'write_in_flight_' must be true before calling.
@@ -408,22 +483,30 @@ class TmpWriteHandle {
   void WaitForWrite();
 
   /// Encrypts the data in 'buffer' in-place and computes 'hash_'.
-  Status EncryptAndHash(MemRange buffer) WARN_UNUSED_RESULT;
+  /// If non-null, the counters in 'counters' are updated with compression time.
+  Status EncryptAndHash(MemRange buffer, const BufferPoolClientCounters* counters);
 
   /// Verifies the integrity hash and decrypts the contents of 'buffer' in place.
-  Status CheckHashAndDecrypt(MemRange buffer) WARN_UNUSED_RESULT;
+  /// If non-null, the counters in 'counters' are updated with compression time.
+  Status CheckHashAndDecrypt(MemRange buffer, const BufferPoolClientCounters* counters);
+
+  /// Free 'compressed_' and update memory accounting. No-op if 'compressed_' is empty.
+  void FreeCompressedBuffer();
+
+  TmpFileGroup* const parent_;
 
   /// Callback to be called when the write completes.
   TmpFileMgr::WriteDoneCallback cb_;
 
-  /// Reference to the TmpFileGroup's 'encryption_timer_'.
-  RuntimeProfile::Counter* encryption_timer_;
+  /// Length of the in-memory data buffer that was written to disk. If compression
+  /// is in use, this is the uncompressed size. Set in Write().
+  int64_t data_len_ = -1;
 
   /// The DiskIoMgr write range for this write.
   boost::scoped_ptr<io::WriteRange> write_range_;
 
   /// The temporary file being written to.
-  TmpFile* file_;
+  TmpFile* file_ = nullptr;
 
   /// If --disk_spill_encryption is on, a AES 256-bit key and initialization vector.
   /// Regenerated for each write.
@@ -435,7 +518,7 @@ class TmpWriteHandle {
 
   /// The scan range for the read that is currently in flight. NULL when no read is in
   /// flight.
-  io::ScanRange* read_range_;
+  io::ScanRange* read_range_ = nullptr;
 
   /// Protects all fields below while 'write_in_flight_' is true. At other times, it is
   /// invalid to call WriteRange/TmpFileGroup methods concurrently from multiple
@@ -445,10 +528,22 @@ class TmpWriteHandle {
   std::mutex write_state_lock_;
 
   /// True if the the write has been cancelled (but is not necessarily complete).
-  bool is_cancelled_;
+  bool is_cancelled_ = false;
 
   /// True if a write is in flight.
-  bool write_in_flight_;
+  bool write_in_flight_ = false;
+
+  /// The buffer used to store compressed data. Buffer is allocated while reading or
+  /// writing a compressed range.
+  /// TODO: ScopedBuffer is a suboptimal memory allocation approach. We would be better
+  /// off integrating more directly with the buffer pool to use its buffer allocator and
+  /// making the compression buffers somehow evictable.
+  ScopedBuffer compressed_;
+
+  /// Set to non-negative if the data in this range was compressed. In that case,
+  /// 'compressed_' is the buffer used to store the data and 'compressed_len_' is the
+  /// amount of valid data in the buffer.
+  int64_t compressed_len_ = -1;
 
   /// Signalled when the write completes and 'write_in_flight_' becomes false, before
   /// 'cb_' is invoked.

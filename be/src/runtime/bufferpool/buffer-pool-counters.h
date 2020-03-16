@@ -31,6 +31,12 @@ struct BufferPoolClientCounters {
   /// Total amount of time spent inside the system allocator (subset of 'alloc_time').
   RuntimeProfile::Counter* sys_alloc_time;
 
+  /// Total amount of time spent compressing and decompressing data when spiling.
+  RuntimeProfile::Counter* compression_time;
+
+  /// Total amount of time spent encrypting and decrypting data when spilling.
+  RuntimeProfile::Counter* encryption_time;
+
   /// Number of buffers allocated via BufferAllocator::AllocateBuffer().
   RuntimeProfile::Counter* cumulative_allocations;
 
@@ -52,7 +58,7 @@ struct BufferPoolClientCounters {
   /// Total number of write I/O operations issued.
   RuntimeProfile::Counter* write_io_ops;
 
-  /// Total bytes written to disk.
+  /// Total bytes written to disk. (May be compressed).
   RuntimeProfile::Counter* bytes_written;
 
   /// The peak total size of unpinned pages.

@@ -32,10 +32,11 @@
 #include "runtime/tmp-file-mgr.h"
 #include "service/fe-support.h"
 #include "testutil/gtest-util.h"
+#include "util/bit-util.h"
+#include "util/collection-metrics.h"
 #include "util/condition-variable.h"
 #include "util/cpu-info.h"
 #include "util/filesystem-util.h"
-#include "util/collection-metrics.h"
 #include "util/metrics.h"
 
 #include "gen-cpp/Types_types.h"  // for TUniqueId
@@ -45,6 +46,9 @@
 using boost::filesystem::path;
 
 DECLARE_bool(disk_spill_encryption);
+DECLARE_int64(disk_spill_compression_buffer_limit_bytes);
+DECLARE_string(disk_spill_compression_codec);
+DECLARE_bool(disk_spill_punch_holes);
 #ifndef NDEBUG
 DECLARE_int32(stress_scratch_write_delay_ms);
 #endif
@@ -61,17 +65,19 @@ static const int64_t TERABYTE = 1024L * GIGABYTE;
 class TmpFileMgrTest : public ::testing::Test {
  public:
   virtual void SetUp() {
+    // Reset query options that are modified by tests.
+    FLAGS_disk_spill_encryption = false;
+    FLAGS_disk_spill_compression_codec = "";
+    FLAGS_disk_spill_punch_holes = false;
+#ifndef NDEBUG
+    FLAGS_stress_scratch_write_delay_ms = 0;
+#endif
+
     metrics_.reset(new MetricGroup("tmp-file-mgr-test"));
     profile_ = RuntimeProfile::Create(&obj_pool_, "tmp-file-mgr-test");
     test_env_.reset(new TestEnv);
     ASSERT_OK(test_env_->Init());
     cb_counter_ = 0;
-
-    // Reset query options that are modified by tests.
-    FLAGS_disk_spill_encryption = false;
-#ifndef NDEBUG
-    FLAGS_stress_scratch_write_delay_ms = 0;
-#endif
   }
 
   virtual void TearDown() {
@@ -90,7 +96,7 @@ class TmpFileMgrTest : public ::testing::Test {
     // the pre-existing metrics (TmpFileMgr assumes it's a singleton in product code).
     MetricGroup* metrics = obj_pool_.Add(new MetricGroup(""));
     TmpFileMgr* mgr = obj_pool_.Add(new TmpFileMgr());
-    EXPECT_OK(mgr->InitCustom(tmp_dirs_spec, false, metrics));
+    EXPECT_OK(mgr->InitCustom(tmp_dirs_spec, false, "", false, metrics));
     return mgr;
   }
 
@@ -178,7 +184,10 @@ class TmpFileMgrTest : public ::testing::Test {
   static int64_t BytesAllocated(TmpFileGroup* group) {
     int64_t bytes_allocated = 0;
     for (unique_ptr<TmpFile>& file : group->tmp_files_) {
-      bytes_allocated += file->bytes_allocated_;
+      int64_t allocated = file->allocation_offset_;
+      int64_t reclaimed = file->bytes_reclaimed_.Load();
+      EXPECT_GE(allocated, reclaimed);
+      bytes_allocated += allocated - reclaimed;
     }
     EXPECT_EQ(bytes_allocated, group->current_bytes_allocated_);
     return bytes_allocated;
@@ -205,8 +214,20 @@ class TmpFileMgrTest : public ::testing::Test {
     while (cb_counter_ < val) cb_cv_.Wait(lock);
   }
 
+  /// Implementation of TestScratchLimit.
+  void TestScratchLimit(bool punch_holes, int64_t alloc_size);
+
+  /// Implementation of TestScratchRangeRecycling.
+  void TestScratchRangeRecycling(bool punch_holes);
+
+  /// Implementation of TestDirectoryLimits.
+  void TestDirectoryLimits(bool punch_holes);
+
   /// Implementation of TestBlockVerification(), which is run with different environments.
   void TestBlockVerification();
+
+  /// Implementation of TestCompressBufferManagment
+  void TestCompressBufferManagement();
 
   ObjectPool obj_pool_;
   scoped_ptr<MetricGroup> metrics_;
@@ -267,7 +288,7 @@ TEST_F(TmpFileMgrTest, TestOneDirPerDevice) {
   vector<string> tmp_dirs({"/tmp/tmp-file-mgr-test.1", "/tmp/tmp-file-mgr-test.2"});
   RemoveAndCreateDirs(tmp_dirs);
   TmpFileMgr tmp_file_mgr;
-  ASSERT_OK(tmp_file_mgr.InitCustom(tmp_dirs, true, metrics_.get()));
+  ASSERT_OK(tmp_file_mgr.InitCustom(tmp_dirs, true, "", false, metrics_.get()));
   TUniqueId id;
   TmpFileGroup file_group(&tmp_file_mgr, io_mgr(), profile_, id);
 
@@ -291,7 +312,7 @@ TEST_F(TmpFileMgrTest, TestMultiDirsPerDevice) {
   vector<string> tmp_dirs({"/tmp/tmp-file-mgr-test.1", "/tmp/tmp-file-mgr-test.2"});
   RemoveAndCreateDirs(tmp_dirs);
   TmpFileMgr tmp_file_mgr;
-  ASSERT_OK(tmp_file_mgr.InitCustom(tmp_dirs, false, metrics_.get()));
+  ASSERT_OK(tmp_file_mgr.InitCustom(tmp_dirs, false, "", false, metrics_.get()));
   TUniqueId id;
   TmpFileGroup file_group(&tmp_file_mgr, io_mgr(), profile_, id);
 
@@ -319,7 +340,7 @@ TEST_F(TmpFileMgrTest, TestReportError) {
   vector<string> tmp_dirs({"/tmp/tmp-file-mgr-test.1", "/tmp/tmp-file-mgr-test.2"});
   RemoveAndCreateDirs(tmp_dirs);
   TmpFileMgr tmp_file_mgr;
-  ASSERT_OK(tmp_file_mgr.InitCustom(tmp_dirs, false, metrics_.get()));
+  ASSERT_OK(tmp_file_mgr.InitCustom(tmp_dirs, false, "", false, metrics_.get()));
   TUniqueId id;
   TmpFileGroup file_group(&tmp_file_mgr, io_mgr(), profile_, id);
 
@@ -368,7 +389,7 @@ TEST_F(TmpFileMgrTest, TestAllocateNonWritable) {
   }
   RemoveAndCreateDirs(tmp_dirs);
   TmpFileMgr tmp_file_mgr;
-  ASSERT_OK(tmp_file_mgr.InitCustom(tmp_dirs, false, metrics_.get()));
+  ASSERT_OK(tmp_file_mgr.InitCustom(tmp_dirs, false, "", false, metrics_.get()));
   TUniqueId id;
   TmpFileGroup file_group(&tmp_file_mgr, io_mgr(), profile_, id);
 
@@ -391,16 +412,29 @@ TEST_F(TmpFileMgrTest, TestAllocateNonWritable) {
 
 // Test scratch limit is applied correctly to group of files.
 TEST_F(TmpFileMgrTest, TestScratchLimit) {
+  TestScratchLimit(false, 128);
+}
+
+// Test that the scratch limit logic behaves identically with hole punching.
+// The test doesn't recycle ranges so this shouldn't affect behaviour.
+TEST_F(TmpFileMgrTest, TestScratchLimitPunchHoles) {
+  // With hole punching, allocations are rounded up to the nearest 4kb block,
+  // so we need the allocation size to be at least this large for the test.
+  TestScratchLimit(true, TmpFileMgr::HOLE_PUNCH_BLOCK_SIZE_BYTES);
+}
+
+void TmpFileMgrTest::TestScratchLimit(bool punch_holes, int64_t alloc_size) {
+  // Size must bea power-of-two so that FileGroup allocates exactly this amount of
+  // scratch space.
+  ASSERT_TRUE(BitUtil::IsPowerOf2(alloc_size));
   vector<string> tmp_dirs({"/tmp/tmp-file-mgr-test.1", "/tmp/tmp-file-mgr-test.2"});
   RemoveAndCreateDirs(tmp_dirs);
   TmpFileMgr tmp_file_mgr;
-  ASSERT_OK(tmp_file_mgr.InitCustom(tmp_dirs, false, metrics_.get()));
+  ASSERT_OK(tmp_file_mgr.InitCustom(tmp_dirs, false, "", punch_holes, metrics_.get()));
 
-  const int64_t LIMIT = 128;
-  // A power-of-two so that FileGroup allocates exactly this amount of scratch space.
-  const int64_t ALLOC_SIZE = 64;
+  const int64_t limit = alloc_size * 2;
   TUniqueId id;
-  TmpFileGroup file_group(&tmp_file_mgr, io_mgr(), profile_, id, LIMIT);
+  TmpFileGroup file_group(&tmp_file_mgr, io_mgr(), profile_, id, limit);
 
   vector<TmpFile*> files;
   ASSERT_OK(CreateFiles(&file_group, &files));
@@ -412,12 +446,12 @@ TEST_F(TmpFileMgrTest, TestScratchLimit) {
 
   // Alloc from file 1 should succeed.
   SetNextAllocationIndex(&file_group, 0);
-  ASSERT_OK(GroupAllocateSpace(&file_group, ALLOC_SIZE, &alloc_file, &offset));
+  ASSERT_OK(GroupAllocateSpace(&file_group, alloc_size, &alloc_file, &offset));
   ASSERT_EQ(alloc_file, files[0]); // Should select files round-robin.
   ASSERT_EQ(0, offset);
 
   // Allocate up to the max.
-  ASSERT_OK(GroupAllocateSpace(&file_group, ALLOC_SIZE, &alloc_file, &offset));
+  ASSERT_OK(GroupAllocateSpace(&file_group, alloc_size, &alloc_file, &offset));
   ASSERT_EQ(0, offset);
   ASSERT_EQ(alloc_file, files[1]);
 
@@ -428,24 +462,37 @@ TEST_F(TmpFileMgrTest, TestScratchLimit) {
   ASSERT_NE(string::npos, status.msg().msg().find(GetBackendString()));
 
   // Check HWM metrics
-  checkHWMMetrics(LIMIT, LIMIT);
+  checkHWMMetrics(limit, limit);
   file_group.Close();
-  checkHWMMetrics(0, LIMIT);
+  checkHWMMetrics(0, limit);
 }
 
 // Test that scratch file ranges of varying length are recycled as expected.
 TEST_F(TmpFileMgrTest, TestScratchRangeRecycling) {
+  TestScratchRangeRecycling(false);
+}
+
+// Test that scratch file ranges are not counted as allocated when we punch holes.
+TEST_F(TmpFileMgrTest, TestScratchRangeHolePunching) {
+  TestScratchRangeRecycling(true);
+}
+
+void TmpFileMgrTest::TestScratchRangeRecycling(bool punch_holes) {
   vector<string> tmp_dirs({"/tmp/tmp-file-mgr-test.1", "/tmp/tmp-file-mgr-test.2"});
   RemoveAndCreateDirs(tmp_dirs);
   TmpFileMgr tmp_file_mgr;
-  ASSERT_OK(tmp_file_mgr.InitCustom(tmp_dirs, false, metrics_.get()));
+  ASSERT_OK(tmp_file_mgr.InitCustom(tmp_dirs, false, "", punch_holes, metrics_.get()));
   TUniqueId id;
 
   TmpFileGroup file_group(&tmp_file_mgr, io_mgr(), profile_, id);
   int64_t expected_scratch_bytes_allocated = 0;
+  // The max value of expected_scratch_bytes_allocated throughout this test.
+  int64_t max_scratch_bytes_allocated = 0;
   // Test some different allocation sizes.
   checkHWMMetrics(0, 0);
-  for (int alloc_size = 64; alloc_size <= 64 * 1024; alloc_size *= 2) {
+  // Hole punching only reclaims space in 4kb block sizes.
+  int min_alloc_size = punch_holes ? TmpFileMgr::HOLE_PUNCH_BLOCK_SIZE_BYTES : 64;
+  for (int alloc_size = min_alloc_size; alloc_size <= 64 * 1024; alloc_size *= 2) {
     // Generate some data.
     const int BLOCKS = 5;
     vector<vector<uint8_t>> data(BLOCKS);
@@ -479,14 +526,20 @@ TEST_F(TmpFileMgrTest, TestScratchRangeRecycling) {
         EXPECT_EQ(0, memcmp(tmp.data(), data[j].data(), alloc_size));
         file_group.DestroyWriteHandle(move(handles[j]));
       }
-      // Check that the space is still in use - it should be recycled by the next
-      // iteration.
-      EXPECT_EQ(expected_scratch_bytes_allocated, BytesAllocated(&file_group));
-      checkHWMMetrics(expected_scratch_bytes_allocated, expected_scratch_bytes_allocated);
+      // With hole punching, the scratch space is not in use. Without hole punching it
+      // is in used, but will be reused by the next iteration.
+      int64_t expected_bytes_allocated =
+          punch_holes ? 0 : expected_scratch_bytes_allocated;
+      EXPECT_EQ(expected_bytes_allocated, BytesAllocated(&file_group));
+      checkHWMMetrics(expected_bytes_allocated, expected_scratch_bytes_allocated);
     }
+    /// No scratch should be in use for the next iteration if holes were punched.
+    max_scratch_bytes_allocated =
+        max(max_scratch_bytes_allocated, expected_scratch_bytes_allocated);
+    if (punch_holes) expected_scratch_bytes_allocated = 0;
   }
   file_group.Close();
-  checkHWMMetrics(0, expected_scratch_bytes_allocated);
+  checkHWMMetrics(0, max_scratch_bytes_allocated);
 }
 
 // Regression test for IMPALA-4748, where hitting the process memory limit caused
@@ -569,6 +622,11 @@ TEST_F(TmpFileMgrTest, TestBlockVerificationGcmDisabled) {
   TestBlockVerification();
 }
 
+TEST_F(TmpFileMgrTest, TestBlockVerificationCompression) {
+  FLAGS_disk_spill_compression_codec = "zstd";
+  TestBlockVerification();
+}
+
 void TmpFileMgrTest::TestBlockVerification() {
   FLAGS_disk_spill_encryption = true;
   TUniqueId id;
@@ -620,7 +678,7 @@ TEST_F(TmpFileMgrTest, TestHWMMetric) {
   vector<string> tmp_dirs({"/tmp/tmp-file-mgr-test.1", "/tmp/tmp-file-mgr-test.2"});
   RemoveAndCreateDirs(tmp_dirs);
   TmpFileMgr tmp_file_mgr;
-  ASSERT_OK(tmp_file_mgr.InitCustom(tmp_dirs, false, metrics_.get()));
+  ASSERT_OK(tmp_file_mgr.InitCustom(tmp_dirs, false, "", false, metrics_.get()));
 
   const int64_t LIMIT = 128;
   // A power-of-two so that FileGroup allocates exactly this amount of scratch space.
@@ -672,13 +730,26 @@ TEST_F(TmpFileMgrTest, TestHWMMetric) {
 // enforced. Sets up several scratch directories, some with limits, and checks
 // that the allocations occur in the right directories.
 TEST_F(TmpFileMgrTest, TestDirectoryLimits) {
+  TestDirectoryLimits(false);
+}
+
+// Same, but with hole punching enabled.
+TEST_F(TmpFileMgrTest, TestDirectoryLimitsPunchHoles) {
+  TestDirectoryLimits(true);
+}
+
+void TmpFileMgrTest::TestDirectoryLimits(bool punch_holes) {
+  // Use an allocation size where FileGroup allocates exactly this amount of scratch
+  // space. The directory limits below are set relative to this size.
+  const int64_t ALLOC_SIZE = TmpFileMgr::HOLE_PUNCH_BLOCK_SIZE_BYTES;
   vector<string> tmp_dirs({"/tmp/tmp-file-mgr-test.1", "/tmp/tmp-file-mgr-test.2",
       "/tmp/tmp-file-mgr-test.3"});
-  vector<string> tmp_dir_specs({"/tmp/tmp-file-mgr-test.1:512",
-      "/tmp/tmp-file-mgr-test.2:1k", "/tmp/tmp-file-mgr-test.3"});
+  vector<string> tmp_dir_specs({"/tmp/tmp-file-mgr-test.1:4k",
+      "/tmp/tmp-file-mgr-test.2:8k", "/tmp/tmp-file-mgr-test.3"});
   RemoveAndCreateDirs(tmp_dirs);
   TmpFileMgr tmp_file_mgr;
-  ASSERT_OK(tmp_file_mgr.InitCustom(tmp_dir_specs, false, metrics_.get()));
+  ASSERT_OK(
+      tmp_file_mgr.InitCustom(tmp_dir_specs, false, "", punch_holes, metrics_.get()));
 
   TmpFileGroup file_group_1(
       &tmp_file_mgr, io_mgr(), RuntimeProfile::Create(&obj_pool_, "p1"), TUniqueId());
@@ -696,8 +767,6 @@ TEST_F(TmpFileMgrTest, TestDirectoryLimits) {
   IntGauge* dir3_usage = metrics_->FindMetricForTesting<IntGauge>(
       "tmp-file-mgr.scratch-space-bytes-used.dir-2");
 
-  // A power-of-two so that FileGroup allocates exactly this amount of scratch space.
-  const int64_t ALLOC_SIZE = 512;
   int64_t offset;
   TmpFile* alloc_file;
 
@@ -755,7 +824,7 @@ TEST_F(TmpFileMgrTest, TestDirectoryLimitsExhausted) {
   const int64_t DIR2_LIMIT = 1024L * 1024L;
   RemoveAndCreateDirs(tmp_dirs);
   TmpFileMgr tmp_file_mgr;
-  ASSERT_OK(tmp_file_mgr.InitCustom(tmp_dir_specs, false, metrics_.get()));
+  ASSERT_OK(tmp_file_mgr.InitCustom(tmp_dir_specs, false, "", false, metrics_.get()));
 
   TmpFileGroup file_group_1(
       &tmp_file_mgr, io_mgr(), RuntimeProfile::Create(&obj_pool_, "p1"), TUniqueId());
@@ -856,5 +925,99 @@ TEST_F(TmpFileMgrTest, TestDirectoryLimitParsing) {
   EXPECT_EQ(0, nodirs.size());
   auto& empty_paths = GetTmpDirs(CreateTmpFileMgr(","));
   EXPECT_EQ(2, empty_paths.size());
+}
+
+// Test compression buffer memory management for reads and writes.
+TEST_F(TmpFileMgrTest, TestCompressBufferManagement) {
+  FLAGS_disk_spill_encryption = false;
+  TestCompressBufferManagement();
+}
+
+TEST_F(TmpFileMgrTest, TestCompressBufferManagementEncrypted) {
+  FLAGS_disk_spill_encryption = true;
+  TestCompressBufferManagement();
+}
+
+void TmpFileMgrTest::TestCompressBufferManagement() {
+  // Data string should be long and redundant enough to be compressible.
+  const string DATA = "the quick brown fox jumped over the lazy dog"
+                      "the fast red fox leaped over the sleepy dog";
+  const string BIG_DATA = DATA + DATA;
+  string data = DATA;
+  string big_data = BIG_DATA;
+  FLAGS_disk_spill_compression_buffer_limit_bytes = 2 * data.size();
+  // Limit compression buffers to not quite enough for two compression buffers
+  // for 'data' (since compression buffers need to be slightly larger than
+  // uncompressed data).
+  TmpFileMgr tmp_file_mgr;
+  ASSERT_OK(tmp_file_mgr.InitCustom(
+      vector<string>{"/tmp/tmp-file-mgr-test.1"}, true, "lz4", true, metrics_.get()));
+  MemTracker* compressed_buffer_tracker = tmp_file_mgr.compressed_buffer_tracker();
+  TmpFileGroup file_group(&tmp_file_mgr, io_mgr(), profile_, TUniqueId());
+  MemRange data_mem_range(reinterpret_cast<uint8_t*>(&data[0]), data.size());
+  MemRange big_data_mem_range(reinterpret_cast<uint8_t*>(&big_data[0]), big_data.size());
+
+  // Start a write in flight, which should encrypt the data and write it to disk.
+  unique_ptr<TmpWriteHandle> compressed_handle, uncompressed_handle;
+  WriteRange::WriteDoneCallback callback =
+      bind(mem_fn(&TmpFileMgrTest::SignalCallback), this, _1);
+  ASSERT_OK(file_group.Write(data_mem_range, callback, &compressed_handle));
+  EXPECT_TRUE(compressed_handle->is_compressed());
+  int mem_consumption_after_first_write = compressed_buffer_tracker->peak_consumption();
+  EXPECT_GT(mem_consumption_after_first_write, 0)
+      << "Compressed buffer memory should be consumed for in-flight writes";
+  WaitForWrite(compressed_handle.get());
+  EXPECT_EQ(0, compressed_buffer_tracker->consumption())
+      << "No memory should be consumed when no reads or writes in-flight";
+
+  // Spot-check that bytes written counters were updated correctly.
+  EXPECT_GT(file_group.bytes_written_counter_->value(), 0);
+  EXPECT_GT(file_group.uncompressed_bytes_written_counter_->value(),
+            file_group.bytes_written_counter_->value());
+
+  // This data range is larger than the memory limit and falls back to uncompressed
+  // writes.
+  ASSERT_OK(file_group.Write(big_data_mem_range, callback, &uncompressed_handle));
+  EXPECT_EQ(uncompressed_handle->data_len(), uncompressed_handle->on_disk_len());
+  EXPECT_FALSE(uncompressed_handle->is_compressed());
+  EXPECT_LE(compressed_buffer_tracker->consumption(), mem_consumption_after_first_write)
+      << "Second write should have fallen back to uncompressed writes";
+
+  WaitForWrite(uncompressed_handle.get());
+  WaitForCallbacks(2);
+  EXPECT_EQ(0, compressed_buffer_tracker->consumption())
+      << "No memory should be consumed when no reads or writes in-flight";
+
+  vector<uint8_t> tmp(data.size());
+  vector<uint8_t> big_tmp(big_data.size());
+  // Check behaviour when reading compressed range with available memory.
+  // Reading from disk needs to allocate a compression buffer.
+  EXPECT_OK(file_group.Read(compressed_handle.get(), MemRange(tmp.data(), tmp.size())));
+  EXPECT_EQ(0, memcmp(tmp.data(), DATA.data(), DATA.size()));
+
+  // Check behaviour when reading ranges with not enough available memory.
+  compressed_buffer_tracker->Consume(DATA.size() * 2);
+  Status status =
+      file_group.Read(compressed_handle.get(), MemRange(tmp.data(), tmp.size()));
+  EXPECT_FALSE(status.ok());
+  EXPECT_EQ(status.code(), TErrorCode::MEM_LIMIT_EXCEEDED);
+
+  // Reading uncompressed range becomes no extra memory
+  EXPECT_OK(file_group.Read(
+      uncompressed_handle.get(), MemRange(big_tmp.data(), big_tmp.size())));
+  EXPECT_EQ(0, memcmp(big_tmp.data(), BIG_DATA.data(), BIG_DATA.size()));
+
+  // Clear buffers to avoid false positives in tests.
+  memset(tmp.data(), 0, tmp.size());
+  memset(big_tmp.data(), 0, big_tmp.size());
+
+  // Restoring data should work ok with no memory.
+  EXPECT_OK(file_group.RestoreData(move(compressed_handle), data_mem_range));
+  EXPECT_EQ(0, memcmp(DATA.data(), data.data(), data.size()));
+  EXPECT_OK(file_group.RestoreData(move(uncompressed_handle), big_data_mem_range));
+  EXPECT_EQ(0, memcmp(BIG_DATA.data(), big_data.data(), big_data.size()));
+
+  compressed_buffer_tracker->Release(DATA.size() * 2);
+  file_group.Close();
 }
 } // namespace impala
