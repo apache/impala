@@ -22,11 +22,13 @@ from getpass import getuser
 
 from tests.common.custom_cluster_test_suite import CustomClusterTestSuite
 from tests.common.sentry_cache_test_suite import SentryCacheTestSuite
+from tests.common.skip import SkipIf
 
 SENTRY_CONFIG_DIR = os.getenv('IMPALA_HOME') + '/fe/src/test/resources/'
 SENTRY_CONFIG_FILE = SENTRY_CONFIG_DIR + 'sentry-site.xml'
 
 
+@SkipIf.sentry_disabled
 class TestSentry(CustomClusterTestSuite):
   """This class contains Sentry specific authorization tests."""
   @pytest.mark.execute_serially

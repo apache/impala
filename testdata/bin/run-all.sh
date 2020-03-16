@@ -74,9 +74,11 @@ if [[ ${DEFAULT_FS} == "hdfs://${INTERNAL_LISTEN_HOST}:20500" ]]; then
   $IMPALA_HOME/testdata/bin/run-hive-server.sh $HIVE_FLAGS 2>&1 | \
       tee ${IMPALA_CLUSTER_LOGS_DIR}/run-hive-server.log
 
-  echo " --> Starting the Sentry Policy Server"
-  $IMPALA_HOME/testdata/bin/run-sentry-service.sh 2>&1 | \
-      tee ${IMPALA_CLUSTER_LOGS_DIR}/run-sentry-service.log
+  if [[ "$DISABLE_SENTRY" != true ]]; then
+    echo " --> Starting the Sentry Policy Server"
+    $IMPALA_HOME/testdata/bin/run-sentry-service.sh 2>&1 | \
+        tee ${IMPALA_CLUSTER_LOGS_DIR}/run-sentry-service.log
+  fi
 
 elif [[ ${DEFAULT_FS} == "${LOCAL_FS}" ]]; then
   # When the local file system is used as default, we only start the Hive metastore.

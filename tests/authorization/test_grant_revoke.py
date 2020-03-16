@@ -25,6 +25,7 @@ from time import sleep
 
 from tests.common.test_dimensions import create_uncompressed_text_dimension
 from tests.common.sentry_cache_test_suite import SentryCacheTestSuite, TestObject
+from tests.common.skip import SkipIf
 from tests.util.calculation_util import get_random_id
 from tests.verifiers.metric_verifier import MetricVerifier
 
@@ -36,6 +37,7 @@ SENTRY_CONFIG_FILE_OO = "%s/sentry-site_oo.xml" % SENTRY_CONFIG_DIR
 SENTRY_LONG_POLLING_FREQUENCY_S = 3600
 
 
+@SkipIf.sentry_disabled
 class TestGrantRevoke(SentryCacheTestSuite):
   @classmethod
   def add_test_dimensions(cls):

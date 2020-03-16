@@ -27,11 +27,13 @@ from os import getenv
 from impala.dbapi import connect as impala_connect
 from tests.common.test_dimensions import create_uncompressed_text_dimension
 from tests.common.custom_cluster_test_suite import CustomClusterTestSuite
+from tests.common.skip import SkipIf
 
 SENTRY_CONFIG_FILE = getenv('IMPALA_HOME') + \
     '/fe/src/test/resources/sentry-site_oo.xml'
 
 
+@SkipIf.sentry_disabled
 class TestShowGrant(CustomClusterTestSuite):
   @classmethod
   def add_test_dimensions(cls):

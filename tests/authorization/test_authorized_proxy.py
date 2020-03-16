@@ -30,6 +30,7 @@ from thrift.transport.TSocket import TSocket
 from thrift.transport.TTransport import TBufferedTransport
 from thrift.protocol import TBinaryProtocol
 from tests.common.custom_cluster_test_suite import CustomClusterTestSuite
+from tests.common.skip import SkipIf
 from tests.hs2.hs2_test_suite import operation_id_to_query_id
 
 AUDIT_LOG_DIR = tempfile.mkdtemp(dir=os.getenv("LOG_DIR"))
@@ -104,6 +105,7 @@ class TestAuthorizedProxy(CustomClusterTestSuite):
       TestHS2.check_response(resp)
     return resp
 
+  @SkipIf.sentry_disabled
   @pytest.mark.execute_serially
   @CustomClusterTestSuite.with_args(
     impalad_args="{0} --authorized_proxy_user_config=foo=bar;hue={1} "
@@ -124,6 +126,7 @@ class TestAuthorizedProxy(CustomClusterTestSuite):
     self._test_authorized_proxy_with_ranger(self._test_authorized_proxy, "non_owner",
                                             False)
 
+  @SkipIf.sentry_disabled
   @pytest.mark.execute_serially
   @CustomClusterTestSuite.with_args(
     impalad_args="{0} --authorized_proxy_user_config=hue=bar "
@@ -147,6 +150,7 @@ class TestAuthorizedProxy(CustomClusterTestSuite):
     self._test_authorized_proxy_with_ranger(self._test_authorized_proxy, "non_owner",
                                             True)
 
+  @SkipIf.sentry_disabled
   @pytest.mark.execute_serially
   @CustomClusterTestSuite.with_args(
     impalad_args="{0} --authorized_proxy_user_config=foo=bar "

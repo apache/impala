@@ -34,6 +34,7 @@ import org.apache.impala.authorization.sentry.SentryProxy.AuthorizationDelta;
 import org.apache.sentry.api.service.thrift.TSentryPrivilege;
 import org.apache.sentry.api.service.thrift.TSentryRole;
 import org.junit.After;
+import org.junit.Assume;
 import org.junit.Before;
 import org.junit.Test;
 
@@ -56,6 +57,8 @@ public class SentryProxyTest {
   private final SentryAuthorizationConfig authzConfig_;
 
   public SentryProxyTest() {
+    String envDisableSentry = System.getenv("DISABLE_SENTRY");
+    if (envDisableSentry != null) Assume.assumeTrue(envDisableSentry.equals("false"));
     authzConfig_ = SentryAuthorizationConfig.createHadoopGroupAuthConfig(
         SENTRY_SERVER,
         System.getenv("IMPALA_HOME") + "/fe/src/test/resources/sentry-site.xml");

@@ -140,8 +140,11 @@ if hive_major_version >= 3:
    'hive.metastore.warehouse.external.dir': '${WAREHOUSE_LOCATION_PREFIX}/test-warehouse'
   })
 else:
+  if os.environ.get('DISABLE_SENTRY') == "false":
+    CONFIG.update({
+     'hive.metastore.event.listeners' : 'org.apache.sentry.binding.metastore.SentrySyncHMSNotificationsPostEventListener'
+    })
   CONFIG.update({
-   'hive.metastore.event.listeners': 'org.apache.sentry.binding.metastore.SentrySyncHMSNotificationsPostEventListener',
    # HMS-2 based environments have a different set of expected configurations for event processor
    'hive.metastore.alter.notifications.basic': 'false',
    'hive.metastore.notification.parameters.exclude.patterns': '',

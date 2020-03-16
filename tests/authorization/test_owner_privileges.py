@@ -24,7 +24,7 @@ from os import getenv
 
 from tests.common.sentry_cache_test_suite import SentryCacheTestSuite, TestObject
 from tests.common.test_dimensions import create_uncompressed_text_dimension
-from tests.common.skip import SkipIfHive3
+from tests.common.skip import SkipIf, SkipIfHive3
 from tests.util.filesystem_utils import FILESYSTEM_PREFIX
 
 # Sentry long polling frequency to make Sentry refresh not run.
@@ -37,6 +37,7 @@ SENTRY_CONFIG_FILE_OO_NOGRANT = SENTRY_CONFIG_DIR + 'sentry-site_oo_nogrant.xml'
 SENTRY_CONFIG_FILE_NO_OO = SENTRY_CONFIG_DIR + 'sentry-site_no_oo.xml'
 
 
+@SkipIf.sentry_disabled
 @SkipIfHive3.sentry_not_supported
 class TestOwnerPrivileges(SentryCacheTestSuite):
   @classmethod

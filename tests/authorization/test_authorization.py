@@ -36,6 +36,7 @@ from thrift.protocol import TBinaryProtocol
 from tests.common.custom_cluster_test_suite import CustomClusterTestSuite
 from tests.common.file_utils import assert_file_in_dir_contains,\
     assert_no_files_in_dir_contain
+from tests.common.skip import SkipIf
 
 SENTRY_CONFIG_DIR = os.getenv('IMPALA_HOME') + '/fe/src/test/resources/'
 SENTRY_BASE_LOG_DIR = os.getenv('IMPALA_CLUSTER_LOGS_DIR') + "/sentry"
@@ -93,6 +94,7 @@ class TestAuthorization(CustomClusterTestSuite):
       TestHS2.check_response(resp)
     return resp
 
+  @SkipIf.sentry_disabled
   @pytest.mark.execute_serially
   @CustomClusterTestSuite.with_args(
       impalad_args="--server_name=server1 "
@@ -121,6 +123,7 @@ class TestAuthorization(CustomClusterTestSuite):
     finally:
       self.__execute_hs2_stmt("drop role {0}".format(unique_role))
 
+  @SkipIf.sentry_disabled
   @pytest.mark.execute_serially
   @CustomClusterTestSuite.with_args(
       impalad_args="--server_name=server1 "
@@ -232,6 +235,7 @@ class TestAuthorization(CustomClusterTestSuite):
       assert "User %s is not authorized to access the runtime profile or "\
           "execution summary." % (getuser()) in str(exec_summary_resp)
 
+  @SkipIf.sentry_disabled
   @pytest.mark.execute_serially
   @CustomClusterTestSuite.with_args(
       impalad_args="--server_name=server1 --sentry_config=" + SENTRY_CONFIG_FILE,
@@ -251,6 +255,7 @@ class TestAuthorization(CustomClusterTestSuite):
     assert_file_in_dir_contains(self.impala_log_dir, "Ignoring removed flag "
                                                      "authorization_policy_file")
 
+  @SkipIf.sentry_disabled
   @pytest.mark.execute_serially
   @CustomClusterTestSuite.with_args(
     impalad_args="--server_name=server1 --sentry_config=%s" % SENTRY_CONFIG_FILE,
@@ -306,6 +311,7 @@ class TestAuthorization(CustomClusterTestSuite):
       return cols[0:len(cols) - 1]
     assert map(columns, result.data) == expected
 
+  @SkipIf.sentry_disabled
   @pytest.mark.execute_serially
   @CustomClusterTestSuite.with_args(
     impalad_args="--server_name=server1 --sentry_config=%s" % SENTRY_CONFIG_FILE,
@@ -343,6 +349,7 @@ class TestAuthorization(CustomClusterTestSuite):
     finally:
       self.role_cleanup(unique_role)
 
+  @SkipIf.sentry_disabled
   @pytest.mark.execute_serially
   @CustomClusterTestSuite.with_args(
     impalad_args="--server_name=server1 --sentry_config=%s" % SENTRY_CONFIG_FILE,
@@ -375,6 +382,7 @@ class TestAuthorization(CustomClusterTestSuite):
     finally:
       self.role_cleanup(unique_role)
 
+  @SkipIf.sentry_disabled
   @pytest.mark.execute_serially
   @CustomClusterTestSuite.with_args(
       impalad_args="--server_name=server1 --sentry_config=%s" % SENTRY_CONFIG_FILE,
@@ -551,6 +559,7 @@ class TestAuthorization(CustomClusterTestSuite):
             "drop database if exists db_%s_%s cascade" % (unique_name, priv))
       self.role_cleanup(unique_role)
 
+  @SkipIf.sentry_disabled
   @pytest.mark.execute_serially
   @CustomClusterTestSuite.with_args(
     impalad_args="--server_name=server1 --sentry_config=%s "
@@ -563,6 +572,7 @@ class TestAuthorization(CustomClusterTestSuite):
   def test_sentry_show_stmts_with_select(self, unique_role, unique_name):
     self._test_sentry_show_stmts_helper(unique_role, unique_name, ['select'])
 
+  @SkipIf.sentry_disabled
   @pytest.mark.execute_serially
   @CustomClusterTestSuite.with_args(
     impalad_args="--server_name=server1 --sentry_config=%s "
@@ -577,6 +587,7 @@ class TestAuthorization(CustomClusterTestSuite):
     self._test_sentry_show_stmts_helper(unique_role, unique_name,
                                         ['select', 'insert'])
 
+  @SkipIf.sentry_disabled
   @pytest.mark.execute_serially
   @CustomClusterTestSuite.with_args(
     impalad_args="--server_name=server1 --sentry_config=%s "
@@ -663,6 +674,7 @@ class TestAuthorization(CustomClusterTestSuite):
   def test_num_check_authorization_threads_with_ranger(self, unique_name):
     self._test_ranger_show_stmts_helper(unique_name, PRIVILEGES)
 
+  @SkipIf.sentry_disabled
   @pytest.mark.execute_serially
   @CustomClusterTestSuite.with_args(
     impalad_args="--server_name=server1 --sentry_config=%s "

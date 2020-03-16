@@ -127,6 +127,8 @@ class SkipIf:
       reason="Secondary filesystem needed")
   is_buggy_el6_kernel = pytest.mark.skipif(
       IS_BUGGY_EL6_KERNEL, reason="Kernel is affected by KUDU-1508")
+  sentry_disabled = pytest.mark.skipif(os.getenv('DISABLE_SENTRY') == "true",
+      reason="$DISABLE_SENTRY evaluates to true.")
 
 
 class SkipIfIsilon:

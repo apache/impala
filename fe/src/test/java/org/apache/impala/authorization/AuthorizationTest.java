@@ -67,6 +67,7 @@ import com.google.common.collect.Maps;
 import org.junit.After;
 import org.junit.AfterClass;
 import org.junit.Assert;
+import org.junit.Assume;
 import org.junit.BeforeClass;
 import org.junit.Test;
 
@@ -82,24 +83,27 @@ public class AuthorizationTest extends FrontendTestBase {
   private static final SentryAuthorizationConfig AUTHZ_CONFIG =
       SentryAuthorizationConfig.createHadoopGroupAuthConfig("server1",
           System.getenv("IMPALA_HOME") + "/fe/src/test/resources/sentry-site.xml");
-  private static final ImpaladTestCatalog AUTHZ_CATALOG =
-      new ImpaladTestCatalog(new SentryAuthorizationFactory(AUTHZ_CONFIG));
-  private static final AuthorizationFactory AUTHZ_FACTORY =
-      new SentryAuthorizationFactory(AUTHZ_CONFIG);
 
-  private static final Frontend AUTHZ_FE;
+  private static ImpaladTestCatalog AUTHZ_CATALOG = null;
+  private static AuthorizationFactory AUTHZ_FACTORY = null;
+  private static Frontend AUTHZ_FE = null;
 
-  static {
+  private final AnalysisContext authzCtx;
+
+  public AuthorizationTest() throws ImpalaException {
+    String envDisableSentry = System.getenv("DISABLE_SENTRY");
+    if (envDisableSentry != null) Assume.assumeTrue(envDisableSentry.equals("false"));
+
+    // Initialize 'AUTHZ_CATALOG' and 'AUTHZ_FACTORY' only if $DISABLE_SENTRY evaluates
+    // to false, in which case the Sentry service is available to answer the RPC's
+    // resulting from SentryAuthorizationFactory().
+    AUTHZ_CATALOG = new ImpaladTestCatalog(new SentryAuthorizationFactory(AUTHZ_CONFIG));
+    AUTHZ_FACTORY = new SentryAuthorizationFactory(AUTHZ_CONFIG);
     try {
       AUTHZ_FE = new Frontend(AUTHZ_FACTORY, AUTHZ_CATALOG);
     } catch (ImpalaException e) {
       throw new RuntimeException(e);
     }
-  }
-
-  private final AnalysisContext authzCtx;
-
-  public AuthorizationTest() throws ImpalaException {
     authzCtx = createAnalysisCtx(AUTHZ_FACTORY, USER.getName());
     setupImpalaCatalog(AUTHZ_CATALOG);
   }

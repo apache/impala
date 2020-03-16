@@ -93,7 +93,12 @@ public class AuthorizationStmtTest extends AuthorizationTestBase {
 
   @Parameters
   public static Collection<AuthorizationProvider> data() {
-    return Arrays.asList(AuthorizationProvider.SENTRY, AuthorizationProvider.RANGER);
+    String envDisableSentry = System.getenv("DISABLE_SENTRY");
+    if (envDisableSentry != null && envDisableSentry.equals("true")) {
+      return Arrays.asList(AuthorizationProvider.RANGER);
+    } else {
+      return Arrays.asList(AuthorizationProvider.SENTRY, AuthorizationProvider.RANGER);
+    }
   }
 
   private static final String[] ALLTYPES_COLUMNS_WITHOUT_ID = new String[]{"bool_col",
