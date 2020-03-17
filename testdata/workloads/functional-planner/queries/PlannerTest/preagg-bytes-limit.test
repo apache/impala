@@ -1,0 +1,137 @@
+# Query where estimate for preagg is higher than PREAGG_BYTES_LIMIT
+select distinct l_orderkey, l_partkey, l_suppkey from tpch_parquet.lineitem
+---- DISTRIBUTEDPLAN
+F02:PLAN FRAGMENT [UNPARTITIONED] hosts=1 instances=1
+|  Per-Host Resources: mem-estimate=10.08MB mem-reservation=0B thread-reservation=1
+PLAN-ROOT SINK
+|  output exprs: l_orderkey, l_partkey, l_suppkey
+|  mem-estimate=0B mem-reservation=0B thread-reservation=0
+|
+04:EXCHANGE [UNPARTITIONED]
+|  mem-estimate=10.08MB mem-reservation=0B thread-reservation=0
+|  tuple-ids=1 row-size=24B cardinality=6.00M
+|  in pipelines: 03(GETNEXT)
+|
+F01:PLAN FRAGMENT [HASH(l_orderkey,l_partkey,l_suppkey)] hosts=3 instances=3
+Per-Host Resources: mem-estimate=85.63MB mem-reservation=34.00MB thread-reservation=1
+03:AGGREGATE [FINALIZE]
+|  group by: l_orderkey, l_partkey, l_suppkey
+|  mem-estimate=75.55MB mem-reservation=34.00MB spill-buffer=2.00MB thread-reservation=0
+|  tuple-ids=1 row-size=24B cardinality=6.00M
+|  in pipelines: 03(GETNEXT), 00(OPEN)
+|
+02:EXCHANGE [HASH(l_orderkey,l_partkey,l_suppkey)]
+|  mem-estimate=10.08MB mem-reservation=0B thread-reservation=0
+|  tuple-ids=1 row-size=24B cardinality=6.00M
+|  in pipelines: 00(GETNEXT)
+|
+F00:PLAN FRAGMENT [RANDOM] hosts=3 instances=3
+Per-Host Resources: mem-estimate=304.00MB mem-reservation=50.00MB thread-reservation=2
+01:AGGREGATE [STREAMING]
+|  group by: l_orderkey, l_partkey, l_suppkey
+|  mem-estimate=64.00MB mem-reservation=34.00MB spill-buffer=2.00MB thread-reservation=0
+|  tuple-ids=1 row-size=24B cardinality=6.00M
+|  in pipelines: 00(GETNEXT)
+|
+00:SCAN HDFS [tpch_parquet.lineitem, RANDOM]
+   HDFS partitions=1/1 files=3 size=194.00MB
+   stored statistics:
+     table: rows=6.00M size=194.00MB
+     columns: all
+   extrapolated-rows=disabled max-scan-range-rows=2.14M
+   mem-estimate=240.00MB mem-reservation=16.00MB thread-reservation=1
+   tuple-ids=0 row-size=24B cardinality=6.00M
+   in pipelines: 00(GETNEXT)
+====
+# Query where estimate for preagg is lower than PREAGG_BYTES_LIMIT
+select distinct l_suppkey from tpch_parquet.lineitem
+---- DISTRIBUTEDPLAN
+F02:PLAN FRAGMENT [UNPARTITIONED] hosts=1 instances=1
+|  Per-Host Resources: mem-estimate=61.29KB mem-reservation=0B thread-reservation=1
+PLAN-ROOT SINK
+|  output exprs: l_suppkey
+|  mem-estimate=0B mem-reservation=0B thread-reservation=0
+|
+04:EXCHANGE [UNPARTITIONED]
+|  mem-estimate=61.29KB mem-reservation=0B thread-reservation=0
+|  tuple-ids=1 row-size=8B cardinality=9.71K
+|  in pipelines: 03(GETNEXT)
+|
+F01:PLAN FRAGMENT [HASH(l_suppkey)] hosts=3 instances=3
+Per-Host Resources: mem-estimate=10.06MB mem-reservation=1.94MB thread-reservation=1
+03:AGGREGATE [FINALIZE]
+|  group by: l_suppkey
+|  mem-estimate=10.00MB mem-reservation=1.94MB spill-buffer=64.00KB thread-reservation=0
+|  tuple-ids=1 row-size=8B cardinality=9.71K
+|  in pipelines: 03(GETNEXT), 00(OPEN)
+|
+02:EXCHANGE [HASH(l_suppkey)]
+|  mem-estimate=61.29KB mem-reservation=0B thread-reservation=0
+|  tuple-ids=1 row-size=8B cardinality=9.71K
+|  in pipelines: 00(GETNEXT)
+|
+F00:PLAN FRAGMENT [RANDOM] hosts=3 instances=3
+Per-Host Resources: mem-estimate=90.00MB mem-reservation=6.00MB thread-reservation=2
+01:AGGREGATE [STREAMING]
+|  group by: l_suppkey
+|  mem-estimate=10.00MB mem-reservation=2.00MB spill-buffer=64.00KB thread-reservation=0
+|  tuple-ids=1 row-size=8B cardinality=9.71K
+|  in pipelines: 00(GETNEXT)
+|
+00:SCAN HDFS [tpch_parquet.lineitem, RANDOM]
+   HDFS partitions=1/1 files=3 size=194.00MB
+   stored statistics:
+     table: rows=6.00M size=194.00MB
+     columns: all
+   extrapolated-rows=disabled max-scan-range-rows=2.14M
+   mem-estimate=80.00MB mem-reservation=4.00MB thread-reservation=1
+   tuple-ids=0 row-size=8B cardinality=6.00M
+   in pipelines: 00(GETNEXT)
+====
+# Query where estimate for preagg is less than minimum reservation
+select distinct l_orderkey, l_partkey, l_suppkey from tpch_parquet.lineitem
+---- QUERYOPTIONS
+DEFAULT_SPILLABLE_BUFFER_SIZE=8M
+---- DISTRIBUTEDPLAN
+F02:PLAN FRAGMENT [UNPARTITIONED] hosts=1 instances=1
+|  Per-Host Resources: mem-estimate=10.08MB mem-reservation=0B thread-reservation=1
+PLAN-ROOT SINK
+|  output exprs: l_orderkey, l_partkey, l_suppkey
+|  mem-estimate=0B mem-reservation=0B thread-reservation=0
+|
+04:EXCHANGE [UNPARTITIONED]
+|  mem-estimate=10.08MB mem-reservation=0B thread-reservation=0
+|  tuple-ids=1 row-size=24B cardinality=6.00M
+|  in pipelines: 03(GETNEXT)
+|
+F01:PLAN FRAGMENT [HASH(l_orderkey,l_partkey,l_suppkey)] hosts=3 instances=3
+Per-Host Resources: mem-estimate=146.08MB mem-reservation=136.00MB thread-reservation=1
+03:AGGREGATE [FINALIZE]
+|  group by: l_orderkey, l_partkey, l_suppkey
+|  mem-estimate=136.00MB mem-reservation=136.00MB spill-buffer=8.00MB thread-reservation=0
+|  tuple-ids=1 row-size=24B cardinality=6.00M
+|  in pipelines: 03(GETNEXT), 00(OPEN)
+|
+02:EXCHANGE [HASH(l_orderkey,l_partkey,l_suppkey)]
+|  mem-estimate=10.08MB mem-reservation=0B thread-reservation=0
+|  tuple-ids=1 row-size=24B cardinality=6.00M
+|  in pipelines: 00(GETNEXT)
+|
+F00:PLAN FRAGMENT [RANDOM] hosts=3 instances=3
+Per-Host Resources: mem-estimate=376.00MB mem-reservation=152.00MB thread-reservation=2
+01:AGGREGATE [STREAMING]
+|  group by: l_orderkey, l_partkey, l_suppkey
+|  mem-estimate=136.00MB mem-reservation=136.00MB spill-buffer=8.00MB thread-reservation=0
+|  tuple-ids=1 row-size=24B cardinality=6.00M
+|  in pipelines: 00(GETNEXT)
+|
+00:SCAN HDFS [tpch_parquet.lineitem, RANDOM]
+   HDFS partitions=1/1 files=3 size=194.00MB
+   stored statistics:
+     table: rows=6.00M size=194.00MB
+     columns: all
+   extrapolated-rows=disabled max-scan-range-rows=2.14M
+   mem-estimate=240.00MB mem-reservation=16.00MB thread-reservation=1
+   tuple-ids=0 row-size=24B cardinality=6.00M
+   in pipelines: 00(GETNEXT)
+====

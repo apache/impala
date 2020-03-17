@@ -573,11 +573,20 @@ public class AggregationNode extends PlanNode {
       }
     }
 
-    return new ResourceProfileBuilder()
+    ResourceProfileBuilder builder = new ResourceProfileBuilder()
         .setMemEstimateBytes(perInstanceMemEstimate)
         .setMinMemReservationBytes(perInstanceMinMemReservation)
         .setSpillableBufferBytes(bufferSize)
-        .setMaxRowBufferBytes(maxRowBufferSize)
-        .build();
+        .setMaxRowBufferBytes(maxRowBufferSize);
+    if (useStreamingPreagg_ && queryOptions.getPreagg_bytes_limit() > 0) {
+      long maxReservationBytes =
+          Math.max(perInstanceMinMemReservation, queryOptions.getPreagg_bytes_limit());
+      builder.setMaxMemReservationBytes(maxReservationBytes);
+      // Aggregations should generally not use significantly more than the max
+      // reservation, since the bulk of the memory is reserved.
+      builder.setMemEstimateBytes(
+          Math.min(perInstanceMemEstimate, maxReservationBytes));
+    }
+    return builder.build();
   }
 }

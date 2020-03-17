@@ -152,6 +152,7 @@ TEST(QueryOptions, SetByteOptions) {
       {MAKE_OPTIONDEF(topn_bytes_limit), {-1, I64_MAX}},
       {MAKE_OPTIONDEF(mem_limit_executors), {-1, I64_MAX}},
       {MAKE_OPTIONDEF(broadcast_bytes_limit), {-1, I64_MAX}},
+      {MAKE_OPTIONDEF(preagg_bytes_limit), {-1, I64_MAX}},
   };
   vector<pair<OptionDef<int32_t>, Range<int32_t>>> case_set_i32{
       {MAKE_OPTIONDEF(runtime_filter_min_size),

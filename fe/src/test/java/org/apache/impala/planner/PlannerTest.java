@@ -1018,4 +1018,14 @@ public class PlannerTest extends PlannerTestBase {
     runPlannerTestFile("broadcast-bytes-limit-large", "tpch_parquet", options);
   }
 
+  /**
+   * Check that planner estimates reflect the preagg bytes limit.
+   */
+  @Test
+  public void testPreaggBytesLimit() {
+    TQueryOptions options = defaultQueryOptions();
+    options.setPreagg_bytes_limit(64 * 1024 * 1024);
+    options.setExplain_level(TExplainLevel.EXTENDED);
+    runPlannerTestFile("preagg-bytes-limit", "tpch_parquet", options);
+  }
 }

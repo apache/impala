@@ -86,4 +86,28 @@ string,string,int,bigint
 # Verify that passthrough was activated.
 row_regex: .*RowsPassedThrough: .* \([1-9][0-9]*\)
 ====
-
+---- QUERY
+# Test that, without preagg_bytes_limit, this query does not pass through rows.
+set default_spillable_buffer_size=64k;
+select count(distinct l_orderkey) from tpch_parquet.lineitem
+---- RESULTS
+1500000
+---- TYPES
+BIGINT
+---- RUNTIME_PROFILE
+# Verify that passthrough was activated.
+row_regex: .*RowsPassedThrough: 0
+====
+---- QUERY
+# Test that preagg_bytes_limit forces the preagg to pass through rows.
+set default_spillable_buffer_size=64k;
+set preagg_bytes_limit=10m;
+select count(distinct l_orderkey) from tpch_parquet.lineitem
+---- RESULTS
+1500000
+---- TYPES
+BIGINT
+---- RUNTIME_PROFILE
+# Verify that passthrough was activated.
+row_regex: .*RowsPassedThrough: .* \([1-9][0-9]*\)
+====

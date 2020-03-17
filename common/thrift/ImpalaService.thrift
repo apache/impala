@@ -503,6 +503,10 @@ enum TImpalaQueryOptions {
   // exchange will exceed this limit, it will not consider a broadcast and instead
   // fall back on a hash partition exchange. 0 or -1 means this has no effect.
   BROADCAST_BYTES_LIMIT = 97
+
+  // The max reservation that each grouping class in a preaggregation will use.
+  // 0 or -1 means this has no effect.
+  PREAGG_BYTES_LIMIT = 98
 }
 
 // The summary of a DML statement.
