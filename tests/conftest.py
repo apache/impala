@@ -26,6 +26,7 @@ import contextlib
 import logging
 import os
 import pytest
+import sys
 
 import tests.common
 from impala_py_lib.helpers import find_all_files, is_core_dump
@@ -607,6 +608,15 @@ def cluster_properties():
   from tests.common.environ import ImpalaTestClusterProperties
   cluster_properties = ImpalaTestClusterProperties.get_instance()
   yield cluster_properties
+
+
+@pytest.fixture(autouse=True, scope='session')
+def validate_python_version():
+  """Check the Python runtime version before running any tests. Since Impala switched
+     to the toolchain Python, which is at least v2.7, the tests will not run on a version
+     below that.
+  """
+  assert sys.version_info > (2, 7), "Tests only support Python 2.7+"
 
 
 @pytest.hookimpl(trylast=True)
