@@ -56,6 +56,9 @@ class KrpcDataStreamSenderConfig : public DataSinkConfig {
   /// per-row partition values for shuffling exchange;
   std::vector<ScalarExpr*> partition_exprs_;
 
+  /// Hash seed used for exchanges. Query id will be used to seed the hash function.
+  uint64_t exchange_hash_seed_;
+
   /// Type and pointer for the codegen'd KrpcDataStreamSender::HashAndAddRows()
   /// function. NULL if codegen is disabled or failed.
   typedef Status (*HashAndAddRowsFn)(KrpcDataStreamSender*, RowBatch* row);
@@ -139,8 +142,8 @@ class KrpcDataStreamSender : public DataSink {
   /// KrpcDataStreamSender::HashRow() symbol. Used for call-site replacement.
   static const char* HASH_ROW_SYMBOL;
 
-  /// An arbitrary hash seed used for exchanges.
-  static constexpr uint64_t EXCHANGE_HASH_SEED = 0x66bd68df22c3ef37;
+  /// An arbitrary constant used to seed the hash.
+  static constexpr uint64_t EXCHANGE_HASH_SEED_CONST = 0x66bd68df22c3ef37;
 
   static const char* LLVM_CLASS_NAME;
 
@@ -261,6 +264,9 @@ class KrpcDataStreamSender : public DataSink {
   /// Used for Kudu partitioning to round-robin rows that don't correspond to a partition
   /// or when errors are encountered.
   int next_unknown_partition_;
+
+  /// Hash seed used for exchanges. Query id will be used to seed the hash function.
+  uint64_t exchange_hash_seed_;
 
   /// Pointer for the codegen'd HashAndAddRows() function.
   /// NULL if codegen is disabled or failed.

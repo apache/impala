@@ -85,6 +85,8 @@ Status KrpcDataStreamSenderConfig::Init(
     RETURN_IF_ERROR(
         ScalarExpr::Create(tsink_->stream_sink.output_partition.partition_exprs,
             *input_row_desc_, state, &partition_exprs_));
+    exchange_hash_seed_ =
+        KrpcDataStreamSender::EXCHANGE_HASH_SEED_CONST ^ state->query_id().hi;
   }
   return Status::OK();
 }
@@ -715,6 +717,7 @@ KrpcDataStreamSender::KrpcDataStreamSender(TDataSinkId sink_id, int sender_id,
     partition_exprs_(sink_config.partition_exprs_),
     dest_node_id_(sink.dest_node_id),
     next_unknown_partition_(0),
+    exchange_hash_seed_(sink_config.exchange_hash_seed_),
     hash_and_add_rows_fn_(sink_config.hash_and_add_rows_fn_) {
   DCHECK_GT(destinations.size(), 0);
   DCHECK(sink.output_partition.type == TPartitionType::UNPARTITIONED
@@ -831,7 +834,7 @@ Status KrpcDataStreamSenderConfig::CodegenHashRow(
 
   // Store the initial seed to hash_val
   llvm::Value* hash_val =
-      codegen->GetI64Constant(KrpcDataStreamSender::EXCHANGE_HASH_SEED);
+      codegen->GetI64Constant(exchange_hash_seed_);
 
   // Unroll the loop and codegen each of the partition expressions
   for (int i = 0; i < partition_exprs_.size(); ++i) {
@@ -973,7 +976,7 @@ Status KrpcDataStreamSender::AddRowToChannel(const int channel_id, TupleRow* row
 }
 
 uint64_t KrpcDataStreamSender::HashRow(TupleRow* row) {
-  uint64_t hash_val = EXCHANGE_HASH_SEED;
+  uint64_t hash_val = exchange_hash_seed_;
   for (ScalarExprEvaluator* eval : partition_expr_evals_) {
     void* partition_val = eval->GetValue(row);
     // We can't use the crc hash function here because it does not result in

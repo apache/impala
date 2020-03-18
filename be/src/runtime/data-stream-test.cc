@@ -50,6 +50,7 @@
 #include "util/parse-util.h"
 #include "util/test-info.h"
 #include "util/tuple-row-compare.h"
+#include "util/uid-util.h"
 #include "gen-cpp/data_stream_service.pb.h"
 #include "gen-cpp/Types_types.h"
 #include "gen-cpp/Descriptors_types.h"
@@ -61,6 +62,8 @@
 
 #include "common/names.h"
 
+using boost::uuids::random_generator;
+using boost::uuids::uuid;
 using namespace impala;
 using namespace apache::thrift;
 using namespace apache::thrift::protocol;
@@ -478,7 +481,7 @@ class DataStreamTest : public testing::Test {
           // hash-partitioned streams send values to the right partition
           int64_t value = *j;
           uint64_t hash_val = RawValue::GetHashValueFastHash(&value, TYPE_BIGINT,
-              KrpcDataStreamSender::EXCHANGE_HASH_SEED);
+              GetExchangeHashSeed(runtime_state_->query_id()));
           EXPECT_EQ(hash_val % receiver_info_.size(), info->receiver_num);
         }
       }
@@ -495,6 +498,45 @@ class DataStreamTest : public testing::Test {
         if (k/num_senders != *j) break;
       }
     }
+  }
+
+  // Returns a map of reciever to all it's data values.
+  unordered_map<int, multiset<int64_t>> GetHashPartitionedReceiversDataMap(
+      int num_receivers, bool reset_hash_seed) {
+    int num_senders = 1;
+    int buffer_size = 1024;
+    bool merging = false;
+    unordered_map<int, multiset<int64_t>> receiver_data_map;
+    Reset();
+    for (int i = 0; i < num_receivers; ++i) {
+      StartReceiver(TPartitionType::HASH_PARTITIONED, num_senders, i,
+          buffer_size, merging);
+    }
+    for (int i = 0; i < num_senders; ++i) {
+      StartSender(TPartitionType::HASH_PARTITIONED, buffer_size,
+          reset_hash_seed);
+    }
+    JoinSenders();
+    CheckSenders();
+    JoinReceivers();
+    receiver_data_map.clear();
+
+    for (int i = 0; i < receiver_info_.size(); i++) {
+      // Store a map of receiver and list of it's data values.
+      ReceiverInfo* info = receiver_info_[i].get();
+      multiset<int64_t> data_set;
+      for (multiset<int64_t>::iterator j = info->data_values.begin();
+           j != info->data_values.end(); ++j) {
+        data_set.insert(*j);
+      }
+      receiver_data_map[info->receiver_num] = data_set;
+    }
+    return receiver_data_map;
+  }
+
+  /// Returns a hash seed with query_id.
+  uint64_t GetExchangeHashSeed(TUniqueId query_id) {
+    return 0x66bd68df22c3ef37 ^ query_id.hi;
   }
 
   void CheckSenders() {
@@ -520,13 +562,13 @@ class DataStreamTest : public testing::Test {
   }
 
   void StartSender(TPartitionType::type partition_type = TPartitionType::UNPARTITIONED,
-                   int channel_buffer_size = 1024) {
+      int channel_buffer_size = 1024, bool reset_hash_seed = false) {
     VLOG_QUERY << "start sender";
     int num_senders = sender_info_.size();
     sender_info_.emplace_back(make_unique<SenderInfo>());
     sender_info_.back()->thread_handle.reset(
         new thread(&DataStreamTest::Sender, this, num_senders, channel_buffer_size,
-            partition_type, sender_info_[num_senders].get()));
+            partition_type, sender_info_[num_senders].get(), reset_hash_seed));
   }
 
   void JoinSenders() {
@@ -537,7 +579,7 @@ class DataStreamTest : public testing::Test {
   }
 
   void Sender(int sender_num, int channel_buffer_size,
-      TPartitionType::type partition_type, SenderInfo* info) {
+      TPartitionType::type partition_type, SenderInfo* info, bool reset_hash_seed) {
     RuntimeState state(TQueryCtx(), exec_env_.get(), desc_tbl_);
     VLOG_QUERY << "create sender " << sender_num;
     const TDataSink& sink = GetSink(partition_type);
@@ -548,8 +590,17 @@ class DataStreamTest : public testing::Test {
     // according to the 'is_thrift' option.
     scoped_ptr<DataSink> sender;
 
-    sender.reset(new KrpcDataStreamSender(-1, sender_num,
-        *(static_cast<const KrpcDataStreamSenderConfig*>(data_sink)),
+    KrpcDataStreamSenderConfig& config =
+        *(static_cast<KrpcDataStreamSenderConfig*>(data_sink));
+
+    // Reset the hash seed with a new query id. Useful for testing hash exchanges are
+    // random.
+    if (reset_hash_seed) {
+      config.exchange_hash_seed_ =
+          GetExchangeHashSeed(UuidToQueryId(random_generator()()));
+    }
+
+    sender.reset(new KrpcDataStreamSender(-1, sender_num, config,
         data_sink->tsink_->stream_sink, dest_, channel_buffer_size, &state));
     EXPECT_OK(sender->Prepare(&state, &tracker_));
     EXPECT_OK(sender->Open(&state));
@@ -673,6 +724,29 @@ TEST_F(DataStreamTest, BasicTest) {
       }
     }
   }
+}
+
+// Test streams with different query ids should hash to different destinations.
+TEST_F(DataStreamTest, HashPartitionTest) {
+  bool result = false;
+  int num_receivers = 4;
+
+  unordered_map<int, multiset<int64_t>> receiver_data_map_1 =
+      GetHashPartitionedReceiversDataMap(num_receivers, false);
+
+  unordered_map<int, multiset<int64_t>> receiver_data_map_2 =
+      GetHashPartitionedReceiversDataMap(num_receivers, true);
+
+  // Check the sizes of the receiver data values in each receiver is different.
+  for (int i = 0; i < num_receivers; ++i) {
+    // Compare the data values in the recievers for the two queries. Verify the values
+    // don't match for at least one reciever.
+    if (receiver_data_map_1[i] != receiver_data_map_2[i]) {
+      result = true;
+      break;
+    }
+  }
+  ASSERT_EQ(result, true);
 }
 
 // This test is to exercise a previously present deadlock path which is now fixed, to
