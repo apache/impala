@@ -4204,3 +4204,263 @@ Per-Host Resources: mem-estimate=128.00MB mem-reservation=32.00KB thread-reserva
    tuple-ids=0 row-size=4B cardinality=7.30K
    in pipelines: 01(GETNEXT)
 ====
+#IMPALA-8533: Analytic ordering columns are constant after union substitution
+WITH
+base_10 AS (SELECT 1 UNION ALL SELECT 1),
+base_10k AS (SELECT 2 constant FROM base_10 b1)
+SELECT ROW_NUMBER() OVER (ORDER BY b1.constant) row_num
+FROM base_10k b1;
+---- QUERYOPTIONS
+explain_level=2
+---- DISTRIBUTEDPLAN
+F00:PLAN FRAGMENT [UNPARTITIONED] hosts=1 instances=1
+|  Per-Host Resources: mem-estimate=4.00MB mem-reservation=4.00MB thread-reservation=1
+PLAN-ROOT SINK
+|  output exprs: row_number()
+|  mem-estimate=0B mem-reservation=0B thread-reservation=0
+|
+01:ANALYTIC
+|  functions: row_number()
+|  order by: 2 ASC
+|  window: ROWS BETWEEN UNBOUNDED PRECEDING AND CURRENT ROW
+|  mem-estimate=4.00MB mem-reservation=4.00MB spill-buffer=2.00MB thread-reservation=0
+|  tuple-ids=0,4 row-size=8B cardinality=2
+|  in pipelines: <none>
+|
+00:UNION
+   constant-operands=2
+   mem-estimate=0B mem-reservation=0B thread-reservation=0
+   tuple-ids=0 row-size=0B cardinality=2
+   in pipelines: <none>
+====
+#IMPALA-8533: Ordering on select same constant from all union arms.
+# Sort not currently eliminated.
+SELECT c1 FROM (SELECT 1 c1 UNION ALL SELECT 1 c1) a ORDER BY a.c1;
+---- QUERYOPTIONS
+explain_level=2
+---- DISTRIBUTEDPLAN
+F00:PLAN FRAGMENT [UNPARTITIONED] hosts=1 instances=1
+|  Per-Host Resources: mem-estimate=6.00MB mem-reservation=6.00MB thread-reservation=1
+PLAN-ROOT SINK
+|  output exprs: c1
+|  mem-estimate=0B mem-reservation=0B thread-reservation=0
+|
+01:SORT
+|  order by: c1 ASC
+|  mem-estimate=6.00MB mem-reservation=6.00MB spill-buffer=2.00MB thread-reservation=0
+|  tuple-ids=2 row-size=1B cardinality=2
+|  in pipelines: 01(GETNEXT)
+|
+00:UNION
+   constant-operands=2
+   mem-estimate=0B mem-reservation=0B thread-reservation=0
+   tuple-ids=0 row-size=1B cardinality=2
+   in pipelines: <none>
+====
+#IMPALA-8533: Ordering on select constant union select same constant from table
+# Sort not currently eliminated.
+SELECT c1 FROM (SELECT 1 c1 FROM functional.alltypestiny UNION ALL SELECT 1 c1 FROM functional.alltypestiny) a ORDER BY c1;
+---- QUERYOPTIONS
+explain_level=2
+---- DISTRIBUTEDPLAN
+F03:PLAN FRAGMENT [UNPARTITIONED] hosts=1 instances=1
+|  Per-Host Resources: mem-estimate=16.00KB mem-reservation=0B thread-reservation=1
+PLAN-ROOT SINK
+|  output exprs: c1
+|  mem-estimate=0B mem-reservation=0B thread-reservation=0
+|
+04:MERGING-EXCHANGE [UNPARTITIONED]
+|  order by: c1 ASC
+|  mem-estimate=16.00KB mem-reservation=0B thread-reservation=0
+|  tuple-ids=4 row-size=1B cardinality=16
+|  in pipelines: 03(GETNEXT)
+|
+F02:PLAN FRAGMENT [RANDOM] hosts=3 instances=3
+Per-Host Resources: mem-estimate=38.00MB mem-reservation=6.01MB thread-reservation=2
+03:SORT
+|  order by: c1 ASC
+|  mem-estimate=6.00MB mem-reservation=6.00MB spill-buffer=2.00MB thread-reservation=0
+|  tuple-ids=4 row-size=1B cardinality=16
+|  in pipelines: 03(GETNEXT), 01(OPEN), 02(OPEN)
+|
+00:UNION
+|  mem-estimate=0B mem-reservation=0B thread-reservation=0
+|  tuple-ids=2 row-size=1B cardinality=16
+|  in pipelines: 01(GETNEXT), 02(GETNEXT)
+|
+|--02:SCAN HDFS [functional.alltypestiny, RANDOM]
+|     HDFS partitions=4/4 files=4 size=460B
+|     stored statistics:
+|       table: rows=8 size=460B
+|       partitions: 4/4 rows=8
+|       columns: all
+|     extrapolated-rows=disabled max-scan-range-rows=2
+|     mem-estimate=32.00MB mem-reservation=8.00KB thread-reservation=1
+|     tuple-ids=1 row-size=0B cardinality=8
+|     in pipelines: 02(GETNEXT)
+|
+01:SCAN HDFS [functional.alltypestiny, RANDOM]
+   HDFS partitions=4/4 files=4 size=460B
+   stored statistics:
+     table: rows=8 size=460B
+     partitions: 4/4 rows=8
+     columns: all
+   extrapolated-rows=disabled max-scan-range-rows=2
+   mem-estimate=32.00MB mem-reservation=8.00KB thread-reservation=1
+   tuple-ids=0 row-size=0B cardinality=8
+   in pipelines: 01(GETNEXT)
+====
+#IMPALA-8533: Select constant from unioned query.
+# Sort not currently eliminated.
+SELECT 1 FROM (SELECT int_col FROM functional.alltypestiny UNION ALL SELECT int_col FROM functional.alltypestiny) a ORDER BY int_col;
+---- QUERYOPTIONS
+explain_level=2
+---- DISTRIBUTEDPLAN
+F03:PLAN FRAGMENT [UNPARTITIONED] hosts=1 instances=1
+|  Per-Host Resources: mem-estimate=16.00KB mem-reservation=0B thread-reservation=1
+PLAN-ROOT SINK
+|  output exprs: CAST(1 AS TINYINT)
+|  mem-estimate=0B mem-reservation=0B thread-reservation=0
+|
+04:MERGING-EXCHANGE [UNPARTITIONED]
+|  order by: int_col ASC
+|  mem-estimate=16.00KB mem-reservation=0B thread-reservation=0
+|  tuple-ids=4 row-size=4B cardinality=16
+|  in pipelines: 03(GETNEXT)
+|
+F02:PLAN FRAGMENT [RANDOM] hosts=3 instances=3
+Per-Host Resources: mem-estimate=38.00MB mem-reservation=6.01MB thread-reservation=2
+03:SORT
+|  order by: int_col ASC
+|  mem-estimate=6.00MB mem-reservation=6.00MB spill-buffer=2.00MB thread-reservation=0
+|  tuple-ids=4 row-size=4B cardinality=16
+|  in pipelines: 03(GETNEXT), 01(OPEN), 02(OPEN)
+|
+00:UNION
+|  pass-through-operands: all
+|  mem-estimate=0B mem-reservation=0B thread-reservation=0
+|  tuple-ids=2 row-size=4B cardinality=16
+|  in pipelines: 01(GETNEXT), 02(GETNEXT)
+|
+|--02:SCAN HDFS [functional.alltypestiny, RANDOM]
+|     HDFS partitions=4/4 files=4 size=460B
+|     stored statistics:
+|       table: rows=8 size=460B
+|       partitions: 4/4 rows=8
+|       columns: all
+|     extrapolated-rows=disabled max-scan-range-rows=2
+|     mem-estimate=32.00MB mem-reservation=8.00KB thread-reservation=1
+|     tuple-ids=1 row-size=4B cardinality=8
+|     in pipelines: 02(GETNEXT)
+|
+01:SCAN HDFS [functional.alltypestiny, RANDOM]
+   HDFS partitions=4/4 files=4 size=460B
+   stored statistics:
+     table: rows=8 size=460B
+     partitions: 4/4 rows=8
+     columns: all
+   extrapolated-rows=disabled max-scan-range-rows=2
+   mem-estimate=32.00MB mem-reservation=8.00KB thread-reservation=1
+   tuple-ids=0 row-size=4B cardinality=8
+   in pipelines: 01(GETNEXT)
+====
+#IMPALA-8533: Select constant from select constant union select same constant
+# Sort not currently eliminated.
+SELECT 1 FROM (SELECT 1 c1 FROM functional.alltypestiny UNION ALL SELECT 1 c1 FROM functional.alltypestiny) a ORDER BY c1;
+---- QUERYOPTIONS
+explain_level=2
+---- DISTRIBUTEDPLAN
+F03:PLAN FRAGMENT [UNPARTITIONED] hosts=1 instances=1
+|  Per-Host Resources: mem-estimate=16.00KB mem-reservation=0B thread-reservation=1
+PLAN-ROOT SINK
+|  output exprs: CAST(1 AS TINYINT)
+|  mem-estimate=0B mem-reservation=0B thread-reservation=0
+|
+04:MERGING-EXCHANGE [UNPARTITIONED]
+|  order by: c1 ASC
+|  mem-estimate=16.00KB mem-reservation=0B thread-reservation=0
+|  tuple-ids=4 row-size=1B cardinality=16
+|  in pipelines: 03(GETNEXT)
+|
+F02:PLAN FRAGMENT [RANDOM] hosts=3 instances=3
+Per-Host Resources: mem-estimate=38.00MB mem-reservation=6.01MB thread-reservation=2
+03:SORT
+|  order by: c1 ASC
+|  mem-estimate=6.00MB mem-reservation=6.00MB spill-buffer=2.00MB thread-reservation=0
+|  tuple-ids=4 row-size=1B cardinality=16
+|  in pipelines: 03(GETNEXT), 01(OPEN), 02(OPEN)
+|
+00:UNION
+|  mem-estimate=0B mem-reservation=0B thread-reservation=0
+|  tuple-ids=2 row-size=1B cardinality=16
+|  in pipelines: 01(GETNEXT), 02(GETNEXT)
+|
+|--02:SCAN HDFS [functional.alltypestiny, RANDOM]
+|     HDFS partitions=4/4 files=4 size=460B
+|     stored statistics:
+|       table: rows=8 size=460B
+|       partitions: 4/4 rows=8
+|       columns: all
+|     extrapolated-rows=disabled max-scan-range-rows=2
+|     mem-estimate=32.00MB mem-reservation=8.00KB thread-reservation=1
+|     tuple-ids=1 row-size=0B cardinality=8
+|     in pipelines: 02(GETNEXT)
+|
+01:SCAN HDFS [functional.alltypestiny, RANDOM]
+   HDFS partitions=4/4 files=4 size=460B
+   stored statistics:
+     table: rows=8 size=460B
+     partitions: 4/4 rows=8
+     columns: all
+   extrapolated-rows=disabled max-scan-range-rows=2
+   mem-estimate=32.00MB mem-reservation=8.00KB thread-reservation=1
+   tuple-ids=0 row-size=0B cardinality=8
+   in pipelines: 01(GETNEXT)
+====
+#IMPALA-8533: Select constant from union order by 1
+# Sort is eliminated.
+SELECT 1 FROM (SELECT int_col c1 FROM functional.alltypestiny UNION ALL SELECT int_col c1 FROM functional.alltypestiny) a ORDER BY 1;
+---- QUERYOPTIONS
+explain_level=2
+---- DISTRIBUTEDPLAN
+F03:PLAN FRAGMENT [UNPARTITIONED] hosts=1 instances=1
+|  Per-Host Resources: mem-estimate=16.00KB mem-reservation=0B thread-reservation=1
+PLAN-ROOT SINK
+|  output exprs: CAST(1 AS TINYINT)
+|  mem-estimate=0B mem-reservation=0B thread-reservation=0
+|
+03:EXCHANGE [UNPARTITIONED]
+|  mem-estimate=16.00KB mem-reservation=0B thread-reservation=0
+|  tuple-ids=2 row-size=0B cardinality=16
+|  in pipelines: 01(GETNEXT), 02(GETNEXT)
+|
+F02:PLAN FRAGMENT [RANDOM] hosts=3 instances=3
+Per-Host Resources: mem-estimate=32.00MB mem-reservation=8.00KB thread-reservation=2
+00:UNION
+|  pass-through-operands: all
+|  mem-estimate=0B mem-reservation=0B thread-reservation=0
+|  tuple-ids=2 row-size=0B cardinality=16
+|  in pipelines: 01(GETNEXT), 02(GETNEXT)
+|
+|--02:SCAN HDFS [functional.alltypestiny, RANDOM]
+|     HDFS partitions=4/4 files=4 size=460B
+|     stored statistics:
+|       table: rows=8 size=460B
+|       partitions: 4/4 rows=8
+|       columns: all
+|     extrapolated-rows=disabled max-scan-range-rows=2
+|     mem-estimate=32.00MB mem-reservation=8.00KB thread-reservation=1
+|     tuple-ids=1 row-size=0B cardinality=8
+|     in pipelines: 02(GETNEXT)
+|
+01:SCAN HDFS [functional.alltypestiny, RANDOM]
+   HDFS partitions=4/4 files=4 size=460B
+   stored statistics:
+     table: rows=8 size=460B
+     partitions: 4/4 rows=8
+     columns: all
+   extrapolated-rows=disabled max-scan-range-rows=2
+   mem-estimate=32.00MB mem-reservation=8.00KB thread-reservation=1
+   tuple-ids=0 row-size=0B cardinality=8
+   in pipelines: 01(GETNEXT)
+====

@@ -363,24 +363,27 @@ public class AnalyticPlanner {
       }
 
       SortInfo sortInfo = createSortInfo(root, sortExprs, isAsc, nullsFirst);
-      SortNode sortNode =
-          SortNode.createTotalSortNode(ctx_.getNextNodeId(), root, sortInfo, 0);
+      // IMPALA-8533: Avoid generating sort with empty tuple descriptor
+      if(sortInfo.getSortTupleDescriptor().getSlots().size() > 0) {
+        SortNode sortNode =
+            SortNode.createTotalSortNode(ctx_.getNextNodeId(), root, sortInfo, 0);
 
-      // if this sort group does not have partitioning exprs, we want the sort
-      // to be executed like a regular distributed sort
-      if (hasActivePartition) sortNode.setIsAnalyticSort(true);
+        // if this sort group does not have partitioning exprs, we want the sort
+        // to be executed like a regular distributed sort
+        if (hasActivePartition) sortNode.setIsAnalyticSort(true);
 
-      if (partitionExprs != null) {
-        // create required input partition
-        DataPartition inputPartition = DataPartition.UNPARTITIONED;
-        if (hasActivePartition) {
-          inputPartition = DataPartition.hashPartitioned(partitionExprs);
+        if (partitionExprs != null) {
+          // create required input partition
+          DataPartition inputPartition = DataPartition.UNPARTITIONED;
+          if (hasActivePartition) {
+            inputPartition = DataPartition.hashPartitioned(partitionExprs);
+          }
+          sortNode.setInputPartition(inputPartition);
         }
-        sortNode.setInputPartition(inputPartition);
-      }
 
-      root = sortNode;
-      root.init(analyzer_);
+        root = sortNode;
+        root.init(analyzer_);
+      }
     }
 
     // create one AnalyticEvalNode per window group

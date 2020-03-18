@@ -134,6 +134,8 @@ public class SortNode extends PlanNode {
 
     // populate resolvedTupleExprs_ and outputSmap_
     List<SlotDescriptor> sortTupleSlots = info_.getSortTupleDescriptor().getSlots();
+    Preconditions.checkState(sortTupleSlots.size() > 0,
+        "empty sort tuple descriptor");
     List<Expr> slotExprs = info_.getMaterializedExprs();
     resolvedTupleExprs_ = new ArrayList<>();
     outputSmap_ = new ExprSubstitutionMap();
