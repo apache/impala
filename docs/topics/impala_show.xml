@@ -178,11 +178,11 @@ show files in sample_table partition (month like 'J%');
 [localhost:21000] > insert into unpart_text (x, s) select id, name
                   > from oreilly.sample_data limit 20e6;
 [localhost:21000] > show files in unpart_text;
-+------------------------------------------------------------------------------+----------+-----------+
-| path                                                                         | size     | partition |
-+------------------------------------------------------------------------------+----------+-----------+
++--------------------------------------------------------------------------------------+----------+-----------+
+| path                                                                                 | size     | partition |
++--------------------------------------------------------------------------------------+----------+-----------+
 | hdfs://<varname>impala_data_dir</varname>/show_files.db/unpart_text/35665776ef85cfaf_1012432410_data.0. | 448.31MB |           |
-+------------------------------------------------------------------------------+----------+-----------+
++--------------------------------------------------------------------------------------+----------+-----------+
 [localhost:21000] > insert into unpart_text (x, s) select id, name from oreilly.sample_data limit 100e6;
 [localhost:21000] > show files in unpart_text;
 +--------------------------------------------------------------------------------------+----------+-----------+
@@ -203,14 +203,14 @@ show files in sample_table partition (month like 'J%');
 <codeblock scale="60">[localhost:21000] > insert into unpart_text values (10,'hello'), (20, 'world');
 [localhost:21000] > insert into unpart_text values (-1,'foo'), (-1000, 'bar');
 [localhost:21000] > show files in unpart_text;
-+--------------------------------------------------------------------------------------+----------+
-| path                                                                                 | size     |
-+--------------------------------------------------------------------------------------+----------+
-| hdfs://<varname>impala_data_dir</varname>/show_files.db/unpart_text/4f11b8bdf8b6aa92_238145083_data.0.  | 18B
-| hdfs://<varname>impala_data_dir</varname>/show_files.db/unpart_text/35665776ef85cfaf_1012432410_data.0. | 448.31MB
-| hdfs://<varname>impala_data_dir</varname>/show_files.db/unpart_text/ac3dba252a8952b8_1663177415_data.0. | 2.19GB
-| hdfs://<varname>impala_data_dir</varname>/show_files.db/unpart_text/cfb8252452445682_1868457216_data.0. | 17B
-+--------------------------------------------------------------------------------------+----------+
++--------------------------------------------------------------------------------------+----------+-----------+
+| path                                                                                 | size     | partition |
++--------------------------------------------------------------------------------------+----------+-----------+
+| hdfs://<varname>impala_data_dir</varname>/show_files.db/unpart_text/4f11b8bdf8b6aa92_238145083_data.0.  | 18B      |           |
+| hdfs://<varname>impala_data_dir</varname>/show_files.db/unpart_text/35665776ef85cfaf_1012432410_data.0. | 448.31MB |           |
+| hdfs://<varname>impala_data_dir</varname>/show_files.db/unpart_text/ac3dba252a8952b8_1663177415_data.0. | 2.19GB   |           |
+| hdfs://<varname>impala_data_dir</varname>/show_files.db/unpart_text/cfb8252452445682_1868457216_data.0. | 17B      |           |
++--------------------------------------------------------------------------------------+----------+-----------+
 [localhost:21000] > create table unpart_parq stored as parquet as select * from unpart_text;
 +---------------------------+
 | summary                   |
@@ -258,18 +258,18 @@ where id between 1 and 1000000;
 | Total |       |     | -1    | 8      | 51.38MB | 0B           |                   |        |                   |
 +-------+-------+-----+-------+--------+---------+--------------+-------------------+--------+-------------------+
 [localhost:21000] > show files in part_text;
-+---------------------------------------------------------------------------------------------------------+--------+-------------------------+
-| path                                                                                                    | size   | partition               |
-+---------------------------------------------------------------------------------------------------------+--------+-------------------------+
-| hdfs://<varname>impala_data_dir</varname>/show_files.db/part_text/year=2014/month=1/day=1/80732d9dc80689f_1418645991_data.0.  | 5.77MB | year=2014/month=1/day=1 |
-| hdfs://<varname>impala_data_dir</varname>/show_files.db/part_text/year=2014/month=1/day=1/80732d9dc8068a0_1418645991_data.0.  | 6.25MB | year=2014/month=1/day=1 |
-| hdfs://<varname>impala_data_dir</varname>/show_files.db/part_text/year=2014/month=1/day=1/80732d9dc8068a1_147082319_data.0.   | 7.16MB | year=2014/month=1/day=1 |
-| hdfs://<varname>impala_data_dir</varname>/show_files.db/part_text/year=2014/month=1/day=1/80732d9dc8068a2_2111411753_data.0.  | 5.98MB | year=2014/month=1/day=1 |
-| hdfs://<varname>impala_data_dir</varname>/show_files.db/part_text/year=2014/month=1/day=2/21a828cf494b5bbb_501271652_data.0.  | 6.42MB | year=2014/month=1/day=2 |
-| hdfs://<varname>impala_data_dir</varname>/show_files.db/part_text/year=2014/month=1/day=2/21a828cf494b5bbc_501271652_data.0.  | 6.62MB | year=2014/month=1/day=2 |
-| hdfs://<varname>impala_data_dir</varname>/show_files.db/part_text/year=2014/month=1/day=2/21a828cf494b5bbd_1393490200_data.0. | 6.98MB | year=2014/month=1/day=2 |
-| hdfs://<varname>impala_data_dir</varname>/show_files.db/part_text/year=2014/month=1/day=2/21a828cf494b5bbe_1393490200_data.0. | 6.20MB | year=2014/month=1/day=2 |
-+---------------------------------------------------------------------------------------------------------+--------+-------------------------+
++-----------------------------------------------------------------------------------------------------------------------+--------+-------------------------+
+| path                                                                                                                  | size   | partition               |
++-----------------------------------------------------------------------------------------------------------------------+--------+-------------------------+
+| hdfs://&lt;impala_data_dir&gt;/show_files.db/part_text/year=2014/month=1/day=1/80732d9dc80689f_1418645991_data.0.  | 5.77MB | year=2014/month=1/day=1 |
+| hdfs://&lt;impala_data_dir&gt;/show_files.db/part_text/year=2014/month=1/day=1/80732d9dc8068a0_1418645991_data.0.  | 6.25MB | year=2014/month=1/day=1 |
+| hdfs://&lt;impala_data_dir&gt;/show_files.db/part_text/year=2014/month=1/day=1/80732d9dc8068a1_147082319_data.0.   | 7.16MB | year=2014/month=1/day=1 |
+| hdfs://&lt;impala_data_dir&gt;/show_files.db/part_text/year=2014/month=1/day=1/80732d9dc8068a2_2111411753_data.0.  | 5.98MB | year=2014/month=1/day=1 |
+| hdfs://&lt;impala_data_dir&gt;/show_files.db/part_text/year=2014/month=1/day=2/21a828cf494b5bbb_501271652_data.0.  | 6.42MB | year=2014/month=1/day=2 |
+| hdfs://&lt;impala_data_dir&gt;/show_files.db/part_text/year=2014/month=1/day=2/21a828cf494b5bbc_501271652_data.0.  | 6.62MB | year=2014/month=1/day=2 |
+| hdfs://&lt;impala_data_dir&gt;/show_files.db/part_text/year=2014/month=1/day=2/21a828cf494b5bbd_1393490200_data.0. | 6.98MB | year=2014/month=1/day=2 |
+| hdfs://&lt;impala_data_dir&gt;/show_files.db/part_text/year=2014/month=1/day=2/21a828cf494b5bbe_1393490200_data.0. | 6.20MB | year=2014/month=1/day=2 |
++-----------------------------------------------------------------------------------------------------------------------+--------+-------------------------+
 </codeblock>
       <p>
         The following example shows a <codeph>SHOW FILES</codeph> statement for a partitioned Parquet table.
@@ -820,20 +820,20 @@ show CREATE TABLE numeric_grades_default_letter;
 |   student STRING NULL ENCODING AUTO_ENCODING COMPRESSION DEFAULT_COMPRESSION,                  |
 |   PRIMARY KEY (score)                                                                          |
 | )                                                                                              |
-| PARTITION BY <b>RANGE (score) (...)</b>                                                          |
+| PARTITION BY RANGE (score) (...) .                                                             |
 | STORED AS KUDU                                                                                 |
 | TBLPROPERTIES ('kudu.master_addresses'='vd0342.example.com:7051')                              |
 +------------------------------------------------------------------------------------------------+
 
 show range partitions numeric_grades_default_letter;
-+--------------------+
-| RANGE (score)      |
-+--------------------+
-| 0 &lt;= VALUES &lt; 50   |
-| 50 &lt;= VALUES &lt; 65  |
-| 65 &lt;= VALUES &lt; 80  |
-| 80 &lt;= VALUES &lt; 100 |
-+--------------------+
++--------------------------+
+| RANGE (score)            |
++--------------------------+
+| 0 &lt;= VALUES &lt; 50         |
+| 50 &lt;= VALUES &lt; 65        |
+| 65 &lt;= VALUES &lt; 80        |
+| 80 &lt;= VALUES &lt; 100       |
++--------------------------+
 </codeblock>
 
       <p conref="../shared/impala_common.xml#common/example_blurb"/>
@@ -1333,20 +1333,22 @@ show column stats store_sales;
 
 <codeblock rev="kudu IMPALA-4403"><![CDATA[
 show partitions million_rows_hash;
-+-----------+----------+-----------------------+------------+
-| Start Key | Stop Key | Leader Replica        | # Replicas |
-+-----------+----------+-----------------------+------------+
-|           | 00000001 | n236.example.com:7050 | 3          |
-| 00000001  | 00000002 | n236.example.com:7050 | 3          |
-| 00000002  | 00000003 | n336.example.com:7050 | 3          |
-| 00000003  | 00000004 | n238.example.com:7050 | 3          |
-| 00000004  | 00000005 | n338.example.com:7050 | 3          |
-...                                                         |
-| 0000002E  | 0000002F | n240.example.com:7050 | 3          |
-| 0000002F  | 00000030 | n336.example.com:7050 | 3          |
-| 00000030  | 00000031 | n240.example.com:7050 | 3          |
-| 00000031  |          | n334.example.com:7050 | 3          |
-+-----------+----------+-----------------------+------------+
+
++--------+-----------+----------+-----------------------+------------+
+| # Rows | Start Key | Stop Key | Leader Replica        | # Replicas |
++--------+-----------+----------+-----------------------+------------+
+| -1     |           | 00000001 | n236.example.com:7050 | 3          |
+| -1     | 00000001  | 00000002 | n236.example.com:7050 | 3          |
+| -1     | 00000002  | 00000003 | n336.example.com:7050 | 3          |
+| -1     | 00000003  | 00000004 | n238.example.com:7050 | 3          |
+| -1     | 00000004  | 00000005 | n338.example.com:7050 | 3          |
+...
+| -1     | 0000002E  | 0000002F | n240.example.com:7050 | 3          |
+| -1     | 0000002F  | 00000030 | n336.example.com:7050 | 3          |
+| -1     | 00000030  | 00000031 | n240.example.com:7050 | 3          |
+| -1     | 00000031  |          | n334.example.com:7050 | 3          |
++--------+-----------+----------+-----------------------+------------+
+Fetched 50 row(s) in 0.05s
 ]]>
 </codeblock>
 
@@ -1452,8 +1454,7 @@ show range partitions million_rows_range;
 | DECIMAL(*,*) | abs(DECIMAL(*,*))                               | BUILTIN     | true          |
 | DOUBLE       | abs(DOUBLE)                                     | BUILTIN     | true          |
 | FLOAT        | abs(FLOAT)                                      | BUILTIN     | true          |
-+----------------+----------------------------------------+
-...
++----------------+-----------------------------------------------+-------------+---------------+
 
 show functions in _impala_builtins like '*week*';
 +-------------+------------------------------+-------------+---------------+
