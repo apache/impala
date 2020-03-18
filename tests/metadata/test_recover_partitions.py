@@ -18,6 +18,7 @@
 # Impala tests for ALTER TABLE RECOVER PARTITIONS statement
 
 import os
+from six.moves import urllib
 from tests.common.impala_test_suite import ImpalaTestSuite
 from tests.common.skip import SkipIfLocal, SkipIfS3, SkipIfCatalogV2
 from tests.common.test_dimensions import ALL_NODES_ONLY
@@ -363,16 +364,18 @@ class TestRecoverPartitions(ImpalaTestSuite):
 
     self.execute_query_expect_success(
         self.client, "CREATE TABLE %s (i int) PARTITIONED BY (p string)" % fq_tbl_name)
-    self.create_fs_partition(tbl_location, 'p=\"', "file_000", "1")
-    self.create_fs_partition(tbl_location, 'p=\'', "file_000", "2")
-    self.create_fs_partition(tbl_location, 'p=\\\"', "file_000", "3")
-    self.create_fs_partition(tbl_location, 'p=\\\'', "file_000", "4")
+    parts = ["\'", "\"", "\\\'", "\\\"", "\\\\\'", "\\\\\""]
+    for i in range(len(parts)):
+      # When creating partition directories, Hive replaces special characters in
+      # partition value string using the %xx escape. e.g. p=' will become p=%27.
+      hex_part = urllib.parse.quote(parts[i])
+      self.create_fs_partition(tbl_location, "p=%s" % hex_part, "file_%d" % i, str(i))
+
     self.execute_query_expect_success(
         self.client, "ALTER TABLE %s RECOVER PARTITIONS" % fq_tbl_name)
     result = self.execute_query_expect_success(
         self.client, "SHOW PARTITIONS %s" % fq_tbl_name)
-    assert self.count_partition(result.data) == 4
-    self.verify_partitions(['\"', '\'', '\\\"', '\\\''], result.data)
+    self.verify_partitions(parts, result.data)
 
   @SkipIfLocal.hdfs_client
   @SkipIfS3.empty_directory
