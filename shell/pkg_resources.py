@@ -623,7 +623,7 @@ class WorkingSet(object):
                 try:
                     resolvees = shadow_set.resolve(req, env, installer)
 
-                except ResolutionError,v:
+                except ResolutionError as v:
                     error_info[dist] = v    # save error info
                     if fallback:
                         continue    # try the next older version of project

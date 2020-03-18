@@ -26,6 +26,7 @@
 # [impala.query_options]
 # EXPLAIN_LEVEL=2
 # MT_DOP=2
+from __future__ import print_function
 
 import ConfigParser
 import sys
@@ -78,8 +79,11 @@ def parse_shell_options(options, defaults, option_list):
   for option, value in options:
     opt = option_dests.get(option)
     if opt is None:
-        print >> sys.stderr, "WARNING: Unable to read configuration file correctly. " \
-          "Ignoring unrecognized config option: '%s'\n" % option
+      warn_msg = (
+        "WARNING: Unable to read configuration file correctly. "
+        "Ignoring unrecognized config option: '%s'" % option
+      )
+      print('\n{0}'.format(warn_msg), file=sys.stderr)
     elif isinstance(defaults.get(option), bool) or \
         opt.action == "store_true" or opt.action == "store_false":
       result[option] = parse_bool_option(value)
@@ -120,7 +124,7 @@ def get_config_from_file(config_filename, option_list):
   config.optionxform = str
   try:
     config.read(config_filename)
-  except Exception, e:
+  except Exception as e:
     raise ConfigFileFormatError(
       "Unable to read configuration file correctly. Check formatting: %s" % e)
 
@@ -129,13 +133,14 @@ def get_config_from_file(config_filename, option_list):
     shell_options = parse_shell_options(config.items("impala"), impala_shell_defaults,
                                         option_list)
     if "config_file" in shell_options:
-      print >> sys.stderr, "WARNING: Option 'config_file' can be only set from shell."
+      warn_msg = "WARNING: Option 'config_file' can be only set from shell."
+      print('\n{0}'.format(warn_msg), file=sys.stderr)
       shell_options["config_file"] = config_filename
 
   config = ConfigParser.ConfigParser()
   try:
     config.read(config_filename)
-  except Exception, e:
+  except Exception as e:
     raise ConfigFileFormatError(
       "Unable to read configuration file correctly. Check formatting: %s" % e)
 

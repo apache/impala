@@ -16,6 +16,7 @@
 # KIND, either express or implied.  See the License for the
 # specific language governing permissions and limitations
 # under the License.
+from __future__ import print_function
 
 import csv
 import re
@@ -38,13 +39,14 @@ class PrettyOutputFormatter(object):
       # output, since Python won't do the encoding automatically when outputting to a
       # non-terminal (see IMPALA-2717).
       return self.prettytable.get_string().encode('utf-8')
-    except Exception, e:
+    except Exception as e:
       # beeswax returns each row as a tab separated string. If a string column
       # value in a row has tabs, it will break the row split. Default to displaying
       # raw results. This will change with a move to hiveserver2. Reference: IMPALA-116
       error_msg = ("Prettytable cannot resolve string columns values that have "
-                   " embedded tabs. Reverting to tab delimited text output")
-      print >>sys.stderr, error_msg
+                   "embedded tabs. Reverting to tab delimited text output")
+      print(error_msg, file=sys.stderr)
+      print('{0}: {1}'.format(type(e), str(e)), file=sys.stderr)
       return '\n'.join(['\t'.join(row) for row in rows])
 
 
@@ -81,12 +83,13 @@ class OutputStream(object):
     if self.filename:
       try:
         self.handle = open(self.filename, 'ab')
-      except IOError, err:
-        print >>sys.stderr, "Error opening file %s: %s" % (self.filename, str(err))
-        print >>sys.stderr, "Writing to stdout"
+      except IOError as err:
+        print("Error opening file %s: %s" % (self.filename, str(err)),
+              file=self.handle)
+        print(sys.stderr, "Writing to stdout", file=self.handle)
 
   def write(self, data):
-    print >>self.handle, self.formatter.format(data)
+    print(self.formatter.format(data), file=self.handle)
     self.handle.flush()
 
   def __del__(self):

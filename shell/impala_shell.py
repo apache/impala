@@ -16,9 +16,10 @@
 # KIND, either express or implied.  See the License for the
 # specific language governing permissions and limitations
 # under the License.
-
 #
 # Impala's shell
+from __future__ import print_function
+
 import cmd
 import errno
 import getpass
@@ -234,8 +235,8 @@ class ImpalaShell(object, cmd.Cmd):
         try:
           self.readline.set_history_length(int(options.history_max))
         except ValueError:
-          print_to_stderr("WARNING: history_max option malformed %s\n"
-            % options.history_max)
+          warning = "WARNING: history_max option malformed %s\n" % options.history_max
+          print(warning, file=sys.stderr)
           self.readline.set_history_length(1000)
       except ImportError:
         self._disable_readline()
@@ -277,9 +278,9 @@ class ImpalaShell(object, cmd.Cmd):
     The options are displayed in groups based on option levels received in parameter.
     Input parameter decides whether all groups or just the 'Regular' and 'Advanced'
     options are displayed."""
-    print "Query options (defaults shown in []):"
+    print("Query options (defaults shown in []):")
     if not self.imp_client.default_query_options and not self.set_query_options:
-      print '\tNo options available.'
+      print('\tNo options available.')
     else:
       (regular_options, advanced_options, development_options, deprecated_options,
           removed_options) = self._get_query_option_grouping()
@@ -288,14 +289,14 @@ class ImpalaShell(object, cmd.Cmd):
       # the advanced_options would be empty and only the regular options would
       # be displayed.
       if advanced_options:
-        print '\nAdvanced Query Options:'
+        print('\nAdvanced Query Options:')
         self._print_option_group(advanced_options)
       if print_mode == QueryOptionDisplayModes.ALL_OPTIONS:
         if development_options:
-          print '\nDevelopment Query Options:'
+          print('\nDevelopment Query Options:')
           self._print_option_group(development_options)
         if deprecated_options:
-          print '\nDeprecated Query Options:'
+          print('\nDeprecated Query Options:')
           self._print_option_group(deprecated_options)
     self._print_shell_options()
 
@@ -306,7 +307,11 @@ class ImpalaShell(object, cmd.Cmd):
     If the option level can't be determined then it defaults to 'REGULAR'"""
     (regular_options, advanced_options, development_options, deprecated_options,
         removed_options) = {}, {}, {}, {}, {}
-    for option_name, option_value in self.imp_client.default_query_options.iteritems():
+    if sys.version_info.major < 3:
+      client_default_query_opts = self.imp_client.default_query_options.iteritems()
+    else:
+      client_default_query_opts = self.imp_client.default_query_options.items()
+    for option_name, option_value in client_default_query_opts:
       level = self.imp_client.query_option_levels.get(option_name,
                                                       QueryOptionLevels.REGULAR)
       if level == QueryOptionLevels.REGULAR:
@@ -320,32 +325,32 @@ class ImpalaShell(object, cmd.Cmd):
       else:
         advanced_options[option_name] = option_value
     return (regular_options, advanced_options, development_options, deprecated_options,
-        removed_options)
+            removed_options)
 
   def _print_option_group(self, query_options):
     """Gets query options and prints them. Value is inside [] for the ones having
     default values.
     query_options parameter is a subset of the default_query_options map"""
-    for option_name in sorted(query_options):
-      if (option_name in self.set_query_options and
-          self.set_query_options[option_name] != query_options[option_name]):
-        print '\n'.join(["\t%s: %s" % (option_name, self.set_query_options[option_name])])
+    for option in sorted(query_options):
+      if (option in self.set_query_options and
+          self.set_query_options[option] != query_options[option]):  # noqa
+        print('\n'.join(["\t%s: %s" % (option, self.set_query_options[option])]))
       else:
-        print '\n'.join(["\t%s: [%s]" % (option_name, query_options[option_name])])
+        print('\n'.join(["\t%s: [%s]" % (option, query_options[option])]))
 
   def _print_variables(self):
     # Prints the currently defined variables.
     if not self.set_variables:
-      print '\tNo variables defined.'
+      print('\tNo variables defined.')
     else:
       for k in sorted(self.set_variables):
-        print '\n'.join(["\t%s: %s" % (k, self.set_variables[k])])
+        print('\n'.join(["\t%s: %s" % (k, self.set_variables[k])]))
 
   def _print_shell_options(self):
     """Prints shell options, which are local and independent of query options."""
-    print "\nShell Options"
+    print("\nShell Options")
     for x in self.VALID_SHELL_OPTIONS:
-      print "\t%s: %s" % (x, self.__dict__[self.VALID_SHELL_OPTIONS[x][1]])
+      print("\t%s: %s" % (x, self.__dict__[self.VALID_SHELL_OPTIONS[x][1]]))
 
   def _build_query_string(self, leading_comment, cmd, args):
     """Called to build a query string based on the parts output by parseline():
@@ -365,8 +370,8 @@ class ImpalaShell(object, cmd.Cmd):
       start_time = time.time()
       os.system(args)
       self._print_if_verbose("--------\nExecuted in %2.2fs" % (time.time() - start_time))
-    except Exception, e:
-      print_to_stderr('Error running command : %s' % e)
+    except Exception as e:
+      print('Error running command : %s' % e, file=sys.stderr)
       return CmdStatus.ERROR
 
   def _remove_comments_before_set(self, line):
@@ -400,7 +405,7 @@ class ImpalaShell(object, cmd.Cmd):
         # The print statement makes the new prompt appear in a new line.
         # Also print an extra newline to indicate that the current command has
         # been cancelled.
-        print '\n'
+        print('\n')
         return str()
     args = self._check_for_command_completion(args)
     args = self._remove_comments_before_set(args)
@@ -544,8 +549,8 @@ class ImpalaShell(object, cmd.Cmd):
                           self.ca_cert, self.user, self.ldap_password,
                           self.use_ldap, self.client_connect_timeout_ms, self.verbose)
     else:
-      print_to_stderr("Invalid --protocol value {0}, must be beeswax, hs2 or hs2-http."
-              .format(protocol))
+      err_msg = "Invalid --protocol value {0}, must be beeswax, hs2 or hs2-http."
+      print(err_msg.format(protocol), file=sys.stderr)
       raise FatalShellException()
 
   def close_connection(self):
@@ -569,7 +574,7 @@ class ImpalaShell(object, cmd.Cmd):
     for cancel_try in xrange(ImpalaShell.CANCELLATION_TRIES):
       try:
         self.imp_client.is_query_cancelled = True
-        print_to_stderr(ImpalaShell.CANCELLATION_MESSAGE)
+        print(ImpalaShell.CANCELLATION_MESSAGE, file=sys.stderr)
         new_imp_client = self._new_impala_client()
         new_imp_client.connect()
         try:
@@ -578,13 +583,14 @@ class ImpalaShell(object, cmd.Cmd):
         finally:
           new_imp_client.close_connection()
         break
-      except Exception, e:
+      except Exception as e:
         # Suppress harmless errors.
         err_msg = str(e).strip()
         if err_msg in ['ERROR: Cancelled', 'ERROR: Invalid or unknown query handle']:
           break
-        print_to_stderr("Failed to reconnect and close (try %i/%i): %s" % (
-            cancel_try + 1, ImpalaShell.CANCELLATION_TRIES, err_msg))
+        err_details = "Failed to reconnect and close (try %i/%i): %s"
+        print(err_details % (cancel_try + 1, ImpalaShell.CANCELLATION_TRIES, err_msg),
+              file=sys.stderr)
 
   def _is_quit_command(self, command):
     # Do a case insensitive check
@@ -609,7 +615,7 @@ class ImpalaShell(object, cmd.Cmd):
       return str()
     # There is no need to reconnect if we are quitting.
     if not self.imp_client.is_connected() and not self._is_quit_command(args):
-      print_to_stderr("Connection lost, reconnecting...")
+      print("Connection lost, reconnecting...", file=sys.stderr)
       self._connect()
       self._validate_database(immediately=True)
     return args.encode('utf-8')
@@ -660,22 +666,22 @@ class ImpalaShell(object, cmd.Cmd):
 
   def do_summary(self, args):
     if not self.last_query_handle:
-      print_to_stderr("Could not retrieve summary: no previous query.")
+      print("Could not retrieve summary: no previous query.", file=sys.stderr)
       return CmdStatus.ERROR
 
     summary = None
     try:
       summary = self.imp_client.get_summary(self.last_query_handle)
-    except RPCException, e:
+    except RPCException as e:
       import re
       error_pattern = re.compile("ERROR: Query id \d+:\d+ not found.")
       if error_pattern.match(e.value):
-        print_to_stderr("Could not retrieve summary for query.")
+        print("Could not retrieve summary for query.", file=sys.stderr)
       else:
-        print_to_stderr(e)
+        print(e, file=sys.stderr)
       return CmdStatus.ERROR
     if summary.nodes is None:
-      print_to_stderr("Summary not available")
+      print("Summary not available", file=sys.stderr)
       return CmdStatus.SUCCESS
     output = []
     table = self._default_summary_table()
@@ -702,7 +708,7 @@ class ImpalaShell(object, cmd.Cmd):
 
   def _print_with_set(self, print_level):
     self._print_options(print_level)
-    print "\nVariables:"
+    print("\nVariables:")
     self._print_variables()
 
   def do_set(self, args):
@@ -730,9 +736,10 @@ class ImpalaShell(object, cmd.Cmd):
         self._print_with_set(QueryOptionDisplayModes.ALL_OPTIONS)
         return CmdStatus.SUCCESS
       else:
-        print_to_stderr("Error: SET <option>=<value>")
-        print_to_stderr("       OR")
-        print_to_stderr("       SET VAR:<variable>=<value>")
+        set_err_msg = ("Error: SET <option>=<value>\n"
+                       "       OR\n"
+                       "       SET VAR:<variable>=<value>")
+        print(set_err_msg, file=sys.stderr)
         return CmdStatus.ERROR
     option_upper = tokens[0].upper()
     # Check if it's a variable
@@ -743,8 +750,8 @@ class ImpalaShell(object, cmd.Cmd):
       self._print_if_verbose('Variable %s set to %s' % (var_name, tokens[1]))
     elif not self._handle_shell_options(option_upper, tokens[1]):
       if option_upper not in self.imp_client.default_query_options.keys():
-        print "Unknown query option: %s" % (tokens[0])
-        print "Available query options, with their values (defaults shown in []):"
+        print("Unknown query option: %s" % (tokens[0]))
+        print("Available query options, with their values (defaults shown in []):")
         self._print_options(QueryOptionDisplayModes.REGULAR_OPTIONS_ONLY)
         return CmdStatus.ERROR
       if self.imp_client.query_option_levels[option_upper] == QueryOptionLevels.REMOVED:
@@ -756,24 +763,24 @@ class ImpalaShell(object, cmd.Cmd):
   def do_unset(self, args):
     """Unset a query option"""
     if len(args.split()) != 1:
-      print 'Usage: unset <option>'
+      print('Usage: unset <option>')
       return CmdStatus.ERROR
     option = args.upper()
     # Check if it's a variable
     var_name = get_var_name(option)
     if var_name is not None:
       if self.set_variables.get(var_name):
-        print 'Unsetting variable %s' % var_name
+        print('Unsetting variable %s' % var_name)
         del self.set_variables[var_name]
       else:
-        print "No variable called %s is set" % var_name
+        print("No variable called %s is set" % var_name)
     elif self.set_query_options.get(option):
-      print 'Unsetting option %s' % option
+      print('Unsetting option %s' % option)
       del self.set_query_options[option]
     elif self._handle_unset_shell_options(option):
-      print 'Unsetting shell option %s' % option
+      print('Unsetting shell option %s' % option)
     else:
-      print "No option called %s is set" % option
+      print("No option called %s is set" % option)
 
   def do_quit(self, args):
     """Quit the Impala shell"""
@@ -803,8 +810,8 @@ class ImpalaShell(object, cmd.Cmd):
     host_port = [val for val in tokens[0].split(':') if val.strip()]
     protocol = options.protocol.lower()
     if (':' in tokens[0] and len(host_port) != 2):
-      print_to_stderr("Connection string must either be empty, or of the form "
-                      "<hostname[:port]>")
+      print("Connection string must either be empty, or of the form "
+            "<hostname[:port]>", file=sys.stderr)
       return CmdStatus.ERROR
     elif len(host_port) == 1:
       if protocol == 'hs2':
@@ -814,7 +821,7 @@ class ImpalaShell(object, cmd.Cmd):
       elif protocol == 'beeswax':
         port = str(DEFAULT_BEESWAX_PORT)
       else:
-        print_to_stderr("Invalid protocol specified: %s" % protocol)
+        print("Invalid protocol specified: %s" % protocol, file=sys.stderr)
         raise FatalShellException()
       host_port.append(port)
     self.impalad = tuple(host_port)
@@ -828,14 +835,14 @@ class ImpalaShell(object, cmd.Cmd):
     if not self.imp_client.connected and not self.use_kerberos and protocol != 'hs2-http':
       try:
         if call(["klist", "-s"]) == 0:
-          print_to_stderr("Kerberos ticket found in the credentials cache, retrying "
-                          "the connection with a secure transport.")
+          print("Kerberos ticket found in the credentials cache, retrying "
+                "the connection with a secure transport.", file=sys.stderr)
           self.use_kerberos = True
           self.use_ldap = False
           self.ldap_password = None
           self.imp_client = self._new_impala_client()
           self._connect()
-      except OSError, e:
+      except OSError:
         pass
 
     if self.imp_client.connected:
@@ -852,10 +859,15 @@ class ImpalaShell(object, cmd.Cmd):
     # Use a temporary to avoid changing set_query_options during iteration.
     new_query_options = {}
     default_query_option_keys = set(self.imp_client.default_query_options)
-    for set_option, value in self.set_query_options.iteritems():
+    if sys.version_info.major < 3:
+      query_options_to_set = self.set_query_options.iteritems()
+    else:
+      query_options_to_set = self.set_query_options.items()
+
+    for set_option, value in query_options_to_set:
       if set_option not in default_query_option_keys:
-        print ('%s is not supported for the impalad being '
-               'connected to, ignoring.' % set_option)
+        print('%s is not supported for the impalad being '
+              'connected to, ignoring.' % set_option)
       else:
         new_query_options[set_option] = value
 
@@ -870,7 +882,7 @@ class ImpalaShell(object, cmd.Cmd):
   def _connect(self):
     try:
       self.server_version, self.webserver_address = self.imp_client.connect()
-    except MissingThriftMethodException, e:
+    except MissingThriftMethodException as e:
       if options.protocol.lower() == 'beeswax':
         port_flag = "-beeswax_port"
         addtl_suggestion = ""
@@ -884,38 +896,38 @@ class ImpalaShell(object, cmd.Cmd):
                             "protocol with the --protocol=beeswax.")
       # We get a TApplicationException if the transport is valid,
       # but the RPC does not exist.
-      print_to_stderr("\n".join(textwrap.wrap(
+      print("\n".join(textwrap.wrap(
         "Error: Unable to communicate with impalad service because of the error "
         "reported below. The service does not implement a required Thrift method. "
         "The service may not be an Impala Daemon or you may have specified the wrong "
         "port to connect to. Check host:port to ensure that the port matches the "
         "{port_flag} flag on the Impala Daemon and try again.{addtl_suggestion}".format(
-          port_flag=port_flag, addtl_suggestion=addtl_suggestion))))
-      print_to_stderr(str(e))
+          port_flag=port_flag, addtl_suggestion=addtl_suggestion))), file=sys.stderr)
+      print(str(e), file=sys.stderr)
       self.close_connection()
       raise
     except ImportError:
-      print_to_stderr("Unable to import the python 'ssl' module. It is"
-      " required for an SSL-secured connection.")
+      print("Unable to import the python 'ssl' module. It is"
+            " required for an SSL-secured connection.", file=sys.stderr)
       raise FatalShellException()
-    except socket.error, e:
+    except socket.error as e:
       # if the socket was interrupted, reconnect the connection with the client
       if e.errno == errno.EINTR:
         self._reconnect_cancellation()
       else:
-        print_to_stderr("Socket error %s: %s" % (e.errno, e))
+        print("Socket error %s: %s" % (e.errno, e), file=sys.stderr)
         self.close_connection()
         self.prompt = self.DISCONNECTED_PROMPT
-    except Exception, e:
+    except Exception as e:
       if self.ldap_password_cmd and \
           self.ldap_password and \
           self.ldap_password.endswith('\n'):
-        print_to_stderr("Warning: LDAP password contains a trailing newline. "
-                      "Did you use 'echo' instead of 'echo -n'?")
+        print("Warning: LDAP password contains a trailing newline. "
+              "Did you use 'echo' instead of 'echo -n'?", file=sys.stderr)
       if self.use_ssl and sys.version_info < (2,7,9) \
           and "EOF occurred in violation of protocol" in str(e):
-        print_to_stderr("Warning: TLSv1.2 is not supported for Python < 2.7.9")
-      print_to_stderr("Error connecting: %s, %s" % (type(e).__name__, e))
+        print("Warning: TLSv1.2 is not supported for Python < 2.7.9", file=sys.stderr)
+      print("Error connecting: %s, %s" % (type(e).__name__, e), file=sys.stderr)
       # A secure connection may still be open. So we explicitly close it.
       self.close_connection()
       # If a connection to another impalad failed while already connected
@@ -945,14 +957,19 @@ class ImpalaShell(object, cmd.Cmd):
       else:
         self.cmdqueue.append(use_current_db + ImpalaShell.CMD_DELIM)
 
-  def _print_if_verbose(self, message):
+  def _print_if_verbose(self, message, file_descriptor=sys.stderr, flush=True):
     if self.verbose:
-      print_to_stderr(message)
+      print(message, file=file_descriptor)
+
+    # print() takes a flush keyword argument in python3, but not in python2,
+    # so we do it as a second step
+    if flush:
+      file_descriptor.flush()
 
   def print_runtime_profile(self, profile, status=False):
     if self.show_profiles or status:
       if profile is not None:
-        print "Query Runtime Profile:\n" + profile
+        print("Query Runtime Profile:\n" + profile)
 
   def _parse_table_name_arg(self, arg):
     """ Parses an argument string and returns the result as a db name, table name combo.
@@ -996,10 +1013,10 @@ class ImpalaShell(object, cmd.Cmd):
   def do_profile(self, args):
     """Prints the runtime profile of the last DML statement or SELECT query executed."""
     if len(args) > 0:
-      print_to_stderr("'profile' does not accept any arguments")
+      print("'profile' does not accept any arguments", file=sys.stderr)
       return CmdStatus.ERROR
     elif self.last_query_handle is None:
-      print_to_stderr('No previous query available to profile')
+      print('No previous query available to profile', file=sys.stderr)
       return CmdStatus.ERROR
     profile = self.imp_client.get_runtime_profile(self.last_query_handle)
     return self.print_runtime_profile(profile, True)
@@ -1092,12 +1109,10 @@ class ImpalaShell(object, cmd.Cmd):
     other output that we want to display to users printed to the output.
     Results for queries are streamed from the server and displayed as they become
     available.
-
     is_dml: True iff the caller detects that 'query_str' is a DML statement, false
             otherwise.
     print_web_link: if True, a link to the query on the Impala debug webserver is printed.
     """
-
     self._print_if_verbose("Query: %s" % query_str)
     # TODO: Clean up this try block and refactor it (IMPALA-3814)
     try:
@@ -1173,40 +1188,41 @@ class ImpalaShell(object, cmd.Cmd):
       try:
         profile = self.imp_client.get_runtime_profile(self.last_query_handle)
         self.print_runtime_profile(profile)
-      except RPCException, e:
+      except RPCException as e:
         if self.show_profiles: raise e
       return CmdStatus.SUCCESS
-    except QueryCancelledByShellException, e:
+    except QueryCancelledByShellException as e:
       return CmdStatus.SUCCESS
-    except RPCException, e:
+    except RPCException as e:
       # could not complete the rpc successfully
-      print_to_stderr(e)
-    except QueryStateException, e:
+      print(e, file=sys.stderr)
+    except QueryStateException as e:
       # an exception occurred while executing the query
       if self.last_query_handle is not None:
         self.imp_client.close_query(self.last_query_handle)
-      print_to_stderr(e)
-    except DisconnectedException, e:
+      print(e, file=sys.stderr)
+    except DisconnectedException as e:
       # the client has lost the connection
-      print_to_stderr(e)
+      print(e, file=sys.stderr)
       self.imp_client.connected = False
       self.prompt = ImpalaShell.DISCONNECTED_PROMPT
-    except socket.error, (code, e):
+    except socket.error as e:
       # if the socket was interrupted, reconnect the connection with the client
-      if code == errno.EINTR:
-        print ImpalaShell.CANCELLATION_MESSAGE
+      if e.errno == errno.EINTR:
+        print(ImpalaShell.CANCELLATION_MESSAGE)
         self._reconnect_cancellation()
       else:
-        print_to_stderr("Socket error %s: %s" % (code, e))
+        print("Socket error %s: %s" % (e.errno, e), file=sys.stderr)
         self.prompt = self.DISCONNECTED_PROMPT
         self.imp_client.connected = False
-    except Exception, u:
+    except Exception as e:
       # if the exception is unknown, there was possibly an issue with the connection
       # set the shell as disconnected
-      print_to_stderr('Unknown Exception : %s' % (u,))
+      print('Unknown Exception : %s' % (e,), file=sys.stderr)
       self.close_connection()
       self.prompt = ImpalaShell.DISCONNECTED_PROMPT
     return CmdStatus.ERROR
+
 
   def construct_table_with_header(self, column_names):
     """ Constructs the table header for a given query handle.
@@ -1306,9 +1322,9 @@ class ImpalaShell(object, cmd.Cmd):
     if self.readline and self.readline.get_current_history_length() > 0:
       for index in xrange(1, self.readline.get_current_history_length() + 1):
         cmd = self.readline.get_history_item(index)
-        print_to_stderr('[%d]: %s' % (index, cmd))
+        print('[%d]: %s' % (index, cmd), file=sys.stderr)
     else:
-      print_to_stderr(READLINE_UNAVAILABLE_ERROR)
+      print(READLINE_UNAVAILABLE_ERROR, file=sys.stderr)
 
   def do_rerun(self, args):
     """Rerun a command with an command index in history
@@ -1319,26 +1335,26 @@ class ImpalaShell(object, cmd.Cmd):
     self.readline.remove_history_item(history_len - 1)
     history_len -= 1
     if not self.readline:
-      print_to_stderr(READLINE_UNAVAILABLE_ERROR)
+      print(READLINE_UNAVAILABLE_ERROR, file=sys.stderr)
       return CmdStatus.ERROR
     try:
       cmd_idx = int(args)
     except ValueError:
-      print_to_stderr("Command index to be rerun must be an integer.")
+      print("Command index to be rerun must be an integer.", file=sys.stderr)
       return CmdStatus.ERROR
     if not (0 < cmd_idx <= history_len or -history_len <= cmd_idx < 0):
-      print_to_stderr("Command index out of range. Valid range: [1, {0}] and [-{0}, -1]"
-                      .format(history_len))
+      print("Command index out of range. Valid range: [1, {0}] and [-{0}, -1]"
+                      .format(history_len), file=sys.stderr)
       return CmdStatus.ERROR
     if cmd_idx < 0:
       cmd_idx += history_len + 1
     cmd = self.readline.get_history_item(cmd_idx)
-    print_to_stderr("Rerunning " + cmd)
+    print("Rerunning " + cmd, file=sys.stderr)
     return self.onecmd(cmd.rstrip(";"))
 
   def do_tip(self, args):
     """Print a random tip"""
-    print_to_stderr(random.choice(TIPS))
+    print(random.choice(TIPS), file=sys.stderr)
 
   def do_src(self, args):
     return self.do_source(args)
@@ -1346,8 +1362,8 @@ class ImpalaShell(object, cmd.Cmd):
   def do_source(self, args):
     try:
       cmd_file = open(args, "r")
-    except Exception, e:
-      print_to_stderr("Error opening file '%s': %s" % (args, e))
+    except Exception as e:
+      print("Error opening file '%s': %s" % (args, e), file=sys.stderr)
       return CmdStatus.ERROR
     if self.execute_query_list(parse_query_text(cmd_file.read())):
       return CmdStatus.SUCCESS
@@ -1364,9 +1380,9 @@ class ImpalaShell(object, cmd.Cmd):
       try:
         self.readline.read_history_file(self.history_file)
         self._replace_history_delimiters(ImpalaShell.HISTORY_FILE_QUERY_DELIM, '\n')
-      except IOError, i:
+      except IOError as i:
         msg = "Unable to load command history (disabling history collection): %s" % i
-        print_to_stderr(msg)
+        print(msg, file=sys.stderr)
         # This history file exists but is not readable, disable readline.
         self._disable_readline()
 
@@ -1376,9 +1392,9 @@ class ImpalaShell(object, cmd.Cmd):
       try:
         self._replace_history_delimiters('\n', ImpalaShell.HISTORY_FILE_QUERY_DELIM)
         self.readline.write_history_file(self.history_file)
-      except IOError, i:
+      except IOError as i:
         msg = "Unable to save command history (disabling history collection): %s" % i
-        print_to_stderr(msg)
+        print(msg, file=sys.stderr)
         # The history file is not writable, disable readline.
         self._disable_readline()
 
@@ -1491,8 +1507,8 @@ class ImpalaShell(object, cmd.Cmd):
 
   def do_version(self, args):
     """Prints the Impala build version"""
-    print_to_stderr("Shell version: %s" % VERSION_STRING)
-    print_to_stderr("Server version: %s" % self.server_version)
+    print("Shell version: %s" % VERSION_STRING, file=sys.stderr)
+    print("Server version: %s" % self.server_version, file=sys.stderr)
 
   def completenames(self, text, *ignored):
     """Make tab completion of commands case agnostic
@@ -1508,12 +1524,12 @@ class ImpalaShell(object, cmd.Cmd):
 
   def execute_query_list(self, queries):
     if not self.imp_client.connected:
-      print_to_stderr('Not connected to Impala, could not execute queries.')
+      print('Not connected to Impala, could not execute queries.', file=sys.stderr)
       return False
     queries = [self.sanitise_input(q) for q in queries]
     for q in queries:
       if self.onecmd(q) is CmdStatus.ERROR:
-        print_to_stderr('Could not execute command: %s' % q)
+        print('Could not execute command: %s' % q, file=sys.stderr)
         if not self.ignore_query_failure: return False
     return True
 
@@ -1564,8 +1580,6 @@ Welcome to the Impala shell.
 """ \
   % (VERSION_STRING, _format_tip(random.choice(TIPS)))
 
-def print_to_stderr(message):
-  print >> sys.stderr, message
 
 def parse_query_text(query_text, utf8_encode_policy='strict'):
   """Parse query file text to extract queries and encode into utf-8"""
@@ -1595,8 +1609,8 @@ def parse_variables(keyvals):
     for keyval in keyvals:
       match = re.match(kv_pattern, keyval)
       if not match:
-        print_to_stderr('Error: Could not parse key-value "%s". ' % (keyval,) +
-                        'It must follow the pattern "KEY=VALUE".')
+        print('Error: Could not parse key-value "%s". ' % (keyval,) +
+              'It must follow the pattern "KEY=VALUE".', file=sys.stderr)
         parser.print_help()
         raise FatalShellException()
       else:
@@ -1604,18 +1618,18 @@ def parse_variables(keyvals):
   return vars
 
 
-def replace_variables(set_variables, string):
+def replace_variables(set_variables, input_string):
   """Replaces variable within the string with their corresponding values using the
      given set_variables."""
   errors = False
-  matches = set(map(lambda v: v.upper(), re.findall(r'(?<!\\)\${([^}]+)}', string)))
+  matches = set([v.upper() for v in re.findall(r'(?<!\\)\${([^}]+)}', input_string)])
   for name in matches:
     value = None
     # Check if syntax is correct
     var_name = get_var_name(name)
     if var_name is None:
-      print_to_stderr('Error: Unknown substitution syntax (%s). ' % (name,) +
-                      'Use ${VAR:var_name}.')
+      print('Error: Unknown substitution syntax (%s). ' % (name,) +
+            'Use ${VAR:var_name}.', file=sys.stderr)
       errors = True
     else:
       # Replaces variable value
@@ -1625,14 +1639,14 @@ def replace_variables(set_variables, string):
           errors = True
         else:
           regexp = re.compile(r'(?<!\\)\${%s}' % (name,), re.IGNORECASE)
-          string = regexp.sub(value, string)
+          input_string = regexp.sub(value, input_string)
       else:
-        print_to_stderr('Error: Unknown variable %s' % (var_name))
+        print('Error: Unknown variable %s' % (var_name), file=sys.stderr)
         errors = True
   if errors:
     return None
   else:
-    return string
+    return input_string
 
 
 def get_var_name(name):
@@ -1658,7 +1672,7 @@ def execute_queries_non_interactive_mode(options, query_options):
       else:
         query_file_handle = open(options.query_file, 'r')
     except Exception, e:
-      print_to_stderr("Could not open file '%s': %s" % (options.query_file, e))
+      print("Could not open file '%s': %s" % (options.query_file, e), file=sys.stderr)
       return False
 
     query_text = query_file_handle.read()
@@ -1709,10 +1723,11 @@ def impala_shell_main():
   if os.path.isfile(global_config):
     # Always output the source of the global config if verbose
     if options.verbose:
-      print_to_stderr(
-        "Loading in options from global config file: %s \n" % global_config)
+      print(
+        "Loading in options from global config file: %s \n" % global_config,
+        file=sys.stderr)
   elif global_config != impala_shell_defaults['global_config_default_path']:
-    print_to_stderr('%s not found.\n' % global_config)
+    print('%s not found.\n' % global_config, file=sys.stderr)
     raise FatalShellException()
   # Override the default user config by a custom config if necessary
   user_config = impala_shell_defaults.get("config_file")
@@ -1721,11 +1736,12 @@ def impala_shell_main():
   if input_config != user_config:
     if os.path.isfile(input_config):
       if options.verbose:
-        print_to_stderr("Loading in options from config file: %s \n" % input_config)
+        print("Loading in options from config file: %s \n" % input_config,
+              file=sys.stderr)
       # command line overrides loading ~/.impalarc
       user_config = input_config
     else:
-      print_to_stderr('%s not found.\n' % input_config)
+      print('%s not found.\n' % input_config, file=sys.stderr)
       raise FatalShellException()
   configs_to_load = [global_config, user_config]
 
@@ -1741,8 +1757,8 @@ def impala_shell_main():
       query_options.update(q_options)
 
     impala_shell_defaults.update(loaded_shell_options)
-  except Exception, e:
-    print_to_stderr(e)
+  except Exception as e:
+    print(e, file=sys.stderr)
     raise FatalShellException()
 
   parser = get_option_parser(impala_shell_defaults)
@@ -1750,54 +1766,56 @@ def impala_shell_main():
 
   # Arguments that could not be parsed are stored in args. Print an error and exit.
   if len(args) > 0:
-    print_to_stderr('Error, could not parse arguments "%s"' % (' ').join(args))
+    print('Error, could not parse arguments "%s"' % (' ').join(args), file=sys.stderr)
     parser.print_help()
     raise FatalShellException()
 
   if options.version:
-    print VERSION_STRING
+    print(VERSION_STRING)
     return
 
   if options.write_delimited:
     delim = options.output_delimiter.decode('string-escape')
     if len(delim) != 1:
-      print_to_stderr("Illegal delimiter %s, the delimiter "
-                      "must be a 1-character string." % delim)
+      print("Illegal delimiter %s, the delimiter "
+            "must be a 1-character string." % delim, file=sys.stderr)
       raise FatalShellException()
 
   if options.use_kerberos and options.use_ldap:
-    print_to_stderr("Please specify at most one authentication mechanism (-k or -l)")
+    print("Please specify at most one authentication mechanism (-k or -l)",
+          file=sys.stderr)
     raise FatalShellException()
 
   if not options.ssl and not options.creds_ok_in_clear and options.use_ldap:
-    print_to_stderr("LDAP credentials may not be sent over insecure " +
-                    "connections. Enable SSL or set --auth_creds_ok_in_clear")
+    print("LDAP credentials may not be sent over insecure " +
+          "connections. Enable SSL or set --auth_creds_ok_in_clear",
+          file=sys.stderr)
     raise FatalShellException()
 
   if not options.use_ldap and options.ldap_password_cmd:
-    print_to_stderr("Option --ldap_password_cmd requires using LDAP authentication " +
-                    "mechanism (-l)")
+    print("Option --ldap_password_cmd requires using LDAP authentication " +
+          "mechanism (-l)", file=sys.stderr)
     raise FatalShellException()
 
   if options.use_kerberos:
     if options.verbose:
-      print_to_stderr("Starting Impala Shell using Kerberos authentication")
-      print_to_stderr("Using service name '%s'" % options.kerberos_service_name)
+      print("Starting Impala Shell using Kerberos authentication", file=sys.stderr)
+      print("Using service name '%s'" % options.kerberos_service_name, file=sys.stderr)
     # Check if the user has a ticket in the credentials cache
     try:
       if call(['klist', '-s']) != 0:
-        print_to_stderr(("-k requires a valid kerberos ticket but no valid kerberos "
-                         "ticket found."))
+        print(("-k requires a valid kerberos ticket but no valid kerberos "
+               "ticket found."), file=sys.stderr)
         raise FatalShellException()
-    except OSError, e:
-      print_to_stderr('klist not found on the system, install kerberos clients')
+    except OSError as e:
+      print('klist not found on the system, install kerberos clients', file=sys.stderr)
       raise FatalShellException()
   elif options.use_ldap:
     if options.verbose:
-      print_to_stderr("Starting Impala Shell using LDAP-based authentication")
+      print("Starting Impala Shell using LDAP-based authentication", file=sys.stderr)
   else:
     if options.verbose:
-      print_to_stderr("Starting Impala Shell without Kerberos authentication")
+      print("Starting Impala Shell without Kerberos authentication", file=sys.stderr)
 
   options.ldap_password = None
   if options.use_ldap and options.ldap_password_cmd:
@@ -1806,30 +1824,30 @@ def impala_shell_main():
                            stderr=subprocess.PIPE)
       options.ldap_password, stderr = p.communicate()
       if p.returncode != 0:
-        print_to_stderr("Error retrieving LDAP password (command was '%s', error was: "
-                        "'%s')" % (options.ldap_password_cmd, stderr.strip()))
+        print("Error retrieving LDAP password (command was '%s', error was: "
+              "'%s')" % (options.ldap_password_cmd, stderr.strip()), file=sys.stderr)
         raise FatalShellException()
-    except Exception, e:
-      print_to_stderr("Error retrieving LDAP password (command was: '%s', exception "
-                      "was: '%s')" % (options.ldap_password_cmd, e))
+    except Exception as e:
+      print("Error retrieving LDAP password (command was: '%s', exception "
+            "was: '%s')" % (options.ldap_password_cmd, e), file=sys.stderr)
       raise FatalShellException()
 
   if options.ssl:
     if options.ca_cert is None:
       if options.verbose:
-        print_to_stderr("SSL is enabled. Impala server certificates will NOT be verified"\
-                        " (set --ca_cert to change)")
+        print("SSL is enabled. Impala server certificates will NOT be verified "
+              "(set --ca_cert to change)", file=sys.stderr)
     else:
       if options.verbose:
-        print_to_stderr("SSL is enabled")
+        print("SSL is enabled", file=sys.stderr)
 
   if options.output_file:
     try:
       # Make sure the given file can be opened for writing. This will also clear the file
       # if successful.
       open(options.output_file, 'wb')
-    except IOError, e:
-      print_to_stderr('Error opening output file for writing: %s' % e)
+    except IOError as e:
+      print('Error opening output file for writing: %s' % e, file=sys.stderr)
       raise FatalShellException()
 
   options.variables = parse_variables(options.keyval)
@@ -1842,10 +1860,11 @@ def impala_shell_main():
   if options.query or options.query_file:
     # Impala shell will disable live_progress if non-interactive mode is detected.
     options.live_progress = False
-    print_to_stderr("Warning: live_progress only applies to interactive shell sessions, "
-                    "and is being skipped for now.")
+    print("Warning: live_progress only applies to interactive shell sessions, "
+          "and is being skipped for now.", file=sys.stderr)
     if options.live_summary:
-      print_to_stderr("Error: live_summary is available for interactive mode only.")
+      print("Error: live_summary is available for interactive mode only.",
+            file=sys.stderr)
       raise FatalShellException()
 
     if execute_queries_non_interactive_mode(options, query_options):
@@ -1861,31 +1880,31 @@ def impala_shell_main():
         try:
           shell.cmdloop(intro)
         except KeyboardInterrupt:
-          print_to_stderr('^C')
+          print('^C', file=sys.stderr)
         # A last measure against any exceptions thrown by an rpc
         # not caught in the shell
-        except socket.error, (code, e):
+        except socket.error as e:
           # if the socket was interrupted, reconnect the connection with the client
-          if code == errno.EINTR:
-            print shell.CANCELLATION_MESSAGE
+          if e.errno == errno.EINTR:
+            print(shell.CANCELLATION_MESSAGE)
             shell._reconnect_cancellation()
           else:
-            print_to_stderr("Socket error %s: %s" % (code, e))
+            print("Socket error %s: %s" % (e.errno, e), file=sys.stderr)
             shell.imp_client.connected = False
             shell.prompt = shell.DISCONNECTED_PROMPT
-        except DisconnectedException, e:
+        except DisconnectedException as e:
           # the client has lost the connection
-          print_to_stderr(e)
+          print(e, file=sys.stderr)
           shell.imp_client.connected = False
           shell.prompt = shell.DISCONNECTED_PROMPT
-        except QueryStateException, e:
+        except QueryStateException as e:
           # an exception occurred while executing the query
           shell.imp_client.close_query(shell.last_query_handle)
-          print_to_stderr(e)
-        except RPCException, e:
+          print(e, file=sys.stderr)
+        except RPCException as e:
           # could not complete the rpc successfully
-          print_to_stderr(e)
-        except IOError, e:
+          print(e, file=sys.stderr)
+        except IOError as e:
           # Interrupted system calls (e.g. because of cancellation) should be ignored.
           if e.errno != errno.EINTR: raise
       finally:

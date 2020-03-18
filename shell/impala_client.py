@@ -16,6 +16,7 @@
 # KIND, either express or implied.  See the License for the
 # specific language governing permissions and limitations
 # under the License.
+from __future__ import print_function
 
 from bitarray import bitarray
 import base64
@@ -101,8 +102,6 @@ class QueryOptionLevels:
     """Return the integral value based on the string. Defaults to DEVELOPMENT."""
     return cls.NAME_TO_VALUES.get(string.upper(), cls.DEVELOPMENT)
 
-def print_to_stderr(message):
-  print >> sys.stderr, message
 
 class ImpalaClient(object):
   """Base class for shared functionality between HS2 and Beeswax. Includes stub methods
@@ -149,8 +148,8 @@ class ImpalaClient(object):
     assert self.transport and self.transport.isOpen()
 
     if self.verbose:
-      print_to_stderr('Opened TCP connection to %s:%s' % (self.impalad_host,
-          self.impalad_port))
+      msg = 'Opened TCP connection to %s:%s' % (self.impalad_host, self.impalad_port)
+      print(msg, file=sys.stderr)
     protocol = TBinaryProtocol.TBinaryProtocolAccelerated(self.transport)
     self.imp_service = self._get_thrift_client(protocol)
     self.connected = True
@@ -336,7 +335,7 @@ class ImpalaClient(object):
     # context in IMPALA-8864. CentOs 6 ships such an incompatible python version
     # out of the box.
     if not hasattr(ssl, "create_default_context"):
-      print_to_stderr("Python version too old. SSLContext not supported.")
+      print("Python version too old. SSLContext not supported.", file=sys.stderr)
       raise NotImplementedError()
     # Current implementation of ImpalaHttpClient does a close() and open() of the
     # underlying http connection on every flush() (THRIFT-4600). Due to this, setting a
@@ -344,15 +343,15 @@ class ImpalaClient(object):
     # block similary in case of problematic remote end points.
     # TODO: Investigate connection reuse in ImpalaHttpClient and revisit this.
     if connect_timeout_ms > 0:
-      print_to_stderr("Warning: --connect_timeout_ms is currently ignored with" +
-          " HTTP transport.")
+      print("Warning: --connect_timeout_ms is currently ignored with HTTP transport.",
+            file=sys.stderr)
 
     # HTTP server implemententations do not support SPNEGO yet.
     # TODO: when we add support for Kerberos+HTTP, we need to re-enable the automatic
     # kerberos retry logic in impala_shell.py that was disabled for HTTP because of
     # IMPALA-8932.
     if self.use_kerberos or self.kerberos_host_fqdn:
-      print_to_stderr("Kerberos not supported with HTTP endpoints.")
+      print("Kerberos not supported with HTTP endpoints.", file=sys.stderr)
       raise NotImplementedError()
 
     host_and_port = "{0}:{1}".format(self.impalad_host, self.impalad_port)
@@ -624,8 +623,8 @@ class ImpalaHS2Client(ImpalaClient):
         self.query_option_levels[name.upper()] = QueryOptionLevels.from_string(level)
     try:
       self.close_query(set_all_handle)
-    except Exception, e:
-      print str(e), type(e)
+    except Exception as e:
+      print('{0} {1}'.format(str(e), type(e)), file=sys.stderr)
       raise
 
   def close_connection(self):
@@ -637,7 +636,7 @@ class ImpalaHS2Client(ImpalaClient):
         req = TCloseSessionReq(self.session_handle)
         resp = self._do_hs2_rpc(lambda: self.imp_service.CloseSession(req))
         self._check_hs2_rpc_status(resp.status)
-      except Exception, e:
+      except Exception as e:
         print("Warning: close session RPC failed: {0}, {1}".format(str(e), type(e)))
       self.session_handle = None
     self._close_transport()
@@ -646,7 +645,7 @@ class ImpalaHS2Client(ImpalaClient):
     req = TPingImpalaHS2ServiceReq(self.session_handle)
     try:
       resp = self.imp_service.PingImpalaHS2Service(req)
-    except TApplicationException, t:
+    except TApplicationException as t:
       if t.type == TApplicationException.UNKNOWN_METHOD:
         raise MissingThriftMethodException(t.message)
       raise
@@ -685,8 +684,17 @@ class ImpalaHS2Client(ImpalaClient):
     # as a result prints the hex representation in the reverse order to how
     # bytes are laid out in guid.
     guid_bytes = last_query_handle.operationId.guid
-    return "{0}:{1}".format(guid_bytes[7::-1].encode('hex_codec'),
-                            guid_bytes[16:7:-1].encode('hex_codec'))
+    low_bytes_reversed = guid_bytes[7::-1]
+    high_bytes_reversed = guid_bytes[16:7:-1]
+
+    if sys.version_info.major < 3:
+      low_hex = low_bytes_reversed.encode('hex_codec')
+      high_hex = high_bytes_reversed.encode('hex_codec')
+    else:
+      low_hex = low_bytes_reversed.hex()
+      high_hex = high_bytes_reversed.hex()
+
+    return "{low}:{high}".format(low=low_hex, high=high_hex)
 
   def _fetch_one_batch(self, query_handle):
     assert query_handle.hasResultSet
@@ -817,10 +825,10 @@ class ImpalaHS2Client(ImpalaClient):
     self._check_connected()
     try:
       return rpc()
-    except TTransportException, e:
+    except TTransportException as e:
       # issue with the connection with the impalad
       raise DisconnectedException("Error communicating with impalad: %s" % e)
-    except TApplicationException, t:
+    except TApplicationException as t:
       # Suppress the errors from cancelling a query that is in waiting_to_finish state
       if suppress_error_on_cancel and self.is_query_cancelled:
         raise QueryCancelledByShellException()
@@ -875,7 +883,12 @@ class ImpalaBeeswaxClient(ImpalaClient):
     return ImpalaService.Client(protocol)
 
   def _options_to_string_list(self, set_query_options):
-    return ["%s=%s" % (k, v) for (k, v) in set_query_options.iteritems()]
+      if sys.version_info.major < 3:
+        key_value_pairs = set_query_options.iteritems()
+      else:
+        key_value_pairs = set_query_options.items()
+
+      return ["%s=%s" % (k, v) for (k, v) in key_value_pairs]
 
   def _open_session(self):
     # Beeswax doesn't have a "session" concept independent of connections, so
@@ -910,7 +923,7 @@ class ImpalaBeeswaxClient(ImpalaClient):
   def _ping_impala_service(self):
     try:
       resp = self.imp_service.PingImpalaService()
-    except TApplicationException, t:
+    except TApplicationException as t:
       if t.type == TApplicationException.UNKNOWN_METHOD:
         raise MissingThriftMethodException(t.message)
       raise
@@ -1056,15 +1069,15 @@ class ImpalaBeeswaxClient(ImpalaClient):
       raise QueryStateException('Error: Stale query handle')
     # beeswaxException prints out the entire object, printing
     # just the message is far more readable/helpful.
-    except BeeswaxService.BeeswaxException, b:
+    except BeeswaxService.BeeswaxException as b:
       # Suppress the errors from cancelling a query that is in fetch state
       if suppress_error_on_cancel and self.is_query_cancelled:
         raise QueryCancelledByShellException()
       raise RPCException("ERROR: %s" % b.message)
-    except TTransportException, e:
+    except TTransportException as e:
       # issue with the connection with the impalad
       raise DisconnectedException("Error communicating with impalad: %s" % e)
-    except TApplicationException, t:
+    except TApplicationException as t:
       # Suppress the errors from cancelling a query that is in waiting_to_finish state
       if suppress_error_on_cancel and self.is_query_cancelled:
         raise QueryCancelledByShellException()
