@@ -22,7 +22,9 @@
 # Setting USE_THRIFT11_GEN_PY will add Thrift 11 Python generated code rather than the
 # default Thrift Python code.
 # Used to allow importing testdata, test, etc modules from other scripts.
-export PYTHONPATH=${IMPALA_HOME}
+
+# ${IMPALA_HOME}/bin has bootstrap_toolchain.py, required by bootstrap_virtualenv.py
+export PYTHONPATH=${IMPALA_HOME}:${IMPALA_HOME}/bin
 
 # Generated Thrift files are used by tests and other scripts.
 if [ -n "${USE_THRIFT11_GEN_PY:-}" ]; then
@@ -30,6 +32,8 @@ if [ -n "${USE_THRIFT11_GEN_PY:-}" ]; then
 else
   PYTHONPATH=${PYTHONPATH}:${IMPALA_HOME}/shell/gen-py
 fi
+
+PYTHONPATH=${PYTHONPATH}:${IMPALA_HOME}/infra/python/env/lib
 
 # There should be just a single version of python that created the
 # site-packages directory. We find it by performing shell independent expansion
