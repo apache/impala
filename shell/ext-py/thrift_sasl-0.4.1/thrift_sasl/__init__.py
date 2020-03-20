@@ -1,6 +1,3 @@
-#!/usr/bin/env python
-
-#
 # Licensed to the Apache Software Foundation (ASF) under one
 # or more contributor license agreements. See the NOTICE file
 # distributed with this work for additional information
@@ -20,16 +17,24 @@
 #
 """ SASL transports for Thrift. """
 
-import sys
+# Initially copied from the Impala repo
 
-from cStringIO import StringIO
-from thrift.transport import TTransport
-from thrift.transport.TTransport import *
-try:
-  import saslwrapper as sasl
-except ImportError:
-  import sasl
+from __future__ import absolute_import
+
+import six
+import sys
 import struct
+
+from thrift.transport.TTransport import (TTransportException, TTransportBase, CReadableTransport)
+
+# TODO: Check whether the following distinction is necessary. Does not appear to
+# break anything when `io.BytesIO` is used everywhere, but there may be some edge
+# cases where things break down.
+if sys.version_info[0] == 3:
+    from io import BytesIO as BufferIO
+else:
+    from cStringIO import StringIO as BufferIO
+
 
 class TSaslClientTransport(TTransportBase, CReadableTransport):
   START = 1
@@ -48,16 +53,24 @@ class TSaslClientTransport(TTransportBase, CReadableTransport):
     self.sasl_client_factory = sasl_client_factory
     self.sasl = None
     self.mechanism = mechanism
-    self.__wbuf = StringIO()
-    self.__rbuf = StringIO()
+    self.__wbuf = BufferIO()
+    self.__rbuf = BufferIO()
     self.opened = False
     self.encode = None
 
   def isOpen(self):
-    return self._trans.isOpen()
+    try:
+      is_open = self._trans.isOpen # Thrift
+    except AttributeError:
+      is_open = self._trans.is_open # thriftpy
+
+    return is_open()
+
+  def is_open(self):
+    return self.isOpen()
 
   def open(self):
-    if not self._trans.isOpen():
+    if not self.isOpen():
       self._trans.open()
 
     if self.sasl is not None:
@@ -91,14 +104,15 @@ class TSaslClientTransport(TTransportBase, CReadableTransport):
 
   def _send_message(self, status, body):
     header = struct.pack(">BI", status, len(body))
+    body = six.ensure_binary(body)
     self._trans.write(header + body)
     self._trans.flush()
 
   def _recv_sasl_message(self):
-    header = self._trans.readAll(5)
+    header = self._trans.read(5)
     status, length = struct.unpack(">BI", header)
     if length > 0:
-      payload = self._trans.readAll(length)
+      payload = self._trans.read(length)
     else:
       payload = ""
     return status, payload
@@ -129,7 +143,7 @@ class TSaslClientTransport(TTransportBase, CReadableTransport):
       self._flushPlain(buffer)
 
     self._trans.flush()
-    self.__wbuf = StringIO()
+    self.__wbuf = BufferIO()
 
   def _flushEncoded(self, buffer):
     # sasl.ecnode() does the encoding and adds the length header, so nothing
@@ -153,28 +167,28 @@ class TSaslClientTransport(TTransportBase, CReadableTransport):
 
   def read(self, sz):
     ret = self.__rbuf.read(sz)
-    if len(ret) != 0:
+    if len(ret) == sz:
       return ret
 
     self._read_frame()
-    return self.__rbuf.read(sz)
+    return ret + self.__rbuf.read(sz - len(ret))
 
   def _read_frame(self):
-    header = self._trans.readAll(4)
+    header = self._trans.read(4)
     (length,) = struct.unpack(">I", header)
     if self.encode:
       # If the frames are encoded (i.e. you're using a QOP of auth-int or
       # auth-conf), then make sure to include the header in the bytes you send to
       # sasl.decode()
-      encoded = header + self._trans.readAll(length)
+      encoded = header + self._trans.read(length)
       success, decoded = self.sasl.decode(encoded)
       if not success:
         raise TTransportException(type=TTransportException.UNKNOWN,
                                   message=self.sasl.getError())
     else:
       # If the frames are not encoded, just pass it through
-      decoded = self._trans.readAll(length)
-    self.__rbuf = StringIO(decoded)
+      decoded = self._trans.read(length)
+    self.__rbuf = BufferIO(decoded)
 
   def close(self):
     self._trans.close()
@@ -193,5 +207,5 @@ class TSaslClientTransport(TTransportBase, CReadableTransport):
     while len(prefix) < reqlen:
       self._read_frame()
       prefix += self.__rbuf.getvalue()
-    self.__rbuf = StringIO(prefix)
+    self.__rbuf = BufferIO(prefix)
     return self.__rbuf

@@ -16,12 +16,13 @@
 # under the License.
 #
 # Thrift utility functions
-
-from thrift.transport.TSocket import TSocket
-from thrift.transport.TTransport import TBufferedTransport
 import getpass
 import sasl
 import struct
+
+from thrift.transport.TSocket import TSocket
+from thrift.transport.TTransport import TBufferedTransport
+from thrift_sasl import TSaslClientTransport
 
 def create_transport(host, port, service, transport_type="buffered", user=None,
                      password=None, use_ssl=False, ssl_cert=None):
@@ -56,7 +57,6 @@ def create_transport(host, port, service, transport_type="buffered", user=None,
     if password is None: password = ""
 
   # Initializes a sasl client
-  from shell.thrift_sasl import TSaslClientTransport
   def sasl_factory():
     sasl_client = sasl.Client()
     sasl_client.setAttr("host", host)
