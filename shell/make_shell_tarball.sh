@@ -124,6 +124,7 @@ cp ${SHELL_HOME}/shell_output.py ${TARBALL_ROOT}/lib
 cp ${SHELL_HOME}/pkg_resources.py ${TARBALL_ROOT}/lib
 cp ${SHELL_HOME}/impala-shell ${TARBALL_ROOT}
 cp ${SHELL_HOME}/impala_shell.py ${TARBALL_ROOT}
+cp ${SHELL_HOME}/compatibility.py ${TARBALL_ROOT}
 
 pushd ${BUILD_DIR} > /dev/null
 echo "Making tarball in ${BUILD_DIR}"

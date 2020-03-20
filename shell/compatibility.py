@@ -1,3 +1,6 @@
+#!/usr/bin/env python
+# -*- coding: utf-8 -*-
+#
 # Licensed to the Apache Software Foundation (ASF) under one
 # or more contributor license agreements.  See the NOTICE file
 # distributed with this work for additional information
@@ -14,18 +17,20 @@
 # KIND, either express or implied.  See the License for the
 # specific language governing permissions and limitations
 # under the License.
+from __future__ import print_function, unicode_literals
 
-# Requirements that require a C/C++ compiler to build, which may not be available until
-# after the toolchain is bootstrapped. Installed after requirements.txt
 
-argparse == 1.4.0
-impyla == 0.16.2
-  bitarray == 1.2.1
-  sasl == 0.2.1
-  six == 1.14.0
-  thrift_sasl == 0.4.1
-psutil == 5.6.3
-# Required for Kudu:
-  Cython == 0.23.4
-  numpy == 1.10.4
-  pytz == 2018.3
+"""
+A module where we can aggregate python2 -> 3 code contortions.
+"""
+
+try:
+  _xrange = xrange
+except NameError:
+  _xrange = range  # python3 compatibilty
+
+
+try:
+  _basestring = basestring
+except NameError:
+  _basestring = str  # python3 compatibility
