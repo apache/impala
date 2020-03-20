@@ -26,6 +26,7 @@
 #include "common/status.h"
 #include "kudu/util/web_callback_registry.h"
 #include "thirdparty/squeasel/squeasel.h"
+#include "util/ldap-util.h"
 #include "util/metrics-fwd.h"
 #include "util/network-util.h"
 #include "util/openssl-util.h"
@@ -189,6 +190,14 @@ class Webserver {
   sq_callback_result_t HandleSpnego(struct sq_connection* connection,
       struct sq_request_info* request_info, std::vector<std::string>* response_headers);
 
+  // Handle Basic authentication for this request. Returns an error if authentication was
+  // unsuccessful.
+  Status HandleBasic(struct sq_connection* connection,
+      struct sq_request_info* request_info, std::vector<std::string>* response_headers);
+
+  // Adds a 'Set-Cookie' header to 'response_headers', if cookie support is enabled.
+  void AddCookie(struct sq_request_info* request_info, vector<string>* response_headers);
+
   /// Renders URLs through the Mustache templating library.
   /// - Default ContentType is HTML.
   /// - Argument 'raw' renders the page with PLAIN ContentType.
@@ -241,10 +250,18 @@ class Webserver {
   /// If true and SPNEGO is in use, cookies will be used for authentication.
   bool use_cookies_;
 
+  /// Used to validate usernames/passwords If LDAP authentication is in use.
+  std::unique_ptr<ImpalaLdap> ldap_;
+
   /// If 'FLAGS_webserver_require_spnego' is true, metrics for the number of successful
   /// and failed Negotiate auth attempts.
   IntCounter* total_negotiate_auth_success_ = nullptr;
   IntCounter* total_negotiate_auth_failure_ = nullptr;
+
+  /// If 'FLAGS_webserver_require_ldap' is true, metrics for the number of successful
+  /// and failed Basic auth attempts.
+  IntCounter* total_basic_auth_success_ = nullptr;
+  IntCounter* total_basic_auth_failure_ = nullptr;
 
   /// If 'use_cookies_' is true, metrics for the number of successful and failed cookie
   /// auth attempts.

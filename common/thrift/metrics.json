@@ -2695,7 +2695,31 @@
     "kind": "COUNTER",
     "key": "impala.webserver.total-negotiate-auth-failure"
   },
-    {
+  {
+    "description": "The number of HTTP connection requests to this daemon's webserver that were successfully authenticated with LDAP",
+    "contexts": [
+      "IMPALAD",
+      "CATALOGSERVER",
+      "STATESTORE"
+    ],
+    "label": "Webserver HTTP Connection LDAP Auth Success",
+    "units": "NONE",
+    "kind": "COUNTER",
+    "key": "impala.webserver.total-basic-auth-success"
+  },
+  {
+    "description": "The number of HTTP connection requests to this daemon's webserver that attempted to authenticate with LDAP but were unsuccessful.",
+    "contexts": [
+      "IMPALAD",
+      "CATALOGSERVER",
+      "STATESTORE"
+    ],
+    "label": "Webserver HTTP Connection LDAP Auth Failure",
+    "units": "NONE",
+    "kind": "COUNTER",
+    "key": "impala.webserver.total-basic-auth-failure"
+  },
+  {
     "description": "The number of HTTP connection requests to this daemon's webserver that were successfully authenticated using a cookie.",
     "contexts": [
       "IMPALAD",

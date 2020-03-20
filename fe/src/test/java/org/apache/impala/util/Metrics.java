@@ -17,9 +17,22 @@
 
 package org.apache.impala.util;
 
-import java.net.URL;
-import java.util.Scanner;
+import java.io.IOException;
 
+import org.apache.http.auth.AuthScope;
+import org.apache.http.auth.UsernamePasswordCredentials;
+import org.apache.http.client.AuthCache;
+import org.apache.http.impl.client.BasicAuthCache;
+import org.apache.http.client.CredentialsProvider;
+import org.apache.http.client.methods.CloseableHttpResponse;
+import org.apache.http.client.methods.HttpGet;
+import org.apache.http.client.protocol.HttpClientContext;
+import org.apache.http.HttpHost;
+import org.apache.http.impl.auth.BasicScheme;
+import org.apache.http.impl.client.BasicCredentialsProvider;
+import org.apache.http.impl.client.CloseableHttpClient;
+import org.apache.http.impl.client.HttpClients;
+import org.apache.http.util.EntityUtils;
 import org.json.simple.JSONObject;
 import org.json.simple.parser.JSONParser;
 
@@ -27,18 +40,23 @@ import org.json.simple.parser.JSONParser;
  * Utility class for retrieving metrics from the Impala webserver.
  */
 public class Metrics {
-  private final static String DEFAULT_WEBSERVER_BASE_URL = "http://localhost:25000/";
-  private final static String JSON_METRICS = "jsonmetrics?json";
+  private final static String WEBSERVER_HOST = "localhost";
+  private final static int WEBSERVER_PORT = 25000;
+  private final static String JSON_METRICS = "/jsonmetrics?json";
 
-  private String webserverBaseUrl;
+  private CloseableHttpClient httpClient_;
+  private String username_;
+  private String password_;
 
-  public Metrics() {
-    this.webserverBaseUrl = DEFAULT_WEBSERVER_BASE_URL;
+  public Metrics() { this("", ""); }
+
+  public Metrics(String username, String password) {
+    this.username_ = username;
+    this.password_ = password;
+    httpClient_ = HttpClients.createDefault();
   }
 
-  public Metrics(String webserverUrl) {
-    this.webserverBaseUrl = webserverUrl;
-  }
+  public void Close() throws IOException { httpClient_.close(); }
 
   /**
    * Returns the metric for the given metric id from the Impala web server.
@@ -47,7 +65,7 @@ public class Metrics {
    *         The caller needs to cast it to the appropriate type, e.g. Long, String, etc.
    */
   public Object getMetric(String metricId) throws Exception {
-    String content = readContent(new URL(this.webserverBaseUrl + JSON_METRICS));
+    String content = readContent(JSON_METRICS);
     if (content == null) return null;
 
     JSONObject json = toJson(content);
@@ -56,14 +74,29 @@ public class Metrics {
     return json.get(metricId);
   }
 
-  private static String readContent(URL url) throws Exception {
-    String ret = null;
+  /**
+   * Retrieves the page at 'path' and returns its contents.
+   */
+  public String readContent(String path) throws IOException {
+    HttpHost targetHost = new HttpHost(WEBSERVER_HOST, WEBSERVER_PORT, "http");
+    HttpClientContext context = HttpClientContext.create();
+    if (!username_.equals("")) {
+      CredentialsProvider credsProvider = new BasicCredentialsProvider();
+      credsProvider.setCredentials(new AuthScope(WEBSERVER_HOST, WEBSERVER_PORT),
+          new UsernamePasswordCredentials(username_, password_));
+      AuthCache authCache = new BasicAuthCache();
+      authCache.put(targetHost, new BasicScheme());
+      context.setCredentialsProvider(credsProvider);
+      context.setAuthCache(authCache);
+    }
 
-    try (Scanner scanner = new Scanner(url.openStream(), "UTF-8")) {
-      scanner.useDelimiter("\\A");
-      if (scanner.hasNext()) {
-        ret = scanner.next();
-      }
+    String ret = "";
+    HttpGet httpGet = new HttpGet(path);
+    CloseableHttpResponse response = httpClient_.execute(targetHost, httpGet, context);
+    try {
+      ret = EntityUtils.toString(response.getEntity());
+    } finally {
+      response.close();
     }
 
     return ret;

@@ -18,6 +18,11 @@
 package org.apache.impala.customcluster;
 
 import java.io.IOException;
+import java.util.Map;
+import java.util.HashMap;
+
+import org.apache.commons.io.IOUtils;
+import org.apache.log4j.Logger;
 
 /**
  * Runs an Impala cluster with custom flags.
@@ -27,18 +32,33 @@ import java.io.IOException;
  * not be used outside of this package.
  */
 class CustomClusterRunner {
+  private static final Logger LOG = Logger.getLogger(CustomClusterRunner.class);
+
   public static int StartImpalaCluster() throws IOException, InterruptedException {
     return StartImpalaCluster("");
   }
 
-  /**
-   * Starts Impala and passes 'args' to the impalads, catalogd, and statestored.
-   */
   public static int StartImpalaCluster(String args)
       throws IOException, InterruptedException {
-    Process p = Runtime.getRuntime().exec(new String[] {"start-impala-cluster.py",
+    return StartImpalaCluster(args, new HashMap<String, String>());
+  }
+
+  /**
+   * Starts Impala, setting environment variables in 'env', and passes 'args' to the
+   * impalads, catalogd, and statestored.
+   */
+  public static int StartImpalaCluster(String args, Map<String, String> env)
+      throws IOException, InterruptedException {
+    ProcessBuilder pb = new ProcessBuilder(new String[] {"start-impala-cluster.py",
         "--impalad_args", args, "--catalogd_args", args, "--state_store_args", args});
+    pb.redirectErrorStream(true);
+    Map<String, String> origEnv = pb.environment();
+    origEnv.putAll(env);
+    Process p = pb.start();
     p.waitFor();
+    // Print out the output of the process, for debugging. We only need to print stdout,
+    // as stderr is redirected to it above.
+    LOG.info(IOUtils.toString(p.getInputStream()));
     return p.exitValue();
   }
 }

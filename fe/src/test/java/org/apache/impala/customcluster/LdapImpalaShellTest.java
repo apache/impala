@@ -17,6 +17,7 @@
 
 package org.apache.impala.customcluster;
 
+import static org.apache.impala.testutil.LdapUtil.*;
 import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.assertTrue;
 
@@ -53,19 +54,7 @@ public class LdapImpalaShellTest {
   @ClassRule
   public static CreateLdapServerRule serverRule = new CreateLdapServerRule();
 
-  // These correspond to the values in fe/src/test/resources/users.ldif
-  private static final String testUser_ = "Test1Ldap";
-  private static final String testPassword_ = "12345";
-  private static final String testUser2_ = "Test2Ldap";
-  private static final String testPassword2_ = "abcde";
-  private static final String testUser3_ = "Test3Ldap";
-  private static final String testPassword3_ = "67890";
-  private static final String testUser4_ = "Test4Ldap";
-  private static final String testPassword4_ = "fghij";
-  // testUser_ and testUser2_ are members of this group.
-  private static final String testUserGroup_ = "group1";
-
-  // The cluster will be set up to allow testUser_ to act as a proxy for delegateUser_.
+  // The cluster will be set up to allow TEST_USER_1 to act as a proxy for delegateUser_.
   // Includes a special character to test HTTP path encoding.
   private static final String delegateUser_ = "proxyUser$";
 
@@ -110,9 +99,9 @@ public class LdapImpalaShellTest {
     String query = "select logged_in_user()";
     // Templated shell commands to test a simple 'show tables' command.
     // 1. Valid username and password. Should succeed.
-    String[] validCommand = {"impala-shell.sh", "", "--ldap",
-        "--auth_creds_ok_in_clear", String.format("--user=%s", testUser_),
-        String.format("--ldap_password_cmd=printf %s", testPassword_),
+    String[] validCommand = {"impala-shell.sh", "", "--ldap", "--auth_creds_ok_in_clear",
+        String.format("--user=%s", TEST_USER_1),
+        String.format("--ldap_password_cmd=printf %s", TEST_PASSWORD_1),
         String.format("--query=%s", query)};
     // 2. Invalid username password combination. Should fail.
     String[] invalidCommand = {"impala-shell.sh", "", "--ldap",
@@ -131,7 +120,7 @@ public class LdapImpalaShellTest {
     for (String protocol: protocolsToTest) {
       protocol = String.format(protocolTemplate, protocol);
       validCommand[1] = protocol;
-      RunShellCommand.Run(validCommand, /*shouldSucceed*/ true, testUser_,
+      RunShellCommand.Run(validCommand, /*shouldSucceed*/ true, TEST_USER_1,
           "Starting Impala Shell using LDAP-based authentication");
       invalidCommand[1] = protocol;
       RunShellCommand.Run(
@@ -157,8 +146,8 @@ public class LdapImpalaShellTest {
    */
   @Test
   public void testHttpImpersonation() throws Exception {
-    setUp(
-        String.format("--authorized_proxy_user_config=%s=%s", testUser_, delegateUser_));
+    setUp(String.format(
+        "--authorized_proxy_user_config=%s=%s", TEST_USER_1, delegateUser_));
     // Ignore the test if python SSLContext support is not available.
     Assume.assumeTrue(pythonSupportsSSLContext());
     String invalidDelegateUser = "invalid-delegate-user";
@@ -167,25 +156,24 @@ public class LdapImpalaShellTest {
 
     // Run with an invalid proxy user.
     String[] command = buildCommand(
-        query, "hs2-http", testUser2_, testPassword2_, "/?doAs=" + delegateUser_);
+        query, "hs2-http", TEST_USER_2, TEST_PASSWORD_2, "/?doAs=" + delegateUser_);
     RunShellCommand.Run(command, /* shouldSucceed */ false, "",
-        String.format(errTemplate, testUser2_, delegateUser_));
+        String.format(errTemplate, TEST_USER_2, delegateUser_));
 
     // Run with a valid proxy user but invalid delegate user.
     command = buildCommand(
-        query, "hs2-http", testUser_, testPassword_, "/?doAs=" + invalidDelegateUser);
+        query, "hs2-http", TEST_USER_1, TEST_PASSWORD_1, "/?doAs=" + invalidDelegateUser);
     RunShellCommand.Run(command, /* shouldSucceed */ false, "",
-        String.format(errTemplate, testUser_, invalidDelegateUser));
+        String.format(errTemplate, TEST_USER_1, invalidDelegateUser));
 
     // 'doAs' parameter that cannot be decoded.
-    command = buildCommand(
-        query, "hs2-http", testUser_, testPassword_, "/?doAs=%");
+    command = buildCommand(query, "hs2-http", TEST_USER_1, TEST_PASSWORD_1, "/?doAs=%");
     RunShellCommand.Run(command, /* shouldSucceed */ false, "",
         "Not connected to Impala");
 
     // Successfully delegate.
     command = buildCommand(
-        query, "hs2-http", testUser_, testPassword_, "/?doAs=" + delegateUser_);
+        query, "hs2-http", TEST_USER_1, TEST_PASSWORD_1, "/?doAs=" + delegateUser_);
     RunShellCommand.Run(command, /* shouldSucceed */ true, delegateUser_, "");
   }
 
@@ -201,27 +189,30 @@ public class LdapImpalaShellTest {
             + "--ldap_group_dn_pattern=%s "
             + "--ldap_group_membership_key=uniqueMember "
             + "--ldap_group_class_key=groupOfUniqueNames",
-        testUserGroup_, testUser_, testUser3_, groupDN));
+        TEST_USER_GROUP, TEST_USER_1, TEST_USER_3, groupDN));
     String query = "select logged_in_user()";
 
     // Run with user that passes the group filter but not the user filter, should fail.
     String[] command =
-        buildCommand(query, "hs2-http", testUser2_, testPassword2_, "/cliservice");
+        buildCommand(query, "hs2-http", TEST_USER_2, TEST_PASSWORD_2, "/cliservice");
     RunShellCommand.Run(
         command, /* shouldSucceed */ false, "", "Not connected to Impala");
 
     // Run with user that passes the user filter but not the group filter, should fail.
-    command = buildCommand(query, "hs2-http", testUser3_, testPassword3_, "/cliservice");
+    command =
+        buildCommand(query, "hs2-http", TEST_USER_3, TEST_PASSWORD_3, "/cliservice");
     RunShellCommand.Run(
         command, /* shouldSucceed */ false, "", "Not connected to Impala");
 
     // Run with user that doesn't pass either filter, should fail.
-    command = buildCommand(query, "hs2-http", testUser4_, testPassword4_, "/cliservice");
+    command =
+        buildCommand(query, "hs2-http", TEST_USER_4, TEST_PASSWORD_4, "/cliservice");
     RunShellCommand.Run(
         command, /* shouldSucceed */ false, "", "Not connected to Impala");
 
     // Run with user that passes both filters, should succeed.
-    command = buildCommand(query, "hs2-http", testUser_, testPassword_, "/cliservice");
-    RunShellCommand.Run(command, /* shouldSucceed */ true, testUser_, "");
+    command =
+        buildCommand(query, "hs2-http", TEST_USER_1, TEST_PASSWORD_1, "/cliservice");
+    RunShellCommand.Run(command, /* shouldSucceed */ true, TEST_USER_1, "");
   }
 }

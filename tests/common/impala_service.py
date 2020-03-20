@@ -22,6 +22,7 @@
 from collections import defaultdict
 import json
 import logging
+import os
 import re
 import requests
 from time import sleep, time
@@ -39,6 +40,9 @@ import zlib
 LOG = logging.getLogger('impala_service')
 LOG.setLevel(level=logging.DEBUG)
 
+WEBSERVER_USERNAME = os.environ.get('IMPALA_WEBSERVER_USERNAME', None)
+WEBSERVER_PASSWORD = os.environ.get('IMPALA_WEBSERVER_PASSWORD', None)
+
 # Base class for all Impala services
 # TODO: Refactor the retry/timeout logic into a common place.
 class BaseImpalaService(object):
@@ -51,6 +55,9 @@ class BaseImpalaService(object):
       self.webserver_interface = hostname
     self.webserver_port = webserver_port
     self.webserver_certificate_file = webserver_certificate_file
+    self.webserver_username_password = None
+    if WEBSERVER_USERNAME is not None and WEBSERVER_PASSWORD is not None:
+      self.webserver_username_password = (WEBSERVER_USERNAME, WEBSERVER_PASSWORD)
 
   def open_debug_webpage(self, page_name, timeout=10, interval=1):
     start_time = time()
@@ -62,7 +69,8 @@ class BaseImpalaService(object):
           protocol = "https"
         url = "%s://%s:%d/%s" % \
             (protocol, self.webserver_interface, int(self.webserver_port), page_name)
-        return requests.get(url, verify=self.webserver_certificate_file)
+        return requests.get(url, verify=self.webserver_certificate_file,
+            auth=self.webserver_username_password)
       except Exception as e:
         LOG.info("Debug webpage not yet available: %s", str(e))
       sleep(interval)

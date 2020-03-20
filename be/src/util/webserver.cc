@@ -34,12 +34,14 @@
 
 #include "common/logging.h"
 #include "gutil/endian.h"
-#include "gutil/strings/substitute.h"
+#include "gutil/strings/escaping.h"
 #include "gutil/strings/strip.h"
+#include "gutil/strings/substitute.h"
+#include "kudu/security/gssapi.h"
 #include "kudu/util/env.h"
 #include "kudu/util/logging.h"
 #include "kudu/util/net/sockaddr.h"
-#include "kudu/security/gssapi.h"
+#include "rpc/authentication.h"
 #include "rpc/cookie-util.h"
 #include "rpc/thrift-util.h"
 #include "runtime/exec-env.h"
@@ -114,11 +116,23 @@ DEFINE_int32(webserver_max_post_length_bytes, 1024 * 1024,
              "the embedded web server.");
 
 DEFINE_bool(webserver_require_spnego, false,
-            "Require connections to the web server to authenticate via Kerberos "
-            "using SPNEGO.");
+    "Require connections to the web server to authenticate via Kerberos using SPNEGO. "
+    "Cannot be used with --webserver_require_ldap.");
 
+DEFINE_bool(webserver_require_ldap, false,
+    "Require connections to the web server to authenticate via LDAP using HTTP Basic "
+    "authentication. Cannot be used with --webserver_require_spnego.");
+DEFINE_string(webserver_ldap_user_filter, "",
+    "Comma separated list of usernames. If specified, users must be on this list for "
+    "LDAP athentication to the webserver to succeed.");
+DEFINE_string(webserver_ldap_group_filter, "",
+    "Comma separated list of groups. If specified, users must belong to one of these "
+    "groups for LDAP authentication to the webserver to succeed.");
+
+DECLARE_bool(enable_ldap_auth);
 DECLARE_string(hostname);
 DECLARE_bool(is_coordinator);
+DECLARE_bool(ldap_passwords_in_clear_ok);
 DECLARE_int64(max_cookie_lifetime_s);
 DECLARE_string(ssl_minimum_version);
 DECLARE_string(ssl_cipher_list);
@@ -259,12 +273,18 @@ Webserver::Webserver(const string& interface, const int port, MetricGroup* metri
         metrics->AddCounter("impala.webserver.total-negotiate-auth-success", 0);
     total_negotiate_auth_failure_ =
         metrics->AddCounter("impala.webserver.total-negotiate-auth-failure", 0);
-    if (use_cookies_) {
-      total_cookie_auth_success_ =
-          metrics->AddCounter("impala.webserver.total-cookie-auth-success", 0);
-      total_cookie_auth_failure_ =
-          metrics->AddCounter("impala.webserver.total-cookie-auth-failure", 0);
-    }
+  }
+  if (FLAGS_webserver_require_ldap) {
+    total_basic_auth_success_ =
+        metrics->AddCounter("impala.webserver.total-basic-auth-success", 0);
+    total_basic_auth_failure_ =
+        metrics->AddCounter("impala.webserver.total-basic-auth-failure", 0);
+  }
+  if (use_cookies_ && (FLAGS_webserver_require_spnego || FLAGS_webserver_require_ldap)) {
+    total_cookie_auth_success_ =
+        metrics->AddCounter("impala.webserver.total-cookie-auth-success", 0);
+    total_cookie_auth_failure_ =
+        metrics->AddCounter("impala.webserver.total-cookie-auth-failure", 0);
   }
 }
 
@@ -376,6 +396,11 @@ Status Webserver::Start() {
     options.push_back(FLAGS_webserver_password_file.c_str());
   }
 
+  if (FLAGS_webserver_require_spnego && FLAGS_webserver_require_ldap) {
+    return Status("Securing the web server with both Kerberos and LDAP is not "
+                  "currently supported.");
+  }
+
   if (FLAGS_webserver_require_spnego) {
     // If Kerberos has been configured, security::InitKerberosForServer() will
     // already have been called, ensuring that the keytab path has been
@@ -387,6 +412,21 @@ Status Webserver::Start() {
       return Status("Unable to configure web server for SPNEGO authentication: "
                     "must configure a keytab file for the server");
     }
+  }
+
+  if (FLAGS_webserver_require_ldap) {
+    if (!FLAGS_enable_ldap_auth) {
+      return Status("Unable to secure web server with LDAP: LDAP authentication must be "
+                    "configured for this daemon.");
+    }
+    if (!IsSecure() && !FLAGS_ldap_passwords_in_clear_ok) {
+      return Status("Unable to secure web server with LDAP: must either enable SSL or "
+                    "set --ldap_passwords_in_clear_ok=true");
+    }
+
+    ldap_.reset(new ImpalaLdap());
+    RETURN_IF_ERROR(
+        ldap_->Init(FLAGS_webserver_ldap_user_filter, FLAGS_webserver_ldap_group_filter));
   }
 
   options.push_back("listening_ports");
@@ -523,49 +563,51 @@ sq_callback_result_t Webserver::BeginRequestCallback(struct sq_connection* conne
   }
 
   vector<string> response_headers;
-  if (FLAGS_webserver_require_spnego){
-    bool authenticated = false;
-    // Try authenticating with a cookie first, if enabled.
-    if (use_cookies_) {
-      const char* cookie_header = sq_get_header(connection, "Cookie");
-      string username;
-      if (cookie_header != nullptr) {
-        Status cookie_status = AuthenticateCookie(hash_, cookie_header, &username);
-        if (cookie_status.ok()) {
-          authenticated = true;
-          request_info->remote_user = strdup(username.c_str());
-          total_cookie_auth_success_->Increment(1);
-        } else {
-          LOG(INFO) << "Invalid cookie provided: " << cookie_header << ": "
-                    << cookie_status.GetDetail();
-          response_headers.push_back(Substitute("Set-Cookie: $0", GetDeleteCookie()));
-          total_cookie_auth_failure_->Increment(1);
-        }
+  bool authenticated = !FLAGS_webserver_require_spnego && !FLAGS_webserver_require_ldap;
+  // Try authenticating with a cookie first, if enabled.
+  if (!authenticated && use_cookies_) {
+    const char* cookie_header = sq_get_header(connection, "Cookie");
+    string username;
+    if (cookie_header != nullptr) {
+      Status cookie_status = AuthenticateCookie(hash_, cookie_header, &username);
+      if (cookie_status.ok()) {
+        authenticated = true;
+        request_info->remote_user = strdup(username.c_str());
+        total_cookie_auth_success_->Increment(1);
+      } else {
+        LOG(INFO) << "Invalid cookie provided: " << cookie_header << ": "
+                  << cookie_status.GetDetail();
+        response_headers.push_back(Substitute("Set-Cookie: $0", GetDeleteCookie()));
+        total_cookie_auth_failure_->Increment(1);
       }
     }
+  }
 
-    if (!authenticated) {
+  if (!authenticated) {
+    if (FLAGS_webserver_require_spnego) {
       sq_callback_result_t spnego_result =
           HandleSpnego(connection, request_info, &response_headers);
       if (spnego_result == SQ_CONTINUE_HANDLING) {
         // Spnego negotiation was successful.
-        if (use_cookies_) {
-          // If cookie auth failed above and we generated a 'delete cookie' header,
-          // remove it.
-          auto eq = [](const string& header) {
-            return header.rfind("Set-Cookie", 0) == 0;
-          };
-          auto it = find_if(response_headers.begin(), response_headers.end(), eq);
-          if (it != response_headers.end()) {
-            response_headers.erase(it);
-          }
-          // Generate a cookie to return.
-          response_headers.push_back(Substitute(
-              "Set-Cookie: $0", GenerateCookie(request_info->remote_user, hash_)));
-        }
+        AddCookie(request_info, &response_headers);
       } else {
         // Spnego negotiation is incomplete or failed, stop processing the request.
         return spnego_result;
+      }
+    } else {
+      DCHECK(FLAGS_webserver_require_ldap);
+      Status basic_status = HandleBasic(connection, request_info, &response_headers);
+      if (basic_status.ok()) {
+        // Basic auth was successful.
+        total_basic_auth_success_->Increment(1);
+        AddCookie(request_info, &response_headers);
+      } else {
+        total_basic_auth_failure_->Increment(1);
+        LOG(ERROR) << "Failed to authenticate: " << basic_status.GetDetail();
+        response_headers.push_back("WWW-Authenticate: Basic");
+        SendResponse(connection, "401 Authentication Required", "text/plain",
+            "Must authenticate with Basic authentication.", response_headers);
+        return SQ_HANDLED_OK;
       }
     }
   }
@@ -699,6 +741,53 @@ sq_callback_result_t Webserver::HandleSpnego(struct sq_connection* connection,
 
   total_negotiate_auth_success_->Increment(1);
   return SQ_CONTINUE_HANDLING;
+}
+
+Status Webserver::HandleBasic(struct sq_connection* connection,
+    struct sq_request_info* request_info, vector<string>* response_headers) {
+  const char* authz_header = sq_get_header(connection, "Authorization");
+  if (!authz_header) {
+    return Status::Expected("No Authorization header provided.");
+  }
+
+  string base64;
+  if (!TryStripPrefixString(authz_header, "Basic ", &base64)) {
+    return Status::Expected("No Basic authentication provided.");
+  }
+
+  string decoded;
+  if (!Base64Unescape(base64, &decoded)) {
+    return Status::Expected("Failed to decode base64 basic authentication token.");
+  }
+
+  std::size_t colon = decoded.find(':');
+  if (colon == std::string::npos) {
+    return Status::Expected("Invalid basic authentication token format, missing ':'.");
+  }
+  string username = decoded.substr(0, colon);
+  string password = decoded.substr(colon + 1);
+  bool ret = ldap_->LdapCheckPass(username.c_str(), password.c_str(), password.length());
+  if (ret) {
+    request_info->remote_user = strdup(username.c_str());
+    return Status::OK();
+  }
+
+  return Status::Expected("Failed to authenticate to LDAP.");
+}
+
+void Webserver::AddCookie(
+    struct sq_request_info* request_info, vector<string>* response_headers) {
+  if (use_cookies_) {
+    // If cookie auth failed and we generated a 'delete cookie' header, remove it.
+    auto eq = [](const string& header) { return header.rfind("Set-Cookie", 0) == 0; };
+    auto it = find_if(response_headers->begin(), response_headers->end(), eq);
+    if (it != response_headers->end()) {
+      response_headers->erase(it);
+    }
+    // Generate a cookie to return.
+    response_headers->push_back(
+        Substitute("Set-Cookie: $0", GenerateCookie(request_info->remote_user, hash_)));
+  }
 }
 
 void Webserver::RenderUrlWithTemplate(const struct sq_connection* connection,
