@@ -19,6 +19,7 @@
 #
 # Impala's shell
 from __future__ import print_function
+from compatibility import _xrange as xrange
 
 import cmd
 import errno

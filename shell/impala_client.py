@@ -17,6 +17,7 @@
 # specific language governing permissions and limitations
 # under the License.
 from __future__ import print_function
+from compatibility import _xrange as xrange
 
 from bitarray import bitarray
 import base64

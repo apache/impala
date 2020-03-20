@@ -49,6 +49,7 @@ assemble_package_files() {
   cp -r "${THRIFT_HOME}/python/lib/python2.7/site-packages/thrift" "${MODULE_LIB_DIR}"
 
   cp "${WORKING_DIR}/__init__.py" "${MODULE_LIB_DIR}"
+  cp "${SHELL_HOME}/compatibility.py" "${MODULE_LIB_DIR}"
   cp "${SHELL_HOME}/impala_shell.py" "${MODULE_LIB_DIR}"
   cp "${SHELL_HOME}/impala_client.py" "${MODULE_LIB_DIR}"
   cp "${SHELL_HOME}/option_parser.py" "${MODULE_LIB_DIR}"

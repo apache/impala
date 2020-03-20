@@ -21,7 +21,11 @@ from __future__ import print_function
 import csv
 import re
 import sys
-from cStringIO import StringIO
+
+try:
+  from cStringIO import StringIO  # python 2
+except ImportError:
+  from io import StringIO  # python 3
 
 
 class PrettyOutputFormatter(object):

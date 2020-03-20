@@ -28,8 +28,13 @@
 # MT_DOP=2
 from __future__ import print_function
 
-import ConfigParser
 import sys
+
+try:
+  from configparser import ConfigParser  # python3
+except ImportError:
+  from ConfigParser import ConfigParser  # python2
+
 from impala_shell_config_defaults import impala_shell_defaults
 from optparse import OptionParser, SUPPRESS_HELP
 
@@ -119,7 +124,11 @@ def get_config_from_file(config_filename, option_list):
   Returns a pair of dictionaries (shell_options, query_options), with option names
   as keys and option values as values.
   """
-  config = ConfigParser.ConfigParser()
+  try:
+    config = ConfigParser(strict=False)  # python3
+  except TypeError:
+    config = ConfigParser()  # python2
+
   # Preserve case-sensitivity since flag names are case sensitive.
   config.optionxform = str
   try:
@@ -136,13 +145,6 @@ def get_config_from_file(config_filename, option_list):
       warn_msg = "WARNING: Option 'config_file' can be only set from shell."
       print('\n{0}'.format(warn_msg), file=sys.stderr)
       shell_options["config_file"] = config_filename
-
-  config = ConfigParser.ConfigParser()
-  try:
-    config.read(config_filename)
-  except Exception as e:
-    raise ConfigFileFormatError(
-      "Unable to read configuration file correctly. Check formatting: %s" % e)
 
   query_options = {}
   if config.has_section("impala.query_options"):
