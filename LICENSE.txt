@@ -697,6 +697,7 @@ be/src/thirdparty/mustache: Apache 2.0 license
 be/src/thirdparty/pcg-cpp-0.98: Apache 2.0 license
 be/src/expr/hll-bias.h: Apache 2.0 license
 shell/ext-py/sasl-0.1.1: Apache 2.0 license
+shell/ext-py/thrift_sasl-0.4.1: Apache 2.0 license
 
 --------------------------------------------------------------------------------
 
