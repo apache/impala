@@ -20,6 +20,7 @@
 import pytest
 
 from tests.common.custom_cluster_test_suite import CustomClusterTestSuite
+from tests.common.environ import HIVE_MAJOR_VERSION
 from tests.common.skip import SkipIfS3
 from tests.common.test_dimensions import create_exec_option_dimension
 from tests.common.test_result_verifier import verify_query_result_is_equal
@@ -66,6 +67,15 @@ class TestTextInterop(CustomClusterTestSuite):
         "insert into {0}(id) values (7777), (8888), (9999), (11111), (22222), (33333)"
         .format(source_table))
 
+    # For Hive 3+, workaround for HIVE-22371 (CTAS puts files in the wrong place) by
+    # explicitly creating an external table so that files are in the external warehouse
+    # directory. Use external.table.purge=true so that it is equivalent to a Hive 2
+    # managed table. Hive 2 stays the same.
+    external = ""
+    tblproperties = ""
+    if HIVE_MAJOR_VERSION >= 3:
+      external = "external"
+      tblproperties = "TBLPROPERTIES('external.table.purge'='TRUE')"
     # Loop through the compression codecs and run interop tests.
     for codec in TEXT_CODECS:
       # Write data in Hive and read from Impala
@@ -83,8 +93,13 @@ class TestTextInterop(CustomClusterTestSuite):
       self.run_stmt_in_hive("drop table if exists {0}".format(hive_table))
       self.run_stmt_in_hive("set hive.exec.compress.output=true;\
           set mapreduce.output.fileoutputformat.compress.codec={0};\
-          create table {1} stored as textfile as select * from {2}"
-          .format(switcher.get(codec, 'Invalid codec'), hive_table, source_table))
+          create {1} table {2} stored as textfile {3} as select * from {4}"
+          .format(switcher.get(codec, 'Invalid codec'), external, hive_table,
+          tblproperties, source_table))
+
+      # Make sure hive CTAS table is not empty
+      assert self.run_stmt_in_hive("select count(*) from {0}".format(
+          hive_table)).split("\n")[1] != "0", "CTAS created Hive table is empty."
 
       # Make sure Impala's metadata is in sync.
       if cluster_properties.is_catalog_v2_cluster():
