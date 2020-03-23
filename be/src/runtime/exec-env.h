@@ -24,6 +24,7 @@
 #include <boost/scoped_ptr.hpp>
 
 // NOTE: try not to add more headers here: exec-env.h is included in many many files.
+#include "common/global-types.h"
 #include "common/status.h"
 #include "runtime/client-cache-types.h"
 #include "util/hdfs-bulk-ops-defs.h" // For declaration of HdfsOpThreadPool
@@ -113,7 +114,7 @@ class ExecEnv {
   /// StartServices() was successful.
   TNetworkAddress GetThriftBackendAddress() const;
 
-  const TBackendId& backend_id() const { return backend_id_; }
+  const BackendIdPB& backend_id() const { return backend_id_; }
 
   KrpcDataStreamMgr* stream_mgr() { return stream_mgr_.get(); }
 
@@ -177,7 +178,7 @@ class ExecEnv {
 
  private:
   // Used to uniquely identify this impalad.
-  TBackendId backend_id_;
+  BackendIdPB backend_id_;
 
   boost::scoped_ptr<ObjectPool> obj_pool_;
   boost::scoped_ptr<MetricGroup> metrics_;

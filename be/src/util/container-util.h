@@ -28,9 +28,9 @@
 
 #include "gen-cpp/ErrorCodes_types.h"
 #include "gen-cpp/Frontend_types.h"
-#include "gen-cpp/StatestoreService_types.h"
 #include "gen-cpp/Status_types.h"
 #include "gen-cpp/Types_types.h"
+#include "gen-cpp/common.pb.h"
 
 /// Comparators for types that we commonly use in containers.
 namespace impala {
@@ -62,6 +62,21 @@ inline bool operator<(const TUniqueId& lhs, const TUniqueId& rhs) {
   return std::tie(lhs.hi, lhs.lo) < std::tie(rhs.hi, rhs.lo);
 }
 
+// UniqueIdPB
+STATIC_ASSERT_SIZE(UniqueIdPB, 40);
+
+inline bool operator==(const UniqueIdPB& lhs, const UniqueIdPB& rhs) {
+  return lhs.hi() == rhs.hi() && lhs.lo() == rhs.lo();
+}
+
+inline bool operator!=(const UniqueIdPB& lhs, const UniqueIdPB& rhs) {
+  return !(lhs == rhs);
+}
+
+inline bool operator<(const UniqueIdPB& lhs, const UniqueIdPB& rhs) {
+  return lhs.hi() < rhs.hi() || (lhs.hi() == rhs.hi() && lhs.lo() < rhs.lo());
+}
+
 // TNetworkAddress
 STATIC_ASSERT_SIZE(TNetworkAddress, 24);
 
@@ -70,6 +85,17 @@ inline bool operator==(const TNetworkAddress& lhs, const TNetworkAddress& rhs) {
 }
 
 inline bool operator!=(const TNetworkAddress& lhs, const TNetworkAddress& rhs) {
+  return !(lhs == rhs);
+}
+
+// NetworkAddressPB
+STATIC_ASSERT_SIZE(NetworkAddressPB, 40);
+
+inline bool operator==(const NetworkAddressPB& lhs, const NetworkAddressPB& rhs) {
+  return lhs.hostname() == rhs.hostname() && lhs.port() == rhs.port();
+}
+
+inline bool operator!=(const NetworkAddressPB& lhs, const NetworkAddressPB& rhs) {
   return !(lhs == rhs);
 }
 
@@ -98,6 +124,15 @@ inline std::size_t hash_value(const TNetworkAddress& host_port) {
   return HashUtil::Hash(&host_port.port, sizeof(host_port.port), hash);
 }
 
+/// Hash function for NetworkAddressPB. This function must be called hash_value to be
+/// picked up properly by boost.
+inline std::size_t hash_value(const NetworkAddressPB& host_port) {
+  uint32_t hash =
+      HashUtil::Hash(host_port.hostname().c_str(), host_port.hostname().length(), 0);
+  int32_t port = host_port.port();
+  return HashUtil::Hash(&port, sizeof(port), hash);
+}
+
 } // end namespace impala
 
 /// Hash function for std:: containers
@@ -105,6 +140,13 @@ namespace std {
 
 template<> struct hash<impala::TNetworkAddress> {
   std::size_t operator()(const impala::TNetworkAddress& host_port) const {
+    return impala::hash_value(host_port);
+  }
+};
+
+template <>
+struct hash<impala::NetworkAddressPB> {
+  std::size_t operator()(const impala::NetworkAddressPB& host_port) const {
     return impala::hash_value(host_port);
   }
 };

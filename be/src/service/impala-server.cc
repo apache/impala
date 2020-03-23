@@ -307,8 +307,7 @@ DECLARE_bool(compact_catalog_topic);
 namespace {
 using namespace impala;
 
-vector<impala::TExecutorGroupDesc> GetExecutorGroups(const string& flag) {
-  vector<impala::TExecutorGroupDesc> result;
+void SetExecutorGroups(const string& flag, BackendDescriptorPB* be_desc) {
   vector<StringPiece> groups;
   groups = Split(flag, ",", SkipEmpty());
   if (groups.empty()) groups.push_back(ImpalaServer::DEFAULT_EXECUTOR_GROUP_NAME);
@@ -316,21 +315,20 @@ vector<impala::TExecutorGroupDesc> GetExecutorGroups(const string& flag) {
   // Name and optional minimum group size are separated by ':'.
   for (const StringPiece& group : groups) {
     int colon_idx = group.find_first_of(':');
-    TExecutorGroupDesc group_desc;
-    group_desc.name = group.substr(0, colon_idx).as_string();
-    group_desc.min_size = 1;
+    ExecutorGroupDescPB* group_desc = be_desc->add_executor_groups();
+    group_desc->set_name(group.substr(0, colon_idx).as_string());
     if (colon_idx != StringPiece::npos) {
       StringParser::ParseResult result;
-      group_desc.min_size = StringParser::StringToInt<int64_t>(
-          group.data() + colon_idx + 1, group.length() - colon_idx - 1, &result);
+      group_desc->set_min_size(StringParser::StringToInt<int64_t>(
+          group.data() + colon_idx + 1, group.length() - colon_idx - 1, &result));
       if (result != StringParser::PARSE_SUCCESS) {
         LOG(FATAL) << "Failed to parse minimum executor group size from group: "
                      << group.ToString();
       }
+    } else {
+      group_desc->set_min_size(1);
     }
-    result.push_back(group_desc);
   }
-  return result;
 }
 } // end anonymous namespace
 
@@ -1209,7 +1207,7 @@ void ImpalaServer::CloseClientRequestState(
         // node to fail was last sender to an exchange, the coordinator will realise and
         // fail the query at the same time the failure detection path does the same
         // thing. They will harmlessly race to remove the query from this map.
-        auto it = query_locations_.find(entry.second.be_desc.backend_id);
+        auto it = query_locations_.find(entry.second.be_desc.backend_id());
         if (it != query_locations_.end()) {
           it->second.query_ids.erase(request_state->query_id());
         }
@@ -1453,7 +1451,7 @@ void ImpalaServer::CancelFromThreadPool(uint32_t thread_id,
     case CancellationWorkCause::BACKEND_FAILED: {
       // We only want to proceed with cancellation if the backends are still in use for
       // the query.
-      vector<TNetworkAddress> active_backends;
+      vector<NetworkAddressPB> active_backends;
       Coordinator* coord = request_state->GetCoordinator();
       if (coord == nullptr) {
         // Query hasn't started yet - it still will run on all backends.
@@ -1468,7 +1466,7 @@ void ImpalaServer::CancelFromThreadPool(uint32_t thread_id,
       }
       stringstream msg;
       for (int i = 0; i < active_backends.size(); ++i) {
-        msg << TNetworkAddressToString(active_backends[i]);
+        msg << active_backends[i];
         if (i + 1 != active_backends.size()) msg << ", ";
       }
       error = Status::Expected(TErrorCode::UNREACHABLE_IMPALADS, msg.str());
@@ -1745,11 +1743,11 @@ void ImpalaServer::RegisterQueryLocations(
   if (!per_backend_params.empty()) {
     lock_guard<mutex> l(query_locations_lock_);
     for (const auto& entry : per_backend_params) {
-      const TBackendId& backend_id = entry.second.be_desc.backend_id;
+      const BackendIdPB& backend_id = entry.second.be_desc.backend_id();
       auto it = query_locations_.find(backend_id);
       if (it == query_locations_.end()) {
         query_locations_.emplace(
-            backend_id, QueryLocationInfo(entry.second.be_desc.address, query_id));
+            backend_id, QueryLocationInfo(entry.second.be_desc.address(), query_id));
       } else {
         it->second.query_ids.insert(query_id);
       }
@@ -1758,13 +1756,13 @@ void ImpalaServer::RegisterQueryLocations(
 }
 
 void ImpalaServer::CancelQueriesOnFailedBackends(
-    const std::unordered_set<TBackendId>& current_membership) {
+    const std::unordered_set<BackendIdPB>& current_membership) {
   // Maps from query id (to be cancelled) to a list of failed Impalads that are
   // the cause of the cancellation. Note that we don't need to use TBackendIds as a single
   // query can't be scheduled on two backends with the same TNetworkAddress so there's no
   // ambiguity, and passing the TNetworkAddresses into the CancellationWork makes them
   // available for generating a user-friendly error message.
-  map<TUniqueId, vector<TNetworkAddress>> queries_to_cancel;
+  map<TUniqueId, vector<NetworkAddressPB>> queries_to_cancel;
   {
     // Build a list of queries that are running on failed hosts (as evidenced by their
     // absence from the membership list).
@@ -1795,7 +1793,7 @@ void ImpalaServer::CancelQueriesOnFailedBackends(
     for (const auto& cancellation_entry : queries_to_cancel) {
       stringstream backends_ss;
       for (int i = 0; i < cancellation_entry.second.size(); ++i) {
-        backends_ss << TNetworkAddressToString(cancellation_entry.second[i]);
+        backends_ss << cancellation_entry.second[i];
         if (i + 1 != cancellation_entry.second.size()) backends_ss << ", ";
       }
       VLOG_QUERY << "Backends failed for query " << PrintId(cancellation_entry.first)
@@ -1806,54 +1804,54 @@ void ImpalaServer::CancelQueriesOnFailedBackends(
   }
 }
 
-std::shared_ptr<const TBackendDescriptor> ImpalaServer::GetLocalBackendDescriptor() {
+std::shared_ptr<const BackendDescriptorPB> ImpalaServer::GetLocalBackendDescriptor() {
   if (!services_started_.load()) return nullptr;
 
   lock_guard<mutex> l(local_backend_descriptor_lock_);
   // Check if the current backend descriptor needs to be initialized.
   if (local_backend_descriptor_.get() == nullptr) {
-    std::shared_ptr<TBackendDescriptor> new_be_desc =
-        std::make_shared<TBackendDescriptor>();
+    std::shared_ptr<BackendDescriptorPB> new_be_desc =
+        std::make_shared<BackendDescriptorPB>();
     BuildLocalBackendDescriptorInternal(new_be_desc.get());
     local_backend_descriptor_ = new_be_desc;
   }
 
   // Check to see if it needs to be updated.
-  if (IsShuttingDown() != local_backend_descriptor_->is_quiescing) {
-    std::shared_ptr<TBackendDescriptor> new_be_desc =
-      std::make_shared<TBackendDescriptor>(*local_backend_descriptor_);
-    new_be_desc->is_quiescing = IsShuttingDown();
+  if (IsShuttingDown() != local_backend_descriptor_->is_quiescing()) {
+    std::shared_ptr<BackendDescriptorPB> new_be_desc =
+        std::make_shared<BackendDescriptorPB>(*local_backend_descriptor_);
+    new_be_desc->set_is_quiescing(IsShuttingDown());
     local_backend_descriptor_ = new_be_desc;
   }
 
   return local_backend_descriptor_;
 }
 
-void ImpalaServer::BuildLocalBackendDescriptorInternal(TBackendDescriptor* be_desc) {
+void ImpalaServer::BuildLocalBackendDescriptorInternal(BackendDescriptorPB* be_desc) {
   DCHECK(services_started_.load());
   bool is_quiescing = shutting_down_.Load() != 0;
 
-  be_desc->__set_backend_id(exec_env_->backend_id());
-  be_desc->__set_address(exec_env_->GetThriftBackendAddress());
-  be_desc->__set_ip_address(exec_env_->ip_address());
-  be_desc->__set_is_coordinator(FLAGS_is_coordinator);
-  be_desc->__set_is_executor(FLAGS_is_executor);
+  *be_desc->mutable_backend_id() = exec_env_->backend_id();
+  *be_desc->mutable_address() = FromTNetworkAddress(exec_env_->GetThriftBackendAddress());
+  be_desc->set_ip_address(exec_env_->ip_address());
+  be_desc->set_is_coordinator(FLAGS_is_coordinator);
+  be_desc->set_is_executor(FLAGS_is_executor);
 
   Webserver* webserver = ExecEnv::GetInstance()->webserver();
   if (webserver != nullptr) {
-    be_desc->__set_debug_http_address(
-        MakeNetworkAddress(webserver->hostname(), webserver->port()));
-    be_desc->__set_secure_webserver(webserver->IsSecure());
+    *be_desc->mutable_debug_http_address() =
+        MakeNetworkAddressPB(webserver->hostname(), webserver->port());
+    be_desc->set_secure_webserver(webserver->IsSecure());
   }
 
   const TNetworkAddress& krpc_address = exec_env_->krpc_address();
   DCHECK(IsResolvedAddress(krpc_address));
-  be_desc->__set_krpc_address(krpc_address);
+  *be_desc->mutable_krpc_address() = FromTNetworkAddress(krpc_address);
 
-  be_desc->__set_admit_mem_limit(exec_env_->admit_mem_limit());
-  be_desc->__set_admission_slots(exec_env_->admission_slots());
-  be_desc->__set_is_quiescing(is_quiescing);
-  be_desc->executor_groups = GetExecutorGroups(FLAGS_executor_groups);
+  be_desc->set_admit_mem_limit(exec_env_->admit_mem_limit());
+  be_desc->set_admission_slots(exec_env_->admission_slots());
+  be_desc->set_is_quiescing(is_quiescing);
+  SetExecutorGroups(FLAGS_executor_groups, be_desc);
 }
 
 ImpalaServer::QueryStateRecord::QueryStateRecord(
@@ -2289,14 +2287,14 @@ void ImpalaServer::UnregisterSessionTimeout(int32_t session_timeout) {
         [&](const std::shared_ptr<ClientRequestState>& request_state) {
           Coordinator* coord = request_state->GetCoordinator();
           if (coord != nullptr) {
-            TNetworkAddress address;
+            NetworkAddressPB address;
             int64_t lag_time_ms = coord->GetMaxBackendStateLagMs(&address);
             if (lag_time_ms > max_lag_ms) {
               to_cancel.push_back(
                   CancellationWork::TerminatedByServer(request_state->query_id(),
                       Status(TErrorCode::UNRESPONSIVE_BACKEND,
                           PrintId(request_state->query_id()),
-                          TNetworkAddressToString(address), lag_time_ms, max_lag_ms),
+                          NetworkAddressPBToString(address), lag_time_ms, max_lag_ms),
                       false /* unregister */));
             }
           }

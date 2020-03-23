@@ -195,10 +195,10 @@ void SendClusterMembershipToFrontend(
   }
   if (group) {
     for (const auto& backend : group->GetAllExecutorDescriptors()) {
-      if (backend.is_executor) {
+      if (backend.is_executor()) {
         if (is_default_group) {
-          update_req.hostnames.insert(backend.address.hostname);
-          update_req.ip_addresses.insert(backend.ip_address);
+          update_req.hostnames.insert(backend.address().hostname());
+          update_req.ip_addresses.insert(backend.ip_address());
         }
         update_req.num_executors++;
       }
@@ -253,7 +253,7 @@ ExecEnv::ExecEnv(int backend_port, int krpc_port,
     rpc_metrics_(metrics_->GetOrCreateChildGroup("rpc")),
     enable_webserver_(FLAGS_enable_webserver && webserver_port > 0),
     configured_backend_address_(MakeNetworkAddress(FLAGS_hostname, backend_port)) {
-  UUIDToTUniqueId(boost::uuids::random_generator()(), &backend_id_);
+  UUIDToUniqueIdPB(boost::uuids::random_generator()(), &backend_id_);
 
   // Resolve hostname to IP address.
   ABORT_IF_ERROR(HostnameToIpAddr(FLAGS_hostname, &ip_address_));
@@ -551,9 +551,9 @@ void ExecEnv::SetImpalaServer(ImpalaServer* server) {
   });
   cluster_membership_mgr_->RegisterUpdateCallbackFn(
       [server](ClusterMembershipMgr::SnapshotPtr snapshot) {
-        std::unordered_set<TBackendId> current_backend_set;
+        std::unordered_set<BackendIdPB> current_backend_set;
         for (const auto& it : snapshot->current_backends) {
-          current_backend_set.insert(it.second.backend_id);
+          current_backend_set.insert(it.second.backend_id());
         }
         server->CancelQueriesOnFailedBackends(current_backend_set);
       });

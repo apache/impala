@@ -26,6 +26,11 @@ class time_zone;
 
 namespace impala {
 
+class UniqueIdPB;
+
+// Used to uniquely identify individual impalads.
+typedef UniqueIdPB BackendIdPB;
+
 typedef cctz::time_zone Timezone;
 
 // There is also a "proper" Timezone for UTC, but using nullptr makes some

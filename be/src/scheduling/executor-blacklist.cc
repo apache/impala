@@ -37,10 +37,10 @@ bool ExecutorBlacklist::BlacklistingEnabled() {
 }
 
 void ExecutorBlacklist::Blacklist(
-    const TBackendDescriptor& be_desc, const Status& cause) {
+    const BackendDescriptorPB& be_desc, const Status& cause) {
   DCHECK(BlacklistingEnabled());
-  DCHECK(!be_desc.ip_address.empty());
-  vector<Entry>& be_descs = executor_list_[be_desc.ip_address];
+  DCHECK(!be_desc.ip_address().empty());
+  vector<Entry>& be_descs = executor_list_[be_desc.ip_address()];
   auto it = find_if(be_descs.begin(), be_descs.end(),
       std::bind(eqBePort, be_desc, std::placeholders::_1));
   if (it != be_descs.end()) {
@@ -68,13 +68,13 @@ void ExecutorBlacklist::Blacklist(
     // This executor was not already on the list, create a new Entry for it.
     be_descs.emplace_back(be_desc, MonotonicMillis(), cause);
   }
-  VLOG(2) << "Blacklisted " << TNetworkAddressToString(be_desc.address)
-          << ", current blacklist: " << DebugString();
+  VLOG(2) << "Blacklisted " << be_desc.address() << ", current blacklist: "
+          << DebugString();
 }
 
 ExecutorBlacklist::State ExecutorBlacklist::FindAndRemove(
-    const TBackendDescriptor& be_desc) {
-  auto be_descs_it = executor_list_.find(be_desc.ip_address);
+    const BackendDescriptorPB& be_desc) {
+  auto be_descs_it = executor_list_.find(be_desc.ip_address());
   if (be_descs_it == executor_list_.end()) {
     // Executor wasn't on the blacklist.
     return NOT_BLACKLISTED;
@@ -111,7 +111,7 @@ bool ExecutorBlacklist::NeedsMaintenance() const {
   return false;
 }
 
-void ExecutorBlacklist::Maintenance(std::list<TBackendDescriptor>* probation_list) {
+void ExecutorBlacklist::Maintenance(std::list<BackendDescriptorPB>* probation_list) {
   int64_t blacklist_timeout = GetBlacklistTimeoutMs();
   int64_t probation_timeout = blacklist_timeout * PROBATION_TIMEOUT_MULTIPLIER;
   int64_t now = MonotonicMillis();
@@ -123,7 +123,7 @@ void ExecutorBlacklist::Maintenance(std::list<TBackendDescriptor>* probation_lis
       if (entry_it->state == State::BLACKLISTED) {
         // Check if we can take it off the blacklist and put it on probation.
         if (elapsed > blacklist_timeout * entry_it->num_consecutive_blacklistings) {
-          LOG(INFO) << "Executor " << TNetworkAddressToString(entry_it->be_desc.address)
+          LOG(INFO) << "Executor " << entry_it->be_desc.address()
                     << " passed the timeout and will be taken off the blacklist.";
           probation_list->push_back(entry_it->be_desc);
           entry_it->state = State::ON_PROBATION;
@@ -148,11 +148,11 @@ void ExecutorBlacklist::Maintenance(std::list<TBackendDescriptor>* probation_lis
 }
 
 bool ExecutorBlacklist::IsBlacklisted(
-    const TBackendDescriptor& be_desc, Status* cause, int64_t* time_remaining_ms) const {
+    const BackendDescriptorPB& be_desc, Status* cause, int64_t* time_remaining_ms) const {
   for (auto executor_it : executor_list_) {
-    if (executor_it.first == be_desc.ip_address) {
+    if (executor_it.first == be_desc.ip_address()) {
       for (auto entry_it : executor_it.second) {
-        if (entry_it.be_desc.address.port == be_desc.address.port
+        if (entry_it.be_desc.address().port() == be_desc.address().port()
             && entry_it.state == State::BLACKLISTED) {
           if (cause != nullptr) *cause = entry_it.cause;
           int64_t elapsed_ms = MonotonicMillis() - entry_it.blacklist_time_ms;
@@ -172,7 +172,7 @@ std::string ExecutorBlacklist::BlacklistToString() const {
   for (auto executor_it : executor_list_) {
     for (auto entry_it : executor_it.second) {
       if (entry_it.state == State::BLACKLISTED) {
-        ss << TNetworkAddressToString(entry_it.be_desc.address) << " ";
+        ss << entry_it.be_desc.address() << " ";
       }
     }
   }
@@ -184,7 +184,7 @@ std::string ExecutorBlacklist::DebugString() const {
   ss << "ExecutorBlacklist[";
   for (auto executor_it : executor_list_) {
     for (auto entry_it : executor_it.second) {
-      ss << TNetworkAddressToString(entry_it.be_desc.address) << " ("
+      ss << entry_it.be_desc.address() << " ("
          << (entry_it.state == BLACKLISTED ? "blacklisted" : "on probation") << ") ";
     }
   }
@@ -201,10 +201,10 @@ int64_t ExecutorBlacklist::GetBlacklistTimeoutMs() const {
 }
 
 bool ExecutorBlacklist::eqBePort(
-    const TBackendDescriptor& be_desc, const Entry& existing) {
+    const BackendDescriptorPB& be_desc, const Entry& existing) {
   // The IP addresses must already match, so it is sufficient to check the port.
-  DCHECK_EQ(existing.be_desc.ip_address, be_desc.ip_address);
-  return existing.be_desc.address.port == be_desc.address.port;
+  DCHECK_EQ(existing.be_desc.ip_address(), be_desc.ip_address());
+  return existing.be_desc.address().port() == be_desc.address().port();
 }
 
 } // namespace impala

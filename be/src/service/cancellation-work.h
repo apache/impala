@@ -50,8 +50,8 @@ class CancellationWork {
   }
 
   // Construct a BACKEND_FAILURE CancellationWork instance.
-  static CancellationWork BackendFailure(const TUniqueId& query_id,
-      const std::vector<TNetworkAddress>& failed_backends) {
+  static CancellationWork BackendFailure(
+      const TUniqueId& query_id, const std::vector<NetworkAddressPB>& failed_backends) {
     return CancellationWork(query_id, CancellationWorkCause::BACKEND_FAILED, Status::OK(),
         failed_backends, false);
   }
@@ -62,7 +62,7 @@ class CancellationWork {
     DCHECK_ENUM_EQ(cause_, CancellationWorkCause::TERMINATED_BY_SERVER);
     return error_;
   }
-  const std::vector<TNetworkAddress>& failed_backends() const {
+  const std::vector<NetworkAddressPB>& failed_backends() const {
     DCHECK_ENUM_EQ(cause_, CancellationWorkCause::BACKEND_FAILED);
     return failed_backends_;
   }
@@ -70,7 +70,7 @@ class CancellationWork {
 
  private:
   CancellationWork(const TUniqueId& query_id, CancellationWorkCause cause,
-      const Status& error, const std::vector<TNetworkAddress>& failed_backends,
+      const Status& error, const std::vector<NetworkAddressPB>& failed_backends,
       bool unregister)
     : query_id_(query_id),
       cause_(cause),
@@ -93,7 +93,7 @@ class CancellationWork {
 
   // If cause is BACKEND_FAILED, all of the backend that were detected to fail. Otherwise
   // not used.
-  std::vector<TNetworkAddress> failed_backends_;
+  std::vector<NetworkAddressPB> failed_backends_;
 
   // If true, unregister the query after cancelling it.
   bool unregister_;

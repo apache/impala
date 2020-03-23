@@ -20,12 +20,10 @@
 #include <unordered_map>
 #include <vector>
 
-#include "gen-cpp/StatestoreService_types.h"
+#include "gen-cpp/statestore_service.pb.h"
 #include "util/network-util.h"
 
 namespace impala {
-
-class TBackendDescriptor;
 
 /// Class to maintain a local blacklist of executors.
 ///
@@ -66,13 +64,13 @@ class ExecutorBlacklist {
   /// was on probation, updates its entry in 'executor_list_' accordingly. Should only be
   /// called if BlacklistingEnabled() is true. 'cause' is an error status indicating why
   /// the executor is being blacklisted.
-  void Blacklist(const TBackendDescriptor& be_desc, const Status& cause);
+  void Blacklist(const BackendDescriptorPB& be_desc, const Status& cause);
 
   /// Removes an executor from the blacklist or probation, if it is in 'executor_list_'.
   /// Does not put blacklisted executors on probation. Returns the executor's state prior
   /// to this call. Will return 'BLACKLISTED' for an executor that has passed the
   /// blacklist timeout if Maintenance() wasn't called since the timeout.
-  State FindAndRemove(const TBackendDescriptor& be_desc);
+  State FindAndRemove(const BackendDescriptorPB& be_desc);
 
   /// Returns true if there are executors that have passed the blacklist timeout and can
   /// be removed from the blacklist. Note that this does not consider executors that can
@@ -86,12 +84,12 @@ class ExecutorBlacklist {
   /// probation, and its descriptor will be returned in 'probation_list'. If an executor
   /// has been on probation for longer than the probation timeout, it will be taken off
   /// probation.
-  void Maintenance(std::list<TBackendDescriptor>* probation_list);
+  void Maintenance(std::list<BackendDescriptorPB>* probation_list);
 
   /// If 'be_desc' is blacklisted, sets 'cause' to the error Status that caused this
   /// executor to be blacklisted, sets 'time_remaining_ms' to the amount of time the
   /// executor has left on the blacklist, and returns true.
-  bool IsBlacklisted(const TBackendDescriptor& be_desc, Status* cause = nullptr,
+  bool IsBlacklisted(const BackendDescriptorPB& be_desc, Status* cause = nullptr,
       int64_t* time_remaining_ms = nullptr) const;
 
   /// Returns a space-separated string of the addresses of executors that are currently
@@ -104,15 +102,15 @@ class ExecutorBlacklist {
  private:
   /// Info about an executor that is either blacklisted or on probabtion.
   struct Entry {
-    Entry(
-        const TBackendDescriptor& be_desc, int64_t blacklist_time_ms, const Status& cause)
+    Entry(const BackendDescriptorPB& be_desc, int64_t blacklist_time_ms,
+        const Status& cause)
       : be_desc(be_desc),
         blacklist_time_ms(blacklist_time_ms),
         state(State::BLACKLISTED),
         num_consecutive_blacklistings(1),
         cause(cause) {}
 
-    TBackendDescriptor be_desc;
+    BackendDescriptorPB be_desc;
 
     /// The UnixMillis() of the last time this executor was blacklisted.
     int64_t blacklist_time_ms;
@@ -136,7 +134,7 @@ class ExecutorBlacklist {
   /// Predicate that returns true if the port number in 'be_desc' matches that in
   /// 'existing.be_desc'. Assumes that they have the same 'ip_address'. Used to do find()
   /// on the values of 'executor_list_'.
-  static bool eqBePort(const TBackendDescriptor& be_desc, const Entry& exiting);
+  static bool eqBePort(const BackendDescriptorPB& be_desc, const Entry& exiting);
 
   /// Map from node ip address to a list of executors for that node that have been
   /// blacklisted. Note that in normal operation there will be a single impalad per node

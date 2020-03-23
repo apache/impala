@@ -496,10 +496,9 @@ Status Coordinator::StartBackendExec() {
       // If Exec() rpc failed for a reason besides being aborted, blacklist the executor.
       if (!backend_state->exec_rpc_status().ok()
           && !backend_state->exec_rpc_status().IsAborted()) {
-        LOG(INFO) << "Blacklisting "
-                  << TNetworkAddressToString(backend_state->impalad_address())
+        LOG(INFO) << "Blacklisting " << backend_state->impalad_address()
                   << " because an Exec() rpc to it failed.";
-        const TBackendDescriptor& be_desc = backend_state->exec_params()->be_desc;
+        const BackendDescriptorPB& be_desc = backend_state->exec_params()->be_desc;
         ExecEnv::GetInstance()->cluster_membership_mgr()->BlacklistExecutor(be_desc,
             FromKuduStatus(backend_state->exec_rpc_status(), "Exec() rpc failed"));
       }
@@ -535,13 +534,13 @@ Status Coordinator::FinishBackendStartup() {
     Status backend_status = backend_state->GetStatus();
     if (!backend_status.ok() && status.ok()) {
       status = backend_status;
-      error_hostname = backend_state->impalad_address().hostname;
+      error_hostname = backend_state->impalad_address().hostname();
     }
     if (backend_state->rpc_latency() > max_latency) {
       // Find the backend that takes the most time to acknowledge to
       // the ExecQueryFInstances() RPC.
       max_latency = backend_state->rpc_latency();
-      max_latency_host = TNetworkAddressToString(backend_state->impalad_address());
+      max_latency_host = NetworkAddressPBToString(backend_state->impalad_address());
     }
     latencies.Update(backend_state->rpc_latency());
     // Mark backend complete if no fragment instances were assigned to it.
@@ -904,7 +903,7 @@ Status Coordinator::UpdateBackendExecStatus(const ReportExecStatusRequestPB& req
       int pending_backends = backend_exec_complete_barrier_->pending();
       if (pending_backends >= 1) {
         VLOG_QUERY << "Backend completed:"
-                   << " host=" << TNetworkAddressToString(backend_state->impalad_address())
+                   << " host=" << backend_state->impalad_address()
                    << " remaining=" << pending_backends
                    << " query_id=" << PrintId(query_id());
         BackendState::LogFirstInProgress(backend_states_);
@@ -923,9 +922,9 @@ Status Coordinator::UpdateBackendExecStatus(const ReportExecStatusRequestPB& req
       // Transition the status if we're not already in a terminal state. This won't block
       // because either this transitions to an ERROR state or the query is already in
       // a terminal state.
-      discard_result(UpdateExecState(status,
-              is_fragment_failure ? &failed_instance_id : nullptr,
-              TNetworkAddressToString(backend_state->impalad_address())));
+      discard_result(
+          UpdateExecState(status, is_fragment_failure ? &failed_instance_id : nullptr,
+              NetworkAddressPBToString(backend_state->impalad_address())));
     }
     // We've applied all changes from the final status report - notify waiting threads.
     discard_result(backend_exec_complete_barrier_->Notify());
@@ -966,8 +965,7 @@ void Coordinator::UpdateBlacklistWithAuxErrorInfo(
       DCHECK(rpc_error_info.has_posix_error_code());
       const NetworkAddressPB& dest_node = rpc_error_info.dest_node();
 
-      auto dest_node_and_be_state =
-          addr_to_backend_state_.find(FromNetworkAddressPB(dest_node));
+      auto dest_node_and_be_state = addr_to_backend_state_.find(dest_node);
 
       // If the target address of the RPC is not known to the Coordinator, it cannot
       // be blacklisted.
@@ -1008,7 +1006,7 @@ void Coordinator::UpdateBlacklistWithAuxErrorInfo(
   }
 }
 
-int64_t Coordinator::GetMaxBackendStateLagMs(TNetworkAddress* address) {
+int64_t Coordinator::GetMaxBackendStateLagMs(NetworkAddressPB* address) {
   DCHECK(exec_rpcs_complete_.Load()) << "Exec() must be called first.";
   DCHECK_GT(backend_states_.size(), 0);
   int64_t current_time = BackendState::GenerateReportTimestamp();
@@ -1053,8 +1051,7 @@ void Coordinator::ComputeQuerySummary() {
   for (BackendState* backend_state: backend_states_) {
     ResourceUtilization utilization = backend_state->ComputeResourceUtilization();
     total_utilization.Merge(utilization);
-    string network_address = TNetworkAddressToString(
-        backend_state->impalad_address());
+    string network_address = NetworkAddressPBToString(backend_state->impalad_address());
     mem_info << network_address << "("
              << PrettyPrinter::Print(utilization.peak_per_host_mem_consumption,
                  TUnit::BYTES) << ") ";
@@ -1161,7 +1158,7 @@ void Coordinator::ReleaseBackendAdmissionControlResources(
   DCHECK(admission_controller != nullptr);
   vector<TNetworkAddress> host_addrs;
   for (auto backend_state : backend_states) {
-    host_addrs.push_back(backend_state->impalad_address());
+    host_addrs.push_back(FromNetworkAddressPB(backend_state->impalad_address()));
   }
   admission_controller->ReleaseQueryBackends(schedule_, host_addrs);
 }
@@ -1175,11 +1172,12 @@ Coordinator::ResourceUtilization Coordinator::ComputeQueryResourceUtilization() 
   return query_resource_utilization;
 }
 
-vector<TNetworkAddress> Coordinator::GetActiveBackends(
-    const vector<TNetworkAddress>& candidates) {
+vector<NetworkAddressPB> Coordinator::GetActiveBackends(
+    const vector<NetworkAddressPB>& candidates) {
   // Build set from vector so that runtime of this function is O(backend_states.size()).
-  std::unordered_set<TNetworkAddress> candidate_set(candidates.begin(), candidates.end());
-  vector<TNetworkAddress> result;
+  std::unordered_set<NetworkAddressPB> candidate_set(
+      candidates.begin(), candidates.end());
+  vector<NetworkAddressPB> result;
   lock_guard<SpinLock> l(backend_states_init_lock_);
   for (BackendState* backend_state : backend_states_) {
     if (candidate_set.find(backend_state->impalad_address()) != candidate_set.end()

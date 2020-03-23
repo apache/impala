@@ -154,7 +154,7 @@ class Coordinator { // NOLINT: The member variables could be re-ordered to save 
   /// for that backend. Only valid to call if Exec() has returned successfully. May return
   /// 0, for example if all of the backends have already completed, in which case
   /// 'address' will not be set.
-  int64_t GetMaxBackendStateLagMs(TNetworkAddress* address);
+  int64_t GetMaxBackendStateLagMs(NetworkAddressPB* address);
 
   /// Get cumulative profile aggregated over all fragments of the query.
   /// This is a snapshot of the current state of execution and will change in
@@ -232,8 +232,8 @@ class Coordinator { // NOLINT: The member variables could be re-ordered to save 
 
   /// Return the backends in 'candidates' that still have at least one fragment instance
   /// executing on them. The returned backends may not be in the same order as the input.
-  std::vector<TNetworkAddress> GetActiveBackends(
-      const std::vector<TNetworkAddress>& candidates);
+  std::vector<NetworkAddressPB> GetActiveBackends(
+      const std::vector<NetworkAddressPB>& candidates);
 
  private:
   class BackendState;
@@ -257,12 +257,12 @@ class Coordinator { // NOLINT: The member variables could be re-ordered to save 
   /// are non-nullptr and owned by obj_pool(). Populated by Exec()/InitBackendStates().
   std::vector<BackendState*> backend_states_;
 
-  /// A map from the TNetworkAddress of a backend to the BackendState running on the
-  /// TNetworkAddress. All values are non-nullptr and owned by obj_pool(). The address
+  /// A map from the NetworkAddressPB of a backend to the BackendState running on the
+  /// NetworkAddressPB. All values are non-nullptr and owned by obj_pool(). The address
   /// is the kRPC address (Coordinator::BackendState::krpc_impalad_address) of the
   /// Backend. This map is distinct from QuerySchedule::per_backend_exec_params(),
   /// which uses the Thrift address as the key rather than the kRPC address.
-  boost::unordered_map<TNetworkAddress, BackendState*> addr_to_backend_state_;
+  boost::unordered_map<NetworkAddressPB, BackendState*> addr_to_backend_state_;
 
   /// Protects the population of backend_states_ vector (not the BackendState objects).
   /// Used when accessing backend_states_ if it's not guaranteed that

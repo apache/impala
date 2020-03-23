@@ -72,14 +72,14 @@ class ClusterMembershipMgrTest : public testing::Test {
     string backend_id;
     std::unique_ptr<MetricGroup> metric_group;
     std::unique_ptr<ClusterMembershipMgr> cmm;
-    std::shared_ptr<TBackendDescriptor> desc;
+    std::shared_ptr<BackendDescriptorPB> desc;
   };
   /// The list of backends_ that owns all backends.
   vector<unique_ptr<Backend>> backends_;
 
   /// Various lists of pointers that point into elements of 'backends_'. These pointers
   /// will stay valid when backend_ resizes. Backends can be in one of 5 states:
-  /// - "Offline": A TBackendDescriptor has been created but has not been associated with
+  /// - "Offline": A BackendDescriptorPB has been created but has not been associated with
   ///     a ClusterMembershipMgr.
   /// - "Starting": A ClusterMembershipMgr has been created, but the associated backend
   ///     descriptor is not running yet (no callback registered with the
@@ -166,8 +166,8 @@ class ClusterMembershipMgrTest : public testing::Test {
     if (idx == -1) idx = backends_.size();
     backends_.push_back(make_unique<Backend>());
     auto& be = backends_.back();
-    be->desc = make_shared<TBackendDescriptor>(MakeBackendDescriptor(idx));
-    be->backend_id = be->desc->address.hostname;
+    be->desc = make_shared<BackendDescriptorPB>(MakeBackendDescriptor(idx));
+    be->backend_id = be->desc->address().hostname();
     offline_.push_back(be.get());
     return be.get();
   }
@@ -213,7 +213,7 @@ class ClusterMembershipMgrTest : public testing::Test {
   /// moves the backend from 'running_' to 'quiescing_'.
   void QuiesceBackend(Backend* be) {
     ASSERT_TRUE(IsInVector(be, running_));
-    be->desc->__set_is_quiescing(true);
+    be->desc->set_is_quiescing(true);
     TopicDeltas topic_deltas = Poll(be);
     ASSERT_EQ(1, topic_deltas.size());
     ASSERT_EQ(1, topic_deltas[0].topic_entries.size());
@@ -269,13 +269,13 @@ class ClusterMembershipMgrTest : public testing::Test {
 /// It also serves as an example for how to craft statestore messages and pass them to
 /// UpdaUpdateMembership().
 TEST_F(ClusterMembershipMgrTest, TwoInstances) {
-  auto b1 = make_shared<TBackendDescriptor>(MakeBackendDescriptor(1));
-  auto b2 = make_shared<TBackendDescriptor>(MakeBackendDescriptor(2));
+  auto b1 = make_shared<BackendDescriptorPB>(MakeBackendDescriptor(1));
+  auto b2 = make_shared<BackendDescriptorPB>(MakeBackendDescriptor(2));
 
   MetricGroup tmp_metrics1("test-metrics1");
   MetricGroup tmp_metrics2("test-metrics2");
-  ClusterMembershipMgr cmm1(b1->address.hostname, nullptr, &tmp_metrics1);
-  ClusterMembershipMgr cmm2(b2->address.hostname, nullptr, &tmp_metrics2);
+  ClusterMembershipMgr cmm1(b1->address().hostname(), nullptr, &tmp_metrics1);
+  ClusterMembershipMgr cmm2(b2->address().hostname(), nullptr, &tmp_metrics2);
 
   const Statestore::TopicId topic_id = Statestore::IMPALA_MEMBERSHIP_TOPIC;
   StatestoreSubscriber::TopicDeltaMap topic_delta_map = {{topic_id, TTopicDelta()}};
@@ -317,12 +317,12 @@ TEST_F(ClusterMembershipMgrTest, TwoInstances) {
 
   // Both managers now have the same state. Shutdown one of them and step through
   // propagating the update.
-  b1->is_quiescing = true;
+  b1->set_is_quiescing(true);
   // Send an empty update to the 1st one to trigger propagation of the shutdown
   returned_topic_deltas.clear();
   topic_delta_map[topic_id] = empty_delta;
   cmm1.UpdateMembership(topic_delta_map, &returned_topic_deltas);
-  // The mgr will return its changed TBackendDescriptor
+  // The mgr will return its changed BackendDescriptorPB
   ASSERT_EQ(1, returned_topic_deltas.size());
   // It will also remove itself from the executor group (but not the current backends).
   ASSERT_EQ(1, GetDefaultGroupSize(cmm1));

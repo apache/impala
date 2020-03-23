@@ -534,7 +534,7 @@ bool AdmissionController::HasAvailableMemResources(const QuerySchedule& schedule
   for (const auto& entry : schedule.per_backend_exec_params()) {
     const TNetworkAddress& host = entry.first;
     const string host_id = TNetworkAddressToString(host);
-    int64_t admit_mem_limit = entry.second.be_desc.admit_mem_limit;
+    int64_t admit_mem_limit = entry.second.be_desc.admit_mem_limit();
     const HostStats& host_stats = host_stats_[host_id];
     int64_t mem_reserved = host_stats.mem_reserved;
     int64_t mem_admitted = host_stats.mem_admitted;
@@ -569,7 +569,7 @@ bool AdmissionController::HasAvailableSlots(const QuerySchedule& schedule,
   for (const auto& entry : schedule.per_backend_exec_params()) {
     const TNetworkAddress& host = entry.first;
     const string host_id = TNetworkAddressToString(host);
-    int64_t admission_slots = entry.second.be_desc.admission_slots;
+    int64_t admission_slots = entry.second.be_desc.admission_slots();
     int64_t slots_in_use = host_stats_[host_id].slots_in_use;
     VLOG_ROW << "Checking available slot on host=" << host_id
              << " slots_in_use=" << slots_in_use
@@ -694,9 +694,9 @@ bool AdmissionController::RejectForSchedule(const QuerySchedule& schedule,
   for (const auto& e : schedule.per_backend_exec_params()) {
     const BackendExecParams& bp = e.second;
     // TODO(IMPALA-8757): Extend slot based admission to default executor group
-    if (!default_group && bp.slots_to_use > bp.be_desc.admission_slots) {
+    if (!default_group && bp.slots_to_use > bp.be_desc.admission_slots()) {
       *rejection_reason = Substitute(REASON_NOT_ENOUGH_SLOTS_ON_BACKEND, bp.slots_to_use,
-          TNetworkAddressToString(bp.be_desc.address), bp.be_desc.admission_slots);
+          NetworkAddressPBToString(bp.be_desc.address()), bp.be_desc.admission_slots());
       return true;
     }
 
@@ -710,10 +710,10 @@ bool AdmissionController::RejectForSchedule(const QuerySchedule& schedule,
     }
     if (bp.is_coord_backend) {
       coord_admit_mem_limit.first = &e.first;
-      coord_admit_mem_limit.second = bp.be_desc.admit_mem_limit;
-    } else if (bp.be_desc.admit_mem_limit < min_executor_admit_mem_limit.second) {
+      coord_admit_mem_limit.second = bp.be_desc.admit_mem_limit();
+    } else if (bp.be_desc.admit_mem_limit() < min_executor_admit_mem_limit.second) {
       min_executor_admit_mem_limit.first = &e.first;
-      min_executor_admit_mem_limit.second = bp.be_desc.admit_mem_limit;
+      min_executor_admit_mem_limit.second = bp.be_desc.admit_mem_limit();
     }
   }
 
@@ -1219,7 +1219,7 @@ Status AdmissionController::ComputeGroupSchedules(
     LOG(WARNING) << queue_node->not_admitted_reason;
     return Status::OK();
   }
-  const TBackendDescriptor& local_be_desc = *membership_snapshot->local_be_desc;
+  const BackendDescriptorPB& local_be_desc = *membership_snapshot->local_be_desc;
 
   vector<const ExecutorGroup*> executor_groups;
   GetExecutorGroupsForPool(
@@ -1981,8 +1981,8 @@ void AdmissionController::UpdateExecGroupMetricMap(
     auto new_grp_it = snapshot->executor_groups.find(new_grp);
     DCHECK(new_grp_it != snapshot->executor_groups.end());
     ExecutorGroup group = new_grp_it->second;
-    for (const TBackendDescriptor& be_desc : group.GetAllExecutorDescriptors()) {
-      const string& host = TNetworkAddressToString(be_desc.address);
+    for (const BackendDescriptorPB& be_desc : group.GetAllExecutorDescriptors()) {
+      const string& host = NetworkAddressPBToString(be_desc.address());
       auto stats = host_stats_.find(host);
       if (stats != host_stats_.end()) {
         currently_running = std::max(currently_running, stats->second.num_admitted);

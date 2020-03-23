@@ -275,7 +275,7 @@ bool QuerySchedule::UseDedicatedCoordEstimates() const {
   for (auto& itr : per_backend_exec_params_) {
     if (!itr.second.is_coord_backend) continue;
     auto& coord = itr.second;
-    bool is_dedicated_coord = !coord.be_desc.is_executor;
+    bool is_dedicated_coord = !coord.be_desc.is_executor();
     bool only_coord_fragment_scheduled =
         RequiresCoordinatorFragment() && coord.instance_params.size() == 1;
     bool no_fragment_scheduled = coord.instance_params.size() == 0;

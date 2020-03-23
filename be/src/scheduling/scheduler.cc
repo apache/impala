@@ -17,26 +17,28 @@
 
 #include "scheduling/scheduler.h"
 
+#include <stdlib.h>
 #include <algorithm>
+#include <limits>
 #include <random>
 #include <unordered_map>
 #include <vector>
-#include <boost/algorithm/string.hpp>
 #include <boost/algorithm/string/join.hpp>
-#include <boost/bind.hpp>
-#include <boost/mem_fn.hpp>
 #include <boost/unordered_set.hpp>
 #include <gutil/strings/substitute.h>
 
 #include "common/logging.h"
-#include "flatbuffers/flatbuffers.h"
-#include "gen-cpp/ImpalaInternalService_constants.h"
+#include "gen-cpp/CatalogObjects_generated.h"
+#include "gen-cpp/DataSinks_types.h"
+#include "gen-cpp/ErrorCodes_types.h"
+#include "gen-cpp/ImpalaInternalService_types.h"
 #include "gen-cpp/Types_types.h"
-#include "runtime/exec-env.h"
+#include "gen-cpp/common.pb.h"
+#include "gen-cpp/statestore_service.pb.h"
+#include "scheduling/executor-group.h"
 #include "scheduling/hash-ring.h"
-#include "statestore/statestore-subscriber.h"
 #include "thirdparty/pcg-cpp-0.98/include/pcg_random.hpp"
-#include "util/container-util.h"
+#include "util/debug-util.h"
 #include "util/flat_buffer.h"
 #include "util/hash-util.h"
 #include "util/metrics.h"
@@ -84,14 +86,15 @@ Scheduler::Scheduler(MetricGroup* metrics, RequestPoolService* request_pool_serv
   }
 }
 
-const TBackendDescriptor& Scheduler::LookUpBackendDesc(
+const BackendDescriptorPB& Scheduler::LookUpBackendDesc(
     const ExecutorConfig& executor_config, const TNetworkAddress& host) {
-  const TBackendDescriptor* desc = executor_config.group.LookUpBackendDesc(host);
+  const BackendDescriptorPB* desc =
+      executor_config.group.LookUpBackendDesc(FromTNetworkAddress(host));
   if (desc == nullptr) {
     // Local host may not be in executor_config's executor group if it's a dedicated
     // coordinator, or if it is configured to be in a different executor group.
-    const TBackendDescriptor& local_be_desc = executor_config.local_be_desc;
-    DCHECK(host == local_be_desc.address);
+    const BackendDescriptorPB& local_be_desc = executor_config.local_be_desc;
+    DCHECK(host == FromNetworkAddressPB(local_be_desc.address()));
     desc = &local_be_desc;
   }
   return *desc;
@@ -99,10 +102,10 @@ const TBackendDescriptor& Scheduler::LookUpBackendDesc(
 
 TNetworkAddress Scheduler::LookUpKrpcHost(
     const ExecutorConfig& executor_config, const TNetworkAddress& backend_host) {
-  const TBackendDescriptor& backend_descriptor =
+  const BackendDescriptorPB& backend_descriptor =
       LookUpBackendDesc(executor_config, backend_host);
-  DCHECK(backend_descriptor.__isset.krpc_address);
-  TNetworkAddress krpc_host = backend_descriptor.krpc_address;
+  DCHECK(backend_descriptor.has_krpc_address());
+  TNetworkAddress krpc_host = FromNetworkAddressPB(backend_descriptor.krpc_address());
   DCHECK(IsResolvedAddress(krpc_host));
   return krpc_host;
 }
@@ -227,10 +230,10 @@ void Scheduler::ComputeFragmentExecParams(
         dest.__set_fragment_instance_id(dest_params->instance_exec_params[i].instance_id);
         const TNetworkAddress& host = dest_params->instance_exec_params[i].host;
         dest.__set_thrift_backend(host);
-        const TBackendDescriptor& desc = LookUpBackendDesc(executor_config, host);
-        DCHECK(desc.__isset.krpc_address);
-        DCHECK(IsResolvedAddress(desc.krpc_address));
-        dest.__set_krpc_backend(desc.krpc_address);
+        const BackendDescriptorPB& desc = LookUpBackendDesc(executor_config, host);
+        DCHECK(desc.has_krpc_address());
+        DCHECK(IsResolvedAddress(desc.krpc_address()));
+        dest.__set_krpc_backend(FromNetworkAddressPB(desc.krpc_address()));
       }
 
       // enumerate senders consecutively;
@@ -273,17 +276,18 @@ void Scheduler::ComputeFragmentExecParams(const ExecutorConfig& executor_config,
     // case 1: root fragment instance executed at coordinator
     VLOG(3) << "Computing exec params for coordinator fragment "
             << fragment_params->fragment.display_name;
-    const TBackendDescriptor& local_be_desc = executor_config.local_be_desc;
-    const TNetworkAddress& coord = local_be_desc.address;
-    DCHECK(local_be_desc.__isset.krpc_address);
-    const TNetworkAddress& krpc_coord = local_be_desc.krpc_address;
+    const BackendDescriptorPB& local_be_desc = executor_config.local_be_desc;
+    const NetworkAddressPB& coord = local_be_desc.address();
+    DCHECK(local_be_desc.has_krpc_address());
+    const NetworkAddressPB& krpc_coord = local_be_desc.krpc_address();
     DCHECK(IsResolvedAddress(krpc_coord));
     // make sure that the coordinator instance ends up with instance idx 0
     TUniqueId instance_id = fragment_params->is_coord_fragment
         ? schedule->query_id()
         : schedule->GetNextInstanceId();
-    fragment_params->instance_exec_params.emplace_back(
-        instance_id, coord, krpc_coord, 0, *fragment_params);
+    fragment_params->instance_exec_params.emplace_back(instance_id,
+        FromNetworkAddressPB(coord), FromNetworkAddressPB(krpc_coord), 0,
+        *fragment_params);
     FInstanceExecParams& instance_params = fragment_params->instance_exec_params.back();
 
     // That instance gets all of the scan ranges, if there are any.
@@ -587,7 +591,7 @@ Status Scheduler::ComputeScanRangeAssignment(const ExecutorConfig& executor_conf
 
   // TODO: Build this one from executor_group
   ExecutorGroup coord_only_executor_group("coordinator-only-group");
-  const TBackendDescriptor& local_be_desc = executor_config.local_be_desc;
+  const BackendDescriptorPB& local_be_desc = executor_config.local_be_desc;
   coord_only_executor_group.AddExecutor(local_be_desc);
   VLOG_QUERY << "Exec at coord is " << (exec_at_coord ? "true" : "false");
   AssignmentCtx assignment_ctx(
@@ -605,7 +609,7 @@ Status Scheduler::ComputeScanRangeAssignment(const ExecutorConfig& executor_conf
     // Select executor for the current scan range.
     if (exec_at_coord) {
       DCHECK(assignment_ctx.executor_group().LookUpExecutorIp(
-          local_be_desc.address.hostname, nullptr));
+          local_be_desc.address().hostname(), nullptr));
       assignment_ctx.RecordScanRangeAssignment(local_be_desc, node_id, host_list,
           scan_range_locations, assignment);
     } else {
@@ -668,7 +672,7 @@ Status Scheduler::ComputeScanRangeAssignment(const ExecutorConfig& executor_conf
       const IpAddr* executor_ip = nullptr;
       executor_ip = assignment_ctx.SelectExecutorFromCandidates(
           executor_candidates, decide_local_assignment_by_rank);
-      TBackendDescriptor executor;
+      BackendDescriptorPB executor;
       assignment_ctx.SelectExecutorOnHost(*executor_ip, &executor);
       assignment_ctx.RecordScanRangeAssignment(
           executor, node_id, host_list, scan_range_locations, assignment);
@@ -699,7 +703,7 @@ Status Scheduler::ComputeScanRangeAssignment(const ExecutorConfig& executor_conf
     } else {
       executor_ip = assignment_ctx.SelectRemoteExecutor();
     }
-    TBackendDescriptor executor;
+    BackendDescriptorPB executor;
     assignment_ctx.SelectExecutorOnHost(*executor_ip, &executor);
     assignment_ctx.RecordScanRangeAssignment(
         executor, node_id, host_list, *scan_range_locations, assignment);
@@ -749,7 +753,7 @@ std::vector<TPlanNodeId> Scheduler::FindScanNodes(const TPlan& plan) {
   return FindNodes(plan, SCAN_NODE_TYPES);
 }
 
-void Scheduler::GetScanHosts(const TBackendDescriptor& local_be_desc,
+void Scheduler::GetScanHosts(const BackendDescriptorPB& local_be_desc,
     const vector<TPlanNodeId>& scan_ids, const FragmentExecParams& params,
     vector<TNetworkAddress>* scan_hosts) {
   for (const TPlanNodeId& scan_id : scan_ids) {
@@ -767,7 +771,7 @@ void Scheduler::GetScanHosts(const TBackendDescriptor& local_be_desc,
       // TODO: we'll need to revisit this strategy once we can partition joins
       // (in which case this fragment might be executing a right outer join
       // with a large build table)
-      scan_hosts->push_back(local_be_desc.address);
+      scan_hosts->push_back(FromNetworkAddressPB(local_be_desc.address()));
     }
   }
 }
@@ -839,15 +843,16 @@ void Scheduler::ComputeBackendExecParams(
 
   // This also ensures an entry always exists for the coordinator backend.
   int64_t coord_min_reservation = 0;
-  const TNetworkAddress& coord_addr = executor_config.local_be_desc.address;
-  BackendExecParams& coord_be_params = per_backend_params[coord_addr];
+  const NetworkAddressPB& coord_addr = executor_config.local_be_desc.address();
+  BackendExecParams& coord_be_params =
+      per_backend_params[FromNetworkAddressPB(coord_addr)];
   coord_be_params.is_coord_backend = true;
   coord_min_reservation = coord_be_params.min_mem_reservation_bytes;
 
   int64_t largest_min_reservation = 0;
   for (auto& backend : per_backend_params) {
     const TNetworkAddress& host = backend.first;
-    const TBackendDescriptor be_desc = LookUpBackendDesc(executor_config, host);
+    const BackendDescriptorPB be_desc = LookUpBackendDesc(executor_config, host);
     backend.second.be_desc = be_desc;
     if (!backend.second.is_coord_backend) {
       largest_min_reservation =
@@ -1015,7 +1020,7 @@ int Scheduler::AssignmentCtx::GetExecutorRank(const IpAddr& ip) const {
 }
 
 void Scheduler::AssignmentCtx::SelectExecutorOnHost(
-    const IpAddr& executor_ip, TBackendDescriptor* executor) {
+    const IpAddr& executor_ip, BackendDescriptorPB* executor) {
   DCHECK(executor_group_.LookUpExecutorIp(executor_ip, nullptr));
   const ExecutorGroup::Executors& executors_on_host =
       executor_group_.GetExecutorsForHost(executor_ip);
@@ -1027,10 +1032,10 @@ void Scheduler::AssignmentCtx::SelectExecutorOnHost(
     next_executor_on_host =
         FindOrInsert(&next_executor_per_host_, executor_ip, executors_on_host.begin());
     auto eq = [next_executor_on_host](auto& elem) {
-      const TBackendDescriptor& next_executor = **next_executor_on_host;
+      const BackendDescriptorPB& next_executor = **next_executor_on_host;
       // The IP addresses must already match, so it is sufficient to check the port.
-      DCHECK_EQ(next_executor.ip_address, elem.ip_address);
-      return next_executor.address.port == elem.address.port;
+      DCHECK_EQ(next_executor.ip_address(), elem.ip_address());
+      return next_executor.address().port() == elem.address().port();
     };
     DCHECK(find_if(executors_on_host.begin(), executors_on_host.end(), eq)
         != executors_on_host.end());
@@ -1044,7 +1049,7 @@ void Scheduler::AssignmentCtx::SelectExecutorOnHost(
 }
 
 void Scheduler::AssignmentCtx::RecordScanRangeAssignment(
-    const TBackendDescriptor& executor, PlanNodeId node_id,
+    const BackendDescriptorPB& executor, PlanNodeId node_id,
     const vector<TNetworkAddress>& host_list,
     const TScanRangeLocationList& scan_range_locations,
     FragmentScanRangeAssignment* assignment) {
@@ -1058,7 +1063,8 @@ void Scheduler::AssignmentCtx::RecordScanRangeAssignment(
   }
 
   IpAddr executor_ip;
-  bool ret = executor_group_.LookUpExecutorIp(executor.address.hostname, &executor_ip);
+  bool ret =
+      executor_group_.LookUpExecutorIp(executor.address().hostname(), &executor_ip);
   DCHECK(ret);
   DCHECK(!executor_ip.empty());
   assignment_heap_.InsertOrUpdate(
@@ -1096,8 +1102,8 @@ void Scheduler::AssignmentCtx::RecordScanRangeAssignment(
     if (!remote_read) total_local_assignments_->Increment(1);
   }
 
-  PerNodeScanRanges* scan_ranges =
-      FindOrInsert(assignment, executor.address, PerNodeScanRanges());
+  PerNodeScanRanges* scan_ranges = FindOrInsert(
+      assignment, FromNetworkAddressPB(executor.address()), PerNodeScanRanges());
   vector<TScanRangeParams>* scan_range_params_list =
       FindOrInsert(scan_ranges, node_id, vector<TScanRangeParams>());
   // Add scan range.
@@ -1109,8 +1115,7 @@ void Scheduler::AssignmentCtx::RecordScanRangeAssignment(
   scan_range_params_list->push_back(scan_range_params);
 
   if (VLOG_FILE_IS_ON) {
-    VLOG_FILE << "Scheduler assignment to executor: "
-              << TNetworkAddressToString(executor.address) << "("
+    VLOG_FILE << "Scheduler assignment to executor: " << executor.address() << "("
               << (remote_read ? "remote" : "local") << " selection)";
   }
 }

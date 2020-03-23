@@ -74,8 +74,8 @@ class Coordinator::BackendState {
   /// The following are initialized in the constructor and always valid to call.
   int state_idx() const { return state_idx_; }
   const BackendExecParams* exec_params() const { return backend_exec_params_; }
-  const TNetworkAddress& impalad_address() const { return host_; }
-  const TNetworkAddress& krpc_impalad_address() const { return krpc_host_; }
+  const NetworkAddressPB& impalad_address() const { return host_; }
+  const NetworkAddressPB& krpc_impalad_address() const { return krpc_host_; }
   /// Returns true if there are no fragment instances scheduled on this backend.
   bool IsEmptyBackend() const { return backend_exec_params_->instance_params.empty(); }
   /// Return true if execution at this backend is done.
@@ -309,9 +309,9 @@ class Coordinator::BackendState {
   RuntimeProfile* host_profile_ = nullptr;
 
   /// Thrift address of execution backend.
-  TNetworkAddress host_;
+  NetworkAddressPB host_;
   /// Krpc address of execution backend.
-  TNetworkAddress krpc_host_;
+  NetworkAddressPB krpc_host_;
 
   /// The query context of the Coordinator that owns this BackendState.
   const TQueryCtx& query_ctx_;
