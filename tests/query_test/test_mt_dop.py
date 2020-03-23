@@ -121,14 +121,13 @@ class TestMtDopParquet(ImpalaTestSuite):
     vector.get_value('exec_option')['parquet_read_statistics'] = '0'
     self.run_test_case('QueryTest/parquet-filtering', vector)
 
-  @pytest.mark.execute_serially
   @SkipIfABFS.file_or_folder_name_ends_with_period
   def test_mt_dop_insert(self, vector, unique_database):
     """Basic tests for inserts with mt_dop > 0"""
     mt_dop = vector.get_value('mt_dop')
     if mt_dop == 0:
       pytest.skip("Non-mt inserts tested elsewhere")
-    self.run_test_case('QueryTest/insert', vector)
+    self.run_test_case('QueryTest/insert', vector, unique_database)
 
   def test_mt_dop_only_joins(self, vector, unique_database):
     """MT_DOP specific tests for joins."""
@@ -173,4 +172,3 @@ class TestMtDopScheduling(ImpalaTestSuite):
   def test_scheduling(self, vector):
     vector.get_value('exec_option')['mt_dop'] = vector.get_value('mt_dop')
     self.run_test_case('QueryTest/mt-dop-parquet-scheduling', vector)
-

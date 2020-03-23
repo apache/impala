@@ -644,9 +644,6 @@ class ImpalaTestSuite(BaseTestSuite):
             '-- QUERY or HIVE_QUERY section.\n%s') %\
             (test_file_name, pprint.pformat(test_section))
 
-      if 'SETUP' in test_section:
-        self.execute_test_case_setup(test_section['SETUP'], table_format_info)
-
       # TODO: support running query tests against different scale factors
       query = QueryTestSectionReader.build_query(
           self.__do_replacements(query_section, use_db=use_db, extra=test_file_vars))
@@ -766,32 +763,6 @@ class ImpalaTestSuite(BaseTestSuite):
           if lineage['queryId'] == query_id:
             return lineage
     return ""
-
-  def execute_test_case_setup(self, setup_section, table_format):
-    """
-    Executes a test case 'SETUP' section
-
-    The test case 'SETUP' section is mainly used for insert tests. These tests need to
-    have some actions performed before each test case to ensure the target tables are
-    empty. The current supported setup actions:
-    RESET <table name> - Drop and recreate the table
-    DROP PARTITIONS <table name> - Drop all partitions from the table
-    """
-    setup_section = QueryTestSectionReader.build_query(setup_section)
-    for row in setup_section.split('\n'):
-      row = row.lstrip()
-      if row.startswith('RESET'):
-        db_name, table_name = QueryTestSectionReader.get_table_name_components(\
-          table_format, row.split('RESET')[1])
-        self.__reset_table(db_name, table_name)
-        self.client.execute("invalidate metadata " + db_name + "." + table_name)
-      elif row.startswith('DROP PARTITIONS'):
-        db_name, table_name = QueryTestSectionReader.get_table_name_components(\
-          table_format, row.split('DROP PARTITIONS')[1])
-        self.__drop_partitions(db_name, table_name)
-        self.client.execute("invalidate metadata " + db_name + "." + table_name)
-      else:
-        assert False, 'Unsupported setup command: %s' % row
 
   @classmethod
   def change_database(cls, impala_client, table_format=None,
@@ -921,24 +892,11 @@ class ImpalaTestSuite(BaseTestSuite):
       assert False, 'Test file not found: %s' % file_name
     return parse_query_test_file(test_file_path, valid_section_names, encoding=encoding)
 
-  def __drop_partitions(self, db_name, table_name):
-    """Drops all partitions in the given table"""
-    for partition in self.hive_client.get_partition_names(db_name, table_name, -1):
-      assert self.hive_client.drop_partition_by_name(db_name, table_name, \
-          partition, True), 'Could not drop partition: %s' % partition
-
   @classmethod
   def __execute_query(cls, impalad_client, query, query_options=None, user=None):
     """Executes the given query against the specified Impalad"""
     if query_options is not None: impalad_client.set_configuration(query_options)
     return impalad_client.execute(query, user=user)
-
-  def __reset_table(self, db_name, table_name):
-    """Resets a table (drops and recreates the table)"""
-    table = self.hive_client.get_table(db_name, table_name)
-    assert table is not None
-    self.hive_client.drop_table(db_name, table_name, True)
-    self.hive_client.create_table(table)
 
   def clone_table(self, src_tbl, dst_tbl, recover_partitions, vector):
     src_loc = self._get_table_location(src_tbl, vector)

@@ -1460,30 +1460,6 @@ LOAD DATA LOCAL INPATH '{impala_home}/testdata/TblWithRaggedColumns/data.csv' OV
 ---- DATASET
 functional
 ---- BASE_TABLE_NAME
-nullinsert
----- CREATE
--- Must not be external
-CREATE TABLE IF NOT EXISTS {db_name}{db_suffix}.{table_name} (
-  str_col1 string,
-  str_col2 string,
-  str_col3 string,
-  str_col4 string,
-  int_cal int
-)
-row format delimited fields terminated by ','  escaped by '\\'
-stored as {file_format}
-LOCATION '{hdfs_location}';
-DROP TABLE IF EXISTS {db_name}{db_suffix}.{table_name}_alt;
-CREATE EXTERNAL TABLE IF NOT EXISTS {db_name}{db_suffix}.{table_name}_alt(
-  whole_row string
-)
-row format delimited fields terminated by '|'
-stored as {file_format}
-LOCATION '{hdfs_location}';
-====
----- DATASET
-functional
----- BASE_TABLE_NAME
 zipcode_incomes
 ---- COLUMNS
 id STRING

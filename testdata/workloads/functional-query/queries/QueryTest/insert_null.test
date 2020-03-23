@@ -1,10 +1,26 @@
 ====
 ---- QUERY
+CREATE TABLE nullinsert (
+  str_col1 string,
+  str_col2 string,
+  str_col3 string,
+  str_col4 string,
+  int_cal int
+)
+row format delimited fields terminated by ','  escaped by '\\'
+LOCATION '$FILESYSTEM_PREFIX/test-warehouse/$DATABASE.db/nullinsert';
+CREATE EXTERNAL TABLE nullinsert_alt(
+  whole_row string
+)
+row format delimited fields terminated by '|'
+LOCATION '$FILESYSTEM_PREFIX/test-warehouse/$DATABASE.db/nullinsert';
+create table alltypesinsert like functional.alltypesinsert;
+create table nullformat_custom like functional.nullformat_custom;
+====
+---- QUERY
 # Test that we properly write null values to text tables.
 insert overwrite table nullinsert
-select NULL, "", "NULL", "\\N", NULL from alltypes limit 1
----- SETUP
-RESET nullinsert
+select NULL, "", "NULL", "\\N", NULL from functional.alltypes limit 1
 ---- RESULTS
 : 1
 ====
@@ -17,8 +33,6 @@ string, string, string, string, int
 ====
 ---- QUERY
 select * from nullinsert_alt
----- SETUP
-RESET nullinsert_alt
 ---- RESULTS
 '\\N,,NULL,\\\\N,\\N'
 ---- TYPES
@@ -26,14 +40,13 @@ string
 ====
 ---- QUERY
 # Test NULL partition keys using static partition insert. Both partitions keys are NULL.
+truncate alltypesinsert;
 insert overwrite table alltypesinsert
 partition(year=NULL, month=NULL)
-select id, bool_col, tinyint_col, smallint_col, int_col, bigint_col, 
+select id, bool_col, tinyint_col, smallint_col, int_col, bigint_col,
 float_col, double_col, date_string_col, string_col, timestamp_col
-from alltypessmall
+from functional.alltypessmall
 where year=2009 and month=4
----- SETUP
-DROP PARTITIONS alltypesinsert
 ---- RESULTS
 year=__HIVE_DEFAULT_PARTITION__/month=__HIVE_DEFAULT_PARTITION__/: 25
 ====
@@ -46,24 +59,22 @@ select count(*) from alltypesinsert where year is null and month is null
 bigint
 ====
 ---- QUERY
-# Verify that dropping NULL partitions works in the SETUP section.
+# Verify that truncate NULL
+truncate alltypesinsert;
 select * from alltypesinsert
----- SETUP
-DROP PARTITIONS alltypesinsert
 ---- RESULTS
 ---- TYPES
 int, boolean, tinyint, smallint, int, bigint, float, double, string, string, timestamp, int, int
 ====
 ---- QUERY
 # Test NULL partition keys using static partition insert. Year partition key is NULL.
+truncate alltypesinsert;
 insert overwrite table alltypesinsert
 partition(year=NULL, month=10)
-select id, bool_col, tinyint_col, smallint_col, int_col, bigint_col, 
+select id, bool_col, tinyint_col, smallint_col, int_col, bigint_col,
 float_col, double_col, date_string_col, string_col, timestamp_col
-from alltypessmall
+from functional.alltypessmall
 where year=2009 and month=4
----- SETUP
-DROP PARTITIONS alltypesinsert
 ---- RESULTS
 year=__HIVE_DEFAULT_PARTITION__/month=10/: 25
 ====
@@ -77,14 +88,13 @@ bigint
 ====
 ---- QUERY
 # Test NULL partition keys using dynamic partition insert. Month partition key is NULL.
+truncate alltypesinsert;
 insert overwrite table alltypesinsert
 partition(year=2008, month=NULL)
-select id, bool_col, tinyint_col, smallint_col, int_col, bigint_col, 
+select id, bool_col, tinyint_col, smallint_col, int_col, bigint_col,
 float_col, double_col, date_string_col, string_col, timestamp_col
-from alltypessmall
+from functional.alltypessmall
 where year=2009 and month=4
----- SETUP
-DROP PARTITIONS alltypesinsert
 ---- RESULTS
 year=2008/month=__HIVE_DEFAULT_PARTITION__/: 25
 ====
@@ -100,10 +110,10 @@ bigint
 # Test NULL partition keys using dynamic partition insert.
 insert overwrite table alltypesinsert
 partition(year, month)
-select id, bool_col, tinyint_col, smallint_col, int_col, bigint_col, 
+select id, bool_col, tinyint_col, smallint_col, int_col, bigint_col,
 float_col, double_col, date_string_col, string_col, timestamp_col,
 cast(if(bool_col, NULL, 2007) as int) as year, cast(if(tinyint_col % 3 = 0, NULL, 6) as int) as month
-from alltypessmall
+from functional.alltypessmall
 where year=2009 and month=4
 ---- RESULTS: VERIFY_IS_EQUAL_SORTED
 year=2007/month=6/: 8

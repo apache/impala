@@ -1,11 +1,13 @@
 ====
 ---- QUERY
+create table insert_overwrite_nopart like functional.insert_overwrite_nopart;
+create table insert_overwrite_partitioned like functional.insert_overwrite_partitioned;
+====
+---- QUERY
 # insert overwrite into unpartitioned table
 insert overwrite table insert_overwrite_nopart 
 select int_col
-from tinyinttable
----- SETUP
-RESET insert_overwrite_nopart
+from functional.tinyinttable
 ---- RESULTS
 : 10
 ====
@@ -33,7 +35,7 @@ int
 # Now do an overwrite that should delete what was just written
 insert overwrite table insert_overwrite_nopart
 select 10
-from tinyinttable
+from functional.tinyinttable
 ---- RESULTS
 : 10
 ====
@@ -60,7 +62,7 @@ int
 ---- QUERY
 insert overwrite table insert_overwrite_nopart
 select 3
-from tinyinttable
+from functional.tinyinttable
 limit 0
 ---- RESULTS
 : 0
@@ -77,9 +79,7 @@ bigint
 insert overwrite table insert_overwrite_partitioned
 PARTITION(col2=5)
 select int_col
-from tinyinttable
----- SETUP
-RESET insert_overwrite_partitioned
+from functional.tinyinttable
 ---- RESULTS
 col2=5/: 10
 ====
@@ -107,9 +107,7 @@ int,int
 insert overwrite table insert_overwrite_partitioned
 PARTITION(col2=6)
 select int_col
-from tinyinttable
----- SETUP
-RESET insert_overwrite_nopart
+from functional.tinyinttable
 ---- RESULTS
 col2=6/: 10
 ====
@@ -147,7 +145,7 @@ int,int
 # Overwrite one partition, check that the other partition remains intact
 insert overwrite table insert_overwrite_partitioned
 partition(col2=5)
-select 10 from tinyinttable
+select 10 from functional.tinyinttable
 ---- RESULTS
 col2=5/: 10
 ====
@@ -184,9 +182,7 @@ int,int
 insert overwrite table insert_overwrite_partitioned
 partition(col2)
 select int_col, int_col 
-from tinyinttable
----- SETUP
-DROP PARTITIONS insert_overwrite_partitioned
+from functional.tinyinttable
 ---- RESULTS
 col2=0/: 1
 col2=1/: 1
@@ -223,7 +219,7 @@ int,int
 # Overwrite dynamic partition. Limit to 1 row without actually using limit, which forces non-parallel insert
 insert overwrite table insert_overwrite_partitioned
 partition(col2)
-select 10, 0 from tinyinttable
+select 10, 0 from functional.tinyinttable
 where int_col = 0
 ---- RESULTS
 col2=0/: 1
