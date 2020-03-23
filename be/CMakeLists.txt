@@ -42,7 +42,7 @@ PROJECT(ASSEMBLER)
 #  -pthread: enable multithreaded malloc
 #  -DBOOST_DATE_TIME_POSIX_TIME_STD_CONFIG: enable nanosecond precision for boost
 #  -fno-omit-frame-pointers: Keep frame pointer for functions in register
-if (CMAKE_SYSTEM_PROCESSOR MATCHES "aarch64")
+if (CMAKE_SYSTEM_PROCESSOR STREQUAL "aarch64")
   SET(CXX_COMMON_FLAGS "${CXX_COMMON_FLAGS} -march=armv8-a+crc")
 endif()
 SET(CXX_COMMON_FLAGS "${CXX_COMMON_FLAGS} -Wall -Wno-sign-compare -Wno-unknown-pragmas -pthread")
@@ -238,8 +238,9 @@ set(CLANG_IR_CXX_FLAGS "-emit-llvm" "-c" "-std=c++14" "-DIR_COMPILE" "-DHAVE_INT
   "-DKUDU_HEADERS_NO_STUBS" "-fcolor-diagnostics" "-Wno-deprecated"
   "-Wno-return-type-c-linkage" "-fsigned-char" "-O1")
 
-if (CMAKE_SYSTEM_NAME MATCHES "Linux" AND CMAKE_SYSTEM_PROCESSOR MATCHES "aarch64")
-  set(CLANG_IR_CXX_FLAGS "${CLANG_IR_CXX_FLAGS}" "-DCACHELINESIZE_AARCH64=${CACHELINESIZE_AARCH64}")
+if (CMAKE_SYSTEM_NAME STREQUAL "Linux" AND CMAKE_SYSTEM_PROCESSOR STREQUAL "aarch64")
+  set(CLANG_IR_CXX_FLAGS "${CLANG_IR_CXX_FLAGS}" "-march=armv8-a+crc"
+    "-DCACHELINESIZE_AARCH64=${CACHELINESIZE_AARCH64}")
 endif()
 
 # -Werror: compile warnings should be errors when using the toolchain compiler.

@@ -19,10 +19,18 @@
 #ifndef IMPALA_UTIL_SSE_UTIL_H
 #define IMPALA_UTIL_SSE_UTIL_H
 
-#include <emmintrin.h>
+#ifdef __aarch64__
+  #include "sse2neon.h"
+#else
+  #include <emmintrin.h>
+#endif
 
 #if defined(IR_COMPILE) && defined(__SSE4_2__) // IR_COMPILE for SSE 4.2.
 #include <smmintrin.h>
+#endif
+
+#if defined(IR_COMPILE) && defined(__aarch64__)  // IR_COMPILE for Aarch64.
+  #include <arm_acle.h>
 #endif
 
 namespace impala {
@@ -76,6 +84,7 @@ namespace SSEUtil {
 /// IR load time) that the processor supports SSE 4.2 before calling these. All __asm__
 /// blocks are marked __volatile__ to prevent hoisting the ASM out of checks for CPU
 /// support (e.g. IMPALA-6882).
+/// On AARCH64 we define alternative implementations that emulate the intrinsics.
 ///
 /// These intrinsics are defined outside the namespace because the IR w/ SSE 4.2 case
 /// needs to use macros.
@@ -97,6 +106,67 @@ namespace SSEUtil {
 /// mode constant into the inline asm.
 #define SSE_ALWAYS_INLINE inline __attribute__ ((__always_inline__))
 
+#ifdef __aarch64__
+typedef union __attribute__((aligned(16))) __oword{
+  int64x2_t m128i;
+  uint8_t m128i_u8[16];
+} __oword;
+
+template<int MODE>
+static inline __m128i SSE4_cmpestrm(
+    int64x2_t str1, int len1, int64x2_t str2, int len2) {
+
+  __oword a, b;
+  a.m128i = str1;
+  b.m128i = str2;
+
+  __m128i result = {0, 0};
+  uint16_t i = 0;
+  uint16_t j = 0;
+
+  for (i = 0; i < len2; i++) {
+    for ( j = 0; j < len1; j++) {
+      if (a.m128i_u8[j] == b.m128i_u8[i]) {
+        result |= (1 << i);
+      }
+    }
+  }
+  return result;
+}
+
+template<int MODE>
+static inline int SSE4_cmpestri(
+    int64x2_t str1, int len1, int64x2_t str2, int len2) {
+
+  __oword a, b;
+  a.m128i = str1;
+  b.m128i = str2;
+
+  int len_s, len_l;
+  if (len1 > len2) {
+    len_s = len2;
+    len_l = len1;
+  } else {
+    len_s = len1;
+    len_l = len2;
+  }
+
+  int result;
+  int i;
+
+  for(i = 0; i < len_s; i++) {
+    if (a.m128i_u8[i] == b.m128i_u8[i]) {
+      break;
+    }
+  }
+
+  result = i;
+  if (result == len_s) result = len_l;
+
+  return result;
+}
+
+#else
 template<int MODE>
 static inline __m128i SSE4_cmpestrm(__m128i str1, int len1, __m128i str2, int len2) {
 #ifdef __clang__
@@ -120,7 +190,29 @@ static inline int SSE4_cmpestri(__m128i str1, int len1, __m128i str2, int len2) 
       : "=c"(result) : "x"(str1), "xm"(str2), "a"(len1), "d"(len2), "i"(MODE) : "cc");
   return result;
 }
+#endif
 
+#ifdef __aarch64__
+static inline uint32_t SSE4_crc32_u8(uint32_t crc, uint8_t value) {
+  __asm__ __volatile__("crc32cb %w[c], %w[c], %w[v]":[c]"+r"(crc):[v]"r"(value));
+  return crc;
+}
+
+static inline uint32_t SSE4_crc32_u16(uint32_t crc, uint16_t value) {
+  __asm__ __volatile__("crc32ch %w[c], %w[c], %w[v]":[c]"+r"(crc):[v]"r"(value));
+  return crc;
+}
+
+static inline uint32_t SSE4_crc32_u32(uint32_t crc, uint32_t value) {
+  __asm__ __volatile__("crc32cw %w[c], %w[c], %w[v]":[c]"+r"(crc):[v]"r"(value));
+  return crc;
+}
+
+static inline uint32_t SSE4_crc32_u64(uint32_t crc, uint64_t value) {
+  __asm__ __volatile__("crc32cx %w[c], %w[c], %x[v]":[c]"+r"(crc):[v]"r"(value));
+  return crc;
+}
+#else
 static inline uint32_t SSE4_crc32_u8(uint32_t crc, uint8_t v) {
   __asm__ __volatile__("crc32b %1, %0" : "+r"(crc) : "rm"(v));
   return crc;
@@ -141,12 +233,33 @@ static inline uint32_t SSE4_crc32_u64(uint32_t crc, uint64_t v) {
   __asm__ __volatile__("crc32q %1, %0" : "+r"(result) : "rm"(v));
   return result;
 }
+#endif
 
+#ifdef __aarch64__
+static inline int POPCNT_popcnt_u64(uint64_t x) {
+  uint64_t count_result = 0;
+  uint64_t count[1];
+  uint8x8_t input_val, count8x8_val;
+  uint16x4_t count16x4_val;
+  uint32x2_t count32x2_val;
+  uint64x1_t count64x1_val;
+
+  input_val = vld1_u8((unsigned char *) &x);
+  count8x8_val = vcnt_u8(input_val);
+  count16x4_val = vpaddl_u8(count8x8_val);
+  count32x2_val = vpaddl_u16(count16x4_val);
+  count64x1_val = vpaddl_u32(count32x2_val);
+  vst1_u64(count, count64x1_val);
+  count_result = count[0];
+  return count_result;
+}
+#else
 static inline int64_t POPCNT_popcnt_u64(uint64_t a) {
   int64_t result;
   __asm__ __volatile__("popcntq %1, %0" : "=r"(result) : "mr"(a) : "cc");
   return result;
 }
+#endif
 
 #undef SSE_ALWAYS_INLINE
 
@@ -179,7 +292,7 @@ static inline int SSE4_cmpestri(
 /// SSE 4.2 instructions.  Otherwise, the IR loading will fail on CPUs that don't
 /// support SSE 4.2.  However, because the caller isn't allowed to call these routines
 /// on CPUs that lack SSE 4.2 anyway, we can implement stubs for this case.
-
+#ifndef __aarch64__
 template<int MODE>
 static inline __m128i SSE4_cmpestrm(__m128i str1, int len1, __m128i str2, int len2) {
   DCHECK(false) << "CPU doesn't support SSE 4.2";
@@ -216,7 +329,12 @@ static inline int64_t POPCNT_popcnt_u64(uint64_t a) {
   DCHECK(false) << "CPU doesn't support SSE 4.2";
   return 0;
 }
-
+#else
+#define SSE4_crc32_u8 __crc32cb
+#define SSE4_crc32_u16 __crc32ch
+#define SSE4_crc32_u32 __crc32cw
+#define SSE4_crc32_u64 __crc32cd
+#endif
 #endif
 
 }

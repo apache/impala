@@ -27,6 +27,7 @@
 
 #include "runtime/multi-precision.h"
 #include "testutil/gtest-util.h"
+#include "gutil/sysinfo.h"
 #include "util/arithmetic-util.h"
 #include "util/bit-util.h"
 #include "util/cpu-info.h"
@@ -134,7 +135,7 @@ TEST(BitUtil, TrailingBits) {
 void TestByteSwapSimd_Unit(const int64_t CpuFlag) {
   void (*bswap_fptr)(const uint8_t* src, uint8_t* dst) = NULL;
   int buf_size = 0;
-  if (CpuFlag == CpuInfo::SSSE3) {
+  if (base::IsAarch64() || CpuFlag == CpuInfo::SSSE3) {
     buf_size = 16;
     bswap_fptr = SimdByteSwap::ByteSwap128;
   } else {
@@ -179,7 +180,7 @@ void TestByteSwapSimd(const int64_t CpuFlag, const int buf_size) {
   std::iota(src_buf, src_buf + buf_size, 0);
 
   int start_size = 0;
-  if (CpuFlag == CpuInfo::SSSE3) {
+  if (base::IsAarch64() || CpuFlag == CpuInfo::SSSE3) {
     start_size = 16;
   } else if (CpuFlag == CpuInfo::AVX2) {
     start_size = 32;
@@ -188,7 +189,7 @@ void TestByteSwapSimd(const int64_t CpuFlag, const int buf_size) {
   for (int i = start_size; i < buf_size; ++i) {
     // Initialize dst buffer and swap i bytes.
     memset(dst_buf, 0, buf_size);
-    if (CpuFlag == CpuInfo::SSSE3) {
+    if (base::IsAarch64() || CpuFlag == CpuInfo::SSSE3) {
       SimdByteSwap::ByteSwapSimd<16>(src_buf, i, dst_buf);
     } else if (CpuFlag == CpuInfo::AVX2) {
       SimdByteSwap::ByteSwapSimd<32>(src_buf, i, dst_buf);
@@ -231,6 +232,10 @@ TEST(BitUtil, ByteSwap) {
   EXPECT_EQ(BitUtil::ByteSwap(static_cast<uint16_t>(0)), 0);
   EXPECT_EQ(BitUtil::ByteSwap(static_cast<uint16_t>(0x1122)), 0x2211);
 
+  #ifdef __aarch64__
+  TestByteSwapSimd_Unit(0);
+  TestByteSwapSimd(0, 64);
+  #else
   // Tests for ByteSwap SIMD functions
   if (CpuInfo::IsSupported(CpuInfo::SSSE3)) {
     // Test SSSE3 functionality unit
@@ -245,6 +250,7 @@ TEST(BitUtil, ByteSwap) {
     // Test ByteSwapSimd() using AVX2;
     TestByteSwapSimd(CpuInfo::AVX2, 64);
   }
+  #endif
 
   // Test BitUtil::ByteSwap(Black Box Testing)
   for (int i = 0; i <= 32; ++i) TestByteSwapSimd(0, i);
@@ -307,6 +313,7 @@ TEST(BitUtil, RoundUpDown) {
   EXPECT_EQ(BitUtil::RoundDownNumi64(65), 1);
 }
 
+#ifndef __aarch64__
 // Prevent inlining so that the compiler can't optimize out the check.
 __attribute__((noinline))
 int CpuInfoIsSupportedHoistHelper(int64_t cpu_info_flag, int arg) {
@@ -329,6 +336,7 @@ TEST(BitUtil, CpuInfoIsSupportedHoist) {
   CpuInfo::TempDisable disable_sssse3(CPU_INFO_FLAG);
   EXPECT_EQ(12345, CpuInfoIsSupportedHoistHelper(CPU_INFO_FLAG, 0));
 }
+#endif
 
 }
 

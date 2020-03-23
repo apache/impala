@@ -14,8 +14,11 @@
 // KIND, either express or implied.  See the License for the
 // specific language governing permissions and limitations
 // under the License.
-
+#ifdef __aarch64__
+#include "util/sse2neon.h"
+#else
 #include <immintrin.h>
+#endif
 #include <stdlib.h>
 
 #include <algorithm>
@@ -105,11 +108,13 @@ void TestSSSE3Swap(int batch_size, void* d) {
   SimdByteSwap::ByteSwapSimd<16>(data->inbuffer, data->num_values, data->outbuffer);
 }
 
+#ifndef __aarch64__
 // Test for the AVX2 subroutine;
 void TestAVX2Swap(int batch_size, void* d) {
   TestData* data = reinterpret_cast<TestData*>(d);
   SimdByteSwap::ByteSwapSimd<32>(data->inbuffer, data->num_values, data->outbuffer);
 }
+#endif
 
 // Test for the SIMD approach in a general way;
 void TestSIMDSwap(int batch_size, void* d) {
@@ -138,7 +143,9 @@ void PerfBenchmark() {
 
     const int baseline = suite.AddBenchmark("FastScalar", TestFastScalarSwap, &data, -1);
     suite.AddBenchmark("SSSE3", TestSSSE3Swap, &data, baseline);
+    #ifndef __aarch64__
     suite.AddBenchmark("AVX2", TestAVX2Swap, &data, baseline);
+    #endif
     suite.AddBenchmark("SIMD", TestSIMDSwap, &data, baseline);
     cout << suite.Measure();
   }

@@ -29,7 +29,7 @@ uint32_t IrMurmurHash(const void* data, int32_t bytes, uint32_t hash) {
 
 extern "C"
 uint32_t IrCrcHash(const void* data, int32_t bytes, uint32_t hash) {
-#ifdef __SSE4_2__
+#if defined(__SSE4_2__) || defined(__aarch64__)
   return HashUtil::CrcHash(data, bytes, hash);
 #else
   return HashUtil::FnvHash64to32(data, bytes, hash);
