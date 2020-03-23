@@ -108,6 +108,13 @@ string PrintId(const TUniqueId& id, const string& separator) {
   return out.str();
 }
 
+string PrintId(const UniqueIdPB& id, const string& separator) {
+  stringstream out;
+  // Outputting the separator string resets the stream width.
+  out << hex << setfill('0') << setw(16) << id.hi() << separator << setw(16) << id.lo();
+  return out.str();
+}
+
 bool ParseId(const string& s, TUniqueId* id) {
   // For backwards compatibility, this method parses two forms of query ID from text:
   //  - <hex-int64_t><colon><hex-int64_t> - this format is the standard going forward

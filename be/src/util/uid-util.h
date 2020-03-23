@@ -34,6 +34,14 @@ inline void UUIDToTUniqueId(const boost::uuids::uuid& uuid, TUniqueId* unique_id
   memcpy(&(unique_id->lo), &uuid.data[8], 8);
 }
 
+inline void UUIDToUniqueIdPB(const boost::uuids::uuid& uuid, UniqueIdPB* unique_id) {
+  uint64_t hi, lo;
+  memcpy(&hi, &uuid.data[0], 8);
+  memcpy(&lo, &uuid.data[8], 8);
+  unique_id->set_hi(hi);
+  unique_id->set_lo(lo);
+}
+
 inline void TUniqueIdToUniqueIdPB(
     const TUniqueId& t_unique_id, UniqueIdPB* unique_id_pb) {
   unique_id_pb->set_lo(t_unique_id.lo);

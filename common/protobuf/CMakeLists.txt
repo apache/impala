@@ -38,7 +38,7 @@ foreach(pb_src common row_batch)
    set(${_PROTO_SRCS} ${${_PROTO_SRCS}} PARENT_SCOPE)
 endforeach()
 
-foreach(pb_src data_stream_service control_service rpc_test)
+foreach(pb_src data_stream_service control_service rpc_test statestore_service)
    string(TOUPPER ${pb_src} _PB_SRC_UPPER)
    set(_PROTO_SRCS ${_PB_SRC_UPPER}_PROTO_SRCS)
    set(_PROTO_HDRS ${_PB_SRC_UPPER}_PROTO_HDRS)

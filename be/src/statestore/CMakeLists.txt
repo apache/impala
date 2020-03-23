@@ -22,8 +22,12 @@ set(LIBRARY_OUTPUT_PATH "${BUILD_OUTPUT_ROOT_DIRECTORY}/statestore")
 # where to put generated binaries
 set(EXECUTABLE_OUTPUT_PATH "${BUILD_OUTPUT_ROOT_DIRECTORY}/statestore")
 
+# Mark the protobuf file as generated
+set_source_files_properties(${STATESTORE_SERVICE_PROTO_SRCS} PROPERTIES GENERATED TRUE)
+
 add_library(Statestore
   failure-detector.cc
+  ${STATESTORE_SERVICE_PROTO_SRCS}
   statestore.cc
   statestore-subscriber.cc
   statestored-main.cc

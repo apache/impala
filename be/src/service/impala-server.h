@@ -456,7 +456,7 @@ class ImpalaServer : public ImpalaServiceIf,
   int GetHS2Port();
 
   /// Returns a current snapshot of the local backend descriptor.
-  std::shared_ptr<const TBackendDescriptor> GetLocalBackendDescriptor();
+  std::shared_ptr<const BackendDescriptorPB> GetLocalBackendDescriptor();
 
   /// Adds the query_id to the map from backend to the list of queries running or expected
   /// to run there (query_locations_). After calling this function, the server will cancel
@@ -467,7 +467,7 @@ class ImpalaServer : public ImpalaServiceIf,
   /// Takes a set of backend ids of active backends and cancels all the queries running on
   /// failed ones (that is, ids not in the active set).
   void CancelQueriesOnFailedBackends(
-      const std::unordered_set<TBackendId>& current_membership);
+      const std::unordered_set<BackendIdPB>& current_membership);
 
   /// Start the shutdown process. Return an error if it could not be started. Otherwise,
   /// if it was successfully started by this or a previous call, return OK along with
@@ -816,7 +816,7 @@ class ImpalaServer : public ImpalaServiceIf,
       WARN_UNUSED_RESULT;
 
   /// Initializes the backend descriptor in 'be_desc' with the local backend information.
-  void BuildLocalBackendDescriptorInternal(TBackendDescriptor* be_desc);
+  void BuildLocalBackendDescriptorInternal(BackendDescriptorPB* be_desc);
 
   /// Snapshot of a query's state, archived in the query log. Not mutated after
   /// construction.
@@ -1298,13 +1298,13 @@ class ImpalaServer : public ImpalaServiceIf,
 
   /// Entries in the 'query_locations' map.
   struct QueryLocationInfo {
-    QueryLocationInfo(TNetworkAddress address, TUniqueId query_id) : address(address) {
+    QueryLocationInfo(NetworkAddressPB address, TUniqueId query_id) : address(address) {
       query_ids.insert(query_id);
     }
 
     /// Used for logging and error messages so that users don't have to translate between
-    /// the TBackendId and a hostname themselves.
-    TNetworkAddress address;
+    /// the BackendIdPB and a hostname themselves.
+    NetworkAddressPB address;
 
     /// Queries currently running or expected to run at this location.
     std::unordered_set<TUniqueId> query_ids;
@@ -1312,12 +1312,12 @@ class ImpalaServer : public ImpalaServiceIf,
 
   /// Contains info about what queries are running on each backend, so that they can be
   /// cancelled if the backend goes down.
-  typedef std::unordered_map<TBackendId, QueryLocationInfo> QueryLocations;
+  typedef std::unordered_map<BackendIdPB, QueryLocationInfo> QueryLocations;
   QueryLocations query_locations_;
 
   /// The local backend descriptor. Updated in GetLocalBackendDescriptor() and protected
   /// by 'local_backend_descriptor_lock_';
-  std::shared_ptr<const TBackendDescriptor> local_backend_descriptor_;
+  std::shared_ptr<const BackendDescriptorPB> local_backend_descriptor_;
   std::mutex local_backend_descriptor_lock_;
 
   /// UUID generator for session IDs and secrets. Uses system random device to get

@@ -34,6 +34,7 @@
 #include "gen-cpp/PlanNodes_types.h"
 #include "gen-cpp/Types_types.h"
 #include "gen-cpp/beeswax_types.h"
+#include "gen-cpp/common.pb.h"
 #include "gen-cpp/parquet_types.h"
 #include "gutil/macros.h"
 
@@ -83,6 +84,7 @@ std::string PrintBatch(RowBatch* batch);
 /// Converts id to a string represantation. If necessary, the gdb equivalent is:
 ///    printf "%lx:%lx\n", id.hi, id.lo
 std::string PrintId(const TUniqueId& id, const std::string& separator = ":");
+std::string PrintId(const UniqueIdPB& id, const std::string& separator = ":");
 
 /// Returns the fully qualified path, e.g. "database.table.array_col.item.field"
 std::string PrintPath(const TableDescriptor& tbl_desc, const SchemaPath& path);

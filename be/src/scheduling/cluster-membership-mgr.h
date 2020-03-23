@@ -17,21 +17,17 @@
 
 #pragma once
 
-#include <gtest/gtest_prod.h> // for FRIEND_TEST
+#include <functional>
+#include <memory>
 #include <mutex>
 #include <string>
 #include <unordered_map>
-#include <unordered_set>
 #include <vector>
 
-#include "common/global-types.h"
 #include "common/status.h"
-#include "gen-cpp/StatestoreService_types.h"
-#include "gutil/threading/thread_collision_warner.h"
 #include "scheduling/executor-blacklist.h"
 #include "scheduling/executor-group.h"
 #include "statestore/statestore-subscriber.h"
-#include "util/container-util.h"
 #include "util/metrics-fwd.h"
 
 namespace impala {
@@ -75,10 +71,10 @@ class ClusterMembershipMgr {
  public:
   /// A immutable pointer to a backend descriptor. It is used to return a consistent,
   /// immutable copy of a backend descriptor.
-  typedef std::shared_ptr<const TBackendDescriptor> BeDescSharedPtr;
+  typedef std::shared_ptr<const BackendDescriptorPB> BeDescSharedPtr;
 
   /// Maps statestore subscriber IDs to backend descriptors.
-  typedef std::unordered_map<std::string, TBackendDescriptor> BackendIdMap;
+  typedef std::unordered_map<std::string, BackendDescriptorPB> BackendIdMap;
 
   /// Maps executor group names to executor groups. For now, only a default group exists
   /// and all executors are part of that group.
@@ -93,11 +89,12 @@ class ClusterMembershipMgr {
     Snapshot(const Snapshot&) = default;
     /// The current backend descriptor of the local backend.
     BeDescSharedPtr local_be_desc;
-    /// Map from unique backend ID to TBackendDescriptor for all known backends, including
-    /// those that are quiescing or blacklisted. The {backend ID, TBackendDescriptor}
-    /// pairs represent the IMPALA_MEMBERSHIP_TOPIC {key, value} pairs of known executors
-    /// retrieved from the statestore. It's important to track both the backend ID as well
-    /// as the TBackendDescriptor so we know what is being removed in a given update.
+    /// Map from unique backend ID to BackendDescriptorPB for all known backends,
+    /// including those that are quiescing or blacklisted. The {backend ID,
+    /// BackendDescriptorPB} pairs represent the IMPALA_MEMBERSHIP_TOPIC {key, value}
+    /// pairs of known executors retrieved from the statestore. It's important to track
+    /// both the backend ID as well as the BackendDescriptorPB so we know what is being
+    /// removed in a given update.
     BackendIdMap current_backends;
     /// A map of executor groups by their names. Only contains executors that are
     /// available for scheduling queries on and not executors that are quiescing or
@@ -165,11 +162,11 @@ class ClusterMembershipMgr {
   /// Adds the given backend to the local blacklist. Updates 'current_membership_' to
   /// remove the backend from 'executor_groups' so that it will not be scheduled on.
   /// 'cause' is an error status representing the reason the node was blacklisted.
-  void BlacklistExecutor(const TBackendDescriptor& be_desc, const Status& cause);
+  void BlacklistExecutor(const BackendDescriptorPB& be_desc, const Status& cause);
 
  private:
   /// Serializes and adds the local backend descriptor to 'subscriber_topic_updates'.
-  void AddLocalBackendToStatestore(const TBackendDescriptor& local_be_desc,
+  void AddLocalBackendToStatestore(const BackendDescriptorPB& local_be_desc,
       std::vector<TTopicDelta>* subscriber_topic_updates);
 
   /// Returns the local backend descriptor or nullptr if no local backend has been
@@ -205,7 +202,7 @@ class ClusterMembershipMgr {
   /// Used to check the consistency of the ClusterMembershipMgr state. Currently, only
   /// used in DCHECKs.
   bool IsBackendInExecutorGroups(
-      const TBackendDescriptor& be_desc, const ExecutorGroups& executor_groups);
+      const BackendDescriptorPB& be_desc, const ExecutorGroups& executor_groups);
 
   /// Ensures that only one thread is processing a membership update at a time, either
   /// from a statestore update or a blacklisting decision. Must be taken before any other
@@ -236,10 +233,6 @@ class ClusterMembershipMgr {
   /// for dynamic updates to the set of available backends. May be nullptr if the set of
   /// backends is fixed (only useful for tests). Thread-safe, not protected by a lock.
   StatestoreSubscriber* statestore_subscriber_;
-
-  /// Serializes TBackendDescriptors when creating topic updates. Not protected by a lock
-  /// - only used in statestore thread.
-  ThriftSerializer thrift_serializer_;
 
   /// Unique - across the cluster - identifier for this impala backend. Used to validate
   /// incoming backend descriptors and to register this backend with the statestore. Not

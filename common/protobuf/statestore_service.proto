@@ -1,0 +1,79 @@
+// Licensed to the Apache Software Foundation (ASF) under one
+// or more contributor license agreements.  See the NOTICE file
+// distributed with this work for additional information
+// regarding copyright ownership.  The ASF licenses this file
+// to you under the Apache License, Version 2.0 (the
+// "License"); you may not use this file except in compliance
+// with the License.  You may obtain a copy of the License at
+//
+//   http://www.apache.org/licenses/LICENSE-2.0
+//
+// Unless required by applicable law or agreed to in writing,
+// software distributed under the License is distributed on an
+// "AS IS" BASIS, WITHOUT WARRANTIES OR CONDITIONS OF ANY
+// KIND, either express or implied.  See the License for the
+// specific language governing permissions and limitations
+// under the License.
+
+syntax="proto2";
+
+package impala;
+
+import "common.proto";
+
+// Structure to describe an executor group. We use this to configure the executor group
+// for backends during startup and during cluster membership management.
+message ExecutorGroupDescPB {
+  // The name of the executor group.
+  optional string name = 1;
+
+  // The minimum size of the executor group to be considered healthy.
+  optional int64 min_size = 2;
+}
+
+// Structure serialised in the Impala backend topic. Each Impalad
+// constructs one BackendDescriptorPB, and registers it in the cluster-membership
+// topic. Impalads subscribe to this topic to learn of the location of
+// all other Impalads in the cluster. Impalads can act as coordinators, executors or
+// both.
+message BackendDescriptorPB {
+  // Unique identifier for this impalad. Generated on startup.
+  optional UniqueIdPB backend_id = 1;
+
+  // Network address of the thrift based ImpalaInternalService on this backend
+  optional NetworkAddressPB address = 2;
+
+  // IP address corresponding to address.hostname. Explicitly including this saves the
+  // cost of resolution at every Impalad (since IP addresses are needed for scheduling)
+  optional string ip_address = 3;
+
+  // True if this is a coordinator node
+  optional bool is_coordinator = 4;
+
+  // True if this is an executor node
+  optional bool is_executor = 5;
+
+  // The address of the debug HTTP server
+  optional NetworkAddressPB debug_http_address = 6;
+
+  // True if the debug webserver is secured (for correctly generating links)
+  optional bool secure_webserver = 7;
+
+  // IP address + port of KRPC based ImpalaInternalService on this backend
+  optional NetworkAddressPB krpc_address = 8;
+
+  // The amount of memory that can be admitted to this backend (in bytes).
+  optional int64 admit_mem_limit = 9;
+
+  // True if fragment instances should not be scheduled on this daemon because the
+  // daemon has been quiescing, e.g. if it shutting down.
+  optional bool is_quiescing = 10;
+
+  // The list of executor groups that this backend belongs to. Only valid if is_executor
+  // is set, and currently must contain exactly one entry.
+  repeated ExecutorGroupDescPB executor_groups = 11;
+
+  // The number of admission slots for this backend that can be occupied by running
+  // queries.
+  optional int64 admission_slots = 12;
+}

@@ -93,16 +93,16 @@ const int64_t FileSplitGeneratorSpec::DEFAULT_FILE_SIZE = 1 << 22;
 const int64_t FileSplitGeneratorSpec::DEFAULT_BLOCK_SIZE = 1 << 20;
 
 ClusterMembershipMgr::BeDescSharedPtr BuildBackendDescriptor(const Host& host) {
-  auto be_desc = make_shared<TBackendDescriptor>();
-  be_desc->address.hostname = host.ip;
-  be_desc->address.port = host.be_port;
-  be_desc->ip_address = host.ip;
-  be_desc->__set_is_coordinator(host.is_coordinator);
-  be_desc->__set_is_executor(host.is_executor);
-  be_desc->is_quiescing = false;
-  be_desc->executor_groups.push_back(TExecutorGroupDesc());
-  be_desc->executor_groups.back().name = ImpalaServer::DEFAULT_EXECUTOR_GROUP_NAME;
-  be_desc->executor_groups.back().min_size = 1;
+  auto be_desc = make_shared<BackendDescriptorPB>();
+  be_desc->mutable_address()->set_hostname(host.ip);
+  be_desc->mutable_address()->set_port(host.be_port);
+  be_desc->set_ip_address(host.ip);
+  be_desc->set_is_coordinator(host.is_coordinator);
+  be_desc->set_is_executor(host.is_executor);
+  be_desc->set_is_quiescing(false);
+  ExecutorGroupDescPB* exec_desc = be_desc->add_executor_groups();
+  exec_desc->set_name(ImpalaServer::DEFAULT_EXECUTOR_GROUP_NAME);
+  exec_desc->set_min_size(1);
   return be_desc;
 }
 
@@ -713,9 +713,8 @@ void SchedulerWrapper::AddHostToTopicDelta(const Host& host, TTopicDelta* delta)
   // Build topic item.
   TTopicItem item;
   item.key = host.ip;
-  ThriftSerializer serializer(false);
-  Status status = serializer.SerializeToString(be_desc.get(), &item.value);
-  DCHECK(status.ok());
+  bool success = be_desc->SerializeToString(&item.value);
+  DCHECK(success);
 
   // Add to topic delta.
   delta->topic_entries.push_back(item);

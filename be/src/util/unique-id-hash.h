@@ -22,6 +22,7 @@
 #include <boost/functional/hash.hpp>
 
 #include "gen-cpp/Types_types.h" // for TUniqueId
+#include "gen-cpp/common.pb.h" // for UniqueIdPB
 
 namespace impala {
 
@@ -29,6 +30,13 @@ inline std::size_t hash_value(const TUniqueId& id) {
   std::size_t seed = 0;
   boost::hash_combine(seed, id.lo);
   boost::hash_combine(seed, id.hi);
+  return seed;
+}
+
+inline std::size_t hash_value(const UniqueIdPB& id) {
+  std::size_t seed = 0;
+  boost::hash_combine(seed, id.lo());
+  boost::hash_combine(seed, id.hi());
   return seed;
 }
 
@@ -40,6 +48,13 @@ namespace std {
 template <>
 struct hash<impala::TUniqueId> {
   std::size_t operator()(const impala::TUniqueId& id) const {
+    return impala::hash_value(id);
+  }
+};
+
+template <>
+struct hash<impala::UniqueIdPB> {
+  std::size_t operator()(const impala::UniqueIdPB& id) const {
     return impala::hash_value(id);
   }
 };

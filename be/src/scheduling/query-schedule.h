@@ -21,19 +21,16 @@
 #include <vector>
 #include <string>
 #include <unordered_map>
-#include <boost/scoped_ptr.hpp>
 
 #include "common/global-types.h"
-#include "common/status.h"
-#include "util/promise.h"
+#include "gen-cpp/Frontend_types.h"
+#include "gen-cpp/Types_types.h" // for TNetworkAddress
+#include "gen-cpp/statestore_service.pb.h"
 #include "util/container-util.h"
 #include "util/runtime-profile.h"
-#include "gen-cpp/Types_types.h"  // for TNetworkAddress
-#include "gen-cpp/Frontend_types.h"
 
 namespace impala {
 
-class Coordinator;
 struct FragmentExecParams;
 struct FInstanceExecParams;
 
@@ -51,7 +48,7 @@ typedef std::unordered_map<TNetworkAddress, PerNodeScanRanges>
 /// via QuerySchedule::set_per_backend_exec_params(). Used as an input to
 /// AdmissionController and a BackendState.
 struct BackendExecParams {
-  TBackendDescriptor be_desc;
+  BackendDescriptorPB be_desc;
 
   /// The fragment instance params assigned to this backend. All instances of a
   /// particular fragment are contiguous in this vector. Query lifetime;

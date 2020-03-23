@@ -508,7 +508,7 @@ void ImpalaHttpHandler::QueryStateHandler(const Webserver::WebRequest& req,
     for (const ImpalaServer::QueryLocations::value_type& location :
         server_->query_locations_) {
       Value location_json(kObjectType);
-      Value location_name(TNetworkAddressToString(location.second.address).c_str(),
+      Value location_name(NetworkAddressPBToString(location.second.address).c_str(),
           document->GetAllocator());
       location_json.AddMember("location", location_name, document->GetAllocator());
       Value backend_id_str(PrintId(location.first).c_str(), document->GetAllocator());
@@ -946,33 +946,34 @@ void ImpalaHttpHandler::BackendsHandler(const Webserver::WebRequest& req,
       cluster_membership_mgr->GetSnapshot();
   DCHECK(membership_snapshot.get() != nullptr);
   for (const auto& entry : membership_snapshot->current_backends) {
-    TBackendDescriptor backend = entry.second;
+    BackendDescriptorPB backend = entry.second;
     Value backend_obj(kObjectType);
-    string address = TNetworkAddressToString(backend.address);
+    string address = NetworkAddressPBToString(backend.address());
     Value str(address.c_str(), document->GetAllocator());
-    Value krpc_address(
-        TNetworkAddressToString(backend.krpc_address).c_str(), document->GetAllocator());
+    Value krpc_address(NetworkAddressPBToString(backend.krpc_address()).c_str(),
+        document->GetAllocator());
     backend_obj.AddMember("address", str, document->GetAllocator());
     backend_obj.AddMember("krpc_address", krpc_address, document->GetAllocator());
-    Value backend_id_str(PrintId(backend.backend_id).c_str(), document->GetAllocator());
+    Value backend_id_str(PrintId(backend.backend_id()).c_str(), document->GetAllocator());
     backend_obj.AddMember("backend_id", backend_id_str, document->GetAllocator());
     string webserver_url =
-        Substitute("$0://$1", backend.secure_webserver ? "https" : "http",
-            TNetworkAddressToString(backend.debug_http_address));
+        Substitute("$0://$1", backend.secure_webserver() ? "https" : "http",
+            NetworkAddressPBToString(backend.debug_http_address()));
     Value webserver_url_val(webserver_url.c_str(), document->GetAllocator());
     backend_obj.AddMember("webserver_url", webserver_url_val, document->GetAllocator());
-    backend_obj.AddMember("is_coordinator", backend.is_coordinator,
-        document->GetAllocator());
-    backend_obj.AddMember("is_executor", backend.is_executor, document->GetAllocator());
-    backend_obj.AddMember("is_quiescing", backend.is_quiescing, document->GetAllocator());
+    backend_obj.AddMember(
+        "is_coordinator", backend.is_coordinator(), document->GetAllocator());
+    backend_obj.AddMember("is_executor", backend.is_executor(), document->GetAllocator());
+    backend_obj.AddMember(
+        "is_quiescing", backend.is_quiescing(), document->GetAllocator());
     Status blacklist_cause;
     int64_t blacklist_time_remaining_ms;
     bool is_blacklisted = membership_snapshot->executor_blacklist.IsBlacklisted(
         backend, &blacklist_cause, &blacklist_time_remaining_ms);
     backend_obj.AddMember("is_blacklisted", is_blacklisted, document->GetAllocator());
-    backend_obj.AddMember(
-        "is_active", !is_blacklisted && !backend.is_quiescing, document->GetAllocator());
-    if (backend.is_quiescing) {
+    backend_obj.AddMember("is_active", !is_blacklisted && !backend.is_quiescing(),
+        document->GetAllocator());
+    if (backend.is_quiescing()) {
       // Backends cannot be both blacklisted and quiescing.
       DCHECK(!is_blacklisted);
       ++num_quiescing_backends;
@@ -990,7 +991,7 @@ void ImpalaHttpHandler::BackendsHandler(const Webserver::WebRequest& req,
     } else {
       ++num_active_backends;
     }
-    Value admit_mem_limit(PrettyPrinter::PrintBytes(backend.admit_mem_limit).c_str(),
+    Value admit_mem_limit(PrettyPrinter::PrintBytes(backend.admit_mem_limit()).c_str(),
         document->GetAllocator());
     backend_obj.AddMember("admit_mem_limit", admit_mem_limit, document->GetAllocator());
     // If the host address does not exist in the 'host_stats', this would ensure that a
@@ -1001,14 +1002,16 @@ void ImpalaHttpHandler::BackendsHandler(const Webserver::WebRequest& req,
     Value mem_admitted(PrettyPrinter::PrintBytes(
         host_stats[address].mem_admitted).c_str(), document->GetAllocator());
     backend_obj.AddMember("mem_admitted", mem_admitted, document->GetAllocator());
-    backend_obj.AddMember("admission_slots", backend.admission_slots,
-        document->GetAllocator());
+    backend_obj.AddMember(
+        "admission_slots", backend.admission_slots(), document->GetAllocator());
     backend_obj.AddMember("num_admitted", host_stats[address].num_admitted,
         document->GetAllocator());
     backend_obj.AddMember("admission_slots_in_use", host_stats[address].slots_in_use,
         document->GetAllocator());
     vector<string> group_names;
-    for (const auto& group : backend.executor_groups) group_names.push_back(group.name);
+    for (const auto& group : backend.executor_groups()) {
+      group_names.push_back(group.name());
+    }
     Value executor_groups(JoinStrings(group_names, ", ").c_str(),
         document->GetAllocator());
     backend_obj.AddMember("executor_groups", executor_groups, document->GetAllocator());

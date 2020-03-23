@@ -73,15 +73,15 @@ Coordinator::BackendState::BackendState(const QuerySchedule& schedule,
     state_idx_(state_idx),
     filter_mode_(filter_mode),
     backend_exec_params_(&exec_params),
-    host_(backend_exec_params_->be_desc.address),
-    krpc_host_(backend_exec_params_->be_desc.krpc_address),
+    host_(backend_exec_params_->be_desc.address()),
+    krpc_host_(backend_exec_params_->be_desc.krpc_address()),
     query_ctx_(query_ctx),
     query_id_(schedule.query_id()),
     num_remaining_instances_(backend_exec_params_->instance_params.size()) {}
 
 void Coordinator::BackendState::Init(const vector<FragmentStats*>& fragment_stats,
     RuntimeProfile* host_profile_parent, ObjectPool* obj_pool) {
-  host_profile_ = RuntimeProfile::Create(obj_pool, TNetworkAddressToString(host_));
+  host_profile_ = RuntimeProfile::Create(obj_pool, NetworkAddressPBToString(host_));
   host_profile_parent->AddChild(host_profile_);
   RuntimeProfile::Counter* admission_slots =
       ADD_COUNTER(host_profile_, "AdmissionSlots", TUnit::UNIT);
@@ -92,7 +92,8 @@ void Coordinator::BackendState::Init(const vector<FragmentStats*>& fragment_stat
   int prev_fragment_idx = -1;
   for (const FInstanceExecParams* instance_params:
        backend_exec_params_->instance_params) {
-    DCHECK(host_ == instance_params->host);  // all hosts must be the same
+    DCHECK_EQ(
+        FromNetworkAddressPB(host_), instance_params->host); // all hosts must be the same
     int fragment_idx = instance_params->fragment().idx;
     DCHECK_LT(fragment_idx, fragment_stats.size());
     if (prev_fragment_idx != -1 && fragment_idx != prev_fragment_idx) {
@@ -238,8 +239,8 @@ void Coordinator::BackendState::ExecAsync(const DebugOptions& debug_options,
     }
 
     std::unique_ptr<ControlServiceProxy> proxy;
-    Status get_proxy_status =
-        ControlService::GetProxy(krpc_host_, host_.hostname, &proxy);
+    Status get_proxy_status = ControlService::GetProxy(
+        FromNetworkAddressPB(krpc_host_), host_.hostname(), &proxy);
     if (!get_proxy_status.ok()) {
       SetExecError(get_proxy_status, exec_status_barrier);
       goto done;
@@ -303,8 +304,7 @@ void Coordinator::BackendState::ExecAsync(const DebugOptions& debug_options,
     request.set_query_ctx_sidecar_idx(query_ctx_sidecar_idx);
 
     VLOG_FILE << "making rpc: ExecQueryFInstances"
-              << " host=" << TNetworkAddressToString(impalad_address())
-              << " query_id=" << PrintId(query_id_);
+              << " host=" << impalad_address() << " query_id=" << PrintId(query_id_);
 
     proxy->ExecQueryFInstancesAsync(request, &exec_response_, &exec_rpc_controller_,
         std::bind(&Coordinator::BackendState::ExecCompleteCb, this, exec_status_barrier,
@@ -396,8 +396,7 @@ void Coordinator::BackendState::LogFirstInProgress(
   for (Coordinator::BackendState* backend_state : backend_states) {
     if (!backend_state->IsDone()) {
       VLOG_QUERY << "query_id=" << PrintId(backend_state->query_id_)
-                 << ": first in-progress backend: "
-                 << TNetworkAddressToString(backend_state->impalad_address());
+                 << ": first in-progress backend: " << backend_state->impalad_address();
       break;
     }
   }
@@ -483,7 +482,7 @@ bool Coordinator::BackendState::ApplyExecStatusReport(
           // Append the log messages from each update with the global state of the query
           // execution
           MergeErrorMaps(stateful_report.error_log(), &error_log_);
-          VLOG_FILE << "host=" << TNetworkAddressToString(host_)
+          VLOG_FILE << "host=" << host_
                     << " error log: " << PrintErrorMapToString(error_log_);
 
           if (stateful_report.has_aux_error_info()) {
@@ -582,7 +581,8 @@ bool Coordinator::BackendState::Cancel() {
   VLogForBackend("Sending CancelQueryFInstances rpc");
 
   std::unique_ptr<ControlServiceProxy> proxy;
-  Status get_proxy_status = ControlService::GetProxy(krpc_host_, host_.hostname, &proxy);
+  Status get_proxy_status = ControlService::GetProxy(
+      FromNetworkAddressPB(krpc_host_), host_.hostname(), &proxy);
   if (!get_proxy_status.ok()) {
     status_.MergeStatus(get_proxy_status);
     VLogForBackend(Substitute("Could not get proxy: $0", get_proxy_status.msg().msg()));
@@ -624,13 +624,12 @@ void Coordinator::BackendState::PublishFilter(FilterState* state,
   // If the backend is already done, it's not waiting for this filter, so we skip
   // sending it in this case.
   if (IsDone()) return;
-  VLOG(2) << "PublishFilter filter_id=" << rpc_params.filter_id()
-          << " backend=" << TNetworkAddressToString(host_);
+  VLOG(2) << "PublishFilter filter_id=" << rpc_params.filter_id() << " backend=" << host_;
   Status status;
 
   std::unique_ptr<DataStreamServiceProxy> proxy;
-  Status get_proxy_status =
-      DataStreamService::GetProxy(krpc_host_, host_.hostname, &proxy);
+  Status get_proxy_status = DataStreamService::GetProxy(
+      FromNetworkAddressPB(krpc_host_), host_.hostname(), &proxy);
   if (!get_proxy_status.ok()) {
     // Failing to send a filter is not a query-wide error - the remote fragment will
     // continue regardless.
@@ -869,7 +868,7 @@ void Coordinator::BackendState::ToJson(Value* value, Document* document) {
   value->AddMember("cpu_sys_s", resource_utilization.cpu_sys_ns / 1e9,
       document->GetAllocator());
 
-  string host = TNetworkAddressToString(impalad_address());
+  string host = NetworkAddressPBToString(impalad_address());
   Value val(host.c_str(), document->GetAllocator());
   value->AddMember("host", val, document->GetAllocator());
 
@@ -900,13 +899,14 @@ void Coordinator::BackendState::InstanceStatsToJson(Value* value, Document* docu
 
   // impalad_address is not protected by lock_. The lifetime of the backend state is
   // protected by Coordinator::lock_.
-  Value val(TNetworkAddressToString(impalad_address()).c_str(), document->GetAllocator());
+  Value val(
+      NetworkAddressPBToString(impalad_address()).c_str(), document->GetAllocator());
   value->AddMember("host", val, document->GetAllocator());
 }
 
 void Coordinator::BackendState::VLogForBackend(const string& msg) {
-  VLOG_QUERY << "query_id=" << PrintId(query_id_)
-             << " target backend=" << TNetworkAddressToString(krpc_host_) << ": " << msg;
+  VLOG_QUERY << "query_id=" << PrintId(query_id_) << " target backend=" << krpc_host_
+             << ": " << msg;
 }
 
 } // namespace impala

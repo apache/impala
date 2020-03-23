@@ -120,6 +120,11 @@ bool IsResolvedAddress(const TNetworkAddress& addr) {
   return sock.ParseString(addr.hostname, addr.port).ok();
 }
 
+bool IsResolvedAddress(const NetworkAddressPB& addr) {
+  kudu::Sockaddr sock;
+  return sock.ParseString(addr.hostname(), addr.port()).ok();
+}
+
 bool FindFirstNonLocalhost(const vector<string>& addresses, string* addr) {
   for (const string& candidate: addresses) {
     if (candidate != LOCALHOST_IP_STR) {
@@ -157,6 +162,13 @@ TNetworkAddress MakeNetworkAddress(const string& address) {
   return ret;
 }
 
+NetworkAddressPB MakeNetworkAddressPB(const string& hostname, int port) {
+  NetworkAddressPB ret;
+  ret.set_hostname(hostname);
+  ret.set_port(port);
+  return ret;
+}
+
 bool IsWildcardAddress(const string& ipaddress) {
   return ipaddress == "0.0.0.0";
 }
@@ -178,6 +190,13 @@ TNetworkAddress FromNetworkAddressPB(const NetworkAddressPB& address) {
   t_address.__set_hostname(address.hostname());
   t_address.__set_port(address.port());
   return t_address;
+}
+
+NetworkAddressPB FromTNetworkAddress(const TNetworkAddress& address) {
+  NetworkAddressPB address_pb;
+  address_pb.set_hostname(address.hostname);
+  address_pb.set_port(address.port);
+  return address_pb;
 }
 
 /// Pick a random port in the range of ephemeral ports

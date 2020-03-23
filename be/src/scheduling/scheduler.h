@@ -17,8 +17,6 @@
 
 #pragma once
 
-#include <list>
-#include <mutex>
 #include <string>
 #include <vector>
 #include <boost/heap/binomial_heap.hpp>
@@ -27,20 +25,22 @@
 
 #include "common/global-types.h"
 #include "common/status.h"
-#include "gen-cpp/CatalogObjects_generated.h"
 #include "gen-cpp/PlanNodes_types.h"
-#include "gen-cpp/StatestoreService_types.h"
-#include "rapidjson/document.h"
-#include "rpc/thrift-util.h"
+#include "gen-cpp/Types_types.h"
 #include "scheduling/executor-group.h"
 #include "scheduling/query-schedule.h"
-#include "scheduling/request-pool-service.h"
-#include "statestore/statestore-subscriber.h"
 #include "util/metrics-fwd.h"
 #include "util/network-util.h"
 #include "util/runtime-profile.h"
 
 namespace impala {
+
+class BackendDescriptorPB;
+class MetricGroup;
+class RequestPoolService;
+class TPlanExecInfo;
+class TQueryOptions;
+class TScanRangeLocationList;
 
 namespace test {
 class SchedulerWrapper;
@@ -64,7 +64,7 @@ class Scheduler {
   /// Current snapshot of executors to be used for scheduling a scan.
   struct ExecutorConfig {
     const ExecutorGroup& group;
-    const TBackendDescriptor& local_be_desc;
+    const BackendDescriptorPB& local_be_desc;
   };
 
   /// Populates given query schedule and assigns fragments to hosts based on scan
@@ -178,15 +178,15 @@ class Scheduler {
     const IpAddr* GetNextUnusedExecutorAndIncrement();
 
     /// Pick an executor in round-robin fashion from multiple executors on a single host.
-    void SelectExecutorOnHost(const IpAddr& executor_ip, TBackendDescriptor* executor);
+    void SelectExecutorOnHost(const IpAddr& executor_ip, BackendDescriptorPB* executor);
 
     /// Build a new TScanRangeParams object and append it to the assignment list for the
     /// tuple (executor, node_id) in 'assignment'. Also, update assignment_heap_ and
     /// assignment_byte_counters_, increase the counters 'total_assignments_' and
     /// 'total_local_assignments_'. 'scan_range_locations' contains information about the
     /// scan range and its replica locations.
-    void RecordScanRangeAssignment(const TBackendDescriptor& executor, PlanNodeId node_id,
-        const vector<TNetworkAddress>& host_list,
+    void RecordScanRangeAssignment(const BackendDescriptorPB& executor,
+        PlanNodeId node_id, const vector<TNetworkAddress>& host_list,
         const TScanRangeLocationList& scan_range_locations,
         FragmentScanRangeAssignment* assignment);
 
@@ -260,7 +260,7 @@ class Scheduler {
   /// Returns the backend descriptor corresponding to 'host' which could be a remote
   /// backend or the local host itself. The returned descriptor should not be retained
   /// beyond the lifetime of 'executor_config'.
-  const TBackendDescriptor& LookUpBackendDesc(
+  const BackendDescriptorPB& LookUpBackendDesc(
       const ExecutorConfig& executor_config, const TNetworkAddress& host);
 
   /// Returns the KRPC host in 'executor_config' based on the thrift backend address
@@ -406,7 +406,7 @@ class Scheduler {
 
   /// Add all hosts that the scans identified by 'scan_ids' are executed on to
   /// 'scan_hosts'.
-  void GetScanHosts(const TBackendDescriptor& local_be_desc,
+  void GetScanHosts(const BackendDescriptorPB& local_be_desc,
       const std::vector<TPlanNodeId>& scan_ids, const FragmentExecParams& params,
       std::vector<TNetworkAddress>* scan_hosts);
 
