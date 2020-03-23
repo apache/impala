@@ -108,13 +108,13 @@ class TestScannersFuzzing(ImpalaTestSuite):
     # Additional queries to scan the nested values.
     custom_queries = [
       "select count(*) from ("
-      "  select distinct t.id, a.pos, a.item, aa.pos, aa.item, m.key, m.value,"
-      "    ma.key, ma.value, t.nested_struct.* "
+      "  select distinct t.id, a.pos as apos, a.item as aitem, aa.pos, aa.item, "
+      "    m.key as mkey, m.value as mvalue, ma.key, ma.value, t.nested_struct.* "
       "  from complextypestbl t, t.int_array a, t.int_array_array.item aa, "
       "    t.int_map m, t.int_map_array.item ma) q",
 
       "select count(*) from ("
-      "  select t.id, t.nested_struct.a, b.pos, b.item, i.e, i.f, m.key,"
+      "  select t.id, t.nested_struct.a, b.pos as bpos, b.item as bitem, i.e, i.f, m.key,"
       "    arr.pos, arr.item "
       "  from complextypestbl t, t.nested_struct.b, t.nested_struct.c.d.item i,"
       "    t.nested_struct.g m, m.value.h.i arr) q",
@@ -221,6 +221,9 @@ class TestScannersFuzzing(ImpalaTestSuite):
         result = self.execute_query(query, query_options = query_options)
         LOG.info('\n'.join(result.log))
       except Exception as e:
+        # We should only test queries that parse succesfully.
+        assert "AnalysisException" not in str(e)
+
         if 'memory limit exceeded' in str(e).lower():
           # Memory limit error should fail query.
           continue
