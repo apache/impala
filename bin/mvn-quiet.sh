@@ -31,9 +31,11 @@ Directory $(pwd)
 ========================================================================
 EOF
 
+LOGGING_OPTIONS="-Dorg.slf4j.simpleLogger.showDateTime \
+  -Dorg.slf4j.simpleLogger.dateTimeFormat=HH:mm:ss"
+
 # Always use maven's batch mode (-B), as it produces output that is easier to parse.
-# Also, add a timestamp to the maven output.
-if ! mvn -B $IMPALA_MAVEN_OPTIONS "$@" | awk '{ print strftime("[%H:%M:%S]"), $0 }' | \
+if ! mvn -B $IMPALA_MAVEN_OPTIONS $LOGGING_OPTIONS "$@" | \
   tee -a "$LOG_FILE" | grep -E -e WARNING -e ERROR -e SUCCESS -e FAILURE -e Test; then
   echo "mvn $IMPALA_MAVEN_OPTIONS $@ exited with code $?"
   exit 1
