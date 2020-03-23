@@ -253,17 +253,10 @@ add_custom_command(OUTPUT MetricDefs.thrift
 # org.apache.hive.service.cli.thrift to org.apache.hive.service.rpc.thrift. Impala calls
 # various Hive methods that have these classes in the interface and if the packages don't
 # match it won't compile.
-add_custom_command(OUTPUT hive-2-api/TCLIService.thrift
+add_custom_command(OUTPUT hive-$ENV{IMPALA_HIVE_MAJOR_VERSION}-api/TCLIService.thrift
   COMMAND sed
       's/namespace java org.apache.hive.service.cli.thrift/namespace java org.apache.hive.service.rpc.thrift/'
-      hive-1-api/TCLIService.thrift > hive-2-api/TCLIService.thrift
-  DEPENDS hive-1-api/TCLIService.thrift
-)
-
-add_custom_command(OUTPUT hive-3-api/TCLIService.thrift
-  COMMAND sed
-      's/namespace java org.apache.hive.service.cli.thrift/namespace java org.apache.hive.service.rpc.thrift/'
-      hive-1-api/TCLIService.thrift > hive-3-api/TCLIService.thrift
+      hive-1-api/TCLIService.thrift > hive-$ENV{IMPALA_HIVE_MAJOR_VERSION}-api/TCLIService.thrift
   DEPENDS hive-1-api/TCLIService.thrift
 )
 
