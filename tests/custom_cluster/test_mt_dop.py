@@ -34,7 +34,6 @@ class TestMtDopFlags(CustomClusterTestSuite):
   def add_test_dimensions(cls):
     super(TestMtDopFlags, cls).add_test_dimensions()
 
-  @pytest.mark.execute_serially
   @CustomClusterTestSuite.with_args(impalad_args="--mt_dop_auto_fallback=true")
   @SkipIfNotHdfsMinicluster.tuned_for_minicluster
   def test_mt_dop_fallback(self, vector, unique_database):
@@ -49,7 +48,7 @@ class TestMtDopFlags(CustomClusterTestSuite):
 
     # Check that the join and insert plans work as expected.
     self.run_test_case('QueryTest/joins', vector, use_db="functional_parquet")
-    self.run_test_case('QueryTest/insert', vector)
+    self.run_test_case('QueryTest/insert', vector, unique_database)
 
   @CustomClusterTestSuite.with_args(impalad_args="--unlock_mt_dop=true", cluster_size=1)
   def test_mt_dop_runtime_filters_one_node(self, vector):

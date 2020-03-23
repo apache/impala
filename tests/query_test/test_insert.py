@@ -79,7 +79,6 @@ class TestInsertQueries(ImpalaTestSuite):
             (v.get_value('table_format').file_format == 'parquet' and \
             v.get_value('compression_codec') == 'none'))
 
-  @pytest.mark.execute_serially
   def test_insert_large_string(self, vector, unique_database):
     """Test handling of large strings in inserter and scanner."""
     if "-Xcheck:jni" in os.environ.get("LIBHDFS_OPTS", ""):
@@ -125,16 +124,15 @@ class TestInsertQueries(ImpalaTestSuite):
   def setup_class(cls):
     super(TestInsertQueries, cls).setup_class()
 
-  @pytest.mark.execute_serially
   # Erasure coding doesn't respect memory limit
   @SkipIfEC.fix_later
   # ABFS partition names cannot end in periods
   @SkipIfABFS.file_or_folder_name_ends_with_period
-  def test_insert(self, vector):
+  def test_insert(self, vector, unique_database):
     if (vector.get_value('table_format').file_format == 'parquet'):
       vector.get_value('exec_option')['COMPRESSION_CODEC'] = \
           vector.get_value('compression_codec')
-    self.run_test_case('QueryTest/insert', vector,
+    self.run_test_case('QueryTest/insert', vector, unique_database,
         multiple_impalad=vector.get_value('exec_option')['sync_ddl'] == 1)
 
   @SkipIfHive2.acid
@@ -162,11 +160,11 @@ class TestInsertQueries(ImpalaTestSuite):
 
   @pytest.mark.execute_serially
   @SkipIfNotHdfsMinicluster.tuned_for_minicluster
-  def test_insert_mem_limit(self, vector):
+  def test_insert_mem_limit(self, vector, unique_database):
     if (vector.get_value('table_format').file_format == 'parquet'):
       vector.get_value('exec_option')['COMPRESSION_CODEC'] = \
           vector.get_value('compression_codec')
-    self.run_test_case('QueryTest/insert-mem-limit', vector,
+    self.run_test_case('QueryTest/insert-mem-limit', vector, unique_database,
         multiple_impalad=vector.get_value('exec_option')['sync_ddl'] == 1)
     # IMPALA-7023: These queries can linger and use up memory, causing subsequent
     # tests to hit memory limits. Wait for some time to allow the query to
@@ -176,18 +174,16 @@ class TestInsertQueries(ImpalaTestSuite):
     for v in verifiers:
       v.wait_for_metric("impala-server.num-fragments-in-flight", 0, timeout=180)
 
-  @pytest.mark.execute_serially
   @SkipIfS3.eventually_consistent
-  def test_insert_overwrite(self, vector):
-    self.run_test_case('QueryTest/insert_overwrite', vector,
+  def test_insert_overwrite(self, vector, unique_database):
+    self.run_test_case('QueryTest/insert_overwrite', vector, unique_database,
         multiple_impalad=vector.get_value('exec_option')['sync_ddl'] == 1)
 
-  @pytest.mark.execute_serially
-  def test_insert_bad_expr(self, vector):
+  def test_insert_bad_expr(self, vector, unique_database):
     # The test currently relies on codegen being disabled to trigger an error in
     # the output expression of the table sink.
     if vector.get_value('exec_option')['disable_codegen']:
-      self.run_test_case('QueryTest/insert_bad_expr', vector,
+      self.run_test_case('QueryTest/insert_bad_expr', vector, unique_database,
           multiple_impalad=vector.get_value('exec_option')['sync_ddl'] == 1)
 
   @UniqueDatabase.parametrize(sync_ddl=True)
@@ -306,9 +302,8 @@ class TestInsertNullQueries(ImpalaTestSuite):
   def setup_class(cls):
     super(TestInsertNullQueries, cls).setup_class()
 
-  @pytest.mark.execute_serially
-  def test_insert_null(self, vector):
-    self.run_test_case('QueryTest/insert_null', vector)
+  def test_insert_null(self, vector, unique_database):
+    self.run_test_case('QueryTest/insert_null', vector, unique_database)
 
 
 class TestInsertFileExtension(ImpalaTestSuite):
