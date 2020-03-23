@@ -23,7 +23,9 @@
 #include <cstring>
 #include <limits>
 
+#ifndef __aarch64__
 #include <immintrin.h>
+#endif
 
 #include "codegen/impala-ir.h"
 #include "common/compiler-util.h"

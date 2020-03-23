@@ -238,10 +238,13 @@ template <bool PROCESS_ESCAPES>
 inline Status DelimitedTextParser<false>::ParseSingleTuple(int64_t remaining_len,
     char* buffer, FieldLocation* field_locations, int* num_fields) {
   char* next_column_start = buffer;
-  __m128i xmm_buffer, xmm_delim_mask, xmm_escape_mask;
 
   column_idx_ = num_partition_keys_;
   current_column_has_escape_ = false;
+
+#ifndef __aarch64__
+  __m128i xmm_buffer, xmm_delim_mask, xmm_escape_mask;
+
   if (LIKELY(CpuInfo::IsSupported(CpuInfo::SSE4_2))) {
     while (LIKELY(remaining_len >= SSEUtil::CHARS_PER_128_BIT_REGISTER)) {
       // Load the next 16 bytes into the xmm register
@@ -294,6 +297,7 @@ inline Status DelimitedTextParser<false>::ParseSingleTuple(int64_t remaining_len
       buffer += SSEUtil::CHARS_PER_128_BIT_REGISTER;
     }
   }
+#endif
 
   while (remaining_len > 0) {
     if (*buffer == escape_char_) {

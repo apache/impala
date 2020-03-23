@@ -68,9 +68,13 @@ set(IR_NO_SSE_TMP_C_FILE ${IR_NO_SSE_C_FILE}.tmp)
 # Run the clang compiler to generate IR. Then run the LLVM opt tool to apply specific
 # optimisations. We need to compile to IR twice, once with sse enabled and one without.
 # At runtime impala will pick the correct file to load.
+
+if (NOT CMAKE_SYSTEM_PROCESSOR STREQUAL "aarch64")
+  set(SSE_FLAG "-msse4.2")
+endif()
 add_custom_command(
   OUTPUT ${IR_SSE_OUTPUT_FILE}
-  COMMAND ${LLVM_CLANG_EXECUTABLE} ${CLANG_IR_CXX_FLAGS} "-msse4.2" ${CLANG_INCLUDE_FLAGS} ${IR_INPUT_FILES} -o ${IR_SSE_TMP_OUTPUT_FILE}
+  COMMAND ${LLVM_CLANG_EXECUTABLE} ${CLANG_IR_CXX_FLAGS} ${SSE_FLAG} ${CLANG_INCLUDE_FLAGS} ${IR_INPUT_FILES} -o ${IR_SSE_TMP_OUTPUT_FILE}
   COMMAND ${LLVM_OPT_EXECUTABLE} ${LLVM_OPT_IR_FLAGS} < ${IR_SSE_TMP_OUTPUT_FILE} > ${IR_SSE_OUTPUT_FILE}
   COMMAND rm ${IR_SSE_TMP_OUTPUT_FILE}
   DEPENDS Exec Exprs Runtime Udf Util ${IR_INPUT_FILES}

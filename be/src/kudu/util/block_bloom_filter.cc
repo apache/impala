@@ -17,8 +17,12 @@
 
 #include "kudu/util/block_bloom_filter.h"
 
-#include <emmintrin.h>
-#include <mm_malloc.h>
+#ifdef __aarch64__
+  #include "sse2neon.h"
+#else
+  #include <emmintrin.h>
+  #include <mm_malloc.h>
+#endif
 
 #include <algorithm>
 #include <cmath>

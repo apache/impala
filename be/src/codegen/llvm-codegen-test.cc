@@ -28,6 +28,7 @@
 #include "runtime/string-value.h"
 #include "runtime/test-env.h"
 #include "service/fe-support.h"
+#include "gutil/sysinfo.h"
 #include "util/cpu-info.h"
 #include "util/filesystem-util.h"
 #include "util/hash-util.h"
@@ -534,11 +535,12 @@ TEST_F(LlvmCodeGenTest, CpuAttrWhitelist) {
   // Non-existent attributes should be disabled regardless of initial states.
   // Whitelisted attributes like sse2 and lzcnt should retain their initial
   // state.
+  // arm does not have sse2
   EXPECT_EQ(std::unordered_set<string>(
-                {"-dummy1", "-dummy2", "-dummy3", "-dummy4", "+sse2", "-lzcnt"}),
+                {"-dummy1", "-dummy2", "-dummy3", "-dummy4",
+                base::IsAarch64() ? "-sse2" : "+sse2", "-lzcnt"}),
       LlvmCodeGen::ApplyCpuAttrWhitelist(
                 {"+dummy1", "+dummy2", "-dummy3", "+dummy4", "+sse2", "-lzcnt"}));
-
   // IMPALA-6291: Test that all AVX512 attributes are disabled.
   vector<string> avx512_attrs;
   EXPECT_EQ(std::unordered_set<string>({"-avx512ifma", "-avx512dqavx512er", "-avx512f",

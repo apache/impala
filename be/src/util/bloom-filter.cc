@@ -16,8 +16,11 @@
 // under the License.
 
 #include "util/bloom-filter.h"
-
-#include <emmintrin.h>
+#ifdef __aarch64__
+  #include "sse2neon.h"
+#else
+  #include <emmintrin.h>
+#endif
 #include <math.h>
 #include <string.h>
 
