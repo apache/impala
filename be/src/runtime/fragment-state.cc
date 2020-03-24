@@ -38,26 +38,35 @@ const string FragmentState::FSTATE_THREAD_GROUP_NAME = "fragment-init";
 const string FragmentState::FSTATE_THREAD_NAME_PREFIX = "init-and-codegen";
 
 Status FragmentState::CreateFragmentStateMap(const TExecPlanFragmentInfo& fragment_info,
-    QueryState* state, std::unordered_map<TFragmentIdx, FragmentState*>& fragment_map) {
+    const ExecQueryFInstancesRequestPB& exec_request, QueryState* state,
+    std::unordered_map<TFragmentIdx, FragmentState*>& fragment_map) {
   int fragment_ctx_idx = 0;
-  const TPlanFragmentCtx& frag_ctx = fragment_info.fragment_ctxs[fragment_ctx_idx];
+  const TPlanFragment& frag = fragment_info.fragments[fragment_ctx_idx];
+  const PlanFragmentCtxPB& frag_ctx = exec_request.fragment_ctxs(fragment_ctx_idx);
   FragmentState* fragment_state =
-      state->obj_pool()->Add(new FragmentState(state, frag_ctx));
+      state->obj_pool()->Add(new FragmentState(state, frag, frag_ctx));
   fragment_map[fragment_state->fragment_idx()] = fragment_state;
-  for (const TPlanFragmentInstanceCtx& instance_ctx :
-      fragment_info.fragment_instance_ctxs) {
-    // determine corresponding TPlanFragmentCtx
+  for (int i = 0; i < fragment_info.fragment_instance_ctxs.size(); ++i) {
+    const TPlanFragmentInstanceCtx& instance_ctx =
+        fragment_info.fragment_instance_ctxs[i];
+    const PlanFragmentInstanceCtxPB& instance_ctx_pb =
+        exec_request.fragment_instance_ctxs(i);
+    DCHECK_EQ(instance_ctx.fragment_idx, instance_ctx_pb.fragment_idx());
+    // determine corresponding TPlanFragment
     if (fragment_state->fragment_idx() != instance_ctx.fragment_idx) {
       ++fragment_ctx_idx;
-      DCHECK_LT(fragment_ctx_idx, fragment_info.fragment_ctxs.size());
-      const TPlanFragmentCtx& fragment_ctx =
-          fragment_info.fragment_ctxs[fragment_ctx_idx];
-      fragment_state = state->obj_pool()->Add(new FragmentState(state, fragment_ctx));
+      DCHECK_LT(fragment_ctx_idx, fragment_info.fragments.size());
+      const TPlanFragment& fragment = fragment_info.fragments[fragment_ctx_idx];
+      const PlanFragmentCtxPB& fragment_ctx =
+          exec_request.fragment_ctxs(fragment_ctx_idx);
+      DCHECK_EQ(fragment.idx, fragment_ctx.fragment_idx());
+      fragment_state =
+          state->obj_pool()->Add(new FragmentState(state, fragment, fragment_ctx));
       fragment_map[fragment_state->fragment_idx()] = fragment_state;
       // we expect fragment and instance contexts to follow the same order
       DCHECK_EQ(fragment_state->fragment_idx(), instance_ctx.fragment_idx);
     }
-    fragment_state->AddInstance(&instance_ctx);
+    fragment_state->AddInstance(&instance_ctx, &instance_ctx_pb);
   }
   // Init all fragments.
   for (auto& elem : fragment_map) {
@@ -67,9 +76,9 @@ Status FragmentState::CreateFragmentStateMap(const TExecPlanFragmentInfo& fragme
 }
 
 Status FragmentState::Init() {
-  RETURN_IF_ERROR(PlanNode::CreateTree(this, fragment_ctx_.fragment.plan, &plan_tree_));
-  RETURN_IF_ERROR(DataSinkConfig::CreateConfig(fragment_ctx_.fragment.output_sink,
-      plan_tree_->row_descriptor_, this, &sink_config_));
+  RETURN_IF_ERROR(PlanNode::CreateTree(this, fragment_.plan, &plan_tree_));
+  RETURN_IF_ERROR(DataSinkConfig::CreateConfig(
+      fragment_.output_sink, plan_tree_->row_descriptor_, this, &sink_config_));
   return Status::OK();
 }
 
@@ -79,8 +88,8 @@ Status FragmentState::InvokeCodegen() {
     codegen_invoked_ = true;
     codegen_status_ = CodegenHelper();
     if (!codegen_status_.ok()) {
-      string error_ctx = Substitute("Fragment failed during codegen, fragment index: $0",
-          fragment_ctx_.fragment.display_name);
+      string error_ctx = Substitute(
+          "Fragment failed during codegen, fragment index: $0", fragment_.display_name);
       codegen_status_.AddDetail(error_ctx);
       query_state_->ErrorDuringFragmentCodegen(codegen_status_);
     }
@@ -111,12 +120,11 @@ Status FragmentState::CodegenHelper() {
   return Status::OK();
 }
 
-FragmentState::FragmentState(QueryState* query_state,
-    const TPlanFragmentCtx& fragment_ctx)
-  : query_state_(query_state),
-    fragment_ctx_(fragment_ctx) {
-  runtime_profile_ = RuntimeProfile::Create(query_state->obj_pool(),
-      Substitute("Fragment $0", fragment_ctx_.fragment.display_name));
+FragmentState::FragmentState(QueryState* query_state, const TPlanFragment& fragment,
+    const PlanFragmentCtxPB& fragment_ctx)
+  : query_state_(query_state), fragment_(fragment), fragment_ctx_(fragment_ctx) {
+  runtime_profile_ = RuntimeProfile::Create(
+      query_state->obj_pool(), Substitute("Fragment $0", fragment_.display_name));
   query_state_->host_profile()->AddChild(runtime_profile_);
 }
 

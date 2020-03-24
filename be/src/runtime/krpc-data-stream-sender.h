@@ -38,13 +38,11 @@ class MemTracker;
 class RowDescriptor;
 class TDataStreamSink;
 class TNetworkAddress;
-class TPlanFragmentDestination;
+class PlanFragmentDestinationPB;
 
 class KrpcDataStreamSenderConfig : public DataSinkConfig {
  public:
-  DataSink* CreateSink(const TPlanFragmentCtx& fragment_ctx,
-      const TPlanFragmentInstanceCtx& fragment_instance_ctx,
-      RuntimeState* state) const override;
+  DataSink* CreateSink(RuntimeState* state) const override;
   void Close() override;
 
   /// Codegen KrpcDataStreamSender::HashAndAddRows() if partitioning type is
@@ -108,7 +106,7 @@ class KrpcDataStreamSender : public DataSink {
   /// and RANDOM.
   KrpcDataStreamSender(TDataSinkId sink_id, int sender_id,
       const KrpcDataStreamSenderConfig& sink_config, const TDataStreamSink& sink,
-      const std::vector<TPlanFragmentDestination>& destinations,
+      const google::protobuf::RepeatedPtrField<PlanFragmentDestinationPB>& destinations,
       int per_channel_buffer_size, RuntimeState* state);
 
   virtual ~KrpcDataStreamSender();

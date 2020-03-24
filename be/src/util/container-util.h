@@ -227,6 +227,14 @@ const V& FindWithDefault(const boost::unordered_map<K, V>& m, const K& key,
   return it->second;
 }
 
+template <typename K, typename V>
+const V& FindWithDefault(const google::protobuf::Map<K, V>& m, const K& key,
+                         const V& default_val) {
+  typename google::protobuf::Map<K,V>::const_iterator it = m.find(key);
+  if (it == m.end()) return default_val;
+  return it->second;
+}
+
 /// Merges (by summing) the values from two maps of values. The values must be
 /// native types or support operator +=.
 template<typename MAP_TYPE>

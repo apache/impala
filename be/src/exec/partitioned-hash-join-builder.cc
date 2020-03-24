@@ -58,10 +58,9 @@ static string ConstructBuilderName(int join_node_id) {
   return Substitute("Hash Join Builder (join_node_id=$0)", join_node_id);
 }
 
-DataSink* PhjBuilderConfig::CreateSink(const TPlanFragmentCtx& fragment_ctx,
-    const TPlanFragmentInstanceCtx& fragment_instance_ctx, RuntimeState* state) const {
+DataSink* PhjBuilderConfig::CreateSink(RuntimeState* state) const {
   // We have one fragment per sink, so we can use the fragment index as the sink ID.
-  TDataSinkId sink_id = fragment_ctx.fragment.idx;
+  TDataSinkId sink_id = state->fragment().idx;
   ObjectPool* pool = state->obj_pool();
   return pool->Add(new PhjBuilder(sink_id, *this, state));
 }

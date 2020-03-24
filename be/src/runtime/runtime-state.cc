@@ -70,11 +70,15 @@ namespace impala {
 
 const char* RuntimeState::LLVM_CLASS_NAME = "class.impala::RuntimeState";
 
-RuntimeState::RuntimeState(QueryState* query_state, const TPlanFragmentCtx& fragment_ctx,
-    const TPlanFragmentInstanceCtx& instance_ctx, ExecEnv* exec_env)
+RuntimeState::RuntimeState(QueryState* query_state, const TPlanFragment& fragment,
+    const TPlanFragmentInstanceCtx& instance_ctx,
+    const PlanFragmentCtxPB& fragment_ctx,
+    const PlanFragmentInstanceCtxPB& instance_ctx_pb, ExecEnv* exec_env)
   : query_state_(query_state),
-    fragment_ctx_(&fragment_ctx),
+    fragment_(&fragment),
     instance_ctx_(&instance_ctx),
+    fragment_ctx_(&fragment_ctx),
+    instance_ctx_pb_(&instance_ctx_pb),
     now_(new TimestampValue(TimestampValue::ParseSimpleDateFormat(
         query_state->query_ctx().now_string))),
     utc_timestamp_(new TimestampValue(TimestampValue::ParseSimpleDateFormat(
@@ -97,8 +101,10 @@ RuntimeState::RuntimeState(
             qctx.client_request.query_options.mem_limit :
             -1,
         "test-pool")),
-    fragment_ctx_(nullptr),
+    fragment_(nullptr),
     instance_ctx_(nullptr),
+    fragment_ctx_(nullptr),
+    instance_ctx_pb_(nullptr),
     local_query_state_(query_state_),
     now_(new TimestampValue(TimestampValue::ParseSimpleDateFormat(qctx.now_string))),
     utc_timestamp_(new TimestampValue(TimestampValue::ParseSimpleDateFormat(
@@ -131,9 +137,9 @@ void RuntimeState::Init() {
   // Register with the thread mgr
   resource_pool_ = ExecEnv::GetInstance()->thread_mgr()->CreatePool();
   DCHECK(resource_pool_ != nullptr);
-  if (fragment_ctx_ != nullptr) {
+  if (fragment_ != nullptr) {
     // Ensure that the planner correctly determined the required threads.
-    resource_pool_->set_max_required_threads(fragment_ctx_->fragment.thread_reservation);
+    resource_pool_->set_max_required_threads(fragment_->thread_reservation);
   }
 
   total_thread_statistics_ = ADD_THREAD_COUNTERS(runtime_profile(), "TotalThreads");
@@ -330,14 +336,12 @@ void RuntimeState::ReleaseResources() {
   released_resources_ = true;
 }
 
-void RuntimeState::SetRPCErrorInfo(TNetworkAddress dest_node, int16_t posix_error_code) {
+void RuntimeState::SetRPCErrorInfo(NetworkAddressPB dest_node, int16_t posix_error_code) {
   std::lock_guard<SpinLock> l(aux_error_info_lock_);
   if (aux_error_info_ == nullptr && !reported_aux_error_info_) {
     aux_error_info_.reset(new AuxErrorInfoPB());
     RPCErrorInfoPB* rpc_error_info = aux_error_info_->mutable_rpc_error_info();
-    NetworkAddressPB* network_addr = rpc_error_info->mutable_dest_node();
-    network_addr->set_hostname(dest_node.hostname);
-    network_addr->set_port(dest_node.port);
+    *rpc_error_info->mutable_dest_node() = dest_node;
     rpc_error_info->set_posix_error_code(posix_error_code);
   }
 }

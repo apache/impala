@@ -27,7 +27,7 @@
 namespace impala {
 
 class BlockingRowBatchQueue;
-class TScanRange;
+class ScanRangeParamsPB;
 
 class ScanPlanNode : public PlanNode {
  public:
@@ -115,7 +115,8 @@ class ScanNode : public ExecNode {
 
   /// This should be called before Prepare(), and the argument must be not destroyed until
   /// after Prepare().
-  void SetScanRanges(const std::vector<TScanRangeParams>& scan_range_params) {
+  void SetScanRanges(
+      const google::protobuf::RepeatedPtrField<ScanRangeParamsPB>& scan_range_params) {
     scan_range_params_ = &scan_range_params;
   }
 
@@ -144,7 +145,7 @@ class ScanNode : public ExecNode {
   RuntimeState* runtime_state_ = nullptr;
 
   /// The scan ranges this scan node is responsible for. Not owned.
-  const std::vector<TScanRangeParams>* scan_range_params_;
+  const google::protobuf::RepeatedPtrField<ScanRangeParamsPB>* scan_range_params_;
 
   /// Total bytes read from the scanner. Initialised in subclasses that track
   /// bytes read, including HDFS and HBase by calling AddBytesReadCounters().

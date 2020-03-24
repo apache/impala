@@ -201,8 +201,9 @@ Java_org_apache_impala_service_FeSupport_NativeEvalExprsWithoutRow(
   query_ctx.request_pool = "fe-eval-exprs";
 
   RuntimeState state(query_ctx, ExecEnv::GetInstance());
-  TPlanFragmentCtx fragment_ctx;
-  FragmentState fragment_state(state.query_state(), fragment_ctx);
+  TPlanFragment fragment;
+  PlanFragmentCtxPB fragment_ctx;
+  FragmentState fragment_state(state.query_state(), fragment, fragment_ctx);
   // Make sure to close the runtime state no matter how this scope is exited.
   const auto close_runtime_state = MakeScopeExitTrigger([&state, &fragment_state]() {
     fragment_state.ReleaseResources();

@@ -205,12 +205,12 @@ Status RowBatch::FromProtobuf(const RowDescriptor* row_desc,
 
   row_batch->num_rows_ = header.num_rows();
   row_batch->capacity_ = header.num_rows();
-  const CompressionType& compression_type = header.compression_type();
-  DCHECK(compression_type == CompressionType::NONE ||
-      compression_type == CompressionType::LZ4)
+  const CompressionTypePB& compression_type = header.compression_type();
+  DCHECK(compression_type == CompressionTypePB::NONE ||
+      compression_type == CompressionTypePB::LZ4)
       << "Unexpected compression type: " << compression_type;
   row_batch->Deserialize(input_tuple_offsets, input_tuple_data, uncompressed_size,
-      compression_type == CompressionType::LZ4, tuple_data);
+      compression_type == CompressionTypePB::LZ4, tuple_data);
   *row_batch_ptr = std::move(row_batch);
   return Status::OK();
 }
@@ -266,7 +266,7 @@ Status RowBatch::Serialize(OutboundRowBatch* output_batch) {
   header->set_num_tuples_per_row(row_desc_->tuple_descriptors().size());
   header->set_uncompressed_size(uncompressed_size);
   header->set_compression_type(
-      is_compressed ? CompressionType::LZ4 : CompressionType::NONE);
+      is_compressed ? CompressionTypePB::LZ4 : CompressionTypePB::NONE);
   return Status::OK();
 }
 

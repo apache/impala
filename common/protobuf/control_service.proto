@@ -21,6 +21,7 @@ syntax="proto2";
 package impala;
 
 import "common.proto";
+import "planner.proto";
 
 import "kudu/rpc/rpc_header.proto";
 
@@ -239,6 +240,70 @@ message RemoteShutdownResultPB {
   optional ShutdownStatusPB shutdown_status = 2;
 }
 
+// Specification of one output destination of a plan fragment
+message PlanFragmentDestinationPB {
+  // The globally unique fragment instance id.
+  optional UniqueIdPB fragment_instance_id = 1;
+
+  // Hostname + port of the Thrift based ImpalaInteralService on the destination.
+  optional NetworkAddressPB thrift_backend = 2;
+
+  // IP address + port of the KRPC based ImpalaInternalService on the destination.
+  optional NetworkAddressPB krpc_backend = 3;
+}
+
+// Context to collect information that is shared among all instances of a particular plan
+// fragment. Corresponds to a TPlanFragment with the same idx in the
+// TExecPlanFragmentInfo.
+message PlanFragmentCtxPB {
+  // Ordinal number of corresponding fragment in the query.
+  optional int32 fragment_idx = 1;
+
+  // Output destinations, one per output partition. The partitioning of the output is
+  // specified by TPlanFragment.output_sink.output_partition in the corresponding
+  // TPlanFragment. The number of output partitions is destinations.size().
+  repeated PlanFragmentDestinationPB destinations = 2;
+}
+
+// A scan range plus the parameters needed to execute that scan.
+message ScanRangeParamsPB {
+  optional ScanRangePB scan_range = 1;
+  optional int32 volume_id = 2 [default = -1];
+  optional bool try_hdfs_cache = 3 [default = false];
+  optional bool is_remote = 4;
+}
+
+// List of ScanRangeParamsPB. This is needed so that per_node_scan_ranges in
+// PlanFragmentInstanceCtxPB can be a map since protobuf doesn't support repeated map
+// values.
+message ScanRangesPB {
+  repeated ScanRangeParamsPB scan_ranges = 1;
+}
+
+// Information about the input fragment instance of a join node.
+message JoinBuildInputPB {
+  // The join node id that will consume this join build.
+  optional int32 join_node_id = 1;
+
+  // Fragment instance id of the input fragment instance.
+  optional UniqueIdPB input_finstance_id = 2;
+}
+
+// Protobuf portion of the execution parameters of a single fragment instance. Every
+// fragment instance will also have a corresponding TPlanFragmentInstanceCtx with the same
+// fragment_idx.
+message PlanFragmentInstanceCtxPB {
+  // Ordinal number of corresponding fragment in the query.
+  optional int32 fragment_idx = 1;
+
+  // Map from plan node id to initial scan ranges for each scan node in
+  // TPlanFragment.plan_tree
+  map<int32, ScanRangesPB> per_node_scan_ranges = 2;
+
+  // List of input join build finstances for joins in this finstance.
+  repeated JoinBuildInputPB join_build_inputs = 3;
+}
+
 // ExecQueryFInstances
 message ExecQueryFInstancesRequestPB {
   // This backend's index into Coordinator::backend_states_, needed for subsequent rpcs to
@@ -268,6 +333,14 @@ message ExecQueryFInstancesRequestPB {
   // The backend memory limit (in bytes) as set by the admission controller. Used by the
   // query mem tracker to enforce the memory limit.
   optional int64 per_backend_mem_limit = 6;
+
+  // General execution parameters for different fragments. Corresponds to 'fragments' in
+  // the TExecPlanFragmentInfo sidecar.
+  repeated PlanFragmentCtxPB fragment_ctxs = 7;
+
+  // Execution parameters for specific fragment instances. Corresponds to
+  // 'fragment_instance_ctxs' in the TExecPlanFragmentInfo sidecar.
+  repeated PlanFragmentInstanceCtxPB fragment_instance_ctxs = 8;
 }
 
 message ExecQueryFInstancesResponsePB {

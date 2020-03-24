@@ -28,11 +28,9 @@
 
 using namespace impala;
 
-DataSink* NljBuilderConfig::CreateSink(const TPlanFragmentCtx& fragment_ctx,
-    const TPlanFragmentInstanceCtx& fragment_instance_ctx,
-    RuntimeState* state) const {
+DataSink* NljBuilderConfig::CreateSink(RuntimeState* state) const {
   // We have one fragment per sink, so we can use the fragment index as the sink ID.
-  TDataSinkId sink_id = fragment_ctx.fragment.idx;
+  TDataSinkId sink_id = state->fragment().idx;
   return NljBuilder::CreateSeparateBuilder(sink_id, *this, state);
 }
 

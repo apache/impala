@@ -78,12 +78,13 @@ Status KuduScanNodeBase::Prepare(RuntimeState* state) {
   DCHECK(state->desc_tbl().GetTupleDescriptor(tuple_id_) != NULL);
   tuple_desc_ = state->desc_tbl().GetTupleDescriptor(tuple_id_);
 
-  // Initialize the list of scan tokens to process from the TScanRangeParams.
+  // Initialize the list of scan tokens to process from the ScanRangeParamsPB.
   DCHECK(scan_range_params_ != NULL);
   int num_remote_tokens = 0;
-  for (const TScanRangeParams& params: *scan_range_params_) {
-    if (params.__isset.is_remote && params.is_remote) ++num_remote_tokens;
-    scan_tokens_.push_back(params.scan_range.kudu_scan_token);
+  for (const ScanRangeParamsPB& params : *scan_range_params_) {
+    if (params.has_is_remote() && params.is_remote()) ++num_remote_tokens;
+    DCHECK(params.scan_range().has_kudu_scan_token());
+    scan_tokens_.push_back(params.scan_range().kudu_scan_token());
   }
   COUNTER_SET(kudu_remote_tokens_, num_remote_tokens);
 

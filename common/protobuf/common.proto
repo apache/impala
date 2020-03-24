@@ -39,11 +39,22 @@ message UniqueIdPB {
   required fixed64 lo = 2;
 }
 
-// The compression codec. Currently used in row batch's header to
-// indicate the type of compression applied to the row batch.
-enum CompressionType {
-  NONE = 0; // No compression.
-  LZ4 = 1;
+// The compression codec. Currently used to indicate the compression used in
+// row batches and HDFS files. Corresponds to THdfsCompression.
+enum CompressionTypePB {
+  NONE = 0;
+  DEFAULT = 1;
+  GZIP = 2;
+  DEFLATE = 3;
+  BZIP2 = 4;
+  SNAPPY = 5;
+  SNAPPY_BLOCKED = 6;
+  LZO = 7;
+  LZ4 = 8;
+  ZLIB = 9;
+  ZSTD = 10;
+  BROTLI = 11;
+  LZ4_BLOCKED = 12;
 }
 
 // This is a union over all possible return types.

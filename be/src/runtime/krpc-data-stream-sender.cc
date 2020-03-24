@@ -89,18 +89,18 @@ Status KrpcDataStreamSenderConfig::Init(
     exchange_hash_seed_ =
         KrpcDataStreamSender::EXCHANGE_HASH_SEED_CONST ^ state->query_id().hi;
   }
-  num_channels_ = state->fragment_ctx().destinations.size();
+  num_channels_ = state->fragment_ctx().destinations().size();
   state->CheckAndAddCodegenDisabledMessage(codegen_status_msgs_);
   return Status::OK();
 }
 
-DataSink* KrpcDataStreamSenderConfig::CreateSink(const TPlanFragmentCtx& fragment_ctx,
-    const TPlanFragmentInstanceCtx& fragment_instance_ctx, RuntimeState* state) const {
+DataSink* KrpcDataStreamSenderConfig::CreateSink(RuntimeState* state) const {
   // We have one fragment per sink, so we can use the fragment index as the sink ID.
-  TDataSinkId sink_id = fragment_ctx.fragment.idx;
-  return state->obj_pool()->Add(new KrpcDataStreamSender(sink_id,
-      fragment_instance_ctx.sender_id, *this, tsink_->stream_sink,
-      fragment_ctx.destinations, FLAGS_data_stream_sender_buffer_size, state));
+  TDataSinkId sink_id = state->fragment().idx;
+  return state->obj_pool()->Add(
+      new KrpcDataStreamSender(sink_id, state->instance_ctx().sender_id, *this,
+          tsink_->stream_sink, state->fragment_ctx().destinations(),
+          FLAGS_data_stream_sender_buffer_size, state));
 }
 
 void KrpcDataStreamSenderConfig::Close() {
@@ -148,8 +148,8 @@ class KrpcDataStreamSender::Channel : public CacheLineAligned {
   // data is getting accumulated before being sent; it only applies when data is added via
   // AddRow() and not sent directly via SendBatch().
   Channel(KrpcDataStreamSender* parent, const RowDescriptor* row_desc,
-      const std::string& hostname, const TNetworkAddress& destination,
-      const TUniqueId& fragment_instance_id, PlanNodeId dest_node_id, int buffer_size)
+      const std::string& hostname, const NetworkAddressPB& destination,
+      const UniqueIdPB& fragment_instance_id, PlanNodeId dest_node_id, int buffer_size)
     : parent_(parent),
       row_desc_(row_desc),
       hostname_(hostname),
@@ -216,8 +216,8 @@ class KrpcDataStreamSender::Channel : public CacheLineAligned {
 
   // The triplet of IP-address:port/finst-id/node-id uniquely identifies the receiver.
   const std::string hostname_;
-  const TNetworkAddress address_;
-  const TUniqueId fragment_instance_id_;
+  const NetworkAddressPB address_;
+  const UniqueIdPB fragment_instance_id_;
   const PlanNodeId dest_node_id_;
 
   // The row batch for accumulating rows copied from AddRow().
@@ -373,7 +373,8 @@ Status KrpcDataStreamSender::Channel::Init(RuntimeState* state) {
   batch_.reset(new RowBatch(row_desc_, capacity, parent_->mem_tracker()));
 
   // Create a DataStreamService proxy to the destination.
-  RETURN_IF_ERROR(DataStreamService::GetProxy(address_, hostname_, &proxy_));
+  RETURN_IF_ERROR(
+      DataStreamService::GetProxy(FromNetworkAddressPB(address_), hostname_, &proxy_));
   return Status::OK();
 }
 
@@ -390,7 +391,7 @@ template <typename ResponsePBType>
 void KrpcDataStreamSender::Channel::LogSlowRpc(
     const char* rpc_name, int64_t total_time_ns, const ResponsePBType& resp) {
   int64_t network_time_ns = total_time_ns - resp_.receiver_latency_ns();
-  LOG(INFO) << "Slow " << rpc_name << " RPC to " << TNetworkAddressToString(address_)
+  LOG(INFO) << "Slow " << rpc_name << " RPC to " << address_
             << " (fragment_instance_id=" << PrintId(fragment_instance_id_) << "): "
             << "took " << PrettyPrinter::Print(total_time_ns, TUnit::TIME_NS) << ". "
             << "Receiver time: "
@@ -400,7 +401,7 @@ void KrpcDataStreamSender::Channel::LogSlowRpc(
 
 void KrpcDataStreamSender::Channel::LogSlowFailedRpc(
     const char* rpc_name, int64_t total_time_ns, const kudu::Status& err) {
-  LOG(INFO) << "Slow " << rpc_name << " RPC to " << TNetworkAddressToString(address_)
+  LOG(INFO) << "Slow " << rpc_name << " RPC to " << address_
             << " (fragment_instance_id=" << PrintId(fragment_instance_id_) << "): "
             << "took " << PrettyPrinter::Print(total_time_ns, TUnit::TIME_NS) << ". "
             << "Error: " << err.ToString();
@@ -424,7 +425,7 @@ Status KrpcDataStreamSender::Channel::WaitForRpcLocked(std::unique_lock<SpinLock
   }
   int64_t elapsed_time_ns = timer.ElapsedTime();
   if (IsSlowRpc(elapsed_time_ns)) {
-    LOG(INFO) << "Long delay waiting for RPC to " << TNetworkAddressToString(address_)
+    LOG(INFO) << "Long delay waiting for RPC to " << address_
               << " (fragment_instance_id=" << PrintId(fragment_instance_id_) << "): "
               << "took " << PrettyPrinter::Print(elapsed_time_ns, TUnit::TIME_NS);
   }
@@ -437,9 +438,9 @@ Status KrpcDataStreamSender::Channel::WaitForRpcLocked(std::unique_lock<SpinLock
 
   DCHECK(!rpc_in_flight_);
   if (UNLIKELY(!rpc_status_.ok())) {
-    LOG(ERROR) << "channel send to " << TNetworkAddressToString(address_) << " failed: "
-               << "(fragment_instance_id=" << PrintId(fragment_instance_id_) << "): "
-               << rpc_status_.GetDetail();
+    LOG(ERROR) << "channel send to " << address_ << " failed: (fragment_instance_id="
+               << PrintId(fragment_instance_id_)
+               << "): " << rpc_status_.GetDetail();
     return rpc_status_;
   }
   return Status::OK();
@@ -523,7 +524,7 @@ void KrpcDataStreamSender::Channel::TransmitDataCompleteCb() {
     DoRpcFn rpc_fn =
         boost::bind(&KrpcDataStreamSender::Channel::DoTransmitDataRpc, this);
     const string& prepend =
-        Substitute("TransmitData() to $0 failed", TNetworkAddressToString(address_));
+        Substitute("TransmitData() to $0 failed", NetworkAddressPBToString(address_));
     HandleFailedRPC(rpc_fn, controller_status, prepend);
   }
 }
@@ -534,9 +535,7 @@ Status KrpcDataStreamSender::Channel::DoTransmitDataRpc() {
 
   // Initialize some constant fields in the request protobuf.
   TransmitDataRequestPB req;
-  UniqueIdPB* finstance_id_pb = req.mutable_dest_fragment_instance_id();
-  finstance_id_pb->set_lo(fragment_instance_id_.lo);
-  finstance_id_pb->set_hi(fragment_instance_id_.hi);
+  *req.mutable_dest_fragment_instance_id() = fragment_instance_id_;
   req.set_sender_id(parent_->sender_id_);
   req.set_dest_node_id(dest_node_id_);
 
@@ -641,7 +640,7 @@ void KrpcDataStreamSender::Channel::EndDataStreamCompleteCb() {
     DoRpcFn rpc_fn =
         boost::bind(&KrpcDataStreamSender::Channel::DoEndDataStreamRpc, this);
     const string& prepend =
-        Substitute("EndDataStream() to $0 failed", TNetworkAddressToString(address_));
+        Substitute("EndDataStream() to $0 failed", NetworkAddressPBToString(address_));
     HandleFailedRPC(rpc_fn, controller_status, prepend);
   }
 }
@@ -650,9 +649,7 @@ Status KrpcDataStreamSender::Channel::DoEndDataStreamRpc() {
   DCHECK(rpc_in_flight_);
   EndDataStreamRequestPB eos_req;
   rpc_controller_.Reset();
-  UniqueIdPB* finstance_id_pb = eos_req.mutable_dest_fragment_instance_id();
-  finstance_id_pb->set_lo(fragment_instance_id_.lo);
-  finstance_id_pb->set_hi(fragment_instance_id_.hi);
+  *eos_req.mutable_dest_fragment_instance_id() = fragment_instance_id_;
   eos_req.set_sender_id(parent_->sender_id_);
   eos_req.set_dest_node_id(dest_node_id_);
   eos_resp_.Clear();
@@ -710,7 +707,7 @@ void KrpcDataStreamSender::Channel::Teardown(RuntimeState* state) {
 
 KrpcDataStreamSender::KrpcDataStreamSender(TDataSinkId sink_id, int sender_id,
     const KrpcDataStreamSenderConfig& sink_config, const TDataStreamSink& sink,
-    const std::vector<TPlanFragmentDestination>& destinations,
+    const google::protobuf::RepeatedPtrField<PlanFragmentDestinationPB>& destinations,
     int per_channel_buffer_size, RuntimeState* state)
   : DataSink(sink_id, sink_config,
         Substitute("KrpcDataStreamSender (dst_id=$0)", sink.dest_node_id), state),
@@ -728,11 +725,10 @@ KrpcDataStreamSender::KrpcDataStreamSender(TDataSinkId sink_id, int sender_id,
       || sink.output_partition.type == TPartitionType::RANDOM
       || sink.output_partition.type == TPartitionType::KUDU);
 
-  for (int i = 0; i < destinations.size(); ++i) {
-    channels_.emplace_back(
-        new Channel(this, row_desc_, destinations[i].thrift_backend.hostname,
-            destinations[i].krpc_backend, destinations[i].fragment_instance_id,
-            sink.dest_node_id, per_channel_buffer_size));
+  for (const auto& destination : destinations) {
+    channels_.emplace_back(new Channel(this, row_desc_,
+        destination.thrift_backend().hostname(), destination.krpc_backend(),
+        destination.fragment_instance_id(), sink.dest_node_id, per_channel_buffer_size));
   }
 
   if (partition_type_ == TPartitionType::UNPARTITIONED

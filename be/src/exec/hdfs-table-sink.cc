@@ -64,9 +64,8 @@ Status HdfsTableSinkConfig::Init(
   return Status::OK();
 }
 
-DataSink* HdfsTableSinkConfig::CreateSink(const TPlanFragmentCtx& fragment_ctx,
-    const TPlanFragmentInstanceCtx& fragment_instance_ctx, RuntimeState* state) const {
-  TDataSinkId sink_id = fragment_ctx.fragment.idx;
+DataSink* HdfsTableSinkConfig::CreateSink(RuntimeState* state) const {
+  TDataSinkId sink_id = state->fragment().idx;
   return state->obj_pool()->Add(
       new HdfsTableSink(sink_id, *this, this->tsink_->table_sink.hdfs_table_sink, state));
 }

@@ -42,6 +42,7 @@ add_library(Util
   codec.cc
   collection-metrics.cc
   common-metrics.cc
+  compression-util.cc
   compress.cc
   cpu-info.cc
   cyclic-barrier.cc

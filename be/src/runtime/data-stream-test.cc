@@ -154,10 +154,11 @@ class DataStreamTest : public testing::Test {
     ABORT_IF_ERROR(exec_env_->InitForFeTests());
     exec_env_->InitBufferPool(32 * 1024, 1024 * 1024 * 1024, 32 * 1024);
     runtime_state_.reset(new RuntimeState(TQueryCtx(), exec_env_.get()));
-    TPlanFragmentCtx* fragment_ctx =
-        runtime_state_->obj_pool()->Add(new TPlanFragmentCtx());
+    TPlanFragment* fragment = runtime_state_->obj_pool()->Add(new TPlanFragment());
+    PlanFragmentCtxPB* fragment_ctx =
+        runtime_state_->obj_pool()->Add(new PlanFragmentCtxPB());
     fragment_state_ = runtime_state_->obj_pool()->Add(
-        new FragmentState(runtime_state_->query_state(), *fragment_ctx));
+        new FragmentState(runtime_state_->query_state(), *fragment, *fragment_ctx));
     mem_pool_.reset(new MemPool(&tracker_));
 
     // Register a BufferPool client for allocating buffers for row batches.
@@ -176,8 +177,8 @@ class DataStreamTest : public testing::Test {
     tsort_info_.is_asc_order.push_back(true);
     tsort_info_.nulls_first.push_back(true);
 
-    next_instance_id_.lo = 0;
-    next_instance_id_.hi = 0;
+    next_instance_id_.set_lo(0);
+    next_instance_id_.set_hi(0);
     stream_mgr_ = exec_env_->stream_mgr();
 
     broadcast_sink_.dest_node_id = DEST_NODE_ID;
@@ -243,7 +244,7 @@ class DataStreamTest : public testing::Test {
   void Reset() {
     sender_info_.clear();
     receiver_info_.clear();
-    dest_.clear();
+    dest_.Clear();
   }
 
   ObjectPool obj_pool_;
@@ -256,7 +257,7 @@ class DataStreamTest : public testing::Test {
   boost::scoped_ptr<ExecEnv> exec_env_;
   scoped_ptr<RuntimeState> runtime_state_;
   FragmentState* fragment_state_;
-  TUniqueId next_instance_id_;
+  UniqueIdPB next_instance_id_;
   string stmt_;
   // The sorting expression for the single BIGINT column.
   vector<ScalarExpr*> ordering_exprs_;
@@ -282,7 +283,7 @@ class DataStreamTest : public testing::Test {
   TDataStreamSink broadcast_sink_;
   TDataStreamSink random_sink_;
   TDataStreamSink hash_sink_;
-  vector<TPlanFragmentDestination> dest_;
+  google::protobuf::RepeatedPtrField<PlanFragmentDestinationPB> dest_;
 
   struct SenderInfo {
     unique_ptr<thread> thread_handle;
@@ -318,14 +319,12 @@ class DataStreamTest : public testing::Test {
 
   // Create an instance id and add it to dest_
   void GetNextInstanceId(TUniqueId* instance_id) {
-    dest_.push_back(TPlanFragmentDestination());
-    TPlanFragmentDestination& dest = dest_.back();
-    dest.fragment_instance_id = next_instance_id_;
-    dest.thrift_backend.hostname = "localhost";
-    dest.thrift_backend.port = FLAGS_port;
-    dest.__set_krpc_backend(krpc_address_);
-    *instance_id = next_instance_id_;
-    ++next_instance_id_.lo;
+    PlanFragmentDestinationPB* dest = dest_.Add();
+    *dest->mutable_fragment_instance_id() = next_instance_id_;
+    *dest->mutable_thrift_backend() = MakeNetworkAddressPB("localhost", FLAGS_port);
+    *dest->mutable_krpc_backend() = FromTNetworkAddress(krpc_address_);
+    UniqueIdPBToTUniqueId(next_instance_id_, instance_id);
+    next_instance_id_.set_lo(next_instance_id_.lo() + 1);
   }
 
   // RowDescriptor to mimic "select bigint_col from alltypesagg", except the slot
@@ -592,10 +591,11 @@ class DataStreamTest : public testing::Test {
     RuntimeState state(TQueryCtx(), exec_env_.get(), desc_tbl_);
     VLOG_QUERY << "create sender " << sender_num;
     const TDataSink sink = GetSink(partition_type);
-    TPlanFragmentCtx fragment_ctx;
-    fragment_ctx.fragment.output_sink = sink;
-    fragment_ctx.destinations = dest_;
-    FragmentState fragment_state(state.query_state(), fragment_ctx);
+    TPlanFragment fragment;
+    fragment.output_sink = sink;
+    PlanFragmentCtxPB fragment_ctx;
+    *fragment_ctx.mutable_destinations() = dest_;
+    FragmentState fragment_state(state.query_state(), fragment, fragment_ctx);
     DataSinkConfig* data_sink = nullptr;
     EXPECT_OK(DataSinkConfig::CreateConfig(sink, row_desc_, &fragment_state, &data_sink));
 

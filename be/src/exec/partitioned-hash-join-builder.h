@@ -51,9 +51,7 @@ class ScalarExprEvaluator;
 /// DataSinkConfig::CreateSink() are not implemented for it.
 class PhjBuilderConfig : public JoinBuilderConfig {
  public:
-  DataSink* CreateSink(const TPlanFragmentCtx& fragment_ctx,
-    const TPlanFragmentInstanceCtx& fragment_instance_ctx,
-    RuntimeState* state) const override;
+  DataSink* CreateSink(RuntimeState* state) const override;
 
   /// Creates a PhjBuilder for embedded use within a PartitionedHashJoinNode.
   PhjBuilder* CreateSink(BufferPool::ClientHandle* buffer_pool_client,

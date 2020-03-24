@@ -14,28 +14,18 @@
 // KIND, either express or implied.  See the License for the
 // specific language governing permissions and limitations
 // under the License.
-//
 
-syntax="proto2";
+#pragma once
 
-package impala;
+#include "gen-cpp/CatalogObjects_types.h"
+#include "gen-cpp/common.pb.h"
 
-import "common.proto";
+namespace impala {
 
-// The serialized version of a header of a RowBatch (in be/src/runtime/row-batch.h).
-// It contains the meta-data of a row batch. The actual data of a row batch is sent
-// as KRPC sidecars. Please see TransmitDataRequestPB for details.
-// All fields are required in V1.
-message RowBatchHeaderPB {
-  // Total number of rows contained in this batch.
-  optional int32 num_rows = 1;
+// Convert THdfsCompression to the equivalent protobuf enum.
+CompressionTypePB THdfsCompressionToProto(const THdfsCompression::type& compression);
 
-  // Number of tuples per row in this batch.
-  optional int32 num_tuples_per_row = 2;
+// Convert CompressionTypePB to the equivalent thrift enum.
+THdfsCompression::type CompressionTypePBToThrift(const CompressionTypePB& compression);
 
-  // Size of 'tuple_data' in bytes before any compression is applied.
-  optional int64 uncompressed_size = 3;
-
-  // The compression codec (if any) used for compressing the row batch.
-  optional CompressionTypePB compression_type = 4;
-}
+} // namespace impala

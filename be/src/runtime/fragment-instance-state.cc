@@ -54,6 +54,7 @@
 
 #include "common/names.h"
 
+using google::protobuf::RepeatedPtrField;
 using kudu::rpc::RpcContext;
 using namespace impala;
 using namespace apache::thrift;
@@ -67,11 +68,14 @@ static const string PREPARE_TIMER_NAME = "PrepareTime";
 static const string EXEC_TIMER_NAME = "ExecTime";
 
 FragmentInstanceState::FragmentInstanceState(QueryState* query_state,
-    FragmentState* fragment_state, const TPlanFragmentInstanceCtx& instance_ctx)
+    FragmentState* fragment_state, const TPlanFragmentInstanceCtx& instance_ctx,
+    const PlanFragmentInstanceCtxPB& instance_ctx_pb)
   : query_state_(query_state),
     fragment_state_(fragment_state),
+    fragment_(fragment_state->fragment()),
+    instance_ctx_(instance_ctx),
     fragment_ctx_(fragment_state->fragment_ctx()),
-    instance_ctx_(instance_ctx) {}
+    instance_ctx_pb_(instance_ctx_pb) {}
 
 Status FragmentInstanceState::Exec() {
   bool is_prepared = false;
@@ -139,8 +143,8 @@ Status FragmentInstanceState::Prepare() {
 
   // Do not call RETURN_IF_ERROR or explicitly return before this line,
   // runtime_state_ != nullptr is a postcondition of this function.
-  runtime_state_ = obj_pool()->Add(new RuntimeState(
-      query_state_, fragment_ctx_, instance_ctx_, ExecEnv::GetInstance()));
+  runtime_state_ = obj_pool()->Add(new RuntimeState(query_state_, fragment_,
+      instance_ctx_, fragment_ctx_, instance_ctx_pb_, ExecEnv::GetInstance()));
 
   // total_time_counter() is in the runtime_state_ so start it up now.
   SCOPED_TIMER(profile()->total_time_counter());
@@ -197,12 +201,12 @@ Status FragmentInstanceState::Prepare() {
 
   // set scan ranges
   vector<ExecNode*> scan_nodes;
-  vector<TScanRangeParams> no_scan_ranges;
+  ScanRangesPB no_scan_ranges;
   exec_tree_->CollectScanNodes(&scan_nodes);
   for (ExecNode* scan_node: scan_nodes) {
-    const vector<TScanRangeParams>& scan_ranges = FindWithDefault(
-        instance_ctx_.per_node_scan_ranges, scan_node->id(), no_scan_ranges);
-    static_cast<ScanNode*>(scan_node)->SetScanRanges(scan_ranges);
+    const ScanRangesPB& scan_ranges = FindWithDefault(
+        instance_ctx_pb_.per_node_scan_ranges(), scan_node->id(), no_scan_ranges);
+    static_cast<ScanNode*>(scan_node)->SetScanRanges(scan_ranges.scan_ranges());
   }
 
   RuntimeProfile::Counter* prepare_timer =
@@ -216,7 +220,7 @@ Status FragmentInstanceState::Prepare() {
   // prepare sink_
   const DataSinkConfig* sink_config = fragment_state_->sink_config();
   DCHECK(sink_config != nullptr);
-  sink_ = sink_config->CreateSink(fragment_ctx_, instance_ctx_, runtime_state_);
+  sink_ = sink_config->CreateSink(runtime_state_);
   RETURN_IF_ERROR(sink_->Prepare(runtime_state_, runtime_state_->instance_mem_tracker()));
   RuntimeProfile* sink_profile = sink_->profile();
   if (sink_profile != nullptr) profile()->AddChild(sink_profile);
@@ -396,7 +400,7 @@ void FragmentInstanceState::Close() {
 
   // If we haven't already released this thread token in Prepare(), release
   // it before calling Close().
-  if (fragment_ctx_.fragment.output_sink.type != TDataSinkType::PLAN_ROOT_SINK) {
+  if (fragment_.output_sink.type != TDataSinkType::PLAN_ROOT_SINK) {
     ReleaseThreadToken();
   }
 
@@ -536,13 +540,13 @@ const string& FragmentInstanceState::ExecStateToString(FInstanceExecStatePB stat
 }
 
 PlanRootSink* FragmentInstanceState::GetRootSink() const {
-  return fragment_ctx_.fragment.output_sink.type == TDataSinkType::PLAN_ROOT_SINK ?
+  return fragment_.output_sink.type == TDataSinkType::PLAN_ROOT_SINK ?
       static_cast<PlanRootSink*>(sink_) :
       nullptr;
 }
 
 bool FragmentInstanceState::HasJoinBuildSink() const {
-  return IsJoinBuildSink(fragment_ctx_.fragment.output_sink.type);
+  return IsJoinBuildSink(fragment_.output_sink.type);
 }
 
 JoinBuilder* FragmentInstanceState::GetJoinBuildSink() const {
@@ -562,11 +566,11 @@ RuntimeProfile* FragmentInstanceState::profile() const {
 }
 
 void FragmentInstanceState::PrintVolumeIds() {
-  if (instance_ctx_.per_node_scan_ranges.empty()) return;
+  if (instance_ctx_pb_.per_node_scan_ranges().empty()) return;
 
   HdfsScanNodeBase::PerVolumeStats per_volume_stats;
-  for (const PerNodeScanRanges::value_type& entry: instance_ctx_.per_node_scan_ranges) {
-    HdfsScanNodeBase::UpdateHdfsSplitStats(entry.second, &per_volume_stats);
+  for (const auto& entry : instance_ctx_pb_.per_node_scan_ranges()) {
+    HdfsScanNodeBase::UpdateHdfsSplitStats(entry.second.scan_ranges(), &per_volume_stats);
   }
 
   stringstream str;

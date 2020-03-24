@@ -53,8 +53,7 @@ class DataSinkConfig {
   virtual ~DataSinkConfig() {}
 
   /// Create its corresponding DataSink. Place the sink in state->obj_pool().
-  virtual DataSink* CreateSink(const TPlanFragmentCtx& fragment_ctx,
-    const TPlanFragmentInstanceCtx& fragment_instance_ctx, RuntimeState* state) const = 0;
+  virtual DataSink* CreateSink(RuntimeState* state) const = 0;
 
   /// Codegen expressions in the sink. Overridden by sink type which supports codegen.
   /// No-op by default.

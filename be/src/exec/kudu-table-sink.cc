@@ -67,9 +67,8 @@ namespace impala {
 // Send 7MB buffers to Kudu, matching a hard-coded size in Kudu (KUDU-1693).
 const static int INDIVIDUAL_BUFFER_SIZE = 7 * 1024 * 1024;
 
-DataSink* KuduTableSinkConfig::CreateSink(const TPlanFragmentCtx& fragment_ctx,
-    const TPlanFragmentInstanceCtx& fragment_instance_ctx, RuntimeState* state) const {
-  TDataSinkId sink_id = fragment_ctx.fragment.idx;
+DataSink* KuduTableSinkConfig::CreateSink(RuntimeState* state) const {
+  TDataSinkId sink_id = state->fragment().idx;
   return state->obj_pool()->Add(
       new KuduTableSink(sink_id, *this, tsink_->table_sink, state));
 }

@@ -34,6 +34,7 @@
 #include "util/runtime-profile-counters.h"
 #include "util/thread.h"
 #include "util/time.h"
+#include "util/uid-util.h"
 
 #include "gen-cpp/PlanNodes_types.h"
 
@@ -189,16 +190,17 @@ Status BlockingJoinNode::OpenImpl(RuntimeState* state, JoinBuilder** separate_bu
   if (UseSeparateBuild(state->query_options())) {
     // Find the input fragment's build sink. We do this in the Open() phase so we don't
     // block this finstance's Prepare() phase on the build finstance's Prepare() phase.
-    const vector<TJoinBuildInput>& build_inputs =
-        state->instance_ctx().join_build_inputs;
+    const google::protobuf::RepeatedPtrField<JoinBuildInputPB>& build_inputs =
+        state->instance_ctx_pb().join_build_inputs();
     auto it = std::find_if(build_inputs.begin(), build_inputs.end(),
-        [this](const TJoinBuildInput& bi) { return bi.join_node_id == id_; });
+        [this](const JoinBuildInputPB& bi) { return bi.join_node_id() == id_; });
     DCHECK(it != build_inputs.end());
     FragmentInstanceState* build_finstance;
-    RETURN_IF_ERROR(state->query_state()->GetFInstanceState(
-        it->input_finstance_id, &build_finstance));
-    TDataSinkType::type build_sink_type =
-        build_finstance->fragment_ctx().fragment.output_sink.type;
+    TUniqueId input_finstance_id;
+    UniqueIdPBToTUniqueId(it->input_finstance_id(), &input_finstance_id);
+    RETURN_IF_ERROR(
+        state->query_state()->GetFInstanceState(input_finstance_id, &build_finstance));
+    TDataSinkType::type build_sink_type = build_finstance->fragment().output_sink.type;
     DCHECK(IsJoinBuildSink(build_sink_type));
     *separate_builder = build_finstance->GetJoinBuildSink();
     DCHECK(*separate_builder != nullptr);
