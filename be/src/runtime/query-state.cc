@@ -209,10 +209,16 @@ Status QueryState::Init(const ExecQueryFInstancesRequestPB* exec_rpc_params,
 
   // don't copy query_ctx, it's large and we already did that in the c'tor
   exec_rpc_params_.set_coord_state_idx(exec_rpc_params->coord_state_idx());
+  exec_rpc_params_.mutable_fragment_ctxs()->Swap(
+      const_cast<google::protobuf::RepeatedPtrField<impala::PlanFragmentCtxPB>*>(
+          &exec_rpc_params->fragment_ctxs()));
+  exec_rpc_params_.mutable_fragment_instance_ctxs()->Swap(
+      const_cast<google::protobuf::RepeatedPtrField<impala::PlanFragmentInstanceCtxPB>*>(
+          &exec_rpc_params->fragment_instance_ctxs()));
   TExecPlanFragmentInfo& non_const_fragment_info =
       const_cast<TExecPlanFragmentInfo&>(fragment_info);
-  fragment_info_.fragment_ctxs.swap(non_const_fragment_info.fragment_ctxs);
-  fragment_info_.__isset.fragment_ctxs = true;
+  fragment_info_.fragments.swap(non_const_fragment_info.fragments);
+  fragment_info_.__isset.fragments = true;
   fragment_info_.fragment_instance_ctxs.swap(
       non_const_fragment_info.fragment_instance_ctxs);
   fragment_info_.__isset.fragment_instance_ctxs = true;
@@ -286,13 +292,12 @@ bool VerifyFiltersProduced(const vector<TPlanFragmentInstanceCtx>& instance_ctxs
 Status QueryState::InitFilterBank() {
   int64_t runtime_filters_reservation_bytes = 0;
   int fragment_ctx_idx = -1;
-  const vector<TPlanFragmentCtx>& fragment_ctxs = fragment_info_.fragment_ctxs;
+  const vector<TPlanFragment>& fragments = fragment_info_.fragments;
   const vector<TPlanFragmentInstanceCtx>& instance_ctxs =
       fragment_info_.fragment_instance_ctxs;
   // Add entries for all produced and consumed filters.
   unordered_map<int32_t, FilterRegistration> filters;
-  for (const TPlanFragmentCtx& fragment_ctx : fragment_ctxs) {
-    const TPlanFragment& fragment = fragment_ctx.fragment;
+  for (const TPlanFragment& fragment : fragments) {
     for (const TPlanNode& plan_node : fragment.plan.nodes) {
       if (!plan_node.__isset.runtime_filters) continue;
       for (const TRuntimeFilterDesc& filter : plan_node.runtime_filters) {
@@ -315,15 +320,15 @@ Status QueryState::InitFilterBank() {
       << "Filters produced by all instances on the same backend should be the same";
   for (const TPlanFragmentInstanceCtx& instance_ctx : instance_ctxs) {
     bool first_instance_of_fragment = fragment_ctx_idx == -1
-        || fragment_ctxs[fragment_ctx_idx].fragment.idx != instance_ctx.fragment_idx;
+        || fragments[fragment_ctx_idx].idx != instance_ctx.fragment_idx;
     if (first_instance_of_fragment) {
       ++fragment_ctx_idx;
-      DCHECK_EQ(fragment_ctxs[fragment_ctx_idx].fragment.idx, instance_ctx.fragment_idx);
+      DCHECK_EQ(fragments[fragment_ctx_idx].idx, instance_ctx.fragment_idx);
     }
     // TODO: this over-reserves memory a bit in a couple of cases:
     // * if different fragments on this backend consume or produce the same filter.
     // * if a finstance was chosen not to produce a global broadcast filter.
-    const TPlanFragment& fragment = fragment_ctxs[fragment_ctx_idx].fragment;
+    const TPlanFragment& fragment = fragments[fragment_ctx_idx];
     runtime_filters_reservation_bytes +=
         fragment.produced_runtime_filters_reservation_bytes;
     if (first_instance_of_fragment) {
@@ -617,7 +622,7 @@ bool QueryState::StartFInstances() {
   DCHECK_GT(refcnt_.Load(), 0);
   DCHECK_GT(backend_resource_refcnt_.Load(), 0) << "Should have been taken in Init()";
 
-  DCHECK_GT(fragment_info_.fragment_ctxs.size(), 0);
+  DCHECK_GT(fragment_info_.fragments.size(), 0);
   vector<unique_ptr<Thread>> codegen_threads;
   int num_unstarted_instances = fragment_info_.fragment_instance_ctxs.size();
 
@@ -629,16 +634,20 @@ bool QueryState::StartFInstances() {
   VLOG(2) << "descriptor table for query=" << PrintId(query_id())
           << "\n" << desc_tbl_->DebugString();
 
-  start_finstances_status =
-      FragmentState::CreateFragmentStateMap(fragment_info_, this, fragment_state_map_);
+  start_finstances_status = FragmentState::CreateFragmentStateMap(
+      fragment_info_, exec_rpc_params_, this, fragment_state_map_);
   if (UNLIKELY(!start_finstances_status.ok())) goto error;
 
   fragment_events_start_time_ = MonotonicStopWatch::Now();
   for (auto& fragment : fragment_state_map_) {
     FragmentState* fragment_state = fragment.second;
-    for (const TPlanFragmentInstanceCtx* instance_ctx : fragment_state->instance_ctxs()) {
-      FragmentInstanceState* fis =
-          obj_pool_.Add(new FragmentInstanceState(this, fragment_state, *instance_ctx));
+    for (int i = 0; i < fragment_state->instance_ctxs().size(); ++i) {
+      const TPlanFragmentInstanceCtx* instance_ctx = fragment_state->instance_ctxs()[i];
+      const PlanFragmentInstanceCtxPB* instance_ctx_pb =
+          fragment_state->instance_ctx_pbs()[i];
+      DCHECK_EQ(instance_ctx->fragment_idx, instance_ctx_pb->fragment_idx());
+      FragmentInstanceState* fis = obj_pool_.Add(new FragmentInstanceState(
+          this, fragment_state, *instance_ctx, *instance_ctx_pb));
 
       // start new thread to execute instance
       refcnt_.Add(1); // decremented in ExecFInstance()

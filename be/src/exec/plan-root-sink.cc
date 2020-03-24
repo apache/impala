@@ -37,13 +37,12 @@ using std::unique_lock;
 
 namespace impala {
 
-DataSink* PlanRootSinkConfig::CreateSink(const TPlanFragmentCtx& fragment_ctx,
-    const TPlanFragmentInstanceCtx& fragment_instance_ctx, RuntimeState* state) const {
-  TDataSinkId sink_id = fragment_ctx.fragment.idx;
+DataSink* PlanRootSinkConfig::CreateSink(RuntimeState* state) const {
+  TDataSinkId sink_id = state->fragment().idx;
   ObjectPool* pool = state->obj_pool();
   if (state->query_options().spool_query_results) {
     return pool->Add(new BufferedPlanRootSink(
-        sink_id, *this, state, fragment_instance_ctx.debug_options));
+        sink_id, *this, state, state->instance_ctx().debug_options));
   } else {
     return pool->Add(new BlockingPlanRootSink(sink_id, *this, state));
   }

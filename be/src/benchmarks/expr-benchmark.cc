@@ -84,10 +84,11 @@ class Planner {
     TNetworkAddress dummy;
     ImpalaServer::PrepareQueryContext(dummy, dummy, &query_ctx);
     runtime_state_.reset(new RuntimeState(query_ctx, &exec_env_));
-    TPlanFragmentCtx* fragment_ctx =
-        runtime_state_->obj_pool()->Add(new TPlanFragmentCtx());
+    TPlanFragment* fragment = runtime_state_->obj_pool()->Add(new TPlanFragment());
+    PlanFragmentCtxPB* fragment_ctx =
+        runtime_state_->obj_pool()->Add(new PlanFragmentCtxPB());
     fragment_state_ = runtime_state_->obj_pool()->Add(
-        new FragmentState(runtime_state_->query_state(), *fragment_ctx));
+        new FragmentState(runtime_state_->query_state(), *fragment, *fragment_ctx));
 
     return frontend_.GetExecRequest(query_ctx, result);
   }

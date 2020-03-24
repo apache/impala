@@ -180,7 +180,7 @@ class Scheduler {
     /// Pick an executor in round-robin fashion from multiple executors on a single host.
     void SelectExecutorOnHost(const IpAddr& executor_ip, BackendDescriptorPB* executor);
 
-    /// Build a new TScanRangeParams object and append it to the assignment list for the
+    /// Build a new ScanRangeParamsPB object and append it to the assignment list for the
     /// tuple (executor, node_id) in 'assignment'. Also, update assignment_heap_ and
     /// assignment_byte_counters_, increase the counters 'total_assignments_' and
     /// 'total_local_assignments_'. 'scan_range_locations' contains information about the
@@ -388,8 +388,8 @@ class Scheduler {
   /// positive. Only returns non-empty vectors: if there are not enough ranges
   /// to create 'max_num_instances', fewer instances are assigned ranges.
   /// May reorder ranges in 'ranges'.
-  static std::vector<std::vector<TScanRangeParams>> AssignRangesToInstances(
-      int max_num_instances, std::vector<TScanRangeParams>* ranges);
+  static std::vector<std::vector<ScanRangeParamsPB>> AssignRangesToInstances(
+      int max_num_instances, std::vector<ScanRangeParamsPB>* ranges);
 
   /// For each instance of fragment_params's input fragment, create a collocated
   /// instance for fragment_params's fragment.

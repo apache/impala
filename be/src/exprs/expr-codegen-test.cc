@@ -117,8 +117,10 @@ class ExprCodegenTest : public ::testing::Test {
     ASSERT_OK(test_env_->Init());
     ASSERT_OK(test_env_->CreateQueryState(0, &query_options, &runtime_state_));
     QueryState* qs = runtime_state_->query_state();
-    TPlanFragmentCtx* fragment_ctx = qs->obj_pool()->Add(new TPlanFragmentCtx());
-    fragment_state_ = qs->obj_pool()->Add(new FragmentState(qs, *fragment_ctx));
+    TPlanFragment* fragment = qs->obj_pool()->Add(new TPlanFragment());
+    PlanFragmentCtxPB* fragment_ctx = qs->obj_pool()->Add(new PlanFragmentCtxPB());
+    fragment_state_ =
+        qs->obj_pool()->Add(new FragmentState(qs, *fragment, *fragment_ctx));
 
     FunctionContext::TypeDesc return_type;
     return_type.type = FunctionContext::TYPE_DECIMAL;

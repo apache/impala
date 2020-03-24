@@ -104,19 +104,19 @@ Status HBaseScanNode::Prepare(RuntimeState* state) {
   // TODO(marcel): add int tuple_idx_[] indexed by TupleId somewhere in runtime-state.h
   tuple_idx_ = 0;
 
-  // Convert TScanRangeParams to ScanRanges
+  // Convert ScanRangeParamsPB to ScanRanges
   DCHECK(scan_range_params_ != NULL)
       << "Must call SetScanRanges() before calling Prepare()";
-  for (const TScanRangeParams& params: *scan_range_params_) {
-    DCHECK(params.scan_range.__isset.hbase_key_range);
-    const THBaseKeyRange& key_range = params.scan_range.hbase_key_range;
+  for (const ScanRangeParamsPB& params : *scan_range_params_) {
+    DCHECK(params.scan_range().has_hbase_key_range());
+    const HBaseKeyRangePB& key_range = params.scan_range().hbase_key_range();
     scan_range_vector_.push_back(HBaseTableScanner::ScanRange());
     HBaseTableScanner::ScanRange& sr = scan_range_vector_.back();
-    if (key_range.__isset.startKey) {
-      sr.set_start_key(key_range.startKey);
+    if (key_range.has_startkey()) {
+      sr.set_start_key(key_range.startkey());
     }
-    if (key_range.__isset.stopKey) {
-      sr.set_stop_key(key_range.stopKey);
+    if (key_range.has_stopkey()) {
+      sr.set_stop_key(key_range.stopkey());
     }
   }
   runtime_profile_->AddInfoString("Table Name", hbase_table->fully_qualified_name());

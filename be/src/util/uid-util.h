@@ -48,6 +48,12 @@ inline void TUniqueIdToUniqueIdPB(
   unique_id_pb->set_hi(t_unique_id.hi);
 }
 
+inline void UniqueIdPBToTUniqueId(
+    const UniqueIdPB& unique_id_pb, TUniqueId* t_unique_id) {
+  t_unique_id->__set_lo(unique_id_pb.lo());
+  t_unique_id->__set_hi(unique_id_pb.hi());
+}
+
 /// Query id: uuid with bottom 4 bytes set to 0
 /// Fragment instance id: query id with instance index stored in the bottom 4 bytes
 

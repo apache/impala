@@ -54,7 +54,7 @@ class ThreadResourcePool;
 class TUniqueId;
 class ExecEnv;
 class HBaseTableFactory;
-class TPlanFragmentCtx;
+class TPlanFragment;
 class TPlanFragmentInstanceCtx;
 class QueryState;
 class ConditionVariable;
@@ -81,8 +81,10 @@ class RuntimeState {
  public:
   /// query_state, fragment_ctx, and instance_ctx need to be alive at least as long as
   /// the constructed RuntimeState
-  RuntimeState(QueryState* query_state, const TPlanFragmentCtx& fragment_ctx,
-      const TPlanFragmentInstanceCtx& instance_ctx, ExecEnv* exec_env);
+  RuntimeState(QueryState* query_state, const TPlanFragment& fragment,
+      const TPlanFragmentInstanceCtx& instance_ctx,
+      const PlanFragmentCtxPB& fragment_ctx,
+      const PlanFragmentInstanceCtxPB& instance_ctx_pb, ExecEnv* exec_env);
 
   /// RuntimeState for test execution and fe-support.cc. Creates its own QueryState and
   /// installs desc_tbl, if set. If query_ctx.request_pool isn't set, sets it to "test-pool".
@@ -102,8 +104,10 @@ class RuntimeState {
   bool strict_mode() const { return query_options().strict_mode; }
   bool decimal_v2() const { return query_options().decimal_v2; }
   const TQueryCtx& query_ctx() const;
-  const TPlanFragmentCtx& fragment_ctx() const { return *fragment_ctx_; }
+  const TPlanFragment& fragment() const { return *fragment_; }
   const TPlanFragmentInstanceCtx& instance_ctx() const { return *instance_ctx_; }
+  const PlanFragmentCtxPB& fragment_ctx() const { return *fragment_ctx_; }
+  const PlanFragmentInstanceCtxPB& instance_ctx_pb() const { return *instance_ctx_pb_; }
   const TUniqueId& session_id() const { return query_ctx().session.session_id; }
   const std::string& do_as_user() const { return query_ctx().session.delegated_user; }
   const std::string& connected_user() const {
@@ -275,7 +279,7 @@ class RuntimeState {
   /// the posix error code of the failed RPC. The target node address and posix error code
   /// will be included in the AuxErrorInfo returned by GetAuxErrorInfo. This method is
   /// idempotent.
-  void SetRPCErrorInfo(TNetworkAddress dest_node, int16_t posix_error_code);
+  void SetRPCErrorInfo(NetworkAddressPB dest_node, int16_t posix_error_code);
 
   /// Returns true if this RuntimeState has any auxiliary error information, false
   /// otherwise. Currently, only SetRPCErrorInfo() sets aux error info.
@@ -308,8 +312,10 @@ class RuntimeState {
 
   /// Global QueryState and original thrift descriptors for this fragment instance.
   QueryState* const query_state_;
-  const TPlanFragmentCtx* const fragment_ctx_;
+  const TPlanFragment* const fragment_;
   const TPlanFragmentInstanceCtx* const instance_ctx_;
+  const PlanFragmentCtxPB* const fragment_ctx_;
+  const PlanFragmentInstanceCtxPB* const instance_ctx_pb_;
 
   /// only populated by the (const QueryCtx&, ExecEnv*, DescriptorTbl*) c'tor
   boost::scoped_ptr<QueryState> local_query_state_;

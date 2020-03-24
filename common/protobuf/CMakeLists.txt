@@ -22,7 +22,7 @@ add_custom_target(proto-deps)
 
 set(PROTOBUF_OUTPUT_DIR ${CMAKE_SOURCE_DIR}/be/generated-sources/gen-cpp/)
 
-foreach(pb_src common row_batch)
+foreach(pb_src common row_batch planner)
    string(TOUPPER ${pb_src} _PB_SRC_UPPER)
    set(_PROTO_SRCS ${_PB_SRC_UPPER}_PROTO_SRCS)
    set(_PROTO_HDRS ${_PB_SRC_UPPER}_PROTO_HDRS)

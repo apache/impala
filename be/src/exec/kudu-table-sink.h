@@ -32,9 +32,7 @@ class KuduTableDescriptor;
 
 class KuduTableSinkConfig : public DataSinkConfig {
  public:
-  DataSink* CreateSink(const TPlanFragmentCtx& fragment_ctx,
-      const TPlanFragmentInstanceCtx& fragment_instance_ctx,
-      RuntimeState* state) const override;
+  DataSink* CreateSink(RuntimeState* state) const override;
 
   ~KuduTableSinkConfig() override {}
 };

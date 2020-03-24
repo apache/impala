@@ -96,9 +96,7 @@ struct OutputPartition {
 
 class HdfsTableSinkConfig : public DataSinkConfig {
  public:
-  DataSink* CreateSink(const TPlanFragmentCtx& fragment_ctx,
-      const TPlanFragmentInstanceCtx& fragment_instance_ctx,
-      RuntimeState* state) const override;
+  DataSink* CreateSink(RuntimeState* state) const override;
   void Close() override;
 
   /// Expressions for computing the target partitions to which a row is written.

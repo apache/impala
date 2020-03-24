@@ -590,54 +590,16 @@ struct TQueryCtx {
   25: optional i64 transaction_id
 }
 
-// Specification of one output destination of a plan fragment
-struct TPlanFragmentDestination {
-  // the globally unique fragment instance id
-  1: required Types.TUniqueId fragment_instance_id
-
-  // hostname + port of the Thrift based ImpalaInteralService on the destination
-  2: required Types.TNetworkAddress thrift_backend
-
-  // IP address + port of the KRPC based ImpalaInternalService on the destination
-  3: optional Types.TNetworkAddress krpc_backend
-}
-
-// Context to collect information, which is shared among all instances of that plan
-// fragment.
-struct TPlanFragmentCtx {
-  1: required Planner.TPlanFragment fragment
-
-  // Output destinations, one per output partition.
-  // The partitioning of the output is specified by
-  // TPlanFragment.output_sink.output_partition.
-  // The number of output partitions is destinations.size().
-  2: list<TPlanFragmentDestination> destinations
-}
-
-// A scan range plus the parameters needed to execute that scan.
-struct TScanRangeParams {
-  1: required PlanNodes.TScanRange scan_range
-  2: optional i32 volume_id = -1
-  3: optional bool try_hdfs_cache = false
-  4: optional bool is_remote
-}
-
 // Descriptor that indicates that a runtime filter is produced by a plan node.
 struct TRuntimeFilterSource {
   1: required Types.TPlanNodeId src_node_id
   2: required i32 filter_id
 }
 
-// Information about the input fragment instance of a join node.
-struct TJoinBuildInput {
-  // The join node id that will consume this join build.
-  1: required Types.TPlanNodeId join_node_id
-
-  // Fragment instance id of the input fragment instance.
-  2: required Types.TUniqueId input_finstance_id
-}
-
-// Execution parameters of a single fragment instance.
+// The Thrift portion of the execution parameters of a single fragment instance. Every
+// fragment instance will also have a corresponding PlanFragmentInstanceCtxPB with the
+// same fragment_idx.
+// TODO: convert the rest of this struct to protobuf
 struct TPlanFragmentInstanceCtx {
   // TPlanFragment.idx
   1: required Types.TFragmentIdx fragment_idx
@@ -656,12 +618,9 @@ struct TPlanFragmentInstanceCtx {
   // Range: [0, <# of instances of parent fragment> - 1]
   3: required i32 per_fragment_instance_idx
 
-  // Initial scan ranges for each scan node in TPlanFragment.plan_tree
-  4: required map<Types.TPlanNodeId, list<TScanRangeParams>> per_node_scan_ranges
-
   // Number of senders for ExchangeNodes contained in TPlanFragment.plan_tree;
   // needed to create a DataStreamRecvr
-  // TODO for per-query exec rpc: move these to TPlanFragmentCtx
+  // TODO for per-query exec rpc: move these to PlanFragmentCtxPB
   5: required map<Types.TPlanNodeId, i32> per_exch_num_senders
 
   // Id of this instance in its role as a sender.
@@ -671,9 +630,6 @@ struct TPlanFragmentInstanceCtx {
 
   // List of runtime filters produced by nodes in the finstance.
   8: optional list<TRuntimeFilterSource> filters_produced
-
-  // List of input join build finstances for joins in this finstance.
-  9: optional list<TJoinBuildInput> join_build_inputs
 
   // If this is a join build fragment, the number of fragment instances that consume the
   // join build. -1 = invalid.
@@ -694,9 +650,9 @@ enum ImpalaInternalServiceVersion {
 // serialize it ourselves and send it with ExecQueryFInstances as a sidecar.
 // TODO: investigate if it's worth converting this fully to protobuf
 struct TExecPlanFragmentInfo {
-  1: optional list<TPlanFragmentCtx> fragment_ctxs
+  1: optional list<Planner.TPlanFragment> fragments
 
-  // the order corresponds to the order of fragments in fragment_ctxs
+  // the order corresponds to the order of fragments in 'fragments'
   2: optional list<TPlanFragmentInstanceCtx> fragment_instance_ctxs
 }
 

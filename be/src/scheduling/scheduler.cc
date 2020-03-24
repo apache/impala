@@ -38,6 +38,7 @@
 #include "scheduling/executor-group.h"
 #include "scheduling/hash-ring.h"
 #include "thirdparty/pcg-cpp-0.98/include/pcg_random.hpp"
+#include "util/compression-util.h"
 #include "util/debug-util.h"
 #include "util/flat_buffer.h"
 #include "util/hash-util.h"
@@ -45,6 +46,7 @@
 #include "util/network-util.h"
 #include "util/pretty-printer.h"
 #include "util/runtime-profile-counters.h"
+#include "util/uid-util.h"
 
 #include "common/names.h"
 
@@ -226,14 +228,15 @@ void Scheduler::ComputeFragmentExecParams(
       // populate src_params->destinations
       src_params->destinations.resize(dest_params->instance_exec_params.size());
       for (int i = 0; i < dest_params->instance_exec_params.size(); ++i) {
-        TPlanFragmentDestination& dest = src_params->destinations[i];
-        dest.__set_fragment_instance_id(dest_params->instance_exec_params[i].instance_id);
+        PlanFragmentDestinationPB& dest = src_params->destinations[i];
+        TUniqueIdToUniqueIdPB(dest_params->instance_exec_params[i].instance_id,
+            dest.mutable_fragment_instance_id());
         const TNetworkAddress& host = dest_params->instance_exec_params[i].host;
-        dest.__set_thrift_backend(host);
+        *dest.mutable_thrift_backend() = FromTNetworkAddress(host);
         const BackendDescriptorPB& desc = LookUpBackendDesc(executor_config, host);
         DCHECK(desc.has_krpc_address());
         DCHECK(IsResolvedAddress(desc.krpc_address()));
-        dest.__set_krpc_backend(FromNetworkAddressPB(desc.krpc_address()));
+        *dest.mutable_krpc_backend() = desc.krpc_address();
       }
 
       // enumerate senders consecutively;
@@ -314,9 +317,9 @@ void Scheduler::ComputeFragmentExecParams(const ExecutorConfig& executor_config,
 /// Returns a numeric weight that is proportional to the estimated processing time for
 /// the scan range represented by 'params'. Weights from different scan node
 /// implementations, e.g. FS vs Kudu, are not comparable.
-static int64_t ScanRangeWeight(const TScanRangeParams& params) {
-  if (params.scan_range.__isset.hdfs_file_split) {
-    return params.scan_range.hdfs_file_split.length;
+static int64_t ScanRangeWeight(const ScanRangeParamsPB& params) {
+  if (params.scan_range().has_hdfs_file_split()) {
+    return params.scan_range().hdfs_file_split().length();
   } else {
     // Give equal weight to each Kudu and Hbase split.
     // TODO: implement more accurate logic for Kudu and Hbase
@@ -429,7 +432,7 @@ void Scheduler::CreateCollocatedAndScanInstances(const ExecutorConfig& executor_
     // The inner vectors are the output of AssignRangesToInstances().
     // The vector may be ragged - i.e. different nodes have different numbers
     // of instances.
-    vector<vector<vector<TScanRangeParams>>> per_scan_per_instance_ranges;
+    vector<vector<vector<ScanRangeParamsPB>>> per_scan_per_instance_ranges;
     for (TPlanNodeId scan_node_id : scan_node_ids) {
       // Ensure empty list is created if no scan ranges are scheduled on this host.
       per_scan_per_instance_ranges.emplace_back();
@@ -478,8 +481,8 @@ void Scheduler::CreateCollocatedAndScanInstances(const ExecutorConfig& executor_
   }
 }
 
-vector<vector<TScanRangeParams>> Scheduler::AssignRangesToInstances(
-    int max_num_instances, vector<TScanRangeParams>* ranges) {
+vector<vector<ScanRangeParamsPB>> Scheduler::AssignRangesToInstances(
+    int max_num_instances, vector<ScanRangeParamsPB>* ranges) {
   // We need to assign scan ranges to instances. We would like the assignment to be
   // as even as possible, so that each instance does about the same amount of work.
   // Use longest-processing time (LPT) algorithm, which is a good approximation of the
@@ -488,7 +491,7 @@ vector<vector<TScanRangeParams>> Scheduler::AssignRangesToInstances(
   // to each instance.
   DCHECK_GT(max_num_instances, 0);
   int num_instances = min(max_num_instances, static_cast<int>(ranges->size()));
-  vector<vector<TScanRangeParams>> per_instance_ranges(num_instances);
+  vector<vector<ScanRangeParamsPB>> per_instance_ranges(num_instances);
   if (num_instances < 2) {
     // Short-circuit the assignment algorithm for the single instance case.
     per_instance_ranges[0] = *ranges;
@@ -502,10 +505,10 @@ vector<vector<TScanRangeParams>> Scheduler::AssignRangesToInstances(
       instance_heap.emplace_back(InstanceAssignment{0, i});
     }
     std::sort(ranges->begin(), ranges->end(),
-        [](const TScanRangeParams& a, const TScanRangeParams& b) {
+        [](const ScanRangeParamsPB& a, const ScanRangeParamsPB& b) {
           return ScanRangeWeight(a) > ScanRangeWeight(b);
         });
-    for (TScanRangeParams& range : *ranges) {
+    for (ScanRangeParamsPB& range : *ranges) {
       per_instance_ranges[instance_heap[0].instance_idx].push_back(range);
       instance_heap[0].weight += ScanRangeWeight(range);
       pop_heap(instance_heap.begin(), instance_heap.end());
@@ -554,9 +557,10 @@ void Scheduler::CreateCollocatedJoinBuildInstances(
           parent_exec_params.krpc_host, per_fragment_instance_idx++, *fragment_params);
       instance_exec_params->back().num_join_build_outputs = 0;
     }
-    TJoinBuildInput build_input;
-    build_input.__set_join_node_id(sink.dest_node_id);
-    build_input.__set_input_finstance_id(instance_exec_params->back().instance_id);
+    JoinBuildInputPB build_input;
+    build_input.set_join_node_id(sink.dest_node_id);
+    TUniqueIdToUniqueIdPB(instance_exec_params->back().instance_id,
+        build_input.mutable_input_finstance_id());
     parent_exec_params.join_build_inputs.emplace_back(build_input);
     VLOG(3) << "Linked join build for node id=" << sink.dest_node_id
             << " build finstance=" << PrintId(instance_exec_params->back().instance_id)
@@ -1048,6 +1052,31 @@ void Scheduler::AssignmentCtx::SelectExecutorOnHost(
   }
 }
 
+void TScanRangeToScanRangePB(const TScanRange& tscan_range, ScanRangePB* scan_range_pb) {
+  if (tscan_range.__isset.hdfs_file_split) {
+    HdfsFileSplitPB* hdfs_file_split = scan_range_pb->mutable_hdfs_file_split();
+    hdfs_file_split->set_relative_path(tscan_range.hdfs_file_split.relative_path);
+    hdfs_file_split->set_offset(tscan_range.hdfs_file_split.offset);
+    hdfs_file_split->set_length(tscan_range.hdfs_file_split.length);
+    hdfs_file_split->set_partition_id(tscan_range.hdfs_file_split.partition_id);
+    hdfs_file_split->set_file_length(tscan_range.hdfs_file_split.file_length);
+    hdfs_file_split->set_file_compression(
+        THdfsCompressionToProto(tscan_range.hdfs_file_split.file_compression));
+    hdfs_file_split->set_mtime(tscan_range.hdfs_file_split.mtime);
+    hdfs_file_split->set_is_erasure_coded(tscan_range.hdfs_file_split.is_erasure_coded);
+    hdfs_file_split->set_partition_path_hash(
+        tscan_range.hdfs_file_split.partition_path_hash);
+  }
+  if (tscan_range.__isset.hbase_key_range) {
+    HBaseKeyRangePB* hbase_key_range = scan_range_pb->mutable_hbase_key_range();
+    hbase_key_range->set_startkey(tscan_range.hbase_key_range.startKey);
+    hbase_key_range->set_stopkey(tscan_range.hbase_key_range.stopKey);
+  }
+  if (tscan_range.__isset.kudu_scan_token) {
+    scan_range_pb->set_kudu_scan_token(tscan_range.kudu_scan_token);
+  }
+}
+
 void Scheduler::AssignmentCtx::RecordScanRangeAssignment(
     const BackendDescriptorPB& executor, PlanNodeId node_id,
     const vector<TNetworkAddress>& host_list,
@@ -1104,14 +1133,15 @@ void Scheduler::AssignmentCtx::RecordScanRangeAssignment(
 
   PerNodeScanRanges* scan_ranges = FindOrInsert(
       assignment, FromNetworkAddressPB(executor.address()), PerNodeScanRanges());
-  vector<TScanRangeParams>* scan_range_params_list =
-      FindOrInsert(scan_ranges, node_id, vector<TScanRangeParams>());
+  vector<ScanRangeParamsPB>* scan_range_params_list =
+      FindOrInsert(scan_ranges, node_id, vector<ScanRangeParamsPB>());
   // Add scan range.
-  TScanRangeParams scan_range_params;
-  scan_range_params.scan_range = scan_range_locations.scan_range;
-  scan_range_params.__set_volume_id(volume_id);
-  scan_range_params.__set_try_hdfs_cache(try_hdfs_cache);
-  scan_range_params.__set_is_remote(remote_read);
+  ScanRangeParamsPB scan_range_params;
+  TScanRangeToScanRangePB(
+      scan_range_locations.scan_range, scan_range_params.mutable_scan_range());
+  scan_range_params.set_volume_id(volume_id);
+  scan_range_params.set_try_hdfs_cache(try_hdfs_cache);
+  scan_range_params.set_is_remote(remote_read);
   scan_range_params_list->push_back(scan_range_params);
 
   if (VLOG_FILE_IS_ON) {
@@ -1133,8 +1163,8 @@ void Scheduler::AssignmentCtx::PrintAssignment(
     VLOG_FILE << "ScanRangeAssignment: server=" << ThriftDebugString(entry.first);
     for (const PerNodeScanRanges::value_type& per_node_scan_ranges : entry.second) {
       stringstream str;
-      for (const TScanRangeParams& params : per_node_scan_ranges.second) {
-        str << ThriftDebugString(params) << " ";
+      for (const ScanRangeParamsPB& params : per_node_scan_ranges.second) {
+        str << params.DebugString() << " ";
       }
       VLOG_FILE << "node_id=" << per_node_scan_ranges.first << " ranges=" << str.str();
     }

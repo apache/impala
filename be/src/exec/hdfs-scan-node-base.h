@@ -414,7 +414,7 @@ class HdfsScanNodeBase : public ScanNode {
 
   /// Update the per volume stats with the given scan range params list
   static void UpdateHdfsSplitStats(
-      const std::vector<TScanRangeParams>& scan_range_params_list,
+      const google::protobuf::RepeatedPtrField<ScanRangeParamsPB>& scan_range_params_list,
       PerVolumeStats* per_volume_stats);
 
   /// Output the per_volume_stats to stringstream. The output format is a list of:

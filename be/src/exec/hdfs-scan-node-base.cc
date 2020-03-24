@@ -48,6 +48,7 @@
 #include "runtime/query-state.h"
 #include "runtime/runtime-filter.inline.h"
 #include "runtime/runtime-state.h"
+#include "util/compression-util.h"
 #include "util/disk-info.h"
 #include "util/hdfs-util.h"
 #include "util/impalad-metrics.h"
@@ -223,14 +224,16 @@ Status HdfsScanPlanNode::Init(const TPlanNode& tnode, FragmentState* state) {
         *min_max_row_desc, state, &min_max_conjuncts_));
   }
 
-  const vector<const TPlanFragmentInstanceCtx*>& instance_ctxs = state->instance_ctxs();
+  const vector<const PlanFragmentInstanceCtxPB*>& instance_ctxs =
+      state->instance_ctx_pbs();
   for (auto ctx : instance_ctxs) {
-    auto ranges = ctx->per_node_scan_ranges.find(tnode.node_id);
-    if (ranges == ctx->per_node_scan_ranges.end()) continue;
-    for (const TScanRangeParams& scan_range_param : ranges->second) {
-      const THdfsFileSplit& split = scan_range_param.scan_range.hdfs_file_split;
+    auto ranges = ctx->per_node_scan_ranges().find(tnode.node_id);
+    if (ranges == ctx->per_node_scan_ranges().end()) continue;
+    for (const ScanRangeParamsPB& scan_range_param : ranges->second.scan_ranges()) {
+      DCHECK(scan_range_param.scan_range().has_hdfs_file_split());
+      const HdfsFileSplitPB& split = scan_range_param.scan_range().hdfs_file_split();
       HdfsPartitionDescriptor* partition_desc =
-          hdfs_table_->GetPartition(split.partition_id);
+          hdfs_table_->GetPartition(split.partition_id());
       scanned_file_formats_.insert(partition_desc->file_format());
     }
   }
@@ -328,28 +331,29 @@ Status HdfsScanNodeBase::Prepare(RuntimeState* state) {
   scan_node_pool_.reset(new MemPool(mem_tracker()));
 
   HdfsFsCache::HdfsFsMap fs_cache;
-  // Convert the TScanRangeParams into per-file DiskIO::ScanRange objects and populate
+  // Convert the ScanRangeParamsPB into per-file DiskIO::ScanRange objects and populate
   // partition_ids_, file_descs_, and per_type_files_.
   DCHECK(scan_range_params_ != NULL)
       << "Must call SetScanRanges() before calling Prepare()";
   int num_ranges_missing_volume_id = 0;
-  for (const TScanRangeParams& params: *scan_range_params_) {
-    DCHECK(params.scan_range.__isset.hdfs_file_split);
-    const THdfsFileSplit& split = params.scan_range.hdfs_file_split;
-    partition_ids_.insert(split.partition_id);
+  for (const ScanRangeParamsPB& params : *scan_range_params_) {
+    DCHECK(params.scan_range().has_hdfs_file_split());
+    const HdfsFileSplitPB& split = params.scan_range().hdfs_file_split();
+    partition_ids_.insert(split.partition_id());
     HdfsPartitionDescriptor* partition_desc =
-        hdfs_table_->GetPartition(split.partition_id);
+        hdfs_table_->GetPartition(split.partition_id());
     if (partition_desc == NULL) {
       // TODO: this should be a DCHECK but we sometimes hit it. It's likely IMPALA-1702.
       LOG(ERROR) << "Bad table descriptor! table_id=" << hdfs_table_->id()
-                 << " partition_id=" << split.partition_id
-                 << "\n" << PrintThrift(state->instance_ctx());
+                 << " partition_id=" << split.partition_id() << "\n"
+                 << PrintThrift(state->instance_ctx()) << "\n"
+                 << state->instance_ctx_pb().DebugString();
       return Status("Query encountered invalid metadata, likely due to IMPALA-1702."
                     " Try rerunning the query.");
     }
 
     filesystem::path file_path(partition_desc->location());
-    file_path.append(split.relative_path, filesystem::path::codecvt());
+    file_path.append(split.relative_path(), filesystem::path::codecvt());
     const string& native_file_path = file_path.native();
 
     auto file_desc_map_key = make_pair(partition_desc->id(), native_file_path);
@@ -359,10 +363,10 @@ Status HdfsScanNodeBase::Prepare(RuntimeState* state) {
       // Add new file_desc to file_descs_ and per_type_files_
       file_desc = runtime_state_->obj_pool()->Add(new HdfsFileDesc(native_file_path));
       file_descs_[file_desc_map_key] = file_desc;
-      file_desc->file_length = split.file_length;
-      file_desc->mtime = split.mtime;
-      file_desc->file_compression = split.file_compression;
-      file_desc->is_erasure_coded = split.is_erasure_coded;
+      file_desc->file_length = split.file_length();
+      file_desc->mtime = split.mtime();
+      file_desc->file_compression = CompressionTypePBToThrift(split.file_compression());
+      file_desc->is_erasure_coded = split.is_erasure_coded();
       RETURN_IF_ERROR(HdfsFsCache::instance()->GetConnection(
           native_file_path, &file_desc->fs, &fs_cache));
       per_type_files_[partition_desc->file_format()].push_back(file_desc);
@@ -371,19 +375,19 @@ Status HdfsScanNodeBase::Prepare(RuntimeState* state) {
       file_desc = file_desc_it->second;
     }
 
-    bool expected_local = params.__isset.is_remote && !params.is_remote;
-    if (expected_local && params.volume_id == -1) ++num_ranges_missing_volume_id;
+    bool expected_local = params.has_is_remote() && !params.is_remote();
+    if (expected_local && params.volume_id() == -1) ++num_ranges_missing_volume_id;
 
     int cache_options = BufferOpts::NO_CACHING;
-    if (params.__isset.try_hdfs_cache && params.try_hdfs_cache) {
+    if (params.has_try_hdfs_cache() && params.try_hdfs_cache()) {
       cache_options |= BufferOpts::USE_HDFS_CACHE;
     }
     if ((!expected_local || FLAGS_always_use_data_cache) && !IsDataCacheDisabled()) {
       cache_options |= BufferOpts::USE_DATA_CACHE;
     }
     file_desc->splits.push_back(
-        AllocateScanRange(file_desc->fs, file_desc->filename.c_str(), split.length,
-            split.offset, split.partition_id, params.volume_id, expected_local,
+        AllocateScanRange(file_desc->fs, file_desc->filename.c_str(), split.length(),
+            split.offset(), split.partition_id(), params.volume_id(), expected_local,
             file_desc->is_erasure_coded, file_desc->mtime, BufferOpts(cache_options)));
   }
 
@@ -1009,17 +1013,17 @@ void HdfsScanNodeBase::TransferToScanNodePool(MemPool* pool) {
 }
 
 void HdfsScanNodeBase::UpdateHdfsSplitStats(
-    const vector<TScanRangeParams>& scan_range_params_list,
+    const google::protobuf::RepeatedPtrField<ScanRangeParamsPB>& scan_range_params_list,
     PerVolumeStats* per_volume_stats) {
   pair<int, int64_t> init_value(0, 0);
-  for (const TScanRangeParams& scan_range_params: scan_range_params_list) {
-    const TScanRange& scan_range = scan_range_params.scan_range;
-    if (!scan_range.__isset.hdfs_file_split) continue;
-    const THdfsFileSplit& split = scan_range.hdfs_file_split;
+  for (const ScanRangeParamsPB& scan_range_params : scan_range_params_list) {
+    const ScanRangePB& scan_range = scan_range_params.scan_range();
+    if (!scan_range.has_hdfs_file_split()) continue;
+    const HdfsFileSplitPB& split = scan_range.hdfs_file_split();
     pair<int, int64_t>* stats =
-        FindOrInsert(per_volume_stats, scan_range_params.volume_id, init_value);
+        FindOrInsert(per_volume_stats, scan_range_params.volume_id(), init_value);
     ++(stats->first);
-    stats->second += split.length;
+    stats->second += split.length();
   }
 }
 

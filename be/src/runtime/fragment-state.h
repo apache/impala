@@ -37,10 +37,13 @@ class RuntimeProfile;
 class FragmentState {
  public:
   /// Create a map of fragment index to its FragmentState object and only populate the
-  /// thrift references of the fragment and instance context objects from 'fragment_info'.
+  /// thrift and protobuf references of the fragment and instance context objects from
+  /// 'fragment_info' and 'exec_request'.
   static Status CreateFragmentStateMap(const TExecPlanFragmentInfo& fragment_info,
-      QueryState* state, std::unordered_map<TFragmentIdx, FragmentState*>& fragment_map);
-  FragmentState(QueryState* query_state, const TPlanFragmentCtx& fragment_ctx);
+      const ExecQueryFInstancesRequestPB& exec_request, QueryState* state,
+      std::unordered_map<TFragmentIdx, FragmentState*>& fragment_map);
+  FragmentState(QueryState* query_state, const TPlanFragment& fragment,
+      const PlanFragmentCtxPB& fragment_ctx);
   ~FragmentState();
 
   /// Called by all the fragment instance threads that execute this fragment. The first
@@ -54,11 +57,15 @@ class FragmentState {
   void ReleaseResources();
 
   ObjectPool* obj_pool() { return &obj_pool_; }
-  int fragment_idx() const { return fragment_ctx_.fragment.idx; }
+  int fragment_idx() const { return fragment_.idx; }
   const TQueryOptions& query_options() const { return query_state_->query_options(); }
-  const TPlanFragmentCtx& fragment_ctx() const { return fragment_ctx_; }
+  const TPlanFragment& fragment() const { return fragment_; }
+  const PlanFragmentCtxPB& fragment_ctx() const { return fragment_ctx_; }
   const std::vector<const TPlanFragmentInstanceCtx*>& instance_ctxs() const {
     return instance_ctxs_;
+  }
+  const std::vector<const PlanFragmentInstanceCtxPB*>& instance_ctx_pbs() const {
+    return instance_ctx_pbs_;
   }
   const PlanNode* plan_tree() const { return plan_tree_; }
   const DataSinkConfig* sink_config() const { return sink_config_; }
@@ -153,8 +160,11 @@ class FragmentState {
   QueryState* query_state_;
 
   /// References to the thrift structs for this fragment.
-  const TPlanFragmentCtx& fragment_ctx_;
+  const TPlanFragment& fragment_;
   std::vector<const TPlanFragmentInstanceCtx*> instance_ctxs_;
+  /// References to the protobuf structs for this fragment.
+  const PlanFragmentCtxPB& fragment_ctx_;
+  std::vector<const PlanFragmentInstanceCtxPB*> instance_ctx_pbs_;
 
   /// Lives in obj_pool(). Not mutated after being initialized in InitAndCodegen() except
   /// for being closed.
@@ -181,10 +191,12 @@ class FragmentState {
   /// fragment instance to call InvokeCodegen() does the actual codegen work.
   bool codegen_invoked_ = false;
 
-  /// Used by the CreateFragmentStateMap to add TPlanFragmentInstanceCtx thrift objects
-  /// for the fragment that this object represents.
-  void AddInstance(const TPlanFragmentInstanceCtx* instance_ctx) {
+  /// Used by the CreateFragmentStateMap to add the TPlanFragmentInstanceCtx and the
+  /// PlanFragmentInstanceCtxPB for the fragment that this object represents.
+  void AddInstance(const TPlanFragmentInstanceCtx* instance_ctx,
+      const PlanFragmentInstanceCtxPB* instance_ctx_pb) {
     instance_ctxs_.push_back(instance_ctx);
+    instance_ctx_pbs_.push_back(instance_ctx_pb);
   }
 
   /// Helper method used by InvokeCodegen(). Does the actual codegen work.

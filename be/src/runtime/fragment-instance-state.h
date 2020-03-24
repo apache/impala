@@ -44,7 +44,7 @@ class RpcContext;
 namespace impala {
 
 class FragmentState;
-class TPlanFragmentCtx;
+class TPlanFragment;
 class TPlanFragmentInstanceCtx;
 class TBloomFilter;
 class TUniqueId;
@@ -81,7 +81,8 @@ class JoinBuilder;
 class FragmentInstanceState {
  public:
   FragmentInstanceState(QueryState* query_state, FragmentState* fragment_state,
-      const TPlanFragmentInstanceCtx& instance_ctx);
+      const TPlanFragmentInstanceCtx& instance_ctx,
+      const PlanFragmentInstanceCtxPB& instance_ctx_pb);
 
   /// Main loop of fragment instance execution. Blocks until execution finishes and
   /// automatically releases resources. Returns execution status.
@@ -131,8 +132,10 @@ class FragmentInstanceState {
   RuntimeState* runtime_state() { return runtime_state_; }
   RuntimeProfile* profile() const;
   const TQueryCtx& query_ctx() const;
-  const TPlanFragmentCtx& fragment_ctx() const { return fragment_ctx_; }
+  const TPlanFragment& fragment() const { return fragment_; }
   const TPlanFragmentInstanceCtx& instance_ctx() const { return instance_ctx_; }
+  const PlanFragmentCtxPB& fragment_ctx() const { return fragment_ctx_; }
+  const PlanFragmentInstanceCtxPB& instance_ctx_pb() const { return instance_ctx_pb_; }
   const TUniqueId& query_id() const { return query_ctx().query_id; }
   const TUniqueId& instance_id() const { return instance_ctx_.fragment_instance_id; }
   FInstanceExecStatePB current_state() const { return current_state_.Load(); }
@@ -158,8 +161,10 @@ class FragmentInstanceState {
  private:
   QueryState* query_state_;
   FragmentState* fragment_state_;
-  const TPlanFragmentCtx& fragment_ctx_;
+  const TPlanFragment& fragment_;
   const TPlanFragmentInstanceCtx& instance_ctx_;
+  const PlanFragmentCtxPB& fragment_ctx_;
+  const PlanFragmentInstanceCtxPB& instance_ctx_pb_;
 
   /// All following member variables that are initialized to nullptr are set
   /// in Prepare().

@@ -1,0 +1,76 @@
+// Licensed to the Apache Software Foundation (ASF) under one
+// or more contributor license agreements.  See the NOTICE file
+// distributed with this work for additional information
+// regarding copyright ownership.  The ASF licenses this file
+// to you under the Apache License, Version 2.0 (the
+// "License"); you may not use this file except in compliance
+// with the License.  You may obtain a copy of the License at
+//
+//   http://www.apache.org/licenses/LICENSE-2.0
+//
+// Unless required by applicable law or agreed to in writing,
+// software distributed under the License is distributed on an
+// "AS IS" BASIS, WITHOUT WARRANTIES OR CONDITIONS OF ANY
+// KIND, either express or implied.  See the License for the
+// specific language governing permissions and limitations
+// under the License.
+
+syntax="proto2";
+
+package impala;
+
+import "common.proto";
+
+// Specification of a subsection of a single HDFS file. Corresponds to THdfsFileSpilt and
+// should be kept in sync with it.
+message HdfsFileSplitPB {
+  // File name (not the full path).  The path is assumed to be relative to the
+  // 'location' of the THdfsPartition referenced by partition_id.
+  optional string relative_path = 1;
+
+  // Starting offset.
+  optional int64 offset = 2;
+
+  // Length of split.
+  optional int64 length = 3;
+
+  // ID of partition within the THdfsTable associated with this scan node.
+  optional int64 partition_id = 4;
+
+  // Total size of the hdfs file.
+  optional int64 file_length = 5;
+
+  // Compression type of the hdfs file.
+  optional CompressionTypePB file_compression = 6;
+
+  // Last modified time of the file.
+  optional int64 mtime = 7;
+
+  // Whether this file is erasure-coded.
+  optional bool is_erasure_coded = 8;
+
+  // Hash of the partition's path. This must be hashed with a hash algorithm that is
+  // consistent across different processes and machines. This is currently using
+  // Java's String.hashCode(), which is consistent. For testing purposes, this can use
+  // any consistent hash.
+  optional int32 partition_path_hash = 9;
+}
+
+// Key range for single THBaseScanNode. Corresponds to THBaseKeyRange and should be kept
+// in sync with it.
+message HBaseKeyRangePB {
+  // Inclusive
+  optional string startKey = 1;
+
+  // Exclusive
+  optional string stopKey = 2;
+}
+
+// Specification of an individual data range which is held in its entirety by a storage
+// server. Corresponds to TScanRange and should be kept in sync with it.
+message ScanRangePB {
+  // One of these must be set for every ScanRangePB.
+  optional HdfsFileSplitPB hdfs_file_split = 1;
+  optional HBaseKeyRangePB hbase_key_range = 2;
+  optional string kudu_scan_token = 3;
+}

@@ -25,6 +25,7 @@
 #include "common/global-types.h"
 #include "gen-cpp/Frontend_types.h"
 #include "gen-cpp/Types_types.h" // for TNetworkAddress
+#include "gen-cpp/control_service.pb.h"
 #include "gen-cpp/statestore_service.pb.h"
 #include "util/container-util.h"
 #include "util/runtime-profile.h"
@@ -35,7 +36,7 @@ struct FragmentExecParams;
 struct FInstanceExecParams;
 
 /// map from scan node id to a list of scan ranges
-typedef std::map<TPlanNodeId, std::vector<TScanRangeParams>> PerNodeScanRanges;
+typedef std::map<TPlanNodeId, std::vector<ScanRangeParamsPB>> PerNodeScanRanges;
 
 /// map from an impalad host address to the per-node assigned scan ranges;
 /// records scan range assignment for a single fragment
@@ -104,7 +105,7 @@ struct FInstanceExecParams {
   int sender_id = -1;
 
   // List of input join build finstances for joins in this finstance.
-  std::vector<TJoinBuildInput> join_build_inputs;
+  std::vector<JoinBuildInputPB> join_build_inputs;
 
   // If this is a join build fragment, the number of fragment instances that consume the
   // join build. -1 = invalid.
@@ -127,7 +128,7 @@ struct FInstanceExecParams {
 /// Execution parameters shared between fragment instances
 struct FragmentExecParams {
   /// output destinations of this fragment
-  std::vector<TPlanFragmentDestination> destinations;
+  std::vector<PlanFragmentDestinationPB> destinations;
 
   /// map from node id to the number of senders (node id expected to be for an
   /// ExchangeNode)

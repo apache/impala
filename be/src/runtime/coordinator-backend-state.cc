@@ -120,32 +120,41 @@ void Coordinator::BackendState::SetRpcParams(const DebugOptions& debug_options,
   request->set_per_backend_mem_limit(schedule_.per_backend_mem_limit());
 
   // set fragment_ctxs and fragment_instance_ctxs
-  fragment_info->__isset.fragment_ctxs = true;
+  fragment_info->__isset.fragments = true;
   fragment_info->__isset.fragment_instance_ctxs = true;
   fragment_info->fragment_instance_ctxs.resize(
       backend_exec_params_->instance_params.size());
   for (int i = 0; i < backend_exec_params_->instance_params.size(); ++i) {
     TPlanFragmentInstanceCtx& instance_ctx = fragment_info->fragment_instance_ctxs[i];
+    PlanFragmentInstanceCtxPB* instance_ctx_pb = request->add_fragment_instance_ctxs();
     const FInstanceExecParams& params = *backend_exec_params_->instance_params[i];
     int fragment_idx = params.fragment_exec_params.fragment.idx;
 
-    // add a TPlanFragmentCtx, if we don't already have it
-    if (fragment_info->fragment_ctxs.empty()
-        || fragment_info->fragment_ctxs.back().fragment.idx != fragment_idx) {
-      fragment_info->fragment_ctxs.emplace_back();
-      TPlanFragmentCtx& fragment_ctx = fragment_info->fragment_ctxs.back();
-      fragment_ctx.__set_fragment(params.fragment_exec_params.fragment);
-      fragment_ctx.__set_destinations(params.fragment_exec_params.destinations);
+    // add a TPlanFragment, if we don't already have it
+    if (fragment_info->fragments.empty()
+        || fragment_info->fragments.back().idx != fragment_idx) {
+      fragment_info->fragments.push_back(params.fragment_exec_params.fragment);
+      PlanFragmentCtxPB* fragment_ctx = request->add_fragment_ctxs();
+      fragment_ctx->set_fragment_idx(params.fragment_exec_params.fragment.idx);
+      *fragment_ctx->mutable_destinations() = {
+          params.fragment_exec_params.destinations.begin(),
+          params.fragment_exec_params.destinations.end()};
     }
 
     instance_ctx.fragment_idx = fragment_idx;
+    instance_ctx_pb->set_fragment_idx(fragment_idx);
     instance_ctx.fragment_instance_id = params.instance_id;
     instance_ctx.per_fragment_instance_idx = params.per_fragment_instance_idx;
-    instance_ctx.__set_per_node_scan_ranges(params.per_node_scan_ranges);
+    for (const auto& entry : params.per_node_scan_ranges) {
+      ScanRangesPB& scan_ranges =
+          (*instance_ctx_pb->mutable_per_node_scan_ranges())[entry.first];
+      *scan_ranges.mutable_scan_ranges() = {entry.second.begin(), entry.second.end()};
+    }
     instance_ctx.__set_per_exch_num_senders(
         params.fragment_exec_params.per_exch_num_senders);
     instance_ctx.__set_sender_id(params.sender_id);
-    instance_ctx.__set_join_build_inputs(params.join_build_inputs);
+    *instance_ctx_pb->mutable_join_build_inputs() = {
+        params.join_build_inputs.begin(), params.join_build_inputs.end()};
     if (params.num_join_build_outputs != -1) {
       instance_ctx.__set_num_join_build_outputs(params.num_join_build_outputs);
     }
@@ -715,9 +724,9 @@ Coordinator::BackendState::InstanceStats::InstanceStats(
 
   // add total split size to fragment_stats->bytes_assigned()
   for (const PerNodeScanRanges::value_type& entry: exec_params_.per_node_scan_ranges) {
-    for (const TScanRangeParams& scan_range_params: entry.second) {
-      if (!scan_range_params.scan_range.__isset.hdfs_file_split) continue;
-      total_split_size_ += scan_range_params.scan_range.hdfs_file_split.length;
+    for (const ScanRangeParamsPB& scan_range_params : entry.second) {
+      if (!scan_range_params.scan_range().has_hdfs_file_split()) continue;
+      total_split_size_ += scan_range_params.scan_range().hdfs_file_split().length();
     }
   }
   (*fragment_stats->bytes_assigned())(total_split_size_);

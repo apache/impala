@@ -31,9 +31,8 @@
 
 namespace impala {
 
-DataSink* HBaseTableSinkConfig::CreateSink(const TPlanFragmentCtx& fragment_ctx,
-    const TPlanFragmentInstanceCtx& fragment_instance_ctx, RuntimeState* state) const {
-  TDataSinkId sink_id = fragment_ctx.fragment.idx;
+DataSink* HBaseTableSinkConfig::CreateSink(RuntimeState* state) const {
+  TDataSinkId sink_id = state->fragment().idx;
   return state->obj_pool()->Add(new HBaseTableSink(sink_id, *this, state));
 }
 

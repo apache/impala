@@ -482,9 +482,10 @@ int main(int argc, char **argv) {
   }
   status = test_env.CreateQueryState(0, nullptr, &state);
   QueryState* qs = state->query_state();
-  TPlanFragmentCtx* fragment_ctx = qs->obj_pool()->Add(new TPlanFragmentCtx());
+  TPlanFragment* fragment = qs->obj_pool()->Add(new TPlanFragment());
+  PlanFragmentCtxPB* fragment_ctx = qs->obj_pool()->Add(new PlanFragmentCtxPB());
   FragmentState* fragment_state =
-      qs->obj_pool()->Add(new FragmentState(qs, *fragment_ctx));
+      qs->obj_pool()->Add(new FragmentState(qs, *fragment, *fragment_ctx));
   if (!status.ok()) {
     cout << "Could not create RuntimeState";
     return -1;

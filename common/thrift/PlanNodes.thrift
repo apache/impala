@@ -170,7 +170,8 @@ struct TRuntimeFilterDesc {
 // - T<subclass>: all other operational parameters that are the same across
 //   all plan fragments
 
-// Specification of subsection of a single hdfs file.
+// Specification of a subsection of a single HDFS file. Corresponds to HdfsFileSpiltPB and
+// should be kept in sync with it.
 struct THdfsFileSplit {
   // File name (not the full path).  The path is assumed to be relative to the
   // 'location' of the THdfsPartition referenced by partition_id.
@@ -204,7 +205,8 @@ struct THdfsFileSplit {
   9: required i32 partition_path_hash
 }
 
-// key range for single THBaseScanNode
+// Key range for single THBaseScanNode. Corresponds to HBaseKeyRangePB and should be kept
+// in sync with it.
 // TODO: does 'binary' have an advantage over string? strings can
 // already store binary data
 struct THBaseKeyRange {
@@ -240,7 +242,7 @@ struct TFileSplitGeneratorSpec {
 }
 
 // Specification of an individual data range which is held in its entirety
-// by a storage server.
+// by a storage server. Corresponds to ScanRangePB and should be kept in sync with it.
 struct TScanRange {
   // one of these must be set for every TScanRange
   1: optional THdfsFileSplit hdfs_file_split

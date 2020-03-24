@@ -554,16 +554,16 @@ void Result::ProcessAssignments(const AssignmentCallback& cb) const {
       const TNetworkAddress& addr = assignment_elem.first;
       const PerNodeScanRanges& per_node_ranges = assignment_elem.second;
       for (const auto& per_node_ranges_elem : per_node_ranges) {
-        const vector<TScanRangeParams> scan_range_params_vector =
+        const vector<ScanRangeParamsPB> scan_range_params_vector =
             per_node_ranges_elem.second;
-        for (const TScanRangeParams& scan_range_params : scan_range_params_vector) {
-          const TScanRange& scan_range = scan_range_params.scan_range;
-          DCHECK(scan_range.__isset.hdfs_file_split);
-          const THdfsFileSplit& hdfs_file_split = scan_range.hdfs_file_split;
-          bool try_hdfs_cache = scan_range_params.__isset.try_hdfs_cache ?
-              scan_range_params.try_hdfs_cache : false;
+        for (const ScanRangeParamsPB& scan_range_params : scan_range_params_vector) {
+          const ScanRangePB& scan_range = scan_range_params.scan_range();
+          DCHECK(scan_range.has_hdfs_file_split());
+          const HdfsFileSplitPB& hdfs_file_split = scan_range.hdfs_file_split();
+          bool try_hdfs_cache = scan_range_params.has_try_hdfs_cache() ?
+              scan_range_params.try_hdfs_cache() : false;
           bool is_remote =
-              scan_range_params.__isset.is_remote ? scan_range_params.is_remote : false;
+              scan_range_params.has_is_remote() ? scan_range_params.is_remote() : false;
           cb({addr, hdfs_file_split, try_hdfs_cache, is_remote});
         }
       }
@@ -583,7 +583,7 @@ int Result::CountAssignmentsIf(const AssignmentFilter& filter) const {
 int64_t Result::CountAssignedBytesIf(const AssignmentFilter& filter) const {
   int64_t assigned_bytes = 0;
   AssignmentCallback cb = [&assigned_bytes, filter](const AssignmentInfo& assignment) {
-    if (filter(assignment)) assigned_bytes += assignment.hdfs_file_split.length;
+    if (filter(assignment)) assigned_bytes += assignment.hdfs_file_split.length();
   };
   ProcessAssignments(cb);
   return assigned_bytes;
@@ -603,7 +603,7 @@ void Result::CountAssignedBytesPerBackend(
   AssignmentCallback cb = [&num_assignments_per_backend](
       const AssignmentInfo& assignment) {
     (*num_assignments_per_backend)[assignment.addr.hostname] +=
-        assignment.hdfs_file_split.length;
+        assignment.hdfs_file_split.length();
   };
   ProcessAssignments(cb);
 }
