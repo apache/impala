@@ -92,6 +92,9 @@ the same dependencies
                 <include>org/apache/hive/service/rpc/thrift/**</include>
                 <include>org/apache/hadoop/hive/serde/**</include>
                 <include>org/apache/hadoop/hive/serde2/**</include>
+                <!-- IMPALA-9548: Add UDF stats estimator -->
+                <include>org/apache/hadoop/hive/ql/plan/ColStatistics.class</include>
+                <include>org/apache/hadoop/hive/ql/stats/estimator/**</include>
                 <include>org/apache/hive/service/rpc/thrift/**</include>
                 <include>org/apache/hive/common/HiveVersionAnnotation.class</include>
                 <include>org/apache/orc/**</include>
