@@ -188,25 +188,6 @@ public class SingleNodePlanner {
   }
 
   /**
-   * Returns true if there is a join in the plan outside of the right branch of a
-   * subplan. This specific behaviour maintains compatibility with older
-   * validatePlan() logic that allowed joins with mt_dop only in this specific case
-   * (presumably by accident).
-   */
-  public boolean hasUnsupportedMtDopJoin(PlanNode planNode) {
-    if (planNode instanceof JoinNode) return true;
-
-    if (planNode instanceof SubplanNode) {
-      return hasUnsupportedMtDopJoin(planNode.getChild(0));
-    }
-
-    for (PlanNode child : planNode.getChildren()) {
-      if (hasUnsupportedMtDopJoin(child)) return true;
-    }
-    return false;
-  }
-
-  /**
    * Creates an EmptyNode that 'materializes' the tuples of the given stmt.
    * Marks all collection-typed slots referenced in stmt as non-materialized because
    * they are never unnested, and therefore the corresponding parent scan should not

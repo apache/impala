@@ -1,5 +1,6 @@
 ====
 ---- QUERY
+# IMPALA-9099: mt_dop is now allowed for joins, so we should run with mt_dop.
 select min(l_orderkey), min(p_name)
 from tpch.lineitem join tpch.part on l_partkey = p_partkey;
 ---- RESULTS
@@ -7,11 +8,10 @@ from tpch.lineitem join tpch.part on l_partkey = p_partkey;
 ---- TYPES
 BIGINT,STRING
 ---- RUNTIME_PROFILE
-row_regex:.*Query Options \(set by configuration and planner\):.*MT_DOP=0.*
-row_regex:.*All 3 execution backends \(5 fragment instances\) started.*
-row_regex:.*NumScannerThreadsStarted.*
+row_regex:.*Query Options \(set by configuration and planner\):.*MT_DOP=4.*
 ====
 ---- QUERY
+# IMPALA-9099: mt_dop is now allowed for joins, so we should run with mt_dop.
 select min(l_orderkey), min(p_name)
 from tpch_kudu.lineitem join tpch_kudu.part on l_partkey = p_partkey;
 ---- RESULTS
@@ -19,9 +19,7 @@ from tpch_kudu.lineitem join tpch_kudu.part on l_partkey = p_partkey;
 ---- TYPES
 BIGINT,STRING
 ---- RUNTIME_PROFILE
-row_regex:.*Query Options \(set by configuration and planner\):.*MT_DOP=0.*
-row_regex:.*All 3 execution backends \(7 fragment instances\) started.*
-row_regex:.*NumScannerThreadsStarted.*
+row_regex:.*Query Options \(set by configuration and planner\):.*MT_DOP=4.*
 ====
 ---- QUERY
 create table tmp as

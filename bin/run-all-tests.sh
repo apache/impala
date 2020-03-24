@@ -162,6 +162,7 @@ for i in $(seq 1 $NUM_TEST_ITERATIONS)
 do
   TEST_RET_CODE=0
 
+  # TODO-MT: remove --unlock_mt_dop when it is no longer needed.
   run-step "Starting Impala cluster" start-impala-cluster.log \
       "${IMPALA_HOME}/bin/start-impala-cluster.py" --log_dir="${IMPALA_EE_TEST_LOGS_DIR}" \
       ${TEST_START_CLUSTER_ARGS} --impalad_args=--unlock_mt_dop=true

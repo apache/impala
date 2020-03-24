@@ -38,7 +38,9 @@ class TestMtDopFlags(CustomClusterTestSuite):
   @CustomClusterTestSuite.with_args(impalad_args="--mt_dop_auto_fallback=true")
   @SkipIfNotHdfsMinicluster.tuned_for_minicluster
   def test_mt_dop_fallback(self, vector, unique_database):
-    """Test joins and inserts fall back to non-mt_dop correctly."""
+    """Test inserts fall back to non-mt_dop correctly.
+    TODO: IMPALA-8966: remove this test when mt_dop is enabled across the board.
+    """
     vector = deepcopy(vector)
     vector.get_value('exec_option')['mt_dop'] = 4
     # Targeted test case that verifies that the fallback actually switches to the

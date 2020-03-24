@@ -633,24 +633,6 @@ public class PlannerTest extends PlannerTestBase {
     // throw a NotImplementedException otherwise (e.g. plan has a distributed join).
     TQueryOptions options = defaultQueryOptions();
     options.setMt_dop(3);
-    options.setDisable_hdfs_num_rows_estimate(false);
-    options.setExplain_level(TExplainLevel.EXTENDED);
-    try {
-      // Temporarily unset the test env such that unsupported queries with mt_dop > 0
-      // throw an exception. Those are otherwise allowed for testing parallel plans.
-      RuntimeEnv.INSTANCE.setEnableMtDopValidation(true);
-      runPlannerTestFile("mt-dop-validation-hdfs-num-rows-est-enabled", options);
-    } finally {
-      RuntimeEnv.INSTANCE.setEnableMtDopValidation(false);
-    }
-  }
-
-  @Test
-  public void testMtDopValidationWithHDFSNumRowsEstDisabled() {
-    // Tests that queries supported with mt_dop > 0 produce a parallel plan, or
-    // throw a NotImplementedException otherwise (e.g. plan has a distributed join).
-    TQueryOptions options = defaultQueryOptions();
-    options.setMt_dop(3);
     options.setDisable_hdfs_num_rows_estimate(true);
     options.setExplain_level(TExplainLevel.EXTENDED);
     try {

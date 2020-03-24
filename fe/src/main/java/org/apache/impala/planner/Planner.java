@@ -125,14 +125,14 @@ public class Planner {
     invertJoins(singleNodePlan, ctx_.isSingleNodeExec());
     singleNodePlan = useNljForSingularRowBuilds(singleNodePlan, ctx_.getRootAnalyzer());
 
-    // Parallel plans are not supported by default for plans with base table joins or
-    // table sinks: we only allow such plans if --unlock_mt_dop=true is specified.
+    // Parallel plans are not supported by default for plans with table sinks because
+    // of issues like IMPALA-8125. We only allow such plans if --unlock_mt_dop=true is
+    // specified.
     if (useParallelPlan()
         && (!RuntimeEnv.INSTANCE.isTestEnv()
                || RuntimeEnv.INSTANCE.isMtDopValidationEnabled())
         && !BackendConfig.INSTANCE.isMtDopUnlocked()
-        && (ctx_.hasTableSink()
-               || singleNodePlanner.hasUnsupportedMtDopJoin(singleNodePlan))) {
+        && ctx_.hasTableSink()) {
       if (BackendConfig.INSTANCE.mtDopAutoFallback()) {
         // Fall back to non-dop mode. This assumes that the mt_dop value is only used
         // in the distributed planning process, which should be generally true as long
