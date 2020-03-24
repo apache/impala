@@ -17,6 +17,7 @@
 # specific language governing permissions and limitations
 # under the License.
 
+import errno
 import os
 import pytest
 import re
@@ -789,7 +790,15 @@ class TestImpalaShell(ImpalaTestSuite):
       try:
         connection = None
         impala_shell = Popen(shell_cmd + args, stdout=devnull, stderr=devnull)
-        connection, client_address = sock.accept()
+        # IMPALA-9547: retry accept(). This is required in Python < 3.5 because some
+        # EINTR return calls from syscalls are not automatically retried. See PEP475.
+        while True:
+          try:
+            connection, client_address = sock.accept()
+            break
+          except IOError, e:
+            if e.errno != errno.EINTR:
+              raise
         data = connection.recv(1024)
         assert expected_output in data
       finally:
