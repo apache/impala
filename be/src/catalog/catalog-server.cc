@@ -79,6 +79,10 @@ DECLARE_int32(state_store_port);
 DECLARE_string(hostname);
 DECLARE_bool(compact_catalog_topic);
 
+#ifndef NDEBUG
+DECLARE_int32(stress_catalog_startup_delay_ms);
+#endif
+
 string CatalogServer::IMPALA_CATALOG_TOPIC = "catalog-update";
 
 const string CATALOG_SERVER_TOPIC_PROCESSING_TIMES =
@@ -252,6 +256,11 @@ Status CatalogServer::Start() {
 
   // This will trigger a full Catalog metadata load.
   catalog_.reset(new Catalog());
+#ifndef NDEBUG
+  if (FLAGS_stress_catalog_startup_delay_ms > 0) {
+    SleepForMs(FLAGS_stress_catalog_startup_delay_ms);
+  }
+#endif
   RETURN_IF_ERROR(Thread::Create("catalog-server", "catalog-update-gathering-thread",
       &CatalogServer::GatherCatalogUpdatesThread, this,
       &catalog_update_gathering_thread_));

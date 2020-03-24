@@ -449,8 +449,6 @@ ImpalaServer::ImpalaServer(ExecEnv* exec_env)
         filter_prefix, catalog_cb));
   }
 
-  ABORT_IF_ERROR(UpdateCatalogMetrics());
-
   // Initialise the cancellation thread pool with 5 (by default) threads. The max queue
   // size is deliberately set so high that it should never fill; if it does the
   // cancellations will get ignored and retried on the next statestore heartbeat.
@@ -2342,7 +2340,10 @@ Status ImpalaServer::Start(int32_t thrift_be_port, int32_t beeswax_port, int32_t
   // then wait for the initial catalog update.
   RETURN_IF_ERROR(exec_env_->StartStatestoreSubscriberService());
 
-  if (FLAGS_is_coordinator) exec_env_->frontend()->WaitForCatalog();
+  if (FLAGS_is_coordinator) {
+    exec_env_->frontend()->WaitForCatalog();
+    ABORT_IF_ERROR(UpdateCatalogMetrics());
+  }
 
   SSLProtocol ssl_version = SSLProtocol::TLSv1_0;
   if (IsExternalTlsConfigured() || IsInternalTlsConfigured()) {

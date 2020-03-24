@@ -161,6 +161,9 @@ DEFINE_bool(thread_creation_fault_injection, false, "A fault injection option th
 DEFINE_int32(stress_catalog_init_delay_ms, 0, "A stress option that injects extra delay"
     " in milliseconds when initializing an impalad's local catalog replica. Delay <= 0"
     " inject no delay.");
+DEFINE_int32(stress_catalog_startup_delay_ms, 0, "A stress option that injects extra "
+    "delay in milliseconds during the startup of catalogd. The delay is before the "
+    "catalogd opens ports or accepts connections. Delay <= 0 injects no delay.");
 DEFINE_int32(stress_disk_read_delay_ms, 0, "A stress option that injects extra delay"
     " in milliseconds when the I/O manager is reading from disk.");
 #endif

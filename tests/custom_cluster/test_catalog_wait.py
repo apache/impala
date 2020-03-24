@@ -41,9 +41,11 @@ class TestCatalogWait(CustomClusterTestSuite):
       assert 'Could not connect to' in str(e.value)
 
   @pytest.mark.execute_serially
-  def test_delayed_catalog(self):
+  def test_delayed_impalad_catalog(self):
     """ Tests client interactions with the cluster when one of the daemons,
-        impalad[2], is delayed in initializing its local catalog replica."""
+        impalad[2], is delayed in initializing its local catalog replica.
+        This delay is simulated on the impalad side, and the catalogd starts
+        up normally."""
 
     # On startup, expect only two executors to be registered.
     self._start_impala_cluster(["--catalog_init_delays=0,0,200000"],
@@ -80,3 +82,53 @@ class TestCatalogWait(CustomClusterTestSuite):
     self.cluster.impalads[0].service.wait_for_metric_value('impala-server.num-fragments', 3);
     self.cluster.impalads[1].service.wait_for_metric_value('impala-server.num-fragments', 3);
     self.cluster.impalads[2].service.wait_for_metric_value('impala-server.num-fragments', 0);
+
+
+@SkipIfBuildType.not_dev_build
+class TestCatalogStartupDelay(CustomClusterTestSuite):
+  """This test injects a real delay in catalogd startup. The impalads are expected to be
+     able to tolerate this delay, either because they wait (as coordinators do) or
+     because they don't need anything from the catalogd. This is done for a few
+     different cluster setups (different metadata, exclusive coordinators). This
+     is not testing anything beyond successful startup."""
+
+  @classmethod
+  def get_workload(cls):
+    return 'functional-query'
+
+  @classmethod
+  def setup_class(cls):
+    if cls.exploration_strategy() != 'exhaustive':
+      pytest.skip('Catalog startup delay tests only run in exhaustive')
+    super(TestCatalogStartupDelay, cls).setup_class()
+
+  @pytest.mark.execute_serially
+  @CustomClusterTestSuite.with_args(
+    catalogd_args="--stress_catalog_startup_delay_ms=60000")
+  def test_default_metadata_settings(self):
+    """This variant tests the default metadata settings."""
+    # The actual test here is successful startup, and we assume nothing about the
+    # functionality of the impalads before the catalogd finishes starting up.
+    self.execute_query("select count(*) from functional.alltypes")
+
+  @pytest.mark.execute_serially
+  @CustomClusterTestSuite.with_args(
+    impalad_args="--use_local_catalog=true",
+    catalogd_args="--stress_catalog_startup_delay_ms=60000 --catalog_topic_mode=minimal")
+  def test_local_catalog(self):
+    """This variant tests with the local catalog."""
+    # The actual test here is successful startup, and we assume nothing about the
+    # functionality of the impalads before the catalogd finishes starting up.
+    self.execute_query("select count(*) from functional.alltypes")
+
+  @pytest.mark.execute_serially
+  @CustomClusterTestSuite.with_args(
+    num_exclusive_coordinators=1,
+    impalad_args="--use_local_catalog=true",
+    catalogd_args="--stress_catalog_startup_delay_ms=60000 --catalog_topic_mode=minimal")
+  def test_local_catalog_excl_coord(self):
+    """This variant tests with the local catalog and an exclusive coordinator. The
+       purpose is to verify that executors do not break."""
+    # The actual test here is successful startup, and we assume nothing about the
+    # functionality of the impalads before the catalogd finishes starting up.
+    self.execute_query("select count(*) from functional.alltypes")
