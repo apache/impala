@@ -42,6 +42,9 @@ PROJECT(ASSEMBLER)
 #  -pthread: enable multithreaded malloc
 #  -DBOOST_DATE_TIME_POSIX_TIME_STD_CONFIG: enable nanosecond precision for boost
 #  -fno-omit-frame-pointers: Keep frame pointer for functions in register
+if (CMAKE_SYSTEM_PROCESSOR MATCHES "aarch64")
+  SET(CXX_COMMON_FLAGS "${CXX_COMMON_FLAGS} -march=armv8-a+crc")
+endif()
 SET(CXX_COMMON_FLAGS "${CXX_COMMON_FLAGS} -Wall -Wno-sign-compare -Wno-unknown-pragmas -pthread")
 SET(CXX_COMMON_FLAGS "${CXX_COMMON_FLAGS} -fno-strict-aliasing -fno-omit-frame-pointer")
 SET(CXX_COMMON_FLAGS "${CXX_COMMON_FLAGS} -fsigned-char")
@@ -229,6 +232,11 @@ add_definitions(-DKUDU_HEADERS_USE_RICH_SLICE -DKUDU_HEADERS_NO_STUBS)
 set(CLANG_IR_CXX_FLAGS "-emit-llvm" "-c" "-std=c++14" "-DIR_COMPILE" "-DHAVE_INTTYPES_H"
   "-DHAVE_NETINET_IN_H" "-DBOOST_DATE_TIME_POSIX_TIME_STD_CONFIG" "-DBOOST_NO_EXCEPTIONS"
   "-fcolor-diagnostics" "-Wno-deprecated" "-Wno-return-type-c-linkage" "-O1")
+
+if (CMAKE_SYSTEM_NAME MATCHES "Linux" AND CMAKE_SYSTEM_PROCESSOR MATCHES "aarch64")
+  set(CLANG_IR_CXX_FLAGS "${CLANG_IR_CXX_FLAGS}" "-DCACHELINESIZE_AARCH64=${CACHELINESIZE_AARCH64}")
+endif()
+
 # -Werror: compile warnings should be errors when using the toolchain compiler.
 set(CLANG_IR_CXX_FLAGS "${CLANG_IR_CXX_FLAGS}" "-Werror")
 

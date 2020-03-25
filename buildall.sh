@@ -461,6 +461,23 @@ generate_cmake_files() {
   else
     CMAKE_ARGS+=(-DCMAKE_TOOLCHAIN_FILE=$IMPALA_HOME/cmake_modules/toolchain.cmake)
   fi
+
+  # ARM64's L3 cacheline size is different according to CPU vendor's implementations of
+  # architecture. so here we will let use decide this value.
+  # If user defined CACHELINESIZE_AARCH64 in impala-config-local.sh, then we will use that
+  # value, if user did not define it, then we will get the value from OS, if fail, then
+  # we will use the default value 64.
+  if [[ "$(uname -p)" = "aarch64" &&  "$(uname -s)" = "Linux" ]]; then
+    local cachelinesize=$(cat /sys/devices/system/cpu/cpu0/cache/index3/coherency_line_size)
+    if [[ $cachelinesize -gt 0 ]]; then
+      CACHELINESIZE_AARCH64=${CACHELINESIZE_AARCH64-$cachelinesize}
+    else
+      CACHELINESIZE_AARCH64=${CACHELINESIZE_AARCH64-64}
+    fi
+    echo "CACHELINESIZE_AARCH64:$CACHELINESIZE_AARCH64"
+    CMAKE_ARGS+=(-DCACHELINESIZE_AARCH64=$CACHELINESIZE_AARCH64)
+  fi
+
   cmake . ${CMAKE_ARGS[@]}
 }
 

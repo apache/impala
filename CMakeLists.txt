@@ -385,6 +385,11 @@ find_package(KRPC REQUIRED)
 
 # KuduClient can use GLOG
 add_definitions(-DKUDU_HEADERS_USE_GLOG)
+
+if (CMAKE_SYSTEM_NAME MATCHES "Linux" AND CMAKE_SYSTEM_PROCESSOR MATCHES "aarch64")
+  add_definitions(-DCACHELINESIZE_AARCH64=${CACHELINESIZE_AARCH64})
+endif()
+
 if(NOT $ENV{KUDU_CLIENT_DIR} EQUAL "")
   set(kuduClient_DIR "$ENV{KUDU_CLIENT_DIR}/usr/local/share/kuduClient/cmake")
 else()
