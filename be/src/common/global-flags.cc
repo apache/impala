@@ -372,6 +372,7 @@ REMOVED_FLAG(enable_partitioned_hash_join);
 REMOVED_FLAG(enable_phj_probe_side_filtering);
 REMOVED_FLAG(enable_rm);
 REMOVED_FLAG(kerberos_reinit_interval);
+REMOVED_FLAG(ldap_manual_config);
 REMOVED_FLAG(llama_addresses);
 REMOVED_FLAG(llama_callback_port);
 REMOVED_FLAG(llama_host);

@@ -61,6 +61,7 @@ add_library(Util
   impalad-metrics.cc
   jni-util.cc
   json-util.cc
+  ldap-util.cc
   logging-support.cc
   mem-info.cc
   memory-metrics.cc

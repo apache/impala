@@ -36,6 +36,8 @@ using namespace ::apache::thrift::transport;
 
 namespace impala {
 
+class ImpalaLdap;
+
 /// System-wide authentication manager responsible for initialising authentication systems,
 /// including SSL, Sasl and Kerberos, and for providing auth-enabled Thrift structures to
 /// servers and clients.
@@ -45,6 +47,9 @@ namespace impala {
 class AuthManager {
  public:
   static AuthManager* GetInstance() { return AuthManager::auth_manager_; }
+
+  AuthManager();
+  ~AuthManager();
 
   /// Set up internal and external AuthProvider classes. This also initializes SSL (via
   /// the creation of ssl_socket_factory_).
@@ -60,6 +65,8 @@ class AuthManager {
   /// connections.  This goes for both the client and server sides.  An example
   /// connection this applies to would be backend <-> statestore.
   AuthProvider* GetInternalAuthProvider();
+
+  ImpalaLdap* GetLdap() { return ldap_.get(); }
 
  private:
   /// One-time kerberos-specific environment variable setup. Sets variables like
@@ -81,6 +88,9 @@ class AuthManager {
   /// initialized, this will be created regardless of whether or not SSL credentials are
   /// specified. This factory isn't otherwise used.
   boost::scoped_ptr<TSSLSocketFactory> ssl_socket_factory_;
+
+  /// Used to authenticate usernames and passwords to LDAP.
+  std::unique_ptr<ImpalaLdap> ldap_;
 };
 
 

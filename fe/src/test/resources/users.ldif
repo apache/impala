@@ -33,3 +33,29 @@ cn: Test2Ldap
 sn: Ldap
 uid: ldaptest2
 userPassword: abcde
+
+dn: cn=Test3Ldap,ou=Users,dc=myorg,dc=com
+objectClass: inetOrgPerson
+objectClass: organizationalPerson
+objectClass: person
+objectClass: top
+cn: Test3Ldap
+sn: Ldap
+uid: ldaptest3
+userPassword: 67890
+
+dn: cn=Test4Ldap,ou=Users,dc=myorg,dc=com
+objectClass: inetOrgPerson
+objectClass: organizationalPerson
+objectClass: person
+objectClass: top
+cn: Test4Ldap
+sn: Ldap
+uid: ldaptest4
+userPassword: fghij
+
+dn: cn=group1,ou=Groups,dc=myorg,dc=com
+objectClass: top
+objectClass: groupOfUniqueNames
+uniqueMember: cn=Test1Ldap,ou=Users,dc=myorg,dc=com
+uniqueMember: cn=Test2Ldap,ou=Users,dc=myorg,dc=com

@@ -52,6 +52,7 @@
 #include "util/coding-util.h"
 #include "util/debug-util.h"
 #include "util/error-util.h"
+#include "util/ldap-util.h"
 #include "util/network-util.h"
 #include "util/os-util.h"
 #include "util/promise.h"
@@ -64,7 +65,6 @@
 #include "common/names.h"
 
 using boost::algorithm::is_any_of;
-using boost::algorithm::replace_all;
 using boost::algorithm::split;
 using boost::algorithm::trim;
 using boost::mt19937;
@@ -92,26 +92,13 @@ DEFINE_string(sasl_path, "", "Colon separated list of paths to look for SASL "
     "security library plugins.");
 DEFINE_bool(enable_ldap_auth, false,
     "If true, use LDAP authentication for client connections");
-
-DEFINE_string(ldap_uri, "", "The URI of the LDAP server to authenticate users against");
-DEFINE_bool(ldap_tls, false, "If true, use the secure TLS protocol to connect to the LDAP"
-    " server");
 DEFINE_string(ldap_ca_certificate, "", "The full path to the certificate file used to"
     " authenticate the LDAP server's certificate for SSL / TLS connections.");
-DEFINE_bool(ldap_passwords_in_clear_ok, false, "If set, will allow LDAP passwords "
-    "to be sent in the clear (without TLS/SSL) over the network.  This option should not "
-    "be used in production environments" );
-DEFINE_bool(ldap_allow_anonymous_binds, false, "(Advanced) If true, LDAP authentication "
-    "with a blank password (an 'anonymous bind') is allowed by Impala.");
-DEFINE_bool(ldap_manual_config, false, "Obsolete; Ignored");
-DEFINE_string(ldap_domain, "", "If set, Impala will try to bind to LDAP with a name of "
-    "the form <userid>@<ldap_domain>");
-DEFINE_string(ldap_baseDN, "", "If set, Impala will try to bind to LDAP with a name of "
-    "the form uid=<userid>,<ldap_baseDN>");
-DEFINE_string(ldap_bind_pattern, "", "If set, Impala will try to bind to LDAP with a name"
-     " of <ldap_bind_pattern>, but where the string #UID is replaced by the user ID. Use"
-     " to control the bind name precisely; do not set --ldap_domain or --ldap_baseDN with"
-     " this option");
+DEFINE_string(ldap_user_filter, "", "Comma separated list of usernames. If specified, "
+    "users must be on this list for athentication to succeed.");
+DEFINE_string(ldap_group_filter, "", "Comma separated list of groups. If specified, "
+    "users must belong to one of these groups for authentication to succeed.");
+
 DEFINE_string(internal_principals_whitelist, "hdfs", "(Advanced) Comma-separated list of "
     " additional usernames authorized to access Impala's internal APIs. Defaults to "
     "'hdfs' which is the system user that in certain deployments must access "
@@ -143,10 +130,6 @@ static string APP_NAME;
 // Constants for the two Sasl mechanisms we support
 static const string KERBEROS_MECHANISM = "GSSAPI";
 static const string PLAIN_MECHANISM = "PLAIN";
-
-// Required prefixes for ldap URIs:
-static const string LDAP_URI_PREFIX = "ldap://";
-static const string LDAPS_URI_PREFIX = "ldaps://";
 
 // We implement an "auxprop" plugin for the Sasl layer in order to have a hook in which
 // to log messages about the start of authentication. This is that plugin's name.
@@ -194,91 +177,8 @@ static int SaslLogCallback(void* context, int level, const char* message) {
   return SASL_OK;
 }
 
-// This callback is only called when we're providing LDAP authentication. This "check
-// pass" callback is our hook to ask the real LDAP server if we're allowed to log in or
-// not. We can be thought of as a proxy for LDAP logins - the user gives their password
-// to us, and we pass it to the real LDAP server.
-//
-// Note that this method uses ldap_sasl_bind_s(), which does *not* provide any security
-// to the connection between Impala and the LDAP server. You must either set --ldap_tls,
-// or have a URI which has "ldaps://" as the scheme in order to get a secure connection.
-// Use --ldap_ca_certificate to specify the location of the certificate used to confirm
-// the authenticity of the LDAP server certificate.
-//
-// user: The username to authenticate
-// pass: The password to use
-// passlen: The length of pass
-// Return: true on success, false otherwise
-static bool LdapCheckPass(const char* user, const char* pass, unsigned passlen) {
-  if (passlen == 0 && !FLAGS_ldap_allow_anonymous_binds) {
-    // Disable anonymous binds.
-    return false;
-  }
-
-  LDAP* ld;
-  int rc = ldap_initialize(&ld, FLAGS_ldap_uri.c_str());
-  if (rc != LDAP_SUCCESS) {
-    LOG(WARNING) << "Could not initialize connection with LDAP server ("
-                 << FLAGS_ldap_uri << "). Error: " << ldap_err2string(rc);
-    return false;
-  }
-
-  // Force the LDAP version to 3 to make sure TLS is supported.
-  int ldap_ver = 3;
-  ldap_set_option(ld, LDAP_OPT_PROTOCOL_VERSION, &ldap_ver);
-
-  // If -ldap_tls is turned on, and the URI is ldap://, issue a STARTTLS operation.
-  // Note that we'll ignore -ldap_tls when using ldaps:// because we've already
-  // got a secure connection (and the LDAP server will reject the STARTTLS).
-  if (FLAGS_ldap_tls && (FLAGS_ldap_uri.find(LDAP_URI_PREFIX) == 0)) {
-    int tls_rc = ldap_start_tls_s(ld, NULL, NULL);
-    if (tls_rc != LDAP_SUCCESS) {
-      LOG(WARNING) << "Could not start TLS secure connection to LDAP server ("
-                   << FLAGS_ldap_uri << "). Error: " << ldap_err2string(tls_rc);
-      ldap_unbind_ext(ld, NULL, NULL);
-      return false;
-    }
-    VLOG(2) << "Started TLS connection with LDAP server: " << FLAGS_ldap_uri;
-  }
-
-  // Map the user string into an acceptable LDAP "DN" (distinguished name)
-  string user_str = user;
-  if (!FLAGS_ldap_domain.empty()) {
-    // Append @domain if there isn't already an @ in the user string.
-    if (user_str.find("@") == string::npos) {
-      user_str = Substitute("$0@$1", user_str, FLAGS_ldap_domain);
-    }
-  } else if (!FLAGS_ldap_baseDN.empty()) {
-    user_str = Substitute("uid=$0,$1", user_str, FLAGS_ldap_baseDN);
-  } else if (!FLAGS_ldap_bind_pattern.empty()) {
-    user_str = FLAGS_ldap_bind_pattern;
-    replace_all(user_str, "#UID", user);
-  }
-
-  // Map the password into a credentials structure
-  struct berval cred;
-  cred.bv_val = const_cast<char*>(pass);
-  cred.bv_len = passlen;
-
-  VLOG_QUERY << "Trying simple LDAP bind for: " << user_str;
-
-  rc = ldap_sasl_bind_s(ld, user_str.c_str(), LDAP_SASL_SIMPLE, &cred,
-      NULL, NULL, NULL);
-  // Free ld
-  ldap_unbind_ext(ld, NULL, NULL);
-  if (rc != LDAP_SUCCESS) {
-    LOG(WARNING) << "LDAP authentication failure for " << user_str
-                 << " : " << ldap_err2string(rc);
-    return false;
-  }
-
-  VLOG_QUERY << "LDAP bind successful";
-
-  return true;
-}
-
-// Wrapper around the function we use to check passwords with LDAP which converts the
-// return value to something appropriate for SASL.
+// Wrapper around the function we use to check passwords with LDAP which has the function
+// signature required to work with SASL.
 //
 // conn: The Sasl connection struct, which we ignore
 // context: Ignored; always NULL
@@ -289,7 +189,8 @@ static bool LdapCheckPass(const char* user, const char* pass, unsigned passlen) 
 // Return: SASL_OK on success, SASL_FAIL otherwise
 int SaslLdapCheckPass(sasl_conn_t* conn, void* context, const char* user,
     const char* pass, unsigned passlen, struct propctx* propctx) {
-  return LdapCheckPass(user, pass, passlen) ? SASL_OK : SASL_FAIL;
+  return AuthManager::GetInstance()->GetLdap()->LdapCheckPass(user, pass, passlen) ?
+      SASL_OK : SASL_FAIL;
 }
 
 // Sasl wants a way to ask us about some options, this function provides
@@ -544,7 +445,8 @@ bool BasicAuth(ThriftServer::ConnectionContext* connection_context,
   }
   string username = decoded.substr(0, colon);
   string password = decoded.substr(colon + 1);
-  bool ret = LdapCheckPass(username.c_str(), password.c_str(), password.length());
+  bool ret = AuthManager::GetInstance()->GetLdap()->LdapCheckPass(
+      username.c_str(), password.c_str(), password.length());
   if (ret) {
     // Authenication was successful, so set the username on the connection.
     connection_context->username = username;
@@ -1155,60 +1057,21 @@ void NoAuthProvider::SetupConnectionContext(
       MakeNetworkAddress(socket->getPeerAddress(), socket->getPeerPort());
 }
 
+AuthManager::AuthManager() {}
+
+AuthManager::~AuthManager() {}
+
 Status AuthManager::Init() {
   ssl_socket_factory_.reset(new TSSLSocketFactory(TLSv1_0));
 
   bool use_ldap = false;
-  const string excl_msg = "--$0 and --$1 are mutually exclusive "
-      "and should not be set together";
 
   // Get all of the flag validation out of the way
   if (FLAGS_enable_ldap_auth) {
     use_ldap = true;
-
-    if (!FLAGS_ldap_domain.empty()) {
-      if (!FLAGS_ldap_baseDN.empty()) {
-        return Status(Substitute(excl_msg, "ldap_domain", "ldap_baseDN"));
-      }
-      if (!FLAGS_ldap_bind_pattern.empty()) {
-        return Status(Substitute(excl_msg, "ldap_domain", "ldap_bind_pattern"));
-      }
-    } else if (!FLAGS_ldap_baseDN.empty()) {
-      if (!FLAGS_ldap_bind_pattern.empty()) {
-        return Status(Substitute(excl_msg, "ldap_baseDN", "ldap_bind_pattern"));
-      }
-    }
-
-    if (FLAGS_ldap_uri.empty()) {
-      return Status("--ldap_uri must be supplied when --ldap_enable_auth is set");
-    }
-
-    if ((FLAGS_ldap_uri.find(LDAP_URI_PREFIX) != 0) &&
-        (FLAGS_ldap_uri.find(LDAPS_URI_PREFIX) != 0)) {
-      return Status(Substitute("--ldap_uri must start with either $0 or $1",
-              LDAP_URI_PREFIX, LDAPS_URI_PREFIX ));
-    }
-
-    LOG(INFO) << "Using LDAP authentication with server " << FLAGS_ldap_uri;
-
-    if (!FLAGS_ldap_tls && (FLAGS_ldap_uri.find(LDAPS_URI_PREFIX) != 0)) {
-      if (FLAGS_ldap_passwords_in_clear_ok) {
-        LOG(WARNING) << "LDAP authentication is being used, but without TLS. "
-                     << "ALL PASSWORDS WILL GO OVER THE NETWORK IN THE CLEAR.";
-      } else {
-        return Status("LDAP authentication specified, but without TLS. "
-                      "Passwords would go over the network in the clear. "
-                      "Enable TLS with --ldap_tls or use an ldaps:// URI. "
-                      "To override this is non-production environments, "
-                      "specify --ldap_passwords_in_clear_ok");
-      }
-    } else if (FLAGS_ldap_ca_certificate.empty()) {
-      LOG(WARNING) << "LDAP authentication is being used with TLS, but without "
-                   << "an --ldap_ca_certificate file, the identity of the LDAP "
-                   << "server cannot be verified.  Network communication (and "
-                   << "hence passwords) could be intercepted by a "
-                   << "man-in-the-middle attack";
-    }
+    RETURN_IF_ERROR(ImpalaLdap::ValidateFlags());
+    ldap_.reset(new ImpalaLdap());
+    RETURN_IF_ERROR(ldap_->Init(FLAGS_ldap_user_filter, FLAGS_ldap_group_filter));
   }
 
   if (FLAGS_principal.empty() && !FLAGS_be_principal.empty()) {
