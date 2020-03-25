@@ -29,7 +29,6 @@ import socket
 import sys
 import threading
 from time import sleep
-from contextlib import closing
 
 # This import is the actual ImpalaShell class from impala_shell.py.
 # We rename it to ImpalaShellClass here because we later import another
@@ -42,6 +41,7 @@ from tests.common.impala_service import ImpaladService
 from tests.common.impala_test_suite import ImpalaTestSuite
 from tests.common.skip import SkipIfLocal
 from tests.common.test_dimensions import create_client_protocol_dimension
+from tests.shell.util import get_unused_port
 from util import (assert_var_substitution, ImpalaShell, get_impalad_port, get_shell_cmd,
                   get_open_sessions_metric, IMPALA_SHELL_EXECUTABLE, spawn_shell)
 import SimpleHTTPServer
@@ -76,18 +76,41 @@ def tmp_history_file(request):
   return tmp.name
 
 
-class UnavailableRequestHandler(SimpleHTTPServer.SimpleHTTPRequestHandler):
-  """An HTTP server that always returns 503"""
-  def do_POST(self):
-    self.send_response(code=httplib.SERVICE_UNAVAILABLE, message="Service Unavailable")
+@pytest.yield_fixture
+def http_503_server():
+  class RequestHandler503(SimpleHTTPServer.SimpleHTTPRequestHandler):
+    """A custom http handler that checks for duplicate 'Host' headers from the most
+    recent http request, and always returns a 503 http code"""
 
+    def do_POST(self):
+      # The unfortunately named self.headers here is an instance of mimetools.Message that
+      # contains the request headers.
+      request_headers = self.headers.headers
 
-def get_unused_port():
-  """ Find an unused port http://stackoverflow.com/questions/1365265 """
-  with closing(socket.socket(socket.AF_INET, socket.SOCK_STREAM)) as s:
-    s.bind(('', 0))
-    s.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
-    return s.getsockname()[1]
+      # Ensure that only one 'Host' header is contained in the request before responding.
+      host_hdr_count = sum([header.startswith('Host:') for header in request_headers])
+      assert host_hdr_count == 1, "duplicate 'Host:' headers in %s" % request_headers
+
+      # Respond with 503.
+      self.send_response(code=httplib.SERVICE_UNAVAILABLE, message="Service Unavailable")
+
+  class TestHTTPServer503(object):
+    def __init__(self):
+      self.HOST = "localhost"
+      self.PORT = get_unused_port()
+      self.httpd = SocketServer.TCPServer((self.HOST, self.PORT), RequestHandler503)
+
+      self.http_server_thread = threading.Thread(target=self.httpd.serve_forever)
+      self.http_server_thread.start()
+
+  server = TestHTTPServer503()
+  yield server
+
+  # Cleanup after test.
+  if server.httpd is not None:
+    server.httpd.shutdown()
+  if server.http_server_thread is not None:
+    server.http_server_thread.join()
 
 
 class TestImpalaShellInteractive(ImpalaTestSuite):
@@ -990,33 +1013,18 @@ class TestImpalaShellInteractive(ImpalaTestSuite):
       result = p.get_result()
       assert "Fetched 0 row" in result.stderr
 
-  def test_http_codes(self, vector):
-    """Check that the shell prints a good message when using hs2-http protocol
-    and the http server returns a 503 error."""
+  def test_http_interactions(self, vector, http_503_server):
+    """Test interactions with the http server when using hs2-http protocol.
+    Check that the shell prints a good message when the server returns a 503 error."""
     protocol = vector.get_value("protocol")
     if protocol != 'hs2-http':
       pytest.skip()
 
-    # Start an http server that always returns 503.
-    HOST = "localhost"
-    PORT = get_unused_port()
-    httpd = None
-    http_server_thread = None
-    try:
-      httpd = SocketServer.TCPServer((HOST, PORT), UnavailableRequestHandler)
-      http_server_thread = threading.Thread(target=httpd.serve_forever)
-      http_server_thread.start()
-
-      # Check that we get a message about the 503 error when we try to connect.
-      shell_args = ["--protocol={0}".format(protocol), "-i{0}:{1}".format(HOST, PORT)]
-      shell_proc = spawn_shell([IMPALA_SHELL_EXECUTABLE] + shell_args)
-      shell_proc.expect("HTTP code 503", timeout=10)
-    finally:
-      # Clean up.
-      if httpd is not None:
-        httpd.shutdown()
-      if http_server_thread is not None:
-        http_server_thread.join()
+    # Check that we get a message about the 503 error when we try to connect.
+    shell_args = ["--protocol={0}".format(protocol),
+                  "-i{0}:{1}".format(http_503_server.HOST, http_503_server.PORT)]
+    shell_proc = spawn_shell([IMPALA_SHELL_EXECUTABLE] + shell_args)
+    shell_proc.expect("HTTP code 503", timeout=10)
 
 
 def run_impala_shell_interactive(vector, input_lines, shell_args=None,

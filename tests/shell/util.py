@@ -20,6 +20,9 @@
 
 import logging
 import os
+import socket
+from contextlib import closing
+
 import pexpect
 import pytest
 import re
@@ -55,7 +58,7 @@ if IMPALA_SHELL_EXECUTABLE is None:
         IMPALA_HOME, "shell/build", "impala-shell-" + IMPALA_LOCAL_BUILD_VERSION,
         "impala-shell")
 
-    
+
 def build_shell_env(env=None):
   """ Construct the environment for the shell to run in based on 'env', or the current
   process's environment if env is None."""
@@ -311,3 +314,11 @@ class ImpalaShell(object):
     if args is not None: cmd += args
     return Popen(cmd, shell=False, stdout=PIPE, stdin=PIPE, stderr=PIPE,
                  env=build_shell_env(env))
+
+
+def get_unused_port():
+  """ Find an unused port http://stackoverflow.com/questions/1365265 """
+  with closing(socket.socket(socket.AF_INET, socket.SOCK_STREAM)) as s:
+    s.bind(('', 0))
+    s.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
+    return s.getsockname()[1]
