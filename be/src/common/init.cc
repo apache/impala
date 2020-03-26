@@ -430,7 +430,7 @@ extern "C" const char* __tsan_default_options() {
 #else
          "1 "
 #endif
-         "halt_on_error=0 history_size=7 allocator_may_return_null=1 "
+         "history_size=7 allocator_may_return_null=1 "
          "suppressions=" THREAD_SANITIZER_SUPPRESSIONS;
 }
 #endif

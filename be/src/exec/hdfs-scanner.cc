@@ -107,10 +107,14 @@ Status HdfsScanner::Open(ScannerContext* context) {
     }
   }
 
-  // Initialize the template_tuple_.
-  template_tuple_ = scan_node_->InitTemplateTuple(
-      context_->partition_descriptor()->partition_key_value_evals(),
-      template_tuple_pool_.get(), state_);
+  // Initialize the template_tuple_, it is copied from the template tuple map in the
+  // HdfsScanNodeBase.
+  Tuple* template_tuple =
+      scan_node_->partition_template_tuple_map_[context_->partition_descriptor()->id()];
+  if (template_tuple != nullptr) {
+    template_tuple_ =
+        template_tuple->DeepCopy(*scan_node_->tuple_desc(), template_tuple_pool_.get());
+  }
   template_tuple_map_[scan_node_->tuple_desc()] = template_tuple_;
 
   decompress_timer_ = ADD_TIMER(scan_node_->runtime_profile(), "DecompressionTime");
