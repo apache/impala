@@ -56,7 +56,8 @@ class TestDateQueries(ImpalaTestSuite):
       #  - Hive2 uses Julian Calendar for writing dates before 1582-10-15, whereas Impala
       #    uses proleptic Gregorian Calendar. This affects the results Impala gets when
       #    querying avro tables written by Hive2.
-      #  - Hive3 on the other hand uses proleptic Gregorian Calendar to write dates.
+      #  - Since HIVE-22589, Hive3 also uses Julian Calendar for dates before 1582-10-15
+      #    by default.
       self.run_test_case('QueryTest/avro_date', vector)
     else:
       self.run_test_case('QueryTest/date', vector)
