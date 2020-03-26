@@ -102,14 +102,17 @@ LibCache::~LibCache() {
   if (current_process_handle_ != nullptr) DynamicClose(current_process_handle_);
 }
 
-Status LibCache::Init() {
+Status LibCache::Init(bool external_fe) {
   DCHECK(LibCache::instance_.get() == nullptr);
   LibCache::instance_.reset(new LibCache());
-  return LibCache::instance_->InitInternal();
+  return LibCache::instance_->InitInternal(external_fe);
 }
 
-Status LibCache::InitInternal() {
-  if (TestInfo::is_fe_test()) {
+Status LibCache::InitInternal(bool external_fe) {
+  if (external_fe) {
+    LOG(INFO) << "Library cache is using shared object for process handle";
+    RETURN_IF_ERROR(DynamicOpen("libfesupport.so", &current_process_handle_));
+  } else if (TestInfo::is_fe_test()) {
     // In the FE tests, nullptr gives the handle to the java process.
     // Explicitly load the fe-support shared object.
     string fe_support_path;

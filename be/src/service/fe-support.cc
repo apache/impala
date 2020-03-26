@@ -63,23 +63,24 @@ using namespace apache::thrift::server;
 
 static bool fe_support_disable_codegen = true;
 
-// Called from the FE when it explicitly loads libfesupport.so for tests.
+// Called from tests or external FE after it explicitly loads libfesupport.so.
 // This creates the minimal state necessary to service the other JNI calls.
 // This is not called when we first start up the BE.
 extern "C"
 JNIEXPORT void JNICALL
-Java_org_apache_impala_service_FeSupport_NativeFeTestInit(
-    JNIEnv* env, jclass fe_support_class) {
+Java_org_apache_impala_service_FeSupport_NativeFeInit(
+    JNIEnv* env, jclass fe_support_class, bool external_fe) {
   DCHECK(ExecEnv::GetInstance() == NULL) << "This should only be called once from the FE";
   char* env_logs_dir_str = std::getenv("IMPALA_FE_TEST_LOGS_DIR");
   if (env_logs_dir_str != nullptr) FLAGS_log_dir = env_logs_dir_str;
   char* name = const_cast<char*>("FeSupport");
   // Init the JVM to load the classes in JniUtil that are needed for returning
   // exceptions to the FE.
-  InitCommonRuntime(1, &name, true, TestInfo::FE_TEST);
+  InitCommonRuntime(1, &name, true,
+      external_fe ? TestInfo::NON_TEST : TestInfo::FE_TEST, external_fe);
   THROW_IF_ERROR(LlvmCodeGen::InitializeLlvm(true), env, JniUtil::internal_exc_class());
-  ExecEnv* exec_env = new ExecEnv(); // This also caches it from the process.
-  THROW_IF_ERROR(exec_env->InitForFeTests(), env, JniUtil::internal_exc_class());
+  ExecEnv* exec_env = new ExecEnv(external_fe); // This also caches it from the process.
+  THROW_IF_ERROR(exec_env->InitForFeSupport(), env, JniUtil::internal_exc_class());
 }
 
 // Serializes expression value 'value' to thrift structure TColumnValue 'col_val'.
@@ -692,8 +693,8 @@ namespace impala {
 
 static JNINativeMethod native_methods[] = {
   {
-      const_cast<char*>("NativeFeTestInit"), const_cast<char*>("()V"),
-      (void*)::Java_org_apache_impala_service_FeSupport_NativeFeTestInit
+      const_cast<char*>("NativeFeInit"), const_cast<char*>("(Z)V"),
+      (void*)::Java_org_apache_impala_service_FeSupport_NativeFeInit
   },
   {
       const_cast<char*>("NativeEvalExprsWithoutRow"), const_cast<char*>("([B[BJ)[B"),

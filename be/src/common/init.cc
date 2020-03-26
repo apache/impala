@@ -27,6 +27,7 @@
 #include "common/status.h"
 #include "exec/kudu-util.h"
 #include "exprs/scalar-expr-evaluator.h"
+#include "exprs/timezone_db.h"
 #include "gutil/atomicops.h"
 #include "gutil/strings/substitute.h"
 #include "rpc/authentication.h"
@@ -72,6 +73,7 @@ DECLARE_int32(logbufsecs);
 DECLARE_int32(max_log_files);
 DECLARE_int32(max_minidumps);
 DECLARE_string(redaction_rules_file);
+DECLARE_bool(redirect_stdout_stderr);
 DECLARE_string(reserved_words_version);
 DECLARE_bool(symbolize_stacktrace);
 
@@ -252,7 +254,7 @@ void BlockImpalaShutdownSignal() {
 }
 
 void impala::InitCommonRuntime(int argc, char** argv, bool init_jvm,
-    TestInfo::Mode test_mode) {
+    TestInfo::Mode test_mode, bool external_fe) {
   srand(time(NULL));
   BlockImpalaShutdownSignal();
 
@@ -275,6 +277,16 @@ void impala::InitCommonRuntime(int argc, char** argv, bool init_jvm,
 # else
   FLAGS_symbolize_stacktrace = true;
 #endif
+
+  if (external_fe) {
+    // Change defaults for flags when loaded as part of external frontend.
+    // Write logs to stderr by default (otherwise logs get written to
+    // FeSupport.INFO/ERROR).
+    FLAGS_logtostderr = true;
+    // Do not redirct stdout/stderr by default.
+    FLAGS_redirect_stdout_stderr = false;
+  }
+
   google::SetVersionString(impala::GetBuildVersion());
   google::ParseCommandLineFlags(&argc, &argv, true);
   if (!FLAGS_redaction_rules_file.empty()) {
@@ -298,7 +310,9 @@ void impala::InitCommonRuntime(int argc, char** argv, bool init_jvm,
   }
   impala::InitGoogleLoggingSafe(argv[0]);
   // Breakpad needs flags and logging to initialize.
-  ABORT_IF_ERROR(RegisterMinidump(argv[0]));
+  if (!external_fe) {
+    ABORT_IF_ERROR(RegisterMinidump(argv[0]));
+  }
 #ifndef THREAD_SANITIZER
 #ifndef __aarch64__
   AtomicOps_x86CPUFeaturesInit();
@@ -360,14 +374,19 @@ void impala::InitCommonRuntime(int argc, char** argv, bool init_jvm,
   }
 
   // Required for the FE's Catalog
-  ABORT_IF_ERROR(impala::LibCache::Init());
+  ABORT_IF_ERROR(impala::LibCache::Init(external_fe));
   Status fs_cache_init_status = impala::HdfsFsCache::Init();
   if (!fs_cache_init_status.ok()) CLEAN_EXIT_WITH_ERROR(fs_cache_init_status.GetDetail());
 
   if (init_jvm) {
+    if (!external_fe) {
+      JniUtil::InitLibhdfs();
+    }
     ABORT_IF_ERROR(JniUtil::Init());
     InitJvmLoggingSupport();
-    ABORT_IF_ERROR(JniUtil::InitJvmPauseMonitor());
+    if (!external_fe) {
+      ABORT_IF_ERROR(JniUtil::InitJvmPauseMonitor());
+    }
     ZipUtil::InitJvm();
   }
 
@@ -397,6 +416,12 @@ void impala::InitCommonRuntime(int argc, char** argv, bool init_jvm,
     stringstream error_msg;
     error_msg << "Failed to register action for SIGTERM: " << GetStrErrMsg();
     CLEAN_EXIT_WITH_ERROR(error_msg.str());
+  }
+
+  if (external_fe) {
+    // Explicitly load the timezone database for external FEs. Impala daemons load it
+    // through ImpaladMain
+    ABORT_IF_ERROR(TimezoneDatabase::Initialize());
   }
 }
 

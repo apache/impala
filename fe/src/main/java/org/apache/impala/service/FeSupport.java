@@ -69,10 +69,11 @@ import com.google.common.base.Preconditions;
 public class FeSupport {
   private final static Logger LOG = LoggerFactory.getLogger(FeSupport.class);
   private static boolean loaded_ = false;
+  private static boolean externalFE_ = false;
 
-  // Only called if this library is explicitly loaded. This only happens
-  // when running FE tests.
-  public native static void NativeFeTestInit();
+  // Only called if this library is explicitly loaded. This happens
+  // when running FE tests or external FE
+  public native static void NativeFeInit(boolean externalFE);
 
   // Returns a serialized TResultRow
   public native static byte[] NativeEvalExprsWithoutRow(
@@ -471,6 +472,15 @@ public class FeSupport {
   }
 
   /**
+   * Calling this function before loadLibrary() causes external frontend
+   * initialization to be used during NativeFeInit()
+   */
+  public static synchronized void setExternalFE() {
+    Preconditions.checkState(!loaded_);
+    externalFE_ = true;
+  }
+
+  /**
    * This function should be called explicitly by the FeSupport to ensure that
    * native functions are loaded. Tests that depend on JniCatalog or JniFrontend
    * being instantiated should also call this function.
@@ -481,6 +491,6 @@ public class FeSupport {
     NativeLibUtil.loadLibrary("libfesupport.so");
     LOG.info("Loaded libfesupport.so");
     loaded_ = true;
-    NativeFeTestInit();
+    NativeFeInit(externalFE_);
   }
 }

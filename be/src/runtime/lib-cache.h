@@ -72,7 +72,7 @@ class LibCache {
   ~LibCache();
 
   /// Initializes the libcache. Must be called before any other APIs.
-  static Status Init();
+  static Status Init(bool external_fe);
 
   /// Gets the local 'path' used to cache the file stored at the global 'hdfs_lib_file'. If
   /// this file is not already on the local fs, or if the cached entry's last modified
@@ -156,7 +156,7 @@ class LibCache {
   LibCache(LibCache const& l); // disable copy ctor
   LibCache& operator=(LibCache const& l); // disable assignment
 
-  Status InitInternal();
+  Status InitInternal(bool external_fe);
 
   /// Returns the cache entry for 'hdfs_lib_file'. If this library has not been
   /// copied locally, it will copy it and add a new LibCacheEntry to 'lib_cache_'.

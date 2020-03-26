@@ -67,7 +67,7 @@ class Planner {
  public:
   Planner() {
     frontend_.SetCatalogIsReady();
-    ABORT_IF_ERROR(exec_env_.InitForFeTests());
+    ABORT_IF_ERROR(exec_env_.InitForFeSupport());
   }
 
   ~Planner() {
