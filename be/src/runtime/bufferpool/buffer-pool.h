@@ -442,9 +442,10 @@ class BufferPool::SubReservation {
   boost::scoped_ptr<ReservationTracker> tracker_;
 };
 
-/// A handle to a buffer allocated from the buffer pool. Each BufferHandle should only
-/// be used by a single thread at a time: concurrently calling BufferHandle methods or
-/// BufferPool methods with the BufferHandle as an argument is not supported.
+/// A handle to a buffer allocated from the buffer pool. Only const methods on
+/// BufferHandle are thread-safe. It is not safe to call non-constant BufferHandle
+/// methods or BufferPool methods with the BufferHandle as an argument concurrently
+/// with any other operations on the BufferHandle.
 class BufferPool::BufferHandle {
  public:
   BufferHandle() { Reset(); }
@@ -508,9 +509,10 @@ class BufferPool::BufferHandle {
   int home_core_;
 };
 
-/// The handle for a page used by clients of the BufferPool. Each PageHandle should
-/// only be used by a single thread at a time: concurrently calling PageHandle methods
-/// or BufferPool methods with the PageHandle as an argument is not supported.
+/// The handle for a page used by clients of the BufferPool. Only const methods on
+/// PageHandle are thread-safe. It is not safe to call non-constant PageHandle
+/// methods or BufferPool methods with the PageHandle as an argument concurrently
+/// with any other operations on the PageHandle.
 class BufferPool::PageHandle {
  public:
   PageHandle();
@@ -535,6 +537,9 @@ class BufferPool::PageHandle {
   /// since the last call to GetBuffer(). Only const accessors of the returned handle can
   /// be used: it is invalid to call FreeBuffer() or TransferBuffer() on it or to
   /// otherwise modify the handle.
+  ///
+  /// This is safe to call from multiple threads at the same time as long as the
+  /// page is pinned.
   Status GetBuffer(const BufferHandle** buffer_handle) const WARN_UNUSED_RESULT;
 
   std::string DebugString() const;

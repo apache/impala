@@ -18,6 +18,7 @@
 #include <algorithm>
 #include <limits>
 
+#include "exec/exec-node.inline.h"
 #include "exec/hdfs-avro-scanner.h"
 #include "exec/read-write-util.h"
 #include "runtime/date-value.h"

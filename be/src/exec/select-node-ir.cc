@@ -16,6 +16,8 @@
 // under the License.
 
 #include "exec/select-node.h"
+
+#include "exec/exec-node.inline.h"
 #include "runtime/tuple-row.h"
 
 using namespace impala;

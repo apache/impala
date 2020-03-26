@@ -23,6 +23,7 @@
 #include <kudu/client/value.h>
 #include <thrift/protocol/TDebugProtocol.h>
 
+#include "exec/exec-node.inline.h"
 #include "exec/kudu-util.h"
 #include "exprs/scalar-expr.h"
 #include "exprs/scalar-expr-evaluator.h"

@@ -55,7 +55,6 @@ row_regex: .*NumHashTableBuildsSkipped: .* \([1-9][0-9]*\)
 # Setting max_row_size == default_spillable_buffer_size was sufficient to trigger
 # IMPALA-9349, because it means there is no surplus reservation during repartitioning.
 set debug_action="-1:OPEN:SET_DENY_RESERVATION_PROBABILITY@1.0";
-set max_row_size=256k;
 select straight_join count(*)
 from
 supplier right outer join lineitem on s_suppkey = l_suppkey
@@ -84,7 +83,7 @@ row_regex: .*NumHashTableBuildsSkipped: .* \([1-9][0-9]*\)
 ---- QUERY
 # Aggregation query that will OOM and fail to spill because of IMPALA-3304 without
 # any help from DEBUG_ACTION.
-set mem_limit=80m;
+set mem_limit=75m;
 select l_orderkey, group_concat(l_comment) comments
 from lineitem
 group by l_orderkey

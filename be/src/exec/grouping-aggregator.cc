@@ -21,6 +21,7 @@
 
 #include "codegen/llvm-codegen.h"
 #include "exec/exec-node.h"
+#include "exec/exec-node.inline.h"
 #include "exec/hash-table.inline.h"
 #include "exprs/agg-fn-evaluator.h"
 #include "exprs/scalar-expr.h"

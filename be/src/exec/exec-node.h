@@ -236,7 +236,7 @@ class ExecNode {
 
   /// Evaluate the conjuncts in 'evaluators' over 'row'.
   /// Returns true if all exprs return true.
-  static bool EvalConjuncts(
+  static inline bool EvalConjuncts(
       ScalarExprEvaluator* const* evals, int num_conjuncts, TupleRow* row);
 
   /// Codegen EvalConjuncts(). Returns a non-OK status if the function couldn't be

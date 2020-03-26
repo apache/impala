@@ -3652,8 +3652,8 @@ PLAN-ROOT SINK
    runtime filters: RF000 -> ps_partkey
    row-size=16B cardinality=800.00K
 ---- PARALLELPLANS
-Max Per-Host Resource Reservation: Memory=50.19MB Threads=8
-Per-Host Resource Estimates: Memory=201MB
+Max Per-Host Resource Reservation: Memory=52.19MB Threads=8
+Per-Host Resource Estimates: Memory=203MB
 PLAN-ROOT SINK
 |
 14:MERGING-EXCHANGE [UNPARTITIONED]

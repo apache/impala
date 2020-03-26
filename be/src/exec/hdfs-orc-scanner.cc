@@ -19,6 +19,7 @@
 
 #include <queue>
 
+#include "exec/exec-node.inline.h"
 #include "exec/orc-column-readers.h"
 #include "exec/scanner-context.inline.h"
 #include "exec/scratch-tuple-batch.h"

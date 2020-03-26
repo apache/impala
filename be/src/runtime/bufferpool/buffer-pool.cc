@@ -97,11 +97,13 @@ Status BufferPool::PageHandle::GetBuffer(const BufferHandle** buffer) const {
   DCHECK(is_open());
   DCHECK(client_->is_registered());
   DCHECK(is_pinned());
-  if (page_->pin_in_flight) {
+  // Dirty check to see if we might need to wait for the pin to finish (this
+  // avoids the lock acquisition in the common case).
+  if (page_->pin_in_flight.Load()) {
     // Finish the work started in Pin().
     RETURN_IF_ERROR(client_->impl_->FinishMoveEvictedToPinned(page_));
   }
-  DCHECK(!page_->pin_in_flight);
+  DCHECK(!page_->pin_in_flight.Load());
   *buffer = &page_->buffer;
   DCHECK((*buffer)->is_open());
   return Status::OK();
@@ -156,9 +158,9 @@ void BufferPool::DestroyPage(ClientHandle* client, PageHandle* handle) {
 
   if (handle->is_pinned()) {
     // Cancel the read I/O - we don't need the data any more.
-    if (handle->page_->pin_in_flight) {
+    if (handle->page_->pin_in_flight.Load()) {
       handle->page_->write_handle->CancelRead();
-      handle->page_->pin_in_flight = false;
+      handle->page_->pin_in_flight.Store(false);
     }
     // In the pinned case, delegate to ExtractBuffer() and FreeBuffer() to do the work
     // of cleaning up the page, freeing the buffer and updating reservations correctly.
@@ -199,7 +201,7 @@ void BufferPool::Unpin(ClientHandle* client, PageHandle* handle) {
   reservation->ReleaseTo(page->len);
 
   if (--page->pin_count > 0) return;
-  if (page->pin_in_flight) {
+  if (page->pin_in_flight.Load()) {
     // Data is not in memory - move it back to evicted.
     client->impl_->UndoMoveEvictedToPinned(page);
   } else {
@@ -550,7 +552,7 @@ Status BufferPool::Client::StartMoveEvictedToPinned(
   RETURN_IF_ERROR(
       file_group_->ReadAsync(page->write_handle.get(), page->buffer.mem_range()));
   pinned_pages_.Enqueue(page);
-  page->pin_in_flight = true;
+  page->pin_in_flight.Store(true);
   DCHECK_CONSISTENCY();
   return Status::OK();
 }
@@ -560,9 +562,9 @@ void BufferPool::Client::UndoMoveEvictedToPinned(Page* page) {
   // * There is no in-flight read.
   // * The page's data is on disk referenced by 'write_handle'
   // * The page has no attached buffer.
-  DCHECK(page->pin_in_flight);
+  DCHECK(page->pin_in_flight.Load());
   page->write_handle->CancelRead();
-  page->pin_in_flight = false;
+  page->pin_in_flight.Store(false);
 
   unique_lock<mutex> lock(lock_);
   DCHECK_CONSISTENCY();
@@ -574,15 +576,17 @@ void BufferPool::Client::UndoMoveEvictedToPinned(Page* page) {
 }
 
 Status BufferPool::Client::FinishMoveEvictedToPinned(Page* page) {
-  DCHECK(page->pin_in_flight);
   SCOPED_TIMER(counters().read_wait_time);
+  lock_guard<SpinLock> pl(page->buffer_lock);
+  // Another thread may have moved it to pinned in the meantime.
+  if (!page->pin_in_flight.Load()) return Status::OK();
   // Don't hold any locks while reading back the data. It is safe to modify the page's
   // buffer handle without holding any locks because no concurrent operations can modify
   // evicted pages.
   RETURN_IF_ERROR(file_group_->WaitForAsyncRead(
       page->write_handle.get(), page->buffer.mem_range(), &counters_));
   file_group_->DestroyWriteHandle(move(page->write_handle));
-  page->pin_in_flight = false;
+  page->pin_in_flight.Store(false);
   return Status::OK();
 }
 

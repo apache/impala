@@ -15,6 +15,7 @@
 // specific language governing permissions and limitations
 // under the License.
 
+#include "exec/exec-node.inline.h"
 #include "exec/hdfs-columnar-scanner.h"
 #include "runtime/row-batch.h"
 #include "exec/scratch-tuple-batch.h"

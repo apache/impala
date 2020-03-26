@@ -37,7 +37,9 @@
 #include "runtime/runtime-state.h"
 #include "util/bloom-filter.h"
 #include "util/cyclic-barrier.h"
+#include "util/debug-util.h"
 #include "util/min-max-filter.h"
+#include "util/pretty-printer.h"
 #include "util/runtime-profile-counters.h"
 
 #include "gen-cpp/PlanNodes_types.h"
@@ -339,6 +341,7 @@ Status PhjBuilder::FinalizeBuild(RuntimeState* state) {
   int64_t num_build_rows = 0;
   for (const unique_ptr<Partition>& partition : hash_partitions_) {
     num_build_rows += partition->build_rows()->num_rows();
+    partition->build_rows()->DoneWriting();
   }
 
   if (num_build_rows > 0) {
@@ -371,12 +374,17 @@ Status PhjBuilder::FinalizeBuild(RuntimeState* state) {
   if (ht_ctx_->level() == 0) {
     PublishRuntimeFilters(num_build_rows);
     non_empty_build_ |= (num_build_rows > 0);
-  }
 
-  if (null_aware_partition_ != nullptr && null_aware_partition_->is_spilled()) {
-    // Free up memory for the hash tables of other partitions by unpinning the
-    // last block of the null aware partition's stream.
-    RETURN_IF_ERROR(null_aware_partition_->Spill(BufferedTupleStream::UNPIN_ALL));
+    if (join_op_ == TJoinOp::NULL_AWARE_LEFT_ANTI_JOIN) {
+      if (null_aware_partition_->is_spilled()) {
+        // Free up memory for the hash tables of other partitions by unpinning the
+        // last block of the null aware partition's stream.
+        RETURN_IF_ERROR(null_aware_partition_->Spill(BufferedTupleStream::UNPIN_ALL));
+      } else {
+        // Invalidate the write iterator so we can safely do concurrent reads later.
+        null_aware_partition_->build_rows()->DoneWriting();
+      }
+    }
   }
 
   HashJoinState next_state;
@@ -830,6 +838,53 @@ void PhjBuilder::CleanUpSinglePartition(
   spilled_partitions_.pop_back();
 }
 
+Status PhjBuilder::BeginNullAwareProbe() {
+  DCHECK(null_aware_partition_ != nullptr);
+  if (num_probe_threads_ > 1) {
+    return probe_barrier_->Wait([&]() {
+      return BeginNullAwareProbeSerial();
+    });
+  } else {
+    return BeginNullAwareProbeSerial();
+  }
+}
+
+Status PhjBuilder::BeginNullAwareProbeSerial() {
+  BufferedTupleStream* build_rows = null_aware_partition_->build_rows();
+  bool pinned;
+  RETURN_IF_ERROR(build_rows->PinStream(&pinned));
+  if (!pinned) {
+    return Status(TErrorCode::NAAJ_OUT_OF_MEMORY, build_rows->num_rows(),
+        PrettyPrinter::PrintBytes(build_rows->byte_size()),
+        PrettyPrinter::PrintBytes(
+            buffer_pool_client_->GetUnusedReservation() + build_rows->BytesPinned(false)),
+        PrettyPrinter::PrintBytes(buffer_pool_client_->GetReservation()));
+  }
+  return Status::OK();
+}
+
+Status PhjBuilder::DoneProbingNullAwarePartition() {
+  DCHECK(null_aware_partition_ != nullptr);
+  if (num_probe_threads_ > 1) {
+    RETURN_IF_ERROR(probe_barrier_->Wait([&]() {
+      CloseNullAwarePartition();
+      return Status::OK();
+    }));
+  } else {
+    CloseNullAwarePartition();
+  }
+  return Status::OK();
+}
+
+void PhjBuilder::CloseNullAwarePartition() {
+  if (null_aware_partition_ == nullptr) return;
+  // We don't need to pass in a batch because the anti-join only returns tuple data
+  // from the probe side - i.e. the RowDescriptor for PartitionedHashJoinNode does
+  // not include the build tuple.
+  null_aware_partition_->Close(nullptr);
+  null_aware_partition_.reset();
+}
+
 void PhjBuilder::CloseAndDeletePartitions(RowBatch* row_batch) {
   // Close all the partitions and clean up all references to them.
   for (unique_ptr<Partition>& partition : hash_partitions_) {
@@ -1015,7 +1070,9 @@ Status PhjBuilder::BeginSpilledProbeSerial() {
           << " for probe clients.";
   // All reservation should be available for repartitioning.
   DCHECK_EQ(0, probe_stream_reservation_.GetReservation());
-  DCHECK_EQ(0, buffer_pool_client_->GetUsedReservation());
+  DCHECK(buffer_pool_client_->GetUsedReservation() == 0
+        || (!is_separate_build_ && join_op_ == TJoinOp::NULL_AWARE_LEFT_ANTI_JOIN))
+      << "Only NAAJ probe streams should be consuming memory" << DebugString();
 
   DCHECK_EQ(partition->build_rows()->BytesPinned(false), 0) << DebugString();
   int64_t num_input_rows = partition->build_rows()->num_rows();
@@ -1299,7 +1356,10 @@ void PhjBuilderConfig::Codegen(FragmentState* state) {
 
 string PhjBuilder::DebugString() const {
   stringstream ss;
-  ss << " PhjBuilder state=" << PrintState(state_)
+  ss << " PhjBuilder op=" << PrintThriftEnum(join_op_)
+     << " is_separate_build=" << is_separate_build_
+     << " num_probe_threads=" << num_probe_threads_
+     << " state=" << PrintState(state_)
      << " Hash partitions: " << hash_partitions_.size() << ":" << endl;
   for (int i = 0; i < hash_partitions_.size(); ++i) {
     ss << " Hash partition " << i << " " << hash_partitions_[i]->DebugString() << endl;
@@ -1312,6 +1372,7 @@ string PhjBuilder::DebugString() const {
   if (null_aware_partition_ != nullptr) {
     ss << "Null-aware partition: " << null_aware_partition_->DebugString();
   }
+  ss << " buffer_pool_client=" << buffer_pool_client_->DebugString();
   return ss.str();
 }
 

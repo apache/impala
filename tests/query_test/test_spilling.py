@@ -113,7 +113,7 @@ class TestSpillingNoDebugActionDimensions(ImpalaTestSuite):
     cls.ImpalaTestMatrix.add_dimension(create_parquet_dimension('tpch'))
     # Tests are calibrated so that they can execute and spill with this page size.
     cls.ImpalaTestMatrix.add_dimension(
-        create_exec_option_dimension_from_dict({'default_spillable_buffer_size': ['256k'],
+        create_exec_option_dimension_from_dict({'default_spillable_buffer_size': ['64k'],
             'mt_dop': [0, 4]}))
 
   def test_spilling_naaj_no_deny_reservation(self, vector):

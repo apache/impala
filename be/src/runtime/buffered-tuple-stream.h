@@ -20,9 +20,11 @@
 
 #include <set>
 #include <vector>
-#include <boost/scoped_ptr.hpp>
 #include <boost/function.hpp>
+#include <boost/scoped_ptr.hpp>
 
+#include "common/atomic.h"
+#include "common/compiler-util.h"
 #include "common/global-types.h"
 #include "common/status.h"
 #include "gutil/macros.h"
@@ -55,7 +57,11 @@ class TupleRow;
 /// To use write-only mode, PrepareForWrite() is called once and AddRow()/AddRowCustom*()
 /// are called repeatedly to initialize then advance a write iterator through the stream.
 /// Once the stream is fully written, it can be read back by calling PrepareForRead()
-/// then GetNext() repeatedly to advance a read iterator through the stream.
+/// then GetNext() repeatedly to advance a read iterator through the stream. If the
+/// stream is pinned, external read iterators can be created with
+/// PrepareForPinnedRead(). Multiple external read iterators can be active at the same
+/// time, reading from different positions in the stream. External read iterators are
+/// thread-safe, which allows safe concurrent access to the stream from different threads.
 ///
 /// To use read/write mode, PrepareForReadWrite() is called once to initialize the read
 /// and write iterators. AddRow()/AddRowCustom*() then advance a write iterator through
@@ -202,6 +208,7 @@ class TupleRow;
 /// TODO: prefetching for pages could speed up iteration over unpinned streams.
 class BufferedTupleStream {
  public:
+  class ReadIterator;
   /// A pointer to the start of a flattened TupleRow in the stream.
   typedef uint8_t* FlatRowPtr;
 
@@ -220,7 +227,7 @@ class BufferedTupleStream {
   /// 'caller_label'. Must be called once before any of the other APIs.
   /// If 'pinned' is true, the tuple stream starts off pinned, otherwise it is unpinned.
   /// 'caller_label' is only used for error reporting.
-  Status Init(const std::string& caller_label, bool pinned) WARN_UNUSED_RESULT;
+  Status Init(const std::string& caller_label, bool pinned);
 
   /// Prepares the stream for writing by saving enough reservation for a default-size
   /// write page. Tries to increase reservation if there is not enough unused reservation
@@ -229,7 +236,7 @@ class BufferedTupleStream {
   /// 'got_reservation': set to true if there was enough reservation to initialize the
   ///     first write page and false if there was not enough reservation and no other
   ///     error was encountered. Undefined if an error status is returned.
-  Status PrepareForWrite(bool* got_reservation) WARN_UNUSED_RESULT;
+  Status PrepareForWrite(bool* got_reservation);
 
   /// Prepares the stream for interleaved reads and writes by saving enough reservation
   /// for default-sized read and write pages. Called after Init() and before the first
@@ -239,7 +246,11 @@ class BufferedTupleStream {
   ///     read and write pages and false if there was not enough reservation and no other
   ///     error was encountered. Undefined if an error status is returned.
   Status PrepareForReadWrite(
-      bool attach_on_read, bool* got_reservation) WARN_UNUSED_RESULT;
+      bool attach_on_read, bool* got_reservation);
+
+  /// Explicitly finishes writing the stream, invalidating the write iterator (if
+  /// there is one). Must be called after the last AddRow() or AddRowCustomEnd().
+  void DoneWriting();
 
   /// Prepares the stream for reading, invalidating the write iterator (if there is one).
   /// Therefore must be called after the last AddRow() or AddRowCustomEnd() and before
@@ -250,7 +261,14 @@ class BufferedTupleStream {
   /// 'got_reservation': set to true if there was enough reservation to initialize the
   ///     first read page and false if there was not enough reservation and no other
   ///     error was encountered. Undefined if an error status is returned.
-  Status PrepareForRead(bool attach_on_read, bool* got_reservation) WARN_UNUSED_RESULT;
+  Status PrepareForRead(bool attach_on_read, bool* got_reservation);
+
+  /// Prepares 'iter' for reading a pinned stream. The stream must not have a write
+  /// iterator and stream must be pinned. This does not attach pages on read.
+  ///
+  /// This method is safe to call concurrently from different threads, as long as the
+  /// stream remains pinned and 'iter' is not shared between threads.
+  Status PrepareForPinnedRead(ReadIterator* iter);
 
   /// Adds a single row to the stream. There are three possible outcomes:
   /// a) The append succeeds. True is returned.
@@ -271,7 +289,7 @@ class BufferedTupleStream {
   ///
   /// BufferedTupleStream will do a deep copy of the memory in the row. After AddRow()
   /// returns an error, it should not be called again.
-  bool AddRow(TupleRow* row, Status* status) noexcept WARN_UNUSED_RESULT;
+  bool AddRow(TupleRow* row, Status* status) noexcept;
 
   /// Allocates space to store a row of 'size' bytes (including fixed and variable length
   /// data). If successful, returns a pointer to the allocated row. The caller then must
@@ -298,7 +316,7 @@ class BufferedTupleStream {
   /// If the current unused reservation is not sufficient to pin the stream in memory,
   /// this will try to increase the reservation. If that fails, 'pinned' is set to false
   /// and the stream is left unpinned. Otherwise 'pinned' is set to true.
-  Status PinStream(bool* pinned) WARN_UNUSED_RESULT;
+  Status PinStream(bool* pinned);
 
   /// Modes for UnpinStream().
   enum UnpinMode {
@@ -316,7 +334,7 @@ class BufferedTupleStream {
   };
 
   /// Unpins stream with the given 'mode' as described above.
-  Status UnpinStream(UnpinMode mode) WARN_UNUSED_RESULT;
+  Status UnpinStream(UnpinMode mode);
 
   /// Get the next batch of output rows, which are backed by the stream's memory.
   ///
@@ -334,13 +352,21 @@ class BufferedTupleStream {
   ///
   /// If the stream is pinned and 'attach_on_read' is false, the memory backing the
   /// rows will remain valid until the stream is unpinned, destroyed, etc.
-  Status GetNext(RowBatch* batch, bool* eos) WARN_UNUSED_RESULT;
+  Status GetNext(RowBatch* batch, bool* eos);
+
+  /// Get the next batch of output rows from 'read_iter', which are backed by the
+  /// pinned stream's memory. The memory backing the rows is valid as long as the
+  /// stream remains pinned.
+  ///
+  /// This method is safe to call concurrently from different threads, as long as the
+  /// stream remains pinned and 'iter' is not shared between threads.
+  Status GetNext(ReadIterator* read_iter, RowBatch* batch, bool* eos);
 
   /// Same as above, but populate 'flat_rows' with a pointer to the flat version of
   /// each returned row in the pinned stream. The pointers in 'flat_rows' are only
   /// valid as long as the stream remains pinned.
   Status GetNext(
-      RowBatch* batch, bool* eos, std::vector<FlatRowPtr>* flat_rows) WARN_UNUSED_RESULT;
+      RowBatch* batch, bool* eos, std::vector<FlatRowPtr>* flat_rows);
 
   /// Must be called once at the end to cleanup all resources. If 'batch' is non-NULL,
   /// attaches buffers from pinned pages that rows returned from GetNext() may reference.
@@ -352,7 +378,7 @@ class BufferedTupleStream {
   int64_t num_rows() const { return num_rows_; }
 
   /// Number of rows returned via GetNext().
-  int64_t rows_returned() const { return rows_returned_; }
+  int64_t rows_returned() const { return read_it_.rows_returned_; }
 
   /// Returns the byte size necessary to store the entire stream in memory.
   int64_t byte_size() const { return total_byte_size_; }
@@ -373,25 +399,31 @@ class BufferedTupleStream {
 
   bool is_closed() const { return closed_; }
   bool is_pinned() const { return pinned_; }
-  bool has_read_iterator() const { return has_read_iterator_; }
+  // Returns true if there is an active embedded read iterator.
+  bool has_read_iterator() const { return read_it_.is_valid(); }
   bool has_write_iterator() const { return has_write_iterator_; }
 
   std::string DebugString() const;
 
  private:
-  DISALLOW_COPY_AND_ASSIGN(BufferedTupleStream);
-  friend class ArrayTupleStreamTest_TestArrayDeepCopy_Test;
-  friend class ArrayTupleStreamTest_TestComputeRowSize_Test;
-  friend class MultiNullableTupleStreamTest_TestComputeRowSize_Test;
-
   /// Wrapper around BufferPool::PageHandle that tracks additional info about the page.
   struct Page {
+    /// Default constructor.
+    Page() {}
+
+    /// Move constructor so this can reside in a vector. Not thread-safe.
+    Page(Page&& src)
+      : handle(std::move(src.handle)),
+        num_rows(src.num_rows),
+        retrieved_buffer(src.retrieved_buffer.Load()),
+        attached_to_output_batch(src.attached_to_output_batch) {}
+
     inline int len() const { return handle.len(); }
     inline bool is_pinned() const { return handle.is_pinned(); }
     inline int pin_count() const { return handle.pin_count(); }
     Status GetBuffer(const BufferPool::BufferHandle** buffer) {
       RETURN_IF_ERROR(handle.GetBuffer(buffer));
-      retrieved_buffer = true;
+      retrieved_buffer.Store(true);
       return Status::OK();
     }
 
@@ -409,13 +441,109 @@ class BufferedTupleStream {
 
     /// Whether we called GetBuffer() on the page since it was last pinned. This means
     /// that GetBuffer() and ExtractBuffer() cannot fail and that GetNext() may have
-    /// returned rows referencing the page's buffer.
-    bool retrieved_buffer = true;
+    /// returned rows referencing the page's buffer. This is atomic because multiple
+    /// iterators may call GetBuffer() concurrently.
+    AtomicBool retrieved_buffer{true};
 
     /// If the page was just attached to the output batch on the last GetNext() call while
     /// in attach_on_read mode. If true, then 'handle' is closed.
     bool attached_to_output_batch = false;
   };
+
+ public:
+  /// A read iterator for a tuple stream. This keeps track of the read position in the
+  /// tuple stream and is advanced forward while reading rows from the stream.
+  /// This can be used in two modes:
+  /// * As the built-in iterator for the stream. This supports various advanced
+  ///   functionality like reading unpinned streams, co-existing with a write iterator,
+  ///   etc.
+  /// * As an external iterator for a read-only pinned stream. In this case, multiple
+  ///   iterators can be used simultaneously and reading from the stream via different
+  ///   iterators is thread safe (as long as each iterator is not accessed concurrently
+  //    from different threads).
+  class ReadIterator {
+   public:
+    int64_t rows_returned() const { return rows_returned_; }
+    bool is_valid() const { return valid_; }
+
+    std::string DebugString(const std::list<Page>& pages) const;
+
+   private:
+    friend class BufferedTupleStream;
+
+    /// True if the read iterator is currently valid
+    bool valid_ = false;
+
+    /// If true, pages are deleted after they are read via this read iterator. This is
+    /// only used for the embedded read iterator, i.e. BufferedTupleStream::read_it_.
+    /// Once rows have been read from a stream with 'attach_on_read_' true, this is
+    /// always true.
+    bool attach_on_read_ = false;
+
+    /// The current page being read. When no read iterator is active, equal to list.end().
+    /// When a read iterator is active, either points to the current read page, or equals
+    /// list.end() if no rows have yet been read.  GetNext() does not advance this past
+    /// the end of the stream, so upon eos 'read_page_' points to the last page and
+    /// rows_returned_ == num_rows_. Always pinned, unless a Pin() call failed and an
+    /// error status was returned.
+    std::list<Page>::iterator read_page_;
+
+    /// Total number of rows returned via this read iterator since Init() was called.
+    int64_t rows_returned_ = 0;
+
+    /// Number of rows returned from the current 'read_page_'.
+    uint32_t read_page_rows_returned_ = -1;
+
+    /// Pointer into 'read_page_' to the byte after the last row read.
+    uint8_t* read_ptr_ = nullptr;
+
+    /// Pointer to one byte past the end of 'read_page_'. Used to detect overruns.
+    const uint8_t* read_end_ptr_ = nullptr;
+
+    /// Initializes a read iterator to a valid state.
+    void Init(bool attach_on_read);
+
+    /// Invalidate the read iterator.
+    void Reset(std::list<Page>* pages);
+
+    /// Sets the current read page and clears state from any previous read page.
+    /// 'read_page' may be pages.end() if there are no pages in the stream yet.
+    /// The iterator must be valid.
+    void SetReadPage(std::list<Page>::iterator read_page);
+
+    /// Set the read page to the next read page. This iterator must be valid and
+    /// 'read_page_' must point to a page, not pages_.end().
+    void AdvanceReadPage(const std::list<Page>& pages);
+
+    /// Prepares to read from pinned 'read_page_'. Called after SetReadPage()
+    /// or AdvanceReadPage().  Waits for the pin to complete if the page was
+    /// unpinned earlier.  Sets 'read_ptr_' and 'read_end_ptr_'.
+    Status InitReadPtrs();
+
+    /// Move forward 'read_ptr_' by 'bytes'. It is invalid to advance more than 1
+    /// byte past the end of the buffer.
+    void AdvanceReadPtr(int64_t bytes) {
+      DCHECK_GE(bytes, 0);
+      read_ptr_ += bytes;
+      DCHECK_LE(read_ptr_, read_end_ptr_);
+    }
+
+    /// Increment the number of rows returned from this page and in total.
+    void IncrRowsReturned(int64_t rows);
+
+    /// Return the number of rows left to read in 'read_page_'. This iterator must be
+    /// valid and 'read_page_' must point to a page, not pages_.end().
+    int64_t GetRowsLeftInPage() const {
+      DCHECK_GE(read_page_->num_rows, read_page_rows_returned_);
+      return read_page_->num_rows - read_page_rows_returned_;
+    }
+  };
+
+ private:
+  DISALLOW_COPY_AND_ASSIGN(BufferedTupleStream);
+  friend class ArrayTupleStreamTest_TestArrayDeepCopy_Test;
+  friend class ArrayTupleStreamTest_TestComputeRowSize_Test;
+  friend class MultiNullableTupleStreamTest_TestComputeRowSize_Test;
 
   /// Runtime state instance used to check for cancellation. Not owned.
   RuntimeState* const state_;
@@ -456,40 +584,19 @@ class BufferedTupleStream {
   /// mode.
   int64_t total_byte_size_ = 0;
 
-  /// True if there is currently an active read iterator for the stream.
-  bool has_read_iterator_ = false;
+  /// The built-in read iterator for the stream.
+  ReadIterator read_it_;
 
-  /// The current page being read. When no read iterator is active, equal to list.end().
-  /// When a read iterator is active, either points to the current read page, or equals
-  /// list.end() if no rows have yet been read.  GetNext() does not advance this past
-  /// the end of the stream, so upon eos 'read_page_' points to the last page and
-  /// rows_returned_ == num_rows_. Always pinned, unless a Pin() call failed and an error
-  /// status was returned.
-  std::list<Page>::iterator read_page_;
-
-  /// Saved reservation for read iterator. 'default_page_len_' reservation is saved if
-  /// there is a read iterator, no pinned read page, and the possibility that the read
-  /// iterator will advance to a valid page.
+  /// Saved reservation for the embedded read iterator. 'default_page_len_' reservation
+  /// is saved if there is a read iterator, no pinned read page, and the possibility
+  /// that the read iterator will advance to a valid page.
   BufferPool::SubReservation read_page_reservation_;
-
-  /// Number of rows returned from the current read_page_.
-  uint32_t read_page_rows_returned_ = -1;
-
-  /// Pointer into read_page_ to the byte after the last row read.
-  uint8_t* read_ptr_ = nullptr;
-
-  /// Pointer to one byte past the end of read_page_. Used to detect overruns.
-  const uint8_t* read_end_ptr_ = nullptr;
 
   /// Pointer into write_page_ to the byte after the last row written.
   uint8_t* write_ptr_ = nullptr;
 
   /// Pointer to one byte past the end of write_page_. Cached to speed up computation
   const uint8_t* write_end_ptr_ = nullptr;
-
-  /// Number of rows returned to the caller from GetNext() since the last
-  /// PrepareForRead() call.
-  int64_t rows_returned_ = 0;
 
   /// True if there is currently an active write iterator into the stream.
   bool has_write_iterator_ = false;
@@ -532,20 +639,18 @@ class BufferedTupleStream {
   /// Whether any tuple in the rows is nullable.
   const bool has_nullable_tuple_;
 
-  /// If true, pages are deleted after they are read during this read pass. Once rows
-  /// have been read from a stream with 'attach_on_read_' true, this is always true.
-  bool attach_on_read_ = false;
-
   bool closed_ = false; // Used for debugging.
 
   /// If true, this stream has been explicitly pinned by the caller and all pages are
   /// kept pinned until the caller calls UnpinStream().
   bool pinned_ = true;
 
+  /// Return true if 'page' is the current page for the embedded read iterator.
   bool is_read_page(const Page* page) const {
-    return read_page_ != pages_.end() && &*read_page_ == page;
+    return read_it_.read_page_ != pages_.end() && &*read_it_.read_page_ == page;
   }
 
+  /// Return true if 'page' is the current page for the embedded write iterator.
   bool is_write_page(const Page* page) const { return write_page_ == page; }
 
   /// Return true if the read and write page are the same.
@@ -590,7 +695,7 @@ class BufferedTupleStream {
   /// Gets a new page of 'page_len' bytes from buffer_pool_, updating write_page_,
   /// write_ptr_ and write_end_ptr_. The caller must ensure there is 'page_len' unused
   /// reservation. The caller must reset the write page (if there is one) before calling.
-  Status NewWritePage(int64_t page_len) noexcept WARN_UNUSED_RESULT;
+  Status NewWritePage(int64_t page_len) noexcept;
 
   /// Determines what page size is needed to fit a row of 'row_size' bytes.
   /// Returns an error if the row cannot fit in a page.
@@ -603,7 +708,7 @@ class BufferedTupleStream {
   /// 'got_reservation' to false if the reservation could not be increased and no other
   /// error was encountered.
   Status AdvanceWritePage(
-      int64_t row_size, bool* got_reservation) noexcept WARN_UNUSED_RESULT;
+      int64_t row_size, bool* got_reservation) noexcept;
 
   /// Reset the write page, if there is one, and unpin pages accordingly. If there
   /// is an active write iterator, the next row will be appended to a new page.
@@ -613,19 +718,19 @@ class BufferedTupleStream {
   /// calling this, no more rows can be appended to the stream.
   void InvalidateWriteIterator();
 
-  /// Same as PrepareForRead(), except the iterators are not invalidated and
-  /// the caller is assumed to have checked there is sufficient unused reservation.
-  Status PrepareForReadInternal(bool attach_on_read) WARN_UNUSED_RESULT;
+  /// Helper for PrepareForRead() and PrepareForPinnedRead(). Sets up 'read_iter' for
+  /// reading from the start of the stream. Does not invalidate any existing iterators.
+  /// The caller must ensure there is sufficient unused reservation.
+  Status PrepareForReadInternal(bool attach_on_read, ReadIterator* read_iter);
 
-  /// Pins the next read page. This blocks reading from disk if necessary to bring the
-  /// page's data into memory. Updates read_page_, read_ptr_, and
-  /// read_page_rows_returned_.
-  Status NextReadPage() WARN_UNUSED_RESULT;
+  /// Pins the next read page for 'read_iter'. This blocks reading from disk if necessary
+  /// to bring the page's data into memory.
+  Status NextReadPage(ReadIterator* read_iter);
 
   /// Invalidate the read iterator, and release any resources associated with the active
-  /// iterator. Invalid to call if 'attach_on_read_' is true and >= 1 rows have been read,
-  /// because that would leave the stream in limbo where it still has pages but it is
-  /// invalid to read or write from in future.
+  /// iterator. Invalid to call if 'read_it_.attach_on_read_' is true and >= 1 rows have
+  /// been read, because that would leave the stream in limbo where it still has pages
+  /// but it is invalid to read or write from in future.
   void InvalidateReadIterator();
 
   /// Returns the total additional bytes that this row will consume in write_page_ if
@@ -634,14 +739,14 @@ class BufferedTupleStream {
   int64_t ComputeRowSize(TupleRow* row) const noexcept;
 
   /// Pins page and updates tracking stats.
-  Status PinPage(Page* page) WARN_UNUSED_RESULT;
+  Status PinPage(Page* page);
 
   /// Increment the page's pin count if this page needs a higher pin count given the
   /// current read and write iterator positions and whether the stream will be pinned
   /// ('stream_pinned'). Assumes that no scenarios occur when the pin count needs to
   /// be incremented multiple times. The caller is responsible for ensuring sufficient
   /// reservation is available.
-  Status PinPageIfNeeded(Page* page, bool stream_pinned) WARN_UNUSED_RESULT;
+  Status PinPageIfNeeded(Page* page, bool stream_pinned);
 
   /// Decrement the page's pin count if this page needs a lower pin count given the
   /// current read and write iterator positions and whether the stream will be pinned
@@ -686,9 +791,11 @@ class BufferedTupleStream {
 
   /// Templated GetNext implementations.
   template <bool FILL_FLAT_ROWS>
-  Status GetNextInternal(RowBatch* batch, bool* eos, std::vector<FlatRowPtr>* flat_rows);
+  Status GetNextInternal(ReadIterator* RESTRICT read_iter, RowBatch* batch, bool* eos,
+      std::vector<FlatRowPtr>* flat_rows);
   template <bool FILL_FLAT_ROWS, bool HAS_NULLABLE_TUPLE>
-  Status GetNextInternal(RowBatch* batch, bool* eos, std::vector<FlatRowPtr>* flat_rows);
+  Status GetNextInternal(ReadIterator* RESTRICT read_iter, RowBatch* batch, bool* eos,
+      std::vector<FlatRowPtr>* flat_rows);
 
   /// Helper function to convert a flattened TupleRow stored starting at '*data' into
   /// 'row'. *data is updated to point to the first byte past the end of the row.
@@ -697,16 +804,18 @@ class BufferedTupleStream {
 
   /// Helper function for GetNextInternal(). For each string slot in string_slots,
   /// update StringValue's ptr field to point to the corresponding string data stored
-  /// inline in the stream (at the current value of read_ptr_) advance read_ptr_ by the
-  /// StringValue's length field.
-  void FixUpStringsForRead(const vector<SlotDescriptor*>& string_slots, Tuple* tuple);
+  /// inline in the stream (at the current value of read_iter->read_ptr_) advance
+  /// read_iter->read_ptr_ by the StringValue's length field.
+  static void FixUpStringsForRead(const vector<SlotDescriptor*>& string_slots,
+      ReadIterator* RESTRICT read_iter, Tuple* tuple);
 
   /// Helper function for GetNextInternal(). For each collection slot in collection_slots,
   /// recursively update any pointers in the CollectionValue to point to the corresponding
-  /// var len data stored inline in the stream, advancing read_ptr_ as data is read.
-  /// Assumes that the collection was serialized to the stream in DeepCopy()'s format.
-  void FixUpCollectionsForRead(
-      const vector<SlotDescriptor*>& collection_slots, Tuple* tuple);
+  /// var len data stored inline in the stream, advancing read_iter->read_ptr_ as data is
+  /// read.  Assumes that the collection was serialized to the stream in DeepCopy()'s
+  /// format.
+  static void FixUpCollectionsForRead(const vector<SlotDescriptor*>& collection_slots,
+      ReadIterator* RESTRICT read_iter, Tuple* tuple);
 
   /// Returns the number of null indicator bytes per row. Only valid if this stream has
   /// nullable tuples.
@@ -719,9 +828,11 @@ class BufferedTupleStream {
   /// a consistent state after returning success from a public API call. The Fast version
   /// has constant runtime and does not check all of 'pages_'. The Full version includes
   /// O(n) checks that require iterating over the whole 'pages_' list (e.g. checking that
-  /// each page is in a valid state).
-  void CheckConsistencyFast() const;
-  void CheckConsistencyFull() const;
+  /// each page is in a valid state). 'read_it' is a read iterator that is safe for
+  /// the current thread to access ('read_iter_' in most cases except when an internal
+  /// read iterator is used.
+  void CheckConsistencyFast(const ReadIterator& read_it) const;
+  void CheckConsistencyFull(const ReadIterator& read_it) const;
   void CheckPageConsistency(const Page* page) const;
 };
 }

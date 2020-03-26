@@ -19,6 +19,7 @@
 
 #include <algorithm>
 
+#include "exec/exec-node.inline.h"
 #include "exec/exec-node-util.h"
 #include "exec/text-converter.inline.h"
 #include "gen-cpp/PlanNodes_types.h"

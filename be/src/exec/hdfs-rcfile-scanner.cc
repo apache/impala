@@ -19,6 +19,7 @@
 
 #include <boost/algorithm/string.hpp>
 
+#include "exec/exec-node.inline.h"
 #include "exec/hdfs-scan-node.h"
 #include "exec/hdfs-sequence-scanner.h"
 #include "exec/scanner-context.inline.h"

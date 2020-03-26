@@ -18,6 +18,7 @@
 #include "exec/unnest-node.h"
 
 #include "common/status.h"
+#include "exec/exec-node.inline.h"
 #include "exec/exec-node-util.h"
 #include "exec/subplan-node.h"
 #include "exprs/scalar-expr-evaluator.h"

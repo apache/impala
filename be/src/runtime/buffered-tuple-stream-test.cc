@@ -18,6 +18,7 @@
 #include <boost/bind.hpp>
 #include <boost/filesystem.hpp>
 #include <boost/scoped_ptr.hpp>
+#include <boost/thread/thread.hpp>
 
 #include <limits> // for std::numeric_limits<int>::max()
 #include <set>
@@ -254,15 +255,31 @@ class SimpleTupleStreamTest : public testing::Test {
     }
   }
 
+  /// Read values from 'stream' into 'results' using the embedded read iterator. 'stream'
+  /// must have been prepared for reading.
   template <typename T>
   void ReadValues(BufferedTupleStream* stream, RowDescriptor* desc, vector<T>* results,
+      int num_batches = -1) {
+    return ReadValues(stream, nullptr, desc, results, num_batches);
+  }
+
+  /// Read values from 'stream' into 'results'. If 'read_it' is non-NULL, reads via that
+  /// iterator. Otherwise use the embedded read iterator, in which case 'stream' must have
+  /// been prepared for reading.
+  template <typename T>
+  void ReadValues(BufferedTupleStream* stream,
+      BufferedTupleStream::ReadIterator* read_it, RowDescriptor* desc, vector<T>* results,
       int num_batches = -1) {
     bool eos = false;
     RowBatch batch(desc, BATCH_SIZE, &tracker_);
     int batches_read = 0;
     do {
       batch.Reset();
-      EXPECT_OK(stream->GetNext(&batch, &eos));
+      if (read_it != nullptr) {
+        EXPECT_OK(stream->GetNext(read_it, &batch, &eos));
+      } else {
+        EXPECT_OK(stream->GetNext(&batch, &eos));
+      }
       ++batches_read;
       for (int i = 0; i < batch.num_rows(); ++i) {
         AppendRowTuples(batch.GetRow(i), desc, results);
@@ -1173,7 +1190,7 @@ TEST_F(SimpleTupleStreamTest, BigStringReadWrite) {
     bool eos;
     ASSERT_OK(stream.GetNext(&read_batch, &eos));
     EXPECT_EQ(1, read_batch.num_rows());
-    EXPECT_TRUE(eos);
+    EXPECT_TRUE(eos) << i << " " << stream.DebugString();
     Tuple* tuple = read_batch.GetRow(0)->GetTuple(0);
     StringValue* str = tuple->GetStringSlot(tuple_desc->slots()[0]->tuple_offset());
     EXPECT_EQ(string_len, str->len);
@@ -1360,6 +1377,79 @@ TEST_F(SimpleTupleStreamTest, WriteAfterReadAttached) {
   unpin_stream.Close(nullptr, RowBatch::FlushMode::NO_FLUSH_RESOURCES);
 
   write_batch->Reset();
+}
+
+/// Test multiple threads reading from a pinned stream using separate read iterators.
+TEST_F(SimpleTupleStreamTest, ConcurrentReaders) {
+  const int BUFFER_SIZE = 1024;
+  // Each tuple is an integer plus a null indicator byte.
+  const int VALS_PER_BUFFER = BUFFER_SIZE / (sizeof(int32_t) + 1);
+  const int NUM_BUFFERS = 100;
+  const int TOTAL_MEM = NUM_BUFFERS * BUFFER_SIZE;
+  Init(TOTAL_MEM);
+  BufferedTupleStream stream(
+      runtime_state_, int_desc_, &client_, BUFFER_SIZE, BUFFER_SIZE);
+  ASSERT_OK(stream.Init("ConcurrentReaders", true));
+  bool got_write_reservation;
+  ASSERT_OK(stream.PrepareForWrite(&got_write_reservation));
+  ASSERT_TRUE(got_write_reservation);
+
+  // Add rows to the stream.
+  int offset = 0;
+  const int NUM_BATCHES = NUM_BUFFERS;
+  const int ROWS_PER_BATCH = VALS_PER_BUFFER;
+  for (int i = 0; i < NUM_BATCHES; ++i) {
+    RowBatch* batch = nullptr;
+    Status status;
+    batch = CreateBatch(int_desc_, offset, ROWS_PER_BATCH, false);
+    for (int j = 0; j < batch->num_rows(); ++j) {
+      bool b = stream.AddRow(batch->GetRow(j), &status);
+      ASSERT_OK(status);
+      ASSERT_TRUE(b);
+    }
+    offset += batch->num_rows();
+    // Reset the batch to make sure the stream handles the memory correctly.
+    batch->Reset();
+  }
+  // Invalidate the write iterator explicitly so that we can read concurrently.
+  stream.DoneWriting();
+
+  const int READ_ITERS = 10; // Do multiple read passes per thread.
+  const int NUM_THREADS = 4;
+
+  // Read from the main thread with the built-in iterator and other threads with
+  // external iterators.
+  thread_group workers;
+  for (int i = 0; i < NUM_THREADS; ++i) {
+    workers.add_thread(new thread([&] () {
+      for (int j = 0; j < READ_ITERS; ++j) {
+        BufferedTupleStream::ReadIterator it;
+        ASSERT_OK(stream.PrepareForPinnedRead(&it));
+
+        // Read all the rows back
+        vector<int> results;
+        ReadValues(&stream, &it, int_desc_, &results);
+
+        // Verify result
+        VerifyResults<int>(*int_desc_, results, ROWS_PER_BATCH * NUM_BATCHES, false);
+      }
+    }));
+  }
+
+  for (int i = 0; i < READ_ITERS; ++i) {
+    bool got_read_reservation;
+    ASSERT_OK(stream.PrepareForRead(false, &got_read_reservation));
+    ASSERT_TRUE(got_read_reservation);
+
+    // Read all the rows back
+    vector<int> results;
+    ReadValues(&stream, int_desc_, &results);
+
+    // Verify result
+    VerifyResults<int>(*int_desc_, results, ROWS_PER_BATCH * NUM_BATCHES, false);
+  }
+  workers.join_all();
+  stream.Close(nullptr, RowBatch::FlushMode::NO_FLUSH_RESOURCES);
 }
 
 // Basic API test. No data should be going to disk.

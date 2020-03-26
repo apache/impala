@@ -54,6 +54,7 @@ order by 1,2,3,4
 BIGINT,BIGINT,BIGINT,INT
 ====
 ---- QUERY
+set max_row_size=64k;
 set debug_action="-1:OPEN:SET_DENY_RESERVATION_PROBABILITY@1.0";
 # Execute NAAJ query 1 with a debug action so that it can not get enough memory to fit
 # the null build rows in memory.

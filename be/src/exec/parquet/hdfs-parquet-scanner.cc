@@ -25,6 +25,7 @@
 #include <gutil/strings/substitute.h>
 
 #include "codegen/codegen-anyval.h"
+#include "exec/exec-node.inline.h"
 #include "exec/hdfs-scan-node.h"
 #include "exec/parquet/parquet-collection-column-reader.h"
 #include "exec/parquet/parquet-column-readers.h"
