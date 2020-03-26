@@ -151,7 +151,7 @@ class DataStreamTest : public testing::Test {
 
   virtual void SetUp() {
     exec_env_.reset(new ExecEnv());
-    ABORT_IF_ERROR(exec_env_->InitForFeTests());
+    ABORT_IF_ERROR(exec_env_->InitForFeSupport());
     exec_env_->InitBufferPool(32 * 1024, 1024 * 1024 * 1024, 32 * 1024);
     runtime_state_.reset(new RuntimeState(TQueryCtx(), exec_env_.get()));
     TPlanFragment* fragment = runtime_state_->obj_pool()->Add(new TPlanFragment());

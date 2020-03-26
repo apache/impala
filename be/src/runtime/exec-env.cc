@@ -229,12 +229,12 @@ struct ExecEnv::KuduClientPtr {
 
 ExecEnv* ExecEnv::exec_env_ = nullptr;
 
-ExecEnv::ExecEnv()
+ExecEnv::ExecEnv(bool external_fe)
   : ExecEnv(FLAGS_krpc_port, FLAGS_state_store_subscriber_port, FLAGS_webserver_port,
-        FLAGS_state_store_host, FLAGS_state_store_port) {}
+        FLAGS_state_store_host, FLAGS_state_store_port, external_fe) {}
 
 ExecEnv::ExecEnv(int krpc_port, int subscriber_port, int webserver_port,
-    const string& statestore_host, int statestore_port)
+    const string& statestore_host, int statestore_port, bool external_fe)
   : obj_pool_(new ObjectPool),
     metrics_(new MetricGroup("impala-metrics")),
     // Create the CatalogServiceClientCache with num_retries = 1 and wait_ms = 0.
@@ -250,11 +250,12 @@ ExecEnv::ExecEnv(int krpc_port, int subscriber_port, int webserver_port,
     pool_mem_trackers_(new PoolMemTrackerRegistry),
     thread_mgr_(new ThreadResourceMgr),
     tmp_file_mgr_(new TmpFileMgr),
-    frontend_(new Frontend()),
+    frontend_(external_fe ? nullptr : new Frontend()),
     async_rpc_pool_(new CallableThreadPool("rpc-pool", "async-rpc-sender", 8, 10000)),
     query_exec_mgr_(new QueryExecMgr()),
     rpc_metrics_(metrics_->GetOrCreateChildGroup("rpc")),
     enable_webserver_(FLAGS_enable_webserver && webserver_port > 0),
+    external_fe_(external_fe),
     configured_backend_address_(MakeNetworkAddress(FLAGS_hostname, krpc_port)) {
   UUIDToUniqueIdPB(boost::uuids::random_generator()(), &backend_id_);
 
@@ -321,7 +322,7 @@ ExecEnv::~ExecEnv() {
   disk_io_mgr_.reset(); // Need to tear down before mem_tracker_.
 }
 
-Status ExecEnv::InitForFeTests() {
+Status ExecEnv::InitForFeSupport() {
   mem_tracker_.reset(new MemTracker(-1, "Process"));
   is_fe_tests_ = true;
   return Status::OK();
@@ -469,7 +470,7 @@ Status ExecEnv::Init() {
   }
 
   RETURN_IF_ERROR(cluster_membership_mgr_->Init());
-  if (FLAGS_is_coordinator) {
+  if (FLAGS_is_coordinator && frontend_ != nullptr) {
     cluster_membership_mgr_->RegisterUpdateCallbackFn(
         [this](ClusterMembershipMgr::SnapshotPtr snapshot) {
           SendClusterMembershipToFrontend(snapshot, this->frontend());
@@ -482,15 +483,18 @@ Status ExecEnv::Init() {
 }
 
 Status ExecEnv::InitHadoopConfig() {
-  // Get the fs.defaultFS value set in core-site.xml and assign it to configured_defaultFs
-  TGetHadoopConfigRequest config_request;
-  config_request.__set_name(DEFAULT_FS);
-  TGetHadoopConfigResponse config_response;
-  RETURN_IF_ERROR(frontend_->GetHadoopConfig(config_request, &config_response));
-  if (config_response.__isset.value) {
-    default_fs_ = config_response.value;
-  } else {
-    default_fs_ = "hdfs://";
+  if (frontend_ != nullptr) {
+    // Get the fs.defaultFS value set in core-site.xml and assign it to
+    // configured_defaultFs
+    TGetHadoopConfigRequest config_request;
+    config_request.__set_name(DEFAULT_FS);
+    TGetHadoopConfigResponse config_response;
+    RETURN_IF_ERROR(frontend_->GetHadoopConfig(config_request, &config_response));
+    if (config_response.__isset.value) {
+      default_fs_ = config_response.value;
+    } else {
+      default_fs_ = "hdfs://";
+    }
   }
   return Status::OK();
 }

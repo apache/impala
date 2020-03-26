@@ -32,8 +32,10 @@ namespace impala {
 /// logging directory, and enable special test-specific behavior.
 /// Callers that want to override default gflags variables should do so before calling
 /// this method. No logging should be performed until after this method returns.
+/// Passing external_fe=true causes specific initialization steps to be skipped
+/// that an external frontend will have already performed.
 void InitCommonRuntime(int argc, char** argv, bool init_jvm,
-    TestInfo::Mode m = TestInfo::NON_TEST);
+    TestInfo::Mode m = TestInfo::NON_TEST, bool external_fe = false);
 
 /// Starts background memory maintenance thread. Must be called after
 /// RegisterMemoryMetrics(). This thread is needed for daemons to free memory and

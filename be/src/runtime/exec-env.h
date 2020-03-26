@@ -81,10 +81,13 @@ namespace io {
 /// ExecEnv::GetInstance().
 class ExecEnv {
  public:
-  ExecEnv();
+  /// If external_fe = true, some members (i.e. frontend_) are not used and will
+  /// be initialized to null.
+  /// TODO: Split out common logic into base class and eliminate null pointers.
+  ExecEnv(bool external_fe = false);
 
   ExecEnv(int krpc_port, int subscriber_port, int webserver_port,
-      const std::string& statestore_host, int statestore_port);
+      const std::string& statestore_host, int statestore_port, bool external_fe = false);
 
   /// Returns the most recently created exec env instance. In a normal impalad, this is
   /// the only instance. In test setups with multiple ExecEnv's per process,
@@ -128,7 +131,10 @@ class ExecEnv {
   HdfsOpThreadPool* hdfs_op_thread_pool() { return hdfs_op_thread_pool_.get(); }
   TmpFileMgr* tmp_file_mgr() { return tmp_file_mgr_.get(); }
   ImpalaServer* impala_server() { return impala_server_; }
-  Frontend* frontend() { return frontend_.get(); }
+  Frontend* frontend() {
+    DCHECK(frontend_.get() != nullptr);
+    return frontend_.get();
+  }
   RequestPoolService* request_pool_service() { return request_pool_service_.get(); }
   CallableThreadPool* rpc_pool() { return async_rpc_pool_.get(); }
   QueryExecMgr* query_exec_mgr() { return query_exec_mgr_.get(); }
@@ -154,7 +160,7 @@ class ExecEnv {
   const TNetworkAddress& krpc_address() const { return krpc_address_; }
 
   /// Initializes the exec env for running FE tests.
-  Status InitForFeTests() WARN_UNUSED_RESULT;
+  Status InitForFeSupport() WARN_UNUSED_RESULT;
 
   /// Returns true if this environment was created from the FE tests. This makes the
   /// environment special since the JVM is started first and libraries are loaded
@@ -229,6 +235,7 @@ class ExecEnv {
   MetricGroup* rpc_metrics_ = nullptr;
 
   bool enable_webserver_;
+  bool external_fe_;
 
  private:
   friend class TestEnv;
