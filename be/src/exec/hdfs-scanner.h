@@ -28,6 +28,7 @@
 #include "common/global-flags.h"
 #include "common/object-pool.h"
 #include "common/status.h"
+#include "exec/exec-node.inline.h"
 #include "exec/hdfs-scan-node-base.h"
 #include "exec/scanner-context.h"
 #include "runtime/io/disk-io-mgr.h"

@@ -19,10 +19,11 @@
 
 #include "codegen/codegen-anyval.h"
 #include "exec/base-sequence-scanner.h"
-#include "exec/text-converter.h"
+#include "exec/exec-node.inline.h"
 #include "exec/hdfs-scan-node.h"
 #include "exec/hdfs-scan-node-mt.h"
 #include "exec/read-write-util.h"
+#include "exec/text-converter.h"
 #include "exec/text-converter.inline.h"
 #include "exprs/scalar-expr-evaluator.h"
 #include "runtime/collection-value-builder.h"

@@ -389,18 +389,3 @@ int64_t BlockingJoinNode::LocalTimeCounterFn(const RuntimeProfile::Counter* tota
   // Don't return a negative number in those cases.
   return ::max<int64_t>(0, local_time);
 }
-
-// This function is replaced by codegen
-void BlockingJoinNode::CreateOutputRow(TupleRow* out, TupleRow* probe, TupleRow* build) {
-  uint8_t* out_ptr = reinterpret_cast<uint8_t*>(out);
-  if (probe == NULL) {
-    memset(out_ptr, 0, probe_tuple_row_size_);
-  } else {
-    memcpy(out_ptr, probe, probe_tuple_row_size_);
-  }
-  if (build == NULL) {
-    memset(out_ptr + probe_tuple_row_size_, 0, build_tuple_row_size_);
-  } else {
-    memcpy(out_ptr + probe_tuple_row_size_, build, build_tuple_row_size_);
-  }
-}

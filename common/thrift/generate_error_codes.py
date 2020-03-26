@@ -454,6 +454,11 @@ error_codes = (
   ("ORC_TYPE_NOT_ROOT_AT_STRUCT", 148,
    "Root of the $0 type returned by the ORC lib is not STRUCT: $1. "
    "Either there are bugs in the ORC lib or ORC file '$2' is corrupt."),
+
+  ("NAAJ_OUT_OF_MEMORY", 149,
+   "Unable to perform Null-Aware Anti-Join. Could not get enough reservation to fit "
+   "all rows with NULLs from the build side in memory. Memory required for $0 rows "
+   "was $1. $2/$3 of the join's reservation was available for the rows."),
 )
 
 import sys

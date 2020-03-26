@@ -121,9 +121,11 @@ struct BufferPool::Page : public InternalList<Page>::Node {
   int pin_count;
 
   /// True if the read I/O to pin the page was started but not completed. Only accessed
-  /// in contexts that are passed the associated PageHandle, so it cannot be accessed
-  /// by multiple threads concurrently.
-  bool pin_in_flight;
+  /// in contexts that are passed the associated PageHandle, so can only be accessed
+  /// by multiple threads concurrently via PageHandle::GetBuffer(), since other page
+  /// handle operators are not thread-safe. This is atomic so that GetBuffer() can do
+  /// optimistic checks to avoid acquiring 'buffer_lock'.
+  AtomicBool pin_in_flight;
 
   /// Non-null if there is a write in flight, the page is clean, or the page is evicted.
   std::unique_ptr<TmpWriteHandle> write_handle;

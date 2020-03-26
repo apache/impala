@@ -446,11 +446,11 @@ class PartitionedHashJoinNode : public BlockingJoinNode {
   /// Initializes 'null_probe_rows_' and prepares that stream for writing.
   Status InitNullProbeRows() WARN_UNUSED_RESULT;
 
-  /// Initializes null_aware_partition_ and nulls_build_batch_ to output rows.
+  /// Prepare to output rows from the null-aware partition.
   /// *has_null_aware_rows is set to true if the null-aware partition has rows that need
   /// to be processed by calling OutputNullAwareProbeRows(), false otherwise. In both
   /// cases, null probe rows need to be processed with OutputNullAwareNullProbe().
-  Status PrepareNullAwarePartition(bool* has_null_aware_rows) WARN_UNUSED_RESULT;
+  Status BeginNullAwareProbe(bool* has_null_aware_rows) WARN_UNUSED_RESULT;
 
   /// Output rows from builder_->null_aware_partition(). Called when 'probe_state_'
   /// is OUTPUTTING_NULL_AWARE - after all input is processed, including spilled
@@ -459,9 +459,10 @@ class PartitionedHashJoinNode : public BlockingJoinNode {
   Status OutputNullAwareProbeRows(
       RuntimeState* state, RowBatch* out_batch, bool* done) WARN_UNUSED_RESULT;
 
-  /// Evaluates all other_join_conjuncts against null_probe_rows_ with all the
-  /// rows in build. This updates matched_null_probe_, short-circuiting if one of the
-  /// conjuncts pass (i.e. there is a match).
+  /// Evaluates 'other_join_conjuncts' for all pairs of 'null_probe_rows_' and the build
+  /// rows provided by the caller until a match is found for that null probe row. This
+  /// updates matched_null_probe_, short-circuiting if one of the conjuncts pass (i.e.
+  /// there is a match). 'build' must be pinned.
   /// This is used for NAAJ, when there are NULL probe rows.
   Status EvaluateNullProbe(
       RuntimeState* state, BufferedTupleStream* build) WARN_UNUSED_RESULT;
@@ -527,10 +528,6 @@ class PartitionedHashJoinNode : public BlockingJoinNode {
   /// When this function returns function returns, we are ready to start reading probe
   /// rows from 'input_partition_'.
   Status BeginSpilledProbe() WARN_UNUSED_RESULT;
-
-  /// Construct an error status for the null-aware anti-join when it could not fit 'rows'
-  /// from the build side in memory.
-  Status NullAwareAntiJoinError(BufferedTupleStream* rows);
 
   /// Calls Close() on every probe partition, destroys the partitions and cleans up any
   /// references to the partitions. Also closes and destroys 'null_probe_rows_'. If

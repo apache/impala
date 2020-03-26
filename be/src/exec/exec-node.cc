@@ -478,14 +478,6 @@ bool ExecNode::CheckLimitAndTruncateRowBatchIfNeededShared(
   return reached_limit;
 }
 
-bool ExecNode::EvalConjuncts(
-    ScalarExprEvaluator* const* evals, int num_conjuncts, TupleRow* row) {
-  for (int i = 0; i < num_conjuncts; ++i) {
-    if (!evals[i]->EvalPredicate(row)) return false;
-  }
-  return true;
-}
-
 Status ExecNode::QueryMaintenance(RuntimeState* state) {
   expr_results_pool_->Clear();
   return state->CheckQueryState();

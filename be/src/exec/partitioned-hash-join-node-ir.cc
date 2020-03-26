@@ -18,6 +18,8 @@
 #include "exec/partitioned-hash-join-node.inline.h"
 
 #include "codegen/impala-ir.h"
+#include "exec/blocking-join-node.inline.h"
+#include "exec/exec-node.inline.h"
 #include "exec/hash-table.inline.h"
 #include "runtime/row-batch.h"
 

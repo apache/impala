@@ -31,6 +31,7 @@
 #include "common/logging.h"
 #include "exec/delimited-text-parser.h"
 #include "exec/delimited-text-parser.inline.h"
+#include "exec/exec-node.inline.h"
 #include "exec/hdfs-plugin-text-scanner.h"
 #include "exec/hdfs-scan-node-base.h"
 #include "exec/hdfs-scan-node.h"

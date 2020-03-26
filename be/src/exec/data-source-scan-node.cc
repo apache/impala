@@ -20,6 +20,7 @@
 #include <vector>
 #include <gutil/strings/substitute.h>
 
+#include "exec/exec-node.inline.h"
 #include "exec/exec-node-util.h"
 #include "exec/parquet/parquet-common.h"
 #include "exec/read-write-util.h"

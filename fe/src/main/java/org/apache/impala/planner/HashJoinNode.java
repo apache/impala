@@ -261,7 +261,6 @@ public class HashJoinNode extends JoinNode {
       // probe streams when spilling. mt_dop is an upper bound on the number of
       // PartitionedHashJoinNodes per builder.
       // TODO: IMPALA-9416: be less conservative here
-      // TODO: how did we not detect the reservation bug here with spilling?
       perInstanceBuildMinMemReservation *= queryOptions.mt_dop;
     }
     // Most reservation for probe buffers is obtained from the join builder when

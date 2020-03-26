@@ -384,17 +384,22 @@ class PhjBuilder : public JoinBuilder {
       RuntimeProfile* probe_profile,
       std::deque<std::unique_ptr<Partition>>* output_partitions, RowBatch* batch);
 
-  /// Close the null aware partition (if there is one) and set it to NULL.
-  /// TODO: IMPALA-9176: improve the encapsulation of the null-aware partition.
-  void CloseNullAwarePartition() {
-    if (null_aware_partition_ != nullptr) {
-      // We don't need to pass in a batch because the anti-join only returns tuple data
-      // from the probe side - i.e. the RowDescriptor for PartitionedHashJoinNode does
-      // not include the build tuple.
-      null_aware_partition_->Close(nullptr);
-      null_aware_partition_.reset();
-    }
-  }
+  /// Called to begin probing of the null-aware partition, after all other partitions
+  /// have been fully processed. This should only be called if there are build rows in the
+  /// null-aware partition. This pins the null-aware build rows in memory and allows all
+  /// probe threads to access those rows in a read-only manner.
+  ///
+  /// Returns an error if an error was encountered or if the query was cancelled.
+  ///
+  /// This is a synchronization point for shared join build. All probe threads must
+  /// call this function before continuing the next phase of the hash join algorithm.
+  Status BeginNullAwareProbe();
+
+  /// Called after probing of the null-aware build partition is complete.
+  ///
+  /// This is a synchronization point for shared join build. All probe threads must
+  /// call this function before continuing the next phase of the hash join algorithm.
+  Status DoneProbingNullAwarePartition();
 
   /// True if the hash table may contain rows with one or more NULL join keys. This
   /// depends on the join type, passed in via 'join_op' and the 'is_not_distinct_from'
@@ -412,8 +417,9 @@ class PhjBuilder : public JoinBuilder {
   /// Safe to call from PartitionedHashJoinNode threads during the probe phase.
   HashJoinState state() const { return state_; }
 
-  /// Accessor to allow PartitionedHashJoinNode to access null_aware_partition_.
-  /// TODO: IMPALA-9176: improve the encapsulation of the null-aware partition.
+  /// Accessor to allow PartitionedHashJoinNode to access 'null_aware_partition_'.
+  /// Generally the PartitionedHashJoinNode should only access this partition in
+  /// a read-only manner.
   inline Partition* null_aware_partition() const { return null_aware_partition_.get(); }
 
   /// Thread-safe.
@@ -679,6 +685,12 @@ class PhjBuilder : public JoinBuilder {
   void CleanUpSinglePartition(
       std::deque<std::unique_ptr<Partition>>* output_partitions, RowBatch* batch);
 
+  /// The serial part of BeginNullAwareProbe() that is executed by a single thread.
+  Status BeginNullAwareProbeSerial();
+
+  /// Close the null aware partition (if there is one) and set it to NULL.
+  void CloseNullAwarePartition();
+
   /// Calls Close() on every Partition, deletes them, and cleans up any pointers that
   /// may reference them. If 'row_batch' if not NULL, transfers the ownership of all
   /// row-backing resources to it.
@@ -858,7 +870,7 @@ class PhjBuilder : public JoinBuilder {
   const PhjBuilderConfig::ProcessBuildBatchFn& process_build_batch_fn_level0_;
 
   /// Jitted Partition::InsertBatch() function pointers. NULL if codegen is disabled.
-  const Partition::InsertBatchFn& insert_batch_fn_ ;
+  const Partition::InsertBatchFn& insert_batch_fn_;
   const Partition::InsertBatchFn& insert_batch_fn_level0_;
 };
 } // namespace impala

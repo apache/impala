@@ -355,7 +355,7 @@ class BufferPoolTest : public ::testing::Test {
 
   // Return whether a pin is in flight for the page.
   static bool PinInFlight(PageHandle* page) {
-    return page->page_->pin_in_flight;
+    return page->page_->pin_in_flight.Load();
   }
 
   // Return the path of the temporary file backing the page.

@@ -90,7 +90,7 @@ Status GroupingAggregator::Partition::InitHashTable(bool* got_memory) {
   // Please update the error message in CreateHashPartitions() if initial size of
   // hash table changes.
   Status status = hash_tbl->Init(got_memory);
-  if (!status.ok() || !(*got_memory)) {
+  if (!status.ok()) {
     hash_tbl->Close();
     hash_tbl.reset();
   }

@@ -21,6 +21,7 @@
 
 #include "codegen/llvm-codegen.h"
 #include "exec/exec-node.h"
+#include "exec/exec-node.inline.h"
 #include "exprs/agg-fn-evaluator.h"
 #include "gutil/strings/substitute.h"
 #include "runtime/descriptors.h"

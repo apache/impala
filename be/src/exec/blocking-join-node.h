@@ -197,7 +197,8 @@ class BlockingJoinNode : public ExecNode {
   /// Write combined row, consisting of the left child's 'probe_row' and right child's
   /// 'build_row' to 'out_row'.
   /// This is replaced by codegen.
-  void CreateOutputRow(TupleRow* out_row, TupleRow* probe_row, TupleRow* build_row);
+  inline void CreateOutputRow(
+      TupleRow* out_row, TupleRow* probe_row, TupleRow* build_row);
 
   /// This function calculates the "local time" spent in the join node.
   ///

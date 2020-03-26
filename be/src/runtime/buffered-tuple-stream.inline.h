@@ -51,6 +51,42 @@ inline uint8_t* BufferedTupleStream::AddRowCustomBegin(int64_t size, Status* sta
 inline void BufferedTupleStream::AddRowCustomEnd(int64_t size) {
   if (UNLIKELY(size > default_page_len_)) AddLargeRowCustomEnd(size);
 }
+
+inline void BufferedTupleStream::GetTupleRow(FlatRowPtr flat_row, TupleRow* row) const {
+  DCHECK(row != nullptr);
+  DCHECK(!closed_);
+  DCHECK(is_pinned());
+  DCHECK(!read_it_.attach_on_read_);
+  uint8_t* data = flat_row;
+  return has_nullable_tuple_ ? UnflattenTupleRow<true>(&data, row) :
+                               UnflattenTupleRow<false>(&data, row);
+}
+
+template <bool HAS_NULLABLE_TUPLE>
+inline void BufferedTupleStream::UnflattenTupleRow(uint8_t** data, TupleRow* row) const {
+  const int tuples_per_row = desc_->tuple_descriptors().size();
+  uint8_t* ptr = *data;
+  if (HAS_NULLABLE_TUPLE) {
+    // Stitch together the tuples from the page and the NULL ones.
+    const uint8_t* null_indicators = ptr;
+    ptr += NullIndicatorBytesPerRow();
+    for (int i = 0; i < tuples_per_row; ++i) {
+      const uint8_t* null_word = null_indicators + (i >> 3);
+      const uint32_t null_pos = i & 7;
+      const bool is_not_null = ((*null_word & (1 << (7 - null_pos))) == 0);
+      row->SetTuple(
+          i, reinterpret_cast<Tuple*>(reinterpret_cast<uint64_t>(ptr) * is_not_null));
+      ptr += fixed_tuple_sizes_[i] * is_not_null;
+    }
+  } else {
+    for (int i = 0; i < tuples_per_row; ++i) {
+      row->SetTuple(i, reinterpret_cast<Tuple*>(ptr));
+      ptr += fixed_tuple_sizes_[i];
+    }
+  }
+  *data = ptr;
+}
+
 }
 
 #endif

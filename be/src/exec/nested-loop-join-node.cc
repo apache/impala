@@ -21,6 +21,8 @@
 #include <gutil/strings/substitute.h>
 
 #include "common/names.h"
+#include "exec/blocking-join-node.inline.h"
+#include "exec/exec-node.inline.h"
 #include "exec/exec-node-util.h"
 #include "exec/join-op.h"
 #include "exprs/scalar-expr-evaluator.h"
