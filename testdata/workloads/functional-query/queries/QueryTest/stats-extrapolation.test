@@ -221,7 +221,7 @@ explain select id from alltypes;
 '     partitions: 0/24 rows=unavailable'
 '     columns: unavailable'
 row_regex:.* extrapolated-rows=unavailable.*
-'   tuple-ids=0 row-size=4B cardinality=17.91K'
+row_regex:.* tuple-ids=0 row-size=4B cardinality=17\.9.*K
 '   in pipelines: 00(GETNEXT)'
 ---- TYPES
 STRING
