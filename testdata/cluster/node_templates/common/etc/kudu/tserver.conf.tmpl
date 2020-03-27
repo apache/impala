@@ -4,8 +4,15 @@
 -fs_data_dirs=${NODE_DIR}/var/lib/kudu/ts/data
 -log_dir=${NODE_DIR}/var/log/kudu/ts
 
+# The flags below require unsafe flags to be unlocked.
+-unlock_unsafe_flags
+
 # fsync is disabled for additional speed. Sometimes operations are slow on EC2/GCE test
 # machines. Some data loss could occur if the system crashes before the OS has a chance
 # to flush data to disk but that is acceptable for development purposes.
--unlock_unsafe_flags
 -never_fsync
+
+# There is no need to require NTP-synchronized clock for tests where all the
+# participating Kudu masters and tablet servers are run at the same node using the same
+# local wallclock.
+-time_source=system_unsync
