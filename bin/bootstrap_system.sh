@@ -187,10 +187,10 @@ function apt-get {
 
 echo ">>> Installing build tools"
 ubuntu apt-get update
-ubuntu apt-get --yes install ccache g++ gcc libffi-dev liblzo2-dev libkrb5-dev \
-        krb5-admin-server krb5-kdc krb5-user libsasl2-dev libsasl2-modules \
-        libsasl2-modules-gssapi-mit libssl-dev make ninja-build ntp \
-        ntpdate python-dev python-setuptools postgresql ssh wget vim-common psmisc \
+ubuntu apt-get --yes install ccache curl gawk g++ gcc libffi-dev liblzo2-dev \
+        libkrb5-dev krb5-admin-server krb5-kdc krb5-user libsasl2-dev \
+        libsasl2-modules libsasl2-modules-gssapi-mit libssl-dev make ninja-build \
+        python-dev python-setuptools postgresql ssh wget vim-common psmisc \
         lsof openjdk-8-jdk openjdk-8-source openjdk-8-dbg apt-utils git ant
 
 if [[ "$UBUNTU" == true ]]; then
@@ -224,8 +224,8 @@ else
   ubuntu18 sudo update-java-alternatives -s java-1.8.0-openjdk-amd64
 fi
 
-redhat sudo yum install -y curl gcc gcc-c++ git krb5-devel krb5-server krb5-workstation \
-        libevent-devel libffi-devel make ntp ntpdate ntp-perl openssl-devel cyrus-sasl \
+redhat sudo yum install -y curl gawk gcc gcc-c++ git krb5-devel krb5-server \
+        krb5-workstation libevent-devel libffi-devel make openssl-devel cyrus-sasl \
         cyrus-sasl-gssapi cyrus-sasl-devel cyrus-sasl-plain \
         python-devel python-setuptools postgresql postgresql-server \
         wget vim-common nscd cmake lzo-devel fuse-devel snappy-devel zlib-devel \
@@ -271,25 +271,6 @@ fi
 # TODO: make this work with non-bash shells
 
 echo ">>> Configuring system"
-
-ubuntu sudo service ntp stop
-redhat6 sudo service ntpd stop
-redhat7 notindocker sudo service ntpd stop
-sudo ntpdate us.pool.ntp.org
-# If on EC2, use Amazon's ntp servers
-# EC2 nodes expose this IP address internally as a way to gather instance metadata.
-# The assumption is that only AWS nodes do this
-if wget -q -T 1 -t 1 -o /dev/null http://169.254.169.254/latest/dynamic/instance-identity
-then
-  sudo sed -i 's/ubuntu\.pool/amazon\.pool/' /etc/ntp.conf
-fi
-# While it is nice to have ntpd running to keep the clock in sync, that does not work in a
-# --privileged docker container, and a non-privileged container cannot run ntpdate, which
-# is strictly needed by Kudu.
-# TODO: Make privileged docker start ntpd
-ubuntu sudo service ntp start || grep docker /proc/1/cgroup
-redhat6 sudo service ntpd start || grep docker /proc/1/cgroup
-notindocker redhat7 sudo service ntpd start
 
 # IMPALA-3932, IMPALA-3926
 if [[ $UBUNTU = true && ( $DISTRIB_RELEASE = 16.04 || $DISTRIB_RELEASE = 18.04 ) ]]

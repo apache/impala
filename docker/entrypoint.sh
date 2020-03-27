@@ -447,15 +447,6 @@ function shell() {
   mkdir -p logs
   boot_container
   impala_environment
-  # Kudu requires --privileged for the Docker container; see
-  # https://issues.apache.org/jira/browse/KUDU-2000. Because
-  # our goal here is convenience for new developers, we
-  # skip kudu if "ntptime" doesn't work, which is a good
-  # proxy for Kudu won't start.
-  if ! ntptime > /dev/null; then
-    export KUDU_IS_SUPPORTED=false
-    KUDU_MSG="Kudu is not started."
-  fi
   start_minicluster
   bin/start-impala-cluster.py
   cat <<"EOF"
