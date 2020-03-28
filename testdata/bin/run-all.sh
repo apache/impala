@@ -99,9 +99,11 @@ else
   $IMPALA_HOME/testdata/bin/run-hive-server.sh -only_metastore 2>&1 | \
       tee ${IMPALA_CLUSTER_LOGS_DIR}/run-hive-server.log
 
-  echo " --> Starting the Sentry Policy Server"
-  $IMPALA_HOME/testdata/bin/run-sentry-service.sh 2>&1 | \
-      tee ${IMPALA_CLUSTER_LOGS_DIR}/run-sentry-service.log
+  if [[ "$DISABLE_SENTRY" != true ]]; then
+    echo " --> Starting the Sentry Policy Server"
+    $IMPALA_HOME/testdata/bin/run-sentry-service.sh 2>&1 | \
+        tee ${IMPALA_CLUSTER_LOGS_DIR}/run-sentry-service.log
+  fi
 fi
 
 echo " --> Starting Ranger Server"
