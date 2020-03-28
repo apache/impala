@@ -1250,15 +1250,8 @@ under the License.
         </dependency>
         <dependency>
           <groupId>org.apache.hadoop</groupId>
-          <artifactId>hadoop-ozone-filesystem</artifactId>
+          <artifactId>hadoop-ozone-filesystem-lib-current</artifactId>
           <version>${ozone.version}</version>
-          <exclusions>
-            <exclusion>
-              <!-- IMPALA-9108: Avoid pulling in leveldbjni, which is unneeded. -->
-              <groupId>org.fusesource.leveldbjni</groupId>
-              <artifactId>*</artifactId>
-            </exclusion>
-          </exclusions>
         </dependency>
       </dependencies>
     </profile>
