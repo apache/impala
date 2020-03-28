@@ -20,7 +20,10 @@
 
 #include "kudu/util/memory/memory.h"
 
+// Aarch64 version gcc doesn't have mm_malloc.h.
+#ifndef __aarch64__
 #include <mm_malloc.h>
+#endif
 
 #include <algorithm>
 #include <cstdlib>
