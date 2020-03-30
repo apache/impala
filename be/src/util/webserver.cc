@@ -231,7 +231,7 @@ kudu::Status RunSpnegoStep(
 
   string resp_token_b64;
   bool is_complete;
-  RETURN_NOT_OK(kudu::gssapi::SpnegoStep(
+  KUDU_RETURN_NOT_OK(kudu::gssapi::SpnegoStep(
       neg_token, &resp_token_b64, &is_complete, authn_user));
 
   if (!resp_token_b64.empty()) {

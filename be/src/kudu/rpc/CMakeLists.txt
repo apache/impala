@@ -39,6 +39,8 @@ ADD_EXPORTABLE_LIBRARY(rpc_introspection_proto
   DEPS ${RPC_INTROSPECTION_PROTO_LIBS}
   NONLINK_DEPS ${RPC_INTROSPECTION_PROTO_TGTS})
 
+add_definitions(-DKUDU_HEADERS_USE_SHORT_STATUS_MACROS)
+
 ### RPC library
 set(KRPC_SRCS
     acceptor_pool.cc

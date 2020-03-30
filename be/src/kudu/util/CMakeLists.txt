@@ -29,6 +29,8 @@ ADD_EXPORTABLE_LIBRARY(util_compression_proto
   DEPS protobuf
   NONLINK_DEPS ${UTIL_COMPRESSION_PROTO_TGTS})
 
+add_definitions(-DKUDU_HEADERS_USE_SHORT_STATUS_MACROS)
+
 #######################################
 # hash_proto
 #######################################

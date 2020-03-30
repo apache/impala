@@ -29,6 +29,8 @@ if(NOT APPLE)
   target_link_libraries(krb5_realm_override dl)
 endif()
 
+add_definitions(-DKUDU_HEADERS_USE_SHORT_STATUS_MACROS)
+
 ##############################
 # token_proto
 ##############################

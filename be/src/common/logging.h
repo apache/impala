@@ -68,6 +68,11 @@
   DCHECK(a == b) << "[ " #a " = " << static_cast<int>(a) << " , " #b " = " \
                  << static_cast<int>(b) << " ]"
 
+/// Define Kudu logging macros to use glog macros.
+#define KUDU_LOG              LOG
+#define KUDU_CHECK            CHECK
+#define KUDU_DCHECK           DCHECK
+
 namespace impala {
 /// IR modules don't use these methods, and can't see the google namespace used in
 /// GetFullLogFilename()'s prototype.

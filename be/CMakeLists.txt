@@ -213,11 +213,9 @@ set_property(GLOBAL PROPERTY RULE_LAUNCH_LINK ${RULE_LAUNCH_PREFIX})
 # Thrift requires these definitions for some types that we use
 add_definitions(-DHAVE_INTTYPES_H -DHAVE_NETINET_IN_H -DHAVE_NETDB_H)
 
-# Kudu flags. 1. Enable non KUDU_* prefixes for status macros to allow Kudu code to
-# compile without changing the macro. 2. Enable full support for all backing types of
-# kudu::Slices. 3. Don't include stubs.h
-add_definitions(-DKUDU_HEADERS_USE_SHORT_STATUS_MACROS -DKUDU_HEADERS_USE_RICH_SLICE
-  -DKUDU_HEADERS_NO_STUBS)
+# Kudu flags. 1. Enable full support for all backing types of kudu::Slices.
+# 2. Don't include stubs.h
+add_definitions(-DKUDU_HEADERS_USE_RICH_SLICE -DKUDU_HEADERS_NO_STUBS)
 
 # Set clang flags for cross-compiling to IR.
 # IR_COMPILE is #defined for the cross compile to remove code that bloats the IR.
