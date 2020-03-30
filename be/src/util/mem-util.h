@@ -31,17 +31,21 @@ namespace impala {
 template <typename T>
 struct StrideWriter {
   // The next element to write to. May not be aligned to the natural alignment of T.
+  // Can be null for convenience, but the StrideWriter cannot be used in that case.
   T* current;
 
   // The stride in bytes between subsequent values.
   int64_t stride;
 
   explicit StrideWriter(T* current, int64_t stride) : current(current), stride(stride) {
-    DCHECK(current != nullptr);
   }
+
+  /// No other functions can be called if false.
+  ALWAYS_INLINE bool IsValid() const { return current != nullptr; }
 
   /// Set the next element to 'val' and advance 'current' to the next element.
   ALWAYS_INLINE void SetNext(T& val) {
+    DCHECK(IsValid());
     // memcpy() is necessary because 'current' may not be aligned.
     memcpy(current, &val, sizeof(T));
     SkipNext(1);
@@ -49,6 +53,7 @@ struct StrideWriter {
 
   /// Return a pointer to the current element and advance 'current' to the next element.
   ALWAYS_INLINE T* Advance() {
+    DCHECK(IsValid());
     T* curr = current;
     SkipNext(1);
     return curr;
@@ -56,11 +61,13 @@ struct StrideWriter {
 
   /// Set the next 'count' elements to 'val', advancing 'current' by 'count' values.
   void SetNext(T& val, int64_t count) {
+    DCHECK(IsValid());
     for (int64_t i = 0; i < count; ++i) SetNext(val);
   }
 
   /// Advance 'current' by 'count' values.
   ALWAYS_INLINE void SkipNext(int64_t count) {
+    DCHECK(IsValid());
     DCHECK_GE(count, 0);
     current = reinterpret_cast<T*>(reinterpret_cast<uint8_t*>(current) + stride * count);
   }
