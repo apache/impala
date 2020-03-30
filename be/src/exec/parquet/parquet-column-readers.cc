@@ -1323,7 +1323,7 @@ int BaseScalarColumnReader::FillPositionsInCandidateRange(int rows_remaining,
     int rep_level = rep_levels_.CacheGetNext();
     if (rep_level == 0) ++row_count;
     ++val_count;
-    if (pos_slot_desc_ != nullptr) {
+    if (pos_writer.IsValid()) {
       if (rep_level <= max_rep_level() - 1) pos_current_value_ = 0;
       *pos_writer.Advance() = pos_current_value_++;
     }

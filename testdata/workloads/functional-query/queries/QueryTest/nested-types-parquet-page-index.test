@@ -702,3 +702,12 @@ BIGINT, DECIMAL
 ---- RUNTIME_PROFILE
 aggregation(SUM, NumStatsFilteredPages): 6
 ====
+---- QUERY
+# Regression test for IMPALA-9572.
+select count(l_partkey) from tpch_nested_parquet.customer.c_orders.o_lineitems
+where l_partkey < 10
+---- RESULTS
+263
+---- TYPES
+BIGINT
+====
