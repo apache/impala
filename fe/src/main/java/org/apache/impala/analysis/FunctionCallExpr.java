@@ -490,7 +490,8 @@ public class FunctionCallExpr extends Expr {
     // User needs DB access.
     FeDb db = analyzer.getDb(fnName_.getDb(), Privilege.VIEW_METADATA, true);
     if (!db.containsFunction(fnName_.getFunction())) {
-      throw new AnalysisException(fnName_ + "() unknown");
+      throw new AnalysisException(fnName_ + "() unknown for database " + db.getName()
+          + ". Currently this db has " + db.numFunctions() + " functions.");
     }
 
     if (isBuiltinCastFunction()) {
