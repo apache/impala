@@ -137,7 +137,11 @@ if hive_major_version >= 3:
    # are built around populating /test-warehouse, so use /test-warehouse/managed
    # to allow that logic to remain the same.
    'hive.metastore.warehouse.dir': '${WAREHOUSE_LOCATION_PREFIX}/test-warehouse/managed',
-   'hive.metastore.warehouse.external.dir': '${WAREHOUSE_LOCATION_PREFIX}/test-warehouse'
+   'hive.metastore.warehouse.external.dir': '${WAREHOUSE_LOCATION_PREFIX}/test-warehouse',
+
+   # Due to HIVE-23102 Hive will wait for at least this amount of time for compactions
+   # (the default value is 5 mins which is way too long). Setting it to 2 seconds.
+   'hive.compactor.wait.timeout': '2000'
   })
 else:
   if os.environ.get('DISABLE_SENTRY') == "false":
