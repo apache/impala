@@ -55,8 +55,8 @@ select id_col, date_part, date_col from date_tbl;
 ---- TYPES
 INT,DATE,DATE
 ---- ERRORS
-Problem parsing file __HDFS_FILENAME__ at 309
-Avro file '__HDFS_FILENAME__' is corrupt: out of range date value -719164 at offset 309. The valid date range is -719162..2932896 (0001-01-01..9999-12-31).
+row_regex: .*Problem parsing file __HDFS_FILENAME__ at \d+
+row_regex: .*Avro file '__HDFS_FILENAME__' is corrupt: out of range date value \-?\d+ at offset \d+\. The valid date range is \-719162\.\.2932896 \(0001\-01\-01\.\.9999\-12\-31\)\.
 ====
 ---- HIVE_MAJOR_VERSION
 2
@@ -88,8 +88,8 @@ select date_part, count(date_col) from date_tbl group by date_part;
 ---- TYPES
 DATE, BIGINT
 ---- ERRORS
-Problem parsing file __HDFS_FILENAME__ at 309
-Avro file '__HDFS_FILENAME__' is corrupt: out of range date value -719164 at offset 309. The valid date range is -719162..2932896 (0001-01-01..9999-12-31).
+row_regex: .*Problem parsing file __HDFS_FILENAME__ at \d+
+row_regex: .*Avro file '__HDFS_FILENAME__' is corrupt: out of range date value \-?\d+ at offset \d+\. The valid date range is \-719162\.\.2932896 \(0001\-01\-01\.\.9999\-12\-31\)\.
 ====
 ---- HIVE_MAJOR_VERSION
 2
@@ -117,8 +117,8 @@ select min(date_part), max(date_part), min(date_col), max(date_col) from date_tb
 ---- TYPES
 DATE, DATE, DATE, DATE
 ---- ERRORS
-Problem parsing file __HDFS_FILENAME__ at 309
-Avro file '__HDFS_FILENAME__' is corrupt: out of range date value -719164 at offset 309. The valid date range is -719162..2932896 (0001-01-01..9999-12-31).
+row_regex: .*Problem parsing file __HDFS_FILENAME__ at \d+
+row_regex: .*Avro file '__HDFS_FILENAME__' is corrupt: out of range date value \-?\d+ at offset \d+\. The valid date range is \-719162\.\.2932896 \(0001\-01\-01\.\.9999\-12\-31\)\.
 ====
 ---- HIVE_MAJOR_VERSION
 2
@@ -150,8 +150,8 @@ select date_part, min(date_col), max(date_col) from date_tbl group by date_part;
 ---- TYPES
 DATE, DATE, DATE
 ---- ERRORS
-Problem parsing file __HDFS_FILENAME__ at 309
-Avro file '__HDFS_FILENAME__' is corrupt: out of range date value -719164 at offset 309. The valid date range is -719162..2932896 (0001-01-01..9999-12-31).
+row_regex: .*Problem parsing file __HDFS_FILENAME__ at \d+
+row_regex: .*Avro file '__HDFS_FILENAME__' is corrupt: out of range date value \-?\d+ at offset \d+\. The valid date range is \-719162\.\.2932896 \(0001\-01\-01\.\.9999\-12\-31\)\.
 ====
 ---- QUERY
 select date_part, count(*) from date_tbl group by date_part;
