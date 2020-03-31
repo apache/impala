@@ -23,7 +23,7 @@ impyla == 0.16.2
   bitarray == 1.2.1
   sasl == 0.2.1
   six == 1.14.0
-  thrift_sasl == 0.4.1
+  thrift_sasl == 0.4.2
 psutil == 5.6.3
 # Required for Kudu:
   Cython == 0.23.4
