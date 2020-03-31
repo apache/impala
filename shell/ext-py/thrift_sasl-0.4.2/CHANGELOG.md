@@ -1,6 +1,11 @@
 Changelog
 =========
 
+0.4.2
+------
+* **Bug Fixes**
+  - Fixes a bug where Thrift transport was not reading all data (#22)
+
 0.4.1
 ------
 * **Bug Fixes**
