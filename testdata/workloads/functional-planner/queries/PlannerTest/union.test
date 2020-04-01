@@ -4464,3 +4464,169 @@ Per-Host Resources: mem-estimate=32.00MB mem-reservation=8.00KB thread-reservati
    tuple-ids=0 row-size=0B cardinality=8
    in pipelines: 01(GETNEXT)
 ====
+# IMPALA-9429: Test partition elimination merging inputs with different
+# partitioning
+select month from (
+    select year, month from functional.alltypes
+    union all
+    select year, 1 month from functional.alltypesagg
+  ) a where year = 0 or month = 0;
+---- QUERYOPTIONS
+explain_level=2
+---- DISTRIBUTEDPLAN
+F03:PLAN FRAGMENT [UNPARTITIONED] hosts=1 instances=1
+|  Per-Host Resources: mem-estimate=16.00KB mem-reservation=0B thread-reservation=1
+PLAN-ROOT SINK
+|  output exprs: month
+|  mem-estimate=0B mem-reservation=0B thread-reservation=0
+|
+03:EXCHANGE [UNPARTITIONED]
+|  mem-estimate=16.00KB mem-reservation=0B thread-reservation=0
+|  tuple-ids=2 row-size=4B cardinality=0
+|  in pipelines: 01(GETNEXT), 02(GETNEXT)
+|
+F02:PLAN FRAGMENT [RANDOM] hosts=1 instances=1
+Per-Host Resources: mem-estimate=0B mem-reservation=0B thread-reservation=1
+00:UNION
+|  pass-through-operands: 01
+|  mem-estimate=0B mem-reservation=0B thread-reservation=0
+|  tuple-ids=2 row-size=4B cardinality=0
+|  in pipelines: 01(GETNEXT), 02(GETNEXT)
+|
+|--02:SCAN HDFS [functional.alltypesagg, RANDOM]
+|     partition predicates: `year` = CAST(0 AS INT) OR FALSE
+|     partitions=0/11 files=0 size=0B
+|     stored statistics:
+|       table: rows=11.00K size=814.73KB
+|       partitions: 0/0 rows=unavailable
+|       columns: all
+|     extrapolated-rows=disabled max-scan-range-rows=0
+|     mem-estimate=0B mem-reservation=0B thread-reservation=0
+|     tuple-ids=1 row-size=0B cardinality=0
+|     in pipelines: 02(GETNEXT)
+|
+01:SCAN HDFS [functional.alltypes, RANDOM]
+   partition predicates: functional.alltypes.year = CAST(0 AS INT) OR functional.alltypes.month = CAST(0 AS INT)
+   partitions=0/24 files=0 size=0B
+   stored statistics:
+     table: rows=7.30K size=478.45KB
+     partitions: 0/0 rows=unavailable
+     columns: all
+   extrapolated-rows=disabled max-scan-range-rows=0
+   mem-estimate=0B mem-reservation=0B thread-reservation=0
+   tuple-ids=0 row-size=4B cardinality=0
+   in pipelines: 01(GETNEXT)
+====
+select month from (
+    select year, month from functional.alltypes
+    union all
+    select year, 1 month from functional.alltypesagg
+  ) a where year = NULL or month = NULL;
+---- QUERYOPTIONS
+explain_level=2
+---- DISTRIBUTEDPLAN
+F03:PLAN FRAGMENT [UNPARTITIONED] hosts=1 instances=1
+|  Per-Host Resources: mem-estimate=16.00KB mem-reservation=0B thread-reservation=1
+PLAN-ROOT SINK
+|  output exprs: month
+|  mem-estimate=0B mem-reservation=0B thread-reservation=0
+|
+03:EXCHANGE [UNPARTITIONED]
+|  mem-estimate=16.00KB mem-reservation=0B thread-reservation=0
+|  tuple-ids=2 row-size=4B cardinality=0
+|  in pipelines: 01(GETNEXT), 02(GETNEXT)
+|
+F02:PLAN FRAGMENT [RANDOM] hosts=1 instances=1
+Per-Host Resources: mem-estimate=0B mem-reservation=0B thread-reservation=1
+00:UNION
+|  pass-through-operands: 01
+|  mem-estimate=0B mem-reservation=0B thread-reservation=0
+|  tuple-ids=2 row-size=4B cardinality=0
+|  in pipelines: 01(GETNEXT), 02(GETNEXT)
+|
+|--02:SCAN HDFS [functional.alltypesagg, RANDOM]
+|     partition predicates: `year` = NULL OR NULL
+|     partitions=0/11 files=0 size=0B
+|     stored statistics:
+|       table: rows=11.00K size=814.73KB
+|       partitions: 0/0 rows=unavailable
+|       columns: all
+|     extrapolated-rows=disabled max-scan-range-rows=0
+|     mem-estimate=0B mem-reservation=0B thread-reservation=0
+|     tuple-ids=1 row-size=0B cardinality=0
+|     in pipelines: 02(GETNEXT)
+|
+01:SCAN HDFS [functional.alltypes, RANDOM]
+   partition predicates: functional.alltypes.year = NULL OR functional.alltypes.month = NULL
+   partitions=0/24 files=0 size=0B
+   stored statistics:
+     table: rows=7.30K size=478.45KB
+     partitions: 0/0 rows=unavailable
+     columns: all
+   extrapolated-rows=disabled max-scan-range-rows=0
+   mem-estimate=0B mem-reservation=0B thread-reservation=0
+   tuple-ids=0 row-size=4B cardinality=0
+   in pipelines: 01(GETNEXT)
+====
+select year, month from (
+   select year, 1 month from functional.alltypesagg
+ ) t where year = 2010 or month = 0;
+---- QUERYOPTIONS
+explain_level=2
+---- DISTRIBUTEDPLAN
+F01:PLAN FRAGMENT [UNPARTITIONED] hosts=1 instances=1
+|  Per-Host Resources: mem-estimate=38.32KB mem-reservation=0B thread-reservation=1
+PLAN-ROOT SINK
+|  output exprs: `year`, CAST(1 AS TINYINT)
+|  mem-estimate=0B mem-reservation=0B thread-reservation=0
+|
+01:EXCHANGE [UNPARTITIONED]
+|  mem-estimate=38.32KB mem-reservation=0B thread-reservation=0
+|  tuple-ids=0 row-size=4B cardinality=11.00K
+|  in pipelines: 00(GETNEXT)
+|
+F00:PLAN FRAGMENT [RANDOM] hosts=3 instances=3
+Per-Host Resources: mem-estimate=80.00MB mem-reservation=128.00KB thread-reservation=2
+00:SCAN HDFS [functional.alltypesagg, RANDOM]
+   partition predicates: `year` = CAST(2010 AS INT) OR FALSE
+   HDFS partitions=11/11 files=11 size=814.73KB
+   stored statistics:
+     table: rows=11.00K size=814.73KB
+     partitions: 11/11 rows=11.00K
+     columns: all
+   extrapolated-rows=disabled max-scan-range-rows=1.00K
+   mem-estimate=80.00MB mem-reservation=128.00KB thread-reservation=1
+   tuple-ids=0 row-size=4B cardinality=11.00K
+   in pipelines: 00(GETNEXT)
+====
+select year, month from (
+   select year, 1 month from functional.alltypesagg
+ ) t where year = 2010 or month between 1 and 2;
+---- QUERYOPTIONS
+explain_level=2
+---- DISTRIBUTEDPLAN
+F01:PLAN FRAGMENT [UNPARTITIONED] hosts=1 instances=1
+|  Per-Host Resources: mem-estimate=38.32KB mem-reservation=0B thread-reservation=1
+PLAN-ROOT SINK
+|  output exprs: `year`, CAST(1 AS TINYINT)
+|  mem-estimate=0B mem-reservation=0B thread-reservation=0
+|
+01:EXCHANGE [UNPARTITIONED]
+|  mem-estimate=38.32KB mem-reservation=0B thread-reservation=0
+|  tuple-ids=0 row-size=4B cardinality=11.00K
+|  in pipelines: 00(GETNEXT)
+|
+F00:PLAN FRAGMENT [RANDOM] hosts=3 instances=3
+Per-Host Resources: mem-estimate=80.00MB mem-reservation=128.00KB thread-reservation=2
+00:SCAN HDFS [functional.alltypesagg, RANDOM]
+   partition predicates: `year` = CAST(2010 AS INT) OR TRUE
+   HDFS partitions=11/11 files=11 size=814.73KB
+   stored statistics:
+     table: rows=11.00K size=814.73KB
+     partitions: 11/11 rows=11.00K
+     columns: all
+   extrapolated-rows=disabled max-scan-range-rows=1.00K
+   mem-estimate=80.00MB mem-reservation=128.00KB thread-reservation=1
+   tuple-ids=0 row-size=4B cardinality=11.00K
+   in pipelines: 00(GETNEXT)
+====
