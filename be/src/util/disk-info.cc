@@ -31,6 +31,7 @@
 #include <boost/algorithm/string/trim.hpp>
 
 #include "gutil/strings/substitute.h"
+#include "util/filesystem-util.h"
 
 #include "common/names.h"
 
@@ -80,19 +81,28 @@ void DiskInfo::GetDeviceNames() {
     vector<string> fields;
     split(fields, line, is_any_of(" "), token_compress_on);
     if (fields.size() != 4) continue;
-    string name = fields[3];
-    if (name == "name") continue;
+    const string& partition_name = fields[3];
+    if (partition_name == "name") continue;
 
-    // NVME devices have a special format. Try to detect that, falling back to the normal
-    // method if this is not an NVME device.
-    std::string nvme_basename;
-    if (TryNVMETrim(name, &nvme_basename)) {
-      // This is an NVME device, use the returned basename
-      name = nvme_basename;
-    } else {
-      // Does not follow the NVME pattern, so use the logic for a normal disk device
-      // Remove the partition# from the name.  e.g. sda2 --> sda
-      trim_right_if(name, is_any_of("0123456789"));
+    // Check if this is the top-level block device. If not, try to guess the
+    // name of the top-level block device.
+    bool found_device = false;
+    string dev_name = partition_name;
+    Status status =
+      FileSystemUtil::PathExists(Substitute("/sys/block/$0", dev_name), &found_device);
+    if (!status.ok()) LOG(WARNING) << status.GetDetail();
+    if (!found_device) {
+      // NVME devices have a special format. Try to detect that, falling back to the normal
+      // method if this is not an NVME device.
+      std::string nvme_basename;
+      if (TryNVMETrim(dev_name, &nvme_basename)) {
+        // This is an NVME device, use the returned basename
+        dev_name = nvme_basename;
+      } else {
+        // Does not follow the NVME pattern, so use the logic for a normal disk device
+        // Remove the partition# from the name.  e.g. sda2 --> sda
+        trim_right_if(dev_name, is_any_of("0123456789"));
+      }
     }
 
     // Create a mapping of all device ids (one per partition) to the disk id.
@@ -102,12 +112,12 @@ void DiskInfo::GetDeviceNames() {
     DCHECK(device_id_to_disk_id_.find(dev) == device_id_to_disk_id_.end());
 
     int disk_id = -1;
-    map<string, int>::iterator it = disk_name_to_disk_id_.find(name);
+    map<string, int>::iterator it = disk_name_to_disk_id_.find(dev_name);
     if (it == disk_name_to_disk_id_.end()) {
       // First time seeing this disk
       disk_id = disks_.size();
-      disks_.push_back(Disk(name, disk_id));
-      disk_name_to_disk_id_[name] = disk_id;
+      disks_.push_back(Disk(dev_name, disk_id));
+      disk_name_to_disk_id_[dev_name] = disk_id;
     } else {
       disk_id = it->second;
     }
@@ -135,6 +145,9 @@ void DiskInfo::GetDeviceNames() {
       string line;
       getline(rotational, line);
       if (line == "0") disks_[i].is_rotational = false;
+    } else {
+      LOG(INFO) << "Could not read " << ss.str() << " for " << disks_[i].name
+                << " , assuming rotational.";
     }
     if (rotational.is_open()) rotational.close();
   }

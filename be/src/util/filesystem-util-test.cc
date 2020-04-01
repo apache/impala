@@ -174,3 +174,29 @@ TEST(FilesystemUtil, DirEntryTypes) {
   ASSERT_EQ(entries.size(), 1);
   EXPECT_TRUE(entries[0] == "impala-file");
 }
+
+TEST(FilesystemUtil, PathExists) {
+  path dir = filesystem::unique_path();
+
+  // Paths to existent and non-existent dirs.
+  path subdir1 = dir / "impala1";
+  path subdir2 = dir / "impala2";
+  filesystem::create_directories(subdir1);
+  bool exists;
+  EXPECT_OK(FileSystemUtil::PathExists(subdir1.string(), &exists));
+  EXPECT_TRUE(exists);
+  EXPECT_OK(FileSystemUtil::PathExists(subdir2.string(), &exists));
+  EXPECT_FALSE(exists);
+
+  // Paths to existent and non-existent file.
+  path file1 = dir / "a_file1";
+  path file2 = dir / "a_file2";
+  ASSERT_OK(FileSystemUtil::CreateFile(file1.string()));
+  EXPECT_OK(FileSystemUtil::PathExists(file1.string(), &exists));
+  EXPECT_TRUE(exists);
+  EXPECT_OK(FileSystemUtil::PathExists(file2.string(), &exists));
+  EXPECT_FALSE(exists);
+
+  // Cleanup
+  filesystem::remove_all(dir);
+}

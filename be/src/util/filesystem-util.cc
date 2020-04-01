@@ -173,6 +173,23 @@ Status FileSystemUtil::VerifyIsDirectory(const string& directory_path) {
   return Status::OK();
 }
 
+Status FileSystemUtil::PathExists(const std::string& path, bool* exists) {
+  error_code errcode;
+  *exists = filesystem::exists(path, errcode);
+  if (errcode != errc::success) {
+    // Need to check for no_such_file_or_directory error case - Boost's exists() sometimes
+    // returns an error when it should simply return false.
+    if (errcode == errc::no_such_file_or_directory) {
+      *exists = false;
+      return Status::OK();
+    }
+    return Status(ErrorMsg(TErrorCode::RUNTIME_ERROR, Substitute(
+        "Encountered exception while checking existence of path $0: $1",
+        path, errcode.message())));
+  }
+  return Status::OK();
+}
+
 Status FileSystemUtil::GetSpaceAvailable(const string& directory_path,
     uint64_t* available_bytes) {
   error_code errcode;

@@ -45,6 +45,9 @@ class FileSystemUtil {
   /// Returns Status::OK if it is, or a runtime error with a message otherwise.
   static Status VerifyIsDirectory(const std::string& directory_path) WARN_UNUSED_RESULT;
 
+  /// Check if a path exists. Returns an error if this could not be determined.
+  static Status PathExists(const std::string& path, bool* exists);
+
   /// Returns the space available on the file system containing 'directory_path'
   /// in 'available_bytes'
   static Status GetSpaceAvailable(
