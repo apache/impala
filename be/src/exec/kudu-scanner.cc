@@ -200,6 +200,11 @@ Status KuduScanner::OpenNextScanToken(const string& scan_token, bool* eos) {
   }
   KUDU_RETURN_IF_ERROR(
       scanner_->SetReadMode(mode), BuildErrorString("Could not set scanner ReadMode"));
+  if (state_->query_options().kudu_snapshot_read_timestamp_micros > 0) {
+    KUDU_RETURN_IF_ERROR(scanner_->SetSnapshotMicros(
+        state_->query_options().kudu_snapshot_read_timestamp_micros),
+        BuildErrorString("Could not set snapshot timestamp"));
+  }
   KUDU_RETURN_IF_ERROR(scanner_->SetTimeoutMillis(FLAGS_kudu_operation_timeout_ms),
       BuildErrorString("Could not set scanner timeout"));
   VLOG_ROW << "Starting KuduScanner with ReadMode=" << mode

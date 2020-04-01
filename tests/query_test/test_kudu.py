@@ -28,6 +28,7 @@ from kudu.schema import (
     BINARY,
     UNIXTIME_MICROS)
 from kudu.client import Partitioning
+from kudu.util import to_unixtime_micros
 import logging
 import pytest
 import random
@@ -66,6 +67,7 @@ class TestKuduOperations(KuduTestSuite):
   @SkipIfKudu.hms_integration_enabled
   def test_out_of_range_timestamps(self, vector, cursor, kudu_client, unique_database):
     """Test timestamp values that are outside of Impala's supported date range."""
+    cursor.execute("set kudu_read_mode=READ_AT_SNAPSHOT")
     cursor.execute("""CREATE TABLE %s.times (a INT PRIMARY KEY, ts TIMESTAMP)
         PARTITION BY HASH(a) PARTITIONS 3 STORED AS KUDU""" % unique_database)
     assert kudu_client.table_exists(
@@ -81,6 +83,8 @@ class TestKuduOperations(KuduTestSuite):
     #session.apply(table.new_insert((2, datetime(12000, 1, 1, 0, 0, tzinfo=utc))))
     session.flush()
 
+    cursor.execute("set kudu_snapshot_read_timestamp_micros=%s" %
+        to_unixtime_micros(kudu_client.latest_observed_timestamp()))
     # TODO: The test driver should have a way to specify query options in an 'options'
     # section rather than having to split abort_on_error cases into separate files.
     vector.get_value('exec_option')['abort_on_error'] = 0
@@ -167,6 +171,7 @@ class TestKuduOperations(KuduTestSuite):
       self, cursor, kudu_client, unique_database, cluster_properties):
     """Test changing a Kudu column outside of Impala results in a failure on read with
        outdated metadata (IMPALA-4828)."""
+    cursor.execute("set kudu_read_mode=READ_AT_SNAPSHOT")
     cursor.execute("""CREATE TABLE %s.foo (a INT PRIMARY KEY, s STRING)
         PARTITION BY HASH(a) PARTITIONS 3 STORED AS KUDU""" % unique_database)
     assert kudu_client.table_exists(
@@ -191,6 +196,8 @@ class TestKuduOperations(KuduTestSuite):
       session.apply(op)
     session.flush()
 
+    cursor.execute("set kudu_snapshot_read_timestamp_micros=%s" %
+        to_unixtime_micros(kudu_client.latest_observed_timestamp()))
     # Scanning should result in an error with Catalog V1, since the metadata is cached.
     try:
       cursor.execute("SELECT * FROM %s.foo" % (unique_database))
@@ -212,6 +219,7 @@ class TestKuduOperations(KuduTestSuite):
       self, cursor, kudu_client, unique_database, cluster_properties):
     """Test changing a NOT NULL Kudu column outside of Impala results in a failure
        on read with outdated metadata (IMPALA-4828)."""
+    cursor.execute("set kudu_read_mode=READ_AT_SNAPSHOT")
     cursor.execute("""CREATE TABLE %s.foo (a INT PRIMARY KEY, s STRING NOT NULL)
         PARTITION BY HASH(a) PARTITIONS 3 STORED AS KUDU""" % unique_database)
     assert kudu_client.table_exists(
@@ -236,6 +244,8 @@ class TestKuduOperations(KuduTestSuite):
       session.apply(op)
     session.flush()
 
+    cursor.execute("set kudu_snapshot_read_timestamp_micros=%s" %
+        to_unixtime_micros(kudu_client.latest_observed_timestamp()))
     # Scanning should result in an error
     try:
       cursor.execute("SELECT * FROM %s.foo" % (unique_database))
@@ -258,6 +268,7 @@ class TestKuduOperations(KuduTestSuite):
       self, cursor, kudu_client, unique_database, cluster_properties):
     """Test changing a NULL Kudu column outside of Impala results in a failure
        on read with outdated metadata (IMPALA-4828)."""
+    cursor.execute("set kudu_read_mode=READ_AT_SNAPSHOT")
     cursor.execute("""CREATE TABLE %s.foo (a INT PRIMARY KEY, s STRING NULL)
         PARTITION BY HASH(a) PARTITIONS 3 STORED AS KUDU""" % unique_database)
     assert kudu_client.table_exists(
@@ -282,6 +293,8 @@ class TestKuduOperations(KuduTestSuite):
       session.apply(op)
     session.flush()
 
+    cursor.execute("set kudu_snapshot_read_timestamp_micros=%s" %
+        to_unixtime_micros(kudu_client.latest_observed_timestamp()))
     # Scanning should result in an error
     try:
       cursor.execute("SELECT * FROM %s.foo" % (unique_database))
@@ -302,6 +315,7 @@ class TestKuduOperations(KuduTestSuite):
 
   def test_kudu_col_added(self, cursor, kudu_client, unique_database, cluster_properties):
     """Test adding a Kudu column outside of Impala."""
+    cursor.execute("set kudu_read_mode=READ_AT_SNAPSHOT")
     cursor.execute("""CREATE TABLE %s.foo (a INT PRIMARY KEY)
         PARTITION BY HASH(a) PARTITIONS 3 STORED AS KUDU""" % unique_database)
     assert kudu_client.table_exists(
@@ -322,6 +336,8 @@ class TestKuduOperations(KuduTestSuite):
     session.apply(op)
     session.flush()
 
+    cursor.execute("set kudu_snapshot_read_timestamp_micros=%s" %
+        to_unixtime_micros(kudu_client.latest_observed_timestamp()))
     cursor.execute("SELECT * FROM %s.foo" % (unique_database))
     if cluster_properties.is_catalog_v2_cluster():
       # Changes in Kudu should be immediately visible to Impala with Catalog V2.

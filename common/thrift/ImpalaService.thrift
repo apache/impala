@@ -516,6 +516,10 @@ enum TImpalaQueryOptions {
   // a disjunctive expression to CNF. Each AND counts as 1 expression. A value of
   // -1 or 0 means no limit. Default is 0 (unlimited).
   MAX_CNF_EXPRS = 100
+
+  // Set the timestamp for Kudu snapshot reads in Unix time micros. Only valid if
+  // KUDU_READ_MODE is set to READ_AT_SNAPSHOT.
+  KUDU_SNAPSHOT_READ_TIMESTAMP_MICROS = 101
 }
 
 // The summary of a DML statement.

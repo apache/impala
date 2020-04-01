@@ -416,6 +416,9 @@ struct TQueryOptions {
 
   // See comment in ImpalaService.thrift
   101: optional i32 max_cnf_exprs = 0;
+
+  // See comment in ImpalaService.thrift
+  102: optional i64 kudu_snapshot_read_timestamp_micros = 0;
 }
 
 // Impala currently has two types of sessions: Beeswax and HiveServer2

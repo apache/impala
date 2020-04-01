@@ -884,6 +884,17 @@ Status impala::SetQueryOption(const string& key, const string& value,
         query_options->__set_max_cnf_exprs(requested_max_cnf_exprs);
         break;
       }
+      case TImpalaQueryOptions::KUDU_SNAPSHOT_READ_TIMESTAMP_MICROS: {
+        StringParser::ParseResult result;
+        const int64_t timestamp =
+            StringParser::StringToInt<int64_t>(value.c_str(), value.length(), &result);
+        if (result != StringParser::PARSE_SUCCESS || timestamp < 0) {
+          return Status(Substitute("Invalid Kudu snapshot read timestamp: Only "
+              "non-negative numbers are allowed.", value));
+        }
+        query_options->__set_kudu_snapshot_read_timestamp_micros(timestamp);
+        break;
+      }
       default:
         if (IsRemovedQueryOption(key)) {
           LOG(WARNING) << "Ignoring attempt to set removed query option '" << key << "'";
