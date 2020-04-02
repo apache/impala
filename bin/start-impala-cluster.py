@@ -40,7 +40,8 @@ from tests.common.impala_cluster import (ImpalaCluster, DEFAULT_BEESWAX_PORT,
     DEFAULT_STATE_STORE_SUBSCRIBER_PORT, DEFAULT_IMPALAD_WEBSERVER_PORT,
     DEFAULT_STATESTORED_WEBSERVER_PORT, DEFAULT_CATALOGD_WEBSERVER_PORT,
     DEFAULT_ADMISSIOND_WEBSERVER_PORT, DEFAULT_CATALOGD_JVM_DEBUG_PORT,
-    DEFAULT_IMPALAD_JVM_DEBUG_PORT, find_user_processes, run_daemon)
+    DEFAULT_EXTERNAL_FE_PORT, DEFAULT_IMPALAD_JVM_DEBUG_PORT,
+    find_user_processes, run_daemon)
 
 LOG = logging.getLogger(os.path.splitext(os.path.basename(__file__))[0])
 LOG.setLevel(level=logging.DEBUG)
@@ -137,6 +138,9 @@ parser.add_option("--enable_admission_service", dest="enable_admission_service",
                   help="If true, enables the Admissison Control Service - the cluster "
                   "will be launched with an admissiond and all coordinators configured "
                   "to use it for admission control.")
+parser.add_option("--enable_external_fe_support", dest="enable_external_fe_support",
+                  action="store_true", default=False,
+                  help="If true, impalads will start with the external_fe_port defined.")
 
 # For testing: list of comma-separated delays, in milliseconds, that delay impalad catalog
 # replica initialization. The ith delay is applied to the ith impalad.
@@ -231,6 +235,7 @@ def choose_impalad_ports(instance_num):
           'hs2_port': DEFAULT_HS2_PORT + instance_num,
           'hs2_http_port': DEFAULT_HS2_HTTP_PORT + instance_num,
           'krpc_port': DEFAULT_KRPC_PORT + instance_num,
+          'external_fe_port': DEFAULT_EXTERNAL_FE_PORT + instance_num,
           'state_store_subscriber_port':
               DEFAULT_STATE_STORE_SUBSCRIBER_PORT + instance_num,
           'webserver_port': DEFAULT_IMPALAD_WEBSERVER_PORT + instance_num}
@@ -244,6 +249,8 @@ def build_impalad_port_args(instance_num):
       "-krpc_port={krpc_port} "
       "-state_store_subscriber_port={state_store_subscriber_port} "
       "-webserver_port={webserver_port}")
+  if options.enable_external_fe_support:
+    IMPALAD_PORTS += " -external_fe_port={external_fe_port}"
   return IMPALAD_PORTS.format(**choose_impalad_ports(instance_num))
 
 
@@ -613,7 +620,8 @@ class DockerMiniClusterOperations(object):
       port_map = {DEFAULT_BEESWAX_PORT: chosen_ports['beeswax_port'],
                   DEFAULT_HS2_PORT: chosen_ports['hs2_port'],
                   DEFAULT_HS2_HTTP_PORT: chosen_ports['hs2_http_port'],
-                  DEFAULT_IMPALAD_WEBSERVER_PORT: chosen_ports['webserver_port']}
+                  DEFAULT_IMPALAD_WEBSERVER_PORT: chosen_ports['webserver_port'],
+                  DEFAULT_EXTERNAL_FE_PORT: chosen_ports['external_fe_port']}
       self.__run_container__("impalad_coord_exec", impalad_arg_lists[i], port_map, i,
           mem_limit=mem_limit, supports_data_cache=True)
 

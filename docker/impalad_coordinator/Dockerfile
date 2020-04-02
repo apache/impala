@@ -29,6 +29,8 @@ EXPOSE 21050
 EXPOSE 28000
 # Debug webserver
 EXPOSE 25000
+# External Frontend
+EXPOSE 21150
 
 ENTRYPOINT ["/opt/impala/bin/daemon_entrypoint.sh", "/opt/impala/bin/impalad",\
      "-log_dir=/opt/impala/logs",\

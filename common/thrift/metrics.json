@@ -1182,6 +1182,66 @@
     "key": "impala.thrift-server.hiveserver2-frontend.timedout-cnxn-requests"
   },
   {
+    "description": "The number of active External Frontend API connections to this Impala Daemon.",
+    "contexts": [
+      "IMPALAD"
+    ],
+    "label": "External Frontend API Active Connections",
+    "units": "NONE",
+    "kind": "GAUGE",
+    "key": "impala.thrift-server.external-frontend.connections-in-use"
+  },
+  {
+    "description": "Amount of time clients of External Frontend API spent waiting for connection to be set up",
+    "contexts": [
+      "IMPALAD"
+    ],
+    "label": "External Frontend API client connection setup time",
+    "units": "TIME_US",
+    "kind": "HISTOGRAM",
+    "key": "impala.thrift-server.external-frontend.connection-setup-time"
+  },
+  {
+    "description": "Amount of time clients of External Frontend API spent waiting for service threads",
+    "contexts": [
+      "IMPALAD"
+    ],
+    "label": "External Frontend API clients' wait time for service threads",
+    "units": "TIME_US",
+    "kind": "HISTOGRAM",
+    "key": "impala.thrift-server.external-frontend.svc-thread-wait-time"
+  },
+  {
+    "description": "The total number of External Frontend API connections made to this Impala Daemon over its lifetime.",
+    "contexts": [
+      "IMPALAD"
+    ],
+    "label": "External Frontend API Total Connections",
+    "units": "UNIT",
+    "kind": "COUNTER",
+    "key": "impala.thrift-server.external-frontend.total-connections"
+  },
+  {
+    "description": "The number of External Frontend API connections to this Impala Daemon that have been accepted and are waiting to be setup.",
+    "contexts": [
+      "IMPALAD"
+    ],
+    "label": "External Frontend API Connections Queued for Setup",
+    "units": "NONE",
+    "kind": "GAUGE",
+    "key": "impala.thrift-server.external-frontend.connection-setup-queue-size"
+  },
+  {
+    "description": "The number of External Frontend API connection requests to this Impala Daemon that have been timed out waiting to be setup.",
+    "contexts": [
+      "IMPALAD"
+    ],
+    "label": "External Frontend API Connection Requests Timed Out",
+    "units": "NONE",
+    "kind": "GAUGE",
+    "key": "impala.thrift-server.external-frontend.timedout-cnxn-requests"
+  },
+  {
     "description": "The number of active HiveServer2 HTTP API connections to this Impala Daemon.",
     "contexts": [
       "IMPALAD"

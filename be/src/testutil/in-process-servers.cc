@@ -80,7 +80,7 @@ Status InProcessImpalaServer::StartWithClientServers(
 
   impala_server_.reset(new ImpalaServer(exec_env_.get()));
   SetCatalogIsReady();
-  RETURN_IF_ERROR(impala_server_->Start(beeswax_port, hs2_port, hs2_http_port));
+  RETURN_IF_ERROR(impala_server_->Start(beeswax_port, hs2_port, hs2_http_port_, 0));
 
   // Wait for up to 1s for the backend server to start
   RETURN_IF_ERROR(WaitForServer(FLAGS_hostname, krpc_port_, 10, 100));
