@@ -87,10 +87,16 @@ Status FileSystemUtil::RemoveAndCreateDirectory(const string& directory) {
     // the check for existence above and the removal here. If the directory is removed in
     // this window, we may get "no_such_file_or_directory" error which is fine.
     //
-    // There is a bug in boost library (as of version 1.6) which may lead to unexpected
-    // exceptions even though we are using the no-exceptions interface. See IMPALA-2846.
+    // There is a bug in boost library (as of version 1.61) which may lead to unexpected
+    // exceptions from the no-exceptions interface. Even worse, the no-exceptions
+    // interface is marked as noexcept, so the unexpected exception will cause the
+    // program to immediately call std::terminate(). This renders the try/catch block
+    // useless. For now, this uses the interface that can throw exceptions and
+    // gets the errorcode from the exception. See IMPALA-2846 + IMPALA-9571.
+    // TODO: Newer boost has a fix for this bug, so this can be switched back after
+    // upgrading boost.
     try {
-      filesystem::remove_all(directory, errcode);
+      filesystem::remove_all(directory);
     } catch (filesystem::filesystem_error& e) {
       errcode = e.code();
     }
@@ -111,10 +117,11 @@ Status FileSystemUtil::RemoveAndCreateDirectory(const string& directory) {
 Status FileSystemUtil::RemovePaths(const vector<string>& directories) {
   for (int i = 0; i < directories.size(); ++i) {
     error_code errcode;
-    // There is a bug in boost library (as of version 1.6) which may lead to unexpected
-    // exceptions even though we are using the no-exceptions interface. See IMPALA-2846.
+    // This uses the boost remove_all() interface that can throw exceptions to avoid a
+    // bug in the implementation of the no-exceptions remove_all(). See comment in
+    // RemoveAndCreateDirectory() for more details.
     try {
-      filesystem::remove_all(directories[i], errcode);
+      filesystem::remove_all(directories[i]);
     } catch (filesystem::filesystem_error& e) {
       errcode = e.code();
     }
