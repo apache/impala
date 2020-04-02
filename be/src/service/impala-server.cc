@@ -147,6 +147,10 @@ DEFINE_int32(hs2_port, 21050, "port on which HiveServer2 client requests are ser
     "If 0 or less, the HiveServer2 server is not started.");
 DEFINE_int32(hs2_http_port, 28000, "port on which HiveServer2 HTTP(s) client "
     "requests are served. If 0 or less, the HiveServer2 http server is not started.");
+DEFINE_int32(external_fe_port, 0, "port on which External Frontend requests are served. "
+    "If 0 or less, the External Frontend server is not started. Careful consideration "
+    "must be taken when enabling due to the fact that this port is currently always "
+    "unauthenticated.");
 
 DEFINE_int32(fe_service_threads, 64,
     "number of threads available to serve client requests");
@@ -2341,7 +2345,8 @@ void ImpalaServer::ConnectionEnd(
     }
   } else {
     DCHECK(connection_context.server_name ==  HS2_SERVER_NAME
-        || connection_context.server_name == HS2_HTTP_SERVER_NAME);
+        || connection_context.server_name == HS2_HTTP_SERVER_NAME
+        || connection_context.server_name == EXTERNAL_FRONTEND_SERVER_NAME);
     for (const TUniqueId& session_id : disconnected_sessions) {
       shared_ptr<SessionState> state;
       Status status = GetSessionState(session_id, SecretArg::SkipSecretCheck(), &state);
@@ -2703,8 +2708,8 @@ void ImpalaServer::ExpireQuery(ClientRequestState* crs, const Status& status) {
   crs->set_expired();
 }
 
-Status ImpalaServer::Start(
-    int32_t beeswax_port, int32_t hs2_port, int32_t hs2_http_port) {
+Status ImpalaServer::Start(int32_t beeswax_port, int32_t hs2_port,
+    int32_t hs2_http_port, int32_t external_fe_port) {
   exec_env_->SetImpalaServer(this);
 
   // We must register the HTTP handlers after registering the ImpalaServer with the
@@ -2801,6 +2806,28 @@ Status ImpalaServer::Start(
       hs2_server_->SetConnectionHandler(this);
     }
 
+    if (external_fe_port > 0 || (TestInfo::is_test() && external_fe_port == 0)) {
+      boost::shared_ptr<TProcessor> external_fe_processor(
+          new ImpalaHiveServer2ServiceProcessor(handler));
+      boost::shared_ptr<TProcessorEventHandler> event_handler(
+          new RpcEventHandler("external_frontend", exec_env_->metrics()));
+      external_fe_processor->setEventHandler(event_handler);
+
+      ThriftServerBuilder builder(EXTERNAL_FRONTEND_SERVER_NAME, external_fe_processor,
+          external_fe_port);
+      ThriftServer* server;
+      RETURN_IF_ERROR(
+          builder.auth_provider(
+              AuthManager::GetInstance()->GetExternalFrontendAuthProvider())
+          .metrics(exec_env_->metrics())
+          .max_concurrent_connections(FLAGS_fe_service_threads)
+          .queue_timeout_ms(FLAGS_accepted_client_cnxn_timeout)
+          .idle_poll_period_ms(FLAGS_idle_client_poll_period_s * MILLIS_PER_SEC)
+          .Build(&server));
+      external_fe_server_.reset(server);
+      external_fe_server_->SetConnectionHandler(this);
+    }
+
     if (hs2_http_port > 0 || (TestInfo::is_test() && hs2_http_port == 0)) {
       boost::shared_ptr<TProcessor> hs2_http_processor(
           new ImpalaHiveServer2ServiceProcessor(handler));
@@ -2845,6 +2872,11 @@ Status ImpalaServer::Start(
     RETURN_IF_ERROR(hs2_http_server_->Start());
     LOG(INFO) << "Impala HiveServer2 Service (HTTP) listening on "
               << hs2_http_server_->port();
+  }
+  if (external_fe_server_.get()) {
+    RETURN_IF_ERROR(external_fe_server_->Start());
+    LOG(INFO) << "Impala External Frontend Service listening on "
+              << external_fe_server_->port();
   }
   if (beeswax_server_.get()) {
     RETURN_IF_ERROR(beeswax_server_->Start());

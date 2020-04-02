@@ -87,6 +87,7 @@ DECLARE_string(be_principal);
 DECLARE_string(krb5_ccname);
 DECLARE_string(krb5_conf);
 DECLARE_string(krb5_debug_file);
+DECLARE_int32(external_fe_port);
 
 // Defined in kudu/security/init.cc
 DECLARE_bool(use_system_auth_to_local);
@@ -1399,12 +1400,23 @@ Status AuthManager::Init() {
   }
   RETURN_IF_ERROR(internal_auth_provider_->Start());
   RETURN_IF_ERROR(external_auth_provider_->Start());
+  if (FLAGS_external_fe_port > 0 ||
+      (TestInfo::is_test() && FLAGS_external_fe_port == 0)) {
+    external_fe_auth_provider_.reset(new NoAuthProvider());
+    LOG(INFO) << "External Frontend communication is not authenticated";
+    RETURN_IF_ERROR(external_fe_auth_provider_->Start());
+  }
   return Status::OK();
 }
 
 AuthProvider* AuthManager::GetExternalAuthProvider() {
   DCHECK(external_auth_provider_.get() != NULL);
   return external_auth_provider_.get();
+}
+
+AuthProvider* AuthManager::GetExternalFrontendAuthProvider() {
+  DCHECK(external_fe_auth_provider_.get() != NULL);
+  return external_fe_auth_provider_.get();
 }
 
 AuthProvider* AuthManager::GetInternalAuthProvider() {

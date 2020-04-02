@@ -67,6 +67,12 @@ class AuthManager {
   /// internal process.
   AuthProvider* GetExternalAuthProvider();
 
+  /// Returns the authentication provider to use for "external frontend" communication.
+  /// This only applies to the server side of a connection; the client side of said
+  /// connection is never an internal process. Currently this is either null if
+  /// external_fe_port <= 0 or NoAuthProvider.
+  AuthProvider* GetExternalFrontendAuthProvider();
+
   /// Returns the authentication provider to use for internal daemon <-> daemon
   /// connections.  This goes for both the client and server sides.  An example
   /// connection this applies to would be backend <-> statestore.
@@ -89,6 +95,7 @@ class AuthManager {
   boost::scoped_ptr<AuthProvider> internal_auth_provider_;
   boost::scoped_ptr<AuthProvider> external_auth_provider_;
   boost::scoped_ptr<AuthProvider> external_http_auth_provider_;
+  boost::scoped_ptr<AuthProvider> external_fe_auth_provider_;
 
   /// Used to authenticate usernames and passwords to LDAP.
   std::unique_ptr<ImpalaLdap> ldap_;
