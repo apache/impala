@@ -26,6 +26,7 @@ set(LIBRARY_OUTPUT_PATH "${BUILD_OUTPUT_ROOT_DIRECTORY}/exec")
 set(EXECUTABLE_OUTPUT_PATH "${BUILD_OUTPUT_ROOT_DIRECTORY}/exec")
 
 add_library(Exec
+  acid-metadata-utils.cc
   aggregation-node.cc
   aggregation-node-base.cc
   aggregator.cc
@@ -109,6 +110,7 @@ add_library(Exec
 add_dependencies(Exec gen-deps)
 
 add_library(ExecTests STATIC
+  acid-metadata-utils-test.cc
   delimited-text-parser-test.cc
   hash-table-test.cc
   hdfs-avro-scanner-test.cc
@@ -118,6 +120,7 @@ add_library(ExecTests STATIC
 )
 add_dependencies(ExecTests gen-deps)
 
+ADD_UNIFIED_BE_LSAN_TEST(acid-metadata-utils-test ValidWriteIdListTest.*)
 ADD_UNIFIED_BE_LSAN_TEST(zigzag-test ZigzagTest.*)
 ADD_UNIFIED_BE_LSAN_TEST(hash-table-test HashTableTest.*)
 ADD_UNIFIED_BE_LSAN_TEST(delimited-text-parser-test DelimitedTextParser.*)

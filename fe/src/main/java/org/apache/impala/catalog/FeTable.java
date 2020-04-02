@@ -20,6 +20,7 @@ import java.util.Comparator;
 import java.util.List;
 import java.util.Set;
 
+import org.apache.hadoop.hive.common.ValidWriteIdList;
 import org.apache.hadoop.hive.metastore.api.Table;
 import org.apache.impala.analysis.TableName;
 import org.apache.impala.thrift.TCatalogObjectType;
@@ -149,7 +150,7 @@ public interface FeTable {
   /**
    * @return the valid write id list for this table
    */
-  String getValidWriteIds();
+  ValidWriteIdList getValidWriteIds();
 
   /**
    * @return the owner user for this table. If the table is not loaded or the owner is

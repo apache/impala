@@ -34,6 +34,13 @@ string PrintNode(const orc::Type* node) {
   return Substitute("$0 column (ORC id=$1)", node->toString(), node->getColumnId());
 }
 
+bool OrcRowValidator::IsRowBatchValid() const {
+  if (write_ids_ == nullptr || write_ids_->numElements == 0) return true;
+
+  int64_t write_id = write_ids_->data[0];
+  return valid_write_ids_.IsWriteIdValid(write_id);
+}
+
 OrcColumnReader* OrcColumnReader::Create(const orc::Type* node,
     const SlotDescriptor* slot_desc, HdfsOrcScanner* scanner) {
   DCHECK(node != nullptr);
@@ -323,6 +330,9 @@ void OrcStructReader::CreateChildForSlot(const orc::Type* curr_node,
 OrcStructReader::OrcStructReader(const orc::Type* node,
     const TupleDescriptor* table_tuple_desc, HdfsOrcScanner* scanner)
     : OrcComplexColumnReader(node, table_tuple_desc, scanner) {
+  bool needs_row_validation = table_tuple_desc == scanner_->scan_node_->tuple_desc() &&
+                              node->getColumnId() == 0 &&
+                              scanner_->row_batches_need_validation_;
   if (materialize_tuple_) {
     for (SlotDescriptor* child_slot : tuple_desc_->slots()) {
       // Skip partition columns and missed columns
@@ -337,11 +347,21 @@ OrcStructReader::OrcStructReader(const orc::Type* node,
     // matches to a descendant of 'node'. Those tuples should be materialized by the
     // corresponding descendant reader. So 'node' should have exactly one selected
     // subtype: the child in the path to the target descendant.
-    DCHECK_EQ(node->getSubtypeCount(), 1);
+    DCHECK_EQ(node->getSubtypeCount(), needs_row_validation ? 2 : 1);
+    int child_index = needs_row_validation ? 1 : 0;
     OrcComplexColumnReader* child = OrcComplexColumnReader::CreateTopLevelReader(
-        node->getSubtype(0), table_tuple_desc, scanner);
+        node->getSubtype(child_index), table_tuple_desc, scanner);
     children_.push_back(child);
-    children_fields_.push_back(0);
+    children_fields_.push_back(child_index);
+  }
+  if (needs_row_validation) {
+    row_validator_.reset(new OrcRowValidator(scanner_->valid_write_ids_));
+    for (int i = 0; i < node->getSubtypeCount(); ++i) {
+      if (node->getSubtype(i)->getColumnId() == CURRENT_TRANSCACTION_TYPE_ID) {
+        current_write_id_field_index_ = i;
+        break;
+      }
+    }
   }
 }
 
@@ -374,6 +394,12 @@ Status OrcStructReader::ReadValue(int row_idx, Tuple* tuple, MemPool* pool) {
 
 Status OrcStructReader::TopLevelReadValueBatch(ScratchTupleBatch* scratch_batch,
     MemPool* pool) {
+  // Validate row batch if needed.
+  if (row_validator_) DCHECK(scanner_->row_batches_need_validation_);
+  if (row_validator_ && !row_validator_->IsRowBatchValid()) {
+    row_idx_ = NumElements();
+    return Status::OK();
+  }
   // Saving the initial value of num_tuples because each child->ReadValueBatch() will
   // update it.
   int scratch_batch_idx = scratch_batch->num_tuples;
@@ -390,6 +416,14 @@ Status OrcStructReader::TopLevelReadValueBatch(ScratchTupleBatch* scratch_batch,
     }
   }
   row_idx_ += scratch_batch->num_tuples - scratch_batch_idx;
+  if (row_validator_ && scanner_->scan_node_->IsZeroSlotTableScan()) {
+    DCHECK_EQ(1, batch_->fields.size()); // We should only select 'currentTransaction'.
+    DCHECK_EQ(scratch_batch_idx, scratch_batch->num_tuples);
+    int num_to_fake_read = std::min(scratch_batch->capacity - scratch_batch->num_tuples,
+                                    NumElements() - row_idx_);
+    scratch_batch->num_tuples += num_to_fake_read;
+    row_idx_ += num_to_fake_read;
+  }
   return Status::OK();
 }
 
@@ -418,6 +452,14 @@ Status OrcStructReader::UpdateInputBatch(orc::ColumnVectorBatch* orc_batch) {
   int size = children_.size();
   for (int c = 0; c < size; ++c) {
     RETURN_IF_ERROR(children_[c]->UpdateInputBatch(batch_->fields[children_fields_[c]]));
+  }
+  if (row_validator_) {
+    orc::ColumnVectorBatch* write_id_batch =
+        batch_->fields[current_write_id_field_index_];
+    DCHECK_EQ(static_cast<orc::LongVectorBatch*>(write_id_batch),
+              dynamic_cast<orc::LongVectorBatch*>(write_id_batch));
+    row_validator_->UpdateTransactionBatch(
+        static_cast<orc::LongVectorBatch*>(write_id_batch));
   }
   return Status::OK();
 }
@@ -451,7 +493,7 @@ Status OrcCollectionReader::AssembleCollection(int row_idx, Tuple* tuple, MemPoo
 int OrcListReader::NumElements() const {
   if (DirectReader()) return batch_ != nullptr ? batch_->numElements : 0;
   if (children_.empty()) {
-    return batch_ != nullptr ?  batch_->offsets[batch_->numElements] : 0;
+    return batch_ != nullptr ? batch_->offsets[batch_->numElements] : 0;
   }
   return children_[0]->NumElements();
 }
@@ -575,7 +617,7 @@ Status OrcListReader::UpdateInputBatch(orc::ColumnVectorBatch* orc_batch) {
   return Status::OK();
 }
 
-int OrcListReader::GetNumTuples(int row_idx) const {
+int OrcListReader::GetNumChildValues(int row_idx) const {
   if (IsNull(DCHECK_NOTNULL(batch_), row_idx)) return 0;
   DCHECK_GT(batch_->offsets.size(), row_idx + 1);
   return batch_->offsets[row_idx + 1] - batch_->offsets[row_idx];
@@ -688,7 +730,7 @@ Status OrcMapReader::UpdateInputBatch(orc::ColumnVectorBatch* orc_batch) {
   return Status::OK();
 }
 
-int OrcMapReader::GetNumTuples(int row_idx) const {
+int OrcMapReader::GetNumChildValues(int row_idx) const {
   if (IsNull(batch_, row_idx)) return 0;
   DCHECK_GT(batch_->offsets.size(), row_idx + 1);
   return batch_->offsets[row_idx + 1] - batch_->offsets[row_idx];

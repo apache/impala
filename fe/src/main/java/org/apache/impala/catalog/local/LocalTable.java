@@ -22,6 +22,7 @@ import java.util.List;
 
 import javax.annotation.Nullable;
 
+import org.apache.hadoop.hive.common.ValidWriteIdList;
 import org.apache.hadoop.hive.metastore.TableType;
 import org.apache.hadoop.hive.metastore.api.ColumnStatisticsObj;
 import org.apache.hadoop.hive.metastore.api.Table;
@@ -276,7 +277,7 @@ abstract class LocalTable implements FeTable {
   }
 
   @Override
-  public String getValidWriteIds() {
+  public ValidWriteIdList getValidWriteIds() {
     return null;
   }
 

@@ -40,9 +40,7 @@ import org.apache.impala.compat.MetastoreShim;
 import org.apache.impala.common.ImpalaRuntimeException;
 import org.apache.impala.common.Metrics;
 import org.apache.impala.common.Pair;
-import org.apache.impala.common.PrintUtils;
 import org.apache.impala.common.RuntimeEnv;
-import org.apache.impala.compat.MetastoreShim;
 import org.apache.impala.service.MetadataOp;
 import org.apache.impala.thrift.TAccessLevel;
 import org.apache.impala.thrift.TCatalogObject;
@@ -62,7 +60,6 @@ import org.apache.log4j.Logger;
 
 import com.codahale.metrics.Timer;
 import com.google.common.base.Preconditions;
-import com.google.common.base.Stopwatch;
 import com.google.common.collect.Lists;
 
 /**
@@ -132,11 +129,6 @@ public abstract class Table extends CatalogObjectImpl implements FeTable {
   // CatalogdTableInvalidator.nanoTime(). This is only set in catalogd and not used by
   // impalad.
   protected long lastUsedTime_;
-
-  // Valid write id list for this table.
-  // null in the case that this table is not transactional.
-  // TODO(todd) this should probably be a ValidWriteIdList in memory instead of a String.
-  protected String validWriteIds_ = null;
 
   // tracks the in-flight metastore events for this table. Used by Events processor to
   // avoid unnecessary refresh when the event is received
@@ -379,48 +371,6 @@ public abstract class Table extends CatalogObjectImpl implements FeTable {
   }
 
   /**
-   * Get valid write ids for the acid table.
-   * @param client the client to access HMS
-   * @return the list of valid write IDs for the table
-   */
-  protected String fetchValidWriteIds(IMetaStoreClient client)
-      throws TableLoadingException {
-    String tblFullName = getFullName();
-    if (LOG.isTraceEnabled()) LOG.trace("Get valid writeIds for table: " + tblFullName);
-    String writeIds = null;
-    try {
-      ValidWriteIdList validWriteIds = MetastoreShim.fetchValidWriteIds(client,
-          tblFullName);
-      writeIds = validWriteIds == null ? null : validWriteIds.writeToString();
-    } catch (Exception e) {
-      throw new TableLoadingException(String.format("Error loading ValidWriteIds for " +
-          "table '%s'", getName()), e);
-    }
-    if (LOG.isTraceEnabled()) {
-      LOG.trace("Valid writeIds: " + writeIds);
-    }
-    return writeIds;
-  }
-
-  /**
-   * Set ValistWriteIdList with stored writeId
-   * @param client the client to access HMS
-   */
-  protected void loadValidWriteIdList(IMetaStoreClient client)
-      throws TableLoadingException {
-    Stopwatch sw = Stopwatch.createStarted();
-    Preconditions.checkState(msTable_ != null && msTable_.getParameters() != null);
-    if (MetastoreShim.getMajorVersion() > 2 &&
-        AcidUtils.isTransactionalTable(msTable_.getParameters())) {
-      validWriteIds_ = fetchValidWriteIds(client);
-    } else {
-      validWriteIds_ = null;
-    }
-    LOG.debug("Load Valid Write Id List Done. Time taken: " +
-        PrintUtils.printTimeNs(sw.elapsed(TimeUnit.NANOSECONDS)));
-  }
-
-  /**
    * Creates a table of the appropriate type based on the given hive.metastore.api.Table
    * object.
    */
@@ -502,8 +452,6 @@ public abstract class Table extends CatalogObjectImpl implements FeTable {
     storageMetadataLoadTime_ = thriftTable.getStorage_metadata_load_time_ns();
 
     storedInImpaladCatalogCache_ = true;
-    validWriteIds_ = thriftTable.isSetValid_write_ids() ?
-        thriftTable.getValid_write_ids() : null;
   }
 
   /**
@@ -554,9 +502,6 @@ public abstract class Table extends CatalogObjectImpl implements FeTable {
 
     table.setMetastore_table(getMetaStoreTable());
     table.setTable_stats(tableStats_);
-    if (validWriteIds_ != null) {
-      table.setValid_write_ids(validWriteIds_);
-    }
     return table;
   }
 
@@ -632,7 +577,12 @@ public abstract class Table extends CatalogObjectImpl implements FeTable {
       }
       resp.table_info.setColumn_stats(statsList);
     }
-
+    if (getMetaStoreTable() != null &&
+        AcidUtils.isTransactionalTable(getMetaStoreTable().getParameters())) {
+      Preconditions.checkState(getValidWriteIds() != null);
+      resp.table_info.setValid_write_ids(
+          MetastoreShim.convertToTValidWriteIdList(getValidWriteIds()));
+    }
     return resp;
   }
   /**
@@ -845,7 +795,7 @@ public abstract class Table extends CatalogObjectImpl implements FeTable {
   }
 
   @Override
-  public String getValidWriteIds() {
-    return validWriteIds_;
+  public ValidWriteIdList getValidWriteIds() {
+    return null;
   }
 }

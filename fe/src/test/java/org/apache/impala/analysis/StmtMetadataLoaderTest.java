@@ -97,8 +97,7 @@ public class StmtMetadataLoaderTest {
     for (FeTable t: stmtTableCache.tables.values()) {
       Assert.assertTrue(t.isLoaded());
       Assert.assertTrue(t.getValidWriteIds() != null);
-      Assert.assertTrue(MetastoreShim.getValidWriteIdListFromString(t.getValidWriteIds())
-          .isWriteIdValid(t.getWriteId()));
+      Assert.assertTrue(t.getValidWriteIds().isWriteIdValid(t.getWriteId()));
     }
   }
 

@@ -101,6 +101,7 @@ import com.codahale.metrics.Timer;
 import com.google.common.annotations.VisibleForTesting;
 import com.google.common.base.Joiner;
 import com.google.common.base.Preconditions;
+import com.google.common.base.Stopwatch;
 import com.google.common.collect.HashMultiset;
 import com.google.common.collect.ImmutableList;
 import com.google.common.collect.Iterables;
@@ -248,6 +249,10 @@ public class HdfsTable extends Table implements FeFsTable {
   // SQL constraints information for the table. Set in load() method.
   private SqlConstraints sqlConstraints_ = new SqlConstraints(new ArrayList<>(),
       new ArrayList<>());
+
+  // Valid write id list for this table.
+  // null in the case that this table is not transactional.
+  protected ValidWriteIdList validWriteIds_ = null;
 
   // Represents a set of storage-related statistics aggregated at the table or partition
   // level.
@@ -624,15 +629,13 @@ public class HdfsTable extends Table implements FeFsTable {
           .add(p);
     }
 
-    ValidWriteIdList writeIds = validWriteIds_ != null
-        ? MetastoreShim.getValidWriteIdListFromString(validWriteIds_) : null;
     //TODO: maybe it'd be better to load the valid txn list in the context of a
     // transaction to have consistent valid write ids and valid transaction ids.
     // Currently tables are loaded when they are first referenced and stay in catalog
     // until certain actions occur (refresh, invalidate, insert, etc.). However,
     // Impala doesn't notice when HMS's cleaner removes old transactional directories,
     // which might lead to FileNotFound exceptions.
-    ValidTxnList validTxnList = writeIds != null ? loadValidTxns(client) : null;
+    ValidTxnList validTxnList = validWriteIds_ != null ? loadValidTxns(client) : null;
 
     // Create a FileMetadataLoader for each path.
     Map<Path, FileMetadataLoader> loadersByPath = Maps.newHashMap();
@@ -640,7 +643,7 @@ public class HdfsTable extends Table implements FeFsTable {
       List<FileDescriptor> oldFds = e.getValue().get(0).getFileDescriptors();
       FileMetadataLoader loader = new FileMetadataLoader(e.getKey(),
           Utils.shouldRecursivelyListPartitions(this), oldFds, hostIndex_, validTxnList,
-          writeIds, e.getValue().get(0).getFileFormat());
+          validWriteIds_, e.getValue().get(0).getFileFormat());
       // If there is a cached partition mapped to this path, we recompute the block
       // locations even if the underlying files have not changed.
       // This is done to keep the cached block metadata up to date.
@@ -1483,6 +1486,10 @@ public class HdfsTable extends Table implements FeFsTable {
     avroSchema_ = hdfsTable.isSetAvroSchema() ? hdfsTable.getAvroSchema() : null;
     isMarkedCached_ =
         HdfsCachingUtil.validateCacheParams(getMetaStoreTable().getParameters());
+    if (hdfsTable.isSetValid_write_ids()) {
+      validWriteIds_ = MetastoreShim.getValidWriteIdListFromThrift(
+          getFullName(), hdfsTable.getValid_write_ids());
+    }
   }
 
   @Override
@@ -1643,6 +1650,10 @@ public class HdfsTable extends Table implements FeFsTable {
     hdfsTable.setPartition_prefixes(partitionLocationCompressor_.getPrefixes());
     if (AcidUtils.isFullAcidTable(getMetaStoreTable().getParameters())) {
       hdfsTable.setIs_full_acid(true);
+    }
+    if (validWriteIds_ != null) {
+      hdfsTable.setValid_write_ids(
+          MetastoreShim.convertToTValidWriteIdList(validWriteIds_));
     }
     return hdfsTable;
   }
@@ -2043,5 +2054,50 @@ public class HdfsTable extends Table implements FeFsTable {
    */
   public boolean isPartitioned() {
     return getMetaStoreTable().getPartitionKeysSize() > 0;
+  }
+
+  /**
+   * Get valid write ids for the acid table.
+   * @param client the client to access HMS
+   * @return the list of valid write IDs for the table
+   */
+  protected ValidWriteIdList fetchValidWriteIds(IMetaStoreClient client)
+      throws TableLoadingException {
+    String tblFullName = getFullName();
+    if (LOG.isTraceEnabled()) LOG.trace("Get valid writeIds for table: " + tblFullName);
+    ValidWriteIdList validWriteIds = null;
+    try {
+      validWriteIds = MetastoreShim.fetchValidWriteIds(client, tblFullName);
+      if (LOG.isTraceEnabled()) {
+        LOG.trace("Valid writeIds: " + validWriteIds.writeToString());
+      }
+      return validWriteIds;
+    } catch (Exception e) {
+      throw new TableLoadingException(String.format("Error loading ValidWriteIds for " +
+          "table '%s'", getName()), e);
+    }
+  }
+
+  /**
+   * Set ValistWriteIdList with stored writeId
+   * @param client the client to access HMS
+   */
+  protected void loadValidWriteIdList(IMetaStoreClient client)
+      throws TableLoadingException {
+    Stopwatch sw = Stopwatch.createStarted();
+    Preconditions.checkState(msTable_ != null && msTable_.getParameters() != null);
+    if (MetastoreShim.getMajorVersion() > 2 &&
+        AcidUtils.isTransactionalTable(msTable_.getParameters())) {
+      validWriteIds_ = fetchValidWriteIds(client);
+    } else {
+      validWriteIds_ = null;
+    }
+    LOG.debug("Load Valid Write Id List Done. Time taken: " +
+        PrintUtils.printTimeNs(sw.elapsed(TimeUnit.NANOSECONDS)));
+  }
+
+  @Override
+  public ValidWriteIdList getValidWriteIds() {
+    return validWriteIds_;
   }
 }

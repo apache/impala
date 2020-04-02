@@ -24,6 +24,12 @@
 
 namespace impala {
 
+// Key of Hive ACID version in ORC metadata.
+const string HIVE_ACID_VERSION_KEY = "hive.acid.version";
+
+// ORC type id of column "currentTransaction" in full ACID ORC files.
+constexpr int CURRENT_TRANSCACTION_TYPE_ID = 5;
+
 /// Util class to resolve SchemaPaths of TupleDescriptors/SlotDescriptors into orc::Type.
 class OrcSchemaResolver {
  public:

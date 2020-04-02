@@ -64,32 +64,10 @@ select * from acid;
 INT
 ====
 ---- HIVE_QUERY
-alter table $DATABASE.acid compact 'minor' and wait;
-====
----- QUERY
-# REFRESH fails because of minor compacted delete delta directories.
-refresh acid;
----- CATCH
-TableLoadingException
-====
----- QUERY
-# Until the old files are still there SELECT works well.
-select * from acid;
----- RESULTS
-1
-3
-5
-5
-5
-====
----- HIVE_QUERY
 alter table $DATABASE.acid compact 'major' and wait;
 ====
 ---- QUERY
-# We can't issue REFRESH here because REFRESH only works if the metadata for the table
-# is successfully loaded. The previous REFRESH broke table metadata. Once Impala-9042 is
-# resolved everything should work smoothly.
-invalidate metadata acid;
+refresh acid;
 show files in acid;
 ---- RESULTS
 row_regex:'$NAMENODE/$MANAGED_WAREHOUSE_DIR/$DATABASE.db/acid/base_0000005_v\d+/bucket_\d+','\d+K?B',''

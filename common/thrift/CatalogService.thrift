@@ -384,6 +384,9 @@ struct TPartialTableInfo {
   // SqlConstraints for the table, small enough that we can
   // return them wholesale.
   8: optional SqlConstraints.TSqlConstraints sql_constraints
+
+  // Valid write id list of ACID table.
+  9: optional CatalogObjects.TValidWriteIdList valid_write_ids;
 }
 
 // Selector for partial information about a Database.

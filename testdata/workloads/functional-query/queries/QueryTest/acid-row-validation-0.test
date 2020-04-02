@@ -1,0 +1,15 @@
+====
+---- QUERY
+refresh streaming;
+select * from streaming;
+---- RESULTS
+---- TYPES
+STRING, STRING
+====
+---- QUERY
+select count(*) from streaming;
+---- RESULTS
+0
+---- TYPES
+BIGINT
+====

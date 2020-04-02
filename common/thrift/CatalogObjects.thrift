@@ -331,6 +331,21 @@ struct THdfsPartition {
 // Must be < 0 to avoid collisions
 const i64 PROTOTYPE_PARTITION_ID = -1;
 
+// Thrift representation of a Hive ACID valid write id list.
+struct TValidWriteIdList {
+  // Every write id greater than 'high_watermark' are invalid.
+  1: optional i64 high_watermark
+
+  // The smallest open write id.
+  2: optional i64 min_open_write_id
+
+  // Open or aborted write ids.
+  3: optional list<i64> invalid_write_ids
+
+  // Indexes of the aborted write ids in 'invalid_write_ids'. The write ids whose index
+  // are not present here are open.
+  4: optional list<i32> aborted_indexes
+}
 
 struct THdfsTable {
   // ============================================================
@@ -381,6 +396,9 @@ struct THdfsTable {
 
   // True if the table is in Hive Full ACID format.
   12: optional bool is_full_acid = false
+
+  // Set iff this is an acid table. The valid write ids list.
+  13: optional TValidWriteIdList valid_write_ids
 }
 
 struct THBaseTable {
@@ -500,12 +518,6 @@ struct TTable {
 
   // Set iff this a kudu table
   13: optional TKuduTable kudu_table
-
-  // Set iff this is an acid table. The valid write ids list.
-  // The string is assumed to be created by ValidWriteIdList.writeToString
-  // For example ValidReaderWriteIdList object's format is:
-  // <table_name>:<highwatermark>:<minOpenWriteId>:<open_writeids>:<abort_writeids>
-  14: optional string valid_write_ids
 
   // Set if this table needs storage access during metadata load.
   // Time used for storage loading in nanoseconds.

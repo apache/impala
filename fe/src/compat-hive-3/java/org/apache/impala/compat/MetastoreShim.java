@@ -35,6 +35,7 @@ import java.util.BitSet;
 import java.util.Collections;
 import java.util.EnumSet;
 import java.util.List;
+import java.util.stream.Collectors;
 
 import org.apache.hadoop.hive.common.StatsSetupConst;
 import org.apache.hadoop.hive.common.ValidReaderWriteIdList;
@@ -98,6 +99,7 @@ import org.apache.impala.service.Frontend;
 import org.apache.impala.service.MetadataOp;
 import org.apache.impala.thrift.TMetadataOpRequest;
 import org.apache.impala.thrift.TResultSet;
+import org.apache.impala.thrift.TValidWriteIdList;
 import org.apache.impala.util.AcidUtils;
 import org.apache.impala.util.AcidUtils.TblTransaction;
 import org.apache.impala.util.MetaStoreUtil.InsertEventInfo;
@@ -595,6 +597,57 @@ public class MetastoreShim {
   public static ValidWriteIdList getValidWriteIdListFromString(String validWriteIds) {
     Preconditions.checkNotNull(validWriteIds);
     return new ValidReaderWriteIdList(validWriteIds);
+  }
+
+  /**
+   * Converts a TValidWriteIdList object to ValidWriteIdList.
+   * @param tableName the name of the table.
+   * @param validWriteIds the thrift object.
+   * @return ValidWriteIdList object
+   */
+  public static ValidWriteIdList getValidWriteIdListFromThrift(String tableName,
+      TValidWriteIdList validWriteIds) {
+    Preconditions.checkNotNull(validWriteIds);
+    BitSet abortedBits;
+    if (validWriteIds.getAborted_indexesSize() > 0) {
+      abortedBits = new BitSet(validWriteIds.getInvalid_write_idsSize());
+      for (int aborted_index : validWriteIds.getAborted_indexes()) {
+        abortedBits.set(aborted_index);
+      }
+    } else {
+      abortedBits = new BitSet();
+    }
+    long highWatermark = validWriteIds.isSetHigh_watermark() ?
+        validWriteIds.high_watermark : Long.MAX_VALUE;
+    long minOpenWriteId = validWriteIds.isSetMin_open_write_id() ?
+        validWriteIds.min_open_write_id : Long.MAX_VALUE;
+    return new ValidReaderWriteIdList(tableName,
+        validWriteIds.getInvalid_write_ids().stream().mapToLong(i -> i).toArray(),
+        abortedBits, highWatermark, minOpenWriteId);
+  }
+
+  /**
+   * Converts a ValidWriteIdList object to TValidWriteIdList.
+   */
+  public static TValidWriteIdList convertToTValidWriteIdList(
+      ValidWriteIdList validWriteIdList) {
+    Preconditions.checkNotNull(validWriteIdList);
+    TValidWriteIdList ret = new TValidWriteIdList();
+    long minOpenWriteId = validWriteIdList.getMinOpenWriteId() != null ?
+        validWriteIdList.getMinOpenWriteId() : Long.MAX_VALUE;
+    ret.setHigh_watermark(validWriteIdList.getHighWatermark());
+    ret.setMin_open_write_id(minOpenWriteId);
+    ret.setInvalid_write_ids(Arrays.stream(
+        validWriteIdList.getInvalidWriteIds()).boxed().collect(Collectors.toList()));
+    List<Integer> abortedIndexes = new ArrayList<>();
+    for (int i = 0; i < validWriteIdList.getInvalidWriteIds().length; ++i) {
+      long writeId = validWriteIdList.getInvalidWriteIds()[i];
+      if (validWriteIdList.isWriteIdAborted(writeId)) {
+        abortedIndexes.add(i);
+      }
+    }
+    ret.setAborted_indexes(abortedIndexes);
+    return ret;
   }
 
   /**

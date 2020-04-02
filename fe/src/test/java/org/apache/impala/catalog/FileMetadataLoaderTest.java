@@ -27,8 +27,11 @@ import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.fs.FileSystem;
 import org.apache.hadoop.fs.FileUtil;
 import org.apache.hadoop.fs.Path;
+import org.apache.hadoop.hive.common.ValidReadTxnList;
+import org.apache.hadoop.hive.common.ValidWriteIdList;
 import org.apache.hadoop.hive.metastore.api.MetaException;
 import org.apache.impala.catalog.HdfsPartition.FileDescriptor;
+import org.apache.impala.compat.MetastoreShim;
 import org.apache.impala.thrift.TNetworkAddress;
 import org.apache.impala.util.ListMap;
 import org.junit.Test;
@@ -106,6 +109,24 @@ public class FileMetadataLoaderTest {
         "year=2016/month=03/day=15/940359ee-cc79-4974-8a2a-5d133a81a3fd-0_1-103-390"
             + "_20200210090618.parquet",
         relPaths.get(2));
+  }
+
+  @Test
+  public void testAcidMinorCompactionLoading() throws IOException, MetaException {
+    //TODO(IMPALA-9042): Remove "throws MetaException"
+    ListMap<TNetworkAddress> hostIndex = new ListMap<>();
+    ValidWriteIdList writeIds = MetastoreShim.getValidWriteIdListFromString(
+        "functional_orc_def.complextypestbl_minor_compacted:10:10::");
+    Path tablePath = new Path("hdfs://localhost:20500/test-warehouse/managed/" +
+                              "complextypestbl_minor_compacted_orc_def/");
+    FileMetadataLoader fml = new FileMetadataLoader(tablePath, /* recursive=*/true,
+        /* oldFds = */ Collections.emptyList(), hostIndex, new ValidReadTxnList(""),
+        writeIds, HdfsFileFormat.ORC);
+    fml.load();
+    // Only load the compacted file.
+    assertEquals(1, fml.getStats().loadedFiles);
+    // 2 * 8 files since the hidden '_orc_acid_version' is filtered out later.
+    assertEquals(16, fml.getStats().filesSupersededByAcidState);
   }
 
   @Test

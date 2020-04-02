@@ -81,6 +81,7 @@ import org.apache.impala.thrift.TUniqueId;
 import org.apache.impala.thrift.TUnit;
 import org.apache.impala.thrift.TUpdateCatalogCacheRequest;
 import org.apache.impala.thrift.TUpdateCatalogCacheResponse;
+import org.apache.impala.thrift.TValidWriteIdList;
 import org.apache.impala.util.ListMap;
 import org.apache.impala.util.TByteBuffer;
 import org.apache.thrift.TDeserializer;
@@ -703,7 +704,8 @@ public class CatalogdMetaProvider implements MetaProvider {
                 new ArrayList<>() : resp.table_info.sql_constraints.getForeign_keys();
             return new TableMetaRefImpl(
                 dbName, tableName, resp.table_info.hms_table, resp.object_version_number,
-                new SqlConstraints(primaryKeys, foreignKeys));
+                new SqlConstraints(primaryKeys, foreignKeys),
+                resp.table_info.valid_write_ids);
            }
       });
     return Pair.create(ref.msTable_, (TableMetaRef)ref);
@@ -1409,13 +1411,20 @@ public class CatalogdMetaProvider implements MetaProvider {
      */
     private final long catalogVersion_;
 
+    /**
+     * Valid write id list of ACID tables.
+     */
+    private final TValidWriteIdList validWriteIds_;
+
     public TableMetaRefImpl(String dbName, String tableName,
-        Table msTable, long catalogVersion, SqlConstraints sqlConstraints) {
+        Table msTable, long catalogVersion, SqlConstraints sqlConstraints,
+        TValidWriteIdList validWriteIds) {
       this.dbName_ = dbName;
       this.tableName_ = tableName;
       this.msTable_ = msTable;
       this.catalogVersion_ = catalogVersion;
       this.sqlConstraints_ = sqlConstraints;
+      this.validWriteIds_ = validWriteIds;
     }
 
     @Override
@@ -1639,5 +1648,12 @@ public class CatalogdMetaProvider implements MetaProvider {
       }
       return (int)size;
     }
+  }
+
+  @Override
+  public TValidWriteIdList getValidWriteIdList(TableMetaRef ref) {
+    Preconditions.checkArgument(ref instanceof TableMetaRefImpl,
+        "table ref %s was not created by CatalogdMetaProvider", ref);
+    return ((TableMetaRefImpl)ref).validWriteIds_;
   }
 }
