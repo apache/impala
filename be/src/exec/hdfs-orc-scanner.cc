@@ -41,8 +41,6 @@ using namespace impala::io;
 DEFINE_bool(enable_orc_scanner, true,
     "If false, reading from ORC format tables is not supported");
 
-const string HIVE_ACID_VERSION_KEY = "hive.acid.version";
-
 Status HdfsOrcScanner::IssueInitialRanges(HdfsScanNodeBase* scan_node,
     const vector<HdfsFileDesc*>& files) {
   DCHECK(!files.empty());
@@ -204,6 +202,19 @@ Status HdfsOrcScanner::Open(ScannerContext* context) {
   schema_resolver_.reset(new OrcSchemaResolver(*scan_node_->hdfs_table(),
       &reader_->getType(), filename(), is_table_full_acid, is_file_full_acid));
   RETURN_IF_ERROR(schema_resolver_->ValidateFullAcidFileSchema());
+
+  // Hive Streaming Ingestion allocates multiple write ids, hence create delta directories
+  // like delta_5_10. Then it continuously appends new stripes (and footers) to the
+  // ORC files of the delte dir. So it's possible that the file has rows that Impala is
+  // not allowed to see based on its valid write id list. In such cases we need to
+  // validate the write ids of the row batches.
+  if (is_table_full_acid && !ValidWriteIdList::IsCompacted(filename())) {
+    valid_write_ids_.InitFrom(scan_node_->hdfs_table()->ValidWriteIdList());
+    ValidWriteIdList::RangeResponse rows_valid =
+        valid_write_ids_.IsFileRangeValid(filename());
+    DCHECK_NE(rows_valid, ValidWriteIdList::NONE);
+    row_batches_need_validation_ = rows_valid == ValidWriteIdList::SOME;
+  }
 
   // Update 'row_reader_options_' based on the tuple descriptor so the ORC lib can skip
   // columns we don't need.
@@ -445,6 +456,7 @@ Status HdfsOrcScanner::SelectColumns(const TupleDescriptor& tuple_desc) {
   RETURN_IF_ERROR(ResolveColumns(tuple_desc, &selected_nodes, &pos_slots));
 
   for (auto t : selected_nodes) selected_type_ids_.push_back(t->getColumnId());
+
   // Select columns for array positions. Due to ORC-450 we can't materialize array
   // offsets without materializing its items, so we should still select the item or any
   // sub column of the item. To be simple, we choose the max column id in the subtree
@@ -467,6 +479,17 @@ Status HdfsOrcScanner::SelectColumns(const TupleDescriptor& tuple_desc) {
     VLOG(3) << "Add ORC column " << array_node->getMaximumColumnId() << " for "
         << PrintPath(*scan_node_->hdfs_table(), pos_slot_desc->col_path());
     selected_nodes.push_back(array_node);
+  }
+
+  // Select "CurrentTransaction" when we need to validate rows.
+  if (row_batches_need_validation_) {
+    // In case of zero-slot scans (e.g. count(*) over the table) we only select the
+    // 'currentTransaction' column.
+    if (scan_node_->IsZeroSlotTableScan()) selected_type_ids_.clear();
+    if (std::find(selected_type_ids_.begin(), selected_type_ids_.end(),
+        CURRENT_TRANSCACTION_TYPE_ID) == selected_type_ids_.end()) {
+      selected_type_ids_.push_back(CURRENT_TRANSCACTION_TYPE_ID);
+    }
   }
 
   COUNTER_SET(num_cols_counter_, static_cast<int64_t>(selected_type_ids_.size()));
@@ -494,7 +517,10 @@ Status HdfsOrcScanner::ProcessSplit() {
 }
 
 Status HdfsOrcScanner::GetNextInternal(RowBatch* row_batch) {
-  if (scan_node_->IsZeroSlotTableScan()) {
+  // In case 'row_batches_need_validation_' is true, we need to look at the row
+  // batches and check their validity. In that case 'currentTransaction' is the only
+  // selected field from the file (in case of zero slot scans).
+  if (scan_node_->IsZeroSlotTableScan() && !row_batches_need_validation_) {
     uint64_t file_rows = reader_->getNumberOfRows();
     // There are no materialized slots, e.g. count(*) over the table.  We can serve
     // this query from just the file metadata.  We don't need to read the column data.
@@ -741,7 +767,7 @@ Status HdfsOrcScanner::AllocateTupleMem(RowBatch* row_batch) {
 Status HdfsOrcScanner::AssembleCollection(
     const OrcComplexColumnReader& complex_col_reader, int row_idx,
     CollectionValueBuilder* coll_value_builder) {
-  int total_tuples = complex_col_reader.GetNumTuples(row_idx);
+  int total_tuples = complex_col_reader.GetNumChildValues(row_idx);
   if (!complex_col_reader.MaterializeTuple()) {
     // 'complex_col_reader' maps to a STRUCT or collection column of STRUCTs/collections
     // and there're no need to materialize current level tuples. Delegate the

@@ -84,7 +84,7 @@ Status OrcSchemaResolver::ResolveColumn(const SchemaPath& col_path,
   *node = root_;
   *pos_field = false;
   *missing_field = false;
-  DCHECK(ValidateFullAcidFileSchema().ok()); // Should have already been validated.
+  DCHECK_OK(ValidateFullAcidFileSchema()); // Should have already been validated.
   bool translate_acid_path = is_table_full_acid_ && is_file_full_acid_;
   int num_part_cols = tbl_desc_.num_clustering_cols();
   for (int i = 0; i < col_path.size(); ++i) {

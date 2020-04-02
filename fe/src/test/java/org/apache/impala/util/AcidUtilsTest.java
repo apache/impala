@@ -36,9 +36,11 @@ import org.apache.impala.compat.MetastoreShim;
 import org.hamcrest.Matchers;
 import org.junit.Assume;
 import org.junit.Test;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 public class AcidUtilsTest {
-
+  private static final Logger LOG = LoggerFactory.getLogger(AcidUtilsTest.class);
   /** Fake base path to root all FileStatuses under. */
   private static final Path BASE_PATH = new Path("file:///foo/bar/");
 
@@ -189,6 +191,36 @@ public class AcidUtilsTest {
           "delta_0000009_0000009_0000/0000/def.txt"});
   }
 
+  public void testStreamingIngest() {
+    assertFiltering(new String[]{
+      "delta_0000001_0000005/bucket_0000",
+      "delta_0000001_0000005/bucket_0001",
+      "delta_0000001_0000005/bucket_0002",
+      "delta_0000001_0000005_v01000/bucket_0000",
+      "delta_0000001_0000005_v01000/bucket_0001",
+      "delta_0000001_0000005_v01000/bucket_0002"},
+    "1100:1000:1000:", // txn 1000 is open
+    "default.test:10:10::", // write ids are committed
+    new String[]{
+      "delta_0000001_0000005/bucket_0000",
+      "delta_0000001_0000005/bucket_0001",
+      "delta_0000001_0000005/bucket_0002"});
+
+    assertFiltering(new String[]{
+      "delta_0000001_0000005/bucket_0000",
+      "delta_0000001_0000005/bucket_0001",
+      "delta_0000001_0000005/bucket_0002",
+      "delta_0000001_0000005_v01000/bucket_0000",
+      "delta_0000001_0000005_v01000/bucket_0001",
+      "delta_0000001_0000005_v01000/bucket_0002"},
+    "1100:::", // txn 1000 is committed
+    "default.test:10:10::", // write ids are committed
+    new String[]{
+      "delta_0000001_0000005_v01000/bucket_0000",
+      "delta_0000001_0000005_v01000/bucket_0001",
+      "delta_0000001_0000005_v01000/bucket_0002"});
+  }
+
   @Test
   public void testAbortedCompaction() {
     assertFiltering(new String[]{
@@ -272,14 +304,14 @@ public class AcidUtilsTest {
         "delta_000006_0000020/",
         "delta_000006_0000020/def.txt",
         "delta_000005.txt"};
-
-    // Only committed up to transaction 10, so skip the 6-20 delta.
+    // Only committed up to write id 10, so we can select 6-20 delta.
     assertFiltering(paths,
       "default.test:10:1234:1,2,3",
       new String[]{
           "delta_000005_0000005/abc.txt",
-          "delta_000005_0000005_0000/abc.txt",
-          "delta_000005.txt"});
+          "delta_000006_0000020/def.txt",
+          "delta_000005.txt",
+          });
   }
 
   @Test
@@ -339,37 +371,125 @@ public class AcidUtilsTest {
   }
 
   @Test
-  public void testMinorCompactionFail() {
-    filteringError(new String[]{
+  public void testMinorCompactionAllTxnsValid() {
+    assertFiltering(new String[]{
             "base_0000005/",
             "base_0000005/abc.txt",
-            "delta_0000006_0000007/",
-            "delta_0000006_0000007/00000"},
-        // all txns are valid
-        "",
+            "delta_0000006_0000006_v01000/00000",
+            "delta_0000007_0000007_v01000/00000",
+            "delta_0000006_0000007_v01000/00000"},
+        "", // all txns are valid
         // <tbl>:<hwm>:<minOpenWriteId>:<openWriteIds>:<abortedWriteIds>
         "default.test:10:1234:1,2,3",
-        "Table is minor compacted");
-    filteringError(new String[]{
+        new String[]{
+          "base_0000005/abc.txt",
+          "delta_0000006_0000007_v01000/00000"});
+    // Minor compact multi-statement transaction
+    assertFiltering(new String[]{
           "base_0000005/",
           "base_0000005/abc.txt",
-          "delta_0000006_0000007_00123/",
-          "delta_0000006_0000007_00123/00000"},
-        // all txns are valid
-        "",
+          "delta_0000006_0000006_00001/00000",  // statement id 1
+          "delta_0000006_0000006_00002/00000",  // statement id 2
+          "delta_0000006_0000006_00003/00000",  // statement id 3
+          "delta_0000006_0000006_v01000/00000", // compacted
+          "delta_0000006_0000006_v01000/00001"},
+        "", // all txns are valid
+        // <tbl>:<hwm>:<minOpenWriteId>:<openWriteIds>:<abortedWriteIds>
+        "default.test:10:1234:",
+        new String[]{
+          "base_0000005/abc.txt",
+          "delta_0000006_0000006_v01000/00000",
+          "delta_0000006_0000006_v01000/00001"});
+    // Disjunct minor compacted delta dirs
+    assertFiltering(new String[]{
+          "delta_0000001_0000001/00000",
+          "delta_0000002_0000002/00000",
+          "delta_0000003_0000003/00000",
+          "delta_0000004_0000004/00000",
+          "delta_0000005_0000005/00000",
+          "delta_0000006_0000006/00000",
+          "delta_0000007_0000007/00000",
+          "delta_0000001_0000003_v00100/00000",
+          "delta_0000004_0000005_v00101/00000",
+          "delta_0000001_0000005_v00102/00000",
+          "delta_0000006_0000007_v00123/00000",
+          "delta_0000006_0000007_v00123/00001"},
+        "", // all txns are valid
+        // <tbl>:<hwm>:<minOpenWriteId>:<openWriteIds>:<abortedWriteIds>
+        "default.test:10:1234:",
+        new String[]{
+          "delta_0000001_0000005_v00102/00000",
+          "delta_0000006_0000007_v00123/00000",
+          "delta_0000006_0000007_v00123/00001"});
+    // Compacted delta range contains aborted write id
+    assertFiltering(new String[]{
+      "delta_0000001_0000001/00000",
+      "delta_0000002_0000002/00000",
+      "delta_0000003_0000003/00000",
+      "delta_0000001_0000003_v01000/00000"},
+    "", // all txns are valid
+    // <tbl>:<hwm>:<minOpenWriteId>:<openWriteIds>:<abortedWriteIds>
+    "default.test:10:5::2",
+    new String[]{"delta_0000001_0000003_v01000/00000"});
+  }
+
+  @Test
+  public void testInProgressMinorCompactions() {
+    assertFiltering(new String[]{
+            "base_0000005/",
+            "base_0000005/abc.txt",
+            "delta_0000006_0000006/00000",
+            "delta_0000007_0000007/00000",
+            "delta_0000006_0000007_v100/00000"},
+        // Txns valid up to id 90, so 100 is invalid
+        "90:90::",
         // <tbl>:<hwm>:<minOpenWriteId>:<openWriteIds>:<abortedWriteIds>
         "default.test:10:1234:1,2,3",
-        "Table is minor compacted");
-    filteringError(new String[]{
+        new String[]{
+          "base_0000005/abc.txt",
+          "delta_0000006_0000006/00000",
+          "delta_0000007_0000007/00000"});
+    // Minor compact multi-statement transaction
+    assertFiltering(new String[]{
           "base_0000005/",
           "base_0000005/abc.txt",
-          "delta_0000006_0000007_v00123/",
-          "delta_0000006_0000007_v00123/00000"},
-        // all txns are valid
-        "",
+          "delta_0000006_0000006_00001/00000", // statement id 1
+          "delta_0000006_0000006_00002/00000", // statement id 2
+          "delta_0000006_0000006_00003/00000", // statement id 3
+          "delta_0000006_0000006_v100/00000",  // no statement id => compacted
+          "delta_0000006_0000006_v100/00001"},
+        // Txn 100 is invalid
+        "110:100:100:",
         // <tbl>:<hwm>:<minOpenWriteId>:<openWriteIds>:<abortedWriteIds>
-        "default.test:10:1234:1,2,3",
-        "Table is minor compacted");
+        "default.test:10:1234:",
+        new String[]{
+          "base_0000005/abc.txt",
+          "delta_0000006_0000006_00001/00000",
+          "delta_0000006_0000006_00002/00000",
+          "delta_0000006_0000006_00003/00000"});
+    // Disjunct minor compacted delta dirs
+    assertFiltering(new String[]{
+          "delta_0000001_0000001/00000",
+          "delta_0000002_0000002/00000",
+          "delta_0000003_0000003/00000",
+          "delta_0000004_0000004/00000",
+          "delta_0000005_0000005/00000",
+          "delta_0000006_0000006/00000",
+          "delta_0000007_0000007/00000",
+          "delta_0000001_0000003_v00100/00000",
+          "delta_0000004_0000005_v00101/00000",
+          "delta_0000001_0000005_v00102/00000",
+          "delta_0000006_0000007_v00123/00000",
+          "delta_0000006_0000007_v00123/00001"},
+        // Txn 102 is invalid (minor compaction 1-5)
+        "130:102:102:",
+        // <tbl>:<hwm>:<minOpenWriteId>:<openWriteIds>:<abortedWriteIds>
+        "default.test:10:1234:",
+        new String[]{
+          "delta_0000001_0000003_v00100/00000",
+          "delta_0000004_0000005_v00101/00000",
+          "delta_0000006_0000007_v00123/00000",
+          "delta_0000006_0000007_v00123/00001"});
   }
 
   @Test
@@ -400,7 +520,6 @@ public class AcidUtilsTest {
         // <table>:<highWaterMark>:<minOpenWriteId>
         "default.test:20:15::",
         new String[]{
-            // No minor compactions after base directory so it should succeed.
             "base_000010/0000_0",
             "delta_0000012_0000012_0000/0000_0",
             "delta_0000012_0000012_0000/0000_1"});

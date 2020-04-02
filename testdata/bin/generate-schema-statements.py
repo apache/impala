@@ -654,7 +654,7 @@ def generate_statements(output_name, test_vectors, sections,
       create_file_format = file_format
       create_codec = codec
       if not (section['LOAD'] or section['DEPENDENT_LOAD']
-              or section['DEPENDENT_LOAD_HIVE']):
+              or section['DEPENDENT_LOAD_HIVE'] or section['DEPENDENT_LOAD_ACID']):
         create_codec = 'none'
         create_file_format = file_format
         if file_format not in IMPALA_SUPPORTED_INSERT_FORMATS:

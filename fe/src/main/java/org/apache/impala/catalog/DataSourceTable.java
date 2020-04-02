@@ -20,6 +20,7 @@ package org.apache.impala.catalog;
 import java.util.List;
 import java.util.Set;
 
+import org.apache.hadoop.hive.common.ValidWriteIdList;
 import org.apache.hadoop.hive.metastore.IMetaStoreClient;
 import org.apache.hadoop.hive.metastore.api.FieldSchema;
 import org.slf4j.Logger;
@@ -113,7 +114,7 @@ public class DataSourceTable extends Table implements FeDataSourceTable {
   }
 
   @Override
-  public String getValidWriteIds() {
+  public ValidWriteIdList getValidWriteIds() {
     return null;
   }
 

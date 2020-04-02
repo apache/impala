@@ -28,6 +28,21 @@ namespace impala {
 
 class HdfsOrcScanner;
 
+class OrcRowValidator {
+ public:
+  OrcRowValidator(const ValidWriteIdList& valid_write_ids) :
+      valid_write_ids_(valid_write_ids) {}
+
+  void UpdateTransactionBatch(orc::LongVectorBatch* batch) {
+    write_ids_ = batch;
+  }
+
+  bool IsRowBatchValid() const;
+ private:
+  const ValidWriteIdList& valid_write_ids_;
+  orc::LongVectorBatch* write_ids_;
+};
+
 /// Base class for reading an ORC column. Each column reader will keep track of an
 /// orc::ColumnVectorBatch and transfer its values into Impala internals(tuples/slots).
 ///
@@ -486,7 +501,7 @@ class OrcComplexColumnReader : public OrcBatchedReader<OrcComplexColumnReader> {
 
   /// Num of tuples inside the 'row_idx'-th row. LIST/MAP types will have 0 to N tuples.
   /// STRUCT type will always have one tuple.
-  virtual int GetNumTuples(int row_idx) const = 0;
+  virtual int GetNumChildValues(int row_idx) const = 0;
 
   /// Collection values (array items, map keys/values) are concatenated in the child's
   /// batch. Get the start offset of values inside the 'row_idx'-th collection.
@@ -551,7 +566,7 @@ class OrcStructReader : public OrcComplexColumnReader {
   /// Whether we've finished reading the current orc batch.
   bool EndOfBatch();
 
-  int GetNumTuples(int row_idx) const override { return 1; }
+  int GetNumChildValues(int row_idx) const final { return 1; }
 
   int GetChildBatchOffset(int row_idx) const override { return row_idx; }
 
@@ -561,6 +576,7 @@ class OrcStructReader : public OrcComplexColumnReader {
     OrcColumnReader* child = children()[0];
     return child->NumElements();
   }
+
  private:
   orc::StructVectorBatch* batch_ = nullptr;
 
@@ -569,6 +585,9 @@ class OrcStructReader : public OrcComplexColumnReader {
 
   /// Keep row index if we're top level readers
   int row_idx_;
+
+  int current_write_id_field_index_ = -1;
+  std::unique_ptr<OrcRowValidator> row_validator_;
 
   void SetNullSlot(Tuple* tuple) override {
     for (OrcColumnReader* child : children_) child->SetNullSlot(tuple);
@@ -580,6 +599,8 @@ class OrcStructReader : public OrcComplexColumnReader {
   /// '*child' and its index inside the children. Returns false for not found.
   inline bool FindChild(const orc::Type& curr_node, const SchemaPath& child_path,
       const orc::Type** child, int* field);
+
+  Status ReadAndValidateRows(ScratchTupleBatch* scratch_batch, MemPool* pool);
 };
 
 class OrcCollectionReader : public OrcComplexColumnReader {
@@ -628,14 +649,14 @@ class OrcListReader : public OrcCollectionReader {
 
   Status ReadValue(int row_idx, Tuple* tuple, MemPool* pool) final WARN_UNUSED_RESULT;
 
-  int GetNumTuples(int row_idx) const override;
+  int GetNumChildValues(int row_idx) const final;
 
   int GetChildBatchOffset(int row_idx) const override;
 
   Status ReadChildrenValue(int row_idx, int tuple_idx, Tuple* tuple, MemPool* pool)
       const override WARN_UNUSED_RESULT;
 
-  virtual int NumElements() const final;
+  int NumElements() const final;
  private:
   Status SetPositionSlot(int row_idx, Tuple* tuple);
 
@@ -662,14 +683,14 @@ class OrcMapReader : public OrcCollectionReader {
 
   Status ReadValue(int row_idx, Tuple* tuple, MemPool* pool) final WARN_UNUSED_RESULT;
 
-  int GetNumTuples(int row_idx) const override;
+  int GetNumChildValues(int row_idx) const final;
 
   int GetChildBatchOffset(int row_idx) const override;
 
   Status ReadChildrenValue(int row_idx, int tuple_idx, Tuple* tuple, MemPool* pool)
       const override WARN_UNUSED_RESULT;
 
-  virtual int NumElements() const final;
+  int NumElements() const final;
  private:
   orc::MapVectorBatch* batch_ = nullptr;
   vector<OrcColumnReader*> key_readers_;

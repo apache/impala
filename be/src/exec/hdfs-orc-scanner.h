@@ -26,6 +26,7 @@
 #include "runtime/exec-env.h"
 #include "runtime/io/disk-io-mgr.h"
 #include "runtime/runtime-state.h"
+#include "exec/acid-metadata-utils.h"
 #include "exec/hdfs-columnar-scanner.h"
 #include "exec/hdfs-scan-node.h"
 #include "exec/orc-metadata-utils.h"
@@ -215,6 +216,16 @@ class HdfsOrcScanner : public HdfsColumnarScanner {
 
   /// Scan range for the metadata (file tail).
   const io::ScanRange* metadata_range_ = nullptr;
+
+  /// With the help of it we can check the validity of ACID write ids.
+  ValidWriteIdList valid_write_ids_;
+
+  /// True if we need to validate the row batches against the valid write id list. This
+  /// only needs to be done for Hive Streaming Ingestion. The 'write id' will be the same
+  /// within a stripe, but we still need to read the row batches for validation because
+  /// there are no statistics written.
+  /// For files not written by Streaming Ingestion we can assume that every row is valid.
+  bool row_batches_need_validation_ = false;
 
   /// Timer for materializing rows. This ignores time getting the next buffer.
   ScopedTimer<MonotonicStopWatch> assemble_rows_timer_;

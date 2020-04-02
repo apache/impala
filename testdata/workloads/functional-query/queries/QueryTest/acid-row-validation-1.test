@@ -1,0 +1,17 @@
+====
+---- QUERY
+refresh streaming;
+select * from streaming;
+---- RESULTS
+'a1','b2'
+'a3','b4'
+---- TYPES
+STRING, STRING
+====
+---- QUERY
+select count(*) from streaming;
+---- RESULTS
+2
+---- TYPES
+BIGINT
+====

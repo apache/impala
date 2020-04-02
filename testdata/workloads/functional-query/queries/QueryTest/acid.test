@@ -111,3 +111,28 @@ show tables;
 ---- RESULTS
 'upgraded_table'
 ====
+---- QUERY
+# Test reading minor-compacted table.
+show files in functional_orc_def.complextypestbl_minor_compacted;
+---- LABELS
+Path,Size,Partition
+---- RESULTS
+row_regex:'$NAMENODE/test-warehouse/managed/complextypestbl_minor_compacted_orc_def/delta_0000001_0000008_v\d+/bucket_00000','.+KB',''
+---- TYPES
+STRING,STRING,STRING
+====
+---- QUERY
+select row__id.originaltransaction, id
+from functional_orc_def.complextypestbl_minor_compacted;
+---- RESULTS
+1,1
+2,2
+3,3
+4,4
+5,5
+6,6
+7,7
+8,8
+---- TYPES
+BIGINT,BIGINT
+====

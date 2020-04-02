@@ -257,7 +257,7 @@ public class StmtMetadataLoader {
           if (AcidUtils.isTransactionalTable(iTbl.getMetaStoreTable().getParameters())) {
             validIdsBuf.append("\n");
             validIdsBuf.append("           ");
-            validIdsBuf.append(iTbl.getValidWriteIds());
+            validIdsBuf.append(iTbl.getValidWriteIds().writeToString());
             hasAcidTbls = true;
           }
         }

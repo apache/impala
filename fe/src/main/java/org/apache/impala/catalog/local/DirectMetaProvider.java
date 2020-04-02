@@ -24,6 +24,7 @@ import java.util.List;
 import java.util.Map;
 import java.util.Set;
 
+import org.apache.commons.lang.NotImplementedException;
 import org.apache.hadoop.fs.Path;
 import org.apache.hadoop.hive.metastore.api.ColumnStatisticsObj;
 import org.apache.hadoop.hive.metastore.api.Database;
@@ -46,6 +47,7 @@ import org.apache.impala.compat.MetastoreShim;
 import org.apache.impala.service.BackendConfig;
 import org.apache.impala.thrift.TBackendGflags;
 import org.apache.impala.thrift.TNetworkAddress;
+import org.apache.impala.thrift.TValidWriteIdList;
 import org.apache.impala.util.ListMap;
 import org.apache.impala.util.MetaStoreUtil;
 import org.apache.thrift.TException;
@@ -396,5 +398,11 @@ class DirectMetaProvider implements MetaProvider {
     private boolean isPartitioned() {
       return msTable_.getPartitionKeysSize() != 0;
     }
+  }
+
+  @Override
+  public TValidWriteIdList getValidWriteIdList(TableMetaRef ref) {
+    throw new NotImplementedException(
+        "getValidWriteIdList() is not implemented for DirectMetaProvider");
   }
 }

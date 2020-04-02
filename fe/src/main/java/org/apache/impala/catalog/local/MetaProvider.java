@@ -33,6 +33,7 @@ import org.apache.impala.catalog.HdfsPartition.FileDescriptor;
 import org.apache.impala.catalog.SqlConstraints;
 import org.apache.impala.common.Pair;
 import org.apache.impala.thrift.TNetworkAddress;
+import org.apache.impala.thrift.TValidWriteIdList;
 import org.apache.impala.util.ListMap;
 import org.apache.thrift.TException;
 
@@ -144,4 +145,6 @@ public interface MetaProvider {
     byte[] getPartitionStats();
     boolean hasIncrementalStats();
   }
+
+  public TValidWriteIdList getValidWriteIdList(TableMetaRef ref);
 }

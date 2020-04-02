@@ -264,10 +264,10 @@ public class FileMetadataLoader {
     public int uncommittedAcidFilesSkipped = 0;
 
     /**
-     * Number of files skipped because they pertain to ACID directories superceded
-     * by later base data.
+     * Number of files skipped because they pertain to ACID directories superseded
+     * by compaction or newer base.
      */
-    public int filesSupercededByNewerBase = 0;
+    public int filesSupersededByAcidState = 0;
 
     // Number of files for which the metadata was loaded.
     public int loadedFiles = 0;
@@ -293,7 +293,7 @@ public class FileMetadataLoader {
         .add("hidden files", nullIfZero(hiddenFiles))
         .add("skipped files", nullIfZero(skippedFiles))
         .add("uncommited files", nullIfZero(uncommittedAcidFilesSkipped))
-        .add("superceded files", nullIfZero(filesSupercededByNewerBase))
+        .add("superceded files", nullIfZero(filesSupersededByAcidState))
         .add("unknown diskIds", nullIfZero(unknownDiskIds))
         .omitNullValues()
         .toString();

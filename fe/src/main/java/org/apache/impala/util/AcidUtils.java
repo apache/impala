@@ -31,13 +31,18 @@ import org.apache.impala.catalog.ScalarType;
 import org.apache.impala.catalog.StructField;
 import org.apache.impala.catalog.StructType;
 import org.apache.impala.common.FileSystemUtil;
-import org.apache.impala.thrift.TQueryOptions;
+import org.apache.impala.common.Pair;
 import org.apache.impala.thrift.TTransactionalType;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 import java.util.ArrayList;
+import java.util.Comparator;
+import java.util.HashSet;
 import java.util.Iterator;
 import java.util.List;
 import java.util.Map;
+import java.util.Set;
 import java.util.function.Predicate;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
@@ -52,6 +57,7 @@ import javax.annotation.Nullable;
  * </p>
  */
 public class AcidUtils {
+  private final static Logger LOG = LoggerFactory.getLogger(AcidUtils.class);
   // Constant also defined in TransactionalValidationListener
   public static final String INSERTONLY_TRANSACTIONAL_PROPERTY = "insert_only";
   // Constant also defined in hive_metastoreConstants
@@ -85,7 +91,8 @@ public class AcidUtils {
       "delta_" +
       "(?<minWriteId>\\d+)_" +
       "(?<maxWriteId>\\d+)" +
-      "(?:_(?<optionalStatementId>\\d+)|_v(?<visibilityTxnId>\\d+))?" +
+      // Statement id, or visiblityTxnId
+      "(?:_(?<statementId>\\d+)|_v(?<visibilityTxnId>\\d+))?" +
       // Optional path suffix.
       "(?:/.*)?";
 
@@ -181,9 +188,10 @@ public class AcidUtils {
       } else {
         ParsedDelta pd = parseDelta(dirPath);
         if (pd != null) {
+          if (!isTxnValid(pd.visibilityTxnId)) return false;
           ValidWriteIdList.RangeResponse rr =
               writeIdList.isWriteIdRangeValid(pd.minWriteId, pd.maxWriteId);
-          return rr.equals(ValidWriteIdList.RangeResponse.ALL);
+          return rr != ValidWriteIdList.RangeResponse.NONE;
         }
       }
       // If it wasn't in a base or a delta directory, we should include it.
@@ -232,15 +240,17 @@ public class AcidUtils {
   private static final class ParsedDelta {
     final long minWriteId;
     final long maxWriteId;
-    /**
-     * Negative value indicates there was no statement id.
-     */
+    /// Value -1 means there is no statement id.
     final long statementId;
+    /// Value -1 means there is no visibility txn id.
+    final long visibilityTxnId;
 
-    ParsedDelta(long minWriteId, long maxWriteId, long statementId) {
+    ParsedDelta(long minWriteId, long maxWriteId, long statementId,
+        long visibilityTxnId) {
       this.minWriteId = minWriteId;
       this.maxWriteId = maxWriteId;
       this.statementId = statementId;
+      this.visibilityTxnId = visibilityTxnId;
     }
   }
 
@@ -250,9 +260,12 @@ public class AcidUtils {
     }
     long minWriteId = Long.valueOf(deltaMatcher.group("minWriteId"));
     long maxWriteId = Long.valueOf(deltaMatcher.group("maxWriteId"));
-    String statementIdStr = deltaMatcher.group("optionalStatementId");
+    String statementIdStr = deltaMatcher.group("statementId");
     long statementId = statementIdStr != null ? Long.valueOf(statementIdStr) : -1;
-    return new ParsedDelta(minWriteId, maxWriteId, statementId);
+    String visibilityTxnIdStr = deltaMatcher.group("visibilityTxnId");
+    long visibilityTxnId = visibilityTxnIdStr != null ?
+        Long.valueOf(visibilityTxnIdStr) : -1;
+    return new ParsedDelta(minWriteId, maxWriteId, statementId, visibilityTxnId);
   }
 
   private static ParsedDelta parseDelta(String dirPath) {
@@ -261,6 +274,15 @@ public class AcidUtils {
 
   private static ParsedDelta parseDeleteDelta(String dirPath) {
     return matcherToParsedDelta(DELETE_DELTA_PATTERN.matcher(dirPath));
+  }
+
+  private static String getFirstDirName(String relPath) {
+    int slashIdx = relPath.indexOf("/");
+    if (slashIdx != -1) {
+      return relPath.substring(0, slashIdx);
+    } else {
+      return null;
+    }
   }
 
   /**
@@ -278,13 +300,13 @@ public class AcidUtils {
   public static List<FileStatus> filterFilesForAcidState(List<FileStatus> stats,
       Path baseDir, ValidTxnList validTxnList, ValidWriteIdList writeIds,
       @Nullable LoadStats loadStats) throws MetaException {
-    List<FileStatus> validStats = new ArrayList<>(stats);
-
     // First filter out any paths that are not considered valid write IDs.
-    // At the same time, calculate the max valid base write ID.
+    // At the same time, calculate the max valid base write ID and collect the names of
+    // the delta directories.
     Predicate<String> pred = new WriteListBasedPredicate(validTxnList, writeIds);
     long maxBaseWriteId = Long.MIN_VALUE;
-    for (Iterator<FileStatus> it = validStats.iterator(); it.hasNext(); ) {
+    Set<String> deltaDirNames = new HashSet<>();
+    for (Iterator<FileStatus> it = stats.iterator(); it.hasNext();) {
       FileStatus stat = it.next();
       String relPath = FileSystemUtil.relativizePath(stat.getPath(), baseDir);
       if (!pred.test(relPath)) {
@@ -292,13 +314,30 @@ public class AcidUtils {
         if (loadStats != null) loadStats.uncommittedAcidFilesSkipped++;
         continue;
       }
-
       maxBaseWriteId = Math.max(getBaseWriteId(relPath), maxBaseWriteId);
+      String dirName = getFirstDirName(relPath);
+      if (dirName != null && (dirName.startsWith("delta_") ||
+          dirName.startsWith("delete_delta_"))) {
+        deltaDirNames.add(dirName);
+      }
     }
+    // Get a list of all valid delta directories.
+    List<Pair<String, ParsedDelta>> deltas =
+        getValidDeltaDirsOrdered(deltaDirNames, maxBaseWriteId, writeIds);
+    // Filter out delta directories superceded by major/minor compactions.
+    Set<String> filteredDeltaDirs =
+        getFilteredDeltaDirs(deltas, maxBaseWriteId, writeIds);
+    // Filter out any files that are superceded by the latest valid base or not located
+    // in 'filteredDeltaDirs'.
+    return filterFilesForAcidState(stats, baseDir, maxBaseWriteId, filteredDeltaDirs,
+        loadStats);
+  }
 
-    // Filter out any files that are superceded by the latest valid base,
-    // as well as any directories.
-    for (Iterator<FileStatus> it = validStats.iterator(); it.hasNext(); ) {
+  private static List<FileStatus> filterFilesForAcidState(List<FileStatus> stats,
+      Path baseDir, long maxBaseWriteId, Set<String> deltaDirs,
+      @Nullable LoadStats loadStats) {
+    List<FileStatus> validStats = new ArrayList<>(stats);
+    for (Iterator<FileStatus> it = validStats.iterator(); it.hasNext();) {
       FileStatus stat = it.next();
 
       if (stat.isDirectory()) {
@@ -307,39 +346,26 @@ public class AcidUtils {
       }
 
       String relPath = FileSystemUtil.relativizePath(stat.getPath(), baseDir);
+      if (relPath.startsWith("delta_") ||
+          relPath.startsWith("delete_delta_")) {
+        String dirName = getFirstDirName(relPath);
+        if (dirName != null && !deltaDirs.contains(dirName)) {
+          it.remove();
+          if (loadStats != null) loadStats.filesSupersededByAcidState++;
+        }
+        continue;
+      }
       long baseWriteId = getBaseWriteId(relPath);
       if (baseWriteId != SENTINEL_BASE_WRITE_ID) {
         if (baseWriteId < maxBaseWriteId) {
           it.remove();
-          if (loadStats != null) loadStats.filesSupercededByNewerBase++;
+          if (loadStats != null) loadStats.filesSupersededByAcidState++;
         }
         continue;
-      }
-      ParsedDelta parsedDelta = parseDelta(relPath);
-      if (parsedDelta != null) {
-        if (parsedDelta.minWriteId <= maxBaseWriteId) {
-          it.remove();
-          if (loadStats != null) loadStats.filesSupercededByNewerBase++;
-        } else if (parsedDelta.minWriteId != parsedDelta.maxWriteId) {
-          // TODO(IMPALA-9512): Validate rows in minor compacted deltas.
-          // We could read the non-compacted delta directories, but we'd need to check
-          // that all of them still exists. Let's throw an error on minor compacted tables
-          // for now since we want to read minor compacted deltas in the near future.
-          throw new MetaException("Table is minor compacted which is not supported " +
-              "by Impala. Run major compaction to resolve this.");
-        }
-        continue;
-      }
-      ParsedDelta deleteDelta = parseDeleteDelta(relPath);
-      if (deleteDelta != null) {
-        if (deleteDelta.maxWriteId > maxBaseWriteId) {
-          throw new MetaException("Table has deleted rows. It's currently not " +
-              "supported by Impala. Run major compaction to resolve this.");
-        }
       }
 
-      // Not in a base or a delta directory. In that case, it's probably a post-upgrade
-      // file.
+      // Not in a base or a delta directory. In that case, it's probably a
+      // post-upgrade file.
       // If there is no valid base: we should read the file (assuming that
       // hive.mm.allow.originals == true)
       // If there is a valid base: the file should be merged to the base by the
@@ -348,5 +374,142 @@ public class AcidUtils {
       if (maxBaseWriteId != SENTINEL_BASE_WRITE_ID) it.remove();
     }
     return validStats;
+  }
+
+  private static List<Pair<String, ParsedDelta>> getValidDeltaDirsOrdered(
+      Set<String> deltaDirNames, long baseWriteId, ValidWriteIdList writeIds)
+      throws MetaException {
+    List <Pair<String, ParsedDelta>> deltas = new ArrayList<>();
+    for (Iterator<String> it = deltaDirNames.iterator(); it.hasNext();) {
+      String dirname = it.next();
+      ParsedDelta parsedDelta = parseDelta(dirname);
+      if (parsedDelta != null) {
+        if (parsedDelta.minWriteId <= baseWriteId) {
+          Preconditions.checkState(parsedDelta.maxWriteId <= baseWriteId);
+          it.remove();
+          continue;
+        }
+        deltas.add(new Pair<String, ParsedDelta>(dirname, parsedDelta));
+        continue;
+      }
+      ParsedDelta deleteDelta = parseDeleteDelta(dirname);
+      if (deleteDelta != null) {
+        if (deleteDelta.maxWriteId > baseWriteId) {
+          throw new MetaException("Table has deleted rows. It's currently not "
+              + "supported by Impala. Run major compaction to resolve this.");
+        }
+      }
+    }
+
+    deltas.sort(new Comparator<Pair<String, ParsedDelta>>() {
+      // This compare method is based on Hive (d6ad73c3615)
+      // AcidUtils.ParsedDeltaLight.compareTo()
+      // One additon to it is to take the visbilityTxnId into consideration. Hence if
+      // there's delta_N_M and delta_N_M_v001234 then delta_N_M_v001234 must be ordered
+      // before.
+      @Override
+      public int compare(Pair<String, ParsedDelta> o1, Pair<String, ParsedDelta> o2) {
+        ParsedDelta pd1 = o1.second;
+        ParsedDelta pd2 = o2.second;
+        if (pd1.minWriteId != pd2.minWriteId) {
+          if (pd1.minWriteId < pd2.minWriteId) {
+            return -1;
+          } else {
+            return 1;
+          }
+        } else if (pd1.maxWriteId != pd2.maxWriteId) {
+          if (pd1.maxWriteId < pd2.maxWriteId) {
+            return 1;
+          } else {
+            return -1;
+          }
+        } else if (pd1.statementId != pd2.statementId) {
+          /**
+           * We want deltas after minor compaction (w/o statementId) to sort earlier so
+           * that getAcidState() considers compacted files (into larger ones) obsolete
+           * Before compaction, include deltas with all statementIds for a given writeId.
+           */
+          if (pd1.statementId < pd2.statementId) {
+            return -1;
+          } else {
+            return 1;
+          }
+        } else if (pd1.visibilityTxnId != pd2.visibilityTxnId) {
+          // This is an alteration from Hive's algorithm. If everything is the same then
+          // the higher visibilityTxnId wins (since no visibiltyTxnId is -1).
+          // Currently this cannot happen since Hive doesn't minor compact standalone
+          // delta directories of streaming ingestion, i.e. the following cannot happen:
+          // delta_1_5 => delta_1_5_v01234
+          // However, it'd make sense because streaming ingested ORC files doesn't use
+          // advanced features like dictionary encoding or statistics. Hence Hive might
+          // do that in the future and that'd make Impala seeing duplicate rows.
+          // So I'd be cautious here in case they forget to tell us.
+          if (pd1.visibilityTxnId < pd2.visibilityTxnId) {
+            return 1;
+          } else {
+            return -1;
+          }
+        } else {
+          return o1.first.compareTo(o2.first);
+        }
+      }
+    });
+    return deltas;
+  }
+
+  /**
+   * The algorithm is copied from Hive's (d6ad73c3615)
+   * org.apache.hadoop.hive.ql.io.AcidUtils.getAcidState()
+   * One additon to it is to take the visbilityTxnId into consideration. Hence if
+   * there's delta_N_M_v001234 and delta_N_M then it ignores delta_N_M.
+   */
+  private static Set<String> getFilteredDeltaDirs(List<Pair<String, ParsedDelta>> deltas,
+      long baseWriteId, ValidWriteIdList writeIds) {
+    long current = baseWriteId;
+    long lastStmtId = -1;
+    ParsedDelta prev = null;
+    Set<String> filteredDeltaDirs = new HashSet<>();
+    for (Pair<String, ParsedDelta> pathDelta : deltas) {
+      ParsedDelta next = pathDelta.second;
+      if (next.maxWriteId > current) {
+        // are any of the new transactions ones that we care about?
+        if (writeIds.isWriteIdRangeValid(current + 1, next.maxWriteId) !=
+            ValidWriteIdList.RangeResponse.NONE) {
+          filteredDeltaDirs.add(pathDelta.first);
+          current = next.maxWriteId;
+          lastStmtId = next.statementId;
+          prev = next;
+        }
+      } else if (next.maxWriteId == current && lastStmtId >= 0) {
+        // make sure to get all deltas within a single transaction; multi-statement txn
+        // generate multiple delta files with the same txnId range
+        // of course, if maxWriteId has already been minor compacted, all per statement
+        // deltas are obsolete
+        filteredDeltaDirs.add(pathDelta.first);
+        prev = next;
+      } else if (prev != null && next.maxWriteId == prev.maxWriteId &&
+          next.minWriteId == prev.minWriteId &&
+          next.statementId == prev.statementId &&
+          // If visibilityTxnId differs, then 'pathDelta' is probably a streaming ingested
+          // delta directory and 'prev' is the compacted version of it.
+          next.visibilityTxnId == prev.visibilityTxnId) {
+        // The 'next' parsedDelta may have everything equal to the 'prev' parsedDelta,
+        // except
+        // the path. This may happen when we have split update and we have two types of
+        // delta
+        // directories- 'delta_x_y' and 'delete_delta_x_y' for the SAME txn range.
+
+        // Also note that any delete_deltas in between a given delta_x_y range would be
+        // made
+        // obsolete. For example, a delta_30_50 would make delete_delta_40_40 obsolete.
+        // This is valid because minor compaction always compacts the normal deltas and
+        // the delete deltas for the same range. That is, if we had 3 directories,
+        // delta_30_30, delete_delta_40_40 and delta_50_50, then running minor compaction
+        // would produce delta_30_50 and delete_delta_30_50.
+        filteredDeltaDirs.add(pathDelta.first);
+        prev = next;
+      }
+    }
+    return filteredDeltaDirs;
   }
 }

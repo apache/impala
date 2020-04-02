@@ -59,6 +59,7 @@ import org.apache.impala.thrift.TNetworkAddress;
 import org.apache.impala.thrift.TResultSet;
 import org.apache.impala.thrift.TTableDescriptor;
 import org.apache.impala.thrift.TTableType;
+import org.apache.impala.thrift.TValidWriteIdList;
 import org.apache.impala.util.AcidUtils;
 import org.apache.impala.util.AvroSchemaConverter;
 import org.apache.impala.util.AvroSchemaUtils;
@@ -327,6 +328,12 @@ public class LocalFsTable extends LocalTable implements FeFsTable {
     TTableDescriptor tableDesc = new TTableDescriptor(tableId, TTableType.HDFS_TABLE,
         FeCatalogUtils.getTColumnDescriptors(this),
         getNumClusteringCols(), name_, db_.getName());
+    // 'ref_' can be null when this table is the target of a CTAS statement.
+    if (ref_ != null) {
+      TValidWriteIdList validWriteIdList =
+          db_.getCatalog().getMetaProvider().getValidWriteIdList(ref_);
+      if (validWriteIdList != null) hdfsTable.setValid_write_ids(validWriteIdList);
+    }
     tableDesc.setHdfsTable(hdfsTable);
     return tableDesc;
   }

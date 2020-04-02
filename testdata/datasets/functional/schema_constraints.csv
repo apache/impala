@@ -78,6 +78,7 @@ table_name:complextypes_multifileformat, constraint:restrict_to, table_format:te
 # TODO: Avro
 table_name:complextypestbl, constraint:restrict_to, table_format:parquet/none/none
 table_name:complextypestbl, constraint:restrict_to, table_format:orc/def/block
+table_name:complextypestbl_minor_compacted, constraint:restrict_to, table_format:orc/def/block
 table_name:complextypestbl_medium, constraint:restrict_to, table_format:parquet/none/none
 table_name:complextypestbl_medium, constraint:restrict_to, table_format:orc/def/block
 table_name:complextypestbl_non_transactional, constraint:restrict_to, table_format:orc/def/block

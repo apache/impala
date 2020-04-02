@@ -236,6 +236,7 @@ HdfsTableDescriptor::HdfsTableDescriptor(const TTableDescriptor& tdesc, ObjectPo
     tdesc.hdfsTable, tdesc.hdfsTable.prototype_partition));
   avro_schema_ = tdesc.hdfsTable.__isset.avroSchema ? tdesc.hdfsTable.avroSchema : "";
   is_full_acid_ = tdesc.hdfsTable.is_full_acid;
+  valid_write_id_list_ = tdesc.hdfsTable.valid_write_ids;
 }
 
 void HdfsTableDescriptor::ReleaseResources() {

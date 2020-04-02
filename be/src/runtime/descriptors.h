@@ -331,6 +331,8 @@ class HdfsTableDescriptor : public TableDescriptor {
 
   bool IsTableFullAcid() const { return is_full_acid_; }
 
+  const TValidWriteIdList& ValidWriteIdList() const { return valid_write_id_list_; }
+
   virtual std::string DebugString() const;
 
  protected:
@@ -343,6 +345,7 @@ class HdfsTableDescriptor : public TableDescriptor {
   /// Set to the table's Avro schema if this is an Avro table, empty string otherwise
   std::string avro_schema_;
   bool is_full_acid_;
+  TValidWriteIdList valid_write_id_list_;
 };
 
 class HBaseTableDescriptor : public TableDescriptor {
