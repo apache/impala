@@ -471,3 +471,8 @@ fi
 cd "$HADOOP_LZO_HOME"
 time -p ant package
 cd "$IMPALA_HOME"
+
+# Try to prepopulate the m2 directory to save time
+if ! bin/jenkins/populate_m2_directory.py ; then
+  echo "Failed to prepopulate the m2 directory. Continuing..."
+fi

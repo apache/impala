@@ -32,6 +32,8 @@ export IMPALA_MAVEN_OPTIONS="-U"
 
 . bin/impala-config.sh
 
+: ${GENERATE_M2_ARCHIVE:=false}
+
 # These are configurations for buildall.
 CONFIGS=(
   # Test gcc builds with and without -so:
@@ -46,14 +48,19 @@ CONFIGS=(
 
 FAILED=""
 
+if [[ "$GENERATE_M2_ARCHIVE" == true ]]; then
+  # The m2 archive relies on parsing the maven log to get a list of jars downloaded
+  # from particular repositories. To accurately produce the archive every time, we
+  # need to clear out the ~/.m2 directory before producing the archive.
+  rm -rf ~/.m2
+fi
+
 TMP_DIR=$(mktemp -d)
 function onexit {
   echo "$0: Cleaning up temporary directory"
   rm -rf ${TMP_DIR}
 }
 trap onexit EXIT
-
-mkdir -p ${TMP_DIR}
 
 for CONFIG in "${CONFIGS[@]}"; do
   DESCRIPTION="Options $CONFIG"
@@ -91,7 +98,9 @@ then
   exit 1
 fi
 
-# Make a tarball of the .m2 directory
-bin/jenkins/archive_m2_directory.sh logs/mvn/mvn_accumulated.log logs/m2_archive.tar.gz
+if [[ "$GENERATE_M2_ARCHIVE" == true ]]; then
+  # Make a tarball of the .m2 directory
+  bin/jenkins/archive_m2_directory.sh logs/mvn/mvn_accumulated.log logs/m2_archive.tar.gz
+fi
 
 # Note: The exit callback handles cleanup of the temp directory.

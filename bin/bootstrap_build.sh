@@ -54,4 +54,9 @@ if [ ! -d /usr/local/apache-maven-3.5.4 ]; then
   sudo ln -s /usr/local/apache-maven-3.5.4/bin/mvn /usr/local/bin
 fi
 
+# Try to prepopulate the m2 directory to save time
+if ! bin/jenkins/populate_m2_directory.py ; then
+  echo "Failed to prepopulate the m2 directory. Continuing..."
+fi
+
 ./buildall.sh -notests -so
