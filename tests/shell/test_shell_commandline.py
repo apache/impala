@@ -134,8 +134,6 @@ class TestImpalaShell(ImpalaTestSuite):
 
   def test_multiple_queries_with_escaped_backslash(self, vector):
     """Regression test for string containing an escaped backslash.
-
-    This relies on the patch at thirdparty/patches/sqlparse/0001-....patch.
     """
     run_impala_shell_cmd(vector, ['-q', r'''select '\\'; select '\'';''', '-B'])
 
