@@ -1434,13 +1434,28 @@ class ImpalaShell(object, cmd.Cmd):
     command: select
     leading comment: /*first comment*/
     """
-    leading_comment, line = ImpalaShell.strip_leading_comment(line.strip())
-    line = line.encode('utf-8')
-    if leading_comment:
-      leading_comment = leading_comment.encode('utf-8')
+    if ImpalaShell._has_leading_comment(line):
+      leading_comment, line = ImpalaShell.strip_leading_comment(line.strip())
+      line = line.encode('utf-8')
+      if leading_comment:
+        leading_comment = leading_comment.encode('utf-8')
+    else:
+      leading_comment, line = None, line.strip()
     if line and line[0] == '@':
       line = 'rerun ' + line[1:]
     return super(ImpalaShell, self).parseline(line) + (leading_comment,)
+
+  @staticmethod
+  def _has_leading_comment(raw_line):
+    """
+    Helper function that returns Boolean true if a query starts with a comment.
+    This saves us from relying on sqlparse filtering, which can be slow.
+    """
+    line = raw_line.lstrip()
+    if line and (line.startswith('--') or line.startswith('/*')):
+      return True
+    else:
+      return False
 
   @staticmethod
   def strip_leading_comment(sql):
@@ -1448,23 +1463,30 @@ class ImpalaShell(object, cmd.Cmd):
     Filter a leading comment in the SQL statement. This function returns a tuple
     containing (leading comment, line without the leading comment).
     """
-    class StripLeadingCommentFilter:
+    class StripLeadingCommentFilter(object):
       def __init__(self):
         self.comment = None
 
       def _process(self, tlist):
+        """
+        Iterate through the list of tokens, appending each leading commment
+        to self.comment, and then popping that element off the list. When we
+        hit the first non-comment and non-whitespace token, then we're done --
+        the remainder after that point is the SQL statement.
+        """
         token = tlist.token_first()
-        if self._is_comment(token):
-          self.comment = ''
-          while token:
-            if self._is_comment(token) or self._is_whitespace(token):
-              tidx = tlist.token_index(token)
-              self.comment += token.value
-              tlist.tokens.pop(tidx)
-              tidx -= 1
-              token = tlist.token_next(tidx, False)
+        while token:
+          if self._is_comment(token) or self._is_whitespace(token):
+            if self.comment is None:
+              self.comment = token.value
             else:
-              break
+              self.comment += token.value
+            tlist.tokens.pop(0)
+
+            # skip_ws=False treats white space characters as tokens also
+            token = tlist.token_first(skip_ws=False)
+          else:
+            break
 
       def _is_comment(self, token):
         return isinstance(token, sqlparse.sql.Comment) or \
@@ -1475,8 +1497,8 @@ class ImpalaShell(object, cmd.Cmd):
         return token.ttype == sqlparse.tokens.Whitespace or \
                token.ttype == sqlparse.tokens.Newline
 
-      def process(self, stack, stmt):
-        [self.process(stack, sgroup) for sgroup in stmt.get_sublists()]
+      def process(self, stmt):
+        [self.process(sgroup) for sgroup in stmt.get_sublists()]
         self._process(stmt)
 
     stack = sqlparse.engine.FilterStack()
