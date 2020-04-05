@@ -67,7 +67,7 @@ void JoinBuilder::CloseFromProbe(RuntimeState* join_node_state) {
 
 Status JoinBuilder::WaitForInitialBuild(RuntimeState* join_node_state) {
   DCHECK(is_separate_build_);
-  join_node_state->AddCancellationCV(&probe_wakeup_cv_);
+  join_node_state->AddCancellationCV(&separate_build_lock_, &probe_wakeup_cv_);
   VLOG(2) << "JoinBuilder (id=" << join_node_id_ << ")"
           << " WaitForInitialBuild() called by finstance "
           << PrintId(join_node_state->fragment_instance_id());
@@ -97,7 +97,7 @@ Status JoinBuilder::WaitForInitialBuild(RuntimeState* join_node_state) {
 void JoinBuilder::HandoffToProbesAndWait(RuntimeState* build_side_state) {
   DCHECK(is_separate_build_) << "Doesn't make sense for embedded builder.";
   VLOG(2) << "Initial build ready JoinBuilder (id=" << join_node_id_ << ")";
-  build_side_state->AddCancellationCV(&build_wakeup_cv_);
+  build_side_state->AddCancellationCV(&separate_build_lock_, &build_wakeup_cv_);
   {
     unique_lock<mutex> l(separate_build_lock_);
     ready_to_probe_ = true;

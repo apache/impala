@@ -19,10 +19,12 @@
 #ifndef IMPALA_RUNTIME_RUNTIME_STATE_H
 #define IMPALA_RUNTIME_RUNTIME_STATE_H
 
-#include <boost/scoped_ptr.hpp>
+#include <mutex>
+#include <string>
 #include <utility>
 #include <vector>
-#include <string>
+
+#include <boost/scoped_ptr.hpp>
 
 // NOTE: try not to add more headers here: runtime-state.h is included in many many files.
 #include "common/global-types.h"  // for PlanNodeId
@@ -187,12 +189,21 @@ class RuntimeState {
   Status LogOrReturnError(const ErrorMsg& message);
 
   bool is_cancelled() const { return is_cancelled_.Load(); }
+
+  /// Cancel this runtime state, signalling all condition variables and cancelling all
+  /// barriers added in AddCancellationCV() and AddBarrierToCancel(). This function will
+  /// acquire mutexes added in AddCancellationCV(), so the caller must not hold any locks
+  /// that must acquire after those mutexes in the lock order.
   void Cancel();
+
   /// Add a condition variable to be signalled when this RuntimeState is cancelled.
   /// Adding a condition variable multiple times is a no-op. Each distinct 'cv' will be
-  /// signalled once with NotifyAll() when is_cancelled() becomes true.
+  /// signalled once with NotifyAll() when is_cancelled() becomes true. 'mutex' will
+  /// be acquired by the cancelling thread after is_cancelled() becomes true. The caller
+  /// must hold 'mutex' when checking is_cancelled() to avoid a race like IMPALA-9611
+  /// where the notification on 'cv' is lost.
   /// The condition variable must have query lifetime.
-  void AddCancellationCV(ConditionVariable* cv);
+  void AddCancellationCV(std::mutex* mutex, ConditionVariable* cv);
 
   /// Add a barrier to be cancelled when this RuntimeState is cancelled. Adding a barrier
   /// multiple times is a no-op. Each distinct 'cb' will be cancelled with status code
@@ -371,7 +382,7 @@ class RuntimeState {
 
   /// Condition variables that will be signalled by Cancel(). Protected by
   /// 'cancellation_cvs_lock_'.
-  std::vector<ConditionVariable*> cancellation_cvs_;
+  std::vector<std::pair<std::mutex*, ConditionVariable*>> cancellation_cvs_;
 
   /// Cyclic barriers that will be signalled by Cancel(). Protected by
   /// 'cancellation_cvs_lock_'.

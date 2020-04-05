@@ -25,11 +25,13 @@ from collections import defaultdict
 from time import sleep
 
 from tests.beeswax.impala_beeswax import ImpalaBeeswaxException
+from tests.common.impala_cluster import ImpalaCluster
 from tests.common.impala_test_suite import ImpalaTestSuite, LOG
 from tests.common.skip import SkipIf, SkipIfS3, SkipIfABFS, SkipIfADLS, SkipIfIsilon, \
     SkipIfLocal
 from tests.common.test_dimensions import create_exec_option_dimension
 from tests.common.test_vector import ImpalaTestDimension
+from tests.verifiers.metric_verifier import MetricVerifier
 
 FAILPOINT_ACTIONS = ['FAIL', 'CANCEL', 'MEM_LIMIT_EXCEEDED']
 # Not included:
@@ -124,6 +126,11 @@ class TestFailpoints(ImpalaTestSuite):
     # injected.
     del vector.get_value('exec_option')['debug_action']
     self.execute_query(query, vector.get_value('exec_option'))
+
+    # Detect any hung fragments left from this test.
+    for impalad in ImpalaCluster.get_e2e_test_cluster().impalads:
+      verifier = MetricVerifier(impalad.service)
+      verifier.wait_for_metric("impala-server.num-fragments-in-flight", 0)
 
   def __parse_plan_nodes_from_explain(self, query, vector):
     """Parses the EXPLAIN <query> output and returns a list of node ids.

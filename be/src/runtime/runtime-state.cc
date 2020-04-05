@@ -229,20 +229,30 @@ void RuntimeState::Cancel() {
   is_cancelled_.Store(true);
   {
     lock_guard<SpinLock> l(cancellation_cvs_lock_);
-    for (ConditionVariable* cv : cancellation_cvs_) cv->NotifyAll();
+    for (pair<std::mutex*, ConditionVariable*>& entry : cancellation_cvs_) {
+      // Acquire the lock to prevent races between readers of 'is_cancelled_' and this
+      // writing thread (e.g. IMPALA-9611) - the caller should read 'is_cancelled_' while
+      // holding the lock. Drop it before signalling the CV so that a blocked thread can
+      // immediately acquire the mutex when it wakes up.
+      {
+        lock_guard<mutex> l(*entry.first);
+      }
+      entry.second->NotifyAll();
+    }
     for (CyclicBarrier* cb : cancellation_cbs_) {
       cb->Cancel(Status::CancelledInternal("RuntimeState::Cancel()"));
     }
   }
+
 }
 
-void RuntimeState::AddCancellationCV(ConditionVariable* cv) {
+void RuntimeState::AddCancellationCV(mutex* mutex, ConditionVariable* cv) {
   lock_guard<SpinLock> l(cancellation_cvs_lock_);
-  for (ConditionVariable* cv2 : cancellation_cvs_) {
+  for (pair<std::mutex*, ConditionVariable*>& entry : cancellation_cvs_) {
     // Don't add if already present.
-    if (cv == cv2) return;
+    if (mutex == entry.first && cv == entry.second) return;
   }
-  cancellation_cvs_.push_back(cv);
+  cancellation_cvs_.push_back(make_pair(mutex, cv));
 }
 
 void RuntimeState::AddBarrierToCancel(CyclicBarrier* cb) {
