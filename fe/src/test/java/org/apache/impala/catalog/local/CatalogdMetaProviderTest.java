@@ -44,6 +44,8 @@ import org.apache.impala.thrift.TBackendGflags;
 import org.apache.impala.thrift.TCatalogObject;
 import org.apache.impala.thrift.TCatalogObjectType;
 import org.apache.impala.thrift.TDatabase;
+import org.apache.impala.thrift.TFunction;
+import org.apache.impala.thrift.TFunctionName;
 import org.apache.impala.thrift.TNetworkAddress;
 import org.apache.impala.thrift.TRuntimeProfileNode;
 import org.apache.impala.thrift.TTable;
@@ -331,6 +333,63 @@ public class CatalogdMetaProviderTest {
       assertEquals(0, stats.hitCount());
       assertEquals(1, stats.missCount());
     }
+  }
+
+  // Test loading and invalidation of databases, tables with upper case
+  // names. Expected behavior is the local catalog should treat these
+  // names as case-insensitive.
+  @Test
+  public void testInvalidateObjectsCaseInsensitive() throws Exception {
+    provider_.loadDb("tpch");
+    provider_.loadTable("tpch", "nation");
+
+    testInvalidateDb("TPCH");
+    testInvalidateTable("TPCH", "nation");
+    testInvalidateTable("tpch", "NATION");
+  }
+
+  private void testInvalidateTable(String dbName, String tblName) throws Exception {
+    CacheStats stats = diffStats();
+
+    provider_.loadTable(dbName, tblName);
+
+    // should get a cache hit since dbName,tblName should be treated as case-insensitive
+    stats = diffStats();
+    assertEquals(1, stats.hitCount());
+    assertEquals(0, stats.missCount());
+
+    // Invalidate it.
+    TCatalogObject obj = new TCatalogObject(TCatalogObjectType.TABLE, 0);
+    obj.setTable(new TTable(dbName, tblName));
+    provider_.invalidateCacheForObject(obj);
+
+    // should get a cache miss if we reload it
+    provider_.loadTable(dbName, tblName);
+    stats = diffStats();
+    assertEquals(0, stats.hitCount());
+    assertEquals(1, stats.missCount());
+  }
+
+  private void testInvalidateDb(String dbName) throws Exception {
+    CacheStats stats = diffStats();
+
+    provider_.loadDb(dbName);
+
+    // should get a cache hit since dbName should be treated as case-insensitive
+    stats = diffStats();
+    assertEquals(1, stats.hitCount());
+    assertEquals(0, stats.missCount());
+
+    // Invalidate it.
+    TCatalogObject obj = new TCatalogObject(TCatalogObjectType.DATABASE, 0);
+    obj.setDb(new TDatabase(dbName));
+    provider_.invalidateCacheForObject(obj);
+
+    // should get a cache miss if we reload it
+    provider_.loadDb(dbName);
+    stats = diffStats();
+    assertEquals(0, stats.hitCount());
+    assertEquals(1, stats.missCount());
   }
 
 }

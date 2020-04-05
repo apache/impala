@@ -622,7 +622,7 @@ public class CatalogdMetaProvider implements MetaProvider {
   public Database loadDb(final String dbName) throws TException {
     return loadWithCaching("database metadata for " + dbName,
         DB_METADATA_STATS_CATEGORY,
-        new DbCacheKey(dbName, DbCacheKey.DbInfoType.HMS_METADATA),
+        new DbCacheKey(dbName.toLowerCase(), DbCacheKey.DbInfoType.HMS_METADATA),
         new Callable<Database>() {
           @Override
           public Database call() throws Exception {
@@ -641,7 +641,7 @@ public class CatalogdMetaProvider implements MetaProvider {
       throws MetaException, UnknownDBException, TException {
     return loadWithCaching("table names for database " + dbName,
         TABLE_NAMES_STATS_CATEGORY,
-        new DbCacheKey(dbName, DbCacheKey.DbInfoType.TABLE_NAMES),
+        new DbCacheKey(dbName.toLowerCase(), DbCacheKey.DbInfoType.TABLE_NAMES),
         new Callable<ImmutableList<String>>() {
           @Override
           public ImmutableList<String> call() throws Exception {
@@ -678,8 +678,8 @@ public class CatalogdMetaProvider implements MetaProvider {
   @Override
   public Pair<Table, TableMetaRef> loadTable(final String dbName, final String tableName)
       throws NoSuchObjectException, MetaException, TException {
-    // TODO(todd) need to lower case?
-    TableCacheKey cacheKey = new TableCacheKey(dbName, tableName);
+    TableCacheKey cacheKey = new TableCacheKey(dbName.toLowerCase(),
+        tableName.toLowerCase());
     TableMetaRefImpl ref = loadWithCaching(
         "table metadata for " + dbName + "." + tableName,
         TABLE_METADATA_CACHE_CATEGORY,
@@ -1280,9 +1280,8 @@ public class CatalogdMetaProvider implements MetaProvider {
    */
   private void invalidateCacheForDb(String dbName, Iterable<DbCacheKey.DbInfoType> types,
       List<String> invalidated) {
-    // TODO(todd) check whether we need to lower-case/canonicalize dbName?
     for (DbCacheKey.DbInfoType type: types) {
-      DbCacheKey key = new DbCacheKey(dbName, type);
+      DbCacheKey key = new DbCacheKey(dbName.toLowerCase(), type);
       if (cache_.asMap().remove(key) != null) {
         invalidated.add(type + " for DB " + dbName);
       }
@@ -1295,8 +1294,7 @@ public class CatalogdMetaProvider implements MetaProvider {
    */
   private void invalidateCacheForTable(String dbName, String tblName,
       List<String> invalidated) {
-    // TODO(todd) check whether we need to lower-case/canonicalize dbName and tblName?
-    TableCacheKey key = new TableCacheKey(dbName, tblName);
+    TableCacheKey key = new TableCacheKey(dbName.toLowerCase(), tblName.toLowerCase());
     if (cache_.asMap().remove(key) != null) {
       invalidated.add("table " + dbName + "." + tblName);
     }
