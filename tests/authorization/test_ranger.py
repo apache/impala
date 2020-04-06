@@ -963,3 +963,58 @@ class TestRanger(CustomClusterTestSuite):
     finally:
       check_call([script])
       TestRanger._remove_column_masking_policy("col_mask_for_hive")
+
+
+class TestRangerColumnMaskingTpchNested(CustomClusterTestSuite):
+  """
+  Tests for Apache Ranger column masking policies on tpch nested tables.
+  """
+
+  @classmethod
+  def get_workload(cls):
+    return 'tpch_nested'
+
+  @classmethod
+  def add_custom_cluster_constraints(cls):
+    # Do not call the super() implementation because this class needs to relax the
+    # set of constraints.
+    cls.ImpalaTestMatrix.add_constraint(
+      lambda v: v.get_value('table_format').file_format == 'parquet')
+
+  @CustomClusterTestSuite.with_args(
+    impalad_args=IMPALAD_ARGS, catalogd_args=CATALOGD_ARGS)
+  def test_tpch_nested_column_masking(self, vector):
+    """Test column masking on nested tables"""
+    user = getuser()
+    db = "tpch_nested_parquet"
+    # Mask PII columns: name, phone, address
+    tbl_cols = {
+      "customer": ["c_name", "c_phone", "c_address"],
+      "supplier": ["s_name", "s_phone", "s_address"],
+      "part": ["p_name"],
+    }
+    # Create another client for admin user since current user doesn't have privileges to
+    # create/drop databases or refresh authorization.
+    admin_client = self.create_impala_client()
+    try:
+      for tbl in tbl_cols:
+        for col in tbl_cols[tbl]:
+          policy_name = "%s_%s_mask" % (tbl, col)
+          # Q22 requires showing the first 2 chars of the phone column.
+          mask_type = "MASK_SHOW_FIRST_4" if col.endswith("phone") else "MASK"
+          TestRanger._add_column_masking_policy(
+            policy_name, user, db, tbl, col, mask_type)
+      self.execute_query_expect_success(admin_client, "refresh authorization",
+                                        user=ADMIN)
+      same_result_queries = ["q1", "q3", "q4", "q5", "q6", "q7", "q8", "q11", "q12",
+                             "q13", "q14", "q16", "q17", "q19", "q22"]
+      result_masked_queries = ["q9", "q10", "q15", "q18", "q20", "q21", "q2"]
+      for q in same_result_queries:
+        self.run_test_case("tpch_nested-" + q, vector, use_db=db)
+      for q in result_masked_queries:
+        self.run_test_case("masked-tpch_nested-" + q, vector, use_db=db)
+    finally:
+      for tbl in tbl_cols:
+        for col in tbl_cols[tbl]:
+          policy_name = "%s_%s_mask" % (tbl, col)
+          TestRanger._remove_column_masking_policy(policy_name)

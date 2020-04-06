@@ -1,0 +1,58 @@
+====
+---- QUERY: TPCH-Q10
+# Q10 - Returned Item Reporting Query
+# Converted select from multiple tables to joins
+select
+  c_custkey,
+  c_name,
+  sum(l_extendedprice * (1 - l_discount)) as revenue,
+  c_acctbal,
+  n_name,
+  c_address,
+  c_phone,
+  c_comment
+from
+  customer c,
+  c.c_orders o,
+  o.o_lineitems l,
+  region.r_nations n
+where
+  o_orderdate >= '1993-10-01'
+  and o_orderdate < '1994-01-01'
+  and l_returnflag = 'R'
+  and c_nationkey = n_nationkey
+group by
+  c_custkey,
+  c_name,
+  c_acctbal,
+  c_phone,
+  n_name,
+  c_address,
+  c_comment
+order by
+  revenue desc
+limit 20
+---- RESULTS
+57040,'Xxxxxxxx#nnnnnnnnn',734235.2455,632.87,'JAPAN','Xxxxxxxnxx','22-8xx-xxx-xxxx','sits. slyly regular requests sleep alongside of the regular inst'
+143347,'Xxxxxxxx#nnnnnnnnn',721002.6948,2557.47,'EGYPT','nxXxXXx,Xxn','14-7xx-xxx-xxxx','ggle carefully enticing requests. final deposits use bold, bold pinto beans. ironic, idle re'
+60838,'Xxxxxxxx#nnnnnnnnn',679127.3077,2454.77,'BRAZIL','nnXxXnxXXXXXxXXxXxxxXxnXXxXX','12-9xx-xxx-xxxx',' need to boost against the slyly regular account'
+101998,'Xxxxxxxx#nnnnnnnnn',637029.5667,3790.89,'UNITED KINGDOM','nnxnXXXxXxxXXXxXx','33-5xx-xxx-xxxx','ress foxes wake slyly after the bold excuses. ironic platelets are furiously carefully bold theodolites'
+125341,'Xxxxxxxx#nnnnnnnnn',633508.0860,4983.51,'GERMANY','XnnXXXnxxxXnXXxxXXxxxXxX','17-5xx-xxx-xxxx','arefully even depths. blithely even excuses sleep furiously. foxes use except the dependencies. ca'
+25501,'Xxxxxxxx#nnnnnnnnn',620269.7849,7725.04,'ETHIOPIA','  XnnnXXxxxxXXXXxxXX,XxnXnXXXXxxXnXX','15-8xx-xxx-xxxx','he pending instructions wake carefully at the pinto beans. regular, final instructions along the slyly fina'
+115831,'Xxxxxxxx#nnnnnnnnn',596423.8672,5098.10,'FRANCE','xXxXxXXxx xx xxnxXnxXxxxxnxXnnxXnxxxXxXx','16-7xx-xxx-xxxx','l somas sleep. furiously final deposits wake blithely regular pinto b'
+84223,'Xxxxxxxx#nnnnnnnnn',594998.0239,528.65,'UNITED KINGDOM','xXXXXxnXxXxx xxXnnX nxXxxxnXXxxxxX','33-4xx-xxx-xxxx',' slyly final deposits haggle regular, pending dependencies. pending escapades wake '
+54289,'Xxxxxxxx#nnnnnnnnn',585603.3918,5583.02,'IRAN','xXXxxXxXnXxxnXXX ,xxxxX','20-8xx-xxx-xxxx','ely special foxes are quickly finally ironic p'
+39922,'Xxxxxxxx#nnnnnnnnn',584878.1134,7321.11,'GERMANY','XxxnxnnxnXXXnxXXXXXnxnnnxXxnX','17-1xx-xxx-xxxx','y final requests. furiously final foxes cajole blithely special platelets. f'
+6226,'Xxxxxxxx#nnnnnnnnn',576783.7606,2230.09,'UNITED KINGDOM','nxXxn,XXXxxxXXnxxXXXXXXXXx,xxXnx,','33-6xx-xxx-xxxx','ending platelets along the express deposits cajole carefully final '
+922,'Xxxxxxxx#nnnnnnnnn',576767.5333,3869.25,'GERMANY','XxnXXxxxnXxXxxnxXXnXxXxXxxnxXxx','17-9xx-xxx-xxxx','luffily fluffy deposits. packages c'
+147946,'Xxxxxxxx#nnnnnnnnn',576455.1320,2030.13,'ALGERIA','xXXxXXxxxxxnXxxxnxXxXxxX','10-8xx-xxx-xxxx','ithely ironic deposits haggle blithely ironic requests. quickly regu'
+115640,'Xxxxxxxx#nnnnnnnnn',569341.1933,6436.10,'ARGENTINA','XxxxxxnxX nXxXxxxXnX','11-4xx-xxx-xxxx','ost slyly along the patterns; pinto be'
+73606,'Xxxxxxxx#nnnnnnnnn',568656.8578,1785.67,'JAPAN','xxXnXxxnxXxXxXXxxxxnxx','22-4xx-xxx-xxxx','he furiously regular ideas. slowly'
+110246,'Xxxxxxxx#nnnnnnnnn',566842.9815,7763.35,'VIETNAM','nXxxxxX XXXxnxXxX','31-9xx-xxx-xxxx','egular deposits serve blithely above the fl'
+142549,'Xxxxxxxx#nnnnnnnnn',563537.2368,5085.99,'INDONESIA','XxxXxXnnXxxxxXxxXXxnxXxxXxxxxn','19-9xx-xxx-xxxx','sleep pending courts. ironic deposits against the carefully unusual platelets cajole carefully express accounts.'
+146149,'Xxxxxxxx#nnnnnnnnn',557254.9865,1791.55,'ROMANIA','xnnxxxXXxX','29-7xx-xxx-xxxx',' of the slyly silent accounts. quickly final accounts across the '
+52528,'Xxxxxxxx#nnnnnnnnn',556397.3509,551.79,'ARGENTINA','XXxxxXXXnnXXX','11-2xx-xxx-xxxx',' deposits hinder. blithely pending asymptotes breach slyly regular re'
+23431,'Xxxxxxxx#nnnnnnnnn',554269.5360,3381.86,'ROMANIA','XxxXnxxxxxXxnxxxXxXxx','29-9xx-xxx-xxxx','nusual, even instructions: furiously stealthy n'
+---- TYPES
+bigint, string, decimal, decimal, string, string, string, string
+====
