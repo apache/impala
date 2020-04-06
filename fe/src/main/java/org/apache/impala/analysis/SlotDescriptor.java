@@ -28,6 +28,8 @@ import org.apache.impala.catalog.FeKuduTable;
 import org.apache.impala.catalog.KuduColumn;
 import org.apache.impala.catalog.Type;
 import org.apache.impala.thrift.TSlotDescriptor;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 import com.google.common.base.Joiner;
 import com.google.common.base.MoreObjects;
@@ -35,6 +37,7 @@ import com.google.common.base.Preconditions;
 import com.google.common.collect.Lists;
 
 public class SlotDescriptor {
+  private final static Logger LOG = LoggerFactory.getLogger(SlotDescriptor.class);
   private final SlotId id_;
   private final TupleDescriptor parent_;
 
@@ -118,7 +121,12 @@ public class SlotDescriptor {
     itemTupleDesc_ = t;
   }
   public boolean isMaterialized() { return isMaterialized_; }
-  public void setIsMaterialized(boolean value) { isMaterialized_ = value; }
+  public void setIsMaterialized(boolean value) {
+    if (isMaterialized_ == value) return;
+    isMaterialized_ = value;
+    LOG.trace("Mark slot(sid={}) of tuple(tid={}) as {}materialized",
+        id_, parent_.getId(), isMaterialized_ ? "" : "non-");
+  }
   public boolean getIsNullable() { return isNullable_; }
   public void setIsNullable(boolean value) { isNullable_ = value; }
   public int getByteSize() { return byteSize_; }

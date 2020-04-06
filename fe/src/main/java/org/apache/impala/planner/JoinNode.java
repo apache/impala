@@ -29,6 +29,7 @@ import org.apache.impala.analysis.Expr;
 import org.apache.impala.analysis.JoinOperator;
 import org.apache.impala.analysis.SlotDescriptor;
 import org.apache.impala.analysis.SlotRef;
+import org.apache.impala.analysis.TupleDescriptor;
 import org.apache.impala.analysis.TupleId;
 import org.apache.impala.catalog.ColumnStats;
 import org.apache.impala.catalog.FeTable;
@@ -217,6 +218,16 @@ public abstract class JoinNode extends PlanNode {
     // have been collected.
     assignConjuncts(analyzer);
     createDefaultSmap(analyzer);
+    // Mark slots used by 'conjuncts_' as materialized after substitution. Recompute
+    // memory layout for affected tuples. Note: only tuples of the masked tables could
+    // be affected if they are referenced by multi-tuple predicates.
+    for (TupleDescriptor tuple : analyzer.materializeSlots(conjuncts_)) {
+      if (LOG.isTraceEnabled()) {
+        LOG.trace("Recompute mem layout for " + tuple.debugString());
+      }
+      Preconditions.checkNotNull(tuple.getMaskedByTuple());
+      tuple.recomputeMemLayout();
+    }
     assignedConjuncts_ = analyzer.getAssignedConjuncts();
     otherJoinConjuncts_ = Expr.substituteList(otherJoinConjuncts_,
         getCombinedChildSmap(), analyzer, false);

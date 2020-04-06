@@ -39,6 +39,7 @@ import org.apache.impala.thrift.TDescriptorTableSerialized;
 
 import com.google.common.base.Preconditions;
 import com.google.common.collect.Lists;
+import com.google.common.collect.Sets;
 
 /**
  * Repository for tuple (and slot) descriptors.
@@ -131,12 +132,17 @@ public class DescriptorTable {
   }
 
   /**
-   * Marks all slots in list as materialized.
+   * Marks all slots in list as materialized and return the affected Tuples.
    */
-  public void markSlotsMaterialized(List<SlotId> ids) {
+  public Set<TupleDescriptor> markSlotsMaterialized(List<SlotId> ids) {
+    Set<TupleDescriptor> affectedTuples = Sets.newHashSet();
     for (SlotId id: ids) {
-      getSlotDesc(id).setIsMaterialized(true);
+      SlotDescriptor slotDesc = getSlotDesc(id);
+      if (slotDesc.isMaterialized()) continue;
+      slotDesc.setIsMaterialized(true);
+      affectedTuples.add(slotDesc.getParent());
     }
+    return affectedTuples;
   }
 
   /**

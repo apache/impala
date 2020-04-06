@@ -104,6 +104,11 @@ public class TupleDescriptor {
   private int numNullBytes_;
   private float avgSerializedSize_;  // in bytes; includes serialization overhead
 
+  // Underlying masked table if this is the tuple of a table masking view.
+  private BaseTableRef maskedTable_ = null;
+  // Tuple of the table masking view that masks this tuple's table.
+  private TupleDescriptor maskedByTuple_ = null;
+
   public TupleDescriptor(TupleId id, String debugName) {
     id_ = id;
     path_ = null;
@@ -190,20 +195,29 @@ public class TupleDescriptor {
     return path_.getRootDesc();
   }
 
+  public TupleDescriptor getMaskedByTuple() { return maskedByTuple_; }
+  public BaseTableRef getMaskedTable() { return maskedTable_; }
+  public void setMaskedTable(BaseTableRef table) {
+    Preconditions.checkState(maskedTable_ == null);
+    maskedTable_ = table;
+    table.getDesc().maskedByTuple_ = this;
+  }
+
   public String debugString() {
     String tblStr = (getTable() == null ? "null" : getTable().getFullName());
     List<String> slotStrings = new ArrayList<>();
     for (SlotDescriptor slot : slots_) {
       slotStrings.add(slot.debugString());
     }
-    return MoreObjects.toStringHelper(this)
+    MoreObjects.ToStringHelper toStrHelper = MoreObjects.toStringHelper(this)
         .add("id", id_.asInt())
         .add("name", debugName_)
         .add("tbl", tblStr)
         .add("byte_size", byteSize_)
         .add("is_materialized", isMaterialized_)
-        .add("slots", "[" + Joiner.on(", ").join(slotStrings) + "]")
-        .toString();
+        .add("slots", "[" + Joiner.on(", ").join(slotStrings) + "]");
+    if (maskedTable_ != null) toStrHelper.add("masks", maskedTable_.getId());
+    return toStrHelper.toString();
   }
 
   @Override

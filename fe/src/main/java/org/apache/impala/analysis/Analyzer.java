@@ -64,6 +64,7 @@ import org.apache.impala.common.ImpalaException;
 import org.apache.impala.common.InternalException;
 import org.apache.impala.common.Pair;
 import org.apache.impala.common.RuntimeEnv;
+import org.apache.impala.planner.JoinNode;
 import org.apache.impala.planner.PlanNode;
 import org.apache.impala.rewrite.BetweenToCompoundRule;
 import org.apache.impala.rewrite.ConvertToCNFRule;
@@ -1487,8 +1488,24 @@ public class Analyzer {
    * Return all unassigned registered conjuncts for node's table ref ids.
    * Wrapper around getUnassignedConjuncts(List<TupleId> tupleIds).
    */
-  public List<Expr> getUnassignedConjuncts(PlanNode node) {
-    return getUnassignedConjuncts(node.getTblRefIds());
+  public final List<Expr> getUnassignedConjuncts(PlanNode node) {
+    List<TupleId> tupleIds = Lists.newCopyOnWriteArrayList(node.getTblRefIds());
+    if (node instanceof JoinNode) {
+      for (TupleId tid : node.getTblRefIds()) {
+        // Pick up TupleId of the masked table since the table masking view and the masked
+        // table are the same in the original query. SlotRefs of table's nested columns
+        // are resolved into table's tuple, but not the table masking view's tuple. As a
+        // result, predicates referencing such nested columns also reference the masked
+        // table's tuple id.
+        TupleDescriptor tuple = getTupleDesc(tid);
+        Preconditions.checkNotNull(tuple);
+        BaseTableRef maskedTable = tuple.getMaskedTable();
+        if (maskedTable != null && maskedTable.exposeNestedColumnsByTableMaskView()) {
+          tupleIds.add(maskedTable.getId());
+        }
+      }
+    }
+    return getUnassignedConjuncts(tupleIds);
   }
 
   /**
@@ -2568,21 +2585,22 @@ public class Analyzer {
 
   /**
    * Mark all slots that are referenced in exprs as materialized.
+   * Return the affected Tuples.
    */
-  public void materializeSlots(List<Expr> exprs) {
+  public Set<TupleDescriptor> materializeSlots(List<Expr> exprs) {
     List<SlotId> slotIds = new ArrayList<>();
     for (Expr e: exprs) {
       Preconditions.checkState(e.isAnalyzed());
       e.getIds(null, slotIds);
     }
-    globalState_.descTbl.markSlotsMaterialized(slotIds);
+    return globalState_.descTbl.markSlotsMaterialized(slotIds);
   }
 
-  public void materializeSlots(Expr e) {
+  public Set<TupleDescriptor> materializeSlots(Expr e) {
     List<SlotId> slotIds = new ArrayList<>();
     Preconditions.checkState(e.isAnalyzed());
     e.getIds(null, slotIds);
-    globalState_.descTbl.markSlotsMaterialized(slotIds);
+    return globalState_.descTbl.markSlotsMaterialized(slotIds);
   }
 
   /**

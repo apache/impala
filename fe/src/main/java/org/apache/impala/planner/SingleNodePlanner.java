@@ -1151,12 +1151,10 @@ public class SingleNodePlanner {
    * If a conjunct is not an On-clause predicate and is safe to propagate it inside the
    * inline view, add it to 'evalAfterJoinPreds'.
    */
-  private void getConjunctsToInlineView(final Analyzer analyzer,
-      final InlineViewRef inlineViewRef, List<Expr> evalInInlineViewPreds,
+  private void getConjunctsToInlineView(final Analyzer analyzer, final String alias,
+      final List<TupleId> tupleIds, List<Expr> evalInInlineViewPreds,
       List<Expr> evalAfterJoinPreds) {
-    List<Expr> unassignedConjuncts =
-        analyzer.getUnassignedConjuncts(inlineViewRef.getId().asList(), true);
-    List<TupleId> tupleIds = inlineViewRef.getId().asList();
+    List<Expr> unassignedConjuncts = analyzer.getUnassignedConjuncts(tupleIds, true);
     for (Expr e: unassignedConjuncts) {
       if (!e.isBoundByTupleIds(tupleIds)) continue;
       List<TupleId> tids = new ArrayList<>();
@@ -1176,8 +1174,7 @@ public class SingleNodePlanner {
           if (!analyzer.isTrueWithNullSlots(e)) {
             evalAfterJoinPreds.add(e);
             if (LOG.isTraceEnabled()) {
-              LOG.trace(String.format("Can propagate %s to inline view %s",
-                  e.debugString(), inlineViewRef.getExplicitAlias()));
+              LOG.trace("Can propagate {} to inline view {}", e.debugString(), alias);
             }
           }
         } catch (InternalException ex) {
@@ -1189,8 +1186,7 @@ public class SingleNodePlanner {
         continue;
       }
       if (LOG.isTraceEnabled()) {
-        LOG.trace(String.format("Can evaluate %s in inline view %s", e.debugString(),
-            inlineViewRef.getExplicitAlias()));
+        LOG.trace("Can evaluate {} in inline view {}", e.debugString(), alias);
       }
     }
   }
@@ -1207,9 +1203,13 @@ public class SingleNodePlanner {
    */
   public void migrateConjunctsToInlineView(final Analyzer analyzer,
       final InlineViewRef inlineViewRef) throws ImpalaException {
-    List<Expr> unassignedConjuncts =
-        analyzer.getUnassignedConjuncts(inlineViewRef.getId().asList(), true);
-    if (LOG. isTraceEnabled()) {
+    List<TupleId> tids = inlineViewRef.getId().asList();
+    if (inlineViewRef.isTableMaskingView()
+        && inlineViewRef.getUnMaskedTableRef().exposeNestedColumnsByTableMaskView()) {
+      tids.add(inlineViewRef.getUnMaskedTableRef().getId());
+    }
+    List<Expr> unassignedConjuncts = analyzer.getUnassignedConjuncts(tids, true);
+    if (LOG.isTraceEnabled()) {
       LOG.trace("unassignedConjuncts: " + Expr.debugString(unassignedConjuncts));
     }
     if (!canMigrateConjuncts(inlineViewRef)) {
@@ -1223,7 +1223,8 @@ public class SingleNodePlanner {
 
     List<Expr> preds = new ArrayList<>();
     List<Expr> evalAfterJoinPreds = new ArrayList<>();
-    getConjunctsToInlineView(analyzer, inlineViewRef, preds, evalAfterJoinPreds);
+    getConjunctsToInlineView(analyzer, inlineViewRef.getExplicitAlias(), tids, preds,
+        evalAfterJoinPreds);
     unassignedConjuncts.removeAll(preds);
     // Migrate the conjuncts by marking the original ones as assigned. They will either
     // be ignored if they are identity predicates (e.g. a = a), or be substituted into

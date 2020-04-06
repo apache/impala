@@ -352,3 +352,267 @@ where a2.item = 1 and a3.item = 2 and d2.e = 10 and d3.e = -10
 ---- TYPES
 BIGINT,INT,INT,INT,INT,INT,INT,STRING,INT,STRING
 ====
+---- QUERY
+# IMPALA-9529: Test predicates that can be resolved to have different tuple ids.
+select id, nested_struct.a from complextypestbl t
+where id = 100 or nested_struct.a = 1;
+---- RESULTS
+100,1
+---- TYPES
+BIGINT,INT
+====
+---- QUERY
+# IMPALA-9529: Test predicates that can be resolved to have different tuple ids.
+select id, nested_struct.a from complextypestbl t
+where id + nested_struct.a = 101;
+---- RESULTS
+100,1
+---- TYPES
+BIGINT,INT
+====
+---- QUERY
+# IMPALA-9529: Test predicates that can be resolved to have different tuple ids.
+select id, id2 from (
+  select id, id as id2 from functional.alltypestiny
+  union all
+  select id, nested_struct.a as id2 from complextypestbl
+) t
+where id + id2 = 101;
+---- RESULTS
+100,1
+---- TYPES
+BIGINT,INT
+====
+---- QUERY
+# IMPALA-9529: Test predicates that can be resolved to have different tuple ids.
+with v as (
+  select id, nested_struct.a as id2 from complextypestbl
+)
+select id, id2 from v
+where id + id2 = 101 or (id = 200 and id2 is null);
+---- RESULTS
+100,1
+200,NULL
+---- TYPES
+BIGINT,INT
+====
+---- QUERY
+# IMPALA-9529: Test predicates with multiple tuple ids.
+select t.id, t.nested_struct.a
+from functional.alltypestiny tiny
+  join complextypestbl t
+  on tiny.id = t.id
+where tiny.id + t.id + t.nested_struct.a = 201;
+---- RESULTS
+100,1
+---- TYPES
+BIGINT,INT
+====
+---- QUERY
+# IMPALA-9529: Test predicates with multiple tuple ids.
+select t.id, t.nested_struct.a
+from functional.alltypestiny tiny
+  join complextypestbl t
+  on tiny.id + t.id + t.nested_struct.a = 201;
+---- RESULTS
+100,1
+---- TYPES
+BIGINT,INT
+====
+---- QUERY
+# IMPALA-9529: Test predicates with multiple tuple ids. Make sure nested columns inside
+# the column masking view are materialized.
+select count(1)
+from functional.alltypestiny tiny
+  join complextypestbl t
+  on tiny.id = t.id
+where (tiny.id + t.id + t.nested_struct.a) is null;
+---- RESULTS
+5
+---- TYPES
+BIGINT
+====
+---- QUERY
+# IMPALA-9529: Test predicates with multiple tuple ids in GroupBy clause.
+select count(1)
+from functional.alltypestiny tiny
+  join complextypestbl t
+  on tiny.id = t.id
+group by tiny.id + t.id + t.nested_struct.a;
+---- RESULTS
+1
+5
+1
+---- TYPES
+BIGINT
+====
+---- QUERY
+# IMPALA-9529: Test predicates with multiple tuple ids in Having clause.
+select count(tiny.id + t.id + t.nested_struct.a)
+from functional.alltypestiny tiny
+  join complextypestbl t
+  on tiny.id = t.id
+group by t.id
+having count(tiny.id + t.id + t.nested_struct.a) = 1
+---- RESULTS
+1
+1
+---- TYPES
+BIGINT
+====
+---- QUERY
+# IMPALA-9529: Test predicates with multiple tuple ids in OrderBy clause.
+select t.id
+from functional.alltypestiny tiny
+  join complextypestbl t
+  on tiny.id = t.id
+order by tiny.id + t.id + t.nested_struct.a, t.id;
+---- RESULTS: VERIFY_IS_EQUAL
+100
+700
+200
+300
+400
+500
+600
+---- TYPES
+BIGINT
+====
+---- QUERY
+# IMPALA-9529: Test predicates with multiple tuple ids in analytic query.
+select t.id, rank() over(order by t.id)
+from functional.alltypestiny tiny
+  join complextypestbl t
+  on tiny.id = t.id
+where tiny.id + t.id + t.nested_struct.a is null;
+---- RESULTS
+200,1
+300,2
+400,3
+500,4
+600,5
+---- TYPES
+BIGINT,BIGINT
+====
+---- QUERY
+# IMPALA-9529: Test predicates with multiple tuple ids.
+select t.id, t.nested_struct.a
+from functional.alltypestiny tiny
+  left join complextypestbl t
+  on tiny.id = t.id
+where tiny.id + t.id + t.nested_struct.a = 201;
+---- RESULTS
+100,1
+---- TYPES
+BIGINT,INT
+====
+---- QUERY
+# IMPALA-9529: Test predicates with multiple tuple ids.
+select t.id, t.nested_struct.a
+from functional.alltypestiny tiny
+  join complextypestbl t
+  on tiny.id = t.id
+  join functional.alltypestiny tiny2
+  on t.id = tiny2.id
+where tiny.id + t.id + t.nested_struct.a + tiny2.id = 301;
+---- RESULTS
+100,1
+---- TYPES
+BIGINT,INT
+====
+---- QUERY
+# IMPALA-9529: Test predicates with multiple tuple ids.
+select t.id, t.nested_struct.a
+from functional.alltypestiny tiny
+  left join complextypestbl t
+  on tiny.id = t.id
+  join functional.alltypestiny tiny2
+  on t.id = tiny2.id
+where tiny.id + t.id + t.nested_struct.a + tiny2.id = 301;
+---- RESULTS
+100,1
+---- TYPES
+BIGINT,INT
+====
+---- QUERY
+# IMPALA-9529: Test predicates with multiple tuple ids.
+with v as (
+  select t.id, t.nested_struct.a
+  from functional.alltypestiny tiny
+    join complextypestbl t
+    on tiny.id = t.id
+  where tiny.id + t.id + t.nested_struct.a = 201
+)
+select t.id, t.nested_struct.a from v
+  join complextypestbl t
+  on v.id = t.id
+where v.id + t.id + t.nested_struct.a = 201
+---- RESULTS
+100,1
+---- TYPES
+BIGINT,INT
+====
+---- QUERY
+select count(distinct id), count(distinct nested_struct.a) from complextypestbl
+---- RESULTS
+8,3
+---- TYPES
+BIGINT,BIGINT
+====
+---- QUERY
+select count(distinct id), count(distinct nested_struct.a) from complextypestbl
+where id + nested_struct.a = 101;
+---- RESULTS
+1,1
+---- TYPES
+BIGINT,BIGINT
+====
+---- QUERY
+select count(distinct tiny.int_col), count(distinct t.id), count(distinct t.nested_struct.a)
+from functional.alltypestiny tiny
+  join complextypestbl t
+  on tiny.id = t.id
+---- RESULTS
+2,7,2
+---- TYPES
+BIGINT,BIGINT,BIGINT
+====
+---- QUERY
+select count(distinct tiny.int_col), count(distinct t.id), count(distinct t.nested_struct.a)
+from functional.alltypestiny tiny
+  join complextypestbl t
+  on tiny.id = t.id
+where tiny.int_col + t.id + t.nested_struct.a = 102
+---- RESULTS
+1,1,1
+---- TYPES
+BIGINT,BIGINT,BIGINT
+====
+---- QUERY
+select tiny.id, t0.nested_struct.a
+from functional.alltypestiny tiny
+  join complextypestbl t0 on tiny.id = t0.id
+  join complextypestbl t1 on tiny.id = t1.id
+  join complextypestbl t2 on tiny.id = t2.id
+  join complextypestbl t3 on tiny.id = t3.id
+where tiny.id + t2.id + t3.nested_struct.a >= 201
+---- RESULTS
+100,1
+700,7
+---- TYPES
+INT,INT
+====
+---- QUERY
+select tiny.id, t0.nested_struct.a
+from functional.alltypestiny tiny
+  join complextypestbl t0 on tiny.id = t0.id
+  join complextypestbl t1 on tiny.id = t1.id
+  join complextypestbl t2 on tiny.id = t2.id
+  join complextypestbl t3 on tiny.id = t3.id
+where (t2.id + t3.id + t3.nested_struct.a = 201 or t2.nested_struct.a is null)
+  and tiny.id + t0.id + t3.nested_struct.a >= 201
+---- RESULTS
+100,1
+---- TYPES
+INT,INT
+====

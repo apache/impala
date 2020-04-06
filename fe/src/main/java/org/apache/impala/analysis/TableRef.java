@@ -132,6 +132,10 @@ public class TableRef extends StmtNode {
   // analysis output
   protected TupleDescriptor desc_;
 
+  // true if this table is masked by a table masking view and need to expose its nested
+  // columns via the view.
+  protected boolean exposeNestedColumnsByTableMaskView_ = false;
+
   // END: Members that need to be reset()
   /////////////////////////////////////////
 
@@ -197,6 +201,7 @@ public class TableRef extends StmtNode {
     allMaterializedTupleIds_ = Lists.newArrayList(other.allMaterializedTupleIds_);
     correlatedTupleIds_ = Lists.newArrayList(other.correlatedTupleIds_);
     desc_ = other.desc_;
+    exposeNestedColumnsByTableMaskView_ = other.exposeNestedColumnsByTableMaskView_;
   }
 
   @Override
@@ -295,6 +300,12 @@ public class TableRef extends StmtNode {
   public void setUsingClause(List<String> colNames) { this.usingColNames_ = colNames; }
   public TableRef getLeftTblRef() { return leftTblRef_; }
   public void setLeftTblRef(TableRef leftTblRef) { this.leftTblRef_ = leftTblRef; }
+  public void setExposeNestedColumnsByTableMaskView() {
+    exposeNestedColumnsByTableMaskView_ = true;
+  }
+  public boolean exposeNestedColumnsByTableMaskView() {
+    return exposeNestedColumnsByTableMaskView_;
+  }
 
   public void setJoinHints(List<PlanHint> hints) {
     Preconditions.checkNotNull(hints);
