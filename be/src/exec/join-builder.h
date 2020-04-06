@@ -151,6 +151,10 @@ class JoinBuilder : public DataSink {
   /// is embedded in a PartitionedHashJoinNode.
   const bool is_separate_build_;
 
+
+  /// Number of build rows. Initialized in Prepare().
+  RuntimeProfile::Counter* num_build_rows_ = nullptr;
+
   /////////////////////////////////////////////////////////////////////
   /// BEGIN: Members that are used only when is_separate_build_ is true
 

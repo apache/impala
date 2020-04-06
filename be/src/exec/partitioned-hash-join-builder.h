@@ -331,10 +331,12 @@ class PhjBuilder : public JoinBuilder {
   /// previous hash partitions must have been cleared with DoneProbingHashPartitions().
   /// The new hash partitions are returned in 'new_partitions'.
   ///
-  /// This is a synchronization point for shared join build. All probe threads must
-  /// call this function before continuing the next phase of the hash join algorithm.
-  Status BeginSpilledProbe(BufferPool::ClientHandle* probe_client, bool* repartitioned,
-      Partition** input_partition, HashPartitions* new_partitions);
+  /// This is a synchronization point for shared join build. The time elapsed during the
+  /// serial execution phase is attributed to the builder. All probe threads must call
+  /// this function before continuing the next phase of the hash join algorithm.
+  Status BeginSpilledProbe(BufferPool::ClientHandle* probe_client,
+      RuntimeProfile* probe_profile, bool* repartitioned, Partition** input_partition,
+      HashPartitions* new_partitions);
 
   /// Called after probing of the hash partitions returned by BeginInitialProbe() or
   /// BeginSpilledProbe() (when *repartitioned is true) is complete, i.e. all of the
@@ -351,10 +353,11 @@ class PhjBuilder : public JoinBuilder {
   ///
   /// Returns an error if an error was encountered or if the query was cancelled.
   ///
-  /// This is a synchronization point for shared join build. All probe threads must
-  /// call this function before continuing the next phase of the hash join algorithm.
+  /// This is a synchronization point for shared join build. The time elapsed during the
+  /// serial execution phase is attributed to the builder. All probe threads must call
+  /// this function before continuing the next phase of the hash join algorithm.
   Status DoneProbingHashPartitions(const int64_t num_spilled_probe_rows[PARTITION_FANOUT],
-      BufferPool::ClientHandle* probe_client,
+      BufferPool::ClientHandle* probe_client, RuntimeProfile* probe_profile,
       std::deque<std::unique_ptr<Partition>>* output_partitions, RowBatch* batch);
 
   /// Called after probing of a single spilled partition returned by
@@ -374,9 +377,11 @@ class PhjBuilder : public JoinBuilder {
   ///
   /// Returns an error if an error was encountered or if the query was cancelled.
   ///
-  /// This is a synchronization point for shared join build. All probe threads must
-  /// call this function before continuing the next phase of the hash join algorithm.
+  /// This is a synchronization point for shared join build. The time elapsed during the
+  /// serial execution phase is attributed to the builder. All probe threads must call
+  /// this function before continuing the next phase of the hash join algorithm.
   Status DoneProbingSinglePartition(BufferPool::ClientHandle* probe_client,
+      RuntimeProfile* probe_profile,
       std::deque<std::unique_ptr<Partition>>* output_partitions, RowBatch* batch);
 
   /// Close the null aware partition (if there is one) and set it to NULL.
@@ -574,8 +579,15 @@ class PhjBuilder : public JoinBuilder {
   /// 'build_filters' is true, runtime filters are populated. 'is_null_aware' is
   /// set to true if the join type is a null aware join.
   Status ProcessBuildBatch(
-      RowBatch* build_batch, HashTableCtx* ctx, bool build_filters,
-      bool is_null_aware) WARN_UNUSED_RESULT;
+      RowBatch* build_batch, HashTableCtx* ctx, bool build_filters, bool is_null_aware);
+
+  /// Helper method for Send() that that does the actual work apart from updating the
+  /// counters. Also used by RepartitionBuildInput().
+  Status AddBatch(RowBatch* build_batch);
+
+  /// Helper method for FlushFinal() that does the actual work. Also used by
+  /// RepartitionBuildInput().
+  Status FinalizeBuild(RuntimeState* state);
 
   /// Append 'row' to 'stream'. In the common case, appending the row to the stream
   /// immediately succeeds. Otherwise this function falls back to the slower path of
@@ -756,9 +768,6 @@ class PhjBuilder : public JoinBuilder {
 
   /// Level of max partition (i.e. number of repartitioning steps).
   RuntimeProfile::HighWaterMarkCounter* max_partition_level_ = nullptr;
-
-  /// Number of build rows that have been partitioned.
-  RuntimeProfile::Counter* num_build_rows_partitioned_ = nullptr;
 
   /// Number of partitions that have been spilled.
   RuntimeProfile::Counter* num_spilled_partitions_ = nullptr;

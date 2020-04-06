@@ -233,6 +233,8 @@ RuntimeProfile* RuntimeProfile::CreateFromThrift(ObjectPool* pool,
     bool indent = nodes[*idx].indent;
     profile->AddChild(RuntimeProfile::CreateFromThrift(pool, nodes, idx), indent);
   }
+  // Compute timers that are not serialized to the thrift.
+  profile->ComputeTimeInProfile();
   return profile;
 }
 

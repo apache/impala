@@ -75,9 +75,7 @@ Status BlockingJoinNode::Prepare(RuntimeState* state) {
   SCOPED_TIMER(runtime_profile_->total_time_counter());
   RETURN_IF_ERROR(ExecNode::Prepare(state));
 
-  build_timer_ = ADD_TIMER(runtime_profile(), "BuildTime");
   probe_timer_ = ADD_TIMER(runtime_profile(), "ProbeTime");
-  build_row_counter_ = ADD_COUNTER(runtime_profile(), "BuildRows", TUnit::UNIT);
   probe_row_counter_ = ADD_COUNTER(runtime_profile(), "ProbeRows", TUnit::UNIT);
 
   // The right child (if present) must match the build row layout.
@@ -245,7 +243,7 @@ Status BlockingJoinNode::ProcessBuildInputAndOpenProbe(
     RETURN_IF_ERROR(AcquireResourcesForBuild(state));
     {
       SCOPED_TIMER(runtime_profile_->inactive_timer());
-      events_->MarkEvent("Waiting for builder");
+      events_->MarkEvent("Waiting for initial build");
       RETURN_IF_ERROR(build_sink->WaitForInitialBuild(state));
       events_->MarkEvent("Initial build available");
     }
@@ -333,35 +331,21 @@ template <bool ASYNC_BUILD>
 Status BlockingJoinNode::SendBuildInputToSink(
     RuntimeState* state, JoinBuilder* build_sink) {
   DCHECK(!UseSeparateBuild(state->query_options()));
-  {
-    SCOPED_TIMER(build_timer_);
-    RETURN_IF_ERROR(build_sink->Open(state));
-  }
-
+  RETURN_IF_ERROR(build_sink->Open(state));
   DCHECK_EQ(build_batch_->num_rows(), 0);
   bool eos = false;
   do {
     RETURN_IF_CANCELLED(state);
     RETURN_IF_ERROR(QueryMaintenance(state));
-
     {
       CONDITIONAL_SCOPED_CONCURRENT_STOP_WATCH(
           &built_probe_overlap_stop_watch_, ASYNC_BUILD);
       RETURN_IF_ERROR(child(1)->GetNext(state, build_batch_.get(), &eos));
     }
-    COUNTER_ADD(build_row_counter_, build_batch_->num_rows());
-
-    {
-      SCOPED_TIMER(build_timer_);
-      RETURN_IF_ERROR(build_sink->Send(state, build_batch_.get()));
-    }
+    RETURN_IF_ERROR(build_sink->Send(state, build_batch_.get()));
     build_batch_->Reset();
   } while (!eos);
-
-  {
-    SCOPED_TIMER(build_timer_);
-    RETURN_IF_ERROR(build_sink->FlushFinal(state));
-  }
+  RETURN_IF_ERROR(build_sink->FlushFinal(state));
   return Status::OK();
 }
 
