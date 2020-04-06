@@ -309,6 +309,11 @@ public class InlineViewRef extends TableRef {
       }
       fields.add(new StructField(colAlias, selectItemExpr.getType(), null));
     }
+
+    // Create the non-materialized tuple and set its type.
+    TupleDescriptor result = analyzer.getDescTbl().createTupleDescriptor(
+        getClass().getSimpleName() + " " + getUniqueAlias());
+    result.setIsMaterialized(false);
     // If this is a table masking view, the underlying table is wrapped by this so its
     // nested columns are not visible to the original query block, because we can't
     // expose nested columns in the SelectList. However, we can expose nested columns
@@ -321,6 +326,7 @@ public class InlineViewRef extends TableRef {
       if (tblRef instanceof BaseTableRef) {
         BaseTableRef baseTbl = (BaseTableRef) tblRef;
         FeTable tbl = baseTbl.resolvedPath_.getRootTable();
+        boolean exposeNestedColumn = false;
         for (Column col : tbl.getColumnsInHiveOrder()) {
           if (!col.getType().isComplexType()) continue;
           if (LOG.isTraceEnabled()) {
@@ -328,14 +334,14 @@ public class InlineViewRef extends TableRef {
                 col.getName(), col.getType().toSql());
           }
           fields.add(new StructField(col.getName(), col.getType(), null));
+          exposeNestedColumn = true;
         }
+        if (exposeNestedColumn) {
+          baseTbl.setExposeNestedColumnsByTableMaskView();
+        }
+        result.setMaskedTable(baseTbl);
       }
     }
-
-    // Create the non-materialized tuple and set its type.
-    TupleDescriptor result = analyzer.getDescTbl().createTupleDescriptor(
-        getClass().getSimpleName() + " " + getUniqueAlias());
-    result.setIsMaterialized(false);
     result.setType(new StructType(fields));
     return result;
   }
