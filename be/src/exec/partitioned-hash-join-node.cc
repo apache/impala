@@ -436,8 +436,8 @@ Status PartitionedHashJoinNode::BeginSpilledProbe() {
 
   PhjBuilder::Partition* build_input_partition;
   bool repartitioned;
-  RETURN_IF_ERROR(builder_->BeginSpilledProbe(buffer_pool_client(), &repartitioned,
-      &build_input_partition, &build_hash_partitions_));
+  RETURN_IF_ERROR(builder_->BeginSpilledProbe(buffer_pool_client(), runtime_profile(),
+      &repartitioned, &build_input_partition, &build_hash_partitions_));
 
   auto it = spilled_partitions_.find(build_input_partition->id());
   DCHECK(it != spilled_partitions_.end())
@@ -1163,9 +1163,9 @@ Status PartitionedHashJoinNode::DoneProbing(RuntimeState* state, RowBatch* batch
   if (builder_->state() == HashJoinState::PROBING_SPILLED_PARTITION) {
     // Need to clean up single in-memory build partition instead of hash partitions.
     DCHECK(build_hash_partitions_.hash_partitions == nullptr);
-    RETURN_IF_ERROR(builder_->DoneProbingSinglePartition(
-          buffer_pool_client(), &output_build_partitions_,
-        IsLeftSemiJoin(join_op_) ? nullptr : batch));
+    RETURN_IF_ERROR(
+        builder_->DoneProbingSinglePartition(buffer_pool_client(), runtime_profile(),
+            &output_build_partitions_, IsLeftSemiJoin(join_op_) ? nullptr : batch));
   } else {
     // Walk the partitions that had hash tables built for the probe phase and either
     // close them or move them to 'spilled_partitions_'.
@@ -1207,9 +1207,9 @@ Status PartitionedHashJoinNode::DoneProbing(RuntimeState* state, RowBatch* batch
     }
     probe_hash_partitions_.clear();
     build_hash_partitions_.Reset();
-    RETURN_IF_ERROR(
-        builder_->DoneProbingHashPartitions(num_spilled_probe_rows, buffer_pool_client(),
-          &output_build_partitions_, IsLeftSemiJoin(join_op_) ? nullptr : batch));
+    RETURN_IF_ERROR(builder_->DoneProbingHashPartitions(num_spilled_probe_rows,
+        buffer_pool_client(), runtime_profile(), &output_build_partitions_,
+        IsLeftSemiJoin(join_op_) ? nullptr : batch));
   }
   if (!output_build_partitions_.empty()) {
     DCHECK(output_unmatched_batch_iter_.get() == nullptr);

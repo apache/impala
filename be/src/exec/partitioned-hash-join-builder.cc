@@ -257,8 +257,7 @@ Status PhjBuilder::Prepare(RuntimeState* state, MemTracker* parent_mem_tracker) 
       profile()->AddHighWaterMarkCounter("LargestPartitionPercent", TUnit::UNIT);
   max_partition_level_ =
       profile()->AddHighWaterMarkCounter("MaxPartitionLevel", TUnit::UNIT);
-  num_build_rows_partitioned_ =
-      ADD_COUNTER(profile(), "BuildRowsPartitioned", TUnit::UNIT);
+  num_build_rows_ = ADD_COUNTER(profile(), "BuildRows", TUnit::UNIT);
   ht_stats_profile_ = HashTable::AddHashTableCounters(profile());
   num_spilled_partitions_ = ADD_COUNTER(profile(), "SpilledPartitions", TUnit::UNIT);
   num_repartitions_ = ADD_COUNTER(profile(), "NumRepartitions", TUnit::UNIT);
@@ -305,6 +304,12 @@ Status PhjBuilder::Open(RuntimeState* state) {
 Status PhjBuilder::Send(RuntimeState* state, RowBatch* batch) {
   SCOPED_TIMER(profile()->total_time_counter());
   SCOPED_TIMER(partition_build_rows_timer_);
+  RETURN_IF_ERROR(AddBatch(batch));
+  COUNTER_ADD(num_build_rows_, batch->num_rows());
+  return Status::OK();
+}
+
+Status PhjBuilder::AddBatch(RowBatch* batch) {
   bool build_filters = ht_ctx_->level() == 0 && filter_ctxs_.size() > 0;
   if (process_build_batch_fn_ == nullptr) {
     RETURN_IF_ERROR(ProcessBuildBatch(batch, ht_ctx_.get(), build_filters,
@@ -313,23 +318,24 @@ Status PhjBuilder::Send(RuntimeState* state, RowBatch* batch) {
   } else {
     DCHECK(process_build_batch_fn_level0_ != nullptr);
     if (ht_ctx_->level() == 0) {
-      RETURN_IF_ERROR(
-          process_build_batch_fn_level0_(this, batch, ht_ctx_.get(), build_filters,
-              join_op_ == TJoinOp::NULL_AWARE_LEFT_ANTI_JOIN));
+      RETURN_IF_ERROR(process_build_batch_fn_level0_(this, batch, ht_ctx_.get(),
+          build_filters, join_op_ == TJoinOp::NULL_AWARE_LEFT_ANTI_JOIN));
     } else {
       RETURN_IF_ERROR(process_build_batch_fn_(this, batch, ht_ctx_.get(), build_filters,
           join_op_ == TJoinOp::NULL_AWARE_LEFT_ANTI_JOIN));
     }
   }
-
   // Free any expr result allocations made during partitioning.
   expr_results_pool_->Clear();
-  COUNTER_ADD(num_build_rows_partitioned_, batch->num_rows());
   return Status::OK();
 }
 
 Status PhjBuilder::FlushFinal(RuntimeState* state) {
   SCOPED_TIMER(profile()->total_time_counter());
+  return FinalizeBuild(state);
+}
+
+Status PhjBuilder::FinalizeBuild(RuntimeState* state) {
   int64_t num_build_rows = 0;
   for (const unique_ptr<Partition>& partition : hash_partitions_) {
     num_build_rows += partition->build_rows()->num_rows();
@@ -692,7 +698,7 @@ int PhjBuilder::GetNumSpilledPartitions(const vector<unique_ptr<Partition>>& par
 
 Status PhjBuilder::DoneProbingHashPartitions(
     const int64_t num_spilled_probe_rows[PARTITION_FANOUT],
-    BufferPool::ClientHandle* probe_client,
+    BufferPool::ClientHandle* probe_client, RuntimeProfile* probe_profile,
     deque<unique_ptr<Partition>>* output_partitions, RowBatch* batch) {
   DCHECK_EQ(is_separate_build_, probe_client != buffer_pool_client_);
   DCHECK(output_partitions->empty());
@@ -710,6 +716,7 @@ Status PhjBuilder::DoneProbingHashPartitions(
   }
 
   if (num_probe_threads_ > 1) {
+    SCOPED_TIMER(probe_profile->inactive_timer());
     // TODO: IMPALA-9411: consider reworking to attach buffers to all output batches.
     RETURN_IF_ERROR(probe_barrier_->Wait([&]() {
       CleanUpHashPartitions(output_partitions, nullptr);
@@ -717,7 +724,12 @@ Status PhjBuilder::DoneProbingHashPartitions(
           << "Cannot share build for join modes that return rows from build partitions";
       return Status::OK();
     }));
+  } else if (is_separate_build_) {
+    SCOPED_TIMER(probe_profile->inactive_timer());
+    CleanUpHashPartitions(output_partitions, batch);
   } else {
+    // No need to activate probe's inactive timer, since the builder will be a child of
+    // the probe and its time will be subtracted from probe's total time.
     CleanUpHashPartitions(output_partitions, batch);
   }
 
@@ -732,6 +744,7 @@ Status PhjBuilder::DoneProbingHashPartitions(
 
 void PhjBuilder::CleanUpHashPartitions(
     deque<unique_ptr<Partition>>* output_partitions, RowBatch* batch) {
+  SCOPED_TIMER(profile()->total_time_counter());
   if (state_ == HashJoinState::REPARTITIONING_PROBE) {
     // Finished repartitioning this partition. Discard before pushing more spilled
     // partitions onto 'spilled_partitions_'.
@@ -767,13 +780,15 @@ void PhjBuilder::CleanUpHashPartitions(
 }
 
 Status PhjBuilder::DoneProbingSinglePartition(BufferPool::ClientHandle* probe_client,
-    deque<unique_ptr<Partition>>* output_partitions, RowBatch* batch) {
+    RuntimeProfile* probe_profile, deque<unique_ptr<Partition>>* output_partitions,
+    RowBatch* batch) {
   VLOG(3) << "PHJ(node_id=" << join_node_id_ << ") done probing single partition.";
   DCHECK_EQ(is_separate_build_, probe_client != buffer_pool_client_);
   // Calculate before popping off the last 'spilled_partition_'.
   int64_t probe_reservation = CalcProbeStreamReservation(state_);
   DCHECK_GE(probe_client->GetUnusedReservation(), probe_reservation);
   if (num_probe_threads_ > 1) {
+    SCOPED_TIMER(probe_profile->inactive_timer());
     // TODO: IMPALA-9411: consider reworking to attach buffers to all output batches.
     RETURN_IF_ERROR(probe_barrier_->Wait([&]() {
       CleanUpSinglePartition(output_partitions, nullptr);
@@ -781,7 +796,12 @@ Status PhjBuilder::DoneProbingSinglePartition(BufferPool::ClientHandle* probe_cl
           << "Cannot share build for join modes that return rows from build partitions";
       return Status::OK();
     }));
+  } else if (is_separate_build_) {
+    SCOPED_TIMER(probe_profile->inactive_timer());
+    CleanUpSinglePartition(output_partitions, batch);
   } else {
+    // No need to activate probe's inactive timer, since the builder will be a child of
+    // the probe and its time will be subtracted from probe's total time.
     CleanUpSinglePartition(output_partitions, batch);
   }
   if (is_separate_build_) {
@@ -795,6 +815,7 @@ Status PhjBuilder::DoneProbingSinglePartition(BufferPool::ClientHandle* probe_cl
 
 void PhjBuilder::CleanUpSinglePartition(
     deque<unique_ptr<Partition>>* output_partitions, RowBatch* batch) {
+  SCOPED_TIMER(profile()->total_time_counter());
   if (NeedToProcessUnmatchedBuildRows(join_op_)) {
     DCHECK_LE(num_probe_threads_, 1)
         << "Don't support returning build partitions with shared build";
@@ -893,15 +914,22 @@ void PhjBuilder::PublishRuntimeFilters(int64_t num_build_rows) {
   }
 }
 
-Status PhjBuilder::BeginSpilledProbe(
-    BufferPool::ClientHandle* probe_client, bool* repartitioned,
-     Partition** input_partition, HashPartitions* new_partitions) {
+Status PhjBuilder::BeginSpilledProbe(BufferPool::ClientHandle* probe_client,
+    RuntimeProfile* probe_profile, bool* repartitioned, Partition** input_partition,
+    HashPartitions* new_partitions) {
   DCHECK_EQ(is_separate_build_, probe_client != buffer_pool_client_);
   DCHECK(!spilled_partitions_.empty());
   DCHECK_EQ(0, hash_partitions_.size());
+
   if (num_probe_threads_ > 1) {
+    SCOPED_TIMER(probe_profile->inactive_timer());
     RETURN_IF_ERROR(probe_barrier_->Wait([&]() { return BeginSpilledProbeSerial(); }));
+  } else if (is_separate_build_) {
+    SCOPED_TIMER(probe_profile->inactive_timer());
+    RETURN_IF_ERROR(BeginSpilledProbeSerial());
   } else {
+    // No need to activate probe's inactive timer, since the builder will be a child of
+    // the probe and its time will be subtracted from probe's total time.
     RETURN_IF_ERROR(BeginSpilledProbeSerial());
   }
 
@@ -919,6 +947,7 @@ Status PhjBuilder::BeginSpilledProbe(
 }
 
 Status PhjBuilder::BeginSpilledProbeSerial() {
+  SCOPED_TIMER(profile()->total_time_counter());
   DCHECK_EQ(0, probe_stream_reservation_.GetReservation());
   if (is_separate_build_ || join_op_ != TJoinOp::NULL_AWARE_LEFT_ANTI_JOIN) {
     DCHECK_EQ(0, buffer_pool_client_->GetUsedReservation())
@@ -1030,13 +1059,13 @@ Status PhjBuilder::RepartitionBuildInput(Partition* input_partition) {
     RETURN_IF_ERROR(state->CheckQueryState());
 
     RETURN_IF_ERROR(build_rows->GetNext(&build_batch, &eos));
-    RETURN_IF_ERROR(Send(state, &build_batch));
+    RETURN_IF_ERROR(AddBatch(&build_batch));
     build_batch.Reset();
   }
 
   // Done reading the input, we can safely close it now to free memory.
   input_partition->Close(nullptr);
-  RETURN_IF_ERROR(FlushFinal(state));
+  RETURN_IF_ERROR(FinalizeBuild(state));
   return Status::OK();
 }
 

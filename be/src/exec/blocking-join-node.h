@@ -142,9 +142,7 @@ class BlockingJoinNode : public ExecNode {
   /// so this tuple is temporarily assembled for evaluating the conjuncts.
   TupleRow* semi_join_staging_row_;
 
-  RuntimeProfile::Counter* build_timer_;   // time to prepare build side
   RuntimeProfile::Counter* probe_timer_;   // time to process the probe (left child) batch
-  RuntimeProfile::Counter* build_row_counter_;   // num build rows
   RuntimeProfile::Counter* probe_row_counter_;   // num probe (left child) rows
 
   /// Stopwatch that measures the build child's Open/GetNext time that overlaps

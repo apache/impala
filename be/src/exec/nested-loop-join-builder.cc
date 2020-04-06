@@ -71,6 +71,7 @@ NljBuilder::~NljBuilder() {}
 
 Status NljBuilder::Prepare(RuntimeState* state, MemTracker* parent_mem_tracker) {
   RETURN_IF_ERROR(DataSink::Prepare(state, parent_mem_tracker));
+  num_build_rows_ = ADD_COUNTER(profile(), "BuildRows", TUnit::UNIT);
   return Status::OK();
 }
 
@@ -81,6 +82,7 @@ Status NljBuilder::Open(RuntimeState* state) {
 
 Status NljBuilder::Send(RuntimeState* state, RowBatch* batch) {
   SCOPED_TIMER(profile()->total_time_counter());
+  int num_input_rows = batch->num_rows();
   // Swap the contents of the batch into a batch owned by the builder.
   RowBatch* build_batch = GetNextEmptyBatch();
   build_batch->AcquireState(batch);
@@ -99,6 +101,7 @@ Status NljBuilder::Send(RuntimeState* state, RowBatch* batch) {
     // is fixed.
     RETURN_IF_ERROR(DeepCopyBuildBatches(state));
   }
+  COUNTER_ADD(num_build_rows_, num_input_rows);
   return Status::OK();
 }
 
