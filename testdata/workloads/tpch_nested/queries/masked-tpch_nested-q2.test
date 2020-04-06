@@ -1,0 +1,147 @@
+====
+---- QUERY: TPCH-Q2
+# Q2 - Minimum Cost Supplier Query
+select
+  s_acctbal,
+  s_name,
+  n_name,
+  p_partkey,
+  p_mfgr,
+  s_address,
+  s_phone,
+  s_comment
+from
+  supplier s,
+  s.s_partsupps ps,
+  part p,
+  region r,
+  r.r_nations n
+where
+  p_partkey = ps_partkey
+  and p_size = 15
+  and p_type like '%BRASS'
+  and s_nationkey = n_nationkey
+  and r_name = 'EUROPE'
+  and ps_supplycost = (
+    select
+      min(ps_supplycost)
+    from
+      supplier s,
+      s.s_partsupps ps,
+      region r,
+      r.r_nations n
+    where
+      p_partkey = ps_partkey
+      and s_nationkey = n_nationkey
+      and r_name = 'EUROPE'
+    )
+order by
+  s_acctbal desc,
+  n_name,
+  s_name,
+  p_partkey
+limit 100
+---- RESULTS
+9938.53,'Xxxxxxxx#nnnnnnnnn','UNITED KINGDOM',185358,'Manufacturer#4','XXxXXx,xXXxxxnXXXXxXXxnn','33-4xx-xxx-xxxx','uriously regular requests hag'
+9937.84,'Xxxxxxxx#nnnnnnnnn','ROMANIA',108438,'Manufacturer#1','XXXXXXXXxx,xxxnnXxxnXXxnxxXxxxnXx','29-5xx-xxx-xxxx','efully express instructions. regular requests against the slyly fin'
+9936.22,'Xxxxxxxx#nnnnnnnnn','UNITED KINGDOM',249,'Manufacturer#4','XnxxxnxxXXxxnXxxnXX X','33-3xx-xxx-xxxx','etect about the furiously final accounts. slyly ironic pinto beans sleep inside the furiously'
+9923.77,'Xxxxxxxx#nnnnnnnnn','GERMANY',29821,'Manufacturer#4','xnXXnXxxXXXx','17-7xx-xxx-xxxx','ackages boost blithely. blithely regular deposits c'
+9871.22,'Xxxxxxxx#nnnnnnnnn','GERMANY',43868,'Manufacturer#5','XnxxXXxXxX','17-8xx-xxx-xxxx','etect blithely bold asymptotes. fluffily ironic platelets wake furiously; blit'
+9870.78,'Xxxxxxxx#nnnnnnnnn','GERMANY',81285,'Manufacturer#2','XXX,XnxxxXxnxXxxxnXxnxnXxXxnXXxxxxXXX','17-5xx-xxx-xxxx',' regular accounts. furiously unusual courts above the fi'
+9870.78,'Xxxxxxxx#nnnnnnnnn','GERMANY',181285,'Manufacturer#4','XXX,XnxxxXxnxXxxxnXxnxnXxXxnXXxxxxXXX','17-5xx-xxx-xxxx',' regular accounts. furiously unusual courts above the fi'
+9852.52,'Xxxxxxxx#nnnnnnnnn','RUSSIA',18972,'Manufacturer#2','xnXnnXxXXXXnx,XxnnxxXxXn','32-1xx-xxx-xxxx','rns wake final foxes. carefully unusual depende'
+9847.83,'Xxxxxxxx#nnnnnnnnn','RUSSIA',130557,'Manufacturer#2','xXxnnxxXnnXxxxXxX','32-3xx-xxx-xxxx',' the special excuses. silent sentiments serve carefully final ac'
+9847.57,'Xxxxxxxx#nnnnnnnnn','FRANCE',86344,'Manufacturer#1','XXxnxxxnxXnnnxnxxnXxXXxxxXxXXXxXxXXXxx','16-8xx-xxx-xxxx','ges. slyly regular requests are. ruthless, express excuses cajole blithely across the unu'
+9847.57,'Xxxxxxxx#nnnnnnnnn','FRANCE',173827,'Manufacturer#2','XXxnxxxnxXnnnxnxxnXxXXxxxXxXXXxXxXXXxx','16-8xx-xxx-xxxx','ges. slyly regular requests are. ruthless, express excuses cajole blithely across the unu'
+9836.93,'Xxxxxxxx#nnnnnnnnn','RUSSIA',4841,'Manufacturer#4','XXxXnXn,nxxXXXXXx','32-3xx-xxx-xxxx','blithely carefully bold theodolites. fur'
+9817.10,'Xxxxxxxx#nnnnnnnnn','RUSSIA',124815,'Manufacturer#2','nXxxXXXxxxXxXXx XxxXxxXxnXnxXXx','32-5xx-xxx-xxxx','wake carefully alongside of the carefully final ex'
+9817.10,'Xxxxxxxx#nnnnnnnnn','RUSSIA',152351,'Manufacturer#3','nXxxXXXxxxXxXXx XxxXxxXxnXnxXXx','32-5xx-xxx-xxxx','wake carefully alongside of the carefully final ex'
+9739.86,'Xxxxxxxx#nnnnnnnnn','FRANCE',138357,'Manufacturer#2','x,XnxnXXxxxxX xnXnx nXnxxX,X','16-4xx-xxx-xxxx','s after the furiously bold packages sleep fluffily idly final requests: quickly final'
+9721.95,'Xxxxxxxx#nnnnnnnnn','UNITED KINGDOM',156241,'Manufacturer#3','XxxnXxXnxXn','33-8xx-xxx-xxxx','eep furiously sauternes; quickl'
+9681.33,'Xxxxxxxx#nnnnnnnnn','RUSSIA',78405,'Manufacturer#1',',xXxXxxxXx','32-1xx-xxx-xxxx','haggle slyly regular excuses. quic'
+9643.55,'Xxxxxxxx#nnnnnnnnn','ROMANIA',107617,'Manufacturer#1','xXnxxXXxxxnxnxnnx Xxnnn','29-2xx-xxx-xxxx','final excuses. final ideas boost quickly furiously speci'
+9624.82,'Xxxxxxxx#nnnnnnnnn','FRANCE',34306,'Manufacturer#3','xnxxxnnxXXXXxxXxxxxxXXxXxxXXxx','16-3xx-xxx-xxxx','e packages are around the special ideas. special, pending foxes us'
+9624.78,'Xxxxxxxx#nnnnnnnnn','ROMANIA',189657,'Manufacturer#1','xXnxXxXxXXnxxXxxxXxXXX,x','29-7xx-xxx-xxxx','ronic asymptotes wake bravely final'
+9612.94,'Xxxxxxxx#nnnnnnnnn','ROMANIA',120715,'Manufacturer#2','XXxxXXXnxXxnXXxxxxxnXxXXxx,xXX','29-3xx-xxx-xxxx','warhorses. quickly even deposits sublate daringly ironic instructions. slyly blithe t'
+9612.94,'Xxxxxxxx#nnnnnnnnn','ROMANIA',198189,'Manufacturer#4','XXxxXXXnxXxnXXxxxxxnXxXXxx,xXX','29-3xx-xxx-xxxx','warhorses. quickly even deposits sublate daringly ironic instructions. slyly blithe t'
+9571.83,'Xxxxxxxx#nnnnnnnnn','ROMANIA',179270,'Manufacturer#2','xXXXnXxXxxxxXXXXXnXx','29-9xx-xxx-xxxx','kly carefully express asymptotes. furiou'
+9558.10,'Xxxxxxxx#nnnnnnnnn','UNITED KINGDOM',88515,'Manufacturer#4','XXxxxxXxnnXXxXxXxxxxXXXxxXnxnxxxxXx','33-1xx-xxx-xxxx',' foxes. quickly even excuses use. slyly special foxes nag bl'
+9492.79,'Xxxxxxxx#nnnnnnnnn','GERMANY',25974,'Manufacturer#5','XnxXxXXxnnxnxX','17-9xx-xxx-xxxx','arefully pending accounts. blithely regular excuses boost carefully carefully ironic p'
+9461.05,'Xxxxxxxx#nnnnnnnnn','UNITED KINGDOM',20033,'Manufacturer#1','nxxXxxxxX nXXnxXxxXxxxxxxxnxXxXxnXXX','33-5xx-xxx-xxxx','. slyly regular deposits wake slyly. furiously regular warthogs are.'
+9453.01,'Xxxxxxxx#nnnnnnnnn','ROMANIA',175767,'Manufacturer#1',',nXXXxnxxXXXxxXXxnXxnnXx','29-3xx-xxx-xxxx','gular frets. permanently special multipliers believe blithely alongs'
+9408.65,'Xxxxxxxx#nnnnnnnnn','UNITED KINGDOM',117771,'Manufacturer#4','XxXnXXX,xxxnxn','33-1xx-xxx-xxxx','nag against the final requests. furiously unusual packages cajole blit'
+9359.61,'Xxxxxxxx#nnnnnnnnn','ROMANIA',62349,'Manufacturer#5','XXxxxXnXx xxn','29-3xx-xxx-xxxx','y ironic theodolites. blithely sile'
+9357.45,'Xxxxxxxx#nnnnnnnnn','UNITED KINGDOM',138648,'Manufacturer#1','xnnn,xxXnxxXxnXx','33-5xx-xxx-xxxx','ously always regular packages. fluffily even accounts beneath the furiously final pack'
+9352.04,'Xxxxxxxx#nnnnnnnnn','GERMANY',170921,'Manufacturer#4','xXXXxxxXXxXXxxxX','17-1xx-xxx-xxxx',' according to the carefully bold ideas'
+9312.97,'Xxxxxxxx#nnnnnnnnn','RUSSIA',90279,'Manufacturer#5','xXXXXXxnXXXXnXXxXXxXX','32-6xx-xxx-xxxx','ecial packages among the pending, even requests use regula'
+9312.97,'Xxxxxxxx#nnnnnnnnn','RUSSIA',100276,'Manufacturer#5','xXXXXXxnXXXXnXXxXXxXX','32-6xx-xxx-xxxx','ecial packages among the pending, even requests use regula'
+9280.27,'Xxxxxxxx#nnnnnnnnn','ROMANIA',47193,'Manufacturer#3','xxXXXxXXxXXxXXXXxXxx xxXXXxxX','29-3xx-xxx-xxxx','o beans haggle after the furiously unusual deposits. carefully silent dolphins cajole carefully'
+9274.80,'Xxxxxxxx#nnnnnnnnn','RUSSIA',76346,'Manufacturer#3','nxxXxXXXnXnxXnxXxxxx XXxxxxnXxXx','32-5xx-xxx-xxxx','y. courts do wake slyly. carefully ironic platelets haggle above the slyly regular the'
+9249.35,'Xxxxxxxx#nnnnnnnnn','FRANCE',26466,'Manufacturer#1','xnnXxXxXnXxnXxXXX,XXxnxXxxXXXxXXXXxXXXn','16-7xx-xxx-xxxx','uests are furiously. regular tithes through the regular, final accounts cajole furiously above the q'
+9249.35,'Xxxxxxxx#nnnnnnnnn','FRANCE',33972,'Manufacturer#1','xnnXxXxXnXxnXxXXX,XXxnxXxxXXXxXXXXxXXXn','16-7xx-xxx-xxxx','uests are furiously. regular tithes through the regular, final accounts cajole furiously above the q'
+9208.70,'Xxxxxxxx#nnnnnnnnn','ROMANIA',40256,'Manufacturer#5','xxxxxxx nxnX XxnxX','29-9xx-xxx-xxxx','lites was quickly above the furiously ironic requests. slyly even foxes against the blithely bold '
+9201.47,'Xxxxxxxx#nnnnnnnnn','UNITED KINGDOM',67183,'Manufacturer#5','XX XxXXxxxnxxxXxnXn','33-1xx-xxx-xxxx','e even, even foxes. blithely ironic packages cajole regular packages. slyly final ide'
+9192.10,'Xxxxxxxx#nnnnnnnnn','UNITED KINGDOM',85098,'Manufacturer#3','xX nxnxnXx,xXn,nXxXXXXXXXXXxxX','33-5xx-xxx-xxxx','es across the carefully express accounts boost caref'
+9189.98,'Xxxxxxxx#nnnnnnnnn','GERMANY',21225,'Manufacturer#4','xxXXxXxXxXxxXXxxx','17-7xx-xxx-xxxx',' deposits. blithely bold excuses about the slyly bold forges wake '
+9128.97,'Xxxxxxxx#nnnnnnnnn','RUSSIA',146768,'Manufacturer#5','XnXxxXxnXXXXxnnnXxxXXn','32-1xx-xxx-xxxx','refully. blithely unusual asymptotes haggle '
+9104.83,'Xxxxxxxx#nnnnnnnnn','GERMANY',150974,'Manufacturer#4','XxXXXxXnXX Xn xnnxXn,n','17-7xx-xxx-xxxx','ly about the blithely ironic depths. slyly final theodolites among the fluffily bold ideas print'
+9101.00,'Xxxxxxxx#nnnnnnnnn','ROMANIA',128254,'Manufacturer#5','xxxnxXX,xxXXXXxx,XnXXXxXnxX xnnxXXxXXX','29-5xx-xxx-xxxx','ts. notornis detect blithely above the carefully bold requests. blithely even package'
+9094.57,'Xxxxxxxx#nnnnnnnnn','RUSSIA',39575,'Manufacturer#1','XXnXxXXXnx,xxX x,xnXXxxxxnXXXXxXxXXx','32-5xx-xxx-xxxx','jole. regular accounts sleep blithely frets. final pinto beans play furiously past the '
+8996.87,'Xxxxxxxx#nnnnnnnnn','FRANCE',102191,'Manufacturer#5','nXXxXXnnxxx','16-8xx-xxx-xxxx','ickly final packages along the express plat'
+8996.14,'Xxxxxxxx#nnnnnnnnn','ROMANIA',139813,'Manufacturer#2','xxnXnxxnnxXXnXXXxXxxXXXxXXXxXXxXXXxX','29-9xx-xxx-xxxx',' dependencies boost quickly across the furiously pending requests! unusual dolphins play sl'
+8968.42,'Xxxxxxxx#nnnnnnnnn','ROMANIA',119999,'Manufacturer#5','xXXXXxxXxXnX XXXxxnnnXXXxXxXXXnx','29-5xx-xxx-xxxx','ly regular foxes boost slyly. quickly special waters boost carefully ironi'
+8936.82,'Xxxxxxxx#nnnnnnnnn','UNITED KINGDOM',109512,'Manufacturer#1','XXxxxxXXxXxxXXnXnXxXXxxXXxxxXXxXXx,nXx','33-7xx-xxx-xxxx','efully regular courts. furiousl'
+8929.42,'Xxxxxxxx#nnnnnnnnn','FRANCE',173735,'Manufacturer#4','XnxXnnXxXxXXXn XxxxxXx','16-2xx-xxx-xxxx','cajole furiously unusual requests. quickly stealthy requests are. '
+8920.59,'Xxxxxxxx#nnnnnnnnn','ROMANIA',26460,'Manufacturer#1','xXxXXxnnXXn','29-1xx-xxx-xxxx','aters. express, pending instructions sleep. brave, r'
+8920.59,'Xxxxxxxx#nnnnnnnnn','ROMANIA',173966,'Manufacturer#2','xXxXXxnnXXn','29-1xx-xxx-xxxx','aters. express, pending instructions sleep. brave, r'
+8913.96,'Xxxxxxxx#nnnnnnnnn','UNITED KINGDOM',137063,'Manufacturer#2','XXxxxXXxnx,xxXxxXXxXXXxnXnnXXxxxXn','33-7xx-xxx-xxxx',' haggle slyly above the furiously regular pinto beans. even '
+8877.82,'Xxxxxxxx#nnnnnnnnn','FRANCE',167966,'Manufacturer#5','XnxxnXXXXnxxnX,xxxXxXXX','16-4xx-xxx-xxxx','ously foxes. express, ironic requests im'
+8862.24,'Xxxxxxxx#nnnnnnnnn','ROMANIA',73322,'Manufacturer#3','Xn xXxxXnXxXxxnXxX','29-7xx-xxx-xxxx','ly pending ideas sleep about the furiously unu'
+8841.59,'Xxxxxxxx#nnnnnnnnn','ROMANIA',100729,'Manufacturer#5','XxxnxXxxnxnnxxXXnxnnxXXnXxxXnxXX','29-3xx-xxx-xxxx','gainst the pinto beans. fluffily unusual dependencies affix slyly even deposits.'
+8781.71,'Xxxxxxxx#nnnnnnnnn','ROMANIA',13120,'Manufacturer#5','xXxXxxxnnnXXXxxXx,nnx,xx nXxXXXnXxxnxX','29-7xx-xxx-xxxx','s wake quickly ironic ideas'
+8754.24,'Xxxxxxxx#nnnnnnnnn','UNITED KINGDOM',179406,'Manufacturer#4','XXXXxxxXxxnX','33-9xx-xxx-xxxx','e ironic requests. carefully even foxes above the furious'
+8691.06,'Xxxxxxxx#nnnnnnnnn','UNITED KINGDOM',126892,'Manufacturer#2','x,XXxxnXxxXXnXnXxx,xXxx','33-9xx-xxx-xxxx','efully express deposits kindle after the deposits. final '
+8655.99,'Xxxxxxxx#nnnnnnnnn','RUSSIA',193810,'Manufacturer#2','XxxxxXXxnxxXxnxnXxXXXXXx xXnXnXxxnXx','32-5xx-xxx-xxxx','symptotes use about the express dolphins. requests use after the express platelets. final, ex'
+8638.36,'Xxxxxxxx#nnnnnnnnn','RUSSIA',75398,'Manufacturer#1','XxnxnxxxxnX','32-1xx-xxx-xxxx','ly quickly ironic requests. even requests whithout t'
+8638.36,'Xxxxxxxx#nnnnnnnnn','RUSSIA',170402,'Manufacturer#3','XxnxnxxxxnX','32-1xx-xxx-xxxx','ly quickly ironic requests. even requests whithout t'
+8607.69,'Xxxxxxxx#nnnnnnnnn','UNITED KINGDOM',76002,'Manufacturer#2','XXnxXXxXxxxxXnXXnnxXxXxxx,nnXnXxXXXxX','33-4xx-xxx-xxxx','ar, pending accounts. pending depende'
+8569.52,'Xxxxxxxx#nnnnnnnnn','RUSSIA',5935,'Manufacturer#5','xXxXXnxxxXXXnxxXXXxxxxxnxXnxnXX','32-6xx-xxx-xxxx','. regular foxes nag carefully atop the regular, silent deposits. quickly regular packages '
+8564.12,'Xxxxxxxx#nnnnnnnnn','GERMANY',110032,'Manufacturer#1','xxxXxXxnnnnXnXXxxXXnXxnXxxnxnXXnxnX','17-1xx-xxx-xxxx','n sauternes along the regular asymptotes are regularly along the '
+8553.82,'Xxxxxxxx#nnnnnnnnn','ROMANIA',143978,'Manufacturer#4','XxxXxXXxXXXnxxxxXXxnXXXxn XxxxXXnXXXX','29-1xx-xxx-xxxx','ic requests wake against the blithely unusual accounts. fluffily r'
+8517.23,'Xxxxxxxx#nnnnnnnnn','RUSSIA',37025,'Manufacturer#5','xnnXnxnXXXXnxXxx','32-5xx-xxx-xxxx','ove the even courts. furiously special platelets '
+8517.23,'Xxxxxxxx#nnnnnnnnn','RUSSIA',59528,'Manufacturer#2','xnnXnxnXXXXnxXxx','32-5xx-xxx-xxxx','ove the even courts. furiously special platelets '
+8503.70,'Xxxxxxxx#nnnnnnnnn','RUSSIA',44325,'Manufacturer#4','XXnXXXXXXXxxXxxxX nX','32-1xx-xxx-xxxx','pades cajole. furious packages among the carefully express excuses boost furiously across th'
+8457.09,'Xxxxxxxx#nnnnnnnnn','UNITED KINGDOM',19455,'Manufacturer#1','nXXxXxnxXnxXxXnXxnnnXXx','33-8xx-xxx-xxxx','cing requests along the furiously unusual deposits promise among the furiously unus'
+8441.40,'Xxxxxxxx#nnnnnnnnn','FRANCE',141302,'Manufacturer#2','xXnxxnxXnn','16-3xx-xxx-xxxx','ely even ideas. ideas wake slyly furiously unusual instructions. pinto beans sleep ag'
+8432.89,'Xxxxxxxx#nnnnnnnnn','RUSSIA',191470,'Manufacturer#1','xxxXXxnXXxxxXXXXXXnnXxxxxxXXXXxxxxXxnx','32-8xx-xxx-xxxx','ep furiously. packages should have to haggle slyly across the deposits. furiously regu'
+8431.40,'Xxxxxxxx#nnnnnnnnn','ROMANIA',5174,'Manufacturer#1','XXXXxXxnXnXXXXxxXxxxxXxxxxXnxxnx','29-4xx-xxx-xxxx','ithely express pinto beans. blithely even foxes haggle. furiously regular theodol'
+8407.04,'Xxxxxxxx#nnnnnnnnn','RUSSIA',162889,'Manufacturer#4','xn xXXnXXnXXnXxxXX','32-6xx-xxx-xxxx','r the blithely regular packages. slyly ironic theodoli'
+8386.08,'Xxxxxxxx#nnnnnnnnn','FRANCE',36014,'Manufacturer#3','nxxxxxXXxnxxXXXX,xnxXxXXxxXXXXXxXxXXxxXX','16-6xx-xxx-xxxx','blithely bold pains are carefully platelets. finally regular pinto beans sleep carefully special'
+8376.52,'Xxxxxxxx#nnnnnnnnn','UNITED KINGDOM',190267,'Manufacturer#5','nxnXn XxXXxxXXXxnXXxx,XXnxxXxnnxXXxxxXxn','33-6xx-xxx-xxxx','ly final accounts sleep special, regular requests. furiously regular'
+8348.74,'Xxxxxxxx#nnnnnnnnn','FRANCE',66344,'Manufacturer#4','xXxxnXxXxxxxn','16-7xx-xxx-xxxx',' boldly final deposits. regular, even instructions detect slyly. fluffily unusual pinto bea'
+8338.58,'Xxxxxxxx#nnnnnnnnn','FRANCE',17268,'Manufacturer#4','XxxXXxXXXxxXnn,n','16-2xx-xxx-xxxx','iously final accounts. even pinto beans cajole slyly regular'
+8328.46,'Xxxxxxxx#nnnnnnnnn','ROMANIA',69237,'Manufacturer#5','xXxnxXnnxn,XXXxnx,xXxXnXxx,xxn','29-3xx-xxx-xxxx','ep carefully-- even, careful packages are slyly along t'
+8307.93,'Xxxxxxxx#nnnnnnnnn','GERMANY',18139,'Manufacturer#1','xxxxxXnxXXXxxXxX','17-5xx-xxx-xxxx','olites wake furiously regular decoys. final requests nod '
+8231.61,'Xxxxxxxx#nnnnnnnnn','RUSSIA',192000,'Manufacturer#2','xxxxxx,xXnxXXXXXnxX','32-7xx-xxx-xxxx',' foxes according to the furi'
+8152.61,'Xxxxxxxx#nnnnnnnnn','ROMANIA',15227,'Manufacturer#4',' xxxXXXxXnxx','29-8xx-xxx-xxxx',' special requests. even, regular warhorses affix among the final gr'
+8109.09,'Xxxxxxxx#nnnnnnnnn','FRANCE',99185,'Manufacturer#1','xxxxxxXXxxxnxXXXxxxxxXXXXXx','16-6xx-xxx-xxxx','tions haggle slyly about the sil'
+8102.62,'Xxxxxxxx#nnnnnnnnn','UNITED KINGDOM',18344,'Manufacturer#5','x XxXXnXnnx','33-4xx-xxx-xxxx','egrate with the slyly bold instructions. special foxes haggle silently among the'
+8046.07,'Xxxxxxxx#nnnnnnnnn','FRANCE',191222,'Manufacturer#3','XxxxxXnXXnxxx ,XxnXxx','16-4xx-xxx-xxxx','onic platelets cajole after the regular instructions. permanently bold excuses'
+8042.09,'Xxxxxxxx#nnnnnnnnn','RUSSIA',135705,'Manufacturer#4','XxnXxxnnxxxxXXnXxXxXxnxnxXXXnxnX','32-8xx-xxx-xxxx','osits. packages cajole slyly. furiously regular deposits cajole slyly. q'
+8042.09,'Xxxxxxxx#nnnnnnnnn','RUSSIA',150729,'Manufacturer#1','XxnXxxnnxxxxXXnXxXxXxnxnxXXXnxnX','32-8xx-xxx-xxxx','osits. packages cajole slyly. furiously regular deposits cajole slyly. q'
+7992.40,'Xxxxxxxx#nnnnnnnnn','FRANCE',118574,'Manufacturer#1','nxXxxxXXxXxxXxXXnxn','16-9xx-xxx-xxxx',' ironic ideas? fluffily even instructions wake. blithel'
+7980.65,'Xxxxxxxx#nnnnnnnnn','FRANCE',13784,'Manufacturer#4','xX,nXxXXxXx','16-6xx-xxx-xxxx','ully bold courts. escapades nag slyly. furiously fluffy theodo'
+7950.37,'Xxxxxxxx#nnnnnnnnn','GERMANY',33094,'Manufacturer#5','xxXxXnXxxxxXxXXX XXxxXXXXxxnXXxxx','17-6xx-xxx-xxxx','arefully unusual requests x-ray above the quickly final deposits. '
+7937.93,'Xxxxxxxx#nnnnnnnnn','ROMANIA',83995,'Manufacturer#2','xXxXxxX,XxnxnxxXxxxXXxxxXxxxx','29-2xx-xxx-xxxx','to the blithely ironic deposits nag sly'
+7914.45,'Xxxxxxxx#nnnnnnnnn','RUSSIA',125988,'Manufacturer#2','xxXxxxxxnXXXxXXxxxXXXxXXnxXxX','32-1xx-xxx-xxxx',' busily bold packages are dolphi'
+7912.91,'Xxxxxxxx#nnnnnnnnn','GERMANY',159180,'Manufacturer#5','nxXXXxxXxxn,xnnXXxxXx,nXXxXXXXXXX','17-2xx-xxx-xxxx','ay furiously regular platelets. cou'
+7912.91,'Xxxxxxxx#nnnnnnnnn','GERMANY',184210,'Manufacturer#4','nxXXXxxXxxn,xnnXXxxXx,nXXxXXXXXXX','17-2xx-xxx-xxxx','ay furiously regular platelets. cou'
+7894.56,'Xxxxxxxx#nnnnnnnnn','GERMANY',85472,'Manufacturer#4','XXXnnxXXXXxxXX','17-9xx-xxx-xxxx','ic platelets affix after the furiously'
+7887.08,'Xxxxxxxx#nnnnnnnnn','GERMANY',164759,'Manufacturer#3','XnnXXXxXxxXnxXXxXnXnxXX XnXxXnXnXxx','17-9xx-xxx-xxxx','ckly around the carefully fluffy theodolites. slyly ironic pack'
+7871.50,'Xxxxxxxx#nnnnnnnnn','RUSSIA',104695,'Manufacturer#1','nx xXXxxXxxXxXnnxxXXxxX','32-4xx-xxx-xxxx','ironic requests. furiously final theodolites cajole. final, express packages sleep. quickly reg'
+7852.45,'Xxxxxxxx#nnnnnnnnn','RUSSIA',8363,'Manufacturer#4','XXXxXXXxXXxnx,x','32-4xx-xxx-xxxx','usly unusual pinto beans. brave ideas sleep carefully quickly ironi'
+7850.66,'Xxxxxxxx#nnnnnnnnn','UNITED KINGDOM',86501,'Manufacturer#1','XXxxnXXxXXXXX','33-7xx-xxx-xxxx','ifts haggle fluffily pending pai'
+7843.52,'Xxxxxxxx#nnnnnnnnn','FRANCE',11680,'Manufacturer#4','nXnXXxxxnnXnnxXXxXXxxxXxxxXxx','16-4xx-xxx-xxxx',' express, final pinto beans x-ray slyly asymptotes. unusual, unusual'
+---- TYPES
+DECIMAL, STRING, STRING, BIGINT, STRING, STRING, STRING, STRING
+====

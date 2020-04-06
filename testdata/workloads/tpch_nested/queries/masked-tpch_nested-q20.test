@@ -1,0 +1,42 @@
+====
+---- QUERY: TPCH-Q20
+# Q20 - Potential Part Promotion Query
+# Note: Tricky rewrite from the original to avoid mixing
+# correlated and uncorrelated table refs in a subquery.
+# No results since "p_name" is masked. Predicate "p_name like 'forest%'"
+# chooses nothing
+select distinct
+  s_name,
+  s_address
+from
+  supplier s,
+  s.s_partsupps ps,
+  region.r_nations n
+where
+  ps_partkey in (
+      select
+        p_partkey
+      from
+        part p
+      where
+        p_name like 'forest%'
+  )
+  and ps_availqty > (
+      select
+        0.5 * sum(l_quantity)
+      from
+        customer.c_orders.o_lineitems l
+      where
+        l_partkey = ps_partkey
+        and l_suppkey = s_suppkey
+        and l_shipdate >= '1994-01-01'
+        and l_shipdate < '1995-01-01'
+  )
+  and s_nationkey = n_nationkey
+  and n_name = 'CANADA'
+order by
+  s_name
+---- RESULTS
+---- TYPES
+string, string
+====
