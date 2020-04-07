@@ -319,7 +319,8 @@ class ImpaladService(BaseImpalaService):
       try:
         query_state = client.get_state(query_handle)
       except Exception as e:
-        pass
+        LOG.error("Exception while getting state of query {0}\n{1}".format(
+            query_handle.get_handle().id, str(e)))
       if query_state == target_state:
         return
       sleep(interval)
