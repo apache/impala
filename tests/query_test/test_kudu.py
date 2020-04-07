@@ -413,7 +413,8 @@ class TestKuduOperations(KuduTestSuite):
     cursor.execute("set kudu_read_mode=READ_AT_SNAPSHOT")
     create_query = "create table %s (id int primary key" % table_name
     for t in types:
-      create_query += ", %s_col %s" % (t, t)
+      # We truncate the type attributes in the column name to keep things simple.
+      create_query += ", %s_col %s" % (t.split('(')[0], t)
     create_query += ") partition by hash(id) partitions 16 stored as kudu"
     cursor.execute(create_query)
 
@@ -425,8 +426,9 @@ class TestKuduOperations(KuduTestSuite):
       for c in compressions:
         for t in types:
           try:
+            # We truncate the type attributes in the column name to keep things simple.
             cursor.execute("""alter table %s alter column %s_col
-                set encoding %s compression %s""" % (table_name, t, e, c))
+                set encoding %s compression %s""" % (table_name, t.split('(')[0], e, c))
           except Exception as err:
             assert "encoding %s not supported for type" % e in str(err)
         cursor.execute("""insert into %s values (%s, true, 0, 0, 0, 0, 0, 0, '0',
@@ -435,7 +437,7 @@ class TestKuduOperations(KuduTestSuite):
         cursor.execute("select * from %s where id = %s" % (table_name, i))
         assert cursor.fetchall() == \
             [(i, True, 0, 0, 0, 0, 0.0, 0.0, '0', datetime(2009, 1, 1, 0, 0), 0,
-                '2010-01-01')]
+                '2010-01-01', '')]
         i += 1
     cursor.execute("select count(*) from %s" % table_name)
     print cursor.fetchall() == [(i, )]
