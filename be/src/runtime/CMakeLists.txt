@@ -98,6 +98,7 @@ add_library(RuntimeTests STATIC
   multi-precision-test.cc
   raw-value-test.cc
   row-batch-serialize-test.cc
+  runtime-filter-test.cc
   string-buffer-test.cc
   string-compare-test.cc
   string-search-test.cc
@@ -131,6 +132,7 @@ ADD_UNIFIED_BE_LSAN_TEST(hdfs-fs-cache-test "HdfsFsCacheTest.*")
 ADD_UNIFIED_BE_LSAN_TEST(tmp-file-mgr-test "TmpFileMgrTest.*")
 ADD_UNIFIED_BE_LSAN_TEST(row-batch-serialize-test "RowBatchSerializeTest.*")
 # Exception to unified be tests: Custom main function with global Frontend object
+ADD_UNIFIED_BE_LSAN_TEST(runtime-filter-test "RuntimeFilterTest.*")
 ADD_BE_LSAN_TEST(row-batch-test)
 # Exception to unified be tests: Custom main function with global Frontend object
 ADD_BE_LSAN_TEST(collection-value-builder-test)
