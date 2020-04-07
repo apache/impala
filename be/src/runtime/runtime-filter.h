@@ -28,6 +28,7 @@
 namespace impala {
 
 class BloomFilter;
+class RuntimeFilterTest;
 
 /// RuntimeFilters represent set-membership predicates that are computed during query
 /// execution (rather than during planning). They can then be sent to other operators to
@@ -117,6 +118,8 @@ class RuntimeFilter {
   static const char* LLVM_CLASS_NAME;
 
  private:
+  friend class RuntimeFilterTest;
+
   /// Membership bloom_filter. May be NULL even after arrival_time_ is set, meaning that
   /// it does not filter any rows, either because it was not created
   /// (filter_desc_.bloom_filter is false), there was not enough memory, or the false
@@ -148,5 +151,9 @@ class RuntimeFilter {
   /// Signalled when a filter arrives or the filter is cancelled. Paired with
   /// 'arrival_mutex_'
   mutable ConditionVariable arrival_cv_;
+
+  /// Injection delay for WaitForArrival. Used in testing only.
+  /// See IMPALA-9612.
+  int64_t injection_delay_ = 0;
 };
 }
