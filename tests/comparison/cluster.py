@@ -209,9 +209,8 @@ class MiniCluster(Cluster):
       shutil.copy(os.path.join(other_conf_dir, file_name), self._local_hadoop_conf_dir)
 
   def _get_node_conf_dir(self):
-    return os.path.join(os.environ["IMPALA_HOME"], "testdata", "cluster",
-                        "cdh%s" % os.environ["CDH_MAJOR_VERSION"], "node-1",
-                        "etc", "hadoop", "conf")
+    return os.path.join(os.environ["IMPALA_CLUSTER_NODES_DIR"],
+                        "node-1", "etc", "hadoop", "conf")
 
   def _get_other_conf_dir(self):
     return os.path.join(os.environ["IMPALA_HOME"], "fe", "src", "test",

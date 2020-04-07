@@ -44,7 +44,8 @@
 
 set -eu -o pipefail
 
-: ${IMPALA_HOME:=~/Impala}
+: ${IMPALA_HOME:=$(cd "$(dirname $0)"/..; pwd)}
+export IMPALA_HOME
 
 if [[ -t 1 ]] # if on an interactive terminal
 then
