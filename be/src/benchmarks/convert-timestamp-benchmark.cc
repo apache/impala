@@ -166,7 +166,7 @@ fast path speedup: 10.2951
 vector<TimestampValue> AddTestDataDateTimes(int n, const string& startstr) {
   DateTimeFormatContext dt_ctx;
   dt_ctx.Reset("yyyy-MMM-dd HH:mm:ss");
-  SimpleDateFormatTokenizer::Tokenize(&dt_ctx);
+  SimpleDateFormatTokenizer::Tokenize(&dt_ctx, PARSE);
 
   random_device rd;
   mt19937 gen(rd());

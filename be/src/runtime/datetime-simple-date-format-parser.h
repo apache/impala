@@ -74,8 +74,6 @@ class SimpleDateFormatTokenizer {
 public:
   /// Constants to hold default format lengths.
   static const int DEFAULT_DATE_FMT_LEN;
-  static const int DEFAULT_TIME_FMT_LEN;
-  static const int DEFAULT_TIME_FRAC_FMT_LEN;
   static const int DEFAULT_SHORT_DATE_TIME_FMT_LEN;
   static const int DEFAULT_DATE_TIME_FMT_LEN;
 
@@ -83,8 +81,9 @@ public:
   /// dt_ctx -- output date/time format context
   /// accept_time_toks -- if true, time tokens are accepted. Otherwise time tokens are
   /// rejected.
+  /// cast_mode -- indicates if it is a 'datetime to string' or 'string to datetime' cast
   /// Return true if the parse was successful.
-  static bool Tokenize(DateTimeFormatContext* dt_ctx,
+  static bool Tokenize(DateTimeFormatContext* dt_ctx, CastDirection cast_mode,
       bool accept_time_toks = true);
 
   /// Parse the date/time string to generate the DateTimeFormatToken required by
@@ -95,11 +94,10 @@ public:
   /// dt_ctx -- date/time format context (must contain valid tokens)
   /// accept_time_toks -- if true, time tokens are accepted, otherwise time tokens are
   /// rejected.
-  /// accept_time_toks_only -- if true, time tokens w/o date tokens are accepted.
   /// Otherwise, they are rejected.
   /// Return true if the date/time was successfully parsed.
   static bool TokenizeByStr(DateTimeFormatContext* dt_ctx,
-      bool accept_time_toks = true, bool accept_time_toks_only = true);
+      bool accept_time_toks = true);
 
   /// Parse date/time string to find the corresponding default date/time format context.
   /// The string must adhere to a default date/time format.
@@ -127,10 +125,8 @@ private:
   static DateTimeFormatContext DEFAULT_SHORT_DATE_TIME_CTX;
   static DateTimeFormatContext DEFAULT_SHORT_ISO_DATE_TIME_CTX;
   static DateTimeFormatContext DEFAULT_DATE_CTX;
-  static DateTimeFormatContext DEFAULT_TIME_CTX;
   static DateTimeFormatContext DEFAULT_DATE_TIME_CTX[10];
   static DateTimeFormatContext DEFAULT_ISO_DATE_TIME_CTX[10];
-  static DateTimeFormatContext DEFAULT_TIME_FRAC_CTX[10];
 
   /// Checks if str_begin point to the beginning of a valid timezone offset.
   static bool IsValidTZOffset(const char* str_begin, const char* str_end);

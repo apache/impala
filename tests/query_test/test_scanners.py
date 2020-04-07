@@ -382,6 +382,19 @@ class TestParquet(ImpalaTestSuite):
     self.run_test_case('QueryTest/out-of-range-timestamp-abort-on-error',
         vector, unique_database)
 
+  def test_dateless_timestamp_parquet(self, vector, unique_database):
+    """Test scanning parquet files which still includes dateless timestamps."""
+    tbl_name = "timestamp_table"
+    create_sql = "create table %s.%s (t timestamp) stored as parquet" % (
+        unique_database, tbl_name)
+    create_table_and_copy_files(self.client, create_sql, unique_database, tbl_name,
+        ["/testdata/data/dateless_timestamps.parq"])
+
+    new_vector = deepcopy(vector)
+    del new_vector.get_value('exec_option')['abort_on_error']
+    self.run_test_case('QueryTest/dateless_timestamp_parquet', new_vector,
+        use_db=unique_database)
+
   def test_date_out_of_range_parquet(self, vector, unique_database):
     """Test scanning parquet files with an out of range date."""
     create_table_from_parquet(self.client, unique_database, "out_of_range_date")
@@ -1232,6 +1245,17 @@ class TestTextScanRangeLengths(ImpalaTestSuite):
     self.run_test_case('QueryTest/hdfs-text-scan-with-header', new_vector,
                        test_file_vars={'$UNIQUE_DB': unique_database})
 
+  def test_dateless_timestamp_text(self, vector, unique_database):
+    """Test scanning text files which still includes dateless timestamps."""
+    tbl_name = "timestamp_text_table"
+    create_sql = "create table %s.%s (t timestamp) stored as textfile" % (
+        unique_database, tbl_name)
+    create_table_and_copy_files(self.client, create_sql, unique_database, tbl_name,
+        ["/testdata/data/dateless_timestamps.txt"])
+
+    new_vector = deepcopy(vector)
+    del new_vector.get_value('exec_option')['abort_on_error']
+    self.run_test_case('QueryTest/dateless_timestamp_text', new_vector, unique_database)
 
 # Missing Coverage: No coverage for truncated files errors or scans.
 @SkipIfS3.hive

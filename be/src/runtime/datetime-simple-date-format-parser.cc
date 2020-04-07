@@ -35,18 +35,14 @@ namespace datetime_parse_util {
 bool SimpleDateFormatTokenizer::initialized = false;
 
 const int SimpleDateFormatTokenizer::DEFAULT_DATE_FMT_LEN = 10;
-const int SimpleDateFormatTokenizer::DEFAULT_TIME_FMT_LEN = 8;
-const int SimpleDateFormatTokenizer::DEFAULT_TIME_FRAC_FMT_LEN = 18;
 const int SimpleDateFormatTokenizer::DEFAULT_SHORT_DATE_TIME_FMT_LEN = 19;
 const int SimpleDateFormatTokenizer::DEFAULT_DATE_TIME_FMT_LEN = 29;
 
 DateTimeFormatContext SimpleDateFormatTokenizer::DEFAULT_SHORT_DATE_TIME_CTX;
 DateTimeFormatContext SimpleDateFormatTokenizer::DEFAULT_SHORT_ISO_DATE_TIME_CTX;
 DateTimeFormatContext SimpleDateFormatTokenizer::DEFAULT_DATE_CTX;
-DateTimeFormatContext SimpleDateFormatTokenizer::DEFAULT_TIME_CTX;
 DateTimeFormatContext SimpleDateFormatTokenizer::DEFAULT_DATE_TIME_CTX[10];
 DateTimeFormatContext SimpleDateFormatTokenizer::DEFAULT_ISO_DATE_TIME_CTX[10];
-DateTimeFormatContext SimpleDateFormatTokenizer::DEFAULT_TIME_FRAC_CTX[10];
 
 void SimpleDateFormatTokenizer::InitCtx() {
   if (initialized) return;
@@ -57,38 +53,27 @@ void SimpleDateFormatTokenizer::InitCtx() {
   for (int i = FRACTIONAL_MAX_LEN; i >= 0; --i) {
     DEFAULT_DATE_TIME_CTX[i].Reset(DATE_TIME_CTX_FMT,
         DEFAULT_DATE_TIME_FMT_LEN - (FRACTIONAL_MAX_LEN - i));
-    Tokenize(&DEFAULT_DATE_TIME_CTX[i]);
+    Tokenize(&DEFAULT_DATE_TIME_CTX[i], PARSE);
   }
 
   // Setup the default ISO date/time context yyyy-MM-ddTHH:mm:ss.SSSSSSSSS
   for (int i = FRACTIONAL_MAX_LEN; i >= 0; --i) {
     DEFAULT_ISO_DATE_TIME_CTX[i].Reset("yyyy-MM-ddTHH:mm:ss.SSSSSSSSS",
         DEFAULT_DATE_TIME_FMT_LEN - (FRACTIONAL_MAX_LEN - i));
-    Tokenize(&DEFAULT_ISO_DATE_TIME_CTX[i]);
+    Tokenize(&DEFAULT_ISO_DATE_TIME_CTX[i], PARSE);
   }
 
   // Setup the short default date/time context yyyy-MM-dd HH:mm:ss
   DEFAULT_SHORT_DATE_TIME_CTX.Reset("yyyy-MM-dd HH:mm:ss");
-  Tokenize(&DEFAULT_SHORT_DATE_TIME_CTX);
+  Tokenize(&DEFAULT_SHORT_DATE_TIME_CTX, PARSE);
 
   // Setup the short default ISO date/time context yyyy-MM-ddTHH:mm:ss
   DEFAULT_SHORT_ISO_DATE_TIME_CTX.Reset("yyyy-MM-ddTHH:mm:ss");
-  Tokenize(&DEFAULT_SHORT_ISO_DATE_TIME_CTX);
+  Tokenize(&DEFAULT_SHORT_ISO_DATE_TIME_CTX, PARSE);
 
   // Setup the default short date context yyyy-MM-dd
   DEFAULT_DATE_CTX.Reset("yyyy-MM-dd");
-  Tokenize(&DEFAULT_DATE_CTX);
-
-  // Setup the default short time context HH:mm:ss
-  DEFAULT_TIME_CTX.Reset("HH:mm:ss");
-  Tokenize(&DEFAULT_TIME_CTX);
-
-  // Setup the default short time context with fractional seconds HH:mm:ss.SSSSSSSSS
-  for (int i = FRACTIONAL_MAX_LEN; i >= 0; --i) {
-    DEFAULT_TIME_FRAC_CTX[i].Reset(DATE_TIME_CTX_FMT + 11,
-        DEFAULT_TIME_FRAC_FMT_LEN - (FRACTIONAL_MAX_LEN - i));
-    Tokenize(&DEFAULT_TIME_FRAC_CTX[i]);
-  }
+  Tokenize(&DEFAULT_DATE_CTX, PARSE);
 
   // Flag that the parser is ready.
   initialized = true;
@@ -112,8 +97,8 @@ bool SimpleDateFormatTokenizer::IsValidTZOffset(const char* str_begin,
   return false;
 }
 
-bool SimpleDateFormatTokenizer::Tokenize(DateTimeFormatContext* dt_ctx,
-    bool accept_time_toks) {
+bool SimpleDateFormatTokenizer::Tokenize(
+    DateTimeFormatContext* dt_ctx, CastDirection cast_mode, bool accept_time_toks) {
   DCHECK(dt_ctx != NULL);
   DCHECK(dt_ctx->fmt != NULL);
   DCHECK(dt_ctx->fmt_len > 0);
@@ -191,7 +176,8 @@ bool SimpleDateFormatTokenizer::Tokenize(DateTimeFormatContext* dt_ctx,
     str += tok.len;
     dt_ctx->toks.push_back(tok);
   }
-  return dt_ctx->has_date_toks || dt_ctx->has_time_toks;
+  if (cast_mode == PARSE) return (dt_ctx->has_date_toks);
+  return (dt_ctx->has_date_toks || dt_ctx->has_time_toks);
 }
 
 const char* SimpleDateFormatTokenizer::ParseDigitToken(const char* str,
@@ -215,7 +201,7 @@ const char* SimpleDateFormatTokenizer::ParseSeparatorToken(const char* str,
 }
 
 bool SimpleDateFormatTokenizer::TokenizeByStr( DateTimeFormatContext* dt_ctx,
-    bool accept_time_toks, bool accept_time_toks_only) {
+    bool accept_time_toks) {
   DCHECK(dt_ctx != NULL);
   DCHECK(dt_ctx->fmt != NULL);
   DCHECK_GT(dt_ctx->fmt_len, 0);
@@ -286,7 +272,7 @@ bool SimpleDateFormatTokenizer::TokenizeByStr( DateTimeFormatContext* dt_ctx,
   if (!accept_time_toks) return false;
   // If no date tokens were found and time tokens on their own are not allowed, return
   // false.
-  if (!dt_ctx->has_date_toks && !accept_time_toks_only) return false;
+  if (!dt_ctx->has_date_toks) return false;
 
   // Parse the 1 or 2 digit hour
   if (tok_end - str != 1 && tok_end - str != 2) return false;
@@ -355,72 +341,56 @@ const DateTimeFormatContext* SimpleDateFormatTokenizer::GetDefaultFormatContext(
   DCHECK(str != nullptr);
   DCHECK(len > 0);
 
-  if (LIKELY(len >= DEFAULT_TIME_FMT_LEN)) {
-    // Check if this string starts with a date component
-    if (str[4] == '-' && str[7] == '-') {
-      // Do we have a date component only?
-      if (len == DEFAULT_DATE_FMT_LEN) {
-        return &DEFAULT_DATE_CTX;
+  // Check if this string starts with a date component
+  if (str[4] == '-' && str[7] == '-') {
+    // Do we have a date component only?
+    if (len == DEFAULT_DATE_FMT_LEN) {
+      return &DEFAULT_DATE_CTX;
+    }
+
+    // We have a time component as well. Do we accept it?
+    if (!accept_time_toks) return nullptr;
+
+    switch (len) {
+      case DEFAULT_SHORT_DATE_TIME_FMT_LEN: {
+        if (LIKELY(str[13] == ':')) {
+          switch (str[10]) {
+            case ' ':
+              return &DEFAULT_SHORT_DATE_TIME_CTX;
+            case 'T':
+              return &DEFAULT_SHORT_ISO_DATE_TIME_CTX;
+          }
+        }
+        break;
       }
-
-      // We have a time component as well. Do we accept it?
-      if (!accept_time_toks) return nullptr;
-
-      switch (len) {
-        case DEFAULT_SHORT_DATE_TIME_FMT_LEN: {
-          if (LIKELY(str[13] == ':')) {
-            switch (str[10]) {
-              case ' ':
-                return &DEFAULT_SHORT_DATE_TIME_CTX;
-              case 'T':
-                return &DEFAULT_SHORT_ISO_DATE_TIME_CTX;
-            }
+      case DEFAULT_DATE_TIME_FMT_LEN: {
+        if (LIKELY(str[13] == ':')) {
+          switch (str[10]) {
+            case ' ':
+              return &DEFAULT_DATE_TIME_CTX[9];
+            case 'T':
+              return &DEFAULT_ISO_DATE_TIME_CTX[9];
           }
-          break;
         }
-        case DEFAULT_DATE_TIME_FMT_LEN: {
-          if (LIKELY(str[13] == ':')) {
-            switch (str[10]) {
-              case ' ':
-                return &DEFAULT_DATE_TIME_CTX[9];
-              case 'T':
-                return &DEFAULT_ISO_DATE_TIME_CTX[9];
-            }
-          }
-          break;
-        }
-        default: {
-          // There is likely a fractional component that's below the expected 9 chars.
-          // We will need to work out which default context to use that corresponds to
-          // the fractional length in the string.
-          if (LIKELY(len > DEFAULT_SHORT_DATE_TIME_FMT_LEN)
-              && LIKELY(str[19] == '.') && LIKELY(str[13] == ':')) {
-            switch (str[10]) {
-              case ' ': {
-                return &DEFAULT_DATE_TIME_CTX[len - DEFAULT_SHORT_DATE_TIME_FMT_LEN - 1];
-              }
-              case 'T': {
-                return &DEFAULT_ISO_DATE_TIME_CTX
-                    [len - DEFAULT_SHORT_DATE_TIME_FMT_LEN - 1];
-              }
-            }
-          }
-          break;
-        }
+        break;
       }
-    } else {
-      // 'str' string does not start with a date component.
-      // Do we accept time component only?
-      if (!accept_time_toks || !accept_time_toks_only) return nullptr;
-
-      // Parse time component.
-      if (str[2] == ':' && str[5] == ':' && isdigit(str[7])) {
-        len = min(len, DEFAULT_TIME_FRAC_FMT_LEN);
-        if (len > DEFAULT_TIME_FMT_LEN && str[8] == '.') {
-          return &DEFAULT_TIME_FRAC_CTX[len - DEFAULT_TIME_FMT_LEN - 1];
-        } else {
-          return &DEFAULT_TIME_CTX;
+      default: {
+        // There is likely a fractional component that's below the expected 9 chars.
+        // We will need to work out which default context to use that corresponds to
+        // the fractional length in the string.
+        if (LIKELY(len > DEFAULT_SHORT_DATE_TIME_FMT_LEN)
+            && LIKELY(str[19] == '.') && LIKELY(str[13] == ':')) {
+          switch (str[10]) {
+            case ' ': {
+              return &DEFAULT_DATE_TIME_CTX[len - DEFAULT_SHORT_DATE_TIME_FMT_LEN - 1];
+            }
+            case 'T': {
+              return &DEFAULT_ISO_DATE_TIME_CTX
+                  [len - DEFAULT_SHORT_DATE_TIME_FMT_LEN - 1];
+            }
+          }
         }
+        break;
       }
     }
   }

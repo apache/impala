@@ -1,0 +1,29 @@
+====
+---- QUERY
+SET abort_on_error=1;
+SELECT * FROM $DATABASE.timestamp_text_table;
+---- TYPES
+TIMESTAMP
+---- CATCH
+Error converting column: 0 to TIMESTAMP
+Error parsing row: file: $NAMENODE/test-warehouse/test_dateless_timestamp_text_
+====
+---- QUERY
+SET abort_on_error=0;
+SELECT * FROM $DATABASE.timestamp_text_table;
+---- TYPES
+TIMESTAMP
+---- RESULTS
+1996-04-22 10:00:00.432100000
+1996-04-22 10:00:00.432100000
+1996-04-22 10:00:00
+1996-04-22 10:00:00
+1996-04-22 00:00:00
+NULL
+NULL
+---- ERRORS
+Error converting column: 0 to TIMESTAMP
+Error converting column: 0 to TIMESTAMP
+Error parsing row: file: __HDFS_FILENAME__, before offset: 148
+Error parsing row: file: __HDFS_FILENAME__, before offset: 148
+====

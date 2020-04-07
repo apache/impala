@@ -65,7 +65,7 @@ StringVal TimestampFunctions::StringValFromTimestamp(FunctionContext* context,
   DateTimeFormatContext* dt_ctx = reinterpret_cast<DateTimeFormatContext*>(state);
   if (!context->IsArgConstant(1)) {
     dt_ctx->Reset(reinterpret_cast<const char*>(fmt.ptr), fmt.len);
-    if (!SimpleDateFormatTokenizer::Tokenize(dt_ctx)){
+    if (!SimpleDateFormatTokenizer::Tokenize(dt_ctx, FORMAT)){
       ReportBadFormat(context, datetime_parse_util::GENERAL_ERROR, fmt, false);
       return StringVal::null();
     }
@@ -165,11 +165,11 @@ TimestampVal TimestampFunctions::ToTimestamp(FunctionContext* context,
   void* state = context->GetFunctionState(FunctionContext::THREAD_LOCAL);
   DateTimeFormatContext* dt_ctx = reinterpret_cast<DateTimeFormatContext*>(state);
   if (!context->IsArgConstant(1)) {
-     dt_ctx->Reset(reinterpret_cast<const char*>(fmt.ptr), fmt.len);
-     if (!SimpleDateFormatTokenizer::Tokenize(dt_ctx)) {
-       ReportBadFormat(context, datetime_parse_util::GENERAL_ERROR, fmt, false);
-       return TimestampVal::null();
-     }
+    dt_ctx->Reset(reinterpret_cast<const char*>(fmt.ptr), fmt.len);
+    if (!SimpleDateFormatTokenizer::Tokenize(dt_ctx, PARSE)) {
+      ReportBadFormat(context, datetime_parse_util::GENERAL_ERROR, fmt, false);
+      return TimestampVal::null();
+    }
   }
   const TimestampValue& tv = TimestampValue::ParseSimpleDateFormat(
       reinterpret_cast<const char*>(date.ptr), date.len, *dt_ctx);

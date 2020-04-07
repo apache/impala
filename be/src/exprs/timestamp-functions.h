@@ -100,9 +100,11 @@ class TimestampFunctions {
   static const std::map<std::string, int> DAYNAME_MAP;
 
   /// Parse and initialize format string if it is a constant. Raise error if invalid.
-  static void UnixAndFromUnixPrepare(FunctionContext* context,
-      FunctionContext::FunctionStateScope scope);
   static void UnixAndFromUnixClose(FunctionContext* context,
+      FunctionContext::FunctionStateScope scope);
+  static void ToUnixPrepare(FunctionContext* context,
+      FunctionContext::FunctionStateScope scope);
+  static void FromUnixPrepare(FunctionContext* context,
       FunctionContext::FunctionStateScope scope);
 
   /// Parses 'string_val' based on the format 'fmt'.

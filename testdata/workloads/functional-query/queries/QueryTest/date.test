@@ -597,13 +597,6 @@ select cast('not-a-date' as date);
 UDF ERROR: String to Date parse failed. Invalid string val: "not-a-date"
 ====
 ---- QUERY
-# TIMESTAMP->DATE conversion fails because timestamp has no date component. Note that
-# time-only timestamps are technically valid but impractical.
-select cast(cast('23:59:59' as timestamp) as date);
----- CATCH
-UDF ERROR: Timestamp to Date conversion failed. Timestamp has no date component.
-====
----- QUERY
 # Basic test for FORMAT clause in CAST().
 select cast("2014-11-01" as date format "YYYY-MM-DD");
 ---- RESULTS

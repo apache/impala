@@ -2022,24 +2022,37 @@ class TestCastWithFormat(ImpalaTestSuite):
 
     # Multiple fraction second token conflict
     err = self.execute_query_expect_failure(self.client,
-        "select cast('2018-10-10' as timestamp format 'FF FF1')")
+        "select cast('2018-10-10' as timestamp format 'YYYY-MM-DD FF FF1')")
     assert "Multiple fractional second tokens provided." in str(err)
 
     err = self.execute_query_expect_failure(self.client,
-        "select cast('2018-10-10' as timestamp format 'FF2 FF3')")
+        "select cast('2018-10-10' as timestamp format 'YYYY-MM-DD FF2 FF3')")
     assert "Multiple fractional second tokens provided." in str(err)
 
     err = self.execute_query_expect_failure(self.client,
-        "select cast('2018-10-10' as timestamp format 'FF4 FF5')")
+        "select cast('2018-10-10' as timestamp format 'YYYY-MM-DD FF4 FF5')")
     assert "Multiple fractional second tokens provided." in str(err)
 
     err = self.execute_query_expect_failure(self.client,
-        "select cast('2018-10-10' as timestamp format 'FF6 FF7')")
+        "select cast('2018-10-10' as timestamp format 'YYYY-MM-DD FF6 FF7')")
     assert "Multiple fractional second tokens provided." in str(err)
 
     err = self.execute_query_expect_failure(self.client,
-        "select cast('2018-10-10' as timestamp format 'FF8 FF9')")
+        "select cast('2018-10-10' as timestamp format 'YYYY-MM-DD FF8 FF9')")
     assert "Multiple fractional second tokens provided." in str(err)
+
+    # No date token
+    err = self.execute_query_expect_failure(self.client,
+        "select cast('2020-05-05' as timestamp format 'FF1')")
+    assert "No date tokens provided." in str(err)
+
+    err = self.execute_query_expect_failure(self.client,
+        "select cast('2020-05-05' as timestamp format 'SSSSS')")
+    assert "No date tokens provided." in str(err)
+
+    err = self.execute_query_expect_failure(self.client,
+        "select cast('2020-05-05' as timestamp format 'HH:MI:SS')")
+    assert "No date tokens provided." in str(err)
 
     # ISO 8601 Week-based and normal date pattern tokens must not be mixed.
     err = self.execute_query_expect_failure(self.client,

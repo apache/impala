@@ -443,7 +443,7 @@ void ScalarExprEvaluator::InitBuiltinsDummy() {
   MathFunctions::Pi(nullptr);
   StringFunctions::Length(nullptr, StringVal::null());
   TimestampFunctions::Year(nullptr, TimestampVal::null());
-  TimestampFunctions::UnixAndFromUnixPrepare(nullptr, FunctionContext::FRAGMENT_LOCAL);
+  TimestampFunctions::FromUnixPrepare(nullptr, FunctionContext::FRAGMENT_LOCAL);
   DateFunctions::Year(nullptr, DateVal::null());
   UdfBuiltins::Pi(nullptr);
   UtilityFunctions::Pid(nullptr);

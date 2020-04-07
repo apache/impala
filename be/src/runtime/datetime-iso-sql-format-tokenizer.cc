@@ -200,6 +200,9 @@ FormatTokenizationResult IsoSqlFormatTokenizer::CheckIncompatibilities() const {
     return SUCCESS;
   }
 
+  DCHECK(cast_mode_ == PARSE);
+  if(!dt_ctx_->has_date_toks) return NO_DATE_TOKENS_ERROR;
+
   short provided_year_count = IsUsedToken("YYYY") + IsUsedToken("YYY") +
       IsUsedToken("YY") + IsUsedToken("Y");
   short provided_round_year_count = IsUsedToken("RRRR") + IsUsedToken("RR");

@@ -151,8 +151,10 @@ TimestampVal TimestampFunctions::ToUtc(FunctionContext* context,
   return ts_val_ret;
 }
 
-void TimestampFunctions::UnixAndFromUnixPrepare(
-    FunctionContext* context, FunctionContext::FunctionStateScope scope) {
+// The purpose of making this .cc only is to avoid moving the code of
+// CastDirection into the .h file
+void UnixAndFromUnixPrepare(FunctionContext* context,
+    FunctionContext::FunctionStateScope scope, CastDirection cast_mode) {
   if (scope != FunctionContext::THREAD_LOCAL) return;
   DateTimeFormatContext* dt_ctx = NULL;
   if (context->IsArgConstant(1)) {
@@ -163,7 +165,7 @@ void TimestampFunctions::UnixAndFromUnixPrepare(
       return;
     }
     dt_ctx = new DateTimeFormatContext(fmt_ref.ptr, fmt_ref.len);
-    bool parse_result = SimpleDateFormatTokenizer::Tokenize(dt_ctx);
+    bool parse_result = SimpleDateFormatTokenizer::Tokenize(dt_ctx, cast_mode);
     if (!parse_result) {
       delete dt_ctx;
       ReportBadFormat(context, datetime_parse_util::GENERAL_ERROR, fmt_val, true);
@@ -187,6 +189,16 @@ void TimestampFunctions::UnixAndFromUnixClose(FunctionContext* context,
     delete dt_ctx;
     context->SetFunctionState(scope, nullptr);
   }
+}
+
+void TimestampFunctions::ToUnixPrepare(
+    FunctionContext* context, FunctionContext::FunctionStateScope scope) {
+  UnixAndFromUnixPrepare(context, scope, PARSE);
+}
+
+void TimestampFunctions::FromUnixPrepare(
+    FunctionContext* context, FunctionContext::FunctionStateScope scope) {
+  UnixAndFromUnixPrepare(context, scope, FORMAT);
 }
 
 }

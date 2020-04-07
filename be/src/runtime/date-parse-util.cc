@@ -108,7 +108,7 @@ bool DateParser::ParseSimpleDateFormat(const char* str, int len, bool accept_tim
   // Generating context lazily as a fall back if default formats fail.
   // ParseFormatTokenByStr() does not require a template format string.
   DateTimeFormatContext lazy_ctx(str, trimmed_len);
-  if (!SimpleDateFormatTokenizer::TokenizeByStr(&lazy_ctx, accept_time_toks, false)) {
+  if (!SimpleDateFormatTokenizer::TokenizeByStr(&lazy_ctx, accept_time_toks)) {
     return IndicateDateParseFailure(date);
   }
   return ParseSimpleDateFormat(str, trimmed_len, lazy_ctx, date);

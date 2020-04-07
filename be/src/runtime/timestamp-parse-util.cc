@@ -85,10 +85,10 @@ bool TimestampParser::ParseSimpleDateFormat(const char* str, int len,
   // Strip if there is a 'Z' suffix
   if (trimmed_len > 0 && str[trimmed_len - 1] == 'Z') {
     --trimmed_len;
-  } else if (trimmed_len > SimpleDateFormatTokenizer::DEFAULT_TIME_FMT_LEN &&
-      (str[4] == '-' || str[2] == ':')) {
+  } else if (trimmed_len > SimpleDateFormatTokenizer::DEFAULT_SHORT_DATE_TIME_FMT_LEN
+      && str[4] == '-') {
     // Strip timezone offset if it seems like a valid timestamp string.
-    int curr_pos = SimpleDateFormatTokenizer::DEFAULT_TIME_FMT_LEN;
+    int curr_pos = SimpleDateFormatTokenizer::DEFAULT_SHORT_DATE_TIME_FMT_LEN;
     // Timezone offset will be at least two bytes long, no need to check last
     // two bytes.
     while (curr_pos < trimmed_len - 2) {

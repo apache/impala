@@ -369,12 +369,6 @@ DateVal CastFunctions::CastToDateVal(FunctionContext* ctx, const StringVal& val)
 DateVal CastFunctions::CastToDateVal(FunctionContext* ctx, const TimestampVal& val) {
   if (val.is_null) return DateVal::null();
   TimestampValue tv = TimestampValue::FromTimestampVal(val);
-  if (UNLIKELY(!tv.HasDate())) {
-    ctx->SetError("Timestamp to Date conversion failed. "
-        "Timestamp has no date component.");
-    return DateVal::null();
-  }
-
   DateValue dv(tv.DaysSinceUnixEpoch());
   return dv.ToDateVal();
 }
