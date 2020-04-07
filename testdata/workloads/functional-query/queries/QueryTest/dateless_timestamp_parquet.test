@@ -1,0 +1,25 @@
+====
+---- QUERY
+SET abort_on_error=1;
+SELECT * FROM $DATABASE.timestamp_table;
+---- TYPES
+TIMESTAMP
+---- CATCH
+timestamp_table/dateless_timestamps.parq' column 't' contains an out of range timestamp. The valid date range is 1400-01-01..9999-12-31.
+====
+---- QUERY
+SET abort_on_error=0;
+SELECT * FROM $DATABASE.timestamp_table;
+---- TYPES
+TIMESTAMP
+---- RESULTS
+1996-04-22 10:00:00.432100000
+1996-04-22 10:00:00.432100000
+1996-04-22 10:00:00
+1996-04-22 10:00:00
+1996-04-22 00:00:00
+NULL
+NULL
+---- ERRORS
+Parquet file '__HDFS_FILENAME__' column 't' contains an out of range timestamp. The valid date range is 1400-01-01..9999-12-31. (1 of 2 similar)
+====

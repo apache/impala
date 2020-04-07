@@ -125,6 +125,9 @@ void ReportBadFormat(FunctionContext* context, FormatTokenizationResult error_ty
       case NO_DATETIME_TOKENS_ERROR:
         ss << "PARSE ERROR: No datetime tokens provided.";
         break;
+      case NO_DATE_TOKENS_ERROR:
+        ss << "PARSE ERROR: No date tokens provided.";
+        break;
       case MISPLACED_FX_MODIFIER_ERROR:
         ss << "PARSE ERROR: FX modifier should be at the beginning of the format string.";
       case CONFLICTING_DAY_OF_WEEK_TOKENS_ERROR:

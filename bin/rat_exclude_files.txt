@@ -144,6 +144,7 @@ testdata/data/decimal_rtf_tbl.txt
 testdata/data/overflow.txt
 testdata/data/text-comma-backslash-newline.txt
 testdata/data/text-dollar-hash-pipe.txt
+testdata/data/dateless_timestamps.txt
 testdata/data/text_large_zstd.txt
 testdata/data/text_large_zstd.zst
 testdata/data/widerow.txt

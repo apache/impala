@@ -152,7 +152,7 @@ class TimestampValue {
   /// Returns a TimestampVal representation in the output variable.
   /// Returns null if the TimestampValue instance doesn't have a valid date or time.
   void ToTimestampVal(impala_udf::TimestampVal* tv) const {
-    if (!HasDateOrTime()) {
+    if (!HasDate()) {
       tv->is_null = true;
       return;
     }
@@ -181,7 +181,6 @@ class TimestampValue {
 
   bool HasDate() const { return !date_.is_special(); }
   bool HasTime() const { return !time_.is_special(); }
-  bool HasDateOrTime() const { return HasDate() || HasTime(); }
   bool HasDateAndTime() const { return HasDate() && HasTime(); }
 
   std::string ToString() const;

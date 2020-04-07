@@ -154,7 +154,7 @@ void TestDateTokens(const vector<DateToken>& toks, int year, int month, int day,
 
   string fmt_val = "Format: " + fmt + ", Val: " + val;
   DateTimeFormatContext dt_ctx(fmt.c_str());
-  ASSERT_TRUE(SimpleDateFormatTokenizer::Tokenize(&dt_ctx, false)) << fmt_val;
+  ASSERT_TRUE(SimpleDateFormatTokenizer::Tokenize(&dt_ctx, PARSE, false)) << fmt_val;
   DateValue dv = DateValue::ParseSimpleDateFormat(val.c_str(), val.length(), dt_ctx);
   ValidateDate(dv, year, month, day, fmt_val);
 
@@ -269,7 +269,7 @@ struct DateTC {
       << " expected date:" << expected_year << "/" << expected_month << "/"
       << expected_day;
 
-    bool parse_result = SimpleDateFormatTokenizer::Tokenize(&dt_ctx, false);
+    bool parse_result = SimpleDateFormatTokenizer::Tokenize(&dt_ctx, PARSE, false);
     if (fmt_should_fail) {
       EXPECT_FALSE(parse_result) << desc.str();
       return;
@@ -498,7 +498,7 @@ struct DateFormatTC {
     desc << "DateFormatTC [" << id << "]: " << "days_since_epoch:" << days_since_epoch
          << " fmt:" << fmt << " str:" << str;
 
-    ASSERT_TRUE(SimpleDateFormatTokenizer::Tokenize(&dt_ctx, false)) << desc.str();
+    ASSERT_TRUE(SimpleDateFormatTokenizer::Tokenize(&dt_ctx, PARSE, false)) << desc.str();
 
     const DateValue cust_dv(days_since_epoch);
     EXPECT_TRUE(cust_dv.IsValid()) << desc.str();

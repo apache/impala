@@ -258,9 +258,9 @@ int main(int argc, char **argv) {
   timestamp_suite.AddBenchmark("Impala", TestImpalaSimpleDateFormat, &times);
 
   dt_ctx_simple_date_format.Reset("yyyy-MM-dd HH:mm:ss", 19);
-  SimpleDateFormatTokenizer::Tokenize(&dt_ctx_simple_date_format);
+  SimpleDateFormatTokenizer::Tokenize(&dt_ctx_simple_date_format, PARSE);
   dt_ctx_tz_simple_date_format.Reset("yyyy-MM-dd HH:mm:ss+hh:mm", 25);
-  SimpleDateFormatTokenizer::Tokenize(&dt_ctx_tz_simple_date_format);
+  SimpleDateFormatTokenizer::Tokenize(&dt_ctx_tz_simple_date_format, PARSE);
 
   dt_ctx_iso_sql_format.Reset("YYYY-MM-DD HH24:MI:SS", 21);
   datetime_parse_util::IsoSqlFormatTokenizer tokenizer(&dt_ctx_iso_sql_format,

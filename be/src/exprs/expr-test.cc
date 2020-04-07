@@ -1299,7 +1299,7 @@ void ExprTest::TestTimestampValue(const string& expr, const TimestampValue& expe
 // We use this function for tests where the expected value is unknown, e.g., now().
 void ExprTest::TestValidTimestampValue(const string& expr) {
   EXPECT_TRUE(
-      ConvertValue<TimestampValue>(GetValue(expr, TYPE_TIMESTAMP)).HasDateOrTime());
+      ConvertValue<TimestampValue>(GetValue(expr, TYPE_TIMESTAMP)).HasDate());
 }
 
 // We can't put this into TestValue() because GTest can't resolve
@@ -6772,6 +6772,8 @@ TEST_P(ExprTest, TimestampFunctions) {
       + 60*60*24), 'yyyy-MM-dd')", "1999-01-02");
   TestStringValue("from_timestamp(to_timestamp(unix_timestamp('1999-01-01 10:10:10') \
       + 10), 'yyyy-MM-dd HH:mm:ss')", "1999-01-01 10:10:20");
+  TestStringValue("from_timestamp(cast('2999-05-05 11:11:11' as timestamp), 'HH:mm:ss')",
+      "11:11:11");
   TestValue("cast('2011-12-22 09:10:11.123456789' as timestamp) > \
       cast('2011-12-22 09:10:11.12345678' as timestamp)", TYPE_BOOLEAN, true);
   TestValue("cast('2011-12-22 08:10:11.123456789' as timestamp) > \
@@ -6807,10 +6809,6 @@ TEST_P(ExprTest, TimestampFunctions) {
   TestValue("dayofweek(cast('2011-12-18' as timestamp))", TYPE_INT, 1);
   TestValue("dayofweek(cast('2011-12-22' as timestamp))", TYPE_INT, 5);
   TestValue("dayofweek(cast('2011-12-24' as timestamp))", TYPE_INT, 7);
-  TestValue("hour(cast('09:10:11.000000' as timestamp))", TYPE_INT, 9);
-  TestValue("minute(cast('09:10:11.000000' as timestamp))", TYPE_INT, 10);
-  TestValue("second(cast('09:10:11.000000' as timestamp))", TYPE_INT, 11);
-  TestValue("millisecond(cast('09:10:11.123456' as timestamp))", TYPE_INT, 123);
   TestStringValue(
       "to_date(cast('2011-12-22 09:10:11.12345678' as timestamp))", "2011-12-22");
 
@@ -6821,7 +6819,6 @@ TEST_P(ExprTest, TimestampFunctions) {
   TestValue("timestamp_cmp('1966-09-04 15:33:45','1966-05-04 15:33:45')", TYPE_INT, 1);
   TestValue("timestamp_cmp('1966-05-04 15:33:45','1966-05-04 15:33:45')", TYPE_INT, 0);
   TestValue("timestamp_cmp('1967-06-05','1966-05-04')", TYPE_INT, 1);
-  TestValue("timestamp_cmp('15:33:45','16:34:45')", TYPE_INT, -1);
   TestValue("timestamp_cmp('1966-05-04','1966-05-04 15:33:45')", TYPE_INT, -1);
 
   TestIsNull("timestamp_cmp('','1966-05-04 15:33:45')", TYPE_INT);
@@ -6836,7 +6833,6 @@ TEST_P(ExprTest, TimestampFunctions) {
   TestValue("int_months_between('1967-07-19','1967-07-19')", TYPE_INT, 0);
   TestValue("int_months_between('2015-07-19','2015-08-18')", TYPE_INT, 0);
 
-  TestIsNull("int_months_between('23:33:45','15:33:45')", TYPE_INT);
   TestIsNull("int_months_between('','1966-06-04')", TYPE_INT);
 
   TestValue("months_between('1967-07-19','1966-06-04')", TYPE_DOUBLE,
@@ -6847,7 +6843,6 @@ TEST_P(ExprTest, TimestampFunctions) {
   TestValue("months_between('2015-02-28','2015-05-31')", TYPE_DOUBLE, -3);
   TestValue("months_between('2012-02-29','2012-01-31')", TYPE_DOUBLE, 1);
 
-  TestIsNull("months_between('23:33:45','15:33:45')", TYPE_DOUBLE);
   TestIsNull("months_between('','1966-06-04')", TYPE_DOUBLE);
 
   TestValue("datediff(cast('2011-12-22 09:10:11.12345678' as timestamp), \
@@ -6855,22 +6850,10 @@ TEST_P(ExprTest, TimestampFunctions) {
   TestValue("datediff(cast('2012-12-22' as timestamp), \
       cast('2011-12-22 09:10:11.12345678' as timestamp))", TYPE_INT, 366);
 
-  TestIsNull("cast('24:59:59' as timestamp)", TYPE_TIMESTAMP);
+  TestIsNull("cast('2020-05-06 24:59:59' as timestamp)", TYPE_TIMESTAMP);
   TestIsNull("cast('10000-12-31' as timestamp)", TYPE_TIMESTAMP);
   TestIsNull("cast('10000-12-31 23:59:59' as timestamp)", TYPE_TIMESTAMP);
   TestIsNull("cast('2000-12-31 24:59:59' as timestamp)", TYPE_TIMESTAMP);
-
-  TestIsNull("year(cast('09:10:11.000000' as timestamp))", TYPE_INT);
-  TestIsNull("quarter(cast('09:10:11.000000' as timestamp))", TYPE_INT);
-  TestIsNull("month(cast('09:10:11.000000' as timestamp))", TYPE_INT);
-  TestIsNull("dayofmonth(cast('09:10:11.000000' as timestamp))", TYPE_INT);
-  TestIsNull("day(cast('09:10:11.000000' as timestamp))", TYPE_INT);
-  TestIsNull("dayofyear(cast('09:10:11.000000' as timestamp))", TYPE_INT);
-  TestIsNull("dayofweek(cast('09:10:11.000000' as timestamp))", TYPE_INT);
-  TestIsNull("weekofyear(cast('09:10:11.000000' as timestamp))", TYPE_INT);
-  TestIsNull("week(cast('09:10:11.000000' as timestamp))", TYPE_INT);
-  TestIsNull("datediff(cast('09:10:11.12345678' as timestamp), "
-      "cast('2012-12-22' as timestamp))", TYPE_INT);
 
   TestIsNull("year(NULL)", TYPE_INT);
   TestIsNull("quarter(NULL)", TYPE_INT);
@@ -7199,9 +7182,6 @@ TEST_P(ExprTest, TimestampFunctions) {
   TestIsNull("cast(trunc('2014-07-22 01:34:55 +0100', 'year') as STRING)", TYPE_STRING);
   TestStringValue("cast(trunc(cast('2014-04-01' as timestamp), 'SYYYY') as string)",
           "2014-01-01 00:00:00");
-  TestIsNull("cast(trunc('01:34:55', 'year') as STRING)", TYPE_STRING);
-  TestStringValue("cast(trunc(cast('07:02:03' as timestamp), 'MI') as string)",
-          "07:02:00");
   // note: no time value in string defaults to 00:00:00
   TestStringValue("cast(trunc(cast('2014-01-01' as timestamp), 'MI') as string)",
           "2014-01-01 00:00:00");
@@ -7399,7 +7379,7 @@ TEST_P(ExprTest, TimestampFunctions) {
         "cast(trunc(cast('2012-09-10 07:59:03' as timestamp), 'MI') as string)",
           "2012-09-10 07:59:00");
   TestStringValue(
-        "cast(trunc(cast('2012-09-10 07:59:59' as timestamp), 'MI') as string)",
+        "cast(trunc(cast('2012-09-10 07:59:59.123' as timestamp), 'MI') as string)",
           "2012-09-10 07:59:00");
   TestNonOkStatus(
       "cast(trunc(cast('2012-09-10 07:59:59' as timestamp), 'MIN') as string)");
@@ -7497,8 +7477,6 @@ TEST_P(ExprTest, TimestampFunctions) {
   TestStringValue(
       "cast(cast('2012-01-01T09:10:11.12345-01:30' as timestamp) as string)",
       "2012-01-01 09:10:11.123450000");
-  TestStringValue("cast(cast('09:10:11+01:30' as timestamp) as string)", "09:10:11");
-  TestStringValue("cast(cast('09:10:11-01:30' as timestamp) as string)", "09:10:11");
 
   TestValue("unix_timestamp('2038-01-19T03:14:08-0100')", TYPE_BIGINT, 2147483648);
   TestValue("unix_timestamp('2038/01/19T03:14:08+01:00', 'yyyy/MM/ddTHH:mm:ss')",
@@ -7511,8 +7489,6 @@ TEST_P(ExprTest, TimestampFunctions) {
 
   TestStringValue("cast(trunc('2014-07-22T01:34:55+0100', 'year') as STRING)",
                   "2014-01-01 00:00:00");
-  TestStringValue("cast(trunc(cast('07:02:03+01:30' as timestamp), 'MI') as string)",
-                  "07:02:00");
 
   // Test timezone offset format
   TestStringValue("from_unixtime(unix_timestamp('2012-01-01 19:10:11+02:30', \
@@ -7590,6 +7566,7 @@ TEST_P(ExprTest, TimestampFunctions) {
   TestError("from_unixtime(unix_timestamp('10:00:00+0530 2010-01-01', \
       'HH:mm:ss+hhmm yyyy-MM-dd'))");
 
+  TestError("to_timestamp('01:01:01', 'HH:mm:ss')");
   TestError("to_timestamp('2012-02-28 11:10:11+0530', 'yyyy-MM-dd HH:mm:ss+hhdd')");
   TestError("to_timestamp('2012-02-28+0530', 'yyyy-MM-dd+hhmm')");
   TestError("to_timestamp('10:00:00+0530 2010-01-01', 'HH:mm:ss+hhmm yyyy-MM-dd')");

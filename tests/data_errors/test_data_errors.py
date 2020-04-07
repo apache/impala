@@ -224,6 +224,6 @@ class TestTimestampErrors(TestDataErrors):
     result = self.client.execute("SELECT * FROM " + FQ_TBL_NAME + " ORDER BY col")
     assert len(result.data) == 7
     assert result.data == ['1954-12-03 15:10:02', '1999-03-24 07:21:02', \
-        '12:10:02', '15:03:09', 'NULL', 'NULL', 'NULL']
+        'NULL', 'NULL', 'NULL', 'NULL', 'NULL']
     result = self.client.execute("SELECT COUNT(DISTINCT col) FROM " + FQ_TBL_NAME)
-    assert result.data == ['4']
+    assert result.data == ['2']

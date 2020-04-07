@@ -480,8 +480,7 @@ public class AnalyzeKuduDDLTest extends FrontendTestBase {
     AnalysisError("create table tdefault (id int primary key, " +
         "ts timestamp not null default cast('00:00:00' as timestamp)) " +
         "partition by hash(id) partitions 3 stored as kudu",
-        "CAST('00:00:00' AS TIMESTAMP) cannot be cast to a TIMESTAMP literal.",
-        isExternalPurgeTbl);
+        "Default value of NULL not allowed on non-nullable column:", isExternalPurgeTbl);
     AnalysisError("create table tdefault (id int primary key, " +
         "ts timestamp not null default '2009-1 foo') " +
         "partition by hash(id) partitions 3 stored as kudu",

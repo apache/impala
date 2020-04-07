@@ -184,7 +184,7 @@ void TestTimestampTokens(vector<TimestampToken>* toks, int year, int month,
       }
       string fmt_val = "Format: " + fmt + ", Val: " + val;
       DateTimeFormatContext dt_ctx(fmt.c_str());
-      ASSERT_TRUE(SimpleDateFormatTokenizer::Tokenize(&dt_ctx)) << fmt_val;
+      ASSERT_TRUE(SimpleDateFormatTokenizer::Tokenize(&dt_ctx, PARSE)) << fmt_val;
       TimestampValue tv =
           TimestampValue::ParseSimpleDateFormat(val.c_str(), val.length(), dt_ctx);
       ValidateTimestamp(tv, fmt, val, fmt_val, year, month, day, hours, mins, secs,
@@ -212,7 +212,7 @@ void TestTimestampTokens(vector<TimestampToken>* toks, int year, int month,
         }
         string fmt_val = "Format: " + fmt + ", Val: " + val;
         DateTimeFormatContext dt_ctx(fmt.c_str());
-        ASSERT_TRUE(SimpleDateFormatTokenizer::Tokenize(&dt_ctx)) << fmt_val;
+        ASSERT_TRUE(SimpleDateFormatTokenizer::Tokenize(&dt_ctx, PARSE)) << fmt_val;
         TimestampValue tv =
             TimestampValue::ParseSimpleDateFormat(val.c_str(), val.length(), dt_ctx);
         ValidateTimestamp(tv, fmt, val, fmt_val, year, month, day, hours, mins, secs,
@@ -399,24 +399,9 @@ TEST(TimestampTest, Basic) {
   EXPECT_EQ(dv1.date().month(), 1);
   EXPECT_EQ(dv1.date().day(), 20);
 
-  char t1[] = "10:11:12.123456789";
-  char t2[] = "00:00:00";
-  TimestampValue tv1 = TimestampValue::ParseSimpleDateFormat(t1, strlen(t1));
-  TimestampValue tv2 = TimestampValue::ParseSimpleDateFormat(t2, strlen(t2));
-
-  EXPECT_NE(tv1, tv2);
-  EXPECT_NE(tv1, v2);
-
-  EXPECT_EQ(tv1.time().hours(), 10);
-  EXPECT_EQ(tv1.time().minutes(), 11);
-  EXPECT_EQ(tv1.time().seconds(), 12);
-  EXPECT_EQ(tv1.time().fractional_seconds(), 123456789);
-  EXPECT_EQ(tv2.time().fractional_seconds(), 0);
-
   // Test variable fraction lengths
   const char* FRACTION_MAX_STR = "123456789";
-  const char* TEST_VALS[] = { "2013-12-10 12:04:17.", "2013-12-10T12:04:17.",
-      "12:04:17." };
+  const char* TEST_VALS[] = { "2013-12-10 12:04:17.", "2013-12-10T12:04:17."};
   const int TEST_VAL_CNT = sizeof(TEST_VALS) / sizeof(char*);
   for (int i = 0; i < TEST_VAL_CNT; ++i) {
     const int VAL_LEN = strlen(TEST_VALS[i]);
@@ -572,13 +557,13 @@ TEST(TimestampTest, Basic) {
     // Test out of range day
     (TimestampTC("yyyyMMdd", "20130100", false, true))
     // Test out of range hour
-    (TimestampTC("HH:mm:ss", "24:01:01", false, true))
+    (TimestampTC("yyyy-MM-dd HH:mm:ss", "1400-01-01 24:01:01", false, true))
     // Test out of range minute
-    (TimestampTC("HH:mm:ss", "23:60:01", false, true))
+    (TimestampTC("yyyy-MM-dd HH:mm:ss", "1400-01-01 23:60:01", false, true))
     // Test out of range second
-    (TimestampTC("HH:mm:ss", "23:01:60", false, true))
+    (TimestampTC("yyyy-MM-dd HH:mm:ss", "1400-01-01 23:01:60", false, true))
     // Test characters where numbers should be
-    (TimestampTC("HH:mm:ss", "aa:01:01", false, true))
+    (TimestampTC("yyyy-MM-dd HH:mm:ss", "1400-01-01 aa:01:01", false, true))
     // Test missing year
     (TimestampTC("MMdd", "1201", false, true))
     // Test missing month
@@ -619,19 +604,27 @@ TEST(TimestampTest, Basic) {
     (TimestampTC("y-M-d", "2013-11-13", false, true, false, 2013, 11, 13))
     (TimestampTC("y-M-d", "13-1-3", false, true, false, 1913, 1, 3))
     // Test short hour token
-    (TimestampTC("H:mm:ss", "14:24:34", false, false, true, 0, 0, 0, 14, 24, 34))
-    (TimestampTC("H:mm:ss", "4:24:34", false, false, true, 0, 0, 0, 4, 24, 34))
+    (TimestampTC("yyyy-MM-dd H:mm:ss", "2020-05-11 14:24:34", false, true, true, 2020,
+        05, 11, 14, 24, 34))
+    (TimestampTC("yyyy-MM-dd H:mm:ss", "2020-05-11 4:24:34", false, true, true, 2020,
+        05, 11, 4, 24, 34))
     // Test short minute token
-    (TimestampTC("HH:m:ss", "14:24:34", false, false, true, 0, 0, 0, 14, 24, 34))
-    (TimestampTC("HH:m:ss", "1:24:34", false, true))
+    (TimestampTC("yyyy-MM-dd HH:m:ss", "2020-05-11 14:24:34", false, true, true, 2020,
+        05, 11, 14, 24, 34))
+    (TimestampTC("yyyy-MM-dd HH:m:ss", "2020-05-11 1:24:34", false, true))
     // Test short second token
-    (TimestampTC("HH:mm:s", "14:24:34", false, false, true, 0, 0, 0, 14, 24, 34))
+    (TimestampTC("yyyy-MM-dd HH:mm:s", "2020-05-11 14:24:34", false, true, true, 2020,
+        05, 11, 14, 24, 34))
+    (TimestampTC("yyyy-MM-dd HH:mm:s", "2020-05-11 14:24:3", false, true, true, 2020,
+        05, 11, 14, 24, 3))
     // Test short all time tokens
-    (TimestampTC("H:m:s", "11:22:33", false, false, true, 0, 0, 0, 11, 22, 33))
-    (TimestampTC("H:m:s", "1:2:3", false, false, true, 0, 0, 0, 1, 2, 3))
+    (TimestampTC("yyyy-MM-dd H:m:s", "2020-05-11 11:22:33", false, true, true, 2020,
+        05, 11, 11, 22, 33))
+    (TimestampTC("yyyy-MM-dd H:m:s", "2020-05-11 1:2:3", false, true, true, 2020, 05,
+        11, 1, 2, 3))
     // Test short fraction token
-    (TimestampTC("HH:mm:ss:S", "14:24:34:1234", false, false, true, 0, 0, 0, 14, 24, 34,
-        123400000));
+    (TimestampTC("yyyy-MM-dd HH:mm:ss:S", "2020-05-11 14:24:34:1234", false, true,
+        true, 2020, 05, 11, 14, 24, 34, 123400000));
   // Loop through custom parse/format test cases and execute each one. Each test case
   // will be explicitly set with a pass/fail expectation related to either the format
   // or literal value.
@@ -639,7 +632,7 @@ TEST(TimestampTest, Basic) {
     TimestampTC test_case = test_cases[i];
     DateTimeFormatContext dt_ctx(test_case.fmt);
     dt_ctx.SetCenturyBreakAndCurrentTime(now);
-    bool parse_result = SimpleDateFormatTokenizer::Tokenize(&dt_ctx);
+    bool parse_result = SimpleDateFormatTokenizer::Tokenize(&dt_ctx, PARSE);
     if (test_case.fmt_should_fail) {
       EXPECT_FALSE(parse_result) << "TC: " << i;
       continue;
@@ -689,11 +682,11 @@ TEST(TimestampTest, Basic) {
   vector<TimestampFormatTC> fmt_test_cases = list_of
     (TimestampFormatTC(1382337792, "yyyy-MM-dd HH:mm:ss.SSSSSSSSS",
         "2013-10-21 06:43:12.000000000"))
-    // Test just formatting time tokens
+    // Test formatting only time tokens
     (TimestampFormatTC(1382337792, "HH:mm:ss.SSSSSSSSS", "06:43:12.000000000"))
     (TimestampFormatTC(0, "yyyy-MM-ddTHH:mm:SS.SSSSSSSSSZ",
         "1970-01-01T00:00:00.000000000Z"))
-    // Test just formatting date tokens
+    // Test formatting only date tokens
     (TimestampFormatTC(965779200, "yyyy-MM-dd", "2000-08-09"))
     // Test short form date tokens
     (TimestampFormatTC(965779200, "yyyy-M-d", "2000-8-9"))
@@ -705,13 +698,14 @@ TEST(TimestampTest, Basic) {
     (TimestampFormatTC(965779200, "dddddd/dd/d", "000009/09/9"))
     // Test padding on double digits
     (TimestampFormatTC(1382337792, "dddddd/dd/dd", "000021/21/21"))
-    // Test just formatting time tokens on a ts value generated from a date
+    // Test formatting only time tokens on a ts value generated from a date
     (TimestampFormatTC(965779200, "HH:mm:ss", "00:00:00"));
   // Loop through format test cases
   for (int i = 0; i < fmt_test_cases.size(); ++i) {
     TimestampFormatTC test_case = fmt_test_cases[i];
     DateTimeFormatContext dt_ctx(test_case.fmt);
-    ASSERT_TRUE(SimpleDateFormatTokenizer::Tokenize(&dt_ctx))  << "TC: " << i;
+    ASSERT_TRUE(SimpleDateFormatTokenizer::Tokenize(&dt_ctx, FORMAT))
+        << "TC: " << i;
     TimestampValue cust_tv = TimestampValue::FromUnixTime(test_case.ts, UTCPTR);
     EXPECT_NE(cust_tv.date(), not_a_date) << "TC: " << i;
     EXPECT_NE(cust_tv.time(), not_a_date_time) << "TC: " << i;
@@ -1065,4 +1059,3 @@ TEST(TimestampTest, TimezoneConversions) {
   }
 }
 }
-
