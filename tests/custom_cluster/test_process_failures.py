@@ -14,88 +14,99 @@
 # KIND, either express or implied.  See the License for the
 # specific language governing permissions and limitations
 # under the License.
-#
-# Impala process failure test suite
 
 import pytest
 
 from tests.common.custom_cluster_test_suite import (
-    NUM_SUBSCRIBERS,
-    CLUSTER_SIZE,
+    DEFAULT_CLUSTER_SIZE,
     CustomClusterTestSuite)
 
 # The exact query doesn't matter much for these tests, just want a query that touches
 # data on all nodes.
-QUERY = "select count(l_comment) from lineitem"
+QUERY = "select count(l_comment) from tpch.lineitem"
 
-# Validates killing and restarting impalad processes between query executions
+# The default number of statestore subscribers should be the default cluster size plus
+# one for the catalogd.
+DEFAULT_NUM_SUBSCRIBERS = DEFAULT_CLUSTER_SIZE + 1
+
+
 class TestProcessFailures(CustomClusterTestSuite):
+  """Validates killing and restarting impalad processes between query executions."""
+
+  @classmethod
+  def setup_class(cls):
+    if cls.exploration_strategy() != 'exhaustive':
+      pytest.skip('These tests only run in exhaustive')
+    super(TestProcessFailures, cls).setup_class()
+
   @pytest.mark.execute_serially
-  def test_restart_coordinator(self, vector):
-    """Restarts the coordinator between queries"""
+  def test_restart_coordinator(self):
+    """Restarts the coordinator between queries."""
     impalad = self.cluster.get_any_impalad()
     client = impalad.service.create_beeswax_client()
 
-    self.execute_query_using_client(client, QUERY, vector)
+    self.execute_query_expect_success(client, QUERY)
 
     statestored = self.cluster.statestored
     impalad.restart()
-    statestored.service.wait_for_live_subscribers(NUM_SUBSCRIBERS, timeout=60)
+    statestored.service.wait_for_live_subscribers(DEFAULT_NUM_SUBSCRIBERS, timeout=60)
 
     # Reconnect
     client = impalad.service.create_beeswax_client()
     impalad.service.wait_for_metric_value('catalog.ready', 1, timeout=60)
-    self.execute_query_using_client(client, QUERY, vector)
+    self.execute_query_expect_success(client, QUERY)
 
   @pytest.mark.execute_serially
-  def test_restart_statestore(self, vector):
-    """Tests the cluster still functions when the statestore dies"""
+  @CustomClusterTestSuite.with_args(
+      impalad_args='--use_local_catalog',
+      catalogd_args='--catalog_topic_mode=minimal')
+  def test_restart_statestore(self):
+    """Tests the cluster still functions when the statestore dies."""
     impalad = self.cluster.get_any_impalad()
     client = impalad.service.create_beeswax_client()
     statestored = self.cluster.statestored
     statestored.kill()
     impalad.service.wait_for_metric_value(
-        'statestore-subscriber.connected', 0, timeout=60)
+        'statestore-subscriber.connected', False, timeout=60)
 
     # impalad should still see the same number of live backends
-    assert impalad.service.get_num_known_live_backends() == CLUSTER_SIZE
+    assert impalad.service.get_num_known_live_backends() == DEFAULT_CLUSTER_SIZE
 
-    self.execute_query_using_client(client, QUERY, vector)
+    self.execute_query_expect_success(client, QUERY)
     # Reconnect
     statestored.start()
 
     impalad.service.wait_for_metric_value(
-        'statestore-subscriber.connected', 1, timeout=60)
-    statestored.service.wait_for_live_subscribers(NUM_SUBSCRIBERS, timeout=60)
+        'statestore-subscriber.connected', True, timeout=60)
+    statestored.service.wait_for_live_subscribers(DEFAULT_NUM_SUBSCRIBERS, timeout=60)
 
     # Wait for the number of live backends to reach the cluster size. Even though
     # all backends have subscribed to the statestore, this impalad may not have
     # received the update yet.
-    impalad.service.wait_for_num_known_live_backends(CLUSTER_SIZE, timeout=60)
+    impalad.service.wait_for_num_known_live_backends(DEFAULT_CLUSTER_SIZE, timeout=60)
 
-    self.execute_query_using_client(client, QUERY, vector)
+    self.execute_query_expect_success(client, QUERY)
 
   @pytest.mark.execute_serially
-  def test_kill_restart_worker(self, vector):
-    """Verifies a worker is able to be killed"""
+  def test_kill_restart_worker(self):
+    """Verifies a worker is able to be killed."""
     impalad = self.cluster.get_any_impalad()
     client = impalad.service.create_beeswax_client()
-    self.execute_query_using_client(client, QUERY, vector)
+    self.execute_query_expect_success(client, QUERY)
 
     # select a different impalad and restart it
     worker_impalad = self.cluster.get_different_impalad(impalad)
-    print "Coordinator impalad: %s Worker impalad: %s" % (impalad, worker_impalad)
 
     # Start executing a query. It will be cancelled due to a killed worker.
-    handle = self.execute_query_async_using_client(client, QUERY, vector)
+    handle = client.execute_async(QUERY)
 
     statestored = self.cluster.statestored
     worker_impalad.kill()
 
     # First wait until the the statestore realizes the impalad has gone down.
-    statestored.service.wait_for_live_subscribers(NUM_SUBSCRIBERS - 1, timeout=60)
+    statestored.service.wait_for_live_subscribers(DEFAULT_NUM_SUBSCRIBERS - 1, timeout=60)
     # Wait until the impalad registers another instance went down.
-    impalad.service.wait_for_num_known_live_backends(CLUSTER_SIZE - 1, timeout=60)
+    impalad.service.wait_for_num_known_live_backends(DEFAULT_CLUSTER_SIZE - 1, timeout=60)
 
     # Wait until the in-flight query has been cancelled.
     # The in-flight query should have been cancelled, reporting a failed worker as the
@@ -103,39 +114,38 @@ class TestProcessFailures(CustomClusterTestSuite):
     # node, or because a stream sender failed to establish a thrift connection. It is
     # non-deterministic which of those paths will initiate cancellation, but in either
     # case the query status should include the failed (or unreachable) worker.
-    impalad.service.wait_for_query_state(client, handle,\
-                                         client.QUERY_STATES['EXCEPTION'])
-
-    # Wait for the query status on the query profile web page to contain the
-    # expected failed hostport.
     query_id = handle.get_handle().id
-    failed_hostport = "%s:%s" % (worker_impalad.service.hostname,\
+    error_state = "Failed due to unreachable impalad"
+    assert impalad.service.wait_for_query_status(client, query_id, error_state)
+
+    # Assert that the query status on the query profile web page contains the expected
+    # failed hostport.
+    failed_hostport = "%s:%s" % (worker_impalad.service.hostname,
                                  worker_impalad.service.be_port)
-    query_status_match =\
-      impalad.service.wait_for_query_status(client, query_id, failed_hostport)
-    try:
-      if not query_status_match:
-        query_profile_page = impalad.service.read_query_profile_page(query_id)
-        assert False, "Query status did not contain expected hostport %s\n\n%s"\
-          % (failed_hostport, query_profile_page)
-    finally:
-      self.close_query_using_client(client, handle)
+    query_profile_page = impalad.service.read_query_profile_page(query_id)
+    assert failed_hostport in query_profile_page,\
+        "Query status did not contain expected hostport %s\n\n%s" % (failed_hostport,
+            query_profile_page)
 
     # Should work fine even if a worker is down.
-    self.execute_query_using_client(client, QUERY, vector)
+    self.execute_query_expect_success(client, QUERY)
 
     # Bring the worker back online and validate queries still work.
     worker_impalad.start()
-    statestored.service.wait_for_live_subscribers(NUM_SUBSCRIBERS, timeout=60)
-    worker_impalad.service.wait_for_metric_value('catalog.ready', 1, timeout=60)
-    self.execute_query_using_client(client, QUERY, vector)
+    statestored.service.wait_for_live_subscribers(DEFAULT_NUM_SUBSCRIBERS, timeout=60)
+    worker_impalad.service.wait_for_metric_value('catalog.ready', True, timeout=60)
+    self.execute_query_expect_success(client, QUERY)
 
   @pytest.mark.execute_serially
-  def test_restart_catalogd(self, vector):
+  @CustomClusterTestSuite.with_args(
+    impalad_args='--use_local_catalog',
+    catalogd_args='--catalog_topic_mode=minimal')
+  @pytest.mark.xfail(run=False, reason="IMPALA-9848")
+  def test_restart_catalogd(self):
     # Choose a random impalad verify a query can run against it.
     impalad = self.cluster.get_any_impalad()
     client = impalad.service.create_beeswax_client()
-    self.execute_query_using_client(client, QUERY, vector)
+    self.execute_query_expect_success(client, QUERY)
 
     # Kill the catalogd.
     catalogd = self.cluster.catalogd
@@ -143,26 +153,25 @@ class TestProcessFailures(CustomClusterTestSuite):
 
     # The statestore should detect the catalog service has gone down.
     statestored = self.cluster.statestored
-    statestored.service.wait_for_live_subscribers(NUM_SUBSCRIBERS - 1, timeout=60)
+    statestored.service.wait_for_live_subscribers(DEFAULT_NUM_SUBSCRIBERS - 1, timeout=60)
 
     # We should still be able to execute queries using the impalad.
-    self.execute_query_using_client(client, QUERY, vector)
+    self.execute_query_expect_success(client, QUERY)
 
     # Start the catalog service back up.
     catalogd.start()
-    statestored.service.wait_for_live_subscribers(NUM_SUBSCRIBERS, timeout=60)
+    statestored.service.wait_for_live_subscribers(DEFAULT_NUM_SUBSCRIBERS, timeout=60)
 
     # Execute a query against the catalog service.
-    impalad.service.wait_for_metric_value('catalog.ready', 1, timeout=60)
-    self.execute_query_using_client(client, "refresh lineitem", vector)
-    self.execute_query_using_client(client, QUERY, vector)
+    impalad.service.wait_for_metric_value('catalog.ready', True, timeout=60)
+    self.execute_query_expect_success(client, QUERY)
 
   @pytest.mark.execute_serially
-  def test_restart_all_impalad(self, vector):
+  def test_restart_all_impalad(self):
     """Restarts all the impalads and runs a query"""
     impalad = self.cluster.get_any_impalad()
     client = impalad.service.create_beeswax_client()
-    self.execute_query_using_client(client, QUERY, vector)
+    self.execute_query_expect_success(client, QUERY)
 
     # Kill each impalad and wait for the statestore to register the failures.
     for impalad_proc in self.cluster.impalads:
@@ -178,13 +187,12 @@ class TestProcessFailures(CustomClusterTestSuite):
 
     # The impalads should re-register with the statestore on restart at which point they
     # can execute queries.
-    statestored.service.wait_for_live_subscribers(NUM_SUBSCRIBERS, timeout=60)
+    statestored.service.wait_for_live_subscribers(DEFAULT_NUM_SUBSCRIBERS, timeout=60)
     for impalad in self.cluster.impalads:
-      impalad.service.wait_for_num_known_live_backends(CLUSTER_SIZE, timeout=60)
-      impalad.service.wait_for_metric_value('catalog.ready', 1, timeout=60)
+      impalad.service.wait_for_num_known_live_backends(DEFAULT_CLUSTER_SIZE, timeout=60)
+      impalad.service.wait_for_metric_value('catalog.ready', True, timeout=60)
       client = impalad.service.create_beeswax_client()
-      self.execute_query_using_client(client, QUERY, vector)
+      self.execute_query_expect_success(client, QUERY)
       # Make sure the catalog service is actually back up by executing an operation
       # against it.
-      self.execute_query_using_client(client, "refresh lineitem", vector)
-      self.execute_query_using_client(client, QUERY, vector)
+      self.execute_query_expect_success(client, QUERY)

@@ -121,6 +121,7 @@ import org.apache.impala.planner.PlanFragment;
 import org.apache.impala.planner.Planner;
 import org.apache.impala.planner.ScanNode;
 import org.apache.impala.thrift.TAlterDbParams;
+import org.apache.impala.thrift.TBackendGflags;
 import org.apache.impala.thrift.TCatalogOpRequest;
 import org.apache.impala.thrift.TCatalogOpType;
 import org.apache.impala.thrift.TCatalogServiceRequestHeader;
@@ -328,7 +329,8 @@ public class Frontend {
         BackendConfig.INSTANCE);
     queryHookManager_ = QueryEventHookManager.createFromConfig(BackendConfig.INSTANCE);
     if (!isBackendTest) {
-      metaStoreClientPool_ = new MetaStoreClientPool(1, 0);
+      TBackendGflags cfg = BackendConfig.INSTANCE.getBackendCfg();
+      metaStoreClientPool_ = new MetaStoreClientPool(1, cfg.initial_hms_cnxn_timeout_s);
       if (MetastoreShim.getMajorVersion() > 2) {
         transactionKeepalive_ = new TransactionKeepalive(metaStoreClientPool_);
       } else {
