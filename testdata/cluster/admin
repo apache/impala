@@ -48,7 +48,6 @@ done
 shift $(($OPTIND-1))
 
 DIR=$(dirname $0)
-NODES_DIR="$DIR/cdh$CDH_MAJOR_VERSION"
 NODE_COUNT=3
 if [[ "$TARGET_FILESYSTEM" == "hdfs" && "$ERASURE_CODING" = true ]]; then
   NODE_COUNT=5
@@ -191,13 +190,13 @@ function is_kerberized {
 
 function cluster_exists {
   # Just use the first node as an indicator...
-  if [[ ! -e "$NODES_DIR/${NODE_PREFIX}1" ]]; then
+  if [[ ! -e "$IMPALA_CLUSTER_NODES_DIR/${NODE_PREFIX}1" ]]; then
     return 1
   fi
 }
 
 function create_cluster {
-  mkdir -p "$NODES_DIR"
+  mkdir -p "$IMPALA_CLUSTER_NODES_DIR"
 
   # Used to populate config templates later
   GROUP=$(id -gn)
@@ -384,7 +383,7 @@ function exec_init_script {
   local CMD="$1"
 
   local PIDS=()
-  for SCRIPT in $(find "$NODES_DIR" -path "*/$NODE_PREFIX*/etc/init.d/$SCRIPT_NAME" \
+  for SCRIPT in $(find "$IMPALA_CLUSTER_NODES_DIR" -path "*/$NODE_PREFIX*/etc/init.d/$SCRIPT_NAME" \
       $FIND_EXECUTABLE_FILTER -type f); do
     if "$SCRIPT" status &>/dev/null; then
       RUNNING=true
@@ -419,7 +418,7 @@ function check_cluster_status {
 
   ROLE_COUNT=0
   NOT_RUNNING=()
-  for NODE_DIR in "$NODES_DIR/$NODE_PREFIX"*; do
+  for NODE_DIR in "$IMPALA_CLUSTER_NODES_DIR/$NODE_PREFIX"*; do
     for SERVICE in ${SUPPORTED_SERVICES[@]-}; do
       for SCRIPT in $(find "$NODE_DIR" -path "*/etc/init.d/$SERVICE*" $FIND_EXECUTABLE_FILTER \
           -type f); do
@@ -472,30 +471,30 @@ function restart {
 
 function delete_data {
   # Delete namenode, datanode and KMS data while preserving directory structure.
-  rm -rf "$NODES_DIR/$NODE_PREFIX"*/data/dfs/{nn,dn}/*
-  rm -f "$NODES_DIR/$NODE_PREFIX"*/data/kms.keystore
+  rm -rf "$IMPALA_CLUSTER_NODES_DIR/$NODE_PREFIX"*/data/dfs/{nn,dn}/*
+  rm -f "$IMPALA_CLUSTER_NODES_DIR/$NODE_PREFIX"*/data/kms.keystore
   delete_kudu_data
 }
 
 function delete_kudu_data {
-  rm -rf "$NODES_DIR/$NODE_PREFIX"*/var/lib/kudu/{master,ts}/*
+  rm -rf "$IMPALA_CLUSTER_NODES_DIR/$NODE_PREFIX"*/var/lib/kudu/{master,ts}/*
 }
 
 function delete_cluster {
   pkill -u $USER -f $KILL_CLUSTER_MARKER || true
-  rm -rf "$NODES_DIR"
+  rm -rf "$IMPALA_CLUSTER_NODES_DIR"
 }
 
 function get_node_dir {
   if $IS_OSX; then
-    greadlink -f "$NODES_DIR/$1"
+    greadlink -f "$IMPALA_CLUSTER_NODES_DIR/$1"
   else
-    readlink -f "$NODES_DIR/$1"
+    readlink -f "$IMPALA_CLUSTER_NODES_DIR/$1"
   fi
 }
 
 function get_hadoop_client_conf_dir {
-  echo "$NODES_DIR/$NODE_PREFIX"1/etc/hadoop/conf
+  echo "$IMPALA_CLUSTER_NODES_DIR/$NODE_PREFIX"1/etc/hadoop/conf
 }
 
 COMMAND=$1

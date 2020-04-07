@@ -18,6 +18,10 @@
 # under the License.
 
 set -euo pipefail
+
+: ${IMPALA_HOME:=$(cd "$(dirname $0)"; pwd)}
+export IMPALA_HOME
+
 . $IMPALA_HOME/bin/report_build_error.sh
 setup_report_build_error
 
