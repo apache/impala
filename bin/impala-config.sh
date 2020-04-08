@@ -230,7 +230,7 @@ export CDP_RANGER_URL=${CDP_RANGER_URL-}
 
 export CDH_COMPONENTS_HOME="$IMPALA_TOOLCHAIN/cdh_components-$CDH_BUILD_NUMBER"
 export CDP_COMPONENTS_HOME="$IMPALA_TOOLCHAIN/cdp_components-$CDP_BUILD_NUMBER"
-export USE_CDP_HIVE=${USE_CDP_HIVE-false}
+export USE_CDP_HIVE=${USE_CDP_HIVE-true}
 export DISABLE_SENTRY=${DISABLE_SENTRY_OVERRIDE:-"true"}
 if $USE_CDP_HIVE; then
   # When USE_CDP_HIVE is set we use the CDP hive version to build as well as deploy in
