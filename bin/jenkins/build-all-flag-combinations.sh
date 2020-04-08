@@ -43,7 +43,7 @@ CONFIGS=(
   "-skiptests -noclean -tsan"
   "-skiptests -noclean -ubsan -so -ninja"
   # USE_CDP_HIVE=true build:
-  "-skiptests -noclean -use_cdp_hive"
+  "-skiptests -noclean -use_cdh_hive"
 )
 
 FAILED=""
@@ -58,12 +58,12 @@ trap onexit EXIT
 mkdir -p ${TMP_DIR}
 
 for CONFIG in "${CONFIGS[@]}"; do
-  CONFIG2=${CONFIG/-use_cdp_hive/}
+  CONFIG2=${CONFIG/-use_cdh_hive/}
   if [[ "$CONFIG" != "$CONFIG2" ]]; then
     CONFIG=$CONFIG2
-    export USE_CDP_HIVE=true
-  else
     export USE_CDP_HIVE=false
+  else
+    export USE_CDP_HIVE=true
   fi
   DESCRIPTION="Options $CONFIG USE_CDP_HIVE=$USE_CDP_HIVE"
 
