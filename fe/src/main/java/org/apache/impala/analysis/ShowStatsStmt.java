@@ -21,6 +21,7 @@ import java.util.List;
 
 import org.apache.impala.authorization.Privilege;
 import org.apache.impala.catalog.FeFsTable;
+import org.apache.impala.catalog.FeIcebergTable;
 import org.apache.impala.catalog.FeKuduTable;
 import org.apache.impala.catalog.FeTable;
 import org.apache.impala.catalog.FeView;
@@ -93,6 +94,21 @@ public class ShowStatsStmt extends StatementBase {
           FeKuduTable.Utils.getRangePartitioningColNames(kuduTable).isEmpty()) {
         throw new AnalysisException(getSqlPrefix() + " requested but table does not " +
             "have range partitions: " + table_.getFullName());
+      }
+    } else if (table_ instanceof FeIcebergTable) {
+      FeIcebergTable icebergTable = (FeIcebergTable) table_;
+      if (op_ == TShowStatsOp.PARTITIONS) {
+        //Non-partition iceberg table only has an empty PartitionField set
+        Preconditions.checkArgument(!icebergTable.getPartitionSpec().isEmpty());
+        IcebergPartitionSpec spec = icebergTable.getPartitionSpec().get(0);
+        boolean emptySpec = (spec.getIcebergPartitionFields_() == null ||
+            spec.getIcebergPartitionFields_().size() == 0);
+        if (icebergTable.getPartitionSpec().size() == 1 && emptySpec) {
+          throw new AnalysisException("Iceberg table does not have PartitionSpec: "
+              + table_.getFullName());
+        }
+      } else {
+        throw new AnalysisException(getSqlPrefix() + " not supported for Iceberg table.");
       }
     } else {
       if (op_ == TShowStatsOp.RANGE_PARTITIONS) {

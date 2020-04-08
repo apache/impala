@@ -94,6 +94,7 @@ import org.apache.impala.catalog.FeDataSourceTable;
 import org.apache.impala.catalog.FeDb;
 import org.apache.impala.catalog.FeFsTable;
 import org.apache.impala.catalog.FeHBaseTable;
+import org.apache.impala.catalog.FeIcebergTable;
 import org.apache.impala.catalog.FeKuduTable;
 import org.apache.impala.catalog.FeTable;
 import org.apache.impala.catalog.Function;
@@ -103,6 +104,7 @@ import org.apache.impala.catalog.MetaStoreClientPool;
 import org.apache.impala.catalog.MetaStoreClientPool.MetaStoreClient;
 import org.apache.impala.catalog.Type;
 import org.apache.impala.catalog.local.InconsistentMetadataFetchException;
+import org.apache.impala.common.AnalysisException;
 import org.apache.impala.common.FileSystemUtil;
 import org.apache.impala.common.ImpalaException;
 import org.apache.impala.common.InternalException;
@@ -1195,6 +1197,12 @@ public class Frontend {
       } else {
         Preconditions.checkState(op == TShowStatsOp.TABLE_STATS);
         return FeKuduTable.Utils.getTableStats((FeKuduTable) table);
+      }
+    } else if (table instanceof FeIcebergTable) {
+      if (op == TShowStatsOp.PARTITIONS) {
+        return FeIcebergTable.Utils.getPartitionSpecs((FeIcebergTable) table);
+      } else {
+        throw new AnalysisException("Iceberg table not supported table stats now.");
       }
     } else {
       throw new InternalException("Invalid table class: " + table.getClass());

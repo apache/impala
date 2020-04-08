@@ -76,7 +76,10 @@ public enum HdfsFileFormat {
       "org.apache.hadoop.hive.kudu.KuduSerDe", false, false, false),
   HUDI_PARQUET("org.apache.hudi.hadoop.HoodieParquetInputFormat",
       "org.apache.hadoop.hive.ql.io.parquet.MapredParquetOutputFormat",
-      "org.apache.hadoop.hive.ql.io.parquet.serde.ParquetHiveSerDe", true, true, true);
+      "org.apache.hadoop.hive.ql.io.parquet.serde.ParquetHiveSerDe", true, true, true),
+  ICEBERG("com.expediagroup.hiveberg.IcebergInputFormat",
+      "org.apache.hadoop.hive.ql.io.HiveIgnoreKeyTextOutputFormat",
+      "com.expediagroup.hiveberg.IcebergSerDe", false, false, false);
 
   private final String inputFormat_;
   private final String outputFormat_;
@@ -130,6 +133,7 @@ public enum HdfsFileFormat {
           .put(KUDU.inputFormat(), KUDU)
           .put(ORC.inputFormat(), ORC)
           .put(HUDI_PARQUET.inputFormat(), HUDI_PARQUET)
+          .put(ICEBERG.inputFormat(), ICEBERG)
           .build();
 
   /**
@@ -168,6 +172,7 @@ public enum HdfsFileFormat {
       case HUDI_PARQUET: return HdfsFileFormat.HUDI_PARQUET;
       case PARQUET: return HdfsFileFormat.PARQUET;
       case KUDU: return HdfsFileFormat.KUDU;
+      case ICEBERG: return HdfsFileFormat.ICEBERG;
       default:
         throw new RuntimeException("Unknown THdfsFileFormat: "
             + thriftFormat + " - should never happen!");
@@ -184,6 +189,7 @@ public enum HdfsFileFormat {
       case HUDI_PARQUET:
       case PARQUET: return THdfsFileFormat.PARQUET;
       case KUDU: return THdfsFileFormat.KUDU;
+      case ICEBERG: return THdfsFileFormat.ICEBERG;
       default:
         throw new RuntimeException("Unknown HdfsFormat: "
             + this + " - should never happen!");
@@ -208,6 +214,7 @@ public enum HdfsFileFormat {
       case PARQUET: return "PARQUET";
       case KUDU: return "KUDU";
       case HUDI_PARQUET: return "HUDIPARQUET";
+      case ICEBERG: return "ICEBERG";
       default:
         throw new RuntimeException("Unknown HdfsFormat: "
             + this + " - should never happen!");
@@ -227,6 +234,7 @@ public enum HdfsFileFormat {
       case PARQUET:
       case HUDI_PARQUET:
       case ORC:
+      case ICEBERG:
         return true;
       case KUDU:
         return false;

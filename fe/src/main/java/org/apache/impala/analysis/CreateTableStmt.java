@@ -27,6 +27,7 @@ import org.apache.hadoop.hive.metastore.api.SQLForeignKey;
 import org.apache.hadoop.hive.metastore.api.SQLPrimaryKey;
 import org.apache.impala.authorization.AuthorizationConfig;
 import org.apache.impala.catalog.KuduTable;
+import org.apache.impala.catalog.IcebergTable;
 import org.apache.impala.catalog.RowFormat;
 import org.apache.impala.catalog.Table;
 import org.apache.impala.common.AnalysisException;
@@ -139,6 +140,10 @@ public class CreateTableStmt extends StatementBase {
     return tableDef_.getPrimaryKeyColumnNames();
   }
 
+  List<IcebergPartitionSpec> getIcebergPartitionSpecs() {
+    return tableDef_.getIcebergPartitionSpecs();
+  }
+
   /**
    * Get foreign keys information as strings. Useful for toSqlUtils.
    * @return List of strings of the form "(col1, col2,..) REFERENCES [pk_db].pk_table
@@ -218,6 +223,13 @@ public class CreateTableStmt extends StatementBase {
       params.addToForeign_keys(fk);
     }
     params.setServer_name(serverName_);
+
+    // Create table stmt only have one PartitionSpec
+    if (!getIcebergPartitionSpecs().isEmpty()) {
+      Preconditions.checkState(getIcebergPartitionSpecs().size() == 1);
+      params.setPartition_spec(getIcebergPartitionSpecs().get(0).toThrift());
+    }
+
     return params;
   }
 
@@ -243,7 +255,8 @@ public class CreateTableStmt extends StatementBase {
     // Avro tables can have empty column defs because they can infer them from the Avro
     // schema. Likewise for external Kudu tables, the schema can be read from Kudu.
     if (getColumnDefs().isEmpty() && getFileFormat() != THdfsFileFormat.AVRO
-        && getFileFormat() != THdfsFileFormat.KUDU) {
+        && getFileFormat() != THdfsFileFormat.KUDU && getFileFormat() !=
+        THdfsFileFormat.ICEBERG) {
       throw new AnalysisException("Table requires at least 1 column");
     }
     if (getFileFormat() == THdfsFileFormat.AVRO) {
@@ -253,6 +266,10 @@ public class CreateTableStmt extends StatementBase {
             "An Avro table requires column definitions or an Avro schema.");
       }
       AvroSchemaUtils.setFromSerdeComment(getColumnDefs());
+    }
+
+    if (getFileFormat() == THdfsFileFormat.ICEBERG) {
+      analyzeIcebergFormat();
     }
 
     // If lineage logging is enabled, compute minimal lineage graph.
@@ -541,5 +558,34 @@ public class CreateTableStmt extends StatementBase {
       propertyMap.put(kv.getKey(),
           new StringLiteral(kv.getValue()).getUnescapedValue());
     }
+  }
+
+  /**
+   * For iceberg file format, add related storage handler
+   */
+  private void analyzeIcebergFormat() throws AnalysisException {
+    // A managed table cannot have 'external.table.purge' property set
+    if (!isExternal() && Boolean.parseBoolean(
+        getTblProperties().get(IcebergTable.TBL_PROP_EXTERNAL_TABLE_PURGE))) {
+      throw new AnalysisException(String.format("Table property '%s' cannot be set to " +
+          "true with a managed Iceberg table.",
+          IcebergTable.TBL_PROP_EXTERNAL_TABLE_PURGE));
+    }
+
+    if ((!isExternal() || Boolean.parseBoolean(getTblProperties().get(
+        Table.TBL_PROP_EXTERNAL_TABLE_PURGE))) && getColumnDefs().isEmpty()) {
+      // External iceberg table can have empty column, but managed iceberg table
+      // requires at least one column.
+      throw new AnalysisException("Table requires at least 1 column for " +
+          "managed iceberg table.");
+    }
+
+    String handler = getTblProperties().get(IcebergTable.KEY_STORAGE_HANDLER);
+    if (handler != null && !IcebergTable.isIcebergStorageHandler(handler)) {
+      throw new AnalysisException("Invalid storage handler " +
+          "specified for Iceberg format: " + handler);
+    }
+    putGeneratedKuduProperty(IcebergTable.KEY_STORAGE_HANDLER,
+        IcebergTable.ICEBERG_STORAGE_HANDLER);
   }
 }

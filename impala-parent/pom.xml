@@ -63,6 +63,7 @@ under the License.
     <derby.version>10.14.2.0</derby.version>
     <jackson-databind.version>2.10.0</jackson-databind.version>
     <project.build.sourceEncoding>UTF-8</project.build.sourceEncoding>
+    <iceberg.version>${env.IMPALA_ICEBERG_VERSION}</iceberg.version>
   </properties>
 
   <repositories>

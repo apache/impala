@@ -542,6 +542,9 @@ struct TCreateTableParams {
 
   // Foreign Keys Structure for Hive API
   20: optional list<hive_metastore.SQLForeignKey> foreign_keys;
+
+  // Just one PartitionSpec when create iceberg table
+  21: optional CatalogObjects.TIcebergPartitionSpec partition_spec
 }
 
 // Parameters of a CREATE VIEW or ALTER VIEW AS SELECT command
