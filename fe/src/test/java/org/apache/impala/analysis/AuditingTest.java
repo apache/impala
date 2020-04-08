@@ -300,6 +300,16 @@ public class AuditingTest extends FrontendTestBase {
             "functional_seq_snap.alltypes", TCatalogObjectType.TABLE, "ALTER"),
         new TAccessEvent(
             "functional_seq_snap.alltypes", TCatalogObjectType.TABLE, "SELECT")));
+
+    // COMPUTE STATS results in two registrations of the ALTER event. Check we do not have
+    // duplicate ALTER events when the fully-qualified table name is not in lowercase.
+    accessEvents = AnalyzeAccessEvents(
+        "COMPUTE STATS FUNCTIONAL_SEQ_SNAP.ALLTYPES");
+    Assert.assertEquals(accessEvents, Sets.newHashSet(
+        new TAccessEvent(
+            "functional_seq_snap.alltypes", TCatalogObjectType.TABLE, "ALTER"),
+        new TAccessEvent(
+            "functional_seq_snap.alltypes", TCatalogObjectType.TABLE, "SELECT")));
   }
 
   @Test
