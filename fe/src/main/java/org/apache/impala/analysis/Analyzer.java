@@ -2756,6 +2756,10 @@ public class Analyzer {
    */
   public Set<TAccessEvent> getAccessEvents() { return globalState_.accessEvents; }
   public void addAccessEvent(TAccessEvent event) {
+    // We convert 'event.name' to lowercase to avoid duplicate access events since a
+    // statement could possibly result in two calls to addAccessEvent(), e.g.,
+    // COMPUTE STATS.
+    event.name = event.name.toLowerCase();
     globalState_.accessEvents.add(event);
   }
 
@@ -2859,8 +2863,8 @@ public class Analyzer {
       TCatalogObjectType objectType = TCatalogObjectType.TABLE;
       if (table instanceof FeView) objectType = TCatalogObjectType.VIEW;
       for (Privilege priv : privilege) {
-        globalState_.accessEvents.add(new TAccessEvent(
-            fqTableName.toString(), objectType, priv.toString()));
+        addAccessEvent(new TAccessEvent(fqTableName.toString(), objectType,
+            priv.toString()));
       }
     }
     return table;
@@ -2943,8 +2947,8 @@ public class Analyzer {
     });
     // Propagate the exception if needed.
     FeDb retDb = getDb(dbName, throwIfDoesNotExist);
-    globalState_.accessEvents.add(new TAccessEvent(
-        dbName, TCatalogObjectType.DATABASE, privilege.toString()));
+    addAccessEvent(new TAccessEvent(dbName, TCatalogObjectType.DATABASE,
+        privilege.toString()));
     return retDb;
   }
 
