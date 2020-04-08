@@ -35,6 +35,8 @@ import org.apache.impala.analysis.UnionStmt.UnionOperand;
 import org.apache.impala.analysis.RangePartition;
 import org.apache.impala.analysis.TableSampleClause;
 import org.apache.impala.analysis.AlterTableAddDropRangePartitionStmt.Operation;
+import org.apache.impala.analysis.IcebergPartitionSpec;
+import org.apache.impala.analysis.IcebergPartitionField;
 import org.apache.impala.catalog.ArrayType;
 import org.apache.impala.catalog.MapType;
 import org.apache.impala.catalog.RowFormat;
@@ -55,7 +57,9 @@ import org.apache.impala.thrift.TShowStatsOp;
 import org.apache.impala.thrift.TTablePropertyType;
 import org.apache.impala.thrift.TPrincipalType;
 import org.apache.impala.thrift.TSortingOrder;
+import org.apache.impala.thrift.TIcebergPartitionTransform;
 import org.apache.impala.service.BackendConfig;
+import org.apache.impala.util.IcebergUtil;
 import org.apache.impala.common.NotImplementedException;
 
 parser code {:
@@ -287,8 +291,8 @@ terminal
   KW_EXTENDED, KW_EXTERNAL, KW_FALSE, KW_FIELDS, KW_FILEFORMAT, KW_FILES, KW_FINALIZE_FN,
   KW_FIRST, KW_FLOAT, KW_FOLLOWING, KW_FOR, KW_FOREIGN, KW_FORMAT, KW_FORMATTED,
   KW_FROM, KW_FULL, KW_FUNCTION, KW_FUNCTIONS, KW_GRANT, KW_GROUP, KW_HASH, KW_HUDIPARQUET,
-  KW_IGNORE, KW_HAVING, KW_IF, KW_ILIKE, KW_IN, KW_INCREMENTAL, KW_INIT_FN, KW_INNER, KW_INPATH,
-  KW_INSERT, KW_INT, KW_INTERMEDIATE, KW_INTERVAL, KW_INTO, KW_INVALIDATE, KW_IREGEXP,
+  KW_IGNORE, KW_HAVING, KW_ICEBERG, KW_IF, KW_ILIKE, KW_IN, KW_INCREMENTAL, KW_INIT_FN, KW_INNER,
+  KW_INPATH, KW_INSERT, KW_INT, KW_INTERMEDIATE, KW_INTERVAL, KW_INTO, KW_INVALIDATE, KW_IREGEXP,
   KW_IS, KW_JOIN,  KW_KUDU, KW_LAST, KW_LEFT, KW_LEXICAL, KW_LIKE, KW_LIMIT, KW_LINES,
   KW_LOAD, KW_LOCATION, KW_MAP, KW_MERGE_FN, KW_METADATA, KW_NORELY, KW_NOT,
   KW_NOVALIDATE, KW_NULL, KW_NULLS, KW_OFFSET, KW_ON, KW_OR, KW_ORC, KW_ORDER, KW_OUTER,
@@ -298,7 +302,7 @@ terminal
   KW_RENAME, KW_REPEATABLE, KW_REPLACE, KW_REPLICATION, KW_RESTRICT, KW_RETURNS,
   KW_REVOKE, KW_RIGHT, KW_RLIKE, KW_ROLE, KW_ROLES, KW_ROW, KW_ROWS, KW_SCHEMA,
   KW_SCHEMAS, KW_SELECT, KW_SEMI, KW_SEQUENCEFILE, KW_SERDEPROPERTIES, KW_SERIALIZE_FN,
-  KW_SET, KW_SHOW, KW_SMALLINT, KW_SORT, KW_STORED, KW_STRAIGHT_JOIN, KW_STRING,
+  KW_SET, KW_SHOW, KW_SMALLINT, KW_SORT, KW_SPEC, KW_STORED, KW_STRAIGHT_JOIN, KW_STRING,
   KW_STRUCT, KW_SYMBOL, KW_TABLE, KW_TABLES, KW_TABLESAMPLE, KW_TBLPROPERTIES,
   KW_TERMINATED, KW_TEXTFILE, KW_THEN, KW_TIMESTAMP, KW_TINYINT, KW_TRUNCATE, KW_STATS,
   KW_TO, KW_TRUE, KW_UNBOUNDED, KW_UNCACHED, KW_UNION, KW_UNKNOWN, KW_UPDATE,
@@ -477,6 +481,13 @@ nonterminal ColumnDef column_def, view_column_def;
 nonterminal List<ColumnDef> column_def_list, partition_column_defs,
   view_column_def_list, view_column_defs;
 nonterminal List<StructField> struct_field_def_list;
+nonterminal List<IcebergPartitionSpec> iceberg_partition_spec_list,
+  iceberg_partition_spec_defs;
+nonterminal IcebergPartitionSpec iceberg_partition_spec_def;
+nonterminal List<IcebergPartitionField> iceberg_partition_field_list,
+  iceberg_partition_field_defs;
+nonterminal IcebergPartitionField iceberg_partition_field_def;
+nonterminal TIcebergPartitionTransform iceberg_partition_transform;
 // Options for DDL commands - CREATE/DROP/ALTER
 nonterminal HdfsCachingOp cache_op_val, opt_cache_op_val;
 nonterminal BigDecimal opt_cache_op_replication;
@@ -1320,6 +1331,7 @@ create_tbl_as_select_params ::=
   {:
     tbl_def.getPrimaryKeyColumnNames().addAll(primary_keys);
     tbl_def.getKuduPartitionParams().addAll(partition_params.getKuduPartitionParams());
+    tbl_def.getIcebergPartitionSpecs().addAll(partition_params.getIcebergPartitionSpecs());
     tbl_def.setOptions(options);
     RESULT = new CreateTableAsSelectStmt.CtasParams(new CreateTableStmt(tbl_def),
         select_stmt, null);
@@ -1360,6 +1372,7 @@ create_tbl_stmt ::=
   {:
     tbl_def.getPartitionColumnDefs().addAll(data_layout.getPartitionColumnDefs());
     tbl_def.getKuduPartitionParams().addAll(data_layout.getKuduPartitionParams());
+    tbl_def.getIcebergPartitionSpecs().addAll(data_layout.getIcebergPartitionSpecs());
     tbl_def.setOptions(options);
     RESULT = new CreateTableStmt(tbl_def);
   :}
@@ -1385,6 +1398,7 @@ create_tbl_stmt ::=
   {:
     tbl_def.getPartitionColumnDefs().addAll(data_layout.getPartitionColumnDefs());
     tbl_def.getKuduPartitionParams().addAll(data_layout.getKuduPartitionParams());
+    tbl_def.getIcebergPartitionSpecs().addAll(data_layout.getIcebergPartitionSpecs());
     tbl_def.setOptions(options);
     RESULT = new CreateTableLikeFileStmt(new CreateTableStmt(tbl_def),
         schema_file_format, new HdfsUri(schema_location));
@@ -1589,6 +1603,8 @@ opt_tbl_data_layout ::=
 partitioned_data_layout ::=
   partition_param_list:partition_params
   {: RESULT = TableDataLayout.createKuduPartitionedLayout(partition_params); :}
+  | iceberg_partition_spec_list:iceberg_partition_specs
+  {: RESULT = TableDataLayout.createIcebergPartitionedLayout(iceberg_partition_specs); :}
   | /* empty */
   {: RESULT = TableDataLayout.createEmptyLayout(); :}
   ;
@@ -1706,6 +1722,59 @@ opt_upper_range_val ::=
   {: RESULT = new Pair<List<Expr>, Boolean>(l, true); :}
   | /* empty */
   {: RESULT = null; :}
+  ;
+
+iceberg_partition_spec_list ::=
+  iceberg_partition_spec_defs:cols
+  {: RESULT = cols; :}
+  ;
+
+iceberg_partition_spec_defs ::=
+  iceberg_partition_spec_def:col_def
+  {:
+    List<IcebergPartitionSpec> list = new ArrayList<>();
+    list.add(col_def);
+    RESULT = list;
+  :}
+  | iceberg_partition_spec_defs:list COMMA iceberg_partition_spec_def:col_def
+  {:
+    list.add(col_def);
+    RESULT = list;
+  :}
+  ;
+
+iceberg_partition_spec_def ::=
+  iceberg_partition_field_list:partition_fields
+  {: RESULT = new IcebergPartitionSpec(partition_fields); :}
+  ;
+
+iceberg_partition_field_list ::=
+  KW_PARTITION KW_BY KW_SPEC LPAREN iceberg_partition_field_defs:cols RPAREN
+  {: RESULT = cols; :}
+  ;
+
+iceberg_partition_field_defs ::=
+  iceberg_partition_field_def:col_def
+  {:
+    List<IcebergPartitionField> list = new ArrayList<>();
+    list.add(col_def);
+    RESULT = list;
+  :}
+  | iceberg_partition_field_defs:list COMMA iceberg_partition_field_def:col_def
+  {:
+    list.add(col_def);
+    RESULT = list;
+  :}
+  ;
+
+iceberg_partition_field_def ::=
+  IDENT:col_name iceberg_partition_transform:partition_transform
+  {: RESULT = new IcebergPartitionField(col_name, partition_transform); :}
+  ;
+
+iceberg_partition_transform ::=
+  IDENT:transfrom_type
+  {: RESULT = IcebergUtil.getPartitionTransform(transfrom_type); :}
   ;
 
 create_udf_stmt ::=
@@ -1880,6 +1949,8 @@ file_format_val ::=
   {: RESULT = THdfsFileFormat.AVRO; :}
   | KW_HUDIPARQUET
   {: RESULT = THdfsFileFormat.HUDI_PARQUET; :}
+  | KW_ICEBERG
+  {: RESULT = THdfsFileFormat.ICEBERG; :}
   ;
 
 tbl_properties ::=
@@ -3789,6 +3860,8 @@ word ::=
   {: RESULT = r.toString(); :}
   | KW_HUDIPARQUET:r
   {: RESULT = r.toString(); :}
+  | KW_ICEBERG:r
+  {: RESULT = r.toString(); :}
   | KW_IF:r
   {: RESULT = r.toString(); :}
   | KW_IGNORE:r
@@ -3954,6 +4027,8 @@ word ::=
   | KW_SMALLINT:r
   {: RESULT = r.toString(); :}
   | KW_SORT:r
+  {: RESULT = r.toString(); :}
+  | KW_SPEC:r
   {: RESULT = r.toString(); :}
   | KW_STORED:r
   {: RESULT = r.toString(); :}

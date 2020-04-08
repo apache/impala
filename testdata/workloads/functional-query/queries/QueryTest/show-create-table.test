@@ -556,3 +556,22 @@ WITH SERDEPROPERTIES ('field.delim'=',', 'serialization.format'=',')
 STORED AS TEXTFILE
 LOCATION '$$location_uri$$'
 ====
+---- CREATE_TABLE
+CREATE TABLE iceberg_test1 (
+  level STRING
+)
+STORED AS ICEBERG
+---- RESULTS-HIVE
+CREATE TABLE show_create_table_test_db.iceberg_test1 (
+  level STRING
+)
+STORED AS ICEBERG
+LOCATION '$$location_uri$$'
+---- RESULTS-HIVE-3
+CREATE EXTERNAL TABLE show_create_table_test_db.iceberg_test1 (
+  level STRING
+)
+STORED AS ICEBERG
+LOCATION '$$location_uri$$'
+TBLPROPERTIES ('external.table.purge'='TRUE')
+====

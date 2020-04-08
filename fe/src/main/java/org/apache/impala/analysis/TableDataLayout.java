@@ -22,32 +22,43 @@ import java.util.List;
 
 /**
  * Represents the PARTITION BY and PARTITIONED BY clauses of a DDL statement.
+ * We can use PARTITION BY SPEC clause to create iceberg table partitions.
  */
 class TableDataLayout {
 
   private final List<ColumnDef> partitionColDefs_;
   private final List<KuduPartitionParam> kuduPartitionParams_;
+  private final List<IcebergPartitionSpec> icebergPartitionSpecs_;
 
   private TableDataLayout(List<ColumnDef> partitionColumnDefs,
-      List<KuduPartitionParam> partitionParams) {
+                          List<KuduPartitionParam> partitionParams,
+                          List<IcebergPartitionSpec> icebergPartitionSpecs) {
     partitionColDefs_ = partitionColumnDefs;
     kuduPartitionParams_ = partitionParams;
+    icebergPartitionSpecs_ = icebergPartitionSpecs;
   }
 
   static TableDataLayout createPartitionedLayout(List<ColumnDef> partitionColumnDefs) {
     return new TableDataLayout(partitionColumnDefs,
-        new ArrayList<>());
+        new ArrayList<>(), new ArrayList<>());
   }
 
   static TableDataLayout createKuduPartitionedLayout(
       List<KuduPartitionParam> partitionParams) {
-    return new TableDataLayout(new ArrayList<>(), partitionParams);
+    return new TableDataLayout(new ArrayList<>(), partitionParams, new ArrayList<>());
+  }
+
+  static TableDataLayout createIcebergPartitionedLayout(
+      List<IcebergPartitionSpec> icebergPartitionSpecs) {
+    return new TableDataLayout(new ArrayList<>(), new ArrayList<>(),
+        icebergPartitionSpecs);
   }
 
   static TableDataLayout createEmptyLayout() {
-    return new TableDataLayout(new ArrayList<>(), new ArrayList<>());
+    return new TableDataLayout(new ArrayList<>(), new ArrayList<>(), new ArrayList<>());
   }
 
   List<ColumnDef> getPartitionColumnDefs() { return partitionColDefs_; }
   List<KuduPartitionParam> getKuduPartitionParams() { return kuduPartitionParams_; }
+  List<IcebergPartitionSpec> getIcebergPartitionSpecs() { return icebergPartitionSpecs_; }
 }

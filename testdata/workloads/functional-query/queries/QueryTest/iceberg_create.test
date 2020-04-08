@@ -1,0 +1,154 @@
+====
+---- QUERY
+CREATE TABLE iceberg_test1(
+  level STRING,
+  event_time TIMESTAMP,
+  register_time DATE,
+  message STRING,
+  price DECIMAL(8,1),
+  map_test MAP <STRING, array <STRING>>,
+  struct_test STRUCT <f1: BIGINT, f2: BIGINT>
+)
+PARTITION BY SPEC
+(
+  level IDENTITY,
+  event_time IDENTITY,
+  event_time HOUR,
+  register_time DAY
+)
+STORED AS ICEBERG;
+---- RESULTS
+'Table has been created.'
+====
+---- QUERY
+DESCRIBE iceberg_test1;
+---- RESULTS
+'level','string',''
+'event_time','timestamp',''
+'register_time','date',''
+'message','string',''
+'price','decimal(8,1)',''
+'map_test','map<string,array<string>>',''
+'struct_test','struct<\n  f1:bigint,\n  f2:bigint\n>',''
+---- TYPES
+STRING,STRING,STRING
+====
+---- QUERY
+SHOW PARTITIONS iceberg_test1;
+---- RESULTS
+0,1,1000,'level','IDENTITY'
+0,2,1001,'event_time','IDENTITY'
+0,2,1002,'event_time_hour','HOUR'
+0,3,1003,'register_time_day','DAY'
+---- TYPES
+BIGINT,BIGINT,BIGINT,STRING,STRING
+====
+---- QUERY
+DROP TABLE iceberg_test1;
+---- RESULTS
+'Table has been dropped.'
+====
+---- QUERY
+CREATE TABLE iceberg_test2(
+  level STRING
+)
+STORED AS ICEBERG;
+DESCRIBE iceberg_test2;
+---- RESULTS
+'level','string',''
+---- TYPES
+STRING,STRING,STRING
+====
+---- QUERY
+SHOW PARTITIONS iceberg_test2;
+---- CATCH
+AnalysisException: Iceberg table does not have PartitionSpec: $DATABASE.iceberg_test2
+====
+---- QUERY
+CREATE TABLE iceberg_test3(
+  level STRING
+)
+PARTITION BY SPEC
+(
+  level IDENTITY,
+  event_time HOUR
+)
+STORED AS ICEBERG;
+---- CATCH
+ImpalaRuntimeException: Error making 'createTable' RPC to Hive Metastore: 
+CAUSED BY: IllegalArgumentException: Cannot find source column: event_time
+====
+---- QUERY
+CREATE TABLE iceberg_test3
+STORED AS ICEBERG;
+---- CATCH
+AnalysisException: Table requires at least 1 column for managed iceberg table.
+====
+---- QUERY
+CREATE EXTERNAL TABLE iceberg_test_external(
+  level STRING
+)
+STORED AS ICEBERG;
+---- RESULTS
+'Location is necessary for external iceberg table.'
+====
+---- QUERY
+CREATE TABLE iceberg_test4(
+  level STRING
+)
+PARTITION BY SPEC
+(
+  level IDENTITY
+)
+STORED AS ICEBERG
+LOCATION '/iceberg_test_with_location';
+CREATE EXTERNAL TABLE iceberg_test_external(
+  level STRING
+)
+STORED AS ICEBERG
+LOCATION '/iceberg_test_with_location';
+---- RESULTS
+'Table has been created.'
+====
+---- QUERY
+DESCRIBE iceberg_test_external;
+---- RESULTS
+'level','string',''
+---- TYPES
+STRING,STRING,STRING
+====
+---- QUERY
+SHOW PARTITIONS iceberg_test_external;
+---- RESULTS
+0,1,1000,'level','IDENTITY'
+---- TYPES
+BIGINT,BIGINT,BIGINT,STRING,STRING
+====
+---- QUERY
+CREATE EXTERNAL TABLE iceberg_test_external_empty_column
+STORED AS ICEBERG
+LOCATION '/iceberg_test_with_location';
+---- RESULTS
+'Table has been created.'
+====
+---- QUERY
+DESCRIBE iceberg_test_external_empty_column;
+---- RESULTS
+'level','string',''
+---- TYPES
+STRING,STRING,STRING
+====
+---- QUERY
+SHOW PARTITIONS iceberg_test_external_empty_column;
+---- RESULTS
+0,1,1000,'level','IDENTITY'
+---- TYPES
+BIGINT,BIGINT,BIGINT,STRING,STRING
+====
+---- QUERY
+DROP TABLE iceberg_test4;
+DROP TABLE iceberg_test_external;
+DROP TABLE iceberg_test_external_empty_column;
+---- RESULTS
+'Table has been dropped.'
+====

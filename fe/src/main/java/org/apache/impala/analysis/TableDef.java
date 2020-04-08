@@ -374,6 +374,10 @@ class TableDef {
   List<KuduPartitionParam> getKuduPartitionParams() {
     return dataLayout_.getKuduPartitionParams();
   }
+
+  List<IcebergPartitionSpec> getIcebergPartitionSpecs() {
+    return dataLayout_.getIcebergPartitionSpecs();
+  }
   void setOptions(Options options) {
     Preconditions.checkNotNull(options);
     options_ = options;

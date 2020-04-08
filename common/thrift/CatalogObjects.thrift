@@ -50,6 +50,7 @@ enum TTableType {
   VIEW = 2
   DATA_SOURCE_TABLE = 3
   KUDU_TABLE = 4
+  ICEBERG_TABLE = 5
 }
 
 // TODO: Separate the storage engines (e.g. Kudu) from the file formats.
@@ -64,6 +65,7 @@ enum THdfsFileFormat {
   KUDU = 5
   ORC = 6
   HUDI_PARQUET = 7
+  ICEBERG = 8
 }
 
 // TODO: Since compression is also enabled for Kudu columns, we should
@@ -111,6 +113,16 @@ enum TAccessLevel {
   READ_WRITE = 1
   READ_ONLY = 2
   WRITE_ONLY = 3
+}
+
+enum TIcebergPartitionTransform {
+  IDENTITY = 0
+  HOUR = 1
+  DAY = 2
+  MONTH = 3
+  YEAR = 4
+  BUCKET = 5
+  TRUNCATE = 6
 }
 
 struct TCompressionCodec {
@@ -474,6 +486,24 @@ struct TKuduTable {
   4: required list<TKuduPartitionParam> partition_by
 }
 
+struct TIcebergPartitionField {
+  1: required i32 source_id
+  2: required i32 field_id
+  3: required string field_name
+  4: required TIcebergPartitionTransform field_type
+}
+
+struct TIcebergPartitionSpec {
+  1: required i32 partition_id
+  2: optional list<TIcebergPartitionField> partition_fields
+}
+
+struct TIcebergTable {
+  // Iceberg file system table location
+  1: required string table_location
+  2: required list<TIcebergPartitionSpec> partition_spec
+}
+
 // Represents a table or view.
 struct TTable {
   // Name of the parent database. Case insensitive, expected to be stored as lowercase.
@@ -522,6 +552,9 @@ struct TTable {
   // Set if this table needs storage access during metadata load.
   // Time used for storage loading in nanoseconds.
   15: optional i64 storage_metadata_load_time_ns
+
+  // Set if this a iceberg table
+  16: optional TIcebergTable iceberg_table
 }
 
 // Represents a database.

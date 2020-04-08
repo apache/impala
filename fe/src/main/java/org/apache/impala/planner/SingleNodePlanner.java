@@ -64,6 +64,7 @@ import org.apache.impala.catalog.FeHBaseTable;
 import org.apache.impala.catalog.FeKuduTable;
 import org.apache.impala.catalog.FeTable;
 import org.apache.impala.catalog.HdfsFileFormat;
+import org.apache.impala.catalog.IcebergTable;
 import org.apache.impala.catalog.ScalarType;
 import org.apache.impala.common.ImpalaException;
 import org.apache.impala.common.InternalException;
@@ -1485,6 +1486,9 @@ public class SingleNodePlanner {
           aggInfo);
       scanNode.init(analyzer);
       return scanNode;
+    } else if (tblRef.getTable() instanceof IcebergTable) {
+      // This function will be supported in the future
+      throw new NotImplementedException("Query is not supported for iceberg table now");
     } else {
       throw new NotImplementedException(
           "Planning not implemented for table ref class: " + tblRef.getClass());

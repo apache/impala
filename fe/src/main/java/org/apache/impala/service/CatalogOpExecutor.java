@@ -34,9 +34,6 @@ import java.util.List;
 import java.util.Map;
 import java.util.Optional;
 import java.util.Set;
-import java.util.concurrent.CompletableFuture;
-import java.util.concurrent.ExecutorService;
-import java.util.concurrent.Executors;
 import java.util.concurrent.TimeUnit;
 import java.util.stream.Collectors;
 
@@ -88,6 +85,7 @@ import org.apache.impala.catalog.HdfsFileFormat;
 import org.apache.impala.catalog.HdfsPartition;
 import org.apache.impala.catalog.HdfsTable;
 import org.apache.impala.catalog.HiveStorageDescriptorFactory;
+import org.apache.impala.catalog.IcebergTable;
 import org.apache.impala.catalog.IncompleteTable;
 import org.apache.impala.catalog.KuduTable;
 import org.apache.impala.catalog.MetaStoreClientPool.MetaStoreClient;
@@ -2251,6 +2249,9 @@ public class CatalogOpExecutor {
     org.apache.hadoop.hive.metastore.api.Table tbl = createMetaStoreTable(params);
     LOG.trace("Creating table {}", tableName);
     if (KuduTable.isKuduTable(tbl)) return createKuduTable(tbl, params, response);
+    else if (IcebergTable.isIcebergTable(tbl)) {
+      return createIcebergTable(tbl, params, response);
+    }
     Preconditions.checkState(params.getColumns().size() > 0,
         "Empty column list given as argument to Catalog.createTable");
     return createTable(tbl, params.if_not_exists, params.getCache_op(),
@@ -2522,6 +2523,69 @@ public class CatalogOpExecutor {
     } else {
       addSummary(response, "View has been created.");
     }
+  }
+
+  /**
+   * Creates a new Icebrg table.
+   */
+  private boolean createIcebergTable(org.apache.hadoop.hive.metastore.api.Table newTable,
+                                  TCreateTableParams params, TDdlExecResponse response)
+      throws ImpalaException {
+    Preconditions.checkState(IcebergTable.isIcebergTable(newTable));
+
+    try {
+      // Add the table to the HMS and the catalog cache. Acquire metastoreDdlLock_ to
+      // ensure the atomicity of these operations.
+      synchronized (metastoreDdlLock_) {
+        try (MetaStoreClient msClient = catalog_.getMetaStoreClient()) {
+          boolean tableInMetastore =
+              msClient.getHiveClient().tableExists(newTable.getDbName(),
+                  newTable.getTableName());
+          if (!tableInMetastore) {
+            String location = newTable.getSd().getLocation();
+            //Create table in iceberg if necessary
+            if (IcebergTable.needsCreateInIceberg(newTable)) {
+              if (location == null) {
+                //Set location here if not been specified in sql
+                location = MetastoreShim.getPathForNewTable(
+                    msClient.getHiveClient().getDatabase(newTable.getDbName()), newTable);
+                newTable.getSd().setLocation(location);
+              }
+              IcebergCatalogOpExecutor.createTable(location, params);
+            } else {
+              if (location == null) {
+                addSummary(response, "Location is necessary for external iceberg table.");
+                return false;
+              }
+            }
+
+            // Iceberg tables are always unpartitioned. The partition columns are
+            // derived from the TCreateTableParams.partition_spec field, and could
+            // include one or more of the table columns
+            Preconditions.checkState(newTable.getPartitionKeys() == null ||
+                newTable.getPartitionKeys().isEmpty());
+            msClient.getHiveClient().createTable(newTable);
+          } else {
+            addSummary(response, "Table already exists.");
+            return false;
+          }
+        }
+        // Add the table to the catalog cache
+        Table newTbl = catalog_.addIncompleteTable(newTable.getDbName(),
+            newTable.getTableName());
+        addTableToCatalogUpdate(newTbl, response.result);
+      }
+    } catch (Exception e) {
+      if (e instanceof AlreadyExistsException && params.if_not_exists) {
+        addSummary(response, "Table already exists.");
+        return false;
+      }
+      throw new ImpalaRuntimeException(
+          String.format(HMS_RPC_ERROR_FORMAT_STR, "createTable"), e);
+    }
+
+    addSummary(response, "Table has been created.");
+    return true;
   }
 
   /**

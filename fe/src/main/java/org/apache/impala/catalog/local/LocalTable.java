@@ -35,6 +35,7 @@ import org.apache.impala.catalog.FeDb;
 import org.apache.impala.catalog.FeTable;
 import org.apache.impala.catalog.HBaseTable;
 import org.apache.impala.catalog.HdfsFileFormat;
+import org.apache.impala.catalog.IcebergTable;
 import org.apache.impala.catalog.KuduTable;
 import org.apache.impala.catalog.SqlConstraints;
 import org.apache.impala.catalog.StructField;
@@ -97,6 +98,8 @@ abstract class LocalTable implements FeTable {
       t = LocalHbaseTable.loadFromHbase(db, msTbl, ref);
     } else if (KuduTable.isKuduTable(msTbl)) {
       t = LocalKuduTable.loadFromKudu(db, msTbl, ref);
+    } else if (IcebergTable.isIcebergTable(msTbl)) {
+      t = LocalIcebergTable.loadFromIceberg(db, msTbl, ref);
     } else if (DataSourceTable.isDataSourceTable(msTbl)) {
       // TODO(todd) support datasource table
     } else if (HdfsFileFormat.isHdfsInputFormatClass(

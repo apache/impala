@@ -386,6 +386,8 @@ public abstract class Table extends CatalogObjectImpl implements FeTable {
       table = new HBaseTable(msTbl, db, msTbl.getTableName(), msTbl.getOwner());
     } else if (KuduTable.isKuduTable(msTbl)) {
       table = new KuduTable(msTbl, db, msTbl.getTableName(), msTbl.getOwner());
+    } else if (IcebergTable.isIcebergTable(msTbl)) {
+      table = new IcebergTable(msTbl, db, msTbl.getTableName(), msTbl.getOwner());
     } else if (DataSourceTable.isDataSourceTable(msTbl)) {
       // It's important to check if this is a DataSourceTable before HdfsTable because
       // DataSourceTables are still represented by HDFS tables in the metastore but
