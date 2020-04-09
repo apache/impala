@@ -85,6 +85,17 @@ under the License.
 
 <codeblock>--data_cache=/data/0,/data/1:500GB</codeblock>
 
+    <p> In Impala 3.4 and higher, you can configure one of the following cache eviction policies for
+      the data cache: <ul>
+        <li>LRU (Least Recently Used--the default)</li>
+        <li>LIRS (Inter-referenece Recency Set)</li>
+      </ul> LIRS is a scan-resistent, low performance-overhead policy. You configure a cache
+      eviction policy using the <codeph>--data_cache_eviction_policy</codeph> Impala Daemon start-up
+      flag: </p>
+    <p>
+<codeblock>--data_cache_eviction_policy=<varname>policy</varname>
+</codeblock>
+    </p>
   </conbody>
 
 </concept>
