@@ -33,6 +33,9 @@ static scoped_ptr<Frontend> fe;
 TEST(CollectionValueBuilderTest, MaxBufferSize) {
   TestEnv test_env;
   ASSERT_OK(test_env.Init());
+  TQueryOptions opts;
+  RuntimeState* runtime_state;
+  ASSERT_OK(test_env.CreateQueryState(1234, &opts, &runtime_state));
   ObjectPool obj_pool;
   DescriptorTblBuilder builder(fe.get(), &obj_pool);
   builder.DeclareTuple() << TYPE_TINYINT << TYPE_TINYINT << TYPE_TINYINT;
@@ -51,7 +54,7 @@ TEST(CollectionValueBuilderTest, MaxBufferSize) {
   MemTracker tracker(mem_limit);
   MemPool pool(&tracker);
   CollectionValueBuilder coll_value_builder(
-      &coll_value, tuple_desc, &pool, NULL, initial_capacity);
+      &coll_value, tuple_desc, &pool, runtime_state, initial_capacity);
   EXPECT_EQ(tracker.consumption(), initial_capacity * 4);
 
   // Attempt to double the buffer so it goes over 32-bit INT_MAX.

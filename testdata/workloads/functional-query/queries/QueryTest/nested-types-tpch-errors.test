@@ -1,0 +1,17 @@
+====
+---- QUERY
+# IMPALA-2376: test error handling when hitting memory limit during allocation of
+# a collection in the scanner. Use debug action to make the failure deterministic
+# (when setting the real mem_limit, it tends to be non-deterministic where in query
+# execution the error is hit).
+set debug_action="SCANNER_COLLECTION_ALLOC:FAIL@1.0";
+select max(cnt1), max(cnt2), max(cnt3), max(cnt4), max(cnt5)
+from customer c,
+  (select count(l_returnflag) cnt1, count(l_partkey) cnt2, count(l_suppkey) cnt3,
+          count(l_linenumber) cnt4, count(l_quantity) cnt5
+   from c.c_orders.o_lineitems) v;
+---- TYPES
+BIGINT
+---- CATCH
+Debug Action: SCANNER_COLLECTION_ALLOC:FAIL@1.0
+====

@@ -25,6 +25,7 @@
 #include "runtime/raw-value.h"
 #include "runtime/raw-value.inline.h"
 #include "runtime/row-batch.h"
+#include "runtime/test-env.h"
 #include "runtime/tuple-row.h"
 #include "service/fe-support.h"
 #include "service/frontend.h"
@@ -47,19 +48,27 @@ class RowBatchSerializeTest : public testing::Test {
   ObjectPool pool_;
   scoped_ptr<MemTracker> tracker_;
 
-  // For computing tuple mem layouts.
-  scoped_ptr<Frontend> fe_;
+  scoped_ptr<TestEnv> test_env_;
+  RuntimeState* runtime_state_ = nullptr;
+
+  TQueryOptions dummy_query_opts_;
 
   virtual void SetUp() {
-    fe_.reset(new Frontend());
+    test_env_.reset(new TestEnv);
+    ASSERT_OK(test_env_->Init());
     tracker_.reset(new MemTracker());
+    ASSERT_OK(test_env_->CreateQueryState(1234, &dummy_query_opts_, &runtime_state_));
   }
 
   virtual void TearDown() {
     pool_.Clear();
     tracker_.reset();
-    fe_.reset();
+    test_env_.reset();
+    runtime_state_ = nullptr;
   }
+
+  /// Helper to get frontend from 'test_env_'.
+  Frontend* frontend() const { return test_env_->exec_env()->frontend(); }
 
   // Serializes and deserializes 'batch', then checks that the deserialized batch is valid
   // and has the same contents as 'batch'. If serialization returns an error (e.g. if the
@@ -104,7 +113,7 @@ class RowBatchSerializeTest : public testing::Test {
     // tuple: (int, string, string, string)
     // This uses three strings so that this test can reach INT_MAX+1 without any
     // single string exceeding the 1GB limit on string length (see string-value.h).
-    DescriptorTblBuilder builder(fe_.get(), &pool_);
+    DescriptorTblBuilder builder(frontend(), &pool_);
     builder.DeclareTuple() << TYPE_INT << TYPE_STRING << TYPE_STRING << TYPE_STRING;
     DescriptorTbl* desc_tbl = builder.Build();
 
@@ -253,7 +262,7 @@ class RowBatchSerializeTest : public testing::Test {
         const TupleDescriptor* item_desc = slot_desc.collection_item_descriptor();
         int array_len = rand() % (MAX_ARRAY_LEN + 1);
         CollectionValue cv;
-        CollectionValueBuilder builder(&cv, *item_desc, pool, NULL, array_len);
+        CollectionValueBuilder builder(&cv, *item_desc, pool, runtime_state_, array_len);
         Tuple* tuple_mem;
         int n;
         EXPECT_OK(builder.GetFreeMemory(&tuple_mem, &n));
@@ -380,7 +389,7 @@ class RowBatchSerializeTest : public testing::Test {
 
 TEST_F(RowBatchSerializeTest, Basic) {
   // tuple: (int)
-  DescriptorTblBuilder builder(fe_.get(), &pool_);
+  DescriptorTblBuilder builder(frontend(), &pool_);
   builder.DeclareTuple() << TYPE_INT;
   DescriptorTbl* desc_tbl = builder.Build();
 
@@ -395,7 +404,7 @@ TEST_F(RowBatchSerializeTest, Basic) {
 
 TEST_F(RowBatchSerializeTest, String) {
   // tuple: (int, string)
-  DescriptorTblBuilder builder(fe_.get(), &pool_);
+  DescriptorTblBuilder builder(frontend(), &pool_);
   builder.DeclareTuple() << TYPE_INT << TYPE_STRING;
   DescriptorTbl* desc_tbl = builder.Build();
 
@@ -441,7 +450,7 @@ TEST_F(RowBatchSerializeTest, BasicArray) {
   array_type.type = TYPE_ARRAY;
   array_type.children.push_back(TYPE_INT);
 
-  DescriptorTblBuilder builder(fe_.get(), &pool_);
+  DescriptorTblBuilder builder(frontend(), &pool_);
   builder.DeclareTuple() << TYPE_INT << TYPE_STRING << array_type;
   DescriptorTbl* desc_tbl = builder.Build();
 
@@ -469,7 +478,7 @@ TEST_F(RowBatchSerializeTest, StringArray) {
   array_type.type = TYPE_ARRAY;
   array_type.children.push_back(struct_type);
 
-  DescriptorTblBuilder builder(fe_.get(), &pool_);
+  DescriptorTblBuilder builder(frontend(), &pool_);
   builder.DeclareTuple() << TYPE_INT << TYPE_STRING << array_type;
   DescriptorTbl* desc_tbl = builder.Build();
 
@@ -510,7 +519,7 @@ TEST_F(RowBatchSerializeTest, NestedArrays) {
   array_type.type = TYPE_ARRAY;
   array_type.children.push_back(struct_type);
 
-  DescriptorTblBuilder builder(fe_.get(), &pool_);
+  DescriptorTblBuilder builder(frontend(), &pool_);
   builder.DeclareTuple() << array_type;
   DescriptorTbl* desc_tbl = builder.Build();
 
@@ -534,7 +543,7 @@ TEST_F(RowBatchSerializeTest, DupCorrectnessFull) {
 
 void RowBatchSerializeTest::TestDupCorrectness(bool full_dedup) {
   // tuples: (int), (string)
-  DescriptorTblBuilder builder(fe_.get(), &pool_);
+  DescriptorTblBuilder builder(frontend(), &pool_);
   builder.DeclareTuple() << TYPE_INT;
   builder.DeclareTuple() << TYPE_STRING;
   DescriptorTbl* desc_tbl = builder.Build();
@@ -575,7 +584,7 @@ TEST_F(RowBatchSerializeTest, DupRemovalFull) {
 // Test that tuple deduplication results in the expected reduction in serialized size.
 void RowBatchSerializeTest::TestDupRemoval(bool full_dedup) {
   // tuples: (int, string)
-  DescriptorTblBuilder builder(fe_.get(), &pool_);
+  DescriptorTblBuilder builder(frontend(), &pool_);
   builder.DeclareTuple() << TYPE_INT << TYPE_STRING;
   DescriptorTbl* desc_tbl = builder.Build();
 
@@ -614,7 +623,7 @@ TEST_F(RowBatchSerializeTest, ConsecutiveNullsFull) {
 // Test that deduplication handles NULL tuples correctly.
 void RowBatchSerializeTest::TestConsecutiveNulls(bool full_dedup) {
   // tuples: (int)
-  DescriptorTblBuilder builder(fe_.get(), &pool_);
+  DescriptorTblBuilder builder(frontend(), &pool_);
   builder.DeclareTuple() << TYPE_INT;
   DescriptorTbl* desc_tbl = builder.Build();
   vector<bool> nullable_tuples(1, true);
@@ -642,7 +651,7 @@ TEST_F(RowBatchSerializeTest, ZeroLengthTuplesDedup) {
 
 void RowBatchSerializeTest::TestZeroLengthTuple(bool full_dedup) {
   // tuples: (int), (string), ()
-  DescriptorTblBuilder builder(fe_.get(), &pool_);
+  DescriptorTblBuilder builder(frontend(), &pool_);
   builder.DeclareTuple() << TYPE_INT;
   builder.DeclareTuple() << TYPE_STRING;
   builder.DeclareTuple();
@@ -669,7 +678,7 @@ TEST_F(RowBatchSerializeTest, DedupPathologicalFull) {
   ColumnType array_type;
   array_type.type = TYPE_ARRAY;
   array_type.children.push_back(TYPE_STRING);
-  DescriptorTblBuilder builder(fe_.get(), &pool_);
+  DescriptorTblBuilder builder(frontend(), &pool_);
   builder.DeclareTuple() << TYPE_INT;
   builder.DeclareTuple() << TYPE_INT;
   builder.DeclareTuple() << array_type;
