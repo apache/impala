@@ -706,6 +706,8 @@ public class SelectStmt extends QueryStmt {
                   + groupingExprsCopy_.get(i).toSql());
         }
       }
+      // initialize groupingExprs_ with the analyzed version
+      groupingExprs_ = groupingExprsCopy_;
     }
 
     private void collectAggExprs() {

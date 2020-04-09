@@ -22,6 +22,7 @@ import org.apache.impala.analysis.CompoundPredicate;
 import org.apache.impala.analysis.Expr;
 import org.apache.impala.analysis.Predicate;
 import org.apache.impala.analysis.TupleId;
+import org.apache.impala.common.AnalysisException;
 
 import java.util.ArrayList;
 import java.util.Arrays;
@@ -82,11 +83,11 @@ public class ConvertToCNFRule implements ExprRewriteRule {
   private final boolean forMultiTablesOnly_;
 
   @Override
-  public Expr apply(Expr expr, Analyzer analyzer) {
-    return convertToCNF(expr);
+  public Expr apply(Expr expr, Analyzer analyzer) throws AnalysisException {
+    return convertToCNF(expr, analyzer);
   }
 
-  private Expr convertToCNF(Expr pred) {
+  private Expr convertToCNF(Expr pred, Analyzer analyzer) throws AnalysisException {
     if (!(pred instanceof CompoundPredicate)) {
       return pred;
     }
@@ -121,13 +122,13 @@ public class ConvertToCNFRule implements ExprRewriteRule {
           // predicate: (a AND b) OR c
           // convert to (a OR c) AND (b OR c)
           return createPredAndIncrementCount(lhs.getChild(0), rhs,
-                  lhs.getChild(1), rhs);
+                  lhs.getChild(1), rhs, analyzer);
         } else if (rhs instanceof CompoundPredicate &&
             ((CompoundPredicate)rhs).getOp() == CompoundPredicate.Operator.AND) {
           // predicate: a OR (b AND c)
           // convert to (a OR b) AND (a or c)
           return createPredAndIncrementCount(lhs, rhs.getChild(0),
-                  lhs, rhs.getChild(1));
+                  lhs, rhs.getChild(1), analyzer);
         }
       } else if (cpred.getOp() == CompoundPredicate.Operator.NOT) {
         Expr child = cpred.getChild(0);
@@ -141,6 +142,7 @@ public class ConvertToCNFRule implements ExprRewriteRule {
           Expr rhs1 = new CompoundPredicate(CompoundPredicate.Operator.NOT, rhs, null);
           Predicate newPredicate =
               (CompoundPredicate) CompoundPredicate.createConjunction(lhs1, rhs1);
+          newPredicate.analyze(analyzer);
           numCnfExprs_++;
           return newPredicate;
         }
@@ -154,7 +156,8 @@ public class ConvertToCNFRule implements ExprRewriteRule {
    * the disjuncts into a top level conjunct. Increment the CNF exprs count.
    */
   private Predicate createPredAndIncrementCount(Expr first_lhs, Expr second_lhs,
-                                                Expr first_rhs, Expr second_rhs) {
+      Expr first_rhs, Expr second_rhs,
+      Analyzer analyzer) throws AnalysisException {
     List<Expr> disjuncts = Arrays.asList(first_lhs, second_lhs);
     Expr lhs1 = (CompoundPredicate)
         CompoundPredicate.createDisjunctivePredicate(disjuncts);
@@ -163,6 +166,7 @@ public class ConvertToCNFRule implements ExprRewriteRule {
         CompoundPredicate.createDisjunctivePredicate(disjuncts);
     Predicate newPredicate = (CompoundPredicate)
         CompoundPredicate.createConjunction(lhs1, rhs1);
+    newPredicate.analyze(analyzer);
     numCnfExprs_++;
     return newPredicate;
   }

@@ -287,3 +287,44 @@ PLAN-ROOT SINK
    runtime filters: RF000 -> o_orderkey
    row-size=16B cardinality=1.50M
 ====
+# IMPALA-9620: query1
+# Test predicates in the SELECT and GROUP-BY
+# with enable_cnf_rewrites = true. No rewrite is expected
+# but query was failing without the patch.
+select l_quantity,
+  if(l_quantity < 5 or l_quantity > 45, 'invalid', 'valid')
+ from lineitem
+ group by l_quantity,
+  if(l_quantity < 5 or l_quantity > 45, 'invalid', 'valid')
+  limit 5
+---- QUERYOPTIONS
+ENABLE_CNF_REWRITES=true
+---- PLAN
+PLAN-ROOT SINK
+|
+01:AGGREGATE [FINALIZE]
+|  group by: l_quantity, if(l_quantity < 5 OR l_quantity > 45, 'invalid', 'valid')
+|  limit: 5
+|  row-size=20B cardinality=5
+|
+00:SCAN HDFS [tpch_parquet.lineitem]
+   HDFS partitions=1/1 files=3 size=193.99MB
+   row-size=8B cardinality=6.00M
+====
+# IMPALA-9620: query2
+select case when not (l_quantity = 5) then 0 else 1 end
+ from lineitem
+ group by case when not (l_quantity = 5) then 0 else 1 end
+---- QUERYOPTIONS
+ENABLE_CNF_REWRITES=true
+---- PLAN
+PLAN-ROOT SINK
+|
+01:AGGREGATE [FINALIZE]
+|  group by: CASE WHEN NOT (l_quantity = 5) THEN 0 ELSE 1 END
+|  row-size=1B cardinality=2
+|
+00:SCAN HDFS [tpch_parquet.lineitem]
+   HDFS partitions=1/1 files=3 size=193.99MB
+   row-size=8B cardinality=6.00M
+====
