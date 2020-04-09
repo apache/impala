@@ -276,7 +276,34 @@ under the License.
       </p>
 
     </section>
-
+    <section>
+      <title>Increasing Scratch Capacity</title>
+      <p> You can compress the data spilled to disk to increase the effective scratch capacity. You
+        typically more than double capacity using compression and reduce spilling to disk. Use the
+        --disk_spill_compression_codec and –-disk_spill_punch_holes startup options. The
+        --disk_spill_compression_codec takes any value supported by the COMPRESSION_CODEC query
+        option. The value is not case-sensitive. A value of <codeph>ZSTD</codeph> or
+          <codeph>LZ4</codeph> is recommended (default is NONE).</p>
+      <p>For example:</p>
+<codeblock>--disk_spill_compression_codec=LZ4
+--disk_spill_punch_holes=true
+</codeblock>
+      <p>
+        If you set <codeph>--disk_spill_compression_codec</codeph> to a value other than <codeph>NONE</codeph>, you must set <codeph>--disk_spill_punch_holes</codeph> to true.
+      </p>
+      <p>
+        The hole punching feature supported by many filesystems is used to reclaim space in scratch files during execution
+        of a query that spills to disk. This results in lower scratch space requirements in many cases, especially when
+        combined with disk spill compression. When this option is not enabled, scratch space is still recycled by a query,
+        but less effectively in many cases.
+      </p>
+      <p> You can specify a compression level for <codeph>ZSTD</codeph> only. For example: </p>
+<codeblock>--disk_spill_compression_codec=ZSTD:10
+--disk_spill_punch_holes=true
+</codeblock>
+      <p> Compression levels from 1 up to 22 (default 3) are supported for <codeph>ZSTD</codeph>.
+        The lower the compression level, the faster the speed at the cost of compression ratio.</p>
+    </section>
   </conbody>
 
 </concept>
