@@ -261,11 +261,7 @@ class HdfsOrcScanner : public HdfsColumnarScanner {
   /// filters and conjuncts (if any) against the tuples. Only surviving tuples are added
   /// to the given batch. Returns if either 'orc_root_batch_' is drained or 'dst_batch'
   /// is full.
-  /// 'do_batch_read' indicates if this function should transfer rows in batches or in a
-  /// row-by-row manner. Batch processing is not used if 'column_reader' has a collection
-  /// amongst its children.
-  Status TransferTuples(OrcComplexColumnReader* column_reader,
-      RowBatch* dst_batch, bool do_batch_read) WARN_UNUSED_RESULT;
+  Status TransferTuples(RowBatch* dst_batch) WARN_UNUSED_RESULT;
 
   /// Process the file footer and parse file_metadata_.  This should be called with the
   /// last FOOTER_SIZE bytes in context_.
