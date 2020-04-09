@@ -263,7 +263,7 @@ Status OrcDecimal16ColumnReader::ReadValue(int row_idx, Tuple* tuple, MemPool* p
 
 OrcComplexColumnReader::OrcComplexColumnReader(const orc::Type* node,
     const TupleDescriptor* table_tuple_desc, HdfsOrcScanner* scanner)
-    : OrcColumnReader(node, nullptr, scanner) {
+    : OrcBatchedReader(node, nullptr, scanner) {
   SchemaPath& path = scanner->col_id_path_map_[node->getColumnId()];
   if (path == table_tuple_desc->tuple_path()) tuple_desc_ = table_tuple_desc;
   materialize_tuple_ = (tuple_desc_ != nullptr);
@@ -271,36 +271,12 @@ OrcComplexColumnReader::OrcComplexColumnReader(const orc::Type* node,
       << ": tuple_desc_=" << (tuple_desc_ ? tuple_desc_->DebugString() : "null");
 }
 
-bool OrcComplexColumnReader::EndOfBatch() {
+bool OrcStructReader::EndOfBatch() {
   DCHECK(slot_desc_ == nullptr
       && (tuple_desc_ == nullptr || tuple_desc_ == scanner_->scan_node_->tuple_desc()))
       << "Should be top level reader when calling EndOfBatch()";
-  if (!materialize_tuple_) {
-    // If this reader is not materializing tuples, its 'row_idx_' is invalid and the
-    // progress is tracked in the child. Delegate the judgement to the child recursively.
-    DCHECK_EQ(children_.size(), 1);
-    return static_cast<OrcComplexColumnReader*>(children_[0])->EndOfBatch();
-  }
-  DCHECK(vbatch_ == nullptr || row_idx_ <= vbatch_->numElements);
-  return vbatch_ == nullptr || row_idx_ == vbatch_->numElements;
-}
-
-bool OrcComplexColumnReader::HasCollectionChild() const {
-  return HasCollectionChildRecursive(this);
-}
-
-bool OrcComplexColumnReader::HasCollectionChildRecursive(
-    const OrcColumnReader* reader) const {
-  DCHECK(reader != nullptr);
-  if (reader->IsCollectionReader()) return true;
-  if (!reader->IsComplexColumnReader()) return false;
-  const OrcComplexColumnReader* complex_reader =
-      static_cast<const OrcComplexColumnReader*>(reader);
-  DCHECK(complex_reader == dynamic_cast<const OrcComplexColumnReader*>(reader));
-  for (OrcColumnReader* child : complex_reader->children_) {
-    if (HasCollectionChildRecursive(child)) return true;
-  }
-  return false;
+  DCHECK(vbatch_ == nullptr || row_idx_ <= NumElements());
+  return vbatch_ == nullptr || row_idx_ == NumElements();
 }
 
 inline bool PathContains(const SchemaPath& path, const SchemaPath& sub_path) {
@@ -381,6 +357,11 @@ OrcStructReader::OrcStructReader(const orc::Type* node,
 }
 
 Status OrcStructReader::ReadValue(int row_idx, Tuple* tuple, MemPool* pool) {
+  if (!MaterializeTuple()) {
+    DCHECK_EQ(1, children_.size());
+    OrcColumnReader* child = children_[0];
+    return child->ReadValue(row_idx, tuple, pool);
+  }
   if (IsNull(DCHECK_NOTNULL(batch_), row_idx)) {
     for (OrcColumnReader* child : children_) child->SetNullSlot(tuple);
     return Status::OK();
@@ -415,7 +396,6 @@ Status OrcStructReader::TopLevelReadValueBatch(ScratchTupleBatch* scratch_batch,
 Status OrcStructReader::ReadValueBatch(int row_idx, ScratchTupleBatch* scratch_batch,
     MemPool* pool, int scratch_batch_idx) {
   for (OrcColumnReader* child : children_) {
-    DCHECK(!child->IsCollectionReader());
     RETURN_IF_ERROR(
         child->ReadValueBatch(row_idx, scratch_batch, pool, scratch_batch_idx));
   }
@@ -442,14 +422,6 @@ Status OrcStructReader::UpdateInputBatch(orc::ColumnVectorBatch* orc_batch) {
   return Status::OK();
 }
 
-Status OrcStructReader::TransferTuple(Tuple* tuple, MemPool* pool) {
-  for (OrcColumnReader* child : children_) {
-    RETURN_IF_ERROR(child->ReadValue(row_idx_, tuple, pool));
-  }
-  ++row_idx_;
-  return Status::OK();
-}
-
 OrcCollectionReader::OrcCollectionReader(const orc::Type* node,
     const SlotDescriptor* slot_desc, HdfsOrcScanner* scanner)
     : OrcComplexColumnReader(node, slot_desc, scanner) {
@@ -464,7 +436,7 @@ OrcCollectionReader::OrcCollectionReader(const orc::Type* node,
   }
 }
 
-Status OrcCollectionReader::ReadValue(int row_idx, Tuple* tuple, MemPool* pool) {
+Status OrcCollectionReader::AssembleCollection(int row_idx, Tuple* tuple, MemPool* pool) {
   if (IsNull(DCHECK_NOTNULL(vbatch_), row_idx)) {
     SetNullSlot(tuple);
     return Status::OK();
@@ -476,15 +448,69 @@ Status OrcCollectionReader::ReadValue(int row_idx, Tuple* tuple, MemPool* pool) 
   return scanner_->AssembleCollection(*this, row_idx, &builder);
 }
 
-Status OrcCollectionReader::TopLevelReadValueBatch(ScratchTupleBatch* scratch_batch,
-    MemPool* pool) {
-  DCHECK(false);
+int OrcListReader::NumElements() const {
+  if (DirectReader()) return batch_ != nullptr ? batch_->numElements : 0;
+  if (children_.empty()) {
+    return batch_ != nullptr ?  batch_->offsets[batch_->numElements] : 0;
+  }
+  return children_[0]->NumElements();
+}
+
+Status OrcListReader::ReadValue(int row_idx, Tuple* tuple, MemPool* pool) {
+  if (DirectReader()) return AssembleCollection(row_idx, tuple, pool);
+
+  for (OrcColumnReader* child : children_) {
+    RETURN_IF_ERROR(child->ReadValue(row_idx, tuple, pool));
+  }
+  if (pos_slot_desc_ != nullptr) {
+    RETURN_IF_ERROR(SetPositionSlot(row_idx, tuple));
+  }
   return Status::OK();
 }
 
-Status OrcCollectionReader::ReadValueBatch(int row_idx,
-    ScratchTupleBatch* scratch_batch, MemPool* pool, int scratch_batch_idx) {
-  DCHECK(false);
+Status OrcMapReader::ReadValue(int row_idx, Tuple* tuple, MemPool* pool) {
+  if (DirectReader()) return AssembleCollection(row_idx, tuple, pool);
+
+  for (OrcColumnReader* child : children_) {
+    RETURN_IF_ERROR(child->ReadValue(row_idx, tuple, pool));
+  }
+  return Status::OK();
+}
+
+Status OrcListReader::SetPositionSlot(int row_idx, Tuple* tuple) {
+  DCHECK(pos_slot_desc_ != nullptr);
+
+  int64_t pos = -1;
+  DCHECK_LT(list_idx_, batch_->numElements);
+  if (list_idx_ == batch_->numElements - 1 ||
+      (batch_->offsets[list_idx_] <= row_idx && row_idx < batch_->offsets[list_idx_+1])) {
+    // We are somewhere in the current list.
+    pos = row_idx - batch_->offsets[list_idx_];
+  } else if (row_idx == batch_->offsets[list_idx_+1]) {
+    // Let's move to the next list.
+    pos = 0;
+    list_idx_ += 1;
+  }
+  else if (row_idx > batch_->offsets[list_idx_+1]) {
+    // We lagged behind. Let's find our list.
+    for (int i = list_idx_; i < batch_->numElements; ++i) {
+      if (row_idx < batch_->offsets[i+1]) {
+        pos = row_idx - batch_->offsets[i];
+        list_idx_ = i;
+        break;
+      }
+    }
+  }
+  if (pos < 0) {
+      // Oops, something went wrong. It can be caused by a corrupt file, so let's raise
+      // an error.
+      return Status(Substitute(
+          "ORC list indexes and elements are inconsistent in file $0",
+          scanner_->filename()));
+  }
+  int64_t* slot_val_ptr = reinterpret_cast<int64_t*>(tuple->GetSlot(
+      pos_slot_desc_->tuple_offset()));
+  *slot_val_ptr = pos;
   return Status::OK();
 }
 
@@ -545,10 +571,7 @@ Status OrcListReader::UpdateInputBatch(orc::ColumnVectorBatch* orc_batch) {
   for (OrcColumnReader* child : children_) {
     RETURN_IF_ERROR(child->UpdateInputBatch(item_batch));
   }
-  if (batch_) {
-    row_idx_ = -1;
-    NextRow();
-  }
+  list_idx_ = 0;
   return Status::OK();
 }
 
@@ -560,20 +583,6 @@ int OrcListReader::GetNumTuples(int row_idx) const {
 
 int OrcListReader::GetChildBatchOffset(int row_idx) const {
   return batch_->offsets[row_idx];
-}
-
-Status OrcListReader::TransferTuple(Tuple* tuple, MemPool* pool) {
-  if (pos_slot_desc_) {
-    int64_t* slot_val_ptr = reinterpret_cast<int64_t*>(
-        tuple->GetSlot(pos_slot_desc_->tuple_offset()));
-    *slot_val_ptr = array_idx_;
-  }
-  for (OrcColumnReader* child : children_) {
-    RETURN_IF_ERROR(child->ReadValue(array_start_ + array_idx_, tuple, pool));
-  }
-  array_idx_++;
-  if (array_start_ + array_idx_ >= array_end_) NextRow();
-  return Status::OK();
 }
 
 Status OrcListReader::ReadChildrenValue(int row_idx, int tuple_idx, Tuple* tuple,
@@ -589,16 +598,6 @@ Status OrcListReader::ReadChildrenValue(int row_idx, int tuple_idx, Tuple* tuple
     RETURN_IF_ERROR(child->ReadValue(offset + tuple_idx, tuple, pool));
   }
   return Status::OK();
-}
-
-void OrcListReader::NextRow() {
-  do {
-    ++row_idx_;
-    if (row_idx_ >= batch_->numElements) break;
-    array_start_ = batch_->offsets[row_idx_];
-    array_end_ = batch_->offsets[row_idx_ + 1];
-  } while (IsNull(batch_, row_idx_) || array_start_ == array_end_);
-  array_idx_ = 0;
 }
 
 void OrcMapReader::CreateChildForSlot(const orc::Type* node,
@@ -686,20 +685,7 @@ Status OrcMapReader::UpdateInputBatch(orc::ColumnVectorBatch* orc_batch) {
   for (OrcColumnReader* child : value_readers_) {
     RETURN_IF_ERROR(child->UpdateInputBatch(value_batch));
   }
-  if (batch_) {
-    row_idx_ = -1;
-    NextRow();
-  }
   return Status::OK();
-}
-
-void OrcMapReader::NextRow() {
-  do {
-    ++row_idx_;
-    if (row_idx_ >= batch_->numElements) break;
-    array_offset_ = batch_->offsets[row_idx_];
-    array_end_ = batch_->offsets[row_idx_ + 1];
-  } while (IsNull(batch_, row_idx_) || array_offset_ == array_end_);
 }
 
 int OrcMapReader::GetNumTuples(int row_idx) const {
@@ -712,15 +698,6 @@ int OrcMapReader::GetChildBatchOffset(int row_idx) const {
   return batch_->offsets[row_idx];
 }
 
-Status OrcMapReader::TransferTuple(Tuple* tuple, MemPool* pool) {
-  for (OrcColumnReader* child : children_) {
-    RETURN_IF_ERROR(child->ReadValue(array_offset_, tuple, pool));
-  }
-  array_offset_++;
-  if (array_offset_ >= array_end_) NextRow();
-  return Status::OK();
-}
-
 Status OrcMapReader::ReadChildrenValue(int row_idx, int tuple_idx, Tuple* tuple,
     MemPool* pool) const {
   DCHECK_LT(row_idx, batch_->numElements);
@@ -730,4 +707,13 @@ Status OrcMapReader::ReadChildrenValue(int row_idx, int tuple_idx, Tuple* tuple,
   }
   return Status::OK();
 }
+
+int OrcMapReader::NumElements() const {
+  if (DirectReader()) return batch_ != nullptr ? batch_->numElements : 0;
+  if (children_.empty()) {
+    return batch_ != nullptr ? batch_->offsets[batch_->numElements] : 0;
+  }
+  return children_[0]->NumElements();
 }
+
+} // namespace impala

@@ -47,9 +47,9 @@ class HdfsOrcScanner;
 ///     }
 ///   }
 ///
-/// For complex types readers, they can be top-level readers (readers materializing
-/// table level tuples), so we need more interface to deal with table/collection level
-/// tuple materialization. See more in the class comments of OrcComplexColumnReader.
+/// The root reader is always an OrcStructReader, it drives the materialization of the
+/// table level tuples, so we need more interface to deal with table/collection level
+/// tuple materialization. See more in the class comments of OrcStructReader.
 class OrcColumnReader {
  public:
   /// Create a column reader for the given 'slot_desc' based on the ORC 'node'. We say
@@ -65,7 +65,7 @@ class OrcColumnReader {
   static OrcColumnReader* Create(const orc::Type* node, const SlotDescriptor* slot_desc,
       HdfsOrcScanner* scanner);
 
-  /// Base constructor for all types of readers that hold a SlotDescriptor (non top-level
+  /// Base constructor for all types of readers that hold a SlotDescriptor (direct
   /// readers). Primitive column readers will materialize values into the slot. STRUCT
   /// column readers will delegate the slot materialization to its children. Collection
   /// column (ARRAY/MAP) readers will create CollectionValue in the slot and assemble
@@ -101,8 +101,23 @@ class OrcColumnReader {
   virtual Status ReadValueBatch(int row_idx, ScratchTupleBatch* scratch_batch,
       MemPool* pool, int scratch_batch_idx) WARN_UNUSED_RESULT = 0;
 
+  /// Returns the number of tuples this reader directly or indirectry writes. E.g. if it
+  /// is a primitive reader it returns 'batch_->numElements'. If it is a collection
+  /// reader then it depends on whether it writes the tuple directly or indirectly. If it
+  /// writes the tuple directly, i.e. it creates a collection value, then it also returns
+  /// 'batch_->numElements' which is the number of collection values (lists, maps) it
+  /// writes. On the other hand, if it writes the tuple indirectly, i.e. it delegates the
+  /// writing to its child then it returns child->NumElements().
+  /// E.g. if there's a column named 'arr', and its type is array<array<array<int>>>, and
+  /// the query is
+  /// "SELECT item from t.arr.item.item"
+  /// then NumElements() for the top OrcListReader returns the number of elements in the
+  /// OrcIntColumnReader in the bottom.
+  virtual int NumElements() const = 0;
+
  protected:
   friend class OrcStructReader;
+  friend class OrcCollectionReader;
 
   /// Convenient field for debug. We can't keep the pointer of orc::Type since they'll be
   /// destroyed after orc::RowReader was released. Only keep the id orc::Type here.
@@ -128,46 +143,63 @@ class OrcColumnReader {
   }
 };
 
-/// The main purpose of this class other than providing implementations relevant only for
-/// primitive type column readers is to implement static polymorphism via the "curiously
-/// recurring template pattern". All the derived classes are expected to provide
-/// themselves as the template parameter of this class. As a result the number of virtual
+/// The main purpose of this class is to implement static polymorphism via the "curiously
+/// recurring template pattern". All the derived classes are expected to provide a
+/// subclass as the template parameter of this class. As a result the number of virtual
 /// function calls can be reduced in ReadValueBatch() as we can directly call non-virtual
 /// ReadValue() of the derived class.
-template<class T>
-class OrcPrimitiveColumnReader : public OrcColumnReader {
+template<class Final>
+class OrcBatchedReader : public OrcColumnReader {
  public:
-  OrcPrimitiveColumnReader(const orc::Type* node, const SlotDescriptor* slot_desc,
+  OrcBatchedReader(const orc::Type* node, const SlotDescriptor* slot_desc,
       HdfsOrcScanner* scanner)
       : OrcColumnReader(node, slot_desc, scanner) {}
 
-  virtual ~OrcPrimitiveColumnReader() { }
-
-  bool IsComplexColumnReader() const override { return false; }
-
-  bool IsCollectionReader() const override { return false; }
-
-  bool MaterializeTuple() const override { return true; }
-
   Status ReadValueBatch(int row_idx, ScratchTupleBatch* scratch_batch, MemPool* pool,
       int scratch_batch_idx) override WARN_UNUSED_RESULT {
-    T* derived = static_cast<T*>(this);
+    Final* final = this->GetFinal();
     int num_to_read = std::min<int>(scratch_batch->capacity - scratch_batch_idx,
-        derived->batch_->numElements - row_idx);
-    DCHECK_LE(row_idx + num_to_read, derived->batch_->numElements);
+        final->NumElements() - row_idx);
+    DCHECK_LE(row_idx + num_to_read, final->NumElements());
     for (int i = 0; i < num_to_read; ++i) {
       int scratch_batch_pos = i + scratch_batch_idx;
       uint8_t* next_tuple = scratch_batch->tuple_mem +
           scratch_batch_pos * OrcColumnReader::scanner_->tuple_byte_size();
       Tuple* tuple = reinterpret_cast<Tuple*>(next_tuple);
-
-      // Make sure that each ReadValue() is final in each derived class. This way
-      // devirtualization helps to reduce the number of virtual function calls, and as a
-      // result to improve performance.
-      RETURN_IF_ERROR(derived->ReadValue(row_idx + i, tuple, pool));
+      // The compiler will devirtualize the call to ReadValue() if it is marked 'final' in
+      // the 'Final' class. This way we can reduce the number of virtual function calls
+      // to improve performance.
+      RETURN_IF_ERROR(final->ReadValue(row_idx + i, tuple, pool));
     }
     scratch_batch->num_tuples = scratch_batch_idx + num_to_read;
     return Status::OK();
+  }
+
+  Final* GetFinal() { return static_cast<Final*>(this); }
+  const Final* GetFinal() const { return static_cast<const Final*>(this); }
+};
+
+/// Base class for primitive types. It implements the common functions with 'final'
+/// annotation. Template parameter 'Final' holds a concrete primitive column reader and is
+/// propagated to OrcBatchedReader.
+template<class Final>
+class OrcPrimitiveColumnReader : public OrcBatchedReader<Final> {
+ public:
+  OrcPrimitiveColumnReader(const orc::Type* node, const SlotDescriptor* slot_desc,
+      HdfsOrcScanner* scanner)
+      : OrcBatchedReader<Final>(node, slot_desc, scanner) {}
+  virtual ~OrcPrimitiveColumnReader() {}
+
+  bool IsComplexColumnReader() const final { return false; }
+
+  bool IsCollectionReader() const final { return false; }
+
+  bool MaterializeTuple() const final { return true; }
+
+  int NumElements() const final {
+    const Final* final = this->GetFinal();
+    if (final->batch_ == nullptr) return 0;
+    return final->batch_->numElements;
   }
 };
 
@@ -413,56 +445,33 @@ class OrcDecimal16ColumnReader
 /// sub queries). The root reader is always an OrcStructReader since the root of the ORC
 /// schema is represented as a STRUCT type.
 ///
-/// Only OrcComplexColumnReaders can be top-level readers: readers that control the
-/// materialization of the top-level tuples, whether directly or indirectly (by its
-/// unique child).
+/// For collection readers, they can be divided into two kinds by whether they should
+/// materialize collection tuples (reflected by materialize_tuple_). (STRUCTs always
+/// delegate materialization to their children.)
 ///
-/// There're only one top-level reader that directly materializes top-level(table-level)
-/// tuples: the reader whose orc_node matches the tuple_path of the top-level
-/// TupleDescriptor. For the only top-level reader that directly materializes top-level
-/// tuples, the usage of the interfaces follows the pattern:
-///   while ( /* has new batch in the stripe */ ) {
-///     reader->UpdateInputBatch(orc_batch);
-///     while (!reader->EndOfBatch()) {
-///       tuple = ...  // Init tuple
-///       reader->ReadValueBatch(scratch_batch, mem_pool);
-///     }
-///   }
-/// 'ReadValueBatch' don't require a row index since the top-level reader will keep
-/// track of the progress by internal fields:
-///   * STRUCT reader: row_idx_
-///   * LIST reader: row_idx_, array_start_, array_idx_, array_end_
-///   * MAP reader: row_idx_, array_offset_, array_end_
-///
-/// For top-level readers that indirectly materializes tuples, they are ancestors of the
-/// above reader. Such kind of readers just UpdateInputBatch (so update children's
-/// recursively) and then delegate the materialization to their children. (See more in
-/// HdfsOrcScanner::TransferTuples)
-///
-/// For non top-level readers, they can be divided into two kinds by whether they should
-/// materialize collection tuples (reflected by materialize_tuple_). STRUCT is not a
-/// collection type so non top-level STRUCT readers always have materialize_tuple_ being
-/// false as default.
-///
-/// For non top-level collection type readers, they create a CollectionValue and a
+/// For collection type readers that materialize a CollectionValue they create a
 /// CollectionValueBuilder when 'ReadValue' is called. Then recursively delegate the
 /// materialization of collection tuples to the child that matches the TupleDescriptor.
 /// This child tracks the boundary of current collection and call 'ReadChildrenValue' to
-/// assemble collection tuples. (See more in HdfsOrcScanner::AssembleCollection)
+/// assemble collection tuples. (See more in HdfsOrcScanner::AssembleCollection).
+/// If they don't materialize collection values then they just delegate the reading to
+/// their children.
 ///
 /// Children readers are created in the constructor recursively.
-class OrcComplexColumnReader : public OrcColumnReader {
+class OrcComplexColumnReader : public OrcBatchedReader<OrcComplexColumnReader> {
  public:
   static OrcComplexColumnReader* CreateTopLevelReader(const orc::Type* node,
       const TupleDescriptor* tuple_desc, HdfsOrcScanner* scanner);
 
-  /// Constructor for top-level readers
+  /// Constructor for indirect readers, they delegate reads to their children.
   OrcComplexColumnReader(const orc::Type* node, const TupleDescriptor* table_tuple_desc,
       HdfsOrcScanner* scanner);
 
-  /// Constructor for non top-level readers
+  /// Constructor for readers that write to a single slot of the given tuple. However,
+  /// this single slot might be a CollectionValue, in which case it materializes new
+  /// tuples for it which will be filled by its children.
   OrcComplexColumnReader(const orc::Type* node, const SlotDescriptor* slot_desc,
-      HdfsOrcScanner* scanner) : OrcColumnReader(node, slot_desc, scanner) { }
+      HdfsOrcScanner* scanner) : OrcBatchedReader(node, slot_desc, scanner) { }
 
   virtual ~OrcComplexColumnReader() { }
 
@@ -470,23 +479,10 @@ class OrcComplexColumnReader : public OrcColumnReader {
 
   bool MaterializeTuple() const override { return materialize_tuple_; }
 
-  /// Whether we've finished reading the current orc batch.
-  bool EndOfBatch();
-
   Status UpdateInputBatch(orc::ColumnVectorBatch* orc_batch) override WARN_UNUSED_RESULT {
     vbatch_ = orc_batch;
     return Status::OK();
   }
-
-  /// Checks if this complex column reader has a collection child.
-  bool HasCollectionChild() const;
-
-  /// Assemble current collection value (tracked by 'row_idx_') into a top level 'tuple'.
-  /// Depends on the UpdateInputBatch being called before (thus batch_ is updated)
-  virtual Status TransferTuple(Tuple* tuple, MemPool* pool) WARN_UNUSED_RESULT = 0;
-
-  virtual Status TopLevelReadValueBatch(ScratchTupleBatch* scratch_batch, MemPool* pool)
-      WARN_UNUSED_RESULT = 0;
 
   /// Num of tuples inside the 'row_idx'-th row. LIST/MAP types will have 0 to N tuples.
   /// STRUCT type will always have one tuple.
@@ -497,6 +493,10 @@ class OrcComplexColumnReader : public OrcColumnReader {
   virtual int GetChildBatchOffset(int row_idx) const = 0;
 
   const vector<OrcColumnReader*>& children() const { return children_; }
+
+  /// Returns true if this column reader writes to a slot directly. Returns false if it
+  /// delegates its job to its children. It might still write a position slot though.
+  bool DirectReader() const { return slot_desc_ != nullptr; }
  protected:
   vector<OrcColumnReader*> children_;
 
@@ -505,17 +505,26 @@ class OrcComplexColumnReader : public OrcColumnReader {
 
   bool materialize_tuple_ = false;
 
-  /// Keep row index if we're top level readers
-  int row_idx_;
-
   /// Convenient reference to 'batch_' of subclass.
   orc::ColumnVectorBatch* vbatch_ = nullptr;
-
-  /// Helper function for HasCollectionChild() to achieve recursion on the children
-  /// tree of 'reader'.
-  bool HasCollectionChildRecursive(const OrcColumnReader* reader) const;
 };
 
+/// Struct readers control the reading of struct fields.
+/// The ORC library always return a struct reader to read the contents of a file. That's
+/// why our root reader is always an OrcStructReader. The root reader controls the
+/// materialization of the top-level tuples.
+/// It provides an interface that is convenient to use by the scanner.
+/// The usage pattern is more or less the following:
+///   while ( /* has new batch in the stripe */ ) {
+///     reader->UpdateInputBatch(orc_batch);
+///     while (!reader->EndOfBatch()) {
+///       InitScratchTuples();
+///       reader->TopLevelReadValueBatch(scratch_batch, mem_pool);
+///       TransferScratchTuples();
+///     }
+///   }
+/// 'TopLevelReadValueBatch' don't require a row index since the root reader will keep
+/// track of the row index.
 class OrcStructReader : public OrcComplexColumnReader {
  public:
   /// Constructor for top level reader
@@ -531,24 +540,35 @@ class OrcStructReader : public OrcComplexColumnReader {
 
   Status UpdateInputBatch(orc::ColumnVectorBatch* orc_batch) override WARN_UNUSED_RESULT;
 
-  Status TransferTuple(Tuple* tuple, MemPool* pool) override WARN_UNUSED_RESULT;
-
   Status ReadValue(int row_idx, Tuple* tuple, MemPool* pool) final WARN_UNUSED_RESULT;
 
-  Status TopLevelReadValueBatch(ScratchTupleBatch* scratch_batch, MemPool* pool) override
+  Status TopLevelReadValueBatch(ScratchTupleBatch* scratch_batch, MemPool* pool)
       WARN_UNUSED_RESULT;
 
   Status ReadValueBatch(int row_idx, ScratchTupleBatch* scratch_batch, MemPool* pool,
       int scratch_batch_idx) override WARN_UNUSED_RESULT;
 
+  /// Whether we've finished reading the current orc batch.
+  bool EndOfBatch();
+
   int GetNumTuples(int row_idx) const override { return 1; }
 
   int GetChildBatchOffset(int row_idx) const override { return row_idx; }
+
+  int NumElements() const final {
+    if (MaterializeTuple()) return vbatch_->numElements;
+    DCHECK_EQ(children().size(), 1);
+    OrcColumnReader* child = children()[0];
+    return child->NumElements();
+  }
  private:
   orc::StructVectorBatch* batch_ = nullptr;
 
   /// Field ids of the children reader
   std::vector<int> children_fields_;
+
+  /// Keep row index if we're top level readers
+  int row_idx_;
 
   void SetNullSlot(Tuple* tuple) override {
     for (OrcColumnReader* child : children_) child->SetNullSlot(tuple);
@@ -576,20 +596,22 @@ class OrcCollectionReader : public OrcComplexColumnReader {
 
   bool IsCollectionReader() const override { return true; }
 
-  Status ReadValue(int row_idx, Tuple* tuple, MemPool* pool) override WARN_UNUSED_RESULT;
-
-  Status TopLevelReadValueBatch(ScratchTupleBatch* scratch_batch, MemPool* pool) override
-      WARN_UNUSED_RESULT;
-
-  Status ReadValueBatch(int row_idx, ScratchTupleBatch* scratch_batch, MemPool* pool,
-      int scratch_batch_idx) override WARN_UNUSED_RESULT;
-
   /// Assemble the given 'tuple' by reading children values into it. The corresponding
   /// children values are in the 'row_idx'-th collection. Each collection (List/Map) may
   /// have variable number of tuples, we only read children values of the 'tuple_idx'-th
   /// tuple.
   virtual Status ReadChildrenValue(int row_idx, int tuple_idx, Tuple* tuple,
       MemPool* pool) const WARN_UNUSED_RESULT = 0;
+ protected:
+  void SetNullSlot(Tuple* tuple) override {
+    if (slot_desc_ != nullptr) {
+      OrcColumnReader::SetNullSlot(tuple);
+      return;
+    }
+    for (OrcColumnReader* child : children_) child->SetNullSlot(tuple);
+  }
+
+  Status AssembleCollection(int row_idx, Tuple* tuple, MemPool* pool) WARN_UNUSED_RESULT;
 };
 
 class OrcListReader : public OrcCollectionReader {
@@ -604,7 +626,7 @@ class OrcListReader : public OrcCollectionReader {
 
   Status UpdateInputBatch(orc::ColumnVectorBatch* orc_batch) override WARN_UNUSED_RESULT;
 
-  Status TransferTuple(Tuple* tuple, MemPool* pool) override WARN_UNUSED_RESULT;
+  Status ReadValue(int row_idx, Tuple* tuple, MemPool* pool) final WARN_UNUSED_RESULT;
 
   int GetNumTuples(int row_idx) const override;
 
@@ -612,18 +634,18 @@ class OrcListReader : public OrcCollectionReader {
 
   Status ReadChildrenValue(int row_idx, int tuple_idx, Tuple* tuple, MemPool* pool)
       const override WARN_UNUSED_RESULT;
+
+  virtual int NumElements() const final;
  private:
+  Status SetPositionSlot(int row_idx, Tuple* tuple);
+
   orc::ListVectorBatch* batch_ = nullptr;
   const SlotDescriptor* pos_slot_desc_ = nullptr;
-  int array_start_ = -1;
-  int array_idx_ = -1;
-  int array_end_ = -1;
+  /// Keeps track the list we are reading. It's needed for calculation the position
+  /// value.
+  int list_idx_ = 0;
 
   void CreateChildForSlot(const orc::Type* node, const SlotDescriptor* slot_desc);
-
-  /// Used for top level readers. Advance current position (row_idx_ and array_idx_)
-  /// to the first tuple inside next row.
-  void NextRow();
 };
 
 class OrcMapReader : public OrcCollectionReader {
@@ -638,7 +660,7 @@ class OrcMapReader : public OrcCollectionReader {
 
   Status UpdateInputBatch(orc::ColumnVectorBatch* orc_batch) override WARN_UNUSED_RESULT;
 
-  Status TransferTuple(Tuple* tuple, MemPool* pool) override WARN_UNUSED_RESULT;
+  Status ReadValue(int row_idx, Tuple* tuple, MemPool* pool) final WARN_UNUSED_RESULT;
 
   int GetNumTuples(int row_idx) const override;
 
@@ -647,17 +669,13 @@ class OrcMapReader : public OrcCollectionReader {
   Status ReadChildrenValue(int row_idx, int tuple_idx, Tuple* tuple, MemPool* pool)
       const override WARN_UNUSED_RESULT;
 
+  virtual int NumElements() const final;
  private:
   orc::MapVectorBatch* batch_ = nullptr;
   vector<OrcColumnReader*> key_readers_;
   vector<OrcColumnReader*> value_readers_;
-  int array_offset_ = -1;
-  int array_end_ = -1;
 
   void CreateChildForSlot(const orc::Type* orc_type, const SlotDescriptor* slot_desc);
-
-  /// Used for top level readers. Advance current position (row_idx_ and array_offset_)
-  /// to the first key/value pair in next row.
-  void NextRow();
 };
-}
+
+} // namespace impala
