@@ -42,8 +42,8 @@ under the License.
   <conbody>
 
     <p> Use the <codeph>DATE</codeph> data type to store date values. The
-        <codeph>DATE</codeph> type is supported for HBase, Text, Avro, and
-      Parquet. </p>
+        <codeph>DATE</codeph> type is supported for Avro, HBase, Kudu, Parquet,
+      and Text. </p>
 
     <p>
       <b>Range:</b>
@@ -199,6 +199,8 @@ under the License.
       The <codeph>DATE</codeph> type is available in Impala 3.3 and higher.
     </p>
 
+    <p conref="../shared/impala_common.xml#common/kudu_blurb"/>
+    <p>In Impala 3.4, you can read and write DATE values to Kudu tables.</p>
   </conbody>
 
 </concept>
