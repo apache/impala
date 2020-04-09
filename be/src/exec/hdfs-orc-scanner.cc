@@ -813,9 +813,8 @@ Status HdfsOrcScanner::AssembleCollection(
 
     int64_t num_rows;
     // We're assembling item tuples into an CollectionValue
-    parse_status_ =
-        GetCollectionMemory(coll_value_builder, &pool, &tuple, &row, &num_rows);
-    if (UNLIKELY(!parse_status_.ok())) break;
+    RETURN_IF_ERROR(
+        GetCollectionMemory(coll_value_builder, &pool, &tuple, &row, &num_rows));
     // 'num_rows' can be very high if we're writing to a large CollectionValue. Limit
     // the number of rows we read at one time so we don't spend too long in the
     // 'num_rows' loop below before checking for cancellation or limit reached.

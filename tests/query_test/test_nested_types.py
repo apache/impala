@@ -144,20 +144,11 @@ class TestNestedTypesNoMtDop(ImpalaTestSuite):
     self.run_test_case('QueryTest/nested-types-tpch-mem-limit', vector,
                        use_db='tpch_nested' + db_suffix)
 
-  @SkipIfNotHdfsMinicluster.tuned_for_minicluster
-  def test_tpch_mem_limit_single_node(self, vector):
-    """Queries over the larger nested TPCH dataset with memory limits tuned for
-    a 3-node HDFS minicluster with num_nodes=1."""
-    new_vector = deepcopy(vector)
-    new_vector.get_value('exec_option')['num_nodes'] = 1
-    if vector.get_value('table_format').file_format == 'orc':
-      # IMPALA-8336: lower memory limit for ORC
-      new_vector.get_value('exec_option')['mem_limit'] = '20M'
-    else:
-      new_vector.get_value('exec_option')['mem_limit'] = '28M'
+  def test_tpch_errors(self, vector):
+    """Queries that test error handling on the TPC-H nested data set."""
     db_suffix = vector.get_value('table_format').db_suffix()
-    self.run_test_case('QueryTest/nested-types-tpch-mem-limit-single-node',
-                       new_vector, use_db='tpch_nested' + db_suffix)
+    self.run_test_case('QueryTest/nested-types-tpch-errors',
+                       vector, use_db='tpch_nested' + db_suffix)
 
   @SkipIfEC.fix_later
   def test_parquet_stats(self, vector):

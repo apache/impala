@@ -20,6 +20,7 @@
 
 #include "runtime/collection-value.h"
 #include "runtime/mem-tracker.h"
+#include "runtime/runtime-state.h"
 #include "runtime/tuple.h"
 #include "util/debug-util.h"
 #include "util/ubsan.h"
@@ -40,7 +41,8 @@ class CollectionValueBuilder {
     : coll_value_(coll_value),
       tuple_desc_(tuple_desc),
       pool_(pool),
-      state_(state) {
+      state_(state),
+      have_debug_action_(!state->query_options().debug_action.empty()) {
     buffer_size_ = initial_tuple_capacity * tuple_desc_.byte_size();
     coll_value_->ptr = pool_->TryAllocate(buffer_size_);
     if (coll_value_->ptr == NULL) buffer_size_ = 0;
@@ -60,6 +62,10 @@ class CollectionValueBuilder {
       int64_t bytes_written = coll_value_->ByteSize(tuple_desc_);
       DCHECK_GE(buffer_size_, bytes_written);
       if (buffer_size_ == bytes_written) {
+        if (UNLIKELY(have_debug_action_)) {
+          RETURN_IF_ERROR(
+              DebugAction(state_->query_options(), "SCANNER_COLLECTION_ALLOC"));
+        }
         // Double tuple buffer
         int64_t new_buffer_size =
             std::max<int64_t>(buffer_size_ * 2, tuple_desc_.byte_size());
@@ -106,6 +112,10 @@ class CollectionValueBuilder {
 
   /// May be NULL. If non-NULL, used to log memory limit errors.
   RuntimeState* state_;
+
+  /// Whether 'state_' has a debug action set. Used to reduce overhead of
+  /// the check that is run once per collection.
+  const bool have_debug_action_;
 
   /// The current size of coll_value_'s buffer in bytes, including any unused space
   /// (i.e. buffer_size_ is equal to or larger than coll_value_->ByteSize()).
