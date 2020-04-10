@@ -315,13 +315,6 @@ def build_table_template(file_format, columns, partition_columns, row_format,
     # Kudu's test tables are managed.
     external = ""
 
-  # ORC tables are full ACID by default.
-  if (HIVE_MAJOR_VERSION == 3 and
-      file_format == 'orc' and
-      'transactional' not in tblproperties):
-    external = ""
-    tblproperties['transactional'] = 'true'
-
   all_tblproperties = []
   for key, value in tblproperties.iteritems():
     all_tblproperties.append("'{0}' = '{1}'".format(key, value))
@@ -655,15 +648,6 @@ def generate_statements(output_name, test_vectors, sections,
       force_reload = options.force_reload or (partition_columns and not alter) or \
           file_format == 'kudu'
 
-      hdfs_location = '{0}.{1}{2}'.format(db_name, table_name, db_suffix)
-      # hdfs file names for functional datasets are stored
-      # directly under /test-warehouse
-      # TODO: We should not need to specify the hdfs file path in the schema file.
-      # This needs to be done programmatically.
-      if data_set == 'functional':
-        hdfs_location = hdfs_location.split('.')[-1]
-      data_path = os.path.join(options.hive_warehouse_dir, hdfs_location)
-
       # Empty tables (tables with no "LOAD" sections) are assumed to be used for insert
       # testing. Since Impala currently only supports inserting into TEXT, PARQUET and
       # HBASE we need to create these tables with a supported insert format.
@@ -677,14 +661,29 @@ def generate_statements(output_name, test_vectors, sections,
           create_file_format = 'text'
 
       tblproperties = parse_table_properties(create_file_format, table_properties)
+      # ORC tables are full ACID by default.
+      if (HIVE_MAJOR_VERSION == 3 and
+          create_file_format == 'orc' and
+          'transactional' not in tblproperties):
+        tblproperties['transactional'] = 'true'
+
+      hdfs_location = '{0}.{1}{2}'.format(db_name, table_name, db_suffix)
+      # hdfs file names for functional datasets are stored
+      # directly under /test-warehouse
+      # TODO: We should not need to specify the hdfs file path in the schema file.
+      # This needs to be done programmatically.
+      if data_set == 'functional':
+        hdfs_location = hdfs_location.split('.')[-1]
+      # Transactional tables need to be put under the 'managed' directory.
+      if is_transactional(tblproperties):
+        hdfs_location = os.path.join('managed', hdfs_location)
+      data_path = os.path.join(options.hive_warehouse_dir, hdfs_location)
 
       output = impala_create
       if create_hive or file_format == 'hbase':
         output = hive_output
       elif codec == 'lzo':
         # Impala CREATE TABLE doesn't allow INPUTFORMAT.
-        output = hive_output
-      elif is_transactional(tblproperties):
         output = hive_output
 
       # TODO: Currently, Kudu does not support partitioned tables via Impala.

@@ -23,7 +23,7 @@ STRING, STRING, STRING
 ====
 ---- QUERY
 create table $DATABASE.temp_chars_table like ORC
-'$FILESYSTEM_PREFIX/test-warehouse/chars_tiny_orc_def/base_0000001/bucket_00000_0'
+'$NAMENODE/$MANAGED_WAREHOUSE_DIR/chars_tiny_orc_def/base_0000001/bucket_00000_0'
 ---- RESULTS
 'Table has been created.'
 ====
@@ -115,9 +115,8 @@ STRING, STRING, STRING
 ====
 ---- QUERY
 create external table transactional_complextypes_clone like ORC
-'$FILESYSTEM_PREFIX/test-warehouse/complextypestbl_orc_def/base_0000001/bucket_00000_0'
-stored as orc
-location '$FILESYSTEM_PREFIX/test-warehouse/complextypestbl_orc_def/';
+'$NAMENODE/$MANAGED_WAREHOUSE_DIR/complextypestbl_orc_def/base_0000001/bucket_00000_0'
+stored as orc;
 ---- RESULTS
 'Table has been created.'
 ====
@@ -132,20 +131,4 @@ describe transactional_complextypes_clone
 'row','struct<\n  id:bigint,\n  int_array:array<int>,\n  int_array_array:array<array<int>>,\n  int_map:map<string,int>,\n  int_map_array:array<map<string,int>>,\n  nested_struct:struct<\n    a:int,\n    b:array<int>,\n    c:struct<\n      d:array<array<struct<\n        e:int,\n        f:string\n      >>>\n    >,\n    g:map<string,struct<\n      h:struct<\n        i:array<double>\n      >\n    >>\n  >\n>','Inferred from ORC file.'
 ---- TYPES
 STRING, STRING, STRING
-====
----- QUERY
-select originaltransaction, rowid, `row`.id from transactional_complextypes_clone;
----- LABELS
-originaltransaction, rowid, row.id
----- RESULTS
-1,0,8
-1,0,1
-1,1,2
-1,2,3
-1,3,4
-1,4,5
-1,5,6
-1,6,7
----- TYPES
-BIGINT, BIGINT, BIGINT
 ====
