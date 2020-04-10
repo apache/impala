@@ -332,6 +332,8 @@ LOCATION '{hdfs_location}';
 ALTER TABLE {table_name}_tmp ADD IF NOT EXISTS PARTITION (year=2009, month=1);
 ALTER TABLE {table_name}_tmp ADD IF NOT EXISTS PARTITION (year=2009, month=2);
 ALTER TABLE {table_name}_tmp ADD IF NOT EXISTS PARTITION (year=2009, month=3);
+---- TABLE_PROPERTIES
+transactional=false
 ---- DEPENDENT_LOAD
 USE {db_name}{db_suffix};
 -- Step 4: Stream the data from tmp text table to desired format tmp table
@@ -458,6 +460,8 @@ USE {db_name}{db_suffix};
 ALTER TABLE {table_name}_tmp ADD IF NOT EXISTS PARTITION (year=2009, month=1);
 ALTER TABLE {table_name}_tmp ADD IF NOT EXISTS PARTITION (year=2009, month=2);
 ALTER TABLE {table_name}_tmp ADD IF NOT EXISTS PARTITION (year=2009, month=3);
+---- TABLE_PROPERTIES
+transactional=false
 ---- DEPENDENT_LOAD
 USE {db_name}{db_suffix};
 -- Step 4: Stream the data from tmp text table to desired format tmp table
@@ -1526,6 +1530,8 @@ CREATE EXTERNAL TABLE IF NOT EXISTS {db_name}{db_suffix}.{table_name} (
 ROW FORMAT DELIMITED FIELDS TERMINATED BY ','
 STORED AS {file_format}
 LOCATION '{hdfs_location}';
+---- TABLE_PROPERTIES
+transactional=false
 ---- DEPENDENT_LOAD
 INSERT OVERWRITE TABLE {db_name}{db_suffix}.{table_name} SELECT * FROM {db_name}.{table_name};
 ---- LOAD
