@@ -505,7 +505,7 @@ def parse_result_rows(exec_result):
 # Currently, the only implemented function is SUM and only integers are supported.
 AGGREGATION_PREFIX_PATTERN = 'aggregation\('
 AGGREGATION_PREFIX = re.compile(AGGREGATION_PREFIX_PATTERN)
-AGGREGATION_SYNTAX_MATCH_PATTERN = 'aggregation\((\w+)[ ]*,[ ]*(\w+)\):[ ]*(\d+)'
+AGGREGATION_SYNTAX_MATCH_PATTERN = 'aggregation\((\w+)[ ]*,[ ]*([^)]+)\):[ ]*(\d+)'
 
 def try_compile_aggregation(row_string):
   """

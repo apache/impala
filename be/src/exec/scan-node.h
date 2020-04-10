@@ -188,8 +188,8 @@ class ScanNode : public ExecNode {
 
   /// Waits for runtime filters to arrive, checking every 20ms. Max wait time is specified
   /// by the 'runtime_filter_wait_time_ms' flag, which is overridden by the query option
-  /// of the same name. Returns true if all filters arrived within the time limit (as
-  /// measured from the time of RuntimeFilterBank::RegisterFilter()), false otherwise.
+  /// of the same name. The wait starts from when this function is called. Returns
+  /// true if all filters arrived within the time limit, false otherwise.
   bool WaitForRuntimeFilters();
 
   /// Additional state only used by multi-threaded scan node implementations.

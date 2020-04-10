@@ -289,13 +289,25 @@ Status QueryState::InitFilterBank() {
   const vector<TPlanFragmentCtx>& fragment_ctxs = fragment_info_.fragment_ctxs;
   const vector<TPlanFragmentInstanceCtx>& instance_ctxs =
       fragment_info_.fragment_instance_ctxs;
-  // Add entries for all filters.
-  unordered_map<int32_t, int> produced_filter_counts;
+  // Add entries for all produced and consumed filters.
+  unordered_map<int32_t, FilterRegistration> filters;
   for (const TPlanFragmentCtx& fragment_ctx : fragment_ctxs) {
-    for (const TPlanNode& plan_node : fragment_ctx.fragment.plan.nodes) {
+    const TPlanFragment& fragment = fragment_ctx.fragment;
+    for (const TPlanNode& plan_node : fragment.plan.nodes) {
       if (!plan_node.__isset.runtime_filters) continue;
       for (const TRuntimeFilterDesc& filter : plan_node.runtime_filters) {
-        produced_filter_counts.emplace(filter.filter_id, 0);
+        // Add filter if not already present.
+        auto it = filters.emplace(filter.filter_id, FilterRegistration(filter)).first;
+        // Currently hash joins are the only filter sources. Otherwise it must be a filter
+        // consumer. 'num_producers' is computed later, so don't update that here.
+        if (!plan_node.__isset.join_node) it->second.has_consumer = true;
+      }
+    }
+    if (fragment.output_sink.__isset.join_build_sink) {
+      const TJoinBuildSink& join_sink = fragment.output_sink.join_build_sink;
+      for (const TRuntimeFilterDesc& filter : join_sink.runtime_filters) {
+        // Add filter if not already present.
+        filters.emplace(filter.filter_id, FilterRegistration(filter));
       }
     }
   }
@@ -320,11 +332,13 @@ Status QueryState::InitFilterBank() {
           fragment.consumed_runtime_filters_reservation_bytes;
     }
     for (const TRuntimeFilterSource& produced_filter : instance_ctx.filters_produced) {
-      ++produced_filter_counts[produced_filter.filter_id];
+      auto it = filters.find(produced_filter.filter_id);
+      DCHECK(it != filters.end());
+      ++it->second.num_producers;
     }
   }
-  filter_bank_.reset(new RuntimeFilterBank(
-      this, produced_filter_counts, runtime_filters_reservation_bytes));
+  filter_bank_.reset(
+      new RuntimeFilterBank(this, filters, runtime_filters_reservation_bytes));
   return filter_bank_->ClaimBufferReservation();
 }
 

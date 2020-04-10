@@ -52,21 +52,31 @@ class TBloomFilter;
 class TRuntimeFilterDesc;
 class TQueryCtx;
 
+/// Metadata about each filter required to initialize the RuntimeFilterBank for a query
+/// running on a backend.
+struct FilterRegistration {
+  FilterRegistration(const TRuntimeFilterDesc& desc) : desc(desc) {}
+
+  const TRuntimeFilterDesc& desc;
+
+  // Whether or not there is a consumer of the filter on this backend.
+  bool has_consumer = false;
+
+  // The number of producers of this filter executing on the backend.
+  int num_producers = 0;
+};
+
 /// RuntimeFilters are produced and consumed by plan nodes at run time to propagate
 /// predicates across the plan tree dynamically. Each query backend manages its
 /// filters with a RuntimeFilterBank which provides low-synchronization access to filter
 /// objects and data structures.
 ///
-/// A RuntimeFilterBank manages both production and consumption of filters. In the case
-/// where a given filter is both consumed and produced by the same backend, the
-/// RuntimeFilterBank treats each filter independently.
-///
-/// All filters must be registered with the filter bank via RegisterFilter(). Local plan
-/// fragments update the filters by calling UpdateFilterFromLocal(), with either a bloom
-/// filter or a min-max filter, depending on the filter's type. The 'bloom_filter' or
-/// 'min_max_filter' that is passed into UpdateFilterFromLocal() must have been allocated
-/// by AllocateScratch*Filter(); this allows RuntimeFilterBank to manage all memory
-/// associated with filters.
+/// All producers and consumers of filters must register via RegisterProducer() and
+/// RegisterConsumer(). Local plan fragments update the filters by calling
+/// UpdateFilterFromLocal(), with either a bloom filter or a min-max filter, depending
+/// on the filter's type. The 'bloom_filter' or 'min_max_filter' that is passed into
+/// UpdateFilterFromLocal() must have been allocated by AllocateScratch*Filter(); this
+/// allows RuntimeFilterBank to manage all memory associated with filters.
 ///
 /// Filters are aggregated, first locally in this RuntimeFilterBank, if there are multiple
 /// producers, and then made available to consumers after PublishGlobalFilter() has been
@@ -80,11 +90,9 @@ class TQueryCtx;
 /// nor the thread that may call RuntimeFilter::Eval() need to coordinate in any way.
 class RuntimeFilterBank {
  public:
-  /// 'produced_filter_counts': contains an entry for every filter produced or consumed
-  /// on this backend, along with the number of producers (0 if there are only consumers
-  /// on this backend).
+  /// 'filters': contains an entry for every filter produced or consumed on this backend.
   RuntimeFilterBank(QueryState* query_state,
-      const boost::unordered_map<int32_t, int>& produced_filter_counts,
+      const boost::unordered_map<int32_t, FilterRegistration>& filters,
       long total_filter_mem_required);
 
   // Define destructor in runtime-filter-bank.cc so that we can compile with only a
@@ -100,10 +108,15 @@ class RuntimeFilterBank {
   /// before Close().
   Status ClaimBufferReservation() WARN_UNUSED_RESULT;
 
-  /// Registers a filter that will either be produced (is_producer == false) or consumed
-  /// (is_producer == true) by fragments that share this QueryState. The filter
-  /// bloom_filter itself is unallocated until the first call to PublishGlobalFilter().
-  RuntimeFilter* RegisterFilter(const TRuntimeFilterDesc& filter_desc, bool is_producer);
+  /// Registers a producer of a filter. The filter must have been registered when
+  /// constructing the RuntimeFilterBank. The storage for the filter is not allocated;
+  /// the caller must call AllocateScratch*Filter() to allocate the actual filter.
+  RuntimeFilter* RegisterProducer(const TRuntimeFilterDesc& filter_desc);
+
+  /// Registers a consumer of a filter. The filter must have been registered when
+  /// constructing the RuntimeFilterBank. The consumer can use the returned RuntimeFilter
+  /// to check for the filter's arrival.
+  RuntimeFilter* RegisterConsumer(const TRuntimeFilterDesc& filter_desc);
 
   /// Updates a filter's 'bloom_filter' or 'min_max_filter' which has been produced by
   /// some operator in a local fragment instance. At most one of 'bloom_filter' and
@@ -125,8 +138,7 @@ class RuntimeFilterBank {
   /// Returns a bloom_filter that can be used by an operator to produce a local filter,
   /// which may then be used in UpdateFilterFromLocal(). The memory returned is owned by
   /// the RuntimeFilterBank and should not be deleted by the caller. The filter identified
-  /// by 'filter_id' must have been previously registered as a 'producer' by
-  /// RegisterFilter().
+  /// by 'filter_id' must have been previously registered by RegisterProducer().
   ///
   /// If memory allocation for the filter fails, or if Close() has been called first,
   /// returns NULL.
@@ -152,7 +164,8 @@ class RuntimeFilterBank {
   struct PerFilterState;
 
   static boost::unordered_map<int32_t, std::unique_ptr<PerFilterState>> BuildFilterMap(
-      const boost::unordered_map<int32_t, int>& produced_filter_counts);
+      const boost::unordered_map<int32_t, FilterRegistration>& filters,
+      ObjectPool* obj_pool);
 
   /// Acquire locks for all filters, returning them to the caller.
   std::vector<std::unique_lock<SpinLock>> LockAllFilters();
@@ -162,12 +175,11 @@ class RuntimeFilterBank {
 
   /// Data tracked for each produced filter in the filter bank.
   struct ProducedFilter {
-    ProducedFilter(int pending_producers);
+    ProducedFilter(int pending_producers, RuntimeFilter* result_filter);
 
-    /// The initial filter returned from RegisterFilter() with metadata about the filter.
-    /// Initialised when RegisterFilter(is_producer=true) is called for this filter id.
-    /// Not modified by producers.
-    RuntimeFilter* result_filter = nullptr;
+    /// The initial filter returned from RegisterProducer() metadata about the filter.
+    /// Not modified by producers. Owned by 'obj_pool_'.
+    RuntimeFilter* const result_filter;
 
     // The expected number of instances of the filter yet to arrive, i.e. additional
     // UpdateFilterFromLocal() calls expected.
@@ -184,7 +196,14 @@ class RuntimeFilterBank {
   /// separately to help with scalability. Aligned so that each lock is on a separate
   /// cache line.
   struct PerFilterState {
-    PerFilterState(int pending_producers);
+    /// pending_producers: the number of producers that will call UpdateFilterFromLocal().
+    /// result_filter: the initial filter that will be returned to producers. Non-NULL if
+    ///   there are any producers. Must be owned by 'obj_pool_'.
+    /// consumed_filter: the filter that will be returned to consumers. Non-NULL if there
+    ///   are any consumers. Must be owned by 'obj_pool_'.
+    PerFilterState(int pending_producers, RuntimeFilter* result_filter,
+        RuntimeFilter* consumed_filter);
+
     /// Lock protecting the structures in this PerFilterState. If multiple locks are
     /// acquired, they must be acquired in the 'filters_' map iteration order.
     SpinLock lock;
@@ -192,13 +211,13 @@ class RuntimeFilterBank {
     /// State of a filter that will be produced by this filter bank.
     ProducedFilter produced_filter;
 
-    /// The filter that is returned to consumers that call RegisterFilter(producer=false).
-    /// Initialised when RegisterFilter(producer=false) is called for this filter id.
+    /// The filter that is returned to consumers that call RegisterConsumer().
+    /// Initialised in the constructor if there are consumer filters on this backend.
     ///
     /// For broadcast joins, SetFilter() must be called while holding 'lock' and after
     /// checking HasFilter() to avoid SetFilter() being called multiple times for
     /// broadcast join filters.
-    RuntimeFilter* consumed_filter = nullptr;
+    RuntimeFilter* const consumed_filter;
 
     /// Contains references to all the bloom filters generated. Used in Close() to safely
     /// release all memory allocated for BloomFilters.
