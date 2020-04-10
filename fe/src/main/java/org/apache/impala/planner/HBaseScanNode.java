@@ -579,9 +579,9 @@ public class HBaseScanNode extends ScanNode {
         } else {
           for (int i = 0; i < filters_.size(); ++i) {
             THBaseFilter filter = filters_.get(i);
-            output.append("\n  " + filter.family + ":" + filter.qualifier + " " +
-                CompareFilter.CompareOp.values()[filter.op_ordinal].toString() + " " +
-                "'" + filter.filter_constant + "'");
+            output.append("\n" + detailPrefix + filter.family + ":" + filter.qualifier
+                + " " + CompareFilter.CompareOp.values()[filter.op_ordinal].toString()
+                + " " + "'" + filter.filter_constant + "'");
           }
         }
         output.append('\n');
