@@ -30,6 +30,7 @@
 #include "util/runtime-profile.h"
 #include "util/stopwatch.h"
 #include "util/time.h"
+#include "gutil/port.h"
 
 namespace impala {
 
@@ -274,6 +275,14 @@ class BlockingQueue : public CacheLineAligned {
   /// Decremented by transferring value from 'get_bytes_dequeued_'.
   /// Guarded by 'put_lock_'
   int64_t put_bytes_enqueued_ = 0;
+
+#ifdef __aarch64__
+  /// Add padding to keep cache line aligned on aarch64 platform.
+  char padding[CACHELINE_SIZE - (sizeof(bool) + sizeof(int) + sizeof(std::mutex) +
+      sizeof(std::deque<T>) + sizeof(ConditionVariable) + sizeof(uintptr_t)
+      + sizeof(int64_t)) % CACHELINE_SIZE];
+
+#endif
 
   /// Guards against concurrent access to 'get_list_'.
   mutable std::mutex get_lock_;

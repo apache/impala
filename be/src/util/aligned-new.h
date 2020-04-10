@@ -22,6 +22,7 @@
 
 #include "common/compiler-util.h"
 #include "common/logging.h"
+#include "gutil/port.h"
 
 namespace impala {
 
@@ -51,7 +52,7 @@ struct alignas(ALIGNMENT) AlignedNew {
   }
 };
 
-using CacheLineAligned = AlignedNew<CACHE_LINE_SIZE>;
+using CacheLineAligned = AlignedNew<CACHELINE_SIZE>;
 }
 
 #endif

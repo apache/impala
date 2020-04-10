@@ -34,6 +34,7 @@
 #include "runtime/io/disk-io-mgr.h"
 #include "runtime/row-batch.h"
 #include "runtime/tuple.h"
+#include "gutil/port.h"
 
 namespace impala {
 
@@ -553,7 +554,7 @@ class HdfsScanner {
             template_tuple, reinterpret_cast<Tuple*>(tuple_mem), tuple_byte_size);
         tuple_mem += tuple_byte_size;
       }
-    } else if (tuple_byte_size <= CACHE_LINE_SIZE) {
+    } else if (tuple_byte_size <= CACHELINE_SIZE) {
       // If each tuple fits in a cache line, it is quicker to zero the whole memory buffer
       // instead of just the null indicators. This is because we are fetching the cache
       // line anyway and zeroing a cache line is cheap (a couple of AVX2 instructions)
