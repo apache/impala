@@ -65,6 +65,7 @@
 #include "runtime/runtime-state.h"
 #include "util/debug-util.h"
 #include "util/runtime-profile-counters.h"
+#include "util/string-parser.h"
 #include "util/uid-util.h"
 
 #include "common/names.h"
@@ -429,8 +430,19 @@ Status ExecNode::ExecDebugActionImpl(TExecNodePhase::type phase, RuntimeState* s
     }
   } else {
     DCHECK_EQ(debug_options_.action, TDebugAction::DELAY);
-    VLOG(1) << "DEBUG_ACTION: Sleeping";
-    SleepForMs(100);
+    int64_t sleep_duration_ms = 100;
+    if (!debug_options_.action_param.empty()) {
+      const string& param = debug_options_.action_param;
+      StringParser::ParseResult result;
+      sleep_duration_ms =
+          StringParser::StringToInt<int64_t>(param.c_str(), param.length(), &result);
+      if (result != StringParser::PARSE_SUCCESS || sleep_duration_ms < 0) {
+        return Status(Substitute("Invalid sleep duration: '$0'. "
+              "Only non-negative numbers are allowed.", param));
+      }
+    }
+    VLOG(1) << "DEBUG_ACTION: Sleeping for " << sleep_duration_ms << "ms";
+    SleepForMs(sleep_duration_ms);
   }
   return Status::OK();
 }

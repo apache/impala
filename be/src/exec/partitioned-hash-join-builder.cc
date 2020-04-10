@@ -187,7 +187,7 @@ PhjBuilder::PhjBuilder(
       << "Returning rows with build partitions is not supported with shared builds";
   for (const TRuntimeFilterDesc& filter_desc : sink_config.filter_descs_) {
     filter_ctxs_.emplace_back();
-    filter_ctxs_.back().filter = state->filter_bank()->RegisterFilter(filter_desc, true);
+    filter_ctxs_.back().filter = state->filter_bank()->RegisterProducer(filter_desc);
   }
   // Ensure threads get unblocked from probe_barrier_ when the query is cancelled. Using
   // the AddBarrierToCancel() mechanism ensures that cancellation happens after the
@@ -223,7 +223,7 @@ PhjBuilder::PhjBuilder(const PhjBuilderConfig& sink_config,
   DCHECK_EQ(1, num_probe_threads_) << "Embedded builders cannot be shared";
   for (const TRuntimeFilterDesc& filter_desc : sink_config.filter_descs_) {
     filter_ctxs_.emplace_back();
-    filter_ctxs_.back().filter = state->filter_bank()->RegisterFilter(filter_desc, true);
+    filter_ctxs_.back().filter = state->filter_bank()->RegisterProducer(filter_desc);
   }
 }
 
