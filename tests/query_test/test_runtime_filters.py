@@ -241,5 +241,15 @@ class TestRuntimeRowFilters(ImpalaTestSuite):
   def test_row_filters(self, vector):
     new_vector = deepcopy(vector)
     new_vector.get_value('exec_option')['mt_dop'] = vector.get_value('mt_dop')
-    self.run_test_case('QueryTest/runtime_row_filters', vector,
+    self.run_test_case('QueryTest/runtime_row_filters', new_vector,
+                       test_file_vars={'$RUNTIME_FILTER_WAIT_TIME_MS': str(WAIT_TIME_MS)})
+
+  def test_row_filter_reservation(self, vector):
+    """Test handling of runtime filter memory reservations. Tuned for mt_dop=0."""
+    mt_dop = vector.get_value('mt_dop')
+    if mt_dop != 0:
+        pytest.skip("Memory reservations tuned for mt_dop=0")
+    new_vector = deepcopy(vector)
+    new_vector.get_value('exec_option')['mt_dop'] = mt_dop
+    self.run_test_case('QueryTest/runtime_row_filter_reservations', new_vector,
                        test_file_vars={'$RUNTIME_FILTER_WAIT_TIME_MS' : str(WAIT_TIME_MS)})

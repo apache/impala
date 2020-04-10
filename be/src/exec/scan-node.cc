@@ -152,7 +152,7 @@ Status ScanNode::Prepare(RuntimeState* state) {
   for (const TRuntimeFilterDesc& filter_desc : plan_node_.tnode_->runtime_filters) {
     filter_ctxs_.emplace_back();
     FilterContext& filter_ctx = filter_ctxs_.back();
-    filter_ctx.filter = state->filter_bank()->RegisterFilter(filter_desc, false);
+    filter_ctx.filter = state->filter_bank()->RegisterConsumer(filter_desc);
     // TODO: Enable stats for min-max filters when Kudu exposes info about filters
     // (KUDU-2162).
     if (filter_ctx.filter->is_bloom_filter()) {

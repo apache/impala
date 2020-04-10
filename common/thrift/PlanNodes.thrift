@@ -76,7 +76,8 @@ enum TDebugAction {
   // A floating point number in range [0.0, 1.0] that gives the probability of denying
   // each reservation increase request after the initial reservation.
   SET_DENY_RESERVATION_PROBABILITY = 4
-  // Delay for a short amount of time: 100ms
+  // Delay for a short amount of time: 100ms or the specified number of seconds in the
+  // optional parameter.
   DELAY = 5
 }
 

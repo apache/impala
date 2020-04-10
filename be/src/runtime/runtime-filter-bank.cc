@@ -59,9 +59,9 @@ const int64_t RuntimeFilterBank::MIN_BLOOM_FILTER_SIZE;
 const int64_t RuntimeFilterBank::MAX_BLOOM_FILTER_SIZE;
 
 RuntimeFilterBank::RuntimeFilterBank(QueryState* query_state,
-    const unordered_map<int32_t, int>& produced_filter_counts,
+    const unordered_map<int32_t, FilterRegistration>& filters,
     long total_filter_mem_required)
-  : filters_(BuildFilterMap(produced_filter_counts)),
+  : filters_(BuildFilterMap(filters, &obj_pool_)),
     query_state_(query_state),
     filter_mem_tracker_(query_state->obj_pool()->Add(new MemTracker(
         -1, "Runtime Filter Bank", query_state->query_mem_tracker(), false))),
@@ -73,10 +73,23 @@ RuntimeFilterBank::~RuntimeFilterBank() {}
 
 unordered_map<int32_t, unique_ptr<RuntimeFilterBank::PerFilterState>>
 RuntimeFilterBank::BuildFilterMap(
-    const unordered_map<int32_t, int>& produced_filter_counts) {
+    const unordered_map<int32_t, FilterRegistration>& filters, ObjectPool* obj_pool) {
   unordered_map<int32_t, unique_ptr<PerFilterState>> result;
-  for (auto& entry : produced_filter_counts) {
-    result.emplace(entry.first, make_unique<PerFilterState>(entry.second));
+  for (auto& entry : filters) {
+    const FilterRegistration reg = entry.second;
+    RuntimeFilter* result_filter = nullptr;
+    RuntimeFilter* consumed_filter = nullptr;
+    if (reg.has_consumer) {
+      VLOG(3) << "registered consumer filter " << reg.desc.filter_id;
+      consumed_filter =
+          obj_pool->Add(new RuntimeFilter(reg.desc, reg.desc.filter_size_bytes));
+    }
+    if (reg.num_producers > 0) {
+      result_filter =
+          obj_pool->Add(new RuntimeFilter(reg.desc, reg.desc.filter_size_bytes));
+    }
+    result.emplace(entry.first,
+        make_unique<PerFilterState>(reg.num_producers, result_filter, consumed_filter));
   }
   return result;
 }
@@ -96,39 +109,29 @@ Status RuntimeFilterBank::ClaimBufferReservation() {
   return Status::OK();
 }
 
-RuntimeFilter* RuntimeFilterBank::RegisterFilter(
-    const TRuntimeFilterDesc& filter_desc, bool is_producer) {
+RuntimeFilter* RuntimeFilterBank::RegisterProducer(
+    const TRuntimeFilterDesc& filter_desc) {
   auto it = filters_.find(filter_desc.filter_id);
   DCHECK(it != filters_.end()) << "Filter ID " << filter_desc.filter_id
                                << " not registered";
   PerFilterState* fs = it->second.get();
-  RuntimeFilter* ret = nullptr;
-  lock_guard<SpinLock> l(fs->lock);
-  if (is_producer) {
-    if (fs->produced_filter.result_filter == nullptr) {
-      ret = obj_pool_.Add(new RuntimeFilter(filter_desc, filter_desc.filter_size_bytes));
-      fs->produced_filter.result_filter = ret;
-    } else {
-      ret = fs->produced_filter.result_filter;
-      DCHECK_EQ(filter_desc.filter_size_bytes, ret->filter_size());
-    }
-  } else {
-    if (fs->consumed_filter == nullptr) {
-      ret = obj_pool_.Add(new RuntimeFilter(filter_desc, filter_desc.filter_size_bytes));
-      // The filter bank may have already been cancelled. In that case, still allocate the
-      // filter but cancel it immediately, so that callers of RuntimeFilterBank don't need
-      // to have separate handling of that case.
-      if (cancelled_) ret->Cancel();
-      fs->consumed_filter = ret;
-      VLOG(2) << "registered consumer filter " << filter_desc.filter_id;
-    } else {
-      // The filter has already been registered in this filter bank by another
-      // fragment instance or target node.
-      ret = fs->consumed_filter;
-      VLOG_QUERY << "re-registered consumer filter " << filter_desc.filter_id;
-    }
-  }
+  DCHECK(fs->produced_filter.result_filter != nullptr);
+  RuntimeFilter* ret = fs->produced_filter.result_filter;
+  DCHECK_EQ(filter_desc.filter_size_bytes, ret->filter_size());
   return ret;
+}
+
+RuntimeFilter* RuntimeFilterBank::RegisterConsumer(
+    const TRuntimeFilterDesc& filter_desc) {
+  auto it = filters_.find(filter_desc.filter_id);
+  DCHECK(it != filters_.end()) << "Filter ID " << filter_desc.filter_id
+                               << " not registered";
+  PerFilterState* fs = it->second.get();
+  DCHECK(fs->consumed_filter != nullptr)
+      << "Consumed filters must be created in constructor";
+  VLOG(3) << "Consumer registered for filter " << filter_desc.filter_id;
+  DCHECK_EQ(filter_desc.filter_size_bytes, fs->consumed_filter->filter_size());
+  return fs->consumed_filter;
 }
 
 void RuntimeFilterBank::UpdateFilterCompleteCb(
@@ -463,8 +466,10 @@ void RuntimeFilterBank::Close() {
   filter_mem_tracker_->Close();
 }
 
-RuntimeFilterBank::ProducedFilter::ProducedFilter(int pending_producers)
-  : pending_producers(pending_producers) {}
+RuntimeFilterBank::ProducedFilter::ProducedFilter(
+    int pending_producers, RuntimeFilter* result_filter)
+  : result_filter(result_filter), pending_producers(pending_producers) {}
 
-RuntimeFilterBank::PerFilterState::PerFilterState(int pending_producers)
-  : produced_filter(pending_producers) {}
+RuntimeFilterBank::PerFilterState::PerFilterState(
+    int pending_producers, RuntimeFilter* result_filter, RuntimeFilter* consumed_filter)
+  : produced_filter(pending_producers, result_filter), consumed_filter(consumed_filter) {}

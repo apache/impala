@@ -176,7 +176,7 @@ PhjBuilder::PhjBuilder(
   DCHECK_GT(sink_config.hash_seed_, 0);
   for (const TRuntimeFilterDesc& filter_desc : sink_config.filter_descs_) {
     filter_ctxs_.emplace_back();
-    filter_ctxs_.back().filter = state->filter_bank()->RegisterFilter(filter_desc, true);
+    filter_ctxs_.back().filter = state->filter_bank()->RegisterProducer(filter_desc);
   }
 }
 
@@ -204,7 +204,7 @@ PhjBuilder::PhjBuilder(const PhjBuilderConfig& sink_config,
   DCHECK_GT(sink_config.hash_seed_, 0);
   for (const TRuntimeFilterDesc& filter_desc : sink_config.filter_descs_) {
     filter_ctxs_.emplace_back();
-    filter_ctxs_.back().filter = state->filter_bank()->RegisterFilter(filter_desc, true);
+    filter_ctxs_.back().filter = state->filter_bank()->RegisterProducer(filter_desc);
   }
 }
 
