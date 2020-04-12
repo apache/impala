@@ -41,28 +41,56 @@ const char* CodegenAnyVal::LLVM_COLLECTIONVAL_NAME = "struct.impala_udf::Collect
 llvm::Type* CodegenAnyVal::GetLoweredType(LlvmCodeGen* cg, const ColumnType& type) {
   switch (type.type) {
     case TYPE_BOOLEAN: // i16
+#ifndef __aarch64__
       return cg->i16_type();
+#else
+      return cg->i64_type();
+#endif
     case TYPE_TINYINT: // i16
+#ifndef __aarch64__
       return cg->i16_type();
+#else
+      return cg->i64_type();
+#endif
     case TYPE_SMALLINT: // i32
+#ifndef __aarch64__
       return cg->i32_type();
+#else
+      return cg->i64_type();
+#endif
     case TYPE_INT: // i64
       return cg->i64_type();
     case TYPE_BIGINT: // { i8, i64 }
+#ifndef __aarch64__
       return llvm::StructType::get(cg->i8_type(), cg->i64_type());
+#else
+      return llvm::ArrayType::get(cg->i64_type(), 2);
+#endif
     case TYPE_FLOAT: // i64
       return cg->i64_type();
     case TYPE_DOUBLE: // { i8, double }
+#ifndef __aarch64__
       return llvm::StructType::get(cg->i8_type(), cg->double_type());
+#else
+      return llvm::ArrayType::get(cg->i64_type(), 2);
+#endif
     case TYPE_STRING: // { i64, i8* }
     case TYPE_VARCHAR: // { i64, i8* }
     case TYPE_CHAR: // Uses StringVal, so same as STRING/VARCHAR.
     case TYPE_FIXED_UDA_INTERMEDIATE: // { i64, i8* }
     case TYPE_ARRAY: // CollectionVal has same memory layout as StringVal.
     case TYPE_MAP: // CollectionVal has same memory layout as StringVal.
+#ifndef __aarch64__
       return llvm::StructType::get(cg->i64_type(), cg->ptr_type());
+#else
+      return llvm::ArrayType::get(cg->i64_type(), 2);
+#endif
     case TYPE_TIMESTAMP: // { i64, i64 }
+#ifndef __aarch64__
       return llvm::StructType::get(cg->i64_type(), cg->i64_type());
+#else
+      return llvm::ArrayType::get(cg->i64_type(), 2);
+#endif
     case TYPE_DECIMAL: // %"struct.impala_udf::DecimalVal" (isn't lowered)
                        // = { {i8}, [15 x i8], {i128} }
       return cg->GetNamedType(LLVM_DECIMALVAL_NAME);
@@ -198,9 +226,14 @@ llvm::Value* CodegenAnyVal::GetIsNull(const char* name) const {
     case TYPE_BIGINT:
     case TYPE_DOUBLE: {
       // Lowered type is of form { i8, * }. Get the i8 value.
-      llvm::Value* is_null_i8 = builder_->CreateExtractValue(value_, 0);
-      DCHECK(is_null_i8->getType() == codegen_->i8_type());
-      return builder_->CreateTrunc(is_null_i8, codegen_->bool_type(), name);
+      // On aarch64, Lowered type is of form { i64, * }
+      llvm::Value* is_null = builder_->CreateExtractValue(value_, 0);
+#ifndef __aarch64__
+      DCHECK(is_null->getType() == codegen_->i8_type());
+#else
+      DCHECK(is_null->getType() == codegen_->i64_type());
+#endif
+      return builder_->CreateTrunc(is_null, codegen_->bool_type(), name);
     }
     case TYPE_DECIMAL: {
       // Lowered type is of the form { {i8}, ... }
@@ -240,8 +273,14 @@ void CodegenAnyVal::SetIsNull(llvm::Value* is_null) {
     case TYPE_BIGINT:
     case TYPE_DOUBLE: {
       // Lowered type is of form { i8, * }. Set the i8 value to 'is_null'.
+      // On aarch64, lowered type is of form { i64, * }
+#ifndef __aarch64__
       llvm::Value* is_null_ext =
           builder_->CreateZExt(is_null, codegen_->i8_type(), "is_null_ext");
+#else
+      llvm::Value* is_null_ext =
+          builder_->CreateZExt(is_null, codegen_->i64_type(), "is_null_ext");
+#endif
       value_ = builder_->CreateInsertValue(value_, is_null_ext, 0, name_);
       break;
     }
@@ -322,14 +361,25 @@ llvm::Value* CodegenAnyVal::GetVal(const char* name) {
       return builder_->CreateBitCast(val, codegen_->float_type());
     }
     case TYPE_BIGINT:
-    case TYPE_DOUBLE:
-      // Lowered type is of form { i8, * }. Get the second value.
       return builder_->CreateExtractValue(value_, 1, name);
+    case TYPE_DOUBLE: {
+      // Lowered type is of form { i8, * }. Get the second value.
+      llvm::Value* val = builder_->CreateExtractValue(value_, 1, name);
+#ifdef __aarch64__
+      val = builder_->CreateBitCast(val, codegen_->double_type());
+#endif
+      return val;
+    }
     case TYPE_DECIMAL: {
-      // Lowered type is of form { {i8}, [15 x i8], {i128} }. Get the i128 value and
-      // truncate it to the correct size. (The {i128} corresponds to the union of the
-      // different width int types.)
+#ifdef __aarch64__
+      // On aarch64, the Lowered type is of form { {i8}, {i128} }. No padding add.
+      uint32_t idxs[] = {1, 0};
+#else
+      // On x86-64, Lowered type is of form { {i8}, [15 x i8], {i128} }.
       uint32_t idxs[] = {2, 0};
+#endif
+      // Get the i128 value and truncate it to the correct size.
+      // (The {i128} corresponds to the union of the different width int types.)
       llvm::Value* val = builder_->CreateExtractValue(value_, idxs, name);
       return builder_->CreateTrunc(val,
           codegen_->GetSlotType(type_), name);
@@ -366,16 +416,27 @@ void CodegenAnyVal::SetVal(llvm::Value* val) {
       value_ = SetHighBits(32, val, value_, name_);
       break;
     case TYPE_BIGINT:
+      value_ = builder_->CreateInsertValue(value_, val, 1, name_);
+      break;
     case TYPE_DOUBLE:
+#ifdef __aarch64__
+      val = builder_->CreateBitCast(val, codegen_->i64_type());
+#endif
       // Lowered type is of form { i8, * }. Set the second value to 'val'.
       value_ = builder_->CreateInsertValue(value_, val, 1, name_);
       break;
     case TYPE_DECIMAL: {
-      // Lowered type is of the form { {i8}, [15 x i8], {i128} }. Set the i128 value to
-      // 'val'. (The {i128} corresponds to the union of the different width int types.)
+      //  Set the i128 value to 'val'.
+      //  (The {i128} corresponds to the union of the different width int types.)
       DCHECK_EQ(val->getType()->getIntegerBitWidth(), type_.GetByteSize() * 8);
       val = builder_->CreateSExt(val, llvm::Type::getIntNTy(codegen_->context(), 128));
+#ifdef __aarch64__
+      // On aarch64, the Lowered type is of form { {i8}, {i128} }. No padding add.
+      uint32_t idxs[] = {1, 0};
+#else
+      // On X86-64, the Lowered type is of the form { {i8}, [15 x i8], {i128} }
       uint32_t idxs[] = {2, 0};
+#endif
       value_ = builder_->CreateInsertValue(value_, val, idxs, name_);
       break;
     }
@@ -430,7 +491,11 @@ void CodegenAnyVal::SetVal(double val) {
 llvm::Value* CodegenAnyVal::GetPtr() {
   // Set the second pointer value to 'ptr'.
   DCHECK(type_.IsStringType() || type_.IsCollectionType());
-  return builder_->CreateExtractValue(value_, 1, name_);
+  llvm::Value* val = builder_->CreateExtractValue(value_, 1, name_);
+#ifdef __aarch64__
+  val = builder_->CreateIntToPtr(val, codegen_->ptr_type());
+#endif
+  return val;
 }
 
 llvm::Value* CodegenAnyVal::GetLen() {
@@ -444,6 +509,9 @@ void CodegenAnyVal::SetPtr(llvm::Value* ptr) {
   // Set the second pointer value to 'ptr'.
   DCHECK(type_.IsStringType() || type_.type == TYPE_FIXED_UDA_INTERMEDIATE
       || type_.IsCollectionType());
+#ifdef __aarch64__
+  ptr = builder_->CreatePtrToInt(ptr, codegen_->i64_type());
+#endif
   value_ = builder_->CreateInsertValue(value_, ptr, 1, name_);
 }
 
@@ -835,7 +903,9 @@ void CodegenAnyVal::CodegenBranchIfNull(
 }
 
 llvm::Value* CodegenAnyVal::GetHighBits(int num_bits, llvm::Value* v, const char* name) {
+#ifndef __aarch64__
   DCHECK_EQ(v->getType()->getIntegerBitWidth(), num_bits * 2);
+#endif
   llvm::Value* shifted = builder_->CreateAShr(v, num_bits);
   return builder_->CreateTrunc(
       shifted, llvm::IntegerType::get(codegen_->context(), num_bits));
@@ -849,9 +919,14 @@ llvm::Value* CodegenAnyVal::GetHighBits(int num_bits, llvm::Value* v, const char
 llvm::Value* CodegenAnyVal::SetHighBits(
     int num_bits, llvm::Value* src, llvm::Value* dst, const char* name) {
   DCHECK_LE(src->getType()->getIntegerBitWidth(), num_bits);
+#ifndef __aarch64__
   DCHECK_EQ(dst->getType()->getIntegerBitWidth(), num_bits * 2);
   llvm::Value* extended_src = builder_->CreateZExt(
       src, llvm::IntegerType::get(codegen_->context(), num_bits * 2));
+#else
+  llvm::Value* extended_src = builder_->CreateZExt(src,
+        llvm::IntegerType::get(codegen_->context(), 64));
+#endif
   llvm::Value* shifted_src = builder_->CreateShl(extended_src, num_bits);
   llvm::Value* masked_dst = builder_->CreateAnd(dst, (1LL << num_bits) - 1);
   return builder_->CreateOr(masked_dst, shifted_src, name);
@@ -879,6 +954,18 @@ llvm::Value* CodegenAnyVal::GetNullVal(LlvmCodeGen* codegen, llvm::Type* val_typ
       return llvm::ConstantStruct::get(struct_type, null_anyval,
           llvm::Constant::getNullValue(type2), llvm::Constant::getNullValue(type3));
     }
+#ifdef __aarch64__
+    else if (struct_type->getElementType(0)->isStructTy()) {
+      llvm::StructType* anyval_struct_type =
+          llvm::cast<llvm::StructType>(struct_type->getElementType(0));
+      llvm::Type* is_null_type = anyval_struct_type->getElementType(0);
+      llvm::Constant* null_anyval = llvm::ConstantStruct::get(
+          anyval_struct_type, llvm::ConstantInt::get(is_null_type, 1));
+      llvm::Type* type1 = struct_type->getElementType(1);
+      return llvm::ConstantStruct::get(struct_type, null_anyval,
+          llvm::Constant::getNullValue(type1));
+    }
+#endif
     // Return the struct { 1, 0 } (the 'is_null' byte, i.e. the first value's first byte,
     // is set to 1, the other bytes don't matter)
     DCHECK_EQ(struct_type->getNumElements(), 2);
@@ -888,6 +975,18 @@ llvm::Value* CodegenAnyVal::GetNullVal(LlvmCodeGen* codegen, llvm::Type* val_typ
     return llvm::ConstantStruct::get(struct_type, llvm::ConstantInt::get(type1, 1),
         llvm::Constant::getNullValue(type2));
   }
+#ifdef __aarch64__
+  if (val_type->isArrayTy()) {
+    llvm::ArrayType* array_type = llvm::cast<llvm::ArrayType>(val_type);
+    DCHECK_EQ(array_type->getNumElements(), 2);
+    llvm::Type* type1 = array_type->getElementType();
+    DCHECK(type1->isIntegerTy()) << LlvmCodeGen::Print(type1);
+    std::vector<llvm::Constant *> arrayElts;
+    arrayElts.push_back(llvm::ConstantInt::get(type1, 1));
+    arrayElts.push_back(llvm::Constant::getNullValue(type1));
+    return llvm::ConstantArray::get(array_type, arrayElts);
+  }
+#endif
   // Return the int 1 ('is_null' byte is 1, other bytes don't matter)
   DCHECK(val_type->isIntegerTy());
   return llvm::ConstantInt::get(val_type, 1);
