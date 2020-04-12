@@ -111,6 +111,12 @@ DECLARE_string(local_library_dir);
 // avx512ifma,avx512pf,avx512vbmi,avx512vl,clflushopt,clwb,fma4,mwaitx.1.2,pcommit,pku,
 // prefetchwt1,sgx,sha,sse4a,tbm,xop,xsavec,xsaves. If new attrs are added to LLVM,
 // they will be disabled until added to this whitelist.
+#ifdef __aarch64__
+DEFINE_string_hidden(llvm_cpu_attr_whitelist, "crc,neon,fp-armv8,crypto",
+    "(Experimental) a comma-separated list of LLVM CPU attribute flags that are enabled "
+    "for runtime code generation. This flag is provided to enable additional LLVM CPU "
+    "attribute flags for testing.");
+#else
 DEFINE_string_hidden(llvm_cpu_attr_whitelist, "adx,aes,avx,avx2,bmi,bmi2,cmov,cx16,f16c,"
     "fma,fsgsbase,hle,invpcid,lzcnt,mmx,movbe,pclmul,popcnt,prfchw,rdrnd,rdseed,rtm,smap,"
     "sse,sse2,sse3,sse4.1,sse4.2,ssse3,xsave,xsaveopt",
@@ -118,6 +124,7 @@ DEFINE_string_hidden(llvm_cpu_attr_whitelist, "adx,aes,avx,avx2,bmi,bmi2,cmov,cx
     "for runtime code generation. The default flags are a known-good set that are "
     "routinely tested. This flag is provided to enable additional LLVM CPU attribute "
     "flags for testing.");
+#endif
 
 namespace impala {
 

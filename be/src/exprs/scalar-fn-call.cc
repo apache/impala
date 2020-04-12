@@ -349,21 +349,60 @@ Status ScalarFnCall::GetCodegendComputeFnImpl(LlvmCodeGen* codegen, llvm::Functi
     llvm::Type* arg_type = CodegenAnyVal::GetUnloweredType(codegen, children_[i]->type());
     llvm::Value* arg_val_ptr;
     if (i < NumFixedArgs()) {
+#ifndef __aarch64__
       // Allocate space to store 'child_fn's result so we can pass the pointer to the UDF.
       arg_val_ptr = codegen->CreateEntryBlockAlloca(builder, arg_type, "arg_val_ptr");
       udf_args.push_back(arg_val_ptr);
+#else
+      PrimitiveType col_type = children_[i]->type().type;
+      if (col_type != TYPE_BOOLEAN and col_type != TYPE_TINYINT
+          and col_type != TYPE_SMALLINT) {
+        arg_val_ptr = codegen->CreateEntryBlockAlloca(builder, arg_type, "arg_val_ptr");
+        udf_args.push_back(arg_val_ptr);
+      }
+#endif
     } else {
       // Store the result of 'child_fn' in varargs_buffer[i].
       arg_val_ptr =
           builder.CreateConstGEP1_32(varargs_buffer, i - NumFixedArgs(), "arg_val_ptr");
     }
+#ifndef __aarch64__
     DCHECK_EQ(arg_val_ptr->getType(), arg_type->getPointerTo());
     // The result of the call must be stored in a lowered AnyVal
     llvm::Value* lowered_arg_val_ptr = builder.CreateBitCast(arg_val_ptr,
         CodegenAnyVal::GetLoweredPtrType(codegen, children_[i]->type()),
         "lowered_arg_val_ptr");
+#else
+    llvm::Value* lowered_arg_val_ptr;
+    if (col_type == TYPE_BOOLEAN or col_type == TYPE_TINYINT
+        or col_type == TYPE_SMALLINT) {
+      lowered_arg_val_ptr = codegen->CreateEntryBlockAlloca(builder,
+          CodegenAnyVal::GetLoweredType(codegen, children_[i]->type()), 1,
+          FunctionContextImpl::VARARGS_BUFFER_ALIGNMENT, "lowered_arg_val_ptr");
+    } else {
+      lowered_arg_val_ptr = builder.CreateBitCast(arg_val_ptr,
+          CodegenAnyVal::GetLoweredPtrType(codegen, children_[i]->type()),
+          "lowered_arg_val_ptr");
+    }
+#endif
     CodegenAnyVal::CreateCall(
         codegen, &builder, child_fn, child_fn_args, "arg_val", lowered_arg_val_ptr);
+#ifdef __aarch64__
+    if (col_type == TYPE_BOOLEAN or col_type == TYPE_TINYINT
+        or col_type == TYPE_SMALLINT) {
+      if (i < NumFixedArgs()) {
+        arg_val_ptr = builder.CreateTruncOrBitCast(lowered_arg_val_ptr,
+            CodegenAnyVal::GetUnloweredPtrType(codegen, children_[i]->type()),
+            "arg_val_ptr");
+        udf_args.push_back(arg_val_ptr);
+      } else {
+        llvm::Value* tmp_ptr = builder.CreateTruncOrBitCast(lowered_arg_val_ptr,
+            CodegenAnyVal::GetUnloweredPtrType(codegen, children_[i]->type()),
+            "tmp_ptr");
+        builder.CreateStore(builder.CreateLoad(tmp_ptr), arg_val_ptr);
+      }
+    }
+#endif
   }
 
   if (vararg_start_idx_ != -1) {
