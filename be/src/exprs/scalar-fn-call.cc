@@ -348,13 +348,15 @@ Status ScalarFnCall::GetCodegendComputeFnImpl(LlvmCodeGen* codegen, llvm::Functi
     DCHECK(child_fn != NULL);
     llvm::Type* arg_type = CodegenAnyVal::GetUnloweredType(codegen, children_[i]->type());
     llvm::Value* arg_val_ptr;
+#ifdef __aarch64__
+    PrimitiveType col_type = children_[i]->type().type;
+#endif
     if (i < NumFixedArgs()) {
 #ifndef __aarch64__
       // Allocate space to store 'child_fn's result so we can pass the pointer to the UDF.
       arg_val_ptr = codegen->CreateEntryBlockAlloca(builder, arg_type, "arg_val_ptr");
       udf_args.push_back(arg_val_ptr);
 #else
-      PrimitiveType col_type = children_[i]->type().type;
       if (col_type != TYPE_BOOLEAN and col_type != TYPE_TINYINT
           and col_type != TYPE_SMALLINT) {
         arg_val_ptr = codegen->CreateEntryBlockAlloca(builder, arg_type, "arg_val_ptr");
