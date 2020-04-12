@@ -1099,8 +1099,9 @@ public class Frontend {
    * level objects in the hierarchy.
    */
   private boolean authEngineSupportsDenyRules() {
+    // Sentry did not support deny rules, but Ranger does. So, this now returns true.
     // TODO: could check config for Ranger and return true if deny rules are disabled
-    return !authzFactory_.getAuthorizationConfig().getProviderName().equals("sentry");
+    return true;
   }
 
   /**

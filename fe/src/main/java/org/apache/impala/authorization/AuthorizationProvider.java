@@ -19,7 +19,6 @@
 package org.apache.impala.authorization;
 
 import org.apache.impala.authorization.ranger.RangerAuthorizationFactory;
-import org.apache.impala.authorization.sentry.SentryAuthorizationFactory;
 
 /**
  * This enum contains the list of authorization providers supported in Impala.
@@ -28,7 +27,6 @@ import org.apache.impala.authorization.sentry.SentryAuthorizationFactory;
  * used to create the correct authorization classes.
  */
 public enum AuthorizationProvider {
-  SENTRY(SentryAuthorizationFactory.class.getCanonicalName()),
   RANGER(RangerAuthorizationFactory.class.getCanonicalName()),
   NOOP(NoopAuthorizationFactory.class.getCanonicalName());
 

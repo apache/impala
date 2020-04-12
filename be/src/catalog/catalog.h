@@ -128,12 +128,6 @@ class Catalog {
   Status GetPartitionStats(
       const TGetPartitionStatsRequest& req, TGetPartitionStatsResponse* resp);
 
-  /// Checks whether the requesting user has admin privileges on the Sentry Service and
-  /// returns OK if they do. Returns a bad status if there was an error executing the
-  /// request.
-  Status SentryAdminCheck(const TSentryAdminCheckRequest& req,
-      TSentryAdminCheckResponse* resp);
-
   /// Update recently used table names and their use counts in an impalad since the last
   /// report.
   Status UpdateTableUsage(const TUpdateTableUsageRequest& req);
@@ -160,7 +154,6 @@ class Catalog {
   jmethodID get_functions_id_; // JniCatalog.getFunctions()
   jmethodID get_partition_stats_id_; // JniCatalog.getPartitionStats()
   jmethodID prioritize_load_id_; // JniCatalog.prioritizeLoad()
-  jmethodID sentry_admin_check_id_; // JniCatalog.checkUserSentryAdmin()
   jmethodID catalog_ctor_;
   jmethodID update_table_usage_id_;
 };

@@ -49,7 +49,10 @@ public class AuthorizationUtil {
       authzFactoryClassName = authzFactoryClassOption;
     } else {
       // use authorization_provider flag
-      final String authzProvider = beCfg.getAuthorizationProvider();
+      String authzProvider = beCfg.getAuthorizationProvider();
+      // If authorization_provider is empty, use the Noop policy that disables
+      // authorization.
+      if (authzProvider.equals("")) authzProvider = "noop";
       try {
         final AuthorizationProvider provider = AuthorizationProvider.valueOf(
             authzProvider.toUpperCase().trim());

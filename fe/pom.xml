@@ -238,175 +238,6 @@ under the License.
     </dependency>
 
     <dependency>
-      <groupId>org.apache.sentry</groupId>
-      <artifactId>sentry-core-common</artifactId>
-      <version>${sentry.version}</version>
-      <exclusions>
-        <!-- https://issues.apache.org/jira/browse/IMPALA-9649 -->
-        <exclusion>
-          <groupId>org.apache.shiro</groupId>
-          <artifactId>shiro-crypto-cipher</artifactId>
-        </exclusion>
-        <exclusion>
-          <groupId>org.apache.shiro</groupId>
-          <artifactId>shiro-core</artifactId>
-        </exclusion>
-      </exclusions>
-    </dependency>
-
-    <dependency>
-      <groupId>org.apache.sentry</groupId>
-      <artifactId>sentry-core-model-db</artifactId>
-      <version>${sentry.version}</version>
-      <exclusions>
-        <!-- https://issues.apache.org/jira/browse/HADOOP-14903 -->
-        <exclusion>
-          <groupId>net.minidev</groupId>
-          <artifactId>json-smart</artifactId>
-        </exclusion>
-      </exclusions>
-    </dependency>
-
-    <dependency>
-      <groupId>org.apache.sentry</groupId>
-      <artifactId>sentry-provider-common</artifactId>
-      <version>${sentry.version}</version>
-    </dependency>
-
-    <dependency>
-      <groupId>org.apache.sentry</groupId>
-      <artifactId>sentry-provider-db</artifactId>
-      <version>${sentry.version}</version>
-      <exclusions>
-        <!-- https://issues.apache.org/jira/browse/IMPALA-9649 -->
-        <exclusion>
-          <groupId>org.apache.shiro</groupId>
-          <artifactId>shiro-crypto-cipher</artifactId>
-        </exclusion>
-        <exclusion>
-          <groupId>org.apache.shiro</groupId>
-          <artifactId>shiro-core</artifactId>
-        </exclusion>
-
-        <!-- https://issues.apache.org/jira/browse/HADOOP-14903 -->
-        <exclusion>
-          <groupId>net.minidev</groupId>
-          <artifactId>json-smart</artifactId>
-        </exclusion>
-        <exclusion>
-          <groupId>org.apache.hive.hcatalog</groupId>
-          <artifactId>*</artifactId>
-        </exclusion>
-        <exclusion>
-          <groupId>org.apache.hive</groupId>
-          <artifactId>*</artifactId>
-        </exclusion>
-        <exclusion>
-          <groupId>org.apache.hadoop</groupId>
-          <artifactId>hadoop-mapreduce-client-jobclient</artifactId>
-        </exclusion>
-        <exclusion>
-          <groupId>org.eclipse.jetty</groupId>
-          <artifactId>*</artifactId>
-        </exclusion>
-        <exclusion>
-          <groupId>ant-contrib</groupId>
-          <artifactId>*</artifactId>
-        </exclusion>
-      </exclusions>
-    </dependency>
-
-    <dependency>
-      <groupId>org.apache.sentry</groupId>
-      <artifactId>sentry-provider-file</artifactId>
-      <version>${sentry.version}</version>
-      <exclusions>
-        <!-- https://issues.apache.org/jira/browse/IMPALA-9649 -->
-        <exclusion>
-          <groupId>org.apache.shiro</groupId>
-          <artifactId>shiro-crypto-cipher</artifactId>
-        </exclusion>
-        <exclusion>
-          <groupId>org.apache.shiro</groupId>
-          <artifactId>shiro-core</artifactId>
-        </exclusion>
-      </exclusions>
-    </dependency>
-
-    <dependency>
-      <groupId>org.apache.sentry</groupId>
-      <artifactId>sentry-provider-cache</artifactId>
-      <version>${sentry.version}</version>
-      <exclusions>
-        <!-- https://issues.apache.org/jira/browse/IMPALA-9649 -->
-        <exclusion>
-          <groupId>org.apache.shiro</groupId>
-          <artifactId>shiro-crypto-cipher</artifactId>
-        </exclusion>
-        <exclusion>
-          <groupId>org.apache.shiro</groupId>
-          <artifactId>shiro-core</artifactId>
-        </exclusion>
-
-        <!-- https://issues.apache.org/jira/browse/HADOOP-14903 -->
-        <exclusion>
-          <groupId>net.minidev</groupId>
-          <artifactId>json-smart</artifactId>
-        </exclusion>
-        <exclusion>
-          <groupId>ant-contrib</groupId>
-          <artifactId>*</artifactId>
-        </exclusion>
-      </exclusions>
-    </dependency>
-
-    <dependency>
-      <groupId>org.apache.sentry</groupId>
-      <artifactId>sentry-policy-common</artifactId>
-      <version>${sentry.version}</version>
-    </dependency>
-
-    <dependency>
-      <groupId>org.apache.sentry</groupId>
-      <artifactId>sentry-binding-hive</artifactId>
-      <version>${sentry.version}</version>
-      <exclusions>
-        <!-- https://issues.apache.org/jira/browse/HADOOP-14903 -->
-        <exclusion>
-          <groupId>net.minidev</groupId>
-          <artifactId>json-smart</artifactId>
-        </exclusion>
-        <exclusion>
-          <groupId>org.apache.hive.hcatalog</groupId>
-          <artifactId>*</artifactId>
-        </exclusion>
-      </exclusions>
-    </dependency>
-
-    <dependency>
-      <groupId>org.apache.sentry</groupId>
-      <artifactId>sentry-policy-engine</artifactId>
-      <version>${sentry.version}</version>
-    </dependency>
-
-    <dependency>
-      <groupId>org.apache.sentry</groupId>
-      <artifactId>sentry-service-api</artifactId>
-      <version>${sentry.version}</version>
-      <exclusions>
-        <!-- https://issues.apache.org/jira/browse/HADOOP-14903 -->
-        <exclusion>
-          <groupId>net.minidev</groupId>
-          <artifactId>json-smart</artifactId>
-        </exclusion>
-        <exclusion>
-          <groupId>org.apache.hive</groupId>
-          <artifactId>*</artifactId>
-        </exclusion>
-      </exclusions>
-    </dependency>
-
-    <dependency>
       <groupId>org.apache.parquet</groupId>
       <artifactId>parquet-hadoop-bundle</artifactId>
       <version>${parquet.version}</version>
@@ -858,13 +689,14 @@ under the License.
                     <exclude>com.sun.jersey:jersey-server</exclude>
                     <exclude>org.glassfish.jersey.core:jersey-servlet</exclude>
                     <exclude>org.glassfish.jersey.core:jersey-servlet</exclude>
+                    <!-- IMPALA-9708: Sentry is removed. -->
+                    <exclude>org.apache.sentry:*</exclude>
                     <!-- Assert that we only use artifacts from only the specified
                          version of these components. -->
                     <exclude>org.apache.hadoop:*</exclude>
                     <exclude>org.apache.hbase:*</exclude>
                     <exclude>org.apache.hive:*</exclude>
                     <exclude>org.apache.kudu:*</exclude>
-                    <exclude>org.apache.sentry:*</exclude>
                     <exclude>org.apache.parquet:*</exclude>
                     <exclude>org.apache.orc:*</exclude>
                   </excludes>
@@ -878,7 +710,6 @@ under the License.
                     <include>org.apache.hive:*:${hive.version}</include>
                     <include>org.apache.hive:hive-storage-api:${hive.storage.api.version}</include>
                     <include>org.apache.kudu:*:${kudu.version}</include>
-                    <include>org.apache.sentry:*:${sentry.version}</include>
                     <include>org.apache.parquet:*:${parquet.version}</include>
                     <include>org.apache.orc:*:${orc.version}</include>
                   </includes>

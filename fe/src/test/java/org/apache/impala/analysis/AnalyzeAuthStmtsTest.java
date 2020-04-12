@@ -20,8 +20,8 @@ package org.apache.impala.analysis;
 import java.util.HashSet;
 
 import org.apache.impala.authorization.NoopAuthorizationFactory;
-import org.apache.impala.authorization.sentry.SentryAuthorizationConfig;
-import org.apache.impala.authorization.sentry.SentryAuthorizationFactory;
+import org.apache.impala.authorization.ranger.RangerAuthorizationConfig;
+import org.apache.impala.authorization.ranger.RangerAuthorizationFactory;
 import org.apache.impala.catalog.Catalog;
 import org.apache.impala.catalog.Role;
 import org.apache.impala.catalog.User;
@@ -33,6 +33,9 @@ import org.apache.impala.util.EventSequence;
 import org.junit.Test;
 
 public class AnalyzeAuthStmtsTest extends FrontendTestBase {
+  protected static final String SERVER_NAME = "server1";
+  protected static final String RANGER_SERVICE_TYPE = "hive";
+  protected static final String RANGER_APP_ID = "impala";
 
   // TODO: Change this to a @BeforeClass method. Then, clean up these
   // items in @AfterClass, else we've made a global change that may affect
@@ -69,8 +72,9 @@ public class AnalyzeAuthStmtsTest extends FrontendTestBase {
         defaultDb, System.getProperty("user.name"));
     EventSequence timeline = new EventSequence("Authorization Test");
     AnalysisContext analysisCtx = new AnalysisContext(queryCtx,
-        new SentryAuthorizationFactory(
-            SentryAuthorizationConfig.createHadoopGroupAuthConfig("server1", null)),
+        new RangerAuthorizationFactory(
+             new RangerAuthorizationConfig(RANGER_SERVICE_TYPE, RANGER_APP_ID,
+                 SERVER_NAME, null, null, null)),
         timeline);
     return analysisCtx;
   }
@@ -316,8 +320,9 @@ public class AnalyzeAuthStmtsTest extends FrontendTestBase {
           Catalog.DEFAULT_DB, "");
       EventSequence timeline = new EventSequence("Authorization Test");
       AnalysisContext noUserNameCtx = new AnalysisContext(noUserNameQueryCtx,
-          new SentryAuthorizationFactory(
-              SentryAuthorizationConfig.createHadoopGroupAuthConfig("server1", null)),
+          new RangerAuthorizationFactory(
+              new RangerAuthorizationConfig(RANGER_SERVICE_TYPE, RANGER_APP_ID,
+                  SERVER_NAME, null, null, null)),
           timeline);
       AnalysisError("GRANT ALL ON SERVER TO myRole", noUserNameCtx,
           "Cannot execute authorization statement with an empty username.");

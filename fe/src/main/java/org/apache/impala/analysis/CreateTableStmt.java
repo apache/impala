@@ -305,7 +305,7 @@ public class CreateTableStmt extends StatementBase {
   private void analyzeKuduTableProperties(Analyzer analyzer) throws AnalysisException {
     AuthorizationConfig authzConfig = analyzer.getAuthzConfig();
     if (authzConfig.isEnabled()) {
-      // Today there is no comprehensive way of enforcing a Sentry authorization policy
+      // Today there is no comprehensive way of enforcing a Ranger authorization policy
       // against tables stored in Kudu. This is why only users with ALL privileges on
       // SERVER may create external Kudu tables or set the master addresses.
       // See IMPALA-4000 for details.

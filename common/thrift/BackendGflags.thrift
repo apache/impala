@@ -26,7 +26,7 @@ enum TReservedWordsVersion {
 // Used to pass gflags from backend to frontend, JniCatalog and JniFrontend
 // Attributes without comments correspond to gflags
 struct TBackendGflags {
-  1: required string sentry_config
+  // REMOVED: 1: required string sentry_config
 
   2: required bool load_auth_to_local_rules
 
@@ -48,7 +48,7 @@ struct TBackendGflags {
 
   11: required string server_name
 
-  12: required string authorization_policy_provider_class
+  // REMOVED: 12: required string authorization_policy_provider_class
 
   13: required string kudu_master_hosts
 
@@ -62,7 +62,7 @@ struct TBackendGflags {
 
   18: required bool enable_stats_extrapolation
 
-  19: required i64 sentry_catalog_polling_frequency_s
+  // REMOVED: 19: required i64 sentry_catalog_polling_frequency_s
 
   20: required i32 max_hdfs_partitions_parallel_load
 

@@ -39,9 +39,10 @@ using namespace impala;
 // Authorization related flags. Must be set to valid values to properly configure
 // authorization.
 DEFINE_string(authorization_provider,
-    "sentry",
+    "",
     "Specifies the type of internally-provided authorization provider to use. "
-    "['ranger', 'sentry' (default)]");
+    "Defaults to unset, which disables authorization. To enable authorization, "
+    "set to one of the following: ['ranger']");
 DEFINE_string(authorization_factory_class,
     "",
     "Specifies the class name that implements the authorization provider. "
@@ -53,9 +54,6 @@ DEFINE_string(ranger_app_id, "",
     "required when authorization with Ranger is enabled.");
 DEFINE_string(server_name, "", "The name to use for securing this impalad "
     "server during authorization. Set to enable authorization.");
-DEFINE_string(authorization_policy_provider_class,
-    "org.apache.sentry.provider.common.HadoopGroupResourceAuthorizationProvider",
-    "Advanced: The authorization policy provider class name for Sentry.");
 DEFINE_string(authorized_proxy_user_config, "",
     "Specifies the set of authorized proxy users (users who can delegate to other "
     "users during authorization) and whom they are allowed to delegate. "

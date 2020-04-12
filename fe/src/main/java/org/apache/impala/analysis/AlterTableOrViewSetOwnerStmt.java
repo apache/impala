@@ -49,9 +49,9 @@ public abstract class AlterTableOrViewSetOwnerStmt extends AlterTableStmt {
           "%d characters. The given owner name has %d characters.",
           MetaStoreUtil.MAX_OWNER_LENGTH, ownerName.length()));
     }
-    // We don't allow assigning to a non-existent role because Sentry should know about
-    // all roles. Sentry does not track all users so we allow assigning to a user
-    // that Sentry doesn't know about yet.
+    // We don't allow assigning to a non-existent role because Ranger should know about
+    // all roles. Ranger does not track all users so we allow assigning to a user
+    // that Ranger doesn't know about yet.
     if (analyzer.isAuthzEnabled() && owner_.getOwnerType() == TOwnerType.ROLE
         && analyzer.getCatalog().getAuthPolicy().getRole(ownerName) == null) {
       throw new AnalysisException(String.format("Role '%s' does not exist.", ownerName));

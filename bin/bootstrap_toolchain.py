@@ -28,16 +28,14 @@
 #   override this to share a toolchain directory between multiple checkouts of Impala
 #   or to use a cached copy to avoid downloading a new one.
 # IMPALA_TOOLCHAIN_HOST - The host to use for downloading the artifacts
-# CDH_COMPONENTS_HOME - Directory to store CDH Hadoop component artifacts
 # CDP_COMPONENTS_HOME - Directory to store CDP Hadoop component artifacts
-# CDH_BUILD_NUMBER - CDH Hadoop components are built with consistent versions so that
+# CDP_BUILD_NUMBER - CDP Hadoop components are built with consistent versions so that
 #   Hadoop, Hive, Kudu, etc are all built with versions that are compatible with each
 #   other. The way to specify a single consistent set of components is via a build
 #   number. This determines the location in s3 to get the artifacts.
-# CDP_BUILD_NUMBER - The CDP equivalent of a CDH_BUILD_NUMBER.
 # DOWNLOAD_CDH_COMPONENTS - When set to true, this script will also download and extract
-#   the CDH/CDP Hadoop components (i.e. Hadoop, Hive, HBase, Sentry, Ranger, etc) into
-#   CDH_COMPONENTS_HOME/CDP_COMPONENTS_HOME as appropriate.
+#   the CDP Hadoop components (i.e. Hadoop, Hive, HBase, Ranger, etc) into
+#   CDP_COMPONENTS_HOME as appropriate.
 # KUDU_IS_SUPPORTED - If KUDU_IS_SUPPORTED is false, Kudu is disabled and we download
 #   the toolchain Kudu and use the symbols to compile a non-functional stub library so
 #   that Impala has something to link against.
@@ -69,7 +67,7 @@ from collections import namedtuple
 from string import Template
 
 # Maps return values from 'lsb_release -irs' to the corresponding OS labels for both the
-# toolchain and the CDH components.
+# toolchain and the CDP components.
 OsMapping = namedtuple('OsMapping', ['lsb_release', 'toolchain', 'cdh'])
 OS_MAPPING = [
   OsMapping("centos5", "ec2-package-centos-5", None),
@@ -294,32 +292,10 @@ class ToolchainPackage(EnvVersionedPackage):
       f.write(self.archive_basename)
 
 
-class CdhComponent(EnvVersionedPackage):
-  def __init__(self, name, explicit_version=None, archive_basename_tmpl=None,
-               unpack_directory_tmpl=None):
-    # Compute the CDH base URL (based on the IMPALA_TOOLCHAIN_HOST and CDH_BUILD_NUMBER)
-    if "IMPALA_TOOLCHAIN_HOST" not in os.environ or "CDH_BUILD_NUMBER" not in os.environ:
-      logging.error("Impala environment not set up correctly, make sure "
-                    "impala-config.sh is sourced.")
-      sys.exit(1)
-    template_subs = {"toolchain_host": os.environ["IMPALA_TOOLCHAIN_HOST"],
-                     "cdh_build_number": os.environ["CDH_BUILD_NUMBER"]}
-    url_prefix_tmpl = "https://${toolchain_host}/build/cdh_components/" + \
-        "${cdh_build_number}/tarballs/"
-
-    # Get the output base directory from CDH_COMPONENTS_HOME
-    destination_basedir = os.environ["CDH_COMPONENTS_HOME"]
-    super(CdhComponent, self).__init__(name, url_prefix_tmpl, destination_basedir,
-                                       explicit_version=explicit_version,
-                                       archive_basename_tmpl=archive_basename_tmpl,
-                                       unpack_directory_tmpl=unpack_directory_tmpl,
-                                       template_subs_in=template_subs)
-
-
 class CdpComponent(EnvVersionedPackage):
   def __init__(self, name, explicit_version=None, archive_basename_tmpl=None,
                unpack_directory_tmpl=None, makedir=False):
-    # Compute the CDH base URL (based on the IMPALA_TOOLCHAIN_HOST and CDP_BUILD_NUMBER)
+    # Compute the CDP base URL (based on the IMPALA_TOOLCHAIN_HOST and CDP_BUILD_NUMBER)
     if "IMPALA_TOOLCHAIN_HOST" not in os.environ or "CDP_BUILD_NUMBER" not in os.environ:
       logging.error("Impala environment not set up correctly, make sure "
                     "impala-config.sh is sourced.")
@@ -592,8 +568,6 @@ def get_hadoop_downloads():
   tez = CdpComponent("tez", archive_basename_tmpl="tez-${version}-minimal",
                      makedir=True)
   cluster_components.extend([hadoop, hbase, hive, hive_src, tez])
-  # Sentry is always CDH
-  cluster_components.append(CdhComponent("sentry"))
   # Ranger is always CDP
   cluster_components.append(CdpComponent("ranger",
                                          archive_basename_tmpl="ranger-${version}-admin"))
@@ -620,16 +594,12 @@ def main():
   compute what packages need to be downloaded. Packages are only downloaded if they are
   not already present in $IMPALA_TOOLCHAIN. There are two main categories of packages.
   Toolchain packages are native packages built using the native toolchain. These are
-  always downloaded. Hadoop component packages are the CDH or CDP builds of Hadoop
+  always downloaded. Hadoop component packages are the CDP builds of Hadoop
   components such as Hadoop, Hive, HBase, etc. Hadoop component packages are organized
-  as a consistent set of compatible version via a build number (i.e. CDH_BUILD_NUMBER
-  and CDP_BUILD_NUMBER). Hadoop component packages are only downloaded if
-  $DOWNLOAD_CDH_COMPONENTS is true. CDH Hadoop packages are downloaded into
-  $CDH_COMPONENTS_HOME. CDP Hadoop packages are downloaded into $CDP_COMPONENTS_HOME.
+  as a consistent set of compatible version via a build number (i.e. CDP_BUILD_NUMBER)
+  Hadoop component packages are only downloaded if $DOWNLOAD_CDH_COMPONENTS is true.
   The versions used for Hadoop components come from the CDP versions based on the
-  $CDP_BUILD_NUMBER.
-  The exceptions is:
-  - sentry (always downloaded from $IMPALA_TOOLCHAIN_HOST for a given $CDH_BUILD_NUMBER)
+  $CDP_BUILD_NUMBER. CDP Hadoop packages are downloaded into $CDP_COMPONENTS_HOME.
   If Kudu is not supported on this platform (or KUDU_IS_SUPPORTED=false), then this
   builds a Kudu stub to allow for compilation without Kudu support.
   """
@@ -652,7 +622,6 @@ def main():
   downloads += get_toolchain_downloads()
   kudu_download = None
   if os.getenv("DOWNLOAD_CDH_COMPONENTS", "false") == "true":
-    create_directory_from_env_var("CDH_COMPONENTS_HOME")
     create_directory_from_env_var("CDP_COMPONENTS_HOME")
     downloads += get_kudu_downloads(use_kudu_stub)
     downloads += get_hadoop_downloads()

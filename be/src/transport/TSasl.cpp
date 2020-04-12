@@ -31,7 +31,7 @@
 #include "common/names.h"
 
 DEFINE_bool(force_lowercase_usernames, false, "If true, all principals and usernames are"
-    " mapped to lowercase shortnames before being passed to any components (Sentry, "
+    " mapped to lowercase shortnames before being passed to any components (Ranger, "
     "admission control) for authorization");
 
 using boost::algorithm::is_any_of;

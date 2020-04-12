@@ -35,13 +35,6 @@ from tests.hs2.hs2_test_suite import operation_id_to_query_id
 
 AUDIT_LOG_DIR = tempfile.mkdtemp(dir=os.getenv("LOG_DIR"))
 
-SENTRY_CONFIG_FILE = "{0}/fe/src/test/resources/sentry-site.xml" \
-                     .format(os.getenv("IMPALA_HOME"))
-SENTRY_IMPALAD_ARGS = "--server-name=server1 " \
-                      "--abort_on_failed_audit_event=false " \
-                      "--audit_event_log_dir={0}".format(AUDIT_LOG_DIR)
-SENTRY_CATALOGD_ARGS = "--sentry_config={0}".format(SENTRY_CONFIG_FILE)
-
 RANGER_IMPALAD_ARGS = "--server-name=server1 " \
                       "--ranger_service_type=hive " \
                       "--ranger_app_id=impala " \
@@ -105,17 +98,6 @@ class TestAuthorizedProxy(CustomClusterTestSuite):
       TestHS2.check_response(resp)
     return resp
 
-  @SkipIf.sentry_disabled
-  @pytest.mark.execute_serially
-  @CustomClusterTestSuite.with_args(
-    impalad_args="{0} --authorized_proxy_user_config=foo=bar;hue={1} "
-                 .format(SENTRY_IMPALAD_ARGS, getuser()),
-    catalogd_args=SENTRY_CATALOGD_ARGS)
-  def test_authorized_proxy_user_with_sentry(self, unique_role):
-    """Tests authorized proxy user with Sentry using HS2."""
-    self._test_authorized_proxy_with_sentry(unique_role, self._test_authorized_proxy,
-                                            getuser())
-
   @pytest.mark.execute_serially
   @CustomClusterTestSuite.with_args(
     impalad_args="{0} --authorized_proxy_user_config=foo=bar;hue=non_owner "
@@ -125,18 +107,6 @@ class TestAuthorizedProxy(CustomClusterTestSuite):
     """Tests authorized proxy user with Ranger using HS2."""
     self._test_authorized_proxy_with_ranger(self._test_authorized_proxy, "non_owner",
                                             False)
-
-  @SkipIf.sentry_disabled
-  @pytest.mark.execute_serially
-  @CustomClusterTestSuite.with_args(
-    impalad_args="{0} --authorized_proxy_user_config=hue=bar "
-                 "--authorized_proxy_group_config=foo=bar;hue={1}"
-                 .format(SENTRY_IMPALAD_ARGS, grp.getgrgid(os.getgid()).gr_name),
-    catalogd_args=SENTRY_CATALOGD_ARGS)
-  def test_authorized_proxy_group_with_sentry(self, unique_role):
-    """Tests authorized proxy group with Sentry using HS2."""
-    self._test_authorized_proxy_with_sentry(unique_role, self._test_authorized_proxy,
-                                            getuser())
 
   @pytest.mark.execute_serially
   @CustomClusterTestSuite.with_args(
@@ -149,15 +119,6 @@ class TestAuthorizedProxy(CustomClusterTestSuite):
     """Tests authorized proxy group with Ranger using HS2."""
     self._test_authorized_proxy_with_ranger(self._test_authorized_proxy, "non_owner",
                                             True)
-
-  @SkipIf.sentry_disabled
-  @pytest.mark.execute_serially
-  @CustomClusterTestSuite.with_args(
-    impalad_args="{0} --authorized_proxy_user_config=foo=bar "
-                 "--authorized_proxy_group_config=foo=bar".format(SENTRY_IMPALAD_ARGS),
-    catalogd_args=SENTRY_CATALOGD_ARGS)
-  def test_no_matching_user_and_group_authorized_proxy_with_sentry(self):
-    self._test_no_matching_user_and_group_authorized_proxy()
 
   @pytest.mark.execute_serially
   @CustomClusterTestSuite.with_args(
@@ -174,24 +135,6 @@ class TestAuthorizedProxy(CustomClusterTestSuite):
     open_session_req.configuration["impala.doas.user"] = "abc"
     resp = self.hs2_client.OpenSession(open_session_req)
     assert "User 'hue' is not authorized to delegate to 'abc'" in str(resp)
-
-  def _test_authorized_proxy_with_sentry(self, role, test_func, delegated_user):
-    try:
-      self.session_handle = self._open_hs2(getuser(), dict()).sessionHandle
-      self._execute_hs2_stmt("create role {0}".format(role))
-      self._execute_hs2_stmt("grant all on table tpch.lineitem to role {0}"
-                             .format(role))
-      self._execute_hs2_stmt("grant role {0} to group {1}"
-                             .format(role, grp.getgrnam(getuser()).gr_name))
-      self._execute_hs2_stmt("grant role {0} to group {1}"
-                             .format(role, grp.getgrgid(os.getgid()).gr_name))
-      test_func(delegated_user)
-    finally:
-      self.session_handle = self._open_hs2(getuser(), dict()).sessionHandle
-      self._execute_hs2_stmt("grant all on server to role {0}".format(role))
-      self._execute_hs2_stmt("grant role {0} to group {1}"
-                             .format(role, grp.getgrnam(getuser()).gr_name))
-      self._execute_hs2_stmt("drop role {0}".format(role))
 
   def _test_authorized_proxy_with_ranger(self, test_func, delegated_user,
                                          delegated_to_group):

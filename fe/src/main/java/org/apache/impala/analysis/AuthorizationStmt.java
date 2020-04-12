@@ -20,7 +20,6 @@ package org.apache.impala.analysis;
 import org.apache.impala.authorization.AuthorizationConfig;
 import org.apache.impala.authorization.AuthorizationProvider;
 import org.apache.impala.authorization.User;
-import org.apache.impala.authorization.sentry.SentryAuthorizationConfig;
 import org.apache.impala.common.AnalysisException;
 
 import com.google.common.base.Strings;
