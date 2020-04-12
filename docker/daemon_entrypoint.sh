@@ -56,4 +56,7 @@ if ! whoami ; then
   cat /etc/passwd
 fi
 
+# Set ulimit core file size 0.
+ulimit -c 0
+
 exec "$@"
