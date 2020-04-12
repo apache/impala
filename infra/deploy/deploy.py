@@ -51,7 +51,6 @@ SERVICE_DEPENDENCIES = {
     "HIVE" : True,
     "YARN" : False,
     "HBASE" : False,
-    "SENTRY" : False,
     "ZOOKEEPER" : False
 }
 

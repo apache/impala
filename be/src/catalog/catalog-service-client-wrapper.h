@@ -103,14 +103,6 @@ class CatalogServiceClientWrapper : public CatalogServiceClient {
     recv_GetPartitionStats(_return);
   }
 
-  void SentryAdminCheck(TSentryAdminCheckResponse& _return,
-      const TSentryAdminCheckRequest& req, bool* send_done) {
-    DCHECK(!*send_done);
-    send_SentryAdminCheck(req);
-    *send_done = true;
-    recv_SentryAdminCheck(_return);
-  }
-
   void UpdateTableUsage(TUpdateTableUsageResponse& _return,
       const TUpdateTableUsageRequest& req, bool* send_done) {
     DCHECK(!*send_done);

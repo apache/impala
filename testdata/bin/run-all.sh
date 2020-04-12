@@ -74,19 +74,13 @@ if [[ ${DEFAULT_FS} == "hdfs://${INTERNAL_LISTEN_HOST}:20500" ]]; then
   $IMPALA_HOME/testdata/bin/run-hive-server.sh $HIVE_FLAGS 2>&1 | \
       tee ${IMPALA_CLUSTER_LOGS_DIR}/run-hive-server.log
 
-  if [[ "$DISABLE_SENTRY" != true ]]; then
-    echo " --> Starting the Sentry Policy Server"
-    $IMPALA_HOME/testdata/bin/run-sentry-service.sh 2>&1 | \
-        tee ${IMPALA_CLUSTER_LOGS_DIR}/run-sentry-service.log
-  fi
-
 elif [[ ${DEFAULT_FS} == "${LOCAL_FS}" ]]; then
   # When the local file system is used as default, we only start the Hive metastore.
   # Impala can run locally without additional services.
   $IMPALA_HOME/testdata/bin/run-hive-server.sh -only_metastore 2>&1 | \
       tee ${IMPALA_CLUSTER_LOGS_DIR}/run-hive-server.log
 else
-  # With Isilon, we only start the Hive metastore and Sentry Policy Server.
+  # With Isilon, we only start the Hive metastore.
   #   - HDFS is not started becuase Isilon is used as the defaultFs in core-site
   #   - HBase is irrelevent for Impala testing with Isilon.
   #   - We don't yet have a good way to start YARN using a different defaultFS. Moreoever,
@@ -98,12 +92,6 @@ else
   echo " --> Starting Hive Metastore Service"
   $IMPALA_HOME/testdata/bin/run-hive-server.sh -only_metastore 2>&1 | \
       tee ${IMPALA_CLUSTER_LOGS_DIR}/run-hive-server.log
-
-  if [[ "$DISABLE_SENTRY" != true ]]; then
-    echo " --> Starting the Sentry Policy Server"
-    $IMPALA_HOME/testdata/bin/run-sentry-service.sh 2>&1 | \
-        tee ${IMPALA_CLUSTER_LOGS_DIR}/run-sentry-service.log
-  fi
 fi
 
 echo " --> Starting Ranger Server"

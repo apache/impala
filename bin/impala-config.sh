@@ -171,7 +171,6 @@ export IMPALA_TOOLCHAIN_HOST
 export CDH_BUILD_NUMBER=1814051
 export CDH_MAVEN_REPOSITORY=\
 "https://${IMPALA_TOOLCHAIN_HOST}/build/cdh_components/${CDH_BUILD_NUMBER}/maven"
-export CDH_SENTRY_VERSION=2.1.0-cdh6.x-SNAPSHOT
 
 export CDP_BUILD_NUMBER=2523282
 export CDP_MAVEN_REPOSITORY=\
@@ -179,10 +178,10 @@ export CDP_MAVEN_REPOSITORY=\
 export CDP_HADOOP_VERSION=3.1.1.7.1.1.0-380
 export CDP_HBASE_VERSION=2.2.3.7.1.1.0-380
 export CDP_HIVE_VERSION=3.1.3000.7.1.1.0-380
-export CDP_RANGER_VERSION=2.0.0.7.1.1.0-380
-export CDP_TEZ_VERSION=0.9.1.7.1.1.0-380
 export CDP_KNOX_VERSION=1.3.0.7.1.1.0-380
 export CDP_OZONE_VERSION=0.4.0.7.1.1.0-380
+export CDP_RANGER_VERSION=2.0.0.7.1.1.0-380
+export CDP_TEZ_VERSION=0.9.1.7.1.1.0-380
 
 export IMPALA_PARQUET_VERSION=1.10.99-cdh6.x-SNAPSHOT
 export IMPALA_AVRO_JAVA_VERSION=1.8.2-cdh6.x-SNAPSHOT
@@ -198,7 +197,6 @@ unset IMPALA_HIVE_URL
 unset IMPALA_KUDU_URL
 unset IMPALA_KUDU_VERSION
 unset IMPALA_KUDU_JAVA_VERSION
-unset IMPALA_SENTRY_URL
 
 export IMPALA_KERBERIZE=false
 
@@ -213,41 +211,29 @@ if [ -f "$IMPALA_HOME/bin/impala-config-local.sh" ]; then
   . "$IMPALA_HOME/bin/impala-config-local.sh"
 fi
 
-export CDH_SENTRY_URL=${CDH_SENTRY_URL-}
-
-export CDP_HIVE_URL=${CDP_HIVE_URL-}
-export CDP_HIVE_SOURCE_URL=${CDP_HIVE_SOURCE_URL-}
 export CDP_HADOOP_URL=${CDP_HADOOP_URL-}
 export CDP_HBASE_URL=${CDP_HBASE_URL-}
-export CDP_TEZ_URL=${CDP_TEZ_URL-}
+export CDP_HIVE_URL=${CDP_HIVE_URL-}
+export CDP_HIVE_SOURCE_URL=${CDP_HIVE_SOURCE_URL-}
 export CDP_RANGER_URL=${CDP_RANGER_URL-}
+export CDP_TEZ_URL=${CDP_TEZ_URL-}
 
-export CDH_COMPONENTS_HOME="$IMPALA_TOOLCHAIN/cdh_components-$CDH_BUILD_NUMBER"
 export CDP_COMPONENTS_HOME="$IMPALA_TOOLCHAIN/cdp_components-$CDP_BUILD_NUMBER"
-export DISABLE_SENTRY=${DISABLE_SENTRY_OVERRIDE:-"true"}
 export CDH_MAJOR_VERSION=7
+export IMPALA_HADOOP_VERSION=${CDP_HADOOP_VERSION}
+export IMPALA_HADOOP_URL=${CDP_HADOOP_URL-}
+export HADOOP_HOME="$CDP_COMPONENTS_HOME/hadoop-${IMPALA_HADOOP_VERSION}/"
+export IMPALA_HBASE_VERSION=${CDP_HBASE_VERSION}
+export IMPALA_HBASE_URL=${CDP_HBASE_URL-}
 export IMPALA_HIVE_VERSION=${CDP_HIVE_VERSION}
 export IMPALA_HIVE_URL=${CDP_HIVE_URL-}
 export IMPALA_HIVE_SOURCE_URL=${CDP_HIVE_SOURCE_URL-}
-export IMPALA_HADOOP_VERSION=${CDP_HADOOP_VERSION}
-export IMPALA_HADOOP_URL=${CDP_HADOOP_URL-}
-export IMPALA_HBASE_VERSION=${CDP_HBASE_VERSION}
-export IMPALA_HBASE_URL=${CDP_HBASE_URL-}
-export IMPALA_TEZ_VERSION=${CDP_TEZ_VERSION}
-export IMPALA_TEZ_URL=${CDP_TEZ_URL-}
 export IMPALA_KNOX_VERSION=${CDP_KNOX_VERSION}
-export HADOOP_HOME="$CDP_COMPONENTS_HOME/hadoop-${IMPALA_HADOOP_VERSION}/"
-
-# Ozone always uses the CDP version
 export IMPALA_OZONE_VERSION=${CDP_OZONE_VERSION}
-
-# Ranger always uses the CDP version
 export IMPALA_RANGER_VERSION=${CDP_RANGER_VERSION}
 export IMPALA_RANGER_URL=${CDP_RANGER_URL-}
-
-# Sentry always uses the CDH version
-export IMPALA_SENTRY_VERSION=${CDH_SENTRY_VERSION}
-export IMPALA_SENTRY_URL=${CDH_SENTRY_URL-}
+export IMPALA_TEZ_VERSION=${CDP_TEZ_VERSION}
+export IMPALA_TEZ_URL=${CDP_TEZ_URL-}
 
 # Extract the first component of the hive version.
 # Allow overriding of Hive source location in case we want to build Impala without
@@ -374,13 +360,6 @@ export METASTORE_DB=${METASTORE_DB-"$(cut -c-59 <<< HMS$ESCAPED_IMPALA_HOME)_cdp
 # Set the Hive binaries in the path
 export PATH="$HIVE_HOME/bin:$PATH"
 
-export SENTRY_POLICY_DB=${SENTRY_POLICY_DB-$(cut -c-63 <<< SP$ESCAPED_IMPALA_HOME)}
-if [[ "${TARGET_FILESYSTEM}" == "s3" ]]; then
-    # On S3, disable Sentry HDFS sync plugin.
-    export SENTRY_PROCESSOR_FACTORIES="org.apache.sentry.api.service.thrift.SentryPolicyStoreProcessorFactory"
-else
-    export SENTRY_PROCESSOR_FACTORIES="org.apache.sentry.api.service.thrift.SentryPolicyStoreProcessorFactory,org.apache.sentry.hdfs.SentryHDFSServiceProcessorFactory"
-fi
 RANGER_POLICY_DB=${RANGER_POLICY_DB-$(cut -c-63 <<< ranger$ESCAPED_IMPALA_HOME)}
 # The DB script in Ranger expects the database name to be in lower case.
 export RANGER_POLICY_DB=$(echo ${RANGER_POLICY_DB} | tr '[:upper:]' '[:lower:]')
@@ -596,9 +575,6 @@ HADOOP_CLASSPATH="${HADOOP_CLASSPATH}:${HADOOP_HOME}/share/hadoop/tools/lib/*"
 
 export PATH="$HADOOP_HOME/bin:$PATH"
 
-export SENTRY_HOME="$CDH_COMPONENTS_HOME/sentry-${IMPALA_SENTRY_VERSION}"
-export SENTRY_CONF_DIR="$IMPALA_HOME/fe/src/test/resources"
-
 export RANGER_HOME="${CDP_COMPONENTS_HOME}/ranger-${IMPALA_RANGER_VERSION}-admin"
 export RANGER_CONF_DIR="$IMPALA_HOME/fe/src/test/resources"
 
@@ -621,7 +597,7 @@ export HIVE_CONF_DIR="$IMPALA_FE_DIR/./src/test/resources"
 # Hive looks for jar files in a single directory from HIVE_AUX_JARS_PATH plus
 # any jars in AUX_CLASSPATH. (Or a list of jars in HIVE_AUX_JARS_PATH.)
 # The Postgres JDBC driver is downloaded by maven when building the frontend.
-# Export the location of Postgres JDBC driver so Sentry can pick it up.
+# Export the location of Postgres JDBC driver so Ranger can pick it up.
 export POSTGRES_JDBC_DRIVER="${IMPALA_FE_DIR}/target/dependency/postgresql-${IMPALA_POSTGRES_JDBC_DRIVER_VERSION}.jar"
 
 export HIVE_AUX_JARS_PATH="$POSTGRES_JDBC_DRIVER"
@@ -737,8 +713,6 @@ echo "HIVE_CONF_DIR           = $HIVE_CONF_DIR"
 echo "HIVE_SRC_DIR            = $HIVE_SRC_DIR"
 echo "HBASE_HOME              = $HBASE_HOME"
 echo "HBASE_CONF_DIR          = $HBASE_CONF_DIR"
-echo "SENTRY_HOME             = $SENTRY_HOME"
-echo "SENTRY_CONF_DIR         = $SENTRY_CONF_DIR"
 echo "RANGER_HOME             = $RANGER_HOME"
 echo "RANGER_CONF_DIR         = $RANGER_CONF_DIR "
 echo "THRIFT_HOME             = $THRIFT_HOME"
@@ -754,14 +728,12 @@ echo "DOWNLOAD_CDH_COMPONENTS = $DOWNLOAD_CDH_COMPONENTS"
 echo "IMPALA_MAVEN_OPTIONS    = $IMPALA_MAVEN_OPTIONS"
 echo "IMPALA_TOOLCHAIN_HOST   = $IMPALA_TOOLCHAIN_HOST"
 echo "CDH_BUILD_NUMBER        = $CDH_BUILD_NUMBER"
-echo "CDH_COMPONENTS_HOME     = $CDH_COMPONENTS_HOME"
 echo "CDP_BUILD_NUMBER        = $CDP_BUILD_NUMBER"
 echo "CDP_COMPONENTS_HOME     = $CDP_COMPONENTS_HOME"
 echo "IMPALA_HADOOP_VERSION   = $IMPALA_HADOOP_VERSION"
 echo "IMPALA_HIVE_VERSION     = $IMPALA_HIVE_VERSION"
 echo "IMPALA_HBASE_VERSION    = $IMPALA_HBASE_VERSION"
 echo "IMPALA_HUDI_VERSION     = $IMPALA_HUDI_VERSION"
-echo "IMPALA_SENTRY_VERSION   = $IMPALA_SENTRY_VERSION"
 echo "IMPALA_KUDU_VERSION     = $IMPALA_KUDU_VERSION"
 echo "IMPALA_KUDU_JAVA_VERSION= $IMPALA_KUDU_JAVA_VERSION"
 echo "IMPALA_RANGER_VERSION   = $IMPALA_RANGER_VERSION"

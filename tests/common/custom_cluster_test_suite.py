@@ -41,8 +41,6 @@ CATALOGD_ARGS = 'catalogd_args'
 KUDU_ARGS = 'kudu_args'
 # Additional args passed to the start-impala-cluster script.
 START_ARGS = 'start_args'
-SENTRY_CONFIG = 'sentry_config'
-SENTRY_LOG_DIR = 'sentry_log_dir'
 HIVE_CONF_DIR = 'hive_conf_dir'
 CLUSTER_SIZE = "cluster_size"
 # Default query options passed to the impala daemon command line. Handled separately from
@@ -103,8 +101,8 @@ class CustomClusterTestSuite(ImpalaTestSuite):
 
   @staticmethod
   def with_args(impalad_args=None, statestored_args=None, catalogd_args=None,
-      start_args=None, sentry_config=None, default_query_options=None,
-      impala_log_dir=None, sentry_log_dir=None, hive_conf_dir=None, cluster_size=None,
+      start_args=None, default_query_options=None,
+      impala_log_dir=None, hive_conf_dir=None, cluster_size=None,
       num_exclusive_coordinators=None, kudu_args=None, statestored_timeout_s=None,
       impalad_timeout_s=None):
     """Records arguments to be passed to a cluster by adding them to the decorated
@@ -117,10 +115,6 @@ class CustomClusterTestSuite(ImpalaTestSuite):
         func.func_dict[CATALOGD_ARGS] = catalogd_args
       if start_args is not None:
         func.func_dict[START_ARGS] = start_args.split()
-      if sentry_config is not None:
-        func.func_dict[SENTRY_CONFIG] = sentry_config
-      if sentry_log_dir is not None:
-        func.func_dict[SENTRY_LOG_DIR] = sentry_log_dir
       if hive_conf_dir is not None:
         func.func_dict[HIVE_CONF_DIR] = hive_conf_dir
       if kudu_args is not None:
@@ -158,10 +152,6 @@ class CustomClusterTestSuite(ImpalaTestSuite):
 
     if KUDU_ARGS in method.func_dict:
       self._restart_kudu_service(method.func_dict[KUDU_ARGS])
-
-    if SENTRY_CONFIG in method.func_dict:
-      self._start_sentry_service(method.func_dict[SENTRY_CONFIG],
-          method.func_dict.get(SENTRY_LOG_DIR))
 
     cluster_size = DEFAULT_CLUSTER_SIZE
     if CLUSTER_SIZE in method.func_dict:
@@ -215,26 +205,6 @@ class CustomClusterTestSuite(ImpalaTestSuite):
     call.wait()
     if call.returncode != 0:
       raise RuntimeError("Unable to restart Kudu")
-
-  @classmethod
-  def _start_sentry_service(cls, sentry_service_config, sentry_log_dir=None):
-    sentry_env = dict(os.environ)
-    if sentry_log_dir is not None:
-        sentry_env['SENTRY_LOG_DIR'] = sentry_log_dir
-    sentry_env['SENTRY_SERVICE_CONFIG'] = sentry_service_config
-    call = subprocess.Popen(
-        ['/bin/bash', '-c', os.path.join(IMPALA_HOME,
-                                         'testdata/bin/run-sentry-service.sh')],
-        env=sentry_env)
-    call.wait()
-    if call.returncode != 0:
-      raise RuntimeError("Unable to start Sentry")
-
-  @classmethod
-  def _stop_sentry_service(cls):
-    subprocess.check_call([os.path.join(os.environ["IMPALA_HOME"],
-                                        "testdata/bin/kill-sentry-service.sh")],
-                          close_fds=True)
 
   @classmethod
   def _start_hive_service(cls, hive_conf_dir):

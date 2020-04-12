@@ -45,7 +45,6 @@ CONFIG.update({
 
   # Location of Hive per-query log files of the form: hive_job_log_<hive_query_id>.txt
   'hive.querylog.location': '${IMPALA_CLUSTER_LOGS_DIR}/hive',
-  'hive.sentry.conf.url': 'file:///${IMPALA_HOME}/fe/src/test/resources/sentry-site.xml',
 
   # Change back to NOSASL when HIVE-4232 is fixed.
   # With NONE, Hive uses the plain SASL transport.
@@ -144,10 +143,6 @@ if hive_major_version >= 3:
    'hive.compactor.wait.timeout': '2000'
   })
 else:
-  if os.environ.get('DISABLE_SENTRY') == "false":
-    CONFIG.update({
-     'hive.metastore.event.listeners' : 'org.apache.sentry.binding.metastore.SentrySyncHMSNotificationsPostEventListener'
-    })
   CONFIG.update({
    # HMS-2 based environments have a different set of expected configurations for event processor
    'hive.metastore.alter.notifications.basic': 'false',
@@ -159,11 +154,10 @@ else:
   })
 
 # Notifications-related configuration.
-# These are for enabling notification between Hive and Sentry as well as
-# metastore event processing in Impala (see IMPALA-7954)
+# These are for enabling notification for Hive as well as metastore event processing
+# in Impala (see IMPALA-7954)
 CONFIG.update({
  'hive.metastore.transactional.event.listeners': 'org.apache.hive.hcatalog.listener.DbNotificationListener,org.apache.kudu.hive.metastore.KuduMetastorePlugin',
- 'hcatalog.message.factory.impl.json': 'org.apache.sentry.binding.metastore.messaging.json.SentryJSONMessageFactory',
  'hive.metastore.dml.events': 'true',
 })
 

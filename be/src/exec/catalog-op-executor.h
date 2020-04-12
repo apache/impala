@@ -79,12 +79,6 @@ class CatalogOpExecutor {
   Status UpdateTableUsage(const TUpdateTableUsageRequest& req,
       TUpdateTableUsageResponse* resp);
 
-  /// Makes an RPC to the CatalogServer to verify whether the specified user has
-  /// privileges / to access the Sentry Policy Service. Returns OK if the RPC was
-  /// successful, otherwise a bad status will be returned.
-  Status SentryAdminCheck(const TSentryAdminCheckRequest& req,
-      TSentryAdminCheckResponse* resp);
-
   /// Set in Exec(), returns a pointer to the TDdlExecResponse of the DDL execution.
   /// If called before Exec(), this will return NULL. Only set if the
   /// TCatalogOpType is DDL.

@@ -33,7 +33,6 @@ import org.apache.impala.thrift.TDescribeOutputStyle;
 import org.apache.impala.thrift.TPrivilegeLevel;
 import org.apache.impala.thrift.TQueryOptions;
 import org.apache.impala.thrift.TTableName;
-import org.apache.sentry.api.service.thrift.TSentryRole;
 import org.junit.AfterClass;
 import org.junit.Before;
 import org.junit.BeforeClass;
@@ -77,28 +76,9 @@ public class AuthorizationStmtTest extends AuthorizationTestBase {
     RuntimeEnv.INSTANCE.reset();
   }
 
-  @Before
-  public void before() throws ImpalaException {
-    if (authzProvider_ == AuthorizationProvider.SENTRY) {
-      // Remove existing roles in order to not interfere with these tests. To be able to
-      // list existing roles, we have to invoke listAllRoles() as the user corresponding
-      // to User(System.getProperty("user.name")), which has the privilege to execute
-      // LIST_ROLES.
-      User user = new User(System.getProperty("user.name"));
-      for (TSentryRole role : sentryService_.listAllRoles(user)) {
-        authzCatalog_.removeRole(role.getRoleName());
-      }
-    }
-  }
-
   @Parameters
   public static Collection<AuthorizationProvider> data() {
-    String envDisableSentry = System.getenv("DISABLE_SENTRY");
-    if (envDisableSentry != null && envDisableSentry.equals("true")) {
-      return Arrays.asList(AuthorizationProvider.RANGER);
-    } else {
-      return Arrays.asList(AuthorizationProvider.SENTRY, AuthorizationProvider.RANGER);
-    }
+    return Arrays.asList(AuthorizationProvider.RANGER);
   }
 
   private static final String[] ALLTYPES_COLUMNS_WITHOUT_ID = new String[]{"bool_col",
@@ -2147,21 +2127,9 @@ public class AuthorizationStmtTest extends AuthorizationTestBase {
             .error(accessError(true, "functional.alltypes"),
                 onTable(true, "functional", "alltypes", allExcept(
                     TPrivilegeLevel.ALL, TPrivilegeLevel.OWNER)));
-        // TODO: Checking if a request is allowed by checking if grant option flag is set
-        // is to Sentry.
-        // The following do not result in Ranger authorization errors.
-        if (authzProvider_ == AuthorizationProvider.SENTRY) {
-          test.error(accessError(true, "functional.alltypes"), onServer(
-              TPrivilegeLevel.values()))
-              .error(accessError(true, "functional.alltypes"), onDatabase("functional",
-                  TPrivilegeLevel.values()))
-              .error(accessError(true, "functional.alltypes"), onTable("functional",
-                  "alltypes", TPrivilegeLevel.values()));
-        } else {
-          test.ok(onServer(TPrivilegeLevel.values()));
-          test.ok(onDatabase("functional", TPrivilegeLevel.values()));
-          test.ok(onTable("functional", "alltypes", TPrivilegeLevel.values()));
-        }
+        test.ok(onServer(TPrivilegeLevel.values()));
+        test.ok(onDatabase("functional", TPrivilegeLevel.values()));
+        test.ok(onTable("functional", "alltypes", TPrivilegeLevel.values()));
       }
     } finally {
       authzCatalog_.removeRole("foo_owner");
@@ -2400,21 +2368,9 @@ public class AuthorizationStmtTest extends AuthorizationTestBase {
             .error(accessError(true, "functional.alltypes_view"), onTable("functional",
                 "alltypes_view", allExcept(TPrivilegeLevel.ALL,
                     TPrivilegeLevel.OWNER)));
-        // TODO: Checking if a request is allowed by checking if grant option flag is set
-        // is to Sentry.
-        // The following do not result in Ranger authorization errors.
-        if (authzProvider_ == AuthorizationProvider.SENTRY) {
-          test.error(accessError(true, "functional.alltypes_view"), onServer(
-              TPrivilegeLevel.values()))
-              .error(accessError(true, "functional.alltypes_view"), onDatabase(
-                  "functional", TPrivilegeLevel.values()))
-              .error(accessError(true, "functional.alltypes_view"), onTable("functional",
-                  "alltypes_view", TPrivilegeLevel.values()));
-        } else {
-          test.ok(onServer(TPrivilegeLevel.values()));
-          test.ok(onDatabase("functional", TPrivilegeLevel.values()));
-          test.ok(onTable("functional", "alltypes_view", TPrivilegeLevel.values()));
-        }
+        test.ok(onServer(TPrivilegeLevel.values()));
+        test.ok(onDatabase("functional", TPrivilegeLevel.values()));
+        test.ok(onTable("functional", "alltypes_view", TPrivilegeLevel.values()));
       }
     } finally {
       authzCatalog_.removeRole("foo_owner");
@@ -2454,21 +2410,10 @@ public class AuthorizationStmtTest extends AuthorizationTestBase {
                 TPrivilegeLevel.ALL, TPrivilegeLevel.OWNER)))
             .error(accessError(true, "functional"), onDatabase(true, "functional",
                 allExcept(TPrivilegeLevel.ALL, TPrivilegeLevel.OWNER)));
-        // TODO: Checking if a request is allowed by checking if grant option flag is set
-        // is to Sentry.
-        // The following do not result in Ranger authorization errors.
-        if (authzProvider_ == AuthorizationProvider.SENTRY) {
-          authorize(String.format("alter database functional set owner %s foo",
-              ownerType))
-              .error(accessError(true, "functional"), onServer(TPrivilegeLevel.values()))
-              .error(accessError(true, "functional"), onDatabase("functional",
-                  TPrivilegeLevel.values()));
-        } else {
-          authorize(String.format("alter database functional set owner %s foo",
-              ownerType))
-              .ok(onServer(TPrivilegeLevel.values()))
-              .ok(onDatabase("functional", TPrivilegeLevel.values()));
-        }
+        authorize(String.format("alter database functional set owner %s foo",
+            ownerType))
+            .ok(onServer(TPrivilegeLevel.values()))
+            .ok(onDatabase("functional", TPrivilegeLevel.values()));
 
         // Database does not exist.
         authorize(String.format("alter database nodb set owner %s foo", ownerType))
@@ -2847,7 +2792,7 @@ public class AuthorizationStmtTest extends AuthorizationTestBase {
           // analysis context, we have to explicitly specify the requesting user
           // corresponding to 'user_' defined in AuthorizationTestBase.java. Otherwise,
           // an analysis context will be created with a user corresponding to
-          // User(System.getProperty("user.name")), resulting in a Sentry authorization
+          // User(System.getProperty("user.name")), resulting in a Ranger authorization
           // error.
           authorize(createAnalysisCtx(options, authzFactory_, user_.getName()),
               "select functional.to_lower('ABCDEF')")
@@ -2883,8 +2828,6 @@ public class AuthorizationStmtTest extends AuthorizationTestBase {
    */
   @Test
   public void testColumnMaskEnabled() throws ImpalaException {
-    if (authzProvider_ == AuthorizationProvider.SENTRY) return;
-
     String policyName = "col_mask";
     for (String tableName: new String[]{"alltypes", "alltypes_view"}) {
       BackendConfig.INSTANCE.setColumnMaskingEnabled(false);
@@ -3005,8 +2948,6 @@ public class AuthorizationStmtTest extends AuthorizationTestBase {
 
   @Test
   public void testRowFilterEnabled() throws ImpalaException {
-    if (authzProvider_ == AuthorizationProvider.SENTRY) return;
-
     String policyName = "row_filter";
     for (String tableName: new String[]{"alltypes", "alltypes_view"}) {
       String json = String.format("{\n" +
@@ -3118,8 +3059,6 @@ public class AuthorizationStmtTest extends AuthorizationTestBase {
    */
   @Test
   public void testRangerObjectOwnership() throws Exception {
-    if (authzProvider_ == AuthorizationProvider.SENTRY) return;
-
     // 'as_owner_' is by default set to false for AuthorizationTestBase. But since this
     // test is meant for testing Ranger's behavior when the requesting user is the owner
     // of the resources, we set 'as_owner_' to true.

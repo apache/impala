@@ -65,7 +65,6 @@ function generate_config {
 }
 
 CREATE_METASTORE=0
-CREATE_SENTRY_POLICY_DB=0
 CREATE_RANGER_POLICY_DB=0
 
 # parse command line options
@@ -75,15 +74,11 @@ do
     -create_metastore)
       CREATE_METASTORE=1
       ;;
-    -create_sentry_policy_db)
-      CREATE_SENTRY_POLICY_DB=1
-      ;;
     -create_ranger_policy_db)
       CREATE_RANGER_POLICY_DB=1
       ;;
     -help|*)
       echo "[-create_metastore] : If true, creates a new metastore."
-      echo "[-create_sentry_policy_db] : If true, creates a new sentry policy db."
       echo "[-create_ranger_policy_db] : If true, creates a new Ranger policy db."
       exit 1
       ;;
@@ -122,7 +117,6 @@ RANGER_TEST_CONF_DIR="${IMPALA_HOME}/testdata/cluster/ranger"
 echo "Config dir: ${CONFIG_DIR}"
 echo "Current user: ${CURRENT_USER}"
 echo "Metastore DB: ${METASTORE_DB}"
-echo "Sentry DB   : ${SENTRY_POLICY_DB}"
 echo "Ranger DB   : ${RANGER_POLICY_DB}"
 
 pushd ${CONFIG_DIR}
@@ -175,12 +169,6 @@ postgres 1>${IMPALA_CLUSTER_LOGS_DIR}/schematool.log 2>&1
       | psql -q -U hiveuser -d ${METASTORE_DB}
 fi
 
-if [ $CREATE_SENTRY_POLICY_DB -eq 1 ]; then
-  echo "Creating Sentry Policy Server DB"
-  dropdb -U hiveuser $SENTRY_POLICY_DB 2> /dev/null || true
-  createdb -U hiveuser $SENTRY_POLICY_DB
-fi
-
 if [ $CREATE_RANGER_POLICY_DB -eq 1 ]; then
   echo "Creating Ranger Policy Server DB"
   dropdb -U hiveuser "${RANGER_POLICY_DB}" 2> /dev/null || true
@@ -214,13 +202,6 @@ fi
 
 generate_config log4j.properties.template log4j.properties
 generate_config hbase-site.xml.template hbase-site.xml
-
-$IMPALA_HOME/bin/generate_xml_config.py sentry-site.xml.py sentry-site.xml
-for SENTRY_VARIANT in oo oo_nogrant no_oo ; do
-  export SENTRY_VARIANT
-  $IMPALA_HOME/bin/generate_xml_config.py sentry-site.xml.py \
-      sentry-site_${SENTRY_VARIANT}.xml
-done
 
 if [[ "${IMPALA_KERBERIZE}" = "true" ]]; then
   generate_config hbase-jaas-server.conf.template hbase-jaas-server.conf

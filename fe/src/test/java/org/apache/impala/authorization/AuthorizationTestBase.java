@@ -27,9 +27,6 @@ import org.apache.impala.authorization.ranger.RangerAuthorizationFactory;
 import org.apache.impala.authorization.ranger.RangerCatalogdAuthorizationManager;
 import org.apache.impala.authorization.ranger.RangerImpalaPlugin;
 import org.apache.impala.authorization.ranger.RangerImpalaResourceBuilder;
-import org.apache.impala.authorization.sentry.SentryAuthorizationConfig;
-import org.apache.impala.authorization.sentry.SentryAuthorizationFactory;
-import org.apache.impala.authorization.sentry.SentryPolicyService;
 import org.apache.impala.catalog.Role;
 import org.apache.impala.catalog.ScalarFunction;
 import org.apache.impala.catalog.Type;
@@ -112,7 +109,6 @@ public abstract class AuthorizationTestBase extends FrontendTestBase {
   protected final AuthorizationFactory authzFactory_;
   protected final AuthorizationProvider authzProvider_;
   protected final AnalysisContext authzCtx_;
-  protected final SentryPolicyService sentryService_;
   protected final ImpaladTestCatalog authzCatalog_;
   protected final Frontend authzFrontend_;
   protected final RangerImpalaPlugin rangerImpalaPlugin_;
@@ -122,20 +118,6 @@ public abstract class AuthorizationTestBase extends FrontendTestBase {
       throws ImpalaException {
     authzProvider_ = authzProvider;
     switch (authzProvider) {
-      case SENTRY:
-        user_ = new User(System.getProperty("user.name"));
-        authzConfig_ = SentryAuthorizationConfig.createHadoopGroupAuthConfig(
-            "server1",
-            System.getenv("IMPALA_HOME") + "/fe/src/test/resources/sentry-site.xml");
-        authzFactory_ = createAuthorizationFactory(authzProvider);
-        authzCtx_ = createAnalysisCtx(authzFactory_, user_.getName());
-        authzCatalog_ = new ImpaladTestCatalog(authzFactory_);
-        authzFrontend_ = new Frontend(authzFactory_, authzCatalog_);
-        sentryService_ = new SentryPolicyService(
-            ((SentryAuthorizationConfig) authzConfig_).getSentryConfig());
-        rangerImpalaPlugin_ = null;
-        rangerRestClient_ = null;
-        break;
       case RANGER:
         user_ = new User("non_owner");
         authzConfig_ = new RangerAuthorizationConfig(RANGER_SERVICE_TYPE, RANGER_APP_ID,
@@ -148,7 +130,6 @@ public abstract class AuthorizationTestBase extends FrontendTestBase {
             ((RangerAuthorizationChecker) authzFrontend_.getAuthzChecker())
                 .getRangerImpalaPlugin();
         assertEquals("test-cluster", rangerImpalaPlugin_.getClusterName());
-        sentryService_ = null;
         rangerRestClient_ = new RangerRESTClient(RANGER_ADMIN_URL, null,
             rangerImpalaPlugin_.getConfig());
         rangerRestClient_.setBasicAuthInfo(RANGER_USER, RANGER_PASSWORD);
@@ -161,77 +142,13 @@ public abstract class AuthorizationTestBase extends FrontendTestBase {
 
   protected AuthorizationFactory createAuthorizationFactory(
       AuthorizationProvider authzProvider) {
-    return authzProvider == AuthorizationProvider.SENTRY ?
-        new SentryAuthorizationFactory(authzConfig_) :
-        new RangerAuthorizationFactory(authzConfig_);
+    return new RangerAuthorizationFactory(authzConfig_);
   }
 
   protected interface WithPrincipal {
     void init(TPrivilege[]... privileges) throws ImpalaException;
     void cleanUp() throws ImpalaException;
     String getName();
-  }
-
-  protected abstract class WithSentryPrincipal implements WithPrincipal {
-    protected final String role_ = "authz_test_role";
-    protected final String sentry_user_ = user_.getName();
-
-    protected void createRole(TPrivilege[]... privileges) throws ImpalaException {
-      Role role = authzCatalog_.addRole(role_);
-      authzCatalog_.addRoleGrantGroup(role_, sentry_user_);
-      for (TPrivilege[] privs: privileges) {
-        for (TPrivilege privilege: privs) {
-          privilege.setPrincipal_id(role.getId());
-          privilege.setPrincipal_type(TPrincipalType.ROLE);
-          authzCatalog_.addRolePrivilege(role_, privilege);
-        }
-      }
-    }
-
-    protected void createUser(TPrivilege[]... privileges) throws ImpalaException {
-      org.apache.impala.catalog.User user = authzCatalog_.addUser(sentry_user_);
-      for (TPrivilege[] privs: privileges) {
-        for (TPrivilege privilege: privs) {
-          privilege.setPrincipal_id(user.getId());
-          privilege.setPrincipal_type(TPrincipalType.USER);
-          authzCatalog_.addUserPrivilege(sentry_user_, privilege);
-        }
-      }
-    }
-
-    protected void dropRole() throws ImpalaException {
-      authzCatalog_.removeRole(role_);
-    }
-
-    protected void dropUser() throws ImpalaException {
-      authzCatalog_.removeUser(sentry_user_);
-    }
-  }
-
-  public class WithSentryUser extends WithSentryPrincipal {
-    @Override
-    public void init(TPrivilege[]... privileges) throws ImpalaException {
-      createUser(privileges);
-    }
-
-    @Override
-    public void cleanUp() throws ImpalaException { dropUser(); }
-
-    @Override
-    public String getName() { return sentry_user_; }
-  }
-
-  public class WithSentryRole extends WithSentryPrincipal {
-    @Override
-    public void init(TPrivilege[]... privileges) throws ImpalaException {
-      createRole(privileges);
-    }
-
-    @Override
-    public void cleanUp() throws ImpalaException { dropRole(); }
-
-    @Override
-    public String getName() { return role_; }
   }
 
   protected abstract class WithRanger implements WithPrincipal {
@@ -375,10 +292,6 @@ public abstract class AuthorizationTestBase extends FrontendTestBase {
   protected List<WithPrincipal> buildWithPrincipals() {
     List<WithPrincipal> withPrincipals = new ArrayList<>();
     switch (authzProvider_) {
-      case SENTRY:
-        withPrincipals.add(new WithSentryRole());
-        withPrincipals.add(new WithSentryUser());
-        break;
       case RANGER:
         withPrincipals.add(new WithRangerUser());
         withPrincipals.add(new WithRangerGroup());

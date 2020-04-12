@@ -30,7 +30,7 @@ import org.apache.impala.catalog.FeTable;
  *
  * For example:
  * PrivilegeRequestBuilder builder = new PrivilegeRequestBuilder(
- *     new AuthorizableFactory(AuthorizationProvider.SENTRY));
+ *     new AuthorizableFactory(AuthorizationProvider.RANGER));
  * PrivilegeRequest = builder.allOf(Privilege.SELECT).onTable("db", "tbl").build();
  */
 public class PrivilegeRequestBuilder {

@@ -29,7 +29,6 @@ import org.apache.impala.authorization.AuthorizationConfig;
 import org.apache.impala.authorization.AuthorizationFactory;
 import org.apache.impala.authorization.AuthorizationManager;
 import org.apache.impala.authorization.User;
-import org.apache.impala.authorization.sentry.SentryCatalogdAuthorizationManager;
 import org.apache.impala.catalog.CatalogException;
 import org.apache.impala.catalog.CatalogServiceCatalog;
 import org.apache.impala.catalog.Db;
@@ -62,8 +61,6 @@ import org.apache.impala.thrift.TGetTablesResult;
 import org.apache.impala.thrift.TLogLevel;
 import org.apache.impala.thrift.TPrioritizeLoadRequest;
 import org.apache.impala.thrift.TResetMetadataRequest;
-import org.apache.impala.thrift.TSentryAdminCheckRequest;
-import org.apache.impala.thrift.TSentryAdminCheckResponse;
 import org.apache.impala.thrift.TStatus;
 import org.apache.impala.thrift.TUniqueId;
 import org.apache.impala.thrift.TUpdateCatalogRequest;
@@ -300,24 +297,6 @@ public class JniCatalog {
       response.setStatus(
           new TStatus(TErrorCode.INTERNAL_ERROR, ImmutableList.of(e.getMessage())));
     }
-    return serializer.serialize(response);
-  }
-
-  /**
-   * Verifies whether the user is configured as a Sentry admin.
-   */
-  public byte[] checkUserSentryAdmin(byte[] thriftReq)
-      throws ImpalaException, TException {
-    TSentryAdminCheckRequest request = new TSentryAdminCheckRequest();
-    JniUtil.deserializeThrift(protocolFactory_, request, thriftReq);
-    TSerializer serializer = new TSerializer(protocolFactory_);
-    User user = new User(request.getHeader().getRequesting_user());
-    Preconditions.checkState(catalogOpExecutor_.getAuthzManager() instanceof
-        SentryCatalogdAuthorizationManager);
-    TSentryAdminCheckResponse response = new TSentryAdminCheckResponse();
-    boolean isSentryAdmin = ((SentryCatalogdAuthorizationManager)
-        catalogOpExecutor_.getAuthzManager()).isSentryAdmin(user);
-    response.setIs_admin(isSentryAdmin);
     return serializer.serialize(response);
   }
 

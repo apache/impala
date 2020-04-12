@@ -18,8 +18,8 @@
 package org.apache.impala.util;
 
 import org.apache.impala.authorization.AuthorizationFactory;
+import org.apache.impala.authorization.NoopAuthorizationFactory;
 import org.apache.impala.authorization.ranger.RangerAuthorizationFactory;
-import org.apache.impala.authorization.sentry.SentryAuthorizationFactory;
 import org.apache.impala.service.BackendConfig;
 import org.apache.impala.thrift.TBackendGflags;
 import org.junit.AfterClass;
@@ -67,28 +67,15 @@ public class AuthorizationUtilTest {
   @Test
   public void testAuthorizationProviderFlag()
       throws Exception {
-    // Test policy factory selection based on provider
-    assertEquals(SentryAuthorizationFactory.class.getCanonicalName(),
-        AuthorizationUtil.authzFactoryClassNameFrom(authCfg("", "sentry")));
-
+    // Use authorization provider if authorization factory class not set
     assertEquals(RangerAuthorizationFactory.class.getCanonicalName(),
         AuthorizationUtil.authzFactoryClassNameFrom(authCfg("", "ranger")));
+    assertEquals(NoopAuthorizationFactory.class.getCanonicalName(),
+        AuthorizationUtil.authzFactoryClassNameFrom(authCfg("", "")));
 
-    // Policy selection factory takes precedence over provider name
-    assertEquals(SentryAuthorizationFactory.class.getCanonicalName(),
-        AuthorizationUtil.authzFactoryClassNameFrom(
-            authCfg(SentryAuthorizationFactory.class, "ranger")));
-
+    // Authorization factory class overrides authorization provider
     assertEquals(RangerAuthorizationFactory.class.getCanonicalName(),
         AuthorizationUtil.authzFactoryClassNameFrom(
-            authCfg(RangerAuthorizationFactory.class, "sentry")));
-
-    assertEquals(SentryAuthorizationFactory.class.getCanonicalName(),
-        AuthorizationUtil.authzFactoryClassNameFrom(
-            authCfg(SentryAuthorizationFactory.class, "sentry")));
-
-    assertEquals(RangerAuthorizationFactory.class.getCanonicalName(),
-        AuthorizationUtil.authzFactoryClassNameFrom(
-            authCfg(RangerAuthorizationFactory.class, "ranger")));
+            authCfg(RangerAuthorizationFactory.class, "")));
   }
 }

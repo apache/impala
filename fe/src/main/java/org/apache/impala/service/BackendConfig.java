@@ -70,9 +70,6 @@ public class BackendConfig {
   public String getImpalaBuildVersion() { return backendCfg_.impala_build_version; }
   public int getImpalaLogLevel() { return backendCfg_.impala_log_lvl; }
   public int getNonImpalaJavaVlogLevel() { return backendCfg_.non_impala_java_vlog; }
-  public long getSentryCatalogPollingFrequency() {
-    return backendCfg_.sentry_catalog_polling_frequency_s;
-  }
 
   public int maxHdfsPartsParallelLoad() {
     return backendCfg_.max_hdfs_partitions_parallel_load;

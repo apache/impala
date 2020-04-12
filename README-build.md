@@ -4,7 +4,7 @@ Beware that it may become stale over time as the project evolves.
 # Detailed Build Notes
 
 Impala can be built with pre-built components or components downloaded from S3.
-The components needed to build Impala are Apache Hadoop, Hive, HBase, and Sentry.
+The components needed to build Impala are Apache Hadoop, Hive, and HBase.
 If you need to manually override the locations or versions of these components, you
 can do so through the environment variables and scripts listed below.
 
@@ -27,8 +27,8 @@ can do so through the environment variables and scripts listed below.
 | IMPALA_HOME          |               | Top level Impala directory |
 | IMPALA_TOOLCHAIN     | "${IMPALA_HOME}/toolchain" | Native toolchain directory (for compilers, libraries, etc.) |
 | SKIP_TOOLCHAIN_BOOTSTRAP | "false" | Skips downloading the toolchain any python dependencies if "true" |
-| CDH_BUILD_NUMBER | | Identifier to indicate the CDH build number
-| CDH_COMPONENTS_HOME | "${IMPALA_HOME}/toolchain/cdh_components-${CDH_BUILD_NUMBER}" | Location of the CDH components within the toolchain. |
+| CDP_BUILD_NUMBER | | Identifier to indicate the CDP build number
+| CDP_COMPONENTS_HOME | "${IMPALA_HOME}/toolchain/cdp_components-${CDP_BUILD_NUMBER}" | Location of the CDP components within the toolchain. |
 | CDH_MAJOR_VERSION | "7" | Identifier used to uniqueify paths for potentially incompatible component builds. |
 | IMPALA_CONFIG_SOURCED | "1" |  Set by ${IMPALA_HOME}/bin/impala-config.sh (internal use) |
 | JAVA_HOME | "/usr/lib/jvm/${JAVA_VERSION}" | Used to locate Java |
@@ -64,6 +64,5 @@ can do so through the environment variables and scripts listed below.
 | HADOOP_LIB_DIR       | "${HADOOP_HOME}/lib" | For 'libhdfs.a' or 'libhdfs.so' |
 | HIVE_HOME            | "${CDP_COMPONENTS_HOME}/{hive-${IMPALA_HIVE_VERSION}/" | |
 | HBASE_HOME           | "${CDP_COMPONENTS_HOME}/hbase-${IMPALA_HBASE_VERSION}/" | |
-| SENTRY_HOME          | "${CDP_COMPONENTS_HOME}/sentry-${IMPALA_SENTRY_VERSION}/" | Used to setup test data |
 | THRIFT_HOME          | "${IMPALA_TOOLCHAIN}/thrift-${IMPALA_THRIFT_VERSION}" | |
 

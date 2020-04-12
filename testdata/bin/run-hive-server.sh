@@ -70,21 +70,6 @@ ${CLUSTER_BIN}/kill-hive-server.sh &> /dev/null
 export HIVE_METASTORE_HADOOP_OPTS="-Xdebug -Xrunjdwp:transport=dt_socket,server=y,\
 suspend=n,address=30010"
 
-# If this is CDP Hive we need to manually add the sentry jars in the classpath since
-# CDH Hive metastore scripts do not do so. This is currently to make sure that we can run
-# all the tests including sentry tests
-# TODO: This can be removed when we move to Ranger completely
-if [[ -n "$SENTRY_HOME" ]]; then
-  for f in ${SENTRY_HOME}/lib/sentry-binding-hive*.jar; do
-    FILE_NAME=$(basename $f)
-    # exclude all the hive jars from being included in the classpath since Sentry
-    # depends on Hive 2.1.1
-    if [[ ! $FILE_NAME == hive* ]]; then
-      export HADOOP_CLASSPATH=${HADOOP_CLASSPATH}:${f}
-    fi
-  done
-fi
-
 # Add Ranger dependencies if we are starting with Ranger authorization enabled.
 if [[ $ENABLE_RANGER_AUTH -eq 1 ]]; then
   export HIVE_CONF_DIR="$HADOOP_CONF_DIR/hive-site-ranger-auth/"

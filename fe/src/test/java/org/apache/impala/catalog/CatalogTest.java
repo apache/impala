@@ -953,7 +953,7 @@ public class CatalogTest {
   }
 
   @Test
-  public void testSentryCatalog() throws CatalogException {
+  public void testAuthorizationCatalog() throws CatalogException {
     AuthorizationPolicy authPolicy = catalog_.getAuthPolicy();
 
     User user = catalog_.addUser("user1");

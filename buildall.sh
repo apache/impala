@@ -58,7 +58,6 @@ TESTDATA_ACTION=0
 TESTS_ACTION=1
 FORMAT_CLUSTER=0
 FORMAT_METASTORE=0
-FORMAT_SENTRY_POLICY_DB=0
 FORMAT_RANGER_POLICY_DB=0
 NEED_MINICLUSTER=0
 START_IMPALA_CLUSTER=0
@@ -107,7 +106,6 @@ do
     -format)
       FORMAT_CLUSTER=1
       FORMAT_METASTORE=1
-      FORMAT_SENTRY_POLICY_DB=1
       FORMAT_RANGER_POLICY_DB=1
       ;;
     -format_cluster)
@@ -115,9 +113,6 @@ do
       ;;
     -format_metastore)
       FORMAT_METASTORE=1
-      ;;
-    -format_sentry_policy_db)
-      FORMAT_SENTRY_POLICY_DB=1
       ;;
     -format_ranger_policy_db)
       FORMAT_RANGER_POLICY_DB=1
@@ -202,11 +197,10 @@ do
       echo "buildall.sh - Builds Impala and runs all tests."
       echo "[-noclean] : Omits cleaning all packages before building. Will not kill"\
            "running Hadoop services unless any -format* is True"
-      echo "[-format] : Format the minicluster, metastore db, and sentry policy db"\
+      echo "[-format] : Format the minicluster, metastore db, and ranger policy db"\
            "[Default: False]"
       echo "[-format_cluster] : Format the minicluster [Default: False]"
       echo "[-format_metastore] : Format the metastore db [Default: False]"
-      echo "[-format_sentry_policy_db] : Format the Sentry policy db [Default: False]"
       echo "[-format_ranger_policy_db] : Format the Ranger policy db [Default: False]"
       echo "[-release_and_debug] : Build both release and debug binaries. Overrides "\
            "other build types [Default: false]"
@@ -354,8 +348,7 @@ if [[ -z "$METASTORE_SNAPSHOT_FILE" && "${TARGET_FILESYSTEM}" != "hdfs" &&
 fi
 
 if [[ $TESTS_ACTION -eq 1 || $TESTDATA_ACTION -eq 1 || $FORMAT_CLUSTER -eq 1 ||
-      $FORMAT_METASTORE -eq 1 || $FORMAT_SENTRY_POLICY_DB -eq 1 ||
-      $FORMAT_RANGER_POLICY_DB -eq 1 || -n "$SNAPSHOT_FILE" ||
+      $FORMAT_METASTORE -eq 1 || $FORMAT_RANGER_POLICY_DB -eq 1 || -n "$SNAPSHOT_FILE" ||
       -n "$METASTORE_SNAPSHOT_FILE" ]]; then
   NEED_MINICLUSTER=1
 fi
@@ -493,8 +486,7 @@ reconfigure_test_cluster() {
   "${IMPALA_HOME}/bin/start-impala-cluster.py" --kill --force
 
   if [[ "$FORMAT_METASTORE" -eq 1 || "$FORMAT_CLUSTER" -eq 1 ||
-        "$FORMAT_SENTRY_POLICY_DB" -eq 1 || "$FORMAT_RANGER_POLICY_DB" -eq 1 ||
-        -n "$METASTORE_SNAPSHOT_FILE" ]]
+        "$FORMAT_RANGER_POLICY_DB" -eq 1 || -n "$METASTORE_SNAPSHOT_FILE" ]]
   then
     # Kill any processes that may be accessing postgres metastore. To be safe, this is
     # done before we make any changes to the config files.
@@ -502,10 +494,6 @@ reconfigure_test_cluster() {
   fi
 
   local CREATE_TEST_CONFIG_ARGS=""
-  if [[ "$FORMAT_SENTRY_POLICY_DB" -eq 1 ]]; then
-    CREATE_TEST_CONFIG_ARGS+=" -create_sentry_policy_db"
-  fi
-
   if [[ "$FORMAT_RANGER_POLICY_DB" -eq 1 ]]; then
     CREATE_TEST_CONFIG_ARGS+=" -create_ranger_policy_db"
   fi

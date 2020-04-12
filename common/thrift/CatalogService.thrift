@@ -507,23 +507,6 @@ struct TPrioritizeLoadResponse {
   1: required Status.TStatus status
 }
 
-// Request to perform a privilege check with the Sentry Service to determine
-// if the requesting user is a Sentry Service admin.
-struct TSentryAdminCheckRequest {
-  1: required CatalogServiceVersion protocol_version = CatalogServiceVersion.V1
-
-  // Common header included in all CatalogService requests.
-  2: optional TCatalogServiceRequestHeader header
-}
-
-struct TSentryAdminCheckResponse {
-  // Returns OK if the operation was successful.
-  1: optional Status.TStatus status
-
-  // Returns true if the user is a Sentry admin user.
-  2: required bool is_admin
-}
-
 struct TTableUsage {
   1: required CatalogObjects.TTableName table_name
   // count of usages since the last report
@@ -565,13 +548,6 @@ service CatalogService {
   // Prioritize the loading of metadata for the CatalogObjects specified in the
   // TPrioritizeLoadRequest.
   TPrioritizeLoadResponse PrioritizeLoad(1: TPrioritizeLoadRequest req);
-
-  // Performs a check with the Sentry Service to determine if the requesting user
-  // is configured as an admin on the Sentry Service. This API may be removed in
-  // the future and external clients should not rely on using it.
-  // TODO: When Sentry Service has a better mechanism to perform these changes this API
-  // should be deprecated.
-  TSentryAdminCheckResponse SentryAdminCheck(1: TSentryAdminCheckRequest req);
 
   // Fetch partial information about some object in the catalog.
   TGetPartialCatalogObjectResponse GetPartialCatalogObject(

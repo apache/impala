@@ -367,6 +367,7 @@ DEFINE_bool(enable_column_masking, true,
 REMOVED_FLAG(abfs_read_chunk_size);
 REMOVED_FLAG(adls_read_chunk_size);
 REMOVED_FLAG(authorization_policy_file);
+REMOVED_FLAG(authorization_policy_provider_class);
 REMOVED_FLAG(be_service_threads);
 REMOVED_FLAG(cgroup_hierarchy_path);
 REMOVED_FLAG(coordinator_rpc_threads);
@@ -399,6 +400,8 @@ REMOVED_FLAG(rm_default_cpu_vcores);
 REMOVED_FLAG(rm_default_memory);
 REMOVED_FLAG(rpc_cnxn_attempts);
 REMOVED_FLAG(rpc_cnxn_retry_interval_ms);
+REMOVED_FLAG(sentry_catalog_polling_frequency_s);
+REMOVED_FLAG(sentry_config);
 REMOVED_FLAG(skip_lzo_version_check);
 REMOVED_FLAG(staging_cgroup);
 REMOVED_FLAG(status_report_interval);

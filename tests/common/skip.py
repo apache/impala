@@ -127,8 +127,6 @@ class SkipIf:
       reason="Secondary filesystem needed")
   is_buggy_el6_kernel = pytest.mark.skipif(
       IS_BUGGY_EL6_KERNEL, reason="Kernel is affected by KUDU-1508")
-  sentry_disabled = pytest.mark.skipif(os.getenv('DISABLE_SENTRY') == "true",
-      reason="$DISABLE_SENTRY evaluates to true.")
 
 
 class SkipIfIsilon:
@@ -213,8 +211,6 @@ class SkipIfDockerizedCluster:
 
 
 class SkipIfHive3:
-  sentry_not_supported = pytest.mark.skipif(HIVE_MAJOR_VERSION >= 3,
-      reason="Sentry HMS follower does not work with HMS-3. See SENTRY-2518 for details")
   kudu_hms_notifications_not_supported = pytest.mark.skipif(HIVE_MAJOR_VERSION >= 3,
       reason="Kudu is not tested with Hive 3 notifications yet, see IMPALA-8751.")
   col_stat_separated_by_engine = pytest.mark.skipif(HIVE_MAJOR_VERSION >= 3,
