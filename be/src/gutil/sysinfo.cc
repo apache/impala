@@ -469,4 +469,12 @@ int MaxCPUIndex(void) {
   return cpuinfo_max_cpu_index;
 }
 
+bool IsAarch64(void) {
+#ifdef __aarch64__
+  return true;
+#else
+  return false;
+#endif
+}
+
 } // namespace base

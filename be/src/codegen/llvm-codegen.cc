@@ -75,6 +75,7 @@
 #include "runtime/runtime-state.h"
 #include "runtime/string-value.h"
 #include "runtime/timestamp-value.h"
+#include "gutil/sysinfo.h"
 #include "util/cpu-info.h"
 #include "util/debug-util.h"
 #include "util/hdfs-util.h"
@@ -892,7 +893,12 @@ Status LlvmCodeGen::LoadFunction(const TFunction& fn, const string& symbol,
     // declaration, not a definition, since we do not create any basic blocks or
     // instructions in it.
     *llvm_fn = prototype.GeneratePrototype(nullptr, nullptr);
-
+#ifdef __aarch64__
+    if (is_decimal) {
+      // Mark first argument as sret
+      (*llvm_fn)->addAttribute(1, llvm::Attribute::StructRet);
+    }
+#endif
     // Associate the dynamically loaded function pointer with the Function* we defined.
     // This tells LLVM where the compiled function definition is located in memory.
     execution_engine_->addGlobalMapping(*llvm_fn, fn_ptr);
@@ -1483,10 +1489,17 @@ Status LlvmCodeGen::LoadIntrinsics() {
     llvm::Intrinsic::ID id;
     const char* error;
   } non_overloaded_intrinsics[] = {
+#ifdef __aarch64__
+      {llvm::Intrinsic::aarch64_crc32cb, "aarch64 crc32_u8"},
+      {llvm::Intrinsic::aarch64_crc32ch, "aarch64 crc32_u16"},
+      {llvm::Intrinsic::aarch64_crc32cw, "aarch64 crc32_u32"},
+      {llvm::Intrinsic::aarch64_crc32cx, "aarch64 crc32_u64"},
+#else
       {llvm::Intrinsic::x86_sse42_crc32_32_8, "sse4.2 crc32_u8"},
       {llvm::Intrinsic::x86_sse42_crc32_32_16, "sse4.2 crc32_u16"},
       {llvm::Intrinsic::x86_sse42_crc32_32_32, "sse4.2 crc32_u32"},
       {llvm::Intrinsic::x86_sse42_crc32_64_64, "sse4.2 crc32_u64"},
+#endif
   };
   const int num_intrinsics =
       sizeof(non_overloaded_intrinsics) / sizeof(non_overloaded_intrinsics[0]);
@@ -1597,7 +1610,7 @@ void LlvmCodeGen::ClearHashFns() {
 //   ret i32 %12
 // }
 llvm::Function* LlvmCodeGen::GetHashFunction(int num_bytes) {
-  if (IsCPUFeatureEnabled(CpuInfo::SSE4_2)) {
+  if (base::IsAarch64() || IsCPUFeatureEnabled(CpuInfo::SSE4_2)) {
     if (num_bytes == -1) {
       // -1 indicates variable length, just return the generic loop based
       // hash fn.
@@ -1622,25 +1635,39 @@ llvm::Function* LlvmCodeGen::GetHashFunction(int num_bytes) {
     llvm::Function* fn = prototype.GeneratePrototype(&builder, &args[0]);
     llvm::Value* data = args[0];
     llvm::Value* result = args[2];
-
+#ifdef __aarch64__
+    llvm::Function* crc8_fn = llvm_intrinsics_[llvm::Intrinsic::aarch64_crc32cb];
+    llvm::Function* crc16_fn = llvm_intrinsics_[llvm::Intrinsic::aarch64_crc32ch];
+    llvm::Function* crc32_fn = llvm_intrinsics_[llvm::Intrinsic::aarch64_crc32cw];
+    llvm::Function* crc64_fn = llvm_intrinsics_[llvm::Intrinsic::aarch64_crc32cx];
+#else
     llvm::Function* crc8_fn = llvm_intrinsics_[llvm::Intrinsic::x86_sse42_crc32_32_8];
     llvm::Function* crc16_fn = llvm_intrinsics_[llvm::Intrinsic::x86_sse42_crc32_32_16];
     llvm::Function* crc32_fn = llvm_intrinsics_[llvm::Intrinsic::x86_sse42_crc32_32_32];
     llvm::Function* crc64_fn = llvm_intrinsics_[llvm::Intrinsic::x86_sse42_crc32_64_64];
+#endif
 
     // Generate the crc instructions starting with the highest number of bytes
     if (num_bytes >= 8) {
+#ifndef __aarch64__
       llvm::Value* result_64 = builder.CreateZExt(result, i64_type());
+#endif
       llvm::Value* ptr = builder.CreateBitCast(data, i64_ptr_type());
       int i = 0;
       while (num_bytes >= 8) {
         llvm::Value* index[] = {GetI32Constant(i++)};
         llvm::Value* d = builder.CreateLoad(builder.CreateInBoundsGEP(ptr, index));
+#ifdef __aarch64__
+        result = builder.CreateCall(crc64_fn, llvm::ArrayRef<llvm::Value*>({result, d}));
+#else
         result_64 =
             builder.CreateCall(crc64_fn, llvm::ArrayRef<llvm::Value*>({result_64, d}));
+#endif
         num_bytes -= 8;
       }
+#ifndef __aarch64__
       result = builder.CreateTrunc(result_64, i32_type());
+#endif
       llvm::Value* index[] = {GetI32Constant(i * 8)};
       // Update data to past the 8-byte chunks
       data = builder.CreateInBoundsGEP(data, index);
@@ -1660,6 +1687,9 @@ llvm::Function* LlvmCodeGen::GetHashFunction(int num_bytes) {
       DCHECK_LT(num_bytes, 4);
       llvm::Value* ptr = builder.CreateBitCast(data, i16_ptr_type());
       llvm::Value* d = builder.CreateLoad(ptr);
+#ifdef __aarch64__
+      d = builder.CreateZExt(d, i32_type());
+#endif
       result = builder.CreateCall(crc16_fn, llvm::ArrayRef<llvm::Value*>({result, d}));
       llvm::Value* index[] = {GetI16Constant(2)};
       data = builder.CreateInBoundsGEP(data, index);
@@ -1669,6 +1699,9 @@ llvm::Function* LlvmCodeGen::GetHashFunction(int num_bytes) {
     if (num_bytes > 0) {
       DCHECK_EQ(num_bytes, 1);
       llvm::Value* d = builder.CreateLoad(data);
+#ifdef __aarch64__
+      d = builder.CreateZExt(d, i32_type());
+#endif
       result = builder.CreateCall(crc8_fn, llvm::ArrayRef<llvm::Value*>({result, d}));
       --num_bytes;
     }
