@@ -190,6 +190,16 @@ under the License.
       <groupId>org.apache.sentry</groupId>
       <artifactId>sentry-core-common</artifactId>
       <version>${sentry.version}</version>
+      <exclusions>
+        <exclusion>
+          <groupId>org.apache.shiro</groupId>
+          <artifactId>shiro-crypto-cipher</artifactId>
+        </exclusion>
+        <exclusion>
+          <groupId>org.apache.shiro</groupId>
+          <artifactId>shiro-core</artifactId>
+        </exclusion>
+      </exclusions>
     </dependency>
 
     <dependency>
