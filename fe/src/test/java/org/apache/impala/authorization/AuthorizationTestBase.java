@@ -149,7 +149,8 @@ public abstract class AuthorizationTestBase extends FrontendTestBase {
                 .getRangerImpalaPlugin();
         assertEquals("test-cluster", rangerImpalaPlugin_.getClusterName());
         sentryService_ = null;
-        rangerRestClient_ = new RangerRESTClient(RANGER_ADMIN_URL, null);
+        rangerRestClient_ = new RangerRESTClient(RANGER_ADMIN_URL, null,
+            rangerImpalaPlugin_.getConfig());
         rangerRestClient_.setBasicAuthInfo(RANGER_USER, RANGER_PASSWORD);
         break;
       default:
