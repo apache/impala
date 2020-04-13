@@ -76,11 +76,9 @@ public class RangerImpaladAuthorizationManager implements AuthorizationManager {
   private static final String ANY = "*";
 
   private final Supplier<RangerImpalaPlugin> plugin_;
-  private final Supplier<RangerAuthContext> authContext_;
 
   public RangerImpaladAuthorizationManager(Supplier<RangerImpalaPlugin> pluginSupplier) {
     plugin_ = pluginSupplier;
-    authContext_ = () -> plugin_.get().createRangerAuthContext();
   }
 
   @Override
@@ -302,7 +300,7 @@ public class RangerImpaladAuthorizationManager implements AuthorizationManager {
 
     for (RangerAccessRequest request : requests) {
       List<RangerResultRow> resultRows;
-      RangerResourceACLs acls = authContext_.get().getResourceACLs(request);
+      RangerResourceACLs acls = plugin_.get().getResourceACLs(request);
 
       switch (params.principal_type) {
         case USER:
