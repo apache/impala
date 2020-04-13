@@ -81,9 +81,7 @@ bool RuntimeFilter::WaitForArrival(int32_t timeout_ms) const {
     int64_t ms_since_registration = MonotonicMillis() - registration_time_;
     int64_t ms_remaining = timeout_ms - ms_since_registration;
     if (ms_remaining <= 0) break;
-#ifndef NDEBUG
     if (injection_delay_ > 0) SleepForMs(injection_delay_);
-#endif
     arrival_cv_.WaitFor(l, ms_remaining * MICROS_PER_MILLI);
   }
   return arrival_time_.Load() != 0;
