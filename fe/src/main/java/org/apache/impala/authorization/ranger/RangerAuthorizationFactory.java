@@ -67,7 +67,8 @@ public class RangerAuthorizationFactory implements AuthorizationFactory {
         "Ranger application ID is empty. Set the Ranger application ID using " +
             "impalad and catalogd --ranger_app_id flag.");
     return new RangerAuthorizationConfig(backendConfig.getRangerServiceType(),
-        backendConfig.getRangerAppId(), backendConfig.getBackendCfg().getServer_name());
+        backendConfig.getRangerAppId(), backendConfig.getBackendCfg().getServer_name(),
+        null, null, null);
   }
 
   @Override
