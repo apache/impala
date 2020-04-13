@@ -92,7 +92,7 @@ be/src/util/cache/rl-cache-test.cc
 be/src/testutil/certificates-info.txt
 bin/README-RUNNING-BENCHMARKS
 LOGS.md
-README.md
+README*.md
 */README
 */README.dox
 */README.txt
