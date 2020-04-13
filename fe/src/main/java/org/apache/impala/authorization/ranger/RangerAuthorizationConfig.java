@@ -19,7 +19,8 @@ package org.apache.impala.authorization.ranger;
 
 import com.google.common.base.Preconditions;
 import org.apache.impala.authorization.AuthorizationConfig;
-import org.apache.impala.authorization.AuthorizationProvider;
+import org.apache.ranger.authorization.hadoop.config.RangerPluginConfig;
+import org.apache.ranger.plugin.policyengine.RangerPolicyEngineOptions;
 
 /**
  * Impala authorization config with Ranger.
@@ -28,11 +29,22 @@ public class RangerAuthorizationConfig implements AuthorizationConfig {
   private final String serviceType_;
   private final String appId_;
   private final String serverName_;
+  private final String clusterName_;
+  private final String clusterType_;
+  private final RangerPolicyEngineOptions policyEngineOptions_;
+  private final RangerPluginConfig rangerConfig_;
 
-  public RangerAuthorizationConfig(String serviceType, String appId, String serverName) {
+  public RangerAuthorizationConfig(String serviceType, String appId, String serverName,
+      String clusterName, String clusterType,
+      RangerPolicyEngineOptions policyEngineOptions) {
     serviceType_ = Preconditions.checkNotNull(serviceType);
     appId_ = Preconditions.checkNotNull(appId);
     serverName_ = Preconditions.checkNotNull(serverName);
+    clusterName_ = clusterName;
+    clusterType_ = clusterType;
+    policyEngineOptions_ = policyEngineOptions;
+    rangerConfig_ = new RangerPluginConfig(serviceType_, serverName_, appId_,
+        clusterName_, clusterType_, policyEngineOptions_);
   }
 
   @Override
@@ -53,4 +65,23 @@ public class RangerAuthorizationConfig implements AuthorizationConfig {
    * Returns the Ranger application ID.
    */
   public String getAppId() { return appId_; }
+
+  /**
+   * Returns the Ranger cluster name.
+   */
+  public String getClusterName() { return clusterName_; }
+
+  /**
+   * Returns the Ranger cluster type.
+   */
+  public String getClusterType() { return clusterType_; }
+
+  /**
+   * Returns the Ranger policy engine options.
+   */
+  public RangerPolicyEngineOptions getPolicyEngineOptions() {
+      return policyEngineOptions_;
+  }
+
+  public RangerPluginConfig getRangerConfig() { return rangerConfig_; }
 }

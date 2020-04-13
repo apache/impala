@@ -139,7 +139,7 @@ public abstract class AuthorizationTestBase extends FrontendTestBase {
       case RANGER:
         user_ = new User("non_owner");
         authzConfig_ = new RangerAuthorizationConfig(RANGER_SERVICE_TYPE, RANGER_APP_ID,
-            SERVER_NAME);
+            SERVER_NAME, null, null, null);
         authzFactory_ = createAuthorizationFactory(authzProvider);
         authzCtx_ = createAnalysisCtx(authzFactory_, user_.getName());
         authzCatalog_ = new ImpaladTestCatalog(authzFactory_);
