@@ -633,6 +633,10 @@ public class FunctionCallExpr extends Expr {
 
       AggregateFunction aggFn = (AggregateFunction)fn_;
       if (aggFn.ignoresDistinct()) params_.setIsDistinct(false);
+
+      if (aggFn.isUnsupported()) {
+        throw new AnalysisException(getFunctionNotFoundError(argTypes));
+      }
     }
 
     if (params_.isIgnoreNulls() && !isAnalyticFnCall_) {

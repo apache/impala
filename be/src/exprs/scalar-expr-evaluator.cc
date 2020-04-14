@@ -28,6 +28,7 @@
 #include "exprs/cast-functions.h"
 #include "exprs/compound-predicates.h"
 #include "exprs/conditional-functions.h"
+#include "datasketches-functions.h"
 #include "exprs/date-functions.h"
 #include "exprs/decimal-functions.h"
 #include "exprs/decimal-operators.h"
@@ -431,6 +432,7 @@ void ScalarExprEvaluator::InitBuiltinsDummy() {
   CastFunctions::CastToBooleanVal(nullptr, TinyIntVal::null());
   CompoundPredicate::Not(nullptr, BooleanVal::null());
   ConditionalFunctions::NullIfZero(nullptr, TinyIntVal::null());
+  DataSketchesFunctions::DsHllEstimate(nullptr, StringVal::null());
   DecimalFunctions::Precision(nullptr, DecimalVal::null());
   DecimalOperators::CastToDecimalVal(nullptr, DecimalVal::null());
   InPredicate::InIterate(nullptr, BigIntVal::null(), 0, nullptr);

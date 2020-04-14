@@ -110,6 +110,11 @@ public class Function extends CatalogObjectImpl {
   // native and IR functions, but only Java functions created without a signature.
   private boolean isPersistent_;
 
+  // Functions with specific parameters can be marked as unsupported so that during
+  // analysis the query can be rejected without Impala trying to cast parameters to a
+  // different type that would be supported.
+  protected boolean isUnsupported_;
+
   public Function(FunctionName name, Type[] argTypes,
       Type retType, boolean varArgs) {
     this.name_ = name;
@@ -125,6 +130,7 @@ public class Function extends CatalogObjectImpl {
       this.retType_ = retType;
     }
     this.userVisible_ = true;
+    this.isUnsupported_ = false;
   }
 
   public Function(FunctionName name, List<Type> args,
@@ -163,12 +169,14 @@ public class Function extends CatalogObjectImpl {
     Preconditions.checkState(argTypes_.length > 0);
     return argTypes_[argTypes_.length - 1];
   }
+  public boolean isUnsupported() { return isUnsupported_; }
 
   public void setLocation(HdfsUri loc) { location_ = loc; }
   public void setBinaryType(TFunctionBinaryType type) { binaryType_ = type; }
   public void setHasVarArgs(boolean v) { hasVarArgs_ = v; }
   public void setIsPersistent(boolean v) { isPersistent_ = v; }
   public void setUserVisible(boolean b) { userVisible_ = b; }
+  protected void setUnsupported() { isUnsupported_ = true; }
 
   // Returns a string with the signature in human readable format:
   // FnName(argtype1, argtyp2).  e.g. Add(int, int)
