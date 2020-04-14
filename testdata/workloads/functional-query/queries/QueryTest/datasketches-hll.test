@@ -1,0 +1,168 @@
+====
+---- QUERY
+# Use a small table for testing Datasketches HLL functions through Impala to make sure
+# that these approximate functions give the correct result. For testing Impala
+# functionality no need to test how Datasketches HLL approximates count distint values
+# so a small table is enough.
+select
+    ds_hll_estimate(ds_hll_sketch(tinyint_col)),
+    ds_hll_estimate(ds_hll_sketch(int_col)),
+    ds_hll_estimate(ds_hll_sketch(bigint_col)),
+    ds_hll_estimate(ds_hll_sketch(float_col)),
+    ds_hll_estimate(ds_hll_sketch(double_col)),
+    ds_hll_estimate(ds_hll_sketch(string_col))
+from functional_parquet.alltypessmall
+---- RESULTS
+10,10,10,10,10,10
+---- TYPES
+BIGINT,BIGINT,BIGINT,BIGINT,BIGINT,BIGINT
+====
+---- QUERY
+select
+    ds_hll_sketch_and_estimate(tinyint_col),
+    ds_hll_sketch_and_estimate(int_col),
+    ds_hll_sketch_and_estimate(bigint_col),
+    ds_hll_sketch_and_estimate(float_col),
+    ds_hll_sketch_and_estimate(double_col),
+    ds_hll_sketch_and_estimate(string_col)
+from functional_parquet.alltypessmall
+---- RESULTS
+10,10,10,10,10,10
+---- TYPES
+BIGINT,BIGINT,BIGINT,BIGINT,BIGINT,BIGINT
+====
+---- QUERY
+# Check that unsupported types give error with ds_hll_sketch().
+select ds_hll_sketch(bool_col) from functional_parquet.alltypessmall;
+---- CATCH
+AnalysisException: No matching function with signature: ds_hll_sketch(BOOLEAN)
+====
+---- QUERY
+select ds_hll_sketch(smallint_col) from functional_parquet.alltypessmall;
+---- CATCH
+AnalysisException: No matching function with signature: ds_hll_sketch(SMALLINT)
+====
+---- QUERY
+select ds_hll_sketch(cast(date_string_col as date format 'MM/DD/YYYY'))
+from functional_parquet.alltypessmall;
+---- CATCH
+AnalysisException: No matching function with signature: ds_hll_sketch(DATE)
+====
+---- QUERY
+select ds_hll_sketch(d1) from functional_parquet.decimal_tbl;
+---- CATCH
+AnalysisException: No matching function with signature: ds_hll_sketch(DECIMAL(9,0))
+====
+---- QUERY
+# Check that unsupported types give error with ds_hll_sketch_and_estimate().
+select ds_hll_sketch_and_estimate(bool_col) from functional_parquet.alltypessmall;
+---- CATCH
+AnalysisException: No matching function with signature: ds_hll_sketch_and_estimate(BOOLEAN)
+====
+---- QUERY
+select ds_hll_sketch_and_estimate(smallint_col) from functional_parquet.alltypessmall;
+---- CATCH
+AnalysisException: No matching function with signature: ds_hll_sketch_and_estimate(SMALLINT)
+====
+---- QUERY
+select ds_hll_sketch_and_estimate(cast(date_string_col as date format 'MM/DD/YYYY'))
+from functional_parquet.alltypessmall;
+---- CATCH
+AnalysisException: No matching function with signature: ds_hll_sketch_and_estimate(DATE)
+====
+---- QUERY
+select ds_hll_sketch_and_estimate(d1) from functional_parquet.decimal_tbl;
+---- CATCH
+AnalysisException: No matching function with signature: ds_hll_sketch_and_estimate(DECIMAL(9,0))
+====
+---- QUERY
+# Check if HLL works with null values.
+select
+    ds_hll_estimate(ds_hll_sketch(null_str)),
+    ds_hll_estimate(ds_hll_sketch(null_int)),
+    ds_hll_estimate(ds_hll_sketch(null_double)),
+    ds_hll_estimate(ds_hll_sketch(some_nulls)),
+    ds_hll_sketch_and_estimate(null_str),
+    ds_hll_sketch_and_estimate(null_int),
+    ds_hll_sketch_and_estimate(null_double),
+    ds_hll_sketch_and_estimate(some_nulls)
+from functional_parquet.nullrows
+---- RESULTS
+NULL,NULL,NULL,6,NULL,NULL,NULL,6
+---- TYPES
+BIGINT,BIGINT,BIGINT,BIGINT,BIGINT,BIGINT,BIGINT,BIGINT
+====
+---- QUERY
+# Check if HLL works for empty datasets.
+select
+    ds_hll_estimate(ds_hll_sketch(field)),
+    ds_hll_estimate(ds_hll_sketch(f2)),
+    ds_hll_sketch_and_estimate(field),
+    ds_hll_sketch_and_estimate(f2)
+from functional_parquet.emptytable
+---- RESULTS
+NULL,NULL,NULL,NULL
+---- TYPES
+BIGINT,BIGINT,BIGINT,BIGINT
+====
+---- QUERY
+# Write sketches to a table as string and get an estimate from the written sketch.
+# Note, the plan is to write sketches as binary instead of strings. For this we have to
+# wait for the binary support (IMPALA-9482).
+create table sketch_store
+    (year int, month int, date_sketch string, float_sketch string)
+stored as parquet;
+insert into sketch_store
+    select
+        year,
+        month,
+        ds_hll_sketch(date_string_col),
+        ds_hll_sketch(float_col)
+    from functional_parquet.alltypessmall
+    group by year, month;
+select
+    year,
+    month,
+    ds_hll_estimate(date_sketch),
+    ds_hll_estimate(float_sketch)
+from sketch_store;
+---- RESULTS
+2009,1,3,10
+2009,2,3,10
+2009,3,3,10
+2009,4,3,10
+---- TYPES
+INT,INT,BIGINT,BIGINT
+====
+---- QUERY
+# Check that ds_hll_estimate returns error for strings that are not serialized sketches.
+select ds_hll_estimate(date_string_col) from functional_parquet.alltypestiny;
+---- CATCH
+UDF ERROR: Unable to deserialize sketch.
+====
+---- QUERY
+# Check that ds_hll_estimate returns null for null inputs.
+select ds_hll_estimate(c) from functional_parquet.nulltable;
+---- RESULTS
+NULL
+---- TYPES
+BIGINT
+====
+---- QUERY
+# Check that sketches made by Hive can be read and used for estimating by Impala.
+select
+    ds_hll_estimate(ti) as ti,
+    ds_hll_estimate(i) as i,
+    ds_hll_estimate(bi) as bi,
+    ds_hll_estimate(f) as f,
+    ds_hll_estimate(d) as d,
+    ds_hll_estimate(s) as s,
+    ds_hll_estimate(c) as c,
+    ds_hll_estimate(v) as v,
+    ds_hll_estimate(nc) as nc
+from hll_sketches_from_hive;
+---- TYPES
+BIGINT,BIGINT,BIGINT,BIGINT,BIGINT,BIGINT,BIGINT,BIGINT,BIGINT
+---- RESULTS
+5,7,6,5,6,4,3,3,NULL
+====

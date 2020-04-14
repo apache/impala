@@ -145,6 +145,17 @@ public class AggregateFunction extends Function {
     return fn;
   }
 
+  public static AggregateFunction createUnsupportedBuiltin(Db db, String name,
+      List<Type> argTypes, Type retType, Type intermediateType) {
+    AggregateFunction fn = new AggregateFunction(new FunctionName(db.getName(), name),
+        argTypes, retType, intermediateType, null, null, null, null, null, null, null,
+        null);
+    fn.setBinaryType(TFunctionBinaryType.BUILTIN);
+    fn.isAggregateFn_ = true;
+    fn.setUnsupported();
+    return fn;
+  }
+
   public static AggregateFunction createAnalyticBuiltin(Db db, String name,
       List<Type> argTypes, Type retType, Type intermediateType) {
     return createAnalyticBuiltin(db, name, argTypes, retType, intermediateType, null,

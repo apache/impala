@@ -233,6 +233,17 @@ class AggregateFunctions {
   static uint64_t HllFinalEstimate(
       const uint8_t* buckets, int hll_len = AggregateFunctions::DEFAULT_HLL_LEN);
 
+  /// These functions provide cardinality estimates similarly to ndv() but these use HLL
+  /// algorithm from Apache Datasketches.
+  static constexpr int DS_SKETCH_CONFIG = 12; // Sketch can hold 2^DS_SKETCH_CONFIG rows
+  static void DsHllInit(FunctionContext*, StringVal* slot);
+  template <typename T>
+  static void DsHllUpdate(FunctionContext*, const T& src, StringVal* dst);
+  static StringVal DsHllSerialize(FunctionContext*, const StringVal& src);
+  static void DsHllMerge(FunctionContext*, const StringVal& src, StringVal* dst);
+  static BigIntVal DsHllFinalize(FunctionContext*, const StringVal& src);
+  static StringVal DsHllFinalizeSketch(FunctionContext*, const StringVal& src);
+
   /// Estimates the number of distinct values (NDV) based on a sample of data and the
   /// corresponding sampling rate. The main idea of this function is to collect several
   /// (x,y) data points where x is the number of rows and y is the corresponding NDV

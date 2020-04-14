@@ -17,8 +17,7 @@
 
 #include "thirdparty/datasketches/hll.hpp"
 
-#include <fstream>
-#include <iostream>
+#include <sstream>
 
 #include "testutil/gtest-util.h"
 
@@ -62,12 +61,11 @@ TEST(TestDataSketchesHll, UseDataSketchesInterface) {
     union_sketch.update(sketch2);
     datasketches::hll_sketch sketch = union_sketch.get_result(type);
 
-    // Approximate result should be in the range of 1.5% to the accurate number. Picked
-    // this threshold to be on the safe side and to make sure that this test won't start
-    // failing once in a while.
-    int accurate_result = 150000;
-    int error_range = accurate_result * 0.015;
-    EXPECT_LE(std::abs(sketch.get_estimate() - accurate_result), error_range);
+    // These sketching algorithms are sensitive for the order of the inputs and may
+    // return different estimations withing the error bounds of the algorithm. However,
+    // the order of the inputs fed to the sketches is fix here so we get the same
+    // estimate every time we run this test.
+    EXPECT_EQ(152040, (int)sketch.get_estimate());
   }
 }
 

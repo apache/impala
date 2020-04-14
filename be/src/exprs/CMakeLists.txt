@@ -36,6 +36,7 @@ add_library(Exprs
   compound-predicates-ir.cc
   conditional-functions.cc
   conditional-functions-ir.cc
+  datasketches-functions-ir.cc
   date-functions-ir.cc
   decimal-functions-ir.cc
   decimal-operators-ir.cc

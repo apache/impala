@@ -38,6 +38,7 @@
 #include "runtime/string-value.inline.h"
 #include "runtime/timestamp-value.h"
 #include "runtime/timestamp-value.inline.h"
+#include "thirdparty/datasketches/hll.hpp"
 #include "util/arithmetic-util.h"
 #include "util/mpfit-util.h"
 #include "util/pretty-printer.h"
@@ -1610,6 +1611,116 @@ BigIntVal AggregateFunctions::HllFinalize(FunctionContext* ctx, const StringVal&
   return estimate;
 }
 
+/// Config for DataSketches HLL algorithm to set the size of each entry within the
+/// sketch.
+/// Introducing this variable in the .cc to avoid including the whole DataSketches HLL
+/// functionality into the header.
+const datasketches::target_hll_type DS_HLL_TYPE = datasketches::target_hll_type::HLL_4;
+
+/// Auxiliary function that receives a hll_sketch and returns the serialized version of
+/// it wrapped into a StringVal.
+/// Introducing this function in the .cc to avoid including the whole DataSketches HLL
+/// functionality into the header.
+StringVal SerializeDsHllSketch(FunctionContext* ctx,
+    const datasketches::hll_sketch& sketch) {
+  std::stringstream serialized_sketch;
+  sketch.serialize_compact(serialized_sketch);
+  std::string serialized_sketch_str = serialized_sketch.str();
+  StringVal dst(ctx, serialized_sketch_str.size());
+  memcpy(dst.ptr, serialized_sketch_str.c_str(), serialized_sketch_str.size());
+  return dst;
+}
+
+void AggregateFunctions::DsHllInit(FunctionContext* ctx, StringVal* dst) {
+  AllocBuffer(ctx, dst, sizeof(datasketches::hll_sketch));
+  if (UNLIKELY(dst->is_null)) {
+    DCHECK(!ctx->impl()->state()->GetQueryStatus().ok());
+    return;
+  }
+  // Note, that hll_sketch will always have the same size regardless of the amount of data
+  // it keeps track. This is because it's a wrapper class that holds all the inserted data
+  // on heap. Here, we put only the wrapper class into a StringVal.
+  datasketches::hll_sketch* sketch_ptr =
+      reinterpret_cast<datasketches::hll_sketch*>(dst->ptr);
+  *sketch_ptr = datasketches::hll_sketch(DS_SKETCH_CONFIG, DS_HLL_TYPE);
+}
+
+template <typename T>
+void AggregateFunctions::DsHllUpdate(FunctionContext* ctx, const T& src,
+    StringVal* dst) {
+  if (src.is_null) return;
+  DCHECK(!dst->is_null);
+  DCHECK_EQ(dst->len, sizeof(datasketches::hll_sketch));
+  datasketches::hll_sketch* sketch_ptr =
+      reinterpret_cast<datasketches::hll_sketch*>(dst->ptr);
+  sketch_ptr->update(src.val);
+}
+
+// Specialize for StringVal
+template <>
+void AggregateFunctions::DsHllUpdate(
+    FunctionContext* ctx, const StringVal& src, StringVal* dst) {
+  if (src.is_null) return;
+  DCHECK(!dst->is_null);
+  DCHECK_EQ(dst->len, sizeof(datasketches::hll_sketch));
+  datasketches::hll_sketch* sketch_ptr =
+      reinterpret_cast<datasketches::hll_sketch*>(dst->ptr);
+  sketch_ptr->update(reinterpret_cast<char*>(src.ptr), src.len);
+}
+
+StringVal AggregateFunctions::DsHllSerialize(FunctionContext* ctx,
+    const StringVal& src) {
+  DCHECK(!src.is_null);
+  DCHECK_EQ(src.len, sizeof(datasketches::hll_sketch));
+  datasketches::hll_sketch* sketch_ptr =
+      reinterpret_cast<datasketches::hll_sketch*>(src.ptr);
+  StringVal dst = SerializeDsHllSketch(ctx, *sketch_ptr);
+  ctx->Free(src.ptr);
+  return dst;
+}
+
+void AggregateFunctions::DsHllMerge(
+    FunctionContext* ctx, const StringVal& src, StringVal* dst) {
+  DCHECK(!src.is_null);
+  DCHECK(!dst->is_null);
+  DCHECK_EQ(dst->len, sizeof(datasketches::hll_sketch));
+  datasketches::hll_sketch src_sketch =
+      datasketches::hll_sketch::deserialize((void*)src.ptr, src.len);
+
+  datasketches::hll_sketch* dst_sketch_ptr =
+      reinterpret_cast<datasketches::hll_sketch*>(dst->ptr);
+
+  datasketches::hll_union union_sketch(DS_SKETCH_CONFIG);
+  union_sketch.update(src_sketch);
+  union_sketch.update(*dst_sketch_ptr);
+
+  *dst_sketch_ptr = union_sketch.get_result(DS_HLL_TYPE);
+}
+
+BigIntVal AggregateFunctions::DsHllFinalize(FunctionContext* ctx, const StringVal& src) {
+  DCHECK(!src.is_null);
+  DCHECK_EQ(src.len, sizeof(datasketches::hll_sketch));
+  datasketches::hll_sketch* sketch_ptr =
+      reinterpret_cast<datasketches::hll_sketch*>(src.ptr);
+  BigIntVal estimate = sketch_ptr->get_estimate();
+  ctx->Free(src.ptr);
+  return (estimate == 0) ? BigIntVal::null() : estimate;
+}
+
+StringVal AggregateFunctions::DsHllFinalizeSketch(FunctionContext* ctx,
+    const StringVal& src) {
+  DCHECK(!src.is_null);
+  DCHECK_EQ(src.len, sizeof(datasketches::hll_sketch));
+  datasketches::hll_sketch* sketch_ptr =
+      reinterpret_cast<datasketches::hll_sketch*>(src.ptr);
+  StringVal result_str = StringVal::null();
+  if (sketch_ptr->get_estimate() > 0.0) {
+    result_str = SerializeDsHllSketch(ctx, *sketch_ptr);
+  }
+  ctx->Free(src.ptr);
+  return result_str;
+}
+
 /// Intermediate aggregation state for the SampledNdv() function.
 /// Stores NUM_HLL_BUCKETS of the form <row_count, hll_state>.
 /// The 'row_count' keeps track of how many input rows were aggregated into that
@@ -2546,6 +2657,23 @@ template void AggregateFunctions::HllUpdate(
     FunctionContext*, const TimestampVal&, const IntVal&, StringVal*);
 template void AggregateFunctions::HllUpdate(
     FunctionContext*, const DateVal&, const IntVal&, StringVal*);
+
+template void AggregateFunctions::DsHllUpdate(
+    FunctionContext*, const BooleanVal&, StringVal*);
+template void AggregateFunctions::DsHllUpdate(
+    FunctionContext*, const TinyIntVal&, StringVal*);
+template void AggregateFunctions::DsHllUpdate(
+    FunctionContext*, const SmallIntVal&, StringVal*);
+template void AggregateFunctions::DsHllUpdate(
+    FunctionContext*, const IntVal&, StringVal*);
+template void AggregateFunctions::DsHllUpdate(
+    FunctionContext*, const BigIntVal&, StringVal*);
+template void AggregateFunctions::DsHllUpdate(
+    FunctionContext*, const FloatVal&, StringVal*);
+template void AggregateFunctions::DsHllUpdate(
+    FunctionContext*, const DoubleVal&, StringVal*);
+template void AggregateFunctions::DsHllUpdate(
+    FunctionContext*, const DateVal&, StringVal*);
 
 template void AggregateFunctions::SampledNdvUpdate(
     FunctionContext*, const BooleanVal&, const DoubleVal&, StringVal*);

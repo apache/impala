@@ -377,6 +377,22 @@ public class BuiltinsDb extends Db {
              "9HllUpdateIN10impala_udf7DateValEEEvPNS2_15FunctionContextERKT_RKNS2_6IntValEPNS2_9StringValE")
         .build();
 
+    private static final Map<Type, String> DS_HLL_UPDATE_SYMBOL =
+      ImmutableMap.<Type, String>builder()
+        .put(Type.TINYINT,
+            "11DsHllUpdateIN10impala_udf10TinyIntValEEEvPNS2_15FunctionContextERKT_PNS2_9StringValE")
+        .put(Type.INT,
+            "11DsHllUpdateIN10impala_udf6IntValEEEvPNS2_15FunctionContextERKT_PNS2_9StringValE")
+        .put(Type.BIGINT,
+            "11DsHllUpdateIN10impala_udf9BigIntValEEEvPNS2_15FunctionContextERKT_PNS2_9StringValE")
+        .put(Type.FLOAT,
+            "11DsHllUpdateIN10impala_udf8FloatValEEEvPNS2_15FunctionContextERKT_PNS2_9StringValE")
+        .put(Type.DOUBLE,
+            "11DsHllUpdateIN10impala_udf9DoubleValEEEvPNS2_15FunctionContextERKT_PNS2_9StringValE")
+        .put(Type.STRING,
+            "11DsHllUpdateIN10impala_udf9StringValEEEvPNS2_15FunctionContextERKT_PS3_")
+        .build();
+
   private static final Map<Type, String> SAMPLED_NDV_UPDATE_SYMBOL =
       ImmutableMap.<Type, String>builder()
         .put(Type.BOOLEAN,
@@ -1034,6 +1050,33 @@ public class BuiltinsDb extends Db {
           null,
           "_Z20IncrementNdvFinalizePN10impala_udf15FunctionContextERKNS_9StringValE",
           true, false, true));
+
+      // DataSketches HLL
+      if (DS_HLL_UPDATE_SYMBOL.containsKey(t)) {
+        db.addBuiltin(AggregateFunction.createBuiltin(db, "ds_hll_sketch_and_estimate",
+            Lists.newArrayList(t), Type.BIGINT, Type.STRING,
+            prefix + "9DsHllInitEPN10impala_udf15FunctionContextEPNS1_9StringValE",
+            prefix + DS_HLL_UPDATE_SYMBOL.get(t),
+            prefix + "10DsHllMergeEPN10impala_udf15FunctionContextERKNS1_9StringValEPS4_",
+            prefix + "14DsHllSerializeEPN10impala_udf15FunctionContextERKNS1_9StringValE",
+            prefix + "13DsHllFinalizeEPN10impala_udf15FunctionContextERKNS1_9StringValE",
+            true, false, true));
+
+        db.addBuiltin(AggregateFunction.createBuiltin(db, "ds_hll_sketch",
+            Lists.newArrayList(t), Type.STRING, Type.STRING,
+            prefix + "9DsHllInitEPN10impala_udf15FunctionContextEPNS1_9StringValE",
+            prefix + DS_HLL_UPDATE_SYMBOL.get(t),
+            prefix + "10DsHllMergeEPN10impala_udf15FunctionContextERKNS1_9StringValEPS4_",
+            prefix + "14DsHllSerializeEPN10impala_udf15FunctionContextERKNS1_9StringValE",
+            prefix + "19DsHllFinalizeSketchEPN10impala_udf15FunctionContextERKNS1_" +
+                "9StringValE", true, false, true));
+      } else {
+        db.addBuiltin(AggregateFunction.createUnsupportedBuiltin(db,
+            "ds_hll_sketch_and_estimate", Lists.newArrayList(t), Type.STRING,
+            Type.STRING));
+        db.addBuiltin(AggregateFunction.createUnsupportedBuiltin(db, "ds_hll_sketch",
+            Lists.newArrayList(t), Type.STRING, Type.STRING));
+      }
 
       // SAMPLED_NDV.
       // Size needs to be kept in sync with SampledNdvState in the BE.
