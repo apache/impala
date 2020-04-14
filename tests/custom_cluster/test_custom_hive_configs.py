@@ -33,9 +33,7 @@ class TestCustomHiveConfigs(CustomClusterTestSuite):
   def setup_class(cls):
     super(TestCustomHiveConfigs, cls).setup_class()
 
-  # TODO: Remove the xfail marker after bumping CDP_BUILD_NUMBER to contain HIVE-22158
   @SkipIfHive2.acid
-  @pytest.mark.xfail(run=True, reason="May fail on Hive3 versions without HIVE-22158")
   @pytest.mark.execute_serially
   @CustomClusterTestSuite.with_args(hive_conf_dir=HIVE_SITE_EXT_DIR)
   def test_ctas_read_write_consistence(self, unique_database):
