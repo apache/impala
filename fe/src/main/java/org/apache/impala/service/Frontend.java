@@ -1695,12 +1695,17 @@ public class Frontend {
       finalizeParams.setTable_db(db == null ? queryCtx.session.database : db);
       FeFsTable hdfsTable = (FeFsTable) insertStmt.getTargetTable();
       finalizeParams.setHdfs_base_dir(hdfsTable.getHdfsBaseDir());
-      finalizeParams.setStaging_dir(
-          hdfsTable.getHdfsBaseDir() + "/_impala_insert_staging");
       if (insertStmt.getWriteId() != -1) {
         Preconditions.checkState(queryCtx.isSetTransaction_id());
         finalizeParams.setTransaction_id(queryCtx.getTransaction_id());
         finalizeParams.setWrite_id(insertStmt.getWriteId());
+      } else {
+        // TODO: Currently this flag only controls the removal of the query-level staging
+        // directory. HdfsTableSink (that creates the staging dir) calculates the path
+        // independently. So it'd be better to either remove this option, or make it used
+        // everywhere where the staging directory is referenced.
+        finalizeParams.setStaging_dir(
+            hdfsTable.getHdfsBaseDir() + "/_impala_insert_staging");
       }
       queryExecRequest.setFinalize_params(finalizeParams);
     }

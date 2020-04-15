@@ -584,6 +584,9 @@ class Coordinator { // NOLINT: The member variables could be re-ordered to save 
   /// fragment on that node failed due to a disk IO error.
   void UpdateBlacklistWithAuxErrorInfo(std::vector<AuxErrorInfoPB>* aux_error_info);
 
+  /// Deletes the query-level staging directory.
+  Status DeleteQueryLevelStagingDir();
+
   /// BackendState and BackendResourceState are private to the Coordinator class, so mark
   /// all tests in CoordinatorBackendStateTest as friends.
   friend class CoordinatorBackendStateTest;
