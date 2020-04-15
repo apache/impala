@@ -28,7 +28,7 @@ from subprocess import check_call
 from tests.common.environ import HIVE_MAJOR_VERSION
 from tests.common.test_dimensions import create_exec_option_dimension_from_dict
 from tests.common.impala_test_suite import ImpalaTestSuite, LOG
-from tests.util.filesystem_utils import WAREHOUSE, get_fs_path
+from tests.util.filesystem_utils import IS_HDFS, WAREHOUSE, get_fs_path
 from tests.util.test_file_parser import QueryTestSectionReader
 
 # Random fuzz testing of HDFS scanners. Existing tables for any HDFS file format
@@ -176,6 +176,8 @@ class TestScannersFuzzing(ImpalaTestSuite):
 
     table_format = vector.get_value('table_format')
     if HIVE_MAJOR_VERSION == 3 and table_format.file_format == 'orc':
+      # TODO: Enable this test on non-HDFS filesystems once IMPALA-9365 is resolved.
+      if not IS_HDFS: pytest.skip()
       self.run_stmt_in_hive("create table %s.%s like %s.%s" % (fuzz_db, fuzz_table,
           src_db, src_table))
       self.run_stmt_in_hive("insert into %s.%s select * from %s.%s" % (fuzz_db,

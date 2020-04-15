@@ -220,6 +220,13 @@ class TestNestedTypesNoMtDop(ImpalaTestSuite):
     self.run_test_case('QueryTest/nested-types-basic-partitioned', vector,
         unique_database)
 
+  # Skip this test on non-HDFS filesystems, because the test contains Hive
+  # queries that hang in some cases due to IMPALA-9365.
+  @SkipIfABFS.hive
+  @SkipIfADLS.hive
+  @SkipIfIsilon.hive
+  @SkipIfLocal.hive
+  @SkipIfS3.hive
   @SkipIfHive2.acid
   def test_partitioned_table_acid(self, vector, unique_database):
     """IMPALA-6370: Test that a partitioned table with nested types can be scanned."""

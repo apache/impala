@@ -55,7 +55,7 @@ from tests.common.test_result_verifier import (
     QueryTestResult,
     parse_result_rows)
 from tests.common.test_vector import ImpalaTestDimension
-from tests.util.filesystem_utils import WAREHOUSE, get_fs_path
+from tests.util.filesystem_utils import IS_HDFS, WAREHOUSE, get_fs_path
 from tests.util.hdfs_util import NAMENODE
 from tests.util.get_parquet_metadata import get_parquet_metadata
 from tests.util.parse_util import get_bytes_summary_stats_counter
@@ -203,6 +203,8 @@ class TestUnmatchedSchema(ImpalaTestSuite):
     self._drop_test_table(vector)
     file_format = vector.get_value('table_format').file_format
     if file_format == 'orc':
+      # TODO: Enable this test on non-HDFS filesystems once IMPALA-9365 is resolved.
+      if not IS_HDFS: pytest.skip()
       db_name = "functional" + vector.get_value('table_format').db_suffix()
       self.run_stmt_in_hive(
           "create table %s.jointbl_test like functional.jointbl "

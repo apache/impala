@@ -26,6 +26,7 @@ from tests.common.impala_test_suite import ImpalaTestSuite
 from tests.common.kudu_test_suite import KuduTestSuite
 from tests.common.skip import SkipIfABFS, SkipIfEC, SkipIfNotHdfsMinicluster
 from tests.common.test_vector import ImpalaTestDimension
+from tests.util.filesystem_utils import IS_HDFS
 
 WAIT_TIME_MS = build_flavor_timeout(60000, slow_build_timeout=100000)
 
@@ -68,6 +69,8 @@ class TestMtDop(ImpalaTestSuite):
         "create external table %s like functional_hbase.alltypes" % fq_table_name)
       expected_results = "Updated 1 partition(s) and 13 column(s)."
     elif HIVE_MAJOR_VERSION == 3 and file_format == 'orc':
+      # TODO: Enable this test on non-HDFS filesystems once IMPALA-9365 is resolved.
+      if not IS_HDFS: pytest.skip()
       self.run_stmt_in_hive(
           "create table %s like functional_orc_def.alltypes" % fq_table_name)
       self.run_stmt_in_hive(
