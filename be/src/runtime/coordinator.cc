@@ -754,7 +754,15 @@ Status Coordinator::FinalizeHdfsDml() {
   } else if (is_transactional) {
     parent_request_state_->AbortTransaction();
   }
+  if (is_transactional) {
+    DCHECK(!finalize_params()->__isset.staging_dir);
+  } else {
+    RETURN_IF_ERROR(DeleteQueryLevelStagingDir());
+  }
+  return return_status;
+}
 
+Status Coordinator::DeleteQueryLevelStagingDir() {
   stringstream staging_dir;
   DCHECK(finalize_params()->__isset.staging_dir);
   staging_dir << finalize_params()->staging_dir << "/" << PrintId(query_id(),"_") << "/";
@@ -763,8 +771,7 @@ Status Coordinator::FinalizeHdfsDml() {
   RETURN_IF_ERROR(HdfsFsCache::instance()->GetConnection(staging_dir.str(), &hdfs_conn));
   VLOG_QUERY << "Removing staging directory: " << staging_dir.str();
   hdfsDelete(hdfs_conn, staging_dir.str().c_str(), 1);
-
-  return return_status;
+  return Status::OK();
 }
 
 void Coordinator::WaitForBackends() {
