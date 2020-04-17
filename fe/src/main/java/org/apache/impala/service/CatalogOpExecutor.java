@@ -4511,6 +4511,8 @@ public class CatalogOpExecutor {
       }
     }
 
+    if (insertEventInfos.isEmpty()) return;
+
     MetaStoreClient metaStoreClient = catalog_.getMetaStoreClient();
     List<Long> eventIds = MetastoreShim.fireInsertEvents(metaStoreClient,
         insertEventInfos, table.getDb().getName(), table.getName());
