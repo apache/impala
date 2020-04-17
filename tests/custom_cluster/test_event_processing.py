@@ -237,6 +237,15 @@ class TestEventProcessing(CustomClusterTestSuite):
     tbl_name = self.__get_random_name("tbl_")
     tbl2 = self.__get_random_name("tbl_")
     view_name = self.__get_random_name("view_")
+    # create a empty table for both partitioned and unpartitioned case for testing insert
+    # events
+    empty_unpartitioned_tbl = self.__get_random_name("insert_test_tbl_")
+    empty_partitioned_tbl = self.__get_random_name("insert_test_parttbl_")
+    self.client.execute(
+      "create table {0}.{1} (c1 int)".format(db_name, empty_unpartitioned_tbl))
+    self.client.execute(
+      "create table {0}.{1} (c1 int) partitioned by (part int)".format(db_name,
+        empty_partitioned_tbl))
     self_event_test_queries = {
       # Queries which will increment the self-events-skipped counter
       True: [
@@ -289,7 +298,12 @@ class TestEventProcessing(CustomClusterTestSuite):
             db_name, tbl_name),
           # drop non-existing partition; essentially this is a no-op
           "alter table {0}.{1} drop if exists partition (year=2100, month=1)".format(
-            db_name, tbl_name)]
+            db_name, tbl_name),
+          "insert overwrite {0}.{1} select * from {0}.{1}".format(
+            db_name, empty_unpartitioned_tbl),
+          "insert overwrite {0}.{1} partition(part) select * from {0}.{1}".format(
+            db_name, empty_partitioned_tbl),
+      ]
     }
     if HIVE_MAJOR_VERSION >= 3:
       # insert into a existing partition; generates INSERT events

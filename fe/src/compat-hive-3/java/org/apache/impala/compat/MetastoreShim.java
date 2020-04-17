@@ -88,8 +88,6 @@ import org.apache.hive.service.rpc.thrift.TGetFunctionsReq;
 import org.apache.hive.service.rpc.thrift.TGetSchemasReq;
 import org.apache.hive.service.rpc.thrift.TGetTablesReq;
 import org.apache.impala.authorization.User;
-import org.apache.impala.catalog.CatalogServiceCatalog;
-import org.apache.impala.catalog.HdfsPartition;
 import org.apache.impala.catalog.MetaStoreClientPool.MetaStoreClient;
 import org.apache.impala.common.ImpalaException;
 import org.apache.impala.common.ImpalaRuntimeException;
@@ -103,17 +101,19 @@ import org.apache.impala.thrift.TResultSet;
 import org.apache.impala.util.AcidUtils;
 import org.apache.impala.util.AcidUtils.TblTransaction;
 import org.apache.impala.util.MetaStoreUtil.InsertEventInfo;
-import org.apache.log4j.Logger;
 import org.apache.thrift.TException;
 
 import com.google.common.base.Preconditions;
 import com.google.common.collect.Lists;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
+
 /**
  * A wrapper around some of Hive's Metastore API's to abstract away differences
  * between major versions of Hive. This implements the shimmed methods for Hive 3.
  */
 public class MetastoreShim {
-  private static final Logger LOG = Logger.getLogger(MetastoreShim.class);
+  private static final Logger LOG = LoggerFactory.getLogger(MetastoreShim.class);
 
   private static final String EXTWRITE = "EXTWRITE";
   private static final String EXTREAD = "EXTREAD";
@@ -1029,6 +1029,8 @@ public class MetastoreShim {
     Preconditions.checkNotNull(msClient);
     Preconditions.checkNotNull(dbName);
     Preconditions.checkNotNull(tableName);
+    Preconditions.checkState(!insertEventInfos.isEmpty(), "Atleast one insert event "
+        + "info must be provided.");
     LOG.debug(String.format(
         "Firing %s insert event for %s", insertEventInfos.size(), tableName));
     FireEventRequestData data = new FireEventRequestData();
@@ -1053,7 +1055,12 @@ public class MetastoreShim {
       data.setInsertDatas(insertDatas);
     }
     FireEventResponse response = msClient.fireListenerEvent(rqst);
-
+    if (!response.isSetEventIds()) {
+      LOG.error("FireEventResponse does not have event ids set for table {}.{}. This "
+              + "may cause the table to unnecessarily be refreshed when the insert event "
+              + "is received.", dbName, tableName);
+      return Collections.EMPTY_LIST;
+    }
     return response.getEventIds();
   }
 }
