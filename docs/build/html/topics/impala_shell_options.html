@@ -4,8 +4,8 @@
 <html xmlns="http://www.w3.org/1999/xhtml" xml:lang="en" lang="en">
 <head><meta http-equiv="Content-Type" content="text/html; charset=UTF-8" />
 
-<meta name="copyright" content="(C) Copyright 2019" />
-<meta name="DC.rights.owner" content="(C) Copyright 2019" />
+<meta name="copyright" content="(C) Copyright 2020" />
+<meta name="DC.rights.owner" content="(C) Copyright 2020" />
 <meta name="DC.Type" content="concept" />
 <meta name="DC.Title" content="impala-shell Configuration Options" />
 <meta name="DC.Relation" scheme="URI" content="../topics/impala_impala_shell.html" />
@@ -13,10 +13,10 @@
 <meta name="prodname" content="Impala" />
 <meta name="prodname" content="Impala" />
 <meta name="prodname" content="Impala" />
-<meta name="version" content="Impala 3.3.x" />
-<meta name="version" content="Impala 3.3.x" />
-<meta name="version" content="Impala 3.3.x" />
-<meta name="version" content="Impala 3.3.x" />
+<meta name="version" content="Impala 3.4.x" />
+<meta name="version" content="Impala 3.4.x" />
+<meta name="version" content="Impala 3.4.x" />
+<meta name="version" content="Impala 3.4.x" />
 <meta name="DC.Format" content="XHTML" />
 <meta name="DC.Identifier" content="shell_options" />
 <link rel="stylesheet" type="text/css" href="../commonltr.css" />
@@ -32,11 +32,11 @@
 
   <div class="body conbody">
 
-    <p class="p">
-      You can specify the following options when starting the <code class="ph codeph">impala-shell</code> command to change how
-      shell commands are executed. The table shows the format to use when specifying each option on the command
-      line, or through the <span class="ph filepath">$HOME/.impalarc</span> configuration file.
-    </p>
+    <p class="p"> You can specify the following options when starting the
+        <code class="ph codeph">impala-shell</code> command to change how shell commands are
+      executed. The table shows the format to use when specifying each option on
+      the command line, or through the <code class="ph codeph">impala-shell</code>
+      configuration file. </p>
 
 
     <div class="note note"><span class="notetitle">Note:</span> 
@@ -74,15 +74,15 @@
       
 <div class="tablenoborder"><table cellpadding="4" cellspacing="0" summary="" class="table" frame="border" border="1" rules="all"><colgroup><col style="width:25%" /><col style="width:25%" /><col style="width:50%" /></colgroup><thead class="thead" style="text-align:left;">
             <tr class="row">
-              <th class="entry nocellnorowborder" style="vertical-align:top;" id="d192375e141">
+              <th class="entry nocellnorowborder" style="vertical-align:top;" id="d196584e141">
                 Command-Line Option
               </th>
 
-              <th class="entry nocellnorowborder" style="vertical-align:top;" id="d192375e144">
+              <th class="entry nocellnorowborder" style="vertical-align:top;" id="d196584e144">
                 Configuration File Setting
               </th>
 
-              <th class="entry cell-norowborder" style="vertical-align:top;" id="d192375e147">
+              <th class="entry cell-norowborder" style="vertical-align:top;" id="d196584e147">
                 Explanation
               </th>
 
@@ -91,21 +91,21 @@
           </thead>
 <tbody class="tbody">
             <tr class="row">
-              <td class="entry nocellnorowborder" style="vertical-align:top;" headers="d192375e141 ">
+              <td class="entry nocellnorowborder" style="vertical-align:top;" headers="d196584e141 ">
                 <p class="p"> -B or </p>
 
                 <p class="p">--delimited </p>
 
               </td>
 
-              <td class="entry nocellnorowborder" style="vertical-align:top;" headers="d192375e144 ">
+              <td class="entry nocellnorowborder" style="vertical-align:top;" headers="d196584e144 ">
                 <p class="p">
                   write_delimited=true
                 </p>
 
               </td>
 
-              <td class="entry cell-norowborder" style="vertical-align:top;" headers="d192375e147 ">
+              <td class="entry cell-norowborder" style="vertical-align:top;" headers="d196584e147 ">
                 <p class="p">
                   Causes all query results to be printed in plain format as a delimited text file. Useful for
                   producing data files to be used with other Hadoop components. Also useful for avoiding the
@@ -120,7 +120,7 @@
             </tr>
 
             <tr class="row">
-              <td class="entry nocellnorowborder" style="vertical-align:top;" headers="d192375e141 ">
+              <td class="entry nocellnorowborder" style="vertical-align:top;" headers="d196584e141 ">
                 <p class="p">
                   -b or
                 </p>
@@ -131,7 +131,7 @@
 
               </td>
 
-              <td class="entry nocellnorowborder" style="vertical-align:top;" headers="d192375e144 ">
+              <td class="entry nocellnorowborder" style="vertical-align:top;" headers="d196584e144 ">
                 <p class="p">
                   kerberos_host_fqdn=
                 </p>
@@ -142,7 +142,7 @@
 
               </td>
 
-              <td class="entry cell-norowborder" style="vertical-align:top;" headers="d192375e147 ">
+              <td class="entry cell-norowborder" style="vertical-align:top;" headers="d196584e147 ">
                 <p class="p">
                   If set, the setting overrides the expected hostname of the
                   Impala daemon's Kerberos service principal.
@@ -158,21 +158,21 @@
             </tr>
 
             <tr class="row">
-              <td class="entry nocellnorowborder" style="vertical-align:top;" headers="d192375e141 ">
+              <td class="entry nocellnorowborder" style="vertical-align:top;" headers="d196584e141 ">
                 <p class="p">
                   --print_header
                 </p>
 
               </td>
 
-              <td class="entry nocellnorowborder" style="vertical-align:top;" headers="d192375e144 ">
+              <td class="entry nocellnorowborder" style="vertical-align:top;" headers="d196584e144 ">
                 <p class="p">
                   print_header=true
                 </p>
 
               </td>
 
-              <td class="entry cell-norowborder" style="vertical-align:top;" headers="d192375e147 ">
+              <td class="entry cell-norowborder" style="vertical-align:top;" headers="d196584e147 ">
                 <p class="p"></p>
 
               </td>
@@ -180,7 +180,7 @@
             </tr>
 
             <tr class="row">
-              <td class="entry nocellnorowborder" style="vertical-align:top;" headers="d192375e141 ">
+              <td class="entry nocellnorowborder" style="vertical-align:top;" headers="d196584e141 ">
                 <p class="p"> -o <var class="keyword varname">filename</var> or </p>
 
                 <p class="p">--output_file <var class="keyword varname">filename</var>
@@ -188,14 +188,14 @@
 
               </td>
 
-              <td class="entry nocellnorowborder" style="vertical-align:top;" headers="d192375e144 ">
+              <td class="entry nocellnorowborder" style="vertical-align:top;" headers="d196584e144 ">
                 <p class="p">
                   output_file=<var class="keyword varname">filename</var>
                 </p>
 
               </td>
 
-              <td class="entry cell-norowborder" style="vertical-align:top;" headers="d192375e147 ">
+              <td class="entry cell-norowborder" style="vertical-align:top;" headers="d196584e147 ">
                 <p class="p">
                   Stores all query results in the specified file. Typically used to store the results of a single
                   query issued from the command line with the <code class="ph codeph">-q</code> option. Also works for
@@ -210,21 +210,21 @@
             </tr>
 
             <tr class="row">
-              <td class="entry nocellnorowborder" style="vertical-align:top;" headers="d192375e141 ">
+              <td class="entry nocellnorowborder" style="vertical-align:top;" headers="d196584e141 ">
                 <p class="p">
                   --output_delimiter=<var class="keyword varname">character</var>
                 </p>
 
               </td>
 
-              <td class="entry nocellnorowborder" style="vertical-align:top;" headers="d192375e144 ">
+              <td class="entry nocellnorowborder" style="vertical-align:top;" headers="d196584e144 ">
                 <p class="p">
                   output_delimiter=<var class="keyword varname">character</var>
                 </p>
 
               </td>
 
-              <td class="entry cell-norowborder" style="vertical-align:top;" headers="d192375e147 ">
+              <td class="entry cell-norowborder" style="vertical-align:top;" headers="d196584e147 ">
                 <p class="p">
                   Specifies the character to use as a delimiter between fields when query results are printed in
                   plain format by the <code class="ph codeph">-B</code> option. Defaults to tab (<code class="ph codeph">'\t'</code>). If an
@@ -237,21 +237,21 @@
             </tr>
 
             <tr class="row">
-              <td class="entry nocellnorowborder" style="vertical-align:top;" headers="d192375e141 ">
+              <td class="entry nocellnorowborder" style="vertical-align:top;" headers="d196584e141 ">
                 <p class="p"> -p or </p>
 
                 <p class="p">--show_profiles </p>
 
               </td>
 
-              <td class="entry nocellnorowborder" style="vertical-align:top;" headers="d192375e144 ">
+              <td class="entry nocellnorowborder" style="vertical-align:top;" headers="d196584e144 ">
                 <p class="p">
                   show_profiles=true
                 </p>
 
               </td>
 
-              <td class="entry cell-norowborder" style="vertical-align:top;" headers="d192375e147 ">
+              <td class="entry cell-norowborder" style="vertical-align:top;" headers="d196584e147 ">
                 <p class="p">
                   Displays the query execution plan (same output as the <code class="ph codeph">EXPLAIN</code> statement) and a
                   more detailed low-level breakdown of execution steps, for every query executed by the shell.
@@ -262,21 +262,21 @@
             </tr>
 
             <tr class="row">
-              <td class="entry nocellnorowborder" style="vertical-align:top;" headers="d192375e141 ">
+              <td class="entry nocellnorowborder" style="vertical-align:top;" headers="d196584e141 ">
                 <p class="p"> -h or </p>
 
                 <p class="p">--help </p>
 
               </td>
 
-              <td class="entry nocellnorowborder" style="vertical-align:top;" headers="d192375e144 ">
+              <td class="entry nocellnorowborder" style="vertical-align:top;" headers="d196584e144 ">
                 <p class="p">
                   N/A
                 </p>
 
               </td>
 
-              <td class="entry cell-norowborder" style="vertical-align:top;" headers="d192375e147 ">
+              <td class="entry cell-norowborder" style="vertical-align:top;" headers="d196584e147 ">
                 <p class="p">
                   Displays help information.
                 </p>
@@ -286,21 +286,21 @@
             </tr>
 
             <tr class="row">
-              <td class="entry nocellnorowborder" style="vertical-align:top;" headers="d192375e141 ">
+              <td class="entry nocellnorowborder" style="vertical-align:top;" headers="d196584e141 ">
                 <p class="p">
                   N/A
                 </p>
 
               </td>
 
-              <td class="entry nocellnorowborder" style="vertical-align:top;" headers="d192375e144 ">
+              <td class="entry nocellnorowborder" style="vertical-align:top;" headers="d196584e144 ">
                 <p class="p">
                   history_max=1000
                 </p>
 
               </td>
 
-              <td class="entry cell-norowborder" style="vertical-align:top;" headers="d192375e147 ">
+              <td class="entry cell-norowborder" style="vertical-align:top;" headers="d196584e147 ">
                 <p class="p">
                   Sets the maximum number of queries to store in the history file.
                 </p>
@@ -310,21 +310,21 @@
             </tr>
 
             <tr class="row">
-              <td class="entry nocellnorowborder" style="vertical-align:top;" headers="d192375e141 ">
+              <td class="entry nocellnorowborder" style="vertical-align:top;" headers="d196584e141 ">
                 <p class="p"> -i <var class="keyword varname">hostname</var> or </p>
 
                 <p class="p">--impalad=<var class="keyword varname">hostname</var>[:<var class="keyword varname">portnum</var>] </p>
 
               </td>
 
-              <td class="entry nocellnorowborder" style="vertical-align:top;" headers="d192375e144 ">
+              <td class="entry nocellnorowborder" style="vertical-align:top;" headers="d196584e144 ">
                 <p class="p">
                   impalad=<var class="keyword varname">hostname</var>[:<var class="keyword varname">portnum</var>]
                 </p>
 
               </td>
 
-              <td class="entry cell-norowborder" style="vertical-align:top;" headers="d192375e147 ">
+              <td class="entry cell-norowborder" style="vertical-align:top;" headers="d196584e147 ">
                 <p class="p">
                   Connects to the <code class="ph codeph">impalad</code> daemon on the specified host. The default port of 21000
                   is assumed unless you provide another value. You can connect to any host in your cluster that is
@@ -338,7 +338,7 @@
             </tr>
 
             <tr class="row">
-              <td class="entry nocellnorowborder" style="vertical-align:top;" headers="d192375e141 ">
+              <td class="entry nocellnorowborder" style="vertical-align:top;" headers="d196584e141 ">
                 <p class="p"> -q <var class="keyword varname">query</var> or </p>
 
                 <p class="p">--query=<var class="keyword varname">query</var>
@@ -346,14 +346,14 @@
 
               </td>
 
-              <td class="entry nocellnorowborder" style="vertical-align:top;" headers="d192375e144 ">
+              <td class="entry nocellnorowborder" style="vertical-align:top;" headers="d196584e144 ">
                 <p class="p">
                   query=<var class="keyword varname">query</var>
                 </p>
 
               </td>
 
-              <td class="entry cell-norowborder" style="vertical-align:top;" headers="d192375e147 ">
+              <td class="entry cell-norowborder" style="vertical-align:top;" headers="d196584e147 ">
                 <p class="p">
                   Passes a query or other <span class="keyword cmdname">impala-shell</span> command from the command line. The
                   <span class="keyword cmdname">impala-shell</span> interpreter immediately exits after processing the statement. It
@@ -370,7 +370,7 @@
             </tr>
 
             <tr class="row">
-              <td class="entry nocellnorowborder" style="vertical-align:top;" headers="d192375e141 ">
+              <td class="entry nocellnorowborder" style="vertical-align:top;" headers="d196584e141 ">
                 <p class="p"> -f <var class="keyword varname">query_file</var> or</p>
 
                 <p class="p"> --query_file=<var class="keyword varname">query_file</var>
@@ -378,14 +378,14 @@
 
               </td>
 
-              <td class="entry nocellnorowborder" style="vertical-align:top;" headers="d192375e144 ">
+              <td class="entry nocellnorowborder" style="vertical-align:top;" headers="d196584e144 ">
                 <p class="p">
                   query_file=<var class="keyword varname">path_to_query_file</var>
                 </p>
 
               </td>
 
-              <td class="entry cell-norowborder" style="vertical-align:top;" headers="d192375e147 ">
+              <td class="entry cell-norowborder" style="vertical-align:top;" headers="d196584e147 ">
                 <p class="p">
                   Passes a SQL query from a file. Multiple statements must be semicolon (;) delimited.
                   <span class="ph">In <span class="keyword">Impala 2.3</span> and higher, you can specify a filename of <code class="ph codeph">-</code>
@@ -398,7 +398,7 @@
             </tr>
 
             <tr class="row">
-              <td class="entry nocellnorowborder" style="vertical-align:top;" headers="d192375e141 ">
+              <td class="entry nocellnorowborder" style="vertical-align:top;" headers="d196584e141 ">
                 <p class="p"> --query_option=</p>
 
                 <p class="p">"<var class="keyword varname">option</var>=</p>
@@ -411,7 +411,7 @@
 
               </td>
 
-              <td class="entry nocellnorowborder" style="vertical-align:top;" headers="d192375e144 ">
+              <td class="entry nocellnorowborder" style="vertical-align:top;" headers="d196584e144 ">
                 <p class="p">
                  Header line <code class="ph codeph">[impala.query_options]</code>,
                  followed on subsequent lines by <var class="keyword varname">option</var>=<var class="keyword varname">value</var>, one option per line.
@@ -419,7 +419,7 @@
 
               </td>
 
-              <td class="entry cell-norowborder" style="vertical-align:top;" headers="d192375e147 ">
+              <td class="entry cell-norowborder" style="vertical-align:top;" headers="d196584e147 ">
                 <p class="p">
                   Sets default query options for an invocation of the <span class="keyword cmdname">impala-shell</span> command.
                   To set multiple query options at once, use more than one instance of this command-line option.
@@ -431,21 +431,21 @@
             </tr>
 
             <tr class="row">
-              <td class="entry nocellnorowborder" style="vertical-align:top;" headers="d192375e141 ">
+              <td class="entry nocellnorowborder" style="vertical-align:top;" headers="d196584e141 ">
                 <p class="p"> -k or </p>
 
                 <p class="p">--kerberos </p>
 
               </td>
 
-              <td class="entry nocellnorowborder" style="vertical-align:top;" headers="d192375e144 ">
+              <td class="entry nocellnorowborder" style="vertical-align:top;" headers="d196584e144 ">
                 <p class="p">
                   use_kerberos=true
                 </p>
 
               </td>
 
-              <td class="entry cell-norowborder" style="vertical-align:top;" headers="d192375e147 ">
+              <td class="entry cell-norowborder" style="vertical-align:top;" headers="d196584e147 ">
                 <p class="p">
                   Kerberos authentication is used when the shell connects to <code class="ph codeph">impalad</code>. If Kerberos
                   is not enabled on the instance of <code class="ph codeph">impalad</code> to which you are connecting, errors
@@ -462,7 +462,7 @@
             </tr>
 
             <tr class="row">
-              <td class="entry nocellnorowborder" style="vertical-align:top;" headers="d192375e141 ">
+              <td class="entry nocellnorowborder" style="vertical-align:top;" headers="d196584e141 ">
                 <p class="p"> -s <var class="keyword varname">kerberos_service_name</var> or </p>
 
                 <p class="p">--kerberos_service_name=<var class="keyword varname">name</var>
@@ -470,14 +470,14 @@
 
               </td>
 
-              <td class="entry nocellnorowborder" style="vertical-align:top;" headers="d192375e144 ">
+              <td class="entry nocellnorowborder" style="vertical-align:top;" headers="d196584e144 ">
                 <p class="p">
                   kerberos_service_name=<var class="keyword varname">name</var>
                 </p>
 
               </td>
 
-              <td class="entry cell-norowborder" style="vertical-align:top;" headers="d192375e147 ">
+              <td class="entry cell-norowborder" style="vertical-align:top;" headers="d196584e147 ">
                 <p class="p">
                   Instructs <code class="ph codeph">impala-shell</code> to authenticate to a particular <code class="ph codeph">impalad</code>
                   service principal. If a <var class="keyword varname">kerberos_service_name</var> is not specified,
@@ -490,21 +490,21 @@
             </tr>
 
             <tr class="row">
-              <td class="entry nocellnorowborder" style="vertical-align:top;" headers="d192375e141 ">
+              <td class="entry nocellnorowborder" style="vertical-align:top;" headers="d196584e141 ">
                 <p class="p"> -V or </p>
 
                 <p class="p">--verbose </p>
 
               </td>
 
-              <td class="entry nocellnorowborder" style="vertical-align:top;" headers="d192375e144 ">
+              <td class="entry nocellnorowborder" style="vertical-align:top;" headers="d196584e144 ">
                 <p class="p">
                   verbose=true
                 </p>
 
               </td>
 
-              <td class="entry cell-norowborder" style="vertical-align:top;" headers="d192375e147 ">
+              <td class="entry cell-norowborder" style="vertical-align:top;" headers="d196584e147 ">
                 <p class="p">
                   Enables verbose output.
                 </p>
@@ -515,21 +515,21 @@
 
             <tr class="row">
 
-              <td class="entry nocellnorowborder" style="vertical-align:top;" headers="d192375e141 ">
+              <td class="entry nocellnorowborder" style="vertical-align:top;" headers="d196584e141 ">
                 <p class="p">
                   --quiet
                 </p>
 
               </td>
 
-              <td class="entry nocellnorowborder" style="vertical-align:top;" headers="d192375e144 ">
+              <td class="entry nocellnorowborder" style="vertical-align:top;" headers="d196584e144 ">
                 <p class="p">
                   verbose=false
                 </p>
 
               </td>
 
-              <td class="entry cell-norowborder" style="vertical-align:top;" headers="d192375e147 ">
+              <td class="entry cell-norowborder" style="vertical-align:top;" headers="d196584e147 ">
                 <p class="p">
                   Disables verbose output.
                 </p>
@@ -539,21 +539,21 @@
             </tr>
 
             <tr class="row">
-              <td class="entry nocellnorowborder" style="vertical-align:top;" headers="d192375e141 ">
+              <td class="entry nocellnorowborder" style="vertical-align:top;" headers="d196584e141 ">
                 <p class="p"> -v or </p>
 
                 <p class="p">--version </p>
 
               </td>
 
-              <td class="entry nocellnorowborder" style="vertical-align:top;" headers="d192375e144 ">
+              <td class="entry nocellnorowborder" style="vertical-align:top;" headers="d196584e144 ">
                 <p class="p">
                   version=true
                 </p>
 
               </td>
 
-              <td class="entry cell-norowborder" style="vertical-align:top;" headers="d192375e147 ">
+              <td class="entry cell-norowborder" style="vertical-align:top;" headers="d196584e147 ">
                 <p class="p">
                   Displays version information.
                 </p>
@@ -563,21 +563,21 @@
             </tr>
 
             <tr class="row">
-              <td class="entry nocellnorowborder" style="vertical-align:top;" headers="d192375e141 ">
+              <td class="entry nocellnorowborder" style="vertical-align:top;" headers="d196584e141 ">
                 <p class="p">
                   -c
                 </p>
 
               </td>
 
-              <td class="entry nocellnorowborder" style="vertical-align:top;" headers="d192375e144 ">
+              <td class="entry nocellnorowborder" style="vertical-align:top;" headers="d196584e144 ">
                 <p class="p">
                   ignore_query_failure=true
                 </p>
 
               </td>
 
-              <td class="entry cell-norowborder" style="vertical-align:top;" headers="d192375e147 ">
+              <td class="entry cell-norowborder" style="vertical-align:top;" headers="d196584e147 ">
                 <p class="p">
                   Continues on query failure.
                 </p>
@@ -587,7 +587,7 @@
             </tr>
 
             <tr class="row">
-              <td class="entry nocellnorowborder" style="vertical-align:top;" headers="d192375e141 ">
+              <td class="entry nocellnorowborder" style="vertical-align:top;" headers="d196584e141 ">
                 <p class="p"> -d <var class="keyword varname">default_db</var> or </p>
 
                 <p class="p">--database=<var class="keyword varname">default_db</var>
@@ -595,14 +595,14 @@
 
               </td>
 
-              <td class="entry nocellnorowborder" style="vertical-align:top;" headers="d192375e144 ">
+              <td class="entry nocellnorowborder" style="vertical-align:top;" headers="d196584e144 ">
                 <p class="p">
                   default_db=<var class="keyword varname">default_db</var>
                 </p>
 
               </td>
 
-              <td class="entry cell-norowborder" style="vertical-align:top;" headers="d192375e147 ">
+              <td class="entry cell-norowborder" style="vertical-align:top;" headers="d196584e147 ">
                 <p class="p">
                   Specifies the database to be used on startup. Same as running the
                   <code class="ph codeph"><a class="xref" href="impala_use.html#use">USE</a></code> statement after connecting. If not
@@ -614,30 +614,30 @@
             </tr>
 
             <tr class="row">
-              <td class="entry nocellnorowborder" style="vertical-align:top;" headers="d192375e141 ">
+              <td class="entry nocellnorowborder" style="vertical-align:top;" headers="d196584e141 ">
                 -ssl
               </td>
 
-              <td class="entry nocellnorowborder" style="vertical-align:top;" headers="d192375e144 ">
+              <td class="entry nocellnorowborder" style="vertical-align:top;" headers="d196584e144 ">
                 ssl=true
               </td>
 
-              <td class="entry cell-norowborder" style="vertical-align:top;" headers="d192375e147 ">
+              <td class="entry cell-norowborder" style="vertical-align:top;" headers="d196584e147 ">
                 Enables TLS/SSL for <span class="keyword cmdname">impala-shell</span>.
               </td>
 
             </tr>
 
             <tr class="row">
-              <td class="entry nocellnorowborder" style="vertical-align:top;" headers="d192375e141 ">
+              <td class="entry nocellnorowborder" style="vertical-align:top;" headers="d196584e141 ">
                 --ca_cert=<var class="keyword varname">path_to_certificate</var>
               </td>
 
-              <td class="entry nocellnorowborder" style="vertical-align:top;" headers="d192375e144 ">
+              <td class="entry nocellnorowborder" style="vertical-align:top;" headers="d196584e144 ">
                 ca_cert=<var class="keyword varname">path_to_certificate</var>
               </td>
 
-              <td class="entry cell-norowborder" style="vertical-align:top;" headers="d192375e147 ">
+              <td class="entry cell-norowborder" style="vertical-align:top;" headers="d196584e147 ">
                 The local pathname pointing to the third-party CA certificate, or to a copy of the server
                 certificate for self-signed server certificates. If <code class="ph codeph">--ca_cert</code> is not set,
                 <span class="keyword cmdname">impala-shell</span> enables TLS/SSL, but does not validate the server certificate. This is
@@ -648,30 +648,30 @@
             </tr>
 
             <tr class="row">
-              <td class="entry nocellnorowborder" style="vertical-align:top;" headers="d192375e141 ">
+              <td class="entry nocellnorowborder" style="vertical-align:top;" headers="d196584e141 ">
                 -l
               </td>
 
-              <td class="entry nocellnorowborder" style="vertical-align:top;" headers="d192375e144 ">
+              <td class="entry nocellnorowborder" style="vertical-align:top;" headers="d196584e144 ">
                 use_ldap=true
               </td>
 
-              <td class="entry cell-norowborder" style="vertical-align:top;" headers="d192375e147 ">
+              <td class="entry cell-norowborder" style="vertical-align:top;" headers="d196584e147 ">
                 Enables LDAP authentication.
               </td>
 
             </tr>
 
             <tr class="row">
-              <td class="entry nocellnorowborder" style="vertical-align:top;" headers="d192375e141 ">
+              <td class="entry nocellnorowborder" style="vertical-align:top;" headers="d196584e141 ">
                 -u
               </td>
 
-              <td class="entry nocellnorowborder" style="vertical-align:top;" headers="d192375e144 ">
+              <td class="entry nocellnorowborder" style="vertical-align:top;" headers="d196584e144 ">
                 user=<var class="keyword varname">user_name</var>
               </td>
 
-              <td class="entry cell-norowborder" style="vertical-align:top;" headers="d192375e147 ">
+              <td class="entry cell-norowborder" style="vertical-align:top;" headers="d196584e147 ">
                 Supplies the username, when LDAP authentication is enabled by the <code class="ph codeph">-l</code> option.
                 (Specify the short username, not the full LDAP distinguished name.) The shell then prompts
                 interactively for the password.
@@ -680,15 +680,15 @@
             </tr>
 
             <tr class="row">
-              <td class="entry nocellnorowborder" style="vertical-align:top;" headers="d192375e141 ">
+              <td class="entry nocellnorowborder" style="vertical-align:top;" headers="d196584e141 ">
                 --ldap_password_cmd=<var class="keyword varname">command</var>
               </td>
 
-              <td class="entry nocellnorowborder" style="vertical-align:top;" headers="d192375e144 ">
+              <td class="entry nocellnorowborder" style="vertical-align:top;" headers="d196584e144 ">
                 N/A
               </td>
 
-              <td class="entry cell-norowborder" style="vertical-align:top;" headers="d192375e147 ">
+              <td class="entry cell-norowborder" style="vertical-align:top;" headers="d196584e147 ">
                 Specifies a command to run to retrieve the LDAP password,
                 when LDAP authentication is enabled by the <code class="ph codeph">-l</code> option.
                 If the command includes space-separated arguments, enclose the command and
@@ -698,50 +698,58 @@
             </tr>
 
             <tr class="row">
-              <td class="entry nocellnorowborder" style="vertical-align:top;" headers="d192375e141 ">
+              <td class="entry nocellnorowborder" style="vertical-align:top;" headers="d196584e141 ">
                 --config_file=<var class="keyword varname">path_to_config_file</var>
               </td>
 
-              <td class="entry nocellnorowborder" style="vertical-align:top;" headers="d192375e144 ">
+              <td class="entry nocellnorowborder" style="vertical-align:top;" headers="d196584e144 ">
                 N/A
               </td>
 
-              <td class="entry cell-norowborder" style="vertical-align:top;" headers="d192375e147 ">
-                Specifies the path of the file containing <span class="keyword cmdname">impala-shell</span> configuration settings.
-                The default is <span class="ph filepath">$HOME/.impalarc</span>. This setting can only be specified on the
-                command line.
-              </td>
+              <td class="entry cell-norowborder" style="vertical-align:top;" headers="d196584e147 "> Specifies the path of the file containing
+                  <span class="keyword cmdname">impala-shell</span> configuration settings. The
+                default is <span class="ph filepath">/etc/impalarc</span>. This setting can
+                only be specified on the command line. </td>
 
             </tr>
 
             <tr class="row">
-              <td class="entry nocellnorowborder" style="vertical-align:top;" headers="d192375e141 ">--live_progress</td>
+              <td class="entry nocellnorowborder" style="vertical-align:top;" headers="d196584e141 ">--live_progress</td>
 
-              <td class="entry nocellnorowborder" style="vertical-align:top;" headers="d192375e144 ">N/A</td>
+              <td class="entry nocellnorowborder" style="vertical-align:top;" headers="d196584e144 ">live_progress=true</td>
 
-              <td class="entry cell-norowborder" style="vertical-align:top;" headers="d192375e147 ">Prints a progress bar showing roughly the percentage complete for each query.
-              The information is updated interactively as the query progresses.
-              See <a class="xref" href="impala_live_progress.html#live_progress">LIVE_PROGRESS Query Option (Impala 2.3 or higher only)</a>.</td>
+              <td class="entry cell-norowborder" style="vertical-align:top;" headers="d196584e147 ">Prints a progress bar showing roughly the percentage complete for each query.
+                The information is updated interactively as the query progresses.
+                See <a class="xref" href="impala_live_progress.html#live_progress">LIVE_PROGRESS Query Option (Impala 2.3 or higher only)</a>.</td>
 
             </tr>
 
             <tr class="row">
-              <td class="entry nocellnorowborder" style="vertical-align:top;" headers="d192375e141 ">--live_summary</td>
+              <td class="entry nocellnorowborder" style="vertical-align:top;" headers="d196584e141 ">--disable_live_progress</td>
 
-              <td class="entry nocellnorowborder" style="vertical-align:top;" headers="d192375e144 ">N/A</td>
+              <td class="entry nocellnorowborder" style="vertical-align:top;" headers="d196584e144 ">live_progress=false</td>
 
-              <td class="entry cell-norowborder" style="vertical-align:top;" headers="d192375e147 ">Prints a detailed report, similar to the <code class="ph codeph">SUMMARY</code> command, showing progress details for each phase of query execution.
+              <td class="entry cell-norowborder" style="vertical-align:top;" headers="d196584e147 ">A command line flag allows users to disable live_progress in the interactive mode.</td>
+
+            </tr>
+
+            <tr class="row">
+              <td class="entry nocellnorowborder" style="vertical-align:top;" headers="d196584e141 ">--live_summary</td>
+
+              <td class="entry nocellnorowborder" style="vertical-align:top;" headers="d196584e144 ">N/A</td>
+
+              <td class="entry cell-norowborder" style="vertical-align:top;" headers="d196584e147 ">Prints a detailed report, similar to the <code class="ph codeph">SUMMARY</code> command, showing progress details for each phase of query execution.
               The information is updated interactively as the query progresses.
               See <a class="xref" href="impala_live_summary.html#live_summary">LIVE_SUMMARY Query Option (Impala 2.3 or higher only)</a>.</td>
 
             </tr>
 
             <tr class="row">
-              <td class="entry nocellnorowborder" style="vertical-align:top;" headers="d192375e141 ">--var=<var class="keyword varname">variable_name</var>=<var class="keyword varname">value</var></td>
+              <td class="entry nocellnorowborder" style="vertical-align:top;" headers="d196584e141 ">--var=<var class="keyword varname">variable_name</var>=<var class="keyword varname">value</var></td>
 
-              <td class="entry nocellnorowborder" style="vertical-align:top;" headers="d192375e144 ">N/A</td>
+              <td class="entry nocellnorowborder" style="vertical-align:top;" headers="d196584e144 ">N/A</td>
 
-              <td class="entry cell-norowborder" style="vertical-align:top;" headers="d192375e147 ">
+              <td class="entry cell-norowborder" style="vertical-align:top;" headers="d196584e147 ">
                 Defines a substitution variable that can be used within the <span class="keyword cmdname">impala-shell</span> session.
                 The variable can be substituted into statements processed by the <code class="ph codeph">-q</code> or <code class="ph codeph">-f</code> options,
                 or in an interactive shell session.
@@ -752,11 +760,11 @@
             </tr>
 
             <tr class="row">
-              <td class="entry nocellnorowborder" style="vertical-align:top;" headers="d192375e141 ">--auth_creds_ok_in_clear</td>
+              <td class="entry nocellnorowborder" style="vertical-align:top;" headers="d196584e141 ">--auth_creds_ok_in_clear</td>
 
-              <td class="entry nocellnorowborder" style="vertical-align:top;" headers="d192375e144 ">N/A</td>
+              <td class="entry nocellnorowborder" style="vertical-align:top;" headers="d196584e144 ">N/A</td>
 
-              <td class="entry cell-norowborder" style="vertical-align:top;" headers="d192375e147 ">
+              <td class="entry cell-norowborder" style="vertical-align:top;" headers="d196584e147 ">
                 Allows LDAP authentication to be used with an insecure connection to the shell.
                 WARNING: This will allow authentication credentials to be sent unencrypted,
                 and hence may be vulnerable to an attack.
@@ -765,11 +773,11 @@
             </tr>
 
             <tr class="row">
-              <td class="entry row-nocellborder" style="vertical-align:top;" headers="d192375e141 ">--protocol=<var class="keyword varname">protocol</var></td>
+              <td class="entry row-nocellborder" style="vertical-align:top;" headers="d196584e141 ">--protocol=<var class="keyword varname">protocol</var></td>
 
-              <td class="entry row-nocellborder" style="vertical-align:top;" headers="d192375e144 ">N/A</td>
+              <td class="entry row-nocellborder" style="vertical-align:top;" headers="d196584e144 ">N/A</td>
 
-              <td class="entry cellrowborder" style="vertical-align:top;" headers="d192375e147 ">Protocol to use for the connection to Impala. <div class="p">Valid
+              <td class="entry cellrowborder" style="vertical-align:top;" headers="d196584e147 ">Protocol to use for the connection to Impala. <div class="p">Valid
                     <var class="keyword varname">protocol</var> values are:<ul class="ul">
                     <li class="li"><code class="ph codeph">'hs2'</code>: Impala-shell uses the binary TCP
                       based transport to speak to the Impala Daemon via the
@@ -809,64 +817,80 @@
 
 
     <div class="body conbody">
+      <p class="p">You can store a set of default settings for
+          <span class="keyword cmdname">impala-shell</span> in the <code class="ph codeph">impala-shell</code>
+        configuration file.</p>
 
-      <p class="p">
-        You can define a set of default options for your <span class="keyword cmdname">impala-shell</span> environment, stored in the
-        file <span class="ph filepath">$HOME/.impalarc</span>. This file consists of key-value pairs, one option per line.
-        Everything after a <code class="ph codeph">#</code> character on a line is treated as a comment and ignored.
-      </p>
+      <p class="p">The global <code class="ph codeph">impala-shell</code> configuration file is located
+        in <code class="ph codeph">/etc/impalarc</code>.</p>
 
+      <p class="p">The user-level <code class="ph codeph">impala-shell</code> configuration file is
+        located in <code class="ph codeph">~/.impalarc</code>.</p>
 
-      <p class="p">
-        The configuration file must contain a header label <code class="ph codeph">[impala]</code>, followed by the options
-        specific to <span class="keyword cmdname">impala-shell</span>. (This standard convention for configuration files lets you
-        use a single file to hold configuration options for multiple applications.)
-      </p>
+      <p class="p">Note that the global-level file name is different from the user-level
+        file name. The global-level file name does not include a dot
+          (<span class="ph filepath">.</span>) in the file name.</p>
 
+      <p class="p">The default path of the global configuration file can be changed by
+        setting the <code class="ph codeph">$IMPALA_SHELL_GLOBAL_CONFIG_FILE</code>
+        environment variable.</p>
 
-      <p class="p">
-        To specify a different filename or path for the configuration file, specify the argument
-        <code class="ph codeph">--config_file=<var class="keyword varname">path_to_config_file</var></code> on the
-        <span class="keyword cmdname">impala-shell</span> command line.
-      </p>
+      <p class="p">To specify a different file name or path for the user-level
+        configuration file, start <span class="keyword cmdname">impala-shell</span> with the
+          <code class="ph codeph">--config_file</code>
+        <span class="keyword cmdname">impala-shell</span> option set to the path of the
+        configuration file. </p>
 
+      <p class="p">Typically, an administrator creates the global configuration file for
+        the <span class="keyword cmdname">impala-shell</span>, and if the user-level configuration
+        file exists, the options set in the user configuration file take
+        precedence over those in the global configuration file.</p>
 
-      <p class="p">
-        The names of the options in the configuration file are similar (although not necessarily identical) to the
-        long-form command-line arguments to the <span class="keyword cmdname">impala-shell</span> command. For the names to use, see
-        <a class="xref" href="impala_shell_options.html#shell_option_summary">Summary of impala-shell Configuration Options</a>.
-      </p>
+      <p class="p">In turn, any options you specify on the <span class="keyword cmdname">impala-shell</span>
+        command line override any corresponding options within the configuration
+        file. </p>
 
+      <p class="p"> The <code class="ph codeph">impala-shell</code> configuration file (global or user)
+        configuration file must contain a header label
+        <code class="ph codeph">[impala]</code>, followed by the options specific to
+          <span class="keyword cmdname">impala-shell</span>.</p>
 
-      <p class="p">
-        Any options you specify on the <span class="keyword cmdname">impala-shell</span> command line override any corresponding
-        options within the configuration file.
-      </p>
+      <p class="p">The <code class="ph codeph">impala-shell</code> configuration file consists of
+        key-value pairs, one option per line. Everything after the
+          <code class="ph codeph">#</code> character on a line is treated as a comment and
+        ignored. </p>
+
+      <p class="p"> The names of the options in the configuration file are similar
+        (although not necessarily identical) to the long-form command-line
+        arguments to the <span class="keyword cmdname">impala-shell</span> command. For the names
+        to use, see <a class="xref" href="impala_shell_options.html#shell_option_summary">Summary of impala-shell Configuration Options</a>. </p>
 
       <p class="p">You can specify key-value pair options using <code class="ph codeph">keyval</code>,
         similar to the <code class="ph codeph">--var</code> command-line option. For example,
           <code class="ph codeph">keyval=</code><var class="keyword varname">variable1</var>=<var class="keyword varname">value1</var>.</p>
 
+      <p class="p">The query options specified in the <code class="ph codeph">[impala]</code> section
+        override the options specified in the
+          <code class="ph codeph">[impala.query_options]</code> section.</p>
 
-      <p class="p">
-        The following example shows a configuration file that you might use during benchmarking tests. It sets
-        verbose mode, so that the output from each SQL query is followed by timing information.
-        <span class="keyword cmdname">impala-shell</span> starts inside the database containing the tables with the benchmark data,
-        avoiding the need to issue a <code class="ph codeph">USE</code> statement or use fully qualified table names.
-      </p>
+      <p class="p"> The following example shows a configuration file that you might use
+        during benchmarking tests. It sets verbose mode, so that the output from
+        each SQL query is followed by timing information.
+          <span class="keyword cmdname">impala-shell</span> starts inside the database containing
+        the tables with the benchmark data, avoiding the need to issue a
+          <code class="ph codeph">USE</code> statement or use fully qualified table names. </p>
 
+      <p class="p"> In this example, the query output is formatted as delimited text
+        rather than enclosed in ASCII art boxes, and is stored in a file rather
+        than printed to the screen. Those options are appropriate for benchmark
+        situations, so that the overhead of <span class="keyword cmdname">impala-shell</span>
+        formatting and printing the result set does not factor into the timing
+        measurements. It also enables the <code class="ph codeph">show_profiles</code> option.
+        That option prints detailed performance information after each query,
+        which might be valuable in understanding the performance of benchmark
+        queries. </p>
 
-      <p class="p">
-        In this example, the query output is formatted as delimited text rather than enclosed in ASCII art boxes,
-        and is stored in a file rather than printed to the screen. Those options are appropriate for benchmark
-        situations, so that the overhead of <span class="keyword cmdname">impala-shell</span> formatting and printing the result set
-        does not factor into the timing measurements. It also enables the <code class="ph codeph">show_profiles</code> option.
-        That option prints detailed performance information after each query, which might be valuable in
-        understanding the performance of benchmark queries.
-      </p>
-
-
-<pre class="pre codeblock"><code>[impala]
+      <pre class="pre codeblock"><code>[impala]
 verbose=true
 default_db=tpc_benchmarking
 write_delimited=true
@@ -874,25 +898,23 @@ output_delimiter=,
 output_file=/home/tester1/benchmark_results.csv
 show_profiles=true
 keyval=msg1=hello,keyval=msg2=world</code></pre>
+      <p class="p"> The following example shows a configuration
+        file that connects to a specific remote Impala node, runs a single query
+        within a particular database, then exits. Any query options predefined
+        under the <code class="ph codeph">[impala.query_options]</code> section in the
+        configuration file take effect during the session. </p>
 
-      <p class="p">
-        The following example shows a configuration file that connects to a specific remote Impala node, runs a
-        single query within a particular database, then exits. Any query options predefined under the
-        <code class="ph codeph">[impala.query_options]</code> section in the configuration file take effect during the session.
-      </p>
+      <p class="p"> You would typically use this kind of single-purpose configuration
+        setting with the <span class="keyword cmdname">impala-shell</span> command-line option
+            <code class="ph codeph">--config_file=<var class="keyword varname">path_to_config_file</var></code>,
+        to easily select between many predefined queries that could be run
+        against different databases, hosts, or even different clusters. To run a
+        sequence of statements instead of a single query, specify the
+        configuration option
+            <code class="ph codeph">query_file=<var class="keyword varname">path_to_query_file</var></code>
+        instead. </p>
 
-
-      <p class="p">
-        You would typically use this kind of single-purpose
-        configuration setting with the <span class="keyword cmdname">impala-shell</span> command-line option
-        <code class="ph codeph">--config_file=<var class="keyword varname">path_to_config_file</var></code>, to easily select between many
-        predefined queries that could be run against different databases, hosts, or even different clusters. To run
-        a sequence of statements instead of a single query, specify the configuration option
-        <code class="ph codeph">query_file=<var class="keyword varname">path_to_query_file</var></code> instead.
-      </p>
-
-
-<pre class="pre codeblock"><code>[impala]
+      <pre class="pre codeblock"><code>[impala]
 impalad=impala-test-node1.example.com
 default_db=site_stats
 # Issue a predefined query and immediately exit.

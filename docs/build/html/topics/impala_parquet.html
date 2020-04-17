@@ -4,8 +4,8 @@
 <html xmlns="http://www.w3.org/1999/xhtml" xml:lang="en" lang="en">
 <head><meta http-equiv="Content-Type" content="text/html; charset=UTF-8" />
 
-<meta name="copyright" content="(C) Copyright 2019" />
-<meta name="DC.rights.owner" content="(C) Copyright 2019" />
+<meta name="copyright" content="(C) Copyright 2020" />
+<meta name="DC.rights.owner" content="(C) Copyright 2020" />
 <meta name="DC.Type" content="concept" />
 <meta name="DC.Title" content="Using the Parquet File Format with Impala Tables" />
 <meta name="DC.Relation" scheme="URI" content="../topics/impala_file_formats.html" />
@@ -28,25 +28,25 @@
 <meta name="prodname" content="Impala" />
 <meta name="prodname" content="Impala" />
 <meta name="prodname" content="Impala" />
-<meta name="version" content="Impala 3.3.x" />
-<meta name="version" content="Impala 3.3.x" />
-<meta name="version" content="Impala 3.3.x" />
-<meta name="version" content="Impala 3.3.x" />
-<meta name="version" content="Impala 3.3.x" />
-<meta name="version" content="Impala 3.3.x" />
-<meta name="version" content="Impala 3.3.x" />
-<meta name="version" content="Impala 3.3.x" />
-<meta name="version" content="Impala 3.3.x" />
-<meta name="version" content="Impala 3.3.x" />
-<meta name="version" content="Impala 3.3.x" />
-<meta name="version" content="Impala 3.3.x" />
-<meta name="version" content="Impala 3.3.x" />
-<meta name="version" content="Impala 3.3.x" />
-<meta name="version" content="Impala 3.3.x" />
-<meta name="version" content="Impala 3.3.x" />
-<meta name="version" content="Impala 3.3.x" />
-<meta name="version" content="Impala 3.3.x" />
-<meta name="version" content="Impala 3.3.x" />
+<meta name="version" content="Impala 3.4.x" />
+<meta name="version" content="Impala 3.4.x" />
+<meta name="version" content="Impala 3.4.x" />
+<meta name="version" content="Impala 3.4.x" />
+<meta name="version" content="Impala 3.4.x" />
+<meta name="version" content="Impala 3.4.x" />
+<meta name="version" content="Impala 3.4.x" />
+<meta name="version" content="Impala 3.4.x" />
+<meta name="version" content="Impala 3.4.x" />
+<meta name="version" content="Impala 3.4.x" />
+<meta name="version" content="Impala 3.4.x" />
+<meta name="version" content="Impala 3.4.x" />
+<meta name="version" content="Impala 3.4.x" />
+<meta name="version" content="Impala 3.4.x" />
+<meta name="version" content="Impala 3.4.x" />
+<meta name="version" content="Impala 3.4.x" />
+<meta name="version" content="Impala 3.4.x" />
+<meta name="version" content="Impala 3.4.x" />
+<meta name="version" content="Impala 3.4.x" />
 <meta name="DC.Format" content="XHTML" />
 <meta name="DC.Identifier" content="parquet" />
 <link rel="stylesheet" type="text/css" href="../commonltr.css" />
@@ -428,6 +428,11 @@
         files written by Impala, increase <code class="ph codeph">fs.s3a.block.size</code> to 268435456 (256
         MB) to match the row group size produced by Impala.
       </p>
+
+      <p class="p">Starting in Impala 3.4.0, use the query option
+          <code class="ph codeph">PARQUET_OBJECT_STORE_SPLIT_SIZE</code> to control the
+        Parquet split size for non-block stores (e.g. S3, ADLS, etc.). The
+        default value is 256 MB.</p>
 
 
       <p class="p">
@@ -1583,73 +1588,73 @@ select * from t2;
 
       <table cellpadding="4" cellspacing="0" summary="" id="parquet_data_types__simpletable_am3_rxn_wgb" border="1" class="simpletable"><col style="width:50%" /><col style="width:50%" /><thead><tr class="sthead">
 
-          <th style="vertical-align:bottom;text-align:left;" id="d141207e1605" class="stentry">Parquet type</th>
+          <th style="vertical-align:bottom;text-align:left;" id="d145576e1611" class="stentry">Parquet type</th>
 
 
-          <th style="vertical-align:bottom;text-align:left;" id="d141207e1608" class="stentry">Impala type</th>
+          <th style="vertical-align:bottom;text-align:left;" id="d145576e1614" class="stentry">Impala type</th>
 
 
         </tr>
 </thead><tbody><tr class="strow">
 
-          <td style="vertical-align:top;" headers="d141207e1605" class="stentry">BINARY</td>
+          <td style="vertical-align:top;" headers="d145576e1611" class="stentry">BINARY</td>
 
 
-          <td style="vertical-align:top;" headers="d141207e1608" class="stentry">STRING</td>
-
-
-        </tr>
-<tr class="strow">
-
-          <td style="vertical-align:top;" headers="d141207e1605" class="stentry">BOOLEAN</td>
-
-
-          <td style="vertical-align:top;" headers="d141207e1608" class="stentry">BOOLEAN</td>
+          <td style="vertical-align:top;" headers="d145576e1614" class="stentry">STRING</td>
 
 
         </tr>
 <tr class="strow">
 
-          <td style="vertical-align:top;" headers="d141207e1605" class="stentry">DOUBLE</td>
+          <td style="vertical-align:top;" headers="d145576e1611" class="stentry">BOOLEAN</td>
 
 
-          <td style="vertical-align:top;" headers="d141207e1608" class="stentry">DOUBLE</td>
-
-
-        </tr>
-<tr class="strow">
-
-          <td style="vertical-align:top;" headers="d141207e1605" class="stentry">FLOAT</td>
-
-
-          <td style="vertical-align:top;" headers="d141207e1608" class="stentry">FLOAT</td>
+          <td style="vertical-align:top;" headers="d145576e1614" class="stentry">BOOLEAN</td>
 
 
         </tr>
 <tr class="strow">
 
-          <td style="vertical-align:top;" headers="d141207e1605" class="stentry">INT32</td>
+          <td style="vertical-align:top;" headers="d145576e1611" class="stentry">DOUBLE</td>
 
 
-          <td style="vertical-align:top;" headers="d141207e1608" class="stentry">INT</td>
-
-
-        </tr>
-<tr class="strow">
-
-          <td style="vertical-align:top;" headers="d141207e1605" class="stentry">INT64</td>
-
-
-          <td style="vertical-align:top;" headers="d141207e1608" class="stentry">BIGINT</td>
+          <td style="vertical-align:top;" headers="d145576e1614" class="stentry">DOUBLE</td>
 
 
         </tr>
 <tr class="strow">
 
-          <td style="vertical-align:top;" headers="d141207e1605" class="stentry">INT96</td>
+          <td style="vertical-align:top;" headers="d145576e1611" class="stentry">FLOAT</td>
 
 
-          <td style="vertical-align:top;" headers="d141207e1608" class="stentry">TIMESTAMP</td>
+          <td style="vertical-align:top;" headers="d145576e1614" class="stentry">FLOAT</td>
+
+
+        </tr>
+<tr class="strow">
+
+          <td style="vertical-align:top;" headers="d145576e1611" class="stentry">INT32</td>
+
+
+          <td style="vertical-align:top;" headers="d145576e1614" class="stentry">INT</td>
+
+
+        </tr>
+<tr class="strow">
+
+          <td style="vertical-align:top;" headers="d145576e1611" class="stentry">INT64</td>
+
+
+          <td style="vertical-align:top;" headers="d145576e1614" class="stentry">BIGINT</td>
+
+
+        </tr>
+<tr class="strow">
+
+          <td style="vertical-align:top;" headers="d145576e1611" class="stentry">INT96</td>
+
+
+          <td style="vertical-align:top;" headers="d145576e1614" class="stentry">TIMESTAMP</td>
 
 
         </tr>
@@ -1669,56 +1674,56 @@ select * from t2;
 
       <table cellpadding="4" cellspacing="0" summary="" id="parquet_data_types__simpletable_az3_byn_wgb" border="1" class="simpletable"><col style="width:50%" /><col style="width:50%" /><thead><tr class="sthead">
 
-          <th style="vertical-align:bottom;text-align:left;" id="d141207e1691" class="stentry">Parquet primitive type and annotation</th>
+          <th style="vertical-align:bottom;text-align:left;" id="d145576e1697" class="stentry">Parquet primitive type and annotation</th>
 
 
-          <th style="vertical-align:bottom;text-align:left;" id="d141207e1694" class="stentry">Impala type</th>
+          <th style="vertical-align:bottom;text-align:left;" id="d145576e1700" class="stentry">Impala type</th>
 
 
         </tr>
 </thead><tbody><tr class="strow">
 
-          <td style="vertical-align:top;" headers="d141207e1691" class="stentry">BINARY annotated with the UTF8 OriginalType</td>
+          <td style="vertical-align:top;" headers="d145576e1697" class="stentry">BINARY annotated with the UTF8 OriginalType</td>
 
 
-          <td style="vertical-align:top;" headers="d141207e1694" class="stentry">STRING</td>
-
-
-        </tr>
-<tr class="strow">
-
-          <td style="vertical-align:top;" headers="d141207e1691" class="stentry">BINARY annotated with the STRING LogicalType</td>
-
-
-          <td style="vertical-align:top;" headers="d141207e1694" class="stentry">STRING</td>
+          <td style="vertical-align:top;" headers="d145576e1700" class="stentry">STRING</td>
 
 
         </tr>
 <tr class="strow">
 
-          <td style="vertical-align:top;" headers="d141207e1691" class="stentry">BINARY annotated with the  ENUM OriginalType</td>
+          <td style="vertical-align:top;" headers="d145576e1697" class="stentry">BINARY annotated with the STRING LogicalType</td>
 
 
-          <td style="vertical-align:top;" headers="d141207e1694" class="stentry">STRING</td>
-
-
-        </tr>
-<tr class="strow">
-
-          <td style="vertical-align:top;" headers="d141207e1691" class="stentry">BINARY annotated with the DECIMAL OriginalType</td>
-
-
-          <td style="vertical-align:top;" headers="d141207e1694" class="stentry">DECIMAL</td>
+          <td style="vertical-align:top;" headers="d145576e1700" class="stentry">STRING</td>
 
 
         </tr>
 <tr class="strow">
 
-          <td style="vertical-align:top;" headers="d141207e1691" class="stentry">INT64 annotated with the TIMESTAMP_MILLIS
+          <td style="vertical-align:top;" headers="d145576e1697" class="stentry">BINARY annotated with the  ENUM OriginalType</td>
+
+
+          <td style="vertical-align:top;" headers="d145576e1700" class="stentry">STRING</td>
+
+
+        </tr>
+<tr class="strow">
+
+          <td style="vertical-align:top;" headers="d145576e1697" class="stentry">BINARY annotated with the DECIMAL OriginalType</td>
+
+
+          <td style="vertical-align:top;" headers="d145576e1700" class="stentry">DECIMAL</td>
+
+
+        </tr>
+<tr class="strow">
+
+          <td style="vertical-align:top;" headers="d145576e1697" class="stentry">INT64 annotated with the TIMESTAMP_MILLIS
             OriginalType</td>
 
 
-          <td style="vertical-align:top;" headers="d141207e1694" class="stentry">TIMESTAMP (in <span class="keyword">Impala 3.2</span> or
+          <td style="vertical-align:top;" headers="d145576e1700" class="stentry">TIMESTAMP (in <span class="keyword">Impala 3.2</span> or
               higher)<p class="p">
               or
             </p>
@@ -1728,11 +1733,11 @@ BIGINT (for backward compatibility)</td>
         </tr>
 <tr class="strow">
 
-          <td style="vertical-align:top;" headers="d141207e1691" class="stentry">INT64 annotated with the TIMESTAMP_MICROS
+          <td style="vertical-align:top;" headers="d145576e1697" class="stentry">INT64 annotated with the TIMESTAMP_MICROS
             OriginalType</td>
 
 
-          <td style="vertical-align:top;" headers="d141207e1694" class="stentry">TIMESTAMP (in <span class="keyword">Impala 3.2</span> or
+          <td style="vertical-align:top;" headers="d145576e1700" class="stentry">TIMESTAMP (in <span class="keyword">Impala 3.2</span> or
               higher)<p class="p">
               or
             </p>
@@ -1742,10 +1747,10 @@ BIGINT (for backward compatibility)</td>
         </tr>
 <tr class="strow">
 
-          <td style="vertical-align:top;" headers="d141207e1691" class="stentry">INT64 annotated with the  TIMESTAMP LogicalType</td>
+          <td style="vertical-align:top;" headers="d145576e1697" class="stentry">INT64 annotated with the  TIMESTAMP LogicalType</td>
 
 
-          <td style="vertical-align:top;" headers="d141207e1694" class="stentry">TIMESTAMP (in <span class="keyword">Impala 3.2</span> or
+          <td style="vertical-align:top;" headers="d145576e1700" class="stentry">TIMESTAMP (in <span class="keyword">Impala 3.2</span> or
               higher)<p class="p">
               or
             </p>

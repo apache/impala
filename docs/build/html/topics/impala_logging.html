@@ -4,8 +4,8 @@
 <html xmlns="http://www.w3.org/1999/xhtml" xml:lang="en" lang="en">
 <head><meta http-equiv="Content-Type" content="text/html; charset=UTF-8" />
 
-<meta name="copyright" content="(C) Copyright 2019" />
-<meta name="DC.rights.owner" content="(C) Copyright 2019" />
+<meta name="copyright" content="(C) Copyright 2020" />
+<meta name="DC.rights.owner" content="(C) Copyright 2020" />
 <meta name="DC.Type" content="concept" />
 <meta name="DC.Title" content="Using Impala Logging" />
 <meta name="prodname" content="Impala" />
@@ -16,16 +16,14 @@
 <meta name="prodname" content="Impala" />
 <meta name="prodname" content="Impala" />
 <meta name="prodname" content="Impala" />
-<meta name="prodname" content="Impala" />
-<meta name="version" content="Impala 3.3.x" />
-<meta name="version" content="Impala 3.3.x" />
-<meta name="version" content="Impala 3.3.x" />
-<meta name="version" content="Impala 3.3.x" />
-<meta name="version" content="Impala 3.3.x" />
-<meta name="version" content="Impala 3.3.x" />
-<meta name="version" content="Impala 3.3.x" />
-<meta name="version" content="Impala 3.3.x" />
-<meta name="version" content="Impala 3.3.x" />
+<meta name="version" content="Impala 3.4.x" />
+<meta name="version" content="Impala 3.4.x" />
+<meta name="version" content="Impala 3.4.x" />
+<meta name="version" content="Impala 3.4.x" />
+<meta name="version" content="Impala 3.4.x" />
+<meta name="version" content="Impala 3.4.x" />
+<meta name="version" content="Impala 3.4.x" />
+<meta name="version" content="Impala 3.4.x" />
 <meta name="DC.Format" content="XHTML" />
 <meta name="DC.Identifier" content="logging" />
 <link rel="stylesheet" type="text/css" href="../commonltr.css" />
@@ -176,22 +174,6 @@
           represented as symbolic links to the latest applicable log files.
         </li>
 
-
-        <li class="li">
-          The init script for the <code class="ph codeph">impala-server</code> service also produces a
-          consolidated log file <code class="ph codeph">/var/logs/impalad/impala-server.log</code>, with all
-          the same information as the corresponding<code class="ph codeph">.INFO</code>,
-          <code class="ph codeph">.WARNING</code>, and <code class="ph codeph">.ERROR</code> files.
-        </li>
-
-
-        <li class="li">
-          The init script for the <code class="ph codeph">impala-state-store</code> service also produces a
-          consolidated log file <code class="ph codeph">/var/logs/impalad/impala-state-store.log</code>, with
-          all the same information as the corresponding<code class="ph codeph">.INFO</code>,
-          <code class="ph codeph">.WARNING</code>, and <code class="ph codeph">.ERROR</code> files.
-        </li>
-
       </ul>
 
 
@@ -226,30 +208,9 @@
   </div>
 
 
-  <div class="topic concept nested1" aria-labelledby="ariaid-title3" id="logs_managing">
+  <div class="topic concept nested1" aria-labelledby="ariaid-title3" id="logs_rotate">
 
-    <h2 class="title topictitle2" id="ariaid-title3">Managing Impala Logs</h2>
-
-
-    
-
-    <div class="body conbody">
-
-      <p class="p">
-        Review Impala log files on each host, when you have traced an issue back to a specific
-        system.
-      </p>
-
-
-    </div>
-
-
-  </div>
-
-
-  <div class="topic concept nested1" aria-labelledby="ariaid-title4" id="logs_rotate">
-
-    <h2 class="title topictitle2" id="ariaid-title4">Rotating Impala Logs</h2>
+    <h2 class="title topictitle2" id="ariaid-title3">Rotating Impala Logs</h2>
 
 
     
@@ -324,29 +285,22 @@
   </div>
 
 
-  <div class="topic concept nested1" aria-labelledby="ariaid-title5" id="logs_debug">
+  <div class="topic concept nested1" aria-labelledby="ariaid-title4" id="logs_debug">
 
-    <h2 class="title topictitle2" id="ariaid-title5">Reviewing Impala Logs</h2>
+    <h2 class="title topictitle2" id="ariaid-title4">Reviewing Impala Logs</h2>
 
 
     <div class="body conbody">
 
-      <p class="p">
-        By default, the Impala log is stored at <code class="ph codeph">/var/logs/impalad/</code>. The most
-        comprehensive log, showing informational, warning, and error messages, is in the file
-        name <span class="ph filepath">impalad.INFO</span>. View log file contents by using the web
-        interface or by examining the contents of the log file. (When you examine the logs
-        through the file system, you can troubleshoot problems by reading the
-        <span class="ph filepath">impalad.WARNING</span> and/or <span class="ph filepath">impalad.ERROR</span> files,
-        which contain the subsets of messages indicating potential problems.)
-      </p>
-
-
-      <p class="p">
-        On a machine named <code class="ph codeph">impala.example.com</code> with default settings, you could
-        view the Impala logs on that machine by using a browser to access
-        <code class="ph codeph">http://impala.example.com:25000/logs</code>.
-      </p>
+      <p class="p"> By default, the Impala log is stored at
+          <code class="ph codeph">/var/log/impalad/</code>. The most comprehensive log,
+        showing informational, warning, and error messages, is in the file name
+          <span class="ph filepath">impalad.INFO</span>. View log file contents by using the
+        web interface or by examining the contents of the log file. (When you
+        examine the logs through the file system, you can troubleshoot problems
+        by reading the <span class="ph filepath">impalad.WARNING</span> and/or
+          <span class="ph filepath">impalad.ERROR</span> files, which contain the subsets of
+        messages indicating potential problems.) </p>
 
 
       <div class="note note"><span class="notetitle">Note:</span> 
@@ -393,9 +347,9 @@ I0107 08:42:12.292706 14876 logging.cc:76] Flags (see also /varz are on debug we
   </div>
 
 
-  <div class="topic concept nested1" aria-labelledby="ariaid-title6" id="log_format">
+  <div class="topic concept nested1" aria-labelledby="ariaid-title5" id="log_format">
 
-    <h2 class="title topictitle2" id="ariaid-title6">Understanding Impala Log Contents</h2>
+    <h2 class="title topictitle2" id="ariaid-title5">Understanding Impala Log Contents</h2>
 
 
     <div class="body conbody">
@@ -434,40 +388,15 @@ I0107 08:42:12.292706 14876 logging.cc:76] Flags (see also /varz are on debug we
       </ul>
 
 
-      <p class="p">
-        There is information about each job Impala has run. Because each Impala job creates an
-        additional set of data about queries, the amount of job specific data may be very large.
-        Logs may contained detailed information on jobs. These detailed log entries may include:
-      </p>
-
-
-      <ul class="ul">
-        <li class="li">
-          The composition of the query.
-        </li>
-
-
-        <li class="li">
-          The degree of data locality.
-        </li>
-
-
-        <li class="li">
-          Statistics on data throughput and response times.
-        </li>
-
-      </ul>
-
-
     </div>
 
 
   </div>
 
 
-  <div class="topic concept nested1" aria-labelledby="ariaid-title7" id="log_levels">
+  <div class="topic concept nested1" aria-labelledby="ariaid-title6" id="log_levels">
 
-    <h2 class="title topictitle2" id="ariaid-title7">Setting Logging Levels</h2>
+    <h2 class="title topictitle2" id="ariaid-title6">Setting Logging Levels</h2>
 
 
     <div class="body conbody">
@@ -550,9 +479,9 @@ I0107 08:42:12.292706 14876 logging.cc:76] Flags (see also /varz are on debug we
   </div>
 
 
-  <div class="topic concept nested1" aria-labelledby="ariaid-title8" id="redaction">
+  <div class="topic concept nested1" aria-labelledby="ariaid-title7" id="redaction">
 
-    <h2 class="title topictitle2" id="ariaid-title8">Redacting Sensitive Information from Impala Log Files</h2>
+    <h2 class="title topictitle2" id="ariaid-title7">Redacting Sensitive Information from Impala Log Files</h2>
 
 
     
@@ -560,15 +489,14 @@ I0107 08:42:12.292706 14876 logging.cc:76] Flags (see also /varz are on debug we
     <div class="body conbody">
 
       <p class="p">
-        
-        <dfn class="term">Log redaction</dfn> is a security feature that prevents sensitive information
-        from being displayed in locations used by administrators for monitoring and
-        troubleshooting, such as log files and the Impala debug web user interface. You
-        configure regular expressions that match sensitive types of information processed by
-        your system, such as credit card numbers or tax IDs, and literals matching these
-        patterns are obfuscated wherever they would normally be recorded in log files or
-        displayed in administration or debugging user interfaces.
-      </p>
+        <dfn class="term">Log redaction</dfn> is a security feature that prevents sensitive
+        information from being displayed in locations used by administrators for
+        monitoring and troubleshooting, such as log files and the Impala debug
+        web user interface. You configure regular expressions that match
+        sensitive types of information processed by your system, such as credit
+        card numbers or tax IDs, and literals matching these patterns are
+        obfuscated wherever they would normally be recorded in log files or
+        displayed in administration or debugging user interfaces. </p>
 
 
       <p class="p">

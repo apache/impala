@@ -4,15 +4,15 @@
 <html xmlns="http://www.w3.org/1999/xhtml" xml:lang="en" lang="en">
 <head><meta http-equiv="Content-Type" content="text/html; charset=UTF-8" />
 
-<meta name="copyright" content="(C) Copyright 2019" />
-<meta name="DC.rights.owner" content="(C) Copyright 2019" />
+<meta name="copyright" content="(C) Copyright 2020" />
+<meta name="DC.rights.owner" content="(C) Copyright 2020" />
 <meta name="DC.Type" content="concept" />
 <meta name="DC.Title" content="Known Issues and Workarounds in Impala" />
 <meta name="DC.Relation" scheme="URI" content="../topics/impala_release_notes.html" />
 <meta name="prodname" content="Impala" />
 <meta name="prodname" content="Impala" />
-<meta name="version" content="Impala 3.3.x" />
-<meta name="version" content="Impala 3.3.x" />
+<meta name="version" content="Impala 3.4.x" />
+<meta name="version" content="Impala 3.4.x" />
 <meta name="DC.Format" content="XHTML" />
 <meta name="DC.Identifier" content="known_issues" />
 <link rel="stylesheet" type="text/css" href="../commonltr.css" />
@@ -288,16 +288,6 @@
 
     </div>
 
-
-
-
-    
-
-    
-
-
-
-    
 
   </div>
 
@@ -583,16 +573,17 @@ explain SELECT 1 FROM alltypestiny a1
 
 
       <div class="body conbody">
-
-        <p class="p">
-          If the following error appears multiple times in a short duration while running a
-          query, it would mean that the connection between the <code class="ph codeph">impalad</code> and the
-          HDFS NameNode is in a bad state and hence the <code class="ph codeph">impalad</code> would have to
-          be restarted:
-        </p>
+        <p class="p"> In Impala 3.2 and higher, if the following error appears multiple
+          times in a short duration while running a query, it would mean that
+          the connection between the <code class="ph codeph">impalad</code> and the HDFS
+          NameNode is in a bad state and hence the <code class="ph codeph">impalad</code>
+          would have to be restarted: </p>
 
 
 <pre class="pre codeblock"><code>"hdfsOpenFile() for &lt;filename&gt; at backend &lt;hostname:port&gt; failed to finish before the &lt;hdfs_operation_timeout_sec&gt; second timeout " </code></pre>
+        <p class="p">In Impala 3.1 and lower, the same issue would cause Impala to wait for
+          a long time or hang without showing the above error message.</p>
+
 
         <p class="p">
           <strong class="ph b">Apache Issue:</strong>
@@ -665,8 +656,6 @@ ALTER TABLE table_name SET TBLPROPERTIES('EXTERNAL'='TRUE');
 
     </div>
 
-
-    
 
     <div class="topic concept nested2" aria-labelledby="ariaid-title22" id="flume_writeformat_text">
 
@@ -787,13 +776,37 @@ ALTER TABLE table_name SET TBLPROPERTIES('EXTERNAL'='TRUE');
 
     </div>
 
+    <div class="topic concept nested2" aria-labelledby="ariaid-title26" id="IMPALA-8953">
+      <h3 class="title topictitle3" id="ariaid-title26">Tables and databases sharing same name can cause query
+        failures</h3>
+
+      <div class="body conbody">
+        <p class="p">A table and a database that share the same name can cause a query
+          failure if the table is not readable by Impala, for example, the table
+          was created in Hive in the Open CSV Serde format. The following
+          exception will return:</p>
+
+        <pre class="pre codeblock"><code>CAUSED BY: TableLoadingException: Unrecognized table type for table</code></pre>
+        <p class="p">
+          <strong class="ph b">Apache Issue:</strong>
+          <a class="xref" href="https://issues.apache.org/jira/browse/IMPALA-8953" target="_blank">IMPALA-8953</a>
+        </p>
+
+        <p class="p">
+          <strong class="ph b">Workaround:</strong> Do not create databases and tables with the same
+          names.</p>
+
+      </div>
+
+    </div>
+
 
   </div>
 
 
-  <div class="topic concept nested1" aria-labelledby="ariaid-title26" id="known_issues_limitations">
+  <div class="topic concept nested1" aria-labelledby="ariaid-title27" id="known_issues_limitations">
 
-    <h2 class="title topictitle2" id="ariaid-title26">Impala Known Issues: Limitations</h2>
+    <h2 class="title topictitle2" id="ariaid-title27">Impala Known Issues: Limitations</h2>
 
 
     <div class="body conbody">
@@ -803,28 +816,6 @@ ALTER TABLE table_name SET TBLPROPERTIES('EXTERNAL'='TRUE');
         to integrate Impala into your data management workflow.
       </p>
 
-
-    </div>
-
-    <div class="topic concept nested2" aria-labelledby="ariaid-title27" id="IMPALA-8829">
-      <h3 class="title topictitle3" id="ariaid-title27">Unable to Correctly Parse the Terabyte Unit</h3>
-
-      <div class="body conbody">
-        <p class="p">Impala does not support parsing strings that contain "TB" when used
-          as a unit for terabytes. The flags related to memory limits may be
-          affected, such as the flags for scratch space and data cache.</p>
-
-        <p class="p"><strong class="ph b">Workaround:</strong> Use other supported units to specify values, e.g.
-          GB or MB.</p>
-
-        <p class="p"><strong class="ph b">Affected Versions:</strong> All versions</p>
-
-        <p class="p">
-          <strong class="ph b">Apache Issue:</strong>
-          <a class="xref" href="https://issues.apache.org/jira/browse/IMPALA-8829" target="_blank">IMPALA-8829</a>
-        </p>
-
-      </div>
 
     </div>
 
@@ -977,10 +968,6 @@ ALTER TABLE table_name SET TBLPROPERTIES('EXTERNAL'='TRUE');
 
     </div>
 
-
-
-
-    
 
     <div class="topic concept nested2" aria-labelledby="ariaid-title33" id="IMPALA-532">
 

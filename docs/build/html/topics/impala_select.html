@@ -4,8 +4,8 @@
 <html xmlns="http://www.w3.org/1999/xhtml" xml:lang="en" lang="en">
 <head><meta http-equiv="Content-Type" content="text/html; charset=UTF-8" />
 
-<meta name="copyright" content="(C) Copyright 2019" />
-<meta name="DC.rights.owner" content="(C) Copyright 2019" />
+<meta name="copyright" content="(C) Copyright 2020" />
+<meta name="DC.rights.owner" content="(C) Copyright 2020" />
 <meta name="DC.Type" content="concept" />
 <meta name="DC.Title" content="SELECT Statement" />
 <meta name="DC.Relation" scheme="URI" content="../topics/impala_langref_sql.html" />
@@ -22,8 +22,8 @@
 <meta name="DC.Relation" scheme="URI" content="../topics/impala_distinct.html" />
 <meta name="prodname" content="Impala" />
 <meta name="prodname" content="Impala" />
-<meta name="version" content="Impala 3.3.x" />
-<meta name="version" content="Impala 3.3.x" />
+<meta name="version" content="Impala 3.4.x" />
+<meta name="version" content="Impala 3.4.x" />
 <meta name="DC.Format" content="XHTML" />
 <meta name="DC.Identifier" content="select" />
 <link rel="stylesheet" type="text/css" href="../commonltr.css" />
@@ -136,6 +136,49 @@ table_reference := { <var class="keyword varname">table_name</var> | (<var class
         <code class="ph codeph"><a class="xref" href="impala_limit.html#limit">LIMIT</a></code> clause. In Impala 1.4.0 and higher, this
         restriction is lifted; sort operations that would exceed the Impala memory limit automatically use a
         temporary disk work area to perform the sort.
+      </li>
+
+      <li class="li">
+        <div class="p"> You can refer to
+          <code class="ph codeph">SELECT</code>-list items by their ordinal position. Impala
+        supports ordinals in the <code class="ph codeph">GROUP BY</code>,
+          <code class="ph codeph">HAVING</code>, and <code class="ph codeph">ORDER BY</code> clauses. From
+        Impala 3.0, ordinals can only be used at the top level. For example, the
+        following statements are allowed:
+        <pre class="pre codeblock"><code>
+  SELECT int_col / 2, sum(x)
+  FROM t
+  GROUP BY 1;
+
+  SELECT int_col / 2
+  FROM t
+  ORDER BY 1;
+
+  SELECT NOT bool_col
+  FROM t
+  GROUP BY 1
+  HAVING 1;
+</code></pre>
+        Numbers in subexpressions are not interpreted as ordinals:
+        <pre class="pre codeblock"><code>
+  SELECT int_col / 2, sum(x)
+  FROM t
+  GROUP BY 1 * 2;
+The above parses OK, however GROUP BY 1 * 2 has no effect.
+
+  SELECT int_col / 2
+  FROM t
+  ORDER BY 1 + 2;
+The above parses OK, however ORDER BY 1 + 2 has no effect.
+
+  SELECT NOT bool_col
+  FROM t
+  GROUP BY 1
+  HAVING not 1;
+The above raises an error at parse-time.
+</code></pre>
+      </div>
+
       </li>
 
 
@@ -295,8 +338,6 @@ table_reference := { <var class="keyword varname">table_name</var> | (<var class
 
   </div>
 
-
-  
 <div class="related-links">
 <ul class="ullinks">
 <li class="link ulchildlink"><strong><a href="../topics/impala_joins.html">Joins in Impala SELECT Statements</a></strong><br />

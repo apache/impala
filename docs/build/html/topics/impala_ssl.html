@@ -4,15 +4,15 @@
 <html xmlns="http://www.w3.org/1999/xhtml" xml:lang="en" lang="en">
 <head><meta http-equiv="Content-Type" content="text/html; charset=UTF-8" />
 
-<meta name="copyright" content="(C) Copyright 2019" />
-<meta name="DC.rights.owner" content="(C) Copyright 2019" />
+<meta name="copyright" content="(C) Copyright 2020" />
+<meta name="DC.rights.owner" content="(C) Copyright 2020" />
 <meta name="DC.Type" content="concept" />
 <meta name="DC.Title" content="Configuring TLS/SSL for Impala" />
 <meta name="DC.Relation" scheme="URI" content="../topics/impala_security.html" />
 <meta name="prodname" content="Impala" />
 <meta name="prodname" content="Impala" />
-<meta name="version" content="Impala 3.3.x" />
-<meta name="version" content="Impala 3.3.x" />
+<meta name="version" content="Impala 3.4.x" />
+<meta name="version" content="Impala 3.4.x" />
 <meta name="DC.Format" content="XHTML" />
 <meta name="DC.Identifier" content="ssl" />
 <link rel="stylesheet" type="text/css" href="../commonltr.css" />
@@ -29,12 +29,10 @@
   <div class="body conbody">
 
     <p class="p">
-      
-      Impala supports TLS/SSL network encryption, between Impala and client
-      programs, and between the Impala-related daemons running on different nodes
-      in the cluster. This feature is important when you also use other features such as Kerberos
-      authentication or Sentry authorization, where credentials are being
-      transmitted back and forth.
+      Impala supports TLS/SSL network encryption, between Impala and client programs, and
+      between the Impala-related daemons running on different nodes in the cluster. This feature
+      is important when you also use other features such as Kerberos authentication or Sentry
+      authorization, where credentials are being transmitted back and forth.
     </p>
 
 
@@ -51,31 +49,37 @@
 
 
     <div class="body conbody">
+
       <p class="p">
-        To enable SSL for when client applications connect to Impala, add both of the following flags to the <span class="keyword cmdname">impalad</span> startup options:
+        To enable TLS/SSL for client applications to connect to Impala, add both of the
+        following flags to the <span class="keyword cmdname">impalad</span> startup options:
       </p>
 
 
       <ul class="ul" id="concept_q1p_j2d_rp__ul_i2p_m2d_rp">
         <li class="li">
-          <code class="ph codeph">--ssl_server_certificate</code>: the full path to the server certificate, on the local filesystem.
+          <code class="ph codeph">--ssl_server_certificate</code>: The full path to the server certificate, on
+          the local filesystem.
         </li>
 
 
         <li class="li">
-          <code class="ph codeph">--ssl_private_key</code>: the full path to the server private key, on the local filesystem.
+          <code class="ph codeph">--ssl_private_key</code>: The full path to the server private key, on the
+          local filesystem.
         </li>
 
       </ul>
 
 
       <p class="p">
-        In <span class="keyword">Impala 2.3</span> and higher, Impala can also use SSL for its own internal communication between the
-        <span class="keyword cmdname">impalad</span>, <code class="ph codeph">statestored</code>, and <code class="ph codeph">catalogd</code> daemons.
-        To enable this additional SSL encryption, set the <code class="ph codeph">--ssl_server_certificate</code>
-        and <code class="ph codeph">--ssl_private_key</code> flags in the startup options for
-        <span class="keyword cmdname">impalad</span>, <span class="keyword cmdname">catalogd</span>, and <span class="keyword cmdname">statestored</span>,
-        and also add the <code class="ph codeph">--ssl_client_ca_certificate</code> flag for all three of those daemons.
+        In <span class="keyword">Impala 2.3</span> and higher, Impala can also use SSL for its own
+        internal communication between the <span class="keyword cmdname">impalad</span>,
+        <code class="ph codeph">statestored</code>, and <code class="ph codeph">catalogd</code> daemons. To enable this
+        additional SSL encryption, set the <code class="ph codeph">--ssl_server_certificate</code> and
+        <code class="ph codeph">--ssl_private_key</code> flags in the startup options for
+        <span class="keyword cmdname">impalad</span>, <span class="keyword cmdname">catalogd</span>, and
+        <span class="keyword cmdname">statestored</span>, and also add the
+        <code class="ph codeph">--ssl_client_ca_certificate</code> flag for all three of those daemons.
       </p>
 
 
@@ -89,47 +93,50 @@
 
 
       <p class="p">
-        If either of these flags are set, both must be set. In that case, Impala starts listening for Beeswax and HiveServer2 requests on
-        SSL-secured ports only. (The port numbers stay the same; see <a class="xref" href="impala_ports.html#ports">Ports Used by Impala</a> for details.)
+        If either of these flags are set, both must be set. In that case, Impala starts
+        listening for Beeswax and HiveServer2 requests on SSL-secured ports only. (The port
+        numbers stay the same; see <a class="xref" href="impala_ports.html#ports">Ports Used by Impala</a> for details.)
       </p>
 
 
       <p class="p">
-        Since Impala uses passphrase-less certificates in PEM format, you can reuse a host's existing Java keystore
-        by using the <code class="ph codeph">openssl</code> toolkit to convert it to the PEM format.
+        Since Impala uses passphrase-less certificates in PEM format, you can reuse a host's
+        existing Java keystore by using the <code class="ph codeph">openssl</code> toolkit to convert it to
+        the PEM format.
       </p>
 
 
       <div class="section" id="concept_q1p_j2d_rp__secref"><h3 class="title sectiontitle">Configuring TLS/SSL Communication for the Impala Shell</h3>
-
         
-
-        <p class="p">
-          With SSL enabled for Impala, use the following options when starting the
-          <span class="keyword cmdname">impala-shell</span> interpreter:
-        </p>
-
+        <p class="p"> With TLS/SSL enabled for Impala, start
+            <span class="keyword cmdname">impala-shell</span> with the following options: </p>
 
         <ul class="ul" id="concept_q1p_j2d_rp__ul_kgp_m2d_rp">
           <li class="li">
-            <code class="ph codeph">--ssl</code>: enables TLS/SSL for <span class="keyword cmdname">impala-shell</span>.
-          </li>
-
+            <code class="ph codeph">--ssl</code>: Enables TLS/SSL for
+              <span class="keyword cmdname">impala-shell</span>. </li>
 
           <li class="li">
-            <code class="ph codeph">--ca_cert</code>: the local pathname pointing to the third-party CA certificate, or to a copy of the server
-            certificate for self-signed server certificates.
-          </li>
+            <code class="ph codeph">--ca_cert</code>: The local pathname pointing to the
+            third-party CA certificate, or to a copy of the server certificate
+            for self-signed server certificates. </li>
 
         </ul>
 
+        <p class="p"> If <code class="ph codeph">--ca_cert</code> is not set,
+            <span class="keyword cmdname">impala-shell</span> enables TLS/SSL, but does not
+          validate the server certificate. This is useful for connecting to a
+          known-good Impala that is only running over TLS/SSL, when a copy of
+          the certificate is not available (such as when debugging customer
+          installations). </p>
 
-        <p class="p">
-          If <code class="ph codeph">--ca_cert</code> is not set, <span class="keyword cmdname">impala-shell</span> enables TLS/SSL, but does not validate the server
-          certificate. This is useful for connecting to a known-good Impala that is only running over TLS/SSL, when a copy of the
-          certificate is not available (such as when debugging customer installations).
-        </p>
-
+        <p class="p">For <span class="keyword cmdname">impala-shell</span> to successfully connect to an
+          Impala cluster that has the minimum allowed TLS/SSL version set to 1.2
+            (<code class="ph codeph">--ssl_minimum_version=tlsv1.2</code>), the Python version
+          on the cluster that <span class="keyword cmdname">impala-shell</span> runs on must be
+          2.7.9 or higher (or a vendor-provided Python version with the required
+          support. Some vendors patched Python 2.7.5 versions on Red Hat
+          Enterprise Linux 7 and derivatives).</p>
 
       </div>
 
@@ -141,14 +148,17 @@
 
 
   <div class="topic concept nested1" aria-labelledby="ariaid-title3" id="ssl_jdbc_odbc">
+
     <h2 class="title topictitle2" id="ariaid-title3">Using TLS/SSL with Business Intelligence Tools</h2>
 
+
     <div class="body conbody">
+
       <p class="p">
-        You can use Kerberos authentication, TLS/SSL encryption, or both to secure
-        connections from JDBC and ODBC applications to Impala.
-        See <a class="xref" href="impala_jdbc.html#impala_jdbc">Configuring Impala to Work with JDBC</a> and <a class="xref" href="impala_odbc.html#impala_odbc">Configuring Impala to Work with ODBC</a>
-        for details.
+        You can use Kerberos authentication, TLS/SSL encryption, or both to secure connections
+        from JDBC and ODBC applications to Impala. See
+        <a class="xref" href="impala_jdbc.html#impala_jdbc">Configuring Impala to Work with JDBC</a> and
+        <a class="xref" href="impala_odbc.html#impala_odbc">Configuring Impala to Work with ODBC</a> for details.
       </p>
 
 
@@ -159,7 +169,9 @@
         supports both of these security features.
       </p>
 
+
     </div>
+
 
   </div>
 
@@ -172,13 +184,12 @@
     <div class="body conbody">
 
       <p class="p">
-        Depending on your cluster configuration and the security practices in your
-        organization, you might need to restrict the allowed versions of TLS/SSL
-        used by Impala. Older TLS/SSL versions might have vulnerabilities or lack
-        certain features. In <span class="keyword">Impala 2.10</span>, you can use startup
-        options for the <span class="keyword cmdname">impalad</span>, <span class="keyword cmdname">catalogd</span>,
-        and <span class="keyword cmdname">statestored</span> daemons to specify a minimum allowed
-        version of TLS/SSL.
+        Depending on your cluster configuration and the security practices in your organization,
+        you might need to restrict the allowed versions of TLS/SSL used by Impala. Older TLS/SSL
+        versions might have vulnerabilities or lack certain features. In
+        <span class="keyword">Impala 2.10</span>, you can use startup options for the
+        <span class="keyword cmdname">impalad</span>, <span class="keyword cmdname">catalogd</span>, and
+        <span class="keyword cmdname">statestored</span> daemons to specify a minimum allowed version of TLS/SSL.
       </p>
 
 
@@ -191,11 +202,12 @@
       <ul class="ul">
         <li class="li">
           <p class="p">
-            <code class="ph codeph">tlsv1</code>: Allow any TLS version of 1.0 or higher.
-            This setting is the default when TLS/SSL is enabled.
+            <code class="ph codeph">tlsv1</code>: Allow any TLS version of 1.0 or higher. This setting is the
+            default when TLS/SSL is enabled.
           </p>
 
         </li>
+
 
         <li class="li">
           <p class="p">
@@ -203,6 +215,7 @@
           </p>
 
         </li>
+
 
         <li class="li">
           <p class="p">
@@ -227,9 +240,9 @@
 </code></pre>
 
       <p class="p">
-        By default, the cipher list is empty, and Impala uses the default cipher list for
-        the underlying platform. See the output of <span class="keyword cmdname">man ciphers</span> for the full
-        set of keywords and notation allowed in the argument string.
+        By default, the cipher list is empty, and Impala uses the default cipher list for the
+        underlying platform. See the output of <span class="keyword cmdname">man ciphers</span> for the full set
+        of keywords and notation allowed in the argument string.
       </p>
 
 

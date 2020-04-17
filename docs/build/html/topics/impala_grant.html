@@ -4,15 +4,15 @@
 <html xmlns="http://www.w3.org/1999/xhtml" xml:lang="en" lang="en">
 <head><meta http-equiv="Content-Type" content="text/html; charset=UTF-8" />
 
-<meta name="copyright" content="(C) Copyright 2019" />
-<meta name="DC.rights.owner" content="(C) Copyright 2019" />
+<meta name="copyright" content="(C) Copyright 2020" />
+<meta name="DC.rights.owner" content="(C) Copyright 2020" />
 <meta name="DC.Type" content="concept" />
 <meta name="DC.Title" content="GRANT Statement (Impala 2.0 or higher only)" />
 <meta name="DC.Relation" scheme="URI" content="../topics/impala_langref_sql.html" />
 <meta name="prodname" content="Impala" />
 <meta name="prodname" content="Impala" />
-<meta name="version" content="Impala 3.3.x" />
-<meta name="version" content="Impala 3.3.x" />
+<meta name="version" content="Impala 3.4.x" />
+<meta name="version" content="Impala 3.4.x" />
 <meta name="DC.Format" content="XHTML" />
 <meta name="DC.Identifier" content="grant" />
 <link rel="stylesheet" type="text/css" href="../commonltr.css" />
@@ -125,6 +125,9 @@ GRANT <var class="keyword varname">privilege</var> ON <var class="keyword varnam
         SQL statements in <span class="keyword">Impala 3.0</span> and higher. The following notations
         are used:
         <ul class="ul">
+          <li class="li">The <strong class="ph b">SERVER</strong> resource type in Ranger implies all databases,
+            all tables, all columns, all UDFs, and all URIs.</li>
+
           <li class="li">
             <strong class="ph b">ANY</strong> denotes the <code class="ph codeph">SELECT</code>, <code class="ph codeph">INSERT</code>,
             <code class="ph codeph">CREATE</code>, <code class="ph codeph">ALTER</code>, <code class="ph codeph">DROP</code>,
@@ -155,7 +158,7 @@ GRANT <var class="keyword varname">privilege</var> ON <var class="keyword varnam
         </ul>
 
         
-<div class="tablenoborder"><table cellpadding="4" cellspacing="0" summary="" id="grant__d6e172" class="table" frame="border" border="1" rules="all"><colgroup><col /><col /><col /></colgroup><tbody class="tbody">
+<div class="tablenoborder"><table cellpadding="4" cellspacing="0" summary="" id="grant__d6e178" class="table" frame="border" border="1" rules="all"><colgroup><col /><col /><col /></colgroup><tbody class="tbody">
               <tr class="row">
                 <td class="entry cellrowborder" style="vertical-align:top;">
                   <strong class="ph b">SQL Statement</strong>

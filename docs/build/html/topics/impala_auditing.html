@@ -4,15 +4,15 @@
 <html xmlns="http://www.w3.org/1999/xhtml" xml:lang="en" lang="en">
 <head><meta http-equiv="Content-Type" content="text/html; charset=UTF-8" />
 
-<meta name="copyright" content="(C) Copyright 2019" />
-<meta name="DC.rights.owner" content="(C) Copyright 2019" />
+<meta name="copyright" content="(C) Copyright 2020" />
+<meta name="DC.rights.owner" content="(C) Copyright 2020" />
 <meta name="DC.Type" content="concept" />
 <meta name="DC.Title" content="Auditing Impala Operations" />
 <meta name="DC.Relation" scheme="URI" content="../topics/impala_security.html" />
 <meta name="prodname" content="Impala" />
 <meta name="prodname" content="Impala" />
-<meta name="version" content="Impala 3.3.x" />
-<meta name="version" content="Impala 3.3.x" />
+<meta name="version" content="Impala 3.4.x" />
+<meta name="version" content="Impala 3.4.x" />
 <meta name="DC.Format" content="XHTML" />
 <meta name="DC.Identifier" content="auditing" />
 <link rel="stylesheet" type="text/css" href="../commonltr.css" />
@@ -274,42 +274,37 @@
 
     <div class="body conbody">
 
-      <p class="p">
-        The kinds of SQL queries represented in the audit log are:
-      </p>
+      <p class="p"> The following types of SQL operations are recorded in the audit
+        log:</p>
 
 
       <ul class="ul">
-        <li class="li">
-          Queries that are prevented due to lack of authorization.
-        </li>
+        <li class="li"> Queries that are prevented due to lack of authorization. </li>
 
+        <li class="li"> Queries that Impala can analyze and parse to determine that they
+          are authorized. The audit data is recorded immediately after Impala
+          finishes its analysis, before the query is actually executed. </li>
 
-        <li class="li">
-          Queries that Impala can analyze and parse to determine that they are authorized. The
-          audit data is recorded immediately after Impala finishes its analysis, before the
-          query is actually executed.
-        </li>
+        <li class="li"> Queries whose results are available to be fetched by clients.</li>
+
+        <li class="li">Finished DDL operations.</li>
 
       </ul>
 
 
-      <p class="p">
-        The audit log does not contain entries for queries that could not be parsed and
-        analyzed. For example, a query that fails due to a syntax error is not recorded in the
-        audit log. The audit log also does not contain queries that fail due to a reference to a
-        table that does not exist, if you would be authorized to access the table if it did
-        exist.
-      </p>
+      <p class="p"> The audit log does not contain entries for queries that could not be
+        parsed and analyzed. For example, a query that fails due to a syntax
+        error is not recorded in the audit log. </p>
+
+      <p class="p">The audit log does not contain queries that fail due to a reference to
+        a table that does not exist. </p>
 
 
-      <p class="p">
-        Certain statements in the <span class="keyword cmdname">impala-shell</span> interpreter, such as
-        <code class="ph codeph">CONNECT</code>, <code class="ph codeph">SUMMARY</code>,
-        <code class="ph codeph">PROFILE</code>, <code class="ph codeph">SET</code>, and <code class="ph codeph">QUIT</code>, do not
-        correspond to actual SQL queries, and these statements are not reflected in the audit
-        log.
-      </p>
+      <p class="p"> Certain statements in the <span class="keyword cmdname">impala-shell</span> interpreter,
+        such as <code class="ph codeph">CONNECT</code>, <code class="ph codeph">SUMMARY</code>,
+          <code class="ph codeph">PROFILE</code>, <code class="ph codeph">SET</code>, and
+          <code class="ph codeph">QUIT</code>, do not correspond to actual SQL queries, and
+        these statements are not recorded in the audit log. </p>
 
 
     </div>

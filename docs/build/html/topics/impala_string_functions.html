@@ -4,15 +4,15 @@
 <html xmlns="http://www.w3.org/1999/xhtml" xml:lang="en" lang="en">
 <head><meta http-equiv="Content-Type" content="text/html; charset=UTF-8" />
 
-<meta name="copyright" content="(C) Copyright 2019" />
-<meta name="DC.rights.owner" content="(C) Copyright 2019" />
+<meta name="copyright" content="(C) Copyright 2020" />
+<meta name="DC.rights.owner" content="(C) Copyright 2020" />
 <meta name="DC.Type" content="concept" />
 <meta name="DC.Title" content="Impala String Functions" />
 <meta name="DC.Relation" scheme="URI" content="../topics/impala_functions.html" />
 <meta name="prodname" content="Impala" />
 <meta name="prodname" content="Impala" />
-<meta name="version" content="Impala 3.3.x" />
-<meta name="version" content="Impala 3.3.x" />
+<meta name="version" content="Impala 3.4.x" />
+<meta name="version" content="Impala 3.4.x" />
 <meta name="DC.Format" content="XHTML" />
 <meta name="DC.Identifier" content="string_functions" />
 <link rel="stylesheet" type="text/css" href="../commonltr.css" />
@@ -134,6 +134,28 @@
 
       <li class="li">
         <a class="xref" href="#string_functions__instr">INSTR</a>
+      </li>
+
+
+      <li class="li">
+        <a class="xref" href="#string_functions__jaro_distance">JARO_DISTANCE, JARO_DIST</a>
+      </li>
+
+
+      <li class="li">
+        <a class="xref" href="#string_functions__jaro_similarity">JARO_SIMILARITY, JARO_SIM</a>
+      </li>
+
+
+      <li class="li">
+        <a class="xref" href="#string_functions__jaro_winkler_distance">JARO_WINKER_DISTANCE,
+        JW_DST</a>
+      </li>
+
+
+      <li class="li">
+        <a class="xref" href="#string_functions__jaro_winkler_similarity">JARO_WINKER_SIMILARITY,
+        JW_SIM</a>
       </li>
 
 
@@ -678,7 +700,7 @@ select concat('[',btrim('xyhelxyzlozyzzxx','xyz'),']');
         different results depending on the type of the argument and the presence of trailing
         spaces for <code class="ph codeph">CHAR</code> values. The <code class="ph codeph">S</code> and <code class="ph codeph">C</code>
         values are displayed with enclosing quotation marks to show any trailing spaces.
-<pre class="pre codeblock" id="string_functions__d6e2688"><code>create table length_demo (s string, c char(5));
+<pre class="pre codeblock" id="string_functions__d6e2695"><code>create table length_demo (s string, c char(5));
 insert into length_demo values
   ('a',cast('a' as char(5))),
   ('abc',cast('abc' as char(5))),
@@ -764,7 +786,10 @@ SELECT chr(97);
 
         <dd class="dd">
           <strong class="ph b">Purpose:</strong> Returns a single string representing all the argument values joined
-          together.
+          together. If any argument is <code class="ph codeph">NULL</code>, it returns <code class="ph codeph">NULL</code>.
+          <p class="p"></p>
+
+
           <p class="p">
             <strong class="ph b">Return type:</strong> <code class="ph codeph">STRING</code>
           </p>
@@ -810,7 +835,7 @@ SELECT chr(97);
       
 
         <dt class="dt dlterm" id="string_functions__find_in_set">
-          FIND_IN_SEt(STRING str, STRING strList)
+          FIND_IN_SET(STRING str, STRING strList)
         </dt>
 
 
@@ -908,43 +933,28 @@ SELECT chr(97);
 
 
         <dd class="dd">
-          <strong class="ph b">Purpose:</strong> Returns the position (starting from 1) of the first occurrence of a
-          substring within a longer string.
-          <p class="p">
-            <strong class="ph b">Return type:</strong> <code class="ph codeph">INT</code>
+          <strong class="ph b">Purpose:</strong> Returns the position (starting from 1) of the first
+          occurrence of a <var class="keyword varname">substr</var> within a longer string. <p class="p">
+            <strong class="ph b">Return type:</strong>
+            <code class="ph codeph">INT</code>
           </p>
-
 
           <p class="p">
         <strong class="ph b">Usage notes:</strong>
       </p>
 
+          <p class="p"> If the <var class="keyword varname">substr</var> is not present in
+              <var class="keyword varname">str</var>, the function returns 0. </p>
 
-          <p class="p">
-            If the substring is not present in the string, the function returns 0:
-          </p>
-
-<pre class="pre codeblock"><code>
-select instr('foo bar bletch', 'z');
-+------------------------------+
-| instr('foo bar bletch', 'z') |
-+------------------------------+
-| 0                            |
-+------------------------------+
-</code></pre>
-          <p class="p">
-            The optional third and fourth arguments let you find instances of the substring
-            other than the first instance starting from the left:
-          </p>
+          <p class="p"> The optional third and fourth arguments
+            let you find instances of the <var class="keyword varname">substr</var> other than
+            the first instance starting from the left. </p>
 
           <ul class="ul">
-            <li class="li">
-              <p class="p">
-                The third argument lets you specify a starting point within the string other
-                than 1:
-              </p>
-
-<pre class="pre codeblock"><code>
+            <li class="li"> The third argument, <var class="keyword varname">position</var>, lets you
+              specify a starting point within the <var class="keyword varname">str</var> other
+              than 1.
+              <pre class="pre codeblock"><code>
 -- Restricting the search to positions 7..end,
 -- the first occurrence of 'b' is at position 9.
 select instr('foo bar bletch', 'b', 7);
@@ -953,23 +963,17 @@ select instr('foo bar bletch', 'b', 7);
 +---------------------------------+
 | 9                               |
 +---------------------------------+
-
--- If there are no more occurrences after the
--- specified position, the result is 0.
-select instr('foo bar bletch', 'b', 10);
-+----------------------------------+
-| instr('foo bar bletch', 'b', 10) |
-+----------------------------------+
-| 0                                |
-+----------------------------------+
 </code></pre>
-              <p class="p">
-                If the third argument is negative, the search works right-to-left starting that
-                many characters from the right. The return value still represents the position
-                starting from the left side of the string.
-              </p>
+            </li>
 
-<pre class="pre codeblock"><code>
+            <li class="li"> If there are no more occurrences after the specified position,
+              the result is 0. </li>
+
+            <li class="li"> If <var class="keyword varname">position</var> is negative, the search works
+              right-to-left starting that many characters from the right. The
+              return value still represents the position starting from the left
+              side of <var class="keyword varname">str</var>.
+              <pre class="pre codeblock"><code>
 -- Scanning right to left, the first occurrence of 'o'
 -- is at position 8. (8th character from the left.)
 select instr('hello world','o',-1);
@@ -979,34 +983,11 @@ select instr('hello world','o',-1);
 | 8                             |
 +-------------------------------+
 
--- Scanning right to left, starting from the 6th character
--- from the right, the first occurrence of 'o' is at
--- position 5 (5th character from the left).
-select instr('hello world','o',-6);
-+-------------------------------+
-| instr('hello world', 'o', -6) |
-+-------------------------------+
-| 5                             |
-+-------------------------------+
+</code></pre></li>
 
--- If there are no more occurrences after the
--- specified position, the result is 0.
-select instr('hello world','o',-10);
-+--------------------------------+
-| instr('hello world', 'o', -10) |
-+--------------------------------+
-| 0                              |
-+--------------------------------+
-</code></pre>
-            </li>
-
-
-            <li class="li">
-              <p class="p">
-                The fourth argument lets you specify an occurrence other than the first:
-              </p>
-
-<pre class="pre codeblock"><code>
+            <li class="li"> The fourth argument, <var class="keyword varname">occurrence</var>, lets you
+              specify an occurrence other than the first.
+              <pre class="pre codeblock"><code>
 -- 2nd occurrence of 'b' is at position 9.
 select instr('foo bar bletch', 'b', 1, 2);
 +------------------------------------+
@@ -1014,78 +995,291 @@ select instr('foo bar bletch', 'b', 1, 2);
 +------------------------------------+
 | 9                                  |
 +------------------------------------+
+</code></pre></li>
 
--- Negative position argument means scan right-to-left.
--- This example finds second instance of 'b' from the right.
-select instr('foo bar bletch', 'b', -1, 2);
-+-------------------------------------+
-| instr('foo bar bletch', 'b', -1, 2) |
-+-------------------------------------+
-| 5                                   |
-+-------------------------------------+
-</code></pre>
-              <p class="p">
-                If the fourth argument is greater than the number of matching occurrences, the
-                function returns 0:
-              </p>
-
-<pre class="pre codeblock"><code>
--- There is no 3rd occurrence within the string.
-select instr('foo bar bletch', 'b', 1, 3);
-+------------------------------------+
-| instr('foo bar bletch', 'b', 1, 3) |
-+------------------------------------+
-| 0                                  |
-+------------------------------------+
-
--- There is not even 1 occurrence when scanning
--- the string starting at position 10.
-select instr('foo bar bletch', 'b', 10, 1);
-+-------------------------------------+
-| instr('foo bar bletch', 'b', 10, 1) |
-+-------------------------------------+
-| 0                                   |
-+-------------------------------------+
-</code></pre>
-              <p class="p">
-                The fourth argument cannot be negative or zero. A non-positive value for this
-                argument causes an error:
-              </p>
-
-<pre class="pre codeblock"><code>
-select instr('foo bar bletch', 'b', 1, 0);
-ERROR: UDF ERROR: Invalid occurrence parameter to instr function: 0
-
-select instr('aaaaaaaaa','aa', 1, -1);
-ERROR: UDF ERROR: Invalid occurrence parameter to instr function: -1
-</code></pre>
-            </li>
-
+            <li class="li"> If <var class="keyword varname">occurrence</var> is greater than the number of
+              matching occurrences, the function returns 0. </li>
 
             <li class="li">
-              <p class="p">
-                If either of the optional arguments is <code class="ph codeph">NULL</code>, the function also
-                returns <code class="ph codeph">NULL</code>:
-              </p>
+              <var class="keyword varname">occurrence</var> cannot be negative or zero. A
+              non-positive value for this argument causes an error. </li>
 
-<pre class="pre codeblock"><code>
-select instr('foo bar bletch', 'b', null);
-+------------------------------------+
-| instr('foo bar bletch', 'b', null) |
-+------------------------------------+
-| NULL                               |
-+------------------------------------+
-
-select instr('foo bar bletch', 'b', 1, null);
-+---------------------------------------+
-| instr('foo bar bletch', 'b', 1, null) |
-+---------------------------------------+
-| NULL                                  |
-+---------------------------------------+
-</code></pre>
-            </li>
+            <li class="li"> If either of the optional arguments,
+                <var class="keyword varname">position</var> or <var class="keyword varname">occurrence</var>, is
+                <code class="ph codeph">NULL</code>, the function also returns
+                <code class="ph codeph">NULL</code>.</li>
 
           </ul>
+
+        </dd>
+
+
+      
+
+      
+
+        <dt class="dt dlterm" id="string_functions__jaro_distance">
+          JARO_DISTANCE(STRING str1, STRING str2), JARO_DST(STRING str1, STRING str2)
+        </dt>
+
+
+        <dd class="dd">
+          <strong class="ph b">Purpose:</strong> Returns the
+          <a class="xref" href="https://ipfs.io/ipfs/QmXoypizjW3WknFiJnKLwHCnL72vedxjQkDDP1mXWo6uco/wiki/Jaro%E2%80%93Winkler_distance.html" target="_blank">Jaro
+          distance</a> between two input strings. The Jaro distance is a measure of
+          similarity between two strings and is the complementary of
+          <code class="ph codeph">JARO_SIMILARITY()</code>, i.e. (1 - <code class="ph codeph">JARO_SIMILARITY()</code>).
+          <p class="p">
+            <strong class="ph b">Return type:</strong> <code class="ph codeph">DOUBLE</code>
+          </p>
+
+
+          <p class="p">
+            <strong class="ph b">Usage notes:</strong>
+          </p>
+
+
+          <p class="p">
+            If the two input strings are identical, the function returns 0.0.
+          </p>
+
+
+          <p class="p">
+            If there is no matching character between the input strings, the function returns
+            1.0.
+          </p>
+
+
+          <p class="p">
+            If either input strings is <code class="ph codeph">NULL</code>, the function returns
+            <code class="ph codeph">NULL</code>.
+          </p>
+
+
+          <p class="p">
+            If the length of either input string is bigger than 255 characters, the function
+            returns an error.
+          </p>
+
+        </dd>
+
+
+      
+
+      
+
+        <dt class="dt dlterm" id="string_functions__jaro_similarity">
+          JARO_SIMILARITY(STRING str1, STRING str2), JARO_SIM(STRING str1, STRING str2)
+        </dt>
+
+
+        <dd class="dd">
+          <strong class="ph b">Purpose:</strong> Returns the
+          <a class="xref" href="https://ipfs.io/ipfs/QmXoypizjW3WknFiJnKLwHCnL72vedxjQkDDP1mXWo6uco/wiki/Jaro%E2%80%93Winkler_distance.html" target="_blank">Jaro
+          similarity</a> of two strings. The higher the Jaro similarity for two strings is,
+          the more similar the strings are.
+          <p class="p">
+            <strong class="ph b">Return type:</strong> <code class="ph codeph">DOUBLE</code>
+          </p>
+
+
+          <p class="p">
+            <strong class="ph b">Usage notes:</strong>
+          </p>
+
+
+          <p class="p">
+            If the two input strings are identical, the function returns 1.0.
+          </p>
+
+
+          <p class="p">
+            If there is no matching character between the input strings, the function returns
+            0.0.
+          </p>
+
+
+          <p class="p">
+            If either input strings is <code class="ph codeph">NULL</code>, the function returns
+            <code class="ph codeph">NULL</code>.
+          </p>
+
+
+          <p class="p">
+            If the length of either input string is bigger than 255 characters, the function
+            returns an error.
+          </p>
+
+        </dd>
+
+
+      
+
+      
+
+        <dt class="dt dlterm" id="string_functions__jaro_winkler_distance">
+          JARO_WINKLER_DISTANCE(STRING str1, STRING str2[, DOUBLE scaling_factor, DOUBLE
+          boost_threshold]), JW_DST(STRING str1, STRING str2[, DOUBLE scaling_factor, DOUBLE
+          boost_threshold])
+        </dt>
+
+
+        <dd class="dd">
+          <strong class="ph b">Purpose:</strong> Returns the
+          <a class="xref" href="https://ipfs.io/ipfs/QmXoypizjW3WknFiJnKLwHCnL72vedxjQkDDP1mXWo6uco/wiki/Jaro%E2%80%93Winkler_distance.html" target="_blank">Jaro-Winkler
+          distance</a> of two input strings. It is the complementary of
+          <code class="ph codeph">JARO_WINKLER_SIMILARITY()</code>, i.e. 1 -
+          <code class="ph codeph">JARO_WINKLER_SIMILARITY()</code>.
+          <p class="p">
+            <strong class="ph b">Return type:</strong> <code class="ph codeph">DOUBLE</code>
+          </p>
+
+
+          <p class="p">
+            <strong class="ph b">Usage notes:</strong>
+          </p>
+
+
+          <p class="p">
+            If the two input strings are identical, the function returns 0.0.
+          </p>
+
+
+          <p class="p">
+            If there is no matching character between the input strings, the function returns
+            1.0.
+          </p>
+
+
+          <div class="p">
+            The function returns an error in the following cases:
+            <ul class="ul">
+              <li class="li">
+                The length of either input string is bigger than 255 characters.
+              </li>
+
+
+              <li class="li">
+                <var class="keyword varname">scaling_factor</var> &lt; 0.0 or <var class="keyword varname">scaling_factor</var>
+                &gt; 0.25
+              </li>
+
+
+              <li class="li">
+                <var class="keyword varname">boost_threshold</var> &lt; 0.0 or
+                <var class="keyword varname">boost_threshold</var> &gt; 1.0
+              </li>
+
+            </ul>
+
+          </div>
+
+
+          <p class="p">
+            If either input strings is <code class="ph codeph">NULL</code>, the function returns
+            <code class="ph codeph">NULL</code>.
+          </p>
+
+
+          <p class="p">
+            The default <var class="keyword varname">scaling factor</var> is 0.1.
+          </p>
+
+
+          <p class="p">
+            The prefix weight will only be applied if the Jaro-distance exceeds the optional
+            <var class="keyword varname">boost_threshold</var>. By default, the
+            <var class="keyword varname">boost_threshold</var> value is 0.7.
+          </p>
+
+        </dd>
+
+
+      
+
+      
+
+        <dt class="dt dlterm" id="string_functions__jaro_winkler_similarity">
+          JARO_WINKLER_SIMILARITY(STRING str1, STRING str2[, DOUBLE scaling_factor, DOUBLE
+          boost_threshold]), JARO_SIM(STRING str1, STRING str2[, DOUBLE scaling_factor, DOUBLE
+          boost_threshold])
+        </dt>
+
+
+        <dd class="dd">
+          <strong class="ph b">Purpose:</strong> Returns the
+          <a class="xref" href="https://ipfs.io/ipfs/QmXoypizjW3WknFiJnKLwHCnL72vedxjQkDDP1mXWo6uco/wiki/Jaro%E2%80%93Winkler_distance.html" target="_blank">Jaro-Winkler
+          Similarity</a> between two input strings. The Jaro-Winkler similarity uses a prefix
+          weight, specified by <var class="keyword varname">scaling factor</var>, which gives more favorable
+          ratings to strings that match from the beginning for a set prefix length, up to a
+          maximum of four characters.
+          <p class="p">
+            Use Jaro or Jaro-Winkler functions to perform fuzzy matches on relatively short
+            strings, e.g. to scrub user inputs of names against the records in the database.
+          </p>
+
+
+          <p class="p">
+            <strong class="ph b">Return type:</strong> <code class="ph codeph">DOUBLE</code>
+          </p>
+
+
+          <p class="p">
+            <strong class="ph b">Usage notes:</strong>
+          </p>
+
+
+          <p class="p">
+            If the two input strings are identical, the function returns 1.0.
+          </p>
+
+
+          <p class="p">
+            If there is no matching character between the input strings, the function returns
+            0.0.
+          </p>
+
+
+          <div class="p">
+            The function returns an error in the following cases:
+            <ul class="ul">
+              <li class="li">
+                The length of either input string is bigger than 255 characters.
+              </li>
+
+
+              <li class="li">
+                <var class="keyword varname">scaling_factor</var> &lt; 0.0 or <var class="keyword varname">scaling_factor</var>
+                &gt; 0.25
+              </li>
+
+
+              <li class="li">
+                <var class="keyword varname">boost_threshold</var> &lt; 0.0 or
+                <var class="keyword varname">boost_threshold</var> &gt; 1.0
+              </li>
+
+            </ul>
+
+          </div>
+
+
+          <p class="p">
+            If either input strings is <code class="ph codeph">NULL</code>, the function returns
+            <code class="ph codeph">NULL</code>.
+          </p>
+
+
+          <p class="p">
+            The default <var class="keyword varname">scaling factor</var> is 0.1.
+          </p>
+
+
+          <p class="p">
+            The prefix weight will only be applied if the Jaro-similarity exceeds the optional
+            <var class="keyword varname">boost_threshold</var>. By default, the
+            <var class="keyword varname">boost_threshold</var> value is 0.7.
+          </p>
 
         </dd>
 
@@ -1155,7 +1349,7 @@ select instr('foo bar bletch', 'b', 1, null);
         different results depending on the type of the argument and the presence of trailing
         spaces for <code class="ph codeph">CHAR</code> values. The <code class="ph codeph">S</code> and <code class="ph codeph">C</code>
         values are displayed with enclosing quotation marks to show any trailing spaces.
-<pre class="pre codeblock" id="string_functions__d6e2688"><code>create table length_demo (s string, c char(5));
+<pre class="pre codeblock" id="string_functions__d6e2695"><code>create table length_demo (s string, c char(5));
 insert into length_demo values
   ('a',cast('a' as char(5))),
   ('abc',cast('abc' as char(5))),
@@ -2024,32 +2218,39 @@ select replace('hello world','xyz','abc');
             single character.
           </p>
 
+
           <p class="p">
             All matching of the delimiter is done exactly, not using any regular expression
             patterns.
           </p>
 
+
           <p class="p">
             <strong class="ph b">Return type:</strong> <code class="ph codeph">STRING</code>
           </p>
+
 
           <p class="p">
         <strong class="ph b">Examples:</strong>
       </p>
 
+
           <p class="p">
             <code class="ph codeph">SPLIT_PART('x,y,z',',',2)</code> returns <code class="ph codeph">'y'</code>.
           </p>
+
 
           <p class="p">
             <code class="ph codeph">SPLIT_PART('one***two***three','***',2)</code> returns
             <code class="ph codeph">'two'</code>.
           </p>
 
+
           <p class="p">
             <code class="ph codeph">SPLIT_PART('abc@@def@@ghi', '@@', 3)</code> returns
             <code class="ph codeph">'ghi'</code>.
           </p>
+
 
           <p class="p">
             <code class="ph codeph">SPLIT_PART('abc@@def@@ghi', '@@', -3)</code> returns

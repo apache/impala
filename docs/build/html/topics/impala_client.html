@@ -4,15 +4,16 @@
 <html xmlns="http://www.w3.org/1999/xhtml" xml:lang="en" lang="en">
 <head><meta http-equiv="Content-Type" content="text/html; charset=UTF-8" />
 
-<meta name="copyright" content="(C) Copyright 2019" />
-<meta name="DC.rights.owner" content="(C) Copyright 2019" />
+<meta name="copyright" content="(C) Copyright 2020" />
+<meta name="DC.rights.owner" content="(C) Copyright 2020" />
 <meta name="DC.Type" content="concept" />
 <meta name="DC.Title" content="Impala Client Access" />
 <meta name="DC.Relation" scheme="URI" content="../topics/impala_impala_shell.html" />
 <meta name="DC.Relation" scheme="URI" content="../topics/impala_odbc.html" />
 <meta name="DC.Relation" scheme="URI" content="../topics/impala_jdbc.html" />
+<meta name="DC.Relation" scheme="URI" content="../topics/impala_query_results_spooling.html" />
 <meta name="prodname" content="Impala" />
-<meta name="version" content="Impala 3.3.x" />
+<meta name="version" content="Impala 3.4.x" />
 <meta name="DC.Format" content="XHTML" />
 <meta name="DC.Identifier" content="intro_client" />
 <link rel="stylesheet" type="text/css" href="../commonltr.css" />
@@ -23,6 +24,8 @@
 
   <h1 class="title topictitle1" id="ariaid-title1">Impala Client Access</h1>
 
+
+  
 
   <div class="body conbody">
 
@@ -251,6 +254,37 @@
         
 
           <dt class="dt dlterm">
+            --hs2_http_port
+          </dt>
+
+
+          <dd class="dd">
+            Specifies the port for clients to connect to Impala server over HTTP.
+            <p class="p">
+              The default port is 28000.
+            </p>
+
+
+            <p class="p">
+              You can disable the HTTP end point for clients by setting the flag to
+              <code class="ph codeph">0</code>.
+            </p>
+
+
+            <p class="p">
+              To enable TLS/SSL for HiveServer2 HTTP endpoint use
+              <code class="ph codeph">--ssl_server_certificate</code> and <code class="ph codeph">--ssl_private_key</code>.
+              See <a class="xref" href="impala_ssl.html#ssl">Configuring TLS/SSL for Impala</a> for detail.
+            </p>
+
+          </dd>
+
+
+        
+
+        
+
+          <dt class="dt dlterm">
             --idle_client_poll_time_s
           </dt>
 
@@ -288,22 +322,44 @@
         
 
           <dt class="dt dlterm">
-            --hs2_http_port
+            --max_cookie_lifetime_s
           </dt>
 
 
           <dd class="dd">
-            Specifies the port for clients to connect to Impala server over HTTP.
+            Starting in Impala 3.4.0, Impala uses cookies for authentication when clients
+            connect via HiveServer2 over HTTP. Use the <code class="ph codeph">--max_cookie_lifetime_s</code>
+            startup flag to control how long generated cookies are valid for.
             <p class="p">
-              You can disable the HTTP end point for clients by setting the flag to
-              <code class="ph codeph">0</code>.
+              Specify the value in seconds.
+            </p>
+
+            <p class="p">
+              The default value is 1 day.
             </p>
 
 
             <p class="p">
-              To enable TLS/SSL for HiveServer2 HTTP endpoint use
-              <code class="ph codeph">--ssl_server_certificate</code> and <code class="ph codeph">--ssl_private_key</code>.
-              See <a class="xref" href="impala_ssl.html#ssl">Configuring TLS/SSL for Impala</a> for detail.
+              Setting the flag to <code class="ph codeph">0</code> disables cookie support.
+            </p>
+
+
+            <p class="p">
+              When an unexpired cookie is successfully verified, the user name contained in the
+              cookie is set on the connection.
+            </p>
+
+
+            <p class="p">
+              Each <code class="ph codeph">impalad</code> uses its own key to generate the signature, so
+              clients that reconnect to a different <code class="ph codeph">impalad</code> have to
+              re-authenticate.
+            </p>
+
+
+            <p class="p">
+              On a single <code class="ph codeph">impalad</code>, cookies are valid across sessions and
+              connections.
             </p>
 
           </dd>
@@ -326,6 +382,8 @@
 <li class="link ulchildlink"><strong><a href="../topics/impala_odbc.html">Configuring Impala to Work with ODBC</a></strong><br />
 </li>
 <li class="link ulchildlink"><strong><a href="../topics/impala_jdbc.html">Configuring Impala to Work with JDBC</a></strong><br />
+</li>
+<li class="link ulchildlink"><strong><a href="../topics/impala_query_results_spooling.html">Spooling Impala Query Results</a></strong><br />
 </li>
 </ul>
 </div></body>

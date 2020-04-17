@@ -1,0 +1,69 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE html
+  PUBLIC "-//W3C//DTD XHTML 1.0 Transitional//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-transitional.dtd">
+<html xmlns="http://www.w3.org/1999/xhtml" xml:lang="en" lang="en">
+<head><meta http-equiv="Content-Type" content="text/html; charset=UTF-8" />
+
+<meta name="copyright" content="(C) Copyright 2020" />
+<meta name="DC.rights.owner" content="(C) Copyright 2020" />
+<meta name="DC.Type" content="concept" />
+<meta name="DC.Title" content="SPOOL_QUERY_RESULTS Query Option" />
+<meta name="DC.Relation" scheme="URI" content="../topics/impala_query_options.html" />
+<meta name="prodname" content="Impala" />
+<meta name="version" content="Impala 3.4.x" />
+<meta name="DC.Format" content="XHTML" />
+<meta name="DC.Identifier" content="SPOOL_QUERY_RESULTS" />
+<link rel="stylesheet" type="text/css" href="../commonltr.css" />
+<title>SPOOL_QUERY_RESULTS Query Option</title>
+</head>
+<body id="SPOOL_QUERY_RESULTS">
+
+  <h1 class="title topictitle1" id="ariaid-title1">SPOOL_QUERY_RESULTS Query Option</h1>
+
+  
+  
+  <div class="body conbody">
+    <p class="p">Use the <code class="ph codeph">SPOOL_QUERY_RESULTS</code> query option to enable query
+      result spooling, which is disabled by default.</p>
+
+    <div class="p">Query result spooling controls how rows are returned to the client. <ul class="ul">
+        <li class="li">When query result spooling is disabled (<code class="ph codeph">SPOOL_QUERY_RESULTS
+            = FALSE</code>), Impala relies on clients to fetch results to
+          trigger the generation of more result row batches until all the result
+          rows have been produced. If a client issues a query without fetching
+          all the results, the query fragments will continue to consume the
+          resources until the query is cancelled and unregistered, potentially
+          tying up resources and cause other queries to wait for extended period
+          of time in admission control.</li>
+
+        <li class="li">When query result spooling is enabled (<code class="ph codeph">SPOOL_QUERY_RESULTS =
+            TRUE</code>), the result sets of queries are eagerly fetched and
+          spooled, either in memory or on disk. <p class="p">Once all result rows have
+            been fetched and stored in the spooling location, the resources are
+            freed up. Incoming client fetches can get the data from the spooled
+            results.</p>
+</li>
+
+      </ul>
+</div>
+
+    <p class="p"><strong class="ph b">Type:</strong>
+      <code class="ph codeph">INT</code></p>
+
+    <p class="p"><strong class="ph b">Default:</strong>
+      <code class="ph codeph">FALSE</code></p>
+
+    <p class="p"><strong class="ph b">Added in:</strong>
+      <span class="keyword">Impala 3.4</span></p>
+
+    <p class="p"><strong class="ph b">Related information:</strong>
+      <a class="xref" href="impala_default_spillable_buffer_size.html#default_spillable_buffer_size">DEFAULT_SPILLABLE_BUFFER_SIZE Query Option</a>, <a class="xref" href="impala_max_spilled_result_spooling_mem.html#MAX_SPILLED_RESULT_SPOOLING_MEM">MAX_SPILLED_RESULT_SPOOLING_MEM Query Option</a>, <a class="xref" href="impala_max_result_spooling_mem.html#MAX_RESULT_SPOOLING_MEM">MAX_RESULT_SPOOLING_MEM Query Option</a></p>
+
+  </div>
+
+<div class="related-links">
+<div class="familylinks">
+<div class="parentlink"><strong>Parent topic:</strong> <a class="link" href="../topics/impala_query_options.html">Query Options for the SET Statement</a></div>
+</div>
+</div></body>
+</html>

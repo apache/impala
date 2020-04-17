@@ -1,0 +1,93 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE html
+  PUBLIC "-//W3C//DTD XHTML 1.0 Transitional//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-transitional.dtd">
+<html xmlns="http://www.w3.org/1999/xhtml" xml:lang="en" lang="en">
+<head><meta http-equiv="Content-Type" content="text/html; charset=UTF-8" />
+
+<meta name="copyright" content="(C) Copyright 2020" />
+<meta name="DC.rights.owner" content="(C) Copyright 2020" />
+<meta name="DC.Type" content="concept" />
+<meta name="DC.Title" content="DISABLE_HBASE_NUM_ROWS_ESTIMATE Query Option" />
+<meta name="DC.Relation" scheme="URI" content="../topics/impala_query_options.html" />
+<meta name="prodname" content="Impala" />
+<meta name="version" content="Impala 3.4.x" />
+<meta name="DC.Format" content="XHTML" />
+<meta name="DC.Identifier" content="disable_hbase_num_rows_estimate" />
+<link rel="stylesheet" type="text/css" href="../commonltr.css" />
+<title>DISABLE_HBASE_NUM_ROWS_ESTIMATE Query Option</title>
+</head>
+<body id="disable_hbase_num_rows_estimate">
+
+
+  <h1 class="title topictitle1" id="ariaid-title1">DISABLE_HBASE_NUM_ROWS_ESTIMATE Query Option</h1>
+
+
+  
+
+  
+
+  <div class="body conbody">
+
+    <p class="p">
+      Use the <code class="ph codeph">DISABLE_HBASE_NUM_ROWS_ESTIMATE</code> query option to disable key
+      sampling of HBase tables in row count and row size estimation.
+    </p>
+
+
+    <p class="p">
+      While generating a plan for an HBase query, the planner samples the underlying HBase
+      tables to estimate their row count and row size, and the sampling can negatively impact
+      the planning time. When the HBase table stats does not change much in short time, disable
+      the sampling by setting the <code class="ph codeph">DISABLE_HBASE_NUM_ROWS_ESTIMATE</code> query option
+      to <code class="ph codeph">TRUE</code>. And Impala planner will fall back to using Hive Metastore (HMS)
+      table stats instead.
+    </p>
+
+
+    <p class="p">
+      When <code class="ph codeph">DISABLE_HBASE_NUM_ROWS_ESTIMATE</code> query option is set to
+      <code class="ph codeph">TRUE</code>, you need to update the HMS table stats by running <code class="ph codeph">COMPUTE
+      STATS</code>. Alternatively, you can manually set table statistics by running
+      <code class="ph codeph">ALTER TABLE</code>. See <a class="xref" href="impala_perf_stats.html#perf_stats">Table and Column Statistics</a>
+      for details.
+    </p>
+
+
+    <div class="p">
+      The following values are supported:
+      <ul class="ul">
+        <li class="li">
+          <code class="ph codeph">TRUE</code> or <code class="ph codeph">1</code>: Disables the normal key sampling of HBase
+          tables and uses HMS table stats for estimation.
+        </li>
+
+
+        <li class="li">
+          <code class="ph codeph">FALSE</code> or <code class="ph codeph">0</code>: Enables the normal sampling of HBase
+          tables.
+        </li>
+
+      </ul>
+
+    </div>
+
+
+    <p class="p">
+      <strong class="ph b">Type:</strong> <code class="ph codeph">BOOLEAN</code>
+    </p>
+
+
+    <p class="p">
+      <strong class="ph b">Default:</strong> <code class="ph codeph">FALSE</code>
+    </p>
+
+
+  </div>
+
+
+<div class="related-links">
+<div class="familylinks">
+<div class="parentlink"><strong>Parent topic:</strong> <a class="link" href="../topics/impala_query_options.html">Query Options for the SET Statement</a></div>
+</div>
+</div></body>
+</html>

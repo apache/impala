@@ -4,8 +4,8 @@
 <html xmlns="http://www.w3.org/1999/xhtml" xml:lang="en" lang="en">
 <head><meta http-equiv="Content-Type" content="text/html; charset=UTF-8" />
 
-<meta name="copyright" content="(C) Copyright 2019" />
-<meta name="DC.rights.owner" content="(C) Copyright 2019" />
+<meta name="copyright" content="(C) Copyright 2020" />
+<meta name="DC.rights.owner" content="(C) Copyright 2020" />
 <meta name="DC.Type" content="concept" />
 <meta name="DC.Title" content="Using Text Data Files with Impala Tables" />
 <meta name="DC.Relation" scheme="URI" content="../topics/impala_file_formats.html" />
@@ -17,14 +17,14 @@
 <meta name="prodname" content="Impala" />
 <meta name="prodname" content="Impala" />
 <meta name="prodname" content="Impala" />
-<meta name="version" content="Impala 3.3.x" />
-<meta name="version" content="Impala 3.3.x" />
-<meta name="version" content="Impala 3.3.x" />
-<meta name="version" content="Impala 3.3.x" />
-<meta name="version" content="Impala 3.3.x" />
-<meta name="version" content="Impala 3.3.x" />
-<meta name="version" content="Impala 3.3.x" />
-<meta name="version" content="Impala 3.3.x" />
+<meta name="version" content="Impala 3.4.x" />
+<meta name="version" content="Impala 3.4.x" />
+<meta name="version" content="Impala 3.4.x" />
+<meta name="version" content="Impala 3.4.x" />
+<meta name="version" content="Impala 3.4.x" />
+<meta name="version" content="Impala 3.4.x" />
+<meta name="version" content="Impala 3.4.x" />
+<meta name="version" content="Impala 3.4.x" />
 <meta name="DC.Format" content="XHTML" />
 <meta name="DC.Identifier" content="txtfile" />
 <link rel="stylesheet" type="text/css" href="../commonltr.css" />
@@ -58,23 +58,23 @@
     
 <div class="tablenoborder"><table cellpadding="4" cellspacing="0" summary="" class="table" frame="border" border="1" rules="all"><caption><span class="tablecap"><span class="table--title-label">Table 1. </span>Text Format Support in Impala</span></caption><colgroup><col style="width:10%" /><col style="width:10%" /><col style="width:20%" /><col style="width:30%" /><col style="width:30%" /></colgroup><thead class="thead" style="text-align:left;">
           <tr class="row">
-            <th class="entry nocellnorowborder" style="vertical-align:top;" id="d214284e149">
+            <th class="entry nocellnorowborder" style="vertical-align:top;" id="d219299e149">
               File Type
             </th>
 
-            <th class="entry nocellnorowborder" style="vertical-align:top;" id="d214284e152">
+            <th class="entry nocellnorowborder" style="vertical-align:top;" id="d219299e152">
               Format
             </th>
 
-            <th class="entry nocellnorowborder" style="vertical-align:top;" id="d214284e155">
+            <th class="entry nocellnorowborder" style="vertical-align:top;" id="d219299e155">
               Compression Codecs
             </th>
 
-            <th class="entry nocellnorowborder" style="vertical-align:top;" id="d214284e158">
+            <th class="entry nocellnorowborder" style="vertical-align:top;" id="d219299e158">
               Impala Can CREATE?
             </th>
 
-            <th class="entry cell-norowborder" style="vertical-align:top;" id="d214284e161">
+            <th class="entry cell-norowborder" style="vertical-align:top;" id="d219299e161">
               Impala Can INSERT?
             </th>
 
@@ -83,30 +83,30 @@
         </thead>
 <tbody class="tbody">
           <tr class="row">
-            <td class="entry row-nocellborder" style="vertical-align:top;" headers="d214284e149 ">
+            <td class="entry row-nocellborder" style="vertical-align:top;" headers="d219299e149 ">
               <a class="xref" href="impala_txtfile.html#txtfile">Text</a>
             </td>
 
-            <td class="entry row-nocellborder" style="vertical-align:top;" headers="d214284e152 ">
+            <td class="entry row-nocellborder" style="vertical-align:top;" headers="d219299e152 ">
               Unstructured
             </td>
 
-            <td class="entry row-nocellborder" style="vertical-align:top;" headers="d214284e155 ">
-              LZO, gzip, bzip2, Snappy
-            </td>
+            <td class="entry row-nocellborder" style="vertical-align:top;" headers="d219299e155 ">bzip2, deflate, gzip, LZO, Snappy, zstd</td>
 
-            <td class="entry row-nocellborder" style="vertical-align:top;" headers="d214284e158 ">
+            <td class="entry row-nocellborder" style="vertical-align:top;" headers="d219299e158 ">
               Yes. For <code class="ph codeph">CREATE TABLE</code> with no <code class="ph codeph">STORED AS</code> clause,
               the default file format is uncompressed text, with values separated by ASCII
               <code class="ph codeph">0x01</code> characters (typically represented as Ctrl-A).
             </td>
 
-            <td class="entry cellrowborder" style="vertical-align:top;" headers="d214284e161 ">
-              Yes: <code class="ph codeph">CREATE TABLE</code>, <code class="ph codeph">INSERT</code>, <code class="ph codeph">LOAD
-              DATA</code>, and query. If LZO compression is used, you must create the table
-              and load data in Hive. If other kinds of compression are used, you must load data
-              through <code class="ph codeph">LOAD DATA</code>, Hive, or manually in HDFS.
-            </td>
+            <td class="entry cellrowborder" style="vertical-align:top;" headers="d219299e161 "> Yes if uncompressed.<p class="p">No if compressed.</p>
+<p class="p">If LZO
+                compression is used, you must create the table and load data in
+                Hive.</p>
+<p class="p">If other kinds of compression are used, you must
+                load data through <code class="ph codeph">LOAD DATA</code>, Hive, or manually
+                in HDFS. </p>
+</td>
 
           </tr>
 
@@ -160,13 +160,13 @@
 
 
       <p class="p">
-        In Impala 2.0 and later, you can also use text data compressed in the gzip, bzip2, or Snappy formats.
-        Because these compressed formats are not <span class="q">"splittable"</span> in the way that LZO is, there is less
-        opportunity for Impala to parallelize queries on them. Therefore, use these types of compressed data only
-        for convenience if that is the format in which you receive the data. Prefer to use LZO compression for text
-        data if you have the choice, or convert the data to Parquet using an <code class="ph codeph">INSERT ... SELECT</code>
-        statement to copy the original data into a Parquet table.
-      </p>
+        You can also use text data compressed in the bzip2, deflate, gzip, Snappy, or
+        zstd formats. Because these compressed formats are not <span class="q">"splittable"</span> in the way that LZO
+        is, there is less opportunity for Impala to parallelize queries on them. Therefore, use
+        these types of compressed data only for convenience if that is the format in which you
+        receive the data. Prefer to use LZO compression for text data if you have the choice, or
+        convert the data to Parquet using an <code class="ph codeph">INSERT ... SELECT</code> statement to copy
+        the original data into a Parquet table. </p>
 
 
       <div class="note note"><span class="notetitle">Note:</span> 
@@ -176,12 +176,16 @@
           first part of such files, leading to incomplete results.
         </p>
 
+      </div>
+
 
         <p class="p">
           The maximum size that Impala can accommodate for an individual bzip file is 1 GB (after uncompression).
         </p>
 
-      </div>
+        <p class="p">
+          Impala supports zstd files created by the zstd command line tool.
+        </p>
 
 
       <p class="p">
@@ -347,12 +351,11 @@ create table pipe_separated(id int, s string, n int, t timestamp, b boolean)
 
 
         <li class="li">
-          <p class="p">
-            Impala uses suffixes to recognize when text data files are compressed text. For Impala to recognize the
-            compressed text files, they must have the appropriate file extension corresponding to the compression
-            codec, either <code class="ph codeph">.gz</code>, <code class="ph codeph">.bz2</code>, or <code class="ph codeph">.snappy</code>. The extensions
-            can be in uppercase or lowercase.
-          </p>
+          <p class="p"> Impala uses suffixes to recognize when text data files are compressed text. For Impala
+            to recognize the compressed text files, they must have the appropriate file extension
+            corresponding to the compression codec, either <code class="ph codeph">.bz2</code>, <code class="ph codeph">.deflate</code>
+            <code class="ph codeph">.gz</code>, <code class="ph codeph">.snappy</code>, or <code class="ph codeph">.zst</code>.
+            The extensions can be in uppercase or lowercase. </p>
 
         </li>
 
@@ -819,36 +822,33 @@ hive&gt; INSERT INTO TABLE lzo_t SELECT col1, col2 FROM uncompressed_text_table;
 
   <div class="topic concept nested1" aria-labelledby="ariaid-title7" id="gzip">
 
-    <h2 class="title topictitle2" id="ariaid-title7">Using gzip, bzip2, or Snappy-Compressed Text Files</h2>
+    <h2 class="title topictitle2" id="ariaid-title7">Using bzip2, deflate, gzip, Snappy, or zstd Text Files</h2>
 
   
 
     <div class="body conbody">
 
-      <p class="p"> In Impala 2.0 and later, Impala supports using text data files that
-        employ gzip, bzip2, or Snappy compression. These compression types are
-        primarily for convenience within an existing ETL pipeline rather than
-        maximum performance. Although it requires less I/O to read compressed
-        text than the equivalent uncompressed text, files compressed by these
-        codecs are not <span class="q">"splittable"</span> and therefore cannot take full
-        advantage of the Impala parallel query capability. </p>
+      <p class="p"> Impala supports using text data files that employ bzip2, deflate, gzip, Snappy, or zstd
+        compression. These compression types are primarily for convenience within an existing ETL
+        pipeline rather than maximum performance. Although it requires less I/O to read compressed
+        text than the equivalent uncompressed text, files compressed by these codecs are not
+          <span class="q">"splittable"</span> and therefore cannot take full advantage of the Impala parallel query
+        capability. Impala can read compressed text files written by Hive.</p>
 
 
-      <p class="p">
-        As each bzip2- or Snappy-compressed text file is processed, the node doing the work reads the entire file
-        into memory and then decompresses it. Therefore, the node must have enough memory to hold both the
-        compressed and uncompressed data from the text file. The memory required to hold the uncompressed data is
-        difficult to estimate in advance, potentially causing problems on systems with low memory limits or with
-        resource management enabled. <span class="ph">In Impala 2.1 and higher, this memory overhead is reduced for
-        gzip-compressed text files. The gzipped data is decompressed as it is read, rather than all at once.</span>
+      <p class="p"> As each Snappy-compressed file is processed, the node doing the work reads the entire file
+        into memory and then decompresses it. Therefore, the node must have enough memory to hold
+        both the compressed and uncompressed data from the text file. The memory required to hold
+        the uncompressed data is difficult to estimate in advance, potentially causing problems on
+        systems with low memory limits or with resource management enabled. <span class="ph">This
+          memory overhead is reduced for bzip2-, deflate-, gzip-, and zstd-compressed text files. The
+          compressed data is decompressed as it is read, rather than all at once.</span>
       </p>
 
 
-      <p class="p">
-        To create a table to hold gzip, bzip2, or Snappy-compressed text, create a text table with no special
-        compression options. Specify the delimiter and escape character if required, using the <code class="ph codeph">ROW
-        FORMAT</code> clause.
-      </p>
+      <p class="p"> To create a table to hold compressed text, create a text table with no special compression
+        options. Specify the delimiter and escape character if required, using the <code class="ph codeph">ROW
+          FORMAT</code> clause. </p>
 
 
       <p class="p">
@@ -856,13 +856,6 @@ hive&gt; INSERT INTO TABLE lzo_t SELECT col1, col2 FROM uncompressed_text_table;
         files outside Impala and use the <code class="ph codeph">LOAD DATA</code> statement, manual HDFS commands to move them to
         the appropriate Impala data directory. (Or, you can use <code class="ph codeph">CREATE EXTERNAL TABLE</code> and point
         the <code class="ph codeph">LOCATION</code> attribute at a directory containing existing compressed text files.)
-      </p>
-
-
-      <p class="p">
-        For Impala to recognize the compressed text files, they must have the appropriate file extension
-        corresponding to the compression codec, either <code class="ph codeph">.gz</code>, <code class="ph codeph">.bz2</code>, or
-        <code class="ph codeph">.snappy</code>. The extensions can be in uppercase or lowercase.
       </p>
 
 
@@ -879,7 +872,7 @@ hive&gt; INSERT INTO TABLE lzo_t SELECT col1, col2 FROM uncompressed_text_table;
 insert into csv_compressed values
   ('one - uncompressed', 'two - uncompressed', 'three - uncompressed'),
   ('abc - uncompressed', 'xyz - uncompressed', '123 - uncompressed');
-...make equivalent .gz, .bz2, and .snappy files and load them into same table directory...
+...make equivalent .bz2, .gz, .snappy, and .zst files and load them into same table directory...
 
 select * from csv_compressed;
 +--------------------+--------------------+----------------------+
@@ -892,6 +885,10 @@ select * from csv_compressed;
 | abc - bz2          | xyz - bz2          | 123 - bz2            |
 | one - gzip         | two - gzip         | three - gzip         |
 | abc - gzip         | xyz - gzip         | 123 - gzip           |
+| one - zstd         | two - zstd         | three - zstd         |
+| abc - zstd         | xyz - zstd         | 123 - zstd           |
+| one - deflate      | two - deflate      | three - deflate      |
+| abc - deflate      | xyz - deflate      | 123 - deflate        |
 +--------------------+--------------------+----------------------+
 
 $ hdfs dfs -ls 'hdfs://127.0.0.1:8020/user/hive/warehouse/file_formats.db/csv_compressed/';
@@ -899,6 +896,8 @@ $ hdfs dfs -ls 'hdfs://127.0.0.1:8020/user/hive/warehouse/file_formats.db/csv_co
 75 hdfs://127.0.0.1:8020/user/hive/warehouse/file_formats.db/csv_compressed/csv_compressed.snappy
 79 hdfs://127.0.0.1:8020/user/hive/warehouse/file_formats.db/csv_compressed/csv_compressed_bz2.csv.bz2
 80 hdfs://127.0.0.1:8020/user/hive/warehouse/file_formats.db/csv_compressed/csv_compressed_gzip.csv.gz
+58 hdfs://127.0.0.1:8020/user/hive/warehouse/file_formats.db/csv_compressed/csv_compressed_zstd.csv.zst
+48 hdfs://127.0.0.1:8020/user/hive/warehouse/file_formats.db/csv_compressed/csv_compressed_deflate.csv.deflate
 116 hdfs://127.0.0.1:8020/user/hive/warehouse/file_formats.db/csv_compressed/dd414df64d67d49b_data.0.
 </code></pre>
 

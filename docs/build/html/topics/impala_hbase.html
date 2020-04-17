@@ -4,8 +4,8 @@
 <html xmlns="http://www.w3.org/1999/xhtml" xml:lang="en" lang="en">
 <head><meta http-equiv="Content-Type" content="text/html; charset=UTF-8" />
 
-<meta name="copyright" content="(C) Copyright 2019" />
-<meta name="DC.rights.owner" content="(C) Copyright 2019" />
+<meta name="copyright" content="(C) Copyright 2020" />
+<meta name="DC.rights.owner" content="(C) Copyright 2020" />
 <meta name="DC.Type" content="concept" />
 <meta name="DC.Title" content="Using Impala to Query HBase Tables" />
 <meta name="prodname" content="Impala" />
@@ -18,16 +18,16 @@
 <meta name="prodname" content="Impala" />
 <meta name="prodname" content="Impala" />
 <meta name="prodname" content="Impala" />
-<meta name="version" content="Impala 3.3.x" />
-<meta name="version" content="Impala 3.3.x" />
-<meta name="version" content="Impala 3.3.x" />
-<meta name="version" content="Impala 3.3.x" />
-<meta name="version" content="Impala 3.3.x" />
-<meta name="version" content="Impala 3.3.x" />
-<meta name="version" content="Impala 3.3.x" />
-<meta name="version" content="Impala 3.3.x" />
-<meta name="version" content="Impala 3.3.x" />
-<meta name="version" content="Impala 3.3.x" />
+<meta name="version" content="Impala 3.4.x" />
+<meta name="version" content="Impala 3.4.x" />
+<meta name="version" content="Impala 3.4.x" />
+<meta name="version" content="Impala 3.4.x" />
+<meta name="version" content="Impala 3.4.x" />
+<meta name="version" content="Impala 3.4.x" />
+<meta name="version" content="Impala 3.4.x" />
+<meta name="version" content="Impala 3.4.x" />
+<meta name="version" content="Impala 3.4.x" />
+<meta name="version" content="Impala 3.4.x" />
 <meta name="DC.Format" content="XHTML" />
 <meta name="DC.Identifier" content="impala_hbase" />
 <link rel="stylesheet" type="text/css" href="../commonltr.css" />
@@ -128,12 +128,12 @@
         </li>
 
 
-        <li class="li">
-          You issue queries against the Impala tables. For efficient queries, use <code class="ph codeph">WHERE</code> clauses to
-          find a single key value or a range of key values wherever practical, by testing the Impala column
-          corresponding to the HBase row key. Avoid queries that do full-table scans, which are efficient for
-          regular Impala tables but inefficient in HBase.
-        </li>
+        <li class="li"> You issue queries against the Impala tables. For efficient queries,
+          use the <code class="ph codeph">WHERE</code> clause to find a single key value or a
+          range of key values wherever practical, by testing the Impala column
+          corresponding to the HBase row key. Avoid queries that do full-table
+          scans, which are efficient for regular Impala tables but inefficient
+          in HBase. </li>
 
       </ul>
 
@@ -207,15 +207,16 @@
       </p>
 
 
-      <p class="p">
-        For best performance of Impala queries against HBase tables, most queries will perform comparisons in the
-        <code class="ph codeph">WHERE</code> against the column that corresponds to the HBase row key. When creating the table
-        through the Hive shell, use the <code class="ph codeph">STRING</code> data type for the column that corresponds to the
-        HBase row key. Impala can translate conditional tests (through operators such as <code class="ph codeph">=</code>,
-        <code class="ph codeph">&lt;</code>, <code class="ph codeph">BETWEEN</code>, and <code class="ph codeph">IN</code>) against this column into fast
-        lookups in HBase, but this optimization (<span class="q">"predicate pushdown"</span>) only works when that column is
-        defined as <code class="ph codeph">STRING</code>.
-      </p>
+      <p class="p"> For best performance of Impala queries against HBase tables, most
+        queries will perform comparisons in the <code class="ph codeph">WHERE</code> clause
+        against the column that corresponds to the HBase row key. When creating
+        the table through the Hive shell, use the <code class="ph codeph">STRING</code> data
+        type for the column that corresponds to the HBase row key. Impala can
+        translate predicates (through operators such as <code class="ph codeph">=</code>,
+          <code class="ph codeph">&lt;</code>, and <code class="ph codeph">BETWEEN</code>) against this
+        column into fast lookups in HBase, but this optimization (<span class="q">"predicate
+          pushdown"</span>) only works when that column is defined as
+          <code class="ph codeph">STRING</code>. </p>
 
 
       <p class="p">

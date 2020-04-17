@@ -4,8 +4,8 @@
 <html xmlns="http://www.w3.org/1999/xhtml" xml:lang="en" lang="en">
 <head><meta http-equiv="Content-Type" content="text/html; charset=UTF-8" />
 
-<meta name="copyright" content="(C) Copyright 2019" />
-<meta name="DC.rights.owner" content="(C) Copyright 2019" />
+<meta name="copyright" content="(C) Copyright 2020" />
+<meta name="DC.rights.owner" content="(C) Copyright 2020" />
 <meta name="DC.Type" content="concept" />
 <meta name="DC.Title" content="SQL Operators" />
 <meta name="DC.Relation" scheme="URI" content="../topics/impala_langref.html" />
@@ -24,21 +24,21 @@
 <meta name="prodname" content="Impala" />
 <meta name="prodname" content="Impala" />
 <meta name="prodname" content="Impala" />
-<meta name="version" content="Impala 3.3.x" />
-<meta name="version" content="Impala 3.3.x" />
-<meta name="version" content="Impala 3.3.x" />
-<meta name="version" content="Impala 3.3.x" />
-<meta name="version" content="Impala 3.3.x" />
-<meta name="version" content="Impala 3.3.x" />
-<meta name="version" content="Impala 3.3.x" />
-<meta name="version" content="Impala 3.3.x" />
-<meta name="version" content="Impala 3.3.x" />
-<meta name="version" content="Impala 3.3.x" />
-<meta name="version" content="Impala 3.3.x" />
-<meta name="version" content="Impala 3.3.x" />
-<meta name="version" content="Impala 3.3.x" />
-<meta name="version" content="Impala 3.3.x" />
-<meta name="version" content="Impala 3.3.x" />
+<meta name="version" content="Impala 3.4.x" />
+<meta name="version" content="Impala 3.4.x" />
+<meta name="version" content="Impala 3.4.x" />
+<meta name="version" content="Impala 3.4.x" />
+<meta name="version" content="Impala 3.4.x" />
+<meta name="version" content="Impala 3.4.x" />
+<meta name="version" content="Impala 3.4.x" />
+<meta name="version" content="Impala 3.4.x" />
+<meta name="version" content="Impala 3.4.x" />
+<meta name="version" content="Impala 3.4.x" />
+<meta name="version" content="Impala 3.4.x" />
+<meta name="version" content="Impala 3.4.x" />
+<meta name="version" content="Impala 3.4.x" />
+<meta name="version" content="Impala 3.4.x" />
+<meta name="version" content="Impala 3.4.x" />
 <meta name="DC.Format" content="XHTML" />
 <meta name="DC.Identifier" content="operators" />
 <link rel="stylesheet" type="text/css" href="../commonltr.css" />
@@ -1419,19 +1419,20 @@ SELECT COUNT(DISTINCT(visitor_id)) FROM web_traffic WHERE month IN ('January','J
 
     <div class="body conbody">
 
-      <p class="p">
-        
-
-        
-        The <code class="ph codeph">IS DISTINCT FROM</code> operator, and its converse the <code class="ph codeph">IS NOT DISTINCT FROM</code> operator, test whether or
-        not values are identical. <code class="ph codeph">IS NOT DISTINCT FROM</code> is similar to the <code class="ph codeph">=</code> operator, and <code class="ph codeph">IS
-        DISTINCT FROM</code> is similar to the <code class="ph codeph">!=</code> operator, except that <code class="ph codeph">NULL</code> values are treated as
-        identical. Therefore, <code class="ph codeph">IS NOT DISTINCT FROM</code> returns <code class="ph codeph">true</code> rather than <code class="ph codeph">NULL</code>, and
-        <code class="ph codeph">IS DISTINCT FROM</code> returns <code class="ph codeph">false</code> rather than <code class="ph codeph">NULL</code>, when comparing two
-        <code class="ph codeph">NULL</code> values. If one of the values being compared is <code class="ph codeph">NULL</code> and the other is not, <code class="ph codeph">IS DISTINCT
-        FROM</code> returns <code class="ph codeph">true</code> and <code class="ph codeph">IS NOT DISTINCT FROM</code> returns <code class="ph codeph">false</code>, again instead
-        of returning <code class="ph codeph">NULL</code> in both cases.
-      </p>
+      <p class="p"> The <code class="ph codeph">IS DISTINCT FROM</code> operator, and its converse the
+          <code class="ph codeph">IS NOT DISTINCT FROM</code> operator, test whether or not
+        values are identical. <code class="ph codeph">IS NOT DISTINCT FROM</code> is similar
+        to the <code class="ph codeph">=</code> operator, and <code class="ph codeph">IS DISTINCT
+          FROM</code> is similar to the <code class="ph codeph">!=</code> operator, except
+        that <code class="ph codeph">NULL</code> values are treated as identical. Therefore,
+          <code class="ph codeph">IS NOT DISTINCT FROM</code> returns <code class="ph codeph">true</code>
+        rather than <code class="ph codeph">NULL</code>, and <code class="ph codeph">IS DISTINCT FROM</code>
+        returns <code class="ph codeph">false</code> rather than <code class="ph codeph">NULL</code>, when
+        comparing two <code class="ph codeph">NULL</code> values. If one of the values being
+        compared is <code class="ph codeph">NULL</code> and the other is not, <code class="ph codeph">IS
+          DISTINCT FROM</code> returns <code class="ph codeph">true</code> and <code class="ph codeph">IS
+          NOT DISTINCT FROM</code> returns <code class="ph codeph">false</code>, again
+        instead of returning <code class="ph codeph">NULL</code> in both cases. </p>
 
 
       <p class="p">
@@ -1466,12 +1467,11 @@ SELECT COUNT(DISTINCT(visitor_id)) FROM web_traffic WHERE month IN ('January','J
       </p>
 
 
-      <p class="p">
-        The <code class="ph codeph">&lt;=&gt;</code> operator, used like an equality operator in a join query,
-        is more efficient than the equivalent clause: <code class="ph codeph">A = B OR (A IS NULL AND B IS NULL)</code>.
-        The <code class="ph codeph">&lt;=&gt;</code> operator can use a hash join, while the <code class="ph codeph">OR</code> expression
-        cannot.
-      </p>
+      <p class="p"> The <code class="ph codeph">&lt;=&gt;</code> operator, used like an equality
+        operator in a join query, is more efficient than the equivalent clause:
+          <code class="ph codeph">IF (A IS NULL OR B IS NULL, A IS NULL AND B IS NULL, A =
+          B)</code>. The <code class="ph codeph">&lt;=&gt;</code> operator can use a hash
+        join, while the <code class="ph codeph">IF</code> expression cannot. </p>
 
 
       <p class="p">

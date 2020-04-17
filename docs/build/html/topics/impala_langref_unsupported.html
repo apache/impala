@@ -4,15 +4,15 @@
 <html xmlns="http://www.w3.org/1999/xhtml" xml:lang="en" lang="en">
 <head><meta http-equiv="Content-Type" content="text/html; charset=UTF-8" />
 
-<meta name="copyright" content="(C) Copyright 2019" />
-<meta name="DC.rights.owner" content="(C) Copyright 2019" />
+<meta name="copyright" content="(C) Copyright 2020" />
+<meta name="DC.rights.owner" content="(C) Copyright 2020" />
 <meta name="DC.Type" content="concept" />
 <meta name="DC.Title" content="SQL Differences Between Impala and Hive" />
 <meta name="DC.Relation" scheme="URI" content="../topics/impala_langref.html" />
 <meta name="prodname" content="Impala" />
 <meta name="prodname" content="Impala" />
-<meta name="version" content="Impala 3.3.x" />
-<meta name="version" content="Impala 3.3.x" />
+<meta name="version" content="Impala 3.4.x" />
+<meta name="version" content="Impala 3.4.x" />
 <meta name="DC.Format" content="XHTML" />
 <meta name="DC.Identifier" content="langref_hiveql_delta" />
 <link rel="stylesheet" type="text/css" href="../commonltr.css" />
@@ -302,38 +302,30 @@
 
 
       <ul class="ul">
-        <li class="li">
-          Impala supports a limited set of implicit casts. This can help avoid undesired results from unexpected
-          casting behavior.
-          <ul class="ul">
-            <li class="li">
-              Impala does not implicitly cast between string and numeric or Boolean types. Always use
-              <code class="ph codeph">CAST()</code> for these conversions.
-            </li>
+        <li class="li"> Impala supports a limited set of implicit casts. This can help
+          avoid undesired results from unexpected casting behavior. <ul class="ul">
+            <li class="li"> Impala does not implicitly cast between string and numeric or
+              Boolean types. Always use <code class="ph codeph">CAST()</code> for these
+              conversions. </li>
 
+            <li class="li"> Impala does perform implicit casts among the numeric types,
+              when going from a smaller or less precise type to a larger or more
+              precise one. For example, Impala will implicitly convert a
+                <code class="ph codeph">SMALLINT</code> to a <code class="ph codeph">BIGINT</code> or
+                <code class="ph codeph">FLOAT</code>, but to convert from
+                <code class="ph codeph">DOUBLE</code> to <code class="ph codeph">FLOAT</code> or
+                <code class="ph codeph">INT</code> to <code class="ph codeph">TINYINT</code> requires a call
+              to <code class="ph codeph">CAST()</code> in the query. </li>
 
-            <li class="li">
-              Impala does perform implicit casts among the numeric types, when going from a smaller or less precise
-              type to a larger or more precise one. For example, Impala will implicitly convert a
-              <code class="ph codeph">SMALLINT</code> to a <code class="ph codeph">BIGINT</code> or <code class="ph codeph">FLOAT</code>, but to convert from
-              <code class="ph codeph">DOUBLE</code> to <code class="ph codeph">FLOAT</code> or <code class="ph codeph">INT</code> to <code class="ph codeph">TINYINT</code>
-              requires a call to <code class="ph codeph">CAST()</code> in the query.
-            </li>
-
-
-            <li class="li">
-              Impala does perform implicit casts from string to timestamp. Impala has a restricted set of literal
-              formats for the <code class="ph codeph">TIMESTAMP</code> data type and the <code class="ph codeph">from_unixtime()</code> format
-              string; see <a class="xref" href="impala_timestamp.html#timestamp">TIMESTAMP Data Type</a> for details.
-            </li>
+            <li class="li"> Impala does perform implicit casts from string to timestamp.
+              Impala has a restricted set of literal formats for the
+                <code class="ph codeph">TIMESTAMP</code> data type and the
+                <code class="ph codeph">from_unixtime()</code> format string; see <a class="xref" href="impala_timestamp.html#timestamp">TIMESTAMP Data Type</a> for details. </li>
 
           </ul>
-
-          <p class="p">
-            See <a class="xref" href="impala_datatypes.html#datatypes">Data Types</a> for full details on implicit and explicit casting for
-            all types, and <a class="xref" href="impala_conversion_functions.html#conversion_functions">Impala Type Conversion Functions</a> for details about
-            the <code class="ph codeph">CAST()</code> function.
-          </p>
+<p class="p"> See the topics under <a class="xref" href="impala_datatypes.html#datatypes">Data Types</a> for full details on
+            implicit and explicit casting for each data type, and <a class="xref" href="impala_conversion_functions.html#conversion_functions">Impala Type Conversion Functions</a> for
+            details about the <code class="ph codeph">CAST()</code> function. </p>
 
         </li>
 

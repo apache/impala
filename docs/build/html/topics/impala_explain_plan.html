@@ -4,8 +4,8 @@
 <html xmlns="http://www.w3.org/1999/xhtml" xml:lang="en" lang="en">
 <head><meta http-equiv="Content-Type" content="text/html; charset=UTF-8" />
 
-<meta name="copyright" content="(C) Copyright 2019" />
-<meta name="DC.rights.owner" content="(C) Copyright 2019" />
+<meta name="copyright" content="(C) Copyright 2020" />
+<meta name="DC.rights.owner" content="(C) Copyright 2020" />
 <meta name="DC.Type" content="concept" />
 <meta name="DC.Title" content="Understanding Impala Query Performance - EXPLAIN Plans and Query Profiles" />
 <meta name="DC.Relation" scheme="URI" content="../topics/impala_performance.html" />
@@ -14,11 +14,11 @@
 <meta name="prodname" content="Impala" />
 <meta name="prodname" content="Impala" />
 <meta name="prodname" content="Impala" />
-<meta name="version" content="Impala 3.3.x" />
-<meta name="version" content="Impala 3.3.x" />
-<meta name="version" content="Impala 3.3.x" />
-<meta name="version" content="Impala 3.3.x" />
-<meta name="version" content="Impala 3.3.x" />
+<meta name="version" content="Impala 3.4.x" />
+<meta name="version" content="Impala 3.4.x" />
+<meta name="version" content="Impala 3.4.x" />
+<meta name="version" content="Impala 3.4.x" />
+<meta name="version" content="Impala 3.4.x" />
 <meta name="DC.Format" content="XHTML" />
 <meta name="DC.Identifier" content="explain_plan" />
 <link rel="stylesheet" type="text/css" href="../commonltr.css" />
@@ -29,31 +29,34 @@
 
   <h1 class="title topictitle1" id="ariaid-title1">Understanding Impala Query Performance - EXPLAIN Plans and Query Profiles</h1>
 
+
   
+
   
 
   <div class="body conbody">
 
     <p class="p">
-      To understand the high-level performance considerations for Impala queries, read the output of the
-      <code class="ph codeph">EXPLAIN</code> statement for the query. You can get the <code class="ph codeph">EXPLAIN</code> plan without
-      actually running the query itself.
+      To understand the high-level performance considerations for Impala queries, read the
+      output of the <code class="ph codeph">EXPLAIN</code> statement for the query. You can get the
+      <code class="ph codeph">EXPLAIN</code> plan without actually running the query itself.
     </p>
 
 
     <p class="p">
-      For an overview of the physical performance characteristics for a query, issue the <code class="ph codeph">SUMMARY</code>
-      statement in <span class="keyword cmdname">impala-shell</span> immediately after executing a query. This condensed information
-      shows which phases of execution took the most time, and how the estimates for memory usage and number of rows
-      at each phase compare to the actual values.
+      For an overview of the physical performance characteristics for a query, issue the
+      <code class="ph codeph">SUMMARY</code> statement in <span class="keyword cmdname">impala-shell</span> immediately after
+      executing a query. This condensed information shows which phases of execution took the
+      most time, and how the estimates for memory usage and number of rows at each phase compare
+      to the actual values.
     </p>
 
 
     <p class="p">
-      To understand the detailed performance characteristics for a query, issue the <code class="ph codeph">PROFILE</code>
-      statement in <span class="keyword cmdname">impala-shell</span> immediately after executing a query. This low-level information
-      includes physical details about memory, CPU, I/O, and network usage, and thus is only available after the
-      query is actually run.
+      To understand the detailed performance characteristics for a query, issue the
+      <code class="ph codeph">PROFILE</code> statement in <span class="keyword cmdname">impala-shell</span> immediately after
+      executing a query. This low-level information includes physical details about memory, CPU,
+      I/O, and network usage, and thus is only available after the query is actually run.
     </p>
 
 
@@ -61,12 +64,12 @@
 
 
     <p class="p">
-      Also, see <a class="xref" href="impala_hbase.html#hbase_performance">Performance Considerations for the Impala-HBase Integration</a>
-      and <a class="xref" href="impala_s3.html#s3_performance">Understanding and Tuning Impala Query Performance for S3 Data</a>
-      for examples of interpreting
-      <code class="ph codeph">EXPLAIN</code> plans for queries against HBase tables
-      <span class="ph">and data stored in the Amazon Simple Storage System (S3)</span>.
+      Also, see <a class="xref" href="impala_hbase.html#hbase_performance">Performance Considerations for the Impala-HBase Integration</a> and
+      <a class="xref" href="impala_s3.html#s3_performance">Understanding and Tuning Impala Query Performance for S3 Data</a> for examples of interpreting
+      <code class="ph codeph">EXPLAIN</code> plans for queries against HBase tables <span class="ph">and data
+      stored in the Amazon Simple Storage System (S3)</span>.
     </p>
+
 
   </div>
 
@@ -83,11 +86,12 @@
     <div class="body conbody">
 
       <p class="p">
-        The <code class="ph codeph"><a class="xref" href="impala_explain.html#explain">EXPLAIN</a></code> statement gives you an outline
-        of the logical steps that a query will perform, such as how the work will be distributed among the nodes
-        and how intermediate results will be combined to produce the final result set. You can see these details
-        before actually running the query. You can use this information to check that the query will not operate in
-        some very unexpected or inefficient way.
+        The <code class="ph codeph"><a class="xref" href="impala_explain.html#explain">EXPLAIN</a></code> statement
+        gives you an outline of the logical steps that a query will perform, such as how the
+        work will be distributed among the nodes and how intermediate results will be combined
+        to produce the final result set. You can see these details before actually running the
+        query. You can use this information to check that the query will not operate in some
+        very unexpected or inefficient way.
       </p>
 
 
@@ -149,23 +153,27 @@
 
 
       <p class="p">
-        The <code class="ph codeph">EXPLAIN</code> plan is also printed at the beginning of the query profile report described in
-        <a class="xref" href="#perf_profile">Using the Query Profile for Performance Tuning</a>, for convenience in examining both the logical and physical aspects of the
-        query side-by-side.
+        The <code class="ph codeph">EXPLAIN</code> plan is also printed at the beginning of the query profile
+        report described in <a class="xref" href="#perf_profile">Using the Query Profile for Performance Tuning</a>, for convenience in examining both the
+        logical and physical aspects of the query side-by-side.
       </p>
 
 
       <p class="p">
-        The amount of detail displayed in the <code class="ph codeph">EXPLAIN</code> output is controlled by the
-        <a class="xref" href="impala_explain_level.html#explain_level">EXPLAIN_LEVEL</a> query option. You typically
-        increase this setting from <code class="ph codeph">standard</code> to <code class="ph codeph">extended</code> (or from <code class="ph codeph">1</code>
-        to <code class="ph codeph">2</code>) when doublechecking the presence of table and column statistics during performance
-        tuning, or when estimating query resource usage in conjunction with the resource management features.
+        The amount of detail displayed in the <code class="ph codeph">EXPLAIN</code> output is controlled by
+        the <a class="xref" href="impala_explain_level.html#explain_level">EXPLAIN_LEVEL</a> query
+        option. You typically increase this setting from <code class="ph codeph">standard</code> to
+        <code class="ph codeph">extended</code> (or from <code class="ph codeph">1</code> to <code class="ph codeph">2</code>) when
+        doublechecking the presence of table and column statistics during performance tuning, or
+        when estimating query resource usage in conjunction with the resource management
+        features.
       </p>
 
 
-      
+
+
     </div>
+
 
   </div>
 
@@ -178,76 +186,70 @@
     <div class="body conbody">
 
       <p class="p">
-        The <code class="ph codeph"><a class="xref" href="impala_shell_commands.html#shell_commands">SUMMARY</a></code> command within
-        the <span class="keyword cmdname">impala-shell</span> interpreter gives you an easy-to-digest overview of the timings for the
-        different phases of execution for a query. Like the <code class="ph codeph">EXPLAIN</code> plan, it is easy to see
-        potential performance bottlenecks. Like the <code class="ph codeph">PROFILE</code> output, it is available after the
-        query is run and so displays actual timing numbers.
+        The
+        <code class="ph codeph"><a class="xref" href="impala_shell_commands.html#shell_commands">SUMMARY</a></code>
+        command within the <span class="keyword cmdname">impala-shell</span> interpreter gives you an
+        easy-to-digest overview of the timings for the different phases of execution for a
+        query. Like the <code class="ph codeph">EXPLAIN</code> plan, it is easy to see potential performance
+        bottlenecks. Like the <code class="ph codeph">PROFILE</code> output, it is available after the query
+        is run and so displays actual timing numbers.
       </p>
 
 
       <p class="p">
-        The <code class="ph codeph">SUMMARY</code> report is also printed at the beginning of the query profile report described
-        in <a class="xref" href="#perf_profile">Using the Query Profile for Performance Tuning</a>, for convenience in examining high-level and low-level aspects of the query
-        side-by-side.
+        The <code class="ph codeph">SUMMARY</code> report is also printed at the beginning of the query
+        profile report described in <a class="xref" href="#perf_profile">Using the Query Profile for Performance Tuning</a>, for convenience in examining
+        high-level and low-level aspects of the query side-by-side.
       </p>
 
 
       <p class="p">
-        For example, here is a query involving an aggregate function, on a single-node VM. The different stages of
-        the query and their timings are shown (rolled up for all nodes), along with estimated and actual values
-        used in planning the query. In this case, the <code class="ph codeph">AVG()</code> function is computed for a subset of
-        data on each node (stage 01) and then the aggregated results from all nodes are combined at the end (stage
-        03). You can see which stages took the most time, and whether any estimates were substantially different
-        than the actual data distribution. (When examining the time values, be sure to consider the suffixes such
-        as <code class="ph codeph">us</code> for microseconds and <code class="ph codeph">ms</code> for milliseconds, rather than just looking
-        for the largest numbers.)
+        When the <code class="ph codeph">MT_DOP</code> query option is set to a value larger than
+        <code class="ph codeph">0</code>, the <code class="ph codeph">#Inst</code> column in the output shows the number of
+        fragment instances. Impala decomposes each query into smaller units of work that are
+        distributed across the cluster, and these units are referred as fragments.
       </p>
 
 
-<pre class="pre codeblock"><code>[localhost:21000] &gt; select avg(ss_sales_price) from store_sales where ss_coupon_amt = 0;
-+---------------------+
-| avg(ss_sales_price) |
-+---------------------+
-| 37.80770926328327   |
-+---------------------+
-[localhost:21000] &gt; summary;
-+--------------+--------+----------+----------+-------+------------+----------+---------------+-----------------+
-| Operator     | #Hosts | Avg Time | Max Time | #Rows | Est. #Rows | Peak Mem | Est. Peak Mem | Detail          |
-+--------------+--------+----------+----------+-------+------------+----------+---------------+-----------------+
-| 03:AGGREGATE | 1      | 1.03ms   | 1.03ms   | 1     | 1          | 48.00 KB | -1 B          | MERGE FINALIZE  |
-| 02:EXCHANGE  | 1      | 0ns      | 0ns      | 1     | 1          | 0 B      | -1 B          | UNPARTITIONED   |
-| 01:AGGREGATE | 1      | 30.79ms  | 30.79ms  | 1     | 1          | 80.00 KB | 10.00 MB      |                 |
-| 00:SCAN HDFS | 1      | 5.45s    | 5.45s    | 2.21M | -1         | 64.05 MB | 432.00 MB     | tpc.store_sales |
-+--------------+--------+----------+----------+-------+------------+----------+---------------+-----------------+
+      <p class="p">
+        When the <code class="ph codeph">MT_DOP</code> query option is set to 0, the <code class="ph codeph">#Inst</code>
+        column in the output shows the same value as the <code class="ph codeph">#Hosts</code> column, since
+        there is exactly one fragment for each host.
+      </p>
+
+
+      <p class="p">
+        For example, here is a query involving an aggregate function, on a single-node cluster.
+        The different stages of the query and their timings are shown (rolled up for all nodes),
+        along with estimated and actual values used in planning the query. In this case, the
+        <code class="ph codeph">AVG()</code> function is computed for a subset of data on each node (stage 01)
+        and then the aggregated results from all nodes are combined at the end (stage 03). You
+        can see which stages took the most time, and whether any estimates were substantially
+        different than the actual data distribution.
+      </p>
+
+
+<pre class="pre codeblock"><code>&gt; SELECT AVG(ss_sales_price) FROM store_sales WHERE ss_coupon_amt = 0;
+&gt; SUMMARY;
++--------------+--------+--------+----------+----------+-------+------------+----------+---------------+-----------------+
+| Operator     | #Hosts | #Inst  | Avg Time | Max Time | #Rows | Est. #Rows | Peak Mem | Est. Peak Mem | Detail          |
++--------------+--------+--------+----------+----------+-------+------------+----------+---------------+-----------------+
+| 03:AGGREGATE | 1      | 1      | 1.03ms   | 1.03ms   | 1     | 1          | 48.00 KB | -1 B          | MERGE FINALIZE  |
+| 02:EXCHANGE  | 1      | 1      | 0ns      | 0ns      | 1     | 1          | 0 B      | -1 B          | UNPARTITIONED   |
+| 01:AGGREGATE | 1      | 1      |30.79ms   | 30.79ms  | 1     | 1          | 80.00 KB | 10.00 MB      |                 |
+| 00:SCAN HDFS | 1      | 1      | 5.45s    | 5.45s    | 2.21M | -1         | 64.05 MB | 432.00 MB     | tpc.store_sales |
++--------------+--------+--------+----------+----------+-------+------------+----------+---------------+-----------------+
 </code></pre>
 
       <p class="p">
-        Notice how the longest initial phase of the query is measured in seconds (s), while later phases working on
-        smaller intermediate results are measured in milliseconds (ms) or even nanoseconds (ns).
+        Notice how the longest initial phase of the query is measured in seconds (s), while
+        later phases working on smaller intermediate results are measured in milliseconds (ms)
+        or even nanoseconds (ns).
       </p>
 
 
-      <p class="p">
-        Here is an example from a more complicated query, as it would appear in the <code class="ph codeph">PROFILE</code>
-        output:
-      </p>
-
-
-<pre class="pre codeblock"><code>Operator              #Hosts   Avg Time   Max Time    #Rows  Est. #Rows  Peak Mem  Est. Peak Mem  Detail
-------------------------------------------------------------------------------------------------------------------------
-09:MERGING-EXCHANGE        1   79.738us   79.738us        5           5         0        -1.00 B  UNPARTITIONED
-05:TOP-N                   3   84.693us   88.810us        5           5  12.00 KB       120.00 B
-04:AGGREGATE               3    5.263ms    6.432ms        5           5  44.00 KB       10.00 MB  MERGE FINALIZE
-08:AGGREGATE               3   16.659ms   27.444ms   52.52K     600.12K   3.20 MB       15.11 MB  MERGE
-07:EXCHANGE                3    2.644ms      5.1ms   52.52K     600.12K         0              0  HASH(o_orderpriority)
-03:AGGREGATE               3  342.913ms  966.291ms   52.52K     600.12K  10.80 MB       15.11 MB
-02:HASH JOIN               3    2s165ms    2s171ms  144.87K     600.12K  13.63 MB      941.01 KB  INNER JOIN, BROADCAST
-|--06:EXCHANGE             3    8.296ms    8.692ms   57.22K      15.00K         0              0  BROADCAST
-|  01:SCAN HDFS            2    1s412ms    1s978ms   57.22K      15.00K  24.21 MB      176.00 MB  tpch.orders o
-00:SCAN HDFS               3    8s032ms    8s558ms    3.79M     600.12K  32.29 MB      264.00 MB  tpch.lineitem l
-</code></pre>
     </div>
+
 
   </div>
 
@@ -259,78 +261,102 @@
 
     <div class="body conbody">
 
-      <p class="p"> The <code class="ph codeph">PROFILE</code> command, available in the
-          <span class="keyword cmdname">impala-shell</span> interpreter, produces a detailed
-        low-level report showing how the most recent query was executed. Unlike
-        the <code class="ph codeph">EXPLAIN</code> plan described in <a class="xref" href="#perf_explain">Using the EXPLAIN Plan for Performance Tuning</a>, this information is only available after the
-        query has finished. It shows physical details such as the number of
-        bytes read, maximum memory usage, and so on for each node. You can use
-        this information to determine if the query is I/O-bound or CPU-bound,
-        whether some network condition is imposing a bottleneck, whether a
-        slowdown is affecting some nodes but not others, and to check that
-        recommended configuration settings such as short-circuit local reads are
-        in effect. </p>
-
-
       <p class="p">
-        By default, time values in the profile output reflect the wall-clock time taken by an operation.
-        For values denoting system time or user time, the measurement unit is reflected in the metric
-        name, such as <code class="ph codeph">ScannerThreadsSysTime</code> or <code class="ph codeph">ScannerThreadsUserTime</code>.
-        For example, a multi-threaded I/O operation might show a small figure for wall-clock time,
-        while the corresponding system time is larger, representing the sum of the CPU time taken by each thread.
-        Or a wall-clock time figure might be larger because it counts time spent waiting, while
-        the corresponding system and user time figures only measure the time while the operation
-        is actively using CPU cycles.
+        The <code class="ph codeph">PROFILE</code> command, available in the <span class="keyword cmdname">impala-shell</span>
+        interpreter, produces a detailed low-level report showing how the most recent query was
+        executed. Unlike the <code class="ph codeph">EXPLAIN</code> plan described in
+        <a class="xref" href="#perf_explain">Using the EXPLAIN Plan for Performance Tuning</a>, this information is only available after the
+        query has finished. It shows physical details such as the number of bytes read, maximum
+        memory usage, and so on for each node. You can use this information to determine if the
+        query is I/O-bound or CPU-bound, whether some network condition is imposing a
+        bottleneck, whether a slowdown is affecting some nodes but not others, and to check that
+        recommended configuration settings such as short-circuit local reads are in effect.
       </p>
 
 
       <p class="p">
-        The <a class="xref" href="impala_explain_plan.html#perf_explain"><code class="ph codeph">EXPLAIN</code> plan</a> is also printed
-        at the beginning of the query profile report, for convenience in examining both the logical and physical
-        aspects of the query side-by-side. The
-        <a class="xref" href="impala_explain_level.html#explain_level">EXPLAIN_LEVEL</a> query option also controls the
-        verbosity of the <code class="ph codeph">EXPLAIN</code> output printed by the <code class="ph codeph">PROFILE</code> command.
+        By default, time values in the profile output reflect the wall-clock time taken by an
+        operation. For values denoting system time or user time, the measurement unit is
+        reflected in the metric name, such as <code class="ph codeph">ScannerThreadsSysTime</code> or
+        <code class="ph codeph">ScannerThreadsUserTime</code>. For example, a multi-threaded I/O operation
+        might show a small figure for wall-clock time, while the corresponding system time is
+        larger, representing the sum of the CPU time taken by each thread. Or a wall-clock time
+        figure might be larger because it counts time spent waiting, while the corresponding
+        system and user time figures only measure the time while the operation is actively using
+        CPU cycles.
       </p>
 
-      <p class="p">In <span class="keyword">Impala 3.2</span>, a new <code class="ph codeph">Per Node
-          Profiles</code> section was added to the profile output. The new
-        section includes the following metrics that can be controlled by the
-            <code class="ph codeph"><a class="xref" href="impala_resource_trace_ratio.html#resource_trace_ratio">RESOURCE_TRACE_RATIO</a></code> query option.</p>
+
+      <p class="p">
+        The <a class="xref" href="impala_explain_plan.html#perf_explain"><code class="ph codeph">EXPLAIN</code>
+        plan</a> is also printed at the beginning of the query profile report, for
+        convenience in examining both the logical and physical aspects of the query
+        side-by-side. The
+        <a class="xref" href="impala_explain_level.html#explain_level">EXPLAIN_LEVEL</a> query option
+        also controls the verbosity of the <code class="ph codeph">EXPLAIN</code> output printed by the
+        <code class="ph codeph">PROFILE</code> command.
+      </p>
+
+
+      <p class="p">
+        In <span class="keyword">Impala 3.2</span>, a new <code class="ph codeph">Per Node Profiles</code> section
+        was added to the profile output. The new section includes the following metrics that can
+        be controlled by the
+        <code class="ph codeph"><a class="xref" href="impala_resource_trace_ratio.html#resource_trace_ratio">RESOURCE_TRACE_RATIO</a></code>
+        query option.
+      </p>
+
 
       <ul class="ul">
-        <li class="li"><code class="ph codeph">CpuIoWaitPercentage</code>
+        <li class="li">
+          <code class="ph codeph">CpuIoWaitPercentage</code>
         </li>
 
-        <li class="li"><code class="ph codeph">CpuSysPercentage</code></li>
 
-        <li class="li"><code class="ph codeph">CpuUserPercentage</code></li>
+        <li class="li">
+          <code class="ph codeph">CpuSysPercentage</code>
+        </li>
 
-        <li class="li"><code class="ph codeph">HostDiskReadThroughput</code>: All data read by the host
-          as part of the execution of this query (spilling), by the HDFS data
-          node, and by other processes running on the same system.</li>
 
-        <li class="li"><code class="ph codeph">HostDiskWriteThroughput</code>: All data written by the
-          host as part of the execution of this query (spilling), by the HDFS
-          data node, and by other processes running on the same system.</li>
+        <li class="li">
+          <code class="ph codeph">CpuUserPercentage</code>
+        </li>
 
-        <li class="li"><code class="ph codeph">HostNetworkRx</code>: All data received by the host as
-          part of the execution of this query, other queries, and other
-          processes running on the same system. </li>
 
-        <li class="li"><code class="ph codeph">HostNetworkTx</code>: All data transmitted by the host as
-          part of the execution of this query, other queries, and other
-          processes running on the same system. </li>
+        <li class="li">
+          <code class="ph codeph">HostDiskReadThroughput</code>: All data read by the host as part of the
+          execution of this query (spilling), by the HDFS data node, and by other processes
+          running on the same system.
+        </li>
+
+
+        <li class="li">
+          <code class="ph codeph">HostDiskWriteThroughput</code>: All data written by the host as part of the
+          execution of this query (spilling), by the HDFS data node, and by other processes
+          running on the same system.
+        </li>
+
+
+        <li class="li">
+          <code class="ph codeph">HostNetworkRx</code>: All data received by the host as part of the execution
+          of this query, other queries, and other processes running on the same system.
+        </li>
+
+
+        <li class="li">
+          <code class="ph codeph">HostNetworkTx</code>: All data transmitted by the host as part of the
+          execution of this query, other queries, and other processes running on the same
+          system.
+        </li>
 
       </ul>
-
-      
-
-      
 
 
     </div>
 
+
   </div>
+
 
 </body>
 </html>

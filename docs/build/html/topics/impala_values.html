@@ -1,0 +1,115 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE html
+  PUBLIC "-//W3C//DTD XHTML 1.0 Transitional//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-transitional.dtd">
+<html xmlns="http://www.w3.org/1999/xhtml" xml:lang="en" lang="en">
+<head><meta http-equiv="Content-Type" content="text/html; charset=UTF-8" />
+
+<meta name="copyright" content="(C) Copyright 2020" />
+<meta name="DC.rights.owner" content="(C) Copyright 2020" />
+<meta name="DC.Type" content="concept" />
+<meta name="DC.Title" content="VALUES Statement" />
+<meta name="DC.Relation" scheme="URI" content="../topics/impala_langref_sql.html" />
+<meta name="prodname" content="Impala" />
+<meta name="version" content="Impala 3.4.x" />
+<meta name="DC.Format" content="XHTML" />
+<meta name="DC.Identifier" content="values" />
+<link rel="stylesheet" type="text/css" href="../commonltr.css" />
+<title>VALUES Statement</title>
+</head>
+<body id="values">
+
+
+  <h1 class="title topictitle1" id="ariaid-title1">VALUES Statement</h1>
+
+  
+  
+
+  <div class="body conbody">
+    <div class="p"> In addition to being part of the <code class="ph codeph">INSERT</code> statement, the
+        <code class="ph codeph">VALUES</code> clause can be used as stand-alone statement or
+      with the <code class="ph codeph">SELECT</code> statement to construct a data set without
+      creating a table. For example, the following statement returns a data set
+      of 2 rows and 3 columns.
+      <pre class="pre codeblock"><code>
+VALUES ('r1_c1', 'r1_c2', 'r1_c3')
+     , ('r2_c1', 'r2_c2', 'r2_c3');</code></pre></div>
+
+    <p class="p"><strong class="ph b">Syntax:</strong></p>
+
+    <pre class="pre codeblock"><code>VALUES (<var class="keyword varname">row</var>)[, (<var class="keyword varname">row</var>), ...];
+
+SELECT <var class="keyword varname">select_list</var> FROM (VALUES (<var class="keyword varname">row</var>)[, (<var class="keyword varname">row</var>), ...]) AS <var class="keyword varname">alias</var>;
+
+<var class="keyword varname">row</var> ::= <var class="keyword varname">column</var> [[AS <var class="keyword varname">alias</var>], <var class="keyword varname">column</var> [AS <var class="keyword varname">alias</var>], ...]</code></pre>
+    <ul class="ul">
+      <li class="li">The <code class="ph codeph">VALUES</code> keyword is followed by a comma separated
+        list of one or more <var class="keyword varname">row</var>s.</li>
+
+      <li class="li"><var class="keyword varname">row</var> is a comma-separated list of one or more
+          <var class="keyword varname">column</var>s.</li>
+
+      <li class="li">Each <var class="keyword varname">row</var> must have the same number of
+          <var class="keyword varname">column</var>s.</li>
+
+      <li class="li"><var class="keyword varname">column</var> can be a constant, a variable, or an
+        expression.</li>
+
+      <li class="li">The corresponding <var class="keyword varname">column</var>s must have compatible data
+        types in all <var class="keyword varname">row</var>s. See the third query in the
+        Examples section below.</li>
+
+      <li class="li">By default, the first row is used to name columns.  But using the
+          <code class="ph codeph">AS</code> keyword, you can optionally give the column an
+          <var class="keyword varname">alias</var>. </li>
+
+      <li class="li">If used in the <code class="ph codeph">SELECT</code> statement, the
+          <code class="ph codeph">AS</code> keyword with an <var class="keyword varname">alias</var> is
+        required.</li>
+
+      <li class="li">
+        <var class="keyword varname">select_list</var> is the columns to be selected for the
+        result set.</li>
+
+    </ul>
+
+    <p class="p"><strong class="ph b">Examples:</strong></p>
+
+    <div class="p">
+      <pre class="pre codeblock"><code>&gt; SELECT * FROM (VALUES(4,5,6),(7,8,9)) AS t;
++---+---+---+
+| 4 | 5 | 6 |
++---+---+---+
+| 4 | 5 | 6 |
+| 7 | 8 | 9 |
++---+---+---+
+
+&gt; SELECT * FROM (VALUES(1 AS c1, true AS c2, 'abc' AS c3),(100,false,'xyz')) AS t;
++-----+-------+-----+
+| c1  | c2    | c3  |
++-----+-------+-----+
+| 1   | true  | abc |
+| 100 | false | xyz |
++-----+-------+-----+
+
+&gt; VALUES (CAST('2019-01-01' AS TIMESTAMP)), ('2019-02-02');
++---------------------------------+
+| cast('2019-01-01' as timestamp) |
++---------------------------------+
+| 2019-01-01 00:00:00             |
+| 2019-02-02 00:00:00             |
++---------------------------------+</code></pre>
+    </div>
+
+    <p class="p"><strong class="ph b">Related information:</strong></p>
+
+    <p class="p">
+      <a class="xref" href="impala_select.html#select">SELECT Statement</a></p>
+
+  </div>
+
+<div class="related-links">
+<div class="familylinks">
+<div class="parentlink"><strong>Parent topic:</strong> <a class="link" href="../topics/impala_langref_sql.html">Impala SQL Statements</a></div>
+</div>
+</div></body>
+</html>

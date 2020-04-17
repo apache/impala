@@ -1,0 +1,169 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE html
+  PUBLIC "-//W3C//DTD XHTML 1.0 Transitional//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-transitional.dtd">
+<html xmlns="http://www.w3.org/1999/xhtml" xml:lang="en" lang="en">
+<head><meta http-equiv="Content-Type" content="text/html; charset=UTF-8" />
+
+<meta name="copyright" content="(C) Copyright 2020" />
+<meta name="DC.rights.owner" content="(C) Copyright 2020" />
+<meta name="DC.Type" content="concept" />
+<meta name="DC.Title" content="Spooling Impala Query Results" />
+<meta name="DC.Relation" scheme="URI" content="../topics/impala_client.html" />
+<meta name="prodname" content="Impala" />
+<meta name="version" content="Impala 3.4.x" />
+<meta name="DC.Format" content="XHTML" />
+<meta name="DC.Identifier" content="data_sink" />
+<link rel="stylesheet" type="text/css" href="../commonltr.css" />
+<title>Spooling Impala Query Results</title>
+</head>
+<body id="data_sink">
+
+  <h1 class="title topictitle1" id="ariaid-title1">Spooling Impala Query Results</h1>
+
+  <div class="body conbody">
+    <p class="p">In Impala, you can control how query results are materialized and
+      returned to clients, e.g. impala-shell, Hue, JDBC apps.</p>
+
+    <ul class="ul">
+      <li class="li">When query result spooling is disabled, Impala relies on clients to
+        fetch results to trigger the generation of more result row batches until
+        all the result rows have been produced. If a client issues a query
+        without fetching all the results, the query fragments continue to
+        consume the resources until the query is cancelled and unregistered,
+        potentially tying up resources and causing other queries to wait for an
+        extended period of time in admission control.<p class="p">Impala would materialize
+          rows on-demand where rows are created only when the client requests
+          them.</p>
+</li>
+
+      <li class="li">When query result spooling is enabled, result sets of queries are
+        eagerly fetched and spooled in the spooling location, either in memory
+        or on disk. <p class="p">Once all result rows have been fetched and stored in the
+          spooling location, the resources are freed up. Incoming client fetches
+          can get the data from the spooled results.</p>
+</li>
+
+    </ul>
+
+    <p class="p">Result spooling is turned off by default, but can be enabled via the
+        <code class="ph codeph">SPOOL_QUERY_RESULTS</code> query option.</p>
+
+    <div class="section" id="data_sink__section_av4_hsy_2jb"><h2 class="title sectiontitle">Admission Control and Result Spooling</h2>
+      
+      <div class="p">Query results spooling collects and stores query results in memory that
+        is controlled by admission control. Use the following query options to
+        calibrate how much memory to use and when to spill to disk.<dl class="dl">
+          
+            <dt class="dt dlterm">MAX_RESULT_SPOOLING_MEM</dt>
+
+            <dd class="dd">
+              <p class="p">The maximum amount of memory used when spooling query results.
+                If this value is exceeded when spooling results, all memory will
+                most likely be spilled to disk. Set to 100 MB by default. </p>
+
+            </dd>
+
+          
+          
+            <dt class="dt dlterm">MAX_SPILLED_RESULT_SPOOLING_MEM</dt>
+
+            <dd class="dd">
+              <p class="p">The maximum amount of memory that can be spilled to disk when
+                spooling query results. Must be greater than or equal to
+                  <code class="ph codeph">MAX_RESULT_SPOOLING_MEM</code>. If this value is
+                exceeded, the coordinator fragment will block until the client
+                has consumed enough rows to free up more memory. Set to 1 GB by
+                default.</p>
+
+            </dd>
+
+          
+        </dl>
+</div>
+
+    </div>
+
+    <div class="section" id="data_sink__section_oh2_fsy_2jb"><h2 class="title sectiontitle">Fetch Timeout</h2>
+      
+      <div class="p">Resources for a query are released when the query completes its
+        execution. To prevent clients from indefinitely waiting for query
+        results, use the <code class="ph codeph">FETCH_ROWS_TIMEOUT_MS</code> query option to
+        set the timeout when clients fetch rows. Timeout applies both when query
+        result spooling is enabled and disabled:<ul class="ul">
+          <li class="li">When result spooling is disabled (<code class="ph codeph">SPOOL_QUERY_RESULTS =
+              FALSE</code>), the timeout controls how long a client waits for
+            a single row batch to be produced by the coordinator. </li>
+
+          <li class="li">When result spooling is enabled ( (<code class="ph codeph">SPOOL_QUERY_RESULTS =
+              TRUE</code>), a client can fetch multiple row batches at a time,
+            so this timeout controls the total time a client waits for row
+            batches to be produced.</li>
+
+        </ul>
+</div>
+
+    </div>
+
+    <div class="section" id="data_sink__section_ahm_bsy_2jb"><h2 class="title sectiontitle">Explain Plans</h2>
+      
+      <div class="p">Below is the part of the <code class="ph codeph">EXPLAIN</code> plan output for
+        result spooling.<pre class="pre codeblock"><code>F01:PLAN FRAGMENT [UNPARTITIONED] hosts=1 instances=1
+|  Per-Host Resources: mem-estimate=4.02MB mem-reservation=4.00MB thread-reservation=1
+PLAN-ROOT SINK
+|  mem-estimate=4.00MB mem-reservation=4.00MB spill-buffer=2.00MB thread-reservation=0</code></pre><ul class="ul">
+          <li class="li">The <code class="ph codeph">mem-estimate</code> for the <code class="ph codeph">PLAN-ROOT
+              SINK</code> is an estimate of the amount of memory needed to
+            spool all the rows returned by the query.</li>
+
+          <li class="li">The <code class="ph codeph">mem-reservation</code> is the number and size of the
+            buffers necessary to spool the query results. By default, the read
+            and write buffers are 2 MB in size each, which is why the default is
+            4 MB.</li>
+
+        </ul>
+</div>
+
+    </div>
+
+    <div class="section" id="data_sink__section_ovl_ksy_2jb"><h2 class="title sectiontitle">PlanRootSink</h2>
+      
+      <p dir="ltr" class="p">In Impala, the <code class="ph codeph">PlanRootSink</code> class controls
+        the passing of batches of rows to the clients and acts as a queue of
+        rows to be sent to clients.</p>
+
+      <div class="p">
+        <ul class="ul">
+          <li class="li">
+            <p class="p">When result spooling is disabled, a single batch or rows is sent
+              to the <code class="ph codeph">PlanRootSink</code>, and then the client must
+              consume that batch before another one can be sent.</p>
+
+          </li>
+
+          <li class="li">
+            <p class="p">When result spooling is enabled, multiple batches of rows can be
+              sent to the <code class="ph codeph">PlanRootSink</code>, and multiple batches
+              can be consumed by the client.</p>
+
+          </li>
+
+        </ul>
+
+      </div>
+
+    </div>
+
+    <div class="section">
+      <p class="p"><strong class="ph b">Related information:</strong>
+        <a class="xref" href="impala_max_result_spooling_mem.html#MAX_RESULT_SPOOLING_MEM">MAX_RESULT_SPOOLING_MEM Query Option</a>, <a class="xref" href="impala_max_spilled_result_spooling_mem.html#MAX_SPILLED_RESULT_SPOOLING_MEM">MAX_SPILLED_RESULT_SPOOLING_MEM Query Option</a>, <a class="xref" href="impala_spool_query_results.html#SPOOL_QUERY_RESULTS">SPOOL_QUERY_RESULTS Query Option</a></p>
+
+    </div>
+
+  </div>
+
+<div class="related-links">
+<div class="familylinks">
+<div class="parentlink"><strong>Parent topic:</strong> <a class="link" href="../topics/impala_client.html">Impala Client Access</a></div>
+</div>
+</div></body>
+</html>

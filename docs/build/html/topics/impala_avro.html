@@ -4,8 +4,8 @@
 <html xmlns="http://www.w3.org/1999/xhtml" xml:lang="en" lang="en">
 <head><meta http-equiv="Content-Type" content="text/html; charset=UTF-8" />
 
-<meta name="copyright" content="(C) Copyright 2019" />
-<meta name="DC.rights.owner" content="(C) Copyright 2019" />
+<meta name="copyright" content="(C) Copyright 2020" />
+<meta name="DC.rights.owner" content="(C) Copyright 2020" />
 <meta name="DC.Type" content="concept" />
 <meta name="DC.Title" content="Using the Avro File Format with Impala Tables" />
 <meta name="DC.Relation" scheme="URI" content="../topics/impala_file_formats.html" />
@@ -20,17 +20,17 @@
 <meta name="prodname" content="Impala" />
 <meta name="prodname" content="Impala" />
 <meta name="prodname" content="Impala" />
-<meta name="version" content="Impala 3.3.x" />
-<meta name="version" content="Impala 3.3.x" />
-<meta name="version" content="Impala 3.3.x" />
-<meta name="version" content="Impala 3.3.x" />
-<meta name="version" content="Impala 3.3.x" />
-<meta name="version" content="Impala 3.3.x" />
-<meta name="version" content="Impala 3.3.x" />
-<meta name="version" content="Impala 3.3.x" />
-<meta name="version" content="Impala 3.3.x" />
-<meta name="version" content="Impala 3.3.x" />
-<meta name="version" content="Impala 3.3.x" />
+<meta name="version" content="Impala 3.4.x" />
+<meta name="version" content="Impala 3.4.x" />
+<meta name="version" content="Impala 3.4.x" />
+<meta name="version" content="Impala 3.4.x" />
+<meta name="version" content="Impala 3.4.x" />
+<meta name="version" content="Impala 3.4.x" />
+<meta name="version" content="Impala 3.4.x" />
+<meta name="version" content="Impala 3.4.x" />
+<meta name="version" content="Impala 3.4.x" />
+<meta name="version" content="Impala 3.4.x" />
+<meta name="version" content="Impala 3.4.x" />
 <meta name="DC.Format" content="XHTML" />
 <meta name="DC.Identifier" content="avro" />
 <link rel="stylesheet" type="text/css" href="../commonltr.css" />
@@ -55,23 +55,23 @@
     
 <div class="tablenoborder"><table cellpadding="4" cellspacing="0" summary="" class="table" frame="border" border="1" rules="all"><caption><span class="tablecap"><span class="table--title-label">Table 1. </span>Avro Format Support in Impala</span></caption><colgroup><col style="width:10%" /><col style="width:10%" /><col style="width:20%" /><col style="width:30%" /><col style="width:30%" /></colgroup><thead class="thead" style="text-align:left;">
           <tr class="row">
-            <th class="entry nocellnorowborder" style="vertical-align:top;" id="d24841e170">
+            <th class="entry nocellnorowborder" style="vertical-align:top;" id="d25374e170">
               File Type
             </th>
 
-            <th class="entry nocellnorowborder" style="vertical-align:top;" id="d24841e173">
+            <th class="entry nocellnorowborder" style="vertical-align:top;" id="d25374e173">
               Format
             </th>
 
-            <th class="entry nocellnorowborder" style="vertical-align:top;" id="d24841e176">
+            <th class="entry nocellnorowborder" style="vertical-align:top;" id="d25374e176">
               Compression Codecs
             </th>
 
-            <th class="entry nocellnorowborder" style="vertical-align:top;" id="d24841e179">
+            <th class="entry nocellnorowborder" style="vertical-align:top;" id="d25374e179">
               Impala Can CREATE?
             </th>
 
-            <th class="entry cell-norowborder" style="vertical-align:top;" id="d24841e182">
+            <th class="entry cell-norowborder" style="vertical-align:top;" id="d25374e182">
               Impala Can INSERT?
             </th>
 
@@ -80,23 +80,23 @@
         </thead>
 <tbody class="tbody">
           <tr class="row">
-            <td class="entry row-nocellborder" style="vertical-align:top;" headers="d24841e170 ">
+            <td class="entry row-nocellborder" style="vertical-align:top;" headers="d25374e170 ">
               <a class="xref" href="impala_avro.html#avro">Avro</a>
             </td>
 
-            <td class="entry row-nocellborder" style="vertical-align:top;" headers="d24841e173 ">
+            <td class="entry row-nocellborder" style="vertical-align:top;" headers="d25374e173 ">
               Structured
             </td>
 
-            <td class="entry row-nocellborder" style="vertical-align:top;" headers="d24841e176 ">
+            <td class="entry row-nocellborder" style="vertical-align:top;" headers="d25374e176 ">
               Snappy, gzip, deflate
             </td>
 
-            <td class="entry row-nocellborder" style="vertical-align:top;" headers="d24841e179 ">
+            <td class="entry row-nocellborder" style="vertical-align:top;" headers="d25374e179 ">
               Yes, in Impala 1.4.0 and higher. In lower versions, create the table using Hive.
             </td>
 
-            <td class="entry cellrowborder" style="vertical-align:top;" headers="d24841e182 ">
+            <td class="entry cellrowborder" style="vertical-align:top;" headers="d25374e182 ">
               No. Import data by using <code class="ph codeph">LOAD DATA</code> on data files already in the
               right format, or use <code class="ph codeph">INSERT</code> in Hive followed by <code class="ph codeph">REFRESH
               <var class="keyword varname">table_name</var></code> in Impala.
@@ -157,8 +157,6 @@
 
       </div>
 
-
-      
 
       <p class="p">
         The following examples demonstrate creating an Avro table in Impala, using either an inline column
@@ -602,50 +600,129 @@ ALTER TABLE avro_table SET TBLPROPERTIES (
 
 
     <div class="body conbody">
+      <p class="p"> The Avro format defines a set of data types whose names differ from
+        the names of the corresponding Impala data types. If you are preparing
+        Avro files using other Hadoop components such as Pig or MapReduce, you
+        might need to work with the type names defined by Avro. The following
+        figure lists the Avro-defined types and the equivalent types in Impala. </p>
 
-      <p class="p">
-        The Avro format defines a set of data types whose names differ from the names of the corresponding Impala
-        data types. If you are preparing Avro files using other Hadoop components such as Pig or MapReduce, you
-        might need to work with the type names defined by Avro. The following figure lists the Avro-defined types
-        and the equivalent types in Impala.
-      </p>
+      <p class="p"><strong class="ph b">Primitive types:</strong></p>
 
+      
+<div class="tablenoborder"><table cellpadding="4" cellspacing="0" summary="" id="avro_data_types__table_uvv_plj_gjb" class="table" frame="border" border="1" rules="all"><colgroup><col style="width:143.44pt" /><col style="width:165.77pt" /></colgroup><thead class="thead" style="text-align:left;">
+            <tr class="row">
+              <th class="entry cellrowborder" style="text-align:left;vertical-align:top;" id="d25374e848">Avro type</th>
 
-<pre class="pre codeblock"><code>Primitive Types (Avro -&gt; Impala)
---------------------------------
-STRING -&gt; STRING
-STRING -&gt; CHAR
-STRING -&gt; VARCHAR
-INT -&gt; INT
-BOOLEAN -&gt; BOOLEAN
-LONG -&gt;  BIGINT
-FLOAT -&gt;  FLOAT
-DOUBLE -&gt; DOUBLE
+              <th class="entry cellrowborder" style="text-align:left;vertical-align:top;" id="d25374e851">Impala type</th>
 
-Logical Types
--------------
-BYTES + logicalType = "decimal" -&gt; DECIMAL
+            </tr>
 
-Avro Types with No Impala Equivalent
-------------------------------------
-RECORD, MAP, ARRAY, UNION,  ENUM, FIXED, NULL
+          </thead>
+<tbody class="tbody">
+            <tr class="row">
+              <td class="entry cellrowborder" style="text-align:left;vertical-align:top;" headers="d25374e848 ">STRING</td>
 
-Impala Types with No Avro Equivalent
-------------------------------------
-TIMESTAMP
+              <td class="entry cellrowborder" style="text-align:left;vertical-align:top;" headers="d25374e851 ">STRING</td>
 
-</code></pre>
+            </tr>
 
-      <p class="p">
-        The Avro specification allows string values up to 2**64 bytes in length. Impala queries
-        for Avro tables use 32-bit integers to hold string lengths. In
-        <span class="keyword">Impala 2.5</span> and higher, Impala truncates <code class="ph codeph">CHAR</code> and
-        <code class="ph codeph">VARCHAR</code> values in Avro tables to (2**31)-1 bytes. If a query encounters
-        a <code class="ph codeph">STRING</code> value longer than (2**31)-1 bytes in an Avro table, the query
-        fails. In earlier releases, encountering such long values in an Avro table could cause a
-        crash.
-      </p>
+            <tr class="row">
+              <td class="entry cellrowborder" style="text-align:left;vertical-align:top;" headers="d25374e848 ">STRING</td>
 
+              <td class="entry cellrowborder" style="text-align:left;vertical-align:top;" headers="d25374e851 ">CHAR</td>
+
+            </tr>
+
+            <tr class="row">
+              <td class="entry cellrowborder" style="text-align:left;vertical-align:top;" headers="d25374e848 ">STRING</td>
+
+              <td class="entry cellrowborder" style="text-align:left;vertical-align:top;" headers="d25374e851 ">VARCHAR</td>
+
+            </tr>
+
+            <tr class="row">
+              <td class="entry cellrowborder" style="text-align:left;vertical-align:top;" headers="d25374e848 ">INT</td>
+
+              <td class="entry cellrowborder" style="text-align:left;vertical-align:top;" headers="d25374e851 ">INT</td>
+
+            </tr>
+
+            <tr class="row">
+              <td class="entry cellrowborder" style="text-align:left;vertical-align:top;" headers="d25374e848 ">BOOLEAN</td>
+
+              <td class="entry cellrowborder" style="text-align:left;vertical-align:top;" headers="d25374e851 ">BOOLEAN</td>
+
+            </tr>
+
+            <tr class="row">
+              <td class="entry cellrowborder" style="text-align:left;vertical-align:top;" headers="d25374e848 ">LONG</td>
+
+              <td class="entry cellrowborder" style="text-align:left;vertical-align:top;" headers="d25374e851 ">BIGINT</td>
+
+            </tr>
+
+            <tr class="row">
+              <td class="entry cellrowborder" style="text-align:left;vertical-align:top;" headers="d25374e848 ">FLOAT</td>
+
+              <td class="entry cellrowborder" style="text-align:left;vertical-align:top;" headers="d25374e851 ">FLOAT</td>
+
+            </tr>
+
+            <tr class="row">
+              <td class="entry cellrowborder" style="text-align:left;vertical-align:top;" headers="d25374e848 ">DOUBLE</td>
+
+              <td class="entry cellrowborder" style="text-align:left;vertical-align:top;" headers="d25374e851 ">DOUBLE</td>
+
+            </tr>
+
+          </tbody>
+</table>
+</div>
+
+      <p class="p">The Avro specification allows string values up to 2**64 bytes in
+        length. Impala queries for Avro tables use 32-bit integers to hold
+        string lengths. </p>
+
+      <p class="p">In <span class="keyword">Impala 2.5</span> and higher, Impala truncates
+          <code class="ph codeph">CHAR</code> and <code class="ph codeph">VARCHAR</code> values in Avro
+        tables to (2**31)-1 bytes. If a query encounters a
+          <code class="ph codeph">STRING</code> value longer than (2**31)-1 bytes in an Avro
+        table, the query fails. In earlier releases, encountering such long
+        values in an Avro table could cause a crash.</p>
+
+      <p class="p"><strong class="ph b">Logical types:</strong></p>
+
+      
+<div class="tablenoborder"><table cellpadding="4" cellspacing="0" summary="" id="avro_data_types__table_ch2_1mj_gjb" class="table" frame="border" border="1" rules="all"><colgroup><col style="width:151.26pt" /><col style="width:149.58pt" /></colgroup><thead class="thead" style="text-align:left;">
+            <tr class="row">
+              <th class="entry cellrowborder" style="text-align:left;vertical-align:top;" id="d25374e969">Avro type</th>
+
+              <th class="entry cellrowborder" style="text-align:left;vertical-align:top;" id="d25374e972">Impala type</th>
+
+            </tr>
+
+          </thead>
+<tbody class="tbody">
+            <tr class="row">
+              <td class="entry cellrowborder" style="text-align:left;vertical-align:top;" headers="d25374e969 ">BYTES annotated</td>
+
+              <td class="entry cellrowborder" style="text-align:left;vertical-align:top;" headers="d25374e972 ">DECIMAL</td>
+
+            </tr>
+
+            <tr class="row">
+              <td class="entry cellrowborder" style="text-align:left;vertical-align:top;" headers="d25374e969 ">INT32 annotated</td>
+
+              <td class="entry cellrowborder" style="text-align:left;vertical-align:top;" headers="d25374e972 ">DATE</td>
+
+            </tr>
+
+          </tbody>
+</table>
+</div>
+
+      <p class="p">Impala does not support the following Avro data types: RECORD, MAP,
+        ARRAY, UNION,  ENUM, FIXED, NULL</p>
 
     </div>
 
