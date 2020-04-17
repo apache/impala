@@ -361,7 +361,6 @@ public class StmtMetadataLoader {
         user_);
     if (tableMask.needsMaskingOrFiltering()) {
       for (Column col : columns) {
-        if (col.getType().isComplexType()) continue;
         // Use authzCtx=null to avoid audits and privilege checks.
         SelectStmt stmt = tableMask.createColumnMaskStmt(
             col.getName(), col.getType(), /*authzCtx*/ null);

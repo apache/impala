@@ -77,33 +77,33 @@ Status SlotRef::Init(
   DCHECK(type_.IsStructType() || children_.size() == 0);
   RETURN_IF_ERROR(ScalarExpr::Init(row_desc, is_entry_point, state));
   if (slot_id_ != -1) {
-    const SlotDescriptor* slot_desc = state->desc_tbl().GetSlotDescriptor(slot_id_);
-    if (slot_desc == NULL) {
+    slot_desc_ = state->desc_tbl().GetSlotDescriptor(slot_id_);
+    if (slot_desc_ == NULL) {
       // TODO: create macro MAKE_ERROR() that returns a stream
       stringstream error;
       error << "couldn't resolve slot descriptor " << slot_id_;
       LOG(INFO) << error.str();
       return Status(error.str());
     }
-    if (slot_desc->parent()->isTupleOfStructSlot()) {
-      tuple_idx_ = row_desc.GetTupleIdx(slot_desc->parent()->getMasterTuple()->id());
+    if (slot_desc_->parent()->isTupleOfStructSlot()) {
+      tuple_idx_ = row_desc.GetTupleIdx(slot_desc_->parent()->getMasterTuple()->id());
     } else {
-      tuple_idx_ = row_desc.GetTupleIdx(slot_desc->parent()->id());
+      tuple_idx_ = row_desc.GetTupleIdx(slot_desc_->parent()->id());
     }
     if (tuple_idx_ == RowDescriptor::INVALID_IDX) {
       TupleDescriptor* d =
-          state->desc_tbl().GetTupleDescriptor(slot_desc->parent()->id());
+          state->desc_tbl().GetTupleDescriptor(slot_desc_->parent()->id());
       string error = Substitute("invalid tuple_idx: $0\nparent=$1\nrow=$2",
-          slot_desc->DebugString(), d->DebugString(), row_desc.DebugString());
+          slot_desc_->DebugString(), d->DebugString(), row_desc.DebugString());
       LOG(INFO) << error;
       return Status(error);
     }
     DCHECK(tuple_idx_ != RowDescriptor::INVALID_IDX);
-    if (!slot_desc->parent()->isTupleOfStructSlot()) {
+    if (!slot_desc_->parent()->isTupleOfStructSlot()) {
       tuple_is_nullable_ = row_desc.TupleIsNullable(tuple_idx_);
     }
-    slot_offset_ = slot_desc->tuple_offset();
-    null_indicator_offset_ = slot_desc->null_indicator_offset();
+    slot_offset_ = slot_desc_->tuple_offset();
+    null_indicator_offset_ = slot_desc_->null_indicator_offset();
   }
   return Status::OK();
 }
@@ -487,6 +487,10 @@ StructVal SlotRef::GetStructValInterpreted(
     struct_val.addChild(child_val, i);
   }
   return struct_val;
+}
+
+const TupleDescriptor* SlotRef::GetCollectionTupleDesc() const {
+  return slot_desc_->children_tuple_descriptor();
 }
 
 } // namespace impala

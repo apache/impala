@@ -122,7 +122,7 @@ public class AnalyzeStmtsTest extends AnalyzerTest {
     String childTblAlias = childTblPath[childTblPath.length - 1];
     TblsAnalysisError(String.format("select %s from $TBL a, a.%s, a.%s",
         collectionField, collectionTable, collectionTable), tbl,
-        String.format("Duplicate table alias: '%s'", childTblAlias));
+        String.format("Duplicate table alias: '%s'", "a." + collectionTable));
     TblsAnalysisError(String.format(
         "select 1 from $TBL, allcomplextypes.%s, functional.allcomplextypes.%s",
         collectionTable, collectionTable), tbl,
@@ -334,6 +334,12 @@ public class AnalyzeStmtsTest extends AnalyzerTest {
       AnalyzesOk(String.format(
           "select 1 from functional.allcomplextypes a %s a.struct_map_col", joinOp));
     }
+
+    AnalysisError("select pos from " +
+        "(select int_array_col from functional.allcomplextypes) v",
+        "Could not resolve column/field reference: 'pos'");
+    AnalyzesOk("select pos from " +
+        "(select int_array_col from functional.allcomplextypes) v, v.int_array_col");
   }
 
   @Test
@@ -410,7 +416,7 @@ public class AnalyzeStmtsTest extends AnalyzerTest {
         "TABLESAMPLE is only supported on HDFS tables: int_array_col");
     AnalysisError("select * from functional.allcomplextypes a, a.int_array_col " +
         "tablesample system (10)",
-        "TABLESAMPLE is only supported on HDFS tables: int_array_col");
+        "TABLESAMPLE is only supported on HDFS tables: a.int_array_col");
   }
 
   /**
@@ -1031,36 +1037,37 @@ public class AnalyzeStmtsTest extends AnalyzerTest {
         "to set DISABLE_CODEGEN=true");
     ctx.getQueryOptions().setDisable_codegen(true);
     AnalyzesOk("select alltypes from functional_orc_def.complextypes_structs", ctx);
-    // Illegal complex-typed expr in a union.
-    AnalysisError("select int_array_col from functional.allcomplextypes ",
-        "Expr 'int_array_col' in select list returns a collection type 'ARRAY<INT>'.\n" +
-        "Collection types are not allowed in the select list.");
-    // Illegal complex-typed expr in a union.
-    AnalysisError("select int_array_col from functional.allcomplextypes " +
-        "union all select int_array_col from functional.allcomplextypes",
-        "Expr 'int_array_col' in select list returns a collection type 'ARRAY<INT>'.\n" +
-        "Collection types are not allowed in the select list.");
+    AnalyzesOk("select int_array_col from functional.allcomplextypes");
+    AnalyzesOk("select int_array_col from functional.allcomplextypes " +
+        "union all select int_array_col from functional.allcomplextypes");
+    AnalysisError("select int_array_col, item from functional.allcomplextypes", ctx,
+        "Could not resolve column/field reference: 'item'");
+    AnalysisError("select int_array_col, int_array_col.item " +
+        "from functional.allcomplextypes", ctx,
+        "Illegal column/field reference 'int_array_col.item' with intermediate " +
+        "collection 'int_array_col' of type 'ARRAY<INT>'");
     AnalysisError("select tiny_struct from functional_orc_def.complextypes_structs " +
         "union all select tiny_struct from functional_orc_def.complextypes_structs", ctx,
         "Set operations don't support STRUCT type. STRUCT<b:BOOLEAN> in tiny_struct");
-    // Illegal complex-typed expr inside inline view.
-    AnalysisError("select 1 from " +
-        "(select int_array_col from functional.allcomplextypes) v",
-        "Expr 'int_array_col' in select list returns a collection type 'ARRAY<INT>'.\n" +
-        "Collection types are not allowed in the select list.");
+    AnalyzesOk("select 1 from " +
+        "(select int_array_col from functional.allcomplextypes) v");
+    AnalyzesOk("select int_array_col from " +
+        "(select int_array_col from functional.allcomplextypes) v");
     // Structs are allowed in an inline view.
     AnalyzesOk("select v.ts from (select tiny_struct as ts from " +
         "functional_orc_def.complextypes_structs) v;", ctx);
     // Illegal complex-typed expr in an insert.
     AnalysisError("insert into functional.allcomplextypes " +
         "select int_array_col from functional.allcomplextypes",
-        "Expr 'int_array_col' in select list returns a collection type 'ARRAY<INT>'.\n" +
-        "Collection types are not allowed in the select list.");
+        "Unable to INSERT into target table (functional.allcomplextypes) because " +
+        "the column 'int_array_col' has a complex type 'ARRAY<INT>' and Impala " +
+        "doesn't support inserting into tables containing complex type columns");
     // Illegal complex-typed expr in a CTAS.
     AnalysisError("create table new_tbl as " +
         "select int_array_col from functional.allcomplextypes",
-        "Expr 'int_array_col' in select list returns a collection type 'ARRAY<INT>'.\n" +
-        "Collection types are not allowed in the select list.");
+        "Unable to INSERT into target table (default.new_tbl) because the column " +
+        "'int_array_col' has a complex type 'ARRAY<INT>' and Impala doesn't support " +
+        "inserting into tables containing complex type columns");
     AnalysisError("create table new_tbl as " +
         "select tiny_struct from functional_orc_def.complextypes_structs", ctx,
         "Unable to INSERT into target table (default.new_tbl) because the column " +

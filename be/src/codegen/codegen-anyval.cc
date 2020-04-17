@@ -665,7 +665,8 @@ void CodegenAnyVal::StoreToNativePtr(llvm::Value* raw_val_ptr, llvm::Value* pool
   llvm::Type* raw_type = codegen_->GetSlotType(type_);
   switch (type_.type) {
     case TYPE_STRING:
-    case TYPE_VARCHAR: {
+    case TYPE_VARCHAR:
+    case TYPE_ARRAY: { // CollectionVal has same memory layout as StringVal.
       // Convert StringVal to StringValue
       llvm::Value* string_value = llvm::Constant::getNullValue(raw_type);
       llvm::Value* len = GetLen();

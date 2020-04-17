@@ -21,9 +21,13 @@
 #include <boost/scoped_ptr.hpp>
 
 #include "exprs/scalar-expr-evaluator.h"
+#include "exprs/slot-ref.h"
 #include "rpc/thrift-util.h"
+#include "runtime/descriptors.h"
 #include "runtime/raw-value.h"
 #include "runtime/row-batch.h"
+#include "runtime/tuple.h"
+#include "runtime/tuple-row.h"
 #include "runtime/types.h"
 #include "service/hs2-util.h"
 #include "util/bit-util.h"
@@ -186,15 +190,39 @@ Status AsciiQueryResultSet::AddRows(const vector<ScalarExprEvaluator*>& expr_eva
     for (int i = 0; i < num_col; ++i) {
       // ODBC-187 - ODBC can only take "\t" as the delimiter
       out_stream << (i > 0 ? "\t" : "");
-      DCHECK_EQ(1, metadata_.columns[i].columnType.types.size());
-      RawValue::PrintValue(expr_evals[i]->GetValue(it.Get()),
-          ColumnType::FromThrift(metadata_.columns[i].columnType), scales[i],
-          &out_stream);
+
+      if (metadata_.columns[i].columnType.types.size() == 1) {
+        RawValue::PrintValue(expr_evals[i]->GetValue(it.Get()),
+            ColumnType::FromThrift(metadata_.columns[i].columnType), scales[i],
+            &out_stream);
+      } else if (metadata_.columns[i].columnType.types.size() > 1) {
+        ColumnType col_type = ColumnType::FromThrift(metadata_.columns[i].columnType);
+        // TODO: Implement map (IMPALA-10918) type.
+        DCHECK(col_type.IsArrayType());
+        if (col_type.IsArrayType()) {
+          PrintArrayValue(expr_evals[i], it.Get(), scales[i], &out_stream);
+        }
+      } else {
+        DCHECK(false);
+      }
     }
     result_set_->push_back(out_stream.str());
     out_stream.str("");
   }
   return Status::OK();
+}
+
+void QueryResultSet::PrintArrayValue(ScalarExprEvaluator* expr_eval,
+    const TupleRow* row, int scale, stringstream *stream) {
+  const ScalarExpr& scalar_expr = expr_eval->root();
+  // Currently scalar_expr can be only a slot ref as no functions return arrays.
+  DCHECK(scalar_expr.IsSlotRef());
+  const TupleDescriptor* item_tuple_desc = scalar_expr.GetCollectionTupleDesc();
+  DCHECK(item_tuple_desc != nullptr);
+  const CollectionValue* array_val =
+      static_cast<const CollectionValue*>(expr_eval->GetValue(row));
+
+  RawValue::PrintArrayValue(array_val, item_tuple_desc, scale, stream);
 }
 
 Status AsciiQueryResultSet::AddOneRow(const TResultRow& row) {
@@ -403,15 +431,17 @@ int64_t HS2ColumnarResultSet::ByteSize(int start_idx, int num_rows) {
 void HS2ColumnarResultSet::InitColumns() {
   result_set_->__isset.columns = true;
   for (const TColumn& col_input : metadata_.columns) {
+    const vector<TTypeNode>& type_nodes = col_input.columnType.types;
+    DCHECK(type_nodes.size() > 0);
     ThriftTColumn col_output;
-    if (col_input.columnType.types[0].type == TTypeNodeType::STRUCT) {
-      DCHECK(col_input.columnType.types.size() > 0);
-      // Return structs as string.
+    if (type_nodes[0].type == TTypeNodeType::STRUCT
+        || type_nodes[0].type == TTypeNodeType::ARRAY) {
+      // Return structs and arrays as string.
       col_output.__isset.stringVal = true;
     } else {
-      DCHECK(col_input.columnType.types.size() == 1);
-      DCHECK(col_input.columnType.types[0].__isset.scalar_type);
-      TPrimitiveType::type input_type = col_input.columnType.types[0].scalar_type.type;
+      DCHECK(type_nodes.size() == 1);
+      DCHECK(type_nodes[0].__isset.scalar_type);
+      TPrimitiveType::type input_type = type_nodes[0].scalar_type.type;
       switch (input_type) {
         case TPrimitiveType::NULL_TYPE:
         case TPrimitiveType::BOOLEAN:

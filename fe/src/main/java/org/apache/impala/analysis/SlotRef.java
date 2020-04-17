@@ -23,6 +23,7 @@ import java.util.Set;
 
 import org.apache.impala.analysis.Path.PathType;
 import org.apache.impala.catalog.FeFsTable;
+import org.apache.impala.catalog.ColumnStats;
 import org.apache.impala.catalog.FeTable;
 import org.apache.impala.catalog.HdfsFileFormat;
 import org.apache.impala.catalog.StructField;
@@ -102,7 +103,6 @@ public class SlotRef extends Expr {
     }
     label_ = other.label_;
     desc_ = other.desc_;
-    type_ = other.type_;
   }
 
   /**
@@ -147,8 +147,9 @@ public class SlotRef extends Expr {
       // Should never happen because we only check registered table aliases.
       Preconditions.checkState(false);
     }
+
     Preconditions.checkNotNull(resolvedPath_);
-    desc_ = analyzer.registerSlotRef(resolvedPath_);
+    desc_ = analyzer.registerSlotRef(resolvedPath_, false /*duplicateIfCollections*/);
     type_ = desc_.getType();
     if (!type_.isSupported()) {
       throw new UnsupportedFeatureException("Unsupported type '"
@@ -160,10 +161,9 @@ public class SlotRef extends Expr {
       // HMS string.
       throw new UnsupportedFeatureException("Unsupported type in '" + toSql() + "'.");
     }
-    // Register scalar columns of a catalog table.
-    if (!resolvedPath_.getMatchedTypes().isEmpty()
-        && !resolvedPath_.getMatchedTypes().get(0).isComplexType()) {
-      analyzer.registerScalarColumnForMasking(desc_);
+    // Register columns of a catalog table for column masking.
+    if (!resolvedPath_.getMatchedTypes().isEmpty()) {
+      analyzer.registerColumnForMasking(desc_);
     }
 
     numDistinctValues_ = adjustNumDistinctValues();
@@ -315,6 +315,7 @@ public class SlotRef extends Expr {
     Preconditions.checkState(desc_.isMaterialized(), String.format(
         "Illegal reference to non-materialized slot: tid=%s sid=%s",
         desc_.getParent().getId(), desc_.getId()));
+    Preconditions.checkState(desc_.getByteOffset() >= 0);
     // check that the tuples associated with this slot are executable
     desc_.getParent().checkIsExecutable();
     if (desc_.getItemTupleDesc() != null) desc_.getItemTupleDesc().checkIsExecutable();

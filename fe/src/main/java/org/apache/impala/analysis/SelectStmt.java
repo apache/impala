@@ -27,10 +27,12 @@ import java.util.Set;
 
 import org.apache.impala.analysis.Path.PathType;
 import org.apache.impala.authorization.Privilege;
+import org.apache.impala.catalog.ArrayType;
 import org.apache.impala.catalog.Column;
 import org.apache.impala.catalog.FeKuduTable;
 import org.apache.impala.catalog.FeTable;
 import org.apache.impala.catalog.FeView;
+import org.apache.impala.catalog.MapType;
 import org.apache.impala.catalog.StructField;
 import org.apache.impala.catalog.StructType;
 import org.apache.impala.catalog.TableLoadingException;
@@ -387,21 +389,24 @@ public class SelectStmt extends QueryStmt {
         throw new AnalysisException("The star exprs expanded to an empty select list " +
             "because the referenced tables only have complex-typed columns.\n" +
             "Star exprs only expand to scalar-typed columns because " +
-            "complex-typed exprs " +
-            "are currently not supported in the select list.\n" +
+            "currently not all complex-typed exprs " +
+            "are supported in the select list.\n" +
             "Affected select statement:\n" + toSql());
       }
 
       for (Expr expr: resultExprs_) {
-        // Collection types are currently not supported in the select list because
-        // we'd need to serialize them in a meaningful way.
-        if (expr.getType().isCollectionType()) {
+        if (expr.getType().isArrayType()) {
+          ArrayType arrayType = (ArrayType) expr.getType();
+          if (!arrayType.getItemType().isSupported()) {
+            throw new AnalysisException("Unsupported type '" +
+                expr.getType().toSql() + "' in '" + expr.toSql() + "'.");
+          }
+        } else if (expr.getType().isMapType()) {
           throw new AnalysisException(String.format(
-              "Expr '%s' in select list returns a collection type '%s'.\n" +
-              "Collection types are not allowed in the select list.",
+              "Expr '%s' in select list returns a map type '%s'.\n" +
+              "Map type is not allowed in the select list.",
               expr.toSql(), expr.getType().toSql()));
-        }
-        if (expr.getType().isStructType()) {
+        } else if (expr.getType().isStructType()) {
           if (!analyzer_.getQueryCtx().client_request.query_options.disable_codegen) {
             throw new AnalysisException("Struct type in select list is not allowed " +
                 "when Codegen is ON. You might want to set DISABLE_CODEGEN=true");
@@ -594,8 +599,7 @@ public class SelectStmt extends QueryStmt {
 
     /**
      * Expand "path.*" from a resolved path, ignoring complex-typed fields
-     * because those are currently illegal in any select list (even for
-     * inline views, etc.)
+     * for backwards compatibility.
      */
     private void expandStar(Path resolvedPath)
         throws AnalysisException {
@@ -669,7 +673,7 @@ public class SelectStmt extends QueryStmt {
       if (resolvedPath.getMatchedTypes().isEmpty()) {
         Preconditions.checkState(!slotDesc.getType().isComplexType(),
             "Star expansion should only introduce scalar columns");
-        analyzer_.registerScalarColumnForMasking(slotDesc);
+        analyzer_.registerColumnForMasking(slotDesc);
       }
       resultExprs_.add(slotRef);
       colLabels_.add(relRawPath[relRawPath.length - 1]);

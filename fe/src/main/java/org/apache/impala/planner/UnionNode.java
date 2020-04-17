@@ -245,6 +245,10 @@ public class UnionNode extends PlanNode {
 
     for (int i = 0; i < children_.size(); i++) {
       if (!isChildPassthrough(analyzer, children_.get(i), resultExprLists_.get(i))) {
+        for (Expr expr : resultExprLists_.get(i)) {
+          Preconditions.checkState(!expr.getType().isCollectionType(),
+              "only pass-through UNION ALL is supported for array columns");
+        }
         newResultExprLists.add(resultExprLists_.get(i));
         newChildren.add(children_.get(i));
       }

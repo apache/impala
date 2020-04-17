@@ -158,15 +158,6 @@ abstract public class PlanNode extends TreeNode<PlanNode> {
     tblRefIds_.addAll(tupleIds);
   }
 
-  protected PlanNode(PlanNodeId id, String displayName,
-      List<CollectionTableRef> tblRefs) {
-    this(id, displayName);
-    for (CollectionTableRef collRef : tblRefs) {
-      tupleIds_.add(collRef.getDesc().getId());
-      tblRefIds_.add(collRef.getDesc().getId());
-    }
-  }
-
   /**
    * Deferred id_ assignment.
    */

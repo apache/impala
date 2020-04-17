@@ -68,7 +68,6 @@ Status BufferedPlanRootSink::Send(RuntimeState* state, RowBatch* batch) {
   // after the sink is closed.
   DCHECK(!closed_);
   DCHECK(batch_queue_->IsOpen());
-  PlanRootSink::ValidateCollectionSlots(*row_desc_, batch);
   RETURN_IF_ERROR(PlanRootSink::UpdateAndCheckRowsProducedLimit(state, batch));
 
   {

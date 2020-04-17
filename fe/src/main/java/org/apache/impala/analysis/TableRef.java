@@ -155,8 +155,8 @@ public class TableRef extends StmtNode {
   // columns via the view.
   protected boolean exposeNestedColumnsByTableMaskView_ = false;
 
-  // Scalar columns referenced in the query. Used in resolving column mask.
-  protected Map<String, Column> scalarColumns_ = new LinkedHashMap<>();
+  // Columns referenced in the query. Used in resolving column mask.
+  protected Map<String, Column> columns_ = new LinkedHashMap<>();
 
   // Time travel spec of this table ref. It contains information specified in the
   // FOR SYSTEM_TIME AS OF <timestamp> or FOR SYSTEM_TIME AS OF <version> clause.
@@ -254,7 +254,7 @@ public class TableRef extends StmtNode {
     correlatedTupleIds_ = Lists.newArrayList(other.correlatedTupleIds_);
     desc_ = other.desc_;
     exposeNestedColumnsByTableMaskView_ = other.exposeNestedColumnsByTableMaskView_;
-    scalarColumns_ = new LinkedHashMap<>(other.scalarColumns_);
+    columns_ = new LinkedHashMap<>(other.columns_);
     isHidden_ = other.isHidden_;
     zippingUnnestType_ = other.zippingUnnestType_;
   }
@@ -313,6 +313,8 @@ public class TableRef extends StmtNode {
    * tuple descriptor, false otherwise.
    */
   public boolean isRelative() { return false; }
+
+  public boolean isCollectionInSelectList() { return false; }
 
   /**
    * Indicates if this TableRef directly or indirectly references another TableRef from
@@ -769,12 +771,12 @@ public class TableRef extends StmtNode {
 
   public boolean isTableMaskingView() { return false; }
 
-  public void registerScalarColumn(Column column) {
-    scalarColumns_.put(column.getName(), column);
+  public void registerColumn(Column column) {
+    columns_.put(column.getName(), column);
   }
 
-  public List<Column> getScalarColumns() {
-    return new ArrayList<>(scalarColumns_.values());
+  public List<Column> getColumns() {
+    return new ArrayList<>(columns_.values());
   }
 
   void migratePropertiesTo(TableRef other) {

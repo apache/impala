@@ -346,13 +346,16 @@ public abstract class Type {
    * casting between any two types other than both decimals.
    *
    *
-   * TODO: Support non-scalar types.
+   * TODO: Support map and struct types.
    */
   public static Type getAssignmentCompatibleType(
       Type t1, Type t2, boolean strict, boolean strictDecimal) {
     if (t1.isScalarType() && t2.isScalarType()) {
       return ScalarType.getAssignmentCompatibleType(
           (ScalarType) t1, (ScalarType) t2, strict, strictDecimal);
+    } else if (t1.isArrayType() && t2.isArrayType()) {
+      // Only support exact match for array types.
+      if (t1.equals(t2)) return t2;
     }
     return ScalarType.INVALID;
   }

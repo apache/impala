@@ -160,11 +160,12 @@ public class InlineViewRef extends TableRef {
     List<Column> columns = tableMask.getRequiredColumns();
     List<SelectListItem> items = Lists.newArrayListWithCapacity(columns.size());
     for (Column col: columns) {
-      Preconditions.checkState(!col.getType().isComplexType(),
-          "Complex type columns should not be registered to table mask");
       items.add(new SelectListItem(
           tableMask.createColumnMask(col.getName(), col.getType(), authzCtx),
           /*alias*/ col.getName()));
+    }
+    if (tableMask.hasComplexColumnMask()) {
+      throw new AnalysisException("Column masking is not supported for complex types");
     }
     if (columns.isEmpty()) {
       // No columns so use "SELECT 1 FROM tbl" to make a valid statement.
@@ -231,6 +232,7 @@ public class InlineViewRef extends TableRef {
         queryStmt_.hasLimit() || queryStmt_.hasOffset());
     queryStmt_.getMaterializedTupleIds(materializedTupleIds_);
     desc_ = analyzer.registerTableRef(this);
+    desc_.setSourceView(this);
     isAnalyzed_ = true;  // true now that we have assigned desc
 
     // For constant selects we materialize its exprs into a tuple.
@@ -255,17 +257,8 @@ public class InlineViewRef extends TableRef {
     for (int i = 0; i < getColLabels().size(); ++i) {
       String colName = getColLabels().get(i).toLowerCase();
       Expr colExpr = queryStmt_.getResultExprs().get(i);
-      Path p = new Path(desc_, Lists.newArrayList(colName));
-      Preconditions.checkState(p.resolve());
-      SlotDescriptor slotDesc = analyzer.registerSlotRef(p);
-      slotDesc.setSourceExpr(colExpr);
-      slotDesc.setStats(ColumnStats.fromExpr(colExpr));
-      SlotRef slotRef = new SlotRef(slotDesc);
-      smap_.put(slotRef, colExpr);
-      baseTblSmap_.put(slotRef, queryStmt_.getBaseTblResultExprs().get(i));
-      if (createAuxPredicate(colExpr)) {
-        analyzer.createAuxEqPredicate(new SlotRef(slotDesc), colExpr.clone());
-      }
+      Expr baseTableExpr =  queryStmt_.getBaseTblResultExprs().get(i);
+      addColumnToSubstitutionMaps(analyzer, colName, colExpr, baseTableExpr);
     }
     if (LOG.isTraceEnabled()) {
       LOG.trace("inline view " + getUniqueAlias() + " smap: " + smap_.debugString());
@@ -280,12 +273,66 @@ public class InlineViewRef extends TableRef {
     analyzeJoin(analyzer);
   }
 
+  private void addColumnToSubstitutionMaps(
+      Analyzer analyzer, String colName, Expr colExpr, Expr baseTableExpr)
+      throws AnalysisException {
+    Path p = new Path(desc_, Lists.newArrayList(colName));
+    Preconditions.checkState(p.resolve());
+    SlotDescriptor slotDesc = analyzer.registerSlotRef(p, false);
+    slotDesc.setSourceExpr(colExpr);
+    slotDesc.setStats(ColumnStats.fromExpr(colExpr));
+    SlotRef slotRef = new SlotRef(slotDesc);
+    smap_.put(slotRef, colExpr);
+    baseTblSmap_.put(slotRef, baseTableExpr);
+    if (createAuxPredicate(colExpr)) {
+      analyzer.createAuxEqPredicate(new SlotRef(slotDesc), colExpr.clone());
+    }
+
+    if (colExpr.getType().isArrayType()) {
+      // Calling registerSlotRef() above created a new SlotDescriptor + TupleDescriptor
+      // hierarchy for Array types. Walk through this hiararchy and add all slot refs
+      // to smap_ and baseTblSmap_.
+      // Source must be a SlotRef
+      SlotRef srcSlotRef = (SlotRef) colExpr;
+      SlotRef baseTableSlotRef = (SlotRef) baseTableExpr;
+      SlotDescriptor srcSlotDesc = srcSlotRef.getDesc();
+      SlotDescriptor baseTableSlotDesc = baseTableSlotRef.getDesc();
+      TupleDescriptor itemTupleDesc = slotDesc.getItemTupleDesc();
+      TupleDescriptor srcItemTupleDesc = srcSlotDesc.getItemTupleDesc();
+      TupleDescriptor baseTableItemTupleDesc = baseTableSlotDesc.getItemTupleDesc();
+      // We don't recurse deeper and only add the immediate item child to the
+      // substitution map. This is enough both for collections in select list and in
+      // from clause.
+      if (itemTupleDesc != null) {
+        Preconditions.checkState(srcItemTupleDesc != null);
+        Preconditions.checkState(baseTableItemTupleDesc != null);
+        // Assume that there is only a single slot as struct in nested in
+        // arrays is not yet supported in select lists.
+        Preconditions.checkState(itemTupleDesc.getSlots().size() == 1);
+        Preconditions.checkState(srcItemTupleDesc.getSlots().size() == 1);
+        Preconditions.checkState(baseTableItemTupleDesc.getSlots().size() == 1);
+        SlotDescriptor itemSlotDesc = itemTupleDesc.getSlots().get(0);
+        SlotDescriptor srcItemSlotDesc = srcItemTupleDesc.getSlots().get(0);
+        SlotDescriptor baseTableItemSlotDesc = baseTableItemTupleDesc.getSlots().get(0);
+        SlotRef itemSlotRef = new SlotRef(itemSlotDesc);
+        SlotRef srcItemSlotRef = new SlotRef(srcItemSlotDesc);
+        SlotRef beseTableItemSlotRef = new SlotRef(baseTableItemSlotDesc);
+        smap_.put(itemSlotRef, srcItemSlotRef);
+        baseTblSmap_.put(itemSlotRef, beseTableItemSlotRef);
+        if (createAuxPredicate(colExpr)) {
+          analyzer.createAuxEqPredicate(
+              new SlotRef(itemSlotDesc), srcItemSlotRef.clone());
+        }
+      }
+    }
+  }
+
   /**
    * Checks if an auxiliary predicate should be created for an expr. Returns False if the
    * inline view has a SELECT stmt with analytic functions and the expr is not in the
    * common partition exprs of all the analytic functions computed by this inline view.
    */
-  public boolean createAuxPredicate(Expr e) {
+  private boolean createAuxPredicate(Expr e) {
     if (!(queryStmt_ instanceof SelectStmt)
         || !((SelectStmt) queryStmt_).hasAnalyticInfo()) {
       return true;

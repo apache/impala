@@ -62,7 +62,7 @@ PLAN-ROOT SINK
    HDFS partitions=1/1 files=4 size=289.07MB
    predicates: c_custkey > CAST(10 AS BIGINT), !empty(c.c_orders)
    predicates on o: !empty(o.o_lineitems), o_orderkey = CAST(4 AS BIGINT)
-   predicates on o_lineitems: CAST(20 AS BIGINT) + CAST(l_linenumber AS BIGINT) < CAST(0 AS BIGINT)
+   predicates on o.o_lineitems: CAST(20 AS BIGINT) + CAST(l_linenumber AS BIGINT) < CAST(0 AS BIGINT)
    stored statistics:
      table: rows=150.00K size=289.07MB
      columns missing stats: c_orders
@@ -71,7 +71,7 @@ PLAN-ROOT SINK
    parquet statistics predicates on o: o_orderkey = CAST(4 AS BIGINT)
    parquet dictionary predicates: c_custkey > CAST(10 AS BIGINT)
    parquet dictionary predicates on o: o_orderkey = CAST(4 AS BIGINT)
-   parquet dictionary predicates on o_lineitems: CAST(20 AS BIGINT) + CAST(l_linenumber AS BIGINT) < CAST(0 AS BIGINT)
+   parquet dictionary predicates on o.o_lineitems: CAST(20 AS BIGINT) + CAST(l_linenumber AS BIGINT) < CAST(0 AS BIGINT)
    mem-estimate=264.00MB mem-reservation=16.00MB thread-reservation=1
    tuple-ids=0 row-size=20B cardinality=15.00K
    in pipelines: 00(GETNEXT)

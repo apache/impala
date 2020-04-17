@@ -307,6 +307,7 @@ TTypeEntry ColumnType::ToHs2Type() const {
       break;
     }
     case TYPE_STRUCT:
+    case TYPE_ARRAY:
       type_entry.__set_type(TTypeId::STRING_TYPE);
       break;
     default:

@@ -145,13 +145,12 @@ public class FromClause extends StmtNode implements Iterable<TableRef> {
 
   private void checkTopLevelComplexAcidScan(Analyzer analyzer,
       CollectionTableRef collRef) {
+    if (collRef.getCollectionExpr() != null) return;
     if (!AcidUtils.isFullAcidTable(
         collRef.getTable().getMetaStoreTable().getParameters())) {
       return;
     }
-    if (collRef.getCollectionExpr() == null) {
-      analyzer.setHasTopLevelAcidCollectionTableRef();
-    }
+    analyzer.setHasTopLevelAcidCollectionTableRef();
   }
 
   @Override
@@ -173,7 +172,10 @@ public class FromClause extends StmtNode implements Iterable<TableRef> {
         // contrary to the intended semantics of reset(). We could address this issue by
         // changing the WITH-clause analysis to register local views that have
         // fully-qualified table refs, and then remove the full qualification here.
-        newTblRef.rawPath_ = origTblRef.getResolvedPath().getFullyQualifiedRawPath();
+        if (!(origTblRef instanceof CollectionTableRef
+            && ((CollectionTableRef)origTblRef).isRelative())) {
+          newTblRef.rawPath_ = origTblRef.getResolvedPath().getFullyQualifiedRawPath();
+        }
         set(i, newTblRef);
       }
       // recurse for views

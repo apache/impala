@@ -51,8 +51,15 @@ bool CollectionColumnReader::ReadValue(MemPool* pool, Tuple* tuple) {
   } else if (def_level_ >= max_def_level()) {
     return ReadSlot(tuple->GetCollectionSlot(tuple_offset_), pool);
   } else {
-    // Null value
-    tuple->SetNull(null_indicator_offset_);
+    // Collections add an extra def level, so it is possible to distinguish between
+    // NULL and empty collections. See hdfs-parquet-scanner.h for more detailed
+    // explanation.
+    if (def_level_ == max_def_level() - 1) {
+      CollectionValue* slot = tuple->GetCollectionSlot(tuple_offset_);
+      *slot = CollectionValue();
+    } else {
+      tuple->SetNull(null_indicator_offset_);
+    }
     return CollectionColumnReader::NextLevels();
   }
 }

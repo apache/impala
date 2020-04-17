@@ -95,6 +95,9 @@ public class TupleDescriptor {
   // single implicit alias.
   private boolean hasExplicitAlias_;
 
+  // True for collection tuples backing collections in select list.
+  private boolean isHidden_;
+
   // If false, this tuple doesn't need to be materialized.
   private boolean isMaterialized_ = true;
 
@@ -113,6 +116,10 @@ public class TupleDescriptor {
   // If this is a tuple representing the children of a struct slot then 'parentSlot_'
   // is the struct slot where this tuple belongs. Otherwise it's null.
   private SlotDescriptor parentStructSlot_ = null;
+
+  // The view that registered this tuple. Null if this is not the result tuple of a view.
+  // This affects handling of collections.
+  private InlineViewRef sourceView_ = null;
 
   public TupleDescriptor(TupleId id, String debugName) {
     id_ = id;
@@ -204,6 +211,11 @@ public class TupleDescriptor {
   public TableName getAliasAsName() {
     return (aliases_ != null) ? new TableName(null, aliases_[0]) : null;
   }
+  public void setSourceView(InlineViewRef value) { sourceView_ = value; }
+  public InlineViewRef getSourceView() { return sourceView_; }
+
+  public void setHidden(boolean isHidden) { isHidden_ = isHidden; }
+  public boolean isHidden() { return isHidden_; }
 
   public TupleDescriptor getRootDesc() {
     if (path_ == null) return null;
@@ -403,6 +415,9 @@ public class TupleDescriptor {
           // struct's children
           nullIndicatorByte = nullIndicators.first;
           nullIndicatorBit = nullIndicators.second;
+        }
+        if (d.getType().isCollectionType() && d.isMaterializedRecursively()) {
+          d.getItemTupleDesc().computeMemLayout();
         }
       }
     }

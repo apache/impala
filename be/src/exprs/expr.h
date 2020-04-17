@@ -31,20 +31,14 @@
 
 namespace impala {
 
-class IsNullExpr;
 struct LibCacheEntry;
-class LlvmCodeGen;
-class MemTracker;
 class ObjectPool;
-class RowDescriptor;
 class RuntimeState;
 class ScalarExpr;
-class SlotDescriptor;
-class TColumnValue;
 class TExpr;
 class TExprNode;
 class Tuple;
-class TupleRow;
+class TupleDescriptor;
 
 /// --- Expr overview
 ///
@@ -83,6 +77,12 @@ class Expr {
 
   const ColumnType& type() const { return type_; }
   const std::vector<ScalarExpr*>& children() const { return children_; }
+
+  /// Returns the backing tuple descriptor for collection types.
+  virtual const TupleDescriptor* GetCollectionTupleDesc() const {
+    DCHECK(false);
+    return nullptr;
+  }
 
   /// Releases cache entries to LibCache in all nodes of the Expr tree.
   virtual void Close();

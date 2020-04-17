@@ -311,7 +311,7 @@ PLAN-ROOT SINK
    HDFS partitions=1/1 files=4 size=289.08MB
    predicates: c.c_nationkey = 10, !empty(c.c_orders)
    predicates on o: !empty(o.o_lineitems), o_orderkey = 4
-   predicates on o_lineitems: l_partkey < 10, l_suppkey = 10
+   predicates on o.o_lineitems: l_partkey < 10, l_suppkey = 10
    row-size=14B cardinality=6.00K
 ====
 # Nested predicates also get propagated
@@ -351,7 +351,7 @@ PLAN-ROOT SINK
    HDFS partitions=1/1 files=4 size=289.08MB
    predicates: c.c_nationkey = 10, !empty(c.c_orders)
    predicates on o: !empty(o.o_lineitems), o.o_orderkey = 10, o.o_shippriority = 10
-   predicates on o_lineitems: l_partkey < 10, l_suppkey = 10
+   predicates on o.o_lineitems: l_partkey < 10, l_suppkey = 10
    row-size=14B cardinality=6.00K
 ====
 # Using IS NULL

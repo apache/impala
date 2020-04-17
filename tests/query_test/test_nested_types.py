@@ -115,15 +115,15 @@ class TestNestedTypes(ImpalaTestSuite):
                        use_db='tpch_nested' + db_suffix)
 
 
-class TestNestedTypesInSelectList(ImpalaTestSuite):
-  """Functional tests for nested types provided in the select list."""
+class TestNestedStructsInSelectList(ImpalaTestSuite):
+  """Functional tests for nested structs provided in the select list."""
   @classmethod
   def get_workload(self):
     return 'functional-query'
 
   @classmethod
   def add_test_dimensions(cls):
-    super(TestNestedTypesInSelectList, cls).add_test_dimensions()
+    super(TestNestedStructsInSelectList, cls).add_test_dimensions()
     cls.ImpalaTestMatrix.add_constraint(lambda v:
         v.get_value('table_format').file_format in ['parquet', 'orc'])
     cls.ImpalaTestMatrix.add_dimension(
@@ -152,6 +152,29 @@ class TestNestedTypesInSelectList(ImpalaTestSuite):
     self.run_test_case('QueryTest/nested-struct-in-select-list', vector, unique_database)
 
 
+class TestNestedTArraysInSelectList(ImpalaTestSuite):
+  """Functional tests for nested arrays provided in the select list."""
+  @classmethod
+  def get_workload(self):
+    return 'functional-query'
+
+  @classmethod
+  def add_test_dimensions(cls):
+    super(TestNestedTArraysInSelectList, cls).add_test_dimensions()
+    cls.ImpalaTestMatrix.add_constraint(lambda v:
+        v.get_value('table_format').file_format in ['parquet', 'orc'])
+    cls.ImpalaTestMatrix.add_dimension(
+        ImpalaTestDimension('mt_dop', 0, 2))
+    cls.ImpalaTestMatrix.add_dimension(
+        create_exec_option_dimension_from_dict({
+            'disable_codegen': ['False', 'True']}))
+    cls.ImpalaTestMatrix.add_dimension(create_client_protocol_dimension())
+
+  def test_array_in_select_list(self, vector, unique_database):
+    """Queries where an array column is in the select list"""
+    self.run_test_case('QueryTest/nested-array-in-select-list', vector)
+
+
 # Moved this to a separate test class from TestNestedTypesInSelectList because this needs
 # a narrower test vector.
 class TestNestedTypesInSelectListWithBeeswax(ImpalaTestSuite):
@@ -169,7 +192,7 @@ class TestNestedTypesInSelectListWithBeeswax(ImpalaTestSuite):
         disable_codegen_options=[True]))
 
   def test_struct_with_beeswax(self, vector):
-    expected_err = "Returning complex types is not supported through the beeswax " + \
+    expected_err = "Returning struct types is not supported through the beeswax " + \
         "interface"
     err = self.execute_query_expect_failure(self.client,
         "select tiny_struct from functional_orc_def.complextypes_structs",

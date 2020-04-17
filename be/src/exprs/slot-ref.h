@@ -58,9 +58,9 @@ class SlotRef : public ScalarExpr {
   virtual int GetSlotIds(std::vector<SlotId>* slot_ids) const override;
   const SlotId& slot_id() const { return slot_id_; }
   static const char* LLVM_CLASS_NAME;
-  int GetTupleIdx() const { return tuple_idx_; }
   NullIndicatorOffset GetNullIndicatorOffset() const { return null_indicator_offset_; }
   int GetSlotOffset() const { return slot_offset_; }
+  virtual const TupleDescriptor* GetCollectionTupleDesc() const override;
 
  protected:
   friend class ScalarExpr;
@@ -83,6 +83,7 @@ class SlotRef : public ScalarExpr {
   NullIndicatorOffset null_indicator_offset_;  // within tuple
   const SlotId slot_id_;
   bool tuple_is_nullable_; // true if the tuple is nullable.
+  const SlotDescriptor* slot_desc_ = nullptr;
 };
 
 }

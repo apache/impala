@@ -18,6 +18,7 @@
 package org.apache.impala.analysis;
 
 import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.Collections;
 import java.util.Comparator;
 import java.util.HashMap;
@@ -44,6 +45,7 @@ import org.apache.impala.authorization.PrivilegeRequestBuilder;
 import org.apache.impala.authorization.TableMask;
 import org.apache.impala.authorization.User;
 import org.apache.impala.catalog.Column;
+import org.apache.impala.catalog.ColumnStats;
 import org.apache.impala.catalog.DatabaseNotFoundException;
 import org.apache.impala.catalog.FeCatalog;
 import org.apache.impala.catalog.FeDataSourceTable;
@@ -707,6 +709,7 @@ public class Analyzer {
     String uniqueAlias = ref.getUniqueAlias();
     return aliasMap_.containsKey(uniqueAlias);
   }
+
   /**
    * Creates an returns an empty TupleDescriptor for the given table ref and registers
    * it against all its legal aliases. For tables refs with an explicit alias, only the
@@ -753,6 +756,14 @@ public class Analyzer {
     }
     tableRefMap_.put(result.getId(), ref);
     return result;
+  }
+
+  // Registers a CollectionTableRef with given alias and tuple descriptor.
+  // Used to register collections that come from a view and are used in the from clause.
+  public void addCollectionTableRef(
+      String alias, CollectionTableRef ref, TupleDescriptor desc) {
+    aliasMap_.put(alias, desc);
+    tableRefMap_.put(desc.getId(), ref);
   }
 
   /**
@@ -869,16 +880,18 @@ public class Analyzer {
       FeView view = ((InlineViewRef) resolvedTableRef).getView();
       dbName = view.getDb().getName();
       tblName = view.getName();
+    } else if (resolvedTableRef instanceof CollectionTableRef
+        && resolvedTableRef.isRelative()) {
+       // Relative table refs don't need masking. Its base table will be masked.
+       return resolvedTableRef;
     } else {
       dbName = resolvedTableRef.getTable().getDb().getName();
       tblName = resolvedTableRef.getTable().getName();
     }
-    List<Column> columns = resolvedTableRef.getScalarColumns();
+    List<Column> columns = resolvedTableRef.getColumns();
     TableMask tableMask = new TableMask(authChecker, dbName, tblName, columns, user_);
     try {
       if (resolvedTableRef instanceof CollectionTableRef) {
-        // Relative table refs don't need masking. Its base table will be masked.
-        if (resolvedTableRef.isRelative()) return resolvedTableRef;
         if (tableMask.needsRowFiltering()) {
           // The table ref is a non-relative CollectionTableRef, e.g. the table ref in
           // "select item from functional_parquet.complextypestbl.int_array". We can't
@@ -1204,14 +1217,14 @@ public class Analyzer {
 
     // Path rooted at a tuple desc with an explicit or implicit unqualified alias.
     TupleDescriptor rootDesc = getDescriptor(rawPath.get(0));
-    if (rootDesc != null) {
+    if (rootDesc != null && !rootDesc.isHidden()) {
       result.add(new Path(rootDesc, rawPath.subList(1, rawPath.size())));
     }
 
     // Path rooted at a tuple desc with an implicit qualified alias.
     if (rawPath.size() > 1) {
       rootDesc = getDescriptor(rawPath.get(0) + "." + rawPath.get(1));
-      if (rootDesc != null) {
+      if (rootDesc != null && !rootDesc.isHidden()) {
         result.add(new Path(rootDesc, rawPath.subList(2, rawPath.size())));
       }
     }
@@ -1328,19 +1341,22 @@ public class Analyzer {
     return legalPaths.get(0);
   }
 
+  public SlotDescriptor registerSlotRef(Path slotPath) throws AnalysisException {
+    return registerSlotRef(slotPath, true);
+  }
+
   /**
-   * Returns an existing or new SlotDescriptor for the given path. Always returns
+   * Returns an existing or new SlotDescriptor for the given path.
+   * If duplicateIfCollections is true, then always returns
    * a new empty SlotDescriptor for paths with a collection-typed destination.
    */
-  public SlotDescriptor registerSlotRef(Path slotPath) throws AnalysisException {
+  public SlotDescriptor registerSlotRef(Path slotPath, boolean duplicateIfCollections)
+      throws AnalysisException {
     Preconditions.checkState(slotPath.isRootedAtTuple());
-    // Always register a new slot descriptor for collection types. The BE currently
-    // relies on this behavior for setting unnested collection slots to NULL.
-    if (slotPath.destType().isCollectionType()) {
-      SlotDescriptor result = addSlotDescriptor(slotPath.getRootDesc());
-      result.setPath(slotPath);
-      registerColumnPrivReq(result);
-      return result;
+    if (slotPath.destType().isCollectionType() && duplicateIfCollections) {
+      // Register a new slot descriptor for collection types. The BE currently
+      // relies on this behavior for setting unnested collection slots to NULL.
+      return registerNewSlotRef(slotPath);
     }
     // SlotRefs with a scalar or struct types are registered against the slot's
     // fully-qualified lowercase path.
@@ -1349,9 +1365,70 @@ public class Analyzer {
         "Slot paths should be lower case: " + key);
     SlotDescriptor existingSlotDesc = slotPathMap_.get(key);
     if (existingSlotDesc != null) return existingSlotDesc;
-    SlotDescriptor result = addSlotDescriptor(slotPath.getRootDesc());
+    SlotDescriptor result = null;
+    if (slotPath.destType().isArrayType()) {
+      result = registerArraySlotRef(slotPath);
+    } else {
+      result = addSlotDescriptor(slotPath.getRootDesc());
+    }
     result.setPath(slotPath);
     slotPathMap_.put(key, result);
+    registerColumnPrivReq(result);
+    return result;
+  }
+
+  /**
+   * Registers an array and its descendants.
+   * Creates a CollectionTableRef for all collections on the path.
+   */
+  private SlotDescriptor registerArraySlotRef(Path slotPath)
+      throws AnalysisException {
+    Preconditions.checkState(slotPath.isResolved());
+    Preconditions.checkState(slotPath.destType().isArrayType());
+    List<String> rawPath = slotPath.getRawPath();
+    List<String> collectionTableRawPath = new ArrayList<>();
+    TupleDescriptor rootDesc = slotPath.getRootDesc();
+    Preconditions.checkNotNull(rootDesc);
+    if (rootDesc.hasExplicitAlias()) {
+      collectionTableRawPath.add(rootDesc.getAlias());
+    } else {
+      collectionTableRawPath.addAll(Arrays.asList(rootDesc.getAlias().split("\\.")));
+    }
+    collectionTableRawPath.addAll(rawPath);
+
+    TableRef tblRef = new TableRef(collectionTableRawPath, null);
+    CollectionTableRef collTblRef = new CollectionTableRef(tblRef, slotPath);
+    collTblRef.setInSelectList(true);
+    collTblRef.analyze(this);
+
+    Preconditions.checkState(collTblRef.getCollectionExpr() instanceof SlotRef);
+    SlotDescriptor desc = ((SlotRef) collTblRef.getCollectionExpr()).getDesc();
+    desc.setIsMaterializedRecursively(true);
+
+    // Resolve path
+    List<String> rawPathToItem = new ArrayList<String>();
+    rawPathToItem.add(Path.ARRAY_ITEM_FIELD_NAME);
+
+    Path resolvedPathToItem = new Path(collTblRef.getDesc(), rawPathToItem);
+    boolean isResolved = resolvedPathToItem.resolve();
+    Preconditions.checkState(isResolved);
+
+    if (resolvedPathToItem.destType().isStructType()) {
+      throw new AnalysisException(
+          "STRUCT type inside collection types is not supported.");
+    }
+    if (resolvedPathToItem.destType().isMapType()) {
+      throw new AnalysisException(
+          "MAP type inside collection types is not supported.");
+    }
+    registerSlotRef(resolvedPathToItem, false);
+    return desc;
+  }
+
+  private SlotDescriptor registerNewSlotRef(Path slotPath) throws AnalysisException {
+    Preconditions.checkState(slotPath.isRootedAtTuple());
+    SlotDescriptor result = addSlotDescriptor(slotPath.getRootDesc());
+    result.setPath(slotPath);
     registerColumnPrivReq(result);
     return result;
   }
@@ -1378,13 +1455,14 @@ public class Analyzer {
   /**
    * Register scalar columns. Used in resolving column mask.
    */
-  public void registerScalarColumnForMasking(SlotDescriptor slotDesc) {
+  public void registerColumnForMasking(SlotDescriptor slotDesc) {
     Preconditions.checkNotNull(slotDesc.getPath());
-    Preconditions.checkState(!slotDesc.getType().isComplexType(),
-        "Don't register complex type columns");
     TupleDescriptor tupleDesc = slotDesc.getParent();
-    Column column = new Column(slotDesc.getPath().getRawPath().get(0), slotDesc.getType(),
-        /*position*/-1);
+    // Pass the full path for nested types even though these are ignore currently.
+    // TODO: RANGER-3525: Clarify handling of column masks on nested types
+    Column column = new Column(
+        String.join(".", slotDesc.getPath().getRawPath()), slotDesc.getType(),
+           /*position*/-1);
     Analyzer analyzer = this;
     TableRef tblRef;
     do {
@@ -1392,9 +1470,10 @@ public class Analyzer {
       // Search in parent query block for correlative reference.
       analyzer = analyzer.getParentAnalyzer();
     } while (tblRef == null && analyzer != null);
+    if (tblRef == null) return;
     Preconditions.checkNotNull(tblRef,
         "Failed to find TableRef of tuple {}", tupleDesc);
-    tblRef.registerScalarColumn(column);
+    tblRef.registerColumn(column);
   }
 
   /**

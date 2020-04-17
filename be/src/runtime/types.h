@@ -223,6 +223,8 @@ struct ColumnType {
     return type == TYPE_ARRAY || type == TYPE_MAP;
   }
 
+  inline bool IsArrayType() const { return type == TYPE_ARRAY; }
+
   inline bool IsVarLenType() const {
     return IsVarLenStringType() || IsCollectionType();
   }

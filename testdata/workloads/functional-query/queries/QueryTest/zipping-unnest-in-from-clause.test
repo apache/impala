@@ -374,7 +374,7 @@ where a1 < 3;
 ---- TYPES
 INT,INT
 ---- RUNTIME_PROFILE
-predicates on arr1: arr1.item < CAST(3 AS INT)
+predicates on t.arr1: arr1.item < CAST(3 AS INT)
 ====
 ---- QUERY
 # After doing a zipping unnest on two arrays, do a regular join to another table. The

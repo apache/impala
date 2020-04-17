@@ -60,6 +60,9 @@ public class SlotDescriptor {
   // (and physical layout parameters are invalid)
   private boolean isMaterialized_ = false;
 
+  // If true, then computeMemLayout() should be recursively called for itemTupleDesc_.
+  private boolean materializeRecursively_ = false;
+
   // if false, this slot cannot be NULL
   // Note: it is still possible that a SlotRef pointing to this descriptor could have a
   // NULL value if the entire tuple is NULL, for example as the result of an outer join.
@@ -131,6 +134,14 @@ public class SlotDescriptor {
     isMaterialized_ = value;
     LOG.trace("Mark slot(sid={}) of tuple(tid={}) as {}materialized",
         id_, parent_.getId(), isMaterialized_ ? "" : "non-");
+    if (materializeRecursively_) {
+      Preconditions.checkState(itemTupleDesc_ != null);
+      itemTupleDesc_.materializeSlots();
+    }
+  }
+  public boolean isMaterializedRecursively() { return materializeRecursively_; }
+  public void setIsMaterializedRecursively(boolean value) {
+    materializeRecursively_ = value;
   }
   public boolean getIsNullable() { return isNullable_; }
   public void setIsNullable(boolean value) { isNullable_ = value; }
@@ -317,12 +328,15 @@ public class SlotDescriptor {
   public String debugString() {
     String pathStr = (path_ == null) ? "null" : path_.toString();
     String typeStr = (type_ == null ? "null" : type_.toString());
+    String parentTupleId = parent_ == null ?
+        "null" : String.valueOf(parent_.getId().asInt());
     return MoreObjects.toStringHelper(this)
         .add("id", id_.asInt())
         .add("path", pathStr)
         .add("label", label_)
         .add("type", typeStr)
         .add("materialized", isMaterialized_)
+        .add("materializeRecursively", materializeRecursively_)
         .add("byteSize", byteSize_)
         .add("byteOffset", byteOffset_)
         .add("nullable", isNullable_)
@@ -331,6 +345,7 @@ public class SlotDescriptor {
         .add("slotIdx", slotIdx_)
         .add("stats", stats_)
         .add("itemTupleDesc", itemTupleDesc_)
+        .add("parent_tuple_id", parentTupleId)
         .toString();
   }
 

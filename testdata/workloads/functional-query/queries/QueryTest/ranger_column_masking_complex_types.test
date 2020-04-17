@@ -616,3 +616,19 @@ where (t2.id + t3.id + t3.nested_struct.a = 201 or t2.nested_struct.a is null)
 ---- TYPES
 INT,INT
 ====
+---- QUERY
+select id, a.item from complextypes_arrays_only_view v, v.int_array a;
+---- RESULTS
+100,1
+100,2
+100,3
+200,NULL
+200,1
+200,2
+200,NULL
+200,3
+200,NULL
+800,-1
+---- TYPES
+BIGINT,INT
+====

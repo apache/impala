@@ -17,11 +17,13 @@
 
 #include "service/hs2-util.h"
 
+#include <sstream>
 #include <rapidjson/rapidjson.h>
 #include <rapidjson/stringbuffer.h>
 #include <rapidjson/writer.h>
 
 #include "common/logging.h"
+#include "exprs/scalar-expr.h"
 #include "exprs/scalar-expr-evaluator.h"
 #include "runtime/date-value.h"
 #include "runtime/decimal-value.inline.h"
@@ -395,6 +397,32 @@ static void StructExprValuesToHS2TColumn(ScalarExprEvaluator* expr_eval,
   }
 }
 
+static void ArrayExprValuesToHS2TColumn(ScalarExprEvaluator* expr_eval,
+    const TColumnType& type, RowBatch* batch, int start_idx, int num_rows,
+    uint32_t output_row_idx, apache::hive::service::cli::thrift::TColumn* column) {
+  DCHECK(type.types.size() > 1);
+  ReserveSpace(num_rows, output_row_idx, &column->stringVal);
+  FOREACH_ROW_LIMIT(batch, start_idx, num_rows, it) {
+    CollectionVal coll_val = expr_eval->GetCollectionVal(it.Get());
+    if (coll_val.is_null) {
+      column->stringVal.values.emplace_back();
+    } else {
+      const impala::ScalarExpr& scalar_expr = expr_eval->root();
+      // Currently scalar_expr can be only a slot ref as no functions return arrays.
+      DCHECK(scalar_expr.IsSlotRef());
+      const TupleDescriptor* item_tuple_desc = scalar_expr.GetCollectionTupleDesc();
+      DCHECK(item_tuple_desc != nullptr);
+      CollectionValue value(coll_val);
+      // TODO: use rapidjson as in for structs
+      stringstream stream;
+      RawValue::PrintArrayValue(&value, item_tuple_desc, -1, &stream);
+      column->stringVal.values.emplace_back(stream.str());
+    }
+    SetNullBit(output_row_idx, coll_val.is_null, &column->stringVal.nulls);
+    ++output_row_idx;
+  }
+}
+
 // For V6 and above
 void impala::ExprValuesToHS2TColumn(ScalarExprEvaluator* expr_eval,
     const TColumnType& type, RowBatch* batch, int start_idx, int num_rows,
@@ -403,10 +431,17 @@ void impala::ExprValuesToHS2TColumn(ScalarExprEvaluator* expr_eval,
   // the type for every row.
   // TODO: instead of relying on stamped out implementations, we could codegen this loop
   // to inline the expression evaluation into the loop body.
-  if (type.types[0].type == TTypeNodeType::STRUCT) {
-    StructExprValuesToHS2TColumn(
-        expr_eval, type, batch, start_idx, num_rows, output_row_idx, column);
-    return;
+  switch (type.types[0].type) {
+    case TTypeNodeType::STRUCT:
+      StructExprValuesToHS2TColumn(
+          expr_eval, type, batch, start_idx, num_rows, output_row_idx, column);
+      return;
+    case TTypeNodeType::ARRAY:
+      ArrayExprValuesToHS2TColumn(
+          expr_eval, type, batch, start_idx, num_rows, output_row_idx, column);
+      return;
+    default:
+      break;
   }
   switch (type.types[0].scalar_type.type) {
     case TPrimitiveType::NULL_TYPE:

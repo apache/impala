@@ -1614,6 +1614,18 @@ class TestRangerColumnMaskingComplexTypesInSelectList(CustomClusterTestSuite):
           unique_name + str(policy_cnt), user, "functional_orc_def",
           "complextypes_structs", "str", "MASK_NULL")
       policy_cnt += 1
+      TestRanger._add_column_masking_policy(
+          unique_name + str(policy_cnt), user, "functional_orc_def",
+          "complextypes_structs", "tiny_struct", "MASK_NULL")
+      policy_cnt += 1
+      TestRanger._add_column_masking_policy(
+          unique_name + str(policy_cnt), user, "functional_orc_def",
+          "complextypestbl", "id", "MASK_NULL")
+      policy_cnt += 1
+      TestRanger._add_column_masking_policy(
+          unique_name + str(policy_cnt), user, "functional_orc_def",
+          "complextypestbl", "int_array_array", "MASK_NULL")
+      policy_cnt += 1
       self.execute_query_expect_success(admin_client, "refresh authorization",
           user=ADMIN)
       self.run_test_case("QueryTest/ranger_column_masking_struct_in_select_list", vector,

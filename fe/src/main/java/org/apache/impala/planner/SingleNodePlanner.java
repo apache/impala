@@ -318,6 +318,10 @@ public class SingleNodePlanner {
     }
 
     if (stmt.evaluateOrderBy() && sortHasMaterializedSlots) {
+      for (Expr expr: stmt.getResultExprs()) {
+        Preconditions.checkState(!expr.getType().isCollectionType(),
+            "Sorting is not supported if the select list contains collection columns.");
+      }
       root = createSortNode(ctx_, analyzer, root, stmt.getSortInfo(), stmt.getLimit(),
           stmt.getOffset(), stmt.hasLimit(), disableTopN);
     } else {
@@ -856,7 +860,13 @@ public class SingleNodePlanner {
           requiredTids.addAll(ref.getCorrelatedTupleIds());
         } else {
           CollectionTableRef collectionTableRef = (CollectionTableRef) ref;
-          requiredTids.add(collectionTableRef.getResolvedPath().getRootDesc().getId());
+          SlotRef collectionExpr =
+              (SlotRef) collectionTableRef.getCollectionExpr();
+          if (collectionExpr != null) {
+            requiredTids.add(collectionExpr.getDesc().getParent().getId());
+          } else {
+            requiredTids.add(collectionTableRef.getResolvedPath().getRootDesc().getId());
+          }
         }
         // Add all plan table ref ids as an ordering dependency for straight_join.
         if (isStraightJoin) requiredTblRefIds.addAll(planTblRefIds);
@@ -1886,7 +1896,7 @@ public class SingleNodePlanner {
       return scanNode;
     } else {
       throw new NotImplementedException(
-          "Planning not implemented for table ref class: " + tblRef.getClass());
+          "Planning not implemented for table class: " + table.getClass());
     }
   }
 

@@ -18,6 +18,7 @@
 #include <sstream>
 #include <boost/functional/hash.hpp>
 
+#include "kudu/gutil/strings/escaping.h"
 #include "runtime/collection-value.h"
 #include "runtime/date-value.h"
 #include "runtime/raw-value.h"
@@ -270,7 +271,6 @@ void RawValue::WritePrimitive(const void* value, Tuple* tuple,
     vector<StringValue*>* string_values) {
   DCHECK(value != nullptr && tuple != nullptr && slot_desc != nullptr &&
       string_values != nullptr);
-  DCHECK(!slot_desc->type().IsComplexType());
 
   void* dst = tuple->GetSlot(slot_desc->tuple_offset());
   Write(value, dst, slot_desc->type(), pool);
@@ -280,7 +280,8 @@ void RawValue::WritePrimitive(const void* value, Tuple* tuple,
 }
 
 void RawValue::PrintValue(
-    const void* value, const ColumnType& type, int scale, std::stringstream* stream) {
+    const void* value, const ColumnType& type, int scale, std::stringstream* stream,
+    bool quote_val) {
   if (value == NULL) {
     *stream << "NULL";
     return;
@@ -337,13 +338,31 @@ void RawValue::PrintValue(
     case TYPE_STRING:
       string_val = reinterpret_cast<const StringValue*>(value);
       if (type.type == TYPE_VARCHAR) DCHECK(string_val->len <= type.len);
-      stream->write(string_val->ptr, string_val->len);
+      if (quote_val) {
+        string str(string_val->ptr, string_val->len);
+        str = strings::Utf8SafeCEscape(str);
+        *stream << "\"";
+        stream->write(str.c_str(), str.size());
+        *stream << "\"";
+      } else {
+        stream->write(string_val->ptr, string_val->len);
+      }
       break;
     case TYPE_TIMESTAMP:
+      if (quote_val) *stream << "\"";
       *stream << *reinterpret_cast<const TimestampValue*>(value);
+      if (quote_val) *stream << "\"";
       break;
     case TYPE_CHAR:
-      stream->write(reinterpret_cast<const char*>(value), type.len);
+      if (quote_val) {
+        string str(reinterpret_cast<const char*>(value), type.len);
+        str = strings::Utf8SafeCEscape(str);
+        *stream << "\"";
+        stream->write(str.c_str(), str.size());
+        *stream << "\"";
+      } else {
+        stream->write(reinterpret_cast<const char*>(value), type.len);
+      }
       break;
     case TYPE_DECIMAL:
       switch (type.GetByteSize()) {
@@ -360,9 +379,10 @@ void RawValue::PrintValue(
       }
       break;
     case TYPE_DATE: {
-        *stream << *reinterpret_cast<const DateValue*>(value);
-      }
-      break;
+      if (quote_val) *stream << "\"";
+      *stream << *reinterpret_cast<const DateValue*>(value);
+      if (quote_val) *stream << "\"";
+    } break;
     default: DCHECK(false) << "Unknown type: " << type;
   }
   stream->precision(old_precision);
@@ -390,4 +410,54 @@ template void RawValue::WritePrimitive<true>(const void* value, Tuple* tuple,
 template void RawValue::WritePrimitive<false>(const void* value, Tuple* tuple,
       const SlotDescriptor* slot_desc, MemPool* pool,
       std::vector<StringValue*>* string_values);
+
+void RawValue::PrintArrayValue(const CollectionValue* array_val,
+    const TupleDescriptor* item_tuple_desc, int scale, stringstream *stream) {
+  DCHECK(item_tuple_desc != nullptr);
+  if (array_val == nullptr) {
+    *stream << "NULL";
+    return;
+  }
+  int item_byte_size = item_tuple_desc->byte_size();
+
+  const vector<SlotDescriptor*>& slot_descs = item_tuple_desc->slots();
+  // TODO: This has to be changed once structs are supported too.
+  DCHECK(slot_descs.size() == 1);
+  DCHECK(slot_descs[0] != nullptr);
+
+  *stream << "[";
+  if (slot_descs[0]->type().IsArrayType()) {
+    // The item is also an array, recurse deeper if not NULL.
+    for (int i = 0; i < array_val->num_tuples; ++i) {
+      Tuple* item = reinterpret_cast<Tuple*>(array_val->ptr + i * item_byte_size);
+      if (item->IsNull(slot_descs[0]->null_indicator_offset())) {
+        *stream << "NULL";
+      } else {
+        const CollectionValue* nested_array_val =
+            item->GetCollectionSlot(slot_descs[0]->tuple_offset());
+        const TupleDescriptor* child_item_tuple_desc =
+            slot_descs[0]->children_tuple_descriptor();
+        DCHECK(child_item_tuple_desc != nullptr);
+        PrintArrayValue(nested_array_val, child_item_tuple_desc, scale, stream);
+      }
+      if (i < array_val->num_tuples - 1) *stream << ",";
+    }
+  } else if (!slot_descs[0]->type().IsComplexType()) {
+    // The item is a scalar, print it with the usual PrintValue.
+    for (int i = 0; i < array_val->num_tuples; ++i) {
+      Tuple* item = reinterpret_cast<Tuple*>(array_val->ptr + i * item_byte_size);
+      if (item->IsNull(slot_descs[0]->null_indicator_offset())) {
+        *stream << "NULL";
+      } else {
+        PrintValue(item->GetSlot(slot_descs[0]->tuple_offset()), slot_descs[0]->type(),
+            scale, stream, true);
+      }
+      if (i < array_val->num_tuples - 1) *stream << ",";
+    }
+  } else {
+    DCHECK(false);
+  }
+  *stream << "]";
+}
+
 }

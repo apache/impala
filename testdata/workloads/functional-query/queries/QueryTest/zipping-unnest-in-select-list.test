@@ -174,10 +174,21 @@ AnalysisException: Providing zipping unnest both in the SELECT list and in the F
 ====
 ---- QUERY
 # Do an unnest on the outer layer of a nested array.
-# IMPALA-9498 Might fix this as it will allow to query arrays in the select list.
 select unnest(int_array_array) from complextypestbl;
----- CATCH
-AnalysisException: Expr 'UNNEST(int_array_array)' in select list returns a collection type 'ARRAY<INT>'.
+---- RESULTS
+'[-1,-2]'
+'[]'
+'[1,2]'
+'[3,4]'
+'[NULL,1,2,NULL]'
+'[3,NULL,4]'
+'[]'
+'NULL'
+'NULL'
+'NULL'
+'[5,6]'
+---- TYPES
+STRING
 ====
 ---- QUERY
 # Do an unnest on the inner layer of a nested array. This will give an error because the

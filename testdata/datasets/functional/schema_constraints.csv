@@ -316,3 +316,6 @@ table_name:part_strings_with_quotes, constraint:restrict_to, table_format:text/n
 
 # 'alltypessmall_bool_sorted' only used in ORC tests.
 table_name:alltypessmall_bool_sorted, constraint:restrict_to, table_format:orc/def/block
+
+table_name:complextypes_arrays_only_view, constraint:restrict_to, table_format:parquet/none/none
+table_name:complextypes_arrays_only_view, constraint:restrict_to, table_format:orc/def/block

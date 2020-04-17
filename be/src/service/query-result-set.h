@@ -22,13 +22,16 @@
 #include "gen-cpp/Data_types.h"
 #include "gen-cpp/Results_types.h"
 #include "gen-cpp/TCLIService_types.h"
+#include "runtime/runtime-state.h"
 
 #include <vector>
+#include <sstream>
 
 namespace impala {
 
 class RowBatch;
 class ScalarExprEvaluator;
+class TupleRow;
 
 /// Wraps a client-API specific result representation, and implements the logic required
 /// to translate into that format from Impala's row format.
@@ -73,6 +76,13 @@ class QueryResultSet {
       apache::hive::service::cli::thrift::TProtocolVersion::type version,
       const TResultSetMetadata& metadata,
       apache::hive::service::cli::thrift::TRowSet* rowset);
+
+protected:
+  /// Wrapper to call RawValue::PrintArrayValue for a given collection column.
+  /// expr_eval must be a SlotRef on a collection slot.
+  static void PrintArrayValue(ScalarExprEvaluator* expr_eval, const TupleRow* row,
+      int scale, std::stringstream *stream);
+
 };
 }
 

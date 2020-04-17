@@ -17,3 +17,33 @@ select id, str, alltypes from functional_orc_def.complextypes_structs
 ---- TYPES
 INT,STRING,STRING
 ====
+---- QUERY
+select id, int_array from functional_orc_def.complextypestbl
+---- RESULTS
+NULL,'[1,2,3]'
+NULL,'[NULL,1,2,NULL,3,NULL]'
+NULL,'[]'
+NULL,'NULL'
+NULL,'NULL'
+NULL,'NULL'
+NULL,'NULL'
+NULL,'[-1]'
+---- TYPES
+bigint,string
+====
+---- QUERY
+# There is a column mask added for int_array_array, but it is ignored.
+# It is not clear whether we should support this (RANGER-3525).
+select id, int_array_array from functional_orc_def.complextypestbl
+---- RESULTS
+NULL,'[[-1,-2],[]]'
+NULL,'[[1,2],[3,4]]'
+NULL,'[[NULL,1,2,NULL],[3,NULL,4],[],NULL]'
+NULL,'[NULL]'
+NULL,'[]'
+NULL,'NULL'
+NULL,'NULL'
+NULL,'[NULL,[5,6]]'
+---- TYPES
+bigint,string
+====

@@ -22,6 +22,7 @@ import java.util.List;
 import org.apache.impala.analysis.Analyzer;
 import org.apache.impala.analysis.CollectionTableRef;
 import org.apache.impala.analysis.Expr;
+import org.apache.impala.analysis.SlotRef;
 import org.apache.impala.common.ImpalaException;
 import org.apache.impala.thrift.TExplainLevel;
 import org.apache.impala.thrift.TPlanNode;
@@ -51,22 +52,22 @@ public class UnnestNode extends PlanNode {
 
   public UnnestNode(PlanNodeId id, SubplanNode containingSubplanNode,
       List<CollectionTableRef> tblRefs) {
-    super(id, "UNNEST", tblRefs);
+    super(id, "UNNEST");
     containingSubplanNode_ = containingSubplanNode;
     tblRefs_ = tblRefs;
-    collectionExprs_ = getCollectionExprs(tblRefs_);
+    Preconditions.checkState(tblRefs.size() > 0);
+    collectionExprs_ = Lists.newArrayList();
+    for (CollectionTableRef ref : tblRefs) {
+      SlotRef collectionSlotRef = (SlotRef)ref.getCollectionExpr();
+      collectionExprs_.add(collectionSlotRef);
+      tupleIds_.add(collectionSlotRef.getDesc().getItemTupleDesc().getId());
+      tblRefIds_.add(collectionSlotRef.getDesc().getItemTupleDesc().getId());
+    }
     // Assume the collection exprs have been fully resolved in analysis.
     for (Expr collectionExpr : collectionExprs_) {
       Preconditions.checkState(
           collectionExpr.isBoundByTupleIds(containingSubplanNode.getChild(0).tupleIds_));
     }
-  }
-
-  private List<Expr> getCollectionExprs(List<CollectionTableRef> collectionRefs) {
-    Preconditions.checkState(collectionRefs.size() > 0);
-    List<Expr> result = Lists.newArrayList();
-    for (CollectionTableRef ref : collectionRefs) result.add(ref.getCollectionExpr());
-    return result;
   }
 
   @Override

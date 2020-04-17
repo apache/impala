@@ -1241,7 +1241,7 @@ PLAN-ROOT SINK
 |
 00:SCAN HDFS [functional.allcomplextypes a]
    partitions=0/0 files=0 size=0B
-   predicates on int_array_col: item > 100
+   predicates on a.int_array_col: item > 100
    row-size=16B cardinality=0
 ====
 # Test subplans: Parent scan and uncorrelated not exists subquery.
@@ -1660,7 +1660,7 @@ PLAN-ROOT SINK
    HDFS partitions=1/1 files=4 size=289.02MB
    predicates: c_custkey < 10, !empty(c.c_orders)
    predicates on o: !empty(o.o_lineitems), o_orderkey < 5
-   predicates on o_lineitems: l_linenumber < 3
+   predicates on o.o_lineitems: l_linenumber < 3
    row-size=20B cardinality=15.00K
 ====
 # Nested subplans.
@@ -1858,7 +1858,7 @@ PLAN-ROOT SINK
    predicates on a: a.item >= 10, a.item <= 20, a.item % 2 = 0
    predicates on m: m.`key` = 'test', m.value != 30
    predicates on c: c.f11 >= 10, c.f11 <= 20, c.f11 % 2 = 0
-   predicates on f12: f12.key = 'test2'
+   predicates on c.f12: c.f12.key = 'test2'
    row-size=48B cardinality=0
 ====
 # IMPALA-2358: Test join ordering of relative collection table refs inside
@@ -2544,7 +2544,7 @@ PLAN-ROOT SINK
 |
 00:SCAN HDFS [tpch_nested_parquet.customer c]
    HDFS partitions=1/1 files=4 size=289.02MB
-   predicates on c_orders: o_orderkey = 6000000
+   predicates on c.c_orders: o_orderkey = 6000000
    row-size=20B cardinality=150.00K
 ====
 # CardinalityCheckNode in subplan in a subplan

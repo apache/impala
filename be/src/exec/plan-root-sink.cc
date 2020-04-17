@@ -64,27 +64,6 @@ Status PlanRootSink::Prepare(RuntimeState* state, MemTracker* parent_mem_tracker
   return Status::OK();
 }
 
-void PlanRootSink::ValidateCollectionSlots(
-    const RowDescriptor& row_desc, RowBatch* batch) {
-#ifndef NDEBUG
-  if (!row_desc.HasVarlenSlots()) return;
-  for (int i = 0; i < batch->num_rows(); ++i) {
-    TupleRow* row = batch->GetRow(i);
-    for (int j = 0; j < row_desc.tuple_descriptors().size(); ++j) {
-      const TupleDescriptor* tuple_desc = row_desc.tuple_descriptors()[j];
-      if (tuple_desc->collection_slots().empty()) continue;
-      for (int k = 0; k < tuple_desc->collection_slots().size(); ++k) {
-        const SlotDescriptor* slot_desc = tuple_desc->collection_slots()[k];
-        int tuple_idx = row_desc.GetTupleIdx(slot_desc->parent()->id());
-        const Tuple* tuple = row->GetTuple(tuple_idx);
-        if (tuple == NULL) continue;
-        DCHECK(tuple->IsNull(slot_desc->null_indicator_offset()));
-      }
-    }
-  }
-#endif
-}
-
 Status PlanRootSink::UpdateAndCheckRowsProducedLimit(
     RuntimeState* state, RowBatch* batch) {
   // Since the PlanRootSink has a single producer, the

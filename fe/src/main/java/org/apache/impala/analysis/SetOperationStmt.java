@@ -341,6 +341,15 @@ public class SetOperationStmt extends QueryStmt {
       resultExprLists.add(op.getQueryStmt().getResultExprs());
     }
     widestExprs_ = analyzer.castToSetOpCompatibleTypes(resultExprLists);
+    // TODO (IMPALA-11018): Currently only UNION ALL is supported for collection types
+    //       due to missing handling in BE.
+    if (!hasOnlyUnionAllOps()) {
+      for (Expr expr: widestExprs_) {
+        Preconditions.checkState(!expr.getType().isCollectionType(),
+            "UNION, EXCEPT and INTERSECT are not supported for collection types");
+      }
+    }
+
 
     // Create tuple descriptor materialized by this UnionStmt, its resultExprs, and
     // its sortInfo if necessary.
@@ -618,6 +627,9 @@ public class SetOperationStmt extends QueryStmt {
       SlotDescriptor slotDesc = analyzer.addSlotDescriptor(tupleDesc);
       slotDesc.setLabel(getColLabels().get(i));
       slotDesc.setType(expr.getType());
+      if (expr.getType().isArrayType()) {
+        slotDesc.setItemTupleDesc(((SlotRef)expr).getDesc().getItemTupleDesc());
+      }
       slotDesc.setStats(columnStats.get(i));
       SlotRef outputSlotRef = new SlotRef(slotDesc);
       resultExprs_.add(outputSlotRef);

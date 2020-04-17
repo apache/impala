@@ -535,7 +535,7 @@ PLAN-ROOT SINK
    HDFS partitions=1/1 files=4 size=289.07MB
    predicates: !empty(c.c_orders)
    predicates on o: o_orderdate >= '1993-07-01', o_orderdate < '1993-10-01'
-   predicates on o_lineitems: l_commitdate < l_receiptdate
+   predicates on o.o_lineitems: l_commitdate < l_receiptdate
    row-size=12B cardinality=150.00K
 ---- DISTRIBUTEDPLAN
 Max Per-Host Resource Reservation: Memory=100.00MB Threads=4
@@ -590,7 +590,7 @@ PLAN-ROOT SINK
    HDFS partitions=1/1 files=4 size=289.07MB
    predicates: !empty(c.c_orders)
    predicates on o: o_orderdate >= '1993-07-01', o_orderdate < '1993-10-01'
-   predicates on o_lineitems: l_commitdate < l_receiptdate
+   predicates on o.o_lineitems: l_commitdate < l_receiptdate
    row-size=12B cardinality=150.00K
 ====
 # TPCH-Q5
@@ -1980,7 +1980,7 @@ PLAN-ROOT SINK
 |
 00:SCAN HDFS [tpch_nested_parquet.customer c]
    HDFS partitions=1/1 files=4 size=289.07MB
-   predicates on c_orders: (NOT o_comment LIKE '%special%requests%')
+   predicates on c.c_orders: (NOT o_comment LIKE '%special%requests%')
    row-size=20B cardinality=150.00K
 ---- DISTRIBUTEDPLAN
 Max Per-Host Resource Reservation: Memory=99.88MB Threads=5
@@ -2032,7 +2032,7 @@ PLAN-ROOT SINK
 |
 00:SCAN HDFS [tpch_nested_parquet.customer c]
    HDFS partitions=1/1 files=4 size=289.07MB
-   predicates on c_orders: (NOT o_comment LIKE '%special%requests%')
+   predicates on c.c_orders: (NOT o_comment LIKE '%special%requests%')
    row-size=20B cardinality=150.00K
 ====
 # TPCH-Q14

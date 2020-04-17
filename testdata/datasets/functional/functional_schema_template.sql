@@ -3294,3 +3294,13 @@ INSERT OVERWRITE TABLE {db_name}{db_suffix}.{table_name} VALUES
   (1, "张三"), (2, "李四"), (3, "王五"), (4, "李小龙"), (5, "Alice"),
   (6, "陈Bob"), (7, "Бopиc"), (8, "Jörg"), (9, "ひなた"), (10, "서연");
 ====
+---- DATASET
+functional
+---- BASE_TABLE_NAME
+complextypes_arrays_only_view
+---- CREATE
+DROP VIEW IF EXISTS {db_name}{db_suffix}.{table_name};
+CREATE VIEW {db_name}{db_suffix}.{table_name}
+AS SELECT id, int_array, int_array_array FROM {db_name}{db_suffix}.complextypestbl;
+---- LOAD
+====

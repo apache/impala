@@ -201,6 +201,26 @@ void ImpalaServer::fetch(Results& query_results,
   }
 }
 
+string ImpalaServer::ColumnTypeToBeeswaxTypeString(const TColumnType& type) {
+  if (type.types.size() == 1) {
+    DCHECK_EQ(TTypeNodeType::SCALAR, type.types[0].type);
+    DCHECK(type.types[0].__isset.scalar_type);
+    TPrimitiveType::type col_type = type.types[0].scalar_type.type;
+    return TypeToOdbcString(ThriftToType(col_type));
+  } else if (type.types[0].type == TTypeNodeType::ARRAY) {
+    DCHECK_GT(type.types.size(), 1);
+    // TODO (IMPALA-11041): consider returning the real type
+    return TypeToOdbcString(PrimitiveType::TYPE_STRING);
+  } else if (type.types[0].type == TTypeNodeType::STRUCT) {
+    DCHECK_GT(type.types.size(), 1);
+    RaiseBeeswaxException("Returning struct types is not supported through the "
+        "beeswax interface", SQLSTATE_GENERAL_ERROR);
+  } else {
+    DCHECK(false);
+    return "";
+  }
+}
+
 // TODO: Handle complex types.
 void ImpalaServer::get_results_metadata(ResultsMetadata& results_metadata,
     const beeswax::QueryHandle& beeswax_handle) {
@@ -231,18 +251,8 @@ void ImpalaServer::get_results_metadata(ResultsMetadata& results_metadata,
     results_metadata.schema.fieldSchemas.resize(result_set_md->columns.size());
     for (int i = 0; i < results_metadata.schema.fieldSchemas.size(); ++i) {
       const TColumnType& type = result_set_md->columns[i].columnType;
-      DCHECK_LE(1, type.types.size());
-      if (type.types[0].type != TTypeNodeType::SCALAR) {
-        RaiseBeeswaxException("Returning complex types is not supported through the "
-            "beeswax interface", SQLSTATE_GENERAL_ERROR);
-      }
-      DCHECK_EQ(1, type.types.size());
-      DCHECK_EQ(TTypeNodeType::SCALAR, type.types[0].type);
-      DCHECK(type.types[0].__isset.scalar_type);
-      TPrimitiveType::type col_type = type.types[0].scalar_type.type;
       results_metadata.schema.fieldSchemas[i].__set_type(
-          TypeToOdbcString(ThriftToType(col_type)));
-
+          ColumnTypeToBeeswaxTypeString(type));
       // Fill column name
       results_metadata.schema.fieldSchemas[i].__set_name(
           result_set_md->columns[i].columnName);
@@ -603,11 +613,7 @@ Status ImpalaServer::FetchInternal(TUniqueId query_id, const bool start_over,
     // boolean and timestamp type are correctly recognized when ODBC-189 is closed.
     // TODO: Handle complex types.
     const TColumnType& type = result_metadata->columns[i].columnType;
-    DCHECK_EQ(1, type.types.size());
-    DCHECK_EQ(TTypeNodeType::SCALAR, type.types[0].type);
-    DCHECK(type.types[0].__isset.scalar_type);
-    TPrimitiveType::type col_type = type.types[0].scalar_type.type;
-    query_results->columns[i] = TypeToOdbcString(ThriftToType(col_type));
+    query_results->columns[i] = ColumnTypeToBeeswaxTypeString(type);
   }
   query_results->__isset.columns = true;
 

@@ -621,3 +621,10 @@ select id, tiny_struct from functional_orc_def.complextypes_structs
 order by 3
 ---- CATCH
 AnalysisException: ORDER BY: ordinal exceeds the number of items in the SELECT list: 3
+====
+---- QUERY
+# Structs inside arrays are not yet supported.
+select nested_struct.c.d from functional_orc_def.complextypestbl;
+---- CATCH
+AnalysisException: STRUCT type inside collection types is not supported.
+====

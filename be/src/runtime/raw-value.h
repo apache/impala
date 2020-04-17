@@ -21,6 +21,7 @@
 #include <string>
 
 #include "codegen/impala-ir.h"
+#include "runtime/collection-value.h"
 #include "runtime/types.h"
 
 namespace impala {
@@ -47,11 +48,13 @@ class RawValue {
 
   /// Convert 'value' into ascii and write to 'stream'. NULL turns into "NULL". 'scale'
   /// determines how many digits after the decimal are printed for floating point numbers,
-  /// -1 indicates to use the stream's current formatting.
+  /// -1 indicates to use the stream's current formatting. Doesn't support complex types.
+  /// If 'quote_val' is true, write STRING, VARCHAR, CHAR, DATE, TIMESTAMP values in
+  /// quoted form surrounded by double quotes.
   /// TODO: for string types, we just print the result regardless of whether or not it
   /// ascii. This could be undesirable.
   static void PrintValue(const void* value, const ColumnType& type, int scale,
-                         std::stringstream* stream);
+                         std::stringstream* stream, bool quote_val=false);
 
   /// Write ascii value to string instead of stringstream.
   static void PrintValue(const void* value, const ColumnType& type, int scale,
@@ -64,6 +67,10 @@ class RawValue {
     return str;
   }
 
+  /// Similar to PrintValue() but works with array values.
+  /// Converts 'array_val' array into ascii and writes to 'stream'.
+  static void PrintArrayValue(const CollectionValue* array_val,
+      const TupleDescriptor* item_tuple_desc, int scale, std::stringstream *stream);
 
   /// Writes the byte representation of a value to a stringstream character-by-character
   static void PrintValueAsBytes(const void* value, const ColumnType& type,

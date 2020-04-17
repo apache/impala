@@ -19,6 +19,7 @@
 #define IMPALA_RUNTIME_COLLECTION_VALUE_H
 
 #include "runtime/descriptors.h"
+#include "udf/udf-internal.h"
 
 namespace impala {
 
@@ -35,6 +36,10 @@ struct __attribute__((__packed__)) CollectionValue {
   int num_tuples;
 
   CollectionValue() : ptr(NULL), num_tuples(0) {}
+  CollectionValue(const impala_udf::CollectionVal& val) :
+      ptr(val.is_null ? nullptr : val.ptr),
+      num_tuples(val.num_tuples)
+  {}
 
   /// Returns the size of this collection in bytes, i.e. the number of bytes written to
   /// ptr.

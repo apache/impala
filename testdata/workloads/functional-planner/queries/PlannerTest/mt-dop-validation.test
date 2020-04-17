@@ -513,7 +513,7 @@ where c_custkey < 10 and o_orderkey < 5 and l_linenumber < 3
 F00:PLAN FRAGMENT [UNPARTITIONED] hosts=1 instances=1
 |  Per-Instance Resources: mem-estimate=104.00MB mem-reservation=104.00MB thread-reservation=1
 PLAN-ROOT SINK
-|  output exprs: c.c_custkey, c.c_name, c.c_address, c.c_nationkey, c.c_phone, c.c_acctbal, c.c_mktsegment, c.c_comment, o.item.o_orderkey, o.item.o_orderstatus, o.item.o_totalprice, o.item.o_orderdate, o.item.o_orderpriority, o.item.o_clerk, o.item.o_shippriority, o.item.o_comment, o_lineitems.item.l_partkey, o_lineitems.item.l_suppkey, o_lineitems.item.l_linenumber, o_lineitems.item.l_quantity, o_lineitems.item.l_extendedprice, o_lineitems.item.l_discount, o_lineitems.item.l_tax, o_lineitems.item.l_returnflag, o_lineitems.item.l_linestatus, o_lineitems.item.l_shipdate, o_lineitems.item.l_commitdate, o_lineitems.item.l_receiptdate, o_lineitems.item.l_shipinstruct, o_lineitems.item.l_shipmode, o_lineitems.item.l_comment
+|  output exprs: c.c_custkey, c.c_name, c.c_address, c.c_nationkey, c.c_phone, c.c_acctbal, c.c_mktsegment, c.c_comment, o.item.o_orderkey, o.item.o_orderstatus, o.item.o_totalprice, o.item.o_orderdate, o.item.o_orderpriority, o.item.o_clerk, o.item.o_shippriority, o.item.o_comment, o.o_lineitems.item.l_partkey, o.o_lineitems.item.l_suppkey, o.o_lineitems.item.l_linenumber, o.o_lineitems.item.l_quantity, o.o_lineitems.item.l_extendedprice, o.o_lineitems.item.l_discount, o.o_lineitems.item.l_tax, o.o_lineitems.item.l_returnflag, o.o_lineitems.item.l_linestatus, o.o_lineitems.item.l_shipdate, o.o_lineitems.item.l_commitdate, o.o_lineitems.item.l_receiptdate, o.o_lineitems.item.l_shipinstruct, o.o_lineitems.item.l_shipmode, o.o_lineitems.item.l_comment
 |  mem-estimate=100.00MB mem-reservation=4.00MB spill-buffer=2.00MB thread-reservation=0
 |
 01:SUBPLAN
@@ -564,17 +564,17 @@ PLAN-ROOT SINK
    HDFS partitions=1/1 files=4 size=289.05MB
    predicates: c_custkey < CAST(10 AS BIGINT), !empty(c.c_orders)
    predicates on o: !empty(o.o_lineitems), o_orderkey < CAST(5 AS BIGINT)
-   predicates on o_lineitems: l_linenumber < CAST(3 AS INT)
+   predicates on o.o_lineitems: l_linenumber < CAST(3 AS INT)
    stored statistics:
      table: rows=150.00K size=289.05MB
      columns missing stats: c_orders
    extrapolated-rows=disabled max-scan-range-rows=50.72K
    parquet statistics predicates: c_custkey < CAST(10 AS BIGINT)
    parquet statistics predicates on o: o_orderkey < CAST(5 AS BIGINT)
-   parquet statistics predicates on o_lineitems: l_linenumber < CAST(3 AS INT)
+   parquet statistics predicates on o.o_lineitems: l_linenumber < CAST(3 AS INT)
    parquet dictionary predicates: c_custkey < CAST(10 AS BIGINT)
    parquet dictionary predicates on o: o_orderkey < CAST(5 AS BIGINT)
-   parquet dictionary predicates on o_lineitems: l_linenumber < CAST(3 AS INT)
+   parquet dictionary predicates on o.o_lineitems: l_linenumber < CAST(3 AS INT)
    mem-estimate=104.00MB mem-reservation=104.00MB thread-reservation=0
    tuple-ids=0 row-size=230B cardinality=15.00K
    in pipelines: 00(GETNEXT)
@@ -582,7 +582,7 @@ PLAN-ROOT SINK
 F01:PLAN FRAGMENT [UNPARTITIONED] hosts=1 instances=1
 |  Per-Instance Resources: mem-estimate=11.93MB mem-reservation=0B thread-reservation=1
 PLAN-ROOT SINK
-|  output exprs: c.c_custkey, c.c_name, c.c_address, c.c_nationkey, c.c_phone, c.c_acctbal, c.c_mktsegment, c.c_comment, o.item.o_orderkey, o.item.o_orderstatus, o.item.o_totalprice, o.item.o_orderdate, o.item.o_orderpriority, o.item.o_clerk, o.item.o_shippriority, o.item.o_comment, o_lineitems.item.l_partkey, o_lineitems.item.l_suppkey, o_lineitems.item.l_linenumber, o_lineitems.item.l_quantity, o_lineitems.item.l_extendedprice, o_lineitems.item.l_discount, o_lineitems.item.l_tax, o_lineitems.item.l_returnflag, o_lineitems.item.l_linestatus, o_lineitems.item.l_shipdate, o_lineitems.item.l_commitdate, o_lineitems.item.l_receiptdate, o_lineitems.item.l_shipinstruct, o_lineitems.item.l_shipmode, o_lineitems.item.l_comment
+|  output exprs: c.c_custkey, c.c_name, c.c_address, c.c_nationkey, c.c_phone, c.c_acctbal, c.c_mktsegment, c.c_comment, o.item.o_orderkey, o.item.o_orderstatus, o.item.o_totalprice, o.item.o_orderdate, o.item.o_orderpriority, o.item.o_clerk, o.item.o_shippriority, o.item.o_comment, o.o_lineitems.item.l_partkey, o.o_lineitems.item.l_suppkey, o.o_lineitems.item.l_linenumber, o.o_lineitems.item.l_quantity, o.o_lineitems.item.l_extendedprice, o.o_lineitems.item.l_discount, o.o_lineitems.item.l_tax, o.o_lineitems.item.l_returnflag, o.o_lineitems.item.l_linestatus, o.o_lineitems.item.l_shipdate, o.o_lineitems.item.l_commitdate, o.o_lineitems.item.l_receiptdate, o.o_lineitems.item.l_shipinstruct, o.o_lineitems.item.l_shipmode, o.o_lineitems.item.l_comment
 |  mem-estimate=100.00MB mem-reservation=4.00MB spill-buffer=2.00MB thread-reservation=0
 |
 09:EXCHANGE [UNPARTITIONED]
@@ -640,17 +640,17 @@ Per-Instance Resources: mem-estimate=104.00MB mem-reservation=104.00MB thread-re
    HDFS partitions=1/1 files=4 size=289.05MB
    predicates: c_custkey < CAST(10 AS BIGINT), !empty(c.c_orders)
    predicates on o: !empty(o.o_lineitems), o_orderkey < CAST(5 AS BIGINT)
-   predicates on o_lineitems: l_linenumber < CAST(3 AS INT)
+   predicates on o.o_lineitems: l_linenumber < CAST(3 AS INT)
    stored statistics:
      table: rows=150.00K size=289.05MB
      columns missing stats: c_orders
    extrapolated-rows=disabled max-scan-range-rows=50.72K
    parquet statistics predicates: c_custkey < CAST(10 AS BIGINT)
    parquet statistics predicates on o: o_orderkey < CAST(5 AS BIGINT)
-   parquet statistics predicates on o_lineitems: l_linenumber < CAST(3 AS INT)
+   parquet statistics predicates on o.o_lineitems: l_linenumber < CAST(3 AS INT)
    parquet dictionary predicates: c_custkey < CAST(10 AS BIGINT)
    parquet dictionary predicates on o: o_orderkey < CAST(5 AS BIGINT)
-   parquet dictionary predicates on o_lineitems: l_linenumber < CAST(3 AS INT)
+   parquet dictionary predicates on o.o_lineitems: l_linenumber < CAST(3 AS INT)
    mem-estimate=104.00MB mem-reservation=104.00MB thread-reservation=0
    tuple-ids=0 row-size=230B cardinality=15.00K
    in pipelines: 00(GETNEXT)

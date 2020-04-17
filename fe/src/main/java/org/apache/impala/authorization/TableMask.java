@@ -30,6 +30,7 @@ import org.apache.impala.common.InternalException;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
+import java.util.Arrays;
 import java.util.List;
 import java.util.stream.Collectors;
 
@@ -47,6 +48,8 @@ public class TableMask {
   private final List<String> requiredColumnNames_;
   private final User user_;
 
+  private boolean hasComplexColumnMask_;
+
   public TableMask(AuthorizationChecker authzChecker, String dbName, String tableName,
       List<Column> requiredColumns, User user) {
     this.authChecker_ = Preconditions.checkNotNull(authzChecker);
@@ -59,6 +62,7 @@ public class TableMask {
   }
 
   public List<Column> getRequiredColumns() { return requiredColumns_; }
+  public boolean hasComplexColumnMask () { return hasComplexColumnMask_; }
 
   /**
    * Returns whether the table/view has column masking or row filtering policies.
@@ -78,7 +82,6 @@ public class TableMask {
   public SelectStmt createColumnMaskStmt(String colName, Type colType,
       AuthorizationContext authzCtx) throws InternalException,
       AnalysisException {
-    Preconditions.checkState(!colType.isComplexType());
     String maskedValue = authChecker_.createColumnMask(user_, dbName_, tableName_,
         colName, authzCtx);
     if (LOG.isTraceEnabled()) {
@@ -88,10 +91,19 @@ public class TableMask {
     if (maskedValue == null || maskedValue.equals(colName)) {  // Don't need masking.
       return null;
     }
+    if (colType.isComplexType() || colName.contains(".")) {
+      // Ignore column masks on complex types or their children.
+      // TODO: RANGER-3525: Clarify handling of column masks on nested types
+      LOG.warn("Ignoring column mask on complex type {}.{}: {} => {}",
+          dbName_, tableName_, colName, maskedValue);
+      return null;
+    }
     SelectStmt maskStmt = (SelectStmt) Parser.parse(
         String.format("SELECT CAST(%s AS %s)", maskedValue, colType));
     if (maskStmt.getSelectList().getItems().size() != 1 || maskStmt.hasGroupByClause()
         || maskStmt.hasHavingClause() || maskStmt.hasWhereClause()) {
+      // TODO (IMPALA-11019): is it ok to throw this exception during table loading,
+      // before column privilege requests are registered?
       throw new AnalysisException("Illegal column masked value: " + maskedValue);
     }
     return maskStmt;
@@ -104,7 +116,7 @@ public class TableMask {
       AuthorizationContext authzCtx) throws InternalException,
       AnalysisException {
     SelectStmt maskStmt = createColumnMaskStmt(colName, colType, authzCtx);
-    if (maskStmt == null) return new SlotRef(Lists.newArrayList(colName));
+    if (maskStmt == null) return new SlotRef(Arrays.asList(colName.split("\\.")));
     Expr res = maskStmt.getSelectList().getItems().get(0).getExpr();
     if (LOG.isTraceEnabled()) {
       LOG.trace("Returned Expr: " + res.toSql());

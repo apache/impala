@@ -45,7 +45,6 @@ Status BlockingPlanRootSink::Prepare(
 
 Status BlockingPlanRootSink::Send(RuntimeState* state, RowBatch* batch) {
   SCOPED_TIMER(profile()->total_time_counter());
-  PlanRootSink::ValidateCollectionSlots(*row_desc_, batch);
   RETURN_IF_ERROR(PlanRootSink::UpdateAndCheckRowsProducedLimit(state, batch));
   int current_batch_row = 0;
 
@@ -68,8 +67,8 @@ Status BlockingPlanRootSink::Send(RuntimeState* state, RowBatch* batch) {
     if (num_rows_requested_ > 0) num_to_fetch = min(num_to_fetch, num_rows_requested_);
     // Debug action before AddBatch is called.
     RETURN_IF_ERROR(DebugAction(state->query_options(), "BPRS_BEFORE_ADD_ROWS"));
-    RETURN_IF_ERROR(
-        results_->AddRows(output_expr_evals_, batch, current_batch_row, num_to_fetch));
+    RETURN_IF_ERROR(results_->AddRows(
+        output_expr_evals_, batch, current_batch_row, num_to_fetch));
     current_batch_row += num_to_fetch;
     // Prevent expr result allocations from accumulating.
     expr_results_pool_->Clear();
