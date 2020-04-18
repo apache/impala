@@ -73,6 +73,10 @@ under the License.
           <groupId>io.netty</groupId>
           <artifactId>*</artifactId>
         </exclusion>
+        <exclusion>
+          <groupId>com.sun.jersey</groupId>
+          <artifactId>jersey-server</artifactId>
+        </exclusion>
       </exclusions>
     </dependency>
     <dependency>
@@ -98,6 +102,14 @@ under the License.
           <!-- IMPALA-9468: Avoid pulling in netty for security reasons -->
           <groupId>io.netty</groupId>
           <artifactId>*</artifactId>
+        </exclusion>
+        <exclusion>
+          <groupId>com.sun.jersey</groupId>
+          <artifactId>jersey-server</artifactId>
+        </exclusion>
+        <exclusion>
+          <groupId>com.sun.jersey</groupId>
+          <artifactId>jersey-servlet</artifactId>
         </exclusion>
       </exclusions>
     </dependency>
@@ -167,6 +179,11 @@ under the License.
             <groupId>org.apache.hive</groupId>
             <artifactId>*</artifactId>
           </exclusion>
+          <exclusion>
+            <!-- Avoid pulling in rocksdb, which is unneeded. -->
+            <groupId>org.rocksdb</groupId>
+            <artifactId>rocksdbjni</artifactId>
+          </exclusion>
         </exclusions>
     </dependency>
 
@@ -191,6 +208,10 @@ under the License.
           <groupId>org.apache.kafka</groupId>
           <artifactId>kafka_2.11</artifactId>
         </exclusion>
+        <exclusion>
+          <groupId>org.apache.solr</groupId>
+          <artifactId>*</artifactId>
+        </exclusion>
       </exclusions>
     </dependency>
     <!-- this is needed by ranger-plugins-audit -->
@@ -204,6 +225,16 @@ under the License.
       <groupId>org.apache.impala</groupId>
       <artifactId>yarn-extras</artifactId>
       <version>${yarn-extras.version}</version>
+      <exclusions>
+        <exclusion>
+          <groupId>com.sun.jersey</groupId>
+          <artifactId>jersey-server</artifactId>
+        </exclusion>
+        <exclusion>
+          <groupId>com.sun.jersey</groupId>
+          <artifactId>jersey-servlet</artifactId>
+        </exclusion>
+      </exclusions>
     </dependency>
 
     <dependency>
@@ -818,6 +849,15 @@ under the License.
                     <exclude>org.apache.shiro:shiro-crypto-cipher:*</exclude>
                     <!-- IMPALA-9648: Ensure that netty-all is not present. -->
                     <exclude>io.netty:*</exclude>
+                    <!-- Avoid runtime dependency on rocksdb. -->
+                    <exclude>org.rocksdb:*</exclude>
+                    <!-- Avoid runtime dependency on solr. -->
+                    <exclude>org.apache.solr:*</exclude>
+                    <!-- Avoid runtime dependency on Jersey server components. -->
+                    <exclude>com.sun.jersey:jersey-server</exclude>
+                    <exclude>com.sun.jersey:jersey-server</exclude>
+                    <exclude>org.glassfish.jersey.core:jersey-servlet</exclude>
+                    <exclude>org.glassfish.jersey.core:jersey-servlet</exclude>
                     <!-- Assert that we only use artifacts from only the specified
                          version of these components. -->
                     <exclude>org.apache.hadoop:*</exclude>

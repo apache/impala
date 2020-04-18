@@ -191,11 +191,13 @@ if [ $CREATE_RANGER_POLICY_DB -eq 1 ]; then
   popd
 fi
 
-echo "Linking common conf files from local cluster:"
+echo "Copying common conf files from local cluster:"
 CLUSTER_HADOOP_CONF_DIR=$(${CLUSTER_DIR}/admin get_hadoop_client_conf_dir)
 for file in core-site.xml hdfs-site.xml yarn-site.xml ; do
   echo ... $file
-  ln -s ${CLUSTER_HADOOP_CONF_DIR}/$file
+  # These need to be copied instead of symlinked so that they can be accessed when the
+  # directory is bind-mounted into /opt/impala/conf in docker containers.
+  cp ${CLUSTER_HADOOP_CONF_DIR}/$file .
 done
 
 if [[ "${IMPALA_KERBERIZE}" = "true" ]]; then

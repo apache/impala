@@ -92,7 +92,8 @@ for jar in dep_classpath.split(":"):
   symlink_file_into_dir(jar, LIB_DIR)
 
 # Impala jars.
-for jar in glob.glob(os.path.join(IMPALA_HOME, "fe/target/impala-frontend-*.jar")):
+for jar in glob.glob(
+    os.path.join(IMPALA_HOME, "fe/target/impala-frontend-*-SNAPSHOT.jar")):
   symlink_file_into_dir(jar, LIB_DIR)
 
 # Templates for debug web pages.
