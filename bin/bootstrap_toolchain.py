@@ -611,7 +611,7 @@ def get_toolchain_downloads():
   toolchain_packages += map(ToolchainPackage,
       ["avro", "binutils", "boost", "breakpad", "bzip2", "cctz", "cmake", "crcutil",
        "flatbuffers", "gdb", "gflags", "glog", "gperftools", "gtest", "libev",
-       "libunwind", "lz4", "openldap", "openssl", "orc", "protobuf",
+       "libunwind", "lz4", "openldap", "openssl", "orc", "protobuf", "python",
        "rapidjson", "re2", "snappy", "thrift", "tpc-h", "tpc-ds", "zlib", "zstd"])
   toolchain_packages += [ToolchainPackage("thrift",
       explicit_version=os.environ.get("IMPALA_THRIFT11_VERSION"))]
