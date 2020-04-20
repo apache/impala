@@ -50,6 +50,8 @@ from bootstrap_toolchain import ToolchainPackage
 
 LOG = logging.getLogger(os.path.splitext(os.path.basename(__file__))[0])
 
+SKIP_TOOLCHAIN_BOOTSTRAP = "SKIP_TOOLCHAIN_BOOTSTRAP"
+
 DEPS_DIR = os.path.join(os.path.dirname(__file__), "deps")
 ENV_DIR = os.path.join(os.path.dirname(__file__), "env")
 
@@ -192,7 +194,9 @@ def find_file(*paths):
 
 def download_toolchain_python():
   '''Grabs the Python implementation from the Impala toolchain, using the machinery from
-     bin/bootstrap_toolchain.py
+     bin/bootstrap_toolchain.py.
+     Skip the download if SKIP_TOOLCHAIN_BOOTSTRAP=true in the environment. In that case
+     only the presence of the Python executable is checked in the toolchain location.
   '''
 
   toolchain_root = os.environ.get("IMPALA_TOOLCHAIN")
@@ -201,7 +205,8 @@ def download_toolchain_python():
         "Impala environment not set up correctly, make sure $IMPALA_TOOLCHAIN is set.")
 
   package = ToolchainPackage("python")
-  package.download()
+  if not (os.environ.get(SKIP_TOOLCHAIN_BOOTSTRAP) == 'true'):
+    package.download()
   python_cmd = os.path.join(package.pkg_directory(), "bin/python")
   if not os.path.exists(python_cmd):
     raise Exception("Unexpected error bootstrapping python from toolchain: {0} does not "
