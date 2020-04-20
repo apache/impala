@@ -758,6 +758,10 @@ under the License.
                     <exclude>org.fusesource.leveldbjni:*</exclude>
                     <!-- IMPALA-9647 (re: CVE-2014-3577, CVE-2015-5262) -->
                     <exclude>org.apache.httpcomponents:fluent-hc</exclude>
+                    <!-- IMPALA-9648: Ensure that netty < v3.10.6 is not present. -->
+                    <exclude>io.netty:netty:[3.10.6,)</exclude>
+                    <!-- IMPALA-9648: Ensure that netty-all < v4.1.46 is not present. -->
+                    <exclude>io.netty:netty-all:[4.1.46,)</exclude>
                     <!-- Assert that we only use artifacts from only the specified
                          version of these components. -->
                     <exclude>org.apache.hadoop:*</exclude>
@@ -1380,6 +1384,40 @@ under the License.
         <artifactId>javax.el</artifactId>
         <version>3.0.1-b08</version>
       </dependency>
+
+      <!-- IMPALA-9648: Avoid pulling in netty -->
+      <dependency>
+        <groupId>org.apache.hadoop</groupId>
+        <artifactId>hadoop-hdfs</artifactId>
+        <exclusions>
+          <exclusion>
+            <groupId>io.netty</groupId>
+            <artifactId>*</artifactId>
+          </exclusion>
+        </exclusions>
+      </dependency>
+      <dependency>
+        <groupId>org.apache.hadoop</groupId>
+        <artifactId>hadoop-distcp</artifactId>
+        <exclusions>
+          <exclusion>
+            <groupId>io.netty</groupId>
+            <artifactId>*</artifactId>
+          </exclusion>
+        </exclusions>
+      </dependency>
+      <dependency>
+        <groupId>org.apache.hadoop</groupId>
+        <artifactId>hadoop-common</artifactId>
+        <exclusions>
+          <exclusion>
+            <groupId>io.netty</groupId>
+            <artifactId>*</artifactId>
+          </exclusion>
+        </exclusions>
+      </dependency>
+      <!-- end IMPALA-9648 -->
+
     </dependencies>
   </dependencyManagement>
 </project>
