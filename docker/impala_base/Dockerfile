@@ -14,8 +14,8 @@
 # KIND, either express or implied.  See the License for the
 # specific language governing permissions and limitations
 # under the License.
-
-FROM ubuntu:16.04
+ARG BASE_IMAGE=ubuntu:16.04
+FROM ${BASE_IMAGE}
 
 # Install minimal dependencies required for Impala services to run.
 # liblzo2-2 may be needed by the Impala-lzo plugin, which is used in tests.
