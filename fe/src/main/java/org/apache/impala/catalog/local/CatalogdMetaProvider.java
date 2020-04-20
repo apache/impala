@@ -34,6 +34,9 @@ import java.util.concurrent.atomic.AtomicInteger;
 import java.util.concurrent.atomic.AtomicLong;
 import java.util.concurrent.atomic.AtomicReference;
 
+import com.google.common.collect.ImmutableCollection;
+import com.google.common.collect.ImmutableMap;
+import org.apache.commons.lang3.StringUtils;
 import org.apache.hadoop.hive.metastore.api.ColumnStatisticsObj;
 import org.apache.hadoop.hive.metastore.api.Database;
 import org.apache.hadoop.hive.metastore.api.MetaException;
@@ -60,8 +63,10 @@ import org.apache.impala.common.InternalException;
 import org.apache.impala.common.Pair;
 import org.apache.impala.service.FeSupport;
 import org.apache.impala.service.FrontendProfile;
+import org.apache.impala.service.MetadataOp;
 import org.apache.impala.thrift.CatalogLookupStatus;
 import org.apache.impala.thrift.TBackendGflags;
+import org.apache.impala.thrift.TBriefTableMeta;
 import org.apache.impala.thrift.TCatalogInfoSelector;
 import org.apache.impala.thrift.TCatalogObject;
 import org.apache.impala.thrift.TCatalogObjectType;
@@ -108,6 +113,8 @@ import com.google.common.util.concurrent.UncheckedExecutionException;
 import com.google.common.util.concurrent.Uninterruptibles;
 import com.google.errorprone.annotations.Immutable;
 import com.google.errorprone.annotations.concurrent.GuardedBy;
+
+import static org.apache.impala.service.MetadataOp.TABLE_COMMENT_KEY;
 
 /**
  * MetaProvider which fetches metadata in a granular fashion from the catalogd.
@@ -204,7 +211,7 @@ public class CatalogdMetaProvider implements MetaProvider {
   private static final String CATALOG_FETCH_PREFIX = "CatalogFetch";
   private static final String DB_LIST_STATS_CATEGORY = "DatabaseList";
   private static final String DB_METADATA_STATS_CATEGORY = "Databases";
-  private static final String TABLE_NAMES_STATS_CATEGORY = "TableNames";
+  private static final String TABLE_LIST_STATS_CATEGORY = "TableList";
   private static final String TABLE_METADATA_CACHE_CATEGORY = "Tables";
   private static final String PARTITION_LIST_STATS_CATEGORY = "PartitionLists";
   private static final String PARTITIONS_STATS_CATEGORY = "Partitions";
@@ -446,7 +453,7 @@ public class CatalogdMetaProvider implements MetaProvider {
     // around invalidation (IMPALA-7534). Namely, we have the following interleaving to
     // worry about:
     //
-    //  Thread 1: loadTableNames() misses and sends a request to fetch table names
+    //  Thread 1: loadTableList() misses and sends a request to fetch table names
     //  Catalogd: sends a response with table list ['foo']
     //  Thread 2:    creates a table 'bar'
     //  Catalogd:    returns an invalidation for the table name list
@@ -638,22 +645,28 @@ public class CatalogdMetaProvider implements MetaProvider {
   }
 
   @Override
-  public ImmutableList<String> loadTableNames(final String dbName)
+  public ImmutableCollection<TBriefTableMeta> loadTableList(final String dbName)
       throws MetaException, UnknownDBException, TException {
-    return loadWithCaching("table names for database " + dbName,
-        TABLE_NAMES_STATS_CATEGORY,
-        new DbCacheKey(dbName.toLowerCase(), DbCacheKey.DbInfoType.TABLE_NAMES),
-        new Callable<ImmutableList<String>>() {
+    ImmutableMap<String, TBriefTableMeta> res = loadWithCaching(
+        "table list of database " + dbName, TABLE_LIST_STATS_CATEGORY,
+        new DbCacheKey(dbName.toLowerCase(), DbCacheKey.DbInfoType.TABLE_LIST),
+        new Callable<ImmutableMap<String, TBriefTableMeta>>() {
           @Override
-          public ImmutableList<String> call() throws Exception {
+          public ImmutableMap<String, TBriefTableMeta> call() throws Exception {
             TGetPartialCatalogObjectRequest req = newReqForDb(dbName);
-            req.db_info_selector.want_table_names = true;
+            req.db_info_selector.want_brief_meta_of_tables = true;
             TGetPartialCatalogObjectResponse resp = sendRequest(req);
-            checkResponse(resp.db_info != null && resp.db_info.table_names != null,
+            checkResponse(
+                resp.db_info != null && resp.db_info.brief_meta_of_tables != null,
                 req, "missing expected table names");
-            return ImmutableList.copyOf(resp.db_info.table_names);
+            ImmutableMap.Builder<String, TBriefTableMeta> map = ImmutableMap.builder();
+            for (TBriefTableMeta meta : resp.db_info.brief_meta_of_tables) {
+              map.put(meta.getName(), meta);
+            }
+            return map.build();
           }
       });
+    return res.values();
   }
 
   private TGetPartialCatalogObjectRequest newReqForTable(String dbName,
@@ -708,7 +721,51 @@ public class CatalogdMetaProvider implements MetaProvider {
                 resp.table_info.valid_write_ids);
            }
       });
+    // The table list is populated based on tables in a given Db in catalogd. If a table
+    // is not loaded at the time in catalogd, we assume that the table type is "TABLE" and
+    // comment is empty (See MetadataOp.getTableType and MetadataOp.getTableComment()).
+    // However, after issuing this load request, if we find that our assumption was
+    // incorrect, we need to invalidate the table list immediately. The table list gets
+    // invalidated automatically when we receive the catalog topic-update but until then,
+    // all the getTables calls will show incorrect table type and comment for this table.
+    // TODO: consider removing this after IMPALA-9670.
+    invalidateStaleTableList(dbName.toLowerCase(), ref);
     return Pair.create(ref.msTable_, (TableMetaRef)ref);
+  }
+
+  /**
+   * Invalidate table list of the given DB if it's loaded and it contains stale
+   * type/comment comparing to the newly loaded msTable.
+   */
+  private void invalidateStaleTableList(final String dbName,
+      final TableMetaRefImpl latestMeta) {
+    Preconditions.checkNotNull(latestMeta.msTable_, "loaded table should have a msTable");
+    DbCacheKey dbKey = new DbCacheKey(dbName, DbCacheKey.DbInfoType.TABLE_LIST);
+    Object dbValue = cache_.getIfPresent(dbKey);
+    if (dbValue instanceof ImmutableMap) {
+      TBriefTableMeta cachedMeta = ((ImmutableMap<String, TBriefTableMeta>) dbValue).get(
+          latestMeta.tableName_);
+      String latestComment = latestMeta.msTable_.getParameters().get(TABLE_COMMENT_KEY);
+      boolean hasStaleComment = !StringUtils.equals(latestComment, cachedMeta.comment);
+      // It's possible that the cached type is null (due to previously unloaded) and the
+      // latest msType we get is a table type (e.g. MANAGED_TABLE, EXTERNAL_TABLE).
+      // This is the most usual case and we don't consider the cached type is stale since
+      // they have the same result after applying MetadataOp.getImpalaTableType().
+      boolean hasStaleType = !StringUtils.equals(
+          MetadataOp.getImpalaTableType(cachedMeta.msType),
+          MetadataOp.getImpalaTableType(latestMeta.msTable_.getTableType()));
+      if (hasStaleType || hasStaleComment) {
+        List<String> invalidated = new ArrayList<>();
+        invalidateCacheForDb(dbName, ImmutableList.of(DbCacheKey.DbInfoType.TABLE_LIST),
+            invalidated);
+        if (!invalidated.isEmpty()) {
+          Preconditions.checkState(invalidated.size() == 1);
+          LOG.debug("Invalidated stale {} after loading table {}: hasStaleType={}, " +
+                  "hasStaleComment={}",
+              invalidated.get(0), latestMeta.tableName_, hasStaleType, hasStaleComment);
+        }
+      }
+    }
   }
 
   @Override
@@ -1238,7 +1295,7 @@ public class CatalogdMetaProvider implements MetaProvider {
       // DB, so we'll be coarse-grained here and invalidate the DB table list when
       // any table change happens. It's relatively cheap to re-fetch this.
       invalidateCacheForDb(obj.table.db_name,
-          ImmutableList.of(DbCacheKey.DbInfoType.TABLE_NAMES),
+          ImmutableList.of(DbCacheKey.DbInfoType.TABLE_LIST),
           invalidated);
       break;
     case FUNCTION:
@@ -1262,7 +1319,7 @@ public class CatalogdMetaProvider implements MetaProvider {
         invalidated.add("list of database names");
       }
       invalidateCacheForDb(obj.db.db_name, ImmutableList.of(
-          DbCacheKey.DbInfoType.TABLE_NAMES,
+          DbCacheKey.DbInfoType.TABLE_LIST,
           DbCacheKey.DbInfoType.HMS_METADATA,
           DbCacheKey.DbInfoType.FUNCTION_NAMES), invalidated);
       break;
@@ -1596,8 +1653,8 @@ public class CatalogdMetaProvider implements MetaProvider {
     static enum DbInfoType {
       /** Cache the HMS Database object */
       HMS_METADATA,
-      /** Cache an ImmutableList<String> for table names within the DB */
-      TABLE_NAMES,
+      /** Cache an ImmutableList<BriefTableMeta> for table names within the DB */
+      TABLE_LIST,
       /** Cache an ImmutableList<String> for function names within the DB */
       FUNCTION_NAMES
     }

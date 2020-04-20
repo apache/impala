@@ -32,6 +32,7 @@ import org.apache.impala.analysis.KuduPartitionParam;
 import org.apache.impala.catalog.events.InFlightEvents;
 import org.apache.impala.common.ImpalaException;
 import org.apache.impala.common.ImpalaRuntimeException;
+import org.apache.impala.thrift.TBriefTableMeta;
 import org.apache.impala.thrift.TCatalogObject;
 import org.apache.impala.thrift.TCatalogObjectType;
 import org.apache.impala.thrift.TDatabase;
@@ -52,6 +53,8 @@ import org.slf4j.LoggerFactory;
 import com.google.common.base.Preconditions;
 import com.google.common.collect.ImmutableList;
 import com.google.common.collect.Lists;
+
+import static org.apache.impala.service.MetadataOp.TABLE_COMMENT_KEY;
 
 /**
  * Internal representation of db-related metadata. Owned by Catalog instance.
@@ -480,8 +483,19 @@ public class Db extends CatalogObjectImpl implements FeDb {
       // instead to avoid this copy.
       resp.db_info.hms_database = getMetaStoreDb().deepCopy();
     }
-    if (selector.want_table_names) {
-      resp.db_info.table_names = getAllTableNames();
+    if (selector.want_brief_meta_of_tables) {
+      List<TBriefTableMeta> briefTableMetaList = Lists.newArrayListWithCapacity(
+          tableCache_.keySet().size());
+      for (Table tbl : tableCache_.getValues()) {
+        TBriefTableMeta meta = new TBriefTableMeta(tbl.getName());
+        org.apache.hadoop.hive.metastore.api.Table msTbl = tbl.getMetaStoreTable();
+        if (msTbl != null) {
+          meta.setMsType(msTbl.getTableType());
+          meta.setComment(msTbl.getParameters().get(TABLE_COMMENT_KEY));
+        }
+        briefTableMetaList.add(meta);
+      }
+      resp.db_info.brief_meta_of_tables = briefTableMetaList;
     }
     if (selector.want_function_names) {
       resp.db_info.function_names = ImmutableList.copyOf(functions_.keySet());

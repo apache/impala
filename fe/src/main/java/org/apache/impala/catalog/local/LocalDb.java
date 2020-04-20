@@ -35,6 +35,7 @@ import org.apache.impala.catalog.FeTable;
 import org.apache.impala.catalog.Function;
 import org.apache.impala.catalog.Function.CompareMode;
 import org.apache.impala.catalog.TableLoadingException;
+import org.apache.impala.thrift.TBriefTableMeta;
 import org.apache.impala.thrift.TDatabase;
 import org.apache.impala.thrift.TFunctionCategory;
 import org.apache.impala.util.FunctionUtils;
@@ -165,9 +166,9 @@ class LocalDb implements FeDb {
     if (tables_ != null) return;
     Map<String, FeTable> newMap = new HashMap<>();
     try {
-      List<String> names = catalog_.getMetaProvider().loadTableNames(name_);
-      for (String tableName : names) {
-        newMap.put(tableName.toLowerCase(), new LocalIncompleteTable(this, tableName));
+      MetaProvider metaProvider = catalog_.getMetaProvider();
+      for (TBriefTableMeta meta : metaProvider.loadTableList(name_)) {
+        newMap.put(meta.getName(), new LocalIncompleteTable(this, meta));
       }
     } catch (TException e) {
       throw new LocalCatalogException(String.format(

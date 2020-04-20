@@ -25,6 +25,7 @@ import java.util.Set;
 
 import org.apache.hadoop.hive.metastore.api.SQLForeignKey;
 import org.apache.hadoop.hive.metastore.api.SQLPrimaryKey;
+import org.apache.hadoop.hive.metastore.api.Table;
 import org.apache.hive.service.rpc.thrift.TGetCrossReferenceReq;
 import org.apache.hive.service.rpc.thrift.TGetPrimaryKeysReq;
 import org.apache.impala.analysis.StmtMetadataLoader;
@@ -44,6 +45,7 @@ import org.apache.impala.catalog.ScalarType;
 import org.apache.impala.catalog.StructType;
 import org.apache.impala.catalog.Type;
 import org.apache.impala.catalog.local.InconsistentMetadataFetchException;
+import org.apache.impala.catalog.local.LocalIncompleteTable;
 import org.apache.impala.common.ImpalaException;
 import org.apache.impala.compat.MetastoreShim;
 import org.apache.impala.thrift.TColumn;
@@ -60,6 +62,8 @@ import org.slf4j.LoggerFactory;
 import com.google.common.base.Strings;
 import com.google.common.collect.Lists;
 
+import javax.annotation.Nullable;
+
 /**
  * Metadata operation. It contains static methods to execute HiveServer2 metadata
  * operations and return the results, result schema and an unique request id in
@@ -73,6 +77,7 @@ public class MetadataOp {
   private static final TColumnValue EMPTY_COL_VAL = createTColumnValue("");
   public static final String TABLE_TYPE_TABLE = "TABLE";
   public static final String TABLE_TYPE_VIEW = "VIEW";
+  public static final String TABLE_COMMENT_KEY = "comment";
 
   // Result set schema for each of the metadata operations.
   private final static TResultSetMetadata GET_CATALOGS_MD = new TResultSetMetadata();
@@ -374,23 +379,16 @@ public class MetadataOp {
             continue;
           }
 
-          String comment = null;
+          String comment = getTableComment(table);
+          String tableType = getTableType(table);
           List<Column> columns = Lists.newArrayList();
           List<SQLPrimaryKey> primaryKeys = Lists.newArrayList();
           List<SQLForeignKey> foreignKeys = Lists.newArrayList();
           // If the table is not yet loaded, the columns will be unknown. Add it
           // to the set of missing tables.
-          String tableType = TABLE_TYPE_TABLE;
           if (!table.isLoaded() || table instanceof FeIncompleteTable) {
             result.missingTbls.add(new TableName(db.getName(), tabName));
           } else {
-            if (table.getMetaStoreTable() != null) {
-              comment = table.getMetaStoreTable().getParameters().get("comment");
-              String tableTypeStr = table.getMetaStoreTable().getTableType() == null ?
-                  null : table.getMetaStoreTable().getTableType().toUpperCase();
-              tableType = MetastoreShim.HMS_TO_IMPALA_TYPE
-                  .getOrDefault(tableTypeStr, TABLE_TYPE_TABLE);
-            }
             columns.addAll(fe.getColumns(table, columnPatternMatcher, user));
             if (columnPatternMatcher != PatternMatcher.MATCHER_MATCH_NONE) {
               // It is unnecessary to populate pk/fk information if the request does not
@@ -416,6 +414,35 @@ public class MetadataOp {
       }
     }
     return result;
+  }
+
+  public static String getTableType(FeTable table) {
+    String msTableType;
+    if (table instanceof LocalIncompleteTable) {
+      // LocalIncompleteTable doesn't have a msTable object but it contains the HMS table
+      // type if the table is loaded in catalogd.
+      msTableType = ((LocalIncompleteTable) table).getMsTableType();
+    } else {
+      Table msTbl = table.getMetaStoreTable();
+      msTableType = (msTbl == null || msTbl.getTableType() == null) ?
+          null : msTbl.getTableType().toUpperCase();
+    }
+    return getImpalaTableType(msTableType);
+  }
+
+  public static String getImpalaTableType(@Nullable String msTableType) {
+    return MetastoreShim.HMS_TO_IMPALA_TYPE.getOrDefault(msTableType, TABLE_TYPE_TABLE);
+  }
+
+  @Nullable
+  public static String getTableComment(FeTable table) {
+    if (table instanceof LocalIncompleteTable) {
+      // LocalIncompleteTable doesn't have a msTable object but it contains the comment
+      // if the table is loaded in catalogd.
+      return ((LocalIncompleteTable) table).getTableComment();
+    }
+    Table msTbl = table.getMetaStoreTable();
+    return msTbl == null ? null : msTbl.getParameters().get(TABLE_COMMENT_KEY);
   }
 
   /**

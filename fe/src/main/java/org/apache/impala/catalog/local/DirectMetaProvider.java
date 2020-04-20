@@ -34,7 +34,7 @@ import org.apache.hadoop.hive.metastore.api.NoSuchObjectException;
 import org.apache.hadoop.hive.metastore.api.Partition;
 import org.apache.hadoop.hive.metastore.api.PrimaryKeysRequest;
 import org.apache.hadoop.hive.metastore.api.Table;
-import org.apache.hadoop.hive.metastore.api.UnknownDBException;
+import org.apache.hadoop.hive.metastore.api.TableMeta;
 import org.apache.impala.authorization.AuthorizationPolicy;
 import org.apache.impala.catalog.FileMetadataLoader;
 import org.apache.impala.catalog.Function;
@@ -46,6 +46,7 @@ import org.apache.impala.common.Pair;
 import org.apache.impala.compat.MetastoreShim;
 import org.apache.impala.service.BackendConfig;
 import org.apache.impala.thrift.TBackendGflags;
+import org.apache.impala.thrift.TBriefTableMeta;
 import org.apache.impala.thrift.TNetworkAddress;
 import org.apache.impala.thrift.TValidWriteIdList;
 import org.apache.impala.util.ListMap;
@@ -53,6 +54,7 @@ import org.apache.impala.util.MetaStoreUtil;
 import org.apache.thrift.TException;
 
 import com.google.common.base.Preconditions;
+import com.google.common.collect.ImmutableCollection;
 import com.google.common.collect.ImmutableList;
 import com.google.common.collect.ImmutableMap;
 import com.google.common.collect.ImmutableSet;
@@ -112,10 +114,19 @@ class DirectMetaProvider implements MetaProvider {
   }
 
   @Override
-  public ImmutableList<String> loadTableNames(String dbName)
-      throws MetaException, UnknownDBException, TException {
+  public ImmutableCollection<TBriefTableMeta> loadTableList(String dbName)
+      throws TException {
     try (MetaStoreClient c = msClientPool_.getClient()) {
-      return ImmutableList.copyOf(c.getHiveClient().getAllTables(dbName));
+      List<TableMeta> tableMetaList = c.getHiveClient().getTableMeta(dbName,
+          /*tablePatterns=*/null, /*tableTypes=*/null);
+      ImmutableList.Builder<TBriefTableMeta> ret = ImmutableList.builder();
+      for (TableMeta meta : tableMetaList) {
+        TBriefTableMeta briefMeta = new TBriefTableMeta(meta.getTableName());
+        briefMeta.setMsType(meta.getTableType());
+        briefMeta.setComment(meta.getComments());
+        ret.add(briefMeta);
+      }
+      return ret.build();
     }
   }
 

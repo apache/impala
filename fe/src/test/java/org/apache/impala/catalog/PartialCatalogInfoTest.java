@@ -39,6 +39,7 @@ import org.apache.impala.common.InternalException;
 import org.apache.impala.service.BackendConfig;
 import org.apache.impala.testutil.CatalogServiceTestCatalog;
 import org.apache.impala.thrift.CatalogLookupStatus;
+import org.apache.impala.thrift.TBriefTableMeta;
 import org.apache.impala.thrift.TCatalogInfoSelector;
 import org.apache.impala.thrift.TCatalogObject;
 import org.apache.impala.thrift.TCatalogObjectType;
@@ -131,11 +132,12 @@ public class PartialCatalogInfoTest {
     req.object_desc.db = new TDatabase("functional");
     req.db_info_selector = new TDbInfoSelector();
     req.db_info_selector.want_hms_database = true;
-    req.db_info_selector.want_table_names = true;
+    req.db_info_selector.want_brief_meta_of_tables = true;
     TGetPartialCatalogObjectResponse resp = sendRequest(req);
     assertTrue(resp.isSetObject_version_number());
     assertEquals(resp.db_info.hms_database.getName(), "functional");
-    assertTrue(resp.db_info.table_names.contains("alltypes"));
+    assertTrue(resp.db_info.brief_meta_of_tables.stream().map(TBriefTableMeta::getName)
+        .anyMatch("alltypes"::equals));
   }
 
   @Test
