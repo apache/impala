@@ -124,6 +124,7 @@ class TestInsertQueries(ImpalaTestSuite):
   def setup_class(cls):
     super(TestInsertQueries, cls).setup_class()
 
+  @UniqueDatabase.parametrize(sync_ddl=True)
   # Erasure coding doesn't respect memory limit
   @SkipIfEC.fix_later
   # ABFS partition names cannot end in periods
@@ -158,6 +159,7 @@ class TestInsertQueries(ImpalaTestSuite):
     self.run_test_case('QueryTest/acid-insert-fail', vector, unique_database,
         multiple_impalad=vector.get_value('exec_option')['sync_ddl'] == 1)
 
+  @UniqueDatabase.parametrize(sync_ddl=True)
   @pytest.mark.execute_serially
   @SkipIfNotHdfsMinicluster.tuned_for_minicluster
   def test_insert_mem_limit(self, vector, unique_database):
@@ -174,11 +176,13 @@ class TestInsertQueries(ImpalaTestSuite):
     for v in verifiers:
       v.wait_for_metric("impala-server.num-fragments-in-flight", 0, timeout=180)
 
+  @UniqueDatabase.parametrize(sync_ddl=True)
   @SkipIfS3.eventually_consistent
   def test_insert_overwrite(self, vector, unique_database):
     self.run_test_case('QueryTest/insert_overwrite', vector, unique_database,
         multiple_impalad=vector.get_value('exec_option')['sync_ddl'] == 1)
 
+  @UniqueDatabase.parametrize(sync_ddl=True)
   def test_insert_bad_expr(self, vector, unique_database):
     # The test currently relies on codegen being disabled to trigger an error in
     # the output expression of the table sink.
