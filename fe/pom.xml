@@ -142,6 +142,11 @@ under the License.
       <version>${hudi.version}</version>
         <exclusions>
           <exclusion>
+            <!-- IMPALA-9647 (re: CVE-2014-3577, CVE-2015-5262) -->
+            <groupId>org.apache.httpcomponents</groupId>
+            <artifactId>fluent-hc</artifactId>
+          </exclusion>
+          <exclusion>
             <groupId>org.apache.parquet</groupId>
             <artifactId>parquet-avro</artifactId>
           </exclusion>
@@ -751,6 +756,8 @@ under the License.
                     <exclude>org.apache.logging.log4j:log4j-1.2-api</exclude>
                     <!-- IMPALA-9108: Avoid pulling in leveldbjni, which is unneeded. -->
                     <exclude>org.fusesource.leveldbjni:*</exclude>
+                    <!-- IMPALA-9647 (re: CVE-2014-3577, CVE-2015-5262) -->
+                    <exclude>org.apache.httpcomponents:fluent-hc</exclude>
                     <!-- Assert that we only use artifacts from only the specified
                          version of these components. -->
                     <exclude>org.apache.hadoop:*</exclude>
