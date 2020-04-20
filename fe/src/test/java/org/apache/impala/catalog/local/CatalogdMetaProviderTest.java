@@ -41,11 +41,10 @@ import org.apache.impala.service.FeSupport;
 import org.apache.impala.service.FrontendProfile;
 import org.apache.impala.testutil.TestUtils;
 import org.apache.impala.thrift.TBackendGflags;
+import org.apache.impala.thrift.TBriefTableMeta;
 import org.apache.impala.thrift.TCatalogObject;
 import org.apache.impala.thrift.TCatalogObjectType;
 import org.apache.impala.thrift.TDatabase;
-import org.apache.impala.thrift.TFunction;
-import org.apache.impala.thrift.TFunctionName;
 import org.apache.impala.thrift.TNetworkAddress;
 import org.apache.impala.thrift.TRuntimeProfileNode;
 import org.apache.impala.thrift.TTable;
@@ -57,6 +56,7 @@ import org.slf4j.LoggerFactory;
 
 import com.google.common.base.Stopwatch;
 import com.google.common.cache.CacheStats;
+import com.google.common.collect.ImmutableCollection;
 import com.google.common.collect.ImmutableList;
 
 public class CatalogdMetaProviderTest {
@@ -185,16 +185,18 @@ public class CatalogdMetaProviderTest {
     CacheStats stats = diffStats();
     assertEquals(1, stats.missCount());
 
-    // ... and the table names for it.
-    ImmutableList<String> tableNames = provider_.loadTableNames("functional");
+    // ... and the table list for it.
+    ImmutableCollection<TBriefTableMeta> tableList = provider_.loadTableList(
+        "functional");
     stats = diffStats();
     assertEquals(1, stats.missCount());
 
     // Load them again, should hit cache.
     Database dbHit = provider_.loadDb("functional");
     assertEquals(db, dbHit);
-    ImmutableList<String> tableNamesHit = provider_.loadTableNames("functional");
-    assertEquals(tableNames, tableNamesHit);
+    ImmutableCollection<TBriefTableMeta> tableListHit = provider_.loadTableList(
+        "functional");
+    assertEquals(tableList, tableListHit);
 
     stats = diffStats();
     assertEquals(2, stats.hitCount());
@@ -208,8 +210,9 @@ public class CatalogdMetaProviderTest {
     // Load another time, should miss cache.
     Database dbMiss = provider_.loadDb("functional");
     assertEquals(db, dbMiss);
-    ImmutableList<String> tableNamesMiss = provider_.loadTableNames("functional");
-    assertEquals(tableNames, tableNamesMiss);
+    ImmutableCollection<TBriefTableMeta> tableListMiss = provider_.loadTableList(
+        "functional");
+    assertEquals(tableList, tableListMiss);
     stats = diffStats();
     assertEquals(0, stats.hitCount());
     assertEquals(2, stats.missCount());
@@ -222,6 +225,16 @@ public class CatalogdMetaProviderTest {
     provider_.loadTable("functional", "alltypes");
     CacheStats stats = diffStats();
     assertEquals(1, stats.hitCount());
+    assertEquals(1, stats.missCount());   // missing the table list
+
+    // Load the table list then load the table again.
+    provider_.loadTableList("functional");
+    stats = diffStats();
+    assertEquals(0, stats.hitCount());
+    assertEquals(1, stats.missCount());
+    provider_.loadTable("functional", "alltypes");
+    stats = diffStats();
+    assertEquals(2, stats.hitCount());    // hit the table and the table list
     assertEquals(0, stats.missCount());
 
     // Invalidate it.
@@ -233,7 +246,7 @@ public class CatalogdMetaProviderTest {
     provider_.loadTable("functional", "alltypes");
     stats = diffStats();
     assertEquals(0, stats.hitCount());
-    assertEquals(1, stats.missCount());
+    assertEquals(2, stats.missCount());   // miss the table and the table list
   }
 
   @Test
@@ -356,7 +369,7 @@ public class CatalogdMetaProviderTest {
     // should get a cache hit since dbName,tblName should be treated as case-insensitive
     stats = diffStats();
     assertEquals(1, stats.hitCount());
-    assertEquals(0, stats.missCount());
+    assertEquals(1, stats.missCount());   // missing the table list
 
     // Invalidate it.
     TCatalogObject obj = new TCatalogObject(TCatalogObjectType.TABLE, 0);
@@ -367,7 +380,7 @@ public class CatalogdMetaProviderTest {
     provider_.loadTable(dbName, tblName);
     stats = diffStats();
     assertEquals(0, stats.hitCount());
-    assertEquals(1, stats.missCount());
+    assertEquals(2, stats.missCount());   // missing the table and the table list
   }
 
   private void testInvalidateDb(String dbName) throws Exception {

@@ -18,20 +18,31 @@ package org.apache.impala.catalog.local;
 
 import org.apache.impala.catalog.FeIncompleteTable;
 import org.apache.impala.common.ImpalaException;
+import org.apache.impala.thrift.TBriefTableMeta;
 import org.apache.impala.thrift.TTableDescriptor;
 
+import javax.annotation.Nullable;
 import java.util.Set;
 
 /**
- * FeTable implementation which represents an unloaded table in the LocalCatalog
- * implementation. This is used so operations that don't require the whole table meta,
- * like GetTables HiveServer2 operation, can get a quick response.
+ * FeTable implementation which represents a table with its brief metadata required by
+ * operations like GetTables HiveServer2 op that don't require the whole table meta.
  */
 public class LocalIncompleteTable extends LocalTable implements FeIncompleteTable {
+  // These are null if the table is unloaded in catalogd.
+  @Nullable
+  private final String msTableType;
+  @Nullable
+  private final String tableComment;
 
-  public LocalIncompleteTable(LocalDb db, String tblName) {
-    super(db, tblName);
+  public LocalIncompleteTable(LocalDb db, TBriefTableMeta tableMeta) {
+    super(db, tableMeta.getName());
+    msTableType = tableMeta.getMsType();
+    tableComment = tableMeta.getComment();
   }
+
+  public String getMsTableType() { return msTableType; }
+  public String getTableComment() { return tableComment; }
 
   @Override
   public ImpalaException getCause() { return null; }

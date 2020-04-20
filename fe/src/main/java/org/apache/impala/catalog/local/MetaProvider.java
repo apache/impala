@@ -32,11 +32,13 @@ import org.apache.impala.catalog.Function;
 import org.apache.impala.catalog.HdfsPartition.FileDescriptor;
 import org.apache.impala.catalog.SqlConstraints;
 import org.apache.impala.common.Pair;
+import org.apache.impala.thrift.TBriefTableMeta;
 import org.apache.impala.thrift.TNetworkAddress;
 import org.apache.impala.thrift.TValidWriteIdList;
 import org.apache.impala.util.ListMap;
 import org.apache.thrift.TException;
 
+import com.google.common.collect.ImmutableCollection;
 import com.google.common.collect.ImmutableList;
 import com.google.errorprone.annotations.Immutable;
 
@@ -63,7 +65,7 @@ public interface MetaProvider {
 
   Database loadDb(String dbName) throws TException;
 
-  ImmutableList<String> loadTableNames(String dbName)
+  ImmutableCollection<TBriefTableMeta> loadTableList(String dbName)
       throws MetaException, UnknownDBException, TException;
 
   Pair<Table, TableMetaRef> loadTable(String dbName, String tableName)

@@ -389,13 +389,25 @@ struct TPartialTableInfo {
   9: optional CatalogObjects.TValidWriteIdList valid_write_ids;
 }
 
+struct TBriefTableMeta {
+  // Name of the table
+  1: required string name
+
+  // HMS table type of the table: EXTERNAL_TABLE, MANAGED_TABLE, VIRTUAL_VIEW, etc.
+  // Unset if the table is unloaded.
+  2: optional string msType
+
+  // Comment(remark) of the table. Unset if the table is unloaded.
+  3: optional string comment
+}
+
 // Selector for partial information about a Database.
 struct TDbInfoSelector {
   // The response should include the HMS Database object.
   1: bool want_hms_database
 
-  // The response should include the list of table names in the DB.
-  2: bool want_table_names
+  // The response should include TBriefTableMeta of tables in the DB.
+  2: bool want_brief_meta_of_tables
 
   // The response should include the list of function names in the DB.
   3: bool want_function_names
@@ -404,7 +416,7 @@ struct TDbInfoSelector {
 // Returned information about a Database, as selected by TDbInfoSelector.
 struct TPartialDbInfo {
   1: optional hive_metastore.Database hms_database
-  2: optional list<string> table_names
+  2: optional list<TBriefTableMeta> brief_meta_of_tables
   3: optional list<string> function_names
 }
 

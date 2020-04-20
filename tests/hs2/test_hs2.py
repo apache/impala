@@ -447,43 +447,64 @@ class TestHS2(HS2TestSuite):
     """Basic test for the GetTables() HS2 method. Needs to execute serially because
     the test depends on controlling whether a table is loaded or not and other
     concurrent tests loading or invalidating tables could interfere with it."""
-    table = "__hs2_column_comments_test"
+    table = "__hs2_table_comment_test"
+    view = "__hs2_view_comment_test"
     self.execute_query("use {0}".format(unique_database))
     self.execute_query("drop table if exists {0}".format(table))
+    self.execute_query("drop view if exists {0}".format(view))
     self.execute_query("""
         create table {0} (a int comment 'column comment')
         comment 'table comment'""".format(table))
+    self.execute_query("""
+        create view {0} comment 'view comment' as select * from {1}
+        """.format(view, table))
     try:
       req = TCLIService.TGetTablesReq()
       req.sessionHandle = self.session_handle
       req.schemaName = unique_database
-      req.tableName = table
 
-      # Execute the request twice, the first time with the table unloaded and the second
-      # with it loaded.
+      # Execute the request twice, the first time with the table/view unloaded and the
+      # second with them loaded.
       self.execute_query("invalidate metadata {0}".format(table))
+      self.execute_query("invalidate metadata {0}".format(view))
       for i in range(2):
         get_tables_resp = self.hs2_client.GetTables(req)
         TestHS2.check_response(get_tables_resp)
 
         fetch_results_resp = self._fetch_results(get_tables_resp.operationHandle, 100)
         results = fetch_results_resp.results
-        table_cat = results.columns[0].stringVal.values[0]
-        table_schema = results.columns[1].stringVal.values[0]
-        table_name = results.columns[2].stringVal.values[0]
-        table_type = results.columns[3].stringVal.values[0]
-        table_remarks = results.columns[4].stringVal.values[0]
-        assert table_cat == ''
-        assert table_schema == unique_database
-        assert table_name == table
-        assert table_type == "TABLE"
-        if i == 0:
-          assert table_remarks == ""
-        else:
-          if not cluster_properties.is_catalog_v2_cluster():
-            assert table_remarks == "table comment"
-        # Ensure the table is loaded for the second iteration.
+        # The returned results should only contain metadata for the table and the view.
+        # Note that results are in columnar format so we get #rows by the length of the
+        # first column.
+        assert len(results.columns[0].stringVal.values) == 2
+        for row_idx in range(2):
+          table_cat = results.columns[0].stringVal.values[row_idx]
+          table_schema = results.columns[1].stringVal.values[row_idx]
+          table_name = results.columns[2].stringVal.values[row_idx]
+          table_type = results.columns[3].stringVal.values[row_idx]
+          table_remarks = results.columns[4].stringVal.values[row_idx]
+          assert table_cat == ''
+          assert table_schema == unique_database
+          if i == 0:
+            # In the first iteration the table and view are unloaded, so their types are
+            # in the default value (TABLE) and their comments are empty.
+            assert table_name in (table, view)
+            assert table_type == "TABLE"
+            assert table_remarks == ""
+          else:
+            # In the second iteration the table and view are loaded. They should be shown
+            # with correct types and comments. Verify types and comments based on table
+            # names so we don't care the order in which the table/view are returned.
+            if table_name == table:
+              assert table_type == "TABLE"
+              assert table_remarks == "table comment"
+            else:
+              assert table_name == view
+              assert table_type == "VIEW"
+              assert table_remarks == "view comment"
+        # Ensure the table and view are loaded for the second iteration.
         self.execute_query("describe {0}".format(table))
+        self.execute_query("describe {0}".format(view))
 
       # Test that session secret is validated by this API.
       invalid_req = TCLIService.TGetTablesReq()
