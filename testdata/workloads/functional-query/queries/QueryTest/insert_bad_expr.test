@@ -1,6 +1,6 @@
 ====
 ---- QUERY
-create table insert_overwrite_nopart like functional.insert_overwrite_nopart;
+create table insert_overwrite_nopart like $ORIGINAL_DB.insert_overwrite_nopart;
 ====
 ---- QUERY
 # This test is run with codegen disabled. Interpretation only handles up to 20 arguments.

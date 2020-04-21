@@ -1,9 +1,9 @@
 ====
 ---- QUERY
-create table alltypesinsert like functional.alltypesinsert;
-create table alltypesnopart_insert like functional.alltypesnopart_insert;
-create table insert_string_partitioned like functional.insert_string_partitioned;
-create table table_with_header_insert like functional.table_with_header_insert;
+create table alltypesinsert like $ORIGINAL_DB.alltypesinsert;
+create table alltypesnopart_insert like $ORIGINAL_DB.alltypesnopart_insert;
+create table insert_string_partitioned like $ORIGINAL_DB.insert_string_partitioned;
+create table table_with_header_insert like $ORIGINAL_DB.table_with_header_insert;
 ====
 ---- QUERY
 # insert overwrite unpartitioned table
