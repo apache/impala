@@ -18,8 +18,8 @@
 # under the License.
 
 # This script automates setup of distcc servers on Ubuntu and CentOS. It has been tested
-# on Ubuntu 14.04 and 16.04 and CentOS 6 and 7. See bin/distcc/README.md for manual setup
-# instructions and background.
+# on Ubuntu 14.04, 16.04 and 18.04 and CentOS 6 and 7. See bin/distcc/README.md for manual
+# setup instructions and background.
 #
 # Usage:
 # ------
@@ -60,8 +60,8 @@ ALLOWED_NETS=$1
 LSB_ID=$(lsb_release -is)
 LSB_VERSION=$(lsb_release -rs)
 if [[ "$LSB_ID" == Ubuntu ]]; then
-  if ! [[ $LSB_VERSION == 14.04 || $LSB_VERSION == 16.04 ]]; then
-    echo "This script only supports Ubuntu 14.04 and 16.04" >&2
+  if ! [[ $LSB_VERSION == 14.04 || $LSB_VERSION == 16.04 || $LSB_VERSION == 18.04 ]]; then
+    echo "This script only supports Ubuntu 14.04, 16.04 and 18.04" >&2
     exit 1
   fi
   LINUX_FLAVOUR=ubuntu
