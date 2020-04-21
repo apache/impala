@@ -36,8 +36,8 @@ fi
 LSB_ID=$(lsb_release -is)
 LSB_VERSION=$(lsb_release -rs)
 if [[ "$LSB_ID" == Ubuntu ]]; then
-  if ! [[ $LSB_VERSION == 16.04 ]]; then
-    echo "This script only supports Ubuntu 16.04" >&2
+  if ! [[ $LSB_VERSION == 16.04 || $LSB_VERSION == 18.04 ]]; then
+    echo "This script only supports Ubuntu 16.04 and 18.04" >&2
     exit 1
   fi
 fi
