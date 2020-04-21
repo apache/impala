@@ -121,7 +121,7 @@ public class LdapImpalaShellTest {
       protocol = String.format(protocolTemplate, protocol);
       validCommand[1] = protocol;
       RunShellCommand.Run(validCommand, /*shouldSucceed*/ true, TEST_USER_1,
-          "Starting Impala Shell using LDAP-based authentication");
+          "Starting Impala Shell with LDAP-based authentication");
       invalidCommand[1] = protocol;
       RunShellCommand.Run(
           invalidCommand, /*shouldSucceed*/ false, "", "Not connected to Impala");

@@ -1838,7 +1838,7 @@ def impala_shell_main():
           "mechanism (-l)", file=sys.stderr)
     raise FatalShellException()
 
-  start_msg = "Starting Impala"
+  start_msg = "Starting Impala Shell"
 
   py_version_msg = "using Python {0}.{1}.{2}".format(
     sys.version_info.major, sys.version_info.minor, sys.version_info.micro)
