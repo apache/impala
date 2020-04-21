@@ -1,11 +1,11 @@
 ====
 ---- QUERY
-create table insert_overwrite_nopart like functional.insert_overwrite_nopart;
-create table insert_overwrite_partitioned like functional.insert_overwrite_partitioned;
+create table insert_overwrite_nopart like $ORIGINAL_DB.insert_overwrite_nopart;
+create table insert_overwrite_partitioned like $ORIGINAL_DB.insert_overwrite_partitioned;
 ====
 ---- QUERY
 # insert overwrite into unpartitioned table
-insert overwrite table insert_overwrite_nopart 
+insert overwrite table insert_overwrite_nopart
 select int_col
 from functional.tinyinttable
 ---- RESULTS
@@ -13,9 +13,9 @@ from functional.tinyinttable
 ====
 ---- QUERY
 # Check results - note larger limit than expected in case there's more data written than there should be
-select col1 
-from insert_overwrite_nopart 
-order by col1 
+select col1
+from insert_overwrite_nopart
+order by col1
 limit 20
 ---- TYPES
 int
@@ -41,9 +41,9 @@ from functional.tinyinttable
 ====
 ---- QUERY
 # check results from previous insert
-select col1 
-from insert_overwrite_nopart 
-order by col1 
+select col1
+from insert_overwrite_nopart
+order by col1
 limit 20
 ---- TYPES
 int
@@ -113,9 +113,9 @@ col2=6/: 10
 ====
 ---- QUERY
 # Check results of previous insert
-select col1, col2 from 
-insert_overwrite_partitioned 
-order by col2, col1 
+select col1, col2 from
+insert_overwrite_partitioned
+order by col2, col1
 limit 30
 ---- TYPES
 int,int
@@ -181,7 +181,7 @@ int,int
 # Dynamic partitions
 insert overwrite table insert_overwrite_partitioned
 partition(col2)
-select int_col, int_col 
+select int_col, int_col
 from functional.tinyinttable
 ---- RESULTS
 col2=0/: 1

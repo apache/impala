@@ -79,6 +79,7 @@ class TestInsertQueries(ImpalaTestSuite):
             (v.get_value('table_format').file_format == 'parquet' and \
             v.get_value('compression_codec') == 'none'))
 
+  @pytest.mark.execute_serially
   def test_insert_large_string(self, vector, unique_database):
     """Test handling of large strings in inserter and scanner."""
     if "-Xcheck:jni" in os.environ.get("LIBHDFS_OPTS", ""):
@@ -134,7 +135,9 @@ class TestInsertQueries(ImpalaTestSuite):
       vector.get_value('exec_option')['COMPRESSION_CODEC'] = \
           vector.get_value('compression_codec')
     self.run_test_case('QueryTest/insert', vector, unique_database,
-        multiple_impalad=vector.get_value('exec_option')['sync_ddl'] == 1)
+        multiple_impalad=vector.get_value('exec_option')['sync_ddl'] == 1,
+        test_file_vars={'$ORIGINAL_DB': ImpalaTestSuite
+        .get_db_name_from_format(vector.get_value('table_format'))})
 
   @SkipIfHive2.acid
   @UniqueDatabase.parametrize(sync_ddl=True)
@@ -167,7 +170,9 @@ class TestInsertQueries(ImpalaTestSuite):
       vector.get_value('exec_option')['COMPRESSION_CODEC'] = \
           vector.get_value('compression_codec')
     self.run_test_case('QueryTest/insert-mem-limit', vector, unique_database,
-        multiple_impalad=vector.get_value('exec_option')['sync_ddl'] == 1)
+        multiple_impalad=vector.get_value('exec_option')['sync_ddl'] == 1,
+        test_file_vars={'$ORIGINAL_DB': ImpalaTestSuite
+        .get_db_name_from_format(vector.get_value('table_format'))})
     # IMPALA-7023: These queries can linger and use up memory, causing subsequent
     # tests to hit memory limits. Wait for some time to allow the query to
     # be reclaimed.
@@ -180,7 +185,9 @@ class TestInsertQueries(ImpalaTestSuite):
   @SkipIfS3.eventually_consistent
   def test_insert_overwrite(self, vector, unique_database):
     self.run_test_case('QueryTest/insert_overwrite', vector, unique_database,
-        multiple_impalad=vector.get_value('exec_option')['sync_ddl'] == 1)
+        multiple_impalad=vector.get_value('exec_option')['sync_ddl'] == 1,
+        test_file_vars={'$ORIGINAL_DB': ImpalaTestSuite
+        .get_db_name_from_format(vector.get_value('table_format'))})
 
   @UniqueDatabase.parametrize(sync_ddl=True)
   def test_insert_bad_expr(self, vector, unique_database):
@@ -188,7 +195,9 @@ class TestInsertQueries(ImpalaTestSuite):
     # the output expression of the table sink.
     if vector.get_value('exec_option')['disable_codegen']:
       self.run_test_case('QueryTest/insert_bad_expr', vector, unique_database,
-          multiple_impalad=vector.get_value('exec_option')['sync_ddl'] == 1)
+          multiple_impalad=vector.get_value('exec_option')['sync_ddl'] == 1,
+          test_file_vars={'$ORIGINAL_DB': ImpalaTestSuite
+          .get_db_name_from_format(vector.get_value('table_format'))})
 
   @UniqueDatabase.parametrize(sync_ddl=True)
   def test_insert_random_partition(self, vector, unique_database):
@@ -307,7 +316,9 @@ class TestInsertNullQueries(ImpalaTestSuite):
     super(TestInsertNullQueries, cls).setup_class()
 
   def test_insert_null(self, vector, unique_database):
-    self.run_test_case('QueryTest/insert_null', vector, unique_database)
+    self.run_test_case('QueryTest/insert_null', vector, unique_database,
+        test_file_vars={'$ORIGINAL_DB': ImpalaTestSuite
+        .get_db_name_from_format(vector.get_value('table_format'))})
 
 
 class TestInsertFileExtension(ImpalaTestSuite):

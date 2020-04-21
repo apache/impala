@@ -14,8 +14,8 @@ CREATE EXTERNAL TABLE nullinsert_alt(
 )
 row format delimited fields terminated by '|'
 LOCATION '$FILESYSTEM_PREFIX/test-warehouse/$DATABASE.db/nullinsert';
-create table alltypesinsert like functional.alltypesinsert;
-create table nullformat_custom like functional.nullformat_custom;
+create table alltypesinsert like $ORIGINAL_DB.alltypesinsert;
+create table nullformat_custom like $ORIGINAL_DB.nullformat_custom;
 ====
 ---- QUERY
 # Test that we properly write null values to text tables.

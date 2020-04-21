@@ -1,6 +1,6 @@
 ====
 ---- QUERY
-create table alltypesinsert like functional.alltypesinsert;
+create table alltypesinsert like $ORIGINAL_DB.alltypesinsert;
 ====
 ---- QUERY
 # Check that hdfs writers respects mem_limit. mem_limit is tuned for a 3-node HDFS

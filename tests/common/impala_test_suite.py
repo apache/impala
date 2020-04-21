@@ -764,6 +764,10 @@ class ImpalaTestSuite(BaseTestSuite):
             return lineage
     return ""
 
+  @staticmethod
+  def get_db_name_from_format(table_format, scale_factor=''):
+    return QueryTestSectionReader.get_db_name(table_format, scale_factor)
+
   @classmethod
   def change_database(cls, impala_client, table_format=None,
       db_name=None, scale_factor=None):
