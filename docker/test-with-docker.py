@@ -257,7 +257,10 @@ def _compute_defaults():
   parallel_test_concurrency = min(cpus, 8)
   memlimit_gb = 8
 
-  if total_memory_gb >= 95:
+  if total_memory_gb >= 140:
+    suite_concurrency = 6
+    memlimit_gb = 11
+  elif total_memory_gb >= 95:
     suite_concurrency = 4
     memlimit_gb = 11
     parallel_test_concurrency = min(cpus, 12)
@@ -356,8 +359,8 @@ DEFAULT_SUITES = [
     ee_test_serial,
     ee_test_parallel,
     cluster_test,
-    Suite("BE_TEST"),
     Suite("FE_TEST"),
+    Suite("BE_TEST"),
     Suite("JDBC_TEST")
 ]
 
