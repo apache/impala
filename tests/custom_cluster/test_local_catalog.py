@@ -26,6 +26,7 @@ import time
 from multiprocessing.pool import ThreadPool
 
 from tests.common.custom_cluster_test_suite import CustomClusterTestSuite
+from tests.common.skip import SkipIfHive2
 from tests.util.filesystem_utils import WAREHOUSE
 
 RETRY_PROFILE_MSG = 'Retried query planning due to inconsistent metadata'
@@ -454,3 +455,17 @@ class TestObservability(CustomClusterTestSuite):
           cache_request_count_prev_run = cache_request_count
     finally:
       client.close()
+
+
+class TestFullAcid(CustomClusterTestSuite):
+  @SkipIfHive2.acid
+  @pytest.mark.execute_serially
+  @CustomClusterTestSuite.with_args(
+    impalad_args="--use_local_catalog=true",
+    catalogd_args="--catalog_topic_mode=minimal")
+  def test_full_acid_support(self):
+    """IMPALA-9685: canary test for full acid support in local catalog"""
+    self.execute_query("show create table functional_orc_def.alltypestiny")
+    res = self.execute_query("select id from functional_orc_def.alltypestiny")
+    res.data.sort()
+    assert res.data == ['0', '1', '2', '3', '4', '5', '6', '7']

@@ -43,13 +43,13 @@ import org.apache.impala.catalog.local.MetaProvider.TableMetaRef;
 import org.apache.impala.common.Pair;
 import org.apache.impala.thrift.TCatalogObjectType;
 import org.apache.impala.thrift.TTableStats;
+import org.apache.impala.util.AcidUtils;
 import org.apache.log4j.Logger;
 import org.apache.thrift.TException;
 
 import com.google.common.base.Preconditions;
 import com.google.common.collect.ImmutableList;
 import com.google.common.collect.ImmutableMap;
-import com.google.common.collect.Iterables;
 import com.google.common.collect.Lists;
 
 /**
@@ -296,6 +296,7 @@ abstract class LocalTable implements FeTable {
     private final ImmutableMap<String, Column> colsByName_;
 
     private final int numClusteringCols_;
+    private final boolean hasRowIdCol_;
 
     public static ColumnMap fromMsTable(Table msTbl) {
       final String fullName = msTbl.getDbName() + "." + msTbl.getTableName();
@@ -306,18 +307,18 @@ abstract class LocalTable implements FeTable {
       // then all other columns.
       List<Column> cols;
       try {
-        cols = FeCatalogUtils.fieldSchemasToColumns(
-            Iterables.concat(msTbl.getPartitionKeys(),
-                             msTbl.getSd().getCols()),
-            msTbl.getTableName());
-        return new ColumnMap(cols, numClusteringCols, fullName);
+        boolean isFullAcidTable = AcidUtils.isFullAcidTable(msTbl.getParameters());
+        cols = FeCatalogUtils.fieldSchemasToColumns(msTbl.getPartitionKeys(),
+            msTbl.getSd().getCols(), msTbl.getTableName(), isFullAcidTable);
+        return new ColumnMap(cols, numClusteringCols, fullName, isFullAcidTable);
       } catch (TableLoadingException e) {
         throw new LocalCatalogException(e);
       }
     }
 
     public ColumnMap(List<Column> cols, int numClusteringCols,
-        String fullTableName) {
+        String fullTableName, boolean isFullAcidSchema) {
+      hasRowIdCol_ = isFullAcidSchema;
       this.colsByPos_ = ImmutableList.copyOf(cols);
       this.numClusteringCols_ = numClusteringCols;
       colsByName_ = indexColumnNames(colsByPos_);
@@ -347,7 +348,8 @@ abstract class LocalTable implements FeTable {
 
 
     public List<Column> getNonClusteringColumns() {
-      return colsByPos_.subList(numClusteringCols_, colsByPos_.size());
+      return colsByPos_.subList(numClusteringCols_ + (hasRowIdCol_ ? 1 : 0),
+          colsByPos_.size());
     }
 
     public List<Column> getClusteringColumns() {

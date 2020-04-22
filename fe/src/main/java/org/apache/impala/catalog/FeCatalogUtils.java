@@ -45,6 +45,7 @@ import org.apache.impala.thrift.TColumnDescriptor;
 import org.apache.impala.thrift.TGetCatalogMetricsResult;
 import org.apache.impala.thrift.THdfsPartition;
 import org.apache.impala.thrift.TTableStats;
+import org.apache.impala.util.AcidUtils;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -95,11 +96,15 @@ public abstract class FeCatalogUtils {
    * @throws TableLoadingException if any type is invalid
    */
   public static ImmutableList<Column> fieldSchemasToColumns(
-      Iterable<FieldSchema> fieldSchemas,
-      String tableName) throws TableLoadingException {
+      List<FieldSchema> partCols, List<FieldSchema> nonPartCols,
+      String tableName, boolean isFullAcidTable) throws TableLoadingException {
     int pos = 0;
     ImmutableList.Builder<Column> ret = ImmutableList.builder();
-    for (FieldSchema s : fieldSchemas) {
+    for (FieldSchema s : Iterables.concat(partCols, nonPartCols)) {
+      if (isFullAcidTable && pos == partCols.size()) {
+        ret.add(AcidUtils.getRowIdColumnType(pos));
+        ++pos;
+      }
       Type type = parseColumnType(s, tableName);
       ret.add(new Column(s.getName(), type, s.getComment(), pos));
       ++pos;

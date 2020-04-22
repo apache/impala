@@ -504,13 +504,7 @@ public class HdfsTable extends Table implements FeFsTable {
    */
   private void addColumnsForFullAcidTable(List<FieldSchema> fieldSchemas)
       throws TableLoadingException {
-    StructType row__id = new StructType();
-    row__id.addField(new StructField("operation", ScalarType.INT, ""));
-    row__id.addField(new StructField("originaltransaction", ScalarType.BIGINT, ""));
-    row__id.addField(new StructField("bucket", ScalarType.INT, ""));
-    row__id.addField(new StructField("rowid", ScalarType.BIGINT, ""));
-    row__id.addField(new StructField("currenttransaction", ScalarType.BIGINT, ""));
-    addColumn(new Column("row__id", row__id, "", colsByPos_.size()));
+    addColumn(AcidUtils.getRowIdColumnType(colsByPos_.size()));
     addColumnsFromFieldSchemas(fieldSchemas);
   }
 

@@ -84,7 +84,8 @@ public class LocalKuduTable extends LocalTable implements FeKuduTable {
 
     List<KuduPartitionParam> partitionBy = Utils.loadPartitionByParams(kuduTable);
 
-    ColumnMap cmap = new ColumnMap(cols, /*numClusteringCols=*/0, fullTableName);
+    ColumnMap cmap = new ColumnMap(cols, /*numClusteringCols=*/0, fullTableName,
+        /*isFullAcidSchema=*/false);
     return new LocalKuduTable(db, msTable, ref, cmap, pkNames, partitionBy);
   }
 
@@ -106,7 +107,8 @@ public class LocalKuduTable extends LocalTable implements FeKuduTable {
       pkNames.add(pkColDef.getColName());
     }
 
-    ColumnMap cmap = new ColumnMap(columns, /*numClusteringCols=*/0, fullTableName);
+    ColumnMap cmap = new ColumnMap(columns, /*numClusteringCols=*/0, fullTableName,
+        /*isFullAcidSchema=*/false);
 
     return new LocalKuduTable(db, msTable, /*ref=*/null, cmap, pkNames,
         kuduPartitionParams);
