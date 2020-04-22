@@ -57,7 +57,7 @@ public class LocalHbaseTable extends LocalTable implements FeHBaseTable {
       // since we don't support composite hbase rowkeys yet, all hbase tables have a
       // single clustering col
       ColumnMap cmap = new ColumnMap(Util.loadColumns(msTable), 1,
-          msTable.getDbName() + "." + msTable.getTableName());
+          msTable.getDbName() + "." + msTable.getTableName(), /*isFullAcidSchema=*/false);
       return new LocalHbaseTable(db, msTable, ref, cmap);
     } catch (IOException | MetaException | SerDeException e) {
       throw new LocalCatalogException(e);

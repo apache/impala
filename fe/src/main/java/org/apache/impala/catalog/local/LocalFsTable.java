@@ -59,6 +59,7 @@ import org.apache.impala.thrift.TNetworkAddress;
 import org.apache.impala.thrift.TResultSet;
 import org.apache.impala.thrift.TTableDescriptor;
 import org.apache.impala.thrift.TTableType;
+import org.apache.impala.util.AcidUtils;
 import org.apache.impala.util.AvroSchemaConverter;
 import org.apache.impala.util.AvroSchemaUtils;
 import org.apache.impala.util.ListMap;
@@ -318,6 +319,9 @@ public class LocalFsTable extends LocalTable implements FeFsTable {
       // referenced partitions are Avro, even if the table is mixed-format.
       hdfsTable.setAvroSchema(AvroSchemaConverter.convertFieldSchemas(
           getMetaStoreTable().getSd().getCols(), getFullName()).toString());
+    }
+    if (AcidUtils.isFullAcidTable(getMetaStoreTable().getParameters())) {
+      hdfsTable.setIs_full_acid(true);
     }
 
     TTableDescriptor tableDesc = new TTableDescriptor(tableId, TTableType.HDFS_TABLE,

@@ -25,7 +25,11 @@ import org.apache.hadoop.fs.Path;
 import org.apache.hadoop.hive.common.ValidTxnList;
 import org.apache.hadoop.hive.common.ValidWriteIdList;
 import org.apache.hadoop.hive.metastore.api.MetaException;
+import org.apache.impala.catalog.Column;
 import org.apache.impala.catalog.FileMetadataLoader.LoadStats;
+import org.apache.impala.catalog.ScalarType;
+import org.apache.impala.catalog.StructField;
+import org.apache.impala.catalog.StructType;
 import org.apache.impala.common.FileSystemUtil;
 import org.apache.impala.thrift.TQueryOptions;
 import org.apache.impala.thrift.TTransactionalType;
@@ -119,6 +123,16 @@ public class AcidUtils {
 
   public static boolean isFullAcidTable(Map<String, String> props) {
     return isTransactionalTable(props) && !isInsertOnlyTable(props);
+  }
+
+  public static Column getRowIdColumnType(int position) {
+    StructType row__id = new StructType();
+    row__id.addField(new StructField("operation", ScalarType.INT, ""));
+    row__id.addField(new StructField("originaltransaction", ScalarType.BIGINT, ""));
+    row__id.addField(new StructField("bucket", ScalarType.INT, ""));
+    row__id.addField(new StructField("rowid", ScalarType.BIGINT, ""));
+    row__id.addField(new StructField("currenttransaction", ScalarType.BIGINT, ""));
+    return new Column("row__id", row__id, "", position);
   }
 
   // Sets transaction related table properties for new tables based on manually
