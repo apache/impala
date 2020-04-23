@@ -95,6 +95,7 @@ import org.apache.impala.thrift.TTableName;
 import org.apache.impala.thrift.TUpdateCatalogCacheRequest;
 import org.apache.impala.thrift.TUpdateExecutorMembershipRequest;
 import org.apache.impala.util.AuthorizationUtil;
+import org.apache.impala.util.ExecutorMembershipSnapshot;
 import org.apache.impala.util.GlogAppender;
 import org.apache.impala.util.PatternMatcher;
 import org.apache.impala.util.TSessionStateUtil;
@@ -134,11 +135,16 @@ public class JniFrontend {
 
     GlogAppender.Install(TLogLevel.values()[cfg.impala_log_lvl],
         TLogLevel.values()[cfg.non_impala_java_vlog]);
-
-    final AuthorizationFactory authzFactory =
-        AuthorizationUtil.authzFactoryFrom(BackendConfig.INSTANCE);
     LOG.info(JniUtil.getJavaVersion());
-    frontend_ = new Frontend(authzFactory);
+
+    if (cfg.is_coordinator) {
+      final AuthorizationFactory authzFactory =
+          AuthorizationUtil.authzFactoryFrom(BackendConfig.INSTANCE);
+      frontend_ = new Frontend(authzFactory);
+    } else {
+      // Avoid instantiating Frontend in executor only impalads.
+      frontend_ = null;
+    }
   }
 
   /**
@@ -147,6 +153,7 @@ public class JniFrontend {
    */
   public byte[] createExecRequest(byte[] thriftQueryContext)
       throws ImpalaException {
+    Preconditions.checkNotNull(frontend_);
     TQueryCtx queryCtx = new TQueryCtx();
     JniUtil.deserializeThrift(protocolFactory_, queryCtx, thriftQueryContext);
 
@@ -168,6 +175,7 @@ public class JniFrontend {
 
   // Deserialize and merge each thrift catalog update into a single merged update
   public byte[] updateCatalogCache(byte[] req) throws ImpalaException, TException {
+    Preconditions.checkNotNull(frontend_);
     TUpdateCatalogCacheRequest request = new TUpdateCatalogCacheRequest();
     JniUtil.deserializeThrift(protocolFactory_, request, req);
     return new TSerializer(protocolFactory_).serialize(
@@ -182,7 +190,7 @@ public class JniFrontend {
       throws ImpalaException {
     TUpdateExecutorMembershipRequest req = new TUpdateExecutorMembershipRequest();
     JniUtil.deserializeThrift(protocolFactory_, req, thriftMembershipUpdate);
-    frontend_.updateExecutorMembership(req);
+    ExecutorMembershipSnapshot.update(req);
   }
 
   /**
@@ -193,6 +201,7 @@ public class JniFrontend {
    */
   public byte[] loadTableData(byte[] thriftLoadTableDataParams)
       throws ImpalaException, IOException {
+    Preconditions.checkNotNull(frontend_);
     TLoadDataReq request = new TLoadDataReq();
     JniUtil.deserializeThrift(protocolFactory_, request, thriftLoadTableDataParams);
     TLoadDataResp response = frontend_.loadTableData(request);
@@ -209,6 +218,7 @@ public class JniFrontend {
    * This call is thread-safe.
    */
   public String getExplainPlan(byte[] thriftQueryContext) throws ImpalaException {
+    Preconditions.checkNotNull(frontend_);
     TQueryCtx queryCtx = new TQueryCtx();
     JniUtil.deserializeThrift(protocolFactory_, queryCtx, thriftQueryContext);
     String plan = frontend_.getExplainString(queryCtx);
@@ -217,6 +227,7 @@ public class JniFrontend {
   }
 
   public byte[] getCatalogMetrics() throws ImpalaException {
+    Preconditions.checkNotNull(frontend_);
     TGetCatalogMetricsResult metrics = frontend_.getCatalogMetrics();
     TSerializer serializer = new TSerializer(protocolFactory_);
     try {
@@ -240,6 +251,7 @@ public class JniFrontend {
    * @see Frontend#getTableNames
    */
   public byte[] getTableNames(byte[] thriftGetTablesParams) throws ImpalaException {
+    Preconditions.checkNotNull(frontend_);
     TGetTablesParams params = new TGetTablesParams();
     JniUtil.deserializeThrift(protocolFactory_, params, thriftGetTablesParams);
     // If the session was not set it indicates this is an internal Impala call.
@@ -269,6 +281,7 @@ public class JniFrontend {
    * @see Frontend#getTableFiles
    */
   public byte[] getTableFiles(byte[] thriftShowFilesParams) throws ImpalaException {
+    Preconditions.checkNotNull(frontend_);
     TShowFilesParams params = new TShowFilesParams();
     JniUtil.deserializeThrift(protocolFactory_, params, thriftShowFilesParams);
     TResultSet result = frontend_.getTableFiles(params);
@@ -291,6 +304,7 @@ public class JniFrontend {
    * @see Frontend#getDbs
    */
   public byte[] getDbs(byte[] thriftGetTablesParams) throws ImpalaException {
+    Preconditions.checkNotNull(frontend_);
     TGetDbsParams params = new TGetDbsParams();
     JniUtil.deserializeThrift(protocolFactory_, params, thriftGetTablesParams);
     // If the session was not set it indicates this is an internal Impala call.
@@ -318,6 +332,7 @@ public class JniFrontend {
    * @see Frontend#getDataSrcs
    */
   public byte[] getDataSrcMetadata(byte[] thriftParams) throws ImpalaException {
+    Preconditions.checkNotNull(frontend_);
     TGetDataSrcsParams params = new TGetDataSrcsParams();
     JniUtil.deserializeThrift(protocolFactory_, params, thriftParams);
 
@@ -342,6 +357,7 @@ public class JniFrontend {
   }
 
   public byte[] getStats(byte[] thriftShowStatsParams) throws ImpalaException {
+    Preconditions.checkNotNull(frontend_);
     TShowStatsParams params = new TShowStatsParams();
     JniUtil.deserializeThrift(protocolFactory_, params, thriftShowStatsParams);
     Preconditions.checkState(params.isSetTable_name());
@@ -369,6 +385,7 @@ public class JniFrontend {
    * @see Frontend#getTableNames
    */
   public byte[] getFunctions(byte[] thriftGetFunctionsParams) throws ImpalaException {
+    Preconditions.checkNotNull(frontend_);
     TGetFunctionsParams params = new TGetFunctionsParams();
     JniUtil.deserializeThrift(protocolFactory_, params, thriftGetFunctionsParams);
 
@@ -402,6 +419,7 @@ public class JniFrontend {
    */
   public byte[] getCatalogObject(byte[] thriftParams) throws ImpalaException,
       TException {
+    Preconditions.checkNotNull(frontend_);
     TCatalogObject objectDescription = new TCatalogObject();
     JniUtil.deserializeThrift(protocolFactory_, objectDescription, thriftParams);
     TSerializer serializer = new TSerializer(protocolFactory_);
@@ -416,6 +434,7 @@ public class JniFrontend {
    * @see Frontend#describeDb
    */
   public byte[] describeDb(byte[] thriftDescribeDbParams) throws ImpalaException {
+    Preconditions.checkNotNull(frontend_);
     TDescribeDbParams params = new TDescribeDbParams();
     JniUtil.deserializeThrift(protocolFactory_, params, thriftDescribeDbParams);
 
@@ -437,6 +456,7 @@ public class JniFrontend {
    * @see Frontend#describeTable
    */
   public byte[] describeTable(byte[] thriftDescribeTableParams) throws ImpalaException {
+    Preconditions.checkNotNull(frontend_);
     TDescribeTableParams params = new TDescribeTableParams();
     JniUtil.deserializeThrift(protocolFactory_, params, thriftDescribeTableParams);
 
@@ -464,6 +484,7 @@ public class JniFrontend {
    */
   public String showCreateTable(byte[] thriftTableName)
       throws ImpalaException {
+    Preconditions.checkNotNull(frontend_);
     TTableName params = new TTableName();
     JniUtil.deserializeThrift(protocolFactory_, params, thriftTableName);
     return ToSqlUtils.getCreateTableSql(frontend_.getCatalog().getTable(
@@ -475,6 +496,7 @@ public class JniFrontend {
    */
   public String showCreateFunction(byte[] thriftShowCreateFunctionParams)
       throws ImpalaException {
+    Preconditions.checkNotNull(frontend_);
     TGetFunctionsParams params = new TGetFunctionsParams();
     JniUtil.deserializeThrift(protocolFactory_, params, thriftShowCreateFunctionParams);
     Preconditions.checkArgument(params.category == TFunctionCategory.SCALAR ||
@@ -506,6 +528,7 @@ public class JniFrontend {
    * Gets all roles.
    */
   public byte[] getRoles(byte[] showRolesParams) throws ImpalaException {
+    Preconditions.checkNotNull(frontend_);
     TShowRolesParams params = new TShowRolesParams();
     JniUtil.deserializeThrift(protocolFactory_, params, showRolesParams);
     TSerializer serializer = new TSerializer(protocolFactory_);
@@ -521,6 +544,7 @@ public class JniFrontend {
    */
   public byte[] getPrincipalPrivileges(byte[] showGrantPrincipalParams)
       throws ImpalaException {
+    Preconditions.checkNotNull(frontend_);
     TShowGrantPrincipalParams params = new TShowGrantPrincipalParams();
     JniUtil.deserializeThrift(protocolFactory_, params, showGrantPrincipalParams);
     TSerializer serializer = new TSerializer(protocolFactory_);
@@ -536,6 +560,7 @@ public class JniFrontend {
    */
   public byte[] execHiveServer2MetadataOp(byte[] metadataOpsParams)
       throws ImpalaException {
+    Preconditions.checkNotNull(frontend_);
     TMetadataOpRequest params = new TMetadataOpRequest();
     JniUtil.deserializeThrift(protocolFactory_, params, metadataOpsParams);
     TResultSet result = frontend_.execHiveServer2MetadataOp(params);
@@ -549,10 +574,14 @@ public class JniFrontend {
   }
 
   public void setCatalogIsReady() {
+    Preconditions.checkNotNull(frontend_);
     frontend_.getCatalog().setIsReady(true);
   }
 
-  public void waitForCatalog() { frontend_.waitForCatalog(); }
+  public void waitForCatalog() {
+    Preconditions.checkNotNull(frontend_);
+    frontend_.waitForCatalog();
+  }
 
   // Caching this saves ~50ms per call to getHadoopConfigAsHtml
   private static final Configuration CONF = new Configuration();
@@ -629,6 +658,7 @@ public class JniFrontend {
    * @param serializedRequest
    */
   public void callQueryCompleteHooks(byte[] serializedRequest) throws ImpalaException {
+    Preconditions.checkNotNull(frontend_);
     final TQueryCompleteContext request = new TQueryCompleteContext();
     JniUtil.deserializeThrift(protocolFactory_, request, serializedRequest);
 
@@ -643,6 +673,7 @@ public class JniFrontend {
    * @throws TransactionException
    */
   public void abortTransaction(long transactionId) throws TransactionException {
+    Preconditions.checkNotNull(frontend_);
     this.frontend_.abortTransaction(transactionId);
   }
 
@@ -651,6 +682,7 @@ public class JniFrontend {
    * @param transactionId the id of the transaction to clear.
    */
   public void unregisterTransaction(long transactionId) {
+    Preconditions.checkNotNull(frontend_);
     this.frontend_.unregisterTransaction(transactionId);
   }
 

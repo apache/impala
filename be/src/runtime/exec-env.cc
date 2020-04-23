@@ -284,6 +284,7 @@ ExecEnv::ExecEnv(int backend_port, int krpc_port,
   cluster_membership_mgr_.reset(new ClusterMembershipMgr(
       PrintId(backend_id_), statestore_subscriber_.get(), metrics_.get()));
 
+  // TODO: Consider removing AdmissionController from executor only impalads.
   admission_controller_.reset(
       new AdmissionController(cluster_membership_mgr_.get(), statestore_subscriber_.get(),
           request_pool_service_.get(), metrics_.get(), configured_backend_address_));
@@ -430,10 +431,12 @@ Status ExecEnv::Init() {
   }
 
   RETURN_IF_ERROR(cluster_membership_mgr_->Init());
-  cluster_membership_mgr_->RegisterUpdateCallbackFn(
-      [this](ClusterMembershipMgr::SnapshotPtr snapshot) {
-        SendClusterMembershipToFrontend(snapshot, this->frontend());
-      });
+  if (FLAGS_is_coordinator) {
+    cluster_membership_mgr_->RegisterUpdateCallbackFn(
+        [this](ClusterMembershipMgr::SnapshotPtr snapshot) {
+          SendClusterMembershipToFrontend(snapshot, this->frontend());
+        });
+  }
 
   RETURN_IF_ERROR(admission_controller_->Init());
 
