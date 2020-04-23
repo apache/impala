@@ -372,13 +372,6 @@ public class Frontend {
   }
 
   /**
-   * Update the cluster membership snapshot with the latest snapshot from the backend.
-   */
-  public void updateExecutorMembership(TUpdateExecutorMembershipRequest req) {
-    ExecutorMembershipSnapshot.update(req);
-  }
-
-  /**
    * Constructs a TCatalogOpRequest and attaches it, plus any metadata, to the
    * result argument.
    */

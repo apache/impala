@@ -24,6 +24,8 @@ import time
 from subprocess import check_call
 from tests.util.filesystem_utils import get_fs_path
 from tests.common.custom_cluster_test_suite import CustomClusterTestSuite
+from tests.common.skip import (SkipIf, SkipIfS3, SkipIfABFS, SkipIfADLS,
+    SkipIfIsilon, SkipIfLocal)
 
 LOG = logging.getLogger('test_coordinators')
 LOG.setLevel(level=logging.DEBUG)
@@ -310,3 +312,19 @@ class TestCoordinators(CustomClusterTestSuite):
                          "functional.alltypes b on a.id = b.id;")
     num_hosts = "hosts=10 instances=10"
     assert num_hosts in str(ret)
+
+  @SkipIfS3.hbase
+  @SkipIfABFS.hbase
+  @SkipIfADLS.hbase
+  @SkipIfIsilon.hbase
+  @SkipIfLocal.hbase
+  @SkipIf.skip_hbase
+  @pytest.mark.execute_serially
+  def test_executor_only_hbase(self):
+    """Verifies HBase tables can be scanned by executor only impalads."""
+    self._start_impala_cluster([], cluster_size=3, num_coordinators=1,
+                         use_exclusive_coordinators=True)
+    client = self.cluster.impalads[0].service.create_beeswax_client()
+    query = "select count(*) from functional_hbase.alltypes"
+    result = self.execute_query_expect_success(client, query)
+    assert result.data == ['7300']
