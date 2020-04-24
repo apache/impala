@@ -46,7 +46,6 @@ import org.apache.impala.common.ImpalaException;
 import org.apache.impala.common.InternalException;
 import org.apache.impala.common.RuntimeEnv;
 import org.apache.impala.testutil.TestSentryGroupMapper;
-import org.apache.impala.testutil.TestSentryResourceAuthorizationProvider;
 import org.apache.impala.service.Frontend;
 import org.apache.impala.testutil.ImpaladTestCatalog;
 import org.apache.impala.thrift.TMetadataOpRequest;
@@ -519,79 +518,6 @@ public class AuthorizationTest extends FrontendTestBase {
   }
 
   @Test
-  public void TestShortUsernameWithAuthToLocal() throws ImpalaException {
-    // We load the auth_to_local configs from core-site.xml in the test mode even if
-    // kerberos is disabled. We use the following configuration for tests
-    //   <property>
-    //     <name>hadoop.security.auth_to_local</name>
-    //     <value>RULE:[2:$1@$0](authtest@REALM.COM)s/(.*)@REALM.COM/auth_to_local_user/
-    //       RULE:[1:$1]
-    //       RULE:[2:$1]
-    //       DEFAULT
-    //     </value>
-    //   </property>
-    SentryAuthorizationConfig authzConfig = new SentryAuthorizationConfig("server1",
-       AuthorizationTest.AUTHZ_CONFIG.getSentryConfig().getConfigFile(),
-        TestSentryResourceAuthorizationProvider.class.getName());
-    SentryAuthorizationFactory authzFactory = new SentryAuthorizationFactory(
-        authzConfig);
-    try (ImpaladTestCatalog catalog = new ImpaladTestCatalog(authzFactory)) {
-      setupImpalaCatalog(catalog);
-      // This test relies on the auth_to_local rule -
-      // "RULE:[2:$1@$0](authtest@REALM.COM)s/(.*)@REALM.COM/auth_to_local_user/"
-      // which converts any principal of type authtest/<hostname>@REALM.COM to user
-      // auth_to_local_user. We have a sentry privilege in place that grants 'SELECT'
-      // privilege on tpcds.* to user auth_to_local_user. To test the integration, we try
-      // running the query with authtest/hostname@REALM.COM user which is converted to
-      // user 'auth_to_local_user' and the authz should pass.
-      User.setRulesForTesting(
-          new Configuration().get(HADOOP_SECURITY_AUTH_TO_LOCAL, "DEFAULT"));
-      User user = new User("authtest/hostname@REALM.COM");
-      AnalysisContext ctx = createAnalysisCtx(authzFactory, user.getName());
-      Frontend fe = new Frontend(authzFactory, catalog);
-
-      // Can select from table that user has privileges on.
-      AuthzOk(fe, ctx, "select * from tpcds.customer");
-      // Does not have privileges to execute a query
-      AuthzError(fe, ctx, "select * from functional.alltypes",
-          "User '%s' does not have privileges to execute 'SELECT' on: " +
-              "functional.alltypes");
-
-      // Unit tests for User#getShortName()
-      // Different auth_to_local rules to apply on the username.
-      List<String> rules = Lists.newArrayList(
-          // Expects user@REALM and returns 'usera' (appends a in the end)
-          "RULE:[1:$1@$0](.*@REALM.COM)s/(.*)@REALM.COM/$1a/g",
-          // Same as above but expects user/host@REALM
-          "RULE:[2:$1@$0](.*@REALM.COM)s/(.*)@REALM.COM/$1a/g");
-
-      // Map from the user to the expected getShortName() output after applying
-      // the corresponding rule from 'rules' list.
-      List<Map.Entry<User, String>> users = Lists.newArrayList(
-          Maps.immutableEntry(new User(USER.getName() + "@REALM.COM"), USER.getName()
-              + "a"),
-          Maps.immutableEntry(new User(USER.getName() + "/abc.host.com@REALM.COM"),
-              USER.getName() + "a"));
-
-      for (int idx = 0; idx < users.size(); ++idx) {
-        Map.Entry<User, String> userObj = users.get(idx);
-        assertEquals(userObj.getKey().getShortNameForTesting(rules.get(idx)),
-            userObj.getValue());
-      }
-
-      // Test malformed rules. RuleParser throws an IllegalArgumentException.
-      String malformedRule = "{((()";
-      try {
-        user.getShortNameForTesting(malformedRule);
-      } catch (IllegalArgumentException e) {
-        Assert.assertTrue(e.getMessage().contains("Invalid rule"));
-        return;
-      }
-      Assert.fail("No exception caught while using getShortName() on a malformed rule");
-    }
-  }
-
-  @Test
   public void TestConfigValidation() throws InternalException {
     String sentryConfig = AUTHZ_CONFIG.getSentryConfig().getConfigFile();
     // Valid configs pass validation.
@@ -679,43 +605,6 @@ public class AuthorizationTest extends FrontendTestBase {
     Assert.assertFalse(config.isEnabled());
     config = new SentryAuthorizationConfig(null, null, null);
     Assert.assertFalse(config.isEnabled());
-  }
-
-  @Test
-  public void TestLocalGroupPolicyProvider() throws ImpalaException {
-    // Use an authorization configuration that uses the
-    // CustomClusterResourceAuthorizationProvider.
-    SentryAuthorizationConfig authzConfig = new SentryAuthorizationConfig("server1",
-        AuthorizationTest.AUTHZ_CONFIG.getSentryConfig().getConfigFile(),
-        TestSentryResourceAuthorizationProvider.class.getName());
-    SentryAuthorizationFactory authzFactory = new SentryAuthorizationFactory(authzConfig);
-    try (ImpaladTestCatalog catalog = new ImpaladTestCatalog(authzFactory)) {
-      setupImpalaCatalog(catalog);
-      // Create an analysis context + FE with the test user
-      // (as defined in the policy file)
-      User user = new User("test_user");
-      AnalysisContext ctx = createAnalysisCtx(authzFactory, user.getName());
-      Frontend fe = new Frontend(authzFactory, catalog);
-
-      // Can select from table that user has privileges on.
-      AuthzOk(fe, ctx, "select * from functional.alltypesagg");
-      // Does not have privileges to execute a query
-      AuthzError(fe, ctx, "select * from functional.alltypes",
-          "User '%s' does not have privileges to execute 'SELECT' on: " +
-              "functional.alltypes");
-
-      // Verify with the admin user
-      user = new User("admin_user");
-      ctx = createAnalysisCtx(authzFactory, user.getName());
-      fe = new Frontend(authzFactory, catalog);
-
-      // Admin user should have privileges to do anything
-      AuthzOk(fe, ctx, "select * from functional.alltypesagg");
-      AuthzOk(fe, ctx, "select * from functional.alltypes");
-      AuthzOk(fe, ctx, "invalidate metadata");
-      AuthzOk(fe, ctx, "create external table tpch.kudu_tbl stored as kudu " +
-          "TBLPROPERTIES ('kudu.master_addresses'='127.0.0.1', 'kudu.table_name'='tbl')");
-    }
   }
 
   private void TestWithIncorrectConfig(AuthorizationConfig authzConfig, User user)

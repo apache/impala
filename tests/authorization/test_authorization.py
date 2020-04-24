@@ -98,35 +98,6 @@ class TestAuthorization(CustomClusterTestSuite):
   @pytest.mark.execute_serially
   @CustomClusterTestSuite.with_args(
       impalad_args="--server_name=server1 "
-                   "--sentry_config={0} "
-                   "--authorization_policy_provider_class="
-                   "org.apache.impala.testutil.TestSentryResourceAuthorizationProvider"
-                   .format(SENTRY_CONFIG_FILE),
-      catalogd_args="--sentry_config={0} "
-                    "--authorization_policy_provider_class="
-                    "org.apache.impala.testutil.TestSentryResourceAuthorizationProvider"
-                    .format(SENTRY_CONFIG_FILE),
-      sentry_config=SENTRY_CONFIG_FILE)
-  def test_custom_authorization_provider(self, unique_role):
-    try:
-      self.session_handle = self.__open_hs2(getuser(), dict()).sessionHandle
-      self.__execute_hs2_stmt("create role {0}".format(unique_role))
-      self.__execute_hs2_stmt("grant role {0} to group {1}"
-                              .format(unique_role, grp.getgrnam(getuser()).gr_name))
-      self.__execute_hs2_stmt("grant select on table tpch.lineitem to role {0}"
-                              .format(unique_role))
-
-      bad_resp = self.__execute_hs2_stmt("describe tpch_seq.lineitem", False)
-      assert 'User \'%s\' does not have privileges to access' % getuser() in \
-             str(bad_resp)
-      self.__execute_hs2_stmt("describe tpch.lineitem")
-    finally:
-      self.__execute_hs2_stmt("drop role {0}".format(unique_role))
-
-  @SkipIf.sentry_disabled
-  @pytest.mark.execute_serially
-  @CustomClusterTestSuite.with_args(
-      impalad_args="--server_name=server1 "
                    "--authorized_proxy_user_config=hue={0}".format(getuser()),
       catalogd_args="--sentry_config=" + SENTRY_CONFIG_FILE,
       sentry_config=SENTRY_CONFIG_FILE)
