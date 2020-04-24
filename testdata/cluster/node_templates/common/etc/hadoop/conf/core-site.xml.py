@@ -22,6 +22,7 @@ import sys
 
 kerberize = os.environ.get('IMPALA_KERBERIZE') == 'true'
 target_filesystem = os.environ.get('TARGET_FILESYSTEM')
+use_cdp_components = os.environ.get('USE_CDP_HIVE') == 'true'
 
 compression_codecs = [
   'org.apache.hadoop.io.compress.GzipCodec',
@@ -109,3 +110,10 @@ if kerberize:
     'hadoop.proxyuser.hive.hosts': '*',
     'hadoop.proxyuser.hive.groups': '*',
   })
+
+if use_cdp_components:
+  # Hadoop changed behaviors for S3AFilesystem to check permissions for the bucket
+  # on initialization (see HADOOP-16711). Some frontend tests access non-existent
+  # buckets and rely on the old behavior. This also means that the tests do not
+  # require AWS credentials.
+  CONFIG.update({'fs.s3a.bucket.probe': '1'})
