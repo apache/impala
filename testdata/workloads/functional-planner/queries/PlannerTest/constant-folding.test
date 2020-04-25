@@ -59,14 +59,14 @@ PLAN-ROOT SINK
 |     in pipelines: 00(GETNEXT)
 |
 00:SCAN HDFS [tpch_nested_parquet.customer c]
-   HDFS partitions=1/1 files=4 size=288.99MB
+   HDFS partitions=1/1 files=4 size=289.14MB
    predicates: c_custkey > CAST(10 AS BIGINT), !empty(c.c_orders)
    predicates on o: !empty(o.o_lineitems), o_orderkey = CAST(4 AS BIGINT)
    predicates on o_lineitems: CAST(20 AS BIGINT) + CAST(l_linenumber AS BIGINT) < CAST(0 AS BIGINT)
    stored statistics:
-     table: rows=150.00K size=288.99MB
+     table: rows=150.00K size=289.14MB
      columns missing stats: c_orders
-   extrapolated-rows=disabled max-scan-range-rows=50.12K
+   extrapolated-rows=disabled max-scan-range-rows=50.03K
    parquet statistics predicates: c_custkey > CAST(10 AS BIGINT)
    parquet statistics predicates on o: o_orderkey = CAST(4 AS BIGINT)
    parquet dictionary predicates: c_custkey > CAST(10 AS BIGINT)
@@ -147,7 +147,7 @@ PLAN-ROOT SINK
 |  group by: timestamp_col = TIMESTAMP '2016-11-15 00:00:00'
 |  having: sum(2 + id) <= CAST(10 AS BIGINT), sum(2 + id) > CAST(1 AS BIGINT), sum(2 + id) >= CAST(5 AS BIGINT), CAST(1048576 AS BIGINT) * count(*) % CAST(2 AS BIGINT) = CAST(0 AS BIGINT)
 |  mem-estimate=10.00MB mem-reservation=1.94MB spill-buffer=64.00KB thread-reservation=0
-|  tuple-ids=1 row-size=17B cardinality=0
+|  tuple-ids=1 row-size=17B cardinality=1
 |  in pipelines: 01(GETNEXT), 00(OPEN)
 |
 00:SCAN HDFS [functional.alltypes]
@@ -221,11 +221,12 @@ left outer join functional.alltypes b
 where cast(b.double_col as decimal(3, 2)) > round(1.11 + 2.22 + 3.33 + 4.44, 1)
 ---- PLAN
 Analyzed query: SELECT CAST(1 AS TINYINT) FROM functional.alltypes a LEFT OUTER
-JOIN functional.alltypes b ON (CAST(2 AS BIGINT) + CAST(a.id AS BIGINT) =
+JOIN functional.alltypes b ON CAST(2 AS BIGINT) + CAST(a.id AS BIGINT) =
+CAST(b.id AS BIGINT) - CAST(2 AS BIGINT) OR CAST(a.int_col AS BIGINT) <=
+b.bigint_col + CAST(97 AS BIGINT) AND CAST(2 AS BIGINT) + CAST(a.id AS BIGINT) =
 CAST(b.id AS BIGINT) - CAST(2 AS BIGINT) OR CAST(a.int_col AS BIGINT) >= CAST(0
-AS BIGINT) + b.bigint_col AND CAST(a.int_col AS BIGINT) <= b.bigint_col +
-CAST(97 AS BIGINT)) WHERE CAST(b.double_col AS DECIMAL(3,2)) > CAST(11.1 AS
-DECIMAL(6,1))
+AS BIGINT) + b.bigint_col WHERE CAST(b.double_col AS DECIMAL(3,2)) > CAST(11.1
+AS DECIMAL(6,1))
 F00:PLAN FRAGMENT [UNPARTITIONED] hosts=1 instances=1
 |  Per-Host Resources: mem-estimate=256.01MB mem-reservation=64.00KB thread-reservation=3
 PLAN-ROOT SINK
@@ -233,7 +234,7 @@ PLAN-ROOT SINK
 |  mem-estimate=0B mem-reservation=0B thread-reservation=0
 |
 02:NESTED LOOP JOIN [LEFT OUTER JOIN]
-|  join predicates: (CAST(2 AS BIGINT) + CAST(a.id AS BIGINT) = CAST(b.id AS BIGINT) - CAST(2 AS BIGINT) OR CAST(a.int_col AS BIGINT) >= CAST(0 AS BIGINT) + b.bigint_col AND CAST(a.int_col AS BIGINT) <= b.bigint_col + CAST(97 AS BIGINT))
+|  join predicates: CAST(2 AS BIGINT) + CAST(a.id AS BIGINT) = CAST(b.id AS BIGINT) - CAST(2 AS BIGINT) OR CAST(a.int_col AS BIGINT) <= b.bigint_col + CAST(97 AS BIGINT), CAST(2 AS BIGINT) + CAST(a.id AS BIGINT) = CAST(b.id AS BIGINT) - CAST(2 AS BIGINT) OR CAST(a.int_col AS BIGINT) >= CAST(0 AS BIGINT) + b.bigint_col
 |  predicates: CAST(b.double_col AS DECIMAL(3,2)) > CAST(11.1 AS DECIMAL(6,1))
 |  mem-estimate=14.26KB mem-reservation=0B thread-reservation=0
 |  tuple-ids=0,1N row-size=28B cardinality=7.30K
@@ -283,7 +284,7 @@ PLAN-ROOT SINK
 |  group by: timestamp_col = TIMESTAMP '2016-11-15 00:00:00'
 |  having: CAST(1048576 AS BIGINT) * count(*) % CAST(2 AS BIGINT) = CAST(0 AS BIGINT)
 |  mem-estimate=10.00MB mem-reservation=1.94MB spill-buffer=64.00KB thread-reservation=0
-|  tuple-ids=2 row-size=17B cardinality=0
+|  tuple-ids=2 row-size=17B cardinality=1
 |  in pipelines: 02(GETNEXT), 01(OPEN)
 |
 01:AGGREGATE
@@ -322,7 +323,7 @@ PLAN-ROOT SINK
 |  output: sum(2 + id), count:merge(*)
 |  having: CAST(1048576 AS BIGINT) * zeroifnull(count(*)) % CAST(2 AS BIGINT) = CAST(0 AS BIGINT)
 |  mem-estimate=10.00MB mem-reservation=0B spill-buffer=2.00MB thread-reservation=0
-|  tuple-ids=2 row-size=16B cardinality=0
+|  tuple-ids=2 row-size=16B cardinality=1
 |  in pipelines: 02(GETNEXT), 01(OPEN)
 |
 01:AGGREGATE

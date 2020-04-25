@@ -412,7 +412,7 @@ struct TQueryOptions {
   99: optional i64 preagg_bytes_limit = -1;
 
   // See comment in ImpalaService.thrift
-  100: optional bool enable_cnf_rewrites = false;
+  100: optional bool enable_cnf_rewrites = true;
 
   // See comment in ImpalaService.thrift
   101: optional i32 max_cnf_exprs = 0;

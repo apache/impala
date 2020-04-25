@@ -109,7 +109,7 @@ PLAN-ROOT SINK
 |  15:HASH JOIN [INNER JOIN]
 |  |  hash predicates: s_nationkey = n_nationkey
 |  |  runtime filters: RF013 <- n_nationkey
-|  |  row-size=328B cardinality=5.04K
+|  |  row-size=328B cardinality=5.05K
 |  |
 |  |--03:SCAN KUDU [tpch_kudu.nation]
 |  |     runtime filters: RF011 -> n_regionkey
@@ -118,12 +118,12 @@ PLAN-ROOT SINK
 |  14:HASH JOIN [INNER JOIN]
 |  |  hash predicates: s_suppkey = ps_suppkey
 |  |  runtime filters: RF015 <- ps_suppkey
-|  |  row-size=301B cardinality=5.04K
+|  |  row-size=301B cardinality=5.05K
 |  |
 |  |--13:HASH JOIN [INNER JOIN]
 |  |  |  hash predicates: ps_partkey = p_partkey
 |  |  |  runtime filters: RF017 <- p_partkey
-|  |  |  row-size=99B cardinality=5.04K
+|  |  |  row-size=99B cardinality=5.05K
 |  |  |
 |  |  |--00:SCAN KUDU [tpch_kudu.part]
 |  |  |     predicates: p_type LIKE '%BRASS'
@@ -438,44 +438,46 @@ order by
   cust_nation,
   l_year
 ---- PLAN
-Max Per-Host Resource Reservation: Memory=76.69MB Threads=7
-Per-Host Resource Estimates: Memory=85MB
+Max Per-Host Resource Reservation: Memory=44.62MB Threads=7
+Per-Host Resource Estimates: Memory=61MB
 PLAN-ROOT SINK
 |
 12:SORT
 |  order by: supp_nation ASC, cust_nation ASC, l_year ASC
-|  row-size=58B cardinality=575.77K
+|  row-size=58B cardinality=3.69K
 |
 11:AGGREGATE [FINALIZE]
 |  output: sum(round(l_extendedprice * (1 - l_discount), 2))
 |  group by: n1.n_name, n2.n_name, year(l_shipdate)
-|  row-size=58B cardinality=575.77K
+|  row-size=58B cardinality=3.69K
 |
 10:HASH JOIN [INNER JOIN]
 |  hash predicates: c_nationkey = n2.n_nationkey
-|  other predicates: ((n1.n_name = 'FRANCE' AND n2.n_name = 'GERMANY') OR (n1.n_name = 'GERMANY' AND n2.n_name = 'FRANCE'))
+|  other predicates: n1.n_name = 'FRANCE' OR n2.n_name = 'FRANCE', n2.n_name = 'GERMANY' OR n1.n_name = 'GERMANY'
 |  runtime filters: RF001 <- n2.n_nationkey
-|  row-size=144B cardinality=575.77K
+|  row-size=144B cardinality=3.69K
 |
 |--05:SCAN KUDU [tpch_kudu.nation n2]
-|     row-size=25B cardinality=25
+|     kudu predicates: n2.n_name IN ('GERMANY', 'FRANCE')
+|     row-size=25B cardinality=2
 |
 09:HASH JOIN [INNER JOIN]
-|  hash predicates: s_nationkey = n1.n_nationkey
-|  runtime filters: RF003 <- n1.n_nationkey
-|  row-size=119B cardinality=575.77K
-|
-|--04:SCAN KUDU [tpch_kudu.nation n1]
-|     row-size=25B cardinality=25
-|
-08:HASH JOIN [INNER JOIN]
 |  hash predicates: o_custkey = c_custkey
-|  runtime filters: RF005 <- c_custkey
-|  row-size=94B cardinality=575.77K
+|  runtime filters: RF003 <- c_custkey
+|  row-size=119B cardinality=46.06K
 |
 |--03:SCAN KUDU [tpch_kudu.customer]
 |     runtime filters: RF001 -> c_nationkey
 |     row-size=10B cardinality=150.00K
+|
+08:HASH JOIN [INNER JOIN]
+|  hash predicates: s_nationkey = n1.n_nationkey
+|  runtime filters: RF005 <- n1.n_nationkey
+|  row-size=109B cardinality=46.06K
+|
+|--04:SCAN KUDU [tpch_kudu.nation n1]
+|     kudu predicates: n1.n_name IN ('FRANCE', 'GERMANY')
+|     row-size=25B cardinality=2
 |
 07:HASH JOIN [INNER JOIN]
 |  hash predicates: l_suppkey = s_suppkey
@@ -483,7 +485,7 @@ PLAN-ROOT SINK
 |  row-size=84B cardinality=575.77K
 |
 |--00:SCAN KUDU [tpch_kudu.supplier]
-|     runtime filters: RF003 -> s_nationkey
+|     runtime filters: RF005 -> s_nationkey
 |     row-size=10B cardinality=10.00K
 |
 06:HASH JOIN [INNER JOIN]
@@ -492,7 +494,7 @@ PLAN-ROOT SINK
 |  row-size=74B cardinality=575.77K
 |
 |--02:SCAN KUDU [tpch_kudu.orders]
-|     runtime filters: RF005 -> o_custkey
+|     runtime filters: RF003 -> o_custkey
 |     row-size=16B cardinality=1.50M
 |
 01:SCAN KUDU [tpch_kudu.lineitem]
@@ -572,7 +574,7 @@ PLAN-ROOT SINK
 12:HASH JOIN [INNER JOIN]
 |  hash predicates: c_nationkey = n1.n_nationkey
 |  runtime filters: RF005 <- n1.n_nationkey
-|  row-size=114B cardinality=3.80K
+|  row-size=114B cardinality=3.81K
 |
 |--05:SCAN KUDU [tpch_kudu.nation n1]
 |     runtime filters: RF003 -> n1.n_regionkey
@@ -581,12 +583,12 @@ PLAN-ROOT SINK
 11:HASH JOIN [INNER JOIN]
 |  hash predicates: c_custkey = o_custkey
 |  runtime filters: RF007 <- o_custkey
-|  row-size=110B cardinality=3.80K
+|  row-size=110B cardinality=3.81K
 |
 |--10:HASH JOIN [INNER JOIN]
 |  |  hash predicates: l_suppkey = s_suppkey
 |  |  runtime filters: RF009 <- s_suppkey
-|  |  row-size=100B cardinality=3.80K
+|  |  row-size=100B cardinality=3.81K
 |  |
 |  |--01:SCAN KUDU [tpch_kudu.supplier]
 |  |     runtime filters: RF001 -> s_nationkey
@@ -595,12 +597,12 @@ PLAN-ROOT SINK
 |  09:HASH JOIN [INNER JOIN]
 |  |  hash predicates: o_orderkey = l_orderkey
 |  |  runtime filters: RF011 <- l_orderkey
-|  |  row-size=90B cardinality=3.80K
+|  |  row-size=90B cardinality=3.81K
 |  |
 |  |--08:HASH JOIN [INNER JOIN]
 |  |  |  hash predicates: l_partkey = p_partkey
 |  |  |  runtime filters: RF013 <- p_partkey
-|  |  |  row-size=48B cardinality=39.63K
+|  |  |  row-size=48B cardinality=39.66K
 |  |  |
 |  |  |--00:SCAN KUDU [tpch_kudu.part]
 |  |  |     kudu predicates: p_type = 'ECONOMY ANODIZED STEEL'
@@ -1359,8 +1361,8 @@ where
     )
   )
 ---- PLAN
-Max Per-Host Resource Reservation: Memory=2.88MB Threads=3
-Per-Host Resource Estimates: Memory=22MB
+Max Per-Host Resource Reservation: Memory=1.94MB Threads=3
+Per-Host Resource Estimates: Memory=21MB
 PLAN-ROOT SINK
 |
 03:AGGREGATE [FINALIZE]
@@ -1369,18 +1371,20 @@ PLAN-ROOT SINK
 |
 02:HASH JOIN [INNER JOIN]
 |  hash predicates: l_partkey = p_partkey
-|  other predicates: ((p_brand = 'Brand#12' AND p_container IN ('SM CASE', 'SM BOX', 'SM PACK', 'SM PKG') AND l_quantity >= 1 AND l_quantity <= 11 AND p_size <= 5) OR (p_brand = 'Brand#23' AND p_container IN ('MED BAG', 'MED BOX', 'MED PKG', 'MED PACK') AND l_quantity >= 10 AND l_quantity <= 20 AND p_size <= 10) OR (p_brand = 'Brand#34' AND p_container IN ('LG CASE', 'LG BOX', 'LG PACK', 'LG PKG') AND l_quantity >= 20 AND l_quantity <= 30 AND p_size <= 15))
+|  other predicates: l_quantity <= 11 OR l_quantity <= 20 OR p_size <= 15, l_quantity <= 11 OR l_quantity >= 10 OR p_size <= 15, l_quantity <= 11 OR p_size <= 10 OR l_quantity <= 30, l_quantity <= 11 OR p_size <= 10 OR l_quantity >= 20, l_quantity <= 11 OR p_size <= 10 OR p_size <= 15, l_quantity >= 1 OR l_quantity <= 20 OR p_size <= 15, l_quantity >= 1 OR l_quantity >= 10 OR p_size <= 15, l_quantity >= 1 OR p_size <= 10 OR l_quantity <= 30, l_quantity >= 1 OR p_size <= 10 OR l_quantity >= 20, l_quantity >= 1 OR p_size <= 10 OR p_size <= 15, p_size <= 5 OR l_quantity <= 20 OR l_quantity <= 30, p_size <= 5 OR l_quantity <= 20 OR l_quantity >= 20, p_size <= 5 OR l_quantity <= 20 OR p_size <= 15, p_size <= 5 OR l_quantity >= 10 OR l_quantity <= 30, p_size <= 5 OR l_quantity >= 10 OR l_quantity >= 20, p_size <= 5 OR l_quantity >= 10 OR p_size <= 15, p_size <= 5 OR p_size <= 10 OR l_quantity <= 30, p_size <= 5 OR p_size <= 10 OR l_quantity >= 20, l_quantity <= 11 OR l_quantity <= 20 OR p_container IN ('LG CASE', 'LG BOX', 'LG PACK', 'LG PKG'), l_quantity <= 11 OR l_quantity >= 10 OR p_container IN ('LG CASE', 'LG BOX', 'LG PACK', 'LG PKG'), l_quantity <= 11 OR p_container IN ('MED BAG', 'MED BOX', 'MED PKG', 'MED PACK') OR l_quantity <= 30, l_quantity <= 11 OR p_container IN ('MED BAG', 'MED BOX', 'MED PKG', 'MED PACK') OR l_quantity >= 20, l_quantity <= 11 OR p_container IN ('MED BAG', 'MED BOX', 'MED PKG', 'MED PACK') OR p_size <= 15, l_quantity <= 11 OR p_size <= 10 OR p_container IN ('LG CASE', 'LG BOX', 'LG PACK', 'LG PKG'), l_quantity >= 1 OR l_quantity <= 20 OR p_container IN ('LG CASE', 'LG BOX', 'LG PACK', 'LG PKG'), l_quantity >= 1 OR l_quantity >= 10 OR p_container IN ('LG CASE', 'LG BOX', 'LG PACK', 'LG PKG'), l_quantity >= 1 OR p_container IN ('MED BAG', 'MED BOX', 'MED PKG', 'MED PACK') OR l_quantity <= 30, l_quantity >= 1 OR p_container IN ('MED BAG', 'MED BOX', 'MED PKG', 'MED PACK') OR l_quantity >= 20, l_quantity >= 1 OR p_container IN ('MED BAG', 'MED BOX', 'MED PKG', 'MED PACK') OR p_size <= 15, l_quantity >= 1 OR p_size <= 10 OR p_container IN ('LG CASE', 'LG BOX', 'LG PACK', 'LG PKG'), p_container IN ('SM CASE', 'SM BOX', 'SM PACK', 'SM PKG') OR l_quantity <= 20 OR l_quantity <= 30, p_container IN ('SM CASE', 'SM BOX', 'SM PACK', 'SM PKG') OR l_quantity <= 20 OR l_quantity >= 20, p_container IN ('SM CASE', 'SM BOX', 'SM PACK', 'SM PKG') OR l_quantity <= 20 OR p_size <= 15, p_container IN ('SM CASE', 'SM BOX', 'SM PACK', 'SM PKG') OR l_quantity >= 10 OR l_quantity <= 30, p_container IN ('SM CASE', 'SM BOX', 'SM PACK', 'SM PKG') OR l_quantity >= 10 OR l_quantity >= 20, p_container IN ('SM CASE', 'SM BOX', 'SM PACK', 'SM PKG') OR l_quantity >= 10 OR p_size <= 15, p_container IN ('SM CASE', 'SM BOX', 'SM PACK', 'SM PKG') OR p_size <= 10 OR l_quantity <= 30, p_container IN ('SM CASE', 'SM BOX', 'SM PACK', 'SM PKG') OR p_size <= 10 OR l_quantity >= 20, p_size <= 5 OR l_quantity <= 20 OR p_container IN ('LG CASE', 'LG BOX', 'LG PACK', 'LG PKG'), p_size <= 5 OR l_quantity >= 10 OR p_container IN ('LG CASE', 'LG BOX', 'LG PACK', 'LG PKG'), l_quantity <= 11 OR p_container IN ('MED BAG', 'MED BOX', 'MED PKG', 'MED PACK') OR p_container IN ('LG CASE', 'LG BOX', 'LG PACK', 'LG PKG'), l_quantity >= 1 OR p_container IN ('MED BAG', 'MED BOX', 'MED PKG', 'MED PACK') OR p_container IN ('LG CASE', 'LG BOX', 'LG PACK', 'LG PKG'), p_container IN ('SM CASE', 'SM BOX', 'SM PACK', 'SM PKG') OR l_quantity <= 20 OR p_container IN ('LG CASE', 'LG BOX', 'LG PACK', 'LG PKG'), p_container IN ('SM CASE', 'SM BOX', 'SM PACK', 'SM PKG') OR l_quantity >= 10 OR p_container IN ('LG CASE', 'LG BOX', 'LG PACK', 'LG PKG'), l_quantity <= 11 OR l_quantity <= 20 OR p_brand = 'Brand#34', l_quantity <= 11 OR l_quantity >= 10 OR p_brand = 'Brand#34', l_quantity <= 11 OR p_brand = 'Brand#23' OR l_quantity <= 30, l_quantity <= 11 OR p_brand = 'Brand#23' OR l_quantity >= 20, l_quantity <= 11 OR p_brand = 'Brand#23' OR p_size <= 15, l_quantity <= 11 OR p_size <= 10 OR p_brand = 'Brand#34', l_quantity >= 1 OR l_quantity <= 20 OR p_brand = 'Brand#34', l_quantity >= 1 OR l_quantity >= 10 OR p_brand = 'Brand#34', l_quantity >= 1 OR p_brand = 'Brand#23' OR l_quantity <= 30, l_quantity >= 1 OR p_brand = 'Brand#23' OR l_quantity >= 20, l_quantity >= 1 OR p_brand = 'Brand#23' OR p_size <= 15, l_quantity >= 1 OR p_size <= 10 OR p_brand = 'Brand#34', p_brand = 'Brand#12' OR l_quantity <= 20 OR l_quantity <= 30, p_brand = 'Brand#12' OR l_quantity <= 20 OR l_quantity >= 20, p_brand = 'Brand#12' OR l_quantity <= 20 OR p_size <= 15, p_brand = 'Brand#12' OR l_quantity >= 10 OR l_quantity <= 30, p_brand = 'Brand#12' OR l_quantity >= 10 OR l_quantity >= 20, p_brand = 'Brand#12' OR l_quantity >= 10 OR p_size <= 15, p_brand = 'Brand#12' OR p_size <= 10 OR l_quantity <= 30, p_brand = 'Brand#12' OR p_size <= 10 OR l_quantity >= 20, p_size <= 5 OR l_quantity <= 20 OR p_brand = 'Brand#34', p_size <= 5 OR l_quantity >= 10 OR p_brand = 'Brand#34', l_quantity <= 11 OR p_brand = 'Brand#23' OR p_container IN ('LG CASE', 'LG BOX', 'LG PACK', 'LG PKG'), l_quantity <= 11 OR p_container IN ('MED BAG', 'MED BOX', 'MED PKG', 'MED PACK') OR p_brand = 'Brand#34', l_quantity >= 1 OR p_brand = 'Brand#23' OR p_container IN ('LG CASE', 'LG BOX', 'LG PACK', 'LG PKG'), l_quantity >= 1 OR p_container IN ('MED BAG', 'MED BOX', 'MED PKG', 'MED PACK') OR p_brand = 'Brand#34', p_brand = 'Brand#12' OR l_quantity <= 20 OR p_container IN ('LG CASE', 'LG BOX', 'LG PACK', 'LG PKG'), p_brand = 'Brand#12' OR l_quantity >= 10 OR p_container IN ('LG CASE', 'LG BOX', 'LG PACK', 'LG PKG'), p_container IN ('SM CASE', 'SM BOX', 'SM PACK', 'SM PKG') OR l_quantity <= 20 OR p_brand = 'Brand#34', p_container IN ('SM CASE', 'SM BOX', 'SM PACK', 'SM PKG') OR l_quantity >= 10 OR p_brand = 'Brand#34', p_size <= 5 OR p_brand = 'Brand#23' AND p_container IN ('MED BAG', 'MED BOX', 'MED PKG', 'MED PACK') OR l_quantity <= 30, p_size <= 5 OR p_brand = 'Brand#23' AND p_container IN ('MED BAG', 'MED BOX', 'MED PKG', 'MED PACK') OR l_quantity >= 20, l_quantity <= 11 OR p_brand = 'Brand#23' OR p_brand = 'Brand#34', l_quantity >= 1 OR p_brand = 'Brand#23' OR p_brand = 'Brand#34', p_brand = 'Brand#12' OR l_quantity <= 20 OR p_brand = 'Brand#34', p_brand = 'Brand#12' OR l_quantity >= 10 OR p_brand = 'Brand#34', p_container IN ('SM CASE', 'SM BOX', 'SM PACK', 'SM PKG') OR p_brand = 'Brand#23' AND p_container IN ('MED BAG', 'MED BOX', 'MED PKG', 'MED PACK') OR l_quantity <= 30, p_container IN ('SM CASE', 'SM BOX', 'SM PACK', 'SM PKG') OR p_brand = 'Brand#23' AND p_container IN ('MED BAG', 'MED BOX', 'MED PKG', 'MED PACK') OR l_quantity >= 20, p_brand = 'Brand#12' OR p_brand = 'Brand#23' AND p_container IN ('MED BAG', 'MED BOX', 'MED PKG', 'MED PACK') OR l_quantity <= 30, p_brand = 'Brand#12' OR p_brand = 'Brand#23' AND p_container IN ('MED BAG', 'MED BOX', 'MED PKG', 'MED PACK') OR l_quantity >= 20
 |  runtime filters: RF001 <- p_partkey
-|  row-size=92B cardinality=79.99K
+|  row-size=92B cardinality=1.41K
 |
 |--01:SCAN KUDU [tpch_kudu.part]
+|     predicates: p_brand = 'Brand#12' OR p_brand = 'Brand#23' AND p_container IN ('MED BAG', 'MED BOX', 'MED PKG', 'MED PACK') OR p_brand = 'Brand#34' AND p_container IN ('LG CASE', 'LG BOX', 'LG PACK', 'LG PKG'), p_container IN ('SM CASE', 'SM BOX', 'SM PACK', 'SM PKG') OR p_brand = 'Brand#23' AND p_container IN ('MED BAG', 'MED BOX', 'MED PKG', 'MED PACK') OR p_brand = 'Brand#34' AND p_container IN ('LG CASE', 'LG BOX', 'LG PACK', 'LG PKG'), p_size <= 5 OR p_size <= 10 OR p_size <= 15, p_container IN ('SM CASE', 'SM BOX', 'SM PACK', 'SM PKG') OR p_size <= 10 OR p_size <= 15, p_brand = 'Brand#12' OR p_size <= 10 OR p_size <= 15, p_size <= 5 OR p_brand = 'Brand#23' AND p_container IN ('MED BAG', 'MED BOX', 'MED PKG', 'MED PACK') OR p_size <= 15, p_size <= 5 OR p_size <= 10 OR p_brand = 'Brand#34' AND p_container IN ('LG CASE', 'LG BOX', 'LG PACK', 'LG PKG'), p_container IN ('SM CASE', 'SM BOX', 'SM PACK', 'SM PKG') OR p_brand = 'Brand#23' AND p_container IN ('MED BAG', 'MED BOX', 'MED PKG', 'MED PACK') OR p_size <= 15, p_container IN ('SM CASE', 'SM BOX', 'SM PACK', 'SM PKG') OR p_size <= 10 OR p_brand = 'Brand#34' AND p_container IN ('LG CASE', 'LG BOX', 'LG PACK', 'LG PKG'), p_brand = 'Brand#12' OR p_brand = 'Brand#23' AND p_container IN ('MED BAG', 'MED BOX', 'MED PKG', 'MED PACK') OR p_size <= 15, p_brand = 'Brand#12' OR p_size <= 10 OR p_brand = 'Brand#34' AND p_container IN ('LG CASE', 'LG BOX', 'LG PACK', 'LG PKG'), p_size <= 5 OR p_brand = 'Brand#23' AND p_container IN ('MED BAG', 'MED BOX', 'MED PKG', 'MED PACK') OR p_brand = 'Brand#34' AND p_container IN ('LG CASE', 'LG BOX', 'LG PACK', 'LG PKG')
 |     kudu predicates: p_size >= 1
-|     row-size=60B cardinality=20.00K
+|     row-size=60B cardinality=1.43K
 |
 00:SCAN KUDU [tpch_kudu.lineitem]
+   predicates: l_quantity <= 11 OR l_quantity <= 20 OR l_quantity <= 30, l_quantity <= 11 OR l_quantity <= 20 OR l_quantity >= 20, l_quantity <= 11 OR l_quantity >= 10 OR l_quantity <= 30, l_quantity <= 11 OR l_quantity >= 10 OR l_quantity >= 20, l_quantity >= 1 OR l_quantity <= 20 OR l_quantity <= 30, l_quantity >= 1 OR l_quantity <= 20 OR l_quantity >= 20, l_quantity >= 1 OR l_quantity >= 10 OR l_quantity <= 30, l_quantity >= 1 OR l_quantity >= 10 OR l_quantity >= 20
    kudu predicates: l_shipmode IN ('AIR', 'AIR REG'), l_shipinstruct = 'DELIVER IN PERSON'
    runtime filters: RF001 -> l_partkey
-   row-size=32B cardinality=801.95K
+   row-size=32B cardinality=197.63K
 ====
 # Q20 - Potential Part Promotion Query
 select

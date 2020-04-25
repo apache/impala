@@ -110,11 +110,15 @@ public class ConvertToCNFRule implements ExprRewriteRule {
         // we can skip the rewrite since the disjunct can be pushed down as-is
         List<TupleId> tids = new ArrayList<>();
         if (!cpred.isAnalyzed()) {
+          // clone before analyzing to avoid side effects of analysis
+          cpred = (CompoundPredicate) (cpred.clone());
           cpred.analyzeNoThrow(analyzer);
         }
         cpred.getIds(tids, null);
         if (tids.size() <= 1) {
-          return cpred;
+          // if no transform is done, return the original predicate,
+          // not the one that that may have been analyzed above
+          return pred;
         }
       }
       if (cpred.getOp() == CompoundPredicate.Operator.OR) {

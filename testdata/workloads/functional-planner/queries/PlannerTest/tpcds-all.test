@@ -770,7 +770,7 @@ PLAN-ROOT SINK
    runtime filters: RF002 -> store_sales.ss_store_sk
    row-size=8B cardinality=84.40K
 ====
-# TPCDS-Q13 (with CNF rewrite enabled)
+# TPCDS-Q13
 select avg(ss_quantity)
        ,avg(ss_ext_sales_price)
        ,avg(ss_ext_wholesale_cost)
@@ -819,8 +819,6 @@ select avg(ss_quantity)
   and ca_state in ('VA', 'TX', 'MS')
   and ss_net_profit between 50 and 250
      ))
----- QUERYOPTIONS
-ENABLE_CNF_REWRITES=true
 ---- PLAN
 Max Per-Host Resource Reservation: Memory=45.01MB Threads=7
 Per-Host Resource Estimates: Memory=461MB
