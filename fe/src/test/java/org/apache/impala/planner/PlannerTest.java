@@ -129,7 +129,7 @@ public class PlannerTest extends PlannerTestBase {
   }
 
   @Test
-  public void testConstantPropagataion() {
+  public void testConstantPropagation() {
     runPlannerTestFile("constant-propagation");
   }
 
@@ -1016,8 +1016,6 @@ public class PlannerTest extends PlannerTestBase {
    */
   @Test
   public void testConvertToCNF() {
-    TQueryOptions options = new TQueryOptions();
-    options.setEnable_cnf_rewrites(true);
-    runPlannerTestFile("convert-to-cnf", "tpch_parquet", options);
+    runPlannerTestFile("convert-to-cnf", "tpch_parquet");
   }
 }
