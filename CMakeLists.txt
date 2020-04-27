@@ -438,17 +438,6 @@ add_custom_target(cscope ALL DEPENDS gen-deps
   COMMAND "${CMAKE_SOURCE_DIR}/bin/gen-cscope.sh"
 )
 
-# This call is passing IMPALA_TOOLCHAIN_PACKAGES_HOME into Impala-lzo's build.sh,
-# but this is known not to work with the current version of Impala-lzo when
-# IMPALA_TOOLCHAIN_PACKAGES_HOME is a subdirectory of IMPALA_TOOLCHAIN. Either
-# Impala-lzo will need to be fixed or it will need to be removed.
-if (DEFINED ENV{IMPALA_LZO} AND EXISTS $ENV{IMPALA_LZO})
-  add_custom_target(impala-lzo ALL DEPENDS gen-deps
-    COMMAND $ENV{IMPALA_LZO}/build.sh ${CMAKE_BUILD_TYPE} ${CMAKE_SOURCE_DIR}
-    $ENV{IMPALA_TOOLCHAIN_PACKAGES_HOME}
-  )
-endif()
-
 # Dump include paths to a file
 if (DUMP_INCLUDE_PATHS)
   file(REMOVE "${DUMP_INCLUDE_PATHS}")

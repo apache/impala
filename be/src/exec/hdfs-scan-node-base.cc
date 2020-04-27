@@ -824,14 +824,6 @@ ScanRange* HdfsScanNodeBase::AllocateScanRange(hdfsFS fs, const char* file, int6
       buffer_opts);
 }
 
-ScanRange* HdfsScanNodeBase::AllocateScanRange(hdfsFS fs, const char* file,
-    int64_t len, int64_t offset, int64_t partition_id, int disk_id,
-    int cache_options, bool expected_local, int64_t mtime,
-    bool is_erasure_coded, const ScanRange* original_split) {
-  return AllocateScanRange(fs, file, len, offset, partition_id, disk_id, expected_local,
-      is_erasure_coded, mtime, BufferOpts(cache_options), original_split);
-}
-
 void* HdfsScanNodeBase::GetCodegenFn(THdfsFileFormat::type type) {
   auto it = codegend_fn_map_.find(type);
   if (it == codegend_fn_map_.end()) return NULL;
@@ -1166,7 +1158,7 @@ void HdfsScanNodeBase::UpdateBytesRead(
   }
 }
 
-HdfsFileDesc* ScanRangeSharedState::GetFileDesc(
+const HdfsFileDesc* ScanRangeSharedState::GetFileDesc(
     int64_t partition_id, const std::string& filename) {
   auto file_desc_map_key = make_pair(partition_id, filename);
   DCHECK(file_descs_.find(file_desc_map_key) != file_descs_.end());

@@ -179,7 +179,6 @@ public class HdfsScanNode extends ScanNode {
       ImmutableSet.<HdfsFileFormat>builder()
       .add(HdfsFileFormat.RC_FILE)
       .add(HdfsFileFormat.TEXT)
-      .add(HdfsFileFormat.LZO_TEXT)
       .add(HdfsFileFormat.SEQUENCE_FILE)
       .add(HdfsFileFormat.AVRO)
       .build();

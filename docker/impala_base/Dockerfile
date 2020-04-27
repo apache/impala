@@ -18,13 +18,11 @@ ARG BASE_IMAGE=ubuntu:16.04
 FROM ${BASE_IMAGE}
 
 # Install minimal dependencies required for Impala services to run.
-# liblzo2-2 may be needed by the Impala-lzo plugin, which is used in tests.
-# We install it in the base image for convenience.
 RUN apt-get update && \
   apt-get install -y openjdk-8-jre-headless \
   libsasl2-2 libsasl2-modules libsasl2-modules-gssapi-mit \
   sudo netcat-openbsd less curl iproute2 vim iputils-ping \
-  tzdata liblzo2-2 krb5-user && \
+  tzdata krb5-user && \
   apt-get clean && \
   rm -rf /var/lib/apt/lists/*
 

@@ -434,9 +434,6 @@ build_all_components() {
     if (( build_independent_targets )); then
       MAKE_TARGETS+=" cscope fe tarballs"
     fi
-    if [[ -e "$IMPALA_LZO" ]]; then
-      MAKE_TARGETS+=" impala-lzo"
-    fi
   fi
   ${MAKE_CMD} -j${IMPALA_BUILD_THREADS:-4} ${IMPALA_MAKE_FLAGS} ${MAKE_TARGETS}
 }
@@ -518,13 +515,6 @@ reconfigure_test_cluster() {
 
   # Generate the Hadoop configs needed by Impala
   "${IMPALA_HOME}/bin/create-test-configuration.sh" ${CREATE_TEST_CONFIG_ARGS}
-
-  # Copy Hadoop-lzo dependencies if available (required to generate Lzo data).
-  if stat "$HADOOP_LZO"/build/native/Linux-*-*/lib/libgplcompression.* > /dev/null ; then
-    cp "$HADOOP_LZO"/build/native/Linux-*-*/lib/libgplcompression.* "$HADOOP_LIB_DIR/native"
-  else
-    echo "No hadoop-lzo found"
-  fi
 }
 
 # Starts the test cluster processes except for Impala.

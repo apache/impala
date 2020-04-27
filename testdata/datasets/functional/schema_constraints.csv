@@ -33,7 +33,6 @@ table_name:insert_overwrite_partitioned, constraint:restrict_to, table_format:pa
 table_name:insert_string_partitioned, constraint:restrict_to, table_format:parquet/none/none
 
 table_name:old_rcfile_table, constraint:restrict_to, table_format:rc/none/none
-table_name:bad_text_lzo, constraint:restrict_to, table_format:text/lzo/block
 table_name:bad_text_gzip, constraint:restrict_to, table_format:text/gzip/block
 table_name:bad_seq_snap, constraint:restrict_to, table_format:seq/snap/block
 table_name:bad_avro_snap_strings, constraint:restrict_to, table_format:avro/snap/block
@@ -242,13 +241,11 @@ table_name:date_tbl, constraint:restrict_to, table_format:avro/snap/block
 table_name:date_tbl, constraint:restrict_to, table_format:orc/def/block
 table_name:date_tbl, constraint:restrict_to, table_format:hbase/none/none
 table_name:date_tbl, constraint:restrict_to, table_format:text/none/none
-table_name:date_tbl, constraint:restrict_to, table_format:text/lzo/block
 table_name:date_tbl, constraint:restrict_to, table_format:text/bzip/block
 table_name:date_tbl, constraint:restrict_to, table_format:text/gzip/block
 table_name:date_tbl, constraint:restrict_to, table_format:text/snap/block
 table_name:date_tbl, constraint:restrict_to, table_format:text/def/block
 table_name:date_tbl_error, constraint:restrict_to, table_format:text/none/none
-table_name:date_tbl_error, constraint:restrict_to, table_format:text/lzo/block
 table_name:date_tbl_error, constraint:restrict_to, table_format:text/bzip/block
 table_name:date_tbl_error, constraint:restrict_to, table_format:text/gzip/block
 table_name:date_tbl_error, constraint:restrict_to, table_format:text/snap/block
@@ -280,7 +277,6 @@ table_name:bucketed_ext_table, constraint:exclude, table_format:hbase/none/none
 table_name:bucketed_ext_table, constraint:exclude, table_format:kudu/none/none
 table_name:bucketed_table, constraint:exclude, table_format:hbase/none/none
 table_name:bucketed_table, constraint:exclude, table_format:kudu/none/none
-table_name:bucketed_table, constraint:exclude, table_format:text/lzo/block
 
 # The uncompressed ORC tables are mainly used in test_scanners_fuzz.py to avoid creating
 # them each time when running the test. Developers may run this test many times locally.

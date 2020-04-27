@@ -371,18 +371,6 @@ LOCATION '$$location_uri$$'
 TBLPROPERTIES ('external.table.purge'='TRUE')
 ====
 ---- QUERY
-SHOW CREATE TABLE functional_text_lzo.tinytable
----- RESULTS-HIVE
-CREATE EXTERNAL TABLE functional_text_lzo.tinytable (
-  a STRING,
-  b STRING
-)
-ROW FORMAT DELIMITED FIELDS TERMINATED BY ','
-STORED AS INPUTFORMAT 'com.hadoop.mapred.DeprecatedLzoTextInputFormat'
-          OUTPUTFORMAT 'org.apache.hadoop.hive.ql.io.HiveIgnoreKeyTextOutputFormat'
-LOCATION '$$location_uri$$'
-====
----- QUERY
 SHOW CREATE TABLE functional.allcomplextypes
 ---- RESULTS-HIVE
 CREATE EXTERNAL TABLE functional.allcomplextypes (

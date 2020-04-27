@@ -72,7 +72,7 @@ class TestScannersFuzzing(ImpalaTestSuite):
     cls.ImpalaTestMatrix.add_constraint(lambda v:
         v.get_value('table_format').file_format in ('avro', 'parquet', 'orc') or
         (v.get_value('table_format').file_format == 'text' and
-          v.get_value('table_format').compression_codec in ('none', 'lzo')))
+          v.get_value('table_format').compression_codec in ('none')))
 
 
   def test_fuzz_alltypes(self, vector, unique_database):
@@ -247,8 +247,7 @@ class TestScannersFuzzing(ImpalaTestSuite):
         msg = "Should not throw error when abort_on_error=0: '{0}'".format(e)
         LOG.error(msg)
         # Parquet and compressed text can fail the query for some parse errors.
-        # E.g. corrupt Parquet footer (IMPALA-3773) or a corrupt LZO index file
-        # (IMPALA-4013).
+        # E.g. corrupt Parquet footer (IMPALA-3773)
         table_format = vector.get_value('table_format')
         if table_format.file_format not in ['parquet', 'orc', 'rc', 'seq'] \
             and not (table_format.file_format == 'text' and

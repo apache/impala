@@ -76,9 +76,7 @@ app_classpath = [
   '$HADOOP_HDFS_HOME/share/hadoop/hdfs/*',
   '$HADOOP_HDFS_HOME/share/hadoop/hdfs/lib/*',
   '$HADOOP_YARN_HOME/share/hadoop/yarn/*',
-  '$HADOOP_YARN_HOME/share/hadoop/yarn/lib/*',
-  # Append the LZO jar for LZO-compressed file support.
-  '${LZO_JAR_PATH}']
+  '$HADOOP_YARN_HOME/share/hadoop/yarn/lib/*']
 
 # Hive 3 needs Tez on the classpath.
 if hive_major_version == 3:

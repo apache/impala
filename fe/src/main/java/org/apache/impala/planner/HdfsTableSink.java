@@ -62,8 +62,8 @@ public class HdfsTableSink extends TableSink {
   protected final boolean inputIsClustered_;
 
   private static final Set<HdfsFileFormat> SUPPORTED_FILE_FORMATS = ImmutableSet.of(
-      HdfsFileFormat.PARQUET, HdfsFileFormat.TEXT, HdfsFileFormat.LZO_TEXT,
-      HdfsFileFormat.RC_FILE, HdfsFileFormat.SEQUENCE_FILE, HdfsFileFormat.AVRO);
+      HdfsFileFormat.PARQUET, HdfsFileFormat.TEXT, HdfsFileFormat.RC_FILE,
+      HdfsFileFormat.SEQUENCE_FILE, HdfsFileFormat.AVRO);
 
   // Stores the indices into the list of non-clustering columns of the target table that
   // are stored in the 'sort.columns' table property. This is sent to the backend to
@@ -150,7 +150,7 @@ public class HdfsTableSink extends TableSink {
       return 1024L * 1024L * 1024L;
     }
 
-    // For all other supported formats (TEXT, LZO_TEXT, RC_FILE, SEQUENCE_FILE & AVRO)
+    // For all other supported formats (TEXT, RC_FILE, SEQUENCE_FILE & AVRO)
     // 100KB is a very approximate estimate of the amount of data buffered.
     return 100L * 1024L;
   }

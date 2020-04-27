@@ -49,6 +49,9 @@ public enum HdfsFileFormat {
       "org.apache.hadoop.hive.ql.io.HiveIgnoreKeyTextOutputFormat",
       "org.apache.hadoop.hive.serde2.lazy.LazySimpleSerDe",
       false, false, true),
+  // LZO_TEXT is never used as an actual HdfsFileFormat. It is used only to store the
+  // input format class and match against it (e.g. in HdfsCompression). Outside of this
+  // file, tables that use the LZO input format class use HdfsFileFormat.TEXT.
   LZO_TEXT("com.hadoop.mapred.DeprecatedLzoTextInputFormat",
       "org.apache.hadoop.hive.ql.io.HiveIgnoreKeyTextOutputFormat",
       "", false, false, true),
@@ -194,8 +197,7 @@ public enum HdfsFileFormat {
       case TEXT:
         if (compressionType == HdfsCompression.LZO ||
             compressionType == HdfsCompression.LZO_INDEX) {
-          // TODO: Update this when we can write LZO text.
-          // It is not currently possible to create a table with LZO compressed text files
+          // It is not possible to create a table with LZO compressed text files
           // in Impala, but this is valid in Hive.
           return String.format("INPUTFORMAT '%s' OUTPUTFORMAT '%s'",
               LZO_TEXT.inputFormat(), LZO_TEXT.outputFormat());

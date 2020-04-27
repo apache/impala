@@ -44,8 +44,7 @@ COMPRESSION_VALUES_MAP = {
   "parquet": {
     "none": "SNAPPY",
     "snap": "SNAPPY",
-    "gzip": "GZIP",
-    "lzo": "LZO"
+    "gzip": "GZIP"
   },
   # Currently, only three codecs are supported in Hive for ORC. See Hive codes in
   # org.apache.orc.impl.WriterImpl#createCodec (in module hive-orc)
@@ -397,7 +396,7 @@ if __name__ == "__main__":
   source_db = args.source_db
   target_db = args.target_db
   file_format, compression_value = args.table_format.split("/")
-  # 'compression_value' is one of [none,def,gzip,bzip,snap,lzo]. We should translate it
+  # 'compression_value' is one of [none,def,gzip,bzip,snap]. We should translate it
   # into values that can be set to Hive.
   if file_format not in COMPRESSION_KEYS_MAP:
     raise Exception("Nested types in file format %s are not supported" % file_format)

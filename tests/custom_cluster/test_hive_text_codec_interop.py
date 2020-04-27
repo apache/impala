@@ -26,7 +26,7 @@ from tests.common.test_dimensions import create_exec_option_dimension
 from tests.common.test_result_verifier import verify_query_result_is_equal
 
 # compression codecs impala support reading in text file type
-TEXT_CODECS = ['snappy', 'gzip', 'zstd', 'lzo', 'bzip2', 'deflate', 'default']
+TEXT_CODECS = ['snappy', 'gzip', 'zstd', 'bzip2', 'deflate', 'default']
 
 
 class TestTextInterop(CustomClusterTestSuite):
@@ -84,7 +84,6 @@ class TestTextInterop(CustomClusterTestSuite):
           'snappy': 'org.apache.hadoop.io.compress.SnappyCodec',
           'gzip': 'org.apache.hadoop.io.compress.GzipCodec',
           'zstd': 'org.apache.hadoop.io.compress.ZStandardCodec',
-          'lzo': 'com.hadoop.compression.lzo.LzopCodec',
           'bzip2': 'org.apache.hadoop.io.compress.BZip2Codec',
           'deflate': 'org.apache.hadoop.io.compress.DeflateCodec',
           'default': 'org.apache.hadoop.io.compress.DefaultCodec'

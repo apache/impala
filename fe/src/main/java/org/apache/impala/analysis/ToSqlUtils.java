@@ -468,8 +468,7 @@ public class ToSqlUtils {
     }
 
     if (storageHandlerClass == null) {
-      // TODO: Remove this special case when we have the LZO_TEXT writer
-      // We must handle LZO_TEXT specially because Impala does not yet support creating
+      // We must handle LZO_TEXT specially because Impala does not support creating
       // tables with this row format. In this case, we cannot output "WITH
       // SERDEPROPERTIES" because Hive does not support it with "STORED AS". For any
       // other HdfsFileFormat we want to output the serdeproperties because it is

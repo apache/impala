@@ -102,7 +102,7 @@ class TestMetadataQueryStatements(ImpalaTestSuite):
     self.exec_and_compare_hive_and_impala_hs2("describe formatted functional.alltypes",
         compare=compare_describe_formatted)
     self.exec_and_compare_hive_and_impala_hs2(
-        "describe formatted functional_text_lzo.alltypes",
+        "describe formatted functional_text_gzip.alltypes",
         compare=compare_describe_formatted)
 
     # Describe an unpartitioned table.

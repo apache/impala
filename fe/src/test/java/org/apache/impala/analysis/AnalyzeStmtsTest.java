@@ -3385,15 +3385,15 @@ public class AnalyzeStmtsTest extends AnalyzerTest {
       // File type / table type mismatch.
       AnalyzesOk(String.format("load data inpath '%s' %s into table " +
           "tpch.lineitem",
-          "/test-warehouse/alltypes_text_lzo/year=2009/month=4", overwrite));
+          "/test-warehouse/alltypes_text_gzip/year=2009/month=4", overwrite));
       // When table type matches, analysis passes for partitioned and unpartitioned
       // tables.
       AnalyzesOk(String.format("load data inpath '%s' %s into table " +
-          "functional_text_lzo.alltypes partition(year=2009, month=4)",
-          "/test-warehouse/alltypes_text_lzo/year=2009/month=4", overwrite));
+          "functional_text_gzip.alltypes partition(year=2009, month=4)",
+          "/test-warehouse/alltypes_text_gzip/year=2009/month=4", overwrite));
       AnalyzesOk(String.format("load data inpath '%s' %s into table " +
-          "functional_text_lzo.jointbl",
-          "/test-warehouse/alltypes_text_lzo/year=2009/month=4", overwrite));
+          "functional_text_gzip.jointbl",
+          "/test-warehouse/alltypes_text_gzip/year=2009/month=4", overwrite));
 
       // Verify with a read-only table
       AnalysisError(String.format("load data inpath '%s' into table " +

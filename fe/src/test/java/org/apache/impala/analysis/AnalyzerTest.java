@@ -101,12 +101,10 @@ public class AnalyzerTest extends FrontendTestBase {
 
   @Test
   public void TestCompressedText() throws AnalysisException {
-    AnalyzesOk("SELECT count(*) FROM functional_text_lzo.tinyinttable");
-    // TODO: Disabling the text/{gzip,bzip,snap} analysis test until the corresponding
-    //       databases are loaded.
-    // AnalyzesOk("SELECT count(*) FROM functional_text_gzip.tinyinttable");
-    // AnalyzesOk("SELECT count(*) FROM functional_text_snap.tinyinttable");
-    // AnalyzesOk("SELECT count(*) FROM functional_text_bzip.tinyinttable");
+    AnalyzesOk("SELECT count(*) FROM functional_text_bzip.tinyinttable");
+    AnalyzesOk("SELECT count(*) FROM functional_text_def.tinyinttable");
+    AnalyzesOk("SELECT count(*) FROM functional_text_gzip.tinyinttable");
+    AnalyzesOk("SELECT count(*) FROM functional_text_snap.tinyinttable");
   }
 
   @Test

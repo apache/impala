@@ -181,7 +181,7 @@ class TestPartitionMetadataUncompressedTextOnly(ImpalaTestSuite):
         FQ_TBL_NAME, TBL_LOCATION))
 
     self.__add_alltypes_partition(vector, FQ_TBL_NAME, "functional", 2009, 1)
-    self.__add_alltypes_partition(vector, FQ_TBL_NAME, "functional_text_lzo", 2009, 2)
+    self.__add_alltypes_partition(vector, FQ_TBL_NAME, "functional_text_gzip", 2009, 2)
 
     # Create a new partition with a bogus file with the unsupported LZ4 suffix.
     lz4_year = 2009
@@ -204,8 +204,18 @@ class TestPartitionMetadataUncompressedTextOnly(ImpalaTestSuite):
         "alter table {0} add partition (year={1}, month={2}) location '{3}'".format(
         FQ_TBL_NAME, fake_comp_year, fake_comp_month, fake_comp_ym_partition_loc))
 
+    # Create a new partition with a bogus file with the now-unsupported LZO suffix
+    lzo_year = 2009
+    lzo_month = 5
+    lzo_ym_partition_loc = self.__make_ym_partition_dir(TBL_LOCATION, lzo_year, lzo_month)
+    self.filesystem_client.create_file("{0}/fake.lzo".format(lzo_ym_partition_loc)[1:],
+        "some test data")
+    self.client.execute(
+        "alter table {0} add partition (year={1}, month={2}) location '{3}'".format(
+            FQ_TBL_NAME, lzo_year, lzo_month, lzo_ym_partition_loc))
+
     show_files_result = self.client.execute("show files in {0}".format(FQ_TBL_NAME))
-    assert len(show_files_result.data) == 4, "Expected one file per partition dir"
+    assert len(show_files_result.data) == 5, "Expected one file per partition dir"
 
     self.run_test_case('QueryTest/unsupported-compression-partitions', vector,
         unique_database)
@@ -222,8 +232,11 @@ class TestPartitionMetadataUncompressedTextOnly(ImpalaTestSuite):
     """Create the year/month partition directory and return the path."""
     y_partition_loc = "{0}/year={1}".format(tbl_location, year)
     ym_partition_loc = "{0}/month={1}".format(y_partition_loc, month)
-    self.filesystem_client.delete_file_dir(tbl_location[1:], recursive=True)
-    self.filesystem_client.make_dir(tbl_location[1:])
-    self.filesystem_client.make_dir(y_partition_loc[1:])
+    if not self.filesystem_client.exists(tbl_location[1:]):
+      self.filesystem_client.make_dir(tbl_location[1:])
+    if not self.filesystem_client.exists(y_partition_loc[1:]):
+      self.filesystem_client.make_dir(y_partition_loc[1:])
+    if self.filesystem_client.exists(ym_partition_loc[1:]):
+      self.filesystem_client.delete_file_dir(ym_partition_loc[1:], recursive=True)
     self.filesystem_client.make_dir(ym_partition_loc[1:])
     return ym_partition_loc
