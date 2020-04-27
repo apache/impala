@@ -185,6 +185,16 @@ DEFINE_int32(max_profile_log_files, 10, "Maximum number of profile log files to 
 DEFINE_int32(cancellation_thread_pool_size, 5,
     "(Advanced) Size of the thread-pool processing cancellations due to node failure");
 
+DEFINE_int32(unregistration_thread_pool_size, 4,
+    "(Advanced) Size of the thread-pool for unregistering queries, including "
+    "finalizing runtime profiles");
+// Limit the number of queries that can be queued for unregistration to avoid holding
+// too many queries in memory unnecessary. The default is set fairly low so that if
+// queries are finishing faster than they can be unregistered, there will be backpressure
+// on query execution before too much memory fills up with queries pending unregistration.
+DEFINE_int32(unregistration_thread_pool_queue_depth, 16,
+    "(Advanced) Max number of queries that can be queued for unregistration.");
+
 DEFINE_string(ssl_server_certificate, "", "The full path to the SSL certificate file used"
     " to authenticate Impala to clients. If set, both Beeswax and HiveServer2 ports will "
     "only accept SSL connections");
@@ -356,7 +366,7 @@ const int64_t EXPIRATION_CHECK_INTERVAL_MS = 1000L;
 // Template to return error messages for client requests that could not be found, belonged
 // to the wrong session, or had a mismatched secret. We need to use this particular string
 // in some places because the shell has a regex for it.
-// TODO: Make consistent with "Invalid query handle: $0" template used elsewhere.
+// TODO: Make consistent "Invalid or unknown query handle: $0" template used elsewhere.
 // TODO: this should be turned into a proper error code and used throughout ImpalaServer.
 static const char* LEGACY_INVALID_QUERY_HANDLE_TEMPLATE = "Query id $0 not found.";
 
@@ -457,6 +467,14 @@ ImpalaServer::ImpalaServer(ExecEnv* exec_env)
       FLAGS_cancellation_thread_pool_size, MAX_CANCELLATION_QUEUE_SIZE,
       bind<void>(&ImpalaServer::CancelFromThreadPool, this, _1, _2)));
   ABORT_IF_ERROR(cancellation_thread_pool_->Init());
+
+  unreg_thread_pool_.reset(new ThreadPool<std::shared_ptr<ClientRequestState>>(
+          "impala-server", "unregistration-worker",
+      FLAGS_unregistration_thread_pool_size, FLAGS_unregistration_thread_pool_queue_depth,
+      [this] (uint32_t thread_id, shared_ptr<ClientRequestState> crs) {
+        FinishUnregisterQuery(move(crs));
+      }));
+  ABORT_IF_ERROR(unreg_thread_pool_->Init());
 
   // Initialize a session expiry thread which blocks indefinitely until the first session
   // with non-zero timeout value is opened. Note that a session which doesn't specify any
@@ -623,7 +641,8 @@ Status ImpalaServer::GetRuntimeProfileOutput(const TUniqueId& query_id,
   DCHECK(output != nullptr);
   // Search for the query id in the active query map
   {
-    shared_ptr<ClientRequestState> request_state = GetClientRequestState(query_id);
+    shared_ptr<ClientRequestState> request_state =
+        GetClientRequestState(query_id, /*return_unregistered=*/ true);
     if (request_state.get() != nullptr) {
       // For queries in INITIALIZED state, the profile information isn't populated yet.
       if (request_state->exec_state() == ClientRequestState::ExecState::INITIALIZED) {
@@ -689,7 +708,8 @@ Status ImpalaServer::GetExecSummary(const TUniqueId& query_id, const string& use
     TExecSummary* result) {
   // Search for the query id in the active query map.
   {
-    shared_ptr<ClientRequestState> request_state = GetClientRequestState(query_id);
+    shared_ptr<ClientRequestState> request_state =
+        GetClientRequestState(query_id, /*return_unregistered=*/ true);
     if (request_state != nullptr) {
       lock_guard<mutex> l(*request_state->lock());
       RETURN_IF_ERROR(CheckProfileAccess(user, request_state->effective_user(),
@@ -1130,25 +1150,35 @@ void ImpalaServer::UpdateExecSummary(
 Status ImpalaServer::UnregisterQuery(const TUniqueId& query_id, bool check_inflight,
     const Status* cause) {
   VLOG_QUERY << "UnregisterQuery(): query_id=" << PrintId(query_id);
-  // Cancel the query.
-  RETURN_IF_ERROR(CancelInternal(query_id, check_inflight, cause));
+  shared_ptr<ClientRequestState> request_state = GetClientRequestState(query_id);
+  if (request_state == nullptr) {
+    return Status::Expected(TErrorCode::INVALID_QUERY_HANDLE, PrintId(query_id));
+  }
+  // We want to do some of the query unregistration work synchronously. Finalize
+  // only succeeds for the first thread to call it to avoid multiple threads
+  // unregistering.
+  RETURN_IF_ERROR(request_state->Finalize(check_inflight, cause));
 
-  // Delete it from the client_request_state_map_ and from the http_handler_.
-  DCHECK_EQ(this, ExecEnv::GetInstance()->impala_server());
-  shared_ptr<ClientRequestState> request_state;
-  RETURN_IF_ERROR(
-      client_request_state_map_.DeleteClientRequestState(query_id, &request_state));
-
-  // Close and delete the ClientRequestState.
-  RETURN_IF_ERROR(CloseClientRequestState(request_state));
-
+  // Do the rest of the unregistration work in the background so that the client does
+  // not need to wait for profile serialization, etc.
+  unreg_thread_pool_->Offer(move(request_state));
   return Status::OK();
 }
 
-Status ImpalaServer::CloseClientRequestState(
-    const std::shared_ptr<ClientRequestState>& request_state) {
-  request_state->Done();
+void ImpalaServer::FinishUnregisterQuery(shared_ptr<ClientRequestState>&& request_state) {
+  DCHECK_EQ(this, ExecEnv::GetInstance()->impala_server());
+  // Do all the finalization before removing the ClientRequestState from the map so that
+  // concurrent operations, e.g. GetRuntimeProfile() can find the query.
+  CloseClientRequestState(request_state);
+  // Make the ClientRequestState inaccessible. There is a time window where the query is
+  // both in 'client_request_state_map_' and 'query_locations_'.
+  Status status =
+      client_request_state_map_.DeleteClientRequestState(request_state->query_id());
+  DCHECK(status.ok()) << "CRS can only be deleted once: " << status.GetDetail();
+}
 
+void ImpalaServer::CloseClientRequestState(
+    const std::shared_ptr<ClientRequestState>& request_state) {
   int64_t duration_us = request_state->end_time_us() - request_state->start_time_us();
   int64_t duration_ms = duration_us / MICROS_PER_MILLI;
 
@@ -1188,7 +1218,6 @@ Status ImpalaServer::CloseClientRequestState(
   }
   ArchiveQuery(request_state.get());
   ImpaladMetrics::NUM_QUERIES_REGISTERED->Increment(-1L);
-  return Status::OK();
 }
 
 Status ImpalaServer::UpdateCatalogMetrics() {
@@ -1228,14 +1257,13 @@ Status ImpalaServer::UpdateCatalogMetrics() {
 
 }
 
-Status ImpalaServer::CancelInternal(const TUniqueId& query_id, bool check_inflight,
-    const Status* cause) {
+Status ImpalaServer::CancelInternal(const TUniqueId& query_id) {
   VLOG_QUERY << "Cancel(): query_id=" << PrintId(query_id);
   shared_ptr<ClientRequestState> request_state = GetClientRequestState(query_id);
   if (request_state == nullptr) {
-    return Status::Expected("Invalid or unknown query handle");
+    return Status::Expected(TErrorCode::INVALID_QUERY_HANDLE, PrintId(query_id));
   }
-  RETURN_IF_ERROR(request_state->Cancel(check_inflight, cause));
+  RETURN_IF_ERROR(request_state->Cancel(/*check_inflight=*/ true, /*cause=*/ nullptr));
   return Status::OK();
 }
 
@@ -2513,18 +2541,22 @@ void ImpalaServer::Join() {
 }
 
 shared_ptr<ClientRequestState> ImpalaServer::GetClientRequestState(
-    const TUniqueId& query_id) {
+    const TUniqueId& query_id, bool return_unregistered) {
   DCHECK_EQ(this, ExecEnv::GetInstance()->impala_server());
   ScopedShardedMapRef<std::shared_ptr<ClientRequestState>> map_ref(query_id,
       &client_request_state_map_);
   DCHECK(map_ref.get() != nullptr);
 
   auto entry = map_ref->find(query_id);
-  if (entry == map_ref->end()) {
+  if (entry == map_ref->end()) return shared_ptr<ClientRequestState>();
+  // This started_finalize() check can race with unregistration. It cannot prevent
+  // unregistration starting immediately after the value is loaded. This check, however,
+  // is sufficient to ensure that after a client operation has unregistered the request,
+  // subsequent operations won't spuriously find the request.
+  if (!return_unregistered && entry->second->started_finalize()) {
     return shared_ptr<ClientRequestState>();
-  } else {
-    return entry->second;
   }
+  return entry->second;
 }
 
 Status ImpalaServer::CheckClientRequestSession(

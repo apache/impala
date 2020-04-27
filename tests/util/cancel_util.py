@@ -61,12 +61,12 @@ def cancel_query_and_validate_state(client, query, exec_option, table_format,
     assert close_error is None
   elif close_error is None:
     # If the close rpc succeeded, then the fetch rpc should have either succeeded,
-    # failed with 'Cancelled' or failed with 'Invalid query handle' (if the close
-    # rpc occured before the fetch rpc).
+    # failed with 'Cancelled' or failed with 'Invalid or unknown query handle'
+    # (if the close rpc occured before the fetch rpc).
     if thread.fetch_results_error is not None:
       assert 'Cancelled' in str(thread.fetch_results_error) or \
-        ('Invalid query handle' in str(thread.fetch_results_error)
-         and not join_before_close)
+        ('Invalid or unknown query handle' in str(thread.fetch_results_error)
+         and not join_before_close), str(thread.fetch_results_error)
   else:
     # If the close rpc encountered an exception, then it must be due to fetch
     # noticing the cancellation and doing the auto-close.

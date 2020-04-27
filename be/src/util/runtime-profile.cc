@@ -140,9 +140,7 @@ RuntimeProfile::RuntimeProfile(
     name_(name),
     is_averaged_profile_(is_averaged_profile),
     counter_total_time_(TUnit::TIME_NS),
-    inactive_timer_(TUnit::TIME_NS),
-    local_time_percent_(0),
-    local_time_ns_(0) {
+    inactive_timer_(TUnit::TIME_NS) {
   Counter* total_time_counter;
   Counter* inactive_timer;
   if (!is_averaged_profile) {
@@ -503,31 +501,33 @@ void RuntimeProfile::ComputeTimeInProfile(int64_t total) {
   // IMPALA-5200: Take the max, because the parent includes all of the time from the
   // children, whether or not its total time counter has been updated recently enough
   // to see this.
-  total_time_ns_ = max(children_total_time, total_time_counter()->value());
+  total_time_ns_.Store(max(children_total_time, total_time_counter()->value()));
 
   // If a local time counter exists, use its value as local time. Otherwise, derive the
   // local time from total time and the child time.
+  int64_t local_time_ns = 0;
   bool has_local_time_counter = false;
   {
     lock_guard<SpinLock> l(counter_map_lock_);
     CounterMap::const_iterator itr = counter_map_.find(LOCAL_TIME_COUNTER_NAME);
     if (itr != counter_map_.end()) {
-      local_time_ns_ = itr->second->value();
+      local_time_ns = itr->second->value();
       has_local_time_counter = true;
     }
   }
 
   if (!has_local_time_counter) {
-    local_time_ns_ = total_time_ns_ - children_total_time;
+    local_time_ns = total_time_ns_.Load() - children_total_time;
     if (!is_averaged_profile_) {
-      local_time_ns_ -= inactive_timer()->value();
+      local_time_ns -= inactive_timer()->value();
     }
   }
   // Counters have some margin, set to 0 if it was negative.
-  local_time_ns_ = ::max<int64_t>(0, local_time_ns_);
-  local_time_percent_ =
-      static_cast<double>(local_time_ns_) / total_time_ns_;
-  local_time_percent_ = ::min(1.0, local_time_percent_) * 100;
+  local_time_ns = ::max<int64_t>(0, local_time_ns);
+  local_time_ns_.Store(local_time_ns);
+  double local_time_frac =
+      min(1.0, static_cast<double>(local_time_ns) / total_time_ns_.Load());
+  local_time_frac_.Store(*reinterpret_cast<int64_t*>(&local_time_frac));
 }
 
 void RuntimeProfile::AddChild(RuntimeProfile* child, bool indent, RuntimeProfile* loc) {
@@ -962,13 +962,14 @@ void RuntimeProfile::PrettyPrint(ostream* s, const string& prefix) const {
   stream.flags(ios::fixed);
   stream << prefix << name_ << ":";
   if (total_time->second->value() != 0) {
+    int64_t local_time_frac_int = local_time_frac_.Load();
     stream << "(Total: "
            << PrettyPrinter::Print(total_time->second->value(),
                total_time->second->unit())
            << ", non-child: "
-           << PrettyPrinter::Print(local_time_ns_, TUnit::TIME_NS)
+           << PrettyPrinter::Print(local_time_ns_.Load(), TUnit::TIME_NS)
            << ", % non-child: "
-           << setprecision(2) << local_time_percent_
+           << setprecision(2) << *reinterpret_cast<double*>(&local_time_frac_int) * 100
            << "%)";
   }
   stream << endl;

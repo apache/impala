@@ -113,16 +113,22 @@ class HS2TestSuite(ImpalaTestSuite):
                          'doubleVal', 'binaryVal']
 
   def setup(self):
-    host, port = IMPALAD_HS2_HOST_PORT.split(":")
-    self.socket = TSocket(host, port)
-    self.transport = TBufferedTransport(self.socket)
-    self.transport.open()
-    self.protocol = TBinaryProtocol.TBinaryProtocol(self.transport)
-    self.hs2_client = ImpalaHiveServer2Service.Client(self.protocol)
+    self.socket, self.hs2_client = self._open_hs2_connection()
 
   def teardown(self):
     if self.socket:
       self.socket.close()
+
+  @staticmethod
+  def _open_hs2_connection():
+    """Opens a HS2 connection, returning the socket and the thrift client."""
+    host, port = IMPALAD_HS2_HOST_PORT.split(":")
+    socket = TSocket(host, port)
+    transport = TBufferedTransport(socket)
+    transport.open()
+    protocol = TBinaryProtocol.TBinaryProtocol(transport)
+    hs2_client = ImpalaHiveServer2Service.Client(protocol)
+    return socket, hs2_client
 
   @staticmethod
   def check_response(response,
@@ -150,7 +156,7 @@ class HS2TestSuite(ImpalaTestSuite):
       expected_err = "Query id"
     else:
       # We should standardise on this error message.
-      expected_err = "Invalid query handle:"
+      expected_err = "Invalid or unknown query handle:"
     HS2TestSuite.check_response(response, TCLIService.TStatusCode.ERROR_STATUS,
                                 expected_err)
 

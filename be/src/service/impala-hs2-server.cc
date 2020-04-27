@@ -710,9 +710,9 @@ void ImpalaServer::GetOperationStatus(TGetOperationStatusResp& return_val,
 
   shared_ptr<ClientRequestState> request_state = GetClientRequestState(query_id);
   if (UNLIKELY(request_state.get() == nullptr)) {
-    // No handle was found
-    HS2_RETURN_ERROR(return_val,
-      Substitute("Invalid query handle: $0", PrintId(query_id)), SQLSTATE_GENERAL_ERROR);
+    Status err = Status::Expected(TErrorCode::INVALID_QUERY_HANDLE, PrintId(query_id));
+    string err_msg = err.GetDetail();
+    HS2_RETURN_ERROR(return_val, err_msg, SQLSTATE_GENERAL_ERROR);
   }
 
   ScopedSessionState session_handle(this);
@@ -748,16 +748,16 @@ void ImpalaServer::CancelOperation(TCancelOperationResp& return_val,
 
   shared_ptr<ClientRequestState> request_state = GetClientRequestState(query_id);
   if (UNLIKELY(request_state.get() == nullptr)) {
-    // No handle was found
-    HS2_RETURN_ERROR(return_val,
-      Substitute("Invalid query handle: $0", PrintId(query_id)), SQLSTATE_GENERAL_ERROR);
+    Status err = Status::Expected(TErrorCode::INVALID_QUERY_HANDLE, PrintId(query_id));
+    string err_msg = err.GetDetail();
+    HS2_RETURN_ERROR(return_val, err_msg, SQLSTATE_GENERAL_ERROR);
   }
   ScopedSessionState session_handle(this);
   const TUniqueId session_id = request_state->session_id();
   HS2_RETURN_IF_ERROR(return_val,
       session_handle.WithSession(session_id, SecretArg::Operation(op_secret, query_id)),
       SQLSTATE_GENERAL_ERROR);
-  HS2_RETURN_IF_ERROR(return_val, CancelInternal(query_id, true), SQLSTATE_GENERAL_ERROR);
+  HS2_RETURN_IF_ERROR(return_val, CancelInternal(query_id), SQLSTATE_GENERAL_ERROR);
   return_val.status.__set_statusCode(thrift::TStatusCode::SUCCESS_STATUS);
 }
 
@@ -781,9 +781,8 @@ void ImpalaServer::CloseImpalaOperation(TCloseImpalaOperationResp& return_val,
 
   shared_ptr<ClientRequestState> request_state = GetClientRequestState(query_id);
   if (UNLIKELY(request_state.get() == nullptr)) {
-    // No handle was found
-    HS2_RETURN_ERROR(return_val,
-      Substitute("Invalid query handle: $0", PrintId(query_id)), SQLSTATE_GENERAL_ERROR);
+    Status err = Status::Expected(TErrorCode::INVALID_QUERY_HANDLE, PrintId(query_id));
+    HS2_RETURN_ERROR(return_val, err.GetDetail(), SQLSTATE_GENERAL_ERROR);
   }
   ScopedSessionState session_handle(this);
   const TUniqueId session_id = request_state->session_id();
@@ -816,9 +815,8 @@ void ImpalaServer::GetResultSetMetadata(TGetResultSetMetadataResp& return_val,
   shared_ptr<ClientRequestState> request_state = GetClientRequestState(query_id);
   if (UNLIKELY(request_state.get() == nullptr)) {
     VLOG_QUERY << "GetResultSetMetadata(): invalid query handle";
-    // No handle was found
-    HS2_RETURN_ERROR(return_val,
-      Substitute("Invalid query handle: $0", PrintId(query_id)), SQLSTATE_GENERAL_ERROR);
+    Status err = Status::Expected(TErrorCode::INVALID_QUERY_HANDLE, PrintId(query_id));
+    HS2_RETURN_ERROR(return_val, err.GetDetail(), SQLSTATE_GENERAL_ERROR);
   }
   ScopedSessionState session_handle(this);
   const TUniqueId session_id = request_state->session_id();
@@ -869,7 +867,8 @@ void ImpalaServer::FetchResults(TFetchResultsResp& return_val,
 
   shared_ptr<ClientRequestState> request_state = GetClientRequestState(query_id);
   if (UNLIKELY(request_state == nullptr)) {
-    string err_msg = Substitute("Invalid query handle: $0", PrintId(query_id));
+    Status err = Status::Expected(TErrorCode::INVALID_QUERY_HANDLE, PrintId(query_id));
+    string err_msg = err.GetDetail();
     VLOG(1) << err_msg;
     HS2_RETURN_ERROR(return_val, err_msg, SQLSTATE_GENERAL_ERROR);
   }
@@ -915,9 +914,9 @@ void ImpalaServer::GetLog(TGetLogResp& return_val, const TGetLogReq& request) {
 
   shared_ptr<ClientRequestState> request_state = GetClientRequestState(query_id);
   if (UNLIKELY(request_state.get() == nullptr)) {
-    // No handle was found
-    HS2_RETURN_ERROR(return_val,
-      Substitute("Invalid query handle: $0", PrintId(query_id)), SQLSTATE_GENERAL_ERROR);
+    Status err = Status::Expected(TErrorCode::INVALID_QUERY_HANDLE, PrintId(query_id));
+    string err_msg = err.GetDetail();
+    HS2_RETURN_ERROR(return_val, err_msg, SQLSTATE_GENERAL_ERROR);
   }
 
   // GetLog doesn't have an associated session handle, so we presume that this request

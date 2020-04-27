@@ -306,8 +306,8 @@ class RuntimeProfile { // NOLINT: This struct is not packed, but there are not s
   /// Returns the counter for the total elapsed time.
   Counter* total_time_counter() { return counter_map_[TOTAL_TIME_COUNTER_NAME]; }
   Counter* inactive_timer() { return counter_map_[INACTIVE_TIME_COUNTER_NAME]; }
-  int64_t local_time() { return local_time_ns_; }
-  int64_t total_time() { return total_time_ns_; }
+  int64_t local_time() { return local_time_ns_.Load(); }
+  int64_t total_time() { return total_time_ns_.Load(); }
 
   /// Prints the contents of the profile in a name: value format.
   /// Does not hold locks when it makes any function calls.
@@ -450,7 +450,7 @@ class RuntimeProfile { // NOLINT: This struct is not packed, but there are not s
 
   /// Recursively compute the fraction of the 'total_time' spent in this profile and
   /// its children.
-  /// This function updates local_time_percent_ for each profile.
+  /// This function updates local_time_frac_ for each profile.
   void ComputeTimeInProfile();
 
   /// Set ExecSummary
@@ -546,22 +546,26 @@ class RuntimeProfile { // NOLINT: This struct is not packed, but there are not s
   Counter counter_total_time_;
 
   /// Total time spent waiting (on non-children) that should not be counted when
-  /// computing local_time_percent_. This is updated for example in the exchange
+  /// computing local_time_frac_. This is updated for example in the exchange
   /// node when waiting on the sender from another fragment.
   Counter inactive_timer_;
 
   /// Time spent in just in this profile (i.e. not the children) as a fraction
-  /// of the total time in the entire profile tree.
-  double local_time_percent_;
+  /// of the total time in the entire profile tree. This is a double's bit pattern
+  /// stored in an integer. Computed in ComputeTimeInProfile().
+  /// Atomic so that it can be read concurrently with the value being calculated.
+  AtomicInt64 local_time_frac_{0};
 
   /// Time spent in this node (not including the children). Computed in
-  /// ComputeTimeInProfile()
-  int64_t local_time_ns_;
+  /// ComputeTimeInProfile(). Atomic b/c it can be read concurrently with
+  /// ComputeTimeInProfile() executing.
+  AtomicInt64 local_time_ns_{0};
 
   /// Total time spent in this node. Computed in ComputeTimeInProfile() and is
   /// the maximum of the total time spent in children and the value of
-  /// counter_total_time_.
-  int64_t total_time_ns_;
+  /// counter_total_time_. Atomic b/c it can be read concurrently with
+  /// ComputeTimeInProfile() executing.
+  AtomicInt64 total_time_ns_{0};
 
   /// The Exec Summary
   TExecSummary t_exec_summary_;

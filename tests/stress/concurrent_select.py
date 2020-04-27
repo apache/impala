@@ -607,7 +607,7 @@ class StressRunner(object):
           # example due to hitting a mem limit), just before the cancellation request, the
           # server may have already unregistered the query as part of the fetch failure.
           # In that case the server gives an error response saying the handle is invalid.
-          if "Invalid query handle" in error_msg and report.timed_out:
+          if "Invalid or unknown query handle" in error_msg and report.timed_out:
             self._num_successive_errors.value = 0
             continue
           # Occasionally the network connection will fail, and depending on when the

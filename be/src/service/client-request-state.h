@@ -171,9 +171,13 @@ class ClientRequestState {
   /// in-flight (for cleaning up after an error on the query issuing path).
   Status Cancel(bool check_inflight, const Status* cause) WARN_UNUSED_RESULT;
 
-  /// This is called when the query is done (finished, cancelled, or failed).
+  /// This is called when the query is done (finished, cancelled, or failed). This runs
+  /// synchronously within the last client RPC and does any work that is required before
+  /// the query is finished from the client's point of view, including cancelling the
+  /// query with 'cause'. Returns an error if 'check_inflight' is true and the query is
+  /// not yet in-flight, or if another thread has already started finalizing the query.
   /// Takes lock_: callers must not hold lock() before calling.
-  void Done();
+  Status Finalize(bool check_inflight, const Status* cause);
 
   /// Sets the API-specific (Beeswax, HS2) result cache and its size bound.
   /// The given cache is owned by this client request state, even if an error is returned.
@@ -308,6 +312,9 @@ class ClientRequestState {
 
   /// Returns the FETCH_ROWS_TIMEOUT_MS value for this query (converted to microseconds).
   int64_t fetch_rows_timeout_us() const { return fetch_rows_timeout_us_; }
+
+  /// True if Finalize() was called.
+  bool started_finalize() const { return started_finalize_.Load(); }
 
 protected:
   /// Updates the end_time_us_ of this query if it isn't set. The end time is determined
@@ -515,9 +522,13 @@ protected:
   /// Start/end time of the query, in Unix microseconds.
   int64_t start_time_us_;
   /// end_time_us_ is initialized to 0, which is used to indicate that the query is not
-  /// yet done. It is assinged the final value in ClientRequestState::Done() or when the
-  /// coordinator relases its admission control resources.
+  /// yet done. It is assigned the final value in ClientRequestState::Finalize() or when
+  /// the coordinator releases its admission control resources.
   AtomicInt64 end_time_us_{0};
+
+  /// True if a thread has called Finalize(). Threads calling Finalize()
+  /// do a compare-and-swap on this so that only one thread can proceed.
+  AtomicBool started_finalize_{false};
 
   /// Timeout, in microseconds, when waiting for rows to become available. Derived from
   /// the query option FETCH_ROWS_TIMEOUT_MS.

@@ -178,7 +178,8 @@ void ImpalaServer::fetch(Results& query_results, const QueryHandle& query_handle
 
   shared_ptr<ClientRequestState> request_state = GetClientRequestState(query_id);
   if (UNLIKELY(request_state == nullptr)) {
-    string err_msg = Substitute("Invalid query handle: $0", PrintId(query_id));
+    Status err = Status::Expected(TErrorCode::INVALID_QUERY_HANDLE, PrintId(query_id));
+    string err_msg = err.GetDetail();
     VLOG(1) << err_msg;
     RaiseBeeswaxException(err_msg, SQLSTATE_GENERAL_ERROR);
   }
@@ -209,8 +210,8 @@ void ImpalaServer::get_results_metadata(ResultsMetadata& results_metadata,
   VLOG_QUERY << "get_results_metadata(): query_id=" << PrintId(query_id);
   shared_ptr<ClientRequestState> request_state = GetClientRequestState(query_id);
   if (UNLIKELY(request_state.get() == nullptr)) {
-    RaiseBeeswaxException(Substitute("Invalid query handle: $0", PrintId(query_id)),
-      SQLSTATE_GENERAL_ERROR);
+    Status err = Status::Expected(TErrorCode::INVALID_QUERY_HANDLE, PrintId(query_id));
+    RaiseBeeswaxException(err.GetDetail(), SQLSTATE_GENERAL_ERROR);
   }
   // Validate that query can be accessed by user.
   RAISE_IF_ERROR(CheckClientRequestSession(session.get(), request_state->effective_user(),
@@ -276,8 +277,8 @@ beeswax::QueryState::type ImpalaServer::get_state(const QueryHandle& handle) {
   shared_ptr<ClientRequestState> request_state = GetClientRequestState(query_id);
   if (UNLIKELY(request_state == nullptr)) {
     VLOG_QUERY << "ImpalaServer::get_state invalid handle";
-    RaiseBeeswaxException(Substitute("Invalid query handle: $0", PrintId(query_id)),
-      SQLSTATE_GENERAL_ERROR);
+    Status err = Status::Expected(TErrorCode::INVALID_QUERY_HANDLE, PrintId(query_id));
+    RaiseBeeswaxException(err.GetDetail(), SQLSTATE_GENERAL_ERROR);
   }
   // Validate that query can be accessed by user.
   RAISE_IF_ERROR(CheckClientRequestSession(session.get(), request_state->effective_user(),
@@ -379,7 +380,7 @@ void ImpalaServer::Cancel(impala::TStatus& tstatus,
   // proceed without validating the session/query relation so that workflows don't
   // get broken. In future we could check that the users match OR that the user has
   // admin priviliges on the server.
-  RAISE_IF_ERROR(CancelInternal(query_id, true), SQLSTATE_GENERAL_ERROR);
+  RAISE_IF_ERROR(CancelInternal(query_id), SQLSTATE_GENERAL_ERROR);
   tstatus.status_code = TErrorCode::OK;
 }
 
@@ -600,9 +601,9 @@ Status ImpalaServer::CloseInsertInternal(SessionState* session, const TUniqueId&
     TDmlResult* dml_result) {
   shared_ptr<ClientRequestState> request_state = GetClientRequestState(query_id);
   if (UNLIKELY(request_state == nullptr)) {
-    string err_msg = Substitute("Invalid query handle: $0", PrintId(query_id));
-    VLOG(1) << err_msg;
-    return Status::Expected(err_msg);
+    Status err = Status::Expected(TErrorCode::INVALID_QUERY_HANDLE, PrintId(query_id));
+    VLOG(1) << err.GetDetail();
+    return err;
   }
 
   RETURN_IF_ERROR(

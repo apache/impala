@@ -459,6 +459,10 @@ error_codes = (
    "Unable to perform Null-Aware Anti-Join. Could not get enough reservation to fit "
    "all rows with NULLs from the build side in memory. Memory required for $0 rows "
    "was $1. $2/$3 of the join's reservation was available for the rows."),
+
+  # Note: impala_shell uses a regex to search for this specific error message, so
+  # changing it may break older shell version.
+  ("INVALID_QUERY_HANDLE", 150, "Invalid or unknown query handle: $0."),
 )
 
 import sys

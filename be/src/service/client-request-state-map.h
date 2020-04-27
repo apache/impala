@@ -38,11 +38,8 @@ class ClientRequestStateMap
   Status AddClientRequestState(
       const TUniqueId& query_id, std::shared_ptr<ClientRequestState> request_state);
 
-  /// Deletes the specified (query_id, request_state) pair from the map and sets the given
-  /// request_state pointer to the ClientRequestState associated with the given query_id.
-  /// If request_state == nullptr, it is not set. Returns an error Status if the query_id
-  /// cannot be found in the map.
-  Status DeleteClientRequestState(const TUniqueId& query_id,
-      std::shared_ptr<ClientRequestState>* request_state = nullptr);
+  /// Deletes the specified (query_id, request_state) pair from the map. Returns an error
+  /// Status if the query_id cannot be found in the map.
+  Status DeleteClientRequestState(const TUniqueId& query_id);
 };
 }

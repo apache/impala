@@ -778,7 +778,7 @@ class TestAdmissionController(TestAdmissionControllerBase, HS2TestSuite):
       client.close_query(handle)
       client.close_query(queued_query_handle)
       queued_profile = client.get_runtime_profile(queued_query_handle)
-      assert "Admission result: Cancelled (queued)" in queued_profile
+      assert "Admission result: Cancelled (queued)" in queued_profile, queued_profile
       self.assert_impalad_log_contains('INFO', "Dequeued cancelled query=")
       client.clear_configuration()
 

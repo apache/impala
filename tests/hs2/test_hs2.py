@@ -22,7 +22,10 @@ from contextlib import contextmanager
 import json
 import logging
 import pytest
+import random
+import threading
 import time
+import uuid
 
 from urllib2 import urlopen
 
@@ -314,7 +317,8 @@ class TestHS2(HS2TestSuite):
 
     get_operation_status_resp = \
         self.get_operation_status(execute_statement_resp.operationHandle)
-    # GetOperationState should return 'Invalid query handle' if the query has been closed.
+    # GetOperationState should return 'Invalid or unknown query handle' if the query has
+    # been closed.
     TestHS2.check_response(get_operation_status_resp, \
         TCLIService.TStatusCode.ERROR_STATUS)
 
@@ -368,7 +372,7 @@ class TestHS2(HS2TestSuite):
     TestHS2.check_response(get_operation_status_resp, \
         TCLIService.TStatusCode.ERROR_STATUS)
 
-    err_msg = "Invalid query handle: efcdab8967452301:3031323334353637"
+    err_msg = "Invalid or unknown query handle: efcdab8967452301:3031323334353637"
     assert err_msg in get_operation_status_resp.status.errorMessage
 
     get_result_set_metadata_req = TCLIService.TGetResultSetMetadataReq()
@@ -378,7 +382,7 @@ class TestHS2(HS2TestSuite):
     TestHS2.check_response(get_result_set_metadata_resp, \
         TCLIService.TStatusCode.ERROR_STATUS)
 
-    err_msg = "Invalid query handle: efcdab8967452301:3031323334353637"
+    err_msg = "Invalid or unknown query handle: efcdab8967452301:3031323334353637"
     assert err_msg in get_result_set_metadata_resp.status.errorMessage
 
   @pytest.mark.execute_serially
@@ -788,6 +792,99 @@ class TestHS2(HS2TestSuite):
         assert statement in info_string["value"], \
           "JSON content is invalid. Content: {0}".format(get_profile_resp.profile)
         break
+
+  @needs_session()
+  def test_concurrent_unregister(self):
+    """Test that concurrently unregistering a query from multiple clients is safe and
+    that the profile can be fetched during the process."""
+    # Attach a UUID to the query text to make it easy to identify in web UI.
+    query_uuid = str(uuid.uuid4())
+    statement = "/*{0}*/ SELECT COUNT(2) FROM functional.alltypes".format(query_uuid)
+    execute_statement_resp = self.execute_statement(statement)
+    op_handle = execute_statement_resp.operationHandle
+
+    fetch_results_req = TCLIService.TFetchResultsReq()
+    fetch_results_req.operationHandle = op_handle
+    fetch_results_req.maxRows = 100
+    fetch_results_resp = self.hs2_client.FetchResults(fetch_results_req)
+    TestHS2.check_response(fetch_results_resp)
+
+    # Create a profile fetch thread and multiple unregister threads.
+    NUM_UNREGISTER_THREADS = 10
+    threads = []
+    profile_fetch_exception = [None]
+    unreg_exceptions = [None] * NUM_UNREGISTER_THREADS
+    sockets = []
+    try:
+      # Start a profile fetch thread first that will fetch the profile
+      # as the query is unregistered.
+      threads.append(threading.Thread(target=self._fetch_profile_loop,
+        args=(profile_fetch_exception, query_uuid, op_handle)))
+
+      # Start threads that will race to unregister the query.
+      for i in xrange(NUM_UNREGISTER_THREADS):
+        socket, client = self._open_hs2_connection()
+        sockets.append(socket)
+        threads.append(threading.Thread(target=self._unregister_query,
+            args=(i, unreg_exceptions, client, op_handle)))
+      for thread in threads:
+        thread.start()
+      for thread in threads:
+        thread.join()
+    finally:
+      for socket in sockets:
+        socket.close()
+
+    if profile_fetch_exception[0] is not None:
+      raise profile_fetch_exception[0]
+
+    # Validate the exceptions and ensure only one thread successfully unregistered
+    # the query.
+    num_successful = 0
+    for exception in unreg_exceptions:
+      if exception is None:
+        num_successful += 1
+      elif "Invalid or unknown query handle" not in str(exception):
+        raise exception
+    assert num_successful == 1, "Only one client should have been able to unregister"
+
+  def _fetch_profile_loop(self, exception_array, query_uuid, op_handle):
+    try:
+      # This thread will keep fetching the profile to make sure that the
+      # ClientRequestState object can be continually accessed during unregistration.
+      get_profile_req = ImpalaHiveServer2Service.TGetRuntimeProfileReq()
+      get_profile_req.operationHandle = op_handle
+      get_profile_req.sessionHandle = self.session_handle
+
+      def find_query(array):
+        """Find the query for this test in a JSON array returned from web UI."""
+        return [q for q in array if query_uuid in q['stmt']]
+      # Loop until the query has been unregistered and moved out of in-flight
+      # queries.
+      registered = True
+      while registered:
+        get_profile_resp = self.hs2_client.GetRuntimeProfile(get_profile_req)
+        TestHS2.check_response(get_profile_resp)
+        if "Unregister query" in get_profile_resp.profile:
+          json = self.impalad_test_service.get_queries_json()
+          inflight_query = find_query(json['in_flight_queries'])
+          completed_query = find_query(json['completed_queries'])
+          # Query should only be in one list.
+          assert len(inflight_query) + len(completed_query) == 1
+          if completed_query:
+            registered = False
+    except BaseException as e:
+      exception_array[0] = e
+
+  def _unregister_query(self, thread_num, exceptions, client, op_handle):
+    # Add some delay/jitter so that unregisters come in at different times.
+    time.sleep(0.01 + 0.005 * random.random())
+    try:
+      close_operation_req = TCLIService.TCloseOperationReq()
+      close_operation_req.operationHandle = op_handle
+      TestHS2.check_response(client.CloseOperation(close_operation_req))
+    except BaseException as e:
+      exceptions[thread_num] = e
 
   @needs_session(conf_overlay={"use:database": "functional"})
   def test_change_default_database(self):
