@@ -24,7 +24,7 @@ PLAN-ROOT SINK
 |     row-size=16B cardinality=150.00K
 |
 00:SCAN HDFS [tpch_parquet.lineitem]
-   HDFS partitions=1/1 files=3 size=193.99MB
+   HDFS partitions=1/1 files=3 size=193.98MB
    predicates: l_partkey > 0, l_suppkey > 10 OR l_suppkey > 30
    runtime filters: RF000 -> l_orderkey
    row-size=24B cardinality=600.12K
@@ -54,7 +54,7 @@ PLAN-ROOT SINK
 |     row-size=16B cardinality=150.00K
 |
 00:SCAN HDFS [tpch_parquet.lineitem]
-   HDFS partitions=1/1 files=3 size=193.99MB
+   HDFS partitions=1/1 files=3 size=193.98MB
    predicates: l_partkey > 0, l_suppkey > 10 OR l_suppkey > 30
    row-size=24B cardinality=600.12K
 ====
@@ -84,7 +84,7 @@ PLAN-ROOT SINK
 |     row-size=16B cardinality=150.00K
 |
 00:SCAN HDFS [tpch_parquet.lineitem]
-   HDFS partitions=1/1 files=3 size=193.99MB
+   HDFS partitions=1/1 files=3 size=193.98MB
    predicates: l_partkey > 0, l_suppkey <= 30 OR l_suppkey >= 30 AND l_suppkey <= 50, l_suppkey >= 10 OR l_suppkey >= 30 AND l_suppkey <= 50
    runtime filters: RF000 -> l_orderkey
    row-size=24B cardinality=600.12K
@@ -118,7 +118,7 @@ PLAN-ROOT SINK
 |     row-size=16B cardinality=91
 |
 00:SCAN HDFS [tpch_parquet.lineitem]
-   HDFS partitions=1/1 files=3 size=193.99MB
+   HDFS partitions=1/1 files=3 size=193.98MB
    predicates: l_partkey > 0, l_suppkey IN (10, 30, 50)
    runtime filters: RF000 -> l_orderkey
    row-size=24B cardinality=586
@@ -144,7 +144,7 @@ PLAN-ROOT SINK
 |  row-size=40B cardinality=600.12K
 |
 |--00:SCAN HDFS [tpch_parquet.lineitem]
-|     HDFS partitions=1/1 files=3 size=193.99MB
+|     HDFS partitions=1/1 files=3 size=193.98MB
 |     predicates: l_partkey > 0
 |     row-size=24B cardinality=600.12K
 |
@@ -182,7 +182,7 @@ PLAN-ROOT SINK
 |     row-size=16B cardinality=150.00K
 |
 00:SCAN HDFS [tpch_parquet.lineitem]
-   HDFS partitions=1/1 files=3 size=193.99MB
+   HDFS partitions=1/1 files=3 size=193.98MB
    predicates: l_partkey > 0
    runtime filters: RF000 -> l_orderkey
    row-size=24B cardinality=600.12K
@@ -216,7 +216,7 @@ PLAN-ROOT SINK
 |     row-size=16B cardinality=150.00K
 |
 00:SCAN HDFS [tpch_parquet.lineitem]
-   HDFS partitions=1/1 files=3 size=193.99MB
+   HDFS partitions=1/1 files=3 size=193.98MB
    predicates: l_partkey > 0, l_suppkey <= 50 OR l_suppkey >= 30 AND l_suppkey <= 90, l_suppkey >= 10 OR l_suppkey >= 30 AND l_suppkey <= 90
    runtime filters: RF000 -> l_orderkey
    row-size=24B cardinality=600.12K
@@ -250,7 +250,7 @@ PLAN-ROOT SINK
 |     row-size=16B cardinality=150.00K
 |
 00:SCAN HDFS [tpch_parquet.lineitem]
-   HDFS partitions=1/1 files=3 size=193.99MB
+   HDFS partitions=1/1 files=3 size=193.98MB
    predicates: l_partkey > 0, l_suppkey <= 50 OR l_suppkey >= 30 AND l_suppkey <= 90, l_suppkey >= 10 OR l_suppkey >= 30 AND l_suppkey <= 90
    runtime filters: RF000 -> l_orderkey
    row-size=24B cardinality=600.12K
@@ -278,7 +278,7 @@ PLAN-ROOT SINK
 |  row-size=40B cardinality=600.12K
 |
 |--00:SCAN HDFS [tpch_parquet.lineitem]
-|     HDFS partitions=1/1 files=3 size=193.99MB
+|     HDFS partitions=1/1 files=3 size=193.98MB
 |     predicates: l_partkey > 0
 |     row-size=24B cardinality=600.12K
 |
@@ -308,7 +308,7 @@ PLAN-ROOT SINK
 |  row-size=20B cardinality=5
 |
 00:SCAN HDFS [tpch_parquet.lineitem]
-   HDFS partitions=1/1 files=3 size=193.99MB
+   HDFS partitions=1/1 files=3 size=193.98MB
    row-size=8B cardinality=6.00M
 ====
 # IMPALA-9620: query2
@@ -325,6 +325,51 @@ PLAN-ROOT SINK
 |  row-size=1B cardinality=2
 |
 00:SCAN HDFS [tpch_parquet.lineitem]
-   HDFS partitions=1/1 files=3 size=193.99MB
+   HDFS partitions=1/1 files=3 size=193.98MB
+   row-size=8B cardinality=6.00M
+====
+# Test predicates in the SELECT and ORDER-BY
+select l_quantity,
+  if(l_quantity < 5 or l_quantity > 45, 'invalid', 'valid')
+ from lineitem
+ order by l_quantity,
+  if(l_quantity < 5 or l_quantity > 45, 'invalid', 'valid')
+  limit 5
+---- QUERYOPTIONS
+ENABLE_CNF_REWRITES=true
+---- PLAN
+PLAN-ROOT SINK
+|
+01:TOP-N [LIMIT=5]
+|  order by: l_quantity ASC, if(l_quantity < 5 OR l_quantity > 45, 'invalid', 'valid') ASC
+|  row-size=20B cardinality=5
+|
+00:SCAN HDFS [tpch_parquet.lineitem]
+   HDFS partitions=1/1 files=3 size=193.98MB
+   row-size=8B cardinality=6.00M
+====
+# Test predicate in the ORDER BY of an analytic function.
+select rank() over
+  (order by if(l_quantity < 5 or l_quantity > 45, 'invalid', 'valid'))
+ from tpch.lineitem
+ limit 5;
+---- QUERYOPTIONS
+ENABLE_CNF_REWRITES=true
+---- PLAN
+PLAN-ROOT SINK
+|
+02:ANALYTIC
+|  functions: rank()
+|  order by: if(l_quantity < 5 OR l_quantity > 45, 'invalid', 'valid') ASC
+|  window: RANGE BETWEEN UNBOUNDED PRECEDING AND CURRENT ROW
+|  limit: 5
+|  row-size=28B cardinality=5
+|
+01:SORT
+|  order by: if(l_quantity < 5 OR l_quantity > 45, 'invalid', 'valid') ASC
+|  row-size=20B cardinality=6.00M
+|
+00:SCAN HDFS [tpch.lineitem]
+   HDFS partitions=1/1 files=1 size=718.94MB
    row-size=8B cardinality=6.00M
 ====

@@ -109,6 +109,9 @@ public class ConvertToCNFRule implements ExprRewriteRule {
         // check if this predicate references one or more tuples. If only 1 tuple,
         // we can skip the rewrite since the disjunct can be pushed down as-is
         List<TupleId> tids = new ArrayList<>();
+        if (!cpred.isAnalyzed()) {
+          cpred.analyzeNoThrow(analyzer);
+        }
         cpred.getIds(tids, null);
         if (tids.size() <= 1) {
           return cpred;
