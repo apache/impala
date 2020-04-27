@@ -36,7 +36,8 @@ LOGGING_OPTIONS="-Dorg.slf4j.simpleLogger.showDateTime \
 
 # Always use maven's batch mode (-B), as it produces output that is easier to parse.
 if ! mvn -B $IMPALA_MAVEN_OPTIONS $LOGGING_OPTIONS "$@" | \
-  tee -a "$LOG_FILE" | grep -E -e WARNING -e ERROR -e SUCCESS -e FAILURE -e Test; then
+  tee -a "$LOG_FILE" | \
+  grep -E -e WARNING -e ERROR -e SUCCESS -e FAILURE -e Test -e "Found Banned"; then
   echo "mvn $IMPALA_MAVEN_OPTIONS $@ exited with code $?"
   exit 1
 fi
