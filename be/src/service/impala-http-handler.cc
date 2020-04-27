@@ -21,6 +21,7 @@
 #include <mutex>
 #include <sstream>
 #include <boost/lexical_cast.hpp>
+#include <boost/unordered_set.hpp>
 #include <rapidjson/prettywriter.h>
 #include <rapidjson/stringbuffer.h>
 
@@ -458,6 +459,7 @@ void ImpalaHttpHandler::QueryStateHandler(const Webserver::WebRequest& req,
           sorted_query_records.insert(ImpalaServer::QueryStateRecord(*request_state));
       });
 
+  unordered_set<TUniqueId> in_flight_query_ids;
   Value in_flight_queries(kArrayType);
   int64_t num_waiting_queries = 0;
   for (const ImpalaServer::QueryStateRecord& record: sorted_query_records) {
@@ -467,6 +469,7 @@ void ImpalaHttpHandler::QueryStateHandler(const Webserver::WebRequest& req,
     if (record_json["waiting"].GetBool()) ++num_waiting_queries;
 
     in_flight_queries.PushBack(record_json, document->GetAllocator());
+    in_flight_query_ids.insert(record.id);
   }
   document->AddMember("in_flight_queries", in_flight_queries, document->GetAllocator());
   document->AddMember("num_in_flight_queries",
@@ -488,6 +491,8 @@ void ImpalaHttpHandler::QueryStateHandler(const Webserver::WebRequest& req,
     lock_guard<mutex> l(server_->query_log_lock_);
     for (const unique_ptr<ImpalaServer::QueryStateRecord>& log_entry :
         server_->query_log_) {
+      // Don't show duplicated entries between in-flight and completed queries.
+      if (in_flight_query_ids.find(log_entry->id) != in_flight_query_ids.end()) continue;
       Value record_json(kObjectType);
       QueryStateToJson(*log_entry, &record_json, document);
       completed_queries.PushBack(record_json, document->GetAllocator());

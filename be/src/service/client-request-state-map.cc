@@ -42,18 +42,14 @@ Status ClientRequestStateMap::AddClientRequestState(
   return Status::OK();
 }
 
-Status ClientRequestStateMap::DeleteClientRequestState(
-    const TUniqueId& query_id, shared_ptr<ClientRequestState>* request_state) {
+Status ClientRequestStateMap::DeleteClientRequestState(const TUniqueId& query_id) {
   ScopedShardedMapRef<shared_ptr<ClientRequestState>> map_ref(query_id, this);
   DCHECK(map_ref.get() != nullptr);
   auto entry = map_ref->find(query_id);
   if (entry == map_ref->end()) {
-    string error_msg =
-        strings::Substitute("Invalid or unknown query handle $0", PrintId(query_id));
-    VLOG(1) << error_msg;
-    return Status::Expected(error_msg);
-  } else if (request_state != nullptr) {
-    *request_state = entry->second;
+    Status err = Status::Expected(TErrorCode::INVALID_QUERY_HANDLE, PrintId(query_id));
+    VLOG(1) << err.GetDetail();
+    return err;
   }
   map_ref->erase(entry);
   return Status::OK();

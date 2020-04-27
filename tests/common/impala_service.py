@@ -212,16 +212,19 @@ class ImpaladService(BaseImpalaService):
       groups[backend['executor_groups']].append(backend['krpc_address'])
     return groups
 
+  def get_queries_json(self):
+    """Return the full JSON from the /queries page."""
+    return json.loads(self.read_debug_webpage('queries?json', timeout=30, interval=1))
+
   def get_query_locations(self):
     # Returns a dictionary of the format <host_address, num_of_queries_running_there>
-    result = json.loads(self.read_debug_webpage('queries?json', timeout=30, interval=1))
+    result = self.get_queries_json()
     if result['query_locations'] is not None:
       return dict([(loc["location"], loc["count"]) for loc in result['query_locations']])
     return None
 
   def get_in_flight_queries(self, timeout=30, interval=1):
-    result = json.loads(self.read_debug_webpage('queries?json', timeout, interval))
-    return result['in_flight_queries']
+    return self.get_queries_json()['in_flight_queries']
 
   def _get_pool_counter(self, pool_name, counter_name, timeout=30, interval=1):
     """Returns the value of the field 'counter_name' in pool 'pool_name' or 0 if the pool

@@ -175,6 +175,10 @@ class AtomicBool {
   /// Atomic store with "release" memory-ordering semantic.
   ALWAYS_INLINE void Store(bool val) { boolean_.Store(val); }
 
+  ALWAYS_INLINE bool CompareAndSwap(bool old_val, bool new_val) {
+    return boolean_.CompareAndSwap(old_val, new_val);
+  }
+
  private:
   internal::AtomicInt<int32_t> boolean_;
 };

@@ -509,7 +509,8 @@ class ImpalaServer : public ImpalaServiceIf,
 
   /// Per-session state.  This object is reference counted using shared_ptrs.  There
   /// is one ref count in the SessionStateMap for as long as the session is active.
-  /// All queries running from this session also have a reference.
+  /// All queries running from this session also have a reference, because query
+  /// unregistration may complete asynchronously after the session is unregistered.
   struct SessionState {
     /// The default hs2_version must be V1 so that child queries (which use HS2, but may
     /// run as children of Beeswax sessions) get results back in the expected format -
@@ -644,9 +645,12 @@ class ImpalaServer : public ImpalaServiceIf,
   static const char* SQLSTATE_GENERAL_ERROR;
   static const char* SQLSTATE_OPTIONAL_FEATURE_NOT_IMPLEMENTED;
 
-  /// Return exec state for given query_id, or NULL if not found.
+  /// Return exec state for given query_id, or NULL if not found. If
+  /// 'return_unregistered' is true, queries that have started unregistration
+  /// may be returned. Otherwise queries that have started unregistration will
+  /// not be returned.
   std::shared_ptr<ClientRequestState> GetClientRequestState(
-      const TUniqueId& query_id);
+      const TUniqueId& query_id, bool return_unregistered=false);
 
   /// Used in situations where the client provides a session ID and a query ID and the
   /// caller needs to validate that the query can be accessed from the session. The two
@@ -697,29 +701,30 @@ class ImpalaServer : public ImpalaServiceIf,
   Status SetQueryInflight(std::shared_ptr<SessionState> session_state,
       const std::shared_ptr<ClientRequestState>& exec_state) WARN_UNUSED_RESULT;
 
-  /// Unregister the query by cancelling it, removing exec_state from
-  /// client_request_state_map_, and removing the query id from session state's
-  /// in-flight query list. If check_inflight is true, then return an error if the query
+  /// Starts the process of unregistering the query. The query is cancelled on the
+  /// current thread, then asynchronously the query's entry is removed from
+  /// client_request_state_map_ and the session state's in-flight query list.
+  /// If check_inflight is true, then return an error if the query
   /// is not yet in-flight. Otherwise, proceed even if the query isn't yet in-flight (for
   /// cleaning up after an error on the query issuing path).
   Status UnregisterQuery(const TUniqueId& query_id, bool check_inflight,
       const Status* cause = NULL) WARN_UNUSED_RESULT;
 
-  /// Performs any final cleanup necessary before the given ClientRequestState goes out
-  /// of scope and is deleted. Marks the given ClientRequestState as done, removes the
-  /// query from the inflight queries list, updates query_locations_, and archives the
-  /// query. Used when unregistering the query.
-  Status CloseClientRequestState(
-      const std::shared_ptr<ClientRequestState>& request_state);
+  /// Unregisters the provided query, does all required finalization and removes it from
+  /// 'client_request_state_' map.
+  void FinishUnregisterQuery(std::shared_ptr<ClientRequestState>&& request_state);
 
-  /// Initiates query cancellation reporting the given cause as the query status.
-  /// Assumes deliberate cancellation by the user if the cause is NULL.  Returns an
-  /// error if query_id is not found.  If check_inflight is true, then return an error
-  /// if the query is not yet in-flight.  Otherwise, returns OK.  Queries still need to
-  /// be unregistered, after cancellation.  Caller should not hold any locks when
-  /// calling this function.
-  Status CancelInternal(const TUniqueId& query_id, bool check_inflight,
-      const Status* cause = NULL) WARN_UNUSED_RESULT;
+  /// Performs finalization of 'request_state' before the request state is removed from
+  /// the server and deleted. Runs asynchronously after the request is reported done
+  /// to the client. Removes the query from the inflight queries list, updates
+  /// query_locations_, and archives the query.
+  void CloseClientRequestState(const std::shared_ptr<ClientRequestState>& request_state);
+
+  /// Initiates query cancellation triggered by the user (i.e. deliberate cancellation).
+  /// Returns an error if query_id is not found or if the query is not yet in flight.
+  /// Otherwise, returns OK. Queries still need to be unregistered after cancellation.
+  /// Caller should not hold any locks when calling this function.
+  Status CancelInternal(const TUniqueId& query_id);
 
   /// Close the session and release all resource used by this session.
   /// Caller should not hold any locks when calling this function.
@@ -1038,7 +1043,9 @@ class ImpalaServer : public ImpalaServiceIf,
   /// Guards query_log_ and query_log_index_
   std::mutex query_log_lock_;
 
-  /// FIFO list of query records, which are written after the query finishes executing
+  /// FIFO list of query records, which are written after the query finishes executing.
+  /// Queries may briefly have entries in 'query_log_' and 'client_request_state_map_'
+  /// while the query is being unregistered.
   typedef std::list<std::unique_ptr<QueryStateRecord>> QueryLog;
   QueryLog query_log_;
 
@@ -1076,6 +1083,10 @@ class ImpalaServer : public ImpalaServiceIf,
   /// avoid blocking the statestore callback.
   boost::scoped_ptr<ThreadPool<CancellationWork>> cancellation_thread_pool_;
 
+  /// Thread pool to unregister queries asynchronously from RPCs. FinishUnregisterQuery()
+  /// is called on all ClientRequestStates added to this pool.
+  boost::scoped_ptr<ThreadPool<std::shared_ptr<ClientRequestState>>> unreg_thread_pool_;
+
   /// Thread that runs SessionMaintenance. It will wake up periodically to check for
   /// sessions which are idle for more their timeout values.
   std::unique_ptr<Thread> session_maintenance_thread_;
@@ -1096,6 +1107,16 @@ class ImpalaServer : public ImpalaServiceIf,
   /// A ClientRequestStateMap maps query ids to ClientRequestStates. The
   /// ClientRequestStates are owned by the ImpalaServer and ClientRequestStateMap
   /// references them using shared_ptr to allow asynchronous deletion.
+  ///
+  /// ClientRequestStates are unregistered from the server as follows:
+  /// 1. UnregisterQuery() is called, which calls ClientRequestState::Finalize() to cancel
+  ///    query execution and start the unregistration process. At this point the query is
+  ///    considered unregistered from the client's point of view.
+  /// 2. The ClientRequestState is enqueued in 'unreg_thread_pool_' to complete
+  ///    unregistration asynchronously.
+  /// 3. Additional cleanup work is done by CloseClientRequestState(), and an entry
+  ///    is added to 'query_log_' for this query.
+  /// 4. The ClientRequestState is removed from this map.
   ClientRequestStateMap client_request_state_map_;
 
   /// Default query options in the form of TQueryOptions and beeswax::ConfigVariable

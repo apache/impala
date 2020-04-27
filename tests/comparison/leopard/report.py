@@ -49,22 +49,23 @@ class Report(object):
 
   def classify_error(self, error):
     d = {
-    ur'LINE \d+:': 'Postgres_error',
-    ur'Permission denied': 'permission_denied',
-    ur'^AnalysisException': 'AnalysisException',
-    ur'^Column \d+ in row \d+ does not match': 'mismatch',
-    ur'^Could not connect': 'could_not_connect',
-    ur'^IllegalStateException': 'IllegalStateException',
-    ur'^Invalid query handle: ': 'invalid_query_handle',
-    ur'^Known issue:': 'known_issue',
-    ur'^Operation is in ERROR_STATE': 'error_state',
-    ur'^Query timed out after \d+ seconds': 'timeout',
-    ur'^Row counts do not match': 'row_counts',
-    ur'^Too much data': 'too_much_data',
-    ur'^Unknown expr node type: \d+': 'unkown_node',
-    ur'^Year is out of valid range': 'year_range',
-    ur'^[A-Za-z]+ out of range': 'out_of_range',
-    ur'^division by zero': 'division_by_zero'}
+      ur'LINE \d+:': 'Postgres_error',
+      ur'Permission denied': 'permission_denied',
+      ur'^AnalysisException': 'AnalysisException',
+      ur'^Column \d+ in row \d+ does not match': 'mismatch',
+      ur'^Could not connect': 'could_not_connect',
+      ur'^IllegalStateException': 'IllegalStateException',
+      ur'^Invalid query handle: ': 'invalid_query_handle',
+      ur'^Invalid or unknown query handle: ': 'invalid_query_handle',
+      ur'^Known issue:': 'known_issue',
+      ur'^Operation is in ERROR_STATE': 'error_state',
+      ur'^Query timed out after \d+ seconds': 'timeout',
+      ur'^Row counts do not match': 'row_counts',
+      ur'^Too much data': 'too_much_data',
+      ur'^Unknown expr node type: \d+': 'unkown_node',
+      ur'^Year is out of valid range': 'year_range',
+      ur'^[A-Za-z]+ out of range': 'out_of_range',
+      ur'^division by zero': 'division_by_zero'}
 
     for r in d:
       if re.search(r, error):

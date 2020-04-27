@@ -159,6 +159,7 @@ ClientRequestState::ClientRequestState(
 
 ClientRequestState::~ClientRequestState() {
   DCHECK(wait_thread_.get() == NULL) << "BlockOnWait() needs to be called!";
+  DCHECK(started_finalize_.Load()) << "Finalize() must have been called";
 }
 
 Status ClientRequestState::SetResultCache(QueryResultSet* cache,
@@ -724,7 +725,14 @@ Status ClientRequestState::ExecShutdownRequest() {
   return Status::OK();
 }
 
-void ClientRequestState::Done() {
+Status ClientRequestState::Finalize(bool check_inflight, const Status* cause) {
+  if (!started_finalize_.CompareAndSwap(false, true)) {
+    // Return error as-if the query was already unregistered, so that it appears to the
+    // client as-if unregistration already happened. We don't need a distinct
+    // client-visible error for this case.
+    return Status::Expected(TErrorCode::INVALID_QUERY_HANDLE, PrintId(query_id()));
+  }
+  RETURN_IF_ERROR(Cancel(check_inflight, cause));
   MarkActive();
   // Make sure we join on wait_thread_ before we finish (and especially before this object
   // is destroyed).
@@ -756,7 +764,6 @@ void ClientRequestState::Done() {
 
   {
     unique_lock<mutex> l(lock_);
-    query_events_->MarkEvent("Unregister query");
     // Update result set cache metrics, and update mem limit accounting before tearing
     // down the coordinator.
     ClearResultCache();
@@ -771,6 +778,10 @@ void ClientRequestState::Done() {
     LogQueryEvents();
   }
   DCHECK(wait_thread_.get() == nullptr);
+
+  // Update the timeline here so that all of the above work is captured in the timeline.
+  query_events_->MarkEvent("Unregister query");
+  return Status::OK();
 }
 
 Status ClientRequestState::Exec(const TMetadataOpRequest& exec_request) {
@@ -1483,7 +1494,7 @@ void ClientRequestState::ClearTransactionState() {
 
 void ClientRequestState::LogQueryEvents() {
   // Wait until the results are available. This guarantees the completion of non QUERY
-  // statemens like DDL/DML etc. Query events are logged if the query reaches a FINISHED
+  // statements like DDL/DML etc. Query events are logged if the query reaches a FINISHED
   // state. For certain query types, events are logged regardless of the query state.
   Status status;
   {

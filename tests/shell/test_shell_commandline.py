@@ -434,7 +434,7 @@ class TestImpalaShell(ImpalaTestSuite):
     os.kill(p.pid(), signal.SIGINT)
     result = p.get_result()
     assert "Cancelling Query" in result.stderr
-    assert "Invalid query handle" not in result.stderr
+    assert "Invalid or unknown query handle" not in result.stderr
 
   def test_get_log_once(self, vector, empty_table):
     """Test that get_log() is always called exactly once."""
