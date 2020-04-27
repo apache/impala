@@ -1079,7 +1079,9 @@ void BufferedTupleStream::ReadIterator::Init(bool attach_on_read) {
   valid_ = true;
   rows_returned_ = 0;
   DCHECK(!attach_on_read_) << "attach_on_read can only be set once";
-  attach_on_read_ = attach_on_read;
+  // Only set 'attach_on_read' if needed. Otherwise, if this is the builtin
+  // iterator, a benign data race may be flagged by TSAN (see IMPALA-9701).
+  if (attach_on_read) attach_on_read_ = attach_on_read;
 }
 
 void BufferedTupleStream::ReadIterator::SetReadPage(list<Page>::iterator read_page) {
