@@ -758,6 +758,8 @@ under the License.
                     <exclude>org.fusesource.leveldbjni:*</exclude>
                     <!-- IMPALA-9647 (re: CVE-2014-3577, CVE-2015-5262) -->
                     <exclude>org.apache.httpcomponents:fluent-hc</exclude>
+                    <!-- IMPALA-9648: Ensure that netty < v3.10.6 is not present. -->
+                    <exclude>io.netty:netty:[3.10.6,)</exclude>
                     <!-- IMPALA-9648: Ensure that netty-all < v4.1.46 is not present. -->
                     <exclude>io.netty:netty-all:[4.1.46,)</exclude>
                     <!-- Assert that we only use artifacts from only the specified
