@@ -416,27 +416,18 @@ public class AnalysisContext {
 
     // Analyze statement and record exception.
     AnalysisException analysisException = null;
-    TClientRequest clientRequest;
-    AuthorizationContext authzCtx = null;
-
+    TClientRequest clientRequest = queryCtx_.getClient_request();
+    AuthorizationContext authzCtx = authzChecker.createAuthorizationContext(true,
+        clientRequest.isSetRedacted_stmt() ?
+            clientRequest.getRedacted_stmt() : clientRequest.getStmt(),
+        queryCtx_.getSession(), Optional.of(timeline_));
+    Preconditions.checkState(authzCtx != null);
     try {
-      clientRequest = queryCtx_.getClient_request();
-      authzCtx = authzChecker.createAuthorizationContext(true,
-          clientRequest.isSetRedacted_stmt() ?
-              clientRequest.getRedacted_stmt() : clientRequest.getStmt(),
-          queryCtx_.getSession(), Optional.of(timeline_));
-      // TODO (IMPALA-9597): Generating column masking audit events in the analysis phase
-      // suffers from the drawback of losing the opportunity to control the final
-      // results. Redundant audits could be generated. For example, we will always
-      // generate audit events for column masking even though the requesting user is not
-      // granted the necessary privilege on the specified resource because
-      // AuthorizationChecker#postAuthorize() is always called whether there is an
-      // AuthorizationException or not. Another example is that if a table occurs several
-      // times in a query, we would have duplicate audits for the same column involved in
-      // a column masking policy.
       analyze(stmtTableCache, authzCtx);
     } catch (AnalysisException e) {
       analysisException = e;
+    } finally {
+      authzChecker.postAnalyze(authzCtx);
     }
     timeline_.markEvent("Analysis finished");
 
@@ -448,9 +439,7 @@ public class AnalysisContext {
     } catch (AuthorizationException e) {
       authException = e;
     } finally {
-      if (authzCtx != null) {
-        authzChecker.postAuthorize(authzCtx);
-      }
+      authzChecker.postAuthorize(authzCtx, authException == null);
     }
 
     // AuthorizationExceptions take precedence over AnalysisExceptions so as not

@@ -19,7 +19,14 @@ package org.apache.impala.authorization.ranger;
 
 import com.google.common.base.Preconditions;
 import org.apache.commons.lang3.StringUtils;
+import org.apache.ranger.plugin.model.RangerServiceDef;
 import org.apache.ranger.plugin.service.RangerBasePlugin;
+
+import java.util.Collection;
+import java.util.HashSet;
+import java.util.List;
+import java.util.Set;
+
 
 /**
  * An implementation of Ranger Impala plugin. Make this a singleton since each process
@@ -52,5 +59,20 @@ public class RangerImpalaPlugin extends RangerBasePlugin {
     Preconditions.checkState(StringUtils.equals(APP_ID, appId),
         String.format("%s != %s", APP_ID, appId));
     return INSTANCE;
+  }
+
+  /**
+   * This method returns the names of the supported mask types excluding those specified
+   * in maskNamesToFilter. The method is not static since getServiceDef() is not static.
+   */
+  public Set<String> getUnfilteredMaskNames(Collection<String> maskNamesToFilter) {
+    Set<String> maskNames = new HashSet<>();
+    List<RangerServiceDef.RangerDataMaskTypeDef> maskTypes =
+        getServiceDef().getDataMaskDef().getMaskTypes();
+    for (RangerServiceDef.RangerDataMaskTypeDef maskType : maskTypes) {
+      maskNames.add(maskType.getName().toUpperCase());
+    }
+    maskNames.removeAll(maskNamesToFilter);
+    return maskNames;
   }
 }

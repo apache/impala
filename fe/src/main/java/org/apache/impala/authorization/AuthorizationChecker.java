@@ -56,8 +56,7 @@ public interface AuthorizationChecker {
    * @param timeline optional timeline to mark events in the query profile
    */
   AuthorizationContext createAuthorizationContext(boolean doAudits, String sqlStmt,
-      TSessionState sessionState, Optional<EventSequence> timeline)
-      throws InternalException;
+      TSessionState sessionState, Optional<EventSequence> timeline);
 
   /**
    * Authorize an analyzed statement.
@@ -71,7 +70,7 @@ public interface AuthorizationChecker {
   /**
    * This method is to be executed after an authorization check has occurred.
    */
-  void postAuthorize(AuthorizationContext authzCtx)
+  void postAuthorize(AuthorizationContext authzCtx, boolean authzOk)
       throws AuthorizationException, InternalException;
 
   /**
@@ -96,4 +95,9 @@ public interface AuthorizationChecker {
    */
   String createColumnMask(User user, String dbName, String tableName, String columnName,
       AuthorizationContext authzCtx) throws InternalException;
+
+  /**
+   * This method is to be executed after AnalysisContext#analyze() is completed.
+   */
+  void postAnalyze(AuthorizationContext authzCtx);
 }

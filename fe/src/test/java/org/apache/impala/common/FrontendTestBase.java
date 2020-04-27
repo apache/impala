@@ -397,6 +397,10 @@ public class FrontendTestBase extends AbstractFrontendTest {
           }
 
           @Override
+          public void postAnalyze(AuthorizationContext authzCtx) {
+          }
+
+          @Override
           public AuthorizationContext createAuthorizationContext(boolean doAudits,
               String sqlStmt, TSessionState sessionState,
               Optional<EventSequence> timeline) {

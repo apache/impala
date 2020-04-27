@@ -224,6 +224,10 @@ public class NoopAuthorizationFactory implements AuthorizationFactory {
           String columnName, AuthorizationContext authzCtx) {
         return null;
       }
+
+      @Override
+      public void postAnalyze(AuthorizationContext authzCtx) {
+      }
     };
   }
 
