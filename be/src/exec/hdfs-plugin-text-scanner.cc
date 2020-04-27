@@ -42,9 +42,9 @@ using boost::upgrade_lock;
 using boost::upgrade_to_unique_lock;
 using std::find;
 
-// Allow LZO by default to maintain backwards compatibility. We can add more options
-// if we determine that the plugins are well-maintained and generally stable.
-DEFINE_string(enabled_hdfs_text_scanner_plugins, "LZO", "(Advanced) whitelist of HDFS "
+// LZO is no longer supported, so there are no plugins enabled by default. This is
+// likely to be removed.
+DEFINE_string(enabled_hdfs_text_scanner_plugins, "", "(Advanced) whitelist of HDFS "
     "text scanner plugins that Impala will try to dynamically load. Must be a "
     "comma-separated list of upper-case compression codec names. Each plugin implements "
     "support for decompression and hands off the decompressed bytes to Impala's builtin "

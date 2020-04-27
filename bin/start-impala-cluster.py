@@ -139,7 +139,6 @@ options, args = parser.parse_args()
 IMPALA_HOME = os.environ["IMPALA_HOME"]
 CORE_SITE_PATH = os.path.join(IMPALA_HOME, "fe/src/test/resources/core-site.xml")
 KNOWN_BUILD_TYPES = ["debug", "release", "latest"]
-IMPALA_LZO = os.environ["IMPALA_LZO"]
 # The location in the container where the cache is always mounted.
 DATA_CACHE_CONTAINER_PATH = "/opt/impala/cache"
 
@@ -622,12 +621,6 @@ class DockerMiniClusterOperations(object):
 
     # Run the container as the current user.
     user_args = ["--user", "{0}:{1}".format(os.getuid(), os.getgid())]
-
-    # Allow loading LZO plugin, if built.
-    lzo_lib_dir = os.path.join(IMPALA_LZO, "build")
-    if os.path.isdir(lzo_lib_dir):
-      mount_args += ["--mount",
-                     "type=bind,src={0},dst=/opt/impala/lib/plugins".format(lzo_lib_dir)]
 
     mem_limit_args = []
     if mem_limit is not None:

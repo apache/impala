@@ -75,7 +75,6 @@ class TestCompressedFormats(ImpalaTestSuite):
     file_format = vector.get_value('file_format')
     extension, suffix = vector.get_value('compression_format')
     if file_format in ['rc', 'seq']:
-      # TODO: How about LZO?
       # Test that {gzip,snappy,bzip,deflate}-compressed
       # {RC,sequence,text} files are supported.
       db_suffix = '_%s_%s' % (file_format, suffix)

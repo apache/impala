@@ -171,7 +171,6 @@ COMPRESSION_MAP = {'def': 'org.apache.hadoop.io.compress.DefaultCodec',
                    'gzip': 'org.apache.hadoop.io.compress.GzipCodec',
                    'bzip': 'org.apache.hadoop.io.compress.BZip2Codec',
                    'snap': 'org.apache.hadoop.io.compress.SnappyCodec',
-                   'lzo': 'com.hadoop.compression.lzo.LzopCodec',
                    'none': ''
                   }
 
@@ -188,9 +187,6 @@ FILE_FORMAT_MAP = {
   'orc': 'ORC',
   'parquet': 'PARQUET',
   'hudiparquet': 'HUDIPARQUET',
-  'text_lzo':
-    "\nINPUTFORMAT 'com.hadoop.mapred.DeprecatedLzoTextInputFormat'" +
-    "\nOUTPUTFORMAT 'org.apache.hadoop.hive.ql.io.HiveIgnoreKeyTextOutputFormat'",
   'avro': 'AVRO',
   'hbase': "'org.apache.hadoop.hive.hbase.HBaseStorageHandler'",
   'kudu': "KUDU",
@@ -224,7 +220,7 @@ WITH SERDEPROPERTIES (
   "{hbase_column_mapping}")
 {tbl_properties}{{hdfs_location}}"""
 
-KNOWN_EXPLORATION_STRATEGIES = ['core', 'pairwise', 'exhaustive', 'lzo']
+KNOWN_EXPLORATION_STRATEGIES = ['core', 'pairwise', 'exhaustive']
 
 def build_create_statement(table_template, table_name, db_name, db_suffix,
                            file_format, compression, hdfs_location,
@@ -232,8 +228,6 @@ def build_create_statement(table_template, table_name, db_name, db_suffix,
   create_stmt = ''
   if (force_reload):
     create_stmt += 'DROP TABLE IF EXISTS %s%s.%s;\n' % (db_name, db_suffix, table_name)
-  if compression == 'lzo':
-    file_format = '%s_%s' % (file_format, compression)
   # hbase / kudu tables are external, and not read from hdfs. We don't need an
   # hdfs_location.
   if file_format in ['hbase', 'kudu']:
@@ -454,9 +448,9 @@ def build_insert_into_statement(insert, db_name, db_suffix, table_name, file_for
   statement += "set hive.auto.convert.join=true;\n"
 
   # For some reason (hive bug?) we need to have the CombineHiveInputFormat set
-  # for cases where we are compressing in bzip or lzo on certain tables that
+  # for cases where we are compressing in bzip on certain tables that
   # have multiple files.
-  if 'multi' in table_name and ('bzip' in db_suffix or 'lzo' in db_suffix):
+  if 'multi' in table_name and ('bzip' in db_suffix):
     statement += SET_HIVE_INPUT_FORMAT % "CombineHiveInputFormat"
   else:
     statement += SET_HIVE_INPUT_FORMAT % "HiveInputFormat"
@@ -682,9 +676,6 @@ def generate_statements(output_name, test_vectors, sections,
       output = impala_create
       if create_hive or file_format == 'hbase':
         output = hive_output
-      elif codec == 'lzo':
-        # Impala CREATE TABLE doesn't allow INPUTFORMAT.
-        output = hive_output
 
       # TODO: Currently, Kudu does not support partitioned tables via Impala.
       # If a CREATE_KUDU section was provided, assume it handles the partition columns
@@ -748,21 +739,7 @@ def generate_statements(output_name, test_vectors, sections,
       # moment, it assumes we're only using ALTER for partitioning the table.
       if alter and file_format not in ("hbase", "kudu"):
         use_db = 'USE {db_name};\n'.format(db_name=db)
-        if output == hive_output and codec == 'lzo':
-          # Hive ALTER TABLE ADD PARTITION doesn't handle null partitions, so
-          # we can't run the ALTER section in this case.
-          if options.force_reload:
-            # IMPALA-2278: Hive INSERT OVERWRITE won't clear out partition directories
-            # that weren't already added to the table. So, for force reload, manually
-            # delete the partition directories.
-            output.create.append(("DFS -rm -R {data_path};").format(
-              data_path=data_path))
-          else:
-            # If this is not a force reload use msck repair to add the partitions
-            # into the table.
-            output.create.append(use_db + 'msck repair table %s;' % (table_name))
-        else:
-          output.create.append(use_db + alter.format(table_name=table_name))
+        output.create.append(use_db + alter.format(table_name=table_name))
 
       # If the directory already exists in HDFS, assume that data files already exist
       # and skip loading the data. Otherwise, the data is generated using either an

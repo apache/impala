@@ -27,10 +27,12 @@ import com.google.common.collect.ImmutableMap;
  * Support for recognizing compression suffixes on data files.
  * Compression of a file is recognized in mapreduce by looking for suffixes of
  * supported codecs.
- * For now Impala supports LZO, GZIP, SNAPPY, BZIP2 and some additional formats if plugins
+ * For now Impala supports GZIP, SNAPPY, BZIP2 and some additional formats if plugins
  * are available. Even if a plugin is available, we need to add the file suffixes here so
  * that we can resolve the compression type from the file name. LZO can use the specific
  * HIVE input class.
+ * Some compression types here are detected even though they are not supported. This
+ * allows for better error messages (e.g. LZ4, LZO).
  */
 public enum HdfsCompression {
   NONE,

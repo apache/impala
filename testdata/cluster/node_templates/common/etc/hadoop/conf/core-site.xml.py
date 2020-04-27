@@ -26,8 +26,6 @@ target_filesystem = os.environ.get('TARGET_FILESYSTEM')
 compression_codecs = [
   'org.apache.hadoop.io.compress.GzipCodec',
   'org.apache.hadoop.io.compress.DefaultCodec',
-  'com.hadoop.compression.lzo.LzoCodec',
-  'com.hadoop.compression.lzo.LzopCodec',
   'org.apache.hadoop.io.compress.BZip2Codec'
 ]
 
@@ -44,7 +42,6 @@ CONFIG = {
 
   # Compression codecs
   'io.compression.codecs': ",".join(compression_codecs),
-  'io.compression.deoc.lzo.class': 'com.hadoop.compression.lzo.LzoCodec',
 
   # Set up proxyuser
   'hadoop.proxyuser.${USER}.hosts': '*',

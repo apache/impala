@@ -48,7 +48,7 @@ const char* const Codec::ZSTD_COMPRESSION =
 const char* const Codec::UNKNOWN_CODEC_ERROR =
     "This compression codec is currently unsupported: ";
 const char* const NO_LZO_MSG = "LZO codecs may not be created via the Codec interface. "
-    "Instead the LZO library is directly invoked.";
+    "Instead LZO is decoded by an optional text scanner plugin.";
 
 const Codec::CodecMap Codec::CODEC_MAP = {{"", THdfsCompression::NONE},
     {DEFAULT_COMPRESSION, THdfsCompression::DEFAULT},

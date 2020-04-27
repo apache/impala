@@ -130,9 +130,7 @@ class ScanRangeSharedState {
  public:
   /// Given a partition_id and filename returns the related file descriptor DCHECK ensures
   /// there is always file descriptor returned.
-  /// TODO: The LZO scanner expects a non const object so switch to returning a const once
-  /// support for LZO scanner is removed.
-  HdfsFileDesc* GetFileDesc(int64_t partition_id, const std::string& filename);
+  const HdfsFileDesc* GetFileDesc(int64_t partition_id, const std::string& filename);
 
   /// Sets the scanner specific metadata for 'partition_id' and 'filename'.
   /// Scanners can use this to store file header information. Thread safe.
@@ -497,12 +495,6 @@ class HdfsScanNodeBase : public ScanNode {
       ScanRangeMetadata* metadata, int disk_id, bool expected_local,
       bool is_erasure_coded, int64_t mtime, const io::BufferOpts& buffer_opts);
 
-  /// Old API for compatibility with text scanners (e.g. LZO text scanner).
-  io::ScanRange* AllocateScanRange(hdfsFS fs, const char* file, int64_t len,
-      int64_t offset, int64_t partition_id, int disk_id, int cache_options,
-      bool expected_local, int64_t mtime, bool is_erasure_coded = false,
-      const io::ScanRange* original_split = nullptr);
-
   /// Adds ranges to be read later by scanners. Must not be called once
   /// remaining_scan_range_submissions_ is 0. The enqueue_location specifies whether the
   /// scan ranges are added to the head or tail of the queue. Implemented by child classes
@@ -525,7 +517,7 @@ class HdfsScanNodeBase : public ScanNode {
 
   /// Given a partition_id and filename returns the related file descriptor
   /// DCHECK ensures there is always file descriptor returned
-  inline HdfsFileDesc* GetFileDesc(
+  inline const HdfsFileDesc* GetFileDesc(
       int64_t partition_id, const std::string& filename) {
     return shared_state_->GetFileDesc(partition_id, filename);
   }

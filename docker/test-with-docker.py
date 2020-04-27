@@ -184,11 +184,6 @@ def main():
                       default=os.path.expanduser("~/.ccache"))
   parser.add_argument('--tail', action="store_true",
       help="Run tail on all container log files.")
-  parser.add_argument('--impala-lzo-repo',
-      default="https://github.com/cloudera/impala-lzo.git",
-      help="Git repo for Impala-lzo repo")
-  parser.add_argument('--impala-lzo-ref', default='master',
-      help="Branch name for Impala-lzo repo.")
   parser.add_argument('--env', metavar='K=V', default=[], action='append',
       help="""Passes given environment variables (expressed as KEY=VALUE)
            through containers.
@@ -210,8 +205,6 @@ def main():
       suite_concurrency=args.suite_concurrency,
       impalad_mem_limit_bytes=args.impalad_mem_limit_bytes,
       tail=args.tail,
-      impala_lzo_repo=args.impala_lzo_repo,
-      impala_lzo_ref=args.impala_lzo_ref,
       env=args.env, base_image=args.base_image)
 
   fh = logging.FileHandler(os.path.join(_make_dir_if_not_exist(t.log_dir), "log.txt"))
@@ -449,7 +442,7 @@ class TestWithDocker(object):
                cleanup_image, ccache_dir, test_mode,
                suite_concurrency, parallel_test_concurrency,
                impalad_mem_limit_bytes, tail,
-               impala_lzo_repo, impala_lzo_ref, env, base_image):
+               env, base_image):
     self.build_image = build_image
     self.name = name
     self.containers = []
@@ -485,8 +478,6 @@ class TestWithDocker(object):
     self.parallel_test_concurrency = parallel_test_concurrency
     self.impalad_mem_limit_bytes = impalad_mem_limit_bytes
     self.tail = tail
-    self.impala_lzo_repo = impala_lzo_repo
-    self.impala_lzo_ref = impala_lzo_ref
     self.env = env
     self.base_image = base_image
 
@@ -571,8 +562,6 @@ class TestWithDocker(object):
           "-v", self.git_root + ":/repo:ro",
           "-v", self.git_common_dir + ":/git_common_dir:ro",
           "-e", "GIT_HEAD_REV=" + self.git_head_rev,
-          "-e", "IMPALA_LZO_REPO=" + self.impala_lzo_repo,
-          "-e", "IMPALA_LZO_REF=" + self.impala_lzo_ref,
           # Share timezone between host and container
           "-e", "LOCALTIME_LINK_TARGET=" + localtime_link_target,
           "-v", self.ccache_dir + ":/ccache",

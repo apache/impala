@@ -325,8 +325,6 @@ export DOWNLOAD_CDH_COMPONENTS=${DOWNLOAD_CDH_COMPONENTS-true}
 
 export IS_OSX="$(if [[ "$OSTYPE" == "darwin"* ]]; then echo true; else echo false; fi)"
 
-export HADOOP_LZO="${HADOOP_LZO-$IMPALA_HOME/../hadoop-lzo}"
-export IMPALA_LZO="${IMPALA_LZO-$IMPALA_HOME/../Impala-lzo}"
 export IMPALA_AUX_TEST_HOME="${IMPALA_AUX_TEST_HOME-$IMPALA_HOME/../Impala-auxiliary-tests}"
 export TARGET_FILESYSTEM="${TARGET_FILESYSTEM-hdfs}"
 export ERASURE_CODING="${ERASURE_CODING-false}"
@@ -568,18 +566,13 @@ export HADOOP_CONF_DIR="$IMPALA_FE_DIR/src/test/resources"
 export HADOOP_INCLUDE_DIR=${HADOOP_INCLUDE_DIR_OVERRIDE:-"${HADOOP_HOME}/include"}
 export HADOOP_LIB_DIR=${HADOOP_LIB_DIR_OVERRIDE:-"${HADOOP_HOME}/lib"}
 
-# Please note that the * is inside quotes, thus it won't get expanded by bash but
-# by java, see "Understanding class path wildcards" at http://goo.gl/f0cfft
-export HADOOP_CLASSPATH="${HADOOP_CLASSPATH-}:${HADOOP_HOME}/share/hadoop/tools/lib/*"
-# YARN is configured to use LZO so the LZO jar needs to be in the hadoop classpath.
-export LZO_JAR_PATH="$HADOOP_LZO/build/hadoop-lzo-0.4.15.jar"
-HADOOP_CLASSPATH+=":$LZO_JAR_PATH"
-
 # Beware of adding entries from $HADOOP_HOME here, because they can change
 # the order of the classpath, leading to configuration not showing up first.
-HADOOP_CLASSPATH="$LZO_JAR_PATH"
+export HADOOP_CLASSPATH="${HADOOP_CLASSPATH-}"
 # Add the path containing the hadoop-aws jar, which is required to access AWS from the
 # minicluster.
+# Please note that the * is inside quotes, thus it won't get expanded by bash but
+# by java, see "Understanding class path wildcards" at http://goo.gl/f0cfft
 HADOOP_CLASSPATH="${HADOOP_CLASSPATH}:${HADOOP_HOME}/share/hadoop/tools/lib/*"
 
 export PATH="$HADOOP_HOME/bin:$PATH"
@@ -610,7 +603,7 @@ export HIVE_CONF_DIR="$IMPALA_FE_DIR/./src/test/resources"
 export POSTGRES_JDBC_DRIVER="${IMPALA_FE_DIR}/target/dependency/postgresql-${IMPALA_POSTGRES_JDBC_DRIVER_VERSION}.jar"
 
 export HIVE_AUX_JARS_PATH="$POSTGRES_JDBC_DRIVER"
-export AUX_CLASSPATH="${LZO_JAR_PATH}"
+export AUX_CLASSPATH=""
 ### Tell hive not to use jline
 export HADOOP_USER_CLASSPATH_FIRST=true
 
@@ -707,7 +700,6 @@ LIBHDFS_OPTS="${LIBHDFS_OPTS} -XX:MaxPermSize=128m"
 export CLASSPATH="$IMPALA_FE_DIR/target/dependency:${CLASSPATH:+:${CLASSPATH}}"
 CLASSPATH="$IMPALA_FE_DIR/target/classes:$CLASSPATH"
 CLASSPATH="$IMPALA_FE_DIR/src/test/resources:$CLASSPATH"
-CLASSPATH="$LZO_JAR_PATH:$CLASSPATH"
 
 # A marker in the environment to prove that we really did source this file
 export IMPALA_CONFIG_SOURCED=1
@@ -726,8 +718,6 @@ echo "HBASE_CONF_DIR          = $HBASE_CONF_DIR"
 echo "RANGER_HOME             = $RANGER_HOME"
 echo "RANGER_CONF_DIR         = $RANGER_CONF_DIR "
 echo "THRIFT_HOME             = $THRIFT_HOME"
-echo "HADOOP_LZO              = $HADOOP_LZO"
-echo "IMPALA_LZO              = $IMPALA_LZO"
 echo "CLASSPATH               = $CLASSPATH"
 echo "LIBHDFS_OPTS            = $LIBHDFS_OPTS"
 echo "JAVA_HOME               = $JAVA_HOME"

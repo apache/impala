@@ -1563,17 +1563,6 @@ OVERWRITE INTO TABLE {db_name}{db_suffix}.{table_name};
 ---- DATASET
 functional
 ---- BASE_TABLE_NAME
-bad_text_lzo
----- COLUMNS
-field STRING
----- DEPENDENT_LOAD_HIVE
--- Error recovery test data for LZO compression.
-LOAD DATA LOCAL INPATH '{impala_home}/testdata/bad_text_lzo/bad_text.lzo'
-OVERWRITE INTO TABLE {db_name}{db_suffix}.{table_name};
-====
----- DATASET
-functional
----- BASE_TABLE_NAME
 bad_text_gzip
 ---- COLUMNS
 s STRING

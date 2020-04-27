@@ -199,7 +199,7 @@ function apt-get {
 
 echo ">>> Installing build tools"
 ubuntu apt-get update
-ubuntu apt-get --yes install ccache curl gawk g++ gcc libffi-dev liblzo2-dev \
+ubuntu apt-get --yes install ccache curl gawk g++ gcc libffi-dev \
         libkrb5-dev krb5-admin-server krb5-kdc krb5-user libsasl2-dev \
         libsasl2-modules libsasl2-modules-gssapi-mit libssl-dev make ninja-build \
         python-dev python-setuptools postgresql ssh wget vim-common psmisc \
@@ -240,7 +240,7 @@ redhat sudo yum install -y curl gawk gcc gcc-c++ git krb5-devel krb5-server \
         krb5-workstation libevent-devel libffi-devel make openssl-devel cyrus-sasl \
         cyrus-sasl-gssapi cyrus-sasl-devel cyrus-sasl-plain \
         postgresql postgresql-server \
-        wget vim-common nscd cmake lzo-devel fuse-devel zlib-devel \
+        wget vim-common nscd cmake fuse-devel zlib-devel \
         psmisc lsof openssh-server redhat-lsb java-1.8.0-openjdk-devel \
         java-1.8.0-openjdk-src
 
@@ -452,25 +452,6 @@ eval "$SET_JAVA_HOME"
 
 # Assert that we have a java available
 test -f $JAVA_HOME/bin/java
-
-# LZO is not needed to compile or run Impala, but it is needed for the data load
-echo ">>> Checking out Impala-lzo"
-: ${IMPALA_LZO_HOME:="${IMPALA_HOME}/../Impala-lzo"}
-if ! [[ -d "$IMPALA_LZO_HOME" ]]
-then
-  git clone --branch master https://github.com/cloudera/impala-lzo.git "$IMPALA_LZO_HOME"
-fi
-
-echo ">>> Checking out and building hadoop-lzo"
-
-: ${HADOOP_LZO_HOME:="${IMPALA_HOME}/../hadoop-lzo"}
-if ! [[ -d "$HADOOP_LZO_HOME" ]]
-then
-  git clone https://github.com/cloudera/hadoop-lzo.git "$HADOOP_LZO_HOME"
-fi
-cd "$HADOOP_LZO_HOME"
-time -p ant package
-cd "$IMPALA_HOME"
 
 # Try to prepopulate the m2 directory to save time
 if ! bin/jenkins/populate_m2_directory.py ; then

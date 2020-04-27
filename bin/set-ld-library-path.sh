@@ -21,9 +21,6 @@
 # run Impala binaries in the context of a dev environment.
 export LD_LIBRARY_PATH="${LD_LIBRARY_PATH:+${LD_LIBRARY_PATH}:}"
 
-# Impala-lzo is loaded at runtime, so needs to be on the search path.
-LD_LIBRARY_PATH="${LD_LIBRARY_PATH}:${IMPALA_LZO}/build"
-
 # We built against toolchain GCC so we need to dynamically link against matching
 # library versions. (the rpath isn't baked into the binaries)
 IMPALA_TOOLCHAIN_GCC_LIB=\

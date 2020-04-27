@@ -453,28 +453,6 @@ EOF
 }
 
 function load-custom-data {
-  # Load the index files for corrupted lzo data.
-  hadoop fs -mkdir -p /test-warehouse/bad_text_lzo_text_lzo
-  hadoop fs -rm -f /test-warehouse/bad_text_lzo_text_lzo/bad_text.lzo.index
-  hadoop fs -put ${IMPALA_HOME}/testdata/bad_text_lzo/bad_text.lzo.index \
-      /test-warehouse/bad_text_lzo_text_lzo/
-
-  hadoop fs -rm -r -f /bad_text_lzo_text_lzo/
-  hadoop fs -mv /test-warehouse/bad_text_lzo_text_lzo/ /
-  # Cleanup the old bad_text_lzo files, if they exist.
-  hadoop fs -rm -r -f /test-warehouse/bad_text_lzo/
-
-  # TODO: Why is there a REMOTE_LOAD condition? See IMPALA-4347
-  if [[ -z $REMOTE_LOAD ]]; then
-    # Index all lzo files in HDFS under /test-warehouse
-    ${IMPALA_HOME}/testdata/bin/lzo_indexer.sh /test-warehouse
-  fi
-
-  hadoop fs -mv /bad_text_lzo_text_lzo/ /test-warehouse/
-
-  # Remove all index files in this partition.
-  hadoop fs -rm -f /test-warehouse/alltypes_text_lzo/year=2009/month=1/*.lzo.index
-
   # Add a sequence file that only contains a header (see IMPALA-362)
   hadoop fs -put -f ${IMPALA_HOME}/testdata/tinytable_seq_snap/tinytable_seq_snap_header_only \
                     /test-warehouse/tinytable_seq_snap
