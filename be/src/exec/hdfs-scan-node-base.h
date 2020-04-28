@@ -38,25 +38,31 @@
 #include "util/container-util.h"
 #include "util/progress-updater.h"
 #include "util/spinlock.h"
+#include "util/unique-id-hash.h"
 
 namespace impala {
 
 class ScannerContext;
 class DescriptorTbl;
 class HdfsScanner;
+class HdfsScanPlanNode;
 class RowBatch;
 class Status;
 class Tuple;
 class TPlanNode;
 class TScanRange;
 
-/// Maintains per file information for files assigned to this scan node.  This includes
+/// Maintains per file information for files assigned to this scan node. This includes
 /// all the splits for the file. Note that it is not thread-safe.
 struct HdfsFileDesc {
   HdfsFileDesc(const std::string& filename)
-    : fs(NULL), filename(filename), file_length(0), mtime(0),
-      file_compression(THdfsCompression::NONE), is_erasure_coded(false) {
-  }
+    : fs(NULL),
+      filename(filename),
+      file_length(0),
+      mtime(0),
+      file_compression(THdfsCompression::NONE),
+      file_format(THdfsFileFormat::TEXT),
+      is_erasure_coded(false) {}
 
   /// Connection to the filesystem containing the file.
   hdfsFS fs;
@@ -72,12 +78,22 @@ struct HdfsFileDesc {
   int64_t mtime;
 
   THdfsCompression::type file_compression;
+  THdfsFileFormat::type file_format;
 
   /// is erasure coded
   bool is_erasure_coded;
 
   /// Splits (i.e. raw byte ranges) for this file, assigned to this scan node.
   std::vector<io::ScanRange*> splits;
+
+  /// Some useful typedefs for creating HdfsFileDesc related data structures.
+  /// This is a pair for partition ID and filename which uniquely identifies a file.
+  typedef pair<int64_t, std::string> PartitionFileKey;
+  /// Partition_id, File path => file descriptor
+  typedef std::unordered_map<PartitionFileKey, HdfsFileDesc*, pair_hash> FileDescMap;
+  /// File format => file descriptors.
+  typedef std::map<THdfsFileFormat::type, std::vector<HdfsFileDesc*>>
+    FileFormatsMap;
 };
 
 /// Struct for additional metadata for scan ranges. This contains the partition id
@@ -97,6 +113,147 @@ struct ScanRangeMetadata {
 
   ScanRangeMetadata(int64_t partition_id, const io::ScanRange* original_split)
       : partition_id(partition_id), original_split(original_split) { }
+};
+
+/// Encapsulated all mutable state related to scan ranges that is shared across all scan
+/// node instances. Maintains the following context that can be accessed by all instances
+/// in a thread safe manner:
+/// - File Descriptors
+/// - File Metadata
+/// - Template Tuples for partitions
+/// - ProgressUpdater keeping tracks of how many scan ranges have been read.
+/// - Counter tracking remaining scan range submissions
+/// - API for fetching and adding a scan range to the queue.
+///
+/// An instance of this can be created and initialized exclusively by HdfsScanPlanNode.
+class ScanRangeSharedState {
+ public:
+  /// Given a partition_id and filename returns the related file descriptor DCHECK ensures
+  /// there is always file descriptor returned.
+  /// TODO: The LZO scanner expects a non const object so switch to returning a const once
+  /// support for LZO scanner is removed.
+  HdfsFileDesc* GetFileDesc(int64_t partition_id, const std::string& filename);
+
+  /// Sets the scanner specific metadata for 'partition_id' and 'filename'.
+  /// Scanners can use this to store file header information. Thread safe.
+  void SetFileMetadata(
+      int64_t partition_id, const std::string& filename, void* metadata);
+
+  /// Returns the scanner specific metadata for 'partition_id' and 'filename'.
+  /// Returns nullptr if there is no metadata. Thread safe.
+  void* GetFileMetadata(int64_t partition_id, const std::string& filename);
+
+  /// Get the template tuple which has only the partition columns materialized for the
+  /// partition identified by 'partition_id' .
+  Tuple* GetTemplateTupleForPartitionId(int64_t partition_id);
+
+  ObjectPool* obj_pool() { return &obj_pool_; }
+  ProgressUpdater& progress() { return progress_; }
+  HdfsFileDesc::FileFormatsMap& per_type_files() { return per_type_files_; }
+
+  /// Updates the counter keeping track of remaining scan range submissions. If MT scan
+  /// nodes are being used, it notifies all instances waiting in GetNextScanRange() every
+  /// time it updates.
+  void UpdateRemainingScanRangeSubmissions(int32_t delta);
+
+  /// Returns the number of remaining scan range submissions.
+  int RemainingScanRangeSubmissions() {
+    return remaining_scan_range_submissions_.Load();
+  }
+
+  /// Returns the list of files assigned to the fragment with id 'fragment_instance_id'
+  /// for which initial scan ranges need to be issued. Returns nullptr if the instance
+  /// has not been assigned anything.
+  std::vector<HdfsFileDesc*>* GetFilesForIssuingScanRangesForInstance(
+      const TUniqueId fragment_instance_id) {
+    auto it = file_assignment_per_instance_.find(fragment_instance_id);
+    if (it == file_assignment_per_instance_.end()) return nullptr;
+    return &it->second;
+  }
+
+  /// The following public methods are only used by MT scan nodes.
+
+  /// Adds all scan ranges to the queue. If 'at_front' is true or the range has
+  /// USE_HDFS_CACHE option set, then adds it to the front of the queue.
+  void EnqueueScanRange(const std::vector<io::ScanRange*>& ranges, bool at_front);
+
+  /// Sets a reference to the next scan range in input variable 'scan_range' from a queue
+  /// of scan ranges that need to be read. Blocks if there are remaining scan range
+  /// submissions and the queue is empty. Unblocks and returns CANCELLED status in case
+  /// the query was cancelled. 'scan_range' is set to nullptr if no more scan ranges are
+  /// left to read.
+  Status GetNextScanRange(RuntimeState* state, io::ScanRange** scan_range);
+
+  /// Add the required hooks to the runtime state that gets triggered in case of
+  /// cancellation. Must be called before adding or removing scan ranges to the queue.
+  void AddCancellationHook(RuntimeState* state);
+
+ private:
+  friend class HdfsScanPlanNode;
+
+  ScanRangeSharedState() = default;
+  DISALLOW_COPY_AND_ASSIGN(ScanRangeSharedState);
+
+  /// Contains all the file descriptors and the scan ranges created.
+  ObjectPool obj_pool_;
+
+  /// For storing partition template tuples.
+  std::unique_ptr<MemPool> template_pool_;
+
+  /// partition_id, File path => file descriptor (which includes the file's splits).
+  /// Populated in HdfsScanPlanNode::Init() after which it is never modified.
+  HdfsFileDesc::FileDescMap file_descs_;
+
+  /// Scanner specific per file metadata (e.g. header information) and associated lock.
+  /// Currently only used by sequence scanners.
+  /// Key of the map is partition_id, filename pair
+  std::mutex metadata_lock_;
+  std::unordered_map<HdfsFileDesc::PartitionFileKey, void*, pair_hash> per_file_metadata_;
+
+  /// Map from partition ID to a template tuple (owned by template_pool_) which has only
+  /// the partition columns for that partition materialized. Used to filter files and scan
+  /// ranges on partition-column filters. Populated in HdfsScanPlanNode::Init().
+  boost::unordered_map<int64_t, Tuple*> partition_template_tuple_map_;
+
+  /// File format => file descriptors.
+  HdfsFileDesc::FileFormatsMap per_type_files_;
+
+  /// Contains a list of files for every instance equally divided among all. Indexed by
+  /// fragment instance id. Might not contain an entry for all instances in case there are
+  /// not enough files to be read.
+  std::unordered_map<TUniqueId, std::vector<HdfsFileDesc*>> file_assignment_per_instance_;
+
+  /// Keeps track of total splits remaining to be read.
+  ProgressUpdater progress_;
+
+  /// When this counter drops to 0, AddDiskIoRanges() should not be called again, and
+  /// therefore scanner threads (for non-MT) or fragment instances (for MT) can't get work
+  /// should exit. For most file formats (except for sequence-based formats), this is 0
+  /// after IssueInitialRanges() has been called by all fragment instances. Note that some
+  /// scanners (namely Parquet) issue additional work to the IO subsystem without using
+  /// AddDiskIoRanges(), but that is managed within the scanner, and doesn't require
+  /// additional scanner threads.
+  /// Initialized the number of instances for this fragment in HdfsScanPlanNode::Init().
+  AtomicInt32 remaining_scan_range_submissions_{0};
+
+  /// Indicates whether MT scan nodes are being used.
+  bool use_mt_scan_node_ = false;
+
+  /// The following are only used by MT scan nodes.
+  /////////////////////////////////////////////////////////////////////
+  /// BEGIN: Members that are used only by MT scan nodes(use_mt_scan_node_ is true).
+
+  /// Lock synchronizes access for calling wait on the condition variable.
+  std::mutex scan_range_submission_lock_;
+  /// Used by scan instances to wait for remaining scan range submission
+  ConditionVariable range_submission_cv_;
+
+  /// Queue of all scan ranges that need to be read. Shared by all instances of this
+  /// fragment. Only used for MT scans.
+  InternalQueue<io::ScanRange> scan_range_queue_;
+
+  /// END: Members that are used only by MT scan nodes(use_mt_scan_node_ is true).
+  /////////////////////////////////////////////////////////////////////
 };
 
 class HdfsScanPlanNode : public ScanPlanNode {
@@ -157,11 +314,21 @@ class HdfsScanPlanNode : public ScanPlanNode {
   /// The root of the table's Avro schema, if we're scanning an Avro table.
   ScopedAvroSchemaElement avro_schema_;
 
-  /// File formats that instances of this node will read.
-  boost::unordered_set<THdfsFileFormat::type> scanned_file_formats_;
-
   /// Per scanner type codegen'd fn.
   boost::unordered_map<THdfsFileFormat::type, void*> codegend_fn_map_;
+
+  /// State related to scan ranges shared across all scan node instances.
+  ScanRangeSharedState shared_state_;
+
+  /// Allocates and initializes a new template tuple allocated from pool with values
+  /// from the partition columns for the current scan range, if any,
+  /// Returns nullptr if there are no partition keys slots.
+  Tuple* InitTemplateTuple(
+      const std::vector<ScalarExprEvaluator*>& evals, MemPool* pool) const;
+
+  /// Processes all the scan range params for this scan node to create all the required
+  /// file descriptors, update metrics and fill in all relevant state in 'shared_state_'.
+  Status ProcessScanRangesAndInitSharedState(FragmentState* state);
 };
 
 /// Base class for all Hdfs scan nodes. Contains common members and functions
@@ -302,7 +469,7 @@ class HdfsScanNodeBase : public ScanNode {
   inline void IncNumScannersCodegenEnabled() { num_scanners_codegen_enabled_.Add(1); }
   inline void IncNumScannersCodegenDisabled() { num_scanners_codegen_disabled_.Add(1); }
 
-  /// Allocate a new scan range object, stored in the runtime state's object pool. For
+  /// Allocate a new scan range object, stored in the fragment state's object pool. For
   /// scan ranges that correspond to the original hdfs splits, the partition id must be
   /// set to the range's partition id. Partition_id is mandatory as it is used to gather
   /// file descriptor info. expected_local should be true if this scan range is not
@@ -316,12 +483,6 @@ class HdfsScanNodeBase : public ScanNode {
       bool is_erasure_coded, int64_t mtime,
       const io::BufferOpts& buffer_opts,
       const io::ScanRange* original_split = nullptr);
-
-  /// Same as above, but it takes a pointer to a ScanRangeMetadata object which contains
-  /// the partition_id, original_splits, and other information about the scan range.
-  io::ScanRange* AllocateScanRange(hdfsFS fs, const char* file, int64_t len,
-      int64_t offset, ScanRangeMetadata* metadata, int disk_id, bool expected_local,
-      bool is_erasure_coded, int64_t mtime, const io::BufferOpts& buffer_opts);
 
   /// Same as the first overload, but it takes sub-ranges as well.
   io::ScanRange* AllocateScanRange(hdfsFS fs, const char* file, int64_t len,
@@ -342,15 +503,14 @@ class HdfsScanNodeBase : public ScanNode {
       bool expected_local, int64_t mtime, bool is_erasure_coded = false,
       const io::ScanRange* original_split = nullptr);
 
-  /// Adds ranges to the io mgr queue. Can be overridden to add scan-node specific
-  /// actions like starting scanner threads. Must not be called once
-  /// remaining_scan_range_submissions_ is 0.
-  /// The enqueue_location specifies whether the scan ranges are added to the head or
-  /// tail of the queue.
+  /// Adds ranges to be read later by scanners. Must not be called once
+  /// remaining_scan_range_submissions_ is 0. The enqueue_location specifies whether the
+  /// scan ranges are added to the head or tail of the queue. Implemented by child classes
+  /// to add ranges to their implementation of a queue that is used to organize ranges.
   virtual Status AddDiskIoRanges(const std::vector<io::ScanRange*>& ranges,
-      EnqueueLocation enqueue_location = EnqueueLocation::TAIL) WARN_UNUSED_RESULT;
+      EnqueueLocation enqueue_location = EnqueueLocation::TAIL) = 0;
 
-  /// Adds all splits for file_desc to the io mgr queue.
+  /// Adds all splits for file_desc to be read later by scanners.
   inline Status AddDiskIoRanges(const HdfsFileDesc* file_desc,
       EnqueueLocation enqueue_location = EnqueueLocation::TAIL) WARN_UNUSED_RESULT {
     return AddDiskIoRanges(file_desc->splits);
@@ -360,27 +520,28 @@ class HdfsScanNodeBase : public ScanNode {
   /// Furthermore, this implies that scanner threads failing to
   /// acquire a new scan range with StartNextScanRange() can exit.
   inline void UpdateRemainingScanRangeSubmissions(int32_t delta) {
-    remaining_scan_range_submissions_.Add(delta);
-    DCHECK_GE(remaining_scan_range_submissions_.Load(), 0);
+    shared_state_->UpdateRemainingScanRangeSubmissions(delta);
   }
-
-  /// Allocates and initializes a new template tuple allocated from pool with values
-  /// from the partition columns for the current scan range, if any,
-  /// Returns NULL if there are no partition keys slots.
-  Tuple* InitTemplateTuple(const std::vector<ScalarExprEvaluator*>& value_evals,
-      MemPool* pool, RuntimeState* state) const;
 
   /// Given a partition_id and filename returns the related file descriptor
   /// DCHECK ensures there is always file descriptor returned
-  HdfsFileDesc* GetFileDesc(int64_t partition_id, const std::string& filename);
+  inline HdfsFileDesc* GetFileDesc(
+      int64_t partition_id, const std::string& filename) {
+    return shared_state_->GetFileDesc(partition_id, filename);
+  }
 
   /// Sets the scanner specific metadata for 'partition_id' and 'filename'.
   /// Scanners can use this to store file header information. Thread safe.
-  void SetFileMetadata(int64_t partition_id, const std::string& filename, void* metadata);
+  inline void SetFileMetadata(
+      int64_t partition_id, const std::string& filename, void* metadata) {
+    shared_state_->SetFileMetadata(partition_id, filename, metadata);
+  }
 
   /// Returns the scanner specific metadata for 'partition_id' and 'filename'.
   /// Returns nullptr if there is no metadata. Thread safe.
-  void* GetFileMetadata(int64_t partition_id, const std::string& filename);
+  inline void* GetFileMetadata(int64_t partition_id, const std::string& filename) {
+    return shared_state_->GetFileMetadata(partition_id, filename);
+  }
 
   /// Called by scanners when a range is complete. Used to record progress.
   /// This *must* only be called after a scanner has completely finished its
@@ -399,7 +560,7 @@ class HdfsScanNodeBase : public ScanNode {
       const std::vector<THdfsCompression::type>& compression_type, bool skipped = false);
 
   /// Calls RangeComplete() with skipped=true for all the splits of the file
-  void SkipFile(const THdfsFileFormat::type& file_type, HdfsFileDesc* file);
+  void SkipFile(const THdfsFileFormat::type& file_type, const HdfsFileDesc* file);
 
   /// Returns true if there are no materialized slots, such as a count(*) over the table.
   inline bool IsZeroSlotTableScan() const {
@@ -437,6 +598,7 @@ class HdfsScanNodeBase : public ScanNode {
   /// Update book-keeping to skip the scan range if it has been issued but will not be
   /// processed by a scanner. E.g. used to cancel ranges that are filtered out by
   /// late-arriving filters that could not be applied in IssueInitialScanRanges()
+  /// The ScanRange must have been added to a RequestContext.
   void SkipScanRange(io::ScanRange* scan_range);
 
   /// Helper to increase reservation from 'curr_reservation' up to 'ideal_reservation'
@@ -453,6 +615,12 @@ class HdfsScanNodeBase : public ScanNode {
   /// individual scanner classes.
   void UpdateBytesRead(
       SlotId slot_id, int64_t uncompressed_bytes_read, int64_t compressed_bytes_read);
+
+  /// Get the template tuple which has only the partition columns materialized for the
+  /// partition identified by 'partition_id'.
+  inline Tuple* GetTemplateTupleForPartitionId(int64_t partition_id) {
+    return shared_state_->GetTemplateTupleForPartitionId(partition_id);
+  }
 
  protected:
   friend class ScannerContext;
@@ -492,39 +660,12 @@ class HdfsScanNodeBase : public ScanNode {
   /// Descriptor for tuples this scan node constructs
   const TupleDescriptor* tuple_desc_ = nullptr;
 
-  /// Map from partition ID to a template tuple (owned by scan_node_pool_) which has only
-  /// the partition columns for that partition materialized. Used to filter files and scan
-  /// ranges on partition-column filters. Populated in Open().
-  boost::unordered_map<int64_t, Tuple*> partition_template_tuple_map_;
-
   /// Descriptor for the hdfs table, including partition and format metadata.
   /// Set in Prepare, owned by RuntimeState
   const HdfsTableDescriptor* hdfs_table_ = nullptr;
 
   /// The root of the table's Avro schema, if we're scanning an Avro table.
   const AvroSchemaElement& avro_schema_;
-
-  /// Partitions scanned by this scan node. Initialized in Prepare() and not modified
-  /// afterwards.
-  std::unordered_set<int64_t> partition_ids_;
-
-  /// This is a pair for partition ID and filename
-  typedef pair<int64_t, std::string> PartitionFileKey;
-
-  /// partition_id, File path => file descriptor (which includes the file's splits)
-  typedef std::unordered_map<PartitionFileKey, HdfsFileDesc*, pair_hash> FileDescMap;
-  FileDescMap file_descs_;
-
-  /// File format => file descriptors.
-  typedef std::map<THdfsFileFormat::type, std::vector<HdfsFileDesc*>>
-    FileFormatsMap;
-  FileFormatsMap per_type_files_;
-
-  /// Scanner specific per file metadata (e.g. header information) and associated lock.
-  /// Key of the map is partition_id, filename pair
-  /// TODO: Remove this lock when removing the legacy scanners and scan nodes.
-  std::mutex metadata_lock_;
-  std::unordered_map<PartitionFileKey, void*, pair_hash> per_file_metadata_;
 
   /// Conjuncts for each materialized tuple (top-level row batch tuples and collection
   /// item tuples). Includes a copy of ExecNode.conjuncts_.
@@ -537,18 +678,9 @@ class HdfsScanNodeBase : public ScanNode {
   const TDictFilterConjunctsMap* thrift_dict_filter_conjuncts_map_;
 
   /// Set to true when the initial scan ranges are issued to the IoMgr. This happens on
-  /// the first call to GetNext(). The token manager, in a different thread, will read
-  /// this variable.
+  /// the first call to GetNext() for non-MT scan nodes and in Open() for MT scan nodes.
+  /// Only used by the thread token manager in non-MT scan nodes in a separate thread.
   AtomicBool initial_ranges_issued_;
-
-  /// When this counter drops to 0, AddDiskIoRanges() will not be called again, and
-  /// therefore scanner threads that can't get work should exit. For most
-  /// file formats (except for sequence-based formats), this is 0 after
-  /// IssueInitialRanges(). Note that some scanners (namely Parquet) issue
-  /// additional work to the IO subsystem without using AddDiskIoRanges(),
-  /// but that is managed within the scanner, and doesn't require
-  /// additional scanner threads.
-  AtomicInt32 remaining_scan_range_submissions_ = { 1 };
 
   /// Per scanner type codegen'd fn.
   const boost::unordered_map<THdfsFileFormat::type, void*>& codegend_fn_map_;
@@ -566,9 +698,6 @@ class HdfsScanNodeBase : public ScanNode {
 
   /// Vector containing slot descriptors for all partition key slots.
   const std::vector<SlotDescriptor*>& partition_key_slots_;
-
-  /// Keeps track of total splits and the number finished.
-  ProgressUpdater progress_;
 
   /// Counters which track the number of scanners that have codegen enabled for the
   /// materialize and conjuncts evaluation code paths.
@@ -642,6 +771,9 @@ class HdfsScanNodeBase : public ScanNode {
   /// can update the map concurrently
   boost::shared_mutex bytes_read_per_col_lock_;
 
+  /// Pointer to the scan range related state that is shared across all node instances.
+  ScanRangeSharedState* shared_state_ = nullptr;
+
   /// Performs dynamic partition pruning, i.e., applies runtime filters to files, and
   /// issues initial ranges for all file types. Waits for runtime filters if necessary.
   /// Only valid to call if !initial_ranges_issued_. Sets initial_ranges_issued_ to true.
@@ -704,6 +836,11 @@ class HdfsScanNodeBase : public ScanNode {
   /// debug action specified for the query.
   Status ScanNodeDebugAction(TExecNodePhase::type phase) WARN_UNUSED_RESULT;
 
+  /// Fetches the next range in queue to read. Implemented by child classes to fetch
+  /// ranges from their implementation of a queue that is used to organize ranges.
+  virtual Status GetNextScanRangeToRead(
+      io::ScanRange** scan_range, bool* needs_buffers) = 0;
+
  private:
   class HdfsCompressionTypesSet {
    public:
@@ -753,7 +890,6 @@ class HdfsScanNodeBase : public ScanNode {
       FileTypeCountsMap;
   FileTypeCountsMap file_type_counts_;
 };
-
 }
 
 #endif

@@ -111,6 +111,11 @@ class HdfsScanNode : public HdfsScanNodeBase {
     return NON_TASK_BASED_SYNC;
   }
 
+ protected:
+  /// Fetches the next range to be read from the reader context. As a side effect, the
+  /// reader context also schedules it to be read by disk threads.
+  Status GetNextScanRangeToRead(io::ScanRange** scan_range, bool* needs_buffers) override;
+
  private:
   ScannerThreadState thread_state_;
 

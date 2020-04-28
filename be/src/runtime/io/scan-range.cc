@@ -449,6 +449,21 @@ void ScanRange::Reset(hdfsFS fs, const char* file, int64_t len, int64_t offset,
       buffer_opts, {}, meta_data);
 }
 
+ScanRange* ScanRange::AllocateScanRange(ObjectPool* obj_pool, hdfsFS fs, const char* file,
+    int64_t len, int64_t offset, std::vector<SubRange>&& sub_ranges, void* metadata,
+    int disk_id, bool expected_local, bool is_erasure_coded, int64_t mtime,
+    const BufferOpts& buffer_opts) {
+  DCHECK_GE(disk_id, -1);
+  DCHECK_GE(offset, 0);
+  DCHECK_GE(len, 0);
+  disk_id =
+      ExecEnv::GetInstance()->disk_io_mgr()->AssignQueue(file, disk_id, expected_local);
+  ScanRange* range = obj_pool->Add(new ScanRange);
+  range->Reset(fs, file, len, offset, disk_id, expected_local, is_erasure_coded, mtime,
+      buffer_opts, move(sub_ranges), metadata);
+  return range;
+}
+
 void ScanRange::Reset(hdfsFS fs, const char* file, int64_t len, int64_t offset,
     int disk_id, bool expected_local, bool is_erasure_coded, int64_t mtime,
     const BufferOpts& buffer_opts, vector<SubRange>&& sub_ranges, void* meta_data) {

@@ -70,6 +70,8 @@ DEBUG_ACTION_DIMS = [None,
 # Trigger injected soft limit failures when scanner threads check memory limit.
 DEBUG_ACTION_DIMS.append('HDFS_SCANNER_THREAD_CHECK_SOFT_MEM_LIMIT:FAIL@0.5')
 
+MT_DOP_VALUES = [0, 1, 4]
+
 class TestScannersAllTableFormats(ImpalaTestSuite):
   BATCH_SIZES = [0, 1, 16]
 
@@ -130,6 +132,7 @@ class TestScannersAllTableFormatsWithLimit(ImpalaTestSuite):
   @classmethod
   def add_test_dimensions(cls):
     super(TestScannersAllTableFormatsWithLimit, cls).add_test_dimensions()
+    cls.ImpalaTestMatrix.add_dimension(ImpalaTestDimension('mt_dop', *MT_DOP_VALUES))
 
   def test_limit(self, vector):
     vector.get_value('exec_option')['abort_on_error'] = 1
@@ -171,6 +174,7 @@ class TestScannersMixedTableFormats(ImpalaTestSuite):
         ImpalaTestDimension('batch_size', *TestScannersAllTableFormats.BATCH_SIZES))
     cls.ImpalaTestMatrix.add_dimension(
         ImpalaTestDimension('debug_action', *DEBUG_ACTION_DIMS))
+    cls.ImpalaTestMatrix.add_dimension(ImpalaTestDimension('mt_dop', *MT_DOP_VALUES))
 
   def test_mixed_format(self, vector):
     new_vector = deepcopy(vector)
@@ -609,6 +613,45 @@ class TestParquet(ImpalaTestSuite):
   @SkipIfIsilon.hdfs_block_size
   @SkipIfLocal.multiple_impalad
   @SkipIfEC.fix_later
+  def test_multiple_blocks_mt_dop(self, vector):
+    """Sanity check for MT scan nodes to make sure all blocks from the same file are read.
+    2 scan ranges per node should be created to read 'lineitem_sixblocks' because
+    there are 6 blocks and 3 scan nodes. We set mt_dop to 2, so ideally every instance
+    should read a single range, but since they share a queue its not deterministic and
+    instead we verify sum of ranges read on a backend is 2."""
+    query = 'select count(l_orderkey) from functional_parquet.lineitem_sixblocks'
+    try:
+      self.client.set_configuration_option('mt_dop', '2')
+      result = self.client.execute(query)
+      TOTAL_ROWS = 40000
+      ranges_complete_list = re.findall(r'ScanRangesComplete: ([0-9]*)',
+        result.runtime_profile)
+      num_rows_read_list = re.findall(r'RowsRead: [0-9.K]* \(([0-9]*)\)',
+        result.runtime_profile)
+      # The extra fragment is the "Averaged Fragment"
+      assert len(num_rows_read_list) == 7
+      assert len(ranges_complete_list) == 7
+
+      total_rows_read = 0
+      # Skip the Averaged Fragment; it comes first in the runtime profile.
+      for num_row_read in num_rows_read_list[1:]:
+        total_rows_read += int(num_row_read)
+      assert total_rows_read == TOTAL_ROWS
+
+      # Again skip the Averaged Fragment; it comes first in the runtime profile.
+      # With mt_dop 2, every backend will have 2 instances which are printed consecutively
+      # in the profile.
+      for i in range(1, len(ranges_complete_list), 2):
+        assert int(ranges_complete_list[i]) + int(ranges_complete_list[i + 1]) == 2
+    finally:
+      self.client.clear_configuration()
+
+  @SkipIfS3.hdfs_block_size
+  @SkipIfABFS.hdfs_block_size
+  @SkipIfADLS.hdfs_block_size
+  @SkipIfIsilon.hdfs_block_size
+  @SkipIfLocal.multiple_impalad
+  @SkipIfEC.fix_later
   def test_multiple_blocks(self, vector):
     # For IMPALA-1881. The table functional_parquet.lineitem_multiblock has 3 blocks, so
     # each impalad should read 1 scan range.
@@ -662,9 +705,9 @@ class TestParquet(ImpalaTestSuite):
 
     # This will fail if the number of impalads != 3
     # The fourth fragment is the "Averaged Fragment"
-    assert len(num_row_groups_list) == 4
-    assert len(scan_ranges_complete_list) == 4
-    assert len(num_rows_read_list) == 4
+    assert len(num_row_groups_list) == 4, result.runtime_profile
+    assert len(scan_ranges_complete_list) == 4, result.runtime_profile
+    assert len(num_rows_read_list) == 4, result.runtime_profile
 
     total_num_row_groups = 0
     # Skip the Averaged Fragment; it comes first in the runtime profile.

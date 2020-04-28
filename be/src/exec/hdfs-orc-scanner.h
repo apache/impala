@@ -119,7 +119,7 @@ class HdfsOrcScanner : public HdfsColumnarScanner {
 
    private:
     HdfsOrcScanner* scanner_;
-    HdfsFileDesc* file_desc_;
+    const HdfsFileDesc* file_desc_;
     std::string filename_;
   };
 

@@ -488,6 +488,11 @@ class HdfsParquetScanner : public HdfsColumnarScanner {
   /// to this counter
   RuntimeProfile::SummaryStatsCounter* parquet_uncompressed_page_size_counter_;
 
+  /// Average and min/max memory reservation for a scanning a row group, both
+  /// ideal(calculated based on min and max buffer size) and actual.
+  RuntimeProfile::SummaryStatsCounter* row_group_ideal_reservation_counter_;
+  RuntimeProfile::SummaryStatsCounter* row_group_actual_reservation_counter_;
+
   /// Number of collection items read in current row batch. It is a scanner-local counter
   /// used to reduce the frequency of updating HdfsScanNode counter. It is updated by the
   /// callees of AssembleRows() and is merged into the HdfsScanNode counter at the end of

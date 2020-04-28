@@ -314,34 +314,6 @@ void Scheduler::ComputeFragmentExecParams(const ExecutorConfig& executor_config,
   }
 }
 
-/// Returns a numeric weight that is proportional to the estimated processing time for
-/// the scan range represented by 'params'. Weights from different scan node
-/// implementations, e.g. FS vs Kudu, are not comparable.
-static int64_t ScanRangeWeight(const ScanRangeParamsPB& params) {
-  if (params.scan_range().has_hdfs_file_split()) {
-    return params.scan_range().hdfs_file_split().length();
-  } else {
-    // Give equal weight to each Kudu and Hbase split.
-    // TODO: implement more accurate logic for Kudu and Hbase
-    return 1;
-  }
-}
-
-/// Helper class used in CreateScanInstances() to track the amount of work assigned
-/// to each instance so far.
-struct InstanceAssignment {
-  // The weight assigned so far.
-  int64_t weight;
-
-  // The index of the instance in 'per_instance_ranges'
-  int instance_idx;
-
-  // Comparator for use in a heap as part of the longest processing time algo.
-  // Invert the comparison order because the *_heap functions implement a max-heap
-  // and we want to assign to the least-loaded instance first.
-  bool operator<(InstanceAssignment& other) const { return weight > other.weight; }
-};
-
 // Maybe the easiest way to understand the objective of this algorithm is as a
 // generalization of two simpler instance creation algorithms that decide how many
 // instances of a fragment to create on each node, given a set of nodes that were
@@ -439,12 +411,8 @@ void Scheduler::CreateCollocatedAndScanInstances(const ExecutorConfig& executor_
       if (assignment_it == sra.end()) continue;
       auto scan_ranges_it = assignment_it->second.find(scan_node_id);
       if (scan_ranges_it == assignment_it->second.end()) continue;
-
-      // We reorder the scan ranges vector in-place to avoid creating another copy of it.
-      // This should be safe since the code is single-threaded and other code does not
-      // depend on the order of the vector.
       per_scan_per_instance_ranges.back() =
-          AssignRangesToInstances(max_num_instances, &scan_ranges_it->second);
+          AssignRangesToInstances(max_num_instances, scan_ranges_it->second);
       DCHECK_LE(per_scan_per_instance_ranges.back().size(), max_num_instances);
     }
 
@@ -482,37 +450,18 @@ void Scheduler::CreateCollocatedAndScanInstances(const ExecutorConfig& executor_
 }
 
 vector<vector<ScanRangeParamsPB>> Scheduler::AssignRangesToInstances(
-    int max_num_instances, vector<ScanRangeParamsPB>* ranges) {
-  // We need to assign scan ranges to instances. We would like the assignment to be
-  // as even as possible, so that each instance does about the same amount of work.
-  // Use longest-processing time (LPT) algorithm, which is a good approximation of the
-  // optimal solution (there is a theoretic bound of ~4/3 of the optimal solution
-  // in the worst case). It also guarantees that at least one scan range is assigned
-  // to each instance.
+    int max_num_instances, vector<ScanRangeParamsPB>& ranges) {
   DCHECK_GT(max_num_instances, 0);
-  int num_instances = min(max_num_instances, static_cast<int>(ranges->size()));
+  int num_instances = min(max_num_instances, static_cast<int>(ranges.size()));
   vector<vector<ScanRangeParamsPB>> per_instance_ranges(num_instances);
   if (num_instances < 2) {
     // Short-circuit the assignment algorithm for the single instance case.
-    per_instance_ranges[0] = *ranges;
+    per_instance_ranges[0] = ranges;
   } else {
-    // The LPT algorithm is straightforward:
-    // 1. sort the scan ranges to be assigned by descending weight.
-    // 2. assign each item to the instance with the least weight assigned so far.
-    vector<InstanceAssignment> instance_heap;
-    instance_heap.reserve(num_instances);
-    for (int i = 0; i < num_instances; ++i) {
-      instance_heap.emplace_back(InstanceAssignment{0, i});
-    }
-    std::sort(ranges->begin(), ranges->end(),
-        [](const ScanRangeParamsPB& a, const ScanRangeParamsPB& b) {
-          return ScanRangeWeight(a) > ScanRangeWeight(b);
-        });
-    for (ScanRangeParamsPB& range : *ranges) {
-      per_instance_ranges[instance_heap[0].instance_idx].push_back(range);
-      instance_heap[0].weight += ScanRangeWeight(range);
-      pop_heap(instance_heap.begin(), instance_heap.end());
-      push_heap(instance_heap.begin(), instance_heap.end());
+    int idx = 0;
+    for (auto& range : ranges) {
+      per_instance_ranges[idx].push_back(range);
+      idx = (idx + 1 == num_instances) ? 0 : idx + 1;
     }
   }
   return per_instance_ranges;
