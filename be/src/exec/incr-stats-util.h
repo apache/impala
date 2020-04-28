@@ -20,6 +20,58 @@
 #include "gen-cpp/CatalogObjects_types.h"
 
 #include <vector>
+#include "exprs/aggregate-functions.h"
+#include "common/names.h"
+
+using namespace impala;
+
+/// A container for statistics for a single column that are aggregated partition by
+/// partition during the incremental computation of column stats. The aggregations are
+/// updated during Update(), and the final statistics are computed by Finalize().
+struct PerColumnStats {
+  // Should have length AggregateFunctions::HLL_PRECISION. Intermediate buckets for the
+  // HLL calculation.
+  string intermediate_ndv;
+
+  // The total number of nulls counted, or -1 for no sample.
+  int64_t num_nulls;
+
+  // The maximum width of the column, in bytes.
+  int32_t max_width;
+
+  // The total number of rows
+  int64_t num_rows;
+
+  // The sum of avg_width * num_rows for each partition, so that avg_width can be
+  // correctly computed during Finalize()
+  // TODO: IMPALA-9722: consolidate unused total_width and the way avg_width is computed
+  double total_width;
+
+  // Populated after Finalize(), the result of the HLL computation
+  int64_t ndv_estimate;
+
+  // The average column width, in bytes (but may have non-integer value)
+  double avg_width;
+
+  PerColumnStats()
+      : intermediate_ndv(AggregateFunctions::HLL_LEN, 0), num_nulls(0),
+      max_width(0), num_rows(0), avg_width(0) { }
+
+  /// Updates all aggregate statistics with a new set of measurements.
+  void Update(const string& ndv, int64_t num_new_rows, double new_avg_width,
+      int32_t max_new_width, int64_t num_new_nulls);
+
+  /// Performs any stats computations that are not distributive, that is they may not be
+  /// computed in part during Update(). After this method returns, ndv_estimate and
+  /// avg_width contain valid values.
+  void Finalize();
+
+  /// Creates a TColumnStats object from PerColumnStats
+  TColumnStats ToTColumnStats() const;
+
+  /// Returns a string with debug information for this
+  string DebugString() const;
+};
 
 namespace impala {
 
