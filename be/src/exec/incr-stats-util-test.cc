@@ -22,8 +22,7 @@
 
 #include "testutil/gtest-util.h"
 #include "exprs/aggregate-functions.h"
-
-#include "common/names.h"
+#include "exec/incr-stats-util.h"
 
 using namespace impala;
 
@@ -72,3 +71,34 @@ TEST(IncrStatsUtilTest, TestEncode) {
   ASSERT_EQ(DecodeNdv(encoded, is_encoded), test);
 }
 
+/**
+ * This test checks the acceptable 'new_num_null' values by the PerColumnStats.Update
+ * method. In earlier releases the number of null values were not counted and the
+ * 'num_nulls' was set to '-1' to indicate missing statistics. To avoid misleading
+ * behavior between partition statistics created by different releases the column stats
+ * should be set to '-1' when a '-1' value exists in the partition stats.
+ */
+TEST(IncrStatsUtilTest, TestNumNullAggregation) {
+  PerColumnStats* stat = new PerColumnStats();
+
+  stat->Update(string(AggregateFunctions::HLL_LEN, 0), 0, 0, 0, 1);
+  ASSERT_EQ(1, stat->ToTColumnStats().num_nulls);
+
+  stat->Update(string(AggregateFunctions::HLL_LEN, 0), 0, 0, 0, 0);
+  ASSERT_EQ(1, stat->ToTColumnStats().num_nulls);
+
+  stat->Update(string(AggregateFunctions::HLL_LEN, 0), 0, 0, 0, 2);
+  ASSERT_EQ(3, stat->ToTColumnStats().num_nulls);
+
+  stat->Update(string(AggregateFunctions::HLL_LEN, 0), 0, 0, 0, -1);
+  ASSERT_EQ(-1, stat->ToTColumnStats().num_nulls);
+
+  stat->Update(string(AggregateFunctions::HLL_LEN, 0), 0, 0, 0, 0);
+  ASSERT_EQ(-1, stat->ToTColumnStats().num_nulls);
+
+  stat->Update(string(AggregateFunctions::HLL_LEN, 0), 0, 0, 0, 3);
+  ASSERT_EQ(-1, stat->ToTColumnStats().num_nulls);
+
+  stat->Update(string(AggregateFunctions::HLL_LEN, 0), 0, 0, 0, -1);
+  ASSERT_EQ(-1, stat->ToTColumnStats().num_nulls);
+}

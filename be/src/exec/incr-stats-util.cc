@@ -112,79 +112,51 @@ string DecodeNdv(const string& ndv, bool is_encoded) {
   return decoded_ndv;
 }
 
-// A container for statistics for a single column that are aggregated partition by
-// partition during the incremental computation of column stats. The aggregations are
-// updated during Update(), and the final statistics are computed by Finalize().
-struct PerColumnStats {
-  // Should have length AggregateFunctions::HLL_PRECISION. Intermediate buckets for the
-  // HLL calculation.
-  string intermediate_ndv;
-
-  // The total number of nulls counted, or -1 for no sample.
-  int64_t num_nulls;
-
-  // The maximum width of the column, in bytes.
-  int32_t max_width;
-
-  // The total number of rows
-  int64_t num_rows;
-
-  // The sum of avg_width * num_rows for each partition, so that avg_width can be
-  // correctly computed during Finalize()
-  double total_width;
-
-  // Populated after Finalize(), the result of the HLL computation
-  int64_t ndv_estimate;
-
-  // The average column width, in bytes (but may have non-integer value)
-  double avg_width;
-
-  PerColumnStats()
-      : intermediate_ndv(AggregateFunctions::HLL_LEN, 0), num_nulls(0),
-        max_width(0), num_rows(0), avg_width(0) { }
-
-  // Updates all aggregate statistics with a new set of measurements.
-  void Update(const string& ndv, int64_t num_new_rows, double new_avg_width,
-      int32_t max_new_width, int64_t num_new_nulls) {
-    DCHECK_EQ(intermediate_ndv.size(), ndv.size()) << "Incompatible intermediate NDVs";
-    DCHECK_GE(num_new_rows, 0);
-    DCHECK_GE(max_new_width, 0);
-    DCHECK_GE(new_avg_width, 0);
-    DCHECK_GE(num_new_nulls, 0);
-    for (int j = 0; j < ndv.size(); ++j) {
-      intermediate_ndv[j] = ::max(intermediate_ndv[j], ndv[j]);
+void PerColumnStats::Update(const string& ndv, int64_t num_new_rows, double new_avg_width,
+    int32_t max_new_width, int64_t num_new_nulls) {
+  DCHECK_EQ(intermediate_ndv.size(), ndv.size())
+      << "Incompatible intermediate NDVs";
+  DCHECK_GE(num_new_rows, 0);
+  DCHECK_GE(max_new_width, 0);
+  DCHECK_GE(new_avg_width, 0);
+  DCHECK_GE(num_new_nulls, -1); // '-1' needed to be backward compatible
+  for (int j = 0; j < ndv.size(); ++j) {
+    intermediate_ndv[j] = ::max(intermediate_ndv[j], ndv[j]);
+  }
+  // Earlier the 'num_nulls' were initialized and persisted with '-1', this condition
+  // ensures metadata backward compatibility between releases
+  if (num_nulls >= 0) {
+    if (num_new_nulls >= 0) {
+      num_nulls += num_new_nulls;
+    } else {
+      num_nulls = -1;
     }
-    num_nulls += num_new_nulls;
-    max_width = ::max(max_width, max_new_width);
-    avg_width += (new_avg_width * num_new_rows);
-    num_rows += num_new_rows;
   }
+  max_width = ::max(max_width, max_new_width);
+  avg_width += (new_avg_width * num_new_rows);
+  num_rows += num_new_rows;
+}
 
-  // Performs any stats computations that are not distributive, that is they may not be
-  // computed in part during Update(). After this method returns, ndv_estimate and
-  // avg_width contain valid values.
-  void Finalize() {
-    ndv_estimate = AggregateFunctions::HllFinalEstimate(
-        reinterpret_cast<const uint8_t*>(intermediate_ndv.data()));
-    avg_width = num_rows == 0 ? 0 : avg_width / num_rows;
-  }
+void PerColumnStats::Finalize() {
+  ndv_estimate = AggregateFunctions::HllFinalEstimate(
+      reinterpret_cast<const uint8_t*>(intermediate_ndv.data()));
+  avg_width = num_rows == 0 ? 0 : avg_width / num_rows;
+}
 
-  TColumnStats ToTColumnStats() const {
-    TColumnStats col_stats;
-    col_stats.__set_num_distinct_values(ndv_estimate);
-    col_stats.__set_num_nulls(num_nulls);
-    col_stats.__set_max_size(max_width);
-    col_stats.__set_avg_size(avg_width);
-    return col_stats;
-  }
+TColumnStats PerColumnStats::ToTColumnStats() const {
+  TColumnStats col_stats;
+  col_stats.__set_num_distinct_values(ndv_estimate);
+  col_stats.__set_num_nulls(num_nulls);
+  col_stats.__set_max_size(max_width);
+  col_stats.__set_avg_size(avg_width);
+  return col_stats;
+}
 
-  // Returns a string with debug information for this
-  string DebugString() const {
-    return Substitute(
-        "ndv: $0, num_nulls: $1, max_width: $2, avg_width: $3, num_rows: $4",
-        ndv_estimate, num_nulls, max_width, avg_width, num_rows);
-  }
-};
+string PerColumnStats::DebugString() const {
+  return Substitute(
+      "ndv: $0, num_nulls: $1, max_width: $2, avg_width: $3, num_rows: $4",
+      ndv_estimate, num_nulls, max_width, avg_width, num_rows);
+}
 
 namespace impala {
 
