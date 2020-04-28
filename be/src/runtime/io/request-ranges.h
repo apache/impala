@@ -248,6 +248,13 @@ class ScanRange : public RequestRange {
     int64_t length;
   };
 
+  /// Allocate a scan range object stored in the given 'obj_pool' and calls Reset() on it
+  /// with the rest of the input variables.
+  static ScanRange* AllocateScanRange(ObjectPool* obj_pool, hdfsFS fs, const char* file,
+      int64_t len, int64_t offset, std::vector<SubRange>&& sub_ranges, void* metadata,
+      int disk_id, bool expected_local, bool is_erasure_coded, int64_t mtime,
+      const BufferOpts& buffer_opts);
+
   /// Resets this scan range object with the scan range description. The scan range
   /// is for bytes [offset, offset + len) in 'file' on 'fs' (which is nullptr for the
   /// local filesystem). The scan range must be non-empty and fall within the file bounds

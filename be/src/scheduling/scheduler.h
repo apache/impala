@@ -382,14 +382,12 @@ class Scheduler {
   void CreateCollocatedAndScanInstances(const ExecutorConfig& executor_config,
       FragmentExecParams* fragment_params, QuerySchedule* schedule);
 
-  /// Compute an assignment of scan ranges 'ranges' that were assigned to a host to
-  /// at most 'max_num_instances' fragment instances running on the same host.
-  /// Attempts to minimize skew across the instances. 'max_num_ranges' must be
-  /// positive. Only returns non-empty vectors: if there are not enough ranges
-  /// to create 'max_num_instances', fewer instances are assigned ranges.
-  /// May reorder ranges in 'ranges'.
+  /// Does a round robin assignment of scan ranges 'ranges' that were assigned to a host
+  /// to at most 'max_num_instances' fragment instances running on the same host.
+  /// 'max_num_ranges' must be positive. Only returns non-empty vectors: if there are not
+  /// enough ranges to create 'max_num_instances', fewer instances are assigned ranges.
   static std::vector<std::vector<ScanRangeParamsPB>> AssignRangesToInstances(
-      int max_num_instances, std::vector<ScanRangeParamsPB>* ranges);
+      int max_num_instances, std::vector<ScanRangeParamsPB>& ranges);
 
   /// For each instance of fragment_params's input fragment, create a collocated
   /// instance for fragment_params's fragment.

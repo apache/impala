@@ -19,9 +19,11 @@
 
 #include <sstream>
 
+#include "exec/exec-node-util.h"
 #include "exec/scanner-context.h"
 #include "runtime/runtime-state.h"
 #include "runtime/row-batch.h"
+#include "runtime/exec-env.h"
 #include "util/debug-util.h"
 #include "util/runtime-profile-counters.h"
 
@@ -33,12 +35,11 @@ using namespace impala::io;
 
 namespace impala {
 
-HdfsScanNodeMt::HdfsScanNodeMt(ObjectPool* pool, const HdfsScanPlanNode& pnode,
-                           const DescriptorTbl& descs)
-    : HdfsScanNodeBase(pool, pnode, pnode.tnode_->hdfs_scan_node, descs),
-      scan_range_(NULL),
-      scanner_(NULL) {
-}
+HdfsScanNodeMt::HdfsScanNodeMt(
+    ObjectPool* pool, const HdfsScanPlanNode& pnode, const DescriptorTbl& descs)
+  : HdfsScanNodeBase(pool, pnode, pnode.tnode_->hdfs_scan_node, descs),
+    scan_range_(NULL),
+    scanner_(NULL) {}
 
 HdfsScanNodeMt::~HdfsScanNodeMt() {
 }
@@ -50,14 +51,17 @@ Status HdfsScanNodeMt::Prepare(RuntimeState* state) {
 
 Status HdfsScanNodeMt::Open(RuntimeState* state) {
   SCOPED_TIMER(runtime_profile_->total_time_counter());
+  ScopedOpenEventAdder ea(this);
   RETURN_IF_ERROR(HdfsScanNodeBase::Open(state));
   DCHECK(!initial_ranges_issued_.Load());
+  shared_state_->AddCancellationHook(state);
   RETURN_IF_ERROR(IssueInitialScanRanges(state));
   return Status::OK();
 }
 
 Status HdfsScanNodeMt::GetNext(RuntimeState* state, RowBatch* row_batch, bool* eos) {
   SCOPED_TIMER(runtime_profile_->total_time_counter());
+  ScopedGetNextEventAdder ea(this, eos);
   RETURN_IF_ERROR(ExecDebugAction(TExecNodePhase::GETNEXT, state));
   RETURN_IF_CANCELLED(state);
   RETURN_IF_ERROR(QueryMaintenance(state));
@@ -140,4 +144,26 @@ void HdfsScanNodeMt::Close(RuntimeState* state) {
   HdfsScanNodeBase::Close(state);
 }
 
+Status HdfsScanNodeMt::AddDiskIoRanges(
+    const vector<ScanRange*>& ranges, EnqueueLocation enqueue_location) {
+  DCHECK(!shared_state_->progress().done())
+      << "Don't call AddScanRanges() after all ranges finished.";
+  DCHECK_GT(shared_state_->RemainingScanRangeSubmissions(), 0);
+  DCHECK_GT(ranges.size(), 0);
+  bool at_front = false;
+  if (enqueue_location == EnqueueLocation::HEAD) {
+    at_front = true;
+  }
+  shared_state_->EnqueueScanRange(ranges, at_front);
+  return Status::OK();
+}
+
+Status HdfsScanNodeMt::GetNextScanRangeToRead(
+    io::ScanRange** scan_range, bool* needs_buffers) {
+  RETURN_IF_ERROR(shared_state_->GetNextScanRange(runtime_state_, scan_range));
+  if (*scan_range != nullptr) {
+    RETURN_IF_ERROR(reader_context_->StartScanRange(*scan_range, needs_buffers));
+  }
+  return Status::OK();
+}
 }

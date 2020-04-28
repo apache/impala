@@ -112,7 +112,7 @@ Status HdfsScanner::Open(ScannerContext* context) {
   // Initialize the template_tuple_, it is copied from the template tuple map in the
   // HdfsScanNodeBase.
   Tuple* template_tuple =
-      scan_node_->partition_template_tuple_map_[context_->partition_descriptor()->id()];
+      scan_node_->GetTemplateTupleForPartitionId(context_->partition_descriptor()->id());
   if (template_tuple != nullptr) {
     template_tuple_ =
         template_tuple->DeepCopy(*scan_node_->tuple_desc(), template_tuple_pool_.get());

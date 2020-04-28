@@ -54,9 +54,6 @@ Status BaseSequenceScanner::IssueInitialRanges(HdfsScanNodeBase* scan_node,
   for (int i = 0; i < files.size(); ++i) {
     ScanRangeMetadata* metadata =
         static_cast<ScanRangeMetadata*>(files[i]->splits[0]->meta_data());
-    ScanRangeMetadata* header_metadata =
-        scan_node->runtime_state()->obj_pool()->Add(new ScanRangeMetadata(*metadata));
-    header_metadata->is_sequence_header = true;
     int64_t header_size = min<int64_t>(HEADER_SIZE, files[i]->file_length);
     // The header is almost always a remote read. Set the disk id to -1 and indicate
     // it is not cached.
@@ -66,8 +63,12 @@ Status BaseSequenceScanner::IssueInitialRanges(HdfsScanNodeBase* scan_node,
     int cache_options = !scan_node->IsDataCacheDisabled() ? BufferOpts::USE_DATA_CACHE :
         BufferOpts::NO_CACHING;
     ScanRange* header_range = scan_node->AllocateScanRange(files[i]->fs,
-        files[i]->filename.c_str(), header_size, 0, header_metadata, -1, expected_local,
-        files[i]->is_erasure_coded, files[i]->mtime, BufferOpts(cache_options));
+        files[i]->filename.c_str(), header_size, 0, metadata->partition_id, -1,
+        expected_local, files[i]->is_erasure_coded, files[i]->mtime,
+        BufferOpts(cache_options), metadata->original_split);
+    ScanRangeMetadata* header_metadata =
+            static_cast<ScanRangeMetadata*>(header_range->meta_data());
+    header_metadata->is_sequence_header = true;
     header_ranges.push_back(header_range);
   }
   // When the header is parsed, we will issue more AddDiskIoRanges in
@@ -170,7 +171,7 @@ Status BaseSequenceScanner::GetNextInternal(RowBatch* row_batch) {
     // Header is parsed, set the metadata in the scan node and issue more ranges.
     static_cast<HdfsScanNodeBase*>(scan_node_)->SetFileMetadata(
         context_->partition_descriptor()->id(), stream_->filename(), header_);
-    HdfsFileDesc* desc = scan_node_->GetFileDesc(
+    const HdfsFileDesc* desc = scan_node_->GetFileDesc(
         context_->partition_descriptor()->id(), stream_->filename());
     // Issue the scan range with priority since it would result in producing a RowBatch.
     status = scan_node_->AddDiskIoRanges(desc, EnqueueLocation::HEAD);
@@ -329,7 +330,7 @@ Status BaseSequenceScanner::SkipToSync(const uint8_t* sync, int sync_size) {
 
 void BaseSequenceScanner::CloseFileRanges(const char* filename) {
   DCHECK(only_parsing_header_);
-  HdfsFileDesc* desc = scan_node_->GetFileDesc(
+  const HdfsFileDesc* desc = scan_node_->GetFileDesc(
       context_->partition_descriptor()->id(), filename);
   const vector<ScanRange*>& splits = desc->splits;
   for (int i = 0; i < splits.size(); ++i) {

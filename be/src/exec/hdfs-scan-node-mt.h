@@ -41,8 +41,8 @@ class HdfsScanNodeMt : public HdfsScanNodeBase {
       ObjectPool* pool, const HdfsScanPlanNode& pnode, const DescriptorTbl& descs);
   ~HdfsScanNodeMt();
 
-  virtual Status Prepare(RuntimeState* state) override WARN_UNUSED_RESULT;
-  virtual Status Open(RuntimeState* state) override WARN_UNUSED_RESULT;
+  virtual Status Prepare(RuntimeState* state) override;
+  virtual Status Open(RuntimeState* state) override;
   virtual Status GetNext(RuntimeState* state, RowBatch* row_batch, bool* eos)
       override WARN_UNUSED_RESULT;
   virtual void Close(RuntimeState* state) override;
@@ -50,12 +50,20 @@ class HdfsScanNodeMt : public HdfsScanNodeBase {
   virtual bool HasRowBatchQueue() const override { return false; }
   virtual ExecutionModel getExecutionModel() const override { return TASK_BASED; }
 
+  /// Adds the range to a queue shared among all instances of this scan node.
+  Status AddDiskIoRanges(const std::vector<io::ScanRange*>& ranges,
+        EnqueueLocation enqueue_location = EnqueueLocation::TAIL) override;
+
+ protected:
+  /// Fetches the next range to read from a queue shared among all instances of this scan
+  /// node. Also schedules it to be read by disk threads via the reader context.
+  Status GetNextScanRangeToRead(io::ScanRange** scan_range, bool* needs_buffers) override;
+
  private:
   /// Create and open new scanner for this partition type.
   /// If the scanner is successfully created and opened, it is returned in 'scanner'.
   Status CreateAndOpenScanner(HdfsPartitionDescriptor* partition,
-      ScannerContext* context, boost::scoped_ptr<HdfsScanner>* scanner)
-      WARN_UNUSED_RESULT;
+      ScannerContext* context, boost::scoped_ptr<HdfsScanner>* scanner);
 
   /// Current scan range and corresponding scanner.
   io::ScanRange* scan_range_;

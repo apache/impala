@@ -70,12 +70,6 @@ static const string ACTUAL_RESERVATION_COUNTER_NAME = "ParquetRowGroupActualRese
 Status HdfsParquetScanner::IssueInitialRanges(HdfsScanNodeBase* scan_node,
     const vector<HdfsFileDesc*>& files) {
   DCHECK(!files.empty());
-  // Add Parquet-specific counters.
-  ADD_SUMMARY_STATS_COUNTER(
-      scan_node->runtime_profile(), IDEAL_RESERVATION_COUNTER_NAME, TUnit::BYTES);
-  ADD_SUMMARY_STATS_COUNTER(
-      scan_node->runtime_profile(), ACTUAL_RESERVATION_COUNTER_NAME, TUnit::BYTES);
-
   for (HdfsFileDesc* file : files) {
     // If the file size is less than 12 bytes, it is an invalid Parquet file.
     if (file->file_length < 12) {
@@ -138,6 +132,10 @@ Status HdfsParquetScanner::Open(ScannerContext* context) {
       scan_node_->runtime_profile(), "ParquetUncompressedPageSize", TUnit::BYTES);
   process_page_index_stats_ =
       ADD_SUMMARY_STATS_TIMER(scan_node_->runtime_profile(), "PageIndexProcessingTime");
+  row_group_ideal_reservation_counter_ = ADD_SUMMARY_STATS_COUNTER(
+      scan_node_->runtime_profile(), IDEAL_RESERVATION_COUNTER_NAME, TUnit::BYTES);
+  row_group_actual_reservation_counter_ = ADD_SUMMARY_STATS_COUNTER(
+      scan_node_->runtime_profile(), ACTUAL_RESERVATION_COUNTER_NAME, TUnit::BYTES);
 
   codegend_process_scratch_batch_fn_ = reinterpret_cast<ProcessScratchBatchFn>(
       scan_node_->GetCodegenFn(THdfsFileFormat::PARQUET));
@@ -565,8 +563,8 @@ Status HdfsParquetScanner::NextRowGroup() {
   int64_t split_offset = split_range->offset();
   int64_t split_length = split_range->len();
 
-  HdfsFileDesc* file_desc = scan_node_->GetFileDesc(
-      context_->partition_descriptor()->id(), filename());
+  const HdfsFileDesc* file_desc =
+      scan_node_->GetFileDesc(context_->partition_descriptor()->id(), filename());
 
   bool start_with_first_row_group = row_group_idx_ == -1;
   bool misaligned_row_group_skipped = false;
@@ -1652,10 +1650,8 @@ Status HdfsParquetScanner::DivideReservationBetweenColumns(
   if (ideal_reservation > context_->total_reservation()) {
     context_->TryIncreaseReservation(ideal_reservation);
   }
-  scan_node_->runtime_profile()->GetSummaryStatsCounter(ACTUAL_RESERVATION_COUNTER_NAME)->
-      UpdateCounter(context_->total_reservation());
-  scan_node_->runtime_profile()->GetSummaryStatsCounter(IDEAL_RESERVATION_COUNTER_NAME)->
-      UpdateCounter(ideal_reservation);
+  row_group_actual_reservation_counter_->UpdateCounter(context_->total_reservation());
+  row_group_ideal_reservation_counter_->UpdateCounter(ideal_reservation);
 
   vector<pair<int, int64_t>> tmp_reservations = DivideReservationBetweenColumnsHelper(
       min_buffer_size, max_buffer_size, col_range_lengths, context_->total_reservation());

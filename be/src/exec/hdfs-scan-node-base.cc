@@ -224,21 +224,135 @@ Status HdfsScanPlanNode::Init(const TPlanNode& tnode, FragmentState* state) {
         *min_max_row_desc, state, &min_max_conjuncts_));
   }
 
-  const vector<const PlanFragmentInstanceCtxPB*>& instance_ctxs =
-      state->instance_ctx_pbs();
-  for (auto ctx : instance_ctxs) {
-    auto ranges = ctx->per_node_scan_ranges().find(tnode.node_id);
-    if (ranges == ctx->per_node_scan_ranges().end()) continue;
-    for (const ScanRangeParamsPB& scan_range_param : ranges->second.scan_ranges()) {
-      DCHECK(scan_range_param.scan_range().has_hdfs_file_split());
-      const HdfsFileSplitPB& split = scan_range_param.scan_range().hdfs_file_split();
-      HdfsPartitionDescriptor* partition_desc =
-          hdfs_table_->GetPartition(split.partition_id());
-      scanned_file_formats_.insert(partition_desc->file_format());
-    }
-  }
+  RETURN_IF_ERROR(ProcessScanRangesAndInitSharedState(state));
+
   state->CheckAndAddCodegenDisabledMessage(codegen_status_msgs_);
   return Status::OK();
+}
+
+Status HdfsScanPlanNode::ProcessScanRangesAndInitSharedState(FragmentState* state) {
+  // Initialize the template tuple pool.
+  shared_state_.template_pool_.reset(new MemPool(state->query_mem_tracker()));
+  auto& template_tuple_map_ = shared_state_.partition_template_tuple_map_;
+  ObjectPool* obj_pool = shared_state_.obj_pool();
+  auto& file_descs = shared_state_.file_descs_;
+  HdfsFsCache::HdfsFsMap fs_cache;
+  int num_ranges_missing_volume_id = 0;
+  int64_t total_splits = 0;
+  const vector<const PlanFragmentInstanceCtxPB*>& instance_ctx_pbs =
+      state->instance_ctx_pbs();
+  for (auto ctx : instance_ctx_pbs) {
+    auto ranges = ctx->per_node_scan_ranges().find(tnode_->node_id);
+    if (ranges == ctx->per_node_scan_ranges().end()) continue;
+    for (const ScanRangeParamsPB& params : ranges->second.scan_ranges()) {
+      DCHECK(params.scan_range().has_hdfs_file_split());
+      const HdfsFileSplitPB& split = params.scan_range().hdfs_file_split();
+      HdfsPartitionDescriptor* partition_desc =
+          hdfs_table_->GetPartition(split.partition_id());
+      if (template_tuple_map_.find(split.partition_id()) == template_tuple_map_.end()) {
+        template_tuple_map_[split.partition_id()] =
+            InitTemplateTuple(partition_desc->partition_key_value_evals(),
+                shared_state_.template_pool_.get());
+      }
+      // Convert the ScanRangeParamsPB into per-file DiskIO::ScanRange objects and
+      // populate partition_ids_, file_descs_, and per_type_files_.
+      if (partition_desc == nullptr) {
+        // TODO: this should be a DCHECK but we sometimes hit it. It's likely IMPALA-1702.
+        LOG(ERROR) << "Bad table descriptor! table_id=" << hdfs_table_->id()
+                   << " partition_id=" << split.partition_id() << "\n"
+                   << PrintThrift(state->fragment())
+                   << state->fragment_ctx().DebugString();
+        return Status("Query encountered invalid metadata, likely due to IMPALA-1702."
+                      " Try rerunning the query.");
+      }
+
+      filesystem::path file_path(partition_desc->location());
+      file_path.append(split.relative_path(), filesystem::path::codecvt());
+      const string& native_file_path = file_path.native();
+
+      auto file_desc_map_key = make_pair(partition_desc->id(), native_file_path);
+      HdfsFileDesc* file_desc = nullptr;
+      auto file_desc_it = file_descs.find(file_desc_map_key);
+      if (file_desc_it == file_descs.end()) {
+        // Add new file_desc to file_descs_ and per_type_files_
+        file_desc = obj_pool->Add(new HdfsFileDesc(native_file_path));
+        file_descs[file_desc_map_key] = file_desc;
+        file_desc->file_length = split.file_length();
+        file_desc->mtime = split.mtime();
+        file_desc->file_compression = CompressionTypePBToThrift(split.file_compression());
+        file_desc->file_format = partition_desc->file_format();
+        file_desc->is_erasure_coded = split.is_erasure_coded();
+        RETURN_IF_ERROR(HdfsFsCache::instance()->GetConnection(
+            native_file_path, &file_desc->fs, &fs_cache));
+        shared_state_.per_type_files_[partition_desc->file_format()].push_back(file_desc);
+      } else {
+        // File already processed
+        file_desc = file_desc_it->second;
+      }
+
+      bool expected_local = params.has_is_remote() && !params.is_remote();
+      if (expected_local && params.volume_id() == -1) ++num_ranges_missing_volume_id;
+
+      int cache_options = BufferOpts::NO_CACHING;
+      if (params.has_try_hdfs_cache() && params.try_hdfs_cache()) {
+        cache_options |= BufferOpts::USE_HDFS_CACHE;
+      }
+      if ((!expected_local || FLAGS_always_use_data_cache)
+          && !state->query_options().disable_data_cache) {
+        cache_options |= BufferOpts::USE_DATA_CACHE;
+      }
+      ScanRangeMetadata* metadata =
+          obj_pool->Add(new ScanRangeMetadata(split.partition_id(), nullptr));
+      file_desc->splits.push_back(ScanRange::AllocateScanRange(obj_pool, file_desc->fs,
+          file_desc->filename.c_str(), split.length(), split.offset(), {}, metadata,
+          params.volume_id(), expected_local, file_desc->is_erasure_coded,
+          file_desc->mtime, BufferOpts(cache_options)));
+      total_splits++;
+    }
+    // Update server wide metrics for number of scan ranges and ranges that have
+    // incomplete metadata.
+    ImpaladMetrics::NUM_RANGES_PROCESSED->Increment(ranges->second.scan_ranges().size());
+    ImpaladMetrics::NUM_RANGES_MISSING_VOLUME_ID->Increment(num_ranges_missing_volume_id);
+  }
+  // Set up the rest of the shared state.
+  shared_state_.remaining_scan_range_submissions_.Store(instance_ctx_pbs.size());
+  shared_state_.progress().Init(
+      Substitute("Splits complete (node=$0)", tnode_->node_id), total_splits);
+  shared_state_.use_mt_scan_node_ = tnode_->hdfs_scan_node.use_mt_scan_node;
+
+  // Distribute the work evenly for issuing initial scan ranges.
+  DCHECK(shared_state_.use_mt_scan_node_ || instance_ctx_pbs.size() == 1)
+      << "Non MT scan node should only have a single instance.";
+  auto instance_ctxs = state->instance_ctxs();
+  DCHECK_EQ(instance_ctxs.size(), instance_ctx_pbs.size());
+  int files_per_instance = file_descs.size() / instance_ctxs.size();
+  int remainder = file_descs.size() % instance_ctxs.size();
+  int num_lists = min(file_descs.size(), instance_ctxs.size());
+  auto fd_it = file_descs.begin();
+  for (int i = 0; i < num_lists; ++i) {
+    vector<HdfsFileDesc*>* curr_file_list =
+        &shared_state_
+             .file_assignment_per_instance_[instance_ctxs[i]->fragment_instance_id];
+    for (int j = 0; j < files_per_instance + (i < remainder); ++j) {
+      curr_file_list->push_back(fd_it->second);
+      ++fd_it;
+    }
+  }
+  DCHECK(fd_it == file_descs.end());
+  return Status::OK();
+}
+
+Tuple* HdfsScanPlanNode::InitTemplateTuple(
+    const std::vector<ScalarExprEvaluator*>& evals, MemPool* pool) const {
+  if (partition_key_slots_.empty()) return nullptr;
+  Tuple* template_tuple = Tuple::Create(tuple_desc_->byte_size(), pool);
+  for (int i = 0; i < partition_key_slots_.size(); ++i) {
+    const SlotDescriptor* slot_desc = partition_key_slots_[i];
+    ScalarExprEvaluator* eval = evals[slot_desc->col_pos()];
+    // Exprs guaranteed to be literals, so can safely be evaluated without a row.
+    RawValue::Write(eval->GetValue(NULL), template_tuple, slot_desc, nullptr);
+  }
+  return template_tuple;
 }
 
 int HdfsScanPlanNode::GetMaterializedSlotIdx(const std::vector<int>& path) const {
@@ -257,6 +371,9 @@ void HdfsScanPlanNode::Close() {
     ScalarExpr::Close(tid_conjunct.second);
   }
   ScalarExpr::Close(min_max_conjuncts_);
+  if (shared_state_.template_pool_.get() != nullptr) {
+    shared_state_.template_pool_->FreeAll();
+  }
   PlanNode::Close();
 }
 
@@ -299,7 +416,8 @@ HdfsScanNodeBase::HdfsScanNodeBase(ObjectPool* pool, const HdfsScanPlanNode& pno
     materialized_slots_(pnode.materialized_slots_),
     partition_key_slots_(pnode.partition_key_slots_),
     disks_accessed_bitmap_(TUnit::UNIT, 0),
-    active_hdfs_read_thread_counter_(TUnit::UNIT, 0) {}
+    active_hdfs_read_thread_counter_(TUnit::UNIT, 0),
+    shared_state_(const_cast<ScanRangeSharedState*>(&(pnode.shared_state_))) {}
 
 HdfsScanNodeBase::~HdfsScanNodeBase() {}
 
@@ -327,75 +445,6 @@ Status HdfsScanNodeBase::Prepare(RuntimeState* state) {
         expr_perm_pool(), expr_results_pool(), &min_max_conjunct_evals_));
   }
 
-  // One-time initialization of state that is constant across scan ranges
-  scan_node_pool_.reset(new MemPool(mem_tracker()));
-
-  HdfsFsCache::HdfsFsMap fs_cache;
-  // Convert the ScanRangeParamsPB into per-file DiskIO::ScanRange objects and populate
-  // partition_ids_, file_descs_, and per_type_files_.
-  DCHECK(scan_range_params_ != NULL)
-      << "Must call SetScanRanges() before calling Prepare()";
-  int num_ranges_missing_volume_id = 0;
-  for (const ScanRangeParamsPB& params : *scan_range_params_) {
-    DCHECK(params.scan_range().has_hdfs_file_split());
-    const HdfsFileSplitPB& split = params.scan_range().hdfs_file_split();
-    partition_ids_.insert(split.partition_id());
-    HdfsPartitionDescriptor* partition_desc =
-        hdfs_table_->GetPartition(split.partition_id());
-    if (partition_desc == NULL) {
-      // TODO: this should be a DCHECK but we sometimes hit it. It's likely IMPALA-1702.
-      LOG(ERROR) << "Bad table descriptor! table_id=" << hdfs_table_->id()
-                 << " partition_id=" << split.partition_id() << "\n"
-                 << PrintThrift(state->instance_ctx()) << "\n"
-                 << state->instance_ctx_pb().DebugString();
-      return Status("Query encountered invalid metadata, likely due to IMPALA-1702."
-                    " Try rerunning the query.");
-    }
-
-    filesystem::path file_path(partition_desc->location());
-    file_path.append(split.relative_path(), filesystem::path::codecvt());
-    const string& native_file_path = file_path.native();
-
-    auto file_desc_map_key = make_pair(partition_desc->id(), native_file_path);
-    HdfsFileDesc* file_desc = NULL;
-    FileDescMap::iterator file_desc_it = file_descs_.find(file_desc_map_key);
-    if (file_desc_it == file_descs_.end()) {
-      // Add new file_desc to file_descs_ and per_type_files_
-      file_desc = runtime_state_->obj_pool()->Add(new HdfsFileDesc(native_file_path));
-      file_descs_[file_desc_map_key] = file_desc;
-      file_desc->file_length = split.file_length();
-      file_desc->mtime = split.mtime();
-      file_desc->file_compression = CompressionTypePBToThrift(split.file_compression());
-      file_desc->is_erasure_coded = split.is_erasure_coded();
-      RETURN_IF_ERROR(HdfsFsCache::instance()->GetConnection(
-          native_file_path, &file_desc->fs, &fs_cache));
-      per_type_files_[partition_desc->file_format()].push_back(file_desc);
-    } else {
-      // File already processed
-      file_desc = file_desc_it->second;
-    }
-
-    bool expected_local = params.has_is_remote() && !params.is_remote();
-    if (expected_local && params.volume_id() == -1) ++num_ranges_missing_volume_id;
-
-    int cache_options = BufferOpts::NO_CACHING;
-    if (params.has_try_hdfs_cache() && params.try_hdfs_cache()) {
-      cache_options |= BufferOpts::USE_HDFS_CACHE;
-    }
-    if ((!expected_local || FLAGS_always_use_data_cache) && !IsDataCacheDisabled()) {
-      cache_options |= BufferOpts::USE_DATA_CACHE;
-    }
-    file_desc->splits.push_back(
-        AllocateScanRange(file_desc->fs, file_desc->filename.c_str(), split.length(),
-            split.offset(), split.partition_id(), params.volume_id(), expected_local,
-            file_desc->is_erasure_coded, file_desc->mtime, BufferOpts(cache_options)));
-  }
-
-  // Update server wide metrics for number of scan ranges and ranges that have
-  // incomplete metadata.
-  ImpaladMetrics::NUM_RANGES_PROCESSED->Increment(scan_range_params_->size());
-  ImpaladMetrics::NUM_RANGES_MISSING_VOLUME_ID->Increment(num_ranges_missing_volume_id);
-
   // Check if reservation was enough to allocate at least one buffer. The
   // reservation calculation in HdfsScanNode.java should guarantee this.
   // Hitting this error indicates a misconfiguration or bug.
@@ -406,13 +455,19 @@ Status HdfsScanNodeBase::Prepare(RuntimeState* state) {
       Substitute("HDFS scan min reservation $0 must be >= min buffer size $1",
        resource_profile_.min_reservation, min_buffer_size));
   }
-  // Add per volume stats to the runtime profile
-  PerVolumeStats per_volume_stats;
-  stringstream str;
-  UpdateHdfsSplitStats(*scan_range_params_, &per_volume_stats);
-  PrintHdfsSplitStats(per_volume_stats, &str);
+
+  // One-time initialization of state that is constant across scan ranges
+  scan_node_pool_.reset(new MemPool(mem_tracker()));
   runtime_profile()->AddInfoString("Table Name", hdfs_table_->fully_qualified_name());
-  runtime_profile()->AddInfoString(HDFS_SPLIT_STATS_DESC, str.str());
+
+  if (HasRowBatchQueue()) {
+    // Add per volume stats to the runtime profile for Non MT scan node.
+    PerVolumeStats per_volume_stats;
+    stringstream str;
+    UpdateHdfsSplitStats(*scan_range_params_, &per_volume_stats);
+    PrintHdfsSplitStats(per_volume_stats, &str);
+    runtime_profile()->AddInfoString(HDFS_SPLIT_STATS_DESC, str.str());
+  }
   return Status::OK();
 }
 
@@ -420,10 +475,10 @@ void HdfsScanPlanNode::Codegen(FragmentState* state) {
   DCHECK(state->ShouldCodegen());
   PlanNode::Codegen(state);
   if (IsNodeCodegenDisabled()) return;
-  for (THdfsFileFormat::type format: scanned_file_formats_) {
+  for (auto& elem: shared_state_.per_type_files_) {
     llvm::Function* fn;
     Status status;
-    switch (format) {
+    switch (elem.first) {
       case THdfsFileFormat::TEXT:
         status = HdfsTextScanner::Codegen(this, state, &fn);
         break;
@@ -443,12 +498,12 @@ void HdfsScanPlanNode::Codegen(FragmentState* state) {
         status = Status::Expected("Not implemented for this format.");
     }
     DCHECK(fn != NULL || !status.ok());
-    const char* format_name = _THdfsFileFormat_VALUES_TO_NAMES.find(format)->second;
+    const char* format_name = _THdfsFileFormat_VALUES_TO_NAMES.find(elem.first)->second;
     if (status.ok()) {
       LlvmCodeGen* codegen = state->codegen();
       DCHECK(codegen != NULL);
       codegen->AddFunctionToJit(
-          fn, &codegend_fn_map_[static_cast<THdfsFileFormat::type>(format)]);
+          fn, &codegend_fn_map_[static_cast<THdfsFileFormat::type>(elem.first)]);
     }
     AddCodegenStatus(status, format_name);
   }
@@ -466,16 +521,6 @@ Status HdfsScanNodeBase::Open(RuntimeState* state) {
 
   // Open min max conjuncts
   RETURN_IF_ERROR(ScalarExprEvaluator::Open(min_max_conjunct_evals_, state));
-
-  // Create template tuples for all partitions.
-  for (int64_t partition_id: partition_ids_) {
-    HdfsPartitionDescriptor* partition_desc = hdfs_table_->GetPartition(partition_id);
-    DCHECK(partition_desc != NULL) << "table_id=" << hdfs_table_->id()
-                                   << " partition_id=" << partition_id
-                                   << "\n" << PrintThrift(state->instance_ctx());
-    partition_template_tuple_map_[partition_id] = InitTemplateTuple(
-        partition_desc->partition_key_value_evals(), scan_node_pool_.get(), state);
-  }
 
   RETURN_IF_ERROR(ClaimBufferReservation(state));
   reader_context_ = ExecEnv::GetInstance()->disk_io_mgr()->RegisterContext();
@@ -552,10 +597,6 @@ Status HdfsScanNodeBase::Open(RuntimeState* state) {
       ExecEnv::GetInstance()->disk_io_mgr()->num_total_disks() + 1);
 
   counters_running_ = true;
-
-  int64_t total_splits = 0;
-  for (const auto& fd: file_descs_) total_splits += fd.second->splits.size();
-  progress_.Init(Substitute("Splits complete (node=$0)", id_), total_splits);
   return Status::OK();
 }
 
@@ -607,29 +648,30 @@ Status HdfsScanNodeBase::IssueInitialScanRanges(RuntimeState* state) {
 
   if (filter_ctxs_.size() > 0) WaitForRuntimeFilters();
   // Apply dynamic partition-pruning per-file.
-  FileFormatsMap matching_per_type_files;
-  for (const FileFormatsMap::value_type& v: per_type_files_) {
-    vector<HdfsFileDesc*>* matching_files = &matching_per_type_files[v.first];
-    for (HdfsFileDesc* file: v.second) {
-      if (FilePassesFilterPredicates(filter_ctxs_, v.first, file)) {
-        matching_files->push_back(file);
-      } else {
-        SkipFile(v.first, file);
-      }
+  HdfsFileDesc::FileFormatsMap matching_per_type_files;
+  std::vector<HdfsFileDesc*>* file_list =
+      shared_state_->GetFilesForIssuingScanRangesForInstance(
+          runtime_state_->instance_ctx().fragment_instance_id);
+  if (file_list == nullptr) return Status::OK();
+  for (HdfsFileDesc* file : *file_list) {
+    if (FilePassesFilterPredicates(filter_ctxs_, file->file_format, file)) {
+      matching_per_type_files[file->file_format].push_back(file);
+    } else {
+      SkipFile(file->file_format, file);
     }
-    // Randomize the order this node processes the files. We want to do this to avoid
-    // issuing remote reads to the same DN from different impalads. In file formats such
-    // as avro/seq/rc (i.e. splittable with a header), every node first reads the header.
-    // If every node goes through the files in the same order, all the remote reads are
-    // for the same file meaning a few DN serves a lot of remote reads at the same time.
-    random_shuffle(matching_files->begin(), matching_files->end());
   }
 
   // Issue initial ranges for all file types. Only call functions for file types that
   // actually exist - trying to add empty lists of ranges can result in spurious
   // CANCELLED errors - see IMPALA-6564.
-  for (const auto& entry : matching_per_type_files) {
+  for (auto& entry : matching_per_type_files) {
     if (entry.second.empty()) continue;
+    // Randomize the order this node processes the files. We want to do this to avoid
+    // issuing remote reads to the same DN from different impalads. In file formats such
+    // as avro/seq/rc (i.e. splittable with a header), every node first reads the header.
+    // If every node goes through the files in the same order, all the remote reads are
+    // for the same file meaning a few DN serves a lot of remote reads at the same time.
+    random_shuffle(entry.second.begin(), entry.second.end());
     switch (entry.first) {
       case THdfsFileFormat::PARQUET:
         RETURN_IF_ERROR(HdfsParquetScanner::IssueInitialRanges(this, entry.second));
@@ -680,7 +722,7 @@ void HdfsScanNodeBase::SkipScanRange(io::ScanRange* scan_range) {
   DCHECK(partition != nullptr) << "table_id=" << hdfs_table_->id()
                                << " partition_id=" << partition_id << "\n"
                                << PrintThrift(runtime_state_->instance_ctx());
-  HdfsFileDesc* desc = GetFileDesc(partition_id, *scan_range->file_string());
+  const HdfsFileDesc* desc = GetFileDesc(partition_id, *scan_range->file_string());
   if (metadata->is_sequence_header) {
     // File ranges haven't been issued yet, skip entire file.
     UpdateRemainingScanRangeSubmissions(-1);
@@ -698,7 +740,7 @@ Status HdfsScanNodeBase::StartNextScanRange(const std::vector<FilterContext>& fi
   bool needs_buffers;
   // Loop until we've got a scan range or run out of ranges.
   do {
-    RETURN_IF_ERROR(reader_context_->GetNextUnstartedRange(scan_range, &needs_buffers));
+    RETURN_IF_ERROR(GetNextScanRangeToRead(scan_range, &needs_buffers));
     if (*scan_range == nullptr) return Status::OK();
     if (filter_ctxs.size() > 0) {
       int64_t partition_id =
@@ -751,16 +793,8 @@ ScanRange* HdfsScanNodeBase::AllocateScanRange(hdfsFS fs, const char* file,
     int64_t len, int64_t offset, int64_t partition_id, int disk_id, bool expected_local,
     bool is_erasure_coded, int64_t mtime,  const BufferOpts& buffer_opts,
     const ScanRange* original_split) {
-  ScanRangeMetadata* metadata = runtime_state_->obj_pool()->Add(
-        new ScanRangeMetadata(partition_id, original_split));
-  return AllocateScanRange(fs, file, len, offset, {}, metadata, disk_id, expected_local,
-      is_erasure_coded, mtime, buffer_opts);
-}
-
-ScanRange* HdfsScanNodeBase::AllocateScanRange(hdfsFS fs, const char* file,
-    int64_t len, int64_t offset, ScanRangeMetadata* metadata, int disk_id,
-    bool expected_local, bool is_erasure_coded, int64_t mtime,
-    const BufferOpts& buffer_opts) {
+  ScanRangeMetadata* metadata =
+      shared_state_->obj_pool()->Add(new ScanRangeMetadata(partition_id, original_split));
   return AllocateScanRange(fs, file, len, offset, {}, metadata, disk_id, expected_local,
       is_erasure_coded, mtime, buffer_opts);
 }
@@ -769,32 +803,25 @@ ScanRange* HdfsScanNodeBase::AllocateScanRange(hdfsFS fs, const char* file,
     int64_t len, int64_t offset, vector<ScanRange::SubRange>&& sub_ranges,
     int64_t partition_id, int disk_id, bool expected_local, bool is_erasure_coded,
     int64_t mtime, const BufferOpts& buffer_opts, const ScanRange* original_split) {
-  ScanRangeMetadata* metadata = runtime_state_->obj_pool()->Add(
-      new ScanRangeMetadata(partition_id, original_split));
+  ScanRangeMetadata* metadata =
+      shared_state_->obj_pool()->Add(new ScanRangeMetadata(partition_id, original_split));
   return AllocateScanRange(fs, file, len, offset, move(sub_ranges), metadata,
       disk_id, expected_local, is_erasure_coded, mtime, buffer_opts);
 }
 
-ScanRange* HdfsScanNodeBase::AllocateScanRange(hdfsFS fs, const char* file,
-    int64_t len, int64_t offset, vector<ScanRange::SubRange>&& sub_ranges,
-    ScanRangeMetadata* metadata, int disk_id, bool expected_local, bool is_erasure_coded,
-    int64_t mtime, const BufferOpts& buffer_opts) {
-  DCHECK_GE(disk_id, -1);
+ScanRange* HdfsScanNodeBase::AllocateScanRange(hdfsFS fs, const char* file, int64_t len,
+    int64_t offset, vector<ScanRange::SubRange>&& sub_ranges, ScanRangeMetadata* metadata,
+    int disk_id, bool expected_local, bool is_erasure_coded, int64_t mtime,
+    const BufferOpts& buffer_opts) {
   // Require that the scan range is within [0, file_length). While this cannot be used
   // to guarantee safety (file_length metadata may be stale), it avoids different
   // behavior between Hadoop FileSystems (e.g. s3n hdfsSeek() returns error when seeking
   // beyond the end of the file).
-  DCHECK_GE(offset, 0);
-  DCHECK_GE(len, 0);
   DCHECK_LE(offset + len, GetFileDesc(metadata->partition_id, file)->file_length)
       << "Scan range beyond end of file (offset=" << offset << ", len=" << len << ")";
-  disk_id = ExecEnv::GetInstance()->disk_io_mgr()->AssignQueue(
-      file, disk_id, expected_local);
-
-  ScanRange* range = runtime_state_->obj_pool()->Add(new ScanRange);
-  range->Reset(fs, file, len, offset, disk_id, expected_local, is_erasure_coded, mtime,
-      buffer_opts, move(sub_ranges), metadata);
-  return range;
+  return ScanRange::AllocateScanRange(shared_state_->obj_pool(), fs, file, len, offset,
+      move(sub_ranges), metadata, disk_id, expected_local, is_erasure_coded, mtime,
+      buffer_opts);
 }
 
 ScanRange* HdfsScanNodeBase::AllocateScanRange(hdfsFS fs, const char* file,
@@ -803,37 +830,6 @@ ScanRange* HdfsScanNodeBase::AllocateScanRange(hdfsFS fs, const char* file,
     bool is_erasure_coded, const ScanRange* original_split) {
   return AllocateScanRange(fs, file, len, offset, partition_id, disk_id, expected_local,
       is_erasure_coded, mtime, BufferOpts(cache_options), original_split);
-}
-
-Status HdfsScanNodeBase::AddDiskIoRanges(const vector<ScanRange*>& ranges,
-    EnqueueLocation enqueue_location) {
-  DCHECK(!progress_.done()) << "Don't call AddScanRanges() after all ranges finished.";
-  DCHECK_GT(remaining_scan_range_submissions_.Load(), 0);
-  DCHECK_GT(ranges.size(), 0);
-  return reader_context_->AddScanRanges(ranges, enqueue_location);
-}
-
-HdfsFileDesc* HdfsScanNodeBase::GetFileDesc(int64_t partition_id, const string& filename) {
-  auto file_desc_map_key = make_pair(partition_id, filename);
-  DCHECK(file_descs_.find(file_desc_map_key) != file_descs_.end());
-  return file_descs_[file_desc_map_key];
-}
-
-void HdfsScanNodeBase::SetFileMetadata(
-    int64_t partition_id, const string& filename, void* metadata) {
-  unique_lock<mutex> l(metadata_lock_);
-  auto file_metadata_map_key = make_pair(partition_id, filename);
-  DCHECK(per_file_metadata_.find(file_metadata_map_key) == per_file_metadata_.end());
-  per_file_metadata_[file_metadata_map_key] = metadata;
-}
-
-void* HdfsScanNodeBase::GetFileMetadata(
-    int64_t partition_id, const string& filename) {
-  unique_lock<mutex> l(metadata_lock_);
-  auto file_metadata_map_key = make_pair(partition_id, filename);
-  auto it = per_file_metadata_.find(file_metadata_map_key);
-  if (it == per_file_metadata_.end()) return NULL;
-  return it->second;
 }
 
 void* HdfsScanNodeBase::GetCodegenFn(THdfsFileFormat::type type) {
@@ -888,19 +884,6 @@ Status HdfsScanNodeBase::CreateAndOpenScannerHelper(HdfsPartitionDescriptor* par
   return ScanNodeDebugAction(TExecNodePhase::PREPARE_SCANNER);
 }
 
-Tuple* HdfsScanNodeBase::InitTemplateTuple(const vector<ScalarExprEvaluator*>& evals,
-    MemPool* pool, RuntimeState* state) const {
-  if (partition_key_slots_.empty()) return NULL;
-  Tuple* template_tuple = Tuple::Create(tuple_desc_->byte_size(), pool);
-  for (int i = 0; i < partition_key_slots_.size(); ++i) {
-    const SlotDescriptor* slot_desc = partition_key_slots_[i];
-    ScalarExprEvaluator* eval = evals[slot_desc->col_pos()];
-    // Exprs guaranteed to be literals, so can safely be evaluated without a row.
-    RawValue::Write(eval->GetValue(NULL), template_tuple, slot_desc, NULL);
-  }
-  return template_tuple;
-}
-
 void HdfsScanNodeBase::InitNullCollectionValues(const TupleDescriptor* tuple_desc,
     Tuple* tuple) const {
   for (const SlotDescriptor* slot_desc: tuple_desc->collection_slots()) {
@@ -939,7 +922,7 @@ bool HdfsScanNodeBase::PartitionPassesFilters(int32_t partition_id,
   if (FilterContext::CheckForAlwaysFalse(stats_name, filter_ctxs)) return false;
   DCHECK_EQ(filter_ctxs.size(), filter_ctxs_.size())
       << "Mismatched number of filter contexts";
-  Tuple* template_tuple = partition_template_tuple_map_[partition_id];
+  Tuple* template_tuple = GetTemplateTupleForPartitionId(partition_id);
   // Defensive - if template_tuple is NULL, there can be no filters on partition columns.
   if (template_tuple == nullptr) return true;
   TupleRow* tuple_row_mem = reinterpret_cast<TupleRow*>(&template_tuple);
@@ -968,7 +951,7 @@ void HdfsScanNodeBase::RangeComplete(const THdfsFileFormat::type& file_type,
 void HdfsScanNodeBase::RangeComplete(const THdfsFileFormat::type& file_type,
     const vector<THdfsCompression::type>& compression_types, bool skipped) {
   scan_ranges_complete_counter_->Add(1);
-  progress_.Update(1);
+  shared_state_->progress().Update(1);
   HdfsCompressionTypesSet compression_set;
   for (int i = 0; i < compression_types.size(); ++i) {
     compression_set.AddType(compression_types[i]);
@@ -977,7 +960,7 @@ void HdfsScanNodeBase::RangeComplete(const THdfsFileFormat::type& file_type,
 }
 
 void HdfsScanNodeBase::SkipFile(const THdfsFileFormat::type& file_type,
-    HdfsFileDesc* file) {
+    const HdfsFileDesc* file) {
   for (int i = 0; i < file->splits.size(); ++i) {
     RangeComplete(file_type, file->file_compression, true);
   }
@@ -1181,4 +1164,91 @@ void HdfsScanNodeBase::UpdateBytesRead(
     bytes_read_per_col_[slot_id].uncompressed_bytes_read.Add(uncompressed_bytes_read);
     bytes_read_per_col_[slot_id].compressed_bytes_read.Add(compressed_bytes_read);
   }
+}
+
+HdfsFileDesc* ScanRangeSharedState::GetFileDesc(
+    int64_t partition_id, const std::string& filename) {
+  auto file_desc_map_key = make_pair(partition_id, filename);
+  DCHECK(file_descs_.find(file_desc_map_key) != file_descs_.end());
+  return file_descs_[file_desc_map_key];
+}
+
+void ScanRangeSharedState::SetFileMetadata(
+    int64_t partition_id, const string& filename, void* metadata) {
+  unique_lock<mutex> l(metadata_lock_);
+  auto file_metadata_map_key = make_pair(partition_id, filename);
+  DCHECK(per_file_metadata_.find(file_metadata_map_key) == per_file_metadata_.end());
+  per_file_metadata_[file_metadata_map_key] = metadata;
+}
+
+void* ScanRangeSharedState::GetFileMetadata(
+    int64_t partition_id, const string& filename) {
+  unique_lock<mutex> l(metadata_lock_);
+  auto file_metadata_map_key = make_pair(partition_id, filename);
+  auto it = per_file_metadata_.find(file_metadata_map_key);
+  if (it == per_file_metadata_.end()) return NULL;
+  return it->second;
+}
+
+Tuple* ScanRangeSharedState::GetTemplateTupleForPartitionId(int64_t partition_id) {
+  DCHECK(partition_template_tuple_map_.find(partition_id)
+      != partition_template_tuple_map_.end());
+  return partition_template_tuple_map_[partition_id];
+}
+
+void ScanRangeSharedState::UpdateRemainingScanRangeSubmissions(int32_t delta) {
+  int new_val = remaining_scan_range_submissions_.Add(delta);
+  DCHECK_GE(new_val, 0);
+  if (!use_mt_scan_node_) return;
+  if (new_val == 0) {
+    // Last thread has added its ranges. Acquire lock so that no waiting thread misses the
+    // last notify.
+    std::unique_lock<std::mutex> l(scan_range_submission_lock_);
+  }
+  range_submission_cv_.NotifyAll();
+}
+
+void ScanRangeSharedState::EnqueueScanRange(
+    const vector<ScanRange*>& ranges, bool at_front) {
+  DCHECK(use_mt_scan_node_) << "Should only be called by MT scan nodes";
+  if (!at_front) {
+    for (ScanRange* scan_range : ranges) {
+      if(scan_range->UseHdfsCache()){
+        scan_range_queue_.PushFront(scan_range);
+        continue;
+      }
+      scan_range_queue_.Enqueue(scan_range);
+    }
+  } else {
+    for (ScanRange* scan_range : ranges) {
+      scan_range_queue_.PushFront(scan_range);
+    }
+  }
+}
+
+Status ScanRangeSharedState::GetNextScanRange(
+    RuntimeState* state, ScanRange** scan_range) {
+  DCHECK(use_mt_scan_node_) << "Should only be called by MT scan nodes";
+  while (true) {
+    *scan_range = scan_range_queue_.Dequeue();
+    if (*scan_range != nullptr) return Status::OK();
+    {
+      unique_lock<mutex> l(scan_range_submission_lock_);
+      while (scan_range_queue_.empty() && remaining_scan_range_submissions_.Load() > 0
+          && !state->is_cancelled()) {
+        range_submission_cv_.Wait(l);
+      }
+    }
+    // No more work to do.
+    if (scan_range_queue_.empty() && remaining_scan_range_submissions_.Load() == 0) {
+      break;
+    }
+    if (state->is_cancelled()) return Status::CANCELLED;
+  }
+  return Status::OK();
+}
+
+void ScanRangeSharedState::AddCancellationHook(RuntimeState* state) {
+  DCHECK(use_mt_scan_node_) << "Should only be called by MT scan nodes";
+  state->AddCancellationCV(&scan_range_submission_lock_, &range_submission_cv_);
 }
