@@ -28,10 +28,12 @@
 #include "exprs/anyval-util.h"
 #include "exprs/scalar-expr.h"
 #include "gutil/strings/charset.h"
+#include "gutil/strings/substitute.h"
 #include "runtime/string-value.inline.h"
 #include "runtime/tuple-row.h"
 #include "util/bit-util.h"
 #include "util/coding-util.h"
+#include "util/pretty-printer.h"
 #include "util/ubsan.h"
 #include "util/url-parser.h"
 
@@ -42,6 +44,9 @@ using std::bitset;
 
 // NOTE: be careful not to use string::append.  It is not performant.
 namespace impala {
+
+const char* ERROR_CHARACTER_LIMIT_EXCEEDED =
+  "$0 is larger than allowed limit of $1 character data.";
 
 // This behaves identically to the mysql implementation, namely:
 //  - 1-indexed positions
@@ -84,6 +89,12 @@ StringVal StringFunctions::Right(
 StringVal StringFunctions::Space(FunctionContext* context, const BigIntVal& len) {
   if (len.is_null) return StringVal::null();
   if (len.val <= 0) return StringVal();
+  if (len.val > StringVal::MAX_LENGTH) {
+    context->SetError(Substitute(ERROR_CHARACTER_LIMIT_EXCEEDED,
+         "space() result",
+         PrettyPrinter::Print(StringVal::MAX_LENGTH, TUnit::BYTES)).c_str());
+    return StringVal::null();
+  }
   StringVal result(context, len.val);
   if (UNLIKELY(result.is_null)) return StringVal::null();
   memset(result.ptr, ' ', len.val);
@@ -95,8 +106,9 @@ StringVal StringFunctions::Repeat(
   if (str.is_null || n.is_null) return StringVal::null();
   if (str.len == 0 || n.val <= 0) return StringVal();
   if (n.val > StringVal::MAX_LENGTH) {
-    context->SetError("Number of repeats in repeat() call is larger than allowed limit "
-        "of 1 GB character data.");
+    context->SetError(Substitute(ERROR_CHARACTER_LIMIT_EXCEEDED,
+        "Number of repeats in repeat() call",
+        PrettyPrinter::Print(StringVal::MAX_LENGTH, TUnit::BYTES)).c_str());
     return StringVal::null();
   }
   static_assert(numeric_limits<int64_t>::max() / numeric_limits<int>::max()
@@ -104,8 +116,9 @@ StringVal StringFunctions::Repeat(
       "multiplying StringVal::len with positive int fits in int64_t");
   int64_t out_len = str.len * n.val;
   if (out_len > StringVal::MAX_LENGTH) {
-    context->SetError(
-        "repeat() result is larger than allowed limit of 1 GB character data.");
+    context->SetError(Substitute(ERROR_CHARACTER_LIMIT_EXCEEDED,
+        "repeat() result",
+        PrettyPrinter::Print(StringVal::MAX_LENGTH, TUnit::BYTES)).c_str());
     return StringVal::null();
   }
   StringVal result(context, static_cast<int>(out_len));
@@ -125,7 +138,12 @@ StringVal StringFunctions::Lpad(FunctionContext* context, const StringVal& str,
   // TODO: Hive seems to go into an infinite loop if pad.len == 0,
   // so we should pay attention to Hive's future solution to be compatible.
   if (len.val <= str.len || pad.len == 0) return StringVal(str.ptr, len.val);
-
+  if (len.val > StringVal::MAX_LENGTH) {
+    context->SetError(Substitute(ERROR_CHARACTER_LIMIT_EXCEEDED,
+        "lpad() result",
+        PrettyPrinter::Print(StringVal::MAX_LENGTH, TUnit::BYTES)).c_str());
+    return StringVal::null();
+  }
   StringVal result(context, len.val);
   if (UNLIKELY(result.is_null)) return StringVal::null();
   int padded_prefix_len = len.val - str.len;
@@ -152,6 +170,12 @@ StringVal StringFunctions::Rpad(FunctionContext* context, const StringVal& str,
   // so we should pay attention to Hive's future solution to be compatible.
   if (len.val <= str.len || pad.len == 0) {
     return StringVal(str.ptr, len.val);
+  }
+  if (len.val > StringVal::MAX_LENGTH) {
+    context->SetError(Substitute(ERROR_CHARACTER_LIMIT_EXCEEDED,
+        "rpad() result",
+        PrettyPrinter::Print(StringVal::MAX_LENGTH, TUnit::BYTES)).c_str());
+    return StringVal::null();
   }
 
   StringVal result(context, len.val);
@@ -351,8 +375,9 @@ StringVal StringFunctions::Replace(FunctionContext* context, const StringVal& st
       if (UNLIKELY(space_needed > buffer_space)) {
         // Check to see if we can allocate a large enough buffer.
         if (space_needed > StringVal::MAX_LENGTH) {
-          context->SetError(
-              "String length larger than allowed limit of 1 GB character data.");
+          context->SetError(Substitute(ERROR_CHARACTER_LIMIT_EXCEEDED,
+              "replace() result",
+              PrettyPrinter::Print(StringVal::MAX_LENGTH, TUnit::BYTES)).c_str());
           return StringVal::null();
         }
         // Double the buffer size whenever it fills up to amortise cost of resizing.
@@ -865,11 +890,19 @@ StringVal StringFunctions::Concat(
   if (num_children == 1) return strs[0];
 
   // Loop once to compute the final size and reserve space.
-  int32_t total_size = 0;
+  int64_t total_size = 0;
   for (int32_t i = 0; i < num_children; ++i) {
     if (strs[i].is_null) return StringVal::null();
     total_size += strs[i].len;
   }
+
+  if (total_size > StringVal::MAX_LENGTH) {
+    context->SetError(Substitute(ERROR_CHARACTER_LIMIT_EXCEEDED,
+         "Concatenated string length",
+         PrettyPrinter::Print(StringVal::MAX_LENGTH, TUnit::BYTES)).c_str());
+    return StringVal::null();
+  }
+
   // If total_size is zero, directly returns empty string
   if (total_size <= 0) return StringVal();
 
@@ -895,7 +928,7 @@ StringVal StringFunctions::ConcatWs(FunctionContext* context, const StringVal& s
   // count.
   int32_t valid_num_children = 0;
   int32_t valid_start_index = -1;
-  int32_t total_size = 0;
+  int64_t total_size = 0;
   for (int32_t i = 0; i < num_children; ++i) {
     if (strs[i].is_null) continue;
 
@@ -909,6 +942,13 @@ StringVal StringFunctions::ConcatWs(FunctionContext* context, const StringVal& s
     }
     // Record the count of valid string object.
     valid_num_children++;
+  }
+
+  if (total_size > StringVal::MAX_LENGTH) {
+    context->SetError(Substitute(ERROR_CHARACTER_LIMIT_EXCEEDED,
+         "Concatenated string length",
+         PrettyPrinter::Print(StringVal::MAX_LENGTH, TUnit::BYTES)).c_str());
+    return StringVal::null();
   }
 
   // If all data are invalid, or data size is zero, return empty string.

@@ -4504,9 +4504,9 @@ TEST_P(ExprTest, StringFunctions) {
   TestIsNull("repeat('ab', NULL)", TYPE_STRING);
   TestIsNull("repeat(NULL, NULL)", TYPE_STRING);
   TestErrorString("repeat('x', 1024 * 1024 * 1024 * 10)", "Number of repeats in "
-      "repeat() call is larger than allowed limit of 1 GB character data.\n");
+      "repeat() call is larger than allowed limit of 1.00 GB character data.\n");
   TestErrorString("repeat('xx', 1024 * 1024 * 1024)", "repeat() result is larger than "
-      "allowed limit of 1 GB character data.\n");
+      "allowed limit of 1.00 GB character data.\n");
 
   TestValue("ascii('')", TYPE_INT, 0);
   TestValue("ascii('abcde')", TYPE_INT, 'a');

@@ -54,7 +54,7 @@ select l_comment from tpch_parquet.lineitem union all
 select l_comment from tpch_parquet.lineitem union all
 select l_comment from tpch_parquet.lineitem) a
 ---- CATCH
-Concatenated string length larger than allowed limit of 1 GB character data
+Concatenated string length is larger than allowed limit of 1.00 GB character data
 =====
 ---- QUERY
 # IMPALA-2620: Allocation by UDF/UDA need to take into account of memory limit.
@@ -122,7 +122,7 @@ select length(concat_ws(',', s, s, s, s)) from (
     select l_comment from tpch.lineitem) t1
   ) t2
 ---- CATCH
-String length larger than allowed limit of 1 GB character data
+Concatenated string length is larger than allowed limit of 1.00 GB character data
 =====
 ---- QUERY
 set mem_limit=4gb;
@@ -132,7 +132,7 @@ select length(repeat(s, 10)) from (
     select l_comment from tpch.lineitem) t1
   ) t2
 ---- CATCH
-repeat() result is larger than allowed limit of 1 GB character data
+repeat() result is larger than allowed limit of 1.00 GB character data
 =====
 ---- QUERY
 set mem_limit=4gb;
@@ -142,7 +142,7 @@ select length(lpad(s, 1073741830, '!')) from (
     select l_comment from tpch.lineitem) t1
   ) t2
 ---- CATCH
-String length larger than allowed limit of 1 GB character data
+lpad() result is larger than allowed limit of 1.00 GB character data
 =====
 ---- QUERY
 set mem_limit=4gb;
@@ -152,14 +152,14 @@ select length(rpad(s, 1073741830, '~')) from (
     select l_comment from tpch.lineitem) t1
   ) t2
 ---- CATCH
-String length larger than allowed limit of 1 GB character data
+rpad() result is larger than allowed limit of 1.00 GB character data
 =====
 ---- QUERY
 set mem_limit=4gb;
 set mem_limit=4gb;
 select space(1073741830);
 ---- CATCH
-String length larger than allowed limit of 1 GB character data
+space() result is larger than allowed limit of 1.00 GB character data
 =====
 ---- QUERY
 set mem_limit=4gb;
@@ -189,19 +189,19 @@ select replace(x, '+', '000') from (select (replace(s, ' ', '++++++++')) x from 
     select l_comment from tpch.lineitem) t1
   ) t2) t3;
 ---- CATCH
-String length larger than allowed limit of 1 GB character data
+replace() result is larger than allowed limit of 1.00 GB character data
 =====
 ---- QUERY
 set mem_limit=4gb;
 select trunc(timestamp_col, space(1073741830)) from functional.alltypes
 ---- CATCH
-String length larger than allowed limit of 1 GB character data
+space() result is larger than allowed limit of 1.00 GB character data
 =====
 ---- QUERY
 set mem_limit=4gb;
 select extract(timestamp_col, space(1073741830)) from functional.alltypes
 ---- CATCH
-String length larger than allowed limit of 1 GB character data
+space() result is larger than allowed limit of 1.00 GB character data
 =====
 ---- QUERY
 set mem_limit=4gb;
@@ -211,7 +211,7 @@ select length(madlib_encode_vector(concat_ws(',', s, s, s, s))) from (
     select l_comment from tpch.lineitem) t1
   ) t2
 ---- CATCH
-String length larger than allowed limit of 1 GB character data
+Concatenated string length is larger than allowed limit of 1.00 GB character data
 =====
 ---- QUERY
 set mem_limit=4gb;
@@ -221,7 +221,7 @@ select length(madlib_decode_vector(concat_ws(',', s, s, s, s))) from (
     select l_comment from tpch.lineitem) t1
   ) t2
 ---- CATCH
-String length larger than allowed limit of 1 GB character data
+Concatenated string length is larger than allowed limit of 1.00 GB character data
 =====
 ---- QUERY
 set mem_limit=4gb;
@@ -244,5 +244,42 @@ INT,INT
 set mem_limit=4gb;
 select repeat('the quick brown fox', 1024 * 1024 * 100)
 ---- CATCH
-repeat() result is larger than allowed limit of 1 GB character data
+repeat() result is larger than allowed limit of 1.00 GB character data
 =====
+---- QUERY
+set mem_limit=4gb;
+select lpad(s, 1024 * 1024 * 1024 * 5, ' ') from (
+  select group_concat(l_comment, "!") s from (
+    select l_comment from tpch.lineitem union all
+    select l_comment from tpch.lineitem) t1
+  ) t2
+---- CATCH
+lpad() result is larger than allowed limit of 1.00 GB character data
+=====
+---- QUERY
+set mem_limit=4gb;
+select rpad(s, 1024 * 1024 * 1024 * 5, ' ') from (
+  select group_concat(l_comment, "!") s from (
+    select l_comment from tpch.lineitem union all
+    select l_comment from tpch.lineitem) t1
+  ) t2
+---- CATCH
+rpad() result is larger than allowed limit of 1.00 GB character data
+=====
+---- QUERY
+set mem_limit=4gb;
+select space(1024 * 1024 * 1024 * 5);
+---- CATCH
+space() result is larger than allowed limit of 1.00 GB character data
+=====
+---- QUERY
+set mem_limit=8gb;
+select concat(lpad(s, 1073741820 , ' '),lpad(s, 1073741820 , ' '),lpad(s, 1073741820 , ' '),lpad(s, 1073741820 , ' '),lpad(s, 1073741820 , ' ')) from (
+  select group_concat(l_comment, "!") s from (
+    select l_comment from tpch.lineitem union all
+    select l_comment from tpch.lineitem) t1
+  ) t2
+---- CATCH
+Concatenated string length is larger than allowed limit of 1.00 GB character data
+=====
+
