@@ -69,13 +69,13 @@ under the License.
   <keydef href="" scope="external" format="html" keys="udf-samples">
     <topicmeta><linktext>impala-udf-samples</linktext></topicmeta>
   </keydef>
-  <keydef href="" scope="external" format="html" keys="uda-sample.cc">
+  <keydef href="https://github.com/cloudera/impala-udf-samples/blob/master/uda-sample.cc" scope="external" format="html" keys="uda-sample.cc">
     <topicmeta><linktext>uda-sample.cc</linktext></topicmeta>
   </keydef>
   <keydef href="" scope="external" format="html" keys="udf-sample.h">
     <topicmeta><linktext>udf-sample.h</linktext></topicmeta>
   </keydef>
-  <keydef href="" scope="external" format="html" keys="uda-sample.h">
+  <keydef href="https://github.com/cloudera/impala-udf-samples/blob/master/uda-sample.h" scope="external" format="html" keys="uda-sample.h">
     <topicmeta><linktext>uda-sample.h</linktext></topicmeta>
   </keydef>
   <keydef href="https://github.com/apache/impala/blob/master/be/src/testutil/test-udas.cc" scope="external" format="html" keys="test-udas.cc">
