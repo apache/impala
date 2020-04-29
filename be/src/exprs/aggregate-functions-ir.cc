@@ -30,6 +30,7 @@
 #include "common/logging.h"
 #include "exprs/anyval-util.h"
 #include "exprs/hll-bias.h"
+#include "gutil/strings/substitute.h"
 #include "runtime/date-value.h"
 #include "runtime/decimal-value.inline.h"
 #include "runtime/runtime-state.h"
@@ -38,6 +39,7 @@
 #include "runtime/timestamp-value.inline.h"
 #include "util/arithmetic-util.h"
 #include "util/mpfit-util.h"
+#include "util/pretty-printer.h"
 
 #include "common/names.h"
 
@@ -128,6 +130,9 @@ int64_t HllEstimateBias(int64_t estimate) {
 }
 
 namespace impala {
+
+const char* ERROR_CONCATENATED_STRING_MAX_SIZE_REACHED =
+  "Concatenated string length is larger than allowed limit of $0 character data.";
 
 // This function initializes StringVal 'dst' with a newly allocated buffer of
 // 'buf_len' bytes. The new buffer will be filled with zero. If allocation fails,
@@ -753,8 +758,8 @@ void AggregateFunctions::StringConcatUpdate(FunctionContext* ctx, const StringVa
       DCHECK(!ctx->impl()->state()->GetQueryStatus().ok());
     }
   } else {
-    ctx->SetError("Concatenated string length larger than allowed limit of "
-        "1 GB character data.");
+    ctx->SetError(Substitute(ERROR_CONCATENATED_STRING_MAX_SIZE_REACHED,
+      PrettyPrinter::Print(StringVal::MAX_LENGTH, TUnit::BYTES)).c_str());
   }
 }
 
@@ -785,8 +790,8 @@ void AggregateFunctions::StringConcatMerge(FunctionContext* ctx,
       DCHECK(!ctx->impl()->state()->GetQueryStatus().ok());
     }
   } else {
-    ctx->SetError("Concatenated string length larger than allowed limit of "
-        "1 GB character data.");
+    ctx->SetError(Substitute(ERROR_CONCATENATED_STRING_MAX_SIZE_REACHED,
+      PrettyPrinter::Print(StringVal::MAX_LENGTH, TUnit::BYTES)).c_str());
   }
 }
 
