@@ -370,6 +370,11 @@ struct TTableInfoSelector {
   // with the HMS table which it has and triggers a reload in case it doesn't match.
   // this field is only used when valid_write_ids is set, otherwise it is ignored
   10: optional i64 table_id = -1
+
+  // The response should contain the column statistics for all columns. If this is set
+  // to true, the list provided in want_stats_for_column_names will be ignored and
+  // stats for all columns will be returned.
+  11: optional bool want_stats_for_all_columns
 }
 
 // Returned information about a particular partition.

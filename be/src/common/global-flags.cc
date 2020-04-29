@@ -346,6 +346,11 @@ DEFINE_bool(enable_incremental_metadata_updates, true,
     "propagated as a whole object in the statestore topic updates. Note that legacy "
     "coordinators can apply incremental or full table updates so don't need this flag.");
 
+DEFINE_bool(enable_catalogd_hms_cache, true,
+    "If true, response for the HMS APIs that are implemented in catalogd will be served "
+    "from catalogd. If this flag is false or a given API is not implemented in catalogd,"
+    " it will be redirected to HMS.");
+
 // ++========================++
 // || Startup flag graveyard ||
 // ++========================++

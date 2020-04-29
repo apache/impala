@@ -30,6 +30,7 @@ import requests
 import socket
 import subprocess
 import time
+import string
 from functools import wraps
 from getpass import getuser
 from random import choice
@@ -150,6 +151,24 @@ class ImpalaTestSuite(BaseTestSuite):
     # Execute tests through Beeswax by default. Individual tests that have been converted
     # to work with the HS2 client can add HS2 in addition to or instead of beeswax.
     cls.ImpalaTestMatrix.add_dimension(ImpalaTestDimension('protocol', 'beeswax'))
+
+  @staticmethod
+  def create_hive_client(port):
+    """
+    Creates a HMS client to a external running metastore service at the provided port
+    """
+    trans_type = 'buffered'
+    if pytest.config.option.use_kerberos:
+      trans_type = 'kerberos'
+    hive_transport = create_transport(
+      host=pytest.config.option.metastore_server.split(':')[0],
+      port=port,
+      service=pytest.config.option.hive_service_name,
+      transport_type=trans_type)
+    protocol = TBinaryProtocol.TBinaryProtocol(hive_transport)
+    hive_client = ThriftHiveMetastore.Client(protocol)
+    hive_transport.open()
+    return hive_client, hive_transport
 
   @classmethod
   def setup_class(cls):
@@ -1191,3 +1210,11 @@ class ImpalaTestSuite(BaseTestSuite):
         LOG.info("Expected log lines could not be found, sleeping before retrying: %s",
             str(e))
         time.sleep(1)
+
+  @staticmethod
+  def get_random_name(prefix='', length=5):
+    """
+    Gets a random name used to create unique database or table
+    """
+    assert length > 0
+    return prefix + ''.join(choice(string.ascii_lowercase) for i in range(length))

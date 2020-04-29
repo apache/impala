@@ -91,6 +91,10 @@ DECLARE_int64(topic_update_tbl_max_wait_time_ms);
 DECLARE_int32(catalog_max_lock_skipped_topic_updates);
 DECLARE_string(scratch_dirs);
 DECLARE_int32(max_wait_time_for_sync_ddl_s);
+DECLARE_bool(start_hms_server);
+DECLARE_int32(hms_port);
+DECLARE_bool(fallback_to_hms_on_errors);
+DECLARE_bool(enable_catalogd_hms_cache);
 
 // HS2 SAML2.0 configuration
 // Defined here because TAG_FLAG caused issues in global-flags.cc
@@ -279,6 +283,10 @@ Status PopulateThriftBackendGflags(TBackendGflags& cfg) {
   cfg.__set_saml2_ee_test_mode(FLAGS_saml2_ee_test_mode);
   cfg.__set_scratch_dirs(FLAGS_scratch_dirs);
   cfg.__set_max_wait_time_for_sync_ddl_s(FLAGS_max_wait_time_for_sync_ddl_s);
+  cfg.__set_start_hms_server(FLAGS_start_hms_server);
+  cfg.__set_hms_port(FLAGS_hms_port);
+  cfg.__set_fallback_to_hms_on_errors(FLAGS_fallback_to_hms_on_errors);
+  cfg.__set_enable_catalogd_hms_cache(FLAGS_enable_catalogd_hms_cache);
   return Status::OK();
 }
 

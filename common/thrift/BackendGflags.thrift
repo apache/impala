@@ -195,4 +195,12 @@ struct TBackendGflags {
   85: required bool enable_row_filtering
 
   86: required i32 max_wait_time_for_sync_ddl_s
+
+  87: required bool start_hms_server
+
+  88: required i32 hms_port
+
+  89: required bool fallback_to_hms_on_errors
+
+  90: required bool enable_catalogd_hms_cache
 }

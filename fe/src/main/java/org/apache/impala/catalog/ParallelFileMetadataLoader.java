@@ -20,6 +20,7 @@ import com.google.common.collect.Iterables;
 import com.google.common.collect.Maps;
 import java.util.ArrayList;
 import java.util.Collection;
+import java.util.Collections;
 import java.util.List;
 import java.util.Map;
 import java.util.concurrent.ExecutionException;
@@ -27,6 +28,7 @@ import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 import java.util.concurrent.Future;
 
+import javax.annotation.Nullable;
 import org.apache.hadoop.fs.FileSystem;
 import org.apache.hadoop.fs.Path;
 import org.apache.hadoop.hive.common.ValidTxnList;
@@ -36,6 +38,8 @@ import org.apache.impala.catalog.HdfsPartition.FileDescriptor;
 import org.apache.impala.common.FileSystemUtil;
 import org.apache.impala.common.Pair;
 import org.apache.impala.service.BackendConfig;
+import org.apache.impala.thrift.TNetworkAddress;
+import org.apache.impala.util.ListMap;
 import org.apache.impala.util.ThreadNameAnnotator;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -69,10 +73,11 @@ public class ParallelFileMetadataLoader {
   private final Map<Path, List<HdfsPartition.Builder>> partsByPath_;
   private final FileSystem fs_;
 
-  public ParallelFileMetadataLoader(HdfsTable table,
+  public ParallelFileMetadataLoader(FileSystem fs,
       Collection<HdfsPartition.Builder> partBuilders,
-      ValidWriteIdList writeIdList, ValidTxnList validTxnList, String debugAction,
-      String logPrefix) throws CatalogException {
+      ValidWriteIdList writeIdList, ValidTxnList validTxnList, boolean isRecursive,
+      @Nullable ListMap<TNetworkAddress> hostIndex, String debugAction, String logPrefix)
+      throws CatalogException {
     if (writeIdList != null || validTxnList != null) {
       // make sure that both either both writeIdList and validTxnList are set or both
       // of them are not.
@@ -91,8 +96,8 @@ public class ParallelFileMetadataLoader {
     for (Map.Entry<Path, List<HdfsPartition.Builder>> e : partsByPath_.entrySet()) {
       List<FileDescriptor> oldFds = e.getValue().get(0).getFileDescriptors();
       FileMetadataLoader loader = new FileMetadataLoader(e.getKey(),
-          Utils.shouldRecursivelyListPartitions(table), oldFds, table.getHostIndex(),
-          validTxnList, writeIdList, e.getValue().get(0).getFileFormat());
+          isRecursive, oldFds, hostIndex, validTxnList, writeIdList,
+          e.getValue().get(0).getFileFormat());
       // If there is a cached partition mapped to this path, we recompute the block
       // locations even if the underlying files have not changed.
       // This is done to keep the cached block metadata up to date.
@@ -103,7 +108,7 @@ public class ParallelFileMetadataLoader {
       loaders_.put(e.getKey(), loader);
     }
     this.logPrefix_ = logPrefix;
-    this.fs_ = table.getFileSystem();
+    this.fs_ = fs;
   }
 
   /**
@@ -153,7 +158,7 @@ public class ParallelFileMetadataLoader {
       List<Pair<FileMetadataLoader, Future<Void>>> futures =
           new ArrayList<>(loaders_.size());
       for (FileMetadataLoader loader : loaders_.values()) {
-        futures.add(new Pair<FileMetadataLoader, Future<Void>>(
+        futures.add(new Pair<>(
             loader, pool.submit(() -> { loader.load(); return null; })));
       }
 
