@@ -920,6 +920,14 @@ within UDAs, you can return without specifying a value.
         </ul>
 
         <p>
+          Intermediate values returned by the init, update and merge functions that referred to allocations
+          must be allocated using <codeph>FunctionContext::Allocate()</codeph> and freed using <codeph>FunctionContext::Free()</codeph>.
+          Both serialize and finalize functions are responsible for cleaning up the intermediate value and freeing such allocations.
+          StringVals returned to Impala directly by Serialize(), Finalize() or GetValue() functions should be backed by
+          temporary results memory allocated using the <codeph>StringVal(FunctionContext*, int) constructor</codeph>,
+          <codeph>StringVal::CopyFrom(FunctionContext*, const uint8_t*, size_t)</codeph>, or <codeph>StringVal::Resize()</codeph>.
+        </p>
+        <p>
           In the SQL syntax, you create a UDAF by using the statement <codeph>CREATE AGGREGATE FUNCTION</codeph>.
           You specify the entry points of the underlying C++ functions using the clauses <codeph>INIT_FN</codeph>,
           <codeph>UPDATE_FN</codeph>, <codeph>MERGE_FN</codeph>, <codeph rev="2.0.0">SERIALIZE_FN</codeph>, and
