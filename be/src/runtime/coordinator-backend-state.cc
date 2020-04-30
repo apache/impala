@@ -542,19 +542,25 @@ void Coordinator::BackendState::UpdateExecStats(
   }
 }
 
-bool Coordinator::BackendState::Cancel() {
+Coordinator::BackendState::CancelResult Coordinator::BackendState::Cancel(
+    bool fire_and_forget) {
+  // Update 'result' based on the actions we take in this function and/or errors we hit.
+  CancelResult result;
   unique_lock<mutex> l(lock_);
 
   // Nothing to cancel if the exec rpc was not sent.
   if (!exec_rpc_sent_) {
-    if (status_.ok()) status_ = Status::CANCELLED;
+    if (status_.ok()) {
+      status_ = Status::CANCELLED;
+      result.became_done = true;
+    }
     VLogForBackend("Not sending Cancel() rpc because nothing was started.");
     exec_done_ = true;
     // Notify after releasing 'lock_' so that we don't wake up a thread just to have it
     // immediately block again.
     l.unlock();
     exec_done_cv_.NotifyAll();
-    return false;
+    return result;
   }
 
   // If the exec rpc was sent but the callback hasn't been executed, try to cancel the rpc
@@ -565,18 +571,35 @@ bool Coordinator::BackendState::Cancel() {
     WaitOnExecLocked(&l);
   }
 
-  // Don't cancel if we're done. Note that its possible the backend is still running, eg.
-  // if the rpc layer reported that the Exec() rpc failed but it actually reached the
-  // backend. In that case, the backend will cancel itself the first time it tries to send
-  // a status report and the coordinator responds with an error.
+  // Don't cancel if we're done or already sent an RPC. Note that its possible the
+  // backend is still running, eg. if the rpc layer reported that the Exec() rpc failed
+  // but it actually reached the backend. In that case, the backend will cancel itself
+  // the first time it tries to send a status report and the coordinator responds with
+  // an error.
   if (IsDoneLocked(l)) {
     VLogForBackend(Substitute(
         "Not cancelling because the backend is already done: $0", status_.GetDetail()));
-    return false;
+    return result;
+  } else if (sent_cancel_rpc_) {
+    DCHECK(status_.ok());
+    // If we did a fire_and_forget=false followed by fire_and_forget=true.
+    if (fire_and_forget) {
+      status_ = Status::CANCELLED;
+      result.became_done = true;
+    }
+    VLogForBackend(Substitute(
+        "Not cancelling because cancel RPC already sent: $0", status_.GetDetail()));
+    return result;
   }
 
-  // Set an error status to make sure we only cancel this once.
-  if (status_.ok()) status_ = Status::CANCELLED;
+  // Avoid sending redundant cancel RPCs.
+  sent_cancel_rpc_ = true;
+  result.cancel_attempted = true;
+  // Set the status to CANCELLED if we are firing and forgetting.
+  if (fire_and_forget && status_.ok()) {
+    result.became_done = true;
+    status_ = Status::CANCELLED;
+  }
 
   VLogForBackend("Sending CancelQueryFInstances rpc");
 
@@ -585,8 +608,9 @@ bool Coordinator::BackendState::Cancel() {
       FromNetworkAddressPB(krpc_host_), host_.hostname(), &proxy);
   if (!get_proxy_status.ok()) {
     status_.MergeStatus(get_proxy_status);
+    result.became_done = true;
     VLogForBackend(Substitute("Could not get proxy: $0", get_proxy_status.msg().msg()));
-    return true;
+    return result;
   }
 
   CancelQueryFInstancesRequestPB request;
@@ -603,18 +627,20 @@ bool Coordinator::BackendState::Cancel() {
 
   if (!rpc_status.ok()) {
     status_.MergeStatus(rpc_status);
+    result.became_done = true;
     VLogForBackend(
         Substitute("CancelQueryFInstances rpc failed: $0", rpc_status.msg().msg()));
-    return true;
+    return result;
   }
   Status cancel_status = Status(response.status());
   if (!cancel_status.ok()) {
     status_.MergeStatus(cancel_status);
+    result.became_done = true;
     VLogForBackend(
         Substitute("CancelQueryFInstances failed: $0", cancel_status.msg().msg()));
-    return true;
+    return result;
   }
-  return true;
+  return result;
 }
 
 void Coordinator::BackendState::PublishFilter(FilterState* state,

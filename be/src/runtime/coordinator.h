@@ -92,7 +92,8 @@ struct FragmentExecParams;
 ///    executing (without an error status).
 /// 3. The query has returned all rows. The overall query status is OK (and remains
 ///    OK). Client cancellation is no longer possible and subsequent backend errors are
-///    ignored. (TODO: IMPALA-6984 initiate backend cancellation in this case).
+///    ignored. The coordinator initiates cancellation for all backends and waits for the
+///    final exec status reports.
 ///
 /// Lifecycle: this object must not be destroyed until after one of the three states
 /// above is reached (error, cancelled, or EOS) to ensure resources are released.
@@ -462,7 +463,6 @@ class Coordinator { // NOLINT: The member variables could be re-ordered to save 
   void HandleExecStateTransition(const ExecState old_state, const ExecState new_state);
 
   /// Return true if 'exec_state_' is RETURNED_RESULTS.
-  /// TODO: remove with IMPALA-6984.
   bool ReturnedAllResults() WARN_UNUSED_RESULT {
     return exec_state_.Load() == ExecState::RETURNED_RESULTS;
   }
@@ -476,9 +476,10 @@ class Coordinator { // NOLINT: The member variables could be re-ordered to save 
   }
 
   /// Helper for HandleExecStateTransition(). Sends cancellation request to all
-  /// executing backends but does not wait for acknowledgement from the backends. The
-  /// ExecState state-machine ensures this is called at most once.
-  void CancelBackends();
+  /// executing backends. If 'fire_and_forget' is true, does not wait for the
+  /// final exec status reports from the backends. The ExecState state-machine
+  /// ensures this is called at most once.
+  void CancelBackends(bool fire_and_forget);
 
   /// Returns only when either all execution backends have reported success or a request
   /// to cancel the backends has already been sent. It is safe to call this concurrently,

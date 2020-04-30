@@ -107,13 +107,28 @@ class Coordinator::BackendState {
   /// times and from different threads.
   void WaitOnExecRpc();
 
-  /// Cancel execution at this backend if anything is running. Returns true if
-  /// cancellation was attempted, false otherwise.
+  /// Result of attempting to cancel a backend.
+  struct CancelResult {
+    // Whether we tried to cancel the backend in some fashion, e.g. attempted to send
+    // an RPC. This is for informational purpose only (logging, metrics, etc), not
+    // control flow.
+    bool cancel_attempted = false;
+
+    // True iff this changed IsDone() from false to true.
+    bool became_done = false;
+  };
+
+  /// Cancel execution at this backend if anything is running. See CancelResult
+  /// for explanation of the return value.
   ///
   /// May be called at any time after Init(). If the ExecQueryFInstances() rpc is
   /// inflight, will attempt to cancel the rpc. If ExecQueryFInstances() has already
   /// completed or cancelling it is unsuccessful, sends the Cancel() rpc.
-  bool Cancel();
+  /// If 'fire_and_forget' is true, the RPC is sent and the backend is immediately
+  /// considered done, without waiting for a final status report. If 'fire_and_forget'
+  /// is false, the backend is only considered done once the final status report is
+  /// received.
+  CancelResult Cancel(bool fire_and_forget);
 
   /////////////////////////////////////////
   /// BEGIN: Functions that should only be called after WaitOnExecRpc() has returned.
@@ -373,6 +388,9 @@ class Coordinator::BackendState {
   /// Initialized in ExecCompleteCb(), then set in each call to ApplyExecStatusReport().
   /// Uses GenerateReportTimeout().
   int64_t last_report_time_ms_ = 0;
+
+  /// True if a CancelQueryFInstances RPC was already sent to this backend.
+  bool sent_cancel_rpc_ = false;
 
   /// END: Members that are protected by 'lock_'.
   /////////////////////////////////////////

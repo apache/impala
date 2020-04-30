@@ -490,7 +490,7 @@ Status Coordinator::StartBackendExec() {
   Status exec_rpc_status = exec_rpcs_status_barrier_.Wait();
   if (!exec_rpc_status.ok()) {
     // One of the backends failed to startup, so we cancel the other ones.
-    CancelBackends();
+    CancelBackends(/*fire_and_forget=*/ true);
     WaitOnExecRpcs();
     for (BackendState* backend_state : backend_states_) {
       // If Exec() rpc failed for a reason besides being aborted, blacklist the executor.
@@ -707,10 +707,12 @@ void Coordinator::HandleExecStateTransition(
   // execution and release resources.
   ReleaseExecResources();
   if (new_state == ExecState::RETURNED_RESULTS) {
-    // TODO: IMPALA-6984: cancel all backends in this case too.
+    // Cancel all backends, but wait for the final status reports to be received so that
+    // we have a complete profile for this successful query.
+    CancelBackends(/*fire_and_forget=*/ false);
     WaitForBackends();
   } else {
-    CancelBackends();
+    CancelBackends(/*fire_and_forget=*/ true);
   }
   ReleaseQueryAdmissionControlResources();
   // Once the query has released its admission control resources, update its end time.
@@ -855,23 +857,22 @@ void Coordinator::Cancel() {
   // RPC passing the exec RPC.
   DCHECK(exec_rpcs_complete_.Load()) << "Exec() must be called first";
   discard_result(SetNonErrorTerminalState(ExecState::CANCELLED));
-  // CancelBackends() is called for all transitions into a terminal state except
-  // for RETURNED_RESULTS. We need to call it now because after Cancel() is called
-  // the coordinator is not guaranteed to get UpdateBackendExecStatus() calls, and
-  // so we need to unblock the backend_exec_complete_barrier_.
-  // TODO: Remove this once IMPALA-6984 is fixed. It won't be necessary since
-  // CancelBackends() will be called when transitioning to RETURNED_RESULTS.
-  if (ReturnedAllResults()) CancelBackends();
+  // CancelBackends() is called for all transitions into a terminal state.
+  // RETURNED_RESULTS, however, calls it with fire_and_forget=false and may be blocked
+  // waiting for cancellation. In that case, we want explicit cancellation to unblock
+  // backend_exec_complete_barrier_, which we do by forcing cancellation.
+  if (ReturnedAllResults()) CancelBackends(/*fire_and_forget=*/ true);
 }
 
-void Coordinator::CancelBackends() {
+void Coordinator::CancelBackends(bool fire_and_forget) {
   int num_cancelled = 0;
   for (BackendState* backend_state: backend_states_) {
     DCHECK(backend_state != nullptr);
-    if (backend_state->Cancel()) ++num_cancelled;
+    BackendState::CancelResult cr = backend_state->Cancel(fire_and_forget);
+    if (cr.cancel_attempted) ++num_cancelled;
+    if (!fire_and_forget && cr.became_done) backend_exec_complete_barrier_->Notify();
   }
-  backend_exec_complete_barrier_->NotifyRemaining();
-
+  if (fire_and_forget) backend_exec_complete_barrier_->NotifyRemaining();
   VLOG_QUERY << Substitute(
       "CancelBackends() query_id=$0, tried to cancel $1 backends",
       PrintId(query_id()), num_cancelled);

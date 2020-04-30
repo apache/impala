@@ -35,6 +35,8 @@ class TypedCountingBarrier {
   /// Returns the remaining pending notifications.
   /// If this is the final notifier, it unblocks Wait() with the returned value as
   /// 'promise_value'.
+  /// TODO: some callers will decrement this below 0. In those cases only the notification
+  /// that brings the count to 0 has an effect.
   int32_t Notify(const T& promise_value) {
     int32_t result = count_.Add(-1);
     if (result == 0) discard_result(promise_.Set(promise_value));
