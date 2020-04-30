@@ -152,8 +152,7 @@ class RuntimeState {
   const std::string& GetEffectiveUser() const;
 
   inline Status GetQueryStatus() {
-    // Do a racy check for query_status_ to avoid unnecessary spinlock acquisition.
-    if (UNLIKELY(!query_status_.ok())) {
+    if (UNLIKELY(!is_query_status_ok_.Load())) {
       std::lock_guard<SpinLock> l(query_status_lock_);
       return query_status_;
     }
@@ -248,6 +247,8 @@ class RuntimeState {
     std::lock_guard<SpinLock> l(query_status_lock_);
     if (!query_status_.ok()) return;
     query_status_ = Status(err_msg);
+    bool set_query_status_ok_ = is_query_status_ok_.CompareAndSwap(true, false);
+    DCHECK(set_query_status_ok_);
   }
 
   /// Sets query_status_ to MEM_LIMIT_EXCEEDED and logs all the registered trackers.
@@ -406,6 +407,11 @@ class RuntimeState {
   /// will not necessarily be set in all error cases.
   SpinLock query_status_lock_;
   Status query_status_;
+
+  /// True if the query_status_ is OK, false otherwise. Used to check if the
+  /// query_status_ is OK without incurring the overhead of acquiring the
+  /// query_status_lock_.
+  AtomicBool is_query_status_ok_{true};
 
   /// This is the node id of the root node for this plan fragment.
   ///

@@ -180,8 +180,9 @@ class StatestoreSubscriber {
   StatsMetric<double>* heartbeat_interval_metric_;
 
   /// Tracks the time between heartbeat messages. Only updated by Heartbeat(), which
-  /// should not run concurrently with itself.
-  MonotonicStopWatch heartbeat_interval_timer_;
+  /// should not run concurrently with itself. Use a ConcurrentStopWatch because the
+  /// watch is started in one thread, but read in another.
+  ConcurrentStopWatch heartbeat_interval_timer_;
 
   /// Current registration ID, in string form.
   StringProperty* registration_id_metric_;
