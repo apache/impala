@@ -287,15 +287,16 @@ void RuntimeState::SetMemLimitExceeded(MemTracker* tracker,
   // cannot abort the fragment immediately. It relies on callers checking status
   // periodically. This means that this function could be called a large number of times
   // (e.g. once per row) before the fragment aborts. See IMPALA-6997.
-  {
-    lock_guard<SpinLock> l(query_status_lock_);
-    if (!query_status_.ok()) return;
-  }
+  if (!is_query_status_ok_.Load()) return;
   Status status = tracker->MemLimitExceeded(this, msg == nullptr ? "" : msg->msg(),
       failed_allocation_size);
   {
     lock_guard<SpinLock> l(query_status_lock_);
-    if (query_status_.ok()) query_status_ = status;
+    if (query_status_.ok()) {
+      query_status_ = status;
+      bool set_query_status_ok_ = is_query_status_ok_.CompareAndSwap(true, false);
+      DCHECK(set_query_status_ok_);
+    }
   }
   LogError(status.msg());
   // Add warning about missing stats except for compute stats child queries.

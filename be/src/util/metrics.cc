@@ -172,20 +172,34 @@ void MetricGroup::CMCompatibleCallback(const Webserver::WebRequest& req,
     return;
   }
 
+  // Add all metrics in the metric_map_ to the given document.
+  for (const MetricMap::value_type& m : metric_map_) {
+    m.second->ToLegacyJson(document);
+  }
+
+
+  // Depth-first traversal of children to flatten all metrics, which is what was
+  // expected by CM before we introduced metric groups.
   stack<MetricGroup*> groups;
-  groups.push(this);
-  do {
-    // Depth-first traversal of children to flatten all metrics, which is what was
-    // expected by CM before we introduced metric groups.
+  for (const ChildGroupMap::value_type& child : children_) {
+    groups.push(child.second);
+  }
+
+  while (!groups.empty()) {
     MetricGroup* group = groups.top();
     groups.pop();
+
+    // children_ and metric_map_ are protected by lock_, so acquire group->lock_ before
+    // adding the metrics to the given document.
+    lock_guard<SpinLock> l(group->lock_);
     for (const ChildGroupMap::value_type& child: group->children_) {
       groups.push(child.second);
     }
+
     for (const MetricMap::value_type& m: group->metric_map_) {
       m.second->ToLegacyJson(document);
     }
-  } while (!groups.empty());
+  }
 }
 
 void MetricGroup::TemplateCallback(const Webserver::WebRequest& req,

@@ -355,7 +355,7 @@ void StatestoreSubscriber::Heartbeat(const RegistrationId& registration_id) {
   const Status& status = CheckRegistrationId(registration_id);
   if (status.ok()) {
     heartbeat_interval_metric_->Update(
-        heartbeat_interval_timer_.Reset() / (1000.0 * 1000.0 * 1000.0));
+        heartbeat_interval_timer_.LapTime() / (1000.0 * 1000.0 * 1000.0));
     failure_detector_->UpdateHeartbeat(STATESTORE_ID, true);
   } else {
     VLOG_RPC << "Heartbeat: " << status.GetDetail();
