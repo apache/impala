@@ -345,6 +345,31 @@ public class ExprRewriterTest extends AnalyzerTest {
             + "FROM functional_kudu.alltypes LEFT SEMI JOIN (SELECT 2) `$a$1` (`$c$1`) "
             + "ON id = `$a$1`.`$c$1` WHERE id = (SELECT 2)");
 
+    //-------------------------
+    // Test || rewrites.
+    //-------------------------
+    assertToSql(ctx,
+        "select * from functional.alltypes where "
+            + "int_col = 1 || int_col = 2 "
+            + "|| tinyint_col > 5 || (string_col || string_col) = 'testtest'",
+        "SELECT * FROM functional.alltypes WHERE "
+            + "int_col = 1 OR int_col = 2 "
+            + "OR tinyint_col > 5 OR (concat(string_col, string_col)) = 'testtest'",
+        "SELECT * FROM functional.alltypes WHERE "
+            + "int_col IN (1, 2) "
+            + "OR tinyint_col > 5 OR concat(string_col, string_col) = 'testtest'");
+
+    assertToSql(ctx,
+        "select int_col = 1 || int_col = 2, string_col || 'test' "
+            + "from functional.alltypes where "
+            + "(bool_col || id = 2) || (string_col || 'test') = 'testtest'",
+        "SELECT int_col = 1 OR int_col = 2, concat(string_col, 'test') "
+            + "FROM functional.alltypes WHERE "
+            + "(bool_col OR id = 2) OR (concat(string_col, 'test')) = 'testtest'",
+        "SELECT int_col IN (1, 2), concat(string_col, 'test') "
+            + "FROM functional.alltypes WHERE "
+            + "bool_col OR id = 2 OR concat(string_col, 'test') = 'testtest'");
+
     // We don't do any rewrite for WITH clause.
     StatementBase stmt = (StatementBase) AnalyzesOk("with t as (select 1 + 1) " +
         "select id from functional.alltypes union select id from functional.alltypesagg",

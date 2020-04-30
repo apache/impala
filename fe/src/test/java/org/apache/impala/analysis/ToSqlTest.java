@@ -1480,6 +1480,9 @@ public class ToSqlTest extends FrontendTestBase {
         "NOT TRUE, (NOT TRUE), NOT FALSE, (NOT FALSE)");
     testToSql("select ((true and (false or false) or true) and (false or true))",
         "SELECT ((TRUE AND (FALSE OR FALSE) OR TRUE) AND (FALSE OR TRUE))");
+    // CompoundVerticalBarExpr.
+    testToSql("select true || false, 'abc' || 'xyz'",
+        "SELECT TRUE OR FALSE, concat('abc', 'xyz')");
     // InPredicate.
     testToSql("select 5 in (4, 6, 7, 5), (5 in (4, 6, 7, 5))," +
         "5 not in (4, 6, 7, 5), (5 not In (4, 6, 7, 5))",

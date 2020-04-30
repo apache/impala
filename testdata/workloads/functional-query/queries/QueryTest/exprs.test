@@ -3094,3 +3094,22 @@ select distinct year from functional.alltypes where case when year = 2010 then m
 ---- TYPES
 int
 ====
+---- QUERY
+# IMPALA-452 Add support for string concatenation operator using ||
+select distinct bool_col || int_col < smallint_col,
+"TEST" || string_col from functional.alltypes
+WHERE float_col = double_col || (string_col || 'test') = 'testtest';
+---- RESULTS
+true,'TEST0'
+---- TYPES
+BOOLEAN, STRING
+====
+---- QUERY
+select distinct bool_col OR int_col < smallint_col,
+concat ("TEST", string_col) from functional.alltypes
+WHERE float_col = double_col OR concat(string_col,'test') = 'testtest';
+---- RESULTS
+true,'TEST0'
+---- TYPES
+BOOLEAN, STRING
+====

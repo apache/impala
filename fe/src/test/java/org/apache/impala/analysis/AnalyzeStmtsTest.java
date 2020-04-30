@@ -4193,4 +4193,151 @@ public class AnalyzeStmtsTest extends AnalyzerTest {
     // right error msg.
     AnalysisError("select casttobar(\"foo\")", "default.casttobar() unknown");
   }
+
+  @Test
+  public void testCompoundVerticalBarExprAnalysis() throws ImpalaException {
+    // Valid uses of || when using as logical OR
+    AnalyzesOk("SELECT bool_col || bool_col FROM functional.alltypessmall");
+    AnalyzesOk("SELECT TRUE || bool_col FROM functional.alltypessmall");
+    AnalyzesOk("SELECT bool_col || FALSE FROM functional.alltypessmall");
+    AnalyzesOk("SELECT TRUE || FALSE FROM functional.alltypessmall");
+    AnalyzesOk("SELECT NULL || bool_col FROM functional.alltypessmall");
+    AnalyzesOk("SELECT NULL || NULL FROM functional.alltypessmall");
+
+    // Valid uses of || when using as concat function call
+    AnalyzesOk("SELECT string_col || string_col FROM functional.alltypessmall");
+    AnalyzesOk("SELECT 'literal' || string_col FROM functional.alltypessmall");
+    AnalyzesOk("SELECT string_col || 'literal' FROM functional.alltypessmall");
+    AnalyzesOk("SELECT 'literal1' || 'literal2' FROM functional.alltypessmall");
+    AnalyzesOk("SELECT 'literal' || cs FROM functional.chars_tiny");
+    AnalyzesOk("SELECT cl || 'literal' FROM functional.chars_tiny");
+    AnalyzesOk("SELECT vc || cs FROM functional.chars_tiny");
+
+    // Invalid operands result exception during analysis
+    AnalysisError("SELECT string_col || bool_col FROM functional.alltypessmall",
+        "Operands of CompoundVerticalBarExpr "
+            + "'string_col || bool_col' should both return 'BOOLEAN' type "
+            + "or they should both return 'STRING' or 'VARCHAR' or 'CHAR' types, "
+            + "but they return types 'STRING' and 'BOOLEAN'.");
+
+    AnalysisError("SELECT bool_col || string_col FROM functional.alltypessmall",
+        "Operands of CompoundVerticalBarExpr "
+            + "'bool_col || string_col' should both return 'BOOLEAN' type "
+            + "or they should both return 'STRING' or 'VARCHAR' or 'CHAR' types, "
+            + "but they return types 'BOOLEAN' and 'STRING'.");
+
+    AnalysisError("SELECT string_col || FALSE FROM functional.alltypessmall",
+        "Operands of CompoundVerticalBarExpr "
+            + "'string_col || FALSE' should both return 'BOOLEAN' type "
+            + "or they should both return 'STRING' or 'VARCHAR' or 'CHAR' types, "
+            + "but they return types 'STRING' and 'BOOLEAN'.");
+
+    AnalysisError("SELECT TRUE || string_col FROM functional.alltypessmall",
+        "Operands of CompoundVerticalBarExpr "
+            + "'TRUE || string_col' should both return 'BOOLEAN' type "
+            + "or they should both return 'STRING' or 'VARCHAR' or 'CHAR' types, "
+            + "but they return types 'BOOLEAN' and 'STRING'.");
+
+    AnalysisError("SELECT 'literal1' || bool_col FROM functional.alltypessmall",
+        "Operands of CompoundVerticalBarExpr "
+            + "''literal1' || bool_col' should both return 'BOOLEAN' type "
+            + "or they should both return 'STRING' or 'VARCHAR' or 'CHAR' types, "
+            + "but they return types 'STRING' and 'BOOLEAN'.");
+
+    AnalysisError("SELECT bool_col || 'literal2' FROM functional.alltypessmall",
+        "Operands of CompoundVerticalBarExpr "
+            + "'bool_col || 'literal2'' should both return 'BOOLEAN' type "
+            + "or they should both return 'STRING' or 'VARCHAR' or 'CHAR' types, "
+            + "but they return types 'BOOLEAN' and 'STRING'.");
+
+    AnalysisError("SELECT vc || TRUE FROM functional.chars_tiny",
+        "Operands of CompoundVerticalBarExpr "
+            + "'vc || TRUE' should both return 'BOOLEAN' type "
+            + "or they should both return 'STRING' or 'VARCHAR' or 'CHAR' types, "
+            + "but they return types 'VARCHAR(32)' and 'BOOLEAN'.");
+
+    AnalysisError("SELECT FALSE || cl FROM functional.chars_tiny",
+        "Operands of CompoundVerticalBarExpr "
+            + "'FALSE || cl' should both return 'BOOLEAN' type "
+            + "or they should both return 'STRING' or 'VARCHAR' or 'CHAR' types, "
+            + "but they return types 'BOOLEAN' and 'CHAR(140)'.");
+
+    AnalysisError("SELECT bool_col || 'literal2' FROM functional.alltypessmall",
+        "Operands of CompoundVerticalBarExpr "
+            + "'bool_col || 'literal2'' should both return 'BOOLEAN' type "
+            + "or they should both return 'STRING' or 'VARCHAR' or 'CHAR' types, "
+            + "but they return types 'BOOLEAN' and 'STRING'.");
+
+    AnalysisError("SELECT string_col || int_col FROM functional.alltypessmall",
+        "Operands of CompoundVerticalBarExpr "
+            + "'string_col || int_col' should both return 'BOOLEAN' type "
+            + "or they should both return 'STRING' or 'VARCHAR' or 'CHAR' types, "
+            + "but they return types 'STRING' and 'INT'.");
+
+    AnalysisError("SELECT int_col || string_col FROM functional.alltypessmall",
+        "Operands of CompoundVerticalBarExpr "
+            + "'int_col || string_col' should both return 'BOOLEAN' type "
+            + "or they should both return 'STRING' or 'VARCHAR' or 'CHAR' types, "
+            + "but they return types 'INT' and 'STRING'.");
+
+    AnalysisError("SELECT bool_col || int_col FROM functional.alltypessmall",
+        "Operands of CompoundVerticalBarExpr "
+            + "'bool_col || int_col' should both return 'BOOLEAN' type "
+            + "or they should both return 'STRING' or 'VARCHAR' or 'CHAR' types, "
+            + "but they return types 'BOOLEAN' and 'INT'.");
+
+    AnalysisError("SELECT int_col || bool_col FROM functional.alltypessmall",
+        "Operands of CompoundVerticalBarExpr "
+            + "'int_col || bool_col' should both return 'BOOLEAN' type "
+            + "or they should both return 'STRING' or 'VARCHAR' or 'CHAR' types, "
+            + "but they return types 'INT' and 'BOOLEAN'.");
+
+    AnalysisError("SELECT string_col || timestamp_col FROM functional.alltypessmall",
+        "Operands of CompoundVerticalBarExpr "
+            + "'string_col || timestamp_col' should both return 'BOOLEAN' type "
+            + "or they should both return 'STRING' or 'VARCHAR' or 'CHAR' types, "
+            + "but they return types 'STRING' and 'TIMESTAMP'.");
+
+    AnalysisError("SELECT timestamp_col || string_col FROM functional.alltypessmall",
+        "Operands of CompoundVerticalBarExpr "
+            + "'timestamp_col || string_col' should both return 'BOOLEAN' type "
+            + "or they should both return 'STRING' or 'VARCHAR' or 'CHAR' types, "
+            + "but they return types 'TIMESTAMP' and 'STRING'.");
+
+    AnalysisError("SELECT bool_col || timestamp_col FROM functional.alltypessmall",
+        "Operands of CompoundVerticalBarExpr "
+            + "'bool_col || timestamp_col' should both return 'BOOLEAN' type "
+            + "or they should both return 'STRING' or 'VARCHAR' or 'CHAR' types, "
+            + "but they return types 'BOOLEAN' and 'TIMESTAMP'.");
+
+    AnalysisError("SELECT timestamp_col || bool_col FROM functional.alltypessmall",
+        "Operands of CompoundVerticalBarExpr "
+            + "'timestamp_col || bool_col' should both return 'BOOLEAN' type "
+            + "or they should both return 'STRING' or 'VARCHAR' or 'CHAR' types, "
+            + "but they return types 'TIMESTAMP' and 'BOOLEAN'.");
+
+    AnalysisError("SELECT bool_col || double_col FROM functional.alltypessmall",
+        "Operands of CompoundVerticalBarExpr "
+            + "'bool_col || double_col' should both return 'BOOLEAN' type "
+            + "or they should both return 'STRING' or 'VARCHAR' or 'CHAR' types, "
+            + "but they return types 'BOOLEAN' and 'DOUBLE'.");
+
+    AnalysisError("SELECT double_col || string_col FROM functional.alltypessmall",
+        "Operands of CompoundVerticalBarExpr "
+            + "'double_col || string_col' should both return 'BOOLEAN' type "
+            + "or they should both return 'STRING' or 'VARCHAR' or 'CHAR' types, "
+            + "but they return types 'DOUBLE' and 'STRING'.");
+
+    AnalysisError("SELECT string_col || NULL FROM functional.alltypessmall",
+        "Operands of CompoundVerticalBarExpr "
+            + "'string_col || NULL' should both return 'BOOLEAN' type "
+            + "or they should both return 'STRING' or 'VARCHAR' or 'CHAR' types, "
+            + "but they return types 'STRING' and 'NULL_TYPE'.");
+
+    AnalysisError("SELECT NULL || string_col FROM functional.alltypessmall",
+        "Operands of CompoundVerticalBarExpr "
+            + "'NULL || string_col' should both return 'BOOLEAN' type "
+            + "or they should both return 'STRING' or 'VARCHAR' or 'CHAR' types, "
+            + "but they return types 'NULL_TYPE' and 'STRING'.");
+  }
 }
