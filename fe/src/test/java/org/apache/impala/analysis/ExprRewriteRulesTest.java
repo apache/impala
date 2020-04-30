@@ -37,6 +37,7 @@ import org.apache.impala.rewrite.EqualityDisjunctsToInRule;
 import org.apache.impala.rewrite.ExprRewriteRule;
 import org.apache.impala.rewrite.ExprRewriter;
 import org.apache.impala.rewrite.ExtractCommonConjunctRule;
+import org.apache.impala.rewrite.ExtractCompoundVerticalBarExprRule;
 import org.apache.impala.rewrite.FoldConstantsRule;
 import org.apache.impala.rewrite.NormalizeBinaryPredicatesRule;
 import org.apache.impala.rewrite.NormalizeCountStarRule;
@@ -425,8 +426,8 @@ public class ExprRewriteRulesTest extends FrontendTestBase {
   public void testCompoundPredicate() throws ImpalaException {
     ExprRewriteRule rule = SimplifyConditionalsRule.INSTANCE;
 
-    RewritesOk("false || id = 0", rule, "id = 0");
-    RewritesOk("true || id = 0", rule, "TRUE");
+    RewritesOk("false OR id = 0", rule, "id = 0");
+    RewritesOk("true OR id = 0", rule, "TRUE");
     RewritesOk("false && id = 0", rule, "FALSE");
     RewritesOk("true && id = 0", rule, "id = 0");
   }
@@ -824,4 +825,34 @@ public class ExprRewriteRulesTest extends FrontendTestBase {
             "NOT int_col < 20 AND NOT int_col > 10");
   }
 
+  @Test
+  public void testExtractCompoundVerticalBarExprRule() throws ImpalaException {
+    ExprRewriteRule extractCompoundVerticalBarExprRule =
+        ExtractCompoundVerticalBarExprRule.INSTANCE;
+    ExprRewriteRule simplifyConditionalsRule = SimplifyConditionalsRule.INSTANCE;
+    List<ExprRewriteRule> rules = new ArrayList<>();
+    rules.add(extractCompoundVerticalBarExprRule);
+    rules.add(simplifyConditionalsRule);
+
+    RewritesOk("string_col || string_col", extractCompoundVerticalBarExprRule,
+        "concat(string_col, string_col)");
+
+    RewritesOk("bool_col || bool_col", extractCompoundVerticalBarExprRule,
+        "bool_col OR bool_col");
+
+    RewritesOk("string_col || 'TEST'", extractCompoundVerticalBarExprRule,
+        "concat(string_col, 'TEST')");
+
+    RewritesOk("functional.chars_tiny", "cl || cs", extractCompoundVerticalBarExprRule,
+        "concat(cl, cs)");
+
+    RewritesOk("FALSE || id = 0", extractCompoundVerticalBarExprRule, "FALSE OR id = 0");
+
+    RewritesOk("FALSE || id = 0", rules, "id = 0");
+
+    RewritesOk("'' || ''", extractCompoundVerticalBarExprRule, "concat('', '')");
+
+    RewritesOk(
+        "NULL || bool_col", extractCompoundVerticalBarExprRule, "NULL OR bool_col");
+  }
 }

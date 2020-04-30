@@ -80,6 +80,7 @@ import org.apache.impala.rewrite.NormalizeExprsRule;
 import org.apache.impala.rewrite.SimplifyCastStringToTimestamp;
 import org.apache.impala.rewrite.SimplifyConditionalsRule;
 import org.apache.impala.rewrite.SimplifyDistinctFromRule;
+import org.apache.impala.rewrite.ExtractCompoundVerticalBarExprRule;
 import org.apache.impala.service.FeSupport;
 import org.apache.impala.thrift.TAccessEvent;
 import org.apache.impala.thrift.TCatalogObjectType;
@@ -468,6 +469,7 @@ public class Analyzer {
       // Binary predicates must be rewritten to a canonical form for both Kudu predicate
       // pushdown and Parquet row group pruning based on min/max statistics.
       rules.add(NormalizeBinaryPredicatesRule.INSTANCE);
+      rules.add(ExtractCompoundVerticalBarExprRule.INSTANCE);
       if (queryCtx.getClient_request().getQuery_options().enable_expr_rewrites) {
         rules.add(FoldConstantsRule.INSTANCE);
         rules.add(NormalizeExprsRule.INSTANCE);

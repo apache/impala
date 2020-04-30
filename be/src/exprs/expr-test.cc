@@ -3882,6 +3882,39 @@ TEST_P(ExprTest, BetweenPredicate) {
   TestIsNull("NULL between NULL and NULL", TYPE_BOOLEAN);
 }
 
+TEST_P(ExprTest, CompoundVerticalBarExpr) {
+  // CompoundVerticalBarExpr is rewritten into a compound predicate
+  // or concat FunctionCallExpr based on the arguments
+  TestValue("5 > 2 || 3 < 6", TYPE_BOOLEAN, true);
+  TestValue("TRUE || NULL", TYPE_BOOLEAN, true);
+  TestIsNull("FALSE || NULL", TYPE_BOOLEAN);
+
+  TestStringValue("'abc' || '5'", "abc5");
+  TestStringValue("cast('foo  ' AS CHAR(5)) || '3'", "foo  3");
+  TestStringValue("cast('foo  ' AS CHAR(5)) || '3'", "foo  3");
+
+  TestIsNull("cast(NULL AS STRING) || 'abc'", TYPE_STRING);
+  TestIsNull("concat (cast(NULL AS STRING), 'abc')", TYPE_STRING);
+
+  TestStringValue("cast(NULL AS CHAR(5)) || 'abc'", "NULL");
+  TestStringValue("cast(NULL AS STRING) || 'abc'", "NULL");
+  TestStringValue("'abc' || cast(NULL AS CHAR(5))", "NULL");
+  TestStringValue("'abc' || cast(NULL AS STRING)", "NULL");
+
+  TestError("NULL || 'abc'");
+  TestError("NULL || cast('abc' AS CHAR(3))");
+  TestError("'xyz' || NULL");
+  TestError("cast('xyz' AS CHAR(3)) || NULL");
+  TestError("TRUE || 'abc'");
+  TestError("'abc' || FALSE");
+  TestError("'abc' || 5");
+  TestError("5 || 6");
+  TestError("5.1 || 6.2");
+  TestError("cast('2011-10-22 09:10:11' as timestamp)"
+            " || cast('2016-10-22 09:10:11' as timestamp)");
+  TestError("cast('2011-01-02' as date) || cast('2020-01-02' as date)");
+}
+
 // Tests with NULLs are in the FE QueryTest.
 TEST_P(ExprTest, InPredicate) {
   // Test integers.
