@@ -41,3 +41,6 @@ class TestTargetedPerf(ImpalaTestSuite):
 
   def test_perf_string(self, vector):
     self.run_test_case('string', vector)
+
+  def test_perf_cancel_union(self, vector):
+    self.run_test_case('primitive_cancel_union', vector)

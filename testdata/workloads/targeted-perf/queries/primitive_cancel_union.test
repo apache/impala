@@ -1,0 +1,32 @@
+====
+---- QUERY: primitive_cancel_union
+-- Description : Union with a cheap branch and expensive branch
+-- Target test case : Regression test for IMPALA-6984. The query
+--  benefits from the coordinator immediately cancelling the expensive branch
+--  of the union when the limit has been reached. With that optimization the
+--  query typically completes in under a second.
+select * from (
+  select c_custkey key, min(c_name)
+  from tpch_parquet.customer
+  where c_custkey <= 10
+  group by c_custkey
+  union all
+  select l_orderkey, min(l_comment)
+  from tpch_parquet.lineitem
+  group by l_orderkey) v
+  limit 10
+---- RESULTS
+1,'Customer#000000001'
+2,'Customer#000000002'
+3,'Customer#000000003'
+4,'Customer#000000004'
+5,'Customer#000000005'
+6,'Customer#000000006'
+7,'Customer#000000007'
+8,'Customer#000000008'
+9,'Customer#000000009'
+10,'Customer#000000010'
+---- TYPES
+BIGINT,STRING
+====
+
