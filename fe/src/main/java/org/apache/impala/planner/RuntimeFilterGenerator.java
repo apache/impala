@@ -49,6 +49,7 @@ import org.apache.impala.common.InternalException;
 import org.apache.impala.planner.JoinNode.DistributionMode;
 import org.apache.impala.service.BackendConfig;
 import org.apache.impala.service.FeSupport;
+import org.apache.impala.thrift.TEnabledRuntimeFilterTypes;
 import org.apache.impala.thrift.TQueryOptions;
 import org.apache.impala.thrift.TRuntimeFilterDesc;
 import org.apache.impala.thrift.TRuntimeFilterMode;
@@ -675,8 +676,9 @@ public final class RuntimeFilterGenerator {
    *    scan node.
    * 3. Only Hdfs and Kudu scan nodes are supported:
    *     a. If the target is an HdfsScanNode, the filter must be type BLOOM.
-   *     b. If the target is a KuduScanNode, the filter must be type MIN_MAX, the target
-   *         must be a slot ref on a column, and the comp op cannot be 'not distinct'.
+   *     b. If the target is a KuduScanNode, the filter could be type MIN_MAX, and/or
+   *        BLOOM, the target must be a slot ref on a column, and the comp op cannot
+   *        be 'not distinct'.
    * A scan node may be used as a destination node for multiple runtime filters.
    */
   private void assignRuntimeFilters(PlannerContext ctx, ScanNode scanNode) {
@@ -687,6 +689,8 @@ public final class RuntimeFilterGenerator {
     boolean disableRowRuntimeFiltering =
         ctx.getQueryOptions().isDisable_row_runtime_filtering();
     TRuntimeFilterMode runtimeFilterMode = ctx.getQueryOptions().getRuntime_filter_mode();
+    TEnabledRuntimeFilterTypes enabledRuntimeFilterTypes =
+        ctx.getQueryOptions().getEnabled_runtime_filter_types();
     for (RuntimeFilter filter: runtimeFiltersByTid_.get(tid)) {
       if (filter.isFinalized()) continue;
       Expr targetExpr = computeTargetExpr(filter, tid, analyzer);
@@ -702,21 +706,46 @@ public final class RuntimeFilterGenerator {
           && filter.getType() != TRuntimeFilterType.BLOOM) {
         continue;
       } else if (scanNode instanceof KuduScanNode) {
-        if (filter.getType() != TRuntimeFilterType.MIN_MAX) continue;
-        // TODO: IMPALA-9294: Support Kudu Date Min/Max Filters
-        if (targetExpr.getType().isDate()) continue;
-        // TODO: IMPALA-9580: Support Kudu VARCHAR Min/Max Filters
-        if (targetExpr.getType().isVarchar()) continue;
-        SlotRef slotRef = targetExpr.unwrapSlotRef(true);
-        // Kudu only supports targeting a single column, not general exprs, so the target
-        // must be a SlotRef pointing to a column. We can allow implicit integer casts
-        // by casting the min/max values before sending them to Kudu.
-        // Kudu also cannot currently return nulls if a filter is applied, so it does not
-        // work with "is not distinct".
-        if (slotRef == null || slotRef.getDesc().getColumn() == null
-            || (targetExpr instanceof CastExpr && !targetExpr.getType().isIntegerType())
-            || filter.getExprCompOp() == Operator.NOT_DISTINCT) {
-          continue;
+        if (filter.getType() == TRuntimeFilterType.BLOOM) {
+          if (enabledRuntimeFilterTypes != TEnabledRuntimeFilterTypes.BLOOM
+              && enabledRuntimeFilterTypes != TEnabledRuntimeFilterTypes.ALL) {
+            continue;
+          }
+          // TODO: IMPALA-9691 Support Kudu Timestamp and Date Bloom Filters
+          if (targetExpr.getType().isTimestamp() || targetExpr.getType().isDate()) {
+            continue;
+          }
+          // TODO: Support Kudu VARCHAR Bloom Filter
+          if (targetExpr.getType().isVarchar()) continue;
+          // Kudu only supports targeting a single column, not general exprs, so the
+          // target must be a SlotRef pointing to a column without casting
+          if (!(targetExpr instanceof SlotRef)
+              || filter.getExprCompOp() == Operator.NOT_DISTINCT) {
+            continue;
+          }
+          SlotRef slotRef = (SlotRef) targetExpr;
+          if (slotRef.getDesc().getColumn() == null) continue;
+        } else {
+          Preconditions.checkState(filter.getType() == TRuntimeFilterType.MIN_MAX);
+          if (enabledRuntimeFilterTypes != TEnabledRuntimeFilterTypes.MIN_MAX
+              && enabledRuntimeFilterTypes != TEnabledRuntimeFilterTypes.ALL) {
+            continue;
+          }
+          // TODO: IMPALA-9294: Support Kudu Date Min/Max Filters
+          if (targetExpr.getType().isDate()) continue;
+          // TODO: IMPALA-9580: Support Kudu VARCHAR Min/Max Filters
+          if (targetExpr.getType().isVarchar()) continue;
+          SlotRef slotRef = targetExpr.unwrapSlotRef(true);
+          // Kudu only supports targeting a single column, not general exprs, so the
+          // target must be a SlotRef pointing to a column. We can allow implicit
+          // integer casts by casting the min/max values before sending them to Kudu.
+          // Kudu also cannot currently return nulls if a filter is applied, so it
+          // does not work with "is not distinct".
+          if (slotRef == null || slotRef.getDesc().getColumn() == null
+              || (targetExpr instanceof CastExpr && !targetExpr.getType().isIntegerType())
+              || filter.getExprCompOp() == Operator.NOT_DISTINCT) {
+            continue;
+          }
         }
       }
 

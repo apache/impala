@@ -342,8 +342,8 @@ void RuntimeFilterBank::PublishGlobalFilter(
       }
 
       if (bloom_filter != BloomFilter::ALWAYS_TRUE_FILTER) {
-        Status status = bloom_filter->Init(
-            params.bloom_filter(), sidecar_slice.data(), sidecar_slice.size());
+        Status status = bloom_filter->Init(params.bloom_filter(), sidecar_slice.data(),
+            sidecar_slice.size(), DefaultHashSeed());
         if (!status.ok()) {
           LOG(ERROR) << "Unable to allocate memory for bloom filter: "
                      << status.GetDetail();
@@ -383,7 +383,7 @@ BloomFilter* RuntimeFilterBank::AllocateScratchBloomFilter(int32_t filter_id) {
       << "BufferPool Client should have enough reservation to fulfill bloom filter "
          "allocation";
   BloomFilter* bloom_filter = obj_pool_.Add(new BloomFilter(&buffer_pool_client_));
-  Status status = bloom_filter->Init(log_filter_size);
+  Status status = bloom_filter->Init(log_filter_size, DefaultHashSeed());
   if (!status.ok()) {
     LOG(ERROR) << "Unable to allocate memory for bloom filter: " << status.GetDetail();
     return nullptr;

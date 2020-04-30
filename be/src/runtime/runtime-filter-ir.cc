@@ -23,7 +23,7 @@ bool IR_ALWAYS_INLINE RuntimeFilter::Eval(
     void* val, const ColumnType& col_type) const noexcept {
   DCHECK(is_bloom_filter());
   if (bloom_filter_.Load() == BloomFilter::ALWAYS_TRUE_FILTER) return true;
-  uint32_t h = RawValue::GetHashValue(val, col_type,
-      RuntimeFilterBank::DefaultHashSeed());
+  uint32_t h = RawValue::GetHashValueFastHash32(
+      val, col_type, RuntimeFilterBank::DefaultHashSeed());
   return bloom_filter_.Load()->Find(h);
 }

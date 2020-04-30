@@ -25,20 +25,23 @@
 
 #include "exec/exec-node.inline.h"
 #include "exec/kudu-util.h"
-#include "exprs/scalar-expr.h"
 #include "exprs/scalar-expr-evaluator.h"
+#include "exprs/scalar-expr.h"
 #include "exprs/slot-ref.h"
+#include "gutil/gscoped_ptr.h"
+#include "gutil/strings/substitute.h"
+#include "kudu/util/block_bloom_filter.h"
+#include "kudu/util/slice.h"
 #include "runtime/mem-pool.h"
 #include "runtime/mem-tracker.h"
 #include "runtime/raw-value.h"
-#include "runtime/runtime-filter.h"
-#include "runtime/runtime-state.h"
 #include "runtime/row-batch.h"
+#include "runtime/runtime-filter.inline.h"
+#include "runtime/runtime-state.h"
 #include "runtime/string-value.h"
 #include "runtime/timestamp-value.inline.h"
 #include "runtime/tuple-row.h"
-#include "gutil/gscoped_ptr.h"
-#include "gutil/strings/substitute.h"
+#include "util/bloom-filter.h"
 #include "util/debug-util.h"
 #include "util/jni-util.h"
 #include "util/min-max-filter.h"
@@ -91,7 +94,7 @@ Status KuduScanner::Open() {
 }
 
 void KuduScanner::KeepKuduScannerAlive() {
-  if (scanner_ == NULL) return;
+  if (scanner_ == nullptr) return;
   int64_t now = MonotonicMicros();
   int64_t keepalive_us = FLAGS_kudu_scanner_keep_alive_period_sec * 1e6;
   if (now < last_alive_time_micros_ + keepalive_us) {
@@ -182,7 +185,7 @@ void KuduScanner::Close() {
 }
 
 Status KuduScanner::OpenNextScanToken(const string& scan_token, bool* eos) {
-  DCHECK(scanner_ == NULL);
+  DCHECK(scanner_ == nullptr);
   kudu::client::KuduScanner* scanner;
   KUDU_RETURN_IF_ERROR(kudu::client::KuduScanToken::DeserializeIntoScanner(
                            scan_node_->kudu_client(), scan_token, &scanner),
@@ -221,56 +224,75 @@ Status KuduScanner::OpenNextScanToken(const string& scan_token, bool* eos) {
 
   if (scan_node_->filter_ctxs_.size() > 0) {
     for (const FilterContext& ctx : scan_node_->filter_ctxs_) {
-      MinMaxFilter* filter = ctx.filter->get_min_max();
-      if (filter != nullptr && !filter->AlwaysTrue()) {
-        if (filter->AlwaysFalse()) {
-          // We can skip this entire scan.
-          CloseCurrentClientScanner();
-          *eos = true;
-          return Status::OK();
-        } else {
-          auto it = ctx.filter->filter_desc().planid_to_target_ndx.find(scan_node_->id());
-          const TRuntimeFilterTargetDesc& target_desc =
-              ctx.filter->filter_desc().targets[it->second];
-          const string& col_name = target_desc.kudu_col_name;
-          DCHECK(col_name != "");
-          const ColumnType& col_type = ColumnType::FromThrift(target_desc.kudu_col_type);
+      if (!ctx.filter->HasFilter() || ctx.filter->AlwaysTrue()) {
+        // If it's always true, the filter won't actually remove any rows so we
+        // don't need to push it down to Kudu.
+        continue;
+      } else if (ctx.filter->AlwaysFalse()) {
+        // We can skip this entire scan if it's always false.
+        CloseCurrentClientScanner();
+        *eos = true;
+        return Status::OK();
+      }
 
-          const void* min = filter->GetMin();
-          const void* max = filter->GetMax();
-          // If the type of the filter is not the same as the type of the target column,
-          // there must be an implicit integer cast and we need to ensure the min/max we
-          // pass to Kudu are within the range of the target column.
-          int64_t int_min;
-          int64_t int_max;
-          if (col_type.type != filter->type()) {
-            DCHECK(col_type.IsIntegerType());
+      auto it = ctx.filter->filter_desc().planid_to_target_ndx.find(scan_node_->id());
+      const TRuntimeFilterTargetDesc& target_desc =
+          ctx.filter->filter_desc().targets[it->second];
+      const string& col_name = target_desc.kudu_col_name;
+      DCHECK(col_name != "");
 
-            if (!filter->GetCastIntMinMax(col_type, &int_min, &int_max)) {
-              // The min/max for this filter is outside the range for the target column,
-              // so all rows are filtered out and we can skip the scan.
-              CloseCurrentClientScanner();
-              *eos = true;
-              return Status::OK();
-            }
-            min = &int_min;
-            max = &int_max;
+      if (ctx.filter->is_bloom_filter()) {
+        BloomFilter* filter = ctx.filter->get_bloom_filter();
+        DCHECK(filter != nullptr);
+
+        kudu::BlockBloomFilter* bbf = filter->GetBlockBloomFilter();
+        vector<kudu::Slice> bbf_vec = {
+            kudu::Slice(reinterpret_cast<const uint8_t*>(bbf), sizeof(*bbf))};
+
+        KUDU_RETURN_IF_ERROR(
+            scanner_->AddConjunctPredicate(
+                scan_node_->table_->NewInBloomFilterPredicate(col_name, bbf_vec)),
+            BuildErrorString("Failed to add bloom filter predicate"));
+      } else {
+        DCHECK(ctx.filter->is_min_max_filter());
+        MinMaxFilter* filter = ctx.filter->get_min_max();
+        DCHECK(filter != nullptr);
+
+        const void* min = filter->GetMin();
+        const void* max = filter->GetMax();
+        // If the type of the filter is not the same as the type of the target column,
+        // there must be an implicit integer cast and we need to ensure the min/max we
+        // pass to Kudu are within the range of the target column.
+        int64_t int_min;
+        int64_t int_max;
+        const ColumnType& col_type = ColumnType::FromThrift(target_desc.kudu_col_type);
+        if (col_type.type != filter->type()) {
+          DCHECK(col_type.IsIntegerType());
+
+          if (!filter->GetCastIntMinMax(col_type, &int_min, &int_max)) {
+            // The min/max for this filter is outside the range for the target column,
+            // so all rows are filtered out and we can skip the scan.
+            CloseCurrentClientScanner();
+            *eos = true;
+            return Status::OK();
           }
-
-          KuduValue* min_value;
-          RETURN_IF_ERROR(CreateKuduValue(col_type, min, &min_value));
-          KUDU_RETURN_IF_ERROR(
-              scanner_->AddConjunctPredicate(scan_node_->table_->NewComparisonPredicate(
-                  col_name, KuduPredicate::ComparisonOp::GREATER_EQUAL, min_value)),
-              BuildErrorString("Failed to add min predicate"));
-
-          KuduValue* max_value;
-          RETURN_IF_ERROR(CreateKuduValue(col_type, max, &max_value));
-          KUDU_RETURN_IF_ERROR(
-              scanner_->AddConjunctPredicate(scan_node_->table_->NewComparisonPredicate(
-                  col_name, KuduPredicate::ComparisonOp::LESS_EQUAL, max_value)),
-              BuildErrorString("Failed to add max predicate"));
+          min = &int_min;
+          max = &int_max;
         }
+
+        KuduValue* min_value;
+        RETURN_IF_ERROR(CreateKuduValue(col_type, min, &min_value));
+        KUDU_RETURN_IF_ERROR(
+            scanner_->AddConjunctPredicate(scan_node_->table_->NewComparisonPredicate(
+                col_name, KuduPredicate::ComparisonOp::GREATER_EQUAL, min_value)),
+            BuildErrorString("Failed to add min predicate"));
+
+        KuduValue* max_value;
+        RETURN_IF_ERROR(CreateKuduValue(col_type, max, &max_value));
+        KUDU_RETURN_IF_ERROR(
+            scanner_->AddConjunctPredicate(scan_node_->table_->NewComparisonPredicate(
+                col_name, KuduPredicate::ComparisonOp::LESS_EQUAL, max_value)),
+            BuildErrorString("Failed to add max predicate"));
       }
     }
   }
@@ -352,7 +374,7 @@ Status KuduScanner::DecodeRowsIntoRowBatch(RowBatch* row_batch, Tuple** tuple_me
           kudu_tuple->GetSlot(slot->tuple_offset()));
       TimestampValue tv = TimestampValue::UtcFromUnixTimeMicros(ts_micros);
       if (tv.HasDateAndTime()) {
-        RawValue::Write(&tv, kudu_tuple, slot, NULL);
+        RawValue::Write(&tv, kudu_tuple, slot, nullptr);
       } else {
         kudu_tuple->SetNull(slot->null_indicator_offset());
         RETURN_IF_ERROR(state_->LogOrReturnError(

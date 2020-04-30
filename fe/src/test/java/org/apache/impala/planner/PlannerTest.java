@@ -34,6 +34,7 @@ import org.apache.impala.service.BackendConfig;
 import org.apache.impala.service.Frontend.PlanCtx;
 import org.apache.impala.testutil.TestUtils;
 import org.apache.impala.testutil.TestUtils.IgnoreValueFilter;
+import org.apache.impala.thrift.TEnabledRuntimeFilterTypes;
 import org.apache.impala.thrift.TExecRequest;
 import org.apache.impala.thrift.TExplainLevel;
 import org.apache.impala.thrift.TJoinDistributionMode;
@@ -567,6 +568,11 @@ public class PlannerTest extends PlannerTestBase {
   }
 
   @Test
+  public void testBloomFilterAssignment() {
+    runPlannerTestFile("bloom-filter-assignment");
+  }
+
+  @Test
   public void testConjunctOrdering() {
     runPlannerTestFile("conjunct-ordering");
   }
@@ -594,10 +600,12 @@ public class PlannerTest extends PlannerTestBase {
   @Test
   public void testKudu() {
     Assume.assumeTrue(RuntimeEnv.INSTANCE.isKuduSupported());
+    TQueryOptions options = defaultQueryOptions();
+    options.setEnabled_runtime_filter_types(TEnabledRuntimeFilterTypes.ALL);
     addTestDb("kudu_planner_test", "Test DB for Kudu Planner.");
     addTestTable("CREATE EXTERNAL TABLE kudu_planner_test.no_stats STORED AS KUDU " +
         "TBLPROPERTIES ('kudu.table_name' = 'impala::functional_kudu.alltypes');");
-    runPlannerTestFile("kudu");
+    runPlannerTestFile("kudu", options);
   }
 
   @Test
@@ -609,7 +617,9 @@ public class PlannerTest extends PlannerTestBase {
   @Test
   public void testKuduUpdate() {
     Assume.assumeTrue(RuntimeEnv.INSTANCE.isKuduSupported());
-    runPlannerTestFile("kudu-update");
+    TQueryOptions options = defaultQueryOptions();
+    options.setEnabled_runtime_filter_types(TEnabledRuntimeFilterTypes.ALL);
+    runPlannerTestFile("kudu-update", options);
   }
 
   @Test
@@ -629,9 +639,11 @@ public class PlannerTest extends PlannerTestBase {
   @Test
   public void testKuduTpch() {
     Assume.assumeTrue(RuntimeEnv.INSTANCE.isKuduSupported());
-    runPlannerTestFile("tpch-kudu", ImmutableSet.of(
-        PlannerTestOption.INCLUDE_RESOURCE_HEADER,
-        PlannerTestOption.VALIDATE_RESOURCES));
+    TQueryOptions options = defaultQueryOptions();
+    options.setEnabled_runtime_filter_types(TEnabledRuntimeFilterTypes.ALL);
+    runPlannerTestFile("tpch-kudu", options,
+        ImmutableSet.of(PlannerTestOption.INCLUDE_RESOURCE_HEADER,
+            PlannerTestOption.VALIDATE_RESOURCES));
   }
 
   @Test
@@ -813,6 +825,7 @@ public class PlannerTest extends PlannerTestBase {
     TQueryOptions options = defaultQueryOptions();
     options.setExplain_level(TExplainLevel.EXTENDED);
     options.setDisable_hdfs_num_rows_estimate(false);
+    options.setEnabled_runtime_filter_types(TEnabledRuntimeFilterTypes.MIN_MAX);
     runPlannerTestFile("min-max-runtime-filters-hdfs-num-rows-est-enabled", options);
   }
 
@@ -821,6 +834,7 @@ public class PlannerTest extends PlannerTestBase {
     TQueryOptions options = defaultQueryOptions();
     options.setExplain_level(TExplainLevel.EXTENDED);
     options.setDisable_hdfs_num_rows_estimate(true);
+    options.setEnabled_runtime_filter_types(TEnabledRuntimeFilterTypes.MIN_MAX);
     runPlannerTestFile("min-max-runtime-filters", options);
   }
 

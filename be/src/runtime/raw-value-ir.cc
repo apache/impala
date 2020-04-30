@@ -176,27 +176,68 @@ uint32_t IR_ALWAYS_INLINE RawValue::GetHashValue(
 uint64_t IR_ALWAYS_INLINE RawValue::GetHashValueFastHash(const void* v,
     const ColumnType& type, uint64_t seed) {
   // Hash with an arbitrary constant to ensure we don't return seed.
-  if (v == nullptr) {
+  if (UNLIKELY(v == nullptr)) {
     return HashUtil::FastHash64(&HASH_VAL_NULL, sizeof(HASH_VAL_NULL), seed);
   }
   switch (type.type) {
+    case TYPE_CHAR:
     case TYPE_STRING:
-    case TYPE_VARCHAR: {
-      const StringValue* string_value = reinterpret_cast<const StringValue*>(v);
-      return HashUtil::FastHash64(string_value->ptr,
-          static_cast<size_t>(string_value->len), seed);
-    }
-    case TYPE_BOOLEAN: return HashUtil::FastHash64(v, 1, seed);
-    case TYPE_TINYINT: return HashUtil::FastHash64(v, 1, seed);
-    case TYPE_SMALLINT: return HashUtil::FastHash64(v, 2, seed);
-    case TYPE_INT: return HashUtil::FastHash64(v, 4, seed);
-    case TYPE_BIGINT: return HashUtil::FastHash64(v, 8, seed);
-    case TYPE_FLOAT: return HashUtil::FastHash64(v, 4, seed);
-    case TYPE_DOUBLE: return HashUtil::FastHash64(v, 8, seed);
-    case TYPE_TIMESTAMP: return HashUtil::FastHash64(v, 12, seed);
-    case TYPE_CHAR: return HashUtil::FastHash64(v, type.len, seed);
-    case TYPE_DECIMAL: return HashUtil::FastHash64(v, type.GetByteSize(), seed);
-    case TYPE_DATE: return HashUtil::FastHash64(v, 4, seed);
-    default: DCHECK(false); return 0;
+    case TYPE_VARCHAR:
+      return RawValue::GetHashValueFastHashNonNull<impala::StringValue>(
+          reinterpret_cast<const StringValue*>(v), type, seed);
+    case TYPE_BOOLEAN:
+      return RawValue::GetHashValueFastHashNonNull<bool>(
+          reinterpret_cast<const bool*>(v), type, seed);
+    case TYPE_TINYINT:
+      return RawValue::GetHashValueFastHashNonNull<int8_t>(
+          reinterpret_cast<const int8_t*>(v), type, seed);
+    case TYPE_SMALLINT:
+      return RawValue::GetHashValueFastHashNonNull<int16_t>(
+          reinterpret_cast<const int16_t*>(v), type, seed);
+    case TYPE_INT:
+      return RawValue::GetHashValueFastHashNonNull<int32_t>(
+          reinterpret_cast<const int32_t*>(v), type, seed);
+    case TYPE_DATE:
+      return RawValue::GetHashValueFastHashNonNull<DateValue>(
+          reinterpret_cast<const DateValue*>(v), type, seed);
+    case TYPE_BIGINT:
+      return RawValue::GetHashValueFastHashNonNull<int64_t>(
+          reinterpret_cast<const int64_t*>(v), type, seed);
+    case TYPE_FLOAT:
+      return RawValue::GetHashValueFastHashNonNull<float>(
+          reinterpret_cast<const float*>(v), type, seed);
+    case TYPE_DOUBLE:
+      return RawValue::GetHashValueFastHashNonNull<double>(
+          reinterpret_cast<const double*>(v), type, seed);
+    case TYPE_TIMESTAMP:
+      return RawValue::GetHashValueFastHashNonNull<TimestampValue>(
+          reinterpret_cast<const TimestampValue*>(v), type, seed);
+    case TYPE_DECIMAL:
+      switch (type.GetByteSize()) {
+        case 4:
+          return RawValue::GetHashValueFastHashNonNull<Decimal4Value>(
+              reinterpret_cast<const impala::Decimal4Value*>(v), type, seed);
+        case 8:
+          return RawValue::GetHashValueFastHashNonNull<Decimal8Value>(
+              reinterpret_cast<const Decimal8Value*>(v), type, seed);
+        case 16:
+          return RawValue::GetHashValueFastHashNonNull<Decimal16Value>(
+              reinterpret_cast<const Decimal16Value*>(v), type, seed);
+        default:
+          DCHECK(false);
+          return 0;
+      }
+    default:
+      DCHECK(false);
+      return 0;
   }
+}
+
+uint32_t IR_ALWAYS_INLINE RawValue::GetHashValueFastHash32(
+    const void* v, const ColumnType& type, uint32_t seed) noexcept {
+  // the following trick converts the 64-bit hashcode to Fermat
+  // residue, which shall retain information from both the higher
+  // and lower parts of hashcode.
+  uint64_t h = GetHashValueFastHash(v, type, seed);
+  return h - (h >> 32);
 }
