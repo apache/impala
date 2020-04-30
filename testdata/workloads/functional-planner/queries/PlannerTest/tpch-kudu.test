@@ -83,96 +83,147 @@ order by
   s_name,
   p_partkey
 limit 100
+---- QUERYOPTIONS
+EXPLAIN_LEVEL=2
 ---- PLAN
-Max Per-Host Resource Reservation: Memory=18.31MB Threads=10
-Per-Host Resource Estimates: Memory=49MB
+Max Per-Host Resource Reservation: Memory=26.31MB Threads=10
+Per-Host Resource Estimates: Memory=57MB
+F00:PLAN FRAGMENT [UNPARTITIONED] hosts=1 instances=1
+|  Per-Host Resources: mem-estimate=57.00MB mem-reservation=26.31MB thread-reservation=10 runtime-filters-memory=8.00MB
 PLAN-ROOT SINK
+|  output exprs: round(s_acctbal, CAST(2 AS TINYINT)), s_name, n_name, p_partkey, p_mfgr, s_address, s_phone, s_comment
+|  mem-estimate=0B mem-reservation=0B thread-reservation=0
 |
 18:TOP-N [LIMIT=100]
 |  order by: s_acctbal DESC, n_name ASC, s_name ASC, p_partkey ASC
-|  row-size=230B cardinality=100
+|  mem-estimate=22.42KB mem-reservation=0B thread-reservation=0
+|  tuple-ids=11 row-size=230B cardinality=100
+|  in pipelines: 18(GETNEXT), 12(OPEN)
 |
 17:HASH JOIN [RIGHT SEMI JOIN]
 |  hash predicates: ps_partkey = p_partkey, min(ps_supplycost) = ps_supplycost
-|  runtime filters: RF002 <- p_partkey
-|  row-size=330B cardinality=1.01K
+|  runtime filters: RF000[bloom] <- p_partkey, RF002[min_max] <- p_partkey
+|  mem-estimate=1.94MB mem-reservation=1.94MB spill-buffer=64.00KB thread-reservation=0
+|  tuple-ids=1,2,0,3,4 row-size=330B cardinality=1.01K
+|  in pipelines: 12(GETNEXT), 01(OPEN)
 |
 |--16:HASH JOIN [INNER JOIN]
 |  |  hash predicates: n_regionkey = r_regionkey
-|  |  runtime filters: RF011 <- r_regionkey
-|  |  row-size=330B cardinality=1.01K
+|  |  fk/pk conjuncts: n_regionkey = r_regionkey
+|  |  runtime filters: RF010[bloom] <- r_regionkey, RF011[min_max] <- r_regionkey
+|  |  mem-estimate=1.94MB mem-reservation=1.94MB spill-buffer=64.00KB thread-reservation=0
+|  |  tuple-ids=1,2,0,3,4 row-size=330B cardinality=1.01K
+|  |  in pipelines: 01(GETNEXT), 04(OPEN)
 |  |
 |  |--04:SCAN KUDU [tpch_kudu.region]
 |  |     kudu predicates: r_name = 'EUROPE'
-|  |     row-size=2B cardinality=1
+|  |     mem-estimate=768.00KB mem-reservation=0B thread-reservation=1
+|  |     tuple-ids=4 row-size=2B cardinality=1
+|  |     in pipelines: 04(GETNEXT)
 |  |
 |  15:HASH JOIN [INNER JOIN]
 |  |  hash predicates: s_nationkey = n_nationkey
-|  |  runtime filters: RF013 <- n_nationkey
-|  |  row-size=328B cardinality=5.05K
+|  |  fk/pk conjuncts: s_nationkey = n_nationkey
+|  |  runtime filters: RF012[bloom] <- n_nationkey, RF013[min_max] <- n_nationkey
+|  |  mem-estimate=1.94MB mem-reservation=1.94MB spill-buffer=64.00KB thread-reservation=0
+|  |  tuple-ids=1,2,0,3 row-size=328B cardinality=5.05K
+|  |  in pipelines: 01(GETNEXT), 03(OPEN)
 |  |
 |  |--03:SCAN KUDU [tpch_kudu.nation]
-|  |     runtime filters: RF011 -> n_regionkey
-|  |     row-size=27B cardinality=25
+|  |     runtime filters: RF010[bloom] -> n_regionkey, RF011[min_max] -> n_regionkey
+|  |     mem-estimate=1.12MB mem-reservation=0B thread-reservation=1
+|  |     tuple-ids=3 row-size=27B cardinality=25
+|  |     in pipelines: 03(GETNEXT)
 |  |
 |  14:HASH JOIN [INNER JOIN]
 |  |  hash predicates: s_suppkey = ps_suppkey
-|  |  runtime filters: RF015 <- ps_suppkey
-|  |  row-size=301B cardinality=5.05K
+|  |  fk/pk conjuncts: s_suppkey = ps_suppkey
+|  |  runtime filters: RF014[bloom] <- ps_suppkey, RF015[min_max] <- ps_suppkey
+|  |  mem-estimate=1.94MB mem-reservation=1.94MB spill-buffer=64.00KB thread-reservation=0
+|  |  tuple-ids=1,2,0 row-size=301B cardinality=5.05K
+|  |  in pipelines: 01(GETNEXT), 02(OPEN)
 |  |
 |  |--13:HASH JOIN [INNER JOIN]
 |  |  |  hash predicates: ps_partkey = p_partkey
-|  |  |  runtime filters: RF017 <- p_partkey
-|  |  |  row-size=99B cardinality=5.05K
+|  |  |  fk/pk conjuncts: ps_partkey = p_partkey
+|  |  |  runtime filters: RF016[bloom] <- p_partkey, RF017[min_max] <- p_partkey
+|  |  |  mem-estimate=1.94MB mem-reservation=1.94MB spill-buffer=64.00KB thread-reservation=0
+|  |  |  tuple-ids=2,0 row-size=99B cardinality=5.05K
+|  |  |  in pipelines: 02(GETNEXT), 00(OPEN)
 |  |  |
 |  |  |--00:SCAN KUDU [tpch_kudu.part]
 |  |  |     predicates: p_type LIKE '%BRASS'
-|  |  |     kudu predicates: p_size = 15
-|  |  |     row-size=75B cardinality=1.26K
+|  |  |     kudu predicates: p_size = CAST(15 AS INT)
+|  |  |     mem-estimate=6.00MB mem-reservation=0B thread-reservation=1
+|  |  |     tuple-ids=0 row-size=75B cardinality=1.26K
+|  |  |     in pipelines: 00(GETNEXT)
 |  |  |
 |  |  02:SCAN KUDU [tpch_kudu.partsupp]
-|  |     runtime filters: RF017 -> ps_partkey
-|  |     row-size=24B cardinality=800.00K
+|  |     runtime filters: RF016[bloom] -> ps_partkey, RF017[min_max] -> ps_partkey
+|  |     mem-estimate=4.50MB mem-reservation=0B thread-reservation=1
+|  |     tuple-ids=2 row-size=24B cardinality=800.00K
+|  |     in pipelines: 02(GETNEXT)
 |  |
 |  01:SCAN KUDU [tpch_kudu.supplier]
-|     runtime filters: RF013 -> s_nationkey, RF015 -> s_suppkey
-|     row-size=203B cardinality=10.00K
+|     runtime filters: RF014[bloom] -> s_suppkey, RF015[min_max] -> s_suppkey, RF012[bloom] -> s_nationkey, RF013[min_max] -> s_nationkey
+|     mem-estimate=10.50MB mem-reservation=0B thread-reservation=1
+|     tuple-ids=1 row-size=203B cardinality=10.00K
+|     in pipelines: 01(GETNEXT)
 |
 12:AGGREGATE [FINALIZE]
 |  output: min(ps_supplycost)
 |  group by: ps_partkey
-|  row-size=16B cardinality=160.00K
+|  mem-estimate=10.00MB mem-reservation=4.75MB spill-buffer=256.00KB thread-reservation=0
+|  tuple-ids=9 row-size=16B cardinality=160.00K
+|  in pipelines: 12(GETNEXT), 05(OPEN)
 |
 11:HASH JOIN [INNER JOIN]
 |  hash predicates: n_regionkey = r_regionkey
-|  runtime filters: RF005 <- r_regionkey
-|  row-size=40B cardinality=160.00K
+|  fk/pk conjuncts: n_regionkey = r_regionkey
+|  runtime filters: RF004[bloom] <- r_regionkey, RF005[min_max] <- r_regionkey
+|  mem-estimate=1.94MB mem-reservation=1.94MB spill-buffer=64.00KB thread-reservation=0
+|  tuple-ids=5,6,7,8 row-size=40B cardinality=160.00K
+|  in pipelines: 05(GETNEXT), 08(OPEN)
 |
 |--08:SCAN KUDU [tpch_kudu.region]
 |     kudu predicates: r_name = 'EUROPE'
-|     row-size=2B cardinality=1
+|     mem-estimate=768.00KB mem-reservation=0B thread-reservation=1
+|     tuple-ids=8 row-size=2B cardinality=1
+|     in pipelines: 08(GETNEXT)
 |
 10:HASH JOIN [INNER JOIN]
 |  hash predicates: s_nationkey = n_nationkey
-|  runtime filters: RF007 <- n_nationkey
-|  row-size=38B cardinality=800.00K
+|  fk/pk conjuncts: s_nationkey = n_nationkey
+|  runtime filters: RF006[bloom] <- n_nationkey, RF007[min_max] <- n_nationkey
+|  mem-estimate=1.94MB mem-reservation=1.94MB spill-buffer=64.00KB thread-reservation=0
+|  tuple-ids=5,6,7 row-size=38B cardinality=800.00K
+|  in pipelines: 05(GETNEXT), 07(OPEN)
 |
 |--07:SCAN KUDU [tpch_kudu.nation]
-|     runtime filters: RF005 -> n_regionkey
-|     row-size=4B cardinality=25
+|     runtime filters: RF004[bloom] -> n_regionkey, RF005[min_max] -> n_regionkey
+|     mem-estimate=768.00KB mem-reservation=0B thread-reservation=1
+|     tuple-ids=7 row-size=4B cardinality=25
+|     in pipelines: 07(GETNEXT)
 |
 09:HASH JOIN [INNER JOIN]
 |  hash predicates: ps_suppkey = s_suppkey
-|  runtime filters: RF009 <- s_suppkey
-|  row-size=34B cardinality=800.00K
+|  fk/pk conjuncts: ps_suppkey = s_suppkey
+|  runtime filters: RF008[bloom] <- s_suppkey, RF009[min_max] <- s_suppkey
+|  mem-estimate=1.94MB mem-reservation=1.94MB spill-buffer=64.00KB thread-reservation=0
+|  tuple-ids=5,6 row-size=34B cardinality=800.00K
+|  in pipelines: 05(GETNEXT), 06(OPEN)
 |
 |--06:SCAN KUDU [tpch_kudu.supplier]
-|     runtime filters: RF007 -> s_nationkey
-|     row-size=10B cardinality=10.00K
+|     runtime filters: RF006[bloom] -> s_nationkey, RF007[min_max] -> s_nationkey
+|     mem-estimate=3.00MB mem-reservation=0B thread-reservation=1
+|     tuple-ids=6 row-size=10B cardinality=10.00K
+|     in pipelines: 06(GETNEXT)
 |
 05:SCAN KUDU [tpch_kudu.partsupp]
-   runtime filters: RF002 -> tpch_kudu.partsupp.ps_partkey, RF009 -> ps_suppkey
-   row-size=24B cardinality=800.00K
+   runtime filters: RF000[bloom] -> tpch_kudu.partsupp.ps_partkey, RF002[min_max] -> tpch_kudu.partsupp.ps_partkey, RF008[bloom] -> ps_suppkey, RF009[min_max] -> ps_suppkey
+   mem-estimate=4.50MB mem-reservation=0B thread-reservation=1
+   tuple-ids=5 row-size=24B cardinality=800.00K
+   in pipelines: 05(GETNEXT)
 ====
 # Q3 - Shipping Priority Query
 select
@@ -199,8 +250,8 @@ order by
   o_orderdate
 limit 10
 ---- PLAN
-Max Per-Host Resource Reservation: Memory=12.38MB Threads=4
-Per-Host Resource Estimates: Memory=26MB
+Max Per-Host Resource Reservation: Memory=14.38MB Threads=4
+Per-Host Resource Estimates: Memory=28MB
 PLAN-ROOT SINK
 |
 06:TOP-N [LIMIT=10]
@@ -214,7 +265,7 @@ PLAN-ROOT SINK
 |
 04:HASH JOIN [INNER JOIN]
 |  hash predicates: o_custkey = c_custkey
-|  runtime filters: RF001 <- c_custkey
+|  runtime filters: RF000 <- c_custkey, RF001 <- c_custkey
 |  row-size=78B cardinality=17.56K
 |
 |--00:SCAN KUDU [tpch_kudu.customer]
@@ -223,17 +274,17 @@ PLAN-ROOT SINK
 |
 03:HASH JOIN [INNER JOIN]
 |  hash predicates: l_orderkey = o_orderkey
-|  runtime filters: RF003 <- o_orderkey
+|  runtime filters: RF002 <- o_orderkey, RF003 <- o_orderkey
 |  row-size=70B cardinality=57.58K
 |
 |--01:SCAN KUDU [tpch_kudu.orders]
 |     kudu predicates: o_orderdate < '1995-03-15'
-|     runtime filters: RF001 -> o_custkey
+|     runtime filters: RF000 -> o_custkey, RF001 -> o_custkey
 |     row-size=46B cardinality=150.00K
 |
 02:SCAN KUDU [tpch_kudu.lineitem]
    kudu predicates: l_shipdate > '1995-03-15'
-   runtime filters: RF003 -> l_orderkey
+   runtime filters: RF002 -> l_orderkey, RF003 -> l_orderkey
    row-size=24B cardinality=600.12K
 ====
 # Q4 - Order Priority Checking Query
@@ -259,8 +310,8 @@ group by
 order by
   o_orderpriority
 ---- PLAN
-Max Per-Host Resource Reservation: Memory=13.94MB Threads=3
-Per-Host Resource Estimates: Memory=42MB
+Max Per-Host Resource Reservation: Memory=14.94MB Threads=3
+Per-Host Resource Estimates: Memory=44MB
 PLAN-ROOT SINK
 |
 04:SORT
@@ -274,7 +325,7 @@ PLAN-ROOT SINK
 |
 02:HASH JOIN [RIGHT SEMI JOIN]
 |  hash predicates: l_orderkey = o_orderkey
-|  runtime filters: RF001 <- o_orderkey
+|  runtime filters: RF000 <- o_orderkey, RF001 <- o_orderkey
 |  row-size=32B cardinality=150.00K
 |
 |--00:SCAN KUDU [tpch_kudu.orders]
@@ -283,7 +334,7 @@ PLAN-ROOT SINK
 |
 01:SCAN KUDU [tpch_kudu.lineitem]
    predicates: l_commitdate < l_receiptdate
-   runtime filters: RF001 -> l_orderkey
+   runtime filters: RF000 -> l_orderkey, RF001 -> l_orderkey
    row-size=60B cardinality=600.12K
 ====
 # Q5 - Local Supplier Volume Query
@@ -312,8 +363,8 @@ group by
 order by
   revenue desc
 ---- PLAN
-Max Per-Host Resource Reservation: Memory=15.38MB Threads=7
-Per-Host Resource Estimates: Memory=32MB
+Max Per-Host Resource Reservation: Memory=21.38MB Threads=7
+Per-Host Resource Estimates: Memory=38MB
 PLAN-ROOT SINK
 |
 12:SORT
@@ -327,7 +378,7 @@ PLAN-ROOT SINK
 |
 10:HASH JOIN [INNER JOIN]
 |  hash predicates: n_regionkey = r_regionkey
-|  runtime filters: RF001 <- r_regionkey
+|  runtime filters: RF000 <- r_regionkey, RF001 <- r_regionkey
 |  row-size=97B cardinality=115.16K
 |
 |--05:SCAN KUDU [tpch_kudu.region]
@@ -336,43 +387,43 @@ PLAN-ROOT SINK
 |
 09:HASH JOIN [INNER JOIN]
 |  hash predicates: s_nationkey = n_nationkey
-|  runtime filters: RF003 <- n_nationkey
+|  runtime filters: RF002 <- n_nationkey, RF003 <- n_nationkey
 |  row-size=95B cardinality=575.77K
 |
 |--04:SCAN KUDU [tpch_kudu.nation]
-|     runtime filters: RF001 -> n_regionkey
+|     runtime filters: RF000 -> n_regionkey, RF001 -> n_regionkey
 |     row-size=27B cardinality=25
 |
 08:HASH JOIN [INNER JOIN]
 |  hash predicates: c_nationkey = s_nationkey, l_suppkey = s_suppkey
-|  runtime filters: RF006 <- s_nationkey, RF007 <- s_suppkey
+|  runtime filters: RF004 <- s_nationkey, RF005 <- s_suppkey, RF006 <- s_nationkey, RF007 <- s_suppkey
 |  row-size=68B cardinality=575.77K
 |
 |--03:SCAN KUDU [tpch_kudu.supplier]
-|     runtime filters: RF003 -> s_nationkey
+|     runtime filters: RF002 -> s_nationkey, RF003 -> s_nationkey
 |     row-size=10B cardinality=10.00K
 |
 07:HASH JOIN [INNER JOIN]
 |  hash predicates: o_custkey = c_custkey
-|  runtime filters: RF009 <- c_custkey
+|  runtime filters: RF008 <- c_custkey, RF009 <- c_custkey
 |  row-size=58B cardinality=575.77K
 |
 |--00:SCAN KUDU [tpch_kudu.customer]
-|     runtime filters: RF003 -> tpch_kudu.customer.c_nationkey, RF006 -> c_nationkey
+|     runtime filters: RF002 -> tpch_kudu.customer.c_nationkey, RF003 -> tpch_kudu.customer.c_nationkey, RF004 -> c_nationkey, RF006 -> c_nationkey
 |     row-size=10B cardinality=150.00K
 |
 06:HASH JOIN [INNER JOIN]
 |  hash predicates: l_orderkey = o_orderkey
-|  runtime filters: RF011 <- o_orderkey
+|  runtime filters: RF010 <- o_orderkey, RF011 <- o_orderkey
 |  row-size=48B cardinality=575.77K
 |
 |--01:SCAN KUDU [tpch_kudu.orders]
 |     kudu predicates: o_orderdate < '1995-01-01', o_orderdate >= '1994-01-01'
-|     runtime filters: RF009 -> o_custkey
+|     runtime filters: RF008 -> o_custkey, RF009 -> o_custkey
 |     row-size=16B cardinality=150.00K
 |
 02:SCAN KUDU [tpch_kudu.lineitem]
-   runtime filters: RF007 -> l_suppkey, RF011 -> l_orderkey
+   runtime filters: RF010 -> l_orderkey, RF011 -> l_orderkey, RF005 -> l_suppkey, RF007 -> l_suppkey
    row-size=32B cardinality=6.00M
 ====
 # Q6 - Forecasting Revenue Change Query
@@ -438,8 +489,8 @@ order by
   cust_nation,
   l_year
 ---- PLAN
-Max Per-Host Resource Reservation: Memory=44.62MB Threads=7
-Per-Host Resource Estimates: Memory=61MB
+Max Per-Host Resource Reservation: Memory=49.62MB Threads=7
+Per-Host Resource Estimates: Memory=66MB
 PLAN-ROOT SINK
 |
 12:SORT
@@ -454,7 +505,7 @@ PLAN-ROOT SINK
 10:HASH JOIN [INNER JOIN]
 |  hash predicates: c_nationkey = n2.n_nationkey
 |  other predicates: n1.n_name = 'FRANCE' OR n2.n_name = 'FRANCE', n2.n_name = 'GERMANY' OR n1.n_name = 'GERMANY'
-|  runtime filters: RF001 <- n2.n_nationkey
+|  runtime filters: RF000 <- n2.n_nationkey, RF001 <- n2.n_nationkey
 |  row-size=144B cardinality=3.69K
 |
 |--05:SCAN KUDU [tpch_kudu.nation n2]
@@ -463,16 +514,16 @@ PLAN-ROOT SINK
 |
 09:HASH JOIN [INNER JOIN]
 |  hash predicates: o_custkey = c_custkey
-|  runtime filters: RF003 <- c_custkey
+|  runtime filters: RF002 <- c_custkey, RF003 <- c_custkey
 |  row-size=119B cardinality=46.06K
 |
 |--03:SCAN KUDU [tpch_kudu.customer]
-|     runtime filters: RF001 -> c_nationkey
+|     runtime filters: RF000 -> c_nationkey, RF001 -> c_nationkey
 |     row-size=10B cardinality=150.00K
 |
 08:HASH JOIN [INNER JOIN]
 |  hash predicates: s_nationkey = n1.n_nationkey
-|  runtime filters: RF005 <- n1.n_nationkey
+|  runtime filters: RF004 <- n1.n_nationkey, RF005 <- n1.n_nationkey
 |  row-size=109B cardinality=46.06K
 |
 |--04:SCAN KUDU [tpch_kudu.nation n1]
@@ -481,25 +532,25 @@ PLAN-ROOT SINK
 |
 07:HASH JOIN [INNER JOIN]
 |  hash predicates: l_suppkey = s_suppkey
-|  runtime filters: RF007 <- s_suppkey
+|  runtime filters: RF006 <- s_suppkey, RF007 <- s_suppkey
 |  row-size=84B cardinality=575.77K
 |
 |--00:SCAN KUDU [tpch_kudu.supplier]
-|     runtime filters: RF005 -> s_nationkey
+|     runtime filters: RF004 -> s_nationkey, RF005 -> s_nationkey
 |     row-size=10B cardinality=10.00K
 |
 06:HASH JOIN [INNER JOIN]
 |  hash predicates: l_orderkey = o_orderkey
-|  runtime filters: RF009 <- o_orderkey
+|  runtime filters: RF008 <- o_orderkey, RF009 <- o_orderkey
 |  row-size=74B cardinality=575.77K
 |
 |--02:SCAN KUDU [tpch_kudu.orders]
-|     runtime filters: RF003 -> o_custkey
+|     runtime filters: RF002 -> o_custkey, RF003 -> o_custkey
 |     row-size=16B cardinality=1.50M
 |
 01:SCAN KUDU [tpch_kudu.lineitem]
    kudu predicates: l_shipdate <= '1996-12-31', l_shipdate >= '1995-01-01'
-   runtime filters: RF007 -> l_suppkey, RF009 -> l_orderkey
+   runtime filters: RF006 -> l_suppkey, RF007 -> l_suppkey, RF008 -> l_orderkey, RF009 -> l_orderkey
    row-size=58B cardinality=600.12K
 ====
 # Q8 - National Market Share Query
@@ -541,8 +592,8 @@ group by
 order by
   o_year
 ---- PLAN
-Max Per-Host Resource Reservation: Memory=12.56MB Threads=9
-Per-Host Resource Estimates: Memory=33MB
+Max Per-Host Resource Reservation: Memory=19.56MB Threads=9
+Per-Host Resource Estimates: Memory=40MB
 PLAN-ROOT SINK
 |
 16:SORT
@@ -556,7 +607,7 @@ PLAN-ROOT SINK
 |
 14:HASH JOIN [INNER JOIN]
 |  hash predicates: s_nationkey = n2.n_nationkey
-|  runtime filters: RF001 <- n2.n_nationkey
+|  runtime filters: RF000 <- n2.n_nationkey, RF001 <- n2.n_nationkey
 |  row-size=141B cardinality=761
 |
 |--06:SCAN KUDU [tpch_kudu.nation n2]
@@ -564,7 +615,7 @@ PLAN-ROOT SINK
 |
 13:HASH JOIN [INNER JOIN]
 |  hash predicates: n1.n_regionkey = r_regionkey
-|  runtime filters: RF003 <- r_regionkey
+|  runtime filters: RF002 <- r_regionkey, RF003 <- r_regionkey
 |  row-size=116B cardinality=761
 |
 |--07:SCAN KUDU [tpch_kudu.region]
@@ -573,35 +624,35 @@ PLAN-ROOT SINK
 |
 12:HASH JOIN [INNER JOIN]
 |  hash predicates: c_nationkey = n1.n_nationkey
-|  runtime filters: RF005 <- n1.n_nationkey
+|  runtime filters: RF004 <- n1.n_nationkey, RF005 <- n1.n_nationkey
 |  row-size=114B cardinality=3.81K
 |
 |--05:SCAN KUDU [tpch_kudu.nation n1]
-|     runtime filters: RF003 -> n1.n_regionkey
+|     runtime filters: RF002 -> n1.n_regionkey, RF003 -> n1.n_regionkey
 |     row-size=4B cardinality=25
 |
 11:HASH JOIN [INNER JOIN]
 |  hash predicates: c_custkey = o_custkey
-|  runtime filters: RF007 <- o_custkey
+|  runtime filters: RF006 <- o_custkey, RF007 <- o_custkey
 |  row-size=110B cardinality=3.81K
 |
 |--10:HASH JOIN [INNER JOIN]
 |  |  hash predicates: l_suppkey = s_suppkey
-|  |  runtime filters: RF009 <- s_suppkey
+|  |  runtime filters: RF008 <- s_suppkey, RF009 <- s_suppkey
 |  |  row-size=100B cardinality=3.81K
 |  |
 |  |--01:SCAN KUDU [tpch_kudu.supplier]
-|  |     runtime filters: RF001 -> s_nationkey
+|  |     runtime filters: RF000 -> s_nationkey, RF001 -> s_nationkey
 |  |     row-size=10B cardinality=10.00K
 |  |
 |  09:HASH JOIN [INNER JOIN]
 |  |  hash predicates: o_orderkey = l_orderkey
-|  |  runtime filters: RF011 <- l_orderkey
+|  |  runtime filters: RF010 <- l_orderkey, RF011 <- l_orderkey
 |  |  row-size=90B cardinality=3.81K
 |  |
 |  |--08:HASH JOIN [INNER JOIN]
 |  |  |  hash predicates: l_partkey = p_partkey
-|  |  |  runtime filters: RF013 <- p_partkey
+|  |  |  runtime filters: RF012 <- p_partkey, RF013 <- p_partkey
 |  |  |  row-size=48B cardinality=39.66K
 |  |  |
 |  |  |--00:SCAN KUDU [tpch_kudu.part]
@@ -609,16 +660,16 @@ PLAN-ROOT SINK
 |  |  |     row-size=8B cardinality=1.32K
 |  |  |
 |  |  02:SCAN KUDU [tpch_kudu.lineitem]
-|  |     runtime filters: RF009 -> l_suppkey, RF013 -> l_partkey
+|  |     runtime filters: RF012 -> l_partkey, RF013 -> l_partkey, RF008 -> l_suppkey, RF009 -> l_suppkey
 |  |     row-size=40B cardinality=6.00M
 |  |
 |  03:SCAN KUDU [tpch_kudu.orders]
 |     kudu predicates: o_orderdate <= '1996-12-31', o_orderdate >= '1995-01-01'
-|     runtime filters: RF011 -> o_orderkey
+|     runtime filters: RF010 -> o_orderkey, RF011 -> o_orderkey
 |     row-size=42B cardinality=150.00K
 |
 04:SCAN KUDU [tpch_kudu.customer]
-   runtime filters: RF005 -> c_nationkey, RF007 -> c_custkey
+   runtime filters: RF006 -> c_custkey, RF007 -> c_custkey, RF004 -> c_nationkey, RF005 -> c_nationkey
    row-size=10B cardinality=150.00K
 ====
 # Q9 - Product Type Measure Query
@@ -654,8 +705,8 @@ order by
   nation,
   o_year desc
 ---- PLAN
-Max Per-Host Resource Reservation: Memory=79.50MB Threads=7
-Per-Host Resource Estimates: Memory=118MB
+Max Per-Host Resource Reservation: Memory=85.50MB Threads=7
+Per-Host Resource Estimates: Memory=124MB
 PLAN-ROOT SINK
 |
 12:SORT
@@ -669,7 +720,7 @@ PLAN-ROOT SINK
 |
 10:HASH JOIN [INNER JOIN]
 |  hash predicates: s_nationkey = n_nationkey
-|  runtime filters: RF001 <- n_nationkey
+|  runtime filters: RF000 <- n_nationkey, RF001 <- n_nationkey
 |  row-size=198B cardinality=574.29K
 |
 |--05:SCAN KUDU [tpch_kudu.nation]
@@ -677,7 +728,7 @@ PLAN-ROOT SINK
 |
 09:HASH JOIN [INNER JOIN]
 |  hash predicates: l_partkey = ps_partkey, l_suppkey = ps_suppkey
-|  runtime filters: RF004 <- ps_partkey, RF005 <- ps_suppkey
+|  runtime filters: RF002 <- ps_partkey, RF003 <- ps_suppkey, RF004 <- ps_partkey, RF005 <- ps_suppkey
 |  row-size=173B cardinality=574.29K
 |
 |--03:SCAN KUDU [tpch_kudu.partsupp]
@@ -685,16 +736,16 @@ PLAN-ROOT SINK
 |
 08:HASH JOIN [INNER JOIN]
 |  hash predicates: l_suppkey = s_suppkey
-|  runtime filters: RF007 <- s_suppkey
+|  runtime filters: RF006 <- s_suppkey, RF007 <- s_suppkey
 |  row-size=149B cardinality=574.29K
 |
 |--01:SCAN KUDU [tpch_kudu.supplier]
-|     runtime filters: RF001 -> s_nationkey, RF005 -> tpch_kudu.supplier.s_suppkey
+|     runtime filters: RF000 -> s_nationkey, RF001 -> s_nationkey, RF003 -> tpch_kudu.supplier.s_suppkey, RF005 -> tpch_kudu.supplier.s_suppkey
 |     row-size=10B cardinality=10.00K
 |
 07:HASH JOIN [INNER JOIN]
 |  hash predicates: l_orderkey = o_orderkey
-|  runtime filters: RF009 <- o_orderkey
+|  runtime filters: RF008 <- o_orderkey, RF009 <- o_orderkey
 |  row-size=139B cardinality=574.29K
 |
 |--04:SCAN KUDU [tpch_kudu.orders]
@@ -702,16 +753,16 @@ PLAN-ROOT SINK
 |
 06:HASH JOIN [INNER JOIN]
 |  hash predicates: l_partkey = p_partkey
-|  runtime filters: RF011 <- p_partkey
+|  runtime filters: RF010 <- p_partkey, RF011 <- p_partkey
 |  row-size=105B cardinality=598.58K
 |
 |--00:SCAN KUDU [tpch_kudu.part]
 |     predicates: p_name LIKE '%green%'
-|     runtime filters: RF004 -> tpch_kudu.part.p_partkey
+|     runtime filters: RF002 -> tpch_kudu.part.p_partkey, RF004 -> tpch_kudu.part.p_partkey
 |     row-size=57B cardinality=20.00K
 |
 02:SCAN KUDU [tpch_kudu.lineitem]
-   runtime filters: RF004 -> l_partkey, RF005 -> l_suppkey, RF007 -> l_suppkey, RF009 -> l_orderkey, RF011 -> l_partkey
+   runtime filters: RF010 -> l_partkey, RF011 -> l_partkey, RF008 -> l_orderkey, RF009 -> l_orderkey, RF002 -> l_partkey, RF003 -> l_suppkey, RF004 -> l_partkey, RF005 -> l_suppkey, RF006 -> l_suppkey, RF007 -> l_suppkey
    row-size=48B cardinality=6.00M
 ====
 # Q10 - Returned Item Reporting Query
@@ -749,8 +800,8 @@ order by
   revenue desc
 limit 20
 ---- PLAN
-Max Per-Host Resource Reservation: Memory=44.44MB Threads=5
-Per-Host Resource Estimates: Memory=67MB
+Max Per-Host Resource Reservation: Memory=47.44MB Threads=5
+Per-Host Resource Estimates: Memory=70MB
 PLAN-ROOT SINK
 |
 08:TOP-N [LIMIT=20]
@@ -764,7 +815,7 @@ PLAN-ROOT SINK
 |
 06:HASH JOIN [INNER JOIN]
 |  hash predicates: c_nationkey = n_nationkey
-|  runtime filters: RF001 <- n_nationkey
+|  runtime filters: RF000 <- n_nationkey, RF001 <- n_nationkey
 |  row-size=278B cardinality=191.92K
 |
 |--03:SCAN KUDU [tpch_kudu.nation]
@@ -772,12 +823,12 @@ PLAN-ROOT SINK
 |
 05:HASH JOIN [INNER JOIN]
 |  hash predicates: c_custkey = o_custkey
-|  runtime filters: RF003 <- o_custkey
+|  runtime filters: RF002 <- o_custkey, RF003 <- o_custkey
 |  row-size=253B cardinality=191.92K
 |
 |--04:HASH JOIN [INNER JOIN]
 |  |  hash predicates: l_orderkey = o_orderkey
-|  |  runtime filters: RF005 <- o_orderkey
+|  |  runtime filters: RF004 <- o_orderkey, RF005 <- o_orderkey
 |  |  row-size=40B cardinality=191.92K
 |  |
 |  |--01:SCAN KUDU [tpch_kudu.orders]
@@ -786,11 +837,11 @@ PLAN-ROOT SINK
 |  |
 |  02:SCAN KUDU [tpch_kudu.lineitem]
 |     kudu predicates: l_returnflag = 'R'
-|     runtime filters: RF005 -> l_orderkey
+|     runtime filters: RF004 -> l_orderkey, RF005 -> l_orderkey
 |     row-size=24B cardinality=2.00M
 |
 00:SCAN KUDU [tpch_kudu.customer]
-   runtime filters: RF001 -> c_nationkey, RF003 -> c_custkey
+   runtime filters: RF000 -> c_nationkey, RF001 -> c_nationkey, RF002 -> c_custkey, RF003 -> c_custkey
    row-size=213B cardinality=150.00K
 ====
 # Q11 - Important Stock Identification
@@ -828,8 +879,8 @@ where
 order by
   value desc
 ---- PLAN
-Max Per-Host Resource Reservation: Memory=9.69MB Threads=7
-Per-Host Resource Estimates: Memory=38MB
+Max Per-Host Resource Reservation: Memory=13.69MB Threads=7
+Per-Host Resource Estimates: Memory=42MB
 PLAN-ROOT SINK
 |
 13:SORT
@@ -846,7 +897,7 @@ PLAN-ROOT SINK
 |  |
 |  10:HASH JOIN [INNER JOIN]
 |  |  hash predicates: s_nationkey = n_nationkey
-|  |  runtime filters: RF005 <- n_nationkey
+|  |  runtime filters: RF004 <- n_nationkey, RF005 <- n_nationkey
 |  |  row-size=36B cardinality=32.00K
 |  |
 |  |--08:SCAN KUDU [tpch_kudu.nation]
@@ -855,15 +906,15 @@ PLAN-ROOT SINK
 |  |
 |  09:HASH JOIN [INNER JOIN]
 |  |  hash predicates: ps_suppkey = s_suppkey
-|  |  runtime filters: RF007 <- s_suppkey
+|  |  runtime filters: RF006 <- s_suppkey, RF007 <- s_suppkey
 |  |  row-size=34B cardinality=800.00K
 |  |
 |  |--07:SCAN KUDU [tpch_kudu.supplier]
-|  |     runtime filters: RF005 -> s_nationkey
+|  |     runtime filters: RF004 -> s_nationkey, RF005 -> s_nationkey
 |  |     row-size=10B cardinality=10.00K
 |  |
 |  06:SCAN KUDU [tpch_kudu.partsupp]
-|     runtime filters: RF007 -> ps_suppkey
+|     runtime filters: RF006 -> ps_suppkey, RF007 -> ps_suppkey
 |     row-size=24B cardinality=800.00K
 |
 05:AGGREGATE [FINALIZE]
@@ -873,7 +924,7 @@ PLAN-ROOT SINK
 |
 04:HASH JOIN [INNER JOIN]
 |  hash predicates: s_nationkey = n_nationkey
-|  runtime filters: RF001 <- n_nationkey
+|  runtime filters: RF000 <- n_nationkey, RF001 <- n_nationkey
 |  row-size=44B cardinality=32.00K
 |
 |--02:SCAN KUDU [tpch_kudu.nation]
@@ -882,15 +933,15 @@ PLAN-ROOT SINK
 |
 03:HASH JOIN [INNER JOIN]
 |  hash predicates: ps_suppkey = s_suppkey
-|  runtime filters: RF003 <- s_suppkey
+|  runtime filters: RF002 <- s_suppkey, RF003 <- s_suppkey
 |  row-size=42B cardinality=800.00K
 |
 |--01:SCAN KUDU [tpch_kudu.supplier]
-|     runtime filters: RF001 -> s_nationkey
+|     runtime filters: RF000 -> s_nationkey, RF001 -> s_nationkey
 |     row-size=10B cardinality=10.00K
 |
 00:SCAN KUDU [tpch_kudu.partsupp]
-   runtime filters: RF003 -> ps_suppkey
+   runtime filters: RF002 -> ps_suppkey, RF003 -> ps_suppkey
    row-size=32B cardinality=800.00K
 ====
 # Q12 - Shipping Mode and Order Priority Query
@@ -923,8 +974,8 @@ group by
 order by
   l_shipmode
 ---- PLAN
-Max Per-Host Resource Reservation: Memory=35.94MB Threads=3
-Per-Host Resource Estimates: Memory=49MB
+Max Per-Host Resource Reservation: Memory=36.94MB Threads=3
+Per-Host Resource Estimates: Memory=50MB
 PLAN-ROOT SINK
 |
 04:SORT
@@ -938,7 +989,7 @@ PLAN-ROOT SINK
 |
 02:HASH JOIN [INNER JOIN]
 |  hash predicates: o_orderkey = l_orderkey
-|  runtime filters: RF001 <- l_orderkey
+|  runtime filters: RF000 <- l_orderkey, RF001 <- l_orderkey
 |  row-size=139B cardinality=320.78K
 |
 |--01:SCAN KUDU [tpch_kudu.lineitem]
@@ -947,7 +998,7 @@ PLAN-ROOT SINK
 |     row-size=106B cardinality=320.78K
 |
 00:SCAN KUDU [tpch_kudu.orders]
-   runtime filters: RF001 -> o_orderkey
+   runtime filters: RF000 -> o_orderkey, RF001 -> o_orderkey
    row-size=32B cardinality=1.50M
 ====
 # Q13 - Customer Distribution Query
@@ -972,8 +1023,8 @@ order by
   custdist desc,
   c_count desc
 ---- PLAN
-Max Per-Host Resource Reservation: Memory=10.75MB Threads=3
-Per-Host Resource Estimates: Memory=20MB
+Max Per-Host Resource Reservation: Memory=11.75MB Threads=3
+Per-Host Resource Estimates: Memory=21MB
 PLAN-ROOT SINK
 |
 05:SORT
@@ -992,7 +1043,7 @@ PLAN-ROOT SINK
 |
 02:HASH JOIN [RIGHT OUTER JOIN]
 |  hash predicates: o_custkey = c_custkey
-|  runtime filters: RF001 <- c_custkey
+|  runtime filters: RF000 <- c_custkey, RF001 <- c_custkey
 |  row-size=89B cardinality=150.00K
 |
 |--00:SCAN KUDU [tpch_kudu.customer]
@@ -1000,7 +1051,7 @@ PLAN-ROOT SINK
 |
 01:SCAN KUDU [tpch_kudu.orders]
    predicates: NOT o_comment LIKE '%special%requests%'
-   runtime filters: RF001 -> o_custkey
+   runtime filters: RF000 -> o_custkey, RF001 -> o_custkey
    row-size=81B cardinality=150.00K
 ====
 # Q14 - Promotion Effect
@@ -1018,8 +1069,8 @@ where
   and l_shipdate >= '1995-09-01'
   and l_shipdate < '1995-10-01'
 ---- PLAN
-Max Per-Host Resource Reservation: Memory=17.00MB Threads=3
-Per-Host Resource Estimates: Memory=33MB
+Max Per-Host Resource Reservation: Memory=18.00MB Threads=3
+Per-Host Resource Estimates: Memory=34MB
 PLAN-ROOT SINK
 |
 03:AGGREGATE [FINALIZE]
@@ -1028,7 +1079,7 @@ PLAN-ROOT SINK
 |
 02:HASH JOIN [INNER JOIN]
 |  hash predicates: l_partkey = p_partkey
-|  runtime filters: RF001 <- p_partkey
+|  runtime filters: RF000 <- p_partkey, RF001 <- p_partkey
 |  row-size=69B cardinality=598.58K
 |
 |--01:SCAN KUDU [tpch_kudu.part]
@@ -1036,7 +1087,7 @@ PLAN-ROOT SINK
 |
 00:SCAN KUDU [tpch_kudu.lineitem]
    kudu predicates: l_shipdate < '1995-10-01', l_shipdate >= '1995-09-01'
-   runtime filters: RF001 -> l_partkey
+   runtime filters: RF000 -> l_partkey, RF001 -> l_partkey
    row-size=24B cardinality=600.12K
 ====
 # Q15 - Top Supplier Query
@@ -1071,8 +1122,8 @@ where
 order by
   s_suppkey
 ---- PLAN
-Max Per-Host Resource Reservation: Memory=15.88MB Threads=4
-Per-Host Resource Estimates: Memory=42MB
+Max Per-Host Resource Reservation: Memory=16.88MB Threads=4
+Per-Host Resource Estimates: Memory=43MB
 PLAN-ROOT SINK
 |
 08:SORT
@@ -1098,7 +1149,7 @@ PLAN-ROOT SINK
 |
 06:HASH JOIN [INNER JOIN]
 |  hash predicates: s_suppkey = l_suppkey
-|  runtime filters: RF001 <- l_suppkey
+|  runtime filters: RF000 <- l_suppkey, RF001 <- l_suppkey
 |  row-size=138B cardinality=10.00K
 |
 |--02:AGGREGATE [FINALIZE]
@@ -1111,7 +1162,7 @@ PLAN-ROOT SINK
 |     row-size=24B cardinality=600.12K
 |
 00:SCAN KUDU [tpch_kudu.supplier]
-   runtime filters: RF001 -> s_suppkey
+   runtime filters: RF000 -> s_suppkey, RF001 -> s_suppkey
    row-size=114B cardinality=10.00K
 ====
 # Q16 - Parts/Supplier Relation Query
@@ -1146,8 +1197,8 @@ order by
   p_type,
   p_size
 ---- PLAN
-Max Per-Host Resource Reservation: Memory=14.88MB Threads=4
-Per-Host Resource Estimates: Memory=22MB
+Max Per-Host Resource Reservation: Memory=15.88MB Threads=4
+Per-Host Resource Estimates: Memory=23MB
 PLAN-ROOT SINK
 |
 07:SORT
@@ -1173,7 +1224,7 @@ PLAN-ROOT SINK
 |
 03:HASH JOIN [INNER JOIN]
 |  hash predicates: ps_partkey = p_partkey
-|  runtime filters: RF001 <- p_partkey
+|  runtime filters: RF000 <- p_partkey, RF001 <- p_partkey
 |  row-size=89B cardinality=31.92K
 |
 |--01:SCAN KUDU [tpch_kudu.part]
@@ -1182,7 +1233,7 @@ PLAN-ROOT SINK
 |     row-size=73B cardinality=8.00K
 |
 00:SCAN KUDU [tpch_kudu.partsupp]
-   runtime filters: RF001 -> ps_partkey
+   runtime filters: RF000 -> ps_partkey, RF001 -> ps_partkey
    row-size=16B cardinality=800.00K
 ====
 # Q17 - Small-Quantity-Order Revenue Query
@@ -1204,8 +1255,8 @@ where
       l_partkey = p_partkey
   )
 ---- PLAN
-Max Per-Host Resource Reservation: Memory=8.62MB Threads=4
-Per-Host Resource Estimates: Memory=24MB
+Max Per-Host Resource Reservation: Memory=10.62MB Threads=4
+Per-Host Resource Estimates: Memory=26MB
 PLAN-ROOT SINK
 |
 06:AGGREGATE [FINALIZE]
@@ -1215,12 +1266,12 @@ PLAN-ROOT SINK
 05:HASH JOIN [RIGHT SEMI JOIN]
 |  hash predicates: l_partkey = p_partkey
 |  other join predicates: l_quantity < round(0.2 * avg(l_quantity), 2)
-|  runtime filters: RF001 <- p_partkey
+|  runtime filters: RF000 <- p_partkey, RF001 <- p_partkey
 |  row-size=32B cardinality=29.93K
 |
 |--04:HASH JOIN [INNER JOIN]
 |  |  hash predicates: l_partkey = p_partkey
-|  |  runtime filters: RF003 <- p_partkey
+|  |  runtime filters: RF002 <- p_partkey, RF003 <- p_partkey
 |  |  row-size=32B cardinality=29.93K
 |  |
 |  |--01:SCAN KUDU [tpch_kudu.part]
@@ -1228,7 +1279,7 @@ PLAN-ROOT SINK
 |  |     row-size=8B cardinality=1.00K
 |  |
 |  00:SCAN KUDU [tpch_kudu.lineitem]
-|     runtime filters: RF003 -> l_partkey
+|     runtime filters: RF002 -> l_partkey, RF003 -> l_partkey
 |     row-size=24B cardinality=6.00M
 |
 03:AGGREGATE [FINALIZE]
@@ -1237,7 +1288,7 @@ PLAN-ROOT SINK
 |  row-size=16B cardinality=200.52K
 |
 02:SCAN KUDU [tpch_kudu.lineitem]
-   runtime filters: RF001 -> tpch_kudu.lineitem.l_partkey
+   runtime filters: RF000 -> tpch_kudu.lineitem.l_partkey, RF001 -> tpch_kudu.lineitem.l_partkey
    row-size=16B cardinality=6.00M
 ====
 # Q18 - Large Value tpch_kudu.customer Query
@@ -1276,8 +1327,8 @@ order by
   o_orderdate
 limit 100
 ---- PLAN
-Max Per-Host Resource Reservation: Memory=81.25MB Threads=5
-Per-Host Resource Estimates: Memory=153MB
+Max Per-Host Resource Reservation: Memory=84.25MB Threads=5
+Per-Host Resource Estimates: Memory=156MB
 PLAN-ROOT SINK
 |
 09:TOP-N [LIMIT=100]
@@ -1291,7 +1342,7 @@ PLAN-ROOT SINK
 |
 07:HASH JOIN [LEFT SEMI JOIN]
 |  hash predicates: o_orderkey = l_orderkey
-|  runtime filters: RF001 <- l_orderkey
+|  runtime filters: RF000 <- l_orderkey, RF001 <- l_orderkey
 |  row-size=108B cardinality=600.12K
 |
 |--04:AGGREGATE [FINALIZE]
@@ -1305,7 +1356,7 @@ PLAN-ROOT SINK
 |
 06:HASH JOIN [INNER JOIN]
 |  hash predicates: o_custkey = c_custkey
-|  runtime filters: RF003 <- c_custkey
+|  runtime filters: RF002 <- c_custkey, RF003 <- c_custkey
 |  row-size=108B cardinality=5.76M
 |
 |--00:SCAN KUDU [tpch_kudu.customer]
@@ -1313,15 +1364,15 @@ PLAN-ROOT SINK
 |
 05:HASH JOIN [INNER JOIN]
 |  hash predicates: l_orderkey = o_orderkey
-|  runtime filters: RF005 <- o_orderkey
+|  runtime filters: RF004 <- o_orderkey, RF005 <- o_orderkey
 |  row-size=66B cardinality=5.76M
 |
 |--01:SCAN KUDU [tpch_kudu.orders]
-|     runtime filters: RF001 -> o_orderkey, RF003 -> o_custkey
+|     runtime filters: RF000 -> o_orderkey, RF001 -> o_orderkey, RF002 -> o_custkey, RF003 -> o_custkey
 |     row-size=50B cardinality=1.50M
 |
 02:SCAN KUDU [tpch_kudu.lineitem]
-   runtime filters: RF001 -> tpch_kudu.lineitem.l_orderkey, RF005 -> l_orderkey
+   runtime filters: RF000 -> tpch_kudu.lineitem.l_orderkey, RF001 -> tpch_kudu.lineitem.l_orderkey, RF004 -> l_orderkey, RF005 -> l_orderkey
    row-size=16B cardinality=6.00M
 ====
 # Q19 - Discounted Revenue Query
@@ -1361,8 +1412,8 @@ where
     )
   )
 ---- PLAN
-Max Per-Host Resource Reservation: Memory=1.94MB Threads=3
-Per-Host Resource Estimates: Memory=21MB
+Max Per-Host Resource Reservation: Memory=2.94MB Threads=3
+Per-Host Resource Estimates: Memory=22MB
 PLAN-ROOT SINK
 |
 03:AGGREGATE [FINALIZE]
@@ -1372,7 +1423,7 @@ PLAN-ROOT SINK
 02:HASH JOIN [INNER JOIN]
 |  hash predicates: l_partkey = p_partkey
 |  other predicates: l_quantity <= 11 OR l_quantity <= 20 OR p_size <= 15, l_quantity <= 11 OR l_quantity >= 10 OR p_size <= 15, l_quantity <= 11 OR p_size <= 10 OR l_quantity <= 30, l_quantity <= 11 OR p_size <= 10 OR l_quantity >= 20, l_quantity <= 11 OR p_size <= 10 OR p_size <= 15, l_quantity >= 1 OR l_quantity <= 20 OR p_size <= 15, l_quantity >= 1 OR l_quantity >= 10 OR p_size <= 15, l_quantity >= 1 OR p_size <= 10 OR l_quantity <= 30, l_quantity >= 1 OR p_size <= 10 OR l_quantity >= 20, l_quantity >= 1 OR p_size <= 10 OR p_size <= 15, p_size <= 5 OR l_quantity <= 20 OR l_quantity <= 30, p_size <= 5 OR l_quantity <= 20 OR l_quantity >= 20, p_size <= 5 OR l_quantity <= 20 OR p_size <= 15, p_size <= 5 OR l_quantity >= 10 OR l_quantity <= 30, p_size <= 5 OR l_quantity >= 10 OR l_quantity >= 20, p_size <= 5 OR l_quantity >= 10 OR p_size <= 15, p_size <= 5 OR p_size <= 10 OR l_quantity <= 30, p_size <= 5 OR p_size <= 10 OR l_quantity >= 20, l_quantity <= 11 OR l_quantity <= 20 OR p_container IN ('LG CASE', 'LG BOX', 'LG PACK', 'LG PKG'), l_quantity <= 11 OR l_quantity >= 10 OR p_container IN ('LG CASE', 'LG BOX', 'LG PACK', 'LG PKG'), l_quantity <= 11 OR p_container IN ('MED BAG', 'MED BOX', 'MED PKG', 'MED PACK') OR l_quantity <= 30, l_quantity <= 11 OR p_container IN ('MED BAG', 'MED BOX', 'MED PKG', 'MED PACK') OR l_quantity >= 20, l_quantity <= 11 OR p_container IN ('MED BAG', 'MED BOX', 'MED PKG', 'MED PACK') OR p_size <= 15, l_quantity <= 11 OR p_size <= 10 OR p_container IN ('LG CASE', 'LG BOX', 'LG PACK', 'LG PKG'), l_quantity >= 1 OR l_quantity <= 20 OR p_container IN ('LG CASE', 'LG BOX', 'LG PACK', 'LG PKG'), l_quantity >= 1 OR l_quantity >= 10 OR p_container IN ('LG CASE', 'LG BOX', 'LG PACK', 'LG PKG'), l_quantity >= 1 OR p_container IN ('MED BAG', 'MED BOX', 'MED PKG', 'MED PACK') OR l_quantity <= 30, l_quantity >= 1 OR p_container IN ('MED BAG', 'MED BOX', 'MED PKG', 'MED PACK') OR l_quantity >= 20, l_quantity >= 1 OR p_container IN ('MED BAG', 'MED BOX', 'MED PKG', 'MED PACK') OR p_size <= 15, l_quantity >= 1 OR p_size <= 10 OR p_container IN ('LG CASE', 'LG BOX', 'LG PACK', 'LG PKG'), p_container IN ('SM CASE', 'SM BOX', 'SM PACK', 'SM PKG') OR l_quantity <= 20 OR l_quantity <= 30, p_container IN ('SM CASE', 'SM BOX', 'SM PACK', 'SM PKG') OR l_quantity <= 20 OR l_quantity >= 20, p_container IN ('SM CASE', 'SM BOX', 'SM PACK', 'SM PKG') OR l_quantity <= 20 OR p_size <= 15, p_container IN ('SM CASE', 'SM BOX', 'SM PACK', 'SM PKG') OR l_quantity >= 10 OR l_quantity <= 30, p_container IN ('SM CASE', 'SM BOX', 'SM PACK', 'SM PKG') OR l_quantity >= 10 OR l_quantity >= 20, p_container IN ('SM CASE', 'SM BOX', 'SM PACK', 'SM PKG') OR l_quantity >= 10 OR p_size <= 15, p_container IN ('SM CASE', 'SM BOX', 'SM PACK', 'SM PKG') OR p_size <= 10 OR l_quantity <= 30, p_container IN ('SM CASE', 'SM BOX', 'SM PACK', 'SM PKG') OR p_size <= 10 OR l_quantity >= 20, p_size <= 5 OR l_quantity <= 20 OR p_container IN ('LG CASE', 'LG BOX', 'LG PACK', 'LG PKG'), p_size <= 5 OR l_quantity >= 10 OR p_container IN ('LG CASE', 'LG BOX', 'LG PACK', 'LG PKG'), l_quantity <= 11 OR p_container IN ('MED BAG', 'MED BOX', 'MED PKG', 'MED PACK') OR p_container IN ('LG CASE', 'LG BOX', 'LG PACK', 'LG PKG'), l_quantity >= 1 OR p_container IN ('MED BAG', 'MED BOX', 'MED PKG', 'MED PACK') OR p_container IN ('LG CASE', 'LG BOX', 'LG PACK', 'LG PKG'), p_container IN ('SM CASE', 'SM BOX', 'SM PACK', 'SM PKG') OR l_quantity <= 20 OR p_container IN ('LG CASE', 'LG BOX', 'LG PACK', 'LG PKG'), p_container IN ('SM CASE', 'SM BOX', 'SM PACK', 'SM PKG') OR l_quantity >= 10 OR p_container IN ('LG CASE', 'LG BOX', 'LG PACK', 'LG PKG'), l_quantity <= 11 OR l_quantity <= 20 OR p_brand = 'Brand#34', l_quantity <= 11 OR l_quantity >= 10 OR p_brand = 'Brand#34', l_quantity <= 11 OR p_brand = 'Brand#23' OR l_quantity <= 30, l_quantity <= 11 OR p_brand = 'Brand#23' OR l_quantity >= 20, l_quantity <= 11 OR p_brand = 'Brand#23' OR p_size <= 15, l_quantity <= 11 OR p_size <= 10 OR p_brand = 'Brand#34', l_quantity >= 1 OR l_quantity <= 20 OR p_brand = 'Brand#34', l_quantity >= 1 OR l_quantity >= 10 OR p_brand = 'Brand#34', l_quantity >= 1 OR p_brand = 'Brand#23' OR l_quantity <= 30, l_quantity >= 1 OR p_brand = 'Brand#23' OR l_quantity >= 20, l_quantity >= 1 OR p_brand = 'Brand#23' OR p_size <= 15, l_quantity >= 1 OR p_size <= 10 OR p_brand = 'Brand#34', p_brand = 'Brand#12' OR l_quantity <= 20 OR l_quantity <= 30, p_brand = 'Brand#12' OR l_quantity <= 20 OR l_quantity >= 20, p_brand = 'Brand#12' OR l_quantity <= 20 OR p_size <= 15, p_brand = 'Brand#12' OR l_quantity >= 10 OR l_quantity <= 30, p_brand = 'Brand#12' OR l_quantity >= 10 OR l_quantity >= 20, p_brand = 'Brand#12' OR l_quantity >= 10 OR p_size <= 15, p_brand = 'Brand#12' OR p_size <= 10 OR l_quantity <= 30, p_brand = 'Brand#12' OR p_size <= 10 OR l_quantity >= 20, p_size <= 5 OR l_quantity <= 20 OR p_brand = 'Brand#34', p_size <= 5 OR l_quantity >= 10 OR p_brand = 'Brand#34', l_quantity <= 11 OR p_brand = 'Brand#23' OR p_container IN ('LG CASE', 'LG BOX', 'LG PACK', 'LG PKG'), l_quantity <= 11 OR p_container IN ('MED BAG', 'MED BOX', 'MED PKG', 'MED PACK') OR p_brand = 'Brand#34', l_quantity >= 1 OR p_brand = 'Brand#23' OR p_container IN ('LG CASE', 'LG BOX', 'LG PACK', 'LG PKG'), l_quantity >= 1 OR p_container IN ('MED BAG', 'MED BOX', 'MED PKG', 'MED PACK') OR p_brand = 'Brand#34', p_brand = 'Brand#12' OR l_quantity <= 20 OR p_container IN ('LG CASE', 'LG BOX', 'LG PACK', 'LG PKG'), p_brand = 'Brand#12' OR l_quantity >= 10 OR p_container IN ('LG CASE', 'LG BOX', 'LG PACK', 'LG PKG'), p_container IN ('SM CASE', 'SM BOX', 'SM PACK', 'SM PKG') OR l_quantity <= 20 OR p_brand = 'Brand#34', p_container IN ('SM CASE', 'SM BOX', 'SM PACK', 'SM PKG') OR l_quantity >= 10 OR p_brand = 'Brand#34', p_size <= 5 OR p_brand = 'Brand#23' AND p_container IN ('MED BAG', 'MED BOX', 'MED PKG', 'MED PACK') OR l_quantity <= 30, p_size <= 5 OR p_brand = 'Brand#23' AND p_container IN ('MED BAG', 'MED BOX', 'MED PKG', 'MED PACK') OR l_quantity >= 20, l_quantity <= 11 OR p_brand = 'Brand#23' OR p_brand = 'Brand#34', l_quantity >= 1 OR p_brand = 'Brand#23' OR p_brand = 'Brand#34', p_brand = 'Brand#12' OR l_quantity <= 20 OR p_brand = 'Brand#34', p_brand = 'Brand#12' OR l_quantity >= 10 OR p_brand = 'Brand#34', p_container IN ('SM CASE', 'SM BOX', 'SM PACK', 'SM PKG') OR p_brand = 'Brand#23' AND p_container IN ('MED BAG', 'MED BOX', 'MED PKG', 'MED PACK') OR l_quantity <= 30, p_container IN ('SM CASE', 'SM BOX', 'SM PACK', 'SM PKG') OR p_brand = 'Brand#23' AND p_container IN ('MED BAG', 'MED BOX', 'MED PKG', 'MED PACK') OR l_quantity >= 20, p_brand = 'Brand#12' OR p_brand = 'Brand#23' AND p_container IN ('MED BAG', 'MED BOX', 'MED PKG', 'MED PACK') OR l_quantity <= 30, p_brand = 'Brand#12' OR p_brand = 'Brand#23' AND p_container IN ('MED BAG', 'MED BOX', 'MED PKG', 'MED PACK') OR l_quantity >= 20
-|  runtime filters: RF001 <- p_partkey
+|  runtime filters: RF000 <- p_partkey, RF001 <- p_partkey
 |  row-size=92B cardinality=1.41K
 |
 |--01:SCAN KUDU [tpch_kudu.part]
@@ -1383,7 +1434,7 @@ PLAN-ROOT SINK
 00:SCAN KUDU [tpch_kudu.lineitem]
    predicates: l_quantity <= 11 OR l_quantity <= 20 OR l_quantity <= 30, l_quantity <= 11 OR l_quantity <= 20 OR l_quantity >= 20, l_quantity <= 11 OR l_quantity >= 10 OR l_quantity <= 30, l_quantity <= 11 OR l_quantity >= 10 OR l_quantity >= 20, l_quantity >= 1 OR l_quantity <= 20 OR l_quantity <= 30, l_quantity >= 1 OR l_quantity <= 20 OR l_quantity >= 20, l_quantity >= 1 OR l_quantity >= 10 OR l_quantity <= 30, l_quantity >= 1 OR l_quantity >= 10 OR l_quantity >= 20
    kudu predicates: l_shipmode IN ('AIR', 'AIR REG'), l_shipinstruct = 'DELIVER IN PERSON'
-   runtime filters: RF001 -> l_partkey
+   runtime filters: RF000 -> l_partkey, RF001 -> l_partkey
    row-size=32B cardinality=197.63K
 ====
 # Q20 - Potential Part Promotion Query
@@ -1424,8 +1475,8 @@ where
 order by
   s_name
 ---- PLAN
-Max Per-Host Resource Reservation: Memory=50.81MB Threads=6
-Per-Host Resource Estimates: Memory=60MB
+Max Per-Host Resource Reservation: Memory=55.81MB Threads=6
+Per-Host Resource Estimates: Memory=65MB
 PLAN-ROOT SINK
 |
 10:SORT
@@ -1434,12 +1485,12 @@ PLAN-ROOT SINK
 |
 09:HASH JOIN [RIGHT SEMI JOIN]
 |  hash predicates: ps_suppkey = s_suppkey
-|  runtime filters: RF001 <- s_suppkey
+|  runtime filters: RF000 <- s_suppkey, RF001 <- s_suppkey
 |  row-size=87B cardinality=400
 |
 |--08:HASH JOIN [INNER JOIN]
 |  |  hash predicates: s_nationkey = n_nationkey
-|  |  runtime filters: RF009 <- n_nationkey
+|  |  runtime filters: RF008 <- n_nationkey, RF009 <- n_nationkey
 |  |  row-size=87B cardinality=400
 |  |
 |  |--01:SCAN KUDU [tpch_kudu.nation]
@@ -1447,18 +1498,18 @@ PLAN-ROOT SINK
 |  |     row-size=2B cardinality=1
 |  |
 |  00:SCAN KUDU [tpch_kudu.supplier]
-|     runtime filters: RF009 -> s_nationkey
+|     runtime filters: RF008 -> s_nationkey, RF009 -> s_nationkey
 |     row-size=85B cardinality=10.00K
 |
 07:HASH JOIN [RIGHT SEMI JOIN]
 |  hash predicates: l_partkey = ps_partkey, l_suppkey = ps_suppkey
 |  other join predicates: ps_availqty > 0.5 * sum(l_quantity)
-|  runtime filters: RF004 <- ps_partkey, RF005 <- ps_suppkey
+|  runtime filters: RF002 <- ps_partkey, RF003 <- ps_suppkey, RF004 <- ps_partkey, RF005 <- ps_suppkey
 |  row-size=24B cardinality=79.79K
 |
 |--06:HASH JOIN [LEFT SEMI JOIN]
 |  |  hash predicates: ps_partkey = p_partkey
-|  |  runtime filters: RF007 <- p_partkey
+|  |  runtime filters: RF006 <- p_partkey, RF007 <- p_partkey
 |  |  row-size=24B cardinality=79.79K
 |  |
 |  |--03:SCAN KUDU [tpch_kudu.part]
@@ -1466,7 +1517,7 @@ PLAN-ROOT SINK
 |  |     row-size=57B cardinality=20.00K
 |  |
 |  02:SCAN KUDU [tpch_kudu.partsupp]
-|     runtime filters: RF001 -> ps_suppkey, RF007 -> ps_partkey
+|     runtime filters: RF000 -> ps_suppkey, RF001 -> ps_suppkey, RF006 -> ps_partkey, RF007 -> ps_partkey
 |     row-size=24B cardinality=800.00K
 |
 05:AGGREGATE [FINALIZE]
@@ -1476,7 +1527,7 @@ PLAN-ROOT SINK
 |
 04:SCAN KUDU [tpch_kudu.lineitem]
    kudu predicates: l_shipdate < '1995-01-01', l_shipdate >= '1994-01-01'
-   runtime filters: RF001 -> tpch_kudu.lineitem.l_suppkey, RF004 -> tpch_kudu.lineitem.l_partkey, RF005 -> tpch_kudu.lineitem.l_suppkey
+   runtime filters: RF000 -> tpch_kudu.lineitem.l_suppkey, RF001 -> tpch_kudu.lineitem.l_suppkey, RF002 -> tpch_kudu.lineitem.l_partkey, RF003 -> tpch_kudu.lineitem.l_suppkey, RF004 -> tpch_kudu.lineitem.l_partkey, RF005 -> tpch_kudu.lineitem.l_suppkey
    row-size=24B cardinality=600.12K
 ====
 # Q21 - Suppliers Who Kept Orders Waiting Query
@@ -1521,8 +1572,8 @@ order by
   s_name
 limit 100
 ---- PLAN
-Max Per-Host Resource Reservation: Memory=10.56MB Threads=7
-Per-Host Resource Estimates: Memory=71MB
+Max Per-Host Resource Reservation: Memory=14.56MB Threads=7
+Per-Host Resource Estimates: Memory=75MB
 PLAN-ROOT SINK
 |
 12:TOP-N [LIMIT=100]
@@ -1542,12 +1593,12 @@ PLAN-ROOT SINK
 |--09:HASH JOIN [RIGHT SEMI JOIN]
 |  |  hash predicates: l2.l_orderkey = l1.l_orderkey
 |  |  other join predicates: l2.l_suppkey != l1.l_suppkey
-|  |  runtime filters: RF001 <- l1.l_orderkey
+|  |  runtime filters: RF000 <- l1.l_orderkey, RF001 <- l1.l_orderkey
 |  |  row-size=122B cardinality=7.68K
 |  |
 |  |--08:HASH JOIN [INNER JOIN]
 |  |  |  hash predicates: s_nationkey = n_nationkey
-|  |  |  runtime filters: RF003 <- n_nationkey
+|  |  |  runtime filters: RF002 <- n_nationkey, RF003 <- n_nationkey
 |  |  |  row-size=122B cardinality=7.68K
 |  |  |
 |  |  |--03:SCAN KUDU [tpch_kudu.nation]
@@ -1556,16 +1607,16 @@ PLAN-ROOT SINK
 |  |  |
 |  |  07:HASH JOIN [INNER JOIN]
 |  |  |  hash predicates: l1.l_suppkey = s_suppkey
-|  |  |  runtime filters: RF005 <- s_suppkey
+|  |  |  runtime filters: RF004 <- s_suppkey, RF005 <- s_suppkey
 |  |  |  row-size=120B cardinality=191.92K
 |  |  |
 |  |  |--00:SCAN KUDU [tpch_kudu.supplier]
-|  |  |     runtime filters: RF003 -> s_nationkey
+|  |  |     runtime filters: RF002 -> s_nationkey, RF003 -> s_nationkey
 |  |  |     row-size=44B cardinality=10.00K
 |  |  |
 |  |  06:HASH JOIN [INNER JOIN]
 |  |  |  hash predicates: l1.l_orderkey = o_orderkey
-|  |  |  runtime filters: RF007 <- o_orderkey
+|  |  |  runtime filters: RF006 <- o_orderkey, RF007 <- o_orderkey
 |  |  |  row-size=76B cardinality=191.92K
 |  |  |
 |  |  |--02:SCAN KUDU [tpch_kudu.orders]
@@ -1574,11 +1625,11 @@ PLAN-ROOT SINK
 |  |  |
 |  |  01:SCAN KUDU [tpch_kudu.lineitem l1]
 |  |     predicates: l1.l_receiptdate > l1.l_commitdate
-|  |     runtime filters: RF005 -> l1.l_suppkey, RF007 -> l1.l_orderkey
+|  |     runtime filters: RF004 -> l1.l_suppkey, RF005 -> l1.l_suppkey, RF006 -> l1.l_orderkey, RF007 -> l1.l_orderkey
 |  |     row-size=68B cardinality=600.12K
 |  |
 |  04:SCAN KUDU [tpch_kudu.lineitem l2]
-|     runtime filters: RF001 -> l2.l_orderkey
+|     runtime filters: RF000 -> l2.l_orderkey, RF001 -> l2.l_orderkey
 |     row-size=16B cardinality=6.00M
 |
 05:SCAN KUDU [tpch_kudu.lineitem l3]

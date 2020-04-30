@@ -83,6 +83,23 @@ class RawValue {
   static uint64_t GetHashValueFastHash(const void* v, const ColumnType& type,
       uint64_t seed);
 
+  /// Templatized version of GetHashValueFastHash, use if type is known ahead.
+  /// GetHashValueFastHash handles nulls. Inlined in IR so that the constant
+  /// 'type' can be propagated.
+  template <typename T>
+  static inline uint64_t IR_ALWAYS_INLINE GetHashValueFastHash(
+      const T* v, const ColumnType& type, uint64_t seed);
+
+  /// Returns hash value for non-nullable 'v' for type T. GetHashValueFastHashNonNull
+  /// doesn't handle nulls.
+  template <typename T>
+  static inline uint64_t GetHashValueFastHashNonNull(
+      const T* v, const ColumnType& type, uint64_t seed);
+
+  // Get a 32-bit hash value using the FastHash algorithm.
+  static uint32_t IR_ALWAYS_INLINE GetHashValueFastHash32(
+      const void* v, const ColumnType& type, uint32_t seed = 0) noexcept;
+
   /// Compares both values.
   /// Return value is < 0  if v1 < v2, 0 if v1 == v2, > 0 if v1 > v2.
   /// Inlined in IR so that the constant 'type' can be propagated.

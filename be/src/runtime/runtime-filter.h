@@ -64,6 +64,7 @@ class RuntimeFilter {
     return filter_desc().type == TRuntimeFilterType::MIN_MAX;
   }
 
+  BloomFilter* get_bloom_filter() const { return bloom_filter_.Load(); }
   MinMaxFilter* get_min_max() const { return min_max_filter_.Load(); }
 
   /// Sets the internal filter bloom_filter to 'bloom_filter' or 'min_max_filter'

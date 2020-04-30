@@ -1,0 +1,151 @@
+====
+---- QUERY
+####################################################
+# Test case 1: straight join
+#     apply different types of runtime filters on same
+#     query and compare number of probe rows
+####################################################
+SET RUNTIME_FILTER_WAIT_TIME_MS=$RUNTIME_FILTER_WAIT_TIME_MS;
+set ENABLED_RUNTIME_FILTER_TYPES=BLOOM;
+select STRAIGHT_JOIN count(*) from tpch_kudu.lineitem a
+join [BROADCAST] tpch_kudu.supplier b
+where a.l_suppkey = b.s_suppkey and b.s_nationkey = 0;
+---- RESULTS
+253146
+---- RUNTIME_PROFILE
+aggregation(SUM, ProbeRows): 253146
+====
+---- QUERY
+SET RUNTIME_FILTER_WAIT_TIME_MS=$RUNTIME_FILTER_WAIT_TIME_MS;
+set ENABLED_RUNTIME_FILTER_TYPES=MIN_MAX;
+select STRAIGHT_JOIN count(*) from tpch_kudu.lineitem a
+join [BROADCAST] tpch_kudu.supplier b
+where a.l_suppkey = b.s_suppkey and b.s_nationkey = 0;
+---- RESULTS
+253146
+---- RUNTIME_PROFILE
+aggregation(SUM, ProbeRows): 5983282
+====
+---- QUERY
+SET RUNTIME_FILTER_WAIT_TIME_MS=$RUNTIME_FILTER_WAIT_TIME_MS;
+set ENABLED_RUNTIME_FILTER_TYPES=ALL;
+select STRAIGHT_JOIN count(*) from tpch_kudu.lineitem a
+join [BROADCAST] tpch_kudu.supplier b
+where a.l_suppkey = b.s_suppkey and b.s_nationkey = 0;
+---- RESULTS
+253146
+---- RUNTIME_PROFILE
+aggregation(SUM, ProbeRows): 253146
+====
+
+---- QUERY
+SET RUNTIME_FILTER_WAIT_TIME_MS=$RUNTIME_FILTER_WAIT_TIME_MS;
+set ENABLED_RUNTIME_FILTER_TYPES=BLOOM;
+select STRAIGHT_JOIN count(*) from tpch_kudu.lineitem a
+join [BROADCAST] tpch_kudu.supplier b
+where a.l_suppkey = b.s_suppkey and b.s_nationkey > 0 and b.s_nationkey < 5;
+---- RESULTS
+984456
+---- RUNTIME_PROFILE
+aggregation(SUM, ProbeRows): 984456
+====
+---- QUERY
+SET RUNTIME_FILTER_WAIT_TIME_MS=$RUNTIME_FILTER_WAIT_TIME_MS;
+set ENABLED_RUNTIME_FILTER_TYPES=MIN_MAX;
+select STRAIGHT_JOIN count(*) from tpch_kudu.lineitem a
+join [BROADCAST] tpch_kudu.supplier b
+where a.l_suppkey = b.s_suppkey and b.s_nationkey > 0 and b.s_nationkey < 5;
+---- RESULTS
+984456
+---- RUNTIME_PROFILE
+aggregation(SUM, ProbeRows): 5998888
+====
+---- QUERY
+SET RUNTIME_FILTER_WAIT_TIME_MS=$RUNTIME_FILTER_WAIT_TIME_MS;
+set ENABLED_RUNTIME_FILTER_TYPES=ALL;
+select STRAIGHT_JOIN count(*) from tpch_kudu.lineitem a
+join [BROADCAST] tpch_kudu.supplier b
+where a.l_suppkey = b.s_suppkey and b.s_nationkey > 0 and b.s_nationkey < 5;
+---- RESULTS
+984456
+---- RUNTIME_PROFILE
+aggregation(SUM, ProbeRows): 984456
+====
+
+
+---- QUERY
+####################################################
+# Test case 2: semi join between two tables
+#     apply different types of runtime filters on same
+#     query and compare number of probe rows
+####################################################
+SET RUNTIME_FILTER_WAIT_TIME_MS=$RUNTIME_FILTER_WAIT_TIME_MS;
+set ENABLED_RUNTIME_FILTER_TYPES=BLOOM;
+select COUNT(*) from tpch_kudu.lineitem a
+where a.l_suppkey in
+(select b.s_suppkey from tpch_kudu.supplier b where b.s_nationkey = 0);
+---- RESULTS
+253146
+---- RUNTIME_PROFILE
+aggregation(SUM, ProbeRows): 253146
+====
+---- QUERY
+SET RUNTIME_FILTER_WAIT_TIME_MS=$RUNTIME_FILTER_WAIT_TIME_MS;
+set ENABLED_RUNTIME_FILTER_TYPES=MIN_MAX;
+select COUNT(*) from tpch_kudu.lineitem a
+where a.l_suppkey in
+(select b.s_suppkey from tpch_kudu.supplier b where b.s_nationkey = 0);
+---- RESULTS
+253146
+---- RUNTIME_PROFILE
+aggregation(SUM, ProbeRows): 5983282
+====
+---- QUERY
+SET RUNTIME_FILTER_WAIT_TIME_MS=$RUNTIME_FILTER_WAIT_TIME_MS;
+set ENABLED_RUNTIME_FILTER_TYPES=ALL;
+select COUNT(*) from tpch_kudu.lineitem a
+where a.l_suppkey in
+(select b.s_suppkey from tpch_kudu.supplier b where b.s_nationkey = 0);
+---- RESULTS
+253146
+---- RUNTIME_PROFILE
+aggregation(SUM, ProbeRows): 253146
+====
+
+
+---- QUERY
+####################################################
+# Test case 3: semi join on same table
+#     apply different types of runtime filters on same
+#     query and compare number of probe rows
+####################################################
+SET RUNTIME_FILTER_WAIT_TIME_MS=$RUNTIME_FILTER_WAIT_TIME_MS;
+set ENABLED_RUNTIME_FILTER_TYPES=BLOOM;
+select COUNT(*) from alltypes a
+where a.id in (select b.id from alltypes b where b.int_col < 10);
+---- RESULTS
+7300
+---- RUNTIME_PROFILE
+aggregation(SUM, ProbeRows): 7300
+====
+---- QUERY
+SET RUNTIME_FILTER_WAIT_TIME_MS=$RUNTIME_FILTER_WAIT_TIME_MS;
+set ENABLED_RUNTIME_FILTER_TYPES=MIN_MAX;
+select COUNT(*) from alltypes a
+where a.id in (select b.id from alltypes b where b.int_col < 10);
+---- RESULTS
+7300
+---- RUNTIME_PROFILE
+aggregation(SUM, ProbeRows): 7300
+====
+---- QUERY
+SET RUNTIME_FILTER_WAIT_TIME_MS=$RUNTIME_FILTER_WAIT_TIME_MS;
+set ENABLED_RUNTIME_FILTER_TYPES=ALL;
+select COUNT(*) from alltypes a
+where a.id in (select b.id from alltypes b where b.int_col < 10);
+---- RESULTS
+7300
+---- RUNTIME_PROFILE
+aggregation(SUM, ProbeRows): 7300
+====
+

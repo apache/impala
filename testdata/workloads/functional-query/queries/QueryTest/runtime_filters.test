@@ -183,6 +183,8 @@ row_regex: .*FiltersReceived: 0 .*
 ====
 ---- QUERY
 # Global mode. Coordinator should report 1 filter update per backend.
+# For Kudu, join expr has implicit casting so no bloom filter will
+# be created, only min-max filter will be created.
 SET RUNTIME_FILTER_WAIT_TIME_MS=$RUNTIME_FILTER_WAIT_TIME_MS;
 SET RUNTIME_FILTER_MODE=GLOBAL;
 select STRAIGHT_JOIN count(*) from alltypes a
@@ -191,6 +193,9 @@ select STRAIGHT_JOIN count(*) from alltypes a
 ---- RESULTS
 0
 ---- RUNTIME_PROFILE
+row_regex: .*FiltersReceived: 3 .*
+row_regex: .*REMOTE.*ms.*ms.*true
+---- RUNTIME_PROFILE: table_format=kudu
 row_regex: .*FiltersReceived: 3 .*
 row_regex: .*REMOTE.*ms.*ms.*true
 ====

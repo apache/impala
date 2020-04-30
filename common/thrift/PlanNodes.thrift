@@ -119,6 +119,13 @@ enum TRuntimeFilterType {
   MIN_MAX = 1
 }
 
+// Enabled runtime filter types to be applied to scan nodes.
+enum TEnabledRuntimeFilterTypes {
+  BLOOM = 1
+  MIN_MAX = 2
+  ALL = 3
+}
+
 // Specification of a runtime filter.
 struct TRuntimeFilterDesc {
   // Filter unique id (within a query)

@@ -82,7 +82,7 @@ void FilterContext::Insert(TupleRow* row) const noexcept {
   if (filter->is_bloom_filter()) {
     if (local_bloom_filter == nullptr) return;
     void* val = expr_eval->GetValue(row);
-    uint32_t filter_hash = RawValue::GetHashValue(
+    uint32_t filter_hash = RawValue::GetHashValueFastHash32(
         val, expr_eval->root().type(), RuntimeFilterBank::DefaultHashSeed());
     local_bloom_filter->Insert(filter_hash);
   } else {
@@ -107,14 +107,14 @@ void FilterContext::MaterializeValues() const {
 //
 // ; Function Attrs: alwaysinline
 // define i1 @FilterContextEval(%"struct.impala::FilterContext"* %this,
-//                              %"class.impala::TupleRow"* %row) #34 {
+//                              %"class.impala::TupleRow"* %row) #41 {
 // entry:
 //   %0 = alloca i16
 //   %expr_eval_ptr = getelementptr inbounds %"struct.impala::FilterContext",
 //       %"struct.impala::FilterContext"* %this, i32 0, i32 0
-//   %expr_eval_arg = load %"class.impala::ExprContext"*,
-//       %"class.impala::ExprContext"** %expr_eval_ptr
-//   %result = call i32 @GetSlotRef(%"class.impala::ExprContext"* %expr_eval_arg,
+//   %expr_eval_arg = load %"class.impala::ScalarExprEvaluator"*,
+//       %"class.impala::ScalarExprEvaluator"** %expr_eval_ptr
+//   %result = call i32 @GetSlotRef(%"class.impala::ScalarExprEvaluator"* %expr_eval_arg,
 //       %"class.impala::TupleRow"* %row)
 //   %is_null1 = trunc i32 %result to i1
 //   br i1 %is_null1, label %is_null, label %not_null
@@ -135,7 +135,7 @@ void FilterContext::MaterializeValues() const {
 //       %"struct.impala::FilterContext"* %this, i32 0, i32 1
 //   %filter_arg = load %"class.impala::RuntimeFilter"*,
 //       %"class.impala::RuntimeFilter"** %filter_ptr
-//   %passed_filter = call i1 @_ZNK6impala13RuntimeFilter4EvalEPvRKNS_10ColumnTypeE.3(
+//   %passed_filter = call i1 @_ZNK6impala13RuntimeFilter4EvalEPvRKNS_10ColumnTypeE(
 //       %"class.impala::RuntimeFilter"* %filter_arg, i8* %val_ptr_phi,
 //       %"struct.impala::ColumnType"* @expr_type_arg)
 //   ret i1 %passed_filter
@@ -221,7 +221,7 @@ Status FilterContext::CodegenEval(
   builder.CreateRet(passed_filter);
 
   *fn = codegen->FinalizeFunction(eval_filter_fn);
-  if (*fn == NULL) {
+  if (*fn == nullptr) {
     return Status("Codegen'ed FilterContext::Eval() fails verification, see log");
   }
   return Status::OK();
@@ -234,7 +234,7 @@ Status FilterContext::CodegenEval(
 //     %"class.std::vector.101" zeroinitializer }
 //
 // define void @FilterContextInsert(%"struct.impala::FilterContext"* %this,
-//     %"class.impala::TupleRow"* %row) #37 {
+//     %"class.impala::TupleRow"* %row) #47 {
 // entry:
 //   %0 = alloca i16
 //   %local_bloom_filter_ptr = getelementptr inbounds %"struct.impala::FilterContext",
@@ -249,7 +249,7 @@ Status FilterContext::CodegenEval(
 //       %"struct.impala::FilterContext"* %this, i32 0, i32 0
 //   %expr_eval_arg = load %"class.impala::ScalarExprEvaluator"*,
 //       %"class.impala::ScalarExprEvaluator"** %expr_eval_ptr
-//   %result = call i32 @GetSlotRef.46(
+//   %result = call i32 @GetSlotRef.26(
 //       %"class.impala::ScalarExprEvaluator"* %expr_eval_arg,
 //       %"class.impala::TupleRow"* %row)
 //   %is_null = trunc i32 %result to i1
@@ -270,9 +270,10 @@ Status FilterContext::CodegenEval(
 //
 // insert_filter:                                    ; preds = %val_not_null, %val_is_null
 //   %val_ptr_phi = phi i8* [ %native_ptr, %val_not_null ], [ null, %val_is_null ]
-//   %hash_value = call i32 @_ZN6impala8RawValue12GetHashValueEPKvRKNS_10ColumnTypeEj(
-//       i8* %val_ptr_phi, %"struct.impala::ColumnType"* @expr_type_arg, i32 1234)
-//   call void @_ZN6impala11BloomFilter10InsertAvx2Ej(
+//   %hash_value = call i32
+//       @_ZN6impala8RawValue22GetHashValueFastHash32EPKvRKNS_10ColumnTypeEj(
+//       i8* %val_ptr_phi, %"struct.impala::ColumnType"* @expr_type_arg.29, i32 1234)
+//   call void @_ZN6impala11BloomFilter8IrInsertEj(
 //       %"class.impala::BloomFilter"* %local_bloom_filter_arg, i32 %hash_value)
 //   ret void
 // }
@@ -382,20 +383,15 @@ Status FilterContext::CodegenInsert(LlvmCodeGen* codegen, ScalarExpr* filter_exp
         codegen->GetI32Constant(RuntimeFilterBank::DefaultHashSeed());
     llvm::Value* get_hash_value_args[] = {val_ptr_phi, expr_type_arg, seed_arg};
     llvm::Function* get_hash_value_fn =
-        codegen->GetFunction(IRFunction::RAW_VALUE_GET_HASH_VALUE, false);
+        codegen->GetFunction(IRFunction::RAW_VALUE_GET_HASH_VALUE_FAST_HASH32, false);
     DCHECK(get_hash_value_fn != nullptr);
     llvm::Value* hash_value =
         builder.CreateCall(get_hash_value_fn, get_hash_value_args, "hash_value");
 
     // Call Insert() on the bloom filter.
-    llvm::Function* insert_bloom_filter_fn;
-    if (LlvmCodeGen::IsCPUFeatureEnabled(CpuInfo::AVX2)) {
-      insert_bloom_filter_fn =
-          codegen->GetFunction(IRFunction::BLOOM_FILTER_INSERT_AVX2, false);
-    } else {
-      insert_bloom_filter_fn =
-          codegen->GetFunction(IRFunction::BLOOM_FILTER_INSERT_NO_AVX2, false);
-    }
+    llvm::Function* insert_bloom_filter_fn =
+        codegen->GetFunction(IRFunction::BLOOM_FILTER_INSERT, false);
+
     DCHECK(insert_bloom_filter_fn != nullptr);
 
     llvm::Value* insert_args[] = {local_filter_arg, hash_value};
@@ -414,7 +410,7 @@ Status FilterContext::CodegenInsert(LlvmCodeGen* codegen, ScalarExpr* filter_exp
   builder.CreateRetVoid();
 
   *fn = codegen->FinalizeFunction(insert_filter_fn);
-  if (*fn == NULL) {
+  if (*fn == nullptr) {
     return Status("Codegen'ed FilterContext::Insert() fails verification, see log");
   }
   return Status::OK();

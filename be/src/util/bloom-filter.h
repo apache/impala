@@ -25,10 +25,12 @@
 
 #include <immintrin.h>
 
+#include "codegen/impala-ir.h"
 #include "common/compiler-util.h"
 #include "common/logging.h"
 #include "common/status.h"
 #include "gutil/macros.h"
+#include "kudu/util/block_bloom_filter.h"
 #include "runtime/bufferpool/buffer-pool.h"
 #include "util/cpu-info.h"
 #include "util/hash-util.h"
@@ -59,28 +61,55 @@ struct TestData;
 
 namespace impala {
 
-/// A BloomFilter stores sets of items and offers a query operation indicating whether or
-/// not that item is in the set.  BloomFilters use much less space than other compact data
-/// structures, but they are less accurate: for a small percentage of elements, the query
-/// operation incorrectly returns true even when the item is not in the set.
-///
-/// When talking about Bloom filter size, rather than talking about 'size', which might be
-/// ambiguous, we distinguish two different quantities:
-///
-/// 1. Space: the amount of buffer pool memory used
-///
-/// 2. NDV: the number of unique items that have been inserted
-///
-/// BloomFilter is implemented using block Bloom filters from Putze et al.'s "Cache-,
-/// Hash- and Space-Efficient Bloom Filters". The basic idea is to hash the item to a tiny
-/// Bloom filter the size of a single cache line or smaller. This implementation sets 8
-/// bits in each tiny Bloom filter. This provides a false positive rate near optimal for
-/// between 5 and 15 bits per distinct value, which corresponds to false positive
-/// probabilities between 0.1% (for 15 bits) and 10% (for 5 bits).
-///
-/// Our tiny BloomFilters are 32 bytes to take advantage of 32-byte SIMD in newer Intel
-/// machines. 'noexcept' is added to various functions called from the cross-compiled code
-/// so LLVM will not generate exception related code at their call sites.
+// Buffer allocator to allocate and de-allocate memory for the BlockBloomFilter
+// from buffer pool.
+class ImpalaBloomFilterBufferAllocator : public kudu::BlockBloomFilterBufferAllocatorIf {
+ public:
+  // Default constructor, which is defined to support the virtual function Clone().
+  // It uses kudu::DefaultBlockBloomFilterBufferAllocator to allocate/de-allocate
+  // memory. Since Clone function is only used for internal testing, so that
+  // memory allocation don't need to be tracked.
+  ImpalaBloomFilterBufferAllocator();
+
+  // Constructor with client handle of the buffer pool, which is created for
+  // runtime filters in runtime-filter-bank.
+  explicit ImpalaBloomFilterBufferAllocator(BufferPool::ClientHandle* client);
+
+  ~ImpalaBloomFilterBufferAllocator() override;
+
+  kudu::Status AllocateBuffer(size_t bytes, void** ptr) override;
+  void FreeBuffer(void* ptr) override;
+
+  // This virtual function is only defined for Kudu internal testing.
+  // Impala code should not hit this function.
+  std::shared_ptr<kudu::BlockBloomFilterBufferAllocatorIf> Clone() const override {
+    LOG(DFATAL) << "Unsupported code path.";
+    return std::make_shared<ImpalaBloomFilterBufferAllocator>();
+  }
+
+  bool IsAllocated() { return is_allocated_; }
+
+ private:
+  void Close();
+
+  /// Bufferpool client and handle used for allocating and freeing directory memory.
+  /// Client is not owned by the buffer allocator.
+  BufferPool::ClientHandle* buffer_pool_client_;
+  BufferPool::BufferHandle buffer_handle_;
+  bool is_allocated_;
+
+  DISALLOW_COPY_AND_ASSIGN(ImpalaBloomFilterBufferAllocator);
+};
+
+/// A BloomFilter stores sets of items and offers a query operation indicating whether
+/// or not that item is in the set. The BloomFilter functionality is implemented in
+/// kudu::BlockBloomFilter class (see source at be/src/kudu/util/block_bloom_filter.h),
+/// which using block Bloom filters from Putze et al.'s "Cache-, Hash- and
+/// Space-Efficient Bloom Filters".
+/// This class is defined as thin wrapper around kudu::BlockBloomFilter.
+/// Note: Kudu only support FastHash for BlockBloomFilter.
+///       Since Fasthash is strictly better than Murmur Hash2, we do not
+///       support Murmur Hash2 algorithm for Bloom filter.
 class BloomFilter {
  public:
   /// Consumes at most (1 << log_bufferpool_space) bytes from the buffer pool client.
@@ -92,9 +121,9 @@ class BloomFilter {
   /// Reset the filter state, allocate/reallocate and initialize the 'directory_'. All
   /// calls to Insert() and Find() should only be done between the calls to Init() and
   /// Close(). Init and Close are safe to call multiple times.
-  Status Init(const int log_bufferpool_space);
+  Status Init(const int log_bufferpool_space, uint32_t hash_seed);
   Status Init(const BloomFilterPB& protobuf, const uint8_t* directory_in,
-      size_t directory_in_size);
+      size_t directory_in_size, uint32_t hash_seed);
   void Close();
 
   /// Representation of a filter which allows all elements to pass.
@@ -107,7 +136,7 @@ class BloomFilter {
   static void ToProtobuf(const BloomFilter* filter, kudu::rpc::RpcController* controller,
       BloomFilterPB* protobuf);
 
-  bool AlwaysFalse() const { return always_false_; }
+  bool AlwaysFalse() const { return block_bloom_filter_.always_false(); }
 
   /// Adds an element to the BloomFilter. The function used to generate 'hash' need not
   /// have good uniformity, but it should have low collision probability. For instance, if
@@ -115,6 +144,8 @@ class BloomFilter {
   /// this Bloom filter, since the collision probability (the probability that two
   /// non-equal values will have the same hash value) is 0.
   void Insert(const uint32_t hash) noexcept;
+  // Same as above for codegen
+  void IR_ALWAYS_INLINE IrInsert(const uint32_t hash) noexcept;
 
   /// Finds an element in the BloomFilter, returning true if it is found and false (with
   /// high probabilty) if it is not.
@@ -136,25 +167,29 @@ class BloomFilter {
   /// rises. MaxNdv() returns the NDV (number of distinct values) at which a BloomFilter
   /// constructed with (1 << log_bufferpool_space) bytes of heap space hits false positive
   /// probabilty fpp.
-  static size_t MaxNdv(const int log_bufferpool_space, const double fpp);
+  static size_t MaxNdv(const int log_bufferpool_space, const double fpp) {
+    return kudu::BlockBloomFilter::MaxNdv(log_bufferpool_space, fpp);
+  }
 
   /// If we expect to fill a Bloom filter with 'ndv' different unique elements and we
   /// want a false positive probabilty of less than 'fpp', then this is the log (base 2)
   /// of the minimum number of bytes we need.
-  static int MinLogSpace(const size_t ndv, const double fpp);
+  static int MinLogSpace(const size_t ndv, const double fpp) {
+    return kudu::BlockBloomFilter::MinLogSpace(ndv, fpp);
+  }
 
   /// Returns the expected false positive rate for the given ndv and log_bufferpool_space
-  static double FalsePositiveProb(const size_t ndv, const int log_bufferpool_space);
+  static double FalsePositiveProb(const size_t ndv, const int log_bufferpool_space) {
+    return kudu::BlockBloomFilter::FalsePositiveProb(ndv, log_bufferpool_space);
+  }
 
   /// Returns the amount of buffer pool space used (in bytes). A value of -1 means that
   /// 'directory_' has not been allocated which can happen if the object was just created
   /// and Init() hasn't been called or Init() failed or Close() was called on the object.
-  int64_t GetBufferPoolSpaceUsed() const {
-    return directory_ == nullptr ? -1 : sizeof(Bucket) * (1LL << log_num_buckets_);
-  }
+  int64_t GetBufferPoolSpaceUsed();
 
   static int64_t GetExpectedMemoryUsed(int log_heap_size) {
-    return sizeof(Bucket) * (1LL << std::max(1, log_heap_size - LOG_BUCKET_WORD_BITS));
+    return kudu::BlockBloomFilter::GetExpectedMemoryUsed(log_heap_size);
   }
 
   /// The following two functions set a sidecar on 'controller' containing the Bloom
@@ -171,81 +206,18 @@ class BloomFilter {
   static void AddDirectorySidecar(BloomFilterPB* rpc_params,
       kudu::rpc::RpcController* controller, const string& directory);
 
+  kudu::BlockBloomFilter* GetBlockBloomFilter() { return &block_bloom_filter_; }
+
  private:
-  // always_false_ is true when the bloom filter hasn't had any elements inserted.
-  bool always_false_ = true;
+  /// Buffer allocator is used by Kudu::BlockBloomFilter to allocate memory for
+  /// Kudu::BlockBloomFilter.directory_.
+  ImpalaBloomFilterBufferAllocator buffer_allocator_;
 
-  /// The BloomFilter is divided up into Buckets
-  static const uint64_t BUCKET_WORDS = 8;
-  typedef uint32_t BucketWord;
-
-  // log2(number of bits in a BucketWord)
-  static const int LOG_BUCKET_WORD_BITS = 5;
-  static const BucketWord BUCKET_WORD_MASK = (1 << LOG_BUCKET_WORD_BITS) - 1;
-
-  /// log2(number of bytes in a bucket)
-  static const int LOG_BUCKET_BYTE_SIZE = 5;
-
-  static_assert((1 << LOG_BUCKET_WORD_BITS) == std::numeric_limits<BucketWord>::digits,
-      "BucketWord must have a bit-width that is be a power of 2, like 64 for uint64_t.");
-
-  typedef BucketWord Bucket[BUCKET_WORDS];
-
-  /// log_num_buckets_ is the log (base 2) of the number of buckets in the directory.
-  int log_num_buckets_ = 0;
-
-  /// directory_mask_ is (1 << log_num_buckets_) - 1. It is precomputed for
-  /// efficiency reasons.
-  uint32_t directory_mask_ = 0;
-
-  Bucket* directory_ = nullptr;
-
-  /// Bufferpool client and handle used for allocating and freeing directory memory.
-  /// Client is not owned by the filter.
-  BufferPool::ClientHandle* buffer_pool_client_;
-  BufferPool::BufferHandle buffer_handle_;
-
-  // Same as Insert(), but skips the CPU check and assumes that AVX is not available.
-  void InsertNoAvx2(const uint32_t hash) noexcept;
-
-  // Same as Insert(), but skips the CPU check and assumes that AVX is available.
-  void InsertAvx2(const uint32_t hash) noexcept;
-
-  /// Does the actual work of Insert(). bucket_idx is the index of the bucket to insert
-  /// into and 'hash' is the value passed to Insert().
-  void BucketInsert(const uint32_t bucket_idx, const uint32_t hash) noexcept;
-
-  /// A faster SIMD version of BucketInsert().
-  void BucketInsertAVX2(const uint32_t bucket_idx, const uint32_t hash) noexcept
-      __attribute__((__target__("avx2")));
-
-  /// BucketFind() and BucketFindAVX2() are just like BucketInsert() and
-  /// BucketInsertAVX2(), but for Find().
-  bool BucketFind(const uint32_t bucket_idx, const uint32_t hash) const noexcept;
-  bool BucketFindAVX2(const uint32_t bucket_idx, const uint32_t hash) const noexcept
-      __attribute__((__target__("avx2")));
-
-  /// A helper function for the AVX2 methods. Turns a 32-bit hash into a 256-bit Bucket
-  /// with 1 single 1-bit set in each 32-bit lane.
-  static inline ALWAYS_INLINE __m256i MakeMask(const uint32_t hash)
-      __attribute__((__target__("avx2")));
-
-  int64_t directory_size() const {
-    return 1uLL << (log_num_buckets_ + LOG_BUCKET_BYTE_SIZE);
-  }
+  /// Embedded Kudu BlockBloomFilter object
+  kudu::BlockBloomFilter block_bloom_filter_;
 
   /// Serializes this filter as Protobuf.
   void ToProtobuf(BloomFilterPB* protobuf, kudu::rpc::RpcController* controller) const;
-
-/// Some constants used in hashing. #defined for efficiency reasons.
-#define IMPALA_BLOOM_HASH_CONSTANTS                                             \
-  0x47b6137bU, 0x44974d91U, 0x8824ad5bU, 0xa2b7289dU, 0x705495c7U, 0x2df1424bU, \
-      0x9efc4947U, 0x5c6bfb31U
-
-  /// REHASH is used as 8 odd 32-bit unsigned ints.  See Dietzfelbinger et al.'s "A
-  /// reliable randomized algorithm for the closest-pair problem".
-  static constexpr uint32_t REHASH[8]
-      __attribute__((aligned(32))) = {IMPALA_BLOOM_HASH_CONSTANTS};
 
   DISALLOW_COPY_AND_ASSIGN(BloomFilter);
 
@@ -267,31 +239,12 @@ class BloomFilter {
   friend struct either::TestData;
 };
 
-// To set 8 bits in an 32-byte Bloom filter, we set one bit in each 32-bit uint32_t. This
-// is a "split Bloom filter", and it has approximately the same false positive probability
-// as standard a Bloom filter; See Mitzenmacher's "Bloom Filters and Such". It also has
-// the advantage of requiring fewer random bits: log2(32) * 8 = 5 * 8 = 40 random bits for
-// a split Bloom filter, but log2(256) * 8 = 64 random bits for a standard Bloom filter.
-
 inline void ALWAYS_INLINE BloomFilter::Insert(const uint32_t hash) noexcept {
-  DCHECK(directory_ != nullptr);
-  always_false_ = false;
-  const uint32_t bucket_idx = HashUtil::Rehash32to32(hash) & directory_mask_;
-  if (CpuInfo::IsSupported(CpuInfo::AVX2)) {
-    BucketInsertAVX2(bucket_idx, hash);
-  } else {
-    BucketInsert(bucket_idx, hash);
-  }
+  block_bloom_filter_.Insert(hash);
 }
 
 inline bool ALWAYS_INLINE BloomFilter::Find(const uint32_t hash) const noexcept {
-  if (always_false_) return false;
-  DCHECK(directory_ != nullptr);
-  const uint32_t bucket_idx = HashUtil::Rehash32to32(hash) & directory_mask_;
-  if (CpuInfo::IsSupported(CpuInfo::AVX2)) {
-    return BucketFindAVX2(bucket_idx, hash);
-  } else {
-    return BucketFind(bucket_idx, hash);
-  }
+  return block_bloom_filter_.Find(hash);
 }
+
 } // namespace impala

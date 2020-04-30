@@ -63,6 +63,8 @@ class TestRuntimeFilters(ImpalaTestSuite):
   def test_basic_filters(self, vector):
     new_vector = deepcopy(vector)
     new_vector.get_value('exec_option')['mt_dop'] = vector.get_value('mt_dop')
+    if 'kudu' in str(vector.get_value('table_format')):
+      self.execute_query("SET ENABLED_RUNTIME_FILTER_TYPES=ALL")
     self.run_test_case('QueryTest/runtime_filters', vector,
         test_file_vars={'$RUNTIME_FILTER_WAIT_TIME_MS' : str(WAIT_TIME_MS)})
 
@@ -167,11 +169,13 @@ class TestBloomFilters(ImpalaTestSuite):
   @classmethod
   def add_test_dimensions(cls):
     super(TestBloomFilters, cls).add_test_dimensions()
-    # Bloom filters are disabled on HBase, Kudu
+    # Bloom filters are disabled on HBase
     cls.ImpalaTestMatrix.add_constraint(
-        lambda v: v.get_value('table_format').file_format not in ['hbase', 'kudu'])
+        lambda v: v.get_value('table_format').file_format not in ['hbase'])
 
   def test_bloom_filters(self, vector):
+    if 'kudu' in str(vector.get_value('table_format')):
+      self.execute_query("SET ENABLED_RUNTIME_FILTER_TYPES=BLOOM")
     self.run_test_case('QueryTest/bloom_filters', vector)
 
   def test_bloom_wait_time(self, vector):
@@ -199,6 +203,7 @@ class TestMinMaxFilters(ImpalaTestSuite):
         lambda v: v.get_value('table_format').file_format in ['kudu'])
 
   def test_min_max_filters(self, vector):
+    self.execute_query("SET ENABLED_RUNTIME_FILTER_TYPES=MIN_MAX")
     self.run_test_case('QueryTest/min_max_filters', vector,
         test_file_vars={'$RUNTIME_FILTER_WAIT_TIME_MS': str(WAIT_TIME_MS)})
 
@@ -251,6 +256,30 @@ class TestMinMaxFilters(ImpalaTestSuite):
     cursor.execute("select count(*) from %s a, %s b where a.string_col = b.string_col"
         % (table1, table2))
     assert cursor.fetchall() == [(len(matching_vals) + 2,)]
+
+
+# Apply both Bloom filter and Minmax filters
+class TestAllRuntimeFilters(ImpalaTestSuite):
+  @classmethod
+  def get_workload(cls):
+    return 'functional-query'
+
+  @classmethod
+  def add_test_dimensions(cls):
+    super(TestAllRuntimeFilters, cls).add_test_dimensions()
+    # All filters are only implemented for Kudu now.
+    cls.ImpalaTestMatrix.add_constraint(
+      lambda v: v.get_value('table_format').file_format in ['kudu'])
+
+  def test_all_runtime_filters(self, vector):
+    self.execute_query("SET ENABLED_RUNTIME_FILTER_TYPES=ALL")
+    self.run_test_case('QueryTest/all_runtime_filters', vector,
+                       test_file_vars={'$RUNTIME_FILTER_WAIT_TIME_MS': str(WAIT_TIME_MS)})
+
+  def test_diff_runtime_filter_types(self, vector):
+    # compare number of probe rows when apply different types of runtime filter
+    self.run_test_case('QueryTest/diff_runtime_filter_types', vector,
+                       test_file_vars={'$RUNTIME_FILTER_WAIT_TIME_MS': str(WAIT_TIME_MS)})
 
 
 @SkipIfLocal.multiple_impalad

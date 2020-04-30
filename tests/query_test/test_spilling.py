@@ -146,7 +146,7 @@ class TestSpillingBroadcastJoins(ImpalaTestSuite):
   def add_test_dimensions(cls):
     super(TestSpillingBroadcastJoins, cls).add_test_dimensions()
     cls.ImpalaTestMatrix.clear_constraints()
-    # Use parquet because it has 9 input splits for lineitem, hence can have a
+    # Use Kudu because it has 9 input splits for lineitem, hence can have a
     # higher effective dop than parquet, which only has 3 splits.
     cls.ImpalaTestMatrix.add_dimension(create_kudu_dimension('tpch'))
     debug_action_dims = CORE_DEBUG_ACTION_DIMS
@@ -158,4 +158,8 @@ class TestSpillingBroadcastJoins(ImpalaTestSuite):
           'debug_action': debug_action_dims, 'mt_dop': [3]}))
 
   def test_spilling_broadcast_joins(self, vector):
+    # Disable bloom-filter for Kudu since the number of probe rows could be reduced
+    # if runtime bloom-filter is pushed to Kudu, hence change the spilling behavior.
+    self.execute_query("SET ENABLED_RUNTIME_FILTER_TYPES=MIN_MAX")
+
     self.run_test_case('QueryTest/spilling-broadcast-joins', vector)

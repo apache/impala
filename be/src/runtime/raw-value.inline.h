@@ -279,6 +279,131 @@ inline uint32_t RawValue::GetHashValue(const T* v, const ColumnType& type,
   return RawValue::GetHashValueNonNull<T>(v, type, seed);
 }
 
+template <>
+inline uint64_t RawValue::GetHashValueFastHashNonNull<bool>(
+    const bool* v, const ColumnType& type, uint64_t seed) {
+  DCHECK_EQ(type.type, TYPE_BOOLEAN);
+  DCHECK(v != NULL);
+  return HashUtil::FastHash64(v, 1, seed);
+}
+
+template <>
+inline uint64_t RawValue::GetHashValueFastHashNonNull<int8_t>(
+    const int8_t* v, const ColumnType& type, uint64_t seed) {
+  DCHECK_EQ(type.type, TYPE_TINYINT);
+  DCHECK(v != NULL);
+  return HashUtil::FastHash64(v, 1, seed);
+}
+
+template <>
+inline uint64_t RawValue::GetHashValueFastHashNonNull<int16_t>(
+    const int16_t* v, const ColumnType& type, uint64_t seed) {
+  DCHECK_EQ(type.type, TYPE_SMALLINT);
+  DCHECK(v != NULL);
+  return HashUtil::FastHash64(v, 2, seed);
+}
+
+template <>
+inline uint64_t RawValue::GetHashValueFastHashNonNull<int32_t>(
+    const int32_t* v, const ColumnType& type, uint64_t seed) {
+  DCHECK_EQ(type.type, TYPE_INT);
+  DCHECK(v != NULL);
+  return HashUtil::FastHash64(v, 4, seed);
+}
+
+template <>
+inline uint64_t RawValue::GetHashValueFastHashNonNull<int64_t>(
+    const int64_t* v, const ColumnType& type, uint64_t seed) {
+  DCHECK_EQ(type.type, TYPE_BIGINT);
+  DCHECK(v != NULL);
+  return HashUtil::FastHash64(v, 8, seed);
+}
+
+template <>
+inline uint64_t RawValue::GetHashValueFastHashNonNull<float>(
+    const float* v, const ColumnType& type, uint64_t seed) {
+  DCHECK_EQ(type.type, TYPE_FLOAT);
+  DCHECK(v != NULL);
+  if (std::isnan(*v)) v = &RawValue::CANONICAL_FLOAT_NAN;
+  return HashUtil::FastHash64(v, 4, seed);
+}
+
+template <>
+inline uint64_t RawValue::GetHashValueFastHashNonNull<double>(
+    const double* v, const ColumnType& type, uint64_t seed) {
+  DCHECK_EQ(type.type, TYPE_DOUBLE);
+  DCHECK(v != NULL);
+  if (std::isnan(*v)) v = &RawValue::CANONICAL_DOUBLE_NAN;
+  return HashUtil::FastHash64(v, 8, seed);
+}
+
+template <>
+inline uint64_t RawValue::GetHashValueFastHashNonNull<impala::StringValue>(
+    const impala::StringValue* v, const ColumnType& type, uint64_t seed) {
+  DCHECK(v != NULL);
+  if (type.type == TYPE_CHAR) {
+    // This is a inlined CHAR(n) slot.
+    // TODO: this is a bit wonky since it's not really a StringValue*. Handle CHAR(n)
+    // in a separate function.
+    return HashUtil::FastHash64(v, type.len, seed);
+  } else {
+    DCHECK(type.type == TYPE_STRING || type.type == TYPE_VARCHAR);
+    if (v->len == 0) {
+      return HashUtil::FastHash64(&HASH_VAL_EMPTY, sizeof(HASH_VAL_EMPTY), seed);
+    }
+    return HashUtil::FastHash64(v->ptr, static_cast<size_t>(v->len), seed);
+  }
+}
+
+template <>
+inline uint64_t RawValue::GetHashValueFastHashNonNull<TimestampValue>(
+    const TimestampValue* v, const ColumnType& type, uint64_t seed) {
+  DCHECK_EQ(type.type, TYPE_TIMESTAMP);
+  DCHECK(v != NULL);
+  return HashUtil::FastHash64(v, 12, seed);
+}
+
+template <>
+inline uint64_t RawValue::GetHashValueFastHashNonNull<DateValue>(
+    const DateValue* v, const ColumnType& type, uint64_t seed) {
+  DCHECK_EQ(type.type, TYPE_DATE);
+  DCHECK(v != NULL);
+  return HashUtil::FastHash64(v, 4, seed);
+}
+
+template <>
+inline uint64_t RawValue::GetHashValueFastHashNonNull<Decimal4Value>(
+    const Decimal4Value* v, const ColumnType& type, uint64_t seed) {
+  DCHECK_EQ(type.type, TYPE_DECIMAL);
+  DCHECK(v != NULL);
+  return HashUtil::FastHash64(v, 4, seed);
+}
+
+template <>
+inline uint64_t RawValue::GetHashValueFastHashNonNull<Decimal8Value>(
+    const Decimal8Value* v, const ColumnType& type, uint64_t seed) {
+  DCHECK_EQ(type.type, TYPE_DECIMAL);
+  DCHECK(v != NULL);
+  return HashUtil::FastHash64(v, 8, seed);
+}
+
+template <>
+inline uint64_t RawValue::GetHashValueFastHashNonNull<Decimal16Value>(
+    const Decimal16Value* v, const ColumnType& type, uint64_t seed) {
+  DCHECK_EQ(type.type, TYPE_DECIMAL);
+  DCHECK(v != NULL);
+  return HashUtil::FastHash64(v, 16, seed);
+}
+
+template <typename T>
+inline uint64_t RawValue::GetHashValueFastHash(
+    const T* v, const ColumnType& type, uint64_t seed) {
+  // Hash with an arbitrary constant to ensure we don't return seed.
+  if (UNLIKELY(v == NULL)) {
+    return HashUtil::FastHash64(&HASH_VAL_NULL, sizeof(HASH_VAL_NULL), seed);
+  }
+  return RawValue::GetHashValueFastHashNonNull<T>(v, type, seed);
+}
 }
 
 #endif

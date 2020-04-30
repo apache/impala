@@ -1,0 +1,461 @@
+====
+---- QUERY
+####################################################
+# Test case 1: all runtime filters of all possible types.
+####################################################
+SET RUNTIME_FILTER_WAIT_TIME_MS=$RUNTIME_FILTER_WAIT_TIME_MS;
+select STRAIGHT_JOIN count(*) from alltypes a join [BROADCAST] alltypestiny b
+where a.bool_col = (b.bool_col && !b.bool_col)
+---- RESULTS
+29200
+---- RUNTIME_PROFILE
+aggregation(SUM, ProbeRows): 3650
+row_regex: .*2 of 2 Runtime Filters Published.*
+====
+---- QUERY
+SET RUNTIME_FILTER_WAIT_TIME_MS=$RUNTIME_FILTER_WAIT_TIME_MS;
+select STRAIGHT_JOIN count(*) from alltypes a join [BROADCAST] alltypestiny b
+where a.tinyint_col = b.tinyint_col
+---- RESULTS
+5840
+---- RUNTIME_PROFILE
+aggregation(SUM, ProbeRows): 1460
+row_regex: .*2 of 2 Runtime Filters Published.*
+====
+---- QUERY
+SET RUNTIME_FILTER_WAIT_TIME_MS=$RUNTIME_FILTER_WAIT_TIME_MS;
+select STRAIGHT_JOIN count(*) from alltypes a join [BROADCAST] alltypestiny b
+where a.smallint_col = b.smallint_col
+---- RESULTS
+5840
+---- RUNTIME_PROFILE
+aggregation(SUM, ProbeRows): 1460
+row_regex: .*2 of 2 Runtime Filters Published.*
+====
+---- QUERY
+SET RUNTIME_FILTER_WAIT_TIME_MS=$RUNTIME_FILTER_WAIT_TIME_MS;
+select STRAIGHT_JOIN count(*) from alltypes a join [BROADCAST] alltypestiny b
+where a.int_col = b.int_col
+---- RESULTS
+5840
+---- RUNTIME_PROFILE
+aggregation(SUM, ProbeRows): 1460
+row_regex: .*2 of 2 Runtime Filters Published.*
+====
+---- QUERY
+SET RUNTIME_FILTER_WAIT_TIME_MS=$RUNTIME_FILTER_WAIT_TIME_MS;
+select STRAIGHT_JOIN count(*) from alltypes a join [BROADCAST] alltypestiny b
+where a.bigint_col = b.bigint_col
+---- RESULTS
+5840
+---- RUNTIME_PROFILE
+aggregation(SUM, ProbeRows): 1460
+row_regex: .*2 of 2 Runtime Filters Published.*
+====
+---- QUERY
+SET RUNTIME_FILTER_WAIT_TIME_MS=$RUNTIME_FILTER_WAIT_TIME_MS;
+select STRAIGHT_JOIN count(*) from alltypes a join [BROADCAST] alltypestiny b
+where a.float_col = b.float_col
+---- RESULTS
+5840
+---- RUNTIME_PROFILE
+aggregation(SUM, ProbeRows): 1460
+row_regex: .*2 of 2 Runtime Filters Published.*
+====
+---- QUERY
+SET RUNTIME_FILTER_WAIT_TIME_MS=$RUNTIME_FILTER_WAIT_TIME_MS;
+select STRAIGHT_JOIN count(*) from alltypes a join [BROADCAST] alltypestiny b
+where a.double_col = b.double_col
+---- RESULTS
+5840
+---- RUNTIME_PROFILE
+aggregation(SUM, ProbeRows): 1460
+row_regex: .*2 of 2 Runtime Filters Published.*
+====
+---- QUERY
+SET RUNTIME_FILTER_WAIT_TIME_MS=$RUNTIME_FILTER_WAIT_TIME_MS;
+select STRAIGHT_JOIN count(*) from alltypes a join [BROADCAST] alltypestiny b
+where a.string_col = b.string_col
+---- RESULTS
+5840
+---- RUNTIME_PROFILE
+aggregation(SUM, ProbeRows): 1460
+row_regex: .*2 of 2 Runtime Filters Published.*
+====
+---- QUERY
+# TODO update the runtime profile for this test case when IMPALA-9691
+#   (Support Kudu Timestamp and Date Bloom Filter) is fixed.
+SET RUNTIME_FILTER_WAIT_TIME_MS=$RUNTIME_FILTER_WAIT_TIME_MS;
+select STRAIGHT_JOIN count(*) from alltypes a join [BROADCAST] alltypestiny b
+where a.timestamp_col = b.timestamp_col
+---- RESULTS
+8
+---- RUNTIME_PROFILE
+aggregation(SUM, ProbeRows): 902
+row_regex: .*1 of 1 Runtime Filter Published.*
+====
+---- QUERY
+SET RUNTIME_FILTER_WAIT_TIME_MS=$RUNTIME_FILTER_WAIT_TIME_MS;
+select STRAIGHT_JOIN count(*) from decimal_rtf_tbl a
+join [BROADCAST] decimal_rtf_tiny_tbl b
+where a.d5_0 = b.d5_0
+---- RESULTS
+38
+---- RUNTIME_PROFILE
+aggregation(SUM, ProbeRows): 38
+row_regex: .*2 of 2 Runtime Filters Published.*
+====
+---- QUERY
+SET RUNTIME_FILTER_WAIT_TIME_MS=$RUNTIME_FILTER_WAIT_TIME_MS;
+select STRAIGHT_JOIN count(*) from decimal_rtf_tbl a
+join [BROADCAST] decimal_rtf_tiny_tbl b
+where a.d5_1 = b.d5_1
+---- RESULTS
+38
+---- RUNTIME_PROFILE
+aggregation(SUM, ProbeRows): 38
+row_regex: .*2 of 2 Runtime Filters Published.*
+====
+---- QUERY
+SET RUNTIME_FILTER_WAIT_TIME_MS=$RUNTIME_FILTER_WAIT_TIME_MS;
+select STRAIGHT_JOIN count(*) from decimal_rtf_tbl a
+join [BROADCAST] decimal_rtf_tiny_tbl b
+where a.d5_3 = b.d5_3
+---- RESULTS
+38
+---- RUNTIME_PROFILE
+aggregation(SUM, ProbeRows): 38
+row_regex: .*2 of 2 Runtime Filters Published.*
+====
+---- QUERY
+SET RUNTIME_FILTER_WAIT_TIME_MS=$RUNTIME_FILTER_WAIT_TIME_MS;
+select STRAIGHT_JOIN count(*) from decimal_rtf_tbl a
+join [BROADCAST] decimal_rtf_tiny_tbl b
+where a.d5_5 = b.d5_5 and b.d5_5 != 0
+---- RESULTS
+37
+---- RUNTIME_PROFILE
+aggregation(SUM, ProbeRows): 37
+row_regex: .*2 of 2 Runtime Filters Published.*
+====
+---- QUERY
+SET RUNTIME_FILTER_WAIT_TIME_MS=$RUNTIME_FILTER_WAIT_TIME_MS;
+select STRAIGHT_JOIN count(*) from decimal_rtf_tbl a
+join [BROADCAST] decimal_rtf_tiny_tbl b
+where a.d5_5 = b.d5_5 and b.d5_5 = 0
+---- RESULTS
+180
+---- RUNTIME_PROFILE
+aggregation(SUM, ProbeRows): 180
+row_regex: .*2 of 2 Runtime Filters Published.*
+====
+---- QUERY
+SET RUNTIME_FILTER_WAIT_TIME_MS=$RUNTIME_FILTER_WAIT_TIME_MS;
+select STRAIGHT_JOIN count(*) from decimal_rtf_tbl a
+join [BROADCAST] decimal_rtf_tiny_tbl b
+where a.d9_0 = b.d9_0
+---- RESULTS
+38
+---- RUNTIME_PROFILE
+aggregation(SUM, ProbeRows): 38
+row_regex: .*2 of 2 Runtime Filters Published.*
+====
+---- QUERY
+SET RUNTIME_FILTER_WAIT_TIME_MS=$RUNTIME_FILTER_WAIT_TIME_MS;
+select STRAIGHT_JOIN count(*) from decimal_rtf_tbl a
+join [BROADCAST] decimal_rtf_tiny_tbl b
+where a.d9_1 = b.d9_1
+---- RESULTS
+38
+---- RUNTIME_PROFILE
+aggregation(SUM, ProbeRows): 38
+row_regex: .*2 of 2 Runtime Filters Published.*
+====
+---- QUERY
+SET RUNTIME_FILTER_WAIT_TIME_MS=$RUNTIME_FILTER_WAIT_TIME_MS;
+select STRAIGHT_JOIN count(*) from decimal_rtf_tbl a
+join [BROADCAST] decimal_rtf_tiny_tbl b
+where a.d9_5 = b.d9_5
+---- RESULTS
+38
+---- RUNTIME_PROFILE
+aggregation(SUM, ProbeRows): 38
+row_regex: .*2 of 2 Runtime Filters Published.*
+====
+---- QUERY
+SET RUNTIME_FILTER_WAIT_TIME_MS=$RUNTIME_FILTER_WAIT_TIME_MS;
+select STRAIGHT_JOIN count(*) from decimal_rtf_tbl a
+join [BROADCAST] decimal_rtf_tiny_tbl b
+where a.d9_9 = b.d9_9 and b.d9_9 != 0
+---- RESULTS
+37
+---- RUNTIME_PROFILE
+aggregation(SUM, ProbeRows): 37
+row_regex: .*2 of 2 Runtime Filters Published.*
+====
+---- QUERY
+SET RUNTIME_FILTER_WAIT_TIME_MS=$RUNTIME_FILTER_WAIT_TIME_MS;
+select STRAIGHT_JOIN count(*) from decimal_rtf_tbl a
+join [BROADCAST] decimal_rtf_tiny_tbl b
+where a.d9_9 = b.d9_9 and b.d9_9 = 0
+---- RESULTS
+306
+---- RUNTIME_PROFILE
+aggregation(SUM, ProbeRows): 306
+row_regex: .*2 of 2 Runtime Filters Published.*
+====
+---- QUERY
+SET RUNTIME_FILTER_WAIT_TIME_MS=$RUNTIME_FILTER_WAIT_TIME_MS;
+select STRAIGHT_JOIN count(*) from decimal_rtf_tbl a
+join [BROADCAST] decimal_rtf_tiny_tbl b
+where a.d14_0 = b.d14_0
+---- RESULTS
+38
+---- RUNTIME_PROFILE
+aggregation(SUM, ProbeRows): 38
+row_regex: .*2 of 2 Runtime Filters Published.*
+====
+---- QUERY
+SET RUNTIME_FILTER_WAIT_TIME_MS=$RUNTIME_FILTER_WAIT_TIME_MS;
+select STRAIGHT_JOIN count(*) from decimal_rtf_tbl a
+join [BROADCAST] decimal_rtf_tiny_tbl b
+where a.d14_1 = b.d14_1
+---- RESULTS
+38
+---- RUNTIME_PROFILE
+aggregation(SUM, ProbeRows): 38
+row_regex: .*2 of 2 Runtime Filters Published.*
+====
+---- QUERY
+SET RUNTIME_FILTER_WAIT_TIME_MS=$RUNTIME_FILTER_WAIT_TIME_MS;
+select STRAIGHT_JOIN count(*) from decimal_rtf_tbl a
+join [BROADCAST] decimal_rtf_tiny_tbl b
+where a.d14_7 = b.d14_7
+---- RESULTS
+38
+---- RUNTIME_PROFILE
+aggregation(SUM, ProbeRows): 38
+row_regex: .*2 of 2 Runtime Filters Published.*
+====
+---- QUERY
+SET RUNTIME_FILTER_WAIT_TIME_MS=$RUNTIME_FILTER_WAIT_TIME_MS;
+select STRAIGHT_JOIN count(*) from decimal_rtf_tbl a
+join [BROADCAST] decimal_rtf_tiny_tbl b
+where a.d14_14 = b.d14_14 and b.d14_14 != 0
+---- RESULTS
+37
+---- RUNTIME_PROFILE
+aggregation(SUM, ProbeRows): 37
+row_regex: .*2 of 2 Runtime Filters Published.*
+====
+---- QUERY
+SET RUNTIME_FILTER_WAIT_TIME_MS=$RUNTIME_FILTER_WAIT_TIME_MS;
+select STRAIGHT_JOIN count(*) from decimal_rtf_tbl a
+join [BROADCAST] decimal_rtf_tiny_tbl b
+where a.d14_14 = b.d14_14 and b.d14_14 = 0
+---- RESULTS
+441
+---- RUNTIME_PROFILE
+aggregation(SUM, ProbeRows): 441
+row_regex: .*2 of 2 Runtime Filters Published.*
+====
+---- QUERY
+SET RUNTIME_FILTER_WAIT_TIME_MS=$RUNTIME_FILTER_WAIT_TIME_MS;
+select STRAIGHT_JOIN count(*) from decimal_rtf_tbl a
+join [BROADCAST] decimal_rtf_tiny_tbl b
+where a.d28_0 = b.d28_0
+---- RESULTS
+38
+---- RUNTIME_PROFILE
+aggregation(SUM, ProbeRows): 38
+row_regex: .*2 of 2 Runtime Filters Published.*
+====
+---- QUERY
+SET RUNTIME_FILTER_WAIT_TIME_MS=$RUNTIME_FILTER_WAIT_TIME_MS;
+select STRAIGHT_JOIN count(*) from decimal_rtf_tbl a
+join [BROADCAST] decimal_rtf_tiny_tbl b
+where a.d28_1 = b.d28_1
+---- RESULTS
+38
+---- RUNTIME_PROFILE
+aggregation(SUM, ProbeRows): 38
+row_regex: .*2 of 2 Runtime Filters Published.*
+====
+---- QUERY
+SET RUNTIME_FILTER_WAIT_TIME_MS=$RUNTIME_FILTER_WAIT_TIME_MS;
+select STRAIGHT_JOIN count(*) from decimal_rtf_tbl a
+join [BROADCAST] decimal_rtf_tiny_tbl b
+where a.d28_14 = b.d28_14
+---- RESULTS
+38
+---- RUNTIME_PROFILE
+aggregation(SUM, ProbeRows): 38
+row_regex: .*2 of 2 Runtime Filters Published.*
+====
+---- QUERY
+SET RUNTIME_FILTER_WAIT_TIME_MS=$RUNTIME_FILTER_WAIT_TIME_MS;
+select STRAIGHT_JOIN count(*) from decimal_rtf_tbl a
+join [BROADCAST] decimal_rtf_tiny_tbl b
+where a.d28_28 = b.d28_28 and b.d28_28 != 0
+---- RESULTS
+37
+---- RUNTIME_PROFILE
+aggregation(SUM, ProbeRows): 37
+row_regex: .*2 of 2 Runtime Filters Published.*
+====
+---- QUERY
+SET RUNTIME_FILTER_WAIT_TIME_MS=$RUNTIME_FILTER_WAIT_TIME_MS;
+select STRAIGHT_JOIN count(*) from decimal_rtf_tbl a
+join [BROADCAST] decimal_rtf_tiny_tbl b
+where a.d28_28 = b.d28_28 and b.d28_28 = 0
+---- RESULTS
+686
+---- RUNTIME_PROFILE
+aggregation(SUM, ProbeRows): 686
+row_regex: .*2 of 2 Runtime Filters Published.*
+====
+---- QUERY
+SET RUNTIME_FILTER_WAIT_TIME_MS=$RUNTIME_FILTER_WAIT_TIME_MS;
+select STRAIGHT_JOIN count(*) from decimal_rtf_tbl a
+join [BROADCAST] decimal_rtf_tiny_tbl b
+where a.d38_0 = b.d38_0
+---- RESULTS
+38
+---- RUNTIME_PROFILE
+aggregation(SUM, ProbeRows): 38
+row_regex: .*2 of 2 Runtime Filters Published.*
+====
+---- QUERY
+SET RUNTIME_FILTER_WAIT_TIME_MS=$RUNTIME_FILTER_WAIT_TIME_MS;
+select STRAIGHT_JOIN count(*) from decimal_rtf_tbl a
+join [BROADCAST] decimal_rtf_tiny_tbl b
+where a.d38_1 = b.d38_1
+---- RESULTS
+38
+---- RUNTIME_PROFILE
+aggregation(SUM, ProbeRows): 38
+row_regex: .*2 of 2 Runtime Filters Published.*
+====
+---- QUERY
+SET RUNTIME_FILTER_WAIT_TIME_MS=$RUNTIME_FILTER_WAIT_TIME_MS;
+select STRAIGHT_JOIN count(*) from decimal_rtf_tbl a
+join [BROADCAST] decimal_rtf_tiny_tbl b
+where a.d38_19 = b.d38_19
+---- RESULTS
+38
+---- RUNTIME_PROFILE
+aggregation(SUM, ProbeRows): 38
+row_regex: .*2 of 2 Runtime Filters Published.*
+====
+---- QUERY
+SET RUNTIME_FILTER_WAIT_TIME_MS=$RUNTIME_FILTER_WAIT_TIME_MS;
+select STRAIGHT_JOIN count(*) from decimal_rtf_tbl a
+join [BROADCAST] decimal_rtf_tiny_tbl b
+where a.d38_38 = b.d38_38 and b.d38_38 != 0
+---- RESULTS
+37
+---- RUNTIME_PROFILE
+aggregation(SUM, ProbeRows): 37
+row_regex: .*2 of 2 Runtime Filters Published.*
+====
+---- QUERY
+SET RUNTIME_FILTER_WAIT_TIME_MS=$RUNTIME_FILTER_WAIT_TIME_MS;
+select STRAIGHT_JOIN count(*) from decimal_rtf_tbl a
+join [BROADCAST] decimal_rtf_tiny_tbl b
+where a.d38_38 = b.d38_38 and b.d38_38 = 0
+---- RESULTS
+732
+---- RUNTIME_PROFILE
+aggregation(SUM, ProbeRows): 732
+row_regex: .*2 of 2 Runtime Filters Published.*
+====
+
+
+---- QUERY
+####################################################
+# Test case 2: filters on a primary key/partition column
+####################################################
+SET RUNTIME_FILTER_WAIT_TIME_MS=$RUNTIME_FILTER_WAIT_TIME_MS;
+select STRAIGHT_JOIN a.id, a.tinyint_col, b.id, b.tinyint_col
+from alltypes a join [BROADCAST] alltypestiny b
+where a.id = b.tinyint_col * 2;
+---- RESULTS: VERIFY_IS_EQUAL_SORTED
+0,0,4,0
+0,0,2,0
+0,0,0,0
+0,0,6,0
+2,2,3,1
+2,2,7,1
+2,2,5,1
+2,2,1,1
+----TYPES
+INT,TINYINT,INT,TINYINT
+---- RUNTIME_PROFILE
+aggregation(SUM, ProbeRows): 2
+row_regex: .*2 of 2 Runtime Filters Published.*
+====
+---- QUERY
+select STRAIGHT_JOIN count(*) from tpch_kudu.orders a
+join [BROADCAST] tpch_kudu.orders b
+where a.o_orderkey = b.o_orderkey and b.o_orderkey = 100000;
+---- RESULTS
+1
+---- RUNTIME_PROFILE
+aggregation(SUM, ProbeRows): 1
+row_regex: .*2 of 2 Runtime Filters Published.*
+====
+---- QUERY
+select STRAIGHT_JOIN count(*) from tpch_kudu.orders a
+join [BROADCAST] tpch_kudu.orders b
+where a.o_orderkey = b.o_orderkey and b.o_orderkey != 100000;
+---- RESULTS
+1499999
+---- RUNTIME_PROFILE
+aggregation(SUM, ProbeRows): 1499999
+row_regex: .*2 of 2 Runtime Filters Published.*
+====
+---- QUERY
+select STRAIGHT_JOIN count(*) from tpch_kudu.orders a
+join [BROADCAST] tpch_kudu.orders b
+where a.o_orderkey = b.o_orderkey and b.o_orderkey = 100009;
+---- RESULTS
+0
+---- RUNTIME_PROFILE
+aggregation(SUM, ProbeRows): 0
+row_regex: .*2 of 2 Runtime Filters Published.*
+====
+
+
+---- QUERY
+####################################################
+# Test case 3: Target expr has an implicit integer cast.
+# Bloom filter will not be created for join expr with casting,
+# only min-max filter will be created.
+####################################################
+SET RUNTIME_FILTER_WAIT_TIME_MS=$RUNTIME_FILTER_WAIT_TIME_MS;
+select STRAIGHT_JOIN count(*)
+from alltypes a join [BROADCAST] alltypes b
+where a.tinyint_col = b.int_col and b.int_col in (0, 1)
+---- RESULTS
+1065800
+---- RUNTIME_PROFILE
+aggregation(SUM, ProbeRows): 1460
+row_regex: .*1 of 1 Runtime Filter Published.*
+row_regex: .*BloomFilterBytes: 0.*
+====
+
+
+---- QUERY
+####################################################
+# Test case 4: Test is with a SEMI_JOIN since
+# it's a common pattern.
+###################################################
+SET RUNTIME_FILTER_WAIT_TIME_MS=$RUNTIME_FILTER_WAIT_TIME_MS;
+select COUNT(*) from alltypes a
+where a.id in (select b.id from alltypes b where b.int_col < 10);
+---- RESULTS
+7300
+---- RUNTIME_PROFILE
+aggregation(SUM, ProbeRows): 7300
+row_regex: .*2 of 2 Runtime Filters Published.*
+====

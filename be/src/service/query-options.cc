@@ -898,6 +898,14 @@ Status impala::SetQueryOption(const string& key, const string& value,
         query_options->__set_kudu_snapshot_read_timestamp_micros(timestamp);
         break;
       }
+      case TImpalaQueryOptions::ENABLED_RUNTIME_FILTER_TYPES: {
+        // Parse the enabled runtime filter types and validate it.
+        TEnabledRuntimeFilterTypes::type enum_type;
+        RETURN_IF_ERROR(GetThriftEnum(value, "enabled runtime filter types",
+            _TEnabledRuntimeFilterTypes_VALUES_TO_NAMES, &enum_type));
+        query_options->__set_enabled_runtime_filter_types(enum_type);
+        break;
+      }
       default:
         if (IsRemovedQueryOption(key)) {
           LOG(WARNING) << "Ignoring attempt to set removed query option '" << key << "'";

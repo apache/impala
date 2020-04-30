@@ -527,6 +527,14 @@ enum TImpalaQueryOptions {
   // retried query is a brand new query. From the client perspective, requests for the
   // failed query are transparently re-routed to the new query.
   RETRY_FAILED_QUERIES = 102
+
+  // Enabled runtime filter types to be applied to scanner.
+  // This option only apply to Kudu now, will apply to HDFS once we support
+  // min-max filter for HDFS.
+  //     BLOOM   - apply bloom filter only,
+  //     MIN_MAX - apply min-max filter only (default).
+  //     ALL     - apply both bloom filter and min-max filter.
+  ENABLED_RUNTIME_FILTER_TYPES = 103
 }
 
 // The summary of a DML statement.

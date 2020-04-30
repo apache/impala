@@ -226,6 +226,10 @@ TEST(QueryOptions, SetEnumOptions) {
       (OFF, LOCAL, GLOBAL)), true);
   TestEnumCase(options, CASE(kudu_read_mode, TKuduReadMode,
       (DEFAULT, READ_LATEST, READ_AT_SNAPSHOT)), true);
+  TestEnumCase(options,
+      CASE(enabled_runtime_filter_types, TEnabledRuntimeFilterTypes,
+          (BLOOM, MIN_MAX, ALL)),
+      true);
 #undef CASE
 #undef ENTRIES
 #undef ENTRY

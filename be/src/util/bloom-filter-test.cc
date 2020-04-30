@@ -31,6 +31,9 @@
 
 #include "gen-cpp/data_stream_service.pb.h"
 
+// This flag is used in Kudu to temporarily disable AVX2 support for testing purpose.
+DECLARE_bool(disable_blockbloomfilter_avx2);
+
 using namespace std;
 
 using namespace impala;
@@ -47,57 +50,53 @@ uint64_t MakeRand() {
   return result;
 }
 
-// BfInsert() and BfFind() are like BloomFilter::{Insert,Find}, except they randomly
-// disable AVX2 instructions half of the time. These are used for testing that AVX2
-// machines and non-AVX2 machines produce compatible BloomFilters.
+// BfInsert() and BfFind() call BloomFilter::{Insert,Find} respectively.
 
 void BfInsert(BloomFilter& bf, uint32_t h) {
-  if (MakeRand() & 0x1) {
-    bf.Insert(h);
-  } else {
-    CpuInfo::TempDisable t1(CpuInfo::AVX2);
-    bf.Insert(h);
-  }
+  bf.Insert(h);
 }
 
 bool BfFind(BloomFilter& bf, uint32_t h) {
-  if (MakeRand() & 0x1) {
-    return bf.Find(h);
-  } else {
-    CpuInfo::TempDisable t1(CpuInfo::AVX2);
-    return bf.Find(h);
-  }
+  return bf.Find(h);
 }
 
 // Computes union of 'x' and 'y'. Computes twice with AVX enabled and disabled and
 // verifies both produce the same result. 'success' is set to true if both union
 // computations returned the same result and set to false otherwise.
-void BfUnion(const BloomFilter& x, const BloomFilter& y, int64_t directory_size,
-    bool* success, BloomFilterPB* protobuf, std::string* directory) {
+void BfUnion(BloomFilter& x, BloomFilter& y, int64_t directory_size, bool* success,
+    BloomFilterPB* protobuf, std::string* directory) {
   BloomFilterPB protobuf_x, protobuf_y;
   RpcController controller_x;
   RpcController controller_y;
   BloomFilter::ToProtobuf(&x, &controller_x, &protobuf_x);
   BloomFilter::ToProtobuf(&y, &controller_y, &protobuf_y);
 
-  string directory_x(reinterpret_cast<const char*>(x.directory_), directory_size);
-  string directory_y(reinterpret_cast<const char*>(y.directory_), directory_size);
+  FLAGS_disable_blockbloomfilter_avx2 = false;
+  string directory_x(
+      reinterpret_cast<const char*>(x.GetBlockBloomFilter()->directory().data()),
+      directory_size);
+  string directory_y(
+      reinterpret_cast<const char*>(y.GetBlockBloomFilter()->directory().data()),
+      directory_size);
 
   BloomFilter::Or(protobuf_x, reinterpret_cast<const uint8_t*>(directory_x.data()),
       &protobuf_y, reinterpret_cast<uint8_t*>(const_cast<char*>(directory_y.data())),
       directory_size);
 
   {
-    CpuInfo::TempDisable t1(CpuInfo::AVX);
-    CpuInfo::TempDisable t2(CpuInfo::AVX2);
+    FLAGS_disable_blockbloomfilter_avx2 = true;
     BloomFilterPB protobuf_x2, protobuf_y2;
     RpcController controller_x2;
     RpcController controller_y2;
     BloomFilter::ToProtobuf(&x, &controller_x2, &protobuf_x2);
     BloomFilter::ToProtobuf(&y, &controller_y2, &protobuf_y2);
 
-    string directory_x2(reinterpret_cast<const char*>(x.directory_), directory_size);
-    string directory_y2(reinterpret_cast<const char*>(y.directory_), directory_size);
+    string directory_x2(
+        reinterpret_cast<const char*>(x.GetBlockBloomFilter()->directory().data()),
+        directory_size);
+    string directory_y2(
+        reinterpret_cast<const char*>(y.GetBlockBloomFilter()->directory().data()),
+        directory_size);
 
     BloomFilter::Or(protobuf_x2, reinterpret_cast<const uint8_t*>(directory_x2.data()),
         &protobuf_y2, reinterpret_cast<uint8_t*>(const_cast<char*>(directory_y2.data())),
@@ -224,8 +223,11 @@ class BloomFilterTest : public testing::Test {
   BloomFilter* CreateBloomFilter(int log_bufferpool_space) {
     int64_t filter_size = BloomFilter::GetExpectedMemoryUsed(log_bufferpool_space);
     EXPECT_TRUE(buffer_pool_client_->IncreaseReservation(filter_size));
+    // Randomly disable AVX2 instructions half of the time. These are used for testing
+    // that AVX2 machines and non-AVX2 machines produce compatible BloomFilters.
+    FLAGS_disable_blockbloomfilter_avx2 = (MakeRand() & 0x1) == 0;
     BloomFilter* bloom_filter = pool_.Add(new BloomFilter(buffer_pool_client_.get()));
-    EXPECT_OK(bloom_filter->Init(log_bufferpool_space));
+    EXPECT_OK(bloom_filter->Init(log_bufferpool_space, 0));
     bloom_filters_.push_back(bloom_filter);
     EXPECT_NE(bloom_filter->GetBufferPoolSpaceUsed(), -1);
     return bloom_filter;
@@ -235,10 +237,13 @@ class BloomFilterTest : public testing::Test {
     int64_t filter_size =
         BloomFilter::GetExpectedMemoryUsed(filter_pb.log_bufferpool_space());
     EXPECT_TRUE(buffer_pool_client_->IncreaseReservation(filter_size));
+    // Randomly disable AVX2 instructions half of the time. These are used for testing
+    // that AVX2 machines and non-AVX2 machines produce compatible BloomFilters.
+    FLAGS_disable_blockbloomfilter_avx2 = (MakeRand() & 0x1) == 0;
     BloomFilter* bloom_filter = pool_.Add(new BloomFilter(buffer_pool_client_.get()));
 
-    EXPECT_OK(bloom_filter->Init(
-        filter_pb, reinterpret_cast<const uint8_t*>(directory.data()), directory.size()));
+    EXPECT_OK(bloom_filter->Init(filter_pb,
+        reinterpret_cast<const uint8_t*>(directory.data()), directory.size(), 0));
 
     bloom_filters_.push_back(bloom_filter);
     EXPECT_NE(bloom_filter->GetBufferPoolSpaceUsed(), -1);
@@ -248,7 +253,10 @@ class BloomFilterTest : public testing::Test {
 
 // We can construct (and destruct) Bloom filters with different spaces.
 TEST_F(BloomFilterTest, Constructor) {
-  for (int i = 1; i < 30; ++i) {
+  // The minimum log_bufferpool_space size is 5 for bloom filter, which is defined
+  // as BlockBloomFilter.kLogBucketWordBits in kudu/util/block_bloom_filter.h,
+  // and is checked in function BlockBloomFilter.GetExpectedMemoryUsed().
+  for (int i = 5; i < 30; ++i) {
     CreateBloomFilter(i);
   }
 }
@@ -357,7 +365,8 @@ TEST_F(BloomFilterTest, Protobuf) {
 
   EXPECT_EQ(to_protobuf.always_true(), false);
 
-  std::string directory(reinterpret_cast<const char*>(bf->directory_),
+  std::string directory(
+      reinterpret_cast<const char*>(bf->GetBlockBloomFilter()->directory().data()),
       BloomFilter::GetExpectedMemoryUsed(BloomFilter::MinLogSpace(100, 0.01)));
 
   BloomFilter* from_protobuf = CreateBloomFilter(to_protobuf, directory);
