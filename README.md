@@ -22,10 +22,18 @@ you analyze, transform and combine data from a variety of data sources:
 
 ## More about Impala
 
-To learn more about Impala as a business user, or to try Impala live or in a VM, please
+The fastest way to try out Impala is a [quickstart Docker container](
+https://github.com/apache/impala/blob/master/docker/README.md#docker-quickstart-with-docker-compose).
+You can try out running queries and processing data sets in Impala on a single machine
+without installing dependencies. It can automatically load test data sets into Apache Kudu
+and Apache Parquet formats and you can start playing around with Apache Impala SQL
+within minutes.
+
+To learn more about Impala as a user or administrator, or to try Impala, please
 visit the [Impala homepage](https://impala.apache.org). Detailed documentation for
 administrators and users is available at
 [Apache Impala documentation](https://impala.apache.org/impala-docs.html).
+
 
 If you are interested in contributing to Impala as a developer, or learning more about
 Impala's internals and architecture, visit the
