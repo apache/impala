@@ -68,7 +68,7 @@ fi
 # moving to a different build of the toolchain, e.g. when a version is bumped or a
 # compile option is changed. The build id can be found in the output of the toolchain
 # build jobs, it is constructed from the build number and toolchain git hash prefix.
-export IMPALA_TOOLCHAIN_BUILD_ID=7-f2ddef91e9
+export IMPALA_TOOLCHAIN_BUILD_ID=22-f3824b7d15
 # Versions of toolchain dependencies.
 # -----------------------------------
 export IMPALA_AVRO_VERSION=1.7.4-p5
@@ -654,8 +654,8 @@ if [[ -z "${KUDU_IS_SUPPORTED-}" ]]; then
 fi
 export KUDU_IS_SUPPORTED
 
-export IMPALA_KUDU_VERSION=${IMPALA_KUDU_VERSION-"4ed0dbbd1"}
-export IMPALA_KUDU_JAVA_VERSION=${IMPALA_KUDU_JAVA_VERSION-"1.12.0-SNAPSHOT"}
+export IMPALA_KUDU_VERSION=${IMPALA_KUDU_VERSION-"389d4f1e1"}
+export IMPALA_KUDU_JAVA_VERSION=${IMPALA_KUDU_JAVA_VERSION-"1.13.0-SNAPSHOT"}
 export IMPALA_KUDU_HOME=${IMPALA_TOOLCHAIN}/kudu-$IMPALA_KUDU_VERSION
 export IMPALA_KUDU_JAVA_HOME=${IMPALA_TOOLCHAIN}/kudu-${IMPALA_KUDU_VERSION}/java
 export IMPALA_TOOLCHAIN_KUDU_MAVEN_REPOSITORY=\
