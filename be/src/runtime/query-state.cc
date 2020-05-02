@@ -554,7 +554,15 @@ int64_t QueryState::GetReportWaitTimeMs() const {
   int64_t report_interval = query_ctx().status_report_interval_ms > 0 ?
       query_ctx().status_report_interval_ms :
       DEFAULT_REPORT_WAIT_TIME_MS;
-  return report_interval * (num_failed_reports_ + 1);
+  if (num_failed_reports_ == 0) {
+    return report_interval;
+  } else {
+    // Generate a random number between 0 and 1 - we'll retry sometime evenly distributed
+    // between 'report_interval' and 'report_interval * (num_failed_reports_ + 1)', so we
+    // won't hit the "thundering herd" problem.
+    float jitter = static_cast<float>(rand()) / static_cast<float>(RAND_MAX);
+    return report_interval * (num_failed_reports_ * jitter + 1);
+  }
 }
 
 void QueryState::ErrorDuringFragmentCodegen(const Status& status) {
