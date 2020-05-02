@@ -244,13 +244,13 @@ class ImpalaShell(object, cmd.Cmd):
           warning = "WARNING: history_max option malformed %s\n" % options.history_max
           print(warning, file=sys.stderr)
           self.readline.set_history_length(1000)
-        except IOError, i:
+        except IOError as i:
           warning = "WARNING: Unable to load command history (disabling impala-shell " \
               "command history): %s" % i
           print(warning, file=sys.stderr)
           # This history file exists but is not readable, disable readline.
           self._disable_readline()
-      except ImportError, i:
+      except ImportError as i:
         warning = "WARNING: Unable to import readline module (disabling impala-shell " \
             "command history): %s" % i
         print(warning, file=sys.stderr)
