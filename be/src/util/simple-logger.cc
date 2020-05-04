@@ -18,21 +18,26 @@
 #include "util/simple-logger.h"
 
 #include <mutex>
+#include <regex>
 
 #include <boost/date_time/posix_time/posix_time.hpp>
 #include <boost/date_time/posix_time/posix_time_types.hpp>
 #include <boost/filesystem.hpp>
 #include <gutil/strings/substitute.h>
 
-#include "common/names.h"
+#include "kudu/util/path_util.h"
+#include "util/filesystem-util.h"
 #include "util/logging-support.h"
 
-using boost::filesystem::create_directory;
+#include "common/names.h"
+
+using boost::filesystem::create_directories;
 using boost::filesystem::exists;
 using boost::filesystem::is_directory;
 using boost::posix_time::microsec_clock;
 using boost::posix_time::ptime;
 using boost::posix_time::time_from_string;
+using kudu::JoinPathSegments;
 using namespace impala;
 
 const ptime EPOCH = time_from_string("1970-01-01 00:00:00.000");
@@ -41,7 +46,7 @@ Status InitLoggingDir(const string& log_dir) {
   if (!exists(log_dir)) {
     LOG(INFO) << "Log directory does not exist, creating: " << log_dir;
     try {
-      create_directory(log_dir);
+      create_directories(log_dir);
     } catch (const std::exception& e) { // Explicit std:: to distinguish from boost::
       LOG(ERROR) << "Could not create log directory: "
                  << log_dir << ", " << e.what();
@@ -57,12 +62,12 @@ Status InitLoggingDir(const string& log_dir) {
   return Status::OK();
 }
 
-void SimpleLogger::GenerateLogFileName() {
+string SimpleLogger::GenerateLogFileName() {
   stringstream ss;
   int64_t ms_since_epoch =
       (microsec_clock::universal_time() - EPOCH).total_milliseconds();
   ss << log_dir_ << "/" << log_file_name_prefix_ << ms_since_epoch;
-  log_file_name_ = ss.str();
+  return ss.str();
 }
 
 SimpleLogger::SimpleLogger(const string& log_dir, const string& log_file_name_prefix,
@@ -77,21 +82,34 @@ SimpleLogger::SimpleLogger(const string& log_dir, const string& log_file_name_pr
 Status SimpleLogger::Init() {
   // Check that Init hasn't already been called by verifying the log_file_name_ is still
   // empty.
+  DCHECK(!initialized_);
   DCHECK(log_file_name_.empty());
   RETURN_IF_ERROR(InitLoggingDir(log_dir_));
-  GenerateLogFileName();
+  log_file_name_ = GenerateLogFileName();
   RETURN_IF_ERROR(FlushInternal());
   LOG(INFO) << "Logging to: " << log_file_name_;
+  // There may be preexisting files from a previous incarnation of this logger. For
+  // example, if a service restarted and logged in the same locations. Proactively
+  // enforce the limit on the number of files to keep the semantics clear.
+  RotateLogFiles();
+  initialized_ = true;
   return Status::OK();
 }
 
 Status SimpleLogger::AppendEntry(const std::string& entry) {
+  DCHECK(initialized_);
   lock_guard<mutex> l(log_file_lock_);
   if (num_log_file_entries_ >= max_entries_per_file_) {
     num_log_file_entries_ = 0;
-    GenerateLogFileName();
-    RETURN_IF_ERROR(FlushInternal());
-    RotateLogFiles();
+    // The log file is generated from a prefix and the timestamp in milliseconds. If
+    // the timestamp hasn't changed, then we continue logging to the same file. In that
+    // case, there is no need to enforce the limit on the number of log files.
+    string next_log_file_name = GenerateLogFileName();
+    if (next_log_file_name != log_file_name_) {
+      log_file_name_ = next_log_file_name;
+      RETURN_IF_ERROR(FlushInternal());
+      RotateLogFiles();
+    }
   }
   if (!log_file_.is_open()) return Status("Log file is not open: " + log_file_name_);
    // Not std::endl, since that causes an implicit flush
@@ -101,6 +119,7 @@ Status SimpleLogger::AppendEntry(const std::string& entry) {
 }
 
 Status SimpleLogger::Flush() {
+  DCHECK(initialized_);
   lock_guard<mutex> l(log_file_lock_);
   return FlushInternal();
 }
@@ -121,4 +140,23 @@ void SimpleLogger::RotateLogFiles() {
   string log_file_name = strings::Substitute("$0/$1*", log_dir_, log_file_name_prefix_);
 
   impala::LoggingSupport::DeleteOldLogs(log_file_name, max_log_files_);
+}
+
+Status SimpleLogger::GetLogFiles(const string& log_dir,
+    const string& log_file_name_prefix, vector<string>* log_file_list) {
+  string log_file_regex = Substitute("$0[0-9]+", log_file_name_prefix);
+  DCHECK(log_file_list != nullptr);
+  log_file_list->clear();
+
+  vector<string> log_file_list_tmp;
+  RETURN_IF_ERROR(FileSystemUtil::Directory::GetEntryNames(log_dir, &log_file_list_tmp,
+      0, FileSystemUtil::Directory::DIR_ENTRY_REG, log_file_regex));
+
+  std::sort(log_file_list_tmp.begin(), log_file_list_tmp.end());
+
+  for (const string& filename : log_file_list_tmp) {
+    log_file_list->push_back(JoinPathSegments(log_dir, filename));
+  }
+
+  return Status::OK();
 }

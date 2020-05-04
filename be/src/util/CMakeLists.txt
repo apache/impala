@@ -136,6 +136,7 @@ add_library(UtilTests STATIC
   redactor-unconfigured-test.cc
   rle-test.cc
   runtime-profile-test.cc
+  simple-logger-test.cc
   string-parser-test.cc
   string-util-test.cc
   symbols-util-test.cc
@@ -201,6 +202,7 @@ ADD_UNIFIED_BE_LSAN_TEST(redactor-test "RedactorTest.*")
 ADD_UNIFIED_BE_LSAN_TEST(redactor-unconfigured-test "RedactorUnconfigTest.*")
 ADD_UNIFIED_BE_LSAN_TEST(rle-test "BitArray.*:RleTest.*")
 ADD_UNIFIED_BE_LSAN_TEST(runtime-profile-test "CountersTest.*:TimerCounterTest.*:TimeSeriesCounterTest.*:VariousNumbers/TimeSeriesCounterResampleTest.*:ToThrift.*:ToJson.*")
+ADD_UNIFIED_BE_LSAN_TEST(simple-logger-test "SimpleLoggerTest.*")
 ADD_UNIFIED_BE_LSAN_TEST(string-parser-test "StringToInt.*:StringToIntWithBase.*:StringToFloat.*:StringToBool.*:StringToDate.*")
 ADD_UNIFIED_BE_LSAN_TEST(string-util-test "TruncateDownTest.*:TruncateUpTest.*:CommaSeparatedContainsTest.*")
 ADD_UNIFIED_BE_LSAN_TEST(symbols-util-test "SymbolsUtil.*")

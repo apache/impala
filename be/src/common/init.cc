@@ -74,10 +74,6 @@ DECLARE_string(redaction_rules_file);
 DECLARE_string(reserved_words_version);
 DECLARE_bool(symbolize_stacktrace);
 
-DEFINE_int32(max_audit_event_log_files, 0, "Maximum number of audit event log files "
-    "to retain. The most recent audit event log files are retained. If set to 0, "
-    "all audit event log files are retained.");
-
 DEFINE_int32(memory_maintenance_sleep_time_ms, 10000, "Sleep time in milliseconds "
     "between memory maintenance iterations");
 
@@ -146,8 +142,6 @@ extern "C" { void __gcov_flush(); }
     if (impala::TestInfo::is_test()) continue;
     // Check for log rotation in every interval of the maintenance thread
     impala::CheckAndRotateLogFiles(FLAGS_max_log_files);
-    // Check for audit event log rotation in every interval of the maintenance thread
-    impala::CheckAndRotateAuditEventLogFiles(FLAGS_max_audit_event_log_files);
     // Check for minidump rotation in every interval of the maintenance thread. This is
     // necessary since an arbitrary number of minidumps can be written by sending SIGUSR1
     // to the process.

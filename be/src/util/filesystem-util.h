@@ -140,9 +140,12 @@ class FileSystemUtil {
     /// entry is returned. Directory entries "." and ".." will be skipped. If 'type' is
     /// specified and filesystem of 'path' supports returning type of directory entries,
     /// only entries of 'type' will be included in 'entry_names'. Otherwise, it will
-    /// include entries of all types.
+    /// include entries of all types. Optionally, a 'regex' can be specified. If the
+    /// regex is not empty, only entries that match the regex are returned. See
+    /// std::regex for the regex pattern syntax.
     static Status GetEntryNames(const string& path, std::vector<std::string>* entry_names,
-        int max_result_size = 0, EntryType type = DIR_ENTRY_ANY);
+        int max_result_size = 0, EntryType type = DIR_ENTRY_ANY,
+        const std::string& regex = "");
 
    private:
     DIR* dir_stream_;
