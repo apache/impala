@@ -200,7 +200,7 @@ class RowBatch {
     // MarkFlushResources().
     DCHECK((!needs_deep_copy_ && flush_mode_ == FlushMode::NO_FLUSH_RESOURCES)
         || num_rows_ == capacity_);
-    int64_t mem_usage = attached_buffer_bytes_ + tuple_data_pool_.total_allocated_bytes();
+    int64_t mem_usage = attached_buffer_bytes_ + tuple_data_pool_.total_reserved_bytes();
     return num_rows_ == capacity_ || mem_usage >= AT_CAPACITY_MEM_USAGE;
   }
 

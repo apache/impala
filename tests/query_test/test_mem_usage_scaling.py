@@ -228,6 +228,7 @@ class TestTpchMemLimitError(TestLowMemoryLimits):
       verifier = MetricVerifier(impalad.service)
       verifier.wait_for_metric("impala-server.num-fragments-in-flight", 0)
 
+
 @SkipIfNotHdfsMinicluster.tuned_for_minicluster
 class TestTpchPrimitivesMemLimitError(TestLowMemoryLimits):
   """
@@ -365,6 +366,32 @@ class TestScanMemLimit(ImpalaTestSuite):
     # Remove num_nodes setting to allow .test file to set num_nodes.
     del vector.get_value('exec_option')['num_nodes']
     self.run_test_case('QueryTest/hdfs-scanner-thread-mem-scaling', vector)
+
+
+@SkipIfNotHdfsMinicluster.tuned_for_minicluster
+class TestHashJoinMemLimit(ImpalaTestSuite):
+  """Targeted test for scan memory limits."""
+
+  @classmethod
+  def get_workload(self):
+    return 'tpch'
+
+  @classmethod
+  def add_test_dimensions(cls):
+    super(TestHashJoinMemLimit, cls).add_test_dimensions()
+    cls.ImpalaTestMatrix.add_dimension(create_single_exec_option_dimension())
+    cls.ImpalaTestMatrix.add_dimension(create_parquet_dimension(cls.get_workload()))
+
+  def test_low_mem_limit_selective_scan_hash_join(self, vector):
+    """Selective scan with hash join and aggregate above it. Regression test for
+    IMPALA-9712 - before the fix this ran out of memory."""
+    OPTS = {'mem_limit': "60MB", 'mt_dop': 1}
+    self.change_database(self.client, vector.get_value('table_format'))
+    result = self.execute_query_expect_success(self.client,
+        """select sum(l_extendedprice * (1 - l_discount)) as revenue
+           from lineitem join part on p_partkey = l_partkey
+           where l_comment like 'ab%'""", query_options=OPTS)
+    assert result.data[0] == '440443181.0505'
 
 
 @SkipIfNotHdfsMinicluster.tuned_for_minicluster
