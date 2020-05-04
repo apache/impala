@@ -1,7 +1,7 @@
 build
-ext-py/sasl-0.1.1/dist/
-ext-py/sasl-0.1.1/build/
-ext-py/sasl-0.1.1/sasl.egg-info/
+ext-py/sasl-0.2.1/dist/
+ext-py/sasl-0.2.1/build/
+ext-py/sasl-0.2.1/sasl.egg-info/
 ext-py/six-1.14.0/dist/
 ext-py/six-1.14.0/build/
 ext-py/six-1.14.0/six.egg-info/
@@ -22,6 +22,7 @@ ext-py/thrift_sasl-0.4.2/six.egg-info/
 # may cause a build failure. Also the ignore path must be changed to the root folder
 # so "git clean -Xdf" will work.
 ext-py/bitarray-0.9.0/
+ext-py/sasl-0.1.1/
 ext-py/six-1.11.0/
 ext-py/sqlparse-0.1.7/
 ext-py/sqlparse-0.1.19/
