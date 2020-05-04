@@ -17,7 +17,8 @@
  * under the License.
 */
 
-#include "saslwrapper.h"
+#include <stdint.h>
+#include <string>
 #include <sasl/sasl.h>
 #include <sstream>
 #include <stdlib.h>
@@ -26,23 +27,117 @@
 #include <iostream>
 
 using namespace std;
-using namespace saslwrapper;
 
 namespace saslwrapper {
 
     class ClientImpl {
-        friend class Client;
+    public:
         ClientImpl() : conn(0), cbIndex(0), maxBufSize(65535), minSsf(0), maxSsf(65535), externalSsf(0), secret(0) {}
         ~ClientImpl() { if (conn) sasl_dispose(&conn); conn = 0; }
+
+        /**
+         * Set attributes to be used in authenticating the session.  All attributes should be set
+         * before init() is called.
+         *
+         * @param key Name of attribute being set
+         * @param value Value of attribute being set
+         * @return true iff success.  If false is returned, call getError() for error details.
+         *
+         * Available attribute keys:
+         *
+         *    service      - Name of the service being accessed
+         *    username     - User identity for authentication
+         *    authname     - User identity for authorization (if different from username)
+         *    password     - Password associated with username
+         *    host         - Fully qualified domain name of the server host
+         *    maxbufsize   - Maximum receive buffer size for the security layer
+         *    minssf       - Minimum acceptable security strength factor (integer)
+         *    maxssf       - Maximum acceptable security strength factor (integer)
+         *    externalssf  - Security strength factor supplied by external mechanism (i.e. SSL/TLS)
+         *    externaluser - Authentication ID (of client) as established by external mechanism
+         */
         bool setAttr(const string& key, const string& value);
         bool setAttr(const string& key, uint32_t value);
+        
+        /**
+         * Initialize the client object.  This should be called after all of the properties have been set.
+         *
+         * @return true iff success.  If false is returned, call getError() for error details.
+         */
         bool init();
-        bool start(const string& mechList, output_string& chosen, output_string& initialResponse);
-        bool step(const string& challenge, output_string& response);
-        bool encode(const string& clearText, output_string& cipherText);
-        bool decode(const string& cipherText, output_string& clearText);
-        bool getUserId(output_string& userId);
-        void getError(output_string& error);
+
+        /**
+         * Start the SASL exchange with the server.
+         *
+         * @param mechList List of mechanisms provided by the server
+         * @param chosen The mechanism chosen by the client
+         * @param initialResponse Initial block of data to send to the server
+         *
+         * @return true iff success.  If false is returned, call getError() for error details.
+         */
+        bool start(const string& mechList, string& chosen, string& initialResponse);
+        
+        /**
+         * Step the SASL handshake.
+         *
+         * @param challenge The challenge supplied by the server
+         * @param response (output) The response to be sent back to the server
+         *
+         * @return true iff success.  If false is returned, call getError() for error details.
+         */
+        bool step(const string& challenge, string& response);
+
+        /**
+         * Encode data for secure transmission to the server.
+         *
+         * @param clearText Clear text data to be encrypted
+         * @param cipherText (output) Encrypted data to be transmitted
+         *
+         * @return true iff success.  If false is returned, call getError() for error details.
+         */
+        bool encode(const string& clearText, string& cipherText);
+
+        /**
+         * Decode data received from the server.
+         *
+         * @param cipherText Encrypted data received from the server
+         * @param clearText (output) Decrypted clear text data 
+         *
+         * @return true iff success.  If false is returned, call getError() for error details.
+         */
+        bool decode(const string& cipherText, string& clearText);
+
+        /**
+         * Get the user identity (used for authentication) associated with this session.
+         * Note that this is particularly useful for single-sign-on mechanisms in which the 
+         * username is not supplied by the application.
+         *
+         * @param userId (output) Authenticated user ID for this session.
+         */
+        bool getUserId(string& userId);
+
+        /**
+         * Get the security strength factor associated with this session.
+         *
+         * @param ssf (output) Negotiated SSF value.
+         */
+        bool getSSF(int *ssf);
+
+        /**
+         * Get error message for last error.
+         * This function will return the last error message then clear the error state.
+         * If there was no error or the error state has been cleared, this function will output
+         * an empty string.
+         *
+         * @param error Error message string
+         */        
+        void getError(string& error);
+
+    private:
+        // Declare private copy constructor and assignment operator.  Ensure that this
+        // class is non-copyable.
+        ClientImpl(const ClientImpl&);
+        const ClientImpl& operator=(const ClientImpl&);
 
         void addCallback(unsigned long id, void* proc);
         void lastCallback() { addCallback(SASL_CB_LIST_END, 0); }
@@ -71,6 +166,8 @@ namespace saslwrapper {
     };
 }
 
+using namespace saslwrapper;
+
 bool ClientImpl::initialized = false;
 
 bool ClientImpl::init()
@@ -86,7 +183,6 @@ bool ClientImpl::init()
         }
     }
 
-    int cbIndex = 0;
 
     addCallback(SASL_CB_GETREALM, 0);
     if (!userName.empty()) {
@@ -193,7 +289,7 @@ bool ClientImpl::setAttr(const string& key, uint32_t value)
     return true;
 }
 
-bool ClientImpl::start(const string& mechList, output_string& chosen, output_string& initialResponse)
+bool ClientImpl::start(const string& mechList, string& chosen, string& initialResponse)
 {
     int result;
     sasl_interact_t* prompt = 0;
@@ -216,7 +312,7 @@ bool ClientImpl::start(const string& mechList, output_string& chosen, output_str
     return true;
 }
 
-bool ClientImpl::step(const string& challenge, output_string& response)
+bool ClientImpl::step(const string& challenge, string& response)
 {
     int result;
     sasl_interact_t* prompt = 0;
@@ -237,7 +333,7 @@ bool ClientImpl::step(const string& challenge, output_string& response)
     return true;
 }
 
-bool ClientImpl::encode(const string& clearText, output_string& cipherText)
+bool ClientImpl::encode(const string& clearText, string& cipherText)
 {
     const char* output;
     unsigned int outlen;
@@ -250,7 +346,7 @@ bool ClientImpl::encode(const string& clearText, output_string& cipherText)
     return true;
 }
 
-bool ClientImpl::decode(const string& cipherText, output_string& clearText)
+bool ClientImpl::decode(const string& cipherText, string& clearText)
 {
     const char* input = cipherText.c_str();
     unsigned int inLen = cipherText.size();
@@ -274,7 +370,7 @@ bool ClientImpl::decode(const string& cipherText, output_string& clearText)
     return true;
 }
 
-bool ClientImpl::getUserId(output_string& userId)
+bool ClientImpl::getUserId(string& userId)
 {
     int result;
     const char* operName;
@@ -289,7 +385,18 @@ bool ClientImpl::getUserId(output_string& userId)
     return true;
 }
 
-void ClientImpl::getError(output_string& _error)
+bool ClientImpl::getSSF(int *ssf)
+{
+    int result = sasl_getprop(conn, SASL_SSF, (const void **)&ssf);
+    if (result != SASL_OK) {
+        setError("sasl_getprop(SASL_SSF)", result);
+        return false;
+    }
+
+    return true;
+}
+
+void ClientImpl::getError(string& _error)
 {
     _error = error;
     error.clear();
@@ -306,8 +413,19 @@ void ClientImpl::addCallback(unsigned long id, void* proc)
 void ClientImpl::setError(const string& context, int code, const string& text, const string& text2)
 {
     stringstream err;
-    string etext(text.empty() ? sasl_errdetail(conn) : text);
-    err << "Error in " << context << " (" << code << ") " << etext;
+    string errtext;
+
+    if (text.empty()) {
+        if (conn) {
+            errtext = sasl_errdetail(conn);
+        } else {
+            errtext = sasl_errstring(code, NULL, NULL);
+        }
+    } else {
+        errtext = text;
+    }
+
+    err << "Error in " << context << " (" << code << ") " << errtext;
     if (!text2.empty())
         err << " - " << text2;
     error = err.str();
@@ -363,21 +481,3 @@ int ClientImpl::cbPassword(sasl_conn_t *conn, void *context, int id, sasl_secret
     *psecret = impl->secret;
     return SASL_OK;
 }
-
-
-//==========================================================
-// WRAPPERS
-//==========================================================
-
-Client::Client() : impl(new ClientImpl()) {}
-Client::~Client() { delete impl; }
-bool Client::setAttr(const string& key, const string& value) { return impl->setAttr(key, value); }
-bool Client::setAttr(const string& key, uint32_t value) { return impl->setAttr(key, value); }
-bool Client::init() { return impl->init(); }
-bool Client::start(const string& mechList, output_string& chosen, output_string& initialResponse) { return impl->start(mechList, chosen, initialResponse); }
-bool Client::step(const string& challenge, output_string& response) { return impl->step(challenge, response); }
-bool Client::encode(const string& clearText, output_string& cipherText) { return impl->encode(clearText, cipherText); }
-bool Client::decode(const string& cipherText, output_string& clearText) { return impl->decode(cipherText, clearText); }
-bool Client::getUserId(output_string& userId) { return impl->getUserId(userId); }
-void Client::getError(output_string& error) { impl->getError(error); }
-
