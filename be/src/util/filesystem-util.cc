@@ -26,6 +26,7 @@
 #include <sys/stat.h>
 
 #include <memory>
+#include <regex>
 #include <string>
 #include <vector>
 
@@ -329,14 +330,18 @@ bool FileSystemUtil::Directory::GetNextEntryName(string* entry_name, EntryType t
 }
 
 Status FileSystemUtil::Directory::GetEntryNames(const string& path,
-    vector<string>* entry_names, int max_result_size, EntryType type) {
+    vector<string>* entry_names, int max_result_size, EntryType type,
+    const string& regex) {
   DCHECK(entry_names != nullptr);
 
   Directory dir(path);
   entry_names->clear();
+  std::regex entry_regex(regex);
   string entry_name;
   while ((max_result_size <= 0 || entry_names->size() < max_result_size) &&
-      dir.GetNextEntryName(&entry_name, type)) {
+         dir.GetNextEntryName(&entry_name, type)) {
+    // If there is a regex and the regex doesn't match, skip this entry
+    if (regex.size() != 0 && !std::regex_match(entry_name, entry_regex)) continue;
     entry_names->push_back(entry_name);
   }
 

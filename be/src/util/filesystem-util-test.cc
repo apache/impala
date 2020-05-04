@@ -175,6 +175,43 @@ TEST(FilesystemUtil, DirEntryTypes) {
   EXPECT_TRUE(entries[0] == "impala-file");
 }
 
+TEST(FilesystemUtil, Regexes) {
+  // Setup a temporary directory with one subdir
+  path base_dir = filesystem::unique_path();
+  path dir = base_dir / "regex-test-dir";
+  path foo1 = dir / "foo1";
+  path foo2 = dir / "foo2";
+  path foo_subdir = dir / "foo_subdir";
+  path bar1 = dir / "bar1";
+  path bar_subdir = dir / "bar_subdir";
+
+  // Always cleanup on exit.
+  auto remove_dir = MakeScopeExitTrigger([&dir]() { filesystem::remove_all(dir); });
+
+  ASSERT_OK(FileSystemUtil::RemoveAndCreateDirectory(dir.string()));
+  ASSERT_OK(FileSystemUtil::CreateFile(foo1.string()));
+  ASSERT_OK(FileSystemUtil::CreateFile(foo2.string()));
+  ASSERT_OK(FileSystemUtil::RemoveAndCreateDirectory(foo_subdir.string()));
+  ASSERT_OK(FileSystemUtil::CreateFile(bar1.string()));
+  ASSERT_OK(FileSystemUtil::RemoveAndCreateDirectory(bar_subdir.string()));
+
+  vector<string> entries;
+  ASSERT_OK(FileSystemUtil::Directory::GetEntryNames(dir.string(), &entries, 0,
+      FileSystemUtil::Directory::DIR_ENTRY_ANY, "foo.*"));
+  ASSERT_EQ(entries.size(), 3);
+  for (const string& entry : entries) {
+    EXPECT_TRUE(entry == "foo1" || entry == "foo2" || entry == "foo_subdir");
+  }
+
+  entries.clear();
+  ASSERT_OK(FileSystemUtil::Directory::GetEntryNames(dir.string(), &entries, 0,
+      FileSystemUtil::Directory::DIR_ENTRY_ANY, "foo[0-9]"));
+  ASSERT_EQ(entries.size(), 2);
+  for (const string& entry : entries) {
+    EXPECT_TRUE(entry == "foo1" || entry == "foo2");
+  }
+}
+
 TEST(FilesystemUtil, PathExists) {
   path dir = filesystem::unique_path();
 

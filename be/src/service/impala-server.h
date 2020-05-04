@@ -500,9 +500,6 @@ class ImpalaServer : public ImpalaServiceIf,
   // Mapping between query option names and levels
   QueryOptionLevels query_option_levels_;
 
-  /// The prefix of audit event log filename.
-  static const std::string AUDIT_EVENT_LOG_FILE_PREFIX;
-
   /// The default executor group name for executors that do not explicitly belong to a
   /// specific executor group.
   static const std::string DEFAULT_EXECUTOR_GROUP_NAME;

@@ -113,11 +113,6 @@ void LogCommandLineFlags();
 /// removes the oldest ones given an upper bound of number of logfiles to keep.
 void CheckAndRotateLogFiles(int max_log_files);
 
-/// Helper function that checks for the number of audit event logfiles in the log
-/// directory and removes the oldest ones given an upper bound of number of audit event
-/// logfiles to keep.
-void CheckAndRotateAuditEventLogFiles(int max_log_files);
-
 #endif // IR_COMPILE
 
 /// Prints v in base 10.

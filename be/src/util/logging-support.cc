@@ -261,8 +261,14 @@ void LoggingSupport::DeleteOldLogs(const string& path_pattern, int max_log_files
   // Ignore bad input or disable log rotation
   if (max_log_files <= 0) return;
 
-  // Map capturing mtimes, oldest files first
-  typedef map<time_t, string> LogFileMap;
+  // Modification time has resolution of seconds, so if there are high frequency updates,
+  // there may be multiple log files with the same mtime. This set keeps mtime,
+  // filename pairs, which allows tracking multiple files with the same mtime. This set
+  // is sorted by mtime first with mtime ties broken by comparison of the filenames. This
+  // is a good fit for the log files, because the log files commonly have a prefix + a
+  // timestamp. Sorting on the filename in this case is sorting from oldest to newest,
+  // which matches the mtime sorting.
+  typedef set<pair<time_t, string>> LogFileMap;
 
   LogFileMap log_file_mtime;
   glob_t result;
@@ -285,11 +291,12 @@ void LoggingSupport::DeleteOldLogs(const string& path_pattern, int max_log_files
                  << strerror(errno) << ")";
       continue;
     }
-    log_file_mtime[stat_val.st_mtime] = result.gl_pathv[i];
+    // Add mtime, filename pair to the set
+    discard_result(log_file_mtime.emplace(stat_val.st_mtime, result.gl_pathv[i]));
   }
   globfree(&result);
 
-  // Iterate over the map and remove oldest log files first when too many
+  // Iterate over the set and remove oldest log files first when too many
   // log files exist
   if (log_file_mtime.size() <= max_log_files) return;
   int files_to_delete = log_file_mtime.size() - max_log_files;

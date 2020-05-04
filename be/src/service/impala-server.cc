@@ -165,6 +165,9 @@ DEFINE_string(audit_event_log_dir, "", "The directory in which audit event log f
     "written. Setting this flag will enable audit event logging.");
 DEFINE_bool(abort_on_failed_audit_event, true, "Shutdown Impala if there is a problem "
     "recording an audit event.");
+DEFINE_int32(max_audit_event_log_files, 0, "Maximum number of audit event log files "
+    "to retain. The most recent audit event log files are retained. If set to 0, "
+    "all audit event log files are retained.");
 
 DEFINE_int32(max_lineage_log_file_size, 5000, "The maximum size (in queries) of "
     "the lineage event log file before a new one is created (if lineage logging is "
@@ -343,7 +346,7 @@ namespace impala {
 // relative to UTC. The same time zone change was made for the audit log, but the
 // version was kept at 1.0 because there is no known consumer of the timestamp.
 const string PROFILE_LOG_FILE_PREFIX = "impala_profile_log_1.1-";
-const string ImpalaServer::AUDIT_EVENT_LOG_FILE_PREFIX = "impala_audit_event_log_1.0-";
+const string AUDIT_EVENT_LOG_FILE_PREFIX = "impala_audit_event_log_1.0-";
 const string LINEAGE_LOG_FILE_PREFIX = "impala_lineage_log_1.0-";
 
 const uint32_t MAX_CANCELLATION_QUEUE_SIZE = 65536;
@@ -597,7 +600,8 @@ Status ImpalaServer::InitAuditEventLogging() {
     return Status::OK();
   }
   audit_event_logger_.reset(new SimpleLogger(FLAGS_audit_event_log_dir,
-     AUDIT_EVENT_LOG_FILE_PREFIX, FLAGS_max_audit_event_log_file_size));
+      AUDIT_EVENT_LOG_FILE_PREFIX, FLAGS_max_audit_event_log_file_size,
+      FLAGS_max_audit_event_log_files));
   RETURN_IF_ERROR(audit_event_logger_->Init());
   RETURN_IF_ERROR(Thread::Create("impala-server", "audit-event-log-flush",
       &ImpalaServer::AuditEventLoggerFlushThread, this,

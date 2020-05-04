@@ -47,7 +47,19 @@ class SimpleLogger {
   /// thread safe and blocks while an AppendEntry() is in progress
   Status Flush();
 
+  /// Get the list of log files from the specific log directory with the specified file
+  /// name prefix. The list is sorted by the order in which the files were written.
+  /// Since this function is used for offline analysis, developers may manipulate log
+  /// files or generate log files. So, this does not use the filesystem's creation or
+  /// modification times for ordering. Instead, it uses the timestamps embedded in the
+  /// filenames.
+  static Status GetLogFiles(const std::string& log_dir,
+      const std::string& log_file_name_prefix, std::vector<std::string>* log_file_list);
+
  private:
+  /// Whether Init() has been called
+  bool initialized_ = false;
+
   /// Protects log_file_, num_log_file_entries_ and log_file_name_
   std::mutex log_file_lock_;
 
@@ -76,7 +88,7 @@ class SimpleLogger {
 
   /// Generates and sets a new log file name that is based off the log file name prefix
   /// and the current system time. The format will be: PREFIX-<UTC timestamp>
-  void GenerateLogFileName();
+  std::string GenerateLogFileName();
 
   /// Flushes the log file to disk (closes and reopens the file). Must be called with the
   /// log_file_lock_ held.
