@@ -61,6 +61,11 @@ class TestAcid(ImpalaTestSuite):
     self.run_test_case('QueryTest/acid-compaction', vector, use_db=unique_database)
 
   @SkipIfHive2.acid
+  @SkipIfS3.hive
+  @SkipIfABFS.hive
+  @SkipIfADLS.hive
+  @SkipIfIsilon.hive
+  @SkipIfLocal.hive
   def test_acid_negative(self, vector, unique_database):
     self.run_test_case('QueryTest/acid-negative', vector, use_db=unique_database)
 
