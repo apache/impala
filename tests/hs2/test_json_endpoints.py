@@ -101,12 +101,7 @@ class TestJsonEndpoints(HS2TestSuite):
       return len(queries_json["in_flight_queries"]) == 0
 
     self.assert_eventually(60, 0.1, no_inflight_queries)
-    start_time = time()
-    TIMEOUT_S = 60
-    while time() - start_time < TIMEOUT_S:
-      queries_json = self._get_json_queries(http_addr)
-      if len(queries_json["in_flight_queries"]) == 0:
-        break
+    queries_json = self._get_json_queries(http_addr)
     assert len(queries_json["in_flight_queries"]) == 0
     assert queries_json["num_in_flight_queries"] == 0
     assert queries_json["num_executing_queries"] == 0
