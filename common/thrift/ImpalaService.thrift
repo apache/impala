@@ -663,7 +663,10 @@ struct TGetRuntimeProfileResp {
 }
 
 service ImpalaHiveServer2Service extends TCLIService.TCLIService {
-  // Returns the exec summary for the given query
+  // Returns the exec summary for the given query. The exec summary is only valid for
+  // queries that execute with Impala's backend, i.e. QUERY, DML and COMPUTE_STATS
+  // queries. Otherwise a default-initialized TExecSummary is returned for
+  // backwards-compatibility with impala-shell - see IMPALA-9729.
   TGetExecSummaryResp GetExecSummary(1:TGetExecSummaryReq req);
 
   // Returns the runtime profile string for the given query
