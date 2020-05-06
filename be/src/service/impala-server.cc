@@ -736,6 +736,9 @@ Status ImpalaServer::GetExecSummary(const TUniqueId& query_id, const string& use
         // TODO: does this not need to be synchronized?
         result->__set_progress(progress);
         return Status::OK();
+      } else {
+        *result = TExecSummary();
+        return Status::OK();
       }
     }
   }
