@@ -80,6 +80,7 @@ TEST(IncrStatsUtilTest, TestEncode) {
  */
 TEST(IncrStatsUtilTest, TestNumNullAggregation) {
   PerColumnStats* stat = new PerColumnStats();
+  ASSERT_EQ(0, stat->ToTColumnStats().num_nulls);
 
   stat->Update(string(AggregateFunctions::HLL_LEN, 0), 0, 0, 0, 1);
   ASSERT_EQ(1, stat->ToTColumnStats().num_nulls);
@@ -101,4 +102,25 @@ TEST(IncrStatsUtilTest, TestNumNullAggregation) {
 
   stat->Update(string(AggregateFunctions::HLL_LEN, 0), 0, 0, 0, -1);
   ASSERT_EQ(-1, stat->ToTColumnStats().num_nulls);
+}
+
+/**
+ * This test updates a PerColumnStats object with new partition stat values 'new_num_null'
+ * and 'new_avg_width'. Then checks if the aggregated average size of the partition column
+ * stat is accurate after the PerColumnStats.Finalize method has been called.
+*/
+TEST(IncrStatsUtilTest, TestAvgSizehAggregation) {
+  PerColumnStats* stat = new PerColumnStats();
+
+  stat->Update(string(AggregateFunctions::HLL_LEN, 0), 1, 4, 0, 0);
+  stat->Finalize();
+  ASSERT_EQ(4, stat->ToTColumnStats().avg_size);
+
+  stat->Update(string(AggregateFunctions::HLL_LEN, 0), 2, 7, 0, 0);
+  stat->Finalize();
+  ASSERT_EQ(6, stat->ToTColumnStats().avg_size);
+
+  stat->Update(string(AggregateFunctions::HLL_LEN, 0), 0, 0, 0, 0);
+  stat->Finalize();
+  ASSERT_EQ(6, stat->ToTColumnStats().avg_size);
 }

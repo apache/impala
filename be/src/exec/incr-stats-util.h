@@ -44,18 +44,18 @@ struct PerColumnStats {
 
   // The sum of avg_width * num_rows for each partition, so that avg_width can be
   // correctly computed during Finalize()
-  // TODO: IMPALA-9722: consolidate unused total_width and the way avg_width is computed
   double total_width;
 
   // Populated after Finalize(), the result of the HLL computation
   int64_t ndv_estimate;
 
-  // The average column width, in bytes (but may have non-integer value)
+  // Populated after Finalize(), the average column width, in bytes (but may have
+  // non-integer value)
   double avg_width;
 
   PerColumnStats()
       : intermediate_ndv(AggregateFunctions::HLL_LEN, 0), num_nulls(0),
-      max_width(0), num_rows(0), avg_width(0) { }
+      max_width(0), num_rows(0), total_width(0) { }
 
   /// Updates all aggregate statistics with a new set of measurements.
   void Update(const string& ndv, int64_t num_new_rows, double new_avg_width,

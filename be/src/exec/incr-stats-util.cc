@@ -133,14 +133,14 @@ void PerColumnStats::Update(const string& ndv, int64_t num_new_rows, double new_
     }
   }
   max_width = ::max(max_width, max_new_width);
-  avg_width += (new_avg_width * num_new_rows);
+  total_width += (new_avg_width * num_new_rows);
   num_rows += num_new_rows;
 }
 
 void PerColumnStats::Finalize() {
   ndv_estimate = AggregateFunctions::HllFinalEstimate(
       reinterpret_cast<const uint8_t*>(intermediate_ndv.data()));
-  avg_width = num_rows == 0 ? 0 : avg_width / num_rows;
+  avg_width = num_rows == 0 ? 0 : total_width / num_rows;
 }
 
 TColumnStats PerColumnStats::ToTColumnStats() const {
