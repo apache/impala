@@ -51,8 +51,7 @@ under the License.
       </p>
 
       <p>
-        Currently, the operations affected by the <codeph>MT_DOP</codeph>
-        query option are:
+        Currently, <codeph>MT_DOP</codeph> support varies by statement type:
       </p>
       <ul>
         <li>
@@ -64,11 +63,28 @@ under the License.
         </li>
         <li>
           <p>
-            Queries with execution plans containing only scan and aggregation operators,
-            or local joins that do not need data exchanges (such as for nested types).
-            Other queries produce an error if <codeph>MT_DOP</codeph> is set to a non-zero
-            value. Therefore, this query option is typically only set for the duration of
-            specific long-running, CPU-intensive queries.
+            <codeph>SELECT</codeph> statements. <codeph>MT_DOP</codeph> is 0 by default
+            for <codeph>SELECT</codeph> statements but can be set to a value greater
+            than 0 to control intra-node parallelism. This may be useful to tune
+            query performance and in particular to reduce execution time of
+            long-running, CPU-intensive queries.
+          </p>
+        </li>
+        <li>
+          <p>
+            <codeph>DML</codeph> statements. <codeph>MT_DOP</codeph> values greater
+            than zero are not currently supported for DML statements. DML statements
+            will produce an error if <codeph>MT_DOP</codeph> is set to a non-zero value.
+          </p>
+        </li>
+        <li>
+          <p>
+            In <keyword keyref="impala34"/> and earlier, not all <codeph>SELECT</codeph>
+            statements support setting <codeph>MT_DOP</codeph>. Specifically, only
+            scan and aggregation operators, and
+            local joins that do not need data exchanges (such as for nested types) are
+            supported. Other <codeph>SELECT</codeph> statements produce an error if
+            <codeph>MT_DOP</codeph> is set to a non-zero value.
           </p>
         </li>
       </ul>
@@ -149,7 +165,7 @@ compute stats billion_rows_parquet;
 
     <p>
       The following example shows the effects of setting <codeph>MT_DOP</codeph>
-      for a query involving only scan and aggregation operations for a Parquet table:
+      for a query on a Parquet table:
     </p>
 
 <codeblock><![CDATA[
@@ -191,10 +207,9 @@ Fetched 1 row(s) in 17.19s
 set mt_dop=1;
 MT_DOP set to 1
 
-select * from a1 inner join a2
-  on a1.id = a2.id limit 4;
-ERROR: NotImplementedException: MT_DOP not supported for plans with
-  base table joins or table sinks.
+insert into a1
+select * from a2;
+ERROR: NotImplementedException: MT_DOP not supported for DML statements.
 ]]>
 </codeblock>
 
