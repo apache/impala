@@ -139,8 +139,7 @@ public class Planner {
         // as the value isn't cached in any plan nodes.
         ctx_.getQueryOptions().setMt_dop(0);
       } else {
-        throw new NotImplementedException(
-            "MT_DOP not supported for plans with base table joins or table sinks.");
+        throw new NotImplementedException("MT_DOP not supported for DML statements.");
       }
     }
 

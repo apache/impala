@@ -257,7 +257,7 @@ WRITE TO HDFS [functional_parquet.alltypes, OVERWRITE=false, PARTITION-KEYS=(yea
    tuple-ids=0 row-size=80B cardinality=unavailable
    in pipelines: 00(GETNEXT)
 ---- PARALLELPLANS
-NotImplementedException: MT_DOP not supported for plans with base table joins or table sinks.
+NotImplementedException: MT_DOP not supported for DML statements.
 ====
 # CTAS not allowed.
 create table ctas_mt_dop_test as select * from functional_parquet.alltypes
@@ -280,7 +280,7 @@ WRITE TO HDFS [default.ctas_mt_dop_test, OVERWRITE=false]
    tuple-ids=0 row-size=80B cardinality=unavailable
    in pipelines: 00(GETNEXT)
 ---- PARALLELPLANS
-NotImplementedException: MT_DOP not supported for plans with base table joins or table sinks.
+NotImplementedException: MT_DOP not supported for DML statements.
 ====
 # Single-table scan/filter/agg/topn should work.
 select count(int_col) cnt from functional_parquet.alltypes
