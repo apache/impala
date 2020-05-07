@@ -35,14 +35,9 @@
 #   other. The way to specify a single consistent set of components is via a build
 #   number. This determines the location in s3 to get the artifacts.
 # CDP_BUILD_NUMBER - The CDP equivalent of a CDH_BUILD_NUMBER.
-# USE_CDP_HIVE - If false, this will use the CDH version of all Hadoop components
-#   (except Ranger, which is CDP only). If true, this will use the CDP version of all
-#   Hadoop components (except Sentry, which is CDH only).
 # DOWNLOAD_CDH_COMPONENTS - When set to true, this script will also download and extract
 #   the CDH/CDP Hadoop components (i.e. Hadoop, Hive, HBase, Sentry, Ranger, etc) into
 #   CDH_COMPONENTS_HOME/CDP_COMPONENTS_HOME as appropriate.
-# USE_CDH_KUDU - Kudu can be downloaded either from the toolchain or as a CDH component,
-#   depending on the value of USE_CDH_KUDU.
 # KUDU_IS_SUPPORTED - If KUDU_IS_SUPPORTED is false, Kudu is disabled and we download
 #   the toolchain Kudu and use the symbols to compile a non-functional stub library so
 #   that Impala has something to link against.
@@ -360,49 +355,6 @@ class ToolchainKudu(ToolchainPackage):
     return False
 
 
-class CdhKudu(CdhComponent):
-  def __init__(self, platform_label):
-    kudu_archive_tmpl = "kudu-${version}-" + platform_label
-    # IMPALA_KUDU_URL can contain '%(platform_label)', which needs to be replaced
-    # with the platform. We override this in os.environ so that it is picked up
-    # in EnvVersionedPackage.
-    kudu_url = os.environ.get("IMPALA_KUDU_URL")
-    if kudu_url:
-       kudu_url = kudu_url.replace("%(platform_label)", platform_label)
-       os.environ["IMPALA_KUDU_URL"] = kudu_url
-    super(CdhKudu, self).__init__('kudu',
-                                  archive_basename_tmpl=kudu_archive_tmpl,
-                                  unpack_directory_tmpl="kudu-${version}")
-
-  def needs_download(self):
-    # This verifies that the unpack directory exists
-    if super(CdhKudu, self).needs_download():
-      return True
-    # Additional check to distinguish this from the Kudu Java package
-    # Regardless of the actual build type, the 'kudu' tarball will always contain a
-    # 'debug' and a 'release' directory.
-    if not os.path.exists(os.path.join(self.pkg_directory(), "debug")):
-      return True
-    # Both the pkg_directory and the debug directory exist
-    return False
-
-
-class CdhKuduJava(CdhComponent):
-  def __init__(self):
-    super(CdhKuduJava, self).__init__('kudu-java',
-                                      archive_basename_tmpl="kudu-${version}")
-
-  def needs_download(self):
-    # This verify that the unpack directory exists
-    if super(CdhKuduJava, self).needs_download():
-      return True
-    # Additional check to distinguish this from the Kudu package
-    # There should be jars under the kudu directory.
-    if len(glob.glob("{0}/*jar".format(self.pkg_directory()))) == 0:
-      return True
-    return False
-
-
 def try_get_platform_release_label():
   """Gets the right package label from the OS version. Returns an OsMapping with both
      'toolchain' and 'cdh' labels. Return None if not found.
@@ -629,21 +581,17 @@ def get_toolchain_downloads():
 
 def get_hadoop_downloads():
   cluster_components = []
-  use_cdp_hive = os.environ["USE_CDP_HIVE"] == "true"
-  if use_cdp_hive:
-    hadoop = CdpComponent("hadoop")
-    hbase = CdpComponent("hbase", archive_basename_tmpl="hbase-${version}-bin",
-                         unpack_directory_tmpl="hbase-${version}")
-    hive = CdpComponent("hive", archive_basename_tmpl="apache-hive-${version}-bin")
-    hive_src = CdpComponent("hive-source",
-                            explicit_version=os.environ.get("IMPALA_HIVE_VERSION"),
-                            archive_basename_tmpl="hive-${version}-source",
-                            unpack_directory_tmpl="hive-${version}")
-    tez = CdpComponent("tez", archive_basename_tmpl="tez-${version}-minimal",
-                       makedir=True)
-    cluster_components.extend([hadoop, hbase, hive, hive_src, tez])
-  else:
-    cluster_components.extend(map(CdhComponent, ["hadoop", "hbase", "hive"]))
+  hadoop = CdpComponent("hadoop")
+  hbase = CdpComponent("hbase", archive_basename_tmpl="hbase-${version}-bin",
+                       unpack_directory_tmpl="hbase-${version}")
+  hive = CdpComponent("hive", archive_basename_tmpl="apache-hive-${version}-bin")
+  hive_src = CdpComponent("hive-source",
+                          explicit_version=os.environ.get("IMPALA_HIVE_VERSION"),
+                          archive_basename_tmpl="hive-${version}-source",
+                          unpack_directory_tmpl="hive-${version}")
+  tez = CdpComponent("tez", archive_basename_tmpl="tez-${version}-minimal",
+                     makedir=True)
+  cluster_components.extend([hadoop, hbase, hive, hive_src, tez])
   # Sentry is always CDH
   cluster_components.append(CdhComponent("sentry"))
   # Ranger is always CDP
@@ -654,24 +602,12 @@ def get_hadoop_downloads():
 
 def get_kudu_downloads(use_kudu_stub):
   # If Kudu is not supported, we download centos7 kudu to build the kudu stub.
-  # TODO: Should this be from toolchain or CDH? Does it matter?
   kudu_downloads = []
   if use_kudu_stub:
     kudu_downloads += [ToolchainKudu("centos7")]
   else:
-    use_cdh_kudu = os.getenv("USE_CDH_KUDU") == "true"
-    if use_cdh_kudu:
-      if not try_get_platform_release_label() \
-         or not try_get_platform_release_label().cdh:
-        logging.error("CDH Kudu is not supported on this platform. Set "
-                      "USE_CDH_KUDU=false to use the toolchain Kudu.")
-        sys.exit(1)
-      kudu_downloads += [CdhKudu(get_platform_release_label().cdh)]
-      # There is also a Kudu Java package.
-      kudu_downloads += [CdhKuduJava()]
-    else:
-      # Toolchain Kudu includes Java artifacts.
-      kudu_downloads += [ToolchainKudu()]
+    # Toolchain Kudu includes Java artifacts.
+    kudu_downloads += [ToolchainKudu()]
 
   return kudu_downloads
 
@@ -690,14 +626,10 @@ def main():
   and CDP_BUILD_NUMBER). Hadoop component packages are only downloaded if
   $DOWNLOAD_CDH_COMPONENTS is true. CDH Hadoop packages are downloaded into
   $CDH_COMPONENTS_HOME. CDP Hadoop packages are downloaded into $CDP_COMPONENTS_HOME.
-  The versions used for Hadoop components depend on whether USE_CDP_HIVE is true or
-  false. If true, most components get the CDP versions based on the $CDP_BUILD_NUMBER.
-  If false, most components get the CDH versions based on the $CDH_BUILD_NUMBER.
-  The exceptions are:
+  The versions used for Hadoop components come from the CDP versions based on the
+  $CDP_BUILD_NUMBER.
+  The exceptions is:
   - sentry (always downloaded from $IMPALA_TOOLCHAIN_HOST for a given $CDH_BUILD_NUMBER)
-  - ranger (always downloaded from $IMPALA_TOOLCHAIN_HOST for a given $CDP_BUILD_NUMBER)
-  - kudu (currently always downloaded from $IMPALA_TOOLCHAIN_HOST for a given
-    $CDH_BUILD_NUMBER)
   If Kudu is not supported on this platform (or KUDU_IS_SUPPORTED=false), then this
   builds a Kudu stub to allow for compilation without Kudu support.
   """

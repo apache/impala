@@ -50,10 +50,6 @@ do
       ONLY_METASTORE=1
       ;;
     -with_ranger)
-      if [[ "$USE_CDP_HIVE" = "false" ]]; then
-        echo "Ranger authorization is not supported in Hive 2."
-        exit 1
-      fi
       ENABLE_RANGER_AUTH=1
       echo "Starting Hive with Ranger authorization."
       ;;
@@ -78,7 +74,7 @@ suspend=n,address=30010"
 # CDH Hive metastore scripts do not do so. This is currently to make sure that we can run
 # all the tests including sentry tests
 # TODO: This can be removed when we move to Ranger completely
-if [[ "$USE_CDP_HIVE" = "true" && -n "$SENTRY_HOME" ]]; then
+if [[ -n "$SENTRY_HOME" ]]; then
   for f in ${SENTRY_HOME}/lib/sentry-binding-hive*.jar; do
     FILE_NAME=$(basename $f)
     # exclude all the hive jars from being included in the classpath since Sentry
@@ -109,19 +105,17 @@ fi
 # but compactions are initiated from the HMS in Hive 3. This may change at
 # some point in the future, in which case we can add this to only the
 # HS2 classpath.
-if ${USE_CDP_HIVE} ; then
-  export HADOOP_CLASSPATH=${HADOOP_CLASSPATH}:${TEZ_HOME}/*
-  # This is a little hacky, but Tez bundles a bunch of junk into lib/, such
-  # as extra copies of the hadoop libraries, etc, and we want to avoid conflicts.
-  # So, we'll be a bit choosy about what we add to the classpath here.
-  for jar in $TEZ_HOME/lib/* ; do
-    case $(basename $jar) in
-      commons-*|RoaringBitmap*)
-        export HADOOP_CLASSPATH=$HADOOP_CLASSPATH:$jar
-        ;;
-    esac
-  done
-fi
+export HADOOP_CLASSPATH=${HADOOP_CLASSPATH}:${TEZ_HOME}/*
+# This is a little hacky, but Tez bundles a bunch of junk into lib/, such
+# as extra copies of the hadoop libraries, etc, and we want to avoid conflicts.
+# So, we'll be a bit choosy about what we add to the classpath here.
+for jar in $TEZ_HOME/lib/* ; do
+  case $(basename $jar) in
+    commons-*|RoaringBitmap*)
+      export HADOOP_CLASSPATH=$HADOOP_CLASSPATH:$jar
+      ;;
+  esac
+done
 
 # Add kudu-hive.jar to the Hive Metastore classpath, so that Kudu's HMS
 # plugin can be loaded.

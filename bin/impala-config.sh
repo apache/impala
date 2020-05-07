@@ -171,9 +171,6 @@ export IMPALA_TOOLCHAIN_HOST
 export CDH_BUILD_NUMBER=1814051
 export CDH_MAVEN_REPOSITORY=\
 "https://${IMPALA_TOOLCHAIN_HOST}/build/cdh_components/${CDH_BUILD_NUMBER}/maven"
-export CDH_HADOOP_VERSION=3.0.0-cdh6.x-SNAPSHOT
-export CDH_HBASE_VERSION=2.1.0-cdh6.x-SNAPSHOT
-export CDH_HIVE_VERSION=2.1.1-cdh6.x-SNAPSHOT
 export CDH_SENTRY_VERSION=2.1.0-cdh6.x-SNAPSHOT
 
 export CDP_BUILD_NUMBER=2523282
@@ -193,8 +190,8 @@ export IMPALA_HUDI_VERSION=0.5.0-incubating
 export IMPALA_KITE_VERSION=1.0.0-cdh6.x-SNAPSHOT
 export IMPALA_ORC_JAVA_VERSION=1.6.2
 
-# When IMPALA_(CDH_COMPONENT)_URL are overridden, they may contain '$(platform_label)'
-# which will be substituted for the CDH platform label in bootstrap_toolchain.py
+# When IMPALA_(CDP_COMPONENT)_URL are overridden, they may contain '$(platform_label)'
+# which will be substituted for the CDP platform label in bootstrap_toolchain.py
 unset IMPALA_HADOOP_URL
 unset IMPALA_HBASE_URL
 unset IMPALA_HIVE_URL
@@ -216,9 +213,6 @@ if [ -f "$IMPALA_HOME/bin/impala-config-local.sh" ]; then
   . "$IMPALA_HOME/bin/impala-config-local.sh"
 fi
 
-export CDH_HIVE_URL=${CDH_HIVE_URL-}
-export CDH_HADOOP_URL=${CDH_HADOOP_URL-}
-export CDH_HBASE_URL=${CDH_HBASE_URL-}
 export CDH_SENTRY_URL=${CDH_SENTRY_URL-}
 
 export CDP_HIVE_URL=${CDP_HIVE_URL-}
@@ -230,35 +224,19 @@ export CDP_RANGER_URL=${CDP_RANGER_URL-}
 
 export CDH_COMPONENTS_HOME="$IMPALA_TOOLCHAIN/cdh_components-$CDH_BUILD_NUMBER"
 export CDP_COMPONENTS_HOME="$IMPALA_TOOLCHAIN/cdp_components-$CDP_BUILD_NUMBER"
-export USE_CDP_HIVE=${USE_CDP_HIVE-true}
 export DISABLE_SENTRY=${DISABLE_SENTRY_OVERRIDE:-"true"}
-if $USE_CDP_HIVE; then
-  # When USE_CDP_HIVE is set we use the CDP hive version to build as well as deploy in
-  # the minicluster
-  export CDH_MAJOR_VERSION=7
-  export IMPALA_HIVE_VERSION=${CDP_HIVE_VERSION}
-  export IMPALA_HIVE_URL=${CDP_HIVE_URL-}
-  export IMPALA_HIVE_SOURCE_URL=${CDP_HIVE_SOURCE_URL-}
-  export IMPALA_HADOOP_VERSION=${CDP_HADOOP_VERSION}
-  export IMPALA_HADOOP_URL=${CDP_HADOOP_URL-}
-  export IMPALA_HBASE_VERSION=${CDP_HBASE_VERSION}
-  export IMPALA_HBASE_URL=${CDP_HBASE_URL-}
-  export IMPALA_TEZ_VERSION=${CDP_TEZ_VERSION}
-  export IMPALA_TEZ_URL=${CDP_TEZ_URL-}
-  export IMPALA_KNOX_VERSION=${CDP_KNOX_VERSION}
-  export HADOOP_HOME="$CDP_COMPONENTS_HOME/hadoop-${IMPALA_HADOOP_VERSION}/"
-else
-  # CDH hive version is used to build and deploy in minicluster when USE_CDP_HIVE is
-  # false
-  export CDH_MAJOR_VERSION=6
-  export IMPALA_HIVE_VERSION=${CDH_HIVE_VERSION}
-  export IMPALA_HIVE_URL=${CDH_HIVE_URL-}
-  export IMPALA_HADOOP_VERSION=${CDH_HADOOP_VERSION}
-  export IMPALA_HADOOP_URL=${CDH_HADOOP_URL-}
-  export IMPALA_HBASE_VERSION=${CDH_HBASE_VERSION}
-  export IMPALA_HBASE_URL=${CDH_HBASE_URL-}
-  export HADOOP_HOME="$CDH_COMPONENTS_HOME/hadoop-${IMPALA_HADOOP_VERSION}/"
-fi
+export CDH_MAJOR_VERSION=7
+export IMPALA_HIVE_VERSION=${CDP_HIVE_VERSION}
+export IMPALA_HIVE_URL=${CDP_HIVE_URL-}
+export IMPALA_HIVE_SOURCE_URL=${CDP_HIVE_SOURCE_URL-}
+export IMPALA_HADOOP_VERSION=${CDP_HADOOP_VERSION}
+export IMPALA_HADOOP_URL=${CDP_HADOOP_URL-}
+export IMPALA_HBASE_VERSION=${CDP_HBASE_VERSION}
+export IMPALA_HBASE_URL=${CDP_HBASE_URL-}
+export IMPALA_TEZ_VERSION=${CDP_TEZ_VERSION}
+export IMPALA_TEZ_URL=${CDP_TEZ_URL-}
+export IMPALA_KNOX_VERSION=${CDP_KNOX_VERSION}
+export HADOOP_HOME="$CDP_COMPONENTS_HOME/hadoop-${IMPALA_HADOOP_VERSION}/"
 
 # Ozone always uses the CDP version
 export IMPALA_OZONE_VERSION=${CDP_OZONE_VERSION}
@@ -273,9 +251,16 @@ export IMPALA_SENTRY_URL=${CDH_SENTRY_URL-}
 
 # Extract the first component of the hive version.
 # Allow overriding of Hive source location in case we want to build Impala without
-# a complete Hive build. This is used by fe/pom.xml to activate compatibility shims
-# for Hive-2 or Hive-3
+# a complete Hive build. This is used by various tests and scripts to enable and
+# disable tests and functionality.
 export IMPALA_HIVE_MAJOR_VERSION=$(echo "$IMPALA_HIVE_VERSION" | cut -d . -f 1)
+
+# Hive 1 and 2 are no longer supported.
+if [[ "${IMPALA_HIVE_MAJOR_VERSION}" == "1" ||
+      "${IMPALA_HIVE_MAJOR_VERSION}" == "2" ]]; then
+  echo "Hive 1 and 2 are no longer supported"
+  return 1
+fi
 
 # It is important to have a coherent view of the JAVA_HOME and JAVA executable.
 # The JAVA_HOME should be determined first, then the JAVA executable should be
@@ -376,27 +361,16 @@ export LOCAL_FS="file:${WAREHOUSE_LOCATION_PREFIX}"
 export IMPALA_CLUSTER_NODES_DIR="${IMPALA_CLUSTER_NODES_DIR-$IMPALA_HOME/testdata/cluster/cdh$CDH_MAJOR_VERSION}"
 
 ESCAPED_IMPALA_HOME=$(sed "s/[^0-9a-zA-Z]/_/g" <<< "$IMPALA_HOME")
-if $USE_CDP_HIVE; then
-  export HIVE_HOME="$CDP_COMPONENTS_HOME/apache-hive-${IMPALA_HIVE_VERSION}-bin"
-  export HIVE_SRC_DIR=${HIVE_SRC_DIR_OVERRIDE:-"${CDP_COMPONENTS_HOME}/hive-\
+export HIVE_HOME="$CDP_COMPONENTS_HOME/apache-hive-${IMPALA_HIVE_VERSION}-bin"
+export HIVE_SRC_DIR=${HIVE_SRC_DIR_OVERRIDE:-"${CDP_COMPONENTS_HOME}/hive-\
 ${IMPALA_HIVE_VERSION}"}
-  # Set the path to the hive_metastore.thrift which is used to build thrift code
-  export HIVE_METASTORE_THRIFT_DIR=$HIVE_SRC_DIR/standalone-metastore/src/main/thrift
-  export TEZ_HOME="$CDP_COMPONENTS_HOME/tez-${IMPALA_TEZ_VERSION}-minimal"
-  export HBASE_HOME="$CDP_COMPONENTS_HOME/hbase-${IMPALA_HBASE_VERSION}/"
-  # It is likely that devs will want to work with both the versions of metastore
-  # if cdp hive is being used change the metastore db name, so we don't have to
-  # format the metastore db everytime we switch between hive versions
-  export METASTORE_DB=${METASTORE_DB-"$(cut -c-59 <<< HMS$ESCAPED_IMPALA_HOME)_cdp"}
-else
-  export HIVE_HOME="$CDH_COMPONENTS_HOME/hive-${IMPALA_HIVE_VERSION}"
-  # Allow overriding of Hive source location in case we want to build Impala without
-# a complete Hive build.
-  export HIVE_SRC_DIR=${HIVE_SRC_DIR_OVERRIDE:-"${HIVE_HOME}/src"}
-  export HIVE_METASTORE_THRIFT_DIR=$HIVE_SRC_DIR/metastore/if
-  export HBASE_HOME="$CDH_COMPONENTS_HOME/hbase-${IMPALA_HBASE_VERSION}/"
-  export METASTORE_DB=${METASTORE_DB-$(cut -c-63 <<< HMS$ESCAPED_IMPALA_HOME)}
-fi
+# Set the path to the hive_metastore.thrift which is used to build thrift code
+export HIVE_METASTORE_THRIFT_DIR=$HIVE_SRC_DIR/standalone-metastore/src/main/thrift
+export TEZ_HOME="$CDP_COMPONENTS_HOME/tez-${IMPALA_TEZ_VERSION}-minimal"
+export HBASE_HOME="$CDP_COMPONENTS_HOME/hbase-${IMPALA_HBASE_VERSION}/"
+# Previously, there were multiple configurations and the "_cdp" included below
+# allowed the two to be distinct. We keep this "_cdp" for historical reasons.
+export METASTORE_DB=${METASTORE_DB-"$(cut -c-59 <<< HMS$ESCAPED_IMPALA_HOME)_cdp"}
 # Set the Hive binaries in the path
 export PATH="$HIVE_HOME/bin:$PATH"
 
@@ -692,56 +666,25 @@ fi
 export USE_KUDU_DEBUG_BUILD=${USE_KUDU_DEBUG_BUILD-false}
 
 # Kudu doesn't compile on some old Linux distros. KUDU_IS_SUPPORTED enables building Kudu
-# into the backend. We prefer to pull Kudu in from the toolchain, but will fall back to
-# using the CDH Kudu by setting USE_CDH_KUDU to true.
-export USE_CDH_KUDU=${USE_CDH_KUDU-false}
+# into the backend.
 if [[ -z "${KUDU_IS_SUPPORTED-}" ]]; then
   if [[ -n "$KUDU_BUILD_DIR" ]]; then
     KUDU_IS_SUPPORTED=true
   elif $IS_OSX; then
-    USE_CDH_KUDU=false
     KUDU_IS_SUPPORTED=false
   else
     KUDU_IS_SUPPORTED=true
-    if $USE_CDH_KUDU; then
-      if ! which lsb_release &>/dev/null; then
-        echo Unable to find the 'lsb_release' command. \
-            Please ensure it is available in your PATH. 1>&2
-        return 1
-      fi
-      DISTRO_VERSION="$(lsb_release -sir 2>&1)"
-      if [[ $? -ne 0 ]]; then
-        echo lsb_release command failed, output was: "$DISTRO_VERSION" 1>&2
-        return 1
-      fi
-      # Remove spaces, trim minor versions, and convert to lowercase.
-      DISTRO_VERSION="$(tr -d ' \n' <<< "$DISTRO_VERSION" | cut -d. -f1 | tr "A-Z" "a-z")"
-      if [[ "$DISTRO_VERSION" == "ubuntu14" ]]; then
-        USE_CDH_KUDU=false
-      fi
-    fi
   fi
 fi
 export KUDU_IS_SUPPORTED
 
-if $USE_CDH_KUDU; then
-  export IMPALA_KUDU_VERSION=${IMPALA_KUDU_VERSION-"1.11.0-cdh6.x-SNAPSHOT"}
-  export IMPALA_KUDU_JAVA_VERSION=${IMPALA_KUDU_JAVA_VERSION-"1.11.0-cdh6.x-SNAPSHOT"}
-  export IMPALA_KUDU_HOME=${CDH_COMPONENTS_HOME}/kudu-$IMPALA_KUDU_VERSION
-  export IMPALA_KUDU_JAVA_HOME=${CDH_COMPONENTS_HOME}/kudu-$IMPALA_KUDU_VERSION
-  # If USE_CDH_KUDU is true, Toolchain Kudu maven repository should be disabled.
-  # We get Kudu Java artifacts from CDH.
-  export IMPALA_TOOLCHAIN_KUDU_MAVEN_REPOSITORY="file:///non/existing/repo"
-  export IMPALA_TOOLCHAIN_KUDU_MAVEN_REPOSITORY_ENABLED=false
-else
-  export IMPALA_KUDU_VERSION=${IMPALA_KUDU_VERSION-"4ed0dbbd1"}
-  export IMPALA_KUDU_JAVA_VERSION=${IMPALA_KUDU_JAVA_VERSION-"1.12.0-SNAPSHOT"}
-  export IMPALA_KUDU_HOME=${IMPALA_TOOLCHAIN}/kudu-$IMPALA_KUDU_VERSION
-  export IMPALA_KUDU_JAVA_HOME=${IMPALA_TOOLCHAIN}/kudu-${IMPALA_KUDU_VERSION}/java
-  export IMPALA_TOOLCHAIN_KUDU_MAVEN_REPOSITORY=\
+export IMPALA_KUDU_VERSION=${IMPALA_KUDU_VERSION-"4ed0dbbd1"}
+export IMPALA_KUDU_JAVA_VERSION=${IMPALA_KUDU_JAVA_VERSION-"1.12.0-SNAPSHOT"}
+export IMPALA_KUDU_HOME=${IMPALA_TOOLCHAIN}/kudu-$IMPALA_KUDU_VERSION
+export IMPALA_KUDU_JAVA_HOME=${IMPALA_TOOLCHAIN}/kudu-${IMPALA_KUDU_VERSION}/java
+export IMPALA_TOOLCHAIN_KUDU_MAVEN_REPOSITORY=\
 "file://${IMPALA_KUDU_JAVA_HOME}/repository"
-  export IMPALA_TOOLCHAIN_KUDU_MAVEN_REPOSITORY_ENABLED=true
-fi
+export IMPALA_TOOLCHAIN_KUDU_MAVEN_REPOSITORY_ENABLED=true
 
 # Set $THRIFT_HOME to the Thrift directory in toolchain.
 export THRIFT_HOME="${IMPALA_TOOLCHAIN}/thrift-${IMPALA_THRIFT_VERSION}"

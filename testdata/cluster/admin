@@ -31,18 +31,10 @@ set -euo pipefail
 . $IMPALA_HOME/bin/report_build_error.sh
 setup_report_build_error
 
-: ${INCLUDE_YARN=}
-
-# For Hive 3, we require Yarn for Tez support.
-if "$USE_CDP_HIVE"; then
-  INCLUDE_YARN=1
-fi
-
 while getopts vy OPT; do
   case $OPT in
     v) set -x;;
-    y) export INCLUDE_YARN=1;;
-    ?) echo "Usage: $0 [-v (verbose) -k (kerberize) -y (yarn)] ACTION (see source...)"; exit 1;;
+    ?) echo "Usage: $0 [-v (verbose) -k (kerberize)] ACTION (see source...)"; exit 1;;
   esac
 done
 shift $(($OPTIND-1))
@@ -63,10 +55,7 @@ export KILL_CLUSTER_MARKER=IBelongToTheMiniCluster
 
 if [[ "$TARGET_FILESYSTEM" == "hdfs" ]]; then
   # The check above indicates that the regular mini-cluster is in use.
-  SUPPORTED_SERVICES=(hdfs kms)
-  if [ -n "${INCLUDE_YARN}" ]; then
-    SUPPORTED_SERVICES+=(yarn)
-  fi
+  SUPPORTED_SERVICES=(hdfs kms yarn)
 else
   # Either a remote distributed file system or a local non-distributed file system is
   # in use. Currently the only service that is expected to work is Kudu, though in theory
