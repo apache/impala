@@ -31,6 +31,18 @@ if [ "x${IMPALA_HOME}" == "x" ]; then
   exit 1
 fi
 
+# Detect whether IMPALA_HOME is a git repository. This is used below to allow extra
+# checks when building ext-py.
+pushd ${IMPALA_HOME}
+IS_GIT_CHECKOUT=false
+if git ls-files --error-unmatch > /dev/null 2>&1 ; then
+  IS_GIT_CHECKOUT=true
+  echo "IMPALA_HOME is a git repository"
+else
+  echo "IMPALA_HOME is not a git repository"
+fi;
+popd
+
 IMPALA_VERSION_INFO_FILE=${IMPALA_HOME}/bin/version.info
 
 if [ ! -f ${IMPALA_VERSION_INFO_FILE} ]; then
@@ -92,6 +104,16 @@ EOF
 # Building all eggs.
 echo "Building all external modules into eggs"
 for MODULE in ${SHELL_HOME}/ext-py/*; do
+  # Sometimes there are leftover module directories from version changes. If IMPALA_HOME
+  # is a git repository, then we can check if the module directory is tracked by git.
+  # If it is not tracked, skip building it. The downside of this check is that when
+  # adding a new directory, it won't build until added in git. This check does not apply
+  # when IMPALA_HOME is not a git repository (e.g. if building from a release tarball).
+  if ${IS_GIT_CHECKOUT} &&
+     ! git ls-files --error-unmatch ${MODULE} > /dev/null 2>&1 ; then
+    echo "WARNING: ${MODULE} is not tracked by the git repository, skipping..."
+    continue;
+  fi
   pushd ${MODULE} > /dev/null 2>&1
   echo "Cleaning up old build artifacts."
   rm -rf dist 2>&1 > /dev/null
