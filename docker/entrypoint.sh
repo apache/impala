@@ -262,38 +262,36 @@ function build_impdev() {
   # can be built when executing those tests. We use "-noclean" to
   # avoid deleting the log for this invocation which is in logs/,
   # and, this is a first build anyway.
-  ./buildall.sh -noclean -format -testdata -notests
+  if ! ./buildall.sh -noclean -format -testdata -notests; then
+    echo "Build + dataload failed!"
+    copy_cluster_logs
+    return 1
+  fi
 
   # We make one exception to "-notests":
   # test_insert_parquet.py, which is used in all the end-to-end test
   # shards, depends on this binary. We build it here once,
   # instead of building it during the startup of each container running
   # a subset of E2E tests. Building it here is also a lot faster.
-  make -j$(nproc) --load-average=$(nproc) parquet-reader impala-profile-tool
+  if ! make -j$(nproc) --load-average=$(nproc) parquet-reader impala-profile-tool; then
+    echo "Impala profile tool build failed!"
+    copy_cluster_logs
+    return 1
+  fi
 
   # Dump current memory usage to logs, before shutting things down.
-  memory_usage
+  memory_usage || true
 
   # Shut down things cleanly.
-  testdata/bin/kill-all.sh
+  testdata/bin/kill-all.sh || true
 
-  # "Compress" HDFS data by de-duplicating blocks. As a result of
-  # having three datanodes, our data load is 3x larger than it needs
-  # to be. To alleviate this (to the tune of ~20GB savings), we
-  # use hardlinks to link together the identical blocks. This is absolutely
-  # taking advantage of an implementation detail of HDFS.
-  echo "Hardlinking duplicate HDFS block data."
-  set +x
-  for x in $(find testdata/cluster/*/node-1/data/dfs/dn/current/ -name 'blk_*[0-9]'); do
-    for n in 2 3; do
-      xn=${x/node-1/node-$n}
-      if [ -f $xn ]; then
-        rm $xn
-        ln $x $xn
-      fi
-    done
-  done
-  set -x
+  if ! hardlink_duplicate_hdfs_data; then
+    echo "Hardlink duplicate HDFS data failed!"
+    copy_cluster_logs
+    return 1
+  fi
+
+  copy_cluster_logs
 
   # Shutting down PostgreSQL nicely speeds up it's start time for new containers.
   _pg_ctl stop
@@ -307,6 +305,26 @@ function build_impdev() {
   find /logs -xtype l -execdir rm '{}' ';'
 
   popd
+}
+
+# "Compress" HDFS data by de-duplicating blocks. As a result of
+# having three datanodes, our data load is 3x larger than it needs
+# to be. To alleviate this (to the tune of ~20GB savings), we
+# use hardlinks to link together the identical blocks. This is absolutely
+# taking advantage of an implementation detail of HDFS.
+function hardlink_duplicate_hdfs_data() {
+  echo "Hardlinking duplicate HDFS block data."
+  set +x
+  for x in $(find testdata/cluster/*/node-1/data/dfs/dn/current/ -name 'blk_*[0-9]'); do
+    for n in 2 3; do
+      xn=${x/node-1/node-$n}
+      if [ -f $xn ]; then
+        rm $xn
+        ln $x $xn
+      fi
+    done
+  done
+  set -x
 }
 
 # Prints top 20 RSS consumers (and other, total), in megabytes Common culprits
@@ -327,6 +345,30 @@ function memory_usage() {
       print total, "-- total --"
     }'
   ) >& /logs/memory_usage.txt
+}
+
+# Some components like hdfs, yarn, kudu creates their log in
+# testdata/cluster/cdh<version-number>/node-<node-id>/var/log/ folder
+# these log folders are symlinked to logs/cluster/ folder
+# remove symlinks and copy these logs to logs/cluster/
+function copy_cluster_logs() {
+  echo ">>> Copy cluster logs..."
+  pushd /home/impdev/Impala
+
+  for x in testdata/cluster/cdh*/node-*/var/log/; do
+    echo $x
+    if [ -d $x ]; then
+
+      CDH_VERSION=`echo $x | sed  "s#testdata/cluster/\(.*\)/node-.*#\1#"`
+      NODE_NUMBER=`echo $x | sed  "s#testdata/cluster/cdh.*/\(.*\)/var.*#\1#"`
+
+      rm -rf logs/cluster/${CDH_VERSION}-${NODE_NUMBER}
+      mkdir -p logs/cluster/${CDH_VERSION}-${NODE_NUMBER}
+      cp -R $x/* logs/cluster/${CDH_VERSION}-${NODE_NUMBER}
+    fi
+  done
+
+  popd
 }
 
 # Runs a suite passed in as the first argument. Tightly
@@ -443,6 +485,9 @@ function test_suite() {
   # leading to test-with-docker.py hitting a timeout. Killing the minicluster
   # daemons fixes this.
   testdata/bin/kill-all.sh || true
+
+  copy_cluster_logs
+
   return $ret
 }
 
