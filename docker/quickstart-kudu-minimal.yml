@@ -1,0 +1,128 @@
+# Licensed to the Apache Software Foundation (ASF) under one
+# or more contributor license agreements.  See the NOTICE file
+# distributed with this work for additional information
+# regarding copyright ownership.  The ASF licenses this file
+# to you under the Apache License, Version 2.0 (the
+# "License"); you may not use this file except in compliance
+# with the License.  You may obtain a copy of the License at
+#
+#   http://www.apache.org/licenses/LICENSE-2.0
+#
+# Unless required by applicable law or agreed to in writing,
+# software distributed under the License is distributed on an
+# "AS IS" BASIS, WITHOUT WARRANTIES OR CONDITIONS OF ANY
+# KIND, either express or implied.  See the License for the
+# specific language governing permissions and limitations
+# under the License.
+
+# Minimal Apache Kudu cluster for quickstart with a single master and three tservers.
+# The Kudu repository contains a docker compose file (docker/quickstart.yml) for a more
+# production-like Kudu cluster with multiple masters, etc. This file is derived from that
+# file.
+version: "3"
+services:
+  kudu-master-1:
+    image: apache/kudu:${KUDU_QUICKSTART_VERSION:-latest}
+    ports:
+      - "${QUICKSTART_LISTEN_ADDR:?Please set QUICKSTART_LISTEN_ADDR environment variable}:7051:7051"
+      - "${QUICKSTART_LISTEN_ADDR:?Please set QUICKSTART_LISTEN_ADDR environment variable}:8051:8051"
+    command: ["master"]
+    volumes:
+      - kudu-minimal-master-1:/var/lib/kudu
+    environment:
+      # TODO: Use `host.docker.internal` instead of QUICKSTART_IP when it
+      # works on Linux (https://github.com/docker/for-linux/issues/264)
+      - >
+        MASTER_ARGS=--fs_wal_dir=/var/lib/kudu/master
+        --rpc_bind_addresses=0.0.0.0:7051
+        --rpc_advertised_addresses=${QUICKSTART_IP:?Please set QUICKSTART_IP environment variable}:7051
+        --webserver_port=8051
+        --webserver_advertised_addresses=${QUICKSTART_IP}:8051
+        --webserver_doc_root=/opt/kudu/www
+        --stderrthreshold=0
+        --use_hybrid_clock=false
+        --memory_limit_hard_bytes=1073741824
+    networks:
+      - quickstart-network
+  kudu-tserver-1:
+    image: apache/kudu:${KUDU_QUICKSTART_VERSION:-latest}
+    depends_on:
+      - kudu-master-1
+    ports:
+      - "${QUICKSTART_LISTEN_ADDR:?Please set QUICKSTART_LISTEN_ADDR environment variable}:7050:7050"
+      - "${QUICKSTART_LISTEN_ADDR:?Please set QUICKSTART_LISTEN_ADDR environment variable}:8050:8050"
+    command: ["tserver"]
+    volumes:
+      - kudu-minimal-tserver-1:/var/lib/kudu
+    environment:
+      - KUDU_MASTERS=kudu-master-1:7051
+      - >
+        TSERVER_ARGS=--fs_wal_dir=/var/lib/kudu/tserver
+        --rpc_bind_addresses=0.0.0.0:7050
+        --rpc_advertised_addresses=${QUICKSTART_IP}:7050
+        --webserver_port=8050
+        --webserver_advertised_addresses=${QUICKSTART_IP}:8050
+        --webserver_doc_root=/opt/kudu/www
+        --stderrthreshold=0
+        --use_hybrid_clock=false
+        --memory_limit_hard_bytes=1073741824
+    networks:
+      - quickstart-network
+  kudu-tserver-2:
+    image: apache/kudu:${KUDU_QUICKSTART_VERSION:-latest}
+    depends_on:
+      - kudu-master-1
+    ports:
+      - "${QUICKSTART_LISTEN_ADDR:?Please set QUICKSTART_LISTEN_ADDR environment variable}:7150:7150"
+      - "${QUICKSTART_LISTEN_ADDR:?Please set QUICKSTART_LISTEN_ADDR environment variable}:8150:8150"
+    command: ["tserver"]
+    volumes:
+      - kudu-minimal-tserver-2:/var/lib/kudu
+    environment:
+      - KUDU_MASTERS=kudu-master-1:7051
+      - >
+        TSERVER_ARGS=--fs_wal_dir=/var/lib/kudu/tserver
+        --rpc_bind_addresses=0.0.0.0:7150
+        --rpc_advertised_addresses=${QUICKSTART_IP}:7150
+        --webserver_port=8150
+        --webserver_advertised_addresses=${QUICKSTART_IP}:8150
+        --webserver_doc_root=/opt/kudu/www
+        --stderrthreshold=0
+        --use_hybrid_clock=false
+        --memory_limit_hard_bytes=1073741824
+    networks:
+      - quickstart-network
+  kudu-tserver-3:
+    image: apache/kudu:${KUDU_QUICKSTART_VERSION:-latest}
+    depends_on:
+      - kudu-master-1
+    ports:
+      - "${QUICKSTART_LISTEN_ADDR:?Please set QUICKSTART_LISTEN_ADDR environment variable}:7250:7250"
+      - "${QUICKSTART_LISTEN_ADDR:?Please set QUICKSTART_LISTEN_ADDR environment variable}:8250:8250"
+    command: ["tserver"]
+    volumes:
+      - kudu-minimal-tserver-3:/var/lib/kudu
+    environment:
+      - KUDU_MASTERS=kudu-master-1:7051
+      - >
+        TSERVER_ARGS=--fs_wal_dir=/var/lib/kudu/tserver
+        --rpc_bind_addresses=0.0.0.0:7250
+        --rpc_advertised_addresses=${QUICKSTART_IP}:7250
+        --webserver_port=8250
+        --webserver_advertised_addresses=${QUICKSTART_IP}:8250
+        --webserver_doc_root=/opt/kudu/www
+        --stderrthreshold=0
+        --use_hybrid_clock=false
+        --memory_limit_hard_bytes=1073741824
+    networks:
+      - quickstart-network
+volumes:
+  kudu-minimal-master-1:
+  kudu-minimal-tserver-1:
+  kudu-minimal-tserver-2:
+  kudu-minimal-tserver-3:
+
+networks:
+  quickstart-network:
+    external: true
+
