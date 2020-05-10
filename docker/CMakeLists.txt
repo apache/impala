@@ -19,6 +19,8 @@ set(IMPALA_BASE_BUILD_CONTEXT_DIR
   ${CMAKE_SOURCE_DIR}/docker/build_context
 )
 
+set(DOCKER_BUILD ${CMAKE_SOURCE_DIR}/docker/docker-build.sh)
+
 find_program(LSB_RELEASE_EXEC lsb_release)
 execute_process(COMMAND ${LSB_RELEASE_EXEC} -is
   OUTPUT_VARIABLE LSB_RELEASE_ID
@@ -37,6 +39,7 @@ else()
   set(DISTRO_BASE_IMAGE "UNSUPPORTED")
 endif()
 MESSAGE(STATUS "Picked docker base image based on host OS: ${DISTRO_BASE_IMAGE}")
+
 
 if (NOT ${DISTRO_BASE_IMAGE} STREQUAL "UNSUPPORTED")
   # Add a target to build a base docker image for 'build_type'. 'build_context_args' are
@@ -58,7 +61,7 @@ if (NOT ${DISTRO_BASE_IMAGE} STREQUAL "UNSUPPORTED")
       # sent to the docker daemon. This allows the Dockerfile built to copy all necessary
       # dependencies.
       COMMAND tar cvh . -C ${CMAKE_SOURCE_DIR}/docker/impala_base/ . |
-              docker build -t impala_base_${build_type}
+              ${DOCKER_BUILD} -t impala_base_${build_type}
                   --build-arg BASE_IMAGE=${DISTRO_BASE_IMAGE} -
       WORKING_DIRECTORY ${IMPALA_BASE_BUILD_CONTEXT_DIR}/${build_type}
       DEPENDS impala_base_build_context_${build_type} ${CMAKE_SOURCE_DIR}/docker/impala_base/Dockerfile
@@ -88,7 +91,7 @@ if (NOT ${DISTRO_BASE_IMAGE} STREQUAL "UNSUPPORTED")
       # build context used for the base image is used for each daemon image. This allows
       # each daemon image to only copy in the dependencies it requires.
       COMMAND tar cvh . -C ${CMAKE_SOURCE_DIR}/docker/${daemon_name}/ . |
-              docker build --build-arg BASE_IMAGE=impala_base_${build_type}
+              ${DOCKER_BUILD} --build-arg BASE_IMAGE=impala_base_${build_type}
                   -t ${image_name} -
       WORKING_DIRECTORY ${IMPALA_BASE_BUILD_CONTEXT_DIR}/${build_type}
       DEPENDS impala_base_image_${build_type} ${build_dir}/Dockerfile
@@ -123,5 +126,34 @@ if (NOT ${DISTRO_BASE_IMAGE} STREQUAL "UNSUPPORTED")
 
   # Generate a text file with all of the release daemon images.
   file(WRITE ${CMAKE_SOURCE_DIR}/docker/docker-images.txt "${daemon_image_names}")
+
+  # HMS quickstart image, which requires Hive and Hadoop builds.
+  set(quickstart_hms_build_dir ${CMAKE_SOURCE_DIR}/docker/quickstart_hms)
+  add_custom_target(quickstart_hms_build_setup
+    COMMAND rm -f ${quickstart_hms_build_dir}/hive ${quickstart_hms_build_dir}/hadoop
+    COMMAND ${CMAKE_COMMAND} -E create_symlink $ENV{HIVE_HOME} ${quickstart_hms_build_dir}/hive
+    COMMAND ${CMAKE_COMMAND} -E create_symlink $ENV{HADOOP_HOME} ${quickstart_hms_build_dir}/hadoop
+  )
+  add_custom_target(quickstart_hms_image
+    # Supply the appropriate base image as an argument for the Dockerfile.
+    # Use tar with -h flag to assemble a tarball including all the symlinked files and
+    # directories in the build context.
+    COMMAND tar cvh . -C ${quickstart_hms_build_dir} . | ${DOCKER_BUILD} --build-arg BASE_IMAGE=${DISTRO_BASE_IMAGE} -t impala_quickstart_hms -
+    DEPENDS ${quickstart_hms_build_dir}/Dockerfile quickstart_hms_build_setup
+    COMMENT "Building quickstart HMS docker image."
+    VERBATIM
+  )
+
+  # Client quickstart image, which only requires some scripts.
+  set(quickstart_client_build_dir ${CMAKE_SOURCE_DIR}/docker/quickstart_client)
+  add_custom_target(quickstart_client_image
+    # Supply the appropriate base image as an argument for the Dockerfile.
+    # Use tar with -h flag to assemble a tarball including all the symlinked files and
+    # directories in the build context.
+    COMMAND tar cvh . -C ${quickstart_client_build_dir} . | ${DOCKER_BUILD} ${COMMON_DOCKER_BUILD_ARGS} --build-arg BASE_IMAGE=${DISTRO_BASE_IMAGE} -t impala_quickstart_client -
+    DEPENDS ${quickstart_client_build_dir}/Dockerfile ${quickstart_client_build_dir}/data-load-entrypoint.sh
+    COMMENT "Building quickstart client docker image."
+    VERBATIM
+  )
 endif()
 

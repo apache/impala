@@ -14,45 +14,53 @@
 # KIND, either express or implied.  See the License for the
 # specific language governing permissions and limitations
 # under the License.
-ARG BASE_IMAGE=ubuntu:16.04
+
+# Build an image that runs a script to load data into the quickstart warehouse.
+# The data load script is os-independent, so only build for a fixed OS.
+ARG BASE_IMAGE=ubuntu:18.04
 FROM ${BASE_IMAGE}
 
-# Install minimal dependencies required for Impala services to run.
+# Common label arguments.
+ARG MAINTAINER
+ARG URL
+ARG VCS_REF
+ARG VCS_TYPE
+ARG VCS_URL
+ARG VERSION
+
+# Install useful utilities. Set to non-interactive to avoid issues when installing tzdata.
+ENV DEBIAN_FRONTEND=noninteractive
 RUN apt-get update && \
-  apt-get install -y openjdk-8-jre-headless \
-  libsasl2-2 libsasl2-modules libsasl2-modules-gssapi-mit \
+  apt-get install -y \
   sudo netcat-openbsd less curl iproute2 vim iputils-ping \
-  tzdata krb5-user && \
+  libsasl2-dev libsasl2-2 libsasl2-modules libsasl2-modules-gssapi-mit \
+  tzdata krb5-user python-pip && \
   apt-get clean && \
   rm -rf /var/lib/apt/lists/*
 
+# Install impala-shell from pip.
+# TODO: consider if it would be better to use the latest impala-shell from the build
+# environment.
+RUN pip install impala-shell
+
 # Use a non-privileged impala user to run the daemons in the container.
-# That user should own everything in the /opt/impala subdirectory.
+# That user should own everything in the /opt/impala and /var/lib/impala subdirectories
 RUN groupadd -r impala -g 1000 && useradd --no-log-init -r -u 1000 -g 1000 impala && \
-    mkdir -p /opt/impala && chown impala /opt/impala && \
-    chmod ugo+w /etc/passwd
+    mkdir -p /opt/impala && chown impala /opt/impala
 USER impala
 
-# Copy build artifacts required for the daemon processes. The daemon images are
-# responsible for copying in the required jar files, as each daemon has a different
-# set of jar dependencies.
-# Need to have multiple copy commands to preserve directory structure.
-COPY --chown=impala www /opt/impala/www
-COPY --chown=impala bin /opt/impala/bin
-# Symlink here instead of in setup_build_context to avoid duplicate binaries.
-RUN cd /opt/impala/bin && ln -s impalad statestored && ln -s impalad catalogd && \
-    ln -s impalad admissiond && \
-# Create conf directory for later config injection.
-    mkdir /opt/impala/conf && \
-# Create logs directory to collect container logs.
-    mkdir /opt/impala/logs && \
-# Create ranger cache directory that is used when ranger is enabled.
-    mkdir /opt/impala/rangercache
+# Copy the client entrypoint and dataload files.
+WORKDIR /opt/impala
+COPY --chown=impala data-load-entrypoint.sh /data-load-entrypoint.sh
+COPY --chown=impala *.sql /opt/impala/sql/
 
-WORKDIR /opt/impala/
+USER impala
 
-LABEL name="Apache Impala Daemon Base Image" \
-      description="Common base image for Apache Impala daemons." \
+# Add the entrypoint.
+ENTRYPOINT ["/data-load-entrypoint.sh"]
+
+LABEL name="Apache Impala Quickstart Client" \
+      description="Client tools for Impala quickstart, including impala-shell and data loading utilities." \
       # Common labels.
       org.label-schema.maintainer=$MAINTAINER \
       org.label-schema.url=$URL \
