@@ -572,7 +572,8 @@ Status PartitionedHashJoinNode::GetNext(
       case ProbeState::PROBING_IN_BATCH: {
         // Finish processing rows in the current probe batch.
         RETURN_IF_ERROR(ProcessProbeBatch(out_batch));
-        DCHECK(out_batch->AtCapacity() || probe_batch_pos_ == probe_batch_->num_rows());
+        DCHECK(out_batch->AtCapacity() || probe_batch_pos_ == probe_batch_->num_rows()
+              || ht_ctx_->expr_values_cache()->AtEnd());
         if (probe_batch_pos_ == probe_batch_->num_rows()
             && current_probe_row_ == nullptr) {
           probe_state_ = ProbeState::PROBING_END_BATCH;

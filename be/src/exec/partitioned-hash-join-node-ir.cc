@@ -331,10 +331,8 @@ bool IR_ALWAYS_INLINE PartitionedHashJoinNode::NextProbeRow(
     DCHECK(status->ok());
     return true;
   }
-  if (probe_batch_iterator->AtEnd()) {
-    // No more probe row.
-    current_probe_row_ = NULL;
-  }
+  // We finished processing the cached values - there is no current probe row.
+  current_probe_row_ = nullptr;
   return false;
 }
 
@@ -383,12 +381,12 @@ int PartitionedHashJoinNode::ProcessProbeBatch(TPrefetchMode::type prefetch_mode
   // Note that 'probe_batch_pos_' is the row no. of the row after 'current_probe_row_'.
   RowBatch::Iterator probe_batch_iterator(probe_batch_.get(), probe_batch_pos_);
   int remaining_capacity = max_rows;
-  bool has_probe_rows = current_probe_row_ != NULL || !probe_batch_iterator.AtEnd();
   HashTableCtx::ExprValuesCache* expr_vals_cache = ht_ctx->expr_values_cache();
 
   // Keep processing more probe rows if there are more to process and the output batch
   // has room and we haven't hit any error yet.
-  while (has_probe_rows && remaining_capacity > 0 && status->ok()) {
+  while ((current_probe_row_ != nullptr || !probe_batch_iterator.AtEnd())
+      && remaining_capacity > 0 && status->ok()) {
     // Prefetch for the current hash_tbl_iterator_.
     if (prefetch_mode != TPrefetchMode::NONE) {
       hash_tbl_iterator_.PrefetchBucket<true>();
@@ -420,9 +418,10 @@ int PartitionedHashJoinNode::ProcessProbeBatch(TPrefetchMode::type prefetch_mode
       DCHECK(status->ok());
     } while (NextProbeRow<JoinOp>(ht_ctx, &probe_batch_iterator, &remaining_capacity,
         status));
-    // Update whether there are more probe rows to process in the current batch.
-    has_probe_rows = current_probe_row_ != NULL;
-    if (!has_probe_rows) DCHECK(probe_batch_iterator.AtEnd());
+    // NextProbeRow() returns false either when it exhausts its input or hits
+    // an error. Otherwise we must have filled up the output batch.
+    DCHECK((ht_ctx->expr_values_cache()->AtEnd() && current_probe_row_ == nullptr)
+        || !status->ok() || remaining_capacity == 0);
     // Update where we are in the probe batch.
     probe_batch_pos_ = (probe_batch_iterator.Get() - probe_batch_->GetRow(0)) /
         probe_batch_->num_tuples_per_row();

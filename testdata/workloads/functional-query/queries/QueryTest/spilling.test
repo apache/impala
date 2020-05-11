@@ -308,3 +308,61 @@ order by l1.l_orderkey desc, l1.l_linenumber desc limit 10
 ---- CATCH
 Repartitioning did not reduce the size of a spilled partition
 ====
+---- QUERY
+# IMPALA-9725: incorrect results for spilling joins with very wide join keys.
+# This test is crafted to always return 0 rows, but with the previous bug
+# would sometimes return rows while spilling. The query needs to have a join
+# key that is more than 256 bytes wide to trigger the bug.
+set buffer_pool_limit=110m;
+set runtime_filter_mode=0;
+SELECT straight_join o_orderkey
+FROM (
+  SELECT *
+  FROM orders
+    JOIN customer ON o_custkey = c_custkey
+    JOIN nation ON c_nationkey = n_nationkey
+    JOIN region ON n_regionkey = r_regionkey
+  WHERE  o_orderkey < 500000) o1
+  LEFT ANTI JOIN /*+broadcast*/ (
+  SELECT *
+  FROM orders
+    JOIN customer ON o_custkey = c_custkey
+    JOIN nation ON c_nationkey = n_nationkey
+    JOIN region ON n_regionkey = r_regionkey
+  WHERE  o_orderkey < 500000) o2 ON o1.o_orderkey = o2.o_orderkey
+      AND o1.o_custkey = o2.o_custkey
+      AND o1.o_orderstatus = o2.o_orderstatus
+      AND o1.o_totalprice = o2.o_totalprice
+      AND o1.o_orderdate = o2.o_orderdate
+      AND o1.o_orderpriority = o2.o_orderpriority
+      AND o1.o_clerk = o2.o_clerk
+      AND o1.o_shippriority = o2.o_shippriority
+      AND o1.o_comment = o2.o_comment
+      AND o1.c_custkey = o2.c_custkey
+      AND o1.c_name = o2.c_name
+      AND o1.c_address = o2.c_address
+      AND o1.c_nationkey = o2.c_nationkey
+      AND o1.c_phone = o2.c_phone
+      AND o1.c_acctbal = o2.c_acctbal
+      AND o1.c_mktsegment = o2.c_mktsegment
+      AND o1.n_nationkey = o2.n_nationkey
+      AND o1.n_name = o2.n_name
+      AND o1.n_regionkey = o2.n_regionkey
+      AND o1.n_comment = o2.n_comment
+      AND o1.r_name = o2.r_name
+      AND o1.r_comment = o2.r_comment
+      AND fnv_hash(o1.n_name) = fnv_hash(o2.n_name)
+      AND fnv_hash(o1.r_name) = fnv_hash(o2.r_name)
+      AND fnv_hash(o1.o_orderstatus) = fnv_hash(o2.o_orderstatus)
+      AND fnv_hash(o1.o_shippriority) = fnv_hash(o2.o_shippriority)
+      AND fnv_hash(o1.o_orderdate) = fnv_hash(o2.o_orderdate)
+      AND fnv_hash(o1.o_orderpriority) = fnv_hash(o2.o_orderpriority)
+      AND fnv_hash(o1.o_clerk) = fnv_hash(o2.o_clerk)
+ORDER BY o_orderkey
+---- RESULTS
+---- TYPES
+BIGINT
+---- RUNTIME_PROFILE
+# Verify that at least one of the joins was spilled.
+row_regex: .*SpilledPartitions: .* \([1-9][0-9]*\)
+====
