@@ -31,15 +31,17 @@ enum TLogLevel {
   FATAL = 6
 }
 
-// Helper structs for GetJavaLogLevel(), SetJavaLogLevel() methods.
-// These are used as input params to get/set the logging level of a
-// particular Java class at runtime using GlogAppender.getLogLevel()
-// and GlogAppender.setLogLevel() methods.
-struct TGetJavaLogLevelParams {
-  1: required string class_name
-}
-
+// Helper structs for GetJavaLogLevels(), SetJavaLogLevel() methods.
+// These are used as:
+// - input param to set the logging level of a particular Java class
+// at runtime using GlogAppender.setLogLevel()
+// - return value as a list of Java classes with corresponding
+// logging levels set before using GlogAppender.getLogLevels()
 struct TSetJavaLogLevelParams {
   1: required string class_name
   2: required string log_level
+}
+
+struct TGetJavaLogLevelsResult {
+  1: required list<string> log_levels
 }

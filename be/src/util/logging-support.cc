@@ -86,7 +86,7 @@ int FLAGS_v_original_value;
 
 static jclass log4j_logger_class_;
 // Jni method descriptors corresponding to getLogLevel() and setLogLevel() operations.
-static jmethodID get_log_level_method; // GlogAppender.getLogLevel()
+static jmethodID get_log_levels_method; // GlogAppender.getLogLevels()
 static jmethodID set_log_level_method; // GlogAppender.setLogLevel()
 static jmethodID reset_log_levels_method; // GlogAppender.resetLogLevels()
 
@@ -98,27 +98,18 @@ void AddDocumentMember(const string& message, const char* member,
   document->AddMember(key, output, document->GetAllocator());
 }
 
-template<class F>
-Webserver::UrlCallback MakeCallback(const F& fnc, bool display_log4j_handlers) {
-  return [fnc, display_log4j_handlers](const auto& req, auto* doc) {
-    // Display log4j log level handlers only when display_log4j_handlers is true.
-    if (display_log4j_handlers) AddDocumentMember("true", "include_log4j_handlers", doc);
-    (*fnc)(req, doc);
-  };
-}
-
 void InitDynamicLoggingSupport() {
   JNIEnv* env = JniUtil::GetJNIEnv();
   ABORT_IF_ERROR(JniUtil::GetGlobalClassRef(env, "org/apache/impala/util/GlogAppender",
         &log4j_logger_class_));
-  JniMethodDescriptor get_log_level_method_desc =
-      {"getLogLevel", "([B)Ljava/lang/String;", &get_log_level_method};
+  JniMethodDescriptor get_log_levels_method_desc =
+      {"getLogLevels", "()[B", &get_log_levels_method};
   JniMethodDescriptor set_log_level_method_desc =
       {"setLogLevel", "([B)Ljava/lang/String;", &set_log_level_method};
   JniMethodDescriptor reset_log_level_method_desc =
       {"resetLogLevels", "()V", &reset_log_levels_method};
   ABORT_IF_ERROR(JniUtil::LoadStaticJniMethod(
-      env, log4j_logger_class_, &get_log_level_method_desc));
+      env, log4j_logger_class_, &get_log_levels_method_desc));
   ABORT_IF_ERROR(JniUtil::LoadStaticJniMethod(
       env, log4j_logger_class_, &set_log_level_method_desc));
   ABORT_IF_ERROR(JniUtil::LoadStaticJniMethod(
@@ -132,38 +123,28 @@ void InitDynamicLoggingSupport() {
       [](const char* flagname, int value) { return value >= 0 && value <= 3; });
 }
 
-// Helper method to get the log level of given Java class. It is a JNI wrapper around
-// GlogAppender.getLogLevel().
-Status GetJavaLogLevel(const TGetJavaLogLevelParams& params, string* result) {
-  return JniCall::static_method(log4j_logger_class_, get_log_level_method)
-      .with_thrift_arg(params).Call(result);
-}
-
 Status ResetJavaLogLevels() {
   return JniCall::static_method(log4j_logger_class_, reset_log_levels_method).Call();
 }
 
-// Callback handler for /get_java_loglevel.
-void GetJavaLogLevelCallback(const Webserver::WebRequest& req, Document* document) {
-  const auto& args = req.parsed_args;
-  Webserver::ArgumentMap::const_iterator log_getclass = args.find("class");
-  if (log_getclass == args.end() || log_getclass->second.empty()) {
-    AddDocumentMember("Invalid input class name", "error", document);
-    return;
-  }
-  string result;
-  TGetJavaLogLevelParams params;
-  params.__set_class_name(log_getclass->second);
-  Status status = GetJavaLogLevel(params, &result);
+void GetJavaLogLevels(Document* document) {
+  TGetJavaLogLevelsResult result;
+
+  Status status =
+    JniCall::static_method(log4j_logger_class_, get_log_levels_method).Call(&result);
+
   if (!status.ok()) {
     AddDocumentMember(status.GetDetail(), "error", document);
     return;
   }
-  if (result.empty()) {
-    AddDocumentMember("Invalid input class name", "error", document);
-    return;
+
+  string log_levels;
+  for (const string& logLevel: result.log_levels) {
+    log_levels.append(logLevel);
+    log_levels.append("\n");
   }
-  AddDocumentMember(result, "get_java_loglevel_result", document);
+
+  AddDocumentMember(log_levels, "get_java_loglevel_result", document);
 }
 
 // Callback handler for /set_java_loglevel.
@@ -205,6 +186,19 @@ void ResetJavaLogLevelCallback(const Webserver::WebRequest& req, Document* docum
   AddDocumentMember("Java log levels reset.", "reset_java_loglevel_result", document);
 }
 
+void GetGlogLevel(Document* document) {
+  string log_level;
+
+  if (google::GetCommandLineOption("v", &log_level)) {
+    AddDocumentMember(log_level, "glog_level", document);
+  }
+  else {
+    AddDocumentMember(to_string(FLAGS_v_original_value), "glog_level", document);
+  }
+
+  AddDocumentMember(to_string(FLAGS_v_original_value), "default_glog_level", document);
+}
+
 // Callback handler for /set_glog_level
 void SetGlogLevelCallback(const Webserver::WebRequest& req, Document* document) {
   const auto& args = req.parsed_args;
@@ -221,7 +215,6 @@ void SetGlogLevelCallback(const Webserver::WebRequest& req, Document* document) 
     return;
   }
   AddDocumentMember(new_log_level, "set_glog_level_result", document);
-  AddDocumentMember(to_string(FLAGS_v_original_value), "default_glog_level", document);
 }
 
 // Callback handler for /reset_glog_level
@@ -231,7 +224,18 @@ void ResetGlogLevelCallback(const Webserver::WebRequest& req, Document* document
   AddDocumentMember(new_log_level, "reset_glog_level_result", document);
 }
 
+template<class F>
+Webserver::UrlCallback MakeCallback(const F& fnc, bool display_log4j_handlers) {
+  return [fnc, display_log4j_handlers](const auto& req, auto* doc) {
+    // Display log4j log level handlers only when display_log4j_handlers is true.
+    if (display_log4j_handlers) AddDocumentMember("true", "include_log4j_handlers", doc);
+    (*fnc)(req, doc);
+    if (display_log4j_handlers) {GetJavaLogLevels(doc);}
+    GetGlogLevel(doc);
+  };
 }
+
+} // namespace
 
 namespace impala {
 
@@ -321,8 +325,6 @@ void RegisterLogLevelCallbacks(Webserver* webserver, bool register_log4j_handler
   webserver->RegisterUrlCallback("/reset_glog_level", "log_level.tmpl",
       MakeCallback(&ResetGlogLevelCallback, register_log4j_handlers), false);
   if (!register_log4j_handlers) return;
-  webserver->RegisterUrlCallback("/get_java_loglevel", "log_level.tmpl",
-      MakeCallback(&GetJavaLogLevelCallback, register_log4j_handlers), false);
   webserver->RegisterUrlCallback("/set_java_loglevel", "log_level.tmpl",
       MakeCallback(&SetJavaLogLevelCallback, register_log4j_handlers), false);
   webserver->RegisterUrlCallback("/reset_java_loglevel", "log_level.tmpl",

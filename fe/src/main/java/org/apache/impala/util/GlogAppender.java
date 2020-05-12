@@ -17,6 +17,9 @@
 
 package org.apache.impala.util;
 
+import java.util.ArrayList;
+import java.util.Enumeration;
+import java.util.List;
 import java.util.Properties;
 
 import org.apache.log4j.AppenderSkeleton;
@@ -30,7 +33,7 @@ import org.apache.impala.common.InternalException;
 import org.apache.impala.common.ImpalaException;
 import org.apache.impala.common.JniUtil;
 import org.apache.impala.service.BackendConfig;
-import org.apache.impala.thrift.TGetJavaLogLevelParams;
+import org.apache.impala.thrift.TGetJavaLogLevelsResult;
 import org.apache.impala.thrift.TSetJavaLogLevelParams;
 import org.apache.impala.thrift.TLogLevel;
 import org.apache.thrift.protocol.TBinaryProtocol;
@@ -139,17 +142,6 @@ public class GlogAppender extends AppenderSkeleton {
   }
 
   /**
-   * Get the log4j log level corresponding to a serialized TGetJavaLogLevelParams.
-   */
-  public static String getLogLevel(byte[] serializedParams) throws ImpalaException {
-    TGetJavaLogLevelParams thriftParams = new TGetJavaLogLevelParams();
-    JniUtil.deserializeThrift(protocolFactory_, thriftParams, serializedParams);
-    String className = thriftParams.getClass_name();
-    if (Strings.isNullOrEmpty(className)) return null;
-    return Logger.getLogger(className).getEffectiveLevel().toString();
-  }
-
-  /**
    * Sets the logging level of a class as per serialized TSetJavaLogLevelParams.
    */
   public static String setLogLevel(byte[] serializedParams) throws ImpalaException {
@@ -170,5 +162,25 @@ public class GlogAppender extends AppenderSkeleton {
     LogManager.resetConfiguration();
     Install(TLogLevel.values()[BackendConfig.INSTANCE.getImpalaLogLevel()],
         TLogLevel.values()[BackendConfig.INSTANCE.getNonImpalaJavaVlogLevel()]);
+  }
+
+  /**
+   * Get all the previously set log4j log levels.
+   */
+  public static byte[] getLogLevels() throws ImpalaException {
+    Enumeration<Logger> allLoggers = LogManager.getCurrentLoggers();
+    List<String> logLevels = new ArrayList<String>();
+
+    while (allLoggers.hasMoreElements()) {
+      Logger logger = allLoggers.nextElement();
+      if (logger.getLevel() != null) {
+        logLevels.add(logger.getName() + " : " + logger.getLevel());
+      }
+    }
+
+    TGetJavaLogLevelsResult result = new TGetJavaLogLevelsResult();
+    result.setLog_levels(logLevels);
+
+    return JniUtil.serializeToThrift(result, protocolFactory_);
   }
 };
