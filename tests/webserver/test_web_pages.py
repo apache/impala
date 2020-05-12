@@ -31,7 +31,6 @@ import requests
 class TestWebPage(ImpalaTestSuite):
 
   ROOT_URL = "http://localhost:{0}/"
-  GET_JAVA_LOGLEVEL_URL = "http://localhost:{0}/get_java_loglevel"
   SET_JAVA_LOGLEVEL_URL = "http://localhost:{0}/set_java_loglevel"
   RESET_JAVA_LOGLEVEL_URL = "http://localhost:{0}/reset_java_loglevel"
   SET_GLOG_LOGLEVEL_URL = "http://localhost:{0}/set_glog_level"
@@ -201,49 +200,31 @@ class TestWebPage(ImpalaTestSuite):
     malformed inputs. This however does not test that the log level changes are actually
     in effect."""
     # Check that the log_level end points are accessible.
-    self.get_and_check_status_jvm(self.GET_JAVA_LOGLEVEL_URL)
     self.get_and_check_status_jvm(self.SET_JAVA_LOGLEVEL_URL)
     self.get_and_check_status_jvm(self.RESET_JAVA_LOGLEVEL_URL)
     self.get_and_check_status(self.SET_GLOG_LOGLEVEL_URL)
     self.get_and_check_status(self.RESET_GLOG_LOGLEVEL_URL)
-    # Try getting log level of a class.
-    get_loglevel_url = (self.GET_JAVA_LOGLEVEL_URL + "?class" +
-        "=org.apache.impala.catalog.HdfsTable")
-    self.get_and_check_status_jvm(get_loglevel_url, "DEBUG")
 
     # Set the log level of a class to TRACE and confirm the setting is in place
     set_loglevel_url = (self.SET_JAVA_LOGLEVEL_URL + "?class" +
         "=org.apache.impala.catalog.HdfsTable&level=trace")
-    self.get_and_check_status_jvm(set_loglevel_url, "Effective log level: TRACE")
+    self.get_and_check_status_jvm(
+      set_loglevel_url,
+      "org.apache.impala.catalog.HdfsTable : TRACE")
 
-    get_loglevel_url = (self.GET_JAVA_LOGLEVEL_URL + "?class" +
-        "=org.apache.impala.catalog.HdfsTable")
-    self.get_and_check_status_jvm(get_loglevel_url, "TRACE")
-    # Check the log level of a different class and confirm it is still DEBUG
-    get_loglevel_url = (self.GET_JAVA_LOGLEVEL_URL + "?class" +
-        "=org.apache.impala.catalog.HdfsPartition")
-    self.get_and_check_status_jvm(get_loglevel_url, "DEBUG")
-
-    # Reset Java logging levels and check the logging level of the class again
+    # Reset Java logging levels
     self.get_and_check_status_jvm(self.RESET_JAVA_LOGLEVEL_URL, "Java log levels reset.")
-    get_loglevel_url = (self.GET_JAVA_LOGLEVEL_URL + "?class" +
-        "=org.apache.impala.catalog.HdfsTable")
-    self.get_and_check_status_jvm(get_loglevel_url, "DEBUG")
 
     # Set a new glog level and make sure the setting has been applied.
     set_glog_url = (self.SET_GLOG_LOGLEVEL_URL + "?glog=3")
-    self.get_and_check_status(set_glog_url, "v set to 3")
+    self.get_and_check_status(set_glog_url, "val(3)")
 
     # Try resetting the glog logging defaults again.
-    self.get_and_check_status(self.RESET_GLOG_LOGLEVEL_URL, "v set to ")
-
-    # Try to get the log level of an empty class input
-    get_loglevel_url = (self.GET_JAVA_LOGLEVEL_URL + "?class=")
-    self.get_and_check_status_jvm(get_loglevel_url)
+    self.get_and_check_status(self.RESET_GLOG_LOGLEVEL_URL, "Current backend log level: ")
 
     # Same as above, for set log level request
     set_loglevel_url = (self.SET_JAVA_LOGLEVEL_URL + "?class=")
-    self.get_and_check_status_jvm(get_loglevel_url)
+    self.get_and_check_status_jvm(set_loglevel_url)
 
     # Empty input for setting a glog level request
     set_glog_url = (self.SET_GLOG_LOGLEVEL_URL + "?glog=")
@@ -254,7 +235,9 @@ class TestWebPage(ImpalaTestSuite):
     # Level.toLevel() method.
     set_loglevel_url = (self.SET_JAVA_LOGLEVEL_URL + "?class" +
         "=org.apache.impala.catalog.HdfsTable&level=foo&")
-    self.get_and_check_status_jvm(set_loglevel_url, "Effective log level: DEBUG")
+    self.get_and_check_status_jvm(
+      set_loglevel_url,
+      "org.apache.impala.catalog.HdfsTable : DEBUG")
 
     # Try setting an invalid glog level.
     set_glog_url = self.SET_GLOG_LOGLEVEL_URL + "?glog=foo"
@@ -274,11 +257,11 @@ class TestWebPage(ImpalaTestSuite):
     self.get_and_check_status(self.RESET_GLOG_LOGLEVEL_URL)
     # Set log level to 3.
     set_glog_url = (self.SET_GLOG_LOGLEVEL_URL + "?glog=3")
-    self.get_and_check_status(set_glog_url, "v set to 3")
+    self.get_and_check_status(set_glog_url, "val(3)")
     # Check that Impala doesn't crash when running a query that aggregates.
     self.client.execute("select avg(int_col) from functional.alltypessmall")
     # Reset log level.
-    self.get_and_check_status(self.RESET_GLOG_LOGLEVEL_URL, "v set to ")
+    self.get_and_check_status(self.RESET_GLOG_LOGLEVEL_URL, "Current backend log level: ")
 
   def test_catalog(self, cluster_properties, unique_database):
     """Tests the /catalog and /catalog_object endpoints."""
