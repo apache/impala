@@ -21,16 +21,27 @@
 #include <cstddef>
 #include <cstdint>
 #include <limits>
+#include <memory>
 
-#include <gflags/gflags_declare.h>
-#include <glog/logging.h>
+// Including glog/logging.h causes problems while compiling in Apache Impala for codegen.
+// IWYU pragma: no_include <glog/logging.h>
 
-#include "kudu/gutil/cpu.h"
 #include "kudu/gutil/macros.h"
 #include "kudu/gutil/port.h"
+#include "kudu/util/hash.pb.h"
+#include "kudu/util/hash_util.h"
+#include "kudu/util/make_shared.h"
+#include "kudu/util/slice.h"
 #include "kudu/util/status.h"
 
-DECLARE_bool(disable_blockbloomfilter_avx2);
+namespace base {
+class CPU;
+}  // namespace base
+
+namespace kudu {
+class Arena;
+class BlockBloomFilterPB;
+}  // namespace kudu
 
 namespace kudu {
 
@@ -68,14 +79,32 @@ class BlockBloomFilter {
 
   // Reset the filter state, allocate/reallocate the internal data structures.
   // All calls to Insert() and Find() should only be done between the calls to Init() and
-  // Close().Init and Close are safe to call multiple times.
-  Status Init(int log_space_bytes);
+  // Close(). Init and Close are safe to call multiple times.
+  // BlockBloomFilter offers convenience of both directly inserting 32-bit integers
+  // and letting the Insert()/Find() hash the keys. To avoid mistakes wherein
+  // caller is using specific hash function and directly inserts 32-bit hash values
+  // but misses specifying the hash function in Init() call, default values are not used.
+  // Parameters:
+  // "log_space_bytes": Log2 of the space in bytes for the BloomFilter.
+  // "hash_algorithm": Hash algorithm used to hash the keys to 32-bit integers prior to doing
+  //                   Insert() or Find().
+  // "hash_seed": Seed used to hash the keys.
+  Status Init(int log_space_bytes, HashAlgorithm hash_algorithm, uint32_t hash_seed);
+  // Initialize the BlockBloomFilter by de-serializing the protobuf message.
+  Status InitFromPB(const BlockBloomFilterPB& bf_src);
+  // Initialize the BlockBloomFilter from a populated "directory" structure.
+  // Useful for initializing the BlockBloomFilter by de-serializing a custom protobuf message.
+  Status InitFromDirectory(int log_space_bytes, const Slice& directory, bool always_false,
+                           HashAlgorithm hash_algorithm, uint32_t hash_seed);
+
+  // Clones the BlockBloomFilter using the supplied "allocator". The allocator is expected
+  // to remain valid during the lifetime of the cloned BlockBloomFilter.
+  // On success, returns Status::OK with cloned BlockBloomFilter in "bf_out" output parameter.
+  // On failure, returns error status.
+  Status Clone(BlockBloomFilterBufferAllocatorIf* allocator,
+               std::unique_ptr<BlockBloomFilter>* bf_out) const;
+
   void Close();
-
-  // Representation of a filter which allows all elements to pass.
-  static constexpr BlockBloomFilter* const kAlwaysTrueFilter = nullptr;
-
-  bool AlwaysFalse() const { return always_false_; }
 
   // Adds an element to the BloomFilter. The function used to generate 'hash' need not
   // have good uniformity, but it should have low collision probability. For instance, if
@@ -83,10 +112,18 @@ class BlockBloomFilter {
   // this Bloom filter, since the collision probability (the probability that two
   // non-equal values will have the same hash value) is 0.
   void Insert(uint32_t hash) noexcept;
+  // Same as above with convenience of hashing the key.
+  void Insert(const Slice& key) noexcept {
+    Insert(HashUtil::ComputeHash32(key, hash_algorithm_, hash_seed_));
+  }
 
   // Finds an element in the BloomFilter, returning true if it is found and false (with
   // high probability) if it is not.
   bool Find(uint32_t hash) const noexcept;
+  // Same as above with convenience of hashing the key.
+  bool Find(const Slice& key) const noexcept {
+    return Find(HashUtil::ComputeHash32(key, hash_algorithm_, hash_seed_));
+  }
 
   // As more distinct items are inserted into a BloomFilter, the false positive rate
   // rises. MaxNdv() returns the NDV (number of distinct values) at which a BloomFilter
@@ -110,6 +147,43 @@ class BlockBloomFilter {
     return sizeof(Bucket) * (1LL << std::max<int>(1, log_heap_size - kLogBucketWordBits));
   }
 
+  // Serializes BlockBloomFilter to protobuf message.
+  void CopyToPB(BlockBloomFilterPB* bf_dst) const;
+
+  bool operator==(const BlockBloomFilter& rhs) const;
+  bool operator!=(const BlockBloomFilter& rhs) const;
+
+  // Computes the logical OR of this filter with 'other' and stores the result in this
+  // filter.
+  // Notes:
+  // - The directory sizes of the Bloom filters must match.
+  // - Or'ing with kAlwaysTrueFilter is disallowed.
+  Status Or(const BlockBloomFilter& other);
+
+  // Computes out[i] |= in[i] for the arrays 'in' and 'out' of length 'n' bytes where 'n'
+  // is multiple of 32-bytes.
+  static Status OrEqualArray(size_t n, const uint8_t* __restrict__ in,
+                             uint8_t* __restrict__ out);
+
+  // Returns whether the Bloom filter is empty and hence would return false for all lookups.
+  bool always_false() const {
+    return always_false_;
+  }
+
+  // Returns amount of space used in log2 bytes.
+  int log_space_bytes() const {
+    return log_num_buckets_ + kLogBucketByteSize;
+  }
+
+  // Returns the directory structure. Useful for serializing the BlockBloomFilter to
+  // a custom protobuf message.
+  Slice directory() const {
+    return Slice(reinterpret_cast<const uint8_t*>(directory_), directory_size());
+  }
+
+  // Representation of a filter which allows all elements to pass.
+  static constexpr BlockBloomFilter* const kAlwaysTrueFilter = nullptr;
+
  private:
   // always_false_ is true when the bloom filter hasn't had any elements inserted.
   bool always_false_;
@@ -127,6 +201,8 @@ class BlockBloomFilter {
 
   // log2(number of bytes in a bucket)
   static constexpr int kLogBucketByteSize = 5;
+  // Bucket size in bytes.
+  static constexpr size_t kBucketByteSize = 1UL << kLogBucketByteSize;
 
   static_assert((1 << kLogBucketWordBits) == std::numeric_limits<BucketWord>::digits,
       "BucketWord must have a bit-width that is be a power of 2, like 64 for uint64_t.");
@@ -144,7 +220,15 @@ class BlockBloomFilter {
 
   Bucket* directory_;
 
-  // Same as Insert(), but skips the CPU check and assumes that AVX is not available.
+  // Hash algorithm used to hash data to 32-bit value before insertion and lookup.
+  HashAlgorithm hash_algorithm_;
+  // Seed used with hash algorithm.
+  uint32_t hash_seed_;
+
+  // Helper function for public Init() variants.
+  Status InitInternal(int log_space_bytes, HashAlgorithm hash_algorithm, uint32_t hash_seed);
+
+  // Same as Insert(), but skips the CPU check and assumes that AVX2 is not available.
   void InsertNoAvx2(uint32_t hash) noexcept;
 
   // Does the actual work of Insert(). bucket_idx is the index of the bucket to insert
@@ -153,8 +237,17 @@ class BlockBloomFilter {
 
   bool BucketFind(uint32_t bucket_idx, uint32_t hash) const noexcept;
 
+  // Computes out[i] |= in[i] for the arrays 'in' and 'out' of length 'n' without using AVX2
+  // operations.
+  static void OrEqualArrayNoAVX2(size_t n, const uint8_t* __restrict__ in,
+                                 uint8_t* __restrict__ out);
+  // Helper function for OrEqualArray functions that encapsulates AVX2 v/s non-AVX2 logic to
+  // invoke the right function.
+  static void OrEqualArrayInternal(size_t n, const uint8_t* __restrict__ in,
+                                   uint8_t* __restrict__ out);
+
 #ifdef USE_AVX2
-  // Same as Insert(), but skips the CPU check and assumes that AVX is available.
+  // Same as Insert(), but skips the CPU check and assumes that AVX2 is available.
   void InsertAvx2(uint32_t hash) noexcept __attribute__((__target__("avx2")));
 
   // A faster SIMD version of BucketInsert().
@@ -164,21 +257,25 @@ class BlockBloomFilter {
   // A faster SIMD version of BucketFind().
   bool BucketFindAVX2(uint32_t bucket_idx, uint32_t hash) const noexcept
       __attribute__((__target__("avx2")));
+
+  // Computes out[i] |= in[i] for the arrays 'in' and 'out' of length 'n' using AVX2
+  // instructions. 'n' must be a multiple of 32.
+  static void OrEqualArrayAVX2(size_t n, const uint8_t* __restrict__ in,
+                               uint8_t* __restrict__ out) __attribute__((target("avx2")));
 #endif
 
-  // Function pointers initialized in constructor to avoid run-time cost
-  // in hot-path of Find and Insert operations.
+  // Function pointers initialized in the constructor to avoid run-time cost in hot-path
+  // of Find and Insert operations.
   decltype(&BlockBloomFilter::BucketInsert) bucket_insert_func_ptr_;
   decltype(&BlockBloomFilter::BucketFind) bucket_find_func_ptr_;
 
+  // Size of the internal directory structure in bytes.
   int64_t directory_size() const {
-    return 1ULL << (log_num_buckets_ + kLogBucketByteSize);
+    return 1ULL << log_space_bytes();
   }
 
   // Detect at run-time whether CPU supports AVX2
-  static bool has_avx2() {
-    return !FLAGS_disable_blockbloomfilter_avx2 && kCpu.has_avx2();
-  }
+  static bool has_avx2();
 
   // Some constants used in hashing. #defined for efficiency reasons.
 #define BLOOM_HASH_CONSTANTS                                             \
@@ -211,21 +308,58 @@ class BlockBloomFilter {
 // Generic interface to allocate and de-allocate memory for the BlockBloomFilter.
 class BlockBloomFilterBufferAllocatorIf {
  public:
+  virtual ~BlockBloomFilterBufferAllocatorIf() = default;
   virtual Status AllocateBuffer(size_t bytes, void** ptr) = 0;
   virtual void FreeBuffer(void* ptr) = 0;
+  // Clones the allocator.
+  virtual std::shared_ptr<BlockBloomFilterBufferAllocatorIf> Clone() const = 0;
 };
 
-class DefaultBlockBloomFilterBufferAllocator : public BlockBloomFilterBufferAllocatorIf {
+// Default allocator implemented as Singleton.
+class DefaultBlockBloomFilterBufferAllocator :
+    public BlockBloomFilterBufferAllocatorIf,
+    public enable_make_shared<DefaultBlockBloomFilterBufferAllocator> {
  public:
-  // Required for Singleton.
-  DefaultBlockBloomFilterBufferAllocator() = default;
+  static std::shared_ptr<DefaultBlockBloomFilterBufferAllocator> GetSingletonSharedPtr();
+  static DefaultBlockBloomFilterBufferAllocator* GetSingleton();
+  ~DefaultBlockBloomFilterBufferAllocator() override = default;
 
   Status AllocateBuffer(size_t bytes, void** ptr) override;
   void FreeBuffer(void* ptr) override;
+  std::shared_ptr<BlockBloomFilterBufferAllocatorIf> Clone() const override;
 
-  static DefaultBlockBloomFilterBufferAllocator* GetSingleton();
+ protected:
+  // Protected default constructor to allow using make_shared()
+  DefaultBlockBloomFilterBufferAllocator() = default;
  private:
   DISALLOW_COPY_AND_ASSIGN(DefaultBlockBloomFilterBufferAllocator);
+};
+
+class ArenaBlockBloomFilterBufferAllocator : public BlockBloomFilterBufferAllocatorIf {
+ public:
+  // Default constructor with arena that's owned by the allocator.
+  ArenaBlockBloomFilterBufferAllocator();
+
+  // "arena" is expected to remain valid during the lifetime of the allocator.
+  explicit ArenaBlockBloomFilterBufferAllocator(Arena* arena);
+
+  ~ArenaBlockBloomFilterBufferAllocator() override;
+
+  Status AllocateBuffer(size_t bytes, void** ptr) override;
+
+  void FreeBuffer(void* ptr) override {
+    // NOP. Buffer will be de-allocated when the arena is destructed.
+  }
+
+  std::shared_ptr<BlockBloomFilterBufferAllocatorIf> Clone() const override {
+    return std::make_shared<ArenaBlockBloomFilterBufferAllocator>();
+  };
+
+ private:
+  Arena* arena_;
+  bool is_arena_owned_;
+
+  DISALLOW_COPY_AND_ASSIGN(ArenaBlockBloomFilterBufferAllocator);
 };
 
 }  // namespace kudu
