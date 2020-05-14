@@ -15,11 +15,15 @@
 // specific language governing permissions and limitations
 // under the License.
 
+#include "kudu/util/hash_util.h"
+
 #include <cstdint>
 
 #include <gtest/gtest.h>
 
-#include "kudu/util/hash_util.h"
+#include "kudu/util/hash.pb.h"
+#include "kudu/util/slice.h"
+#include "kudu/util/test_macros.h"
 
 namespace kudu {
 
@@ -53,6 +57,12 @@ TEST(HashUtilTest, TestFastHash64) {
 
   hash = HashUtil::FastHash64("quick brown fox", 15, 42);
   ASSERT_EQ(3757424404558187042UL, hash);
+
+  hash = HashUtil::FastHash64(nullptr, 0, 0);
+  ASSERT_EQ(12680076593665652444UL, hash);
+
+  hash = HashUtil::FastHash64("", 0, 0);
+  ASSERT_EQ(0, hash);
 }
 
 TEST(HashUtilTest, TestFastHash32) {
@@ -66,6 +76,22 @@ TEST(HashUtilTest, TestFastHash32) {
 
   hash = HashUtil::FastHash32("quick brown fox", 15, 42);
   ASSERT_EQ(1676541068U, hash);
+
+  hash = HashUtil::FastHash32(nullptr, 0, 0);
+  ASSERT_EQ(842467426U, hash);
+
+  hash = HashUtil::FastHash32("", 0, 0);
+  ASSERT_EQ(0, hash);
+}
+
+TEST(HashUtilTest, TestComputeHash32Available) {
+  Slice data("abcd");
+  for (int h = HashAlgorithm_MIN; h <= HashAlgorithm_MAX; h++) {
+    const auto hash_algorithm = static_cast<HashAlgorithm>(h);
+    if (HashUtil::IsComputeHash32Available(hash_algorithm)) {
+      NO_FATALS(HashUtil::ComputeHash32(data, hash_algorithm, 0));
+    }
+  }
 }
 
 } // namespace kudu

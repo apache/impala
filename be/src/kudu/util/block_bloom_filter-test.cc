@@ -20,8 +20,9 @@
 #include <cmath> // IWYU pragma: keep
 #include <cstdint>
 #include <cstdlib>
-#include <iosfwd>
+#include <cstring>
 #include <memory>
+#include <type_traits>
 #include <unordered_set>
 #include <utility>
 #include <vector>
@@ -30,13 +31,18 @@
 #include <glog/logging.h>
 #include <gtest/gtest.h>
 
+#include "kudu/util/hash.pb.h"
+#include "kudu/util/memory/arena.h"
+#include "kudu/util/slice.h"
 #include "kudu/util/status.h"
 #include "kudu/util/test_macros.h"
 #include "kudu/util/test_util.h"
 
 DECLARE_bool(disable_blockbloomfilter_avx2);
 
-using namespace std; // NOLINT(*)
+using std::unique_ptr;
+using std::unordered_set;
+using std::vector;
 
 namespace kudu {
 
@@ -44,6 +50,7 @@ class BlockBloomFilterTest : public KuduTest {
  public:
   void SetUp() override {
     SeedRandom();
+    allocator_ = DefaultBlockBloomFilterBufferAllocator::GetSingleton();
   }
   // Make a random uint32_t, avoiding the absent high bit and the low-entropy low bits
   // produced by rand().
@@ -57,9 +64,8 @@ class BlockBloomFilterTest : public KuduTest {
   BlockBloomFilter* CreateBloomFilter(size_t log_space_bytes) {
     FLAGS_disable_blockbloomfilter_avx2 = (MakeRand() & 0x1) == 0;
 
-    unique_ptr<BlockBloomFilter> bf(
-        new BlockBloomFilter(DefaultBlockBloomFilterBufferAllocator::GetSingleton()));
-    CHECK_OK(bf->Init(log_space_bytes));
+    unique_ptr<BlockBloomFilter> bf(new BlockBloomFilter(allocator_));
+    CHECK_OK(bf->Init(log_space_bytes, FAST_HASH, 0));
     bloom_filters_.emplace_back(move(bf));
     return bloom_filters_.back().get();
   }
@@ -69,6 +75,9 @@ class BlockBloomFilterTest : public KuduTest {
       bf->Close();
     }
   }
+
+ protected:
+  DefaultBlockBloomFilterBufferAllocator* allocator_;
 
  private:
   vector<unique_ptr<BlockBloomFilter>> bloom_filters_;
@@ -81,14 +90,54 @@ TEST_F(BlockBloomFilterTest, Constructor) {
   }
 }
 
+TEST_F(BlockBloomFilterTest, Clone) {
+  Arena arena(1024);
+  ArenaBlockBloomFilterBufferAllocator arena_allocator(&arena);
+  std::shared_ptr<BlockBloomFilterBufferAllocatorIf> allocator_clone = arena_allocator.Clone();
+
+  for (int log_space_bytes = 1; log_space_bytes <= 20; ++log_space_bytes) {
+    auto* bf = CreateBloomFilter(log_space_bytes);
+    int max_elems = BlockBloomFilter::MaxNdv(log_space_bytes, 0.01 /* fpp */);
+    while (max_elems-- > 0) {
+      bf->Insert(MakeRand());
+    }
+    unique_ptr<BlockBloomFilter> bf_clone;
+    ASSERT_OK(bf->Clone(allocator_clone.get(), &bf_clone));
+    ASSERT_NE(nullptr, bf_clone);
+    ASSERT_EQ(*bf_clone, *bf);
+  }
+}
+
 TEST_F(BlockBloomFilterTest, InvalidSpace) {
-  BlockBloomFilter bf(DefaultBlockBloomFilterBufferAllocator::GetSingleton());
+  BlockBloomFilter bf(allocator_);
   // Random number in the range [38, 64).
   const int log_space_bytes = 38 + rand() % (64 - 38);
-  Status s = bf.Init(log_space_bytes);
+  Status s = bf.Init(log_space_bytes, FAST_HASH, 0);
   ASSERT_TRUE(s.IsInvalidArgument());
   ASSERT_STR_CONTAINS(s.ToString(), "Bloom filter too large");
   bf.Close();
+}
+
+// Simple Arena allocator based test that would sometimes trigger
+// SIGSEGV due to misalignment of the "directory_" ptr on AVX operations
+// before adding support for 32/64 byte alignment in Arena allocator.
+// It simulates the allocation pattern in wire-protocol.cc.
+TEST_F(BlockBloomFilterTest, ArenaAligned) {
+  Arena a(64);
+  auto* allocator = a.NewObject<ArenaBlockBloomFilterBufferAllocator>(&a);
+  auto* bf = a.NewObject<BlockBloomFilter>(allocator);
+  bf->Init(6, FAST_HASH, 0);
+  bool key = true;
+  Slice s(reinterpret_cast<const uint8_t*>(&key), sizeof(key));
+  bf->Insert(s);
+  ASSERT_TRUE(bf->Find(s));
+}
+
+TEST_F(BlockBloomFilterTest, InvalidHashAlgorithm) {
+  BlockBloomFilter bf(allocator_);
+  Status s = bf.Init(4, UNKNOWN_HASH, 0);
+  ASSERT_TRUE(s.IsInvalidArgument());
+  ASSERT_STR_CONTAINS(s.ToString(), "Invalid/Unsupported hash algorithm");
 }
 
 // We can Insert() hashes into a Bloom filter with different spaces.
@@ -239,5 +288,47 @@ TEST_F(BlockBloomFilterTest, MinSpaceForFpp) {
       // log space at which we can guarantee the requested fpp.
     }
   }
+}
+
+TEST_F(BlockBloomFilterTest, Or) {
+  BlockBloomFilter* bf1 = CreateBloomFilter(BlockBloomFilter::MinLogSpace(100, 0.01));
+  BlockBloomFilter* bf2 = CreateBloomFilter(BlockBloomFilter::MinLogSpace(100, 0.01));
+
+  for (int i = 60; i < 80; ++i) bf2->Insert(i);
+  for (int i = 0; i < 10; ++i) bf1->Insert(i);
+
+  ASSERT_OK(bf1->Or(*bf2));
+  for (int i = 0; i < 10; ++i) ASSERT_TRUE(bf1->Find(i)) << i;
+  for (int i = 60; i < 80; ++i) ASSERT_TRUE(bf1->Find(i)) << i;
+
+  // Insert another value to aggregated BloomFilter.
+  for (int i = 11; i < 50; ++i) bf1->Insert(i);
+
+  for (int i = 11; i < 50; ++i) ASSERT_TRUE(bf1->Find(i)) << i;
+  ASSERT_FALSE(bf1->Find(81));
+
+  // Check that AlwaysFalse() is updated correctly.
+  BlockBloomFilter* bf3 = CreateBloomFilter(BlockBloomFilter::MinLogSpace(100, 0.01));
+  BlockBloomFilter* always_false = CreateBloomFilter(BlockBloomFilter::MinLogSpace(100, 0.01));
+  ASSERT_OK(bf3->Or(*always_false));
+  EXPECT_TRUE(bf3->always_false());
+  ASSERT_OK(bf3->Or(*bf2));
+  EXPECT_FALSE(bf3->always_false());
+
+  // Invalid argument test cases.
+  BlockBloomFilter* bf4 = CreateBloomFilter(BlockBloomFilter::MinLogSpace(100, 0.01));
+  BlockBloomFilter* bf5 = CreateBloomFilter(BlockBloomFilter::MinLogSpace(100000, 0.01));
+  Status s = bf4->Or(*bf5);
+  ASSERT_TRUE(s.IsInvalidArgument());
+  ASSERT_STR_CONTAINS(s.ToString(), "Directory size don't match");
+
+  // Test the public OrEqualArray() function.
+  static constexpr size_t kNumBytes = 64;
+  unique_ptr<uint8_t[]> a_ptr(new uint8_t[kNumBytes]);
+  unique_ptr<uint8_t[]> b_ptr(new uint8_t[kNumBytes]);
+  memset(a_ptr.get(), 0xDE, kNumBytes);
+  memset(b_ptr.get(), 0, kNumBytes);
+  ASSERT_OK(BlockBloomFilter::OrEqualArray(kNumBytes, a_ptr.get(), b_ptr.get()));
+  ASSERT_EQ(0, memcmp(a_ptr.get(), b_ptr.get(), kNumBytes));
 }
 }  // namespace kudu
