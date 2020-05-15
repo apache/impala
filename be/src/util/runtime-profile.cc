@@ -1932,6 +1932,7 @@ void RuntimeProfileBase::SummaryStatsCounter::SetStats(const SummaryStatsCounter
 void RuntimeProfileBase::SummaryStatsCounter::Merge(const SummaryStatsCounter& other) {
   lock_guard<SpinLock> ol(other.lock_);
   lock_guard<SpinLock> l(lock_);
+  DCHECK_EQ(unit_, other.unit_);
   total_num_values_ += other.total_num_values_;
   min_ = min(min_, other.min_);
   max_ = max(max_, other.max_);

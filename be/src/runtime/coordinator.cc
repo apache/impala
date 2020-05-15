@@ -950,7 +950,7 @@ Status Coordinator::UpdateBackendExecStatus(const ReportExecStatusRequestPB& req
   vector<AuxErrorInfoPB> aux_error_info;
 
   if (backend_state->ApplyExecStatusReport(request, thrift_profiles, &exec_summary_,
-          &progress_, &dml_exec_state_, &aux_error_info)) {
+          &progress_, &dml_exec_state_, &aux_error_info, fragment_stats_)) {
     // This backend execution has completed.
     if (VLOG_QUERY_IS_ON) {
       // Don't log backend completion if the query has already been cancelled.
@@ -1164,7 +1164,7 @@ void Coordinator::ComputeQuerySummary() {
   if (backend_states_.empty()) return;
   // make sure fragment_stats_ are up-to-date
   for (BackendState* backend_state: backend_states_) {
-    backend_state->UpdateExecStats(fragment_stats_);
+    backend_state->UpdateExecStats(fragment_stats_, /*finalize=*/true);
   }
 
   for (FragmentStats* fragment_stats: fragment_stats_) {

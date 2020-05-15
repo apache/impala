@@ -146,13 +146,19 @@ class Coordinator::BackendState {
   bool ApplyExecStatusReport(const ReportExecStatusRequestPB& backend_exec_status,
       const TRuntimeProfileForest& thrift_profiles, ExecSummary* exec_summary,
       ProgressUpdater* scan_range_progress, DmlExecState* dml_exec_state,
-      std::vector<AuxErrorInfoPB>* aux_error_info);
+      std::vector<AuxErrorInfoPB>* aux_error_info,
+      const std::vector<FragmentStats*>& fragment_stats);
 
   /// Merges the incoming 'thrift_profile' into this backend state's host profile.
   void UpdateHostProfile(const TRuntimeProfileTree& thrift_profile);
 
-  /// Update completion_times, rates, and agg_profile for all fragment_stats.
-  void UpdateExecStats(const std::vector<FragmentStats*>& fragment_stats);
+  /// Update completion_times, rates, and agg_profile for instances where the stats are
+  /// not up-to-date with the latest status report received for that instance. Only
+  /// updates for completed instances when --gen_experimental_profile=false, consistent
+  /// with past behaviour, to avoid adding overhead.  If 'finalize' is true, this is the
+  /// last call to this function for the query and we must update all instances,
+  /// regardless of whether they are done or not.
+  void UpdateExecStats(const std::vector<FragmentStats*>& fragment_stats, bool finalize);
 
   /// Make a PublishFilter rpc with given params to this backend. The backend
   /// must be one of the filter targets for the filter being published.
@@ -233,6 +239,17 @@ class Coordinator::BackendState {
     void Update(const FragmentInstanceExecStatusPB& exec_status,
         const TRuntimeProfileTree& thrift_profile, ExecSummary* exec_summary);
 
+    /// Update completion_times, rates, and agg_profile for this instance's
+    /// corresponding fragment in 'fragment_stats'. This may only be called
+    /// once the exec RPC is done, i.e. 'BackendState::exec_done_' is true.
+    /// This depends on the status report applied in Update(), so can be
+    /// called sometime after each Update() call to refresh the stats. It
+    /// may make sense to defer the updates in some cases because the amount of work
+    /// involved, particularly in merging RuntimeProfiles, is not trivial.
+    /// If 'finalize' is true, this is the last call to this function for the query
+    /// and we must update the instance, whether it is done or not.
+    void UpdateExecStats(const vector<FragmentStats*>& fragment_stats, bool finalize);
+
     int per_fragment_instance_idx() const {
       return exec_params_.per_fragment_instance_idx();
     }
@@ -268,6 +285,15 @@ class Coordinator::BackendState {
 
     /// owned by coordinator object pool provided in the c'tor, created in Update()
     RuntimeProfile* profile_ = nullptr;
+
+    /// True if 'agg_profile_' for the fragment is up-to-date with 'profile_'.
+    /// Set to false in Update() when a new profile is received for this instance
+    /// and back to true in UpdateExecStats() when the updated profile is merged into
+    /// 'agg_profile_'.
+    bool agg_profile_up_to_date_ = true;
+
+    /// If true, the completion time for this instance has been set.
+    bool completion_time_set_ = false;
 
     /// true if the final report has been received for the fragment instance.
     /// Used to handle duplicate done ReportExecStatus RPC messages. Used only
@@ -413,6 +439,10 @@ class Coordinator::BackendState {
 
   /// Same as GetResourceUtilization() but caller must hold lock.
   ResourceUtilization GetResourceUtilizationLocked();
+
+  /// Implementation of UpdateExecStats(). Caller must hold 'lock_' via 'lock'.
+  void UpdateExecStatsLocked(const std::unique_lock<std::mutex>& lock,
+      const std::vector<FragmentStats*>& fragment_stats, bool finalize);
 
   /// Logs 'msg' at the VLOG_QUERY level, along with 'query_id_' and 'krpc_host_'.
   void VLogForBackend(const std::string& msg);
