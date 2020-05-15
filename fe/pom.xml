@@ -172,6 +172,10 @@ under the License.
             <artifactId>parquet-avro</artifactId>
           </exclusion>
           <exclusion>
+            <groupId>org.apache.avro</groupId>
+            <artifactId>*</artifactId>
+          </exclusion>
+          <exclusion>
             <groupId>org.apache.hadoop</groupId>
             <artifactId>*</artifactId>
           </exclusion>
@@ -241,6 +245,12 @@ under the License.
       <groupId>org.apache.parquet</groupId>
       <artifactId>parquet-hadoop-bundle</artifactId>
       <version>${parquet.version}</version>
+    </dependency>
+
+    <dependency>
+      <groupId>org.apache.avro</groupId>
+      <artifactId>avro</artifactId>
+      <version>${avro.version}</version>
     </dependency>
 
     <dependency>
@@ -698,6 +708,7 @@ under the License.
                     <exclude>org.apache.hive:*</exclude>
                     <exclude>org.apache.kudu:*</exclude>
                     <exclude>org.apache.parquet:*</exclude>
+                    <exclude>org.apache.avro:*</exclude>
                     <exclude>org.apache.orc:*</exclude>
                   </excludes>
                   <includes>
@@ -710,6 +721,7 @@ under the License.
                     <include>org.apache.hive:*:${hive.version}</include>
                     <include>org.apache.hive:hive-storage-api:${hive.storage.api.version}</include>
                     <include>org.apache.kudu:*:${kudu.version}</include>
+                    <include>org.apache.avro:*:${avro.version}</include>
                     <include>org.apache.parquet:*:${parquet.version}</include>
                     <include>org.apache.orc:*:${orc.version}</include>
                   </includes>

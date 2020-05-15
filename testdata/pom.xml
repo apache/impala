@@ -157,6 +157,12 @@ under the License.
     </dependency>
 
     <dependency>
+      <groupId>org.apache.avro</groupId>
+      <artifactId>avro</artifactId>
+      <version>${avro.version}</version>
+    </dependency>
+
+    <dependency>
       <groupId>org.kitesdk</groupId>
       <artifactId>kite-data-core</artifactId>
       <version>${kite.version}</version>
