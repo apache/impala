@@ -38,6 +38,7 @@ under the License.
     <ranger.version>${env.IMPALA_RANGER_VERSION}</ranger.version>
     <postgres.jdbc.version>${env.IMPALA_POSTGRES_JDBC_DRIVER_VERSION}</postgres.jdbc.version>
     <hbase.version>${env.IMPALA_HBASE_VERSION}</hbase.version>
+    <avro.version>${env.IMPALA_AVRO_JAVA_VERSION}</avro.version>
     <orc.version>${env.IMPALA_ORC_JAVA_VERSION}</orc.version>
     <ozone.version>${env.IMPALA_OZONE_VERSION}</ozone.version>
     <parquet.version>${env.IMPALA_PARQUET_VERSION}</parquet.version>
