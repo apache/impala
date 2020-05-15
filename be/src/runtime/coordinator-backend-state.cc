@@ -381,7 +381,8 @@ bool Coordinator::BackendState::ApplyExecStatusReport(
     const ReportExecStatusRequestPB& backend_exec_status,
     const TRuntimeProfileForest& thrift_profiles, ExecSummary* exec_summary,
     ProgressUpdater* scan_range_progress, DmlExecState* dml_exec_state,
-    vector<AuxErrorInfoPB>* aux_error_info) {
+    vector<AuxErrorInfoPB>* aux_error_info,
+    const vector<FragmentStats*>& fragment_stats) {
   DCHECK(!IsEmptyBackend());
   // Hold the exec_summary's lock to avoid exposing it half-way through
   // the update loop below.
@@ -478,6 +479,10 @@ bool Coordinator::BackendState::ApplyExecStatusReport(
   backend_utilization_.exchange_bytes_sent = backend_exec_status.exchange_bytes_sent();
   backend_utilization_.scan_bytes_sent = backend_exec_status.scan_bytes_sent();
 
+  // Update state that depends on the instance profile updates we just received.
+  // Skip this in the edge case where the exec RPC didn't complete.
+  if (exec_done_) UpdateExecStatsLocked(lock, fragment_stats, /*finalize=*/false);
+
   // status_ has incorporated the status from all fragment instances. If the overall
   // backend status is not OK, but no specific fragment instance reported an error, then
   // this is a general backend error. Incorporate the general error into status_.
@@ -502,29 +507,23 @@ void Coordinator::BackendState::UpdateHostProfile(
 }
 
 void Coordinator::BackendState::UpdateExecStats(
-    const vector<FragmentStats*>& fragment_stats) {
-  lock_guard<mutex> l(lock_);
+    const vector<FragmentStats*>& fragment_stats, bool finalize) {
+  unique_lock<mutex> l(lock_);
+  UpdateExecStatsLocked(l, fragment_stats, finalize);
+}
+
+void Coordinator::BackendState::UpdateExecStatsLocked(const unique_lock<mutex>& lock,
+    const vector<FragmentStats*>& fragment_stats, bool finalize) {
+  DCHECK(lock.owns_lock() && lock.mutex() == &lock_);
   DCHECK(exec_done_) << "May only be called after WaitOnExecRpc() completes.";
-  for (const auto& entry: instance_stats_map_) {
-    const InstanceStats& instance_stats = *entry.second;
-    int fragment_idx = instance_stats.exec_params_.fragment_idx();
-    DCHECK_LT(fragment_idx, fragment_stats.size());
-    FragmentStats* f = fragment_stats[fragment_idx];
-    int64_t completion_time = instance_stats.stopwatch_.ElapsedTime();
-    RuntimeProfile::Counter* completion_timer =
-        PROFILE_CompletionTime.Instantiate(instance_stats.profile_);
-    completion_timer->Set(completion_time);
-    if (!FLAGS_gen_experimental_profile) f->completion_times_(completion_time);
-    if (completion_time > 0) {
-      RuntimeProfile::Counter* execution_rate_counter =
-          PROFILE_ExecutionRate.Instantiate(instance_stats.profile_);
-      double rate =
-          instance_stats.total_split_size_ / (completion_time / 1000.0 / 1000.0 / 1000.0);
-      execution_rate_counter->Set(static_cast<int64_t>(rate));
-      if (!FLAGS_gen_experimental_profile) f->rates_(rate);
+  for (auto& entry : instance_stats_map_) {
+    InstanceStats& instance_stats = *entry.second;
+    // Compute the final exec stats if this was the last update. Maintain the aggregated
+    // profile on all updates if we are using the V2 profile format, so that we get live
+    // updates in the profile for longer-running queries.
+    if (finalize || instance_stats.done_ || FLAGS_gen_experimental_profile) {
+      instance_stats.UpdateExecStats(fragment_stats, finalize);
     }
-    f->agg_profile_->Update(
-        instance_stats.profile_, instance_stats.per_fragment_instance_idx());
   }
 }
 
@@ -760,6 +759,34 @@ void Coordinator::BackendState::InstanceStats::Update(
 
   // extract the current execution state of this instance
   current_state_ = exec_status.current_state();
+  agg_profile_up_to_date_ = false;
+}
+
+void Coordinator::BackendState::InstanceStats::UpdateExecStats(
+    const vector<FragmentStats*>& fragment_stats, bool finalize) {
+  int fragment_idx = exec_params_.fragment_idx();
+  DCHECK_LT(fragment_idx, fragment_stats.size());
+  FragmentStats* f = fragment_stats[fragment_idx];
+  if (!completion_time_set_ && (finalize || done_)) {
+    // Set the completion time if the query or instance finished.
+    int64_t completion_time = stopwatch_.ElapsedTime();
+    RuntimeProfile::Counter* completion_timer =
+        PROFILE_CompletionTime.Instantiate(profile_);
+    completion_timer->Set(completion_time);
+    if (!FLAGS_gen_experimental_profile) f->completion_times_(completion_time);
+    if (completion_time > 0) {
+      RuntimeProfile::Counter* execution_rate_counter =
+          PROFILE_ExecutionRate.Instantiate(profile_);
+      double rate = total_split_size_ / (completion_time / 1000.0 / 1000.0 / 1000.0);
+      execution_rate_counter->Set(static_cast<int64_t>(rate));
+      if (!FLAGS_gen_experimental_profile) f->rates_(rate);
+    }
+    completion_time_set_ = true;
+  }
+  if (!agg_profile_up_to_date_) {
+    f->agg_profile_->Update(profile_, per_fragment_instance_idx());
+    agg_profile_up_to_date_ = true;
+  }
 }
 
 void Coordinator::BackendState::InstanceStats::ToJson(Value* value, Document* document) {
