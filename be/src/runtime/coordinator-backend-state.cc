@@ -384,6 +384,9 @@ bool Coordinator::BackendState::ApplyExecStatusReport(
     vector<AuxErrorInfoPB>* aux_error_info,
     const vector<FragmentStats*>& fragment_stats) {
   DCHECK(!IsEmptyBackend());
+  CHECK(FLAGS_gen_experimental_profile ||
+        backend_exec_status.fragment_exec_status().empty())
+      << "Received pre-aggregated profile but --gen_experimental_profile=false";
   // Hold the exec_summary's lock to avoid exposing it half-way through
   // the update loop below.
   lock_guard<SpinLock> l1(exec_summary->lock);
@@ -399,21 +402,28 @@ bool Coordinator::BackendState::ApplyExecStatusReport(
   if (IsDoneLocked(lock)) return false;
 
   // Use empty profile in case profile serialization/deserialization failed.
-  // 'thrift_profiles' and 'instance_exec_status' vectors have one-to-one correspondance.
+  // Depending on the --gen_experimental_profile value, there is one profile tree per
+  // fragment (if true) or per fragment instance (if false).
   vector<TRuntimeProfileTree> empty_profiles;
+  // We iterate over the profiles in order. The profile trees include the instance
+  // profiles in the same order as 'instance_exec_status', then the aggregated fragment
+  // profiles in the same order as 'fragment_exec_status'.
   vector<TRuntimeProfileTree>::const_iterator profile_iter;
+  int expected_num_profiles = FLAGS_gen_experimental_profile ?
+      backend_exec_status.fragment_exec_status().size() :
+      backend_exec_status.instance_exec_status().size();
   if (UNLIKELY(thrift_profiles.profile_trees.size() == 0)) {
-    empty_profiles.resize(backend_exec_status.instance_exec_status().size());
+    empty_profiles.resize(expected_num_profiles);
     profile_iter = empty_profiles.begin();
   } else {
-    DCHECK_EQ(thrift_profiles.profile_trees.size(),
-        backend_exec_status.instance_exec_status().size());
+    DCHECK_EQ(expected_num_profiles, thrift_profiles.profile_trees.size());
     profile_iter = thrift_profiles.profile_trees.begin();
   }
 
+  int64_t report_time_ms = UnixMillis();
   for (auto status_iter = backend_exec_status.instance_exec_status().begin();
        status_iter != backend_exec_status.instance_exec_status().end();
-       ++status_iter, ++profile_iter) {
+       ++status_iter) {
     const FragmentInstanceExecStatusPB& instance_exec_status = *status_iter;
     int64_t report_seq_no = instance_exec_status.report_seq_no();
     int instance_idx = GetInstanceIdx(instance_exec_status.fragment_instance_id());
@@ -431,7 +441,9 @@ bool Coordinator::BackendState::ApplyExecStatusReport(
     }
 
     DCHECK(!instance_stats->done_);
-    instance_stats->Update(instance_exec_status, *profile_iter, exec_summary);
+    instance_stats->Update(instance_exec_status,
+        FLAGS_gen_experimental_profile ? nullptr : &*profile_iter, report_time_ms,
+        exec_summary);
 
     // Update DML stats
     if (instance_exec_status.has_dml_exec_status()) {
@@ -463,6 +475,7 @@ bool Coordinator::BackendState::ApplyExecStatusReport(
       instance_stats->done_ = true;
       --num_remaining_instances_;
     }
+    if (!FLAGS_gen_experimental_profile) ++profile_iter;
   }
   // Determine newly-completed scan ranges and update scan_range_progress.
   int64_t scan_ranges_complete = backend_exec_status.scan_ranges_complete();
@@ -478,6 +491,25 @@ bool Coordinator::BackendState::ApplyExecStatusReport(
   backend_utilization_.bytes_read = backend_exec_status.bytes_read();
   backend_utilization_.exchange_bytes_sent = backend_exec_status.exchange_bytes_sent();
   backend_utilization_.scan_bytes_sent = backend_exec_status.scan_bytes_sent();
+
+  // Only merge fragment stats if they are newer than that last report received.
+  if (backend_exec_status.backend_report_seq_no() <= last_backend_report_seq_no_) {
+    VLogForBackend(Substitute("Ignoring stale update with seq no $0",
+        backend_exec_status.backend_report_seq_no()));
+  } else {
+    for (const FragmentExecStatusPB& fragment_exec_status :
+          backend_exec_status.fragment_exec_status()) {
+      DCHECK(FLAGS_gen_experimental_profile)
+          << "Per-fragment agg profiles are experimental";
+      int fragment_idx = fragment_exec_status.fragment_idx();
+      FragmentStats* f = fragment_stats[fragment_idx];
+      const TRuntimeProfileTree& tmp_profile = *profile_iter;
+      f->agg_profile_->UpdateAggregatedFromInstances(
+          tmp_profile, fragment_exec_status.min_per_fragment_instance_idx());
+      ++profile_iter;
+    }
+    last_backend_report_seq_no_ = backend_exec_status.backend_report_seq_no();
+  }
 
   // Update state that depends on the instance profile updates we just received.
   // Skip this in the edge case where the exec RPC didn't complete.
@@ -714,15 +746,19 @@ Coordinator::BackendState::InstanceStats::InstanceStats(
 
 void Coordinator::BackendState::InstanceStats::Update(
     const FragmentInstanceExecStatusPB& exec_status,
-    const TRuntimeProfileTree& thrift_profile, ExecSummary* exec_summary) {
-  last_report_time_ms_ = UnixMillis();
+    const TRuntimeProfileTree* thrift_profile, int64_t report_time_ms,
+    ExecSummary* exec_summary) {
+  last_report_time_ms_ = report_time_ms;
   DCHECK_GT(exec_status.report_seq_no(), last_report_seq_no_);
   last_report_seq_no_ = exec_status.report_seq_no();
   if (exec_status.done()) stopwatch_.Stop();
   profile_->UpdateInfoString(LAST_REPORT_TIME_DESC,
       ToStringFromUnixMillis(last_report_time_ms_));
-  profile_->Update(thrift_profile);
-  profile_->ComputeTimeInProfile();
+  if (!FLAGS_gen_experimental_profile) {
+    DCHECK(thrift_profile != nullptr);
+    profile_->Update(*thrift_profile);
+    profile_->ComputeTimeInProfile();
+  }
 
   // update exec_summary
   TExecSummary& thrift_exec_summary = exec_summary->thrift_exec_summary;
@@ -784,7 +820,11 @@ void Coordinator::BackendState::InstanceStats::UpdateExecStats(
     completion_time_set_ = true;
   }
   if (!agg_profile_up_to_date_) {
-    f->agg_profile_->Update(profile_, per_fragment_instance_idx());
+    // Merge this instance profile (which may or may not included the full instance
+    // profile from the executor) into the aggregated profile. We need to do this
+    // regardless of the --gen_experimental_profile setting so that coordinator counters
+    // end up in the final aggregated profile.
+    f->agg_profile_->UpdateAggregatedFromInstance(profile_, per_fragment_instance_idx());
     agg_profile_up_to_date_ = true;
   }
 }

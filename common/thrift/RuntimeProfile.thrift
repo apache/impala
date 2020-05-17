@@ -74,6 +74,19 @@ struct TEventSequence {
   3: required list<string> labels
 }
 
+// Aggregated version of TEventSequence.
+struct TAggEventSequence {
+  1: required string name
+  // One entry per unique label.
+  2: required list<string> label_dict
+
+  // The below lists have one entry per instance.
+
+  // The label of each event, represented as the index in label_dict.
+  3: required list<list<i32>> label_idxs
+  4: required list<list<i64>> timestamps
+}
+
 // Struct to contain data sampled at even time intervals (e.g. ram usage every
 // N seconds).
 // values[0] represents the value when the counter stated (e.g. fragment started)
@@ -95,6 +108,20 @@ struct TTimeSeriesCounter {
   // series contains an interval of a larger series. For values > 0, period_ms should be
   // ignored, as chunked counters don't resample their values.
   5: optional i64 start_index
+}
+
+// Aggregated version of TTimeSeriesCounter
+struct TAggTimeSeriesCounter {
+  1: required string name
+  2: required Metrics.TUnit unit
+
+  // The below lists have one entry per instance, with each list entry containing
+  // the equivalent values to the similarly-named field in TTimeSeriesCounter.
+  3: required list<i32> period_ms
+
+  4: required list<list<i64>> values
+
+  5: required list<i64> start_index
 }
 
 // Thrift version of RuntimeProfile::SummaryStatsCounter.
@@ -172,11 +199,11 @@ struct TAggregatedRuntimeProfileNode {
   // List of summary stats counters.
   5: optional list<TAggSummaryStatsCounter> summary_stats_counters
 
-  // TODO: IMPALA-9382: decide on representation. This is a placeholder
-  // 6: optional list<list<TEventSequence>> event_sequences
+  // List of event sequences.
+  6: optional list<TAggEventSequence> event_sequences
 
-  // TODO: IMPALA-9382: decide on representation. This is a placeholder
-  // 7: optional list<list<TTimeSeriesCounter>> time_series_counters
+  // List of time series counters.
+  7: optional list<TAggTimeSeriesCounter> time_series_counters
 }
 
 
@@ -253,6 +280,7 @@ struct TRuntimeProfileNode {
 // Different from version 1, there is only a single aggregated profile tree for each
 // fragment. All nodes in this tree use the aggregated profile representation. Otherwise
 // the structure of the profile is the same.
+// TODO: IMPALA-9382 - update when non-experimental
 struct TRuntimeProfileTree {
   1: required list<TRuntimeProfileNode> nodes
   2: optional ExecStats.TExecSummary exec_summary
@@ -263,7 +291,7 @@ struct TRuntimeProfileTree {
   // information.
   // Version 1: this field is unset
   // Version 2: this field is set to 2
-  // TODO: IMPALA-9382: document which versions of Impala generate which version.
+  // TODO: IMPALA-9846: document which versions of Impala generate which version.
   3: optional i32 profile_version
 }
 

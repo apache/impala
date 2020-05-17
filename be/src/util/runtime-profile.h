@@ -18,11 +18,13 @@
 #pragma once
 
 #include <iosfwd>
+#include <mutex>
 
 #include <boost/function.hpp>
 #include <rapidjson/document.h>
 #include "common/atomic.h"
 #include "common/status.h"
+#include "testutil/gtest-util.h"
 #include "util/spinlock.h"
 
 #include "gen-cpp/RuntimeProfile_types.h"
@@ -167,9 +169,16 @@ class RuntimeProfileBase {
 
   /// Adds a string to the runtime profile.  If a value already exists for 'key',
   /// the value will be updated.
-  /// TODO: IMPALA-9382: this can be moved to RuntimeProfile once we remove callsites for
+  /// TODO: IMPALA-9846: this can be moved to RuntimeProfile once we remove callsites for
   /// this function on AggregatedRuntimeProfile.
   void AddInfoString(const std::string& key, const std::string& value);
+
+  /// Serializes an entire runtime profile tree to thrift. Can be overridden by subclasses
+  /// to add additional info. The thrift representation is the public-facing
+  /// representation if this is a RuntimeProfile that is the root of the whole query's
+  /// tree. Otherwise this generates a serialized profile for internal use.
+  /// Does not hold locks when it makes any function calls.
+  virtual void ToThrift(TRuntimeProfileTree* tree) const;
 
   /// Returns name of this profile
   const std::string& name() const { return name_; }
@@ -200,6 +209,8 @@ class RuntimeProfileBase {
   void AddSkewInfo(RuntimeProfileBase* root, double threshold);
 
  protected:
+  FRIEND_TEST(CountersTest, AggregateEventSequences);
+
   /// Name of the counter maintaining the total time.
   static const std::string TOTAL_TIME_COUNTER_NAME;
   static const std::string LOCAL_TIME_COUNTER_NAME;
@@ -239,7 +250,7 @@ class RuntimeProfileBase {
   /// acquiring 'counter_map_lock_'.
   Counter* const inactive_timer_;
 
-  /// TODO: IMPALA-9382: info strings can be moved to RuntimeProfile once we remove
+  /// TODO: IMPALA-9846: info strings can be moved to RuntimeProfile once we remove
   /// callsites for this function on AggregatedRuntimeProfile.
   typedef std::map<std::string, std::string> InfoStrings;
   InfoStrings info_strings_;
@@ -288,6 +299,27 @@ class RuntimeProfileBase {
   /// 'children_lock_' must be held by the caller.
   void AddChildLocked(
       RuntimeProfileBase* child, bool indent, ChildVector::iterator insert_pos);
+
+  /// Helper for the various Update*() methods that finds an existing child with 'name'
+  /// or creates it by calling 'create_fn', which is a zero-argument function that returns
+  /// a pointer to a subclass of RuntimeProfileBase.
+  ///
+  /// If the child is created, it is inserted at 'insert_pos'. In either case 'insert_pos'
+  /// is advanced to after the returned child. When callers add children in sequence, this
+  /// is sufficient to preserve the order of children  if children are added after the
+  /// first Update*() call (IMPALA-6694).  E.g. if the first update sends [B, D]
+  /// and the second update sends [A, B, C, D], then this code makes sure that children_
+  /// is [A, B, C, D] afterwards.
+  ///
+  /// 'children_lock_' must be held by the caller.
+  template <typename CreateFn>
+  RuntimeProfileBase* AddOrCreateChild(const std::string& name,
+      ChildVector::iterator* insert_pos, CreateFn create_fn, bool indent);
+
+  /// Update 'child_counters_map_' to add the entries in 'src'.
+  /// Call must hold 'counter_map_lock_' via 'lock'.
+  void UpdateChildCountersLocked(const std::unique_lock<SpinLock>& lock,
+      const ChildCounterMap& src);
 
   /// Clear all chunked time series counters in this profile and all children.
   virtual void ClearChunkedTimeSeriesCounters();
@@ -356,7 +388,7 @@ class RuntimeProfileBase {
   /// implements AddInfoString(), otherwise implements AppendInfoString().
   /// Redaction rules are applied on the info string if 'redact' is true.
   /// Trailing whitespace is removed.
-  /// TODO: IMPALA-9382: this can be moved to RuntimeProfile once we remove callsites for
+  /// TODO: IMPALA-9846: this can be moved to RuntimeProfile once we remove callsites for
   /// this function on AggregatedRuntimeProfile.
   void AddInfoStringInternal(
       const std::string& key, std::string value, bool append, bool redact = false);
@@ -497,7 +529,8 @@ class RuntimeProfile : public RuntimeProfileBase {
   /// Creates and returns a new EventSequence (owned by the runtime
   /// profile) - unless a timer with the same 'key' already exists, in
   /// which case it is returned.
-  /// TODO: EventSequences are not merged by Merge() or Update()
+  /// TODO: EventSequences are not merged by Update()
+  /// TODO: is this comment out of date?
   EventSequence* AddEventSequence(const std::string& key);
   EventSequence* AddEventSequence(const std::string& key, const TEventSequence& from);
   EventSequence* GetEventSequence(const std::string& name) const;
@@ -603,11 +636,7 @@ class RuntimeProfile : public RuntimeProfileBase {
   /// Clear all chunked time series counters in this profile and all children.
   void ClearChunkedTimeSeriesCounters() override;
 
-  /// Serializes an entire runtime profile tree to thrift.
-  /// This is defined in RuntimeProfile instead of RuntimeProfileBase becase we require
-  /// that a runtime profile root be a RuntimeProfile.
-  /// Does not hold locks when it makes any function calls.
-  void ToThrift(TRuntimeProfileTree* tree) const;
+  void ToThrift(TRuntimeProfileTree* tree) const override;
 
   /// Store an entire runtime profile tree into JSON document 'd'.
   void ToJson(rapidjson::Document* d) const;
@@ -749,20 +778,28 @@ class AggregatedRuntimeProfile : public RuntimeProfileBase {
   /// from other profiles.
   ///
   /// 'is_root' must be true if this is the root of the averaged profile tree which
-  /// will have Update() called on it. The descendants of the root are created and
-  /// updated via Update().
+  /// will have UpdateAggregated*() called on it. The descendants of the root are
+  /// created and updated by that call.
   static AggregatedRuntimeProfile* Create(ObjectPool* pool, const std::string& name,
       int num_input_profiles, bool is_root = true);
 
   /// Updates the AveragedCounter counters in this profile with the counters from the
-  /// 'src' profile. If a counter is present in 'src' but missing in this profile, a new
-  /// AveragedCounter is created with the same name. Obtains locks on the counter maps
-  /// and child counter maps in both this and 'src' profiles.
-  /// TODO: IMPALA-9382: update method name and comment.
+  /// 'src' profile, which is the input instance that was assigned index 'idx'. If a
+  /// counter is present in 'src' but missing in this profile, a new AveragedCounter
+  /// is created with the same name. Obtains locks on the counter maps and child
+  /// counter maps in both this and 'src' profiles.
   ///
   /// Note that 'src' must be all instances of RuntimeProfile - no
   /// AggregatedRuntimeProfiles can be part of the input.
-  void Update(RuntimeProfile* src, int idx);
+  void UpdateAggregatedFromInstance(RuntimeProfile* src, int idx);
+
+  /// Updates the AveragedCounter counters in this profile with the counters from the
+  /// 'src' profile, which must be a serialized AggregatedProfile. The instances in
+  /// 'src' must correspond to instances [start_idx, start_idx + # src instances) in
+  /// this profile. If a counter is present in 'src' but missing in this profile, a
+  /// new AveragedCounter is created with the same name. Obtains locks on the counter
+  /// maps and child counter maps in this profile.
+  void UpdateAggregatedFromInstances(const TRuntimeProfileTree& src, int start_idx);
 
  protected:
   virtual int GetNumInputProfiles() const override { return num_input_profiles_; }
@@ -814,6 +851,27 @@ class AggregatedRuntimeProfile : public RuntimeProfileBase {
   /// Protects summary_stats_map_.
   mutable SpinLock summary_stats_map_lock_;
 
+  struct AggEventSequence {
+    // Unique labels in the event sequence. Values are [0, labels.size() - 1]
+    std::map<std::string, int32_t> labels;
+
+    // One entry per instance. Each entry contains the label indices for that instance's
+    // event sequence.
+    std::vector<std::vector<int32_t>> label_idxs;
+
+    // One entry per instance. Each entry contains the timestamps for that instance's
+    // event sequence.
+    std::vector<std::vector<int64_t>> timestamps;
+  };
+
+  std::map<std::string, AggEventSequence> event_sequence_map_;
+
+  /// Protects event_sequence_map_ and event_sequence_labels_.
+  mutable SpinLock event_sequence_lock_;
+
+  /// Time series counters. Protected by 'counter_map_lock_'.
+  std::map<std::string, TAggTimeSeriesCounter> time_series_counter_map_;
+
   AggregatedRuntimeProfile(
       ObjectPool* pool, const std::string& name, int num_input_profiles, bool is_root);
 
@@ -822,8 +880,32 @@ class AggregatedRuntimeProfile : public RuntimeProfileBase {
   std::map<std::string, std::vector<int32_t>> GroupDistinctInfoStrings(
       const std::vector<std::string>& info_string_values) const;
 
-  /// Helper for Update() that is invoked recursively on 'src'.
-  void UpdateRecursive(RuntimeProfile* src, int idx);
+  /// Helper for UpdateAggregatedFromInstance() that are invoked recursively on 'src'.
+  void UpdateAggregatedFromInstanceRecursive(RuntimeProfile* src, int idx);
+
+  /// Helpers for UpdateAggregatedFromInstanceRecursive() that update particular parts
+  /// of this profile node from 'src'.
+  void UpdateCountersFromInstance(RuntimeProfile* src, int idx);
+  void UpdateInfoStringsFromInstance(RuntimeProfile* src, int idx);
+  void UpdateSummaryStatsFromInstance(RuntimeProfile* src, int idx);
+  void UpdateEventSequencesFromInstance(RuntimeProfile* src, int idx);
+
+  /// Helper for UpdateAggregatedFromInstances() that are invoked recursively on 'src'.
+  void UpdateAggregatedFromInstancesRecursive(
+      const TRuntimeProfileTree& src, int* node_idx, int start_idx);
+
+  /// Helpers for UpdateAggregatedFromInstancesRecursive() that update particular parts
+  /// of this profile node from 'src'. 'src' must have an aggregated profile set.
+  void UpdateFromInstances(
+      const TRuntimeProfileNode& node, int start_idx, ObjectPool* pool);
+  void UpdateCountersFromInstances(
+      const TRuntimeProfileNode& node, int start_idx, ObjectPool* pool);
+  void UpdateInfoStringsFromInstances(
+      const TRuntimeProfileNode& node, int start_idx, ObjectPool* pool);
+  void UpdateSummaryStatsFromInstances(
+      const TRuntimeProfileNode& node, int start_idx, ObjectPool* pool);
+  void UpdateEventSequencesFromInstances(
+      const TRuntimeProfileNode& node, int start_idx, ObjectPool* pool);
 
   /// Aggregate summary stats into a single counter. Entries in
   /// 'counter' may be NULL.

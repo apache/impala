@@ -320,6 +320,11 @@ class QueryState {
   /// Thread-safety: Only updated by the query state thread.
   BackendExecState backend_exec_state_ = BackendExecState::PREPARING;
 
+  /// Monotonically increasing sequence number for status reports, incremented for each
+  /// report sent.
+  /// Thread-safety: Only updated by the query state thread.
+  int64_t last_report_seq_no_ = 0;
+
   /// Protects 'overall_status_' and 'failed_finstance_id_'.
   SpinLock status_lock_;
 

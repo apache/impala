@@ -259,7 +259,8 @@ Status FragmentInstanceState::Prepare() {
 }
 
 void FragmentInstanceState::GetStatusReport(FragmentInstanceExecStatusPB* instance_status,
-    TRuntimeProfileTree* thrift_profile) {
+    TRuntimeProfileTree* unagg_profile, AggregatedRuntimeProfile* agg_profile) {
+  DCHECK_NE(unagg_profile == nullptr, agg_profile == nullptr);
   DFAKE_SCOPED_LOCK(report_status_lock_);
   DCHECK(!final_report_sent_);
   // Update the counter for the peak per host mem usage.
@@ -279,7 +280,16 @@ void FragmentInstanceState::GetStatusReport(FragmentInstanceExecStatusPB* instan
   instance_status->set_done(done);
   instance_status->set_current_state(current_state());
   DCHECK(profile() != nullptr);
-  profile()->ToThrift(thrift_profile);
+  if (agg_profile != nullptr) {
+    // Figure out the index of this instance relative to other instances of this fragment
+    // on the backend.
+    int instance_idx = instance_ctx_.per_fragment_instance_idx -
+        fragment_state_->min_per_fragment_instance_idx();
+    agg_profile->UpdateAggregatedFromInstance(profile(), instance_idx);
+  } else {
+    DCHECK(unagg_profile != nullptr);
+    profile()->ToThrift(unagg_profile);
+  }
 
   // Pull out and aggregate counters from the profile.
   RuntimeProfile::Counter* user_time = profile()->GetCounter("TotalThreadsUserTime");

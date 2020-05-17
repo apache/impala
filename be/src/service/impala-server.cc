@@ -137,6 +137,7 @@ DECLARE_string(debug_actions);
 DECLARE_bool(abort_on_config_error);
 DECLARE_bool(disk_spill_encryption);
 DECLARE_bool(enable_ldap_auth);
+DECLARE_bool(gen_experimental_profile);
 DECLARE_bool(use_local_catalog);
 
 DEFINE_int32(beeswax_port, 21000, "port on which Beeswax client requests are served."
@@ -1206,6 +1207,7 @@ void ImpalaServer::PrepareQueryContext(
   query_ctx->__set_local_time_zone(local_tz_name);
   query_ctx->__set_status_report_interval_ms(FLAGS_status_report_interval_ms);
   query_ctx->__set_status_report_max_retry_s(FLAGS_status_report_max_retry_s);
+  query_ctx->__set_gen_aggregated_profile(FLAGS_gen_experimental_profile);
 
   // Creating a random_generator every time is not free, but
   // benchmarks show it to be slightly cheaper than contending for a

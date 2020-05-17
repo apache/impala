@@ -102,9 +102,10 @@ class FragmentInstanceState {
 
   /// Called periodically by query state thread to get the current status of this fragment
   /// instance. The fragment instance's status is stored in 'instance_status' and its
-  /// Thrift runtime profile is stored in 'thrift_profile'.
+  /// Thrift runtime profile is stored in either 'unagg_profile' or 'agg_profile',
+  /// depending on whether aggregated profiles are enabled.
   void GetStatusReport(FragmentInstanceExecStatusPB* instance_status,
-      TRuntimeProfileTree* thrift_profile);
+      TRuntimeProfileTree* unagg_profile, AggregatedRuntimeProfile* agg_profile);
 
   /// After each call to GetStatusReport(), the query state thread should call one of the
   /// following to indicate if the report rpc was successful. Note that in the case of

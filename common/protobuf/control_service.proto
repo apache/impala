@@ -194,6 +194,16 @@ message FragmentInstanceExecStatusPB {
   repeated ExecSummaryDataPB exec_summary_data = 7;
 }
 
+message FragmentExecStatusPB {
+  // Ordinal number of fragment in the query.
+  optional int32 fragment_idx = 1;
+
+  // The index of the first instance included in this state report. The serialized
+  // profile (in a corresponding sidecar) includes the number of instances and the
+  // profiles for those instances. The instance indexes for a backend are sequential.
+  optional int32 min_per_fragment_instance_idx = 2;
+}
+
 message ReportExecStatusRequestPB {
   // The query id which this report is for.
   optional UniqueIdPB query_id = 1;
@@ -203,8 +213,8 @@ message ReportExecStatusRequestPB {
 
   repeated FragmentInstanceExecStatusPB instance_exec_status = 3;
 
-  // Sidecar index of the cumulative profiles of all fragment instances
-  // in instance_exec_status.
+  // Sidecar index of the cumulative profiles in instance_exec_status and
+  // fragment_exec_status
   optional int32 thrift_profiles_sidecar_idx = 4;
 
   // Cumulative status for this backend.
@@ -237,6 +247,15 @@ message ReportExecStatusRequestPB {
   // Total bytes sent by instances that contained a scan node.
   optional int64 scan_bytes_sent = 13;
 
+  // Aggregated status for all instances of a fragment on a backend. Used when
+  // TQueryCtx.gen_aggregated_profile is true.
+  repeated FragmentExecStatusPB fragment_exec_status = 14;
+
+  // Sequence number prevents out-of-order or duplicated updates from being applied.
+  // Incremented for each backend status report. 'fragment_exec_status' should be
+  // disregarded if the sequence number of this report is less than or equal to
+  // the previous report received.
+  optional int64 backend_report_seq_no = 15;
 }
 
 message ReportExecStatusResponsePB {
