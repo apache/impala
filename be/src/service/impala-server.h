@@ -1042,6 +1042,11 @@ class ImpalaServer : public ImpalaServiceIf,
   void AddPoolConfiguration(TQueryCtx* query_ctx,
       const QueryOptionsMask& override_options_mask);
 
+  /// Helper method to enforce a pool's max mt_dop setting. If the provided maximum is
+  /// nonnegative and mt_dop is set higher than the maximum, the mt_dop is reduced to the
+  /// maximum. Otherwise, the mt_dop value is not modified.
+  void EnforceMaxMtDop(TQueryCtx* query_ctx, int64_t max_mt_dop);
+
   /// Register timeout value upon opening a new session. This will wake up
   /// session_timeout_thread_.
   void RegisterSessionTimeout(int32_t timeout);

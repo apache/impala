@@ -910,10 +910,26 @@ void ImpalaServer::AddPoolConfiguration(TQueryCtx* ctx,
            << " overlay_mask=" << overlay_mask.to_string();
   OverlayQueryOptions(pool_options, overlay_mask, &ctx->client_request.query_options);
 
+  // Enforce the max mt_dop after the defaults and overlays have already been done.
+  EnforceMaxMtDop(ctx, config.max_mt_dop);
+
   status = ValidateQueryOptions(&pool_options);
   if (!status.ok()) {
     VLOG_QUERY << "Ignoring errors while validating default query options for pool="
                << resolved_pool << ", message: " << status.GetDetail();
+  }
+}
+
+void ImpalaServer::EnforceMaxMtDop(TQueryCtx* query_ctx, int64_t max_mt_dop) {
+  TQueryOptions& query_options = query_ctx->client_request.query_options;
+  // The mt_dop is overridden if all three conditions are met:
+  // 1. There is a nonnegative max mt_dop setting
+  // 2. The mt_dop query option is set
+  // 3. The specified mt_dop is larger than the max mt_dop setting
+  if (max_mt_dop >= 0 && query_options.__isset.mt_dop &&
+      max_mt_dop < query_options.mt_dop) {
+    query_ctx->__set_overridden_mt_dop_value(query_options.mt_dop);
+    query_options.__set_mt_dop(max_mt_dop);
   }
 }
 

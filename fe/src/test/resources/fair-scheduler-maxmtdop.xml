@@ -1,0 +1,21 @@
+<?xml version="1.0"?>
+<allocations>
+  <queue name="root">
+    <queue name="negative">
+      <aclSubmitApps>*</aclSubmitApps>
+    </queue>
+    <queue name="zero">
+      <aclSubmitApps>* </aclSubmitApps>
+    </queue>
+    <queue name="limited">
+      <aclSubmitApps>* </aclSubmitApps>
+    </queue>
+    <queue name="largeint">
+      <aclSubmitApps>* </aclSubmitApps>
+    </queue>
+    <queue name="nosetting">
+      <aclSubmitApps>* </aclSubmitApps>
+    </queue>
+    <aclSubmitApps> </aclSubmitApps>
+  </queue>
+</allocations>

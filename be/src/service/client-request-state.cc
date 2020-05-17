@@ -196,6 +196,13 @@ Status ClientRequestState::Exec() {
       DebugQueryOptions(query_ctx_.client_request.query_options));
   summary_profile_->AddInfoString("Query Options (set by configuration and planner)",
       DebugQueryOptions(exec_request_->query_options));
+  if (query_ctx_.__isset.overridden_mt_dop_value) {
+    DCHECK(query_ctx_.client_request.query_options.__isset.mt_dop);
+    summary_profile_->AddInfoString("MT_DOP limited by admission control",
+        Substitute("Requested MT_DOP=$0 reduced to MT_DOP=$1",
+            query_ctx_.overridden_mt_dop_value,
+            query_ctx_.client_request.query_options.mt_dop));
+  }
 
   switch (exec_request_->stmt_type) {
     case TStmtType::QUERY:
