@@ -592,6 +592,10 @@ struct TQueryCtx {
 
   // Stores the transaction id if the query is transactional.
   25: optional i64 transaction_id
+
+  // If mt_dop was overridden by admission control's max mt_dop setting, then this
+  // is set to the original value. If mt_dop was not overridden, then this is not set.
+  26: optional i32 overridden_mt_dop_value
 }
 
 // Descriptor that indicates that a runtime filter is produced by a plan node.
@@ -743,6 +747,11 @@ struct TPoolConfig {
   // runtime to give the maximum memory available across the cluster for the pool.  If
   // this value is zero then it is ignored.
   11: required i64 max_memory_multiple = 0;
+
+  // Maximum value for the mt_dop query option. If the mt_dop is set and exceeds this
+  // maximum, the mt_dop setting is reduced to the maximum. If the max_mt_dop is
+  // negative, no limit is enforced.
+  12: required i64 max_mt_dop = -1;
 }
 
 struct TParseDateStringResult {

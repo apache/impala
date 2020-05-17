@@ -1,0 +1,30 @@
+<?xml version="1.0" encoding="UTF-8"?>
+
+<configuration>
+  <!-- Default values -->
+  <property>
+    <name>impala.admission-control.max-mt-dop</name>
+    <value>8</value>
+  </property>
+
+  <property>
+    <name>impala.admission-control.max-mt-dop.root.negative</name>
+    <value>-1</value>
+  </property>
+
+  <property>
+    <name>impala.admission-control.max-mt-dop.root.zero</name>
+    <value>0</value>
+  </property>
+
+  <property>
+    <name>impala.admission-control.max-mt-dop.root.limited</name>
+    <value>4</value>
+  </property>
+
+  <property>
+    <name>impala.admission-control.max-mt-dop.root.largeint</name>
+    <value>4294967296</value>
+  </property>
+
+</configuration>

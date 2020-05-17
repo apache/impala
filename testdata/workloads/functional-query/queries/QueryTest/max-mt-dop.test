@@ -1,0 +1,47 @@
+====
+---- QUERY
+# The 'nosetting' resource pool does not have a max-mt-dop setting, so it uses
+# the top-level max-mt-dop setting (which is 8).
+set request_pool=nosetting;
+set mt_dop=9;
+select 1;
+---- RUNTIME_PROFILE
+row_regex: .*Query Options \(set by configuration\): .*MT_DOP=8.*
+row_regex: .*MT_DOP limited by admission control: Requested MT_DOP=9 reduced to MT_DOP=8.*
+====
+---- QUERY
+# The 'limited' resource pool has max-mt-dop set to 4, so the query is downgraded.
+set request_pool=limited;
+set mt_dop=9;
+select 1;
+---- RUNTIME_PROFILE
+row_regex: .*Query Options \(set by configuration\): .*MT_DOP=4.*
+row_regex: .*MT_DOP limited by admission control: Requested MT_DOP=9 reduced to MT_DOP=4.*
+====
+---- QUERY
+# The 'negative' resource pool has max-mt-dop set to -1, which means the limit is
+# disabled.
+set request_pool=negative;
+set mt_dop=9;
+select 1;
+---- RUNTIME_PROFILE
+row_regex: .*Query Options \(set by configuration\): .*MT_DOP=9.*
+====
+---- QUERY
+# The 'largeint' resource pool has max-mt-dop set to a value that doesn't fit in 4 bytes.
+# The query is not downgraded.
+set request_pool=largeint;
+set mt_dop=9;
+select 1;
+---- RUNTIME_PROFILE
+row_regex: .*Query Options \(set by configuration\): .*MT_DOP=9.*
+====
+---- QUERY
+# The 'zero' resource pool has max-mt-dop set to 0, so the query is downgraded to 0.
+set request_pool=zero;
+set mt_dop=9;
+select 1;
+---- RUNTIME_PROFILE
+row_regex: .*Query Options \(set by configuration\): .*MT_DOP=0.*
+row_regex: .*MT_DOP limited by admission control: Requested MT_DOP=9 reduced to MT_DOP=0.*
+====

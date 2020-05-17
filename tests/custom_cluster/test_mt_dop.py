@@ -15,14 +15,26 @@
 # specific language governing permissions and limitations
 # under the License.
 
+import os
 import pytest
 from copy import deepcopy
 
 from tests.common.custom_cluster_test_suite import CustomClusterTestSuite
 from tests.common.environ import build_flavor_timeout
-from tests.common.skip import SkipIfABFS, SkipIfNotHdfsMinicluster
+from tests.common.skip import SkipIfNotHdfsMinicluster
 
 WAIT_TIME_MS = build_flavor_timeout(60000, slow_build_timeout=100000)
+
+# The path to resources directory which contains the admission control config files
+# (used for max mt dop test).
+RESOURCES_DIR = os.path.join(os.environ['IMPALA_HOME'], "fe", "src", "test", "resources")
+
+
+def impalad_admission_ctrl_maxmtdop_args():
+  fs_allocation_path = os.path.join(RESOURCES_DIR, "fair-scheduler-maxmtdop.xml")
+  llama_site_path = os.path.join(RESOURCES_DIR, "llama-site-maxmtdop.xml")
+  return "--llama_site_path={0} --fair_scheduler_allocation_path={1}".format(
+      llama_site_path, fs_allocation_path)
 
 
 class TestMtDopFlags(CustomClusterTestSuite):
@@ -71,3 +83,20 @@ class TestMtDopFlags(CustomClusterTestSuite):
     vector.get_value('table_format').file_format = 'kudu'
     self.run_test_case('QueryTest/runtime_filters_mt_dop', vector,
         test_file_vars={'$RUNTIME_FILTER_WAIT_TIME_MS': str(WAIT_TIME_MS)})
+
+
+class TestMaxMtDop(CustomClusterTestSuite):
+  @classmethod
+  def get_workload(cls):
+    return 'functional-query'
+
+  @classmethod
+  def add_test_dimensions(cls):
+    super(TestMaxMtDop, cls).add_test_dimensions()
+
+  @pytest.mark.execute_serially
+  @CustomClusterTestSuite.with_args(
+    impalad_args=impalad_admission_ctrl_maxmtdop_args())
+  @SkipIfNotHdfsMinicluster.tuned_for_minicluster
+  def test_max_mt_dop(self, vector):
+    self.run_test_case('QueryTest/max-mt-dop', vector)

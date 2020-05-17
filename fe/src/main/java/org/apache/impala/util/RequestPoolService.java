@@ -140,6 +140,9 @@ public class RequestPoolService {
   private final static String MAX_MEMORY_MULTIPLE =
       "impala.admission-control.max-memory-multiple";
 
+  // Key for specifying the "Max mt_dop" configuration of the pool
+  private final static String MAX_MT_DOP = "impala.admission-control.max-mt-dop";
+
   // String format for a per-pool configuration key. First parameter is the key for the
   // default, e.g. MAX_PLACED_RESERVATIONS_KEY, and the second parameter is the
   // pool name.
@@ -405,6 +408,8 @@ public class RequestPoolService {
           getPoolConfigDoubleValue(currentConf, pool, MAX_QUEUED_QUERIES_MULTIPLE, 0.0));
       result.setMax_memory_multiple(
           getPoolConfigValue(currentConf, pool, MAX_MEMORY_MULTIPLE, 0));
+      result.setMax_mt_dop(
+          getPoolConfigValue(currentConf, pool, MAX_MT_DOP, -1));
     }
     if (LOG.isTraceEnabled()) {
       LOG.debug("getPoolConfig(pool={}): max_mem_resources={}, max_requests={},"
