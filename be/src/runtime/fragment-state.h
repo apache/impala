@@ -68,6 +68,12 @@ class FragmentState {
   const std::vector<const PlanFragmentInstanceCtxPB*>& instance_ctx_pbs() const {
     return instance_ctx_pbs_;
   }
+  /// Return the minimum per-fragment index of an instance on this backend.
+  int min_per_fragment_instance_idx() const {
+    // 'instance_ctxs_' is in ascending order, so can just return the first one.
+    DCHECK(!instance_ctxs_.empty());
+    return instance_ctxs_[0]->per_fragment_instance_idx;
+  }
   const PlanNode* plan_tree() const { return plan_tree_; }
   const DataSinkConfig* sink_config() const { return sink_config_; }
   const TUniqueId& query_id() const { return query_state_->query_id(); }

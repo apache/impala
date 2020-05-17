@@ -392,8 +392,7 @@ class RuntimeProfile::DerivedCounter : public RuntimeProfileBase::Counter {
 /// average of the values in that set. The average is updated through calls
 /// to UpdateCounter(), which may add a new counter or update an existing counter.
 /// Set() and Add() should not be called.
-/// TODO: IMPALA-9382: rename counter. CounterVector? AggregatedCounter?
-/// TODO: IMPALA-9382: consider adding more descriptive stats, e.g. median.
+/// TODO: IMPALA-9846: rename counter. CounterVector? AggregatedCounter?
 class RuntimeProfileBase::AveragedCounter : public RuntimeProfileBase::Counter {
  public:
   /// Construct an empty counter with no values added.
@@ -405,10 +404,18 @@ class RuntimeProfileBase::AveragedCounter : public RuntimeProfileBase::Counter {
 
   /// Update the counter with a new value for the input instance at 'idx'.
   /// No locks are obtained within this method because UpdateCounter() is called from
-  /// Update(), which obtains locks on the entire counter map in a profile.
+  /// the AggregatedRuntimeProfile::Update*() functions, which obtain locks on the entire
+  /// counter map in a profile.
   /// Note that it is not thread-safe to call this from two threads at the same time.
   /// It is safe for it to be read at the same time as it is updated.
   void UpdateCounter(Counter* new_counter, int idx);
+
+  /// Update the values of this counter, setting any provided values that were not
+  /// previously set. 'have_value' and 'value' are applied to values of this counter
+  /// starting at 'start_idx'.
+  /// The same thread safety rules as UpdateCounter() apply.
+  void Update(int start_idx, const std::vector<bool>& have_value,
+      const std::vector<int64_t>& values);
 
   /// Answer the question whether there exists skew among all valid raw values
   /// backing this average counter.
@@ -435,6 +442,8 @@ class RuntimeProfileBase::AveragedCounter : public RuntimeProfileBase::Counter {
       const std::string& prefix, const std::string& name, std::ostream* s) const override;
 
   void ToThrift(const std::string& name, TAggCounter* tcounter) const;
+
+  void ToJson(rapidjson::Document& document, rapidjson::Value* val) const override;
 
   int64_t value() const override;
 
@@ -470,6 +479,11 @@ class RuntimeProfileBase::AveragedCounter : public RuntimeProfileBase::Counter {
   template <typename T>
   void PrettyPrintImpl(
       const std::string& prefix, const std::string& name, std::ostream* s) const;
+
+  /// Implementation of ToJson parameterized by the type that 'values_' is
+  /// interpreted as - either int64_t or double, depending on the T parameter.
+  template <typename T>
+  void ToJsonImpl(rapidjson::Document& document, rapidjson::Value* val) const;
 
   /// Compute all of the stats in Stats, interpreting the values in 'vals' as type T,
   /// which must be double if 'unit_' is DOUBLE_VALUE or int64_t otherwise.
@@ -719,6 +733,8 @@ class RuntimeProfile::EventSequence {
 /// accessing the private interface. Methods are thread-safe where explicitly stated.
 class RuntimeProfile::TimeSeriesCounter {
  public:
+  virtual ~TimeSeriesCounter() {}
+
   // Adds a sample. Thread-safe.
   void AddSample(int ms_elapsed);
 
@@ -728,12 +744,12 @@ class RuntimeProfile::TimeSeriesCounter {
     return GetSamplesLockedForSend(num_samples, period);
   }
 
-  virtual ~TimeSeriesCounter() {}
+  void ToThrift(TTimeSeriesCounter* counter);
+
+  TUnit::type unit() const { return unit_; }
 
  private:
   friend class RuntimeProfile;
-
-  void ToThrift(TTimeSeriesCounter* counter);
 
   /// Builds a new Value into 'value', using (if required) the allocator from
   /// 'document'. Should set the following fields where appropriate:
@@ -772,8 +788,6 @@ class RuntimeProfile::TimeSeriesCounter {
   TimeSeriesCounter(const std::string& name, TUnit::type unit,
       SampleFunction fn = SampleFunction())
     : name_(name), unit_(unit), sample_fn_(fn) {}
-
-  TUnit::type unit() const { return unit_; }
 
   std::string name_;
   TUnit::type unit_;

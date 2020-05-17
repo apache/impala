@@ -502,6 +502,7 @@ int64_t QueryState::AsyncCodegenThreadSysTime() const {
 void QueryState::ConstructReport(bool instances_started,
     ReportExecStatusRequestPB* report, TRuntimeProfileForest* profiles_forest) {
   report->Clear();
+  report->set_backend_report_seq_no(++last_report_seq_no_);
   TUniqueIdToUniqueIdPB(query_id(), report->mutable_query_id());
   DCHECK(exec_rpc_params_.has_coord_state_idx());
   report->set_coord_state_idx(exec_rpc_params_.coord_state_idx());
@@ -526,6 +527,12 @@ void QueryState::ConstructReport(bool instances_started,
   host_profile_->ClearChunkedTimeSeriesCounters();
 
   if (instances_started) {
+    // Map from fragment idx to the averaged profile. When aggregated profiles are
+    // enabled (IMPALA-9382), we populate this map with profiles that are aggregated
+    // from all the instances on this backend.
+    unordered_map<int, AggregatedRuntimeProfile*> agg_profiles;
+    ObjectPool agg_profile_pool;
+
     // Stats that we aggregate across the instances.
     int64_t cpu_user_ns = AsyncCodegenThreadUserTime();
     int64_t cpu_sys_ns = AsyncCodegenThreadSysTime();
@@ -544,8 +551,21 @@ void QueryState::ConstructReport(bool instances_started,
         // Update the status and profiles of this fragment instance.
         FragmentInstanceExecStatusPB* instance_status =
             report->add_instance_exec_status();
-        profiles_forest->profile_trees.emplace_back();
-        fis->GetStatusReport(instance_status, &profiles_forest->profile_trees.back());
+        if (query_ctx_.gen_aggregated_profile) {
+          int fragment_idx = fis->instance_ctx().fragment_idx;
+          AggregatedRuntimeProfile*& agg_profile = agg_profiles[fragment_idx];
+          if (agg_profile == nullptr) {
+            const auto it = fragment_state_map_.find(fragment_idx);
+            DCHECK(it != fragment_state_map_.end());
+            agg_profile = AggregatedRuntimeProfile::Create(&agg_profile_pool,
+                "tmp profile", it->second->instance_ctxs().size(), /*is_root=*/ true);
+          }
+          fis->GetStatusReport(instance_status, nullptr, agg_profile);
+        } else {
+          profiles_forest->profile_trees.emplace_back();
+          fis->GetStatusReport(
+              instance_status, &profiles_forest->profile_trees.back(), nullptr);
+        }
       }
 
       // Include these values for running and completed finstances in the status report.
@@ -560,6 +580,22 @@ void QueryState::ConstructReport(bool instances_started,
       } else {
         exchange_bytes_sent += fis->total_bytes_sent();
       }
+    }
+
+    // Construct the per-fragment status reports, including runtime profiles.
+    for (const auto& entry : agg_profiles) {
+      int fragment_idx = entry.first;
+      const AggregatedRuntimeProfile* agg_profile = entry.second;
+      const auto it = fragment_state_map_.find(fragment_idx);
+      DCHECK(it != fragment_state_map_.end());
+
+      // Add the aggregated runtime profile and additional metadata to the report.
+      FragmentExecStatusPB* fragment_status = report->add_fragment_exec_status();
+      fragment_status->set_fragment_idx(fragment_idx);
+      fragment_status->set_min_per_fragment_instance_idx(
+          it->second->min_per_fragment_instance_idx());
+      profiles_forest->profile_trees.emplace_back();
+      agg_profile->ToThrift(&profiles_forest->profile_trees.back());
     }
     report->set_peak_mem_consumption(query_mem_tracker_->peak_consumption());
     report->set_cpu_user_ns(cpu_user_ns);

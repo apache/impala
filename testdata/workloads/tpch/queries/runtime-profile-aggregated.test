@@ -1,0 +1,29 @@
+====
+---- QUERY
+# Sanity check aggregated runtime profile. Pick a query that runs for long enough for
+# time series counters, etc to collect some data.
+select STRAIGHT_JOIN count(distinct l_partkey)
+from lineitem join [BROADCAST] supplier on l_suppkey = s_suppkey
+---- RESULTS
+200000
+---- RUNTIME_PROFILE
+# Top-level counter (not aggregated)
+row_regex: .*NumBackends: 4 .*
+# Fragment headers.
+row_regex: .*Coordinator Fragment F03.*
+row_regex: .*Fragment F00 \[4 instances\].*
+# Coordinator counter - single instance.
+row_regex: .*RowsSent: 1.*
+# Scan node counter - many instances.
+row_regex: .*BytesRead: mean=.* min=.* p50=.* max=.*
+# Info string from aggregated scan node.
+row_regex: .*Table Name\[0-3\]: tpch.*lineitem.*
+# Timeline from aggregated scan node
+row_regex: .*Node Lifecycle Event Timeline\[.*\]: .*
+# Summary stats counter from aggregated scan node
+row_regex: .*InitialRangeActualReservation: .*Avg:.*Min.*Max.*
+# Time series form aggregated scan node.
+row_regex: .*BytesReadSeries\[.*\] (.*): .*
+# Fragment-level codegen profile should be present.
+row_regex: .*CodegenTotalWallClockTime: .*
+====

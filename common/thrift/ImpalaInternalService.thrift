@@ -636,6 +636,10 @@ struct TQueryCtx {
 
   // The initiating coordinator's backend_id.
   27: optional Types.TUniqueId coord_backend_id
+
+  // True if the new runtime profile format added by IMPALA-9382 should be generated
+  // by this query.
+  28: optional bool gen_aggregated_profile
 }
 
 // Descriptor that indicates that a runtime filter is produced by a plan node.

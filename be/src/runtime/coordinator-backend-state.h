@@ -233,11 +233,14 @@ class Coordinator::BackendState {
         const NetworkAddressPB& address, FragmentStats* fragment_stats,
         ObjectPool* obj_pool);
 
-    /// Updates 'this' with exec_status and the fragment intance's thrift profile. Also
-    /// updates the fragment instance's TExecStats in exec_summary. Also updates the
-    /// instance's avg profile. Caller must hold BackendState::lock_.
+    /// Updates 'this' with exec_status and, if --gen_experimental_profile=false, the
+    /// fragment instance's thrift profile. Also updates the fragment instance's
+    /// TExecStats in exec_summary. Also updates the instance's avg profile.
+    /// 'report_time_ms' should be the UnixMillis() value of when the report was received.
+    /// Caller must hold BackendState::lock_.
     void Update(const FragmentInstanceExecStatusPB& exec_status,
-        const TRuntimeProfileTree& thrift_profile, ExecSummary* exec_summary);
+        const TRuntimeProfileTree* thrift_profile, int64_t report_time_ms,
+        ExecSummary* exec_summary);
 
     /// Update completion_times, rates, and agg_profile for this instance's
     /// corresponding fragment in 'fragment_stats'. This may only be called
@@ -280,10 +283,16 @@ class Coordinator::BackendState {
     /// persists for the duration of one status report update (5 seconds by default).
     int64_t last_report_time_ms_ = 0;
 
-    /// The sequence number of the last report.
+    /// The sequence number of the last report for this fragment instance.
     int64_t last_report_seq_no_ = 0;
 
-    /// owned by coordinator object pool provided in the c'tor, created in Update()
+    /// The profile tree for this instance. Owned by coordinator object pool provided in
+    /// the c'tor, created in Update().
+    /// When --gen_experimental_profile=true, this contains a copy of the full instance
+    /// profile from the executor, which is updated with each status report. It also
+    /// includes some additional counters added by the coordinator.
+    /// When --gen_experimental_profile=false, this only includes the counters added
+    /// by the coordinator.
     RuntimeProfile* profile_ = nullptr;
 
     /// True if 'agg_profile_' for the fragment is up-to-date with 'profile_'.
@@ -403,6 +412,9 @@ class Coordinator::BackendState {
   /// Uses GenerateReportTimeout().
   int64_t last_report_time_ms_ = 0;
 
+  /// The sequence number of the last report for this backend.
+  int64_t last_backend_report_seq_no_ = 0;
+
   /// True if a CancelQueryFInstances RPC was already sent to this backend.
   bool sent_cancel_rpc_ = false;
 
@@ -491,15 +503,15 @@ class Coordinator::FragmentStats {
   int num_instances_;
 
   /// Bytes assigned for instances of this fragment
-  /// TODO: IMPALA-9382: can remove when we switch to the transposed profile.
+  /// TODO: IMPALA-9846: can remove when we switch to the transposed profile.
   SummaryStats bytes_assigned_;
 
   /// Completion times for instances of this fragment
-  /// TODO: IMPALA-9382: can remove when we switch to the transposed profile.
+  /// TODO: IMPALA-9846: can remove when we switch to the transposed profile.
   SummaryStats completion_times_;
 
   /// Execution rates for instances of this fragment
-  /// TODO: IMPALA-9382: can remove when we switch to the transposed profile.
+  /// TODO: IMPALA-9846: can remove when we switch to the transposed profile.
   SummaryStats rates_;
 };
 

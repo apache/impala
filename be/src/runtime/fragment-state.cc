@@ -65,6 +65,11 @@ Status FragmentState::CreateFragmentStateMap(const TExecPlanFragmentInfo& fragme
       fragment_map[fragment_state->fragment_idx()] = fragment_state;
       // we expect fragment and instance contexts to follow the same order
       DCHECK_EQ(fragment_state->fragment_idx(), instance_ctx.fragment_idx);
+    } else if (!fragment_state->instance_ctxs().empty()) {
+      // This invariant is needed for min_per_fragment_instance_idx() to be correct.
+      DCHECK_EQ(fragment_state->instance_ctxs().back()->per_fragment_instance_idx + 1,
+          instance_ctx.per_fragment_instance_idx)
+          << "Instance indexes must be sequential";
     }
     fragment_state->AddInstance(&instance_ctx, &instance_ctx_pb);
   }

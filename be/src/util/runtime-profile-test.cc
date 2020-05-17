@@ -25,6 +25,7 @@
 #include "common/object-pool.h"
 #include "testutil/gtest-util.h"
 #include "testutil/rand-util.h"
+#include "testutil/scoped-flag-setter.h"
 #include "util/container-util.h"
 #include "util/periodic-counter-updater.h"
 #include "util/runtime-profile-counters.h"
@@ -32,6 +33,7 @@
 
 #include "common/names.h"
 
+DECLARE_bool(gen_experimental_profile);
 DECLARE_int32(status_report_interval_ms);
 DECLARE_int32(periodic_counter_update_period_ms);
 
@@ -124,17 +126,17 @@ TEST(CountersTest, Basic) {
   // Averaged
   AggregatedRuntimeProfile* averaged_profile =
       AggregatedRuntimeProfile::Create(&pool, "Merged", 2, true);
-  averaged_profile->Update(from_thrift, 0);
+  averaged_profile->UpdateAggregatedFromInstance(from_thrift, 0);
   counter_merged = averaged_profile->GetCounter("A");
   EXPECT_EQ(counter_merged->value(), 1);
 
   // Update again, there should be no change.
-  averaged_profile->Update(from_thrift, 0);
+  averaged_profile->UpdateAggregatedFromInstance(from_thrift, 0);
   EXPECT_EQ(counter_merged->value(), 1);
 
   counter_a = profile_a2->AddCounter("A", TUnit::UNIT);
   counter_a->Set(3);
-  averaged_profile->Update(profile_a2, 1);
+  averaged_profile->UpdateAggregatedFromInstance(profile_a2, 1);
   EXPECT_EQ(counter_merged->value(), 2);
 
   // Update
@@ -212,8 +214,8 @@ TEST(CountersTest, MergeAndUpdate) {
   profile1->ToThrift(&tprofile1);
   AggregatedRuntimeProfile* averaged_profile =
       AggregatedRuntimeProfile::Create(&pool, "merged", 2, true);
-  averaged_profile->Update(profile1, 0);
-  averaged_profile->Update(profile2, 1);
+  averaged_profile->UpdateAggregatedFromInstance(profile1, 0);
+  averaged_profile->UpdateAggregatedFromInstance(profile2, 1);
   EXPECT_EQ(5, averaged_profile->num_counters());
   ValidateCounter(averaged_profile, "Parent Shared", 2);
   ValidateCounter(averaged_profile, "Parent 1 Only", 2);
@@ -292,7 +294,7 @@ TEST(CountersTest, MergeAndUpdateChildOrder) {
   AggregatedRuntimeProfile* averaged_profile =
       AggregatedRuntimeProfile::Create(&pool, "merged", 2, true);
   RuntimeProfile* deserialized_profile = RuntimeProfile::Create(&pool, "Parent");
-  averaged_profile->Update(profile1, 0);
+  averaged_profile->UpdateAggregatedFromInstance(profile1, 0);
   deserialized_profile->Update(tprofile1_v1);
 
   std::vector<RuntimeProfileBase*> tmp_children;
@@ -307,7 +309,7 @@ TEST(CountersTest, MergeAndUpdateChildOrder) {
   RuntimeProfile* p1_child1 = RuntimeProfile::Create(&pool, "Child1");
   profile1->PrependChild(p1_child1);
   profile1->ToThrift(&tprofile1_v2);
-  averaged_profile->Update(profile1, 0);
+  averaged_profile->UpdateAggregatedFromInstance(profile1, 0);
   deserialized_profile->Update(tprofile1_v2);
 
   averaged_profile->GetChildren(&tmp_children);
@@ -329,7 +331,7 @@ TEST(CountersTest, MergeAndUpdateChildOrder) {
   EXPECT_EQ("Child2", tmp_children[0]->name());
   EXPECT_EQ("Child1", tmp_children[1]->name());
   profile1->ToThrift(&tprofile1_v3);
-  averaged_profile->Update(profile1, 0);
+  averaged_profile->UpdateAggregatedFromInstance(profile1, 0);
   deserialized_profile->Update(tprofile1_v2);
 
   // The previous order of children that were already present is preserved.
@@ -536,6 +538,78 @@ TEST(CountersTest, SummaryStatsCounters) {
 
 }
 
+// Helper for the AggregateSummaryStats that verifies the encoded event sequence
+// in the thrift representation when it was merged into the profile at instance offset
+// 'offset'.
+static void VerifyThriftSummaryStats(
+    const TRuntimeProfileNode& tnode, int offset, int total_instances) {
+  const int NUM_VALID_INSTANCES = 3;
+  DCHECK_LE(offset + NUM_VALID_INSTANCES, total_instances);
+  ASSERT_TRUE(tnode.__isset.aggregated);
+
+  const TAggregatedRuntimeProfileNode& agg_node = tnode.aggregated;
+  ASSERT_TRUE(agg_node.__isset.summary_stats_counters);
+
+  const TAggSummaryStatsCounter& tcounter = agg_node.summary_stats_counters[0];
+  EXPECT_EQ("test ss", tcounter.name);
+  EXPECT_EQ(TUnit::UNIT, tcounter.unit);
+
+  EXPECT_LE(offset + NUM_VALID_INSTANCES, tcounter.has_value.size());
+  EXPECT_LE(offset + NUM_VALID_INSTANCES, tcounter.sum.size());
+  EXPECT_LE(offset + NUM_VALID_INSTANCES, tcounter.total_num_values.size());
+  EXPECT_LE(offset + NUM_VALID_INSTANCES, tcounter.min_value.size());
+  EXPECT_LE(offset + NUM_VALID_INSTANCES, tcounter.max_value.size());
+
+  for (int i = 0; i < total_instances; ++i) {
+    if (i < offset || i >= offset + NUM_VALID_INSTANCES) {
+      EXPECT_FALSE(tcounter.has_value[i]);
+      continue;
+    }
+    EXPECT_TRUE(tcounter.has_value[i]);
+    int min_val = i - offset;
+    EXPECT_EQ(min_val * 2 + 1, tcounter.sum[i]);
+    EXPECT_EQ(2, tcounter.total_num_values[i]);
+    EXPECT_EQ(min_val, tcounter.min_value[i]);
+    EXPECT_EQ(min_val + 1, tcounter.max_value[i]);
+  }
+}
+
+// Test handling of event sequences in the aggregated profile.
+TEST(CountersTest, AggregateSummaryStats) {
+  auto cert = ScopedFlagSetter<bool>::Make(&FLAGS_gen_experimental_profile, true);
+  const int NUM_PROFILES = 3;
+  // Create a profile with event sequences with some shared event keys.
+  ObjectPool pool;
+  RuntimeProfile* profiles[NUM_PROFILES];
+  RuntimeProfile::SummaryStatsCounter* counters[NUM_PROFILES];
+  for (int i = 0; i < NUM_PROFILES; ++i) {
+    profiles[i] = RuntimeProfile::Create(&pool, "Profile");
+    counters[i] = profiles[i]->AddSummaryStatsCounter("test ss", TUnit::UNIT);
+    counters[i]->UpdateCounter(i);
+    counters[i]->UpdateCounter(i + 1);
+  }
+
+  AggregatedRuntimeProfile* averaged_profile =
+      AggregatedRuntimeProfile::Create(&pool, "Merged", 3, true);
+  for (int i = 0; i < NUM_PROFILES; ++i) {
+    averaged_profile->UpdateAggregatedFromInstance(profiles[i], i);
+  }
+
+  TRuntimeProfileTree ttree;
+  averaged_profile->ToThrift(&ttree);
+  VerifyThriftSummaryStats(ttree.nodes[0], 0, NUM_PROFILES);
+
+  // Test merging into another averaged profile at an offset
+  const int NUM_UNINIT_PROFILES = 2;
+  const int OFFSET = 1;
+  AggregatedRuntimeProfile* averaged_profile2 = AggregatedRuntimeProfile::Create(
+      &pool, "Merged 2", NUM_PROFILES + NUM_UNINIT_PROFILES, true);
+  averaged_profile2->UpdateAggregatedFromInstances(ttree, OFFSET);
+  TRuntimeProfileTree ttree2;
+  averaged_profile2->ToThrift(&ttree2);
+  VerifyThriftSummaryStats(ttree2.nodes[0], OFFSET, NUM_PROFILES + NUM_UNINIT_PROFILES);
+}
+
 TEST(CountersTest, DerivedCounters) {
   ObjectPool pool;
   RuntimeProfile* profile = RuntimeProfile::Create(&pool, "Profile");
@@ -694,6 +768,77 @@ TEST(CountersTest, InfoStringTest) {
   EXPECT_EQ(*update_dst_profile->GetInfoString("Foo"), "Bar");
 }
 
+// Helper for the AggregateInfoStrings that verifies the encoded event sequence
+// in the thrift representation when it was merged into the profile at instance offset
+// 'offset'.
+static void VerifyThriftInfoStrings(
+    const TRuntimeProfileNode& tnode, int offset, int total_instances) {
+  ASSERT_TRUE(tnode.__isset.aggregated);
+  const int NUM_VALID_INSTANCES = 3;
+  DCHECK_LE(offset + NUM_VALID_INSTANCES, total_instances);
+
+  const TAggregatedRuntimeProfileNode& agg_node = tnode.aggregated;
+  ASSERT_TRUE(agg_node.__isset.info_strings);
+  const map<string, map<string, vector<int32_t>>>& info_strings = agg_node.info_strings;
+  auto it = info_strings.find("shared");
+  EXPECT_TRUE(it != info_strings.end());
+  EXPECT_EQ(1, it->second.size()) << "Only one distinct value for shared";
+
+  // Same value should be present in all instances, i.e. all indices should be present.
+  auto it2 = it->second.find("same value");
+  EXPECT_TRUE(it2 != it->second.end());
+  EXPECT_EQ(it2->second, vector<int32_t>({offset + 0, offset + 1, offset + 2}));
+
+  // Distinct value should have different value per instance.
+  it = info_strings.find("distinct");
+  EXPECT_TRUE(it != info_strings.end());
+  EXPECT_EQ(NUM_VALID_INSTANCES, it->second.size()) << "One distinct value per instance";
+  it2 = it->second.find("val0");
+  EXPECT_TRUE(it2 != it->second.end());
+  EXPECT_EQ(it2->second, vector<int32_t>({offset + 0}));
+  it2 = it->second.find("val1");
+  EXPECT_TRUE(it2 != it->second.end());
+  EXPECT_EQ(it2->second, vector<int32_t>({offset + 1}));
+  it2 = it->second.find("val2");
+  EXPECT_TRUE(it2 != it->second.end());
+  EXPECT_EQ(it2->second, vector<int32_t>({offset + 2}));
+}
+
+// Test handling of event sequences in the aggregated profile.
+TEST(CountersTest, AggregateInfoStrings) {
+  auto cert = ScopedFlagSetter<bool>::Make(&FLAGS_gen_experimental_profile, true);
+  const int NUM_PROFILES = 3;
+  // Create a profile with info strings that are shared across instances and then
+  // distinct across instances to test that they are deduplicated appropriately.
+  ObjectPool pool;
+  RuntimeProfile* profiles[NUM_PROFILES];
+  for (int i = 0; i < NUM_PROFILES; ++i) {
+    profiles[i] = RuntimeProfile::Create(&pool, "Profile");
+    profiles[i]->AddInfoString("shared", "same value");
+    profiles[i]->AddInfoString("distinct", Substitute("val$0", i));
+  }
+
+  AggregatedRuntimeProfile* averaged_profile =
+      AggregatedRuntimeProfile::Create(&pool, "Merged", 3, true);
+  for (int i = 0; i < NUM_PROFILES; ++i) {
+    averaged_profile->UpdateAggregatedFromInstance(profiles[i], i);
+  }
+
+  TRuntimeProfileTree ttree;
+  averaged_profile->ToThrift(&ttree);
+  VerifyThriftInfoStrings(ttree.nodes[0], 0, NUM_PROFILES);
+
+  // Test merging into another averaged profile at an offset
+  const int NUM_UNINIT_PROFILES = 2;
+  const int OFFSET = 1;
+  AggregatedRuntimeProfile* averaged_profile2 = AggregatedRuntimeProfile::Create(
+      &pool, "Merged 2", NUM_PROFILES + NUM_UNINIT_PROFILES, true);
+  averaged_profile2->UpdateAggregatedFromInstances(ttree, OFFSET);
+  TRuntimeProfileTree ttree2;
+  averaged_profile2->ToThrift(&ttree2);
+  VerifyThriftInfoStrings(ttree2.nodes[0], OFFSET, NUM_PROFILES + NUM_UNINIT_PROFILES);
+}
+
 TEST(CountersTest, RateCounters) {
   ObjectPool pool;
   RuntimeProfile* profile = RuntimeProfile::Create(&pool, "Profile");
@@ -807,6 +952,108 @@ TEST(CountersTest, EventSequences) {
     EXPECT_TRUE(ev.first > last_string);
     last_string = ev.first;
   }
+}
+
+static void CheckAscending(const vector<int64_t>& v) {
+  if (v.empty()) return;
+  int64_t prev = v[0];
+  for (int i = 1; i < v.size(); ++i) {
+    EXPECT_LE(prev, v[i]);
+    prev = v[i];
+  }
+}
+
+// Helper for the AggregateEventSequences that verifies the encoded event sequence
+// in the thrift representation when it was merged into the profile at instance offset
+// 'offset'.
+static void VerifyThriftEventSequences(
+    const TRuntimeProfileNode& tnode, int offset, int total_instances) {
+  ASSERT_TRUE(tnode.__isset.aggregated);
+  const int NUM_VALID_INSTANCES = 3;
+  DCHECK_LE(offset + NUM_VALID_INSTANCES, total_instances);
+
+  const TAggregatedRuntimeProfileNode& agg_node = tnode.aggregated;
+  ASSERT_TRUE(agg_node.__isset.event_sequences);
+  ASSERT_EQ(1, agg_node.event_sequences.size());
+  // Check that the dictionary encoding worked.
+  const TAggEventSequence& tseq = agg_node.event_sequences[0];
+  EXPECT_EQ("event sequence", tseq.name);
+  EXPECT_EQ("aaaa", tseq.label_dict[0]);
+  EXPECT_EQ("bbbb", tseq.label_dict[1]);
+  EXPECT_EQ("cccc", tseq.label_dict[2]);
+  EXPECT_EQ("dddd", tseq.label_dict[3]);
+
+  // Validate that the right number of instances are present and that the invalid
+  // instances do not have any data associated with them.
+  EXPECT_EQ(total_instances, tseq.label_idxs.size());
+  EXPECT_EQ(total_instances, tseq.timestamps.size());
+  for (int i = 0; i < total_instances; ++i) {
+    if (i < offset || i >= offset + NUM_VALID_INSTANCES) {
+      EXPECT_EQ(0, tseq.label_idxs[i].size());
+      EXPECT_EQ(0, tseq.timestamps[i].size());
+    }
+  }
+
+  // Validate the label/timestamp values for the valid instances.
+  EXPECT_EQ(3, tseq.label_idxs[offset + 0].size());
+  EXPECT_EQ(0, tseq.label_idxs[offset + 0][0]);
+  EXPECT_EQ(1, tseq.label_idxs[offset + 0][1]);
+  EXPECT_EQ(2, tseq.label_idxs[offset + 0][2]);
+  EXPECT_EQ(3, tseq.timestamps[offset + 0].size());
+  CheckAscending(tseq.timestamps[offset + 0]);
+
+  EXPECT_EQ(2, tseq.label_idxs[offset + 1].size());
+  EXPECT_EQ(0, tseq.label_idxs[offset + 1][0]);
+  EXPECT_EQ(2, tseq.label_idxs[offset + 1][1]);
+  EXPECT_EQ(2, tseq.timestamps[offset + 1].size());
+  CheckAscending(tseq.timestamps[offset + 1]);
+
+  EXPECT_EQ(3, tseq.label_idxs[offset + 2].size());
+  EXPECT_EQ(0, tseq.label_idxs[offset + 2][0]);
+  EXPECT_EQ(3, tseq.label_idxs[offset + 2][1]);
+  EXPECT_EQ(1, tseq.label_idxs[offset + 2][2]);
+  EXPECT_EQ(3, tseq.timestamps[offset + 2].size());
+  CheckAscending(tseq.timestamps[offset + 2]);
+}
+
+// Test handling of event sequences in the aggregated profile.
+TEST(CountersTest, AggregateEventSequences) {
+  auto cert = ScopedFlagSetter<bool>::Make(&FLAGS_gen_experimental_profile, true);
+  const int NUM_PROFILES = 3;
+  // Create a profile with event sequences with some shared event keys.
+  ObjectPool pool;
+  RuntimeProfile* profiles[NUM_PROFILES];
+  RuntimeProfile::EventSequence* seqs[NUM_PROFILES];
+  for (int i = 0; i < NUM_PROFILES; ++i) {
+    profiles[i] = RuntimeProfile::Create(&pool, "Profile");
+    seqs[i] = profiles[i]->AddEventSequence("event sequence");
+    seqs[i]->MarkEvent("aaaa");
+  }
+  seqs[0]->MarkEvent("bbbb");
+  seqs[0]->MarkEvent("cccc");
+  seqs[1]->MarkEvent("cccc");
+  seqs[2]->MarkEvent("dddd");
+  seqs[2]->MarkEvent("bbbb");
+
+  AggregatedRuntimeProfile* averaged_profile =
+      AggregatedRuntimeProfile::Create(&pool, "Merged", 3, true);
+  for (int i = 0; i < NUM_PROFILES; ++i) {
+    averaged_profile->UpdateAggregatedFromInstance(profiles[i], i);
+  }
+
+  TRuntimeProfileTree ttree;
+  averaged_profile->ToThrift(&ttree);
+  VerifyThriftEventSequences(ttree.nodes[0], 0, NUM_PROFILES);
+
+  // Test merging into another averaged profile at an offset
+  const int NUM_UNINIT_PROFILES = 2;
+  const int OFFSET = 1;
+  AggregatedRuntimeProfile* averaged_profile2 = AggregatedRuntimeProfile::Create(
+      &pool, "Merged 2", NUM_PROFILES + NUM_UNINIT_PROFILES, true);
+  averaged_profile2->UpdateAggregatedFromInstances(ttree, OFFSET);
+  TRuntimeProfileTree ttree2;
+  averaged_profile2->ToThrift(&ttree2);
+  VerifyThriftEventSequences(ttree2.nodes[0], OFFSET, NUM_PROFILES + NUM_UNINIT_PROFILES);
 }
 
 TEST(CountersTest, UpdateEmptyEventSequence) {
@@ -1142,6 +1389,80 @@ TEST(TimeSeriesCounterTest, TestMaximumSize) {
 
   // First 10 samples have been truncated
   ASSERT_EQ(samples[0], 10);
+}
+
+// Helper for the AggregateTimeSeries that verifies the encoded event sequence
+// in the thrift representation when it was merged into the profile at instance offset
+// 'offset'.
+static void VerifyThriftTimeSeries(
+    const TRuntimeProfileNode& tnode, int offset, int total_instances) {
+  ASSERT_TRUE(tnode.__isset.aggregated);
+  const int NUM_VALID_INSTANCES = 3;
+  DCHECK_LE(offset + NUM_VALID_INSTANCES, total_instances);
+
+  const TAggregatedRuntimeProfileNode& agg_node = tnode.aggregated;
+  ASSERT_TRUE(agg_node.__isset.time_series_counters);
+
+  const TAggTimeSeriesCounter& tcounter = agg_node.time_series_counters[0];
+  EXPECT_EQ("TestCounter", tcounter.name);
+  const int test_period = FLAGS_periodic_counter_update_period_ms;
+  for (int i = 0; i < total_instances; ++i) {
+    if (i < offset || i >= offset + NUM_VALID_INSTANCES) {
+      EXPECT_EQ(0, tcounter.period_ms[i]);
+      EXPECT_EQ(0, tcounter.values[i].size());
+      EXPECT_EQ(0, tcounter.start_index[i]);
+      continue;
+    }
+    EXPECT_EQ(test_period, tcounter.period_ms[i]);
+    EXPECT_GE(tcounter.start_index[i], 0);
+    EXPECT_EQ(vector<int64_t>({0, 1, 2, 3, 4, 5, 6, 7, 8, 9}), tcounter.values[i]);
+  }
+}
+
+// Test handling of event sequences in the aggregated profile.
+TEST(TimeSeriesCounterTest, AggregateTimeSeries) {
+  auto cert = ScopedFlagSetter<bool>::Make(&FLAGS_gen_experimental_profile, true);
+  const int NUM_PROFILES = 3;
+  // Create a profile with event sequences with some shared event keys.
+  ObjectPool pool;
+  RuntimeProfile* profiles[NUM_PROFILES];
+  RuntimeProfile::TimeSeriesCounter* counters[NUM_PROFILES];
+  const int test_period = FLAGS_periodic_counter_update_period_ms;
+  for (int i = 0; i < NUM_PROFILES; ++i) {
+    profiles[i] = RuntimeProfile::Create(&pool, "Profile");
+    // Add a counter with a sample function that counts up, starting from 0.
+    int value = 0;
+    auto sample_fn = [&value]() { return value++; };
+    counters[i] =
+        profiles[i]->AddChunkedTimeSeriesCounter("TestCounter", TUnit::UNIT, sample_fn);
+
+    // Stop counter updates from interfering with the rest of the test.
+    StopAndClearCounter(profiles[i], counters[i]);
+
+    // Reset value after previous values have been retrieved.
+    value = 0;
+
+    for (int j = 0; j < 10; ++j) counters[i]->AddSample(test_period);
+  }
+
+  AggregatedRuntimeProfile* averaged_profile =
+      AggregatedRuntimeProfile::Create(&pool, "Merged", 3, true);
+  for (int i = 0; i < NUM_PROFILES; ++i) {
+    averaged_profile->UpdateAggregatedFromInstance(profiles[i], i);
+  }
+  TRuntimeProfileTree ttree;
+  averaged_profile->ToThrift(&ttree);
+  VerifyThriftTimeSeries(ttree.nodes[0], 0, NUM_PROFILES);
+
+  // Test merging into another averaged profile at an offset
+  const int NUM_UNINIT_PROFILES = 2;
+  const int OFFSET = 1;
+  AggregatedRuntimeProfile* averaged_profile2 = AggregatedRuntimeProfile::Create(
+      &pool, "Merged 2", NUM_PROFILES + NUM_UNINIT_PROFILES, true);
+  averaged_profile2->UpdateAggregatedFromInstances(ttree, OFFSET);
+  TRuntimeProfileTree ttree2;
+  averaged_profile2->ToThrift(&ttree2);
+  VerifyThriftTimeSeries(ttree2.nodes[0], OFFSET, NUM_PROFILES + NUM_UNINIT_PROFILES);
 }
 
 /// Test parameter class that helps to test time series resampling during profile pretty
