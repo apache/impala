@@ -1,0 +1,12 @@
+====
+---- QUERY
+# Regression test for IMPALA-9753. The issue only comes on S3, where no Hive is avaliable.
+create table tt (x int) tblproperties (
+  'transactional'='true',
+  'transactional_properties'='insert_only');
+insert into tt values (1);
+truncate table tt;
+select count(*) from tt;
+---- RESULTS
+0
+====

@@ -52,6 +52,14 @@ class TestAcid(ImpalaTestSuite):
     self.run_test_case('QueryTest/acid', vector, use_db=unique_database)
 
   @SkipIfHive2.acid
+  def test_acid_no_hive(self, vector, unique_database):
+    """ Run tests that do not need a running Hive server. This means that (unlike other
+    tests) these can be run in enviroments without Hive, e.g. S3.
+    TODO: find a long term solution to run much more ACID tests in S3
+    """
+    self.run_test_case('QueryTest/acid-no-hive', vector, use_db=unique_database)
+
+  @SkipIfHive2.acid
   @SkipIfS3.hive
   @SkipIfABFS.hive
   @SkipIfADLS.hive
