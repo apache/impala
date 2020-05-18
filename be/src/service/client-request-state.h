@@ -170,12 +170,16 @@ class ClientRequestState {
   /// Cancels the child queries and the coordinator with the given cause.
   /// If cause is NULL, it assumes this was deliberately cancelled by the user while in
   /// FINISHED state. Otherwise, sets state to ERROR (TODO: IMPALA-1262: use CANCELLED).
-  /// Does nothing if the query has reached EOS or already cancelled.
+  /// Does nothing if the query has reached EOS or already cancelled. If
+  /// 'wait_until_finalized' is true and another thread is cancelling 'coord_', block
+  /// until cancellaton of 'coord_' finishes and it is finalized.
+  /// 'wait_until_finalized' should only used by the single thread finalizing the query,
+  /// to avoid many threads piling up waiting for query cancellation.
   ///
   /// Only returns an error if 'check_inflight' is true and the query is not yet
   /// in-flight. Otherwise, proceed and return Status::OK() even if the query isn't
   /// in-flight (for cleaning up after an error on the query issuing path).
-  Status Cancel(bool check_inflight, const Status* cause) WARN_UNUSED_RESULT;
+  Status Cancel(bool check_inflight, const Status* cause, bool wait_until_finalized=false);
 
   /// This is called when the query is done (finished, cancelled, or failed). This runs
   /// synchronously within the last client RPC and does any work that is required before

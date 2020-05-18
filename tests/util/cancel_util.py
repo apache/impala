@@ -55,6 +55,20 @@ def cancel_query_and_validate_state(client, query, exec_option, table_format,
   # Before accessing fetch_results_error we need to join the fetch thread
   thread.join()
 
+  # IMPALA-9756: Make sure query summary info has been added to profile for queries
+  # that proceeded far enough into execution that it should have been added to profile.
+  # The logic in ClientRequestState/Coordinator is convoluted, but the summary info
+  # should be added if the query has got to the point where rows can be fetched. We
+  # need to do this after both close_query() and fetch() have returned to ensure
+  # that the synchronous phase of query unregistration has finished and the profile
+  # is final.
+  profile = client.get_runtime_profile(handle)
+  if ("- Completed admission: " in profile and
+      ("- First row fetched:" in profile or "- Request finished:" in profile)):
+    # TotalBytesRead is a sentinel that will only be created if ComputeQuerySummary()
+    # has been run by the cancelling thread.
+    assert "- TotalBytesRead:" in profile, profile
+
   if thread.fetch_results_error is None:
     # If the fetch rpc didn't result in CANCELLED (and auto-close the query) then
     # the close rpc should have succeeded.

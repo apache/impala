@@ -33,6 +33,7 @@
 #include "runtime/dml-exec-state.h"
 #include "util/counting-barrier.h"
 #include "util/progress-updater.h"
+#include "util/promise.h"
 #include "util/runtime-profile-counters.h"
 #include "util/spinlock.h"
 
@@ -98,6 +99,11 @@ struct FragmentExecParams;
 ///
 /// Lifecycle: this object must not be destroyed until after one of the three states
 /// above is reached (error, cancelled, or EOS) to ensure resources are released.
+/// There is work that needs to be done as part of the transition into each of the
+/// above states. That work is done by the thread that triggered the state transition
+/// *after* the atomic state transition by calling HandleExecStateTransition(). If
+/// another thread depends on that work being complete, they can wait on the 'finalized_'
+/// promise.
 ///
 /// Lock ordering: (lower-numbered acquired before higher-numbered)
 /// 1. wait_lock_
@@ -141,8 +147,12 @@ class Coordinator { // NOLINT: The member variables could be re-ordered to save 
       int64_t block_on_wait_time_us) WARN_UNUSED_RESULT;
 
   /// Cancel execution of query and sets the overall query status to CANCELLED if the
-  /// query is still executing. Idempotent.
-  void Cancel();
+  /// query is still executing. Idempotent. If 'wait_until_finalized' is true and another
+  /// thread is cancelling 'coord_', block until the query profile is completed, e.g.
+  /// if ComputeQuerySummary() is running concurrently. This is only used by the thread
+  /// unregistering the query - other threads should return immediately if the query
+  /// is in the process of being cancelled.
+  void Cancel(bool wait_until_finalized=false);
 
   /// Called by the report status RPC handler to update execution status of a particular
   /// backend as well as dml_exec_state_ and the profile. This may block if exec RPCs are
@@ -409,6 +419,10 @@ class Coordinator { // NOLINT: The member variables could be re-ordered to save 
   /// - CANCELLED: CANCELLED
   /// - ERROR: error status
   Status exec_status_;
+
+  /// Set when all of the work to transition into a terminal state is complete,
+  /// including ComputeQuerySummary().
+  Promise<bool> finalized_;
 
   /// Contains all the state about filters being handled by this coordinator.
   std::unique_ptr<FilterRoutingTable> filter_routing_table_;

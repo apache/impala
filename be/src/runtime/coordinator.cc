@@ -729,6 +729,7 @@ void Coordinator::HandleExecStateTransition(
   // WaitForBackends() and CancelBackends() ensures that.
   // TODO: should move this off of the query execution path?
   ComputeQuerySummary();
+  finalized_.Set(true);
 }
 
 Status Coordinator::FinalizeHdfsDml() {
@@ -860,7 +861,7 @@ Status Coordinator::GetNext(QueryResultSet* results, int max_rows, bool* eos,
   return Status::OK();
 }
 
-void Coordinator::Cancel() {
+void Coordinator::Cancel(bool wait_until_finalized) {
   // Illegal to call Cancel() before Exec() returns, so there's no danger of the cancel
   // RPC passing the exec RPC.
   DCHECK(exec_rpcs_complete_.Load()) << "Exec() must be called first";
@@ -870,6 +871,10 @@ void Coordinator::Cancel() {
   // waiting for cancellation. In that case, we want explicit cancellation to unblock
   // backend_exec_complete_barrier_, which we do by forcing cancellation.
   if (ReturnedAllResults()) CancelBackends(/*fire_and_forget=*/ true);
+
+  // IMPALA-5756: Wait until finalized, in case a different thread was handling the
+  // transition to the terminal state.
+  if (wait_until_finalized) finalized_.Get();
 }
 
 void Coordinator::CancelBackends(bool fire_and_forget) {
