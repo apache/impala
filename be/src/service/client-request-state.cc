@@ -547,18 +547,23 @@ void ClientRequestState::FinishExecQueryOrDmlRequest() {
 
   DebugActionNoFail(schedule_->query_options(), "CRS_AFTER_COORD_STARTS");
 
+  // Make coordinator profile visible, even upon failure.
+  if (coord_->query_profile() != nullptr) profile_->AddChild(coord_->query_profile());
+
   bool cancelled = false;
   Status cancellation_status;
   {
     lock_guard<mutex> l(lock_);
     if (!UpdateQueryStatus(exec_status).ok()) return;
+    // Coordinator::Exec() finished successfully - it is safe to concurrently access
+    // 'coord_'. This thread needs to cancel the coordinator if cancellation occurred
+    // *before* 'coord_' was accessible to other threads. Once the lock is dropped, any
+    // future calls to Cancel() are responsible for calling Coordinator::Cancel(), so
+    // while holding the lock we need to both perform a check for cancellation and make
+    // the coord_ visible.
+    coord_exec_called_.Store(true);
     cancelled = is_cancelled_;
-    if (!cancelled) {
-      // Once the lock is dropped, any future calls to Cancel() are responsible for
-      // calling Coordinator::Cancel(), so while holding the lock we need to both perform
-      // a check for cancellation and make the coord_ visible.
-      coord_exec_called_.Store(true);
-    } else {
+    if (cancelled) {
       VLOG_QUERY << "Cancelled right after starting the coordinator query id="
                  << PrintId(query_id());
       discard_result(UpdateQueryStatus(Status::CANCELLED));
@@ -569,8 +574,6 @@ void ClientRequestState::FinishExecQueryOrDmlRequest() {
     coord_->Cancel();
     return;
   }
-
-  profile_->AddChild(coord_->query_profile());
   UpdateNonErrorExecState(ExecState::RUNNING);
 }
 
@@ -730,7 +733,7 @@ Status ClientRequestState::ExecShutdownRequest() {
 }
 
 Status ClientRequestState::Finalize(bool check_inflight, const Status* cause) {
-  RETURN_IF_ERROR(Cancel(check_inflight, cause));
+  RETURN_IF_ERROR(Cancel(check_inflight, cause, /*wait_until_finalized=*/true));
   MarkActive();
   // Make sure we join on wait_thread_ before we finish (and especially before this object
   // is destroyed).
@@ -1139,7 +1142,8 @@ Status ClientRequestState::FetchRowsInternal(const int32_t max_rows,
   return Status::OK();
 }
 
-Status ClientRequestState::Cancel(bool check_inflight, const Status* cause) {
+Status ClientRequestState::Cancel(
+    bool check_inflight, const Status* cause, bool wait_until_finalized) {
   if (check_inflight) {
     // If the query is in 'inflight_queries' it means that the query has actually started
     // executing. It is ok if the query is removed from 'inflight_queries' during
@@ -1175,7 +1179,7 @@ Status ClientRequestState::Cancel(bool check_inflight, const Status* cause) {
   // Ensure the parent query is cancelled if execution has started (if the query was not
   // started, cancellation is handled by the 'async-exec-thread' thread). 'lock_' should
   // not be held because cancellation involves RPCs and can block for a long time.
-  if (GetCoordinator() != nullptr) GetCoordinator()->Cancel();
+  if (GetCoordinator() != nullptr) GetCoordinator()->Cancel(wait_until_finalized);
   return Status::OK();
 }
 
