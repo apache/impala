@@ -2112,7 +2112,7 @@ public class CatalogOpExecutor {
           part.getLocation() + Path.SEPARATOR + "base_" + String.valueOf(writeId);
       fs.mkdirs(new Path(baseDirStr));
       String emptyFile = baseDirStr + Path.SEPARATOR + "_empty";
-      fs.create(new Path(emptyFile));
+      fs.create(new Path(emptyFile)).close();
     }
   }
 
