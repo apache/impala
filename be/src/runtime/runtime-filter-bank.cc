@@ -426,7 +426,9 @@ void RuntimeFilterBank::Cancel() {
 }
 
 void RuntimeFilterBank::CancelLocked() {
-  if (cancelled_) return;
+  // IMPALA-9730: if no filters are present, we did not acquire any filter locks. Avoid a
+  // TSAN data race on 'cancelled_' by exiting early.
+  if (filters_.empty() || cancelled_) return;
   // Cancel all filters that a thread might be waiting on.
   for (auto& entry : filters_) {
     if (entry.second->consumed_filter != nullptr) entry.second->consumed_filter->Cancel();
