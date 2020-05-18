@@ -254,7 +254,7 @@ class RuntimeFilterBank {
 
   /// True iff Cancel() or Close() has been called. Writer must hold the
   /// 'PerFilterState::lock' of all filters in 'filters_'. Reader must hold at least one
-  /// filter lock.
+  /// filter lock to read/write.
   bool cancelled_ = false;
 
   /// True iff Close() has been called. Used to prevent races between
