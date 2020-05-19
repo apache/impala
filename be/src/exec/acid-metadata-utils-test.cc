@@ -207,3 +207,32 @@ TEST(ValidWriteIdListTest, IsCompacted) {
   EXPECT_FALSE(ValidWriteIdList::IsCompacted("/foo/000"));
   EXPECT_FALSE(ValidWriteIdList::IsCompacted("/foo/p=1/000"));
 }
+
+TEST(ValidWriteIdListTest, GetWriteIdRange) {
+  EXPECT_EQ((make_pair<int64_t, int64_t>(0, 0)),
+      ValidWriteIdList::GetWriteIdRange("/foo/00000_0"));
+  EXPECT_EQ((make_pair<int64_t, int64_t>(5, 5)),
+      ValidWriteIdList::GetWriteIdRange("/foo/base_00005/000"));
+  EXPECT_EQ((make_pair<int64_t, int64_t>(5, 5)),
+      ValidWriteIdList::GetWriteIdRange("/foo/base_00005_v123/000"));
+  EXPECT_EQ((make_pair<int64_t, int64_t>(5 ,10)),
+      ValidWriteIdList::GetWriteIdRange("/foo/delta_00005_00010/000"));
+  EXPECT_EQ((make_pair<int64_t, int64_t>(5 ,10)),
+      ValidWriteIdList::GetWriteIdRange("/foo/delta_00005_00010_0006/000"));
+  EXPECT_EQ((make_pair<int64_t, int64_t>(5 ,10)),
+      ValidWriteIdList::GetWriteIdRange("/foo/delta_00005_00010_v123/000"));
+}
+
+TEST(ValidWriteIdListTest, GetBucketProperty) {
+  EXPECT_EQ(536870912, ValidWriteIdList::GetBucketProperty("/foo/0000000_0"));
+  EXPECT_EQ(536936448, ValidWriteIdList::GetBucketProperty("/foo/0000001_1"));
+  EXPECT_EQ(537001984, ValidWriteIdList::GetBucketProperty("/foo/bucket_00002"));
+  EXPECT_EQ(537067520, ValidWriteIdList::GetBucketProperty(
+      "/foo/base_0001_v1/bucket_000003_0"));
+  EXPECT_EQ(537133056, ValidWriteIdList::GetBucketProperty(
+      "/foo/delta_1_5/bucket_0000004_1"));
+  EXPECT_EQ(537198592, ValidWriteIdList::GetBucketProperty(
+      "/foo/delta_1_1_v1/000005_0_copy_1"));
+  EXPECT_EQ(536870913, ValidWriteIdList::GetBucketProperty(
+      "/foo/delta_1_1_1/00000_0"));
+}

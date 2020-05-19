@@ -28,11 +28,17 @@ Status OrcSchemaResolver::BuildSchemaPaths(int num_partition_keys,
     return Status(TErrorCode::ORC_TYPE_NOT_ROOT_AT_STRUCT, "file", root_->toString(),
         filename_);
   }
+  bool synthetic_acid_schema = is_table_full_acid_ && !is_file_full_acid_;
   SchemaPath path;
   col_id_path_map->push_back(path);
   int num_columns = root_->getSubtypeCount();
+  // Original files don't have "row" field, let's add it manually.
+  if (synthetic_acid_schema) path.push_back(ACID_FIELD_ROW + num_partition_keys);
   for (int i = 0; i < num_columns; ++i) {
-    path.push_back(i + num_partition_keys);
+    // For synthetic ACID schema these columns are not top-level, so don't need to
+    // adjust them by 'num_part_keys'.
+    int field_offset = synthetic_acid_schema ? 0 : num_partition_keys;
+    path.push_back(i + field_offset);
     BuildSchemaPathHelper(*root_->getSubtype(i), &path, col_id_path_map);
     path.pop_back();
   }
@@ -85,42 +91,24 @@ Status OrcSchemaResolver::ResolveColumn(const SchemaPath& col_path,
   *pos_field = false;
   *missing_field = false;
   DCHECK_OK(ValidateFullAcidFileSchema()); // Should have already been validated.
-  bool translate_acid_path = is_table_full_acid_ && is_file_full_acid_;
-  int num_part_cols = tbl_desc_.num_clustering_cols();
-  for (int i = 0; i < col_path.size(); ++i) {
-    int table_idx = col_path[i];
-    int file_idx = table_idx;
-    if (i == 0) {
-      if (translate_acid_path) {
-        constexpr int FILE_INDEX_OF_FIELD_ROW = 5;
-        if (table_idx == num_part_cols + FILE_INDEX_OF_FIELD_ROW) {
-          // Refers to "row" column. Table definition doesn't have "row" column
-          // so here we just step into the file's "row" column to get in sync
-          // with the table schema.
-          *node = (*node)->getSubtype(FILE_INDEX_OF_FIELD_ROW);
-          continue;
-        }
-        DCHECK_GE(table_idx, num_part_cols);
-        // 'col_path' refers to the ACID columns. In table schema they are nested
-        // under the synthetic 'row__id' column. 'row__id' is at index 'num_part_cols'.
-        table_col_type = &tbl_desc_.col_descs()[num_part_cols].type();
-        // The ACID column is under 'row__id' at index 'table_idx - num_part_cols'.
-        int acid_col_idx = table_idx - num_part_cols;
-        DCHECK_GE(acid_col_idx, 0);
-        DCHECK_LT(acid_col_idx, table_col_type->children.size());
-        table_col_type = &table_col_type->children[acid_col_idx];
+  if (col_path.empty()) return Status::OK();
+  SchemaPath table_path, file_path;
+  TranslateColPaths(col_path, &table_path, &file_path);
+  for (int i = 0; i < table_path.size(); ++i) {
+    int table_idx = table_path[i];
+    int file_idx = file_path[i];
+    if (table_idx == -1 || file_idx == -1) {
+      DCHECK_NE(table_idx, file_idx);
+      if (table_idx == -1) {
+        DCHECK_EQ(*node, root_);
+        *node = (*node)->getSubtype(file_idx);
       } else {
+        DCHECK(table_col_type == nullptr);
         table_col_type = &tbl_desc_.col_descs()[table_idx].type();
       }
-      // For top-level columns, the first index in a path includes the table's partition
-      // keys.
-      file_idx -= num_part_cols;
-    } else if (i == 1 && table_col_type == nullptr && translate_acid_path) {
-      // Here we are referring to a table column from the viewpoint of the user.
-      // Hence, in the table metadata this is a top-level column, i.e. it is offsetted
-      // with 'num_part_cols' in the table schema. We also need to add '1', because in the
-      // FeTable we added a synthetic struct typed column 'row__id'.
-      table_idx += 1 + num_part_cols;
+      continue;
+    }
+    if (table_col_type == nullptr) {
       table_col_type = &tbl_desc_.col_descs()[table_idx].type();
     } else if (table_col_type->type == TYPE_ARRAY &&
         table_idx == SchemaPathConstants::ARRAY_POS) {
@@ -141,27 +129,116 @@ Status OrcSchemaResolver::ResolveColumn(const SchemaPath& col_path,
       DCHECK_EQ(table_col_type->children.size(), 1);
       if ((*node)->getKind() != orc::TypeKind::LIST) {
         return Status(TErrorCode::ORC_NESTED_TYPE_MISMATCH, filename_,
-            PrintSubPath(tbl_desc_, col_path, i), "array", (*node)->toString());
+            PrintPath(tbl_desc_, GetCanonicalSchemaPath(table_path, i)), "array",
+            (*node)->toString());
       }
     } else if (table_col_type->type == TYPE_MAP) {
       DCHECK_EQ(table_col_type->children.size(), 2);
       if ((*node)->getKind() != orc::TypeKind::MAP) {
         return Status(TErrorCode::ORC_NESTED_TYPE_MISMATCH, filename_,
-            PrintSubPath(tbl_desc_, col_path, i), "map", (*node)->toString());
+            PrintPath(tbl_desc_, GetCanonicalSchemaPath(table_path, i)), "map",
+            (*node)->toString());
       }
     } else if (table_col_type->type == TYPE_STRUCT) {
       DCHECK_GT(table_col_type->children.size(), 0);
       if ((*node)->getKind() != orc::TypeKind::STRUCT) {
         return Status(TErrorCode::ORC_NESTED_TYPE_MISMATCH, filename_,
-            PrintSubPath(tbl_desc_, col_path, i), "struct", (*node)->toString());
+            PrintPath(tbl_desc_, GetCanonicalSchemaPath(table_path, i)), "struct",
+            (*node)->toString());
       }
     } else {
       DCHECK(!table_col_type->IsComplexType());
-      DCHECK_EQ(i, col_path.size() - 1);
+      DCHECK_EQ(i, table_path.size() - 1);
       RETURN_IF_ERROR(ValidateType(*table_col_type, **node));
     }
   }
   return Status::OK();
+}
+
+SchemaPath OrcSchemaResolver::GetCanonicalSchemaPath(const SchemaPath& col_path,
+    int last_idx) const {
+  DCHECK_LT(last_idx, col_path.size());
+  SchemaPath ret;
+  ret.reserve(col_path.size());
+  std::copy_if(col_path.begin(),
+               col_path.begin() + last_idx + 1,
+               std::back_inserter(ret),
+               [](int i) { return i >= 0; });
+  return ret;
+}
+
+void OrcSchemaResolver::TranslateColPaths(const SchemaPath& col_path,
+    SchemaPath* table_col_path, SchemaPath* file_col_path) const {
+  DCHECK(!col_path.empty());
+  DCHECK(table_col_path != nullptr);
+  DCHECK(file_col_path != nullptr);
+  table_col_path->reserve(col_path.size() + 1);
+  file_col_path->reserve(col_path.size() + 1);
+  int first_idx = col_path[0];
+  int num_part_cols = tbl_desc_.num_clustering_cols();
+  int remaining_idx = 0;
+  if (!is_table_full_acid_) {
+    // Table is not full ACID. Only need to adjust partitioning columns.
+    table_col_path->push_back(first_idx);
+    file_col_path->push_back(first_idx - num_part_cols);
+    remaining_idx = 1;
+  } else if (is_file_full_acid_) {
+    DCHECK(is_table_full_acid_);
+    // Table is full ACID, and file is in full ACID format too. We need to do some
+    // conversions since the Frontend table schema and file schema differs. See the
+    // comment at the declaration of this function.
+    if (first_idx == num_part_cols + ACID_FIELD_ROW) {
+      // 'first_idx' refers to "row" column. Table definition doesn't have "row" column.
+      table_col_path->push_back(-1);
+      file_col_path->push_back(first_idx - num_part_cols);
+      if (col_path.size() == 1 ) return;
+      int second_idx = col_path[1];
+      // Adjust table with num partitioning colums and the synthetic 'row__id' column.
+      table_col_path->push_back(num_part_cols + 1 + second_idx);
+      file_col_path->push_back(second_idx);
+    } else {
+      DCHECK_GE(first_idx, num_part_cols);
+      // 'col_path' refers to the ACID columns. In table schema they are nested
+      // under the synthetic 'row__id' column. 'row__id' is at index 'num_part_cols'.
+      table_col_path->push_back(num_part_cols);
+      file_col_path->push_back(-1);
+      // The ACID column is under 'row__id' at index 'table_idx - num_part_cols'.
+      int acid_col_idx = first_idx - num_part_cols;
+      table_col_path->push_back(acid_col_idx);
+      file_col_path->push_back(acid_col_idx);
+    }
+    remaining_idx = 2;
+  } else if (!is_file_full_acid_) {
+    DCHECK(is_table_full_acid_);
+    // Table is full ACID, but file is in non-ACID format.
+    if (first_idx == num_part_cols + ACID_FIELD_ROW) {
+      if (col_path.size() == 1 ) return;
+      // 'first_idx' refers to "row" column. Table definition doesn't have "row" column,
+      // but neither the file schema here. We don't include it in the output paths.
+      int second_idx = col_path[1];
+      // Adjust table with num partitioning colums and the synthetic 'row__id' column.
+      table_col_path->push_back(num_part_cols + 1 + second_idx);
+      file_col_path->push_back(second_idx);
+    } else {
+      DCHECK_GE(first_idx, num_part_cols);
+      // 'col_path' refers to the ACID columns. In table schema they are nested
+      // under the synthetic 'row__id' column. 'row__id' is at index 'num_part_cols'.
+      table_col_path->push_back(num_part_cols);
+      file_col_path->push_back(-1);
+      // The ACID column is under 'row__id' at index 'table_idx - num_part_cols'.
+      int acid_col_idx = first_idx - num_part_cols;
+      table_col_path->push_back(acid_col_idx);
+      // ACID columns in original files should be considered as missing colums.
+      file_col_path->push_back(std::numeric_limits<int>::max());
+    }
+    remaining_idx = 2;
+  }
+  // The rest of the path is unchanged.
+  for (int i = remaining_idx; i < col_path.size(); ++i) {
+    table_col_path->push_back(col_path[i]);
+    file_col_path->push_back(col_path[i]);
+  }
+  DCHECK_EQ(table_col_path->size(), file_col_path->size());
 }
 
 Status OrcSchemaResolver::ValidateType(const ColumnType& type,
@@ -231,6 +308,14 @@ Status OrcSchemaResolver::ValidateType(const ColumnType& type,
   return Status(Substitute(
       "Type mismatch: table column $0 is map to column $1 in ORC file '$2'",
       type.DebugString(), orc_type.toString(), filename_));
+}
+
+bool OrcSchemaResolver::IsAcidColumn(const SchemaPath& col_path) const {
+  DCHECK(is_table_full_acid_);
+  DCHECK(!is_file_full_acid_);
+  int num_part_cols = tbl_desc_.num_clustering_cols();
+  return col_path.size() == 1 &&
+         col_path.front() >= num_part_cols && col_path.front() < num_part_cols + 5;
 }
 
 Status OrcSchemaResolver::ValidateFullAcidFileSchema() const {

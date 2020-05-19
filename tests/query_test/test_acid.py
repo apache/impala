@@ -17,6 +17,7 @@
 
 # Functional tests for ACID integration with Hive.
 
+import os
 import pytest
 import time
 
@@ -119,6 +120,28 @@ class TestAcid(ImpalaTestSuite):
   @SkipIfLocal.hive
   def test_full_acid_rowid(self, vector, unique_database):
     self.run_test_case('QueryTest/full-acid-rowid', vector, use_db=unique_database)
+
+  @SkipIfHive2.acid
+  @SkipIfS3.hive
+  @SkipIfABFS.hive
+  @SkipIfADLS.hive
+  @SkipIfIsilon.hive
+  @SkipIfLocal.hive
+  def test_full_acid_original_files(self, vector, unique_database):
+    table_name = "alltypes_promoted_nopart"
+    fq_table_name = "{0}.{1}".format(unique_database, table_name)
+    self.client.execute("""CREATE TABLE {0} (
+          id INT, bool_col BOOLEAN, tinyint_col TINYINT, smallint_col SMALLINT,
+          int_col INT, bigint_col BIGINT, float_col FLOAT, double_col DOUBLE,
+          date_string_col STRING, string_col STRING, timestamp_col TIMESTAMP,
+          year INT, month INT) STORED AS ORC""".format(fq_table_name))
+    table_uri = self._get_table_location(fq_table_name, vector)
+    original_file = os.environ['IMPALA_HOME'] + "/testdata/data/alltypes_non_acid.orc"
+    self.hdfs_client.copy_from_local(original_file, table_uri + "/000000_0")
+    self.run_stmt_in_hive("""alter table {0}.{1}
+        set tblproperties('EXTERNAL'='FALSE','transactional'='true')""".format(
+        unique_database, table_name))
+    self.run_test_case('QueryTest/full-acid-original-file', vector, unique_database)
 
   @SkipIfHive2.acid
   @SkipIfS3.hive

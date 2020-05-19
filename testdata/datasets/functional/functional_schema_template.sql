@@ -374,6 +374,31 @@ TBLPROPERTIES("hbase.table.name" = "functional_hbase.hbasealltypeserror");
 ---- DATASET
 functional
 ---- BASE_TABLE_NAME
+alltypes_promoted
+---- PARTITION_COLUMNS
+year int
+month int
+---- COLUMNS
+id int COMMENT 'Add a comment'
+bool_col boolean
+tinyint_col tinyint
+smallint_col smallint
+int_col int
+bigint_col bigint
+float_col float
+double_col double
+date_string_col string
+string_col string
+timestamp_col timestamp
+---- DEPENDENT_LOAD_HIVE
+INSERT INTO TABLE {db_name}{db_suffix}.{table_name} SELECT * FROM {db_name}{db_suffix}.alltypes;
+ALTER TABLE {db_name}{db_suffix}.{table_name} SET tblproperties('EXTERNAL'='FALSE','transactional'='true');
+---- TABLE_PROPERTIES
+transactional=false
+====
+---- DATASET
+functional
+---- BASE_TABLE_NAME
 hbasecolumnfamilies
 ---- HBASE_COLUMN_FAMILIES
 0

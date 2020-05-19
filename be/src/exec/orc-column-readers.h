@@ -577,7 +577,12 @@ class OrcStructReader : public OrcComplexColumnReader {
     return child->NumElements();
   }
 
+  void SetFileRowIndex(int64_t file_row_idx) { file_row_idx_ = file_row_idx; }
+
  private:
+  void FillSyntheticRowId(ScratchTupleBatch* scratch_batch, int scratch_batch_idx,
+      int num_rows);
+
   orc::StructVectorBatch* batch_ = nullptr;
 
   /// Field ids of the children reader
@@ -585,6 +590,10 @@ class OrcStructReader : public OrcComplexColumnReader {
 
   /// Keep row index if we're top level readers
   int row_idx_;
+
+  /// File-level row index. Only set for original files, and only when ACID field 'rowid'
+  /// is needed.
+  int64_t file_row_idx_ = -1;
 
   int current_write_id_field_index_ = -1;
   std::unique_ptr<OrcRowValidator> row_validator_;
