@@ -546,7 +546,8 @@ Status HdfsParquetScanner::EvaluateStatsConjuncts(
     if (stats_read) {
       TupleRow row;
       row.SetTuple(0, min_max_tuple_);
-      if (!eval->EvalPredicate(&row)) {
+      // Accept NULL as the predicate can contain a CAST which may fail.
+      if (!eval->EvalPredicateAcceptNull(&row)) {
         *skip_row_group = true;
         break;
       }
@@ -776,7 +777,8 @@ Status HdfsParquetScanner::EvaluatePageIndex(bool* filter_pages) {
       if (!is_null_page && !value_read) continue;
       TupleRow row;
       row.SetTuple(0, min_max_tuple_);
-      if (is_null_page || !eval->EvalPredicate(&row)) {
+      // Accept NULL as the predicate can contain a CAST which may fail.
+      if (is_null_page || !eval->EvalPredicateAcceptNull(&row)) {
         BaseScalarColumnReader* scalar_reader = scalar_reader_map_[col_idx];
         RETURN_IF_ERROR(page_index_.DeserializeOffsetIndex(col_chunk,
             &scalar_reader->offset_index_));

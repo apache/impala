@@ -173,6 +173,14 @@ class ScalarExprEvaluator {
     return true;
   }
 
+  /// Helper to evaluate a boolean expression with predicate semantics, where NULL is
+  /// equivalent to true.
+  bool EvalPredicateAcceptNull(TupleRow* row) {
+    BooleanVal v = GetBooleanVal(row);
+    if (v.is_null || v.val) return true;
+    return false;
+  }
+
   /// Returns an error status if there was any error in evaluating the expression
   /// or its sub-expressions. 'start_idx' and 'end_idx' correspond to the range
   /// within the vector of FunctionContext for the sub-expressions of interest.

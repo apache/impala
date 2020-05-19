@@ -763,3 +763,13 @@ select count(*) from tnarrow where i32_to_16 = -25536;
 ---- RESULTS
 1
 ====
+---- QUERY
+# Regression test for IMPALA-9707.
+# The min/max predicate contains a cast(as timestamp), which lead to incorrectly dropping
+# the whole row group if the min/max value was not a valid timestamp string.
+create table ts (dt string) stored as parquet;
+insert into ts values ("2010-01-01"), ("non ts");
+select count(*) from ts where dt = cast("2010-01-01" as timestamp);
+---- RESULTS
+1
+====
