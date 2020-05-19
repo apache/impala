@@ -404,7 +404,6 @@ class TestObservability(ImpalaTestSuite):
   def __verify_profile_event_sequence(self, event_regexes, runtime_profile):
     """Check that 'event_regexes' appear in a consecutive series of lines in
        'runtime_profile'"""
-    lines = runtime_profile.splitlines()
     event_regex_index = 0
 
     # Check that the strings appear in the above order with no gaps in the profile.
@@ -501,9 +500,13 @@ class TestObservability(ImpalaTestSuite):
         if key in line:
           # Match byte count within parentheses
           m = re.search("\(([0-9]+)\)", line)
-          assert m, "Cannot match pattern for key %s in line '%s'" % (key, line)
-          # Only keep first (query-level) counter
-          if counters[key] == 0:
+
+          # If a match was not found, then the value of the key should be 0
+          if not m:
+            assert key + ": 0" in line, "Invalid format for key %s" % key
+            assert counters[key] != 0, "Query level counter for key %s cannot be 0" % key
+          elif counters[key] == 0:
+            # Only keep first (query-level) counter
             counters[key] = int(m.group(1))
 
     # All counters have values
