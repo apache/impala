@@ -23,8 +23,11 @@ import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Random;
+import java.util.concurrent.TimeUnit;
 import java.util.stream.Collectors;
 
+import org.apache.hadoop.conf.Configuration;
+import org.apache.hadoop.hive.conf.HiveConf;
 import org.apache.hadoop.hive.metastore.IMetaStoreClient;
 import org.apache.impala.catalog.MetaStoreClientPool;
 import org.apache.impala.catalog.MetaStoreClientPool.MetaStoreClient;
@@ -45,10 +48,9 @@ import com.sun.tools.javac.code.Attribute.Array;
 public class TransactionKeepalive {
   public static final Logger LOG = Logger.getLogger(TransactionKeepalive.class);
 
-  // TODO: should be calculated from hive.txn.timeout or metastore.txn.timeout
-  private static final long SLEEP_INTERVAL_SECONDS = 60;
   private static final long MILLION = 1000000L;
-  private static final long BILLION = 1000000000L;
+
+  private final long sleepIntervalMs_;
 
   final private Thread daemonThread_;
 
@@ -95,7 +97,7 @@ public class TransactionKeepalive {
       try {
         // Let's sleep for a random interval to make the different coordinators
         // out-of-sync to each other. This way we probably lower the workload on HMS.
-        Thread.sleep(rand.nextInt((int)(SLEEP_INTERVAL_SECONDS * 1000)));
+        Thread.sleep(rand.nextInt((int)sleepIntervalMs_));
       } catch (Throwable e) {
         LOG.error("Unexpected exception thrown", e);
       }
@@ -122,7 +124,7 @@ public class TransactionKeepalive {
             LOG.info("Heartbeating the transactions and locks took " +
                 durationOfHeartbeatingMillis + " milliseconds.");
           }
-          long sleepMillis = SLEEP_INTERVAL_SECONDS * 1000 - durationOfHeartbeatingMillis;
+          long sleepMillis = sleepIntervalMs_ - durationOfHeartbeatingMillis;
           if (sleepMillis > 0) {
             long randomness = rand.nextInt((int)(sleepMillis / 10));
             Thread.sleep(sleepMillis + randomness);
@@ -168,8 +170,8 @@ public class TransactionKeepalive {
      * @return True if we should heartbeat this entry.
      */
     private boolean oldEnough(HeartbeatContext heartbeatContext) {
-      Long ageInSeconds = (System.nanoTime() - heartbeatContext.creationTime) / BILLION;
-      return ageInSeconds > SLEEP_INTERVAL_SECONDS;
+      Long ageInMillis = (System.nanoTime() - heartbeatContext.creationTime) / MILLION;
+      return ageInMillis > sleepIntervalMs_;
     }
 
     /**
@@ -206,6 +208,10 @@ public class TransactionKeepalive {
    * Creates TransactionKeepalive object and starts the background thread.
    */
   public TransactionKeepalive(MetaStoreClientPool metaStoreClientPool) {
+    HiveConf hiveConf = new HiveConf(TransactionKeepalive.class);
+    sleepIntervalMs_ = hiveConf.getTimeVar(
+        HiveConf.ConfVars.HIVE_TXN_TIMEOUT, TimeUnit.MILLISECONDS) / 3;
+    Preconditions.checkState(sleepIntervalMs_ > 0);
     Preconditions.checkNotNull(metaStoreClientPool);
     metaStoreClientPool_ = metaStoreClientPool;
     daemonThread_ = new Thread(new DaemonThread());
