@@ -27,6 +27,14 @@ namespace impala {
 // Key of Hive ACID version in ORC metadata.
 const string HIVE_ACID_VERSION_KEY = "hive.acid.version";
 
+// Table level indexes of ACID columns.
+constexpr int ACID_FIELD_OPERATION_INDEX = 0;
+constexpr int ACID_FIELD_ORIGINAL_TRANSACTION_INDEX = 1;
+constexpr int ACID_FIELD_BUCKET_INDEX = 2;
+constexpr int ACID_FIELD_ROWID_INDEX = 3;
+constexpr int ACID_FIELD_CURRENT_TRANSACTION_INDEX = 4;
+constexpr int ACID_FIELD_ROW = 5;
+
 // ORC type id of column "currentTransaction" in full ACID ORC files.
 constexpr int CURRENT_TRANSCACTION_TYPE_ID = 5;
 
@@ -54,7 +62,40 @@ class OrcSchemaResolver {
   /// but the actual file schema doesn't conform to it.
   Status ValidateFullAcidFileSchema() const;
 
+  /// Can be only invoked for original files of full transactional tables.
+  /// Returns true if 'col_path' refers to an ACID column.
+  bool IsAcidColumn(const SchemaPath& col_path) const;
+
  private:
+  /// Translates 'col_path' to non-canonical table and file paths. These non-canonical
+  /// paths have the same lengths. To achieve that they might contain -1 values that must
+  /// be ignored. These paths are useful for tables that have different table and file
+  /// schema (ACID tables, partitioned tables).
+  /// E.g. ACID table schema is
+  /// {
+  ///   "row__id" : {...ACID columns...},
+  ///   ...TABLE columns...
+  /// }
+  /// While ACID file schema is
+  /// {
+  ///   ...ACID columns...,
+  ///   "row" : {...TABLE columns...}
+  /// }
+  /// Let's assume we have a non-partitioned ACID table and the first user column is
+  /// called 'id'.
+  /// In that case 'col_path' for 'id' looks like [5, 0]. This function converts it to
+  /// non-canonical 'table_col_path' [-1, 1] and non-canonical 'file_col_path'
+  /// [5, 0] (which is the same as the canonical in this case).
+  /// Another example for ACID column 'rowid':
+  /// 'col_path' is [3], 'table_col_path' is [0, 3], 'file_col_path' is [-1, 3].
+  /// Different conversions are needed for original files and non-transactional tables
+  /// (for the latter it only adjusts first column offsets if the table is partitioned).
+  /// These non-canonical paths are easier to be processed by ResolveColumn().
+  void TranslateColPaths(const SchemaPath& col_path,
+      SchemaPath* table_col_path, SchemaPath* file_col_path) const;
+
+  SchemaPath GetCanonicalSchemaPath(const SchemaPath& col_path, int last_idx) const;
+
   const HdfsTableDescriptor& tbl_desc_;
   const orc::Type* const root_;
   const char* const filename_ = nullptr;

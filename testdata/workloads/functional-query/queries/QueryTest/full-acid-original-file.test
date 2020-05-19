@@ -1,0 +1,247 @@
+====
+---- QUERY
+refresh alltypes_promoted_nopart;
+====
+---- QUERY
+select count(*) from alltypes_promoted_nopart;
+---- RESULTS
+7300
+---- TYPES
+BIGINT
+====
+---- QUERY
+# Check if the proper ACID field values are generated.
+select row__id.*, id from alltypes_promoted_nopart
+where id < 10;
+---- RESULTS
+0,0,536870912,4030,0,0
+0,0,536870912,4031,0,1
+0,0,536870912,4032,0,2
+0,0,536870912,4033,0,3
+0,0,536870912,4034,0,4
+0,0,536870912,4035,0,5
+0,0,536870912,4036,0,6
+0,0,536870912,4037,0,7
+0,0,536870912,4038,0,8
+0,0,536870912,4039,0,9
+---- TYPES
+INT, BIGINT, INT, BIGINT, BIGINT, INT
+====
+---- QUERY
+select row__id.* from alltypes_promoted_nopart
+where id > 990 and id < 1000;
+---- RESULTS
+0,0,536870912,6531,0
+0,0,536870912,6532,0
+0,0,536870912,6533,0
+0,0,536870912,6534,0
+0,0,536870912,6535,0
+0,0,536870912,6536,0
+0,0,536870912,6537,0
+0,0,536870912,6538,0
+0,0,536870912,6539,0
+---- TYPES
+INT, BIGINT, INT, BIGINT, BIGINT
+====
+---- QUERY
+select row__id.* from alltypes_promoted_nopart
+where id > 7200 and id < 7210;
+---- RESULTS
+0,0,536870912,2381,0
+0,0,536870912,2382,0
+0,0,536870912,2383,0
+0,0,536870912,2384,0
+0,0,536870912,2385,0
+0,0,536870912,2386,0
+0,0,536870912,2387,0
+0,0,536870912,2388,0
+0,0,536870912,2389,0
+---- TYPES
+INT, BIGINT, INT, BIGINT, BIGINT
+====
+---- QUERY
+select row__id.* from alltypes_promoted_nopart
+where row__id.rowid > 1200 and row__id.rowid < 1210;
+---- RESULTS
+0,0,536870912,1201,0
+0,0,536870912,1202,0
+0,0,536870912,1203,0
+0,0,536870912,1204,0
+0,0,536870912,1205,0
+0,0,536870912,1206,0
+0,0,536870912,1207,0
+0,0,536870912,1208,0
+0,0,536870912,1209,0
+---- TYPES
+INT, BIGINT, INT, BIGINT, BIGINT
+====
+---- QUERY
+select row__id.*, id from alltypes_promoted_nopart
+where row__id.rowid > 7200 and row__id.rowid < 7210;
+---- RESULTS
+0,0,536870912,7201,0,491
+0,0,536870912,7202,0,492
+0,0,536870912,7203,0,493
+0,0,536870912,7204,0,494
+0,0,536870912,7205,0,495
+0,0,536870912,7206,0,496
+0,0,536870912,7207,0,497
+0,0,536870912,7208,0,498
+0,0,536870912,7209,0,499
+---- TYPES
+INT, BIGINT, INT, BIGINT, BIGINT, INT
+====
+---- QUERY
+# Check if the proper ACID fields are generated even if the
+# scan range points to the middle of the file.
+set MAX_SCAN_RANGE_LENGTH=1000;
+select row__id.*, id from alltypes_promoted_nopart
+where id < 10;
+---- RESULTS
+0,0,536870912,4030,0,0
+0,0,536870912,4031,0,1
+0,0,536870912,4032,0,2
+0,0,536870912,4033,0,3
+0,0,536870912,4034,0,4
+0,0,536870912,4035,0,5
+0,0,536870912,4036,0,6
+0,0,536870912,4037,0,7
+0,0,536870912,4038,0,8
+0,0,536870912,4039,0,9
+---- TYPES
+INT, BIGINT, INT, BIGINT, BIGINT, INT
+---- RUNTIME_PROFILE
+row_regex: .*NumScannersWithNoReads: [1-9].*
+====
+---- QUERY
+set MAX_SCAN_RANGE_LENGTH=1000;
+select row__id.* from alltypes_promoted_nopart
+where id > 990 and id < 1000;
+---- RESULTS
+0,0,536870912,6531,0
+0,0,536870912,6532,0
+0,0,536870912,6533,0
+0,0,536870912,6534,0
+0,0,536870912,6535,0
+0,0,536870912,6536,0
+0,0,536870912,6537,0
+0,0,536870912,6538,0
+0,0,536870912,6539,0
+---- TYPES
+INT, BIGINT, INT, BIGINT, BIGINT
+---- RUNTIME_PROFILE
+row_regex: .*NumScannersWithNoReads: [1-9].*
+====
+---- QUERY
+set MAX_SCAN_RANGE_LENGTH=1000;
+select row__id.* from alltypes_promoted_nopart
+where id > 7200 and id < 7210;
+---- RESULTS
+0,0,536870912,2381,0
+0,0,536870912,2382,0
+0,0,536870912,2383,0
+0,0,536870912,2384,0
+0,0,536870912,2385,0
+0,0,536870912,2386,0
+0,0,536870912,2387,0
+0,0,536870912,2388,0
+0,0,536870912,2389,0
+---- TYPES
+INT, BIGINT, INT, BIGINT, BIGINT
+---- RUNTIME_PROFILE
+row_regex: .*NumScannersWithNoReads: [1-9].*
+====
+---- QUERY
+set MAX_SCAN_RANGE_LENGTH=1000;
+select row__id.* from alltypes_promoted_nopart
+where row__id.rowid > 1200 and row__id.rowid < 1210;
+---- RESULTS
+0,0,536870912,1201,0
+0,0,536870912,1202,0
+0,0,536870912,1203,0
+0,0,536870912,1204,0
+0,0,536870912,1205,0
+0,0,536870912,1206,0
+0,0,536870912,1207,0
+0,0,536870912,1208,0
+0,0,536870912,1209,0
+---- TYPES
+INT, BIGINT, INT, BIGINT, BIGINT
+---- RUNTIME_PROFILE
+row_regex: .*NumScannersWithNoReads: [1-9].*
+====
+---- QUERY
+set MAX_SCAN_RANGE_LENGTH=1000;
+select row__id.*, id from alltypes_promoted_nopart
+where row__id.rowid > 7200 and row__id.rowid < 7210;
+---- RESULTS
+0,0,536870912,7201,0,491
+0,0,536870912,7202,0,492
+0,0,536870912,7203,0,493
+0,0,536870912,7204,0,494
+0,0,536870912,7205,0,495
+0,0,536870912,7206,0,496
+0,0,536870912,7207,0,497
+0,0,536870912,7208,0,498
+0,0,536870912,7209,0,499
+---- TYPES
+INT, BIGINT, INT, BIGINT, BIGINT, INT
+---- RUNTIME_PROFILE
+row_regex: .*NumScannersWithNoReads: [1-9].*
+====
+---- QUERY
+select count(*) from functional_orc_def.alltypes_promoted where id % 2 = 0;
+---- RESULTS
+3650
+---- TYPES
+BIGINT
+====
+---- QUERY
+select * from functional_orc_def.alltypes_promoted where id = 3000;
+---- RESULTS
+3000,true,0,0,0,0,0,0,'10/28/09','0',2009-10-28 04:30:12.150000000,2009,10
+---- TYPES
+INT, BOOLEAN, TINYINT, SMALLINT, INT, BIGINT, FLOAT, DOUBLE, STRING, STRING, TIMESTAMP, INT, INT
+====
+---- QUERY
+select row__id.originaltransaction, row__id.rowid, id
+from functional_orc_def.alltypes_promoted
+where id < 5;
+---- RESULTS
+0,0,0
+0,1,1
+0,2,2
+0,3,3
+0,4,4
+---- TYPES
+BIGINT, BIGINT, INT
+====
+---- QUERY
+select row__id.originaltransaction, row__id.currenttransaction
+from functional_orc_def.alltypes_promoted
+where id = 0;
+---- RESULTS
+0,0
+---- TYPES
+BIGINT,BIGINT
+====
+---- QUERY
+create table orig_part (i int) partitioned by (p int) stored as orc;
+====
+---- HIVE_QUERY
+use $DATABASE;
+insert into orig_part partition (p=1) values (1), (2), (3);
+alter table orig_part set tblproperties('EXTERNAL'='FALSE','transactional'='true');
+====
+---- QUERY
+refresh orig_part;
+select row__id.*, * from orig_part;
+---- LABELS
+OPERATION,ORIGINALTRANSACTION,BUCKET,ROWID,CURRENTTRANSACTION,I,P
+---- RESULTS
+0,0,536870912,0,0,1,1
+0,0,536870912,1,0,2,1
+0,0,536870912,2,0,3,1
+---- TYPES
+INT,BIGINT,INT,BIGINT,BIGINT,INT,INT
+====

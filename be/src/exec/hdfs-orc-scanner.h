@@ -220,6 +220,15 @@ class HdfsOrcScanner : public HdfsColumnarScanner {
   /// With the help of it we can check the validity of ACID write ids.
   ValidWriteIdList valid_write_ids_;
 
+  /// The write id range for ACID files.
+  std::pair<int64_t, int64_t> acid_write_id_range_;
+
+  /// Non-ACID file in full ACID table.
+  bool acid_original_file_ = false;
+
+  /// Slot descriptor of synthetic rowid of original files.
+  const SlotDescriptor* acid_synthetic_rowid_ = nullptr;
+
   /// True if we need to validate the row batches against the valid write id list. This
   /// only needs to be done for Hive Streaming Ingestion. The 'write id' will be the same
   /// within a stripe, but we still need to read the row batches for validation because
@@ -299,6 +308,9 @@ class HdfsOrcScanner : public HdfsColumnarScanner {
   bool IsPartitionKeySlot(const SlotDescriptor* slot);
 
   bool IsMissingField(const SlotDescriptor* slot);
+
+  void SetSyntheticAcidFieldForOriginalFile(const SlotDescriptor* slot_desc,
+      Tuple* template_tuple);
 };
 
 } // namespace impala

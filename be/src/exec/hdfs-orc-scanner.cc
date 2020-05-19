@@ -193,11 +193,31 @@ Status HdfsOrcScanner::Open(ScannerContext* context) {
   bool is_table_full_acid = scan_node_->hdfs_table()->IsTableFullAcid();
   bool is_file_full_acid = reader_->hasMetadataValue(HIVE_ACID_VERSION_KEY) &&
                            reader_->getMetadataValue(HIVE_ACID_VERSION_KEY) == "2";
-  // TODO: Remove the following constraint once IMPALA-9515 is resolved.
-  if (is_table_full_acid && !is_file_full_acid) {
-    return Status(Substitute("Error: Table is in full ACID format, but "
-        "'hive.acid.version' = '2' is missing from file metadata: table=$0, file=$1",
-        scan_node_->hdfs_table()->name(), filename()));
+  acid_original_file_ = is_table_full_acid && !is_file_full_acid;
+  if (is_table_full_acid) {
+    acid_write_id_range_ = valid_write_ids_.GetWriteIdRange(filename());
+    if (acid_original_file_ &&
+        acid_write_id_range_.first != acid_write_id_range_.second) {
+      return Status(Substitute("Found non-ACID file in directory that can only contain "
+          "files with full ACID schema: $0", filename()));
+    }
+  }
+  if (acid_original_file_) {
+    int32_t filename_len = strlen(filename());
+    if (filename_len >= 2 && strcmp(filename() + filename_len - 2, "_0") != 0) {
+      // It's an original file that should be included in the result.
+      // If it doesn't end with "_0" it means that it belongs to a bucket with other
+      // files. Impala rejects such files and tables.
+      // These files should only exist at table/partition root directory level.
+      // Original files in delta directories are created via the LOAD DATA
+      // statement. LOAD DATA assigns virtual bucket ids to files in non-bucketed
+      // tables, so we will have one file per (virtual) bucket (all of them having "_0"
+      // ending). For bucketed tables LOAD DATA will write ACID files. So after the first
+      // major compaction the table should never get into this state ever again.
+      return Status(Substitute("Found original file with unexpected name: $0 "
+          "Please run a major compaction on the partition/table to overcome this.",
+          filename()));
+    }
   }
   schema_resolver_.reset(new OrcSchemaResolver(*scan_node_->hdfs_table(),
       &reader_->getType(), filename(), is_table_full_acid, is_file_full_acid));
@@ -210,8 +230,8 @@ Status HdfsOrcScanner::Open(ScannerContext* context) {
   // validate the write ids of the row batches.
   if (is_table_full_acid && !ValidWriteIdList::IsCompacted(filename())) {
     valid_write_ids_.InitFrom(scan_node_->hdfs_table()->ValidWriteIdList());
-    ValidWriteIdList::RangeResponse rows_valid =
-        valid_write_ids_.IsFileRangeValid(filename());
+    ValidWriteIdList::RangeResponse rows_valid = valid_write_ids_.IsWriteIdRangeValid(
+        acid_write_id_range_.first, acid_write_id_range_.second);
     DCHECK_NE(rows_valid, ValidWriteIdList::NONE);
     row_batches_need_validation_ = rows_valid == ValidWriteIdList::SOME;
   }
@@ -411,7 +431,11 @@ Status HdfsOrcScanner::ResolveColumns(const TupleDescriptor& tuple_desc,
         *template_tuple =
             Tuple::Create(tuple_desc.byte_size(), template_tuple_pool_.get());
       }
-      (*template_tuple)->SetNull(slot_desc->null_indicator_offset());
+      if (acid_original_file_ && schema_resolver_->IsAcidColumn(slot_desc->col_path())) {
+        SetSyntheticAcidFieldForOriginalFile(slot_desc, *template_tuple);
+      } else {
+        (*template_tuple)->SetNull(slot_desc->null_indicator_offset());
+      }
       missing_field_slots_.insert(slot_desc);
       continue;
     }
@@ -438,6 +462,31 @@ Status HdfsOrcScanner::ResolveColumns(const TupleDescriptor& tuple_desc,
     }
   }
   return Status::OK();
+}
+
+void HdfsOrcScanner::SetSyntheticAcidFieldForOriginalFile(const SlotDescriptor* slot_desc,
+    Tuple* template_tuple) {
+  DCHECK_EQ(1, slot_desc->col_path().size());
+  int field_idx = slot_desc->col_path().front() - scan_node_->num_partition_keys();
+  switch(field_idx) {
+    case ACID_FIELD_OPERATION_INDEX:
+      *template_tuple->GetIntSlot(slot_desc->tuple_offset()) = 0;
+      break;
+    case ACID_FIELD_ORIGINAL_TRANSACTION_INDEX:
+    case ACID_FIELD_CURRENT_TRANSACTION_INDEX:
+      DCHECK_EQ(acid_write_id_range_.first, acid_write_id_range_.second);
+      *template_tuple->GetBigIntSlot(slot_desc->tuple_offset()) =
+          acid_write_id_range_.first;
+      break;
+    case ACID_FIELD_BUCKET_INDEX:
+      *template_tuple->GetBigIntSlot(slot_desc->tuple_offset()) =
+          ValidWriteIdList::GetBucketProperty(filename());
+      break;
+    case ACID_FIELD_ROWID_INDEX:
+      acid_synthetic_rowid_ = slot_desc;
+    default:
+      break;
+  }
 }
 
 /// Whether 'selected_type_ids' contains the id of any children of 'node'
@@ -632,6 +681,9 @@ Status HdfsOrcScanner::NextStripe() {
   advance_stripe_ = false;
   stripe_rows_read_ = 0;
 
+  bool first_invocation = stripe_idx_ == -1;
+  int64_t skipped_rows = 0;
+
   // Loop until we have found a non-empty stripe.
   while (true) {
     // Reset the parse status for the next stripe.
@@ -661,12 +713,17 @@ Status HdfsOrcScanner::NextStripe() {
         stripe_mid_pos < split_offset + split_length)) {
       // Middle pos not in split, this stripe will be handled by a different scanner.
       // Mark if the stripe overlaps with the split.
+      if (first_invocation) skipped_rows += stripe->getNumberOfRows();
       misaligned_stripe_skipped |= CheckStripeOverlapsSplit(stripe_offset,
           stripe_offset + stripe_len, split_offset, split_offset + split_length);
       continue;
     }
 
-    // TODO: check if this stripe can be skipped by stats. e.g. IMPALA-6505
+    // TODO: check if this stripe can be skipped by stats. e.g. IMPALA-6505 In that case,
+    // set the file row index in 'orc_root_reader_' accordingly.
+    if (first_invocation && acid_synthetic_rowid_ != nullptr) {
+      orc_root_reader_->SetFileRowIndex(skipped_rows);
+    }
 
     COUNTER_ADD(num_stripes_counter_, 1);
     row_reader_options_.range(stripe->getOffset(), stripe_len);

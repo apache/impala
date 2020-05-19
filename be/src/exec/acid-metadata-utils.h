@@ -31,6 +31,11 @@ public:
     NONE, SOME, ALL
   };
 
+  static bool IsCompacted(const std::string& file_path);
+  static std::pair<int64_t, int64_t> GetWriteIdRange(const std::string& file_path);
+  static int GetBucketProperty(const std::string& file_path);
+  static int GetStatementId(const std::string& file_path);
+
   ValidWriteIdList() {}
   ValidWriteIdList(const TValidWriteIdList& valid_write_ids);
 
@@ -39,8 +44,6 @@ public:
   bool IsWriteIdValid(int64_t write_id) const;
   RangeResponse IsWriteIdRangeValid(int64_t min_write_id, int64_t max_write_id) const;
   RangeResponse IsFileRangeValid(const std::string& file_path) const;
-
-  static bool IsCompacted(const std::string& file_path);
 private:
   void AddInvalidWriteIds(const std::string& invalid_ids_str);
   int64_t high_water_mark_ = std::numeric_limits<int64_t>::max();

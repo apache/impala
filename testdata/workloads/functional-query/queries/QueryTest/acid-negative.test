@@ -85,3 +85,23 @@ select * from acid;
 ---- TYPES
 INT
 ====
+---- QUERY
+# Impala should reject tables that have multiple files in the same
+# bucket in the same directory.
+# Note: This table is clearly not bucketed, but for row ID
+# generation it has virtual buckets based on the file names.
+create table test_promotion_fail (i int) stored as orc;
+====
+---- HIVE_QUERY
+use $DATABASE;
+insert into test_promotion_fail values (1);
+insert into test_promotion_fail values (1);
+alter table test_promotion_fail
+set tblproperties('EXTERNAL'='false','transactional'='true');
+====
+---- QUERY
+refresh test_promotion_fail;
+select * from  test_promotion_fail;
+---- CATCH
+Found original file with unexpected name
+====

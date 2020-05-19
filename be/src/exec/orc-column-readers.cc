@@ -24,6 +24,7 @@
 #include "runtime/decimal-value.h"
 #include "runtime/string-value.inline.h"
 #include "runtime/timestamp-value.inline.h"
+#include "util/mem-util.h"
 #include "common/names.h"
 
 using namespace impala;
@@ -415,16 +416,34 @@ Status OrcStructReader::TopLevelReadValueBatch(ScratchTupleBatch* scratch_batch,
           item_count, orc_column_id_, scratch_batch->num_tuples));
     }
   }
-  row_idx_ += scratch_batch->num_tuples - scratch_batch_idx;
-  if (row_validator_ && scanner_->scan_node_->IsZeroSlotTableScan()) {
-    DCHECK_EQ(1, batch_->fields.size()); // We should only select 'currentTransaction'.
-    DCHECK_EQ(scratch_batch_idx, scratch_batch->num_tuples);
-    int num_to_fake_read = std::min(scratch_batch->capacity - scratch_batch->num_tuples,
-                                    NumElements() - row_idx_);
-    scratch_batch->num_tuples += num_to_fake_read;
-    row_idx_ += num_to_fake_read;
+  int num_rows_read = scratch_batch->num_tuples - scratch_batch_idx;
+  if (children_.empty()) {
+    DCHECK((scanner_->row_batches_need_validation_ &&
+            scanner_->scan_node_->IsZeroSlotTableScan()) ||
+            scanner_->acid_original_file_);
+    DCHECK_EQ(0, num_rows_read);
+    num_rows_read = std::min(scratch_batch->capacity - scratch_batch->num_tuples,
+                             NumElements() - row_idx_);
+    scratch_batch->num_tuples += num_rows_read;
   }
+  if (scanner_->acid_synthetic_rowid_ != nullptr) {
+    FillSyntheticRowId(scratch_batch, scratch_batch_idx, num_rows_read);
+  }
+  row_idx_ += num_rows_read;
   return Status::OK();
+}
+
+void OrcStructReader::FillSyntheticRowId(ScratchTupleBatch* scratch_batch,
+    int scratch_batch_idx, int num_rows) {
+    DCHECK(scanner_->acid_synthetic_rowid_ != nullptr);
+    int tuple_size = OrcColumnReader::scanner_->tuple_byte_size();
+    uint8_t* first_tuple = scratch_batch->tuple_mem + scratch_batch_idx * tuple_size;
+    int64_t* first_slot = reinterpret_cast<Tuple*>(first_tuple)->GetBigIntSlot(
+        scanner_->acid_synthetic_rowid_->tuple_offset());
+    StrideWriter<int64_t> out{first_slot, tuple_size};
+    for (int i = 0; i < num_rows; ++i) {
+      *out.Advance() = file_row_idx_++;
+    }
 }
 
 Status OrcStructReader::ReadValueBatch(int row_idx, ScratchTupleBatch* scratch_batch,
