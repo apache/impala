@@ -294,6 +294,10 @@ void PartitionedHashJoinNode::Close(RuntimeState* state) {
   }
   output_unmatched_batch_.reset();
   output_unmatched_batch_iter_.reset();
+  // IMPALA-9737: free batches in case attached attached buffers need to be freed to
+  // transfer reservation to 'builder_'.
+  if (build_batch_ != nullptr) build_batch_->Reset();
+  if (probe_batch_ != nullptr) probe_batch_->Reset();
   CloseAndDeletePartitions(nullptr);
   if (builder_ != nullptr) {
     bool separate_build = UseSeparateBuild(state->query_options());
