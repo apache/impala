@@ -439,8 +439,9 @@ U TupleRowZOrderComparator::GetSharedRepresentation(void* val, ColumnType type) 
 
 template <typename U, typename T>
 U inline TupleRowZOrderComparator::GetSharedIntRepresentation(const T val, U mask) const {
-  return (static_cast<U>(val) <<
-      std::max((sizeof(U) - sizeof(T)) * 8, (uint64_t)0)) ^ mask;
+  uint64_t shift_size = static_cast<uint64_t>(
+      std::max(static_cast<int64_t>((sizeof(U) - sizeof(T)) * 8), (int64_t) 0));
+  return (static_cast<U>(val) << shift_size) ^ mask;
 }
 
 template <typename U, typename T>
@@ -449,13 +450,14 @@ U inline TupleRowZOrderComparator::GetSharedFloatRepresentation(void* val, U mas
   T floating_value = *reinterpret_cast<const T*>(val);
   memcpy(&tmp, &floating_value, sizeof(T));
   if (UNLIKELY(std::isnan(floating_value))) return 0;
+  uint64_t shift_size = static_cast<uint64_t>(
+      std::max(static_cast<int64_t>((sizeof(U) - sizeof(T)) * 8), (int64_t) 0));
   if (floating_value < 0.0) {
     // Flipping all bits for negative values.
-    return static_cast<U>(~tmp) << std::max((sizeof(U) - sizeof(T)) * 8, (uint64_t)0);
+    return static_cast<U>(~tmp) << shift_size;
   } else {
     // Flipping only first bit.
-    return (static_cast<U>(tmp) << std::max((sizeof(U) - sizeof(T)) * 8, (uint64_t)0)) ^
-        mask;
+    return (static_cast<U>(tmp) << shift_size) ^ mask;
   }
 }
 
