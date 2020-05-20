@@ -36,6 +36,7 @@ import six
 # The current changes that have been applied:
 # - Added logic for the 'Expect: 100-continue' header on large requests
 # - If an error code is received back in flush(), an exception is thrown.
+# Note there is a copy of this code in Impyla.
 class ImpalaHttpClient(TTransportBase):
   """Http implementation of TTransport base."""
 
@@ -151,6 +152,9 @@ class ImpalaHttpClient(TTransportBase):
   def read(self, sz):
     return self.__http_response.read(sz)
 
+  def readBody(self):
+    return self.__http_response.read()
+
   def write(self, buf):
     self.__wbuf.write(buf)
 
@@ -208,4 +212,8 @@ class ImpalaHttpClient(TTransportBase):
     if self.code >= 300:
       # Report any http response code that is not 1XX (informational response) or
       # 2XX (successful).
-      raise RPCException("HTTP code {}: {}".format(self.code, self.message))
+      body = self.readBody()
+      if not body:
+        raise RPCException("HTTP code {}: {}".format(self.code, self.message))
+      else:
+        raise RPCException("HTTP code {}: {} [{}]".format(self.code, self.message, body))
