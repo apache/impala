@@ -29,6 +29,7 @@ namespace llvm {
 
 namespace impala {
 
+struct ColumnType;
 class LlvmCodeGen;
 class MemPool;
 class SlotDescriptor;
@@ -70,8 +71,10 @@ class TextConverter {
   void UnescapeString(const char* src, char* dest, int* len, int64_t maxlen = -1);
 
   /// Codegen the function to write a slot for slot_desc.
+  /// Should only be called if the column type is supported, i.e.
+  /// SupportsCodegenWriteSlot(slot_desc->type()) returns true.
   /// Returns Status::OK() if codegen was successful. If codegen was successful
-  /// llvm::Function** fn points to the codegen'd function
+  /// llvm::Function** fn points to the codegen'd function.
   /// The signature of the generated function is:
   /// bool WriteSlot(Tuple* tuple, const char* data, int len);
   /// The codegen function returns true if the slot could be written and false
@@ -86,6 +89,8 @@ class TextConverter {
       TupleDescriptor* tuple_desc, SlotDescriptor* slot_desc, llvm::Function** fn,
       const char* null_col_val, int len, bool check_null, bool strict_mode = false);
 
+  /// Returns whether codegen is supported for the given type.
+  static bool SupportsCodegenWriteSlot(const ColumnType& col_type);
  private:
   char escape_char_;
   /// Special string to indicate NULL column values.
