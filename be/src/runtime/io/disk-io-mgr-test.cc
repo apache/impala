@@ -888,7 +888,9 @@ TEST_F(DiskIoMgrTest, MemScarcity) {
           data_offset += buffer->len();
           buffers.emplace_back(move(buffer));
         }
-        if (status.ok()) ASSERT_EQ(DATA_BYTES, data_offset);
+        if (status.ok()) {
+          ASSERT_EQ(DATA_BYTES, data_offset);
+        }
         for (auto& buffer : buffers) range->ReturnBuffer(move(buffer));
       }));
       // Let the thread start running before starting the next.

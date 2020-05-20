@@ -237,8 +237,9 @@ void TestFromDoubleUnixTime(
   TimestampValue from_double = TimestampValue::FromSubsecondUnixTime(
       1.0 * seconds + 0.001 * millis + nanos / NANOS_PER_SEC, UTCPTR);
 
-  if (!expected.HasDate()) EXPECT_FALSE(from_double.HasDate());
-  else {
+  if (!expected.HasDate()) {
+    EXPECT_FALSE(from_double.HasDate());
+  } else {
     // Conversion to double is lossy so the timestamp can be a bit different.
     int64_t expected_rounded_to_micros, from_double_rounded_to_micros;
     EXPECT_TRUE(expected.UtcToUnixTimeMicros(&expected_rounded_to_micros));
@@ -256,8 +257,11 @@ void TestFromDoubleUnixTime(
 void TestFromSubSecondFunctions(int64_t seconds, int64_t millis, const char* expected) {
   TimestampValue from_millis =
       TimestampValue::UtcFromUnixTimeMillis(seconds * 1000 + millis);
-  if (expected == nullptr) EXPECT_FALSE(from_millis.HasDate());
-  else EXPECT_EQ(expected, from_millis.ToString());
+  if (expected == nullptr) {
+    EXPECT_FALSE(from_millis.HasDate());
+  } else {
+    EXPECT_EQ(expected, from_millis.ToString());
+  }
 
   EXPECT_EQ(from_millis, TimestampValue::UtcFromUnixTimeMicros(
       seconds * MICROS_PER_SEC + millis * 1000));

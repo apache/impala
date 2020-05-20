@@ -584,7 +584,9 @@ void BufferPoolTest::TestBufferAllocation(bool reserved) {
   BufferPool::ClientHandle client;
   ASSERT_OK(pool.RegisterClient("test client", NULL, &global_reservations_, NULL,
       TOTAL_MEM, NewProfile(), &client));
-  if (reserved) ASSERT_TRUE(client.IncreaseReservationToFit(TOTAL_MEM));
+  if (reserved) {
+    ASSERT_TRUE(client.IncreaseReservationToFit(TOTAL_MEM));
+  }
 
   vector<BufferPool::BufferHandle> handles(NUM_BUFFERS);
 
@@ -2095,7 +2097,9 @@ void BufferPoolTest::TestRandomInternalImpl(BufferPool* pool, TmpFileGroup* file
       int rand_pick = uniform_int_distribution<int>(0, pages.size() - 1)(*rng);
       PageHandle* page = &pages[rand_pick].first;
       if (!client.IncreaseReservationToFit(page->len())) continue;
-      if (!page->is_pinned() || multiple_pins) ASSERT_OK(pool->Pin(&client, page));
+      if (!page->is_pinned() || multiple_pins) {
+        ASSERT_OK(pool->Pin(&client, page));
+      }
       // Block on the pin and verify data for sync pins.
       if (p < 0.35) VerifyData(*page, pages[rand_pick].second);
     } else if (p < 0.70) {

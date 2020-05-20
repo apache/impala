@@ -30,7 +30,9 @@ void ValidateRanges(RangeVec skip_ranges, int num_rows, const RangeVec& expected
   RangeVec result;
   bool success = ComputeCandidateRanges(num_rows, &skip_ranges, &result);
   EXPECT_EQ(should_succeed, success);
-  if (success) EXPECT_EQ(expected, result);
+  if (success) {
+    EXPECT_EQ(expected, result);
+  }
 }
 
 void ValidateRangesError(RangeVec skip_ranges, int num_rows, const RangeVec& expected) {
@@ -76,7 +78,9 @@ void ValidatePages(const vector<int64_t>& first_row_indexes, const RangeVec& ran
   bool success = ComputeCandidatePages(page_locations, ranges, num_rows,
       &candidate_pages);
   EXPECT_EQ(should_succeed, success);
-  if (success) EXPECT_EQ(expected_page_indexes, candidate_pages);
+  if (success) {
+    EXPECT_EQ(expected_page_indexes, candidate_pages);
+  }
 }
 
 void ValidatePagesError(const vector<int64_t>& first_row_indexes, const RangeVec& ranges,

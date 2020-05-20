@@ -38,7 +38,9 @@ class CpuTestUtil {
     CPU_SET(core, &cpuset);
     ASSERT_EQ(0, pthread_setaffinity_np(pthread_self(), sizeof(cpu_set_t), &cpuset))
         << core;
-    if (validate_current_cpu) ASSERT_EQ(core, CpuInfo::GetCurrentCore());
+    if (validate_current_cpu) {
+      ASSERT_EQ(core, CpuInfo::GetCurrentCore());
+    }
   }
 
   /// Reset the thread affinity of the current thread to all cores.
