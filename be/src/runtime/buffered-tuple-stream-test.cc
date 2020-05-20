@@ -854,7 +854,9 @@ void SimpleTupleStreamTest::TestAttachMemory(bool pin_stream, bool attach_on_rea
   } else {
     EXPECT_EQ(0, num_buffers_attached) << "No buffers attached during iteration.";
   }
-  if (attach_on_read || !pin_stream) EXPECT_EQ(4, num_flushes);
+  if (attach_on_read || !pin_stream) {
+    EXPECT_EQ(4, num_flushes);
+  }
   out_batch->Reset();
   stream.Close(out_batch, RowBatch::FlushMode::FLUSH_RESOURCES);
   if (attach_on_read) {
