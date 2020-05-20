@@ -871,9 +871,11 @@ class TestParquet(ImpalaTestSuite):
        when reading [un]compressed Parquet files, and that the counter
        Parquet[Un]compressedPageSize is not updated."""
     # lineitem_sixblocks is not compressed so ParquetCompressedPageSize should be empty,
-    # but ParquetUncompressedPageSize should have been updated
-    result = self.client.execute("select * from functional_parquet.lineitem_sixblocks"
-                                 " limit 10")
+    # but ParquetUncompressedPageSize should have been updated. Query needs an order by
+    # so that all rows are read. Only access a couple of columns to reduce query runtime.
+    result = self.client.execute("select l_orderkey"
+                                 " from functional_parquet.lineitem_sixblocks"
+                                 " order by l_orderkey limit 10")
 
     compressed_page_size_summaries = get_bytes_summary_stats_counter(
         "ParquetCompressedPageSize", result.runtime_profile)
@@ -894,8 +896,9 @@ class TestParquet(ImpalaTestSuite):
 
     # alltypestiny is compressed so both ParquetCompressedPageSize and
     # ParquetUncompressedPageSize should have been updated
-    result = self.client.execute("select * from functional_parquet.alltypestiny"
-                                 " limit 10")
+    # Query needs an order by so that all rows are read.
+    result = self.client.execute("select int_col from functional_parquet.alltypestiny"
+                                 " order by int_col limit 10")
 
     for summary_name in ("ParquetCompressedPageSize", "ParquetUncompressedPageSize"):
       page_size_summaries = get_bytes_summary_stats_counter(
@@ -910,8 +913,11 @@ class TestParquet(ImpalaTestSuite):
        Parquet[Un]CompressedBytesReadPerColumn is not updated."""
     # lineitem_sixblocks is not compressed so ParquetCompressedBytesReadPerColumn should
     # be empty, but ParquetUncompressedBytesReadPerColumn should have been updated
-    result = self.client.execute("select * from functional_parquet.lineitem_sixblocks"
-                                 " limit 10")
+    # Query needs an order by so that all rows are read. Only access a couple of
+    # columns to reduce query runtime.
+    result = self.client.execute("select l_orderkey, l_partkey "
+                                 "from functional_parquet.lineitem_sixblocks "
+                                 " order by l_orderkey limit 10")
 
     compressed_bytes_read_per_col_summaries = get_bytes_summary_stats_counter(
         "ParquetCompressedBytesReadPerColumn", result.runtime_profile)
@@ -926,13 +932,14 @@ class TestParquet(ImpalaTestSuite):
     assert len(uncompressed_bytes_read_per_col_summaries) > 0
     for summary in uncompressed_bytes_read_per_col_summaries:
       assert not self._is_summary_stats_counter_empty(summary)
-      # There are 16 columns in lineitem_sixblocks so there should be 16 samples
-      assert summary.total_num_values == 16
+      # There are 2 columns read from in lineitem_sixblocks so there should be 2 samples
+      assert summary.total_num_values == 2
 
     # alltypestiny is compressed so both ParquetCompressedBytesReadPerColumn and
     # ParquetUncompressedBytesReadPerColumn should have been updated
+    # Query needs an order by so that all rows are read.
     result = self.client.execute("select * from functional_parquet.alltypestiny"
-                                 " limit 10")
+                                 " order by int_col limit 10")
 
     for summary_name in ("ParquetCompressedBytesReadPerColumn",
                          "ParquetUncompressedBytesReadPerColumn"):
