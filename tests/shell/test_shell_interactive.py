@@ -76,41 +76,83 @@ def tmp_history_file(request):
   return tmp.name
 
 
-@pytest.yield_fixture
-def http_503_server():
-  class RequestHandler503(SimpleHTTPServer.SimpleHTTPRequestHandler):
-    """A custom http handler that checks for duplicate 'Host' headers from the most
-    recent http request, and always returns a 503 http code"""
+class RequestHandler503(SimpleHTTPServer.SimpleHTTPRequestHandler):
+  """A custom http handler that checks for duplicate 'Host' headers from the most
+  recent http request, and always returns a 503 http code."""
 
-    def do_POST(self):
-      # The unfortunately named self.headers here is an instance of mimetools.Message that
-      # contains the request headers.
-      request_headers = self.headers.headers
+  def __init__(self, request, client_address, server):
+    SimpleHTTPServer.SimpleHTTPRequestHandler.__init__(self, request, client_address,
+                                                       server)
 
-      # Ensure that only one 'Host' header is contained in the request before responding.
-      host_hdr_count = sum([header.startswith('Host:') for header in request_headers])
-      assert host_hdr_count == 1, "duplicate 'Host:' headers in %s" % request_headers
+  def should_send_body_text(self):
+    # in RequestHandler503 we do not send any body text
+    return False
 
-      # Respond with 503.
-      self.send_response(code=httplib.SERVICE_UNAVAILABLE, message="Service Unavailable")
+  def do_POST(self):
+    # The unfortunately named self.headers here is an instance of mimetools.Message that
+    # contains the request headers.
+    request_headers = self.headers.headers
 
-  class TestHTTPServer503(object):
-    def __init__(self):
-      self.HOST = "localhost"
-      self.PORT = get_unused_port()
-      self.httpd = SocketServer.TCPServer((self.HOST, self.PORT), RequestHandler503)
+    # Ensure that only one 'Host' header is contained in the request before responding.
+    host_hdr_count = sum([header.startswith('Host:') for header in request_headers])
+    assert host_hdr_count == 1, "duplicate 'Host:' headers in %s" % request_headers
 
-      self.http_server_thread = threading.Thread(target=self.httpd.serve_forever)
-      self.http_server_thread.start()
+    # Respond with 503.
+    self.send_response(code=httplib.SERVICE_UNAVAILABLE, message="Service Unavailable")
+    if self.should_send_body_text():
+      # Optionally send ody text with 503 message.
+      self.end_headers()
+      self.wfile.write("EXTRA")
 
-  server = TestHTTPServer503()
-  yield server
 
-  # Cleanup after test.
+class RequestHandler503Extra(RequestHandler503):
+  """"Override RequestHandler503 so as to send body text with the 503 message."""
+
+  def __init__(self, request, client_address, server):
+    RequestHandler503.__init__(self, request, client_address, server)
+
+  def should_send_body_text(self):
+    # in RequestHandler503Extra we will send body text
+    return True
+
+
+class TestHTTPServer503(object):
+  def __init__(self, clazz):
+    self.HOST = "localhost"
+    self.PORT = get_unused_port()
+    self.httpd = SocketServer.TCPServer((self.HOST, self.PORT), clazz)
+
+    self.http_server_thread = threading.Thread(target=self.httpd.serve_forever)
+    self.http_server_thread.start()
+
+
+def shutdown_server(server):
+  """Helper method to shutdown a http server."""
   if server.httpd is not None:
     server.httpd.shutdown()
   if server.http_server_thread is not None:
     server.http_server_thread.join()
+
+
+@pytest.yield_fixture
+def http_503_server():
+  """A fixture that creates an http server that returns a 503 http code."""
+  server = TestHTTPServer503(RequestHandler503)
+  yield server
+
+  # Cleanup after test.
+  shutdown_server(server)
+
+
+@pytest.yield_fixture
+def http_503_server_extra():
+  """A fixture that creates an http server that returns a 503 http code with extra
+  body text."""
+  server = TestHTTPServer503(RequestHandler503Extra)
+  yield server
+
+  # Cleanup after test.
+  shutdown_server(server)
 
 
 class TestImpalaShellInteractive(ImpalaTestSuite):
@@ -1025,6 +1067,21 @@ class TestImpalaShellInteractive(ImpalaTestSuite):
                   "-i{0}:{1}".format(http_503_server.HOST, http_503_server.PORT)]
     shell_proc = spawn_shell([IMPALA_SHELL_EXECUTABLE] + shell_args)
     shell_proc.expect("HTTP code 503", timeout=10)
+
+  def test_http_interactions_extra(self, vector, http_503_server_extra):
+    """Test interactions with the http server when using hs2-http protocol.
+    Check that the shell prints a good message when the server returns a 503 error,
+    including the body text from the message."""
+    protocol = vector.get_value("protocol")
+    if protocol != 'hs2-http':
+      pytest.skip()
+
+    # Check that we get a message about the 503 error when we try to connect.
+    shell_args = ["--protocol={0}".format(protocol),
+                  "-i{0}:{1}".format(http_503_server_extra.HOST,
+                                     http_503_server_extra.PORT)]
+    shell_proc = spawn_shell([IMPALA_SHELL_EXECUTABLE] + shell_args)
+    shell_proc.expect("HTTP code 503: Service Unavailable \[EXTRA\]", timeout=10)
 
 
 def run_impala_shell_interactive(vector, input_lines, shell_args=None,
