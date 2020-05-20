@@ -588,6 +588,15 @@ class HdfsScanner {
     return reinterpret_cast<TupleRow*>(mem + sizeof(Tuple*));
   }
 
+  /// This is cross-compiled to IR. Used to call the interpreted version of
+  /// TextConverter::WriteSlot from codegen'd code. For types for which
+  /// TextConverter::SupportsCodegenWriteSlot returns false (for example CHAR),
+  /// TextConverter does not support codegenning WriteSlot, but other columns may still
+  /// benefit from codegen so instead of disabling it entirely we call the interpreted
+  /// version from codegen'd code.
+  static bool TextConverterWriteSlotInterpretedIR(HdfsScanner* hdfs_scanner,
+      int slot_idx, Tuple* tuple, const char* data, int len, MemPool* pool);
+
   /// Simple wrapper around conjunct_evals_[idx]. Used in the codegen'd version of
   /// WriteCompleteTuple() because it's easier than writing IR to access
   /// conjunct_evals_.

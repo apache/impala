@@ -342,11 +342,17 @@ Status HdfsScanner::CodegenWriteCompleteTuple(const HdfsScanPlanNode* node,
   for (int i = 0; i < node->materialized_slots_.size(); ++i) {
     llvm::Function* fn = nullptr;
     SlotDescriptor* slot_desc = node->materialized_slots_[i];
-    RETURN_IF_ERROR(TextConverter::CodegenWriteSlot(codegen, tuple_desc, slot_desc, &fn,
-        node->hdfs_table_->null_column_value().data(),
-        node->hdfs_table_->null_column_value().size(), true,
-        state->query_options().strict_mode));
-    if (i >= LlvmCodeGen::CODEGEN_INLINE_EXPRS_THRESHOLD) codegen->SetNoInline(fn);
+
+    // If the type is CHAR, WriteSlot for this slot cannot be codegen'd. To keep codegen
+    // for other things, we call the interpreted code for this slot from the codegen'd
+    // code instead of failing codegen. See IMPALA-9747.
+    if (TextConverter::SupportsCodegenWriteSlot(slot_desc->type())) {
+      RETURN_IF_ERROR(TextConverter::CodegenWriteSlot(codegen, tuple_desc, slot_desc, &fn,
+          node->hdfs_table_->null_column_value().data(),
+          node->hdfs_table_->null_column_value().size(), true,
+          state->query_options().strict_mode));
+      if (i >= LlvmCodeGen::CODEGEN_INLINE_EXPRS_THRESHOLD) codegen->SetNoInline(fn);
+    }
     slot_fns.push_back(fn);
   }
 
@@ -392,6 +398,7 @@ Status HdfsScanner::CodegenWriteCompleteTuple(const HdfsScanPlanNode* node,
 
   // Extract the input args
   llvm::Value* this_arg = args[0];
+  llvm::Value* mem_pool_arg = args[1];
   llvm::Value* fields_arg = args[2];
   llvm::Value* opaque_tuple_arg = args[3];
   llvm::Value* tuple_arg =
@@ -474,8 +481,21 @@ Status HdfsScanner::CodegenWriteCompleteTuple(const HdfsScanPlanNode* node,
 
       // Call slot parse function
       llvm::Function* slot_fn = slot_fns[slot_idx];
-      llvm::Value* slot_parsed = builder.CreateCall(
-          slot_fn, llvm::ArrayRef<llvm::Value*>({tuple_arg, data, len}));
+
+      llvm::Value* slot_parsed = nullptr;
+      if (LIKELY(slot_fn != nullptr)) {
+        slot_parsed = builder.CreateCall(
+            slot_fn, llvm::ArrayRef<llvm::Value*>({tuple_arg, data, len}));
+      } else {
+        llvm::Value* slot_idx_value = codegen->GetI32Constant(slot_idx);
+        llvm::Function* interpreted_slot_fn = codegen->GetFunction(
+            IRFunction::HDFS_SCANNER_TEXT_CONVERTER_WRITE_SLOT_INTERPRETED_IR, false);
+        DCHECK(interpreted_slot_fn != nullptr);
+
+        slot_parsed = builder.CreateCall(interpreted_slot_fn,
+            {this_arg, slot_idx_value, opaque_tuple_arg, data, len, mem_pool_arg});
+      }
+
       llvm::Value* slot_error = builder.CreateNot(slot_parsed, "slot_parse_error");
       error_in_row = builder.CreateOr(error_in_row, slot_error, "error_in_row");
       slot_error = builder.CreateZExt(slot_error, codegen->i8_type());

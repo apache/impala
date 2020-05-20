@@ -16,6 +16,8 @@
 // under the License.
 
 #include "exec/hdfs-scanner.h"
+#include "exec/text-converter.h"
+#include "exec/text-converter.inline.h"
 #include "runtime/row-batch.h"
 #include "util/string-parser.h"
 #include "runtime/string-value.inline.h"
@@ -107,6 +109,21 @@ bool HdfsScanner::EvalRuntimeFilter(int i, TupleRow* row) {
     }
   }
   return true;
+}
+
+bool HdfsScanner::TextConverterWriteSlotInterpretedIR(HdfsScanner* hdfs_scanner,
+    int slot_idx, Tuple* tuple, const char* data, int len, MemPool* pool) {
+  constexpr bool copy_string = false;
+
+  int need_escape = false;
+  if (UNLIKELY(len < 0)) {
+    len = -len;
+    need_escape = true;
+  }
+
+  SlotDescriptor* desc = hdfs_scanner->scan_node_->materialized_slots()[slot_idx];
+  return hdfs_scanner->text_converter_->WriteSlot(desc, tuple, data, len, copy_string,
+      need_escape, pool);
 }
 
 // Define the string parsing functions for llvm.  Stamp out the templated functions

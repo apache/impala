@@ -39,5 +39,4 @@ bigint
 # Verify that CHAR codegen was enabled for hash partitioning even though CHAR
 # codegen isn't supported everywhere.
 row_regex: .*Hash Partitioned Sender Codegen Enabled.*
-row_regex: .*Char isn't supported for CodegenWriteSlot.*
 ====

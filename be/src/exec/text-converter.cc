@@ -15,6 +15,8 @@
 // specific language governing permissions and limitations
 // under the License.
 
+#include <sstream>
+
 #include <boost/algorithm/string.hpp>
 
 #include "codegen/llvm-codegen.h"
@@ -108,10 +110,7 @@ Status TextConverter::CodegenWriteSlot(LlvmCodeGen* codegen,
     TupleDescriptor* tuple_desc, SlotDescriptor* slot_desc, llvm::Function** fn,
     const char* null_col_val, int len, bool check_null, bool strict_mode) {
   DCHECK(fn != nullptr);
-  if (slot_desc->type().type == TYPE_CHAR) {
-    return Status::Expected("TextConverter::CodegenWriteSlot(): Char isn't supported for"
-        " CodegenWriteSlot");
-  }
+  DCHECK(SupportsCodegenWriteSlot(slot_desc->type()));
 
   // Codegen is_null_string
   bool is_default_null = (len == 2 && null_col_val[0] == '\\' && null_col_val[1] == 'N');
@@ -329,4 +328,8 @@ Status TextConverter::CodegenWriteSlot(LlvmCodeGen* codegen,
         "WriteSlot function failed verification, see log");
   }
   return Status::OK();
+}
+
+bool TextConverter::SupportsCodegenWriteSlot(const ColumnType& col_type) {
+  return col_type.type != TYPE_CHAR;
 }

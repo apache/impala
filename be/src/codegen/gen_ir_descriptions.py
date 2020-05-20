@@ -185,6 +185,8 @@ ir_functions = [
    "_ZN6impala19HdfsColumnarScanner19ProcessScratchBatchEPNS_8RowBatchE"],
   ["HDFS_SCANNER_EVAL_RUNTIME_FILTER",
    "_ZN6impala11HdfsScanner17EvalRuntimeFilterEiPNS_8TupleRowE"],
+  ["HDFS_SCANNER_TEXT_CONVERTER_WRITE_SLOT_INTERPRETED_IR",
+   "_ZN6impala11HdfsScanner35TextConverterWriteSlotInterpretedIREPS0_iPNS_5TupleEPKciPNS_7MemPoolE"],
   ["STRING_TO_BOOL", "IrStringToBool"],
   ["STRING_TO_INT8", "IrStringToInt8"],
   ["STRING_TO_INT16", "IrStringToInt16"],
