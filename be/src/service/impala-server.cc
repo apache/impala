@@ -149,7 +149,7 @@ DEFINE_int32(fe_service_threads, 64,
     "number of threads available to serve client requests");
 DEFINE_string(default_query_options, "", "key=value pair of default query options for"
     " impalad, separated by ','");
-DEFINE_int32(query_log_size, 25, "Number of queries to retain in the query log. If -1, "
+DEFINE_int32(query_log_size, 100, "Number of queries to retain in the query log. If -1, "
     "the query log has unbounded size.");
 DEFINE_int32(query_stmt_size, 250, "length of the statements in the query log. If <=0, "
     "the full statement is displayed in the query log without trimming.");
