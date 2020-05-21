@@ -914,6 +914,14 @@ Status impala::SetQueryOption(const string& key, const string& value,
         query_options->__set_enable_distinct_semi_join_optimization(IsTrue(value));
         break;
       }
+      case TImpalaQueryOptions::SORT_RUN_BYTES_LIMIT: {
+        // Parse the sort bytes limit and validate it
+        int64_t sort_run_bytes_limit;
+        RETURN_IF_ERROR(
+            ParseMemValue(value, "sort run bytes limit", &sort_run_bytes_limit));
+        query_options->__set_sort_run_bytes_limit(sort_run_bytes_limit);
+        break;
+      }
       default:
         if (IsRemovedQueryOption(key)) {
           LOG(WARNING) << "Ignoring attempt to set removed query option '" << key << "'";

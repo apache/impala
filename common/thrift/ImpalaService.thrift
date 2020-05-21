@@ -543,6 +543,10 @@ enum TImpalaQueryOptions {
   // operations. If false, disables the optimization (i.e. falls back to pre-Impala-4.0
   // behaviour).
   ENABLE_DISTINCT_SEMI_JOIN_OPTIMIZATION = 105
+
+  // The max reservation that sorter will use for intermediate sort runs.
+  // 0 or -1 means this has no effect.
+  SORT_RUN_BYTES_LIMIT = 106
 }
 
 // The summary of a DML statement.

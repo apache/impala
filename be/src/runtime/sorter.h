@@ -98,6 +98,9 @@ class Sorter {
   /// 'node_label' is the label of the exec node using the sorter for error reporting.
   /// 'enable_spilling' should be set to false to reduce the number of requested buffers
   /// if the caller will use AddBatchNoSpill().
+  /// 'estimated_input_size' is the total rows in bytes that are estimated to get added
+  /// into this sorter. This is used to decide if sorter needs to proactively spill for
+  /// the first run. -1 value means estimate is unavailable.
   ///
   /// The Sorter assumes that it has exclusive use of the client's
   /// reservations for sorting, and may increase the size of the client's reservation.
@@ -107,7 +110,7 @@ class Sorter {
       const std::vector<ScalarExpr*>& sort_tuple_exprs, RowDescriptor* output_row_desc,
       MemTracker* mem_tracker, BufferPool::ClientHandle* client, int64_t page_len,
       RuntimeProfile* profile, RuntimeState* state, const std::string& node_label,
-      bool enable_spilling);
+      bool enable_spilling, int64_t estimated_input_size = -1);
   ~Sorter();
 
   /// Initial set-up of the sorter for execution.
@@ -157,6 +160,9 @@ class Sorter {
   class TupleIterator;
   class TupleSorter;
 
+  /// Minimum value for sot_run_bytes_limit query option.
+  static const int64_t MIN_SORT_RUN_BYTES_LIMIT = 32 << 20; // 32 MB
+
   /// Create a SortedRunMerger from sorted runs in 'sorted_runs_' and assign it to
   /// 'merger_'. 'num_runs' indicates how many runs should be covered by the current
   /// merging attempt. Returns error if memory allocation fails during in
@@ -201,6 +207,28 @@ class Sorter {
   /// buffers for all the runs. This is possible if other operators have released memory
   /// since the Sorter has started working on it's initial runs.
   void TryToIncreaseMemAllocationForMerge();
+
+  /// Given 'estimated_input_size', compute whether we most likely going to spill or not.
+  void ComputeSpillEstimate(int64_t estimated_input_size);
+
+  /// Check if we should enable enforce_sort_run_bytes_limit_ flag.
+  void CheckSortRunBytesLimitEnforcement();
+
+  /// Get value of sort_run_bytes_limit query option. If user specifies value between
+  /// [1,MIN_SORT_RUN_BYTES_LIMIT], it will be silently overridden by
+  /// MIN_SORT_RUN_BYTES_LIMIT. Otherwise, return sort_run_bytes_limit from state_.
+  int64_t GetSortRunBytesLimit() const;
+
+  /// Check if it is necessary to do an intermediate run and spill the sorted run.
+  /// There are two cases where it is necessary to do an intermediate run.
+  /// 1) Number of rows added to a run is less than total number of rows in RowBatch,
+  ///    indicating that mem_limit has been reached.
+  /// 2) enforce_sort_run_bytes_limit_ is true and current used memory is greater than or
+  ///    equal to specified sort_run_bytes_limit.
+  bool MustSortAndSpill(const int rows_added, const int batch_num_rows);
+
+  /// Try to lower current memory reservation up to sort_run_bytes_limit.
+  void TryLowerMemUpToSortRunBytesLimit();
 
   /// Label of the ExecNode that owns the sorter, used for error reporting.
   const std::string node_label_;
@@ -299,6 +327,9 @@ class Sorter {
 
   /// Min, max, and avg size of runs in number of tuples.
   RuntimeProfile::SummaryStatsCounter* run_sizes_;
+
+  /// Flag to enforce sort_run_bytes_limit.
+  bool enforce_sort_run_bytes_limit_ = false;
 };
 
 } // namespace impala

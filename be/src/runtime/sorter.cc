@@ -22,6 +22,7 @@
 
 #include "exprs/scalar-expr-evaluator.h"
 #include "runtime/bufferpool/reservation-tracker.h"
+#include "runtime/bufferpool/reservation-util.h"
 #include "runtime/exec-env.h"
 #include "runtime/mem-tracker.h"
 #include "runtime/query-state.h"
@@ -759,7 +760,7 @@ Sorter::Sorter(const TupleRowComparatorConfig& tuple_row_comparator_config,
     const vector<ScalarExpr*>& sort_tuple_exprs, RowDescriptor* output_row_desc,
     MemTracker* mem_tracker, BufferPool::ClientHandle* buffer_pool_client,
     int64_t page_len, RuntimeProfile* profile, RuntimeState* state,
-    const string& node_label, bool enable_spilling)
+    const string& node_label, bool enable_spilling, int64_t estimated_input_size)
   : node_label_(node_label),
     state_(state),
     expr_perm_pool_(mem_tracker),
@@ -792,6 +793,8 @@ Sorter::Sorter(const TupleRowComparatorConfig& tuple_row_comparator_config,
     default:
       DCHECK(false);
   }
+
+  if (estimated_input_size > 0) ComputeSpillEstimate(estimated_input_size);
 }
 
 Sorter::~Sorter() {
@@ -799,6 +802,21 @@ Sorter::~Sorter() {
   DCHECK(merging_runs_.empty());
   DCHECK(unsorted_run_ == nullptr);
   DCHECK(merge_output_run_ == nullptr);
+}
+
+void Sorter::ComputeSpillEstimate(int64_t estimated_input_size) {
+  int64_t max_reservation = state_->query_state()->GetMaxReservation();
+  if (estimated_input_size > max_reservation) {
+    CheckSortRunBytesLimitEnforcement();
+    if (enforce_sort_run_bytes_limit_) {
+      VLOG(3) << Substitute(
+          "Enforcing sort_run_bytes_limit because spill is estimated to happen: "
+          "max_reservation=$0 estimated_input_size=$1 sort_run_bytes_limit=$2",
+          PrettyPrinter::PrintBytes(max_reservation),
+          PrettyPrinter::PrintBytes(estimated_input_size),
+          PrettyPrinter::PrintBytes(GetSortRunBytesLimit()));
+    }
+  }
 }
 
 Status Sorter::Prepare(ObjectPool* obj_pool) {
@@ -869,19 +887,72 @@ Status Sorter::AddBatch(RowBatch* batch) {
     RETURN_IF_ERROR(AddBatchNoSpill(batch, cur_batch_index, &num_processed));
 
     cur_batch_index += num_processed;
-    if (cur_batch_index < batch->num_rows()) {
+    if (MustSortAndSpill(cur_batch_index, batch->num_rows())) {
       // The current run is full. Sort it, spill it and begin the next one.
+      int64_t unsorted_run_bytes = unsorted_run_->TotalBytes();
       RETURN_IF_ERROR(state_->StartSpilling(mem_tracker_));
       RETURN_IF_ERROR(SortCurrentInputRun());
       RETURN_IF_ERROR(sorted_runs_.back()->UnpinAllPages());
       unsorted_run_ =
           run_pool_.Add(new Run(this, output_row_desc_->tuple_descriptors()[0], true));
       RETURN_IF_ERROR(unsorted_run_->Init());
+
+      bool prev_enforcement = enforce_sort_run_bytes_limit_;
+      CheckSortRunBytesLimitEnforcement();
+      if (!prev_enforcement && enforce_sort_run_bytes_limit_) {
+        VLOG(3) << Substitute(
+            "Enforcing sort_run_bytes_limit because reservation limit exceeded: "
+            "prev_run_total_bytes=$0 sort_run_bytes_limit=$1",
+            PrettyPrinter::PrintBytes(unsorted_run_bytes),
+            PrettyPrinter::PrintBytes(GetSortRunBytesLimit()));
+      }
     }
   }
+  if (enforce_sort_run_bytes_limit_) TryLowerMemUpToSortRunBytesLimit();
   // Clear any temporary allocations made while materializing the sort tuples.
   expr_results_pool_.Clear();
   return Status::OK();
+}
+
+void Sorter::CheckSortRunBytesLimitEnforcement() {
+  enforce_sort_run_bytes_limit_ = GetSortRunBytesLimit() > 0
+      && state_->query_options().scratch_limit != 0
+      && !state_->query_options().disable_unsafe_spills;
+}
+
+int64_t Sorter::GetSortRunBytesLimit() const {
+  if (state_->query_options().sort_run_bytes_limit > 0
+      && state_->query_options().sort_run_bytes_limit < MIN_SORT_RUN_BYTES_LIMIT) {
+    return MIN_SORT_RUN_BYTES_LIMIT;
+  } else {
+    return state_->query_options().sort_run_bytes_limit;
+  }
+}
+
+bool Sorter::MustSortAndSpill(const int rows_added, const int batch_num_rows) {
+  if (rows_added < batch_num_rows) {
+    return true;
+  } else if (enforce_sort_run_bytes_limit_) {
+    int used_reservation = buffer_pool_client_->GetUsedReservation();
+    return GetSortRunBytesLimit() < used_reservation;
+  }
+  return false;
+}
+
+void Sorter::TryLowerMemUpToSortRunBytesLimit() {
+  DCHECK(enforce_sort_run_bytes_limit_);
+  int unused_reservation = buffer_pool_client_->GetUnusedReservation();
+  int current_reservation = buffer_pool_client_->GetReservation();
+  int threshold = GetSortRunBytesLimit() + page_len_; // tolerate +1 page
+
+  if (current_reservation > threshold) {
+    Status status = buffer_pool_client_->DecreaseReservationTo(
+        unused_reservation, GetSortRunBytesLimit());
+    DCHECK(status.ok());
+    VLOG(3) << Substitute("Sorter reservation decreased from $0 to $1",
+        PrettyPrinter::PrintBytes(current_reservation),
+        PrettyPrinter::PrintBytes(buffer_pool_client_->GetReservation()));
+  }
 }
 
 Status Sorter::AddBatchNoSpill(RowBatch* batch, int start_index, int* num_processed) {

@@ -61,6 +61,35 @@ class TestQueryFullSort(ImpalaTestSuite):
       result = transpose_results(query_result.data)
       assert(result[0] == sorted(result[0]))
 
+  def test_multiple_sort_run_bytes_limits(self, vector):
+    """Using lineitem table forces the multi-phase sort with low sort_run_bytes_limit.
+       This test takes about a minute."""
+    query = """select l_comment, l_partkey, l_orderkey, l_suppkey, l_commitdate
+            from lineitem order by l_comment limit 100000"""
+    exec_option = copy(vector.get_value('exec_option'))
+    exec_option['disable_outermost_topn'] = 1
+    exec_option['num_nodes'] = 1
+    table_format = vector.get_value('table_format')
+
+    """The first sort run is given a privilege to ignore sort_run_bytes_limit, except
+       when estimate hints that spill is inevitable. The lower sort_run_bytes_limit of
+       a query is, the more sort runs are likely to be produced and spilled.
+       Case 1 : 0 SpilledRuns, because all rows fit within the maximum reservation.
+                sort_run_bytes_limit is not enforced.
+       Case 2 : 3 SpilledRuns, because the first run hit reservation limit, and the
+                next 2 runs are capped to 100m.
+       Case 3 : 4 SpilledRuns, because sort node estimate that spill is inevitable.
+                So all runs are capped to 130m, including the first one."""
+    options = [('3g', '100m', '0'), ('620m', '100m', '3'), ('400m', '130m', '4')]
+    for (mem_limit, sort_run_bytes_limit, spilled_runs) in options:
+      exec_option['mem_limit'] = mem_limit
+      exec_option['sort_run_bytes_limit'] = sort_run_bytes_limit
+      query_result = self.execute_query(
+          query, exec_option, table_format=table_format)
+      assert "SpilledRuns: " + spilled_runs in query_result.runtime_profile
+      result = transpose_results(query_result.data)
+      assert(result[0] == sorted(result[0]))
+
   def test_multiple_mem_limits_full_output(self, vector):
     """ Exercise a range of memory limits, returning the full sorted input. """
     query = """select o_orderdate, o_custkey, o_comment

@@ -159,6 +159,8 @@ void Coordinator::BackendState::SetRpcParams(const DebugOptions& debug_options,
                || debug_options.instance_idx() == GetInstanceIdx(params.instance_id()))) {
       instance_ctx.__set_debug_options(debug_options.ToThrift());
     }
+    int num_backends = fragment_exec_params.num_hosts();
+    instance_ctx.__set_num_backends(num_backends);
 
     if (filter_mode_ == TRuntimeFilterMode::OFF) continue;
 

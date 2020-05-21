@@ -432,6 +432,9 @@ struct TQueryOptions {
 
   // See comment in ImpalaService.thrift
   106: optional bool enable_distinct_semi_join_optimization = true;
+
+  // See comment in ImpalaService.thrift
+  107: optional i64 sort_run_bytes_limit = -1;
 }
 
 // Impala currently has two types of sessions: Beeswax and HiveServer2
@@ -648,6 +651,10 @@ struct TPlanFragmentInstanceCtx {
   // If this is a join build fragment, the number of fragment instances that consume the
   // join build. -1 = invalid.
   10: optional i32 num_join_build_outputs
+
+  // Number of backends executing the same fragment plan. Can be used by executors to do
+  // some estimations.
+  11: optional i32 num_backends;
 }
 
 
