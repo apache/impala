@@ -261,6 +261,10 @@ class QueryState {
   /// already. Also notifies anyone waiting on WaitForFinishOrTimeout().
   void ErrorDuringExecute(const Status& status, const TUniqueId& finst_id);
 
+  /// Get maximum reservation allowed for this query. MAX_INT64 means effectively
+  /// unlimited.
+  int64_t GetMaxReservation();
+
   /// The default BATCH_SIZE.
   static const int DEFAULT_BATCH_SIZE = 1024;
 

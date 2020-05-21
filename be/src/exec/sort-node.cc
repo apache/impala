@@ -22,6 +22,7 @@
 #include "runtime/row-batch.h"
 #include "runtime/runtime-state.h"
 #include "runtime/sorted-run-merger.h"
+#include "util/pretty-printer.h"
 #include "util/runtime-profile-counters.h"
 
 #include "common/names.h"
@@ -39,6 +40,7 @@ Status SortPlanNode::Init(const TPlanNode& tnode, FragmentState* state) {
   row_comparator_config_ =
       state->obj_pool()->Add(new TupleRowComparatorConfig(tsort_info, ordering_exprs_));
   state->CheckAndAddCodegenDisabledMessage(codegen_status_msgs_);
+  num_backends_ = state->instance_ctxs()[0]->num_backends;
   return Status::OK();
 }
 
@@ -60,9 +62,11 @@ SortNode::SortNode(
     offset_(pnode.tnode_->sort_node.__isset.offset ? pnode.tnode_->sort_node.offset : 0),
     sort_tuple_exprs_(pnode.sort_tuple_slot_exprs_),
     tuple_row_comparator_config_(*pnode.row_comparator_config_),
+    num_backends_(pnode.num_backends_),
     sorter_(NULL),
     num_rows_skipped_(0) {
   runtime_profile()->AddInfoString("SortType", "Total");
+  add_batch_timer_ = ADD_SUMMARY_STATS_TIMER(runtime_profile(), "AddBatchTime");
 }
 
 SortNode::~SortNode() {
@@ -71,12 +75,29 @@ SortNode::~SortNode() {
 Status SortNode::Prepare(RuntimeState* state) {
   SCOPED_TIMER(runtime_profile_->total_time_counter());
   RETURN_IF_ERROR(ExecNode::Prepare(state));
-  sorter_.reset(new Sorter(tuple_row_comparator_config_, sort_tuple_exprs_,
-      &row_descriptor_, mem_tracker(), buffer_pool_client(),
-      resource_profile_.spillable_buffer_size, runtime_profile(), state, label(), true));
+  sorter_.reset(
+      new Sorter(tuple_row_comparator_config_, sort_tuple_exprs_, &row_descriptor_,
+          mem_tracker(), buffer_pool_client(), resource_profile_.spillable_buffer_size,
+          runtime_profile(), state, label(), true, ComputeInputSizeEstimate()));
   RETURN_IF_ERROR(sorter_->Prepare(pool_));
   DCHECK_GE(resource_profile_.min_reservation, sorter_->ComputeMinReservation());
   return Status::OK();
+}
+
+int64_t SortNode::ComputeInputSizeEstimate() {
+  const SortPlanNode& pnode = static_cast<const SortPlanNode&>(plan_node_);
+  const TSortNode& sort_node = pnode.tnode_->sort_node;
+  int64_t estimated_input_size = -1;
+  if (sort_node.__isset.estimated_full_input_size
+      && sort_node.estimated_full_input_size > 0) {
+    estimated_input_size = sort_node.estimated_full_input_size / num_backends_;
+  }
+
+  VLOG(3) << Substitute("Sort estimation: estimated_full_input_size=$0 "
+                        "num_backends=$1 estimated_input_size=$2",
+      PrettyPrinter::PrintBytes(sort_node.estimated_full_input_size), num_backends_,
+      PrettyPrinter::PrintBytes(estimated_input_size));
+  return estimated_input_size;
 }
 
 void SortPlanNode::Codegen(FragmentState* state) {
@@ -188,7 +209,14 @@ Status SortNode::SortInput(RuntimeState* state) {
   bool eos;
   do {
     RETURN_IF_ERROR(child(0)->GetNext(state, &batch, &eos));
-    RETURN_IF_ERROR(sorter_->AddBatch(&batch));
+
+    MonotonicStopWatch timer;
+    timer.Start();
+    Status add_status = sorter_->AddBatch(&batch);
+    timer.Stop();
+    add_batch_timer_->UpdateCounter(timer.ElapsedTime());
+    if (UNLIKELY(!add_status.ok())) return add_status;
+
     batch.Reset();
     RETURN_IF_CANCELLED(state);
     RETURN_IF_ERROR(QueryMaintenance(state));

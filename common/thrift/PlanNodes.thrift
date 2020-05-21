@@ -474,6 +474,10 @@ struct TSortNode {
   // This is the number of rows to skip before returning results.
   // Not used with TSortType::PARTIAL.
   3: optional i64 offset
+
+  // Estimated bytes of input that will go into this sort node across all backends.
+  // -1 if such estimate is unavailable.
+  4: optional i64 estimated_full_input_size
 }
 
 enum TAnalyticWindowType {

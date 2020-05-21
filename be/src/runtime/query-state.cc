@@ -241,8 +241,7 @@ Status QueryState::Init(const ExecQueryFInstancesRequestPB* exec_rpc_params,
   return Status::OK();
 }
 
-Status QueryState::InitBufferPoolState() {
-  ExecEnv* exec_env = ExecEnv::GetInstance();
+int64_t QueryState::GetMaxReservation() {
   int64_t mem_limit = query_mem_tracker_->GetLowestLimit(MemLimit::HARD);
   int64_t max_reservation;
   if (query_options().__isset.buffer_pool_limit
@@ -256,6 +255,12 @@ Status QueryState::InitBufferPoolState() {
     DCHECK_GE(mem_limit, 0);
     max_reservation = ReservationUtil::GetReservationLimitFromMemLimit(mem_limit);
   }
+  return max_reservation;
+}
+
+Status QueryState::InitBufferPoolState() {
+  ExecEnv* exec_env = ExecEnv::GetInstance();
+  int64_t max_reservation = GetMaxReservation();
   VLOG(2) << "Buffer pool limit for " << PrintId(query_id()) << ": " << max_reservation;
 
   buffer_reservation_ = obj_pool_.Add(new ReservationTracker);

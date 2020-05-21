@@ -41,6 +41,9 @@ class SortPlanNode : public PlanNode {
 
   /// Config used to create a TupleRowComparator instance.
   TupleRowComparatorConfig* row_comparator_config_ = nullptr;
+
+  /// Number of backend nodes executing the same sort node plan.
+  int32_t num_backends_;
 };
 
 /// Node that implements a full sort of its input with a fixed memory budget, spilling
@@ -71,6 +74,10 @@ class SortNode : public ExecNode {
   /// Fetch input rows and feed them to the sorter until the input is exhausted.
   Status SortInput(RuntimeState* state) WARN_UNUSED_RESULT;
 
+  /// Compute estimated bytes of input that will go into the sort node.
+  /// Return -1 if estimate can not be determined.
+  int64_t ComputeInputSizeEstimate();
+
   /// Number of rows to skip.
   int64_t offset_;
 
@@ -83,6 +90,12 @@ class SortNode : public ExecNode {
   /// Whether the previous call to GetNext() returned a buffer attached to the RowBatch.
   /// Used to avoid unnecessary calls to ReleaseUnusedReservation().
   bool returned_buffer_ = false;
+
+  /// Min, max, and avg time spent in AddBatch
+  RuntimeProfile::SummaryStatsCounter* add_batch_timer_;
+
+  /// Number of backend nodes executing the same sort node plan.
+  int32_t num_backends_;
 
   /////////////////////////////////////////
   /// BEGIN: Members that must be Reset()

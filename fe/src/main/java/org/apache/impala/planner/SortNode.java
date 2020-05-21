@@ -75,6 +75,10 @@ public class SortNode extends PlanNode {
   // The type of sort. Determines the exec node used in the BE.
   private final TSortType type_;
 
+  // Estimated bytes of input that will go into this sort node across all backends.
+  // Used for sorter spill estimation in backend code.
+  private long estimatedFullInputSize_ = -1;
+
   /**
    * Creates a new SortNode that implements a partial sort.
    */
@@ -201,6 +205,7 @@ public class SortNode extends PlanNode {
     sort_info.setSort_tuple_slot_exprs(Expr.treesToThrift(resolvedTupleExprs_));
     TSortNode sort_node = new TSortNode(sort_info, type_);
     sort_node.setOffset(offset_);
+    sort_node.setEstimated_full_input_size(estimatedFullInputSize_);
     msg.sort_node = sort_node;
   }
 
@@ -264,6 +269,7 @@ public class SortNode extends PlanNode {
     // size sqrt(N) blocks, and we could merge sqrt(N) such runs with sqrt(N) blocks
     // of memory.
     double fullInputSize = getChild(0).cardinality_ * avgRowSize_;
+    estimatedFullInputSize_ = fullInputSize < 0 ? -1 : (long) Math.ceil(fullInputSize);
     boolean usesVarLenBlocks = false;
     for (SlotDescriptor slotDesc: info_.getSortTupleDescriptor().getSlots()) {
       if (slotDesc.isMaterialized() && !slotDesc.getType().isFixedLengthType()) {
