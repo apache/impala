@@ -83,7 +83,7 @@ public class FileMetadataLoader {
    *   compactions.
    * @param writeIds if non-null, a write-id list which will filter the returned
    *   file descriptors to only include those indicated to be valid.
-   * @param HdfsFileFormat if non-null and equal to HdfsFileFormat.HUDI_PARQUET,
+   * @param fileFormat if non-null and equal to HdfsFileFormat.HUDI_PARQUET,
    *   this loader will filter files based on Hudi's HoodieROTablePathFilter method
    */
   public FileMetadataLoader(Path partDir, boolean recursive, List<FileDescriptor> oldFds,
@@ -148,11 +148,12 @@ public class FileMetadataLoader {
    * descriptors.
    *
    * @throws IOException if listing fails.
-   * @throws MetaException on ACID errors. TODO: remove this once IMPALA-9042 is resolved.
+   * @throws CatalogException on ACID errors. TODO: remove this once IMPALA-9042 is
+   * resolved.
    */
-  public void load() throws MetaException, IOException {
+  public void load() throws CatalogException, IOException {
     Preconditions.checkState(loadStats_ == null, "already loaded");
-    loadStats_ = new LoadStats();
+    loadStats_ = new LoadStats(partDir_);
     FileSystem fs = partDir_.getFileSystem(CONF);
 
     // If we don't have any prior FDs from which we could re-use old block location info,
@@ -259,7 +260,11 @@ public class FileMetadataLoader {
   }
 
   // File/Block metadata loading stats for a single HDFS path.
-  public class LoadStats {
+  public static class LoadStats {
+    private final Path partDir_;
+    LoadStats(Path partDir) {
+      this.partDir_ = Preconditions.checkNotNull(partDir);
+    }
     /** Number of files skipped because they pertain to an uncommitted ACID transaction */
     public int uncommittedAcidFilesSkipped = 0;
 

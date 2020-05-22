@@ -32,6 +32,7 @@ import org.apache.hadoop.fs.Path;
 import org.apache.hadoop.hive.common.ValidReadTxnList;
 import org.apache.hadoop.hive.common.ValidWriteIdList;
 import org.apache.hadoop.hive.metastore.api.MetaException;
+import org.apache.impala.catalog.CatalogException;
 import org.apache.impala.compat.MetastoreShim;
 import org.hamcrest.Matchers;
 import org.junit.Assume;
@@ -73,7 +74,7 @@ public class AcidUtilsTest {
       assertThat(AcidUtils.filterFilesForAcidState(stats, BASE_PATH,
           new ValidReadTxnList(validTxnListStr), writeIds, null),
           Matchers.containsInAnyOrder(expectedStats.toArray()));
-    } catch (MetaException me) {
+    } catch (CatalogException me) {
       //TODO: Remove try-catch once IMPALA-9042 is resolved.
       assertTrue(false);
     }

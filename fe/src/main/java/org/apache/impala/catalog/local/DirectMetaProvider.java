@@ -36,6 +36,7 @@ import org.apache.hadoop.hive.metastore.api.PrimaryKeysRequest;
 import org.apache.hadoop.hive.metastore.api.Table;
 import org.apache.hadoop.hive.metastore.api.TableMeta;
 import org.apache.impala.authorization.AuthorizationPolicy;
+import org.apache.impala.catalog.CatalogException;
 import org.apache.impala.catalog.FileMetadataLoader;
 import org.apache.impala.catalog.Function;
 import org.apache.impala.catalog.HdfsPartition.FileDescriptor;
@@ -191,7 +192,7 @@ class DirectMetaProvider implements MetaProvider {
   public Map<String, PartitionMetadata> loadPartitionsByRefs(
       TableMetaRef table, List<String> partitionColumnNames,
       ListMap<TNetworkAddress> hostIndex,
-      List<PartitionRef> partitionRefs) throws MetaException, TException {
+      List<PartitionRef> partitionRefs) throws CatalogException, TException {
     Preconditions.checkNotNull(table);
     Preconditions.checkArgument(table instanceof TableMetaRefImpl);
     Preconditions.checkArgument(!partitionColumnNames.isEmpty());
@@ -260,7 +261,7 @@ class DirectMetaProvider implements MetaProvider {
    */
   private Map<String, PartitionMetadata> loadUnpartitionedPartition(
       TableMetaRefImpl table, List<PartitionRef> partitionRefs,
-      ListMap<TNetworkAddress> hostIndex) throws MetaException {
+      ListMap<TNetworkAddress> hostIndex) throws CatalogException {
     //TODO(IMPALA-9042): Remove "throws MetaException"
     Preconditions.checkArgument(partitionRefs.size() == 1,
         "Expected exactly one partition to load for unpartitioned table");
@@ -318,7 +319,7 @@ class DirectMetaProvider implements MetaProvider {
 
   private ImmutableList<FileDescriptor> loadFileMetadata(String fullTableName,
       String partName, Partition msPartition, ListMap<TNetworkAddress> hostIndex)
-        throws MetaException {
+        throws CatalogException {
     //TODO(IMPALA-9042): Remove "throws MetaException"
     Path partDir = new Path(msPartition.getSd().getLocation());
     // TODO(todd): The table property to disable recursive loading is not supported

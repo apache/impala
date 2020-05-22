@@ -535,7 +535,7 @@ public abstract class Table extends CatalogObjectImpl implements FeTable {
    * service GetPartialCatalogObject RPCs.
    */
   public TGetPartialCatalogObjectResponse getPartialInfo(
-      TGetPartialCatalogObjectRequest req) throws TableLoadingException {
+      TGetPartialCatalogObjectRequest req) throws CatalogException {
     Preconditions.checkState(isLoaded(), "unloaded table: %s", getFullName());
     TTableInfoSelector selector = Preconditions.checkNotNull(req.table_info_selector,
         "no table_info_selector");

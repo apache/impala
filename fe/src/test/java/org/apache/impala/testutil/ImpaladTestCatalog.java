@@ -125,7 +125,7 @@ public class ImpaladTestCatalog extends ImpaladCatalog {
     // The table was not yet loaded. Load it in to the catalog now.
     Table newTbl = null;
     try {
-      newTbl = srcCatalog_.getOrLoadTable(dbName, tblName, "test");
+      newTbl = srcCatalog_.getOrLoadTable(dbName, tblName, "test", null);
     } catch (CatalogException e) {
       throw new IllegalStateException("Unexpected table loading failure.", e);
     }

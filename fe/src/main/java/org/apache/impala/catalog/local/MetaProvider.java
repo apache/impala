@@ -28,6 +28,7 @@ import org.apache.hadoop.hive.metastore.api.Partition;
 import org.apache.hadoop.hive.metastore.api.Table;
 import org.apache.hadoop.hive.metastore.api.UnknownDBException;
 import org.apache.impala.authorization.AuthorizationPolicy;
+import org.apache.impala.catalog.CatalogException;
 import org.apache.impala.catalog.Function;
 import org.apache.impala.catalog.HdfsPartition.FileDescriptor;
 import org.apache.impala.catalog.SqlConstraints;
@@ -109,7 +110,7 @@ public interface MetaProvider {
   Map<String, PartitionMetadata> loadPartitionsByRefs(TableMetaRef table,
       List<String> partitionColumnNames, ListMap<TNetworkAddress> hostIndex,
       List<PartitionRef> partitionRefs)
-      throws MetaException, TException;
+      throws MetaException, TException, CatalogException;
 
   /**
    * Load statistics for the given columns from the given table.

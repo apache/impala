@@ -1787,8 +1787,10 @@ public class CatalogOpExecutor {
     // be loaded because the planning phase on the impalad side triggered the loading.
     // In the LocalCatalog configuration, however, this is often necessary.
     try {
+      // we pass null validWriteIdList here since we don't really care what version of
+      // table is loaded, eventually its going to be dropped below.
       catalog_.getOrLoadTable(params.getTable_name().db_name,
-          params.getTable_name().table_name, "Load for DROP TABLE/VIEW");
+          params.getTable_name().table_name, "Load for DROP TABLE/VIEW", null);
 
     } catch (CatalogException e) {
       // Ignore exceptions -- the above was just to trigger loading. Failure to load
@@ -4555,7 +4557,9 @@ public class CatalogOpExecutor {
    */
   private Table getExistingTable(String dbName, String tblName, String reason)
       throws CatalogException {
-    Table tbl = catalog_.getOrLoadTable(dbName, tblName, reason);
+    // passing null validWriteIdList makes sure that we return the table if it is
+    // already loaded.
+    Table tbl = catalog_.getOrLoadTable(dbName, tblName, reason, null);
     if (tbl == null) {
       throw new TableNotFoundException("Table not found: " + dbName + "." + tblName);
     }

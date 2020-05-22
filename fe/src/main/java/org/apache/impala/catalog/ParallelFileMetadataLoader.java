@@ -16,18 +16,30 @@
 // under the License.
 package org.apache.impala.catalog;
 
+import com.google.common.collect.Iterables;
+import com.google.common.collect.Maps;
 import java.util.ArrayList;
 import java.util.Collection;
 import java.util.List;
+import java.util.Map;
 import java.util.concurrent.ExecutionException;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 import java.util.concurrent.Future;
 
 import org.apache.hadoop.fs.FileSystem;
+import org.apache.hadoop.fs.Path;
+import org.apache.hadoop.hive.common.ValidTxnList;
+import org.apache.hadoop.hive.common.ValidWriteIdList;
+import org.apache.impala.catalog.FeFsTable.Utils;
+import org.apache.impala.catalog.HdfsPartition.FileDescriptor;
+import org.apache.impala.catalog.MetaStoreClientPool.MetaStoreClient;
 import org.apache.impala.common.FileSystemUtil;
+import org.apache.impala.compat.MetastoreShim;
 import org.apache.impala.service.BackendConfig;
+import org.apache.impala.thrift.TValidWriteIdList;
 import org.apache.impala.util.ThreadNameAnnotator;
+import org.apache.thrift.TException;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -57,24 +69,81 @@ public class ParallelFileMetadataLoader {
   private static final int MAX_PATH_METADATA_LOADING_ERRORS_TO_LOG = 100;
 
   private final String logPrefix_;
-  private List<FileMetadataLoader> loaders_;
+  private final Map<Path, FileMetadataLoader> loaders_;
+  private final Map<Path, List<HdfsPartition>> partsByPath_;
   private final FileSystem fs_;
 
-  /**
-   * @param logPrefix informational prefix for log messages
-   * @param fs the filesystem to load from (used to determine appropriate parallelism)
-   * @param loaders the metadata loaders to execute in parallel.
-   */
-  public ParallelFileMetadataLoader(String logPrefix, FileSystem fs,
-      Collection<FileMetadataLoader> loaders) {
-    logPrefix_ = logPrefix;
-    loaders_ = ImmutableList.copyOf(loaders);
+  public ParallelFileMetadataLoader(HdfsTable table, Collection<HdfsPartition> parts,
+      ValidWriteIdList writeIdList, ValidTxnList validTxnList, String logPrefix)
+      throws CatalogException {
+    if (writeIdList != null || validTxnList != null) {
+      // make sure that both either both writeIdList and validTxnList are set or both
+      // of them are not.
+      Preconditions.checkState(writeIdList != null && validTxnList != null);
+    }
+    // Group the partitions by their path (multiple partitions may point to the same
+    // path).
+    partsByPath_ = Maps.newHashMap();
+    for (HdfsPartition p : parts) {
+      Path partPath = FileSystemUtil.createFullyQualifiedPath(new Path(p.getLocation()));
+      partsByPath_.computeIfAbsent(partPath, (path) -> new ArrayList<>())
+          .add(p);
+    }
+    // Create a FileMetadataLoader for each path.
+    loaders_ = Maps.newHashMap();
+    for (Map.Entry<Path, List<HdfsPartition>> e : partsByPath_.entrySet()) {
+      List<FileDescriptor> oldFds = e.getValue().get(0).getFileDescriptors();
+      FileMetadataLoader loader = new FileMetadataLoader(e.getKey(),
+          Utils.shouldRecursivelyListPartitions(table), oldFds, table.getHostIndex(),
+          validTxnList, writeIdList, e.getValue().get(0).getFileFormat());
+      // If there is a cached partition mapped to this path, we recompute the block
+      // locations even if the underlying files have not changed.
+      // This is done to keep the cached block metadata up to date.
+      boolean hasCachedPartition = Iterables.any(e.getValue(),
+          HdfsPartition::isMarkedCached);
+      loader.setForceRefreshBlockLocations(hasCachedPartition);
+      loaders_.put(e.getKey(), loader);
+    }
+    this.logPrefix_ = logPrefix;
+    this.fs_ = table.getFileSystem();
+  }
 
-    // TODO(todd) in actuality, different partitions could be on different file systems.
-    // We probably should create one pool per filesystem type, and size each of those
-    // pools based on that particular filesystem, so if there's a mixed S3+HDFS table
-    // we do the right thing.
-    fs_ = fs;
+  /**
+   * Loads the file metadata for the given list of Partitions in the constructor. If the
+   * load is successful also set the fileDescriptors in the HdfsPartitions.
+   * @throws TableLoadingException
+   */
+  void loadAndSet() throws TableLoadingException {
+    load();
+
+    // Store the loaded FDs into the partitions.
+    for (Map.Entry<Path, List<HdfsPartition>> e : partsByPath_.entrySet()) {
+      Path p = e.getKey();
+      FileMetadataLoader loader = loaders_.get(p);
+
+      for (HdfsPartition part : e.getValue()) {
+        part.setFileDescriptors(loader.getLoadedFds());
+      }
+    }
+  }
+
+  /**
+   * Loads the file-metadata from FileSystem for the given list of HdfsPartitions
+   * @return a Mapping of HdfsPartition and its List of FileDescriptors
+   * @throws TableLoadingException
+   */
+  Map<HdfsPartition, List<FileDescriptor>> loadAndGet() throws TableLoadingException {
+    load();
+    Map<HdfsPartition, List<FileDescriptor>> result = Maps.newHashMap();
+    for (Map.Entry<Path, List<HdfsPartition>> e : partsByPath_.entrySet()) {
+      Path p = e.getKey();
+      FileMetadataLoader loader = loaders_.get(p);
+
+      for (HdfsPartition part : e.getValue()) {
+        result.put(part, loader.getLoadedFds());
+      }
+    }
+    return result;
   }
 
   /**
@@ -82,14 +151,14 @@ public class ParallelFileMetadataLoader {
    * an exception. However, any successful loaders are guaranteed to complete
    * before any exception is thrown.
    */
-  void load() throws TableLoadingException {
+  private void load() throws TableLoadingException {
     if (loaders_.isEmpty()) return;
 
     int failedLoadTasks = 0;
     ExecutorService pool = createPool();
     try (ThreadNameAnnotator tna = new ThreadNameAnnotator(logPrefix_)) {
       List<Future<Void>> futures = new ArrayList<>(loaders_.size());
-      for (FileMetadataLoader loader : loaders_) {
+      for (FileMetadataLoader loader : loaders_.values()) {
         futures.add(pool.submit(() -> { loader.load(); return null; }));
       }
 

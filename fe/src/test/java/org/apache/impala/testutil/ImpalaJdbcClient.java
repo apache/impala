@@ -120,6 +120,12 @@ public class ImpalaJdbcClient {
     return stmt_.executeQuery(query);
   }
 
+  public void execStatement(String query) throws SQLException {
+    validateConnection();
+    LOG.info("Executing statement: " + query);
+    stmt_.execute(query);
+  }
+
   public void changeDatabase(String db_name) throws SQLException {
     validateConnection();
     LOG.info("Using: " + db_name);

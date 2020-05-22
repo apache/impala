@@ -56,6 +56,7 @@ import org.apache.impala.analysis.NumericLiteral;
 import org.apache.impala.analysis.PartitionKeyValue;
 import org.apache.impala.catalog.HdfsPartition.FileBlock;
 import org.apache.impala.catalog.HdfsPartition.FileDescriptor;
+import org.apache.impala.catalog.MetaStoreClientPool.MetaStoreClient;
 import org.apache.impala.common.FileSystemUtil;
 import org.apache.impala.common.ImpalaException;
 import org.apache.impala.common.Pair;
@@ -98,6 +99,7 @@ import org.slf4j.LoggerFactory;
 import com.codahale.metrics.Clock;
 import com.codahale.metrics.Gauge;
 import com.codahale.metrics.Timer;
+import com.codahale.metrics.Counter;
 import com.google.common.annotations.VisibleForTesting;
 import com.google.common.base.Joiner;
 import com.google.common.base.Preconditions;
@@ -106,7 +108,6 @@ import com.google.common.collect.HashMultiset;
 import com.google.common.collect.ImmutableList;
 import com.google.common.collect.Iterables;
 import com.google.common.collect.Lists;
-import com.google.common.collect.Maps;
 import com.google.common.collect.Multiset;
 import com.google.common.collect.Sets;
 
@@ -160,6 +161,10 @@ public class HdfsTable extends Table implements FeFsTable {
   public static final String TOTAL_FILE_BYTES_METRIC = "total-file-size-bytes";
   public static final String MEMORY_ESTIMATE_METRIC = "memory-estimate-bytes";
   public static final String HAS_INCREMENTAL_STATS_METRIC = "has-incremental-stats";
+  // metrics used to find out the cache hit rate when file-metadata is requested
+  // for a given ValidWriteIdList
+  public static final String FILEMETADATA_CACHE_MISS_METRIC = "filemetadata-cache-miss";
+  public static final String FILEMETADATA_CACHE_HIT_METRIC = "filemetadata-cache-hit";
 
   // Load all partitions time, including fetching all partitions
   // from HMS and loading all partitions. The code path is
@@ -617,17 +622,9 @@ public class HdfsTable extends Table implements FeFsTable {
    * affects logging.
    */
   private void loadFileMetadataForPartitions(IMetaStoreClient client,
-      Iterable<HdfsPartition> parts, boolean isRefresh) throws CatalogException {
+      Collection<HdfsPartition> parts, boolean isRefresh) throws CatalogException {
     final Clock clock = Clock.defaultClock();
     long startTime = clock.getTick();
-    // Group the partitions by their path (multiple partitions may point to the same
-    // path).
-    Map<Path, List<HdfsPartition>> partsByPath = Maps.newHashMap();
-    for (HdfsPartition p : parts) {
-      Path partPath = FileSystemUtil.createFullyQualifiedPath(new Path(p.getLocation()));
-      partsByPath.computeIfAbsent(partPath, (path) -> new ArrayList<HdfsPartition>())
-          .add(p);
-    }
 
     //TODO: maybe it'd be better to load the valid txn list in the context of a
     // transaction to have consistent valid write ids and valid transaction ids.
@@ -636,51 +633,18 @@ public class HdfsTable extends Table implements FeFsTable {
     // Impala doesn't notice when HMS's cleaner removes old transactional directories,
     // which might lead to FileNotFound exceptions.
     ValidTxnList validTxnList = validWriteIds_ != null ? loadValidTxns(client) : null;
-
-    // Create a FileMetadataLoader for each path.
-    Map<Path, FileMetadataLoader> loadersByPath = Maps.newHashMap();
-    for (Map.Entry<Path, List<HdfsPartition>> e : partsByPath.entrySet()) {
-      List<FileDescriptor> oldFds = e.getValue().get(0).getFileDescriptors();
-      FileMetadataLoader loader = new FileMetadataLoader(e.getKey(),
-          Utils.shouldRecursivelyListPartitions(this), oldFds, hostIndex_, validTxnList,
-          validWriteIds_, e.getValue().get(0).getFileFormat());
-      // If there is a cached partition mapped to this path, we recompute the block
-      // locations even if the underlying files have not changed.
-      // This is done to keep the cached block metadata up to date.
-      boolean hasCachedPartition = Iterables.any(e.getValue(),
-          HdfsPartition::isMarkedCached);
-      loader.setForceRefreshBlockLocations(hasCachedPartition);
-      loadersByPath.put(e.getKey(), loader);
-    }
-
     String logPrefix = String.format(
         "%s file and block metadata for %s paths for table %s",
-        isRefresh ? "Refreshing" : "Loading", partsByPath.size(),
+        isRefresh ? "Refreshing" : "Loading", parts.size(),
         getFullName());
-    FileSystem tableFs;
-    try {
-      tableFs = (new Path(getLocation())).getFileSystem(CONF);
-    } catch (IOException e) {
-      throw new CatalogException("Invalid table path for table: " + getFullName(), e);
-    }
 
     // Actually load the partitions.
     // TODO(IMPALA-8406): if this fails to load files from one or more partitions, then
     // we'll throw an exception here and end up bailing out of whatever catalog operation
     // we're in the middle of. This could cause a partial metadata update -- eg we may
     // have refreshed the top-level table properties without refreshing the files.
-    new ParallelFileMetadataLoader(logPrefix, tableFs, loadersByPath.values())
-        .load();
-
-    // Store the loaded FDs into the partitions.
-    for (Map.Entry<Path, List<HdfsPartition>> e : partsByPath.entrySet()) {
-      Path p = e.getKey();
-      FileMetadataLoader loader = loadersByPath.get(p);
-
-      for (HdfsPartition part : e.getValue()) {
-        part.setFileDescriptors(loader.getLoadedFds());
-      }
-    }
+    new ParallelFileMetadataLoader(this, parts, validWriteIds_, validTxnList, logPrefix)
+        .loadAndSet();
 
     // TODO(todd): would be good to log a summary of the loading process:
     // - how many block locations did we reuse/load individually/load via batch
@@ -688,7 +652,7 @@ public class HdfsTable extends Table implements FeFsTable {
     // - etc...
     String partNames = Joiner.on(", ").join(
         Iterables.limit(Iterables.transform(parts, HdfsPartition::getPartitionName), 3));
-    if (partsByPath.size() > 3) {
+    if (parts.size() > 3) {
       partNames += String.format(", and %s others",
           Iterables.size(parts) - 3);
     }
@@ -696,6 +660,14 @@ public class HdfsTable extends Table implements FeFsTable {
     long duration = clock.getTick() - startTime;
     LOG.info("Loaded file and block metadata for {} partitions: {}. Time taken: {}",
         getFullName(), partNames, PrintUtils.printTimeNs(duration));
+  }
+
+  public FileSystem getFileSystem() throws CatalogException {
+    try {
+      return (new Path(getLocation())).getFileSystem(CONF);
+    } catch (IOException e) {
+      throw new CatalogException("Invalid table path for table: " + getFullName(), e);
+    }
   }
 
   /**
@@ -1513,11 +1485,12 @@ public class HdfsTable extends Table implements FeFsTable {
     return table;
   }
 
-  @Override
   public TGetPartialCatalogObjectResponse getPartialInfo(
-      TGetPartialCatalogObjectRequest req) throws TableLoadingException {
+      TGetPartialCatalogObjectRequest req,
+      Map<HdfsPartition, TPartialPartitionInfo> missingPartitionInfos)
+      throws CatalogException {
+    Preconditions.checkNotNull(missingPartitionInfos);
     TGetPartialCatalogObjectResponse resp = super.getPartialInfo(req);
-
     boolean wantPartitionInfo = req.table_info_selector.want_partition_files ||
         req.table_info_selector.want_partition_metadata ||
         req.table_info_selector.want_partition_names ||
@@ -1530,6 +1503,12 @@ public class HdfsTable extends Table implements FeFsTable {
       partIds = partitionMap_.keySet();
     }
 
+    ValidWriteIdList reqWriteIdList = req.table_info_selector.valid_write_ids == null ?
+        null : MetastoreShim.getValidWriteIdListFromThrift(getFullName(),
+        req.table_info_selector.valid_write_ids);
+    Counter misses = metrics_.getCounter(FILEMETADATA_CACHE_MISS_METRIC);
+    Counter hits = metrics_.getCounter(FILEMETADATA_CACHE_HIT_METRIC);
+    int numFilesFiltered = 0;
     if (partIds != null) {
       resp.table_info.partitions = Lists.newArrayListWithCapacity(partIds.size());
       for (long partId : partIds) {
@@ -1552,10 +1531,24 @@ public class HdfsTable extends Table implements FeFsTable {
         }
 
         if (req.table_info_selector.want_partition_files) {
-          List<FileDescriptor> fds = part.getFileDescriptors();
-          partInfo.file_descriptors = Lists.newArrayListWithCapacity(fds.size());
-          for (FileDescriptor fd: fds) {
-            partInfo.file_descriptors.add(fd.toThrift());
+          List<FileDescriptor> filteredFds = new ArrayList<>(part.getFileDescriptors());
+          try {
+            numFilesFiltered += AcidUtils
+                .filterFdsForAcidState(filteredFds, reqWriteIdList);
+            partInfo.file_descriptors = Lists
+                .newArrayListWithCapacity(filteredFds.size());
+            for (FileDescriptor fd: filteredFds) {
+              partInfo.file_descriptors.add(fd.toThrift());
+            }
+            hits.inc();
+          } catch (CatalogException ex) {
+            if (LOG.isDebugEnabled()) {
+              LOG.debug("Could not use cached file descriptors of partition {} of table"
+                      + " {} for writeIdList {}", part.getPartitionName(), getFullName(),
+                  reqWriteIdList, ex);
+            }
+            misses.inc();
+            missingPartitionInfos.put(part, partInfo);
           }
         }
 
@@ -1565,6 +1558,11 @@ public class HdfsTable extends Table implements FeFsTable {
 
         resp.table_info.partitions.add(partInfo);
       }
+    }
+
+    if (reqWriteIdList != null) {
+      LOG.debug("{} files filtered out of table {} for {}. Hit rate : {}",
+          numFilesFiltered, getFullName(), reqWriteIdList, getFileMetadataCacheHitRate());
     }
 
     if (req.table_info_selector.want_partition_files) {
@@ -1581,6 +1579,12 @@ public class HdfsTable extends Table implements FeFsTable {
       resp.table_info.setSql_constraints(sqlConstraints);
     }
     return resp;
+  }
+
+  private double getFileMetadataCacheHitRate() {
+    long hits = metrics_.getCounter(FILEMETADATA_CACHE_HIT_METRIC).getCount();
+    long misses = metrics_.getCounter(FILEMETADATA_CACHE_MISS_METRIC).getCount();
+    return ((double) hits) / (double) (hits+misses);
   }
 
   /**
@@ -2029,6 +2033,8 @@ public class HdfsTable extends Table implements FeFsTable {
       public Boolean getValue() { return hasIncrementalStats_; }
     });
     metrics_.addTimer(CATALOG_UPDATE_DURATION_METRIC);
+    metrics_.addCounter(FILEMETADATA_CACHE_HIT_METRIC);
+    metrics_.addCounter(FILEMETADATA_CACHE_MISS_METRIC);
   }
 
   /**
@@ -2082,18 +2088,22 @@ public class HdfsTable extends Table implements FeFsTable {
    * Set ValistWriteIdList with stored writeId
    * @param client the client to access HMS
    */
-  protected void loadValidWriteIdList(IMetaStoreClient client)
+  protected boolean loadValidWriteIdList(IMetaStoreClient client)
       throws TableLoadingException {
     Stopwatch sw = Stopwatch.createStarted();
     Preconditions.checkState(msTable_ != null && msTable_.getParameters() != null);
+    boolean prevWriteIdChanged = false;
     if (MetastoreShim.getMajorVersion() > 2 &&
         AcidUtils.isTransactionalTable(msTable_.getParameters())) {
-      validWriteIds_ = fetchValidWriteIds(client);
+      ValidWriteIdList writeIdList = fetchValidWriteIds(client);
+      prevWriteIdChanged = writeIdList.toString().equals(validWriteIds_);
+      validWriteIds_ = writeIdList;
     } else {
       validWriteIds_ = null;
     }
     LOG.debug("Load Valid Write Id List Done. Time taken: " +
         PrintUtils.printTimeNs(sw.elapsed(TimeUnit.NANOSECONDS)));
+    return prevWriteIdChanged;
   }
 
   @Override
