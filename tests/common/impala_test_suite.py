@@ -37,7 +37,10 @@ from getpass import getuser
 from random import choice
 from subprocess import check_call
 from tests.common.base_test_suite import BaseTestSuite
-from tests.common.environ import HIVE_MAJOR_VERSION, MANAGED_WAREHOUSE_DIR
+from tests.common.environ import (
+    HIVE_MAJOR_VERSION,
+    MANAGED_WAREHOUSE_DIR,
+    EXTERNAL_WAREHOUSE_DIR)
 from tests.common.errors import Timeout
 from tests.common.impala_connection import create_connection
 from tests.common.impala_service import ImpaladService
@@ -435,7 +438,8 @@ class ImpalaTestSuite(BaseTestSuite):
         "IMPALA_HOME",
         "INTERNAL_LISTEN_HOST",
         "INTERNAL_LISTEN_IP",
-        "MANAGED_WAREHOUSE_DIR"])
+        "MANAGED_WAREHOUSE_DIR",
+        "EXTERNAL_WAREHOUSE_DIR"])
     repl.update({
         '$SECONDARY_FILESYSTEM': os.environ.get("SECONDARY_FILESYSTEM", ""),
         '$USER': getuser()})
@@ -500,7 +504,9 @@ class ImpalaTestSuite(BaseTestSuite):
                                               INTERNAL_LISTEN_HOST) \
                                      .replace('$INTERNAL_LISTEN_IP', INTERNAL_LISTEN_IP) \
                                      .replace('$MANAGED_WAREHOUSE_DIR',
-                                              MANAGED_WAREHOUSE_DIR)
+                                              MANAGED_WAREHOUSE_DIR) \
+                                     .replace('$EXTERNAL_WAREHOUSE_DIR',
+                                              EXTERNAL_WAREHOUSE_DIR)
         if use_db:
           test_section[section_name] = test_section[section_name].replace('$DATABASE', use_db)
     result_section, type_section = 'RESULTS', 'TYPES'

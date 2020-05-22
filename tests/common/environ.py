@@ -77,6 +77,7 @@ if HIVE_MAJOR_VERSION > 2:
   MANAGED_WAREHOUSE_DIR = 'test-warehouse/managed'
 else:
   MANAGED_WAREHOUSE_DIR = 'test-warehouse'
+EXTERNAL_WAREHOUSE_DIR = 'test-warehouse'
 
 # Resolve any symlinks in the path.
 impalad_basedir = \
