@@ -25,7 +25,8 @@ from tests.common.impala_test_suite import ImpalaTestSuite
 from tests.common.skip import SkipIfEC, SkipIfCatalogV2, SkipIfNotHdfsMinicluster
 from tests.common.test_dimensions import (
     create_uncompressed_text_dimension, create_exec_option_dimension_from_dict,
-    create_client_protocol_dimension, hs2_parquet_constraint)
+    create_client_protocol_dimension, hs2_parquet_constraint,
+    extend_exec_option_dimension)
 from tests.common.test_vector import ImpalaTestVector
 
 class TestQueries(ImpalaTestSuite):
