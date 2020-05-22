@@ -422,7 +422,7 @@ public class LocalFsTable extends LocalTable implements FeFsTable {
     try {
       partsByName = db_.getCatalog().getMetaProvider().loadPartitionsByRefs(
           ref_, getClusteringColumnNames(), hostIndex_, refs);
-    } catch (TException e) {
+    } catch (CatalogException | TException e) {
       throw new LocalCatalogException(
           "Could not load partitions for table " + getFullName(), e);
     }

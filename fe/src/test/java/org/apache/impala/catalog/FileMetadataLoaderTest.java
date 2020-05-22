@@ -42,8 +42,8 @@ import com.google.common.collect.ImmutableList;
 public class FileMetadataLoaderTest {
 
   @Test
-  public void testRecursiveLoading() throws IOException, MetaException {
-    //TODO(IMPALA-9042): Remove "throws MetaException"
+  public void testRecursiveLoading() throws IOException, CatalogException {
+    //TODO(IMPALA-9042): Remove "throws CatalogException"
     ListMap<TNetworkAddress> hostIndex = new ListMap<>();
     Path tablePath = new Path("hdfs://localhost:20500/test-warehouse/alltypes/");
     FileMetadataLoader fml = new FileMetadataLoader(tablePath, /* recursive=*/true,
@@ -80,8 +80,8 @@ public class FileMetadataLoaderTest {
   }
 
   @Test
-  public void testHudiParquetLoading() throws IOException, MetaException {
-    //TODO(IMPALA-9042): Remove "throws MetaException"
+  public void testHudiParquetLoading() throws IOException, CatalogException {
+    //TODO(IMPALA-9042): Remove "throws CatalogException"
     ListMap<TNetworkAddress> hostIndex = new ListMap<>();
     Path tablePath = new Path("hdfs://localhost:20500/test-warehouse/hudi_parquet/");
     FileMetadataLoader fml = new FileMetadataLoader(tablePath, /* recursive=*/true,
@@ -112,8 +112,8 @@ public class FileMetadataLoaderTest {
   }
 
   @Test
-  public void testAcidMinorCompactionLoading() throws IOException, MetaException {
-    //TODO(IMPALA-9042): Remove "throws MetaException"
+  public void testAcidMinorCompactionLoading() throws IOException, CatalogException {
+    //TODO(IMPALA-9042): Remove "throws CatalogException"
     ListMap<TNetworkAddress> hostIndex = new ListMap<>();
     ValidWriteIdList writeIds = MetastoreShim.getValidWriteIdListFromString(
         "functional_orc_def.complextypestbl_minor_compacted:10:10::");
@@ -130,8 +130,8 @@ public class FileMetadataLoaderTest {
   }
 
   @Test
-  public void testLoadMissingDirectory() throws IOException, MetaException {
-    //TODO(IMPALA-9042): Remove "throws MetaException"
+  public void testLoadMissingDirectory() throws IOException, CatalogException {
+    //TODO(IMPALA-9042): Remove "throws CatalogException"
     for (boolean recursive : ImmutableList.of(false, true)) {
       ListMap<TNetworkAddress> hostIndex = new ListMap<>();
       Path tablePath = new Path("hdfs://localhost:20500/test-warehouse/does-not-exist/");
@@ -142,9 +142,9 @@ public class FileMetadataLoaderTest {
     }
   }
 
-  //TODO(IMPALA-9042): Remove 'throws MetaException'
+  //TODO(IMPALA-9042): Remove 'throws CatalogException'
   @Test
-  public void testSkipHiddenDirectories() throws IOException, MetaException {
+  public void testSkipHiddenDirectories() throws IOException, CatalogException {
     Path sourcePath = new Path("hdfs://localhost:20500/test-warehouse/alltypes/");
     Path tmpTestPath = new Path("hdfs://localhost:20500/tmp/test-filemetadata-loader");
     Configuration conf = new Configuration();

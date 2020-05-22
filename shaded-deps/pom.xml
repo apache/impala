@@ -75,6 +75,7 @@ the same dependencies
               <includes>
                 <include>org/apache/hadoop/hive/conf/**/*</include>
                 <include>org/apache/hadoop/hive/common/FileUtils*</include>
+                <include>org/apache/hive/common/util/TxnIdUtils*</include>
                 <!-- Needed to support describe formatted command compat with Hive --> 
                 <include>org/apache/hadoop/hive/ql/metadata/**/*</include>
                 <include>org/apache/hadoop/hive/ql/parse/SemanticException.class</include>

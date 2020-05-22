@@ -138,7 +138,6 @@ import org.apache.impala.thrift.TTypeNode;
 import org.apache.impala.thrift.TTypeNodeType;
 import org.apache.impala.thrift.TUniqueId;
 import org.apache.impala.thrift.TUpdateCatalogRequest;
-import org.apache.impala.util.MetaStoreUtil;
 import org.apache.impala.util.MetaStoreUtil.InsertEventInfo;
 import org.apache.thrift.TException;
 import org.junit.After;
@@ -839,7 +838,7 @@ public class MetastoreEventsProcessorTest {
     eventsProcessor_.processEvents();
 
     // Simulate a load table
-    Table tbl = catalog_.getOrLoadTable(dbName, tblName, "test");
+    Table tbl = catalog_.getOrLoadTable(dbName, tblName, "test", null);
     Partition partition = null;
     if (isPartitionInsert) {
       // Get the partition from metastore. This should now contain the new file.
@@ -3025,7 +3024,7 @@ public class MetastoreEventsProcessorTest {
   }
 
   private Table loadTable(String dbName, String tblName) throws CatalogException {
-    Table loadedTable = catalog_.getOrLoadTable(dbName, tblName, "test");
+    Table loadedTable = catalog_.getOrLoadTable(dbName, tblName, "test", null);
     assertFalse("Table should have been loaded after getOrLoadTable call",
         loadedTable instanceof IncompleteTable);
     return loadedTable;
