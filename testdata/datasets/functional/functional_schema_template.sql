@@ -2273,16 +2273,6 @@ TBLPROPERTIES('transactional'='true');
 ---- DATASET
 functional
 ---- BASE_TABLE_NAME
-materialized_view
----- HIVE_MAJOR_VERSION
-3
----- CREATE_HIVE
-CREATE MATERIALIZED VIEW IF NOT EXISTS {db_name}{db_suffix}.{table_name}
-  AS SELECT * FROM {db_name}{db_suffix}.insert_only_transactional_table;
-====
----- DATASET
-functional
----- BASE_TABLE_NAME
 insert_only_transactional_bucketed_table
 ---- HIVE_MAJOR_VERSION
 3
@@ -2320,6 +2310,19 @@ SELECT id, int_col from functional.alltypes;
 INSERT OVERWRITE TABLE {db_name}{db_suffix}.{table_name}
 SELECT * from functional.{table_name};
 ====
+---- DATASET
+functional
+---- BASE_TABLE_NAME
+materialized_view
+---- HIVE_MAJOR_VERSION
+3
+---- CREATE_HIVE
+-- The create materialized view command is moved down so that the database's
+-- managed directory has been created. Otherwise the command would fail. This
+-- is a bug in Hive.
+CREATE MATERIALIZED VIEW IF NOT EXISTS {db_name}{db_suffix}.{table_name}
+  AS SELECT * FROM {db_name}{db_suffix}.insert_only_transactional_table;
+=====
 ---- DATASET
 functional
 ---- BASE_TABLE_NAME
