@@ -33,7 +33,9 @@ import org.apache.impala.common.AnalysisSessionFixture;
 import org.apache.impala.common.ImpalaException;
 import org.apache.impala.common.InternalException;
 import org.apache.impala.common.QueryFixture.SelectFixture;
+import org.apache.impala.common.RuntimeEnv;
 import org.apache.impala.planner.CardinalityTest;
+import org.junit.BeforeClass;
 import org.junit.Test;
 
 /**
@@ -76,6 +78,11 @@ import org.junit.Test;
  */
 public class ExprCardinalityTest {
   private static AnalysisSessionFixture session_ = new AnalysisSessionFixture();
+
+  @BeforeClass
+  public static void setUp() {
+    RuntimeEnv.INSTANCE.setTestEnv(true);
+  }
 
   private void verifyTableCol(Table table, String colName,
       long expectedNdv, long expectedNullCount) {
