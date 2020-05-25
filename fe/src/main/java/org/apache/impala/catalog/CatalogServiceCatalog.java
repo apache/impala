@@ -35,6 +35,7 @@ import java.util.concurrent.Semaphore;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicLong;
 import java.util.concurrent.locks.ReentrantReadWriteLock;
+import java.util.stream.Collectors;
 
 import org.apache.commons.collections.MapUtils;
 import org.apache.hadoop.fs.RemoteIterator;
@@ -3125,8 +3126,11 @@ public class CatalogServiceCatalog extends Catalog {
             "Unable to fetch valid transaction ids while loading file metadata for table "
                 + table.getFullName(), ex);
       }
+      List<HdfsPartition.Builder> partBuilders = partToPartialInfoMap.keySet().stream()
+          .map(HdfsPartition.Builder::new)
+          .collect(Collectors.toList());
       Map<HdfsPartition, List<FileDescriptor>> fdsByPart = new ParallelFileMetadataLoader(
-          table, partToPartialInfoMap.keySet(), reqWriteIdList, validTxnList, logPrefix)
+          table, partBuilders, reqWriteIdList, validTxnList, logPrefix)
           .loadAndGet();
       for (HdfsPartition partition : fdsByPart.keySet()) {
         TPartialPartitionInfo partitionInfo = partToPartialInfoMap.get(partition);

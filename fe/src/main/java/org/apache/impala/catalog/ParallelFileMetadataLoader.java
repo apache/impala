@@ -70,10 +70,11 @@ public class ParallelFileMetadataLoader {
 
   private final String logPrefix_;
   private final Map<Path, FileMetadataLoader> loaders_;
-  private final Map<Path, List<HdfsPartition>> partsByPath_;
+  private final Map<Path, List<HdfsPartition.Builder>> partsByPath_;
   private final FileSystem fs_;
 
-  public ParallelFileMetadataLoader(HdfsTable table, Collection<HdfsPartition> parts,
+  public ParallelFileMetadataLoader(HdfsTable table,
+      Collection<HdfsPartition.Builder> partBuilders,
       ValidWriteIdList writeIdList, ValidTxnList validTxnList, String logPrefix)
       throws CatalogException {
     if (writeIdList != null || validTxnList != null) {
@@ -84,14 +85,14 @@ public class ParallelFileMetadataLoader {
     // Group the partitions by their path (multiple partitions may point to the same
     // path).
     partsByPath_ = Maps.newHashMap();
-    for (HdfsPartition p : parts) {
+    for (HdfsPartition.Builder p : partBuilders) {
       Path partPath = FileSystemUtil.createFullyQualifiedPath(new Path(p.getLocation()));
       partsByPath_.computeIfAbsent(partPath, (path) -> new ArrayList<>())
           .add(p);
     }
     // Create a FileMetadataLoader for each path.
     loaders_ = Maps.newHashMap();
-    for (Map.Entry<Path, List<HdfsPartition>> e : partsByPath_.entrySet()) {
+    for (Map.Entry<Path, List<HdfsPartition.Builder>> e : partsByPath_.entrySet()) {
       List<FileDescriptor> oldFds = e.getValue().get(0).getFileDescriptors();
       FileMetadataLoader loader = new FileMetadataLoader(e.getKey(),
           Utils.shouldRecursivelyListPartitions(table), oldFds, table.getHostIndex(),
@@ -100,7 +101,7 @@ public class ParallelFileMetadataLoader {
       // locations even if the underlying files have not changed.
       // This is done to keep the cached block metadata up to date.
       boolean hasCachedPartition = Iterables.any(e.getValue(),
-          HdfsPartition::isMarkedCached);
+          HdfsPartition.Builder::isMarkedCached);
       loader.setForceRefreshBlockLocations(hasCachedPartition);
       loaders_.put(e.getKey(), loader);
     }
@@ -117,12 +118,12 @@ public class ParallelFileMetadataLoader {
     load();
 
     // Store the loaded FDs into the partitions.
-    for (Map.Entry<Path, List<HdfsPartition>> e : partsByPath_.entrySet()) {
+    for (Map.Entry<Path, List<HdfsPartition.Builder>> e : partsByPath_.entrySet()) {
       Path p = e.getKey();
       FileMetadataLoader loader = loaders_.get(p);
 
-      for (HdfsPartition part : e.getValue()) {
-        part.setFileDescriptors(loader.getLoadedFds());
+      for (HdfsPartition.Builder partBuilder : e.getValue()) {
+        partBuilder.setFileDescriptors(loader.getLoadedFds());
       }
     }
   }
@@ -135,12 +136,12 @@ public class ParallelFileMetadataLoader {
   Map<HdfsPartition, List<FileDescriptor>> loadAndGet() throws TableLoadingException {
     load();
     Map<HdfsPartition, List<FileDescriptor>> result = Maps.newHashMap();
-    for (Map.Entry<Path, List<HdfsPartition>> e : partsByPath_.entrySet()) {
+    for (Map.Entry<Path, List<HdfsPartition.Builder>> e : partsByPath_.entrySet()) {
       Path p = e.getKey();
       FileMetadataLoader loader = loaders_.get(p);
 
-      for (HdfsPartition part : e.getValue()) {
-        result.put(part, loader.getLoadedFds());
+      for (HdfsPartition.Builder partBuilder : e.getValue()) {
+        result.put(partBuilder.getOldInstance(), loader.getLoadedFds());
       }
     }
     return result;

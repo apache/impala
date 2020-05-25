@@ -134,7 +134,7 @@ public class PartitionStatsUtil {
    * partition's stats are removed.
    */
   public static void partStatsToPartition(TPartitionStats partStats,
-      HdfsPartition partition) throws ImpalaException {
+      HdfsPartition.Builder partition) throws ImpalaException {
     if (partStats == null) {
       partition.setPartitionStatsBytes(null, false);
       return;

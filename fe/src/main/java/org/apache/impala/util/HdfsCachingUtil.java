@@ -100,7 +100,7 @@ public class HdfsCachingUtil {
    * Returns the ID of the submitted cache directive and throws if there is an error
    * submitting the directive.
    */
-  public static long submitCachePartitionDirective(HdfsPartition part,
+  public static long submitCachePartitionDirective(HdfsPartition.Builder part,
       String poolName, short replication) throws ImpalaRuntimeException {
     long id = HdfsCachingUtil.submitDirective(new Path(part.getLocation()),
         poolName, replication);
@@ -154,7 +154,7 @@ public class HdfsCachingUtil {
    * data. Also updates the partition's metadata to remove the cache directive ID.
    * No-op if the table is not cached.
    */
-  public static void removePartitionCacheDirective(FeFsPartition part)
+  public static void removePartitionCacheDirective(HdfsPartition.Builder part)
       throws ImpalaException {
     Preconditions.checkNotNull(part);
     Map<String, String> parameters = part.getParameters();
@@ -174,17 +174,16 @@ public class HdfsCachingUtil {
   }
 
   /**
-   * Convenience method for working directly on a metastore partition. See
-   * removePartitionCacheDirective(HdfsPartition) for more details.
+   * Convenience method for working directly on a metastore partition params map. See
+   * removePartitionCacheDirective(HdfsPartition.Builder) for more details.
    */
   public static void removePartitionCacheDirective(
-      org.apache.hadoop.hive.metastore.api.Partition part) throws ImpalaException {
-    Preconditions.checkNotNull(part);
-    Long id = getCacheDirectiveId(part.getParameters());
+      Map<String, String> partitionParams) throws ImpalaException {
+    Long id = getCacheDirectiveId(partitionParams);
     if (id == null) return;
     HdfsCachingUtil.removeDirective(id);
-    part.getParameters().remove(CACHE_DIR_ID_PROP_NAME);
-    part.getParameters().remove(CACHE_DIR_REPLICATION_PROP_NAME);
+    partitionParams.remove(CACHE_DIR_ID_PROP_NAME);
+    partitionParams.remove(CACHE_DIR_REPLICATION_PROP_NAME);
   }
 
   /**
@@ -348,8 +347,8 @@ public class HdfsCachingUtil {
    * Update cache directive for a partition and update the metastore parameters.
    * Returns the cache directive ID
    */
-  public static long modifyCacheDirective(Long id, HdfsPartition part, String poolName,
-      short replication) throws ImpalaRuntimeException {
+  public static long modifyCacheDirective(Long id, HdfsPartition.Builder part,
+      String poolName, short replication) throws ImpalaRuntimeException {
     Preconditions.checkNotNull(id);
     HdfsCachingUtil.modifyCacheDirective(id, new Path(part.getLocation()),
         poolName, replication);

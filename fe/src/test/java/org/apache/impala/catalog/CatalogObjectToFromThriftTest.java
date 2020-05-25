@@ -236,14 +236,14 @@ public class CatalogObjectToFromThriftTest {
     Assert.assertNotNull(part);;
     // Create a dummy partition with an invalid decimal type.
     try {
-      new HdfsPartition(hdfsTable, part.toHmsPartition(),
-          Lists.newArrayList(
+      new HdfsPartition.Builder(hdfsTable)
+          .setMsPartition(part.toHmsPartition())
+          .setPartitionKeyValues(Lists.newArrayList(
               LiteralExpr.createFromUnescapedStr(
                   "11.1", ScalarType.createDecimalType(1, 0)),
               LiteralExpr.createFromUnescapedStr(
-                  "11.1", ScalarType.createDecimalType(1, 0))),
-          null, new ArrayList<>(),
-          TAccessLevel.READ_WRITE);
+                  "11.1", ScalarType.createDecimalType(1, 0))))
+          .setAccessLevel(TAccessLevel.READ_WRITE);
       fail("Expected metadata to be malformed.");
     } catch (SqlCastException e) {
       Assert.assertTrue(e.getMessage().contains(

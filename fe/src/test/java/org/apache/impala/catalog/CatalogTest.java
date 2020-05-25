@@ -421,9 +421,10 @@ public class CatalogTest {
     // reload path. Since we can't modify HDFS itself via these tests, we
     // do the next best thing: modify the metadata to revise history as
     // though the partition used above were actually empty.
-    HdfsPartition hdfsPartition = table
-        .getPartitionFromThriftPartitionSpec(partitionSpec);
-    hdfsPartition.setFileDescriptors(new ArrayList<>());
+    HdfsPartition.Builder partBuilder = new HdfsPartition.Builder(
+        table.getPartitionFromThriftPartitionSpec(partitionSpec));
+    partBuilder.setFileDescriptors(new ArrayList<>());
+    table.updatePartition(partBuilder);
     stats.reset();
     catalog_.reloadPartition(table, partitionSpec, new Reference<>(false), "test");
 

@@ -798,4 +798,19 @@ public abstract class Table extends CatalogObjectImpl implements FeTable {
   public ValidWriteIdList getValidWriteIds() {
     return null;
   }
+
+  /**
+   * When altering a table we modify the cached metadata and apply the new metadata to
+   * HMS. Some DDL/DMLs require reloading the HMS and file metadata to update the cached
+   * metadata (See CatalogOpExecutor#alterTable(TAlterTableParams, TDdlExecResponse) for
+   * more details). Before reloading the metadata, these modifications are not finalized.
+   * @return true if there are any in-progress modifications need to be finalized in an
+   * incremental table reload.
+   */
+  public boolean hasInProgressModification() { return false; }
+
+  /**
+   * Clears the in-progress modifications in case of failures.
+   */
+  public void resetInProgressModification() { }
 }

@@ -846,6 +846,8 @@ public class CatalogOpExecutor {
               "Unknown ALTER TABLE operation type: " + params.getAlter_type());
       }
 
+      // Make sure we won't forget finalizing the modification.
+      if (tbl.hasInProgressModification()) Preconditions.checkState(reloadMetadata);
       if (reloadMetadata) {
         loadTableMetadata(tbl, newCatalogVersion, reloadFileMetadata,
             reloadTableSchema, null, "ALTER TABLE " + params.getAlter_type().name());
@@ -854,9 +856,13 @@ public class CatalogOpExecutor {
         catalog_.addVersionsForInflightEvents(false, tbl, newCatalogVersion);
         addTableToCatalogUpdate(tbl, response.result);
       }
+      // Make sure all the modifications are done.
+      Preconditions.checkState(!tbl.hasInProgressModification());
     } finally {
       context.stop();
       UnlockWriteLockIfErronouslyLocked();
+      // Clear in-progress modifications in case of exceptions.
+      tbl.resetInProgressModification();
       tbl.getLock().unlock();
     }
   }
@@ -1126,7 +1132,7 @@ public class CatalogOpExecutor {
 
     // Update partition-level row counts and incremental column stats for
     // partitioned Hdfs tables.
-    List<HdfsPartition> modifiedParts = null;
+    List<HdfsPartition.Builder> modifiedParts = null;
     if (params.isSetPartition_stats() && table.getNumClusteringCols() > 0) {
       Preconditions.checkState(table instanceof HdfsTable);
       modifiedParts = updatePartitionStats(params, (HdfsTable) table);
@@ -1159,10 +1165,10 @@ public class CatalogOpExecutor {
    * Row counts for missing or new partitions as a result of concurrent table alterations
    * are set to 0.
    */
-  private List<HdfsPartition> updatePartitionStats(TAlterTableUpdateStatsParams params,
-      HdfsTable table) throws ImpalaException {
+  private List<HdfsPartition.Builder> updatePartitionStats(
+      TAlterTableUpdateStatsParams params, HdfsTable table) throws ImpalaException {
     Preconditions.checkState(params.isSetPartition_stats());
-    List<HdfsPartition> modifiedParts = Lists.newArrayList();
+    List<HdfsPartition.Builder> modifiedParts = Lists.newArrayList();
     // TODO(todd) only load the partitions that were modified in 'params'.
     Collection<? extends FeFsPartition> parts =
         FeCatalogUtils.loadAllPartitions(table);
@@ -1199,12 +1205,13 @@ public class CatalogOpExecutor {
         LOG.trace(String.format("Updating stats for partition %s: numRows=%d",
             partition.getValuesAsString(), numRows));
       }
-      PartitionStatsUtil.partStatsToPartition(partitionStats, partition);
-      partition.putToParameters(StatsSetupConst.ROW_COUNT, String.valueOf(numRows));
+      HdfsPartition.Builder partBuilder = new HdfsPartition.Builder(partition);
+      PartitionStatsUtil.partStatsToPartition(partitionStats, partBuilder);
+      partBuilder.putToParameters(StatsSetupConst.ROW_COUNT, String.valueOf(numRows));
       // HMS requires this param for stats changes to take effect.
-      partition.putToParameters(MetastoreShim.statsGeneratedViaStatsTaskParam());
-      partition.getParameters().remove(StatsSetupConst.COLUMN_STATS_ACCURATE);
-      modifiedParts.add(partition);
+      partBuilder.putToParameters(MetastoreShim.statsGeneratedViaStatsTaskParam());
+      partBuilder.getParameters().remove(StatsSetupConst.COLUMN_STATS_ACCURATE);
+      modifiedParts.add(partBuilder);
     }
     return modifiedParts;
   }
@@ -1520,18 +1527,17 @@ public class CatalogOpExecutor {
           return;
         }
 
-        for(HdfsPartition partition : partitions) {
+        for (HdfsPartition partition : partitions) {
           if (partition.getPartitionStatsCompressed() != null) {
-            partition.dropPartitionStats();
-            try {
-              applyAlterPartition(table, partition);
-            } finally {
-              partition.markDirty();
-            }
+            HdfsPartition.Builder partBuilder = new HdfsPartition.Builder(partition);
+            partBuilder.dropPartitionStats();
+            applyAlterPartition(table, partBuilder);
+            hdfsTbl.updatePartition(partBuilder);
           }
         }
       }
-      loadTableMetadata(table, newCatalogVersion, false, true, null, "DROP STATS");
+      loadTableMetadata(table, newCatalogVersion, /*reloadFileMetadata=*/false,
+          /*reloadTableSchema=*/true, /*partitionsToUpdate=*/null, "DROP STATS");
       addTableToCatalogUpdate(table, resp.result);
       addSummary(resp, "Stats have been dropped.");
     } finally {
@@ -1602,24 +1608,27 @@ public class CatalogOpExecutor {
     Preconditions.checkNotNull(hdfsTable);
 
     // List of partitions that were modified as part of this operation.
-    List<HdfsPartition> modifiedParts = Lists.newArrayList();
+    List<HdfsPartition.Builder> modifiedParts = Lists.newArrayList();
     Collection<? extends FeFsPartition> parts =
         FeCatalogUtils.loadAllPartitions(hdfsTable);
     for (FeFsPartition fePart: parts) {
       // TODO(todd): avoid downcast
       HdfsPartition part = (HdfsPartition) fePart;
-      boolean isModified = false;
+      HdfsPartition.Builder partBuilder = null;
       if (part.getPartitionStatsCompressed() != null) {
-        part.dropPartitionStats();
-        isModified = true;
+        partBuilder = new HdfsPartition.Builder(part)
+            .dropPartitionStats();
       }
 
       // Remove the ROW_COUNT parameter if it has been set.
-      if (part.getParameters().remove(StatsSetupConst.ROW_COUNT) != null) {
-        isModified = true;
+      if (part.getParameters().containsKey(StatsSetupConst.ROW_COUNT)) {
+        if (partBuilder == null) {
+          partBuilder = new HdfsPartition.Builder(part);
+        }
+        partBuilder.getParameters().remove(StatsSetupConst.ROW_COUNT);
       }
 
-      if (isModified) modifiedParts.add(part);
+      if (partBuilder != null) modifiedParts.add(partBuilder);
     }
 
     bulkAlterPartitions(table, modifiedParts, null);
@@ -1944,8 +1953,12 @@ public class CatalogOpExecutor {
           FeCatalogUtils.loadAllPartitions(hdfsTable);
       for (FeFsPartition part: parts) {
         if (part.isMarkedCached()) {
+          HdfsPartition.Builder partBuilder = new HdfsPartition.Builder(
+              (HdfsPartition) part);
           try {
-            HdfsCachingUtil.removePartitionCacheDirective(part);
+            HdfsCachingUtil.removePartitionCacheDirective(partBuilder);
+            // We are dropping the table. Don't need to update the existing partition so
+            // ignore the partBuilder here.
           } catch (Exception e) {
             LOG.error("Unable to uncache partition: " + part.getPartitionName(), e);
           }
@@ -3153,10 +3166,11 @@ public class CatalogOpExecutor {
       Preconditions.checkArgument(tbl instanceof HdfsTable);
       List<HdfsPartition> partitions =
           ((HdfsTable) tbl).getPartitionsFromPartitionSet(partitionSet);
-      List<HdfsPartition> modifiedParts = Lists.newArrayList();
+      List<HdfsPartition.Builder> modifiedParts = Lists.newArrayList();
       for(HdfsPartition partition: partitions) {
-        partition.setFileFormat(HdfsFileFormat.fromThrift(fileFormat));
-        modifiedParts.add(partition);
+        modifiedParts.add(
+            new HdfsPartition.Builder(partition)
+                .setFileFormat(HdfsFileFormat.fromThrift(fileFormat)));
       }
       bulkAlterPartitions(tbl, modifiedParts, null);
       numUpdatedPartitions.setRef((long) modifiedParts.size());
@@ -3190,10 +3204,11 @@ public class CatalogOpExecutor {
     } else {
       List<HdfsPartition> partitions =
           ((HdfsTable) tbl).getPartitionsFromPartitionSet(partitionSet);
-      List<HdfsPartition> modifiedParts = Lists.newArrayList();
+      List<HdfsPartition.Builder> modifiedParts = Lists.newArrayList();
       for(HdfsPartition partition: partitions) {
-        HiveStorageDescriptorFactory.setSerdeInfo(rowFormat, partition.getSerdeInfo());
-        modifiedParts.add(partition);
+        HdfsPartition.Builder partBuilder = new HdfsPartition.Builder(partition);
+        HiveStorageDescriptorFactory.setSerdeInfo(rowFormat, partBuilder.getSerdeInfo());
+        modifiedParts.add(partBuilder);
       }
       bulkAlterPartitions(tbl, modifiedParts, null);
       numUpdatedPartitions.setRef((long) modifiedParts.size());
@@ -3231,11 +3246,12 @@ public class CatalogOpExecutor {
       TableName tableName = tbl.getTableName();
       HdfsPartition partition = catalog_.getHdfsPartition(
           tableName.getDb(), tableName.getTbl(), partitionSpec);
-      partition.setLocation(location);
+      HdfsPartition.Builder partBuilder = new HdfsPartition.Builder(partition);
+      partBuilder.setLocation(location);
       try {
-        applyAlterPartition(tbl, partition);
+        applyAlterPartition(tbl, partBuilder);
       } finally {
-        partition.markDirty();
+        ((HdfsTable) tbl).markDirtyPartition(partBuilder);
       }
     }
     return reloadFileMetadata;
@@ -3256,26 +3272,27 @@ public class CatalogOpExecutor {
       List<HdfsPartition> partitions =
           ((HdfsTable) tbl).getPartitionsFromPartitionSet(params.getPartition_set());
 
-      List<HdfsPartition> modifiedParts = Lists.newArrayList();
+      List<HdfsPartition.Builder> modifiedParts = Lists.newArrayList();
       for(HdfsPartition partition: partitions) {
+        HdfsPartition.Builder partBuilder = new HdfsPartition.Builder(partition);
         switch (params.getTarget()) {
           case TBL_PROPERTY:
-            partition.getParameters().putAll(properties);
+            partBuilder.getParameters().putAll(properties);
             break;
           case SERDE_PROPERTY:
-            partition.getSerdeInfo().getParameters().putAll(properties);
+            partBuilder.getSerdeInfo().getParameters().putAll(properties);
             break;
           default:
             throw new UnsupportedOperationException(
                 "Unknown target TTablePropertyType: " + params.getTarget());
         }
-        modifiedParts.add(partition);
+        modifiedParts.add(partBuilder);
       }
       try {
         bulkAlterPartitions(tbl, modifiedParts, null);
       } finally {
-        for (HdfsPartition modifiedPart : modifiedParts) {
-          modifiedPart.markDirty();
+        for (HdfsPartition.Builder modifiedPart : modifiedParts) {
+          ((HdfsTable) tbl).markDirtyPartition(modifiedPart);
         }
       }
       numUpdatedPartitions.setRef((long) modifiedParts.size());
@@ -3373,17 +3390,18 @@ public class CatalogOpExecutor {
           // needs to be updated
           if (!partition.isMarkedCached() ||
               HdfsCachingUtil.isUpdateOp(cacheOp, partition.getParameters())) {
+            HdfsPartition.Builder partBuilder = new HdfsPartition.Builder(partition);
             try {
               // If the partition was already cached, update the directive otherwise
               // issue new cache directive
               if (!partition.isMarkedCached()) {
                 cacheDirIds.add(HdfsCachingUtil.submitCachePartitionDirective(
-                    partition, cacheOp.getCache_pool_name(), cacheReplication));
+                    partBuilder, cacheOp.getCache_pool_name(), cacheReplication));
               } else {
                 Long directiveId = HdfsCachingUtil.getCacheDirectiveId(
                     partition.getParameters());
                 cacheDirIds.add(HdfsCachingUtil.modifyCacheDirective(directiveId,
-                    partition, cacheOp.getCache_pool_name(), cacheReplication));
+                    partBuilder, cacheOp.getCache_pool_name(), cacheReplication));
               }
             } catch (ImpalaRuntimeException e) {
               if (partition.isMarkedCached()) {
@@ -3397,9 +3415,9 @@ public class CatalogOpExecutor {
 
             // Update the partition metadata.
             try {
-              applyAlterPartition(tbl, partition);
+              applyAlterPartition(tbl, partBuilder);
             } finally {
-              partition.markDirty();
+              ((HdfsTable) tbl).markDirtyPartition(partBuilder);
             }
           }
         }
@@ -3425,11 +3443,12 @@ public class CatalogOpExecutor {
           // TODO(todd): avoid downcast
           HdfsPartition partition = (HdfsPartition) fePartition;
           if (partition.isMarkedCached()) {
-            HdfsCachingUtil.removePartitionCacheDirective(partition);
+            HdfsPartition.Builder partBuilder = new HdfsPartition.Builder(partition);
+            HdfsCachingUtil.removePartitionCacheDirective(partBuilder);
             try {
-              applyAlterPartition(tbl, partition);
+              applyAlterPartition(tbl, partBuilder);
             } finally {
-              partition.markDirty();
+              ((HdfsTable) tbl).markDirtyPartition(partBuilder);
             }
           }
         }
@@ -3461,23 +3480,25 @@ public class CatalogOpExecutor {
     Preconditions.checkArgument(tbl instanceof HdfsTable);
     List<HdfsPartition> partitions =
         ((HdfsTable) tbl).getPartitionsFromPartitionSet(params.getPartition_set());
-    List<HdfsPartition> modifiedParts = Lists.newArrayList();
+    List<HdfsPartition.Builder> modifiedParts = Lists.newArrayList();
     if (cacheOp.isSet_cached()) {
       for (HdfsPartition partition : partitions) {
         // The directive is null if the partition is not cached
         Long directiveId =
             HdfsCachingUtil.getCacheDirectiveId(partition.getParameters());
+        HdfsPartition.Builder partBuilder = null;
         short replication = HdfsCachingUtil.getReplicationOrDefault(cacheOp);
         List<Long> cacheDirs = Lists.newArrayList();
         if (directiveId == null) {
+          partBuilder = new HdfsPartition.Builder(partition);
           cacheDirs.add(HdfsCachingUtil.submitCachePartitionDirective(
-              partition, cacheOp.getCache_pool_name(), replication));
+              partBuilder, cacheOp.getCache_pool_name(), replication));
         } else {
           if (HdfsCachingUtil.isUpdateOp(cacheOp, partition.getParameters())) {
+            partBuilder = new HdfsPartition.Builder(partition);
             HdfsCachingUtil.validateCachePool(cacheOp, directiveId, tableName, partition);
             cacheDirs.add(HdfsCachingUtil.modifyCacheDirective(
-                directiveId, partition, cacheOp.getCache_pool_name(),
-                replication));
+                directiveId, partBuilder, cacheOp.getCache_pool_name(), replication));
           }
         }
 
@@ -3487,23 +3508,22 @@ public class CatalogOpExecutor {
           catalog_.watchCacheDirs(cacheDirs, tableName.toThrift(),
               "ALTER PARTITION SET CACHED");
         }
-        if (!partition.isMarkedCached()) {
-          modifiedParts.add(partition);
-        }
+        if (partBuilder != null) modifiedParts.add(partBuilder);
       }
     } else {
       for (HdfsPartition partition : partitions) {
         if (partition.isMarkedCached()) {
-          HdfsCachingUtil.removePartitionCacheDirective(partition);
-          modifiedParts.add(partition);
+          HdfsPartition.Builder partBuilder = new HdfsPartition.Builder(partition);
+          HdfsCachingUtil.removePartitionCacheDirective(partBuilder);
+          modifiedParts.add(partBuilder);
         }
       }
     }
     try {
       bulkAlterPartitions(tbl, modifiedParts, null);
     } finally {
-      for (HdfsPartition modifiedPart : modifiedParts) {
-        modifiedPart.markDirty();
+      for (HdfsPartition.Builder modifiedPart : modifiedParts) {
+        ((HdfsTable) tbl).markDirtyPartition(modifiedPart);
       }
     }
     numUpdatedPartitions.setRef((long) modifiedParts.size());
@@ -3668,7 +3688,7 @@ public class CatalogOpExecutor {
    * processor to skip the event generated on the partition.
    */
   private void addToInflightVersionsOfPartition(
-      Map<String, String> partitionParams, HdfsPartition hdfsPartition) {
+      Map<String, String> partitionParams, HdfsPartition.Builder partBuilder) {
     if (!catalog_.isEventProcessingActive()) return;
     Preconditions.checkState(partitionParams != null);
     String version = partitionParams
@@ -3680,7 +3700,7 @@ public class CatalogOpExecutor {
     // catalog service identifiers
     if (catalog_.getCatalogServiceId().equals(serviceId)) {
       Preconditions.checkNotNull(version);
-      hdfsPartition.addToVersionsForInflightEvents(false, Long.parseLong(version));
+      partBuilder.addToVersionsForInflightEvents(false, Long.parseLong(version));
     }
   }
 
@@ -3795,14 +3815,14 @@ public class CatalogOpExecutor {
     }
   }
 
-  private void applyAlterPartition(Table tbl, HdfsPartition partition)
+  private void applyAlterPartition(Table tbl, HdfsPartition.Builder partBuilder)
       throws ImpalaException {
     try (MetaStoreClient msClient = catalog_.getMetaStoreClient()) {
-      Partition hmsPartition = partition.toHmsPartition();
+      Partition hmsPartition = partBuilder.toHmsPartition();
       addCatalogServiceIdentifiers(tbl.getMetaStoreTable(), hmsPartition);
       applyAlterHmsPartitions(tbl.getMetaStoreTable().deepCopy(), msClient,
           tbl.getTableName(), Arrays.asList(hmsPartition));
-      addToInflightVersionsOfPartition(hmsPartition.getParameters(), partition);
+      addToInflightVersionsOfPartition(hmsPartition.getParameters(), partBuilder);
     }
   }
 
@@ -3939,51 +3959,48 @@ public class CatalogOpExecutor {
    * reduces the time spent in a single update and helps avoid metastore client
    * timeouts.
    */
-  private void bulkAlterPartitions(Table tbl, List<HdfsPartition> modifiedParts,
+  private void bulkAlterPartitions(Table tbl, List<HdfsPartition.Builder> modifiedParts,
       TblTransaction tblTxn) throws ImpalaException {
-    List<org.apache.hadoop.hive.metastore.api.Partition> hmsPartitions =
-        Lists.newArrayList();
-    for (HdfsPartition p: modifiedParts) {
-      org.apache.hadoop.hive.metastore.api.Partition msPart = p.toHmsPartition();
+    // Map from msPartitions to the partition builders. Use IdentityHashMap since
+    // modifications will change hash codes of msPartitions.
+    Map<Partition, HdfsPartition.Builder> msPartitionToBuilders =
+        Maps.newIdentityHashMap();
+    for (HdfsPartition.Builder p: modifiedParts) {
+      Partition msPart = p.toHmsPartition();
       if (msPart != null) {
         addCatalogServiceIdentifiers(tbl.getMetaStoreTable(), msPart);
-        hmsPartitions.add(msPart);
+        msPartitionToBuilders.put(msPart, p);
       }
     }
-    if (hmsPartitions.isEmpty()) return;
+    if (msPartitionToBuilders.isEmpty()) return;
 
     String dbName = tbl.getDb().getName();
     String tableName = tbl.getName();
     try (MetaStoreClient msClient = catalog_.getMetaStoreClient()) {
       // Apply the updates in batches of 'MAX_PARTITION_UPDATES_PER_RPC'.
-      for (List<Partition> hmsPartitionsSubList :
-        Lists.partition(hmsPartitions, MAX_PARTITION_UPDATES_PER_RPC)) {
+      for (List<Partition> msPartitionsSubList : Iterables.partition(
+          msPartitionToBuilders.keySet(), MAX_PARTITION_UPDATES_PER_RPC)) {
         try {
           // Alter partitions in bulk.
           if (tblTxn != null) {
             MetastoreShim.alterPartitionsWithTransaction(msClient.getHiveClient(), dbName,
-                tableName, hmsPartitionsSubList, tblTxn);
-          }
-          else {
+                tableName, msPartitionsSubList, tblTxn);
+          } else {
             MetastoreShim.alterPartitions(msClient.getHiveClient(), dbName, tableName,
-                hmsPartitionsSubList);
+                msPartitionsSubList);
           }
           // Mark the corresponding HdfsPartition objects as dirty
-          for (org.apache.hadoop.hive.metastore.api.Partition msPartition:
-              hmsPartitionsSubList) {
-            try {
-              HdfsPartition hdfsPartition = catalog_.getHdfsPartition(dbName, tableName,
-                  msPartition);
-              hdfsPartition.markDirty();
-              // if event processing is turned on add the version number from partition
-              // paramters to the HdfsPartition's list of in-flight events
-              addToInflightVersionsOfPartition(msPartition.getParameters(),
-                  hdfsPartition);
-            } catch (PartitionNotFoundException e) {
-              LOG.error(String.format("Partition of table %s could not be found: %s",
-                  tableName, e.getMessage()));
-              continue;
-            }
+          for (Partition msPartition: msPartitionsSubList) {
+            HdfsPartition.Builder partBuilder = msPartitionToBuilders.get(msPartition);
+            Preconditions.checkNotNull(partBuilder);
+            // TODO(IMPALA-9779): Should we always mark this as dirty? It will trigger
+            //  file meta reload for this partition. Consider remove this and mark the
+            //  "dirty" flag in callers. For those don't need to reload file meta, the
+            //  caller can build and replace the partition directly.
+            ((HdfsTable) tbl).markDirtyPartition(partBuilder);
+            // If event processing is turned on add the version number from partition
+            // parameters to the HdfsPartition's list of in-flight events.
+            addToInflightVersionsOfPartition(msPartition.getParameters(), partBuilder);
           }
         } catch (TException e) {
           throw new ImpalaRuntimeException(
@@ -4352,7 +4369,7 @@ public class CatalogOpExecutor {
                   for (org.apache.hadoop.hive.metastore.api.Partition part:
                       cachedHmsParts) {
                     try {
-                      HdfsCachingUtil.removePartitionCacheDirective(part);
+                      HdfsCachingUtil.removePartitionCacheDirective(part.getParameters());
                     } catch (ImpalaException e1) {
                       String msg = String.format(
                           "Partition %s.%s(%s): State: Leaked caching directive. " +
@@ -4383,7 +4400,6 @@ public class CatalogOpExecutor {
         // For non-partitioned table, only single part exists
         FeFsPartition singlePart = Iterables.getOnlyElement((List<FeFsPartition>) parts);
         affectedExistingPartitions.add(singlePart);
-
       }
       unsetTableColStats(table.getMetaStoreTable(), tblTxn);
       // Submit the watch request for the given cache directives.
