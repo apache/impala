@@ -24,6 +24,7 @@ import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
+import java.util.stream.Collectors;
 
 import org.apache.hadoop.hive.common.FileUtils;
 import org.apache.hadoop.hive.common.StatsSetupConst;
@@ -264,14 +265,8 @@ public abstract class FeCatalogUtils {
    * TODO: this could be a default method in FeFsPartition in Java 8.
    */
   public static String getPartitionName(FeFsPartition partition) {
-    FeFsTable table = partition.getTable();
-    List<String> partitionCols = new ArrayList<>();
-    for (int i = 0; i < table.getNumClusteringCols(); ++i) {
-      partitionCols.add(table.getColumns().get(i).getName());
-    }
-
-    return FileUtils.makePartName(
-        partitionCols, getPartitionValuesAsStrings(partition, true));
+    return getPartitionName(partition.getTable(),
+        getPartitionValuesAsStrings(partition, true));
   }
 
   // TODO: this could be a default method in FeFsPartition in Java 8.
@@ -287,6 +282,23 @@ public abstract class FeCatalogUtils {
       }
     }
     return ret;
+  }
+
+  public static String getPartitionName(HdfsPartition.Builder partBuilder) {
+    HdfsTable table = partBuilder.getTable();
+    List<String> partitionValues = new ArrayList<>();
+    for (LiteralExpr partValue : partBuilder.getPartitionValues()) {
+      partitionValues.add(PartitionKeyValue.getPartitionKeyValueString(
+          partValue, table.getNullPartitionKeyValue()));
+    }
+    return getPartitionName(table, partitionValues);
+  }
+
+  public static String getPartitionName(FeFsTable table, List<String> partitionValues) {
+    List<String> partitionKeys = table.getClusteringColumns().stream()
+        .map(Column::getName)
+        .collect(Collectors.toList());
+    return FileUtils.makePartName(partitionKeys, partitionValues);
   }
 
   // TODO: this could be a default method in FeFsPartition in Java 8.
