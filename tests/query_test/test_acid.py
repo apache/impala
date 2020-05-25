@@ -174,13 +174,15 @@ class TestAcid(ImpalaTestSuite):
   @SkipIfADLS.hive
   @SkipIfIsilon.hive
   @SkipIfLocal.hive
-  @pytest.mark.execute_serially
   def test_acid_heartbeats(self, vector, unique_database):
     """Tests heartbeating of transactions. Creates a long-running query via
     some jitting and in the meanwhile it periodically checks whether there is
     a transaction that has sent a heartbeat since its start.
     """
     if self.exploration_strategy() != 'exhaustive': pytest.skip()
+    table_format = vector.get_value('table_format')
+    if table_format.compression_codec != 'none': pytest.skip()
+
     last_open_txn_start_time = self._latest_open_transaction()
     dummy_tbl = "{}.{}".format(unique_database, "dummy")
     self.execute_query("create table {} (i int) tblproperties"
@@ -188,8 +190,8 @@ class TestAcid(ImpalaTestSuite):
                        "'transactional_properties'='insert_only')".format(dummy_tbl))
     try:
       handle = self.execute_query_async(
-          "insert into {} values (sleep(200000))".format(dummy_tbl))
-      MAX_ATTEMPTS = 10
+          "insert into {} values (sleep(320000))".format(dummy_tbl))
+      MAX_ATTEMPTS = 16
       attempt = 0
       success = False
       while attempt < MAX_ATTEMPTS:

@@ -48,6 +48,10 @@ import com.sun.tools.javac.code.Attribute.Array;
 public class TransactionKeepalive {
   public static final Logger LOG = Logger.getLogger(TransactionKeepalive.class);
 
+  // (IMPALA-9775) The sleep interval is deduced from Hive configuration parameter
+  // hive.txn.timeout. To be safe, set an upper limit for sleep interval as 100
+  // seconds for carrying through the test case TestAcid.test_acid_heartbeats.
+  private static final long MAX_SLEEP_INTERVAL_MILLISECONDS = 100000;
   private static final long MILLION = 1000000L;
 
   private final long sleepIntervalMs_;
@@ -209,8 +213,8 @@ public class TransactionKeepalive {
    */
   public TransactionKeepalive(MetaStoreClientPool metaStoreClientPool) {
     HiveConf hiveConf = new HiveConf(TransactionKeepalive.class);
-    sleepIntervalMs_ = hiveConf.getTimeVar(
-        HiveConf.ConfVars.HIVE_TXN_TIMEOUT, TimeUnit.MILLISECONDS) / 3;
+    sleepIntervalMs_ = Math.min(MAX_SLEEP_INTERVAL_MILLISECONDS, hiveConf.getTimeVar(
+        HiveConf.ConfVars.HIVE_TXN_TIMEOUT, TimeUnit.MILLISECONDS) / 3);
     Preconditions.checkState(sleepIntervalMs_ > 0);
     Preconditions.checkNotNull(metaStoreClientPool);
     metaStoreClientPool_ = metaStoreClientPool;
