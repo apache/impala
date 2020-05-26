@@ -35,6 +35,7 @@ import org.apache.impala.common.InternalException;
 import org.apache.impala.common.QueryFixture.SelectFixture;
 import org.apache.impala.common.RuntimeEnv;
 import org.apache.impala.planner.CardinalityTest;
+import org.junit.AfterClass;
 import org.junit.BeforeClass;
 import org.junit.Test;
 
@@ -82,6 +83,11 @@ public class ExprCardinalityTest {
   @BeforeClass
   public static void setUp() {
     RuntimeEnv.INSTANCE.setTestEnv(true);
+  }
+
+  @AfterClass
+  public static void cleanUp() {
+    RuntimeEnv.INSTANCE.reset();
   }
 
   private void verifyTableCol(Table table, String colName,
