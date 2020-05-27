@@ -726,6 +726,10 @@ TEST(DecimalTest, UnalignedValues) {
   stringstream ss;
   RawValue::PrintValue(unaligned, ColumnType::CreateDecimalType(28, 2), 0, &ss);
   EXPECT_EQ("123.45", ss.str());
+  // Regression test for IMPALA-9781: Verify that operator=() works
+  *unaligned = 0;
+  __int128_t val = unaligned->value();
+  EXPECT_EQ(val, 0);
   free(unaligned_mem);
 }
 
