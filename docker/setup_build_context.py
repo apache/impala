@@ -39,12 +39,13 @@ else:
 OUTPUT_DIR = os.path.join(IMPALA_HOME, "docker/build_context", BUILD_TYPE)
 DOCKERFILE = os.path.join(IMPALA_HOME, "docker/impala_base/Dockerfile")
 
-IMPALA_TOOLCHAIN = os.environ["IMPALA_TOOLCHAIN"]
+IMPALA_TOOLCHAIN_PACKAGES_HOME = os.environ["IMPALA_TOOLCHAIN_PACKAGES_HOME"]
 IMPALA_GCC_VERSION = os.environ["IMPALA_GCC_VERSION"]
 IMPALA_BINUTILS_VERSION = os.environ["IMPALA_BINUTILS_VERSION"]
-GCC_HOME = os.path.join(IMPALA_TOOLCHAIN, "gcc-{0}".format(IMPALA_GCC_VERSION))
+GCC_HOME = os.path.join(IMPALA_TOOLCHAIN_PACKAGES_HOME,
+    "gcc-{0}".format(IMPALA_GCC_VERSION))
 BINUTILS_HOME = os.path.join(
-    IMPALA_TOOLCHAIN, "binutils-{0}".format(IMPALA_BINUTILS_VERSION))
+    IMPALA_TOOLCHAIN_PACKAGES_HOME, "binutils-{0}".format(IMPALA_BINUTILS_VERSION))
 STRIP = os.path.join(BINUTILS_HOME, "bin/strip")
 KUDU_HOME = os.environ["IMPALA_KUDU_HOME"]
 KUDU_LIB_DIR = os.path.join(KUDU_HOME, "release/lib")

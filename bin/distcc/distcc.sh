@@ -45,6 +45,11 @@ fi
 REMOTE_TOOLCHAIN_DIR=/opt/Impala-Toolchain
 
 if $IMPALA_DISTCC_LOCAL; then
+  # We expect the distcc server to have the same directory structure under its toolchain
+  # directory as a regular Impala install. This replaces IMPALA_TOOLCHAIN rather
+  # than IMPALA_TOOLCHAIN_PACKAGES_HOME, because IMPALA_TOOLCHAIN_PACKAGES_HOME is a
+  # subdirectory of IMPALA_TOOLCHAIN. The same directory should exist on the distcc
+  # server, so that part of the path should be preserved.
   if [[ "$CXX_COMPILER" == "$IMPALA_TOOLCHAIN"* ]]; then
     # Remap the local toolchain path to the remote toolchain path.
     CXX_COMPILER=$REMOTE_TOOLCHAIN_DIR/${CXX_COMPILER#$IMPALA_TOOLCHAIN}

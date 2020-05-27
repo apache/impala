@@ -83,12 +83,13 @@ function(set_dep_root NAME)
   string(TOLOWER ${NAME} NAME_LOWER)
   string(REPLACE "_" "-" NAME_LOWER ${NAME_LOWER})
   set(VAL_NAME "IMPALA_${NAME}_VERSION")
-  set(${NAME}_ROOT $ENV{IMPALA_TOOLCHAIN}/${NAME_LOWER}-$ENV{${VAL_NAME}} PARENT_SCOPE)
+  set(${NAME}_ROOT $ENV{IMPALA_TOOLCHAIN_PACKAGES_HOME}/${NAME_LOWER}-$ENV{${VAL_NAME}}
+      PARENT_SCOPE)
 endfunction()
 
 # Define root path for all dependencies, this is in the form of
 # set_dep_root(PACKAGE) ->
-#   PACKAGE_ROOT set to $ENV{IMPALA_TOOLCHAIN}/PACKAGE-$ENV{IMPALA_PACKAGE_VERSION}
+#   PACKAGE_ROOT set to $ENV{IMPALA_TOOLCHAIN_PACKAGES_HOME}/PACKAGE-$ENV{IMPALA_PACKAGE_VERSION}
 set_dep_root(AVRO)
 set_dep_root(ORC)
 set_dep_root(BOOST)
@@ -104,7 +105,8 @@ set_dep_root(GTEST)
 set_dep_root(LIBEV)
 set_dep_root(LIBUNWIND)
 set_dep_root(LLVM)
-set(LLVM_DEBUG_ROOT $ENV{IMPALA_TOOLCHAIN}/llvm-$ENV{IMPALA_LLVM_DEBUG_VERSION})
+set(LLVM_DEBUG_ROOT
+    $ENV{IMPALA_TOOLCHAIN_PACKAGES_HOME}/llvm-$ENV{IMPALA_LLVM_DEBUG_VERSION})
 set_dep_root(LZ4)
 set_dep_root(ZSTD)
 set_dep_root(OPENLDAP)
@@ -113,7 +115,8 @@ set_dep_root(RE2)
 set_dep_root(RAPIDJSON)
 set_dep_root(SNAPPY)
 set_dep_root(THRIFT)
-set(THRIFT11_ROOT $ENV{IMPALA_TOOLCHAIN}/thrift-$ENV{IMPALA_THRIFT11_VERSION})
+set(THRIFT11_ROOT
+    $ENV{IMPALA_TOOLCHAIN_PACKAGES_HOME}/thrift-$ENV{IMPALA_THRIFT11_VERSION})
 set_dep_root(ZLIB)
 set_dep_root(CCTZ)
 
@@ -435,10 +438,14 @@ add_custom_target(cscope ALL DEPENDS gen-deps
   COMMAND "${CMAKE_SOURCE_DIR}/bin/gen-cscope.sh"
 )
 
+# This call is passing IMPALA_TOOLCHAIN_PACKAGES_HOME into Impala-lzo's build.sh,
+# but this is known not to work with the current version of Impala-lzo when
+# IMPALA_TOOLCHAIN_PACKAGES_HOME is a subdirectory of IMPALA_TOOLCHAIN. Either
+# Impala-lzo will need to be fixed or it will need to be removed.
 if (DEFINED ENV{IMPALA_LZO} AND EXISTS $ENV{IMPALA_LZO})
   add_custom_target(impala-lzo ALL DEPENDS gen-deps
     COMMAND $ENV{IMPALA_LZO}/build.sh ${CMAKE_BUILD_TYPE} ${CMAKE_SOURCE_DIR}
-    $ENV{IMPALA_TOOLCHAIN}
+    $ENV{IMPALA_TOOLCHAIN_PACKAGES_HOME}
   )
 endif()
 

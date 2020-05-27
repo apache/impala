@@ -579,7 +579,7 @@ under the License.
                  * LD_PRELOAD needs to include libjsig.so for JVM/native signal handling.
             -->
             <LD_LIBRARY_PATH>
-              ${env.IMPALA_TOOLCHAIN}/gcc-${env.IMPALA_GCC_VERSION}/lib64
+              ${env.IMPALA_TOOLCHAIN_PACKAGES_HOME}/gcc-${env.IMPALA_GCC_VERSION}/lib64
             </LD_LIBRARY_PATH>
             <LD_PRELOAD>
               ${env.LIB_JSIG}

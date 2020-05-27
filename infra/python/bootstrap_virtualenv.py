@@ -199,10 +199,10 @@ def download_toolchain_python():
      only the presence of the Python executable is checked in the toolchain location.
   '''
 
-  toolchain_root = os.environ.get("IMPALA_TOOLCHAIN")
-  if not toolchain_root:
-    raise Exception(
-        "Impala environment not set up correctly, make sure $IMPALA_TOOLCHAIN is set.")
+  toolchain_packages_home = os.environ.get("IMPALA_TOOLCHAIN_PACKAGES_HOME")
+  if not toolchain_packages_home:
+    raise Exception("Impala environment not set up correctly, make sure "
+        "$IMPALA_TOOLCHAIN_PACKAGES_HOME is set.")
 
   package = ToolchainPackage("python")
   if not (os.environ.get(SKIP_TOOLCHAIN_BOOTSTRAP) == 'true'):
@@ -224,12 +224,13 @@ def install_deps():
 
 def have_toolchain():
   '''Return true if the Impala toolchain is available'''
-  return "IMPALA_TOOLCHAIN" in os.environ
+  return "IMPALA_TOOLCHAIN_PACKAGES_HOME" in os.environ
 
 def toolchain_pkg_dir(pkg_name):
   '''Return the path to the toolchain package'''
   pkg_version = os.environ["IMPALA_" + pkg_name.upper() + "_VERSION"]
-  return os.path.join(os.environ["IMPALA_TOOLCHAIN"], pkg_name + "-" + pkg_version)
+  return os.path.join(os.environ["IMPALA_TOOLCHAIN_PACKAGES_HOME"],
+      pkg_name + "-" + pkg_version)
 
 def install_compiled_deps_if_possible():
   '''Install dependencies that require compilation with toolchain GCC, if the toolchain

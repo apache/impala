@@ -15,16 +15,14 @@
 # specific language governing permissions and limitations
 # under the License.
 
-# Set the root directory for the toolchain
-set(TOOLCHAIN_ROOT $ENV{IMPALA_TOOLCHAIN})
-
 # If Impala is built with the toolchain, change compiler and link paths
-set(GCC_ROOT $ENV{IMPALA_TOOLCHAIN}/gcc-$ENV{IMPALA_GCC_VERSION})
+set(GCC_ROOT $ENV{IMPALA_TOOLCHAIN_PACKAGES_HOME}/gcc-$ENV{IMPALA_GCC_VERSION})
 
 # Use the appropriate LLVM version to build ASAN.
-set(LLVM_ASAN_ROOT $ENV{IMPALA_TOOLCHAIN}/llvm-$ENV{IMPALA_LLVM_ASAN_VERSION})
+set(LLVM_ASAN_ROOT
+    $ENV{IMPALA_TOOLCHAIN_PACKAGES_HOME}/llvm-$ENV{IMPALA_LLVM_ASAN_VERSION})
 
-set(LLVM_ROOT $ENV{IMPALA_TOOLCHAIN}/llvm-$ENV{IMPALA_LLVM_VERSION})
+set(LLVM_ROOT $ENV{IMPALA_TOOLCHAIN_PACKAGES_HOME}/llvm-$ENV{IMPALA_LLVM_VERSION})
 
 if ("${CMAKE_BUILD_TYPE}" STREQUAL "ADDRESS_SANITIZER")
   set(CMAKE_C_COMPILER ${LLVM_ASAN_ROOT}/bin/clang)

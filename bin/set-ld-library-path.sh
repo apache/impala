@@ -26,7 +26,8 @@ LD_LIBRARY_PATH="${LD_LIBRARY_PATH}:${IMPALA_LZO}/build"
 
 # We built against toolchain GCC so we need to dynamically link against matching
 # library versions. (the rpath isn't baked into the binaries)
-IMPALA_TOOLCHAIN_GCC_LIB="${IMPALA_TOOLCHAIN}/gcc-${IMPALA_GCC_VERSION}/lib64"
+IMPALA_TOOLCHAIN_GCC_LIB=\
+"${IMPALA_TOOLCHAIN_PACKAGES_HOME}/gcc-${IMPALA_GCC_VERSION}/lib64"
 LD_LIBRARY_PATH="${LD_LIBRARY_PATH}:${IMPALA_TOOLCHAIN_GCC_LIB}"
 
 export LD_PRELOAD="${LD_PRELOAD:+${LD_PRELOAD}:}${LIB_JSIG}"
