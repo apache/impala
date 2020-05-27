@@ -18,11 +18,12 @@
 # Functional tests for ACID integration with Hive.
 
 import os
+import pytest
 
 from tests.common.impala_test_suite import ImpalaTestSuite
 from tests.common.skip import SkipIfLocal
 from tests.util.acid_txn import AcidTxn
-
+from tests.util.filesystem_utils import IS_HDFS
 
 # Tests that Impala validates rows against a validWriteIdList correctly.
 class TestAcidRowValidation(ImpalaTestSuite):
@@ -63,6 +64,10 @@ class TestAcidRowValidation(ImpalaTestSuite):
     """Tests reading from a file written by Hive Streaming Ingestion. In the first no rows
     are valid. Then we commit the first transaction and read the table. Then we commit the
     last transaction and read the table."""
+    # This test only makes sense on a filesystem that supports the file append operation
+    # (e.g. S3 doesn't) because it simulates Hive Streaming V2. So let's run it only on
+    # HDFS.
+    if not IS_HDFS: pytest.skip()
     tbl_name = "streaming"
     self._create_test_table(vector, unique_database, tbl_name)
     self.run_test_case('QueryTest/acid-row-validation-0', vector, use_db=unique_database)
