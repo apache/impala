@@ -346,10 +346,11 @@ class DictDecoder : public DictDecoderBase {
   virtual int num_entries() const { return dict_.size(); }
 
   virtual void GetValue(int index, void* buffer) {
-    T* val_ptr = reinterpret_cast<T*>(buffer);
     DCHECK_GE(index, 0);
     DCHECK_LT(index, dict_.size());
-    *val_ptr = dict_[index];
+    // Avoid an unaligned store by using memcpy
+    T val = dict_[index];
+    memcpy(buffer, reinterpret_cast<const void*>(&val), sizeof(T));
   }
 
   /// Returns the next value.  Returns false if the data is invalid.
