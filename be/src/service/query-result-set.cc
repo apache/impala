@@ -226,7 +226,7 @@ int64_t AsciiQueryResultSet::ByteSize(int start_idx, int num_rows) {
   int64_t bytes = 0;
   const int end = min(static_cast<size_t>(num_rows), result_set_->size() - start_idx);
   for (int i = start_idx; i < start_idx + end; ++i) {
-    bytes += sizeof(result_set_[i]) + result_set_[i].capacity();
+    bytes += sizeof(result_set_[i]) + result_set_[i].size();
   }
   return bytes;
 }
@@ -237,7 +237,7 @@ namespace {
 
 // Utility functions for computing the size of HS2 Thrift structs in bytes.
 inline int64_t ByteSize(const ThriftTColumnValue& val) {
-  return sizeof(val) + val.stringVal.value.capacity();
+  return sizeof(val) + val.stringVal.value.size();
 }
 
 int64_t ByteSize(const TRow& row) {
