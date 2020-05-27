@@ -15,12 +15,9 @@
 # specific language governing permissions and limitations
 # under the License.
 
-# Set the root directory for the toolchain
-set(TOOLCHAIN_ROOT $ENV{IMPALA_TOOLCHAIN})
-
 if($ENV{USE_SYSTEM_GCC} EQUAL "0")
   # If Impala is built with the GCC from the toolchain, change compiler and link paths
-  set(GCC_ROOT $ENV{IMPALA_TOOLCHAIN}/gcc-$ENV{IMPALA_GCC_VERSION})
+  set(GCC_ROOT $ENV{IMPALA_TOOLCHAIN_PACKAGES_HOME}/gcc-$ENV{IMPALA_GCC_VERSION})
   set(CMAKE_C_COMPILER ${GCC_ROOT}/bin/gcc)
   set(CMAKE_CXX_COMPILER ${GCC_ROOT}/bin/g++)
 

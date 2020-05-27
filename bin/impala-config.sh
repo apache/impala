@@ -211,6 +211,12 @@ if [ -f "$IMPALA_HOME/bin/impala-config-local.sh" ]; then
   . "$IMPALA_HOME/bin/impala-config-local.sh"
 fi
 
+# IMPALA_TOOLCHAIN_PACKAGES_HOME is the location inside IMPALA_TOOLCHAIN where native
+# toolchain packages are placed. This is currently the same as IMPALA_TOOLCHAIN, but
+# in future, this will be a subdirectory under IMPALA_TOOLCHAIN to allow different
+# compiler versions.
+export IMPALA_TOOLCHAIN_PACKAGES_HOME=${IMPALA_TOOLCHAIN}
+
 export CDP_HADOOP_URL=${CDP_HADOOP_URL-}
 export CDP_HBASE_URL=${CDP_HBASE_URL-}
 export CDP_HIVE_URL=${CDP_HIVE_URL-}
@@ -550,8 +556,9 @@ export IMPALA_AUX_WORKLOAD_DIR="$IMPALA_AUX_TEST_HOME/testdata/workloads"
 export IMPALA_DATASET_DIR="$IMPALA_HOME/testdata/datasets"
 export IMPALA_AUX_DATASET_DIR="$IMPALA_AUX_TEST_HOME/testdata/datasets"
 export IMPALA_COMMON_DIR="$IMPALA_HOME/common"
-export PATH="$IMPALA_TOOLCHAIN/gdb-$IMPALA_GDB_VERSION/bin:$PATH"
-export PATH="$IMPALA_HOME/bin:$IMPALA_TOOLCHAIN/cmake-$IMPALA_CMAKE_VERSION/bin/:$PATH"
+export PATH="$IMPALA_TOOLCHAIN_PACKAGES_HOME/gdb-$IMPALA_GDB_VERSION/bin:$PATH"
+export PATH="$IMPALA_TOOLCHAIN_PACKAGES_HOME/cmake-$IMPALA_CMAKE_VERSION/bin/:$PATH"
+export PATH="$IMPALA_HOME/bin:$PATH"
 
 export HADOOP_CONF_DIR="$IMPALA_FE_DIR/src/test/resources"
 # The include and lib paths are needed to pick up hdfs.h and libhdfs.*
@@ -656,17 +663,18 @@ export KUDU_IS_SUPPORTED
 
 export IMPALA_KUDU_VERSION=${IMPALA_KUDU_VERSION-"389d4f1e1"}
 export IMPALA_KUDU_JAVA_VERSION=${IMPALA_KUDU_JAVA_VERSION-"1.13.0-SNAPSHOT"}
-export IMPALA_KUDU_HOME=${IMPALA_TOOLCHAIN}/kudu-$IMPALA_KUDU_VERSION
-export IMPALA_KUDU_JAVA_HOME=${IMPALA_TOOLCHAIN}/kudu-${IMPALA_KUDU_VERSION}/java
+export IMPALA_KUDU_HOME=${IMPALA_TOOLCHAIN_PACKAGES_HOME}/kudu-$IMPALA_KUDU_VERSION
+export IMPALA_KUDU_JAVA_HOME=\
+${IMPALA_TOOLCHAIN_PACKAGES_HOME}/kudu-${IMPALA_KUDU_VERSION}/java
 export IMPALA_TOOLCHAIN_KUDU_MAVEN_REPOSITORY=\
 "file://${IMPALA_KUDU_JAVA_HOME}/repository"
 export IMPALA_TOOLCHAIN_KUDU_MAVEN_REPOSITORY_ENABLED=true
 
 # Set $THRIFT_HOME to the Thrift directory in toolchain.
-export THRIFT_HOME="${IMPALA_TOOLCHAIN}/thrift-${IMPALA_THRIFT_VERSION}"
+export THRIFT_HOME="${IMPALA_TOOLCHAIN_PACKAGES_HOME}/thrift-${IMPALA_THRIFT_VERSION}"
 
 # ASAN needs a matching version of llvm-symbolizer to symbolize stack traces.
-export ASAN_SYMBOLIZER_PATH="${IMPALA_TOOLCHAIN}/llvm-${IMPALA_LLVM_ASAN_VERSION}/bin/llvm-symbolizer"
+export ASAN_SYMBOLIZER_PATH="${IMPALA_TOOLCHAIN_PACKAGES_HOME}/llvm-${IMPALA_LLVM_ASAN_VERSION}/bin/llvm-symbolizer"
 
 export CLUSTER_DIR="${IMPALA_HOME}/testdata/cluster"
 
@@ -723,6 +731,7 @@ echo "LIBHDFS_OPTS            = $LIBHDFS_OPTS"
 echo "JAVA_HOME               = $JAVA_HOME"
 echo "POSTGRES_JDBC_DRIVER    = $POSTGRES_JDBC_DRIVER"
 echo "IMPALA_TOOLCHAIN        = $IMPALA_TOOLCHAIN"
+echo "IMPALA_TOOLCHAIN_PACKAGES_HOME = $IMPALA_TOOLCHAIN_PACKAGES_HOME"
 echo "METASTORE_DB            = $METASTORE_DB"
 echo "DOWNLOAD_CDH_COMPONENTS = $DOWNLOAD_CDH_COMPONENTS"
 echo "IMPALA_MAVEN_OPTIONS    = $IMPALA_MAVEN_OPTIONS"

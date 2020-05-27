@@ -31,7 +31,7 @@ then
 fi
 
 TPC_DS_DIRNAME=tpc-ds-${IMPALA_TPC_DS_VERSION}
-TPC_DS_HOME=${IMPALA_TOOLCHAIN}/${TPC_DS_DIRNAME}
+TPC_DS_HOME=${IMPALA_TOOLCHAIN_PACKAGES_HOME}/${TPC_DS_DIRNAME}
 
 echo "Generating TPC-DS data into ${TPC_DS_DATA}"
 # Delete any preexisting data or symlinks

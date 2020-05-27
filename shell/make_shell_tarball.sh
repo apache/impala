@@ -110,7 +110,7 @@ done
 # Copy all the shell files into the build dir
 # The location of python libs for thrift is different in rhel/centos/sles
 
-THRIFT_PY_ROOT="${IMPALA_TOOLCHAIN}/thrift-${IMPALA_THRIFT_PY_VERSION}"
+THRIFT_PY_ROOT="${IMPALA_TOOLCHAIN_PACKAGES_HOME}/thrift-${IMPALA_THRIFT_PY_VERSION}"
 
 if [ -d ${THRIFT_PY_ROOT}/python/lib/python*/site-packages/thrift ]; then
   cp -r ${THRIFT_PY_ROOT}/python/lib/python*/site-packages/thrift\

@@ -23,10 +23,15 @@
 # has been sourced by verifying that IMPALA_HOME is set. This script will fail if an
 # expected environment variable is not present.
 #
+# To share a toolchain directory between multiple checkouts of Impala (or to use a
+# cached copy to avoid downloading a new one), it is best to override IMPALA_TOOLCHAIN
+# in bin/impala-config-local.sh or in the environment prior to sourcing
+# bin/impala-config.sh. This sets IMPALA_TOOLCHAIN_PACKAGES_HOME as well as
+# CDP_COMPONENTS_HOME.
+#
 # The following environment variables control the behavior of this script:
-# IMPALA_TOOLCHAIN - Directory in which to place the artifacts. It can be useful to
-#   override this to share a toolchain directory between multiple checkouts of Impala
-#   or to use a cached copy to avoid downloading a new one.
+# IMPALA_TOOLCHAIN_PACKAGES_HOME - Directory in which to place the native-toolchain
+#   packages.
 # IMPALA_TOOLCHAIN_HOST - The host to use for downloading the artifacts
 # CDP_COMPONENTS_HOME - Directory to store CDP Hadoop component artifacts
 # CDP_BUILD_NUMBER - CDP Hadoop components are built with consistent versions so that
@@ -247,10 +252,10 @@ class EnvVersionedPackage(TemplatedDownloadUnpackTarball):
 
 class ToolchainPackage(EnvVersionedPackage):
   def __init__(self, name, explicit_version=None, platform_release=None):
-    toolchain_root = os.environ.get("IMPALA_TOOLCHAIN")
-    if not toolchain_root:
+    toolchain_packages_home = os.environ.get("IMPALA_TOOLCHAIN_PACKAGES_HOME")
+    if not toolchain_packages_home:
       logging.error("Impala environment not set up correctly, make sure "
-          "$IMPALA_TOOLCHAIN is set.")
+          "$IMPALA_TOOLCHAIN_PACKAGES_HOME is set.")
       sys.exit(1)
     compiler = get_toolchain_compiler()
     label = get_platform_release_label(release=platform_release).toolchain
@@ -263,7 +268,8 @@ class ToolchainPackage(EnvVersionedPackage):
     url_prefix_tmpl = "https://${toolchain_host}/build/${toolchain_build_id}/" + \
         "${name}/${version}-${compiler}/"
     unpack_directory_tmpl = "${name}-${version}"
-    super(ToolchainPackage, self).__init__(name, url_prefix_tmpl, toolchain_root,
+    super(ToolchainPackage, self).__init__(name, url_prefix_tmpl,
+                                           toolchain_packages_home,
                                            explicit_version=explicit_version,
                                            archive_basename_tmpl=archive_basename_tmpl,
                                            unpack_directory_tmpl=unpack_directory_tmpl,
@@ -382,7 +388,7 @@ def check_output(cmd_args):
   return stdout
 
 
-def check_custom_toolchain(toolchain_root, packages):
+def check_custom_toolchain(toolchain_packages_home, packages):
   missing = []
   for p in packages:
     if not os.path.isdir(p.pkg_directory()):
@@ -494,9 +500,10 @@ extern "C" void %s() {
 
     # Compile the library.
     stub_client_lib_path = os.path.join(stub_build_dir, "libkudu_client.so")
-    toolchain_root = os.environ.get("IMPALA_TOOLCHAIN")
+    toolchain_packages_home = os.environ.get("IMPALA_TOOLCHAIN_PACKAGES_HOME")
     gpp = os.path.join(
-        toolchain_root, "gcc-%s" % os.environ.get("IMPALA_GCC_VERSION"), "bin", "g++")
+        toolchain_packages_home, "gcc-%s" % os.environ.get("IMPALA_GCC_VERSION"),
+        "bin", "g++")
     subprocess.check_call([gpp, stub_client_src_file.name, "-shared", "-fPIC",
         "-Wl,-soname,%s" % so_name, "-o", stub_client_lib_path])
 
@@ -547,9 +554,9 @@ def get_toolchain_downloads():
   # has been provided).
   if not try_get_platform_release_label() \
      or not try_get_platform_release_label().toolchain:
-    toolchain_root = os.environ.get("IMPALA_TOOLCHAIN")
+    toolchain_packages_home = os.environ.get("IMPALA_TOOLCHAIN_PACKAGES_HOME")
     # This would throw an exception if the custom toolchain were not valid
-    check_custom_toolchain(toolchain_root, toolchain_packages)
+    check_custom_toolchain(toolchain_packages_home, toolchain_packages)
     # Nothing to download
     return []
   return toolchain_packages
@@ -587,18 +594,19 @@ def get_kudu_downloads(use_kudu_stub):
 
 
 def main():
-  """Validates that bin/impala-config.sh has been sourced by verifying that $IMPALA_HOME
-  and $IMPALA_TOOLCHAIN are in the environment. We assume that if these are set, then
-  IMPALA_<PACKAGE>_VERSION environment variables are also set. This will create the
-  directory specified by $IMPALA_TOOLCHAIN if it does not already exist. Then, it will
-  compute what packages need to be downloaded. Packages are only downloaded if they are
-  not already present in $IMPALA_TOOLCHAIN. There are two main categories of packages.
-  Toolchain packages are native packages built using the native toolchain. These are
-  always downloaded. Hadoop component packages are the CDP builds of Hadoop
-  components such as Hadoop, Hive, HBase, etc. Hadoop component packages are organized
-  as a consistent set of compatible version via a build number (i.e. CDP_BUILD_NUMBER)
-  Hadoop component packages are only downloaded if $DOWNLOAD_CDH_COMPONENTS is true.
-  The versions used for Hadoop components come from the CDP versions based on the
+  """
+  Validates that bin/impala-config.sh has been sourced by verifying that $IMPALA_HOME
+  and $IMPALA_TOOLCHAIN_PACKAGES_HOME are in the environment. We assume that if these
+  are set, then IMPALA_<PACKAGE>_VERSION environment variables are also set. This will
+  create the directory specified by $IMPALA_TOOLCHAIN_PACKAGES_HOME if it does not
+  already exist. Then, it will compute what packages need to be downloaded. Packages are
+  only downloaded if they are not already present. There are two main categories of
+  packages. Toolchain packages are native packages built using the native toolchain.
+  These are always downloaded. Hadoop component packages are the CDP builds of Hadoop
+  components such as Hadoop, Hive, HBase, etc. Hadoop component packages are organized as
+  a consistent set of compatible version via a build number (i.e. CDP_BUILD_NUMBER).
+  Hadoop component packages are only downloaded if $DOWNLOAD_CDH_COMPONENTS is true. The
+  versions used for Hadoop components come from the CDP versions based on the
   $CDP_BUILD_NUMBER. CDP Hadoop packages are downloaded into $CDP_COMPONENTS_HOME.
   If Kudu is not supported on this platform (or KUDU_IS_SUPPORTED=false), then this
   builds a Kudu stub to allow for compilation without Kudu support.
@@ -614,7 +622,7 @@ def main():
     sys.exit(1)
 
   # Create the toolchain directory if necessary
-  create_directory_from_env_var("IMPALA_TOOLCHAIN")
+  create_directory_from_env_var("IMPALA_TOOLCHAIN_PACKAGES_HOME")
 
   use_kudu_stub = os.environ["KUDU_IS_SUPPORTED"] != "true"
 

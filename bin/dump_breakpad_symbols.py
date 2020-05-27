@@ -50,7 +50,7 @@
 #   ./dump_breakpad_symbols.py -d /tmp/syms -b be/build/debug
 #
 # * Use the 'minidump_stackwalk' after symbol extraction tool to process a minidump file:
-#   $IMPALA_TOOLCHAIN/breakpad-*/bin/minidump_stackwalk \
+#   $IMPALA_TOOLCHAIN_PACKAGES_HOME/breakpad-*/bin/minidump_stackwalk \
 #   /tmp/impala-minidumps/impalad/03c0ee26-bfd1-cf3e-43fa49ca-1a6aae25.dmp /tmp/syms
 
 import errno
@@ -84,15 +84,15 @@ def find_dump_syms_binary():
   TODO: Lookup the binary in the system path. Not urgent, since the user can specify the
   path as a command line switch.
   """
-  toolchain = os.environ.get('IMPALA_TOOLCHAIN')
-  if toolchain:
-    if not os.path.isdir(toolchain):
-      die('Could not find toolchain directory')
+  toolchain_packages_home = os.environ.get('IMPALA_TOOLCHAIN_PACKAGES_HOME')
+  if toolchain_packages_home:
+    if not os.path.isdir(toolchain_packages_home):
+      die('Could not find toolchain packages directory')
     breakpad_version = os.environ.get('IMPALA_BREAKPAD_VERSION')
     if not breakpad_version:
       die('Could not determine breakpad version from toolchain')
     breakpad_dir = 'breakpad-%s' % breakpad_version
-    dump_syms = os.path.join(toolchain, breakpad_dir, 'bin', 'dump_syms')
+    dump_syms = os.path.join(toolchain_packages_home, breakpad_dir, 'bin', 'dump_syms')
     if not os.path.isfile(dump_syms):
       die('Could not find dump_syms executable at %s' % dump_syms)
     return dump_syms

@@ -25,5 +25,5 @@ set -euo pipefail
 . "${IMPALA_HOME}/bin/set-ld-library-path.sh"
 
 # LLVM must be on path to symbolise sanitiser stack traces.
-export PATH="${IMPALA_TOOLCHAIN}/llvm-${IMPALA_LLVM_VERSION}/bin:${PATH}"
+export PATH="${IMPALA_TOOLCHAIN_PACKAGES_HOME}/llvm-${IMPALA_LLVM_VERSION}/bin:${PATH}"
 exec "$@"

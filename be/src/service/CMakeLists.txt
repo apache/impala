@@ -63,8 +63,8 @@ add_dependencies(fesupport gen-deps)
 if ("${CMAKE_BUILD_TYPE}" STREQUAL "UBSAN"
     OR "${CMAKE_BUILD_TYPE}" STREQUAL "UBSAN_FULL")
   target_link_libraries(fesupport "-Wl,--whole-archive \
-    $ENV{IMPALA_TOOLCHAIN}/llvm-$ENV{IMPALA_LLVM_DEBUG_VERSION}/lib/clang/$ENV{IMPALA_LLVM_UBSAN_BASE_VERSION}/lib/linux/libclang_rt.ubsan_standalone_cxx-${CMAKE_SYSTEM_PROCESSOR}.a \
-    $ENV{IMPALA_TOOLCHAIN}/llvm-$ENV{IMPALA_LLVM_DEBUG_VERSION}/lib/clang/$ENV{IMPALA_LLVM_UBSAN_BASE_VERSION}/lib/linux/libclang_rt.ubsan_standalone-${CMAKE_SYSTEM_PROCESSOR}.a \
+    $ENV{IMPALA_TOOLCHAIN_PACKAGES_HOME}/llvm-$ENV{IMPALA_LLVM_DEBUG_VERSION}/lib/clang/$ENV{IMPALA_LLVM_UBSAN_BASE_VERSION}/lib/linux/libclang_rt.ubsan_standalone_cxx-${CMAKE_SYSTEM_PROCESSOR}.a \
+    $ENV{IMPALA_TOOLCHAIN_PACKAGES_HOME}/llvm-$ENV{IMPALA_LLVM_DEBUG_VERSION}/lib/clang/$ENV{IMPALA_LLVM_UBSAN_BASE_VERSION}/lib/linux/libclang_rt.ubsan_standalone-${CMAKE_SYSTEM_PROCESSOR}.a \
     -Wl,--no-whole-archive")
 endif()
 
