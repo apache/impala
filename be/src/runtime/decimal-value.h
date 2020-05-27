@@ -49,7 +49,8 @@ class DecimalValue {
   DecimalValue(const T& s) : value_(s) { }
 
   DecimalValue& operator=(const T& s) {
-    value_ = s;
+    // 'value_' may be unaligned. Use memcpy to avoid an unaligned store.
+    memcpy(&value_, &s, sizeof(T));
     return *this;
   }
 
