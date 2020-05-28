@@ -259,7 +259,10 @@ public class CatalogdTableInvalidator {
   private class DaemonThread implements Runnable {
     @Override
     public void run() {
-      long sleepTimeNano = Math.min(unusedTableTtlNano_ / 10, DAEMON_MAXIMUM_SLEEP_NANO);
+      long sleepTimeNano = DAEMON_MAXIMUM_SLEEP_NANO;
+      if (unusedTableTtlNano_ > 0) {
+        sleepTimeNano = Math.min(unusedTableTtlNano_ / 10, sleepTimeNano);
+      }
       while (true) {
         try {
           synchronized (CatalogdTableInvalidator.this) {
