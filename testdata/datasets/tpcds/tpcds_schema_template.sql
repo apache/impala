@@ -772,6 +772,8 @@ set hive.exec.max.dynamic.partitions.pernode=10000;
 set hive.exec.max.dynamic.partitions=10000;
 set hive.exec.dynamic.partition.mode=nonstrict;
 set hive.exec.dynamic.partition=true;
+set hive.optimize.sort.dynamic.partition=true;
+set hive.optimize.sort.dynamic.partition.threshold=1;
 
 insert overwrite table {table_name} partition(ss_sold_date_sk)
 select ss_sold_time_sk,
