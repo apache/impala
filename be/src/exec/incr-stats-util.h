@@ -60,7 +60,7 @@ struct PerColumnStats {
   double avg_width;
 
   PerColumnStats()
-    : intermediate_ndv(AggregateFunctions::HLL_LEN, 0),
+    : intermediate_ndv(AggregateFunctions::DEFAULT_HLL_LEN, 0),
       num_nulls(0),
       max_width(0),
       num_rows(0),

@@ -94,19 +94,19 @@ static float HllThreshold(int p) {
 
 // Implements k nearest neighbor interpolation for k=6,
 // we choose 6 bassed on the HLL++ paper
-int64_t HllEstimateBias(int64_t estimate) {
+int64_t HllEstimateBias(int64_t estimate, int precision) {
   const size_t K = 6;
 
   // Precision index into data arrays
   // We don't have data for precisions less than 4
-  DCHECK(impala::AggregateFunctions::HLL_PRECISION >= 4);
-  static constexpr size_t idx = impala::AggregateFunctions::HLL_PRECISION - 4;
+  DCHECK_IN_RANGE(precision, impala::AggregateFunctions::MIN_HLL_PRECISION,
+      impala::AggregateFunctions::MAX_HLL_PRECISION);
+  size_t idx = precision - 4;
 
   // Calculate the square of the difference of this estimate to all
   // precalculated estimates for a particular precision
   map<double, size_t> distances;
-  for (size_t i = 0;
-      i < impala::HLL_DATA_SIZES[idx] / sizeof(double); ++i) {
+  for (size_t i = 0; i < impala::HLL_DATA_SIZES[idx] / sizeof(double); ++i) {
     double val = estimate - impala::HLL_RAW_ESTIMATE_DATA[idx][i];
     distances.insert(make_pair(val * val, i));
   }
@@ -180,8 +180,13 @@ StringVal ToStringVal(FunctionContext* context, T val) {
       context, reinterpret_cast<const uint8_t*>(str.c_str()), str.size());
 }
 
-constexpr int AggregateFunctions::HLL_PRECISION;
-constexpr int AggregateFunctions::HLL_LEN;
+constexpr int AggregateFunctions::DEFAULT_HLL_PRECISION;
+constexpr int AggregateFunctions::MIN_HLL_PRECISION;
+constexpr int AggregateFunctions::MAX_HLL_PRECISION;
+
+constexpr int AggregateFunctions::DEFAULT_HLL_LEN;
+constexpr int AggregateFunctions::MIN_HLL_LEN;
+constexpr int AggregateFunctions::MAX_HLL_LEN;
 
 void AggregateFunctions::InitNull(FunctionContext*, AnyVal* dst) {
   dst->is_null = true;
@@ -1433,97 +1438,175 @@ T AggregateFunctions::AppxMedianFinalize(FunctionContext* ctx, const StringVal& 
   return result;
 }
 
-void AggregateFunctions::HllInit(FunctionContext* ctx, StringVal* dst) {
-  // The HLL functions use a preallocated FIXED_UDA_INTERMEDIATE intermediate value.
-  DCHECK_EQ(dst->len, HLL_LEN);
-  memset(dst->ptr, 0, HLL_LEN);
+// Compute the precision from a scale value.
+static inline int ComputePrecisionFromScale(int scale) {
+  return scale + 8;
 }
 
+// Compute the precision from a scale value. This method must be identical
+// to function ComputeHllLengthFromScale() defined in FunctionCallExpr.java.
+static inline int ComputeHllLengthFromScale(int scale) {
+  return 1 << ComputePrecisionFromScale(scale);
+}
+
+// Compute the precision from a hll length as log2(len) or # of trailing
+// zeros in length. For example, when len is 1024 = 2^10 = 0b10000000000,
+// precision = 10.
+static inline int ComputePrecisionFromHllLength(int hll_len) {
+  return BitUtil::CountTrailingZeros((unsigned int)hll_len, sizeof(hll_len) * CHAR_BIT);
+}
+
+// Verify that the length of the intermediate data type is computable from
+// the precision as represented in the 2nd argument.
+static inline bool CheckHllArgs(FunctionContext* ctx, StringVal* dst) {
+  if (ctx->GetNumArgs() == 2) {
+    IntVal* int_val = reinterpret_cast<IntVal*>(ctx->GetConstantArg(1));
+
+    // In parallel plan, the merge() function takes only one argument which
+    // is the intermediate data. Avoid check in such cases.
+    if (int_val) {
+      return dst->len == ComputeHllLengthFromScale(int_val->val);
+    }
+  }
+  return true;
+}
+
+void AggregateFunctions::HllInit(FunctionContext* ctx, StringVal* dst) {
+  // The HLL functions use a preallocated FIXED_UDA_INTERMEDIATE intermediate value.
+  DCHECK_IN_RANGE(dst->len, MIN_HLL_LEN, MAX_HLL_LEN);
+  memset(dst->ptr, 0, dst->len);
+  DCHECK(CheckHllArgs(ctx, dst));
+}
+
+// Implementation for update functions. It accepts a precision.
+// Always inline in IR so that constants can be replaced.
 template <typename T>
-void AggregateFunctions::HllUpdate(FunctionContext* ctx, const T& src, StringVal* dst) {
+IR_ALWAYS_INLINE void AggregateFunctions::HllUpdate(
+    FunctionContext* ctx, const T& src, StringVal* dst, int precision) {
   if (src.is_null) return;
   DCHECK(!dst->is_null);
-  DCHECK_EQ(dst->len, HLL_LEN);
+
+  const int& hll_len = dst->len;
+  DCHECK_IN_RANGE(hll_len, MIN_HLL_LEN, MAX_HLL_LEN);
+
   uint64_t hash_value =
       AnyValUtil::Hash64(src, *ctx->GetArgType(0), HashUtil::FNV64_SEED);
   // Use the lower bits to index into the number of streams and then find the first 1 bit
   // after the index bits.
-  int idx = hash_value & (HLL_LEN - 1);
-  const uint8_t first_one_bit =
-      1 + BitUtil::CountTrailingZeros(
-              hash_value >> HLL_PRECISION, sizeof(hash_value) * CHAR_BIT - HLL_PRECISION);
+  int idx = hash_value & (hll_len - 1);
+  const uint8_t first_one_bit = 1
+      + BitUtil::CountTrailingZeros(
+            hash_value >> precision, sizeof(hash_value) * CHAR_BIT - precision);
   dst->ptr[idx] = ::max(dst->ptr[idx], first_one_bit);
 }
 
-// Specialize for DecimalVal to allow substituting decimal size.
-template <>
+// Update function for NDV() that accepts an expression only.
+template <typename T>
+void AggregateFunctions::HllUpdate(FunctionContext* ctx, const T& src, StringVal* dst) {
+  HllUpdate(ctx, src, dst, DEFAULT_HLL_PRECISION);
+}
+
+// Update function for NDV() that accepts an expression and a scale value.
+template <typename T>
 void AggregateFunctions::HllUpdate(
-    FunctionContext* ctx, const DecimalVal& src, StringVal* dst) {
+    FunctionContext* ctx, const T& src1, const IntVal& src2, StringVal* dst) {
+  HllUpdate(ctx, src1, dst, ComputePrecisionFromScale(src2.val));
+}
+
+// Implementation for update functions for DecimalVal to allow substituting decimal
+// size. It accepts a precision. Always inline in IR so that constants can be replaced.
+template <>
+IR_ALWAYS_INLINE void AggregateFunctions::HllUpdate(
+    FunctionContext* ctx, const DecimalVal& src, StringVal* dst, int precision) {
   if (src.is_null) return;
   DCHECK(!dst->is_null);
-  DCHECK_EQ(dst->len, HLL_LEN);
+
+  const int& hll_len = dst->len;
+  DCHECK_IN_RANGE(hll_len, MIN_HLL_LEN, MAX_HLL_LEN);
+
   int byte_size = ctx->impl()->GetConstFnAttr(FunctionContextImpl::ARG_TYPE_SIZE, 0);
   uint64_t hash_value = AnyValUtil::HashDecimal64(src, byte_size, HashUtil::FNV64_SEED);
   if (hash_value != 0) {
     // Use the lower bits to index into the number of streams and then
     // find the first 1 bit after the index bits.
-    int idx = hash_value & (HLL_LEN - 1);
-    uint8_t first_one_bit = __builtin_ctzl(hash_value >> HLL_PRECISION) + 1;
+    int idx = hash_value & (hll_len - 1);
+    uint8_t first_one_bit = __builtin_ctzl(hash_value >> precision) + 1;
     dst->ptr[idx] = ::max(dst->ptr[idx], first_one_bit);
   }
+}
+
+// Specialized update function for NDV() that accepts a decimal typed expression.
+template <>
+void AggregateFunctions::HllUpdate(
+    FunctionContext* ctx, const DecimalVal& src, StringVal* dst) {
+  HllUpdate(ctx, src, dst, DEFAULT_HLL_PRECISION);
+}
+
+// Specialized update function for NDV() that accepts a decimal typed expression
+// and a scale value.
+template <>
+void AggregateFunctions::HllUpdate(
+    FunctionContext* ctx, const DecimalVal& src1, const IntVal& src2, StringVal* dst) {
+  HllUpdate(ctx, src1, dst, ComputePrecisionFromScale(src2.val));
 }
 
 void AggregateFunctions::HllMerge(
     FunctionContext* ctx, const StringVal& src, StringVal* dst) {
   DCHECK(!dst->is_null);
   DCHECK(!src.is_null);
-  DCHECK_EQ(dst->len, HLL_LEN);
-  DCHECK_EQ(src.len, HLL_LEN);
+  DCHECK_IN_RANGE(src.len, MIN_HLL_LEN, MAX_HLL_LEN);
+  DCHECK_EQ(src.len, dst->len);
+
   for (int i = 0; i < src.len; ++i) {
     dst->ptr[i] = ::max(dst->ptr[i], src.ptr[i]);
   }
 }
 
-uint64_t AggregateFunctions::HllFinalEstimate(const uint8_t* buckets) {
+uint64_t AggregateFunctions::HllFinalEstimate(const uint8_t* buckets, int hll_len) {
   DCHECK(buckets != NULL);
 
   // Empirical constants for the algorithm.
   double alpha = 0;
-  if (HLL_LEN == 16) {
+  DCHECK_IN_RANGE(hll_len, MIN_HLL_LEN, MAX_HLL_LEN);
+  int precision = ComputePrecisionFromHllLength(hll_len);
+
+  if (hll_len == 16) {
     alpha = 0.673;
-  } else if (HLL_LEN == 32) {
+  } else if (hll_len == 32) {
     alpha = 0.697;
-  } else if (HLL_LEN == 64) {
+  } else if (hll_len == 64) {
     alpha = 0.709;
   } else {
-    alpha = 0.7213 / (1 + 1.079 / HLL_LEN);
+    alpha = 0.7213 / (1 + 1.079 / hll_len);
   }
 
   double harmonic_mean = 0;
   int num_zero_registers = 0;
-  for (int i = 0; i < HLL_LEN; ++i) {
+  for (int i = 0; i < hll_len; ++i) {
     harmonic_mean += ldexp(1.0, -buckets[i]);
     if (buckets[i] == 0) ++num_zero_registers;
   }
   harmonic_mean = 1.0 / harmonic_mean;
-  int64_t estimate = alpha * HLL_LEN * HLL_LEN * harmonic_mean;
+
+  // The actual harmonic mean is hll_len * harmonic_mean.
+  int64_t estimate = alpha * hll_len * hll_len * harmonic_mean;
   // Adjust for Hll bias based on Hll++ algorithm
-  if (estimate <= 5 * HLL_LEN) {
-    estimate -= HllEstimateBias(estimate);
+  if (estimate <= 5 * hll_len) {
+    estimate -= HllEstimateBias(estimate, precision);
   }
 
   if (num_zero_registers == 0) return estimate;
 
   // Estimated cardinality is too low. Hll is too inaccurate here, instead use
   // linear counting.
-  int64_t h = HLL_LEN * log(static_cast<double>(HLL_LEN) / num_zero_registers);
+  int64_t h = hll_len * log(static_cast<double>(hll_len) / num_zero_registers);
 
-  return (h <= HllThreshold(HLL_PRECISION)) ? h : estimate;
+  return (h <= HllThreshold(precision)) ? h : estimate;
 }
 
 BigIntVal AggregateFunctions::HllFinalize(FunctionContext* ctx, const StringVal& src) {
   if (UNLIKELY(src.is_null)) return BigIntVal::null();
-  uint64_t estimate = HllFinalEstimate(src.ptr);
+  uint64_t estimate = HllFinalEstimate(src.ptr, src.len);
   return estimate;
 }
 
@@ -1538,7 +1621,8 @@ class SampledNdvState {
   static const uint32_t NUM_HLL_BUCKETS = 32;
 
   /// A bucket contains an update count and an HLL intermediate state.
-  static constexpr int64_t BUCKET_SIZE = sizeof(int64_t) + AggregateFunctions::HLL_LEN;
+  static constexpr int64_t BUCKET_SIZE =
+      sizeof(int64_t) + AggregateFunctions::DEFAULT_HLL_LEN;
 
   /// Sampling percent which was given as the second argument to SampledNdv().
   /// Stored here to avoid existing issues with passing constant arguments to all
@@ -1552,7 +1636,7 @@ class SampledNdvState {
   /// Array of buckets.
   struct {
     int64_t row_count;
-    uint8_t hll[AggregateFunctions::HLL_LEN];
+    uint8_t hll[AggregateFunctions::DEFAULT_HLL_LEN];
   } buckets[NUM_HLL_BUCKETS];
 };
 
@@ -1578,7 +1662,7 @@ void AggregateFunctions::SampledNdvUpdate(FunctionContext* ctx, const T& src,
     const DoubleVal& sample_perc, StringVal* dst) {
   SampledNdvState* state = reinterpret_cast<SampledNdvState*>(dst->ptr);
   int64_t bucket_idx = state->total_row_count % SampledNdvState::NUM_HLL_BUCKETS;
-  StringVal hll_dst = StringVal(state->buckets[bucket_idx].hll, HLL_LEN);
+  StringVal hll_dst = StringVal(state->buckets[bucket_idx].hll, DEFAULT_HLL_LEN);
   HllUpdate(ctx, src, &hll_dst);
   ++state->buckets[bucket_idx].row_count;
   ++state->total_row_count;
@@ -1589,8 +1673,8 @@ void AggregateFunctions::SampledNdvMerge(FunctionContext* ctx, const StringVal& 
   SampledNdvState* src_state = reinterpret_cast<SampledNdvState*>(src.ptr);
   SampledNdvState* dst_state = reinterpret_cast<SampledNdvState*>(dst->ptr);
   for (int i = 0; i < SampledNdvState::NUM_HLL_BUCKETS; ++i) {
-    StringVal src_hll = StringVal(src_state->buckets[i].hll, HLL_LEN);
-    StringVal dst_hll = StringVal(dst_state->buckets[i].hll, HLL_LEN);
+    StringVal src_hll = StringVal(src_state->buckets[i].hll, DEFAULT_HLL_LEN);
+    StringVal dst_hll = StringVal(dst_state->buckets[i].hll, DEFAULT_HLL_LEN);
     HllMerge(ctx, src_hll, &dst_hll);
     dst_state->buckets[i].row_count += src_state->buckets[i].row_count;
   }
@@ -1624,15 +1708,15 @@ BigIntVal AggregateFunctions::SampledNdvFinalize(FunctionContext* ctx,
   // are sufficient for reasonable accuracy.
   int pidx = 0;
   for (int i = 0; i < SampledNdvState::NUM_HLL_BUCKETS; ++i) {
-    uint8_t merged_hll_data[HLL_LEN];
-    memset(merged_hll_data, 0, HLL_LEN);
-    StringVal merged_hll(merged_hll_data, HLL_LEN);
+    uint8_t merged_hll_data[DEFAULT_HLL_LEN];
+    memset(merged_hll_data, 0, DEFAULT_HLL_LEN);
+    StringVal merged_hll(merged_hll_data, DEFAULT_HLL_LEN);
     int64_t merged_count = 0;
     for (int j = 0; j < SampledNdvState::NUM_HLL_BUCKETS; ++j) {
       int bucket_idx = (i + j) % SampledNdvState::NUM_HLL_BUCKETS;
       merged_count += state->buckets[bucket_idx].row_count;
       counts[pidx] = merged_count;
-      StringVal hll = StringVal(state->buckets[bucket_idx].hll, HLL_LEN);
+      StringVal hll = StringVal(state->buckets[bucket_idx].hll, DEFAULT_HLL_LEN);
       HllMerge(ctx, hll, &merged_hll);
       ndvs[pidx] = HllFinalEstimate(merged_hll.ptr);
       ++pidx;
@@ -2393,6 +2477,31 @@ template DecimalVal AggregateFunctions::AppxMedianFinalize<DecimalVal>(
 template DateVal AggregateFunctions::AppxMedianFinalize<DateVal>(
     FunctionContext*, const StringVal&);
 
+// Method instantiation for the implementation of the Update
+// functions.
+template void AggregateFunctions::HllUpdate(
+    FunctionContext*, const BooleanVal&, StringVal*, int precision);
+template void AggregateFunctions::HllUpdate(
+    FunctionContext*, const TinyIntVal&, StringVal*, int precision);
+template void AggregateFunctions::HllUpdate(
+    FunctionContext*, const SmallIntVal&, StringVal*, int precision);
+template void AggregateFunctions::HllUpdate(
+    FunctionContext*, const IntVal&, StringVal*, int precision);
+template void AggregateFunctions::HllUpdate(
+    FunctionContext*, const BigIntVal&, StringVal*, int precision);
+template void AggregateFunctions::HllUpdate(
+    FunctionContext*, const FloatVal&, StringVal*, int precision);
+template void AggregateFunctions::HllUpdate(
+    FunctionContext*, const DoubleVal&, StringVal*, int precision);
+template void AggregateFunctions::HllUpdate(
+    FunctionContext*, const StringVal&, StringVal*, int precision);
+template void AggregateFunctions::HllUpdate(
+    FunctionContext*, const TimestampVal&, StringVal*, int precision);
+template void AggregateFunctions::HllUpdate(
+    FunctionContext*, const DateVal&, StringVal*, int precision);
+
+// Method instantiation for NDV() that accepts a single argument. The
+// NDV() is computed with a precision of 10.
 template void AggregateFunctions::HllUpdate(
     FunctionContext*, const BooleanVal&, StringVal*);
 template void AggregateFunctions::HllUpdate(
@@ -2413,6 +2522,30 @@ template void AggregateFunctions::HllUpdate(
     FunctionContext*, const TimestampVal&, StringVal*);
 template void AggregateFunctions::HllUpdate(
     FunctionContext*, const DateVal&, StringVal*);
+
+// Method instantiation for NDV() that accepts two arguments. The
+// NDV() is computed with a precision indirectly specified through
+// the 2nd argument.
+template void AggregateFunctions::HllUpdate(
+    FunctionContext*, const BooleanVal&, const IntVal&, StringVal*);
+template void AggregateFunctions::HllUpdate(
+    FunctionContext*, const TinyIntVal&, const IntVal&, StringVal*);
+template void AggregateFunctions::HllUpdate(
+    FunctionContext*, const SmallIntVal&, const IntVal&, StringVal*);
+template void AggregateFunctions::HllUpdate(
+    FunctionContext*, const IntVal&, const IntVal&, StringVal*);
+template void AggregateFunctions::HllUpdate(
+    FunctionContext*, const BigIntVal&, const IntVal&, StringVal*);
+template void AggregateFunctions::HllUpdate(
+    FunctionContext*, const FloatVal&, const IntVal&, StringVal*);
+template void AggregateFunctions::HllUpdate(
+    FunctionContext*, const DoubleVal&, const IntVal&, StringVal*);
+template void AggregateFunctions::HllUpdate(
+    FunctionContext*, const StringVal&, const IntVal&, StringVal*);
+template void AggregateFunctions::HllUpdate(
+    FunctionContext*, const TimestampVal&, const IntVal&, StringVal*);
+template void AggregateFunctions::HllUpdate(
+    FunctionContext*, const DateVal&, const IntVal&, StringVal*);
 
 template void AggregateFunctions::SampledNdvUpdate(
     FunctionContext*, const BooleanVal&, const DoubleVal&, StringVal*);

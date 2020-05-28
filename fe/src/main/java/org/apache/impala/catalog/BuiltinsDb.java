@@ -17,9 +17,11 @@
 
 package org.apache.impala.catalog;
 
+import java.util.List;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.Map;
+import java.util.HashMap;
 
 import org.apache.hadoop.hive.metastore.api.Database;
 import org.apache.impala.analysis.ArithmeticExpr;
@@ -31,9 +33,11 @@ import org.apache.impala.analysis.InPredicate;
 import org.apache.impala.analysis.IsNullPredicate;
 import org.apache.impala.analysis.LikePredicate;
 import org.apache.impala.builtins.ScalarBuiltins;
+import org.apache.impala.catalog.AggregateFunction;
 
 import com.google.common.collect.ImmutableMap;
 import com.google.common.collect.Lists;
+import com.google.common.base.Preconditions;
 
 public class BuiltinsDb extends Db {
   // Size in bytes of AvgState used for integer, floating point, and timestamp avg().
@@ -49,9 +53,19 @@ public class BuiltinsDb extends Db {
   // Must match PC_INTERMEDIATE_BYTES in aggregate-functions-ir.cc.
   private static final int PC_INTERMEDIATE_SIZE = 256;
 
-  // Size in bytes of Hyperloglog intermediate value used for ndv().
-  // Must match HLL_LEN in aggregate-functions-ir.cc.
+  // Size in bytes of the default Hyperloglog intermediate value used for ndv().
+  // Must match DEFAULT_HLL_LEN in aggregate-functions-ir.cc.
   private static final int HLL_INTERMEDIATE_SIZE = 1024;
+
+  // Sizes in bytes of all supported HyperLogLog intermediate value used for NDV(),
+  // corresponding to precision 9, 10, 11, 12, 13, 14, 15, 16, 17 and 18, respectively
+  private static final int[] hll_intermediate_sizes = {
+      512, 1024, 2048, 4096, 8192, 16384, 32768, 65536, 131072, 262144};
+
+  // A map of the AggregateFunction templates with all known/supported
+  // intermediate data types.
+  private final Map<Type, List<AggregateFunction>> builtinNDVs_ =
+      new HashMap<>();
 
   // Size in bytes of RankState used for rank() and dense_rank().
   private static final int RANK_INTERMEDIATE_SIZE = 16;
@@ -334,6 +348,33 @@ public class BuiltinsDb extends Db {
             "9HllUpdateIN10impala_udf10DecimalValEEEvPNS2_15FunctionContextERKT_PNS2_9StringValE")
         .put(Type.DATE,
             "9HllUpdateIN10impala_udf7DateValEEEvPNS2_15FunctionContextERKT_PNS2_9StringValE")
+        .build();
+
+  // For ndv() with two input arguments
+  private static final Map<Type, String> HLL_UPDATE_SYMBOL_WITH_PRECISION =
+      ImmutableMap.<Type, String>builder()
+        .put(Type.BOOLEAN,
+            "9HllUpdateIN10impala_udf10BooleanValEEEvPNS2_15FunctionContextERKT_RKNS2_6IntValEPNS2_9StringValE")
+        .put(Type.TINYINT,
+             "9HllUpdateIN10impala_udf10TinyIntValEEEvPNS2_15FunctionContextERKT_RKNS2_6IntValEPNS2_9StringValE")
+        .put(Type.SMALLINT,
+             "9HllUpdateIN10impala_udf11SmallIntValEEEvPNS2_15FunctionContextERKT_RKNS2_6IntValEPNS2_9StringValE")
+        .put(Type.INT,
+             "9HllUpdateIN10impala_udf6IntValEEEvPNS2_15FunctionContextERKT_RKS3_PNS2_9StringValE")
+        .put(Type.BIGINT,
+             "9HllUpdateIN10impala_udf9BigIntValEEEvPNS2_15FunctionContextERKT_RKNS2_6IntValEPNS2_9StringValE")
+        .put(Type.FLOAT,
+             "9HllUpdateIN10impala_udf8FloatValEEEvPNS2_15FunctionContextERKT_RKNS2_6IntValEPNS2_9StringValE")
+        .put(Type.DOUBLE,
+             "9HllUpdateIN10impala_udf9DoubleValEEEvPNS2_15FunctionContextERKT_RKNS2_6IntValEPNS2_9StringValE")
+        .put(Type.STRING,
+             "9HllUpdateIN10impala_udf9StringValEEEvPNS2_15FunctionContextERKT_RKNS2_6IntValEPS3_")
+        .put(Type.TIMESTAMP,
+             "9HllUpdateIN10impala_udf12TimestampValEEEvPNS2_15FunctionContextERKT_RKNS2_6IntValEPNS2_9StringValE")
+        .put(Type.DECIMAL,
+             "9HllUpdateIN10impala_udf10DecimalValEEEvPNS2_15FunctionContextERKT_RKNS2_6IntValEPNS2_9StringValE")
+        .put(Type.DATE,
+             "9HllUpdateIN10impala_udf7DateValEEEvPNS2_15FunctionContextERKT_RKNS2_6IntValEPNS2_9StringValE")
         .build();
 
   private static final Map<Type, String> SAMPLED_NDV_UPDATE_SYMBOL =
@@ -845,6 +886,23 @@ public class BuiltinsDb extends Db {
             "25FirstValIgnoreNullsUpdateIN10impala_udf9StringValEEEvPNS2_15FunctionContextERKT_PS6_")
         .build();
 
+  // A helper function to return a template aggregation function for NDV with 2 arguments,
+  // for data type t. Inputs:
+  //  db: the db;
+  //  prefix: the prefix string for each function call symbol in BE;
+  //  t: the type to build the template for;
+  //  hllIntermediateType: the intermediate data type.
+  private static AggregateFunction createTemplateAggregateFunctionForNDVWith2Args(
+      Db db, String prefix, Type t, Type hllIntermediateType) {
+    return AggregateFunction.createBuiltin(db, "ndv", Lists.newArrayList(t, Type.INT),
+        Type.BIGINT, hllIntermediateType,
+        prefix + "7HllInitEPN10impala_udf15FunctionContextEPNS1_9StringValE",
+        prefix + HLL_UPDATE_SYMBOL_WITH_PRECISION.get(t),
+        prefix + "8HllMergeEPN10impala_udf15FunctionContextERKNS1_9StringValEPS4_", null,
+        prefix + "11HllFinalizeEPN10impala_udf15FunctionContextERKNS1_9StringValE", true,
+        false, true);
+  }
+
   // Populate all the aggregate builtins in the catalog.
   // null symbols indicate the function does not need that step of the evaluation.
   // An empty symbol indicates a TODO for the BE to implement the function.
@@ -934,10 +992,15 @@ public class BuiltinsDb extends Db {
           false, false, true));
 
       // NDV
-      Type hllIntermediateType =
+      // Setup the intermediate type based on the default precision in the template
+      // function in the db. This type is useful when the default precision is all
+      // needed in the ndv().
+      Type defaultHllIntermediateType =
           ScalarType.createFixedUdaIntermediateType(HLL_INTERMEDIATE_SIZE);
-      db.addBuiltin(AggregateFunction.createBuiltin(db, "ndv",
-          Lists.newArrayList(t), Type.BIGINT, hllIntermediateType,
+
+      // Single input argument version
+      db.addBuiltin(AggregateFunction.createBuiltin(db, "ndv", Lists.newArrayList(t),
+          Type.BIGINT, defaultHllIntermediateType,
           prefix + "7HllInitEPN10impala_udf15FunctionContextEPNS1_9StringValE",
           prefix + HLL_UPDATE_SYMBOL.get(t),
           prefix + "8HllMergeEPN10impala_udf15FunctionContextERKNS1_9StringValEPS4_",
@@ -945,8 +1008,26 @@ public class BuiltinsDb extends Db {
           prefix + "11HllFinalizeEPN10impala_udf15FunctionContextERKNS1_9StringValE",
           true, false, true));
 
+      // Double input argument version, with the unique HllUpdate function symbols.
+      // Take an intermediate data type with the default length for now. During the
+      // analysis phase, the data type will be resolved to the correct template, based
+      // on the the value in the 2nd argument.
+      db.addBuiltin(createTemplateAggregateFunctionForNDVWith2Args(
+          db, prefix, t, defaultHllIntermediateType));
+
+      // For each type t, populate the hash map of AggregateFunctions with
+      // all known intermediate data types.
+      List<AggregateFunction> ndvList = new ArrayList<AggregateFunction>();
+      for (int size : hll_intermediate_sizes) {
+        Type hllIntermediateType = ScalarType.createFixedUdaIntermediateType(size);
+        ndvList.add(createTemplateAggregateFunctionForNDVWith2Args(
+            db, prefix, t, hllIntermediateType));
+      }
+      builtinNDVs_.put(t, ndvList);
+
+      // Used in stats computation. Will take a single input argument only.
       db.addBuiltin(AggregateFunction.createBuiltin(db, "ndv_no_finalize",
-          Lists.newArrayList(t), Type.STRING, hllIntermediateType,
+          Lists.newArrayList(t), Type.STRING, defaultHllIntermediateType,
           prefix + "7HllInitEPN10impala_udf15FunctionContextEPNS1_9StringValE",
           prefix + HLL_UPDATE_SYMBOL.get(t),
           prefix + "8HllMergeEPN10impala_udf15FunctionContextERKNS1_9StringValEPS4_",
@@ -1279,5 +1360,18 @@ public class BuiltinsDb extends Db {
       db.addBuiltin(AggregateFunction.createAnalyticBuiltin(
             db, "lead", Lists.newArrayList(t, Type.BIGINT), t, t));
     }
+  }
+
+  // Resolve the intermediate data type by searching for one in the
+  // map builtinNDVs_ that has the desired length.
+  public AggregateFunction resolveNdvIntermediateType(
+      AggregateFunction func, int length) {
+    Preconditions.checkState(func.getNumArgs() >= 1);
+    List<AggregateFunction> list = builtinNDVs_.get(func.getArgs()[0]);
+    for (AggregateFunction aggF : list) {
+      ScalarType sType = (ScalarType) aggF.getIntermediateType();
+      if (sType.getLength() == length) return aggF;
+    }
+    return null;
   }
 }

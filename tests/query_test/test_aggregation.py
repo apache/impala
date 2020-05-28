@@ -277,6 +277,49 @@ class TestAggregationQueries(ImpalaTestSuite):
     vector.get_value('exec_option')['batch_size'] = 1
     self.run_test_case('QueryTest/kudu-stats-agg', vector, unique_database)
 
+  def test_ndv(self):
+    """Test the version of NDV() that accepts a scale value argument against
+    different column data types. The scale argument is an integer in range
+    [1, 10]."""
+
+    ndv_results = [
+      [2, 9, 96, 988, 980, 1000, 944, 1030, 1020, 990, 1010, 957, 1030, 1027, 9845, 9898],
+      [2, 9, 97, 957, 1008, 1016, 1005, 963, 994, 993, 1018, 1004, 963, 1014, 10210,
+          10280],
+      [2, 9, 98, 977, 1024, 1020, 975, 977, 1002, 991, 994, 1006, 977, 999, 10118, 9923],
+      [2, 9, 99, 986, 1009, 1011, 994, 980, 997, 994, 1002, 997, 980, 988, 10148, 9987],
+      [2, 9, 99, 995, 996, 1000, 998, 988, 995, 999, 997, 999, 988, 979, 9974, 9960],
+      [2, 9, 99, 998, 1005, 999, 1003, 994, 1000, 993, 999, 998, 994, 992, 9899, 9941],
+      [2, 9, 99, 993, 1001, 1007, 1000, 998, 1002, 997, 999, 998, 998, 999, 9923, 9931],
+      [2, 9, 99, 994, 998, 1002, 1002, 999, 998, 999, 997, 1000, 999, 997, 9937, 9973],
+      [2, 9, 99, 995, 997, 998, 1001, 999, 1001, 996, 997, 1000, 999, 998, 9989, 9981],
+      [2, 9, 99, 998, 998, 997, 999, 998, 1000, 998, 1000, 998, 998, 1000, 10000, 10003]
+    ]
+
+    # For each possible integer value, genereate one query and test it out.
+    for i in xrange(1, 11):
+      ndv_stmt = """
+        select ndv(bool_col, {0}), ndv(tinyint_col, {0}),
+               ndv(smallint_col, {0}), ndv(int_col, {0}),
+               ndv(bigint_col, {0}), ndv(float_col, {0}),
+               ndv(double_col, {0}), ndv(string_col, {0}),
+               ndv(cast(double_col as decimal(5, 0)), {0}),
+               ndv(cast(double_col as decimal(10, 5)), {0}),
+               ndv(cast(double_col as decimal(20, 10)), {0}),
+               ndv(cast(double_col as decimal(38, 33)), {0}),
+               ndv(cast(string_col as varchar(20)), {0}),
+               ndv(cast(string_col as char(10)), {0}),
+               ndv(timestamp_col, {0}), ndv(id, {0})
+        from functional_parquet.alltypesagg""".format(i)
+      ndv_result = self.execute_query(ndv_stmt)
+      ndv_vals = ndv_result.data[0].split('\t')
+
+      # Verify that each ndv() value (one per column for a total of 11) is identical
+      # to the corresponding known value. Since NDV() invokes Hash64() hash function
+      # with a fixed seed value, ndv() result is deterministic.
+      for j in xrange(0, 11):
+        assert(ndv_results[i - 1][j] == int(ndv_vals[j]))
+
   def test_sampled_ndv(self, vector, unique_database):
     """The SAMPLED_NDV() function is inherently non-deterministic and cannot be
     reasonably made deterministic with existing options so we test it separately.

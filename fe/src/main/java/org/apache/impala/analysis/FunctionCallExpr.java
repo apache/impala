@@ -471,6 +471,12 @@ public class FunctionCallExpr extends Expr {
     return ScalarType.createClippedDecimalType(digitsBefore + digitsAfter, digitsAfter);
   }
 
+  // First compute the precision as (scale + 8) and then compute
+  // the needed memory for that precision value which is 2^precision.
+  // This method must be identical to function ComputeHllLengthFromScale()
+  // defined in aggregate-functions-ir.cc.
+  private int ComputeHllLengthFromScale(int scale) { return 1 << (scale + 8); }
+
   @Override
   protected void analyzeImpl(Analyzer analyzer) throws AnalysisException {
     fnName_.analyze(analyzer);
@@ -553,6 +559,39 @@ public class FunctionCallExpr extends Expr {
     fn_ = db.getFunction(searchDesc, Function.CompareMode.IS_NONSTRICT_SUPERTYPE_OF);
     if (fn_ == null || (!isInternalFnCall_ && !fn_.userVisible())) {
       throw new AnalysisException(getFunctionNotFoundError(argTypes));
+    }
+
+    // NDV() can optionally take a second argument which must be an integer literal
+    // in the range from 1 to 10. Perform the analysis here.
+    if (fnName_.getFunction().equalsIgnoreCase("ndv") && children_.size() == 2) {
+      if (!(children_.get(1) instanceof NumericLiteral)) {
+        throw new AnalysisException(
+            "Second parameter of NDV() must be an integer literal: "
+            + children_.get(1).toSql());
+      }
+
+      NumericLiteral scale = (NumericLiteral) children_.get(1);
+
+      if (scale.getValue().scale() != 0
+          || !NumericLiteral.fitsInInt(scale.getValue())
+          || scale.getIntValue() < 1 || scale.getIntValue() > 10) {
+        throw new AnalysisException(
+            "Second parameter of NDV() must be an integer literal in [1,10]: "
+            + scale.toSql());
+      }
+      children_.set(1, scale.uncheckedCastTo(Type.INT));
+
+      // In BuiltinsDb, look for an AggregateFunction template with the correct length for
+      // the intermediate data type and use it.
+      BuiltinsDb builtinDb = (BuiltinsDb) db;
+      int size = ComputeHllLengthFromScale(scale.getIntValue());
+      fn_ = builtinDb.resolveNdvIntermediateType((AggregateFunction) fn_, size);
+
+      if (fn_ == null) {
+        throw new AnalysisException(
+            "A suitable intermediate data type cannot be found for the second parameter "
+            + children_.get(1).toSql() + " in NDV()");
+      }
     }
 
     if (isAggregateFunction()) {

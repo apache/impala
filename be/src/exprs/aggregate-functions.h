@@ -193,17 +193,45 @@ class AggregateFunctions {
 
   /// This precision is the default precision from the paper. It doesn't seem to matter
   /// very much when between 6 and 12.
-  static constexpr int HLL_PRECISION = 10;
-  static constexpr int HLL_LEN = 1 << HLL_PRECISION;
+  static constexpr int DEFAULT_HLL_PRECISION = 10;
+
+  // Define the min and the max of a precision value that can be indirectly
+  // specified by the 2nd argument in NDV(<arg1>, <arg2>).
+  static constexpr int MIN_HLL_PRECISION = 9;
+  static constexpr int MAX_HLL_PRECISION = 18;
+
+  // DEFAULT_HLL_LEN is the parameter m defined in the paper.
+  static constexpr int DEFAULT_HLL_LEN = 1 << DEFAULT_HLL_PRECISION;
+
+  // Define the min and the max of parameter m.
+  static constexpr int MIN_HLL_LEN = 1 << MIN_HLL_PRECISION;
+  static constexpr int MAX_HLL_LEN = 1 << MAX_HLL_PRECISION;
+
   static void HllInit(FunctionContext*, StringVal* slot);
+
+  // The implementation for both versions of the update functions below.
+  template <typename T>
+  static void HllUpdate(FunctionContext*, const T& src, StringVal* dst, int precision);
+
+  // Update function for single input argument version of NDV(),
+  // utilizing the default precision for HLL algorithm.
   template <typename T>
   static void HllUpdate(FunctionContext*, const T& src, StringVal* dst);
+
+  // Update function for two input argument version of NDV(),
+  // utilizing the precision value indirectly specified through the
+  // 2nd argument in NDV().
+  template <typename T>
+  static void HllUpdate(
+      FunctionContext*, const T& src1, const IntVal& src2, StringVal* dst);
+
   static void HllMerge(FunctionContext*, const StringVal& src, StringVal* dst);
   static BigIntVal HllFinalize(FunctionContext*, const StringVal& src);
 
   /// Utility method to compute the final result of an HLL estimation.
-  /// Assumes HLL_LEN number of buckets.
-  static uint64_t HllFinalEstimate(const uint8_t* buckets);
+  /// Assumes hll_len number of buckets.
+  static uint64_t HllFinalEstimate(
+      const uint8_t* buckets, int hll_len = AggregateFunctions::DEFAULT_HLL_LEN);
 
   /// Estimates the number of distinct values (NDV) based on a sample of data and the
   /// corresponding sampling rate. The main idea of this function is to collect several
