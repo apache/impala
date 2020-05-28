@@ -42,7 +42,7 @@ using namespace strings;
 // of the NDV computation into its output StringVal.
 StringVal IncrementNdvFinalize(FunctionContext* ctx, const StringVal& src) {
   if (UNLIKELY(src.is_null)) return src;
-  DCHECK_EQ(src.len, AggregateFunctions::HLL_LEN);
+  DCHECK_EQ(src.len, AggregateFunctions::DEFAULT_HLL_LEN);
   StringVal result_str(ctx, src.len);
   if (UNLIKELY(result_str.is_null)) return result_str;
   memcpy(result_str.ptr, src.ptr, src.len);
@@ -60,8 +60,8 @@ StringVal IncrementNdvFinalize(FunctionContext* ctx, const StringVal& src) {
 // shorter than the input. Otherwise it is set to false, and the input is returned
 // unencoded.
 string EncodeNdv(const string& ndv, bool* is_encoded) {
-  DCHECK_EQ(ndv.size(), AggregateFunctions::HLL_LEN);
-  string encoded_ndv(AggregateFunctions::HLL_LEN, 0);
+  DCHECK_EQ(ndv.size(), AggregateFunctions::DEFAULT_HLL_LEN);
+  string encoded_ndv(AggregateFunctions::DEFAULT_HLL_LEN, 0);
   int idx = 0;
   char last = ndv[0];
 
@@ -69,9 +69,9 @@ string EncodeNdv(const string& ndv, bool* is_encoded) {
   // a byte 0-255, but the actual count is always one more than the encoded value
   // (i.e. in the range 1-256 inclusive).
   uint8_t count = 0;
-  for (int i = 1; i < AggregateFunctions::HLL_LEN; ++i) {
+  for (int i = 1; i < AggregateFunctions::DEFAULT_HLL_LEN; ++i) {
     if (ndv[i] != last || count == numeric_limits<uint8_t>::max()) {
-      if (idx + 2 > AggregateFunctions::HLL_LEN) break;
+      if (idx + 2 > AggregateFunctions::DEFAULT_HLL_LEN) break;
       // Write a (count, value) pair to two successive bytes
       encoded_ndv[idx++] = count;
       count = 0;
@@ -83,7 +83,7 @@ string EncodeNdv(const string& ndv, bool* is_encoded) {
   }
 
   // +2 for the remaining two bytes written below
-  if (idx + 2 > AggregateFunctions::HLL_LEN) {
+  if (idx + 2 > AggregateFunctions::DEFAULT_HLL_LEN) {
     *is_encoded = false;
     return ndv;
   }
@@ -94,21 +94,21 @@ string EncodeNdv(const string& ndv, bool* is_encoded) {
   *is_encoded = true;
   encoded_ndv.resize(idx);
   DCHECK_GT(encoded_ndv.size(), 0);
-  DCHECK_LE(encoded_ndv.size(), AggregateFunctions::HLL_LEN);
+  DCHECK_LE(encoded_ndv.size(), AggregateFunctions::DEFAULT_HLL_LEN);
   return encoded_ndv;
 }
 
 string DecodeNdv(const string& ndv, bool is_encoded) {
   if (!is_encoded) return ndv;
   DCHECK_EQ(ndv.size() % 2, 0);
-  string decoded_ndv(AggregateFunctions::HLL_LEN, 0);
+  string decoded_ndv(AggregateFunctions::DEFAULT_HLL_LEN, 0);
   int idx = 0;
   for (int i = 0; i < ndv.size(); i += 2) {
     for (int j = 0; j < (static_cast<uint8_t>(ndv[i])) + 1; ++j) {
       decoded_ndv[idx++] = ndv[i+1];
     }
   }
-  DCHECK_EQ(idx, AggregateFunctions::HLL_LEN);
+  DCHECK_EQ(idx, AggregateFunctions::DEFAULT_HLL_LEN);
   return decoded_ndv;
 }
 
@@ -240,7 +240,7 @@ void FinalizePartitionedColumnStats(const TTableSchema& col_stats_schema,
   TIntermediateColumnStats empty_column_stats;
   bool is_encoded;
   empty_column_stats.__set_intermediate_ndv(
-      EncodeNdv(string(AggregateFunctions::HLL_LEN, 0), &is_encoded));
+      EncodeNdv(string(AggregateFunctions::DEFAULT_HLL_LEN, 0), &is_encoded));
   empty_column_stats.__set_is_ndv_encoded(is_encoded);
   empty_column_stats.__set_num_nulls(0);
   empty_column_stats.__set_max_width(0);

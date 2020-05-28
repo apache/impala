@@ -29,10 +29,10 @@ using namespace impala;
 extern string EncodeNdv(const string& ndv, bool* is_encoded);
 extern string DecodeNdv(const string& ndv, bool is_encoded);
 
-static const int HLL_LEN = pow(2, AggregateFunctions::HLL_PRECISION);
+static const int DEFAULT_HLL_LEN = pow(2, AggregateFunctions::DEFAULT_HLL_PRECISION);
 
 TEST(IncrStatsUtilTest, TestEmptyRle) {
-  string test(HLL_LEN, 0);
+  string test(DEFAULT_HLL_LEN, 0);
 
   bool is_encoded;
   const string& encoded = EncodeNdv(test, &is_encoded);
@@ -40,13 +40,13 @@ TEST(IncrStatsUtilTest, TestEmptyRle) {
   ASSERT_TRUE(is_encoded);
 
   const string& decoded = DecodeNdv(encoded, is_encoded);
-  ASSERT_EQ(HLL_LEN, decoded.size());
+  ASSERT_EQ(DEFAULT_HLL_LEN, decoded.size());
   ASSERT_EQ(test, decoded);
 }
 
 TEST(IncrStatsUtilTest, TestNoEncode) {
   string test;
-  for (int i = 0; i < HLL_LEN; ++i) {
+  for (int i = 0; i < DEFAULT_HLL_LEN; ++i) {
     test += (i % 2 == 0) ? 'A' : 'B';
   }
 
@@ -60,7 +60,7 @@ TEST(IncrStatsUtilTest, TestNoEncode) {
 
 TEST(IncrStatsUtilTest, TestEncode) {
   string test;
-  for (int i = 0; i < HLL_LEN; ++i) {
+  for (int i = 0; i < DEFAULT_HLL_LEN; ++i) {
     test += (i < 512) ? 'A' : 'B';
   }
 
@@ -82,25 +82,25 @@ TEST(IncrStatsUtilTest, TestNumNullAggregation) {
   PerColumnStats* stat = new PerColumnStats();
   ASSERT_EQ(0, stat->ToTColumnStats().num_nulls);
 
-  stat->Update(string(AggregateFunctions::HLL_LEN, 0), 0, 0, 0, 1, 0, 0);
+  stat->Update(string(AggregateFunctions::DEFAULT_HLL_LEN, 0), 0, 0, 0, 1, 0, 0);
   ASSERT_EQ(1, stat->ToTColumnStats().num_nulls);
 
-  stat->Update(string(AggregateFunctions::HLL_LEN, 0), 0, 0, 0, 0, 0, 0);
+  stat->Update(string(AggregateFunctions::DEFAULT_HLL_LEN, 0), 0, 0, 0, 0, 0, 0);
   ASSERT_EQ(1, stat->ToTColumnStats().num_nulls);
 
-  stat->Update(string(AggregateFunctions::HLL_LEN, 0), 0, 0, 0, 2, 0, 0);
+  stat->Update(string(AggregateFunctions::DEFAULT_HLL_LEN, 0), 0, 0, 0, 2, 0, 0);
   ASSERT_EQ(3, stat->ToTColumnStats().num_nulls);
 
-  stat->Update(string(AggregateFunctions::HLL_LEN, 0), 0, 0, 0, -1, 0, 0);
+  stat->Update(string(AggregateFunctions::DEFAULT_HLL_LEN, 0), 0, 0, 0, -1, 0, 0);
   ASSERT_EQ(-1, stat->ToTColumnStats().num_nulls);
 
-  stat->Update(string(AggregateFunctions::HLL_LEN, 0), 0, 0, 0, 0, 0, 0);
+  stat->Update(string(AggregateFunctions::DEFAULT_HLL_LEN, 0), 0, 0, 0, 0, 0, 0);
   ASSERT_EQ(-1, stat->ToTColumnStats().num_nulls);
 
-  stat->Update(string(AggregateFunctions::HLL_LEN, 0), 0, 0, 0, 3, 0, 0);
+  stat->Update(string(AggregateFunctions::DEFAULT_HLL_LEN, 0), 0, 0, 0, 3, 0, 0);
   ASSERT_EQ(-1, stat->ToTColumnStats().num_nulls);
 
-  stat->Update(string(AggregateFunctions::HLL_LEN, 0), 0, 0, 0, -1, 0, 0);
+  stat->Update(string(AggregateFunctions::DEFAULT_HLL_LEN, 0), 0, 0, 0, -1, 0, 0);
   ASSERT_EQ(-1, stat->ToTColumnStats().num_nulls);
 }
 
@@ -112,15 +112,15 @@ TEST(IncrStatsUtilTest, TestNumNullAggregation) {
 TEST(IncrStatsUtilTest, TestAvgSizehAggregation) {
   PerColumnStats* stat = new PerColumnStats();
 
-  stat->Update(string(AggregateFunctions::HLL_LEN, 0), 1, 4, 0, 0, 0, 0);
+  stat->Update(string(AggregateFunctions::DEFAULT_HLL_LEN, 0), 1, 4, 0, 0, 0, 0);
   stat->Finalize();
   ASSERT_EQ(4, stat->ToTColumnStats().avg_size);
 
-  stat->Update(string(AggregateFunctions::HLL_LEN, 0), 2, 7, 0, 0, 0, 0);
+  stat->Update(string(AggregateFunctions::DEFAULT_HLL_LEN, 0), 2, 7, 0, 0, 0, 0);
   stat->Finalize();
   ASSERT_EQ(6, stat->ToTColumnStats().avg_size);
 
-  stat->Update(string(AggregateFunctions::HLL_LEN, 0), 0, 0, 0, 0, 0, 0);
+  stat->Update(string(AggregateFunctions::DEFAULT_HLL_LEN, 0), 0, 0, 0, 0, 0, 0);
   stat->Finalize();
   ASSERT_EQ(6, stat->ToTColumnStats().avg_size);
 }

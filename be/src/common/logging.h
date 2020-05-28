@@ -62,6 +62,13 @@
 #define VLOG_ROW_IS_ON VLOG_IS_ON(3)
 #define VLOG_PROGRESS_IS_ON VLOG_IS_ON(2)
 
+// Define a range check macro to test x in the inclusive range from low to high.
+#define DCHECK_IN_RANGE(x, low, high) \
+  {                                   \
+    DCHECK_GE(x, low);                \
+    DCHECK_LE(x, high);               \
+  }
+
 /// Define a wrapper around DCHECK for strongly typed enums that print a useful error
 /// message on failure.
 #define DCHECK_ENUM_EQ(a, b)                                               \
