@@ -68,12 +68,12 @@ fi
 # moving to a different build of the toolchain, e.g. when a version is bumped or a
 # compile option is changed. The build id can be found in the output of the toolchain
 # build jobs, it is constructed from the build number and toolchain git hash prefix.
-export IMPALA_TOOLCHAIN_BUILD_ID=29-34813f22eb
+export IMPALA_TOOLCHAIN_BUILD_ID=30-5570b0cd64
 # Versions of toolchain dependencies.
 # -----------------------------------
 export IMPALA_AVRO_VERSION=1.7.4-p5
 unset IMPALA_AVRO_URL
-export IMPALA_BINUTILS_VERSION=2.26.1
+export IMPALA_BINUTILS_VERSION=2.28
 unset IMPALA_BINUTILS_URL
 export IMPALA_BOOST_VERSION=1.61.0-p2
 unset IMPALA_BOOST_URL
@@ -91,7 +91,7 @@ export IMPALA_CYRUS_SASL_VERSION=2.1.23
 unset IMPALA_CYRUS_SASL_URL
 export IMPALA_FLATBUFFERS_VERSION=1.6.0
 unset IMPALA_FLATBUFFERS_URL
-export IMPALA_GCC_VERSION=4.9.2
+export IMPALA_GCC_VERSION=7.5.0
 unset IMPALA_GCC_URL
 export IMPALA_GDB_VERSION=7.9.1-p1
 unset IMPALA_GDB_URL
@@ -212,10 +212,10 @@ if [ -f "$IMPALA_HOME/bin/impala-config-local.sh" ]; then
 fi
 
 # IMPALA_TOOLCHAIN_PACKAGES_HOME is the location inside IMPALA_TOOLCHAIN where native
-# toolchain packages are placed. This is currently the same as IMPALA_TOOLCHAIN, but
-# in future, this will be a subdirectory under IMPALA_TOOLCHAIN to allow different
-# compiler versions.
-export IMPALA_TOOLCHAIN_PACKAGES_HOME=${IMPALA_TOOLCHAIN}
+# toolchain packages are placed. This uses a subdirectory that contains the information
+# about the compiler to allow using different compiler versions.
+export IMPALA_TOOLCHAIN_PACKAGES_HOME=\
+${IMPALA_TOOLCHAIN}/toolchain-packages-gcc${IMPALA_GCC_VERSION}
 
 export CDP_HADOOP_URL=${CDP_HADOOP_URL-}
 export CDP_HBASE_URL=${CDP_HBASE_URL-}

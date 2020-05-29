@@ -18,4 +18,4 @@
 # under the License.
 
 source "$(dirname "$0")/impala-python-common.sh"
-exec "$PY_DIR/env/bin/gcovr" "$@"
+exec "$PY_ENV_DIR/bin/gcovr" "$@"

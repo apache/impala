@@ -16,7 +16,7 @@
 # under the License.
 
 # Sets up the python path for impala-python. This is needed because tests and other
-# utility scripts depend on some modules external to infra/python/env.
+# utility scripts depend on some modules external to infra/python/env-*.
 # TODO: we should try to reduce our reliance on PYTHONPATH if possible.
 #
 # Setting USE_THRIFT11_GEN_PY will add Thrift 11 Python generated code rather than the
@@ -34,7 +34,7 @@ else
   PYTHONPATH=${PYTHONPATH}:${IMPALA_HOME}/shell/gen-py
 fi
 
-PYTHONPATH=${PYTHONPATH}:${IMPALA_HOME}/infra/python/env/lib
+PYTHONPATH=${PYTHONPATH}:${IMPALA_HOME}/infra/python/env-gcc${IMPALA_GCC_VERSION}/lib
 
 # There should be just a single version of python that created the
 # site-packages directory. We find it by performing shell independent expansion

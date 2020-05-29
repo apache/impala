@@ -78,7 +78,7 @@ inline bool operator<(const UniqueIdPB& lhs, const UniqueIdPB& rhs) {
 }
 
 // TNetworkAddress
-STATIC_ASSERT_SIZE(TNetworkAddress, 24);
+STATIC_ASSERT_SIZE(TNetworkAddress, 48);
 
 inline bool operator==(const TNetworkAddress& lhs, const TNetworkAddress& rhs) {
   return std::tie(lhs.hostname, lhs.port) == std::tie(rhs.hostname, rhs.port);
@@ -109,7 +109,7 @@ inline bool operator==(const TStatus& lhs, const TStatus& rhs) {
 }
 
 // TCounter
-STATIC_ASSERT_SIZE(TCounter, 32);
+STATIC_ASSERT_SIZE(TCounter, 56);
 
 inline bool operator==(const TCounter& lhs, const TCounter& rhs) {
   return std::tie(lhs.name, lhs.unit, lhs.value)
