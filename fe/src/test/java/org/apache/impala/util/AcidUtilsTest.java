@@ -507,6 +507,33 @@ public class AcidUtilsTest {
         );
   }
 
+  public void testHiveStreamingFail() {
+    filteringError(new String[]{
+            "base_0000005/",
+            "base_0000005/abc.txt",
+            "delta_0000006_0000016/",
+            "delta_0000006_0000016/00000_0",
+            "delta_0000006_0000016/00000_0_flush_length"},
+        // all txns are valid
+        "",
+        // <tbl>:<hwm>:<minOpenWriteId>:<openWriteIds>:<abortedWriteIds>
+        "default.test:22:1234:1,2,3",
+        "Found Hive Streaming side-file"
+        );
+    assertFiltering(new String[]{
+            "base_0000005/",
+            "base_0000005/abc.txt",
+            "delta_0000006_0000016/",
+            "delta_0000006_0000016/00000_0",
+            "delta_0000006_0000016/00000_0_flush_length",
+            "base_0000017_v123/0000_0"},
+        // all txns are valid
+        "",
+        // <tbl>:<hwm>:<minOpenWriteId>:<openWriteIds>:<abortedWriteIds>
+        "default.test:22:1234:1,2,3",
+        new String[]{"base_0000017_v123/0000_0"});
+  }
+
   @Test
   public void testMinorCompactionBeforeBase() {
     assertFiltering(new String[]{

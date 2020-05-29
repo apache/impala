@@ -335,7 +335,7 @@ public class AcidUtils {
 
   private static List<FileStatus> filterFilesForAcidState(List<FileStatus> stats,
       Path baseDir, long maxBaseWriteId, Set<String> deltaDirs,
-      @Nullable LoadStats loadStats) {
+      @Nullable LoadStats loadStats) throws MetaException {
     List<FileStatus> validStats = new ArrayList<>(stats);
     for (Iterator<FileStatus> it = validStats.iterator(); it.hasNext();) {
       FileStatus stat = it.next();
@@ -352,6 +352,13 @@ public class AcidUtils {
         if (dirName != null && !deltaDirs.contains(dirName)) {
           it.remove();
           if (loadStats != null) loadStats.filesSupersededByAcidState++;
+        }
+        if (relPath.endsWith("_flush_length")) {
+          throw new MetaException("Found Hive Streaming side-file: " +
+              stat.getPath() + " It means that the contents of the directory are " +
+              "currently being written, therefore Impala is not able to read it. " +
+              "Please try to load the table again once Hive Streaming commits " +
+              "the transaction.");
         }
         continue;
       }
