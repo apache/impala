@@ -1228,7 +1228,8 @@ alter_tbl_stmt ::=
     RPAREN
   {:
     if (!BackendConfig.INSTANCE.isZOrderSortUnlocked()) {
-      throw new NotImplementedException("Z-ordering is not yet implemented");
+      throw new NotImplementedException("Z-ordering is not enabled. You can use the " +
+          "unlock_zorder_sort flag to enable it.");
     }
     RESULT = new AlterTableSortByStmt(table, col_names, TSortingOrder.ZORDER);
   :}
@@ -1584,7 +1585,8 @@ opt_sort_cols ::=
   | KW_SORT KW_BY KW_ZORDER LPAREN opt_ident_list:col_names RPAREN
   {:
     if (!BackendConfig.INSTANCE.isZOrderSortUnlocked()) {
-      throw new NotImplementedException("Z-ordering is not yet implemented");
+      throw new NotImplementedException("Z-ordering is not enabled. You can use the " +
+          "unlock_zorder_sort flag to enable it.");
     }
     RESULT = new Pair<List<String>, TSortingOrder>(
       col_names, TSortingOrder.ZORDER);

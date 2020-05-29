@@ -36,9 +36,7 @@ import org.apache.impala.catalog.KuduTable;
 import org.apache.impala.catalog.ScalarFunction;
 import org.apache.impala.catalog.Type;
 import org.apache.impala.common.FrontendTestBase;
-import org.apache.impala.service.BackendConfig;
 import org.apache.impala.thrift.TFunctionBinaryType;
-import org.apache.impala.thrift.TSortingOrder;
 import org.junit.Test;
 
 import com.google.common.collect.Lists;
@@ -137,8 +135,6 @@ public class ToSqlUtilsTest extends FrontendTestBase {
 
   @Test
   public void testSortOrder() {
-    BackendConfig.INSTANCE.setZOrderSortUnlocked(true);
-
     Map<String,String> props = new HashMap<>();
     props.put("foo", "foo-value");
     // Sorting order is LEXICAL by default
@@ -151,8 +147,6 @@ public class ToSqlUtilsTest extends FrontendTestBase {
     props.put(AlterTableSortByStmt.TBL_PROP_SORT_ORDER, "LEXICAL");
     // Returns false if zorder property set to LEXICAL
     assertEquals("LEXICAL", ToSqlUtils.getSortingOrder(props));
-
-    BackendConfig.INSTANCE.setZOrderSortUnlocked(false);
   }
 
   private FeTable getTable(String dbName, String tableName) {

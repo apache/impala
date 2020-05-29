@@ -1291,9 +1291,6 @@ public class AnalyzeDDLTest extends FrontendTestBase {
 
   @Test
   public void TestAlterTableSortByZOrder() {
-
-    BackendConfig.INSTANCE.setZOrderSortUnlocked(true);
-
     AnalyzesOk("alter table functional.alltypes sort by zorder (int_col,id)");
     AnalyzesOk("alter table functional.alltypes sort by zorder (bool_col,int_col,id)");
     AnalyzesOk(
@@ -1308,8 +1305,6 @@ public class AnalyzeDDLTest extends FrontendTestBase {
         "not find SORT BY column 'foo' in table.");
     AnalysisError("alter table functional_hbase.alltypes sort by zorder (id, foo)",
         "ALTER TABLE SORT BY not supported on HBase tables.");
-
-    BackendConfig.INSTANCE.setZOrderSortUnlocked(false);
   }
 
   @Test
@@ -1946,9 +1941,6 @@ public class AnalyzeDDLTest extends FrontendTestBase {
 
   @Test
   public void TestCreateTableLikeFile() throws AnalysisException {
-
-    BackendConfig.INSTANCE.setZOrderSortUnlocked(true);
-
     // check that we analyze all of the CREATE TABLE options
     AnalyzesOk("create table if not exists newtbl_DNE like parquet "
         + "'/test-warehouse/schemas/alltypestiny.parquet'");
@@ -2013,10 +2005,6 @@ public class AnalyzeDDLTest extends FrontendTestBase {
     AnalysisError("create table newtbl_kudu like parquet " +
         "'/test-warehouse/schemas/alltypestiny.parquet' stored as kudu",
         "CREATE TABLE LIKE FILE statement is not supported for Kudu tables.");
-
-
-    BackendConfig.INSTANCE.setZOrderSortUnlocked(false);
-
   }
 
   @Test
@@ -2346,8 +2334,6 @@ public class AnalyzeDDLTest extends FrontendTestBase {
         "Could not find SORT BY column 'foo' in table.");
 
     // Test sort by zorder columns.
-    BackendConfig.INSTANCE.setZOrderSortUnlocked(true);
-
     AnalyzesOk("create table tbl sort by zorder (int_col,id) like functional.alltypes");
     AnalyzesOk("create table tbl sort by zorder (float_col,id) like functional.alltypes");
     AnalyzesOk("create table tbl sort by zorder (double_col,id) like " +
@@ -2356,8 +2342,6 @@ public class AnalyzeDDLTest extends FrontendTestBase {
         "functional.alltypes");
     AnalysisError("create table tbl sort by zorder (int_col,foo) like " +
         "functional.alltypes", "Could not find SORT BY column 'foo' in table.");
-
-    BackendConfig.INSTANCE.setZOrderSortUnlocked(false);
   }
 
   @Test
@@ -2647,8 +2631,6 @@ public class AnalyzeDDLTest extends FrontendTestBase {
           type.name());
     }
 
-    BackendConfig.INSTANCE.setZOrderSortUnlocked(true);
-
     // Tables with sort columns
     AnalyzesOk("create table functional.new_table (i int, j int) sort by (i)");
     AnalyzesOk("create table functional.new_table (i int, j int) sort by (i, j)");
@@ -2691,8 +2673,6 @@ public class AnalyzeDDLTest extends FrontendTestBase {
     AnalysisError("create table functional.new_table (i int) PARTITIONED BY (d decimal)" +
         "sort by zorder (i, d)", "SORT BY column list must not contain partition " +
         "column: 'd'");
-
-    BackendConfig.INSTANCE.setZOrderSortUnlocked(false);
   }
 
   @Test
