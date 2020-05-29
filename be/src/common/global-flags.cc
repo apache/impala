@@ -299,8 +299,8 @@ DEFINE_bool_hidden(mt_dop_auto_fallback, false,
 DEFINE_bool_hidden(recursively_list_partitions, true,
     "If true, recursively list the content of partition directories.");
 
-DEFINE_bool(unlock_zorder_sort, false,
-    "(Experimental) If true, enables using ZORDER option for SORT BY.");
+DEFINE_bool(unlock_zorder_sort, true,
+    "If true, enables using ZORDER option for SORT BY.");
 
 DEFINE_string(min_privilege_set_for_show_stmts, "any",
     "Comma separated list of privileges. Any one of them is required to show a database "

@@ -2060,7 +2060,6 @@ public class AuthorizationStmtTest extends AuthorizationTestBase {
 
   @Test
   public void testAlterTable() throws ImpalaException {
-    BackendConfig.INSTANCE.setZOrderSortUnlocked(true);
     for (AuthzTest test: new AuthzTest[]{
         authorize("alter table functional.alltypes add column c1 int"),
         authorize("alter table functional.alltypes add columns(c1 int)"),
@@ -2104,7 +2103,6 @@ public class AuthorizationStmtTest extends AuthorizationTestBase {
               allExcept(TPrivilegeLevel.ALL, TPrivilegeLevel.OWNER,
               TPrivilegeLevel.ALTER)));
     }
-    BackendConfig.INSTANCE.setZOrderSortUnlocked(false);
 
     try {
       // We cannot set an owner to a role that doesn't exist

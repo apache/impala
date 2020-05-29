@@ -19,7 +19,6 @@ package org.apache.impala.analysis;
 
 import org.apache.impala.catalog.KuduTable;
 import org.apache.impala.common.FrontendTestBase;
-import org.apache.impala.service.BackendConfig;
 import org.apache.impala.testutil.TestUtils;
 import org.apache.kudu.ColumnSchema.CompressionAlgorithm;
 import org.apache.kudu.ColumnSchema.Encoding;
@@ -431,14 +430,10 @@ public class AnalyzeKuduDDLTest extends FrontendTestBase {
         "partitions 8 sort by(i) stored as kudu", "SORT BY is not supported for Kudu " +
         "tables.", isExternalPurgeTbl);
 
-    // Z-Sort columns are not supported for Kudu tables.
-    BackendConfig.INSTANCE.setZOrderSortUnlocked(true);
-
+    // Z-Order sorted columns are not supported for Kudu tables.
     AnalysisError("create table tab (i int, x int primary key) partition by hash(x) " +
         "partitions 8 sort by zorder(i) stored as kudu", "SORT BY is not " +
         "supported for Kudu tables.", isExternalPurgeTbl);
-
-    BackendConfig.INSTANCE.setZOrderSortUnlocked(false);
 
     // Range partitions with TIMESTAMP
     AnalyzesOk("create table ts_ranges (ts timestamp primary key) " +
@@ -715,8 +710,6 @@ public class AnalyzeKuduDDLTest extends FrontendTestBase {
     AnalysisError("alter table functional_kudu.alltypes sort by (int_col)",
         "ALTER TABLE SORT BY not supported on Kudu tables.");
 
-    BackendConfig.INSTANCE.setZOrderSortUnlocked(true);
-
     // ALTER TABLE SORT BY ZORDER
     AnalysisError("alter table functional_kudu.alltypes sort by zorder (int_col)",
         "ALTER TABLE SORT BY not supported on Kudu tables.");
@@ -730,7 +723,5 @@ public class AnalyzeKuduDDLTest extends FrontendTestBase {
     AnalysisError("alter table functional_kudu.alltypes set tblproperties("
         + "'sort.order'='true')",
         "'sort.*' table properties are not supported for Kudu tables.");
-
-    BackendConfig.INSTANCE.setZOrderSortUnlocked(false);
   }
 }

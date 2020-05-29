@@ -199,3 +199,14 @@ describe formatted sortbytest;
 ---- TYPES
 STRING,STRING,STRING
 ====
+---- QUERY
+# Test adding sort.columns and sort.zorder when creating a table from a select query.
+create table zsortbytest sort by zorder (int_col, bool_col) as
+select * from functional.alltypessmall;
+describe formatted zsortbytest;
+---- RESULTS: VERIFY_IS_SUBSET
+'','sort.columns        ','int_col,bool_col    '
+'','sort.order          ','ZORDER              '
+---- TYPES
+STRING,STRING,STRING
+====

@@ -29,7 +29,6 @@ import org.apache.impala.analysis.TimestampArithmeticExpr.TimeUnit;
 import org.apache.impala.common.AnalysisException;
 import org.apache.impala.common.FrontendTestBase;
 import org.apache.impala.compat.MetastoreShim;
-import org.apache.impala.service.BackendConfig;
 import org.junit.Test;
 
 import com.google.common.base.Preconditions;
@@ -2470,14 +2469,10 @@ public class ParserTest extends FrontendTestBase {
 
   @Test
   public void TestAlterTableZSortBy() {
-    BackendConfig.INSTANCE.setZOrderSortUnlocked(true);
-
     ParsesOk("ALTER TABLE TEST SORT BY ZORDER (int_col, id)");
     ParsesOk("ALTER TABLE TEST SORT BY ZORDER ()");
     ParserError("ALTER TABLE TEST PARTITION (year=2009, month=4) SORT BY ZORDER " +
         "(int_col, id)");
-
-    BackendConfig.INSTANCE.setZOrderSortUnlocked(false);
   }
 
   @Test
@@ -2609,8 +2604,6 @@ public class ParserTest extends FrontendTestBase {
     ParserError("CREATE TABLE Foo SORT BY (id) LIKE PARQUET '/user/foo'");
 
     // SORT BY ZORDER clause
-    BackendConfig.INSTANCE.setZOrderSortUnlocked(true);
-
     ParsesOk("CREATE TABLE Foo (i int, j int) SORT BY ZORDER ()");
     ParsesOk("CREATE TABLE Foo (i int) SORT BY ZORDER (i)");
     ParsesOk("CREATE TABLE Foo (i int) SORT BY ZORDER (j)");
@@ -2650,8 +2643,6 @@ public class ParserTest extends FrontendTestBase {
     // Create table like file with zsort columns
     ParsesOk("CREATE TABLE Foo LIKE PARQUET '/user/foo' SORT BY ZORDER (id)");
     ParserError("CREATE TABLE Foo SORT BY ZORDER (id) LIKE PARQUET '/user/foo'");
-
-    BackendConfig.INSTANCE.setZOrderSortUnlocked(false);
 
     // Column comments
     ParsesOk("CREATE TABLE Foo (i int COMMENT 'hello', s string)");
