@@ -1138,7 +1138,7 @@ tpcds
 ---- BASE_TABLE_NAME
 reason
 ---- COLUMNS
-r_reason_sk           bigint
+r_reason_sk           int
 r_reason_id           string
 r_reason_desc         string
 ---- ROW_FORMAT

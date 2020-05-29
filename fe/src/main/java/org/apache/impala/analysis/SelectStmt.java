@@ -274,9 +274,23 @@ public class SelectStmt extends QueryStmt {
           // Analyze the resultExpr before generating a label to ensure enforcement
           // of expr child and depth limits (toColumn() label may call toSql()).
           item.getExpr().analyze(analyzer_);
-          if (item.getExpr().contains(Predicates.instanceOf(Subquery.class))) {
-            throw new AnalysisException(
-                "Subqueries are not supported in the select list.");
+          // Check for scalar subquery types which are not supported
+          List<Subquery> subqueryExprs = new ArrayList<>();
+          item.getExpr().collect(Subquery.class, subqueryExprs);
+          for (Subquery s : subqueryExprs) {
+            Preconditions.checkState(s.getStatement() instanceof SelectStmt);
+            if (!s.returnsScalarColumn()) {
+              throw new AnalysisException("A non-scalar subquery is not supported in "
+                  + "the expression: " + item.getExpr().toSql());
+            }
+            if (s.getStatement().isRuntimeScalar()) {
+              throw new AnalysisException(
+                  "A subquery which may return more than one row is not supported in "
+                  + "the expression: " + item.getExpr().toSql());
+            }
+            Preconditions.checkState(((SelectStmt) s.getStatement()).returnsSingleRow(),
+                "Invariant violated: Only subqueries that are guaranteed to return a "
+                    + "single row are supported: " + item.getExpr().toSql());
           }
           resultExprs_.add(item.getExpr());
           String label = item.toColumnLabel(i, analyzer_.useHiveColLabels());
@@ -1197,12 +1211,17 @@ public class SelectStmt extends QueryStmt {
     if (fromClauseOnly) {
       fromClause_.collectFromClauseTableRefs(tblRefs);
     } else {
+      // Collect TableRefs in all subqueries.
       fromClause_.collectTableRefs(tblRefs);
-    }
-    if (!fromClauseOnly && whereClause_ != null) {
-      // Collect TableRefs in WHERE-clause subqueries.
       List<Subquery> subqueries = new ArrayList<>();
-      whereClause_.collect(Subquery.class, subqueries);
+      if (whereClause_ != null) {
+        whereClause_.collect(Subquery.class, subqueries);
+      }
+      for (SelectListItem item : selectList_.getItems()) {
+        if (item.isStar()) continue;
+        item.getExpr().collect(Subquery.class, subqueries);
+      }
+
       for (Subquery sq: subqueries) {
         sq.getStatement().collectTableRefs(tblRefs, fromClauseOnly);
       }
@@ -1211,8 +1230,6 @@ public class SelectStmt extends QueryStmt {
 
   @Override
   public void collectInlineViews(Set<FeView> inlineViews) {
-    // Impala currently supports sub queries only in FROM, WHERE & WITH clauses. Hence,
-    // this function does not carry out any checks on HAVING clause.
     super.collectInlineViews(inlineViews);
     List<TableRef> fromTblRefs = getTableRefs();
     Preconditions.checkNotNull(inlineViews);
@@ -1235,6 +1252,14 @@ public class SelectStmt extends QueryStmt {
             conjunct.toSql());
         whereSubQueries.get(0).getStatement().collectInlineViews(inlineViews);
       }
+    }
+    List<Subquery> selectListSubQueries = Lists.newArrayList();
+    for (SelectListItem item : selectList_.getItems()) {
+      if (item.isStar()) continue;
+      item.getExpr().collect(Subquery.class, selectListSubQueries);
+    }
+    for (Subquery sq : selectListSubQueries) {
+      sq.getStatement().collectInlineViews(inlineViews);
     }
   }
 

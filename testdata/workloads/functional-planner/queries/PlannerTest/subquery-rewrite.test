@@ -3296,3 +3296,137 @@ PLAN-ROOT SINK
    runtime filters: RF000 -> int_col
    row-size=89B cardinality=7.30K
 ====
+# Scalar subquery in select list
+SELECT alltypesagg.string_col, alltypesagg.date_string_col, dimtbl.name,
+SUM(CASE WHEN dimtbl.zip < 94613 THEN 1 ELSE 0 END) / CAST((SELECT COUNT(*) FROM functional.dimtbl WHERE dimtbl.zip < 94613) AS decimal(10, 6)) AS close,
+SUM(CASE WHEN dimtbl.zip >= 94613 THEN 1 ELSE 0 END) / CAST((SELECT COUNT(*) FROM functional.dimtbl WHERE dimtbl.zip >= 94613) AS decimal(10, 6)) AS remote
+FROM functional.alltypesagg JOIN functional.dimtbl ON (alltypesagg.id = dimtbl.id)
+GROUP BY 1, 2, 3
+ORDER BY alltypesagg.string_col DESC
+---- PLAN
+PLAN-ROOT SINK
+|
+10:SORT
+|  order by: alltypesagg.string_col DESC
+|  row-size=84B cardinality=11
+|
+09:AGGREGATE [FINALIZE]
+|  output: sum(CASE WHEN dimtbl.zip < 94613 THEN 1 ELSE 0 END), max(count(*)), sum(CASE WHEN dimtbl.zip >= 94613 THEN 1 ELSE 0 END), max(count(*))
+|  group by: alltypesagg.string_col, alltypesagg.date_string_col, dimtbl.name
+|  row-size=84B cardinality=11
+|
+08:NESTED LOOP JOIN [CROSS JOIN]
+|  row-size=84B cardinality=11
+|
+|--05:AGGREGATE [FINALIZE]
+|  |  output: count(*)
+|  |  row-size=8B cardinality=1
+|  |
+|  04:SCAN HDFS [functional.dimtbl]
+|     HDFS partitions=1/1 files=1 size=171B
+|     predicates: dimtbl.zip >= 94613
+|     row-size=4B cardinality=1
+|
+07:NESTED LOOP JOIN [CROSS JOIN]
+|  row-size=76B cardinality=11
+|
+|--03:AGGREGATE [FINALIZE]
+|  |  output: count(*)
+|  |  row-size=8B cardinality=1
+|  |
+|  02:SCAN HDFS [functional.dimtbl]
+|     HDFS partitions=1/1 files=1 size=171B
+|     predicates: dimtbl.zip < 94613
+|     row-size=4B cardinality=1
+|
+06:HASH JOIN [INNER JOIN]
+|  hash predicates: alltypesagg.id = dimtbl.id
+|  runtime filters: RF000 <- dimtbl.id
+|  row-size=68B cardinality=11
+|
+|--01:SCAN HDFS [functional.dimtbl]
+|     HDFS partitions=1/1 files=1 size=171B
+|     row-size=29B cardinality=10
+|
+00:SCAN HDFS [functional.alltypesagg]
+   HDFS partitions=11/11 files=11 size=814.73KB
+   runtime filters: RF000 -> alltypesagg.id
+   row-size=39B cardinality=11.00K
+---- DISTRIBUTEDPLAN
+PLAN-ROOT SINK
+|
+20:MERGING-EXCHANGE [UNPARTITIONED]
+|  order by: alltypesagg.string_col DESC
+|
+10:SORT
+|  order by: alltypesagg.string_col DESC
+|  row-size=84B cardinality=11
+|
+19:AGGREGATE [FINALIZE]
+|  output: sum:merge(CASE WHEN dimtbl.zip < 94613 THEN 1 ELSE 0 END), max:merge(`$a$1`.`$c$1`), sum:merge(CASE WHEN dimtbl.zip >= 94613 THEN 1 ELSE 0 END), max:merge(`$a$2`.`$c$1`)
+|  group by: alltypesagg.string_col, alltypesagg.date_string_col, dimtbl.name
+|  row-size=84B cardinality=11
+|
+18:EXCHANGE [HASH(alltypesagg.string_col,alltypesagg.date_string_col,dimtbl.name)]
+|
+09:AGGREGATE [STREAMING]
+|  output: sum(CASE WHEN dimtbl.zip < 94613 THEN 1 ELSE 0 END), max(count(*)), sum(CASE WHEN dimtbl.zip >= 94613 THEN 1 ELSE 0 END), max(count(*))
+|  group by: alltypesagg.string_col, alltypesagg.date_string_col, dimtbl.name
+|  row-size=84B cardinality=11
+|
+08:NESTED LOOP JOIN [CROSS JOIN, BROADCAST]
+|  row-size=84B cardinality=11
+|
+|--17:EXCHANGE [BROADCAST]
+|  |
+|  16:AGGREGATE [FINALIZE]
+|  |  output: count:merge(*)
+|  |  row-size=8B cardinality=1
+|  |
+|  15:EXCHANGE [UNPARTITIONED]
+|  |
+|  05:AGGREGATE
+|  |  output: count(*)
+|  |  row-size=8B cardinality=1
+|  |
+|  04:SCAN HDFS [functional.dimtbl]
+|     HDFS partitions=1/1 files=1 size=171B
+|     predicates: dimtbl.zip >= 94613
+|     row-size=4B cardinality=1
+|
+07:NESTED LOOP JOIN [CROSS JOIN, BROADCAST]
+|  row-size=76B cardinality=11
+|
+|--14:EXCHANGE [BROADCAST]
+|  |
+|  13:AGGREGATE [FINALIZE]
+|  |  output: count:merge(*)
+|  |  row-size=8B cardinality=1
+|  |
+|  12:EXCHANGE [UNPARTITIONED]
+|  |
+|  03:AGGREGATE
+|  |  output: count(*)
+|  |  row-size=8B cardinality=1
+|  |
+|  02:SCAN HDFS [functional.dimtbl]
+|     HDFS partitions=1/1 files=1 size=171B
+|     predicates: dimtbl.zip < 94613
+|     row-size=4B cardinality=1
+|
+06:HASH JOIN [INNER JOIN, BROADCAST]
+|  hash predicates: alltypesagg.id = dimtbl.id
+|  runtime filters: RF000 <- dimtbl.id
+|  row-size=68B cardinality=11
+|
+|--11:EXCHANGE [BROADCAST]
+|  |
+|  01:SCAN HDFS [functional.dimtbl]
+|     HDFS partitions=1/1 files=1 size=171B
+|     row-size=29B cardinality=10
+|
+00:SCAN HDFS [functional.alltypesagg]
+   HDFS partitions=11/11 files=11 size=814.73KB
+   runtime filters: RF000 -> alltypesagg.id
+   row-size=39B cardinality=11.00K
+====

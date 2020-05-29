@@ -94,9 +94,14 @@ public class SelectList {
 
   public void rewriteExprs(ExprRewriter rewriter, Analyzer analyzer)
       throws AnalysisException {
+    List<Subquery> subqueryExprs = new ArrayList<>();
     for (SelectListItem item: items_) {
       if (item.isStar()) continue;
       item.setExpr(rewriter.rewrite(item.getExpr(), analyzer));
+      item.getExpr().collect(Subquery.class, subqueryExprs);
+    }
+    for (Subquery s : subqueryExprs) {
+      s.getStatement().rewriteExprs(rewriter);
     }
   }
 
