@@ -422,10 +422,7 @@ DecimalVal SlotRef::GetDecimalValInterpreted(
     case 8:
       return DecimalVal(*reinterpret_cast<int64_t*>(t->GetSlot(slot_offset_)));
     case 16:
-      // Avoid an unaligned load by using memcpy
-      __int128_t val;
-      memcpy(&val, t->GetSlot(slot_offset_), sizeof(val));
-      return DecimalVal(val);
+      return DecimalVal(*reinterpret_cast<int128_t*>(t->GetSlot(slot_offset_)));
     default:
       DCHECK(false);
       return DecimalVal::null();
