@@ -128,8 +128,7 @@ class DecimalUtil {
       const uint8_t* buffer, int fixed_len_size, T* v) {
     DCHECK_GT(fixed_len_size, 0);
     DCHECK_LE(fixed_len_size, sizeof(T));
-    // Avoid an unaligned store by using memset
-    memset(v, 0, sizeof(T));
+    *v = 0;
     // We need to sign extend val. For example, if the original value was
     // -1, the original bytes were -1,-1,-1,-1. If we only wrote out 1 byte, after
     // the encode step above, val would contain (-1, 0, 0, 0). We need to sign
