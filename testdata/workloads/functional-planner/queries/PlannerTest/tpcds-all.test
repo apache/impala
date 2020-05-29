@@ -8788,3 +8788,919 @@ PLAN-ROOT SINK
    runtime filters: RF004 -> ss_sold_time_sk, RF002 -> ss_hdemo_sk
    row-size=12B cardinality=2.88M
 ====
+# TPCDS-Q9
+select case when (select count(*)
+                  from store_sales
+                  where ss_quantity between 1 and 20) > 74129
+            then (select avg(ss_ext_discount_amt)
+                  from store_sales
+                  where ss_quantity between 1 and 20)
+            else (select avg(ss_net_profit)
+                  from store_sales
+                  where ss_quantity between 1 and 20) end bucket1,
+       case when (select count(*)
+                  from store_sales
+                  where ss_quantity between 21 and 40) > 122840
+            then (select avg(ss_ext_discount_amt)
+                  from store_sales
+                  where ss_quantity between 21 and 40)
+            else (select avg(ss_net_profit)
+                  from store_sales
+                  where ss_quantity between 21 and 40) end bucket2,
+       case when (select count(*)
+                  from store_sales
+                  where ss_quantity between 41 and 60) > 56580
+            then (select avg(ss_ext_discount_amt)
+                  from store_sales
+                  where ss_quantity between 41 and 60)
+            else (select avg(ss_net_profit)
+                  from store_sales
+                  where ss_quantity between 41 and 60) end bucket3,
+       case when (select count(*)
+                  from store_sales
+                  where ss_quantity between 61 and 80) > 10097
+            then (select avg(ss_ext_discount_amt)
+                  from store_sales
+                  where ss_quantity between 61 and 80)
+            else (select avg(ss_net_profit)
+                  from store_sales
+                  where ss_quantity between 61 and 80) end bucket4,
+       case when (select count(*)
+                  from store_sales
+                  where ss_quantity between 81 and 100) > 165306
+            then (select avg(ss_ext_discount_amt)
+                  from store_sales
+                  where ss_quantity between 81 and 100)
+            else (select avg(ss_net_profit)
+                  from store_sales
+                  where ss_quantity between 81 and 100) end bucket5
+from reason
+where r_reason_sk = 1
+---- PLAN
+Max Per-Host Resource Reservation: Memory=120.01MB Threads=17
+Per-Host Resource Estimates: Memory=2.05GB
+PLAN-ROOT SINK
+|
+45:NESTED LOOP JOIN [CROSS JOIN]
+|  row-size=124B cardinality=1
+|
+|--30:AGGREGATE [FINALIZE]
+|  |  output: avg(ss_net_profit)
+|  |  row-size=8B cardinality=1
+|  |
+|  29:SCAN HDFS [tpcds.store_sales]
+|     HDFS partitions=1824/1824 files=1824 size=346.60MB
+|     predicates: ss_quantity <= 100, ss_quantity >= 81
+|     row-size=8B cardinality=288.04K
+|
+44:NESTED LOOP JOIN [CROSS JOIN]
+|  row-size=116B cardinality=1
+|
+|--28:AGGREGATE [FINALIZE]
+|  |  output: avg(ss_ext_discount_amt)
+|  |  row-size=8B cardinality=1
+|  |
+|  27:SCAN HDFS [tpcds.store_sales]
+|     HDFS partitions=1824/1824 files=1824 size=346.60MB
+|     predicates: ss_quantity <= 100, ss_quantity >= 81
+|     row-size=8B cardinality=288.04K
+|
+43:NESTED LOOP JOIN [CROSS JOIN]
+|  row-size=108B cardinality=1
+|
+|--26:AGGREGATE [FINALIZE]
+|  |  output: count(*)
+|  |  row-size=8B cardinality=1
+|  |
+|  25:SCAN HDFS [tpcds.store_sales]
+|     HDFS partitions=1824/1824 files=1824 size=346.60MB
+|     predicates: ss_quantity <= 100, ss_quantity >= 81
+|     row-size=4B cardinality=288.04K
+|
+42:NESTED LOOP JOIN [CROSS JOIN]
+|  row-size=100B cardinality=1
+|
+|--24:AGGREGATE [FINALIZE]
+|  |  output: avg(ss_net_profit)
+|  |  row-size=8B cardinality=1
+|  |
+|  23:SCAN HDFS [tpcds.store_sales]
+|     HDFS partitions=1824/1824 files=1824 size=346.60MB
+|     predicates: ss_quantity <= 80, ss_quantity >= 61
+|     row-size=8B cardinality=288.04K
+|
+41:NESTED LOOP JOIN [CROSS JOIN]
+|  row-size=92B cardinality=1
+|
+|--22:AGGREGATE [FINALIZE]
+|  |  output: avg(ss_ext_discount_amt)
+|  |  row-size=8B cardinality=1
+|  |
+|  21:SCAN HDFS [tpcds.store_sales]
+|     HDFS partitions=1824/1824 files=1824 size=346.60MB
+|     predicates: ss_quantity <= 80, ss_quantity >= 61
+|     row-size=8B cardinality=288.04K
+|
+40:NESTED LOOP JOIN [CROSS JOIN]
+|  row-size=84B cardinality=1
+|
+|--20:AGGREGATE [FINALIZE]
+|  |  output: count(*)
+|  |  row-size=8B cardinality=1
+|  |
+|  19:SCAN HDFS [tpcds.store_sales]
+|     HDFS partitions=1824/1824 files=1824 size=346.60MB
+|     predicates: ss_quantity <= 80, ss_quantity >= 61
+|     row-size=4B cardinality=288.04K
+|
+39:NESTED LOOP JOIN [CROSS JOIN]
+|  row-size=76B cardinality=1
+|
+|--18:AGGREGATE [FINALIZE]
+|  |  output: avg(ss_net_profit)
+|  |  row-size=8B cardinality=1
+|  |
+|  17:SCAN HDFS [tpcds.store_sales]
+|     HDFS partitions=1824/1824 files=1824 size=346.60MB
+|     predicates: ss_quantity <= 60, ss_quantity >= 41
+|     row-size=8B cardinality=288.04K
+|
+38:NESTED LOOP JOIN [CROSS JOIN]
+|  row-size=68B cardinality=1
+|
+|--16:AGGREGATE [FINALIZE]
+|  |  output: avg(ss_ext_discount_amt)
+|  |  row-size=8B cardinality=1
+|  |
+|  15:SCAN HDFS [tpcds.store_sales]
+|     HDFS partitions=1824/1824 files=1824 size=346.60MB
+|     predicates: ss_quantity <= 60, ss_quantity >= 41
+|     row-size=8B cardinality=288.04K
+|
+37:NESTED LOOP JOIN [CROSS JOIN]
+|  row-size=60B cardinality=1
+|
+|--14:AGGREGATE [FINALIZE]
+|  |  output: count(*)
+|  |  row-size=8B cardinality=1
+|  |
+|  13:SCAN HDFS [tpcds.store_sales]
+|     HDFS partitions=1824/1824 files=1824 size=346.60MB
+|     predicates: ss_quantity <= 60, ss_quantity >= 41
+|     row-size=4B cardinality=288.04K
+|
+36:NESTED LOOP JOIN [CROSS JOIN]
+|  row-size=52B cardinality=1
+|
+|--12:AGGREGATE [FINALIZE]
+|  |  output: avg(ss_net_profit)
+|  |  row-size=8B cardinality=1
+|  |
+|  11:SCAN HDFS [tpcds.store_sales]
+|     HDFS partitions=1824/1824 files=1824 size=346.60MB
+|     predicates: ss_quantity <= 40, ss_quantity >= 21
+|     row-size=8B cardinality=288.04K
+|
+35:NESTED LOOP JOIN [CROSS JOIN]
+|  row-size=44B cardinality=1
+|
+|--10:AGGREGATE [FINALIZE]
+|  |  output: avg(ss_ext_discount_amt)
+|  |  row-size=8B cardinality=1
+|  |
+|  09:SCAN HDFS [tpcds.store_sales]
+|     HDFS partitions=1824/1824 files=1824 size=346.60MB
+|     predicates: ss_quantity <= 40, ss_quantity >= 21
+|     row-size=8B cardinality=288.04K
+|
+34:NESTED LOOP JOIN [CROSS JOIN]
+|  row-size=36B cardinality=1
+|
+|--08:AGGREGATE [FINALIZE]
+|  |  output: count(*)
+|  |  row-size=8B cardinality=1
+|  |
+|  07:SCAN HDFS [tpcds.store_sales]
+|     HDFS partitions=1824/1824 files=1824 size=346.60MB
+|     predicates: ss_quantity <= 40, ss_quantity >= 21
+|     row-size=4B cardinality=288.04K
+|
+33:NESTED LOOP JOIN [CROSS JOIN]
+|  row-size=28B cardinality=1
+|
+|--06:AGGREGATE [FINALIZE]
+|  |  output: avg(ss_net_profit)
+|  |  row-size=8B cardinality=1
+|  |
+|  05:SCAN HDFS [tpcds.store_sales]
+|     HDFS partitions=1824/1824 files=1824 size=346.60MB
+|     predicates: ss_quantity <= 20, ss_quantity >= 1
+|     row-size=8B cardinality=288.04K
+|
+32:NESTED LOOP JOIN [CROSS JOIN]
+|  row-size=20B cardinality=1
+|
+|--04:AGGREGATE [FINALIZE]
+|  |  output: avg(ss_ext_discount_amt)
+|  |  row-size=8B cardinality=1
+|  |
+|  03:SCAN HDFS [tpcds.store_sales]
+|     HDFS partitions=1824/1824 files=1824 size=346.60MB
+|     predicates: ss_quantity <= 20, ss_quantity >= 1
+|     row-size=8B cardinality=288.04K
+|
+31:NESTED LOOP JOIN [CROSS JOIN]
+|  row-size=12B cardinality=1
+|
+|--00:SCAN HDFS [tpcds.reason]
+|     HDFS partitions=1/1 files=1 size=1.31KB
+|     predicates: r_reason_sk = 1
+|     row-size=4B cardinality=1
+|
+02:AGGREGATE [FINALIZE]
+|  output: count(*)
+|  row-size=8B cardinality=1
+|
+01:SCAN HDFS [tpcds.store_sales]
+   HDFS partitions=1824/1824 files=1824 size=346.60MB
+   predicates: ss_quantity <= 20, ss_quantity >= 1
+   row-size=4B cardinality=288.04K
+---- DISTRIBUTEDPLAN
+Max Per-Host Resource Reservation: Memory=120.01MB Threads=47
+Per-Host Resource Estimates: Memory=2.20GB
+PLAN-ROOT SINK
+|
+45:NESTED LOOP JOIN [CROSS JOIN, BROADCAST]
+|  row-size=124B cardinality=1
+|
+|--90:EXCHANGE [UNPARTITIONED]
+|  |
+|  89:AGGREGATE [FINALIZE]
+|  |  output: avg:merge(ss_net_profit)
+|  |  row-size=8B cardinality=1
+|  |
+|  88:EXCHANGE [UNPARTITIONED]
+|  |
+|  30:AGGREGATE
+|  |  output: avg(ss_net_profit)
+|  |  row-size=8B cardinality=1
+|  |
+|  29:SCAN HDFS [tpcds.store_sales]
+|     HDFS partitions=1824/1824 files=1824 size=346.60MB
+|     predicates: ss_quantity <= 100, ss_quantity >= 81
+|     row-size=8B cardinality=288.04K
+|
+44:NESTED LOOP JOIN [CROSS JOIN, BROADCAST]
+|  row-size=116B cardinality=1
+|
+|--87:EXCHANGE [UNPARTITIONED]
+|  |
+|  86:AGGREGATE [FINALIZE]
+|  |  output: avg:merge(ss_ext_discount_amt)
+|  |  row-size=8B cardinality=1
+|  |
+|  85:EXCHANGE [UNPARTITIONED]
+|  |
+|  28:AGGREGATE
+|  |  output: avg(ss_ext_discount_amt)
+|  |  row-size=8B cardinality=1
+|  |
+|  27:SCAN HDFS [tpcds.store_sales]
+|     HDFS partitions=1824/1824 files=1824 size=346.60MB
+|     predicates: ss_quantity <= 100, ss_quantity >= 81
+|     row-size=8B cardinality=288.04K
+|
+43:NESTED LOOP JOIN [CROSS JOIN, BROADCAST]
+|  row-size=108B cardinality=1
+|
+|--84:EXCHANGE [UNPARTITIONED]
+|  |
+|  83:AGGREGATE [FINALIZE]
+|  |  output: count:merge(*)
+|  |  row-size=8B cardinality=1
+|  |
+|  82:EXCHANGE [UNPARTITIONED]
+|  |
+|  26:AGGREGATE
+|  |  output: count(*)
+|  |  row-size=8B cardinality=1
+|  |
+|  25:SCAN HDFS [tpcds.store_sales]
+|     HDFS partitions=1824/1824 files=1824 size=346.60MB
+|     predicates: ss_quantity <= 100, ss_quantity >= 81
+|     row-size=4B cardinality=288.04K
+|
+42:NESTED LOOP JOIN [CROSS JOIN, BROADCAST]
+|  row-size=100B cardinality=1
+|
+|--81:EXCHANGE [UNPARTITIONED]
+|  |
+|  80:AGGREGATE [FINALIZE]
+|  |  output: avg:merge(ss_net_profit)
+|  |  row-size=8B cardinality=1
+|  |
+|  79:EXCHANGE [UNPARTITIONED]
+|  |
+|  24:AGGREGATE
+|  |  output: avg(ss_net_profit)
+|  |  row-size=8B cardinality=1
+|  |
+|  23:SCAN HDFS [tpcds.store_sales]
+|     HDFS partitions=1824/1824 files=1824 size=346.60MB
+|     predicates: ss_quantity <= 80, ss_quantity >= 61
+|     row-size=8B cardinality=288.04K
+|
+41:NESTED LOOP JOIN [CROSS JOIN, BROADCAST]
+|  row-size=92B cardinality=1
+|
+|--78:EXCHANGE [UNPARTITIONED]
+|  |
+|  77:AGGREGATE [FINALIZE]
+|  |  output: avg:merge(ss_ext_discount_amt)
+|  |  row-size=8B cardinality=1
+|  |
+|  76:EXCHANGE [UNPARTITIONED]
+|  |
+|  22:AGGREGATE
+|  |  output: avg(ss_ext_discount_amt)
+|  |  row-size=8B cardinality=1
+|  |
+|  21:SCAN HDFS [tpcds.store_sales]
+|     HDFS partitions=1824/1824 files=1824 size=346.60MB
+|     predicates: ss_quantity <= 80, ss_quantity >= 61
+|     row-size=8B cardinality=288.04K
+|
+40:NESTED LOOP JOIN [CROSS JOIN, BROADCAST]
+|  row-size=84B cardinality=1
+|
+|--75:EXCHANGE [UNPARTITIONED]
+|  |
+|  74:AGGREGATE [FINALIZE]
+|  |  output: count:merge(*)
+|  |  row-size=8B cardinality=1
+|  |
+|  73:EXCHANGE [UNPARTITIONED]
+|  |
+|  20:AGGREGATE
+|  |  output: count(*)
+|  |  row-size=8B cardinality=1
+|  |
+|  19:SCAN HDFS [tpcds.store_sales]
+|     HDFS partitions=1824/1824 files=1824 size=346.60MB
+|     predicates: ss_quantity <= 80, ss_quantity >= 61
+|     row-size=4B cardinality=288.04K
+|
+39:NESTED LOOP JOIN [CROSS JOIN, BROADCAST]
+|  row-size=76B cardinality=1
+|
+|--72:EXCHANGE [UNPARTITIONED]
+|  |
+|  71:AGGREGATE [FINALIZE]
+|  |  output: avg:merge(ss_net_profit)
+|  |  row-size=8B cardinality=1
+|  |
+|  70:EXCHANGE [UNPARTITIONED]
+|  |
+|  18:AGGREGATE
+|  |  output: avg(ss_net_profit)
+|  |  row-size=8B cardinality=1
+|  |
+|  17:SCAN HDFS [tpcds.store_sales]
+|     HDFS partitions=1824/1824 files=1824 size=346.60MB
+|     predicates: ss_quantity <= 60, ss_quantity >= 41
+|     row-size=8B cardinality=288.04K
+|
+38:NESTED LOOP JOIN [CROSS JOIN, BROADCAST]
+|  row-size=68B cardinality=1
+|
+|--69:EXCHANGE [UNPARTITIONED]
+|  |
+|  68:AGGREGATE [FINALIZE]
+|  |  output: avg:merge(ss_ext_discount_amt)
+|  |  row-size=8B cardinality=1
+|  |
+|  67:EXCHANGE [UNPARTITIONED]
+|  |
+|  16:AGGREGATE
+|  |  output: avg(ss_ext_discount_amt)
+|  |  row-size=8B cardinality=1
+|  |
+|  15:SCAN HDFS [tpcds.store_sales]
+|     HDFS partitions=1824/1824 files=1824 size=346.60MB
+|     predicates: ss_quantity <= 60, ss_quantity >= 41
+|     row-size=8B cardinality=288.04K
+|
+37:NESTED LOOP JOIN [CROSS JOIN, BROADCAST]
+|  row-size=60B cardinality=1
+|
+|--66:EXCHANGE [UNPARTITIONED]
+|  |
+|  65:AGGREGATE [FINALIZE]
+|  |  output: count:merge(*)
+|  |  row-size=8B cardinality=1
+|  |
+|  64:EXCHANGE [UNPARTITIONED]
+|  |
+|  14:AGGREGATE
+|  |  output: count(*)
+|  |  row-size=8B cardinality=1
+|  |
+|  13:SCAN HDFS [tpcds.store_sales]
+|     HDFS partitions=1824/1824 files=1824 size=346.60MB
+|     predicates: ss_quantity <= 60, ss_quantity >= 41
+|     row-size=4B cardinality=288.04K
+|
+36:NESTED LOOP JOIN [CROSS JOIN, BROADCAST]
+|  row-size=52B cardinality=1
+|
+|--63:EXCHANGE [UNPARTITIONED]
+|  |
+|  62:AGGREGATE [FINALIZE]
+|  |  output: avg:merge(ss_net_profit)
+|  |  row-size=8B cardinality=1
+|  |
+|  61:EXCHANGE [UNPARTITIONED]
+|  |
+|  12:AGGREGATE
+|  |  output: avg(ss_net_profit)
+|  |  row-size=8B cardinality=1
+|  |
+|  11:SCAN HDFS [tpcds.store_sales]
+|     HDFS partitions=1824/1824 files=1824 size=346.60MB
+|     predicates: ss_quantity <= 40, ss_quantity >= 21
+|     row-size=8B cardinality=288.04K
+|
+35:NESTED LOOP JOIN [CROSS JOIN, BROADCAST]
+|  row-size=44B cardinality=1
+|
+|--60:EXCHANGE [UNPARTITIONED]
+|  |
+|  59:AGGREGATE [FINALIZE]
+|  |  output: avg:merge(ss_ext_discount_amt)
+|  |  row-size=8B cardinality=1
+|  |
+|  58:EXCHANGE [UNPARTITIONED]
+|  |
+|  10:AGGREGATE
+|  |  output: avg(ss_ext_discount_amt)
+|  |  row-size=8B cardinality=1
+|  |
+|  09:SCAN HDFS [tpcds.store_sales]
+|     HDFS partitions=1824/1824 files=1824 size=346.60MB
+|     predicates: ss_quantity <= 40, ss_quantity >= 21
+|     row-size=8B cardinality=288.04K
+|
+34:NESTED LOOP JOIN [CROSS JOIN, BROADCAST]
+|  row-size=36B cardinality=1
+|
+|--57:EXCHANGE [UNPARTITIONED]
+|  |
+|  56:AGGREGATE [FINALIZE]
+|  |  output: count:merge(*)
+|  |  row-size=8B cardinality=1
+|  |
+|  55:EXCHANGE [UNPARTITIONED]
+|  |
+|  08:AGGREGATE
+|  |  output: count(*)
+|  |  row-size=8B cardinality=1
+|  |
+|  07:SCAN HDFS [tpcds.store_sales]
+|     HDFS partitions=1824/1824 files=1824 size=346.60MB
+|     predicates: ss_quantity <= 40, ss_quantity >= 21
+|     row-size=4B cardinality=288.04K
+|
+33:NESTED LOOP JOIN [CROSS JOIN, BROADCAST]
+|  row-size=28B cardinality=1
+|
+|--54:EXCHANGE [UNPARTITIONED]
+|  |
+|  53:AGGREGATE [FINALIZE]
+|  |  output: avg:merge(ss_net_profit)
+|  |  row-size=8B cardinality=1
+|  |
+|  52:EXCHANGE [UNPARTITIONED]
+|  |
+|  06:AGGREGATE
+|  |  output: avg(ss_net_profit)
+|  |  row-size=8B cardinality=1
+|  |
+|  05:SCAN HDFS [tpcds.store_sales]
+|     HDFS partitions=1824/1824 files=1824 size=346.60MB
+|     predicates: ss_quantity <= 20, ss_quantity >= 1
+|     row-size=8B cardinality=288.04K
+|
+32:NESTED LOOP JOIN [CROSS JOIN, BROADCAST]
+|  row-size=20B cardinality=1
+|
+|--51:EXCHANGE [UNPARTITIONED]
+|  |
+|  50:AGGREGATE [FINALIZE]
+|  |  output: avg:merge(ss_ext_discount_amt)
+|  |  row-size=8B cardinality=1
+|  |
+|  49:EXCHANGE [UNPARTITIONED]
+|  |
+|  04:AGGREGATE
+|  |  output: avg(ss_ext_discount_amt)
+|  |  row-size=8B cardinality=1
+|  |
+|  03:SCAN HDFS [tpcds.store_sales]
+|     HDFS partitions=1824/1824 files=1824 size=346.60MB
+|     predicates: ss_quantity <= 20, ss_quantity >= 1
+|     row-size=8B cardinality=288.04K
+|
+31:NESTED LOOP JOIN [CROSS JOIN, BROADCAST]
+|  row-size=12B cardinality=1
+|
+|--48:EXCHANGE [UNPARTITIONED]
+|  |
+|  00:SCAN HDFS [tpcds.reason]
+|     HDFS partitions=1/1 files=1 size=1.31KB
+|     predicates: r_reason_sk = 1
+|     row-size=4B cardinality=1
+|
+47:AGGREGATE [FINALIZE]
+|  output: count:merge(*)
+|  row-size=8B cardinality=1
+|
+46:EXCHANGE [UNPARTITIONED]
+|
+02:AGGREGATE
+|  output: count(*)
+|  row-size=8B cardinality=1
+|
+01:SCAN HDFS [tpcds.store_sales]
+   HDFS partitions=1824/1824 files=1824 size=346.60MB
+   predicates: ss_quantity <= 20, ss_quantity >= 1
+   row-size=4B cardinality=288.04K
+---- PARALLELPLANS
+Max Per-Host Resource Reservation: Memory=240.01MB Threads=61
+Per-Host Resource Estimates: Memory=946MB
+PLAN-ROOT SINK
+|
+45:NESTED LOOP JOIN [CROSS JOIN, BROADCAST]
+|  join table id: 00
+|  row-size=124B cardinality=1
+|
+|--JOIN BUILD
+|  |  join-table-id=00 plan-id=01 cohort-id=01
+|  |
+|  90:EXCHANGE [UNPARTITIONED]
+|  |
+|  89:AGGREGATE [FINALIZE]
+|  |  output: avg:merge(ss_net_profit)
+|  |  row-size=8B cardinality=1
+|  |
+|  88:EXCHANGE [UNPARTITIONED]
+|  |
+|  30:AGGREGATE
+|  |  output: avg(ss_net_profit)
+|  |  row-size=8B cardinality=1
+|  |
+|  29:SCAN HDFS [tpcds.store_sales]
+|     HDFS partitions=1824/1824 files=1824 size=346.60MB
+|     predicates: ss_quantity <= 100, ss_quantity >= 81
+|     row-size=8B cardinality=288.04K
+|
+44:NESTED LOOP JOIN [CROSS JOIN, BROADCAST]
+|  join table id: 01
+|  row-size=116B cardinality=1
+|
+|--JOIN BUILD
+|  |  join-table-id=01 plan-id=02 cohort-id=01
+|  |
+|  87:EXCHANGE [UNPARTITIONED]
+|  |
+|  86:AGGREGATE [FINALIZE]
+|  |  output: avg:merge(ss_ext_discount_amt)
+|  |  row-size=8B cardinality=1
+|  |
+|  85:EXCHANGE [UNPARTITIONED]
+|  |
+|  28:AGGREGATE
+|  |  output: avg(ss_ext_discount_amt)
+|  |  row-size=8B cardinality=1
+|  |
+|  27:SCAN HDFS [tpcds.store_sales]
+|     HDFS partitions=1824/1824 files=1824 size=346.60MB
+|     predicates: ss_quantity <= 100, ss_quantity >= 81
+|     row-size=8B cardinality=288.04K
+|
+43:NESTED LOOP JOIN [CROSS JOIN, BROADCAST]
+|  join table id: 02
+|  row-size=108B cardinality=1
+|
+|--JOIN BUILD
+|  |  join-table-id=02 plan-id=03 cohort-id=01
+|  |
+|  84:EXCHANGE [UNPARTITIONED]
+|  |
+|  83:AGGREGATE [FINALIZE]
+|  |  output: count:merge(*)
+|  |  row-size=8B cardinality=1
+|  |
+|  82:EXCHANGE [UNPARTITIONED]
+|  |
+|  26:AGGREGATE
+|  |  output: count(*)
+|  |  row-size=8B cardinality=1
+|  |
+|  25:SCAN HDFS [tpcds.store_sales]
+|     HDFS partitions=1824/1824 files=1824 size=346.60MB
+|     predicates: ss_quantity <= 100, ss_quantity >= 81
+|     row-size=4B cardinality=288.04K
+|
+42:NESTED LOOP JOIN [CROSS JOIN, BROADCAST]
+|  join table id: 03
+|  row-size=100B cardinality=1
+|
+|--JOIN BUILD
+|  |  join-table-id=03 plan-id=04 cohort-id=01
+|  |
+|  81:EXCHANGE [UNPARTITIONED]
+|  |
+|  80:AGGREGATE [FINALIZE]
+|  |  output: avg:merge(ss_net_profit)
+|  |  row-size=8B cardinality=1
+|  |
+|  79:EXCHANGE [UNPARTITIONED]
+|  |
+|  24:AGGREGATE
+|  |  output: avg(ss_net_profit)
+|  |  row-size=8B cardinality=1
+|  |
+|  23:SCAN HDFS [tpcds.store_sales]
+|     HDFS partitions=1824/1824 files=1824 size=346.60MB
+|     predicates: ss_quantity <= 80, ss_quantity >= 61
+|     row-size=8B cardinality=288.04K
+|
+41:NESTED LOOP JOIN [CROSS JOIN, BROADCAST]
+|  join table id: 04
+|  row-size=92B cardinality=1
+|
+|--JOIN BUILD
+|  |  join-table-id=04 plan-id=05 cohort-id=01
+|  |
+|  78:EXCHANGE [UNPARTITIONED]
+|  |
+|  77:AGGREGATE [FINALIZE]
+|  |  output: avg:merge(ss_ext_discount_amt)
+|  |  row-size=8B cardinality=1
+|  |
+|  76:EXCHANGE [UNPARTITIONED]
+|  |
+|  22:AGGREGATE
+|  |  output: avg(ss_ext_discount_amt)
+|  |  row-size=8B cardinality=1
+|  |
+|  21:SCAN HDFS [tpcds.store_sales]
+|     HDFS partitions=1824/1824 files=1824 size=346.60MB
+|     predicates: ss_quantity <= 80, ss_quantity >= 61
+|     row-size=8B cardinality=288.04K
+|
+40:NESTED LOOP JOIN [CROSS JOIN, BROADCAST]
+|  join table id: 05
+|  row-size=84B cardinality=1
+|
+|--JOIN BUILD
+|  |  join-table-id=05 plan-id=06 cohort-id=01
+|  |
+|  75:EXCHANGE [UNPARTITIONED]
+|  |
+|  74:AGGREGATE [FINALIZE]
+|  |  output: count:merge(*)
+|  |  row-size=8B cardinality=1
+|  |
+|  73:EXCHANGE [UNPARTITIONED]
+|  |
+|  20:AGGREGATE
+|  |  output: count(*)
+|  |  row-size=8B cardinality=1
+|  |
+|  19:SCAN HDFS [tpcds.store_sales]
+|     HDFS partitions=1824/1824 files=1824 size=346.60MB
+|     predicates: ss_quantity <= 80, ss_quantity >= 61
+|     row-size=4B cardinality=288.04K
+|
+39:NESTED LOOP JOIN [CROSS JOIN, BROADCAST]
+|  join table id: 06
+|  row-size=76B cardinality=1
+|
+|--JOIN BUILD
+|  |  join-table-id=06 plan-id=07 cohort-id=01
+|  |
+|  72:EXCHANGE [UNPARTITIONED]
+|  |
+|  71:AGGREGATE [FINALIZE]
+|  |  output: avg:merge(ss_net_profit)
+|  |  row-size=8B cardinality=1
+|  |
+|  70:EXCHANGE [UNPARTITIONED]
+|  |
+|  18:AGGREGATE
+|  |  output: avg(ss_net_profit)
+|  |  row-size=8B cardinality=1
+|  |
+|  17:SCAN HDFS [tpcds.store_sales]
+|     HDFS partitions=1824/1824 files=1824 size=346.60MB
+|     predicates: ss_quantity <= 60, ss_quantity >= 41
+|     row-size=8B cardinality=288.04K
+|
+38:NESTED LOOP JOIN [CROSS JOIN, BROADCAST]
+|  join table id: 07
+|  row-size=68B cardinality=1
+|
+|--JOIN BUILD
+|  |  join-table-id=07 plan-id=08 cohort-id=01
+|  |
+|  69:EXCHANGE [UNPARTITIONED]
+|  |
+|  68:AGGREGATE [FINALIZE]
+|  |  output: avg:merge(ss_ext_discount_amt)
+|  |  row-size=8B cardinality=1
+|  |
+|  67:EXCHANGE [UNPARTITIONED]
+|  |
+|  16:AGGREGATE
+|  |  output: avg(ss_ext_discount_amt)
+|  |  row-size=8B cardinality=1
+|  |
+|  15:SCAN HDFS [tpcds.store_sales]
+|     HDFS partitions=1824/1824 files=1824 size=346.60MB
+|     predicates: ss_quantity <= 60, ss_quantity >= 41
+|     row-size=8B cardinality=288.04K
+|
+37:NESTED LOOP JOIN [CROSS JOIN, BROADCAST]
+|  join table id: 08
+|  row-size=60B cardinality=1
+|
+|--JOIN BUILD
+|  |  join-table-id=08 plan-id=09 cohort-id=01
+|  |
+|  66:EXCHANGE [UNPARTITIONED]
+|  |
+|  65:AGGREGATE [FINALIZE]
+|  |  output: count:merge(*)
+|  |  row-size=8B cardinality=1
+|  |
+|  64:EXCHANGE [UNPARTITIONED]
+|  |
+|  14:AGGREGATE
+|  |  output: count(*)
+|  |  row-size=8B cardinality=1
+|  |
+|  13:SCAN HDFS [tpcds.store_sales]
+|     HDFS partitions=1824/1824 files=1824 size=346.60MB
+|     predicates: ss_quantity <= 60, ss_quantity >= 41
+|     row-size=4B cardinality=288.04K
+|
+36:NESTED LOOP JOIN [CROSS JOIN, BROADCAST]
+|  join table id: 09
+|  row-size=52B cardinality=1
+|
+|--JOIN BUILD
+|  |  join-table-id=09 plan-id=10 cohort-id=01
+|  |
+|  63:EXCHANGE [UNPARTITIONED]
+|  |
+|  62:AGGREGATE [FINALIZE]
+|  |  output: avg:merge(ss_net_profit)
+|  |  row-size=8B cardinality=1
+|  |
+|  61:EXCHANGE [UNPARTITIONED]
+|  |
+|  12:AGGREGATE
+|  |  output: avg(ss_net_profit)
+|  |  row-size=8B cardinality=1
+|  |
+|  11:SCAN HDFS [tpcds.store_sales]
+|     HDFS partitions=1824/1824 files=1824 size=346.60MB
+|     predicates: ss_quantity <= 40, ss_quantity >= 21
+|     row-size=8B cardinality=288.04K
+|
+35:NESTED LOOP JOIN [CROSS JOIN, BROADCAST]
+|  join table id: 10
+|  row-size=44B cardinality=1
+|
+|--JOIN BUILD
+|  |  join-table-id=10 plan-id=11 cohort-id=01
+|  |
+|  60:EXCHANGE [UNPARTITIONED]
+|  |
+|  59:AGGREGATE [FINALIZE]
+|  |  output: avg:merge(ss_ext_discount_amt)
+|  |  row-size=8B cardinality=1
+|  |
+|  58:EXCHANGE [UNPARTITIONED]
+|  |
+|  10:AGGREGATE
+|  |  output: avg(ss_ext_discount_amt)
+|  |  row-size=8B cardinality=1
+|  |
+|  09:SCAN HDFS [tpcds.store_sales]
+|     HDFS partitions=1824/1824 files=1824 size=346.60MB
+|     predicates: ss_quantity <= 40, ss_quantity >= 21
+|     row-size=8B cardinality=288.04K
+|
+34:NESTED LOOP JOIN [CROSS JOIN, BROADCAST]
+|  join table id: 11
+|  row-size=36B cardinality=1
+|
+|--JOIN BUILD
+|  |  join-table-id=11 plan-id=12 cohort-id=01
+|  |
+|  57:EXCHANGE [UNPARTITIONED]
+|  |
+|  56:AGGREGATE [FINALIZE]
+|  |  output: count:merge(*)
+|  |  row-size=8B cardinality=1
+|  |
+|  55:EXCHANGE [UNPARTITIONED]
+|  |
+|  08:AGGREGATE
+|  |  output: count(*)
+|  |  row-size=8B cardinality=1
+|  |
+|  07:SCAN HDFS [tpcds.store_sales]
+|     HDFS partitions=1824/1824 files=1824 size=346.60MB
+|     predicates: ss_quantity <= 40, ss_quantity >= 21
+|     row-size=4B cardinality=288.04K
+|
+33:NESTED LOOP JOIN [CROSS JOIN, BROADCAST]
+|  join table id: 12
+|  row-size=28B cardinality=1
+|
+|--JOIN BUILD
+|  |  join-table-id=12 plan-id=13 cohort-id=01
+|  |
+|  54:EXCHANGE [UNPARTITIONED]
+|  |
+|  53:AGGREGATE [FINALIZE]
+|  |  output: avg:merge(ss_net_profit)
+|  |  row-size=8B cardinality=1
+|  |
+|  52:EXCHANGE [UNPARTITIONED]
+|  |
+|  06:AGGREGATE
+|  |  output: avg(ss_net_profit)
+|  |  row-size=8B cardinality=1
+|  |
+|  05:SCAN HDFS [tpcds.store_sales]
+|     HDFS partitions=1824/1824 files=1824 size=346.60MB
+|     predicates: ss_quantity <= 20, ss_quantity >= 1
+|     row-size=8B cardinality=288.04K
+|
+32:NESTED LOOP JOIN [CROSS JOIN, BROADCAST]
+|  join table id: 13
+|  row-size=20B cardinality=1
+|
+|--JOIN BUILD
+|  |  join-table-id=13 plan-id=14 cohort-id=01
+|  |
+|  51:EXCHANGE [UNPARTITIONED]
+|  |
+|  50:AGGREGATE [FINALIZE]
+|  |  output: avg:merge(ss_ext_discount_amt)
+|  |  row-size=8B cardinality=1
+|  |
+|  49:EXCHANGE [UNPARTITIONED]
+|  |
+|  04:AGGREGATE
+|  |  output: avg(ss_ext_discount_amt)
+|  |  row-size=8B cardinality=1
+|  |
+|  03:SCAN HDFS [tpcds.store_sales]
+|     HDFS partitions=1824/1824 files=1824 size=346.60MB
+|     predicates: ss_quantity <= 20, ss_quantity >= 1
+|     row-size=8B cardinality=288.04K
+|
+31:NESTED LOOP JOIN [CROSS JOIN, BROADCAST]
+|  join table id: 14
+|  row-size=12B cardinality=1
+|
+|--JOIN BUILD
+|  |  join-table-id=14 plan-id=15 cohort-id=01
+|  |
+|  48:EXCHANGE [UNPARTITIONED]
+|  |
+|  00:SCAN HDFS [tpcds.reason]
+|     HDFS partitions=1/1 files=1 size=1.31KB
+|     predicates: r_reason_sk = 1
+|     row-size=4B cardinality=1
+|
+47:AGGREGATE [FINALIZE]
+|  output: count:merge(*)
+|  row-size=8B cardinality=1
+|
+46:EXCHANGE [UNPARTITIONED]
+|
+02:AGGREGATE
+|  output: count(*)
+|  row-size=8B cardinality=1
+|
+01:SCAN HDFS [tpcds.store_sales]
+   HDFS partitions=1824/1824 files=1824 size=346.60MB
+   predicates: ss_quantity <= 20, ss_quantity >= 1
+   row-size=4B cardinality=288.04K
+====

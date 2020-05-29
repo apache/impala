@@ -160,3 +160,10 @@ select count(*) from web_site;
 ---- TYPES
 BIGINT
 ====
+---- QUERY: TPCDS-COUNT-REASON
+select count(*) from reason;
+---- RESULTS
+35
+---- TYPES
+BIGINT
+====

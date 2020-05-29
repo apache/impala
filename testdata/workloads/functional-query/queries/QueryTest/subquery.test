@@ -1039,3 +1039,176 @@ where int_col = (select f.id from (
 ---- TYPES
 BIGINT
 ====
+---- QUERY
+# Basic scalar in select list
+select id, 1+(select min(id) from functional.alltypessmall)
+  from functional.alltypestiny
+order by id
+---- RESULTS
+0,1
+1,1
+2,1
+3,1
+4,1
+5,1
+6,1
+7,1
+---- TYPES
+INT, BIGINT
+====
+---- QUERY
+# No aggregate however limit 1
+select id, 1+(select id from functional.alltypessmall where id=0 group by id limit 1)
+  from functional.alltypestiny
+order by id
+---- RESULTS
+0,1
+1,1
+2,1
+3,1
+4,1
+5,1
+6,1
+7,1
+---- TYPES
+INT, BIGINT
+====
+---- QUERY
+# outer join
+select s.id, (select count(id) from alltypes) from alltypestiny t
+  left outer join alltypessmall s on t.id = s.id where s.bool_col
+order by id
+---- RESULTS
+0,7300
+2,7300
+4,7300
+6,7300
+---- TYPES
+INT, BIGINT
+====
+---- QUERY
+# correlated scalar currently unsupported
+select id, (select count(id) from functional.alltypessmall where id=t.id)
+  from functional.alltypestiny t
+order by id
+---- RESULTS
+---- CATCH
+A correlated scalar subquery is not supported in the expression:
+====
+---- QUERY
+# Uncorrelated Scalar Aggregate in select list combined with aggregation in parent query
+select
+max(a.id),
+(select max(id) from functional.alltypestiny),
+(select min(id) from functional.alltypestiny)
+from functional.alltypessmall a
+---- RESULTS
+99,7,0
+---- TYPES
+INT, INT, INT
+====
+---- QUERY
+# Empty tables or false predicate should result in NULLs
+# Count aggregates on empty return 0
+select id,
+  (select sum(f2) from functional.emptytable),
+  (select count(id) from functional.alltypestiny where id > 100)
+from functional.alltypestiny
+order by id
+---- RESULTS
+0,NULL,0
+1,NULL,0
+2,NULL,0
+3,NULL,0
+4,NULL,0
+5,NULL,0
+6,NULL,0
+7,NULL,0
+---- TYPES
+INT, BIGINT, BIGINT
+====
+---- QUERY
+# nested subquery over a view with an outer predicate on the subquery column
+select count(id) from
+  (select id,
+    (select count(*) as cnt from functional.alltypestiny where int_col
+    <= (select max(int_col) from functional.alltypes_view)) as c from functional.dimtbl) T
+  where t.c <10
+---- RESULTS
+10
+---- TYPES
+BIGINT
+====
+---- QUERY
+# Empty tables should result in NULLs
+select id, id in (select min(id) from functional.alltypessmall)
+  from functional.alltypestiny
+order by id
+---- RESULTS
+0,true
+1,false
+2,false
+3,false
+4,false
+5,false
+6,false
+7,false
+---- TYPES
+INT, BOOLEAN
+====
+---- QUERY
+# With a join in the subquery
+select id,
+  (select count(*) from functional.alltypessmall join functional.alltypestiny using (id))
+  from functional.alltypestiny
+order by id
+---- RESULTS
+0,8
+1,8
+2,8
+3,8
+4,8
+5,8
+6,8
+7,8
+---- TYPES
+INT, BIGINT
+====
+---- QUERY
+# EXISTS predicates are handled at plantime so we need to special case their rewrites
+select id,
+  exists (select max(id) from dimtbl)
+  from functional.alltypestiny
+order by id
+---- RESULTS
+0,true
+1,true
+2,true
+3,true
+4,true
+5,true
+6,true
+7,true
+---- TYPES
+INT, BOOLEAN
+====
+---- QUERY
+# Multiple levels of exists
+SELECT id,
+NOT EXISTS (SELECT MAX(f2) FROM emptytable),
+EXISTS (SELECT MAX(id) FROM DIMTBL WHERE EXISTS (SELECT MAX(id) FROM alltypestiny)),
+(SELECT 1
+FROM alltypestiny t1
+WHERE EXISTS
+  (SELECT 1
+   FROM alltypestiny t2
+   WHERE t1.id = t2.id AND t1.int_col = t2.int_col
+   GROUP BY t2.id
+   HAVING count(1) = 1) LIMIT 1)
+FROM alltypessmall WHERE id < 2
+---- RESULTS
+0,false,true,1
+1,false,true,1
+---- TYPES
+INT, BOOLEAN, BOOLEAN, TINYINT
+====
