@@ -24,6 +24,7 @@ Checks: "-*,clang*,\
 -clang-analyzer-core.uninitialized.ArraySubscript,\
 -clang-analyzer-core.uninitialized.Assign,\
 -clang-analyzer-core.uninitialized.Branch,\
+-clang-analyzer-cplusplus.NewDelete,\
 -clang-analyzer-cplusplus.NewDeleteLeaks,\
 -clang-analyzer-deadcode.DeadStores,\
 -clang-analyzer-optin.performance.Padding,\

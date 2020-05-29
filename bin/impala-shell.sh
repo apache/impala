@@ -32,12 +32,13 @@ IMPALA_THRIFT_PY_VERSION=${IMPALA_THRIFT11_VERSION}
 
 THRIFT_PY_ROOT="${IMPALA_TOOLCHAIN_PACKAGES_HOME}/thrift-${IMPALA_THRIFT_PY_VERSION}"
 
-LD_LIBRARY_PATH+=":$(PYTHONPATH=${PYTHONPATH} \
+export LD_LIBRARY_PATH=":$(PYTHONPATH=${PYTHONPATH} \
   python "$IMPALA_HOME/infra/python/bootstrap_virtualenv.py" \
   --print-ld-library-path)"
 
 IMPALA_PY_DIR="$(dirname "$0")/../infra/python"
-IMPALA_PYTHON_EXECUTABLE="${IMPALA_PY_DIR}/env/bin/python"
+IMPALA_PY_ENV_DIR="${IMPALA_PY_DIR}/env-gcc${IMPALA_GCC_VERSION}"
+IMPALA_PYTHON_EXECUTABLE="${IMPALA_PY_ENV_DIR}/bin/python"
 
 for PYTHON_LIB_DIR in ${THRIFT_PY_ROOT}/python/lib{64,}; do
   [[ -d ${PYTHON_LIB_DIR} ]] || continue

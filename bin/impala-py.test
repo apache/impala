@@ -20,4 +20,4 @@
 ##############################################################################
 
 source $(dirname "$0")/impala-python-common.sh
-exec "$PY_DIR/env/bin/py.test" "$@"
+exec "$PY_ENV_DIR/bin/py.test" "$@"

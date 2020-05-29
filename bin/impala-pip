@@ -18,4 +18,4 @@
 # under the License.
 
 source "$(dirname "$0")/impala-python-common.sh"
-exec "$PY_DIR/env/bin/python" "$PY_DIR/env/bin/pip" "$@"
+exec "$PY_ENV_DIR/bin/python" "$PY_ENV_DIR/bin/pip" "$@"

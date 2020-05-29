@@ -17,6 +17,7 @@
 
 #include "runtime/thread-resource-mgr.h"
 
+#include <cmath>
 #include <mutex>
 #include <vector>
 

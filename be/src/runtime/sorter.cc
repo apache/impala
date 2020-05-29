@@ -18,8 +18,6 @@
 #include "runtime/sorter-internal.h"
 
 #include <boost/bind.hpp>
-#include <boost/random/mersenne_twister.hpp>
-#include <boost/random/uniform_int.hpp>
 #include <gutil/strings/substitute.h>
 
 #include "exprs/scalar-expr-evaluator.h"
@@ -34,8 +32,6 @@
 
 #include "common/names.h"
 
-using boost::uniform_int;
-using boost::mt19937_64;
 using namespace strings;
 
 namespace impala {

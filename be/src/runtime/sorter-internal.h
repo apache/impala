@@ -21,6 +21,8 @@
 
 #include "sorter.h"
 
+#include <random>
+
 namespace impala {
 
 /// Wrapper around BufferPool::PageHandle that tracks additional info about the page.

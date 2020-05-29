@@ -52,8 +52,10 @@ LOG = logging.getLogger(os.path.splitext(os.path.basename(__file__))[0])
 
 SKIP_TOOLCHAIN_BOOTSTRAP = "SKIP_TOOLCHAIN_BOOTSTRAP"
 
+GCC_VERSION = os.environ["IMPALA_GCC_VERSION"]
+
 DEPS_DIR = os.path.join(os.path.dirname(__file__), "deps")
-ENV_DIR = os.path.join(os.path.dirname(__file__), "env")
+ENV_DIR = os.path.join(os.path.dirname(__file__), "env-gcc{0}".format(GCC_VERSION))
 
 # Requirements file with packages we need for our build and tests.
 REQS_PATH = os.path.join(DEPS_DIR, "requirements.txt")
@@ -390,9 +392,14 @@ if __name__ == "__main__":
   options, args = parser.parse_args()
 
   if options.print_ld_library_path:
+    # Some python packages have native code that is compiled with the toolchain
+    # compiler, so that code needs to dynamically link against matching library
+    # versions.
+    ld_library_dirs = [os.path.join(toolchain_pkg_dir("gcc"), 'lib64')]
     kudu_client_dir = find_kudu_client_install_dir()
-    print(os.path.pathsep.join([os.path.join(kudu_client_dir, 'lib'),
-                                    os.path.join(kudu_client_dir, 'lib64')]))
+    ld_library_dirs.append(os.path.join(kudu_client_dir, 'lib'))
+    ld_library_dirs.append(os.path.join(kudu_client_dir, 'lib64'))
+    print(os.path.pathsep.join(ld_library_dirs))
     sys.exit()
 
   logging.basicConfig(level=getattr(logging, options.log_level))

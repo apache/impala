@@ -70,7 +70,7 @@ libaio1
 4. Run these commands to install cx_Oracle into the impala-python
    virtual environment:
 
-   $ source "${IMPALA_HOME}"/infra/python/env/bin/activate
+   $ source "${IMPALA_HOME}"/infra/python/env-gcc${IMPALA_GCC_VERSION}/bin/activate
    (env)$ pip install cx_Oracle==5.2.1
    (env)$ deactivate
 
