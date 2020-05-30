@@ -238,7 +238,9 @@ Status TmpFileMgr::InitCustom(const vector<string>& tmp_dir_specifiers,
       }
       if (punch_holes_) {
         // Make sure hole punching is supported for the directory.
-        RETURN_IF_ERROR(FileSystemUtil::CheckHolePunch(scratch_subdir_path.string()));
+        // IMPALA-9798: this file should *not* be created inside impala-scratch
+        // subdirectory to avoid races with multiple impalads starting up.
+        RETURN_IF_ERROR(FileSystemUtil::CheckHolePunch(tmp_path.string()));
       }
     }
   }
