@@ -171,6 +171,9 @@ for i in $(seq 1 $NUM_TEST_ITERATIONS)
 do
   TEST_RET_CODE=0
 
+  # Store a list of the files at the beginning of each iteration.
+  hdfs dfs -ls -R /test-warehouse > ${IMPALA_LOGS_DIR}/file-list-begin-${i}.log 2>&1
+
   start_impala_cluster
 
   if [[ "$BE_TEST" == true ]]; then
@@ -275,6 +278,12 @@ do
   # Disabled temporarily until we figure out the proper timeouts required to make the test
   # succeed.
   # ${IMPALA_HOME}/tests/run-process-failure-tests.sh
+
+  # Store a list of the files at the end of each iteration. This can be compared
+  # to the file-list-begin*.log from the beginning of the iteration to see if files
+  # are not being cleaned up. This is most useful on the first iteration, when
+  # the list of files is from dataload.
+  hdfs dfs -ls -R /test-warehouse > ${IMPALA_LOGS_DIR}/file-list-end-${i}.log 2>&1
 
   # Finally, kill the spawned timeout process and its child sleep process.
   # There may not be a sleep process, so ignore failure.

@@ -34,7 +34,7 @@ from tests.common.environ import build_flavor_timeout
 from common.test_result_verifier import QueryTestResult
 from tests.common.patterns import is_valid_impala_identifier
 from tests.comparison.db_connection import ImpalaConnection
-from tests.util.filesystem_utils import FILESYSTEM, ISILON_WEBHDFS_PORT
+from tests.util.filesystem_utils import FILESYSTEM, ISILON_WEBHDFS_PORT, WAREHOUSE
 
 LOG = logging.getLogger('test_configuration')
 LOG_FORMAT = "-- %(asctime)s %(levelname)-8s %(threadName)s: %(message)s"
@@ -343,22 +343,31 @@ def unique_database(request, testid_checksum):
                        ' test function name or any prefixes for long length or invalid '
                        'characters.'.format(db_name))
 
+  def cleanup_database(db_name, must_exist):
+    request.instance.execute_query_expect_success(request.instance.client,
+        'DROP DATABASE {0} `{1}` CASCADE'.format(
+            "" if must_exist else "IF EXISTS", db_name),
+        {'sync_ddl': sync_ddl})
+    # The database directory may not be removed if there are external tables in the
+    # database when it is dropped. The external locations are not removed by cascade.
+    # These preexisting files/directories can cause errors when tests run repeatedly or
+    # use a data snapshot (see IMPALA-9702), so this forces cleanup of the database
+    # directory.
+    db_location = "{0}/{1}.db".format(WAREHOUSE, db_name).lstrip('/')
+    request.instance.filesystem_client.delete_file_dir(db_location, recursive=True)
+
   def cleanup():
     # Make sure we don't try to drop the current session database
     request.instance.execute_query_expect_success(request.instance.client, "use default")
     for db_name in db_names:
-      request.instance.execute_query_expect_success(
-          request.instance.client, 'DROP DATABASE `{0}` CASCADE'.format(db_name),
-          {'sync_ddl': sync_ddl})
+      cleanup_database(db_name, True)
       LOG.info('Dropped database "{0}" for test ID "{1}"'.format(
           db_name, str(request.node.nodeid)))
 
   request.addfinalizer(cleanup)
 
   for db_name in db_names:
-    request.instance.execute_query_expect_success(
-        request.instance.client, 'DROP DATABASE IF EXISTS `{0}` CASCADE'.format(db_name),
-        {'sync_ddl': sync_ddl})
+    cleanup_database(db_name, False)
     request.instance.execute_query_expect_success(
         request.instance.client, 'CREATE DATABASE `{0}`'.format(db_name),
         {'sync_ddl': sync_ddl})
