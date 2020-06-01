@@ -435,3 +435,6 @@ class TestTPCHAggregationQueries(ImpalaTestSuite):
 
   def test_tpch_stress(self, vector):
     self.run_test_case('tpch-stress-aggregations', vector)
+
+  def test_min_multiple_distinct(self, vector, unique_database):
+    self.run_test_case('min-multiple-distinct-aggs', vector)
