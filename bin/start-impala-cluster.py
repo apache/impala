@@ -151,7 +151,7 @@ KUDU_RPC_TIMEOUT = build_flavor_timeout(0, slow_build_timeout=60000)
 
 # HTTP connections don't keep alive their associated sessions. We increase the timeout
 # during builds to make spurious session expiration less likely.
-DISCONNECTED_SESSION_TIMEOUT = 3600
+DISCONNECTED_SESSION_TIMEOUT = 60 * 60 * 6
 
 def check_process_exists(binary, attempts=1):
   """Checks if a process exists given the binary name. The `attempts` count allows us to
