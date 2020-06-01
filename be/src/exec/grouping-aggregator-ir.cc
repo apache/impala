@@ -157,8 +157,8 @@ Status GroupingAggregator::AddBatchStreamingImpl(int agg_idx, bool needs_seriali
     HashTableCtx* __restrict__ ht_ctx, int remaining_capacity[PARTITION_FANOUT]) {
   DCHECK(is_streaming_preagg_);
   DCHECK(!out_batch->AtCapacity());
-
-  RowBatch::Iterator out_batch_iterator(out_batch, out_batch->num_rows());
+  const int out_batch_start = out_batch->num_rows();
+  RowBatch::Iterator out_batch_iterator(out_batch, out_batch_start);
   HashTableCtx::ExprValuesCache* expr_vals_cache = ht_ctx->expr_values_cache();
   const int num_rows = in_batch->num_rows();
   const int cache_size = expr_vals_cache->capacity();
@@ -200,7 +200,9 @@ Status GroupingAggregator::AddBatchStreamingImpl(int agg_idx, bool needs_seriali
   streaming_idx_ = 0;
 ret:
   if (needs_serialize) {
-    FOREACH_ROW(out_batch, 0, out_batch_iter) {
+    // We only serialize the added rows in this call. The rows before out_batch_start may
+    // be added for other agg_idx values.
+    FOREACH_ROW(out_batch, out_batch_start, out_batch_iter) {
       AggFnEvaluator::Serialize(agg_fn_evals_, out_batch_iter.Get()->GetTuple(agg_idx));
     }
   }
