@@ -249,8 +249,7 @@ class FragmentInstanceState {
   /// on a single host will have the same value for this counter.
   RuntimeProfile::Counter* per_host_mem_usage_ = nullptr;
 
-  /// Number of rows returned by this fragment
-  /// TODO: by this instance?
+  /// Number of rows returned by this fragment instance.
   RuntimeProfile::Counter* rows_produced_counter_ = nullptr;
 
   /// Average number of thread tokens for the duration of the fragment instance execution.
@@ -260,7 +259,6 @@ class FragmentInstanceState {
   /// additional tokens.
   /// This is a measure of how much CPU resources this instance used during the course
   /// of the execution.
-  /// TODO-MT: remove
   RuntimeProfile::Counter* avg_thread_tokens_ = nullptr;
 
   /// Sampled memory usage at even time intervals.
