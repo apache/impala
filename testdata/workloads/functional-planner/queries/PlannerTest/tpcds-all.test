@@ -9704,3 +9704,530 @@ PLAN-ROOT SINK
    predicates: ss_quantity <= 20, ss_quantity >= 1
    row-size=4B cardinality=288.04K
 ====
+# TPCDS-Q44
+SELECT asceding.rnk,
+       i1.i_product_name best_performing,
+       i2.i_product_name worst_performing
+FROM
+  (SELECT *
+   FROM
+     (SELECT item_sk,
+             rank() OVER (
+                          ORDER BY rank_col ASC) rnk
+      FROM
+        (SELECT ss_item_sk item_sk,
+                avg(ss_net_profit) rank_col
+         FROM store_sales ss1
+         WHERE ss_store_sk = 4
+         GROUP BY ss_item_sk
+         HAVING avg(ss_net_profit) > 0.9*
+           (SELECT avg(ss_net_profit) rank_col
+            FROM store_sales
+            WHERE ss_store_sk = 4
+              AND ss_addr_sk IS NULL
+            GROUP BY ss_store_sk))V1)V11
+   WHERE rnk < 11) asceding,
+  (SELECT *
+   FROM
+     (SELECT item_sk,
+             rank() OVER (
+                          ORDER BY rank_col DESC) rnk
+      FROM
+        (SELECT ss_item_sk item_sk,
+                avg(ss_net_profit) rank_col
+         FROM store_sales ss1
+         WHERE ss_store_sk = 4
+         GROUP BY ss_item_sk
+         HAVING avg(ss_net_profit) > 0.9*
+           (SELECT avg(ss_net_profit) rank_col
+            FROM store_sales
+            WHERE ss_store_sk = 4
+              AND ss_addr_sk IS NULL
+            GROUP BY ss_store_sk))V2)V21
+   WHERE rnk < 11) descending,
+     item i1,
+     item i2
+WHERE asceding.rnk = descending.rnk
+  AND i1.i_item_sk=asceding.item_sk
+  AND i2.i_item_sk=descending.item_sk
+ORDER BY asceding.rnk
+LIMIT 100
+---- PLAN
+Max Per-Host Resource Reservation: Memory=65.75MB Threads=7
+Per-Host Resource Estimates: Memory=626MB
+PLAN-ROOT SINK
+|
+23:TOP-N [LIMIT=100]
+|  order by: rnk ASC
+|  row-size=68B cardinality=100
+|
+22:HASH JOIN [INNER JOIN]
+|  hash predicates: i2.i_item_sk = ss_item_sk
+|  runtime filters: RF000 <- ss_item_sk
+|  row-size=148B cardinality=1.80K
+|
+|--21:HASH JOIN [INNER JOIN]
+|  |  hash predicates: rank() = rank()
+|  |  row-size=110B cardinality=1.80K
+|  |
+|  |--17:SELECT
+|  |  |  predicates: rank() < 11
+|  |  |  row-size=36B cardinality=1.80K
+|  |  |
+|  |  16:ANALYTIC
+|  |  |  functions: rank()
+|  |  |  order by: avg(ss_net_profit) DESC
+|  |  |  window: RANGE BETWEEN UNBOUNDED PRECEDING AND CURRENT ROW
+|  |  |  row-size=36B cardinality=17.98K
+|  |  |
+|  |  15:SORT
+|  |  |  order by: avg(ss_net_profit) DESC
+|  |  |  row-size=28B cardinality=17.98K
+|  |  |
+|  |  14:NESTED LOOP JOIN [INNER JOIN]
+|  |  |  predicates: avg(ss_net_profit) > 0.9 * avg(ss_net_profit)
+|  |  |  row-size=28B cardinality=17.98K
+|  |  |
+|  |  |--13:CARDINALITY CHECK
+|  |  |  |  limit: 1
+|  |  |  |  row-size=12B cardinality=1
+|  |  |  |
+|  |  |  12:AGGREGATE [FINALIZE]
+|  |  |  |  output: avg(ss_net_profit)
+|  |  |  |  group by: ss_store_sk
+|  |  |  |  limit: 2
+|  |  |  |  row-size=12B cardinality=2
+|  |  |  |
+|  |  |  11:SCAN HDFS [tpcds.store_sales]
+|  |  |     HDFS partitions=1824/1824 files=1824 size=346.60MB
+|  |  |     predicates: ss_addr_sk IS NULL, ss_store_sk = 4
+|  |  |     row-size=12B cardinality=53.06K
+|  |  |
+|  |  10:AGGREGATE [FINALIZE]
+|  |  |  output: avg(ss_net_profit)
+|  |  |  group by: ss_item_sk
+|  |  |  row-size=16B cardinality=17.98K
+|  |  |
+|  |  09:SCAN HDFS [tpcds.store_sales ss1]
+|  |     HDFS partitions=1824/1824 files=1824 size=346.60MB
+|  |     predicates: ss_store_sk = 4
+|  |     row-size=16B cardinality=480.07K
+|  |
+|  20:HASH JOIN [INNER JOIN]
+|  |  hash predicates: i1.i_item_sk = ss_item_sk
+|  |  runtime filters: RF002 <- ss_item_sk
+|  |  row-size=74B cardinality=1.80K
+|  |
+|  |--08:SELECT
+|  |  |  predicates: rank() < 11
+|  |  |  row-size=36B cardinality=1.80K
+|  |  |
+|  |  07:ANALYTIC
+|  |  |  functions: rank()
+|  |  |  order by: avg(ss_net_profit) ASC
+|  |  |  window: RANGE BETWEEN UNBOUNDED PRECEDING AND CURRENT ROW
+|  |  |  row-size=36B cardinality=17.98K
+|  |  |
+|  |  06:SORT
+|  |  |  order by: avg(ss_net_profit) ASC
+|  |  |  row-size=28B cardinality=17.98K
+|  |  |
+|  |  05:NESTED LOOP JOIN [INNER JOIN]
+|  |  |  predicates: avg(ss_net_profit) > 0.9 * avg(ss_net_profit)
+|  |  |  row-size=28B cardinality=17.98K
+|  |  |
+|  |  |--04:CARDINALITY CHECK
+|  |  |  |  limit: 1
+|  |  |  |  row-size=12B cardinality=1
+|  |  |  |
+|  |  |  03:AGGREGATE [FINALIZE]
+|  |  |  |  output: avg(ss_net_profit)
+|  |  |  |  group by: ss_store_sk
+|  |  |  |  limit: 2
+|  |  |  |  row-size=12B cardinality=2
+|  |  |  |
+|  |  |  02:SCAN HDFS [tpcds.store_sales]
+|  |  |     HDFS partitions=1824/1824 files=1824 size=346.60MB
+|  |  |     predicates: ss_addr_sk IS NULL, ss_store_sk = 4
+|  |  |     row-size=12B cardinality=53.06K
+|  |  |
+|  |  01:AGGREGATE [FINALIZE]
+|  |  |  output: avg(ss_net_profit)
+|  |  |  group by: ss_item_sk
+|  |  |  row-size=16B cardinality=17.98K
+|  |  |
+|  |  00:SCAN HDFS [tpcds.store_sales ss1]
+|  |     HDFS partitions=1824/1824 files=1824 size=346.60MB
+|  |     predicates: ss_store_sk = 4
+|  |     row-size=16B cardinality=480.07K
+|  |
+|  18:SCAN HDFS [tpcds.item i1]
+|     HDFS partitions=1/1 files=1 size=4.82MB
+|     runtime filters: RF002 -> i1.i_item_sk
+|     row-size=38B cardinality=18.00K
+|
+19:SCAN HDFS [tpcds.item i2]
+   HDFS partitions=1/1 files=1 size=4.82MB
+   runtime filters: RF000 -> i2.i_item_sk
+   row-size=38B cardinality=18.00K
+---- DISTRIBUTEDPLAN
+Max Per-Host Resource Reservation: Memory=90.56MB Threads=21
+Per-Host Resource Estimates: Memory=685MB
+PLAN-ROOT SINK
+|
+41:MERGING-EXCHANGE [UNPARTITIONED]
+|  order by: rnk ASC
+|  limit: 100
+|
+23:TOP-N [LIMIT=100]
+|  order by: rnk ASC
+|  row-size=68B cardinality=100
+|
+22:HASH JOIN [INNER JOIN, BROADCAST]
+|  hash predicates: i2.i_item_sk = ss_item_sk
+|  runtime filters: RF000 <- ss_item_sk
+|  row-size=148B cardinality=1.80K
+|
+|--40:EXCHANGE [BROADCAST]
+|  |
+|  21:HASH JOIN [INNER JOIN, BROADCAST]
+|  |  hash predicates: rank() = rank()
+|  |  row-size=110B cardinality=1.80K
+|  |
+|  |--39:EXCHANGE [UNPARTITIONED]
+|  |  |
+|  |  20:HASH JOIN [INNER JOIN, BROADCAST]
+|  |  |  hash predicates: ss_item_sk = i1.i_item_sk
+|  |  |  row-size=74B cardinality=1.80K
+|  |  |
+|  |  |--38:EXCHANGE [UNPARTITIONED]
+|  |  |  |
+|  |  |  18:SCAN HDFS [tpcds.item i1]
+|  |  |     HDFS partitions=1/1 files=1 size=4.82MB
+|  |  |     row-size=38B cardinality=18.00K
+|  |  |
+|  |  08:SELECT
+|  |  |  predicates: rank() < 11
+|  |  |  row-size=36B cardinality=1.80K
+|  |  |
+|  |  07:ANALYTIC
+|  |  |  functions: rank()
+|  |  |  order by: avg(ss_net_profit) ASC
+|  |  |  window: RANGE BETWEEN UNBOUNDED PRECEDING AND CURRENT ROW
+|  |  |  row-size=36B cardinality=17.98K
+|  |  |
+|  |  37:MERGING-EXCHANGE [UNPARTITIONED]
+|  |  |  order by: avg(ss_net_profit) ASC
+|  |  |
+|  |  06:SORT
+|  |  |  order by: avg(ss_net_profit) ASC
+|  |  |  row-size=28B cardinality=17.98K
+|  |  |
+|  |  05:NESTED LOOP JOIN [INNER JOIN, BROADCAST]
+|  |  |  predicates: avg(ss_net_profit) > 0.9 * avg(ss_net_profit)
+|  |  |  row-size=28B cardinality=17.98K
+|  |  |
+|  |  |--36:EXCHANGE [BROADCAST]
+|  |  |  |
+|  |  |  04:CARDINALITY CHECK
+|  |  |  |  limit: 1
+|  |  |  |  row-size=12B cardinality=1
+|  |  |  |
+|  |  |  35:EXCHANGE [UNPARTITIONED]
+|  |  |  |  limit: 2
+|  |  |  |
+|  |  |  34:AGGREGATE [FINALIZE]
+|  |  |  |  output: avg:merge(ss_net_profit)
+|  |  |  |  group by: ss_store_sk
+|  |  |  |  limit: 2
+|  |  |  |  row-size=12B cardinality=2
+|  |  |  |
+|  |  |  33:EXCHANGE [HASH(ss_store_sk)]
+|  |  |  |
+|  |  |  03:AGGREGATE [STREAMING]
+|  |  |  |  output: avg(ss_net_profit)
+|  |  |  |  group by: ss_store_sk
+|  |  |  |  row-size=12B cardinality=6
+|  |  |  |
+|  |  |  02:SCAN HDFS [tpcds.store_sales]
+|  |  |     HDFS partitions=1824/1824 files=1824 size=346.60MB
+|  |  |     predicates: ss_addr_sk IS NULL, ss_store_sk = 4
+|  |  |     row-size=12B cardinality=53.06K
+|  |  |
+|  |  32:AGGREGATE [FINALIZE]
+|  |  |  output: avg:merge(ss_net_profit)
+|  |  |  group by: ss_item_sk
+|  |  |  row-size=16B cardinality=17.98K
+|  |  |
+|  |  31:EXCHANGE [HASH(ss_item_sk)]
+|  |  |
+|  |  01:AGGREGATE [STREAMING]
+|  |  |  output: avg(ss_net_profit)
+|  |  |  group by: ss_item_sk
+|  |  |  row-size=16B cardinality=17.98K
+|  |  |
+|  |  00:SCAN HDFS [tpcds.store_sales ss1]
+|  |     HDFS partitions=1824/1824 files=1824 size=346.60MB
+|  |     predicates: ss_store_sk = 4
+|  |     row-size=16B cardinality=480.07K
+|  |
+|  17:SELECT
+|  |  predicates: rank() < 11
+|  |  row-size=36B cardinality=1.80K
+|  |
+|  16:ANALYTIC
+|  |  functions: rank()
+|  |  order by: avg(ss_net_profit) DESC
+|  |  window: RANGE BETWEEN UNBOUNDED PRECEDING AND CURRENT ROW
+|  |  row-size=36B cardinality=17.98K
+|  |
+|  30:MERGING-EXCHANGE [UNPARTITIONED]
+|  |  order by: avg(ss_net_profit) DESC
+|  |
+|  15:SORT
+|  |  order by: avg(ss_net_profit) DESC
+|  |  row-size=28B cardinality=17.98K
+|  |
+|  14:NESTED LOOP JOIN [INNER JOIN, BROADCAST]
+|  |  predicates: avg(ss_net_profit) > 0.9 * avg(ss_net_profit)
+|  |  row-size=28B cardinality=17.98K
+|  |
+|  |--29:EXCHANGE [BROADCAST]
+|  |  |
+|  |  13:CARDINALITY CHECK
+|  |  |  limit: 1
+|  |  |  row-size=12B cardinality=1
+|  |  |
+|  |  28:EXCHANGE [UNPARTITIONED]
+|  |  |  limit: 2
+|  |  |
+|  |  27:AGGREGATE [FINALIZE]
+|  |  |  output: avg:merge(ss_net_profit)
+|  |  |  group by: ss_store_sk
+|  |  |  limit: 2
+|  |  |  row-size=12B cardinality=2
+|  |  |
+|  |  26:EXCHANGE [HASH(ss_store_sk)]
+|  |  |
+|  |  12:AGGREGATE [STREAMING]
+|  |  |  output: avg(ss_net_profit)
+|  |  |  group by: ss_store_sk
+|  |  |  row-size=12B cardinality=6
+|  |  |
+|  |  11:SCAN HDFS [tpcds.store_sales]
+|  |     HDFS partitions=1824/1824 files=1824 size=346.60MB
+|  |     predicates: ss_addr_sk IS NULL, ss_store_sk = 4
+|  |     row-size=12B cardinality=53.06K
+|  |
+|  25:AGGREGATE [FINALIZE]
+|  |  output: avg:merge(ss_net_profit)
+|  |  group by: ss_item_sk
+|  |  row-size=16B cardinality=17.98K
+|  |
+|  24:EXCHANGE [HASH(ss_item_sk)]
+|  |
+|  10:AGGREGATE [STREAMING]
+|  |  output: avg(ss_net_profit)
+|  |  group by: ss_item_sk
+|  |  row-size=16B cardinality=17.98K
+|  |
+|  09:SCAN HDFS [tpcds.store_sales ss1]
+|     HDFS partitions=1824/1824 files=1824 size=346.60MB
+|     predicates: ss_store_sk = 4
+|     row-size=16B cardinality=480.07K
+|
+19:SCAN HDFS [tpcds.item i2]
+   HDFS partitions=1/1 files=1 size=4.82MB
+   runtime filters: RF000 -> i2.i_item_sk
+   row-size=38B cardinality=18.00K
+---- PARALLELPLANS
+Max Per-Host Resource Reservation: Memory=157.12MB Threads=28
+Per-Host Resource Estimates: Memory=368MB
+PLAN-ROOT SINK
+|
+41:MERGING-EXCHANGE [UNPARTITIONED]
+|  order by: rnk ASC
+|  limit: 100
+|
+23:TOP-N [LIMIT=100]
+|  order by: rnk ASC
+|  row-size=68B cardinality=100
+|
+22:HASH JOIN [INNER JOIN, BROADCAST]
+|  hash predicates: i2.i_item_sk = ss_item_sk
+|  row-size=148B cardinality=1.80K
+|
+|--JOIN BUILD
+|  |  join-table-id=00 plan-id=01 cohort-id=01
+|  |  build expressions: ss_item_sk
+|  |  runtime filters: RF000 <- ss_item_sk
+|  |
+|  40:EXCHANGE [BROADCAST]
+|  |
+|  21:HASH JOIN [INNER JOIN, BROADCAST]
+|  |  hash predicates: rank() = rank()
+|  |  row-size=110B cardinality=1.80K
+|  |
+|  |--JOIN BUILD
+|  |  |  join-table-id=01 plan-id=02 cohort-id=02
+|  |  |  build expressions: rank()
+|  |  |
+|  |  39:EXCHANGE [UNPARTITIONED]
+|  |  |
+|  |  20:HASH JOIN [INNER JOIN, BROADCAST]
+|  |  |  hash predicates: ss_item_sk = i1.i_item_sk
+|  |  |  row-size=74B cardinality=1.80K
+|  |  |
+|  |  |--JOIN BUILD
+|  |  |  |  join-table-id=02 plan-id=03 cohort-id=03
+|  |  |  |  build expressions: i1.i_item_sk
+|  |  |  |
+|  |  |  38:EXCHANGE [UNPARTITIONED]
+|  |  |  |
+|  |  |  18:SCAN HDFS [tpcds.item i1]
+|  |  |     HDFS partitions=1/1 files=1 size=4.82MB
+|  |  |     row-size=38B cardinality=18.00K
+|  |  |
+|  |  08:SELECT
+|  |  |  predicates: rank() < 11
+|  |  |  row-size=36B cardinality=1.80K
+|  |  |
+|  |  07:ANALYTIC
+|  |  |  functions: rank()
+|  |  |  order by: avg(ss_net_profit) ASC
+|  |  |  window: RANGE BETWEEN UNBOUNDED PRECEDING AND CURRENT ROW
+|  |  |  row-size=36B cardinality=17.98K
+|  |  |
+|  |  37:MERGING-EXCHANGE [UNPARTITIONED]
+|  |  |  order by: avg(ss_net_profit) ASC
+|  |  |
+|  |  06:SORT
+|  |  |  order by: avg(ss_net_profit) ASC
+|  |  |  row-size=28B cardinality=17.98K
+|  |  |
+|  |  05:NESTED LOOP JOIN [INNER JOIN, BROADCAST]
+|  |  |  join table id: 03
+|  |  |  predicates: avg(ss_net_profit) > 0.9 * avg(ss_net_profit)
+|  |  |  row-size=28B cardinality=17.98K
+|  |  |
+|  |  |--JOIN BUILD
+|  |  |  |  join-table-id=03 plan-id=04 cohort-id=03
+|  |  |  |
+|  |  |  36:EXCHANGE [BROADCAST]
+|  |  |  |
+|  |  |  04:CARDINALITY CHECK
+|  |  |  |  limit: 1
+|  |  |  |  row-size=12B cardinality=1
+|  |  |  |
+|  |  |  35:EXCHANGE [UNPARTITIONED]
+|  |  |  |  limit: 2
+|  |  |  |
+|  |  |  34:AGGREGATE [FINALIZE]
+|  |  |  |  output: avg:merge(ss_net_profit)
+|  |  |  |  group by: ss_store_sk
+|  |  |  |  limit: 2
+|  |  |  |  row-size=12B cardinality=2
+|  |  |  |
+|  |  |  33:EXCHANGE [HASH(ss_store_sk)]
+|  |  |  |
+|  |  |  03:AGGREGATE [STREAMING]
+|  |  |  |  output: avg(ss_net_profit)
+|  |  |  |  group by: ss_store_sk
+|  |  |  |  row-size=12B cardinality=6
+|  |  |  |
+|  |  |  02:SCAN HDFS [tpcds.store_sales]
+|  |  |     HDFS partitions=1824/1824 files=1824 size=346.60MB
+|  |  |     predicates: ss_addr_sk IS NULL, ss_store_sk = 4
+|  |  |     row-size=12B cardinality=53.06K
+|  |  |
+|  |  32:AGGREGATE [FINALIZE]
+|  |  |  output: avg:merge(ss_net_profit)
+|  |  |  group by: ss_item_sk
+|  |  |  row-size=16B cardinality=17.98K
+|  |  |
+|  |  31:EXCHANGE [HASH(ss_item_sk)]
+|  |  |
+|  |  01:AGGREGATE [STREAMING]
+|  |  |  output: avg(ss_net_profit)
+|  |  |  group by: ss_item_sk
+|  |  |  row-size=16B cardinality=17.98K
+|  |  |
+|  |  00:SCAN HDFS [tpcds.store_sales ss1]
+|  |     HDFS partitions=1824/1824 files=1824 size=346.60MB
+|  |     predicates: ss_store_sk = 4
+|  |     row-size=16B cardinality=480.07K
+|  |
+|  17:SELECT
+|  |  predicates: rank() < 11
+|  |  row-size=36B cardinality=1.80K
+|  |
+|  16:ANALYTIC
+|  |  functions: rank()
+|  |  order by: avg(ss_net_profit) DESC
+|  |  window: RANGE BETWEEN UNBOUNDED PRECEDING AND CURRENT ROW
+|  |  row-size=36B cardinality=17.98K
+|  |
+|  30:MERGING-EXCHANGE [UNPARTITIONED]
+|  |  order by: avg(ss_net_profit) DESC
+|  |
+|  15:SORT
+|  |  order by: avg(ss_net_profit) DESC
+|  |  row-size=28B cardinality=17.98K
+|  |
+|  14:NESTED LOOP JOIN [INNER JOIN, BROADCAST]
+|  |  join table id: 04
+|  |  predicates: avg(ss_net_profit) > 0.9 * avg(ss_net_profit)
+|  |  row-size=28B cardinality=17.98K
+|  |
+|  |--JOIN BUILD
+|  |  |  join-table-id=04 plan-id=05 cohort-id=02
+|  |  |
+|  |  29:EXCHANGE [BROADCAST]
+|  |  |
+|  |  13:CARDINALITY CHECK
+|  |  |  limit: 1
+|  |  |  row-size=12B cardinality=1
+|  |  |
+|  |  28:EXCHANGE [UNPARTITIONED]
+|  |  |  limit: 2
+|  |  |
+|  |  27:AGGREGATE [FINALIZE]
+|  |  |  output: avg:merge(ss_net_profit)
+|  |  |  group by: ss_store_sk
+|  |  |  limit: 2
+|  |  |  row-size=12B cardinality=2
+|  |  |
+|  |  26:EXCHANGE [HASH(ss_store_sk)]
+|  |  |
+|  |  12:AGGREGATE [STREAMING]
+|  |  |  output: avg(ss_net_profit)
+|  |  |  group by: ss_store_sk
+|  |  |  row-size=12B cardinality=6
+|  |  |
+|  |  11:SCAN HDFS [tpcds.store_sales]
+|  |     HDFS partitions=1824/1824 files=1824 size=346.60MB
+|  |     predicates: ss_addr_sk IS NULL, ss_store_sk = 4
+|  |     row-size=12B cardinality=53.06K
+|  |
+|  25:AGGREGATE [FINALIZE]
+|  |  output: avg:merge(ss_net_profit)
+|  |  group by: ss_item_sk
+|  |  row-size=16B cardinality=17.98K
+|  |
+|  24:EXCHANGE [HASH(ss_item_sk)]
+|  |
+|  10:AGGREGATE [STREAMING]
+|  |  output: avg(ss_net_profit)
+|  |  group by: ss_item_sk
+|  |  row-size=16B cardinality=17.98K
+|  |
+|  09:SCAN HDFS [tpcds.store_sales ss1]
+|     HDFS partitions=1824/1824 files=1824 size=346.60MB
+|     predicates: ss_store_sk = 4
+|     row-size=16B cardinality=480.07K
+|
+19:SCAN HDFS [tpcds.item i2]
+   HDFS partitions=1/1 files=1 size=4.82MB
+   runtime filters: RF000 -> i2.i_item_sk
+   row-size=38B cardinality=18.00K
+====

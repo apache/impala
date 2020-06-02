@@ -109,6 +109,18 @@ class TestTpcdsQuery(ImpalaTestSuite):
   def test_tpcds_q21(self, vector):
     self.run_test_case(self.get_workload() + '-q21', vector)
 
+  def test_tpcds_q23_1(self, vector):
+    self.run_test_case(self.get_workload() + '-q23-1', vector)
+
+  def test_tpcds_q23_2(self, vector):
+    self.run_test_case(self.get_workload() + '-q23-2', vector)
+
+  def test_tpcds_q24_1(self, vector):
+    self.run_test_case(self.get_workload() + '-q24-1', vector)
+
+  def test_tpcds_q24_2(self, vector):
+    self.run_test_case(self.get_workload() + '-q24-2', vector)
+
   def test_tpcds_q25(self, vector):
     self.run_test_case(self.get_workload() + '-q25', vector)
 
@@ -150,6 +162,9 @@ class TestTpcdsQuery(ImpalaTestSuite):
 
   def test_tpcds_q43(self, vector):
     self.run_test_case(self.get_workload() + '-q43', vector)
+
+  def test_tpcds_q44(self, vector):
+    self.run_test_case(self.get_workload() + '-q44', vector)
 
   def test_tpcds_q46(self, vector):
     self.run_test_case(self.get_workload() + '-q46', vector)
