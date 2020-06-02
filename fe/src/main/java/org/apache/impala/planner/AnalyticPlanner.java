@@ -103,13 +103,12 @@ public class AnalyticPlanner {
       g.init();
     }
     List<PartitionGroup> partitionGroups = collectPartitionGroups(sortGroups);
-    // TODO-MT: this maybe should be instances
-    mergePartitionGroups(partitionGroups, root.getNumNodes());
+    mergePartitionGroups(partitionGroups, root.getNumInstances());
     orderGroups(partitionGroups);
     if (groupingExprs != null) {
       Preconditions.checkNotNull(inputPartitionExprs);
       computeInputPartitionExprs(
-          partitionGroups, groupingExprs, root.getNumNodes(), inputPartitionExprs);
+          partitionGroups, groupingExprs, root.getNumInstances(), inputPartitionExprs);
     }
 
     for (PartitionGroup partitionGroup: partitionGroups) {
@@ -145,11 +144,11 @@ public class AnalyticPlanner {
 
   /**
    * Coalesce partition groups for which the intersection of their
-   * partition exprs has ndv estimate > numNodes, so that the resulting plan
-   * still parallelizes across all nodes.
+   * partition exprs has ndv estimate > numInstances, so that the resulting plan
+   * still parallelizes across all instances.
    */
   private void mergePartitionGroups(
-      List<PartitionGroup> partitionGroups, int numNodes) {
+      List<PartitionGroup> partitionGroups, int numInstances) {
     boolean hasMerged = false;
     do {
       hasMerged = false;
@@ -158,7 +157,7 @@ public class AnalyticPlanner {
           if (pg1 != pg2) {
             long ndv = Expr.getNumDistinctValues(
                 Expr.intersect(pg1.partitionByExprs, pg2.partitionByExprs));
-            if (ndv == -1 || ndv < 0 || ndv < numNodes) {
+            if (ndv == -1 || ndv < 0 || ndv < numInstances) {
               // didn't get a usable value or the number of partitions is too small
               continue;
             }
@@ -181,9 +180,9 @@ public class AnalyticPlanner {
    * are returned in inputPartitionExprs.
    */
   private void computeInputPartitionExprs(List<PartitionGroup> partitionGroups,
-      List<Expr> groupingExprs, int numNodes, List<Expr> inputPartitionExprs) {
+      List<Expr> groupingExprs, int numInstances, List<Expr> inputPartitionExprs) {
     inputPartitionExprs.clear();
-    Preconditions.checkState(numNodes != -1);
+    Preconditions.checkState(numInstances != -1);
     // find partition group with maximum intersection
     long maxNdv = 0;
     PartitionGroup maxPg = null;
@@ -196,12 +195,13 @@ public class AnalyticPlanner {
       long ndv = Expr.getNumDistinctValues(l1);
       if (LOG.isTraceEnabled()) {
         LOG.trace(String.format("Partition group: %s, intersection: %s. " +
-                "GroupingExprs: %s, intersection: %s. ndv: %d, numNodes: %d, maxNdv: %d.",
+                "GroupingExprs: %s, intersection: %s. ndv: %d, numInstances: %d, " +
+                "maxNdv: %d.",
             Expr.debugString(pg.partitionByExprs), Expr.debugString(l1),
             Expr.debugString(groupingExprs), Expr.debugString(l2),
-            ndv, numNodes, maxNdv));
+            ndv, numInstances, maxNdv));
       }
-      if (ndv < 0 || ndv < numNodes || ndv < maxNdv) continue;
+      if (ndv < 0 || ndv < numInstances || ndv < maxNdv) continue;
       // found a better partition group
       maxPg = pg;
       maxPg.partitionByExprs = l1;
@@ -209,7 +209,7 @@ public class AnalyticPlanner {
       maxNdv = ndv;
     }
 
-    if (maxNdv > numNodes) {
+    if (maxNdv > numInstances) {
       Preconditions.checkNotNull(maxPg);
       // we found a partition group that gives us enough parallelism;
       // move it to the front

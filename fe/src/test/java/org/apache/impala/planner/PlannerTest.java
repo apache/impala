@@ -186,6 +186,18 @@ public class PlannerTest extends PlannerTestBase {
         ImmutableSet.of(PlannerTestOption.VALIDATE_CARDINALITY));
   }
 
+  /**
+   * Tests for analytic functions with higher mt_dop to exercise partitioning logic that
+   * depends on estimates of # of instances.
+   */
+  @Test
+  public void testAnalyticFnsMtDop() {
+    TQueryOptions options = defaultQueryOptions();
+    options.setMt_dop(4);
+    runPlannerTestFile("analytic-fns-mt-dop", options,
+        ImmutableSet.of(PlannerTestOption.VALIDATE_CARDINALITY));
+  }
+
   @Test
   public void testHbase() {
     runPlannerTestFile("hbase");
