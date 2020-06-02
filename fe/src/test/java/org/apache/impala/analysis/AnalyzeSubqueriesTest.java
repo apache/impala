@@ -1355,12 +1355,16 @@ public class AnalyzeSubqueriesTest extends AnalyzerTest {
   @Test
   public void testIllegalSubquery() throws AnalysisException {
     // Predicate with a child subquery in the HAVING clause
-    AnalysisError("select id, count(*) from functional.alltypestiny t group by " +
-        "id having count(*) > (select count(*) from functional.alltypesagg)",
-        "Subqueries are not supported in the HAVING clause.");
-    AnalysisError("select id, count(*) from functional.alltypestiny t group by " +
-        "id having (select count(*) from functional.alltypesagg) > 10",
-        "Subqueries are not supported in the HAVING clause.");
+    AnalysisError("select id, count(*) from functional.alltypestiny t group by id " +
+        "having count(*) > (select count(*) from functional.alltypesagg where id = t.id)",
+        "Unsupported correlated subquery: SELECT count(*) FROM functional.alltypesagg " +
+        "WHERE id = t.id");
+    AnalysisError("select id, count(*) from functional.alltypestiny t group by id "
+            + "having (select count(*) from functional.alltypesagg) > 10 and count(*) < "
+            + "(select count(*) from functional.alltypesagg)",
+        "Multiple subqueries are not supported in expression: (SELECT count(*) FROM "
+            + "functional.alltypesagg) > 10 AND count(*) < (SELECT count(*) FROM "
+            + "functional.alltypesagg");
 
     // Subquery in the select list
     AnalysisError("select id, (select int_col from functional.alltypestiny) "
@@ -1497,5 +1501,14 @@ public class AnalyzeSubqueriesTest extends AnalyzerTest {
         "where (select int_col from functional.alltypes) is not null");
     AnalyzesOk("select 1 from functional.alltypes where " +
         "coalesce(null, (select bool_col from functional.alltypes where id = 0))");
+  }
+
+  @Test
+  public void testHavingSubqueries() throws AnalysisException {
+    // Predicate with a child subquery in the HAVING clause
+    AnalyzesOk("select id, count(*) from functional.alltypestiny t group by "
+        + "id having count(*) > (select count(*) from functional.alltypesagg)");
+    AnalyzesOk("select id, count(*) from functional.alltypestiny t group by "
+        + "id having (select count(*) from functional.alltypesagg) > 10");
   }
 }

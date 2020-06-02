@@ -621,10 +621,12 @@ public class SelectStmt extends QueryStmt {
       // Analyze the HAVING clause first so we can check if it contains aggregates.
       // We need to analyze/register it even if we are not computing aggregates.
       if (havingClause_ == null) return;
-      // can't contain subqueries
-      if (havingClause_.contains(Predicates.instanceOf(Subquery.class))) {
+      List<Expr> subqueries = new ArrayList<>();
+      havingClause_.collectAll(Predicates.instanceOf(Subquery.class), subqueries);
+      if (subqueries.size() > 1) {
         throw new AnalysisException(
-            "Subqueries are not supported in the HAVING clause.");
+            "Multiple subqueries are not supported in expression: "
+            + havingClause_.toSql());
       }
       // Resolve (top-level) aliases and analyzes
       havingPred_ = resolveReferenceExpr(havingClause_, "HAVING", analyzer_,
@@ -818,10 +820,6 @@ public class SelectStmt extends QueryStmt {
         LOG.trace("post-agg selectListExprs: " + Expr.debugString(resultExprs_));
       }
       if (havingPred_ != null) {
-        // Make sure the predicate in the HAVING clause does not contain a
-        // subquery.
-        Preconditions.checkState(!havingPred_.contains(
-            Predicates.instanceOf(Subquery.class)));
         havingPred_ = havingPred_.substitute(combinedSmap, analyzer_, false);
         analyzer_.registerConjuncts(havingPred_, true);
         if (LOG.isTraceEnabled()) {
@@ -1069,16 +1067,16 @@ public class SelectStmt extends QueryStmt {
     Preconditions.checkState(isAnalyzed());
     selectList_.rewriteExprs(rewriter, analyzer_);
     for (TableRef ref: fromClause_.getTableRefs()) ref.rewriteExprs(rewriter, analyzer_);
+    List<Subquery> subqueryExprs = new ArrayList<>();
     if (whereClause_ != null) {
       whereClause_ = rewriter.rewrite(whereClause_, analyzer_);
-      // Also rewrite exprs in the statements of subqueries.
-      List<Subquery> subqueryExprs = new ArrayList<>();
       whereClause_.collect(Subquery.class, subqueryExprs);
-      for (Subquery s: subqueryExprs) s.getStatement().rewriteExprs(rewriter);
     }
     if (havingClause_ != null) {
       havingClause_ = rewriteCheckOrdinalResult(rewriter, havingClause_);
+      havingClause_.collect(Subquery.class, subqueryExprs);
     }
+    for (Subquery s : subqueryExprs) s.getStatement().rewriteExprs(rewriter);
     if (groupingExprs_ != null) {
       for (int i = 0; i < groupingExprs_.size(); ++i) {
         groupingExprs_.set(i, rewriteCheckOrdinalResult(
@@ -1217,6 +1215,9 @@ public class SelectStmt extends QueryStmt {
       if (whereClause_ != null) {
         whereClause_.collect(Subquery.class, subqueries);
       }
+      if (havingClause_ != null) {
+        havingClause_.collect(Subquery.class, subqueries);
+      }
       for (SelectListItem item : selectList_.getItems()) {
         if (item.isStar()) continue;
         item.getExpr().collect(Subquery.class, subqueries);
@@ -1253,12 +1254,15 @@ public class SelectStmt extends QueryStmt {
         whereSubQueries.get(0).getStatement().collectInlineViews(inlineViews);
       }
     }
-    List<Subquery> selectListSubQueries = Lists.newArrayList();
+    List<Subquery> subqueries = Lists.newArrayList();
     for (SelectListItem item : selectList_.getItems()) {
       if (item.isStar()) continue;
-      item.getExpr().collect(Subquery.class, selectListSubQueries);
+      item.getExpr().collect(Subquery.class, subqueries);
     }
-    for (Subquery sq : selectListSubQueries) {
+    if (havingClause_ != null) {
+      havingClause_.collect(Subquery.class, subqueries);
+    }
+    for (Subquery sq : subqueries) {
       sq.getStatement().collectInlineViews(inlineViews);
     }
   }
@@ -1291,6 +1295,9 @@ public class SelectStmt extends QueryStmt {
    *
    * This function may produce false negatives because the cardinality of the
    * result set also depends on the data a stmt is processing.
+   *
+   * TODO: IMPALA-1285 to cover more cases that can be determinded at plan time such has a
+   * group by clause where all grouping expressions are bound to constant expressions.
    */
   public boolean returnsSingleRow() {
     Preconditions.checkState(isAnalyzed());
@@ -1302,6 +1309,7 @@ public class SelectStmt extends QueryStmt {
     if (hasMultiAggInfo() && !hasGroupByClause() && !selectList_.isDistinct()) {
       return true;
     }
+
     // Select from an inline view that returns at most one row.
     List<TableRef> tableRefs = fromClause_.getTableRefs();
     if (tableRefs.size() == 1 && tableRefs.get(0) instanceof InlineViewRef) {

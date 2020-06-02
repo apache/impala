@@ -3429,4 +3429,75 @@ PLAN-ROOT SINK
    HDFS partitions=11/11 files=11 size=814.73KB
    runtime filters: RF000 -> alltypesagg.id
    row-size=39B cardinality=11.00K
+=======
+# IMPALA-9905 Cardinality Check for subqueries with grouping expressions and
+# scalar return types
+select bigint_col from functional.alltypes where int_col >=
+  3 * (select max(int_col)
+   from functional.alltypestiny where id = 1 group by id
+  )
+---- PLAN
+PLAN-ROOT SINK
+|
+04:NESTED LOOP JOIN [INNER JOIN]
+|  predicates: int_col >= 3 * max(int_col)
+|  row-size=20B cardinality=7.30K
+|
+|--03:CARDINALITY CHECK
+|  |  limit: 1
+|  |  row-size=8B cardinality=1
+|  |
+|  02:AGGREGATE [FINALIZE]
+|  |  output: max(int_col)
+|  |  group by: id
+|  |  limit: 2
+|  |  row-size=8B cardinality=1
+|  |
+|  01:SCAN HDFS [functional.alltypestiny]
+|     HDFS partitions=4/4 files=4 size=460B
+|     predicates: id = 1
+|     row-size=8B cardinality=1
+|
+00:SCAN HDFS [functional.alltypes]
+   HDFS partitions=24/24 files=24 size=478.45KB
+   row-size=12B cardinality=7.30K
+---- DISTRIBUTEDPLAN
+PLAN-ROOT SINK
+|
+09:EXCHANGE [UNPARTITIONED]
+|
+04:NESTED LOOP JOIN [INNER JOIN, BROADCAST]
+|  predicates: int_col >= 3 * max(int_col)
+|  row-size=20B cardinality=7.30K
+|
+|--08:EXCHANGE [BROADCAST]
+|  |
+|  03:CARDINALITY CHECK
+|  |  limit: 1
+|  |  row-size=8B cardinality=1
+|  |
+|  07:EXCHANGE [UNPARTITIONED]
+|  |  limit: 2
+|  |
+|  06:AGGREGATE [FINALIZE]
+|  |  output: max:merge(int_col)
+|  |  group by: id
+|  |  limit: 2
+|  |  row-size=8B cardinality=1
+|  |
+|  05:EXCHANGE [HASH(id)]
+|  |
+|  02:AGGREGATE [STREAMING]
+|  |  output: max(int_col)
+|  |  group by: id
+|  |  row-size=8B cardinality=1
+|  |
+|  01:SCAN HDFS [functional.alltypestiny]
+|     HDFS partitions=4/4 files=4 size=460B
+|     predicates: id = 1
+|     row-size=8B cardinality=1
+|
+00:SCAN HDFS [functional.alltypes]
+   HDFS partitions=24/24 files=24 size=478.45KB
+   row-size=12B cardinality=7.30K
 ====
