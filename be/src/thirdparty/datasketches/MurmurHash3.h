@@ -104,14 +104,12 @@ FORCE_INLINE void MurmurHash3_x64_128(const void* key, int lenBytes, uint64_t se
   out.h2 = seed;
 
   // Number of full 128-bit blocks of 16 bytes.
-  // Possible exclusion fo a remainder of up to 15 bytes.
+  // Possible exclusion of a remainder of up to 15 bytes.
   const int nblocks = lenBytes >> 4; // bytes / 16 
 
-  // Process the 128-bit blocks (the body) into teh hash
+  // Process the 128-bit blocks (the body) into the hash
   const uint64_t* blocks = (const uint64_t*)(data);
   for (int i = 0; i < nblocks; ++i) { // 16 bytes per block
-    //uint64_t k1 = getblock64(blocks, 0);
-    //uint64_t k2 = getblock64(blocks, 1);
     uint64_t k1 = getblock64(blocks,i*2+0);
     uint64_t k2 = getblock64(blocks,i*2+1);
 
@@ -124,12 +122,9 @@ FORCE_INLINE void MurmurHash3_x64_128(const void* key, int lenBytes, uint64_t se
     out.h2 = ROTL64(out.h2,31);
     out.h2 += out.h1;
     out.h2 = out.h2*5+0x38495ab5;
-
-    blocks += 2;
   }
 
   // tail
-  //const uint8_t * tail = (const uint8_t*)blocks;
   const uint8_t * tail = (const uint8_t*)(data + (nblocks << 4));
 
   uint64_t k1 = 0;
