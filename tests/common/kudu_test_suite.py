@@ -37,7 +37,7 @@ from random import choice, sample
 from string import ascii_lowercase, digits
 
 from tests.common.impala_test_suite import ImpalaTestSuite
-from tests.common.test_dimensions import create_uncompressed_text_dimension
+from tests.common.test_dimensions import create_kudu_dimension
 
 DEFAULT_KUDU_MASTER_WEBUI_PORT = os.getenv('KUDU_MASTER_WEBUI_PORT', '8051')
 
@@ -88,7 +88,7 @@ class KuduTestSuite(ImpalaTestSuite):
   def add_test_dimensions(cls):
     super(KuduTestSuite, cls).add_test_dimensions()
     cls.ImpalaTestMatrix.add_dimension(
-        create_uncompressed_text_dimension(cls.get_workload()))
+        create_kudu_dimension(cls.get_workload()))
 
   @classmethod
   def auto_create_db(cls):

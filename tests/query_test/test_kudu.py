@@ -42,13 +42,47 @@ from tests.common.environ import ImpalaTestClusterProperties, HIVE_MAJOR_VERSION
 from tests.common.kudu_test_suite import KuduTestSuite
 from tests.common.impala_cluster import ImpalaCluster
 from tests.common.skip import SkipIfNotHdfsMinicluster, SkipIfKudu, SkipIfHive2
-from tests.common.test_dimensions import add_exec_option_dimension
+from tests.common.test_dimensions import (add_exec_option_dimension,
+    extend_exec_option_dimension)
 from tests.verifiers.metric_verifier import MetricVerifier
 
 KUDU_MASTER_HOSTS = pytest.config.option.kudu_master_hosts
 IMPALA_TEST_CLUSTER_PROPERTIES = ImpalaTestClusterProperties.get_instance()
 
 LOG = logging.getLogger(__name__)
+
+
+# TODO(IMPALA-8614): parameterize some tests to run with HMS integration enabled.
+class TestKuduBasicDML(KuduTestSuite):
+  """
+  This suite tests the basic DML operations when using a kudu table.
+  """
+  @classmethod
+  def add_test_dimensions(cls):
+    super(TestKuduBasicDML, cls).add_test_dimensions()
+    # The default read mode of READ_LATEST does not provide high enough consistency for
+    # these tests.
+    add_exec_option_dimension(cls, "kudu_read_mode", "READ_AT_SNAPSHOT")
+    # Run with and without multithreading to ensure Kudu DML works with both threading
+    # models. E.g. see IMPALA-9782.
+    add_exec_option_dimension(cls, "mt_dop", "0")
+    extend_exec_option_dimension(cls, "mt_dop", "4")
+
+  @SkipIfKudu.no_hybrid_clock
+  def test_kudu_insert(self, vector, unique_database):
+    self.run_test_case('QueryTest/kudu_insert', vector, use_db=unique_database)
+
+  @SkipIfKudu.no_hybrid_clock
+  def test_kudu_update(self, vector, unique_database):
+    self.run_test_case('QueryTest/kudu_update', vector, use_db=unique_database)
+
+  @SkipIfKudu.no_hybrid_clock
+  def test_kudu_upsert(self, vector, unique_database):
+    self.run_test_case('QueryTest/kudu_upsert', vector, use_db=unique_database)
+
+  @SkipIfKudu.no_hybrid_clock
+  def test_kudu_delete(self, vector, unique_database):
+    self.run_test_case('QueryTest/kudu_delete', vector, use_db=unique_database)
 
 # TODO(IMPALA-8614): parameterize some tests to run with HMS integration enabled.
 class TestKuduOperations(KuduTestSuite):
@@ -98,27 +132,10 @@ class TestKuduOperations(KuduTestSuite):
   @SkipIfKudu.no_hybrid_clock
   def test_kudu_scan_node(self, vector, unique_database):
     self.run_test_case('QueryTest/kudu-scan-node', vector, use_db=unique_database)
-
-  @SkipIfKudu.no_hybrid_clock
-  def test_kudu_insert(self, vector, unique_database):
-    self.run_test_case('QueryTest/kudu_insert', vector, use_db=unique_database)
-
   @SkipIfNotHdfsMinicluster.tuned_for_minicluster
   @SkipIfKudu.no_hybrid_clock
   def test_kudu_insert_mem_limit(self, vector, unique_database):
     self.run_test_case('QueryTest/kudu_insert_mem_limit', vector, use_db=unique_database)
-
-  @SkipIfKudu.no_hybrid_clock
-  def test_kudu_update(self, vector, unique_database):
-    self.run_test_case('QueryTest/kudu_update', vector, use_db=unique_database)
-
-  @SkipIfKudu.no_hybrid_clock
-  def test_kudu_upsert(self, vector, unique_database):
-    self.run_test_case('QueryTest/kudu_upsert', vector, use_db=unique_database)
-
-  @SkipIfKudu.no_hybrid_clock
-  def test_kudu_delete(self, vector, unique_database):
-    self.run_test_case('QueryTest/kudu_delete', vector, use_db=unique_database)
 
   @SkipIfKudu.no_hybrid_clock
   def test_kudu_partition_ddl(self, vector, unique_database):

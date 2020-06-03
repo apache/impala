@@ -218,6 +218,7 @@ class ScalarExprEvaluator {
   friend class CaseExpr;
   friend class CastFormatExpr;
   friend class HiveUdfCall;
+  friend class KuduPartitionExpr;
   friend class ScalarFnCall;
 
   /// Retrieves a registered FunctionContext. 'i' is the 'fn_context_index_' of the
