@@ -18,10 +18,9 @@
 #ifndef IMPALA_EXPRS_KUDU_PARTITION_EXPR_H_
 #define IMPALA_EXPRS_KUDU_PARTITION_EXPR_H_
 
-#include <kudu/client/client.h>
-#include <kudu/common/partial_row.h>
-
 #include "exprs/scalar-expr.h"
+
+#include <kudu/client/client.h>
 
 namespace impala {
 
@@ -40,14 +39,22 @@ class KuduPartitionExpr : public ScalarExpr {
 
   KuduPartitionExpr(const TExprNode& node);
 
-  virtual Status Init(const RowDescriptor& row_desc, bool is_entry_point,
-      FragmentState* state) override WARN_UNUSED_RESULT;
+  bool HasFnCtx() const override { return true; }
 
-  virtual IntVal GetIntValInterpreted(
+  Status Init(
+      const RowDescriptor& row_desc, bool is_entry_point, FragmentState* state) override;
+
+  Status OpenEvaluator(FunctionContext::FunctionStateScope scope, RuntimeState* state,
+      ScalarExprEvaluator* eval) const override;
+
+  void CloseEvaluator(FunctionContext::FunctionStateScope scope, RuntimeState* state,
+      ScalarExprEvaluator* eval) const override;
+
+  IntVal GetIntValInterpreted(
       ScalarExprEvaluator* eval, const TupleRow* row) const override;
 
-  virtual Status GetCodegendComputeFnImpl(LlvmCodeGen* codegen, llvm::Function** fn)
-      override WARN_UNUSED_RESULT;
+  virtual Status GetCodegendComputeFnImpl(
+      LlvmCodeGen* codegen, llvm::Function** fn) override;
 
  private:
   TKuduPartitionExpr tkudu_partition_expr_;
@@ -55,11 +62,8 @@ class KuduPartitionExpr : public ScalarExpr {
   /// Descriptor of the table to use the partiitoning scheme from. Set in Prepare().
   KuduTableDescriptor* table_desc_;
 
-  /// Used to call into Kudu to determine partitions. Set in Prepare().
-  std::unique_ptr<kudu::client::KuduPartitioner> partitioner_;
-
-  /// Stores the col values for each row that is partitioned.
-  std::unique_ptr<kudu::KuduPartialRow> row_;
+  /// Kudu table object, used to construct per-thread partitioner. Thread-safe.
+  kudu::client::sp::shared_ptr<kudu::client::KuduTable> table_;
 };
 
 } // namespace impala

@@ -509,3 +509,28 @@ VALDATE
 ---- TYPES
 DATE
 ====
+---- QUERY
+create table orders_key_only (o_orderkey bigint primary key)
+partition by range(o_orderkey) (
+  partition values <= 1000000,
+  partition 1000000 < values <= 2000000,
+  partition 2000000 < values <= 3000000,
+  partition 3000000 < values <= 4000000,
+  partition 4000000 < values <= 5000000,
+  partition 5000000 < values )
+stored as kudu;
+---- RESULTS
+'Table has been created.'
+====
+---- QUERY
+# Very large insert to test concurrency and partitioning. Regression test for IMPALA-9782
+# when run with mt_dop > 1. Note that we need to run against the kudu version of the table
+# so that there's enough parallelism to reproduce the bug.
+insert into orders_key_only
+select o_orderkey from tpch_kudu.orders;
+---- RESULTS
+: 1500000
+---- RUNTIME_PROFILE
+NumModifiedRows: 1500000
+NumRowErrors: 0
+====
