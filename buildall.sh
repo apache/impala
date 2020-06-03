@@ -397,6 +397,23 @@ bootstrap_dependencies() {
   # Populate necessary thirdparty components unless it's set to be skipped.
   if [[ "${SKIP_TOOLCHAIN_BOOTSTRAP}" = true ]]; then
     echo "SKIP_TOOLCHAIN_BOOTSTRAP is true, skipping toolchain bootstrap."
+    if [[ "${DOWNLOAD_CDH_COMPONENTS}" = true ]]; then
+      echo ">>> Downloading and extracting cdh components."
+      "$IMPALA_HOME/bin/bootstrap_toolchain.py"
+    fi
+    # Create soft link to locally builded native-toolchain on aarch64
+    if [[ "$(uname -p)" = "aarch64" ]]; then
+      mkdir -p $IMPALA_TOOLCHAIN_PACKAGES_HOME
+      cd "$IMPALA_TOOLCHAIN_PACKAGES_HOME"
+      ln -f -s ${NATIVE_TOOLCHAIN_HOME}/build/* .
+      cd -
+      if ! [[ -d "$IMPALA_HOME/../hadoopAarch64NativeLibs" ]]; then
+        git clone https://github.com/zhaorenhai/hadoopAarch64NativeLibs \
+          "$IMPALA_HOME/../hadoopAarch64NativeLibs"
+      fi
+      cp $IMPALA_HOME/../hadoopAarch64NativeLibs/lib*  $HADOOP_HOME/lib/native/
+    fi
+
   else
     echo ">>> Downloading and extracting toolchain dependencies."
     "$IMPALA_HOME/bin/bootstrap_toolchain.py"
@@ -466,7 +483,7 @@ generate_cmake_files() {
   fi
 
   # ARM64's L3 cacheline size is different according to CPU vendor's implementations of
-  # architecture. so here we will let use decide this value.
+  # architecture. so here we will let user decide this value.
   # If user defined CACHELINESIZE_AARCH64 in impala-config-local.sh, then we will use that
   # value, if user did not define it, then we will get the value from OS, if fail, then
   # we will use the default value 64.

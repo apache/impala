@@ -216,6 +216,12 @@ ubuntu apt-get --yes install ccache curl gawk g++ gcc libffi-dev \
         python-dev python-setuptools postgresql ssh wget vim-common psmisc \
         lsof openjdk-8-jdk openjdk-8-source openjdk-8-dbg apt-utils git ant
 
+ARCH_NAME=$(uname -p)
+if [[ $ARCH_NAME == 'aarch64' ]]; then
+  ubuntu apt-get --yes install unzip pkg-config flex maven python3-pip build-essential \
+          texinfo bison autoconf automake libtool libz-dev libncurses-dev
+fi
+
 if [[ "$UBUNTU" == true ]]; then
   # Don't use openjdk-8-jdk 8u181-b13-1ubuntu0.16.04.1 which is known to break the
   # surefire tests. If we detect that version, we downgrade to the last known good one.
@@ -240,7 +246,6 @@ fi
 
 # Ubuntu 18.04 or 20.04 install OpenJDK 11 and configure it as the default Java version.
 # Impala is currently tested with OpenJDK 8, so configure that version as the default.
-ARCH_NAME=$(uname -p)
 if [[ $ARCH_NAME == 'aarch64' ]]; then
     ubuntu20 sudo update-java-alternatives -s java-1.8.0-openjdk-arm64
     ubuntu18 sudo update-java-alternatives -s java-1.8.0-openjdk-arm64
@@ -378,7 +383,14 @@ then
   sudo -u postgres psql -c "CREATE ROLE hiveuser LOGIN PASSWORD 'password';"
 fi
 sudo -u postgres psql -c "ALTER ROLE hiveuser WITH CREATEDB;"
-sudo -u postgres psql -c "SELECT * FROM pg_roles WHERE rolname = 'hiveuser';"
+# On Ubuntu 18.04 aarch64 version, the sql 'select * from pg_roles' blocked,
+# because output of 'select *' is too long to display in 1 line.
+# So here just change it to 'select count(*)' as a work around.
+if [[ $ARCH_NAME == 'aarch64' ]]; then
+  sudo -u postgres psql -c "SELECT count(*) FROM pg_roles WHERE rolname = 'hiveuser';"
+else
+  sudo -u postgres psql -c "SELECT * FROM pg_roles WHERE rolname = 'hiveuser';"
+fi
 
 # Setup ssh to ssh to localhost
 mkdir -p ~/.ssh
@@ -461,9 +473,27 @@ fi
 
 echo -e "\n$SET_JAVA_HOME" >> "${IMPALA_HOME}/bin/impala-config-local.sh"
 eval "$SET_JAVA_HOME"
-
 # Assert that we have a java available
 test -f $JAVA_HOME/bin/java
+
+if [[ $ARCH_NAME == 'aarch64' ]]; then
+  echo -e "\nexport SKIP_TOOLCHAIN_BOOTSTRAP=true" >> \
+    "${IMPALA_HOME}/bin/impala-config-local.sh"
+  SET_TOOLCHAIN_HOME="export NATIVE_TOOLCHAIN_HOME=${IMPALA_HOME}/../native-toolchain"
+  echo -e "\n$SET_TOOLCHAIN_HOME" >> ~/.bashrc
+  echo -e "\n$SET_TOOLCHAIN_HOME" >> "${IMPALA_HOME}/bin/impala-config-local.sh"
+  eval "$SET_TOOLCHAIN_HOME"
+  if ! [[ -d "$NATIVE_TOOLCHAIN_HOME" ]]; then
+    time -p git clone https://github.com/cloudera/native-toolchain/ \
+      "$NATIVE_TOOLCHAIN_HOME"
+  fi
+  cd "$NATIVE_TOOLCHAIN_HOME"
+  echo "Begin build tool chain, may need several hours, please be patient...."
+  sudo chmod 755 ~/.cache
+  ./buildall.sh
+  cd -
+  mkdir -p ${IMPALA_HOME}/toolchain
+fi
 
 # Try to prepopulate the m2 directory to save time
 if ! bin/jenkins/populate_m2_directory.py ; then

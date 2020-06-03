@@ -57,6 +57,7 @@ import logging
 import glob
 import multiprocessing.pool
 import os
+import platform
 import random
 import re
 import shutil
@@ -505,11 +506,13 @@ def main():
   create_directory_from_env_var("IMPALA_TOOLCHAIN_PACKAGES_HOME")
 
   downloads = []
-  downloads += get_toolchain_downloads()
+  if os.getenv("SKIP_TOOLCHAIN_BOOTSTRAP", "false") != "true":
+    downloads += get_toolchain_downloads()
   kudu_download = None
   if os.getenv("DOWNLOAD_CDH_COMPONENTS", "false") == "true":
     create_directory_from_env_var("CDP_COMPONENTS_HOME")
-    downloads += get_kudu_downloads()
+    if platform.processor() != "aarch64":
+      downloads += get_kudu_downloads()
     downloads += get_hadoop_downloads()
 
   components_needing_download = [d for d in downloads if d.needs_download()]
